@@ -194,9 +194,17 @@ err_out:
  * and call ntfs_inode_close() again. The following error codes are defined:
  *
  *	EBUSY	@ni is dirty and/or the attribute list runlist is dirty.
+ *	EINVAL	@ni is invalid (probably it is an extent inode!)
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
+	/* If the inode is an extent inode, comply rudely! */
+	if (ni->nr_extents == -1) {
+		Dprintf("%s(): BUG: Tried to close extent inode!\n",
+				__FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
 	// TODO: This needs to be replaced with a flush to disk attempt. (AIA)
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		errno = EBUSY;
