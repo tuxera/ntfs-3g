@@ -1,9 +1,9 @@
 #! /bin/sh
 # Attempt to guess a canonical system name.
 #   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-#   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
+#   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
-timestamp='2004-06-24'
+timestamp='2004-03-03'
 
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ version="\
 GNU config.guess ($timestamp)
 
 Originally written by Per Bothner.
-Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
+Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
 Free Software Foundation, Inc.
 
 This is free software; see the source for copying conditions.  There is NO
@@ -136,6 +136,16 @@ UNAME_RELEASE=`(uname -r) 2>/dev/null` || UNAME_RELEASE=unknown
 UNAME_SYSTEM=`(uname -s) 2>/dev/null`  || UNAME_SYSTEM=unknown
 UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
 
+case "${UNAME_MACHINE}" in
+    i?86)
+	test -z "$VENDOR" && VENDOR=pc
+	;;
+    *)
+	test -z "$VENDOR" && VENDOR=unknown
+	;;
+esac
+test -f /etc/SuSE-release -o -f /.buildenv && VENDOR=suse
+
 # Note: order is significant - the case branches are not exclusive.
 
 case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
@@ -212,9 +222,6 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
     hp300:OpenBSD:*:*)
 	echo m68k-unknown-openbsd${UNAME_RELEASE}
 	exit 0 ;;
-    luna88k:OpenBSD:*:*)
-    	echo m88k-unknown-openbsd${UNAME_RELEASE}
-	exit 0 ;;
     mac68k:OpenBSD:*:*)
 	echo m68k-unknown-openbsd${UNAME_RELEASE}
 	exit 0 ;;
@@ -228,6 +235,9 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
 	echo m88k-unknown-openbsd${UNAME_RELEASE}
 	exit 0 ;;
     mvmeppc:OpenBSD:*:*)
+	echo powerpc-unknown-openbsd${UNAME_RELEASE}
+	exit 0 ;;
+    pegasos:OpenBSD:*:*)
 	echo powerpc-unknown-openbsd${UNAME_RELEASE}
 	exit 0 ;;
     pmax:OpenBSD:*:*)
@@ -306,6 +316,9 @@ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
 	# A Xn.n version is an unreleased experimental baselevel.
 	# 1.2 uses "1.2" for uname -r.
 	echo ${UNAME_MACHINE}-dec-osf`echo ${UNAME_RELEASE} | sed -e 's/^[PVTX]//' | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'`
+	exit 0 ;;
+    Alpha*:OpenVMS:*:*)
+	echo alpha-hp-vms
 	exit 0 ;;
     Alpha\ *:Windows_NT*:*)
 	# How do we know it's Interix rather than the generic POSIX subsystem?
@@ -761,7 +774,7 @@ EOF
 	echo sv1-cray-unicos${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
 	exit 0 ;;
     *:UNICOS/mp:*:*)
-	echo craynv-cray-unicosmp${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
+	echo nv1-cray-unicosmp${UNAME_RELEASE} | sed -e 's/\.[^.]*$/.X/'
 	exit 0 ;;
     F30[01]:UNIX_System_V:*:* | F700:UNIX_System_V:*:*)
 	FUJITSU_PROC=`uname -m | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'`
@@ -784,7 +797,21 @@ EOF
 	echo ${UNAME_MACHINE}-unknown-bsdi${UNAME_RELEASE}
 	exit 0 ;;
     *:FreeBSD:*:*)
-	echo ${UNAME_MACHINE}-unknown-freebsd`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`
+	# Determine whether the default compiler uses glibc.
+	eval $set_cc_for_build
+	sed 's/^	//' << EOF >$dummy.c
+	#include <features.h>
+	#if __GLIBC__ >= 2
+	LIBC=gnu
+	#else
+	LIBC=
+	#endif
+EOF
+	eval `$CC_FOR_BUILD -E $dummy.c 2>/dev/null | grep ^LIBC=`
+	# GNU/KFreeBSD systems have a "k" prefix to indicate we are using
+	# FreeBSD's kernel, but not the complete OS.
+	case ${LIBC} in gnu) kernel_only='k' ;; esac
+	echo ${UNAME_MACHINE}-unknown-${kernel_only}freebsd`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`${LIBC:+-$LIBC}
 	exit 0 ;;
     i*:CYGWIN*:*)
 	echo ${UNAME_MACHINE}-pc-cygwin
@@ -828,19 +855,16 @@ EOF
 	echo ${UNAME_MACHINE}-pc-minix
 	exit 0 ;;
     arm*:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
+	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     cris:Linux:*:*)
-	echo cris-axis-linux-gnu
+	echo cris-axis-linux
 	exit 0 ;;
     ia64:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
-	exit 0 ;;
-    m32r*:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
+	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     m68*:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
+	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     mips:Linux:*:*)
 	eval $set_cc_for_build
@@ -859,7 +883,7 @@ EOF
 	#endif
 EOF
 	eval `$CC_FOR_BUILD -E $dummy.c 2>/dev/null | grep ^CPU=`
-	test x"${CPU}" != x && echo "${CPU}-unknown-linux-gnu" && exit 0
+	test x"${CPU}" != x && echo "${CPU}-${VENDOR}-linux" && exit 0
 	;;
     mips64:Linux:*:*)
 	eval $set_cc_for_build
@@ -878,13 +902,13 @@ EOF
 	#endif
 EOF
 	eval `$CC_FOR_BUILD -E $dummy.c 2>/dev/null | grep ^CPU=`
-	test x"${CPU}" != x && echo "${CPU}-unknown-linux-gnu" && exit 0
+	test x"${CPU}" != x && echo "${CPU}-${VENDOR}-linux" && exit 0
 	;;
     ppc:Linux:*:*)
-	echo powerpc-unknown-linux-gnu
+	echo powerpc-${VENDOR}-linux
 	exit 0 ;;
     ppc64:Linux:*:*)
-	echo powerpc64-unknown-linux-gnu
+	echo powerpc64-${VENDOR}-linux
 	exit 0 ;;
     alpha:Linux:*:*)
 	case `sed -n '/^cpu model/s/^.*: \(.*\)/\1/p' < /proc/cpuinfo` in
@@ -897,34 +921,34 @@ EOF
 	  EV68*) UNAME_MACHINE=alphaev68 ;;
         esac
 	objdump --private-headers /bin/sh | grep ld.so.1 >/dev/null
-	if test "$?" = 0 ; then LIBC="libc1" ; else LIBC="" ; fi
-	echo ${UNAME_MACHINE}-unknown-linux-gnu${LIBC}
+	if test "$?" = 0 ; then LIBC="-libc1" ; else LIBC="" ; fi
+	echo ${UNAME_MACHINE}-${VENDOR}-linux${LIBC}
 	exit 0 ;;
     parisc:Linux:*:* | hppa:Linux:*:*)
 	# Look for CPU level
 	case `grep '^cpu[^a-z]*:' /proc/cpuinfo 2>/dev/null | cut -d' ' -f2` in
-	  PA7*) echo hppa1.1-unknown-linux-gnu ;;
-	  PA8*) echo hppa2.0-unknown-linux-gnu ;;
-	  *)    echo hppa-unknown-linux-gnu ;;
+	  PA7*) echo hppa1.1-${VENDOR}-linux ;;
+	  PA8*) echo hppa2.0-${VENDOR}-linux ;;
+	  *)    echo hppa-${VENDOR}-linux ;;
 	esac
 	exit 0 ;;
     parisc64:Linux:*:* | hppa64:Linux:*:*)
-	echo hppa64-unknown-linux-gnu
+	echo hppa64-${VENDOR}-linux
 	exit 0 ;;
     s390:Linux:*:* | s390x:Linux:*:*)
 	echo ${UNAME_MACHINE}-ibm-linux
 	exit 0 ;;
     sh64*:Linux:*:*)
-    	echo ${UNAME_MACHINE}-unknown-linux-gnu
+    	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     sh*:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
+	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     sparc:Linux:*:* | sparc64:Linux:*:*)
-	echo ${UNAME_MACHINE}-unknown-linux-gnu
+	echo ${UNAME_MACHINE}-${VENDOR}-linux
 	exit 0 ;;
     x86_64:Linux:*:*)
-	echo x86_64-unknown-linux-gnu
+	echo x86_64-${VENDOR}-linux
 	exit 0 ;;
     i*86:Linux:*:*)
 	# The BFD linker knows what the default object file format is, so
@@ -939,18 +963,18 @@ EOF
 				    p'`
         case "$ld_supported_targets" in
 	  elf32-i386)
-		TENTATIVE="${UNAME_MACHINE}-pc-linux-gnu"
+		TENTATIVE="${UNAME_MACHINE}-${VENDOR}-linux"
 		;;
 	  a.out-i386-linux)
-		echo "${UNAME_MACHINE}-pc-linux-gnuaout"
+		echo "${UNAME_MACHINE}-${VENDOR}-linuxaout"
 		exit 0 ;;
 	  coff-i386)
-		echo "${UNAME_MACHINE}-pc-linux-gnucoff"
+		echo "${UNAME_MACHINE}-${VENDOR}-linuxcoff"
 		exit 0 ;;
 	  "")
-		# Either a pre-BFD a.out linker (linux-gnuoldld) or
+		# Either a pre-BFD a.out linker (linuxoldld) or
 		# one that does not give us useful --help.
-		echo "${UNAME_MACHINE}-pc-linux-gnuoldld"
+		echo "${UNAME_MACHINE}-${VENDOR}-linuxoldld"
 		exit 0 ;;
 	esac
 	# Determine whether the default compiler is a.out or elf
@@ -979,7 +1003,7 @@ EOF
 	#endif
 EOF
 	eval `$CC_FOR_BUILD -E $dummy.c 2>/dev/null | grep ^LIBC=`
-	test x"${LIBC}" != x && echo "${UNAME_MACHINE}-pc-linux-${LIBC}" && exit 0
+	test x"${LIBC}" != x && echo "${UNAME_MACHINE}-${VENDOR}-linux-${LIBC}" | sed 's/linux-gnu/linux/' && exit 0
 	test x"${TENTATIVE}" != x && echo "${TENTATIVE}" && exit 0
 	;;
     i*86:DYNIX/ptx:4*:*)
@@ -1079,7 +1103,7 @@ EOF
     M680?0:D-NIX:5.3:*)
 	echo m68k-diab-dnix
 	exit 0 ;;
-    M68*:*:R3V[5678]*:*)
+    M68*:*:R3V[567]*:*)
 	test -r /sysV68 && echo 'm68k-motorola-sysv' && exit 0 ;;
     3[345]??:*:4.0:3.0 | 3[34]??A:*:4.0:3.0 | 3[34]??,*:*:4.0:3.0 | 3[34]??/*:*:4.0:3.0 | 4400:*:4.0:3.0 | 4850:*:4.0:3.0 | SKA40:*:4.0:3.0 | SDS2:*:4.0:3.0 | SHG2:*:4.0:3.0)
 	OS_REL=''
@@ -1243,13 +1267,6 @@ EOF
     *:DragonFly:*:*)
 	echo ${UNAME_MACHINE}-unknown-dragonfly`echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`
 	exit 0 ;;
-    *:*VMS:*:*)
-    	UNAME_MACHINE=`(uname -p) 2>/dev/null`
-	case "${UNAME_MACHINE}" in
-	    A*) echo alpha-dec-vms && exit 0 ;;
-	    I*) echo ia64-dec-vms && exit 0 ;;
-	    V*) echo vax-dec-vms && exit 0 ;;
-	esac
 esac
 
 #echo '(No uname command or uname output not recognized.)' 1>&2

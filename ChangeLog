@@ -1,4 +1,4 @@
-xx/xx/2004 - 1.9.3-WIP
+03/09/2004 - 1.9.3 - Lots of fixes and enhancements all over the place.
 
 	- Fix access of MFT_RECORD->bytes_in_use to use le32_to_cpu() instead
 	  of le16_to_cpu() in libntfs/volume.c.  (Pete Curran)
