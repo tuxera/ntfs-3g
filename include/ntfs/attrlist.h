@@ -3,6 +3,7 @@
  *		Linux-NTFS project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -24,6 +25,9 @@
 #define _NTFS_ATTRLIST_H
 
 #include "attrib.h"
+
+extern int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref,
+		ATTR_RECORD *attr);
 
 extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
 
