@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 
 /*
  * Cannot use "../include/types.h" since it conflicts with "wintypes.h".
@@ -136,9 +137,217 @@ static int ntfs_w32error_to_errno(DWORD w32error)
 }
 
 /**
- * ntfs_device_win32_open - open a device
- * @dev:	ntfs device to open
- * @flags:	open flags
+ * ntfs_device_win32_simple_open_file - Just open a file via win32 API
+ * @filename:	Name of the file to open.
+ * @handle:		Pointer the a HADNLE in which to put the result.
+ * @flags:		Unix open status flags.
+ *
+ * Supported flags are O_RDONLY, O_WRONLY and O_RDWR.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
+static int ntfs_device_win32_simple_open_file(char *filename,
+		HANDLE *handle, int flags)
+{
+	int win32flags;
+
+	switch (flags && O_ACCMODE) {
+		case O_RDONLY:
+			win32flags = FILE_READ_DATA;
+			break;
+		case O_WRONLY:
+/*			win32flags = FILE_WRITE_DATA;
+			break; */
+		case O_RDWR:
+/*			win32flags = FILE_READ_DATA || FILE_WRITE_DATA;
+			break; */
+			errno = ENOTSUP;
+			return -errno;
+		default:
+			/* error */
+			return -EINVAL;
+	}
+
+	*handle = CreateFile(filename, win32flags, FILE_SHARE_READ,
+			NULL, OPEN_EXISTING, 0, NULL);
+
+	if (*handle == INVALID_HANDLE_VALUE) {
+		char msg[1024];
+
+		sprintf(msg, "CreateFile(%s) failed", filename);
+		perror(msg);
+		errno = ntfs_w32error_to_errno(GetLastError());
+
+ 		return -errno;
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * ntfs_win32_getsize - Get file size via win32 API
+ * @handle:		Pointer the file HADNLE obtained via open.
+ * @argp:		Pointer to result buffer.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
+static int ntfs_win32_getsize(HANDLE handle,s64 *argp)
+{
+	DWORD loword, hiword;
+
+	loword = GetFileSize(handle, &hiword);
+	if (loword==INVALID_FILE_SIZE) {
+		perror("ntfs_win32_getblksize(): FAILED!");
+		errno = ntfs_w32error_to_errno(GetLastError());
+		return -errno;
+	}
+	*argp=((s64)hiword << 32) + (s64)loword;
+	return 0;
+}
+
+/**
+ * ntfs_device_win32_open_file - Open a file via win32 API
+ * @filename:	Name of the file to open.
+ * @fd:			Pointer to win32 file device in which to put the result.
+ * @flags:		Unix open status flags.
+ *
+ * Return 0 if o.k.
+ *        -errno if not
+ */
+static __inline__ int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
+		int flags)
+{
+	HANDLE handle;
+	s64 size;
+	int err;
+
+	if ((err = ntfs_device_win32_simple_open_file(filename, &handle, flags))) {
+		/* open error */
+ 		return err;
+	}
+
+	if ((err = ntfs_win32_getsize(handle, &size))) {
+		/* error while getting the information */
+		perror("ioctl failed");
+		errno = err;
+		return -err;
+	} else {
+		/* success */
+		fd->handle = handle;
+		fd->part_start = 0;
+		fd->part_end = size;
+		fd->current_pos.QuadPart = 0;
+		fd->part_hidden_sectors = -1;
+		return 0;
+	}
+}
+
+/**
+ * ntfs_device_win32_open_drive - Open a drive via win32 API
+ * @dev:		NTFS_DEVICE to open
+ * @handle:		Win32 file handle to return
+ * @flags:		Unix open status flags.
+ *
+ * return 0 if o.k.
+ *        -errno if not
+ */
+static __inline__ int ntfs_device_win32_open_drive(int drive_id, win32_fd *fd,
+		int flags)
+{
+	char filename[256];
+	HANDLE handle;
+	s64 size;
+	int err;
+
+	sprintf(filename, "\\\\.\\PhysicalDrive%d", drive_id);
+
+	if ((err = ntfs_device_win32_simple_open_file(filename, &handle, flags))) {
+		/* open error */
+ 		return err;
+	}
+
+	if ((err = ntfs_win32_getsize(handle, &size))) {
+		/* error while getting the information */
+		perror("ioctl failed");
+		errno = err;
+		return -err;
+	} else {
+		/* success */
+		fd->handle = handle;
+		fd->part_start = 0;
+		fd->part_end = size;
+		fd->current_pos.QuadPart = 0;
+		fd->part_hidden_sectors = -1;
+		return 0;
+	}
+}
+
+/**
+ * ntfs_device_win32_open_partition - Open a partition via win32 API
+ * @dev:		NTFS_DEVICE to open
+ * @fd:			Win32 file device to return
+ * @flags:		Unix open status flags.
+ *
+ * Return 0 if o.k.
+ *        -errno if not
+ *
+ * When fails, fd contents may have not been preserved.
+ */
+static __inline__ int ntfs_device_win32_open_partition(int drive_id,
+		unsigned int partition_id, win32_fd *fd, int flags)
+{
+	DRIVE_LAYOUT_INFORMATION *drive_layout;
+	char buffer[10240];
+	unsigned int i;
+	DWORD numread;
+	HANDLE handle;
+	int err;
+
+	sprintf(buffer, "\\\\.\\PhysicalDrive%d", drive_id);
+
+	if ((err = ntfs_device_win32_simple_open_file(buffer, &handle, flags))) {
+		/* error */
+		return err;
+	}
+
+	if (!DeviceIoControl(handle, IOCTL_DISK_GET_DRIVE_LAYOUT, NULL, 0,
+			&buffer, sizeof (buffer), &numread,	NULL)) {
+		perror("ioctl failed");
+		errno = ntfs_w32error_to_errno(GetLastError());
+		return -errno;
+	}
+
+	drive_layout = (DRIVE_LAYOUT_INFORMATION *)buffer;
+	for (i = 0; i < drive_layout->PartitionCount; i++) {
+		if (drive_layout->PartitionEntry[i].PartitionNumber == partition_id) {
+			fd->handle = handle;
+			fd->part_start =
+				drive_layout->PartitionEntry[i].StartingOffset.QuadPart;
+			fd->part_end =
+				drive_layout->PartitionEntry[i].StartingOffset.QuadPart +
+				drive_layout->PartitionEntry[i].PartitionLength.QuadPart;
+			fd->current_pos.QuadPart = 0;
+			fd->part_hidden_sectors =
+				drive_layout->PartitionEntry[i].HiddenSectors;
+			return 0;
+		}
+	}
+
+	fprintf(stderr,"partition %u not found on drive %d\n",
+		partition_id, drive_id);
+	errno = ENODEV;
+	return -ENODEV;
+}
+
+/**
+ * ntfs_device_win32_open - Open a device
+ * @dev:		A pointer to the NTFS_DEVICE to open
+ *					dev->d_name must hold the device name, the rest is ignored.
+ * @flags:		Unix open status flags.
+ *
+ * Supported flags are O_RDONLY, O_WRONLY and O_RDWR.
  *
  * If name is in format "(hd[0-9],[0-9])" then open a partition.
  * If name is in format "(hd[0-9])" then open a volume.
@@ -146,116 +355,38 @@ static int ntfs_w32error_to_errno(DWORD w32error)
  */
 static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 {
-	int drive = 0, numparams;
+	int drive_id = 0, numparams;
 	unsigned int part = 0;
-	HANDLE handle;
+	char drive_char;
 	win32_fd fd;
-	char drive_char, filename[256];
+	int err;
 
 	numparams = sscanf(dev->d_name, "/dev/hd%c%u", &drive_char, &part);
-	drive = toupper(drive_char) - 'A';
+	drive_id = toupper(drive_char) - 'A';
 
-	if (numparams >= 1) {
-		if (numparams == 2)
+	switch (numparams) {
+		case 0:
+			Dprintf("win32_open(%s) -> file\n", dev->d_name);
+			err = ntfs_device_win32_open_file(dev->d_name,&fd,flags);
+			break;
+		case 1:
+			Dprintf("win32_open(%s) -> drive %d\n", dev->d_name, drive_id);
+			err = ntfs_device_win32_open_drive(drive_id,&fd,flags);
+			break;
+		case 2:
 			Dprintf("win32_open(%s) -> drive %d, part %u\n",
-					dev->d_name, drive, part);
-		else
-			Dprintf("win32_open(%s) -> drive %d\n", dev->d_name,
-					drive);
+					dev->d_name, drive_id, part);
+			err = ntfs_device_win32_open_partition(drive_id,part,&fd,flags);
+			break;
+		default:
+			Dprintf("win32_open(%s) -> unknwon file format\n", dev->d_name);
+			err = -1;
+			break;
+	}
 
-		sprintf(filename, "\\\\.\\PhysicalDrive%d", drive);
-
-		handle = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ,
-				NULL, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM,
-				NULL);
-
-		if (handle == INVALID_HANDLE_VALUE) {
-			char msg[1024];
-			int err = errno;
-
-			sprintf(msg, "CreateFile(%s) failed", filename);
-			perror(msg);
-			errno = err;
-			return -1;
-		}
-
-		if (numparams == 1) {
-			fd.handle = handle;
-			fd.part_start = 0;
-			fd.part_end = -1;
-			fd.current_pos.QuadPart = 0;
-		} else {
-			char buffer[10240];
-			DWORD numread;
-			DRIVE_LAYOUT_INFORMATION *drive_layout;
-			BOOL rvl;
-			unsigned int i;
-			int found = 0;
-
-			rvl = DeviceIoControl(handle,
-					IOCTL_DISK_GET_DRIVE_LAYOUT, NULL, 0,
-					&buffer, sizeof (buffer), &numread,
-					NULL);
-			if (!rvl) {
-				int err = errno;
-				perror("ioctl failed");
-				errno = err;
-				return -1;
-			}
-
-			drive_layout = (DRIVE_LAYOUT_INFORMATION *)buffer;
-
-			for (i = 0; i < drive_layout->PartitionCount; i++) {
-				if (drive_layout->PartitionEntry[i].
-						PartitionNumber == part) {
-					fd.handle = handle;
-					fd.part_start = drive_layout->
-							PartitionEntry[i].
-							StartingOffset.QuadPart;
-					fd.part_end = drive_layout->
-							PartitionEntry[i].
-							StartingOffset.
-							QuadPart +
-							drive_layout->
-							PartitionEntry[i].
-							PartitionLength.
-							QuadPart;
-					fd.current_pos.QuadPart = 0;
-					found = 1;
-					break;
-				}
-			}
-
-			if (!found) {
-				int err = errno;
-				fprintf(stderr, "partition %u not found on "
-						"drive %d\n", part, drive);
-				errno = err;
-				return -1;
-			}
-		}
-	} else {
-		BY_HANDLE_FILE_INFORMATION info;
-		BOOL rvl;
-
-		Dprintf("win32_open(%s) -> file\n", dev->d_name);
-
-		handle = CreateFile(dev->d_name, GENERIC_READ, FILE_SHARE_READ,
-				NULL, OPEN_EXISTING, 0, NULL);
-
-		rvl = GetFileInformationByHandle(handle, &info);
-		if (!rvl) {
-			int err = errno;
-			perror("ioctl failed");
-			errno = err;
-			return -1;
-		}
-
-		fd.handle = handle;
-		fd.part_start = 0;
-		fd.part_end = (((s64) info.nFileSizeHigh) << 32) +
-				((s64) info.nFileSizeLow);
-		fd.current_pos.QuadPart = 0;
+	if (err) {
+		/* error */
+		return err;
 	}
 
 	Dprintf("win32_open(%s) -> %p, offset 0x%llx\n", dev->d_name, dev,
