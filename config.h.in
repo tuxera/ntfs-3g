@@ -201,6 +201,11 @@
    slash. */
 #undef LSTAT_FOLLOWS_SLASHED_SYMLINK
 
+/* Define this if you do not want the NTFS library to provide default device
+   io operations. This means that you cannot use ntfs_mount() but have to use
+   ntfs_device_mount() and provide your own device operations. */
+#undef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+
 /* Name of package */
 #undef PACKAGE
 
