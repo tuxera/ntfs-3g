@@ -1122,7 +1122,8 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
  *
  * On error return -1 with errno set to the error code.
  */
-int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags)
+int ntfs_check_if_mounted(const char *file __attribute__((unused)),
+		unsigned long *mnt_flags)
 {
 	*mnt_flags = 0;
 #ifdef HAVE_MNTENT_H
