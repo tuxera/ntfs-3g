@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002-2003 Szabolcs Szakacsits
  * Copyright (c) 2002-2003 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will resize an NTFS volume.
  *
@@ -351,6 +352,11 @@ void parse_options(int argc, char **argv)
 	}
 }
 
+/**
+ * runlist_extent_number
+ *
+ * Count the runs in a runlist.
+ */
 int runlist_extent_number(runlist *rl)
 {
 	int i;
@@ -394,7 +400,7 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 	s64 new_volume_size, inode;
 	ATTR_RECORD *a;
 	runlist *rl;
-	int i, j, runs;
+	int i, j;//, runs;
 
 	a = resize->ctx->attr;
 	new_volume_size = resize->new_volume_size;
@@ -406,7 +412,7 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_decompress_mapping_pairs");
 
-	runs = runlist_extent_number(rl);
+	//runs = runlist_extent_number(rl);
 
 	for (i = 0; rl[i].length; i++) {
 		s64 lcn = rl[i].lcn;
@@ -418,8 +424,8 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 		/* FIXME: ntfs_mapping_pairs_decompress should return error */
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
-				 "%llx length %llx\n", inode, a->type, lcn, 
-				 lcn_length);
+				 "%llx length %llx\n", inode,
+				 le32_to_cpu (a->type), lcn, lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
@@ -745,7 +751,8 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
  
-	if (mp_size > a->length - a->mapping_pairs_offset)
+	if (mp_size > le32_to_cpu (a->length) -
+			le16_to_cpu (a->mapping_pairs_offset))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
@@ -754,7 +761,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl_bad))
 		perr_exit("ntfs_mapping_pairs_build");
 
-	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
+	memcpy((char *)a + le16_to_cpu (a->mapping_pairs_offset), mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
 	a->data_size = cpu_to_le64(nr_clusters * vol->cluster_size);
@@ -808,6 +815,12 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 	}
 }
 
+/**
+ * enlarge_bitmap_data_attr
+ *
+ * Enlarge the metadata file $Bitmap.  It must be large enough for one bit per
+ * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
+ */
 void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 {
 	runlist *rl = *rlist;
@@ -841,7 +854,9 @@ void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 	rl_set(rl + 1, nr_bm_clusters, -1LL, 0LL);
 }
 
-
+/**
+ * truncate_bitmap_data_attr
+ */
 void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 {
 	runlist *rl;
@@ -879,7 +894,8 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
  
-	if (mp_size > a->length - a->mapping_pairs_offset)
+	if (mp_size > le32_to_cpu (a->length) -
+			le16_to_cpu (a->mapping_pairs_offset))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
@@ -888,7 +904,7 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
 		perr_exit("ntfs_mapping_pairs_build");
 
-	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
+	memcpy((char *)a + le16_to_cpu (a->mapping_pairs_offset), mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
 	a->data_size = cpu_to_le64(bm_bsize);
@@ -1065,6 +1081,11 @@ void print_volume_size(char *str, s64 bytes)
 	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
 }
 
+/**
+ * print_disk_usage
+ *
+ * Display the amount of disk space in use.
+ */
 void print_disk_usage(ntfs_resize_t *resize)
 {
 	s64 total, used, free, relocations;
