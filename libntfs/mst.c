@@ -113,7 +113,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
  * NOTE: We consider the absence / invalidity of an update sequence array to
  * mean error. This means that you have to create a valid update sequence
  * array header in the ntfs record before calling this function, otherwise it
- * will fail (the header needs to contain the position of the update seqeuence
+ * will fail (the header needs to contain the position of the update sequence
  * array together with the number of elements in the array). You also need to
  * initialise the update sequence number before calling this function
  * otherwise a random word will be used (whatever was in the record at that
