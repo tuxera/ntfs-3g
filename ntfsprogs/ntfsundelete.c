@@ -161,8 +161,8 @@ void usage (void)
 		"    -f          --force            Use less caution\n"
 		"    -q          --quiet            Less output\n"
 		"    -v          --verbose          More output\n"
-		"    -V          --version          Version information\n"
-		"    -h          --help             Print this help\n\n",
+		"    -V          --version          Display version information\n"
+		"    -h          --help             Display this help\n\n",
 		EXEC_NAME);
 	Iprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
 }
@@ -1029,7 +1029,7 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
  * @lcn:  The Logical Cluster Number to test
  *
  * The metadata file $Bitmap has one binary bit representing each cluster on
- * disk.  The bit will be set of each cluster that is in use.  The function
+ * disk.  The bit will be set for each cluster that is in use.  The function
  * reads the relevant part of $Bitmap into a buffer and tests the bit.
  *
  * This function has a static buffer in which it caches a section of $Bitmap.
@@ -1056,7 +1056,7 @@ int cluster_in_use (ntfs_volume *vol, long long lcn)
 		Dprintf ("Bit lies outside cache.\n");
 		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, NULL, 0);
 		if (!attr) {
-			Eprintf ("Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
+			Eprintf ("Couldn't open $Bitmap: %s\n", strerror (errno));
 			return -1;
 		}
 
@@ -1065,7 +1065,7 @@ int cluster_in_use (ntfs_volume *vol, long long lcn)
 		bmplcn = lcn & (~((sizeof (buffer) << 3) - 1));
 
 		if (ntfs_attr_pread (attr, (bmplcn>>3), sizeof (buffer), buffer) < 0) {
-			Eprintf ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
+			Eprintf ("Couldn't read $Bitmap: %s\n", strerror (errno));
 			ntfs_attr_close (attr);
 			return -1;
 		}
