@@ -273,23 +273,16 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 						__FUNCTION__);
 				continue;
 			}
-			/* Allocate the bitmap bit. */
-			*byte |= bit;
-			/* We need to write this bitmap buffer back to disk! */
-			need_writeback = 1;
-			Dprintf("%s(): *byte = 0x%x, need_writeback is set.\n",
-					__FUNCTION__, (unsigned int)*byte);
 			/* Reallocate memory if necessary. */
-			if ((rlpos + 2) * (int)sizeof(runlist) >= rlsize) {
+			if ((rlpos + 3) * (int)sizeof(runlist) >= rlsize) {
 				Dprintf("%s(): Reallocating space.\n",
 						__FUNCTION__);
-				/* Setup first free bit return value. */
-				if (!rl) {
-					start_lcn = lcn + bmp_pos;
-					Dprintf("%s(): start_lcn = 0x%llx.\n",
+				if (!rl)
+					Dprintf("%s(): First free bit is at "
+							"LCN = 0x%llx.\n",
 							__FUNCTION__,
-							(long long)start_lcn);
-				}
+							(long long)(lcn +
+							bmp_pos));
 				rlsize += 4096;
 				trl = (runlist*)realloc(rl, rlsize);
 				if (!trl) {
@@ -305,6 +298,12 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 						"0x%x.\n", __FUNCTION__,
 						rlsize);
 			}
+			/* Allocate the bitmap bit. */
+			*byte |= bit;
+			/* We need to write this bitmap buffer back to disk! */
+			need_writeback = 1;
+			Dprintf("%s(): *byte = 0x%x, need_writeback is set.\n",
+					__FUNCTION__, (unsigned int)*byte);
 			/*
 			 * Coalesce with previous run if adjacent LCNs.
 			 * Otherwise, append a new run.
@@ -775,6 +774,10 @@ err_ret:
 					(long long)rl[0].lcn,
 					(long long)count - clusters);
 		}
+		/* Add runlist terminator element. */
+		rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
+		rl[rlpos].lcn = LCN_ENOENT;
+		rl[rlpos].length = 0;
 		/* Deallocate all allocated clusters. */
 		Dprintf("%s(): Deallocating allocated clusters.\n",
 				__FUNCTION__);
