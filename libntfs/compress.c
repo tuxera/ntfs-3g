@@ -1,5 +1,5 @@
 /*
- * compress.c - Compressed attribute handling code. Part of the Linux-NTFS
+ * compress.c - Compressed attribute handling code.  Part of the Linux-NTFS
  *		project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
@@ -88,8 +88,13 @@ static int ntfs_decompress(u8 *dest, const u32 dest_size,
 do_next_sb:
 	Dprintf("Beginning sub-block at offset = 0x%x in the cb.\n",
 			cb - cb_start);
-	/* Have we reached the end of the compression block? */
-	if (cb == cb_end || !le16_to_cpup((u16*)cb)) {
+	/*
+	 * Have we reached the end of the compression block or the end of the
+	 * decompressed data?  The latter can happen for example if the current
+	 * position in the compression block is one byte before its end so the
+	 * first two checks do not detect it.
+	 */
+	if (cb == cb_end || !le16_to_cpup((u16*)cb) || dest == dest_end) {
 		Dprintf("Completed. Returning success (0).\n");
 		return 0;
 	}
@@ -166,7 +171,7 @@ do_next_tag:
 			/* Continue with the next token. */
 			continue;
 		}
-		/* 
+		/*
 		 * We have a phrase token. Make sure it is not the first tag in
 		 * the sb as this is illegal and would confuse the code below.
 		 */
@@ -227,6 +232,53 @@ return_overflow:
 	Dprintf("Failed. Returning -EOVERFLOW.\n");
 	errno = EOVERFLOW;
 	return -1;
+}
+
+/**
+ * ntfs_is_cb_compressed - internal function, do not use
+ *
+ * This is a very specialised function determining if a cb is compressed or
+ * uncompressed.  It is assumed that checking for a sparse cb has already been
+ * performed and that the cb is not sparse.  It makes all sorts of other
+ * assumptions as well and hence it is not useful anywhere other than where it
+ * is used at the moment.  Please, do not make this function available for use
+ * outside of compress.c as it is bound to confuse people and not do what they
+ * want.
+ *
+ * Return TRUE on errors so that the error will be detected later on in the
+ * code.  Might be a bit confusing to debug but there really should never be
+ * errors coming from here.
+ */
+static __inline__ BOOL ntfs_is_cb_compressed(ntfs_attr *na,
+		runlist_element *rl, VCN cb_start_vcn, int cb_clusters)
+{
+	/*
+	 * The simplest case:  the run starting at @cb_start_vcn contains
+	 * @cb_clusters clusters which are all not sparse, thus the cb is not
+	 * compressed.
+	 */
+	if (rl->length - (cb_start_vcn - rl->vcn) >= cb_clusters)
+		return FALSE;
+	cb_clusters -= rl->length - (cb_start_vcn - rl->vcn);
+	do {
+		/* Go to the next run. */
+		rl++;
+		/* Map the next runlist fragment if it is not mapped. */
+		if (rl->lcn < LCN_HOLE || !rl->length) {
+			rl = ntfs_attr_find_vcn(na, rl->vcn);
+			if (!rl || rl->lcn < LCN_HOLE || !rl->length)
+				return TRUE;
+		}
+		/* If the current run is sparse, the cb is compressed. */
+		if (rl->lcn == LCN_HOLE)
+			return TRUE;
+		/* If the whole cb is not sparse, it is not compressed. */
+		if (rl->length >= cb_clusters)
+			return FALSE;
+		cb_clusters -= rl->length;
+	} while (cb_clusters > 0);
+	/* All cb_clusters were not sparse thus the cb is not compressed. */
+	return FALSE;
 }
 
 /**
@@ -361,7 +413,7 @@ do_next_cb:
 		total += to_read;
 		count -= to_read;
 		b = (u8*)b + to_read;
-	} else if (rl->length - (vcn - rl->vcn) >= cb_clusters) {
+	} else if (!ntfs_is_cb_compressed(na, rl, vcn, cb_clusters)) {
 		s64 tdata_size, tinitialized_size;
 		/*
 		 * Uncompressed cb, read it straight into the destination range
@@ -372,8 +424,8 @@ do_next_cb:
 		 * Read the uncompressed data into the destination buffer.
 		 * NOTE: We cheat a little bit here by marking the attribute as
 		 * not compressed in the ntfs_attr structure so that we can
-		 * read the data by simply using ntfs_attr_pread().  (-8  Note,
-		 * Note, we have to modify data_size and initialized_size
+		 * read the data by simply using ntfs_attr_pread().  (-8
+		 * NOTE: we have to modify data_size and initialized_size
 		 * temporarily as well...
 		 */
 		to_read = min(count, cb_size - ofs);
@@ -386,6 +438,8 @@ do_next_cb:
 			br = ntfs_attr_pread(na, ofs, to_read, b);
 			if (br < 0) {
 				err = errno;
+				na->data_size = tdata_size;
+				na->initialized_size = tinitialized_size;
 				NAttrSetCompressed(na);
 				free(cb);
 				free(dest);
@@ -417,8 +471,9 @@ do_next_cb:
 		 * NOTE: We cheat a little bit here by marking the attribute as
 		 * not compressed in the ntfs_attr structure so that we can
 		 * read the raw, compressed data by simply using
-		 * ntfs_attr_pread().  (-8  Note, we have to modify data_size
-		 * and initialized_size temporarily as well...
+		 * ntfs_attr_pread().  (-8
+		 * NOTE: We have to modify data_size and initialized_size
+		 * temporarily as well...
 		 */
 		to_read = cb_size;
 		NAttrClearCompressed(na);
@@ -431,6 +486,8 @@ do_next_cb:
 					(cb_pos - cb), to_read, cb_pos);
 			if (br < 0) {
 				err = errno;
+				na->data_size = tdata_size;
+				na->initialized_size = tinitialized_size;
 				NAttrSetCompressed(na);
 				free(cb);
 				free(dest);
@@ -474,4 +531,3 @@ do_next_cb:
 	/* Return number of bytes read. */
 	return total + total2;
 }
-
