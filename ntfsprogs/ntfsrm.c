@@ -35,7 +35,7 @@
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
-static char *space = "                                                                                ";
+static const char *space = "                                                                                ";
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
@@ -48,7 +48,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Delete files from an NTFS volume.\n\n",
 		EXEC_NAME, VERSION);
@@ -63,7 +63,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device file\n"
 		"\n"
@@ -92,7 +92,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char **argv)
+static int parse_options (int argc, char **argv)
 {
 	static const char *sopt = "-Dfh?inqRrVv"; //"-Dfh?I:inqRrUVv";
 	static const struct option lopt[] = {
@@ -250,7 +250,7 @@ struct ntfs_dir {
 /**
  * ntfs_name_print
  */
-void ntfs_name_print (ntfschar *name, int name_len)
+static void ntfs_name_print (ntfschar *name, int name_len)
 {
 	char *buffer = NULL;
 
@@ -262,7 +262,7 @@ void ntfs_name_print (ntfschar *name, int name_len)
 /**
  * ntfs_dir_print
  */
-void ntfs_dir_print (struct ntfs_dir *dir, int indent)
+static void ntfs_dir_print (struct ntfs_dir *dir, int indent)
 {
 	int i;
 	if (!dir)
@@ -281,7 +281,7 @@ void ntfs_dir_print (struct ntfs_dir *dir, int indent)
 /**
  * ntfs_dt_print
  */
-void ntfs_dt_print (struct ntfs_dt *dt, int indent)
+static void ntfs_dt_print (struct ntfs_dt *dt, int indent)
 {
 	int i;
 
@@ -299,7 +299,7 @@ void ntfs_dt_print (struct ntfs_dt *dt, int indent)
 /**
  * ntfs_dt_alloc_children
  */
-INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
+static INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
 {
 	int old = (count + 0x1e) & ~0x1f;
 	int new = (count + 0x1f) & ~0x1f;
@@ -313,7 +313,7 @@ INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
 /**
  * ntfs_dt_count_root
  */
-int ntfs_dt_count_root (struct ntfs_dt *dt)
+static int ntfs_dt_count_root (struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
@@ -378,7 +378,7 @@ int ntfs_dt_count_root (struct ntfs_dt *dt)
 /**
  * ntfs_dt_count_alloc
  */
-int ntfs_dt_count_alloc (struct ntfs_dt *dt)
+static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
@@ -442,7 +442,7 @@ int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 /**
  * ntfs_dt_alloc
  */
-struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VCN vcn)
+static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VCN vcn)
 {
 	struct ntfs_dt *dt = NULL;
 	//int i;
@@ -533,7 +533,7 @@ struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 /**
  * ntfs_dt_free
  */
-void ntfs_dt_free (struct ntfs_dt *dt)
+static void ntfs_dt_free (struct ntfs_dt *dt)
 {
 	int i;
 
@@ -552,7 +552,7 @@ void ntfs_dt_free (struct ntfs_dt *dt)
 /**
  * ntfs_dt_find
  */
-MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
+static MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 {
 	MFT_REF res = -1;
 	INDEX_ENTRY *ie;
@@ -624,7 +624,7 @@ MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 /**
  * ntfs_dt_find2
  */
-struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, int *index)
+static struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, int *index_num)
 {
 	struct ntfs_dt *res = NULL;
 	INDEX_ENTRY *ie;
@@ -655,11 +655,11 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, in
 		} else if (r == 0) {
 			//printf ("match\n");
 			res = dt;
-			if (index)
-				*index = i;
+			if (index_num)
+				*index_num = i;
 		} else if (r == -1) {
 			//printf ("recurse\n");
-			res = ntfs_dt_find2 (dt->sub_nodes[i], uname, len, index);
+			res = ntfs_dt_find2 (dt->sub_nodes[i], uname, len, index_num);
 		} else {
 			//printf ("error\n");
 		}
@@ -673,7 +673,7 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, in
 /**
  * ntfs_dt_remove
  */
-int ntfs_dt_remove (struct ntfs_dt *dt, int index)
+static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 {
 	INDEX_ENTRY *ie = NULL;
 	int i;
@@ -685,10 +685,10 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 
 	if (!dt)
 		return 1;
-	if ((index < 0) || (index >= dt->child_count))
+	if ((index_num < 0) || (index_num >= dt->child_count))
 		return 1;
 
-	//printf ("removing entry %d of %d\n", index, dt->child_count);
+	//printf ("removing entry %d of %d\n", index_num, dt->child_count);
 	//printf ("index size = %d\n", dt->data_len);
 	//printf ("index use  = %d\n", dt->header.index_length);
 
@@ -712,7 +712,7 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 	}
 	//printf ("total = %d\n", off);
 
-	ie = dt->children[index];
+	ie = dt->children[index_num];
 	dest = (u8*)ie;
 
 	src  = dest + ie->length;
@@ -729,7 +729,7 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 	//printf ("clear %d bytes\n", dt->data_len - (dest - dt->data) - len);
 	//printf ("%d, %d, %d\n", dest - dt->data + len, 0, dt->data_len - (dest - dt->data) - len);
 
-	//ntfs_dt_print (dt->dir->index, 0);
+	//ntfs_dt_print (dt->dir->index_num, 0);
 #if 1
 	memset (dest + len, 0, dt->data_len - (dest - dt->data) - len);
 
@@ -782,26 +782,26 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 /**
  * ntfs_dt_del_child
  */
-int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
+static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 {
 	struct ntfs_dt *del;
 	INDEX_ENTRY *ie;
 	ntfs_inode *inode = NULL;
 	ntfs_attr *attr = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
-	int index = 0;
+	int index_num = 0;
 	int res = 1;
 	ATTR_RECORD *arec;
 	FILE_NAME_ATTR *file;
 	MFT_REF mft_num;
 
-	del = ntfs_dt_find2 (dt, uname, len, &index);
+	del = ntfs_dt_find2 (dt, uname, len, &index_num);
 	if (!del) {
 		printf ("can't find item to delete\n");
 		goto close;
 	}
 
-	if ((index < 0) || (index >= del->child_count)) {
+	if ((index_num < 0) || (index_num >= del->child_count)) {
 		printf ("error in dt_find\n");
 		goto close;
 	}
@@ -811,7 +811,7 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	ie = del->children[index];
+	ie = del->children[index_num];
 	if (ie->key.file_name.file_attributes & FILE_ATTR_DIRECTORY) {
 		printf ("can't delete directories\n");
 		goto close;
@@ -876,8 +876,8 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	}
 
 	printf ("deleting file\n");
-	//ntfs_dt_print (del->dir->index, 0);
-	res = ntfs_dt_remove (del, index);
+	//ntfs_dt_print (del->dir->index_num, 0);
+	res = ntfs_dt_remove (del, index_num);
 close:
 	ntfs_attr_put_search_ctx (ctx);
 	ntfs_attr_close (attr);
@@ -889,7 +889,7 @@ close:
 /**
  * ntfs_dir_alloc
  */
-struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
+static struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 {
 	struct ntfs_dir *dir   = NULL;
 	ntfs_inode      *inode = NULL;
@@ -933,7 +933,7 @@ struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 /**
  * ntfs_dir_free
  */
-void ntfs_dir_free (struct ntfs_dir *dir)
+static void ntfs_dir_free (struct ntfs_dir *dir)
 {
 	struct ntfs_dir *parent;
 	int i;
@@ -967,7 +967,7 @@ void ntfs_dir_free (struct ntfs_dir *dir)
 /**
  * ntfs_dir_find
  */
-MFT_REF ntfs_dir_find (struct ntfs_dir *dir, char *name)
+static MFT_REF ntfs_dir_find (struct ntfs_dir *dir, char *name)
 {
 	MFT_REF mft_num;
 	ntfschar *uname = NULL;
@@ -995,7 +995,7 @@ MFT_REF ntfs_dir_find (struct ntfs_dir *dir, char *name)
 /**
  * ntfs_dir_add
  */
-void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
+static void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
 {
 	if (!parent || !child)
 		return;
@@ -1012,7 +1012,7 @@ void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
 /**
  * utils_pathname_to_mftref
  */
-MFT_REF utils_pathname_to_mftref (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_dir **finddir)
+static MFT_REF utils_pathname_to_mftref (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_dir **finddir)
 {
 	MFT_REF mft_num;
 	MFT_REF result = -1;
@@ -1079,7 +1079,7 @@ close:
 /**
  * ntfsrm2
  */
-int ntfsrm2 (ntfs_volume *vol, char *name)
+static int ntfsrm2 (ntfs_volume *vol, char *name)
 {
 	struct ntfs_dir *dir = NULL;
 	struct ntfs_dir *finddir = NULL;
@@ -1112,10 +1112,11 @@ int ntfsrm2 (ntfs_volume *vol, char *name)
 	return 0;
 }
 
+#if 0
 /**
  * utils_mftrec_mark_free
  */
-int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
+static int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
 {
 	static u8 buffer[512];
 	static s64 bmpmref = -sizeof (buffer) - 1; /* Which bit of $BITMAP is in the buffer */
@@ -1155,7 +1156,7 @@ int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
 /**
  * ntfsrm - Delete a file from an NTFS volume
  */
-int ntfsrm (ntfs_volume *vol, ntfs_inode *inode, struct options *opts)
+static int ntfsrm (ntfs_volume *vol, ntfs_inode *inode, struct options *opts2)
 {
 	char buffer[128];
 	ntfs_inode *parent;
@@ -1167,7 +1168,7 @@ int ntfsrm (ntfs_volume *vol, ntfs_inode *inode, struct options *opts)
 	u64 parent_mref = 0;
 	//struct ntfs_dt *dt;
 
-	if (!vol || !inode || !opts)
+	if (!vol || !inode || !opts2)
 		return 1;
 	if (!inode->mrec)
 		return 1;
@@ -1227,6 +1228,7 @@ int ntfsrm (ntfs_volume *vol, ntfs_inode *inode, struct options *opts)
 	return 0;
 }
 
+#endif
 /**
  * main - Begin here
  *
