@@ -2356,7 +2356,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 				sizeof(ntfschar) * name_len);
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
-	a->lowest_vcn = cpu_to_le64(lowest_vcn);
+	a->lowest_vcn = scpu_to_le64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
 	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
 	if (name_len)
@@ -2738,10 +2738,11 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Setup the fields specific to non-resident attributes. */
 	a->lowest_vcn = scpu_to_le64(0);
-	if (na->data_size != 0)
-		a->highest_vcn = scpu_to_le64(0);
+	if (na->type == AT_ATTRIBUTE_LIST)
+		a->highest_vcn = scpu_to_le64((new_allocated_size - 1) >>
+						vol->cluster_size_bits);
 	else
-		a->highest_vcn = scpu_to_le64(-1);
+		a->highest_vcn = scpu_to_le64(0);
 
 	a->mapping_pairs_offset = cpu_to_le16(mp_ofs);
 
@@ -3259,10 +3260,11 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		}
 		/*
 		 * Reminder: It is ok for a->highest_vcn to be -1 for zero
-		 * length files.
-		 * Reminder: We may not update a->highest_vcn if it equal to 0.
+		 * length files. We may not update a->highest_vcn if it equal
+		 * to 0 and attribute isn't $ATTRIBUTE_LIST and it is
+		 * single-extent.
 		 */
-		if (a->highest_vcn)
+		if (a->highest_vcn || a->type == AT_ATTRIBUTE_LIST)
 			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
@@ -3641,9 +3643,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 		/*
 		 * Reminder: We may not update a->highest_vcn if it equal to 0
-		 * and attribute is single-extent.
+		 * and attribute isn't $ATTRIBUTE_LIST and it is single-extent.
 		 */
-		if (a->lowest_vcn || a->highest_vcn)
+		if (a->lowest_vcn || a->highest_vcn ||
+					a->type == AT_ATTRIBUTE_LIST)
 			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 
 		ntfs_inode_mark_dirty(ni);
@@ -3729,7 +3732,7 @@ rollback:
 			"failed. Run chkdsk.\n", __FUNCTION__);
 		goto put_err_out;
 	}
-	if (a->lowest_vcn || a->highest_vcn)
+	if (a->lowest_vcn || a->highest_vcn || a->type == AT_ATTRIBUTE_LIST)
 		a->highest_vcn = scpu_to_le64((na->allocated_size >>
 					vol->cluster_size_bits) - 1);
 	stop_vcn = 0;
