@@ -258,8 +258,8 @@ static int parse_options (int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
-/**************** utility functions *********************/
 
+/* *************** utility functions ******************** */
 /**
  * ntfsinfo_time_to_str() -
  * @sle_ntfs_clock:	on disk time format in 100ns units since 1st jan 1601
@@ -307,8 +307,8 @@ static char *ntfs_attr_get_name(ATTR_RECORD *attr)
 	}
 }
 
-/**************** functions for dumping global info *********************/
 
+/* *************** functions for dumping global info ******************** */
 /**
  * ntfs_dump_volume - dump information about the volume
  */
@@ -385,8 +385,8 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	//TODO: Still need to add a few more attributes
 }
 
-/**************** functions for dumping attributes *********************/
 
+/* *************** functions for dumping attributes ******************** */
 /**
  * ntfs_dump_standard_information
  */
@@ -1079,6 +1079,9 @@ static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr __attribute__
 	printf("\tTODO\n");
 }
 
+/**
+ * ntfs_hex_dump
+ */
 static void ntfs_hex_dump(void *buf,unsigned int length)
 {
 	unsigned int i=0;
@@ -1115,6 +1118,9 @@ static void ntfs_hex_dump(void *buf,unsigned int length)
 	}
 }
 
+/**
+ * ntfs_dump_attr_unknown
+ */
 static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 {
 	printf("Dumping unknown attribute type 0x%X.\n"
