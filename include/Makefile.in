@@ -146,44 +146,22 @@ target_alias = @target_alias@
 target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
-
-linux_ntfsincludedir = $(includedir)/ntfs
-linux_ntfsinclude_HEADERS = \
-	attrib.h		\
-	bitmap.h		\
-	bootsect.h		\
-	compat.h		\
-	compress.h		\
-	debug.h			\
-	device.h		\
-	device_io.h		\
-	dir.h			\
-	endians.h		\
-	gnome-vfs-method.h	\
-	gnome-vfs-module.h	\
-	inode.h			\
-	layout.h		\
-	lcnalloc.h		\
-	list.h			\
-	logfile.h		\
-	mft.h			\
-	mst.h			\
-	runlist.h		\
-	support.h		\
-	types.h			\
-	unistr.h		\
-	volume.h
-
+SUBDIRS = ntfs
 subdir = include
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 DIST_SOURCES =
-HEADERS = $(linux_ntfsinclude_HEADERS)
 
-DIST_COMMON = $(linux_ntfsinclude_HEADERS) Makefile.am Makefile.in
-all: all-am
+RECURSIVE_TARGETS = info-recursive dvi-recursive pdf-recursive \
+	ps-recursive install-info-recursive uninstall-info-recursive \
+	all-recursive install-data-recursive install-exec-recursive \
+	installdirs-recursive install-recursive uninstall-recursive \
+	check-recursive installcheck-recursive
+DIST_COMMON = Makefile.am Makefile.in
+DIST_SUBDIRS = $(SUBDIRS)
+all: all-recursive
 
 .SUFFIXES:
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am  $(top_srcdir)/configure.ac $(ACLOCAL_M4)
@@ -201,23 +179,64 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool
 uninstall-info-am:
-linux_ntfsincludeHEADERS_INSTALL = $(INSTALL_HEADER)
-install-linux_ntfsincludeHEADERS: $(linux_ntfsinclude_HEADERS)
-	@$(NORMAL_INSTALL)
-	$(mkinstalldirs) $(DESTDIR)$(linux_ntfsincludedir)
-	@list='$(linux_ntfsinclude_HEADERS)'; for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  f="`echo $$p | sed -e 's|^.*/||'`"; \
-	  echo " $(linux_ntfsincludeHEADERS_INSTALL) $$d$$p $(DESTDIR)$(linux_ntfsincludedir)/$$f"; \
-	  $(linux_ntfsincludeHEADERS_INSTALL) $$d$$p $(DESTDIR)$(linux_ntfsincludedir)/$$f; \
-	done
 
-uninstall-linux_ntfsincludeHEADERS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(linux_ntfsinclude_HEADERS)'; for p in $$list; do \
-	  f="`echo $$p | sed -e 's|^.*/||'`"; \
-	  echo " rm -f $(DESTDIR)$(linux_ntfsincludedir)/$$f"; \
-	  rm -f $(DESTDIR)$(linux_ntfsincludedir)/$$f; \
+# This directory's subdirectories are mostly independent; you can cd
+# into them and run `make' without going through this Makefile.
+# To change the values of `make' variables: instead of editing Makefiles,
+# (1) if the variable is set in `config.status', edit `config.status'
+#     (which will cause the Makefiles to be regenerated when you run `make');
+# (2) otherwise, pass the desired values on the `make' command line.
+$(RECURSIVE_TARGETS):
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	target=`echo $@ | sed s/-recursive//`; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making $$target in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="$$target-am"; \
+	  else \
+	    local_target="$$target"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "$$target-am" || exit 1; \
+	fi; test -z "$$fail"
+
+mostlyclean-recursive clean-recursive distclean-recursive \
+maintainer-clean-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	case "$@" in \
+	  distclean-* | maintainer-clean-*) list='$(DIST_SUBDIRS)' ;; \
+	  *) list='$(SUBDIRS)' ;; \
+	esac; \
+	rev=''; for subdir in $$list; do \
+	  if test "$$subdir" = "."; then :; else \
+	    rev="$$subdir $$rev"; \
+	  fi; \
+	done; \
+	rev="$$rev ."; \
+	target=`echo $@ | sed s/-recursive//`; \
+	for subdir in $$rev; do \
+	  echo "Making $$target in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    local_target="$$target-am"; \
+	  else \
+	    local_target="$$target"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done && test -z "$$fail"
+tags-recursive:
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  test "$$subdir" = . || (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) tags); \
+	done
+ctags-recursive:
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  test "$$subdir" = . || (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) ctags); \
 	done
 
 ETAGS = etags
@@ -237,10 +256,21 @@ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	       END { for (i in files) print i; }'`; \
 	mkid -fID $$unique
 
-TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+TAGS: tags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	tags=; \
 	here=`pwd`; \
+	if (etags --etags-include --version) >/dev/null 2>&1; then \
+	  include_option=--etags-include; \
+	else \
+	  include_option=--include; \
+	fi; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  if test "$$subdir" = .; then :; else \
+	    test -f $$subdir/TAGS && \
+	      tags="$$tags $$include_option=$$here/$$subdir/TAGS"; \
+	  fi; \
+	done; \
 	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
 	unique=`for i in $$list; do \
 	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
@@ -252,7 +282,7 @@ TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 	     $$tags $$unique
 
 ctags: CTAGS
-CTAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+CTAGS: ctags-recursive $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
 	tags=; \
 	here=`pwd`; \
@@ -305,21 +335,34 @@ distdir: $(DISTFILES)
 	    || exit 1; \
 	  fi; \
 	done
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  if test "$$subdir" = .; then :; else \
+	    test -d $(distdir)/$$subdir \
+	    || mkdir $(distdir)/$$subdir \
+	    || exit 1; \
+	    (cd $$subdir && \
+	      $(MAKE) $(AM_MAKEFLAGS) \
+	        top_distdir="$(top_distdir)" \
+	        distdir=../$(distdir)/$$subdir \
+	        distdir) \
+	      || exit 1; \
+	  fi; \
+	done
 check-am: all-am
-check: check-am
-all-am: Makefile $(HEADERS)
+check: check-recursive
+all-am: Makefile
+installdirs: installdirs-recursive
+installdirs-am:
 
-installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(linux_ntfsincludedir)
-install: install-am
-install-exec: install-exec-am
-install-data: install-data-am
-uninstall: uninstall-am
+install: install-recursive
+install-exec: install-exec-recursive
+install-data: install-data-recursive
+uninstall: uninstall-recursive
 
 install-am: all-am
 	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
 
-installcheck: installcheck-am
+installcheck: installcheck-recursive
 install-strip:
 	$(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
 	  INSTALL_STRIP_FLAG=-s \
@@ -335,62 +378,69 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean: clean-am
+clean: clean-recursive
 
 clean-am: clean-generic clean-libtool mostlyclean-am
 
-distclean: distclean-am
+distclean: distclean-recursive
 
 distclean-am: clean-am distclean-generic distclean-libtool \
 	distclean-tags
 
-dvi: dvi-am
+dvi: dvi-recursive
 
 dvi-am:
 
-info: info-am
+info: info-recursive
 
 info-am:
 
-install-data-am: install-linux_ntfsincludeHEADERS
+install-data-am:
 
 install-exec-am:
 
-install-info: install-info-am
+install-info: install-info-recursive
 
 install-man:
 
 installcheck-am:
 
-maintainer-clean: maintainer-clean-am
+maintainer-clean: maintainer-clean-recursive
 
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
-mostlyclean: mostlyclean-am
+mostlyclean: mostlyclean-recursive
 
 mostlyclean-am: mostlyclean-generic mostlyclean-libtool
 
-pdf: pdf-am
+pdf: pdf-recursive
 
 pdf-am:
 
-ps: ps-am
+ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-info-am uninstall-linux_ntfsincludeHEADERS
+uninstall-am: uninstall-info-am
 
-.PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-libtool ctags distclean distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am info \
-	info-am install install-am install-data install-data-am \
-	install-exec install-exec-am install-info install-info-am \
-	install-linux_ntfsincludeHEADERS install-man install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-info-am \
-	uninstall-linux_ntfsincludeHEADERS
+uninstall-info: uninstall-info-recursive
+
+.PHONY: $(RECURSIVE_TARGETS) CTAGS GTAGS all all-am check check-am clean \
+	clean-generic clean-libtool clean-recursive ctags \
+	ctags-recursive distclean distclean-generic distclean-libtool \
+	distclean-recursive distclean-tags distdir dvi dvi-am \
+	dvi-recursive info info-am info-recursive install install-am \
+	install-data install-data-am install-data-recursive \
+	install-exec install-exec-am install-exec-recursive \
+	install-info install-info-am install-info-recursive install-man \
+	install-recursive install-strip installcheck installcheck-am \
+	installdirs installdirs-am installdirs-recursive \
+	maintainer-clean maintainer-clean-generic \
+	maintainer-clean-recursive mostlyclean mostlyclean-generic \
+	mostlyclean-libtool mostlyclean-recursive pdf pdf-am \
+	pdf-recursive ps ps-am ps-recursive tags tags-recursive \
+	uninstall uninstall-am uninstall-info-am \
+	uninstall-info-recursive uninstall-recursive
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
