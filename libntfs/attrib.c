@@ -1493,9 +1493,10 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
  * attribute described by the attribute list of the base mft record described
  * by the search context @ctx.
  *
- * If @type is AT_END, seek to the end and return -1 with errno set to ENOENT.
- * AT_END is not a valid attribute, its length is zero for example, thus it is
- * safer to return error instead of success in this case.
+ * If @type is AT_END, seek to the end of the base mft record ignoring the
+ * attribute list completely and return -1 with errno set to ENOENT.  AT_END is
+ * not a valid attribute, its length is zero for example, thus it is safer to
+ * return error instead of success in this case.
  *
  * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
  * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
@@ -1513,19 +1514,21 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
  * Return 0 if the search was successful and -1 if not, with errno set to the
  * error code.
  *
- * On success, @ctx->attr is the found attribute and it is in mft record
- * @ctx->mrec.
+ * On success, @ctx->attr is the found attribute, it is in mft record
+ * @ctx->mrec, and @ctx->al_entry is the attribute list entry for this
+ * attribute with @ctx->base_* being the base mft record to which @ctx->attr
+ * belongs.
  *
- * On error, @ctx->attr is the attribute which collates just after the attribute
- * being searched for in the base ntfs inode, i.e. if one wants to add the
- * attribute to the mft record this is the correct place to insert it into,
- * and if there is not enough space, the attribute should be placed in an
- * extent mft record. @ctx->al_entry points to the position within
- * @ctx->base_ntfs_ino->attr_list at which the new attribute's attribute list
- * entry should be inserted.
- *
- * FIXME: This is how it should be but unfortunately the current code sets
- *        @ctx->al_entry to NULL, so beware! (AIA)
+ * On error ENOENT, i.e. attribute not found, @ctx->attr is set to the
+ * attribute which collates just after the attribute being searched for in the
+ * base ntfs inode, i.e. if one wants to add the attribute to the mft record
+ * this is the correct place to insert it into, and if there is not enough
+ * space, the attribute should be placed in an extent mft record.
+ * @ctx->al_entry points to the position within @ctx->base_ntfs_ino->attr_list
+ * at which the new attribute's attribute list entry should be inserted.  The
+ * other @ctx fields, base_ntfs_ino, base_mrec, and base_attr are set to NULL.
+ * The only exception to this is when @type is AT_END, in which case
+ * @ctx->al_entry is set to NULL also (see above).
  *
  * The following error codes are defined:
  *	ENOENT	Attribute not found, not an error as such.
@@ -1555,11 +1558,10 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 		/* First call happens with the base mft record. */
 		base_ni = ctx->base_ntfs_ino = ctx->ntfs_ino;
 		ctx->base_mrec = ctx->mrec;
+		ctx->base_attr = ctx->attr;
 	}
 	if (type == AT_END)
 		goto not_found;
-	if (ni == base_ni)
-		ctx->base_attr = ctx->attr;
 	vol = base_ni->vol;
 	al_start = base_ni->attr_list;
 	al_end = al_start + base_ni->attr_list_size;
@@ -1831,21 +1833,36 @@ do_next_attr:
 	return -1;
 not_found:
 	/*
-	 * The attribute wasn't found.  Before we return, we want to ensure
-	 * ctx->mrec and ctx->attr indicate the position at which the attribute
-	 * should be inserted in the base mft record.
+	 * If we were looking for AT_END or we were enumerating and reached the
+	 * end, we reset the search context @ctx and use ntfs_attr_find() to
+	 * seek to the end of the base mft record.
 	 */
-	/* Rewind the current search so ntfs_attr_find() is happy. */
-	ntfs_attr_reinit_search_ctx(ctx);
-	/*
-	 * If we were enumerating and reached the end, we can't just use @type
-	 * because that would return the first attribute instead of the last
-	 * one. Thus we just use AT_END which causes ntfs_attr_find() to seek
-	 * to the end.
-	 */
-	if (type == AT_UNUSED)
+	if (type == AT_UNUSED || type == AT_END) {
+		ntfs_attr_reinit_search_ctx(ctx);
 		return ntfs_attr_find(AT_END, name, name_len, ic, val, val_len,
 				ctx);
+	}
+	/*
+	 * The attribute wasn't found.  Before we return, we want to ensure
+	 * @ctx->mrec and @ctx->attr indicate the position at which the
+	 * attribute should be inserted in the base mft record.  Since we also
+	 * want to preserve @ctx->al_entry we cannot reinitialize the search
+	 * context using ntfs_attr_reinit_search_ctx() as this would set
+	 * @ctx->al_entry to NULL.  Thus we do the necessary bits manually (see
+	 * ntfs_attr_init_search_ctx() below).  Note, we _only_ preserve
+	 * @ctx->al_entry as the remaining fields (base_*) are identical to
+	 * their non base_ counterparts and we cannot set @ctx->base_attr
+	 * correctly yet as we do not know what @ctx->attr will be set to by
+	 * the call to ntfs_attr_find() below.
+	 */
+	ctx->mrec = ctx->base_mrec;
+	ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
+			le16_to_cpu(ctx->mrec->attrs_offset));
+	ctx->is_first = TRUE;
+	ctx->ntfs_ino = ctx->base_ntfs_ino;
+	ctx->base_ntfs_ino = NULL;
+	ctx->base_mrec = NULL;
+	ctx->base_attr = NULL;
 	/*
 	 * In case there are multiple matches in the base mft record, need to
 	 * keep enumerating until we get an attribute not found response (or
@@ -1889,11 +1906,12 @@ not_found:
  * successful call of ntfs_attr_lookup() will return the next attribute, with
  * the current attribute being described by the search context @ctx.
  *
- * If @type is AT_END, seek to the end of the attribute and return -1 with
- * errno set to ENOENT. AT_END is not a valid attribute, its length is zero for
- * example, thus it is safer to return error instead of success in this case.
- * It should never ne needed to do this, but we implement the functionality
- * because it allows for simpler code inside ntfs_external_attr_find().
+ * If @type is AT_END, seek to the end of the base mft record ignoring the
+ * attribute list completely and return -1 with errno set to ENOENT.  AT_END is
+ * not a valid attribute, its length is zero for example, thus it is safer to
+ * return error instead of success in this case.  It should never ne needed to
+ * do this, but we implement the functionality because it allows for simpler
+ * code inside ntfs_external_attr_find().
  *
  * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
  * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
@@ -1906,17 +1924,23 @@ not_found:
  * Return 0 if the search was successful and -1 if not, with errno set to the
  * error code.
  *
- * On success, @ctx->attr is the found attribute and it is in mft record
- * @ctx->mrec.
+ * On success, @ctx->attr is the found attribute, it is in mft record
+ * @ctx->mrec, and @ctx->al_entry is the attribute list entry for this
+ * attribute with @ctx->base_* being the base mft record to which @ctx->attr
+ * belongs.  If no attribute list attribute is present @ctx->al_entry and
+ * @ctx->base_* are NULL.
  *
- * On error, @ctx->attr is the attribute which collates just after the attribute
- * being searched for, i.e. if one wants to add the attribute to the mft
- * record this is the correct place to insert it into. @ctx->al_entry points to
- * the position within @ctx->base_ntfs_ino->attr_list at which the new
- * attribute's attribute list entry should be inserted.
+ * On error ENOENT, i.e. attribute not found, @ctx->attr is set to the
+ * attribute which collates just after the attribute being searched for in the
+ * base ntfs inode, i.e. if one wants to add the attribute to the mft record
+ * this is the correct place to insert it into, and if there is not enough
+ * space, the attribute should be placed in an extent mft record.
+ * @ctx->al_entry points to the position within @ctx->base_ntfs_ino->attr_list
+ * at which the new attribute's attribute list entry should be inserted.  The
+ * other @ctx fields, base_ntfs_ino, base_mrec, and base_attr are set to NULL.
+ * The only exception to this is when @type is AT_END, in which case
+ * @ctx->al_entry is set to NULL also (see above).
  *
- * FIXME: This is how it should be but unfortunately the current code sets
- *        @ctx->al_entry to NULL, so beware! (AIA)
  *
  * The following error codes are defined:
  *	ENOENT	Attribute not found, not an error as such.
@@ -1963,8 +1987,7 @@ static __inline__ void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
 		mrec = ni->mrec;
 	ctx->mrec = mrec;
 	/* Sanity checks are performed elsewhere. */
-	ctx->attr = (ATTR_RECORD*)((char*)mrec +
-			le16_to_cpu(mrec->attrs_offset));
+	ctx->attr = (ATTR_RECORD*)((u8*)mrec + le16_to_cpu(mrec->attrs_offset));
 	ctx->is_first = TRUE;
 	ctx->ntfs_ino = ni;
 	ctx->al_entry = NULL;
@@ -1988,7 +2011,7 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 		/* No attribute list. */
 		ctx->is_first = TRUE;
 		/* Sanity checks are performed elsewhere. */
-		ctx->attr = (ATTR_RECORD*)((char*)ctx->mrec +
+		ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 				le16_to_cpu(ctx->mrec->attrs_offset));
 		return;
 	} /* Attribute list. */
