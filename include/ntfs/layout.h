@@ -100,28 +100,37 @@ typedef struct {
  */
 typedef enum {
 	/* Found in $MFT/$DATA. */
-	magic_FILE = const_cpu_to_le32(0x454c4946), /* mft entry */
-	magic_INDX = const_cpu_to_le32(0x58444e49), /* index buffer */
+	magic_FILE = const_cpu_to_le32(0x454c4946), /* Mft entry. */
+	magic_INDX = const_cpu_to_le32(0x58444e49), /* Index buffer. */
 	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* ? (NTFS 3.0+?) */
 
 	/* Found in $LogFile/$DATA. */
-	magic_RSTR = const_cpu_to_le32(0x52545352), /* restart area */
-	magic_RCRD = const_cpu_to_le32(0x44524352), /* log record */
+	magic_RSTR = const_cpu_to_le32(0x52545352), /* Restart page. */
+	magic_RCRD = const_cpu_to_le32(0x44524352), /* Log record page. */
 
-	/* Found in $LogFile/$DATA but maybe found in $MFT/$DATA, also? */
-	magic_CHKD = const_cpu_to_le32(0x424b4843), /* modified by chkdsk */
+	/* Found in $LogFile/$DATA.  (May be found in $MFT/$DATA, also?) */
+	magic_CHKD = const_cpu_to_le32(0x424b4843), /* Modified by chkdsk. */
 
-	/* Found in both $MFT/$DATA and $LogFile/$DATA. */
-	magic_BAAD = const_cpu_to_le32(0x44414142), /* failed multi sector
-						       transfer was detected */
+	/* Found in all ntfs record containing records. */
+	magic_BAAD = const_cpu_to_le32(0x44414142), /* Failed multi sector
+						       transfer was detected. */
+
+	/*
+	 * Found in $LogFile/$DATA when a page is full or 0xff bytes and is
+	 * thus not initialized.  User has to initialize the page before using
+	 * it.
+	 */
+	magic_empty = const_cpu_to_le32(0xffffffff),/* Record is empty and has
+						       to be initialized before
+						       it can be used. */
 } NTFS_RECORD_TYPES;
 
 /*
  * Generic magic comparison macros. Finally found a use for the ## preprocessor
  * operator! (-8
  */
-#define ntfs_is_magic(x, m)		(   (u32)(x) == (u32)magic_##m )
-#define ntfs_is_magicp(p, m)		( *(u32*)(p) == (u32)magic_##m )
+#define ntfs_is_magic(x, m)	(   (u32)(x) == (u32)magic_##m )
+#define ntfs_is_magicp(p, m)	( *(u32*)(p) == (u32)magic_##m )
 
 /*
  * Specialised magic comparison macros for the NTFS_RECORD_TYPES defined above.
@@ -145,6 +154,9 @@ typedef enum {
 
 #define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
 #define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
+
+#define ntfs_is_empty_record(x)		( ntfs_is_magic (x, empty) )
+#define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
 /*
  * Defines for the NTFS filesystem. Don't want to use BLOCK_SIZE and
