@@ -16,8 +16,8 @@ LINK		= $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
 bin_PROGRAMS		= ntfsfix ntfsinfo
-sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete
-EXTRA_PROGRAMS		= ntfsresize ntfsdump_logfile dumplog ntfswipe
+sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize
+EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 ntfsundelete.8
 EXTRA_MANS		=
@@ -49,15 +49,15 @@ ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h
 ntfsundelete_LDADD	= $(AM_LIBS)
 ntfsundelete_LDFLAGS	= $(AM_LFLAGS)
 
+ntfsresize_SOURCES	= ntfsresize.c
+ntfsresize_LDADD	= $(AM_LIBS)
+ntfsresize_LDFLAGS	= $(AM_LFLAGS)
+
 # We don't distribute these
 
 ntfswipe_SOURCES	= ntfswipe.c ntfswipe.h
 ntfswipe_LDADD		= $(AM_LIBS)
 ntfswipe_LDFLAGS	= $(AM_LFLAGS)
-
-ntfsresize_SOURCES	= ntfsresize.c
-ntfsresize_LDADD	= $(AM_LIBS)
-ntfsresize_LDFLAGS	= $(AM_LFLAGS)
 
 ntfsdump_logfile_SOURCES= ntfsdump_logfile.c
 ntfsdump_logfile_LDADD	= $(AM_LIBS)
