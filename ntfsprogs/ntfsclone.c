@@ -396,6 +396,11 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 	s64 inode = image->ni->mft_no;
 
 	if (inode <= LAST_METADATA_INODE) {
+		
+		/* Don't save bad sectors (both $Bad and unnamed are ignored */
+		if (inode == FILE_BadClus && image->ctx->attr->type == AT_DATA)
+			return 0;
+
 		if (inode != FILE_LogFile)
 			return rl->length;
 
@@ -1220,6 +1225,97 @@ static void check_output_device(s64 input_size)
 		set_filesize(input_size);
 }
 
+static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+{
+	ntfs_attr_search_ctx *ret;
+
+	if ((ret = ntfs_attr_get_search_ctx(ni, mrec)) == NULL)
+		perr_printf("ntfs_attr_get_search_ctx");
+
+	return ret;
+}
+
+static int str2unicode(const char *aname, ntfschar **ustr, int *len)
+{
+	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1)) {
+		perr_printf("Unable to convert '%s' to Unicode", aname);
+		return -1;
+	}
+
+	if (!*ustr || !*len) {
+		*ustr = AT_UNNAMED;
+		*len = 0;
+	}
+	
+	return 0;
+}
+
+/**
+ * lookup_data_attr
+ *
+ * Find the $DATA attribute (with or without a name) for the given ntfs inode.
+ */
+static ntfs_attr_search_ctx *lookup_data_attr(ntfs_inode *ni, const char *aname)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfschar *ustr = NULL;
+	int len = 0;
+
+	if ((ctx = attr_get_search_ctx(ni, NULL)) == NULL)
+		return NULL;
+	
+	if (str2unicode(aname, &ustr, &len) == -1)
+		goto error_out;
+	
+	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, ctx)) {
+		perr_printf("ntfs_attr_lookup");
+		goto error_out;
+	}
+	if (ustr != AT_UNNAMED)
+		free(ustr);
+
+	return ctx;
+error_out:
+	ntfs_attr_put_search_ctx(ctx);
+	return NULL;
+}
+	
+static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
+{
+	ntfs_inode *ni;
+	ntfs_attr_search_ctx *ctx = NULL;
+	runlist *rl;
+	s64 nr_bad_clusters = 0;
+	
+	if (!(ni = ntfs_inode_open(vol, FILE_BadClus)))
+		perr_exit("ntfs_open_inode");
+
+	if ((ctx = lookup_data_attr(ni, "$Bad")) == NULL)
+		exit(1);
+
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
+		perr_exit("ntfs_mapping_pairs_decompress");
+	
+	for (; rl->length; rl++) {
+		s64 lcn = rl->lcn;
+		
+		if (lcn == LCN_HOLE || lcn < 0)
+			continue;
+
+		for (; lcn < rl->lcn + rl->length; lcn++, nr_bad_clusters++) {
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, lcn, 0))
+				image->inuse--;
+		}
+	}
+	if (nr_bad_clusters)
+		Printf("WARNING: The disk has %lld or more bad sectors"
+		       " (hardware faults).\n", nr_bad_clusters);
+
+	ntfs_attr_put_search_ctx(ctx);
+	if (ntfs_inode_close(ni))
+		perr_exit("ntfs_inode_close failed for $BadClus");
+}
+
 int main(int argc, char **argv)
 {
 	ntfs_walk_clusters_ctx image;
@@ -1279,16 +1375,19 @@ int main(int argc, char **argv)
 	compare_bitmaps(&lcn_bitmap);
 	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
 	
+	ignore_bad_clusters(&image);
+
 	if (opt.save_image)
 		initialise_image_hdr(device_size, image.inuse);
 	
 	/* FIXME: save backup boot sector */
 
 	if (opt.std_out || !opt.metadata_only) {
-		s64 nr_clusters = (opt.std_out && !opt.save_image)
-			? vol->nr_clusters : image.inuse;
-		
-		clone_ntfs(nr_clusters);
+		s64 nr_clusters_to_save = image.inuse;
+		if (opt.std_out && !opt.save_image)
+			nr_clusters_to_save = vol->nr_clusters;
+
+		clone_ntfs(nr_clusters_to_save);
 		fsync_clone(fd_out);
 		exit(0);
 	}
