@@ -62,12 +62,16 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn)
  * @vol:	mounted ntfs volume on which to free the clusters
  * @rl:		runlist describing the clusters to free
  * @start_vcn:	starting relative vcn into @rl at which to free the clusters
- * @count:	number of clusters to free
+ * @count:	number of clusters to free or -1 for all clusters
  *
- * Allocate @count clusters starting at cluster @start_lcn or at the current
- * allocator position if @start_lcn is -1, from the mounted ntfs volume @vol.
+ * Free @count clusters starting at the cluster @start_vcn in the runlist @rl
+ * from the mounted ntfs volume @vol.
  *
- * On success return 0 and -1 on error with errno set to the error code.
+ * If @count is -1, all clusters from @start_vcn to the end of the runlist
+ * are deallocated.
+ *
+ * On success return the number of deallocated clusters (not counting sparse
+ * clusters) and on error return -1 with errno set to the error code.
  */
 int ntfs_cluster_free(ntfs_volume *vol, runlist *rl, VCN start_vcn, s64 count)
 {
