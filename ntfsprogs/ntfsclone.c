@@ -637,9 +637,11 @@ static void compare_bitmaps(struct bitmap *a)
 				if (++mismatch > 10)
 					continue;
 
-				Printf("Cluster accounting failed at %llu "
-				       "(0x%llx): %s cluster in $Bitmap\n",
-				       cl, cl, bit ? "missing" : "extra");
+				Printf("Cluster accounting failed at %lld "
+						"(0x%llx): %s cluster in "
+						"$Bitmap\n", (long long)cl,
+						(unsigned long long)cl,
+						bit ? "missing" : "extra");
 			}
 		}
 	}
@@ -817,8 +819,8 @@ static s64 volume_size(ntfs_volume *volume, s64 nr_clusters)
 
 static void print_volume_size(const char *str, s64 bytes)
 {
-	Printf("%s: %lld bytes (%lld MB)\n",
-	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
+	Printf("%s: %lld bytes (%lld MB)\n", str, (long long)bytes,
+			(long long)rounded_up_division(bytes, NTFS_MBYTE));
 }
 
 
@@ -830,8 +832,8 @@ static void print_disk_usage(ntfs_walk_clusters_ctx *image)
 	used = image->inuse * vol->cluster_size;
 
 	Printf("Space in use       : %lld MB (%.1f%%)   ",
-	       rounded_up_division(used, NTFS_MBYTE),
-	       100.0 * ((float)used / total));
+			(long long)rounded_up_division(used, NTFS_MBYTE),
+			100.0 * ((float)used / total));
 
 	Printf("\n");
 }
@@ -1058,7 +1060,8 @@ int main(int argc, char **argv)
 
 	walk_clusters(vol, &backup_clusters);
 	
-	Printf("Num of MFT records       = %8lld\n", vol->nr_mft_records); 
+	Printf("Num of MFT records       = %8lld\n",
+			(long long)vol->nr_mft_records); 
 	Printf("Num of used MFT records  = %8d\n", nr_used_mft_records); 
 	
 	Printf("Wiped unused MFT data    = %8d\n", wiped_unused_mft_data); 
