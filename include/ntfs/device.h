@@ -26,8 +26,6 @@
 #include "config.h"
 #endif
 
-#include <sys/stat.h>
-
 #include "device_io.h"
 #include "types.h"
 #include "support.h"
@@ -69,6 +67,8 @@ struct ntfs_device {
 	void *d_private;			/* Private data used by the
 						   device operations. */
 };
+
+struct stat;
 
 /*
  * The ntfs device operations defining all operations that can be performed on
