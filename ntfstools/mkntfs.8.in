@@ -85,17 +85,16 @@ two, with at least 256, and at most 65536 bytes per cluster. If omitted,
 .I cluster-size
 is determined by the volume size. The value is determined as
 follows:
-.br
-.B \tVolume size\tDefault cluster size (in bytes)
-.br
-	 \<= 512MB		    512
-.br
-	\]512MB-1GB\]	   1024
-.br
-	 \]1GB-2GB\]	   2048
-.br
-	   \> 2GB		   4096
-.br
+.TS
+lB lB lB
+l l r.
+Volume	size	Default cluster
+0	- 512MB	512 bytes
+512MB	- 1GB	1024 bytes
+1GB	- 2GB	2048 bytes
+2GB	+	4096 bytes
+.TE
+
 Note that the default cluster size is set to be at least equal to the sector
 size as a cluster cannot be smaller than a sector. Also, note that values
 greater than 4096 have the side effect that compression is disabled on the
@@ -115,18 +114,17 @@ files, it is useful to set the zone multiplier to a higher value. Note, that
 the MFT zone is resized on the fly as required during operation of the NTFS
 driver but choosing a good value will reduce fragmentation. Valid values
 are 1, 2, 3 and 4. The values have the following meaning:
-.br
-.B \tMFT zone\t\tMFT zone size
-.br
-.B \tmultiplier\t(in % of volume size)
-.br
-		1		   12.5% (default)
-.br
-		2		   25%
-.br
-		3		   37.5%
-.br
-		4		   50%
+.TS
+lB lB
+lB lB
+c l.
+MFT zone	MFT zone size
+multiplier	(% of volume size)
+1	12.5% (default)
+2	25.0%
+3	37.5%
+4	50.0%
+.TE
 .TP
 .B \-f
 Same as

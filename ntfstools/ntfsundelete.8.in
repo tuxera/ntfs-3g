@@ -206,32 +206,27 @@ and
 .B \-\-time
 options, respectively.
 .sp
-The output to scan will be:
+The output of scan will be:
+.sp
+.nf
+Inode  Flags  %age     Date      Size  Filename
+ 6038  FN..    93%  2002-07-17  26629  thesis.doc
+.fi
+.TS
+lB lB
+l l.
+Flag	Description
+F/D	File/Directory
+N/R	(Non-)Resident data stream
+C/E	Compressed/Encrypted data stream
+!	Missing attributes
+.TE
+.RS
 .sp
 .br
-Inode Flags  %age    Date    Size   Filename
-.br
-----------------------------------------------
-.br
-6038  FN..   93%  2002-07-17 26629  thesis.doc
-.br
-.RS
-.TP
-The flags field can display:
-F/D \- File/Directory
-.br
-N/R \- (Non-)Resident data stream
-.br
-C/E \- Compressed/Encrypted data stream
-.br
-!   \- Missing attributes
-.sp
-.RE
-.RS
 The percentage field shows how much of the file can potentially be recovered.
 .sp
 .br
-.RE
 .RE
 .BI "\-S " range
 .br
