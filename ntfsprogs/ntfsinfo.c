@@ -29,7 +29,6 @@
  *	- Dump ACLs when security_id exists (NTFS 3+ only).
  *	- Clean ups.
  *	- Internationalization.
- *	- The AT_ATTRIBUTE_LIST issue.
  *	- Add more Indexed Attr Types.
  *	- Make formatting look more like www.flatcap.org/ntfs/info
  *
@@ -37,13 +36,11 @@
  *	way to output some of these attributes.
  *
  *	Still need to do:
- *	    $SECURITY_DESCRIPTOR
  *	    $REPARSE_POINT/$SYMBOLIC_LINK
  *	    $EA_INFORMATION
  *	    $EA
  *	    $PROPERTY_SET
  *	    $LOGGED_UTILITY_STREAM
- *	    ntfs_dump_attr_unknown()
  */
 
 #include "config.h"
@@ -455,10 +452,38 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
  */
 static void ntfs_dump_attr_list(ATTR_RECORD *attr)
 {
-	/* As far as I know, ntfs_attr_lookup transparantly iterate
-	   through AT_ATTRIBUTE_LIST, so we shouldn't get to this */
-	/* FIXME: inode 9: $Secure does that, I'll have to check. */
-	printf("AT_ATTRIBUTE_LIST type was returned.\n");
+	printf("Dumping attribute AT_ATTRIBUTE_LIST (0x20)\n");
+
+	/* Dump list's name */
+	if (attr->name_length) {
+		char *stream_name = NULL;
+
+		stream_name = ntfs_attr_get_name(attr);
+		if (stream_name) {
+			printf("\tList name:\t\t '%s'\n",stream_name);
+			free(stream_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tList name:\t\t unnamed\n");
+	}
+
+	/* Dump list's size */
+	if (attr->non_resident) {
+		printf("\tAllocated size:\t\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->allocated_size));
+		printf("\tUsed size:\t\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->data_size));
+	} else {
+		/* print only the payload's size */
+		/* - "bytes" is mentioned here to avoid confusion with bits
+		     this is not required (almost) anywhere else */
+		printf("\tList's size:\t\t %u bytes\n",
+			(unsigned int)le32_to_cpu(attr->value_length));
+	}
 }
 
 /**
@@ -581,6 +606,11 @@ static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 				vol->major_ver);
 }
 
+/*
+ * ntfs_dump_acl()
+ *
+ * given an acl, print it in a beautiful & lovley way.
+ */
 static void ntfs_dump_acl(const char *prefix,ACL *acl)
 {
 	unsigned int i;
@@ -645,8 +675,9 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr)
 	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
 	
 	printf("\tRevision:\t\t %u\n",sec_desc_attr->revision);
+
+	/* TODO: parse the flags */
 	printf("\tFlags:\t\t\t 0x%0x\n",sec_desc_attr->control);
-/* todo: stringify flags */
 
 	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc_attr +
 		sec_desc_attr->owner), NULL, 0);
@@ -789,10 +820,8 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 		printf("\tStream name:\t\t unnamed\n");
 	}
 
-/*	length
-	u16 name_offset;
-	ATTR_FLAGS flags;
-	u16 instance; */
+	/* TODO: parse the flags */
+	printf("\tFlags:\t\t\t 0x%04hx\n",le16_to_cpu(attr->flags));
 	
 	/* fork by residence */
 	if (attr->non_resident) {
@@ -817,8 +846,9 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 		printf("\tIs resident? \t\t Yes\n");
 		printf("\tData size:\t\t %u\n",
 			(unsigned int)le32_to_cpu(attr->value_length));
-/*		u16 value_offset; Byte offset of the attribute
-		RESIDENT_ATTR_FLAGS resident_flags; */
+
+		/* TODO: parse the flags */
+		printf("\tResidence Flags:\t 0x%02hhx\n", attr->resident_flags);
 	}
 }
 
@@ -829,6 +859,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
  */
 static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 {
+	unsigned int type;
 	INDEX_ROOT *index_root = NULL;
 	
 	index_root = (INDEX_ROOT*)((u8*)attr + le16_to_cpu(attr->value_offset));
@@ -854,12 +885,13 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 
 	/* attr_type dumping */
 	printf("\tIndexed Attr Type:\t ");
-	if (index_root->type) {
-		if (index_root->type & (0xFFFF - AT_FILE_NAME)) {
+	type = le32_to_cpu(index_root->type);
+	if (type) {
+		if (index_root->type != AT_FILE_NAME) {
 			/* wierd, this should be illgeal */
-			printf("%4X\n",index_root->type);
-			fprintf(stderr, "ntfsinfo error: Illeal Indexed Attr Type: %4X\n",
-				index_root->type);
+			printf("0x%0X\n", type);
+			fprintf(stderr, "ntfsinfo error: Unknown Indexed Attr Type: 0x%0X\n",
+				type);
 		} else {
 			printf("file names\n");
 		}
@@ -885,7 +917,9 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 		(unsigned int)le32_to_cpu(index_root->index.allocated_size));
 	printf("\tUsed Size:\t\t %u\n",
 		(unsigned int)le32_to_cpu(index_root->index.index_length));
-	printf("\tFlags:\t\t\t 0x%x\n",index_root->index.flags);
+
+	/* the flags are 8bit long, no need for byte-order handling */
+	printf("\tFlags:\t\t\t 0x%02x\n",index_root->index.flags);
 	/* printf("\tIndex Entries Following\t %u\n", ???? );*/
 }
 
@@ -914,6 +948,21 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
 	}
+
+	/* dump index's size */
+	if (attr->non_resident) {
+		/* print only the non resident part's size */
+		printf("\tAllocated data size:\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->allocated_size));
+		printf("\tUsed data size:\t\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->data_size));
+	} else {
+		/* print only the payload's size */
+		printf("\tValue's size:\t\t %u\n",
+			(unsigned int)le32_to_cpu(attr->value_length));
+	}
+	
+	/* TODO: parse how many records does this B-*+/Tree contains */
 }
 
 /*
@@ -940,6 +989,21 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 		}
 	} else {
 		printf("\tBitmap name:\t\t unnamed\n");
+	}
+
+	/* dump bitmap size */
+	if (attr->non_resident) {
+		/* print only the non resident part's size */
+		printf("\tAllocated data size:\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->allocated_size));
+		printf("\tUsed data size:\t\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->data_size));
+	} else {
+		/* print only the payload's size */
+		/* - "bytes" is mentioned here to avoid confusion with bits
+		     this is not required (almost) anywhere else */
+		printf("\tBitmap's size:\t\t %u bytes\n",
+			(unsigned int)le32_to_cpu(attr->value_length));
 	}
 }
 
@@ -1010,12 +1074,12 @@ static void ntfs_hex_dump(void *buf,unsigned int length)
 		/* hex content */
 		for (j=i;(j<length) && (j<i+16);j++) {
 			unsigned char c = *((char *)buf + j);
-			printf("%02X ",(unsigned int)c);
+			printf("%02hhX ",c);
 		}
 		
 		/* realign */
 		for (;j<i+16;j++) {
-   			printf("   ");
+			printf("   ");
 		}
 		
 		/* char content */
@@ -1068,7 +1132,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 
 	/* we could parse the flags */
 	/* however, it does not make sense with a new attribute type */
-	printf("\tFlags:\t\t\t 0x%x\n",attr->flags);
+	printf("\tFlags:\t\t\t 0x%04hx\n",le16_to_cpu(attr->flags));
 
 	/* fork by residence */
 	printf("\tIs resident?\t\t ");
@@ -1093,9 +1157,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 		printf("\tResident payload size:\t %u\n",
 			(unsigned int)le32_to_cpu(attr->value_length));
 
-		/* residence flags are 1 byte, cast it to a longer type */
-		printf("\tResidence Flags:\t 0x%hx\n",
-			(short unsigned int)attr->resident_flags);
+		printf("\tResidence Flags:\t 0x%02hhx\n", attr->resident_flags);
 
 		/* hex dump */
 		printf("\tDumping some of the attribute data:\n");
@@ -1106,7 +1168,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 
 static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 {
-	u16 inode_flags = le16_to_cpu(inode->mrec->flags);
+	u16 inode_flags = inode->mrec->flags;
 	
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 	
@@ -1120,21 +1182,15 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 		le16_to_cpu(inode->mrec->link_count));
 
 	printf("MFT record Flags:\t\t ");
-	/* we would like to convert MFT_RECORD_IN_USE -> DELETED
-		and we do that by xoring */
-	inode_flags = inode_flags ^ MFT_RECORD_IN_USE;
-	
 	if (inode_flags) {
-		/* MFT_RECORD_IN_USE is now backwards */
-		if (MFT_RECORD_IN_USE & inode_flags) {
+		if (!(MFT_RECORD_IN_USE & inode_flags)) {
 			printf("DELETED ");
 		}
 		if (MFT_RECORD_IS_DIRECTORY & inode_flags) {
 			printf("DIRECTORY ");
 		}
-		if (MFT_RECORD_IN_USE & !MFT_RECORD_IS_DIRECTORY &
-			MFT_REC_SPACE_FILLER & inode_flags) {
-			printf("UNKNOWN:0x%x",inode_flags);
+		if (~(MFT_RECORD_IN_USE | MFT_RECORD_IS_DIRECTORY) & inode_flags) {
+			printf("UNKNOWN:0x%04hx",inode_flags);
 		}
 	} else {
 		printf("none");
