@@ -47,10 +47,14 @@ safely reboot into NT/W2K. Please note that \fBntfsfix\fP is not a
 chkdsk-like tool, and so is not guaranteed that it could fix all the
 alterations provoked by the NTFS driver.
 
-.SH SEE ALSO
-.BR mkntfs (8).
-.br
 .SH AUTHOR
 This manual page was written by David Martínez Moreno
 <david.martinez@rediris.es>, for the Debian GNU/Linux
 system (but may be used by others).
+.SH AVAILABILITY
+.B ntfsfix
+is part of the linux-ntfs package and is available from 
+http://linux-ntfs.sourceforge.net/.
+.SH SEE ALSO
+.BR mkntfs (8),
+.BR ntfsprogs (8)

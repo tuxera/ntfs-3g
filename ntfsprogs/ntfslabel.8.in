@@ -50,5 +50,6 @@ by Anton Altaparmakov (aia21@cantab.net).
 is part of the linux-ntfs package and is available from 
 http://linux-ntfs.sourceforge.net/.
 .SH SEE ALSO
-.BR mkntfs (8)
+.BR mkntfs (8),
+.BR ntfsprogs (8)
 

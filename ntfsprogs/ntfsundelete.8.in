@@ -334,11 +334,7 @@ is part of the linux\-ntfs package and is available from
 .nh
 http://linux\-ntfs.sourceforge.net/downloads.html
 .hy
-This manual page is available online at:
-.br
-.nh
-http://linux\-ntfs.sourceforge.net/tools/ntfsundelete.html
-.hy
 .SH SEE ALSO
-.BR ntfsinfo(8)
-.br
+.BR ntfsinfo (8),
+.BR ntfsprogs (8)
+

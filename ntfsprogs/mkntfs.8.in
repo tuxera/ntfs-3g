@@ -175,11 +175,6 @@ not implement content indexing at all.)
 Print the version number of 
 .B mkntfs
 and exit.
-.SH AUTHOR
-This version of
-.B mkntfs
-has been written by Anton Altaparmakov <aia21@cantab.net> (if that fails, use
-<antona@users.sf.net>).
 .SH BUGS
 .B mkntfs
 writes the backup boot sector to the last sector of the block
@@ -203,11 +198,17 @@ report them. - If you do see any problems reported, please report the messages
 to the author.
 .br
 There may be other bugs. Please, report them to the author.
+.SH AUTHOR
+This version of
+.B mkntfs
+has been written by Anton Altaparmakov <aia21@cantab.net> (if that fails, use
+<antona@users.sf.net>).
 .SH AVAILABILITY
 .B mkntfs
 is part of the Linux-NTFS project and is available for download from 
 http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
 rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
-.BR badblocks (8)
+.BR badblocks(8),
+.BR ntfsprogs (8)
 

@@ -21,5 +21,7 @@ was written by Matthew J. Fanto (fanto1mj@cmich.edu).
 .B ntfsinfo
 is part of the linux-ntfs package and is available from 
 http://linux-ntfs.sourceforge.net/.
+.SH SEE ALSO
+.BR ntfsprogs (8)
 
 
