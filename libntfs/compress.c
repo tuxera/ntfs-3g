@@ -31,6 +31,7 @@
 #include "types.h"
 #include "layout.h"
 #include "runlist.h"
+#include "compress.h"
 
 /**
  * ntfs_compression_constants - enum of constants used in the compression code
