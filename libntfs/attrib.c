@@ -2110,7 +2110,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	}
 
 	/* Truncate the runlist itself. */
-	if (ntfs_rl_truncate(na->rl, first_free_vcn)) {
+	if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
 		// FIXME: Eeek! We need rollback! (AIA)
 		fprintf(stderr, "%s(): Eeek! Run list truncation failed. "
 				"Leaving inconsistent metadata!\n",

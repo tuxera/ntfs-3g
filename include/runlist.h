@@ -71,7 +71,7 @@ extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
 extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl);
 
-extern int ntfs_rl_truncate(runlist_element *rl, const VCN start_vcn);
+extern int ntfs_rl_truncate(runlist **rl, const VCN start_vcn);
 
 #endif /* defined _NTFS_RUNLIST_H */
 

@@ -1309,15 +1309,18 @@ err_out:
 
 /**
  * ntfs_rl_truncate - truncate a runlist starting at a specified vcn
- * @rl:		runlist to truncate
+ * @rl:		address of runlist to truncate
  * @start_vcn:	first vcn which should be cut off
  *
- * Truncate the runlist @rl starting at vcn @start_vcn as well as the memory
+ * Truncate the runlist *@rl starting at vcn @start_vcn as well as the memory
  * buffer holding the runlist.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
+ *
+ * NOTE: @rl is the address of the runlist. We need the address so we can
+ * modify the pointer to the runlist with the new, reallocated memory buffer.
  */
-int ntfs_rl_truncate(runlist_element *rl, const VCN start_vcn)
+int ntfs_rl_truncate(runlist **rl, const VCN start_vcn)
 {
 	errno = ENOTSUP;
 	return -1;
