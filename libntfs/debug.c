@@ -21,6 +21,7 @@
 
 #include "config.h"
 
+#include "attrib.h"
 #include "debug.h"
 
 #ifdef DEBUG
