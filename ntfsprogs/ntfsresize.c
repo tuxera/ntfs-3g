@@ -1157,7 +1157,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 	if (!(mp = calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
 
-	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0))
+	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0, 0))
 		perr_exit("ntfs_mapping_pairs_build");
 
 	memmove((u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);

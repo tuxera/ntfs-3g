@@ -1396,6 +1396,8 @@ err_out:
  * @dst_len:	size of destination buffer @dst in bytes
  * @rl:		runlist for which to build the mapping pairs array
  * @start_vcn:	vcn at which to start the mapping pairs array
+ * @stopped_at:	if function failed with ENOSPC error code @stopped_at contain
+ * 		first vcn outside destination buffer.
  *
  * Create the mapping pairs array from the runlist @rl, starting at vcn
  * @start_vcn and save the array in @dst.  @dst_len is the size of @dst in
@@ -1403,6 +1405,8 @@ err_out:
  * ntfs_get_size_for_mapping_pairs().
  *
  * If @rl is NULL, just write a single terminator byte to @dst.
+ *
+ * @stopped_at can be NULL in case such information is not required.
  *
  * Return 0 on success.  On error, return -1 with errno set to the error code.
  * The following error codes are defined:
@@ -1414,7 +1418,7 @@ err_out:
  */
 int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl,
-		const VCN start_vcn)
+		const VCN start_vcn, VCN *stopped_at)
 {
 	LCN prev_lcn;
 	s8 *dst_max;
@@ -1475,10 +1479,13 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 				goto size_err;
 		} else
 			lcn_len = 0;
-		/* Update header byte. */
-		*dst = lcn_len << 4 | len_len;
-		/* Position ourselves at next mapping pairs array element. */
-		dst += 1 + len_len + lcn_len;
+		if (dst + len_len + lcn_len + 1 <= dst_max) {
+			/* Update header byte. */
+			*dst = lcn_len << 4 | len_len;
+			/* Position at next mapping pairs array element. */
+			dst += 1 + len_len + lcn_len;
+		} else
+			goto size_err;
 		/* Go to next runlist element. */
 		rl++;
 	}
@@ -1509,17 +1516,21 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 			prev_lcn = rl->lcn;
 		} else
 			lcn_len = 0;
-		/* Update header byte. */
-		*dst = lcn_len << 4 | len_len;
-		/* Position ourselves at next mapping pairs array element. */
-		dst += 1 + len_len + lcn_len;
+		if (dst + len_len + lcn_len + 1 <= dst_max) {
+			/* Update header byte. */
+			*dst = lcn_len << 4 | len_len;
+			/* Position at next mapping pairs array element. */
+			dst += 1 + len_len + lcn_len;
+		} else
+			goto size_err;
 	}
-	if (dst <= dst_max) {
-		/* Terminator byte. */
-		*dst = 0;
-		return 0;
-	}
+	/* Terminator byte. */
+	*dst = 0;
+	return 0;
 size_err:
+	if (stopped_at)
+		*stopped_at = rl->vcn;
+	*dst = 0;
 	errno = ENOSPC;
 	return -1;
 val_err:

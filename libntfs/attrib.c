@@ -2513,7 +2513,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Generate the mapping pairs array in the attribute record. */
 	if (ntfs_mapping_pairs_build(vol, (u8*)a + mp_ofs, arec_size - mp_ofs,
-			rl, 0) < 0) {
+			rl, 0, 0) < 0) {
 		err = errno;
 		// FIXME: Eeek! We need rollback! (AIA)
 		Dprintf("%s(): Eeek!  Failed to build mapping pairs.  Leaving "
@@ -3038,7 +3038,8 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		 * correct destination, i.e. the attribute record itself.
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl, 0)) {
+					a->mapping_pairs_offset), mp_size,
+					na->rl, 0, 0)) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
 			Dprintf("%s(): Eeek! Mapping pairs build "
@@ -3353,7 +3354,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a +
 				le16_to_cpu(a->mapping_pairs_offset), mp_size,
-				na->rl, sle64_to_cpu(a->lowest_vcn))) {
+				na->rl, sle64_to_cpu(a->lowest_vcn), 0)) {
 			err = errno;
 			Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "

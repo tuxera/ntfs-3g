@@ -72,7 +72,7 @@ extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
 
 extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl,
-		const VCN start_vcn);
+		const VCN start_vcn, VCN *stopped_at);
 
 extern int ntfs_rl_truncate(runlist **rl, const VCN start_vcn);
 
