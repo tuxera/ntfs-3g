@@ -2,7 +2,7 @@
  * ntfsresize - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Szabolcs Szakacsits
- * Copyright (c) 2002-2003 Anton Altaparmakov
+ * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will resize an NTFS volume without data loss.
@@ -304,7 +304,7 @@ static void version (void)
 {
 	printf ("\nResize an NTFS Volume, without data loss.\n\n");
 	printf ("Copyright (c) 2002-2004  Szabolcs Szakacsits\n");
-	printf ("Copyright (c) 2002-2003  Anton Altaparmakov\n");
+	printf ("Copyright (c) 2002-2004  Anton Altaparmakov\n");
 	printf ("Copyright (c) 2002-2003  Richard Russon\n");
 	printf ("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
@@ -593,7 +593,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 		return -1;
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
-			(uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			(uchar_t*)((u8*)a + le16_to_cpu(a->name_offset)),
 			a->name_length, 0, NULL, 0)) 
 		ret = 1;
 									
@@ -710,8 +710,8 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 	
 	printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
 			"length %6lld\n", (long long)inode,
-			resize->ctx->attr->type, (unsigned long long)start,
-			(long long)len);
+			(unsigned int)le32_to_cpu(resize->ctx->attr->type),
+			(unsigned long long)start, (long long)len);
 }
 
 /**
@@ -758,7 +758,7 @@ static void build_lcn_usage_bitmap(ntfs_fsck_t *fsck)
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
 				 "%llx length %llx\n", inode,
-				 le32_to_cpu (a->type), lcn, lcn_length);
+				 le32_to_cpu(a->type), lcn, lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
@@ -933,7 +933,7 @@ static void build_allocation_bitmap(ntfs_fsck_t *fsck)
 			perr_exit("Reading inode %lld failed", inode);
 		}
 
-		if ((ni->mrec->base_mft_record) != 0)
+		if (ni->mrec->base_mft_record)
 			goto close_inode;
 
 		fsck->ni = ni;
@@ -996,7 +996,7 @@ static void set_resize_constrains(ntfs_resize_t *resize)
 			perr_exit("Reading inode %lld failed", inode);
 		}
 
-		if ((ni->mrec->base_mft_record) != 0)
+		if (ni->mrec->base_mft_record)
 			goto close_inode;
 
 		resize->ni = ni;
@@ -1069,28 +1069,33 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 		
 		Vprintf("Old mp size      : %d\n", l);
 		Vprintf("New mp size      : %d\n", mp_size);
-		Vprintf("Bytes in use     : %d\n", ctx->mrec->bytes_in_use);
+		Vprintf("Bytes in use     : %u\n", (unsigned int)
+				le32_to_cpu(ctx->mrec->bytes_in_use));
 	
 		next_attr = (char *)a + le16_to_cpu(a->length);
 		l = mp_size - l;
 		
-		Vprintf("Bytes in use new : %d\n", ctx->mrec->bytes_in_use + l);
-		Vprintf("Bytes allocated  : %d\n", ctx->mrec->bytes_allocated);
+		Vprintf("Bytes in use new : %u\n", l + (unsigned int)
+				le32_to_cpu(ctx->mrec->bytes_in_use));
+		Vprintf("Bytes allocated  : %u\n", (unsigned int)
+				le32_to_cpu(ctx->mrec->bytes_allocated));
 
-		remains_size = ctx->mrec->bytes_in_use;
+		remains_size = le32_to_cpu(ctx->mrec->bytes_in_use);
 		remains_size -= (next_attr - (char *)ctx->mrec);
 
 		Vprintf("increase         : %d\n", l);
 		Vprintf("shift            : %lld\n", (long long)remains_size);
 		
-		if (ctx->mrec->bytes_in_use + l > ctx->mrec->bytes_allocated)
+		if (le32_to_cpu(ctx->mrec->bytes_in_use) + l >
+				le32_to_cpu(ctx->mrec->bytes_allocated))
 			err_exit("Extended record needed (%d > %d), not yet "
 				 "supported!\nPlease try to free less space.\n",
-				 ctx->mrec->bytes_in_use + l,
-				 ctx->mrec->bytes_allocated);
+				 le32_to_cpu(ctx->mrec->bytes_in_use) + l,
+				 le32_to_cpu(ctx->mrec->bytes_allocated));
 
 		memmove(next_attr + l, next_attr, remains_size);
-		ctx->mrec->bytes_in_use += l;
+		ctx->mrec->bytes_in_use = cpu_to_le32(l +
+				le32_to_cpu(ctx->mrec->bytes_in_use));
 		a->length += l;
 	}
 
@@ -1100,7 +1105,7 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
 		perr_exit("ntfs_mapping_pairs_build");
 
-	memmove((char *)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
+	memmove((u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
 
 	free(mp);
 }
@@ -1430,8 +1435,8 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
 	Vprintf("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> 0x%08llx\n",
 			(unsigned long long)resize->mref,
-			resize->ctx->attr->type, (long long)lcn_length,
-			(unsigned long long)lcn,
+			(unsigned int)le32_to_cpu(resize->ctx->attr->type),
+			(long long)lcn_length, (unsigned long long)lcn,
 			(unsigned long long)relocate_rl->lcn);
 
 	relocate_clusters(resize, relocate_rl, lcn);
@@ -1864,8 +1869,8 @@ static void update_bootsector(ntfs_resize_t *r)
 	if (vol->dev->d_ops->read(vol->dev, &bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs.number_of_sectors = r->new_volume_size * bs.bpb.sectors_per_cluster;
-	bs.number_of_sectors = cpu_to_le64(bs.number_of_sectors);
+	bs.number_of_sectors = scpu_to_le64(r->new_volume_size *
+			bs.bpb.sectors_per_cluster);
 
 	if (r->mftmir_old) {
 		int save_progress = opt.show_progress;
@@ -1982,7 +1987,8 @@ static void mount_volume(void)
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
-	printf("Cluster size       : %u bytes\n", vol->cluster_size);
+	printf("Cluster size       : %u bytes\n",
+			(unsigned int)vol->cluster_size);
 	print_vol_size("Current volume size", vol_size(vol, vol->nr_clusters));
 }
 

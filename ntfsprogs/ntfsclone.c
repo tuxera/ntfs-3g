@@ -2,6 +2,7 @@
  * ntfsclone - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2004 Szabolcs Szakacsits
+ * Copyright (c) 2004 Anton Altaparmakov
  *
  * Clone NTFS data and/or metadata to a sparse file, device or stdout.
  *
@@ -526,10 +527,10 @@ static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 	ATTR_RECORD *a;
 	u32 i;
 	int n = 0;
-	char *p;
+	u8 *p;
 
 	a = image->ctx->attr;
-	p = (char *)a + a->value_offset;
+	p = (u8*)a + le16_to_cpu(a->value_offset);
 	
 	if (image->ni->mft_no <= LAST_METADATA_INODE)
 		return;
@@ -537,7 +538,7 @@ static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 	if (a->type != AT_DATA)
 		return;
 	
-	for (i = 0; i < a->value_length; i++) {
+	for (i = 0; i < le32_to_cpu(a->value_length); i++) {
 		if (p[i]) {
 			p[i] = 0;
 			n++;
@@ -700,8 +701,9 @@ static void wipe_unused_mft_data(ntfs_inode *ni)
 	if (ni->mft_no <= LAST_METADATA_INODE)
 		return;
 	
-	unused = m->bytes_allocated - m->bytes_in_use;
-	wiped_unused_mft_data += wipe_data((char *)m, m->bytes_in_use, unused);
+	unused = le32_to_cpu(m->bytes_allocated) - le32_to_cpu(m->bytes_in_use);
+	wiped_unused_mft_data += wipe_data((char *)m,
+			le32_to_cpu(m->bytes_in_use), unused);
 }
 
 static void wipe_unused_mft(ntfs_inode *ni)
@@ -713,7 +715,7 @@ static void wipe_unused_mft(ntfs_inode *ni)
 	if (ni->mft_no <= LAST_METADATA_INODE)
 		return;
 	
-	unused = m->bytes_in_use - sizeof(MFT_RECORD);
+	unused = le32_to_cpu(m->bytes_in_use) - sizeof(MFT_RECORD);
 	wiped_unused_mft += wipe_data((char *)m, sizeof(MFT_RECORD), unused);
 }
 
@@ -782,7 +784,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 		if (wipe)
 			nr_used_mft_records++;
 
-		if ((ni->mrec->base_mft_record) != 0)
+		if (ni->mrec->base_mft_record)
 			goto out;
 
 		walk->image->ni = ni;
@@ -909,7 +911,8 @@ static void mount_volume(unsigned long new_mntflag)
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
-	Printf("Cluster size       : %u bytes\n", vol->cluster_size);
+	Printf("Cluster size       : %u bytes\n",
+			(unsigned int)vol->cluster_size);
 	print_volume_size("Current volume size",
 			  volume_size(vol, vol->nr_clusters));
 }
@@ -1125,4 +1128,3 @@ int main(int argc, char **argv)
 	fsync_clone(fd_out);
 	exit(0);
 }
-
