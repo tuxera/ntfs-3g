@@ -663,7 +663,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 
 		parent_mref = ntfs_mft_get_parent_ref(dir_ni);
 		if (parent_mref == ERR_MREF(-1)) {
-			Dprintf("Parent directory not found: %s\n", errno);
+			Dperror("Parent directory not found");
 			goto dir_err_out;
 		}
 

@@ -303,8 +303,8 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			 */
 			Dprintf("%s(): Adding run (lcn 0x%llx, len 0x%llx), "
 					"prev_lcn = 0x%llx, lcn = 0x%llx, "
-					"bmp_pos = 0x%llx, prev_run_len = 0x%x, "
-					"rlpos = %i.\n", __FUNCTION__,
+					"bmp_pos = 0x%llx, prev_run_len = "
+					"0x%llx, rlpos = %i.\n", __FUNCTION__,
 					(long long)(lcn + bmp_pos), 1LL,
 					(long long)prev_lcn, (long long)lcn,
 					(long long)bmp_pos,
@@ -600,8 +600,8 @@ switch_to_data1_zone:		search_zone = 2;
 				}
 				break;
 			case 4:
-				Dprintf("%s(): Switching from data2 zone to "
-						"data1 zone.\n");
+				Dputs("Switching from data2 zone to data1 "
+						"zone.");
 				/* Update data2 zone position. */
 				if (rlpos) {
 					LCN tc;
@@ -701,9 +701,9 @@ switch_to_data1_zone:		search_zone = 2;
 				(long long)zone_end,
 				(long long)vol->data1_zone_pos);
 	}
-	Dprintf("%s(): After outer while loop.\n");
+	Dputs("After outer while loop.");
 done_ret:
-	Dprintf("%s(): At done_ret.\n");
+	Dputs("At done_ret.");
 	/* Add runlist terminator element. */
 	rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
 	rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
@@ -725,7 +725,7 @@ done_ret:
 		}
 	}
 done_err_ret:
-	Dprintf("%s(): At done_err_ret (follows done_ret).\n");
+	Dputs("At done_err_ret (follows done_ret).n");
 	free(buf);
 	/* Done! */
 	if (!err)

@@ -397,12 +397,12 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 {
 	LCN mft_zone_size, mft_lcn;
 	s64 br;
-	const char *OK = "OK";
-	const char *FAILED = "FAILED";
 	ntfs_volume *vol;
 	NTFS_BOOT_SECTOR *bs;
 	int eo;
 #ifdef DEBUG
+	const char *OK = "OK";
+	const char *FAILED = "FAILED";
 	BOOL debug = 1;
 #else
 	BOOL debug = 0;
@@ -585,8 +585,10 @@ error_exit:
 ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 {
 	s64 l;
+#ifdef DEBUG
 	const char *OK = "OK";
 	const char *FAILED = "FAILED";
+#endif
 	ntfs_volume *vol;
 	u8 *m = NULL, *m2 = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;

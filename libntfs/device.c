@@ -495,7 +495,8 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 
 		if (dev->d_ops->ioctl(dev, FDGETPRM, &this_floppy) >= 0) {
 			Dprintf("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
-					this_floppy.size, this_floppy.size);
+					(unsigned long)this_floppy.size,
+					(unsigned long)this_floppy.size);
 			return (s64)this_floppy.size * 512 / block_size;
 		}
 	}
