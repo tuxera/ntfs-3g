@@ -55,4 +55,5 @@ ntfsprogs/ntfsrm
 ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
 ntfsprogs/ntfswipe
+ntfsprogs/ntfscp
 
