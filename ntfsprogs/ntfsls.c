@@ -2,6 +2,7 @@
  * ntfsls - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Lode Leroy
+ * Copyright (c) 2003 Anton Altaparmakov
  *
  * This utility will list a directory's files.
  *
@@ -56,9 +57,9 @@ static struct options {
 	char    *path;
 } opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -67,13 +68,13 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+void version(void)
 {
-	printf ("\n%s v%s - Display information about an NTFS Volume.\n\n",
-		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2003      Lode Leroy\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("\n%s v%s - Display information about an NTFS Volume.\n\n",
+			EXEC_NAME, VERSION);
+	printf("Copyright (c)\n");
+	printf("    2003      Lode Leroy\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -83,9 +84,9 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+void usage(void)
 {
-	printf ("\nUsage: %s [options] -d /dev/hda1 -p /WINDOWS\n"
+	printf("\nUsage: %s [options] -d /dev/hda1 -p /WINDOWS\n"
 		"\n"
 		"    -d      --device     NTFS volume\n"
 		"    -p      --path       Relative path to the directory\n"
@@ -101,7 +102,7 @@ void usage (void)
 		"    -s                   Display system files\n"
 		"\n",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -113,7 +114,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char *argv[])
+int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-fh?qvVd:p:asxliFRHSA";
 	static const struct option lopt[] = {
@@ -143,13 +144,13 @@ int parse_options (int argc, char *argv[])
 	opterr = 0; /* We'll handle the errors, thank you. */
 
 	memset(&opts, 0, sizeof(opts));
-	opts.device = "/dev/hda1";
+	opts.device = NULL;
 	opts.path = "/";
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
-		case 'd':	/* A non-option argument */
-			opts.device = argv[optind-1];
+		case 'd':
+			opts.device = argv[optind - 1];
 			break;
 		case 'p':
 			opts.path = optarg;
@@ -201,23 +202,25 @@ int parse_options (int argc, char *argv[])
 			opts.archive++;
 			break;
 		default:
-			Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
 			err++;
 			break;
 		}
 	}
 
-	if (help || ver) {
+	if (help || ver)
 		opts.quiet = 0;
-	} else {
+	else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify exactly one device.\n");
+				Eprintf("You must specify exactly one "
+						"device.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			Eprintf("You may not use --quiet and --verbose at the "
+					"same time.\n");
 			err++;
 		}
 	}
@@ -229,7 +232,6 @@ int parse_options (int argc, char *argv[])
 
 	return (!err && !help && !ver);
 }
-
 
 /**
  * ucstos - convert unicode-character string to ASCII
@@ -290,100 +292,105 @@ int stoucs(uchar_t *dest, const char *src, int maxlen)
    index of the first byte is start */
 void dump_mem(unsigned char *buf, int start, int length)
 {
-        int offs,i;
-        for(offs=0;offs<length;offs+=16)
-        {
-                printf("%8.8X ",start+offs);
-                for(i=0;i<16;i++)printf(offs+i<length?"%2X ":"   ",buf[offs+i]);
-                for(i=0;i<16;i++)
-		    if (offs+i>=length) { putchar(' '); } else
-                        if(buf[offs+i]>31 && buf[offs+i]<128)putchar(buf[offs+i]
-);
-                        else putchar('.');
-                putchar('\n');
-        }
+	int offs, i;
+
+	for (offs = 0; offs < length; offs += 16) {
+		printf("%8.8X ", start + offs);
+		for (i = 0; i < 16; i++)
+			printf(offs + i < length ? "%2X " : "   ", buf[offs+i]);
+		for (i = 0; i < 16; i++) {
+			if (offs + i >= length)
+				putchar(' ');
+			else if (buf[offs + i] > 31 && buf[offs + i] < 128)
+				putchar(buf[offs + i]);
+			else putchar('.');
+		}
+		putchar('\n');
+	}
 }
 
 typedef struct {
-  ntfs_volume* vol;
+	ntfs_volume* vol;
 } ntfsls_dirent;
 
-int
-list_entry(ntfsls_dirent* dirent, const uchar_t* name, 
-	   const int name_len, const int name_type, const s64 pos,
-	   const MFT_REF mref, const unsigned dt_type) {
-
+// FIXME: Should we print errors as we go along? (AIA)
+int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
+		const int name_len, const int name_type, const s64 pos,
+		const MFT_REF mref, const unsigned dt_type) {
 	char filename[200];
-	ucstos(filename, name, min(name_len+1,sizeof(filename)));
+
+	ucstos(filename, name, min(name_len + 1, sizeof(filename)));
+	// FIXME: error checking... (AIA)
+	// FIXME: Why not use ntfs_mbstoucs() from libntfs? (AIA)
 	//printf("[%s\t,%d,%d]\n", filename, name_type, dt_type);
-	if ((filename[0] == '$') && (!opts.sys)) {
+
+	if ((filename[0] == '$') && (!opts.sys))
 		return 0;
-	} else
-	if (name_type == 0 && !opts.all) {
+	if (name_type == 0 && !opts.all)
 		return 0;
-	}
-	if (((name_type & 3) == 1) && (opts.dos!=0)) {
+	if (((name_type & 3) == 1) && (opts.dos != 0))
 		return 0;
-	}
-	if (((name_type & 3) == 2) && (opts.dos!=1)) {
+	if (((name_type & 3) == 2) && (opts.dos != 1))
 		return 0;
-	}
-	if (dt_type == NTFS_DT_DIR && opts.classify) {
-	    sprintf(filename+strlen(filename),"/");
-	}
+	if (dt_type == NTFS_DT_DIR && opts.classify)
+		sprintf(filename + strlen(filename), "/");
 
 	if (!opts.lng) {
 		printf(filename);
 		printf("\n");
 	} else {
-	    ntfs_inode *ni = NULL;
-	    ntfs_attr_search_ctx *ctx = NULL;
-	    FILE_NAME_ATTR *file_name_attr = NULL;
-	    ATTR_RECORD *attr = NULL;
-	    time_t ntfs_time;
+		s64 filesize = 0;
+		ntfs_inode *ni;
+		ntfs_attr_search_ctx *ctx;
+		FILE_NAME_ATTR *file_name_attr;
+		ATTR_RECORD *attr;
+		time_t ntfs_time;
+		char t_buf[26];
 
-	    ni = ntfs_inode_open(dirent->vol, mref);
-	    if (!ni) { 
-		return -1; 
-	    }
-	    //dump_mem(ni, 0, sizeof(ntfs_inode));
+		ni = ntfs_inode_open(dirent->vol, mref);
+		if (!ni)
+			return -1;
+		//dump_mem(ni, 0, sizeof(ntfs_inode));
 
-	    ctx = ntfs_attr_get_search_ctx(ni, ni->mrec);
-	    if (!ctx) { 
-		return -1; 
-	    }
-	    if(ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		return -1;
-	    }
-	    attr = ctx->attr;
-	    //dump_mem(attr, 0, sizeof(*attr));
+		ctx = ntfs_attr_get_search_ctx(ni, ni->mrec);
+		if (!ctx)
+			return -1;
 
-	    file_name_attr = (FILE_NAME_ATTR*)((char *)attr + le16_to_cpu(attr->value_offset));
-	    if (!file_name_attr) {
-		return -1;
-	    }
-	    //dump_mem(file_name_attr, 0, sizeof(*file_name_attr));
+		if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL,
+				0, ctx))
+			return -1;
+		attr = ctx->attr;
+		//dump_mem(attr, 0, sizeof(*attr));
 
-	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_data_change_time));
-	    char t_buf[26];
-	    strcpy(t_buf, ctime(&ntfs_time));
-	    t_buf[16] = '\0';
+		file_name_attr = (FILE_NAME_ATTR *)((char *)attr +
+				le16_to_cpu(attr->value_offset));
+		if (!file_name_attr)
+			return -1;
+		//dump_mem(file_name_attr, 0, sizeof(*file_name_attr));
 
-	    s64 filesize = 0;
-	    if (dt_type != NTFS_DT_DIR) {
-		if(!ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		    attr = ctx->attr;
-		    filesize = ntfs_get_attribute_value_length(attr);
+		ntfs_time = ntfs2utc(sle64_to_cpu(
+				file_name_attr->last_data_change_time));
+		strcpy(t_buf, ctime(&ntfs_time));
+		t_buf[16] = '\0';
+
+		if (dt_type != NTFS_DT_DIR) {
+			if (!ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0,
+					NULL, 0, ctx))
+				filesize = ntfs_get_attribute_value_length(
+						ctx->attr);
 		}
-	    }
 
-	    if (opts.inode) {
-		printf("%12lld  %18lld  %s\n", filesize, mref, filename);
-	    } else {
-		printf("%12lld  %s  %s\n", filesize, t_buf+4, filename);
-	    }
+		/* Release atrtibute search context and close the inode. */
+		ntfs_attr_put_search_ctx(ctx);
+		ntfs_inode_close(ni);
+
+		if (opts.inode)
+			printf("%12lld  %18lld  %s\n", filesize, mref,
+					filename);
+		else
+			printf("%12lld  %s  %s\n", filesize, t_buf + 4,
+					filename);
 	}
-	
 	return 0;
 }
 
@@ -393,47 +400,83 @@ list_entry(ntfsls_dirent* dirent, const uchar_t* name,
  * Start from here.
  *
  * Return:  0  Success, the program worked
- *	    1  Error, something went wrong
+ *	    1  Error, parsing mount options failed
+ *	    2  Error, mount attempt failed
+ *	    3  Error, failed to open root directory
+ *	    3  Error, failed to open directory in search path
  */
 int main(int argc, char **argv)
 {
+	u64 ino;
+	s64 pos;
 	ntfs_volume *vol;
+	ntfs_inode *ni;
+	char *p;
+	int len;
+	uchar_t unicode[100];
+	ntfsls_dirent dirent;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv)) {
+		// FIXME: Print error... (AIA)
 		return 1;
+	}
 
 	utils_set_locale();
 
-	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
-
-	if (!vol)
+	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
+	if (!vol) {
+		// FIXME: Print error... (AIA)
 		return 2;
+	}
 
-	s64 pos = 0;
-	u64 ino;
-	ntfs_inode* ni = vol->mft_ni;
-	uchar_t unicode[100];
-	int len;
+	/* Open the root directory of the ntfs volume. */
 	ni = ntfs_inode_open(vol, FILE_root);
-	char* p = opts.path;
-	while (p && *p && *p == '/') p++;
+	if (!ni) {
+		// FIXME: Print error... (AIA)
+		ntfs_umount(vol, FALSE);
+		return 3;
+	}
+
+	p = opts.path;
+	while (p && *p && *p == '/')
+		p++;
 	while (p && *p) {
-		char* q = strchr(p, '/');
+		char *q = strchr(p, '/');
 		if (q != NULL) {
 			*q = '\0';
 			q++;
 		}
-		len = stoucs(unicode, p, sizeof(unicode));
-		ino = ntfs_inode_lookup_by_name(ni, unicode, len);
-		ni = ntfs_inode_open(vol, ino);
-		p = q;
-		while (p && *p && *p == '/') p++;
-	}
-	ntfsls_dirent dirent;
-	dirent.vol = vol;
-	ntfs_readdir(ni, &pos, &dirent, list_entry);
 
-	ntfs_umount (vol, FALSE);
+		len = stoucs(unicode, p, sizeof(unicode));
+		// FIXME: error checking... (AIA)
+
+		ino = ntfs_inode_lookup_by_name(ni, unicode, len);
+		// FIXME: error checking... (AIA)
+
+		/* Finished with the inode; release it. */
+		ntfs_inode_close(ni);
+
+		ni = ntfs_inode_open(vol, ino);
+		if (!ni) {
+			// FIXME: Print error... (AIA)
+			ntfs_umount(vol, FALSE);
+			return 4;
+		}
+
+		p = q;
+		while (p && *p && *p == '/')
+			p++;
+	}
+	pos = 0;
+	memset(&dirent, 0, sizeof(dirent));
+	dirent.vol = vol;
+	ntfs_readdir(ni, &pos, &dirent, (ntfs_filldir_t)list_entry);
+	// FIXME: error checking... (AIA)
+
+	/* Finished with the inode; release it. */
+	ntfs_inode_close(ni);
+
+	ntfs_umount(vol, FALSE);
 	return 0;
 }
 
