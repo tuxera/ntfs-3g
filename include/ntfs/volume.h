@@ -170,6 +170,8 @@ struct _ntfs_volume {
 				   bytes. */
 
 	void *private_data;	/* Temp: for directory handling */
+	void *private_bmp1;
+	void *private_bmp2;
 };
 
 extern ntfs_volume *ntfs_volume_alloc(void);
