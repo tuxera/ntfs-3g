@@ -95,16 +95,8 @@ struct {
 				/* -V, print version and exit. */
 } opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
-
-void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
-void usage(void) __attribute__ ((noreturn));
-
 /**
- * Dprintf
- * Debugging output (-vv). Overriden by quiet (-q).
+ * Dprintf - debugging output (-vv); overriden by quiet (-q)
  */
 void Dprintf(const char *fmt, ...)
 {
@@ -119,43 +111,81 @@ void Dprintf(const char *fmt, ...)
 }
 
 /**
- * version - Print version information about the program
- *
- * Print a copyright statement and a brief description of the program.
- *
- * Return:  none
+ * Eprintf - error output; ignores quiet (-q)
  */
-void version (void)
+void Eprintf(const char *fmt, ...)
 {
-	printf ("\n%s v%s - Truncate a specified attribute of a specified inode.\n\n",
-		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2002-2003 Anton Altaparmakov\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+/* Generate code for Vprintf() function: Verbose output (-v). */
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+
+/* Generate code for Qprintf() function: Quietable output (if not -q). */
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
+
+/**
+ * err_exit - error output and terminate; ignores quiet (-q)
+ */
+void err_exit(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "Aborting...\n");
+	exit(1);
 }
 
 /**
- * usage - Print a list of the parameters to the program
- *
- * Print a list of the parameters and options for the program.
- *
- * Return:  none
+ * copyright - print copyright statements
  */
+void copyright(void)
+{
+	fprintf(stderr, "Copyright (c) 2002-2003 Anton Altaparmakov\n"
+			"Copyright (c) 2003 Richard Russon\n"
+			"Truncate a specified attribute of a specified "
+			"inode.\n");
+}
+
+/**
+ * license - print licese statement
+ */
+void license(void)
+{
+	fprintf(stderr, "%s", ntfs_gpl);
+}
+
+/**
+ * usage - print a list of the parameters to the program
+ */
+void usage(void) __attribute__ ((noreturn));
 void usage (void)
 {
-	printf ("\nUsage: %s [options] device [attr-type [attr-name]] new-length\n"
-	       "    If attr-type is not specified, 0x80 (i.e. $DATA) is assumed.\n"
-	       "    If attr-name is not specified, an unnamed attribute is assumed.\n"
-	       "\n"
-	       "    -n    Do not write to disk\n"
-	       "    -f    Use less caution\n"
-	       "    -q    Less output\n"
-	       "    -v    More output\n"
-	       "    -V    Display version information\n"
-	       "    -h    Display this help\n\n",
-	       EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
-	exit (1);
+	copyright();
+	fprintf(stderr, "Usage: %s [options] device [attr-type [attr-name]] "
+			"new-length\n"
+			"    If attr-type is not specified, 0x80 (i.e. $DATA) "
+			"is assumed.\n"
+			"    If attr-name is not specified, an unnamed "
+			"attribute is assumed.\n"
+			"    -n    Do not write to disk\n"
+			"    -f    Force execution despite errors\n"
+			"    -q    Quiet execution\n"
+			"    -v    Verbose execution\n"
+			"    -vv   Very verbose execution\n"
+			"    -V    Display version information\n"
+			"    -l    Display licensing information\n"
+			"    -h    Display this help\n", EXEC_NAME);
+	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
+	exit(1);
 }
 
 /**
@@ -169,9 +199,8 @@ void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	//fprintf(stderr, "%s v%s -- Copyright (c) 2002-2003 Anton "
-			//"Altaparmakov\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "fh?nqvV")) != EOF)
+	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
+	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF)
 		switch (c) {
 		case 'f':
 			opts.force = 1;
@@ -186,7 +215,11 @@ void parse_options(int argc, char *argv[])
 			opts.verbose++;
 			break;
 		case 'V':
-			version();
+			/* Version number already printed, so just exit. */
+			exit(0);
+		case 'l':
+			copyright();
+			license();
 			exit(0);
 		case 'h':
 		case '?':
@@ -261,22 +294,6 @@ void parse_options(int argc, char *argv[])
 		err_exit("Invalid new length: %s\n", s);
 	new_len = ll;
 	Dprintf("new length = %Li\n", new_len);
-}
-/* Error output and terminate. Ignores quiet (-q). */
-
-/**
- * err_exit
- */
-void err_exit(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	fprintf(stderr, "Aborting...\n");
-	exit(1);
 }
 
 /**

@@ -170,58 +170,110 @@ struct {
 					/* -V, print version and exit. */
 } opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
-
-void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
-void usage(void) __attribute__ ((noreturn));
-
 /**
- * version - Print version information about the program
- *
- * Print a copyright statement and a brief description of the program.
- *
- * Return:  none
+ * Dprintf - debugging output (-vv); overriden by quiet (-q)
  */
-void version (void)
+void Dprintf(const char *fmt, ...)
 {
-	printf ("\n%s v%s - Create an NTFS volume on a user specified (block) device.\n\n",
-		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2000-2003 Anton Altaparmakov\n");
-	printf ("    2001-2003 Richard Russon\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	va_list ap;
+
+	if (!opts.quiet && opts.verbose > 1) {
+		printf("DEBUG: ");
+		va_start(ap, fmt);
+		vprintf(fmt, ap);
+		va_end(ap);
+	}
 }
 
 /**
- * usage - Print a list of the parameters to the program
- *
- * Print a list of the parameters and options for the program.
- *
- * Return:  none
+ * Eprintf - error output; ignores quiet (-q)
  */
-void usage (void)
+void Eprintf(const char *fmt, ...)
 {
-	printf ("\nUsage: %s [options] device [number-of-sectors]\n"
-	       "    -s sector-size           Specify the sector size for the device\n"
-	       "    -c cluster-size          Specify the cluster size for the volume\n"
-	       "    -L volume-label          Set the volume label\n"
-	       "    -z mft-zone-multiplier   Set the MFT zone multiplier\n"
-	       "    -f                       Perform a quick format\n"
-	       "    -Q                       Perform a quick format\n"
-	       "    -C                       Enable compression on the volume\n"
-	       "    -I                       mft-zone-multiplier       \n"
-	       "\n"                       
-	       "    -n                       Do not write to disk\n"
-	       "    -F                       Use less caution\n"
-	       "    -q                       Quiet execution\n"
-	       "    -v                       Verbose execution\n"
-	       "    -v                       Very verbose execution\n"
-	       "    -V                       Display version information\n"
-	       "    -h                       Display this help\n\n",
-	       EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+/* Generate code for Vprintf() function: Verbose output (-v). */
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+
+/* Generate code for Qprintf() function: Quietable output (if not -q). */
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
+
+/**
+ * err_exit - error output and terminate; ignores quiet (-q)
+ */
+void err_exit(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "Aborting...\n");
+	exit(1);
+
+}
+
+/**
+ * copyright - print copyright statements
+ */
+void copyright(void)
+{
+	fprintf(stderr, "Copyright (c) 2000-2003 Anton Altaparmakov\n"
+			"Copyright (c) 2001-2003 Richard Russon\n"
+			"Create an NTFS volume on a user specified (block) "
+			"device.\n");
+}
+
+/**
+ * license - print licese statement
+ */
+void license(void)
+{
+	fprintf(stderr, "%s", ntfs_gpl);
+}
+
+/**
+ * usage - print a list of the parameters to the program
+ */
+void usage(void) __attribute__ ((noreturn));
+void usage(void)
+{
+	copyright();
+	fprintf(stderr,	"Usage: %s [options] device "
+			"[number-of-sectors]\n"
+			"    -s sector-size           Specify the sector size "
+			"for the device\n"
+			"    -c cluster-size          Specify the cluster "
+			"size for the volume\n"
+			"    -L volume-label          Set the volume label\n"
+			"    -z mft-zone-multiplier   Set the MFT zone "
+			"multiplier\n"
+			"    -f                       Perform a quick format\n"
+			"    -Q                       Perform a quick format\n"
+			"    -C                       Enable compression on "
+			"the volume\n"
+			"    -I                       Disable indexing on the "
+			"volume\n"
+			"    -n                       Do not write to disk\n"
+			"    -F                       Force execution despite "
+			"errors\n"
+			"    -q                       Quiet execution\n"
+			"    -v                       Verbose execution\n"
+			"    -vv                      Very verbose execution\n"
+			"    -V                       Display version "
+			"information\n"
+			"    -l                       Display licensing "
+			"information\n"
+			"    -h                       Display this help\n",
+			EXEC_NAME);
+	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
@@ -239,7 +291,8 @@ void parse_options(int argc, char *argv[])
 //		 logfile size, list of bad blocks, check for bad blocks, ...
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	while ((c = getopt(argc, argv, "c:fh?nqs:vz:CFIL:QV")) != EOF)
+	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
+	while ((c = getopt(argc, argv, "c:fh?nqs:vz:CFIL:QVl")) != EOF)
 		switch (c) {
 		case 'n':
 			opts.no_action = 1;
@@ -285,7 +338,11 @@ void parse_options(int argc, char *argv[])
 			vol->vol_name = optarg;
 			break;
 		case 'V':
-			version();
+			/* Version number already printed, so just exit. */
+			exit(0);
+		case 'l':
+			copyright();
+			license();
 			exit(0);
 		case 'h':
 		case '?':
@@ -304,39 +361,6 @@ void parse_options(int argc, char *argv[])
 	}
 	if (optind < argc)
 		usage();
-}
-
-
-/**
- * err_exit
- * Error output and terminate. Ignores quiet (-q).
- */
-void err_exit(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	fprintf(stderr, "Aborting...\n");
-	exit(1);
-}
-
-/**
- * Dprintf
- * Debugging output (-vv). Overriden by quiet (-q).
- */
-void Dprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opts.quiet && opts.verbose > 1) {
-		printf("DEBUG: ");
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
 }
 
 /**
@@ -1269,7 +1293,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		if (err >= 0)
 			err = -EIO;
 		Eprintf("insert_positioned_attr_in_mft_record failed with "
-				"error %lld.\n", err < 0 ? err : bw);
+				"error %i.\n", err < 0 ? err : (int)bw);
 	}
 err_out:
 	if (ctx)
@@ -2490,9 +2514,6 @@ void mkntfs_exit(void)
 		free(vol);
 }
 
-// What's wrong with MK_MREF?
-#define MAKE_MFT_REF(_ref, _seqno)	cpu_to_le64((((u64)(_seqno)) << 48) \
-						| ((u64)(_ref)))
 /**
  * main
  */
@@ -2510,6 +2531,7 @@ int main(int argc, char **argv)
 	NTFS_BOOT_SECTOR *bs;
 	unsigned long mnt_flags;
 
+	/* Setup the correct locale for string output and conversion. */
 	utils_set_locale();
 
 	/* Initialize the random number generator with the current time. */
@@ -3058,7 +3080,7 @@ int main(int argc, char **argv)
 		// dump_mft_record(m);
 	}
 	/* The root directory mft reference. */
-	root_ref = MAKE_MFT_REF(FILE_root, FILE_root);
+	root_ref = MK_LE_MREF(FILE_root, FILE_root);
 	Vprintf("Creating root directory (mft record 5)\n");
 	m = (MFT_RECORD*)(buf + 5 * vol->mft_record_size);
 	m->flags |= MFT_RECORD_IS_DIRECTORY;
@@ -3107,7 +3129,7 @@ int main(int argc, char **argv)
 			opts.mft_size);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_MFT, 1), opts.mft_size,
+				MK_LE_MREF(FILE_MFT, 1), opts.mft_size,
 				opts.mft_size, FILE_ATTR_HIDDEN |
 				FILE_ATTR_SYSTEM, 0, 0, "$MFT",
 				FILE_NAME_WIN32_AND_DOS);
@@ -3128,7 +3150,7 @@ int main(int argc, char **argv)
 			rl_mftmirr[0].length * vol->cluster_size);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_MFTMirr, FILE_MFTMirr),
+				MK_LE_MREF(FILE_MFTMirr, FILE_MFTMirr),
 				rl_mftmirr[0].length * vol->cluster_size,
 				rl_mftmirr[0].length * vol->cluster_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
@@ -3153,7 +3175,7 @@ int main(int argc, char **argv)
 	buf2 = NULL;
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_LogFile, FILE_LogFile),
+				MK_LE_MREF(FILE_LogFile, FILE_LogFile),
 				opts.logfile_size, opts.logfile_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
 				"$LogFile", FILE_NAME_WIN32_AND_DOS);
@@ -3167,7 +3189,7 @@ int main(int argc, char **argv)
 	Vprintf("Creating $Volume (mft record 3)\n");
 	m = (MFT_RECORD*)(buf + 3 * vol->mft_record_size);
 	err = create_hardlink(index_block, root_ref, m,
-			MAKE_MFT_REF(FILE_Volume, FILE_Volume), 0LL, 0LL,
+			MK_LE_MREF(FILE_Volume, FILE_Volume), 0LL, 0LL,
 			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
 			"$Volume", FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
@@ -3204,7 +3226,7 @@ int main(int argc, char **argv)
 	buf2 = NULL;
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_AttrDef, FILE_AttrDef),
+				MK_LE_MREF(FILE_AttrDef, FILE_AttrDef),
 				(buf2_size + vol->cluster_size - 1) &
 				~(vol->cluster_size - 1), buf2_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
@@ -3222,7 +3244,7 @@ int main(int argc, char **argv)
 	err = add_attr_data(m, NULL, 0, 0, 0, lcn_bitmap, lcn_bitmap_byte_size);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_Bitmap, FILE_Bitmap),
+				MK_LE_MREF(FILE_Bitmap, FILE_Bitmap),
 				(lcn_bitmap_byte_size + vol->cluster_size - 1) &
 				~(vol->cluster_size - 1), lcn_bitmap_byte_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
@@ -3300,7 +3322,7 @@ int main(int argc, char **argv)
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, rl_boot, buf2, 8192);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_Boot, FILE_Boot),
+				MK_LE_MREF(FILE_Boot, FILE_Boot),
 				(8192 + vol->cluster_size - 1) &
 				~(vol->cluster_size - 1), 8192,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
@@ -3353,7 +3375,7 @@ bb_err:
 	}
 	if (!err) {
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_BadClus, FILE_BadClus),
+				MK_LE_MREF(FILE_BadClus, FILE_BadClus),
 				0LL, 0LL, FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM,
 				0, 0, "$BadClus", FILE_NAME_WIN32_AND_DOS);
 	}
@@ -3369,7 +3391,7 @@ bb_err:
 	err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(9, 9), 0LL, 0LL, FILE_ATTR_HIDDEN
+				MK_LE_MREF(9, 9), 0LL, 0LL, FILE_ATTR_HIDDEN
 				| FILE_ATTR_SYSTEM, 0, 0, "$Quota",
 				FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
@@ -3385,7 +3407,7 @@ bb_err:
 			vol->upcase_len << 1);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_UpCase, FILE_UpCase),
+				MK_LE_MREF(FILE_UpCase, FILE_UpCase),
 				((vol->upcase_len << 1) + vol->cluster_size - 1) &
 				~(vol->cluster_size - 1), vol->upcase_len << 1,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
