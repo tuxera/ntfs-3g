@@ -24,6 +24,8 @@
 
 #include "config.h"
 
+#ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+
 #ifndef __CYGWIN32__
 
 /* Not on Cygwin; use standard Unix style low level device operations. */
@@ -41,6 +43,8 @@
 struct ntfs_device_operations;
 
 extern struct ntfs_device_operations ntfs_device_default_io_ops;
+
+#endif /* NO_NTFS_DEVICE_DEFAULT_IO_OPS */
 
 #endif /* defined _NTFS_DEVICE_IO_H */
 

@@ -945,10 +945,20 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 {
 	struct ntfs_device *dev;
 
+#ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	/* Allocate an ntfs_device structure. */
 	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev)
 		return NULL;
+#else
+	/*
+	 * ntfs_mount() makes no sense if NO_NTFS_DEVICE_DEFAULT_IO_OPS is
+	 * defined as there are no device operations available in libntfs in
+	 * this case.
+	 */
+	errno = ENOTSUP;
+	return NULL;
+#endif
 	/* Call ntfs_device_mount() to do the actual mount. */
 	return ntfs_device_mount(dev, rwflag);
 }
