@@ -238,6 +238,7 @@ found_it:
 	ia = (INDEX_ALLOCATION*)malloc(index_block_size);
 	if (!ia) {
 		Dperror("Failed to allocate buffer for index block");
+		ntfs_attr_close(ia_na);
 		goto put_err_out;
 	}
 
@@ -335,6 +336,7 @@ found_it2:
 			 * about having matched imperfectly before.
 			 */
 			mref = le64_to_cpu(ie->indexed_file);
+			free(ia);
 			ntfs_attr_close(ia_na);
 			ntfs_attr_put_search_ctx(ctx);
 			return mref;
@@ -422,6 +424,7 @@ found_it2:
 		errno = EIO;
 		goto close_err_out;
 	}
+	free(ia);
 	ntfs_attr_close(ia_na);
 	ntfs_attr_put_search_ctx(ctx);
 	/*
@@ -599,10 +602,10 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	ntfs_volume *vol;
 	ntfs_attr *ia_na, *bmp_na = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
-	u8 *index_end, *bmp;
+	u8 *index_end, *bmp = NULL;
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
-	INDEX_ALLOCATION *ia;
+	INDEX_ALLOCATION *ia = NULL;
 	int rc, ir_pos, bmp_buf_size, bmp_buf_pos, eo;
 	u32 index_block_size, index_vcn_size;
 	u8 index_block_size_bits, index_vcn_size_bits;
@@ -901,6 +904,10 @@ EOD:
 	/* We are finished, set *pos to EOD. */
 	*pos = i_size + vol->mft_record_size;
 done:
+	if (ia)
+		free(ia);
+	if (bmp)
+		free(bmp);
 	if (bmp_na)
 		ntfs_attr_close(bmp_na);
 	if (ia_na)
@@ -920,6 +927,10 @@ err_out:
 	Dprintf("%s() failed.\n", __FUNCTION__);
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
+	if (ia)
+		free(ia);
+	if (bmp)
+		free(bmp);
 	if (bmp_na)
 		ntfs_attr_close(bmp_na);
 	if (ia_na)
