@@ -22,10 +22,10 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.6-WIP, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT([ntfsprogs],[1.8.6-WIP],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
 AM_ENABLE_SHARED
@@ -135,7 +135,7 @@ fi
 
 # Check for gcc version being >= 2.96.
 AC_MSG_CHECKING(version of $_cc)
-cc_version=`./getgccver $_cc`
+cc_version=`$srcdir/getgccver $_cc`
 cc_major=`echo $cc_version | cut -d'.' -f1`
 cc_minor=`echo $cc_version | cut -d'.' -f2`
 if test -z "$cc_version"; then
