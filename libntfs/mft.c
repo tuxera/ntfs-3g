@@ -425,6 +425,8 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 		data_pos = vol->mft_data_pos;
 	else
 		data_pos = base_ni->mft_no + 1;
+	if (data_pos < 24)
+		data_pos = 24;
 	if (data_pos >= pass_end) {
 		data_pos = 24;
 		pass = 2;
