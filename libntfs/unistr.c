@@ -112,7 +112,7 @@ int ntfs_names_collate(const uchar_t *name1, const u32 name1_len,
 
 #ifdef DEBUG
 	if (!name1 || !name2 || (ic && !upcase && upcase_len)) {
-		Dputs("ntfs_collate_names received NULL pointer!");
+		Dputs("ntfs_names_collate received NULL pointer!");
 		exit(1);
 	}
 #endif
@@ -267,7 +267,7 @@ void ntfs_name_upcase(uchar_t *name, u32 name_len, const uchar_t *upcase,
 /**
  * ntfs_file_value_upcase
  */
-void ntfs_file_upcase_value(FILE_NAME_ATTR *file_name_attr,
+void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 		const uchar_t *upcase, const u32 upcase_len)
 {
 	ntfs_name_upcase((uchar_t*)&file_name_attr->file_name,
@@ -277,7 +277,7 @@ void ntfs_file_upcase_value(FILE_NAME_ATTR *file_name_attr,
 /**
  * ntfs_file_values_compare
  */
-int ntfs_file_compare_values(FILE_NAME_ATTR *file_name_attr1,
+int ntfs_file_values_compare(FILE_NAME_ATTR *file_name_attr1,
 		FILE_NAME_ATTR *file_name_attr2,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len)

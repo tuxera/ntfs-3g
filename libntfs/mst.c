@@ -175,7 +175,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
  *
  * Perform the necessary post write multi sector transfer fixup, not checking
  * for any errors, because we assume we have just used
- * ntfs_pre_write_mst_fixup(), thus the data will be fine or we would never
+ * ntfs_mst_pre_write_fixup(), thus the data will be fine or we would never
  * have gotten here.
  */
 void ntfs_mst_post_write_fixup(NTFS_RECORD *b)

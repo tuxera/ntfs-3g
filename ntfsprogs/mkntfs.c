@@ -2100,7 +2100,7 @@ int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
 		}
 #endif
 */
-		i = ntfs_file_compare_values(file_name,
+		i = ntfs_file_values_compare(file_name,
 				(FILE_NAME_ATTR*)&ie->key.file_name, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -2124,7 +2124,7 @@ int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
 		if (file_name->file_name_type != FILE_NAME_POSIX ||
 		    ie->key.file_name.file_name_type != FILE_NAME_POSIX)
 			return -EEXIST;
-		i = ntfs_file_compare_values(file_name,
+		i = ntfs_file_values_compare(file_name,
 				(FILE_NAME_ATTR*)&ie->key.file_name, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (i == -1)
