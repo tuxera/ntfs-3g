@@ -101,7 +101,7 @@ static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
  *
  * Limited to a reletevly small but useful number of codes
  */
-static int ntfs_w32error_to_errno(DWORD w32error)
+static int ntfs_w32error_to_errno(unsigned int w32error)
 {
 	Dprintf("win32_w32error_to_errno(%d).\n",w32error);
 	switch (w32error) {
@@ -464,8 +464,8 @@ static BOOL ntfs_device_win32_find_partition(HANDLE handle,DWORD partition_id,
  *
  * When fails, fd contents may have not been preserved.
  */
-static __inline__ int ntfs_device_win32_open_partition(int drive_id,
-		DWORD partition_id, win32_fd *fd, int flags)
+static int ntfs_device_win32_open_partition(int drive_id,
+		unsigned int partition_id, win32_fd *fd, int flags)
 {
 	char drive_name[MAX_PATH];
 	HANDLE handle;
