@@ -30,7 +30,7 @@
 #	include <stdio.h>
 #endif
 
-struct runlist_element;
+struct _runlist_element;
 
 #ifdef DEBUG
 
@@ -66,14 +66,14 @@ static __inline__ void Dperror(const char *s)
 	errno = eo;
 }
 
-extern void ntfs_debug_runlist_dump(const runlist_element *rl);
+extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
 
 #else /* if !DEBUG */
 
 static __inline__ void Dprintf(const char *fmt __attribute__((unused)), ...) {}
 static __inline__ void Dputs(const char *s __attribute__((unused))) {}
 static __inline__ void Dperror(const char *s __attribute__((unused))) {}
-static __inline__ void ntfs_debug_runlist_dump(const runlist_element *rl __attribute__((unused))) {}
+static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}
 
 #endif /* !DEBUG */
 
