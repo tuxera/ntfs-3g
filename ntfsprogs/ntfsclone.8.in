@@ -1,39 +1,37 @@
 .\" -*- nroff -*-
 .\" Copyright (c) 2003 Richard Russon
 .\" Copyright (c) 2003-2004 Szabolcs Szakacsits
+.\" Copyright (c) 2004 Per Olofsson
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Mar 2004" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "Jul 2004" "ntfsprogs version @VERSION@"
 .SH NAME
-ntfsclone \- Efficiently clone an NTFS filesystem
+ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .SH SYNOPSIS
 .B ntfsclone
-[
-.B \-fhm
-] 
-.B \-\-output
-[ 
-.I FILE 
-| 
-.B \-
-]
-.B device
+[\fBOPTIONS\fR]
+.I source
 .br
-.B ntfsclone
-[
-.B \-fhm
-] 
-.B \-\-overwrite 
-.I FILE 
-.B device
+.B ntfsclone \-\-save-image
+[\fBOPTIONS\fR]
+.I source
+.br
+.B ntfsclone \-\-restore-image
+[\fBOPTIONS\fR]
+.I source
+.br
+.B ntfsclone \-\-metadata
+[\fBOPTIONS\fR]
+.I source
 .SH DESCRIPTION
 .B ntfsclone
 will efficiently clone (copy, save, backup, restore) an NTFS filesystem to a 
-sparse file, device (partition) or standard output. 
+sparse file, image, device (partition) or standard output. 
 It works at disk sector level and
 copies only the used data. Unused disk space becomes zero (cloning to 
-sparse file), left unchanged (cloning to a disk/partition) or 
+sparse file), encoded with control codes (cloning to an image),
+left unchanged (cloning to a disk/partition) or 
 filled with zeros (cloning to standard output).
 
 .B ntfsclone
@@ -42,7 +40,7 @@ and restore it later on, or for developers to test NTFS read/write
 functionality, troubleshot/investigate users' issues using the clone
 without the risk of destroying the original filesystem.
 
-The clone is an exact copy of the original
+The clone (if not using the image format) is an exact copy of the original
 NTFS filesystem from sector to sector thus it can be also mounted
 just like the original NTFS filesystem.
 For example if you clone to a file and the kernel has loopback device and
@@ -97,6 +95,28 @@ can't create an archive from the standard input, you can't do this
 in-place by just reading 
 .BR ntfsclone
 standard output.
+.SH THE SPECIAL IMAGE FORMAT
+It is also possible to clone an NTFS filesystem to a special image
+format. Instead of representing unallocated blocks as holes, they are
+encoded using control codes. Thus, the image saves space without
+requiring sparse file support. The image format is ideal for streaming
+filesystem images over the network and similar, and can be used as a
+replacement for Ghost or Partition Image if it is combined with other
+tools. The downside is that you can't mount the image directly, you
+need to restore it first.
+
+To save an image using the special image format, use the
+.B \-s
+or the
+.B \-\-save\-image
+option. To restore an image, use the
+.B \-r
+or the
+.B \-\-restore\-image
+option. Note that you can restore images from standard input by
+using '\-' as the 
+.I source
+file.
 .SH METADATA-ONLY CLONING
 One of the features of
 .BR ntfsclone
@@ -151,12 +171,21 @@ Clone NTFS to
 Clone 
 .B ONLY METADATA
 (for NTFS experts). Moreover only cloning to a file is allowed.
-You can't metadata-only clone to a device or standard output.
+You can't metadata-only clone to a device, image or standard output.
+.TP
+.B \-s, \-\-save\-image
+Save to the special image format.
+.TP
+.B \-r, \-\-restore\-image
+Restore from the special image format specified by
+.I source\fR.
+If the
+.I source
+is '\-' then the image is read from the standard input.
 .TP
 .B \-f, \-\-force
-Forces ntfsclone to proceed, overriding some safety checks. 
-You can use this parameter multiply times if you want 
-to overcome every single safety checks.
+Forces ntfsclone to proceed if the filesystem is marked 
+"dirty" for consistency check.
 .TP
 .B \-h, \-\-help
 Show a list of options with a brief description of each one.
@@ -214,6 +243,20 @@ Restore an NTFS volume from a remote host via ssh.
 .B ssh host 'cat ntfs.img.bz2' | bunzip2 | dd of=/dev/hda1 bs=8192
 .sp
 .RE
+Save a filesystem to a file in the special image format
+.RS
+.sp
+.B ntfsclone \-\-save\-image \-\-output ntfs.img /dev/hda1
+.sp
+.RE
+Stream an image from a web server and restore it to a partition
+.RS
+.sp
+.B wget \-qO \- http://server/ntfs.img | \\\\
+.br
+.B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
+.sp
+.RE
 Pack NTFS metadata for NTFS experts
 .RS
 .sp
@@ -235,6 +278,8 @@ XFS, JFS and ext3 don't have this problem.
 .SH AUTHOR
 .B ntfsclone
 was written by Szabolcs Szakacsits <szaka@sienet.hu>.
+
+Special image format support was added by Per Olofsson <pelle@dsv.su.se>.
 .SH AVAILABILITY
 .B ntfsclone
 is part of the ntfsprogs package and is available from
