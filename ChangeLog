@@ -143,12 +143,16 @@
 	  cope with pre-created sparse files.
 	- Remove GPL message text from usage information in mkntfs.
 	- New tool, ntfsundelete, written by Richard Russon.
-	- New tool, ntfsresize, written by Szabolcs Szakacsits.
+	- New tool, ntfsresize, written by Szakacsits Szabolcs.
 	- The word is "runlist", not "run_list", "run list", or "run-list".
 	- Prefix all functions with "ntfs_" and make the names of the form
 	  "ntfs_object_action()". Keep this for all future functions!
 	- Change unistr.c::ntfs_names_are_equal() to return TRUE when both
 	  names have zero length. Thanks to Leonard Norrgard for spotting this.
+	- Fix bug in ntfs_external_attr_find(). (Szakacsits Szabolcs)
+	- Fix stupid logic inversion bug in ntfs_extent_inode_open(). Same bug
+	  was fixed in the NTFS kernel driver over six months ago but the fix
+	  was never taken over to libntfs. (Szakacsits Szabolcs)
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
