@@ -2005,9 +2005,17 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 {
 	ATTR_DEF *ad;
 
+	/*
+	 * $DATA is always allowed to be non-resident even if $AttrDef does not
+	 * specify this in the flags of the $DATA attribute definition record.
+	 */
+	if (type == AT_DATA)
+		return 0;
+	/* Find the attribute definition record in $AttrDef. */
 	ad = ntfs_attr_find_in_attrdef(vol, type);
 	if (!ad)
 		return -1;
+	/* Check the flags and return the result. */
 	if (ad->flags & CAN_BE_NON_RESIDENT)
 		return 0;
 	errno = EPERM;
@@ -2015,12 +2023,55 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 }
 
 /**
+ * ntfs_attr_record_resize - resize an attribute record
+ * @m:		mft record containing attribute record
+ * @a:		attribute record to resize
+ * @new_size:	new size in bytes to which to resize the attribute record @a
+ *
+ * Resize the attribute record @a, i.e. the resident part of the attribute, in
+ * the mft record @m to @new_size bytes.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOSPC	- Not enough space in the mft record @m to perform the resize.
+ * Note that on error no modifications have been performed whatsoever.
+ *
+ * Warning: If you make a record smaller without having copied all the data you
+ *	    are interested in the data may be overwritten!
+ */
+static int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
+{
+	/* Align to 8 bytes, just in case the caller hasn't. */
+	new_size = (new_size + 7) & ~7;
+
+	/* If the actual attribute length has changed, move things around. */
+	if (new_size != le32_to_cpu(a->length)) {
+		u32 new_muse = le32_to_cpu(m->bytes_in_use) -
+				le32_to_cpu(a->length) + new_size;
+		/* Not enough space in this mft record. */
+		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+			errno = ENOSPC;
+			return -1;
+		}
+		/* Move attributes following @a to their new location. */
+		memmove((u8*)a + new_size, (u8*)a + le32_to_cpu(a->length),
+				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
+				(u8*)m) - le32_to_cpu(a->length));
+		/* Adjust @m to reflect the change in used space. */
+		m->bytes_in_use = cpu_to_le32(new_muse);
+		/* Adjust @a to reflect the new size. */
+		a->length = cpu_to_le32(new_size);
+	}
+	return 0;
+}
+
+/**
  * ntfs_resident_attr_value_resize - resize the value of a resident attribute
  * @m:		mft record containing attribute record
  * @a:		attribute record whose value to resize
- * @newsize:	new size in bytes to which to resize the attribute value of @a
+ * @new_size:	new size in bytes to which to resize the attribute value of @a
  *
- * Resize the value of the attribute @a in the mft record @m to @newsize bytes.
+ * Resize the value of the attribute @a in the mft record @m to @new_size bytes.
  * If the value is made bigger, the newly "allocated" space is cleared.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
@@ -2029,10 +2080,8 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
  * Note that on error no modifications have been performed whatsoever.
  */
 int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
-		const u32 newsize)
+		const u32 new_size)
 {
-	u32 new_alen, new_muse;
-
 	/*
 	 * Check that the attribute name hasn't been placed after the
 	 * attribute value/mapping pairs array. If it has we need to move it.
@@ -2060,42 +2109,231 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 			return -1;
 		}
 	}
-	/* Calculate the new attribute length and mft record bytes used. */
-	new_alen = (le16_to_cpu(a->value_offset) + newsize + 7) & ~7;
-	/* If the actual attribute length has changed, move things around. */
-	if (new_alen != le32_to_cpu(a->length)) {
-		new_muse = le32_to_cpu(m->bytes_in_use) -
-				le32_to_cpu(a->length) + new_alen;
-		/* Not enough space in this mft record. */
-		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
-			errno = ENOSPC;
-			return -1;
+	/* Resize the resident part of the attribute record. */
+	if (ntfs_attr_record_resize(m, a, (le16_to_cpu(a->value_offset) +
+			new_size + 7) & ~7) < 0) {
+		if (errno != ENOSPC) {
+			int eo = errno;
+
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Attribute record resize "
+					"failed. Aborting...\n", __FUNCTION__);
+			errno = eo;
 		}
-		/* Move attributes following @a to their new location. */
-		memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
-				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
-				(u8*)m) - le32_to_cpu(a->length));
-		/* Adjust @m to reflect the change in used space. */
-		m->bytes_in_use = cpu_to_le32(new_muse);
-		/* Adjust @a to reflect the new value size. */
-		a->length = cpu_to_le32(new_alen);
+		return -1;
 	}
 	/*
 	 * If we made the attribute value bigger, clear the area between the
-	 * old size and @newsize.
+	 * old size and @new_size.
 	 */
-	if (newsize > le32_to_cpu(a->value_length))
+	if (new_size > le32_to_cpu(a->value_length))
 		memset((u8*)a + le16_to_cpu(a->value_offset) +
-				le32_to_cpu(a->value_length), 0, newsize -
+				le32_to_cpu(a->value_length), 0, new_size -
 				le32_to_cpu(a->value_length));
-	a->value_length = cpu_to_le32(newsize);
+	/* Finally update the length of the attribute value. */
+	a->value_length = cpu_to_le32(new_size);
 	return 0;
 }
 
+/**
+ * ntfs_attr_make_non_resident - convert a resident to a non-resident attribute
+ * @na:		open ntfs attribute to make non-resident
+ * @ctx:	ntfs search context describing the attribute
+ *
+ * Convert a resident ntfs attribute to a non-resident one.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ *
+ * NOTE to self: No changes in the attribute list are required to move from
+ *		 a resident to a non-resident attribute.
+ *
+ * Warning: We do not set the inode dirty and we do not write out anything!
+ *	    We expect the caller to do this as this is a fairly low level
+ *	    function and it is likely there will be further changes made.
+ */
 static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		ntfs_attr_search_ctx *ctx)
 {
-	errno = ENOTSUP;
+	s64 new_allocated_size, bw;
+	ntfs_volume *vol = na->ni->vol;
+	ATTR_REC *a = ctx->attr;
+	runlist *rl;
+	int mp_size, mp_ofs, name_ofs, arec_size, err;
+
+	/* Some preliminary sanity checking. */
+	if (NAttrNonResident(na)) {
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Trying to make non-resident "
+				"attribute non-resident. Aborting...\n",
+				__FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+	/*
+	 * Check that the attribute name hasn't been placed after the
+	 * attribute value. If it has we need to move it.
+	 * TODO: Implement the move. For now just abort. (AIA)
+	 */
+	if (a->name_length && le16_to_cpu(a->name_offset) >=
+			le16_to_cpu(a->value_offset)) {
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Name is placed after the "
+				"attribute value. Aborting...\n", __FUNCTION__);
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	new_allocated_size = (le32_to_cpu(a->value_length) + vol->cluster_size
+			- 1) & ~(vol->cluster_size - 1);
+
+	/* Start by allocating clusters to hold the attribute value. */
+	rl = ntfs_cluster_alloc(vol, new_allocated_size >>
+			vol->cluster_size_bits, -1, DATA_ZONE);
+	if (!rl) {
+		if (errno != ENOSPC) {
+			int eo = errno;
+
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Failed to allocate "
+					"cluster(s). Aborting...\n",
+					__FUNCTION__);
+			errno = eo;
+		}
+		return -1;
+	}
+
+	/*
+	 * Setup the in-memory attribute structure to be non-resident so that
+	 * we can use ntfs_attr_pwrite().
+	 */
+	NAttrSetNonResident(na);
+	na->rl = rl;
+	na->allocated_size = new_allocated_size;
+	na->data_size = na->initialized_size = le32_to_cpu(a->value_length);
+	/*
+	 * For now just clear all of these as we don't support them when
+	 * writing.
+	 */
+	NAttrClearCompressed(na);
+	NAttrClearSparse(na);
+	NAttrClearEncrypted(na);
+	
+	/* Now copy the attribute value to the allocated cluster(s). */
+	bw = ntfs_attr_pwrite(na, 0, le32_to_cpu(a->value_length),
+			(u8*)a + le16_to_cpu(a->value_offset));
+	if (bw != le32_to_cpu(a->value_length)) {
+		err = errno;
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Failed to write out attribute "
+				"value (bw = %Li, errno = %i). Aborting...\n",
+				__FUNCTION__, (long long)bw, err);
+		if (bw >= 0)
+			err = EIO;
+		goto cluster_free_err_out;
+	}
+
+	/* Determine the size of the mapping pairs array. */
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl);
+	if (mp_size < 0) {
+		err = errno;
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Failed to get size for mapping "
+				"pairs array. Aborting...\n", __FUNCTION__);
+		goto cluster_free_err_out;
+	}
+
+	/* Calculate new offsets for the name and the mapping pairs array. */
+	name_ofs = (sizeof(ATTR_REC) - sizeof(a->compressed_size) + 7) & ~7;
+	mp_ofs = (name_ofs + a->name_length + 7) & ~7;
+
+	/*
+	 * Determine the size of the resident part of the non-resident
+	 * attribute record. (Not compressed thus no compressed_size element
+	 * present.)
+	 */
+	arec_size = (mp_ofs + mp_size + 7) & ~7;
+
+	/* Sanity check. */
+	if (a->name_length && (le16_to_cpu(a->name_offset) + a->name_length >
+			arec_size)) {
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Name exceeds new record size! "
+				"Not supported. Aborting...\n", __FUNCTION__);
+		err = ENOTSUP;
+		goto cluster_free_err_out;
+	}
+
+	/* Resize the resident part of the attribute record. */
+	if (ntfs_attr_record_resize(ctx->mrec, a, arec_size) < 0) {
+		err = errno;
+		if (err != ENOSPC) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Failed to resize "
+					"attribute record. Aborting...\n",
+					__FUNCTION__);
+		}
+		goto cluster_free_err_out;
+	}
+
+	/*
+	 * Convert the resident part of the attribute record to describe a
+	 * non-resident attribute.
+	 */
+	a->non_resident = 1;
+
+	/* Move the attribute name if it exists and update the offset. */
+	if (a->name_length)
+		memmove((u8*)a + name_ofs, (u8*)a + le16_to_cpu(a->name_offset),
+				a->name_length * sizeof(uchar_t));
+	a->name_offset = cpu_to_le16(name_ofs);
+
+	/* Update the flags to match the in-memory ones. */
+	a->flags &= ~(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED |
+			ATTR_COMPRESSION_MASK);
+
+	/* Setup the fields specific to non-resident attributes. */
+	a->lowest_vcn = scpu_to_le64(0);
+	if (na->data_size != 0)
+		a->highest_vcn = scpu_to_le64(0);
+	else
+		a->highest_vcn = scpu_to_le64(-1);
+
+	a->mapping_pairs_offset = cpu_to_le16(mp_ofs);
+
+	a->compression_unit = 0;
+
+	memset(&a->reserved1, 0, sizeof(a->reserved1));
+
+	a->allocated_size = scpu_to_le64(new_allocated_size);
+	a->data_size = a->initialized_size = scpu_to_le64(na->data_size);
+
+	/* Generate the mapping pairs array in the attribute record. */
+	if (ntfs_mapping_pairs_build(vol, (u8*)a + mp_ofs, arec_size - mp_ofs,
+			rl) < 0) {
+		err = errno;
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Failed to build mapping pairs. "
+				"Leaving corrupt attribute record on disk. "
+				"In memory runlist is still intact! Error "
+				"code is %i. FIXME: Need to rollback "
+				"instead!\n", __FUNCTION__, err);
+		errno = err;
+		return -1;
+	}
+
+	/* Done! */
+	return 0;
+
+cluster_free_err_out:
+	if (ntfs_cluster_free(vol, na, 0, -1) < 0)
+		fprintf(stderr, "%s(): Eeek! Failed to release allocated "
+				"clusters in error code path. Leaving "
+				"inconsistent metadata...\n", __FUNCTION__);
+	NAttrClearNonResident(na);
+	na->allocated_size = na->data_size;
+	na->rl = NULL;
+	free(rl);
+	errno = err;
 	return -1;
 }
 
@@ -2181,6 +2419,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			// goto resize_done;
 			fprintf(stderr, "%s(): TODO: Resize attribute now that "
 					"it is non-resident.\n", __FUNCTION__);
+			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			err = ENOTSUP;
 			goto put_err_out;
 		}
@@ -2188,10 +2427,9 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		if (errno != ENOSPC) {
 			err = errno;
 			// FIXME: Eeek!
-			if (err != ENOTSUP)
-				fprintf(stderr, "%s(): Eeek! Failed to make "
-						"attribute non-resident. "
-						"Aborting...\n", __FUNCTION__);
+			fprintf(stderr, "%s(): Eeek! Failed to make attribute "
+					"non-resident. Aborting...\n",
+					__FUNCTION__);
 			goto put_err_out;
 		}
 	} else {
