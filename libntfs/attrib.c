@@ -2458,6 +2458,9 @@ put_err_out:
 	return -1;
 }
 
+/**
+ * ntfs_attr_make_resident - 
+ */
 static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 {
 	// FIXME: For now we cheat and assume there is no attribute list
