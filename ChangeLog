@@ -20,6 +20,8 @@ xx/xx/2004 - 1.9.2-WIP
 	- Make ntfsclone and ntfsresize endiansafe.  (Anton)
 	- Remove global variable rl from mkntfs as it was used only in one
 	  place.  (Yuval, Anton)
+	- Work around mbstowcs() bug in DJGPP and update workaround for bug in
+	  mbsrtowcs() on Cygwin.  (Lode, Christophe, Anton)
 
 05/04/2004 - 1.9.1 - Make mkntfs create bootable volumes and fixes/updates.
 	- Update with SuSE 9.1 beta 1 versions of GNU build system.
