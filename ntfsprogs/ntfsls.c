@@ -144,7 +144,7 @@ int parse_options(int argc, char *argv[])
 	opts.device = NULL;
 	opts.path = "/";
 
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 'd':
 			opts.device = optarg;

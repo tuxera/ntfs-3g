@@ -302,7 +302,7 @@ int parse_options (int argc, char *argv[])
 	opts.percent  = -1;
 	opts.fillbyte = -1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
@@ -313,7 +313,7 @@ int parse_options (int argc, char *argv[])
 			}
 			break;
 		case 'b':
-			if (opts.fillbyte == -1) {
+			if (opts.fillbyte == (char)-1) {
 				end = NULL;
 				opts.fillbyte = strtol (optarg, &end, 0);
 				if (end && *end)
@@ -444,7 +444,8 @@ int parse_options (int argc, char *argv[])
 
 		switch (opts.mode) {
 		case MODE_SCAN:
-			if (opts.output || opts.dest || (opts.fillbyte != -1)) {
+			if (opts.output || opts.dest ||
+					(opts.fillbyte != (char)-1)) {
 				Eprintf ("Scan can only be used with --percent, "
 					"--match, --ignore-case, --size and --time.\n");
 				err++;
@@ -463,9 +464,11 @@ int parse_options (int argc, char *argv[])
 			}
 			break;
 		case MODE_COPY:
-			if ((opts.fillbyte != -1) || (opts.percent != -1) ||
-			    opts.match || opts.match_case ||
-			    (opts.size_begin > 0) || (opts.size_end > 0)) {
+			if ((opts.fillbyte != (char)-1) ||
+					(opts.percent != -1) ||
+					opts.match || opts.match_case ||
+					(opts.size_begin > 0) ||
+					(opts.size_end > 0)) {
 				Eprintf ("Copy can only be used with --output and --destination.\n");
 				err++;
 			}
@@ -491,7 +494,7 @@ int parse_options (int argc, char *argv[])
 		}
 	}
 
-	if (opts.fillbyte == -1)
+	if (opts.fillbyte == (char)-1)
 		opts.fillbyte = 0;
 
 	if (ver)

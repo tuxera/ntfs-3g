@@ -389,7 +389,7 @@ static int parse_options(int argc, char **argv)
 	memset(&opt, 0, sizeof(opt));
 	opt.show_progress = 1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!err && !opt.volume)

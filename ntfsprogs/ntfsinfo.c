@@ -153,7 +153,7 @@ int parse_options (int argc, char *argv[])
 
 	opts.inode = -1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 'd':	/* A non-option argument */
 			if (!opts.device) {
