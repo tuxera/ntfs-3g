@@ -1319,22 +1319,14 @@ int main (int argc, char *argv[])
 
 		printf ("%lld bytes were wiped\n", (long long)total);
 	}
-	
 	/*
-	 * We can't wipe logfile with something different from 0xFF on some volume
-	 * versions, because chdsk doesn't like this. But on NTFS v3.1 chkdsk looks
-	 * normal on logfile full of something different from 0xFF.
-	 *
-	 * FIXME: We need to determine on which versions beside 3.1 we can also
-	 * ignore contents of logfile.
+	 * We need to reset the logfile so Windows can boot and so journal
+	 * replay does not cause corruption.
 	 */
-	if (opts.logfile && (opts.bytes[j - 1] != 0xFF) && (act != act_info) &&
-				!NTFS_V3_1(vol->major_ver, vol->minor_ver)) {
-		printf ("Fixing logfile (because NTFS v%d.%d): ",
-					vol->major_ver, vol->minor_ver);
-		wipe_logfile (vol, 0xFF, act);
+	if (act != act_info) {
+		printf ("Resetting logfile.\n");
+		ntfs_logfile_reset(vol);
 	}
-
 	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
 		Eprintf ("Couldn't mark volume dirty\n");
 	}
