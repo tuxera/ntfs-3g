@@ -53,6 +53,12 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 [
 .B \-V
 ]
+[
+.B \-l
+]
+[
+.B \-h
+]
 .I device
 [
 .I number-of-sectors
@@ -173,6 +179,16 @@ not implement content indexing at all.)
 .TP
 .B \-V
 Print the version number of
+.B mkntfs
+and exit.
+.TP
+.B \-l
+Print the licensing information of
+.B mkntfs
+and exit.
+.TP
+.B \-h
+Print the usage information of 
 .B mkntfs
 and exit.
 .SH BUGS
