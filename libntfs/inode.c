@@ -284,7 +284,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	ni->nr_extents = -1;
 	ni->base_ni = base_ni;
 	/* Attach extent inode to base inode, reallocating memory if needed. */
-	if (!(base_ni->nr_extents & ~3)) {
+	if (!(base_ni->nr_extents & 3)) {
 		i = (base_ni->nr_extents + 4) * sizeof(ntfs_inode *);
 
 		extent_nis = (ntfs_inode**)malloc(i);
