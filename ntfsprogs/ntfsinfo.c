@@ -95,7 +95,7 @@ void ntfs_get_file_attributes(const char *dev, long int i)
 	ntfs_inode *inode = NULL;
 	//int error;
 
-	if(!(vol = ntfs_mount(dev, 0))) {
+	if(!(vol = ntfs_mount(dev, MS_RDONLY))) {
 		fprintf(stderr, "ntfsinfo error: cannot mount device %s\n",dev);
 		exit(1);
 	}
