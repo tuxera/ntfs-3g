@@ -24,6 +24,8 @@
 
 #include "volume.h"
 
+extern struct ntfs_device_operations ntfs_device_disk_io_ops;
+
 extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
 		void *b);
 extern s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
