@@ -1,6 +1,7 @@
 xx/xx/2004 - 1.8.6-WIP
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
-	  HAVE_CONFIG_H (suggestion by Christophe Grenier).
+	  HAVE_CONFIG_H. (Suggested by Christophe.)
+	- Update doc/CodingStyle.  (Suggested by Szaka.)
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
