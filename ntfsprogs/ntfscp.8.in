@@ -68,10 +68,10 @@ Copy boot.ini from /home/user to the root of an /dev/hda1 NTFS volume:
 .B ntfscp /dev/hda1 /home/user/boot.ini boot.ini
 .sp
 .RE
-Copy my_sii_index_root to attribute 0x90 ($INDEX_ROOT) with name $SII of inode 9 (file $Secure):
+Copy myfile to C:\\some\\path\\file:stream (assume that /dev/hda1 letter in windows is C):
 .RS
 .sp
-.B ntfscp -i -a 0x90 -N $SII /dev/hda1 my_sii_index_root 9
+.B ntfscp -N stream /dev/hda1 myfile /some/path/file
 .SH BUGS
 No bugs are known at present. If you find any bugs, please send an email to
 .nh
