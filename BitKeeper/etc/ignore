@@ -6,6 +6,7 @@ PENDING/*
 autom4te.cache/*
 Makefile
 */Makefile
+libntfs/libntfs.conf
 ntfsprogs/*.8
 config.log
 config.h
