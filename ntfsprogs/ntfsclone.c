@@ -77,13 +77,12 @@ struct progress_bar {
 	float unit;
 };
 
-struct __ntfs_walk_clusters_ctx {
+typedef struct {
 	ntfs_inode *ni;			/* inode being processed */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
 	s64 inuse;			/* number of clusters in use */
-};
+} ntfs_walk_clusters_ctx;
 
-typedef struct __ntfs_walk_clusters_ctx ntfs_walk_clusters_ctx;
 typedef int (ntfs_walk_op)(ntfs_inode *ni, void *data);
 
 struct ntfs_walk_cluster {
@@ -349,18 +348,29 @@ static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-static int is_critical_metadata(ntfs_walk_clusters_ctx *image)
+static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
-	s64 inode;
-	
-	inode = image->ni->mft_no;
+	s64 inode = image->ni->mft_no;
 
-	if (inode <= LAST_METADATA_INODE)
+	if (inode <= LAST_METADATA_INODE) {
 		if (inode != FILE_LogFile)
-			return 1;
+			return rl->length;
+
+		if (image->ctx->attr->type == AT_DATA) {
+			/* Save at least the first 8 KiB of FILE_LogFile */
+			s64 s = (s64)8192 - rl->vcn * vol->cluster_size;
+			if (s > 0) {
+				s = rounded_up_division(s, vol->cluster_size);
+				if (rl->length < s)
+					s = rl->length;
+				return s;
+			}
+			return 0;
+		}
+	}
 	
 	if (image->ctx->attr->type != AT_DATA)
-		return 1;
+		return rl->length;
 
 	return 0;
 }
@@ -425,18 +435,18 @@ static void lseek_to_cluster(s64 lcn)
 
 static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
-	int i;
+	s64 i, len; /* number of clusters to copy */
 	
-	if (opt.std_out)
+	if (opt.std_out || !opt.metadata_only)
 		return;
 	
-	if (!opt.metadata_only || !is_critical_metadata(image))
+	if (!(len = is_critical_metadata(image, rl)))
 		return;
-
+	
 	lseek_to_cluster(rl->lcn);
 	
 	/* FIXME: this could give pretty suboptimal performance */
-	for (i = 0; i < rl->length; i++)
+	for (i = 0; i < len; i++)
 		copy_cluster();
 }
 
