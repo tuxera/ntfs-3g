@@ -61,6 +61,41 @@ void __Sprintf(const int silent, const char *fmt, ...)
 
 /* Debug output to stderr.  To get it run ./configure --enable-debug. */
 
+void __ntfs_error(const char *function, const char *fmt, ...)
+{
+	int eo = errno;
+	int flen = 0;
+	va_list args;
+	char err_buf[1024];
+
+	if (function)
+		flen = strlen(function);
+	va_start(args, fmt);
+	vsnprintf(err_buf, sizeof(err_buf), fmt, args);
+	va_end(args);
+	fprintf(stderr, "NTFS error: %s(): %s\n", flen ? function : "",
+			err_buf);
+	errno = eo;
+}
+
+void __ntfs_debug (const char *file, int line, const char *function,
+		const char *fmt, ...)
+{
+	int eo = errno;
+	int flen = 0;
+	va_list args;
+	char err_buf[1024];
+
+	if (function)
+		flen = strlen(function);
+	va_start(args, fmt);
+	vsnprintf(err_buf, sizeof(err_buf), fmt, args);
+	va_end(args);
+	fprintf(stderr, "NTFS DEBUG (%s, %d): %s(): %s\n", file, line,
+			flen ? function : "", err_buf);
+	errno = eo;
+}
+
 void __Dprintf(const char *fmt, ...)
 {
 	int eo = errno;
