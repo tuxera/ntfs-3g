@@ -37,6 +37,8 @@
 #include "volume.h"
 #include "utils.h"
 #include "debug.h"
+#include "dir.h"
+#include "mst.h"
 
 static char *EXEC_NAME = "ntfswipe";
 static struct options opts;
@@ -346,6 +348,7 @@ static int parse_options (int argc, char *argv[])
  * wipe_unused - Wipe unused clusters
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
+ * @act:   Wipe, test or info
  *
  * Read $Bitmap and wipe any clusters that are marked as not in use.
  *
@@ -400,15 +403,15 @@ free:
  * wipe_compressed_attribute - Wipe compressed $DATA attribute
  * @vol:	An ntfs volume obtained from ntfs_mount
  * @byte:	Overwrite with this value
- * @na:		Opened ntfs attribute
  * @act:	Wipe, test or info
+ * @na:		Opened ntfs attribute
  *
  * Return: >0  Success, the atrribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
-									enum action act)
+static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
+						enum action act, ntfs_attr *na)
 {
 	unsigned char *buf;
 	s64 size;
@@ -434,9 +437,14 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
 				rlc++;
 				continue;
 			}
-			offset = (offset & (~cu_mask)) << vol->cluster_size_bits;
+			offset = (offset & (~cu_mask))
+						<< vol->cluster_size_bits;
+			runlist *rlt = rlc;
+			while ((rlt - 1)->lcn == LCN_HOLE) rlt--;
 			while (1) {
-				ret = ntfs_rl_pread (vol, na->rl, offset, 2, &block_size);
+				ret = ntfs_rl_pread (vol, na->rl,
+						offset, 2, &block_size);
+				block_size = le16_to_cpu (block_size);
 				if (ret != 2) {
 					Vprintf ("Internal error\n");
 					Eprintf ("ntfs_rl_pread failed");
@@ -449,12 +457,11 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
 				block_size &= 0x0FFF;
 				block_size += 3;
 				offset += block_size;
-				if (offset >= (((cur_vcn - rlc->length)
-							<< vol->cluster_size_bits) - 2))
+				if (offset >= (((rlt->vcn) <<
+						vol->cluster_size_bits) - 2))
 					goto next;
 			}
-			size = ((cur_vcn - rlc->length)
-					<< vol->cluster_size_bits) - offset;
+			size = (rlt->vcn << vol->cluster_size_bits) - offset;
 		} else {
 			size = na->allocated_size - na->data_size;
 			offset = (cur_vcn << vol->cluster_size_bits) - size;
@@ -462,8 +469,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
 		
 		if (size < 0) {
 			Vprintf ("Internal error\n");
-			Eprintf ("bug or damaged fs: we want allocate buffer "
-								"size %lld bytes", size);
+			Eprintf ("bug or damaged fs: we want "
+				"allocate buffer size %lld bytes", size);
 			return -1;
 		}
 		
@@ -476,7 +483,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
 		buf = malloc (size);
 		if (!buf) {
 			Vprintf ("Not enough memory\n");
-			Eprintf ("Not enough memory to allocate %lld bytes", size);
+			Eprintf ("Not enough memory to allocate "
+							"%lld bytes", size);
 			return -1;
 		}
 		memset (buf, byte, size);
@@ -485,7 +493,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
 		free (buf);
 		if (ret != size) {
 			Vprintf ("Internal error\n");
-			Eprintf ("ntfs_rl_pwrite failed");
+			Eprintf ("ntfs_rl_pwrite failed, offset %llu, "
+				"size %lld, vcn %lld",	offset, size, rlc->vcn);
 			return -1;
 		}
 		wiped += ret;
@@ -500,14 +509,15 @@ next:
  * wipe_attribute - Wipe not compressed $DATA attribute
  * @vol:	An ntfs volume obtained from ntfs_mount
  * @byte:	Overwrite with this value
- * @na:		Opened ntfs attribute
  * @act:	Wipe, test or info
+ * @na:		Opened ntfs attribute
  *
  * Return: >0  Success, the atrribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_attribute (ntfs_volume *vol, int byte, ntfs_attr *na, enum action act)
+static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act, 
+								ntfs_attr *na)
 {
 	unsigned char *buf;
 	s64 wiped;
@@ -590,15 +600,15 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 
 		if (ntfs_attr_map_whole_runlist(na)) {
 			Vprintf ("Internal error\n");
-			Eprintf ("Couldn't map runlist (inode %lld)", inode_num);
+			Eprintf ("Can't map runlist (inode %lld)\n", inode_num);
 			goto close_attr;
 		}
 
 		s64 wiped;
 		if (NAttrCompressed(na))
-			wiped = wipe_compressed_attribute (vol, byte, na, act);
+			wiped = wipe_compressed_attribute (vol, byte, act, na);
 		else
-			wiped = wipe_attribute (vol, byte, na, act);
+			wiped = wipe_attribute (vol, byte, act, na);
 
 		if (wiped == -1) {
 			Eprintf (" (inode %lld)\n", inode_num);
@@ -623,6 +633,7 @@ close_inode:
  * wipe_mft - Wipe the MFT slack space
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
+ * @act:   Wipe, test or info
  *
  * MFT Records are 1024 bytes long, but some of this space isn't used.  Wipe any
  * unused space at the end of the record and wipe any unused records.
@@ -751,9 +762,126 @@ free:
 }
 
 /**
+ * wipe_index_allocation - Wipe $INDEX_ALLOCATION attribute
+ * @vol:	An ntfs volume obtained from ntfs_mount
+ * @byte:	Overwrite with this value
+ * @act:	Wipe, test or info
+ * @naa:	Opened ntfs $INDEX_ALLOCATION attribute
+ * @nab:	Opened ntfs $BIMTAP attribute
+ *
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
+ */
+static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
+					ntfs_attr *naa, ntfs_attr *nab) {
+	const u32 indx_record_size = 4096;
+	s64 total = 0;
+	s64 wiped = 0;
+	s64 offset = 0;
+	s64 obyte = 0;
+	u64 wipe_offset;
+	s64 wipe_size;
+	u8 obit = 0;
+	u8 mask;
+	u8 *bitmap;
+	u8 *buf;
+	
+	bitmap = malloc (nab->data_size);
+	if (!bitmap) {
+		Vprintf ("malloc failed\n");
+		Eprintf ("Couldn't allocate %lld bytes", nab->data_size);
+		return -1;
+	}
+	
+	if (ntfs_attr_pread (nab, 0, nab->data_size, bitmap)
+						!= nab->data_size) {
+		Vprintf ("Internal error\n");
+		Eprintf ("Couldn't read $BITMAP");
+		total = -1;
+		goto free_bitmap;
+	}
+	
+	buf = malloc (indx_record_size);
+	if (!buf) {
+		Vprintf ("malloc failed\n");
+		Eprintf ("Couldn't allocate %d bytes", indx_record_size);
+		total = -1;
+		goto free_bitmap;
+	}
+	
+	while (offset < naa->allocated_size) {
+		mask = 1 << obit;
+		if (bitmap[obyte] & mask) {
+			INDEX_ALLOCATION *indx;
+			
+			s64 ret = ntfs_rl_pread (vol, naa->rl,
+					offset, indx_record_size, buf);
+			if (ret != indx_record_size) {
+				Vprintf ("ntfs_rl_pread failed\n");
+				Eprintf ("Couldn't read INDX record");
+				total = -1;
+				goto free_buf;
+			}
+			
+			indx = (INDEX_ALLOCATION *) buf;
+			if (ntfs_mst_post_read_fixup ((NTFS_RECORD *)buf,
+								indx_record_size))
+				Eprintf ("damaged fs: mst_post_read_fixup failed");
+    			
+			if ((le32_to_cpu(indx->index.allocated_size) + 0x18) != 
+							indx_record_size) {
+				Vprintf ("Internal error\n");
+				Eprintf ("INDX record should be 4096 bytes");
+				total = -1;
+				goto free_buf;
+			}
+			
+			wipe_offset = le32_to_cpu(indx->index.index_length) + 0x18;
+			wipe_size = indx_record_size - wipe_offset;
+			memset (buf + wipe_offset, byte, wipe_size);
+			if (ntfs_mst_pre_write_fixup ((NTFS_RECORD *)indx,
+								indx_record_size))
+				Eprintf ("damaged fs: mst_pre_write_protect failed");
+			if (opts.verbose > 1)
+				Vprintf ("+");
+		} else {
+			wipe_size = indx_record_size;
+			memset (buf, byte, wipe_size);
+			if (opts.verbose > 1)
+				Vprintf ("x");
+		}
+		
+		wiped = ntfs_rl_pwrite (vol, naa->rl, offset, indx_record_size, buf);
+		if (wiped != indx_record_size) {
+			Vprintf ("ntfs_rl_pwrite failed\n");
+			Eprintf ("Couldn't wipe tail of INDX record");
+			total = -1;
+			goto free_buf;
+		}
+		total += wipe_size;
+
+		offset += indx_record_size;
+		obit++;
+		if (obit > 7) {
+			obit = 0;
+			obyte++;
+		}
+	}
+	if ((opts.verbose > 1) && (wiped != -1))
+		Vprintf ("\n\t");
+free_buf:
+	free (buf);
+free_bitmap:
+	free (bitmap);
+	return total;
+}
+
+/**
  * wipe_directory - Wipe the directory indexes
- * @vol:   An ntfs volume obtained from ntfs_mount
- * @byte:  Overwrite with this value
+ * @vol:	An ntfs volume obtained from ntfs_mount
+ * @byte:	Overwrite with this value
+ * @act:	Wipe, test or info
  *
  * Directories are kept in sorted B+ Trees.  Index blocks may not be full.  Wipe
  * the unused space at the ends of these blocks.
@@ -764,17 +892,94 @@ free:
  */
 static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
+	s64 total = 0;
+	s64 inode_num;
+	ntfs_inode *ni;
+	ntfs_attr *naa;
+	ntfs_attr *nab;
+
 	if (!vol || (byte < 0))
 		return -1;
 
-	Qprintf ("wipe_directory (not implemented) 0x%02x\n", byte);
-	return 0;
+	for (inode_num = 5; inode_num < vol->nr_mft_records; inode_num++) {
+		Vprintf ("Inode %lld - ", inode_num);
+		ni = ntfs_inode_open (vol, inode_num);
+		if (!ni) {
+			if (opts.verbose > 2)
+				Vprintf ("Could not open inode\n");
+			else
+				Vprintf ("\r");
+			continue;
+		}
+
+		if (ni->mrec->base_mft_record) {
+			if (opts.verbose > 2)
+				Vprintf ("Not base mft record. Skipping\n");
+			else
+				Vprintf ("\r");
+			goto close_inode;
+		}
+
+		naa = ntfs_attr_open (ni, AT_INDEX_ALLOCATION, I30, 4);
+		if (!naa) {
+			if (opts.verbose > 2)
+				Vprintf ("Couldn't open $INDEX_ALLOCATION\n");
+			else
+				Vprintf ("\r");
+			goto close_inode;
+		}
+		
+		if (!NAttrNonResident(naa)) {
+			Vprintf ("Resident $INDEX_ALLOCATION\n");
+			Eprintf ("damaged fs: Resident $INDEX_ALLOCATION "
+					"(inode %lld)\n", inode_num);
+			goto close_attr_a;
+		}
+
+		if (ntfs_attr_map_whole_runlist(naa)) {
+			Vprintf ("Internal error\n");
+			Eprintf ("Can't map runlist for $INDEX_ALLOCATION "
+					"(inode %lld)\n", inode_num);
+			goto close_attr_a;
+		}
+		
+		nab = ntfs_attr_open (ni, AT_BITMAP, I30, 4);
+		if (!nab) {
+			Vprintf ("Couldn't open $BITMAP\n");
+			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, "
+					"but we can't open $BITMAP with same "
+					"name (inode %lld)\n", inode_num);
+			goto close_attr_a;
+		}
+		
+		s64 wiped = wipe_index_allocation (vol, byte, act, naa, nab);
+		if (wiped == -1) {
+			Eprintf (" (inode %lld)\n", inode_num);
+			goto close_attr_b;
+		}
+		
+		if (wiped) {
+			Vprintf ("Wiped %llu bytes\n", wiped);
+			total += wiped;
+		} else
+			Vprintf ("Nothing to wipe\n");
+close_attr_b:
+		ntfs_attr_close (nab);
+close_attr_a:
+		ntfs_attr_close (naa);
+close_inode:
+		ntfs_inode_close (ni);
+	}
+
+	Qprintf ("wipe_directory 0x%02x, %lld bytes\n", byte, total);
+	return total;
 }
 
 /**
  * wipe_logfile - Wipe the logfile (journal)
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
+ * @act:   Wipe, test or info
  *
  * The logfile journals the metadata to give the volume fault-tolerance.  If the
  * volume is in a consistant state, then this information can be erased.
@@ -878,6 +1083,7 @@ error_exit:
  * wipe_pagefile - Wipe the pagefile (swap space)
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
+ * @act:   Wipe, test or info
  *
  * pagefile.sys is used by Windows as extra virtual memory (swap space).
  * Windows recreates the file at bootup, so it can be wiped without harm.
@@ -959,186 +1165,6 @@ error_exit:
 	errno = eo;
 	return -1;
 }
-
-/**
- * ntfs_info - Display information about the NTFS Volume
- * @vol:  An ntfs volume obtained from ntfs_mount
- *
- * Tell the user how much could be cleaned up.  List the number of free
- * clusters, MFT records, etc.
- *
- * Return:  1  Success, displayed some info
- *	    0  Error, something went wrong
- */
-#if 0
-static int ntfs_info (ntfs_volume *vol)
-{
-	u8 *buffer;
-
-	if (!vol)
-		return 0;
-
-	Qprintf ("ntfs_info\n");
-
-	Qprintf ("\n");
-
-	Qprintf ("Cluster size = %u\n", (unsigned int)vol->cluster_size);
-	Qprintf ("Volume size = %lld clusters\n", (long long)vol->nr_clusters);
-	Qprintf ("Volume size = %lld bytes\n",
-			(long long)vol->nr_clusters * vol->cluster_size);
-	Qprintf ("Volume size = %lld MiB\n", (long long)vol->nr_clusters *
-			vol->cluster_size / (1024*1024)); /* round up? */
-
-	Qprintf ("\n");
-
-	// move back bufsize
-	buffer = malloc (vol->mft_record_size);
-	if (!buffer)
-		return 0;
-
-	Qprintf ("cluster\n");
-	//Qprintf ("allocated_size = %lld\n", vol->lcnbmp_na->allocated_size);
-	Qprintf ("data_size = %lld\n", (long long)vol->lcnbmp_na->data_size);
-	//Qprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
-
-	{
-	s64 offset;
-	s64 size = vol->lcnbmp_na->allocated_size;
-	int bufsize = vol->mft_record_size;
-	s64 use = 0;
-	s64 not = 0;
-	int i, j;
-
-	for (offset = 0; offset < size; offset += bufsize) {
-
-		if ((offset + bufsize) > size)
-			bufsize = size - offset;
-
-		if (ntfs_attr_pread (vol->lcnbmp_na, offset, bufsize, buffer) < bufsize) {
-			Eprintf ("error\n");
-			return 0;
-		}
-
-		for (i = 0; i < bufsize; i++) {
-			for (j = 0; j < 8; j++) {
-				if ((((offset+i)*8) + j) >= vol->nr_clusters)
-					goto done;
-				if (buffer[i] & (1 << j)) {
-					//printf ("*");
-					use++;
-				} else {
-					//printf (".");
-					not++;
-				}
-			}
-		}
-	}
-done:
-
-	Qprintf ("cluster use %lld, not %lld, total %lld\n", (long long)use,
-			(long long)not, (long long)(use + not));
-	Qprintf ("\n");
-
-	}
-
-	{
-	u8 *bitmap;
-	s64 bmpoff;
-	s64 bmpsize = vol->mftbmp_na->data_size;
-	int bmpbufsize = 512;
-	int i, j;
-	s64 use = 0, not = 0;
-
-	bitmap = malloc (bmpbufsize);
-	if (!bitmap)
-		return 0;
-
-	printf ("mft has %lld records\n", (long long)vol->nr_mft_records);
-
-	//Qprintf ("allocated_size = %lld\n", vol->mftbmp_na->allocated_size);
-	Qprintf ("data_size = %lld\n", (long long)vol->mftbmp_na->data_size);
-	//Qprintf ("initialized_size = %lld\n", vol->mftbmp_na->initialized_size);
-
-	printf ("bmpsize = %lld\n", (long long)bmpsize);
-	for (bmpoff = 0; bmpoff < bmpsize; bmpoff += bmpbufsize) {
-		if ((bmpoff + bmpbufsize) > bmpsize)
-			bmpbufsize = bmpsize - bmpoff;
-
-		//printf ("bmpbufsize = %d\n", bmpbufsize);
-
-		if (ntfs_attr_pread (vol->mftbmp_na, bmpoff, bmpbufsize, bitmap) < bmpbufsize) {
-			Eprintf ("error\n");
-			return 0;
-		}
-
-		for (i = 0; i < bmpbufsize; i++) {
-			for (j = 0; j < 8; j++) {
-				if ((((bmpoff+i)*8) + j) >= vol->nr_mft_records)
-					goto bmpdone;
-				if (bitmap[i] & (1 << j)) {
-					//printf ("*");
-					use++;
-				} else {
-					//printf (".");
-					not++;
-				}
-			}
-		}
-	}
-
-bmpdone:
-	printf ("mft\n");
-	printf ("use %lld, not %lld, total %lld\n", (long long)use,
-			(long long)not, (long long)(use + not));
-
-	free (bitmap);
-	}
-
-	/*
-	 * wipe_unused - volume = n clusters, u unused (%age & MB)
-	 *	$Bitmap
-	 *	vol->lcnbmp_na
-	 *
-	 * wipe_tails - volume = n files, total tail slack space
-	 *	$MFT, $DATA
-	 *	vol->mft_na
-	 *
-	 * wipe_mft - volume = n mft records, u unused, s total slack space
-	 *	$MFT, $BITMAP
-	 *	vol->mftbmp_na
-	 *
-	 * wipe_directory - volume has d dirs, t total slack space
-	 *	$MFT, $INDEX_ROOT, $INDEX_ALLOC, $BITMAP
-	 *
-	 * wipe_logfile - logfile is <size>
-	 *	$MFT, $DATA
-	 *
-	 * wipe_pagefile - pagefile is <size>
-	 *	$MFT, $DATA
-	 */
-
-	free (buffer);
-#if 0
-	ntfs_inode *inode;
-	ntfs_attr *attr;
-
-	inode = ntfs_inode_open (vol, 6);	/* $Bitmap */
-	if (!inode)
-		return 0;
-
-	attr = ntfs_attr_open (inode, AT_DATA, NULL, 0);
-	if (!attr)
-		return 0;
-
-	ntfs_attr_pread
-
-	ntfs_attr_close (attr);
-	ntfs_inode_close (inode);
-#endif
-
-	return 1;
-}
-#endif
 
 /**
  * print_summary - Tell the user what we are about to do
@@ -1231,22 +1257,6 @@ int main (int argc, char *argv[])
 		sleep (5);
 	}
 
-#if 0
-	{
-		int i = 0;
-		runlist_element *rl = vol->mft_na->rl;
-		printf ("________________________________________________________________________________\n\n");
-		for (; rl->length > 0; rl++, i++) {
-			printf ("%4d %lld,%lld,%lld\n", i, (long long)rl->vcn,
-					(long long)rl->lcn,
-					(long long)rl->length);
-		}
-		printf ("%4d %lld,%lld,%lld\n", i, (long long)rl->vcn,
-				(long long)rl->lcn, (long long)rl->length);
-		return 0;
-	}
-#endif
-
 	printf ("\n");
 	for (i = 0; i < opts.count; i++) {
 		int byte;
@@ -1310,11 +1320,20 @@ int main (int argc, char *argv[])
 		printf ("%lld bytes were wiped\n", (long long)total);
 	}
 	
-	if (opts.logfile && (opts.bytes[j - 1] != 0xFF) && (act != act_info)) {
-		printf ("Fixing logfile: ");
+	/*
+	 * We can't wipe logfile with something different from 0xFF on some volume
+	 * versions, because chdsk doesn't like this. But on NTFS v3.1 chkdsk looks
+	 * normal on logfile full of something different from 0xFF.
+	 *
+	 * FIXME: We need to determine on which versions beside 3.1 we can also
+	 * ignore contents of logfile.
+	 */
+	if (opts.logfile && (opts.bytes[j - 1] != 0xFF) && (act != act_info) &&
+				!NTFS_V3_1(vol->major_ver, vol->minor_ver)) {
+		printf ("Fixing logfile (because NTFS v%d.%d): ",
+					vol->major_ver, vol->minor_ver);
 		wipe_logfile (vol, 0xFF, act);
 	}
-
 
 	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
 		Eprintf ("Couldn't mark volume dirty\n");
