@@ -563,7 +563,7 @@ map_rl:
  * attribute @na into the data buffer @b.
  *
  * On success, return the number of successfully read bytes. If this number is
- * lower than @count this means that the read reached end of file or thet an
+ * lower than @count this means that the read reached end of file or that an
  * error was encountered during the read so that the read is partial. 0 means
  * end of file or nothing was read (also return 0 when @count is 0).
  *
@@ -2236,7 +2236,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			vol->cluster_size_bits;
 
 	/* Deallocate all clusters starting with the first free one. */
-	nr_freed_clusters = ntfs_cluster_free(vol, na->rl, first_free_vcn, -1);
+	nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn, -1);
 	if (nr_freed_clusters < 0) {
 		err = errno;
 		goto put_err_out;
