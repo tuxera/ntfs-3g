@@ -1,4 +1,4 @@
-xx/xx/2004 - 1.8.6-WIP
+11/04/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
 	  HAVE_CONFIG_H. (Suggested by Christophe.)
 	- Update doc/CodingStyle.  (Suggested by Szaka.)
@@ -40,12 +40,17 @@ xx/xx/2004 - 1.8.6-WIP
 	  arguments to typecast the arguments to (unsigned) long long to avoid
 	  the warnings when compiling on 64 bit architectures.
 	- Use AC_GNU_SOURCE in configure.ac instead of doing it manually.
+	- Fix lots of typos in the documentation.  (David Martínez Moreno)
+	- Update config.sub and config.guess to latest ones.  (David Martínez
+	  Moreno)
+	- Change Linux-NTFS to ntfsprogs everywhere when talking about the
+	  package rather than the project (especially man pages affected).
 	- Add relocation support to ntfsresize.  Note, this modifies the
 	  command line options a little as well as the returned output so
 	  applications using ntfsresize might need modifications before they
 	  will work with the updated ntfsresize.  (Szaka)
 
-27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
+27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes.
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
 	  reflect reality a little better.
 	- Fix BLKGETSIZE usage; parameter is unsigned long not long. (Szaka)
