@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright 2002-2003 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Jan 2003" "ntfsprogs @VERSION@"
+.TH NTFSRESIZE 8 "Oct 2003" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem
 .SH SYNOPSIS
@@ -12,8 +12,8 @@ ntfsresize \- resize an NTFS filesystem
 .SH DESCRIPTION
 The
 .B ntfsresize
-program non-destructively resizes Windows NT4, 2000, XP or .NET
-NTFS filesystems.  At present it can be used to enlarge or shrink a
+program non-destructively resizes Windows NT4, 2000, XP or Windows Server 2003
+NTFS filesystems.  At present it can be used to enlarge any or shrink a
 defragmented NTFS filesystem located on an unmounted
 .I device
 (usually a disk partition). The new volume will have
@@ -28,12 +28,29 @@ parameter is given in kilo-, mega- or gigabytes respectively.
 .B ntfsresize
 conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
-The options 
+
+If both 
+.B -i
+and
+.B -s
+are omitted then the 
+NTFS filesystem will be enlarged to the device size.
+
+If the options
 .B -i 
 and 
 .B -s 
-are mutually exclusive. If both of them are omitted then the 
-NTFS filesystem will be enlarged to the device size.
+are used together then list inodes (files) using space over 
+.I size\fR. At present
+.B ntfsresize 
+can not relocate the files listed to the beginning 
+of the partition thus it refuses to resize at
+.I size
+if there is any.
+To convert the inodes to meaningful file names, you must mount 
+the partition and run for instance
+ 'find /mount/point -inum <inode1> -o -inum <inode2> ...'.
+
 Before a real resize operation, always make a read-only 
 test run using the 
 .B -n 
@@ -45,9 +62,9 @@ program doesn't manipulate the size of partitions.
 To do that you have to use a disk partitioning tool, for example
 .BR fdisk (8).
 .PP
-If you wish to enlarge an NTFS filesystem, 
-you must first make sure you can expand the size of the
-underlying partition first. This can be done using 
+If you wish to enlarge an NTFS filesystem  then
+first you must enlarge the size of the
+underlying partition. This can be done using 
 .BR fdisk (8)
 by deleting the partition and recreating it with a larger size.
 Then  you may use
@@ -78,7 +95,7 @@ computer from the disk!
 .PP
 Note,
 .B ntfsresize
-schedules 'chkdsk' to make an NTFS consistency check
+schedules an NTFS consistency check
 when you will boot Windows. Windows may force a reboot after
 the successful consistency check.
 
@@ -96,7 +113,9 @@ Display help and exit.
 .TP
 .B -i
 Using this option you can calculate the smallest shrunken volume size supported.
-This option will not make any changes to the filesystem.
+This option will not make any changes to the filesystem. 
+You can use this option with 
+.B -s\fR. See the meaning of this case above.
 .TP
 .B -n
 Use this option to make a test run before doing the real resize operation.
@@ -109,7 +128,11 @@ Resize volume to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
 The optional modifiers \fBk\fR, \fBM\fR, \fBG\fR mean the
 .I size
 parameter is given in kilo-, mega- or gigabytes respectively.
-Conforming to standards, k=10^3, M=10^6 and G=10^9.
+Conforming to standards, k=10^3, M=10^6 and G=10^9. You can also use this option
+with
+.B -i\fR. See the meaning of this case above.
+.SH EXIT CODES
+The exit code is 0 on success, non-zero otherwise. 
 .SH BUGS
 No bugs are known or has been reported so far in the current version.
 If you find otherwise, please report it to <linux-ntfs-dev@lists.sourceforge.net>
@@ -117,8 +140,9 @@ If you find otherwise, please report it to <linux-ntfs-dev@lists.sourceforge.net
 .B MAKE SURE YOU HAVE A BACKUP
 of your important data in case of an unexpected failure.
 .PP
-Future work is planned to include support resizing fragmented NTFS volumes.
-Please note, Windows 2000, XP and .NET have built in NTFS defragmenter.
+Future work is planned to include support for resizing fragmented NTFS volumes.
+Please note, Windows 2000, XP and Windows Server 2003 have built in NTFS 
+defragmenter. 
 .SH AUTHOR
 .B ntfsresize
 has been written by
@@ -143,5 +167,6 @@ http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .BR sfdisk (8),
 .BR parted (8),
 .BR mkntfs (8),
+.BR ntfsclone (8),
 .BR ntfsprogs (8)
 

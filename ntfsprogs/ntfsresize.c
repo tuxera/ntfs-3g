@@ -64,8 +64,7 @@ static const char *resize_important_msg =
 "Otherwise you may lose your data or can't boot your computer from the disk!\n";
 
 static const char *fragmented_volume_msg =
-"The volume end is fragmented, this case is not yet supported. Defragment it\n"
-"(Windows 2000, XP and .NET have built in defragmentation tool) and try again.\n";
+"The volume end is fragmented, this case is not yet supported.\n";
 
 struct {
 	int verbose;
@@ -473,11 +472,48 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
+int str2unicode(char *aname, uchar_t **ustr, int *len)
+{
+	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1))
+		return -1;
+
+	if (!*ustr || !*len) {
+		*ustr = AT_UNNAMED;
+		*len = 0;
+	}
+	
+	return 0;
+}
+
+int has_bad_sectors(ntfs_resize_t *resize)
+{
+	int len, ret = 0;
+	uchar_t *ustr = NULL;
+	ATTR_RECORD *a = resize->ctx->attr;
+	
+	if (resize->ni->mft_no != 8)
+		return 0;
+
+	if (str2unicode("$Bad", &ustr, &len) == -1)
+		return -1;
+
+	if (ustr && ntfs_names_are_equal(ustr, len,
+			(uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			a->name_length, 0, NULL, 0)) 
+		ret = 1;
+									
+	if (ustr != AT_UNNAMED)
+		free(ustr);
+
+	return ret;	
+}
+
 void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 {
 	s64 inode;
 	ATTR_FLAGS flags;
-	struct llcn_t *llcn;
+	struct llcn_t *llcn = NULL;
+	int ret;
 
 	inode = resize->ni->mft_no;
 	flags = resize->ctx->attr->flags;
@@ -491,7 +527,12 @@ void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 	else if (flags & ATTR_IS_COMPRESSED)
 		llcn = &resize->last_compressed;
 
-	else if (inode == 0)
+	else if ((ret = has_bad_sectors(resize)) != 0) {
+		if (ret == -1)
+			perr_exit("Couldn't convert string to Unicode.");
+		err_exit("Device has bad sectors, not supported yet.\n");
+
+	} else if (inode == 0)
 		llcn = &resize->last_mft;
 	
 	else if (inode == 1)
@@ -633,6 +674,7 @@ void compare_bitmaps(struct bitmap *a)
 {
 	s64 i, pos, count;
 	int mismatch = 0;
+	int backup_boot = 0;
 	u8 bm[NTFS_BUF_SIZE];
 
 	printf("Accounting clusters ...\n");
@@ -664,6 +706,15 @@ void compare_bitmaps(struct bitmap *a)
 				if (bit == ntfs_bit_get(bm, i * 8 + cl % 8))
 					continue;
 
+				if (!mismatch && !bit && !backup_boot && 
+						cl == vol->nr_clusters / 2) {
+					/* FIXME: call also boot sector check */
+					backup_boot = 1;
+					printf("Found backup boot sector in "
+					       "the middle of the volume.\n");
+					continue;       
+				}	
+
 				if (++mismatch > 10)
 					continue;
 
@@ -679,7 +730,7 @@ void compare_bitmaps(struct bitmap *a)
 		       mismatch);
 		err_exit("Filesystem check failed! Windows wasn't shutdown "
 			 "properly or inconsistent\nfilesystem. Please run "
-			 "chkdsk on Windows.\n");
+			 "chkdsk /f on Windows.\n");
 	}
 }
 
@@ -767,7 +818,7 @@ void print_hint(const char *s, struct llcn_t llcn)
 	
 	runs_b = llcn.lcn * vol->cluster_size;
 	runs_mb = rounded_up_division(runs_b, NTFS_MBYTE);
-	printf("%-19s: %6Ld MB      %8Ld\n", s, runs_mb, llcn.inode);
+	printf("%-19s: %9Ld MB      %8Ld\n", s, runs_mb, llcn.inode);
 }
 
 /**
@@ -788,7 +839,7 @@ void advise_on_resize(ntfs_resize_t *resize)
 	old_b = vol->nr_clusters * vol->cluster_size;
 	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
 	
-	printf("File feature         Last used    Last inode\n");
+	printf("File feature         Last used at      By inode\n");
 	print_hint("$MFT", resize->last_mft);
 	print_hint("$MFTMirr", resize->last_mftmir);
 	print_hint("Compressed", resize->last_compressed);
@@ -826,27 +877,6 @@ void advise_on_resize(ntfs_resize_t *resize)
 	    printf("%lld bytes", g_b);
 
 	printf(").\n");
-}
-
-/**
- * look_for_bad_sector
- *
- * Read through the metadata file $BadClus looking for bad sectors on the disk.
- */
-void look_for_bad_sector(ATTR_RECORD *a)
-{
-	runlist *rl;
-	int i;
-
-	rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
-	if (!rl)
-		perr_exit("ntfs_mapping_pairs_decompress");
-
-	for (i = 0; rl[i].length; i++)
-		if (rl[i].lcn != LCN_HOLE)
-			err_exit("Device has bad sectors, not supported\n");
-
-	free(rl);
 }
 
 /**
@@ -1101,13 +1131,8 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
 	if (!(*ctx = ntfs_attr_get_search_ctx(ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	if (aname && ((len = ntfs_mbstoucs(aname, &ustr, 0)) == -1))
+	if (str2unicode(aname, &ustr, &len) == -1)
 		perr_exit("Unable to convert string to Unicode");
-
-	if (!ustr || !len) {
-		ustr = AT_UNNAMED;
-		len = 0;
-	}
 
 	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
 		perr_exit("ntfs_lookup_attr");
@@ -1145,7 +1170,6 @@ void truncate_badclust_file(s64 nr_clusters)
 	printf("Updating $BadClust file ...\n");
 
 	lookup_data_attr((MFT_REF)FILE_BadClus, "$Bad", &ctx);
-	look_for_bad_sector(ctx->attr);
 	/* FIXME: sanity_check_attr(ctx->attr); */
 	truncate_badclust_bad_attr(ctx->attr, nr_clusters);
 
@@ -1247,11 +1271,10 @@ void print_volume_size(char *str, s64 bytes)
  */
 void print_disk_usage(ntfs_resize_t *resize)
 {
-	s64 total, used, free, relocations;
+	s64 total, used, relocations;
 
 	total = vol->nr_clusters * vol->cluster_size;
 	used = resize->inuse * vol->cluster_size;
-	free = total - used;
 	relocations = resize->relocations * vol->cluster_size;
 
 	printf("Space in use       : %lld MB (%.1f%%)\n",
@@ -1275,9 +1298,12 @@ void mount_volume()
 {
 	unsigned long mntflag;
 
-	if (ntfs_check_if_mounted(opt.volume, &mntflag))
-		perr_exit("Failed to check '%s' mount state", opt.volume);
-
+	if (ntfs_check_if_mounted(opt.volume, &mntflag)) {
+		perr_printf("Failed to check '%s' mount state", opt.volume);
+		printf("Probably /etc/mtab is missing. It's too risky to"
+		       "continue.\nYou might try an another Linux distro.\n");
+		exit(1);
+	}
 	if (mntflag & NTFS_MF_MOUNTED) {
 		if (!(mntflag & NTFS_MF_READONLY))
 			err_exit("Device %s is mounted read-write. "
@@ -1303,7 +1329,7 @@ void mount_volume()
 
 	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
-			err_exit("Volume is dirty. Run chkdsk and "
+			err_exit("Volume is dirty. Run chkdsk /f and "
 				 "please try again (or see -f option).\n");
 
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
@@ -1383,7 +1409,9 @@ int main(int argc, char **argv)
 	if (opt.bytes) {
 		if (device_size < opt.bytes)
 			err_exit("New size can't be bigger than the "
-				 "device size (%Ld bytes).\n", device_size);
+				 "device size (%Ld bytes).\nIf you want to "
+				 "enlarge NTFS then first enlarge the device "
+				 "size by e.g. fdisk.\n", device_size);
 	} else if (!opt.info)
 		opt.bytes = device_size;
 
@@ -1424,7 +1452,7 @@ int main(int argc, char **argv)
 		       resize.multi_ref);
 		err_exit("Filesystem check failed! Windows wasn't shutdown "
 			 "properly or inconsistent\nfilesystem. Please run "
-			 "chkdsk on Windows.\n");
+			 "chkdsk /f on Windows.\n");
 	}
 	compare_bitmaps(&lcn_bitmap);
 

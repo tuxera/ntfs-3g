@@ -2785,7 +2785,7 @@ put_err_out:
  * and do clear the partial run. The latter approach would be more inline with
  * what windows would do, even though windows wouldn't even make the attribute
  * sparse, it would just allocate clusters instead. TODO: Check what happens on
- * WinXP and .NET. FIXME: Make sure to check what NT4 does with an NTFS1.2
+ * WinXP and 2003. FIXME: Make sure to check what NT4 does with an NTFS1.2
  * volume that has sparse files. I suspect it will blow up so we will need to
  * perform allocations of clusters, like NT4 would do for NTFS1.2 while we can
  * use sparse attributes on NTFS3.x.
