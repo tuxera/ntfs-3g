@@ -22,6 +22,8 @@
 #ifndef _NTFS_DEVICE_H
 #define _NTFS_DEVICE_H
 
+#include <sys/stat.h>
+
 #include "types.h"
 #include "support.h"
 
@@ -79,6 +81,7 @@ struct ntfs_device_operations {
 	s64 (*pwrite)(struct ntfs_device *dev, const void *buf, s64 count,
 			s64 offset);
 	int (*sync)(struct ntfs_device *dev);
+	int (*stat)(struct ntfs_device *dev, struct stat *buf);
 	int (*ioctl)(struct ntfs_device *dev, int request, void *argp);
 };
 
