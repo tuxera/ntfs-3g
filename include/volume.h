@@ -158,7 +158,7 @@ struct _ntfs_volume {
 
 	ATTR_DEF *attrdef;	/* Attribute definitions. Obtained from
 				   FILE_AttrDef. */
-	u32 attrdef_len;	/* Size of the attribute definition table in
+	s32 attrdef_len;	/* Size of the attribute definition table in
 				   bytes. */
 };
 
