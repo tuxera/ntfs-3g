@@ -2044,6 +2044,11 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 		/* Sanity checks are performed elsewhere. */
 		ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 				le16_to_cpu(ctx->mrec->attrs_offset));
+		/*
+		 * This needs resetting due to ntfs_external_attr_find() which
+		 * can leave it set despite having zeroed ctx->base_ntfs_ino.
+		 */
+		ctx->al_entry = NULL;
 		return;
 	} /* Attribute list. */
 	ntfs_attr_init_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
