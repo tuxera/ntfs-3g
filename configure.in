@@ -131,10 +131,11 @@ AC_OUTPUT([
 	ntfsprogs/Makefile
 	ntfsprogs/mkntfs.8
 	ntfsprogs/ntfsfix.8
-	ntfsprogs/ntfslabel.8
 	ntfsprogs/ntfsinfo.8
-	ntfsprogs/ntfsundelete.8
+	ntfsprogs/ntfslabel.8
+	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
+	ntfsprogs/ntfsundelete.8
 	linux-ntfs.spec
 ])
 
