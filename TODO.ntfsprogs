@@ -4,7 +4,6 @@ Thanks,
 	Anton
 
 
-
 **********
 * mkntfs *
 **********
@@ -21,6 +20,18 @@ Thanks,
   size to make it work.  Note, reporter was using win2k.
 
 
+*************
+* ntfsclone *
+*************
+
+- get rid of the unneeded lseek()'s during reads/writes
+- catch if source and dest are the same
+- add sparse encoding/decoding, perhaps using Partimage image format?
+- consider badblock list
+- add dd's noerror option
+- disable consistency check for --metadata (e.g. if the check is crashing)
+- make "wiped", etc statistic variables long long
+
 
 ***********
 * ntfsfix *
@@ -36,7 +47,6 @@ Thanks,
   not a showstopper bug for the first release. (AIA)
 
 
-
 *************
 * ntfslabel *
 *************
@@ -44,26 +54,23 @@ Thanks,
 - Support ioctls for ntfs tng driver 2.?.? for reading/changing the label.
 
 
-
 **************
 * ntfsresize *
 **************
 
 High priority
-  - support fragmented volumes -- WIP
-  - recovery support, journaling
+  - move ntfs consistency check to libntfs (for ntfsck, ntfsclone, etc)
+  - use different exit codes (e.g. corrupt volume detected, unsupported case, 
+    bad sectors, etc) 
 
 Medium priority 
-  - easy usage by partitioning tools -- WIP
-  	- move useful things to libntfs
-  	- extended error codes at exit()
-  	- cleanup at exit()
-  - quiet operation 
+  - support disks having bad sectors
+  - cope with the rare, unsupported cases, see man ntfsresize 'KNOWN ISSUES'
+  - save $Bitmap if it was modified and an error occures (e.g. bad sector).
+  - handle signals (^C, etc)
 
 Low priority
   - move volume start
-  - support disks having bad blocks
-
 
 
 ****************
