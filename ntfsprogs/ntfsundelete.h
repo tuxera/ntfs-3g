@@ -65,10 +65,10 @@ struct filename {
 	long long	 size_alloc;	/* Allocated size (multiple of cluster size) */
 	long long	 size_data;	/* Actual size of data */
 	FILE_ATTR_FLAGS	 flags;
-	time_t		 date_c;
-	time_t		 date_a;
-	time_t		 date_m;
-	time_t		 date_r;
+	time_t		 date_c;	/* Time created */
+	time_t		 date_a;	/*	altered */
+	time_t		 date_m;	/*	mft record changed */
+	time_t		 date_r;	/*	read */
 };
 
 struct data {
