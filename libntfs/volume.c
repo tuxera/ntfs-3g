@@ -941,15 +941,18 @@ error_exit:
  * Note, that a copy is made of @name, and hence it can be discarded as
  * soon as the function returns.
  */
-ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
+ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
+		unsigned long rwflag __attribute__((unused)))
 {
+#ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;
 
-#ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	/* Allocate an ntfs_device structure. */
 	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev)
 		return NULL;
+	/* Call ntfs_device_mount() to do the actual mount. */
+	return ntfs_device_mount(dev, rwflag);
 #else
 	/*
 	 * ntfs_mount() makes no sense if NO_NTFS_DEVICE_DEFAULT_IO_OPS is
@@ -959,8 +962,6 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 	errno = ENOTSUP;
 	return NULL;
 #endif
-	/* Call ntfs_device_mount() to do the actual mount. */
-	return ntfs_device_mount(dev, rwflag);
 }
 
 /**
