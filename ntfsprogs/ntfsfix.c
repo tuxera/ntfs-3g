@@ -70,7 +70,11 @@ GEN_PRINTF(Eprintf, stdout, NULL, FALSE)
 GEN_PRINTF(Vprintf, stdout, NULL, FALSE)
 GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
 
-const char *EXEC_NAME = "ntfsfix";
+static const char *EXEC_NAME = "ntfsfix";
+static const char *OK        = "OK";
+static const char *FAILED    = "FAILED";
+static BOOL vol_is_dirty     = FALSE;
+static BOOL journal_is_empty = FALSE;
 
 struct {
 	char *volume;
@@ -142,20 +146,59 @@ static void parse_options(int argc, char **argv)
 	}
 }
 
+static int set_dirty_flag(ntfs_volume *vol)
+{
+	u16 flags;
+
+	if (vol_is_dirty == TRUE)
+		return 0;
+
+	printf("Setting required flags on partition... ");
+	/*
+	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
+	 * and fix it for us.
+	 */
+	flags = vol->flags | VOLUME_IS_DIRTY;
+	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
+	if (vol->major_ver >= 2)
+		flags |= VOLUME_MOUNTED_ON_NT4;
+	if (ntfs_volume_set_flags(vol, flags)) {
+		puts(FAILED);
+		fprintf(stderr, "Error setting volume flags.\n");
+		return -1;
+	}
+	puts(OK);
+	vol_is_dirty = TRUE;
+	return 0;
+}
+
+static int empty_journal(ntfs_volume *vol)
+{
+	if (journal_is_empty == TRUE)
+		return 0;
+
+	printf("Going to empty the journal ($LogFile)... ");
+	if (ntfs_logfile_reset(vol)) {
+		puts(FAILED);
+		perror("Failed to reset $LogFile");
+		return -1;
+	}
+	puts(OK);
+	journal_is_empty = TRUE;
+	return 0;
+}
+
 /**
  * main
  */
 int main(int argc, char **argv)
 {
 	s64 l, br;
-	const char *OK = "OK";
-	const char *FAILED = "FAILED";
 	unsigned char *m = NULL, *m2 = NULL;
 	ntfs_volume *vol;
 	struct ntfs_device *dev;
 	unsigned long mnt_flags;
 	int i;
-	u16 flags;
 	BOOL done, force = FALSE;
 
 	parse_options(argc, argv);
@@ -312,6 +355,13 @@ int main(int argc, char **argv)
 	m = m2 = NULL;
 
 	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
+
+	if (set_dirty_flag(vol) < 0)
+		goto error_exit;
+
+	if (empty_journal(vol) < 0)
+		goto error_exit;
+
 	/* ntfs_umount() will invoke ntfs_device_free() for us. */
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
@@ -331,29 +381,11 @@ mount_ok:
 		goto error_exit;
 	}
 
-	printf("Setting required flags on partition... ");
-	/*
-	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
-	 * and fix it for us.
-	 */
-	flags = vol->flags | VOLUME_IS_DIRTY;
-	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
-	if (ntfs_volume_set_flags(vol, flags)) {
-		puts(FAILED);
-		fprintf(stderr, "Error setting volume flags.\n");
+	if (set_dirty_flag(vol) < 0)
 		goto error_exit;
-	}
-	puts(OK);
 
-	printf("Going to empty the journal ($LogFile)... ");
-	if (ntfs_logfile_reset(vol)) {
-		puts(FAILED);
-		perror("Failed to reset $LogFile");
+	if (empty_journal(vol) < 0)
 		goto error_exit;
-	}
-	puts(OK);
 
 	if (vol->major_ver >= 3) {
 	/* FIXME: If on NTFS 3.0+, check for presence of the usn journal and
