@@ -551,6 +551,44 @@ error_exit:
 }
 
 /**
+ * ntfs_volume_check_logfile - check logfile on target volume
+ * @vol:	volume on which to check logfile
+ *
+ * Return 0 on success and -1 on error with errno set error code.
+ */
+static int ntfs_volume_check_logfile(ntfs_volume *vol)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na = NULL;
+	int ret, err = 0;
+	
+	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
+		Dprintf("Failed to open inode FILE_LogFile.\n");
+		errno = EIO;
+		return -1;
+	}
+	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
+		ret = -1;
+		err = EIO;
+		goto exit;
+	}
+	if (ntfs_check_logfile(na) && ntfs_is_logfile_clean(na))
+		ret = 0;
+	else {
+		ret = -1;
+		err = EIO;
+	}
+exit:
+	if (na)
+		ntfs_attr_close(na);
+	ntfs_inode_close(ni);
+	if (ret)
+		errno = err;
+	return ret;
+}
+
+/**
  * ntfs_device_mount - open ntfs volume
  * @dev:	device to open
  * @rwflag:	optional mount flags
@@ -914,6 +952,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni))
 		Dperror("Failed to close inode, leaking memory");
+
+	/* Check logfile. */
+	if (ntfs_volume_check_logfile(vol))
+		goto error_exit;
 
 	return vol;
 io_error_exit:
