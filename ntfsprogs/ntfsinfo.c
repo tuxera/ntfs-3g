@@ -676,9 +676,11 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	if (attr->non_resident) {
 		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 		if (rl) {
-			s64 data_size = sle64_to_cpu(attr->data_size);
+			s64 data_size, bytes_read;
+
+			data_size = sle64_to_cpu(attr->data_size);
 			sec_desc_attr = malloc(data_size);
-			s64 bytes_read = ntfs_rl_pread(vol, rl, 0,
+			bytes_read = ntfs_rl_pread(vol, rl, 0,
 						data_size, sec_desc_attr);
 			if (bytes_read != data_size) {
 				Eprintf("ntfsinfo error: could not "
@@ -869,8 +871,8 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 		if (opts.verbose) {
 			runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 			if (rl) {
-				printf ("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 				runlist *rlc = rl;
+				printf ("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 				while (rlc->length) {
 					printf ("\t\t\t%lld\t\t%lld\t\t%lld\n",
 							rlc->vcn, rlc->lcn, rlc->length);
