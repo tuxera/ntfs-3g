@@ -25,64 +25,26 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <locale.h>
 #include <libintl.h>
 #include <stdarg.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "ntfswipe.h"
 #include "types.h"
 #include "volume.h"
+#include "utils.h"
 
 static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;
 
-/**
- * Eprintf - Print error messages
- */
-void Eprintf (const char *format, ...)
-{
-	va_list va;
-	va_start (va, format);
-	vfprintf (stderr, format, va);
-	va_end (va);
-}
-
-/**
- * Iprintf - Print informative messages
- */
-void Iprintf (const char *format, ...)
-{
-	va_list va;
-#ifndef DEBUG
-	if (opts.quiet)
-		return;
-#endif
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
-
-/**
- * Vprintf - Print verbose messages
- */
-void Vprintf (const char *format, ...)
-{
-	va_list va;
-#ifndef DEBUG
-	if (!opts.verbose)
-		return;
-#endif
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * Dprintf - Print debug messages
@@ -109,7 +71,7 @@ void Dprintf (const char *format, ...)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_unused (ntfs_volume *vol, int byte)
+int wipe_unused (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -129,7 +91,7 @@ int wipe_unused (ntfs_volume *vol, int byte)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_tails (ntfs_volume *vol, int byte)
+int wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -149,7 +111,7 @@ int wipe_tails (ntfs_volume *vol, int byte)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_mft (ntfs_volume *vol, int byte)
+int wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -159,7 +121,7 @@ int wipe_mft (ntfs_volume *vol, int byte)
 }
 
 /**
- * wipe_directory - Wipe the directiry indexes
+ * wipe_directory - Wipe the directory indexes
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
  *
@@ -169,7 +131,7 @@ int wipe_mft (ntfs_volume *vol, int byte)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_directory (ntfs_volume *vol, int byte)
+int wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -189,7 +151,7 @@ int wipe_directory (ntfs_volume *vol, int byte)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_logfile (ntfs_volume *vol, int byte)
+int wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -209,7 +171,7 @@ int wipe_logfile (ntfs_volume *vol, int byte)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_pagefile (ntfs_volume *vol, int byte)
+int wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return 0;
@@ -217,6 +179,7 @@ int wipe_pagefile (ntfs_volume *vol, int byte)
 	Iprintf ("wipe_pagefile 0x%02x\n", byte);
 	return 1;
 }
+
 
 /**
  * ntfs_info - Display information about the NTFS Volume
@@ -230,10 +193,166 @@ int wipe_pagefile (ntfs_volume *vol, int byte)
  */
 int ntfs_info (ntfs_volume *vol)
 {
+	u8 *buffer;
+
 	if (!vol)
 		return 0;
 
 	Iprintf ("ntfs_info\n");
+
+	Iprintf ("\n");
+
+	Iprintf ("Cluster size = %u\n", vol->cluster_size);
+	Iprintf ("Volume size = %lld clusters\n", vol->nr_clusters);
+	Iprintf ("Volume size = %lld bytes\n", vol->nr_clusters * vol->cluster_size);
+	Iprintf ("Volume size = %lld MiB\n", vol->nr_clusters * vol->cluster_size / (1024*1024)); /* round up? */
+
+	Iprintf ("\n");
+
+	// move back bufsize
+	buffer = malloc (vol->mft_record_size);
+	if (!buffer)
+		return 0;
+
+	Iprintf ("cluster\n");
+	//Iprintf ("allocated_size = %lld\n", vol->lcnbmp_na->allocated_size);
+	Iprintf ("data_size = %lld\n", vol->lcnbmp_na->data_size);
+	//Iprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
+
+	{
+	u64 offset;
+	u64 size = vol->lcnbmp_na->allocated_size;
+	int bufsize = vol->mft_record_size;
+	u64 use = 0;
+	u64 not = 0;
+	int i, j;
+
+	for (offset = 0; offset < size; offset += bufsize) {
+
+		if ((offset + bufsize) > size)
+			bufsize = size - offset;
+
+		if (ntfs_attr_pread (vol->lcnbmp_na, offset, bufsize, buffer) < bufsize) {
+			Eprintf ("error\n");
+			return 0;
+		}
+
+		for (i = 0; i < bufsize; i++) {
+			for (j = 0; j < 8; j++) {
+				if ((((offset+i)*8) + j) >= vol->nr_clusters)
+					goto done;
+				if (buffer[i] & (1 << j)) {
+					//printf ("*");
+					use++;
+				} else {
+					//printf (".");
+					not++;
+				}
+			}
+		}
+	}
+done:
+
+	Iprintf ("cluster use %lld, not %lld, total %lld\n", use, not, use+not);
+	Iprintf ("\n");
+
+	}
+
+	{
+	u8 *bitmap;
+	u64 bmpoff;
+	u64 bmpsize = vol->mftbmp_na->data_size;
+	int bmpbufsize = 512;
+	int i, j;
+	u64 use = 0, not = 0;
+
+	bitmap = malloc (bmpbufsize);
+	if (!bitmap)
+		return 0;
+
+	printf ("mft has %lld records\n", vol->nr_mft_records);
+
+	//Iprintf ("allocated_size = %lld\n", vol->mftbmp_na->allocated_size);
+	Iprintf ("data_size = %lld\n", vol->mftbmp_na->data_size);
+	//Iprintf ("initialized_size = %lld\n", vol->mftbmp_na->initialized_size);
+
+	printf ("bmpsize = %lld\n", bmpsize);
+	for (bmpoff = 0; bmpoff < bmpsize; bmpoff += bmpbufsize) {
+		if ((bmpoff + bmpbufsize) > bmpsize)
+			bmpbufsize = bmpsize - bmpoff;
+
+		//printf ("bmpbufsize = %d\n", bmpbufsize);
+
+		if (ntfs_attr_pread (vol->mftbmp_na, bmpoff, bmpbufsize, bitmap) < bmpbufsize) {
+			Eprintf ("error\n");
+			return 0;
+		}
+
+		for (i = 0; i < bmpbufsize; i++) {
+			for (j = 0; j < 8; j++) {
+				if ((((bmpoff+i)*8) + j) >= vol->nr_mft_records)
+					goto bmpdone;
+				if (bitmap[i] & (1 << j)) {
+					//printf ("*");
+					use++;
+				} else {
+					//printf (".");
+					not++;
+				}
+			}
+		}
+	}
+
+bmpdone:
+	printf ("mft\n");
+	printf ("use %lld, not %lld, total %lld\n", use, not, use+not);
+
+	free (bitmap);
+	}
+
+
+	/*
+	 * wipe_unused - volume = n clusters, u unused (%age & MB)
+	 * 	$Bitmap
+	 *	vol->lcnbmp_na
+	 *
+	 * wipe_tails - volume = n files, total tail slack space
+	 * 	$MFT, $DATA
+	 * 	vol->mft_na
+	 *
+	 * wipe_mft - volume = n mft records, u unused, s total slack space
+	 * 	$MFT, $BITMAP
+	 * 	vol->mftbmp_na
+	 *
+	 * wipe_directory - volume has d dirs, t total slack space
+	 * 	$MFT, $INDEX_ROOT, $INDEX_ALLOC, $BITMAP
+	 *
+	 * wipe_logfile - logfile is <size>
+	 * 	$MFT, $DATA
+	 *
+	 * wipe_pagefile - pagefile is <size>
+	 * 	$MFT, $DATA
+	 */
+
+	free (buffer);
+#if 0
+	ntfs_inode *inode;
+	ntfs_attr *attr;
+
+	inode = ntfs_inode_open (vol, 6);	/* $Bitmap */
+	if (!inode)
+		return 0;
+
+	attr = ntfs_attr_open (inode, AT_DATA, NULL, 0);
+	if (!attr)
+		return 0;
+
+	ntfs_attr_pread
+
+	ntfs_attr_close (attr);
+	ntfs_inode_close (inode);
+#endif
+
 	return 1;
 }
 
@@ -409,6 +528,8 @@ int parse_options (int argc, char *argv[])
 			}
 			break;
 
+		case 'i':
+			opts.info++;		/* and fall through */
 		case 'a':
 			opts.directory++;
 			opts.logfile++;
@@ -443,9 +564,6 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'h':
 			help++;
-			break;
-		case 'i':
-			opts.info++;
 			break;
 		case 'l':
 			opts.logfile++;
@@ -493,25 +611,22 @@ int parse_options (int argc, char *argv[])
 			err++;
 		}
 
-		if ((opts.quiet) && (opts.verbose)) {
+		if (opts.quiet && opts.verbose) {
 			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
 
+		/*
 		if (opts.info && (opts.unused || opts.tails || opts.mft || opts.directory)) {
 			Eprintf ("You may not use any other options with --info.\n");
 			err++;
 		}
+		*/
 
 		if ((opts.count < 1) || (opts.count > 100)) {
 			Eprintf ("The iteration count must be between 1 and 100.\n");
 			err++;
 		}
-
-		/*if (opts.bytes && (opts.count > 0)) {
-			Eprintf ("You may not use both --bytes and --count.\n");
-			err++;
-		}*/
 
 		/* Create a default list */
 		if (!opts.bytes) {
@@ -519,6 +634,9 @@ int parse_options (int argc, char *argv[])
 			if (opts.bytes) {
 				opts.bytes[0] =  0;
 				opts.bytes[1] = -1;
+			} else {
+				Eprintf ("Couldn't allocate memory for byte list.\n");
+				err++;
 			}
 		}
 
@@ -536,64 +654,9 @@ int parse_options (int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
-/**
- * valid_device - Perform some safety checks on the device, before we start
- * @name:   Full pathname of the device/file to work with
- * @force:  Continue regardless of problems
- *
- * Check that the name refers to a device and that is isn't already mounted.
- * These checks can be overridden by using the force option.
- *
- * Return:  1  Success, we can continue
- *	    0  Error, we cannot use this device
- */
-int valid_device (const char *name, int force)
-{
-	unsigned long mnt_flags = 0;
-	struct stat st;
-
-	if (stat (name, &st) == -1) {
-		if (errno == ENOENT) {
-			Eprintf ("The device %s doesn't exist\n", name);
-		} else {
-			Eprintf ("Error getting information about %s: %s\n", name, strerror (errno));
-		}
-		return 0;
-	}
-
-	if (!S_ISBLK (st.st_mode)) {
-		Vprintf ("%s is not a block device.\n", name);
-		if (!force) {
-			Eprintf ("Use the force option to work with files.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	}
-
-	/* Make sure the file system is not mounted. */
-	if (ntfs_check_if_mounted (name, &mnt_flags)) {
-		Vprintf ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
-		if (!force) {
-			Eprintf ("Use the force option to ignore this error.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Vprintf ("The device %s, is mounted.\n", name);
-		if (!force) {
-			Eprintf ("Use the force option to work a mounted filesystem.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	}
-
-	Dprintf ("Device %s, will be used\n", name);
-	return 1;
-}
-
 
 /**
- * print_summary - Tell the use what we are about to do
+ * print_summary - Tell the user what we are about to do
  *
  * List the operations about to be performed.  The output will be silenced by
  * the --quiet option.
@@ -649,6 +712,7 @@ int main (int argc, char *argv[])
 	int result = 1;
 	int flags = 0;
 	int i, j;
+	enum action act = act_info;
 
 	locale = setlocale (LC_ALL, "");
 	if (!locale) {
@@ -661,9 +725,8 @@ int main (int argc, char *argv[])
 	if (!parse_options (argc, argv))
 		return 1;
 
-	if (!valid_device (opts.device, opts.force)) {
+	if (!valid_device (opts.device, opts.force))
 		goto free;
-	}
 
 	if (!opts.info)
 		print_summary();
@@ -686,37 +749,90 @@ int main (int argc, char *argv[])
 	}
 
 	if (opts.info) {
-		ntfs_info (vol);
-		result = 0;
-		goto umount;
+		act = act_info;
+		opts.count = 1;
+	} else if (opts.noaction) {
+		act = act_test;
+	} else {
+		act = act_wipe;
 	}
 
 	/* Even if the output it quieted, you still get 5 seconds to abort. */
-	if (!opts.force) {
+	if ((act == act_wipe) && !opts.force) {
 		Iprintf ("\n%s will begin in 5 seconds, press CTRL-C to abort.\n", EXEC_NAME);
 		sleep (5);
 	}
 
-	if (!opts.bytes) {
-		Eprintf ("Internal error, byte list is empty\n");
-		goto umount;
+	if (0)
+	{
+		printf ("________________________________________________________________________________\n\n");
+		int i = 0;
+		runlist_element *rl = vol->mft_na->rl;
+		for (; rl->length > 0; rl++, i++) {
+			printf ("%4d %lld,%lld,%lld\n", i, rl->vcn, rl->lcn, rl->length);
+		}
+		printf ("%4d %lld,%lld,%lld\n", i, rl->vcn, rl->lcn, rl->length);
+		return 0;
 	}
 
+	printf ("\n");
 	for (i = 0; i < opts.count; i++) {
 		int byte;
+		s64 total = 0;
+		s64 wiped = 0;
+
 		for (j = 0; byte = opts.bytes[j], byte >= 0; j++) {
-			if (opts.unused && !wipe_unused (vol, byte))
-				goto umount;
-			if (opts.tails && !wipe_tails (vol, byte))
-				goto umount;
-			if (opts.mft && !wipe_mft (vol, byte))
-				goto umount;
-			if (opts.directory && !wipe_directory (vol, byte))
-				goto umount;
-			if (opts.logfile && !wipe_logfile (vol, byte))
-				goto umount;
-			if (opts.pagefile && !wipe_pagefile (vol, byte))
-				goto umount;
+
+			if (opts.directory) {
+				wiped = wipe_directory (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (opts.tails) {
+				wiped = wipe_tails (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (opts.logfile) {
+				wiped = wipe_logfile (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (opts.mft) {
+				wiped = wipe_mft (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (opts.pagefile) {
+				wiped = wipe_pagefile (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (opts.unused) {
+				wiped = wipe_unused (vol, byte, act);
+				if (wiped < 0)
+					goto umount;
+				else
+					total += wiped;
+			}
+
+			if (act == act_info)
+				break;
 		}
 	}
 
