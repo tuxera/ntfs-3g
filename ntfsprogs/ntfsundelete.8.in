@@ -341,9 +341,7 @@ If you find one, please send an email to
 .hy
 .SH AUTHOR
 .B ntfsundelete
-was written by Richard Russon (FlatCap) <ntfs@flatcap.org>
-.br
-If you find this tool useful, make FlatCap happy and send him an email.
+was written by Richard Russon (FlatCap)
 .SH AVAILABILITY
 .B ntfsundelete
 is part of the ntfsprogs package and is available from
