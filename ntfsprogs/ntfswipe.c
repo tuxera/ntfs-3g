@@ -37,6 +37,7 @@
 #include "types.h"
 #include "volume.h"
 #include "utils.h"
+#include "debug.h"
 
 static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfswipe";
@@ -44,22 +45,7 @@ static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
-
-/**
- * Dprintf - Print debug messages
- */
-#ifndef DEBUG
-#define Dprintf(...)
-#else
-void Dprintf (const char *format, ...)
-{
-	va_list va;
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
-#endif
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * wipe_unused - Wipe unused clusters
@@ -76,7 +62,7 @@ int wipe_unused (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_unused 0x%02x\n", byte);
+	Qprintf ("wipe_unused 0x%02x\n", byte);
 	return 1;
 }
 
@@ -96,7 +82,7 @@ int wipe_tails (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_tails 0x%02x\n", byte);
+	Qprintf ("wipe_tails 0x%02x\n", byte);
 	return 1;
 }
 
@@ -116,7 +102,7 @@ int wipe_mft (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_mft 0x%02x\n", byte);
+	Qprintf ("wipe_mft 0x%02x\n", byte);
 	return 1;
 }
 
@@ -136,7 +122,7 @@ int wipe_directory (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_directory 0x%02x\n", byte);
+	Qprintf ("wipe_directory 0x%02x\n", byte);
 	return 1;
 }
 
@@ -156,7 +142,7 @@ int wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_logfile 0x%02x\n", byte);
+	Qprintf ("wipe_logfile 0x%02x\n", byte);
 	return 1;
 }
 
@@ -176,7 +162,7 @@ int wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return 0;
 
-	Iprintf ("wipe_pagefile 0x%02x\n", byte);
+	Qprintf ("wipe_pagefile 0x%02x\n", byte);
 	return 1;
 }
 
@@ -198,26 +184,26 @@ int ntfs_info (ntfs_volume *vol)
 	if (!vol)
 		return 0;
 
-	Iprintf ("ntfs_info\n");
+	Qprintf ("ntfs_info\n");
 
-	Iprintf ("\n");
+	Qprintf ("\n");
 
-	Iprintf ("Cluster size = %u\n", vol->cluster_size);
-	Iprintf ("Volume size = %lld clusters\n", vol->nr_clusters);
-	Iprintf ("Volume size = %lld bytes\n", vol->nr_clusters * vol->cluster_size);
-	Iprintf ("Volume size = %lld MiB\n", vol->nr_clusters * vol->cluster_size / (1024*1024)); /* round up? */
+	Qprintf ("Cluster size = %u\n", vol->cluster_size);
+	Qprintf ("Volume size = %lld clusters\n", vol->nr_clusters);
+	Qprintf ("Volume size = %lld bytes\n", vol->nr_clusters * vol->cluster_size);
+	Qprintf ("Volume size = %lld MiB\n", vol->nr_clusters * vol->cluster_size / (1024*1024)); /* round up? */
 
-	Iprintf ("\n");
+	Qprintf ("\n");
 
 	// move back bufsize
 	buffer = malloc (vol->mft_record_size);
 	if (!buffer)
 		return 0;
 
-	Iprintf ("cluster\n");
-	//Iprintf ("allocated_size = %lld\n", vol->lcnbmp_na->allocated_size);
-	Iprintf ("data_size = %lld\n", vol->lcnbmp_na->data_size);
-	//Iprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
+	Qprintf ("cluster\n");
+	//Qprintf ("allocated_size = %lld\n", vol->lcnbmp_na->allocated_size);
+	Qprintf ("data_size = %lld\n", vol->lcnbmp_na->data_size);
+	//Qprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
 
 	{
 	u64 offset;
@@ -253,8 +239,8 @@ int ntfs_info (ntfs_volume *vol)
 	}
 done:
 
-	Iprintf ("cluster use %lld, not %lld, total %lld\n", use, not, use+not);
-	Iprintf ("\n");
+	Qprintf ("cluster use %lld, not %lld, total %lld\n", use, not, use+not);
+	Qprintf ("\n");
 
 	}
 
@@ -272,9 +258,9 @@ done:
 
 	printf ("mft has %lld records\n", vol->nr_mft_records);
 
-	//Iprintf ("allocated_size = %lld\n", vol->mftbmp_na->allocated_size);
-	Iprintf ("data_size = %lld\n", vol->mftbmp_na->data_size);
-	//Iprintf ("initialized_size = %lld\n", vol->mftbmp_na->initialized_size);
+	//Qprintf ("allocated_size = %lld\n", vol->mftbmp_na->allocated_size);
+	Qprintf ("data_size = %lld\n", vol->mftbmp_na->data_size);
+	//Qprintf ("initialized_size = %lld\n", vol->mftbmp_na->initialized_size);
 
 	printf ("bmpsize = %lld\n", bmpsize);
 	for (bmpoff = 0; bmpoff < bmpsize; bmpoff += bmpbufsize) {
@@ -366,7 +352,7 @@ bmpdone:
  */
 void version (void)
 {
-	Iprintf ("%s v%s Copyright (C) 2002 %s\nOverwrite the unused space on "
+	Qprintf ("%s v%s Copyright (C) 2002 %s\nOverwrite the unused space on "
 		"an NTFS Volume\n\n%s is free software, released under the GNU "
 		"General Public License\nand you are welcome to redistribute "
 		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
@@ -385,7 +371,7 @@ void version (void)
  */
 void usage (void)
 {
-	Iprintf ("Usage: %s [options] device\n"
+	Qprintf ("Usage: %s [options] device\n"
 		"    -i       --info        Show volume information (default)\n"
 		"\n"
 		"    -d       --directory   Wipe directory indexes\n"
@@ -407,7 +393,7 @@ void usage (void)
 		"    -V       --version     Version information\n"
 		"    -h       --help        Print this help\n\n",
 		EXEC_NAME);
-	Iprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
 }
 
 /**
@@ -668,33 +654,33 @@ void print_summary (void)
 	int i;
 
 	if (opts.noaction)
-		Iprintf ("%s is in 'no-action' mode, it will NOT write to disk."
+		Qprintf ("%s is in 'no-action' mode, it will NOT write to disk."
 			 "\n\n", EXEC_NAME);
 
-	Iprintf ("%s is about to wipe:\n", EXEC_NAME);
+	Qprintf ("%s is about to wipe:\n", EXEC_NAME);
 	if (opts.unused)
-		Iprintf ("\tunused disk space\n");
+		Qprintf ("\tunused disk space\n");
 	if (opts.tails)
-		Iprintf ("\tfile tails\n");
+		Qprintf ("\tfile tails\n");
 	if (opts.mft)
-		Iprintf ("\tunused mft areas\n");
+		Qprintf ("\tunused mft areas\n");
 	if (opts.directory)
-		Iprintf ("\tunused directory index space\n");
+		Qprintf ("\tunused directory index space\n");
 	if (opts.logfile)
-		Iprintf ("\tthe logfile (journal)\n");
+		Qprintf ("\tthe logfile (journal)\n");
 	if (opts.pagefile)
-		Iprintf ("\tthe pagefile (swap space)\n");
+		Qprintf ("\tthe pagefile (swap space)\n");
 
-	Iprintf ("\n%s will overwrite these areas with: ", EXEC_NAME);
+	Qprintf ("\n%s will overwrite these areas with: ", EXEC_NAME);
 	if (opts.bytes) {
 		for (i = 0; opts.bytes[i] >= 0; i++)
-			Iprintf ("0x%02x ", opts.bytes[i]);
+			Qprintf ("0x%02x ", opts.bytes[i]);
 	}
-	Iprintf ("\n");
+	Qprintf ("\n");
 
 	if (opts.count > 1)
-		Iprintf ("%s will repeat these operations %d times.\n", EXEC_NAME, opts.count);
-	Iprintf ("\n");
+		Qprintf ("%s will repeat these operations %d times.\n", EXEC_NAME, opts.count);
+	Qprintf ("\n");
 }
 
 /**
@@ -729,12 +715,12 @@ int main (int argc, char *argv[])
 		goto free;
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		Iprintf ("Volume is dirty.\n");
+		Qprintf ("Volume is dirty.\n");
 		if (!opts.force) {
 			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
 			goto umount;
 		}
-		Iprintf ("Forced to continue.\n");
+		Qprintf ("Forced to continue.\n");
 	}
 
 	if (opts.info) {
@@ -748,7 +734,7 @@ int main (int argc, char *argv[])
 
 	/* Even if the output it quieted, you still get 5 seconds to abort. */
 	if ((act == act_wipe) && !opts.force) {
-		Iprintf ("\n%s will begin in 5 seconds, press CTRL-C to abort.\n", EXEC_NAME);
+		Qprintf ("\n%s will begin in 5 seconds, press CTRL-C to abort.\n", EXEC_NAME);
 		sleep (5);
 	}
 

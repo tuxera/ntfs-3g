@@ -62,7 +62,7 @@ static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 #define _(S)	gettext(S)
 
@@ -75,7 +75,7 @@ GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	Iprintf ("%s v%s Copyright (C) 2002 %s\nRecover deleted files from an "
+	Qprintf ("%s v%s Copyright (C) 2002 %s\nRecover deleted files from an "
 		"NTFS Volume\n\n%s is free software, released under the GNU "
 		"General Public License\nand you are welcome to redistribute "
 		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
@@ -94,7 +94,7 @@ void version (void)
  */
 void usage (void)
 {
-	Iprintf ("Usage: %s [options] device\n"
+	Qprintf ("Usage: %s [options] device\n"
 		"    -s          --scan             Scan for files (default)\n"
 		"    -p num      --percentage num   Minimum percentage recoverable\n"
 		"    -m pattern  --match pattern    Only work on files with matching names\n"
@@ -115,7 +115,7 @@ void usage (void)
 		"    -V          --version          Display version information\n"
 		"    -h          --help             Display this help\n\n",
 		EXEC_NAME);
-	Iprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
 }
 
 /**
@@ -927,13 +927,13 @@ void dump_record (struct ufile *file)
 	if (!file)
 		return;
 
-	Iprintf ("MFT Record %lld\n", file->inode);
-	Iprintf ("Type: %s\n", (file->directory) ? "Directory" : "File");
+	Qprintf ("MFT Record %lld\n", file->inode);
+	Qprintf ("Type: %s\n", (file->directory) ? "Directory" : "File");
 	strftime (buffer, sizeof (buffer), "%F %R", localtime (&file->date));
-	Iprintf ("Date: %s\n", buffer);
+	Qprintf ("Date: %s\n", buffer);
 
 	if (file->attr_list)
-		Iprintf ("Metadata may span more than one MFT record\n");
+		Qprintf ("Metadata may span more than one MFT record\n");
 
 	list_for_each (item, &file->name) {
 		struct filename *f = list_entry (item, struct filename, list);
@@ -943,64 +943,64 @@ void dump_record (struct ufile *file)
 		else
 			name = NONE;
 
-		Iprintf ("Filename: (%d) %s\n", f->name_space, f->name);
-		Iprintf ("File Flags: ");
-		if (f->flags & FILE_ATTR_SYSTEM)	Iprintf ("System ");
-		if (f->flags & FILE_ATTR_DIRECTORY)	Iprintf ("Directory ");
-		if (f->flags & FILE_ATTR_SPARSE_FILE)	Iprintf ("Sparse ");
-		if (f->flags & FILE_ATTR_REPARSE_POINT)	Iprintf ("Reparse ");
-		if (f->flags & FILE_ATTR_COMPRESSED)	Iprintf ("Compressed ");
-		if (f->flags & FILE_ATTR_ENCRYPTED)	Iprintf ("Encrypted ");
+		Qprintf ("Filename: (%d) %s\n", f->name_space, f->name);
+		Qprintf ("File Flags: ");
+		if (f->flags & FILE_ATTR_SYSTEM)	Qprintf ("System ");
+		if (f->flags & FILE_ATTR_DIRECTORY)	Qprintf ("Directory ");
+		if (f->flags & FILE_ATTR_SPARSE_FILE)	Qprintf ("Sparse ");
+		if (f->flags & FILE_ATTR_REPARSE_POINT)	Qprintf ("Reparse ");
+		if (f->flags & FILE_ATTR_COMPRESSED)	Qprintf ("Compressed ");
+		if (f->flags & FILE_ATTR_ENCRYPTED)	Qprintf ("Encrypted ");
 		if (!(f->flags & (FILE_ATTR_SYSTEM || FILE_ATTR_DIRECTORY ||
 		    FILE_ATTR_SPARSE_FILE || FILE_ATTR_REPARSE_POINT ||
 		    FILE_ATTR_COMPRESSED || FILE_ATTR_ENCRYPTED))) {
-			Iprintf (NONE);
+			Qprintf (NONE);
 		}
-		Iprintf ("\n");
-		Iprintf ("Size alloc: %lld\n", f->size_alloc);
-		Iprintf ("Size data: %lld\n", f->size_data);
+		Qprintf ("\n");
+		Qprintf ("Size alloc: %lld\n", f->size_alloc);
+		Qprintf ("Size data: %lld\n", f->size_data);
 
 		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_c));
-		Iprintf ("Date C: %s\n", buffer);
+		Qprintf ("Date C: %s\n", buffer);
 		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_a));
-		Iprintf ("Date A: %s\n", buffer);
+		Qprintf ("Date A: %s\n", buffer);
 		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_m));
-		Iprintf ("Date M: %s\n", buffer);
+		Qprintf ("Date M: %s\n", buffer);
 		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_r));
-		Iprintf ("Date R: %s\n", buffer);
+		Qprintf ("Date R: %s\n", buffer);
 	}
 
-	Iprintf ("Data Streams:\n");
+	Qprintf ("Data Streams:\n");
 	list_for_each (item, &file->data) {
 		struct data *d = list_entry (item, struct data, list);
-		Iprintf ("Name: %s\n", (d->name) ? d->name : "<unnamed>");
-		Iprintf ("Flags: ");
-		if (d->resident)   Iprintf ("Resident\n");
-		if (d->compressed) Iprintf ("Compressed\n");
-		if (d->encrypted)  Iprintf ("Encrypted\n");
+		Qprintf ("Name: %s\n", (d->name) ? d->name : "<unnamed>");
+		Qprintf ("Flags: ");
+		if (d->resident)   Qprintf ("Resident\n");
+		if (d->compressed) Qprintf ("Compressed\n");
+		if (d->encrypted)  Qprintf ("Encrypted\n");
 		if (!d->resident && !d->compressed && !d->encrypted)
-			Iprintf ("None\n");
+			Qprintf ("None\n");
 		else
-			Iprintf ("\n");
+			Qprintf ("\n");
 
-		Iprintf ("Size alloc: %lld\n", d->size_alloc);
-		Iprintf ("Size data: %lld\n", d->size_data);
-		Iprintf ("Size init: %lld\n", d->size_init);
-		Iprintf ("Size vcn: %lld\n", d->size_vcn);
+		Qprintf ("Size alloc: %lld\n", d->size_alloc);
+		Qprintf ("Size data: %lld\n", d->size_data);
+		Qprintf ("Size init: %lld\n", d->size_init);
+		Qprintf ("Size vcn: %lld\n", d->size_vcn);
 
-		Iprintf ("Data runs:\n");
+		Qprintf ("Data runs:\n");
 		if ((!d->runlist) || (d->runlist[0].length <= 0)) {
-			Iprintf ("    None\n");
+			Qprintf ("    None\n");
 		} else {
 			for (i = 0; d->runlist[i].length > 0; i++) {
-				Iprintf ("    %lld @ %lld\n", d->runlist[i].length, d->runlist[i].lcn);
+				Qprintf ("    %lld @ %lld\n", d->runlist[i].length, d->runlist[i].lcn);
 			}
 		}
 
-		Iprintf ("Amount potentially recoverable %d%%\n", d->percent);
+		Qprintf ("Amount potentially recoverable %d%%\n", d->percent);
 	}
 
-	Iprintf ("________________________________________\n\n");
+	Qprintf ("________________________________________\n\n");
 }
 
 /**
@@ -1067,7 +1067,7 @@ void list_record (struct ufile *file)
 	else
 		name = NONE;
 
-	Iprintf ("%-8lld %c%c%c%c   %3d%%  %s %9lld  %s\n",
+	Qprintf ("%-8lld %c%c%c%c   %3d%%  %s %9lld  %s\n",
 		file->inode, flagd, flagr, flagc, flagx,
 		percent, buffer, size, name);
 }
@@ -1293,8 +1293,8 @@ int scan_disk (ntfs_volume *vol)
 		}
 	}
 
-	Iprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
-	Iprintf ("---------------------------------------------------------------\n");
+	Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
+	Qprintf ("---------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
 		read = min ((bmpsize - i), BUFSIZE);
 		size = ntfs_attr_pread (attr, i, read, buffer);
@@ -1342,7 +1342,7 @@ skip:
 		}
 	}
 done:
-	Iprintf ("\nFiles with potentially recoverable content: %d\n", results);
+	Qprintf ("\nFiles with potentially recoverable content: %d\n", results);
 out:
 	if (opts.match)
 		regfree (&re);
@@ -1405,10 +1405,10 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	if (opts.verbose) {
 		dump_record (file);
 	} else {
-		Iprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
-		Iprintf ("---------------------------------------------------------------\n");
+		Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
+		Qprintf ("---------------------------------------------------------------\n");
 		list_record (file);
-		Iprintf ("\n");
+		Qprintf ("\n");
 	}
 
 	if (file->mft->flags & MFT_RECORD_IN_USE) {
@@ -1421,12 +1421,12 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	}
 
 	if (calc_percentage (file, vol) == 0) {
-		Iprintf ("File has no recoverable data.\n");
+		Qprintf ("File has no recoverable data.\n");
 		goto free;
 	}
 
 	if (list_empty (&file->data)) {
-		Iprintf ("File has no data.  There is nothing to recover.\n");
+		Qprintf ("File has no data.  There is nothing to recover.\n");
 		goto free;
 	}
 
@@ -1535,7 +1535,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 					}
 				}
 			}
-			Iprintf ("\n");
+			Qprintf ("\n");
 			if (close (fd) < 0) {
 				Eprintf ("Close failed: %s\n", strerror (errno));
 			}
@@ -1544,9 +1544,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 		}
 		set_date (pathname, file->date);
 		if (d->name)
-			Iprintf ("Undeleted '%s:%s' successfully.\n", file->pref_name, d->name);
+			Qprintf ("Undeleted '%s:%s' successfully.\n", file->pref_name, d->name);
 		else
-			Iprintf ("Undeleted '%s' successfully.\n", file->pref_name);
+			Qprintf ("Undeleted '%s' successfully.\n", file->pref_name);
 	}
 	result = 1;
 free:
