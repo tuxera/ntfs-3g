@@ -197,6 +197,7 @@ static int parse_options (int argc, char **argv)
 
 struct ntfs_dir;
 static void ntfs_ie_dump (INDEX_ENTRY *ie);
+static VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie);
 static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype);
 
 /**
@@ -322,7 +323,7 @@ static int ntfs_dt_count_root (struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
-	VCN *vcn = NULL;
+	VCN vcn;
 	s64 size = 0;
 	char *name = NULL;
 
@@ -354,8 +355,8 @@ static int ntfs_dt_count_root (struct ntfs_dt *dt)
 		dt->children  = ntfs_dt_alloc_children  (dt->children,  dt->child_count);
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
-			vcn = (VCN *) (ptr + ((entry->key_length + 0x17) & ~7));
-			//printf ("VCN %lld\n", *vcn);
+			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
+			//printf ("VCN %lld\n", vcn);
 		}
 
 		if (!(entry->flags & INDEX_ENTRY_END)) {
@@ -387,7 +388,7 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
-	VCN *vcn = NULL;
+	VCN vcn;
 	s64 size = 0;
 	char *name = NULL;
 
@@ -416,8 +417,8 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 		dt->children = ntfs_dt_alloc_children  (dt->children,  dt->child_count);
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
-			vcn = (VCN *) (ptr + ((entry->key_length + 0x17) & ~7));
-			//printf ("\tVCN %lld\n", *vcn);
+			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
+			//printf ("\tVCN %lld\n", vcn);
 		}
 
 		dt->children[dt->child_count-1] = entry;
@@ -608,7 +609,7 @@ static MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 				//printf ("map & recurse\n");
 				//printf ("sub %p\n", dt->sub_nodes);
 				if (!dt->sub_nodes[i]) {
-					vcn = *(VCN*)(((u8*)ie) + ie->length - sizeof (VCN));
+					vcn = ntfs_ie_get_vcn (ie);
 					//printf ("vcn = %lld\n", vcn);
 					sub = ntfs_dt_alloc (dt->dir, dt, vcn);
 					dt->sub_nodes[i] = sub;
@@ -673,7 +674,7 @@ static struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int n
 			continue;
 		} else if (r == 0) {
 			res = dt;
-			//printf ("match %lld\n", res);
+			//printf ("match %p\n", res);
 			if (index_num)
 				*index_num = i;
 		} else if (r == -1) {
@@ -741,6 +742,72 @@ static struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int n
 			printf ("error collating name\n");
 		}
 		break;
+	}
+
+	return res;
+}
+
+/**
+ * ntfs_dt_find4
+ * find successor
+ */
+static struct ntfs_dt * ntfs_dt_find4 (struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
+{
+	struct ntfs_dt *res = NULL;
+	struct ntfs_dt *sub = NULL;
+	INDEX_ENTRY *ie;
+	VCN vcn;
+	int i;
+	int r;
+
+	if (!dt || !name)
+		return NULL;
+
+	//printf ("child_count = %d\n", dt->child_count);
+	for (i = 0; i < dt->child_count; i++) {
+		ie = dt->children[i];
+
+		if (ie->flags & INDEX_ENTRY_END) {
+			r = -1;
+		} else {
+			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
+			r = ntfs_names_collate (name, name_len,
+						ie->key.file_name.file_name,
+						ie->key.file_name.file_name_length,
+						2, IGNORE_CASE,
+						dt->dir->vol->upcase,
+						dt->dir->vol->upcase_len);
+		}
+
+		//printf ("%d, %d\n", i, r);
+
+		if (r == 1) {
+			//printf ("keep searching\n");
+		} else if (r == 0) {
+			//res = dt;
+			//printf ("match\n");
+			// ignore
+		} else if (r == -1) {
+			if (ie->flags & INDEX_ENTRY_NODE) {
+				//printf ("recurse\n");
+				if (!dt->sub_nodes[i]) {
+					vcn = ntfs_ie_get_vcn (ie);
+					//printf ("vcn = %lld\n", vcn);
+					sub = ntfs_dt_alloc (dt->dir, dt, vcn);
+					dt->sub_nodes[i] = sub;
+				}
+				res = ntfs_dt_find4 (dt->sub_nodes[i], name, name_len, index_num);
+			} else {
+				//printf ("no match\n");
+				res = dt;
+				if (index_num)
+					*index_num = i;
+			}
+			break;
+		} else {
+			printf ("error collating name\n");
+		}
+		//break;
 	}
 
 	return res;
@@ -1125,7 +1192,7 @@ static int ntfs_mft_resize_resident (ntfs_inode *inode, ATTR_TYPES type, ntfscha
 	arec = ctx->attr;
 
 	if (arec->non_resident) {
-		printf ("attributes isn't resident\n");
+		printf ("attribute isn't resident\n");
 		goto done;
 	}
 
@@ -1177,28 +1244,16 @@ done:
  */
 static int ntfs_mft_free_space (struct ntfs_dir *dir)
 {
-	u8 *buffer = NULL;
-	ntfs_volume *vol;
 	int res = 0;
 	MFT_RECORD *mft;
 
-	if (!dir)
+	if ((!dir) || (!dir->inode))
 		return -1;
 
-	buffer = malloc (512);
-	if (!buffer)
-		return -1;
-
-	vol = dir->vol;
-
-	if (ntfs_attr_pread (vol->mft_na, dir->mft_num << vol->mft_record_size_bits, 512, buffer) != 512)
-		goto done;
-
-	mft = (MFT_RECORD*) buffer;
+	mft = (MFT_RECORD*) dir->inode->mrec;
 
 	res = mft->bytes_allocated - mft->bytes_in_use;
-done:
-	free (buffer);
+
 	return res;
 }
 
@@ -1726,7 +1781,6 @@ close:
 	return res;
 }
 
-
 /**
  * ntfsrm
  */
@@ -1843,8 +1897,7 @@ static void ntfs_ie_dump (INDEX_ENTRY *ie)
 		}
 	}
 	if (ie->flags == INDEX_ENTRY_NODE) {
-		VCN *vcn = (VCN*) ((u8*) ie + ie->length - 8);
-		printf ("child vcn = %lld\n", *vcn);
+		printf ("child vcn = %lld\n", ntfs_ie_get_vcn (ie));
 	}
 }
 
@@ -1888,27 +1941,24 @@ static INDEX_ENTRY * ntfs_ie_copy (INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_set_child
+ * ntfs_ie_set_vcn
  */
-static INDEX_ENTRY * ntfs_ie_set_child (INDEX_ENTRY *ie, VCN vcn)
+static INDEX_ENTRY * ntfs_ie_set_vcn (INDEX_ENTRY *ie, VCN vcn)
 {
 	if (!ie)
 		return 0;
 
-	if (ie->flags & INDEX_ENTRY_NODE) {
-		*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
-		return ie;
+	if (!(ie->flags & INDEX_ENTRY_NODE)) {
+		ie->length += 8;
+		ie = realloc (ie, ie->length);
+		if (!ie)
+			return NULL;
+
+		ie->flags |= INDEX_ENTRY_NODE;
 	}
 
-	ie->length += 8;
-	ie = realloc (ie, ie->length);
-	if (!ie)
-		return NULL;
-
-	ie->flags |= INDEX_ENTRY_NODE;
 	*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
-
-	return 0;
+	return ie;
 }
 
 /**
@@ -1976,7 +2026,7 @@ static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int name
 	//printf ("need = %d\n", need);
 
 	if (ie->flags & INDEX_ENTRY_NODE)
-		vcn = *((VCN*) ((u8*) ie + ie->length - 8));
+		vcn = ntfs_ie_get_vcn (ie);
 
 	ie->length = 16 + need;
 	ie->key_length = sizeof (FILE_NAME_ATTR) + (namelen * sizeof (ntfschar));
@@ -1987,7 +2037,7 @@ static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int name
 	memcpy (ie->key.file_name.file_name, name, namelen * 2);
 
 	if (ie->flags & INDEX_ENTRY_NODE)
-		*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
+		ie = ntfs_ie_set_vcn (ie, vcn);
 
 	ie->key.file_name.file_name_length = namelen;
 	ie->key.file_name.file_name_type = nametype;
@@ -2009,7 +2059,7 @@ static INDEX_ENTRY * ntfs_ie_remove_name (INDEX_ENTRY *ie)
 		return ie;
 
 	if (ie->flags & INDEX_ENTRY_NODE)
-		vcn = *((VCN*) ((u8*) ie + ie->length - 8));
+		vcn = ntfs_ie_get_vcn (ie);
 
 	ie->length -= ATTR_SIZE (ie->key_length);
 	ie->key_length = 0;
@@ -2020,7 +2070,7 @@ static INDEX_ENTRY * ntfs_ie_remove_name (INDEX_ENTRY *ie)
 		return NULL;
 
 	if (ie->flags & INDEX_ENTRY_NODE)
-		*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
+		ie = ntfs_ie_set_vcn (ie, vcn);
 	return ie;
 }
 
@@ -2067,12 +2117,12 @@ static int ntfs_ie_test (void)
 	}
 
 	if (1) {
-		ntfs_ie_set_child (ie1, 1234);
+		ie1 = ntfs_ie_set_vcn (ie1, 1234);
 		ntfs_ie_dump (ie1);
 	}
 
 	if (1) {
-		ntfs_ie_remove_child (ie1);
+		ie1 = ntfs_ie_remove_child (ie1);
 		ntfs_ie_dump (ie1);
 	}
 
@@ -2090,6 +2140,17 @@ static int ntfs_ie_test (void)
 	free (ie1);
 	free (ie2);
 	return 0;
+}
+
+/**
+ * ntfs_ie_get_vcn
+ */
+static VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie)
+{
+	if (!ie)
+		return -1;
+
+	return *((VCN*) ((u8*) ie + ie->length - 8));
 }
 
 
@@ -2261,6 +2322,98 @@ done:
 	return 0;
 }
 
+/**
+ * ntfsrm2
+ */
+static int ntfsrm2 (ntfs_volume *vol, char *name)
+{
+	struct ntfs_dir *root_dir = NULL;
+	struct ntfs_dir *find_dir = NULL;
+	struct ntfs_dt *del = NULL;
+	struct ntfs_dt *suc = NULL;
+	MFT_REF mft_num;
+	ntfschar *uname = NULL;
+	int del_num = 0;
+	int suc_num = 0;
+	int len;
+	VCN vcn;
+	INDEX_ENTRY *del_ie = NULL;
+	INDEX_ENTRY *suc_ie = NULL;
+
+	root_dir = ntfs_dir_alloc (vol, FILE_root);
+	if (!root_dir)
+		return 1;
+
+	mft_num = utils_pathname_to_mftref (vol, root_dir, name, &find_dir);
+
+	if (!find_dir) {
+		printf ("Couldn't find the index entry for %s\n", name);
+		goto done;
+	}
+
+	if (rindex (name, PATH_SEP))
+		name = rindex (name, PATH_SEP) + 1;
+
+	len = ntfs_mbstoucs (name, &uname, 0);
+	if (len < 0)
+		goto done;
+
+	del = ntfs_dt_find2 (find_dir->index, uname, len, &del_num);
+	if (!del) {
+		printf ("can't find item to delete\n");
+		goto done;
+	}
+
+	del_ie = del->children[del_num];
+	utils_dump_mem ((u8*)del_ie, 0, del_ie->length, 1);
+	printf ("\n");
+
+	if (del->header->flags & INDEX_NODE) {
+		printf ("node\n");
+
+		vcn = ntfs_ie_get_vcn (del_ie);
+		//printf ("vcn = %lld\n", vcn);
+
+		suc = ntfs_dt_find4 (find_dir->index, uname, len, &suc_num);
+		//printf ("succ = %p, index = %d\n", suc, suc_num);
+		printf ("\n");
+
+		suc_ie = ntfs_ie_copy ((INDEX_ENTRY*) suc->children[suc_num]);
+		//utils_dump_mem ((u8*)suc_ie, 0, suc_ie->length, 1);
+		//printf ("\n");
+
+		suc_ie = ntfs_ie_set_vcn (suc_ie, vcn);
+		utils_dump_mem ((u8*)suc_ie, 0, suc_ie->length, 1);
+		printf ("\n");
+
+		if (del_ie->length != suc_ie->length) {
+			printf ("realloc!\n");
+			return -1;
+		}
+
+		memcpy (del->children[del_num], suc_ie, suc_ie->length);
+
+		ntfs_mft_resize_resident (find_dir->inode, AT_INDEX_ROOT, I30, 4, (u8*)del->data, del->data_len);
+		//utils_dump_mem ((u8*)find_dir->inode->mrec, 0, 1024, 1);
+
+		//commit
+
+		// Continue delete with the original successor
+		del     = suc;
+		del_num = suc_num;
+	}
+
+	//remove key
+
+	//if (!empty)
+	//	done
+
+done:
+	ntfs_dir_free (root_dir);
+	free (uname);
+	return 0;
+}
+
 
 /**
  * main - Begin here
@@ -2308,7 +2461,8 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_index_dump (inode);
 	if (0) result = ntfsrm (vol, opts.file);
 	if (0) result = ntfs_ie_test();
-	if (1) result = ntfsadd (vol, opts.file);
+	if (0) result = ntfsadd (vol, opts.file);
+	if (1) result = ntfsrm2 (vol, opts.file);
 
 done:
 	ntfs_inode_close (inode);
