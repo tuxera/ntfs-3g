@@ -1,9 +1,9 @@
-/*
+/**
  * ntfsinfo - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
  * Copyright (c) 2002 Anton Altaparmakov
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will dump a file's attributes.
  *
@@ -26,94 +26,175 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <locale.h>
 #include <time.h>
+#include <getopt.h>
+
 #include "types.h"
 #include "mft.h"
 #include "attrib.h"
 #include "layout.h"
 #include "inode.h"
+#include "utils.h"
 
-void ntfs_get_file_attributes(const char *dev, long int i);
-void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec);
-void ntfs_dump_standard_information(ntfs_inode *inode, MFT_RECORD *mrec);
+static const char *AUTHOR    = "Matthew J. Fanto";
+static const char *EXEC_NAME = "ntfsinfo";
+
+static struct options {
+	char	*device;	/* Device/File to work with */
+	s64	 inode;		/* Info for this inode */
+	int	 quiet;		/* Less output */
+	int	 verbose;	/* Extra output */
+	int	 force;		/* Override common sense */
+} opts;
+
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
- * ntfs2utc - Convert an NTFS time to Unix time
- * @time:  An NTFS time in 100ns units since 1601
+ * version - Print version information about the program
  *
- * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
- * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
+ * Print a copyright statement and a brief description of the program.
  *
- * Return:  n  A Unix time (number of seconds since 1970)
+ * Return:  none
  */
-time_t ntfs2utc (long long time)
+void version (void)
 {
-	return (time - ((long long) (369 * 365 + 89) * 24 * 3600 * 10000000)) / 10000000;
+	Qprintf ("%s v%s Copyright (C) 2002 %s\nDisplay information about an "
+		"NTFS Volume\n\n%s is free software, released under the GNU "
+		"General Public License\nand you are welcome to redistribute "
+		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
+		"WARRANTY; for details read the GNU\nGeneral Public License "
+		"to be found in the file COPYING in the main\nLinux-NTFS "
+		"distribution directory.\n\n",
+		EXEC_NAME, VERSION, AUTHOR, EXEC_NAME, EXEC_NAME);
 }
 
-#define NTFS_TIME_OFFSET ((u64)(369*365 + 89) * 24 * 3600 * 10000000)
-
-int main(int argc, char **argv)
+/**
+ * usage - Print a list of the parameters to the program
+ *
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
+ */
+void usage (void)
 {
-	const char *AUTHOR = "Matthew J. Fanto";
-	const char *EXEC_NAME = "ntfsinfo";
-	const char *locale;
-	long i;
-
-	locale = setlocale(LC_ALL, "");
-	if (!locale) {
-		char *locale;
-
-		locale = setlocale(LC_ALL, NULL);
-		printf("Failed to set locale, using default (%s).\n", locale);
-	}
-
-	if (argc < 3 || argc > 4) {
-		fprintf(stderr, "%s v%s - %s\n", EXEC_NAME, VERSION, AUTHOR);
-		fprintf(stderr, "Usage: ntfsinfo device inode\n");
-		exit(1);
-	}
-
-	else {
-		i = atoll(argv[2]);
-		ntfs_get_file_attributes(argv[1], i);
-	}
-
-	return 0;
+	Qprintf ("Usage: %s [options] device\n"
+		"    -i num  --inode num  Display information about this inode\n"
+		"\n"
+		"    -f          --force            Use less caution\n"
+		"    -q          --quiet            Less output\n"
+		"    -v          --verbose          More output\n"
+		"    -V          --version          Display version information\n"
+		"    -h          --help             Display this help\n\n",
+		EXEC_NAME);
+	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
 }
 
-void ntfs_get_file_attributes(const char *dev, long int i)
+/**
+ * parse_options - Read and validate the programs command line
+ *
+ * Read the command line, verify the syntax and parse the options.
+ * This function is very long, but quite simple.
+ *
+ * Return:  1 Success
+ *	    0 Error, one or more problems
+ */
+int parse_options (int argc, char *argv[])
 {
+	static const char *sopt = "-fhi:qvV";
+	static const struct option lopt[] = {
+		{ "force",	 no_argument,		NULL, 'f' },
+		{ "help",	 no_argument,		NULL, 'h' },
+		{ "inode",	 required_argument,	NULL, 'i' },
+		{ "quiet",	 no_argument,		NULL, 'q' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "version",	 no_argument,		NULL, 'V' },
+		{ NULL, 0, NULL, 0 },
+	};
 
-	MFT_REF mref;
-	MFT_RECORD *mrec = NULL;
-	//ntfs_attr_search_ctx *ctx = NULL;
-	ntfs_volume *vol = NULL;
-	ntfs_inode *inode = NULL;
-	//int error;
+	char c = -1;
+	int err  = 0;
+	int ver  = 0;
+	int help = 0;
 
-	if(!(vol = ntfs_mount(dev, MS_RDONLY))) {
-		fprintf(stderr, "ntfsinfo error: cannot mount device %s\n",dev);
-		exit(1);
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	opts.inode = -1;
+
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!opts.device) {
+				opts.device = argv[optind-1];
+			} else {
+				opts.device = NULL;
+				err++;
+			}
+			break;
+		case 'i':
+			if ((opts.inode != -1) ||
+			    (!utils_parse_size (argv[optind-1], &opts.inode, FALSE))) {
+				err++;
+			}
+			break;
+		case 'f':
+			opts.force++;
+			break;
+		case 'h':
+			help++;
+			break;
+		case 'q':
+			opts.quiet++;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		case 'V':
+			ver++;
+			break;
+		default:
+			if ((optopt == 'i') && (!optarg)) {
+				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+			} else {
+				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			}
+			err++;
+			break;
+		}
 	}
 
-	mref = (MFT_REF) i;
-	inode = ntfs_inode_open(vol, mref);
+	if (help || ver) {
+		opts.quiet = 0;
+	} else {
+		if (opts.device == NULL) {
+			Eprintf ("You must specify exactly one device.\n");
+			err++;
+		}
 
-	if (ntfs_file_record_read(vol, mref, &mrec, NULL)) {
-		fprintf(stderr, "ntfsinfo error: error reading file record!\n");
-		exit(1);
+		if (opts.inode == -1) {
+			Eprintf ("You much specify an inode to learn about.\n");
+			err++;
+		}
+
+		if (opts.quiet && opts.verbose) {
+			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			err++;
+		}
 	}
 
-	//see flatcap.org/ntfs/info for what formatting should look like
-	//ntfs_dump_boot_sector_information(inode, mrec);
-	ntfs_dump_file_name_attribute(inode, mrec);
-	ntfs_dump_standard_information(inode, mrec);
+	if (ver)
+		version();
+	if (help || err)
+		usage();
+
+	return (!err && !help && !ver);
 }
 
+
+/**
+ * ntfs_dump_file_name_attribute
+ */
 void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
@@ -164,6 +245,9 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 
 }
 
+/**
+ * ntfs_dump_standard_information
+ */
 void ntfs_dump_standard_information(ntfs_inode *inode, MFT_RECORD *mrec)
 {
 
@@ -190,5 +274,57 @@ void ntfs_dump_standard_information(ntfs_inode *inode, MFT_RECORD *mrec)
 	printf("User ID: \t\t\t %d \n", standard_attr->owner_id);
 	printf("Security ID: \t\t\t %d \n", standard_attr->security_id);
 
+}
+
+/**
+ * ntfs_get_file_attributes
+ */
+void ntfs_get_file_attributes(ntfs_volume *vol, s64 i)
+{
+	MFT_REF mref;
+	MFT_RECORD *mrec = NULL;
+	//ntfs_attr_search_ctx *ctx = NULL;
+	ntfs_inode *inode = NULL;
+	//int error;
+
+	mref = (MFT_REF) i;
+	inode = ntfs_inode_open(vol, mref);
+
+	if (ntfs_file_record_read(vol, mref, &mrec, NULL)) {
+		fprintf(stderr, "ntfsinfo error: error reading file record!\n");
+		exit(1);
+	}
+
+	//see flatcap.org/ntfs/info for what formatting should look like
+	//ntfs_dump_boot_sector_information(inode, mrec);
+	ntfs_dump_file_name_attribute(inode, mrec);
+	ntfs_dump_standard_information(inode, mrec);
+}
+
+/**
+ * main - Begin here
+ *
+ * Start from here.
+ *
+ * Return:  0  Success, the program worked
+ *	    1  Error, something went wrong
+ */
+int main(int argc, char **argv)
+{
+	ntfs_volume *vol;
+
+	utils_set_locale();
+
+	if (!parse_options (argc, argv))
+		return 1;
+
+	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
+	if (!vol)
+		return 1;
+	
+	ntfs_get_file_attributes (vol, opts.inode);
+
+	ntfs_umount (vol, FALSE);
+	return 0;
 }
 
