@@ -21,6 +21,7 @@ linux_ntfsinclude_HEADERS = \
 	mft.h			\
 	mst.h			\
 	runlist.h		\
+	security.h		\
 	support.h		\
 	types.h			\
 	unistr.h		\
