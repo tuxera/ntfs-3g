@@ -39,6 +39,7 @@ xx/xx/2004 - 1.8.6-WIP
 	- Fix all occurences of printf with %ll length modifiers but 64 bit
 	  arguments to typecast the arguments to (unsigned) long long to avoid
 	  the warnings when compiling on 64 bit architectures.
+	- Use AC_GNU_SOURCE in configure.ac instead of doing it manually.
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
