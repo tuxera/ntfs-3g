@@ -28,5 +28,6 @@ ntfsprogs/ntfsfix
 ntfsprogs/ntfsinfo
 ntfsprogs/ntfslabel
 ntfsprogs/ntfsresize
+ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
 ntfsprogs/ntfswipe
