@@ -30,7 +30,7 @@
 #include "support.h"
 #include "endians.h"
 #include "bootsect.h"
-#include "disk_io.h"
+#include "device.h"
 #include "attrib.h"
 #include "volume.h"
 #include "mft.h"

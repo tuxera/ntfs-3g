@@ -46,7 +46,7 @@
 #include "attrib.h"
 #include "layout.h"
 #include "inode.h"
-#include "disk_io.h"
+#include "device.h"
 #include "utils.h"
 #include "debug.h"
 

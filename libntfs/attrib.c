@@ -28,7 +28,7 @@
 #include "compat.h"
 
 #include "attrib.h"
-#include "disk_io.h"
+#include "device.h"
 #include "mft.h"
 #include "debug.h"
 #include "mst.h"

@@ -27,7 +27,7 @@
 #include "compat.h"
 
 #include "types.h"
-#include "disk_io.h"
+#include "device.h"
 #include "debug.h"
 #include "bitmap.h"
 #include "attrib.h"

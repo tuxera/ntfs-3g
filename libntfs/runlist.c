@@ -32,7 +32,7 @@
 #include "volume.h"
 #include "layout.h"
 #include "debug.h"
-#include "disk_io.h"
+#include "device.h"
 
 /**
  * Internal:

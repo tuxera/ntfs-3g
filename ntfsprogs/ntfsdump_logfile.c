@@ -48,7 +48,7 @@
 #include "types.h"
 #include "attrib.h"
 #include "mft.h"
-#include "disk_io.h"
+#include "device.h"
 #include "logfile.h"
 #include "mst.h"
 
