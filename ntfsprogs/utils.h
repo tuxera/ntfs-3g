@@ -31,6 +31,10 @@
 #include <errno.h>
 #include <stdarg.h>
 
+extern const char *ntfs_bugs;
+extern const char *ntfs_home;
+extern const char *ntfs_gpl;
+
 #define PATH_SEP	'/'
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
