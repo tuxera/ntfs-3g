@@ -2050,14 +2050,14 @@ fi;
 # but doesn't. So this sets host and erases nonopt effectively moving the
 # standalone command line option into the --host= form.
 if test "x$nonopt" != "xNONE"; then
-  host="$nonopt"
-  nonopt="NONE"
+	host="$nonopt"
+	nonopt="NONE"
 fi
 
 
 if test "x$prefix" = "xNONE"; then
-  prefix=$ac_default_prefix
-  ac_configure_args="$ac_configure_args --prefix $prefix"
+	prefix=$ac_default_prefix
+	ac_configure_args="$ac_configure_args --prefix $prefix"
 fi
 
 # Command-line options.
@@ -18509,6 +18509,14 @@ LIBTOOL='$(SHELL) $(top_builddir)/libtool'
 
 
 
+
+case "$target" in
+*-*-*djgpp)
+	if test -z "$CC"; then CC=gcc; fi
+	if test -z "$AR"; then AR=ar; fi
+	if test -z "$LD"; then LD=ld; fi
+;;
+esac
 
 # Enable large file support.
 # Check whether --enable-largefile or --disable-largefile was given.

@@ -25,6 +25,9 @@ xx/xx/2004 - 1.8.6-WIP
 	  Fledel)
 	- In attribute lookup code in libntfs/attrib.c, check type against
 	  AT_UNUSED and not zero.
+	- Add AC_CANONICAL_HOST([]) to configure.ac and after AC_PROG_CC add
+	  manual provision of CC=gcc, AR=ar, and LD=ld if they are not set and
+	  the target is *-*-*djgpp.  (Requested by Christophe Grenier)
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
