@@ -174,7 +174,7 @@ static int ntfs_device_disk_io_open(struct ntfs_device *dev, int flags)
 	if (((int)dev->d_private = open(dev->d_name, flags)) == -1)
 		return -1;
 	/* Setup our read-only flag. */
-	if ((flags & O_RDONLY) == O_RDONLY)
+	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
 	/* Acquire exlusive (mandatory) lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
