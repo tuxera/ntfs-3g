@@ -849,8 +849,12 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	}
 
 	rl = ntfs_attr_find_vcn(na, start_vcn);
-	if (!rl)
-		return -1;
+	if (!rl) {
+		if (errno == ENOENT)
+			return 0;
+		else
+			return -1;
+	}
 
 	if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 		errno = EIO;
