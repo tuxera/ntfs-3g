@@ -563,11 +563,21 @@ static s64 win32_filepos(struct ntfs_device *dev)
 	return fd->current_pos.QuadPart;
 }
 
+/**
+ * ntfs_device_win32_sync - Flush write buffers to disk.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
 static int ntfs_device_win32_sync(struct ntfs_device *dev)
 {
-	fprintf(stderr, "win32_fsync() unimplemented\n");
-	errno = ENOTSUP;
-	return -1;
+	if (FlushFileBuffers(((win32_fd *)dev->d_private)->handle)) {
+ 		return 0;
+	} else {
+		errno = ntfs_w32error_to_errno(GetLastError());
+		return -errno;
+	}
 }
 
 static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buffer,
