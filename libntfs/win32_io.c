@@ -74,8 +74,8 @@ static __inline__ void Dprintf(const char *fmt, ...) {}
 
 #define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
 
-int win32_perror(const char *file, int line, const char *func, const char *msg);
-int win32_perror(const char *file, int line, const char *func, const char *msg)
+static int win32_perror(const char *file, int line, const char *func,
+		const char *msg)
 {
 	char buffer[1024] = "";
 	DWORD err = GetLastError();
@@ -86,6 +86,24 @@ int win32_perror(const char *file, int line, const char *func, const char *msg)
 	fprintf(stderr, "%s(%d): %s\t%s %s\n", file, line, func, buffer, msg);
 	return 0;
 }
+
+#ifdef EMULATE_SETFILEPOINTEREX
+static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
+		LARGE_INTEGER liDistanceToMove,
+		PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
+{
+	liDistanceToMove.LowPart = SetFilePointer(hFile,
+			liDistanceToMove.LowPart, &liDistanceToMove.HighPart,
+			dwMoveMethod);
+	if (liDistanceToMove.LowPart == INVALID_SET_FILE_POINTER &&
+			GetLastError() != NO_ERROR) {
+		lpNewFilePointer->QuadPart = -1;
+		return FALSE;
+	}
+	lpNewFilePointer->QuadPart = liDistanceToMove.QuadPart;
+	return TRUE;
+}
+#endif
 
 /**
  * ntfs_device_win32_open - open a device
@@ -370,16 +388,14 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	return 0;
 }
 
-s64 win32_bias(struct ntfs_device *dev);
-s64 win32_bias(struct ntfs_device *dev)
+static s64 win32_bias(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
 
 	return fd->part_start.QuadPart;
 }
 
-s64 win32_filepos(struct ntfs_device *dev);
-s64 win32_filepos(struct ntfs_device *dev)
+static s64 win32_filepos(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
 
@@ -440,4 +456,3 @@ struct ntfs_device_operations ntfs_device_win32_io_ops = {
 	.stat		= ntfs_device_win32_stat,
 	.ioctl		= ntfs_device_win32_ioctl
 };
-
