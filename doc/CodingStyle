@@ -1,0 +1,13 @@
+
+The standard K&R coding style is used in this project and the guidelines
+outlined in the Linux kernel CodingStyle document (found in the Linux kernel
+main directory in Documentation/CodingStyle) should be adhered to as strictly
+as possible.
+
+Special notes:
+
+	Capitals are used when declaring NTFS on-disk structures which you
+	can't just go ahead modifying without getting killed (in a bug sense,
+	not literally...). In memory structures are named with lower case as
+	usual.
+
