@@ -116,7 +116,8 @@ sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone
 EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe ntfstruncate
 
 man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
-			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8
+			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
+			  ntfsclone.8 ntfscluster.8
 
 EXTRA_MANS = 
 
@@ -183,8 +184,9 @@ dumplog_LDFLAGS = $(AM_LFLAGS)
 subdir = ntfsprogs
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = mkntfs.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 \
-	ntfsprogs.8 ntfsresize.8 ntfsundelete.8
+CONFIG_CLEAN_FILES = mkntfs.8 ntfsclone.8 ntfscluster.8 ntfsfix.8 \
+	ntfsinfo.8 ntfslabel.8 ntfsls.8 ntfsprogs.8 ntfsresize.8 \
+	ntfsundelete.8
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) dumplog$(EXEEXT) \
 	ntfswipe$(EXEEXT) ntfstruncate$(EXEEXT)
 bin_PROGRAMS = ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT) ntfscluster$(EXEEXT) \
@@ -303,9 +305,9 @@ DIST_SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfsclone_SOURCES) \
 
 NROFF = nroff
 MANS = $(man_MANS)
-DIST_COMMON = Makefile.am Makefile.in mkntfs.8.in ntfsfix.8.in \
-	ntfsinfo.8.in ntfslabel.8.in ntfsprogs.8.in ntfsresize.8.in \
-	ntfsundelete.8.in
+DIST_COMMON = Makefile.am Makefile.in mkntfs.8.in ntfsclone.8.in \
+	ntfscluster.8.in ntfsfix.8.in ntfsinfo.8.in ntfslabel.8.in \
+	ntfsls.8.in ntfsprogs.8.in ntfsresize.8.in ntfsundelete.8.in
 SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 all: all-am
@@ -319,11 +321,17 @@ Makefile: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.in  $(top_builddir)/config.s
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)
 mkntfs.8: $(top_builddir)/config.status mkntfs.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+ntfsclone.8: $(top_builddir)/config.status ntfsclone.8.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+ntfscluster.8: $(top_builddir)/config.status ntfscluster.8.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsfix.8: $(top_builddir)/config.status ntfsfix.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsinfo.8: $(top_builddir)/config.status ntfsinfo.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfslabel.8: $(top_builddir)/config.status ntfslabel.8.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+ntfsls.8: $(top_builddir)/config.status ntfsls.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsprogs.8: $(top_builddir)/config.status ntfsprogs.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
