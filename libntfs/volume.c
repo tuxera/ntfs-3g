@@ -604,7 +604,7 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 		Dperror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Done with the $BitMap mft record. */
+	/* Done with the $Bitmap mft record. */
 	Dputs(OK);
 
 	/* Now load the upcase table from $UpCase. */
