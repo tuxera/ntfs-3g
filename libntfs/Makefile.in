@@ -110,6 +110,8 @@ GLIB_MKENUMS = @GLIB_MKENUMS@
 GOBJECT_QUERY = @GOBJECT_QUERY@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBNTFS_GNOMEVFS_CFLAGS = @LIBNTFS_GNOMEVFS_CFLAGS@
+LIBNTFS_GNOMEVFS_LIBS = @LIBNTFS_GNOMEVFS_LIBS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
@@ -165,6 +167,8 @@ gnomevfsmoduleslib_LTLIBRARIES = libntfs-gnomevfs.la
 
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
 libntfs_gnomevfs_la_LIBADD = libntfs.la
+libntfs_gnomevfs_la_LIBS = $(LIBNTFS_GNOMEVFS_LIBS)
+libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS)
 libntfs_gnomevfs_la_SOURCES = \
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c
@@ -185,7 +189,8 @@ CONFIG_CLEAN_FILES = libntfs.conf libntfs-gnomevfs.8
 LTLIBRARIES = $(gnomevfsmoduleslib_LTLIBRARIES) $(lib_LTLIBRARIES)
 
 libntfs_gnomevfs_la_DEPENDENCIES = libntfs.la
-am_libntfs_gnomevfs_la_OBJECTS = gnome-vfs-method.lo gnome-vfs-module.lo
+am_libntfs_gnomevfs_la_OBJECTS = libntfs_gnomevfs_la-gnome-vfs-method.lo \
+	libntfs_gnomevfs_la-gnome-vfs-module.lo
 libntfs_gnomevfs_la_OBJECTS = $(am_libntfs_gnomevfs_la_OBJECTS)
 libntfs_la_LIBADD =
 am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
@@ -201,9 +206,9 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/bootsect.Plo ./$(DEPDIR)/compat.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/debug.Plo ./$(DEPDIR)/device.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/device_io.Plo ./$(DEPDIR)/dir.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/gnome-vfs-method.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/gnome-vfs-module.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/inode.Plo ./$(DEPDIR)/lcnalloc.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mft.Plo ./$(DEPDIR)/mst.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/runlist.Plo ./$(DEPDIR)/unistr.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/volume.Plo
@@ -293,6 +298,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+libntfs_gnomevfs_la-gnome-vfs-method.lo: gnome-vfs-method.c
+libntfs_gnomevfs_la-gnome-vfs-module.lo: gnome-vfs-module.c
 libntfs-gnomevfs.la: $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_DEPENDENCIES) 
 	$(LINK) -rpath $(gnomevfsmoduleslibdir) $(libntfs_gnomevfs_la_LDFLAGS) $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_LIBADD) $(LIBS)
 libntfs.la: $(libntfs_la_OBJECTS) $(libntfs_la_DEPENDENCIES) 
@@ -312,10 +319,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dir.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gnome-vfs-method.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gnome-vfs-module.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lcnalloc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mst.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runlist.Plo@am__quote@
@@ -342,6 +349,42 @@ distclean-depend:
 @AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Plo' tmpdepfile='$(DEPDIR)/$*.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 	$(LTCOMPILE) -c -o $@ `test -f '$<' || echo '$(srcdir)/'`$<
+
+libntfs_gnomevfs_la-gnome-vfs-method.o: gnome-vfs-method.c
+@AMDEP_TRUE@	source='gnome-vfs-method.c' object='libntfs_gnomevfs_la-gnome-vfs-method.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Po' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-method.o `test -f 'gnome-vfs-method.c' || echo '$(srcdir)/'`gnome-vfs-method.c
+
+libntfs_gnomevfs_la-gnome-vfs-method.obj: gnome-vfs-method.c
+@AMDEP_TRUE@	source='gnome-vfs-method.c' object='libntfs_gnomevfs_la-gnome-vfs-method.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Po' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-method.obj `cygpath -w gnome-vfs-method.c`
+
+libntfs_gnomevfs_la-gnome-vfs-method.lo: gnome-vfs-method.c
+@AMDEP_TRUE@	source='gnome-vfs-method.c' object='libntfs_gnomevfs_la-gnome-vfs-method.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Plo' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-method.lo `test -f 'gnome-vfs-method.c' || echo '$(srcdir)/'`gnome-vfs-method.c
+
+libntfs_gnomevfs_la-gnome-vfs-module.o: gnome-vfs-module.c
+@AMDEP_TRUE@	source='gnome-vfs-module.c' object='libntfs_gnomevfs_la-gnome-vfs-module.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Po' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-module.o `test -f 'gnome-vfs-module.c' || echo '$(srcdir)/'`gnome-vfs-module.c
+
+libntfs_gnomevfs_la-gnome-vfs-module.obj: gnome-vfs-module.c
+@AMDEP_TRUE@	source='gnome-vfs-module.c' object='libntfs_gnomevfs_la-gnome-vfs-module.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Po' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-module.obj `cygpath -w gnome-vfs-module.c`
+
+libntfs_gnomevfs_la-gnome-vfs-module.lo: gnome-vfs-module.c
+@AMDEP_TRUE@	source='gnome-vfs-module.c' object='libntfs_gnomevfs_la-gnome-vfs-module.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Plo' tmpdepfile='$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libntfs_gnomevfs_la_CFLAGS) $(CFLAGS) -c -o libntfs_gnomevfs_la-gnome-vfs-module.lo `test -f 'gnome-vfs-module.c' || echo '$(srcdir)/'`gnome-vfs-module.c
 CCDEPMODE = @CCDEPMODE@
 
 mostlyclean-libtool:

@@ -28,6 +28,32 @@ ntfsresize, and ntfsundelete (for a full list of included utilities see man
 Summary		: NTFS GNOME virtual filesystem module
 Group		: System Environment/Base
 Requires	: ntfsprogs = %{ver}-%{rel}
+Requires	: libbonobo-activation.so.4
+Requires	: libcom_err.so.3
+Requires	: libcrypto.so.4
+Requires	: libdl.so.2
+Requires	: libgconf-2.so.4
+Requires	: libglib-2.0.so.0
+Requires	: libgmodule-2.0.so.0
+Requires	: libgnomevfs-2.so.0
+Requires	: libgobject-2.0.so.0
+Requires	: libgssapi_krb5.so.2
+Requires	: libgthread-2.0.so.0
+Requires	: libk5crypto.so.3
+Requires	: libkrb5.so.3
+Requires	: liblinc.so.1
+Requires	: libm.so.6
+Requires	: libORBit-2.so.0
+Requires	: libpthread.so.0
+Requires	: libpthread.so.0(GLIBC_2.0)
+Requires	: libpthread.so.0(GLIBC_2.2)
+Requires	: libresolv.so.2
+Requires	: librt.so.1
+Requires	: libssl.so.4
+Requires	: libxml2.so.2
+Requires	: libz.so.1
+
+
 %description gnomevfs
 This package contains the NTFS GNOME virtual filesystem (VFS) module which
 allows GNOME VFS clients to seamlessly utilize the NTFS library.

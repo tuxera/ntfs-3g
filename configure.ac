@@ -66,11 +66,6 @@ if test "$USE_MAINTAINER_MODE" = "yes";then
 	CFLAGS="$CFLAGS -ggdb3 -Wall -Wstrict-prototypes -Wsign-compare" ## FIXME: fix all source: -Wsign-compare
 fi
 
-AM_PATH_GLIB_2_0(,,[AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 library.])],[gmodule gobject])
-dnl Force glib-2.0 for the whole package
-CFLAGS="$CFLAGS $GLIB_CFLAGS"
-LIBS="$LIBS $GLIB_LIBS"
-
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -79,10 +74,15 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
+AM_PATH_GLIB_2_0(,,[AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 library.])],[gmodule gobject])
+dnl Force glib-2.0 for the whole package
+LIBNTFS_GNOMEVFS_CFLAGS="$CFLAGS $GLIB_CFLAGS"
+LIBNTFS_GNOMEVFS_LIBS="$LIBS $GLIB_LIBS"
+
 PKG_CHECK_MODULES(GNOME_VFS_MODULE,gnome-vfs-module-2.0)
 dnl Force gnome-vfs-module-2.0 for the whole package
-CFLAGS="$CFLAGS $GNOME_VFS_MODULE_CFLAGS"
-LIBS="$LIBS $GNOME_VFS_MODULE_LIBS"
+LIBNTFS_GNOMEVFS_CFLAGS="$LIBNTFS_GNOMEVFS_CFLAGS $CFLAGS $GNOME_VFS_MODULE_CFLAGS"
+LIBNTFS_GNOMEVFS_LIBS="$LIBNTFS_GNOMEVFS_LIBS $LIBS $GNOME_VFS_MODULE_LIBS"
 
 # create a working libtool-script
 if test -z "$LIBTOOL"; then
@@ -106,6 +106,9 @@ AC_SUBST(CFLAGS)
 AC_SUBST(CPPFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LIBS)
+
+AC_SUBST(LIBNTFS_GNOMEVFS_CFLAGS)
+AC_SUBST(LIBNTFS_GNOMEVFS_LIBS)
 
 AC_SUBST(AUTODIRS)
 

@@ -83,6 +83,8 @@ GLIB_MKENUMS = @GLIB_MKENUMS@
 GOBJECT_QUERY = @GOBJECT_QUERY@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBNTFS_GNOMEVFS_CFLAGS = @LIBNTFS_GNOMEVFS_CFLAGS@
+LIBNTFS_GNOMEVFS_LIBS = @LIBNTFS_GNOMEVFS_LIBS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
@@ -120,9 +122,9 @@ RECURSIVE_TARGETS = info-recursive dvi-recursive install-info-recursive \
 	install-exec-recursive installdirs-recursive install-recursive \
 	uninstall-recursive check-recursive installcheck-recursive
 DIST_COMMON = README AUTHORS COPYING ChangeLog INSTALL Makefile.am \
-	Makefile.in NEWS aclocal.m4 config.guess config.h.in config.sub \
-	configure configure.ac depcomp install-sh ltconfig ltmain.sh \
-	missing mkinstalldirs ntfsprogs.spec.in
+	Makefile.in NEWS aclocal.m4 compile config.guess config.h.in \
+	config.sub configure configure.ac depcomp install-sh ltconfig \
+	ltmain.sh missing mkinstalldirs ntfsprogs.spec.in
 DIST_SUBDIRS = $(SUBDIRS)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

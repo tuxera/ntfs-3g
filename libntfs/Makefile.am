@@ -69,6 +69,8 @@ gnomevfsmoduleslib_LTLIBRARIES = libntfs-gnomevfs.la
 
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
 libntfs_gnomevfs_la_LIBADD = libntfs.la
+libntfs_gnomevfs_la_LIBS = $(LIBNTFS_GNOMEVFS_LIBS)
+libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS)
 libntfs_gnomevfs_la_SOURCES =	\
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c
