@@ -2,17 +2,18 @@
 .\" Copyright (c) 2002-2004 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSINFO 8 "May 2002" "Linux-NTFS version @VERSION@"
+.TH NTFSINFO 8 "Feb 2004" "Linux-NTFS version @VERSION@"
 .SH NAME
 ntfsinfo \- dump a file's attributes
 .SH SYNOPSIS
 .B ntfsinfo
-.I device
-.I inode-number
+.I -d device
+.I -i inode-number
 .SH DESCRIPTION
 .B ntfsinfo
 will dump the attributes of inode
 .IR inode-number .
+Run ntfsinfo without arguments for a full list of options.
 .PP
 .SH AUTHOR
 .B ntfsinfo

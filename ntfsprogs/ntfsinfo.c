@@ -87,7 +87,7 @@ void version (void)
 		EXEC_NAME, VERSION);
 	printf ("Copyright (c)\n");
 	printf ("    2002-2004 Matthew J. Fanto\n");
-	printf ("    2002      Anton Altaparmakov\n");
+	printf ("    2002-2004 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("    2003      Leonard Norrgård\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
@@ -105,7 +105,7 @@ void usage (void)
 	printf ("\nUsage: %s [options] -d dev\n"
 		"    -d dev  --device dev The ntfs volume to display information about\n"
 		"    -i num  --inode num  Display information about this inode\n"
-		"    -m	     --mft	  Dump information about the volume\n"
+		"    -m      --mft        Dump information about the volume\n"
 		"    -t      --epochtime  Report all timestamps as \"Thu Jan  1 00:00:00 1970\"\n"
 		"    -T      --notime     Don't report timestamps at all\n"
 		"\n"
@@ -129,7 +129,7 @@ void usage (void)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fh?i:qtTvVd:";
+	static const char *sopt = "-fh?i:mqtTvVd:";
 	static const struct option lopt[] = {
 		{ "device",	 required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
@@ -214,7 +214,7 @@ int parse_options (int argc, char *argv[])
 			err++;
 		}
 
-		if (opts.inode == -1) {
+		if (opts.inode == -1 && !opts.mft) {
 			if (argc > 1)
 				Eprintf ("You much specify an inode to learn about.\n");
 			err++;
@@ -317,7 +317,8 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
 	if(ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_STANDARD_INFORMATION!\n");
+		if (errno != ENOENT)
+			fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_STANDARD_INFORMATION!\n");
 		ntfs_attr_put_search_ctx(ctx); //free ctx
 		return;
 	}
@@ -365,9 +366,10 @@ void ntfs_dump_file_name_attr(ntfs_inode *inode)
 	char *file_name = NULL;
 
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
-
+do_next:
 	if(ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		fprintf(stderr, "ntfsinfo error: cannot lookup attribute AT_FILE_NAME!\n");
+		if (errno != ENOENT)
+			fprintf(stderr, "ntfsinfo error: cannot lookup attribute AT_FILE_NAME!\n");
 		ntfs_attr_put_search_ctx(ctx); //free ctx	
 		return;
 	}
@@ -414,8 +416,8 @@ void ntfs_dump_file_name_attr(ntfs_inode *inode)
 	}
 	
 	free(file_name);
-	ntfs_attr_put_search_ctx(ctx); //free ctx	
-
+	file_name = NULL;
+	goto do_next;
 }
 
 
@@ -434,12 +436,14 @@ void ntfs_dump_object_id_attr(ntfs_inode *inode)
 
     ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
-    if(ntfs_attr_lookup(AT_OBJECT_ID, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-	    fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_OBJECT_ID: %s\n", 
-			strerror(errno));
-	    ntfs_attr_put_search_ctx(ctx);
-	    return;
-    }
+	if(ntfs_attr_lookup(AT_OBJECT_ID, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+		if (errno != ENOENT)
+			fprintf(stderr, "ntfsinfo error: cannot look up "
+					"attribute AT_OBJECT_ID: %s\n", 
+					strerror(errno));
+		ntfs_attr_put_search_ctx(ctx);
+		return;
+	}
 
     attr = ctx->attr;
 
@@ -483,7 +487,8 @@ void ntfs_dump_volume_name_attr(ntfs_inode *inode)
     ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
     if(ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-	fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_NAME: %s\n", 
+	if (errno != ENOENT)
+		fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_NAME: %s\n", 
 		    strerror(errno));
 	ntfs_attr_put_search_ctx(ctx);
 	return;
@@ -516,7 +521,8 @@ void ntfs_dump_volume_information_attr(ntfs_inode *inode)
     ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
     if(ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-	fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_INFORMATION: %s\n",
+	if (errno != ENOENT)
+		fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_INFORMATION: %s\n",
 			strerror(errno));
 	ntfs_attr_put_search_ctx(ctx);
 	return;
@@ -540,20 +546,13 @@ void ntfs_dump_volume_information_attr(ntfs_inode *inode)
 /**
  * ntfs_get_file_attributes
  */
-void ntfs_get_file_attributes(ntfs_volume *vol, s64 mft_no, int dump_volume)
+void ntfs_get_file_attributes(ntfs_volume *vol, s64 mft_no)
 {
 	ntfs_inode *inode = NULL;
 	//int error;
 
 	inode = ntfs_inode_open(vol, MK_MREF(mft_no, 0));
 
-	/* if opts.mft is not 0, then we will print out information about
-	 * the volume, such as the sector size and whatnot. 
-	 */
-//	if (dump_volume)
-		ntfs_dump_volume(vol);
-
-	
 	//see flatcap.org/ntfs/info for what formatting should look likei
 	//FIXME: both $FILE_NAME_ATTR and $STANDARD_INFORMATION has times, when do 
 	//we want to output it?
@@ -587,7 +586,14 @@ int main(int argc, char **argv)
 	if (!vol)
 		return 1;
 
-	ntfs_get_file_attributes (vol, opts.inode, opts.mft);
+	/* if opts.mft is not 0, then we will print out information about
+	 * the volume, such as the sector size and whatnot. 
+	 */
+	if (opts.mft)
+		ntfs_dump_volume(vol);
+
+	if (opts.inode != -1)
+		ntfs_get_file_attributes(vol, opts.inode);
 
 	ntfs_umount (vol, FALSE);
 	return 0;
