@@ -54,7 +54,12 @@ xx/xx/2004 - 2.0.0-WIP
 	- New API: inode.[ch]::ntfs_inode_add_attrlist.  (Yura)
 	- New API: attrlist.[ch]::ntfs_attrlist_need.  (Yura)
 	- ntfsclone: save by using our, not NTFS cluster allocation bitmap. 
-	  This gives more control in the future what to save (Szaka)
+	  This gives more control in the future what to save.  (Szaka)
+	- New helper: attrlist.h::ntfs_attrlist_mark_dirty.  (Yura)
+	- New API: attrib.[ch]::ntfs_attr_update_mapping_pairs and made
+	  ntfs_non_resident_attr_{shrink,expand} use it, thus attribute resize
+	  functions is almost completed, but still very experemental and maybe
+	  dangerous.  (Yura)
 	- Fix stupid bug in ntfs_attr_reinit_search_ctx() introduced during
 	  changes to ntfs_external_attr_find().  This is because
 	  ntfs_attr_lookup() intentionally does not clear ctx->al_entry but
