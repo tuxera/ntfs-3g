@@ -48,7 +48,8 @@
  * device_err_exit -
  */
 void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
-		ntfs_attr *na, const char *fmt, ...) __attribute__ ((noreturn));
+		ntfs_attr *na, const char *fmt, ...) __attribute__ ((noreturn))
+		__attribute__((format(printf, 5, 6)));
 void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
 		ntfs_attr *na, const char *fmt, ...)
 {
@@ -73,7 +74,8 @@ void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
 /**
  * log_err_exit -
  */
-void log_err_exit(u8 *buf, const char *fmt, ...) __attribute__ ((noreturn));
+void log_err_exit(u8 *buf, const char *fmt, ...) __attribute__ ((noreturn))
+		__attribute__((format(printf, 2, 3)));
 void log_err_exit(u8 *buf, const char *fmt, ...)
 {
 	va_list ap;
