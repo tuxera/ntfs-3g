@@ -55,7 +55,7 @@
  * There are two data zones. First is the area between the end of the mft zone
  * and the end of the volume, and second is the area between the start of the
  * volume and the start of the mft zone. On unmodified/standard NTFS 1.x
- * volumes, the second date zone doesn't exist due to the mft zone being
+ * volumes, the second data zone doesn't exist due to the mft zone being
  * expanded to cover the start of the volume in order to reserve space for the
  * mft bitmap attribute.
  *
