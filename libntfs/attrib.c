@@ -1732,7 +1732,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 	ntfs_inode *base_ni, *ni;
 	ntfs_volume *vol;
 	ATTR_LIST_ENTRY *al_entry, *next_al_entry;
-	char *al_start, *al_end;
+	u8 *al_start, *al_end;
 	ATTR_RECORD *a;
 	ntfschar *al_name;
 	u32 al_name_len;
@@ -1834,18 +1834,18 @@ find_attr_list_attr:
 	for (;; al_entry = next_al_entry) {
 		/* Out of bounds check. */
 		if ((u8*)al_entry < base_ni->attr_list ||
-				(char*)al_entry > al_end)
+				(u8*)al_entry > al_end)
 			break;	/* Inode is corrupt. */
 		ctx->al_entry = al_entry;
 		/* Catch the end of the attribute list. */
-		if ((char*)al_entry == al_end)
+		if ((u8*)al_entry == al_end)
 			goto not_found;
 		if (!al_entry->length)
 			break;
-		if ((char*)al_entry + 6 > al_end || (char*)al_entry +
+		if ((u8*)al_entry + 6 > al_end || (u8*)al_entry +
 				le16_to_cpu(al_entry->length) > al_end)
 			break;
-		next_al_entry = (ATTR_LIST_ENTRY*)((char*)al_entry +
+		next_al_entry = (ATTR_LIST_ENTRY*)((u8*)al_entry +
 				le16_to_cpu(al_entry->length));
 		if (type != AT_UNUSED) {
 			if (le32_to_cpu(al_entry->type) > le32_to_cpu(type))
@@ -1854,7 +1854,7 @@ find_attr_list_attr:
 				continue;
 		}
 		al_name_len = al_entry->name_length;
-		al_name = (ntfschar*)((char*)al_entry + al_entry->name_offset);
+		al_name = (ntfschar*)((u8*)al_entry + al_entry->name_offset);
 		/*
 		 * If !@type we want the attribute represented by this
 		 * attribute list entry.
@@ -1908,9 +1908,9 @@ find_attr_list_attr:
 		 * next attribute list entry still fits @lowest_vcn. Otherwise
 		 * we have reached the right one or the search has failed.
 		 */
-		if (lowest_vcn && (char*)next_al_entry >= al_start	    &&
-				(char*)next_al_entry + 6 < al_end	    &&
-				(char*)next_al_entry + le16_to_cpu(
+		if (lowest_vcn && (u8*)next_al_entry >= al_start	    &&
+				(u8*)next_al_entry + 6 < al_end	    &&
+				(u8*)next_al_entry + le16_to_cpu(
 					next_al_entry->length) <= al_end    &&
 				sle64_to_cpu(next_al_entry->lowest_vcn) <=
 					lowest_vcn			    &&
