@@ -39,12 +39,21 @@
 #include "volume.h"
 #include "debug.h"
 
+const char *ntfs_bugs = "Please report bugs to linux-ntfs-dev@lists.sourceforge.net\n";
+const char *ntfs_home = "Linux NTFS homepage: http://linux-ntfs.sourceforge.net\n";
+const char *ntfs_gpl = "This program is free software, released under the GNU "
+	"General Public License\nand you are welcome to redistribute it under "
+	"certain conditions.  It comes with\nABSOLUTELY NO WARRANTY; for "
+	"details read the GNU General Public License to be\nfound in the file "
+	"\"COPYING\" distributed with this program, or online at:\n"
+	"http://www.gnu.org/copyleft/gpl.html\n";
+
 #define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
 
 /* These utilities require the following functions */
 extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Iprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 
 /**
  * utils_set_locale
@@ -138,13 +147,13 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		Iprintf ("Volume is dirty.\n");
+		Qprintf ("Volume is dirty.\n");
 		if (!force) {
 			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
 			ntfs_umount (vol, FALSE);
 			return NULL;
 		}
-		Iprintf ("Forced to continue.\n");
+		Qprintf ("Forced to continue.\n");
 	}
 
 	return vol;
