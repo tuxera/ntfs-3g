@@ -50,9 +50,19 @@ const char *EXEC_NAME = "ntfsresize";
                            "Homepage: http://linux-ntfs.sf.net\n"
 
 #define NTFS_RESIZE_WARNING \
-"WARNING: Every sanity check passed and only the DANGEROUS \n" \
-"operations left. Please make sure all your important data \n" \
-"had been backed up in case of an unexpected failure!\n"
+"WARNING: Every sanity check passed and only the DANGEROUS operations left.\n" \
+"Please make sure all your important data had been backed up in case of an\n" \
+"unexpected failure!\n"
+
+#define NTFS_RESIZE_IMPORTANT \
+"NTFS had been successfully resized on device '%s'.\n" \
+"You can go on to resize the device e.g. with 'fdisk'.\n" \
+"IMPORTANT: When recreating the partition, make sure you\n" \
+"  1)  create it with the same starting disk cylinder\n" \
+"  2)  create it with the same partition type (usually 7, HPFS/NTFS)\n" \
+"  3)  do not make it smaller than the new NTFS filesystem size\n" \
+"  4)  set the bootable flag for the partition if it existed before\n" \
+"Otherwise you may lose your data or can't boot your computer from the disk!\n"
 
 struct {
 	int verbose;
@@ -81,11 +91,26 @@ ntfs_volume *vol = NULL;
 struct bitmap lcn_bitmap;
 
 
-#define ERR_PREFIX   "==> ERROR"
+#define ERR_PREFIX   "ERROR"
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
 #define NERR_PREFIX  ERR_PREFIX ": "
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
+
+
+void perr_printf(const char *fmt, ...)
+{
+	va_list ap;
+	int eo = errno;
+
+	fprintf(stdout, PERR_PREFIX, eo);
+	va_start(ap, fmt);
+	vfprintf(stdout, fmt, ap);
+	va_end(ap);
+	printf(": %s\n", strerror(eo));
+	fflush(stdout);
+	fflush(stderr);
+}
 
 
 int err_exit(const char *fmt, ...)
@@ -128,7 +153,7 @@ void usage()
 	Dprintf("   -d              Show debug information\n");
 	printf ("   -f              Force to progress (DANGEROUS)\n");
 	printf ("   -h              This help text\n");
-	printf ("   -i              Calculate the smallest shrinked size supported (read-only)\n");
+	printf ("   -i              Calculate the smallest shrunken size supported (read-only)\n");
 	printf ("   -n              Make a test run without write operations (read-only)\n");
 	printf ("   -s size[K|M|G]  Shrink volume to size[K|M|G] bytes\n");
 /*	printf ("   -v              Verbose operation\n"); */
@@ -247,7 +272,7 @@ void parse_options(int argc, char **argv)
 		usage();
 	}
 
-	/* If no '-c clusters' then estimate smallest shrinked volume size */
+	/* If no '-c clusters' then estimate smallest shrunken volume size */
 	if (!opt.size && !opt.bytes)
 		opt.info = 1;
 
@@ -294,8 +319,9 @@ void build_lcn_usage_bitmap(ATTR_RECORD *a)
 		for (j = 0; j < rl[i].length; j++) {
 			u64 k = (u64)rl[i].lcn + j;
 			if (ntfs_get_and_set_bit(lcn_bitmap.bm, k, 1))
-				err_exit("Cluster %lu "
-					 "referenced multiply times!\n", k);
+				err_exit("Cluster %lu referenced twice!\n"
+					 "You didn't shutdown your Windows"
+					 "properly?", k);
 		}
 	}
 	free(rl);
@@ -357,7 +383,8 @@ void compare_bitmaps(struct bitmap *a, struct bitmap *b)
 
 	for (i = 0; i < a->size; i++)
 		if (a->bm[i] != b->bm[i])
-			err_exit("Cluster bitmaps differ at %d (%d != %d)\n",
+			err_exit("Cluster bitmaps differ at %d (%d != %d)\n"
+				 "You didn't shutdown your Windows properly?",
 				 i, a->bm[i], b->bm[i]);
 }
 
@@ -735,8 +762,19 @@ void mount_volume()
 				 "You must umount it first.\n", opt.volume);
 	}
 
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag)))
-                perr_exit("ntfs_mount failed");
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag))) {
+
+		int err = errno;
+
+		perr_printf("ntfs_mount failed");
+		if (errno == EINVAL) {
+			printf("Apparently device '%s' doesn't have a "
+			       "valid NTFS. Maybe you selected\nthe whole "
+			       "disk instead of a partition (e.g. /dev/hda, "
+			       "not /dev/hda8)?\n", opt.volume);
+		}
+		exit(1);
+	}
 
 	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
@@ -761,11 +799,12 @@ void prepare_volume_fixup()
 		if (vol->major_ver >= 2)
 			flags |= VOLUME_MOUNTED_ON_NT4;
 		
-		printf("Setting NTFS $Volume flag dirty ...\n");
+		printf("Schedule chkdsk NTFS consistency check at Windows boot time ...\n");
 		if (ntfs_set_volume_flags(vol, flags))
 			perr_exit("Failed to set $Volume dirty");
 
-		printf("Resetting $LogFile ...\n");
+		printf("Resetting $LogFile ... "
+		       "(this might take a while)\n");
 		if (ntfs_reset_logfile(vol))
 			perr_exit("Failed to reset $LogFile");
 	}
@@ -811,7 +850,7 @@ int main(int argc, char **argv)
 	if (new_volume_size > vol->nr_clusters)
 		err_exit("Volume enlargement not yet supported\n");
 	else if (new_volume_size == vol->nr_clusters) {
-		printf("==> Nothing to do: NTFS volume size is already OK.\n");
+		printf("Nothing to do: NTFS volume size is already OK.\n");
 		exit(0);
 	}
 
@@ -823,7 +862,7 @@ int main(int argc, char **argv)
 			advise_on_resize();
 		}
 
-	if (opt.force-- <= 0) {
+	if (opt.force-- <= 0 && !opt.ro_flag) {
 		printf(NTFS_RESIZE_WARNING);
 		proceed_question();
 	}
@@ -838,7 +877,7 @@ int main(int argc, char **argv)
 	   partition will be split. The scheduled chkdsk will fix it anyway */
 
 	if (opt.ro_flag) {
-		printf("==> The read-only test run ended successfully.\n");
+		printf("The read-only test run ended successfully.\n");
 		exit(0);
 	}
 
@@ -846,12 +885,7 @@ int main(int argc, char **argv)
 	if (fsync(vol->fd) == -1)
 		perr_exit("fsync");
 
-	printf("==> NTFS had been successfully resized on device '%s'.\n"
-	       "==> You can go on to resize the device e.g. with 'fdisk'.\n"
-	       "==> Make sure the device will not be smaller than the\n"
-	       "==> already resized NTFS filesystem!\n",
-	       vol->dev_name);
-
+	printf(NTFS_RESIZE_IMPORTANT, vol->dev_name);
 	return 0;
 }
 
