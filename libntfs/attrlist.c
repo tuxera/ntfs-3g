@@ -35,8 +35,7 @@
 
 /**
  * ntfs_attrlist_entry_add - add an attribute list attribute entry
- * @ni:		opened ntfs inode, to which attribute list add entry
- * @mref:	mft reference of record where new attribute placed
+ * @ni:		opened ntfs inode, which contains that attribute
  * @attr:	attribute record to add to attribute list
  *
  * @mref should be in little endian, use MK_LE_MREF to build it.
@@ -48,9 +47,10 @@
  *	ENOTSUP
  *	EIO
  */
-int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref, ATTR_RECORD *attr)
+int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 {
 	ATTR_LIST_ENTRY *ale;
+	MFT_REF mref;
 	ntfs_attr *na = NULL;
 	u8 *new_al;
 	int new_al_len;
@@ -58,13 +58,15 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref, ATTR_RECORD *attr)
 	int rl_size;
 	int err;
 
-	Dprintf("%s(): Entering for inode 0x%llx, mref 0x%llx, attr 0x%x.\n",
-			 __FUNCTION__, ni->mft_no, mref, attr->type);
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
+			 __FUNCTION__, ni->mft_no, attr->type);
 
 	if (!ni || !attr) {
 		errno = EINVAL;
 		return -1;
 	}
+	
+	mref = MK_LE_MREF(ni->mft_no, le16_to_cpu(ni->mrec->sequence_number));
 
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
@@ -100,11 +102,11 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref, ATTR_RECORD *attr)
 			continue;
 		if (err > 0)
 			break;
-		if (sle16_to_cpu(ale->lowest_vcn) <
-				sle16_to_cpu(attr->lowest_vcn))
+		if (sle64_to_cpu(ale->lowest_vcn) <
+				sle64_to_cpu(attr->lowest_vcn))
 			continue;
-		if (sle16_to_cpu(ale->lowest_vcn) ==
-				sle16_to_cpu(attr->lowest_vcn)) {
+		if (sle64_to_cpu(ale->lowest_vcn) ==
+				sle64_to_cpu(attr->lowest_vcn)) {
 			err = EINVAL;
 			Dprintf("%s(): Attribute with same type, name and "
 				"lowest vcn already present in attribute "
@@ -155,7 +157,15 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref, ATTR_RECORD *attr)
 
 	/* Update ntfs inode. */
 	if (NAttrNonResident(na)) {
-		/* Get new runlist. */
+		/* Create copy of new runlist. */
+		if (ntfs_attr_map_whole_runlist(na)) {
+			Dprintf("%s(): Failed to map runlist.\n", __FUNCTION__);
+			if (ntfs_attr_truncate(na, ni->attr_list_size))
+				Dprintf("%s(): Rollback failed. Leaving "
+					"inconsist metadata.\n", __FUNCTION__);
+			err = EIO;
+			goto err_out;
+		}
 		for (rl = na->rl, rl_size = 1; rl->length; rl++)
 			rl_size++;
 		rl_size = (rl_size * sizeof(runlist_element) + 0xfff) & ~0xfff;	
