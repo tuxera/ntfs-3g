@@ -60,10 +60,8 @@
 	- Do folding assisting cleanups. (Richard Russon, me)
 	- Add new API call ntfs_boot_sector_is_ntfs() provided by bootsect.[hc].
 	- Define and write more API calls provided by attrib.[ch]:
-		ntfs_runlists_merge(),
-		ntfs_mapping_pairs_decompress(),
 		ntfs_attr_map_runlist(),
-		ntfs_{rl,attr}_vcn_to_lcn(),
+		ntfs_attr_vcn_to_lcn(),
 		ntfs_attr_find_vcn(),
 		ntfs_attr_init(),
 		ntfs_attr_{open,close}().
@@ -120,11 +118,16 @@
 	- Add new syntactic sugar API provided by attrib.h:
 		ntfs_attrs_walk(). (Szakacsits Szabolcs)
 	- Add new API for compressing runlists into mapping pairs arrays
-	  provided by attrib.[ch] (adapted from mkntfs.c):
+	  provided by runlist.[hc] (some adapted from mkntfs.c):
+		ntfs_rl_vcn_to_lcn(),
+		ntfs_rl_pwrite(),
+		ntfs_runlists_merge(),
+		ntfs_mapping_pairs_decompress(),
 		ntfs_get_nr_significant_bytes(),
 		ntfs_get_size_for_mapping_pairs(),
-		ntfs_write_significant_bytes(), and
-		ntfs_mapping_pairs_build().
+		ntfs_write_significant_bytes(),
+		ntfs_mapping_pairs_build(), and
+		ntfs_rl_truncate(). -- WIP
 	- Convert mkntfs.c to the above API.
 	- Implement attrib.[hc]::ntfs_rl_pwrite() as a low level scatter write
 	  function analogous in functionality to mkntfs.c::ntfs_rlwrite() but
@@ -176,8 +179,6 @@
 	- Change ntfs_inode_close() to write out dirty inodes and inode extents.
 	- New API functions provided by lcnalloc.[hc]:
 		ntfs_cluster_{alloc,free}(). -- WIP
-	- New API functions provided by runlist.[hc]:
-		ntfs_rl_truncate(). -- WIP
 	- New API function provided by bitmap.[hc]:
 		ntfs_bitmap_clear_run(). -- WIP
 
