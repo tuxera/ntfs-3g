@@ -593,6 +593,8 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		(long long)sle64_to_cpu(file_name_attr->allocated_size));
 	printf("\tReal File Size:\t\t %lld\n",
 		(long long)sle64_to_cpu(file_name_attr->data_size));
+	printf("\tFile attributes:\t %x\n",
+			le32_to_cpu(file_name_attr->file_attributes));
 
 	/* time stuff stuff */
 	if (!opts.notime) {
