@@ -52,6 +52,7 @@ xx/xx/2004 - 2.0.0-WIP
 	  attrlist.[ch]::ntfs_attrlist_set.  (Yura)
 	- New API: attrib.[ch]::ntfs_resident_attr_record_add.  (Yura)
 	- New API: inode.[ch]::ntfs_inode_add_attrlist.  (Yura)
+	- New API: attrlist.[ch]::ntfs_attrlist_need.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
