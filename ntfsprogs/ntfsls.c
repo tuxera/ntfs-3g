@@ -337,7 +337,6 @@ list_entry(ntfsls_dirent* dirent, const uchar_t* name,
 		printf("\n");
 	} else {
 	    ntfs_inode *ni = NULL;
-	    MFT_RECORD *mrec = NULL;
 	    ntfs_attr_search_ctx *ctx = NULL;
 	    FILE_NAME_ATTR *file_name_attr = NULL;
 	    ATTR_RECORD *attr = NULL;
