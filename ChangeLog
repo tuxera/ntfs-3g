@@ -7,6 +7,9 @@ xx/xx/2004 - 1.9.3-WIP
 	  defined like this in POSIX.
 	- Do not use the ++ operator on a variable when it is being passed as a
 	  parameter to a macro in libntfs/unistr.c.  (Pete Curran, Yuval)
+	- Fix out of source tree build of utilities by changing $top_srcdir to
+	  $top_builddir in the references to the build library in the makefile
+	  template ntfsprogs/Makefile.am.  (Yuval)
 
 11/05/2004 - 1.9.2 - Decomrpession bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch

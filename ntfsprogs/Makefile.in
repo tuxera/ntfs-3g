@@ -68,9 +68,9 @@ am_mkntfs_OBJECTS = attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
 	sd.$(OBJEXT) mkntfs.$(OBJEXT) utils.$(OBJEXT)
 mkntfs_OBJECTS = $(am_mkntfs_OBJECTS)
 @REALLYSTATIC_FALSE@am__DEPENDENCIES_1 =  \
-@REALLYSTATIC_FALSE@	$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_FALSE@	$(top_builddir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@am__DEPENDENCIES_1 =  \
-@REALLYSTATIC_TRUE@	$(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_TRUE@	$(top_builddir)/libntfs/.libs/libntfs.a
 mkntfs_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfscat_OBJECTS = ntfscat.$(OBJEXT) utils.$(OBJEXT)
 ntfscat_OBJECTS = $(am_ntfscat_OBJECTS)
@@ -261,8 +261,8 @@ target_alias = @target_alias@
 target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
-@REALLYSTATIC_FALSE@AM_LIBS = $(top_srcdir)/libntfs/libntfs.la
-@REALLYSTATIC_TRUE@AM_LIBS = $(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_FALSE@AM_LIBS = $(top_builddir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@AM_LIBS = $(top_builddir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@AM_LFLAGS = $(all_libraries)
 @REALLYSTATIC_TRUE@AM_LFLAGS = -static
 @REALLYSTATIC_TRUE@STATIC_LINK = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
