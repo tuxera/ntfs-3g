@@ -22,15 +22,16 @@
 #ifndef _NTFS_DEBUG_H
 #define _NTFS_DEBUG_H
 
-#include "attrib.h"
-
-#ifdef DEBUG
-
 #include "config.h"
 
 #ifdef HAVE_STDIO_H
 #	include <stdio.h>
 #endif
+
+#include "attrib.h"
+
+#ifdef DEBUG
+
 #ifdef HAVE_STDARG_H
 #	include <stdarg.h>
 #endif
@@ -65,14 +66,22 @@ static __inline__ void Dperror(const char *s)
 
 extern void ntfs_debug_runlist_dump(const runlist_element *rl);
 
-#else
+#else /* if !DEBUG */
 
 static __inline__ void Dprintf(const char *fmt, ...) {}
 static __inline__ void Dputs(const char *s) {}
 static __inline__ void Dperror(const char *s) {}
 static __inline__ void ntfs_debug_runlist_dump(const runlist_element *rl) {}
 
-#endif
+#endif /* !DEBUG */
+
+#define NTFS_BUG(msg)							  \
+{									  \
+	int ___i;							  \
+	fprintf(stderr, "libntfs: Bug in %s(): %s\n", __FUNCTION__, msg); \
+	Dputs("Forcing segmentation fault!");				  \
+	___i = ((int*)NULL)[1];						  \
+}
 
 #endif /* defined _NTFS_DEBUG_H */
 
