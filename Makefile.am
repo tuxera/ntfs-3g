@@ -16,3 +16,8 @@ libtool: $(LIBTOOL_DEPS)
 strip:
 	$(MAKE) -C ntfsprogs strip
 
+extra:	extras
+
+extras:
+	$(MAKE) -C ntfsprogs extras
+

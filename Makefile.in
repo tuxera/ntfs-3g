@@ -462,6 +462,11 @@ libtool: $(LIBTOOL_DEPS)
 
 strip:
 	$(MAKE) -C ntfsprogs strip
+
+extra:	extras
+
+extras:
+	$(MAKE) -C ntfsprogs extras
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

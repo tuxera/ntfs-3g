@@ -104,5 +104,7 @@ dumplog_LDFLAGS		= $(AM_LFLAGS)
 strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
 	$(STRIP) $^
 
+extra:	extras
+
 extras:	$(EXTRA_PROGRAMS)
 
