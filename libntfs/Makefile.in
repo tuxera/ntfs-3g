@@ -123,6 +123,7 @@ lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION)
 libntfs_la_SOURCES = \
 	attrib.c	\
+	bitmap.c	\
 	bootsect.c	\
 	compat.c	\
 	debug.c		\
@@ -147,9 +148,9 @@ LTLIBRARIES =  $(lib_LTLIBRARIES)
 DEFS = @DEFS@ -I. -I$(srcdir) -I..
 LIBS = @LIBS@
 libntfs_la_LIBADD = 
-libntfs_la_OBJECTS =  attrib.lo bootsect.lo compat.lo debug.lo dir.lo \
-disk_io.lo inode.lo lcnalloc.lo mft.lo mst.lo runlist.lo unistr.lo \
-volume.lo
+libntfs_la_OBJECTS =  attrib.lo bitmap.lo bootsect.lo compat.lo debug.lo \
+dir.lo disk_io.lo inode.lo lcnalloc.lo mft.lo mst.lo runlist.lo \
+unistr.lo volume.lo
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
@@ -161,8 +162,8 @@ DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
 
 TAR = gtar
 GZIP_ENV = --best
-DEP_FILES =  .deps/attrib.P .deps/bootsect.P .deps/compat.P \
-.deps/debug.P .deps/dir.P .deps/disk_io.P .deps/inode.P \
+DEP_FILES =  .deps/attrib.P .deps/bitmap.P .deps/bootsect.P \
+.deps/compat.P .deps/debug.P .deps/dir.P .deps/disk_io.P .deps/inode.P \
 .deps/lcnalloc.P .deps/mft.P .deps/mst.P .deps/runlist.P .deps/unistr.P \
 .deps/volume.P
 SOURCES = $(libntfs_la_SOURCES)

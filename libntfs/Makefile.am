@@ -39,6 +39,7 @@ lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION)
 libntfs_la_SOURCES =	\
 	attrib.c	\
+	bitmap.c	\
 	bootsect.c	\
 	compat.c	\
 	debug.c		\
