@@ -46,23 +46,28 @@
 
 const char *EXEC_NAME = "ntfsresize";
 
-#define NTFS_REPORT_BANNER "\nReport bugs to linux-ntfs-dev@lists.sf.net. " \
-                           "Homepage: http://linux-ntfs.sf.net\n"
+static const char *ntfs_report_banner =
+"\nReport bugs to linux-ntfs-dev@lists.sf.net. "
+"Homepage: http://linux-ntfs.sf.net\n";
 
-#define NTFS_RESIZE_WARNING \
-"WARNING: Every sanity check passed and only the DANGEROUS operations left.\n" \
-"Please make sure all your important data had been backed up in case of an\n" \
-"unexpected failure!\n"
+static const char *resize_warning_msg = 
+"WARNING: Every sanity check passed and only the DANGEROUS operations left.\n"
+"Please make sure all your important data had been backed up in case of an\n"
+"unexpected failure!\n";
 
-#define NTFS_RESIZE_IMPORTANT \
-"NTFS had been successfully resized on device '%s'.\n" \
-"You can go on to resize the device e.g. with 'fdisk'.\n" \
-"IMPORTANT: When recreating the partition, make sure you\n" \
-"  1)  create it with the same starting disk cylinder\n" \
-"  2)  create it with the same partition type (usually 7, HPFS/NTFS)\n" \
-"  3)  do not make it smaller than the new NTFS filesystem size\n" \
-"  4)  set the bootable flag for the partition if it existed before\n" \
-"Otherwise you may lose your data or can't boot your computer from the disk!\n"
+static const char *resize_important_msg = 
+"NTFS had been successfully resized on device '%s'.\n"
+"You can go on to resize the device e.g. with 'fdisk'.\n"
+"IMPORTANT: When recreating the partition, make sure you\n"
+"  1)  create it with the same starting disk cylinder\n"
+"  2)  create it with the same partition type (usually 7, HPFS/NTFS)\n"
+"  3)  do not make it smaller than the new NTFS filesystem size\n"
+"  4)  set the bootable flag for the partition if it existed before\n"
+"Otherwise you may lose your data or can't boot your computer from the disk!\n";
+
+static const char *fragmented_volume_msg = 
+"The volume end is fragmented, this case is not yet supported. Defragment it\n"
+"(Windows 2000, XP and .NET have built in defragmentation tool) and try again.\n";
 
 struct {
 	int verbose;
@@ -156,7 +161,7 @@ void usage()
 	printf ("   -n              Make a test run without write operations (read-only)\n");
 	printf ("   -s size[k|M|G]  Shrink volume to size[k|M|G] bytes (k=10^3, M=10^6, G=10^9)\n");
 /*	printf ("   -v              Verbose operation\n"); */
-	printf("%s", NTFS_REPORT_BANNER);
+	printf(ntfs_report_banner);
 	exit(1);
 }
 
@@ -445,22 +450,22 @@ void walk_inodes()
 void advise_on_resize()
 {
 	u64 i, old_b, new_b, g_b, old_mb, new_mb, g_mb;
+	int fragmanted_end;
 
 	for (i = vol->nr_clusters - 1; i > 0; i--)
 		if (ntfs_get_bit(lcn_bitmap.bm, i))
 			break;
 	
 	i += 2; /* first free + we reserve one for the backup boot sector */
-	if (i >= vol->nr_clusters) {
-		if (opt.info)
-			printf("The volume end is fragmented. "
-			       "This case is not yet supported.\n");
-		exit(1);
+	fragmanted_end = (i >= vol->nr_clusters) ? 1 : 0;
+	
+	if (fragmanted_end || !opt.info) {
+		printf(fragmented_volume_msg);
+		if (fragmanted_end)
+			exit(1);
+		printf("Now ");
 	}
 	
-	if (!opt.info)
-		printf(NERR_PREFIX "However, ");
-
 	old_b = vol->nr_clusters * vol->cluster_size;
 	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
 	new_b = i * vol->cluster_size;
@@ -473,7 +478,7 @@ void advise_on_resize()
 	if ((new_mb * NTFS_MBYTE) < old_b)
 		printf("or %lld MB ", new_mb);
 	
-	printf("(gaining ");
+	printf("(freeing ");
 	
 	if (g_mb && (old_mb - new_mb))
 	    printf("%lld MB", old_mb - new_mb);
@@ -774,10 +779,10 @@ void mount_volume()
 	if (mntflag & NTFS_MF_MOUNTED) {
 		if (!(mntflag & NTFS_MF_READONLY))
 			err_exit("Device %s is mounted read-write. "
-				 "You must umount it first.\n", opt.volume);
+				 "You must 'umount' it first.\n", opt.volume);
 		if (!opt.ro_flag)
 			err_exit("Device %s is mounted. "
-				 "You must umount it first.\n", opt.volume);
+				 "You must 'umount' it first.\n", opt.volume);
 	}
 
 	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag))) {
@@ -877,13 +882,11 @@ int main(int argc, char **argv)
 	for (i = new_volume_size; i < vol->nr_clusters; i++)
 		if (ntfs_get_bit(lcn_bitmap.bm, (u64)i)) {
 			/* FIXME: relocate cluster */
-			printf(NERR_PREFIX "Fragmented volume not yet "
-			       "supported. Defragment it before resize.\n");
 			advise_on_resize();
 		}
 
 	if (opt.force-- <= 0 && !opt.ro_flag) {
-		printf(NTFS_RESIZE_WARNING);
+		printf(resize_warning_msg);
 		proceed_question();
 	}
 
@@ -905,7 +908,7 @@ int main(int argc, char **argv)
 	if (fsync(vol->fd) == -1)
 		perr_exit("fsync");
 
-	printf(NTFS_RESIZE_IMPORTANT, vol->dev_name);
+	printf(resize_important_msg, vol->dev_name);
 	return 0;
 }
 
