@@ -1,0 +1,12 @@
+These are just a collection of notes on encryption in NTFS.
+
+- System files cannot be encrypted.  Check the file attributes and if
+  FILE_ATTR_SYSTEM is set refuse to encrypt.  This also means can sanity
+  check that FILE_ATTR_SYSTEM and FILE_ATTR_ENCRYPTED are never set together.
+
+- The desktop.ini file in each directory has a setting which can disallow
+  encryption of files in it.  The section name is Encrpytion and the key name
+  is Disable.
+
+- Everything in %windir% except for Profiles directory is not encryptable as
+  it is considered a system file.
