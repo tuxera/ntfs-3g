@@ -437,7 +437,7 @@ static void parse_options(int argc, char *argv[])
  *
  * Note: Might not return.
  */
-static void append_to_bad_blocks(unsigned long block)
+static void append_to_bad_blocks(unsigned long long block)
 {
 	long long *new_buf;
 
@@ -3128,14 +3128,14 @@ static void mkntfs_fill_device_with_zeroes(void)
 	 */
 	int i;
 	ssize_t bw;
-	unsigned long position;
-	unsigned long mid_clust;
+	unsigned long long position, mid_clust;
 	float progress_inc = (float)opts.nr_clusters / 100;
 
 	Qprintf("Initialising device with zeroes:   0%%");
 	fflush(stdout);
 	mid_clust = (opts.volume_size >> 1) / vol->cluster_size;
-	for (position = 0; position < opts.nr_clusters; position++) {
+	for (position = 0; position < (unsigned long long)opts.nr_clusters;
+			position++) {
 		if (!(position % (int)(progress_inc+1))) {
 			Qprintf("\b\b\b\b%3.0f%%", position /
 					progress_inc);
@@ -3158,7 +3158,7 @@ static void mkntfs_fill_device_with_zeroes(void)
 					"file $Boot.\n");
 			/* Add the baddie to our bad blocks list. */
 			append_to_bad_blocks(position);
-			Qprintf("\nFound bad cluster (%ld). Adding to "
+			Qprintf("\nFound bad cluster (%lld). Adding to "
 				"list of bad blocks.\nInitialising "
 				"device with zeroes: %3.0f%%", position,
 				position / progress_inc);
@@ -3176,7 +3176,7 @@ static void mkntfs_fill_device_with_zeroes(void)
 		if (bw != opts.sector_size) {
 			if (bw != -1 || errno != EIO)
 				err_exit("This should not happen.\n");
-			else if (i + 1UL == position &&
+			else if (i + 1ull == position &&
 					(vol->major_ver >= 2 ||
 					 (vol->major_ver == 1 &&
 					  vol->minor_ver >= 2)))
