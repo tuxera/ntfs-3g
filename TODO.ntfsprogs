@@ -1,0 +1,74 @@
+Please keep in alphabetical order so utilities are easier to find.
+
+Thanks,
+	Anton
+
+
+
+**********
+* mkntfs *
+**********
+
+- mkntfs should be hard linked with mkfs.ntfs for the mkfs utility.
+- We don't know what the real last sector is, thus we mark the volume dirty
+  and the subsequent chkdsk (which will happen on reboot into Windows
+  automatically) recreates the backup boot sector if the Linux kernel lied to
+  us about the number of sectors.
+
+
+
+***********
+* ntfsfix *
+***********
+
+- Cleanup to use ntfs_attr_* API for editing $MFTMirr, $Volume, and $LogFile.
+  This has the immediate benefit of enabling attribute list support and making
+  the code simpler.
+- On ntfs 3.0+ volumes need to disable the usn journal if it is active. This
+  means deleting file $UsnJrnl from /$Extend directory.
+- On ntfs 3.0+ volumes need to mark the quota out of date? - Probably, but
+  it shouldn't cause any corruption not doing so for the moment so this is
+  not a showstopper bug for the first release. (AIA)
+
+
+
+*************
+* ntfslabel *
+*************
+
+- Support ioctls for ntfs tng driver 2.0.? for reading/changing the label.
+
+
+
+**************
+* ntfsresize *
+**************
+
+High priority
+  - support fragmented volumes
+  - recovery support, journaling
+  - test suite
+
+Medium priority 
+  - easy usage by partitioning tools:
+  	- move useful things to libntfs
+  	- extended error codes at exit()
+  	- cleanup at exit()
+  - quiet operation 
+
+Low priority
+  - volume enlargement
+  - move volume start
+  - support disks having bad blocks
+
+
+
+****************
+* ntfsundelete *
+****************
+
+- support for compressed files
+- support for internationalisation
+- recover by type?
+
+
