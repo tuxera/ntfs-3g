@@ -265,7 +265,7 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 	} else {
 		s64 filesize = 0;
 		ntfs_inode *ni;
-		ntfs_attr_search_ctx *ctx;
+		ntfs_attr_search_ctx *ctx = NULL;
 		FILE_NAME_ATTR *file_name_attr;
 		ATTR_RECORD *attr;
 		time_t ntfs_time;
