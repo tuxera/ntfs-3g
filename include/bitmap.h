@@ -1,7 +1,7 @@
 /*
  * bitmap.h - Exports for bitmap handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -100,6 +100,7 @@ static __inline__ char ntfs_bit_get_and_set(u8 *bitmap, const u64 bit,
 	return old_bit;
 }
 
+extern int ntfs_bitmap_set_run(ntfs_attr *na, s64 start_bit, s64 count);
 extern int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count);
 
 #endif /* defined _NTFS_BITMAP_H */

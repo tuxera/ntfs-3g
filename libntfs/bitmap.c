@@ -1,7 +1,7 @@
 /*
  * bitmap.c - Bitmap handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -21,6 +21,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 
 #include "types.h"
@@ -29,17 +30,19 @@
 
 
 /**
- * ntfs_bitmap_clear_run - clear a run of bits in a bitmap
+ * ntfs_bitmap_set_bits_in__run - set a run of bits in a bitmap to a value
  * @na:		attribute containing the bitmap
- * @start_bit:	first bit to clear
- * @count:	number of bits to clear
+ * @start_bit:	first bit to set
+ * @count:	number of bits to set
+ * @value:	value to set the bits to (i.e. 0 or 1)
  *
- * Clear @count bits starting at bit @start_bit in the bitmap described by the
- * attribute @na.
+ * Set @count bits starting at bit @start_bit in the bitmap described by the
+ * attribute @na to @value, where @value is either 0 or 1.
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  */
-int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
+static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit, s64 count,
+		int value)
 {
 	u8 *buf, *lastbyte_buf;
 	s64 bufsize, br;
@@ -61,10 +64,12 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 	if (bufsize > 8192)
 		bufsize = 8192;
 
-	/* Allocate already zeroed memory. */
-	buf = (u8*)calloc(1, bufsize);
+	/* Allocate memory. */
+	buf = (u8*)malloc(bufsize);
 	if (!buf)
 		return -1;
+	/* Depending on @value, zero or set all bits in the allocated buffer. */
+	memset(buf, value ? 0xff : 0, bufsize);
 
 	/* If there is a first partial byte... */
 	if (bit) {
@@ -75,9 +80,13 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 			errno = EIO;
 			return -1;
 		}
-		/* and clear the appropriate bits in it. */
-		while ((bit & 7) && count--)
-			*buf &= ~(1 << bit++);
+		/* and set or clear the appropriate bits in it. */
+		while ((bit & 7) && count--) {
+			if (value)
+				*buf |= 1 << bit++;
+			else
+				*buf &= ~(1 << bit++);
+		}
 		/* Update @start_bit to the new position. */
 		start_bit = (start_bit + 7) & ~7;
 	}
@@ -115,9 +124,13 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 					err = EIO;
 					goto free_err_out;
 				}
-				/* and clear the appropriate bits in it. */
-				while (bit && count--)
-					*lastbyte_buf &= ~(1 << --bit);
+				/* and set/clear the appropriate bits in it. */
+				while (bit && count--) {
+					if (value)
+						*lastbyte_buf |= 1 << --bit;
+					else
+						*lastbyte_buf &= ~(1 << --bit);
+				}
 				/* We don't want to come back here... */
 				bit = 0;
 				/* We have a last byte that we have handled. */
@@ -164,5 +177,37 @@ free_err_out:
 	free(buf);
 	errno = err;
 	return -1;
+}
+
+/**
+ * ntfs_bitmap_set_run - set a run of bits in a bitmap
+ * @na:		attribute containing the bitmap
+ * @start_bit:	first bit to set
+ * @count:	number of bits to set
+ *
+ * Set @count bits starting at bit @start_bit in the bitmap described by the
+ * attribute @na.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_bitmap_set_run(ntfs_attr *na, s64 start_bit, s64 count)
+{
+	return ntfs_bitmap_set_bits_in_run(na, start_bit, count, 1);
+}
+
+/**
+ * ntfs_bitmap_clear_run - clear a run of bits in a bitmap
+ * @na:		attribute containing the bitmap
+ * @start_bit:	first bit to clear
+ * @count:	number of bits to clear
+ *
+ * Clear @count bits starting at bit @start_bit in the bitmap described by the
+ * attribute @na.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
+{
+	return ntfs_bitmap_set_bits_in_run(na, start_bit, count, 0);
 }
 
