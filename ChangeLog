@@ -11,6 +11,8 @@ xx/xx/2004 - 1.9.1-WIP
 	- Fix layout.h STANDARD_INFORMATION and FILE_ATTR_FLAGS typedefs by
 	  adding the packed attribute where it was missing causing havoc due
 	  to 64 bit alignment.  (Yuval Fledel)
+	- Fix validation of STANDARD_INFORMATION attribute size in ntfsinfo.c
+	  and remove relevant FIXME comments.  (Yuval Fledel)
 
 11/04/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
