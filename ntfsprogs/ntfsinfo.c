@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ntfsinfo - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
@@ -93,7 +91,7 @@ void get_file_attribute_value(const char *dev, long int i)
 	mref = (MFT_REF) i;
 	inode = ntfs_open_inode(vol, mref);
 
-	if (ntfs_read_file_record(vol, mref, &mrec, NULL)) {
+	if (ntfs_file_record_read(vol, mref, &mrec, NULL)) {
 		perror("Error reading file record!\n");
 		exit(1);
 	}

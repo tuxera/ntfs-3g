@@ -183,7 +183,7 @@ already_have_the_base_and_is_first:
 	}
 	if (!type)
 		return FALSE;
-	if (ntfs_read_file_record(vol, mref, &ctx->mrec, &ctx->attr) < 0)
+	if (ntfs_file_record_read(vol, mref, &ctx->mrec, &ctx->attr) < 0)
 		return FALSE;
 	ctx->base = ctx->mrec;
 	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
@@ -250,7 +250,7 @@ compare_lowest_vcn:
 			// FIXME: CcUnpinData(ctx->base);
 			ctx->base = 0;
 		}
-		if (ntfs_read_file_record(vol,
+		if (ntfs_file_record_read(vol,
 				le64_to_cpu(al_pos->mft_reference),
 				&m, &attr_pos) < 0)
 			return FALSE;
@@ -310,7 +310,7 @@ loc_5217c:
 	}
 	if (!type)
 		return FALSE;
-	if (ntfs_read_file_record(vol, mref, &mrec, &ctx->attr) < 0)
+	if (ntfs_file_record_read(vol, mref, &mrec, &ctx->attr) < 0)
 		return FALSE;
 	ctx->base = mrec;
 	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
@@ -340,7 +340,7 @@ BOOL lookup_attr(const ntfs_volume *vol, const MFT_REFERENCE *mref,
 	}
 	if (ctx->base)
 		goto already_have_the_base;
-	if (ntfs_read_file_record(vol, mref, &m, &a) < 0)
+	if (ntfs_file_record_read(vol, mref, &m, &a) < 0)
 		return FALSE;
 	ctx->base = ctx->mrec = m;
 	ctx->attr = a;

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * NtfsFix - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
@@ -228,7 +226,7 @@ int main(int argc, char **argv)
 				printf("Correcting differences in "
 						"$MFTMirr... ");
 			}
-			br = ntfs_write_mft_record(vol, i, (MFT_RECORD*)(m +
+			br = ntfs_mft_record_write(vol, i, (MFT_RECORD*)(m +
 					i * vol->mft_record_size));
 			if (br) {
 				puts(FAILED);

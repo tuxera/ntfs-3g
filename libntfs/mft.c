@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * mft.c - Mft record handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
@@ -32,7 +30,7 @@
 #include "attrib.h"
 
 /**
- * ntfs_read_mft_records - read records from the mft from disk
+ * ntfs_mft_records_read - read records from the mft from disk
  * @vol:	volume to read from
  * @mref:	starting mft record number to read
  * @count:	number of mft records to read
@@ -48,7 +46,7 @@
  *
  * NOTE: @b has to be at least of size @count * vol->mft_record_size.
  */
-int ntfs_read_mft_records(const ntfs_volume *vol, const MFT_REF mref,
+int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b)
 {
 	s64 br;
@@ -79,7 +77,7 @@ int ntfs_read_mft_records(const ntfs_volume *vol, const MFT_REF mref,
 }
 
 /**
- * ntfs_write_mft_records - write mft records to disk
+ * ntfs_mft_records_write - write mft records to disk
  * @vol:	volume to write to
  * @mref:	starting mft record number to write
  * @count:	number of mft records to write
@@ -98,7 +96,7 @@ int ntfs_read_mft_records(const ntfs_volume *vol, const MFT_REF mref,
  * record was successfully written, we write the appropriate mft records from
  * the copied buffer to the mft mirror, too.
  */
-int ntfs_write_mft_records(const ntfs_volume *vol, const MFT_REF mref,
+int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b)
 {
 	s64 bw;
@@ -161,7 +159,7 @@ int ntfs_write_mft_records(const ntfs_volume *vol, const MFT_REF mref,
 }
 
 /**
- * ntfs_read_file_record - read a FILE record from the mft from disk
+ * ntfs_file_record_read - read a FILE record from the mft from disk
  * @vol:	volume to read from
  * @mref:	mft reference specifying mft record to read
  * @mrec:	address of pointer in which to return the mft record
@@ -184,14 +182,14 @@ int ntfs_write_mft_records(const ntfs_volume *vol, const MFT_REF mref,
  * and for having a matching sequence number (if MSEQNO(*@mref) != 0).
  * If either of these fails, -1 is returned and errno is set to EIO. If you get
  * this, but you still want to read the mft record (e.g. in order to correct
- * it), use ntfs_read_mft_record() directly.
+ * it), use ntfs_mft_record_read() directly.
  *
  * Note: Caller has to free *@mrec when finished.
  *
  * Note: We do not check if the mft record is flagged in use. The caller can
  *	 check if desired.
  */
-int ntfs_read_file_record(const ntfs_volume *vol, const MFT_REF mref,
+int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		MFT_RECORD **mrec, ATTR_RECORD **attr)
 {
 	MFT_RECORD *m;
@@ -208,7 +206,7 @@ int ntfs_read_file_record(const ntfs_volume *vol, const MFT_REF mref,
 		if (!m)
 			return -1;
 	}
-	if (ntfs_read_mft_record(vol, mref, m)) {
+	if (ntfs_mft_record_read(vol, mref, m)) {
 		err = errno;
 		goto read_failed;
 	}
@@ -224,7 +222,7 @@ int ntfs_read_file_record(const ntfs_volume *vol, const MFT_REF mref,
 		*attr = a;
 	return 0;
 file_corrupt:
-	Dputs("ntfs_read_file_record(): file is corrupt.");
+	Dputs("ntfs_file_record_read(): file is corrupt.");
 	err = EIO;
 read_failed:
 	if (m != *mrec)

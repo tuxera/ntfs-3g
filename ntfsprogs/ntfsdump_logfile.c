@@ -1,11 +1,9 @@
 const char *EXEC_NAME = "NtfsDump_LogFile";
 const char *EXEC_VERSION = "1.0";
 /*
- * $Id$
- *
  * NtfsDump_LogFile - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) of an
  * NTFS partition and display the results on stdout. Errors will be output to
@@ -120,7 +118,7 @@ version_error:
 			goto error_exit;
 	}
 	/* Read in $LogFile. */
-	if (ntfs_read_file_record(vol, FILE_LogFile, &m, NULL)) {
+	if (ntfs_file_record_read(vol, FILE_LogFile, &m, NULL)) {
 		fprintf(stderr, "Error reading mft record for $LogFile.\n");
 		goto error_exit;
 	}

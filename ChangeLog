@@ -17,13 +17,13 @@
 		mft.[ch] provide:	ntfs_{read,write}_mft_record(),
 					ntfs_{read,write}_mft_records(), and
 					ntfs_get_mft_record_data_size().
-	- When writing mft records using the mft.c::ntfs_write_mft_record{s,}()
+	- When writing mft records using the mft.c::ntfs_mft_record{s,}_write()
 	  interface, the mft mirror is now updated automatically.
 	- Add -Wall to compiler options when ./configure is run with
 	  --enable-debug.
 	- Fix minor error code path bugs in mkntfs.c that showed up with -Wall.
 	- Fix all compiler warnings that showed up with -Wall.
-	- Add new API function, provided by mft.[ch]: ntfs_read_file_record().
+	- Add new API function, provided by mft.[ch]: ntfs_file_record_read().
 	- Add new API calls provided by unistr.[ch]:
 		ntfs_ucstombs() and ntfs_mbstoucs().
 	- Define API for mst.[ch] providing:

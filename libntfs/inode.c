@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Anton Altaparmakov.
@@ -116,7 +114,7 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 	ni = __allocate_ntfs_inode(vol);
 	if (!ni)
 		return NULL;
-	if (ntfs_read_file_record(vol, mref, &ni->mrec, NULL))
+	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
 		goto err_out;
 	if (!(ni->mrec->flags & MFT_RECORD_IN_USE))
 		goto err_out;
@@ -279,7 +277,7 @@ ntfs_inode *ntfs_open_extent_inode(ntfs_inode *base_ni, const MFT_REF mref)
 	ni = __allocate_ntfs_inode(base_ni->vol);
 	if (!ni)
 		return NULL;
-	if (ntfs_read_file_record(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
+	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
 			NULL))
 		goto err_out;
 	ni->mft_no = mft_no;

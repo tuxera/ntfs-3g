@@ -2,6 +2,7 @@
  * ntfsresize - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Szabolcs Szakacsits
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This utility will resize an NTFS volume.
  *
@@ -429,7 +430,7 @@ void walk_inodes()
 		progress_update(&progress, inode);
 
 		mref = (MFT_REF)inode;
-		if (ntfs_read_file_record(vol, mref, &mrec, NULL)) {
+		if (ntfs_file_record_read(vol, mref, &mrec, NULL)) {
 			/* FIXME: continue only if it make sense, e.g.
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO)
@@ -680,7 +681,7 @@ int write_mft_record(ntfs_attr_search_ctx *ctx)
 	if (opt.ro_flag)
 		return 0;
 
-	return ntfs_write_mft_record(vol, ctx->ntfs_ino->mft_no, ctx->mrec);
+	return ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec);
 }
 
 

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * mft.h - Exports for MFT record handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
@@ -27,11 +25,11 @@
 #include "volume.h"
 #include "layout.h"
 
-extern int ntfs_read_mft_records(const ntfs_volume *vol, const MFT_REF mref,
+extern int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b);
 
 /**
- * ntfs_read_mft_record - read a record from the mft
+ * ntfs_mft_record_read - read a record from the mft
  * @vol:	volume to read from
  * @mref:	mft record number to read
  * @b:		output data buffer
@@ -45,20 +43,20 @@ extern int ntfs_read_mft_records(const ntfs_volume *vol, const MFT_REF mref,
  *
  * NOTE: @b has to be at least of size vol->mft_record_size.
  */
-static __inline__ int ntfs_read_mft_record(const ntfs_volume *vol,
+static __inline__ int ntfs_mft_record_read(const ntfs_volume *vol,
 		const MFT_REF mref, MFT_RECORD *b)
 {
-	return ntfs_read_mft_records(vol, mref, 1, b);
+	return ntfs_mft_records_read(vol, mref, 1, b);
 }
 
-extern int ntfs_read_file_record(const ntfs_volume *vol, const MFT_REF mref,
+extern int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		MFT_RECORD **mrec, ATTR_RECORD **attr);
 
-extern int ntfs_write_mft_records(const ntfs_volume *vol, const MFT_REF mref,
+extern int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b);
 
 /**
- * ntfs_write_mft_record - write an mft record to disk
+ * ntfs_mft_record_write - write an mft record to disk
  * @vol:	volume to write to
  * @mref:	mft record number to write
  * @b:		data buffer containing the mft record to write
@@ -72,10 +70,10 @@ extern int ntfs_write_mft_records(const ntfs_volume *vol, const MFT_REF mref,
  *
  * NOTE: @b has to be at least of size vol->mft_record_size.
  */
-static __inline__ int ntfs_write_mft_record(const ntfs_volume *vol,
+static __inline__ int ntfs_mft_record_write(const ntfs_volume *vol,
 		const MFT_REF mref, MFT_RECORD *b)
 {
-	return ntfs_write_mft_records(vol, mref, 1, b);
+	return ntfs_mft_records_write(vol, mref, 1, b);
 }
 
 /**

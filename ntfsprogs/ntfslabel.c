@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ntfslabel - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
@@ -147,7 +145,7 @@ void change_label(const char *dev, const unsigned long mnt_flags,
 				strerror(errno));
 		exit(1);
 	}
-	if (ntfs_read_file_record(vol, (MFT_REF)FILE_Volume, &mrec, NULL)) {
+	if (ntfs_file_record_read(vol, (MFT_REF)FILE_Volume, &mrec, NULL)) {
 		perror("Error reading file record");
 		goto err_out;
 	}
@@ -189,7 +187,7 @@ void change_label(const char *dev, const unsigned long mnt_flags,
 		goto err_out;
 	}
 	memcpy((char*)a + le16_to_cpu(a->value_offset), new_label, label_len);
-	if (ntfs_write_mft_record(vol, (MFT_REF)FILE_Volume, mrec)) {
+	if (ntfs_mft_record_write(vol, (MFT_REF)FILE_Volume, mrec)) {
 		perror("Error writing MFT Record to disk");
 		goto err_out;
 	}

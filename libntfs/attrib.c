@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
@@ -817,7 +815,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			goto err_out;
 		}
 		memcpy(val + pos, b, count);
-		if (ntfs_write_mft_record(vol, ctx->ntfs_ino->mft_no,
+		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
 			/*
 			 * NOTE: We are in a bad state at this moment. We have
@@ -866,7 +864,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			goto err_out;
 		}
 		ctx->attr->initialized_size = scpu_to_le64(pos + count);
-		if (ntfs_write_mft_record(vol, ctx->ntfs_ino->mft_no,
+		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
 			/*
 			 * Undo the change in the in-memory copy and send it
@@ -874,7 +872,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			 */
 			ctx->attr->initialized_size =
 					scpu_to_le64(old_initialized_size);
-			ntfs_write_mft_record(vol, ctx->ntfs_ino->mft_no,
+			ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 					ctx->mrec);
 			goto err_out;
 		}
@@ -1013,7 +1011,7 @@ err_out:
 				na->initialized_size = old_initialized_size;
 				ctx->attr->initialized_size = scpu_to_le64(
 						old_initialized_size);
-				err = ntfs_write_mft_record(vol,
+				err = ntfs_mft_record_write(vol,
 						ctx->ntfs_ino->mft_no,
 						ctx->mrec);
 			}

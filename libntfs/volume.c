@@ -1038,7 +1038,7 @@ int ntfs_set_volume_flags(ntfs_volume *vol, const u16 flags)
 		return -1;
 	}
 
-	if (ntfs_read_file_record(vol, FILE_Volume, &m, NULL)) {
+	if (ntfs_file_record_read(vol, FILE_Volume, &m, NULL)) {
 		Dperror("Failed to read $Volume");
 		return -1;
 	}
@@ -1086,7 +1086,7 @@ int ntfs_set_volume_flags(ntfs_volume *vol, const u16 flags)
 	/* Set the volume flags. */
 	vol->flags = c->flags = cpu_to_le16(flags);
 
-	if (ntfs_write_mft_record(vol, FILE_Volume, m)) {
+	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
 		Dperror("Error writing $Volume");
 		goto err_out;
 	}
