@@ -35,6 +35,11 @@
 	- Support the case where $Volume does not have a $VOLUME_NAME
 	  attribute in ntfs_device_mount() and let ntfslabel create the
 	  attribute when it is not present.
+	- Remove the FIXME in ntfs_attr_lookup() and complete the
+	  implementation of ntfs_external_attr_find() so it now returns the
+	  attribute list attribute position at which the attribute should be
+	  inserted in @ctx->al_entry (see descritpion for ntfs_attr_lookup() in
+	  attrib.c for details).
 
 11/03/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
