@@ -3466,12 +3466,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 	
 	/* Deallocate not used attribute extents and return with success. */
 	if (finished_build) {
-		/*
-		 * FIXME: We use ntfs_attr_init_search_ctx instead of
-		 * ntfs_attr_reinit_search_ctx because last seems to be buggy.
-		 */
-		//ntfs_attr_reinit_search_ctx(ctx);
-		ntfs_attr_init_search_ctx(ctx, na->ni, NULL);
+		ntfs_attr_reinit_search_ctx(ctx);
 		Dprintf("%s(): Deallocate marked extents.\n", __FUNCTION__);
 		while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
 				IGNORE_CASE, 0, NULL, 0, ctx)) {
