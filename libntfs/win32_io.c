@@ -826,14 +826,44 @@ static int ntfs_device_win32_sync(struct ntfs_device *dev)
  * @count:		How many bytes should be written.
  *
  * On success returns the amount of bytes actually written.
- * On fail returns -errno.
+ * On fail returns -1 and errno set.
  */
-static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buffer,
+static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buf,
 		s64 count)
 {
-	fprintf(stderr, "win32_write() unimplemented\n");
-	errno = ENOTSUP;
-	return -1;
+	s64 bytes_written = 0;
+	HANDLE handle = ((win32_fd *)dev->d_private)->handle;
+
+	Dprintf("win32_write: Writing %ll bytes\n",count);
+	
+	if (NDevReadOnly(dev)) {
+		Dputs("win32_write: Device R/O, exiting.");
+		errno = EROFS;
+		return -1;
+	}
+	NDevSetDirty(dev);
+
+	while (count>0) {
+		DWORD cur_written;
+		DWORD cur_count = (count>32768)?32768:count;
+
+		if (WriteFile(handle, buf, cur_count, &cur_written, NULL) &&
+		    (cur_written==cur_count)) {
+			Dprintf("win32_write: Written %u bytes.",bytes_written);
+			bytes_written += cur_written;
+			count -= cur_written;
+		} else {
+			/* error */
+			errno = ntfs_w32error_to_errno(GetLastError());
+			return -1;
+		}
+	}
+	if (count) {
+		errno = EIO;
+		return -1;
+	} else {
+		return bytes_written;
+	}
 }
 
 /**
