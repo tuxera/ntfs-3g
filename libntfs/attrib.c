@@ -2447,6 +2447,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	ntfs_inode_mark_dirty(ni);
 	if (type == AT_ATTRIBUTE_LIST) {
 		NInoClearAttrList(base_ni);
+		NInoClearAttrListDirty(base_ni);
 		free(base_ni->attr_list);
 		free(base_ni->attr_list_rl);
 	}
