@@ -1,0 +1,80 @@
+.\" Copyright (c) 2003 Richard Russon. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFSCLONE 8 "September 2003" "Linux\-NTFS version @VERSION@"
+.SH NAME
+ntfsclone \- Copy an NTFS volume.
+.SH SYNOPSIS
+.B ntfsclone
+[
+.I options
+]
+.B device
+.SH DESCRIPTION
+.B ntfsclone
+will efficiently clone an NTFS volume to a sparse file, device or stdandard
+output.
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfsclone
+accepts.  All options have two equivalent names.  The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
+.TP
+.BI "\-o " FILE
+.br
+.ns
+.TP
+.BI "\-\-output " FILE
+Clone NTFS to the non-existent FILE
+.TP
+.BI "\-O " FILE
+.br
+.ns
+.TP
+.BI "\-\-overwrite " FILE
+Clone NTFS to FILE, overwriting if exists
+.TP
+.B \-m
+.br
+.ns
+.TP
+.B \-\-metadata
+Clone *only* metadata (for NTFS experts)
+.TP
+.B \-f
+.br
+.ns
+.TP
+.B \-\-force
+This will override some sensible defaults, such as not working with a mounted
+volume.  Use this option with caution.
+.TP
+.B \-\-help
+Show a list of options with a brief description of each one.
+.SH EXAMPLES
+.SH BUGS
+This program has no known bugs.  If you find one, please send an email to
+.nh
+<linux-ntfs-dev@lists.sf.net>
+.hy
+.SH AUTHOR
+.B ntfsclone
+was written by Szabolcs Szakacsits <szaka@sienet.hu>.
+.SH AVAILABILITY
+.B ntfsclone
+is part of the linux\-ntfs package and is available from
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/downloads.html
+.hy
+.SH SEE ALSO
+.BR ntfsprogs (8)
+
