@@ -71,7 +71,7 @@ typedef struct {
 				   of the usa (usa_count) and add it to usa_ofs.
 				   Then verify that the result is less than the
 				   value of the restart_offset. */
-/* 20*/	u32 log_page_size;	/* Byte size of log file records, has to be >=
+/* 20*/	u32 log_page_size;	/* Byte size of log file pages, has to be >=
 				   512 and a power of 2.  Usually is 4096 (or
 				   is it just set to system_page_size?). */
 /* 24*/	u16 restart_offset;	/* Byte offset from the start of this header to
