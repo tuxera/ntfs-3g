@@ -372,26 +372,36 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 	return 0;
 }
 
+static const char *es = "  Leaving inconsistent metadata.  Run chkdsk.";
+
 /**
- * ntfs_mft_bitmap_extend_and_allocate_one -
+ * ntfs_mft_bitmap_extend_allocation - extend mft bitmap attribute by a cluster
+ * @vol:	volume on which to extend the mft bitmap attribute
  *
- * Extend the mft bitmap attribute by one cluster.
+ * Extend the mft bitmap attribute on the ntfs volume @vol by one cluster.
  *
- * Note:  Only updates allocated_size, i.e. does not update initialized_size or
+ * Note:  Only changes allocated_size, i.e. does not touch initialized_size or
  * data_size.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
  */
-static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
-		u8 *have_allocated_mftbmp)
+static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 {
 	LCN lcn;
-	s64 ll;
+	s64 ll = 0; /* silence compiler warning */
 	ntfs_attr *mftbmp_na, *lcnbmp_na;
-	runlist_element *rl, *rl2;
+	runlist_element *rl, *rl2 = NULL; /* silence compiler warning */
 	ntfs_attr_search_ctx *ctx;
-	MFT_RECORD *m;
-	ATTR_RECORD *a;
-	int err, mp_size;
-	u8 b;
+	MFT_RECORD *m = NULL; /* silence compiler warning */
+	ATTR_RECORD *a = NULL; /* silence compiler warning */
+	int ret, mp_size;
+	u32 old_alen = 0; /* silence compiler warning */
+	u8 b, tb;
+	struct {
+		u8 added_cluster:1;
+		u8 added_run:1;
+		u8 mp_rebuilt:1;
+	} status = { 0, 0, 0 };
 
 	mftbmp_na = vol->mftbmp_na;
 	lcnbmp_na = vol->lcnbmp_na;
@@ -404,7 +414,7 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 	if (!rl || !rl->length || rl->lcn < 0) {
 		ntfs_error(vol->sb, "Failed to determine last allocated "
 				"cluster of mft bitmap attribute.");
-		if (!rl->length || rl->lcn < 0)
+		if (rl)
 			errno = EIO;
 		return -1;
 	}
@@ -414,34 +424,30 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 	 * hand as it may be in the MFT zone so the allocator would not give it
 	 * to us.
 	 */
-	ll = ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
-	if (ll < 0) {
+	ret = (int)ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
+	if (ret < 0) {
 		ntfs_error(vol->sb, "Failed to read from lcn bitmap.");
 		return -1;
 	}
-	ntfs_debug("Read %llu byte%s.", (long long)ll, ll == 1 ? "" : "s");
-	*have_allocated_mftbmp = 0;
-	if (ll == 1 && b != 0xff) {
-		u8 tb = 1 << (lcn & 7ull);
-		if (!(b & tb)) {
-			/* Next cluster is free, allocate it. */
-			b |= tb;
-			ll = ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
-			if (ll < 1) {
-				ntfs_error(vol->sb, "Failed to write to lcn "
-						"bitmap.");
-				if (!ll)
-					errno = EIO;
-				return -1;
-			}
-			/* Update the mft bitmap runlist. */
-			rl->length++;
-			rl[1].vcn++;
-			*have_allocated_mftbmp |= 1;
-			ntfs_debug("Appending one cluster to mft bitmap.");
+	ntfs_debug("Read %i byte%s.", ret, ret == 1 ? "" : "s");
+	tb = 1 << (lcn & 7ull);
+	if (ret == 1 && b != 0xff && !(b & tb)) {
+		/* Next cluster is free, allocate it. */
+		b |= tb;
+		ret = (int)ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
+		if (ret < 1) {
+			ntfs_error(vol->sb, "Failed to write to lcn "
+					"bitmap.");
+			if (!ret)
+				errno = EIO;
+			return -1;
 		}
-	}
-	if (!have_allocated_mftbmp) {
+		/* Update the mft bitmap runlist. */
+		rl->length++;
+		rl[1].vcn++;
+		status.added_cluster = 1;
+		ntfs_debug("Appending one cluster to mft bitmap.");
+	} else {
 		/* Allocate a cluster from the DATA_ZONE. */
 		rl2 = ntfs_cluster_alloc(vol, 1, lcn, DATA_ZONE, rl[1].vcn);
 		if (!rl2) {
@@ -451,41 +457,37 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 		}
 		rl = ntfs_runlists_merge(mftbmp_na->rl, rl2);
 		if (!rl) {
-			err = errno;
+			ret = errno;
 			ntfs_error(vol->sb, "Failed to merge runlists for mft "
 					"bitmap.");
 			if (ntfs_cluster_free_from_rl(vol, rl2))
 				ntfs_error(vol->sb, "Failed to dealocate "
-						"cluster.  Run chkdsk.");
+						"cluster.%s", es);
 			free(rl2);
-			errno = err;
+			errno = ret;
 			return -1;
 		}
 		mftbmp_na->rl = rl;
-		*have_allocated_mftbmp |= 2;
-		ntfs_debug("Adding run to mft bitmap.");
-		rl = ntfs_attr_find_vcn(mftbmp_na, mftbmp_na->allocated_size >>
-				vol->cluster_size);
-		if (!rl || !rl->length) {
-			ntfs_error(vol->sb, "Failed to determine last "
-					"allocated cluster of mft bitmap "
-					"attribute.");
-			if (!rl->length)
-				errno = EIO;
-			return -1;
-		}
+		status.added_run = 1;
+		ntfs_debug("Adding one run to mft bitmap.");
+		/* Find the last run in the new runlist. */
+		for (rl = mftbmp_na->rl; rl[1].length; rl++)
+			;
 	}
-	/* Update the attribute record as well. */
+	/*
+	 * Update the attribute record as well.  Note: @rl is the last
+	 * (non-terminator) runlist element of mft bitmap.
+	 */
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
 	if (!ctx) {
 		ntfs_error(vol->sb, "Failed to get search context.");
-		return -1;
+		goto undo_alloc;
 	}
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_error(vol->sb, "Failed to find last attribute extent of "
 				"mft bitmap attribute.");
-		goto put_err_out;
+		goto undo_alloc;
 	}
 	m = ctx->mrec;
 	a = ctx->attr;
@@ -494,25 +496,25 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 	if (!rl2 || !rl2->length) {
 		ntfs_error(vol->sb, "Failed to determine previous last "
 				"allocated cluster of mft bitmap attribute.");
-		if (!rl2->length)
+		if (rl2)
 			errno = EIO;
-		goto put_err_out;
+		goto undo_alloc;
 	}
 	/* Get the size for the new mapping pairs array for this extent. */
 	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll);
 	if (mp_size <= 0) {
 		ntfs_error(vol->sb, "Get size for mapping pairs failed for "
 				"mft bitmap attribute extent.");
-		goto put_err_out;
+		goto undo_alloc;
 	}
 	/* Expand the attribute record if necessary. */
+	old_alen = le32_to_cpu(a->length);
 	if (ntfs_attr_record_resize(m, a, mp_size +
 			le16_to_cpu(a->mapping_pairs_offset))) {
 		if (errno != ENOSPC) {
-			ntfs_error(vol->sb, "Failed to resize "
-					"attribute record for mft "
-					"bitmap attribute.");
-			goto put_err_out;
+			ntfs_error(vol->sb, "Failed to resize attribute "
+					"record for mft bitmap attribute.");
+			goto undo_alloc;
 		}
 		// TODO: Deal with this by moving this extent to a new mft
 		// record or by starting a new extent in a new mft record.
@@ -520,25 +522,23 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 				"accomodate extended mft bitmap attribute "
 				"extent.  Cannot handle this yet.");
 		errno = ENOTSUP;
-		goto put_err_out;
+		goto undo_alloc;
 	}
+	status.mp_rebuilt = 1;
 	/* Generate the mapping pairs array directly into the attr record. */
 	if (ntfs_mapping_pairs_build(vol, (u8*)a +
-			le16_to_cpu(a->mapping_pairs_offset), mp_size, rl2,
-			ll, NULL)) {
-		ntfs_error(vol->sb, "Failed to build mapping pairs.  Run "
-				"chkdsk.");
+			le16_to_cpu(a->mapping_pairs_offset), mp_size, rl2, ll,
+			NULL)) {
+		ntfs_error(vol->sb, "Failed to build mapping pairs.");
 		errno = EIO;
-		goto put_err_out;
+		goto undo_alloc;
 	}
 	/* Update the highest_vcn. */
 	a->highest_vcn = scpu_to_le64(rl[1].vcn - 1);
 	/*
 	 * We now have extended the mft bitmap allocated_size by one cluster.
 	 * Reflect this in the ntfs_attr structure and the attribute record.
-	 * @rl is the last (non-terminator) runlist element of mft bitmap.
 	 */
-	mftbmp_na->allocated_size += vol->cluster_size;
 	if (a->lowest_vcn) {
 		/*
 		 * We are not in the first attribute extent, switch to it, but
@@ -550,18 +550,155 @@ static int ntfs_mft_bitmap_extend_by_one_cluster(ntfs_volume *vol,
 				mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 			ntfs_error(vol->sb, "Failed to find first attribute "
 					"extent of mft bitmap attribute.");
-			goto put_err_out;
+			goto restore_undo_alloc;
 		}
 		a = ctx->attr;
 	}
+	mftbmp_na->allocated_size += vol->cluster_size;
 	a->allocated_size = scpu_to_le64(mftbmp_na->allocated_size);
 	/* Ensure the changes make it to disk. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
-put_err_out:
-	err = errno;
+restore_undo_alloc:
+	ret = errno;
+	ntfs_attr_reinit_search_ctx(ctx);
+	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
+			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
+		ntfs_error(vol->sb, "Failed to find last attribute extent of "
+				"mft bitmap attribute.%s", es);
+		ntfs_attr_put_search_ctx(ctx);
+		mftbmp_na->allocated_size += vol->cluster_size;
+		/*
+		 * The only thing that is now wrong is ->allocated_size of the
+		 * base attribute extent which chkdsk should be able to fix.
+		 */
+		errno = ret;
+		return -1;
+	}
+	m = ctx->mrec;
+	a = ctx->attr;
+	a->highest_vcn = scpu_to_le64(rl[1].vcn - 2);
+	errno = ret;
+undo_alloc:
+	ret = errno;
+	if (status.added_cluster) {
+		/* Truncate the last run in the runlist by one cluster. */
+		rl->length--;
+		rl[1].vcn--;
+	} else if (status.added_run) {
+		lcn = rl->lcn;
+		/* Remove the last run from the runlist. */
+		rl->lcn = rl[1].lcn;
+		rl->length = 0;
+	}
+	/* Deallocate the cluster. */
+	if (ntfs_bitmap_clear_bit(lcnbmp_na, lcn))
+		ntfs_error(vol->sb, "Failed to free cluster.%s", es);
+	if (status.mp_rebuilt) {
+		if (ntfs_mapping_pairs_build(vol, (u8*)a +
+				le16_to_cpu(a->mapping_pairs_offset),
+				old_alen - le16_to_cpu(a->mapping_pairs_offset),
+				rl2, ll, NULL))
+			ntfs_error(vol->sb, "Failed to restore mapping "
+					"pairs array.%s", es);
+		if (ntfs_attr_record_resize(m, a, old_alen))
+			ntfs_error(vol->sb, "Failed to restore attribute "
+					"record.%s",
+					es);
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+	}
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
+	errno = ret;
+	return -1;
+}
+
+/**
+ * ntfs_mft_bitmap_extend_initialized - extend mft bitmap initialized data
+ * @vol:	volume on which to extend the mft bitmap attribute
+ *
+ * Extend the initialized portion of the mft bitmap attribute on the ntfs
+ * volume @vol by 8 bytes.
+ *
+ * Note:  Only changes initialized_size and data_size, i.e. requires that
+ * allocated_size is big enough to fit the new initialized_size.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
+{
+	s64 old_data_size, old_initialized_size, ll;
+	ntfs_attr *mftbmp_na;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *a;
+	int err;
+
+	mftbmp_na = vol->mftbmp_na;
+	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
+	if (!ctx) {
+		ntfs_error(vol->sb, "Failed to get search context.");
+		return -1;
+	}
+	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
+			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
+		ntfs_error(vol->sb, "Failed to find first attribute extent of "
+				"mft bitmap attribute.");
+		err = errno;
+		goto put_err_out;
+	}
+	a = ctx->attr;
+	old_data_size = mftbmp_na->data_size;
+	old_initialized_size = mftbmp_na->initialized_size;
+	mftbmp_na->initialized_size += 8;
+	a->initialized_size = scpu_to_le64(mftbmp_na->initialized_size);
+	if (mftbmp_na->initialized_size > mftbmp_na->data_size) {
+		mftbmp_na->data_size = mftbmp_na->initialized_size;
+		a->data_size = scpu_to_le64(mftbmp_na->data_size);
+	}
+	/* Ensure the changes make it to disk. */
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
+	/* Initialize the mft bitmap attribute value with zeroes. */
+	ll = 0;
+	ll = ntfs_attr_pwrite(mftbmp_na, old_initialized_size, 8, &ll);
+	if (ll == 8) {
+		ntfs_debug("Wrote eight initialized bytes to mft bitmap.");
+		return 0;
+	}
+	ntfs_error(vol->sb, "Failed to write to mft bitmap.");
+	err = errno;
+	if (ll >= 0)
+		err = EIO;
+	/* Try to recover from the error. */
+	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
+	if (!ctx) {
+		ntfs_error(vol->sb, "Failed to get search context.%s", es);
+		goto err_out;
+	}
+	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
+			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
+		ntfs_error(vol->sb, "Failed to find first attribute extent of "
+				"mft bitmap attribute.%s", es);
+put_err_out:
+		ntfs_attr_put_search_ctx(ctx);
+		goto err_out;
+	}
+	a = ctx->attr;
+	mftbmp_na->initialized_size = old_initialized_size;
+	a->initialized_size = scpu_to_le64(old_initialized_size);
+	if (mftbmp_na->data_size != old_data_size) {
+		mftbmp_na->data_size = old_data_size;
+		a->data_size = scpu_to_le64(old_data_size);
+	}
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+	ntfs_attr_put_search_ctx(ctx);
+	ntfs_debug("Restored status of mftbmp: allocated_size 0x%llx, "
+			"data_size 0x%llx, initialized_size 0x%llx.",
+			(long long)mftbmp_na->allocated_size,
+			(long long)mftbmp_na->data_size,
+			(long long)mftbmp_na->initialized_size);
+err_out:
 	errno = err;
 	return -1;
 }
@@ -659,10 +796,10 @@ static inline unsigned int ntfs_ffz(unsigned int word)
 #endif
 ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 {
-	s64 nr_allocated_mft_records, pass_end, ll, ll2, buf_pos, pass_start;
+	s64 nr_allocated_mft_records, pass_end, ll, ll2, data_pos, pass_start;
 	s64 last_read_pos, bit;
 	LCN lcn;
-	ntfs_attr *mft_na, *mftbmp_na, *lcnbmp_na;
+	ntfs_attr *mft_na, *mftbmp_na;
 	u8 *buf, *byte;
 	runlist_element *rl, *rl2;
 	ntfs_attr_search_ctx *ctx;
@@ -673,7 +810,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	unsigned int size, buf_size;
 	int err, mp_size;
 	u16 seq_no;
-	u8 pass, b, have_allocated_mftbmp = 0;
+	u8 pass, b;
 
 	if (base_ni)
 		ntfs_debug("Entering (allocating an extent mft record for "
@@ -693,192 +830,162 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 		return NULL;
 	mft_na = vol->mft_na;
 	mftbmp_na = vol->mftbmp_na;
-	lcnbmp_na = vol->lcnbmp_na;
 	/* Determine the number of allocated mft records in the mft. */
-	pass_end = nr_allocated_mft_records = mft_na->allocated_size >>
+	nr_allocated_mft_records = mft_na->allocated_size >>
 			vol->mft_record_size_bits;
 	ntfs_debug("nr_allocated_mft_records 0x%llx.",
 			(long long)nr_allocated_mft_records);
-	/* Make sure we do not overflow the mft bitmap. */
+	/*
+	 * Set the end of the pass making sure we do not overflow the mft
+	 * bitmap.
+	 */
+	pass_end = nr_allocated_mft_records;
 	ll = mftbmp_na->initialized_size << 3;
-	if (ll < nr_allocated_mft_records) {
-		// FIXME: It might be better to extend the bitmap instead.
+	if (pass_end > ll)
 		pass_end = ll;
-	}
 	pass = 1;
 	if (!base_ni)
-		buf_pos = vol->mft_data_pos;
+		data_pos = vol->mft_data_pos;
 	else
-		buf_pos = base_ni->mft_no + 1;
-	if (buf_pos >= pass_end) {
-		buf_pos = 24;
+		data_pos = base_ni->mft_no + 1;
+	if (data_pos >= pass_end) {
+		data_pos = 24;
 		pass = 2;
 	}
-	pass_start = buf_pos;
+	pass_start = data_pos;
 	ntfs_debug("Starting bitmap search: pass %u, pass_start 0x%llx, "
-			"pass_end = 0x%llx.", pass, (long long)pass_start,
-			(long long)pass_end);
+			"pass_end 0x%llx, data_pos 0x%llx.", pass,
+			(long long)pass_start, (long long)pass_end,
+			(long long)data_pos);
 #ifdef DEBUG
 	byte = NULL;
 	b = 0;
 #endif
 	/* Loop until a free mft record is found. */
 	size = PAGE_SIZE;
-	if (size > (ll = nr_allocated_mft_records >> 3))
+	ll = nr_allocated_mft_records >> 3;
+	if (size > ll)
 		size = ll;
 	for (;; size = PAGE_SIZE) {
-		last_read_pos = buf_pos >> 3;
-		ntfs_debug("Before read: mftbmp: allocated_size 0x%llx, "
-				"data_size 0x%llx, initialized_size 0x%llx.",
-				(long long)mftbmp_na->allocated_size,
-				(long long)mftbmp_na->data_size,
-				(long long)mftbmp_na->initialized_size);
+		last_read_pos = data_pos >> 3;
 		ll = ntfs_attr_pread(mftbmp_na, last_read_pos, size, buf);
 		if (ll < 0) {
 			ntfs_error(vol->sb, "Failed to read mft bitmap "
-					"attribute.");
+					"attribute, aborting.");
 			goto err_out;
 		}
 		ntfs_debug("Read 0x%llx bytes.", (long long)ll);
-		ntfs_debug("After read: mftbmp: allocated_size 0x%llx, "
-				"data_size = 0x%llx, initialized_size 0x%llx.",
-				(long long)mftbmp_na->allocated_size,
-				(long long)mftbmp_na->data_size,
-				(long long)mftbmp_na->initialized_size);
-		if (!ll)
-			goto pass_done;
-		buf_size = ll << 3;
-		bit = buf_pos & 7;
-		buf_pos &= ~7ull;
-		ntfs_debug("Before for loop: buf_size 0x%x, buf_pos 0x%llx, "
-				"bit 0x%llx, *byte 0x%x, b %u.", buf_size,
-				(long long)buf_pos, (long long)bit,
-				byte ? *byte : -1, b);
-		for (; bit < buf_size && buf_pos + bit < pass_end;
-				bit &= ~7ull, bit += 8) {
-			byte = buf + (bit >> 3);
-			if (*byte == 0xff)
-				continue;
-			/* Note: ffz() result must be zero based. */
-			b = ntfs_ffz((unsigned long)*byte);
-			if (b < 8 && b >= (bit & 7)) {
-				bit = buf_pos + (bit & ~7ull) + b;
-				ntfs_debug("Found free rec in for loop, "
-						"bit 0x%llx.", (long long)bit);
-				goto found_free_rec;
+		/* If we read at least one byte, search @buf for a zero bit. */
+		if (ll) {
+			buf_size = ll << 3;
+			bit = data_pos & 7;
+			data_pos &= ~7ull;
+			ntfs_debug("Before inner for loop: buf_size 0x%x, "
+					"data_pos 0x%llx, bit 0x%llx, "
+					"*byte 0x%x, b %u.", buf_size,
+					(long long)data_pos, (long long)bit,
+					byte ? *byte : -1, b);
+			for (; bit < buf_size && data_pos + bit < pass_end;
+					bit &= ~7ull, bit += 8) {
+				byte = buf + (bit >> 3);
+				if (*byte == 0xff)
+					continue;
+				/* Note: ffz() result must be zero based. */
+				b = ntfs_ffz((unsigned long)*byte);
+				if (b < 8 && b >= (bit & 7)) {
+					bit = data_pos + (bit & ~7ull) + b;
+					ntfs_debug("Found free record (#1), "
+							"bit 0x%llx.",
+							(long long)bit);
+					goto found_free_rec;
+				}
 			}
+			ntfs_debug("After inner for loop: buf_size 0x%x, "
+					"data_pos 0x%llx, bit 0x%llx, "
+					"*byte 0x%x, b %u.", buf_size,
+					(long long)data_pos, (long long)bit,
+					byte ? *byte : -1, b);
+			data_pos += buf_size;
+			/*
+			 * If the end of the pass has not been reached yet,
+			 * continue searching the mft bitmap for a zero bit.
+			 */
+			if (data_pos < pass_end)
+				continue;
 		}
-		ntfs_debug("After for loop: buf_size 0x%x, buf_pos 0x%llx, "
-				"bit 0x%llx, *byte 0x%x, b %u.", buf_size,
-				(long long)buf_pos, (long long)bit,
-				byte ? *byte : -1, b);
-		buf_pos += buf_size;
-		if (buf_pos < pass_end)
-			continue;
-pass_done:
 		/* Finished with the current pass. */
 		ntfs_debug("At pass_done.");
-		if (pass == 1) {
-			/*
-			 * Now do pass 2, scanning the first part of the zone
-			 * we omitted in pass 1.
-			 */
-			ntfs_debug("Done pass 1, switching to pass 2.");
-			pass = 2;
-			pass_end = pass_start;
-			buf_pos = pass_start = 24;
-			ntfs_debug("pass %i, pass_start 0x%llx, "
-					"pass_end 0x%llx.", pass,
-					(long long)pass_start,
-					(long long)pass_end);
-			continue;
-		} /* pass == 2 */
-		/* No free records left. */
-		if (mftbmp_na->initialized_size << 3 >
-				nr_allocated_mft_records &&
-				mftbmp_na->initialized_size > 3) {
-			/*
-			 * The mft bitmap is already bigger but the space is
-			 * not covered by mft records, this implies that the
-			 * next records are all free, so we already have found
-			 * a free record.
-			 */
-			bit = nr_allocated_mft_records;
-			if (bit < 24)
-				bit = 24;
-			ntfs_debug("Found free record bit (#1) 0x%llx.",
-					(long long)bit);
-			goto found_free_rec;
-		}
-		ntfs_debug("Done pass 2.");
-		ntfs_debug("Status of mftbmp: allocated_size 0x%llx, "
-				"data_size 0x%llx, initialized_size 0x%llx.",
-				(long long)mftbmp_na->allocated_size,
-				(long long)mftbmp_na->data_size,
-				(long long)mftbmp_na->initialized_size);
-		if (mftbmp_na->initialized_size + 8 >
-				mftbmp_na->allocated_size) {
-			/* Need to extend bitmap by one more cluster. */
-			ntfs_debug("mftbmp: initialized_size + 8 > "
-					"allocated_size.");
-			if (ntfs_mft_bitmap_extend_by_one_cluster(vol,
-					&have_allocated_mftbmp))
-				goto err_out;
-			ntfs_debug("New status of mftbmp: allocated_size "
-					"0x%llx, data_size 0x%llx, "
-					"initialized_size 0x%llx.",
-					(long long)mftbmp_na->allocated_size,
-					(long long)mftbmp_na->data_size,
-					(long long)mftbmp_na->initialized_size);
-		}
+		/* If finished the second pass we are done searching. */
+		if (pass == 2)
+			break;
 		/*
-		 * We now have sufficient allocated space, extend the
-		 * initialized_size as well as the data_size if necessary.
+		 * Finished with the first pass.  Now do the second pass, in
+		 * which we scan the first part of the zone we omitted earlier.
 		 */
-		ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
-		if (!ctx) {
-			ntfs_error(vol->sb, "Failed to get search context.");
+		ntfs_debug("Done pass 1, switching to pass 2.");
+		pass = 2;
+		pass_end = pass_start;
+		data_pos = pass_start = 24;
+		ntfs_debug("pass %i, pass_start 0x%llx, pass_end 0x%llx.",
+				pass, (long long)pass_start,
+				(long long)pass_end);
+	}
+	ntfs_debug("Done pass 2.");
+	/*
+	 * No free mft records left.  If the mft bitmap already covers more
+	 * than the currently used mft records, the next records are all free,
+	 * so we can simply allocate the first unused mft record.
+	 * Note: We also have to make sure that the mft bitmap at least covers
+	 * the first 24 mft records as they are special and whilst they may not
+	 * be in use, we do not allocate from them.
+	 */
+	ll = mft_na->initialized_size >> vol->mft_record_size_bits;
+	if (mftbmp_na->initialized_size << 3 > ll &&
+			mftbmp_na->initialized_size > 3) {
+		bit = ll;
+		if (bit < 24)
+			bit = 24;
+		ntfs_debug("Found free record (#2), bit 0x%llx.",
+				(long long)bit);
+		goto found_free_rec;
+	}
+	/*
+	 * The mft bitmap needs to be expanded until it covers the first unused
+	 * mft record that we can allocate.
+	 * Note: The smallest mft record we allocate is mft record 24.
+	 */
+	ntfs_debug("Status of mftbmp before extension: allocated_size 0x%llx, "
+			"data_size 0x%llx, initialized_size 0x%llx.",
+			(long long)mftbmp_na->allocated_size,
+			(long long)mftbmp_na->data_size,
+			(long long)mftbmp_na->initialized_size);
+	if (mftbmp_na->initialized_size + 8 > mftbmp_na->allocated_size) {
+		/* Need to extend bitmap by one more cluster. */
+		ntfs_debug("mftbmp: initialized_size + 8 > allocated_size.");
+		if (ntfs_mft_bitmap_extend_allocation(vol))
 			goto err_out;
-		}
-		if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
-				mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
-			ntfs_error(vol->sb, "Failed to find first attribute "
-					"extent of mft bitmap attribute.");
-			goto put_err_out;
-		}
-		a = ctx->attr;
-		buf_pos = mftbmp_na->initialized_size;
-		mftbmp_na->initialized_size += 8;
-		a->initialized_size = scpu_to_le64(mftbmp_na->initialized_size);
-		if (mftbmp_na->initialized_size > mftbmp_na->data_size) {
-			mftbmp_na->data_size = mftbmp_na->initialized_size;
-			a->data_size = scpu_to_le64(mftbmp_na->data_size);
-		}
-		/* Ensure the changes make it to disk. */
-		ntfs_inode_mark_dirty(ctx->ntfs_ino);
-		ntfs_attr_put_search_ctx(ctx);
-		ntfs_debug("New status of mftbmp: allocated_size 0x%llx, "
-				"data_size 0x%llx, initialized_size 0x%llx.",
+		ntfs_debug("Status of mftbmp after allocation extension: "
+				"allocated_size 0x%llx, data_size 0x%llx, "
+				"initialized_size 0x%llx.",
 				(long long)mftbmp_na->allocated_size,
 				(long long)mftbmp_na->data_size,
 				(long long)mftbmp_na->initialized_size);
-		have_allocated_mftbmp |= 4;
-		/* Initialize the mft bitmap attribute value with zeroes. */
-		memset(buf, 0, 8);
-		ll = ntfs_attr_pwrite(mftbmp_na, buf_pos, 8, buf);
-		if (ll < 8) {
-			ntfs_error(vol->sb, "Failed to write to mft bitmap.");
-			if (ll >= 0)
-				errno = EIO;
-			goto shrink_mftbmp_err_out;
-		}
-		ntfs_debug("Wrote eight initialized bytes to mft bitmap.");
-		bit = buf_pos << 3;
-		ntfs_debug("Found free record bit (#2) 0x%llx.",
-				(long long)bit);
-		/* goto found_free_rec; */
-		break;
 	}
+	/*
+	 * We now have sufficient allocated space, extend the initialized_size
+	 * as well as the data_size if necessary and fill the new space with
+	 * zeroes.
+	 */
+	bit = mftbmp_na->initialized_size << 3;
+	if (ntfs_mft_bitmap_extend_initialized(vol))
+		goto err_out;
+	ntfs_debug("Status of mftbmp after initialized extention: "
+			"allocated_size 0x%llx, data_size 0x%llx, "
+			"initialized_size 0x%llx.",
+			(long long)mftbmp_na->allocated_size,
+			(long long)mftbmp_na->data_size,
+			(long long)mftbmp_na->initialized_size);
+	ntfs_debug("Found free record (#3), bit 0x%llx.", (long long)bit);
 found_free_rec:
 	/* @bit is the found free mft record, allocate it in the mft bitmap. */
 	vol->mft_data_pos = bit;
@@ -888,7 +995,7 @@ found_free_rec:
 		ntfs_error(vol->sb, "Failed to read from mft bitmap.");
 		if (!ll)
 			errno = EIO;
-		goto shrink_mftbmp_err_out;
+		goto err_out;
 	}
 	ntfs_debug("Read 1 byte from mft bitmap.");
 	/* Check our bit is really zero and set it. */
@@ -901,7 +1008,7 @@ found_free_rec:
 	if (ll < 1) {
 		if (!ll)
 			errno = EIO;
-		goto shrink_mftbmp_err_out;
+		goto err_out;
 	}
 	ntfs_debug("Wrote 1 byte to mft bitmap.");
 	/* The mft bitmap is now uptodate.  Deal with mft data attribute now. */
@@ -1238,6 +1345,26 @@ mft_rec_already_initialized:
 	free(buf);
 	return ni;
 
+put_err_out:
+	err = errno;
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+err_out:
+	err = errno;
+	free(buf);
+	if (err)
+		errno = err;
+	else
+		errno = EIO;
+	return NULL;
+
+
+
+
+
+
+
+
 release_mrec_alloc_init_err_out:
 	err = errno;
 	free(ni);
@@ -1257,26 +1384,85 @@ put_undo_data_init_err_out:
 undo_data_init_err_out:
 	goto trunc_mft_rl_shrink_mftbmp_alloc_err_out;
 
-put_err_out:
-	err = errno;
-	ntfs_attr_put_search_ctx(ctx);
-	errno = err;
-
-
 trunc_mft_rl_shrink_mftbmp_alloc_err_out:
 
 undo_mftbmp_alloc_err_out:
+	return NULL;
 
-shrink_mftbmp_err_out:
+#if 0
+	unsigned long l;
+	int old_data_rlen;
+	s64 old_data_len;
+	s64 old_data_allocated;
 
 err_out:
-	err = errno;
-	free(buf);
-	if (err)
-		errno = err;
+	if (err != -ENOSPC)
+		ntfs_error(vol->sb, "Failed to allocate an mft "
+				"record. Returning error code %i.", -err);
 	else
-		errno = EIO;
-	return NULL;
+		ntfs_debug(DEBUG_FILE3, __FUNCTION__ "(): Failed to allocate "
+				"an mft record due to lack of free space.\n");
+	return err;
+undo_data_init_err_out:
+	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): At "
+			"undo_data_init_err_out.\n");
+	mft_na->initialized = old_data_initialized;
+	mft_na->size = old_data_size;
+undo_data_alloc_err_out:
+	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): At undo_data_alloc_err_out."
+			"\n");
+	mft_na->allocated = old_data_allocated;
+undo_partial_data_alloc_err_out:
+	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): At "
+			"undo_partial_data_alloc_err_out.\n");
+	/* Deallocate the clusters. */
+	if (ntfs_deallocate_clusters(vol, rl2, r2len))
+		ntfs_error(vol->sb, "Error deallocating clusters in "
+				"error code path. You should run chkdsk.");
+	ntfs_vfree(rl2);
+	/* Revert the run list back to what it was before. */
+	r2len = mft_na->d.r.len;
+	rl2 = mft_na->d.r.runlist;
+	rl2[old_data_rlen++].len = old_data_len;
+	rl2[old_data_rlen].lcn = (ntfs_cluster_t)-1;
+	rl2[old_data_rlen].len = (ntfs_cluster_t)0;
+	mft_na->d.r.len = old_data_rlen;
+	rl2_size = ((old_data_rlen + 1) * sizeof(ntfs_runlist) + PAGE_SIZE -
+			1) & PAGE_MASK;
+	/* Reallocate memory freeing any extra memory allocated. */
+	if (rl2_size < ((r2len * sizeof(ntfs_runlist) + PAGE_SIZE - 1) &
+			PAGE_MASK)) {
+		rl2 = ntfs_vmalloc(rl2_size);
+		if (rl2) {
+			ntfs_memcpy(rl2, mft_na->d.r.runlist, rl2_size);
+			ntfs_vfree(mft_na->d.r.runlist);
+			mft_na->d.r.runlist = rl2;
+		} else
+			ntfs_error(vol->sb, "Error reallocating "
+					"memory in error code path. This "
+					"should be harmless.");
+	}	
+undo_mftbmp_alloc_err_out:
+	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): At "
+			"undo_mftbmp_alloc_err_out.\n");
+	/* Deallocate the allocated bit in the mft bitmap. */
+	io.param = buf;
+	io.size = 1;
+	io.do_read = 1;
+	err = ntfs_readwrite_attr(vol->mft_ino, mftbmp_na, bit >> 3, &io);
+	if (!err && io.size == 1) {
+		*buf &= ~(1 << (bit & 7));
+		io.param = buf;
+		io.do_read = 0;
+		err = ntfs_readwrite_attr(vol->mft_ino, mftbmp_na, bit >> 3, &io);
+	}
+	if (err || io.size != 1) {
+		if (!err)
+			err = -EIO;
+		ntfs_error(vol->sb, "Error deallocating mft record in "
+				"error code path. You should run chkdsk.");
+	}
+#endif
 }
 
 /**
