@@ -86,6 +86,7 @@ xx/xx/2004 - 2.0.0-WIP
 	  list.  (Yura)
 	- Remove inode.h::NIno{Clear,Set,}AttrListNonResident and attr_list_rl
 	  field from inode.h::_ntfs_inode struct. Adapt all users.  (Yura)
+	- Add --attibute, --attr-name and --inode attribute to ntfscp.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
