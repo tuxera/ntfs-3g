@@ -38,6 +38,7 @@
 #include "inode.h"
 #include "runlist.h"
 #include "lcnalloc.h"
+#include "dir.h"
 
 uchar_t AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -383,7 +384,8 @@ void ntfs_attr_close(ntfs_attr *na)
 {
 	if (NAttrNonResident(na) && na->rl)
 		free(na->rl);
-	if (na->name != AT_UNNAMED)
+	/* Don't release if using an internal constant. */
+	if (na->name != AT_UNNAMED && na->name != I30)
 		free(na->name);
 	free(na);
 	return;
