@@ -3018,8 +3018,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		 * Reminder: It is ok for a->highest_vcn to be -1 for zero
 		 * length files.
 		 */
-		if (a->highest_vcn)
-			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
 		if (mp_size <= 0) {
@@ -3112,6 +3111,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 						__FUNCTION__);
 		}
 	}
+
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
@@ -3464,8 +3464,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		/* Update the attribute record and the ntfs_attr structure. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = scpu_to_le64(na->allocated_size);
-		if (a->highest_vcn)
-			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 	}
 	/* Update the attribute record and the ntfs attribute structure. */
 	na->data_size = newsize;
