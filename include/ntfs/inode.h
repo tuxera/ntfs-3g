@@ -68,13 +68,20 @@ typedef enum {
 #define   set_nino_al_flag(ni, flag)	  set_nino_flag(ni, AttrList##flag)
 #define clear_nino_al_flag(ni, flag)	clear_nino_flag(ni, AttrList##flag)
 
+#define test_and_set_nino_al_flag(ni, flag)	\
+				 test_and_set_nino_flag(ni, AttrList##flag)
+#define test_and_clear_nino_al_flag(ni, flag)	\
+			       test_and_clear_nino_flag(ni, AttrList##flag)
+
 #define NInoAttrListNonResident(ni)	   test_nino_al_flag(ni, NonResident)
 #define NInoSetAttrListNonResident(ni)	    set_nino_al_flag(ni, NonResident)
 #define NInoClearAttrListNonResident(ni)  clear_nino_al_flag(ni, NonResident)
 
-#define NInoAttrListDirty(ni)		   test_nino_al_flag(ni, Dirty)
-#define NInoAttrListSetDirty(ni)	    set_nino_al_flag(ni, Dirty)
-#define NInoAttrListClearDirty(ni)	  clear_nino_al_flag(ni, Dirty)
+#define NInoAttrListDirty(ni)			    test_nino_al_flag(ni, Dirty)
+#define NInoAttrListSetDirty(ni)		     set_nino_al_flag(ni, Dirty)
+#define NInoAttrListClearDirty(ni)		   clear_nino_al_flag(ni, Dirty)
+#define NInoAttrListTestAndSetDirty(ni)	    test_and_set_nino_al_flag(ni, Dirty)
+#define NInoAttrListTestAndClearDirty(ni) test_and_clear_nino_al_flag(ni, Dirty)
 
 /*
  * The NTFS in-memory inode structure. It is just used as an extension to the
