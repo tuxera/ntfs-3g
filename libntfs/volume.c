@@ -1135,15 +1135,15 @@ int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags)
  * @vol:	ntfs volume whose version we're interested in.
  *
  * The function checks if the NTFS volume version is known or not.
- * Version 1.1 and 1.2 are used by Windows NT4.
- * Version 2.x is used by Windows 2000 Beta's
+ * Version 1.1 and 1.2 are used by Windows NT3.x and NT4.
+ * Version 2.x is used by Windows 2000 Betas.
  * Version 3.0 is used by Windows 2000.
  * Version 3.1 is used by Windows XP and Windows Server 2003.
  *
  * Return 0 if NTFS version is supported otherwise -1 with errno set.
  *
  * The following error codes are defined:
- *	ENOTSUP   Unknown NTFS versions
+ *	ENOTSUP   Unknown NTFS version
  *	EINVAL	  Invalid argument
  */
 int ntfs_version_is_supported(ntfs_volume *vol)
