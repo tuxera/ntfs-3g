@@ -3617,8 +3617,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				goto rollback;
 			}
 			m = ni->mrec;
-			/* Clean directory flag. */
-			m->flags &= ~MFT_RECORD_IS_DIRECTORY;
 			/*
 			 * If mapping size exceed avaible space, set them to
 			 * possible maximum.
