@@ -74,3 +74,5 @@ INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
 EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 
+libs:	$(lib_LTLIBRARIES)
+

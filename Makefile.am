@@ -21,3 +21,6 @@ extra:	extras
 extras:
 	$(MAKE) -C ntfsprogs extras
 
+libs:
+	$(MAKE) -C libntfs libs
+
