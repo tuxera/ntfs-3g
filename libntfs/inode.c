@@ -836,6 +836,22 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
 
+	/* Validate attribute type. */
+	if (!ntfs_attr_find_in_attrdef(ni->vol, type)) {
+		if (errno == ENOENT) {
+			Dprintf("%s(): Invalid attribute type.\n",
+					__FUNCTION__);
+			errno = EINVAL;
+			return NULL;
+		} else {
+			err = errno;
+			Dprintf("%s(): ntfs_attr_find_in_attrdef failed.\n",
+					__FUNCTION__);
+			errno = err;
+			return NULL;
+		}
+	}
+
 	/*
 	 * Determine resident or not will be new attribute. We add 8 to size in 
 	 * non resident case for mapping pairs.
