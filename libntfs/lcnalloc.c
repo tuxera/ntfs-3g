@@ -35,17 +35,61 @@
  * @vol:	mounted ntfs volume on which to allocate the clusters
  * @count:	number of clusters to allocate
  * @start_lcn:	starting lcn at which to allocate the clusters (or -1 if none)
+ * @zone:	zone from which to allocate the clusters
  *
- * Allocate @count clusters starting at cluster @start_lcn or at the current
- * allocator position if @start_lcn is -1, from the mounted ntfs volume @vol.
+ * Allocate @count clusters preferably starting at cluster @start_lcn or at the
+ * current allocator position if @start_lcn is -1, on the mounted ntfs volume
+ * @vol. @zone is either DATA_ZONE for allocation of normal clusters and
+ * MFT_ZONE for allocation of clusters for the master file table, i.e. the
+ * $MFT/$DATA attribute.
  *
  * On success return a runlist describing the allocated cluster(s).
  *
  * On error return NULL with errno set to the error code.
+ *
+ * Notes on the allocation algorithm
+ * =================================
+ *
+ * There are two data zones. First is the area between the end of the mft zone
+ * and the end of the volume, and second is the area between the start of the
+ * volume and the start of the mft zone. On unmodified/standard volumes, the
+ * second mft zone doesn't exist due to the mft zone being expanded to cover
+ * the start of the volume in order to reserve space for the mft bitmap
+ * attribute.
+ *
+ * This is not the prettiest function but the complexity stems from the need of
+ * implementing the mft vs data zoned approach and from the fact that we have
+ * access to the lcn bitmap in portions of up to 8192 bytes at a time, so we
+ * need to cope with crossing over boundaries of two buffers. Further, the fact
+ * that the allocator allows for caller supplied hints as to the location of
+ * where allocation should begin and the fact that the allocator keeps track of
+ * where in the data zones the next natural allocation should occur, contribute
+ * to the complexity of the function. But it should all be worthwhile, because
+ * this allocator should: 1) be a full implementation of the MFT zone approach
+ * used by Windows, 2) cause reduction in fragmentation as much as possible,
+ * and 3) be speedy in allocations (the code is not optimized for speed, but
+ * the algorithm is, so further speed improvements are probably possible).
+ *
+ * FIXME: We should be monitoring cluster allocation and increment the MFT zone
+ * size dynamically but this is something for the future. We will just cause
+ * heavier fragmentation by not doing it and I am not even sure Windows would
+ * grow the MFT zone dynamically, so it might even be correct not to do this.
+ * The overhead in doing dynamic MFT zone expansion would be very large and
+ * unlikely worth the effort. (AIA)
+ *
+ * TODO: I have added in double the required zone position pointer wrap around
+ * logic which can be optimized to having only one of the two logic sets.
+ * However, having the double logic will work fine, but if we have only one of
+ * the sets and we get it wrong somewhere, then we get into trouble, so
+ * removing the duplicate logic requires _very_ careful consideration of _all_
+ * possible code paths. So at least for now, I am leaving the double logic -
+ * better safe than sorry... (AIA)
  */
-runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn)
+runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
+		const NTFS_CLUSTER_ALLOCATION_ZONES zone)
 {
-	if (!vol || count < 0 || start_lcn < 0 || !vol->lcnbmp_na) {
+	if (!vol || count < 0 || start_lcn < 0 || !vol->lcnbmp_na ||
+			zone < FIRST_ZONE || zone > LAST_ZONE) {
 		errno = EINVAL;
 		return NULL;
 	}
