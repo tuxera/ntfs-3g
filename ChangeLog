@@ -1,4 +1,4 @@
-xx/xx/2004 - 1.9.2-WIP
+11/05/2004 - 1.9.2 - Decomrpession bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
 	  config.h.in sledge hammers.  (Anton)
 	- Fix the incorrect ntfsclone usage example in the man page.  (Szaka)
@@ -24,6 +24,17 @@ xx/xx/2004 - 1.9.2-WIP
 	  mbsrtowcs() on Cygwin.  (Lode, Christophe, Anton)
 	- Add SetFilePointerEx() emulation to win32_io.c.  (Lode)
 	- Add inode selection by path/filename to ntfsinfo.  (Yuval)
+	- Fix a bug where we would not always detect that we have reached the
+	  end of a compression block because we were ending at minus one byte
+	  which is effectively the same as being at the end.  The fix is to
+	  check whether the uncompressed buffer has been fully filled and if so
+	  we assume we have reached the end of the compression block.  A big
+	  thank you to Marcin Gibu≈Ça for the bug report, the assistance in
+	  tracking down the bug and testing the fix.  (Anton)
+	- Fix a bug where we forgot to reset the data_size and initialized_size
+	  in two error code paths in ntfs_compressed_attr_pread().  (Anton)
+	- Fix a bug where an uncompressed block could be misdetected as a
+	  compressed one if it was made up of multiple runs.  (Anton)
 
 05/04/2004 - 1.9.1 - Make mkntfs create bootable volumes and fixes/updates.
 	- Update with SuSE 9.1 beta 1 versions of GNU build system.
@@ -136,8 +147,8 @@ xx/xx/2004 - 1.9.2-WIP
 	  arguments to typecast the arguments to (unsigned) long long to avoid
 	  the warnings when compiling on 64 bit architectures.
 	- Use AC_GNU_SOURCE in configure.ac instead of doing it manually.
-	- Fix lots of typos in the documentation.  (David MartÌnez Moreno)
-	- Update config.sub and config.guess to latest ones.  (David MartÌnez
+	- Fix lots of typos in the documentation.  (David Mart√≠nez Moreno)
+	- Update config.sub and config.guess to latest ones.  (David Mart√≠nez
 	  Moreno)
 	- Change Linux-NTFS to ntfsprogs everywhere when talking about the
 	  package rather than the project (especially man pages affected).
@@ -550,7 +561,7 @@ xx/xx/2004 - 1.9.2-WIP
 	Minor updates/clarifications to include/layout.h.
 
 02/08/2001 - 1.2.1 - Added ntfsfix man page and minor cleanup.
-	David MartÌnez Moreno <david.martinez@rediris.es> donated a man page
+	David Mart√≠nez Moreno <david.martinez@rediris.es> donated a man page
 	for ntfsfix as well as spelling mistake fixes all over the place.
 
 26/07/2001 - 1.2.0 - Important bug fixes to mkntfs.
