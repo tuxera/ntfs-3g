@@ -2753,7 +2753,7 @@ static void mkntfs_override_phys_params(void)
 		err_exit("volume_size is not a multiple of sector_size.\n");
 	/* Validate volume size. */
 	if (opts.volume_size < 1 << 20 /* 1MiB */)
-		err_exit("Device is too small (%ikiB). Minimum NTFS volume "
+		err_exit("Device is too small (%llikiB). Minimum NTFS volume "
 			 "size is 1MiB.\n", opts.volume_size / 1024);
 	Dprintf("volume size = %llikiB\n", opts.volume_size / 1024);
 	/* If user didn't specify the cluster size, determine it now. */
@@ -2793,7 +2793,7 @@ static void mkntfs_override_phys_params(void)
 			 "to fit inside eight bits. (We do not support larger "
 			 "cluster sizes yet.)\n");
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
-	Dprintf("cluster size = %i bytes\n", vol->cluster_size);
+	Dprintf("cluster size = %u bytes\n", (unsigned int)vol->cluster_size);
 	if (vol->cluster_size > 4096) {
 		if (opts.enable_compression) {
 			if (!opts.force)
@@ -2926,7 +2926,7 @@ static void mkntfs_initialize_rl_mft(void)
 			opts.mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
 					vol->cluster_size;
 	}
-	Dprintf("$MFT logical cluster number = 0x%x\n", opts.mft_lcn);
+	Dprintf("$MFT logical cluster number = 0x%llx\n", opts.mft_lcn);
 	/* Determine MFT zone size. */
 	opts.mft_zone_end = opts.nr_clusters;
 	switch (opts.mft_zone_multiplier) {  /* % of volume size in clusters */
@@ -2944,7 +2944,7 @@ static void mkntfs_initialize_rl_mft(void)
 		opts.mft_zone_end = opts.mft_zone_end >> 3;	/* 12.5% */
 		break;
 	}
-	Dprintf("MFT zone size = %lukiB\n", opts.mft_zone_end / 1024);
+	Dprintf("MFT zone size = %lldkiB\n", opts.mft_zone_end / 1024);
 	/*
 	 * The mft zone begins with the mft data attribute, not at the beginning
 	 * of the device.
@@ -2968,7 +2968,7 @@ static void mkntfs_initialize_rl_mft(void)
 	/* Determine mftmirr_lcn (middle of volume). */
 	opts.mftmirr_lcn = (opts.nr_sectors * opts.sector_size >> 1)
 							/ vol->cluster_size;
-	Dprintf("$MFTMirr logical cluster number = 0x%x\n", opts.mftmirr_lcn);
+	Dprintf("$MFTMirr logical cluster number = 0x%llx\n", opts.mftmirr_lcn);
 	/* Create runlist for mft mirror. */
 	rl_mftmirr = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mftmirr)
@@ -2991,7 +2991,7 @@ static void mkntfs_initialize_rl_mft(void)
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, opts.mftmirr_lcn + i, 1);
 	opts.logfile_lcn = opts.mftmirr_lcn + j;
-	Dprintf("$LogFile logical cluster number = 0x%x\n", opts.logfile_lcn);
+	Dprintf("$LogFile logical cluster number = 0x%llx\n", opts.logfile_lcn);
 }
 
 /**

@@ -225,8 +225,8 @@ int main(int argc, char **argv)
 					"file data: %s", strerror(errno));
 		fd = open(argv[2], O_RDONLY);
 		if (fd == -1)
-			log_err_exit("Failed to open file %s: %s\n", argv[2],
-					strerror(errno));
+			log_err_exit(NULL, "Failed to open file %s: %s\n",
+					argv[2], strerror(errno));
 		/* Read in the file into the buffer. */
 		br = read(fd, buf, buf_size);
 		err = errno;
