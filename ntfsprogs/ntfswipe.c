@@ -414,14 +414,11 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 						enum action act, ntfs_attr *na)
 {
 	unsigned char *buf;
-	s64 size;
-	u64 offset;
+	s64 size, offset, ret, wiped = 0;
 	u16 block_size;
-	s64 ret;
-	u64 wiped = 0;
 	VCN cur_vcn = 0;
 	runlist *rlc = na->rl;
-	u64 cu_mask = na->compression_block_clusters - 1;
+	s64 cu_mask = na->compression_block_clusters - 1;
 		
 	while (rlc->length) {
 		cur_vcn += rlc->length;
@@ -805,7 +802,8 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 	buf = malloc (indx_record_size);
 	if (!buf) {
 		Vprintf ("malloc failed\n");
-		Eprintf ("Couldn't allocate %d bytes", indx_record_size);
+		Eprintf ("Couldn't allocate %u bytes",
+				(unsigned int)indx_record_size);
 		total = -1;
 		goto free_bitmap;
 	}
