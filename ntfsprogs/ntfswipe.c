@@ -707,37 +707,26 @@ void print_summary (void)
  */
 int main (int argc, char *argv[])
 {
-	const char *locale;
 	ntfs_volume *vol;
 	int result = 1;
 	int flags = 0;
 	int i, j;
 	enum action act = act_info;
 
-	locale = setlocale (LC_ALL, "");
-	if (!locale) {
-		locale = setlocale (LC_ALL, NULL);
-		Vprintf ("Failed to set locale, using default '%s'.\n", locale);
-	} else {
-		Vprintf ("Using locale '%s'.\n", locale);
-	}
+	utils_set_locale();
 
 	if (!parse_options (argc, argv))
 		return 1;
-
-	if (!valid_device (opts.device, opts.force))
-		goto free;
 
 	if (!opts.info)
 		print_summary();
 
 	if (opts.info || opts.noaction)
 		flags = MS_RDONLY;
-	vol = ntfs_mount (opts.device, flags);
-	if (!vol) {
-		Eprintf ("Couldn't mount device '%s': %s\n", opts.device, strerror (errno));
+
+	vol = utils_mount_volume (opts.device, flags, opts.force);
+	if (!vol)
 		goto free;
-	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
 		Iprintf ("Volume is dirty.\n");
