@@ -63,7 +63,7 @@ static __inline__ void ntfs_rl_mc(runlist_element *dstbase, int dst,
 /**
  * Internal:
  *
- * ntfs_rl_realloc - Reallocate memory for runlists*
+ * ntfs_rl_realloc - Reallocate memory for runlists
  * @rl:		original runlist
  * @old_size:	number of runlist elements in the original runlist @rl
  * @new_size:	number of runlist elements we need space for
@@ -268,7 +268,8 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	/* disc => Discontinuity between the end of @dst and the start of @src.
 	 *	   This means we might need to insert a hole.
 	 * hole => @dst ends with a hole or an unmapped region which we can
-	 *	   extend to match the discontinuity. */
+	 *	   extend to match the discontinuity.
+	 */
 	if (loc == 0)
 		disc = (src[0].vcn > 0);
 	else {
@@ -286,7 +287,8 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	}
 
 	/* Space required: @dst size + @src size, less one if we merged, plus
-	 * one if there was a discontinuity, less one for a trailing hole. */
+	 * one if there was a discontinuity, less one for a trailing hole.
+	 */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left + disc - hole);
 	if (!dst)
 		return dst;
@@ -378,7 +380,8 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 		left = ntfs_rl_are_mergeable(dst + loc - 1, src);
 
 	/* Allocate some space. We'll need less if the left, right, or both
-	 * ends were merged. */
+	 * ends were merged.
+	 */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left - right);
 	if (!dst)
 		return dst;
@@ -649,7 +652,8 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 				/* Add an unmapped runlist element. */
 				if (!slots) {
 					/* FIXME/TODO: We need to have the
-					 * extra memory already! (AIA) */
+					 * extra memory already! (AIA)
+					 */
 					drl = ntfs_rl_realloc(drl, ds, ds + 2);
 					if (!drl)
 						goto critical_error;
@@ -669,7 +673,8 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			ds++;
 			if (!slots) {
 				/* FIXME/TODO: We need to have the extra
-				 * memory already! (AIA) */
+				 * memory already! (AIA)
+				 */
 				drl = ntfs_rl_realloc(drl, ds, ds + 1);
 				if (!drl)
 					goto critical_error;
