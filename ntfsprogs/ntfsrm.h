@@ -52,6 +52,7 @@ struct options {
  * a cache for either dir/$BITMAP, $MFT/$BITMAP or $Bitmap/$DATA
  */
 struct ntfs_bmp {
+	ntfs_volume	 *vol;
 	ntfs_attr	 *attr;
 	int		  count;
 	u8		**data;
@@ -94,7 +95,6 @@ struct ntfs_dir {
 	ntfs_attr	  *iroot;
 	ntfs_attr	  *ialloc;
 	int                index_size;
-	u8		   padding[4];	/* Unused: padding to 64 bit. */
 };
 
 /**
@@ -119,6 +119,7 @@ struct ntfs_find {
 #define END	"[0m"
 
 #define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
+#define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
 #define ATTR_SIZE(s) ROUND_UP(s,8)
 
 #endif /* _NTFSRM_H_ */
