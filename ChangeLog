@@ -1,8 +1,8 @@
-03/09/2004 - 1.9.4 - Urgent bug fixes.
-	- Rewrite win32_io.c to allow device level write support (Yuval)
-	- Make ntfscp update file size in $FILE_NAME(0x30) attribute (Yura)
+04/09/2004 - 1.9.4 - Urgent bug fixes.
+	- Rewrite win32_io.c to allow device level write support.  (Yuval)
+	- Make ntfscp update file size in $FILE_NAME(0x30) attribute.  (Yura)
 	- Fix ntfsclone crash when --restore-image was used for block device
-	  outputs (Masaru Kawashima, Szaka)
+	  outputs.  (Masaru Kawashima, Szaka)
 	
 03/09/2004 - 1.9.3 - Lots of fixes and enhancements all over the place.
 
