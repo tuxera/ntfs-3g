@@ -40,7 +40,10 @@
 #include "device.h"
 
 #if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
-#	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
+#define BLKGETSIZE _IO(0x12,96) /* Get device size in 512-byte blocks. */
+#endif
+#if defined(linux) && defined(_IOR) && !defined(BLKGETSIZE64)
+#define BLKGETSIZE64 _IOR(0x12,114,sizeof(u64)) /* Get device size in bytes. */
 #endif
 
 /**
@@ -453,20 +456,32 @@ static inline int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
 s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 {
 	s64 high, low;
-#ifdef BLKGETSIZE
-	unsigned long size;
+#ifdef BLKGETSIZE64
+	{	u64 size;
 
-	if (dev->d_ops->ioctl(dev, BLKGETSIZE, &size) >= 0) {
-		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
-				size);
-		return (s64)size * 512 / block_size;
+		if (dev->d_ops->ioctl(dev, BLKGETSIZE64, &size) >= 0) {
+			Dprintf("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
+					(unsigned long long)size,
+					(unsigned long long)size);
+			return (s64)size / block_size;
+		}
+	}
+#endif
+#ifdef BLKGETSIZE
+	{	unsigned long size;
+
+		if (dev->d_ops->ioctl(dev, BLKGETSIZE, &size) >= 0) {
+			Dprintf("BLKGETSIZE nr 512 byte blocks = %lu "
+					"(0x%lx)\n", size, size);
+			return (s64)size * 512 / block_size;
+		}
 	}
 #endif
 #ifdef FDGETPRM
 	{       struct floppy_struct this_floppy;
 
 		if (dev->d_ops->ioctl(dev, FDGETPRM, &this_floppy) >= 0) {
-			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
+			Dprintf("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
 					this_floppy.size, this_floppy.size);
 			return (s64)this_floppy.size * 512 / block_size;
 		}

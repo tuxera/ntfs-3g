@@ -902,20 +902,32 @@ static int device_offset_valid(int fd, s64 ofs)
 static s64 device_size_get(int fd)
 {
 	s64 high, low;
-#ifdef BLKGETSIZE
-	unsigned long size;
+#ifdef BLKGETSIZE64
+	{	u64 size;
 
-	if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
-		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
-				size);
-		return (s64)size * 512;
+		if (ioctl(fd, BLKGETSIZE64, &size) >= 0) {
+			Dprintf("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
+					(unsigned long long)size,
+					(unsigned long long)size);
+			return (s64)size / block_size;
+		}
+	}
+#endif
+#ifdef BLKGETSIZE
+	{	unsigned long size;
+
+		if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
+			Dprintf("BLKGETSIZE nr 512 byte blocks = %lu "
+					"(0x%lx)\n", size, size);
+			return (s64)size * 512;
+		}
 	}
 #endif
 #ifdef FDGETPRM
 	{       struct floppy_struct this_floppy;
 
 		if (ioctl(fd, FDGETPRM, &this_floppy) >= 0) {
-			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
+			Dprintf("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
 					this_floppy.size, this_floppy.size);
 			return (s64)this_floppy.size * 512;
 		}
