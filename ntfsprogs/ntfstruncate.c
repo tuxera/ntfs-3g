@@ -1,4 +1,4 @@
-/*
+/**
  * ntfstruncate - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2003 Anton Altaparmakov
@@ -100,21 +100,12 @@ GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
+void usage(void) __attribute__ ((noreturn));
 
-/* Error output and terminate. Ignores quiet (-q). */
-void err_exit(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	fprintf(stderr, "Aborting...\n");
-	exit(1);
-}
-
-/* Debugging output (-vv). Overriden by quiet (-q). */
+/**
+ * Dprintf
+ * Debugging output (-vv). Overriden by quiet (-q).
+ */
 void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -125,6 +116,167 @@ void Dprintf(const char *fmt, ...)
 		vprintf(fmt, ap);
 		va_end(ap);
 	}
+}
+
+/**
+ * version - Print version information about the program
+ *
+ * Print a copyright statement and a brief description of the program.
+ *
+ * Return:  none
+ */
+void version (void)
+{
+	printf ("\n%s v%s - Truncate a specified attribute of a specified inode.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002-2003 Anton Altaparmakov\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+/**
+ * usage - Print a list of the parameters to the program
+ *
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
+ */
+void usage (void)
+{
+	printf ("\nUsage: %s [options] device [attr-type [attr-name]] new-length\n"
+	       "    If attr-type is not specified, 0x80 (i.e. $DATA) is assumed.\n"
+	       "    If attr-name is not specified, an unnamed attribute is assumed.\n"
+	       "\n"
+	       "    -n    Do not write to disk\n"
+	       "    -f    Use less caution\n"
+	       "    -q    Less output\n"
+	       "    -v    More output\n"
+	       "    -V    Display version information\n"
+	       "    -h    Display this help\n\n",
+	       EXEC_NAME);
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	exit (1);
+}
+
+/**
+ * parse_options
+ */
+void parse_options(int argc, char *argv[])
+{
+	long long ll;
+	char *s, *s2;
+	int c;
+
+	if (argc && *argv)
+		EXEC_NAME = *argv;
+	//fprintf(stderr, "%s v%s -- Copyright (c) 2002-2003 Anton "
+			//"Altaparmakov\n", EXEC_NAME, VERSION);
+	while ((c = getopt(argc, argv, "fh?nqvV")) != EOF)
+		switch (c) {
+		case 'f':
+			opts.force = 1;
+			break;
+		case 'n':
+			opts.no_action = 1;
+			break;
+		case 'q':
+			opts.quiet = 1;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		case 'V':
+			version();
+			exit(0);
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	if (optind == argc)
+		usage();
+
+	/* Get the device. */
+	dev_name = argv[optind++];
+	Dprintf("device name = %s\n", dev_name);
+
+	if (optind == argc)
+		usage();
+
+	/* Get the inode. */
+	ll = strtoll(argv[optind++], &s, 0);
+	if (*s || !ll || (ll >= LLONG_MAX && errno == ERANGE))
+		err_exit("Invalid inode number: %s\n", argv[optind - 1]);
+	inode = ll;
+	Dprintf("inode = %Li\n", (long long)inode);
+
+	if (optind == argc)
+		usage();
+
+	/* Get the attribute type, if specified. */
+	s = argv[optind++];
+	if (optind == argc) {
+		attr_type = AT_DATA;
+		attr_name = AT_UNNAMED;
+		attr_name_len = 0;
+	} else {
+		unsigned long ul;
+
+		ul = strtoul(s, &s2, 0);
+		if (*s2 || !ul || (ul >= ULONG_MAX && errno == ERANGE))
+			err_exit("Invalid attribute type %s: %s\n", s,
+					strerror(errno));
+		attr_type = ul;
+
+		/* Get the attribute name, if specified. */
+		s = argv[optind++];
+		if (optind != argc) {
+			/* Convert the string to little endian Unicode. */
+			attr_name_len = ntfs_mbstoucs(s, &attr_name, 0);
+			if (attr_name_len < 0)
+				err_exit("Invalid attribute name \"%s\": %s\n",
+						s, strerror(errno));
+
+			/* Keep hold of the original string. */
+			s2 = s;
+
+			s = argv[optind++];
+			if (optind != argc)
+				usage();
+		} else {
+			attr_name = AT_UNNAMED;
+			attr_name_len = 0;
+		}
+	}
+	Dprintf("attribute type = 0x%x\n", attr_type);
+	if (attr_name == AT_UNNAMED)
+		Dprintf("attribute name = \"\" (UNNAMED)\n");
+	else
+		Dprintf("attribute name = \"%s\" (length %i Unicode "
+				"characters)\n", s2, attr_name_len);
+
+	/* Get the new length. */
+	ll = strtoll(s, &s2, 0);
+	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
+		err_exit("Invalid new length: %s\n", s);
+	new_len = ll;
+	Dprintf("new length = %Li\n", new_len);
+}
+/* Error output and terminate. Ignores quiet (-q). */
+
+/**
+ * err_exit
+ */
+void err_exit(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "Aborting...\n");
+	exit(1);
 }
 
 /**
@@ -156,6 +308,9 @@ int ucstos(char *dest, const uchar_t *src, int maxlen)
 	return i;
 }
 
+/**
+ * dump_resident_attr_val
+ */
 void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 {
 	const char *don_t_know = "Don't know what to do with this attribute "
@@ -300,6 +455,9 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	}
 }
 
+/**
+ * dump_resident_attr
+ */
 void dump_resident_attr(ATTR_RECORD *a)
 {
 	int i;
@@ -320,12 +478,18 @@ void dump_resident_attr(ATTR_RECORD *a)
 			le32_to_cpu(a->value_length));
 }
 
+/**
+ * dump_mapping_pairs_array
+ */
 void dump_mapping_pairs_array(char *b, unsigned int max_len)
 {
 	// TODO
 	return;
 }
 
+/**
+ * dump_non_resident_attr
+ */
 void dump_non_resident_attr(ATTR_RECORD *a)
 {
 	s64 l;
@@ -356,6 +520,9 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 	dump_mapping_pairs_array((char*)a + i, le32_to_cpu(a->length) - i);
 }
 
+/**
+ * dump_attr_record
+ */
 void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 {
 	unsigned int u;
@@ -449,6 +616,9 @@ void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	}
 }
 
+/**
+ * dump_mft_record
+ */
 void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
@@ -497,123 +667,9 @@ void dump_mft_record(MFT_RECORD *m)
 	printf("-- End of attributes. --\n");
 }
 
-void usage(void) __attribute__ ((noreturn));
-
-void usage(void)
-{
-	fprintf(stderr, "This utility will truncate a specified attribute "
-			"belonging to a specified\ninode, i.e. file or "
-			"directory, to a specified length.\n\n"
-			"Usage: %s [-fhnqvV] device inode [attr-type "
-			"[attr-name]] new-length\n       If "
-			"attr-type is not specified, 0x80 (i.e. $DATA) "
-			"is assumed.\n       If attr-name is not "
-			"specified, an unnamed attribute is assumed.\n",
-			EXEC_NAME);
-	exit(1);
-}
-
-void parse_options(int argc, char *argv[])
-{
-	long long ll;
-	char *s, *s2;
-	int c;
-
-	if (argc && *argv)
-		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s -- Copyright (c) 2002-2003 Anton "
-			"Altaparmakov\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "fhnqvV")) != EOF)
-		switch (c) {
-		case 'f':
-			opts.force = 1;
-			break;
-		case 'n':
-			opts.no_action = 1;
-			break;
-		case 'q':
-			opts.quiet = 1;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
-		case 'V':
-			/* Version number already printed, so just exit. */
-			exit(0);
-		case 'h':
-		default:
-			usage();
-		}
-	if (optind == argc)
-		usage();
-
-	/* Get the device. */
-	dev_name = argv[optind++];
-	Dprintf("device name = %s\n", dev_name);
-
-	if (optind == argc)
-		usage();
-
-	/* Get the inode. */
-	ll = strtoll(argv[optind++], &s, 0);
-	if (*s || !ll || (ll >= LLONG_MAX && errno == ERANGE))
-		err_exit("Invalid inode number: %s\n", argv[optind - 1]);
-	inode = ll;
-	Dprintf("inode = %Li\n", (long long)inode);
-
-	if (optind == argc)
-		usage();
-
-	/* Get the attribute type, if specified. */
-	s = argv[optind++];
-	if (optind == argc) {
-		attr_type = AT_DATA;
-		attr_name = AT_UNNAMED;
-		attr_name_len = 0;
-	} else {
-		unsigned long ul;
-
-		ul = strtoul(s, &s2, 0);
-		if (*s2 || !ul || (ul >= ULONG_MAX && errno == ERANGE))
-			err_exit("Invalid attribute type %s: %s\n", s,
-					strerror(errno));
-		attr_type = ul;
-
-		/* Get the attribute name, if specified. */
-		s = argv[optind++];
-		if (optind != argc) {
-			/* Convert the string to little endian Unicode. */
-			attr_name_len = ntfs_mbstoucs(s, &attr_name, 0);
-			if (attr_name_len < 0)
-				err_exit("Invalid attribute name \"%s\": %s\n",
-						s, strerror(errno));
-
-			/* Keep hold of the original string. */
-			s2 = s;
-
-			s = argv[optind++];
-			if (optind != argc)
-				usage();
-		} else {
-			attr_name = AT_UNNAMED;
-			attr_name_len = 0;
-		}
-	}
-	Dprintf("attribute type = 0x%x\n", attr_type);
-	if (attr_name == AT_UNNAMED)
-		Dprintf("attribute name = \"\" (UNNAMED)\n");
-	else
-		Dprintf("attribute name = \"%s\" (length %i Unicode "
-				"characters)\n", s2, attr_name_len);
-
-	/* Get the new length. */
-	ll = strtoll(s, &s2, 0);
-	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
-		err_exit("Invalid new length: %s\n", s);
-	new_len = ll;
-	Dprintf("new length = %Li\n", new_len);
-}
-
+/**
+ * ntfstruncate_exit
+ */
 void ntfstruncate_exit(void)
 {
 	int err;
@@ -644,6 +700,9 @@ void ntfstruncate_exit(void)
 		free(attr_name);
 }
 
+/**
+ * main
+ */
 int main(int argc, char **argv)
 {
 	unsigned long mnt_flags, ul;
@@ -660,6 +719,8 @@ int main(int argc, char **argv)
 
 	/* Parse command line options. */
 	parse_options(argc, argv);
+
+	utils_set_locale();
 
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(dev_name, &mnt_flags))
