@@ -88,7 +88,7 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 	bit = count & 7;
 	do {
 		/* If there is a last partial byte... */
-		if (bit) {
+		if (count > 0 && bit) {
 			lastbyte_pos = ((count + 7) >> 3) + firstbyte;
 			if (!lastbyte_pos) {
 				// FIXME: Eeek! BUG!
@@ -128,7 +128,7 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 		/* Write the prepared buffer to disk. */
 		tmp = (start_bit >> 3) - firstbyte;
 		br = ntfs_attr_pwrite(na, tmp, bufsize, buf);
-		if (br != tmp) {
+		if (br != bufsize) {
 			// FIXME: Eeek! We need rollback! (AIA)
 			fprintf(stderr, "%s(): Eeek! Failed to write buffer "
 					"to bitmap. Leaving inconsistent "
@@ -142,8 +142,8 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 		firstbyte = 0;
 		start_bit += tmp;
 		count -= tmp;
-		if (bufsize > (count + 7) >> 3)
-			bufsize = (count + 7) >> 3;
+		if (bufsize > (tmp = (count + 7) >> 3))
+			bufsize = tmp;
 
 		if (lastbyte && count != 0) {
 			// FIXME: Eeek! BUG!
