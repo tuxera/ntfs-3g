@@ -35,6 +35,7 @@
 #include "layout.h"
 #include "inode.h"
 #include "runlist.h"
+#include "lcnalloc.h"
 
 uchar_t AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -1604,7 +1605,7 @@ find_attr_list_attr:
 				(char*)next_al_entry + le16_to_cpu(
 					next_al_entry->length) <= al_end    &&
 				sle64_to_cpu(next_al_entry->lowest_vcn) <=
-					sle64_to_cpu(lowest_vcn)	    &&
+					lowest_vcn			    &&
 				next_al_entry->type == al_entry->type	    &&
 				next_al_entry->name_length == al_name_len   &&
 				ntfs_names_are_equal((uchar_t*)((char*)
@@ -1727,7 +1728,7 @@ not_found:
 	 * because that would return the first attribute instead of the last
 	 * one. Thus we just change @type to AT_END which causes
 	 * ntfs_attr_find() to seek to the end. We also do the same when an
-	 * attribute extent was searched for (i.e. lowest_vcn != 0), as we
+	 * attribute extent was searched for (i.e. @lowest_vcn != 0), as we
 	 * otherwise rewind the search back to the first extent and we get
 	 * that extent returned twice during a search for all extents.
 	 */
@@ -2038,22 +2039,6 @@ err_out:
 }
 
 /**
- * ntfs_non_resident_attr_shrink - shrink a non-resident, open ntfs attribute
- * @na:		non-resident ntfs attribute to shrink
- * @newsize:	new size (in bytes) to which to shrink the attribute
- *
- * Reduce the size of a non-resident, open ntfs attribute @na to @newsize bytes.
- *
- * On success return 0 and on error return -1 with errno set to the error code.
- * The following error codes are defined:
- *	ENOTSUP	- The desired resize is not implemented yet.
- */
-static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize) {
-	errno = ENOTSUP;
-	return -1;
-}
-
-/**
  * ntfs_resident_attr_value_resize - resize the value of a resident attribute
  * @m:		mft record containing attribute record
  * @a:		attribute record whose value to resize
@@ -2070,6 +2055,10 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize)
 {
 	u32 new_alen, new_muse;
+
+	// FIXME: Should verify that the attribute name hasn't been placed
+	//	  after the attribute value and if it is, we need to move the
+	//	  name, too. (AIA)
 
 	/* Calculate the new attribute length and mft record bytes used. */
 	new_alen = (le32_to_cpu(a->length) - le32_to_cpu(a->value_length) +
@@ -2104,7 +2093,8 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
  * The following error codes are defined:
  *	ENOTSUP	- The desired resize is not implemented yet.
  */
-static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize) {
+static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
+{
 	ntfs_attr_search_ctx *ctx;
 	int err;
 
@@ -2132,6 +2122,222 @@ static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize) {
 	na->allocated_size = na->data_size = na->initialized_size = newsize;
 	if (NAttrCompressed(na) || NAttrSparse(na))
 		na->compressed_size = newsize;
+
+	/*
+	 * Set the inode (and its base inode if it exists) dirty so it is
+	 * written out later.
+	 */
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+
+	ntfs_attr_put_search_ctx(ctx);
+	return 0;
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_non_resident_attr_shrink - shrink a non-resident, open ntfs attribute
+ * @na:		non-resident ntfs attribute to shrink
+ * @newsize:	new size (in bytes) to which to shrink the attribute
+ *
+ * Reduce the size of a non-resident, open ntfs attribute @na to @newsize bytes.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ *	ENOMEM	- Not enough memory to complete operation.
+ */
+static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
+{
+	ntfs_volume *vol;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *a;
+	MFT_RECORD *m;
+	VCN first_free_vcn;
+	s64 nr_freed_clusters;
+	u32 new_alen, new_muse;
+	int err, mp_size;
+
+	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+			(unsigned long long)na->ni->mft_no, na->type);
+
+	vol = na->ni->vol;
+
+	/* Get the first attribute record that needs modification. */
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, newsize >>
+			vol->cluster_size_bits, NULL, 0, ctx)) {
+		err = errno;
+		if (err == ENOENT)
+			err = EIO;
+		goto put_err_out;
+	}
+	a = ctx->attr;
+	m = ctx->mrec;
+
+	// TODO: Check the attribute type and the corresponding minimum size
+	// against @newsize and fail if @newsize is too small! (AIA)
+
+	// When extents/an attribute list is/are present it is very complicated:
+	// TODO: For the current extent:
+	//	TODO: free the required clusters
+	//	FIXME: how do we deal with extents that haven't been loaded yet?
+	//		do we just fault them in first so that the runlist is
+	//		complete and we are done with deallocations in one go?
+	//	TODO: update the run list in na->rl
+	//	TODO: update the sizes, etc in the ntfs attribute structure na
+	//	TODO: update the mapping pairs array
+	//	TODO: mark the inode dirty
+	// TODO: For all subsequent extents:
+	//	TODO: free all clusters specified by the extent (FIXME: unless
+	//		already done above!)
+	//	TODO: completely delete each extent attribute record from its
+	//		mft record
+	//	TODO: free the mft record if there are no attributes left in it
+	//		(to do so update the $MFT/$Bitmap as well as the mft
+	//		 record header in use flag, etc)
+	//	TODO: write the updated mft record to disk
+	//	TODO: remove the extent inode from the list of loaded extent
+	//		inodes in the base inode
+	//	TODO: free all memory associated with the extent inode
+	// TODO: update the attribute list attribute in ni->attr_list, removing
+	//	 all entries corresponding to deleted attributes
+	// TODO: if the attribute list attribute is resident:
+	// 		TODO: update the actual attribute in the base mft
+	// 			record from ni->attr_list
+	//	 if the attribute list attribute is not resident:
+	//		TODO: update the attribute list attribute run list in
+	//			ni->attr_list_rl, freeing any no longer used
+	//			clusters
+	//		TODO: mark the inode attribute list as containing
+	//			dirty data
+	//		TODO: update the mapping pairs array from
+	//			ni->attr_list_rl
+	// TODO: mark the base inode dirty
+
+	// TODO: Implement attribute list support as desribed above. (AIA)
+	if (NInoAttrList(na)) {
+		err = ENOTSUP;
+		goto put_err_out;
+	}
+	// FIXME: We now know that we don't have an attribute list. Thus we
+	//	  are in the base inode only and hence it is all easier, even
+	//	  if we are cheating for now... (AIA)
+
+	// FIXME: When @newsize is zero, should convert the attribute to a
+	//	  resident attribute.
+
+	/* The first cluster outside the new allocation. */
+	first_free_vcn = (newsize + vol->cluster_size - 1) >>
+			vol->cluster_size_bits;
+
+	/* Deallocate all clusters starting with the first free one. */
+	nr_freed_clusters = ntfs_cluster_free(vol, na->rl, first_free_vcn, -1);
+	if (nr_freed_clusters < 0) {
+		err = errno;
+		goto put_err_out;
+	}
+
+	/* Truncate the runlist itself. */
+	if (ntfs_rl_truncate(na->rl, first_free_vcn)) {
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Run list truncation failed. "
+				"Leaving inconsistent metadata!\n",
+				__FUNCTION__);
+		err = errno;
+		goto put_err_out;
+	}
+
+	/* Update the attribute record and the ntfs attribute structure. */
+
+	na->allocated_size = first_free_vcn << vol->cluster_size_bits;
+	a->allocated_size = scpu_to_le64(na->allocated_size);
+
+	na->data_size = newsize;
+	a->data_size = scpu_to_le64(newsize);
+
+	if (newsize < na->initialized_size) {
+		na->initialized_size = newsize;
+		a->initialized_size = scpu_to_le64(newsize);
+	}
+
+	if (NAttrSparse(na)) {
+		na->compressed_size -= nr_freed_clusters <<
+				vol->cluster_size_bits;
+		a->compressed_size = scpu_to_le64(na->compressed_size);
+
+		if (na->compressed_size < 0) {
+			// FIXME: Eeek! BUG!
+			fprintf(stderr, "%s(): Eeek! Compressed size is "
+					"negative. Leaving inconsistent "
+					"metadata!\n", __FUNCTION__);
+			err = EIO;
+			goto put_err_out;
+		}
+	}
+
+	/*
+	 * Reminder: It is ok for a->highest_vcn to be -1 for zero length
+	 * files.
+	 */
+	if (a->highest_vcn)
+		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+
+	/* Get the size for the new mapping pairs array. */
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+	if (mp_size <= 0) {
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Get size for mapping pairs "
+				"failed. Leaving inconsistent metadata!\n",
+				__FUNCTION__);
+		err = errno;
+		goto put_err_out;
+	}
+
+	/*
+	 * Generate the new mapping pairs array directly into the correct
+	 * destination, i.e. the attribute record itself.
+	 */
+	if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
+			a->mapping_pairs_offset), mp_size, na->rl)) {
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Mapping pairs build failed. "
+				"Leaving inconsistent metadata!\n",
+				__FUNCTION__);
+		err = errno;
+		goto put_err_out;
+	}
+
+	// FIXME: Should verify that the attribute name hasn't been placed
+	//	  after the attribute value and if it is, we need to move the
+	//	  name, too. (AIA)
+
+	/* Calculate the new attribute length and mft record bytes used. */
+	new_alen = (le16_to_cpu(a->mapping_pairs_offset) + mp_size + 7) & ~7;
+	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
+			new_alen;
+
+	if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+		// FIXME: Eeek! BUG()
+		fprintf(stderr, "%s(): Eeek! Ran out of space in mft record. "
+				"Leaving inconsistent metadata!\n",
+				__FUNCTION__);
+		err = EIO;
+		goto put_err_out;
+	}
+
+	/* Move the following attributes forward. */
+	memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
+			le32_to_cpu(m->bytes_in_use) - ((u8*)a - (u8*)m) -
+			le32_to_cpu(a->length));
+
+	/* Update the size of the attribute record and the mft record. */
+	a->length = cpu_to_le32(new_alen);
+	m->bytes_in_use = cpu_to_le32(new_muse);
 
 	/*
 	 * Set the inode (and its base inode if it exists) dirty so it is
