@@ -341,6 +341,15 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	na = calloc(sizeof(ntfs_attr), 1);
 	if (!na)
 		return NULL;
+	if (name && name != AT_UNNAMED && name != I30) {
+		name = ntfs_ucsndup(name, name_len);
+		if (!name) {
+			err = errno;
+			free(na);
+			errno = err;
+			return NULL;
+		}
+	}
 	__ntfs_attr_init(na, ni, type, name, name_len);
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
