@@ -2,6 +2,12 @@ xx/xx/2004 - 1.8.6-WIP
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
 	  HAVE_CONFIG_H. (Suggested by Christophe.)
 	- Update doc/CodingStyle.  (Suggested by Szaka.)
+	- Fix mkntfs for large volumes where the number of clusters would
+	  exceed the maximum of 32 bits and mkntfs would segfault.  Now we
+	  increase the cluster size until the number of clusters no longer
+	  exceeds 32 bits or the maximum cluster size is reached.  We then
+	  exit with an appropriate error message.  (Thanks to Szaka for the
+	  bug report.)
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
