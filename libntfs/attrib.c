@@ -2317,16 +2317,16 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	MFT_RECORD *m;
 	int err, offset;
 	ntfs_inode *base_ni;
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, flags 0x%x.\n",
 		 __FUNCTION__, (long long) ni->mft_no, (unsigned) type,
 		(unsigned) flags);
-	
+
 	if (!ni || (!name && name_len)) {
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (ntfs_attr_can_be_resident(ni->vol, type)) {
 		err = errno;
 		if (errno == EPERM)
@@ -2338,7 +2338,8 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		errno = err;
 		return -1;
 	}
-	
+
+	/* Locate place where record shoud be. */
 	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
@@ -2352,6 +2353,10 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		err = EIO;
 		goto put_err_out;
 	}
+	a = ctx->attr;
+	m = ctx->mrec;
+
+	/* Make room for attribute. */
 	length = (0x18 + sizeof(ntfschar) * name_len + 7) & ~7;
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
@@ -2359,8 +2364,8 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 				__FUNCTION__);
 		goto put_err_out;
 	}
-	a = ctx->attr;
-	m = ctx->mrec;
+
+	/* Setup record fields. */
 	offset = ((u8*)a - (u8*)m);
 	a->type = type;
 	a->length = cpu_to_le32(length);
@@ -2372,7 +2377,6 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->value_length = 0;
 	a->value_offset = cpu_to_le16(length);
 	a->resident_flags = 0;
-	
 	if (name_len)
 		memcpy((u8*)a + le16_to_cpu(a->name_offset),
 			name, sizeof(ntfschar) * name_len);
@@ -2428,17 +2432,17 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	MFT_RECORD *m;
 	ntfs_inode *base_ni;
 	int err, offset;
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
 		"dataruns_size %d, flags 0x%x.\n", __FUNCTION__,
 		(long long) ni->mft_no, (unsigned) type, (long long) lowest_vcn,
 		dataruns_size, (unsigned) flags);
-	
+
 	if (!ni || dataruns_size <= 0 || (!name && name_len)) {
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (ntfs_attr_can_be_non_resident(ni->vol, type)) {
 		err = errno;
 		if (errno == EPERM)
@@ -2450,9 +2454,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		errno = err;
 		return -1;
 	}
-	
-	dataruns_size = (dataruns_size + 7) & ~7;
-	
+
+	/* Locate place where record shoud be. */
 	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
@@ -2466,29 +2469,36 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		err = EIO;
 		goto put_err_out;
 	}
-	length = 0x40 + sizeof(ntfschar) * name_len + dataruns_size;
-	if (flags & ATTR_COMPRESSION_MASK)
-		length += 8;
+	a = ctx->attr;
+	m = ctx->mrec;
+
+	/* Make room for attribute. */
+	dataruns_size = (dataruns_size + 7) & ~7;
+	length = offsetof(ATTR_RECORD, compressed_size) + ((sizeof(ntfschar) *
+			name_len + 7) & ~7) + dataruns_size +
+			(flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
+			sizeof(a->compressed_size) : 0;
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
 		Dprintf("%s(): Failed to make room for attribute.\n",
 				__FUNCTION__);
 		goto put_err_out;
 	}
-	a = ctx->attr;
-	m = ctx->mrec;
+
+	/* Setup record fields. */
 	offset = ((u8*)a - (u8*)m);
 	a->type = type;
-	a->length = cpu_to_le32((length + 7) & ~7);
+	a->length = cpu_to_le32(length);
 	a->non_resident = 1;
 	a->name_length = name_len;
-	a->name_offset = cpu_to_le16(length - dataruns_size -
-				sizeof(ntfschar) * name_len);
+	a->name_offset = cpu_to_le16(offsetof(ATTR_RECORD, compressed_size) +
+			(flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
+			sizeof(a->compressed_size) : 0);
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
 	a->lowest_vcn = cpu_to_sle64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
-	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
+	a->compression_unit = (flags & ATTR_IS_COMPRESSED) ? 4 : 0;
 	if (name_len)
 		memcpy((u8*)a + le16_to_cpu(a->name_offset),
 			name, sizeof(ntfschar) * name_len);
@@ -2532,7 +2542,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	ntfs_inode *base_ni, *ni;
 	ATTR_TYPES type;
 	int err;
-	
+
 	if (!ctx || !ctx->ntfs_ino || !ctx->mrec || !ctx->attr) {
 		errno = EINVAL;
 		return -1;
@@ -3523,8 +3533,11 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		 * possible maximum.
 		 */
 		cur_max_mp_size = le32_to_cpu(m->bytes_allocated) -
-				le32_to_cpu(m->bytes_in_use) - 0x40 -
-				sizeof(ntfschar) * na->name_len;
+				le32_to_cpu(m->bytes_in_use) -
+				(offsetof(ATTR_RECORD, compressed_size) +
+				((NAttrCompressed(na) || NAttrSparse(na)) ?
+				sizeof(a->compressed_size) : 0)) -
+				((sizeof(ntfschar) * na->name_len + 7) & ~7);
 		if (mp_size > cur_max_mp_size)
 			mp_size = cur_max_mp_size;
 		/* Add atribute extent to new record. */
@@ -3781,7 +3794,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			Dprintf("%s(): Eeek! ntfs_attr_map_whole_runlist "
 				"failed.\n", __FUNCTION__);
-			goto put_err_out;
+			errno = err;
+			return -1;
 		}
 
 		/*
@@ -3815,7 +3829,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			Dprintf("%s(): Eeek! Cluster allocation "
 					"failed.\n", __FUNCTION__);
-			goto put_err_out;
+			errno = err;
+			return -1;
 		}
 
 		/* Append new clusters to attribute runlist. */
@@ -3827,7 +3842,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					"failed.\n", __FUNCTION__);
 			ntfs_cluster_free_from_rl(vol, rl);
 			free(rl);
-			goto put_err_out;
+			errno = err;
+			return -1;
 		}
 		na->rl = rln;
 
