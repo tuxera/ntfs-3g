@@ -140,7 +140,7 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 	if (!utils_valid_device (device, force))
 		return NULL;
 
-	vol = ntfs_mount (device, MS_RDONLY);
+	vol = ntfs_mount (device, flags);
 	if (!vol) {
 		Eprintf ("Couldn't mount device '%s': %s\n", device, strerror (errno));
 		return NULL;
