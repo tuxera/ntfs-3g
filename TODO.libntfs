@@ -15,22 +15,22 @@
 
 - write attribute resize function (see mkntfs) and implement ntfs_truncate*
 
-- write ntfs_{allocate,free}_cluster(s) (see ntfs 2.4 driver in CVS)
+- write ntfs_cluster(s)_{allocate,free} (see ntfs 2.4 driver in CVS)
 
 - extend ntfs_attr_pwrite to cope with extending the attribute size and with
   instantiating holes
 
-- write ntfs_{allocate,free}_mft_record (see ntfs 2.4 driver in CVS)
+- write ntfs_mft_record_{allocate,free} (see ntfs 2.4 driver in CVS)
 
-- write ntfs_{rm,create,add}_attr()
+- write ntfs_attr_{rm,create,add}()
 
-- write ntfs_{rm_from,add_to,create,rm}_index()
+- write ntfs_index_{rm_from,add_to,create,rm}()
 
 - write ntfs_file_name_{add,rm}_from_mft_record() or _from_ntfs_inode(?)
 
-- write ntfs_unlink_file()
+- write ntfs_file_unlink()
 
-- write ntfs_create_file()
+- write ntfs_file_create()
 
 - write API for conventional high level file access.
 
