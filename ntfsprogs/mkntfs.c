@@ -898,6 +898,7 @@ static void dump_attr_record(ATTR_RECORD *a)
 /**
  * dump_mft_record
  */
+static void dump_mft_record(MFT_RECORD *m) __attribute__((unused));
 static void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
