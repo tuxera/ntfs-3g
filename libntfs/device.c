@@ -43,7 +43,7 @@
 #define BLKGETSIZE _IO(0x12,96) /* Get device size in 512-byte blocks. */
 #endif
 #if defined(linux) && defined(_IOR) && !defined(BLKGETSIZE64)
-#define BLKGETSIZE64 _IOR(0x12,114,sizeof(u64)) /* Get device size in bytes. */
+#define BLKGETSIZE64 _IOR(0x12,114,size_t) /* Get device size in bytes. */
 #endif
 
 /**
