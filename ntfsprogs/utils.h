@@ -1,9 +1,9 @@
 /*
- * utils.c - Part of the Linux-NTFS project.
+ * utils.h - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2002 Richard Russon
  *
- * This utility will recover deleted files from an NTFS volume.
+ * A set of shared functions for ntfs utilities
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

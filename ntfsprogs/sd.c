@@ -1,7 +1,9 @@
 #include "types.h"
 #include "layout.h"
 
-/*
+/**
+ * init_system_file_sd
+ *
  * NTFS 1.2 - System files security decriptors
  * ===========================================
  *

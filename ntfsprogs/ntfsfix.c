@@ -1,4 +1,4 @@
-/*
+/**
  * NtfsFix - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2003 Anton Altaparmakov.
@@ -58,6 +58,9 @@
 #include "disk_io.h"
 #include "logfile.h"
 
+/**
+ * main
+ */
 int main(int argc, char **argv)
 {
 	s64 l, br;

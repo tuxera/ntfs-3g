@@ -1,8 +1,8 @@
 /**
  * upcase - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001 Richard Russon <ntfs@flatcap.org>
- * Copyright (c) 2001-2002 Anton Altaparmakov <aia21@cantab.net>
+ * Copyright (c) 2001 Richard Russon
+ * Copyright (c) 2001-2002 Anton Altaparmakov
  *
  * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
  *
@@ -26,6 +26,9 @@
 
 #include "types.h"
 
+/**
+ * init_upcase_table
+ */
 void init_upcase_table(uchar_t *uc, u32 uc_len)
 {
 	static int uc_run_table[][3] = { /* Start, End, Add */

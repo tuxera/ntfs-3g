@@ -1,6 +1,4 @@
-const char *EXEC_NAME = "NtfsDump_LogFile";
-const char *EXEC_VERSION = "1.0";
-/*
+/**
  * NtfsDump_LogFile - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov
@@ -8,8 +6,6 @@ const char *EXEC_VERSION = "1.0";
  * This utility will interpret the contents of the journal ($LogFile) of an
  * NTFS partition and display the results on stdout. Errors will be output to
  * stderr.
- *
- *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -56,6 +52,12 @@ const char *EXEC_VERSION = "1.0";
 #include "logfile.h"
 #include "mst.h"
 
+const char *EXEC_NAME = "NtfsDump_LogFile";
+const char *EXEC_VERSION = "1.0";
+
+/**
+ * main
+ */
 int main(int argc, char **argv)
 {
 	MFT_RECORD *m = NULL;

@@ -1,7 +1,7 @@
 /*
  * ntfscluster - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2002 Richard Russon
  *
  * This utility will XXX
  *
