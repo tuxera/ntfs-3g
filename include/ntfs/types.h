@@ -60,6 +60,11 @@ typedef s64 LCN;
 typedef s64 LSN;
 
 /*
+ * Cygwin has a collusion between our BOOL and <windef.h>'s
+ * As long as this file will be included after <windows.h> were fine.
+ */
+#ifndef _WINDEF_H
+/*
  * These are just to make the code more readable...
  */
 typedef enum {
@@ -70,6 +75,7 @@ typedef enum {
 	YES = 1,
 	ONE = 1,
 } BOOL;
+#endif /* defined _WINDEF_H */
 
 typedef enum {
 	CASE_SENSITIVE = 0,
