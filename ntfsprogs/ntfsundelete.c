@@ -223,6 +223,7 @@ static void usage (void)
 		"    -o file     --output file      Save with this filename\n"
 		"    -d dir      --destination dir  Destination directory\n"
 		"    -b num      --byte num         Fill missing parts with this byte\n"
+		"    -T          --truncate         Truncate 100%% recoverable file to exact size.\n"
 		"\n"
 		"    -c range    --copy range       Write a range of MFT records to a file\n"
 		"\n"
@@ -389,7 +390,7 @@ static int parse_time (const char *value, time_t *since)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fh?m:o:p:sS:t:u:qvV";
+	static const char *sopt = "-b:Cc:d:fh?m:o:p:sS:t:Tu:qvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
@@ -403,6 +404,7 @@ static int parse_options (int argc, char *argv[])
 		{ "scan",	 no_argument,		NULL, 's' },
 		{ "size",	 required_argument,	NULL, 'S' },
 		{ "time",	 required_argument,	NULL, 't' },
+		{ "truncate",	 no_argument,		NULL, 'T' },
 		{ "undelete",	 required_argument,	NULL, 'u' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
@@ -518,6 +520,9 @@ static int parse_options (int argc, char *argv[])
 			    err++;
 			}
 			break;
+		case 'T':
+			opts.truncate++;
+			break;
 		case 'u':
 			if (opts.mode == MODE_NONE)
 			{
@@ -568,7 +573,7 @@ static int parse_options (int argc, char *argv[])
 
 		switch (opts.mode) {
 		case MODE_SCAN:
-			if (opts.output || opts.dest ||
+			if (opts.output || opts.dest || opts.truncate ||
 					(opts.fillbyte != (char)-1)) {
 				Eprintf ("Scan can only be used with --percent, "
 					"--match, --ignore-case, --size and --time.\n");
@@ -583,16 +588,16 @@ static int parse_options (int argc, char *argv[])
 			if ((opts.percent != -1) || opts.match || opts.match_case ||
 			    (opts.size_begin > 0) || (opts.size_end > 0)) {
 				Eprintf ("Undelete can only be used with "
-					"--output, --destination and --byte.\n");
+					"--output, --destination, --byte and --truncate.\n");
 				err++;
 			}
 			break;
 		case MODE_COPY:
-			if ((opts.fillbyte != (char)-1) ||
-					(opts.percent != -1) ||
-					opts.match || opts.match_case ||
-					(opts.size_begin > 0) ||
-					(opts.size_end > 0)) {
+			if ((opts.fillbyte != (char)-1) || opts.truncate ||
+			    (opts.percent != -1) ||
+			    opts.match || opts.match_case ||
+			    (opts.size_begin > 0) ||
+			    (opts.size_end > 0)) {
 				Eprintf ("Copy can only be used with --output and --destination.\n");
 				err++;
 			}
@@ -1522,6 +1527,7 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 	long long k;
 	int result = 0;
 	char *name;
+	long long cluster_count;	/* I'll need this variable (see below). +mabs */
 
 	if (!vol)
 		return 0;
@@ -1537,6 +1543,20 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 	if (!buffer)
 		goto free;
 
+	if (file->mft->flags & MFT_RECORD_IN_USE) {		/* These two statement blocks were         */
+		Eprintf ("Record is in use by the mft\n");	/* relocated from below because            */
+		if (!opts.force) {				/* calc_percentage() must be called        */
+			free_file (file);			/* before dump_record() or list_record().  */
+			return 0;				/* Otherwise, when undeleting, a file      */
+		}						/* will always be listed as 0% recoverable */
+		Vprintf ("Forced to continue.\n");		/* even if successfully undeleted.   +mabs */
+	}
+
+	if (calc_percentage (file, vol) == 0) {
+		Qprintf ("File has no recoverable data.\n");
+		goto free;
+	}
+
 	if (opts.verbose) {
 		dump_record (file);
 	} else {
@@ -1544,20 +1564,6 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 		Qprintf ("---------------------------------------------------------------\n");
 		list_record (file);
 		Qprintf ("\n");
-	}
-
-	if (file->mft->flags & MFT_RECORD_IN_USE) {
-		Eprintf ("Record is in use by the mft\n");
-		if (!opts.force) {
-			free_file (file);
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	}
-
-	if (calc_percentage (file, vol) == 0) {
-		Qprintf ("File has no recoverable data.\n");
-		goto free;
 	}
 
 	if (list_empty (&file->data)) {
@@ -1624,6 +1630,7 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 				}
 			}
 
+			cluster_count = 0LL;
 			for (i = 0; rl[i].length > 0; i++) {
 
 				if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
@@ -1637,6 +1644,7 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 							close (fd);
 							goto free;
 						}
+						cluster_count++;
 					}
 					continue;
 				}
@@ -1676,10 +1684,35 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 							close (fd);
 							goto free;
 						}
+						cluster_count++;
 					}
 				}
 			}
 			Qprintf ("\n");
+
+	/* The following block of code implements the --truncate option.        */
+	/* Its semantics are as follows:                                        */
+	/* IF opts.truncate is set AND data stream currently being recovered is */
+	/* non-resident AND data stream has no holes (100% recoverability) AND  */
+	/* 0 <= (data->size_alloc - data->size_data) <= vol->cluster_size AND   */
+	/* cluster_count * vol->cluster_size == data->size_alloc THEN file      */
+	/* currently being written is truncated to data->size_data bytes before */
+	/* it's closed.                                                         */
+	/* This multiple checks try to ensure that only files with consistent   */
+	/* values of size/occupied clusters are eligible for truncation. Note   */
+	/* that resident streams need not be truncated, since the original code */
+	/* already recovers their exact length.                           +mabs */
+
+			if (opts.truncate) {
+				if (d->percent == 100 && d->size_alloc >= d->size_data &&
+					(d->size_alloc - d->size_data) <= (long long)vol->cluster_size &&
+					cluster_count * (long long)vol->cluster_size == d->size_alloc) {
+					if (ftruncate(fd, (off_t)d->size_data))
+						Eprintf("Truncation failed: %s\n", strerror(errno));
+				} else Qprintf("Truncation not performed because file has an "
+					"inconsistent $MFT record.\n");
+			}
+
 			if (close (fd) < 0) {
 				Eprintf ("Close failed: %s\n", strerror (errno));
 			}

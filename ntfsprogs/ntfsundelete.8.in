@@ -264,6 +264,17 @@ option.  Only match files that have been altered since this time.  The time must
 be given as number using a suffix of d, w, m, y for days, weeks, months or years
 ago.
 .TP
+.BI \-T
+.br
+.ns
+.TP
+.BI \-\-truncate
+If
+.BR ntfsundelete
+is confident about the size of a deleted file, then it will restore the file to
+exactly that size.  The default behaviour is to round up the size to the nearest
+cluster (which will be a multiple of 512 bytes).
+.TP
 .BI "\-u " nums
 .br
 .ns

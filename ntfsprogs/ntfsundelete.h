@@ -46,6 +46,7 @@ struct options {
 	char		 fillbyte;	/* Use for unrecoverable sections */
 	char		*match;		/* Pattern for filename matching */
 	int		 match_case;	/* Case sensitive matching */
+	int		 truncate;	/* Truncate files to exact size. */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
 	int		 force;		/* Override common sense */
