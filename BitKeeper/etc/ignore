@@ -36,3 +36,9 @@ ntfsprogs/ntfsresize
 ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
 ntfsprogs/ntfswipe
+ntfsprogs/extra/printf.c
+ntfsprogs/extra/spinner.c
+ntfsprogs/extra/time.c
+ntfsprogs/extra/todo
+ntfsprogs/s
+ntfsprogs/todo
