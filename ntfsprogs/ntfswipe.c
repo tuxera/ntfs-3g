@@ -340,7 +340,6 @@ int parse_options (int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
-
 /**
  * wipe_unused - Wipe unused clusters
  * @vol:   An ntfs volume obtained from ntfs_mount
@@ -427,6 +426,8 @@ s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
  */
 s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
+	// by considering the individual attributes we might be able to
+	// wipe a few more bytes at the attr's tail.
 	s64 i;
 	s64 total = 0;
 	s64 result = 0;
@@ -460,8 +461,6 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 				total += size;
 				continue;
 			}
-
-
 
 			memset (buffer + size, byte, vol->mft_record_size - size);
 
@@ -573,10 +572,91 @@ s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
  */
 s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 {
+	const int NTFS_BUF_SIZE2 = 8192;
+	//FIXME(?): We might need to zero the LSN field of every single mft
+	//record as well. (But, first try without doing that and see what
+	//happens, since chkdsk might pickup the pieces and do it for us...)
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	s64 len, pos, count;
+	char buf[NTFS_BUF_SIZE2];
+	int eo;
+
 	if (!vol || (byte < 0))
 		return -1;
 
-	Qprintf ("wipe_logfile (not implemented) 0x%02x\n", byte);
+	//Qprintf ("wipe_logfile (not implemented) 0x%02x\n", byte);
+
+	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
+		Dprintf("Failed to open inode FILE_LogFile.\n");
+		return -1;
+	}
+
+	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
+		goto error_exit;
+	}
+
+	/* The $DATA attribute of the $LogFile has to be non-resident. */
+	if (!NAttrNonResident(na)) {
+		Dprintf("$LogFile $DATA attribute is resident!?!\n");
+		errno = EIO;
+		goto io_error_exit;
+	}
+
+	/* Get length of $LogFile contents. */
+	len = na->data_size;
+	if (!len) {
+		Dprintf("$LogFile has zero length, no disk write needed.\n");
+		return 0;
+	}
+
+	/* Read $LogFile until its end. We do this as a check for correct
+	   length thus making sure we are decompressing the mapping pairs
+	   array correctly and hence writing below is safe as well. */
+	pos = 0;
+	while ((count = ntfs_attr_pread(na, pos, NTFS_BUF_SIZE2, buf)) > 0)
+		pos += count;
+
+	if (count == -1 || pos != len) {
+		Dprintf("Amount of $LogFile data read does not "
+			"correspond to expected length!");
+		if (count != -1)
+			errno = EIO;
+		goto io_error_exit;
+	}
+
+	/* Fill the buffer with 0xff's. */
+	memset(buf, -1, NTFS_BUF_SIZE2);
+
+	/* Set the $DATA attribute. */
+	pos = 0;
+	while ((count = len - pos) > 0) {
+		if (count > NTFS_BUF_SIZE2)
+			count = NTFS_BUF_SIZE2;
+
+		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
+			Dprintf("Failed to set the $LogFile attribute value.");
+			if (count != -1)
+				errno = EIO;
+			goto io_error_exit;
+		}
+
+		pos += count;
+	}
+
+	ntfs_attr_close(na);
+	return ntfs_inode_close(ni);
+
+io_error_exit:
+	eo = errno;
+	ntfs_attr_close(na);
+	errno = eo;
+error_exit:
+	eo = errno;
+	ntfs_inode_close(ni);
+	errno = eo;
+	return -1;
 	return 0;
 }
 
@@ -593,13 +673,75 @@ s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
  */
 s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 {
+	// wipe completely, chkdsk doesn't do anything, booting writes header
+	const int NTFS_BUF_SIZE2 = 4096;
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	s64 len, pos, count;
+	char buf[NTFS_BUF_SIZE2];
+	int eo;
+
 	if (!vol || (byte < 0))
 		return -1;
 
-	Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
-	return 0;
-}
+	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
+	
+	ni = utils_pathname_to_inode (vol, NULL, "pagefile.sys");
+	if (!ni) {
+		Dprintf("Failed to open inode FILE_LogFile.\n");
+		return -1;
+	}
 
+	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
+		goto error_exit;
+	}
+
+	/* The $DATA attribute of the $LogFile has to be non-resident. */
+	if (!NAttrNonResident(na)) {
+		Dprintf("$LogFile $DATA attribute is resident!?!\n");
+		errno = EIO;
+		goto io_error_exit;
+	}
+
+	/* Get length of $LogFile contents. */
+	len = na->data_size;
+	if (!len) {
+		Dprintf("$LogFile has zero length, no disk write needed.\n");
+		return 0;
+	}
+
+	memset(buf, byte, NTFS_BUF_SIZE2);
+
+	/* Set the $DATA attribute. */
+	pos = 0;
+	while ((count = len - pos) > 0) {
+		if (count > NTFS_BUF_SIZE2)
+			count = NTFS_BUF_SIZE2;
+
+		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
+			Dprintf("Failed to set the $LogFile attribute value.");
+			if (count != -1)
+				errno = EIO;
+			goto io_error_exit;
+		}
+
+		pos += count;
+	}
+
+	ntfs_attr_close(na);
+	return ntfs_inode_close(ni);
+
+io_error_exit:
+	eo = errno;
+	ntfs_attr_close(na);
+	errno = eo;
+error_exit:
+	eo = errno;
+	ntfs_inode_close(ni);
+	errno = eo;
+	return -1;
+}
 
 /**
  * ntfs_info - Display information about the NTFS Volume
@@ -730,7 +872,6 @@ bmpdone:
 	free (bitmap);
 	}
 
-
 	/*
 	 * wipe_unused - volume = n clusters, u unused (%age & MB)
 	 *	$Bitmap
@@ -775,7 +916,6 @@ bmpdone:
 
 	return 1;
 }
-
 
 /**
  * print_summary - Tell the user what we are about to do
@@ -850,14 +990,8 @@ int main (int argc, char *argv[])
 	if (!vol)
 		goto free;
 
-	if (vol->flags & VOLUME_IS_DIRTY) {
-		Qprintf ("Volume is dirty.\n");
-		if (!opts.force) {
-			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
-			goto umount;
-		}
-		Qprintf ("Forced to continue.\n");
-	}
+	if ((vol->flags & VOLUME_IS_DIRTY) && (!opts.force))
+		goto umount;
 
 	if (opts.info) {
 		act = act_info;
@@ -961,5 +1095,4 @@ free:
 		free (opts.bytes);
 	return result;
 }
-
 
