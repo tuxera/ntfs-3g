@@ -27,6 +27,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "types.h"
 #include "attrib.h"
