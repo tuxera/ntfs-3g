@@ -25,8 +25,6 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <locale.h>
-#include <libintl.h>
 #include <stdarg.h>
 #include <getopt.h>
 #include <string.h>

@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <locale.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -37,7 +36,6 @@
 #include <time.h>
 #include <limits.h>
 #include <regex.h>
-#include <libintl.h>
 #include <time.h>
 #include <stdarg.h>
 #include <utime.h>

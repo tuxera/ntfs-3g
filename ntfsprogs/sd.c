@@ -26,7 +26,6 @@
  *
  * Do NOT free *@sd_val as it is static memory. This also means that you can
  * only use *@sd_val until the next call to this function.
- *
  */
 void init_system_file_sd(int sys_file_no, char **sd_val, int *sd_val_len)
 {

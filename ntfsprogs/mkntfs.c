@@ -232,7 +232,7 @@ void copyright(void)
 }
 
 /**
- * license - print licese statement
+ * license - print license statement
  */
 void license(void)
 {
@@ -1030,7 +1030,8 @@ void deallocate_scattered_clusters(const runlist *rl)
 	}
 }
 
-/*
+/**
+ * allocate_scattered_clusters
  * Allocate @clusters and create a runlist of the allocated clusters.
  *
  * Return the allocated runlist. Caller has to free the runlist when finished
@@ -1040,9 +1041,6 @@ void deallocate_scattered_clusters(const runlist *rl)
  *
  * TODO: We should be returning the size as well, but for mkntfs this is not
  * necessary.
- */
-/**
- * allocate_scattered_clusters
  */
 runlist *allocate_scattered_clusters(s64 clusters)
 {
@@ -1597,15 +1595,6 @@ err_out:
 }
 
 /**
- * time2ntfs
- */
-s64 time2ntfs(s64 time)
-{
-	return cpu_to_le64((time + (s64)(369 * 365 + 89) * 24 * 3600)
-			* 10000000);
-}
-
-/**
  * add_attr_std_info
  * Return 0 on success or -errno on error.
  */
@@ -1614,7 +1603,7 @@ int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
 	STANDARD_INFORMATION si;
 	int err;
 
-	si.creation_time = time2ntfs(time(NULL));
+	si.creation_time = utc2ntfs(time(NULL));
 	si.last_data_change_time = si.creation_time;
 	si.last_mft_change_time = si.creation_time;
 	si.last_access_time = si.creation_time;
@@ -2384,7 +2373,7 @@ int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 	fn->parent_directory = ref_parent;
 	// FIXME: Is this correct? Or do we have to copy the creation_time
 	// from the std info?
-	fn->creation_time = time2ntfs(time(NULL));
+	fn->creation_time = utc2ntfs(time(NULL));
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
