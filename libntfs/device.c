@@ -458,10 +458,17 @@ static inline int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
  * open device @dev.
  *
  * Adapted from e2fsutils-1.19, Copyright (C) 1995 Theodore Ts'o.
+ *
+ * On error return -1 with errno set to the error code.
  */
 s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 {
 	s64 high, low;
+
+	if (!dev || block_size <= 0 || (block_size - 1) & block_size) {
+		errno = EINVAL;
+		return -1;
+	}
 #ifdef BLKGETSIZE64
 	{	u64 size;
 
@@ -520,11 +527,16 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
  * block device of @dev.  On error return -1 with errno set to the error code.
  *
  * The following error codes are defined:
+ *	EINVAL		Input parameter error
  *	ENOTSUP		System does not support HDIO_GETGEO ioctl
  *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
  */
 s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
 {
+	if (!dev) {
+		errno = EINVAL;
+		return -1;
+	}
 #ifdef HDIO_GETGEO
 	{	struct hd_geometry geo;
 
@@ -532,6 +544,74 @@ s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
 			Dprintf("HDIO_GETGEO start_sect = %lu (0x%lx)\n",
 					geo.start, geo.start);
 			return geo.start;
+		}
+	}
+#else
+	errno = ENOTSUP;
+#endif
+	return -1;
+}
+
+/**
+ * ntfs_device_heads_get - get number of heads of device
+ * @dev:		open device
+ *
+ * On success, return the number of heads on the device @dev.  On error return
+ * -1 with errno set to the error code.
+ *
+ * The following error codes are defined:
+ *	EINVAL		Input parameter error
+ *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ */
+int ntfs_device_heads_get(struct ntfs_device *dev)
+{
+	if (!dev) {
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef HDIO_GETGEO
+	{	struct hd_geometry geo;
+
+		if (!dev->d_ops->ioctl(dev, HDIO_GETGEO, &geo)) {
+			Dprintf("HDIO_GETGEO heads = %u (0x%x)\n",
+					(unsigned)geo.heads,
+					(unsigned)geo.heads);
+			return geo.heads;
+		}
+	}
+#else
+	errno = ENOTSUP;
+#endif
+	return -1;
+}
+
+/**
+ * ntfs_device_sectors_per_track_get - get number of sectors per track of device
+ * @dev:		open device
+ *
+ * On success, return the number of sectors per track on the device @dev.  On
+ * error return -1 with errno set to the error code.
+ *
+ * The following error codes are defined:
+ *	EINVAL		Input parameter error
+ *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ */
+int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
+{
+	if (!dev) {
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef HDIO_GETGEO
+	{	struct hd_geometry geo;
+
+		if (!dev->d_ops->ioctl(dev, HDIO_GETGEO, &geo)) {
+			Dprintf("HDIO_GETGEO sectors_per_track = %u (0x%x)\n",
+					(unsigned)geo.sectors,
+					(unsigned)geo.sectors);
+			return geo.sectors;
 		}
 	}
 #else
