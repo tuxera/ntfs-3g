@@ -1,7 +1,7 @@
 /*
  * runlist.c - Run list handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1160,7 +1160,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		return 0;
 	/* Always need the termining zero byte. */
 	rls = 1;
-	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[++i].lcn) {
+	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[i++].lcn) {
 		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
 			goto err_out;
 		/* Header byte + length. */
@@ -1269,7 +1269,7 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 	 * ntfs_write_significant_bytes().
 	 */
 	dst_max = dst + dst_len - 1;
-	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[++i].lcn) {
+	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[i++].lcn) {
 		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
 			goto err_out;
 		/* Write length. */
