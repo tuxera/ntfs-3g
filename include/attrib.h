@@ -255,6 +255,7 @@ extern LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn);
 extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
 
 extern int ntfs_get_nr_significant_bytes(const s64 n);
+
 extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		const runlist_element *rl);
 
