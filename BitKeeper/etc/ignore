@@ -12,7 +12,7 @@ config.cache
 config.status
 stamp-h
 libtool
-linux-ntfs.spec
+ntfsprogs.spec
 
 # general build products
 */.deps/*
