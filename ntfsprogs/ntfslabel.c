@@ -345,7 +345,8 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		a->reservedR = 0;
 	}
 	memcpy((u8*)a + le16_to_cpu(a->value_offset), new_label, label_len);
-	if (ntfs_mft_record_write(vol, (MFT_REF)FILE_Volume, mrec)) {
+	if (!opts.noaction &&
+			ntfs_mft_record_write(vol, (MFT_REF)FILE_Volume, mrec)) {
 		perror("Error writing MFT Record to disk");
 		goto err_out;
 	}
@@ -377,8 +378,11 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	//XXX need to set and get mount flags
-	vol = utils_mount_volume (opts.device, 0, opts.force);
+	if (!opts.label)
+		opts.noaction++;
+
+	vol = utils_mount_volume (opts.device, opts.noaction ? MS_RDONLY : 0,
+			opts.force);
 	if (!vol)
 		return 1;
 
