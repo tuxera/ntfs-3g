@@ -3,7 +3,7 @@ Current news
 
 Added new utilities: ntfsclone by Szakacsits Szabolcs, ntfscluster by Richard
 Russon, ntfsinfo by Matthew Fanto, ntfsls originally by Lode Leroy, modified
-by Anton Altaparmakov.
+by Anton Altaparmakov, ntfscat by Richard Russon.
 
 Library internal enhancements and API additions.  Of particular note is the
 device io abstraction layer and the addition of the win32 device operations.
