@@ -143,6 +143,7 @@
 	  cope with precreated sparse files.
 	- Remove GPL message text from usage information in mkntfs.
 	- New tool, ntfsundelete, written by Richard Russon.
+	- New tool, ntfsresize, written by Szabolcs Szakacsits.
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
