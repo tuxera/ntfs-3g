@@ -132,7 +132,7 @@ ntfsinfo_SOURCES = ntfsinfo.c
 ntfsinfo_LDADD = $(AM_LIBS)
 ntfsinfo_LDFLAGS = $(AM_LFLAGS)
 
-ntfsundelete_SOURCES = ntfsundelete.c ntfsundelete.h
+ntfsundelete_SOURCES = ntfsundelete.c ntfsundelete.h utils.c utils.h
 ntfsundelete_LDADD = $(AM_LIBS)
 ntfsundelete_LDFLAGS = $(AM_LFLAGS)
 
@@ -219,7 +219,7 @@ ntfslabel_OBJECTS =  ntfslabel.$(OBJEXT)
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfslabel_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
-ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT)
+ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsundelete_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfsundelete_DEPENDENCIES =  \

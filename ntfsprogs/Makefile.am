@@ -49,7 +49,7 @@ ntfsinfo_SOURCES	= ntfsinfo.c
 ntfsinfo_LDADD		= $(AM_LIBS)
 ntfsinfo_LDFLAGS	= $(AM_LFLAGS)
 
-ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h
+ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h utils.c utils.h
 ntfsundelete_LDADD	= $(AM_LIBS)
 ntfsundelete_LDFLAGS	= $(AM_LFLAGS)
 
