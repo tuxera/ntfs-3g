@@ -73,7 +73,7 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 	/* Check OEMidentifier is "NTFS    " */
 	if (!silent)
 		fprintf(stderr, "Checking OEMid... ");
-	if (b->oem_id != cpu_to_le64(0x202020205346544e)) /* "NTFS    " */
+	if (b->oem_id != cpu_to_le64(0x202020205346544eULL)) /* "NTFS    " */
 		goto not_ntfs;
 	if (!silent)
 		fprintf(stderr, "OK\n");
