@@ -2004,7 +2004,7 @@ int main (int argc, char *argv[])
 				opts.mft_begin, min (vol->nr_mft_records, opts.mft_end));
 		break;
 	default:
-		/* Cannot happen */
+		; /* Cannot happen */
 	}
 
 umount:
