@@ -23,16 +23,15 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /* TODO LIST:
- *	1. Better error checking. (focus on ntfs_dump_volume)
- *	2. Comment things better.
- *	3. More things at verbose mode.
- *	4. Dump ACLs when security_id exists (NTFS 3+ only).
- *	5. Dump by name rather by Inode .
- *	6. Clean ups.
- *	7. Internationalization.
- *	8. The AT_ATTRIBUTE_LIST issue.
- *	9. Add more Indexed Attr Types.
- *	10.Make formatting look more like www.flatcap.org/ntfs/info
+ *	- Better error checking. (focus on ntfs_dump_volume)
+ *	- Comment things better.
+ *	- More things at verbose mode.
+ *	- Dump ACLs when security_id exists (NTFS 3+ only).
+ *	- Clean ups.
+ *	- Internationalization.
+ *	- The AT_ATTRIBUTE_LIST issue.
+ *	- Add more Indexed Attr Types.
+ *	- Make formatting look more like www.flatcap.org/ntfs/info
  *
  *	Still not dumping certain attributes. Need to find the best
  *	way to output some of these attributes.
@@ -77,6 +76,7 @@ static struct options {
 	int	 force;		/* Override common sense */
 	int	 notime;	/* Don't report timestamps at all */
 	int	 mft;		/* Dump information about the volume as well */
+	const char *filename;
 } opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
@@ -114,6 +114,7 @@ static void usage (void)
 	printf ("\nUsage: %s [options] -d dev\n"
 		"    -d dev  --device dev The ntfs volume to display information about\n"
 		"    -i num  --inode num  Display information about this inode\n"
+		"    -F file --file file  Display information about this file (absolute path)\n"
 		"    -m      --mft        Dump information about the volume\n"
 		"    -t      --notime     Don't report timestamps\n"
 		"\n"
@@ -137,12 +138,13 @@ static void usage (void)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fh?i:mqtTvVd:";
+	static const char *sopt = "-fh?i:F:mqtTvVd:";
 	static const struct option lopt[] = {
 		{ "device",	 required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "inode",	 required_argument,	NULL, 'i' },
+		{ "file",	 required_argument,	NULL, 'F' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
@@ -159,6 +161,7 @@ static int parse_options (int argc, char *argv[])
 	opterr = 0; /* We'll handle the errors, thank you. */
 
 	opts.inode = -1;
+	opts.filename = NULL;
 
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
@@ -171,6 +174,15 @@ static int parse_options (int argc, char *argv[])
 		case 'i':
 			if ((opts.inode != -1) ||
 			    (!utils_parse_size (optarg, &opts.inode, FALSE))) {
+				err++;
+			}
+			break;
+		case 'F':
+			if (opts.filename == NULL) {
+				/* The inode can not be resolved here, store the filename */
+				opts.filename = argv[optind-1];
+			} else {
+				/* "-F" can't appear more than once */
 				err++;
 			}
 			break;
@@ -221,7 +233,7 @@ static int parse_options (int argc, char *argv[])
 			err++;
 		}
 
-		if (opts.inode == -1 && !opts.mft) {
+		if ((opts.inode == -1) && (opts.filename == NULL) && !opts.mft) {
 			if (argc > 1)
 				Eprintf ("You must specify an inode to learn about.\n");
 			err++;
@@ -231,6 +243,13 @@ static int parse_options (int argc, char *argv[])
 			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
+
+		if ((opts.inode != -1) && (opts.filename != NULL)) {
+			if (argc > 1)
+				Eprintf ("You may not specify --inode and --file together.\n");
+			err++;
+		}
+
 	}
 
 	if (ver)
@@ -1118,20 +1137,25 @@ int main(int argc, char **argv)
 	if (opts.mft)
 		ntfs_dump_volume(vol);
 
-	if (opts.inode != -1) {
+	if ((opts.inode != -1) || opts.filename) {
 		ntfs_inode *inode;
 		/* obtain the inode */
-		inode = ntfs_inode_open(vol, MK_LE_MREF(opts.inode, 0));
+		if (opts.filename) {
+			inode = utils_pathname_to_inode (vol, NULL, opts.filename);
+		} else {
+	   		inode = ntfs_inode_open(vol, MK_LE_MREF(opts.inode, 0));
+		}
 
+		/* dump the inode information */
 		if (inode) {
-			/* general info */
+			/* general info about the inode's mft record */
 			ntfs_dump_inode_general_info(inode);
 			/* dump attributes */
 			ntfs_dump_file_attributes(inode);
 		} else {
 			/* can't open inode */
-			/* note: when the specified inode does not exist, EIO is returned
-			 *	is there a way to give the correct response instead? */
+			/* note: when the specified inode does not exist, either EIO or
+			 *  or ESPIPE is returned, we should notify better in those cases */
 			fprintf(stderr, "Error loading node: %s\n", strerror(errno));
 		}
 	}
