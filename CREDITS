@@ -1,0 +1,22 @@
+The following people have contributed directly or indirectly to the linux-ntfs
+project.
+
+The list is sorted alphabetically, so please keep it this way!
+
+Please let me know (email Anton Altaparmakov <aia21@cantab.net>) if you believe
+someone is missing or if you prefer to not be listed.
+
+
+Anton Altaparmakov <aia21@cantab.net>
+Albert D. Cahalan <acahalan@cs.uml.edu>
+Matthew J. Fanto <fanto1mj@cmich.edu>
+David Martínez Moreno <david.martinez@rediris.es>
+Yuri Per <yuri@acronis.com>
+Richard Russon <ntfs@flatcap.org>
+Szakacsits Szabolcs <szaka@sienet.hu>
+
+Also, various code snippets and especially the autoconf/automake automated
+configuration, compilation and installation system have been ripped shamelessly
+from numerous different GNU and Gnome utilities and libraries so "Many thanks!"
+to all the people who have participated in their creation!
+
