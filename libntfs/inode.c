@@ -224,7 +224,6 @@ int ntfs_inode_close(ntfs_inode *ni)
 				return -1;
 			}
 		}
-		free(ni->extent_nis);
 	} else if (ni->nr_extents == -1) {
 		ntfs_inode **tmp_nis;
 		ntfs_inode *base_ni;
@@ -247,11 +246,12 @@ int ntfs_inode_close(ntfs_inode *ni)
 			/* Resize the memory buffer. */
 			tmp_nis = realloc(tmp_nis, base_ni->nr_extents *
 					sizeof(ntfs_inode *));
-			/* Ignore errors, they don't really matter. */
+			/* Ignore realloc errors, they don't really matter. */
 			if (tmp_nis)
 				base_ni->extent_nis = tmp_nis;
 			/* Allow for error checking. */
 			i = -1;
+			break;
 		}
 		if (i != -1)
 			Dputs("Extent inode was not attached to base inode! "
@@ -339,7 +339,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		extent_nis = (ntfs_inode**)malloc(i);
 		if (!extent_nis)
 			goto err_out;
-		if (base_ni->extent_nis) {
+		if (base_ni->nr_extents) {
 			memcpy(extent_nis, base_ni->extent_nis,
 					i - 4 * sizeof(ntfs_inode *));
 			free(base_ni->extent_nis);
@@ -453,4 +453,3 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	errno = err;
 	return -1;
 }
-
