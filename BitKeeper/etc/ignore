@@ -40,6 +40,7 @@ ntfsprogs/ntfslabel
 ntfsprogs/ntfsls
 ntfsprogs/ntfsmove
 ntfsprogs/ntfsresize
+ntfsprogs/ntfsrm
 ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
 ntfsprogs/ntfswipe
