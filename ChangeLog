@@ -31,6 +31,12 @@ xx/xx/2004 - 2.0.0-WIP
 	  and fix handling of ->extent_nis for base inodes.  (Anton)
 	- Add ntfsmftalloc utility to the extra utilities to help test the mft
 	  record allocator.  (Anton)
+	- Fix ntfs_attr_record_resize() to cope with a newsize < 8.  This means
+	  you can call ntfs_attr_record_resize() with newsize = 0 to delete an
+	  attribute record from its mft record but you would still need to
+	  update the attribute list attribute if present.  (Anton)
+	- Add the useful offsetof() macro to ntfs/support.h which returns the
+	  offset of a structure element.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
