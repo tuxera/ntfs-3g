@@ -47,6 +47,11 @@
 #endif
 
 /*
+ * Useful macro for determining the offset of a struct member.
+ */
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+
+/*
  * Simple bit operation macros. NOTE: These are NOT atomic.
  */
 #define test_bit(bit, var)	      ((var) & (1 << (bit)))
