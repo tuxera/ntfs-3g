@@ -120,7 +120,7 @@ am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
 
-LTVERSION = 4:0:0
+LTVERSION = 5:0:0
 
 # Later gcc require -fms-extensions to work.
 @GCC_NEEDS_MS_EXTENSIONS_TRUE@GCCflag = -fms-extensions

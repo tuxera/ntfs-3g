@@ -25,7 +25,7 @@
 #   - If the interface is the same as the previous version, change to C:R+1:A
 #
 
-LTVERSION = 4:0:0
+LTVERSION = 5:0:0
 
 # Later gcc require -fms-extensions to work.
 if GCC_NEEDS_MS_EXTENSIONS
