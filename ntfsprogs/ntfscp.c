@@ -342,13 +342,12 @@ int main (int argc, char *argv[])
 	}
 
 	offset = 0;
-	while (!feof (in)) {
+	while (!feof(in)) {
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
 		if (!br) {
-			if (!feof (in))	perror("ERROR: fread failed");
+			if (!feof(in))	perror("ERROR: fread failed");
 			break;
 		}
-		
 		bw = ntfs_attr_pwrite(na, offset, br, buf);
 		if (bw != br) {
 			perror("ERROR: ntfs_attr_pwrite failed");
