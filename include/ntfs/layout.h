@@ -99,11 +99,21 @@ typedef struct {
  * records (like mft records for example).
  */
 typedef enum {
-	magic_BAAD = const_cpu_to_le32(0x44414142), /* BAAD == corrupt record */
-	magic_CHKD = const_cpu_to_le32(0x424b4843), /* CHKD == chkdsk ??? */
-	magic_FILE = const_cpu_to_le32(0x454c4946), /* FILE == mft entry */
-	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* HOLE == ? (NTFS 3.0+?) */
-	magic_INDX = const_cpu_to_le32(0x58444e49), /* INDX == index buffer */
+	/* Found in $MFT/$DATA. */
+	magic_FILE = const_cpu_to_le32(0x454c4946), /* mft entry */
+	magic_INDX = const_cpu_to_le32(0x58444e49), /* index buffer */
+	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* ? (NTFS 3.0+?) */
+
+	/* Found in $LogFile/$DATA. */
+	magic_RSTR = const_cpu_to_le32(0x52545352), /* restart area */
+	magic_RCRD = const_cpu_to_le32(0x44524352), /* log record */
+
+	/* Found in $LogFile/$DATA but maybe found in $MFT/$DATA, also? */
+	magic_CHKD = const_cpu_to_le32(0x424b4843), /* modified by chkdsk */
+
+	/* Found in both $MFT/$DATA and $LogFile/$DATA. */
+	magic_BAAD = const_cpu_to_le32(0x44414142), /* failed multi sector
+						       transfer was detected */
 } NTFS_RECORD_TYPES;
 
 /*
@@ -114,21 +124,27 @@ typedef enum {
 #define ntfs_is_magicp(p, m)		( *(u32*)(p) == (u32)magic_##m )
 
 /*
- * Specialised magic comparison macros.
+ * Specialised magic comparison macros for the NTFS_RECORD_TYPES defined above.
  */
-#define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
-#define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
-#define ntfs_is_chkd_record(x)	( ntfs_is_magic (x, CHKD) )
-#define ntfs_is_chkd_recordp(p)	( ntfs_is_magicp(p, CHKD) )
 #define ntfs_is_file_record(x)	( ntfs_is_magic (x, FILE) )
 #define ntfs_is_file_recordp(p)	( ntfs_is_magicp(p, FILE) )
-#define ntfs_is_hole_record(x)	( ntfs_is_magic (x, HOLE) )
-#define ntfs_is_hole_recordp(p)	( ntfs_is_magicp(p, HOLE) )
-#define ntfs_is_indx_record(x)	( ntfs_is_magic (x, INDX) )
-#define ntfs_is_indx_recordp(p)	( ntfs_is_magicp(p, INDX) )
-
 #define ntfs_is_mft_record(x)	( ntfs_is_file_record(x) )
 #define ntfs_is_mft_recordp(p)	( ntfs_is_file_recordp(p) )
+#define ntfs_is_indx_record(x)	( ntfs_is_magic (x, INDX) )
+#define ntfs_is_indx_recordp(p)	( ntfs_is_magicp(p, INDX) )
+#define ntfs_is_hole_record(x)	( ntfs_is_magic (x, HOLE) )
+#define ntfs_is_hole_recordp(p)	( ntfs_is_magicp(p, HOLE) )
+
+#define ntfs_is_rstr_record(x)	( ntfs_is_magic (x, RSTR) )
+#define ntfs_is_rstr_recordp(p)	( ntfs_is_magicp(p, RSTR) )
+#define ntfs_is_rcrd_record(x)	( ntfs_is_magic (x, RCRD) )
+#define ntfs_is_rcrd_recordp(p)	( ntfs_is_magicp(p, RCRD) )
+
+#define ntfs_is_chkd_record(x)	( ntfs_is_magic (x, CHKD) )
+#define ntfs_is_chkd_recordp(p)	( ntfs_is_magicp(p, CHKD) )
+
+#define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
+#define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
 
 /*
  * Defines for the NTFS filesystem. Don't want to use BLOCK_SIZE and
@@ -2265,7 +2281,7 @@ typedef enum {
  * Like the attribute list and the index buffer list, the EA attribute value is
  * a sequence of EA_ATTR variable length records.
  *
- * FIXME: It appears weird that the EA name is not unicode. Is it true?
+ * FIXME: It appears weird that the EA name is not Unicode. Is it true?
  */
 typedef struct {
 	u32 next_entry_offset;	/* Offset to the next EA_ATTR. */
