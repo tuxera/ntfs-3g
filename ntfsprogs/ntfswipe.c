@@ -2,6 +2,7 @@
  * ntfswipe - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This utility will overwrite unused space on an NTFS volume.
  *
@@ -406,11 +407,97 @@ free:
  */
 static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
+	s64 total = 0;
+	s64 size;
+	s64 inode_num;
+	ntfs_attr_search_ctx *ctx;
+	ntfs_inode *ni;
+	unsigned char *buf;
+	ATTR_RECORD *attr;
+	runlist *rl;
+	
 	if (!vol || (byte < 0))
 		return -1;
+	
+	for (inode_num = 16; inode_num < vol->nr_mft_records; inode_num++) {
+		Vprintf ("Inode %lli - ", inode_num);
+		ni = ntfs_inode_open (vol, inode_num);
+		if (!ni) {
+			Vprintf ("Could not open inode\n");
+			continue;
+		}
+		
+		ctx = ntfs_attr_get_search_ctx(ni, 0);
+		if (!ctx) {
+			Vprintf ("Internal error\n");
+			Eprintf ("Could not get search context\n");
+			goto close_inode;
+		}
 
-	Qprintf ("wipe_tails (not implemented) 0x%02x\n", byte);
-	return 0;
+		if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+			Vprintf ("Could not open $DATA attribute\n");
+			goto put_search_ctx;
+		}
+		attr = ctx->attr;
+		
+		if (!attr->non_resident) {
+			Vprintf ("Resident $DATA atrributes. Skipping.\n");
+			goto put_search_ctx;
+		}
+		
+		if (attr->flags &
+			(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED | ATTR_IS_COMPRESSED)) {
+			Vprintf ("Sparse, encrypted and compressed are not "
+				"supported.\n");
+			goto put_search_ctx;
+		}
+		
+		size = attr->allocated_size - attr->data_size;
+		if (!size) {
+			Vprintf ("Nothing to wipe\n");
+			goto put_search_ctx;
+		}
+		
+		if (act == act_info) {
+			total += size;
+			Vprintf ("Can wipe %lld bytes\n", size);
+			goto put_search_ctx;
+		}
+		
+		buf = malloc (size);
+		if (!buf) {
+			Vprintf ("Not enough memory\n");
+			Eprintf ("Not enough memory to allocate %lld bytes\n", size);
+			goto put_search_ctx;
+		}
+		memset (buf, byte, size);
+		
+		rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+		if (!rl) {
+			Vprintf ("Internal error\n");
+			Eprintf ("Could not decompress mapping pairs\n");
+			goto free_buf;
+		}
+
+		s64 bw = ntfs_rl_pwrite (vol, rl, attr->data_size, size, buf);
+		if (bw == -1) {
+			Vprintf ("Internal error\n");
+			Eprintf ("Couldn't wipe tail of inode %lld\n", inode_num);
+		} else {
+			Vprintf ("Wiped %lld bytes\n", bw);
+			total += bw;
+		}
+
+		free (rl);
+free_buf:
+		free (buf);
+put_search_ctx:
+		ntfs_attr_put_search_ctx (ctx);
+close_inode:
+		ntfs_inode_close (ni);
+	}
+	Qprintf ("wipe_tails 0x%02x, %lld bytes\n", byte, (long long)total);
+	return total;
 }
 
 /**
