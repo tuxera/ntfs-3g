@@ -49,7 +49,7 @@ struct {
 	int debug;
 	int force;
 	int overwrite;
-	int stdout;
+	int std_out;
 	int blkdev_out;		/* output file is block device */   
 	int metadata_only;
 	char *output;
@@ -255,17 +255,17 @@ static void parse_options(int argc, char **argv)
 	}
 
 	if (strcmp(opt.output, "-") == 0)
-		opt.stdout++;
+		opt.std_out++;
 
 	if (opt.volume == NULL) {
 		err_printf("You must specify a device file.\n");
 		usage();
 	}
 
-	if (opt.metadata_only && opt.stdout)
+	if (opt.metadata_only && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
 
-	if (!opt.stdout) {
+	if (!opt.std_out) {
 		struct stat st;
 		
 		if (stat(opt.output, &st) == -1) {
@@ -290,7 +290,7 @@ static void parse_options(int argc, char **argv)
 	
 	/* FIXME: this is a workaround for loosing debug info if stdout != stderr
 	   and for the uncontrollable verbose messages in libntfs. Ughhh. */
-	if (opt.stdout)
+	if (opt.std_out)
 		msg_out = stderr;
 	else if (opt.debug)
 		stderr = stdout; 
@@ -399,7 +399,7 @@ static void lseek_to_cluster(s64 lcn)
 	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek input");
 
-	if (opt.stdout)
+	if (opt.std_out)
 		return;
 	
 	if (lseek(fd_out, pos, SEEK_SET) == (off_t)-1)
@@ -410,7 +410,7 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
 	int i;
 	
-	if (opt.stdout)
+	if (opt.std_out)
 		return;
 	
 	if (!opt.metadata_only || !is_critical_metadata(image))
@@ -463,7 +463,7 @@ static void clone_ntfs(u64 nr_clusters)
 					continue;
 				}
 				
-				if (opt.stdout) {
+				if (opt.std_out) {
 					progress_update(&progress, ++p_counter);
 					if (write_all(&fd_out, buf, csize) == -1)
 						perr_exit("write_all");
@@ -986,7 +986,7 @@ int main(int argc, char **argv)
 			 "size (%lld)!\nCorrupt partition table or incorrect "
 			 "device partitioning?\n", device_size);
 
-	if (opt.stdout) {
+	if (opt.std_out) {
 	       if ((fd_out = fileno(stdout)) == -1) 
 		       perr_exit("fileno for stdout failed");
 	} else {
@@ -1037,8 +1037,8 @@ int main(int argc, char **argv)
 	
 	/* FIXME: save backup boot sector */
 
-	if (opt.stdout || !opt.metadata_only) {
-		s64 nr_clusters = opt.stdout ? vol->nr_clusters : image.inuse;
+	if (opt.std_out || !opt.metadata_only) {
+		s64 nr_clusters = opt.std_out ? vol->nr_clusters : image.inuse;
 		
 		clone_ntfs(nr_clusters);
 		fsync_clone(fd_out);
