@@ -55,9 +55,10 @@ typedef struct ntfs_volume ntfs_volume;
 
 typedef struct win32_fd {
 	HANDLE handle;
-	LARGE_INTEGER part_start;
-	LARGE_INTEGER part_end;
+	s64 part_start;
+	s64 part_end;
 	LARGE_INTEGER current_pos;
+	int part_hidden_sectors;
 } win32_fd;
 
 #define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
@@ -92,6 +93,47 @@ static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
 	return TRUE;
 }
 #endif
+
+/**
+ * ntfs_w32error_to_errno - Convert a win32 error code to the unix one
+ * @w32error	The win32 error code.
+ *
+ * Limited to a reletevly small but useful number of codes
+ */
+static int ntfs_w32error_to_errno(DWORD w32error)
+{
+	switch (w32error) {
+		case ERROR_FILE_NOT_FOUND:
+		case ERROR_PATH_NOT_FOUND:
+			return ENOENT;
+		case ERROR_TOO_MANY_OPEN_FILES:
+			return EMFILE;
+		case ERROR_ACCESS_DENIED:
+			return EACCES;
+		case ERROR_INVALID_HANDLE:
+			return EBADF;
+		case ERROR_NOT_ENOUGH_MEMORY:
+			return ENOMEM;
+		case ERROR_OUTOFMEMORY:
+			return ENOSPC;
+		case ERROR_INVALID_DRIVE:
+		case ERROR_BAD_UNIT:
+			return ENODEV;
+		case ERROR_WRITE_PROTECT:
+			return EROFS;
+		case ERROR_NOT_READY:
+			return EBUSY;
+		case ERROR_BAD_COMMAND:
+			return EINVAL;
+		case ERROR_SEEK:
+			return ESPIPE;
+		case ERROR_NOT_SUPPORTED:
+			return ENOTSUP;
+		default:
+			/* generic message */
+			return ENOMSG;
+	}
+}
 
 /**
  * ntfs_device_win32_open - open a device
@@ -139,8 +181,8 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 		if (numparams == 1) {
 			fd.handle = handle;
-			fd.part_start.QuadPart = 0;
-			fd.part_end.QuadPart = -1;
+			fd.part_start = 0;
+			fd.part_end = -1;
 			fd.current_pos.QuadPart = 0;
 		} else {
 			char buffer[10240];
@@ -169,8 +211,8 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 					fd.handle = handle;
 					fd.part_start = drive_layout->
 							PartitionEntry[i].
-							StartingOffset;
-					fd.part_end.QuadPart = drive_layout->
+							StartingOffset.QuadPart;
+					fd.part_end = drive_layout->
 							PartitionEntry[i].
 							StartingOffset.
 							QuadPart +
@@ -210,8 +252,8 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 		}
 
 		fd.handle = handle;
-		fd.part_start.QuadPart = 0;
-		fd.part_end.QuadPart = (((s64) info.nFileSizeHigh) << 32) +
+		fd.part_start = 0;
+		fd.part_end = (((s64) info.nFileSizeHigh) << 32) +
 				((s64) info.nFileSizeLow);
 		fd.current_pos.QuadPart = 0;
 	}
@@ -238,7 +280,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	switch (whence) {
 	case SEEK_SET:
 		disp = FILE_BEGIN;
-		abs_offset.QuadPart = fd->part_start.QuadPart + offset;
+		abs_offset.QuadPart = fd->part_start + offset;
 		break;
 	case SEEK_CUR:
 		disp = FILE_CURRENT;
@@ -247,13 +289,13 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	case SEEK_END:
 		/* end of partition != end of disk */
 		disp = FILE_BEGIN;
-		if (fd->part_end.QuadPart == -1) {
+		if (fd->part_end == -1) {
 			fprintf(stderr, "win32_seek: position relative to end "
 					"of disk not implemented\n");
 			errno = ENOTSUP;
 			return -1;
 		}
-		abs_offset.QuadPart = fd->part_end.QuadPart + offset;
+		abs_offset.QuadPart = fd->part_end + offset;
 		break;
 	default:
 		printf("win32_seek() wrong mode %d\n", whence);
@@ -380,7 +422,7 @@ static s64 win32_bias(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
 
-	return fd->part_start.QuadPart;
+	return fd->part_start;
 }
 
 static s64 win32_filepos(struct ntfs_device *dev)
@@ -412,12 +454,118 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 	return -1;
 }
 
+/**
+ * ntfs_win32_hdio_getgeo - Get drive geometry.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ * @argp:		A pointer to where to put the output.
+ *
+ * Requires windows NT/2k/XP only
+ *
+ * Currently only the 'start' field is filled
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
+static __inline__ int ntfs_win32_hdio_getgeo(struct ntfs_device *dev,
+		struct hd_geometry *argp)
+{
+	win32_fd *fd;
+
+  	fd = (win32_fd *)dev->d_private;
+
+	if (fd->part_hidden_sectors==-1) {
+		/* not a partition */
+		Dprintf("ntfs_win32_hdio_getgeo(): error: not a partition");
+		fprintf(stderr, "ntfs_win32_hdio_getgeo(): unimplemented\n");
+		errno = ENOTSUP;
+		return -1;
+	} else {
+		/* only fake the 'start' value, others are unsupported */
+		/* heads are returned by disk_int13_info on winXP only */
+		argp->heads = -1;
+		argp->sectors = -1;
+		argp->cylinders = -1;
+		argp->start = fd->part_hidden_sectors;
+		return 0;
+	}
+}
+
+/**
+ * ntfs_win32_blksszget - Get block device sector size.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ * @argp:		A pointer to where to put the output.
+ *
+ * Works on windows NT/2k/XP only
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
+static __inline__ int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
+{
+	win32_fd *fd;
+	DISK_GEOMETRY dg;
+	DWORD bytesReturned;
+
+  	fd = (win32_fd *)dev->d_private;
+
+ 	if (DeviceIoControl(fd->handle, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
+ 			&dg, sizeof(DISK_GEOMETRY), &bytesReturned, NULL)) {
+		/* success */
+		*argp=dg.BytesPerSector;
+		return 0;
+	} else {
+		perror("ntfs_win32_blksszget(): FAILED!");
+		errno = ntfs_w32error_to_errno(GetLastError());
+		return -errno;
+	}
+}
+
 static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 		void *argp)
 {
-	fprintf(stderr, "win32_ioctl() unimplemented\n");
-	errno = ENOTSUP;
-	return -1;
+	win32_fd *fd = (win32_fd *)dev->d_private;
+
+	fprintf(stderr, "win32_ioctl(%d) called\n",request);
+
+	switch (request) {
+#if defined(BLKGETSIZE)
+		case BLKGETSIZE:
+			Dprintf("win32_ioctl: BLKGETSIZE detected");
+			if ((fd->part_end>=0) && (fd->part_start>=0)) {
+				*(int *)argp = (int)((fd->part_end - fd->part_start) / 512);
+				return 0;
+			} else {
+   				errno = ENOTSUP;
+				return -ENOTSUP;
+			}
+#endif
+#if defined(BLKGETSIZE64)
+		case BLKGETSIZE64:
+			Dprintf("win32_ioctl: BLKGETSIZE64 detected");
+			if ((fd->part_end>=0) && (fd->part_start>=0)) {
+				*(s64 *)argp = (s64)(fd->part_end -	fd->part_start);
+				return 0;
+			} else {
+   				errno = ENOTSUP;
+				return -ENOTSUP;
+			}
+#endif
+#ifdef HDIO_GETGEO
+		case HDIO_GETGEO:
+			Dprintf("win32_ioctl: HDIO_GETGEO detected");
+			return ntfs_win32_hdio_getgeo(dev,(struct hd_geometry *)argp);
+#endif
+#ifdef BLKSSZGET
+		case BLKSSZGET:
+			Dprintf("win32_ioctl: BLKSSZGET detected");
+			return ntfs_win32_blksszget(dev,(int *)argp);
+			break;
+#endif
+		default:
+			fprintf(stderr, "win32_ioctl(): unimplemented ioctl %d\n",request);
+			errno = ENOTSUP;
+			return -1;
+	}
 }
 
 static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *buf,
