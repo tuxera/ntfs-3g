@@ -21,12 +21,12 @@ linux-ntfs.spec
 libntfs/*.l?
 
 # specific programs
-ntfstools/dumplog
-ntfstools/mkntfs
-ntfstools/ntfsdump_logfile
-ntfstools/ntfsfix
-ntfstools/ntfsinfo
-ntfstools/ntfslabel
-ntfstools/ntfsresize
-ntfstools/ntfsundelete
-ntfstools/ntfswipe
+ntfsprogs/dumplog
+ntfsprogs/mkntfs
+ntfsprogs/ntfsdump_logfile
+ntfsprogs/ntfsfix
+ntfsprogs/ntfsinfo
+ntfsprogs/ntfslabel
+ntfsprogs/ntfsresize
+ntfsprogs/ntfsundelete
+ntfsprogs/ntfswipe
