@@ -398,6 +398,18 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 	return 0;
 }
 
+/**
+ * ntfs_device_win32_seek - Change current file position.
+ * @handle:		Pointer the file HADNLE obtained via open.
+ * @offset:		Required offset from the whence anchor.
+ * @whence:		May be one of the following:
+ *		SEEK_SET	Offset is relative to file start.
+ *		SEEK_CUR	Offset is relative to current position.
+ *		SEEK_END	Offset is relative to end of file.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
 static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
 {
@@ -445,6 +457,15 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	return offset;
 }
 
+/**
+ * ntfs_device_win32_read - Read 'count' bytes from 'dev' into 'buf'.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ * @buf:		A pointer to where to put the contents.
+ * @count:		How many bytes should be read.
+ *
+ * On success returns the amount of bytes actually read.
+ * On fail returns -errno.
+ */
 static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
@@ -527,6 +548,14 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 	return numread;
 }
 
+/**
+ * ntfs_device_win32_close - Close an open NTFS_DEVICE and
+ *		free internal buffers.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
 static int ntfs_device_win32_close(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
@@ -580,6 +609,15 @@ static int ntfs_device_win32_sync(struct ntfs_device *dev)
 	}
 }
 
+/**
+ * ntfs_device_win32_write - Write 'count' bytes from 'buf' into 'dev'.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ * @buf:		A pointer to the contents.
+ * @count:		How many bytes should be written.
+ *
+ * On success returns the amount of bytes actually written.
+ * On fail returns -errno.
+ */
 static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buffer,
 		s64 count)
 {
