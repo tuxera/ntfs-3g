@@ -94,7 +94,6 @@ struct progress_bar {
 struct llcn_t {
 	s64 lcn;	/* last used LCN for a "special" file/attr type */
 	s64 inode;	/* inode using it */
-	int total;	/* total number of such inodes */
 };	
 	
 struct __ntfs_resize_t {
@@ -109,12 +108,10 @@ struct __ntfs_resize_t {
 	struct llcn_t last_mft;
 	struct llcn_t last_mftmir;
 	struct llcn_t last_multi_mft;
-	struct llcn_t last_compressed_sparse;
 	struct llcn_t last_sparse;
 	struct llcn_t last_compressed;
 	struct llcn_t last_lcn;
-	int inode_seen;
-	int inode_seen_special;
+	s64 last_unsupp;		/* last unsupported cluster */
 };
 
 typedef struct __ntfs_resize_t ntfs_resize_t;
@@ -476,25 +473,6 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-void set_last_lcn(ntfs_resize_t *r, struct llcn_t *llcn, s64 lcn, int special)
-{
-	if (special) {
-		if (!r->inode_seen_special) {
-			r->inode_seen_special = 1;
-			llcn->total++;
-		}
-	} else 
-		if (!r->inode_seen) {
-			r->inode_seen = 1;
-			llcn->total++;
-		}	
-		
-	if (llcn->lcn < lcn) {
-		llcn->lcn = lcn;
-		llcn->inode = r->ni->mft_no;
-	}	
-}
-
 void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 {
 	s64 inode;
@@ -504,29 +482,31 @@ void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 	inode = resize->ni->mft_no;
 	flags = resize->ctx->attr->flags;
 	
-	set_last_lcn(resize, &resize->last_lcn, last_lcn, 0);
-	
-	if (inode == 0)
-		llcn = &resize->last_mft;
-	
-	else if (inode == 1)
-		llcn = &resize->last_mftmir;
-	
-	else if (NInoAttrList(resize->ni))
+	if (NInoAttrList(resize->ni))
 		llcn = &resize->last_multi_mft;
-	
-	else if ((flags & ATTR_IS_SPARSE) && (flags & ATTR_IS_COMPRESSED))
-		llcn = &resize->last_compressed_sparse;
 	
 	else if (flags & ATTR_IS_SPARSE)
 		llcn = &resize->last_sparse;
 	
 	else if (flags & ATTR_IS_COMPRESSED)
 		llcn = &resize->last_compressed;
+
+	else if (inode == 0)
+		llcn = &resize->last_mft;
+	
+	else if (inode == 1)
+		llcn = &resize->last_mftmir;
+	
 	else 
-		return;
-		
-	set_last_lcn(resize, llcn, last_lcn, 1);
+		llcn = &resize->last_lcn;
+	
+	if (llcn->lcn < last_lcn) {
+		llcn->lcn = last_lcn;
+		llcn->inode = inode;
+	}	
+
+	if (resize->last_unsupp < last_lcn)
+		resize->last_unsupp = last_lcn;
 }
 
 
@@ -666,7 +646,7 @@ void compare_bitmaps(struct bitmap *a)
 		if (count == 0) {
 			if (a->size != pos)
 				err_exit("$Bitmap file size doesn't match "
-					 "calculated size ((%Ld != %Ld)\n",
+					 "calculated size (%Ld != %Ld)\n",
 					 a->size, pos);
 			break;
 		}
@@ -771,8 +751,6 @@ void walk_inodes(ntfs_resize_t *resize)
 			goto close_inode;
 
 		resize->ni = ni;
-		resize->inode_seen = 0;
-		resize->inode_seen_special = 0;
 		walk_attributes(resize);
 close_inode:
 		if (ntfs_inode_close(ni))
@@ -789,8 +767,7 @@ void print_hint(const char *s, struct llcn_t llcn)
 	
 	runs_b = llcn.lcn * vol->cluster_size;
 	runs_mb = rounded_up_division(runs_b, NTFS_MBYTE);
-	printf("%-19s: %6Ld MB      %8Ld     %11d\n", 
-		s, runs_mb, llcn.inode, llcn.total);
+	printf("%-19s: %6Ld MB      %8Ld\n", s, runs_mb, llcn.inode);
 }
 
 /**
@@ -802,7 +779,8 @@ void print_hint(const char *s, struct llcn_t llcn)
  */
 void advise_on_resize(ntfs_resize_t *resize)
 {
-	s64 i, old_b, new_b, g_b, old_mb, new_mb, g_mb;
+	s64 old_b, new_b, g_b, old_mb, new_mb, g_mb;
+	s64 supp_lcn = 0; /* smallest size supported in LCN */ 
 	int fragmanted_end;
 
 	printf("Calculating smallest shrunken size supported ...\n");
@@ -810,41 +788,18 @@ void advise_on_resize(ntfs_resize_t *resize)
 	old_b = vol->nr_clusters * vol->cluster_size;
 	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
 	
-	printf("File feature         Last used    Last inode    "
-	       "Total inodes\n");
+	printf("File feature         Last used    Last inode\n");
 	print_hint("$MFT", resize->last_mft);
 	print_hint("$MFTMirr", resize->last_mftmir);
 	print_hint("Compressed", resize->last_compressed);
 	print_hint("Sparse", resize->last_sparse);
-	print_hint("Compressed&Sparse", resize->last_compressed_sparse);
 	print_hint("Multi-Record", resize->last_multi_mft);
-	print_hint("Ordinary&Special", resize->last_lcn);
+	print_hint("Ordinary", resize->last_lcn);
+
+	supp_lcn = resize->last_unsupp;
 	
-	for (i = vol->nr_clusters - 1; i > 0 && (i % 8); i--)
-		if (ntfs_bit_get(lcn_bitmap.bm, i))
-			goto found_used_cluster;
-
-	if (i > 0) {
-		if (ntfs_bit_get(lcn_bitmap.bm, i))
-			goto found_used_cluster;
-	} else
-		goto found_used_cluster;
-
-	for (i -=  8; i >= 0; i -= 8)
-		if (lcn_bitmap.bm[i / 8])
-			break;
-
-	for (i += 7; i > 0; i--)
-		if (ntfs_bit_get(lcn_bitmap.bm, i))
-			break;
-
-found_used_cluster:
-	if (i != resize->last_lcn.lcn)
-		err_exit("Last used cluster calculations don't match! "
-			 "%Ld != %Ld\n", i, resize->last_lcn);
-	
-	i += 2; /* first free + we reserve one for the backup boot sector */
-	fragmanted_end = (i >= vol->nr_clusters) ? 1 : 0;
+	supp_lcn += 2; /* first free + one for the backup boot sector */
+	fragmanted_end = (supp_lcn >= vol->nr_clusters) ? 1 : 0;
 
 	if (fragmanted_end || !opt.info) {
 		printf(fragmented_volume_msg);
@@ -853,9 +808,9 @@ found_used_cluster:
 		printf("Now ");
 	}
 
-	new_b = i * vol->cluster_size;
+	new_b = supp_lcn * vol->cluster_size;
 	new_mb = rounded_up_division(new_b, NTFS_MBYTE);
-	g_b = (vol->nr_clusters - i) * vol->cluster_size;
+	g_b = (vol->nr_clusters - supp_lcn) * vol->cluster_size;
 	g_mb = g_b / NTFS_MBYTE;
 
 	printf("You could resize at %lld bytes ", new_b);
@@ -1401,7 +1356,6 @@ int main(int argc, char **argv)
 	ntfs_resize_t resize;
 	s64 new_size = 0;	/* in clusters */
 	s64 device_size;        /* in bytes */
-	int i;
 
 	printf("%s v%s\n", EXEC_NAME, VERSION);
 
@@ -1478,13 +1432,11 @@ int main(int argc, char **argv)
 		advise_on_resize(&resize);
 		exit(0);
 	}
-
-	for (i = new_size; i < vol->nr_clusters; i++)
-		if (ntfs_bit_get(lcn_bitmap.bm, (u64)i)) {
-			/* FIXME: relocate cluster */
-			advise_on_resize(&resize);
-			exit(1);
-		}
+	
+	if (resize.last_unsupp >= new_size) {
+		advise_on_resize(&resize);
+		exit(1);
+	}
 
 	if (opt.force-- <= 0 && !opt.ro_flag) {
 		printf(resize_warning_msg);
