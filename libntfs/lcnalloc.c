@@ -101,8 +101,8 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 	int err = 0, rlpos, rlsize, buf_size;
 	u8 pass, done_zones, search_zone, need_writeback, bit;
 
-	Dprintf("%s(): Entering with count = 0x%Lx, start_lcn = 0x%Lx,
-			zone = %s_ZONE.\n", __FUNCTION__, (long long)count,
+	Dprintf("%s(): Entering with count = 0x%Lx, start_lcn = 0x%Lx, "
+			"zone = %s_ZONE.\n", __FUNCTION__, (long long)count,
 			(long long)start_lcn,
 			zone == MFT_ZONE ? "MFT" : "DATA");
 	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
