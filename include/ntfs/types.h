@@ -45,9 +45,9 @@ typedef int64_t s64;
 typedef u16 le16;
 typedef u32 le32;
 typedef u64 le64;
-typedef s16 sle16;
-typedef s32 sle32;
-typedef s64 sle64;
+typedef u16 sle16;
+typedef u32 sle32;
+typedef u64 sle64;
 
 typedef u16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1
