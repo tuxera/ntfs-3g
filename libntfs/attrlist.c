@@ -59,7 +59,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	int err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
-			 __FUNCTION__, ni->mft_no, attr->type);
+		 __FUNCTION__, (long long) ni->mft_no, (unsigned) attr->type);
 
 	if (!ni || !attr) {
 		errno = EINVAL;
@@ -230,9 +230,9 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 	ale = ctx->al_entry;
 	
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
-			"%lld.\n", __FUNCTION__, ctx->ntfs_ino->mft_no,
-			le32_to_cpu(ctx->attr->type),
-			le64_to_cpu(ctx->attr->lowest_vcn));
+		"%lld.\n", __FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
+		(unsigned) le32_to_cpu(ctx->attr->type),
+		(long long) le64_to_cpu(ctx->attr->lowest_vcn));
 	
 	new_al_len = base_ni->attr_list_size - le16_to_cpu(ale->length);
 	new_al = malloc(new_al_len);

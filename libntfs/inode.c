@@ -385,7 +385,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		return -1;
 	}
 	
-	Dprintf("%s(): Entring for inode 0x%llx.\n", __FUNCTION__, ni->mft_no);
+	Dprintf("%s(): Entering for inode 0x%llx.\n",
+			__FUNCTION__, (long long) ni->mft_no);
 
 	/* Write out attribute list from cache to disk. */
 	if (ni->nr_extents != -1 && NInoAttrList(ni) &&
