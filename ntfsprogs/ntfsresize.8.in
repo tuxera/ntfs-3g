@@ -32,7 +32,7 @@ The options
 .B -i 
 and 
 .B -s 
-are mutually exclusive. If both of them is omitted then the 
+are mutually exclusive. If both of them are omitted then the 
 NTFS filesystem will be enlarged to the device size.
 Before a real resize operation, always make a read-only 
 test run using the 
