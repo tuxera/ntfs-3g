@@ -453,7 +453,7 @@ static void append_to_bad_blocks(unsigned long block)
  * mkntfs_write
  */
 static __inline__ long long mkntfs_write(struct ntfs_device *dev,
-		const void *buf, long long count)
+		const void *b, long long count)
 {
 	long long bytes_written, total;
 	int retry;
@@ -463,7 +463,7 @@ static __inline__ long long mkntfs_write(struct ntfs_device *dev,
 	total = 0LL;
 	retry = 0;
 	do {
-		bytes_written = dev->d_ops->write(dev, buf, count);
+		bytes_written = dev->d_ops->write(dev, b, count);
 		if (bytes_written == -1LL) {
 			retry = errno;
 			Eprintf("Error writing to %s: %s\n", vol->dev->d_name,
@@ -554,12 +554,12 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 		}
 	}
 	if (delta) {
-		char *buf = (char*)calloc(1, delta);
-		if (!buf)
+		char *b = (char*)calloc(1, delta);
+		if (!b)
 			err_exit("Error allocating internal buffer: "
 					"%s\n", strerror(errno));
-		bytes_written = mkntfs_write(dev, buf, delta);
-		free(buf);
+		bytes_written = mkntfs_write(dev, b, delta);
+		free(b);
 		if (bytes_written == -1LL)
 			return bytes_written;
 	}
@@ -642,7 +642,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			"type yet.";
 	const char *skip = "Skipping display of $%s attribute value.\n";
 	const char *todo = "This is still work in progress.";
-	char *buf;
+	char *b;
 	int i, j;
 
 	switch (type) {
@@ -669,16 +669,16 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	case AT_VOLUME_NAME:
 		printf("Volume name length = %i\n", (unsigned int)val_len);
 		if (val_len) {
-			buf = calloc(1, val_len);
-			if (!buf)
+			b = calloc(1, val_len);
+			if (!b)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
-			i = ucstos(buf, (ntfschar*)val, val_len);
+			i = ucstos(b, (ntfschar*)val, val_len);
 			if (i == -1)
 				printf("Volume name contains non-displayable "
 						"Unicode characters.\n");
-			printf("Volume name = %s\n", buf);
-			free(buf);
+			printf("Volume name = %s\n", b);
+			free(b);
 		}
 		return;
 	case AT_VOLUME_INFORMATION:
@@ -1033,7 +1033,7 @@ static int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 			pos + size > (char*)m + le32_to_cpu(m->bytes_allocated))
 		return -EINVAL;
 	/* The -8 is for the attribute terminator. */
-	if (pos - (char*)m > le32_to_cpu(m->bytes_in_use) - 8)
+	if (pos - (char*)m > (int)le32_to_cpu(m->bytes_in_use) - 8)
 		return -EINVAL;
 #endif
 	biu = le32_to_cpu(m->bytes_in_use);
@@ -2053,7 +2053,7 @@ static int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
  */
 static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		u32 name_len, const IGNORE_CASE_BOOL ic,
-		INDEX_ALLOCATION **index)
+		INDEX_ALLOCATION **idx)
 {
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -2194,7 +2194,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		// Revert index root from index allocation.
 		goto err_out;
 	}
-	*index = ia_val;
+	*idx = ia_val;
 	return 0;
 err_out:
 	if (ctx)
@@ -2206,11 +2206,11 @@ err_out:
 
 /**
  * make_room_for_index_entry_in_index_block
- * Create space of @size bytes at position @pos inside the index block @index.
+ * Create space of @size bytes at position @pos inside the index block @idx.
  *
  * Return 0 on success or -errno on error.
  */
-static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
+static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *idx,
 		INDEX_ENTRY *pos, u32 size)
 {
 	u32 biu;
@@ -2227,31 +2227,31 @@ static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
 				"non 8-byte aligned size.\n");
 		return -EINVAL;
 	}
-	if (!index || !pos)
+	if (!idx || !pos)
 		return -EINVAL;
-	if ((char*)pos < (char*)index || (char*)pos + size < (char*)index ||
-			(char*)pos > (char*)index + sizeof(INDEX_BLOCK) -
+	if ((char*)pos < (char*)idx || (char*)pos + size < (char*)idx ||
+			(char*)pos > (char*)idx + sizeof(INDEX_BLOCK) -
 				sizeof(INDEX_HEADER) +
-				le32_to_cpu(index->index.allocated_size) ||
-			(char*)pos + size > (char*)index + sizeof(INDEX_BLOCK) -
+				le32_to_cpu(idx->index.allocated_size) ||
+			(char*)pos + size > (char*)idx + sizeof(INDEX_BLOCK) -
 				sizeof(INDEX_HEADER) +
-				le32_to_cpu(index->index.allocated_size))
+				le32_to_cpu(idx->index.allocated_size))
 		return -EINVAL;
 	/* The - sizeof(INDEX_ENTRY_HEADER) is for the index terminator. */
-	if ((char*)pos - (char*)&index->index >
-			le32_to_cpu(index->index.index_length)
-			- sizeof(INDEX_ENTRY_HEADER))
+	if ((char*)pos - (char*)&idx->index >
+			(int)le32_to_cpu(idx->index.index_length)
+			- (int)sizeof(INDEX_ENTRY_HEADER))
 		return -EINVAL;
 #endif
-	biu = le32_to_cpu(index->index.index_length);
+	biu = le32_to_cpu(idx->index.index_length);
 	/* Do we have enough space? */
-	if (biu + size > le32_to_cpu(index->index.allocated_size))
+	if (biu + size > le32_to_cpu(idx->index.allocated_size))
 		return -ENOSPC;
 	/* Move everything after pos to pos + size. */
 	memmove((char*)pos + size, (char*)pos, biu - ((char*)pos -
-			(char*)&index->index));
+			(char*)&idx->index));
 	/* Update index block. */
-	index->index.index_length = cpu_to_le32(biu + size);
+	idx->index.index_length = cpu_to_le32(biu + size);
 	return 0;
 }
 
@@ -2259,11 +2259,11 @@ static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
  * insert_file_link_in_dir_index
  * Insert the fully completed FILE_NAME_ATTR @file_name which is inside
  * the file with mft reference @file_ref into the index (allocation) block
- * @index (which belongs to @file_ref's parent directory).
+ * @idx (which belongs to @file_ref's parent directory).
  *
  * Return 0 on success or -errno on error.
  */
-static int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
+static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 		FILE_NAME_ATTR *file_name, u32 file_name_size)
 {
 	int err, i;
@@ -2271,15 +2271,14 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
 	char *index_end;
 
 	/*
-	 * Lookup dir entry @file_name in dir @index to determine correct
+	 * Lookup dir entry @file_name in dir @idx to determine correct
 	 * insertion location. FIXME: Using a very oversimplified lookup
 	 * method which is sufficient for mkntfs but no good whatsoever in
 	 * real world scenario. (AIA)
 	 */
-	index_end = (char*)&index->index +
-			le32_to_cpu(index->index.index_length);
-	ie = (INDEX_ENTRY*)((char*)&index->index +
-			le32_to_cpu(index->index.entries_offset));
+	index_end = (char*)&idx->index + le32_to_cpu(idx->index.index_length);
+	ie = (INDEX_ENTRY*)((char*)&idx->index +
+			le32_to_cpu(idx->index.entries_offset));
 	/*
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
@@ -2367,7 +2366,7 @@ do_next:
 		ie = (INDEX_ENTRY*)((char*)ie + le16_to_cpu(ie->length));
 	};
 	i = (sizeof(INDEX_ENTRY_HEADER) + file_name_size + 7) & ~7;
-	err = make_room_for_index_entry_in_index_block(index, ie, i);
+	err = make_room_for_index_entry_in_index_block(idx, ie, i);
 	if (err) {
 		Eprintf("make_room_for_index_entry_in_index_block failed: "
 				"%s\n", strerror(-err));
@@ -2389,13 +2388,13 @@ do_next:
  * parent directory with mft reference @ref_parent.
  *
  * Then, insert an index entry with this file_name_attribute in the index
- * block @index of the index allocation attribute of the parent directory.
+ * block @idx of the index allocation attribute of the parent directory.
  *
  * @ref_file is the mft reference of @m_file.
  *
  * Return 0 on success or -errno on error.
  */
-static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
+static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 		MFT_RECORD *m_file, const MFT_REF ref_file,
 		const s64 allocated_size, const s64 data_size,
 		const FILE_ATTR_FLAGS flags, const u16 packed_ea_size,
@@ -2464,8 +2463,8 @@ static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 				le16_to_cpu(m_file->link_count) - 1);
 		return i;
 	}
-	/* Insert the index entry for file_name in @index. */
-	i = insert_file_link_in_dir_index(index, ref_file, fn, fn_size);
+	/* Insert the index entry for file_name in @idx. */
+	i = insert_file_link_in_dir_index(idx, ref_file, fn, fn_size);
 	if (i < 0) {
 		Eprintf("create_hardlink failed inserting index entry: %s\n",
 				strerror(-i));
