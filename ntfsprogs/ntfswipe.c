@@ -37,7 +37,7 @@
 #include "utils.h"
 #include "debug.h"
 
-static const char *EXEC_NAME = "ntfswipe";
+static char *EXEC_NAME = "ntfswipe";
 static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
@@ -107,9 +107,9 @@ void usage (void)
  * Return:  0  Error, invalid string
  *	    n  Success, the count of numbers parsed
  */
-int parse_list (const char *list, int **result)
+int parse_list (char *list, int **result)
 {
-	const char *ptr;
+	char *ptr;
 	char *end;
 	int i;
 	int count;
@@ -169,8 +169,8 @@ int parse_list (const char *list, int **result)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-ab:c:dfh?ilmnpqtuvV";
-	static const struct option lopt[] = {
+	static char *sopt = "-ab:c:dfh?ilmnpqtuvV";
+	static struct option lopt[] = {
 		{ "all",	no_argument,		NULL, 'a' },
 		{ "bytes",	required_argument,	NULL, 'b' },
 		{ "count",	required_argument,	NULL, 'c' },
@@ -181,6 +181,7 @@ int parse_options (int argc, char *argv[])
 		{ "logfile",	no_argument,		NULL, 'l' },
 		{ "mft",	no_argument,		NULL, 'm' },
 		{ "no-action",	no_argument,		NULL, 'n' },
+		//{ "no-wait",	no_argument,		NULL, 0   },
 		{ "pagefile",	no_argument,		NULL, 'p' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "tails",	no_argument,		NULL, 't' },
@@ -352,9 +353,9 @@ int parse_options (int argc, char *argv[])
  */
 s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 {
-	u64 i;
-	u64 total = 0;
-	u64 result = 0;
+	s64 i;
+	s64 total = 0;
+	s64 result = 0;
 	u8 *buffer = NULL;
 
 	if (!vol || (byte < 0))
@@ -375,7 +376,7 @@ s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 			continue;
 		}
 
-		if (act != act_wipe) {
+		if (act == act_wipe) {
 			//Vprintf ("cluster %lld is not in use\n", i);
 			result = ntfs_pwrite (vol->dev, vol->cluster_size * i, vol->cluster_size, buffer);
 			if (result != vol->cluster_size) {
@@ -387,7 +388,7 @@ s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 		total += vol->cluster_size;
 	}
 
-	Qprintf ("wipe_unused 0x%02x\n", byte);
+	Qprintf ("wipe_unused 0x%02x, %lld bytes\n", byte, total);
 free:
 	free (buffer);
 	return total;
@@ -426,8 +427,9 @@ s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
  */
 s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
-	u64 i;
-	u64 total = 0;
+	s64 i;
+	s64 total = 0;
+	s64 result = 0;
 	u8 *buffer = NULL;
 
 	if (!vol || (byte < 0))
@@ -449,10 +451,51 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 				total += vol->mft_record_size;
 				continue;
 			}
+
+			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
+				vol->mft_record_size / vol->sector_size, vol->sector_size, buffer);
+			if (result != (vol->mft_record_size / vol->sector_size)) {
+				Eprintf ("error attr mst read %lld\n", i);
+				total = -1;	// XXX just negate result?
+				goto free;
+			}
+
+			// Build the record from scratch
+			memset (buffer, 0, vol->mft_record_size);
+
+			*((u32*) (buffer + 0x00)) = magic_FILE;				// Magic
+			*((u16*) (buffer + 0x06)) = cpu_to_le16 (0x0003);		// USA size
+			*((u16*) (buffer + 0x10)) = cpu_to_le16 (0x0001);		// Seq num
+			*((u32*) (buffer + 0x1C)) = cpu_to_le32 (vol->mft_record_size);	// FILE size
+			*((u16*) (buffer + 0x28)) = cpu_to_le16 (0x0001);		// Attr ID
+
+			if (vol->major_ver == 3) {
+				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x0030);	// USA offset
+				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0038);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000040);	// FILE usage
+				*((u32*) (buffer + 0x38)) = cpu_to_le32 (0xFFFFFFFF);	// End marker
+			} else { 
+				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x002A);	// USA offset
+				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0030);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000038);	// FILE usage
+				*((u32*) (buffer + 0x30)) = cpu_to_le32 (0xFFFFFFFF);	// End marker
+			}
+
+			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
+				1, vol->mft_record_size, buffer);
+			if (result != 1) {
+				Eprintf ("error attr mst write %lld\n", i);
+				total = -1;
+				goto free;
+			}
+
+			total += vol->mft_record_size;
 		}
 	}
 
-	Qprintf ("wipe_mft 0x%02x\n", byte);
+	Qprintf ("wipe_mft 0x%02x, %lld bytes\n", byte, total);
+free:
+	free (buffer);
 	return total;
 }
 
