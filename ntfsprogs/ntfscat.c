@@ -218,7 +218,7 @@ static int cat (ntfs_volume *vol __attribute__((unused)), ntfs_inode *inode,
 	const int bufsize = 1024; 
 	char *buffer;
 	ntfs_attr *attr;
-	s64 read, written;
+	s64 bytes_read, written;
 	s64 offset;
 
 	buffer = malloc (bufsize);
@@ -234,20 +234,20 @@ static int cat (ntfs_volume *vol __attribute__((unused)), ntfs_inode *inode,
 
 	offset = 0;
 	for (;;) {
-		read = ntfs_attr_pread (attr, offset, bufsize, buffer);
-		if (read == -1) {
+		bytes_read = ntfs_attr_pread (attr, offset, bufsize, buffer);
+		if (bytes_read == -1) {
 			perror ("ERROR: Couldn't read file");
 			break;
 		}
-		if (!read)
+		if (!bytes_read)
 			break;
 
-		written = fwrite (buffer, 1, read, stdout);
-		if (written != read) {
+		written = fwrite (buffer, 1, bytes_read, stdout);
+		if (written != bytes_read) {
 			perror ("ERROR: Couldn't output all data!");
 			break;
 		}
-		offset += read;
+		offset += bytes_read;
 	}
 
 	ntfs_attr_close (attr);
