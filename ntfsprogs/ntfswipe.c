@@ -40,7 +40,7 @@
 #include "dir.h"
 #include "mst.h"
 
-static char *EXEC_NAME = "ntfswipe";
+static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
@@ -173,7 +173,7 @@ static int parse_list (char *list, int **result)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static char *sopt = "-ab:c:dfh?ilmnpqtuvV";
+	static const char *sopt = "-ab:c:dfh?ilmnpqtuvV";
 	static struct option lopt[] = {
 		{ "all",	no_argument,		NULL, 'a' },
 		{ "bytes",	required_argument,	NULL, 'b' },
@@ -429,6 +429,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 		}
 
 		if (rlc->lcn == LCN_HOLE) {
+			runlist *rlt;
+
 			offset = cur_vcn - rlc->length;
 			if (offset == (offset & (~cu_mask))) {
 				rlc++;
@@ -436,7 +438,7 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 			}
 			offset = (offset & (~cu_mask))
 						<< vol->cluster_size_bits;
-			runlist *rlt = rlc;
+			rlt = rlc;
 			while ((rlt - 1)->lcn == LCN_HOLE) rlt--;
 			while (1) {
 				ret = ntfs_rl_pread (vol, na->rl,
@@ -572,6 +574,8 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 		return -1;
 
 	for (inode_num = 16; inode_num < vol->nr_mft_records; inode_num++) {
+		s64 wiped;
+
 		Vprintf ("Inode %lld - ", inode_num);
 		ni = ntfs_inode_open (vol, inode_num);
 		if (!ni) {
@@ -601,7 +605,6 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 			goto close_attr;
 		}
 
-		s64 wiped;
 		if (NAttrCompressed(na))
 			wiped = wipe_compressed_attribute (vol, byte, act, na);
 		else
@@ -831,7 +834,7 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 							indx_record_size) {
 				Vprintf ("Internal error\n");
 				Eprintf ("INDX record should be %u bytes",
-								indx_record_size);
+						(unsigned int)indx_record_size);
 				total = -1;
 				goto free_buf;
 			}
@@ -927,6 +930,9 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 		return -1;
 
 	for (inode_num = 5; inode_num < vol->nr_mft_records; inode_num++) {
+		u32 indx_record_size;
+		s64 wiped;
+
 		Vprintf ("Inode %lld - ", inode_num);
 		ni = ntfs_inode_open (vol, inode_num);
 		if (!ni) {
@@ -993,13 +999,13 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			goto close_attr_root;
 		}
 		
-		u32 indx_record_size = get_indx_record_size (nar);
+		indx_record_size = get_indx_record_size (nar);
 		if (!indx_record_size) {
 			Eprintf (" (inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
 		
-		s64 wiped = wipe_index_allocation (vol, byte, act,
+		wiped = wipe_index_allocation (vol, byte, act,
 						naa, nab, indx_record_size);
 		if (wiped == -1) {
 			Eprintf (" (inode %lld)\n", inode_num);
