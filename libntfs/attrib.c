@@ -4296,7 +4296,8 @@ put_err_out:
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
-	if (!na || newsize < 0 || (na->ni == FILE_MFT && na->type == AT_DATA)) {
+	if (!na || newsize < 0 ||
+			(na->ni->mft_no == FILE_MFT && na->type == AT_DATA)) {
 		Dprintf("%s(): Invalid aruments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
