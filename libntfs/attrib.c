@@ -3699,6 +3699,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 			/* Add attribute list, if it isn't present and retry. */
 			if (!NInoAttrList(na->ni)) {
+			        err = ENOTSUP; /* to suppress gcc complain */
 				add_attr_list_and_retry = TRUE;
 				goto rollback;
 			}
