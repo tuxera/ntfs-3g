@@ -133,7 +133,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	ale->lowest_vcn = attr->lowest_vcn;
 	ale->mft_reference = mref;
 	ale->instance = attr->instance;
-	memcpy(ale->name, (u8 *)attr + attr->name_length, attr->name_length);
+	memcpy(ale->name, (u8 *)attr + attr->name_offset, attr->name_length);
 
 	/* Resize $ATTRIBUTE_LIST attribute. */
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, 0, 0);
