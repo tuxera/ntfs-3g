@@ -25,7 +25,7 @@
 #   - If the interface is the same as the previous version, change to C:R+1:A
 #
 
-LTVERSION_LIBNTFS = 6:0:1
+LTVERSION_LIBNTFS = 7:0:0
 LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 
