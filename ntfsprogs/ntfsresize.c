@@ -1,8 +1,8 @@
 /**
  * ntfsresize - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Szabolcs Szakacsits
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Szabolcs Szakacsits
+ * Copyright (c) 2002-2003 Anton Altaparmakov
  *
  * This utility will resize an NTFS volume.
  *
@@ -728,17 +728,17 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
 	rl_set(rl_bad + 1, nr_clusters, -1LL, 0LL);
 
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad);
+	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad)) == -1)
+		perr_exit("ntfs_get_size_for_mapping_pairs");
+ 
+	if (mp_size > a->length - a->mapping_pairs_offset)
+		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
 
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl_bad))
 		exit(1);
-
-	/* We must have at least 8 bytes free to hold the runlist */ 
-	if (mp_size > 8)
-		perr_exit("ntfs_mapping_pairs_build");
 
 	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
@@ -862,11 +862,11 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 	else
 		enlarge_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
 
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl);
-
-	/* We must have at least 8 bytes free to hold the runlist */ 
-	if (mp_size > 8)
-		err_exit("Resizing attribute header isn't supported yet.\n");
+	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
+		perr_exit("ntfs_get_size_for_mapping_pairs");
+ 
+	if (mp_size > a->length - a->mapping_pairs_offset)
+		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
@@ -885,15 +885,13 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 	 * attribute too, for now chkdsk will do this for us. 
 	 */
 	
-	if (!opt.ro_flag) {
-		size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, lcn_bitmap.bm);
-		if (bm_bsize != size) {
-			if (size == -1)
-				perr_exit("Couldn't write $Bitmap");
-			printf("Couldn't write full $Bitmap file "
-			       "(%lld from %lld)\n", size, bm_bsize);
-			exit(1);
-		}
+	size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, lcn_bitmap.bm);
+	if (bm_bsize != size) {
+		if (size == -1)
+			perr_exit("Couldn't write $Bitmap");
+		printf("Couldn't write full $Bitmap file "
+		       "(%lld from %lld)\n", size, bm_bsize);
+		exit(1);
 	}
 
 	free(rl);
@@ -944,9 +942,6 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
  */
 int write_mft_record(ntfs_attr_search_ctx *ctx)
 {
-	if (opt.ro_flag)
-		return 0;
-
 	return ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec);
 }
 
@@ -1129,9 +1124,6 @@ void mount_volume()
 void prepare_volume_fixup()
 {
 	u16 flags;
-
-	if (opt.ro_flag)
-		return;
 
 	flags = vol->flags | VOLUME_IS_DIRTY;
 	if (vol->major_ver >= 2)
