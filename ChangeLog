@@ -1,3 +1,13 @@
+13/02/2003 - 1.7.1 - Urgent bug fixes.
+	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):
+	  - compare_bitmaps(): fix another bug reporting the correct cluster
+	    mismatch
+	  - walk_inodes(): fix leaking ntfs_inode in certain cases
+	  - delete redundant and unused MFT_RECORD *mrec from ntfs_resize_t
+	- Urgent bug fixes in libntfs (thanks to Szaka for bug reports):
+	  - attrib.c::ntfs_external_attr_find(): broken error detection
+	  - mft.c::ntfs_mft_records_write(): stupid buffer overflow bug (ouch!)
+
 12/02/2003 - 1.7.0 - Small bug fixes and updates.
 	- Bug fixes in mapping pairs array generation in libntfs.
 	- Bug fixes and updates in ntfsresize. (Szabolcs Szakacsits)
