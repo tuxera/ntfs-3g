@@ -33,7 +33,6 @@
 #include "volume.h"
 #include "lcnalloc.h"
 
-
 /**
  * ntfs_cluster_alloc - allocate clusters on an ntfs volume
  * @vol:	mounted ntfs volume on which to allocate the clusters
@@ -88,10 +87,11 @@
  * removing the duplicate logic requires _very_ careful consideration of _all_
  * possible code paths. So at least for now, I am leaving the double logic -
  * better safe than sorry... (AIA)
+ *
+ * FIXME: Add a start_vcn parameter if we need it and then instead of setting
+ * rl[rlpos].vcn = 0; for the first run, add a sparse start element (LCN_HOLE),
+ * and make rl[rlpos].vcn = start_vcn; for the first non-sparse run. (AIA)
  */
-// FIXME: Add a start_vcn parameter if we need it and then instead of setting
-// rl[rlpos].vcn = 0; for the first run, add a sparse start element (LCN_HOLE),
-// and make rl[rlpos].vcn = start_vcn; for the first non-sparse run. (AIA)
 runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		const NTFS_CLUSTER_ALLOCATION_ZONES zone)
 {
