@@ -1827,7 +1827,9 @@ int main (int argc, char *argv[])
 			{
 				result = !undelete_file (vol, inode);
 				if (result)
-					Vprintf ("ERROR: Failed to undelete inode %d\n!", inode);
+					Vprintf ("ERROR: Failed to undelete "
+							"inode %u\n!",
+							(unsigned int)inode);
 			}
 		}
 		break;
