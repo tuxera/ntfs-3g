@@ -165,6 +165,8 @@
 	- Don't free extent inodes in attrib.c! (Szakacsits Szabolcs)
 	- Return the attribute list attribute when enumerating attributes, too.
 	  Thanks to Szakacsits Szabolcs for pointing this problem out.
+	- New API function provided by unistr.[hc] and use it in mkntfs:
+		ntfs_ucsnlen().
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for

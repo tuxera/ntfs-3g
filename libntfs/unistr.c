@@ -228,6 +228,29 @@ int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
 }
 
 /**
+ * ntfs_ucsnlen - determine the length of a little endian Unicode string
+ * @s:		pointer to Unicode string
+ * @maxlen:	maximum length of string @s
+ *
+ * Return the number of Unicode characters in the little endian Unicode
+ * string @s up to a maximum of maxlen Unicode characters, not including
+ * the terminating (uchar_t)'\0'. If there is no (uchar_t)'\0' between @s
+ * and @s + @maxlen, @maxlen is returned.
+ *
+ * This function never looks beyond @s + @maxlen.
+ */
+u32 ntfs_ucsnlen(const uchar_t *s, u32 maxlen)
+{
+	u32 i;
+
+	for (i = 0; i < maxlen; i++) {
+		if (!le16_to_cpu(s[i]))
+			break;
+	}
+	return i;
+}
+
+/**
  * ntfs_name_upcase
  */
 void ntfs_name_upcase(uchar_t *name, u32 name_len, const uchar_t *upcase,
