@@ -3180,8 +3180,9 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	else
 		ni = na->ni;
 	if (!NInoAttrList(na->ni)) {
-		ntfs_inode_add_attrlist(ni);
-		ntfs_attr_put_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);	
+		if (ntfs_inode_add_attrlist(ni))
+			return -1;
 		return ntfs_resident_attr_resize(na, newsize);
 	}
 	/* Allocate new mft record. */
@@ -3608,14 +3609,9 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		Dprintf("%s(): Deallocate marked extents.\n", __FUNCTION__);
 		while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
 				IGNORE_CASE, 0, NULL, 0, ctx)) {
-			Dprintf("%s(): Found attr 0x%x in inode "
-				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
-				ctx->ntfs_ino->mft_no);
 			if (sle64_to_cpu(ctx->attr->highest_vcn) !=
 							NTFS_VCN_DELETE_MARK)
 				continue;
-			Dprintf("%s(): It is marked. Delete it.\n",
-				__FUNCTION__);
 			/* Remove unused attribute record. */
 			if (ntfs_attr_record_rm(ctx)) {
 				err = errno;
@@ -3623,7 +3619,6 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 					"record.\n", __FUNCTION__);
 				goto put_err_out;
 			}
-			//ntfs_attr_init_search_ctx(ctx, na->ni, NULL);
 			ntfs_attr_reinit_search_ctx(ctx);
 		}
 		if (errno != ENOENT) {
