@@ -288,6 +288,8 @@ extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
 
+extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na);
+
 extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
 
 // FIXME / TODO: Above here the file is cleaned up. (AIA)
