@@ -683,6 +683,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 				free(sec_desc_attr);
 				return;
 			}
+			free (rl);
 		} else {
 			Eprintf("ntfsinfo error: could not decompress runlist\n");
 			return;
