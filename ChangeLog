@@ -1,4 +1,4 @@
-xx/xx/2003 - 1.8.0-devel - Work in progress.
+xx/10/2003 - 1.8.0beta - Work in progress.
 	- Further work on attribute resizing.
 	- Fix two logic inversion bugs in dir.c. Thanks to Russ Christensen for
 	  finding the first one.
@@ -21,10 +21,9 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	  causing the program doing the enumeration to hang in a tight loop.
 	  NOTE: There is still work to do as ctx->al_entry is set to NULL
 	  instead of to the position in the attribute list at which to insert.
-	- Added man pages for ntfsls and other utilities (Richard Russon and
-	  me).
+	- Added man pages for the new utilities (Richard Russon and me).
 	- Lots of extensions and cleanups to ntfsls.
-	- Other assorted bugfixes and developments (see bk changes).
+	- Other assorted bugfixes and developments (see NEWS and bk changes).
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
 	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):
