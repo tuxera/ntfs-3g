@@ -1910,6 +1910,53 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 }
 
 /**
+ * ntfs_attr_size_bounds_check - check a size of an attribute type for validity
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ * @size:	size which to check
+ *
+ * Check whether the @size in bytes is valid for an attribute of @type on the
+ * ntfs volume @vol.
+ *
+ * Return 0 if valid and -1 if not valid or an error occured. On error the
+ * error code is stored in errno. The following error codes are defined:
+ *	ERANGE	- @size is not valid for the attribute @type.
+ *	ENOENT	- The attribute @type is not specified in $AttrDef.
+ *	EINVAL	- Invalid parameters (e.g. @size is < 0 or @vol is not valid)
+ */
+int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
+		const s64 size)
+{
+	ATTR_DEF *ad;
+
+	if (!vol || !vol->attrdef || size < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
+			vol->attrdef_len && ad->type; ++ad) {
+		/* We haven't found it yet, carry on searching. */
+		if (ad->type < type)
+			continue;
+		/* We have gone too far already. No point in continuing. */
+		if (ad->type > type)
+			break;
+		/* We found the attribute. - Do the bounds check. */
+		if (size >= le64_to_cpu(ad->min_size) &&
+				size <= le64_to_cpu(ad->max_size))
+			return 0;
+		/* @size is out of range! */
+		errno = ERANGE;
+		return -1;
+	}
+
+	/* Attribute not found?!? */
+	errno = ENOENT;
+	return -1;
+}
+
+/**
  * ntfs_resident_attr_value_resize - resize the value of a resident attribute
  * @m:		mft record containing attribute record
  * @a:		attribute record whose value to resize
@@ -1965,6 +2012,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
  *	ENOTSUP	- The desired resize is not implemented yet.
+ *	ERANGE	- @newsize is not valid for the attribute type of @na.
  */
 static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
 {
@@ -1982,10 +2030,20 @@ static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
 		err = errno;
 		goto put_err_out;
 	}
-
-	// TODO: Check the attribute type and the corresponding minimum size
-	// against @newsize and fail if @newsize is too small! (AIA)
-
+	/*
+	 * Check the attribute type and the corresponding minimum size
+	 * against @newsize and fail if @newsize is too small.
+	 */
+	if (ntfs_attr_size_bounds_check(na->ni->vol, na->type, newsize) < 0) {
+		err = errno;
+		if (err == ERANGE) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Size bounds check "
+					"failed. Aborting...\n", __FUNCTION__);
+		} else if (err == ENOENT)
+			err = EIO;
+		goto put_err_out;
+	}
 	/* Perform the resize of the attribute record. */
 	if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr, newsize)) {
 		err = errno;
@@ -2020,6 +2078,7 @@ put_err_out:
  * The following error codes are defined:
  *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
+ *	ERANGE	- @newsize is not valid for the attribute type of @na.
  */
 static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 {
@@ -2050,9 +2109,20 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	}
 	a = ctx->attr;
 	m = ctx->mrec;
-
-	// TODO: Check the attribute type and the corresponding minimum size
-	// against @newsize and fail if @newsize is too small! (AIA)
+	/*
+	 * Check the attribute type and the corresponding minimum size
+	 * against @newsize and fail if @newsize is too small.
+	 */
+	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
+		err = errno;
+		if (err == ERANGE) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Size bounds check "
+					"failed. Aborting...\n", __FUNCTION__);
+		} else if (err == ENOENT)
+			err = EIO;
+		goto put_err_out;
+	}
 
 	// When extents/an attribute list is/are present it is very complicated:
 	// TODO: For the current extent:
