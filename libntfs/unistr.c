@@ -430,7 +430,7 @@ err_out:
 int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 {
 	uchar_t *ucs;
-	char *s;
+	const char *s;
 	wchar_t wc;
 	int i, o, cnt, ins_len, ucs_len;
 #ifdef HAVE_MBSINIT
