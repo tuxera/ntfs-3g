@@ -219,7 +219,7 @@ AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
-	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit])
+	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit SetFilePointerEx])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([
