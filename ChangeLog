@@ -91,6 +91,8 @@ xx/xx/2004 - 2.0.0-WIP
 	- Extend ntfs_attr_pwrite to cope with extending the attribute size
 	  and with instantiating holes.  (Yura)
 	- Add new API's ntfs_rl_sparse and ntfs_rl_get_copmressed_size.  (Yura)
+	- ntfsinfo: Dump flags names for $STANDARD_INFORMATION and $FILE_NAME
+	  attributes.  (Yura)
 	- Move NAttr{Sparse,Compressed,Encrypted} to inode struct preserving
 	  the previous interface.  (Yura, with fixes from Anton)
 	- Rename/move inode.[hc]::ntfs_inode_{add,rm}_attr() to
