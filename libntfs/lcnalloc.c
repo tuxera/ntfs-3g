@@ -75,8 +75,9 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	runlist *rl;
 	s64 nr_freed, delta, to_free;
 
-	if (!vol || !vol->lcnbmp_na || !na || !na->rl || start_vcn < 0 ||
+	if (!vol || !vol->lcnbmp_na || !na || start_vcn < 0 ||
 			(count < 0 && count != -1)) {
+		fprintf(stderr, "%s(): Invalid arguments!\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
