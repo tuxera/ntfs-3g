@@ -258,6 +258,7 @@ s64 get_new_volume_size(char *s)
 {
 	s64 size;
 	char *suffix;
+	int prefix_kind = 1000;
 
 	size = strtoll(s, &suffix, 10);
 	if (size <= 0 || errno == ERANGE)
@@ -266,7 +267,9 @@ s64 get_new_volume_size(char *s)
 	if (!*suffix)
 		return size;
 
-	if (strlen(suffix) > 1)
+	if (strlen(suffix) == 2 && suffix[1] == 'i')
+		prefix_kind = 1024;
+	else if (strlen(suffix) > 1)
 		usage();
 
 	/* We follow the SI prefixes:
@@ -284,11 +287,11 @@ s64 get_new_volume_size(char *s)
 	/* FIXME: check for overflow */
 	switch (*suffix) {
 	case 'G':
-		size *= 1000;
+		size *= prefix_kind;
 	case 'M':
-		size *= 1000;
+		size *= prefix_kind;
 	case 'k':
-		size *= 1000;
+		size *= prefix_kind;
 		break;
 	default:
 		usage();
