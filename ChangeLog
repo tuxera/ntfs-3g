@@ -19,6 +19,7 @@ xx/xx/2004 - 1.9.3-WIP
 	  calls even though they exist with a different name (bswap16(), etc
 	  instead of bswap_16(), etc).  (Anton)
 	- Undelete: add ability to recover ranges of inodes.  (Holger Ohmacht)
+	- Lots of updates to ntfsinfo, see "bk changes".  (Yuval)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
