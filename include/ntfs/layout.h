@@ -1,7 +1,7 @@
 /*
  * layout.h - Ntfs on-disk layout structures. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -52,10 +52,11 @@ typedef struct {
 	u16 sectors;			/* zero */
 	u8  media_type;			/* 0xf8 = hard disk */
 	u16 sectors_per_fat;		/* zero */
-	u16 sectors_per_track;		/* irrelevant */
-	u16 heads;			/* irrelevant */
+	u16 sectors_per_track;		/* Required to boot Windows. */
+	u16 heads;			/* Required to boot Windows. */
 	u32 hidden_sectors;		/* Offset to the start of the partition
-					   relative to the disk in sectors. */
+					   relative to the disk in sectors.
+					   Required to boot Windows. */
 	u32 large_sectors;		/* zero */
 /* sizeof() = 25 (0x19) bytes */
 } __attribute__ ((__packed__)) BIOS_PARAMETER_BLOCK;

@@ -45,6 +45,14 @@
 	  cloning from larger device to a smaller one but the NTFS image 
 	  could have fit fully.
 	- Added a few (hopefully) better explanatory messages to ntfsresize.
+	- Add new API device.[hc]::ntfs_device_heads_get() and make mkntfs use
+	  it.
+	- Provide a new command line option "-H" to mkntfs to allow the user to
+	  specify the number of heads manually.
+	- Add new API device.[hc]::ntfs_device_sectors_per_track_get() and make
+	  mkntfs use it.
+	- Provide a new command line option "-S" to mkntfs to allow the user to
+	  specify the number of sectors per track manually.
 
 11/03/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
