@@ -32,7 +32,7 @@
 
 
 /**
- * ntfs_bitmap_set_bits_in__run - set a run of bits in a bitmap to a value
+ * ntfs_bitmap_set_bits_in_run - set a run of bits in a bitmap to a value
  * @na:		attribute containing the bitmap
  * @start_bit:	first bit to set
  * @count:	number of bits to set
