@@ -74,7 +74,8 @@ static __inline__ void Dprintf(const char *fmt, ...) {}
 
 #define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
 
-int win32_perror(char *file, int line, char *func, char *msg)
+int win32_perror(const char *file, int line, const char *func, const char *msg);
+int win32_perror(const char *file, int line, const char *func, const char *msg)
 {
 	char buffer[1024] = "";
 	DWORD err = GetLastError();
@@ -97,17 +98,18 @@ int win32_perror(char *file, int line, char *func, char *msg)
  */
 static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 {
-	int drive = 0, part = 0, numparams;
+	int drive = 0, numparams;
+	unsigned int part = 0;
 	HANDLE handle;
 	win32_fd fd;
 	char drive_char, filename[256];
 
-	numparams = sscanf(dev->d_name, "/dev/hd%c%d", &drive_char, &part);
+	numparams = sscanf(dev->d_name, "/dev/hd%c%u", &drive_char, &part);
 	drive = toupper(drive_char) - 'A';
 
 	if (numparams >= 1) {
 		if (numparams == 2)
-			Dprintf("win32_open(%s) -> drive %d, part %d\n",
+			Dprintf("win32_open(%s) -> drive %d, part %u\n",
 					dev->d_name, drive, part);
 		else
 			Dprintf("win32_open(%s) -> drive %d\n", dev->d_name,
@@ -139,7 +141,7 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 			DWORD numread;
 			DRIVE_LAYOUT_INFORMATION *drive_layout;
 			BOOL rvl;
-			int i;
+			unsigned int i;
 			int found = 0;
 
 			rvl = DeviceIoControl(handle,
@@ -178,7 +180,7 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 			if (!found) {
 				int err = errno;
-				fprintf(stderr, "partition %d not found on "
+				fprintf(stderr, "partition %u not found on "
 						"drive %d\n", part, drive);
 				errno = err;
 				return -1;
@@ -368,6 +370,7 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	return 0;
 }
 
+s64 win32_bias(struct ntfs_device *dev);
 s64 win32_bias(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
@@ -375,6 +378,7 @@ s64 win32_bias(struct ntfs_device *dev)
 	return fd->part_start.QuadPart;
 }
 
+s64 win32_filepos(struct ntfs_device *dev);
 s64 win32_filepos(struct ntfs_device *dev)
 {
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
@@ -412,17 +416,11 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 	return -1;
 }
 
-extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
-		void *b);
-
 static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
 {
 	return ntfs_pread(dev, offset, count, buf);
 }
-
-extern s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
-		const void *b);
 
 static s64 ntfs_device_win32_pwrite(struct ntfs_device *dev, const void *buf,
 		s64 count, s64 offset)
