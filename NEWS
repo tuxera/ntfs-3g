@@ -1,8 +1,11 @@
 Current news
 ============
 
-ntfsprogs should now compile with DJGPP under DOS, too.  Thanks to Christophe
-Grenier.
+ntfsprogs now compiles and works on FreeBSD.  Thanks to Christophe Grenier.
+
+ntfsprogs now compiles with DJGPP under DOS, too (only "make libs" target,
+which is sufficient to write DOS applications using libntfs).  Thanks to
+Christophe Grenier.
 
 Merged the NTFS Gnome VFS module by Jan Kratochvil.
 
