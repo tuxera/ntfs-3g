@@ -675,17 +675,20 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	if (attr->non_resident) {
 		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 		if (rl) {
-			sec_desc_attr = malloc(attr->data_size);
+			s64 data_size = sle64_to_cpu(attr->data_size);
+			sec_desc_attr = malloc(data_size);
 			s64 bytes_read = ntfs_rl_pread(vol, rl, 0,
-						attr->data_size, sec_desc_attr);
-			if (bytes_read != attr->data_size) {
-				Eprintf("ntfsinfo error: could not read secutiry descriptor\n");
+						data_size, sec_desc_attr);
+			if (bytes_read != data_size) {
+				Eprintf("ntfsinfo error: could not "
+						"read secutiry descriptor\n");
 				free(sec_desc_attr);
 				return;
 			}
 			free (rl);
 		} else {
-			Eprintf("ntfsinfo error: could not decompress runlist\n");
+			Eprintf("ntfsinfo error: could not "
+						"decompress runlist\n");
 			return;
 		}
 	} else {
