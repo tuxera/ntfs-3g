@@ -1,3 +1,6 @@
+xx/xx/2003 - 1.7.2-WIP - Work in progress.
+	- Further work on attribute resizing.
+
 13/02/2003 - 1.7.1 - Urgent bug fixes.
 	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):
 	  - compare_bitmaps(): fix another bug reporting the correct cluster
