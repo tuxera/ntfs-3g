@@ -170,7 +170,7 @@ int perr_exit(const char *fmt, ...)
 void usage()
 {
 	Eprintf("\nUsage: %s [options] device\n"
-		"    Efficiently clone NTFS to a sparse file, device or stdandard output.\n"
+		"    Efficiently clone NTFS to a sparse file, device or standard output.\n"
 		"\n"
 		"    -o FILE --output FILE      Clone NTFS to the non-existent FILE\n"
 		"    -O FILE --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
