@@ -134,6 +134,7 @@ AC_OUTPUT([
 	ntfstools/ntfslabel.8
 	ntfstools/ntfsinfo.8
 	ntfstools/ntfsundelete.8
+	ntfstools/ntfsresize.8
 	linux-ntfs.spec
 ])
 
