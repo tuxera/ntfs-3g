@@ -4242,6 +4242,9 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		errno = EINVAL;
 		return -1;
 	}
+	
+	if (na->data_size == newsize)
+		return 0;
 	/*
 	 * Encrypted attributes are not supported. We return access denied,
 	 * which is what Windows NT4 does, too.
