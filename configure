@@ -20028,12 +20028,13 @@ fi
 
 
 
+
 for ac_header in fcntl.h libintl.h limits.h locale.h mntent.h stddef.h \
 	stdint.h stdlib.h stdio.h stdarg.h string.h strings.h errno.h time.h \
 	unistd.h utime.h wchar.h getopt.h features.h endian.h byteswap.h \
-	sys/endian.h sys/param.h sys/ioctl.h sys/mount.h sys/stat.h \
-	sys/types.h sys/vfs.h linux/major.h linux/fd.h linux/hdreg.h \
-	machine/endian.h
+	sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h sys/mount.h \
+	sys/stat.h sys/types.h sys/vfs.h linux/major.h linux/fd.h \
+	linux/hdreg.h machine/endian.h
 do
 as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
 if eval "test \"\${$as_ac_Header+set}\" = set"; then
