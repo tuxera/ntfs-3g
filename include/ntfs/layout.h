@@ -54,7 +54,8 @@ typedef struct {
 	u16 sectors_per_fat;		/* zero */
 	u16 sectors_per_track;		/* irrelevant */
 	u16 heads;			/* irrelevant */
-	u32 hidden_sectors;		/* zero */
+	u32 hidden_sectors;		/* Offset to the start of the partition
+					   relative to the disk in sectors. */
 	u32 large_sectors;		/* zero */
 /* sizeof() = 25 (0x19) bytes */
 } __attribute__ ((__packed__)) BIOS_PARAMETER_BLOCK;
