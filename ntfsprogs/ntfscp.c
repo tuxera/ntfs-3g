@@ -204,6 +204,8 @@ int main (int argc, char *argv[])
 	ntfs_volume *vol;
 	ntfs_inode *out;
 	ntfs_attr *na;
+	ntfs_attr_search_ctx *ctx;
+	FILE_NAME_ATTR *fna;
 	int flags = 0;
 	int result = 1;
 	s64 new_size;
@@ -258,19 +260,36 @@ int main (int argc, char *argv[])
 	}
 	
 	Vprintf ("Old file size: %lld\n", na->data_size);
-//	utils_dump_mem ((u8 *) out->mrec, 0,
-//		le32_to_cpu(out->mrec->bytes_in_use), DM_INDENT | DM_GREEN);
 	if (na->data_size != new_size) {
 		if (ntfs_attr_truncate (na, new_size)) {
-//			utils_dump_mem ((u8 *) out->mrec, 0, le32_to_cpu(
-//				out->mrec->bytes_in_use), DM_INDENT | DM_RED);
 			perror ("ERROR: Couldn't resize $DATA attribute");
 			goto close_attr;
 		}
 		need_logfile_reset = 1;
+		
+		/* Update $FILE_NAME(0x30) attribute for new file size. */
+		ctx = ntfs_attr_get_search_ctx(out, NULL);
+		if (!ctx) {
+			perror("ERROR: Couldn't get search context");
+			goto close_attr;
+		}
+		if (ntfs_attr_lookup(AT_FILE_NAME, 0, 0, 0, 0, NULL, 0, ctx)) {
+			perror("ERROR: Couldn't find $FILE_NAME attribute");
+			ntfs_attr_put_search_ctx(ctx);
+			goto close_attr;
+		}
+		fna = (FILE_NAME_ATTR *)((u8*)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
+		if (NAttrNonResident(na)) {
+			fna->allocated_size = scpu_to_le64(na->allocated_size);
+			fna->data_size = scpu_to_le64(na->data_size);
+		} else {
+			fna->allocated_size = 0;
+			fna->data_size = 0;
+		}
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		ntfs_attr_put_search_ctx(ctx);
 	}
-//	utils_dump_mem ((u8 *) out->mrec, 0,
-//		le32_to_cpu(out->mrec->bytes_in_use), DM_INDENT | DM_RED);
 
 	buf = malloc (NTFS_BUF_SIZE);
 	if (!buf) {
