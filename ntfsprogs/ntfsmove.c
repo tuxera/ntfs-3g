@@ -709,7 +709,7 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 
 	// update data runs
 	ntfs_mapping_pairs_build(vol, ((u8*)rec) + rec->mapping_pairs_offset,
-			need_to, from, 0, 0);
+			need_to, from, 0, NULL);
 
 	// commit
 	ntfs_inode_mark_dirty (ino);
