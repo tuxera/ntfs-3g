@@ -3409,8 +3409,11 @@ put_err_out:
  *
  * Return 0 on success and -1 on error with errno set to the error code. The
  * following error codes are defined:
+ *	EINVAL	- Invalid arguments passed.
  *	EPERM	- The attribute is not allowed to be resident.
- *	TODO: others...
+ *	EIO	- I/O error, damaged inode or bug.
+ *	ENOSPC	- There is no enough space to perform conversion.
+ *	ENOTSUP	- Requested conversion is not supported yet.
  *
  * Warning: We do not set the inode dirty and we do not write out anything!
  *	    We expect the caller to do this as this is a fairly low level
@@ -3423,9 +3426,16 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	int name_ofs, val_ofs, err = EIO;
 	s64 arec_size, bytes_read;
 
+	/* Should be called for the first extent of the attribute. */
+	if (sle64_to_cpu(a->lowest_vcn)) {
+		Dprintf("%s(): Eeek!  Should be called for the first extent "
+			"of the attribute.  Aborting...\n", __FUNCTION__);
+		err = EINVAL;
+		return -1;
+	}
+
 	/* Some preliminary sanity checking. */
 	if (!NAttrNonResident(na)) {
-		// FIXME: Eeek!
 		Dprintf("%s(): Eeek!  Trying to make resident attribute "
 				"resident.  Aborting...\n", __FUNCTION__);
 		errno = EINVAL;
@@ -3444,27 +3454,17 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/*
 	 * Check that the attribute name hasn't been placed after the
-	 * mapping pairs array. If it has we need to move it.
-	 * TODO: Implement the move. For now just abort. (AIA)
+	 * mapping pairs array. Chkdsk treat this as corruption.
 	 */
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->mapping_pairs_offset)) {
-		// FIXME: Eeek!
-		Dprintf("%s(): Eeek!  Name is placed after the mapping "
-				"pairs array.  Aborting...\n", __FUNCTION__);
-		errno = ENOTSUP;
+		Dprintf("%s(): Eeek!  Damaged attribute. Name is placed after "
+				"the mapping pairs array. Run chkdsk.  "
+				"Aborting...\n", __FUNCTION__);
+		errno = EIO;
 		return -1;
 	}
 
-	// FIXME: For now we cheat and assume there is no attribute list
-	//	  attribute present. (AIA)
-	if (NInoAttrList(na->ni)) {
-		Dprintf("%s(): Working on files with attribute list "
-				"attribute is not implemented yet.\n",
-				__FUNCTION__);
-		errno = ENOTSUP;
-		return -1;
-	}
 	if (NAttrCompressed(na) || NAttrEncrypted(na)) {
 		Dprintf("%s(): Making compressed or encrypted files "
 				"resident is not implemented yet.\n",
@@ -3475,7 +3475,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/* Work out offsets into and size of the resident attribute. */
 	name_ofs = 24; /* = sizeof(resident_ATTR_REC); */
-	val_ofs = (name_ofs + a->name_length + 7) & ~7;
+	val_ofs = (name_ofs + a->name_length * sizeof(ntfschar) + 7) & ~7;
 	arec_size = (val_ofs + na->data_size + 7) & ~7;
 
 	/* Sanity check the size before we start modifying the attribute. */
@@ -3491,17 +3491,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/* Move the attribute name if it exists and update the offset. */
 	if (a->name_length) {
-		/* Sanity check. */
-		if (le16_to_cpu(a->name_offset) +
-				a->name_length * sizeof(ntfschar) > arec_size) {
-			// FIXME: Eeek!
-			Dprintf("%s(): Eeek! Name exceeds new record "
-					"size! Not supported. Aborting...\n",
-					__FUNCTION__);
-			errno = ENOTSUP;
-			return -1;
-		}
-
 		memmove((u8*)a + name_ofs, (u8*)a + le16_to_cpu(a->name_offset),
 				a->name_length * sizeof(ntfschar));
 	}
@@ -3509,14 +3498,14 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/* Resize the resident part of the attribute record. */
 	if (ntfs_attr_record_resize(ctx->mrec, a, arec_size) < 0) {
-		if (errno != ENOSPC) {
-			err = errno;
-			// FIXME: Eeek!
-			Dprintf("%s(): Eeek! Failed to resize "
-					"attribute record. Aborting...\n",
-					__FUNCTION__);
-			errno = err;
-		}
+		/*
+		 * Bug, because ntfs_attr_record_resize should not fail (we
+		 * already checked that attribute fits MFT record).
+		 */
+		Dprintf("%s(): BUG! Failed to resize attribute record. "
+			"Please report to the linux-ntfs-dev@lists.sf.net.  "
+			"Aborting...\n", __FUNCTION__);
+		errno = EIO;
 		return -1;
 	}
 
@@ -3546,8 +3535,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	if (bytes_read != na->initialized_size) {
 		if (bytes_read < 0)
 			err = errno;
-		// FIXME: Eeek!
 		Dprintf("%s(): Eeek! Failed to read attribute data. "
+				"Leaving inconsist metadata. Run chkdsk.  "
 				"Aborting...\n", __FUNCTION__);
 		errno = err;
 		return -1;
@@ -3567,7 +3556,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 */
 	if (ntfs_cluster_free(vol, na, 0, -1) < 0) {
 		err = errno;
-		// FIXME: Eeek!
 		Dprintf("%s(): Eeek! Failed to release allocated "
 				"clusters (error: %s).  Ignoring error and "
 				"leaving behind wasted clusters.\n",
