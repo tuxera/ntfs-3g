@@ -1,9 +1,9 @@
 /*
  * ntfscluster - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2003 Richard Russon
  *
- * This utility will XXX
+ * This utility will locate the owner of any given sector or cluster.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
