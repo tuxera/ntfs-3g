@@ -2605,13 +2605,17 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	/* Make the attribute non-resident if possible. */
 	if (!ntfs_attr_make_non_resident(na, ctx)) {
-		// TODO: Attribute is now non-resident. Resize it!
-		// goto resize_done;
-		fprintf(stderr, "%s(): TODO: Resize attribute now that "
-				"it is non-resident.\n", __FUNCTION__);
-		ntfs_inode_mark_dirty(ctx->ntfs_ino);
-		err = ENOTSUP;
-		goto put_err_out;
+		/* Resize non-resident attribute */
+		if (ntfs_attr_truncate (na, newsize)) {
+			/* 
+			 * Resize failed, but mark inode dirty because we made
+			 * it non-resident.
+			 */
+			err = errno;
+			ntfs_inode_mark_dirty(ctx->ntfs_ino);
+			goto put_err_out;
+		}
+		goto resize_done;
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
 		// FIXME: Eeek!
@@ -2734,7 +2738,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	}
 
 	/* Read and cache the whole runlist if not already done. */
-	if (ntfs_attr_map_whole_runlist(na))
+	if (!na->rl && ntfs_attr_map_whole_runlist(na))
 		return -1;
 
 	/* Move the attribute name if it exists and update the offset. */
@@ -3172,15 +3176,15 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
 			vol->cluster_size_bits;
 	/*
-	 * Compare the new allocation with the old one and only deallocate
+	 * Compare the new allocation with the old one and only allocate
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		nr_need_allocate = first_free_vcn -
 				(na->allocated_size >> vol->cluster_size_bits);
 		
-		if (ntfs_attr_map_whole_runlist (na)) {
-			err = EIO;
+		if (!na->rl && ntfs_attr_map_runlist (na, 0)) {
+			err = errno;
 			fprintf(stderr, "%s(): Eeek! "
 					"ntfs_attr_map_whole_runlist failed.\n",
 					 __FUNCTION__);
@@ -3214,17 +3218,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			fprintf(stderr, "%s(): Eeek! Run list merge "
 					"failed.\n", __FUNCTION__);
-			rln = rl;
-			if (rln->lcn == LCN_RL_NOT_MAPPED) rln++;
-			while (rln->length) {
-				if (ntfs_bitmap_clear_run(vol->lcnbmp_na,
-							rln->lcn, rln->length))
-					fprintf(stderr, "%s(): Eeek! "
-						"Deallocation of just "
-						"allocated clusters "
-						"failed.\n", __FUNCTION__);
-				rln++;
-			}
+			ntfs_cluster_free_from_rl (vol, rl);
 			free (rl);
 			goto put_err_out;
 		}
