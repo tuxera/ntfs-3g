@@ -32,6 +32,7 @@
 #include "ntfsrm.h"
 #include "debug.h"
 #include "dir.h"
+#include "lcnalloc.h"
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
@@ -978,7 +979,18 @@ static int utils_free_non_residents (ntfs_inode *inode)
 		if (arec->non_resident) {
 			na = ntfs_attr_open (inode, arec->type, NULL, 0);
 			if (na) {
-				printf ("truncate = %d\n", ntfs_attr_truncate (na, 0));
+				runlist_element *rl;
+				LCN size;
+				LCN count;
+				ntfs_attr_map_whole_runlist (na);
+				rl = na->rl;
+				size = na->allocated_size >> inode->vol->cluster_size_bits;
+				for (count = 0; count < size; count += rl->length, rl++) {
+					//printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
+					//printf ("freed %d\n", ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length));
+					ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length);
+				}
+				ntfs_attr_close (na);
 			}
 		}
 	}
@@ -1120,6 +1132,8 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	FILE_NAME_ATTR *file;
 	int filenames = 0;
 
+	// compressed & encrypted files?
+
 	del = ntfs_dt_find2 (dt, uname, len, &index_num);
 	if (!del) {
 		printf ("can't find item to delete\n");
@@ -1166,24 +1180,12 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 
 	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
 		arec = ctx->attr;
+		/*
 		if (arec->non_resident) {
-			ntfs_attr *a;
 			printf ("can't delete non-resident files\n");
-			a = ntfs_attr_open (ichild, arec->type, NULL, 0);
-			if (a) {
-				runlist_element *rl;
-				LCN size;
-				LCN count;
-				ntfs_attr_map_whole_runlist (a);
-				rl = a->rl;
-				size = a->allocated_size >> ichild->vol->cluster_size_bits;
-				for (count = 0; count < size; count += rl->length, rl++) {
-					printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
-				}
-				ntfs_attr_close (a);
-			}
-			//goto close;
+			goto close;
 		}
+		*/
 		if (arec->type == AT_ATTRIBUTE_LIST) {
 			printf ("can't delete files with an attribute list\n");
 			goto close;
@@ -1219,13 +1221,10 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	printf ("deleting file\n");
 	//ntfs_dt_print (del->dir->index_num, 0);
 
-	if (0) {
-	res = utils_free_non_residents (ichild);
-	res = utils_mftrec_mark_free (dt->dir->vol, del->children[index_num]->indexed_file);
-	res = ntfs_dt_remove (del, index_num);
-	// chkdsk will recover up to this point
-	res = utils_mftrec_mark_free2 (dt->dir->vol, del->children[index_num]->indexed_file);
-	}
+	if (1) res = utils_free_non_residents (ichild);
+	if (1) res = utils_mftrec_mark_free (dt->dir->vol, del->children[index_num]->indexed_file);
+	if (1) res = utils_mftrec_mark_free2 (dt->dir->vol, del->children[index_num]->indexed_file);
+	if (1) res = ntfs_dt_remove (del, index_num);
 
 close:
 	ntfs_attr_put_search_ctx (ctx);
