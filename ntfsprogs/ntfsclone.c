@@ -1012,7 +1012,7 @@ static void set_filesize(s64 filesize)
 			if (opt.stfs.f_type == 0x517b) {
 				Printf("SMBFS needs minimum Linux kernel "
 				       "version 2.4.25 and\n the 'lfs' option"
-				       "\nfor mount or smbmount to have large "
+				       "\nfor smbmount to have large "
 				       "file support.\n");
 			}
 		}
