@@ -1,5 +1,5 @@
 /*
- * layout.h - Ntfs on-disk layout structures. Part of the Linux-NTFS project.
+ * layout.h - Ntfs on-disk layout structures.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  *
@@ -299,7 +299,7 @@ typedef struct {
 	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
 	u16 usa_count;		/* See NTFS_RECORD definition above. */
 
-/*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
+/*  8*/	LSN lsn;		/* $LogFile sequence number for this record.
 				   Changed every time the record is modified. */
 /* 16*/	u16 sequence_number;	/* Number of times this mft record has been
 				   reused. (See description for MFT_REF
@@ -369,7 +369,7 @@ typedef struct {
 	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
 	u16 usa_count;		/* See NTFS_RECORD definition above. */
 
-/*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
+/*  8*/	LSN lsn;		/* $LogFile sequence number for this record.
 				   Changed every time the record is modified. */
 /* 16*/	u16 sequence_number;	/* Number of times this mft record has been
 				   reused. (See description for MFT_REF
@@ -1957,7 +1957,7 @@ typedef struct {
 	u16 usa_ofs;		/* See NTFS_RECORD definition. */
 	u16 usa_count;		/* See NTFS_RECORD definition. */
 
-/*  8*/	s64 lsn;		/* $LogFile sequence number of the last
+/*  8*/	LSN lsn;		/* $LogFile sequence number of the last
 				   modification of this index block. */
 /* 16*/	VCN index_block_vcn;	/* Virtual cluster number of the index block. */
 /* 24*/	INDEX_HEADER index;	/* Describes the following index entries. */
