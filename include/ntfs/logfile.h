@@ -1,7 +1,7 @@
 /*
- * logfile.h - Exports for $LogFile handling. Part of the Linux-NTFS project.
+ * logfile.h - Exports for $LogFile handling.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,6 +23,8 @@
 #define _NTFS_LOGFILE_H
 
 #include "types.h"
+#include "endians.h"
+#include "layout.h"
 
 typedef enum {
 	magic_RSTR = const_cpu_to_le32(0x52545352), /* "RSTR", restart area */
@@ -59,7 +61,7 @@ typedef struct {
 	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
 	u16 usa_count;		/* See NTFS_RECORD definition above. */
 
-	u64 chkdsk_lsn;		/* The check disk log file sequence number for
+	LSN chkdsk_lsn;		/* The check disk log file sequence number for
 				   this restart page. Only used when the
 				   magic is changed to "CHKD". = 0 */
 	u32 system_page_size;	/* Byte size of system pages, has to be >= 512
@@ -85,7 +87,7 @@ typedef struct {
  * it.
  */
 typedef struct {
-	u64 current_lsn;	/* Log file record. = 0x700000, 0x700808 */
+	LSN current_lsn;	/* Log file record. = 0x700000, 0x700808 */
 	u16 log_clients;	/* Number of log client records following
 				   the restart_area. = 1 */
 	s16 client_free_list;	/* How many clients are free(?). If != 0xffff,
@@ -147,9 +149,9 @@ typedef struct {
  * the offset of the RESTART_AREA to the client_array_offset value found in it.
  */
 typedef struct {
-	u64 oldest_lsn;		/* Oldest log file sequence number for this
+	LSN oldest_lsn;		/* Oldest log file sequence number for this
 				   client record. */
-	u64 client_restart_lsn;	/* Log file sequence number at which to
+	LSN client_restart_lsn;	/* Log file sequence number at which to
 				    restart the volume, i.e. the current
 				    position within the logfile. */
 	s16 prev_client;	/* ??? = 0xffff */
@@ -182,7 +184,7 @@ typedef struct {
 	u16 usa_count;		/* See NTFS_RECORD definition above. */
 
 	union {
-		u64 last_lsn;
+		LSN last_lsn;
 		u32 file_offset;
 	} __attribute__ ((__packed__)) copy;
 	u32 flags;
@@ -191,7 +193,7 @@ typedef struct {
 	union {
 		struct {
 			u64 next_record_offset;
-			u64 last_end_lsn;
+			LSN last_end_lsn;
 		} __attribute__ ((__packed__)) packed;
 	} __attribute__ ((__packed__)) header;
 } __attribute__ ((__packed__)) RECORD_PAGE_HEADER;
@@ -211,9 +213,9 @@ typedef enum {
  * bytes.
  */
 typedef struct {
-	u64 this_lsn;
-	u64 client_previous_lsn;
-	u64 client_undo_next_lsn;
+	LSN this_lsn;
+	LSN client_previous_lsn;
+	LSN client_undo_next_lsn;
 	u32 client_data_length;
 	struct {
 		u16 seq_number;
@@ -237,11 +239,11 @@ typedef struct {
 	u16 record_offset;
 	u16 attribute_offset;
 	u32 alignment_or_reserved;
-	s64 target_vcn;
+	VCN target_vcn;
 /* Now at ofs 0x50. */
 	struct {			   /* Only present if lcns_to_follow
 					      is not 0. */
-		s64 lcn;
+		LCN lcn;
 	} __attribute__((__packed__)) lcn_list[0];
 } __attribute__ ((__packed__)) LOG_RECORD;
 
