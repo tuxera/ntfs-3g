@@ -3,6 +3,10 @@ xx/xx/2004 - 1.9.2-WIP
 	  config.h.in sledge hammers.
 	- Fix the incorrect ntfsclone usage example in the man page.  (Szaka)
 	- Fix compiler warnings in win32_io.c.  (Yuval)
+	- Move constant bswap macros out of the ifdefs in endians.h so they are
+	  always available.  (Yuval)
+	- Add conditional include of sys/param.h in endians.h which provides
+	  endianness support on Cygwin.  (Yuval)
 
 05/04/2004 - 1.9.1 - Make mkntfs create bootable volumes and fixes/updates.
 	- Update with SuSE 9.1 beta 1 versions of GNU build system.
