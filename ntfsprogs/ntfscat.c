@@ -2,6 +2,7 @@
  * ntfscat - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Richard Russon
+ * Copyright (c) 2003 Anton Altaparmakov
  *
  * This utility will concatenate files and print on the standard output.
  *
@@ -38,12 +39,10 @@
 
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
-static int verbose = 0;
-static int quiet   = 0;
 
 GEN_PRINTF (Eprintf, stderr, NULL,     FALSE)
-GEN_PRINTF (Vprintf, stdout, &verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &quiet,   FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -71,8 +70,10 @@ void usage (void)
 {
 	printf ("\nUsage: %s [options] device file\n"
 		"    -f  --force      Use less caution\n"
+		"    -h  --help       Print this help\n"
+		"    -q  --quiet      Less output\n"
 		"    -V  --version    Version information\n"
-		"    -h  --help       Print this help\n\n",
+		"    -v  --verbose    More output\n\n",
 		//"    -A  --attribute  Display this attribute",
 		//"    -I  --file       Display this file",
 		//"    -F  --inode      Display this inode",
@@ -93,11 +94,13 @@ void usage (void)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-fh?V"; // A:F:I:N:
+	static const char *sopt = "-fh?qVv"; // A:F:I:N:
 	static const struct option lopt[] = {
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
+		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "version",	no_argument,		NULL, 'V' },
+		{ "verbose",	no_argument,		NULL, 'v' },
 	//	{ "attribute",	required_argument,	NULL, 'A' },
 	//	{ "file",	required_argument,	NULL, 'F' },
 	//	{ "inode",	required_argument,	NULL, 'I' },
@@ -132,8 +135,14 @@ int parse_options (int argc, char **argv)
 		case '?':
 			help++;
 			break;
+		case 'q':
+			opts.quiet++;
+			break;
 		case 'V':
 			ver++;
+			break;
+		case 'v':
+			opts.verbose++;
 			break;
 		default:
 			Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
@@ -143,11 +152,18 @@ int parse_options (int argc, char **argv)
 	}
 
 	if (help || ver) {
+		opts.quiet = 0;
 	} else {
 		if ((opts.device == NULL) ||
 		    (opts.file   == NULL)) {
 			if (argc > 1)
 				Eprintf ("You must specify one device and one file.\n");
+			err++;
+		}
+
+		if (opts.quiet && opts.verbose) {
+			Eprintf("You may not use --quiet and --verbose at the "
+					"same time.\n");
 			err++;
 		}
 	}
