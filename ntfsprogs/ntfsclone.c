@@ -903,7 +903,7 @@ static s64 device_size_get(int fd)
 {
 	s64 high, low;
 #ifdef BLKGETSIZE
-	long size;
+	unsigned long size;
 
 	if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
 		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
