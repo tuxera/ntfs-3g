@@ -175,7 +175,9 @@
 		ntfs_inode_sync().
 	- Change ntfs_inode_close() to write out dirty inodes and inode extents.
 	- New API functions provided by lcnalloc.[hc]:
-		ntfs_cluster_{alloc,free}().
+		ntfs_cluster_{alloc,free}(). -- WIP
+	- New API functions provided by runlist.[hc]:
+		ntfs_rl_truncate(). -- WIP
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
