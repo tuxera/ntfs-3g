@@ -1,6 +1,9 @@
 Current news
 ============
 
+ntfsprogs now should ./configure and compile cleanly on SuSE as well as RedHat
+Linux.
+
 ntfsprogs now compiles and works on FreeBSD.  Thanks to Christophe Grenier.
 
 ntfsprogs now compiles with DJGPP under DOS, too (only "make libs" target,
