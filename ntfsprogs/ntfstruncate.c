@@ -170,8 +170,8 @@ void usage(void) __attribute__ ((noreturn));
 void usage (void)
 {
 	copyright();
-	fprintf(stderr, "Usage: %s [options] device [attr-type [attr-name]] "
-			"new-length\n"
+	fprintf(stderr, "Usage: %s [options] device inode [attr-type "
+			"[attr-name]] new-length\n"
 			"    If attr-type is not specified, 0x80 (i.e. $DATA) "
 			"is assumed.\n"
 			"    If attr-name is not specified, an unnamed "
