@@ -41,11 +41,11 @@
 		ntfs_attr_{get,put,reinit}_search_ctx(), and
 		ntfs_attr_lookup().
 	- Add a TODO.libntfs laying down my personal roadmap for the library.
-	- Remove ntfs_attr_find() from API, everyone must use ntfs_lookup_attr()
+	- Remove ntfs_attr_find() from API, everyone must use ntfs_attr_lookup()
 	  instead.
 	- Rename all attribute name constants from $blah to AT_blah.
 	- Rename all system file constants from FILE_$blah to FILE_blah.
-	- Port ntfS_attr_lookup() stuff from ntfs tng driver.
+	- Port ntfs_attr_lookup() stuff from ntfs tng driver.
 	- Implement loading of extent inodes. They are attached on open to the
 	  base inode and are cached there until the base inode is closed.
 	- Cleanup/streamline include file dependencies.
@@ -140,7 +140,7 @@
 		ntfs_volume_set_flags().
 	- Change size autodetection of non-block device files in mkntfs to use
 	  the stat returned file size rather than the block allocation count to
-	  cope with precreated sparse files.
+	  cope with pre-created sparse files.
 	- Remove GPL message text from usage information in mkntfs.
 	- New tool, ntfsundelete, written by Richard Russon.
 	- New tool, ntfsresize, written by Szabolcs Szakacsits.
