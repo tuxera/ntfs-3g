@@ -289,7 +289,7 @@ extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
 		
 extern int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni);
-extern int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx);
+extern int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra);
 
 extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na);
 

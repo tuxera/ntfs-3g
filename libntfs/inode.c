@@ -807,7 +807,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		record_size = le32_to_cpu(ctx->attr->length);
 
 		/* Move away attribute. */
-		if (ntfs_attr_record_move_away(ctx)) {
+		if (ntfs_attr_record_move_away(ctx, 0)) {
 			err = errno;
 			Dprintf("%s(): Failed to move out attribute.\n",
 					__FUNCTION__);

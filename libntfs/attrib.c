@@ -3046,19 +3046,23 @@ put_err_out:
 /**
  * ntfs_attr_record_move_away - move away attribute record from it's mft record
  * @ctx:	attribute search context describing the attrubute record
+ * @extra:	minimum amount of free spase in the new holder of record
  *
+ * New attribute record holder must have free @extra bytes after moving
+ * attribute record to it.
+ * 
  * If this function succeed, user should reinit search context if he/she wants
  * use it anymore.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
-int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx)
+int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 {
 	ntfs_inode *base_ni, *ni;
 	MFT_RECORD *m;
 	int i, err;
 
-	if (!ctx || !ctx->attr || !ctx->ntfs_ino) {
+	if (!ctx || !ctx->attr || !ctx->ntfs_ino || extra < 0) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
@@ -3097,7 +3101,7 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx)
 
 		if (le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) <
-				le32_to_cpu(ctx->attr->length))
+				le32_to_cpu(ctx->attr->length) + extra)
 			continue;
 
 		if (!ntfs_attr_record_move_to(ctx, ni))
