@@ -1,11 +1,11 @@
 .\" -*- nroff -*-
 .\" Copyright (c) 2003 Richard Russon
-.\" Copyright (c) 2003-2004 Szabolcs Szakacsits
+.\" Copyright (c) 2003-2005 Szabolcs Szakacsits
 .\" Copyright (c) 2004 Per Olofsson
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Sep 2004" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "Feb 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .SH SYNOPSIS
@@ -190,6 +190,8 @@ Forces ntfsclone to proceed if the filesystem is marked
 .TP
 .B \-h, \-\-help
 Show a list of options with a brief description of each one.
+.SH EXIT CODES
+The exit code is 0 on success, non-zero otherwise. 
 .SH EXAMPLES
 Save an NTFS to a file in the special image format
 .RS
