@@ -1606,10 +1606,11 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  * FIXME: this function should go away and instead using a generalized
  * "truncate_bitmap_data_attr()"
  */
-static void truncate_badclust_bad_attr(ntfs_attr_search_ctx *ctx, s64 nr_clusters)
+static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 {
 	runlist *rl_bad;
-	ATTR_RECORD *a = ctx->attr;
+	ATTR_RECORD *a = resize->ctx->attr;
+	s64 nr_clusters = resize->new_volume_size;
 
 	if (!a->non_resident)
 		/* FIXME: handle resident attribute value */
@@ -1625,7 +1626,7 @@ static void truncate_badclust_bad_attr(ntfs_attr_search_ctx *ctx, s64 nr_cluster
 	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
 	rl_set(rl_bad + 1, nr_clusters, -1LL, 0LL);
 
-	replace_attribute_runlist(ctx, rl_bad);
+	replace_attribute_runlist(resize->ctx, rl_bad);
 
 	free(rl_bad);
 }
@@ -1799,20 +1800,18 @@ static void lookup_data_attr(MFT_REF mref, const char *aname, ntfs_attr_search_c
  *
  * Shrink the $BadClus file to match the new volume size.
  */
-static void truncate_badclust_file(s64 nr_clusters)
+static void truncate_badclust_file(ntfs_resize_t *resize)
 {
-	ntfs_attr_search_ctx *ctx = NULL;
-
 	printf("Updating $BadClust file ...\n");
 
-	lookup_data_attr((MFT_REF)FILE_BadClus, "$Bad", &ctx);
+	lookup_data_attr((MFT_REF)FILE_BadClus, "$Bad", &resize->ctx);
 	/* FIXME: sanity_check_attr(ctx->attr); */
-	truncate_badclust_bad_attr(ctx, nr_clusters);
+	truncate_badclust_bad_attr(resize);
 
-	if (write_mft_record(ctx->ntfs_ino->mft_no, ctx->mrec))
+	if (write_mft_record(resize->ctx->ntfs_ino->mft_no,resize->ctx->mrec))
 		perr_exit("Couldn't update $BadClust");
 
-	ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(resize->ctx);
 }
 
 /**
@@ -2163,7 +2162,7 @@ int main(int argc, char **argv)
 	if (resize.relocations)
 		relocate_inodes(&resize);
 
-	truncate_badclust_file(new_size);
+	truncate_badclust_file(&resize);
 	truncate_bitmap_file(&resize);
 	update_bootsector(&resize);
 
