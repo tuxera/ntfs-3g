@@ -723,7 +723,8 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		if (lcn < 0 || lcn_length < 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
 				 "%llx length %llx\n", ctx->ntfs_ino->mft_no,
-				 le32_to_cpu (a->type), lcn, lcn_length);
+				 (unsigned int)le32_to_cpu(a->type), lcn,
+				 lcn_length);
 		
 		if (!wipe)
 			dump_clusters(walk->image, rl + i);
@@ -1007,7 +1008,7 @@ static void print_image_info(void)
 	Printf("NTFS volume version: %d.%d\n",
 	       image_hdr.major_ver, image_hdr.minor_ver);
 	Printf("Cluster size       : %u bytes\n",
-	       image_hdr.cluster_size);
+	       (unsigned int)image_hdr.cluster_size);
 	print_volume_size("Image volume size  ",
 			  image_hdr.cluster_size
 			  * image_hdr.nr_clusters);
@@ -1064,7 +1065,8 @@ static void mount_volume(unsigned long new_mntflag)
 				 "please try again (or see -f option).\n");
 	
 	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
-		err_exit("Cluster size %u is too large!\n", vol->cluster_size);
+		err_exit("Cluster size %u is too large!\n",
+				(unsigned int)vol->cluster_size);
 
 	Printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
 	if (ntfs_version_is_supported(vol))

@@ -772,7 +772,8 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
 				 "%llx length %llx\n", inode,
-				 le32_to_cpu(a->type), lcn, lcn_length);
+				 (unsigned int)le32_to_cpu(a->type), lcn,
+				 lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
@@ -1529,7 +1530,8 @@ static void relocate_attribute(ntfs_resize_t *resize)
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in MTF %llu attr %x LCN "
 				 "%llx length %llx\n", resize->mref,
-				 le32_to_cpu (a->type), lcn, lcn_length);
+				 (unsigned int)le32_to_cpu(a->type),
+				 lcn, lcn_length);
 
 		relocate_run(resize, &rl, i);
 	}
@@ -2046,7 +2048,8 @@ static ntfs_volume *mount_volume(void)
 				 "please try again (or see -f option).\n");
 	
 	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
-		err_exit("Cluster size %u is too large!\n", vol->cluster_size);
+		err_exit("Cluster size %u is too large!\n",
+			(unsigned int)vol->cluster_size);
 
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
 	if (ntfs_version_is_supported(vol))
