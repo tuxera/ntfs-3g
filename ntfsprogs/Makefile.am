@@ -30,7 +30,8 @@ sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone
 EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
-			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8
+			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
+			  ntfsclone.8 ntfscluster.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)

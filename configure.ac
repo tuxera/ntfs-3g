@@ -140,6 +140,8 @@ AC_CONFIG_FILES([
 	libntfs/Makefile
 	ntfsprogs/Makefile
 	ntfsprogs/mkntfs.8
+	ntfsprogs/ntfsclone.8
+	ntfsprogs/ntfscluster.8
 	ntfsprogs/ntfsfix.8
 	ntfsprogs/ntfsinfo.8
 	ntfsprogs/ntfslabel.8
