@@ -1049,7 +1049,7 @@ typedef struct {
  * twelve hexadecimal digits. GUIDs are Microsoft's implementation of the
  * distributed computing environment (DCE) universally unique identifier (UUID).
  * Example of a GUID:
- *	1F010768-5A73-BC91-0010A52216A7
+ *	1F010768-5A73-BC91-0010-A52216A7
  */
 typedef struct {
 	u32 data1;	/* The first eight hexadecimal digits of the GUID. */
@@ -1243,11 +1243,13 @@ typedef enum {					/* Identifier authority. */
 
 /*
  * The SID_IDENTIFIER_AUTHORITY is a 48-bit value used in the SID structure.
+ *
+ * NOTE: This is stored as a big endian number.
  */
 typedef union {
 	struct {
-		u32 low_part;		/* Low 32-bits. */
 		u16 high_part;		/* High 16-bits. */
+		u32 low_part;		/* Low 32-bits. */
 	} __attribute__ ((__packed__));
 	u8 value[6];			/* Value as individual bytes. */
 } __attribute__ ((__packed__)) SID_IDENTIFIER_AUTHORITY;
@@ -1262,9 +1264,11 @@ typedef union {
  *    - The first "S" is the literal character 'S' identifying the following
  *	digits as a SID.
  *    - R is the revision level of the SID expressed as a sequence of digits
- *	either in decimal or hexadecimal (if the later, prefixed by "0x").
- *    - I is the 48-bit identifier_authority, expressed as digits as R above.
- *    - S... is one or more sub_authority values, expressed as digits as above.
+ *	in decimal.
+ *    - I is the 48-bit identifier_authority, expressed as digits in decimal,
+ *	if I < 2^32, or hexadecimal prefixed by "0x", if I >= 2^32.
+ *    - S... is one or more sub_authority values, expressed as digits in
+ *	decimal.
  *
  * Example SID; the domain-relative SID of the local Administrators group on
  * Windows NT/2k:
