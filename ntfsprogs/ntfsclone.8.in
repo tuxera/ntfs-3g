@@ -5,7 +5,7 @@
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Jul 2004" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "Sep 2004" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .SH SYNOPSIS
@@ -30,7 +30,7 @@ will efficiently clone (copy, save, backup, restore) an NTFS filesystem to a
 sparse file, image, device (partition) or standard output. 
 It works at disk sector level and
 copies only the used data. Unused disk space becomes zero (cloning to 
-sparse file), encoded with control codes (cloning to an image),
+sparse file), encoded with control codes (saving in special image format),
 left unchanged (cloning to a disk/partition) or 
 filled with zeros (cloning to standard output).
 
@@ -40,7 +40,7 @@ and restore it later on, or for developers to test NTFS read/write
 functionality, troubleshot/investigate users' issues using the clone
 without the risk of destroying the original filesystem.
 
-The clone (if not using the image format) is an exact copy of the original
+The clone, if not using the special image format, is an exact copy of the original
 NTFS filesystem from sector to sector thus it can be also mounted
 just like the original NTFS filesystem.
 For example if you clone to a file and the kernel has loopback device and
@@ -96,8 +96,9 @@ in-place by just reading
 .BR ntfsclone
 standard output.
 .SH THE SPECIAL IMAGE FORMAT
-It is also possible to clone an NTFS filesystem to a special image
-format. Instead of representing unallocated blocks as holes, they are
+It's also possible, actually it's recommended, to save an NTFS filesystem 
+to a special image format. 
+Instead of representing unallocated blocks as holes, they are
 encoded using control codes. Thus, the image saves space without
 requiring sparse file support. The image format is ideal for streaming
 filesystem images over the network and similar, and can be used as a
@@ -120,7 +121,7 @@ file.
 .SH METADATA-ONLY CLONING
 One of the features of
 .BR ntfsclone
-is it can also save only the NTFS metadata using the option
+is that, it can also save only the NTFS metadata using the option
 .B \-m
 or
 .B \-\-metadata
@@ -190,63 +191,47 @@ Forces ntfsclone to proceed if the filesystem is marked
 .B \-h, \-\-help
 Show a list of options with a brief description of each one.
 .SH EXAMPLES
-Clone (save, backup) an NTFS volume to a non-existent file
+Save an NTFS to a file in the special image format
 .RS
 .sp
-.B ntfsclone \-\-output ntfs.img /dev/hda1
+.B ntfsclone \-\-save\-image \-\-output ntfs-backup.img /dev/hda1
 .sp
 .RE
-Restore a clone image to its original partition
+Restore an NTFS from a special image file to its original partition
 .RS
 .sp
-.B ntfsclone \-\-overwrite /dev/hda1 ntfs.img 
+.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 ntfs-backup.img 
 .sp
 .RE
-Space and speed-wise the most efficient way to compress a clone image
+Save an NTFS into a compressed image. Note, gzip is faster usually 
+at least 2-4 times than bzip2 but it creates also bigger compressed files.
 .RS
 .sp
-.B tar \-cjSf ntfs.img.tar.bz2 ntfs.img
+.B ntfsclone \-\-save-image \-o \- /dev/hda1 | bzip2 \-c > ntfs.img.bz2
 .sp
 .RE
-Uncompressing a 
-.BR tar 
-archived clone image 
+Restore an NTFS volume from a compressed image file
 .RS
 .sp
-.B tar \-xjSf ntfs.img.tar.bz2
+.B bunzip2 \-c ntfs.img.bz2 | \\\\
+.br
+.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
-In-place compressing an NTFS volume. Note, gzip is faster usually 
-at least 2-4  times but it creates also bigger compressed files.
+Backup an NTFS volume to a remote host, using ssh.
 .RS
 .sp
-.B ntfsclone \-\-output \- /dev/hda1 | bzip2 \-c > ntfs.img.bz2
-.sp
-.RE
-Restore an NTFS volume from a compressed image
-.RS
-.sp
-.B bunzip2 \-c ntfs.img.bz2 | dd of=/dev/hda1 bs=8192
-.sp
-.RE
-Backup an NTFS volume to a remote host, using
-.BR ssh
-default compression. 
-.RS
-.sp
-.B ntfsclone \-o \- /dev/hda1 | ssh \-C host 'bzip \-c9 > ntfs.img.bz2'
+.B ntfsclone \-\-save-image \-\-output \- /dev/hda1 | \\\\
+.br
+.B gzip \-c | ssh host 'cat > ntfs.img.gz'
 .sp
 .RE
 Restore an NTFS volume from a remote host via ssh.
 .RS
 .sp
-.B ssh host 'cat ntfs.img.bz2' | bunzip2 | dd of=/dev/hda1 bs=8192
-.sp
-.RE
-Save a filesystem to a file in the special image format
-.RS
-.sp
-.B ntfsclone \-\-save\-image \-\-output ntfs.img /dev/hda1
+.B ssh host 'cat ntfs.img.gz' | gunzip -c | \\\\
+.br
+.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
 Stream an image from a web server and restore it to a partition
@@ -257,6 +242,12 @@ Stream an image from a web server and restore it to a partition
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
+Clone an NTFS volume to a non-existent file
+.RS
+.sp
+.B ntfsclone \-\-output ntfs-clone.img /dev/hda1
+.sp
+.RE
 Pack NTFS metadata for NTFS experts
 .RS
 .sp
@@ -264,7 +255,8 @@ Pack NTFS metadata for NTFS experts
 .br
 .B tar \-cjSf ntfsmeta.img.tar.bz2 ntfsmeta.img
 .SH KNOWN ISSUES
-This program has no known bugs.  If you find one, please send an email to
+This program has no known bugs. If you think you have found one then 
+please send an email to
 .nh
 <linux-ntfs-dev@lists.sourceforge.net>.
 
