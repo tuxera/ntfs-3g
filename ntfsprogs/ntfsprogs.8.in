@@ -14,6 +14,11 @@ available for free and come with full source code.
 .PP
 .BR mkntfs (8)
 : Format a partition using NTFS.
+.SS ntfscat
+.PP
+.BR ntfscat (8)
+: Dump a file's contents to the standard output.
+.PP
 .SS ntfsclone
 .PP
 .BR ntfsclone (8)
