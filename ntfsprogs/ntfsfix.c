@@ -1,7 +1,7 @@
 /*
  * NtfsFix - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2003 Anton Altaparmakov.
  *
  * This utility will attempt to fix a partition that has been damaged by the
  * current Linux-NTFS driver. It should be run after dismounting a NTFS
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 		       "*before*\nrebooting into Windows NT/2000/XP or you "
 		       "*will* suffer! - You have been warned!\n\n"
 		       /* Generic copyright / disclaimer. */
-		       "Copyright (c) 2000-2002 Anton Altaparmakov.\n\n"
+		       "Copyright (c) 2000-2003 Anton Altaparmakov.\n\n"
 		       "%s is free software, released under the GNU "
 		       "General Public License and you\nare welcome to "
 		       "redistribute it under certain conditions.\n"

@@ -1,7 +1,7 @@
 /*
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  * Copyright (c) 2001-2002 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
@@ -2261,7 +2261,7 @@ void usage(void) __attribute__ ((noreturn));
 
 void usage(void)
 {
-	fprintf(stderr, "Copyright (c) 2001,2002 Anton Altaparmakov.\n"
+	fprintf(stderr, "Copyright (c) 2001-2003 Anton Altaparmakov.\n"
 		"Create an NTFS volume on a user specified (block) device.\n"
 		"Usage: %s [-s sector-size] [-c cluster-size] "
 			"[-L volume-label]\n\t[-z mft-zone-multiplier] "

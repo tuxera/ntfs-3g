@@ -1,7 +1,7 @@
 /*
  * ntfstruncate - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Anton Altaparmakov
  *
  * This utility will truncate a specified attribute belonging to a
  * specified inode, i.e. file or directory, to a specified length.
@@ -551,8 +551,8 @@ void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s -- Copyright (c) 2002 Anton Altaparmakov\n",
-			EXEC_NAME, VERSION);
+	fprintf(stderr, "%s v%s -- Copyright (c) 2002-2003 Anton "
+			"Altaparmakov\n", EXEC_NAME, VERSION);
 	while ((c = getopt(argc, argv, "fhnqvV")) != EOF)
 		switch (c) {
 		case 'f':
