@@ -2,6 +2,7 @@
  * inode.h - Defines for NTFS inode handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -145,6 +146,8 @@ static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni) {
 }
 
 extern int ntfs_inode_sync(ntfs_inode *ni);
+
+extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
 
 #endif /* defined _NTFS_INODE_H */
 
