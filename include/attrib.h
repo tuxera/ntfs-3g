@@ -254,6 +254,9 @@ extern int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn);
 extern LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn);
 extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
 
+extern int ntfs_attr_size_bounds_check(const ntfs_volume *vol,
+		const ATTR_TYPES type, const s64 size);
+
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
 
