@@ -156,14 +156,14 @@ typedef enum {
 
 /**
  * ntfs_attr - ntfs in memory non-resident attribute structure
- * @rl:		if not NULL, the decompressed run list
+ * @rl:		if not NULL, the decompressed runlist
  * @ni:		base ntfs inode to which this attribute belongs
  * @type:	attribute type
  * @name:	Unicode name of the attribute
  * @name_len:	length of @name in Unicode characters
  * @state:	NTFS attribute specific flags descibing this attribute
  *
- * This structure exists purely to provide a mechanism of caching the run list
+ * This structure exists purely to provide a mechanism of caching the runlist
  * of an attribute. If you want to operate on a particular attribute extent,
  * you should not be using this structure at all. If you want to work with a
  * resident attribute, you should not be using this structure at all. As a
@@ -175,9 +175,9 @@ typedef enum {
  * record, edit that, and then write back the mft record (or set the
  * corresponding ntfs inode dirty for delayed write back).
  *
- * @rl is the decompressed run list of the attribute described by this
+ * @rl is the decompressed runlist of the attribute described by this
  * structure. Obviously this only makes sense if the attribute is not resident,
- * i.e. NAttrNonResident() is true. If the run list hasn't been decomressed yet
+ * i.e. NAttrNonResident() is true. If the runlist hasn't been decomressed yet
  * @rl is NULL, so be prepared to cope with @rl == NULL.
  *
  * @ni is the base ntfs inode of the attribute described by this structure.
@@ -190,7 +190,7 @@ typedef enum {
  * structure. See ntfs_attr_state_bits above.
  */
 struct _ntfs_attr {
-	run_list_element *rl;
+	runlist_element *rl;
 	ntfs_inode *ni;
 	ATTR_TYPES type;
 	uchar_t *name;
@@ -251,14 +251,14 @@ extern s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos,
 extern s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos,
 		s64 bk_cnt, const u32 bk_size, void *src);
 
-extern int ntfs_attr_map_run_list(ntfs_attr *na, VCN vcn);
+extern int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn);
 
 extern LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn);
-extern run_list_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
+extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
 
 extern int ntfs_get_nr_significant_bytes(const s64 n);
 extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const run_list_element *rl);
+		const runlist_element *rl);
 
 extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
 		const s64 n);

@@ -28,14 +28,14 @@
 #include "types.h"
 
 /* Forward declarations */
-typedef struct _run_list_element run_list_element;
-typedef run_list_element run_list;
+typedef struct _runlist_element runlist_element;
+typedef runlist_element runlist;
 
 #include "attrib.h"
 #include "volume.h"
 
 /*
- * run_list_element - in memory vcn to lcn mapping array element
+ * runlist_element - in memory vcn to lcn mapping array element
  * @vcn:	starting vcn of the current array element
  * @lcn:	starting lcn of the current array element
  * @length:	length in clusters of the current array element
@@ -45,25 +45,25 @@ typedef run_list_element run_list;
  * When lcn == -1 this means that the count vcns starting at vcn are not
  * physically allocated (i.e. this is a hole / data is sparse).
  */
-struct _run_list_element {/* In memory vcn to lcn mapping structure element. */
+struct _runlist_element {/* In memory vcn to lcn mapping structure element. */
 	VCN vcn;	/* vcn = Starting virtual cluster number. */
 	LCN lcn;	/* lcn = Starting logical cluster number. */
 	s64 length;	/* Run length in clusters. */
 };
 
-extern LCN ntfs_rl_vcn_to_lcn(const run_list_element *rl, const VCN vcn);
+extern LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
-extern s64 ntfs_rl_pwrite(const ntfs_volume *vol, const run_list_element *rl,
+extern s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		const s64 pos, s64 count, void *b);
 
-extern run_list_element *ntfs_merge_run_lists(run_list_element *drl,
-		run_list_element *srl);
+extern runlist_element *ntfs_merge_runlists(runlist_element *drl,
+		runlist_element *srl);
 
-extern run_list_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
-		const ATTR_RECORD *attr, run_list_element *old_rl);
+extern runlist_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
+		const ATTR_RECORD *attr, runlist_element *old_rl);
 
 extern int ntfs_build_mapping_pairs(const ntfs_volume *vol, s8 *dst,
-		const int dst_len, const run_list_element *rl);
+		const int dst_len, const runlist_element *rl);
 
 #endif /* defined _NTFS_RUNLIST_H */
 

@@ -54,15 +54,15 @@
 	  of using the opt global structure. Necessary so can call the
 	  modified ntfs_decompress_mapping_pairs() from mkntfs.c.
 	- Add libntfs/debug.c providing:
-		ntfs_debug_dump_run_list().
+		ntfs_debug_dump_runlist().
 	- Add new API call ntfs_check_if_mounted() to volume.[ch]. (Matthew
 	  Fanto, me)
 	- Do folding assisting cleanups. (Richard Russon, me)
 	- Add new API call is_boot_sector_ntfs() provided by bootsect.[hc].
 	- Define and write more API calls provided by attrib.[ch]:
-		ntfs_merge_run_lists(),
+		ntfs_merge_runlists(),
 		ntfs_decompress_mapping_pairs(),
-		ntfs_attr_map_run_list(),
+		ntfs_attr_map_runlist(),
 		ntfs_{rl,attr}_vcn_to_lcn(),
 		ntfs_attr_find_vcn(),
 		ntfs_attr_init(),
@@ -119,7 +119,7 @@
 	  instead of aborting and returning error EIO to flag the corruption.
 	- Add new syntactic sugar API provided by attrib.h:
 		ntfs_walk_attrs(). (Szakacsits Szabolcs)
-	- Add new API for compressing run lists into mapping pairs arrays
+	- Add new API for compressing runlists into mapping pairs arrays
 	  provided by attrib.[ch] (adapted from mkntfs.c):
 		ntfs_get_nr_significant_bytes(),
 		ntfs_get_size_for_mapping_pairs(),
@@ -132,7 +132,7 @@
 	  flexible use.
 	- Don't use string concatenation with __FUNCTION__ as gcc-3.x don't
 	  like it.
-	- Move run list functions to runlist.[hc]. (Richard Russon)
+	- Move runlist functions to runlist.[hc]. (Richard Russon)
 	- Add new API to volume.[hc] and use it (Szakacsits Szabolcs):
 		ntfs_is_version_supported(),
 		NTFS_V{1_[12],2_x,3_[01]}() macros,

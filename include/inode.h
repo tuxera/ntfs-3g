@@ -86,7 +86,7 @@ struct _ntfs_inode {
 	 */
 	u32 attr_list_size;	/* Length of attribute list value in bytes. */
 	u8 *attr_list;		/* Attribute list value itself. */
-	run_list *attr_list_rl;	/* Run list for the attribute list value. */
+	runlist *attr_list_rl;	/* Run list for the attribute list value. */
 	s32 nr_extents;		/* For a base mft record, the number of
 				   attached extent inodes (0 if none), for
 				   extent records this is -1. */

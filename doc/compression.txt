@@ -11,7 +11,7 @@ Regis Duchesne's NTFS documentation and from various LZ77 descriptions) and
 further refined by looking at a few compressed streams to figure out some
 uncertainties.
 
-Note: You should also read the run list description with regards to compression
+Note: You should also read the runlist description with regards to compression
 in linux-ntfs/include/layout.h. Just search for "Attribute compression".
 FIXME: Should merge the info from there into this document some time.
 
@@ -30,14 +30,14 @@ Each cb is independent of the other cbs and is thus the minimal unit we have
 to parse even if we wanted to decompress only one byte.
 
 Also, a cb can be totally uncompressed and this would be indicated as a sparse
-cb in the run list.
+cb in the runlist.
 
-Thus, we need to look at the run list of the compressed data stream, starting
+Thus, we need to look at the runlist of the compressed data stream, starting
 at the beginning of the first cb overlapping @page. So we convert the page
 offset into units of clusters (vcn), and round the vcn down to a mutliple of
 cb_size clusters.
 
-We then scan the run list for the appropriate position. Based on what we find
+We then scan the runlist for the appropriate position. Based on what we find
 there, we decide how to proceed.
 
 If the cb is not compressed at all, and covers the whole of @page, we pretend

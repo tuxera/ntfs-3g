@@ -25,16 +25,16 @@
 
 #ifdef DEBUG
 /**
- * ntfs_debug_dump_run_list - Dump a run list.
+ * ntfs_debug_dump_runlist - Dump a runlist.
  */
-void ntfs_debug_dump_run_list(const run_list_element *rl)
+void ntfs_debug_dump_runlist(const runlist_element *rl)
 {
 	int i = 0;
 	const char *lcn_str[5] = { "LCN_HOLE         ", "LCN_RL_NOT_MAPPED",
 				   "LCN_ENOENT       ", "LCN_EINVAL       ",
 				   "LCN_unknown      " };
 
-	Dputs("NTFS-fs DEBUG: Dumping run list (values in hex):");
+	Dputs("NTFS-fs DEBUG: Dumping runlist (values in hex):");
 	if (!rl) {
 		Dputs("Run list not present.");
 		return;
@@ -50,11 +50,11 @@ void ntfs_debug_dump_run_list(const run_list_element *rl)
 				index = 4;
 			Dprintf("%-16Lx %s %-16Lx%s\n", rl[i].vcn,
 					lcn_str[index], rl[i].length,
-					rl[i].length ? "" : " (run list end)");
+					rl[i].length ? "" : " (runlist end)");
 		} else
 			Dprintf("%-16Lx %-16Lx  %-16Lx%s\n", rl[i].vcn,
 					rl[i].lcn, rl[i].length,
-					rl[i].length ? "" : " (run list end)");
+					rl[i].length ? "" : " (runlist end)");
 	} while (rl[i++].length);
 }
 

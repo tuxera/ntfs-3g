@@ -65,14 +65,14 @@ static __inline__ void Dperror(const char *s)
 	errno = eo;
 }
 
-extern void ntfs_debug_dump_run_list(const run_list_element *rl);
+extern void ntfs_debug_dump_runlist(const runlist_element *rl);
 
 #else
 
 static __inline__ void Dprintf(const char *fmt, ...) {}
 static __inline__ void Dputs(const char *s) {}
 static __inline__ void Dperror(const char *s) {}
-static __inline__ void ntfs_debug_dump_run_list(const run_list_element *rl) {}
+static __inline__ void ntfs_debug_dump_runlist(const runlist_element *rl) {}
 
 #endif
 

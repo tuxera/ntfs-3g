@@ -95,7 +95,7 @@ static __inline__ int __release_ntfs_inode(ntfs_inode *ni)
  * is found, load the attribute list attribute value and attach it to the
  * ntfs_inode structure (->attr_list). Also set the NI_AttrList bit to indicate
  * this as well as the NI_AttrListNonResident bit if the the attribute list is
- * non-resident. In that case, also attach the decompressed run list to the
+ * non-resident. In that case, also attach the decompressed runlist to the
  * ntfs_inode structure (->attr_list_rl).
  *
  * Return a pointer to the ntfs_inode structure on success or NULL on error,
@@ -159,7 +159,7 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 	// FIXME: We are duplicating work here! (AIA)
 	ni->attr_list_rl = ntfs_decompress_mapping_pairs(vol, ctx->attr, NULL);
 	if (ni->attr_list_rl) {
-		/* We got the run list, so we are done. */
+		/* We got the runlist, so we are done. */
 		ntfs_put_attr_search_ctx(ctx);
 		return ni;
 	}
@@ -195,7 +195,7 @@ err_out:
  * error, @ni has not been freed. The user should attempt to handle the error
  * and call ntfs_close_inode() again. The following error codes are defined:
  *
- *	EBUSY	@ni is dirty and/or the attribute list run list is dirty.
+ *	EBUSY	@ni is dirty and/or the attribute list runlist is dirty.
  */
 int ntfs_close_inode(ntfs_inode *ni)
 {
