@@ -74,6 +74,16 @@ xx/xx/2004 - 2.0.0-WIP
 	  ntfs_resident_attr_resize use it.  (Yura)
 	- Improve ntfs_resident_attr_resize to try make attributes non-resident
 	  when such convert is reasonable.  (Yura)
+	- New API attrib.[ch]::ntfs_attr_record_move_away().  (Yura)
+	- New API inode.[ch]::ntfs_inode_attach_all_extents .  (Yura)
+	- New API inode.[ch]::ntfs_inode_free_space.  (Yura)
+	- Improved layout.h::ATTR_RECORD to have
+	  {compressed_non_,non_,}resident_attr_end fields. Use
+	  offsetof(ATTR_RECORD, *resident_attr_end) to get size of accordable
+	  attribute.  (Yura)
+	- Make ntfs_attr_update_mapping_pairs and ntfs_inode_add_attrlist use
+	  ntfs_inode_free_space when there is no enough space for attribute
+	  list.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
