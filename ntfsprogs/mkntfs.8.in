@@ -13,6 +13,10 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 .I sector-size
 ]
 [
+.B \-p
+.I part-start-sect
+]
+[
 .B \-c
 .I cluster-size
 ]
@@ -80,21 +84,29 @@ automagically figures the file system size.
 Specify the size of sectors in bytes. Valid sector size values are 256, 512,
 1024, 2048 and 4096 bytes per sector. If omitted,
 .B mkntfs
+attempts to determine the
 .I sector-size
-is determined automatically and if that fails a default of 512
-bytes per sector is used.
+automatically and if that fails a default of 512 bytes per sector is used.
+.TP
+.BI \-p " part-start-sect"
+Specify the partition start sector. The maximum is 4294967295 (2^32-1). If
+omitted,
+.B mkntfs
+attempts to determine
+.I part-start-sect
+automatically and if that fails a default of 0 is used.
 .TP
 .BI \-c " cluster-size"
 Specify the size of clusters in bytes. Valid cluster size values are powers of
 two, with at least 256, and at most 65536 bytes per cluster. If omitted,
 .B mkntfs
+determines the 
 .I cluster-size
-is determined by the volume size. The value is determined as
-follows:
+from the volume size. The value is determined as follows:
 .TS
 lB lB lB
 l l r.
-Volume	size	Default cluster
+Volume	size	Default cluster size
 0	- 512MB	512 bytes
 512MB	- 1GB	1024 bytes
 1GB	- 2GB	2048 bytes
