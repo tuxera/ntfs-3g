@@ -1,0 +1,144 @@
+.\" Copyright (c) 2003 Richard Russon. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFSCLUSTER 8 "September 2003" "Linux\-NTFS version @VERSION@"
+.SH NAME
+ntfscluster \- identify files in a specified region of an NTFS volume.
+.SH SYNOPSIS
+.B ntfscluster
+[
+.I options
+]
+.B device
+.SH DESCRIPTION
+.B ntfscluster
+has three modes of operation:
+.IR info ,
+.I sector
+and
+.IR cluster .
+.SS Info
+.PP
+The default mode,
+.I info
+is currently not implemented.  It will display general infomation about the NTFS
+volume when it is working.
+.SS Sector
+.PP
+The
+.I sector
+mode will display a list of files that have data in the specified range of
+sectors.
+.SS Cluster
+The
+.I cluster
+mode will display a list of files that have data in the specified range of
+clusters.  When the cluster size is one sector, this will be equivalent to the
+.I sector
+mode of operation.
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfscluster
+accepts.  All options have two equivalent names.  The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
+.TP
+.BI "\-c " range
+.br
+.ns
+.TP
+.BI "\-\-cluster " range
+Any files whose data is in this range of clusters will be displayed.
+.TP
+.B \-f
+.br
+.ns
+.TP
+.B \-\-force
+This will override some sensible defaults, such as not working with a mounted
+volume.  Use this option with caution.
+.TP
+.B \-\-help
+Show a list of options with a brief description of each one.
+.TP
+.B \-i
+.br
+.ns
+.TP
+.B \-\-info
+This option is not yet implemented.
+.TP
+.BI \-q
+.br
+.ns
+.TP
+.BI \-\-quiet
+Reduce the amount of output to a minimum.  Naturally, it doesn't make sense to
+combine this option with
+.TP
+.B \-s
+.br
+.ns
+.TP
+.B \-\-sector
+Any files whose data is in this range of sectors will be displayed.
+.TP
+.B \-v
+.br
+.ns
+.TP
+.B \-\-verbose
+Increase the amount of output that
+.B ntfscluster
+prints.
+.TP
+.B \-V
+.br
+.ns
+.TP
+.B \-\-version
+Show the version number, copyright and license
+.BR ntfscluster .
+.SH EXAMPLES
+Get some information about the volume /dev/hda1.
+.RS
+.sp
+.B ntfscluster /dev/hda1
+.sp
+.RE
+Look for files in the first 500 clusters of /dev/hda1.
+.RS
+.sp
+.B ntfscluster -c 0-500 /dev/hda1
+.sp
+.SH BUGS
+The
+.I info
+mode isn't implemented yet.  This program is quite limited, but it has no known
+bugs.  If you find one, please send an email to
+.nh
+<linux-ntfs-dev@lists.sf.net>
+.hy
+.SH AUTHOR
+.B ntfscluster
+was written by Richard Russon (FlatCap) <ntfs@flatcap.org>
+.br
+If you find this tool useful, make FlatCap happy and send him an email.
+.SH AVAILABILITY
+.B ntfscluster
+is part of the linux\-ntfs package and is available from
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/downloads.html
+.hy
+.SH SEE ALSO
+.BR ntfsinfo (8),
+.BR ntfsprogs (8)
+
