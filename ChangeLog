@@ -31,6 +31,9 @@ xx/xx/2004 - 1.8.6-WIP
 	- Use bswap_xx instead of __bswap_constant_xx when the constant version
 	  is not available as is the case on some architectures.  (Thanks to
 	  David Martínez Moreno for the bug report.)
+	- Use head -n 1 instead of -1 in getgccver script.  (From SUSE LINUX)
+	- Fix typo in ntfsinfo.c.  (From SUSE LINUX)
+	  
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
