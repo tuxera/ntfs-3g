@@ -112,6 +112,8 @@ struct _ntfs_inode {
 	int ref_count;
 };
 
+extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
+
 extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
 
 extern int ntfs_inode_close(ntfs_inode *ni);
