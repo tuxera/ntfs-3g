@@ -8,12 +8,15 @@ endif
 if REALLYSTATIC
 AM_LIBS		= $(top_srcdir)/libntfs/.libs/libntfs.a
 AM_LFLAGS	= -static
-LINK		= $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
+STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else
 AM_LIBS		= $(top_srcdir)/libntfs/libntfs.la
 AM_LFLAGS	= $(all_libraries)
-LINK		= $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
+LIBTOOL_LINK    = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
+
+# Workaround to make REALLYSTATIC work with automake 1.5.
+LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= ntfsfix ntfsinfo
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize
