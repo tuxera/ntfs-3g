@@ -26,6 +26,9 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef HAVE_LINUX_FD_H
 #	include <sys/ioctl.h>
 #	include <linux/fd.h>
@@ -35,6 +38,7 @@
 #include "disk_io.h"
 #include "mst.h"
 #include "debug.h"
+#include "device.h"
 
 #if defined(__linux__) && defined(_IO) && !defined(BLKGETSIZE)
 #	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
@@ -42,13 +46,13 @@
 
 /**
  * ntfs_pread - positioned read from disk
- * @fd:		file descriptor to read from
- * @pos:	position in file descriptor to read from
+ * @dev:	device to read from
+ * @pos:	position in device to read from
  * @count:	number of bytes to read
  * @b:		output data buffer
  *
- * This function will read @count bytes from file descriptor @fd at position
- * @pos into the data buffer @b.
+ * This function will read @count bytes from device @dev at position @pos into
+ * the data buffer @b.
  *
  * On success, return the number of successfully read bytes. If this number is
  * lower than @count this means that we have either reached end of file or
@@ -56,12 +60,13 @@
  * end of file or nothing to read (@count is 0).
  *
  * On error and nothing has been read, return -1 with errno set appropriately
- * to the return code of either lseek, read, or set to EINVAL in case of
+ * to the return code of either seek, read, or set to EINVAL in case of
  * invalid arguments.
  */
-s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b)
+s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 {
 	s64 br, total;
+	struct ntfs_device_operations *dops;
 
 	Dprintf("%s(): Entering for pos 0x%Lx, count 0x%Lx.\n", __FUNCTION__,
 			pos, count);
@@ -71,15 +76,16 @@ s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b)
 	}
 	if (!count)
 		return 0;
+	dops = dev->d_ops;
 	/* Locate to position. */
-	if (lseek(fd, pos, SEEK_SET) == (off_t)-1) {
-		Dprintf("ntfs_pread: lseek to 0x%Lx returned error: %s\n", pos,
-				strerror(errno));
+	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
+		Dprintf("ntfs_pread: device seek to 0x%Lx returned error: "
+				"%s\n", pos, strerror(errno));
 		return -1;
 	}
 	/* Read the data. */
 	for (total = 0; count; count -= br, total += br) {
-		br = read(fd, (char*)b + total, count);
+		br = dops->read(dev, (char*)b + total, count);
 		/* If everything ok, continue. */
 		if (br > 0)
 			continue;
@@ -95,13 +101,13 @@ s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b)
 
 /**
  * ntfs_pwrite - positioned write to disk
- * @fd:		file descriptor to write to
+ * @dev:	device to write to
  * @pos:	position in file descriptor to write to
  * @count:	number of bytes to write
  * @b:		data buffer to write to disk
  *
- * This function will write @count bytes from data buffer @b to file descriptor
- * @fd at position @pos.
+ * This function will write @count bytes from data buffer @b to the device @dev
+ * at position @pos.
  *
  * On success, return the number of successfully written bytes. If this number
  * is lower than @count this means that the write has been interrupted in
@@ -109,12 +115,14 @@ s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b)
  * is partial. 0 means nothing was written (also return 0 when @count is 0).
  *
  * On error and nothing has been written, return -1 with errno set
- * appropriately to the return code of either lseek, write, or set
+ * appropriately to the return code of either seek, write, or set
  * to EINVAL in case of invalid arguments.
  */
-s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
+s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
+		const void *b)
 {
 	s64 written, total;
+	struct ntfs_device_operations *dops;
 
 	Dprintf("%s(): Entering for pos 0x%Lx, count 0x%Lx.\n", __FUNCTION__,
 			pos, count);
@@ -124,15 +132,20 @@ s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
 	}
 	if (!count)
 		return 0;
+	if (NDevReadOnly(dev)) {
+		errno = EROFS;
+		return -1;
+	}
+	dops = dev->d_ops;
 	/* Locate to position. */
-	if (lseek(fd, pos, SEEK_SET) == (off_t)-1) {
-		Dprintf("ntfs_pwrite: lseek to 0x%Lx returned error: %s\n",
+	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
+		Dprintf("ntfs_pwrite: seek to 0x%Lx returned error: %s\n",
 				pos, strerror(errno));
 		return -1;
 	}
 	/* Write the data. */
 	for (total = 0; count; count -= written, total += written) {
-		written = write(fd, (char*)b + total, count);
+		written = dops->write(dev, (char*)b + total, count);
 		/* If everything ok, continue. */
 		if (written > 0)
 			continue;
@@ -148,17 +161,118 @@ s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
 	return total;
 }
 
+static int ntfs_device_disk_io_open(struct ntfs_device *dev, int flags)
+{
+	if (NDevOpen(dev)) {
+		errno = EBUSY;
+		return -1;
+	}
+
+	/* Open the device/file obtaining the file descriptor. */
+	if (((int)dev->d_private = open(dev->d_name, flags)) == -1)
+		return -1;
+
+	/* Setup our read-only open flags appropriately. */
+	if ((flags & O_RDONLY) == O_RDONLY)
+		NDevSetReadOnly(dev);
+	NDevSetOpen(dev);
+	return 0;
+}
+
+static int ntfs_device_disk_io_close(struct ntfs_device *dev)
+{
+	if (!NDevOpen(dev)) {
+		errno = EBADF;
+		return -1;
+	}
+
+	/* Close the file descriptor and clear our open flag. */
+	if (close((int)dev->d_private) == -1)
+		return -1;
+	NDevClearOpen(dev);
+
+	/* Destroy the device as we are done with it. */
+	ntfs_device_free(dev);
+	return 0;
+}
+
+static s64 ntfs_device_disk_io_seek(struct ntfs_device *dev, s64 offset,
+		int whence)
+{
+	return lseek((int)dev->d_private, offset, whence);
+}
+
+static s64 ntfs_device_disk_io_read(struct ntfs_device *dev, void *buf,
+		s64 count)
+{
+	return read((int)dev->d_private, buf, count);
+}
+
+static s64 ntfs_device_disk_io_write(struct ntfs_device *dev, const void *buf,
+		s64 count)
+{
+	if (NDevReadOnly(dev)) {
+		errno = EROFS;
+		return -1;
+	}
+	return write((int)dev->d_private, buf, count);
+}
+
+static s64 ntfs_device_disk_io_pread(struct ntfs_device *dev, void *buf,
+		s64 count, s64 offset)
+{
+	return ntfs_pread(dev, offset, count, buf);
+}
+
+static s64 ntfs_device_disk_io_pwrite(struct ntfs_device *dev, const void *buf,
+		s64 count, s64 offset)
+{
+	if (NDevReadOnly(dev)) {
+		errno = EROFS;
+		return -1;
+	}
+	return ntfs_pwrite(dev, offset, count, buf);
+}
+
+static int ntfs_device_disk_io_sync(struct ntfs_device *dev)
+{
+	if (!NDevReadOnly(dev))
+		return fsync((int)dev->d_private);
+	return 0;
+}
+
+static int ntfs_device_disk_io_ioctl(struct ntfs_device *dev, int request,
+		void *argp)
+{
+	return ioctl((int)dev->d_private, request, argp);
+}
+
+/**
+ * Default device operations for working with unix style devices and files.
+ */
+struct ntfs_device_operations ntfs_device_disk_io_ops = {
+	.open		= ntfs_device_disk_io_open,
+	.close		= ntfs_device_disk_io_close,
+	.seek		= ntfs_device_disk_io_seek,
+	.read		= ntfs_device_disk_io_read,
+	.write		= ntfs_device_disk_io_write,
+	.pread		= ntfs_device_disk_io_pread,
+	.pwrite		= ntfs_device_disk_io_pwrite,
+	.sync		= ntfs_device_disk_io_sync,
+	.ioctl		= ntfs_device_disk_io_ioctl,
+};
+
 /**
  * ntfs_mst_pread - multi sector transfer (mst) positioned read
- * @fd:		file descriptor to read from
+ * @dev:	device to read from
  * @pos:	position in file descriptor to read from
  * @count:	number of blocks to read
  * @bksize:	size of each block that needs mst deprotecting
  * @b:		output data buffer
  *
  * Multi sector transfer (mst) positioned read. This function will read @count
- * blocks of size @bksize bytes each from file descriptor @fd at position @pos
- * into the data buffer @b.
+ * blocks of size @bksize bytes each from device @dev at position @pos into the
+ * the data buffer @b.
  *
  * On success, return the number of successfully read blocks. If this number is
  * lower than @count this means that we have reached end of file, that the read
@@ -167,7 +281,7 @@ s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
  * when @count or @bksize are 0).
  *
  * On error and nothing was read, return -1 with errno set appropriately to the
- * return code of either lseek, read, or set to EINVAL in case of invalid
+ * return code of either seek, read, or set to EINVAL in case of invalid
  * arguments.
  *
  * NOTE: If an incomplete multi sector transfer has been detected the magic
@@ -177,8 +291,8 @@ s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
  * sector transfer error. This should be detected by the caller by checking for
  * the magic being "BAAD".
  */
-s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
-		const u32 bksize, const void *b)
+s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
+		const u32 bksize, void *b)
 {
 	s64 br, i;
 
@@ -187,7 +301,7 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
 		return -1;
 	}
 	/* Do the read. */
-	br = ntfs_pread(fd, pos, count * bksize, b);
+	br = ntfs_pread(dev, pos, count * bksize, b);
 	if (br < 0)
 		return br;
 	/*
@@ -206,15 +320,15 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
 
 /**
  * ntfs_mst_pwrite - multi sector transfer (mst) positioned write
- * @fd:		file descriptor to write to
+ * @dev:	device to write to
  * @pos:	position in file descriptor to write to
  * @count:	number of blocks to write
  * @bksize:	size of each block that needs mst protecting
  * @b:		data buffer to write to disk
  *
  * Multi sector transfer (mst) positioned write. This function will write
- * @count blocks of size @bksize bytes each from data buffer @b to file
- * descriptor @fd at position @pos.
+ * @count blocks of size @bksize bytes each from data buffer @b to the device
+ * @dev at position @pos.
  *
  * On success, return the number of successfully written blocks. If this number
  * is lower than @count this means that the write has been interrutped or that
@@ -222,7 +336,7 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
  * means nothing was written (also return 0 when @count or @bksize are 0).
  *
  * On error and nothing has been written, return -1 with errno set
- * appropriately to the return code of either lseek, write, or set
+ * appropriately to the return code of either seek, write, or set
  * to EINVAL in case of invalid arguments.
  *
  * NOTE: We mst protect the data, write it, then mst deprotect it using a quick
@@ -234,7 +348,7 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
  * simulating an mst read on the written data. This way cache coherency is
  * achieved.
  */
-s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
+s64 ntfs_mst_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		const u32 bksize, const void *b)
 {
 	s64 written, i;
@@ -260,7 +374,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 		}
 	}
 	/* Write the prepared data. */
-	written = ntfs_pwrite(fd, pos, count * bksize, b);
+	written = ntfs_pwrite(dev, pos, count * bksize, b);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < count; ++i)
 		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)b + i * bksize));
@@ -281,8 +395,8 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
  * volume @vol into buffer @b. Return number of clusters read or -1 on error,
  * with errno set to the error code.
  */
-s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
-		const s64 count, const void *b)
+s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn, const s64 count,
+		void *b)
 {
 	s64 br;
 
@@ -294,7 +408,7 @@ s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		errno = ESPIPE;
 		return -1;
 	}
-	br = ntfs_pread(vol->fd, lcn << vol->cluster_size_bits,
+	br = ntfs_pread(vol->dev, lcn << vol->cluster_size_bits,
 			count << vol->cluster_size_bits, b);
 	if (br < 0) {
 		Dperror("Error reading cluster(s)");
@@ -328,7 +442,7 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		return -1;
 	}
 	if (!NVolReadOnly(vol))
-		bw = ntfs_pwrite(vol->fd, lcn << vol->cluster_size_bits,
+		bw = ntfs_pwrite(vol->dev, lcn << vol->cluster_size_bits,
 				count << vol->cluster_size_bits, b);
 	else
 		bw = count << vol->cluster_size_bits;
@@ -341,40 +455,41 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 
 /**
  * ntfs_device_offset_valid - test if a device offset is valid
- * @f:		open file descriptor of device
+ * @dev:	open device
  * @ofs:	offset to test for validity
  *
  * Test if the offset @ofs is an existing location on the device described
- * by the open file descriptor @f.
+ * by the open device structure @dev.
  *
  * Return 0 if it is valid and -1 if it is not valid.
  */
-static inline int ntfs_device_offset_valid(int f, s64 ofs)
+static inline int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
 {
 	char ch;
 
-	if (lseek(f, ofs, SEEK_SET) >= 0 && read(f, &ch, 1) == 1)
+	if (dev->d_ops->seek(dev, ofs, SEEK_SET) >= 0 &&
+			dev->d_ops->read(dev, &ch, 1) == 1)
 		return 0;
 	return -1;
 }
 
 /**
  * ntfs_device_size_get - return the size of a device in blocks
- * @f:		open file descriptor of device
+ * @dev:	open device
  * @block_size:	block size in bytes in which to return the result
  *
  * Return the number of @block_size sized blocks in the device described by the
- * open file descriptor @f.
+ * open device @dev.
  *
  * Adapted from e2fsutils-1.19, Copyright (C) 1995 Theodore Ts'o.
  */
-s64 ntfs_device_size_get(int f, int block_size)
+s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 {
 	s64 high, low;
 #ifdef BLKGETSIZE
 	long size;
 
-	if (ioctl(f, BLKGETSIZE, &size) >= 0) {
+	if (dev->d_ops->ioctl(dev, BLKGETSIZE, &size) >= 0) {
 		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
 				size);
 		return (s64)size * 512 / block_size;
@@ -383,7 +498,7 @@ s64 ntfs_device_size_get(int f, int block_size)
 #ifdef FDGETPRM
 	{       struct floppy_struct this_floppy;
 
-		if (ioctl(f, FDGETPRM, &this_floppy) >= 0) {
+		if (dev->d_ops->ioctl(dev, FDGETPRM, &this_floppy) >= 0) {
 			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
 					this_floppy.size, this_floppy.size);
 			return (s64)this_floppy.size * 512 / block_size;
@@ -395,17 +510,17 @@ s64 ntfs_device_size_get(int f, int block_size)
 	 * so do binary search to find the size of the device.
 	 */
 	low = 0LL;
-	for (high = 1024LL; !ntfs_device_offset_valid(f, high); high <<= 1)
+	for (high = 1024LL; !ntfs_device_offset_valid(dev, high); high <<= 1)
 		low = high;
 	while (low < high - 1LL) {
 		const s64 mid = (low + high) / 2;
 
-		if (!ntfs_device_offset_valid(f, mid))
+		if (!ntfs_device_offset_valid(dev, mid))
 			low = mid;
 		else
 			high = mid;
 	}
-	lseek(f, 0LL, SEEK_SET);
+	dev->d_ops->seek(dev, 0LL, SEEK_SET);
 	return (low + 1LL) / block_size;
 }
 

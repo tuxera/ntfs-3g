@@ -151,7 +151,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 				 * or can we have sparse runs in uncompressed
 				 * files as well?
 				 */
-				r = ntfs_pread(vol->fd, rl[i].lcn <<
+				r = ntfs_pread(vol->dev, rl[i].lcn <<
 						vol->cluster_size_bits,
 						rl[i].length <<
 						vol->cluster_size_bits, intbuf);
@@ -189,7 +189,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 				 * to 0 for the length of the run, which should
 				 * be 16 (= compression unit size).
 				 */
-				r = ntfs_pread(vol->fd, rl[i].lcn <<
+				r = ntfs_pread(vol->dev, rl[i].lcn <<
 						vol->cluster_size_bits,
 						rl[i].length <<
 						vol->cluster_size_bits,
@@ -580,7 +580,6 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	s64 br, to_read, ofs, total, total2;
 	ntfs_volume *vol;
 	runlist_element *rl;
-	int f;
 
 	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, pos 0x%Lx, "
 			"count 0x%Lx.\n", __FUNCTION__,
@@ -591,11 +590,6 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		return -1;
 	}
 	vol = na->ni->vol;
-	f = vol->fd;
-	if (!f) {
-		errno = EBADF;
-		return -1;
-	}
 	/*
 	 * Encrypted attributes are not supported. We return access denied,
 	 * which is what Windows NT4 does, too.
@@ -700,8 +694,8 @@ retry:
 		Dprintf("%s(): Reading 0x%Lx bytes from vcn 0x%Lx, lcn 0x%Lx, "
 				"ofs 0x%Lx.\n", __FUNCTION__, to_read,
 				rl->vcn, rl->lcn, ofs);
-		br = ntfs_pread(f, (rl->lcn << vol->cluster_size_bits) + ofs,
-				to_read, b);
+		br = ntfs_pread(vol->dev, (rl->lcn << vol->cluster_size_bits) +
+				ofs, to_read, b);
 		/* If everything ok, update progress counters and continue. */
 		if (br > 0) {
 			total += br;
@@ -755,7 +749,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
-	int f, eo;
+	int eo;
 	struct {
 		unsigned int initialized_size	: 1;
 	} need_to_undo = { 0 };
@@ -768,11 +762,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		return -1;
 	}
 	vol = na->ni->vol;
-	f = vol->fd;
-	if (!f) {
-		errno = EBADF;
-		return -1;
-	}
 	/*
 	 * Encrypted attributes are not supported. We return access denied,
 	 * which is what Windows NT4 does, too.
@@ -963,7 +952,7 @@ retry:
 				"ofs 0x%Lx.\n", __FUNCTION__, to_write,
 				rl->vcn, rl->lcn, ofs);
 		if (!NVolReadOnly(vol))
-			written = ntfs_pwrite(f, (rl->lcn <<
+			written = ntfs_pwrite(vol->dev, (rl->lcn <<
 					vol->cluster_size_bits) + ofs,
 					to_write, b);
 		else

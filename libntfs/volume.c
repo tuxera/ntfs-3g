@@ -20,6 +20,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -69,12 +70,16 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		ntfs_attr_close(v->mftmirr_na);
 	if (v->mftmirr_ni)
 		ntfs_inode_close(v->mftmirr_ni);
-	if (v->fd) {
-		fdatasync(v->fd);
-		close(v->fd);
+	if (v->dev) {
+		struct ntfs_device *dev = v->dev;
+
+		if (NDevDirty(dev))
+			dev->d_ops->sync(dev);
+		if (dev->d_ops->close(dev))
+			fprintf(stderr, "%s(): Eeek! Failed to close the "
+					"device. Error: %s\n", __FUNCTION__,
+					strerror(errno));
 	}
-	if (v->dev_name)
-		free(v->dev_name);
 	if (v->vol_name)
 		free(v->vol_name);
 	if (v->upcase)
@@ -118,7 +123,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	vol->mft_ni->mft_no = 0;
 	vol->mft_ni->mrec = mb;
 	/* Can't use any of the higher level functions yet! */
-	l = ntfs_mst_pread(vol->fd, vol->mft_lcn << vol->cluster_size_bits, 1,
+	l = ntfs_mst_pread(vol->dev, vol->mft_lcn << vol->cluster_size_bits, 1,
 			vol->mft_record_size, mb);
 	if (l != 1) {
 		if (l != -1)
@@ -363,7 +368,7 @@ error_exit:
 
 /**
  * ntfs_volume_startup - allocate and setup an ntfs volume
- * @name:	name of device/file to open
+ * @dev:	device to open
  * @rwflag:	optional mount flags
  *
  * Load, verify, and parse bootsector; load and setup $MFT and $MFTMirr. After
@@ -373,7 +378,7 @@ error_exit:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
+ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 {
 	LCN mft_zone_size, mft_lcn;
 	s64 br;
@@ -388,26 +393,30 @@ ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
 	BOOL debug = 0;
 #endif
 
+	if (!dev || !dev->d_ops || !dev->d_name) {
+		errno = EINVAL;
+		return NULL;
+	}
+
 	/* Allocate the volume structure. */
 	vol = __ntfs_volume_allocate();
 	if (!vol)
 		return NULL;
-	/* Make a copy of the partition name. */
-	if (!(vol->dev_name = strdup(name)))
-		goto error_exit;
+	/* Attach the device to the volume. */
+	vol->dev = dev;
+	if (rwflag & MS_RDONLY)
+		NVolSetReadOnly(vol);
 	/* Allocate the boot sector structure. */
 	if (!(bs = (NTFS_BOOT_SECTOR *)malloc(sizeof(NTFS_BOOT_SECTOR))))
 		goto error_exit;
-	if (rwflag & MS_RDONLY)
-		NVolSetReadOnly(vol);
 	Dprintf("Reading bootsector... ");
-	if ((vol->fd = open(name, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) < 0) {
+	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
 		Dputs(FAILED);
-		Dperror("Error opening partition file");
+		Dperror("Error opening partition device");
 		goto error_exit;
 	}
 	/* Now read the bootsector. */
-	br = ntfs_pread(vol->fd, 0, sizeof(NTFS_BOOT_SECTOR), bs);
+	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
 	if (br != sizeof(NTFS_BOOT_SECTOR)) {
 		Dputs(FAILED);
 		if (br != -1)
@@ -421,7 +430,8 @@ ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
 	}
 	Dputs(OK);
 	if (!ntfs_boot_sector_is_ntfs(bs, !debug)) {
-		Dprintf("Error: %s is not a valid NTFS partition!\n", name);
+		Dprintf("Error: %s is not a valid NTFS partition!\n",
+				dev->d_name);
 		errno = EINVAL;
 		goto error_exit;
 	}
@@ -537,31 +547,28 @@ error_exit:
 }
 
 /**
- * ntfs_mount - open ntfs volume
- * @name:	name of device/file to open
+ * ntfs_device_mount - open ntfs volume
+ * @dev:	device to open
  * @rwflag:	optional mount flags
  *
- * This function mounts an ntfs volume. @name should contain the name of the
- * device/file to mount as the ntfs volume.
+ * This function mounts an ntfs volume. @dev should describe the device which
+ * to mount as the ntfs volume.
  *
  * @rwflags is an optional second parameter. The same flags are used as for
  * the mount system call (man 2 mount). Currently only the following flag
  * is implemented:
  *	MS_RDONLY	- mount volume read-only
  *
- * The function opens the device or file @name and verifies that it contains a
- * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
+ * The function opens the device @dev and verifies that it contains a valid
+ * bootsector. Then, it allocates an ntfs_volume structure and initializes
  * some of the values inside the structure from the information stored in the
  * bootsector. It proceeds to load the necessary system files and completes
  * setting up the structure.
  *
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
- *
- * Note, that a copy is made of @name, and hence it can be discarded as
- * soon as the function returns.
  */
-ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
+ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 {
 	s64 l;
 	const char *OK = "OK";
@@ -577,12 +584,7 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 	int i, j, eo;
 	u32 u;
 
-	if (!name) {
-		errno = EINVAL;
-		return NULL;
-	}
-
-	vol = ntfs_volume_startup(name, rwflag);
+	vol = ntfs_volume_startup(dev, rwflag);
 	if (!vol) {
 		Dperror("Failed to startup volume");
 		return NULL;
@@ -900,13 +902,55 @@ error_exit:
 	return NULL;
 }
 
+/* External declaration for internal structure. */
+extern struct ntfs_device_operations ntfs_device_disk_io_ops;
+
+/**
+ * ntfs_mount - open ntfs volume
+ * @name:	name of device/file to open
+ * @rwflag:	optional mount flags
+ *
+ * This function mounts an ntfs volume. @name should contain the name of the
+ * device/file to mount as the ntfs volume.
+ *
+ * @rwflags is an optional second parameter. The same flags are used as for
+ * the mount system call (man 2 mount). Currently only the following flag
+ * is implemented:
+ *	MS_RDONLY	- mount volume read-only
+ *
+ * The function opens the device or file @name and verifies that it contains a
+ * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
+ * some of the values inside the structure from the information stored in the
+ * bootsector. It proceeds to load the necessary system files and completes
+ * setting up the structure.
+ *
+ * Return the allocated volume structure on success and NULL on error with
+ * errno set to the error code.
+ *
+ * Note, that a copy is made of @name, and hence it can be discarded as
+ * soon as the function returns.
+ */
+ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
+{
+	struct ntfs_device *dev;
+
+	/* Allocate an ntfs_device structure. */
+	dev = ntfs_device_alloc(name, 0, &ntfs_device_disk_io_ops, NULL);
+	if (!dev)
+		return NULL;
+
+	/* Call ntfs_device_mount() to do the actual mount. */
+	return ntfs_device_mount(dev, rwflag);
+}
+
 /**
  * ntfs_umount - close ntfs volume
  * @vol: address of ntfs_volume structure of volume to close
  * @force: if true force close the volume even if it is busy
  *
  * Deallocate all structures (including @vol itself) associated with the ntfs
- * volume @vol.
+ * volume @vol. Can be used on volumes mounted with ntfs_mount() as well as
+ * with volumes mounted with ntfs_device_mount().
  *
  * Return 0 on success. On error return -1 with errno set appropriately
  * (most likely to one of EAGAIN, EBUSY or EINVAL). The EAGAIN error means that

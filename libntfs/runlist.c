@@ -1011,15 +1011,10 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		const s64 pos, s64 count, void *b)
 {
 	s64 written, to_write, ofs, total;
-	int f, err = EIO;
+	int err = EIO;
 
 	if (!vol || !rl || pos < 0 || count < 0) {
 		errno = EINVAL;
-		return -1;
-	}
-	f = vol->fd;
-	if (!f) {
-		errno = EBADF;
 		return -1;
 	}
 	if (!count)
@@ -1075,7 +1070,7 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 				ofs);
 retry:
 		if (!NVolReadOnly(vol))
-			written = ntfs_pwrite(f, (rl->lcn <<
+			written = ntfs_pwrite(vol->dev, (rl->lcn <<
 					vol->cluster_size_bits) + ofs,
 					to_write, b);
 		else

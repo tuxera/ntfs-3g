@@ -70,18 +70,20 @@ struct ntfs_device {
  * the low level device described by a ntfs device structure.
  */
 struct ntfs_device_operations {
-	struct ntfs_device *(*open)(const char *pathname, int flags);
+	int (*open)(struct ntfs_device *dev, int flags);
 	int (*close)(struct ntfs_device *dev);
-	int (*sync)(struct ntfs_device *dev);
 	s64 (*seek)(struct ntfs_device *dev, s64 offset, int whence);
 	s64 (*read)(struct ntfs_device *dev, void *buf, s64 count);
 	s64 (*write)(struct ntfs_device *dev, const void *buf, s64 count);
 	s64 (*pread)(struct ntfs_device *dev, void *buf, s64 count, s64 offset);
 	s64 (*pwrite)(struct ntfs_device *dev, const void *buf, s64 count,
 			s64 offset);
+	int (*sync)(struct ntfs_device *dev);
+	int (*ioctl)(struct ntfs_device *dev, int request, void *argp);
 };
 
-struct ntfs_device *ntfs_device_alloc(void);
+struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
+		struct ntfs_device_operations *dops, void *private);
 int ntfs_device_free(struct ntfs_device *dev);
 
 #endif /* defined _NTFS_DEVICE_H */

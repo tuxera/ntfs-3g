@@ -1,7 +1,7 @@
 /*
  * volume.h - Exports for NTFS volume handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -87,8 +87,6 @@ typedef enum {
  * ntfs_volume - structure describing an open volume in memory
  */
 struct _ntfs_volume {
-	int fd;		//FIXME: Remove this. -> Use *dev instead.
-	char *dev_name; //FIXME: Remove this. -> Use *dev instead.
 	struct ntfs_device *dev;/* NTFS device associated with the volume. */
 	char *vol_name;		/* Name of the volume. */
 	unsigned long state;	/* NTFS specific flags describing this volume.
@@ -156,9 +154,12 @@ struct _ntfs_volume {
 				   bytes. */
 };
 
-extern ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag);
-extern ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag);
+extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
+		unsigned long rwflag);
 
+extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
+		unsigned long rwflag);
+extern ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);
