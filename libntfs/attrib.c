@@ -924,7 +924,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (pos + count > na->data_size) {
 		if (ntfs_attr_truncate(na, pos + count)) {
 			eo = errno;
-			Dprintf("%s(): Attribute extend failed.", __FUNCTION__);
+			Dprintf("%s(): Attribute extend failed.\n",
+					__FUNCTION__);
 			errno = eo;
 			return -1;
 		}
@@ -1004,7 +1005,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			ofs = na->initialized_size;
 			while (ofs < pos) {
 				to_write = min(pos - ofs, NTFS_BUF_SIZE);
-				written = ntfs_rl_pwrite(vol, na->rl, ofs, 
+				written = ntfs_rl_pwrite(vol, na->rl, ofs,
 							to_write, buf);
 				if (written <= 0) {
 					err = errno;
@@ -1057,7 +1058,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		if (rl->lcn < (LCN)0) {
 			LCN lcn_seek_from = -1;
 			runlist *rlc;
-			VCN cur_vcn;
+			VCN cur_vcn, from_vcn;
 			s64 t;
 			int cnt;
 
@@ -1105,6 +1106,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			}
 			/* The buffer is non zero, instantiate the hole. */
 			cur_vcn = rl->vcn;
+			from_vcn = rl->vcn + (ofs >> vol->cluster_size_bits);
 			Dprintf("%s(): Isntantiate the hole with vcn 0x%llx.\n",
 					__FUNCTION__, cur_vcn);
 			/*
@@ -1116,7 +1118,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				rlc--;
 				if (rlc->lcn >= 0) {
 					lcn_seek_from = rlc->lcn +
-							(rl->vcn - rlc->vcn);
+							(from_vcn - rlc->vcn);
 					break;
 				}
 			}
@@ -1127,15 +1129,16 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 					rlc++;
 					if (rlc->lcn >= 0) {
 						lcn_seek_from = rlc->lcn -
-							(rlc->vcn - rl->vcn);
+							(rlc->vcn - from_vcn);
 						break;
 					}
 				}
 			}
 			/* Allocate clusters to instantiate the hole. */
-			rlc = ntfs_cluster_alloc(vol, rl->vcn,
+			rlc = ntfs_cluster_alloc(vol, from_vcn,
 						((ofs + to_write - 1) >>
-						vol->cluster_size_bits) + 1,
+						vol->cluster_size_bits) + 1 +
+						rl->vcn - from_vcn,
 						lcn_seek_from, DATA_ZONE);
 			if (!rlc) {
 				eo = errno;
@@ -1175,11 +1178,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				errno = EIO;
 				goto err_out;
 			}
+			/* If leaved part of the hole go to the next run. */
+			if (rl->lcn < 0)
+				rl++;
+			/* Now LCN should shoudn't be lesser than 0. */
 			if (rl->lcn < 0) {
-				/*
-				 * BUG! LCN shoudn't be lesser than 0, because
-				 * we just instantiated the hole.
-				 */
 				Dprintf("%s(): BUG! LCN is lesser than 0. "
 						"Please report to the "
 						"linux-ntfs-dev@lists.sf.net."
@@ -1187,12 +1190,46 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				errno = EIO;
 				goto err_out;
 			}
-			if (rl->vcn != cur_vcn) {
+			if (ofs) {
+				/*
+				 * Need to clear region between start of
+				 * @cur_vcn cluster and @ofs.
+				 */
+				char *buf;
+
+				buf = malloc(ofs);
+				if (!buf) {
+					Dprintf("%s(): Not enough memory to "
+						"allocate %lld bytes.\n",
+						__FUNCTION__, ofs);
+					errno = ENOMEM;
+					goto err_out;
+				}
+				memset(buf, 0, ofs);
+				if (ntfs_rl_pwrite(vol, na->rl, cur_vcn <<
+							vol->cluster_size_bits,
+							ofs, buf) < 0) {
+					eo = errno;
+					Dprintf("%s(): Failed to zero area.\n",
+							__FUNCTION__);
+					errno = eo;
+					goto err_out;
+				}
+			}
+			if (rl->vcn < cur_vcn) {
 				/* 
 				 * Clusters that replaced hole are merged with
 				 * previous run, so we need to update offset.
 				 */
 				ofs += (cur_vcn - rl->vcn) <<
+					vol->cluster_size_bits;
+			}
+			if (rl->vcn > cur_vcn) {
+				/*
+				 * We left part of the hole, so update we need
+				 * to update offset
+				 */
+				ofs -= (rl->vcn - cur_vcn) <<
 					vol->cluster_size_bits;
 			}
 		}
