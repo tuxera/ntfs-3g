@@ -2,6 +2,7 @@
 linux_ntfsincludedir = $(includedir)/ntfs
 linux_ntfsinclude_HEADERS = \
 	attrib.h		\
+	attrlist.h		\
 	bitmap.h		\
 	bootsect.h		\
 	compat.h		\
