@@ -1046,7 +1046,8 @@ int main(int argc, char **argv)
 	       if ((fd_out = fileno(stdout)) == -1) 
 		       perr_exit("fileno for stdout failed");
 	} else {
-		int flags = O_WRONLY;
+	        /* device_size_get() might need to read() */
+		int flags = O_RDWR;
 		
 		if (!opt.blkdev_out) {
 			flags |= O_CREAT | O_TRUNC;
