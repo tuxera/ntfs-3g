@@ -2,7 +2,7 @@
  * mkntfs - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov
- * Copyright (C) 2001-2002 Richard Russon
+ * Copyright (c) 2001-2002 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
  * specified (block) device.
@@ -163,7 +163,7 @@ struct {
 	ATTR_DEF *attr_defs;		/* filename, attribute defs. */
 	int attr_defs_len;		/* in bytes */
 	uchar_t *upcase;		/* filename, upcase table. */
-	u32 upcase_len;		/* Determined automatically. */
+	u32 upcase_len;			/* Determined automatically. */
 	char quiet;			/* -q, quiet execution. */
 	char verbose;			/* -v, verbose execution, given twice,
 					 * really verbose execution (debug
@@ -175,7 +175,7 @@ struct {
 					   on the volume by default. */
 	char disable_indexing;		/* -I, disables indexing of file
 					   contents on the volume by default. */
-	/* -V, print version and exit. */
+					/* -V, print version and exit. */
 } opt;
 
 /* Error output. Ignores quiet (-q). */
