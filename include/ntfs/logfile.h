@@ -41,10 +41,12 @@
  * circular entity.
  *
  * NOTE: Windows NT, 2000, and XP all use log file version 1.1 but they accept
- * versions <= 1.x, including -1.-1.  (Yes, these are minus ones in there!)  We
+ * versions <= 1.x, including 0.-1.  (Yes, that is a minus one in there!)  We
  * probably only want to support 1.1 as this seems to be the current version
- * and we don't know how that differs from the older versions -1.-1, 0.x, and
- * 1.0
+ * and we don't know how that differs from the older versions.  The only
+ * exception is if the journal is clean as marked by the two restart pages
+ * then it doesn't matter whether we are on an earlier version.  We can just
+ * reinitialize the logfile and start again with version 1.1.
  */
 
 /*
@@ -95,13 +97,13 @@ typedef struct {
 	u16 log_clients;	/* Number of log client records in the array of
 				   log client records which follows this
 				   restart area.  Must be 1.  */
-	u16 client_free_list;	/* How many log client records are free in the
-				   array of log client records.  If != 0xffff,
-				   check that log_clients > client_free_list.
-				   = 0xffff */
-	u16 client_in_use_list;	/* How many log client records are in use in
-				   the array of log client records.  If !=
-				   0xffff check that log_clients >
+	u16 client_free_list;	/* The index of the first free log client record
+				   in the array of log client records.  If !=
+				   0xffff, check that log_clients >
+				   client_free_list.  = 0xffff */
+	u16 client_in_use_list;	/* The index of the first in-use log client
+				   revcord in the array of log client records.
+				   If != 0xffff check that log_clients >
 				   client_in_use_list.  = 0 */
 	u16 flags;		/* Flags modifying LFS behaviour.  = 0 */
 	u32 seq_number_bits;	/* How many bits to use for the sequence
