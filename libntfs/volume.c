@@ -371,6 +371,7 @@ error_exit:
  */
 ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
 {
+	LCN mft_zone_size, mft_lcn;
 	s64 br;
 	const char *OK = "OK";
 	const char *FAILED = "FAILED";
@@ -426,6 +427,82 @@ ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
 	}
 	free(bs);
 	bs = NULL;
+
+	/*
+	 * We now initialize the cluster allocator.
+	 *
+	 * FIXME: Move this to its own function? (AIA)
+	 */
+
+	// TODO: Make this tunable at mount time. (AIA)
+	vol->mft_zone_multiplier = 1;
+
+	/* Determine the size of the MFT zone. */
+	mft_zone_size = vol->nr_clusters;
+	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
+	case 4:
+		mft_zone_size >>= 1;			/* 50%   */
+		break;
+	case 3:
+		mft_zone_size = mft_zone_size * 3 >> 3;	/* 37.5% */
+		break;
+	case 2:
+		mft_zone_size >>= 2;			/* 25%   */
+		break;
+	/* case 1: */
+	default:
+		mft_zone_size >>= 3;			/* 12.5% */
+		break;
+	}
+
+	/* Setup the mft zone. */
+	vol->mft_zone_start = vol->mft_zone_pos = vol->mft_lcn;
+	Dprintf("mft_zone_pos = 0x%Lx\n", (long long)vol->mft_zone_pos);
+
+	/*
+	 * Calculate the mft_lcn for an unmodified NTFS volume (see mkntfs
+	 * source) and if the actual mft_lcn is in the expected place or even
+	 * further to the front of the volume, extend the mft_zone to cover the
+	 * beginning of the volume as well. This is in order to protect the
+	 * area reserved for the mft bitmap as well within the mft_zone itself.
+	 * On non-standard volumes we don't protect it as the overhead would be
+	 * higher than the speed increase we would get by doing it.
+	 */
+	mft_lcn = (8192 + 2 * vol->cluster_size - 1) / vol->cluster_size;
+	if (mft_lcn * vol->cluster_size < 16 * 1024)
+		mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
+				vol->cluster_size;
+	if (vol->mft_zone_start <= mft_lcn)
+		vol->mft_zone_start = 0;
+	Dprintf("mft_zone_start = 0x%Lx\n", (long long)vol->mft_zone_start);
+
+	/*
+	 * Need to cap the mft zone on non-standard volumes so that it does
+	 * not point outside the boundaries of the volume. We do this by
+	 * halving the zone size until we are inside the volume.
+	 */
+	vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
+	while (vol->mft_zone_end >= vol->nr_clusters) {
+		mft_zone_size >>= 1;
+		vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
+	}
+	Dprintf("mft_zone_end = 0x%Lx\n", (long long)vol->mft_zone_end);
+
+	/*
+	 * Set the current position within each data zone to the start of the
+	 * respective zone.
+	 */
+	vol->data1_zone_pos = vol->mft_zone_end;
+	Dprintf("data1_zone_pos = 0x%Lx\n", vol->data1_zone_pos);
+	vol->data2_zone_pos = 0;
+	Dprintf("data2_zone_pos = 0x%Lx\n", vol->data2_zone_pos);
+
+	/* Set the mft data allocation position to mft record 24. */
+	vol->mft_data_pos = 24;
+
+	/*
+	 * The cluster allocator is now fully operational.
+	 */
 
 	/* Need to setup $MFT so we can use the library read functions. */
 	Dprintf("Loading $MFT... ");
