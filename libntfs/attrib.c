@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -42,6 +43,7 @@
 #include "lcnalloc.h"
 #include "dir.h"
 #include "compress.h"
+#include "bitmap.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -2378,7 +2380,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Start by allocating clusters to hold the attribute value. */
 	rl = ntfs_cluster_alloc(vol, new_allocated_size >>
-			vol->cluster_size_bits, -1, DATA_ZONE);
+			vol->cluster_size_bits, -1, DATA_ZONE, 0);
 	if (!rl) {
 		if (errno != ENOSPC) {
 			int eo = errno;
@@ -3103,6 +3105,228 @@ put_err_out:
 }
 
 /**
+ * ntfs_non_resident_attr_expand - expand a non-resident, open ntfs attribute
+ * @na:		non-resident ntfs attribute to expand
+ * @newsize:	new size (in bytes) to which to expand the attribute
+ *
+ * Expand the size of a non-resident, open ntfs attribute @na to @newsize bytes,
+ * by allocating new clusters.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ *	ENOMEM	- Not enough memory to complete operation.
+ *	ERANGE	- @newsize is not valid for the attribute type of @na.
+ */
+static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
+{
+	ntfs_volume *vol;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *a;
+	MFT_RECORD *m;
+	VCN first_free_vcn;
+	s64 nr_need_allocate;
+	u32 new_alen, new_muse;
+	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
+	runlist *rl, *rln;
+	LCN lcn_seek_from = 0;
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
+			(unsigned long long)na->ni->mft_no, na->type);
+
+	vol = na->ni->vol;
+
+	/* Get the first attribute record that needs modification. */
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0,
+							NULL, 0, ctx)) {
+		err = errno;
+		if (err == ENOENT)
+			err = EIO;
+		goto put_err_out;
+	}
+	a = ctx->attr;
+	m = ctx->mrec;
+	/*
+	 * Check the attribute type and the corresponding maximum size
+	 * against @newsize and fail if @newsize is too big.
+	 */
+	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
+		err = errno;
+		if (err == ERANGE) {
+			fprintf(stderr, "%s(): Eeek! Size bounds check "
+					"failed. Aborting...\n", __FUNCTION__);
+		} else if (err == ENOENT)
+			err = EIO;
+		goto put_err_out;
+	}
+
+	if (NInoAttrList(na->ni)) {
+		err = ENOTSUP;
+		goto put_err_out;
+	}
+
+	/* The first cluster outside the new allocation. */
+	first_free_vcn = (newsize + vol->cluster_size - 1) >>
+			vol->cluster_size_bits;
+	/*
+	 * Compare the new allocation with the old one and only deallocate
+	 * clusters if there is a change.
+	 */
+	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
+		nr_need_allocate = first_free_vcn -
+				(na->allocated_size >> vol->cluster_size_bits);
+		
+		if (ntfs_attr_map_whole_runlist (na)) {
+			err = EIO;
+			fprintf(stderr, "%s(): Eeek! "
+					"ntfs_attr_map_whole_runlist failed.\n",
+					 __FUNCTION__);
+			goto put_err_out;
+		}
+		
+		/*
+		 * Determine first after last LCN of attribute. We will start
+		 * seek clusters from this LCN to avoid fragmentation.
+		 */
+		if (na->rl->length) {
+			for (rl = na->rl; (rl + 1)->length; rl++)
+				;
+			lcn_seek_from = rl->lcn + rl->length;
+		}
+		
+		rl = ntfs_cluster_alloc(vol, nr_need_allocate, lcn_seek_from,
+					DATA_ZONE, na->allocated_size >>
+					vol->cluster_size_bits);
+		if (!rl) {
+			err = errno;
+			fprintf(stderr, "%s(): Eeek! Cluster allocation "
+					"failed.\n", __FUNCTION__);
+			goto put_err_out;
+		}
+
+		/* Append new clusters to attribute runlist */
+		rln = ntfs_runlists_merge (na->rl, rl);
+		if (!rln) {
+			/* Failed, free just allocated clusters */
+			err = errno;
+			fprintf(stderr, "%s(): Eeek! Run list merge "
+					"failed.\n", __FUNCTION__);
+			rln = rl;
+			if (rln->lcn == LCN_RL_NOT_MAPPED) rln++;
+			while (rln->length) {
+				if (ntfs_bitmap_clear_run(vol->lcnbmp_na,
+							rln->lcn, rln->length))
+					fprintf(stderr, "%s(): Eeek! "
+						"Deallocation of just "
+						"allocated clusters "
+						"failed.\n", __FUNCTION__);
+				rln++;
+			}
+			free (rl);
+			goto put_err_out;
+		}
+		na->rl = rln;
+		
+		/* Get the size for the new mapping pairs array. */
+		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+		/*
+		 * Determine maximum possible length of mapping pairs,
+		 * if we shall *not* expand space for mapping pairs
+		 */
+		cur_max_mp_size = le32_to_cpu(a->length) - 
+					le16_to_cpu(a->mapping_pairs_offset);
+		/*
+		 * Determine maximum possible length of mapping pairs,
+		 * if we shall expand space for mapping pairs
+		 */
+		exp_max_mp_size = le32_to_cpu(m->bytes_allocated)
+			- le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
+
+		if (mp_size > exp_max_mp_size) {
+			err = ENOTSUP;
+			fprintf(stderr, "%s(): Eeek! Maping pairs size is"
+					" too big.\n", __FUNCTION__);
+			ntfs_cluster_free (vol, na, na->allocated_size >>
+						vol->cluster_size_bits, -1);
+			goto put_err_out;
+		}
+
+		/* Expand space for mapping pairs if we need this*/
+		if (mp_size > cur_max_mp_size) {
+			/*
+			 * Calculate the new attribute length and mft record
+			 * bytes used.
+			 */
+			new_alen = (le16_to_cpu(a->mapping_pairs_offset)
+							+ mp_size + 7) & ~7;
+			new_muse = le32_to_cpu(m->bytes_in_use) -
+					le32_to_cpu(a->length) + new_alen;
+			if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+				fprintf(stderr, "%s(): BUG! Ran out of space in"
+						" mft record. Please report to "
+						"linux-ntfs-dev@lists.sf.net\n",
+						__FUNCTION__);
+				ntfs_cluster_free (vol, na, na->allocated_size
+						>> vol->cluster_size_bits, -1);
+				err = EIO;
+				goto put_err_out;
+			}
+			/* Move the following attributes forward. */
+			memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(
+					a->length), le32_to_cpu(m->bytes_in_use)
+					- ((u8*)a - (u8*)m) - le32_to_cpu(
+					a->length));
+			/* Update the sizes of the attribute and mft records. */
+			a->length = cpu_to_le32(new_alen);
+			m->bytes_in_use = cpu_to_le32(new_muse);
+		}
+
+		if (mp_size <= 0) {
+			err = errno;
+			fprintf(stderr, "%s(): Eeek! Get size for mapping "
+					"pairs failed.\n", __FUNCTION__);
+			ntfs_cluster_free (vol, na, na->allocated_size >>
+						vol->cluster_size_bits, -1);
+			goto put_err_out;
+		}
+		/*
+		 * Generate the new mapping pairs array directly into the
+		 * correct destination, i.e. the attribute record itself.
+		 */
+		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
+				a->mapping_pairs_offset), mp_size, na->rl)) {
+			err = errno;
+			fprintf(stderr, "%s(): Eeek! Mapping pairs build "
+					"failed.\n", __FUNCTION__);
+			ntfs_cluster_free (vol, na, na->allocated_size >>
+						vol->cluster_size_bits, -1);
+			goto put_err_out;
+		}
+
+		/* Update the attribute record and the ntfs_attr structure. */
+		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
+		a->allocated_size = scpu_to_le64(na->allocated_size);
+		if (a->highest_vcn)
+			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+	}
+	/* Update the attribute record and the ntfs attribute structure. */
+	na->data_size = newsize;
+	a->data_size = scpu_to_le64(newsize);
+	/* Set the inode dirty so it is written out later. */
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+	/* Done! */
+	ntfs_attr_put_search_ctx(ctx);
+	return 0;
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+
+/**
  * ntfs_attr_truncate - resize an ntfs attribute
  * @na:		open ntfs attribute to resize
  * @newsize:	new size (in bytes) to which to resize the attribute
@@ -3130,9 +3354,6 @@ put_err_out:
  * The following error codes are defined:
  *	EINVAL	- Invalid arguments were passed to the function.
  *	ENOTSUP	- The desired resize is not implemented yet.
- *
- * NOTE: At present attributes can only be made smaller using this function,
- *	 never bigger.
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
@@ -3149,15 +3370,17 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		return -1;
 	}
 	/*
-	 * TODO: Implement making non-resident attributes bigger/filling in of
-	 * uninitialized holes as well as handling of compressed attributes.
+	 * TODO: Implement making handling of compressed attributes.
 	 */
-	if ((NAttrNonResident(na) && newsize > na->initialized_size) ||
-			NAttrCompressed(na)) {
+	if (NAttrCompressed(na)) {
 		errno = ENOTSUP;
 		return -1;
 	}
-	if (NAttrNonResident(na))
-		return ntfs_non_resident_attr_shrink(na, newsize);
+	if (NAttrNonResident(na)) {
+		if (newsize > na->initialized_size)
+			return ntfs_non_resident_attr_expand(na, newsize);
+		else
+			return ntfs_non_resident_attr_shrink(na, newsize);
+	}
 	return ntfs_resident_attr_resize(na, newsize);
 }
