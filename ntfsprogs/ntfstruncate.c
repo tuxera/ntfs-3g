@@ -72,7 +72,7 @@ char *dev_name;
 s64 inode;
 u32 attr_type;
 ntfschar *attr_name = NULL;
-u32 attr_name_len;
+int attr_name_len;
 s64 new_len;
 
 ntfs_volume *vol;
@@ -283,7 +283,7 @@ static void parse_options(int argc, char *argv[])
 			attr_name_len = 0;
 		}
 	}
-	Dprintf("attribute type = 0x%x\n", attr_type);
+	Dprintf("attribute type = 0x%x\n", (unsigned int)attr_type);
 	if (attr_name == AT_UNNAMED)
 		Dprintf("attribute name = \"\" (UNNAMED)\n");
 	else
@@ -336,9 +336,9 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			"type yet.";
 	const char *skip = "Skipping display of $%s attribute value.\n";
 	const char *todo = "This is still work in progress.";
+	unsigned int u;
 	char *buf;
 	int i, j;
-	u32 u;
 
 	switch (type) {
 	case AT_STANDARD_INFORMATION:
@@ -558,7 +558,8 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
 			(unsigned)((u8*)a - (u8*)m));
 	if (a->type == AT_END) {
-		printf("Attribute type = 0x%x ($END)\n", le32_to_cpu(AT_END));
+		printf("Attribute type = 0x%x ($END)\n",
+				(unsigned int)le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
 		printf("Length of resident part = %u (0x%x)\n", u, u);
 		return;
@@ -785,8 +786,8 @@ int main(int argc, char **argv)
 	/* Open the specified attribute. */
 	na = ntfs_attr_open(ni, attr_type, attr_name, attr_name_len);
 	if (!na)
-		err_exit("Failed to open attribute 0x%x: %s\n", attr_type,
-				strerror(errno));
+		err_exit("Failed to open attribute 0x%x: %s\n",
+				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		Dprintf("Dumping mft record before calling "
@@ -797,8 +798,8 @@ int main(int argc, char **argv)
 	/* Truncate the attribute. */
 	err = ntfs_attr_truncate(na, new_len);
 	if (err)
-		err_exit("Failed to truncate attribute 0x%x: %s\n", attr_type,
-				strerror(errno));
+		err_exit("Failed to truncate attribute 0x%x: %s\n",
+				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
 		Dprintf("Dumping mft record after calling "
