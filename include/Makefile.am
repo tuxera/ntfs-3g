@@ -13,6 +13,7 @@ linux_ntfsinclude_HEADERS = \
 	bootsect.h	\
 	compat.h	\
 	debug.h		\
+	device.h	\
 	dir.h		\
 	disk_io.h	\
 	endians.h	\
