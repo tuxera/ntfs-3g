@@ -123,6 +123,7 @@
 #include "mst.h"
 #include "dir.h"
 #include "runlist.h"
+#include "mft.h"
 #include "utils.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
@@ -952,59 +953,6 @@ static void dump_mft_record(MFT_RECORD *m)
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
 	};
 	printf("-- End of attributes. --\n");
-}
-
-/**
- * format_mft_record
- */
-static void format_mft_record(MFT_RECORD *m)
-{
-	ATTR_RECORD *a;
-
-	memset(m, 0, vol->mft_record_size);
-	m->magic = magic_FILE;
-	/*
-	 * Aligned to 2-byte boundary.  Note, we use the MFT_RECORD_OLD here
-	 * explicitly as the MFT_RECORD structure has extra fields at the end
-	 * which are only present in NTFS 3.1+.
-	 */
-	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD_OLD) + 1) & ~1);
-	if (vol->mft_record_size >= NTFS_SECTOR_SIZE)
-		m->usa_count = cpu_to_le16(vol->mft_record_size /
-				NTFS_SECTOR_SIZE + 1);
-	else {
-		m->usa_count = cpu_to_le16(1);
-		Qprintf("Sector size is bigger than MFT record size. Setting "
-			"usa_count to 1. If Windows\nchkdsk reports this as "
-			"corruption, please email linux-ntfs-dev@lists.sf.net\n"
-			"stating that you saw this message and that the file "
-			"system created was corrupt.\nThank you.");
-	}
-	/* Set the update sequence number to 1. */
-	*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = cpu_to_le16(1);
-	m->lsn = cpu_to_le64(0LL);
-	m->sequence_number = cpu_to_le16(1);
-	m->link_count = cpu_to_le16(0);
-	/* Aligned to 8-byte boundary. */
-	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
-			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
-	m->flags = cpu_to_le16(0);
-	/*
-	 * Using attrs_offset plus eight bytes (for the termination attribute),
-	 * aligned to 8-byte boundary.
-	 */
-	m->bytes_in_use = cpu_to_le32((le16_to_cpu(m->attrs_offset) + 8 + 7) &
-			~7);
-	m->bytes_allocated = cpu_to_le32(vol->mft_record_size);
-	m->base_mft_record = cpu_to_le64((MFT_REF)0);
-	m->next_attr_instance = cpu_to_le16(0);
-	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
-	a->type = AT_END;
-	a->length = cpu_to_le32(0);
-#if 0
-	if (!opts.quiet && opts.verbose > 1)
-		dump_mft_record(m);
-#endif
 }
 
 /**
@@ -3092,8 +3040,17 @@ int main(int argc, char **argv)
 		Qprintf(" - Done.\n");
 	}
 	Qprintf("Creating NTFS volume structures.\n");
-	/* Setup an empty mft record. */
-	format_mft_record((MFT_RECORD*)buf);
+	/*
+	 * Setup an empty mft record.  Note, we can just give 0 as the mft
+	 * reference as we are creating an NTFS 1.2 volume for which the mft
+	 * reference is ignored by ntfs_mft_record_layout().
+	 */
+	if (ntfs_mft_record_layout(vol, 0, (MFT_RECORD *)buf))
+		err_exit("Error:  Failed to layout mft record.\n");
+#if 0
+	if (!opts.quiet && opts.verbose > 1)
+		dump_mft_record((MFT_RECORD*)buf);
+#endif
 	/*
 	 * Copy the mft record onto all 16 records in the buffer and setup the
 	 * sequence numbers of each system file to equal the mft record number

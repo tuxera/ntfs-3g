@@ -123,7 +123,7 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	int cnt = 0, res = 0;
 
 	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
-	if (!vol || !vol->mft_na || !b || count < 0) {
+	if (!vol || !vol->mft_na || vol->mftmirr_size <= 0 || !b || count < 0) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -134,6 +134,10 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		return -1;
 	}
 	if (m < vol->mftmirr_size) {
+		if (!vol->mftmirr_na) {
+			errno = EINVAL;
+			return -1;
+		}
 		cnt = vol->mftmirr_size - m;
 		if (cnt > count)
 			cnt = count;
@@ -249,8 +253,125 @@ read_failed:
 }
 
 /**
+ * ntfs_mft_record_layout - layout an mft record into a memory buffer
+ * @vol:	volume to which the mft record will belong
+ * @mref:	mft reference specifying the mft record number
+ * @m:		destination buffer of size >= @vol->mft_record_size bytes
+ *
+ * Layout an empty, unused mft record with the mft reference @mref into the
+ * buffer @m.  The volume @vol is needed because the mft record structure was
+ * modified in NTFS 3.1 so we need to know which volume version this mft record
+ * will be used on.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
+		MFT_RECORD *m)
+{
+	ATTR_RECORD *a;
+
+	if (!vol || !m) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Aligned to 2-byte boundary. */
+	if (vol->major_ver < 3 || (vol->major_ver == 3 && !vol->minor_ver))
+		m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD_OLD) + 1) & ~1);
+	else {
+		/* Abort if mref is > 32 bits. */
+		if (MREF(mref) & 0x0000ffff00000000ull) {
+			fprintf(stderr, "Mft reference exceeds 32 bits!");
+			errno = ERANGE;
+			return -1;
+		}
+		m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
+		/*
+		 * Set the NTFS 3.1+ specific fields while we know that the
+		 * volume version is 3.1+.
+		 */
+		m->reserved = cpu_to_le16(0);
+		m->mft_record_number = cpu_to_le32(MREF(mref));
+	}
+	m->magic = magic_FILE;
+	if (vol->mft_record_size >= NTFS_SECTOR_SIZE)
+		m->usa_count = cpu_to_le16(vol->mft_record_size /
+				NTFS_SECTOR_SIZE + 1);
+	else {
+		m->usa_count = cpu_to_le16(1);
+		fprintf(stderr, "Sector size is bigger than MFT record size. "
+				"Setting usa_count to 1. If Windows\nchkdsk "
+				"reports this as corruption, please email "
+				"linux-ntfs-dev@lists.sf.net\nstating that "
+				"you saw this message and that the file "
+				"system created was corrupt.\nThank you.");
+	}
+	/* Set the update sequence number to 1. */
+	*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = cpu_to_le16(1);
+	m->lsn = cpu_to_le64(0ull);
+	m->sequence_number = cpu_to_le16(1);
+	m->link_count = cpu_to_le16(0);
+	/* Aligned to 8-byte boundary. */
+	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
+			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
+	m->flags = cpu_to_le16(0);
+	/*
+	 * Using attrs_offset plus eight bytes (for the termination attribute),
+	 * aligned to 8-byte boundary.
+	 */
+	m->bytes_in_use = cpu_to_le32((le16_to_cpu(m->attrs_offset) + 8 + 7) &
+			~7);
+	m->bytes_allocated = cpu_to_le32(vol->mft_record_size);
+	m->base_mft_record = cpu_to_le64((MFT_REF)0);
+	m->next_attr_instance = cpu_to_le16(0);
+	a = (ATTR_RECORD*)((u8*)m + le16_to_cpu(m->attrs_offset));
+	a->type = AT_END;
+	a->length = cpu_to_le32(0);
+	/* Finally, clear the unused part of the mft record. */
+	memset((u8*)a + 8, 0, vol->mft_record_size - ((u8*)a + 8 - (u8*)m));
+	return 0;
+}
+
+/**
+ * ntfs_mft_record_format - format an mft record on an ntfs volume
+ * @vol:	volume on which to format the mft record
+ * @mref:	mft reference specifying mft record to format
+ *
+ * Format the mft record with the mft reference @mref in $MFT/$DATA, i.e. lay
+ * out an empty, unused mft record in memory and write it to the volume @vol.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
+{
+	MFT_RECORD *m;
+	int err;
+
+	if (!vol || !vol->mft_na) {
+		errno = EINVAL;
+		return -1;
+	}
+	m = malloc(vol->mft_record_size);
+	if (!m)
+		return -1;
+	if (ntfs_mft_record_layout(vol, mref, m)) {
+		err = errno;
+		free(m);
+		errno = err;
+		return -1;
+	}
+	if (ntfs_mft_record_write(vol, mref, m)) {
+		err = errno;
+		free(m);
+		errno = err;
+		return -1;
+	}
+	free(m);
+	return 0;
+}
+
+/**
  * ntfs_mft_record_alloc - allocate an mft record on an ntfs volume
- * @vol:	mounted ntfs volume on which to allocate the mft record
+ * @vol:	volume on which to allocate the mft record
  * @start:	starting mft record at which to allocate (or -1 if none)
  *
  * Allocate an mft record in $MFT/$DATA starting to search for a free record
@@ -274,7 +395,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, s64 start)
 
 /**
  * ntfs_mft_record_free - free an mft record on an ntfs volume
- * @vol:	mounted ntfs volume on which to free the mft record
+ * @vol:	volume on which to free the mft record
  * @ni:		open ntfs inode of the mft record to free
  *
  * Free the mft record of the open inode @ni on the mounted ntfs volume @vol.

@@ -101,6 +101,11 @@ static __inline__ u32 ntfs_mft_record_get_data_size(const MFT_RECORD *m)
 	return le32_to_cpu(m->bytes_in_use);
 }
 
+extern int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
+		MFT_RECORD *mrec);
+
+extern int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref);
+
 extern ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, s64 start);
 
 extern int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni);
