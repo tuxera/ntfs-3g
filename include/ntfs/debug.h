@@ -31,6 +31,7 @@
 #ifdef HAVE_STDARG_H
 #	include <stdarg.h>
 #endif
+#include <string.h>
 #include <errno.h>
 
 struct _runlist_element;
@@ -49,7 +50,7 @@ extern void __ntfs_debug (const char *file, int line, const char *function,
 		__ntfs_debug(__FILE__, __LINE__, __FUNCTION__, f, ##a)
 
 extern void __ntfs_error(const char *function,
-		const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+		const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 #define ntfs_error(sb, f, a...)		__ntfs_error(__FUNCTION__, f, ##a)
 
 extern void __Dprintf(const char *fmt, ...)
