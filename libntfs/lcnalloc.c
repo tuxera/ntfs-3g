@@ -429,7 +429,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 					if (rl)
 						free(rl);
 					free(buf);
-					NTFS_BUG("switch(search_zone)");
+					NTFS_BUG("switch(search_zone) 1");
 					return NULL;
 				}
 				Dprintf("%s(): Going to done_ret.\n",
@@ -490,7 +490,7 @@ zone_pass_done:	/* Finished with the current zone pass. */
 				zone_start = 0;
 				break;
 			default:
-				NTFS_BUG("switch(search_zone), 2");
+				NTFS_BUG("switch(search_zone) 2");
 			}
 			/* Sanity check. */
 			if (zone_end < zone_start)
