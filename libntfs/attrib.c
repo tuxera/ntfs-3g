@@ -3751,7 +3751,8 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 					"failed. Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
-		goto put_err_out;
+		errno = err;
+		return -1;
 	}
 
 	/* The first cluster outside the new allocation. */
@@ -3986,6 +3987,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx) {
+		err = errno;
 		if ((na->allocated_size >> vol->cluster_size_bits) !=
 				first_free_vcn)
 			goto rollback;
