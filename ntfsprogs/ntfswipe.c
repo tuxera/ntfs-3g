@@ -640,11 +640,11 @@ int ntfs_info (ntfs_volume *vol)
 	//Qprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
 
 	{
-	u64 offset;
-	u64 size = vol->lcnbmp_na->allocated_size;
+	s64 offset;
+	s64 size = vol->lcnbmp_na->allocated_size;
 	int bufsize = vol->mft_record_size;
-	u64 use = 0;
-	u64 not = 0;
+	s64 use = 0;
+	s64 not = 0;
 	int i, j;
 
 	for (offset = 0; offset < size; offset += bufsize) {
@@ -680,11 +680,11 @@ done:
 
 	{
 	u8 *bitmap;
-	u64 bmpoff;
-	u64 bmpsize = vol->mftbmp_na->data_size;
+	s64 bmpoff;
+	s64 bmpsize = vol->mftbmp_na->data_size;
 	int bmpbufsize = 512;
 	int i, j;
-	u64 use = 0, not = 0;
+	s64 use = 0, not = 0;
 
 	bitmap = malloc (bmpbufsize);
 	if (!bitmap)

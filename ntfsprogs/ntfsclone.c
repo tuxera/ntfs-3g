@@ -69,7 +69,7 @@ struct progress_bar {
 struct __ntfs_walk_clusters_ctx {
 	ntfs_inode *ni;			/* inode being processed */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
-	u64 inuse;			/* number of clusters in use */
+	s64 inuse;			/* number of clusters in use */
 };
 
 typedef struct __ntfs_walk_clusters_ctx ntfs_walk_clusters_ctx;
@@ -167,7 +167,7 @@ int perr_exit(const char *fmt, ...)
 }
 
 
-void usage()
+void usage(void)
 {
 	Eprintf("\nUsage: %s [options] device\n"
 		"    Efficiently clone NTFS to a sparse file, device or standard output.\n"
@@ -370,7 +370,7 @@ int io_all(void *fd, void *buf, int count, int do_write)
 }
 
 
-void copy_cluster()
+void copy_cluster(void)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 
@@ -440,7 +440,7 @@ void clone_ntfs(u64 nr_clusters)
 			return;
 
 		for (i = 0; i < count; i++, pos++) {
-			u64 cl;  /* current cluster */	  
+			s64 cl;  /* current cluster */	  
 
 			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
 
@@ -495,7 +495,8 @@ void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a;
-	int i, n = 0;
+	u32 i;
+	int n = 0;
 	char *p;
 
 	a = image->ctx->attr;
@@ -612,7 +613,7 @@ void compare_bitmaps(struct bitmap *a)
 		}
 
 		for (i = 0; i < count; i++, pos++) {
-			u64 cl;  /* current cluster */	  
+			s64 cl;  /* current cluster */	  
 
 			if (a->bm[pos] == bm[i])
 				continue;
@@ -787,7 +788,7 @@ void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-void setup_lcn_bitmap()
+void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
@@ -1010,7 +1011,7 @@ int main(int argc, char **argv)
 	/* FIXME: save backup boot sector */
 
 	if (opt.stdout || !opt.metadata_only) {
-		u64 nr_clusters = opt.stdout ? vol->nr_clusters : image.inuse;
+		s64 nr_clusters = opt.stdout ? vol->nr_clusters : image.inuse;
 		
 		clone_ntfs(nr_clusters);
 		Printf("Syncing ...\n");

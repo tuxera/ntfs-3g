@@ -194,7 +194,7 @@ int perr_exit(const char *fmt, ...)
  *
  * Return:  none
  */
-void usage()
+void usage(void)
 {
 
 	printf ("\nUsage: %s [options] device\n"
@@ -694,7 +694,7 @@ void compare_bitmaps(struct bitmap *a)
 		}
 
 		for (i = 0; i < count; i++, pos++) {
-			u64 cl;  /* current cluster */	  
+			s64 cl;  /* current cluster */	  
 
 			if (a->bm[pos] == bm[i])
 				continue;
@@ -930,8 +930,8 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 
-	if (mp_size > le32_to_cpu (a->length) -
-			le16_to_cpu (a->mapping_pairs_offset))
+	if (mp_size > (int)(le32_to_cpu (a->length) -
+			le16_to_cpu (a->mapping_pairs_offset)))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
@@ -959,7 +959,7 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 {
 	runlist *rl = *rlist;
 	int i, j;
-	u64 k;
+	s64 k;
 	int trunc_at = -1;	/* FIXME: -1 means unset */
 
 	/* Unallocate truncated clusters in $Bitmap */
@@ -974,11 +974,11 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 			if (rl[i].vcn + j < nr_bm_clusters)
 				continue;
 
-			k = (u64)rl[i].lcn + j;
+			k = rl[i].lcn + j;
 			if (k < new_size) {
 				ntfs_bit_set(lcn_bitmap.bm, k, 0);
 				Dprintf("Unallocate cluster: "
-				       "%llu (%llx)\n", k, k);
+				       "%lld (%llx)\n", k, k);
 			}
 		}
 	}
@@ -1076,8 +1076,8 @@ void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 
-	if (mp_size > le32_to_cpu (a->length) -
-			le16_to_cpu (a->mapping_pairs_offset))
+	if (mp_size > (int)(le32_to_cpu (a->length) -
+			le16_to_cpu (a->mapping_pairs_offset)))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
 
 	if (!(mp = (char *)calloc(1, mp_size)))
@@ -1204,7 +1204,7 @@ void truncate_bitmap_file(ntfs_resize_t *resize)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-void setup_lcn_bitmap()
+void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
@@ -1294,7 +1294,7 @@ void print_disk_usage(ntfs_resize_t *resize)
  * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
  * the volume (load the metadata into memory).
  */
-void mount_volume()
+void mount_volume(void)
 {
 	unsigned long mntflag;
 
@@ -1348,7 +1348,7 @@ void mount_volume()
  * boots it will automatically run chkdsk to check for any problems.  If the
  * read-only command line option was given, this function will do nothing.
  */
-void prepare_volume_fixup()
+void prepare_volume_fixup(void)
 {
 	u16 flags;
 
