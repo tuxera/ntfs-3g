@@ -18961,7 +18961,7 @@ fi
 # Check for gcc version being >= 2.96.
 echo "$as_me:$LINENO: checking version of $_cc" >&5
 echo $ECHO_N "checking version of $_cc... $ECHO_C" >&6
-cc_version=`./getgccver $_cc`
+cc_version=`$srcdir/getgccver $_cc`
 cc_major=`echo $cc_version | cut -d'.' -f1`
 cc_minor=`echo $cc_version | cut -d'.' -f2`
 if test -z "$cc_version"; then
