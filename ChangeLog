@@ -90,6 +90,7 @@ xx/xx/2004 - 2.0.0-WIP
 	- ntfscp is moved from extra to standard program set.  (Yura)
 	- Add new high level API inode.[ch]::ntfs_inode_add_attr and make ntfscp
 	  use it when requested attribute isn't exist.  (Yura)
+	- Add new high level API inode.[ch]::ntfs_inode_rm_attr.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
