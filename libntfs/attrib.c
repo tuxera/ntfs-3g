@@ -2031,6 +2031,42 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 }
 
 /**
+ * ntfs_attr_can_be_resident - check if an attribute can be resident
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ *
+ * Check whether the attribute of @type on the ntfs volume @vol is allowed to
+ * be resident. This information is derived from our ntfs knowledge and may
+ * not be completely accurate, especially when user defined attributes are
+ * present. Basically we allow everything to be resident except for index
+ * allocation and extended attribute attributes.
+ *
+ * Return 0 if the attribute is allowed to be resident and -1 if not or an
+ * error occured. On error the error code is stored in errno. The following
+ * error codes are defined:
+ *	EPERM	- The attribute is not allowed to be resident.
+ *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
+ *
+ * Warning: In the system file $MFT the attribute $Bitmap must be non-resident
+ *	    otherwise windows will not boot (blue screen of death)!  We cannot
+ *	    check for this here as we don't know which inode's $Bitmap is being
+ *	    asked about so the caller needs to special case this.
+ */
+int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
+{
+	if (!vol || !vol->attrdef || !type) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (type != AT_INDEX_ALLOCATION && type != AT_EA)
+		return 0;
+
+	errno = EPERM;
+	return -1;
+}
+
+/**
  * ntfs_attr_record_resize - resize an attribute record
  * @m:		mft record containing attribute record
  * @a:		attribute record to resize
@@ -2150,7 +2186,10 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
  *
  * Convert a resident ntfs attribute to a non-resident one.
  *
- * Return 0 on success and -1 on error with errno set to the error code.
+ * Return 0 on success and -1 on error with errno set to the error code. The
+ * following error codes are defined:
+ *	EPERM	- The attribute is not allowed to be non-resident.
+ *	TODO: others...
  *
  * NOTE to self: No changes in the attribute list are required to move from
  *		 a resident to a non-resident attribute.
@@ -2177,6 +2216,11 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		errno = EINVAL;
 		return -1;
 	}
+
+	/* Check that the attribute is allowed to be non-resident. */
+	if (ntfs_attr_can_be_non_resident(vol, na->type))
+		return -1;
+
 	/*
 	 * Check that the attribute name hasn't been placed after the
 	 * attribute value. If it has we need to move it.
@@ -2419,37 +2463,22 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	}
 	/* There is not enough space in the mft record to perform the resize. */
 
-	/* Check if the attribute is allowed to be non-resident. */
-	if (!ntfs_attr_can_be_non_resident(vol, na->type)) {
-		/* Make the attribute non-resident. */
-		if (!ntfs_attr_make_non_resident(na, ctx)) {
-			// TODO: Attribute is now non-resident. Resize it!
-			// goto resize_done;
-			fprintf(stderr, "%s(): TODO: Resize attribute now that "
-					"it is non-resident.\n", __FUNCTION__);
-			ntfs_inode_mark_dirty(ctx->ntfs_ino);
-			err = ENOTSUP;
-			goto put_err_out;
-		}
-		/* Error! If not enough space, just continue. */
-		if (errno != ENOSPC) {
-			err = errno;
-			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Failed to make attribute "
-					"non-resident. Aborting...\n",
-					__FUNCTION__);
-			goto put_err_out;
-		}
-	} else {
-		/*
-		 * If the attribute can be non-resident but an error occured
-		 * while making it non-resident, abort.
-		 */
-		if (errno != EPERM) {
-			err = errno;
-			goto put_err_out;
-		}
-		/* Attribute is not allowed to be non-resident, continue. */
+	/* Make the attribute non-resident if possible. */
+	if (!ntfs_attr_make_non_resident(na, ctx)) {
+		// TODO: Attribute is now non-resident. Resize it!
+		// goto resize_done;
+		fprintf(stderr, "%s(): TODO: Resize attribute now that "
+				"it is non-resident.\n", __FUNCTION__);
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		err = ENOTSUP;
+		goto put_err_out;
+	} else if (errno != ENOSPC && errno != EPERM) {
+		err = errno;
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Failed to make attribute "
+				"non-resident. Aborting...\n",
+				__FUNCTION__);
+		goto put_err_out;
 	}
 
 	// TODO: Try to make other attributes non-resident.
@@ -2476,20 +2505,61 @@ put_err_out:
 }
 
 /**
- * ntfs_attr_make_resident - 
+ * ntfs_attr_make_resident - convert a non-resident to a resident attribute
+ * @na:		open ntfs attribute to make resident
+ * @ctx:	ntfs search context describing the attribute
+ *
+ * Convert a non-resident ntfs attribute to a resident one.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code. The
+ * following error codes are defined:
+ *	EPERM	- The attribute is not allowed to be resident.
+ *	TODO: others...
+ *
+ * Warning: We do not set the inode dirty and we do not write out anything!
+ *	    We expect the caller to do this as this is a fairly low level
+ *	    function and it is likely there will be further changes made.
  */
 static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 {
-	// FIXME: For now we cheat and assume there is no attribute list
-	//	  present. (AIA)
-	if (NInoAttrList(na->ni)) {
-		errno = ENOTSUP;
+	/* Some preliminary sanity checking. */
+	if (!NAttrNonResident(na)) {
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Trying to make resident "
+				"attribute resident. Aborting...\n",
+				__FUNCTION__);
+		errno = EINVAL;
 		return -1;
 	}
 
 	/* Make sure this is not $MFT/$BITMAP or Windows will not boot! */
 	if (na->type == AT_BITMAP && na->ni->mft_no == FILE_MFT) {
 		errno = EPERM;
+		return -1;
+	}
+
+	/* Check that the attribute is allowed to be resident. */
+	if (ntfs_attr_can_be_resident(vol, na->type))
+		return -1;
+
+	/*
+	 * Check that the attribute name hasn't been placed after the
+	 * mapping pairs array. If it has we need to move it.
+	 * TODO: Implement the move. For now just abort. (AIA)
+	 */
+	if (a->name_length && le16_to_cpu(a->name_offset) >=
+			le16_to_cpu(a->mapping_pairs_offset)) {
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Name is placed after the mapping "
+				"pairs array. Aborting...\n", __FUNCTION__);
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	// FIXME: For now we cheat and assume there is no attribute list
+	//	  present. (AIA)
+	if (NInoAttrList(na->ni)) {
+		errno = ENOTSUP;
 		return -1;
 	}
 
