@@ -2175,10 +2175,8 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 		errno = EINVAL;
 		return -1;
 	}
-
 	if (type != AT_INDEX_ALLOCATION && type != AT_EA)
 		return 0;
-
 	errno = EPERM;
 	return -1;
 }
@@ -2204,7 +2202,6 @@ static int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 {
 	/* Align to 8 bytes, just in case the caller hasn't. */
 	new_size = (new_size + 7) & ~7;
-
 	/* If the actual attribute length has changed, move things around. */
 	if (new_size != le32_to_cpu(a->length)) {
 		u32 new_muse = le32_to_cpu(m->bytes_in_use) -
@@ -2275,7 +2272,6 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 			new_size + 7) & ~7) < 0) {
 		if (errno != ENOSPC) {
 			int eo = errno;
-
 			// FIXME: Eeek!
 			fprintf(stderr, "%s(): Eeek! Attribute record resize "
 					"failed. Aborting...\n", __FUNCTION__);
@@ -2602,6 +2598,9 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	// TODO: Move the attribute to a new mft record, creating an attribute
 	// list attribute or modifying it if it is already present.
+
+	// TODO: If that is still not enough, split the attribute into multiple
+	// extents and save them to several mft records.
 
 	err = ENOTSUP;
 	goto put_err_out;
@@ -3133,9 +3132,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		errno = ENOTSUP;
 		return -1;
 	}
-
 	if (NAttrNonResident(na))
 		return ntfs_non_resident_attr_shrink(na, newsize);
 	return ntfs_resident_attr_resize(na, newsize);
 }
-

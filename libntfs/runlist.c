@@ -1427,9 +1427,7 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 		errno = EINVAL;
 		return -1;
 	}
-
 	rl = *arl;
-
 	if (start_vcn < rl->vcn) {
 		// FIXME: Eeek! BUG()
 		fprintf(stderr, "%s(): Eeek! start_vcn lies outside front of "
@@ -1437,7 +1435,6 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 		errno = EIO;
 		return -1;
 	}
-
 	/* Find the starting vcn in the run list. */
 	while (rl->length) {
 		if (start_vcn < rl[1].vcn)
@@ -1458,13 +1455,10 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 		errno = EIO;
 		return -1;
 	}
-
 	if (rl->length) {
 		is_end = FALSE;
-
 		/* Truncate the run. */
 		rl->length = start_vcn - rl->vcn;
-
 		/*
 		 * If a run was partially truncated, make the following runlist
 		 * element a terminator instead of the truncated runlist
@@ -1479,9 +1473,7 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 		}
 	} else
 		is_end = TRUE;
-
 	rl->lcn = (LCN)LCN_ENOENT;
-
 	/* Reallocate memory if necessary. */
 	if (!is_end) {
 		size_t new_size = (rl - *arl + 1) * sizeof(runlist_element);
@@ -1498,8 +1490,6 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 					__FUNCTION__);
 		}
 	}
-
 	/* Done! */
 	return 0;
 }
-
