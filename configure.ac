@@ -1,9 +1,35 @@
+#
+# configure.ac - Source file to generate "./configure" to prepare package for
+#		 compilation.
+#
+# Copyright (c) 2000-2003 Anton Altaparmakov
+# Copyright (c) 2003 Jan Kratochvil
+#
+# This program/include file is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published
+# by the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program/include file is distributed in the hope that it will be
+# useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program (in the main directory of the Linux-NTFS
+# distribution in the file COPYING); if not, write to the Free Software
+# Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.0beta, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.0betaBK, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
+AM_MAINTAINER_MODE
+AM_ENABLE_SHARED
+AM_ENABLE_STATIC
 
 # This is required to get past a stupid configure bug when making the rpm.
 # Basically it is broken to specify the host as a command line argument to
@@ -14,8 +40,6 @@ if test "x$nonopt" != "xNONE"; then
   host="$nonopt"
   nonopt="NONE"
 fi
-
-AM_MAINTAINER_MODE
 
 AC_PREFIX_DEFAULT(/usr/local)
 if test "x$prefix" = "xNONE"; then
@@ -37,6 +61,16 @@ AC_ARG_ENABLE(really-static,
 AM_CONDITIONAL(DEBUG, test "$enable_debug" = yes)
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
 
+# Do not discard 'CFLAGS' as they may have been passed us by rpmbuild(8)
+if test "$USE_MAINTAINER_MODE" = "yes";then
+	CFLAGS="$CFLAGS -ggdb3 -Wall -Wstrict-prototypes -Wsign-compare" ## FIXME: fix all source: -Wsign-compare
+fi
+
+AM_PATH_GLIB_2_0(,,[AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 library.])],[gmodule gobject])
+dnl Force glib-2.0 for the whole package
+CFLAGS="$CFLAGS $GLIB_CFLAGS"
+LIBS="$LIBS $GLIB_LIBS"
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -44,6 +78,11 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
+
+PKG_CHECK_MODULES(GNOME_VFS_MODULE,gnome-vfs-module-2.0)
+dnl Force gnome-vfs-module-2.0 for the whole package
+CFLAGS="$CFLAGS $GNOME_VFS_MODULE_CFLAGS"
+LIBS="$LIBS $GNOME_VFS_MODULE_LIBS"
 
 # create a working libtool-script
 if test -z "$LIBTOOL"; then
@@ -66,6 +105,7 @@ AC_SUBST(all_libraries)
 AC_SUBST(CFLAGS)
 AC_SUBST(CPPFLAGS)
 AC_SUBST(LDFLAGS)
+AC_SUBST(LIBS)
 
 AC_SUBST(AUTODIRS)
 
@@ -138,6 +178,7 @@ AC_CONFIG_FILES([
 	doc/Makefile
 	include/Makefile
 	libntfs/Makefile
+	libntfs/libntfs.conf
 	ntfsprogs/Makefile
 	ntfsprogs/mkntfs.8
 	ntfsprogs/ntfscat.8
