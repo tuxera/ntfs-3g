@@ -1006,22 +1006,52 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 
 static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 {
+	u16 inode_flags = le16_to_cpu(inode->mrec->flags);
+	
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
-/*
-	NTFS_RECORD_TYPES magic;// Usually the magic is "FILE".
-	u16 usa_ofs;		// See NTFS_RECORD definition above.
-	u16 usa_count;		// See NTFS_RECORD definition above.
-	LSN lsn;		// $LogFile sequence number for this record. Changed every time the record is modified.
-	u16 sequence_number;	// Number of times this mft record has been reused.
-	u16 link_count;		// Number of hard links
-	MFT_RECORD_FLAGS flags;	// Bit array of MFT_RECORD_FLAGS.
-	u32 bytes_in_use;	// Number of bytes used in this mft record.
-	u32 bytes_allocated;	// Number of bytes allocated for this mft record. This should be equal to the mft record size.
-	MFT_REF base_mft_record; // This is zero for base mft records.
-	u16 next_attr_instance; // The instance number that will be assigned to the next attribute added to this mft record.
-// The below fields are specific to NTFS 3.1+ (Windows XP and above):
-	u32 mft_record_number;	// Number of this mft record.
-*/
+	
+	printf("Update Sequence Array Count:\t%hu\n",
+		le16_to_cpu(inode->mrec->usa_count));
+	printf("$LogFile seqNum for this Inode:\t0x%llx\n",
+		(signed long long int)sle64_to_cpu(inode->mrec->lsn));
+	printf("Number of times reused:\t\t%hu\n",
+		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
+	printf("Number of hard links:\t\t%hu\n",
+		le16_to_cpu(inode->mrec->link_count));
+
+	printf("MFT record Flags:\t\t");
+	/* we would like to convert MFT_RECORD_IN_USE -> DELETED
+		and we do that by xoring */
+	inode_flags = inode_flags ^ MFT_RECORD_IN_USE;
+	
+	if (inode_flags) {
+		/* MFT_RECORD_IN_USE is now backwards */
+		if (MFT_RECORD_IN_USE & inode_flags) {
+			printf("DELETED ");
+		}
+		if (MFT_RECORD_IS_DIRECTORY & inode_flags) {
+			printf("DIRECTORY ");
+		}
+		if (MFT_RECORD_IN_USE & !MFT_RECORD_IS_DIRECTORY &
+			MFT_REC_SPACE_FILLER & inode_flags) {
+			printf("UNKNOWN:0x%x",inode_flags);
+		}
+	} else {
+		printf("none");
+	}
+	printf("\n");
+
+	printf("Size - Used:\t\t\t%u bytes\n",
+		(unsigned int)le32_to_cpu(inode->mrec->bytes_in_use));
+	printf("Size - Allocated:\t\t%u bytes\n",
+		(unsigned int)le32_to_cpu(inode->mrec->bytes_allocated));
+		
+	if (inode->mrec->base_mft_record) {
+		printf("base MFT record:\t\t%llu\n",
+			MREF_LE(inode->mrec->base_mft_record));
+	}
+	printf("Next Attribute Instance Num\t%hu\n",
+		le16_to_cpu(inode->mrec->next_attr_instance));
 }
 
 /**
