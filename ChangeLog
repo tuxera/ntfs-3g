@@ -1,4 +1,4 @@
-03/12/2003 - 1.x.x - WIP
+06/01/2004 - 1.8.1 - Important bug fix and various enhancements.
 	- Add new API function attrib.[hc]:ntfs_attr_map_whole_runlist().
 	- Add new API function runlist.[hc]:ntfs_rl_pread().
 	- Fix bug in run list encoding functions that hit sparse and compressed

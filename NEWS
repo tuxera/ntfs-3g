@@ -1,6 +1,9 @@
 Current news
 ============
 
+ntfsprogs should now compile with DJGPP under DOS, too.  Thanks to Christophe
+Grenier.
+
 Merged the NTFS Gnome VFS module by Jan Kratochvil.
 
 Added new utilities: ntfsclone by Szakacsits Szabolcs, ntfscluster by Richard
