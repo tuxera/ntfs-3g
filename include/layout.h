@@ -509,7 +509,7 @@ typedef enum {
  * can be stored:
  *
  *   1) The data in the block is all zero (a sparse block):
- *	  This is stored as a sparse block in the run list, i.e. the run list
+ *	  This is stored as a sparse block in the runlist, i.e. the runlist
  *	  entry has length = X and lcn = -1. The mapping pairs array actually
  *	  uses a delta_lcn value length of 0, i.e. delta_lcn is not present at
  *	  all, which is then interpreted by the driver as lcn = -1.
@@ -522,7 +522,7 @@ typedef enum {
  *	  in clusters. I.e. if compression has a small effect so that the
  *	  compressed data still occupies X clusters, then the uncompressed data
  *	  is stored in the block.
- *	  This case is recognised by the fact that the run list entry has
+ *	  This case is recognised by the fact that the runlist entry has
  *	  length = X and lcn >= 0. The mapping pairs array stores this as
  *	  normal with a run length of X and some specific delta_lcn, i.e.
  *	  delta_lcn has to be present.
@@ -531,7 +531,7 @@ typedef enum {
  *	  The common case. This case is recognised by the fact that the run
  *	  list entry has length L < X and lcn >= 0. The mapping pairs array
  *	  stores this as normal with a run length of X and some specific
- *	  delta_lcn, i.e. delta_lcn has to be present. This run list entry is
+ *	  delta_lcn, i.e. delta_lcn has to be present. This runlist entry is
  *	  immediately followed by a sparse entry with length = X - L and
  *	  lcn = -1. The latter entry is to make up the vcn counting to the
  *	  full compression block size X.
@@ -539,15 +539,15 @@ typedef enum {
  * In fact, life is more complicated because adjacent entries of the same type
  * can be coalesced. This means that one has to keep track of the number of
  * clusters handled and work on a basis of X clusters at a time being one
- * block. An example: if length L > X this means that this particular run list
+ * block. An example: if length L > X this means that this particular runlist
  * entry contains a block of length X and part of one or more blocks of length
  * L - X. Another example: if length L < X, this does not necessarily mean that
  * the block is compressed as it might be that the lcn changes inside the block
- * and hence the following run list entry describes the continuation of the
+ * and hence the following runlist entry describes the continuation of the
  * potentially compressed block. The block would be compressed if the
- * following run list entry describes at least X - L sparse clusters, thus
+ * following runlist entry describes at least X - L sparse clusters, thus
  * making up the compression block length as described in point 3 above. (Of
- * course, there can be several run list entries with small lengths so that the
+ * course, there can be several runlist entries with small lengths so that the
  * sparse entry does not follow the first data containing entry with
  * length < X.)
  *
