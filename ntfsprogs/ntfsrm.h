@@ -65,6 +65,7 @@ struct ntfs_dt {
 	int		  child_count;
 	INDEX_ENTRY	**children;
 	struct ntfs_dt	**sub_nodes;
+	ntfs_inode	**inodes;
 	INDEX_HEADER	 *header;
 	VCN		  vcn;
 	BOOL		  changed;
