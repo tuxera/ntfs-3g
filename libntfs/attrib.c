@@ -3066,7 +3066,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	}
 	/* Calculate new offsets for the name and the mapping pairs array. */
 	name_ofs = (sizeof(ATTR_REC) - sizeof(a->compressed_size) + 7) & ~7;
-	mp_ofs = (name_ofs + a->name_length + 7) & ~7;
+	mp_ofs = (name_ofs + a->name_length * sizeof(ntfschar) + 7) & ~7;
 	/*
 	 * Determine the size of the resident part of the non-resident
 	 * attribute record. (Not compressed thus no compressed_size element
