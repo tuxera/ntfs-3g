@@ -601,7 +601,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 	return ret;	
 }
 
-static void collect_shrink_constraints(ntfs_resize_t *resize, runlist *rl)
+static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 {
 	s64 inode, last_lcn;
 	ATTR_FLAGS flags;
@@ -670,7 +670,7 @@ static void collect_shrink_constraints(ntfs_resize_t *resize, runlist *rl)
 }
 
 
-static void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
+static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 {
 	s64 lcn, lcn_length, start, len, inode;
 	s64 new_vol_size;	/* (last LCN on the volume) + 1 */
@@ -771,13 +771,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 						(unsigned long long)k);
 			}
 		}
-
 		resize->inuse += lcn_length;
-		
-		collect_shrink_constraints(resize, rl + i);
-		
-		if (resize->shrink)
-			collect_shrink_info(resize, rl + i);
 	}
 	free(rl);
 }
@@ -790,19 +784,16 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
  */
 static void walk_attributes(ntfs_resize_t *resize)
 {
-	ntfs_attr_search_ctx *ctx;
-
-	if (!(ctx = ntfs_attr_get_search_ctx(resize->ni, NULL)))
+	if (!(resize->ctx = ntfs_attr_get_search_ctx(resize->ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	while (!ntfs_attrs_walk(ctx)) {
-		if (ctx->attr->type == AT_END)
+	while (!ntfs_attrs_walk(resize->ctx)) {
+		if (resize->ctx->attr->type == AT_END)
 			break;
-		resize->ctx = ctx;
 		build_lcn_usage_bitmap(resize);
 	}
 
-	ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(resize->ctx);
 }
 
 /**
@@ -918,20 +909,19 @@ static void progress_update(struct progress_bar *p, u64 current)
  * Read each record in the MFT, skipping the unused ones, and build up a bitmap
  * from all the non-resident attributes.
  */
-static void walk_inodes(ntfs_resize_t *resize)
+static void build_allocation_bitmap(ntfs_resize_t *resize)
 {
 	s64 inode = 0;
-	s64 last_mft_rec;
 	ntfs_inode *ni;
+	struct progress_bar progress;
 
 	/* WARNING: don't modify the text, external tools grep for it */
 	printf("Checking filesystem consistency ...\n");
 
-	last_mft_rec = vol->nr_mft_records - 1;
-	progress_init(&resize->progress, inode, last_mft_rec, 100);
+	progress_init(&progress, inode, vol->nr_mft_records - 1, 100);
 
-	for (; inode <= last_mft_rec; inode++) {
-		progress_update(&resize->progress, inode);
+	for (; inode < vol->nr_mft_records; inode++) {
+		progress_update(&progress, inode);
 
 		if ((ni = ntfs_inode_open(vol, (MFT_REF)inode)) == NULL) {
 			/* FIXME: continue only if it make sense, e.g.
@@ -946,6 +936,69 @@ static void walk_inodes(ntfs_resize_t *resize)
 
 		resize->ni = ni;
 		walk_attributes(resize);
+close_inode:
+		if (ntfs_inode_close(ni))
+			perr_exit("ntfs_inode_close for inode %lld", inode);
+	}
+}
+
+static void build_resize_constrains(ntfs_resize_t *resize)
+{
+	s64 i;
+	runlist *rl;
+
+	if (!resize->ctx->attr->non_resident)
+		return;
+
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, resize->ctx->attr, NULL)))
+		perr_exit("ntfs_decompress_mapping_pairs");
+
+	for (i = 0; rl[i].length; i++) {
+		/* CHECKME: LCN_RL_NOT_MAPPED check isn't needed */
+		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
+			continue;
+		
+		collect_resize_constraints(resize, rl + i);
+		if (resize->shrink)
+			collect_relocation_info(resize, rl + i);
+	}
+	free(rl);
+}
+
+static void resize_constrains_by_attributes(ntfs_resize_t *resize)
+{
+	if (!(resize->ctx = ntfs_attr_get_search_ctx(resize->ni, NULL)))
+		perr_exit("ntfs_get_attr_search_ctx");
+
+	while (!ntfs_attrs_walk(resize->ctx)) {
+		if (resize->ctx->attr->type == AT_END)
+			break;
+		build_resize_constrains(resize);
+	}
+
+	ntfs_attr_put_search_ctx(resize->ctx);
+}
+
+static void set_resize_constrains(ntfs_resize_t *resize)
+{
+	s64 inode;
+	ntfs_inode *ni;
+
+	printf("Collecting shrinkage constrains ...\n");
+
+	for (inode = 0; inode < vol->nr_mft_records; inode++) {
+
+		if ((ni = ntfs_inode_open(vol, (MFT_REF)inode)) == NULL) {
+			if (errno == EIO || errno == ENOENT)
+				continue;
+			perr_exit("Reading inode %lld failed", inode);
+		}
+
+		if ((ni->mrec->base_mft_record) != 0)
+			goto close_inode;
+
+		resize->ni = ni;
+		resize_constrains_by_attributes(resize);
 close_inode:
 		if (ntfs_inode_close(ni))
 			perr_exit("ntfs_inode_close for inode %lld", inode);
@@ -1429,19 +1482,16 @@ static void relocate_attribute(ntfs_resize_t *resize)
 
 static void relocate_attributes(ntfs_resize_t *resize)
 {
-	ntfs_attr_search_ctx *ctx;
-
-	if (!(ctx = ntfs_attr_get_search_ctx(NULL, resize->mrec)))
+	if (!(resize->ctx = ntfs_attr_get_search_ctx(NULL, resize->mrec)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	while (!ntfs_attrs_walk(ctx)) {
-		if (ctx->attr->type == AT_END)
+	while (!ntfs_attrs_walk(resize->ctx)) {
+		if (resize->ctx->attr->type == AT_END)
 			break;
-		resize->ctx = ctx;
 		relocate_attribute(resize);
 	}
 
-	ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(resize->ctx);
 }
 
 static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref)
@@ -2071,7 +2121,7 @@ int main(int argc, char **argv)
 	if (new_size < vol->nr_clusters)
 		resize.shrink = 1;
 	
-	walk_inodes(&resize);
+	build_allocation_bitmap(&resize);
 	if (resize.multi_ref) {
 		err_printf("Filesystem check failed! Totally %d clusters "
 			   "referenced multiply times.\n", resize.multi_ref);
@@ -2081,7 +2131,8 @@ int main(int argc, char **argv)
 	compare_bitmaps(&resize.lcn_bitmap);
 
 	print_disk_usage(&resize);
-	
+
+	set_resize_constrains(&resize);
 	set_disk_usage_constraint(&resize);
 	check_shrink_constraints(&resize);
 
