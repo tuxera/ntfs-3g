@@ -42,7 +42,6 @@
 #ifdef HAVE_ERRNO_H
 #	include <errno.h>
 #endif
-#include <fcntl.h>
 #include <time.h>
 #ifdef HAVE_GETOPT_H
 #	include <getopt.h>
@@ -79,8 +78,6 @@ s64 new_len;
 ntfs_volume *vol;
 ntfs_inode *ni;
 ntfs_attr *na = NULL;
-
-struct flock flk;
 
 ATTR_DEF *attr_defs;
 
@@ -701,12 +698,6 @@ void ntfstruncate_exit(void)
 		fprintf(stderr, "Warning: Failed to close inode %Li: %s\n",
 				(long long)inode, strerror(errno));
 	}
-	/* Unlock the device. */
-	flk.l_type = F_UNLCK;
-	err = fcntl(vol->fd, F_SETLK, &flk);
-	if (err == -1)
-		fprintf(stderr, "Warning: Could not unlock %s: %s\n", dev_name,
-				strerror(errno));
 	/* Unmount the volume. */
 	err = ntfs_umount(vol, 0);
 	if (err == -1)
@@ -761,26 +752,6 @@ int main(int argc, char **argv)
 	if (!vol)
 		err_exit("Failed to mount %s: %s\n", dev_name, strerror(errno));
 
-	/* Acquire exlusive (mandatory) lock on the whole device. */
-	memset(&flk, 0, sizeof(flk));
-	if (opts.no_action)
-		flk.l_type = F_RDLCK;
-	else
-		flk.l_type = F_WRLCK;
-	flk.l_whence = SEEK_SET;
-	flk.l_start = flk.l_len = 0LL;
-	err = fcntl(vol->fd, F_SETLK, &flk);
-	if (err == -1) {
-		Eprintf("Could not lock %s for %s: %s\n", dev_name,
-				opts.no_action ? "reading" : "writing",
-				strerror(errno));
-		err = ntfs_umount(vol, 0);
-		if (err == -1)
-			Eprintf("Warning: Could not umount %s: %s\n",
-					dev_name, strerror(errno));
-		exit(1);
-	}
-
 	/* Register our exit function which will unlock and close the device. */
 	err = atexit(&ntfstruncate_exit);
 	if (err == -1) {
@@ -828,13 +799,6 @@ int main(int argc, char **argv)
 	err = ntfs_inode_close(ni);
 	if (err)
 		err_exit("Failed to close inode %Li: %s\n", (long long)inode,
-				strerror(errno));
-
-	/* Unlock the device. */
-	flk.l_type = F_UNLCK;
-	err = fcntl(vol->fd, F_SETLK, &flk);
-	if (err == -1)
-		fprintf(stderr, "Warning: Failed to unlock %s: %s\n", dev_name,
 				strerror(errno));
 
 	/* Unmount the volume. */

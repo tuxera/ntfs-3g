@@ -56,6 +56,7 @@
 #include "attrib.h"
 #include "mft.h"
 #include "disk_io.h"
+#include "device.h"
 #include "logfile.h"
 
 /**
@@ -69,6 +70,7 @@ int main(int argc, char **argv)
 	const char *FAILED = "FAILED";
 	unsigned char *m = NULL, *m2 = NULL;
 	ntfs_volume *vol;
+	struct ntfs_device *dev;
 	unsigned long mnt_flags;
 	int i;
 	u16 flags;
@@ -122,13 +124,21 @@ int main(int argc, char **argv)
 	}
 	puts(FAILED);
 
-	puts("Attempting to correct errors.");
+	printf("Attempting to correct errors... ");
 
-	vol = ntfs_volume_startup(argv[1], 0);
+	dev = ntfs_device_alloc(argv[1], 0, &ntfs_device_disk_io_ops, NULL);
+	if (!dev) {
+		puts(FAILED);
+		perror("Failed to allocate device");
+		goto error_exit;
+	}
+
+	vol = ntfs_volume_startup(dev, 0);
 	if (!vol) {
 		puts(FAILED);
 		perror("Failed to startup volume");
 		fprintf(stderr, "Volume is corrupt. You should run chkdsk.");
+		ntfs_device_free(dev);
 		goto error_exit;
 	}
 
@@ -245,6 +255,7 @@ int main(int argc, char **argv)
 	m = m2 = NULL;
 
 	printf("Processing of $MFT and $MFTMirr completed successfully.\n\n");
+	/* ntfs_umount() will invoke ntfs_device_free() for us. */
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
 	vol = ntfs_mount(argv[1], 0);
@@ -300,7 +311,7 @@ mount_ok:
 
 	/* That's all for now! */
 	printf("NTFS partition %s was processed successfully.\n",
-			vol->dev_name);
+			vol->dev->d_name);
 	/* Set return code to 0. */
 	i = 0;
 final_exit:
