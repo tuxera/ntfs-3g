@@ -40,7 +40,7 @@
 #include "debug.h"
 #include "device.h"
 
-#if defined(__linux__) && defined(_IO) && !defined(BLKGETSIZE)
+#if defined(__LINUX__) && defined(_IO) && !defined(BLKGETSIZE)
 #	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
 #endif
 
@@ -143,6 +143,7 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 				pos, strerror(errno));
 		return -1;
 	}
+	NDevSetDirty(dev);
 	/* Write the data. */
 	for (total = 0; count; count -= written, total += written) {
 		written = dops->write(dev, (char*)b + total, count);
@@ -163,36 +164,65 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 
 static int ntfs_device_disk_io_open(struct ntfs_device *dev, int flags)
 {
+	struct flock flk;
+
 	if (NDevOpen(dev)) {
 		errno = EBUSY;
 		return -1;
 	}
-
 	/* Open the device/file obtaining the file descriptor. */
 	if (((int)dev->d_private = open(dev->d_name, flags)) == -1)
 		return -1;
-
-	/* Setup our read-only open flags appropriately. */
+	/* Setup our read-only flag. */
 	if ((flags & O_RDONLY) == O_RDONLY)
 		NDevSetReadOnly(dev);
+	/* Acquire exlusive (mandatory) lock on the whole device. */
+	memset(&flk, 0, sizeof(flk));
+	if (NDevReadOnly(dev))
+		flk.l_type = F_RDLCK;
+	else
+		flk.l_type = F_WRLCK;
+	flk.l_whence = SEEK_SET;
+	flk.l_start = flk.l_len = 0LL;
+	if (fcntl((int)dev->d_private, F_SETLK, &flk)) {
+		int eo = errno;
+		Dprintf("ntfs_device_disk_io_open: Could not lock %s for %s: "
+				"%s\n", dev->d_name, NDevReadOnly(dev) ?
+				"reading" : "writing", strerror(errno));
+		if (close((int)dev->d_private))
+			Dprintf("ntfs_device_disk_io_open: Warning: Could not "
+					"close %s: %s\n", dev->d_name,
+					strerror(errno));
+		errno = eo;
+		return -1;
+	}
+	/* Set our open flag. */
 	NDevSetOpen(dev);
 	return 0;
 }
 
 static int ntfs_device_disk_io_close(struct ntfs_device *dev)
 {
+	struct flock flk;
+
 	if (!NDevOpen(dev)) {
 		errno = EBADF;
 		return -1;
 	}
-
+	if (NDevDirty(dev))
+		fsync((int)dev->d_private);
+	/* Release exlusive (mandatory) lock on the whole device. */
+	memset(&flk, 0, sizeof(flk));
+	flk.l_type = F_UNLCK;
+	flk.l_whence = SEEK_SET;
+	flk.l_start = flk.l_len = 0LL;
+	if (fcntl((int)dev->d_private, F_SETLK, &flk))
+		Dprintf("ntfs_device_disk_io_close: Warning: Could not unlock "
+				"%s: %s\n", dev->d_name, strerror(errno));
 	/* Close the file descriptor and clear our open flag. */
-	if (close((int)dev->d_private) == -1)
+	if (close((int)dev->d_private))
 		return -1;
 	NDevClearOpen(dev);
-
-	/* Destroy the device as we are done with it. */
-	ntfs_device_free(dev);
 	return 0;
 }
 
@@ -215,6 +245,7 @@ static s64 ntfs_device_disk_io_write(struct ntfs_device *dev, const void *buf,
 		errno = EROFS;
 		return -1;
 	}
+	NDevSetDirty(dev);
 	return write((int)dev->d_private, buf, count);
 }
 
@@ -231,14 +262,24 @@ static s64 ntfs_device_disk_io_pwrite(struct ntfs_device *dev, const void *buf,
 		errno = EROFS;
 		return -1;
 	}
+	NDevSetDirty(dev);
 	return ntfs_pwrite(dev, offset, count, buf);
 }
 
 static int ntfs_device_disk_io_sync(struct ntfs_device *dev)
 {
-	if (!NDevReadOnly(dev))
-		return fsync((int)dev->d_private);
+	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
+		int res = fsync((int)dev->d_private);
+		if (!res)
+			NDevClearDirty(dev);
+		return res;
+	}
 	return 0;
+}
+
+static int ntfs_device_disk_io_stat(struct ntfs_device *dev, struct stat *buf)
+{
+	return fstat((int)dev->d_private, buf);
 }
 
 static int ntfs_device_disk_io_ioctl(struct ntfs_device *dev, int request,
@@ -259,6 +300,7 @@ struct ntfs_device_operations ntfs_device_disk_io_ops = {
 	.pread		= ntfs_device_disk_io_pread,
 	.pwrite		= ntfs_device_disk_io_pwrite,
 	.sync		= ntfs_device_disk_io_sync,
+	.stat		= ntfs_device_disk_io_stat,
 	.ioctl		= ntfs_device_disk_io_ioctl,
 };
 
