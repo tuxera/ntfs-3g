@@ -107,6 +107,9 @@ struct _ntfs_inode {
 		ntfs_inode *base_ni;	/* For nr_extents == -1, the ntfs
 					   inode of the base mft record. */
 	};
+
+	void *private_data;	/* Temp: for directory handling */
+	int ref_count;
 };
 
 extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
