@@ -700,7 +700,6 @@ void truncate_badclust_file(s64 nr_clusters)
 	if (write_mft_record(ctx))
 		perr_exit("Couldn't update $BadClust");
 
-	/* FIXME: clean up API => ntfs_put_attr_search_ctx() also closes ni */
 	ntfs_attr_put_search_ctx(ctx);
 }
 
