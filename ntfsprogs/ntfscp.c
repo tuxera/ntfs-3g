@@ -356,7 +356,7 @@ int main (int argc, char *argv[])
 		offset += bw;
 	}
 	need_logfile_reset = 1;
-
+	result = 0;
 	free(buf);
 close_attr:
 	ntfs_attr_close(na);
