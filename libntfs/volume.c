@@ -218,8 +218,8 @@ mft_has_no_attr_list:
 		Dperror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Set the number of mft records. */
-	vol->nr_mft_records = vol->mft_na->data_size >>
+	/* Set the number of initialized mft records. */
+	vol->nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 	/* Read all extents from the $DATA attribute in $MFT. */
 	ntfs_attr_reinit_search_ctx(ctx);

@@ -49,6 +49,10 @@
  * @b. Return 0 on success or -1 on error, with errno set to the error
  * code.
  *
+ * If any of the records exceed the initialized size of the $MFT/$DATA
+ * attribute, i.e. they cannot possibly be allocated mft records, assume this
+ * is a bug and return error code ESPIPE.
+ *
  * The read mft records are mst deprotected and are hence ready to use. The
  * caller should check each record with is_baad_record() in case mst
  * deprotection failed.
@@ -67,6 +71,7 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 		return -1;
 	}
 	m = MREF(mref);
+	/* Refuse to read non-allocated mft records. */
 	if (m + count > vol->nr_mft_records) {
 		errno = ESPIPE;
 		return -1;
@@ -95,6 +100,10 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
  * Write @count mft records starting at @mref from data buffer @b to volume
  * @vol. Return 0 on success or -1 on error, with errno set to the error code.
  *
+ * If any of the records exceed the initialized size of the $MFT/$DATA
+ * attribute, i.e. they cannot possibly be allocated mft records, assume this
+ * is a bug and return error code ESPIPE.
+ *
  * Before the mft records are written, they are mst protected. After the write,
  * they are deprotected again, thus resulting in an increase in the update
  * sequence number inside the data buffer @b.
@@ -119,6 +128,11 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		return -1;
 	}
 	m = MREF(mref);
+	/* Refuse to write non-allocated mft records. */
+	if (m + count > vol->nr_mft_records) {
+		errno = ESPIPE;
+		return -1;
+	}
 	if (m < vol->mftmirr_size) {
 		cnt = vol->mftmirr_size - m;
 		if (cnt > count)
@@ -127,14 +141,6 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		if (!bmirr)
 			return -1;
 		memcpy(bmirr, b, cnt * vol->mft_record_size);
-	}
-	if (m + count > vol->nr_mft_records) {
-		// TODO: Need to extend $MFT. This is not just normal attribute
-		// extension as many rules need to be observed. (AIA)
-		if (bmirr)
-			free(bmirr);
-		errno = ENOTSUP;
-		return -1;
 	}
 	bw = ntfs_attr_mst_pwrite(vol->mft_na, m << vol->mft_record_size_bits,
 			count, vol->mft_record_size, b);
@@ -335,4 +341,3 @@ sync_rollback:
 	errno = err;
 	return -1;
 }
-

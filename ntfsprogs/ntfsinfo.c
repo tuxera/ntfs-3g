@@ -267,7 +267,7 @@ void ntfs_dump_volume(ntfs_volume *vol)
 		    (long long)vol->data1_zone_pos);
     printf("\tCurrent Position in Second Data Zone: %lld\n",
 		    (long long)vol->data2_zone_pos);
-    printf("\tNumber of Records in MFT: %lld\n",
+    printf("\tNumber of Initialized Records in MFT: %lld\n",
 		    (long long)vol->nr_mft_records);
     printf("\tLCN of Data Attribute for FILE_MFT: %lld\n",
 		    (long long)vol->mft_lcn);

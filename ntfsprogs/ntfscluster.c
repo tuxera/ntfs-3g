@@ -327,27 +327,27 @@ int info (ntfs_volume *vol)
 	t = mc >> cb;
 	u = mc * 100 / b / e;
 
-	printf ("bytes per sector       : %llu\n", (unsigned long long)a);
-	printf ("bytes per cluster      : %llu\n", (unsigned long long)b);
-	printf ("sectors per cluster    : %llu\n", (unsigned long long)c);
-	printf ("bytes per volume       : %llu\n", (unsigned long long)d);
-	printf ("sectors per volume     : %llu\n", (unsigned long long)e);
-	printf ("clusters per volume    : %llu\n", (unsigned long long)f);
-	printf ("mft records total      : %llu\n", (unsigned long long)g);
-	printf ("mft records in use     : %llu\n", (unsigned long long)h);
-	printf ("mft records percentage : %llu\n", (unsigned long long)i);
-	printf ("bytes of free space    : %llu\n", (unsigned long long)j);
-	printf ("sectors of free space  : %llu\n", (unsigned long long)k);
-	printf ("clusters of free space : %llu\n", (unsigned long long)l);
-	printf ("percentage free space  : %llu\n", (unsigned long long)m);
-	printf ("bytes of user data     : %llu\n", (unsigned long long)n);
-	printf ("sectors of user data   : %llu\n", (unsigned long long)o);
-	printf ("clusters of user data  : %llu\n", (unsigned long long)p);
-	printf ("percentage user data   : %llu\n", (unsigned long long)q);
-	printf ("bytes of metadata      : %llu\n", (unsigned long long)r);
-	printf ("sectors of metadata    : %llu\n", (unsigned long long)s);
-	printf ("clusters of metadata   : %llu\n", (unsigned long long)t);
-	printf ("percentage metadata    : %llu\n", (unsigned long long)u);
+	printf ("bytes per sector        : %llu\n", (unsigned long long)a);
+	printf ("bytes per cluster       : %llu\n", (unsigned long long)b);
+	printf ("sectors per cluster     : %llu\n", (unsigned long long)c);
+	printf ("bytes per volume        : %llu\n", (unsigned long long)d);
+	printf ("sectors per volume      : %llu\n", (unsigned long long)e);
+	printf ("clusters per volume     : %llu\n", (unsigned long long)f);
+	printf ("initialized mft records : %llu\n", (unsigned long long)g);
+	printf ("mft records in use      : %llu\n", (unsigned long long)h);
+	printf ("mft records percentage  : %llu\n", (unsigned long long)i);
+	printf ("bytes of free space     : %llu\n", (unsigned long long)j);
+	printf ("sectors of free space   : %llu\n", (unsigned long long)k);
+	printf ("clusters of free space  : %llu\n", (unsigned long long)l);
+	printf ("percentage free space   : %llu\n", (unsigned long long)m);
+	printf ("bytes of user data      : %llu\n", (unsigned long long)n);
+	printf ("sectors of user data    : %llu\n", (unsigned long long)o);
+	printf ("clusters of user data   : %llu\n", (unsigned long long)p);
+	printf ("percentage user data    : %llu\n", (unsigned long long)q);
+	printf ("bytes of metadata       : %llu\n", (unsigned long long)r);
+	printf ("sectors of metadata     : %llu\n", (unsigned long long)s);
+	printf ("clusters of metadata    : %llu\n", (unsigned long long)t);
+	printf ("percentage metadata     : %llu\n", (unsigned long long)u);
 
 	return 0;
 }
