@@ -1,7 +1,7 @@
 /**
  * utils.c - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2002-2004 Richard Russon
  * Copyright (c) 2003-2004 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
  *
@@ -771,6 +771,7 @@ ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, cons
 		if (ni != parent)
 			ntfs_inode_close (ni);
 
+		inum = MREF (inum);
 		ni = ntfs_inode_open (vol, inum);
 		if (!ni) {
 			Eprintf ("Cannot open inode %llu: %s.\n",
