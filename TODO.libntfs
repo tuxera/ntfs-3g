@@ -51,7 +51,7 @@
 * LOW priority *
 ****************
 
-- Do we attach attributes (ntfs_attr) to the corresponding ntfs_inode? Now we
+- Do we attach attributes (ntfs_attr) to the corresponding ntfs_inode?  Now we
   just atach the inode to the attribute and expect the user to not shoot
   themselves in the foot.
 

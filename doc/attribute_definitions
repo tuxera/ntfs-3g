@@ -21,7 +21,7 @@ __u32 flags		= 0x42
 __u64 min_size		= 0x44
 __u64 max_size		= 0x242
 
-/* The $volume_version attribute has never been observed in the field. It
+/* The $volume_version attribute has never been observed in the field.  It
  * probably never was used and was hence replaced by the $object_id in
  * Windows 2000. */
 __u16 name[64]		= "$VOLUME_VERSION" in Win2k: "$OBJECT_ID"
@@ -80,7 +80,7 @@ __u32 flags		= 0x80
 __u64 min_size		= 0
 __u64 max_size		= -1
 
-/* The $symbolic_link attribute has never been observed in the field. It
+/* The $symbolic_link attribute has never been observed in the field.  It
  * probably never was used and was hence replaced by the $reparse_point in
  * Windows 2000. */
 __u16 name[64]		= "$SYMBOLIC_LINK" in Win2k: "$REPARSE_POINT"
@@ -121,8 +121,8 @@ __u64 min_size		= 0
 __u64 max_size		= 0x10000
 
 /*
- * This is terminated by a single record all of whose fields are zero. This
- * also finishes the $AttrDef data attribute. I.e. the attribute size is the
+ * This is terminated by a single record all of whose fields are zero.  This
+ * also finishes the $AttrDef data attribute, i.e. the attribute size is the
  * correct size of the sequence of attribute definitions (2560 bytes, i.e.
  * 16 attribute definitions of 160 bytes each).
  */

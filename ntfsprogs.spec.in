@@ -18,7 +18,7 @@ License		: GPL
 Group		: System Environment/Base
 %description
 The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
-for the NTFS filesystem to the Linux operating system. Linux-NTFS currently
+for the NTFS filesystem to the Linux operating system.  Linux-NTFS currently
 consists of a static library and utilities such as mkntfs, ntfscat, ntfsls,
 ntfsresize, and ntfsundelete (for a full list of included utilities see man
 8 ntfsprogs after installation).

@@ -24,7 +24,7 @@ Thanks,
 - Cleanup to use ntfs_attr_* API for editing $MFTMirr, $Volume, and $LogFile.
   This has the immediate benefit of enabling attribute list support and making
   the code simpler.
-- On ntfs 3.0+ volumes need to disable the usn journal if it is active. This
+- On ntfs 3.0+ volumes need to disable the usn journal if it is active.  This
   means deleting file $UsnJrnl from /$Extend directory.
 - On ntfs 3.0+ volumes need to mark the quota out of date? - Probably, but
   it shouldn't cause any corruption not doing so for the moment so this is
