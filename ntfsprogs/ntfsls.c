@@ -62,7 +62,7 @@ struct dir {
  */
 struct path_component {
 	struct list_head list;
-	char *name;
+	const char *name;
 };
 
 /* The list of sub-dirs is like a "horizontal" tree. The root of
@@ -102,8 +102,12 @@ static struct options {
 	int inode;
 	int classify;
 	int recursive;
-	char *path;
+	const char *path;
 } opts;
+
+typedef struct {
+	ntfs_volume *vol;
+} ntfsls_dirent;
 
 GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
@@ -274,10 +278,6 @@ static int parse_options(int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
-typedef struct {
-	ntfs_volume *vol;
-} ntfsls_dirent;
-
 static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 			  const int name_len, const int name_type,
 			  const s64 pos, const MFT_REF mref,
@@ -289,7 +289,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
  *
  * Close the inode and then free the dir
  */
-void free_dir(struct dir *tofree)
+static void free_dir(struct dir *tofree)
 {
 	if (tofree) {
 		if (tofree->ni) {
@@ -306,7 +306,7 @@ void free_dir(struct dir *tofree)
  *
  * Iterate over @dir_list, calling free_dir on each entry
  */
-void free_dirs(struct list_head *dir_list)
+static void free_dirs(struct list_head *dir_list)
 {
 	struct dir *tofree = NULL;
 	struct list_head *walker = NULL;
@@ -335,7 +335,7 @@ void free_dirs(struct list_head *dir_list)
  * NOTE: Assumes recursive option. Currently no limit on the depths of
  * recursion.
  */
-int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
+static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 {
 	/* list of dirs to "ls" recursively */
 	static struct dir dirs = {
