@@ -754,9 +754,9 @@ int main (int argc, char *argv[])
 
 	if (0)
 	{
-		printf ("________________________________________________________________________________\n\n");
 		int i = 0;
 		runlist_element *rl = vol->mft_na->rl;
+		printf ("________________________________________________________________________________\n\n");
 		for (; rl->length > 0; rl++, i++) {
 			printf ("%4d %lld,%lld,%lld\n", i, rl->vcn, rl->lcn, rl->length);
 		}
