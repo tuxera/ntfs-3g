@@ -88,7 +88,7 @@ struct {
 	char quiet;		/* -q, quiet execution. */
 	char verbose;		/* -v, verbose execution, given twice, really
 				       verbose execution (debug mode). */
-	char force;		/* -F, force truncation. */
+	char force;		/* -f, force truncation. */
 				/* -V, print version and exit. */
 } opt;
 
@@ -527,12 +527,13 @@ void usage(void) __attribute__ ((noreturn));
 
 void usage(void)
 {
-	fprintf(stderr, "\nThis utility will truncate a specified attribute "
+	fprintf(stderr, "This utility will truncate a specified attribute "
 			"belonging to a specified\ninode, i.e. file or "
-			"directory to a specified length.\n\n"
+			"directory, to a specified length.\n\n"
 			"Usage: %s [-hnqvFV] device inode [attribute-type] "
-			"new-length\n\nIf attribute-type is not specified, "
-			"0x80 (i.e. $DATA) is assumed.\n", EXEC_NAME);
+			"new-length\n       If attribute-type is not "
+			"specified, 0x80 (i.e. $DATA) is assumed.\n",
+			EXEC_NAME);
 	exit(1);
 }
 
@@ -546,8 +547,11 @@ void parse_options(int argc, char *argv[])
 		EXEC_NAME = *argv;
 	fprintf(stderr, "%s v%s -- Copyright (c) 2002 Anton Altaparmakov\n",
 			EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "hnqvFV")) != EOF)
+	while ((c = getopt(argc, argv, "fhnqvV")) != EOF)
 		switch (c) {
+		case 'f':
+			opt.force = 1;
+			break;
 		case 'n':
 			opt.no_action = 1;
 			break;
@@ -556,9 +560,6 @@ void parse_options(int argc, char *argv[])
 			break;
 		case 'v':
 			opt.verbose++;
-			break;
-		case 'F':
-			opt.force = 1;
 			break;
 		case 'V':
 			/* Version number already printed, so just exit. */
