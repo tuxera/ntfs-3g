@@ -1,6 +1,8 @@
 Current news
 ============
 
+Merged the NTFS Gnome VFS module by Jan Kratochvil.
+
 Added new utilities: ntfsclone by Szakacsits Szabolcs, ntfscluster by Richard
 Russon, ntfsinfo by Matthew Fanto, ntfsls originally by Lode Leroy, modified
 by Anton Altaparmakov, ntfscat by Richard Russon.

@@ -14,9 +14,8 @@ All the libraries and utilities come with ABSOLUTELY NO WARRANTY; for details
 read the GNU General Public License to be found in the file COPYING in the main
 Linux-NTFS distribution directory.
  
-Linux-NTFS currently consists of the NTFS library (libntfs) and utilities
-(ntfsprogs). In the future it will also contain a new NTFS driver for the
-Linux kernel.
+Linux-NTFS currently consists of the NTFS library (libntfs), the NTFS Gnome VFS
+module (libntfs-gnomevfs) and various utilities (ntfsprogs).
 
 The Linux-NTFS project is registered on Sourceforge.net. The home page for
 Linux-NTFS is http://linux-ntfs.sf.net/ and the project page is:
@@ -39,6 +38,14 @@ NTFS library
 Provides common NTFS access functions to the ntfsprogs and other foreign
 open source applications. Note, that the library is still under development and
 a lot of functionality is not yet included.
+
+NTFS Gnome VFS module
+=====================
+
+The Gnome virtual filesystem provides universal access to diffent filesystems.
+This modules enables Gnome VFS clients to seamlessly utilize the NTFS library.
+For further details and examples of how to make use of the NTFS Gnome VFS
+module in practice see man 8 ntfsgnomevfs.
 
 NTFS utilities
 ==============
