@@ -87,13 +87,9 @@
  * removing the duplicate logic requires _very_ careful consideration of _all_
  * possible code paths. So at least for now, I am leaving the double logic -
  * better safe than sorry... (AIA)
- *
- * FIXME: Add a start_vcn parameter if we need it and then instead of setting
- * rl[rlpos].vcn = 0; for the first run, add a sparse start element (LCN_HOLE),
- * and make rl[rlpos].vcn = start_vcn; for the first non-sparse run. (AIA)
  */
 runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
-		const NTFS_CLUSTER_ALLOCATION_ZONES zone)
+		const NTFS_CLUSTER_ALLOCATION_ZONES zone, VCN start_vcn)
 {
 	LCN zone_start, zone_end, bmp_pos, bmp_initial_pos, last_read_pos, lcn;
 	LCN prev_lcn = 0, prev_run_len = 0, mft_zone_size;
@@ -330,6 +326,12 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 							"first run.\n",
 							__FUNCTION__);
 					rl[rlpos].vcn = 0;
+					if (start_vcn) {
+						rl[0].lcn = LCN_RL_NOT_MAPPED;
+						rl[0].length = start_vcn;
+						rl[1].vcn = start_vcn;
+						rlpos = 1;
+					}
 				}
 				rl[rlpos].lcn = prev_lcn = lcn + bmp_pos;
 				rl[rlpos].length = prev_run_len = 1;
