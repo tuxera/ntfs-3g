@@ -413,6 +413,7 @@ void ntfs_attr_close(ntfs_attr *na)
  */
 int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 {
+	LCN lcn;
 	ntfs_attr_search_ctx *ctx;
 	int err;
 
@@ -420,7 +421,7 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)vcn);
 	
-	LCN lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
+	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
 	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
 		return 0;
 
