@@ -902,7 +902,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 
 	/* attr_type dumping */
 	printf("\tIndexed Attr Type:\t ");
-	type = index_root->type;
+	type = le32_to_cpu(index_root->type);
 	if (type) {
 		if (index_root->type != AT_FILE_NAME) {
 			/* wierd, this should be illgeal */
