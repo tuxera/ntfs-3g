@@ -593,8 +593,8 @@ typedef struct {
 /* 12*/	ATTR_FLAGS flags;	/* Flags describing the attribute. */
 /* 14*/	u16 instance;		/* The instance of this attribute record. This
 				   number is unique within this mft record (see
-				   MFT_RECORD/next_attribute_instance notes in
-				   in mft.h for more details). */
+				   MFT_RECORD/next_attribute_instance notes
+				   above for more details). */
 /* 16*/	union {
 		/* Resident attributes. */
 		struct {
