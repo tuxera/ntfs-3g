@@ -2218,7 +2218,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	na->allocated_size = new_allocated_size;
 	na->data_size = na->initialized_size = le32_to_cpu(a->value_length);
 	/*
-	 * For now just clear all of these as we don't support them when
+	 * FIXME: For now just clear all of these as we don't support them when
 	 * writing.
 	 */
 	NAttrClearCompressed(na);

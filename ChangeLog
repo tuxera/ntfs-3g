@@ -28,6 +28,7 @@ xx/10/2003 - 1.8.0beta - Work in progress.
 	- Integrate win32_io.c into the build process so win32_io ops are used
 	  when compiling under Cygwin and standard Unix style io ops are used
 	  otherwise.
+	- Add new utility ntfscat (Richard Russon) and a corresponding man page.
 	- Other assorted bugfixes and developments (see NEWS and bk changes).
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
