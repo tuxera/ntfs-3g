@@ -26,6 +26,12 @@
 
 #include "types.h"
 
+enum action {
+	act_info,
+	act_test,
+	act_wipe,
+};
+
 struct options {
 	char	*device;	/* Device/File to work with */
 	int	 info;		/* Show volume info */
