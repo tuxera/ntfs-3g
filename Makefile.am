@@ -14,13 +14,13 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
 strip:
-	$(MAKE) -C ntfsprogs strip
+	(cd ntfsprogs && $(MAKE) strip) || exit 1;
 
 extra:	extras
 
 extras:
-	$(MAKE) -C ntfsprogs extras
+	(cd ntfsprogs && $(MAKE) extras) || exit 1;
 
 libs:
-	$(MAKE) -C libntfs libs
+	(cd libntfs && $(MAKE) libs) || exit 1;
 
