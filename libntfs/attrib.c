@@ -879,20 +879,18 @@ rl_err_out:
  * On error and nothing has been written, return -1 with errno set
  * appropriately to the return code of ntfs_pwrite(), or to EINVAL in case of
  * invalid arguments.
- *
- * NOTE: Currently changes in length of the attribute @na are not implemented.
- * Thus if such a change is requested we return -1 with errno set to ENOTSUP.
  */
 s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 {
-	s64 written, to_write, ofs, total, old_initialized_size;
+	s64 written, to_write, ofs, total, old_initialized_size, old_data_size;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
 	int eo;
 	struct {
 		unsigned int initialized_size	: 1;
-	} need_to_undo = { 0 };
+		unsigned int data_size		: 1;
+	} need_to_undo = { 0, 0 };
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
 			"count 0x%llx.\n", __FUNCTION__, na->ni->mft_no,
@@ -921,14 +919,15 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (!count)
 		return 0;
 	/* If the write reaches beyond the end, extend the attribute. */
+	old_data_size = na->data_size;
 	if (pos + count > na->data_size) {
-		// TODO: Need to extend the attribute. For now, just do a
-		// partial write or abort if completely out of bounds. (AIA)
-		if (pos >= na->data_size) {
-			errno = ENOTSUP;
+		if (ntfs_attr_truncate(na, pos + count)) {
+			eo = errno;
+			Dprintf("%s(): Attribute extend failed.", __FUNCTION__);
+			errno = eo;
 			return -1;
 		}
-		count = na->data_size - pos;
+		need_to_undo.data_size = 1;
 	}
 	old_initialized_size = na->initialized_size;
 	/* If it is a resident attribute, write the data to the mft record. */
@@ -1165,6 +1164,9 @@ err_out:
 	}
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
+	/* Restore original data_size if needed. */
+	if (need_to_undo.data_size && ntfs_attr_truncate(na, old_data_size))
+		Dprintf("%s(): Failed to restore data_size.\n", __FUNCTION__);
 	errno = eo;
 	return -1;
 }
