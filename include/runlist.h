@@ -1,0 +1,69 @@
+/*
+ * $Id$
+ *
+ * runlist.h - Exports for runlist handling. Part of the Linux-NTFS project.
+ *
+ * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Richard Russon.
+ *
+ * This program/include file is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as published
+ * by the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program (in the main directory of the Linux-NTFS
+ * distribution in the file COPYING); if not, write to the Free Software
+ * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#ifndef _NTFS_RUNLIST_H
+#define _NTFS_RUNLIST_H
+
+#include "types.h"
+
+/* Forward declarations */
+typedef struct _run_list_element run_list_element;
+typedef run_list_element run_list;
+
+#include "attrib.h"
+#include "volume.h"
+
+/*
+ * run_list_element - in memory vcn to lcn mapping array element
+ * @vcn:	starting vcn of the current array element
+ * @lcn:	starting lcn of the current array element
+ * @length:	length in clusters of the current array element
+ *
+ * The last vcn (in fact the last vcn + 1) is reached when length == 0.
+ *
+ * When lcn == -1 this means that the count vcns starting at vcn are not
+ * physically allocated (i.e. this is a hole / data is sparse).
+ */
+struct _run_list_element {/* In memory vcn to lcn mapping structure element. */
+	VCN vcn;	/* vcn = Starting virtual cluster number. */
+	LCN lcn;	/* lcn = Starting logical cluster number. */
+	s64 length;	/* Run length in clusters. */
+};
+
+extern LCN ntfs_rl_vcn_to_lcn(const run_list_element *rl, const VCN vcn);
+
+extern s64 ntfs_rl_pwrite(const ntfs_volume *vol, const run_list_element *rl,
+		const s64 pos, s64 count, void *b);
+
+extern run_list_element *ntfs_merge_run_lists(run_list_element *drl,
+		run_list_element *srl);
+
+extern run_list_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
+		const ATTR_RECORD *attr, run_list_element *old_rl);
+
+extern int ntfs_build_mapping_pairs(const ntfs_volume *vol, s8 *dst,
+		const int dst_len, const run_list_element *rl);
+
+#endif /* defined _NTFS_RUNLIST_H */
+
