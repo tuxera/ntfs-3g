@@ -433,7 +433,7 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return -1;
 
-	if (act == wipe) {
+	if (act == act_wipe) {
 		buffer = malloc (vol->mft_record_size);
 		if (!buffer) {
 			Eprintf ("malloc failed\n");
