@@ -117,7 +117,8 @@ extern ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
  */
 static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
 {
-	return ntfs_attr_lookup(0, NULL, 0, 0, 0, NULL, 0, ctx);
+	return ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE, 0,
+			NULL, 0, ctx);
 }
 
 /**
