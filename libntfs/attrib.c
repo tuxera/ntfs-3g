@@ -1,7 +1,7 @@
 /*
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1910,49 +1910,105 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 }
 
 /**
+ * ntfs_attr_find_in_attrdef - find an attribute in the $AttrDef system file
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to find
+ *
+ * Search for the attribute definition record corresponding to the attribute
+ * @type in the $AttrDef system file.
+ *
+ * Return the attribute type definition record if found and NULL if not found
+ * or an error occured. On error the error code is stored in errno. The
+ * following error codes are defined:
+ *	ENOENT	- The attribute @type is not specified in $AttrDef.
+ *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
+ */
+static ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
+		const ATTR_TYPES type)
+{
+	ATTR_DEF *ad;
+
+	if (!vol || !vol->attrdef || !type) {
+		errno = EINVAL;
+		return NULL;
+	}
+	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
+			vol->attrdef_len && ad->type; ++ad) {
+		/* We haven't found it yet, carry on searching. */
+		if (ad->type < type)
+			continue;
+		/* We found the attribute; return it. */
+		if (ad->type == type)
+			return ad;
+		/* We have gone too far already. No point in continuing. */
+		break;
+	}
+	/* Attribute not found?!? */
+	errno = ENOENT;
+	return NULL;
+}
+
+/**
  * ntfs_attr_size_bounds_check - check a size of an attribute type for validity
  * @vol:	ntfs volume to which the attribute belongs
  * @type:	attribute type which to check
  * @size:	size which to check
  *
  * Check whether the @size in bytes is valid for an attribute of @type on the
- * ntfs volume @vol.
+ * ntfs volume @vol. This information is obtained from $AttrDef system file.
  *
  * Return 0 if valid and -1 if not valid or an error occured. On error the
  * error code is stored in errno. The following error codes are defined:
  *	ERANGE	- @size is not valid for the attribute @type.
  *	ENOENT	- The attribute @type is not specified in $AttrDef.
- *	EINVAL	- Invalid parameters (e.g. @size is < 0 or @vol is not valid)
+ *	EINVAL	- Invalid parameters (e.g. @size is < 0 or @vol is not valid).
  */
 int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 		const s64 size)
 {
 	ATTR_DEF *ad;
 
-	if (!vol || !vol->attrdef || size < 0) {
+	if (size < 0) {
 		errno = EINVAL;
 		return -1;
 	}
-
-	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
-			vol->attrdef_len && ad->type; ++ad) {
-		/* We haven't found it yet, carry on searching. */
-		if (ad->type < type)
-			continue;
-		/* We have gone too far already. No point in continuing. */
-		if (ad->type > type)
-			break;
-		/* We found the attribute. - Do the bounds check. */
-		if (size >= le64_to_cpu(ad->min_size) &&
-				size <= le64_to_cpu(ad->max_size))
-			return 0;
-		/* @size is out of range! */
-		errno = ERANGE;
+	ad = ntfs_attr_find_in_attrdef(vol, type);
+	if (!ad)
 		return -1;
-	}
+	/* We found the attribute. - Do the bounds check. */
+	if (size >= le64_to_cpu(ad->min_size) &&
+			size <= le64_to_cpu(ad->max_size))
+		return 0;
+	/* @size is out of range! */
+	errno = ERANGE;
+	return -1;
+}
 
-	/* Attribute not found?!? */
-	errno = ENOENT;
+/**
+ * ntfs_attr_can_be_non_resident - check if an attribute can be non-resident
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ *
+ * Check whether the attribute of @type on the ntfs volume @vol is allowed to
+ * be non-resident. This information is obtained from $AttrDef system file.
+ *
+ * Return 0 if the attribute is allowed to be non-resident and -1 if not or an
+ * error occured. On error the error code is stored in errno. The following
+ * error codes are defined:
+ *	EPERM	- The attribute is not allowed to be non-resident.
+ *	ENOENT	- The attribute @type is not specified in $AttrDef.
+ *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
+ */
+int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
+{
+	ATTR_DEF *ad;
+
+	ad = ntfs_attr_find_in_attrdef(vol, type);
+	if (!ad)
+		return -1;
+	if (ad->flags & CAN_BE_NON_RESIDENT)
+		return 0;
+	errno = EPERM;
 	return -1;
 }
 
@@ -1975,10 +2031,33 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 {
 	u32 new_alen, new_muse;
 
-	// FIXME: Should verify that the attribute name hasn't been placed
-	//	  after the attribute value and if it is, we need to move the
-	//	  name, too. (AIA)
-
+	/*
+	 * Check that the attribute name hasn't been placed after the
+	 * attribute value/mapping pairs array. If it has we need to move it.
+	 * TODO: Implement the move. For now just abort. (AIA)
+	 */
+	if (a->name_length) {
+		BOOL move_name = FALSE;
+		if (a->non_resident) {
+			if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->mapping_pairs_offset))
+				move_name = TRUE;
+		} else {
+			if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->value_offset))
+				move_name = TRUE;
+				
+		}
+		if (move_name) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Name is placed after the "
+					"%s. Aborting...\n", __FUNCTION__,
+					a->non_resident ? "mapping pairs array":
+					"attribute value");
+			errno = ENOTSUP;
+			return -1;
+		}
+	}
 	/* Calculate the new attribute length and mft record bytes used. */
 	new_alen = (le16_to_cpu(a->value_offset) + newsize + 7) & ~7;
 	/* If the actual attribute length has changed, move things around. */
@@ -2027,6 +2106,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
 	ntfs_attr_search_ctx *ctx;
+	ntfs_volume *vol;
 	int err;
 
 	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
@@ -2040,11 +2120,12 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		err = errno;
 		goto put_err_out;
 	}
+	vol = na->ni->vol;
 	/*
 	 * Check the attribute type and the corresponding minimum and maximum
 	 * sizes against @newsize and fail if @newsize is out of bounds.
 	 */
-	if (ntfs_attr_size_bounds_check(na->ni->vol, na->type, newsize) < 0) {
+	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
 		err = errno;
 		if (err == ERANGE) {
 			// FIXME: Eeek!
@@ -2059,7 +2140,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	 * attribute non-resident if the attribute type supports it. If it is
 	 * smaller we can go ahead and attempt the resize.
 	 */
-	if (newsize < na->ni->vol->mft_record_size) {
+	if (newsize < vol->mft_record_size) {
 		/* Perform the resize of the attribute record. */
 		if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 				newsize)) {
@@ -2078,7 +2159,20 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	/* There is not enough space in the mft record to perform the resize. */
 
 	// FIXME: Need to try to:
-	//	- make the attribute non-resident if the attribute type allows
+
+	/* Check if the attribute is allowed to be non-resident. */
+	if (ntfs_attr_can_be_non_resident(vol, na->type) < 0) {
+		/* If an error occured, abort. */
+		if (errno != EPERM) {
+			err = errno;
+			goto put_err_out;
+		}
+		/* Attribute is not allowed to be non-resident. */
+	} else {
+		/* Make the attribute non-resident. */
+		// TODO: do it!
+	}
+
 	//	- make other attributes non-resident to free up enough space
 	//	- move the attribute to a new mft record
 	// Note that some of the above changes also require changes in the
@@ -2304,11 +2398,34 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 					"metadata!\n", __FUNCTION__);
 			goto put_err_out;
 		}
-
-		// FIXME: Should verify that the attribute name hasn't been
-		//	  placed after the attribute value and if it is, we
-		//	  need to move the name, too. (AIA)
-
+		/*
+		 * Check that the attribute name hasn't been placed after the
+		 * attribute value/mapping pairs array. If it has we need to
+		 * move it. TODO: Implement the move. For now just abort. (AIA)
+		 */
+		if (a->name_length) {
+			BOOL move_name = FALSE;
+			if (a->non_resident) {
+				if (le16_to_cpu(a->name_offset) >= le16_to_cpu(
+						a->mapping_pairs_offset))
+					move_name = TRUE;
+			} else {
+				if (le16_to_cpu(a->name_offset) >=
+						le16_to_cpu(a->value_offset))
+					move_name = TRUE;
+					
+			}
+			if (move_name) {
+				// FIXME: Eeek!
+				fprintf(stderr, "%s(): Eeek! Name is placed "
+						"after the %s. Aborting...\n",
+						__FUNCTION__, a->non_resident ?
+						"mapping pairs array":
+						"attribute value");
+				err = ENOTSUP;
+				goto put_err_out;
+			}
+		}
 		/*
 		 * Calculate the new attribute length and mft record bytes
 		 * used.
