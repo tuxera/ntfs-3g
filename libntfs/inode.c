@@ -2,6 +2,7 @@
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -384,10 +385,33 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		return -1;
 	}
 
-	// TODO: Implement writing out of attribute list attribute. (AIA)
+	/* Write out attribute list from cache to disk. */
 	if (NInoAttrListDirty(ni)) {
-		errno = ENOTSUP;
-		return -1;
+		ntfs_attr *na;
+
+		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, 0, 0);
+		if (!na) {
+			if (!err || errno == EIO) {
+				err = errno;
+				if (err != EIO)
+					err = EBUSY;
+			}
+		} else {
+			if (na->data_size == ni->attr_list_size) {
+				if (ntfs_attr_pwrite(na, 0, ni->attr_list_size,
+							ni->attr_list) !=
+							ni->attr_list_size) {
+					if (!err || errno == EIO) {
+						err = errno;
+						if (err != EIO)
+							err = EBUSY;
+					}
+				} else
+					NInoAttrListClearDirty(ni);
+			} else
+				err = EIO;
+			ntfs_attr_close(na);
+		}
 	}
 
 	/* Write this inode out to the $MFT (and $MFTMirr if applicable). */
