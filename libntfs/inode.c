@@ -235,6 +235,9 @@ int ntfs_inode_close(ntfs_inode *ni)
  * Finally attach the ntfs inode to its base inode @base_ni and return a
  * pointer to the ntfs_inode structure on success or NULL on error, with errno
  * set to the error code.
+ *
+ * Note, extent inodes are never closed directly. They are automatically
+ * disposed off by the closing of the base inode.
  */
 ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 {

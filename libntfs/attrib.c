@@ -1786,8 +1786,7 @@ static __inline__ void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
  * ntfs_attr_reinit_search_ctx - reinitialize an attribute search context
  * @ctx:	attribute search context to reinitialize
  *
- * Reinitialize the attribute search context @ctx, unmapping an associated
- * extent mft record if present, and initialize the search context again.
+ * Reinitialize the attribute search context @ctx.
  *
  * This is used when a search for a new attribute is being started to reset
  * the search context to the beginning.
@@ -1802,8 +1801,6 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 				le16_to_cpu(ctx->mrec->attrs_offset));
 		return;
 	} /* Attribute list. */
-	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
-		ntfs_inode_close(ctx->ntfs_ino);
 	ntfs_attr_init_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
@@ -1839,13 +1836,10 @@ ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
  * ntfs_attr_put_search_ctx - release an attribute search context
  * @ctx:	attribute search context to free
  *
- * Release the attribute search context @ctx, unmapping an associated extent
- * mft record if present.
+ * Release the attribute search context @ctx.
  */
 void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 {
-	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
-		ntfs_inode_close(ctx->ntfs_ino);
 	free(ctx);
 	return;
 }
