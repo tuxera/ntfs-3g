@@ -768,7 +768,7 @@ int ntfs_info (ntfs_volume *vol)
 
 	Qprintf ("\n");
 
-	Qprintf ("Cluster size = %u\n", vol->cluster_size);
+	Qprintf ("Cluster size = %u\n", (unsigned int)vol->cluster_size);
 	Qprintf ("Volume size = %lld clusters\n", (long long)vol->nr_clusters);
 	Qprintf ("Volume size = %lld bytes\n",
 			(long long)vol->nr_clusters * vol->cluster_size);

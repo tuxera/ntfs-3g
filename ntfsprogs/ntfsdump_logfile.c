@@ -390,10 +390,11 @@ rstr_pass_loc:
 			(long long)sle64_to_cpu(rstr->chkdsk_lsn),
 			(unsigned long long)sle64_to_cpu(rstr->chkdsk_lsn));
 	printf("system_page_size = %u (0x%x)\n",
-			le32_to_cpu(rstr->system_page_size),
-			le32_to_cpu(rstr->system_page_size));
-	printf("log_page_size = %u (0x%x)\n", le32_to_cpu(rstr->log_page_size),
-			le32_to_cpu(rstr->log_page_size));
+			(unsigned int)le32_to_cpu(rstr->system_page_size),
+			(unsigned int)le32_to_cpu(rstr->system_page_size));
+	printf("log_page_size = %u (0x%x)\n",
+			(unsigned int)le32_to_cpu(rstr->log_page_size),
+			(unsigned int)le32_to_cpu(rstr->log_page_size));
 	printf("restart_offset = %u (0x%x)\n",
 			le16_to_cpu(rstr->restart_offset),
 			le16_to_cpu(rstr->restart_offset));
@@ -412,8 +413,8 @@ rstr_pass_loc:
 			le16_to_cpu(ra->client_in_use_list));
 	printf("flags = 0x%.4x\n", le16_to_cpu(ra->flags));
 	printf("seq_number_bits = %u (0x%x)\n",
-			le32_to_cpu(ra->seq_number_bits),
-			le32_to_cpu(ra->seq_number_bits));
+			(unsigned int)le32_to_cpu(ra->seq_number_bits),
+			(unsigned int)le32_to_cpu(ra->seq_number_bits));
 	printf("restart_area_length = %u (0x%x)\n",
 			le16_to_cpu(ra->restart_area_length),
 			le16_to_cpu(ra->restart_area_length));
@@ -424,8 +425,8 @@ rstr_pass_loc:
 			(long long)sle64_to_cpu(ra->file_size),
 			(unsigned long long)sle64_to_cpu(ra->file_size));
 	printf("last_lsn_data_length = %u (0x%x)\n",
-			le32_to_cpu(ra->last_lsn_data_length),
-			le32_to_cpu(ra->last_lsn_data_length));
+			(unsigned int)le32_to_cpu(ra->last_lsn_data_length),
+			(unsigned int)le32_to_cpu(ra->last_lsn_data_length));
 	printf("record_length = %u (0x%x)\n", le16_to_cpu(ra->record_length),
 			le16_to_cpu(ra->record_length));
 	printf("log_page_data_offset = %u (0x%x)\n",
@@ -456,8 +457,8 @@ rstr_pass_loc:
 		printf("seq_number = %u (0x%x)\n", le16_to_cpu(lcr->seq_number),
 				le16_to_cpu(lcr->seq_number));
 		printf("client_name_length = %u (0x%x)\n",
-				le32_to_cpu(lcr->client_name_length) / 2,
-				le32_to_cpu(lcr->client_name_length) / 2);
+				(unsigned int)le32_to_cpu(lcr->client_name_length) / 2,
+				(unsigned int)le32_to_cpu(lcr->client_name_length) / 2);
 		if (le32_to_cpu(lcr->client_name_length)) {
 			client_name = NULL;
 			if (ntfs_ucstombs(lcr->client_name,
@@ -510,7 +511,7 @@ rcrd_pass_loc:
 // TODO: I am here... (AIA)
 	printf("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->copy.last_lsn));
-	printf("flags = 0x%x\n", le32_to_cpu(rcrd->flags));
+	printf("flags = 0x%x\n", (unsigned int)le32_to_cpu(rcrd->flags));
 	printf("page count = %i\n", le16_to_cpu(rcrd->page_count));
 	printf("page position = %i\n", le16_to_cpu(rcrd->page_position));
 	printf("header.next_record_offset = 0x%llx\n", (unsigned long long)
@@ -532,13 +533,15 @@ log_record_pass:
 	printf("client undo next lsn = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(lr->client_undo_next_lsn));
 	printf("client data length = 0x%x\n",
-			le32_to_cpu(lr->client_data_length));
+			(unsigned int)le32_to_cpu(lr->client_data_length));
 	printf("client_id.seq_number = 0x%x\n",
 			le16_to_cpu(lr->client_id.seq_number));
 	printf("client_id.client_index = 0x%x\n",
 			le16_to_cpu(lr->client_id.client_index));
-	printf("record type = 0x%x\n", le32_to_cpu(lr->record_type));
-	printf("transaction_id = 0x%x\n", le32_to_cpu(lr->transaction_id));
+	printf("record type = 0x%x\n",
+			(unsigned int)le32_to_cpu(lr->record_type));
+	printf("transaction_id = 0x%x\n",
+			(unsigned int)le32_to_cpu(lr->transaction_id));
 	printf("flags = 0x%x:", lr->flags);
 	if (!lr->flags)
 		printf(" NONE\n");
