@@ -1,9 +1,9 @@
-/*
+/**
  * ntfslabel - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
  * Copyright (c) 2002 Anton Altaparmakov
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will display/change the label on an NTFS partition.
  *
@@ -30,11 +30,154 @@
 #include <string.h>
 #include <errno.h>
 #include <locale.h>
+#include <getopt.h>
 
 #include "debug.h"
 #include "mft.h"
+#include "utils.h"
 
-/*
+static const char *EXEC_NAME = "ntfslabel";
+
+static struct options {
+	char	*device;	/* Device/File to work with */
+	char	*label;		/* Set the label to this */
+	int	 quiet;		/* Less output */
+	int	 verbose;	/* Extra output */
+	int	 force;		/* Override common sense */
+	int	 noaction;	/* Do not write to disk */
+} opts;
+
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+
+/**
+ * version - Print version information about the program
+ *
+ * Print a copyright statement and a brief description of the program.
+ *
+ * Return:  none
+ */
+void version (void)
+{
+	printf ("\n%s v%s - Display, or set, the label for an NTFS Volume\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("\tMatthew J. Fanto\n");
+	printf ("\tAnton Altaparmakov\n");
+	printf ("\tRichard Russon\n");
+	printf ("\n%s\n\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+/**
+ * usage - Print a list of the parameters to the program
+ *
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
+ */
+void usage (void)
+{
+	printf ("\nUsage: %s [options] device [label]\n"
+	       "    -n    --no-action    Do not write to disk\n"
+	       "    -f    --force        Use less caution\n"
+	       "    -q    --quiet        Less output\n"
+	       "    -v    --verbose      More output\n"
+	       "    -V    --version      Display version information\n"
+	       "    -h    --help         Display this help\n\n",
+	       EXEC_NAME);
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+}
+
+/**
+ * parse_options - Read and validate the programs command line
+ *
+ * Read the command line, verify the syntax and parse the options.
+ * This function is very long, but quite simple.
+ *
+ * Return:  1 Success
+ *	    0 Error, one or more problems
+ */
+int parse_options (int argc, char *argv[])
+{
+	static const char *sopt = "-fhnqvV";
+	static const struct option lopt[] = {
+		{ "force",	 no_argument,		NULL, 'f' },
+		{ "help",	 no_argument,		NULL, 'h' },
+		{ "no-action",	 no_argument,		NULL, 'n' },
+		{ "quiet",	 no_argument,		NULL, 'q' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "version",	 no_argument,		NULL, 'V' },
+		{ NULL, 0, NULL, 0 },
+	};
+
+	char c = -1;
+	int err  = 0;
+	int ver  = 0;
+	int help = 0;
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!err && !opts.device)
+				opts.device = argv[optind-1];
+			else if (!err && !opts.label)
+				opts.label = argv[optind-1];
+			else
+				err++;
+			break;
+		case 'f':
+			opts.force++;
+			break;
+		case 'h':
+			help++;
+			break;
+		case 'n':
+			opts.noaction++;
+			break;
+		case 'q':
+			opts.quiet++;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		case 'V':
+			ver++;
+			break;
+		default:
+			Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			err++;
+			break;
+		}
+	}
+
+	if (help || ver) {
+		opts.quiet = 0;
+	} else {
+		if (opts.device == NULL) {
+			if (argc > 1)
+				Eprintf ("You must specify a device.\n");
+			err++;
+		}
+
+		if (opts.quiet && opts.verbose) {
+			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			err++;
+		}
+	}
+
+	if (ver)
+		version();
+	if (help || err)
+		usage();
+
+	return (!err && !help && !ver);
+}
+
+
+/**
  * print_label - display the current label of a mounted ntfs partition.
  * @dev:	device to read the label from
  * @mnt_flags:	mount flags of the device or 0 if not mounted
@@ -42,33 +185,22 @@
  *
  * Print the label of the device @dev to stdout.
  */
-void print_label(const char *dev, const unsigned long mnt_flags,
-		const char *mnt_point)
+int print_label (ntfs_volume *vol, unsigned long mnt_flags)
 {
-	ntfs_volume *vol;
-
-	if (mnt_point) {
-		// Try ioctl and finish if present.
-		// goto finished;
-	}
+	int result = 0;
+	//XXX significant?
 	if ((mnt_flags & (NTFS_MF_MOUNTED | NTFS_MF_READONLY)) ==
 			NTFS_MF_MOUNTED) {
-		fprintf(stderr, "%s is mounted read-write, results may be "
-				"unreliable.\n", dev);
+		Eprintf ("%s is mounted read-write, results may be "
+			"unreliable.\n", opts.device);
+		result = 1;
 	}
-	vol = ntfs_mount(dev, MS_RDONLY);
-	if (!vol) {
-		fprintf(stderr, "ntfs_mount() on device %s failed: %s\n", dev,
-				strerror(errno));
-		exit(1);
-	}
-//finished:
+
 	printf("%s\n", vol->vol_name);
-	if (ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
+	return result;
 }
 
-/*
+/**
  * resize_resident_attribute_value - resize a resident attribute
  * @m:		mft record containing attribute to resize
  * @a:		attribute record (inside @m) which to resize
@@ -103,7 +235,7 @@ int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
 	return 0;
 }
 
-/*
+/**
  * change_label - change the current label on a device
  * @dev:	device to change the label on
  * @mnt_flags:	mount flags of the device or 0 if not mounted
@@ -112,20 +244,16 @@ int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
  *
  * Change the label on the device @dev to @label.
  */
-void change_label(const char *dev, const unsigned long mnt_flags,
-		const char *mnt_point, char *label, BOOL force)
+int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
 {
 	ntfs_attr_search_ctx *ctx = NULL;
 	uchar_t *new_label = NULL;
 	MFT_RECORD *mrec = NULL;
 	ATTR_RECORD *a;
-	ntfs_volume *vol;
-	int label_len, err = 1;
+	int label_len;
+	int result = 0;
 
-	if (mnt_point) {
-		// Try ioctl and return if present.
-		// return;
-	}
+	//XXX significant?
 	if (mnt_flags & NTFS_MF_MOUNTED) {
 		/* If not the root fs or mounted read/write, refuse change. */
 		if (!(mnt_flags & NTFS_MF_ISROOT) ||
@@ -134,17 +262,12 @@ void change_label(const char *dev, const unsigned long mnt_flags,
 				fprintf(stderr, "Refusing to change label on "
 						"read-%s mounted device %s.\n",
 						mnt_flags & NTFS_MF_READONLY ?
-						"only" : "write", dev);
-				return;
+						"only" : "write", opts.device);
+				return 1;
 			}
 		}
 	}
-	vol = ntfs_mount(dev, 0);
-	if (!vol) {
-		fprintf(stderr, "ntfs_mount() on device %s failed: %s\n", dev,
-				strerror(errno));
-		exit(1);
-	}
+
 	if (ntfs_file_record_read(vol, (MFT_REF)FILE_Volume, &mrec, NULL)) {
 		perror("Error reading file record");
 		goto err_out;
@@ -191,55 +314,45 @@ void change_label(const char *dev, const unsigned long mnt_flags,
 		perror("Error writing MFT Record to disk");
 		goto err_out;
 	}
-	err = 0;
+	result = 0;
 err_out:
 	if (new_label)
 		free(new_label);
 	if (mrec)
 		free(mrec);
-	if (ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
-	if (err)
-		exit(1);
+	return result;
 }
 
+/**
+ * main - Begin here
+ *
+ * Start from here.
+ *
+ * Return:  0  Success, the program worked
+ *	    1  Error, something went wrong
+ */
 int main(int argc, char **argv)
 {
-	const char *AUTHOR = "Matthew Fanto";
-	char *EXEC_NAME = "ntfslabel";
-	char *locale, *mnt_point = NULL;
-	unsigned long mnt_flags;
-	int err;
-	// FIXME:Implement option -F meaning force the change.
-	BOOL force = 0;
+	unsigned long mnt_flags = 0;
+	int result = 0;
+	ntfs_volume *vol;
 
-	locale = setlocale(LC_ALL, "");
-	if (!locale) {
-		char *locale;
+	utils_set_locale();
 
-		locale = setlocale(LC_ALL, NULL);
-		Dprintf("Failed to set locale, using default (%s).\n", locale);
-	} else
-		Dprintf("Using locale %s.\n", locale);
-	if (argc && *argv)
-		EXEC_NAME = *argv;
-	if (argc < 2 || argc > 3) {
-		fprintf(stderr, "%s v%s - %s\n", EXEC_NAME, VERSION, AUTHOR);
-		fprintf(stderr, "Usage: ntfslabel device [newlabel]\n");
-		exit(1);
-	}
-	err = ntfs_check_if_mounted(argv[1], &mnt_flags);
-	if (err)
-		fprintf(stderr, "Failed to determine whether %s is mounted: "
-				"%s\n", argv[1], strerror(errno));
-	else if (mnt_flags & NTFS_MF_MOUNTED) {
-	// Not implemented yet. Will be used for ioctl interface to driver.
-	//	mnt_point = ntfs_get_mount_point(argv[1]);
-	}
-	if (argc == 2)
-		print_label(argv[1], mnt_flags, mnt_point);
+	if (!parse_options (argc, argv))
+		return 1;
+
+	//XXX need to set and get mount flags
+	vol = utils_mount_volume (opts.device, 0, opts.force);
+	if (!vol)
+		return 1;
+
+	if (opts.label)
+		result = change_label (vol, mnt_flags, opts.label, opts.force);
 	else
-		change_label(argv[1], mnt_flags, mnt_point, argv[2], force);
-	return 0;
+		result = print_label (vol, mnt_flags);
+
+	ntfs_umount (vol, FALSE);
+	return result;
 }
 
