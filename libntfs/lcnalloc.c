@@ -167,7 +167,6 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		pass = 2;
 	}
 	if (zone == MFT_ZONE) {
-//FIXME: What about when vol->mft_zone_end is zero? (AIA)
 		zone_end = vol->mft_zone_end;
 		search_zone = 1;
 	} else /* if (zone == DATA_ZONE) */ {
