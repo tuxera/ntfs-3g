@@ -1,7 +1,7 @@
 /**
  * NtfsDump_LogFile - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) of an
  * NTFS partition and display the results on stdout. Errors will be output to
@@ -223,9 +223,9 @@ pass_loc:
 			le16_to_cpu(rr->restart_area_length));
 	printf("ClientArrayOffset = 0x%x\n",
 			le16_to_cpu(rr->client_array_offset));
-	printf("FileSize = %Lu (0x%Lx)\n", le64_to_cpu(rr->file_size),
-			le64_to_cpu(rr->file_size));
-	if (le64_to_cpu(rr->file_size) != l)
+	printf("FileSize = %Lu (0x%Lx)\n", sle64_to_cpu(rr->file_size),
+			sle64_to_cpu(rr->file_size));
+	if (sle64_to_cpu(rr->file_size) != l)
 		puts("$LogFile restart area indicates a log file size"
 		     "different from the actual size!");
 	printf("LastLsnDataLength = 0x%x\n",

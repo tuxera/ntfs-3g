@@ -110,7 +110,7 @@ typedef struct {
 				   have to be <= 510. Also, the offset to the
 				   client array + (log_clients * 0xa0) have to
 				   be <= SystemPageSize. = 0x30 */
-	u64 file_size;		/* Byte size of the log file. If the
+	s64 file_size;		/* Byte size of the log file. If the
 				   restart_offset + the offset of the file_size
 				   are > 510 then corruption has occured. This
 				   is the very first check when starting with

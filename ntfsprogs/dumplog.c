@@ -173,8 +173,8 @@ pass_loc:
 			le16_to_cpu(rr->restart_area_length));
 	printf("ClientArrayOffset = 0x%x\n",
 			le16_to_cpu(rr->client_array_offset));
-	printf("FileSize = %Lu (0x%Lx)\n", le64_to_cpu(rr->file_size),
-			le64_to_cpu(rr->file_size));
+	printf("FileSize = %Lu (0x%Lx)\n", sle64_to_cpu(rr->file_size),
+			sle64_to_cpu(rr->file_size));
 	printf("LastLsnDataLength = 0x%x\n",
 			le32_to_cpu(rr->last_lsn_data_length));
 	printf("RecordLength = 0x%x\n", le16_to_cpu(rr->record_length));
