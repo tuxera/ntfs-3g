@@ -180,7 +180,7 @@ static int ntfs_load_mft(ntfs_volume *vol)
 		vol->mft_ni->attr_list_rl = ntfs_decompress_mapping_pairs(vol,
 				ctx->attr, NULL);
 		if (!vol->mft_ni->attr_list_rl) {
-			Dperror("Error: failed to get run list for "
+			Dperror("Error: failed to get runlist for "
 					"$MFT/$ATTRIBUTE_LIST");
 			goto error_exit;
 		}
@@ -203,7 +203,7 @@ mft_has_no_attr_list:
 	highest_vcn = next_vcn = 0;
 	a = NULL;
 	while (!ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, next_vcn, NULL, 0, ctx)) {
-		run_list_element *nrl;
+		runlist_element *nrl;
 
 		a = ctx->attr;
 		/* $MFT must be non-resident. */
@@ -223,7 +223,7 @@ mft_has_no_attr_list:
 		}
 		/*
 		 * Decompress the mapping pairs array of this extent and merge
-		 * the result into the existing run list. No need for locking
+		 * the result into the existing runlist. No need for locking
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
@@ -255,7 +255,7 @@ mft_has_no_attr_list:
 		goto io_error_exit;
 	}
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		Dputs("Failed to load the complete run list for $MFT/$DATA. "
+		Dputs("Failed to load the complete runlist for $MFT/$DATA. "
 				"Bug or corrupt $MFT. Run chkdsk.");
 		Dprintf("highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx\n",
 				(long long)highest_vcn,
@@ -308,7 +308,7 @@ error_exit:
 static int ntfs_load_mftmirr(ntfs_volume *vol)
 {
 	int i;
-	run_list_element rl[2];
+	runlist_element rl[2];
 
 	vol->mftmirr_ni = ntfs_open_inode(vol, FILE_MFTMirr);
 	if (!vol->mftmirr_ni) {
@@ -321,11 +321,11 @@ static int ntfs_load_mftmirr(ntfs_volume *vol)
 		Dperror("Failed to open $MFTMirr/$DATA");
 		goto error_exit;
 	}
-	if (ntfs_attr_map_run_list(vol->mftmirr_na, 0) < 0) {
-		Dperror("Failed to map run list of $MFTMirr/$DATA");
+	if (ntfs_attr_map_runlist(vol->mftmirr_na, 0) < 0) {
+		Dperror("Failed to map runlist of $MFTMirr/$DATA");
 		goto error_exit;
 	}
-	/* Construct the mft mirror run list. */
+	/* Construct the mft mirror runlist. */
 	rl[0].vcn = 0;
 	rl[0].lcn = vol->mftmirr_lcn;
 	rl[0].length = (vol->mftmirr_size * vol->mft_record_size +
@@ -333,7 +333,7 @@ static int ntfs_load_mftmirr(ntfs_volume *vol)
 	rl[1].vcn = rl[0].length;
 	rl[1].lcn = LCN_ENOENT;
 	rl[1].length = 0;
-	/* Compare the two run lists. They must be identical. */
+	/* Compare the two runlists. They must be identical. */
 	i = 0;
 	do {
 		if (rl[i].vcn != vol->mftmirr_na->rl[i].vcn ||

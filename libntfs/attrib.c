@@ -87,7 +87,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 		errno = 0;
 		return (s64)le32_to_cpu(a->value_length);
 	} else {			/* Attribute is not resident. */
-		run_list *rl;
+		runlist *rl;
 		s64 total, r;
 		int i;
 
@@ -99,7 +99,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 		/*
 		 * FIXME: What about attribute lists?!? (AIA)
 		 */
-		/* Decompress the mapping pairs array into a run list. */
+		/* Decompress the mapping pairs array into a runlist. */
 		rl = ntfs_decompress_mapping_pairs(vol, a, NULL);
 		if (!rl) {
 			errno = EINVAL;
@@ -107,13 +107,13 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 		}
 		/*
 		 * FIXED: We were overflowing here in a nasty fashion when we
-		 * reach the last cluster in the run list as the buffer will
+		 * reach the last cluster in the runlist as the buffer will
 		 * only be big enough to hold data_size bytes while we are
 		 * reading in allocated_size bytes which is usually larger
 		 * than data_size, since the actual data is unlikely to have a
 		 * size equal to a multiple of the cluster size!
 		 */
-		/* Now load all clusters in the run list into b. */
+		/* Now load all clusters in the runlist into b. */
 		for (i = 0, total = 0; rl[i].length; i++) {
 			if (!rl[i+1].length) {
 				unsigned char *intbuf = NULL;
@@ -389,15 +389,15 @@ void ntfs_attr_close(ntfs_attr *na)
 }
 
 /**
- * ntfs_attr_map_run_list - map (a part of) a run list of an ntfs attribute
- * @na:		ntfs attribute for which to map (part of) a run list
- * @vcn:	map run list part containing this vcn
+ * ntfs_attr_map_runlist - map (a part of) a runlist of an ntfs attribute
+ * @na:		ntfs attribute for which to map (part of) a runlist
+ * @vcn:	map runlist part containing this vcn
  *
- * Map the part of a run list containing the @vcn of an the ntfs attribute @na.
+ * Map the part of a runlist containing the @vcn of an the ntfs attribute @na.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
-int ntfs_attr_map_run_list(ntfs_attr *na, VCN vcn)
+int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 {
 	ntfs_attr_search_ctx *ctx;
 	int err;
@@ -413,9 +413,9 @@ int ntfs_attr_map_run_list(ntfs_attr *na, VCN vcn)
 	/* Find the attribute in the mft record. */
 	if (!ntfs_lookup_attr(na->type, na->name, na->name_len, CASE_SENSITIVE,
 			vcn, NULL, 0, ctx)) {
-		run_list_element *rl;
+		runlist_element *rl;
 
-		/* Decode the run list. */
+		/* Decode the runlist. */
 		rl = ntfs_decompress_mapping_pairs(na->ni->vol, ctx->attr,
 				na->rl);
 		if (rl) {
@@ -433,11 +433,11 @@ int ntfs_attr_map_run_list(ntfs_attr *na, VCN vcn)
 
 /**
  * ntfs_attr_vcn_to_lcn - convert a vcn into a lcn given an ntfs attribute
- * @na:		ntfs attribute whose run list to use for conversion
+ * @na:		ntfs attribute whose runlist to use for conversion
  * @vcn:	vcn to convert
  *
  * Convert the virtual cluster number @vcn of an attribute into a logical
- * cluster number (lcn) of a device using the run list @na->rl to map vcns to
+ * cluster number (lcn) of a device using the runlist @na->rl to map vcns to
  * their corresponding lcns.
  *
  * If the @vcn is not mapped yet, attempt to map the attribute extent
@@ -460,16 +460,16 @@ LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn)
 	if (!na || !NAttrNonResident(na) || vcn < 0)
 		return (LCN)LCN_EINVAL;
 retry:
-	/* Convert vcn to lcn. If that fails map the run list and retry once. */
+	/* Convert vcn to lcn. If that fails map the runlist and retry once. */
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
 	if (lcn >= 0)
 		return lcn;
-	if (!is_retry && !ntfs_attr_map_run_list(na, vcn)) {
+	if (!is_retry && !ntfs_attr_map_runlist(na, vcn)) {
 		is_retry = TRUE;
 		goto retry;
 	}
 	/*
-	 * If the attempt to map the run list failed, or we are getting
+	 * If the attempt to map the runlist failed, or we are getting
 	 * LCN_RL_NOT_MAPPED despite having mapped the attribute extent
 	 * successfully, something is really badly wrong...
 	 */
@@ -480,28 +480,28 @@ retry:
 }
 
 /**
- * ntfs_attr_find_vcn - find a vcn in the run list of an ntfs attribute
- * @na:		ntfs attribute whose run list to search
+ * ntfs_attr_find_vcn - find a vcn in the runlist of an ntfs attribute
+ * @na:		ntfs attribute whose runlist to search
  * @vcn:	vcn to find
  *
- * Find the virtual cluster number @vcn in the run list of the ntfs attribute
- * @na and return the the address of the run list element containing the @vcn.
+ * Find the virtual cluster number @vcn in the runlist of the ntfs attribute
+ * @na and return the the address of the runlist element containing the @vcn.
  *
- * Note you need to distinguish between the lcn of the returned run list
+ * Note you need to distinguish between the lcn of the returned runlist
  * element being >= 0 and LCN_HOLE. In the later case you have to return zeroes
- * on read and allocate clusters on write. You need to update the run list, the
+ * on read and allocate clusters on write. You need to update the runlist, the
  * attribute itself as well as write the modified mft record to disk.
  *
  * If there is an error return NULL with errno set to the error code. The
  * following error codes are defined:
  *	EINVAL		Input parameter error.
- *	ENOENT		There is no such vcn in the run list.
+ *	ENOENT		There is no such vcn in the runlist.
  *	ENOMEM		Not enough memory.
  *	EIO		I/O error or corrupt metadata.
  */
-run_list_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn)
+runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn)
 {
-	run_list_element *rl;
+	runlist_element *rl;
 	BOOL is_retry = FALSE;
 
 	if (!na || !NAttrNonResident(na) || vcn < 0) {
@@ -537,8 +537,8 @@ retry:
 	}
 	return NULL;
 map_rl:
-	/* The @vcn is in an unmapped region, map the run list and retry. */
-	if (!is_retry && !ntfs_attr_map_run_list(na, vcn)) {
+	/* The @vcn is in an unmapped region, map the runlist and retry. */
+	if (!is_retry && !ntfs_attr_map_runlist(na, vcn)) {
 		is_retry = TRUE;
 		goto retry;
 	}
@@ -576,7 +576,7 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 {
 	s64 br, to_read, ofs, total, total2;
 	ntfs_volume *vol;
-	run_list_element *rl;
+	runlist_element *rl;
 	int f;
 
 	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, pos 0x%Lx, "
@@ -656,7 +656,7 @@ res_err_out:
 		count -= total2;
 		memset((u8*)b + count, 0, total2);
 	}
-	/* Find the run list element containing the vcn. */
+	/* Find the runlist element containing the vcn. */
 	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
 	if (!rl) {
 		/*
@@ -751,7 +751,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	s64 written, to_write, ofs, total, old_initialized_size;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
-	run_list_element *rl;
+	runlist_element *rl;
 	int f, eo;
 	struct {
 		unsigned int initialized_size	: 1;
@@ -832,7 +832,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		return count;
 	}
 	total = 0;
-	/* Find the run list element containing the vcn. */
+	/* Find the runlist element containing the vcn. */
 	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
 	if (!rl) {
 		/*
@@ -938,7 +938,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			}
 			if (eo) {
 				// TODO: Need to instantiate the hole. Then get
-				// the run list element again checking if it is
+				// the runlist element again checking if it is
 				// ok and fall through to do the writing. (AIA)
 				errno = ENOTSUP;
 				goto rl_err_out;
@@ -1883,21 +1883,21 @@ __inline__ int ntfs_get_nr_significant_bytes(const s64 n)
 /**
  * ntfs_get_size_for_mapping_pairs - get bytes needed for mapping pairs array
  * @vol:	ntfs volume (needed for the ntfs version)
- * @rl:		run list for which to determine the size of the mapping pairs
+ * @rl:		runlist for which to determine the size of the mapping pairs
  *
- * Walk the run list @rl and calculate the size in bytes of the mapping pairs
- * array corresponding to the run list @rl. This for example allows us to
+ * Walk the runlist @rl and calculate the size in bytes of the mapping pairs
+ * array corresponding to the runlist @rl. This for example allows us to
  * allocate a buffer of the right size when building the mapping pairs array.
  *
  * Return the calculated size in bytes on success. If @rl is NULL return 0.
  * On error, return -1 with errno set to the error code. The following error
  * codes are defined:
  *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
- *		  fully mapped run lists to this function.
- *	EIO	- The run list is corrupt.
+ *		  fully mapped runlists to this function.
+ *	EIO	- The runlist is corrupt.
  */
 int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const run_list_element *rl)
+		const runlist_element *rl)
 {
 	LCN prev_lcn;
 	int i, rls;
@@ -1941,7 +1941,7 @@ err_out:
  * @dest_max, the maximum position within @dst to which we are allowed to
  * write.
  *
- * This is used when building the mapping pairs array of a run list to compress
+ * This is used when building the mapping pairs array of a runlist to compress
  * a given logical cluster number (lcn) or a specific run length to the minumum
  * size possible.
  *
