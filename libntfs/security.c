@@ -178,8 +178,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 {
 	u64 u;
 	char *s;
-	size_t cnt;
-	int i, j;
+	int i, j, cnt;
 
 	/*
 	 * No need to check @sid if !@sid_str since ntfs_sid_to_mbs_size() will
@@ -222,13 +221,13 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	s += i;
 	cnt -= i;
 	/* Finally, add the sub authorities. */
-	for (i = 0; i < sid->sub_authority_count; i++) {
-		j = snprintf(s, cnt, "-%u", (unsigned int)
-				le32_to_cpu(sid->sub_authority[i]));
-		if (j < 0 || j >= cnt)
+	for (j = 0; j < sid->sub_authority_count; j++) {
+		i = snprintf(s, cnt, "-%u", (unsigned int)
+				le32_to_cpu(sid->sub_authority[j]));
+		if (i < 0 || i >= cnt)
 			goto err_out;
-		s += j;
-		cnt -= j;
+		s += i;
+		cnt -= i;
 	}
 	return sid_str;
 err_out:
