@@ -217,11 +217,13 @@ int ntfs_inode_close(ntfs_inode *ni)
 	}
 	/* Is this a base inode with mapped extent inodes? */
 	if (ni->nr_extents > 0) {
-		int i;
-
-		// FIXME: Handle dirty case for each extent inode! (AIA)
-		for (i = 0; i < ni->nr_extents; i++)
-			__ntfs_inode_release(ni->extent_nis[i]);
+		while (ni->nr_extents > 0) {
+			if (ntfs_inode_close(ni->extent_nis[0])) {
+				if (errno != EIO)
+					errno = EBUSY;
+				return -1;
+			}
+		}
 		free(ni->extent_nis);
 	} else if (ni->nr_extents == -1) {
 		ntfs_inode **tmp_nis;
