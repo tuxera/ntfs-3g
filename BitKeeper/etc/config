@@ -1,0 +1,7 @@
+description: Linux NTFS userspace library and utilities
+category: System Environment/Base
+logging: logging@openlogging.org
+compression: gzip
+autofix: yes
+contact: Anton Altaparmakov <aia21@cantab.net>
+email: aia21@cantab.net
