@@ -37,7 +37,7 @@ ntfsfix_SOURCES		= ntfsfix.c
 ntfsfix_LDADD		= $(AM_LIBS)
 ntfsfix_LDFLAGS		= $(AM_LFLAGS)
 
-mkntfs_SOURCES		= attrdef.c upcase.c boot.c sd.c mkntfs.c
+mkntfs_SOURCES		= attrdef.c upcase.c boot.c sd.c mkntfs.c utils.c utils.h
 mkntfs_LDADD		= $(AM_LIBS)
 mkntfs_LDFLAGS		= $(AM_LFLAGS)
 
@@ -63,7 +63,7 @@ ntfscluster_SOURCES	= ntfscluster.c ntfscluster.h utils.c utils.h
 ntfscluster_LDADD	= $(AM_LIBS)
 ntfscluster_LDFLAGS	= $(AM_LFLAGS)
 
-ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c
+ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)
 ntfstruncate_LDFLAGS	= $(AM_LFLAGS)
 

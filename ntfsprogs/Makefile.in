@@ -120,7 +120,7 @@ ntfsfix_SOURCES = ntfsfix.c
 ntfsfix_LDADD = $(AM_LIBS)
 ntfsfix_LDFLAGS = $(AM_LFLAGS)
 
-mkntfs_SOURCES = attrdef.c upcase.c boot.c sd.c mkntfs.c
+mkntfs_SOURCES = attrdef.c upcase.c boot.c sd.c mkntfs.c utils.c utils.h
 mkntfs_LDADD = $(AM_LIBS)
 mkntfs_LDFLAGS = $(AM_LFLAGS)
 
@@ -146,7 +146,7 @@ ntfscluster_SOURCES = ntfscluster.c ntfscluster.h utils.c utils.h
 ntfscluster_LDADD = $(AM_LIBS)
 ntfscluster_LDFLAGS = $(AM_LFLAGS)
 
-ntfstruncate_SOURCES = attrdef.c ntfstruncate.c
+ntfstruncate_SOURCES = attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD = $(AM_LIBS)
 ntfstruncate_LDFLAGS = $(AM_LFLAGS)
 
@@ -188,7 +188,8 @@ ntfswipe_OBJECTS =  ntfswipe.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfswipe_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
-ntfstruncate_OBJECTS =  attrdef.$(OBJEXT) ntfstruncate.$(OBJEXT)
+ntfstruncate_OBJECTS =  attrdef.$(OBJEXT) ntfstruncate.$(OBJEXT) \
+utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfstruncate_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfstruncate_DEPENDENCIES =  \
@@ -209,7 +210,7 @@ ntfsinfo_OBJECTS =  ntfsinfo.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_FALSE@ntfsinfo_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 mkntfs_OBJECTS =  attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
-sd.$(OBJEXT) mkntfs.$(OBJEXT)
+sd.$(OBJEXT) mkntfs.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@mkntfs_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@mkntfs_DEPENDENCIES =  \
