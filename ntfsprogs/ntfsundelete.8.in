@@ -27,7 +27,7 @@ will print a list giving the inode number, name and size.
 .PP
 The
 .I undelete
-mode takes the inode and recovers as much of the data as possible.  It save the
+mode takes the inode and recovers as much of the data as possible.  It saves the
 result to another location.  Partly for safety, but mostly because NTFS write
 support isn't finished.
 .SS Copy
