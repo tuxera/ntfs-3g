@@ -395,7 +395,6 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *rec;
-	ATTR_RECORD *oldrec;
 	FILE_NAME_ATTR *attr;
 	int name_space;
 	MFT_REF parent = FILE_root;
@@ -421,11 +420,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
 
 		name_space = 4;
-		oldrec = NULL;
 		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
-			if (rec == oldrec)
-				break;
-			oldrec = rec;
 			/* We know this will always be resident. */
 			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
 
