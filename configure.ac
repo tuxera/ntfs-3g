@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.9.1],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.9.2-WIP],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])

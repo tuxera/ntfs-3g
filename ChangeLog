@@ -1,3 +1,7 @@
+xx/xx/2004 - 1.9.2-WIP
+	- Hopefully fix the autogen.sh problems using the --force and touch
+	  config.h.in sledge hammers.
+
 05/04/2004 - 1.9.1 - Make mkntfs create bootable volumes and fixes/updates.
 	- Update with SuSE 9.1 beta 1 versions of GNU build system.
 	- Fix warnings on powerpc architecture where it would seem char is

@@ -3,7 +3,7 @@
 #   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
 #   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
-timestamp='2004-01-05'
+timestamp='2004-02-23'
 
 # This file is (in principle) common to ALL GNU software.
 # The presence of a machine in this file suggests that SOME GNU software
@@ -363,6 +363,9 @@ case $basic_machine in
 		basic_machine=a29k-amd
 		os=-udi
 		;;
+    	abacus)
+		basic_machine=abacus-unknown
+		;;
 	adobe68k)
 		basic_machine=m68010-adobe
 		os=-scout
@@ -442,11 +445,19 @@ case $basic_machine in
 		basic_machine=j90-cray
 		os=-unicos
 		;;
+	cr16c)
+		basic_machine=cr16c-unknown
+		os=-elf
+		;;
 	crds | unos)
 		basic_machine=m68k-crds
 		;;
 	cris | cris-* | etrax*)
 		basic_machine=cris-axis
+		;;
+	crx)
+		basic_machine=crx-unknown
+		os=-elf
 		;;
 	da30 | da30-*)
 		basic_machine=m68k-da30
@@ -1143,8 +1154,9 @@ case $os in
 	      | -aos* \
 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
-	      | -hiux* | -386bsd* | -knetbsd* | -netbsd* | -openbsd* | -kfreebsd* | -freebsd* | -riscix* \
-	      | -lynxos* | -bosx* | -nextstep* | -cxux* | -aout* | -elf* | -oabi* \
+	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* | -openbsd* \
+	      | -ekkobsd* | -kfreebsd* | -freebsd* | -riscix* | -lynxos* \
+	      | -bosx* | -nextstep* | -cxux* | -aout* | -elf* | -oabi* \
 	      | -ptx* | -coff* | -ecoff* | -winnt* | -domain* | -vsta* \
 	      | -udi* | -eabi* | -lites* | -ieee* | -go32* | -aux* \
 	      | -chorusos* | -chorusrdb* \
