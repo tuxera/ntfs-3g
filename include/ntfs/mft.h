@@ -82,16 +82,16 @@ static __inline__ int ntfs_mft_record_write(const ntfs_volume *vol,
  * @m:		mft record to get the data size of
  *
  * Takes the mft record @m and returns the number of bytes used in the record
- * or 0 on error (i.e. @m is not a valid mft record). Zero is not a valid size
- * for an mft record as it at least has to have the MFT_RECORD, thus making the
- * minimum size:
- *	(sizeof(MFT_RECORD) + 7) & ~7 + sizeof(ATTR_TYPES) = 52 bytes
- * Aside: The 8-byte alignment and the 4 bytes for the attribute type are needed
- * as each mft record has to have a list of attributes even if it only contains
- * the attribute $END which doesn't contain anything else apart from its type.
- * Also, you would expect every mft record to contain an update sequence array
- * as well but that could in theory be non-existent (don't know if Windows'
- * NTFS driver/chkdsk wouldn't view this as corruption in itself though).
+ * or 0 on error (i.e. @m is not a valid mft record).  Zero is not a valid size
+ * for an mft record as it at least has to have the MFT_RECORD itself and a
+ * zero length attribute of type AT_END, thus making the minimum size 56 bytes.
+ *
+ * Aside:  The size is independent of NTFS versions 1.x/3.x because the 8-byte
+ * alignment of the first attribute mask the difference in MFT_RECORD size
+ * between NTFS 1.x and 3.x.  Also, you would expect every mft record to
+ * contain an update sequence array as well but that could in theory be
+ * non-existent (don't know if Windows' NTFS driver/chkdsk wouldn't view this
+ * as corruption in itself though).
  */
 static __inline__ u32 ntfs_mft_record_get_data_size(const MFT_RECORD *m)
 {
