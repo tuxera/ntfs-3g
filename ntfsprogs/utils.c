@@ -1,8 +1,9 @@
 /**
  * utils.c - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003 Lode Leroy
  *
  * A set of shared functions for ntfs utilities
  *
@@ -39,6 +40,7 @@
 #include "types.h"
 #include "volume.h"
 #include "debug.h"
+#include "dir.h"
 
 const char *ntfs_bugs = "Please report bugs to linux-ntfs-dev@lists.sourceforge.net\n";
 const char *ntfs_home = "Linux NTFS homepage: http://linux-ntfs.sourceforge.net\n";
@@ -672,14 +674,101 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 	return (buffer[byte] & bit);
 }
 
+/**
+ * utils_pathname_to_inode - Find the inode which represents the given pathname
+ * @vol:       An ntfs volume obtained from ntfs_mount
+ * @parent:    A directory inode to begin the search (may be NULL)
+ * @pathname:  Pathname to be located
+ *
+ * Take an ASCII pathname and find the inode that represents it.  The function
+ * splits the path and then descends the directory tree.  If @parent is NULL,
+ * then the root directory '.' will be used as the base for the search.
+ *
+ * Return:  inode  Success, the pathname was valid
+ *	    NULL   Error, the pathname was invalid, or some other error occurred
+ */
+ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, const char *pathname)
+{
+	u64 inum;
+	int len;
+	char *p, *q;
+	ntfs_inode *ni;
+	ntfs_inode *result  = NULL;
+	uchar_t    *unicode = NULL;
+	char       *ascii   = NULL;
+
+	if (!vol || !pathname) {
+		return NULL;
+	}
+
+	if (parent) {
+		ni = parent;
+	} else {
+		ni = ntfs_inode_open (vol, FILE_root);
+		if (!ni) {
+			Eprintf ("Couldn't open the inode of the root directory.\n");
+			goto close;
+		}
+	}
+
+	unicode = calloc (1, MAX_PATH);
+	ascii   = strdup (pathname);		// Work with a r/w copy
+	if (!unicode || !ascii) {
+		Eprintf ("Out of memory.\n");
+		goto close;
+	}
+
+	p = ascii;
+	while (p && *p && *p == PATH_SEP)	// Remove leading /'s
+		p++;
+	while (p && *p) {
+		q = strchr (p, PATH_SEP);	// Find the end of the first token
+		if (q != NULL) {
+			*q = '\0';
+			q++;
+		}
+
+		len = ntfs_mbstoucs (p, &unicode, MAX_PATH);
+		if (len < 0) {
+			Eprintf ("Couldn't convert name to Unicode: %s.\n", p);
+			goto close;
+		}
+
+		inum = ntfs_inode_lookup_by_name (ni, unicode, len);
+		if (inum == -1) {
+			Eprintf ("Couldn't find name '%s' in pathname '%s'.\n", p, pathname);
+			goto close;
+		}
+
+		if (ni != parent)
+			ntfs_inode_close (ni);
+
+		ni = ntfs_inode_open (vol, inum);
+		if (!ni) {
+			Eprintf ("Cannot open inode %lld: %s.\n", inum, p);
+			goto close;
+		}
+
+		p = q;
+		while (p && *p && *p == PATH_SEP)
+			p++;
+	}
+
+	result = ni;
+	ni = NULL;
+close:
+	if (ni && (ni != parent))
+		ntfs_inode_close (ni);
+	free (ascii);
+	free (unicode);
+	return result;
+}
 
 /**
  * __metadata
  */
 static int __metadata (ntfs_volume *vol, u64 num)
 {
-	if (num == FILE_root)
-		return 0;
 	if (num <= FILE_UpCase)
 		return 1;
 	if (!vol)
@@ -707,10 +796,12 @@ int utils_is_metadata (ntfs_inode *inode)
 	ntfs_volume *vol;
 	ATTR_RECORD *rec;
 	FILE_NAME_ATTR *attr;
+	MFT_RECORD *file;
 	u64 num;
 
 	if (!inode)
 		return -1;
+
 	vol = inode->vol;
 	if (!vol)
 		return -1;
@@ -718,6 +809,14 @@ int utils_is_metadata (ntfs_inode *inode)
 	num = inode->mft_no;
 	if (__metadata (vol, num) == 1)
 		return 1;
+
+	file = inode->mrec;
+	if (file && (file->base_mft_record != 0)) {
+		num = MREF (file->base_mft_record);
+		if (__metadata (vol, num) == 1)
+			return 1;
+	}
+	file = inode->mrec;
 
 	rec = find_first_attribute (AT_FILE_NAME, inode->mrec);
 	if (!rec)
@@ -727,7 +826,7 @@ int utils_is_metadata (ntfs_inode *inode)
 	attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
 
 	num = MREF (attr->parent_directory);
-	if (__metadata (vol, num) == 1)
+	if ((num != FILE_root) && (__metadata (vol, num) == 1))
 		return 1;
 
 	return 0;
