@@ -379,7 +379,7 @@ err_out:
 int ntfs_inode_sync(ntfs_inode *ni)
 {
 	int err = 0;
-	
+
 	if (!ni) {
 		errno = EINVAL;
 		return -1;
