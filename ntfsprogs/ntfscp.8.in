@@ -1,0 +1,94 @@
+.\" -*- nroff -*-
+.\" Copyright (c) 2004 Yura Pakhuchiy. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFSCP 8 "October 2004" "ntfsprogs version @VERSION@"
+.SH NAME
+ntfscp \- overwrite file on an NTFS volume.
+.SH SYNOPSIS
+.B ntfscp
+[
+.I options
+]
+.B device src_file dest_file
+.SH DESCRIPTION
+.B ntfscp
+will overwrite file on an NTFS volume. At present
+.B ntfscp
+can't create new files.
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfscp
+accepts.  All options have two equivalent names.  The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
+.TP
+.BI "\-a, \-\-attribute " number
+Write to this attribute.
+.TP
+.B \-i, \-\-inode
+Treat
+.I dest_file
+as inode number.
+.TP
+.BI "\-N, \-\-attr-name " name
+Write to attribute with this name.
+.TP
+.B -n, --no-action
+Use this option to make a test run before doing the real copy operation.
+Volume will be opened read-only and no write will be done.
+.TP
+.B \-f, \-\-force
+This will override some sensible defaults, such as not working with a mounted
+volume.  Use this option with caution.
+.TP
+.B \-h, \-\-help
+Show a list of options with a brief description of each one.
+.TP
+.B \-q, \-\-quiet
+Suppress some debug/warning/error messages.
+.TP
+.B \-V, \-\-version
+Show the version number, copyright and license
+.BR ntfscp .
+.TP
+.B \-v, \-\-vebose
+Display more debug/warning/error messages.
+.SH EXAMPLES
+Copy boot.ini from /home/user to the root of an /dev/hda1 NTFS volume:
+.RS
+.sp
+.B ntfscp /dev/hda1 /home/user/boot.ini boot.ini
+.sp
+.RE
+Copy my_sii_index_root to attribute 0x90 ($INDEX_ROOT) with name $SII of inode 9 (file $Secure):
+.RS
+.sp
+.B ntfscp -i -a 0x90 -N $SII /dev/hda1 my_sii_index_root 9
+.SH BUGS
+No bugs are known at present. If you find any bugs, please send an email to
+.nh
+<linux-ntfs-dev@lists.sourceforge.net>.
+.hy
+.SH AUTHOR
+.B ntfscp
+was written by Yura Pakhuchiy.
+.B ntfscp
+and this manual page is based on ntfscat and it's manaul page by Richard Russon, so many thanks to him.
+.SH AVAILABILITY
+.B ntfscp
+is part of the ntfsprogs package and is available from
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/downloads.html.
+.hy
+.SH SEE ALSO
+.BR ntfsprogs (8)
+
