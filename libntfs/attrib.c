@@ -419,6 +419,10 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, vcn 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)vcn);
+	
+	LCN lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
+	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
+		return 0;
 
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
@@ -475,17 +479,27 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 	/* Map all attribute extents one by one. */
 	next_vcn = last_vcn = highest_vcn = 0;
 	a = NULL;
-	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-			CASE_SENSITIVE, next_vcn, NULL, 0, ctx)) {
+	while (1) {
 		runlist_element *rl;
+		
+		int not_mapped = 0;
+		if (ntfs_rl_vcn_to_lcn(na->rl, next_vcn) == LCN_RL_NOT_MAPPED)
+			not_mapped = 1;
+
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len,
+				CASE_SENSITIVE, next_vcn, NULL, 0, ctx))
+			break;
 
 		a = ctx->attr;
 
-		/* Decode the runlist. */
-		rl = ntfs_mapping_pairs_decompress(na->ni->vol, a, na->rl);
-		if (!rl)
-			goto err_out;
-		na->rl = rl;
+		if (not_mapped) {
+			/* Decode the runlist. */
+			rl = ntfs_mapping_pairs_decompress(na->ni->vol,
+								a, na->rl);
+			if (!rl)
+				goto err_out;
+			na->rl = rl;
+		}
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
@@ -2738,7 +2752,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	}
 
 	/* Read and cache the whole runlist if not already done. */
-	if (!na->rl && ntfs_attr_map_whole_runlist(na))
+	if (ntfs_attr_map_whole_runlist(na))
 		return -1;
 
 	/* Move the attribute name if it exists and update the offset. */
@@ -3183,7 +3197,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		nr_need_allocate = first_free_vcn -
 				(na->allocated_size >> vol->cluster_size_bits);
 		
-		if (!na->rl && ntfs_attr_map_runlist (na, 0)) {
+		if (ntfs_attr_map_runlist (na, 0)) {
 			err = errno;
 			fprintf(stderr, "%s(): Eeek! "
 					"ntfs_attr_map_whole_runlist failed.\n",
