@@ -1,7 +1,7 @@
 /**
  * ntfscp - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This utility will overwrite files on ntfs volume
  *
@@ -27,7 +27,9 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "types.h"
 #include "attrib.h"
@@ -50,6 +52,7 @@ struct options {
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
+static int caught_sigint = 0;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
@@ -230,6 +233,20 @@ static int parse_options (int argc, char **argv)
 }
 
 /**
+ * sigint_handler - Handle SIGINT: abort write, sync and exit.
+ */
+static void sigint_handler(int arg __attribute__((unused)))
+{
+	caught_sigint++;
+	if (caught_sigint > 3) {
+		Eprintf("SIGTERM received more than 3 times. "
+				"Exit immediately.\n");
+		exit(2);
+	} else
+		Eprintf("SIGTERM received. Aborting write.\n");
+}
+
+/**
  * main - Begin here
  *
  * Start from here.
@@ -257,6 +274,12 @@ int main (int argc, char *argv[])
 
 	utils_set_locale();
 	
+	/* Set SIGINT handler. */
+	if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+		perror("Failed to set SIGINT handler");
+		return 1;
+	}
+
 	if (opts.noaction)
 		flags = MS_RDONLY;
 
@@ -338,11 +361,12 @@ int main (int argc, char *argv[])
 		goto close_attr;
 	}
 
+	Vprintf("Starting write.\n");
 	offset = 0;
-	while (!feof(in)) {
+	while (!feof(in) && !caught_sigint) {
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
 		if (!br) {
-			if (!feof(in))	perror("ERROR: fread failed");
+			if (!feof(in)) perror("ERROR: fread failed");
 			break;
 		}
 		bw = ntfs_attr_pwrite(na, offset, br, buf);
@@ -352,16 +376,24 @@ int main (int argc, char *argv[])
 		}
 		offset += bw;
 	}
+	Vprintf("Syncing.\n");
 	result = 0;
 	free(buf);
 close_attr:
 	ntfs_attr_close(na);
 close_dst:
-	ntfs_inode_close(out);
+	while (ntfs_inode_close(out)) {
+		if (errno != EBUSY) {
+			Eprintf("Sync failed. Run chkdsk.\n");
+			break;
+		}
+		Eprintf("Device busy. Will retry sync after 3 seconds.\n");
+		sleep(3);
+	}
 close_src:
-	fclose (in);
+	fclose(in);
 umount:
-	ntfs_umount (vol, FALSE);
-
+	ntfs_umount(vol, FALSE);
+	Vprintf("Done.\n");
 	return result;
 }

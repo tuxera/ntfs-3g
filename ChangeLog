@@ -103,6 +103,8 @@ xx/xx/2005 - 2.0.0-WIP
 	  kernel driver.  (Yura)
 	- Port logfile checking routines from the kernel to the library and
 	  integrate them with mount process.  (Yura)
+	- ntfscp: Added SIGINT (Ctrl+C) handler, improved error handling in
+	  sync failed case.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
