@@ -919,17 +919,18 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 			goto err_out;
 		}
 		/* Attribute can't be resident. */
-		attr_rec_size =
-			offsetof(ATTR_RECORD, non_resident_attr_end) + 8;
+		attr_rec_size = offsetof(ATTR_RECORD, non_resident_attr_end) +
+				((name_len * sizeof(ntfschar) + 7) & ~7) + 8;
 	} else {
-		if (size >= ni->vol->mft_record_size)
-			/* Attribute will not fit MFT record. */
+		/* Attribute can be resident. */
+		attr_rec_size = offsetof(ATTR_RECORD, resident_attr_end) +
+			((name_len * sizeof(ntfschar) + 7) & ~7);
+		/* Check whether attribute will fit into the MFT record. */
+		if (size + attr_rec_size >= ni->vol->mft_record_size)
+			/* Will not fit, make it non resident. */
 			attr_rec_size = offsetof(ATTR_RECORD,
-					non_resident_attr_end) + 8;
-		else
-			/* Attribute can be resident. */
-			attr_rec_size =
-				offsetof(ATTR_RECORD, resident_attr_end);
+					non_resident_attr_end) + ((name_len *
+					sizeof(ntfschar) + 7) & ~7) + 8;
 	}
 
 	if (le32_to_cpu(ni->mrec->bytes_allocated) -
