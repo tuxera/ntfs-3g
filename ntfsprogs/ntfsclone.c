@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #ifdef HAVE_SYS_VFS_H
 #	include <sys/vfs.h>
 #endif
@@ -40,6 +41,13 @@
 #include "inode.h"
 #include "runlist.h"
 #include "utils.h"
+
+#if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
+#define BLKGETSIZE	_IO(0x12,96)  /* Get device size in 512-byte blocks. */
+#endif
+#if defined(linux) && defined(_IOR) && !defined(BLKGETSIZE64)
+#define BLKGETSIZE64	_IOR(0x12,114,size_t)	/* Get device size in bytes. */
+#endif
 
 static const char *EXEC_NAME = "ntfsclone";
 
@@ -910,7 +918,7 @@ static s64 device_size_get(int fd)
 			Dprintf("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
 					(unsigned long long)size,
 					(unsigned long long)size);
-			return (s64)size / block_size;
+			return (s64)size;
 		}
 	}
 #endif
