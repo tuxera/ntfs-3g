@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
-.\" Copyright 2002 by Szabolcs Szakacsits  All Rights Reserved.
+.\" Copyright 2002-2003 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "November 2002" "Linux\-NTFS @VERSION@"
+.TH NTFSRESIZE 8 "Jan 2003" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem
 .SH SYNOPSIS
@@ -34,6 +34,10 @@ and
 .B -s 
 are mutually exclusive. If both of them is omitted then the 
 NTFS filesystem will be enlarged to the device size.
+Before a real resize operation, always make a read-only 
+test run using the 
+.B -n 
+option.
 .PP
 The
 .B ntfsresize
@@ -95,7 +99,7 @@ Using this option you can calculate the smallest shrunken volume size supported.
 This option will not make any changes to the filesystem.
 .TP
 .B -n
-You can use this option to make a test run before doing the real resize operation.
+Use this option to make a test run before doing the real resize operation.
 Volume will be opened read-only and
 .B ntfsresize
 displays what it would do if it were to resize the filesystem.
@@ -130,7 +134,8 @@ man page formed the basis of this page.
 is part of the linux-ntfs package and is available from
 http://linux-ntfs.sourceforge.net/ as source and pre-compiled binary.
 .B ntfsresize
-related news and FAQ (frequently asked questions) is maintained at 
+related news, example of usage and FAQ (frequently asked questions)
+is maintained at 
 http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .SH SEE ALSO
 .BR fdisk (8),
