@@ -1,4 +1,4 @@
-/*z
+/*
  * $Id$
  *
  * ntfsinfo - Part of the Linux-NTFS project.
@@ -31,7 +31,7 @@
 #include <string.h>
 #include <errno.h>
 #include <locale.h>
-#include <asm/types.h>
+#include "types.h"
 #include "mft.h"
 #include "attrib.h"
 #include "layout.h"
