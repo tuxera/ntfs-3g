@@ -115,8 +115,8 @@ all_includes = @all_includes@
 all_libraries = @all_libraries@
 
 LTVERSION = 4:0:0
-@DEBUG_TRUE@AM_CFLAGS = @DEBUG_TRUE@-D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
-@DEBUG_FALSE@AM_CFLAGS = @DEBUG_FALSE@-D_FILE_OFFSET_BITS=64
+@DEBUG_TRUE@AM_CFLAGS = @DEBUG_TRUE@-D_FILE_OFFSET_BITS=64 -Wall -g -DDEBUG
+@DEBUG_FALSE@AM_CFLAGS = @DEBUG_FALSE@-D_FILE_OFFSET_BITS=64 -Wall
 
 linux_ntfsincludedir = -I$(top_srcdir)/include
 lib_LTLIBRARIES = libntfs.la
