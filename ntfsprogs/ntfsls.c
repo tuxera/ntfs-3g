@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003 Lode Leroy
  * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003 Richard Russon
  *
  * This utility will list a directory's files.
  *
@@ -68,8 +69,9 @@ void version(void)
 {
 	printf("\n%s v%s - Display information about an NTFS Volume.\n\n",
 			EXEC_NAME, VERSION);
-	printf("Copyright (c)\n");
-	printf("    2003      Lode Leroy\n");
+	printf("Copyright (c) 2003 Lode Leroy\n");
+	printf("Copyright (c) 2003 Anton Altaparmakov\n");
+	printf("Copyright (c) 2003 Richard Russon\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -216,107 +218,41 @@ int parse_options(int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
-/**
- * ucstos - convert unicode-character string to ASCII
- * @dest:	points to buffer to receive the converted string
- * @src:	points to string to convert
- * @maxlen:	size of @dest buffer in bytes
- *
- * Return the number of characters written to @dest, not including the
- * terminating null byte. If a unicode character was encountered which could
- * not be converted -1 is returned.
- */
-int ucstos(char *dest, const uchar_t *src, int maxlen)
-{
-	uchar_t u;
-	int i;
-
-	/* Need one byte for null terminator. */
-	maxlen--;
-	for (i = 0; i < maxlen; i++) {
-		u = le16_to_cpu(src[i]);
-		if (!u)
-			break;
-		if (u & 0xff00)
-			return -1;
-		dest[i] = u & 0xff;
-	}
-	dest[i] = 0;
-	return i;
-}
-
-/**
- * stoucs - convert ASCII string to unicode-character string
- * @dest:	points to buffer to receive the converted string
- * @src:	points to string to convert
- * @maxlen:	size of @dest buffer in bytes
- *
- * Return the number of characters written to @dest, not including the
- * terminating null unicode character.
- */
-int stoucs(uchar_t *dest, const char *src, int maxlen)
-{
-	char c;
-	int i;
-
-	/* Need two bytes for null terminator. */
-	maxlen -= 2;
-	for (i = 0; i < maxlen; i++) {
-		c = src[i];
-		if (!c)
-			break;
-		dest[i] = cpu_to_le16(c);
-	}
-	dest[i] = cpu_to_le16('\0');
-	return i;
-}
-
-/* Dump a block of memory starting at buf. Display length bytes. The displayed
-   index of the first byte is start */
-void dump_mem(unsigned char *buf, int start, int length)
-{
-	int offs, i;
-
-	for (offs = 0; offs < length; offs += 16) {
-		printf("%8.8X ", start + offs);
-		for (i = 0; i < 16; i++)
-			printf(offs + i < length ? "%2X " : "   ", buf[offs+i]);
-		for (i = 0; i < 16; i++) {
-			if (offs + i >= length)
-				putchar(' ');
-			else if (buf[offs + i] > 31 && buf[offs + i] < 128)
-				putchar(buf[offs + i]);
-			else putchar('.');
-		}
-		putchar('\n');
-	}
-}
-
 typedef struct {
 	ntfs_volume *vol;
 } ntfsls_dirent;
 
-// FIXME: Should we print errors as we go along? (AIA)
+/**
+ * list_entry
+ * FIXME: Should we print errors as we go along? (AIA)
+ */
 int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
 		const int name_len, const int name_type, const s64 pos,
-		const MFT_REF mref, const unsigned dt_type) {
-	char filename[255 + 2];
+		const MFT_REF mref, const unsigned dt_type)
+{
+	char *filename = NULL;
+	int result = 0;
 
-	ucstos(filename, name, min(name_len + 1, sizeof(filename)));
-	// FIXME: error checking... (AIA)
-	// FIXME: Why not use ntfs_mbstoucs() from libntfs? (AIA)
-	//printf("[%s\t,%d,%d]\n", filename, name_type, dt_type);
+	filename = calloc (1, MAX_PATH);
+	if (!filename)
+		return -1;
 
+	if (ntfs_ucstombs (name, name_len, &filename, MAX_PATH) < 0) {
+		Eprintf ("Cannot represent filename in current locale.\n");
+		goto free;
+	}
+
+	result = 0;					// These are successful
 	if ((filename[0] == '$') && (!opts.system))
-		return 0;
+		goto free;
 	if (name_type == FILE_NAME_POSIX && !opts.all)
-		return 0;
+		goto free;
 	if (((name_type & FILE_NAME_WIN32_AND_DOS) == FILE_NAME_WIN32) &&
 			opts.dos)
-		return 0;
+		goto free;
 	if (((name_type & FILE_NAME_WIN32_AND_DOS) == FILE_NAME_DOS) &&
 			!opts.dos)
-		return 0;
+		goto free;
 	if (dt_type == NTFS_DT_DIR && opts.classify)
 		sprintf(filename + strlen(filename), "/");
 
@@ -325,6 +261,7 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 			printf("%s\n", filename);
 		else
 			printf("%7lld %s\n", MREF(mref), filename);
+		result = 0;
 	} else {
 		s64 filesize = 0;
 		ntfs_inode *ni;
@@ -334,26 +271,25 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 		time_t ntfs_time;
 		char t_buf[26];
 
+		result = -1;				// Everything else is bad
+
 		ni = ntfs_inode_open(dirent->vol, mref);
 		if (!ni)
-			return -1;
-		//dump_mem(ni, 0, sizeof(ntfs_inode));
+			goto release;
 
 		ctx = ntfs_attr_get_search_ctx(ni, ni->mrec);
 		if (!ctx)
-			return -1;
+			goto release;
 
 		if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL,
 				0, ctx))
-			return -1;
+			goto release;
 		attr = ctx->attr;
-		//dump_mem(attr, 0, sizeof(*attr));
 
 		file_name_attr = (FILE_NAME_ATTR *)((char *)attr +
 				le16_to_cpu(attr->value_offset));
 		if (!file_name_attr)
-			return -1;
-		//dump_mem(file_name_attr, 0, sizeof(*file_name_attr));
+			goto release;
 
 		ntfs_time = ntfs2utc(sle64_to_cpu(
 				file_name_attr->last_data_change_time));
@@ -367,17 +303,23 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 						ctx->attr);
 		}
 
-		/* Release atrtibute search context and close the inode. */
-		ntfs_attr_put_search_ctx(ctx);
-		ntfs_inode_close(ni);
-
 		if (opts.inode)
 			printf("%7lld    %8lld %s %s\n", MREF(mref), filesize,
 					t_buf + 4, filename);
 		else
 			printf("%8lld %s %s\n", filesize, t_buf + 4, filename);
+
+		result = 0;
+release:
+		/* Release atrtibute search context and close the inode. */
+		if (ctx)
+			ntfs_attr_put_search_ctx(ctx);
+		if (ni)
+			ntfs_inode_close(ni);
 	}
-	return 0;
+free:
+	free (filename);
+	return result;
 }
 
 /**
@@ -389,17 +331,13 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
  *	    1  Error, parsing mount options failed
  *	    2  Error, mount attempt failed
  *	    3  Error, failed to open root directory
- *	    3  Error, failed to open directory in search path
+ *	    4  Error, failed to open directory in search path
  */
 int main(int argc, char **argv)
 {
-	u64 ino;
 	s64 pos;
 	ntfs_volume *vol;
 	ntfs_inode *ni;
-	char *p;
-	int len;
-	uchar_t unicode[100];
 	ntfsls_dirent dirent;
 
 	if (!parse_options(argc, argv)) {
@@ -415,46 +353,11 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	/* Open the root directory of the ntfs volume. */
-	ni = ntfs_inode_open(vol, FILE_root);
+	ni = utils_pathname_to_inode (vol, NULL, opts.path);
 	if (!ni) {
 		// FIXME: Print error... (AIA)
 		ntfs_umount(vol, FALSE);
 		return 3;
-	}
-
-	memset(unicode, 0, sizeof(unicode));
-	len = 0;
-
-	p = opts.path;
-	while (p && *p && *p == '/')
-		p++;
-	while (p && *p) {
-		char *q = strchr(p, '/');
-		if (q != NULL) {
-			*q = '\0';
-			q++;
-		}
-
-		len = stoucs(unicode, p, sizeof(unicode));
-		// FIXME: error checking... (AIA)
-
-		ino = ntfs_inode_lookup_by_name(ni, unicode, len);
-		// FIXME: error checking... (AIA)
-
-		/* Finished with the inode; release it. */
-		ntfs_inode_close(ni);
-
-		ni = ntfs_inode_open(vol, ino);
-		if (!ni) {
-			// FIXME: Print error... (AIA)
-			ntfs_umount(vol, FALSE);
-			return 4;
-		}
-
-		p = q;
-		while (p && *p && *p == '/')
-			p++;
 	}
 
 	/*
@@ -467,12 +370,33 @@ int main(int argc, char **argv)
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
 		ntfs_readdir(ni, &pos, &dirent, (ntfs_filldir_t)list_entry);
 		// FIXME: error checking... (AIA)
-	} else if (len) {
-		// FIXME: Ought to lookup the actual name in the mft record
-		//	  and display that... (AIA)
-		list_entry(&dirent, unicode, len, 3, pos, ni->mft_no,
-				NTFS_DT_REG);
+	} else {
+		ATTR_RECORD *rec;
+		FILE_NAME_ATTR *attr;
+		ntfs_attr_search_ctx *ctx;
+		int space = 4;
+		uchar_t *name = NULL;
+		int name_len = 0;;
+
+		ctx = ntfs_attr_get_search_ctx (NULL, ni->mrec);
+		if (!ctx)
+			return -1;
+
+		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+			/* We know this will always be resident. */
+			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+
+			if (attr->file_name_type < space) {
+				name     = attr->file_name;
+				name_len = attr->file_name_length;
+				space    = attr->file_name_type;
+			}
+		}
+
+		list_entry(&dirent, name, name_len, space, pos, ni->mft_no, NTFS_DT_REG);
 		// FIXME: error checking... (AIA)
+
+		ntfs_attr_put_search_ctx(ctx);
 	}
 
 	/* Finished with the inode; release it. */
