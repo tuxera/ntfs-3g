@@ -98,6 +98,8 @@
 #include "mst.h"
 #include "dir.h"
 #include "runlist.h"
+//#include "debug.h"
+#include "utils.h"
 
 extern const unsigned char attrdef_ntfs12_array[2400];
 extern const unsigned char boot_array[3429];
@@ -156,11 +158,11 @@ struct {
 	int attr_defs_len;		/* in bytes */
 	uchar_t *upcase;		/* filename, upcase table. */
 	u32 upcase_len;			/* Determined automatically. */
-	char quiet;			/* -q, quiet execution. */
-	char verbose;			/* -v, verbose execution, given twice,
+	int quiet;			/* -q, quiet execution. */
+	int verbose;			/* -v, verbose execution, given twice,
 					 * really verbose execution (debug
 					 * mode). */
-	char force;			/* -F, force fs creation. */
+	int force;			/* -F, force fs creation. */
 	char quick_format;		/* -f or -Q, fast format, don't zero
 					   the volume first. */
 	char enable_compression;	/* -C, enables compression of all files
@@ -168,18 +170,11 @@ struct {
 	char disable_indexing;		/* -I, disables indexing of file
 					   contents on the volume by default. */
 					/* -V, print version and exit. */
-} opt;
+} opts;
 
-/* Error output. Ignores quiet (-q). */
-void Eprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
 
@@ -201,32 +196,8 @@ void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
 
-	if (!opt.quiet && opt.verbose > 1) {
+	if (!opts.quiet && opts.verbose > 1) {
 		printf("DEBUG: ");
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/* Verbose output (-v). */
-void Vprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opt.quiet && opt.verbose > 0) {
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/* Quietable output (if not -q). */
-void Qprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opt.quiet) {
 		va_start(ap, fmt);
 		vprintf(fmt, ap);
 		va_end(ap);
@@ -237,17 +208,17 @@ void append_to_bad_blocks(unsigned long block)
 {
 	long long *new_buf;
 
-	if (!(opt.nr_bad_blocks & 15)) {
-		new_buf = realloc(opt.bad_blocks, (opt.nr_bad_blocks + 16) *
+	if (!(opts.nr_bad_blocks & 15)) {
+		new_buf = realloc(opts.bad_blocks, (opts.nr_bad_blocks + 16) *
 							sizeof(long long));
 		if (!new_buf)
 			err_exit("Reallocating memory for bad blocks list "
 				 "failed: %s\n", strerror(errno));
-		if (opt.bad_blocks != new_buf)
-			free(opt.bad_blocks);
-		opt.bad_blocks = new_buf;
+		if (opts.bad_blocks != new_buf)
+			free(opts.bad_blocks);
+		opts.bad_blocks = new_buf;
 	}
-	opt.bad_blocks[opt.nr_bad_blocks++] = block;
+	opts.bad_blocks[opts.nr_bad_blocks++] = block;
 }
 
 __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
@@ -255,7 +226,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 	long long bytes_written, total;
 	int retry;
 
-	if (opt.no_action)
+	if (opts.no_action)
 		return count;
 	total = 0LL;
 	retry = 0;
@@ -301,7 +272,7 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 
 	if (inited_size)
 		*inited_size = 0LL;
-	if (opt.no_action)
+	if (opts.no_action)
 		return val_len;
 	total = delta = 0LL;
 	for (i = 0; rl[i].length; i++) {
@@ -628,15 +599,15 @@ void dump_attr_record(ATTR_RECORD *a)
 		return;
 	}
 	u = le32_to_cpu(a->type);
-	for (i = 0; opt.attr_defs[i].type; i++)
-		if (le32_to_cpu(opt.attr_defs[i].type) >= u)
+	for (i = 0; opts.attr_defs[i].type; i++)
+		if (le32_to_cpu(opts.attr_defs[i].type) >= u)
 			break;
-	if (opt.attr_defs[i].type) {
-//		printf("type = 0x%x\n", le32_to_cpu(opt.attr_defs[i].type));
-//		{ char *p = (char*)opt.attr_defs[i].name;
+	if (opts.attr_defs[i].type) {
+//		printf("type = 0x%x\n", le32_to_cpu(opts.attr_defs[i].type));
+//		{ char *p = (char*)opts.attr_defs[i].name;
 //		printf("name = %c%c%c%c%c\n", *p, p[1], p[2], p[3], p[4]);
 //		}
-		if (ucstos(s, opt.attr_defs[i].name, sizeof(s)) == -1) {
+		if (ucstos(s, opts.attr_defs[i].name, sizeof(s)) == -1) {
 			Eprintf("Could not convert Unicode string to single "
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
@@ -794,7 +765,7 @@ void format_mft_record(MFT_RECORD *m)
 	a->type = AT_END;
 	a->length = cpu_to_le32(0);
 #if 0
-	if (!opt.quiet && opt.verbose > 1)
+	if (!opts.quiet && opts.verbose > 1)
 		dump_mft_record(m);
 #endif
 }
@@ -891,11 +862,11 @@ runlist *allocate_scattered_clusters(s64 clusters)
 	s64 prev_run_len = 0LL;
 	char bit;
 
-	end = opt.nr_clusters;
+	end = opts.nr_clusters;
 	/* Loop until all clusters are allocated. */
 	while (clusters) {
 		/* Loop in current zone until we run out of free clusters. */
-		for (lcn = opt.mft_zone_end; lcn < end; lcn++) {
+		for (lcn = opts.mft_zone_end; lcn < end; lcn++) {
 			bit = ntfs_bit_get_and_set(lcn_bitmap, lcn, 1);
 			if (bit)
 				continue;
@@ -930,10 +901,10 @@ runlist *allocate_scattered_clusters(s64 clusters)
 
 		}
 		/* Switch to next zone, decreasing mft zone by factor 2. */
-		end = opt.mft_zone_end;
-		opt.mft_zone_end >>= 1;
+		end = opts.mft_zone_end;
+		opts.mft_zone_end >>= 1;
 		/* Have we run out of space on the volume? */
-		if (opt.mft_zone_end <= 0)
+		if (opts.mft_zone_end <= 0)
 			goto err_end;
 	}
 	return rl;
@@ -1129,7 +1100,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		if (err >= 0)
 			err = -EIO;
 		Eprintf("insert_positioned_attr_in_mft_record failed with "
-				"error %i.\n", err < 0 ? err : bw);
+				"error %lld.\n", err < 0 ? err : bw);
 	}
 err_out:
 	if (ctx)
@@ -1314,7 +1285,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		if (err >= 0)
 			err = -EIO;
 		Eprintf("insert_non_resident_attr_in_mft_record failed with "
-				"error %i.\n", err < 0 ? err : bw);
+			"error %lld.\n", (long long) (err < 0 ? err : bw));
 	}
 err_out:
 	if (ctx)
@@ -1722,14 +1693,14 @@ int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
 			free(r);
 			return -EINVAL;
 		}
-		if (index_block_size < opt.sector_size) {
+		if (index_block_size < opts.sector_size) {
 			 Eprintf("add_attr_index_root: index block size is "
 					 "smaller than the sector size.\n");
 			 free(r);
 			 return -EINVAL;
 		}
 		r->clusters_per_index_block = index_block_size /
-				opt.sector_size;
+				opts.sector_size;
 	}
 	memset(&r->reserved, 0, sizeof(r->reserved));
 	r->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
@@ -2250,11 +2221,11 @@ int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 
 void init_options()
 {
-	memset(&opt, 0, sizeof(opt));
-	opt.index_block_size = 4096;
-	opt.attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
-	opt.attr_defs_len = sizeof(attrdef_ntfs12_array);
-	//Dprintf("Attr_defs table length = %u\n", opt.attr_defs_len);
+	memset(&opts, 0, sizeof(opts));
+	opts.index_block_size = 4096;
+	opts.attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
+	opts.attr_defs_len = sizeof(attrdef_ntfs12_array);
+	//Dprintf("Attr_defs table length = %u\n", opts.attr_defs_len);
 }
 
 void usage(void) __attribute__ ((noreturn));
@@ -2285,7 +2256,7 @@ void parse_options(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "c:fnqs:vz:CFIL:QV")) != EOF)
 		switch (c) {
 		case 'n':
-			opt.no_action = 1;
+			opts.no_action = 1;
 			break;
 		case 'c':
 			l = strtol(optarg, &s, 0);
@@ -2295,34 +2266,34 @@ void parse_options(int argc, char *argv[])
 			break;
 		case 'f':
 		case 'Q':
-			opt.quick_format = 1;
+			opts.quick_format = 1;
 			break;
 		case 'q':
-			opt.quiet = 1;
+			opts.quiet = 1;
 			break;
 		case 's':
 			l = strtol(optarg, &s, 0);
 			if (!l || l > INT_MAX || *s)
 				err_exit("Invalid sector size.\n");
-			opt.sector_size = l;
+			opts.sector_size = l;
 			break;
 		case 'v':
-			opt.verbose++;
+			opts.verbose++;
 			break;
 		case 'z':
 			l = strtol(optarg, &s, 0);
 			if (l < 1 || l > 4 || *s)
 				err_exit("Invalid MFT zone multiplier.\n");
-			opt.mft_zone_multiplier = l;
+			opts.mft_zone_multiplier = l;
 			break;
 		case 'C':
-			opt.enable_compression = 1;
+			opts.enable_compression = 1;
 			break;
 		case 'F':
-			opt.force = 1;
+			opts.force = 1;
 			break;
 		case 'I':
-			opt.disable_indexing = 1;
+			opts.disable_indexing = 1;
 			break;
 		case 'L':
 			vol->vol_name = optarg;
@@ -2341,7 +2312,7 @@ void parse_options(int argc, char *argv[])
 		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
 			err_exit("Invalid number of sectors: %s\n",
 					argv[optind - 1]);
-		opt.nr_sectors = u;
+		opts.nr_sectors = u;
 	}
 	if (optind < argc)
 		usage();
@@ -2377,10 +2348,10 @@ void mkntfs_exit(void)
 		free(rl_bad);
 	if (rl_index)
 		free(rl_index);
-	if (opt.bad_blocks)
-		free(opt.bad_blocks);
-	if (opt.attr_defs != (ATTR_DEF*)attrdef_ntfs12_array)
-		free(opt.attr_defs);
+	if (opts.bad_blocks)
+		free(opts.bad_blocks);
+	if (opts.attr_defs != (ATTR_DEF*)attrdef_ntfs12_array)
+		free(opts.attr_defs);
 	if (vol->upcase)
 		free(vol->upcase);
 	flk.l_type = F_UNLCK;
@@ -2396,9 +2367,9 @@ void mkntfs_exit(void)
 		free(vol);
 }
 
+// What's wrong with MK_MREF?
 #define MAKE_MFT_REF(_ref, _seqno)	cpu_to_le64((((u64)(_seqno)) << 48) \
 						| ((u64)(_ref)))
-
 
 int main(int argc, char **argv)
 {
@@ -2430,7 +2401,7 @@ int main(int argc, char **argv)
 	if (!vol->upcase)
 		err_exit("Could not allocate memory for internal buffer.\n");
 	init_upcase_table(vol->upcase, vol->upcase_len * sizeof(uchar_t));
-	/* Initialize opt to zero / required values. */
+	/* Initialize opts to zero / required values. */
 	init_options();
 	/* Parse command line options. */
 	parse_options(argc, argv);
@@ -2444,25 +2415,25 @@ int main(int argc, char **argv)
 	}
 	if (!S_ISBLK(sbuf.st_mode)) {
 		Eprintf("%s is not a block device.\n", vol->dev_name);
-		if (!opt.force)
+		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
-		if (!opt.nr_sectors) {
+		if (!opts.nr_sectors) {
 			if (!sbuf.st_size && !sbuf.st_blocks)
 				err_exit("You must specify the number of "
 						"sectors.\n");
-			if (opt.sector_size) {
+			if (opts.sector_size) {
 				if (sbuf.st_size)
-					opt.nr_sectors = sbuf.st_size /
-							opt.sector_size;
+					opts.nr_sectors = sbuf.st_size /
+							opts.sector_size;
 				else
-					opt.nr_sectors = ((s64)sbuf.st_blocks
-							<< 9) /	opt.sector_size;
+					opts.nr_sectors = ((s64)sbuf.st_blocks
+							<< 9) /	opts.sector_size;
 			} else {
 				if (sbuf.st_size)
-					opt.nr_sectors = sbuf.st_size / 512;
+					opts.nr_sectors = sbuf.st_size / 512;
 				else
-					opt.nr_sectors = sbuf.st_blocks;
-				opt.sector_size = 512;
+					opts.nr_sectors = sbuf.st_blocks;
+				opts.sector_size = 512;
 			}
 		}
 		fprintf(stderr, "mkntfs forced anyway.\n");
@@ -2482,14 +2453,14 @@ int main(int argc, char **argv)
 				vol->dev_name, strerror(errno));
 	else if (mnt_flags & NTFS_MF_MOUNTED) {
 		Eprintf("%s is mounted.\n", vol->dev_name);
-		if (!opt.force)
+		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
 		fprintf(stderr, "mkntfs forced anyway. Hope /etc/mtab is "
 				"incorrect.\n");
 	}
 
 	/* Open the device for reading or reading and writing. */
-	if (opt.no_action) {
+	if (opts.no_action) {
 		Qprintf("Running in READ-ONLY mode!\n");
 		i = O_RDONLY;
 	} else
@@ -2500,7 +2471,7 @@ int main(int argc, char **argv)
 							strerror(errno));
 	/* Acquire exlusive (mandatory) write lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
-	if (opt.no_action)
+	if (opts.no_action)
 		flk.l_type = F_RDLCK;
 	else
 		flk.l_type = F_WRLCK;
@@ -2509,7 +2480,7 @@ int main(int argc, char **argv)
 	err = fcntl(vol->fd, F_SETLK, &flk);
 	if (err == -1) {
 		Eprintf("Could not lock %s for %s: %s\n", vol->dev_name,
-				opt.no_action ? "reading" : "writing",
+				opts.no_action ? "reading" : "writing",
 				strerror(errno));
 		err = close(vol->fd);
 		if (err == -1)
@@ -2526,12 +2497,12 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	/* If user didn't specify the sector size, determine it now. */
-	if (!opt.sector_size) {
+	if (!opts.sector_size) {
 #ifdef BLKSSZGET
 		int _sect_size = 0;
 
 		if (ioctl(vol->fd, BLKSSZGET, &_sect_size) >= 0)
-			opt.sector_size = _sect_size;
+			opts.sector_size = _sect_size;
 		else
 #endif
 		{
@@ -2539,57 +2510,57 @@ int main(int argc, char **argv)
 					"not be obtained automatically.\n"
 					"Assuming sector size is 512 bytes.\n",
 					vol->dev_name);
-			opt.sector_size = 512;
+			opts.sector_size = 512;
 		}
 	}
 	/* Validate sector size. */
-	if ((opt.sector_size - 1) & opt.sector_size ||
-	    opt.sector_size < 256 || opt.sector_size > 4096)
+	if ((opts.sector_size - 1) & opts.sector_size ||
+	    opts.sector_size < 256 || opts.sector_size > 4096)
 		err_exit("Error: sector_size is invalid. It must be a power "
 			 "of two, and it must be\n greater or equal 256 and "
 			 "less than or equal 4096 bytes.\n");
-	Dprintf("sector size = %i bytes\n", opt.sector_size);
+	Dprintf("sector size = %i bytes\n", opts.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
-	if (!opt.nr_sectors) {
-		opt.nr_sectors = ntfs_device_size_get(vol->fd, opt.sector_size);
-		if (opt.nr_sectors <= 0)
+	if (!opts.nr_sectors) {
+		opts.nr_sectors = ntfs_device_size_get(vol->fd, opts.sector_size);
+		if (opts.nr_sectors <= 0)
 			err_exit("ntfs_device_size_get(%s) failed. Please "
 					"specify it manually.\n",
 					vol->dev_name);
 	}
-	Dprintf("number of sectors = %Ld (0x%Lx)\n", opt.nr_sectors,
-			opt.nr_sectors);
+	Dprintf("number of sectors = %Ld (0x%Lx)\n", opts.nr_sectors,
+			opts.nr_sectors);
 	/* Reserve the last sector for the backup boot sector. */
-	opt.nr_sectors--;
+	opts.nr_sectors--;
 	/* If user didn't specify the volume size, determine it now. */
-	if (!opt.volume_size)
-		opt.volume_size = opt.nr_sectors * opt.sector_size;
-	else if (opt.volume_size & (opt.sector_size - 1))
+	if (!opts.volume_size)
+		opts.volume_size = opts.nr_sectors * opts.sector_size;
+	else if (opts.volume_size & (opts.sector_size - 1))
 		err_exit("Error: volume_size is not a multiple of "
 			 "sector_size.\n");
 	/* Validate volume size. */
-	if (opt.volume_size < 1 << 20 /* 1MiB */)
+	if (opts.volume_size < 1 << 20 /* 1MiB */)
 		err_exit("Error: device is too small (%ikiB). Minimum NTFS "
-			 "volume size is 1MiB.\n", opt.volume_size / 1024);
-	Dprintf("volume size = %LikiB\n", opt.volume_size / 1024);
+			 "volume size is 1MiB.\n", opts.volume_size / 1024);
+	Dprintf("volume size = %LikiB\n", opts.volume_size / 1024);
 	/* If user didn't specify the cluster size, determine it now. */
 	if (!vol->cluster_size) {
-		if (opt.volume_size <= 512LL << 20)	/* <= 512MB */
+		if (opts.volume_size <= 512LL << 20)	/* <= 512MB */
 			vol->cluster_size = 512;
-		else if (opt.volume_size <= 1LL << 30)	/* ]512MB-1GB] */
+		else if (opts.volume_size <= 1LL << 30)	/* ]512MB-1GB] */
 			vol->cluster_size = 1024;
-		else if (opt.volume_size <= 2LL << 30)	/* ]1GB-2GB] */
+		else if (opts.volume_size <= 2LL << 30)	/* ]1GB-2GB] */
 			vol->cluster_size = 2048;
 		else
 			vol->cluster_size = 4096;
 		/* For small volumes on devices with large sector sizes. */
-		if (vol->cluster_size < opt.sector_size)
-			vol->cluster_size = opt.sector_size;
+		if (vol->cluster_size < opts.sector_size)
+			vol->cluster_size = opts.sector_size;
 	}
 	/* Validate cluster size. */
 	if (vol->cluster_size & (vol->cluster_size - 1) ||
-	    vol->cluster_size < opt.sector_size ||
-	    vol->cluster_size > 128 * opt.sector_size ||
+	    vol->cluster_size < opts.sector_size ||
+	    vol->cluster_size > 128 * opts.sector_size ||
 	    vol->cluster_size > 65536)
 		err_exit("Error: cluster_size is invalid. It must be a power "
 			 "of two, be at least\nthe same as sector_size, be "
@@ -2599,15 +2570,15 @@ int main(int argc, char **argv)
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
 	Dprintf("cluster size = %i bytes\n", vol->cluster_size);
 	if (vol->cluster_size > 4096) {
-		if (opt.enable_compression) {
-			if (!opt.force)
+		if (opts.enable_compression) {
+			if (!opts.force)
 				err_exit("Error: cluster_size is above 4096 "
 						"bytes and compression is "
 						"requested.\nThis is not "
 						"possible due to limitations "
 						"in the compression algorithm "
 						"used by\nWindows.\n");
-			opt.enable_compression = 0;
+			opts.enable_compression = 0;
 		}
 		Qprintf("Warning: compression will be disabled on this volume "
 				"because it is not\nsupported when the cluster "
@@ -2616,23 +2587,23 @@ int main(int argc, char **argv)
 				"by Windows.\n");
 	}
 	/* If user didn't specify the number of clusters, determine it now. */
-	if (!opt.nr_clusters)
-		opt.nr_clusters = opt.volume_size / vol->cluster_size;
+	if (!opts.nr_clusters)
+		opts.nr_clusters = opts.volume_size / vol->cluster_size;
 	/*
 	 * Check the cluster_size and nr_sectors for consistency with
 	 * sector_size and nr_sectors. And check both of these for consistency
 	 * with volume_size.
 	 */
-	if (opt.nr_clusters != (opt.nr_sectors * opt.sector_size) /
+	if (opts.nr_clusters != (opts.nr_sectors * opts.sector_size) /
 			vol->cluster_size ||
-	    opt.volume_size / opt.sector_size != opt.nr_sectors ||
-	    opt.volume_size / vol->cluster_size != opt.nr_clusters)
+	    opts.volume_size / opts.sector_size != opts.nr_sectors ||
+	    opts.volume_size / vol->cluster_size != opts.nr_clusters)
 		err_exit("Illegal combination of volume/cluster/sector size "
 			 "and/or cluster/sector number.\n");
-	Dprintf("number of clusters = %Lu (0x%Lx)\n", opt.nr_clusters,
-			opt.nr_clusters);
+	Dprintf("number of clusters = %Lu (0x%Lx)\n", opts.nr_clusters,
+			opts.nr_clusters);
 	/* Determine lcn bitmap byte size and allocate it. */
-	lcn_bitmap_byte_size = (opt.nr_clusters + 7) >> 3;
+	lcn_bitmap_byte_size = (opts.nr_clusters + 7) >> 3;
 	/* Needs to be multiple of 8 bytes. */
 	lcn_bitmap_byte_size = (lcn_bitmap_byte_size + 7) & ~7;
 	i = (lcn_bitmap_byte_size + vol->cluster_size - 1) &
@@ -2647,17 +2618,17 @@ int main(int argc, char **argv)
 	 * $Bitmap can overlap the end of the volume. Any bits in this region
 	 * must be set. This region also encompasses the backup boot sector.
 	 */
-	for (i = opt.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
+	for (i = opts.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
 		ntfs_bit_set(lcn_bitmap, (u64)i, 1);
 	/*
 	 * Determine mft_size: 16 mft records or 1 cluster, which ever is
 	 * bigger, rounded to multiples of cluster size.
 	 */
-	opt.mft_size = (16 * vol->mft_record_size + vol->cluster_size - 1)
+	opts.mft_size = (16 * vol->mft_record_size + vol->cluster_size - 1)
 			& ~(vol->cluster_size - 1);
-	Dprintf("MFT size = %i (0x%x) bytes\n", opt.mft_size, opt.mft_size);
+	Dprintf("MFT size = %i (0x%x) bytes\n", opts.mft_size, opts.mft_size);
 	/* Determine mft bitmap size and allocate it. */
-	mft_bitmap_size = opt.mft_size / vol->mft_record_size;
+	mft_bitmap_size = opts.mft_size / vol->mft_record_size;
 	/* Convert to bytes, at least one. */
 	mft_bitmap_byte_size = (mft_bitmap_size + 7) >> 3;
 	/* Mft bitmap is allocated in multiples of 8 bytes. */
@@ -2687,66 +2658,66 @@ int main(int argc, char **argv)
 	/* Allocate cluster for mft bitmap. */
 	ntfs_bit_set(lcn_bitmap, (s64)j, 1);
 	/* If user didn't specify the mft lcn, determine it now. */
-	if (!opt.mft_lcn) {
+	if (!opts.mft_lcn) {
 		/*
 		 * We start at the higher value out of 16kiB and just after the
 		 * mft bitmap.
 		 */
-		opt.mft_lcn = rl_mft_bmp[0].lcn + rl_mft_bmp[0].length;
-		if (opt.mft_lcn * vol->cluster_size < 16 * 1024)
-			opt.mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
+		opts.mft_lcn = rl_mft_bmp[0].lcn + rl_mft_bmp[0].length;
+		if (opts.mft_lcn * vol->cluster_size < 16 * 1024)
+			opts.mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
 					vol->cluster_size;
 	}
-	Dprintf("$MFT logical cluster number = 0x%x\n", opt.mft_lcn);
+	Dprintf("$MFT logical cluster number = 0x%x\n", opts.mft_lcn);
 	/* Determine MFT zone size. */
-	opt.mft_zone_end = opt.nr_clusters;
-	switch (opt.mft_zone_multiplier) {  /* % of volume size in clusters */
+	opts.mft_zone_end = opts.nr_clusters;
+	switch (opts.mft_zone_multiplier) {  /* % of volume size in clusters */
 	case 4:
-		opt.mft_zone_end = opt.mft_zone_end >> 1;	/* 50%   */
+		opts.mft_zone_end = opts.mft_zone_end >> 1;	/* 50%   */
 		break;
 	case 3:
-		opt.mft_zone_end = opt.mft_zone_end * 3 >> 3;	/* 37.5% */
+		opts.mft_zone_end = opts.mft_zone_end * 3 >> 3;	/* 37.5% */
 		break;
 	case 2:
-		opt.mft_zone_end = opt.mft_zone_end >> 2;	/* 25%   */
+		opts.mft_zone_end = opts.mft_zone_end >> 2;	/* 25%   */
 		break;
 	/* case 1: */
 	default:
-		opt.mft_zone_end = opt.mft_zone_end >> 3;	/* 12.5% */
+		opts.mft_zone_end = opts.mft_zone_end >> 3;	/* 12.5% */
 		break;
 	}
-	Dprintf("MFT zone size = %lukiB\n", opt.mft_zone_end / 1024);
+	Dprintf("MFT zone size = %lukiB\n", opts.mft_zone_end / 1024);
 	/*
 	 * The mft zone begins with the mft data attribute, not at the beginning
 	 * of the device.
 	 */
-	opt.mft_zone_end += opt.mft_lcn;
+	opts.mft_zone_end += opts.mft_lcn;
 	/* Create runlist for mft. */
 	rl_mft = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mft)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
 	rl_mft[0].vcn = 0LL;
-	rl_mft[0].lcn = opt.mft_lcn;
+	rl_mft[0].lcn = opts.mft_lcn;
 	/* We already rounded mft size up to a cluster. */
-	j = opt.mft_size / vol->cluster_size;
+	j = opts.mft_size / vol->cluster_size;
 	rl_mft[1].vcn = rl_mft[0].length = j;
 	rl_mft[1].lcn = -1LL;
 	rl_mft[1].length = 0LL;
 	/* Allocate clusters for mft. */
 	for (i = 0; i < j; i++)
-		ntfs_bit_set(lcn_bitmap, opt.mft_lcn + i, 1);
+		ntfs_bit_set(lcn_bitmap, opts.mft_lcn + i, 1);
 	/* Determine mftmirr_lcn (middle of volume). */
-	opt.mftmirr_lcn = (opt.nr_sectors * opt.sector_size >> 1)
+	opts.mftmirr_lcn = (opts.nr_sectors * opts.sector_size >> 1)
 							/ vol->cluster_size;
-	Dprintf("$MFTMirr logical cluster number = 0x%x\n", opt.mftmirr_lcn);
+	Dprintf("$MFTMirr logical cluster number = 0x%x\n", opts.mftmirr_lcn);
 	/* Create runlist for mft mirror. */
 	rl_mftmirr = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mftmirr)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
 	rl_mftmirr[0].vcn = 0LL;
-	rl_mftmirr[0].lcn = opt.mftmirr_lcn;
+	rl_mftmirr[0].lcn = opts.mftmirr_lcn;
 	/*
 	 * The mft mirror is either 4kb (the first four records) or one cluster
 	 * in size, which ever is bigger. In either case, it contains a
@@ -2760,49 +2731,49 @@ int main(int argc, char **argv)
 	rl_mftmirr[1].length = 0LL;
 	/* Allocate clusters for mft mirror. */
 	for (i = 0; i < j; i++)
-		ntfs_bit_set(lcn_bitmap, opt.mftmirr_lcn + i, 1);
-	opt.logfile_lcn = opt.mftmirr_lcn + j;
-	Dprintf("$LogFile logical cluster number = 0x%x\n", opt.logfile_lcn);
+		ntfs_bit_set(lcn_bitmap, opts.mftmirr_lcn + i, 1);
+	opts.logfile_lcn = opts.mftmirr_lcn + j;
+	Dprintf("$LogFile logical cluster number = 0x%x\n", opts.logfile_lcn);
 	/* Create runlist for log file. */
 	rl_logfile = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_logfile)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
 	rl_logfile[0].vcn = 0LL;
-	rl_logfile[0].lcn = opt.logfile_lcn;
+	rl_logfile[0].lcn = opts.logfile_lcn;
 	/*
 	 * Determine logfile_size from volume_size (rounded up to a cluster),
 	 * making sure it does not overflow the end of the volume.
 	 */
-	if (opt.volume_size < 2048LL * 1024)		/* < 2MiB	*/
-		opt.logfile_size = 256LL * 1024;	/*   -> 256kiB	*/
-	else if (opt.volume_size < 4000000LL)		/* < 4MB	*/
-		opt.logfile_size = 512LL * 1024;	/*   -> 512kiB	*/
-	else if (opt.volume_size <= 200LL * 1024 * 1024)/* < 200MiB	*/
-		opt.logfile_size = 2048LL * 1024;	/*   -> 2MiB	*/
-	else if (opt.volume_size >= 400LL << 20)	/* > 400MiB	*/
-		opt.logfile_size = 4 << 20;		/*   -> 4MiB	*/
+	if (opts.volume_size < 2048LL * 1024)		/* < 2MiB	*/
+		opts.logfile_size = 256LL * 1024;	/*   -> 256kiB	*/
+	else if (opts.volume_size < 4000000LL)		/* < 4MB	*/
+		opts.logfile_size = 512LL * 1024;	/*   -> 512kiB	*/
+	else if (opts.volume_size <= 200LL * 1024 * 1024)/* < 200MiB	*/
+		opts.logfile_size = 2048LL * 1024;	/*   -> 2MiB	*/
+	else if (opts.volume_size >= 400LL << 20)	/* > 400MiB	*/
+		opts.logfile_size = 4 << 20;		/*   -> 4MiB	*/
 	else
-		opt.logfile_size = (opt.volume_size / 100) &
+		opts.logfile_size = (opts.volume_size / 100) &
 				~(vol->cluster_size - 1);
-	j = opt.logfile_size / vol->cluster_size;
-	while (rl_logfile[0].lcn + j >= opt.nr_clusters) {
+	j = opts.logfile_size / vol->cluster_size;
+	while (rl_logfile[0].lcn + j >= opts.nr_clusters) {
 		/*
 		 * $Logfile would overflow volume. Need to make it smaller than
 		 * the standard size. It's ok as we are creating a non-standard
 		 * volume anyway if it is that small.
 		 */
-		opt.logfile_size >>= 1;
-		j = opt.logfile_size / vol->cluster_size;
+		opts.logfile_size >>= 1;
+		j = opts.logfile_size / vol->cluster_size;
 	}
-	opt.logfile_size = (opt.logfile_size + vol->cluster_size - 1) &
+	opts.logfile_size = (opts.logfile_size + vol->cluster_size - 1) &
 			~(vol->cluster_size - 1);
-	Dprintf("$LogFile (journal) size = %ikiB\n", opt.logfile_size / 1024);
+	Dprintf("$LogFile (journal) size = %ikiB\n", opts.logfile_size / 1024);
 	/*
 	 * FIXME: The 256kiB limit is arbitrary. Should find out what the real
 	 * minimum requirement for Windows is so it doesn't blue screen.
 	 */
-	if (opt.logfile_size < 256 << 10)
+	if (opts.logfile_size < 256 << 10)
 		err_exit("$LogFile would be created with invalid size. This "
 				"is not allowed as it would cause Windows to "
 				"blue screen and during boot.\n");
@@ -2811,7 +2782,7 @@ int main(int argc, char **argv)
 	rl_logfile[1].length = 0LL;
 	/* Allocate clusters for log file. */
 	for (i = 0; i < j; i++)
-		ntfs_bit_set(lcn_bitmap, opt.logfile_lcn + i, 1);
+		ntfs_bit_set(lcn_bitmap, opts.logfile_lcn + i, 1);
 	/* Create runlist for $Boot. */
 	rl_boot = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_boot)
@@ -2831,7 +2802,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, 0LL + i, 1);
 	/* Allocate a buffer large enough to hold the mft. */
-	buf = calloc(1, opt.mft_size);
+	buf = calloc(1, opts.mft_size);
 	if (!buf)
 		err_exit("Failed to allocate internal buffer: %s\n",
 							strerror(errno));
@@ -2846,7 +2817,7 @@ int main(int argc, char **argv)
 	 * $BadClus named stream $Bad contains the whole volume as a single
 	 * sparse runlist entry.
 	 */
-	rl_bad[1].vcn = rl_bad[0].length = opt.nr_clusters;
+	rl_bad[1].vcn = rl_bad[0].length = opts.nr_clusters;
 	rl_bad[1].lcn = -1LL;
 	rl_bad[1].length = 0LL;
 
@@ -2856,15 +2827,15 @@ int main(int argc, char **argv)
 	 * If not quick format, fill the device with 0s.
 	 * FIXME: Except bad blocks! (AIA)
 	 */
-	if (!opt.quick_format) {
+	if (!opts.quick_format) {
 		unsigned long position;
 		unsigned long mid_clust;
-		float progress_inc = (float)opt.nr_clusters / 100;
+		float progress_inc = (float)opts.nr_clusters / 100;
 
 		Qprintf("Initialising device with zeroes:   0%%");
 		fflush(stdout);
-		mid_clust = (opt.volume_size >> 1) / vol->cluster_size;
-		for (position = 0; position < opt.nr_clusters; position++) {
+		mid_clust = (opts.volume_size >> 1) / vol->cluster_size;
+		for (position = 0; position < opts.nr_clusters; position++) {
 			if (!(position % (int)(progress_inc+1))) {
 				Qprintf("\b\b\b\b%3.0f%%", position /
 						progress_inc);
@@ -2889,7 +2860,7 @@ int main(int argc, char **argv)
 				append_to_bad_blocks(position);
 				Qprintf("\nFound bad cluster (%ld). Adding to "
 					"list of bad blocks.\nInitialising "
-					"device with zeroes: %3.0i%%", position,
+					"device with zeroes: %3.0f%%", position,
 					position / progress_inc);
 				/* Seek to next cluster. */
 				lseek(vol->fd, ((off_t)position + 1) *
@@ -2897,11 +2868,11 @@ int main(int argc, char **argv)
 			}
 		}
 		Qprintf("\b\b\b\b100%%");
-		position = (opt.volume_size & (vol->cluster_size - 1)) /
-				opt.sector_size;
+		position = (opts.volume_size & (vol->cluster_size - 1)) /
+				opts.sector_size;
 		for (i = 0; i < position; i++) {
-			bw = mkntfs_write(vol->fd, buf, opt.sector_size);
-			if (bw != opt.sector_size) {
+			bw = mkntfs_write(vol->fd, buf, opts.sector_size);
+			if (bw != opts.sector_size) {
 				if (bw != -1 || errno != EIO)
 					err_exit("This should not happen.\n");
 				else if (i + 1 == position &&
@@ -2912,7 +2883,7 @@ int main(int argc, char **argv)
 						"location reserved for system "
 						"file $Boot.\n");
 				/* Seek to next sector. */
-				lseek(vol->fd, opt.sector_size, SEEK_CUR);
+				lseek(vol->fd, opts.sector_size, SEEK_CUR);
 			}
 		}
 		Qprintf(" - Done.\n");
@@ -2951,9 +2922,9 @@ int main(int argc, char **argv)
 		ntfs_bit_set(mft_bitmap, 0LL + i, 1);
 		file_attrs = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM;
 		if (i == FILE_root) {
-			if (opt.disable_indexing)
+			if (opts.disable_indexing)
 				file_attrs |= FILE_ATTR_NOT_CONTENT_INDEXED;
-			if (opt.enable_compression)
+			if (opts.enable_compression)
 				file_attrs |= FILE_ATTR_COMPRESSED;
 		}
 		add_attr_std_info(m, file_attrs);
@@ -2976,7 +2947,7 @@ int main(int argc, char **argv)
 	// FIXME: This should be IGNORE_CASE
 	if (!err)
 		err = add_attr_index_root(m, "$I30", 4, 0, AT_FILE_NAME,
-				COLLATION_FILE_NAME, opt.index_block_size);
+				COLLATION_FILE_NAME, opts.index_block_size);
 	// FIXME: This should be IGNORE_CASE
 	if (!err)
 		err = upgrade_to_large_index(m, "$I30", 4, 0, &index_block);
@@ -3006,11 +2977,11 @@ int main(int argc, char **argv)
 	Vprintf("Creating $MFT (mft record 0)\n");
 	m = (MFT_RECORD*)buf;
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, rl_mft, buf,
-			opt.mft_size);
+			opts.mft_size);
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
-				MAKE_MFT_REF(FILE_MFT, 1), opt.mft_size,
-				opt.mft_size, FILE_ATTR_HIDDEN |
+				MAKE_MFT_REF(FILE_MFT, 1), opts.mft_size,
+				opts.mft_size, FILE_ATTR_HIDDEN |
 				FILE_ATTR_SYSTEM, 0, 0, "$MFT",
 				FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
@@ -3044,19 +3015,19 @@ int main(int argc, char **argv)
 	//dump_mft_record(m);
 	Vprintf("Creating $LogFile (mft record 2)\n");
 	m = (MFT_RECORD*)(buf + 2 * vol->mft_record_size);
-	buf2 = malloc(opt.logfile_size);
+	buf2 = malloc(opts.logfile_size);
 	if (!buf2)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memset(buf2, -1, opt.logfile_size);
+	memset(buf2, -1, opts.logfile_size);
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, rl_logfile, buf2,
-			opt.logfile_size);
+			opts.logfile_size);
 	free(buf2);
 	buf2 = NULL;
 	if (!err)
 		err = create_hardlink(index_block, root_ref, m,
 				MAKE_MFT_REF(FILE_LogFile, FILE_LogFile),
-				opt.logfile_size, opt.logfile_size,
+				opts.logfile_size, opts.logfile_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
 				"$LogFile", FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
@@ -3095,12 +3066,12 @@ int main(int argc, char **argv)
 	if (vol->major_ver < 3)
 		buf2_size = 36000;
 	else
-		buf2_size = opt.attr_defs_len;
+		buf2_size = opts.attr_defs_len;
 	buf2 = (char*)calloc(1, buf2_size);
 	if (!buf2)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memcpy(buf2, opt.attr_defs, opt.attr_defs_len);
+	memcpy(buf2, opts.attr_defs, opts.attr_defs_len);
 	err = add_attr_data(m, NULL, 0, 0, 0, buf2, buf2_size);
 	free(buf2);
 	buf2 = NULL;
@@ -3149,18 +3120,18 @@ int main(int argc, char **argv)
 	 * already inserted, so no need to worry about these things.
 	 */
 	bs = (NTFS_BOOT_SECTOR*)buf2;
-	bs->bpb.bytes_per_sector = cpu_to_le16(opt.sector_size);
+	bs->bpb.bytes_per_sector = cpu_to_le16(opts.sector_size);
 	bs->bpb.sectors_per_cluster = (u8)(vol->cluster_size /
-			opt.sector_size);
+			opts.sector_size);
 	bs->bpb.media_type = 0xf8; /* hard disk */
 	/*
 	 * If there are problems go back to bs->unused[0-3] and set them. See
 	 * ../include/bootsect.h for details. Other fields to also consider
 	 * setting are: bs->bpb.sectors_per_track, .heads, and .hidden_sectors.
 	 */
-	bs->number_of_sectors = scpu_to_le64(opt.nr_sectors);
-	bs->mft_lcn = scpu_to_le64(opt.mft_lcn);
-	bs->mftmirr_lcn = scpu_to_le64(opt.mftmirr_lcn);
+	bs->number_of_sectors = scpu_to_le64(opts.nr_sectors);
+	bs->mft_lcn = scpu_to_le64(opts.mft_lcn);
+	bs->mftmirr_lcn = scpu_to_le64(opts.mftmirr_lcn);
 	if (vol->mft_record_size >= vol->cluster_size)
 		bs->clusters_per_mft_record = vol->mft_record_size /
 			vol->cluster_size;
@@ -3174,13 +3145,13 @@ int main(int argc, char **argv)
 	Dprintf("Clusters per mft record = %i (0x%x)\n",
 			bs->clusters_per_mft_record,
 			bs->clusters_per_mft_record);
-	if (opt.index_block_size >= vol->cluster_size)
-		bs->clusters_per_index_record = opt.index_block_size /
+	if (opts.index_block_size >= vol->cluster_size)
+		bs->clusters_per_index_record = opts.index_block_size /
 			vol->cluster_size;
 	else {
-		bs->clusters_per_index_record = -(ffs(opt.index_block_size) - 1);
+		bs->clusters_per_index_record = -(ffs(opts.index_block_size) - 1);
 		if ((1 << -bs->clusters_per_index_record) !=
-				opt.index_block_size)
+				opts.index_block_size)
 			err_exit("BUG: calculated clusters_per_index_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_index_record);
@@ -3197,7 +3168,7 @@ int main(int argc, char **argv)
 	 */
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
-	if (!ntfs_boot_sector_is_ntfs(bs, opt.verbose > 0 ? 0 : 1))
+	if (!ntfs_boot_sector_is_ntfs(bs, opts.verbose > 0 ? 0 : 1))
 		err_exit("FATAL: Generated boot sector is invalid!\n");
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, rl_boot, buf2, 8192);
 	if (!err)
@@ -3215,10 +3186,10 @@ int main(int argc, char **argv)
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
 	Vprintf("Creating backup boot sector.\n");
 	/*
-	 * Write the first max(512, opt.sector_size) bytes from buf2 to the
+	 * Write the first max(512, opts.sector_size) bytes from buf2 to the
 	 * last sector.
 	 */
-	if (lseek(vol->fd, (opt.nr_sectors + 1) * opt.sector_size - i,
+	if (lseek(vol->fd, (opts.nr_sectors + 1) * opts.sector_size - i,
 			SEEK_SET) == (off_t)-1)
 		goto bb_err;
 	bw = mkntfs_write(vol->fd, buf2, i);
@@ -3249,7 +3220,7 @@ bb_err:
 	// FIXME: This should be IGNORE_CASE
 	/* Create a sparse named stream of size equal to the volume size. */
 	err = add_attr_data_positioned(m, "$Bad", 4, 0, 0, rl_bad, NULL,
-			opt.nr_clusters * vol->cluster_size);
+			opts.nr_clusters * vol->cluster_size);
 	if (!err) {
 		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
 	}
@@ -3301,7 +3272,7 @@ bb_err:
 	//dump_mft_record(m);
 	/* NTFS 1.2 reserved system files (mft records 0xb-0xf) */
 	for (i = 0xb; i < 0x10; i++) {
-		Vprintf("Creating system file (mft record 0x%x)\n", i, i);
+		Vprintf("Creating system file (mft record 0x%x)\n", i);
 		m = (MFT_RECORD*)(buf + i * vol->mft_record_size);
 		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
 		if (!err) {
@@ -3391,10 +3362,10 @@ bb_err:
 	 * its creation.
 	 */
 	Vprintf("Syncing $MFT.\n");
-	pos = opt.mft_lcn * vol->cluster_size;
+	pos = opts.mft_lcn * vol->cluster_size;
 	lw = 1;
-	for (i = 0; i < opt.mft_size / vol->mft_record_size; i++) {
-		if (!opt.no_action)
+	for (i = 0; i < opts.mft_size / vol->mft_record_size; i++) {
+		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(vol->fd, pos, 1,
 					vol->mft_record_size,
 					buf + i * vol->mft_record_size);
@@ -3404,7 +3375,7 @@ bb_err:
 		pos += vol->mft_record_size;
 	}
 	Vprintf("Updating $MFTMirr.\n");
-	pos = opt.mftmirr_lcn * vol->cluster_size;
+	pos = opts.mftmirr_lcn * vol->cluster_size;
 	lw = 1;
 	for (i = 0; i < rl_mftmirr[0].length * vol->cluster_size /
 			vol->mft_record_size; i++) {
@@ -3421,7 +3392,7 @@ bb_err:
 		if (usn-- <= 1)
 			usn = 0xfffe;
 		*usnp = cpu_to_le16(usn);
-		if (!opt.no_action)
+		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(vol->fd, pos, 1,
 					vol->mft_record_size,
 					buf + i * vol->mft_record_size);
