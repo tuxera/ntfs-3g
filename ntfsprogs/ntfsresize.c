@@ -474,63 +474,60 @@ void walk_attributes(ntfs_resize_t *resize)
 }
 
 /**
- * get_bitmap_data
- *
- * Read the metadata file $Bitmap into a bitmap struct.
- * Each cluster on disk is represented by a bit in this file.
- */
-void get_bitmap_data(ntfs_volume *vol, struct bitmap *bm)
-{
-	ntfs_attr *attr;
-
-	attr = vol->lcnbmp_na;
-
-	bm->size = attr->initialized_size;
-
-	bm->bm = malloc (bm->size);
-	if (!bm->bm)
-		perr_exit ("get_bitmap_data");
-
-	if (ntfs_attr_pread (attr, 0, bm->size, bm->bm) < 0)
-		perr_exit("Couldn't get $Bitmap $DATA");
-}
-
-/**
  * compare_bitmaps
  *
  * Compare two bitmaps.  In this case, $Bitmap as read from the disk and
  * lcn_bitmap which we built from the MFT Records.
  */
-void compare_bitmaps(struct bitmap *a, struct bitmap *b)
+void compare_bitmaps(struct bitmap *a)
 {
-	u64 i, j, mismatch = 0;
+	s64 i,count;
+	int k, mismatch = 0;
 	char bit;
-
-	if (a->size != b->size)
-		err_exit("$Bitmap file size doesn't match "
-			 "calculated size ((%d != %d)\n", a->size, b->size);
-
-	for (i = 0; i < a->size; i++) {
+	u8 bm[NTFS_BUF_SIZE];
+	
+	printf("Accounting clusters ...\n");
+	
+	i = 0;
+	while (1) {
+		count = ntfs_attr_pread(vol->lcnbmp_na, i, NTFS_BUF_SIZE, bm);
+		if (count == -1)
+			perr_exit("Couldn't get $Bitmap $DATA");
 		
-		if (a->bm[i] == b->bm[i])
-			continue;
-		
-		for (j = i * 8; j < i * 8 + 8; j++) {
+		if (count == 0) {
+			if (a->size != i)
+				err_exit("$Bitmap file size doesn't match "
+					 "calculated size ((%Ld != %Ld)\n", 
+					 a->size, i);
+			break;
+		}
 
-			bit = ntfs_bit_get(a->bm, j);
-			if (bit != ntfs_bit_get(b->bm, j)) {
+		for (k = 0; k < count; k++) {
+			u64 j;
+
+			if (a->bm[i + k] == bm[k])
+				continue;
+		
+			for (j = i * 8; j < i * 8 + 8; j++) {
+	
+				bit = ntfs_bit_get(a->bm, j);
+				if (bit != ntfs_bit_get(bm, k + j % 8))
+					continue;
+				
 				if (++mismatch > 10)
 					continue;
 
 				printf("Cluster accounting failed at %llu "
 				       "(0x%Lx): %s cluster in $Bitmap\n",
-				       j, j, bit ? "extra" : "miss");
+				       j, j, bit ? "missing" : "extra");
 			}
 		}
+		
+		i += count;
 	}
 	
 	if (mismatch) {
-		printf("Totally %Lu cluster accounting mismatches.\n"
+		printf("Totally %d cluster accounting mismatches.\n"
 		       "You didn't shutdown Windows properly?\n", mismatch);
 		exit(1);
 	}	
@@ -620,13 +617,30 @@ void walk_inodes(ntfs_resize_t *resize)
  */
 void advise_on_resize()
 {
-	u64 i, old_b, new_b, g_b, old_mb, new_mb, g_mb;
+	s64 i, old_b, new_b, g_b, old_mb, new_mb, g_mb;
 	int fragmanted_end;
 
-	for (i = vol->nr_clusters - 1; i > 0; i--)
+	printf("Calculating smallest shrunken size supported ...\n");
+	       
+	for (i = vol->nr_clusters - 1; i > 0 && (i % 8); i--)
+		if (ntfs_bit_get(lcn_bitmap.bm, i))
+			goto found_used_cluster;
+	
+	if (i > 0) {
+		if (ntfs_bit_get(lcn_bitmap.bm, i))
+			goto found_used_cluster;
+	} else 
+		goto found_used_cluster;
+	
+	for (i -=  8; i >= 0; i -= 8)
+		if (lcn_bitmap.bm[i / 8])
+			break;
+		
+	for (i += 7; i > 0; i--)
 		if (ntfs_bit_get(lcn_bitmap.bm, i))
 			break;
-
+		
+found_used_cluster:
 	i += 2; /* first free + we reserve one for the backup boot sector */
 	fragmanted_end = (i >= vol->nr_clusters) ? 1 : 0;
 
@@ -738,7 +752,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 		perr_exit("Couldn't get memory");
 
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl_bad))
-		exit(1);
+		perr_exit("ntfs_mapping_pairs_build");
 
 	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
@@ -1034,18 +1048,21 @@ void update_bootsector(s64 nr_clusters)
 			perr_exit("write() error");
 }
 
+
+s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
+{
+	return nr_clusters * vol->cluster_size;
+}
+
 /**
  * print_volume_size
  *
  * Print the volume size in bytes and decimal megabytes.
  */
-void print_volume_size(char *str, ntfs_volume *v, s64 nr_clusters)
+void print_volume_size(char *str, s64 bytes)
 {
-	s64 b; /* volume size in bytes */
-
-	b = nr_clusters * v->cluster_size;
 	printf("%s: %lld bytes (%lld MB)\n",
-	       str, b, rounded_up_division(b, NTFS_MBYTE));
+	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
 }
 
 void print_disk_usage(ntfs_resize_t *resize)
@@ -1057,7 +1074,7 @@ void print_disk_usage(ntfs_resize_t *resize)
 	free = total - used;
 	relocations = resize->relocations * vol->cluster_size;
 	
-	printf("Space in use: %lld MB (%.1f%%)   ",
+	printf("Space in use       : %lld MB (%.1f%%)   ",
 	       rounded_up_division(used, NTFS_MBYTE),
 	       100.0 * ((float)used / total));
 	
@@ -1110,8 +1127,9 @@ void mount_volume()
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
-	Dprintf("Cluster size       : %u\n", vol->cluster_size);
-	print_volume_size("Current volume size", vol, vol->nr_clusters);
+	printf("Cluster size       : %u bytes\n", vol->cluster_size);
+	print_volume_size("Current volume size", 
+			  volume_size(vol, vol->nr_clusters));
 }
 
 /**
@@ -1148,7 +1166,6 @@ void prepare_volume_fixup()
  */
 int main(int argc, char **argv)
 {
-	struct bitmap on_disk_lcn_bitmap;
 	ntfs_resize_t resize;
 	s64 new_size = 0;	/* in clusters */
 	s64 device_size;        /* in bytes */
@@ -1170,6 +1187,8 @@ int main(int argc, char **argv)
 	if (device_size <= 0)
 		err_exit("Couldn't get device size (%Ld)!\n", device_size);
 
+	print_volume_size("Current device size", device_size);
+	
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
 			 "size (%Ld)!\nCorrupt partition table or incorrect "
@@ -1190,7 +1209,8 @@ int main(int argc, char **argv)
 	new_size = opt.bytes / vol->cluster_size;
 
 	if (!opt.info)
-		print_volume_size("New volume size    ", vol, new_size);
+		print_volume_size("New volume size    ", 
+				  volume_size(vol, new_size));
 	
 	/* Backup boot sector at the end of device isn't counted in NTFS
 	   volume size thus we have to reserve space for. We don't trust
@@ -1211,12 +1231,9 @@ int main(int argc, char **argv)
 	resize.new_volume_size = new_size;
 
 	walk_inodes(&resize);
+	compare_bitmaps(&lcn_bitmap);
 
 	print_disk_usage(&resize);
-
-	get_bitmap_data(vol, &on_disk_lcn_bitmap);
-	compare_bitmaps(&on_disk_lcn_bitmap, &lcn_bitmap);
-	free(on_disk_lcn_bitmap.bm);
 
 	if (opt.info) {
 		advise_on_resize();
