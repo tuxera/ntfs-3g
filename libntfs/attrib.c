@@ -3717,7 +3717,18 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
  * @na:		non-resident ntfs open attribute for which we need update
  *
- * Build mapping pairs from na->runlist and write them to the disk.
+ * Build mapping pairs from na->runlist and write them to the disk. Also, this
+ * function updates sparse bit and allocates/frees space for compressed_size,
+ * but doesn't change it, so caller should update it manually.
+ *
+ * NOTE: Code that set/clean sparse bit currently disabled, because chkdsk
+ * complain if we don't update index entry's for inode to which we set sparse
+ * bit. But it doesn't if attribute's runlist has lcn holes and sparse bit
+ * isn't set. So until we have no API for updating index entries it's the best
+ * choice.
+ *
+ * WARNING: Don't enable set/clean sparse bit code until complete attribute
+ * move out in case it have no spase for mapping pairs.
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
@@ -3769,7 +3780,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
-		
+
 		/*
 		 * Check whether we finished mapping pairs build, if so mark
 		 * extent as need to delete (by setting highest vcn to
@@ -3784,7 +3795,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			continue;
 		}
-		
+
 		/*
 		 * Check that the attribute name hasn't been placed after the
 		 * mapping pairs array. Windows treat this as a corruption.
@@ -3799,7 +3810,59 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 				goto put_err_out;
 			}
 		}
-
+#if 0
+		/* If we in the first extent, then set/clean sparse bit. */
+		if (!a->lowest_vcn) {
+			int sparse;
+			
+			sparse = ntfs_rl_sparse(na->rl);
+			if (sparse == -1) {
+				Dprintf("%s(): Bad runlist.");
+				err = EIO;
+				goto put_err_out;
+			}
+			if (sparse && !(a->flags & (ATTR_IS_SPARSE |
+							ATTR_IS_COMPRESSED))) {
+				if (!(le32_to_cpu(a->length) - le16_to_cpu(
+						a->mapping_pairs_offset))) {
+					Dprintf("%s(): Size of the space "
+						"allocated for mapping pairs "
+						"should not be 0.  "
+						"Aborting ...\n", __FUNCTION__);
+					err = EIO;
+					goto put_err_out;
+				}
+				NAttrSetSparse(na);
+				a->flags |= ATTR_IS_SPARSE;
+				a->compression_unit = 4; /* Windows set it so,
+							    even if attribute
+							    is not actually
+							    compressed. */
+				memmove((u8*)a + le16_to_cpu(a->name_offset) +
+					8, (u8*)a + le16_to_cpu(a->name_offset),
+					a->name_length * sizeof(ntfschar));
+				a->name_offset = cpu_to_le16(le16_to_cpu(
+							a->name_offset) + 8);
+				a->mapping_pairs_offset =
+						cpu_to_le16(le16_to_cpu(
+						a->mapping_pairs_offset) + 8);
+			}
+			if (!sparse && (a->flags & ATTR_IS_SPARSE) &&
+					!(a->flags & ATTR_IS_COMPRESSED)) {
+				NAttrClearSparse(na);
+				a->flags &= ~ATTR_IS_SPARSE;
+				a->compression_unit = 0;
+				memmove((u8*)a + le16_to_cpu(a->name_offset) -
+					8, (u8*)a + le16_to_cpu(a->name_offset),
+					a->name_length * sizeof(ntfschar));
+				a->name_offset = cpu_to_le16(le16_to_cpu(
+							a->name_offset) - 8);
+				a->mapping_pairs_offset =
+						cpu_to_le16(le16_to_cpu(
+						a->mapping_pairs_offset) - 8);
+			}
+		}
+#endif
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
 								stop_vcn);
@@ -3822,7 +3885,20 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		 */
 		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
-
+#if 0
+		/*
+		 * If we have no space for mapping pairs (we can receive such
+		 * attribute after allocating spase for compressed_size) then
+		 * move attribute to different mft record with more free space.
+		 */
+		if (!exp_max_mp_size) {
+			// TODO
+			Dprintf("%s(): Here we shall move attribute to the "
+					"another extent.\n", __FUNCTION__);
+			err = ENOTSUP;
+			goto put_err_out;
+		}
+#endif
 		/* Test mapping pairs for fitting in the current mft record. */
 		if (mp_size > exp_max_mp_size) {
 			/*
@@ -4150,7 +4226,22 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
+#if 0
+	/* Update compressed_size if present. */
+	if (NAttrSparse(na) || NAttrCompressed(na)) {
+		s64 new_compr_size;
 
+		new_compr_size = ntfs_rl_get_compressed_size(vol, na->rl);
+		if (new_compr_size == -1) {
+			err = errno;
+			Dprintf("%s(): BUG! Leaving inconsist metadata.\n",
+					__FUNCTION__);
+			goto put_err_out;
+		}
+		na->compressed_size = new_compr_size;
+		a->compressed_size = cpu_to_sle64(new_compr_size);
+	}
+#endif
 	/* Update data and initialized size. */
 	na->data_size = newsize;
 	a->data_size = cpu_to_sle64(newsize);
@@ -4357,6 +4448,22 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
+#if 0
+	/* Update compressed_size if present. */
+	if (NAttrSparse(na) || NAttrCompressed(na)) {
+		s64 new_compr_size;
+
+		new_compr_size = ntfs_rl_get_compressed_size(vol, na->rl);
+		if (new_compr_size == -1) {
+			err = errno;
+			Dprintf("%s(): BUG! Leaving inconsist metadata.\n",
+					__FUNCTION__);
+			goto put_err_out;
+		}
+		na->compressed_size = new_compr_size;
+		a->compressed_size = cpu_to_sle64(new_compr_size);
+	}
+#endif
 	/* Update data size. */
 	na->data_size = newsize;
 	a->data_size = cpu_to_sle64(newsize);
