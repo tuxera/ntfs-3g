@@ -7,6 +7,8 @@
 	  exist (in unistd.h) so we could switch to that if we wanted.
 	- Enable lots of compiler warnings in maintainer mode and fix all
 	  warnings from libntfs.
+	- Fix memory deallocation bug in mft.c spotted by the additional
+	  warnings.
 
 06/01/2004 - 1.8.1 - Important bug fix and various enhancements.
 	- Add new API function attrib.[hc]:ntfs_attr_map_whole_runlist().
