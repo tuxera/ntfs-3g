@@ -29,9 +29,9 @@ LTVERSION = 4:0:0
 
 # Need this to enable 64-bit (device) file access functions and parameters.
 if DEBUG
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall -g -DDEBUG
 else
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall
 endif
 
 linux_ntfsincludedir = -I$(top_srcdir)/include
