@@ -1,6 +1,10 @@
 Current news
 ============
 
+ntfsinfo has been extended and now provides much more detailed information as
+well as being able to resolve a path/filename instead of requiring the inode
+number.  (Yuval Fledel, Anton Altaparmakov)
+
 mkntfs now creates bootable ntfs volumes so you can install Windows on an
 ntfs volume created with mkntfs and Windows will manage to boot afterwards.
 
