@@ -763,19 +763,19 @@ free:
 
 /**
  * wipe_index_allocation - Wipe $INDEX_ALLOCATION attribute
- * @vol:	An ntfs volume obtained from ntfs_mount
- * @byte:	Overwrite with this value
- * @act:	Wipe, test or info
- * @naa:	Opened ntfs $INDEX_ALLOCATION attribute
- * @nab:	Opened ntfs $BIMTAP attribute
+ * @vol:		An ntfs volume obtained from ntfs_mount
+ * @byte:		Overwrite with this value
+ * @act:		Wipe, test or info
+ * @naa:		Opened ntfs $INDEX_ALLOCATION attribute
+ * @nab:		Opened ntfs $BIMTAP attribute
+ * @indx_record_size:	Size of INDX record
  *
  * Return: >0  Success, the clusters were wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
 static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
-					ntfs_attr *naa, ntfs_attr *nab) {
-	const u32 indx_record_size = 4096;
+			ntfs_attr *naa, ntfs_attr *nab, u32 indx_record_size) {
 	s64 total = 0;
 	s64 wiped = 0;
 	s64 offset = 0;
@@ -832,7 +832,8 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 			if ((le32_to_cpu(indx->index.allocated_size) + 0x18) != 
 							indx_record_size) {
 				Vprintf ("Internal error\n");
-				Eprintf ("INDX record should be 4096 bytes");
+				Eprintf ("INDX record should be %u bytes",
+								indx_record_size);
 				total = -1;
 				goto free_buf;
 			}
@@ -878,6 +879,31 @@ free_bitmap:
 }
 
 /**
+ * get_indx_record_size - determine size of INDX record from $INDEX_ROOT
+ * @nar:	Opened ntfs $INDEX_ROOT attribute
+ *
+ * Return: >0  Success, return INDX record size
+ *          0  Error, something went wrong
+ */
+static u32 get_indx_record_size (ntfs_attr *nar)
+{
+	u32 indx_record_size;
+	
+	if (ntfs_attr_pread (nar, 8, 4, &indx_record_size) != 4) {
+		Vprintf ("Couldn't determine size of INDX record\n");
+		Eprintf ("ntfs_attr_pread failed");
+		return 0;
+	}
+	
+	indx_record_size = le32_to_cpu (indx_record_size);
+	if (!indx_record_size) {
+		Vprintf ("Internal error\n");
+		Eprintf ("INDX record should be 0");
+	}
+	return indx_record_size;
+}
+
+/**
  * wipe_directory - Wipe the directory indexes
  * @vol:	An ntfs volume obtained from ntfs_mount
  * @byte:	Overwrite with this value
@@ -897,6 +923,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 	ntfs_inode *ni;
 	ntfs_attr *naa;
 	ntfs_attr *nab;
+	ntfs_attr *nar;
 
 	if (!vol || (byte < 0))
 		return -1;
@@ -933,29 +960,52 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			Vprintf ("Resident $INDEX_ALLOCATION\n");
 			Eprintf ("damaged fs: Resident $INDEX_ALLOCATION "
 					"(inode %lld)\n", inode_num);
-			goto close_attr_a;
+			goto close_attr_allocation;
 		}
 
 		if (ntfs_attr_map_whole_runlist(naa)) {
 			Vprintf ("Internal error\n");
 			Eprintf ("Can't map runlist for $INDEX_ALLOCATION "
 					"(inode %lld)\n", inode_num);
-			goto close_attr_a;
+			goto close_attr_allocation;
 		}
-		
+
 		nab = ntfs_attr_open (ni, AT_BITMAP, I30, 4);
 		if (!nab) {
 			Vprintf ("Couldn't open $BITMAP\n");
 			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, "
 					"but we can't open $BITMAP with same "
 					"name (inode %lld)\n", inode_num);
-			goto close_attr_a;
+			goto close_attr_allocation;
 		}
 		
-		s64 wiped = wipe_index_allocation (vol, byte, act, naa, nab);
+		nar = ntfs_attr_open (ni, AT_INDEX_ROOT, I30, 4);
+		if (!nar) {
+			Vprintf ("Couldn't open $INDEX_ROOT\n");
+			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, but "
+					"we can't open $INDEX_ROOT with same name"
+					" (inode %lld)\n", inode_num);
+			goto close_attr_bitmap;
+		}
+		
+		if (NAttrNonResident(nar)) {
+			Vprintf ("Not resident $INDEX_ROOT\n");
+			Eprintf ("damaged fs: Not resident $INDEX_ROOT "
+					"(inode %lld)\n", inode_num);
+			goto close_attr_root;
+		}
+		
+		u32 indx_record_size = get_indx_record_size (nar);
+		if (!indx_record_size) {
+			Eprintf (" (inode %lld)\n", inode_num);
+			goto close_attr_root;
+		}
+		
+		s64 wiped = wipe_index_allocation (vol, byte, act,
+						naa, nab, indx_record_size);
 		if (wiped == -1) {
 			Eprintf (" (inode %lld)\n", inode_num);
-			goto close_attr_b;
+			goto close_attr_root;
 		}
 		
 		if (wiped) {
@@ -963,9 +1013,11 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			total += wiped;
 		} else
 			Vprintf ("Nothing to wipe\n");
-close_attr_b:
+close_attr_root:
+		ntfs_attr_close (nar);
+close_attr_bitmap:
 		ntfs_attr_close (nab);
-close_attr_a:
+close_attr_allocation:
 		ntfs_attr_close (naa);
 close_inode:
 		ntfs_inode_close (ni);
