@@ -29,8 +29,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #ifdef HAVE_LINUX_FD_H
-#	include <sys/ioctl.h>
 #	include <linux/fd.h>
 #endif
 
@@ -40,7 +40,7 @@
 #include "debug.h"
 #include "device.h"
 
-#if defined(__LINUX__) && defined(_IO) && !defined(BLKGETSIZE)
+#if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
 #	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
 #endif
 
