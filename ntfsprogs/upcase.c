@@ -1,5 +1,5 @@
-/*
- * $Id$
+/**
+ * upcase - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001 Richard Russon <ntfs@flatcap.org>
  * Copyright (c) 2001-2002 Anton Altaparmakov <aia21@cantab.net>
