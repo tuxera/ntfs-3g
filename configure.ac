@@ -217,6 +217,11 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
 	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit])
 
+# Check for declarations of constant bswap function as some systems do not
+# provide all of them.
+AC_CHECK_DECLS([__bswap_constant_16, __bswap_constant_32, __bswap_constant_64],
+	       , , [#include <byteswap.h>])
+
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([
 	Makefile
