@@ -201,7 +201,7 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 	FILE_NAME_ATTR *file_name_attr = NULL;
 	ATTR_RECORD *attr = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
-	char *file_name;
+	char *file_name = NULL;
 	time_t ntfs_time;
 
 	ctx = ntfs_attr_get_search_ctx(inode, mrec);
@@ -214,8 +214,6 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 	attr = ctx->attr;
 
 	file_name_attr = (FILE_NAME_ATTR*)((char *)attr + le16_to_cpu(attr->value_offset));
-
-	file_name = malloc(file_name_attr->file_name_length * sizeof(char));
 
 	//need to convert the little endian unicode string to a multibyte string
 	ntfs_ucstombs(file_name_attr->file_name, file_name_attr->file_name_length,
@@ -230,16 +228,16 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 	printf("Real File Size: \t %lld\n", sle64_to_cpu(file_name_attr->data_size));
 
 	//time conversion stuff
-	ntfs_time = ntfs2utc(file_name_attr->creation_time);
+	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->creation_time));
 	printf("File Creation Time: \t %s",ctime(&ntfs_time));
 
-	ntfs_time = ntfs2utc(file_name_attr->last_data_change_time);
+	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_data_change_time));
 	printf("File Altered Time: \t %s",ctime(&ntfs_time));
 
-	ntfs_time = ntfs2utc(file_name_attr->last_mft_change_time);
+	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_mft_change_time));
 	printf("MFT Changed Time: \t %s",ctime(&ntfs_time));
 
-	ntfs_time = ntfs2utc(file_name_attr->last_access_time);
+	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_access_time));
 	printf("Last Acced Time: \t %s",ctime(&ntfs_time));
 
 	free(file_name);
@@ -269,11 +267,11 @@ void ntfs_dump_standard_information(ntfs_inode *inode, MFT_RECORD *mrec)
 
 	printf("Dumping $STANDARD_INFORMATION (0x10)\n");
 
-	printf("Maximum Number of Versions: \t %d \n",standard_attr->maximum_versions);
-	printf("Version Number: \t\t %d \n",standard_attr->version_number);
-	printf("Class ID: \t\t\t %d \n",standard_attr->class_id);
-	printf("User ID: \t\t\t %d \n", standard_attr->owner_id);
-	printf("Security ID: \t\t\t %d \n", standard_attr->security_id);
+	printf("Maximum Number of Versions: \t %d \n", le32_to_cpu (standard_attr->maximum_versions));
+	printf("Version Number: \t\t %d \n", le32_to_cpu (standard_attr->version_number));
+	printf("Class ID: \t\t\t %d \n", le32_to_cpu (standard_attr->class_id));
+	printf("User ID: \t\t\t %d \n",  le32_to_cpu (standard_attr->owner_id));
+	printf("Security ID: \t\t\t %d \n",  le32_to_cpu (standard_attr->security_id));
 
 }
 
