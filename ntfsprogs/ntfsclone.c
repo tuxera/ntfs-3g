@@ -545,7 +545,7 @@ static void clone_ntfs(u64 nr_clusters)
 			perr_exit("write_all");
 	}
 	
-	for (last_cl = cl = 0; cl < vol->nr_clusters; cl++) {
+	for (last_cl = cl = 0; cl < (u64)vol->nr_clusters; cl++) {
 	
 		if (ntfs_bit_get(lcn_bitmap.bm, cl)) {
 			progress_update(&progress, ++p_counter);
