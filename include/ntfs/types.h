@@ -42,6 +42,13 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
+typedef u16 le16;
+typedef u32 le32;
+typedef u64 le64;
+typedef s16 sle16;
+typedef s32 sle32;
+typedef s64 sle64;
+
 typedef u16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1
 
@@ -50,7 +57,9 @@ typedef u16 ntfschar;			/* 2-byte Unicode character type. */
  * and VCN, to allow for type checking and better code readability.
  */
 typedef s64 VCN;
+typedef sle64 leVCN;
 typedef s64 LCN;
+typedef sle64 leLCN;
 
 /*
  * The NTFS journal $LogFile uses log sequence numbers which are signed 64-bit
@@ -58,6 +67,7 @@ typedef s64 LCN;
  * code readability.
  */
 typedef s64 LSN;
+typedef sle64 leLSN;
 
 /*
  * Cygwin has a collusion between our BOOL and <windef.h>'s
