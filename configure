@@ -11612,6 +11612,7 @@ do
   "ntfsprogs/ntfsprogs.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfsprogs.8" ;;
   "ntfsprogs/ntfsresize.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfsresize.8" ;;
   "ntfsprogs/ntfsundelete.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfsundelete.8" ;;
+  "ntfsprogs/ntfscluster.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfscluster.8" ;;
   "ntfsprogs.spec" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs.spec" ;;
   "depfiles" ) CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
