@@ -1300,8 +1300,8 @@ void mount_volume()
 
 	if (ntfs_check_if_mounted(opt.volume, &mntflag)) {
 		perr_printf("Failed to check '%s' mount state", opt.volume);
-		printf("Probably /etc/mtab is missing. It's too risky to"
-		       "continue.\nYou might try an another Linux distro.\n");
+		printf("Probably /etc/mtab is missing. It's too risky to "
+		       "continue. You might try\nan another Linux distro.\n");
 		exit(1);
 	}
 	if (mntflag & NTFS_MF_MOUNTED) {
