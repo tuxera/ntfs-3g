@@ -205,6 +205,9 @@ err_out:
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
+	if (!ni)
+		return 0;
+
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
