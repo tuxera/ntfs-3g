@@ -391,6 +391,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 				if (err != EIO)
 					err = EBUSY;
 			}
+			NInoSetDirty(ni);
 		}
 	}
 
@@ -410,6 +411,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 						if (err != EIO)
 							err = EBUSY;
 					}
+					NInoSetDirty(eni);
 				}
 			}
 		}
