@@ -1355,12 +1355,12 @@ __inline__ int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
 		if (dst > dst_max)
 			goto err_out;
 		i++;
-		*dst = (s8)-1;
+		*dst = (u8)-1;
 	} else if (n > 0LL && j < 0) {
 		if (dst > dst_max)
 			goto err_out;
 		i++;
-		*dst = (s8)0;
+		*dst = 0;
 	}
 	return i;
 err_out:
