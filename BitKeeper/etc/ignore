@@ -15,6 +15,7 @@ BitKeeper/*/*
 Makefile
 PENDING/*
 TAGS
+autom4te.cache/*
 config.cache
 config.h
 config.log
@@ -31,6 +32,7 @@ ntfsprogs/ntfsdump_logfile
 ntfsprogs/ntfsfix
 ntfsprogs/ntfsinfo
 ntfsprogs/ntfslabel
+ntfsprogs/ntfsls
 ntfsprogs/ntfsresize
 ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
