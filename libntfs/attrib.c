@@ -2591,7 +2591,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		goto put_err_out;
 	}
 
-	// TODO: Try to make other attributes non-resident.
+	// TODO: Try to make other attributes non-resident and retry each time.
 
 	// TODO: Move the attribute to a new mft record, creating an attribute
 	// list attribute or modifying it if it is already present.
