@@ -1,7 +1,7 @@
 /*
  * volume.c - NTFS volume handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1049,12 +1049,13 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 	*mnt_flags = NTFS_MF_MOUNTED;
 	if (!strcmp(mnt->mnt_dir, "/"))
 		*mnt_flags |= NTFS_MF_ISROOT;
+#ifdef HAVE_HASMNTOPT
 	if (hasmntopt(mnt, "ro") && !hasmntopt(mnt, "rw"))
 		*mnt_flags |= NTFS_MF_READONLY;
+#endif
 	return 0;
 }
-
-#endif
+#endif /* HAVE_MNTENT_H */
 
 /**
  * ntfs_check_if_mounted - check if an ntfs volume is currently mounted
