@@ -27,6 +27,11 @@
 #include "types.h"
 #include "layout.h"
 
+#define ntfs_malloc	malloc
+#define ntfs_realloc	realloc
+#define ntfs_calloc	calloc
+#define ntfs_free	free
+
 /**
  * struct options
  */
@@ -48,10 +53,11 @@ struct options {
  */
 struct ntfs_bmp {
 	ntfs_attr	 *attr;
+	int		  count;
 	u8		**data;
 	VCN		 *data_vcn;
-	int		  count;
-	//int		  cluster_size;
+	u8		 *cache;
+	VCN		  cache_vcn;
 };
 
 /**
@@ -83,11 +89,10 @@ struct ntfs_dir {
 	struct ntfs_dt	  *index;
 	struct ntfs_dir	 **children;
 	int		   child_count;
-	struct mft_bitmap *bitmap;
+	struct ntfs_bmp	  *bitmap;
 	ntfs_inode	  *inode;
 	ntfs_attr	  *iroot;
 	ntfs_attr	  *ialloc;
-	ntfs_attr	  *ibmp;
 	int                index_size;
 	u8		   padding[4];	/* Unused: padding to 64 bit. */
 };
