@@ -309,15 +309,16 @@ void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
  * ntfs_attr_open - open an ntfs attribute for access
  * @ni:		open ntfs inode in which the ntfs attribute resides
  * @type:	attribute type
- * @name:	attribute name in little endian Unicode or NULL
+ * @name:	attribute name in little endian Unicode or AT_UNNAMED or NULL
  * @name_len:	length of attribute @name in Unicode characters (if @name given)
  *
  * Allocate a new ntfs attribute structure, initialize it with @ni, @type,
  * @name, and @name_len, then return it. Return NULL on error with
  * errno set to the error code.
  *
- * If looking for an unnamed attribute set @name to NULL. @name_len is not used
- * at all in that case.
+ * If @name is AT_UNNAMED look specifically for an unnamed attribute.  If you
+ * do not care whether the attribute is named or not set @name to NULL.  In
+ * both those cases @name_len is not used at all.
  */
 ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		uchar_t *name, const u32 name_len)
@@ -326,6 +327,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ntfs_attr *na;
 	ATTR_RECORD *a;
 	int err;
+	BOOL cs;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)ni->mft_no, type);
@@ -349,8 +351,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		goto put_err_out;
 	}
 	a = ctx->attr;
+	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 	if (a->non_resident) {
-		BOOL cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 		ntfs_attr_init(na, TRUE, a->flags & ATTR_IS_COMPRESSED,
 				a->flags & ATTR_IS_ENCRYPTED,
 				a->flags & ATTR_IS_SPARSE,
@@ -361,12 +363,11 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				cs ? a->compression_unit : 0);
 	} else {
 		s64 l = le32_to_cpu(a->value_length);
-		if (a->flags & (ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED |
-				ATTR_IS_SPARSE)) {
-			err = EIO;
-			goto put_err_out;
-		}
-		ntfs_attr_init(na, FALSE, FALSE, FALSE, FALSE, l, l, l, 0, 0);
+		ntfs_attr_init(na, FALSE, a->flags & ATTR_IS_COMPRESSED,
+				a->flags & ATTR_IS_ENCRYPTED,
+				a->flags & ATTR_IS_SPARSE, l, l, l,
+				cs ? sle64_to_cpu(a->compressed_size) : 0,
+				cs ? a->compression_unit : 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	return na;
@@ -1544,8 +1545,8 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
-	Dprintf("Entering for inode %llu, attribute type 0x%x.\n",
-			(unsigned long long)ni->mft_no, type);
+	Dprintf("%s(): Entering for inode 0x%llx, attribute type 0x%x.\n",
+			__FUNCTION__, (unsigned long long)ni->mft_no, type);
 	if (!base_ni) {
 		/* First call happens with the base mft record. */
 		base_ni = ctx->base_ntfs_ino = ctx->ntfs_ino;
