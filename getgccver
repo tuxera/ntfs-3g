@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if test -z "$1"; then
+	echo "This program is only to be run by the ./configure script."
+	exit 1
+fi
+
+# Get the gcc version. Can't do this in configure.ac as automake refuses to
+# preserve the square brackets while generating the configure script.
+$1 --version 2>&1 | head -1 | sed s/"egcs-"// | sed s/"gcc (GCC) \([0-9]\.[0-9]*\).*"/"\1"/
