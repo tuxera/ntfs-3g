@@ -13,9 +13,15 @@ xx/xx/2004 - 2.0.0-WIP
 	  doesn't update them unless a rename operation occur.  (Yura)
 	- Improvement to ntfs_non_resident_attr_expand: expand multi extent
 	  attributes if we don't need to allocate new mft records to perform
-	  this  (Yura).
+	  this.  (Yura)
 	- ntfsinfo: dump attribute list entries in verbose mode and display
 	  attribute instance of all attributes.  (Yura)
+	- new API: attrlist.[ch]::ntfs_attrlist_entry_add add entry to attribute
+	  list.  (Yura)
+	- ntfs_inode_sync: write out dirty attribute list from cache to
+	  disk.  (Yura)
+	- Add @stopped_at parameter to ntfs_mapping_pairs_build() and adapt
+	  all callers.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
