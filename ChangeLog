@@ -16,8 +16,8 @@ xx/xx/2004 - 2.0.0-WIP
 	  this.  (Yura)
 	- ntfsinfo: dump attribute list entries in verbose mode and display
 	  attribute instance of all attributes.  (Yura)
-	- new API: attrlist.[ch]::ntfs_attrlist_entry_add add entry to attribute
-	  list.  (Yura)
+	- new API: attrlist.[ch]::ntfs_attrlist_entry_add add entry to
+	  attribute list.  (Yura)
 	- ntfs_inode_sync: write out dirty attribute list from cache to
 	  disk.  (Yura)
 	- Add stop_vcn parameter to ntfs_mapping_pairs_build() and adapt
@@ -25,6 +25,7 @@ xx/xx/2004 - 2.0.0-WIP
 	  pairs and then continuing in a different extent once the first extent
 	  is full.  (Yura)
 	- Remove vol->nr_mft_records and update all users.  (Anton)
+	- Add new API to mft.[hc]::ntfs_mft_record_{alloc,free}().  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
