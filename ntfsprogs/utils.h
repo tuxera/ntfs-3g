@@ -28,6 +28,9 @@
 #include "layout.h"
 #include "volume.h"
 
+#include <errno.h>
+#include <stdarg.h>
+
 #define PATH_SEP	'/'
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
