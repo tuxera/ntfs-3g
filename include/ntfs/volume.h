@@ -168,6 +168,8 @@ struct _ntfs_volume {
 				   FILE_AttrDef. */
 	s32 attrdef_len;	/* Size of the attribute definition table in
 				   bytes. */
+
+	void *private_data;	/* Temp: for directory handling */
 };
 
 extern ntfs_volume *ntfs_volume_alloc(void);
