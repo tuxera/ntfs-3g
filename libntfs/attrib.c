@@ -888,9 +888,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	runlist_element *rl;
 	int eo;
 	struct {
-		unsigned int initialized_size	: 1;
-		unsigned int data_size		: 1;
-	} need_to_undo = { 0, 0 };
+		unsigned int undo_initialized_size	: 1;
+		unsigned int undo_data_size		: 1;
+		unsigned int update_mapping_pairs	: 1;
+	} need_to = { 0, 0, 0 };
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
 			"count 0x%llx.\n", __FUNCTION__, na->ni->mft_no,
@@ -927,7 +928,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			errno = eo;
 			return -1;
 		}
-		need_to_undo.data_size = 1;
+		need_to.undo_data_size = 1;
 	}
 	old_initialized_size = na->initialized_size;
 	/* If it is a resident attribute, write the data to the mft record. */
@@ -1040,7 +1041,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		 * we decide to abort, we MUST change the initialized_size
 		 * again.
 		 */
-		need_to_undo.initialized_size = 1;
+		need_to.undo_initialized_size = 1;
 	}
 	/*
 	 * Scatter the data from the linear data buffer to the volume. Note, a
@@ -1054,6 +1055,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			goto rl_err_out;
 		}
 		if (rl->lcn < (LCN)0) {
+			LCN lcn_seek_from = -1;
+			runlist *rlc;
+			VCN cur_vcn;
 			s64 t;
 			int cnt;
 
@@ -1089,21 +1093,107 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 					}
 				}
 			}
-			if (eo) {
-				// TODO: Need to instantiate the hole. Then get
-				// the runlist element again checking if it is
-				// ok and fall through to do the writing. (AIA)
-				errno = ENOTSUP;
-				goto rl_err_out;
+			if (!eo) {
+				/*
+				 * The buffer region is zero, update progress
+				 * counters and proceed with next run.
+				 */
+				total += to_write;
+				count -= to_write;
+				b = (u8*)b + to_write;
+				continue;
 			}
+			/* The buffer is non zero, instantiate the hole. */
+			cur_vcn = rl->vcn;
+			Dprintf("%s(): Isntantiate the hole with vcn 0x%llx.\n",
+					__FUNCTION__, cur_vcn);
 			/*
-			 * The buffer region is zero, update progress counters
-			 * and proceed with next run.
+			 * Search backwards to find the best lcn to start
+			 * seek from.
 			 */
-			total += to_write;
-			count -= to_write;
-			b = (u8*)b + to_write;
-			continue;
+			rlc = rl;
+			while (rlc->vcn) {
+				rlc--;
+				if (rlc->lcn >= 0) {
+					lcn_seek_from = rlc->lcn +
+							(rl->vcn - rlc->vcn);
+					break;
+				}
+			}
+			if (lcn_seek_from == -1) {
+				/* Backwards search failed, search forwards. */
+				rlc = rl;
+				while (rlc->length) {
+					rlc++;
+					if (rlc->lcn >= 0) {
+						lcn_seek_from = rlc->lcn -
+							(rlc->vcn - rl->vcn);
+						break;
+					}
+				}
+			}
+			/* Allocate clusters to instantiate the hole. */
+			rlc = ntfs_cluster_alloc(vol, ((ofs + to_write - 1) >>
+					vol->cluster_size_bits) + 1,
+					lcn_seek_from, DATA_ZONE, rl->vcn);
+			if (!rlc) {
+				eo = errno;
+				Dprintf("%s(): Failed to allocate clusters for "
+					"hole instantiating.\n", __FUNCTION__);
+				errno = eo;
+				goto err_out;
+			}
+			/* Merge runlists. */
+			rl = ntfs_runlists_merge(na->rl, rlc);
+			if (!rl) {
+				eo = errno;
+				Dprintf("%s(): Failed to merge runlists.\n",
+						__FUNCTION__);
+				if (ntfs_cluster_free_from_rl(vol, rlc)) {
+					Dprintf("%s(): Failed to free just "
+						"allocated clusters. Leaving "
+						"inconsist metadata. "
+						"Run chkdsk", __FUNCTION__);
+				}
+				errno = eo;
+				goto err_out;
+			}
+			na->rl = rl;
+			need_to.update_mapping_pairs = 1;
+			rl = ntfs_attr_find_vcn(na, cur_vcn);
+			if (!rl) {
+				/*
+				 * It's definitely a BUG, if we failed to find
+				 * @cur_vcn, because we missed it during
+				 * instatiating of the hole.
+				 */
+				Dprintf("%s(): BUG! Failed to find run after "
+					"instantiating. Please report to the "
+					"linux-ntfs-dev@lists.sf.net.\n",
+					__FUNCTION__);
+				errno = EIO;
+				goto err_out;
+			}
+			if (rl->lcn < 0) {
+				/*
+				 * BUG! LCN shoudn't be lesser than 0, because
+				 * we just instantiated the hole.
+				 */
+				Dprintf("%s(): BUG! LCN is lesser than 0. "
+						"Please report to the "
+						"linux-ntfs-dev@lists.sf.net."
+						"\n", __FUNCTION__);
+				errno = EIO;
+				goto err_out;
+			}
+			if (rl->vcn != cur_vcn) {
+				/* 
+				 * Clusters that replaced hole are merged with
+				 * previous run, so we need to update offset.
+				 */
+				ofs += (cur_vcn - rl->vcn) <<
+					vol->cluster_size_bits;
+			}
 		}
 		/* It is a real lcn, write it to the volume. */
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -
@@ -1135,12 +1225,15 @@ retry:
 done:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
+	/* Update mapping pairs if needed. */
+	if (need_to.update_mapping_pairs)
+		ntfs_attr_update_mapping_pairs(na);
 	/* Finally, return the number of bytes written. */
 	return total;
 rl_err_out:
 	eo = errno;
 	if (total) {
-		if (need_to_undo.initialized_size) {
+		if (need_to.undo_initialized_size) {
 			if (pos + total > na->initialized_size)
 				goto done;
 			// TODO: Need to try to change initialized_size. If it
@@ -1153,7 +1246,7 @@ rl_err_out:
 	errno = eo;
 err_out:
 	eo = errno;
-	if (need_to_undo.initialized_size) {
+	if (need_to.undo_initialized_size) {
 		int err;
 
 		err = 0;
@@ -1186,8 +1279,11 @@ err_out:
 	}
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
+	/* Update mapping pairs if needed. */
+	if (need_to.update_mapping_pairs)
+		ntfs_attr_update_mapping_pairs(na);
 	/* Restore original data_size if needed. */
-	if (need_to_undo.data_size && ntfs_attr_truncate(na, old_data_size))
+	if (need_to.undo_data_size && ntfs_attr_truncate(na, old_data_size))
 		Dprintf("%s(): Failed to restore data_size.\n", __FUNCTION__);
 	errno = eo;
 	return -1;
@@ -4107,38 +4203,63 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		}
 
 		/*
-		 * Determine first after last LCN of attribute.  We will start
-		 * seek clusters from this LCN to avoid fragmentation.  If
-		 * there are no valid LCNs in the attribute let the cluster
-		 * allocator choose the starting LCN.
+		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
+		 * sparse runs instead of real alloction of clusters.
 		 */
-		lcn_seek_from = -1;
-		if (na->rl->length) {
-			/* Seek to the last run list element. */
-			for (rl = na->rl; (rl + 1)->length; rl++)
-				;
+		if (na->type == AT_DATA && vol->major_ver >= 3) {
+			rl = malloc(0x1000);
+			if (!rl) {
+				Dprintf("%s(): Not enough memory.\n",
+						__FUNCTION__);
+				err = ENOMEM;
+				return -1;
+			}
+			rl[0].vcn = (na->allocated_size >>
+					vol->cluster_size_bits);
+			rl[0].lcn = LCN_HOLE;
+			rl[0].length = first_free_vcn -
+				(na->allocated_size >> vol->cluster_size_bits);
+			rl[1].vcn = first_free_vcn;
+			rl[1].lcn = LCN_ENOENT;
+			rl[1].length = 0;
+		} else {
 			/*
-			 * If the last LCN is a hole or simillar seek back to
-			 * last valid LCN.
+			 * Determine first after last LCN of attribute.
+			 * We will start seek clusters from this LCN to avoid
+			 * fragmentation.  If there are no valid LCNs in the
+			 * attribute let the cluster allocator choose the
+			 * starting LCN.
 			 */
-			while (rl->lcn < 0 && rl != na->rl)
-				rl--;
-			/* Only set lcn_seek_from it the LCN is valid. */
-			if (rl->lcn >= 0)
-				lcn_seek_from = rl->lcn + rl->length;
-		}
+			lcn_seek_from = -1;
+			if (na->rl->length) {
+				/* Seek to the last run list element. */
+				for (rl = na->rl; (rl + 1)->length; rl++)
+					;
+				/*
+				 * If the last LCN is a hole or simillar seek
+				 * back to last valid LCN.
+				 */
+				while (rl->lcn < 0 && rl != na->rl)
+					rl--;
+				/*
+				 * Only set lcn_seek_from it the LCN is valid.
+				 */
+				if (rl->lcn >= 0)
+					lcn_seek_from = rl->lcn + rl->length;
+			}
 
-		rl = ntfs_cluster_alloc(vol, first_free_vcn - 
+			rl = ntfs_cluster_alloc(vol, first_free_vcn - 
 					(na->allocated_size >>
 					vol->cluster_size_bits), lcn_seek_from,
 					DATA_ZONE, na->allocated_size >>
 					vol->cluster_size_bits);
-		if (!rl) {
-			err = errno;
-			Dprintf("%s(): Eeek! Cluster allocation "
-					"failed.\n", __FUNCTION__);
-			errno = err;
-			return -1;
+			if (!rl) {
+				err = errno;
+				Dprintf("%s(): Eeek! Cluster allocation "
+						"failed.\n", __FUNCTION__);
+				errno = err;
+				return -1;
+			}
 		}
 
 		/* Append new clusters to attribute runlist. */
