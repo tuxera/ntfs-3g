@@ -592,7 +592,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	vol = ntfs_volume_startup(dev, rwflag);
 	if (!vol) {
 		Dperror("Failed to startup volume");
-		ntfs_device_free (dev);
 		return NULL;
 	}
 
@@ -961,13 +960,20 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 {
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;
+	ntfs_volume *vol;
 
 	/* Allocate an ntfs_device structure. */
 	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev)
 		return NULL;
 	/* Call ntfs_device_mount() to do the actual mount. */
-	return ntfs_device_mount(dev, rwflag);
+	vol = ntfs_device_mount(dev, rwflag);
+	if (!vol) {
+		int eo = errno;
+		ntfs_device_free(dev);
+		errno = eo;
+	}
+	return vol;
 #else
 	/*
 	 * ntfs_mount() makes no sense if NO_NTFS_DEVICE_DEFAULT_IO_OPS is
