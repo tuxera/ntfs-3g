@@ -1,4 +1,4 @@
-xx/xx/2004 - 1.8.5 - WIP
+27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
 	  reflect reality a little better.
 	- Fix BLKGETSIZE usage; parameter is unsigned long not long. (Szaka)
