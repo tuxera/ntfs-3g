@@ -204,8 +204,8 @@ int main (int argc, char *argv[])
 	ntfs_volume *vol;
 	ntfs_inode *out;
 	ntfs_attr *na;
-	ntfs_attr_search_ctx *ctx;
-	FILE_NAME_ATTR *fna;
+//	ntfs_attr_search_ctx *ctx;
+//	FILE_NAME_ATTR *fna;
 	int flags = 0;
 	int result = 1;
 	s64 new_size;
@@ -267,7 +267,12 @@ int main (int argc, char *argv[])
 		}
 		need_logfile_reset = 1;
 		
-		/* Update $FILE_NAME(0x30) attributes for new file size. */
+		/*
+		 * Update $FILE_NAME(0x30) attributes for new file size.
+		 * This code now commented, because Windows does not update
+		 * them unless a rename operation occur.
+		 */
+		/*
 		ctx = ntfs_attr_get_search_ctx(out, NULL);
 		if (!ctx) {
 			perror("ERROR: Couldn't get search context");
@@ -282,13 +287,13 @@ int main (int argc, char *argv[])
 				fna->allocated_size = scpu_to_le64(
 							na->allocated_size);
 				fna->data_size = scpu_to_le64(na->data_size);
+				ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			}
 		}
 		if (errno != ENOENT)
 			perror("ERROR: Attribute lookup failed");
-
-		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		ntfs_attr_put_search_ctx(ctx);
+		*/
 	}
 
 	buf = malloc (NTFS_BUF_SIZE);
