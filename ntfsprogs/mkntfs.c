@@ -1,7 +1,7 @@
 /**
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2001-2003 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
@@ -73,14 +73,41 @@
 #include <fcntl.h>
 #ifdef HAVE_LINUX_MAJOR_H
 #	include <linux/major.h>
-#endif
-#ifndef MAJOR
-#	define MAJOR(dev)	((dev) >> 8)
-#	define MINOR(dev)	((dev) & 0xff)
-#endif
-#ifndef SCSI_BLK_MAJOR
-#	define SCSI_BLK_MAJOR(m)	((m) == SCSI_DISK_MAJOR || \
-					 (m) == SCSI_CDROM_MAJOR)
+#	ifndef MAJOR
+#		define MAJOR(dev)	((dev) >> 8)
+#		define MINOR(dev)	((dev) & 0xff)
+#	endif
+#	ifndef IDE_DISK_MAJOR
+#		ifndef IDE0_MAJOR
+#			define IDE0_MAJOR	3
+#			define IDE1_MAJOR	22
+#			define IDE2_MAJOR	33
+#			define IDE3_MAJOR	34
+#			define IDE4_MAJOR	56
+#			define IDE5_MAJOR	57
+#			define IDE6_MAJOR	88
+#			define IDE7_MAJOR	89
+#			define IDE8_MAJOR	90
+#			define IDE9_MAJOR	91
+#		endif
+#		define IDE_DISK_MAJOR(M) \
+				((M) == IDE0_MAJOR || (M) == IDE1_MAJOR || \
+				(M) == IDE2_MAJOR || (M) == IDE3_MAJOR || \
+				(M) == IDE4_MAJOR || (M) == IDE5_MAJOR || \
+				(M) == IDE6_MAJOR || (M) == IDE7_MAJOR || \
+				(M) == IDE8_MAJOR || (M) == IDE9_MAJOR)
+#	endif
+#	ifndef SCSI_DISK_MAJOR
+#		ifndef SCSI_DISK0_MAJOR
+#			define SCSI_DISK0_MAJOR	8
+#			define SCSI_DISK1_MAJOR	65
+#			define SCSI_DISK7_MAJOR	71
+#		endif
+#		define SCSI_DISK_MAJOR(M) \
+				((M) == SCSI_DISK0_MAJOR || \
+				((M) >= SCSI_DISK1_MAJOR && \
+				(M) <= SCSI_DISK7_MAJOR))
+#	endif
 #endif
 #include <limits.h>
 
@@ -96,7 +123,6 @@
 #include "mst.h"
 #include "dir.h"
 #include "runlist.h"
-//#include "debug.h"
 #include "utils.h"
 
 extern const unsigned char attrdef_ntfs12_array[2400];
@@ -2600,12 +2626,15 @@ int main(int argc, char **argv)
 		fprintf(stderr, "mkntfs forced anyway.\n");
 	}
 #ifdef HAVE_LINUX_MAJOR_H
-	else if ((MAJOR(sbuf.st_rdev) == HD_MAJOR &&
+	else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
 			MINOR(sbuf.st_rdev) % 64 == 0) ||
-			(SCSI_BLK_MAJOR(MAJOR(sbuf.st_rdev)) &&
+			(SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
 			MINOR(sbuf.st_rdev) % 16 == 0)) {
-		err_exit("%s is entire device, not just one partition!\n",
+		Eprintf("%s is entire device, not just one partition.\n",
 				vol->dev->d_name);
+		if (!opts.force)
+			err_exit("Refusing to make a filesystem here!\n");
+		fprintf(stderr, "mkntfs forced anyway.\n");
 	}
 #endif
 	/* Make sure the file system is not mounted. */
