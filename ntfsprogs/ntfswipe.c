@@ -430,39 +430,78 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 	s64 i;
 	s64 total = 0;
 	s64 result = 0;
+	int size = 0;
 	u8 *buffer = NULL;
 
 	if (!vol || (byte < 0))
 		return -1;
 
-	if (act == act_wipe) {
-		buffer = malloc (vol->mft_record_size);
-		if (!buffer) {
-			Eprintf ("malloc failed\n");
-			return -1;
-		}
+	buffer = malloc (vol->mft_record_size);
+	if (!buffer) {
+		Eprintf ("malloc failed\n");
+		return -1;
 	}
 
 	for (i = 0; i < vol->nr_mft_records; i++) {
 		if (utils_mftrec_in_use (vol, i)) {
-			total += 300;		// some token amount?
+			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
+				1, vol->mft_record_size, buffer);
+			if (result != 1) {
+				Eprintf ("error attr mst read %lld\n", i);
+				total = -1;	// XXX just negate result?
+				goto free;
+			}
+
+			// We know that the end marker will only take 4 bytes
+			size = *((u32*) (buffer + 0x18)) - 4;
+
+			if (act == act_info) {
+				//printf ("mft %d\n", size);
+				total += size;
+				continue;
+			}
+
+
+
+			memset (buffer + size, byte, vol->mft_record_size - size);
+
+			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
+				1, vol->mft_record_size, buffer);
+			if (result != 1) {
+				Eprintf ("error attr mst write %lld\n", i);
+				total = -1;
+				goto free;
+			}
+
+			if ((vol->mft_record_size * (i+1)) <= vol->mftmirr_na->allocated_size)
+			{
+				// We have to reduce the update sequence number, or else...
+				u16 offset;
+				u16 usa;
+				offset = le16_to_cpu (*(buffer + 0x04));
+				usa = le16_to_cpu (*(buffer + offset));
+				*((u16*) (buffer + offset)) = cpu_to_le16 (usa - 1);
+
+				result = ntfs_attr_mst_pwrite (vol->mftmirr_na, vol->mft_record_size * i,
+					1, vol->mft_record_size, buffer);
+				if (result != 1) {
+					Eprintf ("error attr mst write %lld\n", i);
+					total = -1;
+					goto free;
+				}
+			}
+
+			total += vol->mft_record_size;
 		} else {
 			if (act == act_info) {
 				total += vol->mft_record_size;
 				continue;
 			}
 
-			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
-				vol->mft_record_size / vol->sector_size, vol->sector_size, buffer);
-			if (result != (vol->mft_record_size / vol->sector_size)) {
-				Eprintf ("error attr mst read %lld\n", i);
-				total = -1;	// XXX just negate result?
-				goto free;
-			}
-
 			// Build the record from scratch
 			memset (buffer, 0, vol->mft_record_size);
 
+			// Common values
 			*((u32*) (buffer + 0x00)) = magic_FILE;				// Magic
 			*((u16*) (buffer + 0x06)) = cpu_to_le16 (0x0003);		// USA size
 			*((u16*) (buffer + 0x10)) = cpu_to_le16 (0x0001);		// Seq num
@@ -470,11 +509,13 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			*((u16*) (buffer + 0x28)) = cpu_to_le16 (0x0001);		// Attr ID
 
 			if (vol->major_ver == 3) {
+				// Only XP and 2K3
 				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x0030);	// USA offset
 				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0038);	// Attr offset
 				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000040);	// FILE usage
 				*((u32*) (buffer + 0x38)) = cpu_to_le32 (0xFFFFFFFF);	// End marker
-			} else { 
+			} else {
+				// Only NT and 2K
 				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x002A);	// USA offset
 				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0030);	// Attr offset
 				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000038);	// FILE usage
@@ -906,6 +947,10 @@ int main (int argc, char *argv[])
 		}
 
 		printf ("%llu bytes were wiped\n", total);
+	}
+
+	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
+		Eprintf ("Couldn't mark volume dirty\n");
 	}
 
 	result = 0;
