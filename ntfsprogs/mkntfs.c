@@ -161,6 +161,9 @@ char *dev_name;
 struct {
 	int sector_size;		/* -s, in bytes, power of 2, default is
 					   512 bytes. */
+	int sectors_per_track;		/* number of sectors per track on
+					   device */
+	int heads;			/* number of heads on device */
 	long long part_start_sect;	/* start sector of partition on parent
 					   device */
 	long long nr_sectors;		/* size of device in sectors */
@@ -289,6 +292,10 @@ static void usage(void)
 			"for the device\n"
 			"    -p part-start-sect       Specify the partition "
 			"start sector\n"
+			"    -H heads                 Specify the number of "
+			"heads\n"
+			"    -S sectors-per-track     Specify the number of "
+			"sectors per track\n"
 			"    -c cluster-size          Specify the cluster "
 			"size for the volume\n"
 			"    -L volume-label          Set the volume label\n"
@@ -338,7 +345,7 @@ static void parse_options(int argc, char *argv[])
 			break;
 		case 'c':
 			l = strtol(optarg, &s, 0);
-			if (!l || l > INT_MAX || *s)
+			if (l <= 0 || l > INT_MAX || *s)
 				err_exit("Invalid cluster size.\n");
 			vol->cluster_size = l;
 			break;
@@ -348,20 +355,29 @@ static void parse_options(int argc, char *argv[])
 			break;
 		case 'p':
 			u = strtoul(optarg, &s, 0);
+			if ((u >= ULONG_MAX && errno == ERANGE) || *s)
+				err_exit("Invalid partition start sector.\n");
 			opts.part_start_sect = u;
-			if ((u >= ULONG_MAX && errno == ERANGE) || *s ||
-					(opts.part_start_sect >> 32))
-				err_exit("Invalid partition start sector: %s  "
-						"Maximum is 4294967295 "
-						"(2^32-1).\n",
-						optarg);
+			break;
+		case 'H':
+			l = strtol(optarg, &s, 0);
+			if (l <= 0 || l > INT_MAX || *s)
+				err_exit("Invalid number of heads.\n");
+			opts.heads = l;
+			break;
+		case 'S':
+			l = strtol(optarg, &s, 0);
+			if (l <= 0 || l > INT_MAX || *s)
+				err_exit("Invalid number of sectors per "
+						"track.\n");
+			opts.sectors_per_track = l;
 			break;
 		case 'q':
 			opts.quiet = 1;
 			break;
 		case 's':
 			l = strtol(optarg, &s, 0);
-			if (!l || l > INT_MAX || *s)
+			if (l <= 0 || l > INT_MAX || *s)
 				err_exit("Invalid sector size.\n");
 			opts.sector_size = l;
 			break;
@@ -2462,6 +2478,8 @@ static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 static void init_options(void)
 {
 	memset(&opts, 0, sizeof(opts));
+	opts.sectors_per_track = -1;
+	opts.heads = -1;
 	opts.part_start_sect = -1;
 	opts.index_block_size = 4096;
 	opts.attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
@@ -2676,19 +2694,77 @@ int main(int argc, char **argv)
 	/* Reserve the last sector for the backup boot sector. */
 	opts.nr_sectors--;
 	/* If user didn't specify the partition start sector, determine it. */
-	if (opts.part_start_sect == -1) {
+	if (opts.part_start_sect < 0) {
 		opts.part_start_sect = ntfs_device_partition_start_sector_get(
 				vol->dev);
 		if (opts.part_start_sect < 0) {
 			Eprintf("No partition start sector specified for %s "
 					"and it could not\nbe obtained "
 					"automatically.  Setting it to 0.\n"
-					"This will probably cause Windows not "
-					"to be able to boot from this "
-					"volume.\n", vol->dev->d_name);
+					"This will cause Windows not to be "
+					"able to boot from this volume.\n",
+					vol->dev->d_name);
+			opts.part_start_sect = 0;
+		} else if (opts.part_start_sect >> 32) {
+			Eprintf("No partition start sector specified for %s "
+					"and the automatically\ndetermined "
+					"value is too large.  Setting it to 0."
+					"  This will cause Windows not\nto be "
+					"able to boot from this volume.\n",
+					vol->dev->d_name);
 			opts.part_start_sect = 0;
 		}
-	}
+	} else if (opts.part_start_sect >> 32)
+		err_exit("Invalid partition start sector specified: %lli  "
+				"Maximum is 4294967295 (2^32-1).\n",
+				opts.part_start_sect);
+	/* If user didn't specify the sectors per track, determine it now. */
+	if (opts.sectors_per_track < 0) {
+		opts.sectors_per_track =
+				ntfs_device_sectors_per_track_get(vol->dev);
+		if (opts.sectors_per_track < 0) {
+			Eprintf("No number of sectors per track specified for "
+					"%s and\nit could not be obtained "
+					"automatically.  Setting it to 0.  "
+					"This will cause\nWindows not to be "
+					"able to boot from this volume.\n",
+					vol->dev->d_name);
+			opts.sectors_per_track = 0;
+		} else if (opts.sectors_per_track > 0xffff) {
+			Eprintf("No number of sectors per track specified for "
+					"%s and the automatically\ndetermined "
+					"value is too large.  Setting it to 0."
+					"  This will cause Windows not\nto be "
+					"able to boot from this volume.\n",
+					vol->dev->d_name);
+			opts.sectors_per_track = 0;
+		}
+	} else if (opts.sectors_per_track > 0xffff)
+		err_exit("Invalid number of sectors per track specified: %i  "
+				"Maximum is 65535 (0xffff).\n",
+				opts.sectors_per_track);
+	/* If user didn't specify the number of heads, determine it now. */
+	if (opts.heads < 0) {
+		opts.heads = ntfs_device_heads_get(vol->dev);
+		if (opts.heads < 0) {
+			Eprintf("No number of heads specified for %s and it "
+					"could not\nbe obtained automatically."
+					"  Setting it to 0.  This will cause "
+					"Windows not to\nbe able to boot from "
+					"this volume.\n", vol->dev->d_name);
+			opts.heads = 0;
+		} else if (opts.heads > 0xffff) {
+			Eprintf("No number of heads specified for %s and the "
+					"automatically\ndetermined value is "
+					"too large.  Setting it to 0.  This "
+					"will cause Windows not\nto be able "
+					"to boot from this volume.\n",
+					vol->dev->d_name);
+			opts.heads = 0;
+		}
+	} else if (opts.heads > 0xffff)
+		err_exit("Invalid number of heads specified: %i  Maximum is "
+				"65535 (0xffff).\n", opts.heads);
 	/* If user didn't specify the volume size, determine it now. */
 	if (!opts.volume_size)
 		opts.volume_size = opts.nr_sectors * opts.sector_size;
@@ -3314,8 +3390,13 @@ int main(int argc, char **argv)
 	bs->bpb.sectors_per_cluster = (u8)(vol->cluster_size /
 			opts.sector_size);
 	bs->bpb.media_type = 0xf8; /* hard disk */
+	bs->bpb.sectors_per_track = cpu_to_le16(opts.sectors_per_track);
+	Dprintf("sectors per track = %u (0x%x)\n", opts.sectors_per_track,
+			opts.sectors_per_track);
+	bs->bpb.heads = cpu_to_le16(opts.heads);
+	Dprintf("heads = %u (0x%x)\n", opts.heads, opts.heads);
 	bs->bpb.hidden_sectors = cpu_to_le32(opts.part_start_sect);
-	Dprintf("hidden sectors = %lli (0x%llx)\n", opts.part_start_sect,
+	Dprintf("hidden sectors = %llu (0x%llx)\n", opts.part_start_sect,
 			opts.part_start_sect);
 	/*
 	 * If there are problems go back to bs->unused[0-3] and set them. See
