@@ -19,10 +19,19 @@ Group		: System Environment/Base
 %description
 The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
 for the NTFS filesystem to the Linux operating system. Linux-NTFS currently
-consists of a static library and utilities (for a full list of included
-utilities see man 8 ntfsprogs after installation) as well as a GNOME virtual
-filesystem module to allow GNOME VFS clients to seamlessly utilize the NTFS
-library.
+consists of a static library and utilities such as mkntfs, ntfscat, ntfsls,
+ntfsresize, and ntfsundelete (for a full list of included utilities see man
+8 ntfsprogs after installation).
+
+
+%package gnomevfs
+Summary		: NTFS GNOME virtual filesystem module
+Group		: System Environment/Base
+Requires	: ntfsprogs = %{ver}-%{rel}
+%description gnomevfs
+This package contains the NTFS GNOME virtual filesystem (VFS) module which
+allows GNOME VFS clients to seamlessly utilize the NTFS library.
+
 
 %package devel
 Summary		: files required to compile software that uses libntfs
@@ -64,11 +73,15 @@ rm -rf "$RPM_BUILD_ROOT"
 %doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
 %{bindir}/*
 %{sbindir}/*
-%{mandir}/*/*
+%{mandir}/man8/mkntfs.8*
+%{mandir}/man8/ntfs*.8*
 %{_libdir}/libntfs.*so*
+
+%files gnomevfs
+%defattr(-,root,root)
+%{mandir}/man8/libntfs-gnomevfs.8*
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*so*
 %{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
-
 
 %files devel
 %defattr(-,root,root)
