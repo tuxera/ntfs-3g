@@ -567,8 +567,10 @@ int stoucs(uchar_t *dest, const char *src, int maxlen)
 	char c;
 	int i;
 
-	/* Need two bytes for null terminator. */
-	maxlen -= 2;
+	/* Convert maxlen from bytes to unicode characters. */
+	maxlen /= sizeof(uchar_t);
+	/* Need space for null terminator. */
+	maxlen--;
 	for (i = 0; i < maxlen; i++) {
 		c = src[i];
 		if (!c)
