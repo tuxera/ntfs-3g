@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# post-incoming.mail - A BitKeeper trigget to send incoming ChangeSets to the
+#		       linux-ntfs-cvs mailing list, one ChangeSet per email.
+#
+# Copyright (c) 2005 Yura Pakhuchiy
+# Copyright (c) 2005 Anton Altaparmakov
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA 02111-1307, USA.
+#########################################################################
+
+# This script should only be run on successful incoming pushes in the
+# repository on bkbits.net.
+if [ "x${BK_SIDE}" != "xserver" ]; then
+	exit 0
+fi
+if [ "x${BK_EVENT}" != "xincoming push" ]; then
+	exit 0
+fi
+if [ "x${BK_STATUS}" != "xOK" ]; then
+	exit 0
+fi
+if [ -z "$(echo ${BKD_HOST} | grep bkbits.net)" ]; then
+	exit 0
+fi
+
+# For each ChangeSet, send an email.
+bk changes -f -d'$unless(:MERGE:){:CSETREV:\n}' - < "${BK_CSETLIST}" 2>/dev/null | while read rev; do
+
+{
+cat <<EOT
+From: Anton Altaparmakov <aia21@cantab.net>
+To: ntfs-cvs <linux-ntfs-cvs@lists.sourceforge.net>
+Subject: bk-$(echo ${BKD_ROOT} 2>/dev/null | sed "s#.*/##" 2>/dev/null): ChangeSet@${rev} by ${BK_USER}@${BK_HOST}
+
+EOT
+
+bk changes -f -d'$unless(:MERGE:){ChangeSet|:CSETREV:\n}' -r$rev 2>/dev/null |
+bk -R prs -h -d'$unless(:MERGE:){ChangeSet@:I:, 20:Dy:-:Dm:-:Dd: :T::TZ:, :P:@:HOST:\n}' - 2>/dev/null
+
+cat <<EOT
+
+This will update the following files:
+
+EOT
+
+bk export -tpatch -du -h -r$rev 2>/dev/null | diffstat -p1 2>/dev/null
+
+cat <<EOT
+
+Comments:
+
+EOT
+
+bk changes -v -r$rev 2>/dev/null
+
+cat <<EOT
+Unified diff:
+
+EOT
+
+bk export -tpatch -du -h -r$rev 2>/dev/null
+
+} | sendmail -ti
+
+done
+
+exit 0
