@@ -121,6 +121,7 @@ am__quote = @am__quote@
 install_sh = @install_sh@
 
 LTVERSION = 5:0:0
+LTVERSION_GNOMEVFS = 1:0:0
 
 # Later gcc require -fms-extensions to work.
 @GCC_NEEDS_MS_EXTENSIONS_TRUE@GCCflag = -fms-extensions
@@ -131,7 +132,8 @@ LTVERSION = 5:0:0
 @DEBUG_FALSE@AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall $(GCCflag)
 
 linux_ntfsincludedir = -I$(top_srcdir)/include
-lib_LTLIBRARIES = libntfs.la
+lib_LTLIBRARIES = libntfs.la libntfs-gnomevfs.la
+
 libntfs_la_LDFLAGS = -version-info $(LTVERSION)
 libntfs_la_SOURCES = \
 	attrib.c	\
@@ -151,15 +153,24 @@ libntfs_la_SOURCES = \
 	volume.c
 
 
+libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_GNOMEVFS)
+libntfs_gnomevfs_la_SOURCES = \
+	gnome-vfs-method.c		\
+	gnome-vfs-module.c
+
+
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST = unix_io.c win32_io.c
+EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 subdir = libntfs
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 LTLIBRARIES = $(lib_LTLIBRARIES)
 
+libntfs_gnomevfs_la_LIBADD =
+am_libntfs_gnomevfs_la_OBJECTS = gnome-vfs-method.lo gnome-vfs-module.lo
+libntfs_gnomevfs_la_OBJECTS = $(am_libntfs_gnomevfs_la_OBJECTS)
 libntfs_la_LIBADD =
 am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
 	debug.lo device.lo device_io.lo dir.lo inode.lo lcnalloc.lo \
@@ -175,6 +186,8 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/bootsect.Plo ./$(DEPDIR)/compat.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/debug.Plo ./$(DEPDIR)/device.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/device_io.Plo ./$(DEPDIR)/dir.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/gnome-vfs-method.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/gnome-vfs-module.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/inode.Plo ./$(DEPDIR)/lcnalloc.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mft.Plo ./$(DEPDIR)/mst.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/runlist.Plo ./$(DEPDIR)/unistr.Plo \
@@ -186,9 +199,9 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(libntfs_la_SOURCES)
+DIST_SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
 DIST_COMMON = Makefile.am Makefile.in
-SOURCES = $(libntfs_la_SOURCES)
+SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
 
 all: all-am
 
@@ -227,6 +240,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+libntfs-gnomevfs.la: $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_DEPENDENCIES) 
+	$(LINK) -rpath $(libdir) $(libntfs_gnomevfs_la_LDFLAGS) $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_LIBADD) $(LIBS)
 libntfs.la: $(libntfs_la_OBJECTS) $(libntfs_la_DEPENDENCIES) 
 	$(LINK) -rpath $(libdir) $(libntfs_la_LDFLAGS) $(libntfs_la_OBJECTS) $(libntfs_la_LIBADD) $(LIBS)
 
@@ -244,6 +259,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dir.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gnome-vfs-method.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gnome-vfs-module.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lcnalloc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mft.Plo@am__quote@
