@@ -3155,10 +3155,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 	vol = na->ni->vol;
 
-	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
-	if (!ctx)
-		return -1;
-
 	/*
 	 * Check the attribute type and the corresponding maximum size
 	 * against @newsize and fail if @newsize is too big.
@@ -3174,6 +3170,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		return -1;
 	}
 
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+
 	/* The first cluster outside the new allocation. */
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
 			vol->cluster_size_bits;
@@ -3183,9 +3183,9 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		/* Get the last extent of the attribute. */
-		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 
-			(na->allocated_size >> vol->cluster_size_bits) - 1,
-							NULL, 0, ctx)) {
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
+				(na->allocated_size >>
+				vol->cluster_size_bits) - 1, NULL, 0, ctx)) {
 			err = errno;
 			if (err == ENOENT)
 				err = EIO;
@@ -3266,7 +3266,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl,
-						sle64_to_cpu(a->lowest_vcn));
+				sle64_to_cpu(a->lowest_vcn));
 		if (mp_size <= 0) {
 			err = errno;
 			Dprintf("%s(): Eeek! Get size for mapping "
@@ -3278,18 +3278,18 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * if we shall *not* expand space for mapping pairs
 		 */
 		cur_max_mp_size = le32_to_cpu(a->length) - 
-					le16_to_cpu(a->mapping_pairs_offset);
+				le16_to_cpu(a->mapping_pairs_offset);
 		/*
 		 * Determine maximum possible length of mapping pairs,
 		 * if we shall expand space for mapping pairs
 		 */
-		exp_max_mp_size = le32_to_cpu(m->bytes_allocated)
-			- le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
+		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
+				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
 
 		if (mp_size > exp_max_mp_size) {
 			err = ENOTSUP;
-			Dprintf("%s(): Eeek! Maping pairs size is"
-					" too big.\n", __FUNCTION__);
+			Dprintf("%s(): Eeek! Maping pairs size is too big.\n",
+					__FUNCTION__);
 			goto rollback;
 		}
 
@@ -3311,8 +3311,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			 * Calculate the new attribute length and mft record
 			 * bytes used.
 			 */
-			new_alen = (le16_to_cpu(a->mapping_pairs_offset)
-							+ mp_size + 7) & ~7;
+			new_alen = (le16_to_cpu(a->mapping_pairs_offset) +
+					mp_size + 7) & ~7;
 			new_muse = le32_to_cpu(m->bytes_in_use) -
 					le32_to_cpu(a->length) + new_alen;
 			if (new_muse > le32_to_cpu(m->bytes_allocated)) {
@@ -3327,10 +3327,11 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				goto rollback;
 			}
 			/* Move the following attributes making space. */
-			memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(
-					a->length), le32_to_cpu(m->bytes_in_use)
-					- ((u8*)a - (u8*)m) - le32_to_cpu(
-					a->length));
+			memmove((u8*)a + new_alen, (u8*)a +
+					le32_to_cpu(a->length),
+					le32_to_cpu(m->bytes_in_use) -
+					((u8*)a - (u8*)m) -
+					le32_to_cpu(a->length));
 			/* Update the sizes of the attribute and mft records. */
 			a->length = cpu_to_le32(new_alen);
 			m->bytes_in_use = cpu_to_le32(new_muse);
@@ -3339,9 +3340,9 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * Generate the new mapping pairs array directly into the
 		 * correct destination, i.e. the attribute record itself.
 		 */
-		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-					a->mapping_pairs_offset), mp_size,
-					na->rl, sle64_to_cpu(a->lowest_vcn))) {
+		if (ntfs_mapping_pairs_build(vol, (u8*)a +
+				le16_to_cpu(a->mapping_pairs_offset), mp_size,
+				na->rl, sle64_to_cpu(a->lowest_vcn))) {
 			err = errno;
 			Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "
@@ -3364,24 +3365,24 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
 	
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 
-							0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
+			ctx)) {
 		Dprintf("%s(): Eeek! Lookup of first attribute extent "
-						"failed.\n", __FUNCTION__);
+				"failed.\n", __FUNCTION__);
 		err = errno;
 		if (err == ENOENT)
 			err = EIO;
 		if ((na->allocated_size >> vol->cluster_size_bits) !=
-							first_free_vcn) {
+				first_free_vcn) {
 			Dprintf("%s(): Trying perform rollback.\n",
-							__FUNCTION__);
+					__FUNCTION__);
 			ntfs_attr_reinit_search_ctx(ctx);
 			if (ntfs_attr_lookup(na->type, na->name, na->name_len,
 					0, (na->allocated_size >>
 					vol->cluster_size_bits) - 1,
 					NULL, 0, ctx)) {
 				Dprintf("%s(): Eeek! Rollback failed. "
-					"Run chkdsk.\n", __FUNCTION__);
+						"Run chkdsk.\n", __FUNCTION__);
 				err = errno;
 				if (err == ENOENT)
 					err = EIO;
