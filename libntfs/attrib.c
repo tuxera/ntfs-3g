@@ -2508,6 +2508,15 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->lowest_vcn = cpu_to_sle64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
 	a->compression_unit = (flags & ATTR_IS_COMPRESSED) ? 4 : 0;
+	/* If @lowest_vcn == 0, than setup empty attribute. */
+	if (!lowest_vcn) {
+		a->highest_vcn = cpu_to_sle64(-1);
+		a->allocated_size = 0;
+		a->data_size = 0;
+		a->initialized_size = 0;
+		/* Set empty mapping pairs. */
+		*((u8*) a + (length - dataruns_size)) = 0;
+	}
 	if (name_len)
 		memcpy((u8*)a + le16_to_cpu(a->name_offset),
 			name, sizeof(ntfschar) * name_len);
