@@ -358,6 +358,53 @@ err_out:
 }
 
 /**
+ * ntfs_inode_attach_all_extents - atach all extents for target inode
+ * @ni:		opened ntfs inode for which perform atach
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_inode_attach_all_extents(ntfs_inode *ni)
+{
+	ATTR_LIST_ENTRY *ale;
+
+	if (!ni) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (ni->nr_extents == -1)
+		ni = ni->base_ni;
+
+	Dprintf("%s(): Entering for inode 0x%llx.\n",
+			__FUNCTION__, (long long) ni->mft_no);
+
+	/* Inode haven't got attribute list, thus nothing to attach. */
+	if (!NInoAttrList(ni))
+		return 0;
+	
+	if (!ni->attr_list) {
+		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Walk thru attribute list and attach all extents. */
+	errno = 0;
+	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
+	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
+		if (!ntfs_extent_inode_open(ni, MREF_LE(ale->mft_reference))) {
+			Dprintf("%s(): Couldn't attach extent inode.\n",
+					__FUNCTION__);
+			return -1;
+		}
+		ale = (ATTR_LIST_ENTRY *)((u8*)ale + le16_to_cpu(ale->length));
+	}
+	return 0;
+}
+
+
+/**
  * ntfs_inode_sync - write the inode (and its dirty extents) to disk
  * @ni:		ntfs inode to write
  *
@@ -584,15 +631,41 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	al = aln;
 	ntfs_attr_put_search_ctx(ctx);
 
+	/* Free space if there is not enough it for $ATTRIBUTE_LIST. */
+	if (le32_to_cpu(ni->mrec->bytes_allocated) -
+			le32_to_cpu(ni->mrec->bytes_in_use) <
+			offsetof(ATTR_RECORD, resident_attr_end)) {
+		/*
+		 * Set temporary in-memory attribute list. We need this to be
+		 * able perform attribute lookups and move out attributes.
+		 */
+		ni->attr_list = al;
+		ni->attr_list_size = al_len;
+		NInoSetAttrList(ni);
+		/* Free space. */
+		if (ntfs_inode_free_space(ni,
+				offsetof(ATTR_RECORD, resident_attr_end))) {
+			/*
+			 * Couldn't free space, unset temporary in-memory
+			 * attribute list and fail.
+			 */
+			err = errno;
+			Dprintf("%s(): Failed to free space for "
+				"$ATTRIBUTE_LIST.\n", __FUNCTION__);
+			ni->attr_list = NULL;
+			NInoClearAttrList(ni);
+			goto err_out;
+		}
+		/* Unset temporary in-memory attribute list. */
+		ni->attr_list = NULL;
+		NInoClearAttrList(ni);
+	}
+
 	/* Add $ATTRIBUTE_LIST to mft record. */
 	if (ntfs_resident_attr_record_add(ni, AT_ATTRIBUTE_LIST, 0, 0, 0) < 0) {
 		err = errno;
 		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
 			__FUNCTION__);
-		if (err == ENOSPC) {
-			//FIXME: Move out attributes and try once again.
-			err = ENOTSUP;
-		}
 		goto err_out;
 	}
 
@@ -608,6 +681,131 @@ put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	free(al);
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_inode_free_space - free space in the MFT record of inode
+ * @ni:		ntfs inode in which MFT record free space
+ * @size:	amount of space needed to free
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_inode_free_space(ntfs_inode *ni, int size)
+{
+	ntfs_attr_search_ctx *ctx;
+	int freed = 0, err;
+
+	if (!ni || size < 0) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+	
+	Dprintf("%s(): Entering for inode 0x%llx, size %d.\n",
+			__FUNCTION__, (long long) ni->mft_no, size);
+
+	if (!size)
+		return 0;
+
+	ctx = ntfs_attr_get_search_ctx(ni, 0);
+	if (!ctx) {
+		err = errno;
+		Dprintf("%s(): Failed to get attribute search context.\n",
+				__FUNCTION__);
+		errno = err;
+		return -1;
+	}
+
+	/*
+	 * Chkdsk complain if $STANDART_INFORMATION is not in the base MFT
+	 * record. FIXME: I'm not sure in this, need to recheck. For now simply
+	 * do not move $STANDART_INFORMATION at all.
+	 *
+	 * Also we can't move $ATTRIBUTE_LIST from base MFT_RECORD, so position
+	 * search context on first attribute after $STANDARD_INFORMATION and
+	 * $ATTRIBUTE_LIST.
+	 *
+	 * Why we reposition instead of simply skip this attributes during
+	 * enumeration? Because in case we have got only in-memory attribute
+	 * list ntfs_attr_lookup will fail when it will try to find
+	 * $ATTRIBUTE_LIST.
+	 */
+	if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0, NULL,
+				0, ctx)) {
+		if (errno != ENOENT) {
+			err = errno;
+			Dprintf("%s(): Attribute lookup failed.\n",
+				__FUNCTION__);
+			goto put_err_out;
+		}
+		if (ctx->attr->type == AT_END) {
+			err = ENOSPC;
+			goto put_err_out;
+		}
+	}
+
+	while (1) {
+		int record_size;
+
+		/*
+		 * Check whether attribute is from different MFT record. If so,
+		 * find next, because we don't need such.
+		 */
+		while (ctx->ntfs_ino->mft_no != ni->mft_no) {
+			if (ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE,
+						0, NULL, 0, ctx)) {
+				err = errno;
+				if (errno != ENOENT) {
+					Dprintf("%s(): Attribute lookup failed."
+						"\n", __FUNCTION__);
+				}
+				break;
+			}
+		}
+
+		record_size = le32_to_cpu(ctx->attr->length);
+
+		/* Move away attribute. */
+		if (ntfs_attr_record_move_away(ctx)) {
+			err = errno;
+			Dprintf("%s(): Failed to move out attribute.\n",
+					__FUNCTION__);
+			break;
+		}
+		freed += record_size;
+
+		/* Check whether we done. */
+		if (size <= freed) {
+			ntfs_attr_put_search_ctx(ctx);
+			return 0;
+		}
+
+		/*
+		 * Repostion to first attribute after $STANDARD_INFORMATION and
+		 * $ATTRIBUTE_LIST (see comments upwards).
+		 */
+		ntfs_attr_reinit_search_ctx(ctx);
+		if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0,
+				NULL, 0, ctx)) {
+			if (errno != ENOENT) {
+				err = errno;
+				Dprintf("%s(): Attribute lookup failed.\n",
+					__FUNCTION__);
+				break;
+			}
+			if (ctx->attr->type == AT_END) {
+				err = ENOSPC;
+				break;
+			}
+		}
+	}
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	if (err == ENOSPC)
+		Dprintf("%s(): No attributes left that can be moved out.\n",
+			__FUNCTION__);
 	errno = err;
 	return -1;
 }
