@@ -27,9 +27,8 @@ Thanks,
 - get rid of the unneeded lseek()'s during reads/writes (probably it 
   doesn't improve performance much, or any at all)
 - catch if source and dest are the same
-- add dd's noerror option
+- rescue: when reading a cluster fails then try rescue at the sector level 
 - disable consistency check for --metadata (e.g. if the check is crashing)
-- ignore consistency check (different than "disabling" fsck)
 - make "wiped", etc statistic variables long long
 - option: --inode 
 - option: --data

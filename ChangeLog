@@ -113,6 +113,10 @@ xx/xx/2005 - 2.0.0-WIP
 	- ntfsclone: added a new option, --ignore-fs-check. It can be used
 	  only with the --metadata option. The clusters causing the 
 	  inconsistency are saved too. (Szaka)
+	- ntfsclone: added a new option, --rescue. It ignores read errors
+	  so disks having bad sectors (dying disks) can be rescued. The content
+	  of the cluster having bad sectors is filled by character '2' and the
+	  start of the cluster is marked by "BadClusteR". (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
