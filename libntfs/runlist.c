@@ -1033,10 +1033,9 @@ s64 ntfs_rl_pread(const ntfs_volume *vol, const runlist_element *rl,
 	if (!count)
 		return count;
 	/* Seek in @rl to the run containing @pos. */
-	for (ofs = 0; rl->length &&
-		(ofs + rl->length << vol->cluster_size_bits <= pos); rl++) {
+	for (ofs = 0; rl->length && (ofs + (rl->length <<
+			vol->cluster_size_bits) <= pos); rl++)
 		ofs += rl->length * vol->cluster_size;
-	}
 	/* Offset in the run at which to begin reading. */
 	ofs = pos - ofs;
 	for (total = 0LL; count; rl++, ofs = 0) {
@@ -1118,10 +1117,9 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 	if (!count)
 		return count;
 	/* Seek in @rl to the run containing @pos. */
-	for (ofs = 0; rl->length &&
-		(ofs + rl->length << vol->cluster_size_bits <= pos); rl++) {
+	for (ofs = 0; rl->length && (ofs + (rl->length <<
+			vol->cluster_size_bits) <= pos); rl++)
 		ofs += rl->length * vol->cluster_size;
-	}
 	/* Offset in the run at which to begin writing. */
 	ofs = pos - ofs;
 	for (total = 0LL; count; rl++, ofs = 0) {
