@@ -96,6 +96,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Mon Jan 19 2004 Anton Altaparmakov <aia21@cantab.net>
+- Add %config to tell rpm that libntfs.conf is a config file.
+
 * Thu Nov 6 2003 Anton Altaparmakov <aia21@cantab.net>
 - update description (it was getting too long)
 - merge libntfs-gnomevfs
