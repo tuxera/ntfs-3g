@@ -2,7 +2,7 @@
  * endians.h - Definitions related to handling of byte ordering. Part of the
  *	       Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -34,6 +34,28 @@
  */
 
 #include <asm/byteorder.h>
+
+/* The following are not defined on Cygwin... Luckily Cygwin is LE already. */
+#ifdef __CYGWIN32__
+
+#define __le16_to_cpu(x) (x)
+#define __le32_to_cpu(x) (x)
+#define __le64_to_cpu(x) (x)
+
+#define __cpu_to_le16(x) (x)
+#define __cpu_to_le32(x) (x)
+#define __cpu_to_le64(x) (x)
+
+#define __constant_le16_to_cpu(x) (x)
+#define __constant_le32_to_cpu(x) (x)
+#define __constant_le64_to_cpu(x) (x)
+
+#define __constant_cpu_to_le16(x) (x)
+#define __constant_cpu_to_le32(x) (x)
+#define __constant_cpu_to_le64(x) (x)
+
+#endif /* __CYGWIN32__ */
+
 
 /* Unsigned from LE to CPU conversion. */
 
