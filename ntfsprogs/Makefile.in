@@ -113,7 +113,9 @@ LINK = $(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS = ntfsfix ntfsinfo
 sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete ntfsresize
-EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscluster ntfsclone
+EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe ntfstruncate \
+			  ntfscluster ntfsclone ntfsls
+
 
 man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8
@@ -161,6 +163,10 @@ ntfscluster_SOURCES = ntfscluster.c ntfscluster.h utils.c utils.h
 ntfscluster_LDADD = $(AM_LIBS)
 ntfscluster_LDFLAGS = $(AM_LFLAGS)
 
+ntfsls_SOURCES = ntfsls.c utils.c utils.h
+ntfsls_LDADD = $(AM_LIBS)
+ntfsls_LDFLAGS = $(AM_LFLAGS)
+
 ntfstruncate_SOURCES = attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD = $(AM_LIBS)
 ntfstruncate_LDFLAGS = $(AM_LFLAGS)
@@ -183,7 +189,7 @@ CONFIG_CLEAN_FILES = mkntfs.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 \
 	ntfsprogs.8 ntfsresize.8 ntfsundelete.8
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) dumplog$(EXEEXT) \
 	ntfswipe$(EXEEXT) ntfstruncate$(EXEEXT) ntfscluster$(EXEEXT) \
-	ntfsclone$(EXEEXT)
+	ntfsclone$(EXEEXT) ntfsls$(EXEEXT)
 bin_PROGRAMS = ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT)
 sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) ntfsundelete$(EXEEXT) \
 	ntfsresize$(EXEEXT)
@@ -238,6 +244,12 @@ ntfslabel_OBJECTS = $(am_ntfslabel_OBJECTS)
 @REALLYSTATIC_TRUE@	$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfslabel_DEPENDENCIES = \
 @REALLYSTATIC_FALSE@	$(top_srcdir)/libntfs/libntfs.la
+am_ntfsls_OBJECTS = ntfsls.$(OBJEXT) utils.$(OBJEXT)
+ntfsls_OBJECTS = $(am_ntfsls_OBJECTS)
+@REALLYSTATIC_TRUE@ntfsls_DEPENDENCIES = \
+@REALLYSTATIC_TRUE@	$(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_FALSE@ntfsls_DEPENDENCIES = \
+@REALLYSTATIC_FALSE@	$(top_srcdir)/libntfs/libntfs.la
 am_ntfsresize_OBJECTS = ntfsresize.$(OBJEXT) utils.$(OBJEXT)
 ntfsresize_OBJECTS = $(am_ntfsresize_OBJECTS)
 @REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES = \
@@ -274,7 +286,8 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsclone.Po ./$(DEPDIR)/ntfscluster.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsdump_logfile.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsfix.Po ./$(DEPDIR)/ntfsinfo.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/ntfslabel.Po ./$(DEPDIR)/ntfsresize.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/ntfslabel.Po ./$(DEPDIR)/ntfsls.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/ntfsresize.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfstruncate.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsundelete.Po ./$(DEPDIR)/ntfswipe.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/sd.Po ./$(DEPDIR)/upcase.Po \
@@ -287,7 +300,7 @@ CCLD = $(CC)
 DIST_SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfsclone_SOURCES) \
 	$(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) \
 	$(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) \
-	$(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) \
+	$(ntfsls_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) \
 	$(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 NROFF = nroff
@@ -295,7 +308,7 @@ MANS = $(man_MANS)
 DIST_COMMON = Makefile.am Makefile.in mkntfs.8.in ntfsfix.8.in \
 	ntfsinfo.8.in ntfslabel.8.in ntfsprogs.8.in ntfsresize.8.in \
 	ntfsundelete.8.in
-SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
+SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 all: all-am
 
@@ -402,6 +415,9 @@ ntfsinfo$(EXEEXT): $(ntfsinfo_OBJECTS) $(ntfsinfo_DEPENDENCIES)
 ntfslabel$(EXEEXT): $(ntfslabel_OBJECTS) $(ntfslabel_DEPENDENCIES) 
 	@rm -f ntfslabel$(EXEEXT)
 	$(LINK) $(ntfslabel_LDFLAGS) $(ntfslabel_OBJECTS) $(ntfslabel_LDADD) $(LIBS)
+ntfsls$(EXEEXT): $(ntfsls_OBJECTS) $(ntfsls_DEPENDENCIES) 
+	@rm -f ntfsls$(EXEEXT)
+	$(LINK) $(ntfsls_LDFLAGS) $(ntfsls_OBJECTS) $(ntfsls_LDADD) $(LIBS)
 ntfsresize$(EXEEXT): $(ntfsresize_OBJECTS) $(ntfsresize_DEPENDENCIES) 
 	@rm -f ntfsresize$(EXEEXT)
 	$(LINK) $(ntfsresize_LDFLAGS) $(ntfsresize_OBJECTS) $(ntfsresize_LDADD) $(LIBS)
@@ -431,6 +447,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsfix.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsinfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfslabel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsresize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfstruncate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsundelete.Po@am__quote@

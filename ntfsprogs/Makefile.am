@@ -27,7 +27,8 @@ LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= ntfsfix ntfsinfo
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize
-EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscluster ntfsclone
+EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate \
+			  ntfscluster ntfsclone ntfsls
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8
@@ -73,6 +74,10 @@ ntfsclone_LDFLAGS	= $(AM_LFLAGS)
 ntfscluster_SOURCES	= ntfscluster.c ntfscluster.h utils.c utils.h
 ntfscluster_LDADD	= $(AM_LIBS)
 ntfscluster_LDFLAGS	= $(AM_LFLAGS)
+
+ntfsls_SOURCES		= ntfsls.c utils.c utils.h
+ntfsls_LDADD		= $(AM_LIBS)
+ntfsls_LDFLAGS		= $(AM_LFLAGS)
 
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)
