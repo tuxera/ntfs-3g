@@ -53,34 +53,36 @@
  * Log file restart page header (begins the restart area).
  */
 typedef struct {
+/*Ofs*/
 /*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
-	NTFS_RECORD_TYPES magic;/* The magic is "RSTR". */
-	u16 usa_ofs;		/* See NTFS_RECORD definition in layout.h.
+/*  0*/	NTFS_RECORD_TYPES magic;/* The magic is "RSTR". */
+/*  4*/	u16 usa_ofs;		/* See NTFS_RECORD definition in layout.h.
 				   When creating, set this to be immediately
 				   after this header structure (without any
 				   alignment). */
-	u16 usa_count;		/* See NTFS_RECORD definition in layout.h. */
+/*  6*/	u16 usa_count;		/* See NTFS_RECORD definition in layout.h. */
 
-	LSN chkdsk_lsn;		/* The last log file sequence number found by
+/*  8*/	LSN chkdsk_lsn;		/* The last log file sequence number found by
 				   chkdsk.  Only used when the magic is changed
 				   to "CHKD".  Otherwise this is zero. */
-	u32 system_page_size;	/* Byte size of system pages when the log file
+/* 16*/	u32 system_page_size;	/* Byte size of system pages when the log file
 				   was created, has to be >= 512 and a power of
 				   2.  Use this to calculate the required size
 				   of the usa (usa_count) and add it to usa_ofs.
 				   Then verify that the result is less than the
 				   value of the restart_offset. */
-	u32 log_page_size;	/* Byte size of log file records, has to be >=
+/* 20*/	u32 log_page_size;	/* Byte size of log file records, has to be >=
 				   512 and a power of 2.  Usually is 4096 (or
 				   is it just set to system_page_size?). */
-	u16 restart_offset;	/* Byte offset from the start of this header to
+/* 24*/	u16 restart_offset;	/* Byte offset from the start of this header to
 				   the RESTART_AREA.  Value has to be aligned
 				   to 8-byte boundary.  When creating, set this
 				   to be after the usa. */
-	s16 minor_ver;		/* Log file minor version.  Only check if major
+/* 26*/	s16 minor_ver;		/* Log file minor version.  Only check if major
 				   version is 1. */
-	s16 major_ver;		/* Log file major version.  We only support
+/* 28*/	s16 major_ver;		/* Log file major version.  We only support
 				   version 1.1. */
+/* sizeof() = 30 (0x1e) bytes */
 } __attribute__ ((__packed__)) RESTART_PAGE_HEADER;
 
 /*
@@ -89,33 +91,42 @@ typedef struct {
  * it.  See notes at restart_offset above.
  */
 typedef struct {
-	LSN current_lsn;	/* The current LSN inside the log when the
+/*Ofs*/
+/*  0*/	LSN current_lsn;	/* The current LSN inside the log when the
 				   restart area was last written.  This happens
 				   often but what is the interval?  Is it just
 				   fixed time or is it every time a check point
 				   is written or somethine else? */
-	u16 log_clients;	/* Number of log client records in the array of
+/*  8*/	u16 log_clients;	/* Number of log client records in the array of
 				   log client records which follows this
 				   restart area.  Must be 1.  */
-	u16 client_free_list;	/* The index of the first free log client record
-				   in the array of log client records.  If !=
-				   0xffff, check that log_clients >
-				   client_free_list.  = 0xffff */
-	u16 client_in_use_list;	/* The index of the first in-use log client
-				   revcord in the array of log client records.
-				   If != 0xffff check that log_clients >
-				   client_in_use_list.  = 0 */
-	u16 flags;		/* Flags modifying LFS behaviour.  = 0 */
-	u32 seq_number_bits;	/* How many bits to use for the sequence
+/* 10*/	u16 client_free_list;	/* The index of the first free log client record
+				   in the array of log client records.  0xffff
+				   means that there are no free log client
+				   records in the array.  If != 0xffff, check
+				   that log_clients > client_free_list.  On a
+				   clean volume this is != 0xffff, should at
+				   present always be 0.  At present on dirty
+				   volume this is 0xffff. */
+/* 12*/	u16 client_in_use_list;	/* The index of the first in-use log client
+				   record in the array of log client records.
+				   0xffff means that there are no in-use log
+				   client records in the array.  If != 0xffff
+				   check that log_clients > client_in_use_list.
+				   On a clean volume this is 0xffff.  On a
+				   dirty volume this is != 0xffff.  At present
+				   on dirty volume this is 0. */
+/* 14*/	u16 flags;		/* Flags modifying LFS behaviour.  = 0 */
+/* 16*/	u32 seq_number_bits;	/* How many bits to use for the sequence
 				   number.  I have seen 0x2c and 0x2d. */
-	u16 restart_area_length;/* Length of the restart area.  Following
+/* 20*/	u16 restart_area_length;/* Length of the restart area.  Following
 				   checks required if version matches.
 				   Otherwise, skip them.  restart_offset +
 				   restart_area_length has to be <=
 				   system_page_size.  Also, restart_area_length
 				   has to be >= client_array_offset +
-				   (log_clients * 0xa0).  = 0xd0 */
-	u16 client_array_offset;/* Offset from the start of this record to
+				   (log_clients * sizeof(log client record)). */
+/* 22*/	u16 client_array_offset;/* Offset from the start of this record to
 				   the first log client record if versions are
 				   matched.  When creating, set this to be
 				   after this restart area structure, aligned
@@ -127,8 +138,9 @@ typedef struct {
 				   to an 8-byte boundary.  Also, restart_offset
 				   + client_array_offset has to be <= 510.
 				   Finally, client_array_offset + (log_clients
-				   * 0xa0) has to be <=  system_page_size. */
-	s64 file_size;		/* Byte size of the log file.  If the
+				   * sizeof(log client record)) has to be <=
+				   system_page_size. */
+/* 24*/	s64 file_size;		/* Byte size of the log file.  If the
 				   restart_offset + the offset of the file_size
 				   are > 510 then corruption has occured.  This
 				   is the very first check when starting with
@@ -140,15 +152,17 @@ typedef struct {
 				   Calculate the file_size bits and check that
 				   seq_number_bits == 0x43 - file_size bits.
 				   = 0x400000 */
-	u32 last_lsn_data_length;/* ??? = 0, 0x40 */
-	u16 record_length;	/* Byte size of log records.  If the version
+/* 32*/	u32 last_lsn_data_length;/* ??? = 0, 0x40 */
+/* 36*/	u16 record_length;	/* Byte size of log records.  If the version
 				   matches then check that the value of
 				   record_length is a multiple of 8, i.e.
 				   (record_length + 7) & ~7 == record_length.
 				   = 0x30 */
-	u16 log_page_data_offset;/* ??? = 0x40 */
-	u32 unknown;		/* ??? = 0 */
-	u32 reserved;		/* Reserved/alignment to 8-byte boundary. */
+/* 38*/	u16 log_page_data_offset;/* ??? = 0x40 */
+/* 40*/	u32 unknown;		/* ??? It seems like it = 0 if clean and it != 0
+				   if dirty.  */
+/* 44*/	u32 reserved;		/* Reserved/alignment to 8-byte boundary. */
+/* sizeof() = 48 (0x30) bytes */
 } __attribute__ ((__packed__)) RESTART_AREA;
 
 /*
@@ -156,16 +170,28 @@ typedef struct {
  * of the RESTART_AREA to the client_array_offset value found in it.
  */
 typedef struct {
-	LSN oldest_lsn;		/* Oldest LSN needed by this client. */
-	LSN client_restart_lsn;	/* LSN at which this client needs to restart
+/*Ofs*/
+/*  0*/	LSN oldest_lsn;		/* Oldest LSN needed by this client. */
+/*  8*/	LSN client_restart_lsn;	/* LSN at which this client needs to restart
 				   the volume, i.e. the current position within
-				   the log file. */
-	u16 prev_client;	/* ??? = 0xffff */
-	u16 next_client;	/* ??? = 0xffff */
-	u16 seq_number;		/* ??? = 1 */
-	u8 reserved[6];		/* Reserved/alignment. */
-	u32 client_name_length; /* Length of client name in bytes.  = 8 */
-	uchar_t client_name[64];/* Name of the client in Unicode.  = NTFS */
+				   the log file.  At present, if clean this
+				   should = current_lsn in restart area but it
+				   probably also = current_lsn when dirty most
+				   of the time. */
+/* 16*/	u16 prev_client;	/* The offset to the previous log client record
+				   in the array of log client records.  0xffff
+				   means there is no previous client record,
+				   i.e. this is the first one. */
+/* 18*/	u16 next_client;	/* The offset to the next log client record in
+				   the array of log client records.  0xffff
+				   means there are no next client records, i.e.
+				   this is the last one. */
+/* 20*/	u16 seq_number;		/* ???  It is 1 when clean and 0 when dirty,
+				   but don't know if this is always the case. */
+/* 22*/	u8 reserved[6];		/* Reserved/alignment. */
+/* 28*/	u32 client_name_length; /* Length of client name in bytes.  = 8 */
+/* 32*/	uchar_t client_name[64];/* Name of the client in Unicode.  = NTFS */
+/* sizeof() = 160 (0xa0) bytes */
 } __attribute__ ((__packed__)) LOG_CLIENT_RECORD;
 
 /*
