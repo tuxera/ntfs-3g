@@ -32,12 +32,12 @@
 /**
  * ntfs_boot_sector_is_ntfs - check if buffer contains a valid ntfs boot sector
  * @b:		buffer containing putative boot sector to analyze
- * @silent:	if zero, output progress messages to stdout
+ * @silent:	if zero, output progress messages to stderr
  *
  * Check if the buffer @b contains a valid ntfs boot sector. The buffer @b
  * must be at least 512 bytes in size.
  *
- * If @silent is zero, output progress messages to stdout. Otherwise, do not
+ * If @silent is zero, output progress messages to stderr. Otherwise, do not
  * output any messages (except when configured with --enable-debug in which
  * case warning/debug messages may be displayed).
  *
@@ -48,7 +48,7 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 	u32 i;
 
 	if (!silent)
-		printf("\nBeginning bootsector check...\n");
+		fprintf(stderr, "\nBeginning bootsector check...\n");
 
 	/* Calculate the checksum. Note, this is just a simple addition of
 	   all u32 values in the bootsector starting at the beginning and
@@ -59,7 +59,7 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 		u32 *bi = (u32 *)(&b->checksum);
 
 		if (!silent)
-			printf("Calculating bootsector checksum... ");
+			fprintf(stderr, "Calculating bootsector checksum... ");
 
 		for (i = 0; u < bi; ++u)
 			i += le32_to_cpup(u);
@@ -67,29 +67,29 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i)
 			goto not_ntfs;
 		if (!silent)
-			puts("OK");
+			fprintf(stderr, "OK\n");
 	}
 
 	/* Check OEMidentifier is "NTFS    " */
 	if (!silent)
-		printf("Checking OEMid... ");
+		fprintf(stderr, "Checking OEMid... ");
 	if (b->oem_id != cpu_to_le64(0x202020205346544e)) /* "NTFS    " */
 		goto not_ntfs;
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check bytes per sector value is between 256 and 4096. */
 	if (!silent)
-		printf("Checking bytes per sector... ");
+		fprintf(stderr, "Checking bytes per sector... ");
 	if (le16_to_cpu(b->bpb.bytes_per_sector) <  0x100 ||
 	    le16_to_cpu(b->bpb.bytes_per_sector) > 0x1000)
 		goto not_ntfs;
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check sectors per cluster value is valid. */
 	if (!silent)
-		printf("Checking sectors per cluster... ");
+		fprintf(stderr, "Checking sectors per cluster... ");
 	switch (b->bpb.sectors_per_cluster) {
 	case 1: case 2: case 4: case 8: case 16:
 	case 32: case 64: case 128:
@@ -98,20 +98,20 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 		goto not_ntfs;
 	}
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check the cluster size is not above 65536 bytes. */
 	if (!silent)
-		printf("Checking cluster size... ");
+		fprintf(stderr, "Checking cluster size... ");
 	if ((u32)le16_to_cpu(b->bpb.bytes_per_sector) *
 	    b->bpb.sectors_per_cluster > 0x10000)
 		goto not_ntfs;
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check reserved/unused fields are really zero. */
 	if (!silent)
-		printf("Checking reserved fields are zero... ");
+		fprintf(stderr, "Checking reserved fields are zero... ");
 	if (le16_to_cpu(b->bpb.reserved_sectors) ||
 	    le16_to_cpu(b->bpb.root_entries) ||
 	    le16_to_cpu(b->bpb.sectors) ||
@@ -120,11 +120,11 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 	    b->bpb.fats)
 		goto not_ntfs;
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check clusters per file mft record value is valid. */
 	if (!silent)
-		printf("Checking clusters per mft record... ");
+		fprintf(stderr, "Checking clusters per mft record... ");
 	if ((u8)b->clusters_per_mft_record < 0xe1 ||
 	    (u8)b->clusters_per_mft_record > 0xf7) {
 		switch (b->clusters_per_mft_record) {
@@ -135,11 +135,11 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 		}
 	}
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	/* Check clusters per index block value is valid. */
 	if (!silent)
-		printf("Checking clusters per index block... ");
+		fprintf(stderr, "Checking clusters per index block... ");
 	if ((u8)b->clusters_per_index_record < 0xe1 ||
 	    (u8)b->clusters_per_index_record > 0xf7) {
 		switch (b->clusters_per_index_record) {
@@ -150,19 +150,19 @@ BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 		}
 	}
 	if (!silent)
-		puts("OK");
+		fprintf(stderr, "OK\n");
 
 	if (b->end_of_sector_marker != cpu_to_le16(0xaa55))
 		Dputs("Warning: Bootsector has invalid end of sector marker.");
 
 	if (!silent)
-		puts("Bootsector check completed successfully.");
+		fprintf(stderr, "Bootsector check completed successfully.\n");
 
 	return TRUE;
 not_ntfs:
 	if (!silent) {
-		puts("FAILED");
-		puts("Bootsector check failed. Aborting...");
+		fprintf(stderr, "FAILED\n");
+		fprintf(stderr, "Bootsector check failed. Aborting...\n");
 	}
 	return FALSE;
 }
