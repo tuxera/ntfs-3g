@@ -44,6 +44,11 @@
 #include "inode.h"
 #include "runlist.h"
 
+const char *EXEC_NAME = "ntfsresize";
+
+#define NTFS_REPORT_BANNER "\nReport bugs to linux-ntfs-dev@lists.sf.net. " \
+                           "Homepage: http://linux-ntfs.sf.net\n"
+
 struct {
 	int verbose;
 	int debug;
@@ -108,9 +113,12 @@ int perr_exit(const char *fmt, ...)
 }
 
 
-void usage(char *s)
+void usage()
 {
-	printf ("Usage: %s [-fhin] [-c clusters] [-s byte[K|M|G]] device\n", s);
+	printf("\n");
+	printf ("Usage: %s [-fhin] [-c clusters] [-s byte[K|M|G]] device\n", EXEC_NAME);
+	printf("Shrink a defragmented NTFS volume.\n");
+	printf("\n");
 	printf ("   -c clusters     Shrink volume to size given in NTFS clusters\n");
 	Dprintf("   -d              Show debug information\n");
 	printf ("   -f              Force to progress (DANGEROUS)\n");
@@ -119,11 +127,12 @@ void usage(char *s)
 	printf ("   -n              No write operations (mount volume read-only)\n");
 	printf ("   -s byte[K|M|G]  Shrink volume to size given in byte[K|M|G]\n");
 /*	printf ("   -v              Verbose operation\n"); */
+	printf("%s", NTFS_REPORT_BANNER);
 	exit(1);
 }
 
 
-s64 get_new_volume_size(char *s, char **argv)
+s64 get_new_volume_size(char *s)
 {
 	s64 size;
 	char *suffix;
@@ -134,10 +143,10 @@ s64 get_new_volume_size(char *s, char **argv)
 	
 	if (!*suffix)
 		return size;
-	
+
 	if (strlen(suffix) > 1)
-		usage(argv[0]);
-	
+		usage();
+
 	/* FIXME: check for overflow */
 	switch (*suffix) {
 	case 'G':
@@ -151,7 +160,7 @@ s64 get_new_volume_size(char *s, char **argv)
 		size *= 1024;
 		break;
 	default:
-		usage(argv[0]);
+		usage();
 	}
 	
 	return size;
@@ -162,6 +171,8 @@ void parse_options(int argc, char **argv)
 {
 	char *s;
 	int i;
+
+	printf("%s v%s\n", EXEC_NAME, VERSION);
 
 	memset(&opt, 0, sizeof(opt));
 
@@ -179,7 +190,7 @@ void parse_options(int argc, char **argv)
 			opt.force++;
 			break;
 		case 'h':
-			usage(argv[0]);
+			usage();
 		case 'i':
 			opt.info = 1;
 			break;
@@ -187,19 +198,19 @@ void parse_options(int argc, char **argv)
 			opt.ro_flag = MS_RDONLY;
 			break;
 		case 's':
-			opt.bytes = get_new_volume_size(optarg, argv);
+			opt.bytes = get_new_volume_size(optarg);
 			break;
 		case 'v':
 			opt.verbose++;
 			break;
 		default:
-			usage(argv[0]);
+			usage();
 		}
 	if (optind == argc)
-		usage(argv[0]);
+		usage();
 	opt.volume = argv[optind++];
 	if (optind < argc)
-		usage(argv[0]);
+		usage();
 
 	stderr = stdout;
 	if (!opt.debug)
@@ -210,7 +221,7 @@ void parse_options(int argc, char **argv)
 	if (opt.size && opt.bytes) {
 		printf(NERR_PREFIX "It makes no sense to use "
 		       "-c and -s together.\n");
-		usage(argv[0]);
+		usage();
 	}
 
 	/* If no '-c clusters' then estimate smallest shrinked volume size */
@@ -221,7 +232,7 @@ void parse_options(int argc, char **argv)
 		if (opt.size || opt.bytes) {
 			printf(NERR_PREFIX "It makes no sense to use -i and "
 				"-%c together.\n", opt.size ? 'c' : 's');
-			usage(argv[0]);
+			usage();
 		}
 		opt.ro_flag = MS_RDONLY;
 	} 
