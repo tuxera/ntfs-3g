@@ -79,7 +79,7 @@ BOOL ntfs_names_are_equal(const uchar_t *s1, size_t s1_len,
 	if (!s1_len)
 		return TRUE;
 	if (ic == CASE_SENSITIVE)
-		return ntfs_ucsncmp(s1, s2, s1_len << 1) ? FALSE: TRUE;
+		return ntfs_ucsncmp(s1, s2, s1_len) ? FALSE: TRUE;
 	return ntfs_ucsncasecmp(s1, s2, s1_len, upcase, upcase_size) ? FALSE:
 								       TRUE;
 }
