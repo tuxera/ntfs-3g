@@ -2331,7 +2331,7 @@ cluster_free_err_out:
 /**
  * ntfs_resident_attr_resize - resize a resident, open ntfs attribute
  * @na:		resident ntfs attribute to resize
- * @newsize:	new size (in bytes) to which to shrink the attribute
+ * @newsize:	new size (in bytes) to which to resize the attribute
  *
  * Change the size of a resident, open ntfs attribute @na to @newsize bytes.
  *
@@ -2757,7 +2757,7 @@ put_err_out:
  * "allocated" space is cleared and if the attribute is non-resident the
  * newly allocated space is marked as not initialised and no real allocation
  * on disk is performed. FIXME: Do we have to create sparse runs or can we just
- * leave the reunlist to finish below data_size, i.e. can we have
+ * leave the runlist to finish below data_size, i.e. can we have
  * allocated_size < data_size? I guess that what we can't and thus we will have
  * to set the sparse bit of the attribute and create sparse runs to ensure that
  * allocated_size is >= data_size. We don't need to clear the partial run at
