@@ -40,6 +40,7 @@
 #include <libintl.h>
 #include <time.h>
 #include <stdarg.h>
+#include <utime.h>
 
 #include "ntfsundelete.h"
 #include "bootsect.h"
@@ -839,11 +840,6 @@ int get_filenames (struct ufile *file)
 		name->date_m     = ntfs2utc (sle64_to_cpu (attr->last_mft_change_time));
 		name->date_r     = ntfs2utc (sle64_to_cpu (attr->last_access_time));
 
-		file->date = max (file->date, name->date_c);
-		file->date = max (file->date, name->date_a);
-		file->date = max (file->date, name->date_m);
-		file->date = max (file->date, name->date_r);
-
 		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
 		    name->uname_len) < 0) {
 			Dprintf ("Couldn't translate filename to current locale.\n");
@@ -1008,7 +1004,7 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
 	{
 		STANDARD_INFORMATION *si;
 		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu (attr10->value_offset));
-		file->date = max (file->date, ntfs2utc (sle64_to_cpu (si->last_data_change_time)));
+		file->date = ntfs2utc (sle64_to_cpu (si->last_data_change_time));
 	}
 
 	if (attr20 || !attr10)
@@ -1451,48 +1447,98 @@ unsigned int write_data (int fd, const char *buffer, unsigned int bufsize)
 }
 
 /**
- * open_file - Create a file based on the dir, name and stream supplied
- * @dir:     Directory in which to create the file (optional)
- * @name:    Filename to give the file (optional)
- * @stream:  Name of the stream (optional)
+ * create_pathname - Create a path/file from some components
+ * @dir:      Directory in which to create the file (optional)
+ * @name:     Filename to give the file (optional)
+ * @stream:   Name of the stream (optional)
+ * @buffer:   Store the result here
+ * @bufsize:  Size of buffer
  *
- * Create a file and return the file descriptor.  All the components are
- * optional.  If the name is missing, "unknown" will be used.  If the directory
- * is missing the file will be created in the current directory.  If the stream
- * name is present it will be appended to the filename, delimited by a colon.
+ * Create a filename from various pieces.  The output will be of the form:
+ *	dir/file
+ *	dir/file:stream
+ *	file
+ *	file:stream
  *
- * Return:  -1  Error, failed to create the file
- *	     n  Success, this is the file descriptor
+ * All the components are optional.  If the name is missing, "unknown" will be
+ * used.  If the directory is missing the file will be created in the current
+ * directory.  If the stream name is present it will be appended to the
+ * filename, delimited by a colon.
+ *
+ * N.B. If the buffer isn't large enough the name will be truncated.
+ *
+ * Return:  n  Length of the allocated name
  */
-int open_file (const char *dir, const char *name, const char *stream)
+int create_pathname (const char *dir, const char *name, const char *stream,
+		     char *buffer, int bufsize)
 {
-	char buf[256];
-	int flags;
-
 	if (!name)
 		name = UNKNOWN;
 
 	if (dir)
 		if (stream)
-			snprintf (buf, sizeof (buf), "%s/%s:%s", dir, name, stream);
+			snprintf (buffer, bufsize, "%s/%s:%s", dir, name, stream);
 		else
-			snprintf (buf, sizeof (buf), "%s/%s", dir, name);
+			snprintf (buffer, bufsize, "%s/%s", dir, name);
 	else
 		if (stream)
-			snprintf (buf, sizeof (buf), "%s:%s", name, stream);
+			snprintf (buffer, bufsize, "%s:%s", name, stream);
 		else
-			snprintf (buf, sizeof (buf), "%s", name);
+			snprintf (buffer, bufsize, "%s", name);
 
-	Vprintf ("Creating file: %s\n", buf);
+	return strlen (buffer);
+}
+
+/**
+ * open_file - Open a file to write to
+ * @pathname:  Path, name and stream of the file to open
+ *
+ * Create a file and return the file descriptor.
+ *
+ * N.B.  If option force is given and existing file will be overwritten.
+ *
+ * Return:  -1  Error, failed to create the file
+ *	     n  Success, this is the file descriptor
+ */
+int open_file (const char *pathname)
+{
+	int flags;
+
+	Vprintf ("Creating file: %s\n", pathname);
 
 	if (opts.force)
 		flags = O_RDWR | O_CREAT | O_TRUNC;
 	else
 		flags = O_RDWR | O_CREAT | O_EXCL;
 
-	return open (buf, flags, S_IRUSR | S_IWUSR);
+	return open (pathname, flags, S_IRUSR | S_IWUSR);
 }
 
+/**
+ * set_date - Set the file's date and time
+ * @pathname:  Path and name of the file to alter
+ * @date:      Date and time to set
+ *
+ * Give a file a particular date and time.
+ *
+ * Return:  1  Success, set the file's date and time
+ *	    0  Error, failed to change the file's date and time
+ */
+int set_date (const char *pathname, time_t date)
+{
+	struct utimbuf ut;
+
+	if (!pathname)
+		return 0;
+
+	ut.actime  = date;
+	ut.modtime = date;
+	if (utime (pathname, &ut)) {
+		Eprintf ("Couldn't set the file's date and time\n");
+		return 0;
+	}
+	return 1;
+}
 
 /**
  * scan_disk - Search an NTFS volume for files that could be undeleted
@@ -1631,7 +1677,9 @@ out:
  */
 int undelete_file (ntfs_volume *vol, long long inode)
 {
+	char pathname[256];
 	char *buffer = NULL;
+	unsigned int bufsize;
 	struct ufile *file;
 	int i, j;
 	long long start, end;
@@ -1650,7 +1698,8 @@ int undelete_file (ntfs_volume *vol, long long inode)
 		return 0;
 	}
 
-	buffer = malloc (vol->mft_record_size);
+	bufsize = vol->cluster_size;
+	buffer = malloc (bufsize);
 	if (!buffer)
 		goto free;
 
@@ -1685,8 +1734,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	list_for_each (item, &file->data) {
 		struct data *d = list_entry (item, struct data, list);
 
+		create_pathname (opts.dest, file->pref_name, d->name, pathname, sizeof (pathname));
 		if (d->resident) {
-			fd = open_file (opts.dest, file->pref_name, d->name);
+			fd = open_file (pathname);
 			if (fd < 0) {
 				Eprintf ("Couldn't create file: %s\n", strerror (errno));
 				goto free;
@@ -1715,7 +1765,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 				continue;
 			}
 
-			fd = open_file (opts.dest, file->pref_name, d->name);
+			fd = open_file (pathname);
 			if (fd < 0) {
 				Eprintf ("Couldn't create output file: %s\n", strerror (errno));
 				goto free;
@@ -1723,9 +1773,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 
 			if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
 				Vprintf ("Missing segment at beginning, %lld clusters.\n", rl[0].length);
-				memset (buffer, opts.fillbyte, sizeof (buffer));
-				for (k = 0; k < rl[0].length * vol->cluster_size; k += sizeof (buffer)) {
-					if (write_data (fd, buffer, sizeof (buffer)) < sizeof (buffer)) {
+				memset (buffer, opts.fillbyte, bufsize);
+				for (k = 0; k < rl[0].length * vol->cluster_size; k += bufsize) {
+					if (write_data (fd, buffer, bufsize) < bufsize) {
 						Eprintf ("Write failed: %s\n", strerror (errno));
 						close (fd);
 						goto free;
@@ -1737,9 +1787,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 
 				if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
 					Vprintf ("Missing segment at end, %lld clusters.\n", rl[i].length);
-					memset (buffer, opts.fillbyte, sizeof (buffer));
-					for (k = 0; k < rl[k].length * vol->cluster_size; k += sizeof (buffer)) {
-						if (write_data (fd, buffer, sizeof (buffer)) < sizeof (buffer)) {
+					memset (buffer, opts.fillbyte, bufsize);
+					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
+						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;
@@ -1750,9 +1800,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 
 				if (rl[i].lcn == LCN_HOLE) {
 					Vprintf ("File has a sparse section.\n");
-					memset (buffer, 0, sizeof (buffer));
-					for (k = 0; k < rl[k].length * vol->cluster_size; k += sizeof (buffer)) {
-						if (write_data (fd, buffer, sizeof (buffer)) < sizeof (buffer)) {
+					memset (buffer, 0, bufsize);
+					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
+						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;
@@ -1766,8 +1816,8 @@ int undelete_file (ntfs_volume *vol, long long inode)
 
 				for (j = start; j < end; j++) {
 					if (cluster_in_use (vol, j)) {
-						memset (buffer, opts.fillbyte, sizeof (buffer));
-						if (write_data (fd, buffer, sizeof (buffer)) < sizeof (buffer)) {
+						memset (buffer, opts.fillbyte, bufsize);
+						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;
@@ -1778,7 +1828,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 							close (fd);
 							goto free;
 						}
-						if (write_data (fd, buffer, sizeof (buffer)) < sizeof (buffer)) {
+						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;
@@ -1793,6 +1843,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 			fd = -1;
 
 		}
+		set_date (pathname, file->date);
 		if (d->name)
 			Iprintf ("Undeleted '%s:%s' successfully.\n", file->pref_name, d->name);
 		else
@@ -1819,6 +1870,7 @@ free:
  */
 int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 {
+	char pathname[256];
 	ntfs_attr *mft;
 	char *buffer;
 	const char *name;
@@ -1852,7 +1904,8 @@ int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 		Dprintf ("No output filename, defaulting to '%s'.\n", name);
 	}
 
-	fd = open_file (opts.dest, name, NULL);
+	create_pathname (opts.dest, name, NULL, pathname, sizeof (pathname));
+	fd = open_file (pathname);
 	if (fd < 0) {
 		Eprintf ("Couldn't open output file '%s': %s\n", name, strerror (errno));
 		goto attr;
