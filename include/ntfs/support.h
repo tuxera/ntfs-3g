@@ -36,7 +36,7 @@
 #endif
 
 /*
- * The classical min and max macros.
+ * The classic min and max macros.
  */
 #ifndef min
 #define min(a,b)	((a) <= (b) ? (a) : (b))
