@@ -136,6 +136,6 @@ AC_OUTPUT([
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
-	linux-ntfs.spec
+	ntfsprogs.spec
 ])
 

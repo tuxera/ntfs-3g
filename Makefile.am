@@ -9,13 +9,13 @@ endif
 SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
-		INSTALL NEWS README autogen.sh linux-ntfs.spec.in \
+		INSTALL NEWS README autogen.sh ntfsprogs.spec.in \
 		TODO.ntfsprogs
 
 AUTOMAKE_OPTIONS = gnu
 
-dist-hook: linux-ntfs.spec
-	cp linux-ntfs.spec $(distdir)
+dist-hook: ntfsprogs.spec
+	cp ntfsprogs.spec $(distdir)
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck

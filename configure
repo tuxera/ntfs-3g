@@ -6332,7 +6332,7 @@ trap 'rm -fr `echo "
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
-	linux-ntfs.spec
+	ntfsprogs.spec
  config.h" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
 cat >> $CONFIG_STATUS <<EOF
@@ -6466,7 +6466,7 @@ CONFIG_FILES=\${CONFIG_FILES-"Makefile
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
-	linux-ntfs.spec
+	ntfsprogs.spec
 "}
 EOF
 cat >> $CONFIG_STATUS <<\EOF
