@@ -102,7 +102,7 @@ LINK = $(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS = ntfsfix ntfsinfo
 sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete ntfsresize
-EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscluster
+EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscluster ntfsclone
 
 man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8
@@ -141,6 +141,10 @@ ntfsresize_LDADD = $(AM_LIBS)
 ntfsresize_LDFLAGS = $(AM_LFLAGS)
 
 # We don't distribute these
+
+ntfsclone_SOURCES = ntfsclone.c utils.c utils.h
+ntfsclone_LDADD = $(AM_LIBS)
+ntfsclone_LDFLAGS = $(AM_LFLAGS)
 
 ntfscluster_SOURCES = ntfscluster.c ntfscluster.h utils.c utils.h
 ntfscluster_LDADD = $(AM_LIBS)
@@ -199,6 +203,11 @@ ntfscluster_OBJECTS =  ntfscluster.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@ntfscluster_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsclone_OBJECTS =  ntfsclone.$(OBJEXT) utils.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsclone_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsclone_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 ntfsfix_OBJECTS =  ntfsfix.$(OBJEXT)
 @REALLYSTATIC_FALSE@ntfsfix_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
@@ -247,12 +256,12 @@ DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
 TAR = gtar
 GZIP_ENV = --best
 DEP_FILES =  .deps/attrdef.P .deps/boot.P .deps/dumplog.P .deps/mkntfs.P \
-.deps/ntfscluster.P .deps/ntfsdump_logfile.P .deps/ntfsfix.P \
-.deps/ntfsinfo.P .deps/ntfslabel.P .deps/ntfsresize.P \
+.deps/ntfsclone.P .deps/ntfscluster.P .deps/ntfsdump_logfile.P \
+.deps/ntfsfix.P .deps/ntfsinfo.P .deps/ntfslabel.P .deps/ntfsresize.P \
 .deps/ntfstruncate.P .deps/ntfsundelete.P .deps/ntfswipe.P .deps/sd.P \
 .deps/upcase.P .deps/utils.P
-SOURCES = $(ntfsdump_logfile_SOURCES) $(dumplog_SOURCES) $(ntfswipe_SOURCES) $(ntfstruncate_SOURCES) $(ntfscluster_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(mkntfs_SOURCES) $(ntfslabel_SOURCES) $(ntfsundelete_SOURCES) $(ntfsresize_SOURCES)
-OBJECTS = $(ntfsdump_logfile_OBJECTS) $(dumplog_OBJECTS) $(ntfswipe_OBJECTS) $(ntfstruncate_OBJECTS) $(ntfscluster_OBJECTS) $(ntfsfix_OBJECTS) $(ntfsinfo_OBJECTS) $(mkntfs_OBJECTS) $(ntfslabel_OBJECTS) $(ntfsundelete_OBJECTS) $(ntfsresize_OBJECTS)
+SOURCES = $(ntfsdump_logfile_SOURCES) $(dumplog_SOURCES) $(ntfswipe_SOURCES) $(ntfstruncate_SOURCES) $(ntfscluster_SOURCES) $(ntfsclone_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(mkntfs_SOURCES) $(ntfslabel_SOURCES) $(ntfsundelete_SOURCES) $(ntfsresize_SOURCES)
+OBJECTS = $(ntfsdump_logfile_OBJECTS) $(dumplog_OBJECTS) $(ntfswipe_OBJECTS) $(ntfstruncate_OBJECTS) $(ntfscluster_OBJECTS) $(ntfsclone_OBJECTS) $(ntfsfix_OBJECTS) $(ntfsinfo_OBJECTS) $(mkntfs_OBJECTS) $(ntfslabel_OBJECTS) $(ntfsundelete_OBJECTS) $(ntfsresize_OBJECTS)
 
 all: all-redirect
 .SUFFIXES:
@@ -386,6 +395,10 @@ ntfstruncate$(EXEEXT): $(ntfstruncate_OBJECTS) $(ntfstruncate_DEPENDENCIES)
 ntfscluster$(EXEEXT): $(ntfscluster_OBJECTS) $(ntfscluster_DEPENDENCIES)
 	@rm -f ntfscluster$(EXEEXT)
 	$(LINK) $(ntfscluster_LDFLAGS) $(ntfscluster_OBJECTS) $(ntfscluster_LDADD) $(LIBS)
+
+ntfsclone$(EXEEXT): $(ntfsclone_OBJECTS) $(ntfsclone_DEPENDENCIES)
+	@rm -f ntfsclone$(EXEEXT)
+	$(LINK) $(ntfsclone_LDFLAGS) $(ntfsclone_OBJECTS) $(ntfsclone_LDADD) $(LIBS)
 
 ntfsfix$(EXEEXT): $(ntfsfix_OBJECTS) $(ntfsfix_DEPENDENCIES)
 	@rm -f ntfsfix$(EXEEXT)
