@@ -384,14 +384,14 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 	dump_mapping_pairs_array((char*)a + i, le32_to_cpu(a->length) - i);
 }
 
-void dump_attr_record(ATTR_RECORD *a)
+void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 {
 	unsigned int u;
 	char s[0x200];
 	int i;
 
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
-			((ptrdiff_t)(u8*)a) & 0x3ff);
+			(u8*)a - (u8*)m);
 	if (a->type == AT_END) {
 		printf("Attribute type = 0x%x ($END)\n", le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
@@ -516,7 +516,8 @@ void dump_mft_record(MFT_RECORD *m)
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	printf("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
-		dump_attr_record(a);
+		if (a->type == cpu_to_le32(attr_type))
+			dump_attr_record(m, a);
 		if (a->type == AT_END)
 			break;
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
