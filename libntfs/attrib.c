@@ -1937,7 +1937,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
 			vol->attrdef_len && ad->type; ++ad) {
 		/* We haven't found it yet, carry on searching. */
-		if (ad->type < type)
+		if (le32_to_cpu(ad->type) < le32_to_cpu(type))
 			continue;
 		/* We found the attribute; return it. */
 		if (ad->type == type)
@@ -2151,12 +2151,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	 */
 	if (newsize < vol->mft_record_size) {
 		/* Perform the resize of the attribute record. */
-		if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
+		if (!ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 				newsize)) {
-			err = errno;
-			if (err != ENOSPC)
-				goto put_err_out;
-		} else {
 			/* Update the ntfs attribute structure, too. */
 			na->allocated_size = na->data_size =
 					na->initialized_size = newsize;
@@ -2164,51 +2160,62 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 				na->compressed_size = newsize;
 			goto resize_done;
 		}
+		/* Error! If not enough space, just continue. */
+		if (errno != ENOSPC) {
+			err = errno;
+			// FIXME: Eeek!
+			if (err != ENOTSUP)
+				fprintf(stderr, "%s(): Eeek! Failed to resize "
+						"resident part of attribute. "
+						"Aborting...\n", __FUNCTION__);
+			goto put_err_out;
+		}
 	}
 	/* There is not enough space in the mft record to perform the resize. */
 
-	// FIXME: Need to try to:
-
 	/* Check if the attribute is allowed to be non-resident. */
-	if (ntfs_attr_can_be_non_resident(vol, na->type) < 0) {
-		/* If an error occured, abort. */
+	if (!ntfs_attr_can_be_non_resident(vol, na->type)) {
+		/* Make the attribute non-resident. */
+		if (!ntfs_attr_make_non_resident(na, ctx)) {
+			// TODO: Attribute is now non-resident. Resize it!
+			// goto resize_done;
+			fprintf(stderr, "%s(): TODO: Resize attribute now that "
+					"it is non-resident.\n", __FUNCTION__);
+			err = ENOTSUP;
+			goto put_err_out;
+		}
+		/* Error! If not enough space, just continue. */
+		if (errno != ENOSPC) {
+			err = errno;
+			// FIXME: Eeek!
+			if (err != ENOTSUP)
+				fprintf(stderr, "%s(): Eeek! Failed to make "
+						"attribute non-resident. "
+						"Aborting...\n", __FUNCTION__);
+			goto put_err_out;
+		}
+	} else {
+		/*
+		 * If the attribute can be non-resident but an error occured
+		 * while making it non-resident, abort.
+		 */
 		if (errno != EPERM) {
 			err = errno;
 			goto put_err_out;
 		}
 		/* Attribute is not allowed to be non-resident. */
-	} else {
-		/* Make the attribute non-resident. */
-		if (ntfs_attr_make_non_resident(na, ctx) < 0) {
-			if (errno != ENOSPC) {
-				err = errno;
-				// FIXME: Eeek!
-				if (err != ENOTSUP)
-					fprintf(stderr, "%s(): Eeek! Failed "
-							"to make attribute "
-							"non-resident. "
-							"Aborting...\n",
-							__FUNCTION__);
-				goto put_err_out;
-			}
-			/* Not enough space to do that. */
-			// TODO: Try to make other attributes non-resident!
-			// TODO: Move it to a new mft record and perhaps make
-			// it non-resident at same time.
-		} else {
-			/* Attribute is now non-resident. */
-			// TODO: Resize it!
-		}
 	}
 
-	//	- make other attributes non-resident to free up enough space
-	//	- move the attribute to a new mft record
+	// TODO: Try to make other attributes non-resident.
+	// TODO: Move the attribute to a new mft record.
+
 	// Note that some of the above changes also require changes in the
 	// attribute list attribute (or even creation thereof) hence take
 	// care!!! Probably want to try to do things in the same order as
 	// above. Also take care that $MFT/$BITMAP _must_ be non-resident or
 	// windows ntfs driver causes a blue screen of death on mount attempt,
 	// i.e. usually at boot time which renders the machine not bootable.
+
 	err = ENOTSUP;
 	goto put_err_out;
 
@@ -2224,6 +2231,25 @@ resize_done:
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
+	return -1;
+}
+
+static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
+{
+	// FIXME: For now we cheat and assume there is no attribute list
+	//	  present. (AIA)
+	if (NInoAttrList(na->ni)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	/* Make sure this is not $MFT/$BITMAP or Windows will not boot! */
+	if (na->type == AT_BITMAP && na->ni->mft_no == FILE_MFT) {
+		errno = EPERM;
+		return -1;
+	}
+
+	errno = ENOTSUP;
 	return -1;
 }
 
@@ -2330,9 +2356,6 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	//	  are in the base inode only and hence it is all easier, even
 	//	  if we are cheating for now... (AIA)
 
-	// FIXME: When @newsize is zero, should convert the attribute to a
-	//	  resident attribute.
-
 	/* The first cluster outside the new allocation. */
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
 			vol->cluster_size_bits;
@@ -2356,19 +2379,25 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		 * resident attribute.
 		 */
 		if (!newsize) {
-			// TODO: Perform the conversion! (AIA)
-
-			/* Update the ntfs attribute structure accordingly. */
-/*
-			na->allocated_size = na->data_size =
-					na->initialized_size = newsize;
-			if (NAttrCompressed(na) || NAttrSparse(na))
-				na->compressed_size = newsize;
-			NAttrClearNonResident(na);
-			free(na->rl);
-			na->rl = NULL;
-			goto done;
-*/
+			if (!ntfs_attr_make_resident(na, ctx)) {
+				/*
+				 * Attribute is now resident. Update the ntfs
+				 * attribute structure accordingly.
+				 */
+				na->allocated_size = na->data_size =
+						na->initialized_size = newsize;
+				if (NAttrCompressed(na) || NAttrSparse(na))
+					na->compressed_size = newsize;
+				NAttrClearNonResident(na);
+				free(na->rl);
+				na->rl = NULL;
+				goto done;
+			}
+			/* If couldn't make resident, just continue. */
+			if (errno != EPERM)
+				Dprintf("%s(): Conversion of attribute to "
+						"resident failed. Leaving as "
+						"is...\n", __FUNCTION__);
 		}
 		/* Truncate the runlist itself. */
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
@@ -2485,7 +2514,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->initialized_size = newsize;
 		a->initialized_size = scpu_to_le64(newsize);
 	}
-//done:
+done:
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
