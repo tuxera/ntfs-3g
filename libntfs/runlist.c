@@ -141,31 +141,6 @@ static __inline__ void __ntfs_rl_merge(runlist_element *dst,
 /**
  * Internal:
  *
- * ntfs_rl_merge - test if two runlists can be joined together and merge them
- * @dst:	original, destination runlist
- * @src:	new runlist to merge with @dst
- *
- * Test if two runlists can be joined together. For this, their VCNs and LCNs
- * must be adjacent. If they can be merged, perform the merge, writing into
- * the destination runlist @dst.
- *
- * Return: TRUE   Success, the runlists have been merged.
- *	   FALSE  Failure, the runlists cannot be merged and have not been
- *		  modified.
- */
-static __inline__ BOOL ntfs_rl_merge(runlist_element *dst,
-		runlist_element *src)
-{
-	BOOL merge = ntfs_rl_are_mergeable(dst, src);
-
-	if (merge)
-		__ntfs_rl_merge(dst, src);
-	return merge;
-}
-
-/**
- * Internal:
- *
  * ntfs_rl_append - append a runlist after a given element
  * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
