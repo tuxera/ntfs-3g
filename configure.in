@@ -1,0 +1,139 @@
+AC_INIT(aclocal.m4)
+
+dnl This is required to get past a stupid configure bug when making the rpm.
+dnl Basically it is broken to specify the host as a command line argument to
+dnl configure on its own, i.e. without giving --host=. It is supposed to work
+dnl but doesn't. So this sets host and erases nonopt effectively moving the
+dnl standalone command line option into the --host= form.
+if test "x$nonopt" != "xNONE"; then
+  host="$nonopt"
+  nonopt="NONE"
+fi
+
+AC_CANONICAL_SYSTEM
+
+AM_INIT_AUTOMAKE(linux-ntfs,1.6.99)
+
+AM_MAINTAINER_MODE
+
+AM_CONFIG_HEADER(config.h)
+
+AC_PREFIX_DEFAULT(/usr/local)
+if test "x$prefix" = "xNONE"; then
+  prefix=$ac_default_prefix
+  ac_configure_args="$ac_configure_args --prefix $prefix"
+fi
+
+dnl Command-line options.
+AC_ARG_ENABLE(debug,
+	[  --enable-debug          enable debugging], ,
+	enable_debug=no
+)
+
+AC_ARG_ENABLE(really-static,
+	[  --enable-really-static  completely static binaries], ,
+	enable_really_static=no
+)
+
+AM_CONDITIONAL(DEBUG, test "$enable_debug" = yes)
+AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
+
+dnl Checks for programs.
+AC_PROG_CXX
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+
+dnl create a working libtool-script
+if test -z "$LIBTOOL"; then
+  AC_LANG_SAVE
+  AC_LANG_C
+  AM_PROG_LIBTOOL
+  dnl LIBTOOL="$LIBTOOL --silent"
+  AC_LANG_RESTORE
+  AC_SUBST(LIBTOOL_DEPS)
+  LIBTOOL_SHELL='/bin/sh ./libtool'
+else
+  LIBTOOL_SHELL=$LIBTOOL
+fi
+
+dnl add --with-extra-includes and --with-extra-libs switch to ./configure
+all_libraries="$all_libraries $USER_LDFLAGS"
+all_includes="$all_includes $USER_INCLUDES"
+AC_SUBST(all_includes)
+AC_SUBST(all_libraries)
+
+AC_SUBST(AUTODIRS)
+
+AC_SUBST(CFLAGS)
+AC_SUBST(CPPFLAGS)
+AC_SUBST(LDFLAGS)
+
+dnl Get compiler name
+if test ! -z "$CC"; then
+	_cc="$CC"
+else
+	_cc="gcc"
+fi
+
+dnl Check for gcc version being >= 2.96.
+AC_MSG_CHECKING(version of $_cc)
+cc_version=`$_cc --version 2>&1`
+cc_major=`echo $cc_version | sed 's/egcs-//' | cut -d'.' -f1`
+cc_minor=`echo $cc_version | sed 's/egcs-//' | cut -d'.' -f2`
+if test -z $cc_version; then
+	cc_version="v. ?.??"
+	cc_major=1
+fi
+if test $cc_major -lt 2 -o \( $cc_major -eq 2 -a $cc_minor -lt 96 \) ; then
+cc_version="$cc_version, bad"
+AC_MSG_RESULT($cc_version)
+AC_MSG_ERROR(Please upgrade your gcc compiler to gcc-2.96+ or gcc-3+ version!\
+ Earlier compiler versions will NOT work as these do not support \
+unnamed/annonymous structures and unions which are used heavily in linux-ntfs.)
+fi
+cc_version="$cc_version, ok"
+AC_MSG_RESULT($cc_version)
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS(stdint.h stdlib.h fcntl.h unistd.h errno.h sys/stat.h \
+	sys/ioctl.h sys/types.h linux/types.h asm/byteorder.h sys/mount.h \
+	time.h mntent.h stdio.h stdarg.h string.h getopt.h linux/major.h \
+	limits.h linux/fd.h wchar.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_C_INLINE
+AC_C_LONG_DOUBLE
+AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
+
+dnl Checks for library functions.
+AC_FUNC_MEMCMP
+AC_CHECK_FUNCS(memset strdup puts printf fprintf vprintf vfprintf \
+	perror strerror malloc calloc free realloc open close read write \
+	lseek fdatasync ioctl fflush atexit exit time srandom random wcrtomb \
+	mbrtowc mbsrtowcs setmntent getmntent endmntent hasmntopt)
+
+dnl Perform program name transformation.
+AC_ARG_PROGRAM
+
+dnl Makefiles to be created by configure.
+AC_OUTPUT([
+	Makefile
+	doc/Makefile
+	include/Makefile
+	libntfs/Makefile
+	ntfstools/Makefile
+	ntfstools/mkntfs.8
+	ntfstools/ntfsfix.8
+	ntfstools/ntfslabel.8
+	ntfstools/ntfsinfo.8
+	ntfstools/ntfsundelete.8
+	linux-ntfs.spec
+])
+
