@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "mft.h"
 #include "attrib.h"
+#include "attrlist.h"
 #include "runlist.h"
 
 /**
@@ -469,6 +470,144 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 	if (!err)
 		return err;
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_inode_add_attrlist - add attribute list to inode and fill it
+ * @ni - opened ntfs inode to which add attribute list
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ * The following error codes are defined:
+ *	EINVAL	- Invalid arguments were passed to the function.
+ *	EEXIST	- Attibute list already exist.
+ *	EIO	- Input/Ouput error occured.
+ *	ENOTSUP	- Add requires code that has not been imlemented yet.
+ *	ENOMEM	- Not enogh memory to perform add.
+ */
+int ntfs_inode_add_attrlist(ntfs_inode *ni)
+{
+	int err;
+	ntfs_attr_search_ctx *ctx;
+	u8 *al, *aln;
+	int al_len, al_allocated;
+	ATTR_LIST_ENTRY *ale;
+
+	if (!ni) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for inode 0x%llx.\n",
+			__FUNCTION__, (long long) ni->mft_no);
+
+	if (NInoAttrList(ni) || ni->nr_extents) {
+		Dprintf("%s(): Inode already has got attribute list.\n",
+				__FUNCTION__);
+		errno = EEXIST;
+		return -1;
+	}
+	
+	al_allocated = 0x40;
+	al_len = 0;
+	al = malloc(al_allocated);
+	ale = (ATTR_LIST_ENTRY *) al;
+	if (!al) {
+		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
+		errno = ENOMEM;
+		return -1;
+	}
+	
+	/* Form attribute list. */
+	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	if (!ctx) {
+		err = errno;
+		Dprintf("%s(): Coudn't get search context.\n", __FUNCTION__);
+		goto err_out;
+	}
+	/* Walk through all attributes. */
+	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		if (ctx->attr->type == AT_ATTRIBUTE_LIST) {
+			err = EIO;
+			Dprintf("%s(): Eeek! Attribute list already present.\n",
+					__FUNCTION__);
+			goto put_err_out;
+		}
+		/* Calculate new length of attribute list. */
+		al_len += (sizeof(ATTR_LIST_ENTRY) + sizeof(ntfschar) *
+					ctx->attr->name_length + 7) & ~7;
+		/* Allocate more memory if needed. */
+		while (al_len > al_allocated) {
+			al_allocated += 0x40;
+			aln = realloc(al, al_allocated);
+			if (!aln) {
+				Dprintf("%s(): Not enough memory.\n",
+						__FUNCTION__);
+				errno = ENOMEM;
+				goto put_err_out;
+			}
+			ale = (ATTR_LIST_ENTRY *)(aln + ((u8 *)ale - al));
+			al = aln;
+		}
+		/* Add attribute to attribute list. */
+		ale->type = ctx->attr->type;
+		ale->length = cpu_to_le16((sizeof(ATTR_LIST_ENTRY) +
+			sizeof(ntfschar) * ctx->attr->name_length + 7) & ~7);
+		ale->name_length = ctx->attr->name_length;
+		ale->name_offset = (u8 *)ale->name - (u8 *)ale;
+		if (ctx->attr->non_resident)
+			ale->lowest_vcn = ctx->attr->lowest_vcn;
+		else
+			ale->lowest_vcn = 0;
+		ale->mft_reference = MK_LE_MREF(ni->mft_no,
+			le16_to_cpu(ni->mrec->sequence_number));
+		ale->instance = ctx->attr->instance;
+		memcpy(ale->name, (u8 *)ctx->attr +
+			ctx->attr->name_offset, ctx->attr->name_length);
+		ale = (ATTR_LIST_ENTRY *)(al + al_len);
+	}
+	/* Check for real error occured. */
+	if (errno != ENOENT) {
+		err = errno;
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	/* Deallocate trailing memory. */
+	aln = realloc(al, al_len);
+	if (!aln) {
+		err = errno;
+		Dprintf("%s(): realloc() failed.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	al = aln;
+	ntfs_attr_put_search_ctx(ctx);
+
+	/* Add $ATTRIBUTE_LIST to mft record. */
+	if (ntfs_resident_attr_record_add(ni, AT_ATTRIBUTE_LIST, 0, 0, 0) < 0) {
+		err = errno;
+		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
+			__FUNCTION__);
+		if (err == ENOSPC) {
+			//FIXME: Move out attributes and try once again.
+			err = ENOTSUP;
+		}
+		goto err_out;
+	}
+
+	/* Set new attribute list. */	
+	if (ntfs_attrlist_set(ni, al, al_len)) {
+		err = errno;
+		Dprintf("%s(): Coudn't set attribute list.\n", __FUNCTION__);
+		goto err_out;
+	}
+	return 0;
+
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+err_out:
+	free(al);
 	errno = err;
 	return -1;
 }
