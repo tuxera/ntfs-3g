@@ -1,0 +1,449 @@
+/* Reverse engineered functions in more or less modified form. find_attr()
+ * is quite heavily modified but should be functionally equivalent to original.
+ * lookup and lookup_external are less modified. Both should be functionally
+ * equivalent to originals. */
+
+/*
+ * attr_search_context - used in attribute search functions
+ * @mrec:	buffer containing mft record to search
+ * @attr:	attribute record in @mrec where to begin/continue search
+ * @alist_mrec:	mft record containing attribute list (i.e. base mft record)
+ * @alist_attr: attribute list attribute record
+ * @alist_val:	attribute list value (if alist is resident in @alist_mrec)
+ * @alist_val_end:	end of attribute list value + 1
+ * @alist_val_len:	length of attribute list in bytes
+ * @is_first:	if true lookup_attr() begins search with @attr, else after @attr
+ *
+ * Structure must be initialized to zero before the first call to one of the
+ * attribute search functions. If the mft record in which to search has already
+ * been loaded into memory, then initialize @base and @mrec to point to it,
+ * @attr to point to the first attribute within @mrec, and set @is_first to
+ * TRUE.
+ *
+ * @is_first is only honoured in lookup_attr() and only when called with @mrec
+ * not NULL. Then, if @is_first is TRUE, lookup_attr() begins the search with
+ * @attr. If @is_first is FALSE, lookup_attr() begins the search after @attr.
+ * This is so that, after the first call to lookup_attr(), we can call
+ * lookup_attr() again, without any modification of the search context, to
+ * automagically get the next matching attribute.
+ *
+ * In contrast, find_attr() ignores @is_first and always begins the search with
+ * @attr. find_attr() shouldn't really be called directly; it is just for
+ * internal use. FIXME: Might want to change this behaviour later, but not
+ * before I am finished with lookup_external_attr(). (AIA)
+ */
+typedef struct {
+	u8 *base;
+	MFT_RECORD *mrec;
+	ATTR_RECORD *attr;
+
+	u8 *alist_val_base;
+	MFT_RECORD *alist_mrec;
+	ATTR_RECORD *alist_attr;
+	ATTR_LIST_ENTRY *alist_val;
+	ATTR_LIST_ENTRY *alist_val_end;
+	u32 alist_val_len;
+	IS_FIRST_BOOL is_first;
+	u8 *alist_old_base;
+} attr_search_context;
+
+BOOL find_attr(const ntfs_volume *vol, const ATTR_TYPES type,
+		const wchar_t *name, const u32 name_len,
+		const IGNORE_CASE_BOOL ic, const u8 *val, const u32 val_len,
+		ntfs_attr_search_ctx *ctx)
+{
+	ATTR_RECORD *a;
+
+#ifdef DEBUG
+	if (!vol || !ctx || !ctx->mrec || !ctx->attr) {
+		printf(stderr, "find_attr() received NULL pointer!\n");
+		return FALSE;
+	}
+#endif
+	a = ctx->attr;
+	/*
+	 * Iterate over attributes in mft record starting at @ctx->attr.
+	 * Note: Not using while/do/for loops so the comparison code
+	 * does not get indented out of the 80 characters wide screen... (AIA)
+	 */
+	goto search_loop;
+do_next:
+	a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
+	if (a < ctx->mrec || a > (char*)ctx->mrec + vol->mft_record_size)
+		goto file_corrupt;
+	ctx->attr = a;
+search_loop:
+	/* We catch $END with this more general check, too... */
+	if (le32_to_cpu(a->type) > le32_to_cpu(type))
+		goto not_found;
+	if (!a->length)
+		goto file_corrupt;
+	if (a->type != type)
+		goto do_next;
+	/* If no @name is specified, check for @val. */
+	if (!name) {
+		register int rv;
+		/* If no @val specified, we are done. */
+		if (!val) {
+found_it:
+			return TRUE;
+		}
+		rv = memcmp(val, (char*)a + le16_to_cpu(a->value_offset),
+			    min(val_len, le32_to_cpu(a->value_length)));
+		/* If @val collates after the current attribute's value,
+		   continue searching as a matching attribute might follow. */
+		if (!rv) {
+			register u32 avl = le32_to_cpu(a->value_length);
+			if (val_len == avl)
+				goto found_it;
+			if (val_len > avl)
+				goto do_next;
+		} else if (rv > 0)
+			goto do_next;
+		goto not_found;
+	}
+	if (ntfs_are_names_equal(name, name_len,
+			    (wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			    a->name_length, ic, vol->upcase, vol->upcase_len))
+		goto found_it;
+	{	register int rc = ntfs_collate_names(vol->upcase,
+			vol->upcase_len, name, name_len,
+			(wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			a->name_length, IGNORE_CASE, 1);
+		/* If case insensitive collation of names collates @name
+		   before a->name, there is no matching attribute. */
+		if (rc == -1)
+			goto not_found;
+		/* If the strings are not equal, continue search. */
+		if (rc)
+	 		goto do_next;
+	}
+	/* If case sensitive collation of names doesn't collate @name before
+	   a->name, we continue the search. Otherwise we haven't found it. */
+	if (ntfs_collate_names(vol->upcase, vol->upcase_len, name, name_len,
+			(wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			a->name_length, CASE_SENSITIVE, 1) != -1)
+	 	goto do_next;
+not_found:
+	return FALSE;
+file_corrupt:
+#ifdef DEBUG
+	printf(stderr, "find_attr(): File is corrupt. Run chkdsk.\n");
+#endif
+	goto not_found;
+}
+
+BOOL lookup_external_attr(const ntfs_volume *vol, const MFT_REFERENCE mref,
+			  const ATTR_TYPES type, const wchar_t *name,
+			  const u32 name_len, const IGNORE_CASE_BOOL ic,
+			  const s64 lowest_vcn, const u8 *val,
+			  const u32 val_len, ntfs_attr_search_ctx *ctx)
+{
+	ATTR_LIST_ENTRY *al_pos, **al_val, *al_val_start, *al_next_pos;
+	ATTR_RECORD *attr_pos;
+	MFT_RECORD *mrec, *m;
+	u8 var1 = 0;
+	u8 var2 = 0;
+	u8 var3;
+	int rc;
+	wchar_t *al_name;
+	u32 al_name_len;
+
+	al_val = &ctx->alist_val;
+	if (ctx->alist_val_end <= *al_val && !ctx->is_first)
+		goto file_corrupt;
+	al_val_start = 0;
+	if (ctx->base) {
+		if (ctx->is_first)
+			goto already_have_the_base_and_is_first;
+		al_val_start = *al_val;
+		al_pos = (char*)*al_val + le16_to_cpu((*al_val)->length);
+	} else
+		al_pos = *al_val;
+do_next:
+	if (al_pos < ctx->alist_val_end)
+		goto al_pos_below_alist_val_end;
+	var1 = var2 = 1;
+	al_pos = *al_val;
+do_next_2:
+	*al_val = al_pos;
+	if (!type || var1 || type == al_pos->type)
+		goto compare_names;
+	if (le32_to_cpu(al_pos->type) > le32_to_cpu(type))
+		goto gone_too_far;
+	al_pos = al_next_pos;
+	goto do_next;
+already_have_the_base_and_is_first:
+	ctx->is_first = FALSE;
+	if (*al_val < ctx->alist_val_end)
+		goto do_next;
+	if (ctx->base) {
+		// FIXME: CcUnpinData(ctx->base);
+		ctx->base = NULL;
+	}
+	if (!type)
+		return FALSE;
+	if (ntfs_read_file_record(vol, mref, &ctx->mrec, &ctx->attr) < 0)
+		return FALSE;
+	ctx->base = ctx->mrec;
+	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+	return FALSE;
+al_pos_below_alist_val_end:
+	if (al_pos < ctx->alist_val)
+		goto file_corrupt;
+	if (al_pos >= ctx->alist_val_end)
+		goto file_corrupt;
+	if (!al_pos->length)
+		goto file_corrupt;
+	al_next_pos = (ATTR_LIST_ENTRY*)((char*)al_pos +
+						le16_to_cpu(al_pos->length));
+	goto do_next_2;
+gone_too_far:
+	var1 = 1;
+compare_names:
+	al_name_len = al_pos->name_length;
+	al_name = (wchar_t*)((char*)al_pos + al_pos->name_offset);
+	if (!name || var1)
+		goto compare_lowest_vcn;
+	if (ic == CASE_SENSITIVE) {
+		if (name_len == al_name_len &&
+		    !memcmp(al_name, name, al_name_len << 1))
+			rc = TRUE;
+		else
+			rc = FALSE;
+	} else /* IGNORE_CASE */
+		rc = ntfs_are_names_equal(al_name, al_name_len, name, name_len,
+					  ic, vol->upcase, vol->upcase_len);
+	if (rc)
+		goto compare_lowest_vcn;
+	rc = ntfs_collate_names(vol->upcase, vol->upcase_len, name, name_len,
+				al_name, al_name_len, IGNORE_CASE, 1);
+	if (rc == -1)
+		goto name_collates_before_al_name;
+	if (!rc && ntfs_collate_names(vol->upcase, vol->upcase_len, name,
+				      name_len, al_name, al_name_len,
+				      IGNORE_CASE, 0) == -1)
+		goto name_collates_before_al_name;
+	al_pos = al_next_pos;
+	goto do_next;
+name_collates_before_al_name:
+	var1 = 1;
+compare_lowest_vcn:
+	if (lowest_vcn   &&   !var1   &&   al_next_pos < ctx->alist_val_end &&
+	    sle64_to_cpu(al_next_pos->lowest_vcn) <= sle64_to_cpu(lowest_vcn) &&
+	    al_next_pos->type == al_pos->type &&
+	    al_next_pos->name_length == al_name_len &&
+	    !memcmp((char*)al_next_pos + al_next_pos->name_offset, al_name,
+							al_name_len << 1)) {
+		al_pos = al_next_pos;
+		goto do_next;
+	}
+	/* Don't mask the sequence number. If it isn't equal, the ref is stale.
+	 */
+	if (al_val_start &&
+			al_pos->mft_reference == al_val_start->mft_reference) {
+		mrec = ctx->mrec;
+		attr_pos = (ATTR_RECORD*)((char*)mrec +
+					le16_to_cpu(mrec->attrs_offset));
+	} else {
+		if (ctx->base) {
+			// FIXME: CcUnpinData(ctx->base);
+			ctx->base = 0;
+		}
+		if (ntfs_read_file_record(vol,
+				le64_to_cpu(al_pos->mft_reference),
+				&m, &attr_pos) < 0)
+			return FALSE;
+		mrec = ctx->mrec;
+		ctx->base = ctx->mrec = m;
+	}
+	var3 = 0;
+do_next_attr_loop_start:
+	if (attr_pos < mrec || attr_pos > (char*)mrec + vol->mft_record_size)
+		goto file_corrupt;
+	if (attr_pos->type == AT_END)
+		goto do_next_al_entry;
+	if (!attr_pos->length)
+		goto file_corrupt;
+	if (al_pos->instance != attr_pos->instance)
+		goto do_next_attr;
+	if (al_pos->type != attr_pos->type)
+		goto do_next_al_entry;
+	if (!name)
+		goto skip_name_comparison;
+	if (attr_pos->name_length != al_name_len)
+		goto do_next_al_entry;
+	if (memcmp((wchar_t*)((char*)attr_pos +
+			le16_to_cpu(attr_pos->name_offset)), al_name,
+			attr_pos->name_length << 1))
+		goto do_next_al_entry;
+skip_name_comparison:
+	var3 = 1;
+	ctx->attr = attr_pos;
+	if (var1)
+		goto loc_5217c;
+	if (!val)
+		return TRUE;
+	if (attr_pos->non_resident)
+		goto do_next_attr;
+	if (le32_to_cpu(attr_pos->value_length) != val_len)
+		goto do_next_attr;
+	if (!memcmp((char*)attr_pos + le16_to_cpu(attr_pos->value_offset),
+		    val, val_len))
+		return TRUE;
+do_next_attr:
+	attr_pos = (ATTR_RECORD*)((char*)attr_pos +
+						le32_to_cpu(attr_pos->length));
+	goto do_next_attr_loop_start;
+do_next_al_entry:
+	if (!var3)
+		goto file_corrupt;
+	al_pos = (ATTR_RECORD*)((char*)al_pos + le16_to_cpu(al_pos->length));
+	goto do_next;
+loc_5217c:
+	if (var2)
+		*al_val = (ATTR_RECORD*)((char*)al_pos +
+						le16_to_cpu(al_pos->length));
+	if (ctx->base) {
+		// FIXME: CcUnpinData(ctx->base);
+		ctx->base = 0;
+	}
+	if (!type)
+		return FALSE;
+	if (ntfs_read_file_record(vol, mref, &mrec, &ctx->attr) < 0)
+		return FALSE;
+	ctx->base = mrec;
+	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+	return FALSE;
+file_corrupt:
+#ifdef DEBUG
+	fprintf(stderr, "lookup_attr() encountered corrupt file record.\n");
+#endif
+	return FALSE;
+}
+
+BOOL lookup_attr(const ntfs_volume *vol, const MFT_REFERENCE *mref,
+		 const ATTR_TYPES type, const wchar_t *name,
+		 const u32 name_len, const IGNORE_CASE_BOOL ic,
+		 const s64 lowest_vcn, const u8 *val, const u32 val_len,
+		 ntfs_attr_search_ctx *ctx)
+{
+	MFT_RECORD *m;
+        ATTR_RECORD *a;
+	s64 len;
+
+	if (!vol || !ctx) {
+#ifdef DEBUG
+		printf(stderr, "lookup_attr() received NULL pointer!\n");
+#endif
+		return FALSE;
+	}
+	if (ctx->base)
+		goto already_have_the_base;
+	if (ntfs_read_file_record(vol, mref, &m, &a) < 0)
+		return FALSE;
+	ctx->base = ctx->mrec = m;
+	ctx->attr = a;
+	ctx->alist_mrec = ctx->alist_attr = ctx->alist_val = NULL;
+	/*
+	 * Look for an attribute list and at the same time check for attributes
+	 * which collate before the attribute list (i.e. $STANDARD_INFORMATION).
+	 */
+	if (le32_to_cpu(a->type) > le32_to_cpu(AT_ATTRIBUTE_LIST))
+		goto no_attr_list;
+do_next:
+	if (!a->length)
+		goto file_corrupt;
+	if (a->type == AT_ATTRIBUTE_LIST)
+		goto attr_list_present;
+	a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
+	if (a < m || a > (char*)m + vol->mft_record_size)
+		goto file_corrupt;
+	if (le32_to_cpu(a->type) <= le32_to_cpu(AT_ATTRIBUTE_LIST))
+		goto do_next;
+no_attr_list:
+	if (!type || type == AT_STANDARD_INFORMATION &&
+			a->type == AT_STANDARD_INFORMATION)
+		goto found_it;
+call_find_attr:
+	return find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+found_it:
+	ctx->attr = a;
+	return TRUE;
+already_have_the_base:
+	/*
+	 * If ctx->is_first, search starting with ctx->attr. Otherwise
+	 * continue search after ctx->attr.
+	 */
+	if (ctx->is_first) {
+		a = ctx->attr;
+		ctx->is_first = 0;
+	} else
+		a = (ATTR_RECORD*)((char*)ctx->attr +
+						le32_to_cpu(ctx->attr->length));
+	if (a < m || a > (char*)m + vol->mft_record_size)
+		goto file_corrupt;
+	if (a->type == AT_END)
+		return FALSE;
+	if (!a->length)
+		goto file_corrupt;
+	if (type)
+		goto call_find_attr;
+	goto found_it;
+attr_list_present:
+	/*
+	 * Looking for zero means we return the first attribute, which will
+	 * be the first one listed in the attribute list.
+	 */
+	ctx->attr = a;
+	if (!type)
+		goto search_attr_list;
+	if (type == AT_ATTRIBUTE_LIST)
+		return TRUE;
+search_attr_list:
+	/*
+	 * "a" contains the attribute list attribute at this stage.
+	 */
+	ctx->alist_attr = a;
+	len = get_attribute_value_length(a);
+#ifdef DEBUG
+	if (len > 0x40000LL) {
+		printf(stderr, "lookup_attr() found corrupt attribute list.\n");
+		return FALSE;
+	}
+#endif
+	ctx->alist_val_len = len;
+	if (!(ctx->alist_val = malloc(ctx->alist_val_len))) {
+#ifdef DEBUG
+		printf(stderr, "lookup_attr() failed to allocate memory for "
+				"attribute list value.\n");
+#endif
+		return FALSE;
+	}
+	if (get_attribute_value(vol, ctx->mrec, a, ctx->alist_val) !=
+	    ctx->alist_val_len) {
+#ifdef DEBUG
+		printf(stderr, "lookup_attr() failed to read attribute list "
+				"value.\n");
+#endif
+		return FALSE;
+	}
+	ctx->alist_val_end = (char*)ctx->alist_val + ctx->alist_val_len;
+	if (a->non_resident) {
+		ctx->alist_old_base = ctx->alist_val_base;
+		ctx->alist_val_base = ctx->base;
+		ctx->base = NULL;
+	} else if (ctx->base) {
+		// FIXME: CcUnpinData(ctx->base);
+		ctx->base = NULL;
+	}
+lookup_external:
+	return lookup_external_attr(vol, mref, type, name, name_len, ic,
+				    lowest_vcn, val, val_len, ctx);
+file_corrupt:
+#ifdef DEBUG
+	fprintf(stderr, "lookup_attr() encountered corrupt file record.\n");
+#endif
+	return FALSE;
+}
+
