@@ -23,6 +23,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "compat.h"
+
 #include "types.h"
 #include "inode.h"
 #include "debug.h"

@@ -24,6 +24,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "compat.h"
+
 #include "types.h"
 #include "disk_io.h"
 #include "debug.h"

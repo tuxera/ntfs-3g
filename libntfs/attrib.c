@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include "compat.h"
+
 #include "attrib.h"
 #include "disk_io.h"
 #include "mft.h"
