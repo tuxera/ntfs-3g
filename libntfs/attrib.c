@@ -977,6 +977,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	}
 	/* Handle writes beyond initialized_size. */
 	if (pos + count > na->initialized_size) {
+		if (ntfs_attr_map_whole_runlist(na))
+			goto err_out;
 		/* Set initialized_size to @pos + @count. */
 		ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 		if (!ctx)
@@ -986,15 +988,35 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			goto err_out;
 		/* If write starts beyond initialized_size, zero the gap. */
 		if (pos > na->initialized_size) {
-			// TODO: Need to write zeroes in the region from
-			// na->initialized_size to @pos, then update the
-			// initialized size to equal @pos. If any sparse runs
-			// are encountered while filling the gap, need to
-			// honour them, i.e. do not instantiate them. Then can
-			// continue as if pos <= na->initialized_size, i.e. can
-			// just fall through and continue. (AIA)
-			errno = ENOTSUP;
-			goto err_out;
+			char *buf;
+			int err;
+
+			buf = malloc(NTFS_BUF_SIZE);
+			if (!buf) {
+				err = errno;
+				Dprintf("%s(): Not enough memory.\n",
+						__FUNCTION__);
+				errno = err;
+				goto err_out;
+			}
+			memset(buf, 0, NTFS_BUF_SIZE);
+			ofs = na->initialized_size;
+			while (ofs < pos) {
+				to_write = min(pos - ofs, NTFS_BUF_SIZE);
+				written = ntfs_rl_pwrite(vol, na->rl, ofs, 
+							to_write, buf);
+				if (written <= 0) {
+					err = errno;
+					Dprintf("%s(): Failed to zero space "
+						"between initialized size and "
+						"@pos.\n", __FUNCTION__);
+					free(buf);
+					errno = err;
+					goto err_out;
+				}
+				ofs += written;
+			}
+			free(buf);
 		}
 		ctx->attr->initialized_size = cpu_to_sle64(pos + count);
 		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
