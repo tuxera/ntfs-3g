@@ -391,7 +391,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 		return -1;
 	}
 
-	/* Walk thru attribute list and attach all extents. */
+	/* Walk though attribute list and attach all extents. */
 	errno = 0;
 	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
@@ -405,6 +405,47 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	return 0;
 }
 
+/**
+ * ntfs_inode_sync_standard_information - update standard informaiton attribute
+ * @ni:		ntfs inode to update standard information
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_inode_sync_standard_information(ntfs_inode *ni) {
+	ntfs_attr_search_ctx *ctx;
+	STANDARD_INFORMATION *std_info;
+	int err;
+
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx)
+		return -1;
+	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
+				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		err = errno;
+		Dprintf("%s(): Failed to receive STANDARD_INFORMATION "
+				"attribute.\n", __FUNCTION__);
+		ntfs_attr_put_search_ctx(ctx);
+		errno = err;
+		return -1;
+	}
+	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
+			le16_to_cpu(ctx->attr->value_offset));
+	if (NInoCompressed(ni))
+		std_info->file_attributes |= FILE_ATTR_COMPRESSED;
+	else
+		std_info->file_attributes &= ~FILE_ATTR_COMPRESSED;
+	if (NInoEncrypted(ni))
+		std_info->file_attributes |= FILE_ATTR_ENCRYPTED;
+	else
+		std_info->file_attributes &= ~FILE_ATTR_ENCRYPTED;
+	if (NInoSparse(ni))
+		std_info->file_attributes |= FILE_ATTR_SPARSE_FILE;
+	else
+		std_info->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
+	ntfs_attr_put_search_ctx(ctx);
+	ntfs_inode_mark_dirty(ni);
+	return 0;
+}
 
 /**
  * ntfs_inode_sync - write the inode (and its dirty extents) to disk
@@ -436,6 +477,17 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	
 	Dprintf("%s(): Entering for inode 0x%llx.\n",
 			__FUNCTION__, (long long) ni->mft_no);
+
+	/* Update STANDARD_INFORMATION. */
+	if (ntfs_inode_sync_standard_information(ni)) {
+		if (!err || errno == EIO) {
+			err = errno;
+			if (err != EIO)
+				err = EBUSY;
+		}
+		Dprintf("%s(): Failed to sync standard information.\n",
+				__FUNCTION__);
+	}
 
 	/* Write out attribute list from cache to disk. */
 	if (ni->nr_extents != -1 && NInoAttrList(ni) &&
@@ -516,8 +568,10 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		}
 	}
 
+	// TODO: Update FILE_NAME attribute in the index.
+
 	if (!err)
-		return err;
+		return 0;
 	errno = err;
 	return -1;
 }
