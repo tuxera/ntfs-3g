@@ -49,6 +49,7 @@ ntfsprogs/ntfsfix
 ntfsprogs/ntfsinfo
 ntfsprogs/ntfslabel
 ntfsprogs/ntfsls
+ntfsprogs/ntfsmftalloc
 ntfsprogs/ntfsmove
 ntfsprogs/ntfsresize
 ntfsprogs/ntfsrm
