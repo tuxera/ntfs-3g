@@ -118,6 +118,7 @@ int Eprintf(const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
+	return 0;
 }
 
 /* Generate code for Vprintf() function: Verbose output (-v). */
