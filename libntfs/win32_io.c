@@ -71,10 +71,10 @@ static LPFN_FINDVOLUMECLOSE fnFindVolumeClose = NULL;
 
 typedef struct win32_fd {
 	HANDLE handle;
+	int part_hidden_sectors;
 	s64 part_start;
 	s64 part_end;
 	LARGE_INTEGER current_pos;
-	int part_hidden_sectors;
 } win32_fd;
 
 #ifdef EMULATE_SETFILEPOINTEREX

@@ -125,8 +125,8 @@ struct mft_search_ctx {
 	int flags_search;
 	int flags_match;
 	ntfs_inode *inode;
-	u64 mft_num;
 	ntfs_volume *vol;
+	u64 mft_num;
 };
 
 struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol);

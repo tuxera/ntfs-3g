@@ -31,8 +31,8 @@
 struct options {
 	char		*device;	/* Device/File to work with */
 	char		*file;		/* File to display */
-	ATTR_TYPES	 attr;		/* Attribute type to display */
 	s64		 inode;		/* Inode to work with */
+	ATTR_TYPES	 attr;		/* Attribute type to display */
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */

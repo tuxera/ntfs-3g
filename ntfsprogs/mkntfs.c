@@ -159,11 +159,6 @@ ntfs_volume *vol;
 char *dev_name;
 
 struct {
-	int sector_size;		/* -s, in bytes, power of 2, default is
-					   512 bytes. */
-	int sectors_per_track;		/* number of sectors per track on
-					   device */
-	int heads;			/* number of heads on device */
 	long long part_start_sect;	/* start sector of partition on parent
 					   device */
 	long long nr_sectors;		/* size of device in sectors */
@@ -179,27 +174,32 @@ struct {
 	long long logfile_lcn;		/* lcn of $LogFile, $DATA. */
 	int logfile_size;		/* in bytes, determined from
 					   volume_size. */
-	char mft_zone_multiplier;	/* -z, value from 1 to 4. Default is
+	int mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 
 					   1. */
 	long long mft_zone_end;		/* Determined from volume_size and
 					   mft_zone_multiplier, in clusters. */
-	char no_action;			/* -n, do not write to device, only
-					   display what would be done. */
-	char check_bad_blocks;		/* read-only test for bad
-					   clusters. */
-	long long *bad_blocks;		/* Array of bad clusters. */
 	long long nr_bad_blocks;	/* Number of bad clusters. */
+	long long *bad_blocks;		/* Array of bad clusters. */
 	char *bad_blocks_filename;	/* filename, file to read list of
 					   bad clusters from. */
 	ATTR_DEF *attr_defs;		/* filename, attribute defs. */
 	int attr_defs_len;		/* in bytes */
 	ntfschar *upcase;		/* filename, upcase table. */
 	u32 upcase_len;			/* Determined automatically. */
+	int sector_size;		/* -s, in bytes, power of 2, default is
+					   512 bytes. */
+	int sectors_per_track;		/* number of sectors per track on
+					   device */
+	int heads;			/* number of heads on device */
 	int quiet;			/* -q, quiet execution. */
 	int verbose;			/* -v, verbose execution, given twice,
 					 * really verbose execution (debug
 					 * mode). */
 	int force;			/* -F, force fs creation. */
+	int no_action;			/* -n, do not write to device, only
+					   display what would be done. */
+	char check_bad_blocks;		/* read-only test for bad
+					   clusters. */
 	char quick_format;		/* -f or -Q, fast format, don't zero
 					   the volume first. */
 	char enable_compression;	/* -C, enables compression of all files
