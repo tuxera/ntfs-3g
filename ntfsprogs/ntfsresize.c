@@ -95,10 +95,14 @@ struct bitmap {
 	s64 size;
 };
 
+#define NTFS_PROGBAR		0x0001
+#define NTFS_PROGBAR_SUPPRESS	0x0002
+
 struct progress_bar {
 	u64 start;
 	u64 stop;
 	int resolution;
+	int flags;
 	float unit;
 };
 
@@ -106,12 +110,15 @@ struct llcn_t {
 	s64 lcn;	/* last used LCN for a "special" file/attr type */
 	s64 inode;	/* inode using it */
 };	
-	
+
+#define NTFSCK_PROGBAR		0x0001
+
 typedef struct {
 	ntfs_inode *ni;		     /* inode being processed */
 	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
 	s64 inuse;		     /* num of clusters in use */
 	int multi_ref;		     /* num of clusters referenced many times */
+	int flags;
 	struct bitmap lcn_bitmap;
 } ntfs_fsck_t;
 
@@ -864,12 +871,13 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
  *
  * Create and scale our progress bar.
  */
-static void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
+static void progress_init(struct progress_bar *p, u64 start, u64 stop, int flags)
 {
 	p->start = start;
 	p->stop = stop;
 	p->unit = 100.0 / (stop - start);
-	p->resolution = res;
+	p->resolution = 100;
+	p->flags = flags;
 }
 
 /**
@@ -881,7 +889,9 @@ static void progress_update(struct progress_bar *p, u64 current)
 {
 	float percent;
 	
-	if (!opt.show_progress)
+	if (!(p->flags & NTFS_PROGBAR))
+		return;
+	if (p->flags & NTFS_PROGBAR_SUPPRESS)
 		return;
 	
 	/* WARNING: don't modify the texts, external tools grep for them */
@@ -906,11 +916,15 @@ static void build_allocation_bitmap(ntfs_volume *vol, ntfs_fsck_t *fsck)
 	s64 inode = 0;
 	ntfs_inode *ni;
 	struct progress_bar progress;
+	int pb_flags = 0;	/* progress bar flags */
 
 	/* WARNING: don't modify the text, external tools grep for it */
 	printf("Checking filesystem consistency ...\n");
 
-	progress_init(&progress, inode, vol->nr_mft_records - 1, 100);
+	if (fsck->flags & NTFSCK_PROGBAR)
+		pb_flags |= NTFS_PROGBAR;
+
+	progress_init(&progress, inode, vol->nr_mft_records - 1, pb_flags);
 
 	for (; inode < vol->nr_mft_records; inode++) {
 		progress_update(&progress, inode);
@@ -1527,8 +1541,8 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	MFT_REF mref;
 
 	printf("Relocating needed data ...\n");
-
-	progress_init(&resize->progress, 0, resize->relocations, 100);
+	
+	progress_init(&resize->progress, 0, resize->relocations, resize->progress.flags);
 	resize->relocations = 0;
 	
 	resize->mrec = (MFT_RECORD *)malloc(resize->vol->mft_record_size);
@@ -1878,13 +1892,11 @@ static void update_bootsector(ntfs_resize_t *r)
 			bs.bpb.sectors_per_cluster);
 
 	if (r->mftmir_old) {
-		int save_progress = opt.show_progress;
-
-		opt.show_progress = 0;
+		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
 		copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old, 
 			      r->mftmir_rl.length);
 		bs.mftmirr_lcn = cpu_to_le64(r->mftmir_rl.lcn);
-		opt.show_progress = save_progress;
+		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
 	}
 
 	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
@@ -2131,8 +2143,10 @@ int main(int argc, char **argv)
 	}
 
 	memset(&fsck, 0, sizeof(fsck));
+	if (opt.show_progress)
+		fsck.flags |= NTFSCK_PROGBAR;
+
 	setup_lcn_bitmap(&fsck.lcn_bitmap, vol->nr_clusters);
-	
 	build_allocation_bitmap(vol, &fsck);
 	if (fsck.multi_ref) {
 		err_printf("Filesystem check failed! Totally %d clusters "
@@ -2149,6 +2163,8 @@ int main(int argc, char **argv)
 	resize.inuse = fsck.inuse;
 	resize.lcn_bitmap = fsck.lcn_bitmap;
 	resize.vol = vol;
+	if (opt.show_progress)
+		resize.progress.flags |= NTFS_PROGBAR;
 	
 	/* This is also true if --info was used w/o --size (new_size = 0) */
 	if (new_size < vol->nr_clusters)
