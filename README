@@ -65,5 +65,8 @@ command line options.
 ntfslabel - Display/change the label of an NTFS partition. See man 8 ntfslabel
 for details.
 
-ntfsundelete - Recover deleted files from an NTFS volume.  See man 8
+ntfsundelete - Recover deleted files from an NTFS volume. See man 8
 ntfsundelete for more details.
+
+ntfsresize - Resize NTFS volumes. See man 8 ntfsresize for details.
+
