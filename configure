@@ -18995,11 +18995,6 @@ if test "$USE_MAINTAINER_MODE" = "yes";then
 	CFLAGS="$CFLAGS -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes -Wshadow -Wwrite-strings -W -Wcast-align -Waggregate-return -Wbad-function-cast -Wcast-qual -Wundef -Wredundant-decls -Wsign-compare"
 fi
 
-# Add -fms-extensions for gcc-3.2+.
-if test $cc_major -gt 3 -o \( $cc_major -eq 3 -a $cc_minor -ge 2 \); then
-	CFLAGS="$CFLAGS -fms-extensions"
-fi
-
 # Add debugging switches if in debug mode.
 if test "$enable_debug" = "yes"; then
 	CFLAGS="$CFLAGS -ggdb3 -DDEBUG"

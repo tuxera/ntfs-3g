@@ -54,7 +54,11 @@ typedef enum {
  * Log file restart page header (begins the restart area).
  */
 typedef struct {
-	NTFS_RECORD;		/* The magic is "RSTR". */
+/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
+	NTFS_RECORD_TYPES magic;/* The magic is "RSTR". */
+	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
+	u16 usa_count;		/* See NTFS_RECORD definition above. */
+
 	u64 chkdsk_lsn;		/* The check disk log file sequence number for
 				   this restart page. Only used when the
 				   magic is changed to "CHKD". = 0 */
@@ -172,7 +176,11 @@ typedef struct {
  * aligned to 8 byte boundary, but is this specified anywhere?).
  */
 typedef struct {
-	NTFS_RECORD;			/* The magic is "RCRD". */
+/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
+	NTFS_RECORD_TYPES magic;/* Usually the magic is "RCRD". */
+	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
+	u16 usa_count;		/* See NTFS_RECORD definition above. */
+
 	union {
 		u64 last_lsn;
 		u32 file_offset;

@@ -292,7 +292,11 @@ typedef u64 MFT_REF;
  */
 typedef struct {
 /*Ofs*/
-/*  0*/	NTFS_RECORD;		/* Usually the magic is "FILE". */
+/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
+	NTFS_RECORD_TYPES magic;/* Usually the magic is "FILE". */
+	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
+	u16 usa_count;		/* See NTFS_RECORD definition above. */
+
 /*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
 				   Changed every time the record is modified. */
 /* 16*/	u16 sequence_number;	/* Number of times this mft record has been
@@ -1428,9 +1432,13 @@ typedef struct {
  * ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE
  */
 typedef struct {
-	ACE_HEADER;		/* The ACE header. */
-	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
-	SID sid;		/* The SID associated with the ACE. */
+/*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
+	ACE_TYPES type;		/* Type of the ACE. */
+	ACE_FLAGS flags;	/* Flags describing the ACE. */
+	u16 size;		/* Size in bytes of the ACE. */
+
+/*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
+/*  8*/	SID sid;		/* The SID associated with the ACE. */
 } __attribute__ ((__packed__)) ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE,
 			       SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE;
 
@@ -1443,12 +1451,16 @@ typedef enum {
 } OBJECT_ACE_FLAGS;
 
 typedef struct {
-	ACE_HEADER;		/* The ACE_HEADER. */
-	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
-	OBJECT_ACE_FLAGS flags;	/* Flags describing the object ACE. */
-	GUID object_type;
-	GUID inherited_object_type;
-	SID sid;		/* The SID associated with the ACE. */
+/*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
+	ACE_TYPES type;		/* Type of the ACE. */
+	ACE_FLAGS flags;	/* Flags describing the ACE. */
+	u16 size;		/* Size in bytes of the ACE. */
+
+/*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
+/*  8*/	OBJECT_ACE_FLAGS object_flags;	/* Flags describing the object ACE. */
+/* 12*/	GUID object_type;
+/* 28*/	GUID inherited_object_type;
+/* 44*/	SID sid;		/* The SID associated with the ACE. */
 } __attribute__ ((__packed__)) ACCESS_ALLOWED_OBJECT_ACE,
 			       ACCESS_DENIED_OBJECT_ACE,
 			       SYSTEM_AUDIT_OBJECT_ACE,
@@ -1692,8 +1704,13 @@ typedef struct {
  * $SDS data stream and the second copy will be at offset 0x451d0.
  */
 typedef struct {
-	SECURITY_DESCRIPTOR_HEADER;	  /* The security descriptor header. */
-	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
+/*  0	SECURITY_DESCRIPTOR_HEADER; -- Unfolded here as gcc doesn't like
+				       unnamed structs. */
+	u32 hash;	   /* Hash of the security descriptor. */
+	u32 security_id;   /* The security_id assigned to the descriptor. */
+	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
+	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
+/* 20*/	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
 					     descriptor. */
 } __attribute__ ((__packed__)) SDS_ENTRY;
 
@@ -1867,7 +1884,11 @@ typedef struct {
  * index entries (INDEX_ENTRY structures), as described by the INDEX_HEADER.
  */
 typedef struct {
-/*  0*/	NTFS_RECORD;		/* Magic is "INDX". */
+/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
+	NTFS_RECORD_TYPES magic;/* Magic is "INDX". */
+	u16 usa_ofs;		/* See NTFS_RECORD definition. */
+	u16 usa_count;		/* See NTFS_RECORD definition. */
+
 /*  8*/	s64 lsn;		/* $LogFile sequence number of the last
 				   modification of this index block. */
 /* 16*/	VCN index_block_vcn;	/* Virtual cluster number of the index block. */
@@ -2018,7 +2039,30 @@ typedef struct {
  * NOTE: Before NTFS 3.0 only filename attributes were indexed.
  */
 typedef struct {
-/*  0*/ INDEX_ENTRY_HEADER;	/* The index entry header (see above). */
+/*  0	INDEX_ENTRY_HEADER; -- Unfolded here as gcc dislikes unnamed structs. */
+	union {
+		struct { /* Only valid when INDEX_ENTRY_END is not set. */
+			MFT_REF indexed_file;	/* The mft reference of the file
+						   described by this index
+						   entry. Used for directory
+						   indexes. */
+		} __attribute__ ((__packed__));
+		struct { /* Used for views/indexes to find the entry's data. */
+			u16 data_offset;	/* Data byte offset from this
+						   INDEX_ENTRY. Follows the
+						   index key. */
+			u16 data_length;	/* Data length in bytes. */
+			u32 reservedV;		/* Reserved (zero). */
+		} __attribute__ ((__packed__));
+	} __attribute__ ((__packed__));
+	u16 length;		 /* Byte size of this index entry, multiple of
+				    8-bytes. */
+	u16 key_length;		 /* Byte size of the key value, which is in the
+				    index entry. It follows field reserved. Not
+				    multiple of 8-bytes. */
+	INDEX_ENTRY_FLAGS flags; /* Bit field of INDEX_ENTRY_* flags. */
+	u16 reserved;		 /* Reserved/align to 8-byte boundary. */
+
 /* 16*/	union {		/* The key of the indexed attribute. NOTE: Only present
 			   if INDEX_ENTRY_END bit in flags is not set. NOTE: On
 			   NTFS versions before 3.0 the only valid key is the
@@ -2030,7 +2074,8 @@ typedef struct {
 		GUID object_id;		/* $O index in FILE_Extend/$ObjId: The
 					   object_id of the mft record found in
 					   the data part of the index. */
-		REPARSE_INDEX_KEY;	/* $R index in FILE_Extend/$Reparse. */
+		REPARSE_INDEX_KEY reparse;	/* $R index in
+						   FILE_Extend/$Reparse. */
 		SID sid;		/* $O index in FILE_Extend/$Quota:
 					   SID of the owner of the user_id. */
 		u32 owner_id;		/* $Q index in FILE_Extend/$Quota:
