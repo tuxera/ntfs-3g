@@ -81,7 +81,9 @@ No bugs are known at present. If you find any bugs, please send an email to
 .B ntfscp
 was written by Yura Pakhuchiy.
 .B ntfscp
-and this manual page is based on ntfscat and it's manaul page by Richard Russon, so many thanks to him.
+and this manual page is based on
+.B ntfscat
+and it's manaul page by Richard Russon, so many thanks to him.
 .SH AVAILABILITY
 .B ntfscp
 is part of the ntfsprogs package and is available from
