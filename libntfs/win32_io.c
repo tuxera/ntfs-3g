@@ -54,17 +54,6 @@ typedef struct ntfs_volume ntfs_volume;
 #define IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS 5636096
 #endif
 
-#ifndef DiskGeometryGetPartition
-#define DiskGeometryGetPartition(Geometry) \
-	((PDISK_PARTITION_INFO)(&((PDISK_GEOMETRY_EX)buf)->Data))
-#endif
-
-#ifndef DiskGeometryGetDetect
-#define DiskGeometryGetDetect(Geometry)\
-	((PDISK_DETECTION_INFO)(((PBYTE)DiskGeometryGetPartition(Geometry) + \
-	DiskGeometryGetPartition(Geometry)->SizeOfPartitionInfo)))
-#endif
-
 /* windows 2k+ imports */
 typedef HANDLE (WINAPI *LPFN_FINDFIRSTVOLUME) (LPTSTR,DWORD);
 typedef BOOL (WINAPI *LPFN_FINDNEXTVOLUME) (HANDLE,LPTSTR,DWORD);
@@ -388,8 +377,11 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 			&buf, sizeof(buf), &i, NULL);
 	if (rvl) {
 		Dputs("GET_DRIVE_GEOMETRY_EX detected.");
-		DISK_DETECTION_INFO *ddi = DiskGeometryGetDetect(
-			(PDISK_GEOMETRY)buf);
+		DISK_DETECTION_INFO *ddi = (PDISK_DETECTION_INFO)
+			(((PBYTE)(&((PDISK_GEOMETRY_EX)buf)->Data)) +
+			(((PDISK_PARTITION_INFO)(&((PDISK_GEOMETRY_EX)buf)
+			->Data))->SizeOfPartitionInfo));
+
 		fd->geo_cylinders = ((DISK_GEOMETRY*)&buf)->Cylinders.QuadPart;
 		fd->geo_sectors = ((DISK_GEOMETRY*)&buf)->SectorsPerTrack;
 		fd->geo_size = ((DISK_GEOMETRY_EX*)&buf)->DiskSize.QuadPart;
