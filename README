@@ -1,0 +1,69 @@
+
+Linux-NTFS
+==========
+
+The Linux-NTFS project aims to bring full support for the NTFS filesystem to
+the Linux operating system.
+
+Linux-NTFS is copyright (c) 2000-2002 Anton Altaparmakov.
+
+All of the contents of the Linux-NTFS project are free software, released under
+the GNU General Public License and you are welcome to redistribute them under
+certain conditions.
+All the libraries and utilities come with ABSOLUTELY NO WARRANTY; for details
+read the GNU General Public License to be found in the file COPYING in the main
+Linux-NTFS distribution directory.
+ 
+Linux-NTFS currently consists of the NTFS library (libntfs) and utilities
+(ntfstools). In the future it will also contain a new NTFS driver for the
+Linux kernel.
+
+The Linux-NTFS project is registered on Sourceforge.net. The home page for
+Linux-NTFS is http://linux-ntfs.sf.net/ and the project page is:
+http://sf.net/projects/linux-ntfs/
+
+If you would like to take part in the development of Linux-NTFS, you are
+invited to subscribe to the development mailing list,
+linux-ntfs-dev@lists.sourceforge.net. The easiest way to do this is to visit
+the list page on sourceforge at:
+	http://lists.sourceforge.net/lists/listinfo/linux-ntfs-dev
+
+If you would like to be kept up to date about new releases and other Linux-NTFS
+announcements, subscribe to the linux-ntfs-announce mailing list (very low
+volume). The easiest way to do this is to visit the list page on sourceforge at:
+	http://lists.sourceforge.net/lists/listinfo/linux-ntfs-announce
+
+NTFS library
+============
+
+Provides common NTFS access functions to the ntfstools and other foreign
+open source applications. Note, that the library is still under heavy
+development and doesn't include the majority of functionality yet. It only
+is capable of just about supporting the current ntfstools, so I wouldn't 
+recommend using it for your own applications at this stage.
+
+NTFS utilities
+==============
+
+The ntfstools will eventually include utilities for doing all required tasks
+to NTFS partitions. In general, just run a utility without any command line
+options to display the version number and usage syntax.
+
+The following utilities are so far implemented:
+
+NtfsFix - Attempt to fix an NTFS partition that has been damaged by the Linux
+NTFS driver. Note that you should run it every time after you have used the
+Linux NTFS driver to write to an NTFS partition to prevent massive data
+corruption from happening when Windows mounts the partition.
+IMPORTANT: Run this only *after* unmounting the partition in Linux but *before*
+rebooting into Windows NT/2000 or you *will* suffer! - You have been warned!
+See man 8 ntfsfix for details.
+
+mkntfs - Format a partition with the NTFS filesystem. See man 8 mkntfs for
+command line options.
+
+ntfslabel - Display/change the label of an NTFS partition. See man 8 ntfslabel
+for details.
+
+ntfsundelete - Recover deleted files from an NTFS volume.  See man 8
+ntfsundelete for more details.
