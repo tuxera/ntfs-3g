@@ -42,6 +42,9 @@ xx/xx/2004 - 1.9.3-WIP
 	- Add a @start_vcn parameter to lcnalloc.[ch]::ntfs_cluster_alloc (Yura)
 	- Add ntfscp utility, at present it can only overwrite files. It can
 	  increment or decrease file size if $ATTRIBUTE_LIST not present (Yura)
+	- Added new API lcnalloc.[ch]::ntfs_cluster_free_from_rl, and made
+	  ntfs_cluster_alloc use it (Yura)
+	- Bugfix in ntfs_cluster_alloc for count = 0 (Yura)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
