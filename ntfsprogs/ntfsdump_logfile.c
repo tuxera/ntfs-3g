@@ -123,7 +123,8 @@ int main(int argc, char **argv)
 	LOG_CLIENT_RECORD *lcr;
 	RECORD_PAGE_HEADER *rcrd;
 	LOG_RECORD *lr;
-	int buf_size, err, i, page_size, usa_end_ofs, client, pass = 1;
+	int buf_size, err, client, pass = 1;
+	unsigned int page_size, usa_end_ofs, i;
 
 	printf("\n");
 	if (argc < 2 || argc > 3)
@@ -161,7 +162,8 @@ int main(int argc, char **argv)
 		if (!na)
 			device_err_exit(argv[1], vol, ni, NULL, "Failed to "
 					"open $LogFile/$DATA (attribute "
-					"0x%x): %s\n", le32_to_cpu(AT_DATA),
+					"0x%x): %s\n",
+					(unsigned int)le32_to_cpu(AT_DATA),
 					strerror(errno));
 		if (!na->data_size)
 			device_err_exit(argv[1], vol, ni, na, "$LogFile has "
