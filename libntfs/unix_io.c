@@ -43,17 +43,24 @@
 #	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
 #endif
 
+#define DEV_FD(dev)	(*(int *)dev->d_private)
+
 static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 {
 	struct flock flk;
+	int err;
 
 	if (NDevOpen(dev)) {
 		errno = EBUSY;
 		return -1;
 	}
-	/* Open the device/file obtaining the file descriptor. */
-	if (((int)dev->d_private = open(dev->d_name, flags)) == -1)
+	if (!(dev->d_private = malloc(sizeof(int))))
 		return -1;
+	/* Open the device/file obtaining the file descriptor. */
+	if ((*(int *)dev->d_private = open(dev->d_name, flags)) == -1) {
+		err = errno;
+		goto err_out;
+	}
 	/* Setup our read-only flag. */
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
@@ -65,21 +72,25 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 		flk.l_type = F_WRLCK;
 	flk.l_whence = SEEK_SET;
 	flk.l_start = flk.l_len = 0LL;
-	if (fcntl((int)dev->d_private, F_SETLK, &flk)) {
-		int eo = errno;
+	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
+		err = errno;
 		Dprintf("ntfs_device_unix_io_open: Could not lock %s for %s: "
 				"%s\n", dev->d_name, NDevReadOnly(dev) ?
 				"reading" : "writing", strerror(errno));
-		if (close((int)dev->d_private))
+		if (close(DEV_FD(dev)))
 			Dprintf("ntfs_device_unix_io_open: Warning: Could not "
 					"close %s: %s\n", dev->d_name,
 					strerror(errno));
-		errno = eo;
-		return -1;
+		goto err_out;
 	}
 	/* Set our open flag. */
 	NDevSetOpen(dev);
 	return 0;
+err_out:
+	free(dev->d_private);
+	dev->d_private = NULL;
+	errno = err;
+	return -1;
 }
 
 static int ntfs_device_unix_io_close(struct ntfs_device *dev)
@@ -91,32 +102,34 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 		return -1;
 	}
 	if (NDevDirty(dev))
-		fsync((int)dev->d_private);
+		fsync(DEV_FD(dev));
 	/* Release exlusive (mandatory) lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
 	flk.l_type = F_UNLCK;
 	flk.l_whence = SEEK_SET;
 	flk.l_start = flk.l_len = 0LL;
-	if (fcntl((int)dev->d_private, F_SETLK, &flk))
+	if (fcntl(DEV_FD(dev), F_SETLK, &flk))
 		Dprintf("ntfs_device_unix_io_close: Warning: Could not unlock "
 				"%s: %s\n", dev->d_name, strerror(errno));
 	/* Close the file descriptor and clear our open flag. */
-	if (close((int)dev->d_private))
+	if (close(DEV_FD(dev)))
 		return -1;
 	NDevClearOpen(dev);
+	free(dev->d_private);
+	dev->d_private = NULL;
 	return 0;
 }
 
 static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
 {
-	return lseek((int)dev->d_private, offset, whence);
+	return lseek(DEV_FD(dev), offset, whence);
 }
 
 static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
 		s64 count)
 {
-	return read((int)dev->d_private, buf, count);
+	return read(DEV_FD(dev), buf, count);
 }
 
 static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
@@ -127,7 +140,7 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 		return -1;
 	}
 	NDevSetDirty(dev);
-	return write((int)dev->d_private, buf, count);
+	return write(DEV_FD(dev), buf, count);
 }
 
 static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
@@ -150,7 +163,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 {
 	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
-		int res = fsync((int)dev->d_private);
+		int res = fsync(DEV_FD(dev));
 		if (!res)
 			NDevClearDirty(dev);
 		return res;
@@ -160,13 +173,13 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 
 static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 {
-	return fstat((int)dev->d_private, buf);
+	return fstat(DEV_FD(dev), buf);
 }
 
 static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev, int request,
 		void *argp)
 {
-	return ioctl((int)dev->d_private, request, argp);
+	return ioctl(DEV_FD(dev), request, argp);
 }
 
 /**
