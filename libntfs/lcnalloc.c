@@ -255,10 +255,11 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 					"*byte = 0x%x.\n", __FUNCTION__,
 					buf_size, (long long)lcn,
 					(long long)bmp_pos, need_writeback,
-					lcn >> 3, *byte);
+					(unsigned int)(lcn >> 3),
+					(unsigned int)*byte);
 			/* Skip full bytes. */
 			if (*byte == 0xff) {
-				lcn += 8;
+				lcn = (lcn + 8) & ~7;
 				Dprintf("%s(): continuing while loop 1.\n",
 						__FUNCTION__);
 				continue;
@@ -277,7 +278,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			/* We need to write this bitmap buffer back to disk! */
 			need_writeback = 1;
 			Dprintf("%s(): *byte = 0x%x, need_writeback is set.\n",
-					__FUNCTION__, *byte);
+					__FUNCTION__, (unsigned int)*byte);
 			/* Reallocate memory if necessary. */
 			if ((rlpos + 2) * (int)sizeof(runlist) >= rlsize) {
 				Dprintf("%s(): Reallocating space.\n",
