@@ -91,6 +91,17 @@ struct ntfs_dir {
 	int                index_size;
 };
 
+/**
+ * struct ntfs_find
+ */
+struct ntfs_find {
+	ntfs_inode	  *inode;
+	struct ntfs_dir   *dir;
+	struct ntfs_dt	  *dt;
+	int		   dt_index;
+	MFT_REF		   mref;
+};
+
 
 #define RED	"[31m"
 #define GREEN	"[32m"
