@@ -34,11 +34,8 @@ if test -z "$*"; then
   echo
 fi
 
-conf_flags="--enable-maintainer-mode --enable-compile-warnings"
-
-echo Running $srcdir/configure $conf_flags "$@" ...
-$srcdir/configure $conf_flags "$@" \
-	&& echo Now type \`make\' to compile ntfsprogs. || err=1
+echo Running $srcdir/configure "$@" ...
+$srcdir/configure "$@" && echo Now type \`make\' to compile ntfsprogs. || err=1
 
 if test "$srcdir" != "."; then
 	popd > /dev/null
