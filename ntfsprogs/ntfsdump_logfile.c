@@ -45,22 +45,6 @@
 #include "mst.h"
 
 /**
- * err_exit - error output and terminate
- */
-void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
-void err_exit(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	fprintf(stderr, "Aborting...\n");
-	exit(1);
-}
-
-/**
  * device_err_exit -
  */
 void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
@@ -78,6 +62,24 @@ void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
 	if (ntfs_umount(vol, 0))
 		fprintf(stderr, "Warning: Failed to umount %s: %s\n",
 				dev_name, strerror(errno));
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "Aborting...\n");
+	exit(1);
+}
+
+/**
+ * log_err_exit -
+ */
+void log_err_exit(u8 *buf, const char *fmt, ...) __attribute__ ((noreturn));
+void log_err_exit(u8 *buf, const char *fmt, ...)
+{
+	va_list ap;
+
+	if (buf)
+		free(buf);
 	fprintf(stderr, "ERROR: ");
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
@@ -119,7 +121,7 @@ int main(int argc, char **argv)
 	LOG_CLIENT_RECORD *lcr;
 	RECORD_PAGE_HEADER *rcrd;
 	LOG_RECORD *lr;
-	int buf_size, err, i, lps, client, pass = 1;
+	int buf_size, err, i, page_size, usa_end_ofs, client, pass = 1;
 
 	printf("\n");
 	if (argc < 2 || argc > 3)
@@ -140,7 +142,7 @@ int main(int argc, char **argv)
 
 		vol = ntfs_mount(argv[1], MS_RDONLY);
 		if (!vol)
-			err_exit("Failed to mount %s: %s\n", argv[1],
+			log_err_exit(NULL, "Failed to mount %s: %s\n", argv[1],
 					strerror(errno));
 		printf("\nMounted NTFS volume %s (NTFS v%i.%i) on device %s.\n",
 				vol->vol_name ? vol->vol_name : "<NO_NAME>",
@@ -200,11 +202,11 @@ int main(int argc, char **argv)
 			usage(argv[0]);
 		if (stat(argv[2], &sbuf) == -1) {
 			if (errno == ENOENT)
-				err_exit("The file %s does not exist.  Did "
-						"you specify it correctly?\n",
-						argv[2]);
-			err_exit("Error getting information about %s: %s\n",
-					argv[2], strerror(errno));
+				log_err_exit(NULL, "The file %s does not "
+						"exist.  Did you specify it "
+						"correctly?\n", argv[2]);
+			log_err_exit(NULL, "Error getting information about "
+					"%s: %s\n", argv[2], strerror(errno));
 		}
 		if (sbuf.st_size <= 64 * 1024 * 1024)
 			buf_size = sbuf.st_size;
@@ -217,26 +219,22 @@ int main(int argc, char **argv)
 		/* For simplicity we read all of the file into memory. */
 		buf = malloc(buf_size);
 		if (!buf)
-			err_exit("Failed to allocate buffer for file data: %s",
-					strerror(errno));
+			log_err_exit(NULL, "Failed to allocate buffer for "
+					"file data: %s", strerror(errno));
 		fd = open(argv[2], O_RDONLY);
-		if (fd == -1) {
-			free(buf);
-			err_exit("Failed to open file %s: %s\n", argv[2],
+		if (fd == -1)
+			log_err_exit("Failed to open file %s: %s\n", argv[2],
 					strerror(errno));
-		}
 		/* Read in the file into the buffer. */
 		br = read(fd, buf, buf_size);
 		err = errno;
 		if (close(fd))
 			fprintf(stderr, "Warning: Failed to close file %s: "
 					"%s\n", argv[2], strerror(errno));
-		if (br != buf_size) {
-			free(buf);
-			err_exit("Failed to read data from %s: %s", argv[2],
-					br < 0 ? strerror(err) :
+		if (br != buf_size)
+			log_err_exit(buf, "Failed to read data from %s: %s",
+					argv[2], br < 0 ? strerror(err) :
 					"Partial read.");
-		}
 	}
 	/*
 	 * We now have the entirety of the journal ($LogFile/$DATA or argv[2])
@@ -246,131 +244,270 @@ int main(int argc, char **argv)
 	 * never seen such a large $LogFile.  Usually it is only a few MiB in
 	 * size.
 	 */
-// TODO: I am here... (AIA)
+	rstr = (RESTART_PAGE_HEADER*)buf;
 	/* Check for presence of restart area signature. */
-	if (!ntfs_is_rstr_recordp(buf)) {
+	if (!ntfs_is_rstr_record(rstr->magic) &&
+			!ntfs_is_chkd_record(rstr->magic)) {
 		s8 *pos = (s8*)buf;
 		s8 *end = pos + buf_size;
 		while (pos < end && *pos == -1)
 			pos++;
-		free(buf);
 		if (pos != end)
-			err_exit("$LogFile contents are corrupt (magic RSTR "
-					"missing)!");
+			log_err_exit(buf, "$LogFile contents are corrupt "
+					"(magic RSTR is missing).  Cannot "
+					"handle this yet.\n");
 		/* All bytes are -1. */
+		free(buf);
 		puts("$LogFile is not initialized.");
 		return 0;
 	}
-	/* Do the interpretation and display now. */
-	rstr = (RESTART_PAGE_HEADER*)buf;
-	lps = le32_to_cpu(rstr->log_page_size);
-pass_loc:
-	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)rstr, lps) ||
-	    ntfs_is_baad_record(rstr->magic)) {
-		puts("$LogFile incomplete multi sector transfer detected! "
-		     "Cannot handle this yet!");
-		goto log_file_error;
+	/*
+	 * First, verify the restart page header for consistency.
+	 */
+	/* Only CHKD records are allowed to have chkdsk_lsn set. */
+	if (!ntfs_is_chkd_record(rstr->magic) && sle64_to_cpu(rstr->chkdsk_lsn))
+		log_err_exit(buf, "$LogFile is corrupt:  Restart page header "
+				"magic is not CHKD but a chkdsk LSN is "
+				"specified.  Cannot handle this yet.\n");
+	/* Both system and log page size must be >= 512 and a power of 2. */
+	page_size = le32_to_cpu(rstr->log_page_size);
+	if (page_size < 512 || page_size & (page_size - 1))
+		log_err_exit(buf, "$LogFile is corrupt:  Restart page header "
+				"specifies invalid log page size.  Cannot "
+				"handle this yet.\n");
+	if (page_size != le32_to_cpu(rstr->system_page_size)) {
+		page_size = le32_to_cpu(rstr->system_page_size);
+		if (page_size < 512 || page_size & (page_size - 1))
+			log_err_exit(buf, "$LogFile is corrupt:  Restart page "
+					"header specifies invalid system page "
+					"size.  Cannot handle this yet.\n");
 	}
-	if ((pass == 2) && !memcmp(buf, rstr, lps)) {
-		printf("2nd restart area fully matches the 1st one. Skipping "
-				"display.\n");
-		goto skip_rstr_pass;
-	}
-	if (le16_to_cpu(rstr->major_ver != 1) ||
-	    le16_to_cpu(rstr->minor_ver != 1)) {
-		fprintf(stderr, "$LogFile version %i.%i! Error: Unknown "
-				"$LogFile version!\n",
-					le16_to_cpu(rstr->major_ver),
-					le16_to_cpu(rstr->minor_ver));
-		goto log_file_error;
-	}
-	ra = (RESTART_AREA*)((u8*)rstr + le16_to_cpu(rstr->restart_offset));
-	lcr = (LOG_CLIENT_RECORD*)((u8*)ra +
-			le16_to_cpu(ra->client_array_offset));
-	/* Dump of the interpreted $LogFile restart area. */
+	/* Abort if the version number is not 1.1. */
+	if (sle16_to_cpu(rstr->major_ver != 1) ||
+			sle16_to_cpu(rstr->minor_ver != 1))
+		log_err_exit(buf, "Unknown $LogFile version %i.%i.  Only know "
+				"how to handle version 1.1.\n",
+				sle16_to_cpu(rstr->major_ver),
+				sle16_to_cpu(rstr->minor_ver));
+	/* Verify the location and size of the update sequence array. */
+	usa_end_ofs = le16_to_cpu(rstr->usa_ofs) +
+			le16_to_cpu(rstr->usa_count) * sizeof(u16);
+	if (page_size / NTFS_SECTOR_SIZE + 1 != le16_to_cpu(rstr->usa_count))
+		log_err_exit(buf, "Restart page header in $LogFile is "
+				"corrupt:  Update sequence array size is "
+				"wrong.  Cannot handle this yet.\n");
+	if (le16_to_cpu(rstr->usa_ofs) < sizeof(RESTART_PAGE_HEADER))
+		log_err_exit(buf, "Restart page header in $LogFile is "
+				"corrupt:  Update sequence array overlaps "
+				"restart page header.  Cannot handle this "
+				"yet.\n");
+	if (usa_end_ofs >= NTFS_SECTOR_SIZE - sizeof(u16))
+		log_err_exit(buf, "Restart page header in $LogFile is "
+				"corrupt:  Update sequence array overlaps or "
+				"is behind first protected sequence number.  "
+				"Cannot handle this yet.\n");
+	if (usa_end_ofs > le16_to_cpu(rstr->restart_offset))
+		log_err_exit(buf, "Restart page header in $LogFile is "
+				"corrupt:  Update sequence array overlaps or "
+				"is behind restart area.  Cannot handle this "
+				"yet.\n");
+	/* Finally, verify the offset of the restart area. */
+	if (le16_to_cpu(rstr->restart_offset) & 7)
+		log_err_exit(buf, "Restart page header in $LogFile is "
+				"corrupt:  Restart area offset is not aligned "
+				"to 8-byte boundary.  Cannot handle this "
+				"yet.\n");
+	/*
+	 * Second, verify the restart area itself.
+	 */
+	// TODO: Implement this.
+	fprintf(stderr, "Warning:  Sanity checking of restart area not "
+			"implemented yet.\n");
+	/*
+	 * Third and last, verify the array of log client records.
+	 */
+	// TODO: Implement this.
+	fprintf(stderr, "Warning:  Sanity checking of array of log client "
+			"records not implemented yet.\n");
+rstr_pass_loc:
+	if (ntfs_is_chkd_record(rstr->magic))
+		log_err_exit(buf, "The %s restart page header in $LogFile has "
+				"been modified by chkdsk.  Do not know how to "
+				"handle this yet.  Reboot into Windows to fix "
+				"this.\n", (u8*)rstr == buf ? "first" :
+				"second");
+	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)rstr, page_size) ||
+			ntfs_is_baad_record(rstr->magic))
+		log_err_exit(buf, "$LogFile incomplete multi sector transfer "
+				"detected in restart page header.  Cannot "
+				"handle this yet.\n");
 	if (pass == 1)
-		printf("\n$LogFile version %i.%i.\n",
-				le16_to_cpu(rstr->major_ver),
-				le16_to_cpu(rstr->minor_ver));
-	printf("\n%s restart area:\n", pass == 1? "1st": "2nd");
-	printf("magic = RSTR\n");
-	printf("ChkDskLsn = 0x%llx\n",
+		printf("$LogFile version %i.%i.\n",
+				sle16_to_cpu(rstr->major_ver),
+				sle16_to_cpu(rstr->minor_ver));
+	else /* if (pass == 2) */ {
+		/*
+		 * rstr is now the second restart page so we declare rstr1
+		 * as the first restart page as this one has been verified in
+		 * the first pass so we can use all its members safely.
+		 */
+		RESTART_PAGE_HEADER *rstr1 = (RESTART_PAGE_HEADER*)buf;
+
+		/* Exclude the usa from the comparison. */
+		ra = (RESTART_AREA*)((u8*)rstr1 +
+				le16_to_cpu(rstr1->restart_offset));
+		if (!memcmp(rstr1, rstr, le16_to_cpu(rstr1->usa_ofs)) &&
+				!memcmp((u8*)rstr1 + le16_to_cpu(
+				rstr1->restart_offset), (u8*)rstr +
+				le16_to_cpu(rstr->restart_offset),
+				le16_to_cpu(ra->restart_area_length))) {
+			puts("\nSkipping analysis of second restart page "
+					"because it fully matches the first "
+					"one.");
+			goto skip_rstr_pass;
+		}
+		/*
+		 * The $LogFile versions specified in each of the two restart
+		 * page headers must match.
+		 */
+		if (rstr1->major_ver != rstr->major_ver ||
+				rstr1->minor_ver != rstr->minor_ver)
+			log_err_exit(buf, "Second restart area specifies "
+					"different $LogFile version to first "
+					"restart area.  Cannot handle this "
+					"yet.\n");
+	}
+	/* The restart page header is in rstr and it is mst deprotected. */
+	printf("\n%s restart page:\n", pass == 1 ? "1st" : "2nd");
+	printf("\nRestart page header:\n");
+	printf("magic = %s\n", ntfs_is_rstr_record(rstr->magic) ? "RSTR" :
+			"CHKD");
+	printf("usa_ofs = %u (0x%x)\n", le16_to_cpu(rstr->usa_ofs),
+			le16_to_cpu(rstr->usa_ofs));
+	printf("usa_count = %u (0x%x)\n", le16_to_cpu(rstr->usa_count),
+			le16_to_cpu(rstr->usa_count));
+	printf("chkdsk_lsn = %lli (0x%llx)\n",
+			(long long)sle64_to_cpu(rstr->chkdsk_lsn),
 			(unsigned long long)sle64_to_cpu(rstr->chkdsk_lsn));
-	printf("SystemPageSize = %u\n", le32_to_cpu(rstr->system_page_size));
-	printf("LogPageSize = %u\n", le32_to_cpu(rstr->log_page_size));
-	printf("RestartOffset = 0x%x\n", le16_to_cpu(rstr->restart_offset));
-	printf("\n(1st) restart record:\n");
-	printf("CurrentLsn = %llx\n",
+	printf("system_page_size = %u (0x%x)\n",
+			le32_to_cpu(rstr->system_page_size),
+			le32_to_cpu(rstr->system_page_size));
+	printf("log_page_size = %u (0x%x)\n", le32_to_cpu(rstr->log_page_size),
+			le32_to_cpu(rstr->log_page_size));
+	printf("restart_offset = %u (0x%x)\n",
+			le16_to_cpu(rstr->restart_offset),
+			le16_to_cpu(rstr->restart_offset));
+	printf("\nRestart area:\n");
+	ra = (RESTART_AREA*)((u8*)rstr + le16_to_cpu(rstr->restart_offset));
+	printf("current_lsn = %lli (0x%llx)\n",
+			(long long)sle64_to_cpu(ra->current_lsn),
 			(unsigned long long)sle64_to_cpu(ra->current_lsn));
-	printf("LogClients = %u\n", le16_to_cpu(ra->log_clients));
-	printf("ClientFreeList = %i\n", sle16_to_cpu(ra->client_free_list));
-	printf("ClientInUseList = %i\n", sle16_to_cpu(ra->client_in_use_list));
-	printf("Flags = 0x%x\n", le16_to_cpu(ra->flags));
-	printf("SeqNumberBits = %u (0x%x)\n", le32_to_cpu(ra->seq_number_bits),
+	printf("log_clients = %u (0x%x)\n", le16_to_cpu(ra->log_clients),
+			le16_to_cpu(ra->log_clients));
+	printf("client_free_list = %i (0x%x)\n",
+			(s16)le16_to_cpu(ra->client_free_list),
+			le16_to_cpu(ra->client_free_list));
+	printf("client_in_use_list = %i (0x%x)\n",
+			(s16)le16_to_cpu(ra->client_in_use_list),
+			le16_to_cpu(ra->client_in_use_list));
+	printf("flags = 0x%.4x\n", le16_to_cpu(ra->flags));
+	printf("seq_number_bits = %u (0x%x)\n",
+			le32_to_cpu(ra->seq_number_bits),
 			le32_to_cpu(ra->seq_number_bits));
-	printf("RestartAreaLength = 0x%x\n",
+	printf("restart_area_length = %u (0x%x)\n",
+			le16_to_cpu(ra->restart_area_length),
 			le16_to_cpu(ra->restart_area_length));
-	printf("ClientArrayOffset = 0x%x\n",
+	printf("client_array_offset = %u (0x%x)\n",
+			le16_to_cpu(ra->client_array_offset),
 			le16_to_cpu(ra->client_array_offset));
-	printf("FileSize = %lld (0x%llx)\n",
+	printf("file_size = %lli (0x%llx)\n",
 			(long long)sle64_to_cpu(ra->file_size),
 			(unsigned long long)sle64_to_cpu(ra->file_size));
-	if (sle64_to_cpu(ra->file_size) != buf_size)
-		puts("$LogFile restart area indicates a log file size"
-		     "different from the actual size!");
-	printf("LastLsnDataLength = 0x%x\n",
+	printf("last_lsn_data_length = %u (0x%x)\n",
+			le32_to_cpu(ra->last_lsn_data_length),
 			le32_to_cpu(ra->last_lsn_data_length));
-	printf("RecordLength = 0x%x\n", le16_to_cpu(ra->record_length));
-	printf("LogPageDataOffset = 0x%x\n",
+	printf("record_length = %u (0x%x)\n", le16_to_cpu(ra->record_length),
+			le16_to_cpu(ra->record_length));
+	printf("log_page_data_offset = %u (0x%x)\n",
+			le16_to_cpu(ra->log_page_data_offset),
 			le16_to_cpu(ra->log_page_data_offset));
+	printf("unknown = %u (0x%x)\n", le16_to_cpu(ra->unknown),
+			le16_to_cpu(ra->unknown));
+	lcr = (LOG_CLIENT_RECORD*)((u8*)ra +
+			le16_to_cpu(ra->client_array_offset));
 	for (client = 0; client < le16_to_cpu(ra->log_clients); client++) {
-		printf("\nRestart client record number %i:\n", client);
-		printf("OldestLsn = 0x%llx\n", (unsigned long long)
+		char *client_name;
+
+		printf("\nLog client record number %i:\n", client + 1);
+		printf("oldest_lsn = %lli (0x%llx)\n",
+				(long long)sle64_to_cpu(lcr->oldest_lsn),
+				(unsigned long long)
 				sle64_to_cpu(lcr->oldest_lsn));
-		printf("ClientRestartLsn = 0x%llx\n", (unsigned long long)
+		printf("client_restart_lsn = %lli (0x%llx)\n", (long long)
+				sle64_to_cpu(lcr->client_restart_lsn),
+				(unsigned long long)
 				sle64_to_cpu(lcr->client_restart_lsn));
-		printf("PrevClient = %i\n", sle16_to_cpu(lcr->prev_client));
-		printf("NextClient = %i\n", sle16_to_cpu(lcr->next_client));
-		printf("SeqNumber = 0x%llx\n", (unsigned long long)
-				le64_to_cpu(lcr->seq_number));
-		printf("ClientNameLength = 0x%x\n",
-				le32_to_cpu(lcr->client_name_length));
+		printf("prev_client = %i (0x%x)\n",
+				(s16)le16_to_cpu(lcr->prev_client),
+				le16_to_cpu(lcr->prev_client));
+		printf("next_client = %i (0x%x)\n",
+				(s16)le16_to_cpu(lcr->next_client),
+				le16_to_cpu(lcr->next_client));
+		printf("seq_number = %u (0x%x)\n", le16_to_cpu(lcr->seq_number),
+				le16_to_cpu(lcr->seq_number));
+		printf("client_name_length = %u (0x%x)\n",
+				le32_to_cpu(lcr->client_name_length) / 2,
+				le32_to_cpu(lcr->client_name_length) / 2);
 		if (le32_to_cpu(lcr->client_name_length)) {
-			// convert to ascii and print out.
-			// printf("ClientName = %u\n", le16_to_cpu(lcr->client_name));
-		}
-		/* Size of a restart client record is fixed at 0xa0 bytes. */
-		lcr = (LOG_CLIENT_RECORD*)((u8*)lcr + 0xa0);
+			client_name = NULL;
+			if (ntfs_ucstombs(lcr->client_name,
+					le32_to_cpu(lcr->client_name_length) /
+					2, &client_name, 0) < 0) {
+				perror("Failed to convert log client name");
+				client_name = strdup("<conversion error>");
+			}
+		} else
+			client_name = strdup("<unnamed>");
+		printf("client_name = %s\n", client_name);
+		free(client_name);
+		/*
+		 * Log client records are fixed size so we can simply use the
+		 * C increment operator to get to the next one.
+		 */
+		lcr++;
 	}
 skip_rstr_pass:
 	if (pass == 1) {
-		rstr = (RESTART_PAGE_HEADER*)((u8*)rstr + lps);
+		rstr = (RESTART_PAGE_HEADER*)((u8*)rstr + page_size);
 		++pass;
-		goto pass_loc;
+		goto rstr_pass_loc;
 	}
-	rcrd = (RECORD_PAGE_HEADER*)rstr;
-	/* Reuse pass for log record clienter. */
+	printf("\n\nFinished with restart pages.  Beginning with log pages.\n");
+	/* Reuse pass for log area. */
 	pass = 0;
-	printf("\nFinished with restart area. Beginning with log area.\n");
+	rcrd = (RECORD_PAGE_HEADER*)rstr;
 rcrd_pass_loc:
-	rcrd = (RECORD_PAGE_HEADER*)((u8*)rcrd + lps);
-	if ((u8*)rcrd + lps > buf + buf_size)
+	rcrd = (RECORD_PAGE_HEADER*)((u8*)rcrd + page_size);
+	if ((u8*)rcrd + page_size > buf + buf_size)
 		goto end_of_rcrd_passes;
 	printf("\nLog record page number %i", pass);
-	if (!ntfs_is_rcrd_record(rcrd->magic)) {
-		for (i = 0; i < lps; i++)
+	if (!ntfs_is_rcrd_record(rcrd->magic) &&
+			!ntfs_is_chkd_record(rcrd->magic)) {
+		for (i = 0; i < page_size; i++)
 			if (((u8*)rcrd)[i] != (u8)-1)
 				break;
-		if (i < lps)
-			puts(" is corrupt (magic RCRD is missing).");
+		if (i < page_size)
+			puts(" is corrupt (magic is not RCRD or CHKD).");
 		else
 			puts(" is empty.");
 		pass++;
 		goto rcrd_pass_loc;
 	} else
-		printf(":");
+		puts(":");
 	/* Dump log record page */
-	printf("\nmagic = RCRD\n");
+	printf("magic = %s\n", ntfs_is_rcrd_record(rcrd->magic) ? "RCRD" :
+			"CHKD");
+// TODO: I am here... (AIA)
 	printf("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->copy.last_lsn));
 	printf("flags = 0x%x\n", le32_to_cpu(rcrd->flags));
@@ -444,8 +581,6 @@ log_record_pass:
 	pass++;
 	goto rcrd_pass_loc;
 end_of_rcrd_passes:
-log_file_error:
-	printf("\n");
 	free(buf);
 	return 0;
 }
