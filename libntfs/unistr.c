@@ -342,7 +342,7 @@ int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 	memset(&mbstate, 0, sizeof(mbstate));
 	for (i = o = 0; i < ins_len; i++) {
 		/* Reallocate memory if necessary or abort. */
-		if (o + MB_CUR_MAX > mbs_len) {
+		if ((int)(o + MB_CUR_MAX) > mbs_len) {
 			char *tc;
 			if (mbs == *outs) {
 				errno = ENAMETOOLONG;

@@ -839,7 +839,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 					"name!");
 			goto error_exit;
 		}
-		for (j = 0; j < u; j++) {
+		for (j = 0; j < (s32)u; j++) {
 			uchar_t uc = le16_to_cpu(vname[j]);
 			if (uc > 0xff)
 				uc = (uchar_t)'_';

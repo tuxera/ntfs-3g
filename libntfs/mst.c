@@ -48,7 +48,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 	usa_count = le16_to_cpu(b->usa_count) - 1;
 	/* Size and alignment checks. */
 	if (size & (NTFS_SECTOR_SIZE - 1) || usa_ofs & 1 ||
-			usa_ofs + (usa_count * 2) > size ||
+			(u32)(usa_ofs + (usa_count * 2)) > size ||
 			(size >> NTFS_SECTOR_SIZE_BITS) != usa_count) {
 		errno = EINVAL;
 		return -1;
@@ -136,7 +136,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 	usa_count = le16_to_cpu(b->usa_count) - 1;
 	/* Size and alignment checks. */
 	if (size & (NTFS_SECTOR_SIZE - 1) || usa_ofs & 1 ||
-			usa_ofs + (usa_count * 2) > size ||
+			(u32)(usa_ofs + (usa_count * 2)) > size ||
 			(size >> NTFS_SECTOR_SIZE_BITS) != usa_count) {
 		errno = EINVAL;
 		return -1;

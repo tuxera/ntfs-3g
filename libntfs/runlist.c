@@ -771,7 +771,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		 * Allocate more memory if needed, including space for the
 		 * not-mapped and terminator elements.
 		 */
-		if (((rlpos + 3) * sizeof(*old_rl)) > rlsize) {
+		if ((int)((rlpos + 3) * sizeof(*old_rl)) > rlsize) {
 			runlist_element *rl2;
 
 			rlsize += 0x1000;
