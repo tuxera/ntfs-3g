@@ -90,7 +90,7 @@ void usage (void)
 		"    -i        --info           Print information about the volume\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
 		"    -s range  --sector range   Look for objects in this range of sectors\n"
-		"    -l        --last           Find the last file on the volume\n"
+	/*	"    -l        --last           Find the last file on the volume\n" */
 		"\n"
 		"    -f        --force          Use less caution\n"
 		"    -q        --quiet          Less output\n"
@@ -112,13 +112,13 @@ void usage (void)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-c:fhilqs:vV";
+	static const char *sopt = "-c:fhiqs:vV"; // l
 	static const struct option lopt[] = {
 		{ "cluster",	required_argument,	NULL, 'c' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "info",	no_argument,		NULL, 'i' },
-		{ "last",	no_argument,		NULL, 'l' },
+		//{ "last",	no_argument,		NULL, 'l' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "sector",	required_argument,	NULL, 's' },
 		{ "verbose",	no_argument,		NULL, 'v' },
@@ -169,12 +169,14 @@ int parse_options (int argc, char **argv)
 				err++;
 			}
 			break;
+		/*
 		case 'l':
 			if (opts.action == act_none)
 				opts.action = act_last;
 			else
 				opts.action = act_error;
 			break;
+		*/
 		case 'q':
 			opts.quiet++;
 			break;
@@ -287,6 +289,185 @@ int mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 	return (buffer[byte] & bit);
 }
 
+
+/**
+ * get_inode_name
+ *
+ * using inode
+ * get filename
+ * add name to list
+ * get parent
+ * if parent is 5 (/) stop
+ * get inode of parent
+ */
+int get_inode_name (ntfs_inode *inode, char *buffer, int bufsize)
+{
+	// XXX option: names = posix/win32 or dos
+	// flags: path, filename, or both
+	const int max_path = 20;
+
+	ntfs_volume *vol;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *rec;
+	FILE_NAME_ATTR *attr;
+	int name_space;
+	MFT_REF parent = FILE_root;
+	char *names[max_path + 1];
+	int i, len, offset = 0;
+
+	if (!inode || !buffer)
+		return 0;
+
+	vol = inode->vol;
+
+	//printf ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
+	memset (names, 0, sizeof (names));
+	memset (buffer, 0, bufsize);	//XXX remove
+
+	for (i = 0; i < max_path; i++) {
+
+		ctx = ntfs_attr_get_search_ctx (inode, NULL);
+		if (!ctx) {
+			Eprintf ("Couldn't create a search context.\n");
+			return 0;
+		}
+
+		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
+
+		name_space = 4;
+		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+			/* We know this will always be resident. */
+			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+
+			if (attr->file_name_type >= name_space) { //XXX find the ...
+				continue;
+			}
+
+			name_space = attr->file_name_type;
+			parent     = attr->parent_directory;
+
+			if (names[i]) {
+				free (names[i]);
+				names[i] = NULL;
+			}
+
+			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
+			    &names[i], attr->file_name_length) < 0) {
+				Eprintf ("Couldn't translate filename to current locale.\n");
+				// <MFT1234>?
+			}
+
+			//printf ("names[%d] %s\n", i, names[i]);
+			//printf ("parent = %lld\n", MREF (parent));
+		}
+
+		ntfs_attr_put_search_ctx(ctx);
+		if (MREF (parent) == FILE_root) {
+			//printf ("inode 5\n");
+			break;
+		}
+
+		if (i > 0) {			/* Don't close the original inode */
+			ntfs_inode_close (inode);
+		}
+
+		inode = ntfs_inode_open (vol, parent);
+		if (!inode) {
+			//Eprintf ()
+		}
+	}
+
+	if (i >= max_path) {
+		// trouble
+	}
+
+	for (i = max_path; i >= 0; i--) {
+		if (!names[i])
+			continue;
+
+		len = snprintf (buffer + offset, bufsize - offset, "/%s", names[i]);
+		//printf ("len = %d, offset = %d\n", len, offset);
+		if (len >= (bufsize - offset)) {
+			Eprintf ("Pathname was truncated.\n");
+			break;
+		}
+
+		offset += len;
+		free (names[i]);
+	}
+
+	//printf ("Pathname: %s\n", buffer);
+
+	return 0;
+}
+
+/**
+ * get_attr_name
+ */
+int get_attr_name (ATTR_RECORD *attr, char *buffer, int bufsize)
+{
+	static const char *attrs[] = {
+		NULL,
+		"$STANDARD_INFORMATION",
+		"$ATTRIBUTE_LIST",
+		"$FILE_NAME",
+		"$OBJECT_ID",
+		"$SECURITY_DESCRIPTOR",
+		"$VOLUME_NAME",
+		"$VOLUME_INFORMATION",
+		"$DATA",
+		"$INDEX_ROOT",
+		"$INDEX_ALLOCATION",
+		"$BITMAP",
+		"$REPARSE_POINT",
+		"$EA_INFORMATION",
+		"$EA",
+		"$PROPERTY_SET",
+		"$LOGGED_UTILITY_STREAM",
+	};
+	int len, offset = 0;
+	const char *name;
+	char *attr_name = NULL;
+
+	// flags: attr, name, or both
+	if (!attr || !buffer)
+		return 0;
+
+	memset (buffer, 0, bufsize);	// XXX remove
+
+	if ((attr->type < 0x10) || (attr->type > 0x100) || (attr->type & 0x0F)) {
+		Eprintf ("Unknown attribute type 0x%02x\n", attr->type);
+		name = "<UNKNOWN>";
+	} else {
+		name = attrs[attr->type >> 4];
+	}
+
+	len = snprintf (buffer, bufsize, "%s", name);
+	if (len >= bufsize) {
+		Eprintf ("Attribute type was truncated.\n");
+		return 0;
+	}
+
+	offset += len;
+
+	if (!attr->name_length) {
+		return 0;
+	}
+
+	if (ntfs_ucstombs ((uchar_t *)((char *)attr + attr->name_offset),
+	    attr->name_length, &attr_name, attr->name_length) < 0) {
+		Eprintf ("Couldn't translate attribute name to current locale.\n");
+		// <UNKNOWN>?
+		return 0;
+	}
+
+	snprintf (buffer + offset, bufsize - offset, "(%s)", attr_name);
+	free (attr_name);
+
+	return 0;
+}
+
+
 /**
  * cluster_find
  */
@@ -367,13 +548,18 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 				//Vprintf ("\t\t%lld\t%lld\t%lld\n", runs[j].vcn, runs[j].lcn, runs[j].length);
 				//dprint list
 
-				if (a_begin > s_end) {
-					continue;	// after search range (5)
+				if ((a_begin > s_end) || (a_end < s_begin))
+					continue;	// before or after search range
+
+				{
+					char buffer[256];
+					get_inode_name (inode, buffer, sizeof (buffer));
+					//XXX distinguish between file/dir
+					printf ("inode %d %s", i, buffer);
+					get_attr_name (ctx->attr, buffer, sizeof (buffer));
+					printf ("/%s\n", buffer);
+					//printf ("\n");
 				}
-				if (a_end < s_begin) {
-					continue;	// before search range (1)
-				}
-				printf ("inode %d matches\n", i);
 				break;
 			}
 		}
@@ -424,9 +610,11 @@ int main (int argc, char *argv[])
 			Iprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
 			result = cluster_find (vol, opts.range_begin, opts.range_end);
 			break;
+		/*
 		case act_last:
 			printf ("Last\n");
 			break;
+		*/
 		case act_info:
 		default:
 			printf ("Info\n");
