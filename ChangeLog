@@ -26,6 +26,11 @@ xx/xx/2004 - 2.0.0-WIP
 	  is full.  (Yura)
 	- Remove vol->nr_mft_records and update all users.  (Anton)
 	- Add new API to mft.[hc]::ntfs_mft_record_{alloc,free}().  (Anton)
+	- Sync inodes before closing attributes or the umount fails.  (Anton)
+	- Write out dirty extent inodes in ntfs_inode_close() when closing a
+	  base inode.  (Anton)
+	- Add ntfsmftalloc utility to the extra utilities to help test the mft
+	  record allocator.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
