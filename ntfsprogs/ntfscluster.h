@@ -25,14 +25,17 @@
 #define _NTFSCLUSTER_H_
 
 #include "types.h"
+#include "layout.h"
 
 enum action {
-	act_none = 1,
-	act_info = 2,
-	act_cluster = 3,
-	act_sector = 4,
-	act_last = 5,
-	act_error = 6,
+	act_none,
+	act_info,
+	act_cluster,
+	act_sector,
+	act_inode,
+	act_file,
+	act_last,
+	act_error,
 };
 
 struct options {
@@ -41,8 +44,18 @@ struct options {
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
 	int		 force;		/* Override common sense */
+	char		*filename;	/* File to examine */
+	u64		 inode;		/* Inode to examine */
 	u64		 range_begin;	/* Look for objects in this range */
 	u64		 range_end;
+};
+
+struct match {
+	u64		 inum;		/* Inode number */
+	ATTR_TYPES	 type;		/* Attribute type */
+	uchar_t		*name;		/* Attribute name */
+	int		 name_len;	/* Length of attribute name */
+	LCN		 lcn;		/* Last cluster in use */
 };
 
 #endif /* _NTFSCLUSTER_H_ */
