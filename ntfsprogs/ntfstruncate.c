@@ -71,6 +71,8 @@ BOOL success = FALSE;
 char *dev_name;
 s64 inode;
 u32 attr_type;
+uchar_t *attr_name = NULL;
+u32 attr_name_len;
 s64 new_len;
 
 ntfs_volume *vol;
@@ -532,9 +534,11 @@ void usage(void)
 	fprintf(stderr, "This utility will truncate a specified attribute "
 			"belonging to a specified\ninode, i.e. file or "
 			"directory, to a specified length.\n\n"
-			"Usage: %s [-fhnqvV] device inode [attribute-type] "
-			"new-length\n       If attribute-type is not "
-			"specified, 0x80 (i.e. $DATA) is assumed.\n",
+			"Usage: %s [-fhnqvV] device inode [attr-type "
+			"[attr-name]] new-length\n       If "
+			"attr-type is not specified, 0x80 (i.e. $DATA) "
+			"is assumed.\n       If attr-name is not "
+			"specified, an unnamed attribute is assumed.\n",
 			EXEC_NAME);
 	exit(1);
 }
@@ -592,22 +596,45 @@ void parse_options(int argc, char *argv[])
 
 	/* Get the attribute type, if specified. */
 	s = argv[optind++];
-	if (optind == argc)
+	if (optind == argc) {
 		attr_type = AT_DATA;
-	else {
+		attr_name = AT_UNNAMED;
+		attr_name_len = 0;
+	} else {
 		unsigned long ul;
 
 		ul = strtoul(s, &s2, 0);
 		if (*s2 || !ul || (ul >= ULONG_MAX && errno == ERANGE))
-			err_exit("Invalid attribute type: %s\n", s);
+			err_exit("Invalid attribute type %s: %s\n", s,
+					strerror(errno));
 		attr_type = ul;
 
+		/* Get the attribute name, if specified. */
 		s = argv[optind++];
+		if (optind != argc) {
+			/* Convert the string to little endian Unicode. */
+			attr_name_len = ntfs_mbstoucs(s, &attr_name, 0);
+			if (attr_name_len < 0)
+				err_exit("Invalid attribute name \"%s\": %s\n",
+						s, strerror(errno));
 
-		if (optind != argc)
-			usage();
+			/* Keep hold of the original string. */
+			s2 = s;
+
+			s = argv[optind++];
+			if (optind != argc)
+				usage();
+		} else {
+			attr_name = AT_UNNAMED;
+			attr_name_len = 0;
+		}
 	}
 	Dprintf("attribute type = 0x%x\n", attr_type);
+	if (attr_name == AT_UNNAMED)
+		Dprintf("attribute name = \"\" (UNNAMED)\n");
+	else
+		Dprintf("attribute name = \"%s\" (length %i Unicode "
+				"characters)\n", s2, attr_name_len);
 
 	/* Get the new length. */
 	ll = strtoll(s, &s2, 0);
@@ -642,6 +669,9 @@ void ntfstruncate_exit(void)
 	if (err == -1)
 		fprintf(stderr, "Warning: Could not umount %s: %s\n", dev_name,
 				strerror(errno));
+	/* Free the attribute name if it exists. */
+	if (attr_name && attr_name != AT_UNNAMED)
+		free(attr_name);
 }
 
 int main(int argc, char **argv)
@@ -719,7 +749,7 @@ int main(int argc, char **argv)
 				strerror(errno));
 
 	/* Open the specified attribute. */
-	na = ntfs_attr_open(ni, attr_type, NULL, 0);
+	na = ntfs_attr_open(ni, attr_type, attr_name, attr_name_len);
 	if (!na)
 		err_exit("Failed to open attribute 0x%x: %s\n", attr_type,
 				strerror(errno));
@@ -764,6 +794,10 @@ int main(int argc, char **argv)
 	if (err == -1)
 		fprintf(stderr, "Warning: Failed to umount %s: %s\n", dev_name,
 				strerror(errno));
+
+	/* Free the attribute name if it exists. */
+	if (attr_name && attr_name != AT_UNNAMED)
+		free(attr_name);
 
 	/* Finally, disable our ntfstruncate_exit() handler. */
 	success = TRUE;
