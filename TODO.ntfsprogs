@@ -26,7 +26,6 @@ Thanks,
 
 - get rid of the unneeded lseek()'s during reads/writes
 - catch if source and dest are the same
-- consider badblock list
 - add dd's noerror option
 - disable consistency check for --metadata (e.g. if the check is crashing)
 - make "wiped", etc statistic variables long long
