@@ -109,4 +109,6 @@ extern s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 
 extern s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size);
 
+extern s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev);
+
 #endif /* defined _NTFS_DEVICE_H */

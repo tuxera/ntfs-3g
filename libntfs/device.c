@@ -33,6 +33,9 @@
 #ifdef HAVE_LINUX_FD_H
 #	include <linux/fd.h>
 #endif
+#ifdef HAVE_LINUX_HDREG_H
+#	include <linux/hdreg.h>
+#endif
 
 #include "types.h"
 #include "mst.h"
@@ -40,10 +43,13 @@
 #include "device.h"
 
 #if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
-#define BLKGETSIZE _IO(0x12,96) /* Get device size in 512-byte blocks. */
+#define BLKGETSIZE	_IO(0x12,96)  /* Get device size in 512-byte blocks. */
 #endif
 #if defined(linux) && defined(_IOR) && !defined(BLKGETSIZE64)
-#define BLKGETSIZE64 _IOR(0x12,114,size_t) /* Get device size in bytes. */
+#define BLKGETSIZE64	_IOR(0x12,114,size_t)	/* Get device size in bytes. */
+#endif
+#if defined(linux) && !defined(HDIO_GETGEO)
+#define HDIO_GETGEO	0x0301	/* Get device geometry. */
 #endif
 
 /**
@@ -506,3 +512,30 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 	return (low + 1LL) / block_size;
 }
 
+/**
+ * ntfs_device_partition_start_sector_get - get starting sector of a partition
+ * @dev:	open device
+ *
+ * On success, return the starting sector of the partition @dev in the parent
+ * block device of @dev.  On error return -1 with errno set to the error code.
+ *
+ * The following error codes are defined:
+ *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ */
+s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
+{
+#ifdef HDIO_GETGEO
+	{	struct hd_geometry geo;
+
+		if (!dev->d_ops->ioctl(dev, HDIO_GETGEO, &geo)) {
+			Dprintf("HDIO_GETGEO start_sect = %lu (0x%lx)\n",
+					geo.start, geo.start);
+			return geo.start;
+		}
+	}
+#else
+	errno = ENOTSUP;
+#endif
+	return -1;
+}
