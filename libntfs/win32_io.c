@@ -219,7 +219,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	case SEEK_END:
 		/* end of partition != end of disk */
 		disp = FILE_BEGIN;
-		if (fd.part_end.QuadPart == -1) {
+		if (fd->part_end.QuadPart == -1) {
 			fprintf(stderr, "win32_seek: position relative to end "
 					"of disk not implemented\n");
 			errno = ENOTSUP;
