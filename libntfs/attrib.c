@@ -2258,7 +2258,8 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 		/* Adjust @m to reflect the change in used space. */
 		m->bytes_in_use = cpu_to_le32(new_muse);
 		/* Adjust @a to reflect the new size. */
-		a->length = cpu_to_le32(new_size);
+		if (new_size >= offsetof(ATTR_REC, length) + sizeof(a->length))
+			a->length = cpu_to_le32(new_size);
 	}
 	return 0;
 }
