@@ -1,7 +1,7 @@
 /*
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -39,6 +39,7 @@
 #include "runlist.h"
 #include "lcnalloc.h"
 #include "dir.h"
+#include "compress.h"
 
 uchar_t AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -701,21 +702,18 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		errno = EINVAL;
 		return -1;
 	}
-	vol = na->ni->vol;
 	/*
-	 * Encrypted attributes are not supported. We return access denied,
+	 * If this is a compressed attribute it needs special treatment, but
+	 * only if it is non-resident.
+	 */
+	if (NAttrCompressed(na) && NAttrNonResident(na))
+		return ntfs_compressed_attr_pread(na, pos, count, b);
+	/*
+	 * Encrypted attributes are not supported.  We return access denied,
 	 * which is what Windows NT4 does, too.
 	 */
 	if (NAttrEncrypted(na)) {
 		errno = EACCES;
-		return -1;
-	}
-	/* If this is a compressed attribute it needs special treatment. */
-	if (NAttrCompressed(na)) {
-		// TODO: Implement reading compressed attributes! (AIA)
-		// return ntfs_attr_pread_compressed(ntfs_attr *na,
-		//		const s64 pos, s64 count, void *b);
-		errno = ENOTSUP;
 		return -1;
 	}
 	if (!count)
@@ -726,6 +724,7 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			return 0;
 		count = na->data_size - pos;
 	}
+	vol = na->ni->vol;
 	/* If it is a resident attribute, get the value from the mft record. */
 	if (!NAttrNonResident(na)) {
 		ntfs_attr_search_ctx *ctx;
@@ -2689,10 +2688,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		return -1;
 	}
 
-	/* Read and cache the whole runlist if not already done. */
-	if (ntfs_attr_map_whole_runlist(na))
-		return -1;
-
 	/* Work out offsets into and size of the resident attribute. */
 	name_ofs = 24; /* = sizeof(resident_ATTR_REC); */
 	val_ofs = (name_ofs + a->name_length + 7) & ~7;
@@ -2704,6 +2699,10 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		errno = ENOSPC;
 		return -1;
 	}
+
+	/* Read and cache the whole runlist if not already done. */
+	if (ntfs_attr_map_whole_runlist(na))
+		return -1;
 
 	/* Move the attribute name if it exists and update the offset. */
 	if (a->name_length) {
