@@ -721,7 +721,7 @@ typedef enum {
 	   us whether this file has a view index present (eg. object id index,
 	   quota index, one of the security indexes or the encrypting file
 	   system related indexes). */
-} FILE_ATTR_FLAGS;
+} __attribute__ ((__packed__)) FILE_ATTR_FLAGS;
 
 /*
  * NOTE on times in NTFS: All times are in MS standard time format, i.e. they
@@ -813,8 +813,8 @@ typedef struct {
 				partition. This, in contrast to disabling the
 				journal is a very fast process, so the user
 				won't even notice it. */
-		};
-	};
+		} __attribute__ ((__packed__));
+	} __attribute__ ((__packed__));
 /* sizeof() = 72 bytes (NTFS 3.0) */
 } __attribute__ ((__packed__)) STANDARD_INFORMATION;
 
