@@ -73,7 +73,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 
 	if (!guid) {
 		errno = EINVAL;
-		return (char *)guid;
+		return NULL;
 	}
 	_guid_str = guid_str;
 	if (!_guid_str) {
