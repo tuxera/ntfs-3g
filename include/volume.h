@@ -154,6 +154,8 @@ struct _ntfs_volume {
 				   bytes. */
 };
 
+extern ntfs_volume *ntfs_volume_alloc(void);
+
 extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 		unsigned long rwflag);
 
