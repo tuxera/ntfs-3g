@@ -145,5 +145,8 @@ extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
 
 extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
+extern ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, s64 size);
+
 #endif /* defined _NTFS_INODE_H */
 
