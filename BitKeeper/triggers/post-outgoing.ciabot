@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# post-outgoing -- catch and format BitKeeper repository events and mail them to the CIA bot.
+#
+# Copyright (C) 2003 Leonard Norrgard <leonard.norrgard@refactor.fi>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA 02111-1307, USA.
+#########################################################################
+
+# Submit bkbits.net repository changes to the CIA bot, who in turn
+# forwards the messages to #commits on IRC and a project IRC channel,
+# as configured below. If your project isn't on bkbits.net, you may need to
+# make several changes in the script itself. See "bk help triggers" for the
+# basic documentation to how this works. There's a trick: bkbits.net don't
+# have triggers enabled,
+#
+# It tries to makes sure that only pushes to public repositories get broadcasted.
+#
+# 1) Edit the channel setting below.
+# 2) Put this script in a file named post-outgoing.ciabot in
+# BitKeeper/triggers/pre-apply.ciabot in your project.
+# 3) Check it into your repository on bkbits.net
+# 4) The next time anyone pulls the project, they'll get the script.
+#    From then on, BitKeeper does the rest.
+# 4) ?
+# 5) Profit! :^)
+
+# --- begin config section ---
+#
+# Note: irc network name ignored for now, but must be included.
+# What you say here end up as a prefix on each row of your logs
+# on #commits. You must use the name of your projects IRC channel in
+# order to have the invite the bot there.
+#
+# example:
+# IRCCHANNEL=irc.freenode.net/ourprojectchannel
+IRCCHANNEL=irc.freenode.net/ntfs
+
+# The email address where we send the commit messages.
+#COMMITADDRESS=commits@picogui.org
+COMMITADDRESS=leonard.norrgard@pp.inet.fi
+
+#
+# --- end config section ---
+#
+######################################################################
+
+if [ X$BK_STATUS = XDRYRUN -o X$BK_STATUS = XNOTHING ]
+then exit 0
+fi
+
+# In order to make sure only pushes to public BitKeeper repositories
+# are broadcasted to #commits, we check that a) the parent repository
+# is on bkbits.net and b) we are the client.
+
+# Is parent a public BitKeeper repository at bkbits.net?
+if [ -z "`bk parent|grep bkbits.net/`" ]
+then exit 0
+fi
+
+if [ $BK_SIDE != client ]
+then exit 0
+fi
+
+# Display info about incoming and outgoing csets.
+
+U=$BK_USER
+H=$BK_HOST
+R=$BK_ROOT
+
+(
+U_OUT="user={light blue}${U}@${H}{normal}"
+R_OUT=`echo $R | sed "s,.*/,,"`
+
+echo repository={green}${R_OUT}{normal} $U_OUT
+
+# See "bk help prs" for documentation on the formatting string.
+if [ X$BK_CSETLIST != X ]
+then (
+     bk changes -v -d'$if(:GFILE:=ChangeSet){{orange}ChangeSet@:REV:{normal} tags=$if(:TAG:){{red}:TAG:{normal}} $if(:C:){:C:}\n}$unless(:GFILE:=ChangeSet){* :GFILE:$if(:C:){: $each(:C:){(:C:)}}\n}' - < $BK_CSETLIST
+     )
+fi
+) | mail -s "Announce `echo -n $IRCCHANNEL | sed 's,.*/,,'`" $COMMITADDRESS
+exit 0
