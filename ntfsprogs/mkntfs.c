@@ -64,12 +64,8 @@
 #ifdef HAVE_ERRNO_H
 #	include <errno.h>
 #endif
-#include <fcntl.h>
-#ifdef HAVE_LINUX_FD_H
-#	include <sys/ioctl.h>
-#	include <linux/fd.h>
-#endif
 #include <time.h>
+#include <fcntl.h>
 #ifdef HAVE_GETOPT_H
 #	include <getopt.h>
 #else
@@ -89,10 +85,6 @@
 					 (m) == SCSI_CDROM_MAJOR)
 #endif
 #include <limits.h>
-
-#if defined(__linux__) && defined(_IO) && !defined(BLKGETSIZE)
-#	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
-#endif
 
 #if defined(__linux__) && defined(_IO) && !defined(BLKSSZGET)
 #	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytse. */
@@ -2407,59 +2399,6 @@ void mkntfs_exit(void)
 #define MAKE_MFT_REF(_ref, _seqno)	cpu_to_le64((((u64)(_seqno)) << 48) \
 						| ((u64)(_ref)))
 
-static inline int valid_offset(int f, long long ofs)
-{
-	char ch;
-
-	if (lseek(f, ofs, SEEK_SET) >= 0 && read(f, &ch, 1) == 1)
-		return 1;
-	return 0;
-}
-
-/*
- * Returns the number of bs sized blocks in a partition. Adapted from
- * e2fsutils-1.19, Copyright (C) 1995 Theodore Ts'o.
- */
-long long get_device_size(int f, int bs)
-{
-	long long high, low;
-#ifdef BLKGETSIZE
-	long size;
-
-	if (ioctl(f, BLKGETSIZE, &size) >= 0) {
-		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
-				size);
-		return (long long)size * 512 / bs;
-	}
-#endif
-#ifdef FDGETPRM
-	{	struct floppy_struct this_floppy;
-
-		if (ioctl(f, FDGETPRM, &this_floppy) >= 0) {
-			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
-					this_floppy.size, this_floppy.size);
-			return (long long)this_floppy.size * 512 / bs;
-		}
-	}
-#endif
-	/*
-	 * We couldn't figure it out by using a specialized ioctl,
-	 * so do binary search to find the size of the partition.
-	 */
-	low = 0LL;
-	for (high = 1024LL; valid_offset(f, high); high <<= 1)
-		low = high;
-	while (low < high - 1LL) {
-		const long long mid = (low + high) / 2;
-
-		if (valid_offset(f, mid))
-			low = mid;
-		else
-			high = mid;
-	}
-	lseek(f, 0LL, SEEK_SET);
-	return (low + 1LL) / bs;
-}
 
 int main(int argc, char **argv)
 {
@@ -2612,10 +2551,11 @@ int main(int argc, char **argv)
 	Dprintf("sector size = %i bytes\n", opt.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
 	if (!opt.nr_sectors) {
-		opt.nr_sectors = get_device_size(vol->fd, opt.sector_size);
+		opt.nr_sectors = ntfs_device_size_get(vol->fd, opt.sector_size);
 		if (opt.nr_sectors <= 0)
-			err_exit("get_device_size(%s) failed. Please specify "
-					"it manually.\n", vol->dev_name);
+			err_exit("ntfs_device_size_get(%s) failed. Please "
+					"specify it manually.\n",
+					vol->dev_name);
 	}
 	Dprintf("number of sectors = %Ld (0x%Lx)\n", opt.nr_sectors,
 			opt.nr_sectors);

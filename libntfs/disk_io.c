@@ -1,7 +1,7 @@
 /*
  * disk_io.c - Disk io functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -19,16 +19,26 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "config.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#ifdef HAVE_LINUX_FD_H
+#	include <sys/ioctl.h>
+#	include <linux/fd.h>
+#endif
 
 #include "types.h"
 #include "disk_io.h"
 #include "mst.h"
 #include "debug.h"
+
+#if defined(__linux__) && defined(_IO) && !defined(BLKGETSIZE)
+#	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
+#endif
 
 /**
  * ntfs_pread - positioned read from disk
@@ -330,5 +340,75 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		return bw;
 	}
 	return bw >> vol->cluster_size_bits;
+}
+
+/**
+ * ntfs_device_offset_valid - test if a device offset is valid
+ * @f:		open file descriptor of device
+ * @ofs:	offset to test for validity
+ *
+ * Test if the offset @ofs is an existing location on the device described
+ * by the open file descriptor @f.
+ *
+ * Return 0 if it is valid and -1 if it is not valid.
+ */
+static inline int ntfs_device_offset_valid(int f, s64 ofs)
+{
+	char ch;
+
+	if (lseek(f, ofs, SEEK_SET) >= 0 && read(f, &ch, 1) == 1)
+		return 0;
+	return -1;
+}
+
+/**
+ * ntfs_device_size_get - return the size of a device in blocks
+ * @f:		open file descriptor of device
+ * @block_size:	block size in bytes in which to return the result
+ *
+ * Return the number of @block_size sized blocks in the device described by the
+ * open file descriptor @f.
+ *
+ * Adapted from e2fsutils-1.19, Copyright (C) 1995 Theodore Ts'o.
+ */
+s64 ntfs_device_size_get(int f, int block_size)
+{
+	s64 high, low;
+#ifdef BLKGETSIZE
+	long size;
+
+	if (ioctl(f, BLKGETSIZE, &size) >= 0) {
+		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
+				size);
+		return (s64)size * 512 / block_size;
+	}
+#endif
+#ifdef FDGETPRM
+	{       struct floppy_struct this_floppy;
+
+		if (ioctl(f, FDGETPRM, &this_floppy) >= 0) {
+			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
+					this_floppy.size, this_floppy.size);
+			return (s64)this_floppy.size * 512 / block_size;
+		}
+	}
+#endif
+	/*
+	 * We couldn't figure it out by using a specialized ioctl,
+	 * so do binary search to find the size of the device.
+	 */
+	low = 0LL;
+	for (high = 1024LL; ntfs_device_offset_valid(f, high); high <<= 1)
+		low = high;
+	while (low < high - 1LL) {
+		const s64 mid = (low + high) / 2;
+
+		if (ntfs_device_offset_valid(f, mid))
+			low = mid;
+		else
+			high = mid;
+	}
+	lseek(f, 0LL, SEEK_SET);
+	return (low + 1LL) / block_size;
 }
 

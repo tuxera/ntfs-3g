@@ -1,7 +1,7 @@
 /*
  * disk_io.h - Exports for disk io. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -36,6 +36,8 @@ extern s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b);
 extern s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b);
+
+extern s64 ntfs_device_size_get(int f, int block_size);
 
 #endif /* defined _NTFS_DISK_IO_H */
 
