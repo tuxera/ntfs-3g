@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * disk_io.c - Disk io functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.

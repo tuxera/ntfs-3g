@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * debug.c - Debugging output functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Anton Altaparmakov.

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * mst.c - Multi sector fixup handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.

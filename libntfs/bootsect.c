@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * bootsect.c - Boot sector handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000,2001 Anton Altaparmakov.

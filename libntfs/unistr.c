@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * unistr.c - Unicode string handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
