@@ -2,6 +2,9 @@ xx/xx/2004 - 1.9.3-WIP
 
 	- Fix access of MFT_RECORD->bytes_in_use to use le32_to_cpu() instead
 	  of le16_to_cpu() in libntfs/volume.c.  (Pete Curran)
+	- Rename uchar_t to ntfschar everywhere since uchar_t is already
+	  defined on Solaris to be an unsigned 1-byte character and it is also
+	  defined like this in POSIX.
 
 11/05/2004 - 1.9.2 - Decomrpession bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch

@@ -293,12 +293,12 @@ static char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
  */
 static char *ntfs_attr_get_name(ATTR_RECORD *attr)
 {
-	uchar_t *ucs_attr_name;
+	ntfschar *ucs_attr_name;
 	char *mbs_attr_name = NULL;
 	int mbs_attr_name_size;
 	
 	/* calculate name position */
-	ucs_attr_name = (uchar_t *)((char *)attr + le16_to_cpu(attr->name_offset));
+	ucs_attr_name = (ntfschar *)((char *)attr + le16_to_cpu(attr->name_offset));
 	/* convert unicode to printable format */
 	mbs_attr_name_size = ntfs_ucstombs(ucs_attr_name,attr->name_length,
 		&mbs_attr_name,0);
@@ -692,7 +692,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr)
  */
 static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 {
-	uchar_t *ucs_vol_name = NULL;
+	ntfschar *ucs_vol_name = NULL;
 
 	printf("Dumping attribute $VOLUME_NAME (0x60)\n");
 
@@ -700,11 +700,11 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 		char *mbs_vol_name = NULL;
 		int mbs_vol_name_size;
 		/* calculate volume name position */
-		ucs_vol_name = (uchar_t*)((u8*)attr +
+		ucs_vol_name = (ntfschar*)((u8*)attr +
 				le16_to_cpu(attr->value_offset));
 		/* convert the name to current locale multibyte sequence */
 		mbs_vol_name_size = ntfs_ucstombs(ucs_vol_name,
-				le32_to_cpu(attr->value_length)/sizeof(uchar_t),
+				le32_to_cpu(attr->value_length)/sizeof(ntfschar),
 				&mbs_vol_name,0);
 
 		if (mbs_vol_name_size>0) {

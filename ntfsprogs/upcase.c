@@ -31,8 +31,8 @@
 /**
  * init_upcase_table
  */
-void init_upcase_table(uchar_t *uc, u32 uc_len);
-void init_upcase_table(uchar_t *uc, u32 uc_len)
+void init_upcase_table(ntfschar *uc, u32 uc_len);
+void init_upcase_table(ntfschar *uc, u32 uc_len)
 {
 	static int uc_run_table[][3] = { /* Start, End, Add */
 	{0x0061, 0x007B,  -32}, {0x0451, 0x045D, -80}, {0x1F70, 0x1F72,  74},

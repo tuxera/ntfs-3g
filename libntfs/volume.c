@@ -594,7 +594,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	ntfs_attr *na;
 	ATTR_RECORD *a;
 	VOLUME_INFORMATION *vinf;
-	uchar_t *vname;
+	ntfschar *vname;
 	int i, j, eo;
 	u32 u;
 
@@ -732,7 +732,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 		goto error_exit;
 	}
 	vol->upcase_len = na->data_size >> 1;
-	vol->upcase = (uchar_t*)malloc(na->data_size);
+	vol->upcase = (ntfschar*)malloc(na->data_size);
 	if (!vol->upcase) {
 		Dputs(FAILED);
 		Dputs("Not enough memory to load $UpCase.");
@@ -844,7 +844,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 			goto error_exit;
 		}
 		/* Get a pointer to the value of the attribute. */
-		vname = (uchar_t*)(le16_to_cpu(a->value_offset) + (char*)a);
+		vname = (ntfschar*)(le16_to_cpu(a->value_offset) + (char*)a);
 		u = le32_to_cpu(a->value_length) / 2;
 		/*
 		 * Convert Unicode volume name to current locale multibyte
@@ -864,9 +864,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 				goto error_exit;
 			}
 			for (j = 0; j < (s32)u; j++) {
-				uchar_t uc = le16_to_cpu(vname[j]);
+				ntfschar uc = le16_to_cpu(vname[j]);
 				if (uc > 0xff)
-					uc = (uchar_t)'_';
+					uc = (ntfschar)'_';
 				vol->vol_name[j] = (char)uc;
 			}
 			vol->vol_name[u] = '\0';

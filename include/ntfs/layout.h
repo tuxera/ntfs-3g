@@ -568,7 +568,7 @@ typedef enum {
  */
 typedef struct {
 /*hex ofs*/
-/*  0*/	uchar_t name[0x40];		/* Unicode name of the attribute. Zero
+/*  0*/	ntfschar name[0x40];		/* Unicode name of the attribute. Zero
 					   terminated. */
 /* 80*/	ATTR_TYPES type;		/* Type of the attribute. */
 /* 84*/	u32 display_rule;		/* Default display rule.
@@ -969,7 +969,7 @@ typedef struct {
 				   attribute value. */
 /* 24*/	u16 instance;		/* If lowest_vcn = 0, the instance of the
 				   attribute being referenced; otherwise 0. */
-/* 26*/	uchar_t name[0];	/* Use when creating only. When reading use
+/* 26*/	ntfschar name[0];	/* Use when creating only. When reading use
 				   name_offset to determine the location of the
 				   name. */
 /* sizeof() = 26 + (attribute_name_length * 2) bytes */
@@ -1051,7 +1051,7 @@ typedef struct {
 /* 40*/	u8 file_name_length;			/* Length of file name in
 						   (Unicode) characters. */
 /* 41*/	FILE_NAME_TYPE_FLAGS file_name_type;	/* Namespace of the file name.*/
-/* 42*/	uchar_t file_name[0];			/* File name in Unicode. */
+/* 42*/	ntfschar file_name[0];			/* File name in Unicode. */
 } __attribute__ ((__packed__)) FILE_NAME_ATTR;
 
 /*
@@ -1839,7 +1839,7 @@ typedef struct {
  * NOTE: Present only in FILE_Volume.
  */
 typedef struct {
-	uchar_t name[0];	/* The name of the volume in Unicode. */
+	ntfschar name[0];	/* The name of the volume in Unicode. */
 } __attribute__ ((__packed__)) VOLUME_NAME;
 
 /*

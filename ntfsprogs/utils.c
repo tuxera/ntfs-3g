@@ -567,7 +567,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 
 	name    = NULL;
 	namelen = attr->name_length;
-	if (ntfs_ucstombs ((uchar_t *)((char *)attr + attr->name_offset),
+	if (ntfs_ucstombs ((ntfschar *)((char *)attr + attr->name_offset),
 	    namelen, &name, namelen) < 0) {
 		Eprintf ("Couldn't translate attribute name to current locale.\n");
 		// <UNKNOWN>?
@@ -721,7 +721,7 @@ ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, cons
 	char *p, *q;
 	ntfs_inode *ni;
 	ntfs_inode *result  = NULL;
-	uchar_t    *unicode = NULL;
+	ntfschar    *unicode = NULL;
 	char       *ascii   = NULL;
 
 	if (!vol || !pathname) {

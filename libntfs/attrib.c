@@ -43,7 +43,7 @@
 #include "dir.h"
 #include "compress.h"
 
-uchar_t AT_UNNAMED[] = { const_cpu_to_le16('\0') };
+ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
 /**
  * ntfs_get_attribute_value_length
@@ -246,7 +246,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
  * Initialize the ntfs attribute @na with @ni, @type, @name, and @name_len.
  */
 static __inline__ void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
-		const ATTR_TYPES type, uchar_t *name, const u32 name_len)
+		const ATTR_TYPES type, ntfschar *name, const u32 name_len)
 {
 	na->rl = NULL;
 	na->ni = ni;
@@ -323,7 +323,7 @@ void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
  * both those cases @name_len is not used at all.
  */
 ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		uchar_t *name, const u32 name_len)
+		ntfschar *name, const u32 name_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na;
@@ -1331,13 +1331,13 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * Warning: Never use @val when looking for attribute types which can be
  *	    non-resident as this most likely will result in a crash!
  */
-static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
+static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ATTR_RECORD *a;
 	ntfs_volume *vol;
-	uchar_t *upcase;
+	ntfschar *upcase;
 	u32 upcase_len;
 
 	if (!ctx || !ctx->mrec || !ctx->attr) {
@@ -1394,12 +1394,12 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
 				return -1;
 			}
 		} else if (name && !ntfs_names_are_equal(name, name_len,
-			    (uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
+			    (ntfschar*)((char*)a + le16_to_cpu(a->name_offset)),
 			    a->name_length, ic, upcase, upcase_len)) {
 			register int rc;
 
 			rc = ntfs_names_collate(name, name_len,
-					(uchar_t*)((char*)a +
+					(ntfschar*)((char*)a +
 					le16_to_cpu(a->name_offset)),
 					a->name_length, 1, IGNORE_CASE,
 					upcase, upcase_len);
@@ -1415,7 +1415,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
 			if (rc)
 				continue;
 			rc = ntfs_names_collate(name, name_len,
-					(uchar_t*)((char*)a +
+					(ntfschar*)((char*)a +
 					le16_to_cpu(a->name_offset)),
 					a->name_length, 1, CASE_SENSITIVE,
 					upcase, upcase_len);
@@ -1536,7 +1536,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
  *	EIO	I/O error or corrupt data structures found.
  *	ENOMEM	Not enough memory to allocate necessary buffers.
  */
-static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
+static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)
@@ -1546,7 +1546,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 	ATTR_LIST_ENTRY *al_entry, *next_al_entry;
 	char *al_start, *al_end;
 	ATTR_RECORD *a;
-	uchar_t *al_name;
+	ntfschar *al_name;
 	u32 al_name_len;
 	BOOL is_first_search = FALSE;
 
@@ -1665,7 +1665,7 @@ find_attr_list_attr:
 				continue;
 		}
 		al_name_len = al_entry->name_length;
-		al_name = (uchar_t*)((char*)al_entry + al_entry->name_offset);
+		al_name = (ntfschar*)((char*)al_entry + al_entry->name_offset);
 		/*
 		 * If !@type we want the attribute represented by this
 		 * attribute list entry.
@@ -1727,7 +1727,7 @@ find_attr_list_attr:
 					lowest_vcn			    &&
 				next_al_entry->type == al_entry->type	    &&
 				next_al_entry->name_length == al_name_len   &&
-				ntfs_names_are_equal((uchar_t*)((char*)
+				ntfs_names_are_equal((ntfschar*)((char*)
 					next_al_entry +
 					next_al_entry->name_offset),
 					next_al_entry->name_length,
@@ -1800,7 +1800,7 @@ do_next_attr_loop:
 		 */
 		if (al_entry->type != a->type)
 			break;
-		if (!ntfs_names_are_equal((uchar_t*)((char*)a +
+		if (!ntfs_names_are_equal((ntfschar*)((char*)a +
 				le16_to_cpu(a->name_offset)),
 				a->name_length, al_name,
 				al_name_len, CASE_SENSITIVE,
@@ -1948,7 +1948,7 @@ not_found:
  *	EIO	I/O error or corrupt data structures found.
  *	ENOMEM	Not enough memory to allocate necessary buffers.
  */
-int ntfs_attr_lookup(const ATTR_TYPES type, const uchar_t *name,
+int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)
@@ -2474,7 +2474,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	/* Move the attribute name if it exists and update the offset. */
 	if (a->name_length)
 		memmove((u8*)a + name_ofs, (u8*)a + le16_to_cpu(a->name_offset),
-				a->name_length * sizeof(uchar_t));
+				a->name_length * sizeof(ntfschar));
 	a->name_offset = cpu_to_le16(name_ofs);
 
 	/* Update the flags to match the in-memory ones. */
@@ -2748,7 +2748,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		}
 
 		memmove((u8*)a + name_ofs, (u8*)a + le16_to_cpu(a->name_offset),
-				a->name_length * sizeof(uchar_t));
+				a->name_length * sizeof(ntfschar));
 	}
 	a->name_offset = cpu_to_le16(name_ofs);
 

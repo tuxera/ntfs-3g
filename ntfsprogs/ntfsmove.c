@@ -441,7 +441,7 @@ done:
  */
 static int dont_move (ntfs_inode *ino)
 {
-	static const uchar_t ntldr[6] = {
+	static const ntfschar ntldr[6] = {
 		const_cpu_to_le16('n'), const_cpu_to_le16('t'), const_cpu_to_le16('l'),
 		const_cpu_to_le16('d'), const_cpu_to_le16('r'), const_cpu_to_le16('\0')
 	};

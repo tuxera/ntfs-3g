@@ -71,7 +71,7 @@ BOOL success = FALSE;
 char *dev_name;
 s64 inode;
 u32 attr_type;
-uchar_t *attr_name = NULL;
+ntfschar *attr_name = NULL;
 u32 attr_name_len;
 s64 new_len;
 
@@ -304,9 +304,9 @@ static void parse_options(int argc, char *argv[])
  * terminating null byte. If a unicode character was encountered which could
  * not be converted -1 is returned.
  */
-static int ucstos(char *dest, const uchar_t *src, int maxlen)
+static int ucstos(char *dest, const ntfschar *src, int maxlen)
 {
-	uchar_t u;
+	ntfschar u;
 	int i;
 
 	/* Need one byte for null terminator. */
@@ -364,7 +364,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			if (!buf)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
-			i = ucstos(buf, (uchar_t*)val, val_len);
+			i = ucstos(buf, (ntfschar*)val, val_len);
 			if (i == -1)
 				printf("Volume name contains non-displayable "
 						"Unicode characters.\n");
@@ -585,7 +585,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 			cpu_to_le16(a->name_offset));
 	u = a->flags;
 	if (a->name_length) {
-		if (ucstos(s, (uchar_t*)((char*)a +
+		if (ucstos(s, (ntfschar*)((char*)a +
 				cpu_to_le16(a->name_offset)),
 				min((int)sizeof(s),
 						a->name_length + 1)) == -1) {

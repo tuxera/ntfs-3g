@@ -42,7 +42,7 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
-typedef u16 uchar_t;			/* 2-byte Unicode character type. */
+typedef u16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1
 
 /*

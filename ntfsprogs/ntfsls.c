@@ -226,7 +226,7 @@ typedef struct {
  * list_entry
  * FIXME: Should we print errors as we go along? (AIA)
  */
-static int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
+static int list_entry(ntfsls_dirent *dirent, const ntfschar *name, 
 		const int name_len, const int name_type, const s64 pos,
 		const MFT_REF mref, const unsigned dt_type)
 {
@@ -379,7 +379,7 @@ int main(int argc, char **argv)
 		FILE_NAME_ATTR *attr;
 		ntfs_attr_search_ctx *ctx;
 		int space = 4;
-		uchar_t *name = NULL;
+		ntfschar *name = NULL;
 		int name_len = 0;;
 
 		ctx = ntfs_attr_get_search_ctx (NULL, ni->mrec);

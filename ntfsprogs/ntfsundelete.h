@@ -60,7 +60,7 @@ struct filename {
 	struct list_head list;		/* Previous/Next links */
 	char		*name;		/* Filename in current locale */
 	FILE_NAME_TYPE_FLAGS name_space;
-	uchar_t		*uname;		/* Filename in unicode */
+	ntfschar		*uname;		/* Filename in unicode */
 	int		 uname_len;	/* and its length */
 	long long	 size_alloc;	/* Allocated size (multiple of cluster size) */
 	long long	 size_data;	/* Actual size of data */
@@ -74,7 +74,7 @@ struct filename {
 struct data {
 	struct list_head list;		/* Previous/Next links */
 	char		*name;		/* Stream name in current locale */
-	uchar_t		*uname;		/* Unicode stream name */
+	ntfschar	*uname;		/* Unicode stream name */
 	int		 uname_len;	/* and its length */
 	int		 resident;	/* Stream is resident */
 	int		 compressed;	/* Stream is compressed */

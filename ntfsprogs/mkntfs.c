@@ -137,7 +137,7 @@ extern const unsigned char attrdef_ntfs12_array[2400];
 extern const unsigned char boot_array[3429];
 extern void init_system_file_sd(int sys_file_no, char **sd_val,
 		int *sd_val_len);
-extern void init_upcase_table(uchar_t *uc, u32 uc_len);
+extern void init_upcase_table(ntfschar *uc, u32 uc_len);
 
 /* Page size on ia32. Can change to 8192 on Alpha. */
 #define NTFS_PAGE_SIZE	4096
@@ -193,7 +193,7 @@ struct {
 					   bad clusters from. */
 	ATTR_DEF *attr_defs;		/* filename, attribute defs. */
 	int attr_defs_len;		/* in bytes */
-	uchar_t *upcase;		/* filename, upcase table. */
+	ntfschar *upcase;		/* filename, upcase table. */
 	u32 upcase_len;			/* Determined automatically. */
 	int quiet;			/* -q, quiet execution. */
 	int verbose;			/* -v, verbose execution, given twice,
@@ -571,9 +571,9 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
  * terminating null byte. If a unicode character was encountered which could
  * not be converted -1 is returned.
  */
-static int ucstos(char *dest, const uchar_t *src, int maxlen)
+static int ucstos(char *dest, const ntfschar *src, int maxlen)
 {
-	uchar_t u;
+	ntfschar u;
 	int i;
 
 	/* Need one byte for null terminator. */
@@ -603,17 +603,17 @@ static int ucstos(char *dest, const uchar_t *src, int maxlen)
  * write the terminating null unicode character and hence return -1 with errno
  * set to EINVAL.
  */
-static int stoucs(uchar_t *dest, const char *src, int maxlen)
+static int stoucs(ntfschar *dest, const char *src, int maxlen)
 {
 	char c;
 	int i;
 
-	if (maxlen < (int)sizeof(uchar_t)) {
+	if (maxlen < (int)sizeof(ntfschar)) {
 		errno = EINVAL;
 		return -1;
 	}
 	/* Convert maxlen from bytes to unicode characters. */
-	maxlen /= sizeof(uchar_t);
+	maxlen /= sizeof(ntfschar);
 	/* Need space for null terminator. */
 	maxlen--;
 	for (i = 0; i < maxlen; i++) {
@@ -666,7 +666,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			if (!buf)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
-			i = ucstos(buf, (uchar_t*)val, val_len);
+			i = ucstos(buf, (ntfschar*)val, val_len);
 			if (i == -1)
 				printf("Volume name contains non-displayable "
 						"Unicode characters.\n");
@@ -881,7 +881,7 @@ static void dump_attr_record(ATTR_RECORD *a)
 			cpu_to_le16(a->name_offset));
 	u = a->flags;
 	if (a->name_length) {
-		if (ucstos(s, (uchar_t*)((char*)a +
+		if (ucstos(s, (ntfschar*)((char*)a +
 				cpu_to_le16(a->name_offset)),
 				min(sizeof(s), a->name_length + 1U)) == -1) {
 			Eprintf("Could not convert Unicode string to single "
@@ -1162,15 +1162,15 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	int asize, mpa_size, err, i;
 	s64 bw = 0, inited_size;
 	VCN highest_vcn;
-	uchar_t *uname;
+	ntfschar *uname;
 /*
 	if (base record)
 		attr_lookup();
 	else
 */
 	if (name_len) {
-		i = (name_len + 1) * sizeof(uchar_t);
-		uname = (uchar_t*)calloc(1, i);
+		i = (name_len + 1) * sizeof(ntfschar);
+		uname = (ntfschar*)calloc(1, i);
 		if (!uname)
 			return -errno;
 		name_len = stoucs(uname, name, i);
@@ -1347,15 +1347,15 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	int asize, mpa_size, err, i;
 	runlist *rl = NULL;
 	s64 bw = 0;
-	uchar_t *uname;
+	ntfschar *uname;
 /*
 	if (base record)
 		attr_lookup();
 	else
 */
 	if (name_len) {
-		i = (name_len + 1) * sizeof(uchar_t);
-		uname = (uchar_t*)calloc(1, i);
+		i = (name_len + 1) * sizeof(ntfschar);
+		uname = (ntfschar*)calloc(1, i);
 		if (!uname)
 			return -errno;
 		name_len = stoucs(uname, name, i);
@@ -1536,15 +1536,15 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
 	int asize, err, i;
-	uchar_t *uname;
+	ntfschar *uname;
 /*
 	if (base record)
 		ntfs_attr_lookup();
 	else
 */
 	if (name_len) {
-		i = (name_len + 1) * sizeof(uchar_t);
-		uname = (uchar_t*)calloc(1, i);
+		i = (name_len + 1) * sizeof(ntfschar);
+		uname = (ntfschar*)calloc(1, i);
 		name_len = stoucs(uname, name, i);
 		if (name_len > 0xff)
 			return -ENAMETOOLONG;
@@ -1695,7 +1695,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	}
 	si = (STANDARD_INFORMATION*)((char*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
-	i = (strlen(file_name) + 1) * sizeof(uchar_t);
+	i = (strlen(file_name) + 1) * sizeof(ntfschar);
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
 	fn = (FILE_NAME_ATTR*)malloc(fn_size);
 	if (!fn) {
@@ -1735,7 +1735,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	}
 	/* No terminating null in file names. */
 	fn->file_name_length = i;
-	fn_size = sizeof(FILE_NAME_ATTR) + i * sizeof(uchar_t);
+	fn_size = sizeof(FILE_NAME_ATTR) + i * sizeof(ntfschar);
 	i = insert_resident_attr_in_mft_record(m, AT_FILE_NAME, NULL, 0, 0,
 			0, RESIDENT_ATTR_IS_INDEXED, (char*)fn, fn_size);
 	free(fn);
@@ -1833,7 +1833,7 @@ static int add_attr_data_positioned(MFT_RECORD *m, const char *name,
  * Create volume name attribute specifying the volume name @vol_name as a null
  * terminated char string of length @vol_name_len (number of characters not
  * including the terminating null), which is converted internally to a little
- * endian uchar_t string. The name is at least 1 character long and at most
+ * endian ntfschar string. The name is at least 1 character long and at most
  * 0xff characters long (not counting the terminating null).
  *
  * Return 0 on success or -errno on error.
@@ -1841,15 +1841,15 @@ static int add_attr_data_positioned(MFT_RECORD *m, const char *name,
 static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 		const int vol_name_len)
 {
-	uchar_t *uname;
+	ntfschar *uname;
 	int i, len;
 
 	if (vol_name_len) {
-		len = (vol_name_len + 1) * sizeof(uchar_t);
+		len = (vol_name_len + 1) * sizeof(ntfschar);
 		uname = calloc(1, len);
 		if (!uname)
 			return -errno;
-		i = (stoucs(uname, vol_name, len) + 1) * sizeof(uchar_t);
+		i = (stoucs(uname, vol_name, len) + 1) * sizeof(ntfschar);
 		if (!i) {
 			free(uname);
 			return -EINVAL;
@@ -2053,14 +2053,14 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	INDEX_ROOT *r;
 	INDEX_ENTRY *re;
 	INDEX_ALLOCATION *ia_val = NULL;
-	uchar_t *uname;
+	ntfschar *uname;
 	char bmp[8];
 	char *re_start, *re_end;
 	int i, err, index_block_size;
 
 	if (name_len) {
-		i = (name_len + 1) * sizeof(uchar_t);
-		uname = (uchar_t*)calloc(1, i);
+		i = (name_len + 1) * sizeof(ntfschar);
+		uname = (ntfschar*)calloc(1, i);
 		if (!uname)
 			return -errno;
 		name_len = stoucs(uname, name, i);
@@ -2289,7 +2289,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
 			if (!__buf)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
-			i = ucstos(__buf, (uchar_t*)&file_name->file_name,
+			i = ucstos(__buf, (ntfschar*)&file_name->file_name,
 					file_name->file_name_length + 1);
 			if (i == -1)
 				Dprintf("Name contains non-displayable "
@@ -2399,7 +2399,7 @@ static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 	int i, fn_size;
 
 	/* Create the file_name attribute. */
-	i = (strlen(file_name) + 1) * sizeof(uchar_t);
+	i = (strlen(file_name) + 1) * sizeof(ntfschar);
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
 	fn = (FILE_NAME_ATTR*)malloc(fn_size);
 	if (!fn)
@@ -2436,7 +2436,7 @@ static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 	}
 	/* No terminating null in file names. */
 	fn->file_name_length = i;
-	fn_size = sizeof(FILE_NAME_ATTR) + i * sizeof(uchar_t);
+	fn_size = sizeof(FILE_NAME_ATTR) + i * sizeof(ntfschar);
 	/* Increment the link count of @m_file. */
 	i = le16_to_cpu(m_file->link_count);
 	if (i == 0xffff) {
@@ -3621,10 +3621,10 @@ int main(int argc, char **argv)
 	vol->mft_record_size_bits = 10;
 	/* Length is in unicode characters. */
 	vol->upcase_len = 65536;
-	vol->upcase = (uchar_t*)malloc(vol->upcase_len * sizeof(uchar_t));
+	vol->upcase = (ntfschar*)malloc(vol->upcase_len * sizeof(ntfschar));
 	if (!vol->upcase)
 		err_exit("Could not allocate memory for internal buffer.\n");
-	init_upcase_table(vol->upcase, vol->upcase_len * sizeof(uchar_t));
+	init_upcase_table(vol->upcase, vol->upcase_len * sizeof(ntfschar));
 	/* Initialize opts to zero / required values. */
 	init_options();
 	/* Parse command line options. */
@@ -3666,7 +3666,7 @@ int main(int argc, char **argv)
 //   update during each subsequent c&w of each system file.
 	Vprintf("Syncing root directory index record.\n");
 	m = (MFT_RECORD*)(buf + 5 * vol->mft_record_size);
-	i = 5 * sizeof(uchar_t);
+	i = 5 * sizeof(ntfschar);
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx)
 		err_exit("Failed to allocate attribute search context: %s\n",

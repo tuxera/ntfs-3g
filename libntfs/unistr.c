@@ -71,10 +71,10 @@ const u8 legal_ansi_char_array[0x40] = {
  * identical, or FALSE (0) if they are not identical. If @ic is IGNORE_CASE,
  * the @upcase table is used to performa a case insensitive comparison.
  */
-BOOL ntfs_names_are_equal(const uchar_t *s1, size_t s1_len,
-		const uchar_t *s2, size_t s2_len,
+BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
+		const ntfschar *s2, size_t s2_len,
 		const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_size)
+		const ntfschar *upcase, const u32 upcase_size)
 {
 	if (s1_len != s2_len)
 		return FALSE;
@@ -104,13 +104,13 @@ BOOL ntfs_names_are_equal(const uchar_t *s1, size_t s1_len,
  *
  * The following characters are considered invalid: '"', '*', '<', '>' and '?'.
  */
-int ntfs_names_collate(const uchar_t *name1, const u32 name1_len,
-		const uchar_t *name2, const u32 name2_len,
+int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
+		const ntfschar *name2, const u32 name2_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_len)
+		const ntfschar *upcase, const u32 upcase_len)
 {
 	u32 cnt;
-	uchar_t c1, c2;
+	ntfschar c1, c2;
 
 #ifdef DEBUG
 	if (!name1 || !name2 || (ic && !upcase && upcase_len)) {
@@ -160,9 +160,9 @@ int ntfs_names_collate(const uchar_t *name1, const u32 name1_len,
  * if @s1 (or the first @n Unicode characters thereof) is found, respectively,
  * to be less than, to match, or be greater than @s2.
  */
-int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n)
+int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 {
-	uchar_t c1, c2;
+	ntfschar c1, c2;
 	size_t i;
 
 #ifdef DEBUG
@@ -202,10 +202,10 @@ int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n)
  * if @s1 (or the first @n Unicode characters thereof) is found, respectively,
  * to be less than, to match, or be greater than @s2.
  */
-int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
-		const uchar_t *upcase, const u32 upcase_size)
+int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
+		const ntfschar *upcase, const u32 upcase_size)
 {
-	uchar_t c1, c2;
+	ntfschar c1, c2;
 	size_t i;
 
 #ifdef DEBUG
@@ -236,12 +236,12 @@ int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
  *
  * Return the number of Unicode characters in the little endian Unicode
  * string @s up to a maximum of maxlen Unicode characters, not including
- * the terminating (uchar_t)'\0'. If there is no (uchar_t)'\0' between @s
+ * the terminating (ntfschar)'\0'. If there is no (ntfschar)'\0' between @s
  * and @s + @maxlen, @maxlen is returned.
  *
  * This function never looks beyond @s + @maxlen.
  */
-u32 ntfs_ucsnlen(const uchar_t *s, u32 maxlen)
+u32 ntfs_ucsnlen(const ntfschar *s, u32 maxlen)
 {
 	u32 i;
 
@@ -255,11 +255,11 @@ u32 ntfs_ucsnlen(const uchar_t *s, u32 maxlen)
 /**
  * ntfs_name_upcase
  */
-void ntfs_name_upcase(uchar_t *name, u32 name_len, const uchar_t *upcase,
+void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 		const u32 upcase_len)
 {
 	u32 i;
-	uchar_t u;
+	ntfschar u;
 
 	for (i = 0; i < name_len; i++)
 		if ((u = le16_to_cpu(name[i])) < upcase_len)
@@ -270,9 +270,9 @@ void ntfs_name_upcase(uchar_t *name, u32 name_len, const uchar_t *upcase,
  * ntfs_file_value_upcase
  */
 void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
-		const uchar_t *upcase, const u32 upcase_len)
+		const ntfschar *upcase, const u32 upcase_len)
 {
-	ntfs_name_upcase((uchar_t*)&file_name_attr->file_name,
+	ntfs_name_upcase((ntfschar*)&file_name_attr->file_name,
 			file_name_attr->file_name_length, upcase, upcase_len);
 }
 
@@ -282,11 +282,11 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 int ntfs_file_values_compare(FILE_NAME_ATTR *file_name_attr1,
 		FILE_NAME_ATTR *file_name_attr2,
 		const int err_val, const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_len)
+		const ntfschar *upcase, const u32 upcase_len)
 {
-	return ntfs_names_collate((uchar_t*)&file_name_attr1->file_name,
+	return ntfs_names_collate((ntfschar*)&file_name_attr1->file_name,
 			file_name_attr1->file_name_length,
-			(uchar_t*)&file_name_attr2->file_name,
+			(ntfschar*)&file_name_attr2->file_name,
 			file_name_attr2->file_name_length,
 			err_val, ic, upcase, upcase_len);
 }
@@ -316,7 +316,7 @@ int ntfs_file_values_compare(FILE_NAME_ATTR *file_name_attr1,
  *	ENAMETOOLONG	Destination buffer is too small for input string.
  *	ENOMEM		Not enough memory to allocate destination buffer.
  */
-int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
+int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		int outs_len)
 {
 	char *mbs;
@@ -429,9 +429,9 @@ err_out:
  *	ENAMETOOLONG	Destination buffer is too small for input string.
  *	ENOMEM		Not enough memory to allocate destination buffer.
  */
-int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
+int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 {
-	uchar_t *ucs;
+	ntfschar *ucs;
 	const char *s;
 	wchar_t wc;
 	int i, o, cnt, ins_len, ucs_len;
@@ -480,7 +480,7 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 	ins_len++;
 	if (!ucs) {
 		ucs_len = ins_len;
-		ucs = (uchar_t*)malloc(ucs_len * sizeof(uchar_t));
+		ucs = (ntfschar*)malloc(ucs_len * sizeof(ntfschar));
 		if (!ucs)
 			return -1;
 	}
@@ -492,7 +492,7 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 	for (i = o = cnt = 0; o < ins_len; i += cnt, o++) {
 		/* Reallocate memory if necessary or abort. */
 		if (o >= ucs_len) {
-			uchar_t *tc;
+			ntfschar *tc;
 			if (ucs == *outs) {
 				errno = ENAMETOOLONG;
 				return -1;
@@ -501,12 +501,12 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 			 * We will never get here but hey, it's only a bit of
 			 * extra code...
 			 */
-			ucs_len = (ucs_len * sizeof(uchar_t) + 64) & ~63;
-			tc = (uchar_t*)realloc(ucs, ucs_len);
+			ucs_len = (ucs_len * sizeof(ntfschar) + 64) & ~63;
+			tc = (ntfschar*)realloc(ucs, ucs_len);
 			if (!tc)
 				goto err_out;
 			ucs = tc;
-			ucs_len /= sizeof(uchar_t);
+			ucs_len /= sizeof(ntfschar);
 		}
 		/* Convert the multibyte character to a wide character. */
 #ifdef HAVE_MBSINIT
@@ -525,7 +525,7 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 		}
 		/* Make sure we are not overflowing the NTFS Unicode set. */
 		if ((unsigned long)wc >= (unsigned long)(1 <<
-				(8 * sizeof(uchar_t)))) {
+				(8 * sizeof(ntfschar)))) {
 			errno = EILSEQ;
 			goto err_out;
 		}

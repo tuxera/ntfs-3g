@@ -35,7 +35,7 @@
 /*
  * The little endian Unicode string "$I30" as a global constant.
  */
-uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
+ntfschar I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		   const_cpu_to_le16('3'), const_cpu_to_le16('0'),
 		   const_cpu_to_le16('\0') };
 
@@ -64,7 +64,7 @@ uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
  * If the volume is mounted with the case sensitive flag set, then we only
  * allow exact matches.
  */
-u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
+u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		const int uname_len)
 {
 	VCN vcn;
@@ -137,7 +137,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		 * returning.
 		 */
 		if (ntfs_names_are_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
 found_it:
@@ -158,7 +158,7 @@ found_it:
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
 				ntfs_names_are_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			/* Only one case insensitive matching name allowed. */
@@ -178,7 +178,7 @@ found_it:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_names_collate(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -197,7 +197,7 @@ found_it:
 		 * collation.
 		 */
 		rc = ntfs_names_collate(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -329,7 +329,7 @@ descend_into_child_node:
 		 * returning.
 		 */
 		if (ntfs_names_are_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
 found_it2:
@@ -352,7 +352,7 @@ found_it2:
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
 				ntfs_names_are_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			/* Only one case insensitive matching name allowed. */
@@ -372,7 +372,7 @@ found_it2:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_names_collate(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -391,7 +391,7 @@ found_it2:
 		 * collation.
 		 */
 		rc = ntfs_names_collate(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -456,7 +456,7 @@ close_err_out:
 /*
  * The little endian Unicode string ".." for ntfs_readdir().
  */
-static const uchar_t dotdot[3] = { const_cpu_to_le16('.'),
+static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
 				   const_cpu_to_le16('.'),
 				   const_cpu_to_le16('\0') };
 

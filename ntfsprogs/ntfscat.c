@@ -210,7 +210,7 @@ static int parse_options (int argc, char **argv)
 /**
  * cat
  */
-static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type, uchar_t *name, int namelen)
+static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int namelen)
 {
 	/* increase 1024 only if you fix partial writes below */
 	const int bufsize = 1024; 

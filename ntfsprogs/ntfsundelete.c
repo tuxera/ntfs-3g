@@ -666,7 +666,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 		data->encrypted  = rec->flags & ATTR_IS_ENCRYPTED;
 
 		if (rec->name_length) {
-			data->uname     = (uchar_t *) ((char *) rec + le16_to_cpu (rec->name_offset));
+			data->uname     = (ntfschar *) ((char *) rec + le16_to_cpu (rec->name_offset));
 			data->uname_len = rec->name_length;
 
 			if (ntfs_ucstombs (data->uname, data->uname_len, &data->name,

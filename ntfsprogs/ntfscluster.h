@@ -53,7 +53,7 @@ struct options {
 struct match {
 	u64		 inum;		/* Inode number */
 	ATTR_TYPES	 type;		/* Attribute type */
-	uchar_t		*name;		/* Attribute name */
+	ntfschar		*name;		/* Attribute name */
 	int		 name_len;	/* Length of attribute name */
 	LCN		 lcn;		/* Last cluster in use */
 };

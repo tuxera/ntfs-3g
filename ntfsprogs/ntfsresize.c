@@ -560,7 +560,7 @@ static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-static int str2unicode(const char *aname, uchar_t **ustr, int *len)
+static int str2unicode(const char *aname, ntfschar **ustr, int *len)
 {
 	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1))
 		return -1;
@@ -576,7 +576,7 @@ static int str2unicode(const char *aname, uchar_t **ustr, int *len)
 static int has_bad_sectors(ntfs_resize_t *resize)
 {
 	int len, ret = 0;
-	uchar_t *ustr = NULL;
+	ntfschar *ustr = NULL;
 	ATTR_RECORD *a = resize->ctx->attr;
 	
 	if (resize->ni->mft_no != FILE_BadClus)
@@ -586,7 +586,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 		return -1;
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
-			(uchar_t*)((u8*)a + le16_to_cpu(a->name_offset)),
+			(ntfschar*)((u8*)a + le16_to_cpu(a->name_offset)),
 			a->name_length, 0, NULL, 0)) 
 		ret = 1;
 									
@@ -1776,7 +1776,7 @@ static void lookup_data_attr(ntfs_volume *vol,
 			     ntfs_attr_search_ctx **ctx)
 {
 	ntfs_inode *ni;
-	uchar_t *ustr = NULL;
+	ntfschar *ustr = NULL;
 	int len = 0;
 
 	if (!(ni = ntfs_inode_open(vol, mref)))

@@ -31,7 +31,7 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 #include "runlist.h"
 #include "volume.h"
 
-extern uchar_t AT_UNNAMED[];
+extern ntfschar AT_UNNAMED[];
 
 /**
  * ntfs_lcn_special_values - special return values for ntfs_*_vcn_to_lcn()
@@ -82,7 +82,7 @@ extern ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
 extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
 
-extern int ntfs_attr_lookup(const ATTR_TYPES type, const uchar_t *name,
+extern int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx);
@@ -202,7 +202,7 @@ struct _ntfs_attr {
 	runlist_element *rl;
 	ntfs_inode *ni;
 	ATTR_TYPES type;
-	uchar_t *name;
+	ntfschar *name;
 	u32 name_len;
 	unsigned long state;
 	s64 allocated_size;
@@ -247,7 +247,7 @@ extern void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
 		const u8 compression_unit);
 
 extern ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		uchar_t *name, const u32 name_len);
+		ntfschar *name, const u32 name_len);
 extern void ntfs_attr_close(ntfs_attr *na);
 
 extern s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count,

@@ -249,7 +249,7 @@ static int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
 static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
 {
 	ntfs_attr_search_ctx *ctx = NULL;
-	uchar_t *new_label = NULL;
+	ntfschar *new_label = NULL;
 	MFT_RECORD *mrec = NULL;
 	ATTR_RECORD *a;
 	int label_len;
@@ -305,13 +305,13 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		perror("Unable to convert label string to Unicode");
 		goto err_out;
 	}
-	label_len *= sizeof(uchar_t);
+	label_len *= sizeof(ntfschar);
 	if (label_len > 0x100) {
 		fprintf(stderr, "New label is too long. Maximum %u characters "
 				"allowed. Truncating excess characters.\n",
-				(unsigned)(0x100 / sizeof(uchar_t)));
+				(unsigned)(0x100 / sizeof(ntfschar)));
 		label_len = 0x100;
-		new_label[label_len / sizeof(uchar_t)] = cpu_to_le16(L'\0');
+		new_label[label_len / sizeof(ntfschar)] = cpu_to_le16(L'\0');
 	}
 	if (a) {
 		if (resize_resident_attribute_value(mrec, a, label_len)) {

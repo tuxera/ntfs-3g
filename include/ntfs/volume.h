@@ -158,7 +158,7 @@ struct _ntfs_volume {
 	ntfs_attr *mftmirr_na;	/* ntfs_attr structure for the data attribute
 				   of FILE_MFTMirr. */
 
-	uchar_t *upcase;	/* Upper case equivalents of all 65536 2-byte
+	ntfschar *upcase;	/* Upper case equivalents of all 65536 2-byte
 				   Unicode characters. Obtained from
 				   FILE_UpCase. */
 	u32 upcase_len;		/* Length in Unicode characters of the upcase

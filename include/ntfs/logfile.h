@@ -190,7 +190,7 @@ typedef struct {
 				   but don't know if this is always the case. */
 /* 22*/	u8 reserved[6];		/* Reserved/alignment. */
 /* 28*/	u32 client_name_length; /* Length of client name in bytes.  = 8 */
-/* 32*/	uchar_t client_name[64];/* Name of the client in Unicode.  = NTFS */
+/* 32*/	ntfschar client_name[64];/* Name of the client in Unicode.  = NTFS */
 /* sizeof() = 160 (0xa0) bytes */
 } __attribute__ ((__packed__)) LOG_CLIENT_RECORD;
 

@@ -25,10 +25,10 @@
 #include "types.h"
 
 /* The little endian Unicode string $I30 as a global constant. */
-extern uchar_t I30[5];
+extern ntfschar I30[5];
 
 extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
-		const uchar_t *uname, const int uname_len);
+		const ntfschar *uname, const int uname_len);
 
 /*
  * File types (adapted from include <linux/fs.h>)
@@ -49,7 +49,7 @@ extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
  * This allows the caller to read directories into their application or
  * to have different dirent layouts depending on the binary type.
  */
-typedef int (*ntfs_filldir_t)(void *dirent, const uchar_t *name,
+typedef int (*ntfs_filldir_t)(void *dirent, const ntfschar *name,
 		const int name_len, const int name_type, const s64 pos,
 		const MFT_REF mref, const unsigned dt_type);
 
