@@ -80,11 +80,11 @@ void usage (void)
 	printf ("\nUsage: %s [options] device\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"\n"
-		"    -f          --force            Use less caution\n"
-		"    -q          --quiet            Less output\n"
-		"    -v          --verbose          More output\n"
-		"    -V          --version          Display version information\n"
-		"    -h          --help             Display this help\n\n",
+		"    -f      --force      Use less caution\n"
+		"    -q      --quiet      Less output\n"
+		"    -v      --verbose    More output\n"
+		"    -V      --version    Display version information\n"
+		"    -h      --help       Display this help\n\n",
 		EXEC_NAME);
 	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
