@@ -55,6 +55,7 @@
 #include "layout.h"
 #include "inode.h"
 #include "utils.h"
+#include "security.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 
@@ -440,14 +441,13 @@ do_next:
  */
 void ntfs_dump_object_id_attr(ntfs_inode *inode)
 {
-    
-    OBJECT_ID_ATTR *obj_id_attr = NULL;
-    ATTR_RECORD *attr = NULL;
-    ntfs_attr_search_ctx *ctx = NULL;
+	OBJECT_ID_ATTR *obj_id_attr = NULL;
+	ATTR_RECORD *attr = NULL;
+	ntfs_attr_search_ctx *ctx = NULL;
 
-    ctx = ntfs_attr_get_search_ctx(inode, NULL);
+	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
-	if(ntfs_attr_lookup(AT_OBJECT_ID, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_OBJECT_ID, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		if (errno != ENOENT)
 			fprintf(stderr, "ntfsinfo error: cannot look up "
 					"attribute AT_OBJECT_ID: %s\n", 
@@ -456,30 +456,57 @@ void ntfs_dump_object_id_attr(ntfs_inode *inode)
 		return;
 	}
 
-    attr = ctx->attr;
+	attr = ctx->attr;
 
-    obj_id_attr = (OBJECT_ID_ATTR*)((char *)attr + le16_to_cpu(attr->value_offset)); //the attribute plus the offset
+	obj_id_attr = (OBJECT_ID_ATTR *)((u8*)attr +
+			le16_to_cpu(attr->value_offset));
 
-    printf("Dumping $OBJECT_ID (0x40)\n");
+	printf("Dumping $OBJECT_ID (0x40)\n");
 
-    //I believe these attributes are only present on volume versions > 3.0. It was introduced
-    //in Win2k, which is 3.0
+	if (inode->vol->major_ver >= 3.0) {
+		u32 value_length;
+		char printable_GUID[37];
 
-    //FIXME: Need to do a check to make sure these attributes are actually present
-    //even if it is > 3.0. 
-    if (inode->vol->major_ver >= 3.0) {
-	printf("\tVolume Version > 3.0... Dumping Attributes\n");
-	
-	//printf("\tObject ID: \t\t\t %d\n", obj_id_attr->object_id);
-	//printf("\tBirth Volume ID: \t\t\t %d\n", obj_id_attr->birth_volume_id);
-	//printf("\tBirth Object ID: \t\t\t %d\n", obj_id_attr->birth_object_id);
-    }
+		printf("\tVolume Version >= 3.0... Dumping Attributes\n");
 
-    else 
-      printf("\t$OBJECT_ID not present. Only NTFS versions > 3.0 have $OBJECT_ID. \
-		  Your version of NTFS is %d\n", inode->vol->major_ver);
+		value_length = le32_to_cpu(attr->value_length);
 
-    ntfs_attr_put_search_ctx(ctx);
+		/* Object ID is mandatory. */
+		ntfs_guid_to_mbs(&obj_id_attr->object_id, printable_GUID);
+		printf("\tObject ID:\t\t%s\n", printable_GUID);
+
+		/* Dump Birth Volume ID. */
+		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
+				&obj_id_attr->birth_volume_id)) {
+			ntfs_guid_to_mbs(&obj_id_attr->birth_volume_id,
+					printable_GUID);
+			printf("\tBirth Volume ID:\t\t%s\n", printable_GUID);
+		} else
+			printf("\tBirth Volume ID:\tmissing\n");
+
+		/* Dumping Birth Object ID */
+		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
+				&obj_id_attr->birth_object_id)) {
+			ntfs_guid_to_mbs(&obj_id_attr->birth_object_id,
+					printable_GUID);
+			printf("\tBirth Object ID:\t\t%s\n", printable_GUID);
+		} else
+			printf("\tBirth Object ID:\tmissing\n");
+
+		/* Dumping Domain_id - reserved for now */
+		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
+				&obj_id_attr->domain_id)) {
+			ntfs_guid_to_mbs(&obj_id_attr->domain_id,
+					printable_GUID);
+			printf("\tDomain ID:\t\t\t%s\n", printable_GUID);
+		} else
+			printf("\tDomain ID:\t\tmissing\n");
+	} else 
+		printf("\t$OBJECT_ID not present.  Only NTFS versions > 3.0 "
+				"have $OBJECT_ID.  Your version of NTFS is "
+				"%d.\n", inode->vol->major_ver);
+
+	ntfs_attr_put_search_ctx(ctx);
 }
 
 
@@ -487,7 +514,6 @@ void ntfs_dump_object_id_attr(ntfs_inode *inode)
  * ntfs_dump_volume_name()
  *
  * dump the name of the volume the inode belongs to
- *
  */
 void ntfs_dump_volume_name_attr(ntfs_inode *inode)
 {
