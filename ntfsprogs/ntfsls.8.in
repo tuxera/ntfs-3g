@@ -1,0 +1,120 @@
+.\" -*- nroff -*-
+.\" Copyright (c) 2003 Anton Altaparmakov. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFSLS 8 "August 2003" "Linux-NTFS version @VERSION@"
+.SH NAME
+ntfsls \- list directory contents on an NTFS file system
+.SH SYNOPSIS
+.B ntfsls
+[
+.B \-a
+|
+.B \-\-all
+]
+[
+.B \-F
+|
+.B \-\-classify
+]
+[
+.B \-f
+|
+.B \-\-force
+]
+[
+.B \-h
+|
+.B \-?
+|
+.B \-\-help
+]
+[
+.B \-i
+|
+.B \-\-inode
+]
+[
+.B \-l
+|
+.B \-\-long
+]
+[
+.B \-p
+|
+.B \-\-path
+.I PATH
+]
+[
+.B \-q
+|
+.B \-\-quiet
+]
+[
+.B \-s
+|
+.B \-\-system
+]
+[
+.B \-V
+|
+.B \-\-version
+]
+[
+.B \-v
+|
+.B \-\-verbose
+]
+[
+.B \-x
+|
+.B \-\-dos
+]
+.B \-d
+|
+.B \-\-device
+.I DEVICE
+.SH DESCRIPTION
+.B ntfsls
+is used to list information about the files specified by the
+.I PATH
+option (the root directory by default).
+.I DEVICE
+is the special file corresponding to the device (e.g
+.IR /dev/hdXX ).
+.SH OPTIONS
+.TP
+.B \-a, \-\-all
+Display all files.  If this option is not specified file names in the POSIX
+namespace will not be displayed.
+.TP
+.BI "\-d, \-\-device" " DEVICE"
+The special file corresponding to the device that contains the NTFS partition
+to read.
+.TP
+.B \-V, \-\-version
+Print the version number of
+.B ntfsls
+and exit.
+.TP
+.B \-h, \-?, \-\-help
+Print the usage information of 
+.B ntfsls
+and exit.
+.SH BUGS
+We are not aware of any bugs.  If you find a bug, please report it to
+<linux-ntfs-dev@lists.sf.net>.  Thank you.
+.SH AUTHOR
+This version of
+.B ntfsls
+has been written by Lode Leroy <lode.leroy@barco.com> and enhanced by 
+Anton Altaparmakov <aia21@cantab.net>.  This man page has been written by
+Anton Altaparmakov.
+.SH AVAILABILITY
+.B ntfsls
+is part of the Linux-NTFS project and is available for download from
+http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
+rpm) and pre-compiled binary (i386 rpm and deb) form.
+.SH SEE ALSO
+.BR ntfsprogs (8)
+
