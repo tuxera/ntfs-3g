@@ -729,7 +729,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	runlist_element *rl;	/* The output runlist. */
 	u8 *buf;		/* Current position in mapping pairs array. */
 	u8 *attr_end;		/* End of attribute. */
-	int rlsize;		/* Size of runlist buffer. */
+	int err, rlsize;	/* Size of runlist buffer. */
 	u16 rlpos;		/* Current runlist position in units of
 				   runlist_elements. */
 	u8 b;			/* Current byte offset in buf. */
@@ -921,8 +921,10 @@ mpa_err:
 	old_rl = ntfs_runlists_merge(old_rl, rl);
 	if (old_rl)
 		return old_rl;
+	err = errno;
 	free(rl);
 	Dputs("Failed to merge runlists.");
+	errno = err;
 	return NULL;
 io_error:
 	Dputs("Corrupt attribute.");
