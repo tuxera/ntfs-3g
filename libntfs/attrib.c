@@ -374,6 +374,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
+	free(na);
 	errno = err;
 	return NULL;
 }
