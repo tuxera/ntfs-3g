@@ -1243,7 +1243,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		return 0;
 	/* Always need the termining zero byte. */
 	rls = 1;
-	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[i++].lcn) {
+	for (prev_lcn = i = 0; rl[i].length; i++) {
 		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
 			goto err_out;
 		/* Header byte + length. */
@@ -1255,8 +1255,13 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		 */
 		if (rl[i].lcn == LCN_HOLE && vol->major_ver >= 3)
 			continue;
-		/* Change in lcn. */
+		/*
+		 * Change in lcn.  Note: this assumes that on NTFS 1.2-, holes
+		 * are stored with an lcn of -1 and _not_ a delta_lcn of -1
+		 * (unless both are -1).
+		 */
 		rls += ntfs_get_nr_significant_bytes(rl[i].lcn - prev_lcn);
+		prev_lcn = rl[i].lcn;
 	}
 	return rls;
 err_out:
@@ -1352,7 +1357,7 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 	 * ntfs_write_significant_bytes().
 	 */
 	dst_max = dst + dst_len - 1;
-	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[i++].lcn) {
+	for (prev_lcn = i = 0; rl[i].length; i++) {
 		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
 			goto err_out;
 		/* Write length. */
@@ -1366,13 +1371,15 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		 * zero space. On earlier NTFS versions we just write the lcn
 		 * change. FIXME: Do we need to write the lcn change or just
 		 * the lcn in that case? Not sure as I have never seen this
-		 * case on NT4. (AIA)
+		 * case on NT4. - We assume that we just need to write the lcn
+		 * change until someone tells us otherwise... (AIA)
 		 */
 		if (rl[i].lcn != LCN_HOLE || vol->major_ver < 3) {
 			lcn_len = ntfs_write_significant_bytes(dst + 1 +
 					len_len, dst_max, rl[i].lcn - prev_lcn);
 			if (lcn_len < 0)
 				goto size_err;
+			prev_lcn = rl[i].lcn;
 		} else
 			lcn_len = 0;
 		/* Update header byte. */
