@@ -1178,59 +1178,40 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	get_type_and_size_of_indx(ni, attr, &type, &indx_record_size);
 
-	name = malloc(attr->name_length * sizeof(ntfschar));
-	if (!name) {
-		perror("malloc failed");
-		return;
-	}
-	memcpy(name, (u8 *)attr + attr->name_offset, 
-			attr->name_length * sizeof(ntfschar));
+	name = (ntfschar*)((u8*)attr + attr->name_offset);
 	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
 	if (!na) {
 		perror("ntfs_attr_open failed");
-		free(name);
 		return;
 	}
 	bitmap = malloc(na->data_size);
 	if (!bitmap) {
 		perror("malloc failed");
-		free(name);
 		return;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, bitmap) != na->data_size) {
 		perror("ntfs_attr_pread failed");
 		free(bitmap);
-		free(name);
 		return;
 	}
 	ntfs_attr_close(na);
 	byte = bitmap;
 		
-	name = malloc(attr->name_length * sizeof(ntfschar));
-	if (!name) {
-		perror("malloc failed");
-		return;
-	}
-	memcpy(name, (u8 *)attr + attr->name_offset, 
-			attr->name_length * sizeof(ntfschar));
 	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, attr->name_length);
 	if (!na) {
 		perror("ntfs_attr_open failed");
-		free(name);
 		free(bitmap);
 		return;
 	}
 	allocation = malloc(na->data_size);
 	if (!allocation) {
 		perror("malloc failed");
-		free(name);
 		free(bitmap);
 		return;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, allocation)
 							 != na->data_size) {
 		perror("ntfs_attr_pread failed");
-		free(name);
 		free(allocation);
 		free(bitmap);
 		return;
