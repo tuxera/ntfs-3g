@@ -60,6 +60,7 @@
 #include "inode.h"
 #include "layout.h"
 #include "volume.h"
+#include "utils.h"
 
 extern const unsigned char attrdef_ntfs12_array[2400];
 
@@ -85,25 +86,18 @@ ATTR_DEF *attr_defs;
 
 struct {
 				/* -h, print usage and exit. */
-	char no_action;		/* -n, do not write to device, only display
+	int no_action;		/* -n, do not write to device, only display
 				       what would be done. */
-	char quiet;		/* -q, quiet execution. */
-	char verbose;		/* -v, verbose execution, given twice, really
+	int quiet;		/* -q, quiet execution. */
+	int verbose;		/* -v, verbose execution, given twice, really
 				       verbose execution (debug mode). */
-	char force;		/* -f, force truncation. */
+	int force;		/* -f, force truncation. */
 				/* -V, print version and exit. */
-} opt;
+} opts;
 
-/* Error output. Ignores quiet (-q). */
-void Eprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
 
@@ -125,32 +119,8 @@ void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
 
-	if (!opt.quiet && opt.verbose > 1) {
+	if (!opts.quiet && opts.verbose > 1) {
 		printf("DEBUG: ");
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/* Verbose output (-v). Overriden by quite (-q). */
-void Vprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opt.quiet && opt.verbose > 0) {
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/* Quietable output (if not -q). */
-void Qprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opt.quiet) {
 		va_start(ap, fmt);
 		vprintf(fmt, ap);
 		va_end(ap);
@@ -556,16 +526,16 @@ void parse_options(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "fhnqvV")) != EOF)
 		switch (c) {
 		case 'f':
-			opt.force = 1;
+			opts.force = 1;
 			break;
 		case 'n':
-			opt.no_action = 1;
+			opts.no_action = 1;
 			break;
 		case 'q':
-			opt.quiet = 1;
+			opts.quiet = 1;
 			break;
 		case 'v':
-			opt.verbose++;
+			opts.verbose++;
 			break;
 		case 'V':
 			/* Version number already printed, so just exit. */
@@ -679,8 +649,8 @@ int main(int argc, char **argv)
 	unsigned long mnt_flags, ul;
 	int err;
 
-	/* Initialize opt to zero / required values. */
-	memset(&opt, 0, sizeof(opt));
+	/* Initialize opts to zero / required values. */
+	memset(&opts, 0, sizeof(opts));
 
 	/*
 	 * Setup a default $AttrDef. FIXME: Should be reading this from the
@@ -697,14 +667,14 @@ int main(int argc, char **argv)
 				dev_name, strerror(errno));
 	else if (mnt_flags & NTFS_MF_MOUNTED) {
 		Eprintf("%s is mounted.\n", dev_name);
-		if (!opt.force)
+		if (!opts.force)
 			err_exit("Refusing to run!\n");
 		fprintf(stderr, "ntfstruncate forced anyway. Hope /etc/mtab "
 				"is incorrect.\n");
 	}
 
 	/* Mount the device. */
-	if (opt.no_action) {
+	if (opts.no_action) {
 		Qprintf("Running in READ-ONLY mode!\n");
 		ul = MS_RDONLY;
 	} else
@@ -715,7 +685,7 @@ int main(int argc, char **argv)
 
 	/* Acquire exlusive (mandatory) lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
-	if (opt.no_action)
+	if (opts.no_action)
 		flk.l_type = F_RDLCK;
 	else
 		flk.l_type = F_WRLCK;
@@ -724,7 +694,7 @@ int main(int argc, char **argv)
 	err = fcntl(vol->fd, F_SETLK, &flk);
 	if (err == -1) {
 		Eprintf("Could not lock %s for %s: %s\n", dev_name,
-				opt.no_action ? "reading" : "writing",
+				opts.no_action ? "reading" : "writing",
 				strerror(errno));
 		err = ntfs_umount(vol, 0);
 		if (err == -1)
@@ -754,7 +724,7 @@ int main(int argc, char **argv)
 		err_exit("Failed to open attribute 0x%x: %s\n", attr_type,
 				strerror(errno));
 
-	if (!opt.quiet && opt.verbose > 1) {
+	if (!opts.quiet && opts.verbose > 1) {
 		Dprintf("Dumping mft record before calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
@@ -766,7 +736,7 @@ int main(int argc, char **argv)
 		err_exit("Failed to truncate attribute 0x%x: %s\n", attr_type,
 				strerror(errno));
 
-	if (!opt.quiet && opt.verbose > 1) {
+	if (!opts.quiet && opts.verbose > 1) {
 		Dprintf("Dumping mft record after calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
