@@ -1172,6 +1172,36 @@ done:
 	return res;
 }
 
+/**
+ * ntfs_mft_free_space
+ */
+static int ntfs_mft_free_space (struct ntfs_dir *dir)
+{
+	u8 *buffer = NULL;
+	ntfs_volume *vol;
+	int res = 0;
+	MFT_RECORD *mft;
+
+	if (!dir)
+		return -1;
+
+	buffer = malloc (512);
+	if (!buffer)
+		return -1;
+
+	vol = dir->vol;
+
+	if (ntfs_attr_pread (vol->mft_na, dir->mft_num << vol->mft_record_size_bits, 512, buffer) != 512)
+		goto done;
+
+	mft = (MFT_RECORD*) buffer;
+
+	res = mft->bytes_allocated - mft->bytes_in_use;
+done:
+	free (buffer);
+	return res;
+}
+
 
 /**
  * ntfs_dt_add_alloc
@@ -1194,7 +1224,7 @@ static int ntfs_dt_add_alloc (struct ntfs_dt *parent, int index_num, INDEX_ENTRY
 	space = parent->data_len - block->index.index_length - 24;
 
 	printf ("need %d, have %d\n", need, space);
-	if (ie->length > space) {
+	if (need > space) {
 		printf ("no room");
 		return 0;
 	}
@@ -1234,8 +1264,68 @@ static int ntfs_dt_add_alloc (struct ntfs_dt *parent, int index_num, INDEX_ENTRY
 /**
  * ntfs_dt_add_root
  */
-static int ntfs_dt_add_root (struct ntfs_dt *parent, struct ntfs_dt *child)
+static int ntfs_dt_add_root (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie)
 {
+	INDEX_ROOT *root;
+	int need;
+	int space;
+	u8 *attr;
+	u8 *src;
+	u8 *dst;
+	int len;
+
+	if (!parent || !ie)
+		return 0;
+
+	root = (INDEX_ROOT*) parent->data;
+
+	printf ("[01;31m");
+	utils_dump_mem (parent->data, 0, parent->data_len, 1);
+	printf ("[0m\n");
+
+	need  = ie->length;
+	space = ntfs_mft_free_space (parent->dir);
+
+	printf ("need %d, have %d\n", need, space);
+	if (need > space) {
+		printf ("no room");
+		return 0;
+	}
+
+	attr = malloc (parent->data_len + need);
+
+	src = parent->data;
+	dst = attr;
+	len = root->index.entries_offset + 16;
+
+	memcpy (dst, src, len);
+
+	dst += len;
+	src = (u8*) ie;
+	len = ie->length;
+
+	memcpy (dst, src, len);
+
+	dst += len;
+	src = (u8*) parent->children[index_num];
+	len = parent->data + parent->data_len - src;
+
+	memcpy (dst, src, len);
+
+	free (parent->data);
+	parent->data = attr;
+	parent->data_len += need;
+
+	root = (INDEX_ROOT*) parent->data;
+	root->index.index_length   = parent->data_len - 16;
+	root->index.allocated_size = parent->data_len - 16;
+
+	printf ("[01;33m");
+	utils_dump_mem (parent->data, 0, parent->data_len, 1);
+	printf ("[0m\n");
+
+	ntfs_mft_resize_resident (parent->dir->inode, AT_INDEX_ROOT, I30, 4, parent->data, parent->data_len);
+
 	return 0;
 }
 
@@ -1259,12 +1349,12 @@ static int ntfs_dt_add (struct ntfs_dt *parent, INDEX_ENTRY *ie)
 
 	//printf ("dt = %p, index = %d\n", dt, index_num);
 	//ntfs_ie_dump (dt->children[index_num]);
-	utils_dump_mem ((u8*)dt->children[index_num], 0, dt->children[index_num]->length, 1);
-	printf ("\n");
+	//utils_dump_mem ((u8*)dt->children[index_num], 0, dt->children[index_num]->length, 1);
+	//printf ("\n");
 
-	ntfs_dt_add_alloc (dt, index_num, ie);
+	if (0) ntfs_dt_add_alloc (dt, index_num, ie);
+	if (0) ntfs_dt_add_root (dt->dir->index, 0, ie);
 
-	if (0) ntfs_dt_add_root (parent, NULL);
 	return 0;
 }
 
@@ -1944,7 +2034,7 @@ static int ntfs_ie_test (void)
 	int namelen = 0;
 	ntfschar *name = NULL;
 
-	printf ("\n\n\n\n\n\n[01;31m----------------------------------------------------------------------------------[0m\n\n");
+	printf ("\n\n\n\n\n\n[01;31m");
 	if (1) {
 		ie1 = ntfs_ie_create();
 		//ntfs_ie_dump (ie1);
@@ -2156,8 +2246,8 @@ static int ntfsadd (ntfs_volume *vol, char *name)
 	if (!ie)
 		goto done;
 
-	utils_dump_mem ((u8*)ie, 0, ie->length, 1);
-	printf ("\n");
+	//utils_dump_mem ((u8*)ie, 0, ie->length, 1);
+	//printf ("\n");
 	//printf ("ie = %lld\n", MREF (ie->indexed_file));
 	//ntfs_dt_del_child (finddir->index, uname, len);
 
