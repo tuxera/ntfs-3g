@@ -19,31 +19,10 @@ Group		: System Environment/Base
 %description
 The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
 for the NTFS filesystem to the Linux operating system. Linux-NTFS currently
-consists of a static library and utilities. This package contains the following
-utilities:
-	NtfsFix - Attempt to fix an NTFS partition that has been damaged by the
-Linux NTFS driver. It should be run every time after you have used the Linux
-NTFS driver to write to an NTFS partition to prevent massive data corruption
-from happening when Windows mounts the partition.
-IMPORTANT: Run this only *after* unmounting the partition in Linux but *before*
-rebooting into Windows NT/2000! See man 8 ntfsfix for details.
-	mkntfs - Format a partition with the NTFS filesystem. See man 8 mkntfs
-for command line options.
-	ntfslabel - Display/change the label of an NTFS partition. See man 8
-ntfslabel for details.
-	ntfsundelete - Recover deleted files from an NTFS volume.  See man 8
-ntfsundelete for details.
-	ntfsresize - Resize an NTFS volume. See man 8 ntfsresize for details.
-	ntfsclone - Efficiently create/restore an image of an NTFS partition.
-See man 8 ntfsclone for details.
-	ntfscluster - Locate the owner of any given sector or cluster on an
-NTFS partition. See man 8 ntfscluster for details.
-	ntfsinfo - Show some information about an NTFS partition or one of the
-files or directories within it. See man 8 ntfsinfo for details.
-	ntfsls - List information about files in a directory residing on an
-NTFS partition. See man 8 ntfsls for details.
-	ntfscat - Concatenate files and print their contents on the standard
-output.  See man 8 ntfscat for details.
+consists of a static library and utilities (for a full list of included
+utilities see man 8 ntfsprogs after installation) as well as a GNOME virtual
+filesystem module to allow GNOME VFS clients to seamlessly utilize the NTFS
+library.
 
 %package devel
 Summary		: files required to compile software that uses libntfs
@@ -72,22 +51,36 @@ make DESTDIR="$RPM_BUILD_ROOT" install-strip
 rm -rf "$RPM_BUILD_ROOT"
 
 
+%post
+/sbin/ldconfig
+
+
+%postun
+/sbin/ldconfig
+
+
 %files
 %defattr(-,root,root)
 %doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
 %{bindir}/*
 %{sbindir}/*
 %{mandir}/*/*
-%{prefix}/lib/*.so*
+%{_libdir}/libntfs.*so*
+%{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*so*
+%{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
 
 
 %files devel
 %defattr(-,root,root)
-%{prefix}/include/*
-%{prefix}/lib/*.a*
-%{prefix}/lib/*.la*
+%{_includedir}/*
+%{_libdir}/libntfs.*a*
+%{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Thu Nov 6 2003 Anton Altaparmakov <aia21@cantab.net>
+- update description (it was getting too long)
+- merge libntfs-gnomevfs
+
 * Fri Oct 19 2003 Richard Russon <ntfs@flatcap.org>
 - added the new utility ntfscat
 
