@@ -1934,22 +1934,25 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	/* Calculate the new attribute length and mft record bytes used. */
 	new_alen = (le32_to_cpu(a->length) - le32_to_cpu(a->value_length) +
 			newsize + 7) & ~7;
-	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
-			new_alen;
-	/* Not enough space in this mft record. */
-	if (new_muse > le32_to_cpu(m->bytes_allocated)) {
-		errno = ENOSPC;
-		return -1;
+	/* If the actual attribute length has changed, move tihings around. */
+	if (new_alen != le32_to_cpu(a->length)) {
+		new_muse = le32_to_cpu(m->bytes_in_use) -
+				le32_to_cpu(a->length) + new_alen;
+		/* Not enough space in this mft record. */
+		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+			errno = ENOSPC;
+			return -1;
+		}
+		/* Move attributes following @a to their new location. */
+		memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
+				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
+				(u8*)m) - le32_to_cpu(a->length));
+		/* Adjust @m to reflect the change in used space. */
+		m->bytes_in_use = cpu_to_le32(new_muse);
+		/* Adjust @a to reflect the new value size. */
+		a->length = cpu_to_le32(new_alen);
 	}
-	/* Move attributes following @a to their new location. */
-	memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
-			le32_to_cpu(m->bytes_in_use) - ((u8*)a - (u8*)m) -
-			le32_to_cpu(a->length));
-	/* Adjust @a to reflect the new value size. */
-	a->length = cpu_to_le32(new_alen);
 	a->value_length = cpu_to_le32(newsize);
-	/* Adjust @m to reflect the change in used space. */
-	m->bytes_in_use = cpu_to_le32(new_muse);
 	return 0;
 }
 
@@ -1993,13 +1996,12 @@ static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
 	na->allocated_size = na->data_size = na->initialized_size = newsize;
 	if (NAttrCompressed(na) || NAttrSparse(na))
 		na->compressed_size = newsize;
-
 	/*
 	 * Set the inode (and its base inode if it exists) dirty so it is
 	 * written out later.
 	 */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
-
+	/* Done! */
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 put_err_out:
@@ -2105,117 +2107,113 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	/* The first cluster outside the new allocation. */
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
 			vol->cluster_size_bits;
+	/*
+	 * Compare the new allocation with the old one and only deallocate
+	 * clusters if there is a change.
+	 */
+	if (na->allocated_size >> vol->cluster_size_bits != first_free_vcn) {
+		/* Deallocate all clusters starting with the first free one. */
+		nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn,
+				-1);
+		if (nr_freed_clusters < 0) {
+			err = errno;
+			goto put_err_out;
+		}
+		/* Truncate the runlist itself. */
+		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
+			// FIXME: Eeek! We need rollback! (AIA)
+			fprintf(stderr, "%s(): Eeek! Run list truncation "
+					"failed. Leaving inconsistent "
+					"metadata!\n", __FUNCTION__);
+			err = errno;
+			goto put_err_out;
+		}
+		/* Update the attribute record and the ntfs_attr structure. */
+		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
+		a->allocated_size = scpu_to_le64(na->allocated_size);
+		if (NAttrSparse(na)) {
+			na->compressed_size -= nr_freed_clusters <<
+					vol->cluster_size_bits;
+			a->compressed_size = scpu_to_le64(na->compressed_size);
 
-	/* Deallocate all clusters starting with the first free one. */
-	nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn, -1);
-	if (nr_freed_clusters < 0) {
-		err = errno;
-		goto put_err_out;
-	}
+			if (na->compressed_size < 0) {
+				// FIXME: Eeek! BUG!
+				fprintf(stderr, "%s(): Eeek! Compressed size "
+						"is negative. Leaving "
+						"inconsistent metadata!\n",
+						__FUNCTION__);
+				err = EIO;
+				goto put_err_out;
+			}
+		}
+		/*
+		 * Reminder: It is ok for a->highest_vcn to be -1 for zero
+		 * length files.
+		 */
+		if (a->highest_vcn)
+			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+		/* Get the size for the new mapping pairs array. */
+		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+		if (mp_size <= 0) {
+			// FIXME: Eeek! We need rollback! (AIA)
+			fprintf(stderr, "%s(): Eeek! Get size for mapping "
+					"pairs failed. Leaving inconsistent "
+					"metadata!\n", __FUNCTION__);
+			err = errno;
+			goto put_err_out;
+		}
+		/*
+		 * Generate the new mapping pairs array directly into the
+		 * correct destination, i.e. the attribute record itself.
+		 */
+		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
+				a->mapping_pairs_offset), mp_size, na->rl)) {
+			// FIXME: Eeek! We need rollback! (AIA)
+			fprintf(stderr, "%s(): Eeek! Mapping pairs build "
+					"failed. Leaving inconsistent "
+					"metadata!\n", __FUNCTION__);
+			err = errno;
+			goto put_err_out;
+		}
 
-	/* Truncate the runlist itself. */
-	if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
-		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Run list truncation failed. "
-				"Leaving inconsistent metadata!\n",
-				__FUNCTION__);
-		err = errno;
-		goto put_err_out;
-	}
+		// FIXME: Should verify that the attribute name hasn't been
+		//	  placed after the attribute value and if it is, we
+		//	  need to move the name, too. (AIA)
 
-	/* Update the attribute record and the ntfs attribute structure. */
-
-	na->allocated_size = first_free_vcn << vol->cluster_size_bits;
-	a->allocated_size = scpu_to_le64(na->allocated_size);
-
-	na->data_size = newsize;
-	a->data_size = scpu_to_le64(newsize);
-
-	if (newsize < na->initialized_size) {
-		na->initialized_size = newsize;
-		a->initialized_size = scpu_to_le64(newsize);
-	}
-
-	if (NAttrSparse(na)) {
-		na->compressed_size -= nr_freed_clusters <<
-				vol->cluster_size_bits;
-		a->compressed_size = scpu_to_le64(na->compressed_size);
-
-		if (na->compressed_size < 0) {
-			// FIXME: Eeek! BUG!
-			fprintf(stderr, "%s(): Eeek! Compressed size is "
-					"negative. Leaving inconsistent "
+		/*
+		 * Calculate the new attribute length and mft record bytes
+		 * used.
+		 */
+		new_alen = (le16_to_cpu(a->mapping_pairs_offset) + mp_size +
+				7) & ~7;
+		new_muse = le32_to_cpu(m->bytes_in_use) -
+				le32_to_cpu(a->length) + new_alen;
+		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+			// FIXME: Eeek! BUG()
+			fprintf(stderr, "%s(): Eeek! Ran out of space in mft "
+					"record. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
 			err = EIO;
 			goto put_err_out;
 		}
+		/* Move the following attributes forward. */
+		memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
+				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
+				(u8*)m) - le32_to_cpu(a->length));
+		/* Update the sizes of the attribute and mft records. */
+		a->length = cpu_to_le32(new_alen);
+		m->bytes_in_use = cpu_to_le32(new_muse);
 	}
-
-	/*
-	 * Reminder: It is ok for a->highest_vcn to be -1 for zero length
-	 * files.
-	 */
-	if (a->highest_vcn)
-		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
-
-	/* Get the size for the new mapping pairs array. */
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
-	if (mp_size <= 0) {
-		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Get size for mapping pairs "
-				"failed. Leaving inconsistent metadata!\n",
-				__FUNCTION__);
-		err = errno;
-		goto put_err_out;
+	/* Update the attribute record and the ntfs attribute structure. */
+	na->data_size = newsize;
+	a->data_size = scpu_to_le64(newsize);
+	if (newsize < na->initialized_size) {
+		na->initialized_size = newsize;
+		a->initialized_size = scpu_to_le64(newsize);
 	}
-
-	/*
-	 * Generate the new mapping pairs array directly into the correct
-	 * destination, i.e. the attribute record itself.
-	 */
-	if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-			a->mapping_pairs_offset), mp_size, na->rl)) {
-		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Mapping pairs build failed. "
-				"Leaving inconsistent metadata!\n",
-				__FUNCTION__);
-		err = errno;
-		goto put_err_out;
-	}
-
-	// FIXME: Should verify that the attribute name hasn't been placed
-	//	  after the attribute value and if it is, we need to move the
-	//	  name, too. (AIA)
-
-	/* Calculate the new attribute length and mft record bytes used. */
-	new_alen = (le16_to_cpu(a->mapping_pairs_offset) + mp_size + 7) & ~7;
-	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
-			new_alen;
-
-	if (new_muse > le32_to_cpu(m->bytes_allocated)) {
-		// FIXME: Eeek! BUG()
-		fprintf(stderr, "%s(): Eeek! Ran out of space in mft record. "
-				"Leaving inconsistent metadata!\n",
-				__FUNCTION__);
-		err = EIO;
-		goto put_err_out;
-	}
-
-	/* Move the following attributes forward. */
-	memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
-			le32_to_cpu(m->bytes_in_use) - ((u8*)a - (u8*)m) -
-			le32_to_cpu(a->length));
-
-	/* Update the size of the attribute record and the mft record. */
-	a->length = cpu_to_le32(new_alen);
-	m->bytes_in_use = cpu_to_le32(new_muse);
-
-	/*
-	 * Set the inode (and its base inode if it exists) dirty so it is
-	 * written out later.
-	 */
+	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
-
+	/* Done! */
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 put_err_out:
@@ -2264,6 +2262,6 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 
 	if (NAttrNonResident(na))
 		return ntfs_non_resident_attr_shrink(na, newsize);
-	return ntfs_resident_attr_shrink(na, newsize);
+	return ntfs_resident_attr_shrink(na, (u32)newsize);
 }
 
