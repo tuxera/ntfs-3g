@@ -289,185 +289,6 @@ int mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 	return (buffer[byte] & bit);
 }
 
-
-/**
- * get_inode_name
- *
- * using inode
- * get filename
- * add name to list
- * get parent
- * if parent is 5 (/) stop
- * get inode of parent
- */
-int get_inode_name (ntfs_inode *inode, char *buffer, int bufsize)
-{
-	// XXX option: names = posix/win32 or dos
-	// flags: path, filename, or both
-	const int max_path = 20;
-
-	ntfs_volume *vol;
-	ntfs_attr_search_ctx *ctx;
-	ATTR_RECORD *rec;
-	FILE_NAME_ATTR *attr;
-	int name_space;
-	MFT_REF parent = FILE_root;
-	char *names[max_path + 1];
-	int i, len, offset = 0;
-
-	if (!inode || !buffer)
-		return 0;
-
-	vol = inode->vol;
-
-	//printf ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
-	memset (names, 0, sizeof (names));
-	memset (buffer, 0, bufsize);	//XXX remove
-
-	for (i = 0; i < max_path; i++) {
-
-		ctx = ntfs_attr_get_search_ctx (inode, NULL);
-		if (!ctx) {
-			Eprintf ("Couldn't create a search context.\n");
-			return 0;
-		}
-
-		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
-
-		name_space = 4;
-		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
-			/* We know this will always be resident. */
-			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
-
-			if (attr->file_name_type >= name_space) { //XXX find the ...
-				continue;
-			}
-
-			name_space = attr->file_name_type;
-			parent     = attr->parent_directory;
-
-			if (names[i]) {
-				free (names[i]);
-				names[i] = NULL;
-			}
-
-			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
-			    &names[i], attr->file_name_length) < 0) {
-				Eprintf ("Couldn't translate filename to current locale.\n");
-				// <MFT1234>?
-			}
-
-			//printf ("names[%d] %s\n", i, names[i]);
-			//printf ("parent = %lld\n", MREF (parent));
-		}
-
-		ntfs_attr_put_search_ctx(ctx);
-		if (MREF (parent) == FILE_root) {
-			//printf ("inode 5\n");
-			break;
-		}
-
-		if (i > 0) {			/* Don't close the original inode */
-			ntfs_inode_close (inode);
-		}
-
-		inode = ntfs_inode_open (vol, parent);
-		if (!inode) {
-			//Eprintf ()
-		}
-	}
-
-	if (i >= max_path) {
-		// trouble
-	}
-
-	for (i = max_path; i >= 0; i--) {
-		if (!names[i])
-			continue;
-
-		len = snprintf (buffer + offset, bufsize - offset, "/%s", names[i]);
-		//printf ("len = %d, offset = %d\n", len, offset);
-		if (len >= (bufsize - offset)) {
-			Eprintf ("Pathname was truncated.\n");
-			break;
-		}
-
-		offset += len;
-		free (names[i]);
-	}
-
-	//printf ("Pathname: %s\n", buffer);
-
-	return 0;
-}
-
-/**
- * get_attr_name
- */
-int get_attr_name (ATTR_RECORD *attr, char *buffer, int bufsize)
-{
-	static const char *attrs[] = {
-		NULL,
-		"$STANDARD_INFORMATION",
-		"$ATTRIBUTE_LIST",
-		"$FILE_NAME",
-		"$OBJECT_ID",
-		"$SECURITY_DESCRIPTOR",
-		"$VOLUME_NAME",
-		"$VOLUME_INFORMATION",
-		"$DATA",
-		"$INDEX_ROOT",
-		"$INDEX_ALLOCATION",
-		"$BITMAP",
-		"$REPARSE_POINT",
-		"$EA_INFORMATION",
-		"$EA",
-		"$PROPERTY_SET",
-		"$LOGGED_UTILITY_STREAM",
-	};
-	int len, offset = 0;
-	const char *name;
-	char *attr_name = NULL;
-
-	// flags: attr, name, or both
-	if (!attr || !buffer)
-		return 0;
-
-	memset (buffer, 0, bufsize);	// XXX remove
-
-	if ((attr->type < 0x10) || (attr->type > 0x100) || (attr->type & 0x0F)) {
-		Eprintf ("Unknown attribute type 0x%02x\n", attr->type);
-		name = "<UNKNOWN>";
-	} else {
-		name = attrs[attr->type >> 4];
-	}
-
-	len = snprintf (buffer, bufsize, "%s", name);
-	if (len >= bufsize) {
-		Eprintf ("Attribute type was truncated.\n");
-		return 0;
-	}
-
-	offset += len;
-
-	if (!attr->name_length) {
-		return 0;
-	}
-
-	if (ntfs_ucstombs ((uchar_t *)((char *)attr + attr->name_offset),
-	    attr->name_length, &attr_name, attr->name_length) < 0) {
-		Eprintf ("Couldn't translate attribute name to current locale.\n");
-		// <UNKNOWN>?
-		return 0;
-	}
-
-	snprintf (buffer + offset, bufsize - offset, "(%s)", attr_name);
-	free (attr_name);
-
-	return 0;
-}
-
-
 /**
  * cluster_find
  */
@@ -553,11 +374,11 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 
 				{
 					char buffer[256];
-					get_inode_name (inode, buffer, sizeof (buffer));
+					utils_inode_get_name (inode, buffer, sizeof (buffer));
 					//XXX distinguish between file/dir
 					printf ("inode %d %s", i, buffer);
-					get_attr_name (ctx->attr, buffer, sizeof (buffer));
-					printf ("/%s\n", buffer);
+					utils_attr_get_name (vol, ctx->attr, buffer, sizeof (buffer));
+					printf ("%c%s\n", PATH_SEP, buffer);
 					//printf ("\n");
 				}
 				break;
@@ -600,14 +421,20 @@ int main (int argc, char *argv[])
 
 	switch (opts.action) {
 		case act_sector:
-			Iprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
+			if (opts.range_begin == opts.range_end)
+				Iprintf ("Searching for sector %lld\n", opts.range_begin);
+			else
+				Iprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
 			/* Convert to clusters */
 			opts.range_begin <<= (vol->cluster_size_bits - vol->sector_size_bits);
 			opts.range_end   <<= (vol->cluster_size_bits - vol->sector_size_bits);
 			result = cluster_find (vol, opts.range_begin, opts.range_end);
 			break;
 		case act_cluster:
-			Iprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
+			if (opts.range_begin == opts.range_end)
+				Iprintf ("Searching for cluster %lld\n", opts.range_begin);
+			else
+				Iprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
 			result = cluster_find (vol, opts.range_begin, opts.range_end);
 			break;
 		/*
