@@ -2622,15 +2622,156 @@ static BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 	printf ("\n");
 #endif
 
-	//printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
+	printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
 	return TRUE;
 }
 
 
 /**
- * ntfsadd
+ * ntfs_dt_root_add
  */
-static int ntfsadd (ntfs_volume *vol, char *name)
+static int ntfs_dt_root_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
+{
+	FILE_NAME_ATTR *file;
+	struct ntfs_dt *suc;
+	int suc_num;
+	int need;
+	int space;
+	u8 *attr;
+	u8 *src;
+	u8 *dst;
+	int len;
+
+	if (!add || !add_ie)
+		return 0;
+
+	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
+	//printf ("\n");
+
+	need  = add_ie->length;
+	space = ntfs_mft_free_space (add->dir);
+
+	file = &add_ie->key.file_name;
+
+	suc = ntfs_dt_find3 (add, file->file_name, file->file_name_length, &suc_num);
+	if (!suc)
+		return 0;
+
+	// hmm, suc == add
+
+	printf ("need %d, have %d\n", need, space);
+	if (need > space) {
+		printf ("no room");
+		return 0;
+	}
+
+	attr = malloc (add->data_len + need);
+
+	src = add->data;
+	dst = attr;
+	len = add->header->entries_offset + 16;
+
+	memcpy (dst, src, len);
+
+	dst += len;
+	src = (u8*) add_ie;
+	len = add_ie->length;
+
+	memcpy (dst, src, len);
+
+	dst += len;
+	src = (u8*) suc->children[suc_num];
+	len = add->data + add->data_len - src;
+
+	memcpy (dst, src, len);
+
+	free (add->data);
+	add->data = attr;
+	add->data_len += need;
+
+	add->header->index_length   = add->data_len - 16;
+	add->header->allocated_size = add->data_len - 16;
+
+	ntfs_mft_resize_resident (add->dir->inode, AT_INDEX_ROOT, I30, 4, add->data, add->data_len);
+
+	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
+	//printf ("\n");
+
+	printf ("Modified: inode %lld MFT_RECORD, attribute 0x90\n", add->dir->inode->mft_no);
+	return 0;
+}
+
+/**
+ * ntfs_dt_alloc_add
+ */
+static int ntfs_dt_alloc_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
+{
+	FILE_NAME_ATTR *file;
+	struct ntfs_dt *suc_dt;
+	int suc_num;
+	int need;
+	int space;
+	u8 *src;
+	u8 *dst;
+	int len;
+
+	if (!add || !add_ie)
+		return 0;
+
+	need  = add_ie->length;
+	space = add->data_len - add->header->index_length - 24;
+
+	file = &add_ie->key.file_name;
+
+	suc_dt = ntfs_dt_find3 (add, file->file_name, file->file_name_length, &suc_num);
+	if (!suc_dt)
+		return 0;
+
+	// hmm, suc_dt == add
+
+	printf ("need %d, have %d\n", need, space);
+	if (need > space) {
+		printf ("no room");
+		return 0;
+	}
+
+	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
+	//printf ("\n");
+
+	src = (u8*) suc_dt->children[suc_num];
+	dst = src + need;
+	len = add->data + add->data_len - src - space;
+	//printf ("src = %d\n", src - add->data);
+	//printf ("dst = %d\n", dst - add->data);
+	//printf ("len = %d\n", len);
+
+	memmove (dst, src, len);
+
+	dst = src;
+	src = (u8*) add_ie;
+	len = need;
+
+	memcpy (dst, src, len);
+
+	add->header->index_length += len;
+
+	dst = add->data     + add->header->index_length + 24;
+	len = add->data_len - add->header->index_length - 24;
+
+	memset (dst, 0, len);
+
+	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
+	//printf ("\n");
+
+	printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", add->dir->inode->mft_no, add->vcn, add->vcn + 4);
+	return 0;
+}
+
+
+/**
+ * ntfs_file_add
+ */
+static int ntfs_file_add (ntfs_volume *vol, char *name)
 {
 	struct ntfs_dir *dir = NULL;
 	struct ntfs_dir *finddir = NULL;
@@ -2690,6 +2831,11 @@ static int ntfsadd (ntfs_volume *vol, char *name)
 	//ntfs_dt_print (finddir->index, 0);
 	ntfs_dt_add (finddir->index, ie);
 
+	// test
+	if (0) ntfs_dt_alloc_add (del, ie);
+	if (0) ntfs_dt_root_add (del, ie);
+	// test
+
 done:
 	ntfs_dir_free (dir);
 	free (uname);
@@ -2698,9 +2844,9 @@ done:
 }
 
 /**
- * ntfsrm2
+ * ntfs_file_remove
  */
-static int ntfsrm2 (ntfs_volume *vol, char *name)
+static int ntfs_file_remove (ntfs_volume *vol, char *name)
 {
 	// XXX work with inode - lookup name outside?
 	// how do I do the inode -> dt lookup?
@@ -2870,8 +3016,8 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_index_dump (inode);
 	if (0) result = ntfsrm (vol, opts.file);
 	if (0) result = ntfs_ie_test();
-	if (0) result = ntfsadd (vol, opts.file);
-	if (0) result = ntfsrm2 (vol, opts.file);
+	if (0) result = ntfs_file_add (vol, opts.file);
+	if (0) result = ntfs_file_remove (vol, opts.file);
 
 done:
 	ntfs_inode_close (inode);
