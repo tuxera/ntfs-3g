@@ -2255,8 +2255,8 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 	size = (size + 7) & ~7;
 
 	/* Rigorous consistency checks. */
-	if (!m || !pos || size < 0 || pos < (u8*)m || pos + size >
-				(u8*)m + le32_to_cpu(m->bytes_allocated)) {
+	if (!m || !pos || pos < (u8*)m || pos + size >
+			(u8*)m + le32_to_cpu(m->bytes_allocated)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -3725,11 +3725,11 @@ rollback:
 	a->highest_vcn = scpu_to_le64((na->allocated_size >>
 					vol->cluster_size_bits) - 1);
 	stop_vcn = 0;
-	while(!ntfs_attr_lookup(na->type, na->name,
+	while (!ntfs_attr_lookup(na->type, na->name,
 			na->name_len, 0, 0, NULL, 0, ctx)) {
-		if (stop_vcn > le64_to_cpu(ctx->attr->highest_vcn))
+		if (stop_vcn > sle64_to_cpu(ctx->attr->highest_vcn))
 			continue;
-		stop_vcn = le64_to_cpu(ctx->attr->highest_vcn) + 1;
+		stop_vcn = sle64_to_cpu(ctx->attr->highest_vcn) + 1;
 		if (ntfs_attr_record_rm(ctx)) {
 			Dprintf("%s(): Eeek! Removing attribute extent failed. "
 				"Rollback failed. Run chkdsk.\n", __FUNCTION__);
