@@ -2232,7 +2232,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->initialized_size = newsize;
 		a->initialized_size = scpu_to_le64(newsize);
 	}
-done:
+//done:
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
