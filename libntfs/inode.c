@@ -2,7 +2,7 @@
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -368,6 +368,7 @@ err_out:
 int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 {
 	ATTR_LIST_ENTRY *ale;
+	u64 prev_attached = 0;
 
 	if (!ni) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
@@ -391,14 +392,19 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 		return -1;
 	}
 
-	/* Walk though attribute list and attach all extents. */
+	/* Walk through attribute list and attach all extents. */
 	errno = 0;
 	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
-		if (!ntfs_extent_inode_open(ni, MREF_LE(ale->mft_reference))) {
-			Dprintf("%s(): Couldn't attach extent inode.\n",
-					__FUNCTION__);
-			return -1;
+		if (ni->mft_no != MREF_LE(ale->mft_reference) &&
+				prev_attached != MREF_LE(ale->mft_reference)) {
+			if (!ntfs_extent_inode_open(ni,
+					MREF_LE(ale->mft_reference))) {
+				Dprintf("%s(): Couldn't attach extent inode.\n",
+						__FUNCTION__);
+				return -1;
+			}
+			prev_attached = MREF_LE(ale->mft_reference);
 		}
 		ale = (ATTR_LIST_ENTRY *)((u8*)ale + le16_to_cpu(ale->length));
 	}
