@@ -1,7 +1,7 @@
 
  NOTE: The GPL below is copyrighted by the Free Software Foundation, 
  but the instances of code that it refers to (the Linux-NTFS project,
- including the NTFS library "libntfs", the NTFS utilities "ntfstools"
+ including the NTFS library "libntfs", the NTFS utilities "ntfsprogs"
  and the Linux kernel NTFS driver) are copyrighted by me and others
  who actually wrote them.
 
