@@ -67,7 +67,7 @@ void version (void)
 	printf ("    2002      Matthew J. Fanto\n");
 	printf ("    2002      Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
-	printf ("    2003      Leonard Norrgard\n");
+	printf ("    2003      Leonard Norrgård\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
