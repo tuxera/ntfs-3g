@@ -35,6 +35,7 @@
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
+static char *space = "                                                                                ";
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
@@ -247,9 +248,9 @@ struct ntfs_dir {
 
 
 /**
- * ntfs_print_name
+ * ntfs_name_print
  */
-void ntfs_print_name (ntfschar *name, int name_len)
+void ntfs_name_print (ntfschar *name, int name_len)
 {
 	char *buffer = NULL;
 
@@ -259,29 +260,40 @@ void ntfs_print_name (ntfschar *name, int name_len)
 }
 
 /**
- * ntfs_print_dir
+ * ntfs_dir_print
  */
-void ntfs_print_dir (struct ntfs_dir *dir)
+void ntfs_dir_print (struct ntfs_dir *dir, int indent)
 {
+	int i;
 	if (!dir)
 		return;
 
-	printf ("vol         = %p\n", dir->vol);
-	printf ("parent      = %p\n", dir->parent);
-	printf ("name        = "); ntfs_print_name (dir->name, dir->name_len); printf ("\n");
-	printf ("name_len    = %d\n", dir->name_len);
-	printf ("index       = %p\n", dir->index);
-	printf ("children    = %p\n", dir->children);
-	printf ("child_count = %d\n", dir->child_count);
-	printf ("mft_num     = %8.8llx\n", dir->mft_num);
-	printf ("bitmap      = %p\n", dir->bitmap);
-	printf ("inode       = %p\n", dir->inode);
-	printf ("iroot       = %p\n", dir->iroot);
-	printf ("ialloc      = %p\n", dir->ialloc);
-	printf ("ibmp        = %p\n", dir->ibmp);
+	printf ("%.*s%p ", indent, space, dir);
+	ntfs_name_print (dir->name, dir->name_len);
+	printf ("\n");
+
+	for (i = 0; i < dir->child_count; i++) {
+		ntfs_dir_print (dir->children[i], indent + 4);
+	}
+
 }
 
+/**
+ * ntfs_dt_print
+ */
+void ntfs_dt_print (struct ntfs_dt *dt, int indent)
+{
+	int i;
 
+	if (!dt)
+		return;
+
+	printf ("%.*s%p (%d)\n", indent, space, dt, dt->child_count);
+
+	for (i = 0; i < dt->child_count; i++) {
+		ntfs_dt_print (dt->sub_nodes[i], indent + 4);
+	}
+}
 
 
 /**
@@ -569,7 +581,7 @@ MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 		if (ie->flags & INDEX_ENTRY_END) {
 			r = -1;
 		} else {
-			//printf ("\t"); ntfs_print_name (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
+			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
 			r = ntfs_names_collate (name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
@@ -659,24 +671,6 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, in
 
 
 /**
- * ntfs_dt_print
- */
-void ntfs_dt_print (struct ntfs_dt *dt, int indent)
-{
-	char *space = "                                                                                ";
-	int i;
-
-	if (!dt)
-		return;
-
-	printf ("%.*s%p\n", indent, space, dt);
-
-	for (i = 0; i < dt->child_count; i++) {
-		ntfs_dt_print (dt->sub_nodes[i], indent + 4);
-	}
-}
-
-/**
  * ntfs_dt_remove
  */
 int ntfs_dt_remove (struct ntfs_dt *dt, int index)
@@ -713,7 +707,7 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 			break;
 		}
 
-		//ntfs_print_name (ie->key.file_name.file_name, ie->key.file_name.file_name_length);
+		//ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length);
 		//printf (" (%d)\n", ie->length);
 	}
 	//printf ("total = %d\n", off);
@@ -734,13 +728,17 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 
 	//printf ("clear %d bytes\n", dt->data_len - (dest - dt->data) - len);
 	//printf ("%d, %d, %d\n", dest - dt->data + len, 0, dt->data_len - (dest - dt->data) - len);
+
+	//ntfs_dt_print (dt->dir->index, 0);
 #if 1
 	memset (dest + len, 0, dt->data_len - (dest - dt->data) - len);
 
-	for (i = index; i < dt->child_count; i++) {
-		printf ("this shouldn't happen\n");
+	/*
+	for (i = 0; i < dt->child_count; i++) {
+		printf ("this shouldn't happen %p\n", dt->sub_nodes[i]);
 		ntfs_dt_free (dt->sub_nodes[i]);	// shouldn't be any, yet
 	}
+	*/
 
 	free (dt->sub_nodes);
 	dt->sub_nodes = NULL;
@@ -772,7 +770,7 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 			break;
 		}
 
-		ntfs_print_name (ie->key.file_name.file_name,
+		ntfs_name_print (ie->key.file_name.file_name,
 				 ie->key.file_name.file_name_length);
 		printf (" (%d)\n", ie->length);
 	}
@@ -790,6 +788,7 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	INDEX_ENTRY *ie;
 	ntfs_inode *inode = NULL;
 	ntfs_attr *attr = NULL;
+	ntfs_attr_search_ctx *ctx = NULL;
 	int index = 0;
 	int res = 1;
 	ATTR_RECORD *arec;
@@ -841,23 +840,21 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	attr = ntfs_attr_open (inode, AT_DATA, NULL, 0);
-	if (!attr) {
-		printf ("can't open data\n");
-		goto close;
-	}
-
-	if (attr->rl) {
+	arec = find_first_attribute (AT_DATA, inode->mrec);
+	if (arec->non_resident) {
 		printf ("can't delete non-resident files\n");
 		goto close;
 	}
 
-	ntfs_attr_close (attr);
-	attr = NULL;
+	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	if (!ctx) {
+		printf ("can't create a search context\n");
+		goto close;
+	}
 
-	arec = find_first_attribute (AT_FILE_NAME, inode->mrec);
-	if (!arec) {
-		printf ("can't read filename\n");
+	arec = find_attribute (AT_FILE_NAME, ctx);
+	if (find_attribute (AT_FILE_NAME, ctx)) {
+		printf ("file has more than one name\n");
 		goto close;
 	}
 
@@ -880,8 +877,9 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 
 	printf ("deleting file\n");
 	//ntfs_dt_print (del->dir->index, 0);
-	//res = ntfs_dt_remove (del, index);
+	res = ntfs_dt_remove (del, index);
 close:
+	ntfs_attr_put_search_ctx (ctx);
 	ntfs_attr_close (attr);
 	ntfs_inode_close (inode);
 	return res;
