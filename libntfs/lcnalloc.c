@@ -267,7 +267,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				continue;
 			}
 			/* Reallocate memory if necessary. */
-			if ((rlpos + 3) * (int)sizeof(runlist) >= rlsize) {
+			if ((rlpos + 2) * (int)sizeof(runlist) >= rlsize) {
 				Dprintf("%s(): Reallocating space.\n",
 						__FUNCTION__);
 				if (!rl)
