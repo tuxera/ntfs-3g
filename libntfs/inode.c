@@ -554,7 +554,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	}
 	
 	/* Form attribute list. */
-	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
 		Dprintf("%s(): Coudn't get search context.\n", __FUNCTION__);
@@ -616,12 +616,12 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		goto put_err_out;
 	}
 	al = aln;
-	ntfs_attr_put_search_ctx(ctx);
 
 	/* Set in-memory attribute list. */
 	ni->attr_list = al;
 	ni->attr_list_size = al_len;
 	NInoSetAttrList(ni);
+	NInoAttrListSetDirty(ni);
 
 	/* Free space if there is not enough it for $ATTRIBUTE_LIST. */
 	if (le32_to_cpu(ni->mrec->bytes_allocated) -
@@ -633,32 +633,87 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 			err = errno;
 			Dprintf("%s(): Failed to free space for "
 				"$ATTRIBUTE_LIST.\n", __FUNCTION__);
-			free(al);
 			goto rollback;
 		}
 	}
 
 	/* Add $ATTRIBUTE_LIST to mft record. */
-	na = ntfs_inode_add_attr(ni, AT_ATTRIBUTE_LIST, NULL, 0, al_len);
+	if (ntfs_resident_attr_record_add(ni,
+				AT_ATTRIBUTE_LIST, NULL, 0, 0) < 0) {
+		err = errno;
+		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
+			__FUNCTION__);
+		goto rollback;
+	}
+
+	/* Resize it. */
+	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
 	if (!na) {
 		err = errno;
-		Dprintf("%s(): Failed to add $ATTRIBUTE_LIST.\n", __FUNCTION__);
-		goto rollback;
+		Dprintf("%s(): Failed to open just added $ATTRIBUTE_LIST.\n",
+				__FUNCTION__);
+		goto remove_attrlist_record;
+	}
+	if (ntfs_attr_truncate(na, al_len)) {
+		err = errno;
+		Dprintf("%s(): Failed to resize just added $ATTRIBUTE_LIST.\n",
+				__FUNCTION__);
+		ntfs_attr_close(na);
+		goto remove_attrlist_record;;
 	}
 	/* Done! */
 	ntfs_attr_close(na);
 	return 0;
-rollback:
-	/*
-	 * FIXME: We should here scan attribute list for attributes that placed
-	 * not in the base MFT record and move them to it.
-	 */
-
-	/* Unset in-memory attribute list. */
+remove_attrlist_record:
+	/* Prevent ntfs_attr_recorm_rm from freeing attribute list. */
 	ni->attr_list = NULL;
 	NInoClearAttrList(ni);
-	errno = err;
-	return -1;
+	/* Remove $ATTRIBUTE_LIST record. */
+	ntfs_attr_reinit_search_ctx(ctx);
+	if (!ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		if (ntfs_attr_record_rm(ctx))
+			Dprintf("%s(): Rollback failed. Failed to remove "
+				"attribute list record.\n", __FUNCTION__);
+	} else
+		Dprintf("%s(): Rollback failed. Coudn't find attribute list "
+			"record.\n", __FUNCTION__);
+	/* Setup back in-memory runlist. */
+	ni->attr_list = al;
+	ni->attr_list_size = al_len;
+	NInoSetAttrList(ni);
+rollback:
+	/*
+	 * Scan attribute list for attributes that placed not in the base MFT
+	 * record and move them to it.
+	 */
+	ntfs_attr_reinit_search_ctx(ctx);
+	ale = (ATTR_LIST_ENTRY*)al;
+	while ((u8*)ale < al + al_len) {
+		if (MREF_LE(ale->mft_reference) != ni->mft_no) {
+			if (!ntfs_attr_lookup(ale->type, ale->name,
+						ale->name_length,
+						CASE_SENSITIVE,
+						sle64_to_cpu(ale->lowest_vcn),
+						NULL, 0, ctx)) {
+				if (ntfs_attr_record_move_to(ctx, ni))
+					Dprintf("%s(): Rollback failed. "
+						"Couldn't back attribute to "
+						"base MFT record.\n",
+						__FUNCTION__);
+			} else
+				Dprintf("%s(): Rollback failed. "
+					"ntfs_attr_lookup failed.\n",
+					__FUNCTION__);
+			ntfs_attr_reinit_search_ctx(ctx);
+		}
+		ale = (ATTR_LIST_ENTRY*)((u8*)ale + le16_to_cpu(ale->length));
+	}
+	/* Remove in-memory attribute list. */
+	ni->attr_list = NULL;
+	ni->attr_list_size = 0;
+	NInoClearAttrList(ni);
+	NInoAttrListClearDirty(ni);
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
@@ -824,7 +879,7 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
 	
-	if (!ni || size < 0) {
+	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return NULL;
@@ -881,12 +936,6 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 			le32_to_cpu(ni->mrec->bytes_in_use) >= attr_rec_size) {
 		attr_ni = ni;
 		goto add_attr_record;
-	}
-
-	/* Attribute list can be placed only in the base MFT record. */
-	if (type == AT_ATTRIBUTE_LIST) {
-		err = ENOSPC;
-		goto err_out;
 	}
 
 	/* Try to add to extent inodes. */
