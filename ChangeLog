@@ -1,3 +1,6 @@
+08/01/2004 - 1.8.3 - WIP
+	- 
+
 07/01/2004 - 1.8.2 - Make ntfsprogs work on FreeBSD.
 	- Add compatibility for building on FreeBSD. (Christophe Grenier)
 	- Add new compile target "make libs" which only compiles libntfs.
