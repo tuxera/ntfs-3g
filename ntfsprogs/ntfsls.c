@@ -40,21 +40,21 @@
 static const char *EXEC_NAME = "ntfsls";
 
 static struct options {
-	char	*device;	/* Device/File to work with */
-	int	 quiet;		/* Less output */
-	int	 verbose;	/* Extra output */
-	int	 force;		/* Override common sense */
+	char *device;	/* Device/File to work with */
+	int quiet;	/* Less output */
+	int verbose;	/* Extra output */
+	int force;	/* Override common sense */
 	int all;
 	int sys;
 	int dos;
 	int lng;
-	int	inode;
+	int inode;
 	int classify;
 	int readonly;
 	int hidden;
 	int archive;
 	int system;
-	char    *path;
+	char *path;
 } opts;
 
 GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
@@ -127,7 +127,6 @@ int parse_options(int argc, char *argv[])
 		{ "classify",	 no_argument,		NULL, 'F' },
 		{ "system",	 no_argument,		NULL, 'S' },
 		{ "dos",	 no_argument,		NULL, 'x' },
-
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
@@ -310,7 +309,7 @@ void dump_mem(unsigned char *buf, int start, int length)
 }
 
 typedef struct {
-	ntfs_volume* vol;
+	ntfs_volume *vol;
 } ntfsls_dirent;
 
 // FIXME: Should we print errors as we go along? (AIA)
@@ -437,6 +436,9 @@ int main(int argc, char **argv)
 		return 3;
 	}
 
+	memset(unicode, 0, sizeof(unicode));
+	len = 0;
+
 	p = opts.path;
 	while (p && *p && *p == '/')
 		p++;
@@ -467,11 +469,24 @@ int main(int argc, char **argv)
 		while (p && *p && *p == '/')
 			p++;
 	}
+
+	/*
+	 * We now are at the final path component.  If it is a file just
+	 * list it.  If it is a directory, list its contents.
+	 */
 	pos = 0;
 	memset(&dirent, 0, sizeof(dirent));
 	dirent.vol = vol;
-	ntfs_readdir(ni, &pos, &dirent, (ntfs_filldir_t)list_entry);
-	// FIXME: error checking... (AIA)
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		ntfs_readdir(ni, &pos, &dirent, (ntfs_filldir_t)list_entry);
+		// FIXME: error checking... (AIA)
+	} else if (len) {
+		// FIXME: Ought to lookup the actual name in the mft record
+		//	  and display that... (AIA)
+		list_entry(&dirent, unicode, len, 3, pos, ni->mft_no,
+				NTFS_DT_REG);
+		// FIXME: error checking... (AIA)
+	}
 
 	/* Finished with the inode; release it. */
 	ntfs_inode_close(ni);
@@ -480,9 +495,3 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-/*
- * Local Variables:
- * c-basic-offset:4
- * tab-width:8
- * End:
- */
