@@ -669,7 +669,7 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 
 	printf ("move %lld,%lld,%lld to %lld,%lld,%lld\n", run->vcn, run->lcn, run->length, to->vcn, to->lcn, to->length);
 
-	need_from = ntfs_get_size_for_mapping_pairs (vol, from);
+	need_from = ntfs_get_size_for_mapping_pairs(vol, from, 0);
 	printf ("orig data run = %d bytes\n", need_from);
 
 	//ntfs_debug_runlist_dump2 (from, 5, "\t");
@@ -683,7 +683,7 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 
 	//ntfs_debug_runlist_dump2 (from, 5, "\t");
 
-	need_to = ntfs_get_size_for_mapping_pairs (vol, from);
+	need_to = ntfs_get_size_for_mapping_pairs(vol, from, 0);
 	printf ("new  data run = %d bytes\n", need_to);
 
 	need_from = calc_attr_length (rec, need_from);
@@ -708,7 +708,8 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	memset (((u8*)rec) +rec->mapping_pairs_offset, 0, need_to - rec->mapping_pairs_offset);
 
 	// update data runs
-	ntfs_mapping_pairs_build (vol, ((u8*)rec) + rec->mapping_pairs_offset, need_to, from);
+	ntfs_mapping_pairs_build(vol, ((u8*)rec) + rec->mapping_pairs_offset,
+			need_to, from, 0);
 
 	// commit
 	ntfs_inode_mark_dirty (ino);

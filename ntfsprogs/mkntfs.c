@@ -1235,7 +1235,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	} else {
 		hdr_size = 64;
 		if (val_len) {
-			mpa_size = ntfs_get_size_for_mapping_pairs(vol, rl);
+			mpa_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0);
 			if (mpa_size < 0) {
 				err = -errno;
 				Eprintf("Failed to get size for mapping "
@@ -1322,7 +1322,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
 		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
-				((name_len + 7) & ~7), mpa_size, rl);
+				((name_len + 7) & ~7), mpa_size, rl, 0);
 	}
 	a->initialized_size = cpu_to_le64(inited_size);
 	if (err < 0 || bw != val_len) {
@@ -1431,7 +1431,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	} else {
 		hdr_size = 64;
 		if (val_len) {
-			mpa_size = ntfs_get_size_for_mapping_pairs(vol, rl);
+			mpa_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0);
 			if (mpa_size < 0) {
 				err = -errno;
 				Eprintf("Failed to get size for mapping "
@@ -1512,7 +1512,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
 		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
-				((name_len + 7) & ~7), mpa_size, rl);
+				((name_len + 7) & ~7), mpa_size, rl, 0);
 	}
 	if (err < 0 || bw != val_len) {
 		// FIXME: Handle error.

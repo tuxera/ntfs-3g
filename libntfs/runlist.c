@@ -1238,10 +1238,12 @@ __inline__ int ntfs_get_nr_significant_bytes(const s64 n)
  * ntfs_get_size_for_mapping_pairs - get bytes needed for mapping pairs array
  * @vol:	ntfs volume (needed for the ntfs version)
  * @rl:		runlist for which to determine the size of the mapping pairs
+ * @start_vcn:	vcn at which to start the mapping pairs array
  *
  * Walk the runlist @rl and calculate the size in bytes of the mapping pairs
- * array corresponding to the runlist @rl. This for example allows us to
- * allocate a buffer of the right size when building the mapping pairs array.
+ * array corresponding to the runlist @rl, starting at vcn @start_vcn.  This
+ * for example allows us to allocate a buffer of the right size when building
+ * the mapping pairs array.
  *
  * If @rl is NULL, just return 1 (for the single terminator byte).
  *
@@ -1249,41 +1251,86 @@ __inline__ int ntfs_get_nr_significant_bytes(const s64 n)
  * errno set to the error code.  The following error codes are defined:
  *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
  *		  fully mapped runlists to this function.
+ *		- @start_vcn is invalid.
  *	EIO	- The runlist is corrupt.
  */
 int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const runlist_element *rl)
+		const runlist_element *rl, const VCN start_vcn)
 {
 	LCN prev_lcn;
-	int i, rls;
+	int rls;
 
-	if (!rl)
+	if (start_vcn < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (!rl) {
+		if (start_vcn) {
+			errno = EINVAL;
+			return -1;
+		}
 		return 1;
+	}
+	/* Skip to runlist element containing @start_vcn. */
+	while (rl->length && start_vcn >= rl[1].vcn)
+		rl++;
+	if ((!rl->length && start_vcn > rl->vcn) || start_vcn < rl->vcn) {
+		errno = EINVAL;
+		return -1;
+	}
+	prev_lcn = 0;
 	/* Always need the termining zero byte. */
 	rls = 1;
-	for (prev_lcn = i = 0; rl[i].length; i++) {
-		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
+	/* Do the first partial run if present. */
+	if (start_vcn > rl->vcn) {
+		s64 delta;
+
+		/* We know rl->length != 0 already. */
+		if (rl->length < 0 || rl->lcn < LCN_HOLE)
 			goto err_out;
+		delta = start_vcn - rl->vcn;
 		/* Header byte + length. */
-		rls += 1 + ntfs_get_nr_significant_bytes(rl[i].length);
+		rls += 1 + ntfs_get_nr_significant_bytes(rl->length - delta);
 		/*
 		 * If the logical cluster number (lcn) denotes a hole and we
 		 * are on NTFS 3.0+, we don't store it at all, i.e. we need
 		 * zero space. On earlier NTFS versions we just store the lcn.
+		 * Note: this assumes that on NTFS 1.2-, holes are stored with
+		 * an lcn of -1 and not a delta_lcn of -1 (unless both are -1).
 		 */
-		if (rl[i].lcn == LCN_HOLE && vol->major_ver >= 3)
-			continue;
+		if (rl->lcn >= 0 || vol->major_ver < 3) {
+			prev_lcn = rl->lcn;
+			if (rl->lcn >= 0)
+				prev_lcn += delta;
+			/* Change in lcn. */
+			rls += ntfs_get_nr_significant_bytes(prev_lcn);
+		}
+		/* Go to next runlist element. */
+		rl++;
+	}
+	/* Do the full runs. */
+	for (; rl->length; rl++) {
+		if (rl->length < 0 || rl->lcn < LCN_HOLE)
+			goto err_out;
+		/* Header byte + length. */
+		rls += 1 + ntfs_get_nr_significant_bytes(rl->length);
 		/*
-		 * Change in lcn.  Note: this assumes that on NTFS 1.2-, holes
-		 * are stored with an lcn of -1 and _not_ a delta_lcn of -1
-		 * (unless both are -1).
+		 * If the logical cluster number (lcn) denotes a hole and we
+		 * are on NTFS 3.0+, we don't store it at all, i.e. we need
+		 * zero space. On earlier NTFS versions we just store the lcn.
+		 * Note: this assumes that on NTFS 1.2-, holes are stored with
+		 * an lcn of -1 and not a delta_lcn of -1 (unless both are -1).
 		 */
-		rls += ntfs_get_nr_significant_bytes(rl[i].lcn - prev_lcn);
-		prev_lcn = rl[i].lcn;
+		if (rl->lcn >= 0 || vol->major_ver < 3) {
+			/* Change in lcn. */
+			rls += ntfs_get_nr_significant_bytes(rl->lcn -
+					prev_lcn);
+			prev_lcn = rl->lcn;
+		}
 	}
 	return rls;
 err_out:
-	if (rl[i].lcn == LCN_RL_NOT_MAPPED)
+	if (rl->lcn == LCN_RL_NOT_MAPPED)
 		errno = EINVAL;
 	else
 		errno = EIO;
@@ -1348,10 +1395,12 @@ err_out:
  * @dst:	destination buffer to which to write the mapping pairs array
  * @dst_len:	size of destination buffer @dst in bytes
  * @rl:		runlist for which to build the mapping pairs array
+ * @start_vcn:	vcn at which to start the mapping pairs array
  *
- * Create the mapping pairs array from the runlist @rl and save the array in
- * @dst. @dst_len is the size of @dst in bytes and it should be at least equal
- * to the value obtained by calling ntfs_get_size_for_mapping_pairs().
+ * Create the mapping pairs array from the runlist @rl, starting at vcn
+ * @start_vcn and save the array in @dst.  @dst_len is the size of @dst in
+ * bytes and it should be at least equal to the value obtained by calling
+ * ntfs_get_size_for_mapping_pairs().
  *
  * If @rl is NULL, just write a single terminator byte to @dst.
  *
@@ -1359,35 +1408,87 @@ err_out:
  * The following error codes are defined:
  *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
  *		  fully mapped runlists to this function.
+ *		- @start_vcn is invalid.
  *	EIO	- The runlist is corrupt.
  *	ENOSPC	- The destination buffer is too small.
  */
 int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
-		const int dst_len, const runlist_element *rl)
+		const int dst_len, const runlist_element *rl,
+		const VCN start_vcn)
 {
 	LCN prev_lcn;
 	s8 *dst_max;
-	int i;
 	s8 len_len, lcn_len;
 
+	if (start_vcn < 0)
+		goto val_err;
 	if (!rl) {
+		if (start_vcn)
+			goto val_err;
 		if (dst_len < 1)
 			goto size_err;
 		/* Terminator byte. */
 		*dst = 0;
 		return 0;
 	}
+	/* Skip to runlist element containing @start_vcn. */
+	while (rl->length && start_vcn >= rl[1].vcn)
+		rl++;
+	if ((!rl->length && start_vcn > rl->vcn) || start_vcn < rl->vcn)
+		goto val_err;
 	/*
 	 * @dst_max is used for bounds checking in
 	 * ntfs_write_significant_bytes().
 	 */
 	dst_max = dst + dst_len - 1;
-	for (prev_lcn = i = 0; rl[i].length; i++) {
-		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
+	prev_lcn = 0;
+	/* Do the first partial run if present. */
+	if (start_vcn > rl->vcn) {
+		s64 delta;
+
+		/* We know rl->length != 0 already. */
+		if (rl->length < 0 || rl->lcn < LCN_HOLE)
+			goto err_out;
+		delta = start_vcn - rl->vcn;
+		/* Write length. */
+		len_len = ntfs_write_significant_bytes(dst + 1, dst_max,
+				rl->length - delta);
+		if (len_len < 0)
+			goto size_err;
+		/*
+		 * If the logical cluster number (lcn) denotes a hole and we
+		 * are on NTFS 3.0+, we don't store it at all, i.e. we need
+		 * zero space. On earlier NTFS versions we just write the lcn
+		 * change.  FIXME: Do we need to write the lcn change or just
+		 * the lcn in that case?  Not sure as I have never seen this
+		 * case on NT4. - We assume that we just need to write the lcn
+		 * change until someone tells us otherwise... (AIA)
+		 */
+		if (rl->lcn >= 0 || vol->major_ver < 3) {
+			prev_lcn = rl->lcn;
+			if (rl->lcn >= 0)
+				prev_lcn += delta;
+			/* Write change in lcn. */
+			lcn_len = ntfs_write_significant_bytes(dst + 1 +
+					len_len, dst_max, prev_lcn);
+			if (lcn_len < 0)
+				goto size_err;
+		} else
+			lcn_len = 0;
+		/* Update header byte. */
+		*dst = lcn_len << 4 | len_len;
+		/* Position ourselves at next mapping pairs array element. */
+		dst += 1 + len_len + lcn_len;
+		/* Go to next runlist element. */
+		rl++;
+	}
+	/* Do the full runs. */
+	for (; rl->length; rl++) {
+		if (rl->length < 0 || rl->lcn < LCN_HOLE)
 			goto err_out;
 		/* Write length. */
 		len_len = ntfs_write_significant_bytes(dst + 1, dst_max,
-				rl[i].length);
+				rl->length);
 		if (len_len < 0)
 			goto size_err;
 		/*
@@ -1399,12 +1500,13 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		 * case on NT4. - We assume that we just need to write the lcn
 		 * change until someone tells us otherwise... (AIA)
 		 */
-		if (rl[i].lcn != LCN_HOLE || vol->major_ver < 3) {
+		if (rl->lcn >= 0 || vol->major_ver < 3) {
+			/* Write change in lcn. */
 			lcn_len = ntfs_write_significant_bytes(dst + 1 +
-					len_len, dst_max, rl[i].lcn - prev_lcn);
+					len_len, dst_max, rl->lcn - prev_lcn);
 			if (lcn_len < 0)
 				goto size_err;
-			prev_lcn = rl[i].lcn;
+			prev_lcn = rl->lcn;
 		} else
 			lcn_len = 0;
 		/* Update header byte. */
@@ -1420,8 +1522,11 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 size_err:
 	errno = ENOSPC;
 	return -1;
+val_err:
+	errno = EINVAL;
+	return -1;
 err_out:
-	if (rl[i].lcn == LCN_RL_NOT_MAPPED)
+	if (rl->lcn == LCN_RL_NOT_MAPPED)
 		errno = EINVAL;
 	else
 		errno = EIO;

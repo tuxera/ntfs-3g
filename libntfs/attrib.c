@@ -2440,7 +2440,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		}
 	}
 	/* Determine the size of the mapping pairs array. */
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl);
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0);
 	if (mp_size < 0) {
 		err = errno;
 		// FIXME: Eeek!
@@ -2513,7 +2513,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Generate the mapping pairs array in the attribute record. */
 	if (ntfs_mapping_pairs_build(vol, (u8*)a + mp_ofs, arec_size - mp_ofs,
-			rl) < 0) {
+			rl, 0) < 0) {
 		err = errno;
 		// FIXME: Eeek! We need rollback! (AIA)
 		Dprintf("%s(): Eeek!  Failed to build mapping pairs.  Leaving "
@@ -3018,7 +3018,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (a->highest_vcn)
 			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		/* Get the size for the new mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
 		if (mp_size <= 0) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
@@ -3032,7 +3032,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		 * correct destination, i.e. the attribute record itself.
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl)) {
+				a->mapping_pairs_offset), mp_size, na->rl, 0)) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
 			Dprintf("%s(): Eeek! Mapping pairs build "
@@ -3270,7 +3270,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		na->rl = rln;
 
 		/* Get the size for the new mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
 		if (mp_size <= 0) {
 			err = errno;
 			Dprintf("%s(): Eeek! Get size for mapping "
@@ -3344,7 +3344,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * correct destination, i.e. the attribute record itself.
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl)) {
+				a->mapping_pairs_offset), mp_size, na->rl, 0)) {
 			err = errno;
 			Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "

@@ -1097,7 +1097,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 	
 	rl_fixup(&rl);
 
-	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
+	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 	
 	if (a->name_length) {
@@ -1157,7 +1157,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 	if (!(mp = calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
 
-	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
+	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0))
 		perr_exit("ntfs_mapping_pairs_build");
 
 	memmove((u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
