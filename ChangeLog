@@ -6,6 +6,12 @@
 	- Make libntfs more portable by removing the dependency on
 	  asm/byteorder.h and using <endian.h> and <byteswap.h> instead. Also
 	  adapting our endians.h appropriately. (Richard Russon)
+	- Fix nasty buffer overflow bug in ntfs_get_attribute_value() which we
+	  use to get the attribute list attribute.  This is the same bug that
+	  was biting us in the ntfs driver 2.1.4 and was fixed in 2.1.5.
+	  Windows XP creates files where an attribute's data size is more than
+	  one run list run shorter than the allocated size which causes us to
+	  crash out as we assumed this would never happen.
 	- Various other small cleanups and fixes.
 
 10/11/2003 - 1.8.0beta2 - More features!
