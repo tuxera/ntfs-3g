@@ -565,7 +565,7 @@ void walk_attributes(ntfs_resize_t *resize)
  */
 void compare_bitmaps(struct bitmap *a)
 {
-	s64 i,count;
+	s64 i, count;
 	int k, mismatch = 0;
 	char bit;
 	u8 bm[NTFS_BUF_SIZE];
@@ -596,7 +596,7 @@ void compare_bitmaps(struct bitmap *a)
 			for (j = start; j < start + 8; j++) {
 
 				bit = ntfs_bit_get(a->bm, j);
-				if (bit != ntfs_bit_get(bm, k + j % 8))
+				if (bit == ntfs_bit_get(bm, k + j % 8))
 					continue;
 
 				if (++mismatch > 10)
@@ -664,7 +664,7 @@ void walk_inodes(ntfs_resize_t *resize)
 	ntfs_inode *ni;
 	struct progress_bar progress;
 
-	printf("Scanning volume ...\n");
+	printf("Checking filesystem consistency ...\n");
 
 	last_mft_rec = vol->nr_mft_records - 1;
 	progress_init(&progress, inode, last_mft_rec, 100);
