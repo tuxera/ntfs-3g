@@ -963,8 +963,12 @@ static void format_mft_record(MFT_RECORD *m)
 
 	memset(m, 0, vol->mft_record_size);
 	m->magic = magic_FILE;
-	/* Aligned to 2-byte boundary. */
-	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
+	/*
+	 * Aligned to 2-byte boundary.  Note, we use the MFT_RECORD_OLD here
+	 * explicitly as the MFT_RECORD structure has extra fields at the end
+	 * which are only present in NTFS 3.1+.
+	 */
+	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD_OLD) + 1) & ~1);
 	if (vol->mft_record_size >= NTFS_SECTOR_SIZE)
 		m->usa_count = cpu_to_le16(vol->mft_record_size /
 				NTFS_SECTOR_SIZE + 1);
@@ -977,7 +981,7 @@ static void format_mft_record(MFT_RECORD *m)
 			"system created was corrupt.\nThank you.");
 	}
 	/* Set the update sequence number to 1. */
-	*(u16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
+	*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = cpu_to_le16(1);
 	m->lsn = cpu_to_le64(0LL);
 	m->sequence_number = cpu_to_le16(1);
 	m->link_count = cpu_to_le16(0);
