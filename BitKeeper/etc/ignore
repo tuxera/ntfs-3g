@@ -1,2 +1,32 @@
+# Bitkeeper
 BitKeeper/*/*
 PENDING/*
+
+# configure
+Makefile
+*/Makefile
+ntfstools/*.8
+config.log
+config.h
+config.cache
+config.status
+stamp-h
+libtool
+linux-ntfs.spec
+
+# general build products
+*/.deps/*
+*/.libs/*
+*/*.o
+libntfs/*.l?
+
+# specific programs
+ntfstools/dumplog
+ntfstools/mkntfs
+ntfstools/ntfsdump_logfile
+ntfstools/ntfsfix
+ntfstools/ntfsinfo
+ntfstools/ntfslabel
+ntfstools/ntfsresize
+ntfstools/ntfsundelete
+ntfstools/ntfswipe
