@@ -398,7 +398,7 @@ static int dump_file (ntfs_volume *vol, ntfs_inode *ino)
  * print_match
  */
 static int print_match (ntfs_inode *ino, ATTR_RECORD *attr,
-	runlist_element *run, void *data)
+	runlist_element *run, void *data __attribute__((unused)))
 {
 	char *buffer;
 

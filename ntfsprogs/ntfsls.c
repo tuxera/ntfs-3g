@@ -463,8 +463,8 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
  */
 static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 			  const int name_len, const int name_type,
-			  const s64 pos, const MFT_REF mref,
-			  const unsigned dt_type)
+			  const s64 pos __attribute__((unused)),
+			  const MFT_REF mref, const unsigned dt_type)
 {
 	char *filename = NULL;
 	int result = 0;

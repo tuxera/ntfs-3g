@@ -38,7 +38,7 @@
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
-int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
+int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx __attribute__((unused)))
 {
 	errno = ENOTSUP;
 	return -1;
