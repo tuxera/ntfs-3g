@@ -337,7 +337,8 @@ static int transform (const char *pattern, char **regex)
  */
 static int parse_time (const char *value, time_t *since)
 {
-	time_t result, now;
+	long long result;
+	time_t now;
 	char *suffix = NULL;
 
 	if (!value || !since)
