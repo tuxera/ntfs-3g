@@ -202,7 +202,7 @@ static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int name
 
 /**
  * struct ntfs_bmp
- * a cache for either dir/$BITMAP, $MFT/$BITMAP or $MFT/$Bitmap
+ * a cache for either dir/$BITMAP, $MFT/$BITMAP or $Bitmap/$DATA
  */
 struct ntfs_bmp {
 	ntfs_attr	 *attr;
@@ -509,8 +509,15 @@ static int ntfs_bmp_set_range (struct ntfs_bmp *bmp, VCN vcn, u64 length, int va
 				memset (buffer+start, 0x00, finish-start);
 			buffer[finish] &= ~fin_part;
 		}
-		utils_dump_mem (buffer, 0, 16, DM_DEFAULTS);
+		//utils_dump_mem (buffer, 0, 16, DM_DEFAULTS);
 	}
+
+	printf ("Modified: inode %lld, ", bmp->attr->ni->mft_no);
+	switch (bmp->attr->type) {
+		case AT_BITMAP: printf ("$BITMAP"); break;
+		case AT_DATA:   printf ("$DATA");   break;
+	}
+	printf (" vcn %lld-%lld\n", vcn>>12, (vcn+length)>>12);
 
 	return 1;
 }
@@ -1341,6 +1348,40 @@ static int utils_mftrec_mark_free2 (ntfs_volume *vol, MFT_REF mref)
 	res = ntfs_mft_record_write (vol, mref, rec);
 	printf ("res = %lld\n", res);
 
+	return 0;
+}
+
+/**
+ * utils_mftrec_mark_free3
+ */
+static int utils_mftrec_mark_free3 (struct ntfs_bmp *bmp, MFT_REF mref)
+{
+	return ntfs_bmp_set_range (bmp, (VCN) MREF (mref), 1, 0);
+}
+
+/**
+ * utils_mftrec_mark_free4
+ */
+static int utils_mftrec_mark_free4 (ntfs_inode *inode)
+{
+	MFT_RECORD *rec;
+
+	if (!inode)
+		return -1;
+
+	rec = (MFT_RECORD*) inode->mrec;
+
+	if ((rec->flags & MFT_RECORD_IN_USE) == 0) {
+		Eprintf ("MFT record isn't in use (2).\n");
+		return -1;
+	}
+
+	rec->flags &= ~MFT_RECORD_IN_USE;
+
+	//printf ("\n");
+	//utils_dump_mem (buffer, 0, 1024, DM_DEFAULTS);
+
+	printf ("Modified: inode %lld MFT_RECORD header\n", inode->mft_no);
 	return 0;
 }
 
@@ -2650,7 +2691,7 @@ static BOOL ntfs_dt_alloc_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY
 
 	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
 
-	printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
+	printf ("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
 	return TRUE;
 }
 
@@ -2877,7 +2918,7 @@ static BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 	printf ("\n");
 #endif
 
-	printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
+	printf ("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + 4);
 	return TRUE;
 }
 
@@ -3018,7 +3059,7 @@ static int ntfs_dt_alloc_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
 	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
 	//printf ("\n");
 
-	printf ("Modified: inode %lld, INDEX_ALLOCATION vcn %lld-%lld\n", add->dir->inode->mft_no, add->vcn, add->vcn + 4);
+	printf ("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", add->dir->inode->mft_no, add->vcn, add->vcn + 4);
 	return 0;
 }
 
@@ -3227,10 +3268,11 @@ done:
 /**
  * ntfs_test_bmp
  */
-static int ntfs_test_bmp (ntfs_volume *vol, ntfs_inode *inode, int s, int f)
+static int ntfs_test_bmp (ntfs_volume *vol, ntfs_inode *inode)
 {
 	ntfs_inode *volbmp;
 	struct ntfs_bmp *bmp;
+	struct ntfs_bmp *bmp2;
 	//u8 *buffer;
 	//int i;
 
@@ -3242,9 +3284,14 @@ static int ntfs_test_bmp (ntfs_volume *vol, ntfs_inode *inode, int s, int f)
 	if (!bmp)
 		return 1;
 
-	if (0) utils_free_non_residents2 (inode, bmp);
+	bmp2 = ntfs_bmp_alloc (vol->mft_ni, AT_BITMAP, NULL, 0);
+	if (!bmp2)
+		return 1;
 
-	ntfs_bmp_set_range (bmp, s, f, 1);
+	if (0) ntfs_bmp_set_range (bmp, 0, 9, 1);
+	if (0) utils_free_non_residents2 (inode, bmp);
+	if (0) utils_mftrec_mark_free3 (bmp2, inode->mft_no);
+	if (0) utils_mftrec_mark_free4 (inode);
 
 	ntfs_bmp_free (bmp);
 	return 0;
@@ -3272,8 +3319,7 @@ int main (int argc, char *argv[])
 	utils_set_locale();
 
 #if 0
-	printf ("sizeof (bmp_page)   = %d\n", sizeof (struct bmp_page));
-	printf ("sizeof (mft_bitmap) = %d\n", sizeof (struct mft_bitmap));
+	printf ("sizeof (ntfs_bmp)   = %d\n", sizeof (struct ntfs_bmp));
 	printf ("sizeof (ntfs_dt)    = %d\n", sizeof (struct ntfs_dt));
 	printf ("sizeof (ntfs_dir)   = %d\n", sizeof (struct ntfs_dir));
 	printf ("\n");
@@ -3299,7 +3345,7 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_ie_test();
 	if (0) result = ntfs_file_add (vol, opts.file);
 	if (0) result = ntfs_file_remove (vol, opts.file);
-	if (0) result = ntfs_test_bmp (vol, inode, s, f-s+1);
+	if (0) result = ntfs_test_bmp (vol, inode);
 
 done:
 	ntfs_inode_close (inode);
