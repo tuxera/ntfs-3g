@@ -258,7 +258,8 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		ale->lowest_vcn = 0;
 	ale->mft_reference = mref;
 	ale->instance = attr->instance;
-	memcpy(ale->name, (u8 *)attr + attr->name_offset, attr->name_length);
+	memcpy(ale->name, (u8 *)attr + attr->name_offset,
+			attr->name_length * sizeof(ntfschar));
 
 	/* Set new runlist. */
 	if (ntfs_attrlist_set(ni, new_al, new_al_len)) {

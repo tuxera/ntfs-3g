@@ -595,8 +595,8 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		ale->mft_reference = MK_LE_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number));
 		ale->instance = ctx->attr->instance;
-		memcpy(ale->name, (u8 *)ctx->attr +
-			ctx->attr->name_offset, ctx->attr->name_length);
+		memcpy(ale->name, (u8 *)ctx->attr + ctx->attr->name_offset,
+				ctx->attr->name_length * sizeof(ntfschar));
 		ale = (ATTR_LIST_ENTRY *)(al + al_len);
 	}
 	/* Check for real error occured. */

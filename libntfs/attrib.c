@@ -2492,8 +2492,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->non_resident = 1;
 	a->name_length = name_len;
 	a->name_offset = cpu_to_le16(offsetof(ATTR_RECORD, compressed_size) +
-			(flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
-			sizeof(a->compressed_size) : 0);
+			((flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
+			sizeof(a->compressed_size) : 0));
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
 	a->lowest_vcn = cpu_to_sle64(lowest_vcn);
@@ -3600,7 +3600,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 	/* Fill attribute records with new mapping pairs. */
 	stop_vcn = 0;
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-				IGNORE_CASE, 0, NULL, 0, ctx)) {
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
 		
@@ -3760,7 +3760,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		ntfs_attr_reinit_search_ctx(ctx);
 		Dprintf("%s(): Deallocate marked extents.\n", __FUNCTION__);
 		while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-				IGNORE_CASE, 0, NULL, 0, ctx)) {
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			if (sle64_to_cpu(ctx->attr->highest_vcn) !=
 							NTFS_VCN_DELETE_MARK)
 				continue;
@@ -4137,11 +4137,13 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx) {
 		err = errno;
-		if ((na->allocated_size >> vol->cluster_size_bits) !=
-				first_free_vcn)
+		Dprintf("%s(): Failed to get search context.\n", __FUNCTION__);
+		if ((na->allocated_size >> vol->cluster_size_bits) ==
+				first_free_vcn) {
+			errno = err;
+			return -1;
+		} else
 			goto rollback;
-		else
-			goto put_err_out;
 	}
 
 	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
