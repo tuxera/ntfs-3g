@@ -1,7 +1,7 @@
 /*
  * unistr.c - Unicode string handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -454,6 +454,11 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 	ins_len = mbsrtowcs(NULL, (const char **)&s, 0, &mbstate);
 #else
 	ins_len = mbstowcs(NULL, s, 0);
+#endif
+#ifdef __CYGWIN32__
+	/* Eeek!!! Cygwin has broken mbstowcs() implementation!!! */
+	if (!ins_len)
+		ins_len = strlen(ins);
 #endif
 	if (ins_len == -1)
 		return ins_len;
