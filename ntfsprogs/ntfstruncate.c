@@ -95,7 +95,7 @@ struct {
 /**
  * Dprintf - debugging output (-vv); overriden by quiet (-q)
  */
-void Dprintf(const char *fmt, ...)
+static void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -130,7 +130,7 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
-void err_exit(const char *fmt, ...)
+static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -145,7 +145,7 @@ void err_exit(const char *fmt, ...)
 /**
  * copyright - print copyright statements
  */
-void copyright(void)
+static void copyright(void)
 {
 	fprintf(stderr, "Copyright (c) 2002-2003 Anton Altaparmakov\n"
 			"Copyright (c) 2003 Richard Russon\n"
@@ -156,7 +156,7 @@ void copyright(void)
 /**
  * license - print licese statement
  */
-void license(void)
+static void license(void)
 {
 	fprintf(stderr, "%s", ntfs_gpl);
 }
@@ -189,7 +189,7 @@ void usage (void)
 /**
  * parse_options
  */
-void parse_options(int argc, char *argv[])
+static void parse_options(int argc, char *argv[])
 {
 	long long ll;
 	char *s, *s2;
@@ -304,7 +304,7 @@ void parse_options(int argc, char *argv[])
  * terminating null byte. If a unicode character was encountered which could
  * not be converted -1 is returned.
  */
-int ucstos(char *dest, const uchar_t *src, int maxlen)
+static int ucstos(char *dest, const uchar_t *src, int maxlen)
 {
 	uchar_t u;
 	int i;
@@ -326,7 +326,7 @@ int ucstos(char *dest, const uchar_t *src, int maxlen)
 /**
  * dump_resident_attr_val
  */
-void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
+static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 {
 	const char *don_t_know = "Don't know what to do with this attribute "
 			"type yet.";
@@ -474,7 +474,7 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 /**
  * dump_resident_attr
  */
-void dump_resident_attr(ATTR_RECORD *a)
+static void dump_resident_attr(ATTR_RECORD *a)
 {
 	int i;
 
@@ -497,7 +497,7 @@ void dump_resident_attr(ATTR_RECORD *a)
 /**
  * dump_mapping_pairs_array
  */
-void dump_mapping_pairs_array(char *b, unsigned int max_len)
+static void dump_mapping_pairs_array(char *b, unsigned int max_len)
 {
 	// TODO
 	return;
@@ -506,7 +506,7 @@ void dump_mapping_pairs_array(char *b, unsigned int max_len)
 /**
  * dump_non_resident_attr
  */
-void dump_non_resident_attr(ATTR_RECORD *a)
+static void dump_non_resident_attr(ATTR_RECORD *a)
 {
 	s64 l;
 	int i;
@@ -545,7 +545,7 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 /**
  * dump_attr_record
  */
-void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
+static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 {
 	unsigned int u;
 	char s[0x200];
@@ -642,7 +642,7 @@ void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 /**
  * dump_mft_record
  */
-void dump_mft_record(MFT_RECORD *m)
+static void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
 	unsigned int u;
@@ -695,7 +695,7 @@ void dump_mft_record(MFT_RECORD *m)
 /**
  * ntfstruncate_exit
  */
-void ntfstruncate_exit(void)
+static void ntfstruncate_exit(void)
 {
 	int err;
 

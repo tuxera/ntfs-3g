@@ -72,7 +72,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Recover deleted files from an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
@@ -88,7 +88,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device\n"
 		"    -s          --scan             Scan for files (default)\n"
@@ -135,7 +135,7 @@ void usage (void)
  * Return:  1, Success, the string was transformed
  *	    0, An error occurred
  */
-int transform (const char *pattern, char **regex)
+static int transform (const char *pattern, char **regex)
 {
 	char *result;
 	int length, i, j;
@@ -210,7 +210,7 @@ int transform (const char *pattern, char **regex)
  * Return:  1  Success
  *	    0  Error, the string was malformed
  */
-int parse_time (const char *value, time_t *since)
+static int parse_time (const char *value, time_t *since)
 {
 	time_t result, now;
 	char *suffix = NULL;
@@ -266,7 +266,7 @@ int parse_time (const char *value, time_t *since)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char *argv[])
+static int parse_options (int argc, char *argv[])
 {
 	static const char *sopt = "-b:Cc:d:fh?m:o:p:sS:t:u:qvV";
 	static const struct option lopt[] = {
@@ -515,7 +515,7 @@ int parse_options (int argc, char *argv[])
  *
  * Return:  none
  */
-void free_file (struct ufile *file)
+static void free_file (struct ufile *file)
 {
 	struct list_head *item, *tmp;
 
@@ -563,7 +563,7 @@ void free_file (struct ufile *file)
  * Return:  n  The number of $FILENAME attributes found
  *	   -1  Error
  */
-int get_filenames (struct ufile *file)
+static int get_filenames (struct ufile *file)
 {
 	ATTR_RECORD *rec;
 	FILE_NAME_ATTR *attr;
@@ -639,7 +639,7 @@ int get_filenames (struct ufile *file)
  * Return:  n  The number of $FILENAME attributes found
  *	   -1  Error
  */
-int get_data (struct ufile *file, ntfs_volume *vol)
+static int get_data (struct ufile *file, ntfs_volume *vol)
 {
 	ATTR_RECORD *rec;
 	ntfs_attr_search_ctx *ctx;
@@ -713,7 +713,7 @@ int get_data (struct ufile *file, ntfs_volume *vol)
  * Return:  Pointer  A ufile object containing the results
  *	    NULL     Error
  */
-struct ufile * read_record (ntfs_volume *vol, long long record)
+static struct ufile * read_record (ntfs_volume *vol, long long record)
 {
 	ATTR_RECORD *attr10, *attr20, *attr90;
 	struct ufile *file;
@@ -807,7 +807,7 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
  * Return:  n  The percentage of the file that _could_ be recovered
  *	   -1  Error
  */
-int calc_percentage (struct ufile *file, ntfs_volume *vol)
+static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 {
 	runlist_element *rl = NULL;
 	struct list_head *pos;
@@ -924,7 +924,7 @@ int calc_percentage (struct ufile *file, ntfs_volume *vol)
  *
  * Return:  none
  */
-void dump_record (struct ufile *file)
+static void dump_record (struct ufile *file)
 {
 	char buffer[20];
 	char *name;
@@ -1035,7 +1035,7 @@ void dump_record (struct ufile *file)
  *
  * Return:  none
  */
-void list_record (struct ufile *file)
+static void list_record (struct ufile *file)
 {
 	char buffer[20];
 	struct list_head *item;
@@ -1092,7 +1092,7 @@ void list_record (struct ufile *file)
  * Return:  1  There is a matching filename.
  *	    0  There is no match.
  */
-int name_match (regex_t *re, struct ufile *file)
+static int name_match (regex_t *re, struct ufile *file)
 {
 	struct list_head *item;
 	int result;
@@ -1130,7 +1130,8 @@ int name_match (regex_t *re, struct ufile *file)
  * Return:  -1  Error, something went wrong
  *	     0  Success, all the data was written
  */
-unsigned int write_data (int fd, const char *buffer, unsigned int bufsize)
+static unsigned int write_data (int fd, const char *buffer,
+	unsigned int bufsize)
 {
 	ssize_t result1, result2;
 
@@ -1177,8 +1178,8 @@ unsigned int write_data (int fd, const char *buffer, unsigned int bufsize)
  *
  * Return:  n  Length of the allocated name
  */
-int create_pathname (const char *dir, const char *name, const char *stream,
-		     char *buffer, int bufsize)
+static int create_pathname (const char *dir, const char *name, 
+	const char *stream, char *buffer, int bufsize)
 {
 	if (!name)
 		name = UNKNOWN;
@@ -1208,7 +1209,7 @@ int create_pathname (const char *dir, const char *name, const char *stream,
  * Return:  -1  Error, failed to create the file
  *	     n  Success, this is the file descriptor
  */
-int open_file (const char *pathname)
+static int open_file (const char *pathname)
 {
 	int flags;
 
@@ -1232,7 +1233,7 @@ int open_file (const char *pathname)
  * Return:  1  Success, set the file's date and time
  *	    0  Error, failed to change the file's date and time
  */
-int set_date (const char *pathname, time_t date)
+static int set_date (const char *pathname, time_t date)
 {
 	struct utimbuf ut;
 
@@ -1260,7 +1261,7 @@ int set_date (const char *pathname, time_t date)
  * Return:  -1  Error, something went wrong
  *	     n  Success, the number of recoverable files
  */
-int scan_disk (ntfs_volume *vol)
+static int scan_disk (ntfs_volume *vol)
 {
 	const int BUFSIZE = 8192;
 	char *buffer = NULL;
@@ -1383,7 +1384,7 @@ out:
  * Return:  0  Error, something went wrong
  *	    1  Success, the data was recovered
  */
-int undelete_file (ntfs_volume *vol, long long inode)
+static int undelete_file (ntfs_volume *vol, long long inode)
 {
 	char pathname[256];
 	char *buffer = NULL;
@@ -1586,7 +1587,7 @@ free:
  * Return:  0  Success, all the records were written
  *	    1  Error, something went wrong
  */
-int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
+static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 {
 	char pathname[256];
 	ntfs_attr *mft;

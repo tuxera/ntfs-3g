@@ -52,7 +52,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Find the owner of any given sector or cluster.\n\n",
 		EXEC_NAME, VERSION);
@@ -67,7 +67,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device\n"
 		"    -i        --info           Print information about the volume (default)\n"
@@ -96,7 +96,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char **argv)
+static int parse_options (int argc, char **argv)
 {
 	static const char *sopt = "-c:F:fh?I:ilqs:vV";
 	static const struct option lopt[] = {
@@ -247,7 +247,7 @@ int parse_options (int argc, char **argv)
 /**
  * info
  */
-int info (ntfs_volume *vol)
+static int info (ntfs_volume *vol)
 {
 	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u;
 	int cb, sb, cps;
@@ -355,7 +355,7 @@ int info (ntfs_volume *vol)
 /**
  * dump_file
  */
-int dump_file (ntfs_volume *vol, ntfs_inode *ino)
+static int dump_file (ntfs_volume *vol, ntfs_inode *ino)
 {
 	u8 buffer[1024];
 	ntfs_attr_search_ctx *ctx;
@@ -397,7 +397,8 @@ int dump_file (ntfs_volume *vol, ntfs_inode *ino)
 /**
  * print_match
  */
-int print_match (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void *data)
+static int print_match (ntfs_inode *ino, ATTR_RECORD *attr,
+	runlist_element *run, void *data)
 {
 	char *buffer;
 
@@ -423,7 +424,8 @@ int print_match (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void 
 /**
  * find_last
  */
-int find_last (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void *data)
+static int find_last (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run,
+	void *data)
 {
 	struct match *m;
 

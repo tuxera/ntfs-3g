@@ -65,7 +65,7 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version(void)
+static void version(void)
 {
 	printf("\n%s v%s - Display information about an NTFS Volume.\n\n",
 			EXEC_NAME, VERSION);
@@ -82,7 +82,7 @@ void version(void)
  *
  * Return:  none
  */
-void usage(void)
+static void usage(void)
 {
 	printf("\nUsage: %s [options] -d /dev/hda1\n"
 		"\n"
@@ -113,7 +113,7 @@ void usage(void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options(int argc, char *argv[])
+static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-ad:Ffh?ilp:qsVvx";
 	static const struct option lopt[] = {
@@ -226,7 +226,7 @@ typedef struct {
  * list_entry
  * FIXME: Should we print errors as we go along? (AIA)
  */
-int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
+static int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
 		const int name_len, const int name_type, const s64 pos,
 		const MFT_REF mref, const unsigned dt_type)
 {

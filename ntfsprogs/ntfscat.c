@@ -43,7 +43,7 @@ static struct options opts;
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
-GEN_PRINTF (Printf,  stderr, NULL,          FALSE)
+static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -52,7 +52,7 @@ GEN_PRINTF (Printf,  stderr, NULL,          FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	Printf ("\n%s v%s - Concatenate files and print on the standard output.\n\n",
 		EXEC_NAME, VERSION);
@@ -67,7 +67,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	Printf ("\nUsage: %s [options] device [file]\n\n"
 		"    -a, --attribute num   Display this attribute\n"
@@ -93,7 +93,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char **argv)
+static int parse_options (int argc, char **argv)
 {
 	static const char *sopt = "-a:fh?i:qVv"; // F:N:
 	static const struct option lopt[] = {
@@ -210,7 +210,7 @@ int parse_options (int argc, char **argv)
 /**
  * cat
  */
-int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type, uchar_t *name, int namelen)
+static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type, uchar_t *name, int namelen)
 {
 	/* increase 1024 only if you fix partial writes below */
 	const int bufsize = 1024; 

@@ -57,7 +57,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Move files and directories on an NTFS volume.\n\n",
 		EXEC_NAME, VERSION);
@@ -72,7 +72,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device file\n"
 		"\n"
@@ -101,7 +101,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char **argv)
+static int parse_options (int argc, char **argv)
 {
 	static const char *sopt = "-BC:DEfh?nqSVv";
 	static const struct option lopt[] = {
@@ -233,7 +233,7 @@ int parse_options (int argc, char **argv)
 /**
  * ntfs_debug_runlist_dump2 - Dump a runlist.
  */
-int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
+static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 {
 	//int abbr = 3;	/* abbreviate long lists */
 	int len = 0;
@@ -291,7 +291,7 @@ int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 /**
  * resize_nonres_attr
  */
-int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
+static int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
 {
 	int this_attr;
 	int next_attr;
@@ -327,7 +327,7 @@ int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
 /**
  * calc_attr_length
  */
-int calc_attr_length (ATTR_RECORD *rec, int runlength)
+static int calc_attr_length (ATTR_RECORD *rec, int runlength)
 {
 	int size;
 
@@ -344,7 +344,7 @@ int calc_attr_length (ATTR_RECORD *rec, int runlength)
 /**
  * dump_runs
  */
-void dump_runs (u8 *buffer, int len)
+static void dump_runs (u8 *buffer, int len)
 {
 	int i;
 	printf ("RUN: [01;31m");
@@ -358,7 +358,7 @@ void dump_runs (u8 *buffer, int len)
 /**
  * find_unused
  */
-runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc, int flags)
+static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc, int flags)
 {
 	const int bufsize = 8192;
 	u8 *buffer;
@@ -439,7 +439,7 @@ done:
  *   Any fragmented MFT records
  *   The boot file 'ntldr'
  */
-int dont_move (ntfs_inode *ino)
+static int dont_move (ntfs_inode *ino)
 {
 	static const uchar_t ntldr[6] = {
 		const_cpu_to_le16('n'), const_cpu_to_le16('t'), const_cpu_to_le16('l'),
@@ -480,7 +480,7 @@ int dont_move (ntfs_inode *ino)
 /**
  * bitmap_alloc
  */
-int bitmap_alloc (ntfs_volume *vol, runlist_element *rl)
+static int bitmap_alloc (ntfs_volume *vol, runlist_element *rl)
 {
 	int res;
 
@@ -498,7 +498,7 @@ int bitmap_alloc (ntfs_volume *vol, runlist_element *rl)
 /**
  * bitmap_free
  */
-int bitmap_free (ntfs_volume *vol, runlist_element *rl)
+static int bitmap_free (ntfs_volume *vol, runlist_element *rl)
 {
 	int res;
 
@@ -516,7 +516,7 @@ int bitmap_free (ntfs_volume *vol, runlist_element *rl)
 /**
  * data_copy
  */
-int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *to)
+static int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *to)
 {
 	int i;
 	u8 *buffer;
@@ -567,7 +567,8 @@ int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *to)
  * copy data
  * deallocate old space
  */
-s64 move_runlist (ntfs_volume *vol, runlist_element *from, runlist_element *to)
+static s64 move_runlist (ntfs_volume *vol, runlist_element *from,
+	runlist_element *to)
 {
 	int i;
 
@@ -632,7 +633,8 @@ s64 move_runlist (ntfs_volume *vol, runlist_element *from, runlist_element *to)
 //      requires a mrec arg, not an ino (ino->mrec will do for now)
 // check size of new runlist before allocting / moving
 // replace one datarun with another (by hand)
-s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec, runlist_element *run, u64 loc, int flags)
+static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
+	runlist_element *run, u64 loc, int flags)
 {
 	runlist *from;
 	runlist *to;
@@ -719,7 +721,8 @@ s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec, runlist_e
  * = 0  Nothing to do
  * < 0  Error
  */
-s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec, u64 loc, int flags)
+static s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
+	u64 loc, int flags)
 {
 	int i;
 	s64 res;
@@ -763,7 +766,7 @@ s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec, u64 loc
  * = 0  Nothing to do
  * < 0  Error
  */
-s64 move_file (ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
+static s64 move_file (ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
 {
 	char *buffer;
 	ntfs_attr_search_ctx *ctx;

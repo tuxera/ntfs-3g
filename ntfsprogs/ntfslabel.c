@@ -58,7 +58,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Display, or set, the label for an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
@@ -76,7 +76,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device [label]\n"
 	       "    -n    --no-action    Do not write to disk\n"
@@ -98,7 +98,7 @@ void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char *argv[])
+static int parse_options (int argc, char *argv[])
 {
 	static const char *sopt = "-fh?nqvV";
 	static const struct option lopt[] = {
@@ -187,7 +187,7 @@ int parse_options (int argc, char *argv[])
  *
  * Print the label of the device @dev to stdout.
  */
-int print_label (ntfs_volume *vol, unsigned long mnt_flags)
+static int print_label (ntfs_volume *vol, unsigned long mnt_flags)
 {
 	int result = 0;
 	//XXX significant?
@@ -211,7 +211,7 @@ int print_label (ntfs_volume *vol, unsigned long mnt_flags)
  * Return 0 on success and -1 with errno = ENOSPC if not enough space in the
  * mft record.
  */
-int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
+static int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 new_vsize)
 {
 	int new_alen, new_muse;
@@ -246,7 +246,7 @@ int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
  *
  * Change the label on the device @dev to @label.
  */
-int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
+static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
 {
 	ntfs_attr_search_ctx *ctx = NULL;
 	uchar_t *new_label = NULL;

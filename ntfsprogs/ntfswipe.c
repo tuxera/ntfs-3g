@@ -51,7 +51,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\n%s v%s - Overwrite the unused space on an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
@@ -66,7 +66,7 @@ void version (void)
  *
  * Return:  none
  */
-void usage (void)
+static void usage (void)
 {
 	printf ("\nUsage: %s [options] device\n"
 		"    -i       --info        Show volume information (default)\n"
@@ -107,7 +107,7 @@ void usage (void)
  * Return:  0  Error, invalid string
  *	    n  Success, the count of numbers parsed
  */
-int parse_list (char *list, int **result)
+static int parse_list (char *list, int **result)
 {
 	char *ptr;
 	char *end;
@@ -167,7 +167,7 @@ int parse_list (char *list, int **result)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options (int argc, char *argv[])
+static int parse_options (int argc, char *argv[])
 {
 	static char *sopt = "-ab:c:dfh?ilmnpqtuvV";
 	static struct option lopt[] = {
@@ -350,7 +350,7 @@ int parse_options (int argc, char *argv[])
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 {
 	s64 i;
 	s64 total = 0;
@@ -404,7 +404,7 @@ free:
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return -1;
@@ -424,7 +424,7 @@ s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
 	// by considering the individual attributes we might be able to
 	// wipe a few more bytes at the attr's tail.
@@ -554,7 +554,7 @@ free:
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
 		return -1;
@@ -574,7 +574,7 @@ s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 {
 	const int NTFS_BUF_SIZE2 = 8192;
 	//FIXME(?): We might need to zero the LSN field of every single mft
@@ -675,7 +675,7 @@ error_exit:
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 {
 	// wipe completely, chkdsk doesn't do anything, booting writes header
 	const int NTFS_BUF_SIZE2 = 4096;
@@ -757,7 +757,7 @@ error_exit:
  * Return:  1  Success, displayed some info
  *	    0  Error, something went wrong
  */
-int ntfs_info (ntfs_volume *vol)
+static int ntfs_info (ntfs_volume *vol)
 {
 	u8 *buffer;
 
@@ -933,7 +933,7 @@ bmpdone:
  *
  * Return:  none
  */
-void print_summary (void)
+static void print_summary (void)
 {
 	int i;
 
