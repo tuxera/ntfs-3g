@@ -87,7 +87,7 @@ parameter is given in kilo-, mega- or gigabytes respectively.
 Conforming to standards, k=10^3, M=10^6 and G=10^9.
 .SH BUGS
 No bugs are known or has been reported so far in the current version.
-If you find otherwise, please report it to <linux-ntfs-dev@lists.sf.net>
+If you find otherwise, please report it to <linux-ntfs-dev@lists.sourceforge.net>
 (no subscription needed). It's also strongly advised you
 .B MAKE SURE YOU HAVE A BACKUP
 of your important data in case of an unexpected failure.
@@ -108,7 +108,7 @@ man page formed the basis of this page.
 .SH AVAILABILITY
 .B ntfsresize
 is part of the linux-ntfs package and is available from
-http://linux-ntfs.sf.net/ as source and pre-compiled binary.
+http://linux-ntfs.sourceforge.net/ as source and pre-compiled binary.
 .SH SEE ALSO
 .BR fdisk (8),
 .BR cfdisk (8),
