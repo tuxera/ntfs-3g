@@ -973,7 +973,8 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 add_attr_record:
-	if (attr_rec_size == offsetof(ATTR_RECORD, resident_end)) {
+	if (attr_rec_size == offsetof(ATTR_RECORD, resident_end) +
+			((name_len * sizeof(ntfschar) + 7) & ~7)) {
 		/* Add resident attribute. */
 		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
 				name_len, 0);
