@@ -2322,6 +2322,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		return -1;
 	}
 	
+	dataruns_size = (dataruns_size + 7) & ~7;
+	
 	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
@@ -2358,10 +2360,11 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->lowest_vcn = cpu_to_le64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
 	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
-	memcpy((u8*)a + le16_to_cpu(a->name_offset), name,
-					sizeof(ntfschar) * name_len);
+	if (name_len)
+		memcpy((u8*)a + le16_to_cpu(a->name_offset),
+			name, sizeof(ntfschar) * name_len);
 	m->next_attr_instance =
-		cpu_to_le16(le16_to_cpu(m->next_attr_instance) + 1);
+		cpu_to_le16((le16_to_cpu(m->next_attr_instance) + 1) & 0xffff);
 	if (ntfs_attrlist_entry_add(ni, a)) {
 		err = errno;
 		ntfs_attr_record_resize(m, a, 0);
@@ -2397,6 +2400,7 @@ put_err_out:
  */
 int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 {
+	Dprintf("%s(): Entering for new_size %u.\n",  __FUNCTION__, new_size);
 	/* Align to 8 bytes, just in case the caller hasn't. */
 	new_size = (new_size + 7) & ~7;
 	/* If the actual attribute length has changed, move things around. */
@@ -3533,6 +3537,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				goto rollback;
 			}
 			m = ni->mrec;
+			/* Clean directory flag. */
+			m->flags &= ~MFT_RECORD_IS_DIRECTORY;
 			/*
 			 * If mapping size exceed avaible space, set them to
 			 * possible maximum.
