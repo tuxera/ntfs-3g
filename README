@@ -15,7 +15,7 @@ read the GNU General Public License to be found in the file COPYING in the main
 Linux-NTFS distribution directory.
  
 Linux-NTFS currently consists of the NTFS library (libntfs) and utilities
-(ntfstools). In the future it will also contain a new NTFS driver for the
+(ntfsprogs). In the future it will also contain a new NTFS driver for the
 Linux kernel.
 
 The Linux-NTFS project is registered on Sourceforge.net. The home page for
@@ -36,16 +36,16 @@ volume). The easiest way to do this is to visit the list page on sourceforge at:
 NTFS library
 ============
 
-Provides common NTFS access functions to the ntfstools and other foreign
+Provides common NTFS access functions to the ntfsprogs and other foreign
 open source applications. Note, that the library is still under heavy
 development and doesn't include the majority of functionality yet. It only
-is capable of just about supporting the current ntfstools, so I wouldn't 
+is capable of just about supporting the current ntfsprogs, so I wouldn't 
 recommend using it for your own applications at this stage.
 
 NTFS utilities
 ==============
 
-The ntfstools will eventually include utilities for doing all required tasks
+The ntfsprogs will eventually include utilities for doing all required tasks
 to NTFS partitions. In general, just run a utility without any command line
 options to display the version number and usage syntax.
 

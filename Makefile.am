@@ -6,11 +6,11 @@ else
 AM_CFLAGS = -D_FILE_OFFSET_BITS=64
 endif
 
-SUBDIRS = doc include libntfs ntfstools
+SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh linux-ntfs.spec.in \
-		TODO.ntfstools
+		TODO.ntfsprogs
 
 AUTOMAKE_OPTIONS = gnu
 
@@ -21,5 +21,5 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
 strip:
-	$(MAKE) -C ntfstools strip
+	$(MAKE) -C ntfsprogs strip
 

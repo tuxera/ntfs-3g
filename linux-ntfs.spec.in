@@ -63,7 +63,7 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files
 %defattr(-,root,root)
-%doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfstools doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
+%doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
 %{bindir}/*
 %{sbindir}/*
 %{mandir}/*/*
