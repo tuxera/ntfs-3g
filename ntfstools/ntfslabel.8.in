@@ -1,0 +1,54 @@
+.\" -*- nroff -*-
+.\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\" Adapted from e2fsprogs-1.26/misc/e2label.8.in by Theodore Ts'o.
+.\" 
+.TH NTFSLABEL 8 "April 2002" "Linux-NTFS version @VERSION@"
+.SH NAME
+ntfslabel \- display/change the label on an ntfs file system
+.SH SYNOPSIS
+.B ntfslabel
+.I device
+[
+.I new-label
+]
+.SH DESCRIPTION
+.B ntfslabel
+will display or change the file system label on the ntfs file system located on
+.IR device .
+.PP
+If the optional argument
+.I new-label
+is not present,
+.B ntfslabel
+will simply display the current file system label.
+.PP
+If the optional argument
+.I new-label
+is present, then
+.B ntfslabel
+will set the file system label to be
+.IR new-label .
+NTFS file system labels can be at most 128 Unicode characters long; if
+.I new-label
+is longer than 128 Unicode characters,
+.B ntfslabel
+will truncate it and print a warning message.
+.PP
+It is also possible to set the file system label using the
+.B \-L
+option of
+.BR mkntfs (8)
+during creation of the file system.
+.PP
+.SH AUTHOR
+.B ntfslabel 
+was written by Matthew J. Fanto (fanto1mj@cmich.edu). This man page was written
+by Anton Altaparmakov (aia21@cantab.net).
+.SH AVAILABILITY
+.B ntfslabel
+is part of the linux-ntfs package and is available from 
+http://linux-ntfs.sourceforge.net/.
+.SH SEE ALSO
+.BR mkntfs (8)
+
