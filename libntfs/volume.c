@@ -105,9 +105,6 @@ static void __ntfs_volume_release(ntfs_volume *v)
 	free(v);
 }
 
-/* External declaration for internal function. */
-extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *);
-
 /**
  * Internal:
  *
