@@ -5,7 +5,7 @@ Linux-NTFS
 The Linux-NTFS project aims to bring full support for the NTFS filesystem to
 the Linux operating system.
 
-Linux-NTFS is copyright (c) 2000-2002 Anton Altaparmakov.
+Linux-NTFS is copyright (c) 2000-2003 Anton Altaparmakov.
 
 All of the contents of the Linux-NTFS project are free software, released under
 the GNU General Public License and you are welcome to redistribute them under
@@ -37,10 +37,8 @@ NTFS library
 ============
 
 Provides common NTFS access functions to the ntfsprogs and other foreign
-open source applications. Note, that the library is still under heavy
-development and doesn't include the majority of functionality yet. It only
-is capable of just about supporting the current ntfsprogs, so I wouldn't 
-recommend using it for your own applications at this stage.
+open source applications. Note, that the library is still under development and
+a lot of functionality is not yet included.
 
 NTFS utilities
 ==============
@@ -52,7 +50,7 @@ options to display the version number and usage syntax.
 The following utilities are so far implemented:
 
 NtfsFix - Attempt to fix an NTFS partition that has been damaged by the Linux
-NTFS driver. Note that you should run it every time after you have used the
+NTFS driver. Note that you should run it every time after you have used the old
 Linux NTFS driver to write to an NTFS partition to prevent massive data
 corruption from happening when Windows mounts the partition.
 IMPORTANT: Run this only *after* unmounting the partition in Linux but *before*
