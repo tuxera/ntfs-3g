@@ -55,7 +55,9 @@
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
+#ifdef DEBUG
 static const char *UNNAMED   = "<unnamed>";
+#endif
 static const char *NONE      = "<none>";
 static const char *UNKNOWN   = "unknown";
 static struct options opts;
