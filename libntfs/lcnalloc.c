@@ -2,6 +2,7 @@
  * lcnalloc.c - Cluster (de)allocation code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,6 +40,7 @@
  * @count:	number of clusters to allocate
  * @start_lcn:	starting lcn at which to allocate the clusters (or -1 if none)
  * @zone:	zone from which to allocate the clusters
+ * @start_vcn:	
  *
  * Allocate @count clusters preferably starting at cluster @start_lcn or at the
  * current allocator position if @start_lcn is -1, on the mounted ntfs volume
@@ -108,6 +110,24 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		fprintf(stderr, "%s(): Invalid arguments!\n", __FUNCTION__);
 		errno = EINVAL;
 		return NULL;
+	}
+	
+	/* Return empty runlist if @count == 0 */
+	if (!count) {
+		rl = malloc (0x1000);
+		if (!rl)
+			return NULL;
+		rlpos = 0;
+		if (start_vcn) {
+			rl[0].vcn = 0;
+			rl[0].lcn = LCN_RL_NOT_MAPPED;
+			rl[0].length = start_vcn;
+			rlpos++;
+		}
+		rl[rlpos].vcn = start_vcn;
+		rl[rlpos].lcn = LCN_ENOENT;
+		rl[rlpos].length = 0;
+		return rl;
 	}
 
 	/* Allocate memory. */
@@ -754,16 +774,10 @@ err_ret:
 					(long long)rl[0].lcn,
 					(long long)count - clusters);
 		}
-//FIXME: We don't have an attribute just a run list here! Also rl is not
-//	 terminated at this moment in time! (AIA)
-#if 0
 		/* Deallocate all allocated clusters. */
 		Dprintf("%s(): Deallocating allocated clusters.\n",
 				__FUNCTION__);
-		ntfs_cluster_free(vol, attrib_with_rl, 0, -1);
-#endif
-		fprintf(stderr, "%s(): Eeek! Leaving inconsistent metadata.\n",
-				__FUNCTION__);
+		ntfs_cluster_free_from_rl (vol, rl);
 		/* Free the runlist. */
 		free(rl);
 		rl = NULL;
@@ -777,6 +791,33 @@ err_ret:
 	}
 	Dprintf("%s(): rl = NULL, going to done_err_ret.\n", __FUNCTION__);
 	goto done_err_ret;
+}
+
+/**
+ * ntfs_cluster_free_from_rl - free clusters from runlist
+ * @vol:	mounted ntfs volume on which to free the clusters
+ * @rl:		runlist from which deallocate clusters
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
+{
+	while (rl->length) {
+		if (rl->lcn < 0) {
+			rl++;
+			continue;
+		}
+		if (ntfs_bitmap_clear_run(vol->lcnbmp_na,
+						rl->lcn, rl->length)) {
+			int eo = errno;
+			fprintf(stderr, "%s(): Eeek! Deallocation of "
+					"clusters failed.\n", __FUNCTION__);
+			errno = eo;
+			return -1;
+		}
+		rl++;
+	}
+	return 0;
 }
 
 /**
