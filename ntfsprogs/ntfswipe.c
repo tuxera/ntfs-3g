@@ -55,8 +55,7 @@ void version (void)
 {
 	printf ("\n%s v%s - Overwrite the unused space on an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2002-2003 Richard Russon\n");
+	printf ("Copyright (c) 2002-2003 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -351,13 +350,47 @@ int parse_options (int argc, char *argv[])
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_unused (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 {
+	u64 i;
+	u64 total = 0;
+	u64 result = 0;
+	u8 *buffer = NULL;
+
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
+
+	if (act != act_info) {
+		buffer = malloc (vol->cluster_size);
+		if (!buffer) {
+			Eprintf ("malloc failed\n");
+			return -1;
+		}
+		memset (buffer, byte, vol->cluster_size);
+	}
+
+	for (i = 0; i < vol->nr_clusters; i++) {
+		if (utils_cluster_in_use (vol, i)) {
+			//Vprintf ("cluster %lld is in use\n", i);
+			continue;
+		}
+
+		if (act != act_wipe) {
+			//Vprintf ("cluster %lld is not in use\n", i);
+			result = ntfs_pwrite (vol->dev, vol->cluster_size * i, vol->cluster_size, buffer);
+			if (result != vol->cluster_size) {
+				Eprintf ("write failed\n");
+				goto free;
+			}
+		}
+
+		total += vol->cluster_size;
+	}
 
 	Qprintf ("wipe_unused 0x%02x\n", byte);
-	return 1;
+free:
+	free (buffer);
+	return total;
 }
 
 /**
@@ -371,13 +404,13 @@ int wipe_unused (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_tails (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
 
-	Qprintf ("wipe_tails 0x%02x\n", byte);
-	return 1;
+	Qprintf ("wipe_tails (not implemented) 0x%02x\n", byte);
+	return 0;
 }
 
 /**
@@ -391,13 +424,36 @@ int wipe_tails (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_mft (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
+	u64 i;
+	u64 total = 0;
+	u8 *buffer = NULL;
+
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
+
+	if (act == wipe) {
+		buffer = malloc (vol->mft_record_size);
+		if (!buffer) {
+			Eprintf ("malloc failed\n");
+			return -1;
+		}
+	}
+
+	for (i = 0; i < vol->nr_mft_records; i++) {
+		if (utils_mftrec_in_use (vol, i)) {
+			total += 300;		// some token amount?
+		} else {
+			if (act == act_info) {
+				total += vol->mft_record_size;
+				continue;
+			}
+		}
+	}
 
 	Qprintf ("wipe_mft 0x%02x\n", byte);
-	return 1;
+	return total;
 }
 
 /**
@@ -411,13 +467,13 @@ int wipe_mft (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_directory (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
 
-	Qprintf ("wipe_directory 0x%02x\n", byte);
-	return 1;
+	Qprintf ("wipe_directory (not implemented) 0x%02x\n", byte);
+	return 0;
 }
 
 /**
@@ -431,13 +487,13 @@ int wipe_directory (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_logfile (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
 
-	Qprintf ("wipe_logfile 0x%02x\n", byte);
-	return 1;
+	Qprintf ("wipe_logfile (not implemented) 0x%02x\n", byte);
+	return 0;
 }
 
 /**
@@ -451,13 +507,13 @@ int wipe_logfile (ntfs_volume *vol, int byte, enum action act)
  * Return:  1  Success, the clusters were wiped
  *	    0  Error, something went wrong
  */
-int wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
+s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 {
 	if (!vol || (byte < 0))
-		return 0;
+		return -1;
 
-	Qprintf ("wipe_pagefile 0x%02x\n", byte);
-	return 1;
+	Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
+	return 0;
 }
 
 
@@ -805,6 +861,8 @@ int main (int argc, char *argv[])
 			if (act == act_info)
 				break;
 		}
+
+		printf ("%llu bytes were wiped\n", total);
 	}
 
 	result = 0;
