@@ -1,0 +1,349 @@
+.\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\" 
+.TH NTFSUNDELETE 8 "June 2002" "Linux\-NTFS version @VERSION@"
+.SH NAME
+ntfsundelete \- recover a deleted file from an NTFS volume.
+.SH SYNOPSIS
+.B ntfsundelete
+[
+.I options
+]
+.B device
+.SH DESCRIPTION
+.B ntfsundelete
+has three modes of operation:
+.IR scan ,
+.I undelete
+and
+.IR copy .
+.SS Scan
+.PP
+The default mode,
+.I scan
+simply reads an NTFS Volume and looks for files that have been deleted.  Then it
+will print a list giving the inode number, name and size.
+.SS Undelete
+.PP
+The
+.I undelete
+mode takes the inode and recovers as much of the data as possible.  It save the
+result to another location.  Partly for safety, but mostly because NTFS write
+support isn't finished.
+.SS Copy
+.PP
+This is a wizard's option.  It will save a portion of the MFT to a file.  This
+probably only be useful when debugging
+.I ntfsundelete
+.SS Notes
+.B ntfsundelete
+only ever
+.B reads
+from the NTFS Volume.
+.B ntfsundelete
+will never change the volume.
+.SH CAVEATS
+.SS Miracles
+.B ntfsundelete
+cannot perform the impossible.
+.PP
+When a file is deleted the MFT Record is marked as not in use and the bitmap
+representing the disk usage is updated.  If the power isn't turned off
+immediately, the free space, where the file used to live, may become
+overwritten.  Worse, the MFT Record may be reused for another file.  If this
+happens it is impossible to tell where the file was on disk.
+.PP 
+Even if all the clusters of a file are not in use, there is no guarantee that
+they haven't been overwritten by some short\-lived file.
+.SS Locale
+In NTFS all the filenames are stored as Unicode.  They will be converted into
+the current locale for display by
+.BR ntfsundelete .
+The utility has successfully displayed some Chinese pictogram filenames and then
+correctly recovered them.
+.SS Extended MFT Records
+In rare circumstances, a single MFT Record will not be large enough to hold the
+metadata describing a file (a file would have to be in hundreds of fragments
+for this to happen).  In these cases one MFT record may hold the filename, but
+another will hold the information about the data.
+.B ntfsundelete
+will not try and piece together such records.  It will simply show unnamed files
+with data.
+.SS Compressed and Encrypted Files
+.B ntfsundelete
+cannot recover compressed or encrypted files.  When scanning for them, it will
+display as being 0% recoverable.
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfsundelete
+accepts.  All options have two equivalent names.  The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
+.TP
+.BI "\-b " num
+.br
+.ns
+.TP
+.BI "\-\-byte " num
+If any clusters of the file cannot be recovered, the missing parts will be
+filled with this byte.  The default is zeros.
+.TP
+.B \-C
+.br
+.ns
+.TP
+.B \-\-case
+When scanning an NTFS volume, any filename matching (using the
+.B \-\-match
+option) is case\-insensitive.  This option makes the maching case\-sensitive.
+.TP
+.BI "\-c " range
+.br
+.ns
+.TP
+.BI "\-\-copy " range
+This wizard's option will write a block of MFT FILE records to a file.  The
+default file is
+.I mft
+which will be created in the current directory.  This option can be combined
+with the
+.B \-\-output
+and
+.B \-\-destination
+options.
+.TP
+.BI "\-d " dir
+.br
+.ns
+.TP
+.BI "\-\-destination " dir
+This option controls where to put the output file of the
+.B \-\-undelete
+and
+.B \-\-copy
+options.  
+.TP
+.B \-f
+.br
+.ns
+.TP
+.B \-\-force
+This will override some sensible defaults, such as not overwriting an existing
+file.  Use this option with caution.
+.TP
+.B \-h
+.br
+.ns
+.TP
+.B \-\-help
+Show a list of options with a brief description of each one.
+.TP
+.BI "\-m " pattern
+.br
+.ns
+.TP
+.BI "\-\-match " pattern
+Filter the output of the
+.B \-\-scan
+option, by only looking for matching filenames.  The pattern can include the
+wildcards '?', match exactly one character or '*', match zero or more
+characters.  By default the matching is case\-insensitive.  To make the search
+case sensitive, use the
+.B \-\-case
+option.
+.TP
+.BI "\-o " file
+.br
+.ns
+.TP
+.BI "\-\-output " file
+Use this option to set name of output file that
+.B \-\-undelete
+or
+.B \-\-copy
+will create.
+.TP
+.BI "\-p " num
+.br
+.ns
+.TP
+.BI "\-\-percentage " num
+Filter the output of the
+.B \-\-scan
+option, by only matching files with a certain amount of recoverable content.
+.B Please read the caveats section for more details.
+.TP
+.BI \-q
+.br
+.ns
+.TP
+.BI \-\-quiet
+Reduce the amount of output to a minimum.  Naturally, it doesn't make sense to
+combine this option with
+.BR \-\-scan .
+.TP
+.B \-s
+.br
+.ns
+.TP
+.B \-\-scan
+Search through an NTFS volume and print a list of files that could be recovered.
+This is the default action of
+.BR ntfsundelete .
+This list can be filtered by filename, size, percentage recoverable or last
+modification time, using the
+.BR \-\-match ,
+.BR \-\-size ,
+.B \-\-percent
+and
+.B \-\-time
+options, respectively.
+.sp
+The output to scan will be:
+.sp
+.br
+Inode Flags  %age    Date    Size   Filename
+.br
+----------------------------------------------
+.br
+6038  FN..   93%  2002-07-17 26629  thesis.doc
+.br
+.RS
+.TP
+The flags field can display:
+F/D \- File/Directory
+.br
+N/R \- (Non-)Resident data stream
+.br
+C/E \- Compressed/Encrypted data stream
+.br
+!   \- Missing attributes
+.sp
+.RE
+.RS
+The percentage field shows how much of the file can potentially be recovered.
+.sp
+.br
+.RE
+.RE
+.BI "\-S " range
+.br
+.ns
+.TP
+.BI "\-\-size " range
+Filter the output of the
+.B \-\-scan
+option, by looking for a particular range of file sizes.  The range may be
+specified as two numbers separated by a '\-'.  The sizes may be abbreviated
+using the suffixes k, m, g, t, for kilobytes, megabytes, gigabytes and terabytes
+respectively.
+.TP
+.BI "\-t " since
+.br
+.ns
+.TP
+.BI "\-\-time " since
+Filter the output of the
+.B \-\-scan
+option.  Only match files that have been altered since this time.  The time must
+be given as number using a suffix of d, w, m, y for days, weeks, months or years
+ago.
+.TP
+.BI "\-u " num
+.br
+.ns
+.TP
+.BI "\-\-undelete " num
+Recover the file with this inode number.  This option can be combined with
+.BR \-\-output ,
+.BR \-\-destination ,
+and
+.BR \-\-byte .
+.TP
+.B \-v
+.br
+.ns
+.TP
+.B \-\-verbose
+Increase the amount of output that
+.B ntfsundelete
+prints.
+.TP
+.B \-V
+.br
+.ns
+.TP
+.B \-\-version
+Show the version number, copyright and license
+.BR ntfsundelete .
+.SH EXAMPLES
+Look for deleted files on /dev/hda1.
+.RS
+.sp
+.B ntfsundelete /dev/hda1
+.sp
+.RE
+Look for deleted documents on /dev/hda1.
+.RS
+.sp
+.B ntfsundelete /dev/hda1 -s \-m '*.doc'
+.sp
+.RE
+Look for deleted files between 5000 and 6000000 bytes, with at least 90% of the
+data recoverable, on /dev/hda1.
+.RS
+.sp
+.B ntfsundelete /dev/hda1 \-S 5k\-6m \-p 90
+.sp
+.RE
+Look for deleted files altered in the last two days
+.RS
+.sp
+.B ntfsundelete /dev/hda1 \-t 2d
+.sp
+.RE
+Undelete inode number 3689, call the file 'work.doc' and put it in the user's
+home directory.
+.RS
+.sp
+.B ntfsundelete /dev/hda1 \-u 3689 \-o work.doc \-d ~
+.sp
+.RE
+Save MFT Records 3689 to 3690 to a file 'debug'
+.RS
+.sp
+.B ntfsundelete /dev/hda1 \-c 3689\-3690 \-o debug
+.RE
+.SH BUGS
+There are some small limitations to this program, but currently no known bugs.
+If you find one, please send an email to
+.nh
+<linux-ntfs-dev@lists.sf.net>
+.hy
+.SH AUTHOR
+.B ntfsundelete
+was written by Richard Russon (FlatCap) <ntfs@flatcap.org>
+.br
+If you find this tool useful, make FlatCap happy and send him an email.
+.SH AVAILABILITY
+.B ntfsundelete
+is part of the linux\-ntfs package and is available from 
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/downloads.html
+.hy
+This manual page is available online at:
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/tools/ntfsundelete.html
+.hy
+.SH SEE ALSO
+.BR ntfsinfo(8)
+.br
