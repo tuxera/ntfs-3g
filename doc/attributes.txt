@@ -49,7 +49,7 @@ the location of each attribute.
 
 The attribute list attribute lists all attributes that belong to this mft
 record (with the exception of itself). Each entry in the attribute list
-describes the attribute listed and in which mft record it's attribute header can
+describes the attribute listed and in which mft record its attribute header can
 be found. For resident attributes this will be the same number as the base mft
 record in which the attribute list attribute is located itself. For non-resident
 attributes, this will be another mft record, called an extension mft record.
@@ -59,14 +59,14 @@ Only one attribute is stored in an extension mft record, even if the attribute
 is very small. At least this is the case with Windows NT4 SP6a driver.
 
 Should the mapping pairs array of an attribute become so large as to not fit
-into an extenstion mft record, even though it's attribute is the only attribute
+into an extenstion mft record, even though its attribute is the only attribute
 in this extension record, then the attribute is splitt into several extents.
-The first extent starts at vcn 0 and has it's lowest vcn value set to zero and
-continues up to it's highest vcn value. This is determined by splitting up the
+The first extent starts at vcn 0 and has its lowest vcn value set to zero and
+continues up to its highest vcn value. This is determined by splitting up the
 mapping pairs array into chunks which just fit into an extension mft record
 each. Thus the first mapping pairs array chunk will determine the value of
 the highest vcn for the first extent. The attribute list will contain an entry
-for this extent. Then, a second extent is created which has it's lowest vcn
+for this extent. Then, a second extent is created which has its lowest vcn
 value set to the highest vcn of the previous extent + 1 and the next chunk of
 the mapping pairs array is inserted into this extent. Again, an entry for this
 extent is placed into the attribute list, and so on, until the whole
@@ -105,7 +105,7 @@ Since NTFS 3.0, the attribute value of each $DATA attribute can be encrypted,
 to protect the contents from spying eyes. If this is the case, the
 ATTR_IS_ENCRYPTED flag is set.
 
-FIXME: Write notes on attribute encryption. The descussions from the articles
+FIXME: Write notes on attribute encryption. The discussions from the articles
 "Inside the Encrypting File System" in Windows NT magazine (?) are very good
 starting points. (AIA)
 
