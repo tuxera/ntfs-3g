@@ -66,8 +66,8 @@ struct ntfs_dt {
 	INDEX_ENTRY	**children;
 	struct ntfs_dt	**sub_nodes;
 	ntfs_inode	**inodes;
-	INDEX_HEADER	 *header;
 	VCN		  vcn;
+	INDEX_HEADER	 *header;
 	BOOL		  changed;
 };
 
@@ -79,16 +79,17 @@ struct ntfs_dir {
 	struct ntfs_dir	  *parent;
 	ntfschar	  *name;
 	int		   name_len;
+	MFT_REF		   mft_num;
 	struct ntfs_dt	  *index;
 	struct ntfs_dir	 **children;
 	int		   child_count;
-	MFT_REF		   mft_num;
 	struct mft_bitmap *bitmap;
 	ntfs_inode	  *inode;
 	ntfs_attr	  *iroot;
 	ntfs_attr	  *ialloc;
 	ntfs_attr	  *ibmp;
 	int                index_size;
+	u8		   padding[4];	/* Unused: padding to 64 bit. */
 };
 
 /**

@@ -88,11 +88,13 @@ struct {
 	int show_progress;
 	s64 bytes;
 	char *volume;
+	u8 padding[4];		/* Unused: padding to 64 bit. */
 } opt;
 
 struct bitmap {
-	u8 *bm;
 	s64 size;
+	u8 *bm;
+	u8 padding[4];		/* Unused: padding to 64 bit. */
 };
 
 #define NTFS_PROGBAR		0x0001
@@ -104,6 +106,7 @@ struct progress_bar {
 	int resolution;
 	int flags;
 	float unit;
+	u8 padding[4];		/* Unused: padding to 64 bit. */
 };
 
 struct llcn_t {
@@ -124,9 +127,8 @@ typedef struct {
 
 typedef struct {
 	ntfs_volume *vol;
-	s64 new_volume_size;	     /* in clusters; 0 = --info w/o --size */
-	int shrink;		     /* shrink = 1, enlarge = 0 */
 	ntfs_inode *ni;		     /* inode being processed */
+	s64 new_volume_size;	     /* in clusters; 0 = --info w/o --size */
 	MFT_REF mref;                /* mft reference */
 	MFT_RECORD *mrec;            /* mft record */
 	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
@@ -135,6 +137,7 @@ typedef struct {
 	runlist mftmir_rl;	     /* $MFTMirr AT_DATA's new position */
 	s64 mftmir_old;		     /* $MFTMirr AT_DATA's old LCN */
 	int dirty_inode;	     /* some inode data got relocated */
+	int shrink;		     /* shrink = 1, enlarge = 0 */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */

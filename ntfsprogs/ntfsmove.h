@@ -33,12 +33,13 @@
 struct options {
 	char		*device;	/* Device/File to work with */
 	char		*file;		/* File to display */
+	s64		 location;	/* Where to place the file */
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
 	int		 noaction;	/* Do not write to disk */
 	int		 nodirty;	/* Do not mark volume dirty */
-	s64		 location;	/* Where to place the file */
+	u8 		 padding[4];	/* Unused: alignment to 64 bit. */
 };
 
 #endif /* _NTFSMOVE_H_ */

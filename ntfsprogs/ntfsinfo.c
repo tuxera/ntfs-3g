@@ -68,14 +68,15 @@
 static const char *EXEC_NAME = "ntfsinfo";
 
 static struct options {
-	char	*device;	/* Device/File to work with */
+	const char *device;	/* Device/File to work with */
+	const char *filename;	/* Resolve this filename to mft number */
 	s64	 inode;		/* Info for this inode */
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
 	int	 notime;	/* Don't report timestamps at all */
 	int	 mft;		/* Dump information about the volume as well */
-	const char *filename;
+	u8	 padding[4];	/* Unused: padding to 64 bit. */
 } opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)

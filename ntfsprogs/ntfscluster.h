@@ -52,10 +52,11 @@ struct options {
 
 struct match {
 	u64		 inum;		/* Inode number */
-	ATTR_TYPES	 type;		/* Attribute type */
-	ntfschar		*name;		/* Attribute name */
-	int		 name_len;	/* Length of attribute name */
 	LCN		 lcn;		/* Last cluster in use */
+	ATTR_TYPES	 type;		/* Attribute type */
+	ntfschar	*name;		/* Attribute name */
+	int		 name_len;	/* Length of attribute name */
+	u8		 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 #endif /* _NTFSCLUSTER_H_ */

@@ -43,7 +43,6 @@ struct options {
 	int		 uinode;	/* Undelete this inode */
 	char		*dest;		/* Save file to this directory */
 	char		*output;	/* With this filename */
-	char		 fillbyte;	/* Use for unrecoverable sections */
 	char		*match;		/* Pattern for filename matching */
 	int		 match_case;	/* Case sensitive matching */
 	int		 truncate;	/* Truncate files to exact size. */
@@ -56,13 +55,13 @@ struct options {
 	s64		 size_end;
 	s64		 mft_begin;	/* Range for mft copy */
 	s64		 mft_end;
+	char		 fillbyte;	/* Use for unrecoverable sections */
+	char		 padding[7];	/* Unused: padding to 64 bit. */
 };
 
 struct filename {
 	struct list_head list;		/* Previous/Next links */
-	char		*name;		/* Filename in current locale */
-	FILE_NAME_TYPE_FLAGS name_space;
-	ntfschar		*uname;		/* Filename in unicode */
+	ntfschar	*uname;		/* Filename in unicode */
 	int		 uname_len;	/* and its length */
 	long long	 size_alloc;	/* Allocated size (multiple of cluster size) */
 	long long	 size_data;	/* Actual size of data */
@@ -71,6 +70,9 @@ struct filename {
 	time_t		 date_a;	/*	altered */
 	time_t		 date_m;	/*	mft record changed */
 	time_t		 date_r;	/*	read */
+	char		*name;		/* Filename in current locale */
+	FILE_NAME_TYPE_FLAGS name_space;
+	char		 padding[7];	/* Unused: padding to 64 bit. */
 };
 
 struct data {
@@ -88,6 +90,7 @@ struct data {
 	runlist_element *runlist;	/* Decoded data runs */
 	int		 percent;	/* Amont potentially recoverable */
 	void		*data;		/* If resident, a pointer to the data */
+	char		 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 struct ufile {
@@ -100,6 +103,7 @@ struct ufile {
 	int		 attr_list;	/* MFT record may be one of many */
 	int		 directory;	/* MFT record represents a directory */
 	MFT_RECORD	*mft;		/* Raw MFT record */
+	char		 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 #endif /* _NTFSUNDELETE_H_ */
