@@ -12,13 +12,14 @@ endif
 LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
-sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone
+sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
+			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsrm ntfscp ntfsmftalloc
+			  ntfsrm ntfsmftalloc
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
-			  ntfsclone.8 ntfscluster.8 ntfscat.8
+			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
@@ -68,6 +69,10 @@ ntfscat_SOURCES		= ntfscat.c ntfscat.h utils.c utils.h
 ntfscat_LDADD		= $(AM_LIBS)
 ntfscat_LDFLAGS		= $(AM_LFLAGS)
 
+ntfscp_SOURCES		= ntfscp.c utils.c utils.h
+ntfscp_LDADD		= $(AM_LIBS)
+ntfscp_LDFLAGS		= $(AM_LFLAGS)
+
 # We don't distribute these
 
 ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
@@ -93,10 +98,6 @@ ntfswipe_LDFLAGS	= $(AM_LFLAGS)
 ntfsdump_logfile_SOURCES= ntfsdump_logfile.c
 ntfsdump_logfile_LDADD	= $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
-
-ntfscp_SOURCES		= ntfscp.c utils.c utils.h
-ntfscp_LDADD		= $(AM_LIBS)
-ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
 # Extra targets
 
