@@ -2591,7 +2591,30 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	}
 	if (type == AT_ATTRIBUTE_LIST || !NInoAttrList(base_ni))
 		return 0;
-	// FIXME: Remove $ATTRIBUTE_LIST if no extents left or it is size == 0.
+	if (!ntfs_attrlist_need(base_ni)) {
+		ntfs_attr_reinit_search_ctx(ctx);
+		if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, IGNORE_CASE,
+				0, NULL, 0, ctx)) {
+			/*
+			 * FIXME: Should we succeed here? Definitely something
+			 * goes wrong because NInoAttrList(base_ni) returned
+			 * that we have got attribute list.
+			 */
+			Dprintf("%s(): Coudn't find attribute list. Succeed "
+				"anyway.\n", __FUNCTION__);
+			return 0;
+		}
+		if (ntfs_attr_record_rm(ctx)) {
+			/*
+			 * FIXME: Should we succeed here? BTW, chkdsk doesn't
+			 * complain if it find MFT record with attribute list,
+			 * but wothout extents.
+			 */
+			Dprintf("%s(): Coudn't remove attribute list. Succeed "
+				"anyway.\n", __FUNCTION__);
+			return 0;
+		}
+	}
 	return 0;
 }
 
