@@ -214,8 +214,9 @@ static inline void NAttrSet##flag(ntfs_attr *na)		\
 	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
 		NInoSet##flag(na->ni);				\
 	else							\
-		Dprintf("%s(): BUG! Called for named data "	\
-			"attribute.\n", __FUNCTION__);		\
+		Dprintf("%s(): BUG! Should be called only for "	\
+			"unnamed data attribute.\n",		\
+			__FUNCTION__);				\
 }								\
 static inline void NAttrClear##flag(ntfs_attr *na)		\
 {								\
