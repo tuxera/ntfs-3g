@@ -1261,11 +1261,15 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 	int rls;
 
 	if (start_vcn < 0) {
+		Dprintf("%s(): start_vcn %lld (should be >= 0)",
+			__FUNCTION__, (long long) start_vcn);
 		errno = EINVAL;
 		return -1;
 	}
 	if (!rl) {
 		if (start_vcn) {
+			Dprintf("%s(): rl NULL, start_vcn %lld (should be > 0)",
+				__FUNCTION__, (long long) start_vcn);
 			errno = EINVAL;
 			return -1;
 		}
@@ -1396,7 +1400,7 @@ err_out:
  * @dst_len:	size of destination buffer @dst in bytes
  * @rl:		runlist for which to build the mapping pairs array
  * @start_vcn:	vcn at which to start the mapping pairs array
- * @stop_vcn:	first vcn outside destination buffer on on ENOSPC error
+ * @stop_vcn:	first vcn outside destination buffer on success or ENOSPC error
  *
  * Create the mapping pairs array from the runlist @rl, starting at vcn
  * @start_vcn and save the array in @dst.  @dst_len is the size of @dst in
@@ -1405,12 +1409,12 @@ err_out:
  *
  * If @rl is NULL, just write a single terminator byte to @dst.
  *
- * On error ENOSPC, if @stop_vcn is not NULL, *@stop_vcn is set to the first
- * vcn outside the destination buffer.  Note that @dst has been filled with all
- * the mapping pairs that will fit, thus it can be treated as partial success,
- * in that a new attribute extent needs to be created or the next extent has to
- * be used and the mapping pairs build has to be continued with @start_vcn set
- * to *@stop_vcn.
+ * On success or ENOSPC error, if @stop_vcn is not NULL, *@stop_vcn is set to
+ * the first vcn outside the destination buffer. Note that on error @dst has
+ * been filled with all the mapping pairs that will fit, thus it can be treated
+ * as partial success, in that a new attribute extent needs to be created or the
+ * next extent has to be used and the mapping pairs build has to be continued
+ * with @start_vcn set to *@stop_vcn.
  *
  * Return 0 on success.  On error, return -1 with errno set to the error code.
  * The following error codes are defined:
@@ -1433,8 +1437,12 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 	if (!rl) {
 		if (start_vcn)
 			goto val_err;
-		if (dst_len < 1)
-			goto size_err;
+		if (stop_vcn)
+			*stop_vcn = 0;
+		if (dst_len < 1) {
+			errno = ENOSPC;
+			return -1;
+		}
 		/* Terminator byte. */
 		*dst = 0;
 		return 0;
@@ -1528,12 +1536,17 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		/* Position at next mapping pairs array element. */
 		dst += 1 + len_len + lcn_len;
 	}
+	/* Set stop vcn. */
+	if (stop_vcn)
+		*stop_vcn = rl->vcn;
 	/* Add terminator byte. */
 	*dst = 0;
 	return 0;
 size_err:
+	/* Set stop vcn. */
 	if (stop_vcn)
 		*stop_vcn = rl->vcn;
+	/* Add terminator byte. */
 	*dst = 0;
 	errno = ENOSPC;
 	return -1;
