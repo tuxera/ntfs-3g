@@ -23,4 +23,8 @@
 #ifndef _NTFS_ATTRLIST_H
 #define _NTFS_ATTRLIST_H
 
+#include "attrib.h"
+
+extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
+
 #endif /* defined _NTFS_ATTRLIST_H */
