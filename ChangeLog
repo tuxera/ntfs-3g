@@ -1,3 +1,13 @@
+19/11/2003 - 1.8.0 - Final fixes and tidy ups.
+	- Cleanup build system wrt CFLAGS handling placing it all in one place
+	  in configure.ac and removing everything related from the Makefile.am
+	  files.
+	- Fix all compiler warnings (Richard Russon, me)
+	- Make libntfs more portable by removing the dependency on
+	  asm/byteorder.h and using <endian.h> and <byteswap.h> instead. Also
+	  adapting our endians.h appropriately. (Richard Russon)
+	- Various other small cleanups and fixes.
+
 10/11/2003 - 1.8.0beta2 - More features!
 	- Merge ntfsprogs-gnomevfs written by Jan Kratochvil.
 
