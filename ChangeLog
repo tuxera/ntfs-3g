@@ -127,6 +127,7 @@ xx/xx/2005 - 2.0.0-WIP
 	  Save at least the first 16 KiB of $Logfile (the two RSTR records 
 	  should always be included if present). Save also records used for
 	  checking empty $Logfile. (Szaka)
+	- ntfscp: add ability to specify directory as destination file.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
