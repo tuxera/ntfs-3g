@@ -10,11 +10,10 @@ work with the updated ntfsresize.  (Szakacsits Szabolcs)
 ntfsprogs now should ./configure and compile cleanly on SuSE as well as RedHat
 Linux.
 
-ntfsprogs now compiles and works on FreeBSD.  Thanks to Christophe Grenier.
-
-ntfsprogs now compiles with DJGPP under DOS, too (only "make libs" target,
-which is sufficient to write DOS applications using libntfs).  Thanks to
-Christophe Grenier.
+ntfsprogs ("make libs" only) now compiles on FreeBSD, NetBSD, Windows (Cygwin),
+and DOS (DJGPP).  Thanks to Christophe Grenier for DOS and FreeBSD testing
+and fixes and to Lode Leroy for Windows testing and fixes.  Note, the Windows
+version is read-only and has limited functionality at present.
 
 Merged the NTFS Gnome VFS module by Jan Kratochvil.
 
