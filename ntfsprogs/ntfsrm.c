@@ -3997,7 +3997,8 @@ static int ntfs_index_dump_alloc (ntfs_attr *attr, VCN vcn, int indent)
 			break;
 	}
 	printf ("%.*s", indent, space_line);
-	printf ("fill = %d/%d\n", block->index.index_length, block->index.allocated_size);
+	printf ("fill = %u/%u\n", (unsigned int)block->index.index_length,
+			(unsigned int)block->index.allocated_size);
 	return 0;
 }
 

@@ -1140,10 +1140,12 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		
 		if (le32_to_cpu(ctx->mrec->bytes_in_use) + l >
 				le32_to_cpu(ctx->mrec->bytes_allocated))
-			err_exit("Extended record needed (%d > %d), not yet "
+			err_exit("Extended record needed (%u > %u), not yet "
 				 "supported!\nPlease try to free less space.\n",
-				 le32_to_cpu(ctx->mrec->bytes_in_use) + l,
-				 le32_to_cpu(ctx->mrec->bytes_allocated));
+				 (unsigned int)le32_to_cpu(ctx->mrec->
+					bytes_in_use) + l,
+				 (unsigned int)le32_to_cpu(ctx->mrec->
+					bytes_allocated));
 
 		memmove(next_attr + l, next_attr, remains_size);
 		ctx->mrec->bytes_in_use = cpu_to_le32(l +

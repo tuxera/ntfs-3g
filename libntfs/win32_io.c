@@ -696,7 +696,8 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 	numtoread.QuadPart = ((count + offset.QuadPart - 1) | 0x1FF) + 1;
 
 	Dprintf("win32_read(fd=%p,b=%p,count=0x%llx)->(%llx+%llx:%llx)\n", fd,
-			buf, count, base, offset, numtoread);
+			buf, count, base.QuadPart, offset.QuadPart,
+			numtoread.QuadPart);
 
 #ifndef FORCE_ALIGNED_READ
 	if (((((long)buf) & ((s64)0x1FF)) == 0) && ((count & ((s64)0x1FF)) == 0)
@@ -834,7 +835,7 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buf,
 	s64 bytes_written = 0;
 	HANDLE handle = ((win32_fd *)dev->d_private)->handle;
 
-	Dprintf("win32_write: Writing %ll bytes\n",count);
+	Dprintf("win32_write: Writing %lld bytes\n",count);
 	
 	if (NDevReadOnly(dev)) {
 		Dputs("win32_write: Device R/O, exiting.");
@@ -849,7 +850,8 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buf,
 
 		if (WriteFile(handle, buf, cur_count, &cur_written, NULL) &&
 		    (cur_written==cur_count)) {
-			Dprintf("win32_write: Written %u bytes.",bytes_written);
+			Dprintf("win32_write: Written %lld bytes.\n",
+				bytes_written);
 			bytes_written += cur_written;
 			count -= cur_written;
 		} else {
