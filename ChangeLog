@@ -45,6 +45,9 @@ xx/xx/2004 - 2.0.0-WIP
 	- Implement attrlist.[ch]::ntfs_attrlist_entry_rm().  (Yura)
 	- Attribute handling functions always update highest_vcn, if it was
 	  modified.  (Yura)
+	- Add new API unistr.[hc]::ntfs_ucsndup().  (Anton)
+	- Make libntfs/attrib.c::ntfs_attr_open() make a copy of the attribute
+	  name unless it is one of the internal names.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
