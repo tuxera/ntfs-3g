@@ -114,19 +114,12 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 	
 	/* Return empty runlist if @count == 0 */
 	if (!count) {
-		rl = malloc (0x1000);
+		rl = malloc(0x1000);
 		if (!rl)
 			return NULL;
-		rlpos = 0;
-		if (start_vcn) {
-			rl[0].vcn = 0;
-			rl[0].lcn = LCN_RL_NOT_MAPPED;
-			rl[0].length = start_vcn;
-			rlpos++;
-		}
-		rl[rlpos].vcn = start_vcn;
-		rl[rlpos].lcn = LCN_ENOENT;
-		rl[rlpos].length = 0;
+		rl[0].vcn = start_vcn;
+		rl[0].lcn = LCN_RL_NOT_MAPPED;
+		rl[0].length = 0;
 		return rl;
 	}
 
@@ -345,13 +338,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 					Dprintf("%s(): Adding new run, is "
 							"first run.\n",
 							__FUNCTION__);
-					rl[rlpos].vcn = 0;
-					if (start_vcn) {
-						rl[0].lcn = LCN_RL_NOT_MAPPED;
-						rl[0].length = start_vcn;
-						rl[1].vcn = start_vcn;
-						rlpos = 1;
-					}
+					rl[rlpos].vcn = start_vcn;
 				}
 				rl[rlpos].lcn = prev_lcn = lcn + bmp_pos;
 				rl[rlpos].length = prev_run_len = 1;
@@ -719,7 +706,7 @@ done_ret:
 	Dprintf("%s(): At done_ret.\n");
 	/* Add runlist terminator element. */
 	rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
-	rl[rlpos].lcn = LCN_ENOENT;
+	rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 	rl[rlpos].length = 0;
 	if (need_writeback) {
 		s64 bw;
@@ -776,7 +763,7 @@ err_ret:
 		}
 		/* Add runlist terminator element. */
 		rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
-		rl[rlpos].lcn = LCN_ENOENT;
+		rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 		rl[rlpos].length = 0;
 		/* Deallocate all allocated clusters. */
 		Dprintf("%s(): Deallocating allocated clusters.\n",
@@ -806,20 +793,15 @@ err_ret:
  */
 int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 {
-	while (rl->length) {
-		if (rl->lcn < 0) {
-			rl++;
-			continue;
-		}
-		if (ntfs_bitmap_clear_run(vol->lcnbmp_na,
-						rl->lcn, rl->length)) {
+	for (; rl->length; rl++) {
+		if (rl->lcn >= 0 && ntfs_bitmap_clear_run(vol->lcnbmp_na,
+				rl->lcn, rl->length)) {
 			int eo = errno;
 			fprintf(stderr, "%s(): Eeek! Deallocation of "
 					"clusters failed.\n", __FUNCTION__);
 			errno = eo;
 			return -1;
 		}
-		rl++;
 	}
 	return 0;
 }
