@@ -25,8 +25,7 @@
 /* TODO LIST:
  *	1. Better error checking. In fact, my error checking sucks.
  *	2. Fix output issues.
- *	3. Check on the 72/48 issue
- *	4. Comment things better
+ *	3. Comment things better
  *
  *	Still not dumping certain attributes. Need to find the best
  *	way to output some of these attributes. 
@@ -321,6 +320,7 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 	STANDARD_INFORMATION *standard_attr = NULL;
 	ATTR_RECORD *attr = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
+	u32 value_length;
 
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 
@@ -337,13 +337,13 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 
 	printf("Dumping $STANDARD_INFORMATION (0x10)\n");
 	
-	//check with flatcap/anton and make sure this is correct
-	if (sizeof(STANDARD_INFORMATION) == 48) {
+	value_length = le32_to_cpu(attr->value_length);
+	if (value_length == 48) {
 	  printf("\t$STANDARD_INFORMATION fields maximum_versions, version_number, \
 		      class_id, owner_id, security_id missing. This volume has \
 		      not been upgraded\n");
 	}
-	if (sizeof(STANDARD_INFORMATION) == 72) {
+	if (value_length == 72) {
 	    printf("\tMaximum Number of Versions: \t %u \n",
 			    le32_to_cpu(standard_attr->maximum_versions));
 	    printf("\tVersion Number: \t\t %u \n",
@@ -357,7 +357,7 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 	} else {
 		printf("\tSize of STANDARD_INFORMATION is %u. It should be "
 				"either 72 or 48, something is wrong...\n",
-				(unsigned)sizeof(STANDARD_INFORMATION));
+				value_length);
 	}
 
 	ntfs_attr_put_search_ctx(ctx); //free ctx
