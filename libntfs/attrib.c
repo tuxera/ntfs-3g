@@ -1428,6 +1428,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 	ATTR_RECORD *a;
 	uchar_t *al_name;
 	u32 al_name_len;
+	BOOL is_first_search = FALSE;
 
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
@@ -1445,8 +1446,10 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 	vol = base_ni->vol;
 	al_start = base_ni->attr_list;
 	al_end = al_start + base_ni->attr_list_size;
-	if (!ctx->al_entry)
+	if (!ctx->al_entry) {
 		ctx->al_entry = (ATTR_LIST_ENTRY*)al_start;
+		is_first_search = TRUE;
+	}
 	/*
 	 * Iterate over entries in attribute list starting at @ctx->al_entry,
 	 * or the entry following that, if @ctx->is_first is TRUE.
@@ -1454,9 +1457,71 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 	if (ctx->is_first) {
 		al_entry = ctx->al_entry;
 		ctx->is_first = FALSE;
-	} else
+		/*
+		 * If an enumeration and the first attribute is higher than
+		 * the attribute list itself, need to return the attribute list
+		 * attribute.
+		 */
+		if (!type && is_first_search && le16_to_cpu(al_entry->type) >
+				le16_to_cpu(AT_ATTRIBUTE_LIST))
+			goto find_attr_list_attr;
+	} else {
 		al_entry = (ATTR_LIST_ENTRY*)((char*)ctx->al_entry +
 				le16_to_cpu(ctx->al_entry->length));
+		/*
+		 * If this is an enumeration and the attribute list attribute
+		 * is the next one in the enumeration sequence, just return the
+		 * attribute list attribute from the base mft record as it is
+		 * not listed in the attribute list itself.
+		 */
+		if (!type && le16_to_cpu(ctx->al_entry->type) <
+				le16_to_cpu(AT_ATTRIBUTE_LIST) &&
+				le16_to_cpu(al_entry->type) >
+				le16_to_cpu(AT_ATTRIBUTE_LIST)) {
+			int rc;
+find_attr_list_attr:
+
+			/* Check for bogus calls. */
+			if (name || name_len || val || val_len || lowest_vcn) {
+				errno = EINVAL;
+				return -1;
+			}
+
+			/* We want the base record. */
+			ctx->ntfs_ino = base_ni;
+			ctx->mrec = ctx->base_mrec;
+			ctx->is_first = TRUE;
+			/* Sanity checks are performed elsewhere. */
+			ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
+					le16_to_cpu(ctx->mrec->attrs_offset));
+
+			/* Find the attribute list attribute. */
+			rc = ntfs_attr_find(AT_ATTRIBUTE_LIST, NULL, 0,
+					IGNORE_CASE, NULL, 0, ctx);
+
+			/*
+			 * Setup the search context so the correct
+			 * attribute is returned next time round.
+			 */
+			ctx->al_entry = al_entry;
+			ctx->is_first = TRUE;
+
+			/* Got it. Done. */
+			if (!rc)
+			       return 0;
+
+			/* Error! If other than not found return it. */
+			if (errno != EINVAL)
+				return rc;
+
+			/* Not found?!? Absurd! Must be a bug... )-: */
+			Dprintf("%s(): BUG! Attribute list attribute not found "
+					"but it exists! Returning error "
+					"(EINVAL).", __FUNCTION__);
+			errno = EINVAL;
+			return -1;
+		}
+	}
 	for (;; al_entry = next_al_entry) {
 		/* Out of bounds check. */
 		if ((u8*)al_entry < base_ni->attr_list ||
