@@ -49,7 +49,9 @@
 /*
  * Useful macro for determining the offset of a struct member.
  */
+#ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
 
 /*
  * Simple bit operation macros. NOTE: These are NOT atomic.
