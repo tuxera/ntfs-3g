@@ -40,7 +40,7 @@ static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -51,7 +51,7 @@ GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	Iprintf ("%s v%s Copyright (C) 2002 %s\n***XXX***on "
+	Qprintf ("%s v%s Copyright (C) 2002 %s\n***XXX***on "
 		"an NTFS Volume\n\n%s is free software, released under the GNU "
 		"General Public License\nand you are welcome to redistribute "
 		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
@@ -70,7 +70,7 @@ void version (void)
  */
 void usage (void)
 {
-	Iprintf ("Usage: %s [options] device\n"
+	Qprintf ("Usage: %s [options] device\n"
 		"    -i        --info           Print information about the volume\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
 		"    -s range  --sector range   Look for objects in this range of sectors\n"
@@ -82,7 +82,7 @@ void usage (void)
 		"    -V        --version        Version information\n"
 		"    -h        --help           Print this help\n\n",
 		EXEC_NAME);
-	Iprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
 }
 
 /**
@@ -370,9 +370,9 @@ int main (int argc, char *argv[])
 	switch (opts.action) {
 		case act_sector:
 			if (opts.range_begin == opts.range_end)
-				Iprintf ("Searching for sector %lld\n", opts.range_begin);
+				Qprintf ("Searching for sector %lld\n", opts.range_begin);
 			else
-				Iprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
+				Qprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
 			/* Convert to clusters */
 			opts.range_begin <<= (vol->cluster_size_bits - vol->sector_size_bits);
 			opts.range_end   <<= (vol->cluster_size_bits - vol->sector_size_bits);
@@ -380,9 +380,9 @@ int main (int argc, char *argv[])
 			break;
 		case act_cluster:
 			if (opts.range_begin == opts.range_end)
-				Iprintf ("Searching for cluster %lld\n", opts.range_begin);
+				Qprintf ("Searching for cluster %lld\n", opts.range_begin);
 			else
-				Iprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
+				Qprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
 			result = cluster_find (vol, opts.range_begin, opts.range_end);
 			break;
 		/*
