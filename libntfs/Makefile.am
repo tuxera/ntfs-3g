@@ -38,6 +38,7 @@ libntfs_la_SOURCES =	\
 	bitmap.c	\
 	bootsect.c	\
 	compat.c	\
+	compress.c	\
 	debug.c		\
 	device.c	\
 	device_io.c	\

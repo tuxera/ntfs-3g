@@ -5,6 +5,7 @@ linux_ntfsinclude_HEADERS = \
 	bitmap.h		\
 	bootsect.h		\
 	compat.h		\
+	compress.h		\
 	debug.h			\
 	device.h		\
 	device_io.h		\

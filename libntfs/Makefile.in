@@ -135,6 +135,7 @@ libntfs_la_SOURCES = \
 	bitmap.c	\
 	bootsect.c	\
 	compat.c	\
+	compress.c	\
 	debug.c		\
 	device.c	\
 	device_io.c	\
@@ -180,8 +181,8 @@ am_libntfs_gnomevfs_la_OBJECTS = libntfs_gnomevfs_la-gnome-vfs-method.lo \
 libntfs_gnomevfs_la_OBJECTS = $(am_libntfs_gnomevfs_la_OBJECTS)
 libntfs_la_LIBADD =
 am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
-	debug.lo device.lo device_io.lo dir.lo inode.lo lcnalloc.lo \
-	mft.lo mst.lo runlist.lo unistr.lo volume.lo
+	compress.lo debug.lo device.lo device_io.lo dir.lo inode.lo \
+	lcnalloc.lo mft.lo mst.lo runlist.lo unistr.lo volume.lo
 libntfs_la_OBJECTS = $(am_libntfs_la_OBJECTS)
 
 DEFS = @DEFS@
@@ -190,9 +191,10 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrib.Plo ./$(DEPDIR)/bitmap.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/bootsect.Plo ./$(DEPDIR)/compat.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/debug.Plo ./$(DEPDIR)/device.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/device_io.Plo ./$(DEPDIR)/dir.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/inode.Plo ./$(DEPDIR)/lcnalloc.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/compress.Plo ./$(DEPDIR)/debug.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/device.Plo ./$(DEPDIR)/device_io.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/dir.Plo ./$(DEPDIR)/inode.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/lcnalloc.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mft.Plo ./$(DEPDIR)/mst.Plo \
@@ -301,6 +303,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitmap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bootsect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compat.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compress.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device_io.Plo@am__quote@
