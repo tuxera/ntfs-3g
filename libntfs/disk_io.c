@@ -109,7 +109,7 @@ s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b)
  * is partial. 0 means nothing was written (also return 0 when @count is 0).
  *
  * On error and nothing has been written, return -1 with errno set
- * appropriately to the return code of either lseek, write, fdatasync, or set
+ * appropriately to the return code of either lseek, write, or set
  * to EINVAL in case of invalid arguments.
  */
 s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
@@ -144,9 +144,6 @@ s64 ntfs_pwrite(const int fd, const s64 pos, s64 count, const void *b)
 		/* Nothing written and error, return error status. */
 		return written;
 	}
-	/* Sync write to disk. */
-	if (fdatasync(fd) == -1)
-		return -1;
 	/* Finally, return the number of bytes written. */
 	return total;
 }
@@ -225,7 +222,7 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
  * means nothing was written (also return 0 when @count or @bksize are 0).
  *
  * On error and nothing has been written, return -1 with errno set
- * appropriately to the return code of either lseek, write, fdatasync, or set
+ * appropriately to the return code of either lseek, write, or set
  * to EINVAL in case of invalid arguments.
  *
  * NOTE: We mst protect the data, write it, then mst deprotect it using a quick
