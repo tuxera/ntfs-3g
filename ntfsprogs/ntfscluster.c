@@ -25,13 +25,10 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <locale.h>
-#include <libintl.h>
 #include <stdarg.h>
 #include <getopt.h>
-#include <stdlib.h>
-#include <limits.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "ntfscluster.h"
 #include "types.h"
@@ -91,8 +88,9 @@ void usage (void)
 {
 	Iprintf ("Usage: %s [options] device\n"
 		"    -i        --info           Print information about the volume\n"
-		"    -s range  --sector range   Look for objects in this range of sectors\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
+		"    -s range  --sector range   Look for objects in this range of sectors\n"
+		"    -l        --last           Find the last file on the volume\n"
 		"\n"
 		"    -f        --force          Use less caution\n"
 		"    -q        --quiet          Less output\n"
@@ -101,121 +99,6 @@ void usage (void)
 		"    -h        --help           Print this help\n\n",
 		EXEC_NAME);
 	Iprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
-}
-
-/**
- * parse_size - Convert a string representing a size
- * @value:  String to be parsed
- * @size:   Parsed size
- *
- * Read a string and convert it to a number.  Strings may be suffixed to scale
- * them.  Any number without a suffix is assumed to be in bytes.
- *
- * Suffix  Description  Multiple
- *  [tT]    Terabytes     10^12
- *  [gG]    Gigabytes     10^9
- *  [mM]    Megabytes     10^6
- *  [kK]    Kilobytes     10^3
- *
- * Notes:
- *     Only the first character of the suffix is read.
- *     The multipliers are decimal thousands, not binary: 1000, not 1024.
- *     If parse_size fails, @size will not be changed
- *
- * Return:  1  Success
- *	    0  Error, the string was malformed
- */
-int parse_size (const char *value, s64 *size)
-{
-	long long result;
-	char *suffix = NULL;
-
-	if (!value || !size)
-		return 0;
-
-	Dprintf ("Parsing size '%s'.\n", value);
-
-	result = strtoll (value, &suffix, 10);
-	if (result < 0 || errno == ERANGE) {
-		Eprintf ("Invalid size '%s'.\n", value);
-		return 0;
-	}
-
-	if (!suffix) {
-		Eprintf ("Internal error, strtoll didn't return a suffix.\n");
-		return 0;
-	}
-
-
-	/*if (strlen (suffix) > 1) {
-		Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
-		return 0;
-	} Can't do this because of ranges*/
-
-	switch (suffix[0]) {
-		case 't': case 'T': result *= 1000;
-		case 'g': case 'G': result *= 1000;
-		case 'm': case 'M': result *= 1000;
-		case 'k': case 'K': result *= 1000;
-		case '-': case 0:
-			break;
-		default:
-			Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
-			return 0;
-	}
-
-	Dprintf ("Parsed size = %lld.\n", result);
-	*size = result;
-	return 1;
-}
-
-/**
- * parse_range - Convert a string representing a range of numbers
- * @string:  The string to be parsed
- * @start:   The beginning of the range will be stored here
- * @finish:  The end of the range will be stored here
- *
- * Read a string of the form n-m.  If the lower end is missing, zero will be
- * substituted.  If the upper end is missing LONG_MAX will be used.  If the
- * string cannot be parsed correctly, @start and @finish will not be changed.
- *
- * Return:  1  Success, a valid string was found
- *	    0  Error, the string was not a valid range
- */
-int parse_range (const char *string, s64 *start, s64 *finish)
-{
-	s64 a, b;
-	char *middle;
-
-	if (!string || !start || !finish)
-		return 0;
-
-	middle = strchr (string, '-');
-	if (string == middle) {
-		Dprintf ("Range has no beginning, defaulting to 0.\n");
-		a = 0;
-	} else {
-		if (!parse_size (string, &a))
-			return 0;
-	}
-
-	if (middle) {
-		if (middle[1] == 0) {
-			b = LONG_MAX;		// XXX ULLONG_MAX
-			Dprintf ("Range has no end, defaulting to %lld.\n", b);
-		} else {
-			if (!parse_size (middle+1, &b))
-				return 0;
-		}
-	} else {
-		b = a;
-	}
-
-	Dprintf ("Range '%s' = %lld - %lld\n", string, a, b);
-
-	*start  = a;
-	*finish = b;
-	return 1;
 }
 
 /**
@@ -229,12 +112,13 @@ int parse_range (const char *string, s64 *start, s64 *finish)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-c:fhiqs:vV";
+	static const char *sopt = "-c:fhilqs:vV";
 	static const struct option lopt[] = {
 		{ "cluster",	required_argument,	NULL, 'c' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "info",	no_argument,		NULL, 'i' },
+		{ "last",	no_argument,		NULL, 'l' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "sector",	required_argument,	NULL, 's' },
 		{ "verbose",	no_argument,		NULL, 'v' },
@@ -249,6 +133,10 @@ int parse_options (int argc, char **argv)
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
+	opts.action      = act_none;
+	opts.range_begin = -1;
+	opts.range_end   = -1;
+
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
@@ -261,10 +149,11 @@ int parse_options (int argc, char **argv)
 			break;
 
 		case 'c':
-			if ((opts.cluster_begin > 0) || (opts.cluster_end > 0) ||
-			    !parse_range (optarg, &opts.cluster_begin, &opts.cluster_end)) {
-				err++;
-			}
+			if ((opts.action == act_none) &&
+			    (utils_parse_range (optarg, &opts.range_begin, &opts.range_end, FALSE)))
+				opts.action = act_cluster;
+			else
+				opts.action = act_error;
 			break;
 		case 'f':
 			opts.force++;
@@ -273,16 +162,28 @@ int parse_options (int argc, char **argv)
 			help++;
 			break;
 		case 'i':
-			opts.info++;
+			if (opts.action == act_none) {
+				opts.action = act_info;
+			} else {
+				opts.action = act_error;
+				err++;
+			}
+			break;
+		case 'l':
+			if (opts.action == act_none)
+				opts.action = act_last;
+			else
+				opts.action = act_error;
 			break;
 		case 'q':
 			opts.quiet++;
 			break;
 		case 's':
-			if ((opts.sector_begin > 0) || (opts.sector_end > 0) ||
-			    !parse_range (optarg, &opts.sector_begin, &opts.sector_end)) {
-				err++;
-			}
+			if ((opts.action == act_none) &&
+			    (utils_parse_range (optarg, &opts.range_begin, &opts.range_end, FALSE)))
+				opts.action = act_sector;
+			else
+				opts.action = act_error;
 			break;
 		case 'v':
 			opts.verbose++;
@@ -291,11 +192,10 @@ int parse_options (int argc, char **argv)
 			ver++;
 			break;
 		default:
-			if ((optopt == 'c') || (optopt == 's')) {
+			if ((optopt == 'c') || (optopt == 's'))
 				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
-			} else {
+			else
 				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
-			}
 			err++;
 			break;
 		}
@@ -304,6 +204,11 @@ int parse_options (int argc, char **argv)
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
+		if (opts.action == act_none)
+			opts.action = act_info;
+		if (opts.action == act_info)
+			opts.quiet = 0;
+
 		if (opts.device == NULL) {
 			Eprintf ("You must specify exactly one device.\n");
 			err++;
@@ -314,18 +219,13 @@ int parse_options (int argc, char **argv)
 			err++;
 		}
 
-		if (opts.sector_end && opts.cluster_end) {
-			Eprintf ("You must specify either a sector or a cluster.\n");
+		if (opts.action == act_error) {
+			Eprintf ("You may only specify one action: --info, --cluster, --sector or --last.\n");
 			err++;
-		}
-		if (opts.cluster_begin > opts.cluster_end) {
-			Eprintf ("The cluster range must be in ascending order.\n");
+		} else if (opts.range_begin > opts.range_end) {
+			Eprintf ("The range must be in ascending order.\n");
 			err++;
-		}
-		if (opts.sector_begin > opts.sector_end) {
-			Eprintf ("The sector range must be in ascending order.\n");
-			err++;
-		}
+		} 
 	}
 
 	if (ver)
@@ -405,9 +305,9 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 		return 1;
 	}
 
+	// first, is the cluster in use in $Bitmap?
+
 	for (i = 0; i < vol->nr_mft_records; i++) {
-	//for (i = 0; i < 30; i++) {
-	//for (i = 162; i < 175; i++) {
 		ntfs_inode *inode;
 		ntfs_attr_search_ctx *ctx;
 
@@ -491,56 +391,6 @@ free:
 }
 
 /**
- * my_locale
- */
-int my_locale (void)
-{
-	const char *locale;
-
-	locale = setlocale (LC_ALL, "");
-	if (!locale) {
-		locale = setlocale (LC_ALL, NULL);
-		Vprintf ("Failed to set locale, using default '%s'.\n", locale);
-		return 1;
-	} else {
-		Vprintf ("Using locale '%s'.\n", locale);
-		return 0;
-	}
-}
-
-/**
- * get_vol
- */
-ntfs_volume * get_vol (const char *device, unsigned long flags, BOOL force)
-{
-	ntfs_volume *vol;
-
-	if (!device)
-		return NULL;
-
-	if (!valid_device (device, force))
-		return NULL;
-
-	vol = ntfs_mount (device, MS_RDONLY);
-	if (!vol) {
-		Eprintf ("Couldn't mount device '%s': %s\n", device, strerror (errno));
-		return NULL;
-	}
-
-	if (vol->flags & VOLUME_IS_DIRTY) {
-		Iprintf ("Volume is dirty.\n");
-		if (!force) {
-			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
-			ntfs_umount (vol, FALSE);
-			return NULL;
-		}
-		Iprintf ("Forced to continue.\n");
-	}
-
-	return vol;
-}
-
-/**
  * main - Begin here
  *
  * Start from here.
@@ -551,31 +401,37 @@ ntfs_volume * get_vol (const char *device, unsigned long flags, BOOL force)
 int main (int argc, char *argv[])
 {
 	ntfs_volume *vol;
-	int result;
+	int result = 1;
 
 	if (!parse_options (argc, argv))
 		return 1;
 
-	my_locale();
+	utils_set_locale();
 
-	vol = get_vol (opts.device, MS_RDONLY, opts.force);
+	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol)
 		return 1;
 
-#if 0
-	if (opts.info) {
-		//result = get_info (vol);
-	} else if (opts.cluster) {
-		result = cluster_find (vol, opts.cluster);
-	} else if (opts.sector) {
-		//result = 
-	} else {
-		//result = 
+	switch (opts.action) {
+		case act_sector:
+			Iprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
+			/* Convert to clusters */
+			opts.range_begin <<= (vol->cluster_size_bits - vol->sector_size_bits);
+			opts.range_end   <<= (vol->cluster_size_bits - vol->sector_size_bits);
+			result = cluster_find (vol, opts.range_begin, opts.range_end);
+			break;
+		case act_cluster:
+			Iprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
+			result = cluster_find (vol, opts.range_begin, opts.range_end);
+			break;
+		case act_last:
+			printf ("Last\n");
+			break;
+		case act_info:
+		default:
+			printf ("Info\n");
+			break;
 	}
-#endif
-	//opts.cluster_end = LONG_MAX;
-	printf ("Searching for cluster range %lld-%lld\n", opts.cluster_begin, opts.cluster_end);
-	result = cluster_find (vol, opts.cluster_begin, opts.cluster_end);
 
 	ntfs_umount (vol, FALSE);
 	return result;

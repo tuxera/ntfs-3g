@@ -26,16 +26,23 @@
 
 #include "types.h"
 
+enum action {
+	act_none = 1,
+	act_info = 2,
+	act_cluster = 3,
+	act_sector = 4,
+	act_last = 5,
+	act_error = 6,
+};
+
 struct options {
-	char	*device;	/* Device/File to work with */
-	int	 info;		/* Show volume info */
-	int	 quiet;		/* Less output */
-	int	 verbose;	/* Extra output */
-	int	 force;		/* Override common sense */
-	u64	 sector_begin;	/* Look for objects in this range of sectors */
-	u64	 sector_end;
-	u64	 cluster_begin;	/* Look for objects in this range of clusters */
-	u64	 cluster_end;
+	char		*device;	/* Device/File to work with */
+	enum action	 action;	/* What to do */
+	int		 quiet;		/* Less output */
+	int		 verbose;	/* Extra output */
+	int		 force;		/* Override common sense */
+	u64		 range_begin;	/* Look for objects in this range */
+	u64		 range_end;
 };
 
 #endif /* _NTFSCLUSTER_H_ */
