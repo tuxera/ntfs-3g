@@ -290,8 +290,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		errno = EINVAL;
 		return NULL;
 	}
-	Dprintf("Opening extent inode %llu (base mft record 0x%llu).\n",
-			(unsigned long long)mft_no,
+	Dprintf("%s(): Opening extent inode 0x%llx (base mft record 0x%llx).\n",
+			__FUNCTION__, (unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	/* Is the extent inode already open and attached to the base inode? */
 	if (base_ni->nr_extents > 0) {
