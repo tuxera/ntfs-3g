@@ -1,6 +1,9 @@
 Current news
 ============
 
+mkntfs now creates bootable ntfs volumes so you can install Windows on an
+ntfs volume created with mkntfs and Windows will manage to boot afterwards.
+
 ntfsresize now supports relocation which generally means you are now able to
 resize to any size you like (as long as there is enough free space).  Note,
 this modifies the command line options a little as well as the returned output
