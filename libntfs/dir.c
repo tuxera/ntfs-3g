@@ -612,6 +612,11 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		return -1;
 	}
 
+	if (!(dir_ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+		errno = ENOTDIR;
+		return -1;
+	}
+
 	vol = dir_ni->vol;
 
 	Dprintf("Entering for inode 0x%Lx, *pos 0x%Lx.\n",
@@ -898,7 +903,8 @@ EOD:
 done:
 	if (bmp_na)
 		ntfs_attr_close(bmp_na);
-	ntfs_attr_close(ia_na);
+	if (ia_na)
+		ntfs_attr_close(ia_na);
 #ifdef DEBUG
 	if (!rc)
 		Dprintf("EOD, *pos 0x%Lx, returning 0.\n", (long long)*pos);
@@ -916,7 +922,8 @@ err_out:
 		ntfs_attr_put_search_ctx(ctx);
 	if (bmp_na)
 		ntfs_attr_close(bmp_na);
-	ntfs_attr_close(ia_na);
+	if (ia_na)
+		ntfs_attr_close(ia_na);
 	errno = eo;
 	return -1;
 }
