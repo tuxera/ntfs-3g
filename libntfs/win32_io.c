@@ -33,13 +33,18 @@
  * define our own...
  */
 typedef long long int s64;
+typedef unsigned long int u32;
 struct flock;
 struct stat;
+struct ntfs_volume;
+typedef struct ntfs_volume ntfs_volume;
 
 #include "config.h"
 
 /* Need device, but prevent ../include/types.h to be loaded. */
 #define _NTFS_TYPES_H
+#define _NTFS_SUPPORT_H
+#define _NTFS_VOLUME_H
 #include "device.h"
 
 #define FORCE_ALIGNED_READ

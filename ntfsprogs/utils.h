@@ -38,6 +38,10 @@ extern const char *ntfs_gpl;
 #define PATH_SEP	'/'
 #define MAX_PATH	1024
 
+#ifndef REG_NOERROR
+#define REG_NOERROR	REG_OKAY
+#endif
+
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
 	__attribute__ ((format (printf, 1, 2)))					\
 	int NAME (const char *format, ...)					\
