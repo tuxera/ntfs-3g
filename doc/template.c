@@ -3,7 +3,7 @@ const char *EXEC_VERSION= "0.0.1";
 /*
  * EXEC_NAME - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * Short description here.
  *

@@ -2,7 +2,7 @@
 Description of the NTFS (de)compression algorithm (based on a modified LZ77
 algorithm)
 
-Copyright (c) 2001 Anton Altaparmakov.
+Copyright (c) 2001 Anton Altaparmakov
 
 This document is published under the GNU General Public License.
 
