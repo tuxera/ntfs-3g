@@ -2,7 +2,10 @@
 * HIGH priority *
 *****************
 
-- write attribute resize function (see mkntfs) and implement ntfs_truncate*
+- implement ntfs_rl_truncate().
+
+- write attribute resize function (see mkntfs) and implement
+  ntfs_attr_truncate()
 
 - write ntfs_cluster_allocate() (see ntfs 2.4 driver in CVS)
 
