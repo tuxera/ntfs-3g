@@ -26,10 +26,10 @@
 
 #include "attrib.h"
 
+extern int ntfs_attrlist_need(ntfs_inode *ni);
+
 extern int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len);
-
 extern int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr);
-
 extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
 
 #endif /* defined _NTFS_ATTRLIST_H */
