@@ -45,15 +45,11 @@ static struct options {
 	int verbose;	/* Extra output */
 	int force;	/* Override common sense */
 	int all;
-	int sys;
+	int system;
 	int dos;
 	int lng;
 	int inode;
 	int classify;
-	int readonly;
-	int hidden;
-	int archive;
-	int system;
 	char *path;
 } opts;
 
@@ -86,20 +82,20 @@ void version(void)
  */
 void usage(void)
 {
-	printf("\nUsage: %s [options] -d /dev/hda1 -p /WINDOWS\n"
+	printf("\nUsage: %s [options] -d /dev/hda1\n"
 		"\n"
-		"    -d      --device     NTFS volume\n"
-		"    -p      --path       Relative path to the directory\n"
-		"    -l      --long       Display long info\n"
-		"    -F      --classify   Display classification\n"
-		"    -f      --force      Use less caution\n"
-		"    -q      --quiet      Less output\n"
-		"    -v      --verbose    More output\n"
-		"    -V      --version    Display version information\n"
-		"    -h      --help       Display this help\n"
-		"    -a                   Display all files\n"
-		"    -x                   Use short (DOS 8.3) names\n"
-		"    -s                   Display system files\n"
+		"    -a         --all            Display all files\n"
+		"    -d DEVICE  --device DEVICE  NTFS volume\n"
+		"    -F         --classify       Display classification\n"
+		"    -f         --force          Use less caution\n"
+		"    -h   -?    --help           Display this help\n"
+		"    -l         --long           Display long info\n"
+		"    -p PATH    --path PATH      Directory whose contents to list\n"
+		"    -q         --quiet          Less output\n"
+		"    -s         --system         Display system files\n"
+		"    -V         --version        Display version information\n"
+		"    -v         --verbose        More output\n"
+		"    -x         --dos            Use short (DOS 8.3) names\n"
 		"\n",
 		EXEC_NAME);
 	printf("%s%s\n", ntfs_bugs, ntfs_home);
@@ -116,22 +112,21 @@ void usage(void)
  */
 int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-fh?qvVd:p:asxliFRHSA";
+	static const char *sopt = "-ad:Ffh?ilp:qsVvx";
 	static const struct option lopt[] = {
-		{ "device",      required_argument,	NULL, 'd' },
-		{ "path",	 required_argument,     NULL, 'p' },
 		{ "all",	 no_argument,		NULL, 'a' },
-		{ "sys",	 no_argument,		NULL, 's' },
-		{ "long",	 no_argument,		NULL, 'l' },
-		{ "inode",	 no_argument,		NULL, 'i' },
+		{ "device",      required_argument,	NULL, 'd' },
 		{ "classify",	 no_argument,		NULL, 'F' },
-		{ "system",	 no_argument,		NULL, 'S' },
-		{ "dos",	 no_argument,		NULL, 'x' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
+		{ "inode",	 no_argument,		NULL, 'i' },
+		{ "long",	 no_argument,		NULL, 'l' },
+		{ "path",	 required_argument,     NULL, 'p' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
-		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "system",	 no_argument,		NULL, 's' },
 		{ "version",	 no_argument,		NULL, 'V' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "dos",	 no_argument,		NULL, 'x' },
 		{ NULL, 0, NULL, 0 },
 	};
 
@@ -149,7 +144,7 @@ int parse_options(int argc, char *argv[])
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 'd':
-			opts.device = argv[optind - 1];
+			opts.device = optarg;
 			break;
 		case 'p':
 			opts.path = optarg;
@@ -171,7 +166,7 @@ int parse_options(int argc, char *argv[])
 			ver++;
 			break;
 		case 'x':
-			opts.dos++;
+			opts.dos = 1;
 			break;
 		case 'l':
 			opts.lng++;
@@ -186,19 +181,7 @@ int parse_options(int argc, char *argv[])
 			opts.all++;
 			break;
 		case 's':
-			opts.sys++;
-			break;
-		case 'R':
-			opts.readonly++;
-			break;
-		case 'H':
-			opts.hidden++;
-			break;
-		case 'S':
 			opts.system++;
-			break;
-		case 'A':
-			opts.archive++;
 			break;
 		default:
 			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
@@ -316,27 +299,31 @@ typedef struct {
 int list_entry(ntfsls_dirent *dirent, const uchar_t *name, 
 		const int name_len, const int name_type, const s64 pos,
 		const MFT_REF mref, const unsigned dt_type) {
-	char filename[200];
+	char filename[255 + 2];
 
 	ucstos(filename, name, min(name_len + 1, sizeof(filename)));
 	// FIXME: error checking... (AIA)
 	// FIXME: Why not use ntfs_mbstoucs() from libntfs? (AIA)
 	//printf("[%s\t,%d,%d]\n", filename, name_type, dt_type);
 
-	if ((filename[0] == '$') && (!opts.sys))
+	if ((filename[0] == '$') && (!opts.system))
 		return 0;
-	if (name_type == 0 && !opts.all)
+	if (name_type == FILE_NAME_POSIX && !opts.all)
 		return 0;
-	if (((name_type & 3) == 1) && (opts.dos != 0))
+	if (((name_type & FILE_NAME_WIN32_AND_DOS) == FILE_NAME_WIN32) &&
+			opts.dos)
 		return 0;
-	if (((name_type & 3) == 2) && (opts.dos != 1))
+	if (((name_type & FILE_NAME_WIN32_AND_DOS) == FILE_NAME_DOS) &&
+			!opts.dos)
 		return 0;
 	if (dt_type == NTFS_DT_DIR && opts.classify)
 		sprintf(filename + strlen(filename), "/");
 
 	if (!opts.lng) {
-		printf(filename);
-		printf("\n");
+		if (!opts.inode)
+			printf("%s\n", filename);
+		else
+			printf("%18lld  %s\n", mref, filename);
 	} else {
 		s64 filesize = 0;
 		ntfs_inode *ni;
@@ -384,8 +371,8 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 		ntfs_inode_close(ni);
 
 		if (opts.inode)
-			printf("%12lld  %18lld  %s\n", filesize, mref,
-					filename);
+			printf("%18lld  %12lld  %s  %s\n", mref, filesize,
+					t_buf + 4, filename);
 		else
 			printf("%12lld  %s  %s\n", filesize, t_buf + 4,
 					filename);
