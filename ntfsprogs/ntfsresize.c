@@ -587,12 +587,13 @@ void compare_bitmaps(struct bitmap *a)
 		}
 
 		for (k = 0; k < count; k++) {
-			u64 j;
+			u64 j, start;
 
 			if (a->bm[i + k] == bm[k])
 				continue;
 
-			for (j = i * 8; j < i * 8 + 8; j++) {
+			start = (i + k) * 8;
+			for (j = start; j < start + 8; j++) {
 
 				bit = ntfs_bit_get(a->bm, j);
 				if (bit != ntfs_bit_get(bm, k + j % 8))
