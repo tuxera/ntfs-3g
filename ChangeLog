@@ -65,7 +65,8 @@
 		ntfs_attr_find_vcn(),
 		ntfs_attr_init(),
 		ntfs_attr_{open,close}(),
-		ntfs_attr_size_bounds_check().
+		ntfs_attr_size_bounds_check(),
+		ntfs_attr_can_be_non_resident().
 	- Add new field mftmirr_size to ntfs_volume structure and initialize
 	  it to the number of mft records stored in the mft mirror in
 	  ntfs_mount().
