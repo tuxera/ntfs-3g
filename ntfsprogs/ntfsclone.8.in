@@ -4,7 +4,7 @@
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Oct 2003" "ntfsprogs @VERSION@"
+.TH NTFSCLONE 8 "Oct 2003" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone an NTFS filesystem
 .SH SYNOPSIS
