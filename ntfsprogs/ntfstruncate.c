@@ -72,7 +72,7 @@ char *dev_name;
 s64 inode;
 u32 attr_type;
 ntfschar *attr_name = NULL;
-int attr_name_len;
+u32 attr_name_len;
 s64 new_len;
 
 ntfs_volume *vol;
@@ -268,7 +268,7 @@ static void parse_options(int argc, char *argv[])
 		if (optind != argc) {
 			/* Convert the string to little endian Unicode. */
 			attr_name_len = ntfs_mbstoucs(s, &attr_name, 0);
-			if (attr_name_len < 0)
+			if ((int)attr_name_len < 0)
 				err_exit("Invalid attribute name \"%s\": %s\n",
 						s, strerror(errno));
 
@@ -287,8 +287,9 @@ static void parse_options(int argc, char *argv[])
 	if (attr_name == AT_UNNAMED)
 		Dprintf("attribute name = \"\" (UNNAMED)\n");
 	else
-		Dprintf("attribute name = \"%s\" (length %i Unicode "
-				"characters)\n", s2, attr_name_len);
+		Dprintf("attribute name = \"%s\" (length %u Unicode "
+				"characters)\n", s2,
+				(unsigned int)attr_name_len);
 
 	/* Get the new length. */
 	ll = strtoll(s, &s2, 0);
@@ -336,9 +337,9 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 			"type yet.";
 	const char *skip = "Skipping display of $%s attribute value.\n";
 	const char *todo = "This is still work in progress.";
-	unsigned int u;
 	char *buf;
 	int i, j;
+	u32 u;
 
 	switch (type) {
 	case AT_STANDARD_INFORMATION:
@@ -471,7 +472,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		printf("Cannot display unknown %s defined attribute type 0x%x"
 				".\n", u >=
 				le32_to_cpu(AT_FIRST_USER_DEFINED_ATTRIBUTE) ?
-				"user" : "system", u);
+				"user" : "system", (unsigned int)u);
 	}
 }
 
