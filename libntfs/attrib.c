@@ -187,6 +187,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 				}
 #undef ESTR
 				free(rl);
+				free(intbuf);
 				return 0;
 			}
 			memcpy(b + total, intbuf, sle64_to_cpu(a->data_size) -
