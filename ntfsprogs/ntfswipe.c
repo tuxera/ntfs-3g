@@ -402,13 +402,14 @@ free:
  * @attr:	A vaild $DATA attribute record
  * @compr_unit:	Compression unit obtained from first $DATA attribute (because in other
  *		it 0)
+ * @tail:	If last is not compressed, how many we have to wipe in it end
  *
  * Return: >0  Success, the atrribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
 static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action act,
-							ATTR_RECORD *attr, u8 compr_unit)
+					ATTR_RECORD *attr, u8 compr_unit, u32 tail)
 {
 	runlist *rl;
 	unsigned char *buf;
@@ -418,6 +419,7 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action ac
 	u64 wiped = 0;
 	s64 ret;
 	runlist *rlc;
+	u64 cu_mask;
 	
 	if (compr_unit != 4)
 		Eprintf ("strange: compression unit is %u (not 4)\n", compr_unit);
@@ -427,6 +429,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action ac
 		Eprintf ("Compression unit could not be 0");
 		return -1;
 	}
+	
+	cu_mask = (1 << compr_unit) - 1;
 
 	rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 	if (!rl) {
@@ -437,31 +441,37 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action ac
 
 	rlc = rl;
 	while (rlc->length) {
-		if ((rlc->length >> compr_unit) || (rlc->lcn < 0)) {
+		if ((!(rlc->length & cu_mask) && ((rlc+1)->length || !tail))
+								|| (rlc->lcn < 0)) {
 			rlc++;
 			continue;
 		}
 		
-		offset = 0;
-		while (1) {
-			ret = ntfs_rl_pread (vol, rlc, offset, 2, &block_size);
-			if (ret != 2) {
-				Vprintf ("Internal error\n");
-				Eprintf ("ntfs_rl_pread failed");
-				wiped = -1;
-				goto free_rl;
+		if (rlc->length & cu_mask) {
+			offset = (rlc->length & (~cu_mask)) << vol->cluster_size_bits;
+			while (1) {
+				ret = ntfs_rl_pread (vol, rlc, offset, 2, &block_size);
+				if (ret != 2) {
+					Vprintf ("Internal error\n");
+					Eprintf ("ntfs_rl_pread failed");
+					wiped = -1;
+					goto free_rl;
+				}
+				if (block_size == 0) {
+					offset += 2;
+					break;
+				}
+				block_size &= 0x0FFF;
+				block_size += 3;
+				offset += block_size;
+				if (offset >= (rlc->length << vol->cluster_size_bits) - 2)
+					goto next;
 			}
-			if (block_size == 0) {
-				offset += 2;
-				break;
-			}
-			block_size &= 0x0FFF;
-			block_size += 3;
-			offset += block_size;
-			if (offset >= (rlc->length << vol->cluster_size_bits) - 2)
-				goto next;
+			size = (rlc->length << vol->cluster_size_bits) - offset;
+		} else {
+			size = tail;
+			offset = (rlc->length << vol->cluster_size_bits) - tail;
 		}
-		size = (rlc->length << vol->cluster_size_bits) - offset;
 
 		if ((act == act_info) || (!size)) {
 			wiped += size;
@@ -591,6 +601,8 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 		s64 size = -1;
 		u64 offset;
 		VCN last_vcn;
+		u32 tail;
+		ATTR_RECORD *first_attr = 0;
 		while (!ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 			attr = ctx->attr;
 		
@@ -598,13 +610,21 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 				Vprintf ("Resident $DATA atrribute. Skipping.\n");
 				goto put_search_ctx;
 			}
+			
+			if (!first_attr) {
+				first_attr = attr;
+				if (attr->compression_unit) {
+					compr_unit = attr->compression_unit;
+					tail = attr->allocated_size - attr->data_size;
+				}
+			}
 		
 			s64 wiped;
-			if (attr->flags & ATTR_IS_COMPRESSED) {
-				if (attr->compression_unit)
-					compr_unit = attr->compression_unit;
-				wiped = wipe_compressed_attribute (vol, byte, act,
-									attr, compr_unit);
+			if (first_attr->flags & ATTR_IS_COMPRESSED) {
+				Vprintf ("Compressed $DATA attribute. Not supported yet ;(\n");
+				goto put_search_ctx;
+//				wiped = wipe_compressed_attribute (vol, byte, act,
+//								attr, compr_unit, tail);
 			} else {
 				if (size == -1) {
 					offset = attr->data_size;
@@ -613,7 +633,7 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 					if (attr->flags & ATTR_IS_ENCRYPTED)
 						offset = (((offset - 1) >> 10) + 1) << 10;
 					size = (vol->cluster_size - offset) %
-								    vol->cluster_size;
+								vol->cluster_size;
 					last_vcn = attr->data_size >>
 								vol->cluster_size_bits;
 				}
