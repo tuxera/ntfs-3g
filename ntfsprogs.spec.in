@@ -87,7 +87,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %{mandir}/man8/libntfs-gnomevfs.8*
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*so*
-%{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
+%config %{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
 
 %files devel
 %defattr(-,root,root)
