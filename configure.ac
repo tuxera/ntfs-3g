@@ -28,7 +28,6 @@ AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
-AM_MAINTAINER_MODE
 AM_ENABLE_SHARED
 AM_ENABLE_STATIC
 
@@ -72,7 +71,7 @@ AC_ARG_ENABLE(default-device-io-ops,
 
 AC_ARG_ENABLE(gnome-vfs,
 	AS_HELP_STRING(--disable-gnome-vfs,omit Gnome-VFS-2.0 'libntfs'
-		       interface [default=detect]), ,
+		       interface (default=detect)), ,
 	enable_gnome_vfs=auto
 )
 
@@ -82,6 +81,11 @@ AC_ARG_ENABLE(really-static,
 	enable_really_static=no
 )
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
+
+AC_ARG_ENABLE(warnings,
+	AS_HELP_STRING(--enable-warnings,enable additional compiler warnings), ,
+	enable_warnings=no
+)
 
 # Use GNU extensions if available.
 AC_GNU_SOURCE
@@ -159,15 +163,15 @@ AC_MSG_RESULT($cc_version)
 
 # Add our compiler switches not discarding 'CFLAGS' as they may have been
 # passed to us by rpmbuild(8).
-# We add -Wall to enable compiler warnings.
+# We add -Wall to enable some compiler warnings.
 CFLAGS="$CFLAGS -Wall"
 
-# Add lots of extra warnings if in maintainer mode.
-if test "$USE_MAINTAINER_MODE" = "yes";then
+# Add lots of extra warnings if --enable-warnings was specified.
+if test "$enable_warnings" = "yes"; then
 	CFLAGS="$CFLAGS -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes -Wshadow -Wwrite-strings -W -Wcast-align -Waggregate-return -Wbad-function-cast -Wcast-qual -Wundef -Wredundant-decls -Wsign-compare"
 fi
 
-# Add debugging switches if in debug mode.
+# Add debugging switches if --enable-debug was specified.
 if test "$enable_debug" = "yes"; then
 	CFLAGS="$CFLAGS -ggdb3 -DDEBUG"
 fi
