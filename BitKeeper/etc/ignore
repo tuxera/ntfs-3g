@@ -7,6 +7,7 @@ autom4te.cache/*
 Makefile
 */Makefile
 libntfs/libntfs.conf
+libntfs/*.8
 ntfsprogs/*.8
 config.log
 config.h
