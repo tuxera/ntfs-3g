@@ -1408,6 +1408,9 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
  * @ctx->base_ntfs_ino->attr_list at which the new attribute's attribute list
  * entry should be inserted.
  *
+ * FIXME: This is how it should be but unfortunately the current code sets
+ *        @ctx->al_entry to NULL, so beware! (AIA)
+ *
  * The following error codes are defined:
  *	ENOENT	Attribute not found, not an error as such.
  *	EINVAL	Invalid arguments.
@@ -1711,27 +1714,37 @@ do_next_attr:
 	return -1;
 not_found:
 	/*
-	 * Seek to the end of the base mft record, i.e. when we return false,
-	 * ctx->mrec and ctx->attr indicate where the attribute should be
-	 * inserted into the attribute record.
-	 * And of course ctx->al_entry points to the end of the attribute
-	 * list inside ctx->base_ntfs_ino->attr_list.
-	 *
-	 * FIXME: Do we really want to do this here? Think about it... (AIA)
+	 * The attribute wasn't found.  Before we return, we want to ensure
+	 * ctx->mrec and ctx->attr indicate the position at which the attribute
+	 * should be inserted in the base mft record.
 	 */
+	/* Rewind the current search so ntfs_attr_find() is happy. */
 	ntfs_attr_reinit_search_ctx(ctx);
 	/*
-	 * If we were enumerating and reached the end, we can't just use !@type
+	 * If we were enumerating and reached the end, we can't just use @type
 	 * because that would return the first attribute instead of the last
-	 * one. Thus we just change @type to AT_END which causes
-	 * ntfs_attr_find() to seek to the end. We also do the same when an
-	 * attribute extent was searched for (i.e. @lowest_vcn != 0), as we
-	 * otherwise rewind the search back to the first extent and we get
-	 * that extent returned twice during a search for all extents.
+	 * one. Thus we just use AT_END which causes ntfs_attr_find() to seek
+	 * to the end.
 	 */
-	if (!type || lowest_vcn)
-		type = AT_END;
-	return ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
+	if (!type)
+		return ntfs_attr_find(AT_END, name, name_len, ic, val, val_len,
+				ctx);
+	/*
+	 * In case there are multiple matches in the base mft record, need to
+	 * keep enumerating until we get an attribute not found response (or
+	 * another error), otherwise we would keep returning the same attribute
+	 * over and over again and all programs using us for enumeration would
+	 * lock up in a tight loop.
+	 */
+	{
+		int ret;
+
+		do {
+			ret = ntfs_attr_find(type, name, name_len, ic, val,
+					val_len, ctx);
+		} while (!ret);
+		return ret;
+	}
 }
 
 /**
@@ -1784,6 +1797,9 @@ not_found:
  * record this is the correct place to insert it into. @ctx->al_entry points to
  * the position within @ctx->base_ntfs_ino->attr_list at which the new
  * attribute's attribute list entry should be inserted.
+ *
+ * FIXME: This is how it should be but unfortunately the current code sets
+ *        @ctx->al_entry to NULL, so beware! (AIA)
  *
  * The following error codes are defined:
  *	ENOENT	Attribute not found, not an error as such.
