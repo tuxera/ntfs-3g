@@ -568,6 +568,11 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 	win32_fd fd;
 	int err;
 
+	if (NDevOpen(dev)) {
+		errno = EBUSY;
+		return -1;
+	}
+
 	numparams = sscanf(dev->d_name, "/dev/hd%c%u", &drive_char, &part);
 	drive_id = toupper(drive_char) - 'A';
 
@@ -599,8 +604,15 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 	Dprintf("win32_open(%s) -> %p, offset 0x%llx\n", dev->d_name, dev,
 			fd.part_start);
 
+	/* Setup our read-only flag. */
+	if ((flags & O_RDWR) != O_RDWR)
+		NDevSetReadOnly(dev);
+
 	dev->d_private = malloc(sizeof (win32_fd));
 	memcpy(dev->d_private, &fd, sizeof (win32_fd));
+
+	NDevSetOpen(dev);
+	NDevClearDirty(dev);
 
 	return 0;
 }
@@ -765,6 +777,11 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 
 	Dprintf("win32_close(%p)\n", dev);
 
+	if (!NDevOpen(dev)) {
+		errno = EBADF;
+		return -errno;
+	}
+
 	rvl = CloseHandle(fd->handle);
 	fd->handle = 0;
 
@@ -788,11 +805,17 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
  */
 static int ntfs_device_win32_sync(struct ntfs_device *dev)
 {
-	if (FlushFileBuffers(((win32_fd *)dev->d_private)->handle)) {
- 		return 0;
+	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
+		if (FlushFileBuffers(((win32_fd *)dev->d_private)->handle)) {
+			NDevClearDirty(dev);
+	 		return 0;
+		} else {
+			errno = ntfs_w32error_to_errno(GetLastError());
+			return -errno;
+		}
 	} else {
-		errno = ntfs_w32error_to_errno(GetLastError());
-		return -errno;
+		/* no need/ability for a sync(), just exit gracefully */
+		return 0;
 	}
 }
 
