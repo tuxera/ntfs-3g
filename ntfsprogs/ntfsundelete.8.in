@@ -1,7 +1,7 @@
 .\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSUNDELETE 8 "June 2002" "Linux\-NTFS version @VERSION@"
+.TH NTFSUNDELETE 8 "June 2002" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsundelete \- recover a deleted file from an NTFS volume.
 .SH SYNOPSIS
@@ -346,7 +346,7 @@ was written by Richard Russon (FlatCap) <ntfs@flatcap.org>
 If you find this tool useful, make FlatCap happy and send him an email.
 .SH AVAILABILITY
 .B ntfsundelete
-is part of the linux\-ntfs package and is available from
+is part of the ntfsprogs package and is available from
 .br
 .nh
 http://linux\-ntfs.sourceforge.net/downloads.html

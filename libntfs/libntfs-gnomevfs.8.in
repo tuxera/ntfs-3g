@@ -3,7 +3,8 @@
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
 .TH NTFSPROGS 8 "November 2003" "Linux-NTFS version @VERSION@"
-
+.SH NAME
+libntfs-gnomevfs \- Module for GNOME VFS that allows access to NTFS filesystems.
 .SH OVERVIEW
 The GNOME virtual filesystem (VFS) provides universal access to different filesystems.
 The

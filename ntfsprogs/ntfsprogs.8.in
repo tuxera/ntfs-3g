@@ -2,8 +2,9 @@
 .\" Copyright (c) 2002-2003 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "August 2003" "Linux-NTFS version @VERSION@"
-
+.TH NTFSPROGS 8 "August 2003" "ntfsprogs version @VERSION@"
+.SH NAME
+ntfstools \- several tools for doing neat things with NTFS partitions
 .SH OVERVIEW
 .B ntfsprogs
 is a suite of NTFS utilities based around a shared library.  The tools are

@@ -3,7 +3,7 @@
 .\" This file may be copied under the terms of the GNU Public License.
 .\" Adapted from e2fsprogs-1.19/misc/mke2fs.8.in by Theodore Ts'o.
 .\"
-.TH MKNTFS 8 "March 2002" "Linux-NTFS version @VERSION@"
+.TH MKNTFS 8 "March 2002" "ntfsprogs version @VERSION@"
 .SH NAME
 mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 .SH SYNOPSIS

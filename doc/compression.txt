@@ -132,7 +132,7 @@ Note that decompression has to occur byte by byte, as it is possible that some
 of the bytes pointed to by the pt will only be generated in the sliding window
 as the byte sequence pointed to by the pt is being copied into it!
 
-To give a concrete example; a block full of the letter A would be compressed
+To give a concrete example: a block full of the letter A would be compressed
 by storing the byte A once as a symbol token, followed by a single phrase
 token with back pointer -1 (p = 0, therefore go back by -(0 + 1) bytes) and
 length 4095 (l=0xffc, therefore length 0xffc + 3 bytes).

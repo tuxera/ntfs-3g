@@ -2,7 +2,7 @@
 .\" Copyright (c) 2002-2004 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSINFO 8 "Feb 2004" "Linux-NTFS version @VERSION@"
+.TH NTFSINFO 8 "Feb 2004" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsinfo \- dump a file's attributes
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ Run ntfsinfo without arguments for a full list of options.
 was written by Matthew J. Fanto (mattjf@uncompiled.com).
 .SH AVAILABILITY
 .B ntfsinfo
-is part of the linux-ntfs package and is available from
+is part of the ntfsprogs package and is available from
 http://linux-ntfs.sourceforge.net/.
 .SH SEE ALSO
 .BR ntfsprogs (8)

@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH NTFSFIX 8 "July 2001" "Linux-NTFS version @VERSION@"
+.TH NTFSFIX 8 "March 2004" "ntfsprogs version @VERSION@"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -38,22 +38,22 @@ stupidity when fixing altered partitions. Because the main problems
 are journal files, \fBntfsfix\fP aims to fix those issues.
 .sp
 Running ntfsfix after mounting NTFS partitions read-write is recommended
-for reducing the chance of severe data loss when NT/W2K tries to remount
+for reducing the chance of severe data loss when NT/W2K/XP tries to remount
 the affected partition(s).
 .sp
 In order to use \fBntfsfix\fP you must unmount the NTFS partition, and run
 ntfsfix device, where device is the NTFS partition. After this, you can
-safely reboot into NT/W2K. Please note that \fBntfsfix\fP is not a
+safely reboot into NT/W2K/XP. Please note that \fBntfsfix\fP is not a
 chkdsk-like tool, and so is not guaranteed that it could fix all the
 alterations provoked by the NTFS driver.
 
 .SH AUTHOR
 This manual page was written by David Martínez Moreno
-<david.martinez@rediris.es>, for the Debian GNU/Linux
+<ender@debian.org>, for Debian the GNU/Linux
 system (but may be used by others).
 .SH AVAILABILITY
 .B ntfsfix
-is part of the linux-ntfs package and is available from
+is part of the ntfsprogs package and is available from
 http://linux-ntfs.sourceforge.net/.
 .SH SEE ALSO
 .BR mkntfs (8),
