@@ -29,7 +29,6 @@
 #include <time.h>
 #include <getopt.h>
 #include <string.h>
-#include <list.h>
 
 #include "types.h"
 #include "mft.h"
@@ -38,6 +37,7 @@
 #include "inode.h"
 #include "utils.h"
 #include "dir.h"
+#include "list.h"
 
 static const char *EXEC_NAME = "ntfsls";
 
