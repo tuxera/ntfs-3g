@@ -156,7 +156,7 @@ version_error:
 		goto log_file_error;
 	}
 	/* Read in the $LogFile into the buffer. */
-	if (l != ntfs_get_attribute_value(vol, m, a, lfd)) {
+	if (l != ntfs_get_attribute_value(vol, a, lfd)) {
 		puts("Amount of data read does not correspond to expected "
 		     "length!");
 		free(lfd);
