@@ -1625,7 +1625,7 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 }
 
 /**
- * ntfs_runlist_sparse - check whether runlist have sparse regions or not.
+ * ntfs_rl_sparse - check whether runlist have sparse regions or not.
  * @rl:		runlist to check
  *
  * Return 1 if have, 0 if not, -1 on error with errno set to the error code.
@@ -1654,7 +1654,7 @@ int ntfs_rl_sparse(runlist *rl)
 }
 
 /**
- * ntfs_runlist_get_compressed_size - calculate length of non sparse regions
+ * ntfs_rl_get_compressed_size - calculate length of non sparse regions
  * @vol:	ntfs volume (need for cluster size)
  * @rl:		runlist to calculate for
  *
