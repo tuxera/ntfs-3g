@@ -654,7 +654,7 @@ res_err_out:
 		}
 		total2 = pos + count - na->initialized_size;
 		count -= total2;
-		memset(b + count, 0, total2);
+		memset((u8*)b + count, 0, total2);
 	}
 	/* Find the run list element containing the vcn. */
 	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
@@ -1079,7 +1079,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	if (br <= 0)
 		return br;
 	br /= bk_size;
-	for (end = (u8*)b + br * bk_size; b < end; (u8*)b += bk_size)
+	for (end = (u8*)b + br * bk_size; (u8*)b < end; (u8*)b += bk_size)
 		ntfs_post_read_mst_fixup((NTFS_RECORD*)b, bk_size);
 	/* Finally, return the number of blocks read. */
 	return br;
