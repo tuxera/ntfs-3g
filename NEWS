@@ -1,6 +1,8 @@
 Current news
 ============
 
+Renamed ntfstools to ntfsprogs everywhere.
+
 Added new utility ntfslabel by Matthew Fanto. See man 8 ntfslabel for details.
 
 Added new utility ntfsundelete by Richard Russon.  See man 8 ntfsundelete for
