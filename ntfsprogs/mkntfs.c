@@ -84,7 +84,7 @@
 #endif
 #include <limits.h>
 
-#if defined(__LINUX__) && defined(_IO) && !defined(BLKSSZGET)
+#if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
 #	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytse. */
 #endif
 
