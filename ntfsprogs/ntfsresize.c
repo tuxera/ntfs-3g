@@ -108,18 +108,25 @@ struct llcn_t {
 };	
 	
 typedef struct {
-	s64 new_volume_size;		/* in clusters; 0 = --info w/o --size */
-	int shrink;			/* shrink = 1, enlarge = 0 */
-	ntfs_inode *ni;			/* inode being processed */
-	MFT_REF mref;                   /* mft reference */
-	MFT_RECORD *mrec;               /* mft record */
-	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
-	u64 relocations;		/* num of clusters to relocate */
-	s64 inuse;			/* num of clusters in use */
-	int multi_ref;			/* num of clusters ref'd many times */
-	runlist mftmir_rl;		/* $MFTMirr AT_DATA's new position */
-	s64 mftmir_old;			/* $MFTMirr AT_DATA's old LCN */
-	int dirty_inode;		/* some inode data got relocated */
+	ntfs_inode *ni;		     /* inode being processed */
+	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
+	s64 inuse;		     /* num of clusters in use */
+	int multi_ref;		     /* num of clusters referenced many times */
+	struct bitmap lcn_bitmap;
+} ntfs_fsck_t;
+
+typedef struct {
+	s64 new_volume_size;	     /* in clusters; 0 = --info w/o --size */
+	int shrink;		     /* shrink = 1, enlarge = 0 */
+	ntfs_inode *ni;		     /* inode being processed */
+	MFT_REF mref;                /* mft reference */
+	MFT_RECORD *mrec;            /* mft record */
+	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
+	u64 relocations;	     /* num of clusters to relocate */
+	s64 inuse;		     /* num of clusters in use */
+	runlist mftmir_rl;	     /* $MFTMirr AT_DATA's new position */
+	s64 mftmir_old;		     /* $MFTMirr AT_DATA's old LCN */
+	int dirty_inode;	     /* some inode data got relocated */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */
@@ -129,8 +136,8 @@ typedef struct {
 	struct llcn_t last_sparse;
 	struct llcn_t last_compressed;
 	struct llcn_t last_lcn;
-	s64 last_unsafe;		/* last "unsafe-to-move" cluster */
-	s64 last_unsupp;		/* last unsupported cluster */
+	s64 last_unsafe;	     /* last "unsafe-to-move" cluster */
+	s64 last_unsupp;	     /* last unsupported cluster */
 } ntfs_resize_t;
 
 
@@ -716,16 +723,16 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
  *
  * This serves as a rudimentary "chkdsk" operation.
  */
-static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
+static void build_lcn_usage_bitmap(ntfs_fsck_t *fsck)
 {
 	s64 inode;
 	ATTR_RECORD *a;
 	runlist *rl;
 	int i, j;
-	struct bitmap *lcn_bitmap = &resize->lcn_bitmap;
+	struct bitmap *lcn_bitmap = &fsck->lcn_bitmap;
 
-	a = resize->ctx->attr;
-	inode = resize->ni->mft_no;
+	a = fsck->ctx->attr;
+	inode = fsck->ni->mft_no;
 
 	if (!a->non_resident)
 		return;
@@ -757,7 +764,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 			u64 k = (u64)lcn + j;
 			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
 				
-				if (++resize->multi_ref > 10)
+				if (++fsck->multi_ref > 10)
 					continue;
 
 				printf("Cluster %llu (0x%llx) referenced "
@@ -766,7 +773,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 						(unsigned long long)k);
 			}
 		}
-		resize->inuse += lcn_length;
+		fsck->inuse += lcn_length;
 	}
 	free(rl);
 }
@@ -777,18 +784,18 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
  * For a given MFT Record, iterate through all its attributes.  Any non-resident
  * data runs will be marked in lcn_bitmap.
  */
-static void walk_attributes(ntfs_resize_t *resize)
+static void walk_attributes(ntfs_fsck_t *fsck)
 {
-	if (!(resize->ctx = ntfs_attr_get_search_ctx(resize->ni, NULL)))
+	if (!(fsck->ctx = ntfs_attr_get_search_ctx(fsck->ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	while (!ntfs_attrs_walk(resize->ctx)) {
-		if (resize->ctx->attr->type == AT_END)
+	while (!ntfs_attrs_walk(fsck->ctx)) {
+		if (fsck->ctx->attr->type == AT_END)
 			break;
-		build_lcn_usage_bitmap(resize);
+		build_lcn_usage_bitmap(fsck);
 	}
 
-	ntfs_attr_put_search_ctx(resize->ctx);
+	ntfs_attr_put_search_ctx(fsck->ctx);
 }
 
 /**
@@ -904,7 +911,7 @@ static void progress_update(struct progress_bar *p, u64 current)
  * Read each record in the MFT, skipping the unused ones, and build up a bitmap
  * from all the non-resident attributes.
  */
-static void build_allocation_bitmap(ntfs_resize_t *resize)
+static void build_allocation_bitmap(ntfs_fsck_t *fsck)
 {
 	s64 inode = 0;
 	ntfs_inode *ni;
@@ -929,8 +936,8 @@ static void build_allocation_bitmap(ntfs_resize_t *resize)
 		if ((ni->mrec->base_mft_record) != 0)
 			goto close_inode;
 
-		resize->ni = ni;
-		walk_attributes(resize);
+		fsck->ni = ni;
+		walk_attributes(fsck);
 close_inode:
 		if (ntfs_inode_close(ni))
 			perr_exit("ntfs_inode_close for inode %lld", inode);
@@ -1903,12 +1910,12 @@ static void print_vol_size(const char *str, s64 bytes)
  *
  * Display the amount of disk space in use.
  */
-static void print_disk_usage(ntfs_resize_t *resize)
+static void print_disk_usage(s64 nr_used_clusters)
 {
 	s64 total, used;
 
 	total = vol->nr_clusters * vol->cluster_size;
-	used = resize->inuse * vol->cluster_size;
+	used = nr_used_clusters * vol->cluster_size;
 
 	/* WARNING: don't modify the text, external tools grep for it */
 	printf("Space in use       : %lld MB (%.1f%%)\n",
@@ -2055,6 +2062,7 @@ static void check_shrink_constraints(ntfs_resize_t *resize)
 
 int main(int argc, char **argv)
 {
+	ntfs_fsck_t fsck;
 	ntfs_resize_t resize;
 	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
@@ -2106,26 +2114,28 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
-
-	memset(&resize, 0, sizeof(resize));
-	resize.new_volume_size = new_size;
+	memset(&fsck, 0, sizeof(fsck));
+	setup_lcn_bitmap(&fsck.lcn_bitmap);
 	
-	setup_lcn_bitmap(&resize.lcn_bitmap);
-
-	/* This is also true if --info was used w/o --size (new_size = 0) */
-	if (new_size < vol->nr_clusters)
-		resize.shrink = 1;
-	
-	build_allocation_bitmap(&resize);
-	if (resize.multi_ref) {
+	build_allocation_bitmap(&fsck);
+	if (fsck.multi_ref) {
 		err_printf("Filesystem check failed! Totally %d clusters "
-			   "referenced multiply times.\n", resize.multi_ref);
+			   "referenced multiply times.\n", fsck.multi_ref);
 		printf(corrupt_volume_msg);
 		exit(1);
 	}
-	compare_bitmaps(&resize.lcn_bitmap);
+	compare_bitmaps(&fsck.lcn_bitmap);
 
-	print_disk_usage(&resize);
+	print_disk_usage(fsck.inuse);
+	
+	memset(&resize, 0, sizeof(resize));
+	resize.new_volume_size = new_size;
+	resize.inuse = fsck.inuse;
+	resize.lcn_bitmap = fsck.lcn_bitmap;
+	
+	/* This is also true if --info was used w/o --size (new_size = 0) */
+	if (new_size < vol->nr_clusters)
+		resize.shrink = 1;
 
 	set_resize_constrains(&resize);
 	set_disk_usage_constraint(&resize);
