@@ -220,7 +220,7 @@ int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
 	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
 			new_alen;
 	/* Check for sufficient space. */
-	if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+	if ((u32)new_muse > le32_to_cpu(m->bytes_allocated)) {
 		errno = ENOSPC;
 		return -1;
 	}

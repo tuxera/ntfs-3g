@@ -350,7 +350,7 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 		return 1;
 	}
 
-	for (i = s_begin; i < s_end; i++) {
+	for (i = s_begin; (LCN)i < s_end; i++) {
 		if (utils_cluster_in_use (vol, i) == 1) {
 			in_use = 1;
 			break;
@@ -368,7 +368,7 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 
 	// first, is the cluster in use in $Bitmap?
 
-	for (i = 0; i < vol->nr_mft_records; i++) {
+	for (i = 0; (s64)i < vol->nr_mft_records; i++) {
 		ntfs_inode *inode;
 		ntfs_attr_search_ctx *ctx;
 

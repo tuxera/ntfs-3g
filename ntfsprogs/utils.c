@@ -675,7 +675,8 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 	}
 
 	/* Does mref lie in the section of $Bitmap we already have cached? */
-	if ((mref < bmpmref) || (mref >= (bmpmref + (sizeof (buffer) << 3)))) {
+	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
+			(sizeof (buffer) << 3)))) {
 		Dprintf ("Bit lies outside cache.\n");
 
 		/* Mark the buffer as not in use, in case the read is shorter. */
@@ -760,7 +761,7 @@ ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, cons
 		}
 
 		inum = ntfs_inode_lookup_by_name (ni, unicode, len);
-		if (inum == -1) {
+		if (inum == (u64)-1) {
 			Eprintf ("Couldn't find name '%s' in pathname '%s'.\n", p, pathname);
 			goto close;
 		}
@@ -912,7 +913,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		ctx->inode = NULL;
 	}
 
-	for (ctx->mft_num++; ctx->mft_num < ctx->vol->nr_mft_records; ctx->mft_num++) {
+	for (ctx->mft_num++; (s64)ctx->mft_num < ctx->vol->nr_mft_records; ctx->mft_num++) {
 		ctx->flags_match = 0;
 		int in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {

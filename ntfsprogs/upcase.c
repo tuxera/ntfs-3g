@@ -71,7 +71,7 @@ void init_upcase_table(uchar_t *uc, u32 uc_len)
 
 	memset((char*)uc, 0, uc_len);
 	uc_len >>= 1;
-	for (i = 0; i < uc_len; i++)
+	for (i = 0; (u32)i < uc_len; i++)
 		uc[i] = i;
 	for (r = 0; uc_run_table[r][0]; r++)
 		for (i = uc_run_table[r][0]; i < uc_run_table[r][1]; i++)

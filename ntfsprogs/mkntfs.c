@@ -694,7 +694,7 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	default:
 		i = le32_to_cpu(type);
 		printf("Cannot display unknown %s defined attribute type 0x%x"
-				".\n", i >=
+				".\n", (u32)i >=
 				le32_to_cpu(AT_FIRST_USER_DEFINED_ATTRIBUTE) ?
 				"user" : "system", i);
 	}
@@ -809,7 +809,7 @@ void dump_attr_record(ATTR_RECORD *a)
 	if (a->name_length) {
 		if (ucstos(s, (uchar_t*)((char*)a +
 				cpu_to_le16(a->name_offset)),
-				min(sizeof(s), a->name_length + 1)) == -1) {
+				min(sizeof(s), a->name_length + 1U)) == -1) {
 			Eprintf("Could not convert Unicode string to single "
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
@@ -1067,7 +1067,7 @@ runlist *allocate_scattered_clusters(s64 clusters)
 			 * Reallocate memory if necessary. Make sure we have
 			 * enough for the terminator entry as well.
 			 */
-			if ((rlpos + 2) * sizeof(runlist) >= rlsize) {
+			if ((rlpos + 2) * (int)sizeof(runlist) >= rlsize) {
 				rlsize += 4096; /* PAGE_SIZE */
 				rlt = realloc(rl, rlsize);
 				if (!rlt)
@@ -1905,7 +1905,7 @@ int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
 			free(r);
 			return -EINVAL;
 		}
-		if (index_block_size < opts.sector_size) {
+		if (index_block_size < (u32)opts.sector_size) {
 			 Eprintf("add_attr_index_root: index block size is "
 					 "smaller than the sector size.\n");
 			 free(r);
@@ -2445,7 +2445,7 @@ int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 /**
  * init_options
  */
-void init_options()
+void init_options(void)
 {
 	memset(&opts, 0, sizeof(opts));
 	opts.index_block_size = 4096;
@@ -2679,13 +2679,13 @@ int main(int argc, char **argv)
 		else
 			vol->cluster_size = 4096;
 		/* For small volumes on devices with large sector sizes. */
-		if (vol->cluster_size < opts.sector_size)
+		if (vol->cluster_size < (u32)opts.sector_size)
 			vol->cluster_size = opts.sector_size;
 	}
 	/* Validate cluster size. */
 	if (vol->cluster_size & (vol->cluster_size - 1) ||
-	    vol->cluster_size < opts.sector_size ||
-	    vol->cluster_size > 128 * opts.sector_size ||
+	    vol->cluster_size < (u32)opts.sector_size ||
+	    vol->cluster_size > 128 * (u32)opts.sector_size ||
 	    vol->cluster_size > 65536)
 		err_exit("Error: cluster_size is invalid. It must be a power "
 			 "of two, be at least\nthe same as sector_size, be "
@@ -2967,7 +2967,7 @@ int main(int argc, char **argv)
 				fflush(stdout);
 			}
 			bw = mkntfs_write(vol->dev, buf, vol->cluster_size);
-			if (bw != vol->cluster_size) {
+			if (bw != (ssize_t)vol->cluster_size) {
 				if (bw != -1 || errno != EIO)
 					err_exit("This should not happen.\n");
 				if (!position)
@@ -2996,12 +2996,12 @@ int main(int argc, char **argv)
 		Qprintf("\b\b\b\b100%%");
 		position = (opts.volume_size & (vol->cluster_size - 1)) /
 				opts.sector_size;
-		for (i = 0; i < position; i++) {
+		for (i = 0; (unsigned long)i < position; i++) {
 			bw = mkntfs_write(vol->dev, buf, opts.sector_size);
 			if (bw != opts.sector_size) {
 				if (bw != -1 || errno != EIO)
 					err_exit("This should not happen.\n");
-				else if (i + 1 == position &&
+				else if (i + 1UL == position &&
 						(vol->major_ver >= 2 ||
 						 (vol->major_ver == 1 &&
 						  vol->minor_ver >= 2)))
@@ -3264,7 +3264,8 @@ int main(int argc, char **argv)
 			vol->cluster_size;
 	else {
 		bs->clusters_per_mft_record = -(ffs(vol->mft_record_size) - 1);
-		if ((1 << -bs->clusters_per_mft_record) != vol->mft_record_size)
+		if ((u32)(1 << -bs->clusters_per_mft_record) !=
+				vol->mft_record_size)
 			err_exit("BUG: calculated clusters_per_mft_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_mft_record);
@@ -3272,7 +3273,7 @@ int main(int argc, char **argv)
 	Dprintf("Clusters per mft record = %i (0x%x)\n",
 			bs->clusters_per_mft_record,
 			bs->clusters_per_mft_record);
-	if (opts.index_block_size >= vol->cluster_size)
+	if (opts.index_block_size >= (int)vol->cluster_size)
 		bs->clusters_per_index_record = opts.index_block_size /
 			vol->cluster_size;
 	else {
@@ -3491,7 +3492,7 @@ bb_err:
 	Vprintf("Syncing $MFT.\n");
 	pos = opts.mft_lcn * vol->cluster_size;
 	lw = 1;
-	for (i = 0; i < opts.mft_size / vol->mft_record_size; i++) {
+	for (i = 0; i < opts.mft_size / (s32)vol->mft_record_size; i++) {
 		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(vol->dev, pos, 1,
 					vol->mft_record_size,
