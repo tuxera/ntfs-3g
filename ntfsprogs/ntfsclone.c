@@ -845,6 +845,23 @@ static void print_disk_usage(ntfs_walk_clusters_ctx *image)
 	Printf("\n");
 }
 
+static void check_if_mounted(const char *device, unsigned long new_mntflag)
+{
+	unsigned long mntflag;
+	
+	if (ntfs_check_if_mounted(device, &mntflag))
+		perr_exit("Failed to check '%s' mount state", device);
+
+	if (mntflag & NTFS_MF_MOUNTED) {
+		if (!(mntflag & NTFS_MF_READONLY))
+			err_exit("Device %s is mounted read-write. "
+				 "You must 'umount' it first.\n", device);
+		if (!new_mntflag)
+			err_exit("Device %s is mounted. "
+				 "You must 'umount' it first.\n", device);
+	}
+}
+
 /**
  * First perform some checks to determine if the volume is already mounted, or
  * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
@@ -852,20 +869,8 @@ static void print_disk_usage(ntfs_walk_clusters_ctx *image)
  */
 static void mount_volume(unsigned long new_mntflag)
 {
-	unsigned long mntflag;
+	check_if_mounted(opt.volume, new_mntflag);
 	
-	if (ntfs_check_if_mounted(opt.volume, &mntflag))
-		perr_exit("Failed to check '%s' mount state", opt.volume);
-
-	if (mntflag & NTFS_MF_MOUNTED) {
-		if (!(mntflag & NTFS_MF_READONLY))
-			err_exit("Device %s is mounted read-write. "
-				 "You must 'umount' it first.\n", opt.volume);
-		if (!new_mntflag)
-			err_exit("Device %s is mounted. "
-				 "You must 'umount' it first.\n", opt.volume);
-	}
-
 	if (!(vol = ntfs_mount(opt.volume, new_mntflag))) {
 
 		int err = errno;
@@ -1008,7 +1013,7 @@ int main(int argc, char **argv)
 		}
 
 		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1) 
-			perr_exit("opening file '%s' failed", opt.output);
+			perr_exit("Opening file '%s' failed", opt.output);
 	
 		if (!opt.blkdev_out) {
 			struct statfs stfs;
@@ -1028,9 +1033,13 @@ int main(int argc, char **argv)
 					  opt.output);
 		} else {
 			s64 dest_size = device_size_get(fd_out);
-			if (dest_size < device_size)
+			s64 ntfs_size = vol->nr_clusters * vol->cluster_size;
+			ntfs_size += 512; /* add backup boot sector */
+			if (dest_size < ntfs_size)
 				err_exit("Output device size (%lld) is too small"
-				    " to fit an NTFS clone\n", dest_size);
+					 " to fit the NTFS image.\n", dest_size);
+			
+			check_if_mounted(opt.output, 0);
 		}
 	}
 
