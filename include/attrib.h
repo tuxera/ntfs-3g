@@ -1,7 +1,7 @@
 /*
  * attrib.h - Exports for attribute handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -157,12 +157,19 @@ typedef enum {
 
 /**
  * ntfs_attr - ntfs in memory non-resident attribute structure
- * @rl:		if not NULL, the decompressed runlist
- * @ni:		base ntfs inode to which this attribute belongs
- * @type:	attribute type
- * @name:	Unicode name of the attribute
- * @name_len:	length of @name in Unicode characters
- * @state:	NTFS attribute specific flags descibing this attribute
+ * @rl:			if not NULL, the decompressed runlist
+ * @ni:			base ntfs inode to which this attribute belongs
+ * @type:		attribute type
+ * @name:		Unicode name of the attribute
+ * @name_len:		length of @name in Unicode characters
+ * @state:		NTFS attribute specific flags descibing this attribute
+ * @allocated_size:	copy from the attribute record
+ * @data_size:		copy from the attribute record
+ * @initialized_size:	copy from the attribute record
+ * @compressed_size: 	copy from the attribute record
+ * @compression_block_size:		size of a compression block (cb)
+ * @compression_block_size_bits:	log2 of the size of a cb
+ * @compression_block_clusters:		number of clusters per cb
  *
  * This structure exists purely to provide a mechanism of caching the runlist
  * of an attribute. If you want to operate on a particular attribute extent,
