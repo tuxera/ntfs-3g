@@ -1,33 +1,44 @@
-
 # Bitkeeper
-# configure
-# general build products
-# specific programs
-*/*.o
-*/.*swp
-*/.deps/*
-*/.libs/*
-*/Makefile
-*/TAGS
-*/tags
-.*swp
 BitKeeper/*/*
-Makefile
 PENDING/*
-TAGS
+
+# configure
 autom4te.cache/*
 config.cache
 config.h
 config.h.in~
 config.log
 config.status
+libtool
+Makefile
+*/Makefile
+ntfsprogs/*.8
+stamp-h
+stamp-h1
+
+# general build products
+*/.deps/*
 libntfs/*.8
 libntfs/*.l?
 libntfs/libntfs.conf
-libtool
-ntfsprogs-*.tar.gz
+*/.libs/*
+*/*.o
+tags
+*/tags
+TAGS
+*/TAGS
+
+# other
+*~
+*/*~
+*/*/~
+.*swp
+*/.*swp
+*/*/.*swp
 ntfsprogs.spec
-ntfsprogs/*.8
+ntfsprogs-*.tar.gz
+
+# specific programs
 ntfsprogs/dumplog
 ntfsprogs/mkntfs
 ntfsprogs/ntfscat
@@ -44,7 +55,4 @@ ntfsprogs/ntfsrm
 ntfsprogs/ntfstruncate
 ntfsprogs/ntfsundelete
 ntfsprogs/ntfswipe
-stamp-h
-stamp-h1
-tags
-ntfsprogs/ntfsinfo.c~
+
