@@ -23,6 +23,7 @@
 
 AC_PREREQ(2.57)
 AC_INIT([ntfsprogs],[1.8.6-WIP],[linux-ntfs-dev@lists.sourceforge.net])
+AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
@@ -37,14 +38,14 @@ AM_ENABLE_STATIC
 # but doesn't. So this sets host and erases nonopt effectively moving the
 # standalone command line option into the --host= form.
 if test "x$nonopt" != "xNONE"; then
-  host="$nonopt"
-  nonopt="NONE"
+	host="$nonopt"
+	nonopt="NONE"
 fi
 
 AC_PREFIX_DEFAULT(/usr/local)
 if test "x$prefix" = "xNONE"; then
-  prefix=$ac_default_prefix
-  ac_configure_args="$ac_configure_args --prefix $prefix"
+	prefix=$ac_default_prefix
+	ac_configure_args="$ac_configure_args --prefix $prefix"
 fi
 
 # Command-line options.
@@ -97,6 +98,14 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
+
+case "$target" in
+*-*-*djgpp)
+	if test -z "$CC"; then CC=gcc; fi
+	if test -z "$AR"; then AR=ar; fi
+	if test -z "$LD"; then LD=ld; fi
+;;
+esac
 
 # Enable large file support.
 AC_SYS_LARGEFILE
