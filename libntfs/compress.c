@@ -192,9 +192,8 @@ do_next_tag:
 			goto return_overflow;
 		/* Now calculate the length of the byte sequence. */
 		length = (pt & (0xfff >> lg)) + 3;
-		/* Advance destination position and verify it is in range. */
-		dest += length;
-		if (dest > dest_sb_end)
+		/* Verify destination is in range. */
+		if (dest + length > dest_sb_end)
 			goto return_overflow;
 		/* The number of non-overlapping bytes. */
 		max_non_overlap = dest - dest_back_addr;
@@ -282,8 +281,9 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 		return 0;
 	/* Truncate reads beyond end of attribute. */
 	if (pos + count > na->data_size) {
-		if (pos >= na->data_size)
+		if (pos >= na->data_size) {
 			return 0;
+		}
 		count = na->data_size - pos;
 	}
 	/* If it is a resident attribute, simply use ntfs_attr_pread(). */
@@ -360,6 +360,7 @@ do_next_cb:
 		count -= to_read;
 		(u8*)b += to_read;
 	} else if (rl->length - (vcn - rl->vcn) >= cb_clusters) {
+		s64 tdata_size, tinitialized_size;
 		/*
 		 * Uncompressed cb, read it straight into the destination range
 		 * overlapping the cb.
@@ -369,11 +370,16 @@ do_next_cb:
 		 * Read the uncompressed data into the destination buffer.
 		 * NOTE: We cheat a little bit here by marking the attribute as
 		 * not compressed in the ntfs_attr structure so that we can
-		 * read the data by simply using ntfs_attr_pread().  (-8
+		 * read the data by simply using ntfs_attr_pread().  (-8  Note,
+		 * Note, we have to modify data_size and initialized_size
+		 * temporarily as well...
 		 */
 		to_read = min(count, cb_size - ofs);
 		ofs += vcn << vol->cluster_size_bits;
 		NAttrClearCompressed(na);
+		tdata_size = na->data_size;
+		tinitialized_size = na->initialized_size;
+		na->data_size = na->initialized_size = na->allocated_size;
 		do {
 			br = ntfs_attr_pread(na, ofs, to_read, b);
 			if (br < 0) {
@@ -392,9 +398,13 @@ do_next_cb:
 			to_read -= br;
 			ofs += br;
 		} while (to_read > 0);
+		na->data_size = tdata_size;
+		na->initialized_size = tinitialized_size;
 		NAttrSetCompressed(na);
 		ofs = 0;
 	} else {
+		s64 tdata_size, tinitialized_size;
+
 		/*
 		 * Compressed cb, decompress it into the temporary buffer, then
 		 * copy the data to the destination range overlapping the cb.
@@ -405,10 +415,14 @@ do_next_cb:
 		 * NOTE: We cheat a little bit here by marking the attribute as
 		 * not compressed in the ntfs_attr structure so that we can
 		 * read the raw, compressed data by simply using
-		 * ntfs_attr_pread().  (-8
+		 * ntfs_attr_pread().  (-8  Note, we have to modify data_size
+		 * and initialized_size temporarily as well...
 		 */
 		to_read = cb_size;
 		NAttrClearCompressed(na);
+		tdata_size = na->data_size;
+		tinitialized_size = na->initialized_size;
+		na->data_size = na->initialized_size = na->allocated_size;
 		do {
 			br = ntfs_attr_pread(na,
 					(vcn << vol->cluster_size_bits) +
@@ -426,6 +440,8 @@ do_next_cb:
 			cb_pos += br;
 			to_read -= br;
 		} while (to_read > 0);
+		na->data_size = tdata_size;
+		na->initialized_size = tinitialized_size;
 		NAttrSetCompressed(na);
 		/* Just a precaution. */
 		if (cb_pos + 2 <= cb_end)
