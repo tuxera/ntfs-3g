@@ -2738,11 +2738,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Setup the fields specific to non-resident attributes. */
 	a->lowest_vcn = scpu_to_le64(0);
-	if (na->type == AT_ATTRIBUTE_LIST)
-		a->highest_vcn = scpu_to_le64((new_allocated_size - 1) >>
+	a->highest_vcn = scpu_to_le64((new_allocated_size - 1) >>
 						vol->cluster_size_bits);
-	else
-		a->highest_vcn = scpu_to_le64(0);
 
 	a->mapping_pairs_offset = cpu_to_le16(mp_ofs);
 
@@ -3258,14 +3255,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 				goto put_err_out;
 			}
 		}
-		/*
-		 * Reminder: It is ok for a->highest_vcn to be -1 for zero
-		 * length files. We may not update a->highest_vcn if it equal
-		 * to 0 and attribute isn't $ATTRIBUTE_LIST and it is
-		 * single-extent.
-		 */
-		if (a->highest_vcn || a->type == AT_ATTRIBUTE_LIST)
-			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
 		if (mp_size <= 0) {
@@ -3640,15 +3630,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			}
 			a = (ATTR_RECORD*)((u8*)m + err);
 		}
-
-		/*
-		 * Reminder: We may not update a->highest_vcn if it equal to 0
-		 * and attribute isn't $ATTRIBUTE_LIST and it is single-extent.
-		 */
-		if (a->lowest_vcn || a->highest_vcn ||
-					a->type == AT_ATTRIBUTE_LIST)
-			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
-
+		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		ntfs_inode_mark_dirty(ni);
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
@@ -3732,8 +3714,7 @@ rollback:
 			"failed. Run chkdsk.\n", __FUNCTION__);
 		goto put_err_out;
 	}
-	if (a->lowest_vcn || a->highest_vcn || a->type == AT_ATTRIBUTE_LIST)
-		a->highest_vcn = scpu_to_le64((na->allocated_size >>
+	a->highest_vcn = scpu_to_le64((na->allocated_size >>
 					vol->cluster_size_bits) - 1);
 	stop_vcn = 0;
 	while(!ntfs_attr_lookup(na->type, na->name,
