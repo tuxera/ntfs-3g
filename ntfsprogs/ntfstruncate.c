@@ -110,7 +110,7 @@ void Dprintf(const char *fmt, ...)
 /**
  * Eprintf - error output; ignores quiet (-q)
  */
-void Eprintf(const char *fmt, ...)
+int Eprintf(const char *fmt, ...)
 {
 	va_list ap;
 
