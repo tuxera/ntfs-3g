@@ -71,7 +71,7 @@ libntfs_gnomevfs_la_SOURCES =	\
 
 man_MANS = libntfs-gnomevfs.8
 
-INCLUDES = $(linux_ntfsincludedir) $(all_includes)
+AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
 
 EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 

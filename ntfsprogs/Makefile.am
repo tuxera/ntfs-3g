@@ -25,7 +25,7 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
 # Set the include path.
-INCLUDES		= -I$(top_srcdir)/include/ntfs $(all_includes)
+AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
 
 ntfsfix_SOURCES		= ntfsfix.c
 ntfsfix_LDADD		= $(AM_LIBS)
