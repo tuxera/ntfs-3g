@@ -43,8 +43,8 @@
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  */
-static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit, s64 count,
-		int value)
+static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
+		s64 count, int value)
 {
 	s64 bufsize, br;
 	u8 *buf, *lastbyte_buf;
@@ -212,4 +212,3 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 {
 	return ntfs_bitmap_set_bits_in_run(na, start_bit, count, 0);
 }
-

@@ -1,7 +1,7 @@
 /*
  * bitmap.h - Exports for bitmap handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -46,7 +46,6 @@
 static __inline__ void ntfs_bit_set(u8 *bitmap, const u64 bit,
 		const u8 new_value)
 {
-//	Dprintf("bitmap %p, bit 0x%llx, new_value %i\n", bitmap, bit, new_value);
 	if (!bitmap || new_value > 1)
 		return;
 	if (!new_value)
@@ -103,5 +102,32 @@ static __inline__ char ntfs_bit_get_and_set(u8 *bitmap, const u64 bit,
 extern int ntfs_bitmap_set_run(ntfs_attr *na, s64 start_bit, s64 count);
 extern int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count);
 
-#endif /* defined _NTFS_BITMAP_H */
+/**
+ * ntfs_bitmap_set_bit - set a bit in a bitmap
+ * @na:		attribute containing the bitmap
+ * @bit:	bit to set
+ *
+ * Set the @bit in the bitmap described by the attribute @na.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+static __inline__ int ntfs_bitmap_set_bit(ntfs_attr *na, s64 bit)
+{
+	return ntfs_bitmap_set_run(na, bit, 1);
+}
 
+/**
+ * ntfs_bitmap_clear_bit - clear a bit in a bitmap
+ * @na:		attribute containing the bitmap
+ * @bit:	bit to clear
+ *
+ * Clear @bit in the bitmap described by the attribute @na.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+static __inline__ int ntfs_bitmap_clear_bit(ntfs_attr *na, s64 bit)
+{
+	return ntfs_bitmap_clear_run(na, bit, 1);
+}
+
+#endif /* defined _NTFS_BITMAP_H */
