@@ -1,8 +1,8 @@
 /*
- * unistr.h - Exports for unicode string handling. Part of the Linux-NTFS
+ * unistr.h - Exports for Unicode string handling. Part of the Linux-NTFS
  *	      project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
