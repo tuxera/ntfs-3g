@@ -6,9 +6,10 @@ Russon, ntfsinfo by Matthew Fanto, ntfsls originally by Lode Leroy, modified
 by Anton Altaparmakov.
 
 Library internal enhancements and API additions.  Of particular note is the
-device io abstraction layer and the addition of the win32 device operations
-(these haven't been integrated in the build process yet but do work when
-integrated manually).  Thanks to Lode Leroy for the win32 code.
+device io abstraction layer and the addition of the win32 device operations.
+(Note the win32 device operations are read only and incomplete but should
+allow running of simple read-only ntfs utilities under Cygwin.)  Thanks to
+Lode Leroy for the win32 code.
 
 
 Older news

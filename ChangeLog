@@ -23,6 +23,11 @@ xx/10/2003 - 1.8.0beta - Work in progress.
 	  instead of to the position in the attribute list at which to insert.
 	- Added man pages for the new utilities (Richard Russon and me).
 	- Lots of extensions and cleanups to ntfsls.
+	- Move common bits from disk_io.c into device.c and rename the Unix io
+	  specific code that remains to unix_io.c to complement win32_io.c.
+	- Integrate win32_io.c into the build process so win32_io ops are used
+	  when compiling under Cygwin and standard Unix style io ops are used
+	  otherwise.
 	- Other assorted bugfixes and developments (see NEWS and bk changes).
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
