@@ -29,6 +29,7 @@
 #include <time.h>
 #include <getopt.h>
 #include <string.h>
+#include <list.h>
 
 #include "types.h"
 #include "mft.h"
@@ -39,6 +40,55 @@
 #include "dir.h"
 
 static const char *EXEC_NAME = "ntfsls";
+
+/**
+ * To hold sub-directory information for recursive listing.
+ * @depth:     the level of this dir relative to opts.path
+ */
+struct dir {
+	struct list_head list;
+	ntfs_inode *ni;
+	char name[MAX_PATH];
+	int depth;
+};
+
+/**
+ * path_component - to store path component strings
+ *
+ * @name: string pointer
+ *
+ * NOTE: @name is not directly allocated memory. It simply points to the
+ * character array name in struct dir.
+ */
+struct path_component {
+	struct list_head list;
+	char *name;
+};
+
+/* The list of sub-dirs is like a "horizontal" tree. The root of
+ * the tree is opts.path, but it is not part of the list because
+ * that's not necessary. The rules of the list are (in order of
+ * precedence):
+ * 1. directories immediately follow their parent.
+ * 2. siblings are next to one another.
+ *
+ * For example, if:
+ *   1. opts.path is /
+ *   2. /    has 2 sub-dirs: dir1 and dir2
+ *   3. dir1 has 2 sub-dirs: dir11 and dir12
+ *   4. dir2 has 0 sub-dirs
+ * then the list will be:
+ * dummy head -> dir1 -> dir11 -> dir12 -> dir2
+ *
+ * dir_list_insert_pos keeps track of where to insert a sub-dir
+ * into the list.
+ */
+struct list_head *dir_list_insert_pos = NULL;
+
+/* The global depth relative to opts.path.
+ * ie: opts.path has depth 0, a sub-dir of opts.path has depth 1
+ */
+int depth = 0;
 
 static struct options {
 	char *device;	/* Device/File to work with */
@@ -51,6 +101,7 @@ static struct options {
 	int lng;
 	int inode;
 	int classify;
+	int recursive;
 	char *path;
 } opts;
 
@@ -95,6 +146,7 @@ static void usage(void)
 		"    -l         --long           Display long info\n"
 		"    -p PATH    --path PATH      Directory whose contents to list\n"
 		"    -q         --quiet          Less output\n"
+		"    -R         --recursive      Recursively list subdirectories\n"
 		"    -s         --system         Display system files\n"
 		"    -V         --version        Display version information\n"
 		"    -v         --verbose        More output\n"
@@ -115,7 +167,7 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-ad:Ffh?ilp:qsVvx";
+	static const char *sopt = "-ad:Ffh?ilp:qRsVvx";
 	static const struct option lopt[] = {
 		{ "all",	 no_argument,		NULL, 'a' },
 		{ "device",      required_argument,	NULL, 'd' },
@@ -125,6 +177,7 @@ static int parse_options(int argc, char *argv[])
 		{ "inode",	 no_argument,		NULL, 'i' },
 		{ "long",	 no_argument,		NULL, 'l' },
 		{ "path",	 required_argument,     NULL, 'p' },
+		{ "recursive",	 no_argument,		NULL, 'R' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "system",	 no_argument,		NULL, 's' },
 		{ "version",	 no_argument,		NULL, 'V' },
@@ -186,6 +239,9 @@ static int parse_options(int argc, char *argv[])
 		case 's':
 			opts.system++;
 			break;
+		case 'R':
+			opts.recursive++;
+			break;
 		default:
 			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
 			err++;
@@ -222,16 +278,187 @@ typedef struct {
 	ntfs_volume *vol;
 } ntfsls_dirent;
 
+static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
+			  const int name_len, const int name_type,
+			  const s64 pos, const MFT_REF mref,
+			  const unsigned dt_type);
+
 /**
- * list_entry
+ * free_dir - free one dir
+ * @tofree:   the dir to free
+ *
+ * Close the inode and then free the dir
+ */
+void free_dir(struct dir *tofree)
+{
+	if (tofree) {
+		if (tofree->ni) {
+			ntfs_inode_close(tofree->ni);
+			tofree->ni = NULL;
+		}
+		free(tofree);
+	}
+}
+
+/**
+ * free_dirs - walk the list of dir's and free each of them
+ * @dir_list:    the list_head of any entry in the list
+ *
+ * Iterate over @dir_list, calling free_dir on each entry
+ */
+void free_dirs(struct list_head *dir_list)
+{
+	struct dir *tofree = NULL;
+	struct list_head *walker = NULL;
+
+	if (dir_list) {
+		list_for_each(walker, dir_list) {
+			free_dir(tofree);
+			tofree = list_entry(walker, struct dir, list);
+		}
+
+		free_dir(tofree);
+	}
+}
+
+/**
+ * readdir_recursive - list a directory and sub-directories encountered
+ * @ni:         ntfs inode of the directory to list
+ * @pos:	current position in directory
+ * @dirent:	context for filldir callback supplied by the caller
+ *
+ * For each directory, print its path relative to opts.path. List a directory,
+ * then list each of its sub-directories.
+ *
+ * Returns 0 on success or -1 on error.
+ *
+ * NOTE: Assumes recursive option. Currently no limit on the depths of
+ * recursion.
+ */
+int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
+{
+	/* list of dirs to "ls" recursively */
+	static struct dir dirs = {
+		.list = LIST_HEAD_INIT(dirs.list),
+		.ni = NULL,
+		.name = {0},
+		.depth = 0
+	};
+
+	static struct path_component paths = {
+		.list = LIST_HEAD_INIT(paths.list),
+		.name = NULL
+	};
+
+	static struct path_component base_comp;
+
+	struct dir *subdir = NULL;
+	struct dir *tofree = NULL;
+	struct path_component comp;
+	struct path_component *tempcomp = NULL;
+	struct list_head *dir_walker = NULL;
+	struct list_head *comp_walker = NULL;
+	s64 pos2 = 0;
+	int ni_depth = depth;
+	int result = 0;
+
+	if (list_empty(&dirs.list)) {
+		base_comp.name = opts.path;
+		list_add(&base_comp.list, &paths.list);
+		dir_list_insert_pos = &dirs.list;
+		printf("%s:\n", opts.path);
+	}
+
+	depth++;
+
+	result = ntfs_readdir(ni, pos, dirent, (ntfs_filldir_t) list_dir_entry);
+
+	if (result == 0) {
+		list_add_tail(&comp.list, &paths.list);
+
+		/* for each of ni's sub-dirs: list in this iteration, then
+		   free at the top of the next iteration or outside of loop */
+		list_for_each(dir_walker, &dirs.list) {
+			if (tofree) {
+				free_dir(tofree);
+				tofree = NULL;
+			}
+			subdir = list_entry(dir_walker, struct dir, list);
+
+			/* subdir is not a subdir of ni */
+			if (subdir->depth != ni_depth + 1)
+				break;
+
+			pos2 = 0;
+			dir_list_insert_pos = &dirs.list;
+			if (!subdir->ni) {
+				subdir->ni =
+				    utils_pathname_to_inode(ni->vol, ni,
+							    subdir->name);
+
+				if (!subdir->ni) {
+					Eprintf
+					    ("ntfsls::readdir_recursive(): cannot get inode from pathname.\n");
+					result = -1;
+					break;
+				}
+			}
+			puts("");
+
+			comp.name = subdir->name;
+
+			/* print relative path header */
+			list_for_each(comp_walker, &paths.list) {
+				tempcomp =
+				    list_entry(comp_walker,
+					       struct path_component, list);
+				printf("%s", tempcomp->name);
+				if (tempcomp != &comp
+				    && *tempcomp->name != PATH_SEP
+				    && (!opts.classify
+					|| tempcomp == &base_comp))
+					putchar(PATH_SEP);
+			}
+			puts(":");
+
+			result = readdir_recursive(subdir->ni, &pos2, dirent);
+
+			if (result)
+				break;
+
+			tofree = subdir;
+			list_del(dir_walker);
+		}
+
+		list_del(&comp.list);
+	}
+
+	if (tofree)
+		free_dir(tofree);
+
+	/* if at the outter-most readdir_recursive, then clean up */
+	if (ni_depth == 0) {
+		free_dirs(&dirs.list);
+	}
+
+	depth--;
+
+	return result;
+}
+
+/**
+ * list_dir_entry
  * FIXME: Should we print errors as we go along? (AIA)
  */
-static int list_entry(ntfsls_dirent *dirent, const ntfschar *name, 
-		const int name_len, const int name_type, const s64 pos,
-		const MFT_REF mref, const unsigned dt_type)
+static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
+			  const int name_len, const int name_type,
+			  const s64 pos, const MFT_REF mref,
+			  const unsigned dt_type)
 {
 	char *filename = NULL;
 	int result = 0;
+
+	struct dir *dir = NULL;
 
 	filename = calloc (1, MAX_PATH);
 	if (!filename)
@@ -255,6 +482,20 @@ static int list_entry(ntfsls_dirent *dirent, const ntfschar *name,
 		goto free;
 	if (dt_type == NTFS_DT_DIR && opts.classify)
 		sprintf(filename + strlen(filename), "/");
+
+	if (dt_type == NTFS_DT_DIR && opts.recursive) {
+		dir = (struct dir *)calloc(1, sizeof(struct dir));
+
+		if (!dir) {
+			Eprintf("Failed to allocate for subdir.\n");
+			result = -1;
+			goto free;
+		}
+
+		strcpy(dir->name, filename);
+		dir->ni = NULL;
+		dir->depth = depth;
+	}
 
 	if (!opts.lng) {
 		if (!opts.inode)
@@ -313,6 +554,11 @@ static int list_entry(ntfsls_dirent *dirent, const ntfschar *name,
 			printf("%8lld %s %s\n", (long long)filesize, t_buf + 4,
 					filename);
 
+		if (dt_type == NTFS_DT_DIR && opts.recursive) {
+			dir->ni = ni;
+			ni = NULL;	/* so release does not close inode */
+		}
+
 		result = 0;
 release:
 		/* Release atrtibute search context and close the inode. */
@@ -321,6 +567,13 @@ release:
 		if (ni)
 			ntfs_inode_close(ni);
 	}
+
+	/* add dir to list */
+	if (dir && !result) {
+		list_add(&dir->list, dir_list_insert_pos);
+		dir_list_insert_pos = &dir->list;
+	}
+
 free:
 	free (filename);
 	return result;
@@ -372,7 +625,11 @@ int main(int argc, char **argv)
 	memset(&dirent, 0, sizeof(dirent));
 	dirent.vol = vol;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
-		ntfs_readdir(ni, &pos, &dirent, (ntfs_filldir_t)list_entry);
+		if (opts.recursive)
+			readdir_recursive(ni, &pos, &dirent);
+		else
+			ntfs_readdir(ni, &pos, &dirent,
+				     (ntfs_filldir_t) list_dir_entry);
 		// FIXME: error checking... (AIA)
 	} else {
 		ATTR_RECORD *rec;
@@ -397,7 +654,8 @@ int main(int argc, char **argv)
 			}
 		}
 
-		list_entry(&dirent, name, name_len, space, pos, ni->mft_no, NTFS_DT_REG);
+		list_dir_entry(&dirent, name, name_len, space, pos, ni->mft_no,
+			       NTFS_DT_REG);
 		// FIXME: error checking... (AIA)
 
 		ntfs_attr_put_search_ctx(ctx);
