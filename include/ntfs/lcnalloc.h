@@ -3,6 +3,7 @@
  *		project.
  *
  * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -36,6 +37,8 @@ typedef enum {
 
 extern runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		const NTFS_CLUSTER_ALLOCATION_ZONES zone, VCN start_vcn);
+
+extern int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl);
 
 extern int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn,
 		s64 count);
