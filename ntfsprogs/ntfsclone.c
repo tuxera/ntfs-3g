@@ -1,0 +1,934 @@
+/**
+ * ntfsclone - Part of the Linux-NTFS project.
+ *
+ * Copyright (c) 2003 Szabolcs Szakacsits
+ *
+ * ntfsclone clones NTFS data and/or metadata to a sparse file or stdout.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ */
+
+#include "config.h"
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+#include <getopt.h>
+
+#include "debug.h"
+#include "types.h"
+#include "support.h"
+#include "endians.h"
+#include "bootsect.h"
+#include "disk_io.h"
+#include "attrib.h"
+#include "volume.h"
+#include "mft.h"
+#include "bitmap.h"
+#include "inode.h"
+#include "runlist.h"
+#include "utils.h"
+
+static const char *EXEC_NAME = "ntfsclone";
+
+struct {
+	int verbose;
+	int quiet;
+	int debug;
+	int force;
+	int overwrite;
+	int stdout;
+	int metadata_only;
+	char *output;
+	char *volume;
+} opt;
+
+struct bitmap {
+	u8 *bm;
+	s64 size;
+};
+
+struct progress_bar {
+	u64 start;
+	u64 stop;
+	int resolution;
+	float unit;
+};
+
+struct __ntfs_walk_clusters_ctx {
+	ntfs_inode *ni;			/* inode being processed */
+	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
+	u64 inuse;			/* number of clusters in use */
+};
+
+typedef struct __ntfs_walk_clusters_ctx ntfs_walk_clusters_ctx;
+typedef int (ntfs_walk_op)(ntfs_inode *ni, void *data);
+
+struct ntfs_walk_cluster {
+	ntfs_walk_op *inode_op;		/* not implemented yet */
+	ntfs_walk_clusters_ctx *image;
+};
+
+
+ntfs_volume *vol = NULL;
+struct bitmap lcn_bitmap;
+
+int fd_out;
+FILE *msg_out = NULL;
+
+int nr_used_mft_records = 0;
+int wipe = 0;
+int wiped_unused_mft_data = 0;
+int wiped_unused_mft = 0;
+int wiped_resident_data = 0;
+int wiped_timestamp_data = 0;
+
+#define NTFS_MBYTE (1000 * 1000)
+
+#define ERR_PREFIX   "ERROR"
+#define PERR_PREFIX  ERR_PREFIX "(%d): "
+#define NERR_PREFIX  ERR_PREFIX ": "
+
+#define LAST_METADATA_INODE  	11
+
+#define NTFS_MAX_CLUSTER_SIZE 	65536
+
+#define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
+
+GEN_PRINTF(Eprintf, stderr,  NULL,         FALSE)
+GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
+GEN_PRINTF(Qprintf, msg_out, &opt.quiet,   FALSE)
+GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
+
+
+void perr_printf(const char *fmt, ...)
+{
+	va_list ap;
+	int eo = errno;
+
+	Printf(PERR_PREFIX, eo);
+	va_start(ap, fmt);
+	vfprintf(msg_out, fmt, ap);
+	va_end(ap);
+	Printf(": %s\n", strerror(eo));
+	fflush(msg_out);
+}
+
+void err_printf(const char *fmt, ...)
+{
+	va_list ap;
+
+	Printf(NERR_PREFIX);
+	va_start(ap, fmt);
+	vfprintf(msg_out, fmt, ap);
+	va_end(ap);
+	fflush(msg_out);
+}
+
+int err_exit(const char *fmt, ...)
+{
+	va_list ap;
+
+	Printf(NERR_PREFIX);
+	va_start(ap, fmt);
+	vfprintf(msg_out, fmt, ap);
+	va_end(ap);
+	fflush(msg_out);
+	exit(1);
+}
+
+
+int perr_exit(const char *fmt, ...)
+{
+	va_list ap;
+	int eo = errno;
+
+	Printf(PERR_PREFIX, eo);
+	va_start(ap, fmt);
+	vfprintf(msg_out, fmt, ap);
+	va_end(ap);
+	Printf(": %s\n", strerror(eo));
+	fflush(msg_out);
+	exit(1);
+}
+
+
+void usage()
+{
+	Eprintf("\nUsage: %s [options] device\n"
+		"    Clone NTFS data to a sparse file or send it to stdout.\n"
+		"\n"
+		"    -o FILE --output FILE  Clone NTFS to the non-existent FILE\n"
+		"    -O FILE                Clone NTFS to FILE, overwriting if exists\n"
+		"    -m      --metadata     Clone *only* metadata (for NTFS experts)\n"
+		"    -f      --force        Force to progress (DANGEROUS)\n"
+		"    -h      --help         Display this help\n"
+#ifdef DEBUG
+		"    -d      --debug        Show debug information\n"
+#endif
+		"\n"
+		"    If FILE is '-' then send NTFS data to stdout replacing non used\n"
+		"    NTFS and partition space with zeros.\n"
+		"\n", EXEC_NAME);
+	Eprintf("%s%s\n", ntfs_bugs, ntfs_home);
+	exit(1);
+}
+
+
+void parse_options(int argc, char **argv)
+{
+	static const char *sopt = "-dfhmo:O:";
+	static const struct option lopt[] = {
+#ifdef DEBUG
+		{ "debug",	no_argument,		NULL, 'd' },
+#endif
+		{ "force",	no_argument,		NULL, 'f' },
+		{ "help",	no_argument,		NULL, 'h' },
+		{ "metadata",	no_argument,		NULL, 'm' },
+		{ "output",	required_argument,	NULL, 'o' },
+		{ NULL, 0, NULL, 0 }
+	};
+
+	char c;
+
+	memset(&opt, 0, sizeof(opt));
+
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (opt.volume)
+				usage();
+			opt.volume = argv[optind-1];
+			break;
+		case 'd':
+			opt.debug++;
+			break;
+		case 'f':
+			opt.force++;
+			break;
+		case 'h':
+		case '?':
+			usage();
+		case 'm':
+			opt.metadata_only++;
+			break;
+		case 'O':
+			opt.overwrite++;
+		case 'o':
+			if (opt.output)
+				usage();
+			opt.output = argv[optind-1];
+			break;
+		default:
+			err_printf("Unknown option '%s'.\n", argv[optind-1]);
+			usage();
+		}
+	}
+	
+	if (opt.output == NULL) {
+		err_printf("You must specify an output file.\n");
+		usage();
+	}
+
+	if (strcmp(opt.output, "-") == 0)
+		opt.stdout++;
+
+	if (opt.volume == NULL) {
+		err_printf("You must specify a device file.\n");
+		usage();
+	}
+
+	if (opt.metadata_only && opt.stdout)
+		err_exit("Cloning only metadata to stdout isn't supported yet!\n");
+	
+	msg_out = stdout;
+	
+	/* FIXME: this is a workaround for loosing debug info if stdout != stderr
+	   and for the uncontrollable verbose messages in libntfs. Ughhh. */
+	if (opt.stdout)
+		msg_out = stderr;
+	else if (opt.debug)
+		stderr = stdout; 
+	else
+		if (!(stderr = fopen("/dev/null", "rw")))
+			perr_exit("Couldn't open /dev/null");
+}
+
+
+/**
+ * nr_clusters_to_bitmap_byte_size
+ *
+ * Take the number of clusters in the volume and calculate the size of $Bitmap.
+ * The size will always be a multiple of 8 bytes.
+ */
+s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
+{
+	s64 bm_bsize;
+
+	bm_bsize = rounded_up_division(nr_clusters, 8);
+
+	bm_bsize = (bm_bsize + 7) & ~7;
+	Dprintf("Bitmap byte size  : %lld (%lld clusters)\n",
+	       bm_bsize, rounded_up_division(bm_bsize, vol->cluster_size));
+
+	return bm_bsize;
+}
+
+int is_critical_meatadata(ntfs_walk_clusters_ctx *image)
+{
+	s64 inode;
+	
+	inode = image->ni->mft_no;
+
+	if (inode <= LAST_METADATA_INODE)
+		if (inode != FILE_LogFile)
+			return 1;
+	
+	if (image->ctx->attr->type != AT_DATA)
+		return 1;
+
+	return 0;
+}
+
+void write_cluster(const char *buff)
+{
+	int count;
+	
+	if ((count = write(fd_out, buff, vol->cluster_size)) == -1)
+		perr_exit("write");
+	
+	if (count != vol->cluster_size)
+		err_exit("Partial write not yet handled\n");
+}
+
+void copy_cluster()
+{
+	int count;
+	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+
+	/* FIXME: handle partial read/writes */
+	if ((count = vol->dev->d_ops->read(vol->dev, buff,
+			vol->cluster_size)) == -1)
+		perr_exit("read");
+
+	if (count != vol->cluster_size)
+		err_exit("Partial read not yet handled\n");
+	
+	write_cluster(buff);
+}
+
+void lseek_to_cluster(s64 lcn)
+{
+	off_t pos;
+	
+	pos = (off_t)(lcn * vol->cluster_size);
+	
+	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
+		perr_exit("lseek input");
+
+	if (opt.stdout)
+		return;
+	
+	if (lseek(fd_out, pos, SEEK_SET) == (off_t)-1)
+		perr_exit("lseek output");
+}
+
+void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
+{
+	int i;
+	
+	if (opt.stdout)
+		return;
+	
+	if (opt.metadata_only && !is_critical_meatadata(image))
+		return;
+
+	lseek_to_cluster(rl->lcn);
+	
+	/* FIXME: this could give pretty suboptimal performance */
+	for (i = 0; i < rl->length; i++)
+		copy_cluster();
+}
+
+void dump_to_stdout()
+{
+	s64 i, pos, count;
+	u8 bm[NTFS_BUF_SIZE];
+	void *buff;
+
+	Printf("Dumping NTFS to stdout ...\n");
+	
+	if ((buff = calloc(1, vol->cluster_size)) == NULL)
+		perr_exit("dump_to_stdout");
+	
+	pos = 0;
+	while (1) {
+		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
+		if (count == -1)
+			perr_exit("Couldn't read $Bitmap (pos = %Ld)\n", pos);
+
+		if (count == 0)
+			return;
+
+		for (i = 0; i < count; i++, pos++) {
+			u64 cl;  /* current cluster */	  
+
+			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
+
+				if (cl > vol->nr_clusters - 1)
+					return;
+				
+				if (ntfs_bit_get(bm, i * 8 + cl % 8)) {
+					lseek_to_cluster(cl);
+					copy_cluster();
+				} else
+					write_cluster(buff);
+			}
+		}
+	}
+}
+
+#define WIPE_TIMESTAMPS(atype, attr)				\
+do {								\
+	atype *ats;						\
+	ats = (atype *)((char*)(attr) + (attr)->value_offset); 	\
+								\
+	ats->creation_time = 0;					\
+	ats->last_data_change_time = 0;				\
+	ats->last_mft_change_time= 0;				\
+	ats->last_access_time = 0;				\
+								\
+	wiped_timestamp_data += 32;				\
+								\
+} while(0)
+
+void wipe_timestamps(ntfs_walk_clusters_ctx *image)
+{
+	ATTR_RECORD *a = image->ctx->attr;
+	
+	if (image->ni->mft_no <= LAST_METADATA_INODE)
+		return;
+
+	if (a->type == AT_FILE_NAME) 
+		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a);
+
+	else if (a->type == AT_STANDARD_INFORMATION)	
+		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a);
+}
+
+void wipe_resident_data(ntfs_walk_clusters_ctx *image)
+{
+	ATTR_RECORD *a;
+	int i, n = 0;
+	char *p;
+
+	a = image->ctx->attr;
+	p = (char *)a + a->value_offset;
+	
+	if (image->ni->mft_no <= LAST_METADATA_INODE)
+		return;
+	
+	if (a->type != AT_DATA)
+		return;
+	
+	for (i = 0; i < a->value_length; i++) {
+		if (p[i]) {
+			p[i] = 0;
+			n++;
+		}	
+	}		
+			
+	wiped_resident_data += n;
+}
+
+void walk_runs(struct ntfs_walk_cluster *walk)
+{
+	int i, j;
+	runlist *rl;
+	ATTR_RECORD *a;
+	ntfs_attr_search_ctx *ctx;
+
+	ctx = walk->image->ctx;
+	a = ctx->attr;
+
+	if (!a->non_resident) {
+		if (wipe) {
+			wipe_resident_data(walk->image);
+			wipe_timestamps(walk->image);
+		}
+		return;
+	}
+
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
+		perr_exit("ntfs_decompress_mapping_pairs");
+
+	for (i = 0; rl[i].length; i++) {
+		s64 lcn = rl[i].lcn;
+		s64 lcn_length = rl[i].length;
+
+		if (lcn == LCN_HOLE || lcn == LCN_RL_NOT_MAPPED)
+			continue;
+
+		/* FIXME: ntfs_mapping_pairs_decompress should return error */
+		if (lcn < 0 || lcn_length < 0)
+			err_exit("Corrupt runlist in inode %lld attr %x LCN "
+				 "%llx length %llx\n", ctx->ntfs_ino->mft_no,
+				 le32_to_cpu (a->type), lcn, lcn_length);
+		
+		if (!wipe)
+			dump_clusters(walk->image, rl + i);
+		
+		for (j = 0; j < lcn_length; j++) {
+			u64 k = (u64)lcn + j;
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
+				err_exit("Cluster %lu referenced twice!\n"
+					 "You didn't shutdown your Windows"
+					 "properly?\n", k);
+		}
+
+		walk->image->inuse += lcn_length;
+	}
+	
+	free(rl);
+}
+
+
+void walk_attributes(struct ntfs_walk_cluster *walk)
+{
+	ntfs_attr_search_ctx *ctx;
+
+	if (!(ctx = ntfs_attr_get_search_ctx(walk->image->ni, NULL)))
+		perr_exit("ntfs_get_attr_search_ctx");
+
+	while (!ntfs_attrs_walk(ctx)) {
+		if (ctx->attr->type == AT_END)
+			break;
+
+		walk->image->ctx = ctx;
+		walk_runs(walk);
+	}
+
+	ntfs_attr_put_search_ctx(ctx);
+}
+
+
+
+void compare_bitmaps(struct bitmap *a)
+{
+	s64 i, pos, count;
+	int mismatch = 0;
+	u8 bm[NTFS_BUF_SIZE];
+
+	Printf("Accounting clusters ...\n");
+
+	pos = 0;
+	while (1) {
+		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
+		if (count == -1)
+			perr_exit("Couldn't get $Bitmap $DATA");
+
+		if (count == 0) {
+			if (a->size != pos)
+				err_exit("$Bitmap file size doesn't match "
+					 "calculated size (%Ld != %Ld)\n",
+					 a->size, pos);
+			break;
+		}
+
+		for (i = 0; i < count; i++, pos++) {
+			u64 cl;  /* current cluster */	  
+
+			if (a->bm[pos] == bm[i])
+				continue;
+
+			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
+				char bit;
+
+				bit = ntfs_bit_get(a->bm, cl);
+				if (bit == ntfs_bit_get(bm, i * 8 + cl % 8))
+					continue;
+
+				if (++mismatch > 10)
+					continue;
+
+				Printf("Cluster accounting failed at %Lu "
+				       "(0x%Lx): %s cluster in $Bitmap\n",
+				       cl, cl, bit ? "missing" : "extra");
+			}
+		}
+	}
+
+	if (mismatch) {
+		Printf("Totally %d cluster accounting mismatches.\n", 
+		       mismatch);
+		err_exit("Filesystem check failed! Windows wasn't shutdown "
+			 "properly or inconsistent\nfilesystem. Please run "
+			 "chkdsk on Windows.\n");
+	}
+}
+
+
+void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
+{
+	p->start = start;
+	p->stop = stop;
+	p->unit = 100.0 / (stop - start);
+	p->resolution = res;
+}
+
+
+void progress_update(struct progress_bar *p, u64 current)
+{
+	float percent = p->unit * current;
+
+	if (current != p->stop) {
+		if ((current - p->start) % p->resolution)
+			return;
+		Printf("%6.2f percent completed\r", percent);
+	} else
+		Printf("100.00 percent completed\n");
+	fflush(msg_out);
+}
+
+int wipe_data(char *p, int pos, int len)
+{
+	int wiped = 0;
+	
+	p += pos;
+	for (; len > 0; len--) {
+		if (p[len]) {
+			p[len] = 0;
+			wiped++;
+		}	
+	}		
+
+	return wiped;
+}
+
+void wipe_unused_mft_data(ntfs_inode *ni)
+{
+	int unused;
+	MFT_RECORD *m = ni->mrec;
+	
+	/* FIXME: MFTMirr update is broken in libntfs */
+	if (ni->mft_no <= LAST_METADATA_INODE)
+		return;
+	
+	unused = m->bytes_allocated - m->bytes_in_use;
+	wiped_unused_mft_data += wipe_data((char *)m, m->bytes_in_use, unused);
+}
+
+void wipe_unused_mft(ntfs_inode *ni)
+{
+	int unused;
+	MFT_RECORD *m = ni->mrec;
+	
+	/* FIXME: MFTMirr update is broken in libntfs */
+	if (ni->mft_no <= LAST_METADATA_INODE)
+		return;
+	
+	/* MFT_RECORD doesn't have the XP specific 6 bytes, so add it */
+	unused = m->bytes_in_use - (sizeof(MFT_RECORD) + 6);
+	wiped_unused_mft += wipe_data((char *)m, sizeof(MFT_RECORD), unused);
+}
+
+
+int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
+{
+	s64 inode = 0;
+	s64 last_mft_rec;
+	ntfs_inode *ni;
+	struct progress_bar progress;
+
+	Printf("Scanning volume ...\n");
+
+	last_mft_rec = vol->nr_mft_records - 1;
+	progress_init(&progress, inode, last_mft_rec, 100);
+
+	for (; inode <= last_mft_rec; inode++) {
+		
+		int err, deleted_inode;
+		MFT_REF mref = (MFT_REF)inode;
+
+		progress_update(&progress, inode);
+
+		/* FIXME: Terribe kludge for libntfs not being able to return
+		   a deleted MFT record as inode */
+		ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
+		if (!ni)
+			perr_exit("walk_clusters");
+		
+		ni->vol = vol;
+
+		err = ntfs_file_record_read(vol, mref, &ni->mrec, NULL);
+		if (err == -1) {
+			free(ni);
+			continue;
+		}	
+
+	        deleted_inode = !(ni->mrec->flags & MFT_RECORD_IN_USE);
+
+	        if (deleted_inode) {
+
+			ni->mft_no = MREF(mref);
+			if (wipe) {
+				wipe_unused_mft(ni);
+				wipe_unused_mft_data(ni);
+				if (ntfs_mft_record_write(vol, ni->mft_no, ni->mrec))
+					perr_exit("ntfs_mft_record_write");
+			}		
+		}
+
+	       	if (ni->mrec)
+	        	free(ni->mrec);
+		free(ni);
+
+	        if (deleted_inode) 
+			continue;
+		
+		if ((ni = ntfs_inode_open(vol, mref)) == NULL) {
+			/* FIXME: continue only if it make sense, e.g.
+			   MFT record not in use based on $MFT bitmap */
+			if (errno == EIO || errno == ENOENT)
+				continue;
+			perr_exit("Reading inode %lld failed", inode);
+		}
+
+		if (wipe)
+			nr_used_mft_records++;
+
+		if ((ni->mrec->base_mft_record) != 0)
+			goto out;
+
+		walk->image->ni = ni;
+		walk_attributes(walk);
+out:		
+		if (wipe) {
+			wipe_unused_mft_data(ni);
+			if (ntfs_mft_record_write(vol, ni->mft_no, ni->mrec))
+				perr_exit("ntfs_mft_record_write");
+		}		
+
+		if (ntfs_inode_close(ni))
+			perr_exit("ntfs_inode_close for inode %Ld", inode);
+	}
+	
+	return 0;
+}
+
+
+/*
+ * $Bitmap can overlap the end of the volume. Any bits in this region
+ * must be set. This region also encompasses the backup boot sector.
+ */
+void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
+{
+	for (; cluster < bm->size << 3; cluster++)
+		ntfs_bit_set(bm->bm, (u64)cluster, 1);
+}
+
+
+/*
+ * Allocate a block of memory with one bit for each cluster of the disk.
+ * All the bits are set to 0, except those representing the region beyond the
+ * end of the disk.
+ */
+void setup_lcn_bitmap()
+{
+	/* Determine lcn bitmap byte size and allocate it. */
+	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
+
+	if (!(lcn_bitmap.bm = (unsigned char *)calloc(1, lcn_bitmap.size)))
+		perr_exit("Failed to allocate internal buffer");
+
+	bitmap_file_data_fixup(vol->nr_clusters, &lcn_bitmap);
+}
+
+
+s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
+{
+	return nr_clusters * vol->cluster_size;
+}
+
+
+void print_volume_size(char *str, s64 bytes)
+{
+	Printf("%s: %lld bytes (%lld MB)\n",
+	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
+}
+
+
+void print_disk_usage(ntfs_walk_clusters_ctx *image)
+{
+	s64 total, used, free;
+
+	total = vol->nr_clusters * vol->cluster_size;
+	used = image->inuse * vol->cluster_size;
+	free = total - used;
+
+	Printf("Space in use       : %lld MB (%.1f%%)   ",
+	       rounded_up_division(used, NTFS_MBYTE),
+	       100.0 * ((float)used / total));
+
+	Printf("\n");
+}
+
+/**
+ * First perform some checks to determine if the volume is already mounted, or
+ * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
+ * the volume (load the metadata into memory).
+ */
+void mount_volume(unsigned long new_mntflag)
+{
+	unsigned long mntflag;
+	
+	if (ntfs_check_if_mounted(opt.volume, &mntflag))
+		perr_exit("Failed to check '%s' mount state", opt.volume);
+
+	if (mntflag & NTFS_MF_MOUNTED) {
+		if (!(mntflag & NTFS_MF_READONLY))
+			err_exit("Device %s is mounted read-write. "
+				 "You must 'umount' it first.\n", opt.volume);
+		if (!new_mntflag)
+			err_exit("Device %s is mounted. "
+				 "You must 'umount' it first.\n", opt.volume);
+	}
+
+	if (!(vol = ntfs_mount(opt.volume, new_mntflag))) {
+
+		int err = errno;
+
+		perr_printf("ntfs_mount failed");
+		if (err == EINVAL) {
+			Printf("Apparently device '%s' doesn't have a "
+			       "valid NTFS. Maybe you selected\nthe whole "
+			       "disk instead of a partition (e.g. /dev/hda, "
+			       "not /dev/hda1)?\n", opt.volume);
+		}
+		exit(1);
+	}
+
+	if (vol->flags & VOLUME_IS_DIRTY)
+		if (opt.force-- <= 0)
+			err_exit("Volume is dirty. Run chkdsk and "
+				 "please try again (or see -f option).\n");
+	
+	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
+		err_exit("Cluster size %u is too large!\n", vol->cluster_size);
+
+	Printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
+	if (ntfs_version_is_supported(vol))
+		perr_exit("Unknown NTFS version");
+
+	Printf("Cluster size       : %u bytes\n", vol->cluster_size);
+	print_volume_size("Current volume size",
+			  volume_size(vol, vol->nr_clusters));
+}
+
+struct ntfs_walk_cluster backup_clusters = { NULL, NULL }; 
+
+
+int main(int argc, char **argv)
+{
+	ntfs_walk_clusters_ctx image;
+	s64 device_size;        /* in bytes */
+	int flags, wiped_total = 0;
+
+	/* print to stderr, stdout can be an NTFS image ... */
+	Eprintf("%s v%s\n", EXEC_NAME, VERSION);
+	msg_out = stderr;
+
+	parse_options(argc, argv);
+	
+	utils_set_locale();
+
+	mount_volume(MS_RDONLY);
+	
+	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
+	device_size *= vol->sector_size;
+	if (device_size <= 0)
+		err_exit("Couldn't get device size (%Ld)!\n", device_size);
+
+	print_volume_size("Current device size", device_size);
+
+	if (device_size < vol->nr_clusters * vol->cluster_size)
+		err_exit("Current NTFS volume size is bigger than the device "
+			 "size (%Ld)!\nCorrupt partition table or incorrect "
+			 "device partitioning?\n", device_size);
+
+	if (opt.stdout) {
+	       if ((fd_out = fileno(stdout)) == -1) 
+		       perr_exit("fileno for stdout failed");
+	} else {
+		flags =	O_CREAT | O_TRUNC | O_WRONLY;
+		if (!opt.overwrite)
+			flags |= O_EXCL;
+
+		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1) 
+			perr_exit("opening file '%s' failed", opt.output);
+	
+		if (ftruncate(fd_out, device_size) == -1)
+			perr_exit("ftruncate failed for file '%s'", opt.output);
+	}
+
+	setup_lcn_bitmap();
+	memset(&image, 0, sizeof(image));
+	backup_clusters.image = &image; 
+
+	walk_clusters(vol, &backup_clusters);
+	compare_bitmaps(&lcn_bitmap);
+	print_disk_usage(&image);
+	
+	free(lcn_bitmap.bm);
+	
+	/* FIXME: save backup boot sector */
+
+	if (opt.stdout) {
+		dump_to_stdout();
+		fsync(fd_out);
+		exit(0);
+	}
+	
+	Printf("Syncing image file ...\n");
+	if (fsync(fd_out) == -1)
+		perr_exit("fsync");
+
+	if (!opt.metadata_only)
+		exit(0);
+	
+	wipe = 1;	
+	opt.volume = opt.output;
+	mount_volume(0);
+
+	setup_lcn_bitmap();
+	memset(&image, 0, sizeof(image));
+	backup_clusters.image = &image; 
+
+	walk_clusters(vol, &backup_clusters);
+	
+	Printf("Num of MFT records       = %8Ld\n", vol->nr_mft_records); 
+	Printf("Num of used MFT records  = %8d\n", nr_used_mft_records); 
+	
+	Printf("Wiped unused MFT data    = %8d\n", wiped_unused_mft_data); 
+	Printf("Wiped deleted MFT data   = %8d\n", wiped_unused_mft); 
+	Printf("Wiped resident user data = %8d\n", wiped_resident_data);
+	Printf("Wiped timestamp data     = %8d\n", wiped_timestamp_data);
+	
+	wiped_total += wiped_unused_mft_data;
+	wiped_total += wiped_unused_mft;
+	wiped_total += wiped_resident_data;
+	wiped_total += wiped_timestamp_data;
+	Printf("Wiped totally            = %8d\n", wiped_total);
+	
+	exit(0);
+}
+
