@@ -89,6 +89,7 @@ void usage(void)
 		"    -F         --classify       Display classification\n"
 		"    -f         --force          Use less caution\n"
 		"    -h   -?    --help           Display this help\n"
+		"    -i         --inode          Display inode numbers\n"
 		"    -l         --long           Display long info\n"
 		"    -p PATH    --path PATH      Directory whose contents to list\n"
 		"    -q         --quiet          Less output\n"
