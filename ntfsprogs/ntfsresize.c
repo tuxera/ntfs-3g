@@ -107,7 +107,7 @@ struct llcn_t {
 	s64 inode;	/* inode using it */
 };	
 	
-struct __ntfs_resize_t {
+typedef struct {
 	s64 new_volume_size;		/* in clusters; 0 = --info w/o --size */
 	int shrink;			/* shrink = 1, enlarge = 0 */
 	ntfs_inode *ni;			/* inode being processed */
@@ -121,6 +121,7 @@ struct __ntfs_resize_t {
 	s64 mftmir_old;			/* $MFTMirr AT_DATA's old LCN */
 	int dirty_inode;		/* some inode data got relocated */
 	struct progress_bar progress;
+	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */
 	struct llcn_t last_mft;
 	struct llcn_t last_mftmir;
@@ -130,16 +131,14 @@ struct __ntfs_resize_t {
 	struct llcn_t last_lcn;
 	s64 last_unsafe;		/* last "unsafe-to-move" cluster */
 	s64 last_unsupp;		/* last unsupported cluster */
-};
+} ntfs_resize_t;
 
-typedef struct __ntfs_resize_t ntfs_resize_t;
 
-/* FIXME: This will go to struct __ntfs_resize_t */
+/* FIXME: This will go to ntfs_resize_t */
 ntfs_volume *vol = NULL;
 
-/* FIXME: These and 'pos' from find_free_cluster() will make a cluster
-   allocation related structure, attached to struct __ntfs_resize_t */
-struct bitmap lcn_bitmap;
+/* FIXME: This, lcn_bitmap and pos from find_free_cluster() will make a cluster
+   allocation related structure, attached to ntfs_resize_t */
 s64 max_free_cluster_range = 0;
 
 #define NTFS_MBYTE (1000 * 1000)
@@ -728,6 +727,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 	ATTR_RECORD *a;
 	runlist *rl;
 	int i, j;
+	struct bitmap *lcn_bitmap = &resize->lcn_bitmap;
 
 	a = resize->ctx->attr;
 	inode = resize->ni->mft_no;
@@ -760,7 +760,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
-			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1)) {
+			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
 				
 				if (++resize->multi_ref > 10)
 					continue;
@@ -1050,22 +1050,22 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 	free(mp);
 }
 
-static void set_bitmap_range(s64 pos, s64 length, u8 bit)
+static void set_bitmap_range(struct bitmap *bm, s64 pos, s64 length, u8 bit)
 {
 	while (length--)
-		ntfs_bit_set(lcn_bitmap.bm, pos++, bit);
+		ntfs_bit_set(bm->bm, pos++, bit);
 }
 
-static void set_bitmap_clusters(runlist *rl, u8 bit)
+static void set_bitmap_clusters(struct bitmap *bm, runlist *rl, u8 bit)
 {
 	for (; rl->length; rl++)
-		set_bitmap_range(rl->lcn, rl->length, bit);
+		set_bitmap_range(bm, rl->lcn, rl->length, bit);
 }
 
-static void release_bitmap_clusters(runlist *rl)
+static void release_bitmap_clusters(struct bitmap *bm, runlist *rl)
 {
 	max_free_cluster_range = 0;
-	set_bitmap_clusters(rl, 0);
+	set_bitmap_clusters(bm, rl, 0);
 }
 
 static void set_max_free_zone(s64 length, s64 end, runlist_element *rle)
@@ -1076,7 +1076,10 @@ static void set_max_free_zone(s64 length, s64 end, runlist_element *rle)
 	}
 }
 
-static int find_free_cluster(runlist_element *rle, s64 nr_vol_clusters, int hint)
+static int find_free_cluster(struct bitmap *bm, 
+			     runlist_element *rle,
+			     s64 nr_vol_clusters, 
+			     int hint)
 {
 	/* FIXME: get rid of this 'static' variable */
 	static s64 pos = 0;
@@ -1093,7 +1096,7 @@ static int find_free_cluster(runlist_element *rle, s64 nr_vol_clusters, int hint
 	i = pos;
 
 	do {
-		if (!ntfs_bit_get(lcn_bitmap.bm, i)) {
+		if (!ntfs_bit_get(bm->bm, i)) {
 			if (++free_zone == items) {
 				set_max_free_zone(free_zone, i + 1, rle);
 				break;
@@ -1126,11 +1129,14 @@ static int find_free_cluster(runlist_element *rle, s64 nr_vol_clusters, int hint
 	if (pos == nr_vol_clusters)
 		pos = 0;
 
-	set_bitmap_range(rle->lcn, rle->length, 1);
+	set_bitmap_range(bm, rle->lcn, rle->length, 1);
 	return 0;
 }
 
-static runlist *alloc_cluster(s64 items, s64 nr_vol_clusters, int hint)
+static runlist *alloc_cluster(struct bitmap *bm, 
+			      s64 items, 
+			      s64 nr_vol_clusters, 
+			      int hint)
 {
 	runlist_element rle;
 	runlist *rl = NULL;
@@ -1147,7 +1153,7 @@ static runlist *alloc_cluster(s64 items, s64 nr_vol_clusters, int hint)
 		if (runs)
 			hint = 0;
 		rle.length = items;
-		if (find_free_cluster(&rle, nr_vol_clusters, hint) == -1)
+		if (find_free_cluster(bm, &rle, nr_vol_clusters, hint) == -1)
 			return NULL;
 		
 		rl_size = (runs + 2) * sizeof(runlist_element);
@@ -1361,7 +1367,8 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 	}
 
 	hint = (resize->mref == FILE_MFTMirr) ? 1 : 0;
-	if (!(relocate_rl = alloc_cluster(lcn_length, new_vol_size, hint)))
+	if (!(relocate_rl = alloc_cluster(&resize->lcn_bitmap, lcn_length, 
+					  new_vol_size, hint)))
 		perr_exit("Cluster allocation failed for %llu:%lld",
 			  resize->mref, lcn_length);
 	
@@ -1572,7 +1579,10 @@ static void truncate_badclust_bad_attr(ntfs_attr_search_ctx *ctx, s64 nr_cluster
  * Shrink the metadata file $Bitmap.  It must be large enough for one bit per
  * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-static void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
+static void shrink_bitmap_data_attr(struct bitmap *bm, 
+				    runlist **rlist, 
+				    s64 nr_bm_clusters, 
+				    s64 new_size)
 {
 	runlist *rl = *rlist;
 	int i, j;
@@ -1593,7 +1603,7 @@ static void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new
 
 			k = rl[i].lcn + j;
 			if (k < new_size) {
-				ntfs_bit_set(lcn_bitmap.bm, k, 0);
+				ntfs_bit_set(bm->bm, k, 0);
 				Dprintf("Unallocate cluster: "
 				       "%lld (%llx)\n", k, k);
 			}
@@ -1617,17 +1627,20 @@ static void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new
  * Enlarge the metadata file $Bitmap.  It must be large enough for one bit per
  * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-static void enlarge_bitmap_data_attr(runlist **rl, s64 nr_bm_clusters, s64 new_size)
+static void enlarge_bitmap_data_attr(struct bitmap *bm,
+				     runlist **rl, 
+				     s64 nr_bm_clusters, 
+				     s64 new_size)
 {
 	s64 i;
 
-	release_bitmap_clusters(*rl);
+	release_bitmap_clusters(bm, *rl);
 	free(*rl);
 
 	for (i = vol->nr_clusters; i < new_size; i++)
-		ntfs_bit_set(lcn_bitmap.bm, i, 0);
+		ntfs_bit_set(bm->bm, i, 0);
 
-	if (!(*rl = alloc_cluster(nr_bm_clusters, new_size, 0)))
+	if (!(*rl = alloc_cluster(bm, nr_bm_clusters, new_size, 0)))
 		perr_exit("Couldn't allocate $Bitmap clusters");
 }
 
@@ -1652,11 +1665,11 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	bm_bsize = nr_clusters_to_bitmap_byte_size(nr_clusters);
 	nr_bm_clusters = rounded_up_division(bm_bsize, vol->cluster_size);
 
-	if (!(tmp = (u8 *)realloc(lcn_bitmap.bm, bm_bsize)))
+	if (!(tmp = (u8 *)realloc(resize->lcn_bitmap.bm, bm_bsize)))
 		perr_exit("realloc");
-	lcn_bitmap.bm = tmp;
-	lcn_bitmap.size = bm_bsize;
-	bitmap_file_data_fixup(nr_clusters, &lcn_bitmap);
+	resize->lcn_bitmap.bm = tmp;
+	resize->lcn_bitmap.size = bm_bsize;
+	bitmap_file_data_fixup(nr_clusters, &resize->lcn_bitmap);
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
@@ -1664,9 +1677,11 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	/* NOTE: shrink could use enlarge_bitmap_data_attr() also. Advantages:
 	   less code, better code coverage. "Drawback": could be relocated */
 	if (resize->shrink)
-		shrink_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
+		shrink_bitmap_data_attr(&resize->lcn_bitmap, &rl, 
+					nr_bm_clusters, nr_clusters);
 	else
-		enlarge_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
+		enlarge_bitmap_data_attr(&resize->lcn_bitmap, &rl, 
+					 nr_bm_clusters, nr_clusters);
 
 	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
@@ -1680,7 +1695,7 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	 * attribute too, for now chkdsk will do this for us.
 	 */
 
-	size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, lcn_bitmap.bm);
+	size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, resize->lcn_bitmap.bm);
 	if (bm_bsize != size) {
 		if (size == -1)
 			perr_exit("Couldn't write $Bitmap");
@@ -1768,15 +1783,15 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-static void setup_lcn_bitmap(void)
+static void setup_lcn_bitmap(struct bitmap *bm)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
-	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
+	bm->size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
 
-	if (!(lcn_bitmap.bm = (unsigned char *)calloc(1, lcn_bitmap.size)))
+	if (!(bm->bm = (unsigned char *)calloc(1, bm->size)))
 		perr_exit("Failed to allocate internal buffer");
 
-	bitmap_file_data_fixup(vol->nr_clusters, &lcn_bitmap);
+	bitmap_file_data_fixup(vol->nr_clusters, bm);
 }
 
 /**
@@ -2046,10 +2061,11 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
-	setup_lcn_bitmap();
 
 	memset(&resize, 0, sizeof(resize));
 	resize.new_volume_size = new_size;
+	
+	setup_lcn_bitmap(&resize.lcn_bitmap);
 
 	/* This is also true if --info was used w/o --size (new_size = 0) */
 	if (new_size < vol->nr_clusters)
@@ -2062,7 +2078,7 @@ int main(int argc, char **argv)
 		printf(corrupt_volume_msg);
 		exit(1);
 	}
-	compare_bitmaps(&lcn_bitmap);
+	compare_bitmaps(&resize.lcn_bitmap);
 
 	print_disk_usage(&resize);
 	
