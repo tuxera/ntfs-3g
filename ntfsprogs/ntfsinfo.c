@@ -1012,7 +1012,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
  *
  * of ntfs 3.x dumps the reparse_point attribute
  */
-static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr)
+static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr __attribute__((unused)))
 {
 	printf("Dumping attribute $REPARSE_POINT/$SYMBOLIC_LINK (0xC0)\n");
 	printf("\tTODO\n");
@@ -1023,7 +1023,7 @@ static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr)
  *
  * dump the ea_information attribute
  */
-static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
+static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr __attribute__((unused)))
 {
 	printf("Dumping attribute $EA_INFORMATION (0xD0)\n");
 	printf("\tTODO\n");
@@ -1034,7 +1034,7 @@ static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
  *
  * dump the ea attribute
  */
-static void ntfs_dump_attr_ea(ATTR_RECORD *attr)
+static void ntfs_dump_attr_ea(ATTR_RECORD *attr __attribute__((unused)))
 {
 	printf("Dumping attribute $EA (0xE0)\n");
 	printf("\tTODO\n");
@@ -1045,7 +1045,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr)
  *
  * dump the property_set attribute
  */
-static void ntfs_dump_attr_property_set(ATTR_RECORD *attr)
+static void ntfs_dump_attr_property_set(ATTR_RECORD *attr __attribute__((unused)))
 {
 	printf("Dumping attribute $PROPERTY_SET (0xF0)\n");
 	printf("\tTODO\n");
@@ -1056,7 +1056,7 @@ static void ntfs_dump_attr_property_set(ATTR_RECORD *attr)
  *
  * dump the property_set attribute
  */
-static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr)
+static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr __attribute__((unused)))
 {
 	printf("Dumping attribute $LOGGED_UTILITY_STREAM (0x100)\n");
 	printf("\tTODO\n");
