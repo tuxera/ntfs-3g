@@ -1388,6 +1388,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	int fd = -1;
 	long long k;
 	int result = 0;
+	char *name;
 
 	if (!vol)
 		return 0;
@@ -1434,7 +1435,12 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	list_for_each (item, &file->data) {
 		struct data *d = list_entry (item, struct data, list);
 
-		create_pathname (opts.dest, file->pref_name, d->name, pathname, sizeof (pathname));
+		if (opts.output)
+				name = opts.output;
+		else
+				name = file->pref_name;
+
+		create_pathname (opts.dest, name, d->name, pathname, sizeof (pathname));
 		if (d->resident) {
 			fd = open_file (pathname);
 			if (fd < 0) {
