@@ -1066,7 +1066,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 		const u32 bk_size, void *b)
 {
 	s64 br;
-	void *end;
+	u8 *end;
 
 	Dprintf("%s(): Entering for inode 0x%Lx, attr type 0x%x, pos 0x%Lx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
