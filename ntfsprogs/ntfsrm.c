@@ -471,7 +471,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 		dt->data_len = parent->data_len;
 		//printf ("parent size = %d\n", dt->data_len);
 		dt->data     = malloc (dt->data_len);
-		//printf ("%lld\n", ntfs_attr_mst_pread (dir->ialloc, vcn*512, 2, 2048, dt->data));
+		//printf ("%lld\n", ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data));
 		ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data);
 		//utils_dump_mem (dt->data, 0, dt->data_len, 1);
 		//printf ("\n");
@@ -874,8 +874,10 @@ static int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
 		return -1;
 	}
 
+	mref = MREF (mref);
+	//printf ("mref = %lld\n", mref);
 	/* Does mref lie in the section of $Bitmap we already have cached? */
-	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
+	if (((s64)mref < bmpmref) || ((s64)mref >= (bmpmref +
 			(sizeof (buffer) << 3)))) {
 		Dprintf ("Bit lies outside cache.\n");
 
@@ -896,18 +898,60 @@ static int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
 	Dprintf ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n",
 		mref, bmpmref, byte, bit, buffer[byte] & bit);
 
+	if ((buffer[byte] & bit) == 0) {
+		Eprintf ("MFT record isn't in use (1).\n");
+		return -1;
+	}
+
+	//utils_dump_mem (buffer, byte, 1, 0);
+	buffer[byte] &= ~bit;
+	//utils_dump_mem (buffer, byte, 1, 0);
+
+	if (ntfs_attr_pwrite (vol->mftbmp_na, (bmpmref>>3), sizeof (buffer), buffer) < 0) {
+		Eprintf ("Couldn't write $MFT/$BITMAP: %s\n", strerror (errno));
+		return -1;
+	}
+
 	return (buffer[byte] & bit);
 }
 
 /**
  * utils_mftrec_mark_free2
  */
-static int utils_mftrec_mark_free2 (ntfs_inode *inode)
+static int utils_mftrec_mark_free2 (ntfs_volume *vol, MFT_REF mref)
 {
-	if (!inode)
+	u8 buffer[1024];
+	s64 pos;
+	s64 count;
+	u32 blk;
+	s64 res;
+	MFT_RECORD *rec;
+
+	if (!vol)
 		return -1;
 
-	inode->mrec->flags &= ~MFT_RECORD_IN_USE;
+	pos   = MREF (mref) << vol->mft_record_size_bits;
+	count = 1;
+	blk   = vol->mft_record_size;
+
+	res = ntfs_attr_mst_pread (vol->mft_na, pos, count, blk, buffer);
+	printf ("res = %lld\n", res);
+
+	rec = (MFT_RECORD*) buffer;
+
+	if ((rec->flags & MFT_RECORD_IN_USE) == 0) {
+		Eprintf ("MFT record isn't in use (2).\n");
+		return -1;
+	}
+
+	rec->flags &= ~MFT_RECORD_IN_USE;
+
+	//printf ("\n");
+	//utils_dump_mem (buffer, 0, 1024, 1);
+
+	res = ntfs_attr_mst_pwrite (vol->mft_na, pos, count, blk, buffer);
+	printf ("res = %lld\n", res);
+
 	return 0;
 }
 
@@ -923,6 +967,7 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 	u8 *end;
 	int off;
 	int len;
+	s64 res;
 
 	if (!dt)
 		return 1;
@@ -987,7 +1032,9 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 	dt->children = NULL;
 	dt->child_count = 0;
 
+	//printf ("before = %d\n", dt->header->index_length + 24);
 	dt->header->index_length -= src - dest;
+	//printf ("after  = %d\n", dt->header->index_length + 24);
 
 	ntfs_dt_count_alloc (dt);
 #endif
@@ -1016,6 +1063,9 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 		printf (" (%d)\n", ie->length);
 	}
 #endif
+	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
+	res = ntfs_attr_mst_pwrite (dt->dir->ialloc, dt->vcn*512, 1, dt->data_len, dt->data);
+	printf ("res = %lld\n", res);
 
 	return 0;
 }
@@ -1032,9 +1082,10 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	ntfs_attr_search_ctx *ctx = NULL;
 	int index_num = 0;
 	int res = 1;
-	ATTR_RECORD *arec;
+	ATTR_RECORD *arec = NULL;
+	MFT_REF mft_num = -1;
 	FILE_NAME_ATTR *file;
-	MFT_REF mft_num;
+	int filenames = 0;
 
 	del = ntfs_dt_find2 (dt, uname, len, &index_num);
 	if (!del) {
@@ -1086,26 +1137,29 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	arec = find_first_attribute (AT_DATA, inode->mrec);
-	if (arec->non_resident) {
-		printf ("can't delete non-resident files\n");
-		goto close;
-	}
-
 	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
 	if (!ctx) {
 		printf ("can't create a search context\n");
 		goto close;
 	}
 
-	arec = find_attribute (AT_FILE_NAME, ctx);
-	if (find_attribute (AT_FILE_NAME, ctx)) {
+	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
+		arec = ctx->attr;
+		if (arec->non_resident) {
+			printf ("can't delete non-resident files\n");
+			goto close;
+		}
+		if (arec->type == AT_FILE_NAME) {
+			filenames++;
+			file = (FILE_NAME_ATTR*) ((u8*) arec + arec->value_offset);
+			mft_num = MREF (file->parent_directory);
+		}
+	}
+
+	if (filenames != 1) {
 		printf ("file has more than one name\n");
 		goto close;
 	}
-
-	file = (FILE_NAME_ATTR*) ((u8*) arec + arec->value_offset);
-	mft_num = MREF (file->parent_directory);
 
 	ntfs_inode_close (inode);
 
@@ -1121,14 +1175,14 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	printf ("deleting file\n");
+	//printf ("deleting file\n");
 	//ntfs_dt_print (del->dir->index_num, 0);
+
+#if 1
+	res = utils_mftrec_mark_free (dt->dir->vol, del->children[index_num]->indexed_file);
+	res = utils_mftrec_mark_free2 (dt->dir->vol, del->children[index_num]->indexed_file);
 	res = ntfs_dt_remove (del, index_num);
-
-	res = utils_mftrec_mark_free (dt->dir->vol, dt->dir->mft_num);
-	//printf ("mft free = %d\n", res);
-
-	res = utils_mftrec_mark_free2 (dt->dir->inode);
+#endif
 
 close:
 	ntfs_attr_put_search_ctx (ctx);
