@@ -323,12 +323,6 @@ int main(int argc, char **argv)
 					"sector transfer detected in %s.\n", s);
 			goto error_exit;
 		}
-		if (!ntfs_is_mft_recordp(m2 + i * vol->mft_record_size)) {
-			puts("FAILED");
-			fprintf(stderr, "$MFTMirr error: Invalid mft record "
-					"for %s.\n", s);
-			goto error_exit;
-		}
 		if (memcmp((u8*)m + i * vol->mft_record_size, (u8*)m2 +
 				i * vol->mft_record_size,
 				ntfs_mft_record_get_data_size((MFT_RECORD*)(
@@ -336,8 +330,7 @@ int main(int argc, char **argv)
 			if (!done) {
 				done = TRUE;
 				puts(FAILED);
-				printf("Correcting differences in "
-						"$MFTMirr... ");
+				printf("Correcting differences in $MFTMirr...");
 			}
 			br = ntfs_mft_record_write(vol, i, (MFT_RECORD*)(m +
 					i * vol->mft_record_size));
