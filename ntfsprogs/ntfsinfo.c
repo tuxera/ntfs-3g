@@ -23,19 +23,29 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /* TODO LIST:
- *	1. Better error checking. In fact, my error checking sucks.
- *	2. Fix output issues.
- *	3. Comment things better
+ *	1. Better error checking. (focus on ntfs_dump_volume)
+ *	2. Comment things better.
+ *	3. More things at verbose mode.
+ *	4. Dump ACLs when security_id exists (NTFS 3+ only).
+ *	5. Dump by name rather by Inode .
+ *	6. Clean ups.
+ *	7. Internationalization.
+ *	8. The AT_ATTRIBUTE_LIST issue.
+ *	9. Add more Indexed Attr Types.
+ *	10.Make formatting look more like www.flatcap.org/ntfs/info
  *
  *	Still not dumping certain attributes. Need to find the best
- *	way to output some of these attributes. 
+ *	way to output some of these attributes.
  *
  *	Still need to do:
- *	    $OBJECT_ID - dump correctly
  *	    $SECURITY_DESCRIPTOR
+ *	    $REPARSE_POINT/$SYMBOLIC_LINK
+ *	    $EA_INFORMATION
+ *	    $EA
+ *	    $PROPERTY_SET
+ *	    $LOGGED_UTILITY_STREAM
+ *	    ntfs_dump_attr_unknown()
  */
-
-
 
 #include "config.h"
 
@@ -65,7 +75,6 @@ static struct options {
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
-	int	 epochtime;	/* Report all timestamps as "Thu Jan  1 00:00:00 1970" */
 	int	 notime;	/* Don't report timestamps at all */
 	int	 mft;		/* Dump information about the volume as well */
 } opts;
@@ -106,8 +115,7 @@ void usage (void)
 		"    -d dev  --device dev The ntfs volume to display information about\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"    -m      --mft        Dump information about the volume\n"
-		"    -t      --epochtime  Report all timestamps as \"Thu Jan  1 00:00:00 1970\"\n"
-		"    -T      --notime     Don't report timestamps at all\n"
+		"    -t      --notime     Don't report timestamps\n"
 		"\n"
 		"    -f      --force      Use less caution\n"
 		"    -q      --quiet      Less output\n"
@@ -138,10 +146,9 @@ int parse_options (int argc, char *argv[])
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
-		{ "epochtime",   no_argument,		NULL, 't' },
 		{ "notime",	 no_argument,		NULL, 'T' },
-	        { "mft",	 no_argument,		NULL, 'm' },
-		{ NULL, 0, NULL, 0 },
+		{ "mft",	 no_argument,		NULL, 'm' },
+		{ NULL,		 0,			NULL,  0  }
 	};
 
 	char c = -1;
@@ -180,10 +187,12 @@ int parse_options (int argc, char *argv[])
 			opts.quiet++;
 			break;
 		case 't':
-			opts.epochtime++;
+			opts.notime++;
 			break;
 		case 'T':
-			opts.notime++;
+			/* 'T' is depreceted, notify */
+			Eprintf ("Option 'T' is deprecated, it was replaced by 't'.\n");
+			err++;
 			break;
 		case 'v':
 			opts.verbose++;
@@ -224,11 +233,6 @@ int parse_options (int argc, char *argv[])
 			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
-
-		if (opts.epochtime && opts.notime) {
-			Eprintf ("You may not use --notime and --epochtime at the same time.\n");
-			err++;
-		}
 	}
 
 	if (ver)
@@ -239,197 +243,252 @@ int parse_options (int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
+/**************** utility functions *********************/
+
+/**
+ * ntfsinfo_time_to_str()
+ * @sle_ntfs_clock The disk time format, meaning 100ns units since 1st jan 1601
+ *   in little-endian format
+ *
+ * Return char* in a format 'Thu Jan  1 00:00:00 1970'.
+ *
+ * Example of usage:
+ *   char *time_str = ntfsinfo_time_to_str(
+ *   	sle64_to_cpu(standard_attr->creation_time));
+ *   printf("\tFile Creation Time: \t %s",time_str);
+ *   free(time_str);
+ */
+char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
+{
+	time_t unix_clock = ntfs2utc(sle64_to_cpu(sle_ntfs_clock));
+	return ctime(&unix_clock);
+}
+
+/**
+ * ntfs_attr_get_name()
+ * @attr a vaild attribute record
+ *
+ * return multi-byte string containing the attribute name if exist. the user
+ *             is then responsible of freeing that memory.
+ *        null if no name exists (attr->name_length==0). no memory allocated.
+ *        null if cannot convert to multi-byte string. errno would contain the
+ *             error id. no memory allocated in that case
+ */
+char *ntfs_attr_get_name(ATTR_RECORD *attr)
+{
+	uchar_t *ucs_attr_name;
+	char *mbs_attr_name = NULL;
+	int mbs_attr_name_size;
+	
+	/* calculate name position */
+	ucs_attr_name = (uchar_t *)((char *)attr + le16_to_cpu(attr->name_offset));
+	/* convert unicode to printable format */
+	mbs_attr_name_size = ntfs_ucstombs(ucs_attr_name,attr->name_length,
+		&mbs_attr_name,0);
+	if (mbs_attr_name_size>0) {
+		return mbs_attr_name;
+	} else {
+		return NULL;
+	}
+}
+
+/**************** functions for dumping global info *********************/
 
 /**
  * ntfs_dump_volume - dump information about the volume
  */
 void ntfs_dump_volume(ntfs_volume *vol)
 {
-    
-    printf("Volume Information \n");
-    printf("\tName of device: %s\n", vol->dev->d_name);
-    printf("\tDevice state: %lu\n", vol->dev->d_state);
-    printf("\tVolume Name: %s\n", vol->vol_name);
-    printf("\tVolume State: %lu\n", vol->state);
-    printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
-    printf("\tSector Size: %hu\n", vol->sector_size);
-    printf("\tCluster Size: %u\n", vol->cluster_size);
-    printf("\tVolume Size in Clusters: %lld\n", (long long)vol->nr_clusters);
-    
-    printf("MFT Information \n");
-    printf("\tMFT Record Size: %u\n", vol->mft_record_size);
-    printf("\tMFT Zone Multiplier: %u\n", vol->mft_zone_multiplier);
-    printf("\tMFT Data Position: %lld\n", (long long)vol->mft_data_pos);
-    printf("\tMFT Zone Start: %lld\n", (long long)vol->mft_zone_start);
-    printf("\tMFT Zone End: %lld\n", (long long)vol->mft_zone_end);
-    printf("\tMFT Zone Position: %lld\n", (long long)vol->mft_zone_pos);
-    printf("\tCurrent Position in First Data Zone: %lld\n",
-		    (long long)vol->data1_zone_pos);
-    printf("\tCurrent Position in Second Data Zone: %lld\n",
-		    (long long)vol->data2_zone_pos);
-    printf("\tNumber of Initialized Records in MFT: %lld\n",
-		    (long long)vol->nr_mft_records);
-    printf("\tLCN of Data Attribute for FILE_MFT: %lld\n",
-		    (long long)vol->mft_lcn);
-    printf("\tFILE_MFTMirr Size: %d\n", vol->mftmirr_size);
-    printf("\tLCN of Data Attribute for File_MFTMirr: %lld\n",
-		    (long long)vol->mftmirr_lcn);
-    printf("\tSize of Attribute Definition Table: %d\n", vol->attrdef_len);
-   
-    printf("FILE_Bitmap Information \n");
-    printf("\tFILE_Bitmap MFT Record Number: %llu\n",
-		    (unsigned long long)vol->lcnbmp_ni->mft_no);
-    printf("\tState of FILE_Bitmap Inode: %lu\n", vol->lcnbmp_ni->state);
-    printf("\tLength of Attribute List: %u\n", vol->lcnbmp_ni->attr_list_size);
-    printf("\tAttribute List: %s\n", vol->lcnbmp_ni->attr_list);
-    printf("\tNumber of Attached Extent Inodes: %d\n", vol->lcnbmp_ni->nr_extents);
-	//FIXME: need to add code for the union if nr_extens != 0, but
-	//i dont know if it will ever != 0 with FILE_Bitmap
-    
-    printf("FILE_Bitmap Data Attribute Information\n");
-    printf("\tDecompressed Runlist: not done yet\n");
-    printf("\tBase Inode: %llu\n",
-		    (unsigned long long)vol->lcnbmp_na->ni->mft_no);
-    printf("\tAttribute Types: not done yet\n");
-    //printf("\tAttribute Name: %s\n", vol->lcnbmp_na->name);
-    printf("\tAttribute Name Length: %u\n", vol->lcnbmp_na->name_len);
-    printf("\tAttribute State: %lu\n", vol->lcnbmp_na->state);
-    printf("\tAttribute Allocated Size: %lld\n",
-		    (long long)vol->lcnbmp_na->allocated_size);
-    printf("\tAttribute Data Size: %lld\n",
-		    (long long)vol->lcnbmp_na->data_size);
-    printf("\tAttribute Initialized Size: %lld\n",
-		    (long long)vol->lcnbmp_na->initialized_size);
-    printf("\tAttribute Compressed Size: %lld\n",
-		    (long long)vol->lcnbmp_na->compressed_size);
-    printf("\tCompression Block Size: %u\n",
-		    vol->lcnbmp_na->compression_block_size);
-    printf("\tCompression Block Size Bits: %u\n",
-		    vol->lcnbmp_na->compression_block_size_bits);
-    printf("\tCompression Block Clusters: %u\n",
-		    vol->lcnbmp_na->compression_block_clusters);
+	printf("Volume Information \n");
+	printf("\tName of device: %s\n", vol->dev->d_name);
+	printf("\tDevice state: %lu\n", vol->dev->d_state);
+	printf("\tVolume Name: %s\n", vol->vol_name);
+	printf("\tVolume State: %lu\n", vol->state);
+	printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
+	printf("\tSector Size: %hu\n", vol->sector_size);
+	printf("\tCluster Size: %u\n", vol->cluster_size);
+	printf("\tVolume Size in Clusters: %lld\n", (long long)vol->nr_clusters);
+	
+	printf("MFT Information \n");
+	printf("\tMFT Record Size: %u\n", vol->mft_record_size);
+	printf("\tMFT Zone Multiplier: %u\n", vol->mft_zone_multiplier);
+	printf("\tMFT Data Position: %lld\n", (long long)vol->mft_data_pos);
+	printf("\tMFT Zone Start: %lld\n", (long long)vol->mft_zone_start);
+	printf("\tMFT Zone End: %lld\n", (long long)vol->mft_zone_end);
+	printf("\tMFT Zone Position: %lld\n", (long long)vol->mft_zone_pos);
+	printf("\tCurrent Position in First Data Zone: %lld\n",
+		(long long)vol->data1_zone_pos);
+	printf("\tCurrent Position in Second Data Zone: %lld\n",
+		(long long)vol->data2_zone_pos);
+	printf("\tNumber of Initialized Records in MFT: %lld\n",
+		(long long)vol->nr_mft_records);
+	printf("\tLCN of Data Attribute for FILE_MFT: %lld\n",
+		(long long)vol->mft_lcn);
+	printf("\tFILE_MFTMirr Size: %d\n", vol->mftmirr_size);
+	printf("\tLCN of Data Attribute for File_MFTMirr: %lld\n",
+		(long long)vol->mftmirr_lcn);
+	printf("\tSize of Attribute Definition Table: %d\n", vol->attrdef_len);
+	
+	printf("FILE_Bitmap Information \n");
+	printf("\tFILE_Bitmap MFT Record Number: %llu\n",
+		(unsigned long long)vol->lcnbmp_ni->mft_no);
+	printf("\tState of FILE_Bitmap Inode: %lu\n", vol->lcnbmp_ni->state);
+	printf("\tLength of Attribute List: %u\n", vol->lcnbmp_ni->attr_list_size);
+	printf("\tAttribute List: %s\n", vol->lcnbmp_ni->attr_list);
+	printf("\tNumber of Attached Extent Inodes: %d\n",
+		vol->lcnbmp_ni->nr_extents);
+	/* FIXME: need to add code for the union if nr_extens != 0, but
+	   i dont know if it will ever != 0 with FILE_Bitmap */
+	
+	printf("FILE_Bitmap Data Attribute Information\n");
+	printf("\tDecompressed Runlist: not done yet\n");
+	printf("\tBase Inode: %llu\n",
+		(unsigned long long)vol->lcnbmp_na->ni->mft_no);
+	printf("\tAttribute Types: not done yet\n");
+	//printf("\tAttribute Name: %s\n", vol->lcnbmp_na->name);
+	printf("\tAttribute Name Length: %u\n", vol->lcnbmp_na->name_len);
+	printf("\tAttribute State: %lu\n", vol->lcnbmp_na->state);
+	printf("\tAttribute Allocated Size: %lld\n",
+		(long long)vol->lcnbmp_na->allocated_size);
+	printf("\tAttribute Data Size: %lld\n",
+		(long long)vol->lcnbmp_na->data_size);
+	printf("\tAttribute Initialized Size: %lld\n",
+		(long long)vol->lcnbmp_na->initialized_size);
+	printf("\tAttribute Compressed Size: %lld\n",
+		(long long)vol->lcnbmp_na->compressed_size);
+	printf("\tCompression Block Size: %u\n",
+		vol->lcnbmp_na->compression_block_size);
+	printf("\tCompression Block Size Bits: %u\n",
+		vol->lcnbmp_na->compression_block_size_bits);
+	printf("\tCompression Block Clusters: %u\n",
+		vol->lcnbmp_na->compression_block_clusters);
 		
-    //TODO: Still need to add a few more attributes
+	//TODO: Still need to add a few more attributes
 }
+
+/**************** functions for dumping attributes *********************/
 
 /**
  * ntfs_dump_standard_information
  */
-void ntfs_dump_standard_information_attr(ntfs_inode *inode)
+void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 {
-
 	STANDARD_INFORMATION *standard_attr = NULL;
-	ATTR_RECORD *attr = NULL;
-	ntfs_attr_search_ctx *ctx = NULL;
 	u32 value_length;
 
-	ctx = ntfs_attr_get_search_ctx(inode, NULL);
+	standard_attr = (STANDARD_INFORMATION*)((char *)attr +
+		le16_to_cpu(attr->value_offset));
 
-	if(ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		if (errno != ENOENT)
-			fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_STANDARD_INFORMATION!\n");
-		ntfs_attr_put_search_ctx(ctx); //free ctx
-		return;
+	printf("Dumping attribute $STANDARD_INFORMATION (0x10)\n");
+
+	/* let's start with mandatory? fields */
+
+	/* time conversion stuff */
+	if (!opts.notime) {
+		char *ntfs_time_str = NULL;
+		
+		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->creation_time);
+		printf("\tFile Creation Time: \t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(
+			standard_attr->last_data_change_time);
+		printf("\tFile Altered Time: \t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(
+			standard_attr->last_mft_change_time);
+		printf("\tMFT Changed Time: \t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->last_access_time);
+		printf("\tLast Accessed Time: \t %s",ntfs_time_str);
 	}
+	
+	/* TODO: file_attributes - Flags describing the file. */
+	
+	printf("\tMax Number of Versions:\t %u \n",
+		le32_to_cpu(standard_attr->maximum_versions));
+	printf("\tVersion Number: \t %u \n",
+		le32_to_cpu(standard_attr->version_number));
+	printf("\tClass ID: \t\t %u \n",
+		le32_to_cpu(standard_attr->class_id));
 
-	attr = ctx->attr;
-
-	standard_attr = (STANDARD_INFORMATION*)((char *)attr + le16_to_cpu(attr->value_offset));
-
-	printf("Dumping $STANDARD_INFORMATION (0x10)\n");
 	
 	value_length = le32_to_cpu(attr->value_length);
 	if (value_length == 48) {
-	  printf("\t$STANDARD_INFORMATION fields maximum_versions, version_number, \
-		      class_id, owner_id, security_id missing. This volume has \
-		      not been upgraded\n");
-	}
-	if (value_length == 72) {
-	    printf("\tMaximum Number of Versions: \t %u \n",
-			    le32_to_cpu(standard_attr->maximum_versions));
-	    printf("\tVersion Number: \t\t %u \n",
-			    le32_to_cpu(standard_attr->version_number));
-	    printf("\tClass ID: \t\t\t %u \n",
-			    le32_to_cpu(standard_attr->class_id));
-	    printf("\tUser ID: \t\t\t %u \n",
-			    le32_to_cpu (standard_attr->owner_id));
-	    printf("\tSecurity ID: \t\t\t %u \n",
-			    le32_to_cpu(standard_attr->security_id));
+/*		printf("\t$STANDARD_INFORMATION fields owner_id, security_id, quota \n"
+			"\t & usn are missing. This volume has not been upgraded\n"); */
+	} else if (value_length == 72) {
+		printf("\tUser ID: \t\t %u \n",
+			le32_to_cpu (standard_attr->owner_id));
+		printf("\tSecurity ID: \t\t %u \n",
+			le32_to_cpu(standard_attr->security_id));
 	} else {
 		printf("\tSize of STANDARD_INFORMATION is %u. It should be "
-				"either 72 or 48, something is wrong...\n",
-				value_length);
+			"either 72 or 48, something is wrong...\n", value_length);
 	}
-
-	ntfs_attr_put_search_ctx(ctx); //free ctx
 	
 }
 
 /**
- * ntfs_dump_file_name_attribute
+ * ntfs_dump_attr_file_name()
  */
-void ntfs_dump_file_name_attr(ntfs_inode *inode)
+void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
-	ATTR_RECORD *attr = NULL;
-	ntfs_attr_search_ctx *ctx = NULL;
-	char *file_name = NULL;
 
-	ctx = ntfs_attr_get_search_ctx(inode, NULL);
-do_next:
-	if(ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		if (errno != ENOENT)
-			fprintf(stderr, "ntfsinfo error: cannot lookup attribute AT_FILE_NAME!\n");
-		ntfs_attr_put_search_ctx(ctx); //free ctx	
-		return;
+	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
+		le16_to_cpu(attr->value_offset));
+
+	printf("Dumping attribute $FILE_NAME (0x30)\n");
+	
+	/* let's start with the obvious - file name */
+
+	if (file_name_attr->file_name_length>0) {
+		/* but first we need to convert the little endian unicode string
+		   into a printable format */
+		char *mbs_file_name = NULL;
+		int mbs_file_name_size;
+
+		mbs_file_name_size = ntfs_ucstombs(file_name_attr->file_name,
+			file_name_attr->file_name_length,&mbs_file_name,0);
+
+		if (mbs_file_name_size>0) {
+			printf("\tFile Name: \t\t '%s'\n", mbs_file_name);
+			free(mbs_file_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse file name: %s\n",
+				strerror(errno));
+		}
+		/* any way, error or not, print the length */
+		printf("\tFile Name Length: \t %d\n", file_name_attr->file_name_length);
+	} else {
+		printf("\tFile Name: \t\t unnamed?!?\n");
 	}
-
-	attr = ctx->attr;
-
-	file_name_attr = (FILE_NAME_ATTR*)((char *)attr + le16_to_cpu(attr->value_offset));
-
-	//need to convert the little endian unicode string to a multibyte string
-	ntfs_ucstombs(file_name_attr->file_name, file_name_attr->file_name_length,
-			&file_name, file_name_attr->file_name_length);
-
-	printf("Dumping $FILE_NAME (0x30)\n");
-
-	//basic stuff about the file
-	printf("\tFile Name: \t\t %s\n", file_name);
-	printf("\tFile Name Length: \t %d\n", file_name_attr->file_name_length);
+	
+	/* other basic stuff about the file */
 	printf("\tAllocated File Size: \t %lld\n",
-			(long long)sle64_to_cpu(file_name_attr->allocated_size));
+		(long long)sle64_to_cpu(file_name_attr->allocated_size));
 	printf("\tReal File Size: \t %lld\n",
-			(long long)sle64_to_cpu(file_name_attr->data_size));
+		(long long)sle64_to_cpu(file_name_attr->data_size));
 
-	//time conversion stuff
+	/* time stuff stuff */
 	if (!opts.notime) {
-	  time_t ntfs_time = { 0 };
+		char *ntfs_time_str;
 	
-	  if (!opts.epochtime) {
-	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->creation_time));
-	    printf("\tFile Creation Time: \t %s",ctime(&ntfs_time));
-	    
-	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_data_change_time));
-	    printf("\tFile Altered Time: \t %s",ctime(&ntfs_time));
-	    
-	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_mft_change_time));
-	    printf("\tMFT Changed Time: \t %s",ctime(&ntfs_time));
-	    
-	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_access_time));
-	    printf("\tLast Accessed Time: \t %s",ctime(&ntfs_time));
-	  } else {
-	    char *t = asctime(gmtime(&ntfs_time));
-	    printf("\tFile Creation Time: \t %s",t);
-	    printf("\tFile Altered Time: \t %s",t);
-	    printf("\tMFT Changed Time: \t %s",t);
-	    printf("\tLast Accessed Time: \t %s",t);
-	  }
+		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->creation_time);
+		printf("\tFile Creation Time: \t %s",ntfs_time_str);
+
+		ntfs_time_str = ntfsinfo_time_to_str(
+			file_name_attr->last_data_change_time);
+		printf("\tFile Altered Time: \t %s",ntfs_time_str);
+
+		ntfs_time_str = ntfsinfo_time_to_str(
+			file_name_attr->last_mft_change_time);
+		printf("\tMFT Changed Time: \t %s",ntfs_time_str);
+
+		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->last_access_time);
+		printf("\tLast Accessed Time: \t %s",ntfs_time_str);
 	}
-	
-	free(file_name);
-	file_name = NULL;
-	goto do_next;
 }
 
 
@@ -439,106 +498,102 @@ do_next:
  * dump the $OBJECT_ID attribute - not present on all systems
  *
  */
-void ntfs_dump_object_id_attr(ntfs_inode *inode)
+void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 {
 	OBJECT_ID_ATTR *obj_id_attr = NULL;
-	ATTR_RECORD *attr = NULL;
-	ntfs_attr_search_ctx *ctx = NULL;
-
-	ctx = ntfs_attr_get_search_ctx(inode, NULL);
-
-	if (ntfs_attr_lookup(AT_OBJECT_ID, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		if (errno != ENOENT)
-			fprintf(stderr, "ntfsinfo error: cannot look up "
-					"attribute AT_OBJECT_ID: %s\n", 
-					strerror(errno));
-		ntfs_attr_put_search_ctx(ctx);
-		return;
-	}
-
-	attr = ctx->attr;
 
 	obj_id_attr = (OBJECT_ID_ATTR *)((u8*)attr +
 			le16_to_cpu(attr->value_offset));
 
-	printf("Dumping $OBJECT_ID (0x40)\n");
+	printf("Dumping attribute $OBJECT_ID (0x40)\n");
 
-	if (inode->vol->major_ver >= 3.0) {
+	if (vol->major_ver >= 3.0) {
 		u32 value_length;
 		char printable_GUID[37];
-
-		printf("\tVolume Version >= 3.0... Dumping Attributes\n");
 
 		value_length = le32_to_cpu(attr->value_length);
 
 		/* Object ID is mandatory. */
 		ntfs_guid_to_mbs(&obj_id_attr->object_id, printable_GUID);
-		printf("\tObject ID:\t\t%s\n", printable_GUID);
+		printf("\tObject ID:\t\t %s\n", printable_GUID);
 
 		/* Dump Birth Volume ID. */
 		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
 				&obj_id_attr->birth_volume_id)) {
 			ntfs_guid_to_mbs(&obj_id_attr->birth_volume_id,
 					printable_GUID);
-			printf("\tBirth Volume ID:\t\t%s\n", printable_GUID);
+			printf("\tBirth Volume ID:\t\t %s\n", printable_GUID);
 		} else
-			printf("\tBirth Volume ID:\tmissing\n");
+			printf("\tBirth Volume ID:\t missing\n");
 
 		/* Dumping Birth Object ID */
 		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
 				&obj_id_attr->birth_object_id)) {
 			ntfs_guid_to_mbs(&obj_id_attr->birth_object_id,
 					printable_GUID);
-			printf("\tBirth Object ID:\t\t%s\n", printable_GUID);
+			printf("\tBirth Object ID:\t\t %s\n", printable_GUID);
 		} else
-			printf("\tBirth Object ID:\tmissing\n");
+			printf("\tBirth Object ID:\t missing\n");
 
 		/* Dumping Domain_id - reserved for now */
 		if ((value_length > sizeof(GUID)) && !ntfs_guid_is_zero(
 				&obj_id_attr->domain_id)) {
 			ntfs_guid_to_mbs(&obj_id_attr->domain_id,
 					printable_GUID);
-			printf("\tDomain ID:\t\t\t%s\n", printable_GUID);
+			printf("\tDomain ID:\t\t\t %s\n", printable_GUID);
 		} else
-			printf("\tDomain ID:\t\tmissing\n");
-	} else 
-		printf("\t$OBJECT_ID not present.  Only NTFS versions > 3.0 "
-				"have $OBJECT_ID.  Your version of NTFS is "
-				"%d.\n", inode->vol->major_ver);
-
-	ntfs_attr_put_search_ctx(ctx);
+			printf("\tDomain ID:\t\t missing\n");
+	} else
+		printf("\t$OBJECT_ID not present. Only NTFS versions > 3.0\n"
+				"\thave $OBJECT_ID. Your version of NTFS is %d.\n",
+				vol->major_ver);
 }
 
+/*
+ * ntfs_dump_security_descriptor()
+ *
+ * dump the security information about the file
+ */
+void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
+	printf("\tTODO\n");
+}
 
 /*
  * ntfs_dump_volume_name()
  *
  * dump the name of the volume the inode belongs to
  */
-void ntfs_dump_volume_name_attr(ntfs_inode *inode)
+void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 {
-	VOLUME_NAME *vol_name = NULL;
-	ATTR_RECORD *attr = NULL;
-	ntfs_attr_search_ctx *ctx = NULL;
+	uchar_t *ucs_vol_name = NULL;
 
-	ctx = ntfs_attr_get_search_ctx(inode, NULL);
-	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
-			ctx)) {
-		if (errno != ENOENT)
-			fprintf(stderr, "ntfsinfo error: cannot look up "
-					"attribute AT_VOLUME_NAME: %s\n",
-					strerror(errno));
-		ntfs_attr_put_search_ctx(ctx);
-		return;
+	printf("Dumping attribute $VOLUME_NAME (0x60)\n");
+
+	if (attr->value_length>0) {
+		char *mbs_vol_name = NULL;
+		int mbs_vol_name_length;
+		/* calculate volume name position */
+		ucs_vol_name = (uchar_t*)((u8*)attr +
+				le16_to_cpu(attr->value_offset));
+		/* convert the name to current locale multibyte sequence */
+		mbs_vol_name_length = ntfs_ucstombs(ucs_vol_name,
+				attr->value_length/sizeof(uchar_t),
+				&mbs_vol_name,0);
+
+		if (mbs_vol_name_length>0) {
+			/* output the converted name. */
+			printf("\tVolume Name: \t\t '%s'\n",mbs_vol_name);
+			free(mbs_vol_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr,"ntfsinfo error: could not parse volume name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tVolume Name: \t\t unnamed\n");
 	}
-	attr = ctx->attr;
-	vol_name = (VOLUME_NAME*)((char *)attr +
-			le16_to_cpu(attr->value_offset));
-	printf("Dumping $VOLUME_NAME (0x60)\n");
-	// FIXME: convert the name to current locale multibyte sequence
-	// then output the converted name.
-	//printf("\tVolume Name: \t\t\t %s\n", vol_name->name);
-	ntfs_attr_put_search_ctx(ctx);
 }
 
 
@@ -548,36 +603,280 @@ void ntfs_dump_volume_name_attr(ntfs_inode *inode)
  * dump the information for the volume the inode belongs to
  *
  */
-void ntfs_dump_volume_information_attr(ntfs_inode *inode)
+void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 {
-    VOLUME_INFORMATION *vol_information = NULL;
-    ATTR_RECORD *attr = NULL;
-    ntfs_attr_search_ctx *ctx = NULL;
+	VOLUME_INFORMATION *vol_information = NULL;
+	
+	vol_information = (VOLUME_INFORMATION*)((char *)attr+
+		le16_to_cpu(attr->value_offset));
 
-    ctx = ntfs_attr_get_search_ctx(inode, NULL);
+	printf("Dumping attribute $VOLUME_INFORMATION (0x70)\n");
 
-    if(ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-	if (errno != ENOENT)
-		fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_INFORMATION: %s\n",
-			strerror(errno));
-	ntfs_attr_put_search_ctx(ctx);
-	return;
-    }
-
-    attr = ctx->attr;
-    
-    vol_information = (VOLUME_INFORMATION*)((char *)attr + le16_to_cpu(attr->value_offset));
-
-    printf("Dumping $VOLUME_INFORMATION (0x70)\n");
-
-    printf("\tVolume Major Version: \t\t\t %d\n", vol_information->major_ver);
-    printf("\tVolume Minor Version: \t\t\t %d\n", vol_information->minor_ver);
-    printf("\tFlags: \t\t\t Not Finished Yet! \n");
-
-    ntfs_attr_put_search_ctx(ctx);
+	printf("\tVolume Version: \t %d.%d\n", vol_information->major_ver,
+		vol_information->minor_ver);
+	printf("\tFlags: \t\t\t ");
+	if (vol_information->flags & VOLUME_IS_DIRTY)
+		printf("DIRTY ");
+	if (vol_information->flags & VOLUME_RESIZE_LOG_FILE)
+		printf("RESIZE_LOG ");
+	if (vol_information->flags & VOLUME_UPGRADE_ON_MOUNT)
+		printf("UPG_ON_MOUNT ");
+	if (vol_information->flags & VOLUME_MOUNTED_ON_NT4)
+		printf("MOUNTED_NT4 ");
+	if (vol_information->flags & VOLUME_DELETE_USN_UNDERWAY)
+		printf("DEL_USN ");
+	if (vol_information->flags & VOLUME_REPAIR_OBJECT_ID)
+		printf("REPAIR_OBJID ");
+	if (vol_information->flags & VOLUME_MODIFIED_BY_CHKDSK)
+		printf("MOD_BY_CHKDSK ");
+	if (vol_information->flags & VOLUME_FLAGS_MASK) {
+		printf("\n");
+	} else {
+		printf("none set\n");
+	}
+	if (vol_information->flags & (0xFFFF - VOLUME_FLAGS_MASK))
+		printf("\t\t\t\t Unknown Flags: 0x%04x\n",
+			vol_information->flags & (0xFFFF - VOLUME_FLAGS_MASK));
 }
 
+/*
+ * ntfs_dump_data_attr()
+ *
+ * dump some info about the data attribute
+ */
+void ntfs_dump_attr_data(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $DATA (0x80) related info\n");
 
+	/* Dump stream name */
+	if (attr->name_length) {
+		char *stream_name = NULL;
+
+		stream_name = ntfs_attr_get_name(attr);
+		if (stream_name) {
+			printf("\tStream name: \t\t '%s'\n",stream_name);
+			free(stream_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tStream name: \t\t unnamed\n");
+	}
+
+/*	length
+	u16 name_offset;
+	ATTR_FLAGS flags;
+	u16 instance; */
+	
+	/* fork by residence */
+	if (attr->non_resident) {
+/*		VCN lowest_vcn;	  Lowest valid virtual cluster number
+		VCN highest_vcn;  Highest valid vcn of this extent of
+		u16 mapping_pairs_offset; Byte offset from the ... */
+		printf("\tIs resident? \t\t No\n");
+		printf("\tData size: \t\t %llu\n",
+			(long long)le64_to_cpu(attr->data_size));
+		printf("\tAllocated size: \t %llu\n",
+			(long long)le64_to_cpu(attr->allocated_size));
+		printf("\tInitialized size: \t %llu\n",
+			(long long)le64_to_cpu(attr->initialized_size));
+		if (attr->compression_unit) {
+			printf("\tCompression unit: \t %u\n",attr->compression_unit);
+			printf("\tCompressed size: \t %llu\n",
+				(long long)le64_to_cpu(attr->compressed_size));
+		} else {
+			printf("\tNot Compressed\n");
+		}
+	} else {
+		printf("\tIs resident? \t\t Yes\n");
+		printf("\tData size: \t\t %u\n",le32_to_cpu(attr->value_length));
+/*		u16 value_offset; Byte offset of the attribute
+		RESIDENT_ATTR_FLAGS resident_flags; */
+	}
+}
+
+/*
+ * ntfs_dump_attr_index_root()
+ *
+ * dump the index_root attribute
+ */
+void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
+{
+	INDEX_ROOT *index_root = NULL;
+	
+	index_root = (INDEX_ROOT*)((u8*)attr + le16_to_cpu(attr->value_offset));
+	
+	printf("Dumping attribute $INDEX_ROOT (0x90)\n");
+	
+	/* Dump index name */
+	if (attr->name_length) {
+		char *index_name = NULL;
+		index_name = ntfs_attr_get_name(attr);
+		
+		if (index_name) {
+			printf("\tIndex name: \t\t '%s'\n",index_name);
+			free(index_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse index name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tIndex name: \t\t unnamed\n");
+	}
+
+	/* attr_type dumping */
+	printf("\tIndexed Attr Type: \t ");
+	if (index_root->type) {
+		if (index_root->type & (0xFFFF - AT_FILE_NAME)) {
+			/* wierd, this should be illgeal */
+			printf("%4X\n",index_root->type);
+			fprintf(stderr, "ntfsinfo error: Illeal Indexed Attr Type: %4X\n",
+				index_root->type);
+		} else {
+			printf("file names\n");
+		}
+	} else {
+		/* fixme: add some more index types */
+		printf("unknown\n");
+	}
+
+	/* collation rule dumping */
+	printf("\tCollation Rule: \t %u\n",
+		le32_to_cpu(index_root->collation_rule));
+/*	COLLATION_BINARY, COLLATION_FILE_NAME, COLLATION_UNICODE_STRING,
+	COLLATION_NTOFS_ULONG, COLLATION_NTOFS_SID,
+	COLLATION_NTOFS_SECURITY_HASH, COLLATION_NTOFS_ULONGS */
+
+	printf("\tIndex Block Size:\t %u\n",
+		le32_to_cpu(index_root->index_block_size));
+	printf("\tClusters Per Block:\t %u\n",
+		index_root->clusters_per_index_block);
+	
+	/* index header starts here */
+	printf("\tAllocated Size:\t\t %u\n",
+		le32_to_cpu(index_root->index.allocated_size));
+	printf("\tUsed Size:\t\t %u\n",
+		le32_to_cpu(index_root->index.index_length));
+	printf("\tFlags:\t\t\t %u\n",index_root->index.flags);
+	/* printf("\tIndex Entries Following\t %u\n", ???? );*/
+}
+
+/*
+ * ntfs_dump_attr_index_allocation()
+ *
+ * dump the index_allocation attribute
+ */
+void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $INDEX_ALLOCATION (0xA0)\n");
+
+	/* Dump index name */
+	if (attr->name_length) {
+		char *index_name = NULL;
+		index_name = ntfs_attr_get_name(attr);
+		
+		if (index_name) {
+			printf("\tIndex name: \t\t '%s'\n",index_name);
+			free(index_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse index name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tIndex name: \t\t unnamed\n");
+	}
+}
+
+/*
+ * ntfs_dump_attr_bitmap()
+ *
+ * dump the bitmap attribute
+ */
+void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $BITMAP (0xB0)\n");
+
+	/* Dump bitmap name */
+	if (attr->name_length) {
+		char *bitmap_name = NULL;
+		bitmap_name = ntfs_attr_get_name(attr);
+		
+		if (bitmap_name) {
+			printf("\tBitmap name: \t\t '%s'\n",bitmap_name);
+			free(bitmap_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse bitmap name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tBitmap name: \t\t unnamed\n");
+	}
+}
+
+/*
+ * ntfs_dump_attr_reparse_point()
+ *
+ * of ntfs 3.x dumps the reparse_point attribute
+ */
+void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $REPARSE_POINT/$SYMBOLIC_LINK (0xC0)\n");
+	printf("\tTODO\n");
+}
+
+/*
+ * ntfs_dump_attr_ea_information()
+ *
+ * dump the ea_information attribute
+ */
+void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $EA_INFORMATION (0xD0)\n");
+	printf("\tTODO\n");
+}
+
+/*
+ * ntfs_dump_attr_ea()
+ *
+ * dump the ea attribute
+ */
+void ntfs_dump_attr_ea(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $EA (0xE0)\n");
+	printf("\tTODO\n");
+}
+
+/*
+ * ntfs_dump_attr_property_set()
+ *
+ * dump the property_set attribute
+ */
+void ntfs_dump_attr_property_set(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $PROPERTY_SET (0xF0)\n");
+	printf("\tTODO\n");
+}
+
+/*
+ * ntfs_dump_attr_logged_utility_stream()
+ *
+ * dump the property_set attribute
+ */
+void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr)
+{
+	printf("Dumping attribute $LOGGED_UTILITY_STREAM (0x100)\n");
+	printf("\tTODO\n");
+}
+
+void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
+{
+	printf("TODO: ntfs_dump_unknown_attr\n");
+}
 	
 /**
  * ntfs_get_file_attributes
@@ -585,24 +884,103 @@ void ntfs_dump_volume_information_attr(ntfs_inode *inode)
 void ntfs_get_file_attributes(ntfs_volume *vol, s64 mft_no)
 {
 	ntfs_inode *inode = NULL;
-	//int error;
+	ntfs_attr_search_ctx *ctx = NULL;
 
+	/* first obtain our inode */
 	inode = ntfs_inode_open(vol, MK_MREF(mft_no, 0));
+	if (!inode) {
+		/* can't open inode */
+		/* note: when the specified inode does not exist, EIO is returned
+		         is there a way to give the correct response instead? */
+		fprintf(stderr, "Error loading node: %s\n", strerror(errno));
+		return;
+	}
+	
+	/* then start enumerating attributes
+	   see ntfs_attr_lookup documentation for detailed explenation */
+	ctx = ntfs_attr_get_search_ctx(inode, NULL);
+	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		switch (ctx->attr->type) {
+		case AT_UNUSED:
+			/* That's an internal type, isn't it? */
+			printf("Weird: AT_UNUSED type was returned, please report this.\n");
+			break;
+		case AT_STANDARD_INFORMATION:
+			ntfs_dump_attr_standard_information(ctx->attr);
+			break;
+		case AT_ATTRIBUTE_LIST:
+			/* As far as I know, ntfs_attr_lookup transparantly iterate
+			   through AT_ATTRIBUTE_LIST, so we shouldn't get to this */
+			/* FIXME: inode 9: $Secure does that, I'll have to check */
+			printf("Weird: AT_ATTRIBUTE_LIST type was returned.\n");
+			break;
+		case AT_FILE_NAME:
+			ntfs_dump_attr_file_name(ctx->attr);
+			break;
+		case AT_OBJECT_ID:
+			ntfs_dump_attr_object_id(ctx->attr,vol);
+			break;
+		case AT_SECURITY_DESCRIPTOR:
+			ntfs_dump_attr_security_descriptor(ctx->attr);
+			break;
+		case AT_VOLUME_NAME:
+			ntfs_dump_attr_volume_name(ctx->attr);
+			break;
+		case AT_VOLUME_INFORMATION:
+			ntfs_dump_attr_volume_information(ctx->attr);
+			break;
+		case AT_DATA:
+			ntfs_dump_attr_data(ctx->attr);
+			break;
+		case AT_INDEX_ROOT:
+			ntfs_dump_attr_index_root(ctx->attr);
+			break;
+		case AT_INDEX_ALLOCATION:
+			ntfs_dump_attr_index_allocation(ctx->attr);
+			break;
+		case AT_BITMAP:
+			ntfs_dump_attr_bitmap(ctx->attr);
+			break;
+		case AT_REPARSE_POINT:
+			ntfs_dump_attr_reparse_point(ctx->attr);
+			break;
+		case AT_EA_INFORMATION:
+			ntfs_dump_attr_ea_information(ctx->attr);
+			break;
+		case AT_EA:
+			ntfs_dump_attr_ea(ctx->attr);
+			break;
+		case AT_PROPERTY_SET:
+			ntfs_dump_attr_property_set(ctx->attr);
+			break;
+		case AT_LOGGED_UTILITY_STREAM:
+			ntfs_dump_attr_logged_utility_stream(ctx->attr);
+			break;
+		case AT_END:
+			printf("Weird: AT_END type was returned, please report this.\n");
+			break;
+		default:
+			ntfs_dump_attr_unknown(ctx->attr);
+		}
+	}
+	
+	/* if we exited the loop before we're done - notify the user */
+	if (errno != ENOENT) {
+		fprintf(stderr, "ntfsinfo error: stopped before finished "
+			"enumerating attributes: %s\n", strerror(errno));
+	} else {
+		printf("End of attribute list reached\n");
+	}
 
-	//see flatcap.org/ntfs/info for what formatting should look likei
-	//FIXME: both $FILE_NAME_ATTR and $STANDARD_INFORMATION has times, when do 
-	//we want to output it?
-	ntfs_dump_standard_information_attr(inode);
-	ntfs_dump_file_name_attr(inode);
-	ntfs_dump_object_id_attr(inode);
-	ntfs_dump_volume_name_attr(inode);
-	ntfs_dump_volume_information_attr(inode);
-
+	/* close all data-structures we used */
+	ntfs_attr_put_search_ctx(ctx);
 	ntfs_inode_close(inode);
+	
+	/* happily exit */
 }
 
 /**
- * main - Begin here
+ * main() - Begin here
  *
  * Start from here.
  *
@@ -623,7 +1001,7 @@ int main(int argc, char **argv)
 		return 1;
 
 	/* if opts.mft is not 0, then we will print out information about
-	 * the volume, such as the sector size and whatnot. 
+	 * the volume, such as the sector size and whatnot.
 	 */
 	if (opts.mft)
 		ntfs_dump_volume(vol);
