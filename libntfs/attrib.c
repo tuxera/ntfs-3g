@@ -31,6 +31,7 @@
 #include "compat.h"
 
 #include "attrib.h"
+#include "attrlist.h"
 #include "device.h"
 #include "mft.h"
 #include "debug.h"
@@ -2222,6 +2223,148 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 }
 
 /**
+ * ntfs_make_room_for_attr - make room for an attribute inside an mft record
+ * @m:		mft record
+ * @pos:	position at which to make space
+ * @size:	byte size to make available at this position
+ *
+ * @pos points to the attribute in front of which we want to make space.
+ *
+ * Return 0 on success or -1 on error. On error the error code is stored in
+ * errno. Possible error codes are:
+ *	ENOSPC - There is not enough space available to complete operation. The
+ *		 caller has to make space before calling this.
+ *	EINVAL - Input parameters were faulty.
+ */
+static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
+{
+	u32 biu;
+	
+	Dprintf("%s(): Entering for pos 0x%d, size %u.\n",
+		 __FUNCTION__, (int)(pos - (u8*)m), size);
+
+	/* Make size 8-byte aligment. */
+	size = (size + 7) & ~7;
+
+	/* Rigorous consistency checks. */
+	if (!m || !pos || size < 0 || pos < (u8*)m || pos + size >
+				(u8*)m + le32_to_cpu(m->bytes_allocated)) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* The -8 is for the attribute terminator. */
+	if (pos - (u8*)m > (int)le32_to_cpu(m->bytes_in_use) - 8) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Nothing to do. */
+	if (!size)
+		return 0;
+
+	biu = le32_to_cpu(m->bytes_in_use);
+	/* Do we have enough space? */
+	if (biu + size > le32_to_cpu(m->bytes_allocated)) {
+		errno = ENOSPC;
+		return -1;
+	}
+	/* Move everything after pos to pos + size. */
+	memmove(pos + size, pos, biu - (pos - (u8*)m));
+	/* Update mft record. */
+	m->bytes_in_use = cpu_to_le32(biu + size);
+	return 0;
+}
+
+/**
+ * ntfs_not_resident_attr_record_add - 
+ * @ni:			
+ * @type:		
+ * @name:		
+ * @name_len:		
+ * @lowest_vcn:		
+ * @dataruns_size:	
+ * @flags:		
+ *
+ * Return offset to attribute from the beginning of the mft record on success
+ * and NULL on error. On error the error code is stored in errno.
+ * Possible error codes are:
+ *	EINVAL -
+ *	EEXIST -
+ *	EIO - 
+ */
+int ntfs_not_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
+		ATTR_FLAGS flags)
+{
+	ntfs_attr_search_ctx *ctx;
+	u32 length;
+	ATTR_RECORD *a;
+	MFT_RECORD *m;
+	int err, offset;
+	
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
+		"dataruns_size %d, flags 0x%x.\n", __FUNCTION__, ni->mft_no,
+		type, lowest_vcn, dataruns_size, flags);
+	
+	if (!ni || dataruns_size <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	
+	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	if (!ctx)
+		return -1;
+	if (!ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
+					lowest_vcn, NULL, 0, ctx)) {
+		err = EEXIST;
+		Dprintf("%s(): Attribute already present.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	if (errno != ENOENT) {
+		err = EIO;
+		goto put_err_out;
+	}
+	length = 0x40 + sizeof(ntfschar) * name_len + dataruns_size;
+	if (flags & ATTR_COMPRESSION_MASK)
+		length += 8;
+	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
+		err = errno;
+		Dprintf("%s(): Failed to make room for attribute.\n",
+				__FUNCTION__);
+		goto put_err_out;
+	}
+	a = ctx->attr;
+	m = ctx->mrec;
+	offset = ((u8*)a - (u8*)m);
+	a->type = type;
+	a->length = cpu_to_le32(length);
+	a->non_resident = 1;
+	a->name_length = name_len;
+	a->name_offset = cpu_to_le16(length - dataruns_size -
+				sizeof(ntfschar) * name_len);
+	a->flags = flags;
+	a->instance = m->next_attr_instance;
+	a->lowest_vcn = cpu_to_le64(lowest_vcn);
+	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
+	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
+	m->next_attr_instance =
+		cpu_to_le16(le16_to_cpu(m->next_attr_instance) + 1);
+	if (ntfs_attrlist_entry_add(ni, a)) {
+		err = errno;
+		ntfs_attr_record_resize(m, a, 0);
+		Dprintf("%s(): Failed add attribute entry to ATTRIBUTE_LIST.\n",
+			__FUNCTION__);
+		goto put_err_out;
+	}
+	ntfs_inode_mark_dirty(ni);
+	ntfs_attr_put_search_ctx(ctx);
+	return offset;
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+
+/**
  * ntfs_attr_record_resize - resize an attribute record
  * @m:		mft record containing attribute record
  * @a:		attribute record to resize
@@ -3146,17 +3289,14 @@ put_err_out:
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
-	int mft_changed = 0;
-	u8 *mft_rec_copy = NULL;
-	u32 mft_rec_copy_size = 0;
 	LCN lcn_seek_from;
-	VCN first_free_vcn;
+	VCN first_free_vcn, stop_vcn;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
 	runlist *rl, *rln;
-	u32 new_alen, new_muse;
+	ntfs_inode *ni;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
@@ -3284,51 +3424,53 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		}
 		/*
 		 * Determine maximum possible length of mapping pairs,
-		 * if we shall *not* expand space for mapping pairs
+		 * if we shall *not* expand space for mapping pairs.
 		 */
 		cur_max_mp_size = le32_to_cpu(a->length) - 
 				le16_to_cpu(a->mapping_pairs_offset);
 		/*
-		 * Determine maximum possible length of mapping pairs,
-		 * if we shall expand space for mapping pairs
+		 * Determine maximum possible length of mapping pairs in the
+		 * current mft record, if we shall expand space for mapping
+		 * pairs.
 		 */
 		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
 
+		/* Test mapping pairs for fitting in the current mft record. */
 		if (mp_size > exp_max_mp_size) {
-			if (na->type == AT_ATTRIBUTE_LIST)
+			/*
+			 * Mapping pairs of $ATTRIBUTE_LIST attribute must fit
+			 * in the base mft record.
+			 */
+			if (na->type == AT_ATTRIBUTE_LIST) {
 				err = ENOSPC;
-			else {
-				err = ENOTSUP;
-				Dprintf("%s(): Eeek! Maping pairs size is "
-						"too big.\n", __FUNCTION__);
+				goto rollback;
+			} else {
+				/* Add attribute list, if it is not present. */
+				if (!NInoAttrList(na->ni)) {
+					// FIXME: Add attribute list and retry.
+					Dprintf("%s(): Eeek! Adding of "
+						"$ATTRIBUTE_LIST not supported "
+						"yet. Sorry.\n", __FUNCTION__);
+					err = ENOTSUP;
+					goto rollback;
+				} else {
+					/*
+					 * Set mapping pairs size to maximum
+					 * possible for this mft record. We
+					 * shall allocate new mft records for
+					 * rest of mapping pairs.
+					 */
+					mp_size = exp_max_mp_size;
+				}
 			}
-			goto rollback;
 		}
-
-		/* Backup mft record. We need this for rollback. */
-		mft_rec_copy_size = le32_to_cpu(m->bytes_in_use);
-		mft_rec_copy = malloc(mft_rec_copy_size);
-		if (!mft_rec_copy) {
-			err = ENOMEM;
-			Dprintf("%s(): Eeek! Not enough memory to "
-					"allocate %d bytes.\n", __FUNCTION__,
-					le32_to_cpu(m->bytes_in_use));
-			goto rollback;
-		}
-		memcpy(mft_rec_copy, m, mft_rec_copy_size);
 
 		/* Expand space for mapping pairs if we need this. */
 		if (mp_size > cur_max_mp_size) {
-			/*
-			 * Calculate the new attribute length and mft record
-			 * bytes used.
-			 */
-			new_alen = (le16_to_cpu(a->mapping_pairs_offset) +
-					mp_size + 7) & ~7;
-			new_muse = le32_to_cpu(m->bytes_in_use) -
-					le32_to_cpu(a->length) + new_alen;
-			if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+			if (ntfs_attr_record_resize(m, a,
+					le16_to_cpu(a->mapping_pairs_offset) +
+					mp_size)) {
 				Dprintf("%s(): BUG! Ran out of space in"
 						" mft record. Please run chkdsk"
 						" and if that doesn't find any "
@@ -3339,42 +3481,73 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				err = EIO;
 				goto rollback;
 			}
-			/* Move the following attributes making space. */
-			memmove((u8*)a + new_alen, (u8*)a +
-					le32_to_cpu(a->length),
-					le32_to_cpu(m->bytes_in_use) -
-					((u8*)a - (u8*)m) -
-					le32_to_cpu(a->length));
-			/* Update the sizes of the attribute and mft records. */
-			a->length = cpu_to_le32(new_alen);
-			m->bytes_in_use = cpu_to_le32(new_muse);
 		}
 		/*
 		 * Generate the new mapping pairs array directly into the
 		 * correct destination, i.e. the attribute record itself.
+		 * If we ran out of space than allocate new MFT record, add
+		 * attribute extent to it and continue generation.
 		 */
-		if (ntfs_mapping_pairs_build(vol, (u8*)a +
-				le16_to_cpu(a->mapping_pairs_offset), mp_size,
-				na->rl, sle64_to_cpu(a->lowest_vcn), NULL)) {
-			err = errno;
-			Dprintf("%s(): BUG!  Mapping pairs build "
+		stop_vcn = sle64_to_cpu(a->lowest_vcn);
+		ni = ctx->ntfs_ino;
+		while(ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
+				a->mapping_pairs_offset), mp_size, na->rl,
+				stop_vcn, &stop_vcn)) {
+			if (errno != ENOSPC) {
+				err = errno;
+				Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "
 					"that doesn't find any errors please "
 					"report you saw this message to "
 					"linux-ntfs-dev@lists.sf.net.\n",
 					__FUNCTION__);
-			mft_changed = 1;
-			goto rollback;
+				goto rollback;
+			}
+			a->highest_vcn = scpu_to_le64(stop_vcn - 1);
+			ntfs_inode_mark_dirty(ni);
+			
+			/* Calculate size of rest mapping pairs. */
+			mp_size = ntfs_get_size_for_mapping_pairs(vol,
+					na->rl, stop_vcn);
+	
+			/* Allocate new mft record. */
+			ni = ntfs_mft_record_alloc(vol, na->ni);
+			if (!ni) {
+				err = errno;
+				Dprintf("%s(): Couldn't allocate new MFT "
+					"record.\n", __FUNCTION__);
+				goto rollback;
+			}
+			m = ni->mrec;
+			/*
+			 * If mapping size exceed avaible space, set them to
+			 * possible maximum.
+			 */
+			cur_max_mp_size = le32_to_cpu(m->bytes_allocated) -
+					le32_to_cpu(m->bytes_in_use) - 0x40 -
+					sizeof(ntfschar) * na->name_len;
+			if (mp_size > cur_max_mp_size)
+				mp_size = cur_max_mp_size;
+			/* Add atribute extent to new record. */
+			err = ntfs_not_resident_attr_record_add(ni, na->type,
+				 na->name, na->name_len, stop_vcn, mp_size, 0);
+			if (err == -1) {
+				err = errno;
+				Dprintf("%s(): Couldn't add attribute extent "
+					"into the MFT record.\n", __FUNCTION__);
+				goto rollback;
+			}
+			a = (ATTR_RECORD*)((u8*)m + err);
 		}
 
 		/*
 		 * Reminder: We may not update a->highest_vcn if it equal to 0
 		 * and attribute is single-extent.
 		 */
-		if (a->highest_vcn)
+		if (a->lowest_vcn || a->highest_vcn)
 			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 
-		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		ntfs_inode_mark_dirty(ni);
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
 	
@@ -3420,8 +3593,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
-	if (mft_rec_copy)
-		free(mft_rec_copy);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 rollback:
@@ -3441,12 +3612,7 @@ rollback:
 		free(na->rl);
 		na->rl = NULL;
 	}
-	/* Restote mft record. */
-	if (mft_changed)
-		memcpy(m, mft_rec_copy, mft_rec_copy_size);
 put_err_out:
-	if (mft_rec_copy)
-		free(mft_rec_copy);
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
