@@ -78,7 +78,7 @@ typedef struct win32_fd {
 	HANDLE vol_handle;
 } win32_fd;
 
-#ifdef EMULATE_SETFILEPOINTEREX
+#ifndef HAVE_SETFILEPOINTEREX
 static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
 		LARGE_INTEGER liDistanceToMove,
 		PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
@@ -174,7 +174,7 @@ static __inline__ int ntfs_device_unix_status_flags_to_win32(int flags)
 /**
  * ntfs_device_win32_simple_open_file - Just open a file via win32 API
  * @filename:	Name of the file to open.
- * @handle:		Pointer the a HADNLE in which to put the result.
+ * @handle:		Pointer the a HANDLE in which to put the result.
  * @flags:		Unix open status flags.
  * @locking:	will the function gain an exclusive lock on the file?
  *
@@ -201,7 +201,7 @@ static int ntfs_device_win32_simple_open_file(const char *filename,
 
 /**
  * ntfs_device_win32_lock - Lock the volume
- * @handle:	A win32 HADNLE for a volume to lock.
+ * @handle:	A win32 HANDLE for a volume to lock.
  *
  * Locking a volume means no one can access its contents.
  * Exiting the process automatically unlocks the volume, except in old NT4s.
@@ -224,7 +224,7 @@ static int ntfs_device_win32_lock(HANDLE handle)
 
 /**
  * ntfs_device_win32_unlock - Unlock the volume
- * @handle:	The win32 HADNLE which the volume was locked with.
+ * @handle:	The win32 HANDLE which the volume was locked with.
  *
  * Return 0 if o.k.
  *	 -1 if not, and errno set.
@@ -244,7 +244,7 @@ static int ntfs_device_win32_unlock(HANDLE handle)
 
 /**
  * ntfs_device_win32_dismount - Dismount a volume
- * @handle:	A win32 HADNLE for a volume to dismount.
+ * @handle:	A win32 HANDLE for a volume to dismount.
  *
  * Dismounting means the system will refresh the volume in the first change
  *	it gets. Usefull after altering the file structures.
@@ -271,7 +271,7 @@ static int ntfs_device_win32_dismount(HANDLE handle)
 
 /**
  * ntfs_device_win32_getsize - Get file size via win32 API
- * @handle:		Pointer the file HADNLE obtained via open.
+ * @handle:		Pointer the file HANDLE obtained via open.
  *
  * Only works on ordinary files.
  *
@@ -293,7 +293,7 @@ static s64 ntfs_device_win32_getsize(HANDLE handle)
 
 /**
  * ntfs_device_win32_getdisklength - Get disk size via win32 API
- * @handle:		Pointer the file HADNLE obtained via open.
+ * @handle:		Pointer the file HANDLE obtained via open.
  * @argp:		Pointer to result buffer.
  *
  * Only works on PhysicalDriveX type handles.
@@ -319,7 +319,7 @@ static s64 ntfs_device_win32_getdisklength(HANDLE handle)
 
 /**
  * ntfs_device_win32_getntfssize - Get NTFS volume size via win32 API
- * @handle:		Pointer the file HADNLE obtained via open.
+ * @handle:		Pointer the file HANDLE obtained via open.
  * @argp:		Pointer to result buffer.
  *
  * Only works on NTFS volume handles.
@@ -334,6 +334,7 @@ static s64 ntfs_device_win32_getdisklength(HANDLE handle)
  */
 static s64 ntfs_device_win32_getntfssize(HANDLE handle)
 {
+#ifdef FSCTL_GET_NTFS_VOLUME_DATA
 	NTFS_VOLUME_DATA_BUFFER buf;
 	DWORD i;
 
@@ -347,6 +348,9 @@ static s64 ntfs_device_win32_getntfssize(HANDLE handle)
 		Dprintf("NTFS volume length: 0x%llx\n", (long long)rvl);
 		return rvl;
 	}
+#else
+	return -1;
+#endif
 }
 
 /**
@@ -804,7 +808,7 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 /**
  * ntfs_device_win32_seek - Change current file position.
- * @handle:		Pointer the file HADNLE obtained via open.
+ * @handle:		Pointer the file HANDLE obtained via open.
  * @pos:		Offset in the file relative to file start.
  *
  * Return Succeed: The new position in the file
@@ -848,7 +852,7 @@ static s64 ntfs_device_win32_abs_seek(struct win32_fd *fd, LARGE_INTEGER pos)
 
 /**
  * ntfs_device_win32_seek - Change current file position.
- * @handle:		Pointer the file HADNLE obtained via open.
+ * @handle:		Pointer the file HANDLE obtained via open.
  * @offset:		Required offset from the whence anchor.
  * @whence:		May be one of the following:
  *	SEEK_SET	Offset is relative to file start.
