@@ -405,7 +405,6 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
  * Return 0 on success or -1 on error with errno set to the error code.
  * The following error codes are defined:
  *	EINVAL	- Invalid arguments were passed to the function.
- *	ENOTSUP	- Syncing requires code that has not been imlemented yet.
  *	EBUSY	- Inode and/or one of its extents is busy, try again later.
  *	EIO	- I/O error while writing the inode (or one of its extents).
  */
@@ -515,7 +514,6 @@ int ntfs_inode_sync(ntfs_inode *ni)
  *	EINVAL	- Invalid arguments were passed to the function.
  *	EEXIST	- Attibute list already exist.
  *	EIO	- Input/Ouput error occured.
- *	ENOTSUP	- Add requires code that has not been imlemented yet.
  *	ENOMEM	- Not enogh memory to perform add.
  */
 int ntfs_inode_add_attrlist(ntfs_inode *ni)

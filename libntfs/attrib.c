@@ -3193,7 +3193,6 @@ cluster_free_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
  *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
@@ -3249,10 +3248,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		/* Error! If not enough space, just continue. */
 		if (errno != ENOSPC) {
 			err = errno;
-			if (err != ENOTSUP)
-				Dprintf("%s(): Eeek!  Failed to resize "
-						"resident part of attribute.  "
-						"Aborting...\n", __FUNCTION__);
+			Dprintf("%s(): Eeek!  Failed to resize resident part "
+				"of attribute.  Aborting...\n", __FUNCTION__);
 			goto put_err_out;
 		}
 	}
@@ -3590,7 +3587,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
  */
@@ -3905,7 +3901,6 @@ put_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
  */
@@ -4061,7 +4056,6 @@ put_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
  *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.

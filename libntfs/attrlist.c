@@ -91,7 +91,6 @@ int ntfs_attrlist_need(ntfs_inode *ni)
  * following error codes are defined:
  *	EINVAL	- Invalid argumets passed to function.
  *	ENOMEM	- Not enough memory to allocate necessary buffers.
- *	ENOTSUP	- Code that required for set is not implemented yet.
  *	EIO	- I/O error occured or damaged filesystem.
  */
 int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
