@@ -1309,20 +1309,95 @@ err_out:
 
 /**
  * ntfs_rl_truncate - truncate a runlist starting at a specified vcn
- * @rl:		address of runlist to truncate
+ * @arl:	address of runlist to truncate
  * @start_vcn:	first vcn which should be cut off
  *
- * Truncate the runlist *@rl starting at vcn @start_vcn as well as the memory
+ * Truncate the runlist *@arl starting at vcn @start_vcn as well as the memory
  * buffer holding the runlist.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  *
- * NOTE: @rl is the address of the runlist. We need the address so we can
+ * NOTE: @arl is the address of the runlist. We need the address so we can
  * modify the pointer to the runlist with the new, reallocated memory buffer.
  */
-int ntfs_rl_truncate(runlist **rl, const VCN start_vcn)
+int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 {
-	errno = ENOTSUP;
-	return -1;
+	runlist *rl;
+	BOOL is_end;
+
+	if (!arl || !*arl) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	rl = *arl;
+
+	if (start_vcn < rl->vcn) {
+		// FIXME: Eeek! BUG()
+		fprintf(stderr, "%s(): Eeek! start_vcn lies outside front of "
+				"runlist! Aborting.\n", __FUNCTION__);
+		errno = EIO;
+		return -1;
+	}
+
+	/* Find the starting vcn in the run list. */
+	while (rl->length) {
+		if (start_vcn < rl[1].vcn)
+			break;
+	}
+	if (!rl->length) {
+		// FIXME: Weird, probably a BUG()!
+		fprintf(stderr, "%s(): Weird! Asking to truncate already "
+				"truncated runlist?!? Abort.\n", __FUNCTION__);
+		errno = EIO;
+		return -1;
+	}
+	if (start_vcn < rl->vcn) {
+		// FIXME: Eeek! BUG()
+		fprintf(stderr, "%s(): Eeek! start_vcn < rl->vcn! Aborting.\n",
+				__FUNCTION__);
+		errno = EIO;
+		return -1;
+	}
+
+	if (rl->length) {
+		is_end = FALSE;
+
+		/* Truncate the run. */
+		rl->length = start_vcn - rl->vcn;
+
+		/*
+		 * If a run was partially truncated, make the following runlist
+		 * element a terminator instead of the truncated runlist
+		 * element itself.
+		 */
+		if (rl->length) {
+			++rl;
+			if (!rl->length)
+				is_end = TRUE;
+			rl->vcn = start_vcn;
+			rl->length = 0;
+		}
+	} else
+		is_end = TRUE;
+
+	rl->lcn = (LCN)LCN_ENOENT;
+
+	/* Reallocate memory if necessary. */
+	if (!is_end) {
+		rl = realloc(*arl, (rl - *arl + 1) * sizeof(runlist_element));
+		if (rl)
+			*arl = rl;
+		else {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Failed to reallocate "
+					"runlist buffer! Continuing "
+					"regardless and returning success.\n",
+					__FUNCTION__);
+		}
+	}
+
+	/* Done! */
+	return 0;
 }
 
