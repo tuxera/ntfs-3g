@@ -2390,21 +2390,24 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	new_allocated_size = (le32_to_cpu(a->value_length) + vol->cluster_size
 			- 1) & ~(vol->cluster_size - 1);
 
-	/* Start by allocating clusters to hold the attribute value. */
-	rl = ntfs_cluster_alloc(vol, new_allocated_size >>
-			vol->cluster_size_bits, -1, DATA_ZONE, 0);
-	if (!rl) {
-		if (errno != ENOSPC) {
-			int eo = errno;
+	if (new_allocated_size > 0) {
+		/* Start by allocating clusters to hold the attribute value. */
+		rl = ntfs_cluster_alloc(vol, new_allocated_size >>
+				vol->cluster_size_bits, -1, DATA_ZONE, 0);
+		if (!rl) {
+			if (errno != ENOSPC) {
+				int eo = errno;
 
-			// FIXME: Eeek!
-			Dprintf("%s(): Eeek!  Failed to allocate cluster(s).  "
-					"Aborting...\n", __FUNCTION__);
-			errno = eo;
+				// FIXME: Eeek!
+				Dprintf("%s(): Eeek!  Failed to allocate "
+						"cluster(s).  Aborting...\n",
+						__FUNCTION__);
+				errno = eo;
+			}
+			return -1;
 		}
-		return -1;
-	}
-
+	} else
+		rl = NULL;
 	/*
 	 * Setup the in-memory attribute structure to be non-resident so that
 	 * we can use ntfs_attr_pwrite().
@@ -2420,35 +2423,34 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	NAttrClearCompressed(na);
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
-	
-	/* Now copy the attribute value to the allocated cluster(s). */
-	bw = ntfs_attr_pwrite(na, 0, le32_to_cpu(a->value_length),
-			(u8*)a + le16_to_cpu(a->value_offset));
-	if (bw != le32_to_cpu(a->value_length)) {
-		err = errno;
-		// FIXME: Eeek!
-		Dprintf("%s(): Eeek!  Failed to write out attribute value "
-				"(bw = %lli, errno = %i). Aborting...\n",
-				__FUNCTION__, (long long)bw, err);
-		if (bw >= 0)
-			err = EIO;
-		goto cluster_free_err_out;
-	}
 
+	if (rl) {	
+		/* Now copy the attribute value to the allocated cluster(s). */
+		bw = ntfs_attr_pwrite(na, 0, le32_to_cpu(a->value_length),
+				(u8*)a + le16_to_cpu(a->value_offset));
+		if (bw != le32_to_cpu(a->value_length)) {
+			err = errno;
+			// FIXME: Eeek!
+			Dprintf("Eeek!  Failed to write out attribute value "
+					"(bw = %lli, errno = %i).  "
+					"Aborting...\n", (long long)bw, err);
+			if (bw >= 0)
+				err = EIO;
+			goto cluster_free_err_out;
+		}
+	}
 	/* Determine the size of the mapping pairs array. */
 	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl);
 	if (mp_size < 0) {
 		err = errno;
 		// FIXME: Eeek!
-		Dprintf("%s(): Eeek!  Failed to get size for mapping pairs "
-				"array.  Aborting...\n", __FUNCTION__);
+		Dputs("Eeek!  Failed to get size for mapping pairs array.  "
+				"Aborting...");
 		goto cluster_free_err_out;
 	}
-
 	/* Calculate new offsets for the name and the mapping pairs array. */
 	name_ofs = (sizeof(ATTR_REC) - sizeof(a->compressed_size) + 7) & ~7;
 	mp_ofs = (name_ofs + a->name_length + 7) & ~7;
-
 	/*
 	 * Determine the size of the resident part of the non-resident
 	 * attribute record. (Not compressed thus no compressed_size element
@@ -2527,14 +2529,15 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	return 0;
 
 cluster_free_err_out:
-	if (ntfs_cluster_free(vol, na, 0, -1) < 0)
+	if (rl && ntfs_cluster_free(vol, na, 0, -1) < 0)
 		Dprintf("%s(): Eeek!  Failed to release allocated "
 				"clusters in error code path.  Leaving "
 				"inconsistent metadata...\n", __FUNCTION__);
 	NAttrClearNonResident(na);
 	na->allocated_size = na->data_size;
 	na->rl = NULL;
-	free(rl);
+	if (rl)
+		free(rl);
 	errno = err;
 	return -1;
 }
@@ -3213,7 +3216,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		nr_need_allocate = first_free_vcn -
 				(na->allocated_size >> vol->cluster_size_bits);
 
-		if (ntfs_attr_map_runlist (na, 0)) {
+		if (ntfs_attr_map_whole_runlist(na)) {
 			err = errno;
 			Dprintf("%s(): Eeek! "
 					"ntfs_attr_map_whole_runlist failed.\n",
