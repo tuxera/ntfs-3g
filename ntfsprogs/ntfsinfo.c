@@ -216,7 +216,7 @@ int parse_options (int argc, char *argv[])
 
 		if (opts.inode == -1 && !opts.mft) {
 			if (argc > 1)
-				Eprintf ("You much specify an inode to learn about.\n");
+				Eprintf ("You must specify an inode to learn about.\n");
 			err++;
 		}
 
