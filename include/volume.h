@@ -1,0 +1,155 @@
+/*
+ * $Id$
+ *
+ * volume.h - Exports for NTFS volume handling. Part of the Linux-NTFS project.
+ *
+ * Copyright (c) 2000-2002 Anton Altaparmakov.
+ *
+ * This program/include file is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as published
+ * by the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program (in the main directory of the Linux-NTFS
+ * distribution in the file COPYING); if not, write to the Free Software
+ * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#ifndef _NTFS_VOLUME_H
+#define _NTFS_VOLUME_H
+
+#include "config.h"
+
+#include <sys/mount.h>
+#ifdef HAVE_MNTENT_H
+#	include <mntent.h>
+#endif
+
+/* Forward declaration */
+typedef struct _ntfs_volume ntfs_volume;
+
+#include "types.h"
+#include "support.h"
+#include "inode.h"
+
+/*
+ * Flags returned by the ntfs_check_if_mounted() function.
+ */
+typedef enum {
+	NTFS_MF_MOUNTED		= 1,	/* Device is mounted. */
+	NTFS_MF_ISROOT		= 2,	/* Device is mounted as system root. */
+	NTFS_MF_READONLY	= 4,	/* Device is mounted read-only. */
+} ntfs_mount_flags;
+
+extern int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags);
+
+/*
+ * Defined bits for the state field in the ntfs_volume structure.
+ */
+typedef enum {
+	NV_ReadOnly,		/* 1: Volume is read-only. */
+	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
+} ntfs_volume_state_bits;
+
+#define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
+#define   set_nvol_flag(nv, flag)	  set_bit(NV_##flag, (nv)->state)
+#define clear_nvol_flag(nv, flag)	clear_bit(NV_##flag, (nv)->state)
+
+#define NVolReadOnly(nv)		 test_nvol_flag(nv, ReadOnly)
+#define NVolSetReadOnly(nv)		  set_nvol_flag(nv, ReadOnly)
+#define NVolClearReadOnly(nv)		clear_nvol_flag(nv, ReadOnly)
+
+#define NVolCaseSensitive(nv)		 test_nvol_flag(nv, CaseSensitive)
+#define NVolSetCaseSensitive(nv)	  set_nvol_flag(nv, CaseSensitive)
+#define NVolClearCaseSensitive(nv)	clear_nvol_flag(nv, CaseSensitive)
+
+/*
+ * NTFS version 1.1 and 1.2 are used by Windows NT4.
+ * NTFS version 2.x is used by Windows 2000 Beta
+ * NTFS version 3.0 is used by Windows 2000.
+ * NTFS version 3.1 is used by Windows XP and .NET.
+ */
+
+#define NTFS_V1_1(major, minor) ((major) == 1 && (minor) == 1)
+#define NTFS_V1_2(major, minor) ((major) == 1 && (minor) == 2)
+#define NTFS_V2_X(major, minor) ((major) == 2)
+#define NTFS_V3_0(major, minor) ((major) == 3 && (minor) == 0)
+#define NTFS_V3_1(major, minor) ((major) == 3 && (minor) == 1)
+
+#define NTFS_BUF_SIZE 8192
+
+/*
+ * ntfs_volume - structure describing an open volume in memory
+ */
+struct _ntfs_volume {
+	int fd;			/* File descriptor associated with volume. */
+	char *dev_name;		/* Name of the device/file the volume is in. */
+	char *vol_name;		/* Name of the volume. */
+	unsigned long state;	/* NTFS specific flags describing this volume.
+				   See ntfs_volume_state_bits above. */
+	u8 major_ver;		/* Ntfs major version of volume. */
+	u8 minor_ver;		/* Ntfs minor version of volume. */
+	u16 flags;		/* Bit array of VOLUME_* flags. */
+
+	u16 sector_size;	/* Byte size of a sector. */
+	u8 sector_size_bits;	/* Log(2) of the byte size of a sector. */
+	u32 cluster_size;	/* Byte size of a cluster. */
+	u32 mft_record_size;	/* Byte size of a mft record. */
+	u8 cluster_size_bits;	/* Log(2) of the byte size of a cluster. */
+	u8 mft_record_size_bits;/* Log(2) of the byte size of a mft record. */
+
+	s64 nr_clusters;	/* Volume size in clusters, hence also the
+				   number of bits in lcn_bitmap. */
+	ntfs_inode *lcnbmp_ni;	/* ntfs_inode structure for FILE_Bitmap. */
+	ntfs_attr *lcnbmp_na;	/* ntfs_attr structure for the data attribute
+				   of FILE_Bitmap. Each bit represents a
+				   cluster on the volume, bit 0 representing
+				   lcn 0 and so on. A set bit means that the
+				   cluster and vice versa. */
+
+	s64 nr_mft_records;	/* Number of records in the mft, equals the
+				   number of bits in mft_bitmap. */
+	s64 mft_lcn;		/* Logical cluster number of the data attribute
+				   for FILE_MFT. */
+	ntfs_inode *mft_ni;	/* ntfs_inode structure for FILE_MFT. */
+	ntfs_attr *mft_na;	/* ntfs_attr structure for the data attribute
+				   of FILE_MFT. */
+	ntfs_attr *mftbmp_na;	/* ntfs_attr structure for the bitmap attribute
+				   of FILE_MFT. Each bit represents an mft
+				   record in the $DATA attribute, bit 0
+				   representing mft record 0 and so on. A set
+				   bit means that the mft record is in use and
+				   vice versa. */
+
+	int mftmirr_size;	/* Size of the FILE_MFTMirr in mft records. */
+	s64 mftmirr_lcn;	/* Logical cluster number of the data attribute
+				   for FILE_MFTMirr. */
+	ntfs_inode *mftmirr_ni;	/* ntfs_inode structure for FILE_MFTMirr. */
+	ntfs_attr *mftmirr_na;	/* ntfs_attr structure for the data attribute
+				   of FILE_MFTMirr. */
+
+	uchar_t *upcase;	/* Upper case equivalents of all 65536 2-byte
+				   Unicode characters. Obtained from
+				   FILE_UpCase. */
+	u32 upcase_len;		/* Length in Unicode characters of the upcase
+				   table. */
+};
+
+extern ntfs_volume *ntfs_startup_volume(const char *name, unsigned long rwflag);
+extern ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag);
+
+extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
+
+extern int ntfs_is_version_supported(ntfs_volume *vol);
+extern int ntfs_reset_logfile(ntfs_volume *vol);
+extern int ntfs_set_volume_flags(ntfs_volume *v, const u16 flags);
+
+#endif /* defined _NTFS_VOLUME_H */
+
+
