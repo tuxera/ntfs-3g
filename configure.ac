@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT([ntfsprogs],[1.9-devel],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.9.0],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
@@ -216,11 +216,6 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
 	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit])
-
-# Check for declarations of constant bswap function as some systems do not
-# provide all of them.
-#AC_CHECK_DECLS([__bswap_constant_16, __bswap_constant_32, __bswap_constant_64],
-#	       , , [#include <byteswap.h>])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([

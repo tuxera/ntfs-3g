@@ -18,10 +18,10 @@ License		: GPL
 Group		: System Environment/Base
 %description
 The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
-for the NTFS filesystem to the Linux operating system.  Linux-NTFS currently
-consists of a static library and utilities such as mkntfs, ntfscat, ntfsls,
-ntfsresize, and ntfsundelete (for a full list of included utilities see man
-8 ntfsprogs after installation).
+for the NTFS filesystem to the Linux operating system.  The ntfsprogs package
+currently consists of a static library and utilities such as mkntfs, ntfscat,
+ntfsls, ntfsresize, and ntfsundelete (for a full list of included utilities
+see man 8 ntfsprogs after installation).
 
 
 %package gnomevfs
@@ -32,11 +32,9 @@ BuildRequires	: glib2-devel
 Requires	: glib2
 BuildRequires	: gnome-vfs2-devel
 Requires	: gnome-vfs2
-
-
 %description gnomevfs
 This package contains the NTFS GNOME virtual filesystem (VFS) module which
-allows GNOME VFS clients to seamlessly utilize the NTFS library.
+allows GNOME VFS clients to seamlessly utilize the NTFS library (libntfs).
 
 
 %package devel
@@ -45,7 +43,7 @@ Group		: Development/System
 Requires	: ntfsprogs = %{ver}-%{rel}
 %description devel
 This package includes the header files and libraries needed to link software
-with libntfs.
+with the NTFS library (libntfs).
 
 
 %prep
@@ -96,6 +94,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Wed Mar 10 2004 Anton Altaparmakov <aia21@cantab.net>
+- Cleanup descriptions ready for 1.9.0 release.
+
 * Mon Jan 19 2004 Anton Altaparmakov <aia21@cantab.net>
 - Add %config to tell rpm that libntfs.conf is a config file.
 

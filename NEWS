@@ -1,6 +1,12 @@
 Current news
 ============
 
+ntfsresize now supports relocation which generally means you are now able to
+resize to any size you like (as long as there is enough free space).  Note,
+this modifies the command line options a little as well as the returned output
+so applications using ntfsresize might need modifications before they will
+work with the updated ntfsresize.  (Szakacsits Szabolcs)
+
 ntfsprogs now should ./configure and compile cleanly on SuSE as well as RedHat
 Linux.
 
@@ -36,59 +42,4 @@ more details.
 Added new utility ntfsresize by Szakacsits Szabolcs. See man 8 ntfsresize for
 details.
 
-The API has been fully reworked and the library mostly rewritten since the
-last release (1.6.0). It should now offer a much more solid and stable basis
-for development of software accessing NTFS volumes. All utilities have been
-ported to the new API.
-
-linux-ntfs should now compile and work on all architectures.
-
-Added two options to mkntfs. One to enable compression on the volume and one
-to disable content indexing. See man 8 mkntfs for details.
-
-Changed version numbers of mkntfs and ntfsfix to match linux-ntfs release.
-
-ntfsfix had two minor bugs fixed. This also should remove the compilation
-warnings in ntfsfix.c on 64-bit-pointer-size architectures.
-
-mkntfs now should be truly bug free.
-
-ntfs_mount syntax changed to accept a read-only flag.
-
-mkntfs now allows creation of small NTFS volumes (current minimum size is one
-mega byte). This allows placing NTFS on a floppy disk for example.
-
-mkntfs now correctly handles directories on volumes with large clusters.
-
-ntfsfix now works on Windows XP NTFS volumes (NTFS 3.1).
-
-Reenabled shared library generation and use.
-
-ntfsfix now has a man page, too. Donated by David Martínez Moreno.
-
-mkntfs now uses correct defaults for small partitions on devices with
-non-standard sector sizes.
-
-mkntfs now in sbin not bin and it got some bugs fixed.
-
 Gcc 2.96 or above is required to compile.
-
-Dropped ldm, ntfsdump_logfile and dumplog from linux-ntfs distribution. ldm will
-reappear in a different package as ldminfo (probably linux-ldm) while the dump
-tools are only useful to us developers to play with they don't actually do
-anything useful (and these remain in CVS for developer (ab)use).
-
-We now have mkntfs. Yey! And it even has a man page. So go read it. (-8
-
-Disable shared library building by default as it breaks on some systems. (No
-idea why. If any one can figure it out and tell me what the problem/fix is I
-would be thankful.)
-
-libntfs and hence ntfsfix still don't support attribute lists.
-
-Updated ntfsdump_logfile to really dump the whole logfile with all the current
-knowledge about the structures. Also added dumplog which does the same but
-operates on a file rather than a partition, i.e. it can operate on a live
-mounted NTFS partition under linux when the -o show_sys_files was used on mount.
-(Note this mount option first appeared in Linux kernel 2.4.4-ac18.)
-
