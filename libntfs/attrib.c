@@ -4496,7 +4496,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
-#if 0
+
 	/* Update compressed_size if present. */
 	if (NAttrSparse(na) || NAttrCompressed(na)) {
 		s64 new_compr_size;
@@ -4511,7 +4511,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->compressed_size = new_compr_size;
 		a->compressed_size = cpu_to_sle64(new_compr_size);
 	}
-#endif
+
 	/* Update data and initialized size. */
 	na->data_size = newsize;
 	a->data_size = cpu_to_sle64(newsize);
@@ -4718,7 +4718,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
-#if 0
+
 	/* Update compressed_size if present. */
 	if (NAttrSparse(na) || NAttrCompressed(na)) {
 		s64 new_compr_size;
@@ -4733,7 +4733,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		na->compressed_size = new_compr_size;
 		a->compressed_size = cpu_to_sle64(new_compr_size);
 	}
-#endif
+
 	/* Update data size. */
 	na->data_size = newsize;
 	a->data_size = cpu_to_sle64(newsize);
