@@ -989,6 +989,92 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 }
 
 /**
+ * ntfs_rl_pread - gather read from disk
+ * @vol:	ntfs volume to read from
+ * @rl:		runlist specifying where to read the data from
+ * @pos:	byte position within runlist @rl at which to begin the read
+ * @count:	number of bytes to read
+ * @b:		data buffer into which to read from disk
+ *
+ * This function will read @count bytes from the volume @vol to the data buffer
+ * @b gathering the data as specified by the runlist @rl. The read begins at
+ * offset @pos into the runlist @rl.
+ *
+ * On success, return the number of successfully read bytes. If this number is
+ * lower than @count this means that the read reached end of file or that an
+ * error was encountered during the read so that the read is partial. 0 means
+ * nothing was read (also return 0 when @count is 0).
+ *
+ * On error and nothing has been read, return -1 with errno set appropriately
+ * to the return code of ntfs_pread(), or to EINVAL in case of invalid
+ * arguments.
+ *
+ * NOTE: If we encounter EOF while reading we return EIO because we assume that
+ * the run list must point to valid locations within the ntfs volume.
+ */
+s64 ntfs_rl_pread(const ntfs_volume *vol, const runlist_element *rl,
+		const s64 pos, s64 count, void *b)
+{
+	s64 bytes_read, to_read, ofs, total;
+	int err = EIO;
+
+	if (!vol || !rl || pos < 0 || count < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (!count)
+		return count;
+	/* Seek in @rl to the run containing @pos. */
+	for (ofs = 0; rl->length && (ofs + rl->length <= pos); rl++)
+		ofs += rl->length;
+	/* Offset in the run at which to begin reading. */
+	ofs = pos - ofs;
+	for (total = 0LL; count; rl++, ofs = 0) {
+		if (!rl->length)
+			goto rl_err_out;
+		if (rl->lcn < (LCN)0) {
+			if (rl->lcn != (LCN)LCN_HOLE)
+				goto rl_err_out;
+			/* It is a hole. Just fill buffer @b with zeroes. */
+			to_read = min(count, (rl->length <<
+					vol->cluster_size_bits) - ofs);
+			memset(b, 0, to_read);
+			/* Update counters and proceed with next run. */
+			total += to_read;
+			count -= to_read;
+			(u8*)b += to_read;
+			continue;
+		}
+		/* It is a real lcn, read it from the volume. */
+		to_read = min(count, (rl->length << vol->cluster_size_bits) -
+				ofs);
+retry:
+		bytes_read = ntfs_pread(vol->dev, (rl->lcn <<
+				vol->cluster_size_bits) + ofs, to_read, b);
+		/* If everything ok, update progress counters and continue. */
+		if (bytes_read > 0) {
+			total += bytes_read;
+			count -= bytes_read;
+			(u8*)b += bytes_read;
+			continue;
+		}
+		/* If the syscall was interrupted, try again. */
+		if (bytes_read == (s64)-1 && errno == EINTR)
+			goto retry;
+		if (bytes_read == (s64)-1)
+			err = errno;
+		goto rl_err_out;
+	}
+	/* Finally, return the number of bytes read. */
+	return total;
+rl_err_out:
+	if (total)
+		return total;
+	errno = err;
+	return -1;
+}
+
+/**
  * ntfs_rl_pwrite - scatter write to disk
  * @vol:	ntfs volume to write to
  * @rl:		runlist specifying where to write the data to
@@ -1006,8 +1092,8 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
  * is partial. 0 means nothing was written (also return 0 when @count is 0).
  *
  * On error and nothing has been written, return -1 with errno set
- * appropriately to the return code of either lseek, write, fdatasync, or set
- * to EINVAL in case of invalid arguments.
+ * appropriately to the return code of ntfs_pwrite(), or to to EINVAL in case
+ * of invalid arguments.
  */
 s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		const s64 pos, s64 count, void *b)
@@ -1029,7 +1115,7 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 	for (total = 0LL; count; rl++, ofs = 0) {
 		if (!rl->length)
 			goto rl_err_out;
-		if (rl->lcn < (LCN) 0) {
+		if (rl->lcn < (LCN)0) {
 			s64 t;
 			int cnt;
 
@@ -1087,7 +1173,7 @@ retry:
 		/* If the syscall was interrupted, try again. */
 		if (written == (s64)-1 && errno == EINTR)
 			goto retry;
-		if (written == -1)
+		if (written == (s64)-1)
 			err = errno;
 		goto rl_err_out;
 	}
@@ -1389,9 +1475,12 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 
 	/* Reallocate memory if necessary. */
 	if (!is_end) {
-		rl = realloc(*arl, (rl - *arl + 1) * sizeof(runlist_element));
+		size_t new_size = (rl - *arl + 1) * sizeof(runlist_element);
+		rl = realloc(*arl, new_size);
 		if (rl)
 			*arl = rl;
+		else if (!new_size)
+			*arl = NULL;
 		else {
 			// FIXME: Eeek!
 			fprintf(stderr, "%s(): Eeek! Failed to reallocate "

@@ -1,5 +1,6 @@
 03/12/2003 - 1.x.x - WIP
 	- Add new API function attrib.[hc]:ntfs_attr_map_whole_runlist().
+	- Add new API function runlist.[hc]:ntfs_rl_pread().
 
 19/11/2003 - 1.8.0 - Final fixes and tidy ups.
 	- Cleanup build system wrt CFLAGS handling placing it all in one place
