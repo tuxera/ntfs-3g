@@ -47,6 +47,8 @@ static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 	return ni;
 }
 
+extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
+
 /**
  * Internal:
  *

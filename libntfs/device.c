@@ -213,7 +213,7 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 	NDevSetDirty(dev);
 	/* Write the data. */
 	for (total = 0; count; count -= written, total += written) {
-		written = dops->write(dev, (char*)b + total, count);
+		written = dops->write(dev, (const char*)b + total, count);
 		/* If everything ok, continue. */
 		if (written > 0)
 			continue;
@@ -316,7 +316,7 @@ s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
  * achieved.
  */
 s64 ntfs_mst_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
-		const u32 bksize, const void *b)
+		const u32 bksize, void *b)
 {
 	s64 written, i;
 

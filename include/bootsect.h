@@ -39,8 +39,7 @@
  * disregarding the value of silent (but only if configure was run with
  * --enable-debug).
  */
-extern BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b,
-		const BOOL silent);
+extern BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, BOOL silent);
 extern int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b);
 
 #endif /* defined _NTFS_BOOTSECT_H */

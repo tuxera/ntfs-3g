@@ -129,7 +129,7 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	if (m + count > vol->nr_mft_records) {
 		// TODO: Need to extend $MFT. This is not just normal attribute
 		// extension as many rules need to be observed. (AIA)
-		if (bmirr);
+		if (bmirr)
 			free(bmirr);
 		errno = ENOTSUP;
 		return -1;
@@ -253,9 +253,9 @@ read_failed:
  *
  * On error return NULL with errno set to the error code.
  */
-ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, u64 start)
+ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, s64 start)
 {
-	if (!vol || !vol->mftbmp_na) {
+	if (!vol || !vol->mftbmp_na || start < -1) {
 		errno = EINVAL;
 		return NULL;
 	}

@@ -96,7 +96,7 @@ extern s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 extern s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
 		const u32 bksize, void *b);
 extern s64 ntfs_mst_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
-		const u32 bksize, const void *b);
+		const u32 bksize, void *b);
 
 extern s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, void *b);

@@ -106,7 +106,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			(long long)start_lcn,
 			zone == MFT_ZONE ? "MFT" : "DATA");
 	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
-			zone < FIRST_ZONE || zone > LAST_ZONE) {
+			(s8)zone < FIRST_ZONE || zone > LAST_ZONE) {
 		fprintf(stderr, "%s(): Invalid arguments!\n", __FUNCTION__);
 		errno = EINVAL;
 		return NULL;

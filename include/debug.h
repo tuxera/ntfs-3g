@@ -68,10 +68,10 @@ extern void ntfs_debug_runlist_dump(const runlist_element *rl);
 
 #else /* if !DEBUG */
 
-static __inline__ void Dprintf(const char *fmt, ...) {}
-static __inline__ void Dputs(const char *s) {}
-static __inline__ void Dperror(const char *s) {}
-static __inline__ void ntfs_debug_runlist_dump(const runlist_element *rl) {}
+static __inline__ void Dprintf(const char *fmt __attribute__((unused)), ...) {}
+static __inline__ void Dputs(const char *s __attribute__((unused))) {}
+static __inline__ void Dperror(const char *s __attribute__((unused))) {}
+static __inline__ void ntfs_debug_runlist_dump(const runlist_element *rl __attribute__((unused))) {}
 
 #endif /* !DEBUG */
 

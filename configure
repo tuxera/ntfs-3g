@@ -8249,9 +8249,9 @@ echo "${ECHO_T}$cc_version" >&6
 # enable 64-bit (device) file access functions and parameters.
 CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -Wall"
 
-# Add extra warnings if in maintainer mode.
+# Add lots of extra warnings if in maintainer mode.
 if test "$USE_MAINTAINER_MODE" = "yes";then
-	CFLAGS="$CFLAGS -Wstrict-prototypes -Wsign-compare"
+	CFLAGS="$CFLAGS -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes -Wshadow -Wwrite-strings -W -Wcast-align -Waggregate-return -Wbad-function-cast -Wcast-qual -Wundef -Wredundant-decls -Wsign-compare"
 fi
 
 # Add -fms-extensions for gcc-3.2+.

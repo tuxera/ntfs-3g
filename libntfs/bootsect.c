@@ -43,7 +43,7 @@
  *
  * Return TRUE if @b contains a valid ntfs boot sector and FALSE if not.
  */
-BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
+BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent)
 {
 	u32 i;
 

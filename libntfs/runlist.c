@@ -727,8 +727,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	LCN lcn;		/* Current lcn. */
 	s64 deltaxcn;		/* Change in [vl]cn. */
 	runlist_element *rl;	/* The output runlist. */
-	u8 *buf;		/* Current position in mapping pairs array. */
-	u8 *attr_end;		/* End of attribute. */
+	const u8 *buf;		/* Current position in mapping pairs array. */
+	const u8 *attr_end;	/* End of attribute. */
 	int err, rlsize;	/* Size of runlist buffer. */
 	u16 rlpos;		/* Current runlist position in units of
 				   runlist_elements. */
@@ -746,9 +746,9 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	vcn = sle64_to_cpu(attr->lowest_vcn);
 	lcn = 0;
 	/* Get start of the mapping pairs array. */
-	buf = (u8*)attr + le16_to_cpu(attr->mapping_pairs_offset);
-	attr_end = (u8*)attr + le32_to_cpu(attr->length);
-	if (buf < (u8*)attr || buf > attr_end) {
+	buf = (const u8*)attr + le16_to_cpu(attr->mapping_pairs_offset);
+	attr_end = (const u8*)attr + le32_to_cpu(attr->length);
+	if (buf < (const u8*)attr || buf > attr_end) {
 		Dputs("Corrupt attribute.");
 		errno = EIO;
 		return NULL;

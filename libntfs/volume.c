@@ -976,7 +976,8 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
  * function returns success. If it returns an error then nothing has been done
  * so it is safe to continue using @vol.
  */
-int ntfs_device_umount(ntfs_volume *vol, const BOOL force)
+int ntfs_device_umount(ntfs_volume *vol,
+		const BOOL force __attribute__((unused)))
 {
 	if (!vol) {
 		errno = EINVAL;
@@ -1008,7 +1009,8 @@ int ntfs_device_umount(ntfs_volume *vol, const BOOL force)
  * function returns success. If it returns an error then nothing has been done
  * so it is safe to continue using @vol.
  */
-int ntfs_umount(ntfs_volume *vol, const BOOL force)
+int ntfs_umount(ntfs_volume *vol,
+		const BOOL force __attribute__((unused)))
 {
 	struct ntfs_device *dev;
 

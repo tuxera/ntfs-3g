@@ -298,23 +298,23 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 
 /**
  * ntfs2utc - Convert an NTFS time to Unix time
- * @time:  An NTFS time in 100ns units since 1601
+ * @ntfs_time:  An NTFS time in 100ns units since 1601
  *
  * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
  * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
  *
  * Return:  n  A Unix time (number of seconds since 1970)
  */
-time_t ntfs2utc (s64 time)
+time_t ntfs2utc (s64 ntfs_time)
 {
-	return (time - (NTFS_TIME_OFFSET)) / 10000000;
+	return (ntfs_time - (NTFS_TIME_OFFSET)) / 10000000;
 }
 
 /**
  * utc2ntfs - Convert Linux time to NTFS time
- * @time:  Linux time to convert to NTFS
+ * @utc_time:  Linux time to convert to NTFS
  *
- * Convert the Linux time @time to its corresponding NTFS time.
+ * Convert the Linux time @utc_time to its corresponding NTFS time.
  *
  * Linux stores time in a long at present and measures it as the number of
  * 1-second intervals since 1st January 1970, 00:00:00 UTC.
@@ -325,10 +325,10 @@ time_t ntfs2utc (s64 time)
  *
  * Return:  n  An NTFS time (100ns units since Jan 1601)
  */
-s64 utc2ntfs (time_t time)
+s64 utc2ntfs (time_t utc_time)
 {
 	/* Convert to 100ns intervals and then add the NTFS time offset. */
-	return (s64)time * 10000000 + NTFS_TIME_OFFSET;
+	return (s64)utc_time * 10000000 + NTFS_TIME_OFFSET;
 }
 
 /**

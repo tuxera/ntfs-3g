@@ -64,7 +64,7 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
  * ntfs_get_attribute_value
  */
 s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
-			  const ATTR_RECORD *a, u8 *b)
+		const ATTR_RECORD *a, u8 *b)
 {
 	runlist *rl;
 	s64 total, r;
@@ -91,7 +91,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 			return 0;
 		}
 
-		memcpy(b, (char*)a + le16_to_cpu(a->value_offset),
+		memcpy(b, (const char*)a + le16_to_cpu(a->value_offset),
 				le32_to_cpu(a->value_length));
 		errno = 0;
 		return (s64)le32_to_cpu(a->value_length);
