@@ -43,13 +43,25 @@
 #endif
 
 /*
- * Simple bit operation macros.
+ * Simple bit operation macros. NOTE: These are NOT atomic.
  */
-#define test_bit(bit, var)		((var) & (1 << (bit)))
-#define set_bit(bit, var)		(var) |= 1 << (bit)
-#define clear_bit(bit, var)		(var) &= ~(1 << (bit))
-#define test_and_set_bit(bit, var)	(test_bit(bit, var), set_bit(bit, var))
-#define test_and_clear_bit(bit, var)	(test_bit(bit, var), clear_bit(bit, var))
+#define test_bit(bit, var)	      ((var) & (1 << (bit)))
+#define set_bit(bit, var)	      (var) |= 1 << (bit)
+#define clear_bit(bit, var)	      (var) &= ~(1 << (bit))
+
+#define test_and_set_bit(bit, var)			\
+({							\
+	const BOOL old_state = test_bit(bit, var);	\
+	set_bit(bit, var);				\
+	old_state;					\
+})
+
+#define test_and_clear_bit(bit, var)			\
+({							\
+ 	const BOOL old_state = test_bit(bit, var);	\
+	clear_bit(bit, var);				\
+	old_state;					\
+})
 
 #endif /* defined _NTFS_SUPPORT_H */
 
