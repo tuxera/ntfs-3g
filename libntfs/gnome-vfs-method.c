@@ -247,7 +247,8 @@ struct libntfs_directory {
 
 static GnomeVFSResult libntfs_gnomevfs_open_directory(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle **method_handle, GnomeVFSURI *uri,
-		GnomeVFSFileInfoOptions options, GnomeVFSContext *context)
+		GnomeVFSFileInfoOptions options __attribute__((unused)),
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	ntfs_volume *volume;
@@ -276,7 +277,8 @@ static GnomeVFSResult libntfs_gnomevfs_open_directory(GnomeVFSMethod *method,
 }
 
 static GnomeVFSResult libntfs_gnomevfs_close_directory(GnomeVFSMethod *method,
-		GnomeVFSMethodHandle *method_handle, GnomeVFSContext *context)
+		GnomeVFSMethodHandle *method_handle,
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	struct libntfs_directory *libntfs_directory;
 	int errint;
@@ -331,7 +333,8 @@ static gchar *libntfs_ntfscharo_utf8(const ntfschar *name, const int name_len)
  */
 static int libntfs_gnomevfs_read_directory_filldir(
 		struct libntfs_directory *libntfs_directory /* dirent */,
-		const ntfschar *name, const int name_len, const int name_type,
+		const ntfschar *name, const int name_len,
+		const int name_type __attribute__((unused)),
 		const s64 pos, const MFT_REF mref, const unsigned dt_type)
 {
 	GnomeVFSFileInfo *file_info;
@@ -413,7 +416,8 @@ static int libntfs_gnomevfs_read_directory_filldir(
 
 static GnomeVFSResult libntfs_gnomevfs_read_directory(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle *method_handle,
-		GnomeVFSFileInfo *file_info, GnomeVFSContext *context)
+		GnomeVFSFileInfo *file_info,
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	struct libntfs_directory *libntfs_directory;
@@ -497,7 +501,8 @@ static GnomeVFSResult libntfs_open_attr(struct libntfs_file *libntfs_file)
 
 static GnomeVFSResult libntfs_gnomevfs_open(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle **method_handle_return, GnomeVFSURI *uri,
-		GnomeVFSOpenMode mode, GnomeVFSContext *context)
+		GnomeVFSOpenMode mode,
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	ntfs_volume *volume;
@@ -530,8 +535,10 @@ static GnomeVFSResult libntfs_gnomevfs_open(GnomeVFSMethod *method,
 
 static GnomeVFSResult libntfs_gnomevfs_create(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle **method_handle_return, GnomeVFSURI *uri,
-		GnomeVFSOpenMode mode, gboolean exclusive, guint perm,
-		GnomeVFSContext *context)
+		GnomeVFSOpenMode mode __attribute__((unused)),
+		gboolean exclusive __attribute__((unused)),
+		guint perm __attribute__((unused)),
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	ntfs_volume *volume;
@@ -549,7 +556,8 @@ static GnomeVFSResult libntfs_gnomevfs_create(GnomeVFSMethod *method,
 }
 
 static GnomeVFSResult libntfs_gnomevfs_close(GnomeVFSMethod *method,
-		GnomeVFSMethodHandle *method_handle, GnomeVFSContext *context)
+		GnomeVFSMethodHandle *method_handle,
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	struct libntfs_file *libntfs_file;
 	int errint;
@@ -579,7 +587,7 @@ static GnomeVFSResult libntfs_gnomevfs_close(GnomeVFSMethod *method,
 static GnomeVFSResult libntfs_gnomevfs_read(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle *method_handle, gpointer buffer,
 		GnomeVFSFileSize num_bytes, GnomeVFSFileSize *bytes_read_return,
-		GnomeVFSContext *context)
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	struct libntfs_file *libntfs_file;
@@ -616,7 +624,7 @@ static GnomeVFSResult libntfs_gnomevfs_read(GnomeVFSMethod *method,
 static GnomeVFSResult libntfs_gnomevfs_seek(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle *method_handle,
 		GnomeVFSSeekPosition whence, GnomeVFSFileOffset offset,
-		GnomeVFSContext *context)
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	struct libntfs_file *libntfs_file;
@@ -681,10 +689,11 @@ static gboolean libntfs_gnomevfs_is_local(GnomeVFSMethod *method,
 	return gnome_vfs_uri_is_local(uri->parent);
 }
 
-GnomeVFSResult libntfs_gnomevfs_get_file_info_from_handle(
+static GnomeVFSResult libntfs_gnomevfs_get_file_info_from_handle(
 		GnomeVFSMethod *method, GnomeVFSMethodHandle *method_handle,
-		GnomeVFSFileInfo *file_info, GnomeVFSFileInfoOptions options,
-		GnomeVFSContext *context)
+		GnomeVFSFileInfo *file_info,
+		GnomeVFSFileInfoOptions options __attribute__((unused)),
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	GnomeVFSResult errvfsresult;
 	struct libntfs_file *libntfs_file;
@@ -761,9 +770,9 @@ static GnomeVFSResult libntfs_gnomevfs_get_file_info(GnomeVFSMethod *method,
 	return GNOME_VFS_OK;
 }
 
-GnomeVFSResult libntfs_gnomevfs_check_same_fs(GnomeVFSMethod *method,
+static GnomeVFSResult libntfs_gnomevfs_check_same_fs(GnomeVFSMethod *method,
 		GnomeVFSURI *a, GnomeVFSURI *b, gboolean *same_fs_return,
-		GnomeVFSContext *context)
+		GnomeVFSContext *context __attribute__((unused)))
 {
 	ntfs_volume *volume_a;
 	ntfs_volume *volume_b;
