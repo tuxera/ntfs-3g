@@ -2,7 +2,7 @@
  * ntfsinfo - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2003 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will dump a file's attributes.
@@ -80,7 +80,8 @@ void version (void)
  */
 void usage (void)
 {
-	printf ("\nUsage: %s [options] device\n"
+	printf ("\nUsage: %s [options] -d dev\n"
+		"    -d dev  --device dev The ntfs volume to display information about\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"\n"
 		"    -f      --force      Use less caution\n"
@@ -105,8 +106,9 @@ void usage (void)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fh?i:qtTvV";
+	static const char *sopt = "-fh?i:qtTvVd:";
 	static const struct option lopt[] = {
+		{ "device",	 required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "inode",	 required_argument,	NULL, 'i' },
@@ -129,7 +131,7 @@ int parse_options (int argc, char *argv[])
 
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
-		case 1:	/* A non-option argument */
+		case 'd':	/* A non-option argument */
 			if (!opts.device) {
 				opts.device = argv[optind-1];
 			} else {
