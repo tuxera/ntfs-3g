@@ -51,12 +51,14 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <getopt.h>
 
 #include "types.h"
 #include "attrib.h"
 #include "mft.h"
 #include "device.h"
 #include "logfile.h"
+#include "utils.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \
@@ -64,13 +66,88 @@ You need to run ./configure without the --disable-default-device-io-ops \
 switch if you want to be able to build the NTFS utilities."
 #endif
 
+GEN_PRINTF(Eprintf, stdout, NULL, FALSE)
+GEN_PRINTF(Vprintf, stdout, NULL, FALSE)
+GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
+
+const char *EXEC_NAME = "ntfsfix";
+
+struct {
+	char *volume;
+} opt;
+
+static int usage(void)
+{
+
+	printf("%s v%s\n"
+		   "\n"
+		   "Usage: %s [options] device\n"
+		   "    Attempt to fix an NTFS partition.\n"
+		   "\n"
+		   "    -h, --help             Display this help\n"
+		   "    -V, --version          Display version information\n"
+		   "\n"
+		   "For example: %s /dev/hda6\n\n", 
+		   EXEC_NAME, VERSION, EXEC_NAME, EXEC_NAME);
+	printf("%s%s", ntfs_bugs, ntfs_home);
+	exit(1);
+}
+
+static void version (void)
+{
+	printf("%s v%s\n\n"
+		   "Attempt to fix an NTFS partition.\n\n"
+		   "Copyright (c) 2000-2003 Anton Altaparmakov.\n\n",
+		   EXEC_NAME, VERSION);
+	printf("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
+	exit(1);
+}
+
+static void parse_options(int argc, char **argv)
+{
+	char c;
+	static const char *sopt = "-hV";
+	static const struct option lopt[] = {
+		{ "help",	    no_argument,		NULL, 'h' },
+		{ "version",	no_argument,		NULL, 'V' },
+		{ NULL, 0, NULL, 0 }
+	};
+
+	memset(&opt, 0, sizeof(opt));
+
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!opt.volume)
+				opt.volume = argv[optind - 1];
+			else {
+				printf("ERROR: Too many arguments.\n");
+				usage();
+			}
+			break;
+		case 'h':
+		case '?':
+			usage();
+		case 'V':
+			version();
+		default:
+			printf("ERROR: Unknown option '%s'.\n", argv[optind - 1]);
+			usage();
+		}
+	}
+	
+	if (opt.volume == NULL) {
+		printf("ERROR: You must specify a device.\n");
+		usage();
+	}
+}
+
 /**
  * main
  */
 int main(int argc, char **argv)
 {
 	s64 l, br;
-	const char *EXEC_NAME = "NtfsFix";
 	const char *OK = "OK";
 	const char *FAILED = "FAILED";
 	unsigned char *m = NULL, *m2 = NULL;
@@ -81,57 +158,32 @@ int main(int argc, char **argv)
 	u16 flags;
 	BOOL done, force = FALSE;
 
-	printf("\n");
-	if (argc != 2 || !argv[1]) {
-		printf("%s v%s - Attempt to fix an NTFS partition that "
-		       "has been damaged by the\nLinux NTFS driver. Note that "
-		       "you should run it every time after you have used\nthe "
-		       "Linux NTFS driver to write to an NTFS partition to "
-		       "prevent massive data\ncorruption from happening when "
-		       "Windows mounts the partition.\nIMPORTANT: Run this "
-		       "only *after* unmounting the partition in Linux but "
-		       "*before*\nrebooting into Windows NT/2000/XP or you "
-		       "*will* suffer! - You have been warned!\n\n"
-		       /* Generic copyright / disclaimer. */
-		       "Copyright (c) 2000-2003 Anton Altaparmakov.\n\n"
-		       "%s is free software, released under the GNU "
-		       "General Public License and you\nare welcome to "
-		       "redistribute it under certain conditions.\n"
-		       "%s comes with ABSOLUTELY NO WARRANTY; for details "
-		       "read the file GNU\nGeneral Public License to be found "
-		       "in the file COPYING in the main Linux-NTFS\n"
-		       "distribution directory.\n\n"
-		       /* Generic part ends here. */
-		       "Syntax: ntfsfix partition_or_file_name\n"
-		       "        e.g. ntfsfix /dev/hda6\n\n", EXEC_NAME,
-		       VERSION, EXEC_NAME, EXEC_NAME);
-		fprintf(stderr, "Error: incorrect syntax\n");
-		exit(1);
-	}
-	if (!ntfs_check_if_mounted(argv[1], &mnt_flags)) {
+	parse_options(argc, argv);
+
+	if (!ntfs_check_if_mounted(opt.volume, &mnt_flags)) {
 		if ((mnt_flags & NTFS_MF_MOUNTED) &&
 				!(mnt_flags & NTFS_MF_READONLY) && !force) {
 			fprintf(stderr, "Refusing to operate on read-write "
-					"mounted device %s.\n", argv[1]);
+					"mounted device %s.\n", opt.volume);
 			exit(1);
 		}
 	} else
 		fprintf(stderr, "Failed to determine whether %s is mounted: "
-				"%s\n", argv[1], strerror(errno));
+				"%s\n", opt.volume, strerror(errno));
 	/* Attempt a full mount first. */
 	printf("Mounting volume... ");
-	vol = ntfs_mount(argv[1], 0);
+	vol = ntfs_mount(opt.volume, 0);
 	if (vol) {
 		puts(OK);
-		printf("\nProcessing of $MFT and $MFTMirr completed "
-				"successfully.\n\n");
+		printf("Processing of $MFT and $MFTMirr completed "
+				"successfully.\n");
 		goto mount_ok;
 	}
 	puts(FAILED);
 
 	printf("Attempting to correct errors... ");
 
-	dev = ntfs_device_alloc(argv[1], 0, &ntfs_device_default_io_ops, NULL);
+	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev) {
 		puts(FAILED);
 		perror("Failed to allocate device");
@@ -142,12 +194,12 @@ int main(int argc, char **argv)
 	if (!vol) {
 		puts(FAILED);
 		perror("Failed to startup volume");
-		fprintf(stderr, "Volume is corrupt. You should run chkdsk.");
+		fprintf(stderr, "Volume is corrupt. You should run chkdsk.\n");
 		ntfs_device_free(dev);
 		goto error_exit;
 	}
 
-	puts("Processing $MFT and $MFTMirr.");
+	puts("\nProcessing $MFT and $MFTMirr... ");
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
 	m = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
@@ -259,11 +311,11 @@ int main(int argc, char **argv)
 	free(m2);
 	m = m2 = NULL;
 
-	printf("Processing of $MFT and $MFTMirr completed successfully.\n\n");
+	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
 	/* ntfs_umount() will invoke ntfs_device_free() for us. */
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
-	vol = ntfs_mount(argv[1], 0);
+	vol = ntfs_mount(opt.volume, 0);
 	if (!vol) {
 		perror("Remount failed");
 		goto error_exit;
@@ -272,7 +324,7 @@ mount_ok:
 	m = NULL;
 
 	/* Check NTFS version is ok for us (in $Volume) */
-	printf("NTFS volume version is %i.%i.\n\n", vol->major_ver,
+	printf("NTFS volume version is %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
 	if (ntfs_version_is_supported(vol)) {
 		fprintf(stderr, "Error: Unknown NTFS version.\n");
@@ -294,7 +346,6 @@ mount_ok:
 		goto error_exit;
 	}
 	puts(OK);
-	printf("\n");
 
 	printf("Going to empty the journal ($LogFile)... ");
 	if (ntfs_logfile_reset(vol)) {
@@ -303,7 +354,6 @@ mount_ok:
 		goto error_exit;
 	}
 	puts(OK);
-	printf("\n");
 
 	if (vol->major_ver >= 3) {
 	/* FIXME: If on NTFS 3.0+, check for presence of the usn journal and
