@@ -1,8 +1,8 @@
 # Need this to enable 64-bit (device) file access functions and parameters.
 if DEBUG
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall -g -DDEBUG
 else
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64
+AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall
 endif
 
 if REALLYSTATIC
@@ -20,7 +20,7 @@ LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= ntfsfix ntfsinfo
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize
-EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate
+EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscluster
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8
@@ -59,11 +59,15 @@ ntfsresize_LDFLAGS	= $(AM_LFLAGS)
 
 # We don't distribute these
 
+ntfscluster_SOURCES	= ntfscluster.c ntfscluster.h utils.c utils.h
+ntfscluster_LDADD	= $(AM_LIBS)
+ntfscluster_LDFLAGS	= $(AM_LFLAGS)
+
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c
 ntfstruncate_LDADD	= $(AM_LIBS)
 ntfstruncate_LDFLAGS	= $(AM_LFLAGS)
 
-ntfswipe_SOURCES	= ntfswipe.c ntfswipe.h
+ntfswipe_SOURCES	= ntfswipe.c ntfswipe.h utils.c utils.h
 ntfswipe_LDADD		= $(AM_LIBS)
 ntfswipe_LDFLAGS	= $(AM_LFLAGS)
 
@@ -79,3 +83,4 @@ dumplog_LDFLAGS		= $(AM_LFLAGS)
 
 strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
 	$(STRIP) $^
+
