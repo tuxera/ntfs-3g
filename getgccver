@@ -7,4 +7,4 @@ fi
 
 # Get the gcc version. Can't do this in configure.ac as automake refuses to
 # preserve the square brackets while generating the configure script.
-$1 --version 2>&1 | head -1 | sed s/"egcs-"// | sed s/"gcc (GCC) \([0-9]\.[0-9]*\).*"/"\1"/
+$1 --version 2>&1 | head -n 1 | sed s/"egcs-"// | sed s/"gcc (GCC) \([0-9]\.[0-9]*\).*"/"\1"/
