@@ -247,6 +247,7 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
+static void err_exit(const char *fmt, ...) __attribute__((noreturn));
 static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -430,6 +431,8 @@ static void parse_options(int argc, char *argv[])
 
 /**
  * append_to_bad_blocks
+ *
+ * Note: Might not return.
  */
 static void append_to_bad_blocks(unsigned long block)
 {
@@ -492,6 +495,8 @@ static __inline__ long long mkntfs_write(struct ntfs_device *dev,
  *
  * Return the number of bytes written (minus padding) or -1 on error. Errno
  * will be set to the error code.
+ *
+ * Note: Might not return.
  */
 static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 		const char *val, const s64 val_len, s64 *inited_size)
@@ -628,6 +633,8 @@ static int stoucs(ntfschar *dest, const char *src, int maxlen)
 
 /**
  * dump_resident_attr_val
+ *
+ * Note: Might not return.
  */
 static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 {
@@ -2536,6 +2543,8 @@ static void mkntfs_exit(void)
 
 /**
  * mkntfs_open_partition -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_open_partition(void)
 {
@@ -2620,6 +2629,8 @@ static void mkntfs_open_partition(void)
 
 /**
  * mkntfs_override_phys_params -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_override_phys_params(void)
 {
@@ -2829,6 +2840,8 @@ static void mkntfs_override_phys_params(void)
 
 /**
  * mkntfs_initialize_bitmaps -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_initialize_bitmaps(void)
 {
@@ -2893,6 +2906,8 @@ static void mkntfs_initialize_bitmaps(void)
 
 /**
  * mkntfs_initialize_rl_mft -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_initialize_rl_mft(void)
 {
@@ -2979,6 +2994,8 @@ static void mkntfs_initialize_rl_mft(void)
 
 /**
  * mkntfs_initialize_rl_logfile -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_initialize_rl_logfile(void)
 {
@@ -3037,6 +3054,8 @@ static void mkntfs_initialize_rl_logfile(void)
 
 /**
  * mkntfs_initialize_rl_boot -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_initialize_rl_boot(void)
 {
@@ -3063,6 +3082,8 @@ static void mkntfs_initialize_rl_boot(void)
 
 /**
  * mkntfs_initialize_rl_bad -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_initialize_rl_bad(void)
 {
@@ -3086,6 +3107,8 @@ static void mkntfs_initialize_rl_bad(void)
 
 /**
  * mkntfs_fill_device_with_zeroes -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_fill_device_with_zeroes(void)
 {
@@ -3160,6 +3183,8 @@ static void mkntfs_fill_device_with_zeroes(void)
 
 /**
  * mkntfs_create_root_structures -
+ *
+ * Note: Might not return.
  */
 static void mkntfs_create_root_structures(void)
 {
