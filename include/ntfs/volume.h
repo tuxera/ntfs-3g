@@ -102,7 +102,11 @@ typedef enum {
  * ntfs_volume - structure describing an open volume in memory
  */
 struct _ntfs_volume {
-	struct ntfs_device *dev;/* NTFS device associated with the volume. */
+	union {
+		struct ntfs_device *dev;	/* NTFS device associated with
+						   the volume. */
+		void *sb;	/* For kernel porting compatibility. */
+	};
 	char *vol_name;		/* Name of the volume. */
 	unsigned long state;	/* NTFS specific flags describing this volume.
 				   See ntfs_volume_state_bits above. */
