@@ -44,6 +44,8 @@ static struct options {
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
+	int	 epochtime;	/* Report all timestamps as "Thu Jan  1 00:00:00 1970" */
+	int	 notime;	/* Don't report timestamps at all */
 } opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
@@ -65,6 +67,7 @@ void version (void)
 	printf ("    2002      Matthew J. Fanto\n");
 	printf ("    2002      Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
+	printf ("    2003      Leonard Norrgard\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -84,7 +87,9 @@ void usage (void)
 		"    -q      --quiet      Less output\n"
 		"    -v      --verbose    More output\n"
 		"    -V      --version    Display version information\n"
-		"    -h      --help       Display this help\n\n",
+		"    -h      --help       Display this help\n\n"
+		"    -t      --epochtime  Report all timestamps as \"Thu Jan  1 00:00:00 1970\"\n"
+		"    -T      --notime     Don't report timestamps at all\n",
 		EXEC_NAME);
 	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -100,7 +105,7 @@ void usage (void)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fh?i:qvV";
+	static const char *sopt = "-fh?i:qtTvV";
 	static const struct option lopt[] = {
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
@@ -108,6 +113,8 @@ int parse_options (int argc, char *argv[])
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
+		{ "epochtime",   no_argument,		NULL, 't' },
+		{ "notime",	 no_argument,		NULL, 'T' },
 		{ NULL, 0, NULL, 0 },
 	};
 
@@ -146,6 +153,12 @@ int parse_options (int argc, char *argv[])
 		case 'q':
 			opts.quiet++;
 			break;
+		case 't':
+			opts.epochtime++;
+			break;
+		case 'T':
+			opts.notime++;
+			break;
 		case 'v':
 			opts.verbose++;
 			break;
@@ -182,6 +195,11 @@ int parse_options (int argc, char *argv[])
 			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
+
+		if (opts.epochtime && opts.notime) {
+			Eprintf ("You may not use --notime and --epochtime at the same time.\n");
+			err++;
+		}
 	}
 
 	if (ver)
@@ -202,7 +220,6 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 	ATTR_RECORD *attr = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
 	char *file_name = NULL;
-	time_t ntfs_time;
 
 	ctx = ntfs_attr_get_search_ctx(inode, mrec);
 
@@ -228,18 +245,30 @@ void ntfs_dump_file_name_attribute(ntfs_inode *inode, MFT_RECORD *mrec)
 	printf("Real File Size: \t %lld\n", sle64_to_cpu(file_name_attr->data_size));
 
 	//time conversion stuff
-	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->creation_time));
-	printf("File Creation Time: \t %s",ctime(&ntfs_time));
+	if (!opts.notime) {
+	  time_t ntfs_time = { 0 };
 
-	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_data_change_time));
-	printf("File Altered Time: \t %s",ctime(&ntfs_time));
+	  if (!opts.epochtime) {
+	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->creation_time));
+	    printf("File Creation Time: \t %s",ctime(&ntfs_time));
+	    
+	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_data_change_time));
+	    printf("File Altered Time: \t %s",ctime(&ntfs_time));
+	    
+	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_mft_change_time));
+	    printf("MFT Changed Time: \t %s",ctime(&ntfs_time));
+	    
+	    ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_access_time));
+	    printf("Last Accessed Time: \t %s",ctime(&ntfs_time));
+	  } else {
+	    char *t = asctime(gmtime(&ntfs_time));
 
-	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_mft_change_time));
-	printf("MFT Changed Time: \t %s",ctime(&ntfs_time));
-
-	ntfs_time = ntfs2utc (sle64_to_cpu (file_name_attr->last_access_time));
-	printf("Last Acced Time: \t %s",ctime(&ntfs_time));
-
+	    printf("File Creation Time: \t %s",t);
+	    printf("File Altered Time: \t %s",t);
+	    printf("MFT Changed Time: \t %s",t);
+	    printf("Last Accessed Time: \t %s",t);
+	  }
+	}
 	free(file_name);
 
 }
