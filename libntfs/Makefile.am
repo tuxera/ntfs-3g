@@ -29,20 +29,6 @@ LTVERSION_LIBNTFS = 5:0:0
 LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 
-# Later gcc require -fms-extensions to work.
-if GCC_NEEDS_MS_EXTENSIONS
-GCCflag = -fms-extensions
-else
-GCCflag =
-endif
-
-# Need this to enable 64-bit (device) file access functions and parameters.
-if DEBUG
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall -g -DDEBUG $(GCCflag)
-else
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall $(GCCflag)
-endif
-
 linux_ntfsincludedir = -I$(top_srcdir)/include
 
 lib_LTLIBRARIES = libntfs.la
@@ -77,7 +63,7 @@ endif
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
 libntfs_gnomevfs_la_LIBADD = libntfs.la
 libntfs_gnomevfs_la_LIBS = $(LIBNTFS_GNOMEVFS_LIBS)
-libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS) $(GCCflag)
+libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS)
 libntfs_gnomevfs_la_SOURCES =	\
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c

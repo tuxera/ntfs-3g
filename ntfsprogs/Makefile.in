@@ -95,15 +95,6 @@ all_libraries = @all_libraries@
 am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
-
-# Later gcc require -fms-extensions to work.
-@GCC_NEEDS_MS_EXTENSIONS_TRUE@GCCflag = -fms-extensions
-@GCC_NEEDS_MS_EXTENSIONS_FALSE@GCCflag = 
-
-# Need this to enable 64-bit (device) file access functions and parameters.
-@DEBUG_TRUE@AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall -g -DDEBUG $(GCCflag)
-@DEBUG_FALSE@AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall $(GCCflag)
-
 @REALLYSTATIC_TRUE@AM_LIBS = $(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@AM_LIBS = $(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@AM_LFLAGS = -static

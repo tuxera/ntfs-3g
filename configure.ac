@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.0beta2, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.0, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])
@@ -58,13 +58,7 @@ AC_ARG_ENABLE(really-static,
 	enable_really_static=no
 )
 
-AM_CONDITIONAL(DEBUG, test "$enable_debug" = yes)
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
-
-# Do not discard 'CFLAGS' as they may have been passed us by rpmbuild(8)
-if test "$USE_MAINTAINER_MODE" = "yes";then
-	CFLAGS="$CFLAGS -ggdb3 -Wall -Wstrict-prototypes -Wsign-compare" ## FIXME: fix all source: -Wsign-compare
-fi
 
 # Checks for programs.
 AC_PROG_CC
@@ -78,11 +72,11 @@ AC_ARG_ENABLE(gnome-vfs,
 	enable_gnome_vfs=auto
 )
 compile_gnome_vfs=false
-if test "$enable_gnome_vfs" != "no";then
+if test "$enable_gnome_vfs" != "no"; then
 	PKG_CHECK_MODULES(LIBNTFS_GNOMEVFS, [glib-2.0 gthread-2.0 gnome-vfs-module-2.0],
 	[ compile_gnome_vfs=true ],
 	[
-		if test "$enable_gnome_vfs" = "yes";then
+		if test "$enable_gnome_vfs" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
 		else
 			AC_MSG_WARN([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
@@ -109,16 +103,6 @@ all_includes="$all_includes $USER_INCLUDES"
 AC_SUBST(all_includes)
 AC_SUBST(all_libraries)
 
-AC_SUBST(CFLAGS)
-AC_SUBST(CPPFLAGS)
-AC_SUBST(LDFLAGS)
-AC_SUBST(LIBS)
-
-AC_SUBST(LIBNTFS_GNOMEVFS_CFLAGS)
-AC_SUBST(LIBNTFS_GNOMEVFS_LIBS)
-
-AC_SUBST(AUTODIRS)
-
 # Get compiler name
 if test ! -z "$CC"; then
 	_cc="$CC"
@@ -136,7 +120,7 @@ if test -z "$cc_version"; then
 	cc_major=1
 	cc_minor=1
 fi
-if test $cc_major -lt 2 -o \( $cc_major -eq 2 -a $cc_minor -lt 96 \) ; then
+if test $cc_major -lt 2 -o \( $cc_major -eq 2 -a $cc_minor -lt 96 \); then
 cc_version="$cc_version, bad"
 AC_MSG_RESULT($cc_version)
 AC_MSG_ERROR(Please upgrade your gcc compiler to gcc-2.96+ or gcc-3+ version!\
@@ -146,8 +130,36 @@ fi
 cc_version="$cc_version, ok"
 AC_MSG_RESULT($cc_version)
 
+# Add our compiler switches not discarding 'CFLAGS' as they may have been
+# passed to us by rpmbuild(8).
+# We add -Wall to enable compiler warnings and define _FILE_OFFSET_BITS to 64
+# enable 64-bit (device) file access functions and parameters.
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -Wall"
+
+# Add extra warnings if in maintainer mode.
+if test "$USE_MAINTAINER_MODE" = "yes";then
+	CFLAGS="$CFLAGS -Wstrict-prototypes -Wsign-compare"
+fi
+
 # Add -fms-extensions for gcc-3.2+.
-AM_CONDITIONAL(GCC_NEEDS_MS_EXTENSIONS, test $cc_major -gt 3 -o \( $cc_major -eq 3 -a $cc_minor -ge 2 \))
+if test $cc_major -gt 3 -o \( $cc_major -eq 3 -a $cc_minor -ge 2 \); then
+	CFLAGS="$CFLAGS -fms-extensions"
+fi
+
+# Add debugging switches if in debug mode.
+if test "$enable_debug" = "yes"; then
+	CFLAGS="$CFLAGS -ggdb3 -DDEBUG"
+fi
+
+AC_SUBST(CFLAGS)
+AC_SUBST(CPPFLAGS)
+AC_SUBST(LDFLAGS)
+AC_SUBST(LIBS)
+
+AC_SUBST(LIBNTFS_GNOMEVFS_CFLAGS)
+AC_SUBST(LIBNTFS_GNOMEVFS_LIBS)
+
+AC_SUBST(AUTODIRS)
 
 # Checks for libraries.
 
