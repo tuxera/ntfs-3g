@@ -37,10 +37,10 @@
 /**
  * ntfs_cluster_alloc - allocate clusters on an ntfs volume
  * @vol:	mounted ntfs volume on which to allocate the clusters
+ * @start_vcn:	vcn to use for the first allocated cluster
  * @count:	number of clusters to allocate
  * @start_lcn:	starting lcn at which to allocate the clusters (or -1 if none)
  * @zone:	zone from which to allocate the clusters
- * @start_vcn:	
  *
  * Allocate @count clusters preferably starting at cluster @start_lcn or at the
  * current allocator position if @start_lcn is -1, on the mounted ntfs volume
@@ -90,8 +90,8 @@
  * possible code paths. So at least for now, I am leaving the double logic -
  * better safe than sorry... (AIA)
  */
-runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
-		const NTFS_CLUSTER_ALLOCATION_ZONES zone, VCN start_vcn)
+runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
+		LCN start_lcn, const NTFS_CLUSTER_ALLOCATION_ZONES zone)
 {
 	LCN zone_start, zone_end, bmp_pos, bmp_initial_pos, last_read_pos, lcn;
 	LCN prev_lcn = 0, prev_run_len = 0, mft_zone_size;

@@ -595,7 +595,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		ntfs_debug("Appending one cluster to mft bitmap.");
 	} else {
 		/* Allocate a cluster from the DATA_ZONE. */
-		rl2 = ntfs_cluster_alloc(vol, 1, lcn, DATA_ZONE, rl[1].vcn);
+		rl2 = ntfs_cluster_alloc(vol, rl[1].vcn, 1, lcn, DATA_ZONE);
 		if (!rl2) {
 			ntfs_error(vol->sb, "Failed to allocate a cluster for "
 					"the mft bitmap.");
@@ -907,7 +907,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 			"%lli.", (long long)nr);
 	old_last_vcn = rl[1].vcn;
 	do {
-		rl2 = ntfs_cluster_alloc(vol, nr, lcn, MFT_ZONE, old_last_vcn);
+		rl2 = ntfs_cluster_alloc(vol, old_last_vcn, nr, lcn, MFT_ZONE);
 		if (rl2)
 			break;
 		if (errno != ENOSPC || nr == min_nr) {

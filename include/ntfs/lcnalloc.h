@@ -35,8 +35,8 @@ typedef enum {
 	LAST_ZONE	= 1,	/* For sanity checking. */
 } NTFS_CLUSTER_ALLOCATION_ZONES;
 
-extern runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
-		const NTFS_CLUSTER_ALLOCATION_ZONES zone, VCN start_vcn);
+extern runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
+		LCN start_lcn, const NTFS_CLUSTER_ALLOCATION_ZONES zone);
 
 extern int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl);
 

@@ -1133,9 +1133,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				}
 			}
 			/* Allocate clusters to instantiate the hole. */
-			rlc = ntfs_cluster_alloc(vol, ((ofs + to_write - 1) >>
-					vol->cluster_size_bits) + 1,
-					lcn_seek_from, DATA_ZONE, rl->vcn);
+			rlc = ntfs_cluster_alloc(vol, rl->vcn,
+						((ofs + to_write - 1) >>
+						vol->cluster_size_bits) + 1,
+						lcn_seek_from, DATA_ZONE);
 			if (!rlc) {
 				eo = errno;
 				Dprintf("%s(): Failed to allocate clusters for "
@@ -3146,8 +3147,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	if (new_allocated_size > 0) {
 		/* Start by allocating clusters to hold the attribute value. */
-		rl = ntfs_cluster_alloc(vol, new_allocated_size >>
-				vol->cluster_size_bits, -1, DATA_ZONE, 0);
+		rl = ntfs_cluster_alloc(vol, 0, new_allocated_size >>
+				vol->cluster_size_bits, -1, DATA_ZONE);
 		if (!rl) {
 			if (errno != ENOSPC) {
 				int eo = errno;
@@ -4248,11 +4249,11 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					lcn_seek_from = rl->lcn + rl->length;
 			}
 
-			rl = ntfs_cluster_alloc(vol, first_free_vcn - 
+			rl = ntfs_cluster_alloc(vol, na->allocated_size >>
+					vol->cluster_size_bits, first_free_vcn -
 					(na->allocated_size >>
 					vol->cluster_size_bits), lcn_seek_from,
-					DATA_ZONE, na->allocated_size >>
-					vol->cluster_size_bits);
+					DATA_ZONE);
 			if (!rl) {
 				err = errno;
 				Dprintf("%s(): Eeek! Cluster allocation "
