@@ -179,13 +179,20 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			goto err_out;
 		}
 		memcpy(rl, na->rl, rl_size);
-		free(ni->attr_list_rl);	
+		if (NInoAttrListNonResident(ni) && ni->attr_list_rl)
+			free(ni->attr_list_rl);
 		ni->attr_list_rl = rl;
 		NInoSetAttrListNonResident(ni);
-	} else
-		NInoClearAttrListNonResident(ni);
+	} else {
+		if (NInoAttrListNonResident(ni)) {
+			if (ni->attr_list_rl)
+				free(ni->attr_list_rl);
+			NInoClearAttrListNonResident(ni);
+		}
+	}
 
-	free(ni->attr_list);
+	if (ni->attr_list)
+		free(ni->attr_list);
 	ni->attr_list = new_al;
 	ni->attr_list_size = new_al_len;
 	NInoAttrListSetDirty(ni);
@@ -278,8 +285,13 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 				break;
 		}
 		NInoSetAttrListNonResident(base_ni);
-	} else
-		NInoClearAttrListNonResident(base_ni);
+	} else {
+		if (NInoAttrListNonResident(base_ni)) {
+			if (base_ni->attr_list_rl)
+				free(base_ni->attr_list_rl);
+			NInoClearAttrListNonResident(base_ni);
+		}
+	}
 
 	free(base_ni->attr_list);
 	base_ni->attr_list = new_al;

@@ -2453,10 +2453,13 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	}
 	ntfs_inode_mark_dirty(ni);
 	if (type == AT_ATTRIBUTE_LIST) {
+		if (NInoAttrList(base_ni) && base_ni->attr_list)
+			free(base_ni->attr_list);
+		if (NInoAttrListNonResident(base_ni) && base_ni->attr_list_rl)
+			free(base_ni->attr_list_rl);
 		NInoClearAttrList(base_ni);
+		NInoClearAttrListNonResident(base_ni);
 		NInoAttrListClearDirty(base_ni);
-		free(base_ni->attr_list);
-		free(base_ni->attr_list_rl);
 	}
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) -
 			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
