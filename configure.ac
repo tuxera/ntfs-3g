@@ -2,7 +2,7 @@
 # configure.ac - Source file to generate "./configure" to prepare package for
 #		 compilation.
 #
-# Copyright (c) 2000-2003 Anton Altaparmakov
+# Copyright (c) 2000-2004 Anton Altaparmakov
 # Copyright (c) 2003 Jan Kratochvil
 #
 # This program/include file is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.2, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.3-WIP, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])
