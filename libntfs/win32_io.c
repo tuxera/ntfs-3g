@@ -660,7 +660,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 		abs_offset.QuadPart = fd->part_end + offset;
 		break;
 	default:
-		printf("win32_seek() wrong mode %d.\n", whence);
+		Dprintf("win32_seek() wrong mode %d.\n", whence);
 		errno = EINVAL;
 		return -1;
 	}
@@ -1011,7 +1011,8 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 			break;
 #endif
 		default:
-			fprintf(stderr, "win32_ioctl(): unimplemented ioctl %d.\n",request);
+			Dprintf("win32_ioctl(): unimplemented ioctl %d.\n",
+					request);
 			errno = ENOTSUP;
 			return -1;
 	}

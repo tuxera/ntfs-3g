@@ -92,8 +92,8 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		if (NDevDirty(dev))
 			dev->d_ops->sync(dev);
 		if (dev->d_ops->close(dev))
-			fprintf(stderr, "%s(): Eeek! Failed to close the "
-					"device. Error: %s\n", __FUNCTION__,
+			Dprintf("%s(): Eeek! Failed to close the device.  "
+					"Error: %s\n", __FUNCTION__,
 					strerror(errno));
 	}
 	if (v->vol_name)

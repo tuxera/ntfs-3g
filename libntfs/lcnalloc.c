@@ -107,7 +107,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			zone == MFT_ZONE ? "MFT" : "DATA");
 	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
 			(s8)zone < FIRST_ZONE || zone > LAST_ZONE) {
-		fprintf(stderr, "%s(): Invalid arguments!\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments!\n", __FUNCTION__);
 		errno = EINVAL;
 		return NULL;
 	}
@@ -455,10 +455,10 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 					err = errno;
 				else
 					err = EIO;
-				fprintf(stderr, "%s(): Bitmap writeback "
-						"failed in read next buffer "
-						"code path with error code "
-						"%i.\n", __FUNCTION__, err);
+				Dprintf("%s(): Bitmap writeback failed in "
+						"read next buffer code path "
+						"with error code %i.\n",
+						__FUNCTION__, err);
 				goto err_ret;
 			}
 		}
@@ -718,9 +718,9 @@ done_ret:
 				err = errno;
 			else
 				err = EIO;
-			fprintf(stderr, "%s(): Bitmap writeback failed "
-					"in done code path with error code "
-					"%i.\n", __FUNCTION__, err);
+			Dprintf("%s(): Bitmap writeback failed in done code "
+					"path with error code %i.\n",
+					__FUNCTION__, err);
 			goto err_ret;
 		}
 	}
@@ -746,9 +746,9 @@ wb_err_ret:
 				err = errno;
 			else
 				err = EIO;
-			fprintf(stderr, "%s(): Bitmap writeback failed "
-					"in error code path with error code "
-					"%i.\n", __FUNCTION__, err);
+			Dprintf("%s(): Bitmap writeback failed in error code "
+					"path with error code %i.\n",
+					__FUNCTION__, err);
 		}
 	}
 err_ret:
@@ -797,8 +797,8 @@ int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 		if (rl->lcn >= 0 && ntfs_bitmap_clear_run(vol->lcnbmp_na,
 				rl->lcn, rl->length)) {
 			int eo = errno;
-			fprintf(stderr, "%s(): Eeek! Deallocation of "
-					"clusters failed.\n", __FUNCTION__);
+			Dprintf("%s(): Eeek! Deallocation of clusters "
+					"failed.\n", __FUNCTION__);
 			errno = eo;
 			return -1;
 		}
@@ -829,7 +829,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 
 	if (!vol || !vol->lcnbmp_na || !na || start_vcn < 0 ||
 			(count < 0 && count != -1)) {
-		fprintf(stderr, "%s(): Invalid arguments!\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments!\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -881,8 +881,8 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		//	  list support! (AIA)
 		if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! invalid lcn (= %lli). "
-					"Should attempt to map runlist! "
+			Dprintf("%s(): Eeek! invalid lcn (= %lli).  Should "
+					"attempt to map runlist!  "
 					"Leaving inconsistent metadata!\n",
 					__FUNCTION__, (long long)rl->lcn);
 			errno = EIO;
@@ -901,8 +901,8 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 				int eo = errno;
 
 				// FIXME: Eeek! We need rollback! (AIA)
-				fprintf(stderr, "%s(): Eeek! bitmap clear run "
-						"failed. Leaving inconsistent "
+				Dprintf("%s(): Eeek!  bitmap clear run "
+						"failed.  Leaving inconsistent "
 						"metadata!\n", __FUNCTION__);
 				errno = eo;
 				return -1;
@@ -917,9 +917,9 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 
 	if (count != -1 && count != 0) {
 		// FIXME: Eeek! BUG()
-		fprintf(stderr, "%s(): Eeek! count still not zero (= %lli). "
-				"Leaving inconsistent metadata!\n",
-				__FUNCTION__, (long long)count);
+		Dprintf("%s(): Eeek!  count still not zero (= %lli).  Leaving "
+				"inconsistent metadata!\n", __FUNCTION__,
+				(long long)count);
 		errno = EIO;
 		return -1;
 	}
@@ -927,4 +927,3 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	/* Done. Return the number of actual clusters that were freed. */
 	return nr_freed;
 }
-

@@ -29,7 +29,7 @@
 #include "types.h"
 #include "attrib.h"
 #include "bitmap.h"
-
+#include "debug.h"
 
 /**
  * ntfs_bitmap_set_bits_in_run - set a run of bits in a bitmap to a value
@@ -103,7 +103,7 @@ static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 			lastbyte_pos = ((count + 7) >> 3) + firstbyte;
 			if (!lastbyte_pos) {
 				// FIXME: Eeek! BUG!
-				fprintf(stderr, "%s(): Eeek! lastbyte is zero. "
+				Dprintf("%s(): Eeek! lastbyte is zero. "
 						"Leaving inconsistent "
 						"metadata.\n", __FUNCTION__);
 				err = EIO;
@@ -118,8 +118,8 @@ static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 						3, 1, lastbyte_buf);
 				if (br != 1) {
 					// FIXME: Eeek! We need rollback! (AIA)
-					fprintf(stderr, "%s(): Eeek! Read of "
-							"last byte failed. "
+					Dprintf("%s(): Eeek! Read of last "
+							"byte failed. "
 							"Leaving inconsistent "
 							"metadata.\n",
 							__FUNCTION__);
@@ -145,8 +145,8 @@ static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 		br = ntfs_attr_pwrite(na, tmp, bufsize, buf);
 		if (br != bufsize) {
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! Failed to write buffer "
-					"to bitmap. Leaving inconsistent "
+			Dprintf("%s(): Eeek! Failed to write buffer to "
+					"bitmap. Leaving inconsistent "
 					"metadata.\n", __FUNCTION__);
 			err = EIO;
 			goto free_err_out;
@@ -162,8 +162,8 @@ static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 
 		if (lastbyte && count != 0) {
 			// FIXME: Eeek! BUG!
-			fprintf(stderr, "%s(): Eeek! Last buffer but count is "
-					"not zero (= %lli). Leaving "
+			Dprintf("%s(): Eeek! Last buffer but count is not "
+					"zero (= %lli). Leaving "
 					"inconsistent metadata.\n",
 					__FUNCTION__, (long long)count);
 			err = EIO;

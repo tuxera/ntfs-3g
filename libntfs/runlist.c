@@ -1445,8 +1445,8 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	rl = *arl;
 	if (start_vcn < rl->vcn) {
 		// FIXME: Eeek! BUG()
-		fprintf(stderr, "%s(): Eeek! start_vcn lies outside front of "
-				"runlist! Aborting.\n", __FUNCTION__);
+		Dprintf("%s(): Eeek! start_vcn lies outside front of "
+				"runlist!  Aborting.\n", __FUNCTION__);
 		errno = EIO;
 		return -1;
 	}
@@ -1458,14 +1458,14 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	}
 	if (!rl->length) {
 		// FIXME: Weird, probably a BUG()!
-		fprintf(stderr, "%s(): Weird! Asking to truncate already "
-				"truncated runlist?!? Abort.\n", __FUNCTION__);
+		Dprintf("%s(): Weird!  Asking to truncate already truncated "
+				"runlist?!?  Abort.\n", __FUNCTION__);
 		errno = EIO;
 		return -1;
 	}
 	if (start_vcn < rl->vcn) {
 		// FIXME: Eeek! BUG()
-		fprintf(stderr, "%s(): Eeek! start_vcn < rl->vcn! Aborting.\n",
+		Dprintf("%s(): Eeek!  start_vcn < rl->vcn!  Aborting.\n",
 				__FUNCTION__);
 		errno = EIO;
 		return -1;
@@ -1499,10 +1499,9 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 			*arl = NULL;
 		else {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Failed to reallocate "
-					"runlist buffer! Continuing "
-					"regardless and returning success.\n",
-					__FUNCTION__);
+			Dprintf("%s(): Eeek!  Failed to reallocate runlist "
+					"buffer!  Continuing regardless and "
+					"returning success.\n", __FUNCTION__);
 		}
 	}
 	/* Done! */

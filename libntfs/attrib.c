@@ -82,8 +82,8 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	}
 	/* Complex attribute? */
 	if (a->flags) {
-		puts("Enountered non-zero attribute flags. Cannot handle this "
-		     "yet.");
+		Dputs("Enountered non-zero attribute flags.  Cannot handle "
+				"this yet.");
 		errno = ENOTSUP;
 		return 0;
 	}
@@ -179,12 +179,10 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 					errno = eo;
 				} else if (r < rl[i].length <<
 						vol->cluster_size_bits) {
-					fprintf(stderr, ESTR ": Ran out of "
-							"input data.\n");
+					Dputs(ESTR ": Ran out of input data.");
 					errno = EIO;
 				} else {
-					fprintf(stderr, ESTR ": unknown "
-						   "error\n");
+					Dputs(ESTR ": unknown error");
 					errno = EIO;
 				}
 #undef ESTR
@@ -217,11 +215,10 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 				perror(ESTR);
 				errno = eo;
 			} else if (r < rl[i].length << vol->cluster_size_bits) {
-				fprintf(stderr, ESTR ": Ran out of input "
-						"data.\n");
+				Dputs(ESTR ": Ran out of input data.");
 				errno = EIO;
 			} else {
-				fprintf(stderr, ESTR ": unknown error\n");
+				Dputs(ESTR ": unknown error");
 				errno = EIO;
 			}
 #undef ESTR
@@ -2301,8 +2298,8 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		}
 		if (move_name) {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Name is placed after the "
-					"%s. Aborting...\n", __FUNCTION__,
+			Dprintf("%s(): Eeek!  Name is placed after the %s.  "
+					"Aborting...\n", __FUNCTION__,
 					a->non_resident ? "mapping pairs array":
 					"attribute value");
 			errno = ENOTSUP;
@@ -2315,8 +2312,8 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		if (errno != ENOSPC) {
 			int eo = errno;
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Attribute record resize "
-					"failed. Aborting...\n", __FUNCTION__);
+			Dprintf("%s(): Eeek!  Attribute record resize failed.  "
+					"Aborting...\n", __FUNCTION__);
 			errno = eo;
 		}
 		return -1;
@@ -2365,9 +2362,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	/* Some preliminary sanity checking. */
 	if (NAttrNonResident(na)) {
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Trying to make non-resident "
-				"attribute non-resident. Aborting...\n",
-				__FUNCTION__);
+		Dprintf("%s(): Eeek!  Trying to make non-resident attribute "
+				"non-resident.  Aborting...\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -2384,8 +2380,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->value_offset)) {
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Name is placed after the "
-				"attribute value. Aborting...\n", __FUNCTION__);
+		Dprintf("%s(): Eeek!  Name is placed after the attribute "
+				"value.  Aborting...\n", __FUNCTION__);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -2401,9 +2397,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 			int eo = errno;
 
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Failed to allocate "
-					"cluster(s). Aborting...\n",
-					__FUNCTION__);
+			Dprintf("%s(): Eeek!  Failed to allocate cluster(s).  "
+					"Aborting...\n", __FUNCTION__);
 			errno = eo;
 		}
 		return -1;
@@ -2431,8 +2426,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	if (bw != le32_to_cpu(a->value_length)) {
 		err = errno;
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Failed to write out attribute "
-				"value (bw = %lli, errno = %i). Aborting...\n",
+		Dprintf("%s(): Eeek!  Failed to write out attribute value "
+				"(bw = %lli, errno = %i). Aborting...\n",
 				__FUNCTION__, (long long)bw, err);
 		if (bw >= 0)
 			err = EIO;
@@ -2444,8 +2439,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	if (mp_size < 0) {
 		err = errno;
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Failed to get size for mapping "
-				"pairs array. Aborting...\n", __FUNCTION__);
+		Dprintf("%s(): Eeek!  Failed to get size for mapping pairs "
+				"array.  Aborting...\n", __FUNCTION__);
 		goto cluster_free_err_out;
 	}
 
@@ -2464,8 +2459,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	if (a->name_length && (le16_to_cpu(a->name_offset) + a->name_length >
 			arec_size)) {
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Name exceeds new record size! "
-				"Not supported. Aborting...\n", __FUNCTION__);
+		Dprintf("%s(): Eeek!  Name exceeds new record size! "
+				"Not supported.  Aborting...\n", __FUNCTION__);
 		err = ENOTSUP;
 		goto cluster_free_err_out;
 	}
@@ -2475,9 +2470,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		err = errno;
 		if (err != ENOSPC) {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Failed to resize "
-					"attribute record. Aborting...\n",
-					__FUNCTION__);
+			Dprintf("%s(): Eeek!  Failed to resize attribute "
+					"record.  Aborting...\n", __FUNCTION__);
 		}
 		goto cluster_free_err_out;
 	}
@@ -2519,10 +2513,10 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 			rl) < 0) {
 		err = errno;
 		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Failed to build mapping pairs. "
-				"Leaving corrupt attribute record on disk. "
-				"In memory runlist is still intact! Error "
-				"code is %i. FIXME: Need to rollback "
+		Dprintf("%s(): Eeek!  Failed to build mapping pairs.  Leaving "
+				"corrupt attribute record on disk.  "
+				"In memory runlist is still intact!  Error "
+				"code is %i.  FIXME:  Need to rollback "
 				"instead!\n", __FUNCTION__, err);
 		errno = err;
 		return -1;
@@ -2533,8 +2527,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 cluster_free_err_out:
 	if (ntfs_cluster_free(vol, na, 0, -1) < 0)
-		fprintf(stderr, "%s(): Eeek! Failed to release allocated "
-				"clusters in error code path. Leaving "
+		Dprintf("%s(): Eeek!  Failed to release allocated "
+				"clusters in error code path.  Leaving "
 				"inconsistent metadata...\n", __FUNCTION__);
 	NAttrClearNonResident(na);
 	na->allocated_size = na->data_size;
@@ -2583,8 +2577,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		err = errno;
 		if (err == ERANGE) {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Size bounds check "
-					"failed. Aborting...\n", __FUNCTION__);
+			Dprintf("%s(): Eeek!  Size bounds check failed.  "
+					"Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
 		goto put_err_out;
@@ -2610,8 +2604,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			// FIXME: Eeek!
 			if (err != ENOTSUP)
-				fprintf(stderr, "%s(): Eeek! Failed to resize "
-						"resident part of attribute. "
+				Dprintf("%s(): Eeek!  Failed to resize "
+						"resident part of attribute.  "
 						"Aborting...\n", __FUNCTION__);
 			goto put_err_out;
 		}
@@ -2634,9 +2628,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Failed to make attribute "
-				"non-resident. Aborting...\n",
-				__FUNCTION__);
+		Dprintf("%s(): Eeek!  Failed to make attribute non-resident.  "
+				"Aborting...\n", __FUNCTION__);
 		goto put_err_out;
 	}
 
@@ -2692,9 +2685,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	/* Some preliminary sanity checking. */
 	if (!NAttrNonResident(na)) {
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Trying to make resident "
-				"attribute resident. Aborting...\n",
-				__FUNCTION__);
+		Dprintf("%s(): Eeek!  Trying to make resident attribute "
+				"resident.  Aborting...\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -2717,8 +2709,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->mapping_pairs_offset)) {
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Name is placed after the mapping "
-				"pairs array. Aborting...\n", __FUNCTION__);
+		Dprintf("%s(): Eeek!  Name is placed after the mapping "
+				"pairs array.  Aborting...\n", __FUNCTION__);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -2726,14 +2718,14 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	// FIXME: For now we cheat and assume there is no attribute list
 	//	  attribute present. (AIA)
 	if (NInoAttrList(na->ni)) {
-		fprintf(stderr, "%s(): Working on files with attribute list "
+		Dprintf("%s(): Working on files with attribute list "
 				"attribute is not implemented yet.\n",
 				__FUNCTION__);
 		errno = ENOTSUP;
 		return -1;
 	}
 	if (NAttrCompressed(na) || NAttrEncrypted(na)) {
-		fprintf(stderr, "%s(): Making compressed or encrypted files "
+		Dprintf("%s(): Making compressed or encrypted files "
 				"resident is not implemented yet.\n",
 				__FUNCTION__);
 		errno = ENOTSUP;
@@ -2761,7 +2753,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		/* Sanity check. */
 		if (le16_to_cpu(a->name_offset) + a->name_length > arec_size) {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Name exceeds new record "
+			Dprintf("%s(): Eeek! Name exceeds new record "
 					"size! Not supported. Aborting...\n",
 					__FUNCTION__);
 			errno = ENOTSUP;
@@ -2778,7 +2770,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		if (errno != ENOSPC) {
 			err = errno;
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Failed to resize "
+			Dprintf("%s(): Eeek! Failed to resize "
 					"attribute record. Aborting...\n",
 					__FUNCTION__);
 			errno = err;
@@ -2813,7 +2805,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		if (bytes_read < 0)
 			err = errno;
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Failed to read attribute data. "
+		Dprintf("%s(): Eeek! Failed to read attribute data. "
 				"Aborting...\n", __FUNCTION__);
 		errno = err;
 		return -1;
@@ -2834,7 +2826,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	if (ntfs_cluster_free(vol, na, 0, -1) < 0) {
 		err = errno;
 		// FIXME: Eeek!
-		fprintf(stderr, "%s(): Eeek! Failed to release allocated "
+		Dprintf("%s(): Eeek! Failed to release allocated "
 				"clusters (error: %s).  Ignoring error and "
 				"leaving behind wasted clusters.\n",
 				__FUNCTION__, strerror(err));
@@ -2906,7 +2898,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		err = errno;
 		if (err == ERANGE) {
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Size bounds check "
+			Dprintf("%s(): Eeek! Size bounds check "
 					"failed. Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
@@ -2973,7 +2965,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (nr_freed_clusters < 0) {
 			err = errno;
 			// FIXME: Eeek!
-			fprintf(stderr, "%s(): Eeek! Freeing of clusters "
+			Dprintf("%s(): Eeek! Freeing of clusters "
 					"failed. Aborting...\n", __FUNCTION__);
 			goto put_err_out;
 		}
@@ -2981,7 +2973,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! Run list truncation "
+			Dprintf("%s(): Eeek! Run list truncation "
 					"failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
 			goto put_err_out;
@@ -2994,7 +2986,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 					vol->cluster_size_bits;
 			// FIXME: Bug catcher. Remove later... (AIA)
 			if (!newsize && na->compressed_size) {
-				fprintf(stderr, "%s(): Eeek! !newsize but "
+				Dprintf("%s(): Eeek! !newsize but "
 						"na->compressed_size not zero "
 						"(= %lli)! Fixing up by hand!\n",
 						__FUNCTION__, (long long)
@@ -3006,7 +2998,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			// FIXME: Bug catcher. Remove later... (AIA)
 			if (na->compressed_size < 0) {
 				// FIXME: Eeek! BUG!
-				fprintf(stderr, "%s(): Eeek! Compressed size "
+				Dprintf("%s(): Eeek! Compressed size "
 						"is negative. Leaving "
 						"inconsistent metadata!\n",
 						__FUNCTION__);
@@ -3026,7 +3018,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (mp_size <= 0) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! Get size for mapping "
+			Dprintf("%s(): Eeek! Get size for mapping "
 					"pairs failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
 			goto put_err_out;
@@ -3039,7 +3031,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 				a->mapping_pairs_offset), mp_size, na->rl)) {
 			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! Mapping pairs build "
+			Dprintf("%s(): Eeek! Mapping pairs build "
 					"failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
 			goto put_err_out;
@@ -3063,7 +3055,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			}
 			if (move_name) {
 				// FIXME: Eeek!
-				fprintf(stderr, "%s(): Eeek! Name is placed "
+				Dprintf("%s(): Eeek! Name is placed "
 						"after the %s. Aborting...\n",
 						__FUNCTION__, a->non_resident ?
 						"mapping pairs array":
@@ -3082,7 +3074,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 				le32_to_cpu(a->length) + new_alen;
 		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
 			// FIXME: Eeek! BUG()
-			fprintf(stderr, "%s(): Eeek! Ran out of space in mft "
+			Dprintf("%s(): Eeek! Ran out of space in mft "
 					"record. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
 			err = EIO;
@@ -3182,7 +3174,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	if (a->name_length) {
 		if (le16_to_cpu(a->name_offset) >=
 					le16_to_cpu(a->mapping_pairs_offset)) {
-			fprintf(stderr, "%s(): Eeek! Name is placed after the "
+			Dprintf("%s(): Eeek! Name is placed after the "
 					"mapping pairs array. Aborting...\n",
 					__FUNCTION__);
 			err = ENOTSUP;
@@ -3197,7 +3189,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
 		err = errno;
 		if (err == ERANGE) {
-			fprintf(stderr, "%s(): Eeek! Size bounds check "
+			Dprintf("%s(): Eeek! Size bounds check "
 					"failed. Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
@@ -3222,7 +3214,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 		if (ntfs_attr_map_runlist (na, 0)) {
 			err = errno;
-			fprintf(stderr, "%s(): Eeek! "
+			Dprintf("%s(): Eeek! "
 					"ntfs_attr_map_whole_runlist failed.\n",
 					 __FUNCTION__);
 			goto put_err_out;
@@ -3255,7 +3247,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					vol->cluster_size_bits);
 		if (!rl) {
 			err = errno;
-			fprintf(stderr, "%s(): Eeek! Cluster allocation "
+			Dprintf("%s(): Eeek! Cluster allocation "
 					"failed.\n", __FUNCTION__);
 			goto put_err_out;
 		}
@@ -3265,7 +3257,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		if (!rln) {
 			/* Failed, free just allocated clusters */
 			err = errno;
-			fprintf(stderr, "%s(): Eeek! Run list merge "
+			Dprintf("%s(): Eeek! Run list merge "
 					"failed.\n", __FUNCTION__);
 			ntfs_cluster_free_from_rl (vol, rl);
 			free (rl);
@@ -3277,7 +3269,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
 		if (mp_size <= 0) {
 			err = errno;
-			fprintf(stderr, "%s(): Eeek! Get size for mapping "
+			Dprintf("%s(): Eeek! Get size for mapping "
 					"pairs failed.\n", __FUNCTION__);
 			goto rollback;
 		}
@@ -3296,7 +3288,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 		if (mp_size > exp_max_mp_size) {
 			err = ENOTSUP;
-			fprintf(stderr, "%s(): Eeek! Maping pairs size is"
+			Dprintf("%s(): Eeek! Maping pairs size is"
 					" too big.\n", __FUNCTION__);
 			goto rollback;
 		}
@@ -3306,7 +3298,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		mft_rec_copy = malloc(mft_rec_copy_size);
 		if (!mft_rec_copy) {
 			err = ENOMEM;
-			fprintf(stderr, "%s(): Eeek! Not enough memory to "
+			Dprintf("%s(): Eeek! Not enough memory to "
 					"allocate %d bytes.\n", __FUNCTION__,
 					le32_to_cpu(m->bytes_in_use));
 			goto rollback;
@@ -3324,7 +3316,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			new_muse = le32_to_cpu(m->bytes_in_use) -
 					le32_to_cpu(a->length) + new_alen;
 			if (new_muse > le32_to_cpu(m->bytes_allocated)) {
-				fprintf(stderr, "%s(): BUG! Ran out of space in"
+				Dprintf("%s(): BUG! Ran out of space in"
 						" mft record. Please run chkdsk"
 						" and if that doesn't find any "
 						"errors please report you saw "
@@ -3350,7 +3342,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
 				a->mapping_pairs_offset), mp_size, na->rl)) {
 			err = errno;
-			fprintf(stderr, "%s(): BUG!  Mapping pairs build "
+			Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "
 					"that doesn't find any errors please "
 					"report you saw this message to "
@@ -3382,7 +3374,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 rollback:
 	if (ntfs_cluster_free(vol, na, na->allocated_size >>
 					vol->cluster_size_bits, -1) < 0) {
-		fprintf(stderr, "%s(): Eeek!  Leaking clusters.  Run chkdsk!\n",
+		Dprintf("%s(): Eeek!  Leaking clusters.  Run chkdsk!\n",
 				__FUNCTION__);
 		err = EIO;
 	}

@@ -280,7 +280,7 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 	else {
 		/* Abort if mref is > 32 bits. */
 		if (MREF(mref) & 0x0000ffff00000000ull) {
-			fprintf(stderr, "Mft reference exceeds 32 bits!");
+			Dputs("Mft reference exceeds 32 bits!");
 			errno = ERANGE;
 			return -1;
 		}
@@ -298,12 +298,12 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 				NTFS_SECTOR_SIZE + 1);
 	else {
 		m->usa_count = cpu_to_le16(1);
-		fprintf(stderr, "Sector size is bigger than MFT record size. "
-				"Setting usa_count to 1. If Windows\nchkdsk "
+		Dprintf("Sector size is bigger than MFT record size.  "
+				"Setting usa_count to 1.  If Windows\nchkdsk "
 				"reports this as corruption, please email "
 				"linux-ntfs-dev@lists.sf.net\nstating that "
 				"you saw this message and that the file "
-				"system created was corrupt.\nThank you.");
+				"system created was corrupt.\nThank you.\n");
 	}
 	/* Set the update sequence number to 1. */
 	*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = cpu_to_le16(1);
@@ -452,9 +452,8 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	/* Rollback what we did... */
 bitmap_rollback:
 	if (ntfs_bitmap_set_run(vol->mftbmp_na, mft_no, 1))
-		fprintf(stderr, "Eeek! Rollback failed in "
-				"ntfs_mft_record_free(). Leaving inconsistent "
-				"metadata!");
+		Dputs("Eeek! Rollback failed in ntfs_mft_record_free().  "
+				"Leaving inconsistent metadata!");
 sync_rollback:
 	ni->mrec->flags |= MFT_RECORD_IN_USE;
 	ni->mrec->sequence_number = cpu_to_le16(old_seq_no);
