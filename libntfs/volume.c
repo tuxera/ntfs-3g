@@ -592,6 +592,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	vol = ntfs_volume_startup(dev, rwflag);
 	if (!vol) {
 		Dperror("Failed to startup volume");
+		ntfs_device_free (dev);
 		return NULL;
 	}
 
