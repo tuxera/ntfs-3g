@@ -172,7 +172,7 @@
 		ntfs_attr_truncate(). -- WIP
 	- New API functions provided by inode.[hc]:
 		ntfs_inode_mark_dirty(),
-		ntfs_inode_sync(). -- WIP
+		ntfs_inode_sync().
 	- Change ntfs_inode_close() to write out dirty inodes and inode extents.
 	- New API functions provided by lcnalloc.[hc]:
 		ntfs_cluster_{alloc,free}().

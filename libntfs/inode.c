@@ -195,7 +195,8 @@ err_out:
  *
  *	EBUSY	@ni and/or its attribute list runlist is/are dirty and the
  *		attempt to write it/them to disk failed.
- *	EINVAL	@ni is invalid (probably it is an extent inode!)
+ *	EINVAL	@ni is invalid (probably it is an extent inode).
+ *	EIO	I/O error while trying to write inode to disk.
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
@@ -209,7 +210,8 @@ int ntfs_inode_close(ntfs_inode *ni)
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
-			errno = EBUSY;
+			if (errno != EIO)
+				errno = EBUSY;
 			return -1;
 		}
 	}
@@ -326,18 +328,71 @@ err_out:
  * @ni:		ntfs inode to write
  *
  * Write the inode @ni to disk as well as its dirty extent inodes if such
- * exist.
+ * exist and @ni is a base inode. If @ni is an extent inode, only @ni is
+ * written completely disregarding its base inode and any other extent inodes.
+ *
+ * For a base inode with dirty extent inodes if any writes fail for whatever
+ * reason, the failing inode is skipped and the sync process is continued. At
+ * the end the error condition that brought about the failure is returned. Thus
+ * the smallest amount of data loss possible occurs.
  *
  * Return 0 on success or -1 on error with errno set to the error code.
+ * The following error codes are defined:
+ *	EINVAL	- Invalid arguments were passed to the function.
+ *	ENOTSUP	- Syncing requires code that has not been imlemented yet.
+ *	EBUSY	- Inode and/or one of its extents is busy, try again later.
+ *	EIO	- I/O error while writing the inode (or one of its extents).
  */
 int ntfs_inode_sync(ntfs_inode *ni)
 {
+	int err = 0;
+
 	if (!ni) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	errno = ENOTSUP;
+	// TODO: Implement writing out of attribute list attribute. (AIA)
+	if (NInoAttrListDirty(ni)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	/* Write this inode out to the $MFT (and $MFTMirr if applicable). */
+	if (NInoTestAndClearDirty(ni)) {
+		if (ntfs_mft_record_write(ni->vol, ni->mft_no, ni->mrec)) {
+			if (!err || errno == EIO) {
+				err = errno;
+				if (err != EIO)
+					err = EBUSY;
+			}
+		}
+	}
+
+	/* If this is a base inode with extents write all dirty extents, too. */
+	if (ni->nr_extents > 0) {
+		s32 i;
+
+		for (i = 0; i < ni->nr_extents; ++i) {
+			ntfs_inode *eni;
+			
+			eni = ni->extent_nis[i];
+			if (NInoTestAndClearDirty(eni)) {
+				if (ntfs_mft_record_write(eni->vol, eni->mft_no,
+						eni->mrec)) {
+					if (!err || errno == EIO) {
+						err = errno;
+						if (err != EIO)
+							err = EBUSY;
+					}
+				}
+			}
+		}
+	}
+
+	if (!err)
+		return err;
+	errno = err;
 	return -1;
 }
 
