@@ -3810,6 +3810,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	/* Get the first attribute record. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx) {
+		err = errno;
 		if ((na->allocated_size >> vol->cluster_size_bits)
 						!= first_free_vcn)
 			Dprintf("%s(): Coudn't get attribute search context. "
@@ -3817,6 +3818,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		else
 			Dprintf("%s(): Coudn't get attribute search context.\n",
 				 __FUNCTION__);
+		errno = err;
 		return -1;
 	}
 	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
