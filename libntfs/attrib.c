@@ -2764,23 +2764,12 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	 * TODO: Implement the move. For now just abort. (AIA)
 	 */
 	if (a->name_length) {
-		BOOL move_name = FALSE;
-		if (a->non_resident) {
-			if (le16_to_cpu(a->name_offset) >=
-					le16_to_cpu(a->mapping_pairs_offset))
-				move_name = TRUE;
-		} else {
-			if (le16_to_cpu(a->name_offset) >=
-					le16_to_cpu(a->value_offset))
-				move_name = TRUE;
-				
-		}
-		if (move_name) {
+		if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->value_offset)) {
 			// FIXME: Eeek!
-			Dprintf("%s(): Eeek!  Name is placed after the %s.  "
-					"Aborting...\n", __FUNCTION__,
-					a->non_resident ? "mapping pairs array":
-					"attribute value");
+			Dprintf("%s(): Eeek!  Name is placed after the "
+					"attribute value.  Aborting...\n",
+					__FUNCTION__);
 			errno = ENOTSUP;
 			return -1;
 		}
