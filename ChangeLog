@@ -181,6 +181,9 @@
 		ntfs_cluster_{alloc,free}(). -- WIP
 	- New API function provided by bitmap.[hc]:
 		ntfs_bitmap_clear_run(). -- WIP
+	- Extend the volume.h::ntfs_volume structure with variables required by
+	  the cluster and mft allocators and set them up in
+	  volume.c::ntfs_volume_startup().
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
