@@ -49,15 +49,38 @@ fi
 
 # Command-line options.
 AC_ARG_ENABLE(debug,
-	[  --enable-debug          enable debugging], ,
+	AC_HELP_STRING([--enable-debug],[enable additional debugging code and
+			output]), ,
 	enable_debug=no
 )
 
-AC_ARG_ENABLE(really-static,
-	[  --enable-really-static  completely static binaries], ,
-	enable_really_static=no
+# AH_TEMPLATE is needed here because we want to have a template in config.h
+# regardless of whether the option is given or not.
+AH_TEMPLATE([NO_NTFS_DEVICE_DEFAULT_IO_OPS],
+	    [Define this if you do not want the NTFS library to provide default
+	     device io operations.  This means that you cannot use ntfs_mount()
+	     but have to use ntfs_device_mount() and provide your own device
+	     operations.])
+AC_ARG_ENABLE(default-device-io-ops,
+	AC_HELP_STRING([--disable-default-device-io-ops],
+		       [do not provide default device io operations]),
+	if test "$enable_default_device_io_ops" == "no"; then
+		AC_DEFINE(NO_NTFS_DEVICE_DEFAULT_IO_OPS)
+	fi,
 )
 
+AC_ARG_ENABLE(gnome-vfs,
+	AC_HELP_STRING([--disable-gnome-vfs],
+		       [omit Gnome-VFS-2.0 'libntfs' interface
+			(default=detect)]), ,
+	enable_gnome_vfs=auto
+)
+
+AC_ARG_ENABLE(really-static,
+	AC_HELP_STRING([--enable-really-static],[create completely static
+			binaries for the utilities]), ,
+	enable_really_static=no
+)
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
 
 # Enable GNU extensions on systems that have them.
@@ -78,10 +101,7 @@ AC_PROG_LIBTOOL
 # Enable large file support.
 AC_SYS_LARGEFILE
 
-AC_ARG_ENABLE(gnome-vfs,
-	[  --disable-gnome-vfs     Omit Gnome-VFS-2.0 'libntfs' interface (default=detect)], ,
-	enable_gnome_vfs=auto
-)
+# Autodetect whether to build Gnome VFS or not.
 compile_gnome_vfs=false
 if test "$enable_gnome_vfs" != "no"; then
 	# Make compilation work on SuSE 9.0.
@@ -92,9 +112,9 @@ if test "$enable_gnome_vfs" != "no"; then
 	[ compile_gnome_vfs=true ],
 	[
 		if test "$enable_gnome_vfs" = "yes"; then
-			AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
+			AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 libraries.])
 		else
-			AC_MSG_WARN([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
+			AC_MSG_WARN([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 libraries.])
 		fi
 	])
 fi
