@@ -261,7 +261,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			Dprintf("%s(): *byte = 0x%x, need_writeback is set.\n",
 					__FUNCTION__, *byte);
 			/* Reallocate memory if necessary. */
-			if ((rlpos + 2) * sizeof(runlist) >= rlsize) {
+			if ((rlpos + 2) * (int)sizeof(runlist) >= rlsize) {
 				Dprintf("%s(): Reallocating space.\n",
 						__FUNCTION__);
 				/* Setup first free bit return value. */
