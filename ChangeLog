@@ -20,8 +20,10 @@ xx/xx/2004 - 2.0.0-WIP
 	  list.  (Yura)
 	- ntfs_inode_sync: write out dirty attribute list from cache to
 	  disk.  (Yura)
-	- Add @stopped_at parameter to ntfs_mapping_pairs_build() and adapt
-	  all callers.  (Yura)
+	- Add stop_vcn parameter to ntfs_mapping_pairs_build() and adapt
+	  all callers.  This allows filling an attribute extent with mapping
+	  pairs and then continuing in a different extent once the first extent
+	  is full.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
