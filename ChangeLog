@@ -1,3 +1,8 @@
+xx/xx/2004 - 1.9.3-WIP
+
+	- Fix access of MFT_RECORD->bytes_in_use to use le32_to_cpu() instead
+	  of le16_to_cpu() in libntfs/volume.c.  (Pete Curran)
+
 11/05/2004 - 1.9.2 - Decomrpession bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
 	  config.h.in sledge hammers.  (Anton)
