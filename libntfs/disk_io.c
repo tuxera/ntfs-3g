@@ -193,8 +193,8 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
 	 */
 	count = br / bksize;
 	for (i = 0; i < count; ++i)
-		ntfs_post_read_mst_fixup((NTFS_RECORD*)(b + i * bksize),
-				bksize);
+		ntfs_post_read_mst_fixup((NTFS_RECORD*)
+				((u8*)b + i * bksize), bksize);
 	/* Finally, return the number of complete blocks read. */
 	return count;
 }
@@ -244,8 +244,8 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 	for (i = 0; i < count; ++i) {
 		int err;
 
-		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)(b + i * bksize),
-				bksize);
+		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)
+				((u8*)b + i * bksize), bksize);
 		if (err < 0) {
 			/* Abort write at this position. */
 			if (!i)
@@ -258,7 +258,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 	written = ntfs_pwrite(fd, pos, count * bksize, b);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < count; ++i)
-		ntfs_post_write_mst_fixup((NTFS_RECORD*)(b + i * bksize));
+		ntfs_post_write_mst_fixup((NTFS_RECORD*)((u8*)b + i * bksize));
 	if (written <= 0)
 		return written;
 	/* Finally, return the number of complete blocks written. */

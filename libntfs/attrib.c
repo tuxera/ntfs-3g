@@ -687,7 +687,7 @@ res_err_out:
 			/* Update progress counters. */
 			total += to_read;
 			count -= to_read;
-			b += to_read;
+			(u8*)b += to_read;
 			continue;
 		}
 		/* It is a real lcn, read it into @dst. */
@@ -703,7 +703,7 @@ retry:
 		if (br > 0) {
 			total += br;
 			count -= br;
-			b += br;
+			(u8*)b += br;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
@@ -927,7 +927,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				int i;
 				u8 *b2;
 
-				b2 = b + (to_write &
+				b2 = (u8*)b + (to_write &
 						~(sizeof(unsigned long) - 1));
 				for (i = 0; i < cnt; i++) {
 					if (b2[i]) {
@@ -949,7 +949,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			 */
 			total += to_write;
 			count -= to_write;
-			b += to_write;
+			(u8*)b += to_write;
 			continue;
 		}
 		/* It is a real lcn, write it to the volume. */
@@ -965,7 +965,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
-			b += written;
+			(u8*)b += written;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
@@ -1079,7 +1079,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	if (br <= 0)
 		return br;
 	br /= bk_size;
-	for (end = b + br * bk_size; b < end; b += bk_size)
+	for (end = (u8*)b + br * bk_size; b < end; (u8*)b += bk_size)
 		ntfs_post_read_mst_fixup((NTFS_RECORD*)b, bk_size);
 	/* Finally, return the number of blocks read. */
 	return br;
@@ -1133,8 +1133,8 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	for (i = 0; i < bk_cnt; ++i) {
 		int err;
 
-		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)(b + i * bk_size),
-				bk_size);
+		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)
+				((u8*)b + i * bk_size), bk_size);
 		if (err < 0) {
 			/* Abort write at this position. */
 			if (!i)
@@ -1147,7 +1147,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, b);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < bk_cnt; ++i)
-		ntfs_post_write_mst_fixup((NTFS_RECORD*)(b + i * bk_size));
+		ntfs_post_write_mst_fixup((NTFS_RECORD*)((u8*)b + i * bk_size));
 	if (written <= 0)
 		return written;
 	/* Finally, return the number of complete blocks written. */

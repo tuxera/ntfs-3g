@@ -1054,7 +1054,7 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const run_list_element *rl,
 				int i;
 				u8 *b2;
 
-				b2 = b + (to_write &
+				b2 = (u8*)b + (to_write &
 						~(sizeof(unsigned long) - 1));
 				for (i = 0; i < cnt; i++) {
 					if (b2[i])
@@ -1067,7 +1067,7 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const run_list_element *rl,
 			 */
 			total += to_write;
 			count -= to_write;
-			b += to_write;
+			(u8*)b += to_write;
 			continue;
 		}
 		/* It is a real lcn, write it to the volume. */
@@ -1080,7 +1080,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
-			b += written;
+			(u8*)b += written;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
