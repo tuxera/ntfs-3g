@@ -3105,7 +3105,6 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
 		err = errno;
 		if (err == ERANGE) {
-			// FIXME: Eeek!
 			Dprintf("%s(): Eeek!  Size bounds check failed.  "
 					"Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
@@ -3131,7 +3130,6 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		/* Error! If not enough space, just continue. */
 		if (errno != ENOSPC) {
 			err = errno;
-			// FIXME: Eeek!
 			if (err != ENOTSUP)
 				Dprintf("%s(): Eeek!  Failed to resize "
 						"resident part of attribute.  "
@@ -3144,7 +3142,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	/* Make the attribute non-resident if possible. */
 	if (!ntfs_attr_make_non_resident(na, ctx)) {
 		/* Resize non-resident attribute */
-		if (ntfs_attr_truncate (na, newsize)) {
+		if (ntfs_attr_truncate(na, newsize)) {
 			/* 
 			 * Resize failed, but mark inode dirty because we made
 			 * it non-resident.
@@ -3156,16 +3154,56 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		goto resize_done;
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
-		// FIXME: Eeek!
 		Dprintf("%s(): Eeek!  Failed to make attribute non-resident.  "
 				"Aborting...\n", __FUNCTION__);
 		goto put_err_out;
 	}
 
-	// TODO: Try to make other attributes non-resident and retry each time.
+	/* Try to make other attributes non-resident and retry each time. */
+	ntfs_attr_init_search_ctx(ctx, 0, na->ni->mrec);
+	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		ntfs_attr *tna;
+		ATTR_RECORD *a;
+		
+		a = ctx->attr;
+		if (a->non_resident)
+			continue;
 
-	if (na->type == AT_ATTRIBUTE_LIST) {
+		/*
+		 * Check out whether convert is reasonable. Assume that mapping
+		 * pairs will take 8 bytes.
+		 */
+		if (le32_to_cpu(a->length) <= offsetof(ATTR_RECORD,
+				compressed_size) + ((a->name_length *
+				sizeof(ntfschar) + 7) & ~7) + 8)
+			continue;
+
+		tna = ntfs_attr_open(na->ni, a->type, (ntfschar*)((u8*)a +
+				le16_to_cpu(a->name_offset)), a->name_length);
+		if (!tna) {
+			err = errno;
+			Dprintf("%s(): Couldn't open attribute.\n",
+				__FUNCTION__);
+			goto put_err_out;
+		}
+		if (ntfs_attr_make_non_resident(tna, ctx)) {
+			ntfs_attr_close(tna);
+			continue;
+		}
+		ntfs_attr_close(tna);
+		ntfs_attr_put_search_ctx(ctx);
+		return ntfs_resident_attr_resize(na, newsize);
+	}
+	/* Check whether error occured. */
+	if (errno != ENOENT) {
 		err = errno;
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	
+	/* We can't move out attribute list. */
+	if (na->type == AT_ATTRIBUTE_LIST) {
+		err = ENOSPC;
 		goto put_err_out;
 	}
 	
@@ -3174,6 +3212,15 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	 * attribute or modifying it if it is already present.
 	 */
 
+	/* Point search context back to attribute which we need resize. */
+	ntfs_attr_init_search_ctx(ctx, na->ni, 0);
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
+			ctx)) {
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		err = errno;
+		goto put_err_out;
+	}
+	
 	/* Add attribute list if not present. */
 	if (na->ni->nr_extents == -1)
 		ni = na->ni->base_ni;
@@ -3596,7 +3643,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
 	}
-	/* Check wether error occured. */
+	/* Check whether error occured. */
 	if (errno != ENOENT) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
