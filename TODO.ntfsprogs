@@ -69,6 +69,7 @@ Low priority
 - support for compressed files
 - support for internationalisation
 - recover by type?
+- mass undelete (using wildcards)
 - display parent directory
 - name "<none>" to MFTn
 
