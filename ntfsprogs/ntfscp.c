@@ -312,8 +312,18 @@ int main (int argc, char *argv[])
 	}
 	na = ntfs_attr_open(out, opts.attribute, attr_name, attr_name_len);
 	if (!na) {
-		perror("ERROR: Couldn't open attribute");
-		goto close_dst;
+		if (errno != ENOENT) {
+			perror("ERROR: Couldn't open attribute");
+			goto close_dst;
+		}
+		/* Requested attribute isn't present, add it. */
+		na = ntfs_inode_add_attr(out, opts.attribute, attr_name,
+			attr_name_len, 0);
+		if (!na) {
+			perror("ERROR: Couldn't add attribute");
+			goto close_dst;
+		}
+		need_logfile_reset = 1;
 	}
 	
 	Vprintf("Old file size: %lld\n", na->data_size);
