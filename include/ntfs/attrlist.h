@@ -26,8 +26,7 @@
 
 #include "attrib.h"
 
-extern int ntfs_attrlist_entry_add(ntfs_inode *ni, MFT_REF mref,
-		ATTR_RECORD *attr);
+extern int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr);
 
 extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
 
