@@ -76,6 +76,8 @@ libntfs_gnomevfs_la_SOURCES =	\
 gnomevfsmodulesconfdir = $(sysconfdir)/gnome-vfs-2.0/modules
 gnomevfsmodulesconf_DATA = libntfs.conf
 
+man_MANS = libntfs-gnomevfs.8
+
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
 EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in

@@ -179,6 +179,7 @@ AC_CONFIG_FILES([
 	include/Makefile
 	libntfs/Makefile
 	libntfs/libntfs.conf
+	libntfs/libntfs-gnomevfs.8
 	ntfsprogs/Makefile
 	ntfsprogs/mkntfs.8
 	ntfsprogs/ntfscat.8

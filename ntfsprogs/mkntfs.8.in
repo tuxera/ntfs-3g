@@ -225,6 +225,6 @@ is part of the Linux-NTFS project and is available for download from
 http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
 rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
-.BR badblocks(8),
+.BR badblocks (8),
 .BR ntfsprogs (8)
 

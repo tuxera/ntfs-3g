@@ -45,7 +45,7 @@ NTFS Gnome VFS module
 The Gnome virtual filesystem provides universal access to diffent filesystems.
 This modules enables Gnome VFS clients to seamlessly utilize the NTFS library.
 For further details and examples of how to make use of the NTFS Gnome VFS
-module in practice see man 8 ntfsgnomevfs.
+module in practice see man 8 libntfs-gnomevfs.
 
 NTFS utilities
 ==============

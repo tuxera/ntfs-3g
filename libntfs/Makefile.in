@@ -173,13 +173,15 @@ libntfs_gnomevfs_la_SOURCES = \
 gnomevfsmodulesconfdir = $(sysconfdir)/gnome-vfs-2.0/modules
 gnomevfsmodulesconf_DATA = libntfs.conf
 
+man_MANS = libntfs-gnomevfs.8
+
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
 EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 subdir = libntfs
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = libntfs.conf
+CONFIG_CLEAN_FILES = libntfs.conf libntfs-gnomevfs.8
 LTLIBRARIES = $(gnomevfsmoduleslib_LTLIBRARIES) $(lib_LTLIBRARIES)
 
 libntfs_gnomevfs_la_DEPENDENCIES = libntfs.la
@@ -213,9 +215,13 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
+
+NROFF = nroff
+MANS = $(man_MANS)
 DATA = $(gnomevfsmodulesconf_DATA)
 
-DIST_COMMON = Makefile.am Makefile.in libntfs.conf.in
+DIST_COMMON = Makefile.am Makefile.in libntfs-gnomevfs.8.in \
+	libntfs.conf.in
 SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
 
 all: all-am
@@ -228,6 +234,8 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am  $(top_srcdir)/configu
 Makefile: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)
 libntfs.conf: $(top_builddir)/config.status libntfs.conf.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+libntfs-gnomevfs.8: $(top_builddir)/config.status libntfs-gnomevfs.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 gnomevfsmoduleslibLTLIBRARIES_INSTALL = $(INSTALL)
 install-gnomevfsmoduleslibLTLIBRARIES: $(gnomevfsmoduleslib_LTLIBRARIES)
@@ -345,6 +353,49 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool
 uninstall-info-am:
+
+man8dir = $(mandir)/man8
+install-man8: $(man8_MANS) $(man_MANS)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(man8dir)
+	@list='$(man8_MANS) $(dist_man8_MANS) $(nodist_man8_MANS)'; \
+	l2='$(man_MANS) $(dist_man_MANS) $(nodist_man_MANS)'; \
+	for i in $$l2; do \
+	  case "$$i" in \
+	    *.8*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  if test -f $(srcdir)/$$i; then file=$(srcdir)/$$i; \
+	  else file=$$i; fi; \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  case "$$ext" in \
+	    8*) ;; \
+	    *) ext='8' ;; \
+	  esac; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed -e 's/^.*\///'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " $(INSTALL_DATA) $$file $(DESTDIR)$(man8dir)/$$inst"; \
+	  $(INSTALL_DATA) $$file $(DESTDIR)$(man8dir)/$$inst; \
+	done
+uninstall-man8:
+	@$(NORMAL_UNINSTALL)
+	@list='$(man8_MANS) $(dist_man8_MANS) $(nodist_man8_MANS)'; \
+	l2='$(man_MANS) $(dist_man_MANS) $(nodist_man_MANS)'; \
+	for i in $$l2; do \
+	  case "$$i" in \
+	    *.8*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed -e 's/^.*\///'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " rm -f $(DESTDIR)$(man8dir)/$$inst"; \
+	  rm -f $(DESTDIR)$(man8dir)/$$inst; \
+	done
 gnomevfsmodulesconfDATA_INSTALL = $(INSTALL_DATA)
 install-gnomevfsmodulesconfDATA: $(gnomevfsmodulesconf_DATA)
 	@$(NORMAL_INSTALL)
@@ -427,10 +478,10 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(DATA)
+all-am: Makefile $(LTLIBRARIES) $(MANS) $(DATA)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(gnomevfsmoduleslibdir) $(DESTDIR)$(libdir) $(DESTDIR)$(gnomevfsmodulesconfdir)
+	$(mkinstalldirs) $(DESTDIR)$(gnomevfsmoduleslibdir) $(DESTDIR)$(libdir) $(DESTDIR)$(man8dir) $(DESTDIR)$(gnomevfsmodulesconfdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -475,13 +526,13 @@ info: info-am
 info-am:
 
 install-data-am: install-gnomevfsmodulesconfDATA \
-	install-gnomevfsmoduleslibLTLIBRARIES
+	install-gnomevfsmoduleslibLTLIBRARIES install-man
 
 install-exec-am: install-libLTLIBRARIES
 
 install-info: install-info-am
 
-install-man:
+install-man: install-man8
 
 installcheck-am:
 
@@ -496,7 +547,9 @@ mostlyclean-am: mostlyclean-compile mostlyclean-generic \
 
 uninstall-am: uninstall-gnomevfsmodulesconfDATA \
 	uninstall-gnomevfsmoduleslibLTLIBRARIES uninstall-info-am \
-	uninstall-libLTLIBRARIES
+	uninstall-libLTLIBRARIES uninstall-man
+
+uninstall-man: uninstall-man8
 
 .PHONY: GTAGS all all-am check check-am clean clean-generic \
 	clean-gnomevfsmoduleslibLTLIBRARIES clean-libLTLIBRARIES \
@@ -506,13 +559,13 @@ uninstall-am: uninstall-gnomevfsmodulesconfDATA \
 	install-data-am install-exec install-exec-am \
 	install-gnomevfsmodulesconfDATA \
 	install-gnomevfsmoduleslibLTLIBRARIES install-info \
-	install-info-am install-libLTLIBRARIES install-man \
+	install-info-am install-libLTLIBRARIES install-man install-man8 \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
 	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
 	tags uninstall uninstall-am uninstall-gnomevfsmodulesconfDATA \
 	uninstall-gnomevfsmoduleslibLTLIBRARIES uninstall-info-am \
-	uninstall-libLTLIBRARIES
+	uninstall-libLTLIBRARIES uninstall-man uninstall-man8
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
