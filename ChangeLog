@@ -105,6 +105,7 @@ xx/xx/2005 - 2.0.0-WIP
 	  integrate them with mount process.  (Yura)
 	- ntfscp: Added SIGINT (Ctrl+C) handler, improved error handling in
 	  sync failed case.  (Yura)
+	- Fix a nasty runlist merge bug when merging two holes.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
