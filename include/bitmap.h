@@ -23,6 +23,7 @@
 #define _NTFS_BITMAP_H
 
 #include "types.h"
+#include "attrib.h"
 
 /*
  * NOTES:
@@ -98,6 +99,8 @@ static __inline__ char ntfs_bit_get_and_set(u8 *bitmap, const u64 bit,
 		bitmap[bit >> 3] ^= 1 << shift;
 	return old_bit;
 }
+
+extern int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count);
 
 #endif /* defined _NTFS_BITMAP_H */
 
