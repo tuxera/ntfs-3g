@@ -947,9 +947,9 @@ void dump_record (struct ufile *file)
 		if (f->flags & FILE_ATTR_REPARSE_POINT)	Qprintf ("Reparse ");
 		if (f->flags & FILE_ATTR_COMPRESSED)	Qprintf ("Compressed ");
 		if (f->flags & FILE_ATTR_ENCRYPTED)	Qprintf ("Encrypted ");
-		if (!(f->flags & (FILE_ATTR_SYSTEM || FILE_ATTR_DIRECTORY ||
-		    FILE_ATTR_SPARSE_FILE || FILE_ATTR_REPARSE_POINT ||
-		    FILE_ATTR_COMPRESSED || FILE_ATTR_ENCRYPTED))) {
+		if (!(f->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_DIRECTORY |
+		    FILE_ATTR_SPARSE_FILE | FILE_ATTR_REPARSE_POINT |
+		    FILE_ATTR_COMPRESSED | FILE_ATTR_ENCRYPTED))) {
 			Qprintf (NONE);
 		}
 		Qprintf ("\n");
