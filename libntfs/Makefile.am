@@ -26,6 +26,8 @@
 #
 
 LTVERSION = 5:0:0
+LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
+
 
 # Later gcc require -fms-extensions to work.
 if GCC_NEEDS_MS_EXTENSIONS
@@ -61,7 +63,18 @@ libntfs_la_SOURCES =	\
 	unistr.c	\
 	volume.c
 
+gnomevfsmoduleslibdir = $(libdir)/gnome-vfs-2.0/modules
+gnomevfsmoduleslib_LTLIBRARIES = libntfs-gnomevfs.la
+
+libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
+libntfs_gnomevfs_la_SOURCES =	\
+	gnome-vfs-method.c	\
+	gnome-vfs-module.c
+
+gnomevfsmodulesconfdir = $(sysconfdir)/gnome-vfs-2.0/modules
+gnomevfsmodulesconf_DATA = libntfs.conf
+
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST=unix_io.c win32_io.c
+EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 
