@@ -278,10 +278,11 @@ extern int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
 
+extern int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, ATTR_FLAGS flags);
 extern int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
 		ATTR_FLAGS flags);
-
 extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
