@@ -45,19 +45,17 @@ Thanks,
 **************
 
 High priority
-  - support fragmented volumes
+  - support fragmented volumes -- WIP
   - recovery support, journaling
-  - test suite
 
 Medium priority 
-  - easy usage by partitioning tools:
+  - easy usage by partitioning tools -- WIP
   	- move useful things to libntfs
   	- extended error codes at exit()
   	- cleanup at exit()
   - quiet operation 
 
 Low priority
-  - volume enlargement
   - move volume start
   - support disks having bad blocks
 
