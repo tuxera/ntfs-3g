@@ -55,12 +55,6 @@ static ntfs_volume *__ntfs_volume_allocate(void)
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
-	if (v->fd)
-		close(v->fd);
-	if (v->dev_name)
-		free(v->dev_name);
-	if (v->vol_name)
-		free(v->vol_name);
 	if (v->lcnbmp_na)
 		ntfs_attr_close(v->lcnbmp_na);
 	if (v->lcnbmp_ni)
@@ -75,6 +69,14 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		ntfs_attr_close(v->mftmirr_na);
 	if (v->mftmirr_ni)
 		ntfs_inode_close(v->mftmirr_ni);
+	if (v->fd) {
+		fdatasync(v->fd);
+		close(v->fd);
+	}
+	if (v->dev_name)
+		free(v->dev_name);
+	if (v->vol_name)
+		free(v->vol_name);
 	if (v->upcase)
 		free(v->upcase);
 	free(v);
