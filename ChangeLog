@@ -106,6 +106,10 @@ xx/xx/2005 - 2.0.0-WIP
 	- ntfscp: Added SIGINT (Ctrl+C) handler, improved error handling in
 	  sync failed case.  (Yura)
 	- Fix a nasty runlist merge bug when merging two holes.  (Anton)
+	- ntfsfix: empty journal and mark volume dirty for chkdsk if ntfs_mount
+	  failed. This makes read-write mounting of NTFS metadata images 
+	  possible by ntfsprogs and the kernel driver what were created by
+	  versions of ntfsclone previous than 2.0.0. (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
