@@ -24,6 +24,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "compat.h"
+
 #include "bootsect.h"
 #include "debug.h"
 
@@ -190,7 +192,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	/*
 	 * The bounds checks on mft_lcn and mft_mirr_lcn (i.e. them being
 	 * below or equal the number_of_clusters) really belong in the
-	 * is_boot_sector_ntfs but in this way we can just do this once.
+	 * ntfs_boot_sector_is_ntfs but in this way we can just do this once.
 	 */
 	sectors_per_cluster = bs->bpb.sectors_per_cluster;
 	Dprintf("NumberOfSectors = %Li\n", sle64_to_cpu(bs->number_of_sectors));

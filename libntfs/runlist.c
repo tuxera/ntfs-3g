@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include "compat.h"
+
 #include "types.h"
 #include "attrib.h"
 #include "volume.h"
@@ -534,7 +536,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 
 	/* Can't have an entirely unmapped source runlist. */
 	if (!srl[si].length) {
-		Dputs("Eeek! ntfs_merge_runlists() received entirely "
+		Dputs("Eeek! ntfs_runlists_merge() received entirely "
 				"unmapped source runlist.");
 		errno = EINVAL;
 		return NULL;
