@@ -72,16 +72,22 @@ ntfs_volume *ntfs_volume_alloc(void)
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
+	if (v->lcnbmp_ni && NInoDirty(v->lcnbmp_ni))
+		ntfs_inode_sync(v->lcnbmp_ni);
 	if (v->lcnbmp_na)
 		ntfs_attr_close(v->lcnbmp_na);
 	if (v->lcnbmp_ni)
 		ntfs_inode_close(v->lcnbmp_ni);
+	if (v->mft_ni && NInoDirty(v->mft_ni))
+		ntfs_inode_sync(v->mft_ni);
 	if (v->mftbmp_na)
 		ntfs_attr_close(v->mftbmp_na);
 	if (v->mft_na)
 		ntfs_attr_close(v->mft_na);
 	if (v->mft_ni)
 		ntfs_inode_close(v->mft_ni);
+	if (v->mftmirr_ni && NInoDirty(v->mftmirr_ni))
+		ntfs_inode_sync(v->mftmirr_ni);
 	if (v->mftmirr_na)
 		ntfs_attr_close(v->mftmirr_na);
 	if (v->mftmirr_ni)
