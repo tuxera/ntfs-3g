@@ -588,11 +588,42 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buffer,
 	return -1;
 }
 
+/**
+ * ntfs_device_win32_stat - Get a Unix-like stat structure for the file.
+ * @dev:		An NTFS_DEVICE obtained via the open command.
+ * @argp:		A pointer to where to put the output.
+ *
+ * Only st_mode & st_size are filled.
+ *
+ * Return 0 if o.k.
+ *        -errno if not, in this case handle is trashed.
+ */
 static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 {
-	fprintf(stderr, "win32_fstat() unimplemented\n");
-	errno = ENOTSUP;
-	return -1;
+	mode_t st_mode;
+	s64 st_size = 0;
+	int ret;
+
+	switch (GetFileType(((win32_fd *)dev->d_private)->handle)) {
+		case FILE_TYPE_CHAR:
+			st_mode = S_IFCHR;
+		case FILE_TYPE_DISK:
+			st_mode = S_IFBLK;
+		case FILE_TYPE_PIPE:
+			st_mode = S_IFIFO;
+		default:
+			st_mode = 0;
+	}
+
+	ret = ntfs_win32_getsize(dev,&st_size);
+	if (ret)
+		Dprintf("ntfs_device_win32_stat(): getsize failed");
+
+	memset(buf,0,sizeof (struct stat));
+	buf->st_mode = st_mode;
+	buf->st_size = st_size;
+
+	return 0;
 }
 
 /**
