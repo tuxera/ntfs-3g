@@ -57,6 +57,7 @@ static void version (void)
 	printf ("\n%s v%s - Overwrite the unused space on an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
 	printf ("Copyright (c) 2002-2003 Richard Russon\n");
+	printf ("Copyright (c) 2004 Yura Pakhuchiy\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -348,8 +349,9 @@ static int parse_options (int argc, char *argv[])
  *
  * Read $Bitmap and wipe any clusters that are marked as not in use.
  *
- * Return:  1  Success, the clusters were wiped
- *	    0  Error, something went wrong
+ * Return: >0  Success, the atrribute was wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
  */
 static s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 {
@@ -625,8 +627,9 @@ close_inode:
  * MFT Records are 1024 bytes long, but some of this space isn't used.  Wipe any
  * unused space at the end of the record and wipe any unused records.
  *
- * Return:  1  Success, the clusters were wiped
- *	    0  Error, something went wrong
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
  */
 static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
@@ -755,8 +758,9 @@ free:
  * Directories are kept in sorted B+ Trees.  Index blocks may not be full.  Wipe
  * the unused space at the ends of these blocks.
  *
- * Return:  1  Success, the clusters were wiped
- *	    0  Error, something went wrong
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
  */
 static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
@@ -775,8 +779,9 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
  * The logfile journals the metadata to give the volume fault-tolerance.  If the
  * volume is in a consistant state, then this information can be erased.
  *
- * Return:  1  Success, the clusters were wiped
- *	    0  Error, something went wrong
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
  */
 static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 {
@@ -834,91 +839,7 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 		goto io_error_exit;
 	}
 
-	/* Fill the buffer with 0xff's. */
-	memset(buf, -1, NTFS_BUF_SIZE2);
-
-	/* Set the $DATA attribute. */
-	pos = 0;
-	while ((count = len - pos) > 0) {
-		if (count > NTFS_BUF_SIZE2)
-			count = NTFS_BUF_SIZE2;
-
-		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
-			Dprintf("Failed to set the $LogFile attribute value.");
-			if (count != -1)
-				errno = EIO;
-			goto io_error_exit;
-		}
-
-		pos += count;
-	}
-
-	ntfs_attr_close(na);
-	return ntfs_inode_close(ni);
-
-io_error_exit:
-	eo = errno;
-	ntfs_attr_close(na);
-	errno = eo;
-error_exit:
-	eo = errno;
-	ntfs_inode_close(ni);
-	errno = eo;
-	return -1;
-	return 0;
-}
-
-/**
- * wipe_pagefile - Wipe the pagefile (swap space)
- * @vol:   An ntfs volume obtained from ntfs_mount
- * @byte:  Overwrite with this value
- *
- * pagefile.sys is used by Windows as extra virtual memory (swap space).
- * Windows recreates the file at bootup, so it can be wiped without harm.
- *
- * Return:  1  Success, the clusters were wiped
- *	    0  Error, something went wrong
- */
-static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
-{
-	// wipe completely, chkdsk doesn't do anything, booting writes header
-	const int NTFS_BUF_SIZE2 = 4096;
-	ntfs_inode *ni;
-	ntfs_attr *na;
-	s64 len, pos, count;
-	char buf[NTFS_BUF_SIZE2];
-	int eo;
-
-	if (!vol || (byte < 0))
-		return -1;
-
-	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
-	
-	ni = utils_pathname_to_inode (vol, NULL, "pagefile.sys");
-	if (!ni) {
-		Dprintf("Failed to open inode FILE_LogFile.\n");
-		return -1;
-	}
-
-	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
-		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
-		goto error_exit;
-	}
-
-	/* The $DATA attribute of the $LogFile has to be non-resident. */
-	if (!NAttrNonResident(na)) {
-		Dprintf("$LogFile $DATA attribute is resident!?!\n");
-		errno = EIO;
-		goto io_error_exit;
-	}
-
-	/* Get length of $LogFile contents. */
-	len = na->data_size;
-	if (!len) {
-		Dprintf("$LogFile has zero length, no disk write needed.\n");
-		return 0;
-	}
-
+	/* Fill the buffer with @byte's. */
 	memset(buf, byte, NTFS_BUF_SIZE2);
 
 	/* Set the $DATA attribute. */
@@ -938,7 +859,95 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 	}
 
 	ntfs_attr_close(na);
-	return ntfs_inode_close(ni);
+	ntfs_inode_close(ni);
+	Qprintf ("wipe_logfile 0x%02x, %lld bytes\n", byte, pos);
+	return pos;
+
+io_error_exit:
+	eo = errno;
+	ntfs_attr_close(na);
+	errno = eo;
+error_exit:
+	eo = errno;
+	ntfs_inode_close(ni);
+	errno = eo;
+	return -1;
+}
+
+/**
+ * wipe_pagefile - Wipe the pagefile (swap space)
+ * @vol:   An ntfs volume obtained from ntfs_mount
+ * @byte:  Overwrite with this value
+ *
+ * pagefile.sys is used by Windows as extra virtual memory (swap space).
+ * Windows recreates the file at bootup, so it can be wiped without harm.
+ *
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
+ */
+static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
+{
+	// wipe completely, chkdsk doesn't do anything, booting writes header
+	const int NTFS_BUF_SIZE2 = 4096;
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	s64 len, pos, count;
+	char buf[NTFS_BUF_SIZE2];
+	int eo;
+
+	if (!vol || (byte < 0))
+		return -1;
+
+	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
+	
+	ni = utils_pathname_to_inode (vol, NULL, "pagefile.sys");
+	if (!ni) {
+		Dprintf("Failed to open inode of pagefile.sys.\n");
+		return 0;
+	}
+
+	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+		Dprintf("Failed to open pagefile.sys/$DATA\n");
+		goto error_exit;
+	}
+
+	/* The $DATA attribute of the pagefile.sys has to be non-resident. */
+	if (!NAttrNonResident(na)) {
+		Dprintf("pagefile.sys $DATA attribute is resident!?!\n");
+		errno = EIO;
+		goto io_error_exit;
+	}
+
+	/* Get length of pagfile.sys contents. */
+	len = na->data_size;
+	if (!len) {
+		Dprintf("pagefile.sys has zero length, no disk write needed.\n");
+		return 0;
+	}
+
+	memset(buf, byte, NTFS_BUF_SIZE2);
+
+	/* Set the $DATA attribute. */
+	pos = 0;
+	while ((count = len - pos) > 0) {
+		if (count > NTFS_BUF_SIZE2)
+			count = NTFS_BUF_SIZE2;
+
+		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
+			Dprintf("Failed to set the pagefile.sys attribute value.");
+			if (count != -1)
+				errno = EIO;
+			goto io_error_exit;
+		}
+
+		pos += count;
+	}
+
+	ntfs_attr_close(na);
+	ntfs_inode_close(ni);
+	Qprintf ("wipe_pagefile 0x%02x, %lld bytes\n", byte, pos);
+	return pos;
 
 io_error_exit:
 	eo = errno;
@@ -961,6 +970,7 @@ error_exit:
  * Return:  1  Success, displayed some info
  *	    0  Error, something went wrong
  */
+#if 0
 static int ntfs_info (ntfs_volume *vol)
 {
 	u8 *buffer;
@@ -1128,6 +1138,7 @@ bmpdone:
 
 	return 1;
 }
+#endif
 
 /**
  * print_summary - Tell the user what we are about to do
@@ -1220,7 +1231,7 @@ int main (int argc, char *argv[])
 		sleep (5);
 	}
 
-	if (0)
+#if 0
 	{
 		int i = 0;
 		runlist_element *rl = vol->mft_na->rl;
@@ -1234,6 +1245,7 @@ int main (int argc, char *argv[])
 				(long long)rl->lcn, (long long)rl->length);
 		return 0;
 	}
+#endif
 
 	printf ("\n");
 	for (i = 0; i < opts.count; i++) {
@@ -1297,6 +1309,12 @@ int main (int argc, char *argv[])
 
 		printf ("%lld bytes were wiped\n", (long long)total);
 	}
+	
+	if (opts.logfile && (opts.bytes[j - 1] != 0xFF) && (act != act_info)) {
+		printf ("Fixing logfile: ");
+		wipe_logfile (vol, 0xFF, act);
+	}
+
 
 	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
 		Eprintf ("Couldn't mark volume dirty\n");
