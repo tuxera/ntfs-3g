@@ -11,9 +11,6 @@ xx/xx/2004 - 2.0.0-WIP
 	  error, because $INDEX_ALLOCATION can't be resident.  (Yura)
 	- ntfscp: Not longer update $FILE_NAME attributes, because Windows
 	  doesn't update them unless a rename operation occur.  (Yura)
-	- Improvement to ntfs_non_resident_attr_expand: expand multi extent
-	  attributes if we don't need to allocate new mft records to perform
-	  this.  (Yura)
 	- ntfsinfo: dump attribute list entries in verbose mode and display
 	  attribute instance of all attributes.  (Yura)
 	- new API: attrlist.[ch]::ntfs_attrlist_entry_add add entry to
@@ -37,6 +34,15 @@ xx/xx/2004 - 2.0.0-WIP
 	  update the attribute list attribute if present.  (Anton)
 	- Add the useful offsetof() macro to ntfs/support.h which returns the
 	  offset of a structure element.  (Anton)
+	- New API: attrib.[ch]::ntfs_make_room_for_attr (it is ported from
+	  mkntfs).  (Yura)
+	- New API: attrib.[ch]::ntfs_non_resident_attr_record_add() and
+	  attrib.[ch]::ntfs_attr_record_rm(). This is low-level functions to
+	  manipulate attribute extents.  (Yura)
+	- Improvement to ntfs_non_resident_attr_expand: now it can expand multi
+	  extent attributes and allocate new MFT records if mapping mapirs
+	  doesn't fit current.  (Yura)
+	- Implement attrlist.[ch]::ntfs_attrlist_entry_rm().  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
