@@ -210,8 +210,8 @@ struct _ntfs_attr {
  * structure.
  */
 typedef union {
-	u8;	/* Unnamed u8 to serve as default when just using
-		   a_val without specifying any of the below. */
+	u8 _default;	/* Unnamed u8 to serve as default when just using
+			   a_val without specifying any of the below. */
 	STANDARD_INFORMATION std_inf;
 	ATTR_LIST_ENTRY al_entry;
 	FILE_NAME_ATTR filename;
