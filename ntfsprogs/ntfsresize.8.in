@@ -48,7 +48,7 @@ underlying partition first. This can be done using
 by deleting the partition and recreating it with a larger size.
 Then  you may use
 .B ntfsresize
-to shrink the size of the filesystem.
+to enlarge the size of the filesystem.
 .PP
 If you wish to shrink an NTFS partition, first use
 .B ntfsresize
@@ -62,9 +62,12 @@ When recreating the partition with
 .BR fdisk (8)
 make sure you create it with the same starting
 disk cylinder and partition type
-as before. If you shrink a partition also make sure you do not make 
-it smaller than the new size
-of the NTFS filesystem! Otherwise you may lose your entire filesystem.
+as before. 
+If you enlarge a partition make sure it will not overlap with 
+an other existing partition!
+If you shrink a partition, do not make 
+it smaller than the new size of the NTFS filesystem! 
+Otherwise you may lose your entire filesystem.
 Also make sure you set the bootable flag for the partition if it
 existed before. Failing to do so you might not be able to boot your
 computer from the disk!
