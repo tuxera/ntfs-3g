@@ -162,6 +162,7 @@
 	  to the closing of the base inode to dispose of all the extent inodes.
 	- Add sanity check to ntfs_inode_close() to detect attempts at closing
 	  extent inodes.
+	- Don't free extent inodes in attrib.c! (Szakacsits Szabolcs)
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for

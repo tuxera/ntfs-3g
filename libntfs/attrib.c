@@ -1559,9 +1559,6 @@ is_enumeration:
 				break;
 			}
 		} else { /* Mft references do not match. */
-			/* If there is a mapped extent inode unmap it first. */
-			if (ni != base_ni)
-				ntfs_inode_close(ni);
 			/* Do we want the base record back? */
 			if (MREF_LE(al_entry->mft_reference) ==
 					base_ni->mft_no) {
@@ -1642,8 +1639,6 @@ do_next_attr:
 		goto do_next_attr_loop;
 	}
 	if (ni != base_ni) {
-		if (ni)
-			ntfs_inode_close(ni);
 		ctx->ntfs_ino = base_ni;
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
