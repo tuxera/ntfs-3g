@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
+SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -41,8 +41,8 @@ bin_PROGRAMS = ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT) ntfscluster$(EXEEXT) \
 	ntfsls$(EXEEXT) ntfscat$(EXEEXT)
 sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 	ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT) ntfsclone$(EXEEXT)
-EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) dumplog$(EXEEXT) \
-	ntfswipe$(EXEEXT) ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT)
+EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) ntfswipe$(EXEEXT) \
+	ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT)
 subdir = ntfsprogs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/mkntfs.8.in $(srcdir)/ntfscat.8.in \
@@ -64,16 +64,13 @@ am__installdirs = $(DESTDIR)$(bindir) $(DESTDIR)$(sbindir) $(DESTDIR)$(man8dir)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(sbin_PROGRAMS)
-am_dumplog_OBJECTS = dumplog.$(OBJEXT)
-dumplog_OBJECTS = $(am_dumplog_OBJECTS)
+am_mkntfs_OBJECTS = attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
+	sd.$(OBJEXT) mkntfs.$(OBJEXT) utils.$(OBJEXT)
+mkntfs_OBJECTS = $(am_mkntfs_OBJECTS)
 @REALLYSTATIC_FALSE@am__DEPENDENCIES_1 =  \
 @REALLYSTATIC_FALSE@	$(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@am__DEPENDENCIES_1 =  \
 @REALLYSTATIC_TRUE@	$(top_srcdir)/libntfs/.libs/libntfs.a
-dumplog_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_mkntfs_OBJECTS = attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
-	sd.$(OBJEXT) mkntfs.$(OBJEXT) utils.$(OBJEXT)
-mkntfs_OBJECTS = $(am_mkntfs_OBJECTS)
 mkntfs_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfscat_OBJECTS = ntfscat.$(OBJEXT) utils.$(OBJEXT)
 ntfscat_OBJECTS = $(am_ntfscat_OBJECTS)
@@ -120,9 +117,8 @@ DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrdef.Po ./$(DEPDIR)/boot.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/cluster.Po ./$(DEPDIR)/dumplog.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/mkntfs.Po ./$(DEPDIR)/ntfscat.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/ntfsclone.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/cluster.Po ./$(DEPDIR)/mkntfs.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/ntfscat.Po ./$(DEPDIR)/ntfsclone.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfscluster.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsdump_logfile.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/ntfsfix.Po ./$(DEPDIR)/ntfsinfo.Po \
@@ -138,14 +134,13 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) \
 	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
 	$(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
-SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
-	$(ntfsclone_SOURCES) $(ntfscluster_SOURCES) \
-	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
-	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) \
+SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) \
+	$(ntfscluster_SOURCES) $(ntfsdump_logfile_SOURCES) \
+	$(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) \
+	$(ntfsls_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
-DIST_SOURCES = $(dumplog_SOURCES) $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
+DIST_SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
 	$(ntfsclone_SOURCES) $(ntfscluster_SOURCES) \
 	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
 	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
@@ -329,9 +324,6 @@ ntfswipe_LDFLAGS = $(AM_LFLAGS)
 ntfsdump_logfile_SOURCES = ntfsdump_logfile.c
 ntfsdump_logfile_LDADD = $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS = $(AM_LFLAGS)
-dumplog_SOURCES = dumplog.c
-dumplog_LDADD = $(AM_LIBS)
-dumplog_LDFLAGS = $(AM_LFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -443,9 +435,6 @@ clean-sbinPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
-dumplog$(EXEEXT): $(dumplog_OBJECTS) $(dumplog_DEPENDENCIES) 
-	@rm -f dumplog$(EXEEXT)
-	$(LINK) $(dumplog_LDFLAGS) $(dumplog_OBJECTS) $(dumplog_LDADD) $(LIBS)
 mkntfs$(EXEEXT): $(mkntfs_OBJECTS) $(mkntfs_DEPENDENCIES) 
 	@rm -f mkntfs$(EXEEXT)
 	$(LINK) $(mkntfs_LDFLAGS) $(mkntfs_OBJECTS) $(mkntfs_LDADD) $(LIBS)
@@ -498,7 +487,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/attrdef.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/boot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cluster.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dumplog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mkntfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfscat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsclone.Po@am__quote@
