@@ -29,7 +29,7 @@ linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 # Set the include path.
 AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
 
-ntfsfix_SOURCES		= ntfsfix.c
+ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)
 ntfsfix_LDFLAGS		= $(AM_LFLAGS)
 
