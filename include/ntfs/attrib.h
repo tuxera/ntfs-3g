@@ -295,6 +295,10 @@ extern int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ATTR_FLAGS flags);
 extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 
+extern ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, s64 size);
+extern int ntfs_attr_rm(ntfs_attr *na);
+
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
 
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
@@ -306,11 +310,6 @@ extern int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra);
 extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na);
 
 extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
-
-extern ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, s64 size);
-
-extern int ntfs_inode_rm_attr(ntfs_attr *na);
 
 // FIXME / TODO: Above here the file is cleaned up. (AIA)
 /**

@@ -317,8 +317,8 @@ int main (int argc, char *argv[])
 			goto close_dst;
 		}
 		/* Requested attribute isn't present, add it. */
-		na = ntfs_inode_add_attr(out, opts.attribute, attr_name,
-			attr_name_len, 0);
+		na = ntfs_attr_add(out, opts.attribute, attr_name,
+				attr_name_len, 0);
 		if (!na) {
 			perror("ERROR: Couldn't add attribute");
 			goto close_dst;
