@@ -2522,6 +2522,9 @@ put_err_out:
  */
 static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 {
+	ntfs_volume *vol = na->ni->vol;
+	ATTR_REC *a = ctx->attr;
+
 	/* Some preliminary sanity checking. */
 	if (!NAttrNonResident(na)) {
 		// FIXME: Eeek!
