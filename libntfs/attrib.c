@@ -1668,7 +1668,7 @@ find_attr_list_attr:
 			/* Not found?!? Absurd! Must be a bug... )-: */
 			Dprintf("%s(): BUG! Attribute list attribute not found "
 					"but it exists! Returning error "
-					"(EINVAL).", __FUNCTION__);
+					"(EINVAL).\n", __FUNCTION__);
 			errno = EINVAL;
 			return -1;
 		}
@@ -2636,6 +2636,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 					"Couldn't free clusters from attribute "
 					"list runlist. Succeed anyway.\n",
 					 __FUNCTION__);
+				return 0;
 			}
 		}
 		/* Remove attribute record itself. */
@@ -2790,8 +2791,9 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 	}
 
 	Dprintf("%s(): Entering for ctx->attr->type 0x%x, ctx->ntfs_ino->mft_no"
-		" 0x%llx, ni->mft_no 0x%llx.\n", __FUNCTION__, ctx->attr->type,
-		(long long) ctx->ntfs_ino->mft_no, (long long) ni->mft_no);
+		" 0x%llx, ni->mft_no 0x%llx.\n", __FUNCTION__, (unsigned)
+		le32_to_cpu(ctx->attr->type), (long long) ctx->ntfs_ino->mft_no,
+		(long long) ni->mft_no);
 
 	if (ctx->ntfs_ino == ni)
 		return 0;
@@ -2855,6 +2857,89 @@ put_err_out:
 	ntfs_attr_put_search_ctx(nctx);
 	errno = err;
 	return -1;
+}
+
+/**
+ * ntfs_attr_record_move_away - move away attribute record from it's mft record
+ * @ctx:	attribute search context describing the attrubute record
+ *
+ * If this function succeed, user should reinit search context if he/she wants
+ * use it anymore.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx)
+{
+	ntfs_inode *base_ni, *ni;
+	MFT_RECORD *m;
+	int i, err;
+
+	if (!ctx || !ctx->attr || !ctx->ntfs_ino) {
+		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for attr 0x%x, inode 0x%llx.\n", __FUNCTION__,
+			(unsigned) le32_to_cpu(ctx->attr->type),
+			(long long) ctx->ntfs_ino->mft_no);
+	
+	if (ctx->ntfs_ino->nr_extents == -1)
+		base_ni = ctx->base_ntfs_ino;
+	else
+		base_ni = ctx->ntfs_ino;
+
+	if (!NInoAttrList(base_ni)) {
+		Dprintf("%s(): Inode should contain attribute list to use "
+			"this function.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (ntfs_inode_attach_all_extents(ctx->ntfs_ino)) {
+		err = errno;
+		Dprintf("%s(): Couldn't attach extent inode.\n", __FUNCTION__);
+		errno = err;
+		return -1;
+	}
+
+	/* Walk through all extents and try to move attribute to them. */
+	for (i = 0; i < base_ni->nr_extents; i++) {
+		ni = base_ni->extent_nis[i];
+		m = ni->mrec;
+
+		if (ctx->ntfs_ino->mft_no == ni->mft_no)
+			continue;
+
+		if (le32_to_cpu(m->bytes_allocated) -
+				le32_to_cpu(m->bytes_in_use) <
+				le32_to_cpu(ctx->attr->length))
+			continue;
+
+		if (!ntfs_attr_record_move_to(ctx, ni))
+			return 0;
+	}
+
+	/* 
+	 * Failed to move attribute to one of the current extents, so allocate
+	 * new extent and move attribute to it.
+	 */
+	ni = ntfs_mft_record_alloc(base_ni->vol, base_ni);
+	if (!ni) {
+		err = errno;
+		Dprintf("%s(): Couldn't allocate new MFT record.\n",
+			__FUNCTION__);
+		errno = err;
+		return -1;
+	}
+	if (ntfs_attr_record_move_to(ctx, ni)) {
+		err = errno;
+		Dprintf("%s(): Couldn't move attribute to new MFT record.\n",
+			__FUNCTION__);
+		errno = err;
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -3227,7 +3312,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		ni = na->ni->base_ni;
 	else
 		ni = na->ni;
-	if (!NInoAttrList(na->ni)) {
+	if (!NInoAttrList(ni)) {
 		ntfs_attr_put_search_ctx(ctx);	
 		if (ntfs_inode_add_attrlist(ni))
 			return -1;
@@ -3569,11 +3654,24 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		if (mp_size > exp_max_mp_size) {
 			/*
 			 * Mapping pairs of $ATTRIBUTE_LIST attribute must fit
-			 * in the base mft record.
+			 * in the base mft record. Try to move out other
+			 * attibutes and try again.
 			 */
 			if (na->type == AT_ATTRIBUTE_LIST) {
-				err = ENOSPC;
-				goto put_err_out;
+				ntfs_attr_put_search_ctx(ctx);
+				if (ntfs_inode_free_space(na->ni, mp_size -
+							exp_max_mp_size)) {
+					if (errno != ENOSPC)
+						return -1;
+					Dprintf("%s(): Attribute list mapping "
+						"pairs size to big, can't fit "
+						"them in the base MFT record. "
+						"Defragment volume and try "
+						"once again.\n", __FUNCTION__);
+					errno = ENOSPC;
+					return -1;
+				}
+				return ntfs_attr_update_mapping_pairs(na);
 			}
 
 			/* Add attribute list if it isn't present, and retry. */
