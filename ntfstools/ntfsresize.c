@@ -70,7 +70,6 @@ struct {
 	int ro_flag;
 	int force;
 	int info;
-	s64 size;
 	s64 bytes;
 	char *volume;
 } opt;
@@ -147,10 +146,9 @@ int perr_exit(const char *fmt, ...)
 void usage()
 {
 	printf("\n");
-	printf ("Usage: %s [-fhin] [-c clusters] [-s size[k|M|G]] device\n", EXEC_NAME);
+	printf ("Usage: %s [-fhin] [-s size[k|M|G]] device\n", EXEC_NAME);
 	printf("Shrink a defragmented NTFS volume.\n");
 	printf("\n");
-	printf ("   -c clusters     Shrink volume to size given in NTFS clusters\n");
 	Dprintf("   -d              Show debug information\n");
 	printf ("   -f              Force to progress (DANGEROUS)\n");
 	printf ("   -h              This help text\n");
@@ -234,13 +232,8 @@ void parse_options(int argc, char **argv)
 
 	memset(&opt, 0, sizeof(opt));
 
-	while ((i = getopt(argc, argv, "c:dfhins:")) != EOF)
+	while ((i = getopt(argc, argv, "dfhins:")) != EOF)
 		switch (i) {
-		case 'c':
-			opt.size = strtoll(optarg, &s, 0);
-			if (*s || opt.size <= 0 || errno == ERANGE)
-				err_exit("Illegal number of clusters!\n");
-			break;
 		case 'd':
 			opt.debug = 1;
 			break;
@@ -276,20 +269,14 @@ void parse_options(int argc, char **argv)
 			perr_exit("Couldn't open /dev/null");
 
 
-	if (opt.size && opt.bytes) {
-		printf(NERR_PREFIX "It makes no sense to use "
-		       "-c and -s together.\n");
-		usage();
-	}
-
-	/* If no '-c clusters' then estimate smallest shrunken volume size */
-	if (!opt.size && !opt.bytes)
+	/* If no '-s size' then estimate smallest shrunken volume size */
+	if (!opt.bytes)
 		opt.info = 1;
 
 	if (opt.info) {
-		if (opt.size || opt.bytes) {
+		if (opt.bytes) {
 			printf(NERR_PREFIX "It makes no sense to use -i and "
-				"-%c together.\n", opt.size ? 'c' : 's');
+				"-s together.\n");
 			usage();
 		}
 		opt.ro_flag = MS_RDONLY;
@@ -457,7 +444,7 @@ void walk_inodes()
 
 void advise_on_resize()
 {
-	u64 i;
+	u64 i, old_b, new_b, g_b, old_mb, new_mb, g_mb;
 
 	for (i = vol->nr_clusters - 1; i > 0; i--)
 		if (ntfs_get_bit(lcn_bitmap.bm, i))
@@ -474,8 +461,26 @@ void advise_on_resize()
 	if (!opt.info)
 		printf(NERR_PREFIX "However, ");
 
-	printf("You could resize at cluster %lld gaining %lld MB.\n",
-	       i, ((vol->nr_clusters - i) * vol->cluster_size) / NTFS_MBYTE);
+	old_b = vol->nr_clusters * vol->cluster_size;
+	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
+	new_b = i * vol->cluster_size;
+	new_mb = rounded_up_division(new_b, NTFS_MBYTE);
+	g_b = (vol->nr_clusters - i) * vol->cluster_size;
+	g_mb = g_b / NTFS_MBYTE;
+	
+	printf("You could resize at %lld bytes ", new_b);
+	
+	if ((new_mb * NTFS_MBYTE) < old_b)
+		printf("or %lld MB ", new_mb);
+	
+	printf("(gaining ");
+	
+	if (g_mb && (old_mb - new_mb))
+	    printf("%lld MB", old_mb - new_mb);
+	else
+	    printf("%lld bytes", g_b);
+
+	printf(").\n");
 	exit(1);
 }
 
@@ -798,7 +803,7 @@ void mount_volume()
 	if (ntfs_is_version_supported(vol))
 		perr_exit("Unknown NTFS version"); 
 
-	printf("Cluster size       : %u\n", vol->cluster_size);
+	Dprintf("Cluster size       : %u\n", vol->cluster_size);
 	print_volume_size("Current volume size", vol, vol->nr_clusters);
 }
 
@@ -834,14 +839,12 @@ int main(int argc, char **argv)
 	
 	mount_volume();
 
-	if (opt.size || opt.bytes) {
+	if (opt.bytes) {
 		/* Take the integer part: when shrinking we don't want 
 		   to make the volume to be bigger than requested.
 		   Later on we will also decrease this value to save
 		   room for the backup boot sector */
 		new_volume_size = opt.bytes / vol->cluster_size;
-		if (opt.size)
-			new_volume_size = opt.size;
 		print_volume_size("New volume size    ", vol, new_volume_size);
 	}
 
