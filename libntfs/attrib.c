@@ -2037,7 +2037,6 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 
 /**
  * ntfs_attr_get_search_ctx - allocate/initialize a new attribute search context
- * @ctx:	address of pointer in which to return the new search context
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
  *
@@ -2285,7 +2284,7 @@ static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  * @flags:		
  *
  * Return offset to attribute from the beginning of the mft record on success
- * and NULL on error. On error the error code is stored in errno.
+ * and -1 on error. On error the error code is stored in errno.
  * Possible error codes are:
  *	EINVAL -
  *	EEXIST -
@@ -2379,6 +2378,86 @@ put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
+}
+
+/**
+ * ntfs_attr_record_rm - 
+ * @ctx:	
+ *
+ * User should reinit search context after use of this function if he/she wants
+ * use it anymore.
+ *
+ * Return 0 on success and -1 on error. On error the error code is stored in
+ * errno. Possible error codes are:
+ *	EINVAL - 
+ *	EIO - 
+ */
+int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
+	ntfs_inode *base_ni, *ni;
+	ATTR_TYPES type;
+	int err;
+	
+	if (!ctx || !ctx->ntfs_ino || !ctx->mrec || !ctx->attr) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
+			"%lld.\n", __FUNCTION__, ctx->ntfs_ino->mft_no,
+			le32_to_cpu(ctx->attr->type),
+			le64_to_cpu(ctx->attr->lowest_vcn));
+	type = ctx->attr->type;
+	ni = ctx->ntfs_ino;
+	if (ctx->base_ntfs_ino)
+		base_ni = ctx->base_ntfs_ino;
+	else
+		base_ni = ctx->ntfs_ino;
+	/*
+	 * Remove record from $ATTRIBUTE_LIST if present and we don't want
+	 * delete $ATTRIBUTE_LIST itself.
+	 */
+	if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST) {
+		if (ntfs_attrlist_entry_rm(ctx)) {
+			err = errno;
+			Dprintf("%s(): Coudn't delete record from "
+				"$ATTRIBUTE_LIST.\n",  __FUNCTION__);
+			errno = err;
+			return -1;
+		}
+	}
+	if (ntfs_attr_record_resize(ctx->mrec, ctx->attr, 0)) {
+		Dprintf("%s(): Coudn't remove attribute record. Bug or "
+			"damaged MFT record.\n", __FUNCTION__);
+		if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST)
+			if (ntfs_attrlist_entry_add(ni, ctx->attr))
+				Dprintf("%s(): Rollback failed. Leaving "
+					"inconsist metadata.\n", __FUNCTION__);
+		err = EIO;
+		return -1;
+	}
+	ntfs_inode_mark_dirty(ni);
+	if (type == AT_ATTRIBUTE_LIST) {
+		NInoClearAttrList(base_ni);
+		free(base_ni->attr_list);
+		free(base_ni->attr_list_rl);
+	}
+	if (le32_to_cpu(ctx->mrec->bytes_in_use) -
+			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
+		if (ntfs_mft_record_free(ni->vol, ni)) {
+			// FIXME: We need rollback here.
+			Dprintf("%s(): Coudn't free MFT record.\n",
+					__FUNCTION__);
+			errno = EIO;
+			return -1;
+		}
+		/* Remove done if we freed base inode. */
+		if (ni == base_ni)
+			return 0;
+	}
+	if (type == AT_ATTRIBUTE_LIST || !NInoAttrList(base_ni))
+		return 0;
+	// FIXME: Remove $ATTRIBUTE_LIST if no extents left or it is size == 0.
+	return 0;
 }
 
 /**
@@ -3582,20 +3661,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				first_free_vcn) {
 			Dprintf("%s(): Trying perform rollback.\n",
 					__FUNCTION__);
-			ntfs_attr_reinit_search_ctx(ctx);
-			if (ntfs_attr_lookup(na->type, na->name, na->name_len,
-					0, (na->allocated_size >>
-					vol->cluster_size_bits) - 1,
-					NULL, 0, ctx)) {
-				Dprintf("%s(): Eeek! Rollback failed. "
-						"Run chkdsk.\n", __FUNCTION__);
-				err = errno;
-				if (err == ENOENT)
-					err = EIO;
-				goto put_err_out;
-			}
-			a = ctx->attr;
-			m = ctx->mrec;
 			goto rollback;
 		} else
 			goto put_err_out;
@@ -3610,6 +3675,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Update the attribute record and the ntfs attribute structure. */
 	na->data_size = newsize;
 	a->data_size = scpu_to_le64(newsize);
+	na->initialized_size = newsize;
+	a->initialized_size = scpu_to_le64(newsize);
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
@@ -3632,6 +3699,57 @@ rollback:
 		free(na->rl);
 		na->rl = NULL;
 	}
+	ntfs_attr_reinit_search_ctx(ctx);
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
+			(na->allocated_size >> vol->cluster_size_bits) - 1,
+			 NULL, 0, ctx)) {
+		Dprintf("%s(): Eeek! Rollback failed. Run chkdsk.\n",
+				__FUNCTION__);
+		goto put_err_out;
+	}
+	a = ctx->attr;
+	m = ctx->mrec;
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 
+					sle64_to_cpu(a->lowest_vcn));
+	if (mp_size <= 0) {
+		Dprintf("%s(): Eeek! Get size for mapping pairs failed. "
+			"Rollback failed. Run chkdsk.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	if (ntfs_attr_record_resize(m, a,
+			le16_to_cpu(a->mapping_pairs_offset) + mp_size)) {
+		Dprintf("%s(): Eeek! Attribuite record resize failed. Rollback "
+			"failed. Run chkdsk.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
+				a->mapping_pairs_offset), mp_size, na->rl,
+				sle64_to_cpu(a->lowest_vcn), 0)) {
+		Dprintf("%s(): Eeek! Mapping pairs build failed. Rollback "
+			"failed. Run chkdsk.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	if (a->lowest_vcn || a->highest_vcn)
+		a->highest_vcn = scpu_to_le64((na->allocated_size >>
+					vol->cluster_size_bits) - 1);
+	stop_vcn = 0;
+	while(!ntfs_attr_lookup(na->type, na->name,
+			na->name_len, 0, 0, NULL, 0, ctx)) {
+		if (stop_vcn > le64_to_cpu(ctx->attr->highest_vcn))
+			continue;
+		stop_vcn = le64_to_cpu(ctx->attr->highest_vcn) + 1;
+		if (ntfs_attr_record_rm(ctx)) {
+			Dprintf("%s(): Eeek! Removing attribute extent failed. "
+				"Rollback failed. Run chkdsk.\n", __FUNCTION__);
+			goto put_err_out;
+		}
+		ntfs_attr_reinit_search_ctx(ctx);
+	}
+	if (errno != ENOENT) {
+		Dprintf("%s(): Eeek! Attribute extent lookup failed. Rollback "
+			"failed. Run chkdsk.\n", __FUNCTION__);
+	} else
+		Dprintf("%s(): Rollback success.\n", __FUNCTION__);
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
