@@ -1,9 +1,9 @@
 if REALLYSTATIC
-AM_LIBS		= $(top_srcdir)/libntfs/.libs/libntfs.a
+AM_LIBS		= $(top_builddir)/libntfs/.libs/libntfs.a
 AM_LFLAGS	= -static
 STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else
-AM_LIBS		= $(top_srcdir)/libntfs/libntfs.la
+AM_LIBS		= $(top_builddir)/libntfs/libntfs.la
 AM_LFLAGS	= $(all_libraries)
 LIBTOOL_LINK    = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
