@@ -15,6 +15,12 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	  it is NULL.
 	- Return errno ENOTDIR from dir.c::ntfs_readdir() when called with a
 	  file inode.
+	- Fix a silly bug in attrib.c::ntfs_external_attr_find() which caused
+	  us to always return the same attribute during an enumeration as soon
+	  as the end of the attributes to be enumerated was reached thus
+	  causing the program doing the enumeration to hang in a tight loop.
+	  NOTE: There is still work to do as ctx->al_entry is set to NULL
+	  instead of to the position in the attribute list at which to insert.
 	- Added man page for ntfsls.
 	- Lots of extensions and cleanups to ntfsls.
 
