@@ -69,7 +69,9 @@ xx/xx/2004 - 2.0.0-WIP
 	- Rename scpu_to_le{16,32,64}() to cpu_to_sle{16,32,64}() to match the
 	  kernel.
 	- ntfsclone: honor bad clusters list ($BadClus:$Bad), known bad sectors
-	  aren't tried to be saved anymore. (Szaka)
+	  aren't tried to be saved anymore.  (Szaka)
+	- Add new API attrib.[ch]::ntfs_attr_record_move_to and make
+	  ntfs_resident_attr_resize use it.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
