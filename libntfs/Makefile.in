@@ -87,7 +87,8 @@ libntfs_gnomevfs_la_OBJECTS = $(am_libntfs_gnomevfs_la_OBJECTS)
 libntfs_la_LIBADD =
 am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
 	compress.lo debug.lo device.lo device_io.lo dir.lo inode.lo \
-	lcnalloc.lo mft.lo mst.lo runlist.lo unistr.lo volume.lo
+	lcnalloc.lo mft.lo mst.lo runlist.lo security.lo unistr.lo \
+	volume.lo
 libntfs_la_OBJECTS = $(am_libntfs_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -101,8 +102,8 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-method.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/libntfs_gnomevfs_la-gnome-vfs-module.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mft.Plo ./$(DEPDIR)/mst.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/runlist.Plo ./$(DEPDIR)/unistr.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/volume.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/runlist.Plo ./$(DEPDIR)/security.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/unistr.Plo ./$(DEPDIR)/volume.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) \
@@ -252,6 +253,7 @@ libntfs_la_SOURCES = \
 	mft.c		\
 	mst.c		\
 	runlist.c	\
+	security.c	\
 	unistr.c	\
 	volume.c
 
@@ -388,6 +390,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mst.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runlist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/security.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unistr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/volume.Plo@am__quote@
 

@@ -48,6 +48,7 @@ libntfs_la_SOURCES =	\
 	mft.c		\
 	mst.c		\
 	runlist.c	\
+	security.c	\
 	unistr.c	\
 	volume.c
 
