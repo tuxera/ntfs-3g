@@ -27,6 +27,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "ntfscluster.h"
 #include "types.h"
@@ -35,6 +36,7 @@
 #include "volume.h"
 #include "debug.h"
 #include "dir.h"
+#include "cluster.h"
 
 static const char *EXEC_NAME = "ntfscluster";
 static struct options opts;
@@ -54,8 +56,7 @@ void version (void)
 {
 	printf ("\n%s v%s - Find the owner of any given sector or cluster.\n\n",
 		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2002-2003 Richard Russon\n");
+	printf ("Copyright (c) 2002-2003 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -70,8 +71,11 @@ void usage (void)
 {
 	printf ("\nUsage: %s [options] device\n"
 		"    -i        --info           Print information about the volume (default)\n"
+		"\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
 		"    -s range  --sector range   Look for objects in this range of sectors\n"
+		"    -I num    --inode num      Show information about this inode\n"
+		"    -F name   --filename name  Show information about this file\n"
 	/*	"    -l        --last           Find the last file on the volume\n" */
 		"\n"
 		"    -f        --force          Use less caution\n"
@@ -94,13 +98,15 @@ void usage (void)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-c:fh?iqs:vV"; // l
+	static const char *sopt = "-c:F:fh?I:ilqs:vV";
 	static const struct option lopt[] = {
 		{ "cluster",	required_argument,	NULL, 'c' },
+		{ "filename",	required_argument,	NULL, 'F' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "info",	no_argument,		NULL, 'i' },
-		//{ "last",	no_argument,		NULL, 'l' },
+		{ "inode",	required_argument,	NULL, 'I' },
+		{ "last",	no_argument,		NULL, 'l' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "sector",	required_argument,	NULL, 's' },
 		{ "verbose",	no_argument,		NULL, 'v' },
@@ -112,6 +118,7 @@ int parse_options (int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	char *end = NULL;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -137,6 +144,14 @@ int parse_options (int argc, char **argv)
 			else
 				opts.action = act_error;
 			break;
+		case 'F':
+			if (opts.action == act_none) {
+				opts.action = act_file;
+				opts.filename = optarg;
+			} else {
+				opts.action = act_error;
+			}
+			break;
 		case 'f':
 			opts.force++;
 			break;
@@ -144,22 +159,28 @@ int parse_options (int argc, char **argv)
 		case '?':
 			help++;
 			break;
-		case 'i':
+		case 'I':
 			if (opts.action == act_none) {
-				opts.action = act_info;
+				opts.action = act_inode;
+				opts.inode = strtol (optarg, &end, 0);
+				if (end && *end)
+					err++;
 			} else {
 				opts.action = act_error;
-				err++;
 			}
 			break;
-		/*
+		case 'i':
+			if (opts.action == act_none)
+				opts.action = act_info;
+			else
+				opts.action = act_error;
+			break;
 		case 'l':
 			if (opts.action == act_none)
 				opts.action = act_last;
 			else
 				opts.action = act_error;
 			break;
-		*/
 		case 'q':
 			opts.quiet++;
 			break;
@@ -206,8 +227,7 @@ int parse_options (int argc, char **argv)
 		}
 
 		if (opts.action == act_error) {
-			//Eprintf ("You may only specify one action: --info, --cluster, --sector or --last.\n");
-			Eprintf ("You may only specify one action: --info, --cluster or --sector.\n");
+			Eprintf ("You may only specify one action: --info, --cluster, --sector or --last.\n");
 			err++;
 		} else if (opts.range_begin > opts.range_end) {
 			Eprintf ("The range must be in ascending order.\n");
@@ -333,128 +353,88 @@ int info (ntfs_volume *vol)
 }
 
 /**
- * cluster_find
+ * dump_file
  */
-int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
+int dump_file (ntfs_volume *vol, ntfs_inode *ino)
 {
-	u64 i;
-	int in_use = 0, result = 1;
-	u8 *buffer;
+	u8 buffer[1024];
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *rec;
+	int i;
+	runlist *runs;
 
-	if (!vol)
-		return 1;
+	utils_inode_get_name (ino, buffer, sizeof (buffer));
 
-	buffer = malloc (vol->mft_record_size);
-	if (!buffer) {
-		Eprintf ("Couldn't allocate memory.\n");
-		return 1;
-	}
+	printf ("Dump: %s\n", buffer);
 
-	for (i = s_begin; (LCN)i < s_end; i++) {
-		if (utils_cluster_in_use (vol, i) == 1) {
-			in_use = 1;
-			break;
-		}
-	}
+	ctx = ntfs_attr_get_search_ctx (ino, NULL);
 
-	if (!in_use) {
-		if (s_begin == s_end)
-			printf ("cluster isn't in use\n");
-		else
-			printf ("clusters aren't in use\n");
-		result = 0;
-		goto free;
-	}
-
-	// first, is the cluster in use in $Bitmap?
-
-	for (i = 0; (s64)i < vol->nr_mft_records; i++) {
-		ntfs_inode *inode;
-		ntfs_attr_search_ctx *ctx;
-
-		if (!utils_mftrec_in_use (vol, i)) {
-			//printf ("%lld skipped\n", i);
-			continue;
-		}
-
-		inode = ntfs_inode_open (vol, i);
-		if (!inode) {
-			Eprintf ("Can't read inode %lld\n", i);
-			goto free;
-		}
-
-		if (inode->nr_extents == -1) {
-			printf ("inode %lld is an extent record\n", i);
-			goto close;
-		}
-
-		Vprintf ("Inode: %lld\n", i);
-		ctx = ntfs_attr_get_search_ctx (inode, NULL);
-
-		if (ntfs_attr_lookup (AT_STANDARD_INFORMATION, NULL, 0, IGNORE_CASE, 0, NULL, 0, ctx) < 0) {
-			//printf ("extent inode\n");
-			continue;
-		}
-		ntfs_attr_reinit_search_ctx (ctx);
-
-		//printf ("Searching for cluster range %lld-%lld\n", s_begin, s_end);
-		while (ntfs_attr_lookup (AT_UNUSED, NULL, 0, IGNORE_CASE, 0, NULL, 0, ctx) >= 0) {
-			runlist_element *runs;
-			int j;
-
-			if (!ctx->attr->non_resident) {
-				//printf ("0x%02X ", ctx->attr->type);
-				continue;
-			}
-
-			runs = ntfs_mapping_pairs_decompress (vol, ctx->attr, NULL);
-			if (!runs) {
-				Eprintf ("Couldn't read the data runs.\n");
-				ntfs_inode_close (inode);
-				goto free;
-			}
-
-			Vprintf ("\t[0x%02X]\n", ctx->attr->type);
-
-			Vprintf ("\t\tVCN\tLCN\tLength\n");
-			for (j = 0; runs[j].length > 0; j++) {
-				LCN a_begin = runs[j].lcn;
-				LCN a_end   = a_begin + runs[j].length - 1;
-
-				if (a_begin < 0)
-					continue;	// sparse, discontiguous, etc
-
-				Vprintf ("\t\t%lld\t%lld-%lld (%lld)\n", runs[j].vcn, runs[j].lcn, runs[j].lcn + runs[j].length - 1, runs[j].length);
-				//Vprintf ("\t\t%lld\t%lld\t%lld\n", runs[j].vcn, runs[j].lcn, runs[j].length);
-				//dprint list
-
-				if ((a_begin > s_end) || (a_end < s_begin))
-					continue;	// before or after search range
-
-				{
-					char buffer[256];
-					utils_inode_get_name (inode, buffer, sizeof (buffer));
-					//XXX distinguish between file/dir
-					printf ("inode %lld %s", i, buffer);
-					utils_attr_get_name (vol, ctx->attr, buffer, sizeof (buffer));
-					printf ("%c%s\n", PATH_SEP, buffer);
+	while ((rec = find_attribute (AT_UNUSED, ctx))) {
+		printf ("    0x%02x - ", rec->type);
+		if (rec->non_resident) {
+			printf ("non-resident\n");
+			runs = ntfs_mapping_pairs_decompress (vol, rec, NULL);
+			if (runs) {
+				printf ("             VCN     LCN     Length\n");
+				for (i = 0; runs[i].length > 0; i++) {
+					printf ("        %8lld %8lld %8lld\n", runs[i].vcn, runs[i].lcn, runs[i].length);
 				}
-				break;	// XXX if verbose, we should list all matching runs
+				free (runs);
 			}
+		} else {
+			printf ("resident\n");
 		}
-
-		ntfs_attr_put_search_ctx (ctx);
-		ctx = NULL;
-close:
-		//printf ("\n");
-		ntfs_inode_close (inode);
 	}
-free:
-	free (buffer);
-	result = 0;
-	return result;
+
+	ntfs_attr_put_search_ctx (ctx);
+	return 0;
 }
 
+/**
+ * print_match
+ */
+int print_match (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void *data)
+{
+	char *buffer;
+
+	if (!ino || !attr || !run)
+		return 1;
+
+	buffer = malloc (MAX_PATH);
+	if (!buffer) {
+		Eprintf ("!buffer\n");
+		return 1;
+	}
+
+	utils_inode_get_name (ino, buffer, MAX_PATH);
+	printf ("Inode %lld %s", ino->mft_no, buffer);
+
+	utils_attr_get_name (ino->vol, attr, buffer, MAX_PATH);
+	printf ("/%s\n", buffer);
+
+	free (buffer);
+	return 0;
+}
+
+/**
+ * find_last
+ */
+int find_last (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void *data)
+{
+	struct match *m;
+
+	if (!ino || !attr || !run || !data)
+		return 1;
+
+	m = data;
+
+	if ((run->lcn + run->length) > m->lcn) {
+		m->inum = ino->mft_no;
+		m->lcn  = run->lcn + run->length;
+	}
+
+	return 0;
+}
 
 /**
  * main - Begin here
@@ -467,6 +447,8 @@ free:
 int main (int argc, char *argv[])
 {
 	ntfs_volume *vol;
+	ntfs_inode *ino = NULL;
+	struct match m;
 	int result = 1;
 
 	if (!parse_options (argc, argv))
@@ -487,20 +469,46 @@ int main (int argc, char *argv[])
 			/* Convert to clusters */
 			opts.range_begin >>= (vol->cluster_size_bits - vol->sector_size_bits);
 			opts.range_end   >>= (vol->cluster_size_bits - vol->sector_size_bits);
-			result = cluster_find (vol, opts.range_begin, opts.range_end);
+			result = cluster_find (vol, opts.range_begin, opts.range_end, (cluster_cb*)&print_match, NULL);
 			break;
 		case act_cluster:
 			if (opts.range_begin == opts.range_end)
 				Qprintf ("Searching for cluster %lld\n", opts.range_begin);
 			else
 				Qprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
-			result = cluster_find (vol, opts.range_begin, opts.range_end);
+			result = cluster_find (vol, opts.range_begin, opts.range_end, (cluster_cb*)&print_match, NULL);
 			break;
-		/*
+		case act_file:
+			ino = utils_pathname_to_inode (vol, NULL, opts.filename);
+			if (ino)
+				result = dump_file (vol, ino);
+			break;
+		case act_inode:
+			ino = ntfs_inode_open (vol, opts.inode);
+			if (ino) {
+				result = dump_file (vol, ino);
+				ntfs_inode_close (ino);
+			} else {
+				Eprintf ("Cannot open inode %lld\n", opts.inode);
+			}
+			break;
 		case act_last:
-			printf ("Last\n");
+			memset (&m, 0, sizeof (m));
+			m.lcn = -1;
+			result = cluster_find (vol, 0, LONG_MAX, (cluster_cb*)&find_last, &m);
+			if (m.lcn >= 0) {
+				ino = ntfs_inode_open (vol, m.inum);
+				if (ino) {
+					result = dump_file (vol, ino);
+					ntfs_inode_close (ino);
+				} else {
+					Eprintf ("Cannot open inode %lld\n", opts.inode);
+				}
+				result = 0;
+			} else {
+				result = 1;
+			}
 			break;
-		*/
 		case act_info:
 		default:
 			result = info (vol);
