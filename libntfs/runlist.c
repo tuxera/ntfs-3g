@@ -1243,9 +1243,10 @@ __inline__ int ntfs_get_nr_significant_bytes(const s64 n)
  * array corresponding to the runlist @rl. This for example allows us to
  * allocate a buffer of the right size when building the mapping pairs array.
  *
- * Return the calculated size in bytes on success. If @rl is NULL return 0.
- * On error, return -1 with errno set to the error code. The following error
- * codes are defined:
+ * If @rl is NULL, just return 1 (for the single terminator byte).
+ *
+ * Return the calculated size in bytes on success.  On error, return -1 with
+ * errno set to the error code.  The following error codes are defined:
  *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
  *		  fully mapped runlists to this function.
  *	EIO	- The runlist is corrupt.
@@ -1257,7 +1258,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 	int i, rls;
 
 	if (!rl)
-		return 0;
+		return 1;
 	/* Always need the termining zero byte. */
 	rls = 1;
 	for (prev_lcn = i = 0; rl[i].length; i++) {
@@ -1352,8 +1353,10 @@ err_out:
  * @dst. @dst_len is the size of @dst in bytes and it should be at least equal
  * to the value obtained by calling ntfs_get_size_for_mapping_pairs().
  *
- * Return 0 on success or when @rl is NULL. On error, return -1 with errno set
- * to the error code. The following error codes are defined:
+ * If @rl is NULL, just write a single terminator byte to @dst.
+ *
+ * Return 0 on success.  On error, return -1 with errno set to the error code.
+ * The following error codes are defined:
  *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
  *		  fully mapped runlists to this function.
  *	EIO	- The runlist is corrupt.
@@ -1367,8 +1370,13 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 	int i;
 	s8 len_len, lcn_len;
 
-	if (!rl)
+	if (!rl) {
+		if (dst_len < 1)
+			goto size_err;
+		/* Terminator byte. */
+		*dst = 0;
 		return 0;
+	}
 	/*
 	 * @dst_max is used for bounds checking in
 	 * ntfs_write_significant_bytes().
