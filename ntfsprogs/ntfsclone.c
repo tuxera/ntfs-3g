@@ -693,8 +693,7 @@ static void wipe_unused_mft(ntfs_inode *ni)
 	if (ni->mft_no <= LAST_METADATA_INODE)
 		return;
 	
-	/* MFT_RECORD doesn't have the XP specific 6 bytes, so add it */
-	unused = m->bytes_in_use - (sizeof(MFT_RECORD) + 6);
+	unused = m->bytes_in_use - sizeof(MFT_RECORD);
 	wiped_unused_mft += wipe_data((char *)m, sizeof(MFT_RECORD), unused);
 }
 
