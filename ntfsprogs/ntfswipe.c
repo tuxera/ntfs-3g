@@ -410,6 +410,7 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 	s64 total = 0;
 	s64 size;
 	s64 inode_num;
+	u64 offset;
 	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *ni;
 	unsigned char *buf;
@@ -439,58 +440,134 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 			goto put_search_ctx;
 		}
 		attr = ctx->attr;
-		
+
 		if (!attr->non_resident) {
 			Vprintf ("Resident $DATA atrributes. Skipping.\n");
 			goto put_search_ctx;
 		}
-		
-		if (attr->flags &
-			(ATTR_IS_SPARSE | ATTR_IS_ENCRYPTED | ATTR_IS_COMPRESSED)) {
-			Vprintf ("Sparse, encrypted and compressed are not "
-				"supported.\n");
-			goto put_search_ctx;
-		}
-		
-		size = attr->allocated_size - attr->data_size;
-		if (!size) {
-			Vprintf ("Nothing to wipe\n");
-			goto put_search_ctx;
-		}
-		
-		if (act == act_info) {
-			total += size;
-			Vprintf ("Can wipe %lld bytes\n", size);
-			goto put_search_ctx;
-		}
-		
-		buf = malloc (size);
-		if (!buf) {
-			Vprintf ("Not enough memory\n");
-			Eprintf ("Not enough memory to allocate %lld bytes\n", size);
-			goto put_search_ctx;
-		}
-		memset (buf, byte, size);
-		
-		rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
-		if (!rl) {
-			Vprintf ("Internal error\n");
-			Eprintf ("Could not decompress mapping pairs\n");
-			goto free_buf;
-		}
 
-		s64 bw = ntfs_rl_pwrite (vol, rl, attr->data_size, size, buf);
-		if (bw == -1) {
-			Vprintf ("Internal error\n");
-			Eprintf ("Couldn't wipe tail of inode %lld\n", inode_num);
+		if (attr->flags & ATTR_IS_COMPRESSED) {
+			rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+			if (!rl) {
+				Vprintf ("Internal error\n");
+				Eprintf ("Could not decompress mapping pairs\n");
+				goto put_search_ctx;
+			}
+
+			u16 block_size;
+			u64 wiped = 0;
+			s64 ret;
+			runlist *rlc = rl;
+			while (rlc->length) {
+				if ((rlc->length >> attr->compression_unit) || 
+								(rlc->lcn == -1)) {
+					rlc++;
+					continue;
+				}
+				
+				offset = 0;
+				while (1) {
+					ret = ntfs_rl_pread (vol, rlc, offset, 2,
+									&block_size);
+					if (ret != 2) {
+						Vprintf ("Internal error\n");
+						Eprintf ("ntfs_rl_pread failed\n");
+						goto free_rl;
+					}
+					if (block_size == 0) {
+						offset += 2;
+						break;
+					}
+					block_size &= 0x0FFF;
+					block_size += 3;
+					offset += block_size;
+					if (offset >=
+						(rlc->length << vol->cluster_size_bits))
+						goto next;
+				}
+				size = (rlc->length << vol->cluster_size_bits) - offset;
+
+				if ((act == act_info) || (!size)) {
+					wiped += size;
+					rlc++;
+					continue;
+				}
+
+				buf = malloc (size);
+				if (!buf) {
+					Vprintf ("Not enough memory\n");
+					Eprintf ("Not enough memory to allocate "
+								"%lld bytes\n", size);
+					goto free_rl;
+				}
+				memset (buf, byte, size);
+				
+				ret = ntfs_rl_pwrite (vol, rlc, offset, size, buf);
+				if (ret != size) {
+					Vprintf ("Internal error\n");
+					Eprintf ("ntfs_rl_pwrite failed\n");
+					free (buf);
+					goto free_rl;
+				}
+				free (buf);
+				wiped += ret;
+next:
+				rlc++;
+			}
+			if (wiped)
+				Vprintf ("Wiped %lld bytes\n", wiped);
+			else
+				Vprintf ("Nothing to wipe\n");
+			total += wiped;
+free_rl:
+			free (rl);
 		} else {
-			Vprintf ("Wiped %lld bytes\n", bw);
-			total += bw;
-		}
+			offset = attr->data_size;
+			if (attr->flags & ATTR_IS_ENCRYPTED)
+				offset = (((offset - 1) >> 10) + 1) << 10;
 
-		free (rl);
+			size = (vol->cluster_size - offset) % vol->cluster_size;
+
+			if (!size) {
+				Vprintf ("Nothing to wipe\n");
+				goto put_search_ctx;
+			}
+
+			if (act == act_info) {
+				total += size;
+				Vprintf ("Can wipe %lld bytes\n", size);
+				goto put_search_ctx;
+			}
+
+			buf = malloc (size);
+			if (!buf) {
+				Vprintf ("Not enough memory\n");
+				Eprintf ("Not enough memory to allocate %lld bytes\n",
+										size);
+				goto put_search_ctx;
+			}
+			memset (buf, byte, size);
+
+			rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+			if (!rl) {
+				Vprintf ("Internal error\n");
+				Eprintf ("Could not decompress mapping pairs\n");
+				goto free_buf;
+			}
+
+			s64 bw = ntfs_rl_pwrite (vol, rl, offset, size, buf);
+			if (bw == -1) {
+				Vprintf ("Internal error\n");
+				Eprintf ("Couldn't wipe tail of inode %lld\n", inode_num);
+			} else {
+				Vprintf ("Wiped %lld bytes\n", bw);
+				total += bw;
+			}
+
+			free (rl);
 free_buf:
-		free (buf);
+			free (buf);
+		}
 put_search_ctx:
 		ntfs_attr_put_search_ctx (ctx);
 close_inode:
