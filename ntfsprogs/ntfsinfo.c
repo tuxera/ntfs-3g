@@ -4,6 +4,7 @@
  * Copyright (c) 2002-2004 Matthew J. Fanto
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This utility will dump a file's attributes.
  *
