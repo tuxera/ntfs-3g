@@ -48,9 +48,14 @@ of the partition thus it refuses to resize at
 .I size
 if there is any.
 To convert the inodes to meaningful file names, you must mount 
-the partition and run for instance
- 'find /mount/point -inum <inode1> -o -inum <inode2> ...'.
-
+the partition with the
+.I show_sys_files
+mount option and run for instance
+.RS
+.sp
+.B find /mount/point \-inum <inode1> \-o \-inum <inode2> ...
+.sp
+.RE
 Before a real resize operation, always make a read-only 
 test run using the 
 .B -n 

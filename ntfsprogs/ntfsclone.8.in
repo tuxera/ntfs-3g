@@ -10,21 +10,21 @@ ntfsclone \- Efficiently clone an NTFS filesystem
 .SH SYNOPSIS
 .B ntfsclone
 [
-.B -fhm
+.B \-fhm
 ] 
-.B -o 
+.B \-o 
 [ 
 .I FILE 
 | 
-.B - 
+.B \- 
 ]
 .B device
 .br
 .B ntfsclone
 [
-.B -fhm
+.B \-fhm
 ] 
-.B -O 
+.B \-O 
 .I FILE 
 .B device
 .SH DESCRIPTION
@@ -45,54 +45,84 @@ without the risk of destroying the original filesystem.
 The clone is an exact copy of the original
 NTFS filesystem from sector to sector thus it can be also mounted
 just like the original NTFS filesystem.
-For example an ntfsclone'd sparse file can be mounted as
-   'mount -t ntfs -o loop ntfsclone.img /mnt/ntfsclone'
+For example if you clone to a file and the kernel has loopback device and
+NTFS support then the file can be mounted as
+.RS
+.sp
+.B   mount \-t ntfs \-o loop ntfsclone.img /mnt/ntfsclone
+.SH SPARSE FILES
+A file is sparse if it has unallocated blocks (holes). The reported size of such 
+files are always higher than the disk space consumed by them.
+The
+.BR du
+command can tell the real disk space used by a sparse file.
+The holes are always read as zeros. All major Linux filesystem like,
+ext2, ext3, reiserfs, Reiser4, JFS and XFS, supports
+sparse files but for example the ISO 9600 CD-ROM filesystem doesn't.
 .SH HANDLING LARGE SPARSE FILES
-As of today Linux provides inadequate support for managing (tar, cp,
-[un]gzip, [un]bzip2, etc) large sparse files. The only main Linux filesystem
-having support for efficient sparse file handling is XFS (by XFS_IOC_GETBMAPX). 
-However none of the common utility supports XFS_IOC_GETBMAPX. This
-means when you tar, cp, gzip, bzip2, etc a large sparse file they will
-always read the entire file, even if you use the "sparse support" options. 
+As of today Linux provides inadequate support for managing (tar, 
+cp, gzip, gunzip, bzip2, bunzip2, cat, etc) large sparse files. 
+The only main Linux filesystem
+having support for efficient sparse file handling is XFS by the 
+XFS_IOC_GETBMAPX 
+.BR ioctl\fR.
+However none of the common utility supports it.
+This means when you tar, cp, gzip, bzip2, etc a large sparse file 
+they will always read the entire file, even if you use the "sparse support" 
+options. 
 
 .BR bzip2 
 compresses large sparse files much better than 
 .BR gzip 
 but it does so 
-also much slower, usually. Moreover neither of them handles large sparse
-files efficiently during uncompression from disk space usage point of view.
-
+also much slower. Moreover neither of them handles large sparse
+files efficiently during uncompression from disk space usage point 
+of view. A possible workaround is if you pipe the uncompressed 
+stream through 
+.BR cp\fR,
+for example this way,
+.RS
+.sp
+.B bunzip2 \-c image.bz2 | cp \-\-sparse=always /proc/self/fd/0 image
+.sp
+.RE
 At present the most efficient way, both speed and space-wise, to
 compress and uncompress large sparse files by common tools 
 is using 
 .BR tar 
 with the options 
-.B -S 
+.B \-S 
 (handle sparse files "efficiently") and
-.B -j 
+.B \-j 
 (filter the archive through bzip2). Altough
 .BR tar
 still reads and analyses the entire file, it doesn't pass on the
 large data blocks having only zeros to filters and it also avoids
-writing large amount of zeros to the disk needlessly.
+writing large amount of zeros to the disk needlessly. But since
+.BR tar
+can't create an archive from the standard input, you can't do this
+in-place by just reading 
+.BR ntfsclone
+standard output.
 .SH METADATA-ONLY CLONING
 One of the features of
 .BR ntfsclone
 is it can also save only the NTFS metadata using the option
-.B -m
+.B \-m
 or
-.B --metadata
+.B \-\-metadata
 and the clone still will be
-mountable (but of course all non-metadata file content will be zeros). 
+mountable. In this case all non-metadata file content will be lost and
+reading them back will result always zeros.
 
 The metadata-only image can be compressed very
 well, usually to not more than 1-3 MB thus it's relatively easy to transfer
-it via the Internet for investigation to NTFS experts.  
+it for investigation to NTFS experts.
 
 In this mode of ntfsclone,
 .B NONE 
 of the user's data is saved, including the resident user's data
-embedded into metadata (they are also filled with zeros).
+embedded into metadata. All is filled with zeros.
 Moreover all the file timestamps, deleted and unused spaces inside
 the metadata are filled with zeros. Thus this mode is inappropriate
 for example for forensic analyses.
@@ -113,69 +143,98 @@ single command, e.g.
 is equivalent to
 .BR "\-f \-m" .
 .TP
-.BI "\-o " FILE
-.br
-.ns
-.TP
-.BI "\-\-output " FILE
-Clone NTFS to the non-existent FILE. If FILE is '-' then clone to the 
+.BI "\-o, \-\-output " FILE
+Clone NTFS to the non-existent 
+.I FILE\fR. If 
+.I FILE 
+is '-' then clone to the 
 standard output.
 .TP
-.BI "\-O " FILE
-.br
-.ns
+.BI "\-O, \-\-overwrite " FILE
+Clone NTFS to 
+.I FILE\fR, overwriting if exists.
 .TP
-.BI "\-\-overwrite " FILE
-Clone NTFS to FILE, overwriting if exists.
-.TP
-.B \-m
-.br
-.ns
-.TP
-.B \-\-metadata
+.B \-m, \-\-metadata
 Clone 
 .B ONLY METADATA
 (for NTFS experts). Moreover only cloning to a file is allowed.
 You can't metadata-only clone to a device or standard output.
 .TP
-.B \-f
-.br
-.ns
-.TP
-.B \-\-force
+.B \-f, \-\-force
 Forces ntfsclone to proceed, overriding some safety checks. 
 You can use this parameter multiply times if you want 
 to overcome every single safety checks.
 .TP
-.B \-h
-.br
-.ns
-.TP
-.B \-\-help
+.B \-h, \-\-help
 Show a list of options with a brief description of each one.
 .SH EXAMPLES
-Clone (save, backup) an NTFS to a non-existent file
+Cloning (save, backup) an NTFS volume to a non-existent file
 .RS
 .sp
 .B ntfsclone \-\-output ntfs.img /dev/hda1
 .sp
 .RE
-Restore a clone image to its original partition
+Restoring a clone image to its original partition
 .RS
 .sp
 .B ntfsclone \-\-overwrite /dev/hda1 ntfs.img 
 .sp
 .RE
-Efficiently compress a clone image
+Space and speed-wise the most efficient way to compress a clone image
 .RS
 .sp
 .B tar \-cjSf ntfs.img.tar.bz2 ntfs.img
 .sp
 .RE
-Efficiently uncompress a clone image
+Uncompressing a 
+.BR tar 
+archived clone image 
 .RS
 .sp
 .B tar \-xjSf ntfs.img.tar.bz2
+.sp
+.RE
+In-place compressing an NTFS volume. Note, gzip is faster usually 
+at least 2-4  times but it creates also bigger compressed files.
+.RS
+.sp
+.B ntfsclone \-\-output ntfs.img /dev/hda1 | bzip2 \-c > ntfs.img.bz2
+.sp
+.RE
+Restoring an NTFS volume from a compressed image
+.RS
+.sp
+.B bunzip2 \-c ntfs.img.bz2 | dd of=/dev/hda1
+.sp
+.RE
+Backup an NTFS volume to a remote host, using
+.BR ssh
+default compression. 
+.RS
+.sp
+.B ntfsclone \-o \- /dev/hda1 | ssh \-C host 'bzip \-c9 > ntfs.img.bz2'
+.sp
+.RE
+Clone an NTFS volume to a remote host, using
+.BR ssh
+default compression (type everything in one line).
+.RS
+.sp
+.B ntfsclone \-o \- /dev/hda1 | \\\\
+.br
+.B ssh \-C host 'cat | cp \-\-sparse=always /proc/self/fd/0 ntfs.img'
+.sp
+.RE
+Clone a remote NTFS volume to the local filesystem via 
+.BR ssh
+using a custom compression level (type everything in one line).
+Speed-wise the optimal compression level depends on your network, 
+disk and CPU speed, saturation.
+.RS
+.sp
+.B ssh  host 'ntfsclone \-o \- /dev/hda1 | gzip \-2c' | \\\\
+.br
+.B gunzip \-c | cp \-\-sparse=always /proc/self/fd/0 ntfs.img
 .sp
 .RE
 Pack NTFS metadata for NTFS experts
@@ -189,10 +248,11 @@ This program has no known bugs.  If you find one, please send an email to
 .nh
 <linux-ntfs-dev@lists.sf.net>.
 
-Sometimes it might appear ntfsclone froze using Reiserfs and even
-CTRL-C won't stop it. This is not a bug in ntfsclone, however
-it's due to Reiserfs being extremely inefficient creating large 
-sparse files and not handling signals during this operation. 
+Sometimes it might appear ntfsclone froze if the clone is on ReiserFS 
+and even CTRL-C won't stop it. This is not a bug in ntfsclone, however
+it's due to ReiserFS being extremely inefficient creating large 
+sparse files and not handling signals during this operation. This
+ReiserFS problem was improved in kernel 2.4.22.
 XFS, JFS and ext3 don't have this problem.
 .hy
 .SH AUTHOR
