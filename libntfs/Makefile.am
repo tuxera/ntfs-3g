@@ -63,3 +63,6 @@ libntfs_la_SOURCES =	\
 
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
+EXTRA_DIST =	\
+	win32_io.c
+
