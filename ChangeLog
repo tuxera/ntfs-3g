@@ -19,7 +19,12 @@ xx/xx/2004 - 1.8.6-WIP
 	- Rename private to priv_data in ntfs_device_alloc() to avoid name
 	  space clashes with C++.  (Yuval Fledel, modified fix by me)
 	- Rename 'opt' struct member stdout to std_out in ntfsclone.c because
-	  stdout is a macro on Cygwin and compilation fails. (Yuval Fledel)
+	  stdout is a macro on Cygwin and compilation fails.  (Yuval Fledel)
+	- Make ntfs_attrs_walk() use AT_UNUSED and CASE_SENSITIVE instead of
+	  zero when calling ntfs_lookup() for type checking correctness.  (Yuval
+	  Fledel)
+	- In attribute lookup code in libntfs/attrib.c, check type against
+	  AT_UNUSED and not zero.
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
