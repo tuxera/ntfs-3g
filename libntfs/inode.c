@@ -795,3 +795,176 @@ put_err_out:
 	errno = err;
 	return -1;
 }
+
+/**
+ * ntfs_inode_add_attr - add attribute to inode
+ * @ni:		opened ntfs inode to which add attribute
+ * @type:	type of the new attribute
+ * @name:	name in unicode of the new attribute
+ * @name_len:	name length in unicode charcters of the new attribute
+ * @size:	size of the new attribute
+ *
+ * If inode haven't got enogh space to add attribute, add attribute to one of it
+ * extents, if no extents present or no one of them have enough space, than
+ * allocate new extent and add attribute to it.
+ *
+ * If on one of this steps attribute list is needed but not present, than it is
+ * added transparently to caller. So, this function should not be called with
+ * @type == AT_ATTRIBUTE_LIST, if you really need to add attribute list call
+ * ntfs_inode_add_attrlist instead.
+ * 
+ * On success return opened new ntfs attribute. On error return NULL with errno
+ * set to the error code.
+ */
+ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, s64 size) {
+	int attr_rec_size, err, i, offset;
+	ntfs_inode *attr_ni;
+	ntfs_attr *na;
+	
+	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
+		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (ni->nr_extents == -1)
+		ni = ni->base_ni;
+
+	/*
+	 * Determine resident or not will be new attribute. We add 8 to size in 
+	 * non resident case for mapping pairs.
+	 */
+	if (ntfs_attr_can_be_resident(ni->vol, type)) {
+		if (errno != EPERM) {
+			err = errno;
+			Dprintf("%s(): ntfs_attr_can_be resident failed.\n",
+					__FUNCTION__);
+			goto err_out;
+		}
+		/* Attribute can't be resident. */
+		attr_rec_size =
+			offsetof(ATTR_RECORD, non_resident_attr_end) + 8;
+	} else {
+		if (size >= ni->vol->mft_record_size)
+			/* Attribute will not fit MFT record. */
+			attr_rec_size = offsetof(ATTR_RECORD,
+					non_resident_attr_end) + 8;
+		else
+			/* Attribute can be resident. */
+			attr_rec_size =
+				offsetof(ATTR_RECORD, resident_attr_end);
+	}
+
+	if (le32_to_cpu(ni->mrec->bytes_allocated) -
+			le32_to_cpu(ni->mrec->bytes_in_use) >= attr_rec_size) {
+		attr_ni = ni;
+		goto add_attr_record;
+	}
+
+	/* Try to add to extent inodes. */
+	if (ntfs_inode_attach_all_extents(ni)) {
+		err = errno;
+		Dprintf("%s(): Failed to attach all extents to inode.\n",
+				__FUNCTION__);
+		goto err_out;
+	}
+	for (i = 0; i < ni->nr_extents; i++) {
+		attr_ni = ni->extent_nis[i];
+		if (le32_to_cpu(attr_ni->mrec->bytes_allocated) -
+				le32_to_cpu(attr_ni->mrec->bytes_in_use) >=
+				attr_rec_size)
+			goto add_attr_record;
+	}
+
+	/* There is no extent that contain enough space for new attribute. */
+	if (!NInoAttrList(ni)) {
+		/* Add attribute list not present, add it and retry. */
+		if (ntfs_inode_add_attrlist(ni)) {
+			err = errno;
+			Dprintf("%s(): Failed to add attribute list.\n",
+					__FUNCTION__);
+			goto err_out;
+		}
+		return ntfs_inode_add_attr(ni, type, name, name_len, size);
+	}
+	/* Allocate new extent. */
+	attr_ni = ntfs_mft_record_alloc(ni->vol, ni);
+	if (!attr_ni) {
+		err = errno;
+		Dprintf("%s(): Failed to allocate extent record.\n",
+				__FUNCTION__);
+		goto err_out;
+	}
+
+add_attr_record:
+	if (attr_rec_size == offsetof(ATTR_RECORD, resident_attr_end)) {
+		/* Add resident attribute. */
+		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
+				name_len, 0);
+		if (offset < 0) {
+			err = errno;
+			Dprintf("%s(): Failed to add resident attribute.\n",
+					__FUNCTION__);
+			goto free_err_out;
+		}
+	} else {
+		/* Add non resident attribute. */
+		offset = ntfs_non_resident_attr_record_add(attr_ni, type, name,
+				name_len, 0, 8, 0);
+		if (offset < 0) {
+			err = errno;
+			Dprintf("%s(): Failed to add non resident attribute.\n",
+					__FUNCTION__);
+			goto free_err_out;
+		}
+	}
+
+	/* Open new attribute and resize it. */
+	na = ntfs_attr_open(ni, type, name, name_len);
+	if (!na) {
+		err = errno;
+		Dprintf("%s(): Failed to open just added attribute.\n",
+				__FUNCTION__);
+		goto rm_attr_err_out;
+	}
+	if (!size)
+		return na;
+	if (ntfs_attr_truncate(na, size)) {
+		err = errno;
+		Dprintf("%s(): Failed to resize just added attribute. Probably "
+				"leaving inconsist metadata.\n", __FUNCTION__);
+		/*
+		 * We can't goto rm_attr_err_out, because attribute maybe moved
+		 * during attempt of resize. FIXME: Call ntfs_inode_rm_attr when
+		 * it's will be implemented.
+		 */
+		// ntfs_inode_rm_attr(na);
+		// ntfs_attr_close(na);
+		// goto err_out;
+		ntfs_attr_close(na);
+		goto free_err_out;
+	}
+	/* Done !*/
+	return na;
+
+rm_attr_err_out:
+	/* Remove just added attribute. */
+	if (ntfs_attr_record_resize(attr_ni->mrec,
+			(ATTR_RECORD*)((u8*)attr_ni->mrec + offset), 0)) {
+		Dprintf("%s(): Failed to remove just added attribute.\n",
+				__FUNCTION__);
+	}
+free_err_out:
+	/* Free MFT record, if it isn't contain attributes. */
+	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
+			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
+		if (ntfs_mft_record_free(attr_ni->vol, attr_ni)) {
+			Dprintf("%s(): Failed to free MFT record. Leaving "
+					"inconsist metadata.\n", __FUNCTION__);
+		}
+	}
+err_out:
+	errno = err;
+	return NULL;
+}
