@@ -1666,9 +1666,12 @@ not_found:
 	 * If we were enumerating and reached the end, we can't just use !@type
 	 * because that would return the first attribute instead of the last
 	 * one. Thus we just change @type to AT_END which causes
-	 * ntfs_attr_find() to seek to the end.
+	 * ntfs_attr_find() to seek to the end. We also do the same when an
+	 * attribute extent was searched for (i.e. lowest_vcn != 0), as we
+	 * otherwise rewind the search back to the first extent and we get
+	 * that extent returned twice during a search for all extents.
 	 */
-	if (!type)
+	if (!type || lowest_vcn)
 		type = AT_END;
 	return ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
 }
