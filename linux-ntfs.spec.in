@@ -15,7 +15,7 @@ Source		: http://prdownloads.sf.net/linux-ntfs/linux-ntfs-%{ver}.tar.gz
 Buildroot	: %{_tmppath}/%{name}-root
 Packager	: Anton Altaparmakov <aia21@cantab.net>
 License		: GPL
-Group		: Applications/System
+Group		: System Environment/Base
 %description
 The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
 for the NTFS filesystem to the Linux operating system. Linux-NTFS currently
