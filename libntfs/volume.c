@@ -362,7 +362,7 @@ error_exit:
  * @name:	name of device/file to open
  * @rwflag:	optional mount flags
  *
- * Load, verify and parse bootsector; load and setup $MFT and $MFTMirr. After
+ * Load, verify, and parse bootsector; load and setup $MFT and $MFTMirr. After
  * calling this function, the volume is setup sufficiently to call all read
  * and write access functions provided by the library.
  *
@@ -436,7 +436,7 @@ ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag)
 	}
 	Dputs(OK);
 
-	/* Need to setup $MFTMirr  so we can use the write functions, too. */
+	/* Need to setup $MFTMirr so we can use the write functions, too. */
 	Dprintf("Loading $MFTMirr... ");
 	if (ntfs_mftmirr_load(vol) < 0) {
 		Dputs(FAILED);
@@ -863,9 +863,9 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
  * Finally, check if the file system is mounted read-only, and if so set the
  * NTFS_MF_READONLY flag in *@mnt_flags.
  *
- * On sucess, return 0 with *@mnt_flags set to the ntfs mount flags.
+ * On sucess return 0 with *@mnt_flags set to the ntfs mount flags.
  *
- * On error, return -1 with errno set to the error code.
+ * On error return -1 with errno set to the error code.
  */
 int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags)
 {
@@ -924,13 +924,14 @@ int ntfs_version_is_supported(ntfs_volume *vol)
  *
  * Fill the value of the $LogFile data attribute, i.e. the contents of
  * the file, with 0xff's, thus marking the journal as empty.
+ *
  * FIXME(?): We might need to zero the LSN field of every single mft
  * record as well. (But, first try without doing that and see what
  * happens, since chkdsk might pickup the pieces and do it for us...)
  *
  * On success return 0.
  *
- * On error, return -1 with errno set to the error code.
+ * On error return -1 with errno set to the error code.
  */
 int ntfs_logfile_reset(ntfs_volume *vol)
 {
@@ -1024,7 +1025,7 @@ error_exit:
  * Set the on-disk volume flags in the mft record of $Volume and
  * on volume @vol to @flags.
  *
- * Return 0 on successful and -1 if not, with errno set to the error code.
+ * Return 0 if successful and -1 if not with errno set to the error code.
  */
 int ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 {
