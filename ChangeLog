@@ -8,6 +8,11 @@ xx/xx/2004 - 1.8.6-WIP
 	  exceeds 32 bits or the maximum cluster size is reached.  We then
 	  exit with an appropriate error message.  (Thanks to Szaka for the
 	  bug report.)
+	- Modify layout.h and logfile.h expanding/naming annonymous structs
+	  and unions (much like I did earlier in the kernel driver) so that
+	  the -fms-extensions switch is no longer required.  Also, removed
+	  the -fms-extensions switch and associated autodetection from
+	  ./configure.ac.  (Yuval Fledel with small fixes from me)
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
