@@ -247,10 +247,11 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 
 	if (!in_use) {
 		if (s_begin == s_end)
-			printf ("clusters isn't in use\n");
+			printf ("cluster isn't in use\n");
 		else
 			printf ("clusters aren't in use\n");
-		return 0;
+		result = 0;
+		goto free;
 	}
 
 	// first, is the cluster in use in $Bitmap?
