@@ -23,11 +23,15 @@
 #include <errno.h>
 #include <string.h>
 
-#include "mft.h"
+#include "types.h"
 #include "disk_io.h"
 #include "debug.h"
 #include "bitmap.h"
 #include "attrib.h"
+#include "inode.h"
+#include "volume.h"
+#include "layout.h"
+#include "mft.h"
 
 /**
  * ntfs_mft_records_read - read records from the mft from disk
@@ -229,5 +233,88 @@ read_failed:
 		free(m);
 	errno = err;
 	return -1;
+}
+
+/**
+ * ntfs_mft_record_alloc - allocate an mft record on an ntfs volume
+ * @vol:	mounted ntfs volume on which to allocate the mft record
+ * @start:	starting mft record at which to allocate (or -1 if none)
+ *
+ * Allocate an mft record in $MFT/$DATA starting to search for a free record
+ * at mft record number @start or at the current allocator position if
+ * @start_mref is -1, on the mounted ntfs volume @vol.
+ *
+ * On success return the now opened ntfs inode of the mft record.
+ *
+ * On error return NULL with errno set to the error code.
+ */
+ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, u64 start)
+{
+	if (!vol || !vol->mftbmp_na) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	errno = ENOTSUP;
+	return NULL;
+}
+
+/**
+ * ntfs_mft_record_free - free an mft record on an ntfs volume
+ * @vol:	mounted ntfs volume on which to free the mft record
+ * @ni:		open ntfs inode of the mft record to free
+ *
+ * Free the mft record of the open inode @ni on the mounted ntfs volume @vol.
+ * Note that this function calls ntfs_inode_close() internally and hence you
+ * cannot use the pointer @ni any more after this function returns success.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
+{
+	u64 mft_no;
+	u16 seq_no;
+
+	if (!vol || !vol->mftbmp_na || !ni) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Cache the mft reference for later. */
+	mft_no = ni->mft_no;
+
+	/* Mark the mft record as not in use. */
+	ni->mrec->flags &= ~MFT_RECORD_IN_USE;
+
+	/* Increment the sequence number, skipping zero, if it is not zero. */
+	seq_no = le16_to_cpu(ni->mrec->sequence_number);
+	if (seq_no == 0xffff)
+		seq_no = 1;
+	else if (seq_no)
+		seq_no++;
+	ni->mrec->sequence_number = cpu_to_le16(seq_no);
+
+	/* Set the inode dirty and close it so it is written out. */
+	ntfs_inode_mark_dirty(ni);
+	if (ntfs_inode_close(ni)) {
+		int eo = errno;
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Failed to close the inode."
+				"Leaving inconsistent metadata!\n",
+				__FUNCTION__);
+		errno = eo;
+		return -1;
+	}
+
+	/* Clear the bit in the $MFT/$BITMAP corresponding to this record. */
+	if (ntfs_bitmap_clear_run(vol->mftbmp_na, mft_no, 1)) {
+		// FIXME: Eeek! We need rollback! (AIA)
+		fprintf(stderr, "%s(): Eeek! Failed to clear the allocation "
+				"in the mft bitmap. Leaving deleted mft record "
+				"marked as in use in the mft bitmap and "
+				"pretending we succeeded. Error: %s\n",
+				__FUNCTION__, strerror(errno));
+	}
+	return 0;
 }
 

@@ -23,6 +23,7 @@
 #define _NTFS_MFT_H
 
 #include "volume.h"
+#include "inode.h"
 #include "layout.h"
 
 extern int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
@@ -99,6 +100,10 @@ static __inline__ u32 ntfs_mft_record_get_data_size(const MFT_RECORD *m)
 	/* Get the number of used bytes and return it. */
 	return le32_to_cpu(m->bytes_in_use);
 }
+
+extern ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, u64 start);
+
+extern int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni);
 
 #endif /* defined _NTFS_MFT_H */
 
