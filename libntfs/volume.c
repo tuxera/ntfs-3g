@@ -419,7 +419,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 	vol = ntfs_volume_alloc();
 	if (!vol)
 		goto error_exit;
-	if (rwflag & MS_RDONLY)
+	if ((rwflag & MS_RDONLY) == MS_RDONLY)
 		NVolSetReadOnly(vol);
 	Dprintf("Reading bootsector... ");
 	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
