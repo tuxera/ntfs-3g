@@ -143,12 +143,10 @@ static void copyright(void)
 {
 	fprintf(stderr, "Copyright (c) 2004 Anton Altaparmakov\n"
 			"Allocate and initialize a base or an extent mft "
-			"record.\n"
-			"If a base mft record is not specified, a base record "
-			"is allocated and initialized.\n"
-			"If a base mft record is specified, an extent mft "
-			"record is allocated and\n"
-			"initialized to point to the specified base mft "
+			"record.  If a base mft record\nis not specified, a "
+			"base mft record is allocated and initialized.  "
+			"Otherwise,\nan extent mft record is allocated and "
+			"initialized to point to the specified\nbase mft "
 			"record.\n");
 }
 
