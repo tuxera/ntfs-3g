@@ -2760,26 +2760,21 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 {
 	/*
 	 * Check that the attribute name hasn't been placed after the
-	 * attribute value/mapping pairs array. If it has we need to move it.
-	 * TODO: Implement the move. For now just abort. (AIA)
+	 * attribute valuy. Chkdsk treat this as corruption.
 	 */
-	if (a->name_length) {
-		if (le16_to_cpu(a->name_offset) >=
-					le16_to_cpu(a->value_offset)) {
-			// FIXME: Eeek!
-			Dprintf("%s(): Eeek!  Name is placed after the "
-					"attribute value.  Aborting...\n",
-					__FUNCTION__);
-			errno = ENOTSUP;
-			return -1;
-		}
+	if (a->name_length && le16_to_cpu(a->name_offset) >=
+			le16_to_cpu(a->value_offset)) {
+		Dprintf("%s(): Eeek!  Name is placed after the "
+			"attribute value. Corrupted inode. Run chkdsk.  "
+			"Aborting...\n", __FUNCTION__);
+		errno = EIO;
+		return -1;
 	}
 	/* Resize the resident part of the attribute record. */
 	if (ntfs_attr_record_resize(m, a, (le16_to_cpu(a->value_offset) +
 			new_size + 7) & ~7) < 0) {
 		if (errno != ENOSPC) {
 			int eo = errno;
-			// FIXME: Eeek!
 			Dprintf("%s(): Eeek!  Attribute record resize failed.  "
 					"Aborting...\n", __FUNCTION__);
 			errno = eo;
@@ -3003,7 +2998,6 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/* Some preliminary sanity checking. */
 	if (NAttrNonResident(na)) {
-		// FIXME: Eeek!
 		Dprintf("%s(): Eeek!  Trying to make non-resident attribute "
 				"non-resident.  Aborting...\n", __FUNCTION__);
 		errno = EINVAL;
@@ -3016,15 +3010,14 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/*
 	 * Check that the attribute name hasn't been placed after the
-	 * attribute value. If it has we need to move it.
-	 * TODO: Implement the move. For now just abort. (AIA)
+	 * attribute valuy. Chkdsk treat this as corruption.
 	 */
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->value_offset)) {
-		// FIXME: Eeek!
-		Dprintf("%s(): Eeek!  Name is placed after the attribute "
-				"value.  Aborting...\n", __FUNCTION__);
-		errno = ENOTSUP;
+		Dprintf("%s(): Eeek!  Name is placed after the "
+			"attribute value. Corrupted inode. Run chkdsk.  "
+			"Aborting...\n", __FUNCTION__);
+		errno = EIO;
 		return -1;
 	}
 
@@ -3039,7 +3032,6 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 			if (errno != ENOSPC) {
 				int eo = errno;
 
-				// FIXME: Eeek!
 				Dprintf("%s(): Eeek!  Failed to allocate "
 						"cluster(s).  Aborting...\n",
 						__FUNCTION__);
@@ -3071,7 +3063,6 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 				(u8*)a + le16_to_cpu(a->value_offset));
 		if (bw != le32_to_cpu(a->value_length)) {
 			err = errno;
-			// FIXME: Eeek!
 			Dprintf("Eeek!  Failed to write out attribute value "
 					"(bw = %lli, errno = %i).  "
 					"Aborting...\n", (long long)bw, err);
@@ -3084,7 +3075,6 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0);
 	if (mp_size < 0) {
 		err = errno;
-		// FIXME: Eeek!
 		Dputs("Eeek!  Failed to get size for mapping pairs array.  "
 				"Aborting...");
 		goto cluster_free_err_out;
@@ -3099,21 +3089,10 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 */
 	arec_size = (mp_ofs + mp_size + 7) & ~7;
 
-	/* Sanity check. */
-	if (a->name_length && ((le16_to_cpu(a->name_offset) +
-			a->name_length * sizeof(ntfschar)) > (u32) arec_size)) {
-		// FIXME: Eeek!
-		Dprintf("%s(): Eeek!  Name exceeds new record size! "
-				"Not supported.  Aborting...\n", __FUNCTION__);
-		err = ENOTSUP;
-		goto cluster_free_err_out;
-	}
-
 	/* Resize the resident part of the attribute record. */
 	if (ntfs_attr_record_resize(ctx->mrec, a, arec_size) < 0) {
 		err = errno;
 		if (err != ENOSPC) {
-			// FIXME: Eeek!
 			Dprintf("%s(): Eeek!  Failed to resize attribute "
 					"record.  Aborting...\n", __FUNCTION__);
 		}
