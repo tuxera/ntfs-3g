@@ -27,9 +27,10 @@ will print a list giving the inode number, name and size.
 .PP
 The
 .I undelete
-mode takes the inode and recovers as much of the data as possible.  It saves the
-result to another location.  Partly for safety, but mostly because NTFS write
-support isn't finished.
+mode takes the files either matching the regular expression (option -m)
+or  specified by the inode-expressions and recovers as much of the data
+as possible.   It saves the result to another location.  Partly for
+safety, but mostly because NTFS write support isn't finished.
 .SS Copy
 .PP
 This is a wizard's option.  It will save a portion of the MFT to a file.  This
@@ -158,14 +159,20 @@ file.  Use this option with caution.
 .B \-\-help
 Show a list of options with a brief description of each one.
 .TP
+.B \-i
+.br
+.ns
+.TP
+.B \-\-interactive
+Switches the interactive mode, meaning that for  each undeleting of a file
+the user will be asked.
+.TP
 .BI "\-m " pattern
 .br
 .ns
 .TP
 .BI "\-\-match " pattern
-Filter the output of the
-.B \-\-scan
-option, by only looking for matching filenames.  The pattern can include the
+Filter the output by only looking for matching filenames.  The pattern can include the
 wildcards '?', match exactly one character or '*', match zero or more
 characters.  By default the matching is case\-insensitive.  To make the search
 case sensitive, use the
@@ -275,14 +282,15 @@ is confident about the size of a deleted file, then it will restore the file to
 exactly that size.  The default behaviour is to round up the size to the nearest
 cluster (which will be a multiple of 512 bytes).
 .TP
-.BI "\-u " nums
+.BI "\-u " [nums]
 .br
 .ns
 .TP
-.BI "\-\-undelete " nums
-Recover the files with these inode numbers. You can specify more than
-one inode by separating with "," or a range of inodes by using
-"-". This option can be combined with
+.BI "\-\-undelete " [nums]
+where <nums> is optional. Recover the files either by matching the
+regular expression of option -m or by the given nums, which are the
+inode numbers. You can specify more than one inode by separating with
+"," or a range of inodes by using "-". This option can be combined with
 .BR \-\-output ,
 .BR \-\-destination ,
 and
