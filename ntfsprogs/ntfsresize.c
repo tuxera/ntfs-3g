@@ -485,15 +485,16 @@ static void print_advise(s64 supp_lcn, int flags)
 	freed_b = (vol->nr_clusters - supp_lcn + 1) * vol->cluster_size;
 	freed_mb = freed_b / NTFS_MBYTE;
 
-	printf("You %s resize at %lld bytes ", beta ? "might" : "could", new_b);
+	printf("You %s resize at %lld bytes ", beta ? "might" : "could",
+			(long long)new_b);
 	if ((new_mb * NTFS_MBYTE) < old_b)
-		printf("or %lld MB ", new_mb);
+		printf("or %lld MB ", (long long)new_mb);
 
 	printf("(freeing ");
 	if (freed_mb && (old_mb - new_mb))
-	    printf("%lld MB", old_mb - new_mb);
+	    printf("%lld MB", (long long)(old_mb - new_mb));
 	else
-	    printf("%lld bytes", freed_b);
+	    printf("%lld bytes", (long long)freed_b);
 	printf("). %s\n", beta ? "BETA." : "STABLE.");
 	
 	if (final)
@@ -520,8 +521,9 @@ static int rl_items(runlist *rl)
 
 static void dump_run(runlist_element *r)
 {
-	Vprintf(" %8lld  %8lld (0x%08llx)  %lld\n",
-		r->vcn, r->lcn, r->lcn, r->length);
+	Vprintf(" %8lld  %8lld (0x%08llx)  %lld\n", (long long)r->vcn,
+			(long long)r->lcn, (long long)r->lcn,
+			(long long)r->length);
 }
 
 static void dump_runlist(runlist *rl)
@@ -1004,7 +1006,7 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 		remains_size -= (next_attr - (char *)ctx->mrec);
 
 		Vprintf("increase         : %d\n", l);
-		Vprintf("shift            : %lld\n", remains_size);
+		Vprintf("shift            : %lld\n", (long long)remains_size);
 		
 		if (ctx->mrec->bytes_in_use + l > ctx->mrec->bytes_allocated)
 			err_exit("Extended record needed (%d > %d), not yet "
@@ -1097,7 +1099,8 @@ static int find_free_cluster(runlist_element *rle, s64 nr_vol_clusters, int hint
 	}
 	if (rle->length < items && rle->length < max_free_cluster_range) {
 		max_free_cluster_range = rle->length;
-		Vprintf("Max free range: %7lld     \n", max_free_cluster_range);
+		Vprintf("Max free range: %7lld     \n",
+				(long long)max_free_cluster_range);
 	}
 	pos = rle->lcn + items;
 	if (pos == nr_vol_clusters)
@@ -1281,7 +1284,7 @@ static void rl_split_run(runlist **rl, int run, s64 pos)
 	rl_set(rle_new, rle->vcn, rle->lcn, len_head);
 	rl_set(rle_new + 1, rle->vcn + len_head, rle->lcn + len_head, len_tail);
 	
-	Vprintf("Splitting run at cluster %lld:\n", pos);
+	Vprintf("Splitting run at cluster %lld:\n", (long long)pos);
 	dump_run(rle); dump_run(rle_new); dump_run(rle_new + 1);
 
 	free(*rl);
@@ -1344,8 +1347,10 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 	
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
 	Vprintf("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> 0x%08llx\n",
-	       resize->mref, resize->ctx->attr->type, lcn_length, lcn,
-	       relocate_rl->lcn);
+			(unsigned long long)resize->mref,
+			resize->ctx->attr->type, (long long)lcn_length,
+			(unsigned long long)lcn,
+			(unsigned long long)relocate_rl->lcn);
 
 	relocate_clusters(resize, relocate_rl, lcn);
 	rl_insert_at_run(rl, run, relocate_rl);

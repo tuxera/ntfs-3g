@@ -77,12 +77,14 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 	m_ctx->flags_search = FEMR_IN_USE | FEMR_BASE_RECORD;
 
 	while (mft_next_record (m_ctx) == 0) {
-		printf (RED "Inode: %lld\n" NORM, m_ctx->inode->mft_no);
+		printf (RED "Inode: %llu\n" NORM, (unsigned long long)
+				m_ctx->inode->mft_no);
 
 		if (!(m_ctx->flags_match & FEMR_BASE_RECORD))
 			continue;
 
-		Vprintf ("Inode: %lld\n", m_ctx->inode->mft_no);
+		Vprintf ("Inode: %llu\n", (unsigned long long)
+				m_ctx->inode->mft_no);
 
 		a_ctx = ntfs_attr_get_search_ctx (NULL, m_ctx->inode->mrec);
 
@@ -109,7 +111,12 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 				if (a_begin < 0)
 					continue;	// sparse, discontiguous, etc
 
-				Vprintf ("\t\t%lld\t%lld-%lld (%lld)\n", runs[j].vcn, runs[j].lcn, runs[j].lcn + runs[j].length - 1, runs[j].length);
+				Vprintf ("\t\t%lld\t%lld-%lld (%lld)\n",
+						(long long)runs[j].vcn,
+						(long long)runs[j].lcn,
+						(long long)(runs[j].lcn +
+						runs[j].length - 1),
+						(long long)runs[j].length);
 				//dprint list
 
 				if ((a_begin > c_end) || (a_end < c_begin))

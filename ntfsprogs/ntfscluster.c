@@ -377,7 +377,11 @@ int dump_file (ntfs_volume *vol, ntfs_inode *ino)
 			if (runs) {
 				printf ("             VCN     LCN     Length\n");
 				for (i = 0; runs[i].length > 0; i++) {
-					printf ("        %8lld %8lld %8lld\n", runs[i].vcn, runs[i].lcn, runs[i].length);
+					printf ("        %8lld %8lld %8lld\n",
+							(long long)runs[i].vcn,
+							(long long)runs[i].lcn,
+							(long long)
+							runs[i].length);
 				}
 				free (runs);
 			}
@@ -407,7 +411,7 @@ int print_match (ntfs_inode *ino, ATTR_RECORD *attr, runlist_element *run, void 
 	}
 
 	utils_inode_get_name (ino, buffer, MAX_PATH);
-	printf ("Inode %lld %s", ino->mft_no, buffer);
+	printf ("Inode %llu %s", (unsigned long long)ino->mft_no, buffer);
 
 	utils_attr_get_name (ino->vol, attr, buffer, MAX_PATH);
 	printf ("/%s\n", buffer);
@@ -491,7 +495,8 @@ int main (int argc, char *argv[])
 				result = dump_file (vol, ino);
 				ntfs_inode_close (ino);
 			} else {
-				Eprintf ("Cannot open inode %lld\n", opts.inode);
+				Eprintf ("Cannot open inode %llu\n",
+						(unsigned long long)opts.inode);
 			}
 			break;
 		case act_last:
@@ -504,7 +509,9 @@ int main (int argc, char *argv[])
 					result = dump_file (vol, ino);
 					ntfs_inode_close (ino);
 				} else {
-					Eprintf ("Cannot open inode %lld\n", opts.inode);
+					Eprintf ("Cannot open inode %llu\n",
+							(unsigned long long)
+							opts.inode);
 				}
 				result = 0;
 			} else {
