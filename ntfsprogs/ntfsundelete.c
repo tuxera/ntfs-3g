@@ -1,8 +1,8 @@
 /**
  * ntfsundelete - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Richard Russon
- * Copyright (c) 2004 Holger Ohmacht
+ * Copyright (c) 2002-2005 Richard Russon
+ * Copyright (c) 2004-2005 Holger Ohmacht
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -68,12 +68,16 @@ typedef struct
 	u32 end;
 } range;
 
-static range *ranges;
-static long  nr_entries;
+static short	with_regex;			/* Flag  Regular expression available */
+static short	avoid_duplicate_printing;	/* Flag  No duplicate printing of file infos */
+static range	*ranges;			/* Array containing all Inode-Rages for undelete */
+static long	nr_entries;			/* Number of range entries */
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+
+static int undelete_file (ntfs_volume *vol, long long inode);
 
 #define _(S)	gettext(S)
 
@@ -97,43 +101,43 @@ static int parse_inode_arg (void)
 	char *opt_arg_end1;
 	char *opt_arg_end2;
 
+	/* Check whether optarg is available or not */
+	nr_entries = 0;
+	if (optarg == NULL)
+		return (0);	/* bailout if no optarg */
+
 	/* init variables */
 	p = strlen (optarg);
 	imax = p;
 	opt_arg_ptr = optarg;
 	opt_arg_end1 = optarg;
 	opt_arg_end2 = &(optarg[p]);
-	nr_entries = 0;
 
 	/* alloc mem for range table */
 	ranges = (range *) malloc ((p + 1) * sizeof (range));
-	if (ranges == NULL)
-	{
+	if (ranges == NULL) {
 		printf ("ERROR: Couldn't alloc mem for parsing inodes!\n");
 		return (-1);
 	}
 
 	/* loop */
-	while ((opt_arg_end1 != opt_arg_end2) && (p > 0))
-	{
+	while ((opt_arg_end1 != opt_arg_end2) && (p > 0)) {
+		/* Try to get inode */
 		inode = strtoul (opt_arg_ptr, &opt_arg_end1, 0);
 		p--;
 
 		/* invalid char at begin */
-		if ((opt_arg_ptr == opt_arg_end1) || (opt_arg_ptr == opt_arg_end2))
-		{
+		if ((opt_arg_ptr == opt_arg_end1) || (opt_arg_ptr == opt_arg_end2)) {
 			printf ("ERROR: Invalid Number: %s\n", opt_arg_ptr);
 			return (-1);
 		}
 
 		/* RANGE - Check for range */
-		if (opt_arg_end1[0] == '-')
-		{
+		if (opt_arg_end1[0] == '-') {
 			/* get range end */
 			opt_arg_temp = opt_arg_end1;
 			opt_arg_end1 = & (opt_arg_temp[1]);
-			if (opt_arg_temp >= opt_arg_end2)
-			{
+			if (opt_arg_temp >= opt_arg_end2) {
 				printf ("ERROR: Missing range end!\n");
 				return (-1);
 			}
@@ -141,15 +145,13 @@ static int parse_inode_arg (void)
 
 			/* get count */
 			range_end = strtoul (opt_arg_end1, &opt_arg_temp, 0);
-			if (opt_arg_temp == opt_arg_end1)
-			{
+			if (opt_arg_temp == opt_arg_end1) {
 				printf ("ERROR: Invalid Number: %s\n", opt_arg_temp);
 				return (-1);
 			}
 
 			/* check for correct values */
-			if (range_begin > range_end)
-			{
+			if (range_begin > range_end) {
 				range_temp = range_end;
 				range_end = range_begin;
 				range_begin = range_temp;
@@ -173,8 +175,7 @@ static int parse_inode_arg (void)
 
 			/* Next inode */
 			opt_arg_ptr = & (opt_arg_end1[1]);
-			if (opt_arg_ptr >= opt_arg_end2)
-			{
+			if (opt_arg_ptr >= opt_arg_end2) {
 				printf ("ERROR: Missing new value at end of input!\n");
 				return (-1);
 			}
@@ -199,8 +200,8 @@ static void version (void)
 {
 	printf ("\n%s v%s - Recover deleted files from an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
-	printf ("Copyright (c)\n");
-	printf ("    2002-2003 Richard Russon\n");
+	printf ("Copyright (c) 2002-2005 Richard Russon\n"
+		"Copyright (c) 2004-2005 Holger Ohmacht\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -221,7 +222,8 @@ static void usage (void)
 		"    -S range    --size range       Match files of this size\n"
 		"    -t since    --time since       Last referenced since this time\n"
 		"\n"
-		"    -u nums     --undelete nums    Undelete inodes\n"
+		"    -i          --interactive      Interactive mode\n"
+		"    -u [nums]   --undelete [nums]  Undelete mode: if <nums> specified, so undelete these\n"
 		"    -o file     --output file      Save with this filename\n"
 		"    -O          --optimistic       Undelete in-use clusters as well\n"
 		"    -d dir      --destination dir  Destination directory\n"
@@ -395,13 +397,14 @@ static int parse_time (const char *value, time_t *since)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fh?m:o:OPp:sS:t:Tu:qvV";
+	static const char *sopt = "-b:Cc:d:fhi?m:o:OPp:sS:t:Tu::qvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
 		{ "copy",	 required_argument,	NULL, 'c' },
 		{ "destination", required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
+		{ "interactive", no_argument,		NULL, 'i' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "match",	 required_argument,	NULL, 'm' },
 		{ "output",	 required_argument,	NULL, 'o' },
@@ -412,7 +415,7 @@ static int parse_options (int argc, char *argv[])
 		{ "parent",	 no_argument,		NULL, 'P' },
 		{ "time",	 required_argument,	NULL, 't' },
 		{ "truncate",	 no_argument,		NULL, 'T' },
-		{ "undelete",	 required_argument,	NULL, 'u' },
+		{ "undelete",	 optional_argument,	NULL, 'u' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
@@ -431,8 +434,7 @@ static int parse_options (int argc, char *argv[])
 	opts.uinode   = -1;
 	opts.percent  = -1;
 	opts.fillbyte = -1;
-
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+        while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
@@ -480,8 +482,12 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'm':
 			if (!opts.match) {
-				if (!transform (optarg, &opts.match))
+				if (!transform (optarg, &opts.match)) {
 					err++;
+				} else {
+					/* set regex-flag on true ;) */
+					with_regex= 1;
+				}
 			} else {
 				err++;
 			}
@@ -545,8 +551,7 @@ static int parse_options (int argc, char *argv[])
 			opts.truncate++;
 			break;
 		case 'u':
-			if (opts.mode == MODE_NONE)
-			{
+			if (opts.mode == MODE_NONE) {
 				end = NULL;
 				opts.mode = MODE_UNDELETE;
 				/* parse inodes */
@@ -605,13 +610,13 @@ static int parse_options (int argc, char *argv[])
 				err++;
 			}
 			break;
+
 		case MODE_UNDELETE:
-			if ((opts.percent != -1) || opts.match || opts.match_case ||
-			    (opts.size_begin > 0) || (opts.size_end > 0)) {
+			/*if ((opts.percent != -1) || (opts.size_begin > 0) || (opts.size_end > 0)) {
 				Eprintf ("Undelete can only be used with "
 					"--output, --destination, --byte and --truncate.\n");
 				err++;
-			}
+			}*/
 			break;
 		case MODE_COPY:
 			if ((opts.fillbyte != (char)-1) || opts.truncate ||
@@ -730,7 +735,7 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec) {
 
 	ctx = ntfs_attr_get_search_ctx(NULL, rec);
 	if (!ctx) {
-		Eprintf ("Couldn't create a search context.\n");
+		Eprintf ("ERROR: Couldn't create a search context.\n");
 		return NULL;
 	}
 
@@ -754,15 +759,14 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec) {
 
 			if (filename_attr->file_name_type == name->name_space) {
 				found_same_space = 1;
-			}
-			else {
+			} else {
 				if (filename_attr->file_name_type < lowest_space_name->file_name_type) {
 					lowest_space_name = filename_attr;
 				}
 			}
 		}
 	}
-	
+
 	ntfs_attr_put_search_ctx(ctx);
 
 	return (found_same_space ? filename_attr : lowest_space_name);
@@ -771,9 +775,9 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec) {
 /**
  * get_parent_name - Find the name of a file's parent.
  * @name:	the filename whose parent's name to find
- *
  */
-static void get_parent_name(struct filename* name, ntfs_volume* vol) {
+static void get_parent_name (struct filename* name, ntfs_volume* vol)
+{
 	ntfs_attr* mft_data;
 	MFT_RECORD* rec;
 	FILE_NAME_ATTR* filename_attr;
@@ -784,21 +788,19 @@ static void get_parent_name(struct filename* name, ntfs_volume* vol) {
 	
 	rec = calloc(1, vol->mft_record_size);
 	if (!rec) {
-		Eprintf ("Couldn't allocate memory in get_parent_name()\n");
+		Eprintf ("ERROR: Couldn't allocate memory in get_parent_name()\n");
 		return;
 	}
 
 	mft_data = ntfs_attr_open(vol->mft_ni, AT_DATA, NULL, 0);
 	if (!mft_data) {
-		Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
-	}
-	else {
+		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+	} else {
 		inode_num = MREF(name->parent_mref);
 
 		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num, vol->mft_record_size, rec) < 1) {
-			Eprintf ("Couldn't read MFT Record %lld.\n", inode_num);
-		}
-		else {
+			Eprintf ("ERROR: Couldn't read MFT Record %lld.\n", inode_num);
+		} else {
 			if ((filename_attr = verify_parent(name, rec))) {
 				if (ntfs_ucstombs(filename_attr->file_name, filename_attr->file_name_length, &name->parent_name, 0) < 0) {
 					Dprintf ("Couldn't translate filename to current locale.\n");
@@ -860,7 +862,7 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 
 		name = calloc (1, sizeof (*name));
 		if (!name) {
-			Eprintf ("Couldn't allocate memory in get_filenames().\n");
+			Eprintf ("ERROR: Couldn't allocate memory in get_filenames().\n");
 			count = -1;
 			break;
 		}
@@ -879,7 +881,7 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 
 		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
 		    name->uname_len) < 0) {
-			Dprintf ("Couldn't translate filename to current locale.\n");
+			Dprintf ("ERROR: Couldn't translate filename to current locale.\n");
 		}
 
 		name->parent_name = NULL;
@@ -939,7 +941,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 	while ((rec = find_attribute (AT_DATA, ctx))) {
 		data = calloc (1, sizeof (*data));
 		if (!data) {
-			Eprintf ("Couldn't allocate memory in get_data().\n");
+			Eprintf ("ERROR: Couldn't allocate memory in get_data().\n");
 			count = -1;
 			break;
 		}
@@ -954,7 +956,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 
 			if (ntfs_ucstombs (data->uname, data->uname_len, &data->name,
 			    data->uname_len) < 0) {
-				Eprintf ("Cannot translate name into current locale.\n");
+				Eprintf ("ERROR: Cannot translate name into current locale.\n");
 			}
 		}
 
@@ -1007,7 +1009,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 
 	file = calloc (1, sizeof (*file));
 	if (!file) {
-		Eprintf ("Couldn't allocate memory in read_record()\n");
+		Eprintf ("ERROR: Couldn't allocate memory in read_record()\n");
 		return NULL;
 	}
 
@@ -1017,20 +1019,20 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 
 	file->mft = malloc (vol->mft_record_size);
 	if (!file->mft) {
-		Eprintf ("Couldn't allocate memory in read_record()\n");
+		Eprintf ("ERROR: Couldn't allocate memory in read_record()\n");
 		free_file (file);
 		return NULL;
 	}
 
 	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, NULL, 0);
 	if (!mft) {
-		Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 		free_file (file);
 		return NULL;
 	}
 
 	if (ntfs_attr_mst_pread (mft, vol->mft_record_size * record, 1, vol->mft_record_size, file->mft) < 1) {
-		Eprintf ("Couldn't read MFT Record %lld.\n", record);
+		Eprintf ("ERROR: Couldn't read MFT Record %lld.\n", record);
 		ntfs_attr_close (mft);
 		free_file (file);
 		return NULL;
@@ -1045,8 +1047,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 
 	Dprintf ("Attributes present: %s %s %s\n", attr10?"0x10":"", attr20?"0x20":"", attr90?"0x90":"");
 
-	if (attr10)
-	{
+	if (attr10) {
 		STANDARD_INFORMATION *si;
 		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu (attr10->value_offset));
 		file->date = ntfs2utc (sle64_to_cpu (si->last_data_change_time));
@@ -1058,10 +1059,10 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 		file->directory = 1;
 
 	if (get_filenames (file, vol) < 0) {
-		Eprintf ("Couldn't get filenames.\n");
+		Eprintf ("ERROR: Couldn't get filenames.\n");
 	}
 	if (get_data (file, vol) < 0) {
-		Eprintf ("Couldn't get data streams.\n");
+		Eprintf ("ERROR: Couldn't get data streams.\n");
 	}
 
 	return file;
@@ -1179,7 +1180,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		}
 
 		if ((clusters_inuse + clusters_free) == 0) {
-			Eprintf ("Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
+			Eprintf ("ERROR: Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
 			continue;
 		}
 
@@ -1369,6 +1370,7 @@ static void list_record (struct ufile *file)
 	Qprintf ("%-8lld %c%c%c%c   %3d%%  %s %9lld  %s\n",
 		file->inode, flagd, flagr, flagc, flagx,
 		percent, buffer, size, name);
+
 }
 
 /**
@@ -1533,7 +1535,7 @@ static int set_date (const char *pathname, time_t date)
 	ut.actime  = date;
 	ut.modtime = date;
 	if (utime (pathname, &ut)) {
-		Eprintf ("Couldn't set the file's date and time\n");
+		Eprintf ("ERROR: Couldn't set the file's date and time\n");
 		return 0;
 	}
 	return 1;
@@ -1570,14 +1572,14 @@ static int scan_disk (ntfs_volume *vol)
 
 	attr = ntfs_attr_open (vol->mft_ni, AT_BITMAP, AT_UNNAMED, 0);
 	if (!attr) {
-		Eprintf ("Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
+		Eprintf ("ERROR: Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
 		return -1;
 	}
 	bmpsize = attr->initialized_size;
 
 	buffer = malloc (BUFSIZE);
 	if (!buffer) {
-		Eprintf ("Couldn't allocate memory in scan_disk()\n");
+		Eprintf ("ERROR: Couldn't allocate memory in scan_disk()\n");
 		results = -1;
 		goto out;
 	}
@@ -1588,7 +1590,7 @@ static int scan_disk (ntfs_volume *vol)
 		if (!opts.match_case)
 			flags |= REG_ICASE;
 		if (regcomp (&re, opts.match, flags)) {
-			Eprintf ("Couldn't create a regex.\n");
+			Eprintf ("ERROR: Couldn't create a regex.\n");
 			goto out;
 		}
 	}
@@ -1596,7 +1598,7 @@ static int scan_disk (ntfs_volume *vol)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
-	Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
+	Qprintf ("Inode    Flags  %%age  Date           Size  Filename\n");
 	Qprintf ("---------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
 		long long read_count = min ((bmpsize - i), BUFSIZE);
@@ -1627,14 +1629,22 @@ static int scan_disk (ntfs_volume *vol)
 					goto skip;
 
 				percent = calc_percentage (file, vol);
-
 				if ((opts.percent == -1) || (percent >= opts.percent)) {
 					if (opts.verbose)
 						dump_record (file);
 					else
 						list_record (file);
-				}
 
+					/* Was -u specified with no inode
+					   so undelete file by regex */
+					if (opts.mode == MODE_UNDELETE) {
+						if  (!undelete_file (vol, file->inode))
+							Vprintf ("ERROR: Failed to undelete "
+							          "inode %lli\n!",
+							          file->inode);
+						printf ("\n");
+					}
+				}
 				if (((opts.percent == -1) && (percent > 0)) ||
 				    ((opts.percent > 0)  && (percent >= opts.percent))) {
 					results++;
@@ -1696,10 +1706,21 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 	if (!vol)
 		return 0;
 
+	/* try to get record */
 	file = read_record (vol, inode);
 	if (!file || !file->mft) {
 		Eprintf ("Can't read info from mft record %lld.\n", inode);
 		return 0;
+	}
+
+	/* if flag was not set, print file informations */
+	if (avoid_duplicate_printing == 0) {
+		if (opts.verbose) {
+			dump_record (file);
+		} else {
+			list_record (file);
+			//Qprintf ("\n");
+		}
 	}
 
 	bufsize = vol->cluster_size;
@@ -1720,15 +1741,6 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 	if (calc_percentage (file, vol) == 0) {
 		Qprintf ("File has no recoverable data.\n");
 		goto free;
-	}
-
-	if (opts.verbose) {
-		dump_record (file);
-	} else {
-		Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
-		Qprintf ("---------------------------------------------------------------\n");
-		list_record (file);
-		Qprintf ("\n");
 	}
 
 	if (list_empty (&file->data)) {
@@ -1987,6 +1999,46 @@ free:
 }
 
 /**
+ * handle_undelete
+ * Handles the undelete
+ */
+int handle_undelete (ntfs_volume *vol)
+{
+	int result = 1;
+	int i;
+	unsigned long long	inode;
+
+	/* Check whether (an) inode(s) was specified or at least a regex! */
+	if (nr_entries == 0) {
+		if (with_regex == 0) {
+			printf ("ERROR: NO inode(s) AND NO match-regex specified!\n");
+		} else {
+			avoid_duplicate_printing= 1;
+			result = !scan_disk (vol);
+			if (result)
+				Vprintf ("ERROR: Failed to scan device '%s'.\n", opts.device);
+		}
+	} else {
+		/* Normal undelete by specifying inode(s) */
+		Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
+		Qprintf ("---------------------------------------------------------------\n");
+
+		/* loop all given inodes */
+		for (i = 0; i < nr_entries; i++) {
+			for (inode = ranges[i].begin; inode <= ranges[i].end; inode ++) {
+				/* Now undelete file */
+				result = !undelete_file (vol, inode);
+				if (result)
+					Vprintf ("ERROR: Failed to undelete "
+						"inode %lli\n!",
+						inode);
+			}
+		}
+	}
+	return (result);
+}
+
+/**
  * main - Begin here
  *
  * Start from here.
@@ -1996,11 +2048,11 @@ free:
  */
 int main (int argc, char *argv[])
 {
-	s64 nr_mft_records;
 	ntfs_volume *vol;
 	int result = 1;
-	int i;
-	u32 inode;
+
+	with_regex = 0;
+	avoid_duplicate_printing = 0;
 
 	if (!parse_options (argc, argv))
 		goto free;
@@ -2011,39 +2063,28 @@ int main (int argc, char *argv[])
 	if (!vol)
 		return 1;
 
+	/* handling of the different modes */
 	switch (opts.mode) {
+	/* Scanning */
 	case MODE_SCAN:
 		result = !scan_disk (vol);
 		if (result)
-			Vprintf ("Failed to scan device '%s'.\n", opts.device);
+			Vprintf ("ERROR: Failed to scan device '%s'.\n", opts.device);
 		break;
+
+	/* Undelete-handling */
 	case MODE_UNDELETE:
-		if (nr_entries == 0)
-		{
-			printf ("ERROR: No inode(s) specified!\n");
-			break;
-		}
-
-		for (i = 0; i < nr_entries; i++)
-		{
-			for (inode = ranges[i].begin; inode <= ranges[i].end; inode ++)
-			{
-				result = !undelete_file (vol, inode);
-				if (result)
-					Vprintf ("ERROR: Failed to undelete "
-							"inode %u\n!",
-							(unsigned int)inode);
-			}
-		}
+		result= handle_undelete (vol);
 		break;
-	case MODE_COPY:
-		nr_mft_records = vol->mft_na->initialized_size >>
-				vol->mft_record_size_bits;
 
+	/* Handling of copy mft */
+	case MODE_COPY:
 		result = !copy_mft (vol, opts.mft_begin, opts.mft_end);
 		if (result)
-			Vprintf ("Failed to read MFT blocks %lld-%lld.\n",
-				opts.mft_begin, min(nr_mft_records, opts.mft_end));
+			Vprintf ("ERROR: Failed to read MFT blocks %lld-%lld.\n",
+				opts.mft_begin,
+				min((vol->mft_na->initialized_size >>
+				vol->mft_record_size_bits) , opts.mft_end));
 		break;
 	default:
 		; /* Cannot happen */
