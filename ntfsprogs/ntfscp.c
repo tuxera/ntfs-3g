@@ -324,11 +324,47 @@ int main (int argc, char *argv[])
  		perror("ERROR: Couldn't open destination file");
 		goto close_src;
 	}
-	
+	if ((le16_to_cpu(out->mrec->flags) & MFT_RECORD_IS_DIRECTORY) &&
+			!opts.inode){
+		/*
+		 * @out is directory and it was specified by pathname, add
+		 * filename to path and reopen inode.
+		 */
+		char *filename, *new_dest_file;
+
+		/*
+		 * FIXME: There should exist more beautiful way to get filename.
+		 * Not sure that it will work in windows, but I don't think that
+		 * someone will use ntfscp under windows.
+		 */
+		filename = strrchr(opts.src_file, '/');
+		if (filename)
+			filename++;
+		else
+			filename = opts.src_file;
+		/* Add 2 bytes for '/' and null-terminator. */
+		new_dest_file = malloc(strlen(opts.dest_file) +
+				strlen(filename) + 2);
+		if (!new_dest_file) {
+			perror("ERROR: malloc() failed");
+			goto close_dst;
+		}
+		strcpy(new_dest_file, opts.dest_file);
+		strcat(new_dest_file, "/");
+		strcat(new_dest_file, filename);
+		ntfs_inode_close(out);
+		out = utils_pathname_to_inode(vol, NULL, new_dest_file);
+		free(new_dest_file);
+		if (!out) {
+			perror("ERROR: Failed to open destination file");
+			goto close_src;
+		}
+	}
+
 	if (opts.attr_name) { 
 		attr_name_len = ntfs_mbstoucs(opts.attr_name, &attr_name, 0);
 		if (attr_name_len == -1) {
-			perror("ERROR: failed to parse attribute name");
+			perror("ERROR: Failed to parse attribute name");
 			goto close_dst;
 		}
 	}
