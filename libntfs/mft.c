@@ -296,9 +296,9 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 		m->mft_record_number = cpu_to_le32(MREF(mref));
 	}
 	m->magic = magic_FILE;
-	if (vol->mft_record_size >= NTFS_SECTOR_SIZE)
+	if (vol->mft_record_size >= NTFS_BLOCK_SIZE)
 		m->usa_count = cpu_to_le16(vol->mft_record_size /
-				NTFS_SECTOR_SIZE + 1);
+				NTFS_BLOCK_SIZE + 1);
 	else {
 		m->usa_count = cpu_to_le16(1);
 		Dprintf("Sector size is bigger than MFT record size.  "

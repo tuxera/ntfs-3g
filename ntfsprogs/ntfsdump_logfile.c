@@ -295,7 +295,7 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 	/* Verify the location and size of the update sequence array. */
 	usa_end_ofs = le16_to_cpu(rstr->usa_ofs) +
 			le16_to_cpu(rstr->usa_count) * sizeof(u16);
-	if (page_size / NTFS_SECTOR_SIZE + 1 != le16_to_cpu(rstr->usa_count))
+	if (page_size / NTFS_BLOCK_SIZE + 1 != le16_to_cpu(rstr->usa_count))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array size is "
 				"wrong.  Cannot handle this yet.\n");
@@ -304,7 +304,7 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 				"corrupt:  Update sequence array overlaps "
 				"restart page header.  Cannot handle this "
 				"yet.\n");
-	if (usa_end_ofs > NTFS_SECTOR_SIZE - sizeof(u16))
+	if (usa_end_ofs > NTFS_BLOCK_SIZE - sizeof(u16))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array overlaps or "
 				"is behind first protected sequence number.  "

@@ -109,7 +109,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
 	index_block_size = le32_to_cpu(ir->index_block_size);
-	if (index_block_size < NTFS_SECTOR_SIZE ||
+	if (index_block_size < NTFS_BLOCK_SIZE ||
 			index_block_size & (index_block_size - 1)) {
 		Dprintf("Index block size %u is invalid.\n", index_block_size);
 		goto put_err_out;
@@ -699,7 +699,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 
 	/* Determine the size of a vcn in the directory index. */
 	index_block_size = le32_to_cpu(ir->index_block_size);
-	if (index_block_size < NTFS_SECTOR_SIZE ||
+	if (index_block_size < NTFS_BLOCK_SIZE ||
 			index_block_size & (index_block_size - 1)) {
 		Dprintf("Index block size %u is invalid.\n", index_block_size);
 		goto dir_err_out;

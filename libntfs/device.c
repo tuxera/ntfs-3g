@@ -272,7 +272,7 @@ s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
 {
 	s64 br, i;
 
-	if (bksize & (bksize - 1) || bksize % NTFS_SECTOR_SIZE) {
+	if (bksize & (bksize - 1) || bksize % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -329,7 +329,7 @@ s64 ntfs_mst_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 {
 	s64 written, i;
 
-	if (count < 0 || bksize % NTFS_SECTOR_SIZE) {
+	if (count < 0 || bksize % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
 		return -1;
 	}

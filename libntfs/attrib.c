@@ -1365,7 +1365,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	Dprintf("%s(): Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)pos);
-	if (bk_cnt < 0 || bk_size % NTFS_SECTOR_SIZE) {
+	if (bk_cnt < 0 || bk_size % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -1417,7 +1417,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	Dprintf("%s(): Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)pos);
-	if (bk_cnt < 0 || bk_size % NTFS_SECTOR_SIZE) {
+	if (bk_cnt < 0 || bk_size % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
 		return -1;
 	}

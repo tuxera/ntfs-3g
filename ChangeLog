@@ -99,6 +99,8 @@ xx/xx/2004 - 2.0.0-WIP
 	  attrib.[hc]::ntfs_attr_{add,rm}(), respectively.  (Anton)
 	- Update sparse/compressed/encrypted bits in STANDARD_INFORMATION
 	  during inode sync.  (Yura)
+	- Rename NTFS_SECTOR_SIZE to NTFS_BLOCK_SIZE to keep in sync with
+	  kernel driver.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

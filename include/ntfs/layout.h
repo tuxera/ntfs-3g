@@ -158,12 +158,9 @@ typedef enum {
 #define ntfs_is_empty_record(x)		( ntfs_is_magic (x, empty) )
 #define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
-/*
- * Defines for the NTFS filesystem. Don't want to use BLOCK_SIZE and
- * BLOCK_SIZE_BITS from the kernel as that is 1024 and hence too high for us.
- */
-#define NTFS_SECTOR_SIZE	512
-#define NTFS_SECTOR_SIZE_BITS	9
+
+#define NTFS_BLOCK_SIZE		512
+#define NTFS_BLOCK_SIZE_BITS	9
 
 /*
  * The Update Sequence Array (usa) is an array of the u16 values which belong

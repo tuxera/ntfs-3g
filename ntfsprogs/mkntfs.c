@@ -2132,9 +2132,9 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	/* Setup header. */
 	ia_val->magic = magic_INDX;
 	ia_val->usa_ofs = cpu_to_le16(sizeof(INDEX_ALLOCATION));
-	if (index_block_size >= NTFS_SECTOR_SIZE)
+	if (index_block_size >= NTFS_BLOCK_SIZE)
 		ia_val->usa_count = cpu_to_le16(index_block_size /
-				NTFS_SECTOR_SIZE + 1);
+				NTFS_BLOCK_SIZE + 1);
 	else {
 		ia_val->usa_count = cpu_to_le16(1);
 		Qprintf("Sector size is bigger than index block size. Setting "

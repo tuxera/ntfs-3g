@@ -50,9 +50,9 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 	/* Decrement usa_count to get number of fixups. */
 	usa_count = le16_to_cpu(b->usa_count) - 1;
 	/* Size and alignment checks. */
-	if (size & (NTFS_SECTOR_SIZE - 1) || usa_ofs & 1 ||
+	if (size & (NTFS_BLOCK_SIZE - 1) || usa_ofs & 1 ||
 			(u32)(usa_ofs + (usa_count * 2)) > size ||
-			(size >> NTFS_SECTOR_SIZE_BITS) != usa_count) {
+			(size >> NTFS_BLOCK_SIZE_BITS) != usa_count) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -69,7 +69,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 	/*
 	 * Position in protected data of first u16 that needs fixing up.
 	 */
-	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
+	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
 	/*
 	 * Check for incomplete multi sector transfer(s).
 	 */
@@ -84,11 +84,11 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 			errno = EIO;
 			return -1;
 		}
-		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
 	}
 	/* Re-setup the variables. */
 	usa_count = le16_to_cpu(b->usa_count) - 1;
-	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
+	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
 	/* Fixup all sectors. */
 	while (usa_count--) {
 		/*
@@ -97,7 +97,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 		 */
 		*data_pos = *(++usa_pos);
 		/* Increment position in data as well. */
-		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
 	}
 	return 0;
 }
@@ -138,9 +138,9 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 	/* Decrement usa_count to get number of fixups. */
 	usa_count = le16_to_cpu(b->usa_count) - 1;
 	/* Size and alignment checks. */
-	if (size & (NTFS_SECTOR_SIZE - 1) || usa_ofs & 1 ||
+	if (size & (NTFS_BLOCK_SIZE - 1) || usa_ofs & 1 ||
 			(u32)(usa_ofs + (usa_count * 2)) > size ||
-			(size >> NTFS_SECTOR_SIZE_BITS) != usa_count) {
+			(size >> NTFS_BLOCK_SIZE_BITS) != usa_count) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -156,7 +156,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 	usn = cpu_to_le16(usn);
 	*usa_pos = usn;
 	/* Position in data of first u16 that needs fixing up. */
-	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
+	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
 	/* Fixup all sectors. */
 	while (usa_count--) {
 		/*
@@ -167,7 +167,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 		/* Apply fixup to data. */
 		*data_pos = usn;
 		/* Increment position in data as well. */
-		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
 	}
 	return 0;
 }
@@ -192,7 +192,7 @@ void ntfs_mst_post_write_fixup(NTFS_RECORD *b)
 	usa_pos = (u16*)b + usa_ofs/sizeof(u16);
 
 	/* Position in protected data of first u16 that needs fixing up. */
-	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
+	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
 
 	/* Fixup all sectors. */
 	while (usa_count--) {
@@ -203,7 +203,7 @@ void ntfs_mst_post_write_fixup(NTFS_RECORD *b)
 		*data_pos = *(++usa_pos);
 
 		/* Increment position in data as well. */
-		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
 	}
 }
 
