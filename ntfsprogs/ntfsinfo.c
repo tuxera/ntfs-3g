@@ -999,9 +999,110 @@ static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr)
 	printf("\tTODO\n");
 }
 
+static void ntfs_hex_dump(void *buf,unsigned int length)
+{
+	unsigned int i=0;
+	while (i<length) {
+		unsigned int j;
+
+		/* line start */
+		printf("\t%04X  ",i);
+
+		/* hex content */
+		for (j=i;(j<length) && (j<i+16);j++) {
+			unsigned char c = *((char *)buf + j);
+			printf("%02X ",(unsigned int)c);
+		}
+		
+		/* realign */
+		for (;j<i+16;j++) {
+   			printf("   ");
+		}
+		
+		/* char content */
+		for (j=i;(j<length) && (j<i+16);j++) {
+			unsigned char c = *((char *)buf + j);
+			/* display unprintable chars as '.' */
+			if ((c<32) || (c>126)) {
+				c = '.';
+			}
+			printf("%c",c);
+		}
+		
+		/* end line */
+		printf("\n");
+		i=j;
+	}
+}
+
 static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 {
-	printf("TODO: ntfs_dump_unknown_attr\n");
+	printf("Dumping unknown attribute type 0x%X.\n"
+			"--Please report this to linux-ntfs-dev@lists.sourceforge.net--\n",
+			(unsigned int)le32_to_cpu(attr->type));
+
+	printf("\tResident size:\t\t %u\n",(unsigned int)le32_to_cpu(attr->length));
+
+	printf("\tIs resident? \t\t ");
+	if (attr->non_resident) {
+		printf("No\n");
+	} else {
+		printf("Yes\n");
+	}
+
+	/* Dump attribute name */
+	if (attr->name_length) {
+		char *attr_name = NULL;
+		attr_name = ntfs_attr_get_name(attr);
+
+		if (attr_name) {
+			printf("\tAttribute name: \t '%s'\n",attr_name);
+			free(attr_name);
+		} else {
+			/* an error occured, errno holds the reason - notify the user */
+			fprintf(stderr, "ntfsinfo error: could not parse attribute name: %s\n",
+				strerror(errno));
+		}
+	} else {
+		printf("\tAttribute name: \t unnamed\n");
+	}
+
+	/* we could parse the flags */
+	/* however, it does not make sense with a new attribute type */
+	printf("\tFlags:\t\t\t 0x%x\n",attr->flags);
+
+	/* fork by residence */
+	printf("\tIs resident?\t\t ");
+	if (attr->non_resident) {
+		printf("No\n");
+		printf("\tAllocated data size:\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->allocated_size));
+		printf("\tUsed data size:\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->data_size));
+		printf("\tInitialized data size:\t %llu\n",
+			(unsigned long long)le64_to_cpu(attr->initialized_size));
+
+		/* if the attribute resident part is large enough, it may contain
+			the compressed size */
+		if ((le32_to_cpu(attr->length)>=72) &&
+			((attr->name_offset==0) || (le16_to_cpu(attr->name_offset)>=72))) {
+			printf("\tCompressed size:\t %llu\n",
+				(unsigned long long)le64_to_cpu(attr->compressed_size));
+		}
+	} else {
+		printf("Yes\n");
+		printf("\tResident payload size:\t %u\n",
+			(unsigned int)le32_to_cpu(attr->value_length));
+
+		/* residence flags are 1 byte, cast it to a longer type */
+		printf("\tResidence Flags:\t 0x%hx\n",
+			(short unsigned int)attr->resident_flags);
+
+		/* hex dump */
+		printf("\tDumping some of the attribute data:\n");
+		ntfs_hex_dump((u8*)attr + le16_to_cpu(attr->value_offset),
+			(le16_to_cpu(attr->value_length)>128)?128:le16_to_cpu(attr->value_length));
+	}
 }
 
 static void ntfs_dump_inode_general_info(ntfs_inode *inode)
