@@ -229,6 +229,7 @@ static int parse_options (int argc, char **argv)
 	return (!err && !help && !ver);
 }
 
+#if 0
 
 /**
  * ntfs_debug_runlist_dump2 - Dump a runlist.
@@ -288,6 +289,8 @@ static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 	return res;
 }
 
+#endif /* if 0 */
+
 /**
  * resize_nonres_attr
  */
@@ -341,6 +344,8 @@ static int calc_attr_length (ATTR_RECORD *rec, int runlength)
 	return size;
 }
 
+#if 0
+
 /**
  * dump_runs
  */
@@ -354,6 +359,8 @@ static void dump_runs (u8 *buffer, int len)
 	}
 	printf ("[0m\n");
 }
+
+#endif /* if 0 */
 
 /**
  * find_unused
