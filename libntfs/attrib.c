@@ -880,7 +880,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	runlist_element *rl;
 	int eo;
 	struct {
-		unsigned int initialized_size	: 1;
+		char initialized_size;
 	} need_to_undo = { 0 };
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
