@@ -1307,9 +1307,15 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * ntfs_attr_find() takes a search context @ctx as parameter and searches the
  * mft record specified by @ctx->mrec, beginning at @ctx->attr, for an
  * attribute of @type, optionally @name and @val. If found, ntfs_attr_find()
- * returns 0 and @ctx->attr will point to the found attribute. If not found,
- * ntfs_attr_find() returns -1, with errno set to the error code and @ctx->attr
- * is undefined (i.e. do not rely on it not changing).
+ * returns 0 and @ctx->attr will point to the found attribute.
+ *
+ * If not found, ntfs_attr_find() returns -1, with errno set to ENOENT and
+ * @ctx->attr will point to the attribute before which the attribute being
+ * searched for would need to be inserted if such an action were to be desired.
+ *
+ * On actual error, ntfs_attr_find() returns -1 with errno set to the error
+ * code but not to ENOENT.  In this case @ctx->attr is undefined and in
+ * particular do not rely on it not changing.
  *
  * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself. If it
  * is FALSE, the search begins after @ctx->attr.
@@ -1393,7 +1399,6 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
 		ctx->attr = a;
-		/* We catch $END with this more general check, too... */
 		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
 				le32_to_cpu(type))) ||
 				(a->type == AT_END)) {
@@ -1583,8 +1588,9 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		/* First call happens with the base mft record. */
 		base_ni = ctx->base_ntfs_ino = ctx->ntfs_ino;
 		ctx->base_mrec = ctx->mrec;
-		ctx->base_attr = ctx->attr;
 	}
+	if (ni == base_ni)
+		ctx->base_attr = ctx->attr;
 	if (type == AT_END)
 		goto not_found;
 	vol = base_ni->vol;
