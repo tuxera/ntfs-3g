@@ -873,7 +873,8 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 
 	Printf("Scanning volume ...\n");
 
-	last_mft_rec = volume->nr_mft_records - 1;
+	last_mft_rec = (volume->mft_na->initialized_size >>
+			volume->mft_record_size_bits) - 1;
 	progress_init(&progress, inode, last_mft_rec, 100);
 
 	for (; inode <= last_mft_rec; inode++) {
@@ -1331,7 +1332,8 @@ int main(int argc, char **argv)
 	walk_clusters(vol, &backup_clusters);
 	
 	Printf("Num of MFT records       = %8lld\n",
-			(long long)vol->nr_mft_records); 
+			(long long)vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits); 
 	Printf("Num of used MFT records  = %8d\n", nr_used_mft_records); 
 	
 	Printf("Wiped unused MFT data    = %8d\n", wiped_unused_mft_data); 

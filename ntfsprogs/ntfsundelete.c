@@ -1553,6 +1553,7 @@ static int set_date (const char *pathname, time_t date)
  */
 static int scan_disk (ntfs_volume *vol)
 {
+	s64 nr_mft_records;
 	const int BUFSIZE = 8192;
 	char *buffer = NULL;
 	int results = 0;
@@ -1592,6 +1593,9 @@ static int scan_disk (ntfs_volume *vol)
 		}
 	}
 
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
 	Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
 	Qprintf ("---------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
@@ -1603,7 +1607,7 @@ static int scan_disk (ntfs_volume *vol)
 		for (j = 0; j < size; j++) {
 			b = buffer[j];
 			for (k = 0; k < 8; k++, b>>=1) {
-				if (((i+j)*8+k) >= vol->nr_mft_records)
+				if (((i+j)*8+k) >= nr_mft_records)
 					goto done;
 				if (b & 1)
 					continue;
@@ -1907,6 +1911,7 @@ free:
  */
 static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 {
+	s64 nr_mft_records;
 	char pathname[256];
 	ntfs_attr *mft;
 	char *buffer;
@@ -1948,10 +1953,13 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 		goto attr;
 	}
 
-	mft_end = min (mft_end, vol->nr_mft_records - 1);
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
+	mft_end = min (mft_end, nr_mft_records - 1);
 
 	Dprintf ("MFT records\n");
-	Dprintf ("    Total: %8lld\n", vol->nr_mft_records);
+	Dprintf ("    Total: %8lld\n", nr_mft_records);
 	Dprintf ("    Begin: %8lld\n", mft_begin);
 	Dprintf ("    End:   %8lld\n", mft_end);
 
@@ -1988,6 +1996,7 @@ free:
  */
 int main (int argc, char *argv[])
 {
+	s64 nr_mft_records;
 	ntfs_volume *vol;
 	int result = 1;
 	int i;
@@ -2028,10 +2037,13 @@ int main (int argc, char *argv[])
 		}
 		break;
 	case MODE_COPY:
+		nr_mft_records = vol->mft_na->initialized_size >>
+				vol->mft_record_size_bits;
+
 		result = !copy_mft (vol, opts.mft_begin, opts.mft_end);
 		if (result)
 			Vprintf ("Failed to read MFT blocks %lld-%lld.\n",
-				opts.mft_begin, min(vol->nr_mft_records, opts.mft_end));
+				opts.mft_begin, min(nr_mft_records, opts.mft_end));
 		break;
 	default:
 		; /* Cannot happen */

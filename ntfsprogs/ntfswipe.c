@@ -566,14 +566,17 @@ static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
 static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
-	s64 inode_num;
+	s64 nr_mft_records, inode_num;
 	ntfs_inode *ni;
 	ntfs_attr *na;
 
 	if (!vol || (byte < 0))
 		return -1;
 
-	for (inode_num = 16; inode_num < vol->nr_mft_records; inode_num++) {
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
+	for (inode_num = 16; inode_num < nr_mft_records; inode_num++) {
 		s64 wiped;
 
 		Vprintf ("Inode %lld - ", inode_num);
@@ -646,7 +649,7 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 {
 	// by considering the individual attributes we might be able to
 	// wipe a few more bytes at the attr's tail.
-	s64 i;
+	s64 nr_mft_records, i;
 	s64 total = 0;
 	s64 result = 0;
 	int size = 0;
@@ -661,7 +664,10 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 		return -1;
 	}
 
-	for (i = 0; i < vol->nr_mft_records; i++) {
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
+	for (i = 0; i < nr_mft_records; i++) {
 		if (utils_mftrec_in_use (vol, i)) {
 			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
@@ -920,7 +926,7 @@ static u32 get_indx_record_size (ntfs_attr *nar)
 static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
-	s64 inode_num;
+	s64 nr_mft_records, inode_num;
 	ntfs_inode *ni;
 	ntfs_attr *naa;
 	ntfs_attr *nab;
@@ -929,7 +935,10 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return -1;
 
-	for (inode_num = 5; inode_num < vol->nr_mft_records; inode_num++) {
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
+	for (inode_num = 5; inode_num < nr_mft_records; inode_num++) {
 		u32 indx_record_size;
 		s64 wiped;
 

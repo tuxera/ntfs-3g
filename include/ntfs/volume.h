@@ -140,9 +140,6 @@ struct _ntfs_volume {
 				   lcn 0 and so on. A set bit means that the
 				   cluster and vice versa. */
 
-	s64 nr_mft_records;	/* Number of initialized records in the mft,
-				   equals the number of bits in mft_bitmap that
-				   may be set. */
 	LCN mft_lcn;		/* Logical cluster number of the data attribute
 				   for FILE_MFT. */
 	ntfs_inode *mft_ni;	/* ntfs_inode structure for FILE_MFT. */

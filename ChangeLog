@@ -24,6 +24,7 @@ xx/xx/2004 - 2.0.0-WIP
 	  all callers.  This allows filling an attribute extent with mapping
 	  pairs and then continuing in a different extent once the first extent
 	  is full.  (Yura)
+	- Remove vol->nr_mft_records and update all users.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

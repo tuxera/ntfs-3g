@@ -953,7 +953,7 @@ static int inode_close(ntfs_inode *ni)
  */
 static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 {
-	s64 inode = 0;
+	s64 nr_mft_records, inode = 0;
 	ntfs_inode *ni;
 	struct progress_bar progress;
 	int pb_flags = 0;	/* progress bar flags */
@@ -964,9 +964,12 @@ static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 	if (fsck->flags & NTFSCK_PROGBAR)
 		pb_flags |= NTFS_PROGBAR;
 
-	progress_init(&progress, inode, vol->nr_mft_records - 1, pb_flags);
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
 
-	for (; inode < vol->nr_mft_records; inode++) {
+	progress_init(&progress, inode, nr_mft_records - 1, pb_flags);
+
+	for (; inode < nr_mft_records; inode++) {
 		progress_update(&progress, inode);
 
 		if ((ni = ntfs_inode_open(vol, (MFT_REF)inode)) == NULL) {
@@ -1033,12 +1036,15 @@ static void resize_constrains_by_attributes(ntfs_resize_t *resize)
 
 static void set_resize_constrains(ntfs_resize_t *resize)
 {
-	s64 inode;
+	s64 nr_mft_records, inode;
 	ntfs_inode *ni;
 
 	printf("Collecting shrinkage constrains ...\n");
 
-	for (inode = 0; inode < resize->vol->nr_mft_records; inode++) {
+	nr_mft_records = resize->vol->mft_na->initialized_size >>
+			resize->vol->mft_record_size_bits;
+
+	for (inode = 0; inode < nr_mft_records; inode++) {
 
 		ni = ntfs_inode_open(resize->vol, (MFT_REF)inode);
 		if (ni == NULL) {
@@ -1586,6 +1592,7 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref)
 
 static void relocate_inodes(ntfs_resize_t *resize)
 {
+	s64 nr_mft_records;
 	MFT_REF mref;
 
 	printf("Relocating needed data ...\n");
@@ -1597,7 +1604,10 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	if (!resize->mrec)
 		perr_exit("malloc failed");
 
-   	for (mref = 1; mref < (MFT_REF)resize->vol->nr_mft_records; mref++)
+	nr_mft_records = resize->vol->mft_na->initialized_size >>
+			resize->vol->mft_record_size_bits;
+
+   	for (mref = 1; mref < (MFT_REF)nr_mft_records; mref++)
 		relocate_inode(resize, mref);
 
 	relocate_inode(resize, 0);

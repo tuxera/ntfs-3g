@@ -311,7 +311,7 @@ static int info (ntfs_volume *vol)
 	d = vol->nr_clusters << cb;
 	e = vol->nr_clusters;
 	f = vol->nr_clusters >> cps;
-	g = vol->nr_mft_records;
+	g = vol->mft_na->initialized_size >> vol->mft_record_size_bits;
 	h = inuse;
 	i = h * 100 / g;
 	j = fc;

@@ -72,7 +72,8 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	m = MREF(mref);
 	/* Refuse to read non-allocated mft records. */
-	if (m + count > vol->nr_mft_records) {
+	if (m + count > vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits) {
 		errno = ESPIPE;
 		return -1;
 	}
@@ -129,7 +130,8 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	m = MREF(mref);
 	/* Refuse to write non-allocated mft records. */
-	if (m + count > vol->nr_mft_records) {
+	if (m + count > vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits) {
 		errno = ESPIPE;
 		return -1;
 	}
@@ -375,20 +377,88 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
  * @start:	starting mft record at which to allocate (or -1 if none)
  *
  * Allocate an mft record in $MFT/$DATA starting to search for a free record
- * at mft record number @start or at the current allocator position if
- * @start_mref is -1, on the mounted ntfs volume @vol.
+ * at mft record number @start or at the current allocator position if @start
+ * is -1, on the mounted ntfs volume @vol.
  *
  * On success return the now opened ntfs inode of the mft record.
  *
  * On error return NULL with errno set to the error code.
+ *
+ * To find a free mft record, we scan the mft bitmap for a zero bit.  To
+ * optimize this we start scanning at the place specified by @start or if
+ * @start is -1 we start where we last stopped and we perform wrap around when
+ * we reach the end.  Note, we do not try to allocate mft records below number
+ * 24 because numbers 0 to 15 are the defined system files anyway and 16 to 24
+ * are special in that they are used for storing extension mft records for the
+ * $DATA attribute of $MFT.  This is required to avoid the possibility of
+ * creating a run list with a circular dependence which once written to disk
+ * can never be read in again.  Windows will only use records 16 to 24 for
+ * normal files if the volume is completely out of space.  We never use them
+ * which means that when the volume is really out of space we cannot create any
+ * more files while Windows can still create up to 8 small files.  We can start
+ * doing this at some later time, it does not matter much for now.
+ *
+ * When scanning the mft bitmap, we only search up to the last allocated mft
+ * record.  If there are no free records left in the range 24 to number of
+ * allocated mft records, then we extend the $MFT/$DATA attribute in order to
+ * create free mft records.  We extend the allocated size of $MFT/$DATA by 16
+ * records at a time or one cluster, if cluster size is above 16kiB.  If there
+ * is not sufficient space to do this, we try to extend by a single mft record
+ * or one cluster, if cluster size is above the mft record size, but we only do
+ * this if there is enough free space, which we know from the values returned
+ * by the failed cluster allocation function when we tried to do the first
+ * allocation.
+ *
+ * No matter how many mft records we allocate, we initialize only the first
+ * allocated mft record, incrementing mft data size and initialized size
+ * accordingly, open an ntfs_inode for it and return it to the caller, unless
+ * there are less than 24 mft records, in which case we allocate and initialize
+ * mft records until we reach record 24 which we consider as the first free mft
+ * record for use by normal files.
+ *
+ * If during any stage we overflow the initialized data in the mft bitmap, we
+ * extend the initialized size (and data size) by 8 bytes, allocating another
+ * cluster if required.  The bitmap data size has to be at least equal to the
+ * number of mft records in the mft, but it can be bigger, in which case the
+ * superflous bits are padded with zeroes.
+ *
+ * Thus, when we return successfully (return value non-zero), we will have:
+ *	- initialized / extended the mft bitmap if necessary,
+ *	- initialized / extended the mft data if necessary,
+ *	- set the bit corresponding to the mft record being allocated in the
+ *	  mft bitmap,
+ *	- open an ntfs_inode for the allocated mft record, and we will
+ *	- return the ntfs_inode.
+ *
+ * On error (return value zero), nothing will have changed.  If we had changed
+ * anything before the error occured, we will have reverted back to the
+ * starting state before returning to the caller.  Thus, except for bugs, we
+ * should always leave the volume in a consistent state when returning from
+ * this function.
+ *
+ * Note, this function cannot make use of most of the normal functions, like
+ * for example for attribute resizing, etc, because when the run list overflows
+ * the base mft record and an attribute list is used, it is very important that
+ * the extension mft records used to store the $DATA attribute of $MFT can be
+ * reached without having to read the information contained inside them, as
+ * this would make it impossible to find them in the first place after the
+ * volume is dismounted.  $MFT/$BITMAP probably does not need to follow this
+ * rule because the bitmap is not essential for finding the mft records, but on
+ * the other hand, handling the bitmap in this special way would make life
+ * easier because otherwise there might be circular invocations of functions
+ * when reading the bitmap but if we are careful, we should be able to avoid
+ * all problems.
  */
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, s64 start)
 {
-	if (!vol || !vol->mftbmp_na || start < -1) {
+	ntfs_debug("Entering (start 0x%llx).", (long long)start);
+	if (!vol || !vol->mft_na || !vol->mftbmp_na || start < -1) {
 		errno = EINVAL;
 		return NULL;
 	}
-
 	errno = ENOTSUP;
 	return NULL;
 }

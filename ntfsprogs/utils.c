@@ -963,6 +963,7 @@ void mft_put_search_ctx (struct mft_search_ctx *ctx)
  */
 int mft_next_record (struct mft_search_ctx *ctx)
 {
+	s64 nr_mft_records;
 	ATTR_RECORD *attr10 = NULL;
 	ATTR_RECORD *attr20 = NULL;
 	ATTR_RECORD *attr80 = NULL;
@@ -978,7 +979,10 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		ctx->inode = NULL;
 	}
 
-	for (ctx->mft_num++; (s64)ctx->mft_num < ctx->vol->nr_mft_records; ctx->mft_num++) {
+	nr_mft_records = ctx->vol->mft_na->initialized_size >>
+			ctx->vol->mft_record_size_bits;
+
+	for (ctx->mft_num++; (s64)ctx->mft_num < nr_mft_records; ctx->mft_num++) {
 		int in_use;
 
 		ctx->flags_match = 0;
