@@ -49,8 +49,9 @@ typedef struct _ntfs_volume ntfs_volume;
 
 #include "types.h"
 #include "support.h"
-#include "inode.h"
 #include "device.h"
+#include "inode.h"
+#include "attrib.h"
 
 /*
  * Flags returned by the ntfs_check_if_mounted() function.

@@ -28,9 +28,11 @@ typedef struct _ntfs_attr ntfs_attr;
 typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 
 #include "types.h"
+#include "inode.h"
 #include "unistr.h"
 #include "runlist.h"
 #include "volume.h"
+#include "debug.h"
 
 extern ntfschar AT_UNNAMED[];
 
@@ -123,41 +125,6 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
 }
 
 /**
- * ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
- */
-typedef enum {
-	NA_Initialized,		/* 1: structure is initialized. */
-	NA_NonResident,		/* 1: Attribute is not resident. */
-	NA_Compressed,		/* 1: Attribute is compressed. */
-	NA_Encrypted,		/* 1: Attribute is encrypted. */
-	NA_Sparse,		/* 1: Attribute is sparse. */
-} ntfs_attr_state_bits;
-
-#define  test_nattr_flag(na, flag)	 test_bit(NA_##flag, (na)->state)
-#define   set_nattr_flag(na, flag)	  set_bit(NA_##flag, (na)->state)
-#define clear_nattr_flag(na, flag)	clear_bit(NA_##flag, (na)->state)
-
-#define NAttrInitialized(na)		 test_nattr_flag(na, Initialized)
-#define NAttrSetInitialized(na)		  set_nattr_flag(na, Initialized)
-#define NAttrClearInitialized(na)	clear_nattr_flag(na, Initialized)
-
-#define NAttrNonResident(na)		 test_nattr_flag(na, NonResident)
-#define NAttrSetNonResident(na)		  set_nattr_flag(na, NonResident)
-#define NAttrClearNonResident(na)	clear_nattr_flag(na, NonResident)
-
-#define NAttrCompressed(na)		 test_nattr_flag(na, Compressed)
-#define NAttrSetCompressed(na)		  set_nattr_flag(na, Compressed)
-#define NAttrClearCompressed(na)	clear_nattr_flag(na, Compressed)
-
-#define NAttrEncrypted(na)		 test_nattr_flag(na, Encrypted)
-#define NAttrSetEncrypted(na)		  set_nattr_flag(na, Encrypted)
-#define NAttrClearEncrypted(na)		clear_nattr_flag(na, Encrypted)
-
-#define NAttrSparse(na)			 test_nattr_flag(na, Sparse)
-#define NAttrSetSparse(na)		  set_nattr_flag(na, Sparse)
-#define NAttrClearSparse(na)		clear_nattr_flag(na, Sparse)
-
-/**
  * ntfs_attr - ntfs in memory non-resident attribute structure
  * @rl:			if not NULL, the decompressed runlist
  * @ni:			base ntfs inode to which this attribute belongs
@@ -214,6 +181,51 @@ struct _ntfs_attr {
 	u8 compression_block_size_bits;
 	u8 compression_block_clusters;
 };
+
+/**
+ * ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
+ */
+typedef enum {
+	NA_Initialized,		/* 1: structure is initialized. */
+	NA_NonResident,		/* 1: Attribute is not resident. */
+} ntfs_attr_state_bits;
+
+#define  test_nattr_flag(na, flag)	 test_bit(NA_##flag, (na)->state)
+#define   set_nattr_flag(na, flag)	  set_bit(NA_##flag, (na)->state)
+#define clear_nattr_flag(na, flag)	clear_bit(NA_##flag, (na)->state)
+
+#define NAttrInitialized(na)		 test_nattr_flag(na, Initialized)
+#define NAttrSetInitialized(na)		  set_nattr_flag(na, Initialized)
+#define NAttrClearInitialized(na)	clear_nattr_flag(na, Initialized)
+
+#define NAttrNonResident(na)		 test_nattr_flag(na, NonResident)
+#define NAttrSetNonResident(na)		  set_nattr_flag(na, NonResident)
+#define NAttrClearNonResident(na)	clear_nattr_flag(na, NonResident)
+
+#define GenNAttrIno(flag)					\
+static inline int NAttr##flag(ntfs_attr *na)			\
+{								\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
+		return NIno##flag(na->ni);			\
+	return 0;						\
+}								\
+static inline void NAttrSet##flag(ntfs_attr *na)		\
+{								\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
+		NInoSet##flag(na->ni);				\
+	else							\
+		Dprintf("%s(): BUG! Called for named data "	\
+			"attribute.\n", __FUNCTION__);		\
+}								\
+static inline void NAttrClear##flag(ntfs_attr *na)		\
+{								\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
+		NInoClear##flag(na->ni);			\
+}
+
+GenNAttrIno(Compressed)
+GenNAttrIno(Encrypted)
+GenNAttrIno(Sparse)
 
 /*
  * Union of all known attribute values. For convenience. Used in the attr
@@ -294,6 +306,11 @@ extern int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra);
 extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na);
 
 extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
+
+extern ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, s64 size);
+
+extern int ntfs_inode_rm_attr(ntfs_attr *na);
 
 // FIXME / TODO: Above here the file is cleaned up. (AIA)
 /**

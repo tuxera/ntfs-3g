@@ -27,8 +27,9 @@
 typedef struct _ntfs_inode ntfs_inode;
 
 #include "types.h"
+#include "layout.h"
 #include "support.h"
-#include "runlist.h"
+#include "volume.h"
 
 /*
  * Defined bits for the state field in the ntfs_inode structure.
@@ -41,6 +42,9 @@ typedef enum {
 	NI_AttrList,		/* 1: Mft record contains an attribute list. */
 	NI_AttrListDirty,	/* 1: Attribute list needs to be written to the
 				      mft record and then to disk. */
+	NI_Compressed,		/* 1: Inode is compressed. */
+	NI_Encrypted,		/* 1: Inode is encrypted. */
+	NI_Sparse,		/* 1: Inode is sparse. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -77,6 +81,18 @@ typedef enum {
 #define NInoAttrListClearDirty(ni)		   clear_nino_al_flag(ni, Dirty)
 #define NInoAttrListTestAndSetDirty(ni)	    test_and_set_nino_al_flag(ni, Dirty)
 #define NInoAttrListTestAndClearDirty(ni) test_and_clear_nino_al_flag(ni, Dirty)
+
+#define NInoCompressed(ni)		 test_nino_flag(ni, Compressed)
+#define NInoSetCompressed(ni)		  set_nino_flag(ni, Compressed)
+#define NInoClearCompressed(ni)		clear_nino_flag(ni, Compressed)
+
+#define NInoEncrypted(ni)		 test_nino_flag(ni, Encrypted)
+#define NInoSetEncrypted(ni)		  set_nino_flag(ni, Encrypted)
+#define NInoClearEncrypted(ni)		clear_nino_flag(ni, Encrypted)
+
+#define NInoSparse(ni)			 test_nino_flag(ni, Sparse)
+#define NInoSetSparse(ni)		  set_nino_flag(ni, Sparse)
+#define NInoClearSparse(ni)		clear_nino_flag(ni, Sparse)
 
 /*
  * The NTFS in-memory inode structure. It is just used as an extension to the
@@ -145,10 +161,4 @@ extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
 
 extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
-extern ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, s64 size);
-
-extern int ntfs_inode_rm_attr(ntfs_attr *na);
-
 #endif /* defined _NTFS_INODE_H */
-

@@ -117,14 +117,14 @@
 #endif
 
 #include "types.h"
-#include "bootsect.h"
-#include "device.h"
 #include "attrib.h"
 #include "bitmap.h"
-#include "mst.h"
+#include "bootsect.h"
+#include "device.h"
 #include "dir.h"
-#include "runlist.h"
 #include "mft.h"
+#include "mst.h"
+#include "runlist.h"
 #include "utils.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
@@ -210,10 +210,11 @@ struct {
 } opts;
 
 /**
- * Dprintf - debugging output (-vv); overriden by quiet (-q)
+ * mkDprintf - debugging output (-vv); overriden by quiet (-q)
  */
-static void Dprintf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-static void Dprintf(const char *fmt, ...)
+static void mkDprintf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
+static void mkDprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -2297,7 +2298,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 	while ((char*)ie < index_end && !(ie->flags & INDEX_ENTRY_END)) {
 /*
 #ifdef DEBUG
-		Dprintf("file_name_attr1->file_name_length = %i\n",
+		mkDprintf("file_name_attr1->file_name_length = %i\n",
 				file_name->file_name_length);
 		if (file_name->file_name_length) {
 			char *__buf;
@@ -2309,12 +2310,12 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 			i = ucstos(__buf, (ntfschar*)&file_name->file_name,
 					file_name->file_name_length + 1);
 			if (i == -1)
-				Dprintf("Name contains non-displayable "
+				mkDprintf("Name contains non-displayable "
 						"Unicode characters.\n");
-			Dprintf("file_name_attr1->file_name = %s\n", __buf);
+			mkDprintf("file_name_attr1->file_name = %s\n", __buf);
 			free(__buf);
 		}
-		Dprintf("file_name_attr2->file_name_length = %i\n",
+		mkDprintf("file_name_attr2->file_name_length = %i\n",
 				ie->key.file_name.file_name_length);
 		if (ie->key.file_name.file_name_length) {
 			char *__buf;
@@ -2326,9 +2327,9 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 			i = ucstos(__buf, ie->key.file_name.file_name,
 					ie->key.file_name.file_name_length + 1);
 			if (i == -1)
-				Dprintf("Name contains non-displayable "
+				mkDprintf("Name contains non-displayable "
 						"Unicode characters.\n");
-			Dprintf("file_name_attr2->file_name = %s\n", __buf);
+			mkDprintf("file_name_attr2->file_name = %s\n", __buf);
 			free(__buf);
 		}
 #endif
@@ -2369,7 +2370,7 @@ do_next:
 #ifdef DEBUG
 		/* Next entry. */
 		if (!ie->length) {
-			Dprintf("BUG: ie->length is zero, breaking out of "
+			mkDprintf("BUG: ie->length is zero, breaking out of "
 					"loop.\n");
 			break;
 		}
@@ -2502,7 +2503,7 @@ static void init_options(void)
 	opts.index_block_size = 4096;
 	opts.attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
 	opts.attr_defs_len = sizeof(attrdef_ntfs12_array);
-	//Dprintf("Attr_defs table length = %u\n", opts.attr_defs_len);
+	//mkDprintf("Attr_defs table length = %u\n", opts.attr_defs_len);
 }
 
 /**
@@ -2668,7 +2669,7 @@ static void mkntfs_override_phys_params(void)
 		err_exit("sector_size is invalid. It must be a power "
 			 "of two, and it must be\n greater or equal 256 and "
 			 "less than or equal 4096 bytes.\n");
-	Dprintf("sector size = %i bytes\n", opts.sector_size);
+	mkDprintf("sector size = %i bytes\n", opts.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
 	if (!opts.nr_sectors) {
 		opts.nr_sectors = ntfs_device_size_get(vol->dev,
@@ -2678,7 +2679,7 @@ static void mkntfs_override_phys_params(void)
 					"specify it manually.\n",
 					vol->dev->d_name);
 	}
-	Dprintf("number of sectors = %lld (0x%llx)\n", opts.nr_sectors,
+	mkDprintf("number of sectors = %lld (0x%llx)\n", opts.nr_sectors,
 			opts.nr_sectors);
 	/* Reserve the last sector for the backup boot sector. */
 	opts.nr_sectors--;
@@ -2763,7 +2764,7 @@ static void mkntfs_override_phys_params(void)
 	if (opts.volume_size < 1 << 20 /* 1MiB */)
 		err_exit("Device is too small (%llikiB). Minimum NTFS volume "
 			 "size is 1MiB.\n", opts.volume_size / 1024);
-	Dprintf("volume size = %llikiB\n", opts.volume_size / 1024);
+	mkDprintf("volume size = %llikiB\n", opts.volume_size / 1024);
 	/* If user didn't specify the cluster size, determine it now. */
 	if (!vol->cluster_size) {
 		if (opts.volume_size <= 512LL << 20)	/* <= 512MB */
@@ -2801,7 +2802,7 @@ static void mkntfs_override_phys_params(void)
 			 "to fit inside eight bits. (We do not support larger "
 			 "cluster sizes yet.)\n");
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
-	Dprintf("cluster size = %u bytes\n", (unsigned int)vol->cluster_size);
+	mkDprintf("cluster size = %u bytes\n", (unsigned int)vol->cluster_size);
 	if (vol->cluster_size > 4096) {
 		if (opts.enable_compression) {
 			if (!opts.force)
@@ -2833,7 +2834,7 @@ static void mkntfs_override_phys_params(void)
 	    opts.volume_size / vol->cluster_size != opts.nr_clusters)
 		err_exit("Illegal combination of volume/cluster/sector size "
 			 "and/or cluster/sector number.\n");
-	Dprintf("number of clusters = %llu (0x%llx)\n", opts.nr_clusters,
+	mkDprintf("number of clusters = %llu (0x%llx)\n", opts.nr_clusters,
 			opts.nr_clusters);
 	/* Number of clusters must fit within 32 bits (Win2k limitation). */
 	if (opts.nr_clusters >> 32) {
@@ -2863,7 +2864,7 @@ static void mkntfs_initialize_bitmaps(void)
 	lcn_bitmap_byte_size = (lcn_bitmap_byte_size + 7) & ~7;
 	i = (lcn_bitmap_byte_size + vol->cluster_size - 1) &
 			~(vol->cluster_size - 1);
-	Dprintf("lcn_bitmap_byte_size = %i, allocated = %i\n",
+	mkDprintf("lcn_bitmap_byte_size = %i, allocated = %i\n",
 			lcn_bitmap_byte_size, i);
 	lcn_bitmap = (unsigned char *)calloc(1, lcn_bitmap_byte_size);
 	if (!lcn_bitmap)
@@ -2881,14 +2882,14 @@ static void mkntfs_initialize_bitmaps(void)
 	 */
 	opts.mft_size = (16 * vol->mft_record_size + vol->cluster_size - 1)
 			& ~(vol->cluster_size - 1);
-	Dprintf("MFT size = %i (0x%x) bytes\n", opts.mft_size, opts.mft_size);
+	mkDprintf("MFT size = %i (0x%x) bytes\n", opts.mft_size, opts.mft_size);
 	/* Determine mft bitmap size and allocate it. */
 	mft_bitmap_size = opts.mft_size / vol->mft_record_size;
 	/* Convert to bytes, at least one. */
 	mft_bitmap_byte_size = (mft_bitmap_size + 7) >> 3;
 	/* Mft bitmap is allocated in multiples of 8 bytes. */
 	mft_bitmap_byte_size = (mft_bitmap_byte_size + 7) & ~7;
-	Dprintf("mft_bitmap_size = %i, mft_bitmap_byte_size = %i\n",
+	mkDprintf("mft_bitmap_size = %i, mft_bitmap_byte_size = %i\n",
 			mft_bitmap_size, mft_bitmap_byte_size);
 	mft_bitmap = (unsigned char *)calloc(1, mft_bitmap_byte_size);
 	if (!mft_bitmap)
@@ -2934,7 +2935,7 @@ static void mkntfs_initialize_rl_mft(void)
 			opts.mft_lcn = (16 * 1024 + vol->cluster_size - 1) /
 					vol->cluster_size;
 	}
-	Dprintf("$MFT logical cluster number = 0x%llx\n", opts.mft_lcn);
+	mkDprintf("$MFT logical cluster number = 0x%llx\n", opts.mft_lcn);
 	/* Determine MFT zone size. */
 	opts.mft_zone_end = opts.nr_clusters;
 	switch (opts.mft_zone_multiplier) {  /* % of volume size in clusters */
@@ -2952,7 +2953,7 @@ static void mkntfs_initialize_rl_mft(void)
 		opts.mft_zone_end = opts.mft_zone_end >> 3;	/* 12.5% */
 		break;
 	}
-	Dprintf("MFT zone size = %lldkiB\n", opts.mft_zone_end / 1024);
+	mkDprintf("MFT zone size = %lldkiB\n", opts.mft_zone_end / 1024);
 	/*
 	 * The mft zone begins with the mft data attribute, not at the beginning
 	 * of the device.
@@ -2975,8 +2976,9 @@ static void mkntfs_initialize_rl_mft(void)
 		ntfs_bit_set(lcn_bitmap, opts.mft_lcn + i, 1);
 	/* Determine mftmirr_lcn (middle of volume). */
 	opts.mftmirr_lcn = (opts.nr_sectors * opts.sector_size >> 1)
-							/ vol->cluster_size;
-	Dprintf("$MFTMirr logical cluster number = 0x%llx\n", opts.mftmirr_lcn);
+			/ vol->cluster_size;
+	mkDprintf("$MFTMirr logical cluster number = 0x%llx\n",
+			opts.mftmirr_lcn);
 	/* Create runlist for mft mirror. */
 	rl_mftmirr = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mftmirr)
@@ -2999,7 +3001,8 @@ static void mkntfs_initialize_rl_mft(void)
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, opts.mftmirr_lcn + i, 1);
 	opts.logfile_lcn = opts.mftmirr_lcn + j;
-	Dprintf("$LogFile logical cluster number = 0x%llx\n", opts.logfile_lcn);
+	mkDprintf("$LogFile logical cluster number = 0x%llx\n",
+			opts.logfile_lcn);
 }
 
 /**
@@ -3045,7 +3048,8 @@ static void mkntfs_initialize_rl_logfile(void)
 	}
 	opts.logfile_size = (opts.logfile_size + vol->cluster_size - 1) &
 			~(vol->cluster_size - 1);
-	Dprintf("$LogFile (journal) size = %ikiB\n", opts.logfile_size / 1024);
+	mkDprintf("$LogFile (journal) size = %ikiB\n",
+			opts.logfile_size / 1024);
 	/*
 	 * FIXME: The 256kiB limit is arbitrary. Should find out what the real
 	 * minimum requirement for Windows is so it doesn't blue screen.
@@ -3453,12 +3457,12 @@ static void mkntfs_create_root_structures(void)
 			opts.sector_size);
 	bs->bpb.media_type = 0xf8; /* hard disk */
 	bs->bpb.sectors_per_track = cpu_to_le16(opts.sectors_per_track);
-	Dprintf("sectors per track = %u (0x%x)\n", opts.sectors_per_track,
+	mkDprintf("sectors per track = %u (0x%x)\n", opts.sectors_per_track,
 			opts.sectors_per_track);
 	bs->bpb.heads = cpu_to_le16(opts.heads);
-	Dprintf("heads = %u (0x%x)\n", opts.heads, opts.heads);
+	mkDprintf("heads = %u (0x%x)\n", opts.heads, opts.heads);
 	bs->bpb.hidden_sectors = cpu_to_le32(opts.part_start_sect);
-	Dprintf("hidden sectors = %llu (0x%llx)\n", opts.part_start_sect,
+	mkDprintf("hidden sectors = %llu (0x%llx)\n", opts.part_start_sect,
 			opts.part_start_sect);
 	/*
 	 * If there are problems go back to bs->unused[0-3] and set them. See
@@ -3478,7 +3482,7 @@ static void mkntfs_create_root_structures(void)
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_mft_record);
 	}
-	Dprintf("clusters per mft record = %i (0x%x)\n",
+	mkDprintf("clusters per mft record = %i (0x%x)\n",
 			bs->clusters_per_mft_record,
 			bs->clusters_per_mft_record);
 	if (opts.index_block_size >= (int)vol->cluster_size)
@@ -3492,7 +3496,7 @@ static void mkntfs_create_root_structures(void)
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_index_record);
 	}
-	Dprintf("clusters per index block = %i (0x%x)\n",
+	mkDprintf("clusters per index block = %i (0x%x)\n",
 			bs->clusters_per_index_record,
 			bs->clusters_per_index_record);
 	/* Generate a 64-bit random number for the serial number. */

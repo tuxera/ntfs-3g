@@ -84,10 +84,11 @@ static struct {
 } opts;
 
 /**
- * Dprintf - debugging output (-vv); overriden by quiet (-q)
+ * mkDprintf - debugging output (-vv); overriden by quiet (-q)
  */
-static void Dprintf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-static void Dprintf(const char *fmt, ...)
+static void mkDprintf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
+static void mkDprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -220,7 +221,7 @@ static void parse_options(int argc, char *argv[])
 		usage();
 	/* Get the device. */
 	dev_name = argv[optind++];
-	Dprintf("device name = %s\n", dev_name);
+	mkDprintf("device name = %s\n", dev_name);
 	if (optind != argc) {
 		/* Get the base mft record number. */
 		ll = strtoll(argv[optind++], &s, 0);
@@ -228,7 +229,7 @@ static void parse_options(int argc, char *argv[])
 			err_exit("Invalid base mft record number: %s\n",
 					argv[optind - 1]);
 		base_mft_no = ll;
-		Dprintf("base mft record number = 0x%llx\n", (long long)ll);
+		mkDprintf("base mft record number = 0x%llx\n", (long long)ll);
 	}
 	if (optind != argc)
 		usage();
@@ -366,7 +367,7 @@ int main(int argc, char **argv)
 				(long long)base_mft_no);
 	printf(".\n");
 	if (!opts.quiet && opts.verbose > 1) {
-		Dprintf("Dumping allocated mft record 0x%llx:\n",
+		mkDprintf("Dumping allocated mft record 0x%llx:\n",
 				(long long)ni->mft_no);
 		dump_mft_record(ni->mrec);
 	}

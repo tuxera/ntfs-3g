@@ -93,10 +93,11 @@ struct {
 } opts;
 
 /**
- * Dprintf - debugging output (-vv); overriden by quiet (-q)
+ * mkDprintf - debugging output (-vv); overriden by quiet (-q)
  */
-static void Dprintf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-static void Dprintf(const char *fmt, ...)
+static void mkDprintf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
+static void mkDprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -233,7 +234,7 @@ static void parse_options(int argc, char *argv[])
 
 	/* Get the device. */
 	dev_name = argv[optind++];
-	Dprintf("device name = %s\n", dev_name);
+	mkDprintf("device name = %s\n", dev_name);
 
 	if (optind == argc)
 		usage();
@@ -243,7 +244,7 @@ static void parse_options(int argc, char *argv[])
 	if (*s || !ll || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid inode number: %s\n", argv[optind - 1]);
 	inode = ll;
-	Dprintf("inode = %lli\n", (long long)inode);
+	mkDprintf("inode = %lli\n", (long long)inode);
 
 	if (optind == argc)
 		usage();
@@ -283,11 +284,11 @@ static void parse_options(int argc, char *argv[])
 			attr_name_len = 0;
 		}
 	}
-	Dprintf("attribute type = 0x%x\n", (unsigned int)attr_type);
+	mkDprintf("attribute type = 0x%x\n", (unsigned int)attr_type);
 	if (attr_name == AT_UNNAMED)
-		Dprintf("attribute name = \"\" (UNNAMED)\n");
+		mkDprintf("attribute name = \"\" (UNNAMED)\n");
 	else
-		Dprintf("attribute name = \"%s\" (length %u Unicode "
+		mkDprintf("attribute name = \"%s\" (length %u Unicode "
 				"characters)\n", s2,
 				(unsigned int)attr_name_len);
 
@@ -296,7 +297,7 @@ static void parse_options(int argc, char *argv[])
 	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid new length: %s\n", s);
 	new_len = ll;
-	Dprintf("new length = %lli\n", new_len);
+	mkDprintf("new length = %lli\n", new_len);
 }
 
 /**
@@ -791,7 +792,7 @@ int main(int argc, char **argv)
 				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
-		Dprintf("Dumping mft record before calling "
+		mkDprintf("Dumping mft record before calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
 	}
@@ -803,7 +804,7 @@ int main(int argc, char **argv)
 				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
-		Dprintf("Dumping mft record after calling "
+		mkDprintf("Dumping mft record after calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
 	}
