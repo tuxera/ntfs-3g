@@ -49,6 +49,7 @@
 #include "layout.h"
 #include "inode.h"
 #include "disk_io.h"
+#include "utils.h"
 
 static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfsundelete";
@@ -58,48 +59,11 @@ static       char *NONE      = "<none>";
 static       char *UNKNOWN   = "unknown";
 static struct options opts;
 
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
+
 #define _(S)	gettext(S)
-
-/**
- * Eprintf - Print error messages
- */
-void Eprintf (const char *format, ...)
-{
-	va_list va;
-	va_start (va, format);
-	vfprintf (stderr, format, va);
-	va_end (va);
-}
-
-/**
- * Iprintf - Print informative messages
- */
-void Iprintf (const char *format, ...)
-{
-	va_list va;
-#ifndef DEBUG
-	if (opts.quiet)
-		return;
-#endif
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
-
-/**
- * Vprintf - Print verbose messages
- */
-void Vprintf (const char *format, ...)
-{
-	va_list va;
-#ifndef DEBUG
-	if (!opts.verbose)
-		return;
-#endif
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
 
 /**
  * Dprintf - Print debug messages
@@ -311,121 +275,6 @@ int parse_time (const char *value, time_t *since)
 }
 
 /**
- * parse_size - Convert a string representing a size
- * @value:  String to be parsed
- * @size:   Parsed size
- *
- * Read a string and convert it to a number.  Strings may be suffixed to scale
- * them.  Any number without a suffix is assumed to be in bytes.
- *
- * Suffix  Description  Multiple
- *  [tT]    Terabytes     10^12
- *  [gG]    Gigabytes     10^9
- *  [mM]    Megabytes     10^6
- *  [kK]    Kilobytes     10^3
- *
- * Notes:
- *     Only the first character of the suffix is read.
- *     The multipliers are decimal thousands, not binary: 1000, not 1024.
- *     If parse_size fails, @size will not be changed
- *
- * Return:  1  Success
- *	    0  Error, the string was malformed
- */
-int parse_size (const char *value, long long *size)
-{
-	long long result;
-	char *suffix = NULL;
-
-	if (!value || !size)
-		return 0;
-
-	Dprintf ("Parsing size '%s'.\n", value);
-
-	result = strtoll (value, &suffix, 10);
-	if (result < 0 || errno == ERANGE) {
-		Eprintf ("Invalid size '%s'.\n", value);
-		return 0;
-	}
-
-	if (!suffix) {
-		Eprintf ("Internal error, strtoll didn't return a suffix.\n");
-		return 0;
-	}
-
-
-	/*if (strlen (suffix) > 1) {
-		Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
-		return 0;
-	} Can't do this because of ranges*/
-
-	switch (suffix[0]) {
-		case 't': case 'T': result *= 1000;
-		case 'g': case 'G': result *= 1000;
-		case 'm': case 'M': result *= 1000;
-		case 'k': case 'K': result *= 1000;
-		case '-': case 0:
-			break;
-		default:
-			Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
-			return 0;
-	}
-
-	Dprintf ("Parsed size = %lld.\n", result);
-	*size = result;
-	return 1;
-}
-
-/**
- * parse_range - Convert a string representing a range of numbers
- * @string:  The string to be parsed
- * @start:   The beginning of the range will be stored here
- * @finish:  The end of the range will be stored here
- *
- * Read a string of the form n-m.  If the lower end is missing, zero will be
- * substituted.  If the upper end is missing LONG_MAX will be used.  If the
- * string cannot be parsed correctly, @start and @finish will not be changed.
- *
- * Return:  1  Success, a valid string was found
- *	    0  Error, the string was not a valid range
- */
-int parse_range (const char *string, long long *start, long long *finish)
-{
-	long long a, b;
-	char *middle;
-
-	if (!string || !start || !finish)
-		return 0;
-
-	middle = strchr (string, '-');
-	if (string == middle) {
-		Dprintf ("Range has no beginning, defaulting to 0.\n");
-		a = 0;
-	} else {
-		if (!parse_size (string, &a))
-			return 0;
-	}
-
-	if (middle) {
-		if (middle[1] == 0) {
-			b = LONG_MAX;
-			Dprintf ("Range has no end, defaulting to %lld.\n", b);
-		} else {
-			if (!parse_size (middle+1, &b))
-				return 0;
-		}
-	} else {
-		b = a;
-	}
-
-	Dprintf ("Range '%s' = %lld - %lld\n", string, a, b);
-
-	*start  = a;
-	*finish = b;
-	return 1;
-}
-
-/**
  * parse_options - Read and validate the programs command line
  *
  * Read the command line, verify the syntax and parse the options.
@@ -495,7 +344,8 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'c':
 			if (opts.mode == MODE_NONE) {
-				if (!parse_range (argv[optind-1], &opts.mft_begin, &opts.mft_end))
+				if (!utils_parse_range (argv[optind-1],
+				    &opts.mft_begin, &opts.mft_end, TRUE))
 					err++;
 				opts.mode = MODE_COPY;
 			} else {
@@ -550,8 +400,8 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'S':
 			if ((opts.size_begin > 0) || (opts.size_end > 0) ||
-			    !parse_range (argv[optind-1], &opts.size_begin,
-			     &opts.size_end)) {
+			    !utils_parse_range (argv[optind-1], &opts.size_begin,
+			     &opts.size_end, TRUE)) {
 			    err++;
 			}
 			break;
@@ -701,85 +551,6 @@ void free_file (struct ufile *file)
 
 	free (file->mft);
 	free (file);
-}
-
-/**
- * ntfs2utc - Convert an NTFS time to Unix time
- * @time:  An NTFS time in 100ns units since 1601
- *
- * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
- * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
- *
- * Return:  n  A Unix time (number of seconds since 1970)
- */
-time_t ntfs2utc (long long time)
-{
-	return (time - ((long long) (369 * 365 + 89) * 24 * 3600 * 10000000)) / 10000000;
-}
-
-/**
- * find_attribute - Find an attribute of the given type
- * @type:  An attribute type, e.g. AT_FILE_NAME
- * @ctx:   A search context, created using ntfs_get_attr_search_ctx
- *
- * Using the search context to keep track, find the first/next occurrence of a
- * given attribute type.
- *
- * N.B.  This will return a pointer into @mft.  As long as the search context
- *       has been created without an inode, it won't overflow the buffer.
- *
- * Return:  Pointer  Success, an attribute was found
- *	    NULL     Error, no matching attributes were found
- */
-ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
-{
-	if (!ctx)
-		return NULL;
-
-	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
-		Dprintf ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
-		return NULL;	/* None / no more of that type */
-	}
-
-	Dprintf ("find_attribute found an attribute of type: 0x%02x.\n", type);
-	return ctx->attr;
-}
-
-/**
- * find_first_attribute - Find the first attribute of a given type
- * @type:  An attribute type, e.g. AT_FILE_NAME
- * @mft:   A buffer containing a raw MFT record
- *
- * Search through a raw MFT record for an attribute of a given type.
- * The return value is a pointer into the MFT record that was supplied.
- *
- * N.B.  This will return a pointer into @mft.  The pointer won't stray outside
- *       the buffer, since we created the search context without an inode.
- *
- * Return:  Pointer  Success, an attribute was found
- *	    NULL     Error, no matching attributes were found
- */
-ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
-{
-	ntfs_attr_search_ctx *ctx;
-	ATTR_RECORD *rec;
-
-	if (!mft)
-		return NULL;
-
-	ctx = ntfs_attr_get_search_ctx(NULL, mft);
-	if (!ctx) {
-		Eprintf ("Couldn't create a search context.\n");
-		return NULL;
-	}
-
-	rec = find_attribute (type, ctx);
-	ntfs_attr_put_search_ctx(ctx);
-	if (rec)
-		Dprintf ("find_first_attribute: found attr of type 0x%02x.\n", type);
-	else
-		Dprintf ("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
-	return rec;
 }
 
 /**
@@ -1920,7 +1691,7 @@ int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 
 	for (i = mft_begin; i <= mft_end; i++) {
 		if (ntfs_attr_pread (mft, vol->mft_record_size * i, vol->mft_record_size, buffer) < vol->mft_record_size) {
-			Eprintf ("Couldn't read MFT Record %d: %s.\n", i, strerror (errno));
+			Eprintf ("Couldn't read MFT Record %lld: %s.\n", i, strerror (errno));
 			goto close;
 		}
 
@@ -1930,7 +1701,7 @@ int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 		}
 	}
 
-	Vprintf ("Read %d MFT Records\n", mft_end - mft_begin + 1);
+	Vprintf ("Read %lld MFT Records\n", mft_end - mft_begin + 1);
 	result = 0;
 close:
 	close (fd);
@@ -2006,29 +1777,17 @@ int valid_device (const char *name, int force)
  */
 int main (int argc, char *argv[])
 {
-	const char *locale;
 	ntfs_volume *vol;
 	int result = 1;
 
-	locale = setlocale (LC_ALL, "");
-	if (!locale) {
-		locale = setlocale (LC_ALL, NULL);
-		Vprintf ("Failed to set locale, using default '%s'.\n", locale);
-	} else {
-		Vprintf ("Using locale '%s'.\n", locale);
-	}
+	utils_set_locale();
 
 	if (!parse_options (argc, argv))
 		goto free;
 
-	if (!valid_device (opts.device, opts.force))
-		goto free;
-
-	vol = ntfs_mount (opts.device, MS_RDONLY);
-	if (!vol) {
-		Eprintf ("Couldn't mount device '%s': %s\n", opts.device, strerror (errno));
-		goto free;
-	}
+	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
+	if (!vol)
+		return 1;
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
 		Iprintf ("Volume is dirty.\n");
