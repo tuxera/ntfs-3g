@@ -70,6 +70,7 @@
 	extern int optind;
 #endif
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #ifdef HAVE_LINUX_MAJOR_H
 #	include <linux/major.h>
@@ -160,6 +161,8 @@ char *dev_name;
 struct {
 	int sector_size;		/* -s, in bytes, power of 2, default is
 					   512 bytes. */
+	long long part_start_sect;	/* start sector of partition on parent
+					   device */
 	long long nr_sectors;		/* size of device in sectors */
 	long long nr_clusters;		/* Note: Win2k treats clusters as
 					   32-bit entities! */
@@ -259,7 +262,7 @@ static void err_exit(const char *fmt, ...)
  */
 static void copyright(void)
 {
-	fprintf(stderr, "Copyright (c) 2000-2003 Anton Altaparmakov\n"
+	fprintf(stderr, "Copyright (c) 2000-2004 Anton Altaparmakov\n"
 			"Copyright (c) 2001-2003 Richard Russon\n"
 			"Create an NTFS volume on a user specified (block) "
 			"device.\n");
@@ -284,6 +287,8 @@ static void usage(void)
 			"[number-of-sectors]\n"
 			"    -s sector-size           Specify the sector size "
 			"for the device\n"
+			"    -p part-start-sect       Specify the partition "
+			"start sector\n"
 			"    -c cluster-size          Specify the cluster "
 			"size for the volume\n"
 			"    -L volume-label          Set the volume label\n"
@@ -326,7 +331,7 @@ static void parse_options(int argc, char *argv[])
 	if (argc && *argv)
 		EXEC_NAME = *argv;
 	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "c:fh?nqs:vz:CFIL:QVl")) != EOF)
+	while ((c = getopt(argc, argv, "c:fh?np:qs:vz:CFIL:QVl")) != EOF)
 		switch (c) {
 		case 'n':
 			opts.no_action = 1;
@@ -340,6 +345,16 @@ static void parse_options(int argc, char *argv[])
 		case 'f':
 		case 'Q':
 			opts.quick_format = 1;
+			break;
+		case 'p':
+			u = strtoul(optarg, &s, 0);
+			opts.part_start_sect = u;
+			if ((u >= ULONG_MAX && errno == ERANGE) || *s ||
+					(opts.part_start_sect >> 32))
+				err_exit("Invalid partition start sector: %s  "
+						"Maximum is 4294967295 "
+						"(2^32-1).\n",
+						optarg);
 			break;
 		case 'q':
 			opts.quiet = 1;
@@ -2447,6 +2462,7 @@ static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 static void init_options(void)
 {
 	memset(&opts, 0, sizeof(opts));
+	opts.part_start_sect = -1;
 	opts.index_block_size = 4096;
 	opts.attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
 	opts.attr_defs_len = sizeof(attrdef_ntfs12_array);
@@ -2659,6 +2675,20 @@ int main(int argc, char **argv)
 			opts.nr_sectors);
 	/* Reserve the last sector for the backup boot sector. */
 	opts.nr_sectors--;
+	/* If user didn't specify the partition start sector, determine it. */
+	if (opts.part_start_sect == -1) {
+		opts.part_start_sect = ntfs_device_partition_start_sector_get(
+				vol->dev);
+		if (opts.part_start_sect < 0) {
+			Eprintf("No partition start sector specified for %s "
+					"and it could not\nbe obtained "
+					"automatically.  Setting it to 0.\n"
+					"This will probably cause Windows not "
+					"to be able to boot from this "
+					"volume.\n", vol->dev->d_name);
+			opts.part_start_sect = 0;
+		}
+	}
 	/* If user didn't specify the volume size, determine it now. */
 	if (!opts.volume_size)
 		opts.volume_size = opts.nr_sectors * opts.sector_size;
@@ -3284,10 +3314,13 @@ int main(int argc, char **argv)
 	bs->bpb.sectors_per_cluster = (u8)(vol->cluster_size /
 			opts.sector_size);
 	bs->bpb.media_type = 0xf8; /* hard disk */
+	bs->bpb.hidden_sectors = cpu_to_le32(opts.part_start_sect);
+	Dprintf("hidden sectors = %lli (0x%llx)\n", opts.part_start_sect,
+			opts.part_start_sect);
 	/*
 	 * If there are problems go back to bs->unused[0-3] and set them. See
-	 * ../include/bootsect.h for details. Other fields to also consider
-	 * setting are: bs->bpb.sectors_per_track, .heads, and .hidden_sectors.
+	 * ../include/layout.h for details. Other fields to also consider
+	 * setting are: bs->bpb.sectors_per_track and .heads.
 	 */
 	bs->number_of_sectors = scpu_to_le64(opts.nr_sectors);
 	bs->mft_lcn = scpu_to_le64(opts.mft_lcn);
@@ -3303,7 +3336,7 @@ int main(int argc, char **argv)
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_mft_record);
 	}
-	Dprintf("Clusters per mft record = %i (0x%x)\n",
+	Dprintf("clusters per mft record = %i (0x%x)\n",
 			bs->clusters_per_mft_record,
 			bs->clusters_per_mft_record);
 	if (opts.index_block_size >= (int)vol->cluster_size)
@@ -3317,7 +3350,7 @@ int main(int argc, char **argv)
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_index_record);
 	}
-	Dprintf("Clusters per index block = %i (0x%x)\n",
+	Dprintf("clusters per index block = %i (0x%x)\n",
 			bs->clusters_per_index_record,
 			bs->clusters_per_index_record);
 	/* Generate a 64-bit random number for the serial number. */
