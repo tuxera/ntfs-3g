@@ -713,10 +713,10 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (NAttrCompressed(na) && NAttrNonResident(na))
 		return ntfs_compressed_attr_pread(na, pos, count, b);
 	/*
-	 * Encrypted attributes are not supported.  We return access denied,
-	 * which is what Windows NT4 does, too.
+	 * Encrypted non-resident attributes are not supported.  We return
+	 * access denied, which is what Windows NT4 does, too.
 	 */
-	if (NAttrEncrypted(na)) {
+	if (NAttrEncrypted(na) && NAttrNonResident(na)) {
 		errno = EACCES;
 		return -1;
 	}
@@ -878,10 +878,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	}
 	vol = na->ni->vol;
 	/*
-	 * Encrypted attributes are not supported. We return access denied,
-	 * which is what Windows NT4 does, too.
+	 * Encrypted non-resident attributes are not supported.  We return
+	 * access denied, which is what Windows NT4 does, too.
 	 */
-	if (NAttrEncrypted(na)) {
+	if (NAttrEncrypted(na) && NAttrNonResident(na)) {
 		errno = EACCES;
 		return -1;
 	}
