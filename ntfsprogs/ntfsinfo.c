@@ -818,7 +818,7 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
  *
  * dump some info about the data attribute
  */
-static void ntfs_dump_attr_data(ATTR_RECORD *attr)
+static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 {
 	printf("Dumping attribute $DATA (0x80) related info\n");
 
@@ -860,6 +860,23 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 				(long long)le64_to_cpu(attr->compressed_size));
 		} else {
 			printf("\tNot Compressed\n");
+		}
+
+		if (opts.verbose) {
+			runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+			if (rl) {
+				printf ("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
+				runlist *rlc = rl;
+				while (rlc->length) {
+					printf ("\t\t\t%lld\t\t%lld\t\t%lld\n",
+							rlc->vcn, rlc->lcn, rlc->length);
+					rlc++;
+				}
+				free (rl);
+			} else {
+				Eprintf("ntfsinfo error: could not decompress runlist\n");
+				return;
+			}
 		}
 	} else {
 		printf("\tIs resident? \t\t Yes\n");
@@ -1276,7 +1293,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_volume_information(ctx->attr);
 			break;
 		case AT_DATA:
-			ntfs_dump_attr_data(ctx->attr);
+			ntfs_dump_attr_data(ctx->attr, inode->vol);
 			break;
 		case AT_INDEX_ROOT:
 			ntfs_dump_attr_index_root(ctx->attr);
