@@ -1963,10 +1963,11 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
  * @newsize:	new size in bytes to which to resize the attribute value of @a
  *
  * Resize the value of the attribute @a in the mft record @m to @newsize bytes.
+ * If the value is made bigger, the newly "allocated" space is cleared.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  * The following error codes are defined:
- *	ENOSPC	- Not enough space in mft record to perform the resize.
+ *	ENOSPC	- Not enough space in the mft record @m to perform the resize.
  * Note that on error no modifications have been performed whatsoever.
  */
 int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
@@ -1980,7 +1981,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 
 	/* Calculate the new attribute length and mft record bytes used. */
 	new_alen = (le16_to_cpu(a->value_offset) + newsize + 7) & ~7;
-	/* If the actual attribute length has changed, move tihings around. */
+	/* If the actual attribute length has changed, move things around. */
 	if (new_alen != le32_to_cpu(a->length)) {
 		new_muse = le32_to_cpu(m->bytes_in_use) -
 				le32_to_cpu(a->length) + new_alen;
@@ -1998,23 +1999,32 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		/* Adjust @a to reflect the new value size. */
 		a->length = cpu_to_le32(new_alen);
 	}
+	/*
+	 * If we made the attribute value bigger, clear the area between the
+	 * old size and @newsize.
+	 */
+	if (newsize > le32_to_cpu(a->value_length))
+		memset((u8*)a + le16_to_cpu(a->value_offset) +
+				le32_to_cpu(a->value_length), 0, newsize -
+				le32_to_cpu(a->value_length));
 	a->value_length = cpu_to_le32(newsize);
 	return 0;
 }
 
 /**
- * ntfs_resident_attr_shrink - shrink a resident, open ntfs attribute
- * @na:		resident ntfs attribute to shrink
+ * ntfs_resident_attr_resize - resize a resident, open ntfs attribute
+ * @na:		resident ntfs attribute to resize
  * @newsize:	new size (in bytes) to which to shrink the attribute
  *
- * Reduce the size of a resident, open ntfs attribute @na to @newsize bytes.
+ * Change the size of a resident, open ntfs attribute @na to @newsize bytes.
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
  *	ENOTSUP	- The desired resize is not implemented yet.
+ *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
  */
-static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
+static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
 	ntfs_attr_search_ctx *ctx;
 	int err;
@@ -2031,8 +2041,8 @@ static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
 		goto put_err_out;
 	}
 	/*
-	 * Check the attribute type and the corresponding minimum size
-	 * against @newsize and fail if @newsize is too small.
+	 * Check the attribute type and the corresponding minimum and maximum
+	 * sizes against @newsize and fail if @newsize is out of bounds.
 	 */
 	if (ntfs_attr_size_bounds_check(na->ni->vol, na->type, newsize) < 0) {
 		err = errno;
@@ -2044,15 +2054,43 @@ static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize)
 			err = EIO;
 		goto put_err_out;
 	}
-	/* Perform the resize of the attribute record. */
-	if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr, newsize)) {
-		err = errno;
-		goto put_err_out;
+	/*
+	 * If @newsize is bigger than the mft record we need to make the
+	 * attribute non-resident if the attribute type supports it. If it is
+	 * smaller we can go ahead and attempt the resize.
+	 */
+	if (newsize < na->ni->vol->mft_record_size) {
+		/* Perform the resize of the attribute record. */
+		if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
+				newsize)) {
+			err = errno;
+			if (err != ENOSPC)
+				goto put_err_out;
+		} else {
+			/* Update the ntfs attribute structure, too. */
+			na->allocated_size = na->data_size =
+					na->initialized_size = newsize;
+			if (NAttrCompressed(na) || NAttrSparse(na))
+				na->compressed_size = newsize;
+			goto resize_done;
+		}
 	}
-	/* Update the ntfs attribute structure, too. */
-	na->allocated_size = na->data_size = na->initialized_size = newsize;
-	if (NAttrCompressed(na) || NAttrSparse(na))
-		na->compressed_size = newsize;
+	/* There is not enough space in the mft record to perform the resize. */
+
+	// FIXME: Need to try to:
+	//	- make the attribute non-resident if the attribute type allows
+	//	- make other attributes non-resident to free up enough space
+	//	- move the attribute to a new mft record
+	// Note that some of the above changes also require changes in the
+	// attribute list attribute (or even creation thereof) hence take
+	// care!!! Probably want to try to do things in the same order as
+	// above. Also take care that $MFT/$BITMAP _must_ be non-resident or
+	// windows ntfs driver causes a blue screen of death on mount attempt,
+	// i.e. usually at boot time which renders the machine not bootable.
+	err = ENOTSUP;
+	goto put_err_out;
+
+resize_done:
 	/*
 	 * Set the inode (and its base inode if it exists) dirty so it is
 	 * written out later.
@@ -2319,7 +2357,24 @@ put_err_out:
  * @na:		open ntfs attribute to resize
  * @newsize:	new size (in bytes) to which to resize the attribute
  *
- * Change the size of an open ntfs attribute @na to @newsize bytes.
+ * Change the size of an open ntfs attribute @na to @newsize bytes. If the
+ * attribute is made bigger and the attribute is resident the newly
+ * "allocated" space is cleared and if the attribute is non-resident the
+ * newly allocated space is marked as not initialised and no real allocation
+ * on disk is performed. FIXME: Do we have to create sparse runs or can we just
+ * leave the reunlist to finish below data_size, i.e. can we have
+ * allocated_size < data_size? I guess that what we can't and thus we will have
+ * to set the sparse bit of the attribute and create sparse runs to ensure that
+ * allocated_size is >= data_size. We don't need to clear the partial run at
+ * the end of the real allocation because we leave initialized_size low enough.
+ * FIXME: Do we want that? Alternatively, we leave initialized_size = data_size
+ * and do clear the partial run. The latter approach would be more inline with
+ * what windows would do, even though windows wouldn't even make the attribute
+ * sparse, it would just allocate clusters instead. TODO: Check what happens on
+ * WinXP and .NET. FIXME: Make sure to check what NT4 does with an NTFS1.2
+ * volume that has sparse files. I suspect it will blow up so we will need to
+ * perform allocations of clusters, like NT4 would do for NTFS1.2 while we can
+ * use sparse attributes on NTFS3.x.
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
@@ -2344,16 +2399,17 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		return -1;
 	}
 	/*
-	 * TODO: Implement making attributes bigger/filling in of uninitialized
-	 * holes as well as handling of compressed attributes. (AIA)
+	 * TODO: Implement making non-resident attributes bigger/filling in of
+	 * uninitialized holes as well as handling of compressed attributes.
 	 */
-	if (newsize > na->initialized_size || NAttrCompressed(na)) {
+	if ((NAttrNonResident(na) && newsize > na->initialized_size) ||
+			NAttrCompressed(na)) {
 		errno = ENOTSUP;
 		return -1;
 	}
 
 	if (NAttrNonResident(na))
 		return ntfs_non_resident_attr_shrink(na, newsize);
-	return ntfs_resident_attr_shrink(na, (u32)newsize);
+	return ntfs_resident_attr_resize(na, newsize);
 }
 
