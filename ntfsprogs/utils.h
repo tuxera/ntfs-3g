@@ -52,7 +52,11 @@ struct _IO_FILE;
 int ntfs_printf (struct _IO_FILE *stream, int *control, BOOL trigger,
 		const char *format, ...) __attribute__ ((format (printf, 4, 5)));
 
-int valid_device (const char *name, int force);
+int utils_valid_device (const char *name, int force);
+int utils_set_locale (void);
+ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
+int utils_parse_size (const char *value, s64 *size, BOOL scale);
+int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale);
 
 time_t ntfs2utc (s64 time);
 s64 utc2ntfs (time_t time);

@@ -28,6 +28,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <locale.h>
+#include <libintl.h>
+#include <stdlib.h>
+#include <limits.h>
 
 #include "config.h"
 #include "types.h"
@@ -36,48 +40,31 @@
 
 #define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
 
-/**
- * ntfs2utc - Convert an NTFS time to Unix time
- * @time:  An NTFS time in 100ns units since 1601
- *
- * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
- * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
- *
- * Return:  n  A Unix time (number of seconds since 1970)
- */
-time_t ntfs2utc (s64 time)
-{
-	return (time - (NTFS_TIME_OFFSET)) / 10000000;
-}
-
-/**
- * utc2ntfs - convert Linux time to NTFS time
- * @time:  Linux time to convert to NTFS
- *
- * Convert the Linux time @time to its corresponding NTFS time.
- *
- * Linux stores time in a long at present and measures it as the number of
- * 1-second intervals since 1st January 1970, 00:00:00 UTC.
- *
- * NTFS uses Microsoft's standard time format which is stored in a s64 and is
- * measured as the number of 100 nano-second intervals since 1st January 1601,
- * 00:00:00 UTC.
- *
- * Return:  n  An NTFS time (100ns units since Jan 1601)
- */
-s64 utc2ntfs (time_t time)
-{
-	/* Convert to 100ns intervals and then add the NTFS time offset. */
-	return (s64)time * 10000000 + NTFS_TIME_OFFSET;
-}
-
-
-/* valid_device requires the following */
+/* These utilities require the following functions */
 extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Iprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 
 /**
- * valid_device - Perform some safety checks on the device, before we start
+ * utils_set_locale
+ */
+int utils_set_locale (void)
+{
+	const char *locale;
+
+	locale = setlocale (LC_ALL, "");
+	if (!locale) {
+		locale = setlocale (LC_ALL, NULL);
+		Eprintf ("Failed to set locale, using default '%s'.\n", locale);
+		return 1;
+	} else {
+		Vprintf ("Using locale '%s'.\n", locale);
+		return 0;
+	}
+}
+
+/**
+ * utils_valid_device - Perform some safety checks on the device, before we start
  * @name:   Full pathname of the device/file to work with
  * @force:  Continue regardless of problems
  *
@@ -87,7 +74,7 @@ extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 
  * Return:  1  Success, we can continue
  *	    0  Error, we cannot use this device
  */
-int valid_device (const char *name, int force)
+int utils_valid_device (const char *name, int force)
 {
 	unsigned long mnt_flags = 0;
 	struct stat st;
@@ -128,6 +115,190 @@ int valid_device (const char *name, int force)
 	}
 
 	return 1;
+}
+
+/**
+ * utils_mount_volume
+ */
+ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force)
+{
+	ntfs_volume *vol;
+
+	if (!device)
+		return NULL;
+
+	if (!utils_valid_device (device, force))
+		return NULL;
+
+	vol = ntfs_mount (device, MS_RDONLY);
+	if (!vol) {
+		Eprintf ("Couldn't mount device '%s': %s\n", device, strerror (errno));
+		return NULL;
+	}
+
+	if (vol->flags & VOLUME_IS_DIRTY) {
+		Iprintf ("Volume is dirty.\n");
+		if (!force) {
+			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
+			ntfs_umount (vol, FALSE);
+			return NULL;
+		}
+		Iprintf ("Forced to continue.\n");
+	}
+
+	return vol;
+}
+
+/**
+ * utils_parse_size - Convert a string representing a size
+ * @value:  String to be parsed
+ * @size:   Parsed size
+ * @scale:  XXX FIXME
+ *
+ * Read a string and convert it to a number.  Strings may be suffixed to scale
+ * them.  Any number without a suffix is assumed to be in bytes.
+ *
+ * Suffix  Description  Multiple
+ *  [tT]    Terabytes     10^12
+ *  [gG]    Gigabytes     10^9
+ *  [mM]    Megabytes     10^6
+ *  [kK]    Kilobytes     10^3
+ *
+ * Notes:
+ *     Only the first character of the suffix is read.
+ *     The multipliers are decimal thousands, not binary: 1000, not 1024.
+ *     If parse_size fails, @size will not be changed
+ *
+ * Return:  1  Success
+ *	    0  Error, the string was malformed
+ */
+int utils_parse_size (const char *value, s64 *size, BOOL scale)
+{
+	long long result;
+	char *suffix = NULL;
+
+	if (!value || !size)
+		return 0;
+
+	Dprintf ("Parsing size '%s'.\n", value);
+
+	result = strtoll (value, &suffix, 10);
+	if (result < 0 || errno == ERANGE) {
+		Eprintf ("Invalid size '%s'.\n", value);
+		return 0;
+	}
+
+	if (!suffix) {
+		Eprintf ("Internal error, strtoll didn't return a suffix.\n");
+		return 0;
+	}
+
+	if (scale) {
+		switch (suffix[0]) {
+			case 't': case 'T': result *= 1000;
+			case 'g': case 'G': result *= 1000;
+			case 'm': case 'M': result *= 1000;
+			case 'k': case 'K': result *= 1000;
+			case '-': case 0:
+				break;
+			default:
+				Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
+				return 0;
+		}
+	} else {
+		if ((suffix[0] != '-') && (suffix[0] != 0)) {
+			Eprintf ("Invalid number '%.*s'.\n", (suffix - value + 1), value);
+			return 0;
+		}
+	}
+
+	Dprintf ("Parsed size = %lld.\n", result);
+	*size = result;
+	return 1;
+}
+
+/**
+ * utils_parse_range - Convert a string representing a range of numbers
+ * @string:  The string to be parsed
+ * @start:   The beginning of the range will be stored here
+ * @finish:  The end of the range will be stored here
+ *
+ * Read a string of the form n-m.  If the lower end is missing, zero will be
+ * substituted.  If the upper end is missing LONG_MAX will be used.  If the
+ * string cannot be parsed correctly, @start and @finish will not be changed.
+ *
+ * Return:  1  Success, a valid string was found
+ *	    0  Error, the string was not a valid range
+ */
+int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
+{
+	s64 a, b;
+	char *middle;
+
+	if (!string || !start || !finish)
+		return 0;
+
+	middle = strchr (string, '-');
+	if (string == middle) {
+		Dprintf ("Range has no beginning, defaulting to 0.\n");
+		a = 0;
+	} else {
+		if (!utils_parse_size (string, &a, scale))
+			return 0;
+	}
+
+	if (middle) {
+		if (middle[1] == 0) {
+			b = LONG_MAX;		// XXX ULLONG_MAX
+			Dprintf ("Range has no end, defaulting to %lld.\n", b);
+		} else {
+			if (!utils_parse_size (middle+1, &b, scale))
+				return 0;
+		}
+	} else {
+		b = a;
+	}
+
+	Dprintf ("Range '%s' = %lld - %lld\n", string, a, b);
+
+	*start  = a;
+	*finish = b;
+	return 1;
+}
+
+/**
+ * ntfs2utc - Convert an NTFS time to Unix time
+ * @time:  An NTFS time in 100ns units since 1601
+ *
+ * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
+ * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
+ *
+ * Return:  n  A Unix time (number of seconds since 1970)
+ */
+time_t ntfs2utc (s64 time)
+{
+	return (time - (NTFS_TIME_OFFSET)) / 10000000;
+}
+
+/**
+ * utc2ntfs - convert Linux time to NTFS time
+ * @time:  Linux time to convert to NTFS
+ *
+ * Convert the Linux time @time to its corresponding NTFS time.
+ *
+ * Linux stores time in a long at present and measures it as the number of
+ * 1-second intervals since 1st January 1970, 00:00:00 UTC.
+ *
+ * NTFS uses Microsoft's standard time format which is stored in a s64 and is
+ * measured as the number of 100 nano-second intervals since 1st January 1601,
+ * 00:00:00 UTC.
+ *
+ * Return:  n  An NTFS time (100ns units since Jan 1601)
+ */
+s64 utc2ntfs (time_t time)
+{
+	/* Convert to 100ns intervals and then add the NTFS time offset. */
+	return (s64)time * 10000000 + NTFS_TIME_OFFSET;
 }
 
 /**
