@@ -1,7 +1,7 @@
 /*
  * mft.c - Mft record handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -119,6 +119,8 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	m = MREF(mref);
 	if (m < vol->mftmirr_size) {
 		cnt = vol->mftmirr_size - m;
+		if (cnt > count)
+			cnt = count;
 		bmirr = malloc(cnt * vol->mft_record_size);
 		if (!bmirr)
 			return -1;
