@@ -21,10 +21,71 @@
 
 #include "config.h"
 
+#include "types.h"
 #include "attrib.h"
 #include "debug.h"
 
+/**
+ * Sprintf - silencable output to stderr
+ * @silent:	if 0 string is output to stderr
+ * @fmt:	printf style format string
+ * @...:	optional arguments for the printf style format string
+ *
+ * If @silent is 0, output the string @fmt to stderr.
+ *
+ * This is basically a replacement for:
+ *
+ *	if (!silent)
+ *		fprintf(stderr, fmt, ...);
+ *
+ * It is more convenient to use Sprintf instead of the above code and perhaps
+ * more importantly, Sprintf makes it much easier to turn it into a "do
+ * nothing" function, by defining it to "do {} while (0)" in debug.h instead of
+ * to * __Sprintf, thus removing the whole output completely.
+ */
+void __Sprintf(const int silent, const char *fmt, ...)
+{
+	int eo;
+	va_list ap;
+
+	if (silent)
+		return;
+	eo = errno;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	errno = eo;
+}
+
 #ifdef DEBUG
+
+/* Debug output to stderr.  To get it run ./configure --enable-debug. */
+
+void __Dprintf(const char *fmt, ...)
+{
+	int eo = errno;
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	errno = eo;
+}
+
+void __Dputs(const char *s)
+{
+	int eo = errno;
+	fprintf(stderr, "%s\n", s);
+	errno = eo;
+}
+
+void __Dperror(const char *s)
+{
+	int eo = errno;
+	perror(s);
+	errno = eo;
+}
+
 /**
  * ntfs_debug_runlist_dump - Dump a runlist.
  */
@@ -60,4 +121,3 @@ void ntfs_debug_runlist_dump(const runlist_element *rl)
 }
 
 #endif
-

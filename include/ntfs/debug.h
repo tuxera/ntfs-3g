@@ -33,77 +33,34 @@
 #endif
 #include <errno.h>
 
-#include "types.h"
-
 struct _runlist_element;
 
-/**
- * Sprintf - silencable output to stderr
- * @silent:	if false string is output to stderr
- * @fmt:	printf style format string
- * @...:	optional arguments for the printf style format string
- *
- * If @silent is false, output the string @fmt to stderror.
- *
- * This is basically a replacelment for:
- *
- *	if (!silent)
- *		fprintf(stderr, fmt, ...);
- *
- * It is more convenient to use Sprintf instead of the above code and perhaps
- * more importantly, Sprintf makes it much easier to turn it into a "do
- * nothing" function with an #ifdef, thus removing the whole output completely.
- */
-static __inline__ void Sprintf(const BOOL silent, const char *fmt, ...)
-{
-	int eo;
-	va_list ap;
-
-	if (silent)
-		return;
-	eo = errno;
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	errno = eo;
-}
+extern void __Sprintf(const int silent, const char *fmt, ...)
+		__attribute__ ((format (printf, 2, 3)));
+#define Sprintf(silent, f, a...)	__Sprintf(silent, f, ##a)
 
 #ifdef DEBUG
 
 /* Debug output to stderr.  To get it run ./configure --enable-debug. */
 
-static __inline__ void Dprintf(const char *fmt, ...)
-{
-	int eo = errno;
-	va_list ap;
+extern void __Dprintf(const char *fmt, ...)
+		__attribute__ ((format (printf, 1, 2)));
+#define Dprintf(f, a...)	__Dprintf(f, ##a)
 
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	errno = eo;
-}
+extern void __Dputs(const char *s);
+#define Dputs(s)		__Dputs(s)
 
-static __inline__ void Dputs(const char *s)
-{
-	int eo = errno;
-	fprintf(stderr, "%s\n", s);
-	errno = eo;
-}
-
-static __inline__ void Dperror(const char *s)
-{
-	int eo = errno;
-	perror(s);
-	errno = eo;
-}
+extern void __Dperror(const char *s);
+#define Dperror(s)		__Dperror(s)
 
 extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
 
 #else /* if !DEBUG */
 
-static __inline__ void Dprintf(const char *fmt __attribute__((unused)), ...) {}
-static __inline__ void Dputs(const char *s __attribute__((unused))) {}
-static __inline__ void Dperror(const char *s __attribute__((unused))) {}
+#define Dprintf(f, a...)	do {} while (0)
+#define Dputs(s)		do {} while (0)
+#define Dperror(s)		do {} while (0)
+
 static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}
 
 #endif /* !DEBUG */
