@@ -63,5 +63,7 @@ extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl);
 
+extern int ntfs_rl_truncate(runlist_element *rl, const VCN start_vcn);
+
 #endif /* defined _NTFS_RUNLIST_H */
 

@@ -1106,7 +1106,7 @@ rl_err_out:
  *
  * Create the mapping pairs array from the runlist @rl and save the array in
  * @dst. @dst_len is the size of @dst in bytes and it should be at least equal
- * to the value obtained by calling ntfs_get_size_for_mapping_pairs(@rl).
+ * to the value obtained by calling ntfs_get_size_for_mapping_pairs().
  *
  * Return 0 on success or when @rl is NULL. On error, return -1 with errno set
  * to the error code. The following error codes are defined:
@@ -1171,6 +1171,22 @@ err_out:
 		errno = EINVAL;
 	else
 		errno = EIO;
+	return -1;
+}
+
+/**
+ * ntfs_rl_truncate - truncate a runlist starting at a specified vcn
+ * @rl:		runlist to truncate
+ * @start_vcn:	first vcn which should be cut off
+ *
+ * Truncate the runlist @rl starting at vcn @start_vcn as well as the memory
+ * buffer holding the runlist.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_rl_truncate(runlist_element *rl, const VCN start_vcn)
+{
+	errno = ENOTSUP;
 	return -1;
 }
 
