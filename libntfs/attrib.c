@@ -2476,8 +2476,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	dataruns_size = (dataruns_size + 7) & ~7;
 	length = offsetof(ATTR_RECORD, compressed_size) + ((sizeof(ntfschar) *
 			name_len + 7) & ~7) + dataruns_size +
-			(flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
-			sizeof(a->compressed_size) : 0;
+			((flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ?
+			sizeof(a->compressed_size) : 0);
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
 		Dprintf("%s(): Failed to make room for attribute.\n",
