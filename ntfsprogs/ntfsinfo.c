@@ -886,7 +886,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 		(unsigned int)le32_to_cpu(index_root->index.allocated_size));
 	printf("\tUsed Size:\t\t %u\n",
 		(unsigned int)le32_to_cpu(index_root->index.index_length));
-	printf("\tFlags:\t\t\t %u\n",index_root->index.flags);
+	printf("\tFlags:\t\t\t 0x%x\n",index_root->index.flags);
 	/* printf("\tIndex Entries Following\t %u\n", ???? );*/
 }
 
@@ -1010,16 +1010,16 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 	
-	printf("Update Sequence Array Count:\t%hu\n",
+	printf("Update Sequence Array Count:\t %hu\n",
 		le16_to_cpu(inode->mrec->usa_count));
-	printf("$LogFile seqNum for this Inode:\t0x%llx\n",
+	printf("$LogFile seqNum for this Inode:\t 0x%llx\n",
 		(signed long long int)sle64_to_cpu(inode->mrec->lsn));
-	printf("Number of times reused:\t\t%hu\n",
+	printf("Number of times reused:\t\t %hu\n",
 		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
-	printf("Number of hard links:\t\t%hu\n",
+	printf("Number of hard links:\t\t %hu\n",
 		le16_to_cpu(inode->mrec->link_count));
 
-	printf("MFT record Flags:\t\t");
+	printf("MFT record Flags:\t\t ");
 	/* we would like to convert MFT_RECORD_IN_USE -> DELETED
 		and we do that by xoring */
 	inode_flags = inode_flags ^ MFT_RECORD_IN_USE;
@@ -1041,16 +1041,16 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	}
 	printf("\n");
 
-	printf("Size - Used:\t\t\t%u bytes\n",
+	printf("Size - Used:\t\t\t %u bytes\n",
 		(unsigned int)le32_to_cpu(inode->mrec->bytes_in_use));
-	printf("Size - Allocated:\t\t%u bytes\n",
+	printf("Size - Allocated:\t\t %u bytes\n",
 		(unsigned int)le32_to_cpu(inode->mrec->bytes_allocated));
 		
 	if (inode->mrec->base_mft_record) {
-		printf("base MFT record:\t\t%llu\n",
+		printf("base MFT record:\t\t %llu\n",
 			MREF_LE(inode->mrec->base_mft_record));
 	}
-	printf("Next Attribute Instance Num\t%hu\n",
+	printf("Next Attribute Instance Num\t %hu\n",
 		le16_to_cpu(inode->mrec->next_attr_instance));
 }
 
