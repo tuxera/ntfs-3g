@@ -105,8 +105,8 @@ linux_ntfsinclude_HEADERS = \
 	compat.h	\
 	debug.h		\
 	device.h	\
+	device_io.h	\
 	dir.h		\
-	disk_io.h	\
 	endians.h	\
 	inode.h		\
 	layout.h	\

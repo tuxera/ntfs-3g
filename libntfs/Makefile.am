@@ -51,8 +51,8 @@ libntfs_la_SOURCES =	\
 	compat.c	\
 	debug.c		\
 	device.c	\
+	device_io.c	\
 	dir.c		\
-	disk_io.c	\
 	inode.c		\
 	lcnalloc.c	\
 	mft.c		\
@@ -63,6 +63,5 @@ libntfs_la_SOURCES =	\
 
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST =	\
-	win32_io.c
+EXTRA_DIST=unix_io.c win32_io.c
 
