@@ -2515,7 +2515,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		a->data_size = 0;
 		a->initialized_size = 0;
 		/* Set empty mapping pairs. */
-		*((u8*) a + (length - dataruns_size)) = 0;
+		*((u8*)a + le16_to_cpu(a->mapping_pairs_offset)) = 0;
 	}
 	if (name_len)
 		memcpy((u8*)a + le16_to_cpu(a->name_offset),
