@@ -833,6 +833,155 @@ int utils_is_metadata (ntfs_inode *inode)
 }
 
 
+/**
+ * mft_get_search_ctx
+ */
+struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol)
+{
+	struct mft_search_ctx *ctx;
+
+	ctx = calloc (1, sizeof *ctx);
+
+	ctx->mft_num = -1;
+	ctx->vol = vol;
+
+	return ctx;
+}
+
+/**
+ * mft_put_search_ctx
+ */
+void mft_put_search_ctx (struct mft_search_ctx *ctx)
+{
+	if (!ctx)
+		return;
+	if (ctx->inode)
+		ntfs_inode_close (ctx->inode);
+	free (ctx);
+}
+
+/**
+ * mft_next_record
+ */
+int mft_next_record (struct mft_search_ctx *ctx)
+{
+	ATTR_RECORD *attr10 = NULL;
+	ATTR_RECORD *attr20 = NULL;
+	ATTR_RECORD *attr80 = NULL;
+	ntfs_attr_search_ctx *attr_ctx;
+
+	if (!ctx)
+		return -1;
+
+	if (ctx->inode) {
+		ntfs_inode_close (ctx->inode);
+		ctx->inode = NULL;
+	}
+
+	for (ctx->mft_num++; ctx->mft_num < ctx->vol->nr_mft_records; ctx->mft_num++) {
+		ctx->flags_match = 0;
+		int in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
+		if (in_use == -1) {
+			Eprintf ("Error reading inode %lld.  Aborting.", ctx->mft_num);
+			return -1;
+		}
+
+		if (in_use) {
+			ctx->flags_match |= FEMR_IN_USE;
+
+			ctx->inode = ntfs_inode_open (ctx->vol, (MFT_REF) ctx->mft_num);
+			if (ctx->inode == NULL) {
+				Eprintf ("Error reading inode %lld.", ctx->mft_num);
+				return -1;
+			}
+
+			attr10 = find_first_attribute (AT_STANDARD_INFORMATION, ctx->inode->mrec);
+			attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,       ctx->inode->mrec);
+			attr80 = find_first_attribute (AT_DATA, ctx->inode->mrec);
+
+			if (attr10)
+				ctx->flags_match |= FEMR_BASE_RECORD;
+			else
+				ctx->flags_match |= FEMR_NOT_BASE_RECORD;
+
+			if (attr20)
+				ctx->flags_match |= FEMR_BASE_RECORD;
+
+			if (attr80)
+				ctx->flags_match |= FEMR_FILE;
+
+			if (ctx->flags_search & FEMR_DIR) {
+				attr_ctx = ntfs_attr_get_search_ctx (NULL, ctx->inode->mrec);
+				if (attr_ctx) {
+					if (ntfs_attr_lookup (AT_INDEX_ROOT, I30, 4, 0, 0, NULL, 0, attr_ctx) == 0)
+						ctx->flags_match |= FEMR_DIR;
+
+					ntfs_attr_put_search_ctx (attr_ctx);
+				} else {
+					Eprintf ("Couldn't create a search context.\n");
+					return -1;
+				}
+			}
+
+			switch (utils_is_metadata (ctx->inode)) {
+				case 1: ctx->flags_match |= FEMR_METADATA;     break;
+				case 0: ctx->flags_match |= FEMR_NOT_METADATA; break;
+				default:
+					ctx->flags_match |= FEMR_NOT_METADATA; break;
+					//Eprintf ("Error reading inode %lld.", ctx->mft_num);
+					//return -1;
+			}
+
+		} else {		// !in_use
+			ntfs_attr *mft;
+
+			ctx->flags_match |= FEMR_NOT_IN_USE;
+
+			ctx->inode = calloc (1, sizeof (*ctx->inode));
+			if (!ctx->inode) {
+				Eprintf ("Out of memory.  Aborting.");
+				return -1;
+			}
+
+			ctx->inode->mft_no = ctx->mft_num;
+			ctx->inode->vol    = ctx->vol;
+			ctx->inode->mrec   = malloc (ctx->vol->mft_record_size);
+			if (!ctx->inode->mrec) {
+				free (ctx->inode); // == ntfs_inode_close
+				Eprintf ("Out of memory.  Aborting.");
+				return -1;
+			}
+
+			mft = ntfs_attr_open (ctx->vol->mft_ni, AT_DATA, NULL, 0);
+			if (!mft) {
+				Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+				// free / close
+				return -1;
+			}
+
+			if (ntfs_attr_pread (mft, ctx->vol->mft_record_size * ctx->mft_num, ctx->vol->mft_record_size, ctx->inode->mrec) < ctx->vol->mft_record_size) {
+				Eprintf ("Couldn't read MFT Record %lld: %s.\n", ctx->mft_num, strerror (errno));
+				// free / close
+				return -1;
+			}
+		}
+
+		if (ctx->flags_match & ctx->flags_search) {
+			break;
+		}
+
+		if (ntfs_inode_close (ctx->inode)) {
+			Eprintf ("Error closing inode %lld.", ctx->mft_num);
+			return -errno;
+		}
+
+		ctx->inode = NULL;
+	}
+
+	return (ctx->inode == NULL);
+}
+
+
 #if 0
 hamming weight
 inline unsigned int hweight32(unsigned int w)

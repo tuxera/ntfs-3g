@@ -81,4 +81,33 @@ s64 utc2ntfs (time_t time);
 ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft);
 
+/**
+ * defines...
+ * if *not in use* then the other flags are ignored?
+ */
+#define FEMR_IN_USE		1 << 0
+#define FEMR_NOT_IN_USE		1 << 1
+#define FEMR_FILE		1 << 2		// $DATA
+#define FEMR_DIR		1 << 3		// $INDEX_ROOT, "$I30"
+#define FEMR_METADATA		1 << 4
+#define FEMR_NOT_METADATA	1 << 5
+#define FEMR_BASE_RECORD	1 << 6
+#define FEMR_NOT_BASE_RECORD	1 << 7
+#define FEMR_ALL_RECORDS	0xFF
+
+/**
+ * struct mft_search_ctx
+ */
+struct mft_search_ctx {
+	int flags_search;
+	int flags_match;
+	ntfs_inode *inode;
+	u64 mft_num;
+	ntfs_volume *vol;
+};
+
+struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol);
+void mft_put_search_ctx (struct mft_search_ctx *ctx);
+int mft_next_record (struct mft_search_ctx *ctx);
+
 #endif /* _NTFS_UTILS_H_ */
