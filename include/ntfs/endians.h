@@ -91,6 +91,17 @@
 #define __cpu_to_le32(x) bswap_32(x)
 #define __cpu_to_le64(x) bswap_64(x)
 
+/* For architectures that do not provide some/all of the constant versions. */
+#ifndef __bswap_constant_16
+#define __bswap_constant_16(x) bswap_16(x)
+#endif
+#ifndef __bswap_constant_32
+#define __bswap_constant_32(x) bswap_32(x)
+#endif
+#ifndef __bswap_constant_64
+#define __bswap_constant_64(x) bswap_64(x)
+#endif
+
 #define __constant_le16_to_cpu(x) __bswap_constant_16(x)
 #define __constant_le32_to_cpu(x) __bswap_constant_32(x)
 #define __constant_le64_to_cpu(x) __bswap_constant_64(x)
