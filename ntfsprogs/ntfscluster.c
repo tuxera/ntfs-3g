@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ntfscluster.h"
 #include "types.h"
@@ -33,6 +34,7 @@
 #include "utils.h"
 #include "volume.h"
 #include "debug.h"
+#include "dir.h"
 
 static const char *EXEC_NAME = "ntfscluster";
 static struct options opts;
@@ -223,82 +225,112 @@ int parse_options (int argc, char **argv)
 
 
 /**
- * free_space - Calculate the amount of space which isn't in use
- */
-u64 free_space (ntfs_volume *vol)
-{
-	return 0;
-}
-
-/**
- * user_space - Calculate the amount of space of the user's files
- */
-u64 user_space (ntfs_volume *vol)
-{
-	return 0;
-}
-
-/**
- * meta_space - Calculate the amount of space used by the filesystem structures
- */
-u64 meta_space (ntfs_volume *vol)
-{
-	return 0;
-}
-
-/**
- * info - Display information about the volume
+ * info
  */
 int info (ntfs_volume *vol)
 {
-	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q;
-	int cps;
-	u64 fs, us, ms;
+	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u;
+	int cb, sb, cps;
+	u64 uc = 0, mc = 0, fc = 0;
 
-	cps = vol->cluster_size_bits - vol->sector_size_bits;
-	fs  = free_space (vol);
-	ms  = meta_space (vol);
-	us  = user_space (vol);
+	struct mft_search_ctx *m_ctx;
+	ntfs_attr_search_ctx *a_ctx;
+	runlist_element *rl;
+	ATTR_RECORD *rec;
+	int z;
+	int inuse = 0;
+
+	m_ctx = mft_get_search_ctx (vol);
+	m_ctx->flags_search = FEMR_IN_USE | FEMR_METADATA | FEMR_BASE_RECORD | FEMR_NOT_BASE_RECORD;
+	while (mft_next_record (m_ctx) == 0) {
+
+		if (!(m_ctx->flags_match & FEMR_IN_USE))
+			continue;
+
+		inuse++;
+
+		a_ctx = ntfs_attr_get_search_ctx (NULL, m_ctx->inode->mrec);
+
+		while ((rec = find_attribute (AT_UNUSED, a_ctx))) {
+
+			if (!rec->non_resident)
+				continue;
+
+			rl = ntfs_mapping_pairs_decompress (vol, rec, NULL);
+
+			for (z = 0; rl[z].length > 0; z++)
+			{
+				if (rl[z].lcn >= 0) {
+					if (m_ctx->flags_match & FEMR_METADATA)
+						mc += rl[z].length;
+					else
+						uc += rl[z].length;
+				}
+
+			}
+
+			free (rl);
+		}
+
+		ntfs_attr_put_search_ctx (a_ctx);
+	}
+	mft_put_search_ctx (m_ctx);
+
+	cb  = vol->cluster_size_bits;
+	sb  = vol->sector_size_bits;
+	cps = cb - sb;
+
+	fc  = vol->nr_clusters-mc-uc;
+	fc  <<= cb;
+	mc  <<= cb;
+	uc  <<= cb;
 
 	a = vol->sector_size;
 	b = vol->cluster_size;
 	c = 1 << cps;
-	d = vol->nr_clusters >> cps;
+	d = vol->nr_clusters << cb;
 	e = vol->nr_clusters;
-	f = vol->nr_mft_records;
-	g = 0;
-	h = 0;
-	i = fs / a;
-	j = fs / b;
-	k = fs * 100 / a / d;
-	l = us / a;
-	m = us / b;
-	n = us * 100 / a / d;
-	o = ms / a;
-	p = ms / b;
-	q = ms * 100 / a / d;
+	f = vol->nr_clusters >> cps;
+	g = vol->nr_mft_records;
+	h = inuse;
+	i = h * 100 / g;
+	j = fc;
+	k = fc >> sb;
+	l = fc >> cb;
+	m = fc * 100 / b / e;
+	n = uc;
+	o = uc >> sb;
+	p = uc >> cb;
+	q = uc * 100 / b / e;
+	r = mc;
+	s = mc >> sb;
+	t = mc >> cb;
+	u = mc * 100 / b / e;
 
 	printf ("bytes per sector       : %lld\n", a);
 	printf ("bytes per cluster      : %lld\n", b);
 	printf ("sectors per cluster    : %lld\n", c);
-	printf ("sectors per volume     : %lld\n", d);
-	printf ("clusters per volume    : %lld\n", e);
-	printf ("mft records total      : %lld\n", f);
-	printf ("mft records in use     : %lld\n", g);
-	printf ("mft records percentage : %lld\n", h);
-	printf ("sectors of free space  : %lld\n", i);
-	printf ("clusters of free space : %lld\n", j);
-	printf ("percentage free space  : %lld\n", k);
-	printf ("sectors of user data   : %lld\n", l);
-	printf ("clusters of user data  : %lld\n", m);
-	printf ("percentage user data   : %lld\n", n);
-	printf ("sectors of metadata    : %lld\n", o);
-	printf ("clusters of metadata   : %lld\n", p);
-	printf ("percentage metadata    : %lld\n", q);
+	printf ("bytes per volume       : %lld\n", d);
+	printf ("sectors per volume     : %lld\n", e);
+	printf ("clusters per volume    : %lld\n", f);
+	printf ("mft records total      : %lld\n", g);
+	printf ("mft records in use     : %lld\n", h);
+	printf ("mft records percentage : %lld\n", i);
+	printf ("bytes of free space    : %lld\n", j);
+	printf ("sectors of free space  : %lld\n", k);
+	printf ("clusters of free space : %lld\n", l);
+	printf ("percentage free space  : %lld\n", m);
+	printf ("bytes of user data     : %lld\n", n);
+	printf ("sectors of user data   : %lld\n", o);
+	printf ("clusters of user data  : %lld\n", p);
+	printf ("percentage user data   : %lld\n", q);
+	printf ("bytes of metadata      : %lld\n", r);
+	printf ("sectors of metadata    : %lld\n", s);
+	printf ("clusters of metadata   : %lld\n", t);
+	printf ("percentage metadata    : %lld\n", u);
 
 	return 0;
 }
-
 
 /**
  * cluster_find
@@ -471,7 +503,7 @@ int main (int argc, char *argv[])
 		*/
 		case act_info:
 		default:
-			info (vol);
+			result = info (vol);
 			break;
 	}
 
