@@ -30,13 +30,13 @@
  * defaults don't necessarily perform appropriate typecasts.
  *	Also, using our own functions means that we can change them if it
  * turns out that we do need to use the unaligned access macros on
- * architectures requirering aligned memory accesses...
+ * architectures requiring aligned memory accesses...
  */
 
-#include <asm/byteorder.h>
+#include <endian.h>
+#include <byteswap.h>
 
-/* The following are not defined on Cygwin... Luckily Cygwin is LE already. */
-#ifdef __CYGWIN32__
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
 
 #define __le16_to_cpu(x) (x)
 #define __le32_to_cpu(x) (x)
@@ -54,8 +54,29 @@
 #define __constant_cpu_to_le32(x) (x)
 #define __constant_cpu_to_le64(x) (x)
 
-#endif /* __CYGWIN32__ */
+#elif (__BYTE_ORDER == __BIG_ENDIAN)
 
+#define __le16_to_cpu(x) bswap_16(x)
+#define __le32_to_cpu(x) bswap_32(x)
+#define __le64_to_cpu(x) bswap_64(x)
+
+#define __cpu_to_le16(x) bswap_16(x)
+#define __cpu_to_le32(x) bswap_32(x)
+#define __cpu_to_le64(x) bswap_64(x)
+
+#define __constant_le16_to_cpu(x) __bswap_constant_16(x)
+#define __constant_le32_to_cpu(x) __bswap_constant_32(x)
+#define __constant_le64_to_cpu(x) __bswap_constant_64(x)
+
+#define __constant_cpu_to_le16(x) __bswap_constant_16(x)
+#define __constant_cpu_to_le32(x) __bswap_constant_32(x)
+#define __constant_cpu_to_le64(x) __bswap_constant_64(x)
+
+#else
+
+#error "You must define __BYTE_ORDER to be __LITTLE_ENDIAN or __BIG_ENDIAN"
+
+#endif
 
 /* Unsigned from LE to CPU conversion. */
 
