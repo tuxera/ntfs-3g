@@ -8,15 +8,15 @@
 	- Remove a LOT of dead code. Massive cleanup.
 	- Add full attribute search context and allocation/init/deallocation
 	  functions (see attrib.c).
-	- Remove find_first_attr(). Just use get_attr_search_ctx() +
-	  find_attr() which has the same effect.
+	- Remove find_first_attr(). Just use ntfs_attr_get_search_ctx() +
+	  ntfs_attr_find() which has the same effect.
 	- Rewrite disk_io.[ch] and mft.[ch] defining new access API:
 		disk_io.[ch] provide:	ntfs_p{read,write}(),
 					ntfs_mst_p{read,write}(), and
-					ntfs_{read,write}_clusters().
-		mft.[ch] provide:	ntfs_{read,write}_mft_record(),
-					ntfs_{read,write}_mft_records(), and
-					ntfs_get_mft_record_data_size().
+					ntfs_clusters_{read,write}().
+		mft.[ch] provide:	ntfs_mft_record_{read,write}(),
+					ntfs_mft_records_{read,write}(), and
+					ntfs_mft_record_get_data_size().
 	- When writing mft records using the mft.c::ntfs_mft_record{s,}_write()
 	  interface, the mft mirror is now updated automatically.
 	- Add -Wall to compiler options when ./configure is run with
@@ -27,41 +27,41 @@
 	- Add new API calls provided by unistr.[ch]:
 		ntfs_ucstombs() and ntfs_mbstoucs().
 	- Define API for mst.[ch] providing:
-		ntfs_post_read_mst_fixup(),
-		ntfs_pre_write_mst_fixup(), and
-		ntfs_post_write_mst_fixup().
+		ntfs_mst_post_read_fixup(),
+		ntfs_mst_pre_write_fixup(), and
+		ntfs_mst_post_write_fixup().
 	- Define API for bootsect.[ch] providing:
-		is_boot_sector_ntfs().
+		ntfs_boot_sector_is_ntfs().
 	- Add beginning of new API with new files inode.[ch] providing:
-		ntfs_{open,close)_inode(), and
-		ntfs_open_extent_inode().
+		ntfs_inode_{open,close)(), and
+		ntfs_extent_inode_open().
 		- Note the inode related API is subject to change.
 	- Start defining API provided by attrib.[ch]:
 		ntfs_attr_search_ctx typedef,
-		ntfs_{get,put,reinit}_attr_search_ctx(), and
-		ntfs_lookup_attr().
+		ntfs_attr_{get,put,reinit}_search_ctx(), and
+		ntfs_attr_lookup().
 	- Add a TODO.libntfs laying down my personal roadmap for the library.
-	- Remove find_attr() from API, everyone must use ntfs_lookup_attr()
+	- Remove ntfs_attr_find() from API, everyone must use ntfs_lookup_attr()
 	  instead.
 	- Rename all attribute name constants from $blah to AT_blah.
 	- Rename all system file constants from FILE_$blah to FILE_blah.
-	- Port lookup_attr() stuff from ntfs tng driver.
+	- Port ntfS_attr_lookup() stuff from ntfs tng driver.
 	- Implement loading of extent inodes. They are attached on open to the
 	  base inode and are cached there until the base inode is closed.
 	- Cleanup/streamline include file dependencies.
 	- Port attribute list merging code from ntfs tng driver. API to follow.
 	- Allocate a ntfs_volume in mkntfs and start initializing it instead
 	  of using the opt global structure. Necessary so can call the
-	  modified ntfs_decompress_mapping_pairs() from mkntfs.c.
+	  modified ntfs_mapping_pairs_decompress() from mkntfs.c.
 	- Add libntfs/debug.c providing:
-		ntfs_debug_dump_runlist().
+		ntfs_debug_runlist_dump().
 	- Add new API call ntfs_check_if_mounted() to volume.[ch]. (Matthew
 	  Fanto, me)
 	- Do folding assisting cleanups. (Richard Russon, me)
-	- Add new API call is_boot_sector_ntfs() provided by bootsect.[hc].
+	- Add new API call ntfs_boot_sector_is_ntfs() provided by bootsect.[hc].
 	- Define and write more API calls provided by attrib.[ch]:
-		ntfs_merge_runlists(),
-		ntfs_decompress_mapping_pairs(),
+		ntfs_runlists_merge(),
+		ntfs_mapping_pairs_decompress(),
 		ntfs_attr_map_runlist(),
 		ntfs_{rl,attr}_vcn_to_lcn(),
 		ntfs_attr_find_vcn(),
@@ -83,16 +83,16 @@
 	  overwrite only):
 		ntfs_attr_p{read,write}(), and
 		ntfs_attr_mst_p{read,write}().
-	- Fix detection of read-only mounts in volume.c::ntfs_check_mntent().
+	- Fix detection of read-only mounts in volume.c::ntfs_mntent_check().
 	- Start modularising ntfs_mount():
 		- Split off the boot sector parsing code and move it to
-		  bootsect.c::parse_ntfs_boot_sector().
+		  bootsect.c::ntfs_boot_sector_parse().
 		- Move $MFT loading and parsing code to separate function
-		  volume.c::ntfs_load_mft().
+		  volume.c::ntfs_mft_load().
 		- Move $MFTMirr loading and parsing code to
-		  volume.c::ntfs_load_mftmirr().
+		  volume.c::ntfs_mftmirr_load().
 		- Move all startup code (loading and parsing of bootsector,
-		  $MFT, and $MFTMirr) to volume.c::ntfs_startup_volume().
+		  $MFT, and $MFTMirr) to volume.c::ntfs_volume_startup().
 	- Update ntfsfix to above modularisation.
 	- Add detection of read-write mounted devices to ntfsfix and refuse to
 	  operate on them.
@@ -100,10 +100,10 @@
 	  and writes and deal with end of file properly. Affected functions:
 	  	ntfs_p{read,write}(),
 		ntfs_mst_p{read,write}(), and
-		ntfs_{read,write}_clusters().
+		ntfs_clusters_{read,write}().
 	- Change ntfsfix to take into account the automatic mft mirror updates.
 	- Add new API provided by new files dir.[ch]:
-		ntfs_lookup_inode_by_name(), and
+		ntfs_inode_lookup_by_name(), and
 		ntfs_readdir().
 	- We now use u8, u16, u32, u64, s8, s16, s32, and s64 types and we
 	  typedef them ourselves from the C99 standard uint8_t, etc types which
@@ -111,20 +111,20 @@
 	- Better gcc detection in 'configure.in'. (Szakacsits Szabolcs)
 	  Tested with:	egcs-1.0.3 (egcs-2.90.29), egcs-1.1.2 (egcs-2.91.66),
 			gcc 2.95.3, 2.96 (from RH 7.1 and 7.3), and 3.0.4.
-	- Enable enumeration of attributes using ntfs_lookup_attr() which is
+	- Enable enumeration of attributes using ntfs_attr_lookup() which is
 	  requested by passing a type of AT_UNUSED (or simply zero) to
-	  ntfs_lookup_attr(). (Based on initial patch by Szakacsits Szabolcs.)
-	- Fix two minor buglets in ntfs_find_external_attr() where we would
+	  ntfs_attr_lookup(). (Based on initial patch by Szakacsits Szabolcs.)
+	- Fix two minor buglets in ntfs_external_attr_find() where we would
 	  continue the search when we detect a mismatched type and/or name
 	  instead of aborting and returning error EIO to flag the corruption.
 	- Add new syntactic sugar API provided by attrib.h:
-		ntfs_walk_attrs(). (Szakacsits Szabolcs)
+		ntfs_attrs_walk(). (Szakacsits Szabolcs)
 	- Add new API for compressing runlists into mapping pairs arrays
 	  provided by attrib.[ch] (adapted from mkntfs.c):
 		ntfs_get_nr_significant_bytes(),
 		ntfs_get_size_for_mapping_pairs(),
 		ntfs_write_significant_bytes(), and
-		ntfs_build_mapping_pairs().
+		ntfs_mapping_pairs_build().
 	- Convert mkntfs.c to the above API.
 	- Implement attrib.[hc]::ntfs_rl_pwrite() as a low level scatter write
 	  function analogous in functionality to mkntfs.c::ntfs_rlwrite() but
@@ -134,10 +134,10 @@
 	  like it.
 	- Move runlist functions to runlist.[hc]. (Richard Russon)
 	- Add new API to volume.[hc] and use it (Szakacsits Szabolcs):
-		ntfs_is_version_supported(),
+		ntfs_version_is_supported(),
 		NTFS_V{1_[12],2_x,3_[01]}() macros,
-		ntfs_reset_logfile(), and
-		ntfs_set_volume_flags().
+		ntfs_logfile_reset(), and
+		ntfs_volume_set_flags().
 	- Change size autodetection of non-block device files in mkntfs to use
 	  the stat returned file size rather than the block allocation count to
 	  cope with precreated sparse files.
@@ -145,6 +145,8 @@
 	- New tool, ntfsundelete, written by Richard Russon.
 	- New tool, ntfsresize, written by Szabolcs Szakacsits.
 	- The word is "runlist", not "run_list", "run list", or "run-list".
+	- Prefix all functions with "ntfs_" and make the names of the form
+	  "ntfs_object_action()". Keep this for all future functions!
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
