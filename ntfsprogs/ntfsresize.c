@@ -164,11 +164,14 @@ s64 max_free_cluster_range = 0;
 
 #define NTFS_MAX_CLUSTER_SIZE 	(65536)
 
-#define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
-
 GEN_PRINTF(Eprintf, stderr, NULL,         FALSE)
 GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
 GEN_PRINTF(Qprintf, stdout, NULL,         FALSE)
+
+static s64 rounded_up_division(s64 numer, s64 denom)
+{
+	return (numer + (denom - 1)) / denom;
+}
 
 /**
  * perr_printf
@@ -775,16 +778,27 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 	free(rl);
 }
 
+
+static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+{
+	ntfs_attr_search_ctx *ret;
+
+	if ((ret = ntfs_attr_get_search_ctx(ni, mrec)) == NULL)
+		perr_printf("ntfs_attr_get_search_ctx");
+
+	return ret;
+}
+
 /**
  * walk_attributes
  *
  * For a given MFT Record, iterate through all its attributes.  Any non-resident
  * data runs will be marked in lcn_bitmap.
  */
-static void walk_attributes(ntfs_volume *vol, ntfsck_t *fsck)
+static int walk_attributes(ntfs_volume *vol, ntfsck_t *fsck)
 {
-	if (!(fsck->ctx = ntfs_attr_get_search_ctx(fsck->ni, NULL)))
-		perr_exit("ntfs_get_attr_search_ctx");
+	if (!(fsck->ctx = attr_get_search_ctx(fsck->ni, NULL)))
+		return -1;
 
 	while (!ntfs_attrs_walk(fsck->ctx)) {
 		if (fsck->ctx->attr->type == AT_END)
@@ -793,6 +807,7 @@ static void walk_attributes(ntfs_volume *vol, ntfsck_t *fsck)
 	}
 
 	ntfs_attr_put_search_ctx(fsck->ctx);
+	return 0;
 }
 
 /**
@@ -905,13 +920,23 @@ static void progress_update(struct progress_bar *p, u64 current)
 	fflush(stdout);
 }
 
+static int inode_close(ntfs_inode *ni)
+{
+	if (ntfs_inode_close(ni)) {
+		perr_printf("ntfs_inode_close for inode %llu",
+			    (unsigned long long)ni->mft_no);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * walk_inodes
  *
  * Read each record in the MFT, skipping the unused ones, and build up a bitmap
  * from all the non-resident attributes.
  */
-static void build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
+static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 {
 	s64 inode = 0;
 	ntfs_inode *ni;
@@ -934,18 +959,23 @@ static void build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO || errno == ENOENT)
 				continue;
-			perr_exit("Reading inode %lld failed", inode);
+			perr_printf("Reading inode %lld failed", inode);
+			return -1;
 		}
 
 		if (ni->mrec->base_mft_record)
 			goto close_inode;
 
 		fsck->ni = ni;
-		walk_attributes(vol, fsck);
+		if (walk_attributes(vol, fsck) != 0) {
+			inode_close(ni);
+			return -1;
+		}
 close_inode:
-		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %lld", inode);
+		if (inode_close(ni) != 0)
+			return -1;
 	}
+	return 0;
 }
 
 static void build_resize_constrains(ntfs_resize_t *resize)
@@ -974,8 +1004,8 @@ static void build_resize_constrains(ntfs_resize_t *resize)
 
 static void resize_constrains_by_attributes(ntfs_resize_t *resize)
 {
-	if (!(resize->ctx = ntfs_attr_get_search_ctx(resize->ni, NULL)))
-		perr_exit("ntfs_get_attr_search_ctx");
+	if (!(resize->ctx = attr_get_search_ctx(resize->ni, NULL)))
+		exit(1);
 
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
@@ -1008,8 +1038,8 @@ static void set_resize_constrains(ntfs_resize_t *resize)
 		resize->ni = ni;
 		resize_constrains_by_attributes(resize);
 close_inode:
-		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %lld", inode);
+		if (inode_close(ni) != 0)
+			exit(1);
 	}
 }
 
@@ -1498,8 +1528,8 @@ static void relocate_attribute(ntfs_resize_t *resize)
 
 static void relocate_attributes(ntfs_resize_t *resize)
 {
-	if (!(resize->ctx = ntfs_attr_get_search_ctx(NULL, resize->mrec)))
-		perr_exit("ntfs_get_attr_search_ctx");
+	if (!(resize->ctx = attr_get_search_ctx(NULL, resize->mrec)))
+		exit(1);
 
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
@@ -1799,8 +1829,8 @@ static void lookup_data_attr(ntfs_volume *vol,
 	if (NInoAttrList(ni))
 		perr_exit("Attribute list attribute not yet supported");
 
-	if (!(*ctx = ntfs_attr_get_search_ctx(ni, NULL)))
-		perr_exit("ntfs_get_attr_search_ctx");
+	if (!(*ctx = attr_get_search_ctx(ni, NULL)))
+		exit(1);
 
 	if (str2unicode(aname, &ustr, &len) == -1)
 		perr_exit("Unable to convert string to Unicode");
@@ -1858,15 +1888,16 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-static void setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
+static int setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
 	bm->size = nr_clusters_to_bitmap_byte_size(nr_clusters);
 
 	if (!(bm->bm = (unsigned char *)calloc(1, bm->size)))
-		perr_exit("Failed to allocate internal buffer");
+		return -1;
 
 	bitmap_file_data_fixup(nr_clusters, bm);
+	return 0;
 }
 
 /**
@@ -2146,8 +2177,10 @@ int main(int argc, char **argv)
 	if (opt.show_progress)
 		fsck.flags |= NTFSCK_PROGBAR;
 
-	setup_lcn_bitmap(&fsck.lcn_bitmap, vol->nr_clusters);
-	build_allocation_bitmap(vol, &fsck);
+	if (setup_lcn_bitmap(&fsck.lcn_bitmap, vol->nr_clusters) != 0)
+		perr_exit("Failed to setup allocation bitmap");
+	if (build_allocation_bitmap(vol, &fsck) != 0)
+		exit(1);
 	if (fsck.multi_ref) {
 		err_printf("Filesystem check failed! Totally %d clusters "
 			   "referenced multiply times.\n", fsck.multi_ref);
