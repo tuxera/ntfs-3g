@@ -1242,7 +1242,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
  *
  * determine size and type of INDX record
  */
-static void get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
+static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 						ATTR_TYPES *type, u32 *size)
 {
 	ntfs_attr_search_ctx *ctx;
@@ -1253,7 +1253,7 @@ static void get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 		name = malloc(attr->name_length * sizeof(ntfschar));
 		if (!name) {
 			perror("malloc failed");
-			return;
+			return -1;
 		}
 		memcpy(name, (u8 *)attr + attr->name_offset, 
 				attr->name_length * sizeof(ntfschar));
@@ -1262,14 +1262,14 @@ static void get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 	if (!ctx) {
 		perror("ntfs_get_search_ctx failed");
 		free(name);
-		return;
+		return -1;
 	}
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0,
 							0, NULL, 0, ctx)) {
 		perror("ntfs_attr_lookup failed");
 		ntfs_attr_put_search_ctx(ctx);
 		free(name);
-		return;
+		return -1;
 	}
 	
 	root = (INDEX_ROOT*)((u8*)ctx->attr +
@@ -1278,6 +1278,7 @@ static void get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 	*type = root->type;
 	ntfs_attr_put_search_ctx(ctx);
 	free(name);
+	return 0;
 }
 
 /**
@@ -1298,7 +1299,8 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	int bit;
 	ntfschar *name;
 
-	get_type_and_size_of_indx(ni, attr, &type, &indx_record_size);
+	if (get_type_and_size_of_indx(ni, attr, &type, &indx_record_size))
+		return;
 
 	name = (ntfschar*)((u8*)attr + attr->name_offset);
 	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
