@@ -953,8 +953,11 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	if (ntfs_inode_close(ni))
 		Dperror("Failed to close inode, leaking memory");
 
-	/* Check logfile. */
-	if (ntfs_volume_check_logfile(vol))
+	/*
+	 * Check logfile. We care about not clean logfile only during
+	 * read-write mount, so for read-only mount don't check logfile at all.
+	 */
+	if (!(rwflag & MS_RDONLY) && ntfs_volume_check_logfile(vol))
 		goto error_exit;
 
 	return vol;
