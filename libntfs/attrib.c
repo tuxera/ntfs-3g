@@ -3139,16 +3139,16 @@ put_err_out:
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
+	LCN lcn_seek_from;
+	VCN first_free_vcn;
+	s64 nr_need_allocate;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
-	VCN first_free_vcn;
-	s64 nr_need_allocate;
+	runlist *rl, *rln;
 	u32 new_alen, new_muse;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
-	runlist *rl, *rln;
-	LCN lcn_seek_from = 0;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
@@ -3224,13 +3224,25 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		}
 		
 		/*
-		 * Determine first after last LCN of attribute. We will start
-		 * seek clusters from this LCN to avoid fragmentation.
+		 * Determine first after last LCN of attribute.  We will start
+		 * seek clusters from this LCN to avoid fragmentation.  If
+		 * there are no valid LCNs in the attribute let the cluster
+		 * allocator choose the starting LCN.
 		 */
+		lcn_seek_from = -1;
 		if (na->rl->length) {
+			/* Seek to the last run list element. */
 			for (rl = na->rl; (rl + 1)->length; rl++)
 				;
-			lcn_seek_from = rl->lcn + rl->length;
+			/*
+			 * If the last LCN is a hole or simillar seek back to
+			 * last valid LCN.
+			 */
+			while (rl->lcn < 0 && rl != na->rl)
+				rl--;
+			/* Only set lcn_seek_from it the LCN is valid. */
+			if (rl->lcn >= 0)
+				lcn_seek_from = rl->lcn + rl->length;
 		}
 		
 		rl = ntfs_cluster_alloc(vol, nr_need_allocate, lcn_seek_from,
@@ -3258,6 +3270,32 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
+		if (mp_size <= 0) {
+			err = errno;
+			fprintf(stderr, "%s(): Eeek! Get size for mapping "
+					"pairs failed.\n", __FUNCTION__);
+			if (ntfs_cluster_free(vol, na, na->allocated_size >>
+					vol->cluster_size_bits, -1) < 0) {
+				// FIXME: Eeek!  Leaving inconsistent metadata!
+				// (AIA)
+				fprintf(stderr, "%s(): Eeek!  Leaking "
+						"clusters.  Run chkdsk!\n",
+						__FUNCTION__);
+				err = EIO;
+			}
+			/* Now, truncate the runlist itself. */
+			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
+					vol->cluster_size_bits)) {
+				/*
+				 * Failed to truncate the runlist, so just
+				 * throw it away, it will be mapped afresh on
+				 * next use.
+				 */
+				free(na->rl);
+				na->rl = NULL;
+			}
+			goto put_err_out;
+		}
 		/*
 		 * Determine maximum possible length of mapping pairs,
 		 * if we shall *not* expand space for mapping pairs
@@ -3275,12 +3313,30 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = ENOTSUP;
 			fprintf(stderr, "%s(): Eeek! Maping pairs size is"
 					" too big.\n", __FUNCTION__);
-			ntfs_cluster_free (vol, na, na->allocated_size >>
-						vol->cluster_size_bits, -1);
+			if (ntfs_cluster_free(vol, na, na->allocated_size >>
+					vol->cluster_size_bits, -1) < 0) {
+				// FIXME: Eeek!  Leaving inconsistent metadata!
+				// (AIA)
+				fprintf(stderr, "%s(): Eeek!  Leaking "
+						"clusters.  Run chkdsk!\n",
+						__FUNCTION__);
+				err = EIO;
+			}
+			/* Now, truncate the runlist itself. */
+			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
+					vol->cluster_size_bits)) {
+				/*
+				 * Failed to truncate the runlist, so just
+				 * throw it away, it will be mapped afresh on
+				 * next use.
+				 */
+				free(na->rl);
+				na->rl = NULL;
+			}
 			goto put_err_out;
 		}
 
-		/* Expand space for mapping pairs if we need this*/
+		/* Expand space for mapping pairs if we need this. */
 		if (mp_size > cur_max_mp_size) {
 			/*
 			 * Calculate the new attribute length and mft record
@@ -3298,12 +3354,33 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 						"this message to "
 						"linux-ntfs-dev@lists.sf.net."
 						"\n", __FUNCTION__);
-				ntfs_cluster_free (vol, na, na->allocated_size
-						>> vol->cluster_size_bits, -1);
+				if (ntfs_cluster_free(vol, na,
+						na->allocated_size >>
+						vol->cluster_size_bits, -1) <
+						0) {
+					// FIXME: Eeek!  Leaving inconsistent
+					// metadata! (AIA)
+					fprintf(stderr, "%s(): Eeek!  Leaking "
+							"clusters.  Run "
+							"chkdsk!\n",
+							__FUNCTION__);
+				}
+				/* Now, truncate the runlist itself. */
+				if (ntfs_rl_truncate(&na->rl,
+						na->allocated_size >>
+						vol->cluster_size_bits)) {
+					/*
+					 * Failed to truncate the runlist, so
+					 * just throw it away, it will be
+					 * mapped afresh on next use.
+					 */
+					free(na->rl);
+					na->rl = NULL;
+				}
 				err = EIO;
 				goto put_err_out;
 			}
-			/* Move the following attributes forward. */
+			/* Move the following attributes making space. */
 			memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(
 					a->length), le32_to_cpu(m->bytes_in_use)
 					- ((u8*)a - (u8*)m) - le32_to_cpu(
@@ -3312,15 +3389,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			a->length = cpu_to_le32(new_alen);
 			m->bytes_in_use = cpu_to_le32(new_muse);
 		}
-
-		if (mp_size <= 0) {
-			err = errno;
-			fprintf(stderr, "%s(): Eeek! Get size for mapping "
-					"pairs failed.\n", __FUNCTION__);
-			ntfs_cluster_free (vol, na, na->allocated_size >>
-						vol->cluster_size_bits, -1);
-			goto put_err_out;
-		}
 		/*
 		 * Generate the new mapping pairs array directly into the
 		 * correct destination, i.e. the attribute record itself.
@@ -3328,10 +3396,42 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
 				a->mapping_pairs_offset), mp_size, na->rl)) {
 			err = errno;
-			fprintf(stderr, "%s(): Eeek! Mapping pairs build "
-					"failed.\n", __FUNCTION__);
-			ntfs_cluster_free (vol, na, na->allocated_size >>
-						vol->cluster_size_bits, -1);
+			fprintf(stderr, "%s(): BUG!  Mapping pairs build "
+					"failed.  Please run chkdsk and if "
+					"that doesn't find any errors please "
+					"report you saw this message to "
+					"linux-ntfs-dev@lists.sf.net.\n",
+					__FUNCTION__);
+			if (ntfs_cluster_free(vol, na, na->allocated_size >>
+					vol->cluster_size_bits, -1) < 0) {
+				// FIXME: Eeek!  Leaving inconsistent metadata!
+				// (AIA)
+				fprintf(stderr, "%s(): Eeek!  Leaking "
+						"clusters.  Run chkdsk!\n",
+						__FUNCTION__);
+				err = EIO;
+			}
+			/* Now, truncate the runlist itself. */
+			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
+					vol->cluster_size_bits)) {
+				/*
+				 * Failed to truncate the runlist, so just
+				 * throw it away, it will be mapped afresh on
+				 * next use.
+				 */
+				free(na->rl);
+				na->rl = NULL;
+			}
+			// FIXME:  Recovery is not complete yet here!  Because
+			// the attributes have been moved and the attribute and
+			// mft records have been updated.  We really should
+			// throw away the whole mft record and reload it from
+			// disk.  But this might loose other changes...  Might
+			// still be preferable to writing out a corrupt
+			// attribute...  Or even better, we should save the old
+			// values and restore them here as well as moving the
+			// following attributes back to their old location.
+			// (AIA)
 			goto put_err_out;
 		}
 
