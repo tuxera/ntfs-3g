@@ -24,7 +24,9 @@
 #ifndef _NTFS_GNOME_VFS_METHOD_H
 #define _NTFS_GNOME_VFS_METHOD_H
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #include <libgnomevfs/gnome-vfs-method.h>
 

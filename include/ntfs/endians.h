@@ -23,7 +23,9 @@
 #ifndef _NTFS_ENDIANS_H
 #define _NTFS_ENDIANS_H
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 /*
  * Notes:

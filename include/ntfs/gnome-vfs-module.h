@@ -24,7 +24,9 @@
 #ifndef _NTFS_GNOME_VFS_MODULE_H
 #define _NTFS_GNOME_VFS_MODULE_H
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 G_BEGIN_DECLS
 
