@@ -40,10 +40,11 @@ fi
 EMAIL="ntfs-cvs <linux-ntfs-cvs@lists.sourceforge.net>"
 REPLYTO="ntfs-dev <linux-ntfs-dev@lists.sourceforge.net>"
 
-SUBJECT="Subject: bk-$(echo ${BKD_ROOT} 2>/dev/null | sed "s#.*/##" 2>/dev/null): ChangeSet@${rev} by ${BK_USER}@${BK_HOST}"
-
 # For each ChangeSet, send an email.
 bk changes -f -d'$unless(:MERGE:){:CSETREV:\n}' - < "${BK_CSETLIST}" 2>/dev/null | while read rev; do
+
+SUBJECT="Subject: bk-$(echo ${BKD_ROOT} 2>/dev/null | sed "s#.*/##" 2>/dev/null): ChangeSet@${rev} by ${BK_USER}@${BK_HOST}"
+
 {
 bk changes -f -d'$unless(:MERGE:){ChangeSet|:CSETREV:\n}' -r$rev 2>/dev/null |
 bk -R prs -h -d'$unless(:MERGE:){ChangeSet@:I:, 20:Dy:-:Dm:-:Dd: :T::TZ:, :P:@:HOST:\n}' - 2>/dev/null
