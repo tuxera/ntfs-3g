@@ -24,10 +24,7 @@
 #include "config.h"
 
 #include <stdio.h>
-#include <errno.h>
-#include <stdarg.h>
 #include <getopt.h>
-#include <string.h>
 #include <stdlib.h>
 
 #include "ntfscluster.h"
@@ -35,6 +32,7 @@
 #include "attrib.h"
 #include "utils.h"
 #include "volume.h"
+#include "debug.h"
 
 static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfscluster";
@@ -44,20 +42,6 @@ GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
 
-/**
- * Dprintf - Print debug messages
- */
-#ifndef DEBUG
-#define Dprintf(...)
-#else
-void Dprintf (const char *format, ...)
-{
-	va_list va;
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-}
-#endif
 /**
  * version - Print version information about the program
  *

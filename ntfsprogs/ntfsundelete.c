@@ -50,6 +50,7 @@
 #include "inode.h"
 #include "disk_io.h"
 #include "utils.h"
+#include "debug.h"
 
 static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfsundelete";
@@ -64,20 +65,6 @@ GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Iprintf, stdout, &opts.quiet,   FALSE)
 
 #define _(S)	gettext(S)
-
-/**
- * Dprintf - Print debug messages
- */
-void Dprintf (const char *format, ...)
-{
-#ifdef DEBUG
-	va_list va;
-	va_start (va, format);
-	vfprintf (stdout, format, va);
-	va_end (va);
-#endif
-}
-
 
 /**
  * version - Print version information about the program
