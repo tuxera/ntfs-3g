@@ -795,65 +795,6 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
 
 
 /**
- * cluster_in_use - Determine if a cluster is in use
- * @vol:  An ntfs volume obtained from ntfs_mount
- * @lcn:  The Logical Cluster Number to test
- *
- * The metadata file $Bitmap has one binary bit representing each cluster on
- * disk.  The bit will be set for each cluster that is in use.  The function
- * reads the relevant part of $Bitmap into a buffer and tests the bit.
- *
- * This function has a static buffer in which it caches a section of $Bitmap.
- * If the lcn, being tested, lies outside the range, the buffer will be
- * refreshed.
- *
- * Return:  1  Cluster is in use
- *	    0  Cluster is free space
- *	   -1  Error occurred
- */
-int cluster_in_use (ntfs_volume *vol, long long lcn)
-{
-	static unsigned char buffer[512];
-	static long long bmplcn = -sizeof (buffer) - 1;	/* Which bit of $Bitmap is in the buffer */
-
-	int byte, bit;
-	ntfs_attr *attr;
-
-	if (!vol)
-		return -1;
-
-	/* Does lcn lie in the section of $Bitmap we already have cached? */
-	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
-		Dprintf ("Bit lies outside cache.\n");
-		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, NULL, 0);
-		if (!attr) {
-			Eprintf ("Couldn't open $Bitmap: %s\n", strerror (errno));
-			return -1;
-		}
-
-		/* Mark the buffer as in use, in case the read is shorter. */
-		memset (buffer, 0xFF, sizeof (buffer));
-		bmplcn = lcn & (~((sizeof (buffer) << 3) - 1));
-
-		if (ntfs_attr_pread (attr, (bmplcn>>3), sizeof (buffer), buffer) < 0) {
-			Eprintf ("Couldn't read $Bitmap: %s\n", strerror (errno));
-			ntfs_attr_close (attr);
-			return -1;
-		}
-
-		Dprintf ("Reloaded bitmap buffer.\n");
-		ntfs_attr_close (attr);
-	}
-
-	bit  = 1 << (lcn & 7);
-	byte = (lcn >> 3) & (sizeof (buffer) - 1);
-	Dprintf ("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n",
-		lcn, bmplcn, byte, bit, buffer[byte] & bit);
-
-	return (buffer[byte] & bit);
-}
-
-/**
  * calc_percentage - Calculate how much of the file is recoverable
  * @file:  The file object to work with
  * @vol:   An ntfs volume obtained from ntfs_mount
@@ -953,7 +894,7 @@ int calc_percentage (struct ufile *file, ntfs_volume *vol)
 			end   = rl[i].lcn + rl[i].length;
 
 			for (j = start; j < end; j++) {
-				if (cluster_in_use (vol, j))
+				if (utils_cluster_in_use (vol, j))
 					inuse++;
 				else
 					free++;
@@ -1586,7 +1527,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 				end   = rl[i].lcn + rl[i].length;
 
 				for (j = start; j < end; j++) {
-					if (cluster_in_use (vol, j)) {
+					if (utils_cluster_in_use (vol, j)) {
 						memset (buffer, opts.fillbyte, bufsize);
 						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));
@@ -1713,61 +1654,6 @@ free:
 }
 
 /**
- * valid_device - Perform some safety checks on the device, before we start
- * @name:   Full pathname of the device/file to work with
- * @force:  Continue regardless of problems
- *
- * Check that the name refers to a device and that is isn't already mounted.
- * These checks can be overridden by using the force option.
- *
- * Return:  1  Success, we can continue
- *	    0  Error, we cannot use this device
- */
-int valid_device (const char *name, int force)
-{
-	unsigned long mnt_flags = 0;
-	struct stat st;
-
-	if (stat (name, &st) == -1) {
-		if (errno == ENOENT) {
-			Eprintf ("The device %s doesn't exist\n", name);
-		} else {
-			Eprintf ("Error getting information about %s: %s\n", name, strerror (errno));
-		}
-		return 0;
-	}
-
-	if (!S_ISBLK (st.st_mode)) {
-		Vprintf ("%s is not a block device.\n", name);
-		if (!force) {
-			Eprintf ("Use the force option to work with files.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	}
-
-	/* Make sure the file system is not mounted. */
-	if (ntfs_check_if_mounted (name, &mnt_flags)) {
-		Vprintf ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
-		if (!force) {
-			Eprintf ("Use the force option to ignore this error.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Vprintf ("The device %s, is mounted.\n", name);
-		if (!force) {
-			Eprintf ("Use the force option to work a mounted filesystem.\n");
-			return 0;
-		}
-		Vprintf ("Forced to continue.\n");
-	}
-
-	Dprintf ("Device %s, will be used\n", name);
-	return 1;
-}
-
-/**
  * main - Begin here
  *
  * Start from here.
@@ -1788,15 +1674,6 @@ int main (int argc, char *argv[])
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol)
 		return 1;
-
-	if (vol->flags & VOLUME_IS_DIRTY) {
-		Iprintf ("Volume is dirty.\n");
-		if (!opts.force) {
-			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
-			goto umount;
-		}
-		Iprintf ("Forced to continue.\n");
-	}
 
 	switch (opts.mode) {
 	case MODE_SCAN:
@@ -1819,7 +1696,6 @@ int main (int argc, char *argv[])
 		; /* Cannot happen */
 	}
 
-umount:
 	ntfs_umount (vol, FALSE);
 free:
 	if (opts.match)
