@@ -390,7 +390,8 @@ void dump_attr_record(ATTR_RECORD *a)
 	char s[0x200];
 	int i;
 
-	printf("-- Beginning dump of attribute record. --\n");
+	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
+			((ptrdiff_t)(u8*)a) & 0x3ff);
 	if (a->type == AT_END) {
 		printf("Attribute type = 0x%x ($END)\n", le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
@@ -530,7 +531,7 @@ void usage(void)
 	fprintf(stderr, "This utility will truncate a specified attribute "
 			"belonging to a specified\ninode, i.e. file or "
 			"directory, to a specified length.\n\n"
-			"Usage: %s [-hnqvFV] device inode [attribute-type] "
+			"Usage: %s [-fhnqvV] device inode [attribute-type] "
 			"new-length\n       If attribute-type is not "
 			"specified, 0x80 (i.e. $DATA) is assumed.\n",
 			EXEC_NAME);
@@ -609,7 +610,7 @@ void parse_options(int argc, char *argv[])
 
 	/* Get the new length. */
 	ll = strtoll(s, &s2, 0);
-	if (*s2 || !ll || (ll >= LLONG_MAX && errno == ERANGE))
+	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid new length: %s\n", s);
 	new_len = ll;
 	Dprintf("new length = %Li\n", new_len);
