@@ -2,7 +2,7 @@
  * types.h - Misc type definitions not related to on-disk structure. Part of
  *	     the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,9 +23,12 @@
 #ifndef _NTFS_TYPES_H
 #define _NTFS_TYPES_H
 
+#include "config.h"
+
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
+#endif
 #include <sys/types.h>
-#include <linux/types.h>
 
 typedef uint8_t  u8;			/* Unsigned types of an exact size */
 typedef uint16_t u16;
