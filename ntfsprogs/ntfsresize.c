@@ -95,8 +95,9 @@ struct __ntfs_resize_t {
 	ntfs_inode *ni;			/* inode being processed */
 	MFT_RECORD *mrec;		/* MFT buffer being processed */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
-	u64 relocations;		/* number of clusters to relocate */
-	u64 inuse;			/* number of clusters in use */
+	u64 relocations;		/* num of clusters to relocate */
+	u64 inuse;			/* num of clusters in use */
+	int multi_ref;			/* num of clusters ref'd many times */
 };
 
 typedef struct __ntfs_resize_t ntfs_resize_t;
@@ -499,10 +500,14 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
-			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
-				err_exit("Cluster %lu referenced twice!\n"
-					 "You didn't shutdown your Windows"
-					 "properly?\n", k);
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1)) {
+				
+				if (++resize->multi_ref > 10)
+					continue;
+				
+				printf("Cluster %Lu (0x%Lx) referenced "
+				       "multiply times!\n", k, k);
+			}
 		}
 
 		resize->inuse += lcn_length;
@@ -603,9 +608,11 @@ void compare_bitmaps(struct bitmap *a)
 	}
 
 	if (mismatch) {
-		printf("Totally %d cluster accounting mismatches.\n"
-		       "You didn't shutdown Windows properly?\n", mismatch);
-		exit(1);
+		printf("Totally %d cluster accounting mismatches.\n", 
+		       mismatch);
+		err_exit("Filesystem check failed! Windows wasn't shutdown "
+			 "properly or inconsistent\nfilesystem. Please run "
+			 "chkdsk on Windows.\n");
 	}
 }
 
@@ -894,10 +901,11 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 {
 	runlist *rl = *rlist;
-	s64 i, free_zone = 0;
+	s64 i, j, free_zone = 0;
 
-	for (i = 0; i < rl->length; i++)
-		ntfs_bit_set(lcn_bitmap.bm, rl->lcn + i, 0);
+	for (i = 0; rl[i].length; i++)
+		for (j = 0; j < rl[i].length; j++)
+			ntfs_bit_set(lcn_bitmap.bm, rl[i].lcn + j, 0);
 	free(rl);
 
 	if (!(rl = *rlist = (runlist *)malloc(2 * sizeof(runlist))))
@@ -951,10 +959,6 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
-
-	if (runlist_extent_number(rl) != 1)
-		err_exit("$Bitmap data has more than one extent, unusual.\n"
-			 "Please report it to linux-ntfs-dev@lists.sf.net");
 
 	if (nr_clusters < vol->nr_clusters)
 		shrink_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
@@ -1334,6 +1338,13 @@ int main(int argc, char **argv)
 	resize.new_volume_size = new_size;
 
 	walk_inodes(&resize);
+	if (resize.multi_ref) {
+		printf("Totally %d clusters referenced multiply times.\n", 
+		       resize.multi_ref);
+		err_exit("Filesystem check failed! Windows wasn't shutdown "
+			 "properly or inconsistent\nfilesystem. Please run "
+			 "chkdsk on Windows.\n");
+	}
 	compare_bitmaps(&lcn_bitmap);
 
 	print_disk_usage(&resize);
