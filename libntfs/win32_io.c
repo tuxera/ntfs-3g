@@ -43,6 +43,7 @@ struct ntfs_volume;
 typedef struct ntfs_volume ntfs_volume;
 
 #include "config.h"
+#include "debug.h"
 
 /* Need device, but prevent ../include/types.h to be loaded. */
 #define _NTFS_TYPES_H
@@ -58,19 +59,6 @@ typedef struct win32_fd {
 	LARGE_INTEGER part_end;
 	LARGE_INTEGER current_pos;
 } win32_fd;
-
-#ifdef DEBUG
-static __inline__ void Dprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
-#else
-static __inline__ void Dprintf(const char *fmt, ...) {}
-#endif
 
 #define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
 
