@@ -153,6 +153,7 @@
 	- Fix stupid logic inversion bug in ntfs_extent_inode_open(). Same bug
 	  was fixed in the NTFS kernel driver over six months ago but the fix
 	  was never taken over to libntfs. (Szakacsits Szabolcs)
+	- Fix stupid bug in ntfs_ucsncmp(). Spotted by Leonard Norrgard.
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
