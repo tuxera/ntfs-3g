@@ -1518,7 +1518,7 @@ find_attr_list_attr:
 			       return 0;
 
 			/* Error! If other than not found return it. */
-			if (errno != EINVAL)
+			if (errno != ENOENT)
 				return rc;
 
 			/* Not found?!? Absurd! Must be a bug... )-: */
@@ -2092,6 +2092,13 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	return 0;
 }
 
+static int ntfs_attr_make_non_resident(ntfs_attr *na,
+		ntfs_attr_search_ctx *ctx)
+{
+	errno = ENOTSUP;
+	return -1;
+}
+
 /**
  * ntfs_resident_attr_resize - resize a resident, open ntfs attribute
  * @na:		resident ntfs attribute to resize
@@ -2172,7 +2179,26 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		/* Attribute is not allowed to be non-resident. */
 	} else {
 		/* Make the attribute non-resident. */
-		// TODO: do it!
+		if (ntfs_attr_make_non_resident(na, ctx) < 0) {
+			if (errno != ENOSPC) {
+				err = errno;
+				// FIXME: Eeek!
+				if (err != ENOTSUP)
+					fprintf(stderr, "%s(): Eeek! Failed "
+							"to make attribute "
+							"non-resident. "
+							"Aborting...\n",
+							__FUNCTION__);
+				goto put_err_out;
+			}
+			/* Not enough space to do that. */
+			// TODO: Try to make other attributes non-resident!
+			// TODO: Move it to a new mft record and perhaps make
+			// it non-resident at same time.
+		} else {
+			/* Attribute is now non-resident. */
+			// TODO: Resize it!
+		}
 	}
 
 	//	- make other attributes non-resident to free up enough space
