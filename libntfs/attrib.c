@@ -2092,7 +2092,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	// TODO: mark the base inode dirty
 
 	// TODO: Implement attribute list support as desribed above. (AIA)
-	if (NInoAttrList(na)) {
+	if (NInoAttrList(na->ni)) {
 		err = ENOTSUP;
 		goto put_err_out;
 	}
@@ -2110,11 +2110,14 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	 * Compare the new allocation with the old one and only deallocate
 	 * clusters if there is a change.
 	 */
-	if (na->allocated_size >> vol->cluster_size_bits != first_free_vcn) {
+	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		/* Deallocate all clusters starting with the first free one. */
 		nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn,
 				-1);
 		if (nr_freed_clusters < 0) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Freeing of clusters "
+					"failed. Aborting...\n", __FUNCTION__);
 			err = errno;
 			goto put_err_out;
 		}
