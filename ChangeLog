@@ -123,6 +123,10 @@ xx/xx/2005 - 2.0.0-WIP
 	  pushes successfully to the ntfsprogs repository on bkbits.net.  This
 	  is done on the server side and is thus independent of whether the
 	  client doing the push has got a correct email setup.  (Yura, Anton)
+	- ntfsclone: make --metadata work with the new $Logfile checking code.
+	  Save at least the first 16 KiB of $Logfile (the two RSTR records 
+	  should always be included if present). Save also records used for
+	  checking empty $Logfile. (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
