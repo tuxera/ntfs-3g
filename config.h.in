@@ -233,9 +233,9 @@
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS
 
-/* Enable GNU extensions on systems that have them. */
+/* Enable GNU extensions on systems that have them.  */
 #ifndef _GNU_SOURCE
-# define _GNU_SOURCE
+# undef _GNU_SOURCE
 #endif
 
 /* Define for large files, on AIX-style hosts. */
