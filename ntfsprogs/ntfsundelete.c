@@ -1704,6 +1704,7 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 	if (file->mft->flags & MFT_RECORD_IN_USE) {		/* These two statement blocks were         */
 		Eprintf ("Record is in use by the mft\n");	/* relocated from below because            */
 		if (!opts.force) {				/* calc_percentage() must be called        */
+			free(buffer);
 			free_file (file);			/* before dump_record() or list_record().  */
 			return 0;				/* Otherwise, when undeleting, a file      */
 		}						/* will always be listed as 0% recoverable */
