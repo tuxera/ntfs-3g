@@ -1555,8 +1555,9 @@ static void ntfs_ie_dump (INDEX_ENTRY *ie)
 	if (!ie)
 		return;
 
-	utils_dump_mem ((u8*)ie, 0, ie->length, 1);
+	printf ("________________________________________________");
 	printf ("\n");
+	utils_dump_mem ((u8*)ie, 0, ie->length, 1);
 
 	printf ("MFT Ref: 0x%llx\n", ie->indexed_file);
 	printf ("length: %d\n", ie->length);
@@ -1577,8 +1578,7 @@ static void ntfs_ie_dump (INDEX_ENTRY *ie)
 		printf ("alloc size: %lld\n", ie->key.file_name.allocated_size);
 		printf ("data size: %lld\n", ie->key.file_name.data_size);
 		printf ("file flags: 0x%04x\n", ie->key.file_name.file_attributes);
-		printf ("reserved: 0x%04x\n", ie->key.file_name.reserved);
-		printf ("name len: %d\n", ie->key.file_name.file_name_length);
+		printf ("reserved: 0x%04x\n", ie->key.file_name.reserved); printf ("name len: %d\n", ie->key.file_name.file_name_length);
 		if (ie->key.file_name.file_name_length > 0) {
 			int i, r;
 			printf ("name type: %d\n", ie->key.file_name.file_name_type);
@@ -1642,41 +1642,43 @@ static INDEX_ENTRY * ntfs_ie_copy (INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_reset_flags
+ * ntfs_ie_set_child
  */
-static INDEX_ENTRY * ntfs_ie_reset_flags (INDEX_ENTRY *ie, INDEX_ENTRY_FLAGS flags)
+static INDEX_ENTRY * ntfs_ie_set_child (INDEX_ENTRY *ie, VCN vcn)
 {
-	VCN vcn;
-
 	if (!ie)
 		return 0;
 
-	if ((flags & INDEX_ENTRY_NODE) && (!(ie->flags & INDEX_ENTRY_NODE))) {
-		ie->length -= 8;
-		ie->flags &= ~INDEX_ENTRY_NODE;
-		ie = realloc (ie, ie->length);
-	}
-
-	if ((!(flags & INDEX_ENTRY_END)) && (ie->flags & INDEX_ENTRY_END)) {
-		ie->length -= ATTR_SIZE (ie->key_length);
-		vcn = *((VCN*) ((u8*) ie + ie->length - 8));
-
+	if (ie->flags & INDEX_ENTRY_NODE) {
 		*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
-		ie->flags |= INDEX_ENTRY_END;
+		return ie;
 	}
 
-	return ie;
+	ie->length += 8;
+	ie = realloc (ie, ie->length);
+	if (!ie)
+		return NULL;
+
+	ie->flags |= INDEX_ENTRY_NODE;
+	*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
+
+	return 0;
 }
 
 /**
- * ntfs_ie_set_child
+ * ntfs_ie_remove_child
  */
-static int ntfs_ie_set_child (INDEX_ENTRY *ie, VCN vcn)
+static INDEX_ENTRY * ntfs_ie_remove_child (INDEX_ENTRY *ie)
 {
 	if (!ie)
-		return 0;
-	vcn = 0;
-	return 0;
+		return NULL;
+	if (!(ie->flags & INDEX_ENTRY_NODE))
+		return ie;
+
+	ie->length -= 8;
+	ie->flags &= ~INDEX_ENTRY_NODE;
+	ie = realloc (ie, ie->length);
+	return NULL;
 }
 
 /**
@@ -1723,9 +1725,9 @@ static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int name
 	klen = ATTR_SIZE (ie->key_length);
 	need = ATTR_SIZE (sizeof (FILE_NAME_ATTR) + (namelen * sizeof (ntfschar)));
 
-	printf ("ilen = %d\n", ie->length);
-	printf ("klen = %d\n", klen);
-	printf ("need = %d\n", need);
+	//printf ("ilen = %d\n", ie->length);
+	//printf ("klen = %d\n", klen);
+	//printf ("need = %d\n", need);
 
 	if (ie->flags & INDEX_ENTRY_NODE)
 		vcn = *((VCN*) ((u8*) ie + ie->length - 8));
@@ -1746,6 +1748,102 @@ static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int name
 	ie->flags &= ~INDEX_ENTRY_END;
 
 	return ie;
+}
+
+/**
+ * ntfs_ie_remove_name
+ */
+static INDEX_ENTRY * ntfs_ie_remove_name (INDEX_ENTRY *ie)
+{
+	VCN vcn;
+
+	if (!ie)
+		return NULL;
+	if (ie->key_length == 0)
+		return ie;
+
+	if (ie->flags & INDEX_ENTRY_NODE)
+		vcn = *((VCN*) ((u8*) ie + ie->length - 8));
+
+	ie->length -= ATTR_SIZE (ie->key_length);
+	ie->key_length = 0;
+	ie->flags |= INDEX_ENTRY_END;
+
+	ie = realloc (ie, ie->length);
+	if (!ie)
+		return NULL;
+
+	if (ie->flags & INDEX_ENTRY_NODE)
+		*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
+	return ie;
+}
+
+/**
+ * ntfs_ie_test
+ */
+static int ntfs_ie_test (void)
+{
+	INDEX_ENTRY *ie1 = NULL;
+	INDEX_ENTRY *ie2 = NULL;
+	int namelen = 0;
+	ntfschar *name = NULL;
+
+	printf ("\n\n\n\n\n\n[01;31m----------------------------------------------------------------------------------[0m\n\n");
+	if (1) {
+		ie1 = ntfs_ie_create();
+		//ntfs_ie_dump (ie1);
+	}
+
+	if (0) {
+		ie2 = ntfs_ie_copy (ie1);
+		ntfs_ie_dump (ie2);
+	}
+
+	if (1) {
+		namelen = ntfs_mbstoucs("richard", &name, 0);
+		ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
+		free (name);
+		name = NULL;
+		ntfs_ie_dump (ie1);
+	}
+
+	if (1) {
+		namelen = ntfs_mbstoucs("richard2", &name, 0);
+		ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
+		free (name);
+		name = NULL;
+		ntfs_ie_dump (ie1);
+	}
+
+	if (1) {
+		ie1 = ntfs_ie_remove_name (ie1);
+		ntfs_ie_dump (ie1);
+	}
+
+	if (1) {
+		ntfs_ie_set_child (ie1, 1234);
+		ntfs_ie_dump (ie1);
+	}
+
+	if (1) {
+		ntfs_ie_remove_child (ie1);
+		ntfs_ie_dump (ie1);
+	}
+
+	ie1->indexed_file = 1234;
+	ie1->key.file_name.parent_directory = 5;
+	ie1->key.file_name.creation_time = utc2ntfs (time(NULL));
+	ie1->key.file_name.last_data_change_time = utc2ntfs (time(NULL));
+	ie1->key.file_name.last_mft_change_time = utc2ntfs (time(NULL));
+	ie1->key.file_name.last_access_time = utc2ntfs (time(NULL));
+	ie1->key.file_name.allocated_size = 4096;
+	ie1->key.file_name.data_size = 3973;
+
+	//ntfs_ie_dump (ie1);
+	free (name);
+	free (ie1);
+	free (ie2);
+	return 0;
 }
 
 
@@ -1889,54 +1987,7 @@ int main (int argc, char *argv[])
 
 	if (0) result = ntfs_index_dump (inode);
 	if (0) result = ntfsrm (vol, opts.file);
-
-	if (1) {
-		INDEX_ENTRY *ie1 = NULL;
-		INDEX_ENTRY *ie2 = NULL;
-		int namelen = 0;
-		ntfschar *name = NULL;
-
-		if (1) {
-			ie1 = ntfs_ie_create();
-			ntfs_ie_dump (ie1);
-		}
-
-		if (0) {
-			ie2 = ntfs_ie_copy (ie1);
-			ntfs_ie_dump (ie2);
-		}
-
-		if (0) {
-			ie1 = ntfs_ie_reset_flags (ie1, INDEX_ENTRY_END);
-			ntfs_ie_dump (ie1);
-		}
-
-		if (0) {
-			ntfs_ie_set_child (ie1, 1234);
-			ntfs_ie_dump (ie1);
-		}
-
-		namelen = ntfs_mbstoucs("richard", &name, 0);
-		if (1) ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
-		free (name);
-		name = NULL;
-		namelen = ntfs_mbstoucs("richard2", &name, 0);
-		if (1) ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
-
-		ie1->indexed_file = 1234;
-		ie1->key.file_name.parent_directory = 5;
-		ie1->key.file_name.creation_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_data_change_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_mft_change_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_access_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.allocated_size = 4096;
-		ie1->key.file_name.data_size = 3973;
-
-		ntfs_ie_dump (ie1);
-		free (name);
-		free (ie1);
-		free (ie2);
-	}
+	if (0) result = ntfs_ie_test();
 
 done:
 	ntfs_inode_close (inode);
