@@ -1680,7 +1680,7 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 				return -1;
 			}
 		} else
-			ret = rlc->length << vol->cluster_size_bits;
+			ret += rlc->length;
 	}
-	return ret;
+	return ret << vol->cluster_size_bits;
 }
