@@ -2156,6 +2156,16 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 		errno = EINVAL;
 		return -1;
 	}
+
+	/*
+	 * $ATTRIBUTE_LIST should be not greater than 0x40000, but this is not
+	 * listed in the AttrDef.
+	 */
+	if (type == AT_ATTRIBUTE_LIST && size > 0x40000) {
+		errno = ERANGE;
+		return -1;
+	}
+
 	ad = ntfs_attr_find_in_attrdef(vol, type);
 	if (!ad)
 		return -1;
