@@ -140,8 +140,8 @@ libntfs_la_SOURCES = \
 	compat.c	\
 	debug.c		\
 	device.c	\
+	device_io.c	\
 	dir.c		\
-	disk_io.c	\
 	inode.c		\
 	lcnalloc.c	\
 	mft.c		\
@@ -153,9 +153,7 @@ libntfs_la_SOURCES = \
 
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST = \
-	win32_io.c
-
+EXTRA_DIST = unix_io.c win32_io.c
 subdir = libntfs
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -164,7 +162,7 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libntfs_la_LIBADD =
 am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
-	debug.lo device.lo dir.lo disk_io.lo inode.lo lcnalloc.lo \
+	debug.lo device.lo device_io.lo dir.lo inode.lo lcnalloc.lo \
 	mft.lo mst.lo runlist.lo unistr.lo volume.lo
 libntfs_la_OBJECTS = $(am_libntfs_la_OBJECTS)
 
@@ -176,7 +174,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrib.Plo ./$(DEPDIR)/bitmap.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/bootsect.Plo ./$(DEPDIR)/compat.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/debug.Plo ./$(DEPDIR)/device.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/dir.Plo ./$(DEPDIR)/disk_io.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/device_io.Plo ./$(DEPDIR)/dir.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/inode.Plo ./$(DEPDIR)/lcnalloc.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mft.Plo ./$(DEPDIR)/mst.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/runlist.Plo ./$(DEPDIR)/unistr.Plo \
@@ -244,8 +242,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compat.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/debug.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/device_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dir.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/disk_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lcnalloc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mft.Plo@am__quote@
