@@ -2635,8 +2635,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 {
 	ntfs_volume *vol = na->ni->vol;
 	ATTR_REC *a = ctx->attr;
-	int name_ofs, val_ofs;
-	s64 arec_size;
+	int name_ofs, val_ofs, err = EIO;
+	s64 arec_size, bytes_read;
 
 	/* Some preliminary sanity checking. */
 	if (!NAttrNonResident(na)) {
@@ -2675,40 +2675,134 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	// FIXME: For now we cheat and assume there is no attribute list
 	//	  attribute present. (AIA)
 	if (NInoAttrList(na->ni)) {
+		fprintf(stderr, "%s(): Working on files with attribute list "
+				"attribute is not implemented yet.\n",
+				__FUNCTION__);
 		errno = ENOTSUP;
 		return -1;
 	}
+	if (NAttrCompressed(na) || NAttrEncrypted(na)) {
+		fprintf(stderr, "%s(): Making compressed or encrypted files "
+				"resident is not implemented yet.\n",
+				__FUNCTION__);
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	/* Read and cache the whole runlist if not already done. */
+	if (ntfs_attr_map_whole_runlist(na))
+		return -1;
 
 	/* Work out offsets into and size of the resident attribute. */
 	name_ofs = 24; /* = sizeof(resident_ATTR_REC); */
 	val_ofs = (name_ofs + a->name_length + 7) & ~7;
 	arec_size = (val_ofs + na->data_size + 7) & ~7;
 
-	/* Read and cache the whole runlist if not already done. */
-	if (ntfs_attr_map_whole_runlist(na))
-		return -1;
-
-	// Can be done by ntfs_attr_record_resize() itself!
-	if (ctx->mrec->bytes_in_use - le32_to_cpu(a->length) + arec_size >
-			ctx->mrec->bytes_allocated) {
+	/* Sanity check the size before we start modifying the attribute. */
+	if (le32_to_cpu(ctx->mrec->bytes_in_use) - le32_to_cpu(a->length) +
+			arec_size > le32_to_cpu(ctx->mrec->bytes_allocated)) {
 		errno = ENOSPC;
 		return -1;
 	}
 
+	/* Move the attribute name if it exists and update the offset. */
+	if (a->name_length) {
+		/* Sanity check. */
+		if (le16_to_cpu(a->name_offset) + a->name_length > arec_size) {
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Name exceeds new record "
+					"size! Not supported. Aborting...\n",
+					__FUNCTION__);
+			errno = ENOTSUP;
+			return -1;
+		}
 
-	// Convert to resident attribute & resize attribute record.
+		memmove((u8*)a + name_ofs, (u8*)a + le16_to_cpu(a->name_offset),
+				a->name_length * sizeof(uchar_t));
+	}
+	a->name_offset = cpu_to_le16(name_ofs);
 
-	// Copy data from run list to resident attribute value.
+	/* Resize the resident part of the attribute record. */
+	if (ntfs_attr_record_resize(ctx->mrec, a, arec_size) < 0) {
+		if (errno != ENOSPC) {
+			err = errno;
+			// FIXME: Eeek!
+			fprintf(stderr, "%s(): Eeek! Failed to resize "
+					"attribute record. Aborting...\n",
+					__FUNCTION__);
+			errno = err;
+		}
+		return -1;
+	}
 
-	// Deallocate clusters from runlist and throw away runlist.
+	/* Convert the attribute record to describe a resident attribute. */
+	a->non_resident = 0;
+	a->flags = 0;
+	a->value_length = cpu_to_le32(na->data_size);
+	a->value_offset = cpu_to_le16(val_ofs);
+	/*
+	 * File names cannot be non-resident so we would never see this here
+	 * but at least it serves as a reminder that there may be attributes
+	 * for which we do need to set this flag. (AIA)
+	 */
+	if (a->type == AT_FILE_NAME)
+		a->resident_flags = RESIDENT_ATTR_IS_INDEXED;
+	else
+		a->resident_flags = 0;
+	a->reservedR = 0;
 
-	// Update in-memory struct ntfs_attribute if not done already.
+	/* Sanity fixup...  Shouldn't really happen. (AIA) */
+	if (na->initialized_size > na->data_size)
+		na->initialized_size = na->data_size;
 
-	errno = ENOTSUP;
-	return -1;
+	/* Copy data from run list to resident attribute value. */
+	bytes_read = ntfs_rl_pread(vol, na->rl, 0, na->initialized_size,
+			(u8*)a + val_ofs);
+	if (bytes_read != na->initialized_size) {
+		if (bytes_read < 0)
+			err = errno;
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Failed to read attribute data. "
+				"Aborting...\n", __FUNCTION__);
+		errno = err;
+		return -1;
+	}
 
-	//NAttrClearNonResident(na);
-	//return 0;
+	/* Clear memory in gap between initialized_size and data_size. */
+	if (na->initialized_size < na->data_size)
+		memset((u8*)a + val_ofs + na->initialized_size, 0,
+				na->data_size - na->initialized_size);
+
+	/*
+	 * Deallocate clusters from the runlist.
+	 *
+	 * NOTE: We can use ntfs_cluster_free() because we have already mapped
+	 * the whole run list and thus it doesn't matter that the attribute
+	 * record is in a transiently corrupted state at this moment in time.
+	 */
+	if (ntfs_cluster_free(vol, na, 0, -1) < 0) {
+		err = errno;
+		// FIXME: Eeek!
+		fprintf(stderr, "%s(): Eeek! Failed to release allocated "
+				"clusters (error: %s).  Ignoring error and "
+				"leaving behind wasted clusters.\n",
+				__FUNCTION__, strerror(err));
+	}
+
+	/* Throw away the now unused runlist. */
+	free(na->rl);
+	na->rl = NULL;
+
+	/* Update in-memory struct ntfs_attr. */
+	NAttrClearNonResident(na);
+	NAttrClearCompressed(na);
+	NAttrClearSparse(na);
+	NAttrClearEncrypted(na);
+	na->allocated_size = na->initialized_size = na->compressed_size =
+			na->data_size;
+	na->compression_block_size = 0;
+	na->compression_block_size_bits = na->compression_block_clusters = 0;
+	return 0;
 }
 
 /**
