@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 
 	RESTART_PAGE_HEADER *rph;
 	RESTART_AREA *rr;
-	RESTART_CLIENT *cr;
+	LOG_CLIENT_RECORD *cr;
 	RECORD_PAGE_HEADER *rcrd_ph;
 	LOG_RECORD *lr;
 	int pass = 1;
@@ -203,7 +203,7 @@ pass_loc:
 		goto log_file_error;
 	}
 	rr = (RESTART_AREA*)((char*)rph + le16_to_cpu(rph->restart_offset));
-	cr = (RESTART_CLIENT*)((char*)rr +
+	cr = (LOG_CLIENT_RECORD*)((char*)rr +
 			le16_to_cpu(rr->client_array_offset));
 	/* Dump of the interpreted $LogFile restart area. */
 	if (pass == 1)
@@ -258,7 +258,7 @@ pass_loc:
 			// printf("ClientName = %u\n", le16_to_cpu(cr->client_name));
 		}
 		/* Size of a restart client record is fixed at 0xa0 bytes. */
-		cr = (RESTART_CLIENT*)((char*)cr + 0xa0);
+		cr = (LOG_CLIENT_RECORD*)((char*)cr + 0xa0);
 	}
 skip_rstr_pass:
 	if (pass == 1) {
