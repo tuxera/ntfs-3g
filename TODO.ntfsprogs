@@ -24,11 +24,27 @@ Thanks,
 * ntfsclone *
 *************
 
-- get rid of the unneeded lseek()'s during reads/writes
+- get rid of the unneeded lseek()'s during reads/writes (probably it 
+  doesn't improve performance much, or any at all)
 - catch if source and dest are the same
 - add dd's noerror option
 - disable consistency check for --metadata (e.g. if the check is crashing)
+- ignore consistency check (different than "disabling" fsck)
 - make "wiped", etc statistic variables long long
+- option: --inode 
+- option: --data
+- metadata cloning: skip more non-needed inodes
+- manual: document LFS issues (smbfs' lfs option, nfs)
+- manual: mention optimized seeks
+- manual: optimal backup if disks have bad sectors
+- manual: ntfsclone guarantees the restored image works only
+  if one restores to the exactly same partition. For example,
+  one can not copy system partition to a different partition:
+  minimum "hidden sectors" field and BOOT.INI need modifications.
+  We could do these adjustments optionally.
+- check if kernel block size = GCD(page size, device size) makes
+  effect on performance (Al Viro says no)
+- check whether the O_WRONLY -> O_RDWR change made effect on performance
 
 
 ***********
