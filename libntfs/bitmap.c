@@ -165,7 +165,7 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit, s64 count,
 			fprintf(stderr, "%s(): Eeek! Last buffer but count is "
 					"not zero (= %lli). Leaving "
 					"inconsistent metadata.\n",
-					__FUNCTION__, count);
+					__FUNCTION__, (long long)count);
 			err = EIO;
 			goto free_err_out;
 		}
