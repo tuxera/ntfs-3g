@@ -50,7 +50,7 @@ const char *EXEC_NAME = "ntfsresize";
                            "Homepage: http://linux-ntfs.sf.net\n"
 
 #define NTFS_RESIZE_WARNING \
-"WARNING: Every sanity checks passed and only the DANGEROUS \n" \
+"WARNING: Every sanity check passed and only the DANGEROUS \n" \
 "operations left. Please make sure all your important data \n" \
 "had been backed up in case of an unexpected failure!\n"
 
@@ -121,16 +121,16 @@ int perr_exit(const char *fmt, ...)
 void usage()
 {
 	printf("\n");
-	printf ("Usage: %s [-fhin] [-c clusters] [-s byte[K|M|G]] device\n", EXEC_NAME);
+	printf ("Usage: %s [-fhin] [-c clusters] [-s size[K|M|G]] device\n", EXEC_NAME);
 	printf("Shrink a defragmented NTFS volume.\n");
 	printf("\n");
 	printf ("   -c clusters     Shrink volume to size given in NTFS clusters\n");
 	Dprintf("   -d              Show debug information\n");
 	printf ("   -f              Force to progress (DANGEROUS)\n");
 	printf ("   -h              This help text\n");
-	printf ("   -i              Calculate the smallest shrinked volume size supported\n");
-	printf ("   -n              No write operations (mount volume read-only)\n");
-	printf ("   -s byte[K|M|G]  Shrink volume to size given in byte[K|M|G]\n");
+	printf ("   -i              Calculate the smallest shrinked size supported (read-only)\n");
+	printf ("   -n              Make a test run without write operations (read-only)\n");
+	printf ("   -s size[K|M|G]  Shrink volume to size[K|M|G] bytes\n");
 /*	printf ("   -v              Verbose operation\n"); */
 	printf("%s", NTFS_REPORT_BANNER);
 	exit(1);
@@ -837,8 +837,19 @@ int main(int argc, char **argv)
 	/* We don't create backup boot sector because we don't know where the 
 	   partition will be split. The scheduled chkdsk will fix it anyway */
 
-	printf("==> NTFS had been successfully resized on device %s.\n"
-	       "==> Now you can go on to resize/split the partition.\n", 
+	if (opt.ro_flag) {
+		printf("==> The read-only test run ended successfully.\n");
+		exit(0);
+	}
+
+	printf("Syncing device ...\n");
+	if (fsync(vol->fd) == -1)
+		perr_exit("fsync");
+
+	printf("==> NTFS had been successfully resized on device '%s'.\n"
+	       "==> You can go on to resize the device e.g. with 'fdisk'.\n"
+	       "==> Make sure the device will not be smaller than the\n"
+	       "==> already resized NTFS filesystem!\n",
 	       vol->dev_name);
 
 	return 0;
