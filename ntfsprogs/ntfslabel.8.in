@@ -1,5 +1,5 @@
 .\" -*- nroff -*-
-.\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
+.\" Copyright (c) 2002-2004 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\" Adapted from e2fsprogs-1.26/misc/e2label.8.in by Theodore Ts'o.
 .\"
@@ -43,8 +43,8 @@ during creation of the file system.
 .PP
 .SH AUTHOR
 .B ntfslabel
-was written by Matthew J. Fanto (fanto1mj@cmich.edu). This man page was written
-by Anton Altaparmakov (aia21@cantab.net).
+was written by Matthew J. Fanto (mattjf@uncompiled.com). This man page was
+written by Anton Altaparmakov (aia21@cantab.net).
 .SH AVAILABILITY
 .B ntfslabel
 is part of the linux-ntfs package and is available from
