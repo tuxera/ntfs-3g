@@ -79,6 +79,8 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		free(v->vol_name);
 	if (v->upcase)
 		free(v->upcase);
+	if (v->attrdef)
+		free(v->attrdef);
 	free(v);
 }
 
@@ -836,7 +838,50 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 	if (ntfs_inode_close(ni))
 		Dperror("Failed to close inode, leaking memory");
 
-	/* FIXME: Need to deal with FILE_AttrDef. (AIA) */
+	/* Now load the attribute definitions from $AttrDef. */
+	Dprintf("Loading $AttrDef... ");
+	ni = ntfs_inode_open(vol, FILE_AttrDef);
+	if (!ni) {
+		Dputs(FAILED);
+		Dperror("Failed to open inode");
+		goto error_exit;
+	}
+	/* Get an ntfs attribute for $AttrDef/$DATA. */
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		Dputs(FAILED);
+		Dperror("Failed to open ntfs attribute");
+		goto error_exit;
+	}
+	/* Check we don't overflow 32-bits. */
+	if (na->data_size > 0xffffffffLL) {
+		Dputs(FAILED);
+		Dputs("Error: Attribute definition table is too big "
+				"(max 32-bit allowed).");
+		errno = EINVAL;
+		goto error_exit;
+	}
+	vol->attrdef_len = na->data_size;
+	vol->attrdef = (ATTR_DEF*)malloc(na->data_size);
+	if (!vol->attrdef) {
+		Dputs(FAILED);
+		Dputs("Not enough memory to load $AttrDef.");
+		goto error_exit;
+	}
+	/* Read in the $DATA attribute value into the buffer. */
+	l = ntfs_attr_pread(na, 0, na->data_size, vol->attrdef);
+	if (l != na->data_size) {
+		Dputs(FAILED);
+		Dputs("Amount of data read does not correspond to expected "
+				"length!");
+		errno = EIO;
+		goto error_exit;
+	}
+	/* Done with the $AttrDef mft record. */
+	Dputs(OK);
+	ntfs_attr_close(na);
+	if (ntfs_inode_close(ni))
+		Dperror("Failed to close inode, leaking memory");
 
 	return vol;
 io_error_exit:
