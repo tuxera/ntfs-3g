@@ -339,8 +339,6 @@ ntfsresize.8: $(top_builddir)/config.status ntfsresize.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsundelete.8: $(top_builddir)/config.status ntfsundelete.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-ntfscluster.8: $(top_builddir)/config.status ntfscluster.8.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)

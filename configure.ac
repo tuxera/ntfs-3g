@@ -149,7 +149,6 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
-	ntfsprogs/ntfscluster.8
 	ntfsprogs.spec
 ])
 AC_OUTPUT
