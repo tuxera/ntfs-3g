@@ -48,6 +48,10 @@ xx/xx/2004 - 2.0.0-WIP
 	- Add new API unistr.[hc]::ntfs_ucsndup().  (Anton)
 	- Make libntfs/attrib.c::ntfs_attr_open() make a copy of the attribute
 	  name unless it is one of the internal names.  (Anton)
+	- Move out common part of ntfs_attrlist_entry_{add,rm} to new API:
+	  attrlist.[ch]::ntfs_attrlist_set.  (Yura)
+	- New API: attrib.[ch]::ntfs_resident_attr_record_add.  (Yura)
+	- New API: inode.[ch]::ntfs_inode_add_attrlist.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
