@@ -135,7 +135,7 @@ int parse_options (int argc, char **argv)
 		case 'a':
 			if (opts.attr != (ATTR_TYPES)-1)
 				Eprintf("You must specify exactly one attribute.\n");
-			else if (utils_parse_size(argv[optind-1], &attr, FALSE)) {
+			else if (utils_parse_size(optarg, &attr, FALSE)) {
 				opts.attr = (ATTR_TYPES)attr;
 				break;
 			} else
@@ -153,7 +153,7 @@ int parse_options (int argc, char **argv)
 		case 'i':
 			if (opts.inode != -1)
 				Eprintf("You must specify exactly one inode.\n");
-			else if (utils_parse_size(argv[optind-1], &opts.inode, FALSE))
+			else if (utils_parse_size(optarg, &opts.inode, FALSE))
 				break;
 			else
 				Eprintf("Couldn't parse inode number.\n");

@@ -327,7 +327,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'c':
 			if (opts.mode == MODE_NONE) {
-				if (!utils_parse_range (argv[optind-1],
+				if (!utils_parse_range (optarg,
 				    &opts.mft_begin, &opts.mft_end, TRUE))
 					err++;
 				opts.mode = MODE_COPY;
@@ -337,7 +337,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'd':
 			if (!opts.dest)
-				opts.dest = argv[optind-1];
+				opts.dest = optarg;
 			else
 				err++;
 			break;
@@ -350,7 +350,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'm':
 			if (!opts.match) {
-				if (!transform (argv[optind-1], &opts.match))
+				if (!transform (optarg, &opts.match))
 					err++;
 			} else {
 				err++;
@@ -358,7 +358,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'o':
 			if (!opts.output) {
-				opts.output = argv[optind-1];
+				opts.output = optarg;
 			} else {
 				err++;
 			}
@@ -384,14 +384,14 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'S':
 			if ((opts.size_begin > 0) || (opts.size_end > 0) ||
-			    !utils_parse_range (argv[optind-1], &opts.size_begin,
+			    !utils_parse_range (optarg, &opts.size_begin,
 			     &opts.size_end, TRUE)) {
 			    err++;
 			}
 			break;
 		case 't':
 			if (opts.since == 0) {
-				if (!parse_time (argv[optind-1], &opts.since))
+				if (!parse_time (optarg, &opts.since))
 					err++;
 			} else {
 			    err++;

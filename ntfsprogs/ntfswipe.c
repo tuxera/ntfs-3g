@@ -224,7 +224,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'b':
 			if (!opts.bytes) {
-				if (!parse_list (argv[optind-1], &opts.bytes))
+				if (!parse_list (optarg, &opts.bytes))
 					err++;
 			} else {
 				err++;

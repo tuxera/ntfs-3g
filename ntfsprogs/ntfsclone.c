@@ -249,7 +249,7 @@ static void parse_options(int argc, char **argv)
 		case 'o':
 			if (opt.output)
 				usage();
-			opt.output = argv[optind-1];
+			opt.output = optarg;
 			break;
 		default:
 			err_printf("Unknown option '%s'.\n", argv[optind-1]);

@@ -172,7 +172,7 @@ int parse_options (int argc, char *argv[])
 			break;
 		case 'i':
 			if ((opts.inode != -1) ||
-			    (!utils_parse_size (argv[optind-1], &opts.inode, FALSE))) {
+			    (!utils_parse_size (optarg, &opts.inode, FALSE))) {
 				err++;
 			}
 			break;
