@@ -3139,6 +3139,8 @@ put_err_out:
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
+	u8 *mft_rec_copy = NULL;
+	u32 mft_rec_copy_size;
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
 	s64 nr_need_allocate;
@@ -3214,7 +3216,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		nr_need_allocate = first_free_vcn -
 				(na->allocated_size >> vol->cluster_size_bits);
-		
+
 		if (ntfs_attr_map_runlist (na, 0)) {
 			err = errno;
 			fprintf(stderr, "%s(): Eeek! "
@@ -3222,7 +3224,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					 __FUNCTION__);
 			goto put_err_out;
 		}
-		
+
 		/*
 		 * Determine first after last LCN of attribute.  We will start
 		 * seek clusters from this LCN to avoid fragmentation.  If
@@ -3244,7 +3246,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			if (rl->lcn >= 0)
 				lcn_seek_from = rl->lcn + rl->length;
 		}
-		
+
 		rl = ntfs_cluster_alloc(vol, nr_need_allocate, lcn_seek_from,
 					DATA_ZONE, na->allocated_size >>
 					vol->cluster_size_bits);
@@ -3267,7 +3269,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			goto put_err_out;
 		}
 		na->rl = rln;
-		
+
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
 		if (mp_size <= 0) {
@@ -3335,6 +3337,38 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			}
 			goto put_err_out;
 		}
+
+		/* Backup mft record. We need this for rollback. */
+		mft_rec_copy_size = le32_to_cpu(m->bytes_in_use);
+		mft_rec_copy = malloc(mft_rec_copy_size);
+		if (!mft_rec_copy) {
+			err = ENOMEM;
+			fprintf(stderr, "%s(): Eeek! Not enough memory to "
+					"allocate %d bytes.\n", __FUNCTION__,
+					le32_to_cpu(m->bytes_in_use));
+			if (ntfs_cluster_free(vol, na, na->allocated_size >>
+					vol->cluster_size_bits, -1) < 0) {
+				// FIXME: Eeek!  Leaving inconsistent metadata!
+				// (AIA)
+				fprintf(stderr, "%s(): Eeek!  Leaking "
+						"clusters.  Run chkdsk!\n",
+						__FUNCTION__);
+				err = EIO;
+			}
+			/* Now, truncate the runlist itself. */
+			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
+					vol->cluster_size_bits)) {
+				/*
+				 * Failed to truncate the runlist, so just
+				 * throw it away, it will be mapped afresh on
+				 * next use.
+				 */
+				free(na->rl);
+				na->rl = NULL;
+			}
+			goto put_err_out;
+		}
+		memcpy(mft_rec_copy, m, mft_rec_copy_size);
 
 		/* Expand space for mapping pairs if we need this. */
 		if (mp_size > cur_max_mp_size) {
@@ -3422,16 +3456,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				free(na->rl);
 				na->rl = NULL;
 			}
-			// FIXME:  Recovery is not complete yet here!  Because
-			// the attributes have been moved and the attribute and
-			// mft records have been updated.  We really should
-			// throw away the whole mft record and reload it from
-			// disk.  But this might loose other changes...  Might
-			// still be preferable to writing out a corrupt
-			// attribute...  Or even better, we should save the old
-			// values and restore them here as well as moving the
-			// following attributes back to their old location.
-			// (AIA)
+			/* Restote mft record. */
+			memcpy(m, mft_rec_copy, mft_rec_copy_size);
 			goto put_err_out;
 		}
 
@@ -3447,9 +3473,13 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
+	if (mft_rec_copy)
+		free(mft_rec_copy);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 put_err_out:
+	if (mft_rec_copy)
+		free(mft_rec_copy);
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
