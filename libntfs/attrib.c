@@ -2185,10 +2185,10 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn,
 				-1);
 		if (nr_freed_clusters < 0) {
+			err = errno;
 			// FIXME: Eeek!
 			fprintf(stderr, "%s(): Eeek! Freeing of clusters "
 					"failed. Aborting...\n", __FUNCTION__);
-			err = errno;
 			goto put_err_out;
 		}
 		/*
@@ -2212,11 +2212,11 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		}
 		/* Truncate the runlist itself. */
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
+			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
 			fprintf(stderr, "%s(): Eeek! Run list truncation "
 					"failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
-			err = errno;
 			goto put_err_out;
 		}
 		/* Update the attribute record and the ntfs_attr structure. */
@@ -2246,11 +2246,11 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		/* Get the size for the new mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl);
 		if (mp_size <= 0) {
+			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
 			fprintf(stderr, "%s(): Eeek! Get size for mapping "
 					"pairs failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
-			err = errno;
 			goto put_err_out;
 		}
 		/*
@@ -2259,11 +2259,11 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
 				a->mapping_pairs_offset), mp_size, na->rl)) {
+			err = errno;
 			// FIXME: Eeek! We need rollback! (AIA)
 			fprintf(stderr, "%s(): Eeek! Mapping pairs build "
 					"failed. Leaving inconsistent "
 					"metadata!\n", __FUNCTION__);
-			err = errno;
 			goto put_err_out;
 		}
 
