@@ -202,6 +202,7 @@ AC_CONFIG_FILES([
 	Makefile
 	doc/Makefile
 	include/Makefile
+	include/ntfs/Makefile
 	libntfs/Makefile
 	libntfs/libntfs.conf
 	libntfs/libntfs-gnomevfs.8

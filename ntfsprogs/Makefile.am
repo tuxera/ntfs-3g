@@ -22,10 +22,10 @@ EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
 
-linux_ntfsincludedir	= -I$(top_srcdir)/include
+linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
 # Set the include path.
-INCLUDES		= -I$(top_srcdir)/include $(all_includes)
+INCLUDES		= -I$(top_srcdir)/include/ntfs $(all_includes)
 
 ntfsfix_SOURCES		= ntfsfix.c
 ntfsfix_LDADD		= $(AM_LIBS)
