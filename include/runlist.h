@@ -1,10 +1,8 @@
 /*
- * $Id$
- *
  * runlist.h - Exports for runlist handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -56,13 +54,13 @@ extern LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 extern s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		const s64 pos, s64 count, void *b);
 
-extern runlist_element *ntfs_merge_runlists(runlist_element *drl,
+extern runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		runlist_element *srl);
 
-extern runlist_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
+extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
 
-extern int ntfs_build_mapping_pairs(const ntfs_volume *vol, s8 *dst,
+extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl);
 
 #endif /* defined _NTFS_RUNLIST_H */

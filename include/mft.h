@@ -1,7 +1,7 @@
 /*
  * mft.h - Exports for MFT record handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -77,7 +77,7 @@ static __inline__ int ntfs_mft_record_write(const ntfs_volume *vol,
 }
 
 /**
- * ntfs_get_mft_record_data_size - return number of bytes used in mft record @b
+ * ntfs_mft_record_get_data_size - return number of bytes used in mft record @b
  * @m:		mft record to get the data size of
  *
  * Takes the mft record @m and returns the number of bytes used in the record
@@ -92,9 +92,9 @@ static __inline__ int ntfs_mft_record_write(const ntfs_volume *vol,
  * as well but that could in theory be non-existent (don't know if Windows'
  * NTFS driver/chkdsk wouldn't view this as corruption in itself though).
  */
-static __inline__ u32 ntfs_get_mft_record_data_size(const MFT_RECORD *m)
+static __inline__ u32 ntfs_mft_record_get_data_size(const MFT_RECORD *m)
 {
-	if (!m || !is_mft_record(m->magic))
+	if (!m || !ntfs_is_mft_record(m->magic))
 		return 0;
 	/* Get the number of used bytes and return it. */
 	return le32_to_cpu(m->bytes_in_use);

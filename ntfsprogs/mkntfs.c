@@ -1,10 +1,8 @@
 /*
- * $Id$
- *
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
- * Copyright (C) 2001-2002 Richard Russon.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (C) 2001-2002 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
  * specified (block) device.
@@ -925,7 +923,7 @@ void deallocate_scattered_clusters(const runlist *rl)
 			continue;
 		/* Deallocate the current run. */
 		for (j = rl[i].lcn; j < rl[i].lcn + rl[i].length; j++)
-			ntfs_set_bit(lcn_bitmap, j, 0);
+			ntfs_bit_set(lcn_bitmap, j, 0);
 	}
 }
 
@@ -955,7 +953,7 @@ runlist *allocate_scattered_clusters(s64 clusters)
 	while (clusters) {
 		/* Loop in current zone until we run out of free clusters. */
 		for (lcn = opt.mft_zone_end; lcn < end; lcn++) {
-			bit = ntfs_get_and_set_bit(lcn_bitmap, lcn, 1);
+			bit = ntfs_bit_get_and_set(lcn_bitmap, lcn, 1);
 			if (bit)
 				continue;
 			/*
@@ -1031,7 +1029,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	uchar_t *uname;
 /*
 	if (base record)
-		lookup_attr();
+		attr_lookup();
 	else
 */
 	if (name_len) {
@@ -1047,7 +1045,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	} else
 		uname = NULL;
 	/* Check if the attribute is already there. */
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
 		err = -ENOMEM;
@@ -1058,7 +1056,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		err = -ENOTSUP;
 		goto err_out;
 	}
-	if (!ntfs_lookup_attr(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
+	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
 		err = -EEXIST;
 		goto err_out;
 	}
@@ -1177,7 +1175,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
-		err = ntfs_build_mapping_pairs(vol, (s8*)a + hdr_size +
+		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl);
 	}
 	a->initialized_size = cpu_to_le64(inited_size);
@@ -1192,7 +1190,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	}
 err_out:
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (uname)
 		free(uname);
 	return err;
@@ -1212,7 +1210,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	uchar_t *uname;
 /*
 	if (base record)
-		lookup_attr();
+		attr_lookup();
 	else
 */
 	if (name_len) {
@@ -1228,7 +1226,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	} else
 		uname = AT_UNNAMED;
 	/* Check if the attribute is already there. */
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
 		err = -ENOMEM;
@@ -1239,7 +1237,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		err = -ENOTSUP;
 		goto err_out;
 	}
-	if (!ntfs_lookup_attr(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
+	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
 		err = -EEXIST;
 		goto err_out;
 	}
@@ -1363,7 +1361,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
-		err = ntfs_build_mapping_pairs(vol, (s8*)a + hdr_size +
+		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl);
 	}
 	if (err < 0 || bw != val_len) {
@@ -1377,7 +1375,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	}
 err_out:
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (uname && (uname != AT_UNNAMED))
 		free(uname);
 	if (rl)
@@ -1397,7 +1395,7 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	uchar_t *uname;
 /*
 	if (base record)
-		lookup_attr();
+		ntfs_attr_lookup();
 	else
 */
 	if (name_len) {
@@ -1409,7 +1407,7 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	} else
 		uname = AT_UNNAMED;
 	/* Check if the attribute is already there. */
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
 		err = -ENOMEM;
@@ -1420,7 +1418,7 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		err = -ENOTSUP;
 		goto err_out;
 	}
-	if (!ntfs_lookup_attr(type, uname, name_len, ic, 0, val, val_len,
+	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, val, val_len,
 			ctx)) {
 		err = -EEXIST;
 		goto err_out;
@@ -1479,7 +1477,7 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		memcpy((char*)a + le16_to_cpu(a->value_offset), val, val_len);
 err_out:
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (uname && (uname != AT_UNNAMED))
 		free(uname);
 	return err;
@@ -1538,17 +1536,17 @@ int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	int i, fn_size;
 
 	/* Check if the attribute is already there. */
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
 		return -ENOMEM;
 	}
-	if (ntfs_lookup_attr(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0,
+	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		int eo = errno;
 		Eprintf("BUG: Standard information attribute not present in "
 				"file record\n");
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return -eo;
 	}
 	si = (STANDARD_INFORMATION*)((char*)ctx->attr +
@@ -1557,7 +1555,7 @@ int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
 	fn = (FILE_NAME_ATTR*)malloc(fn_size);
 	if (!fn) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return -errno;
 	}
 	fn->parent_directory = parent_dir;
@@ -1566,7 +1564,7 @@ int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	fn->last_data_change_time = si->last_data_change_time;
 	fn->last_mft_change_time = si->last_mft_change_time;
 	fn->last_access_time = si->last_access_time;
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 
 	fn->allocated_size = cpu_to_le64(allocated_size);
 	fn->data_size = cpu_to_le64(data_size);
@@ -1908,7 +1906,7 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	} else
 		uname = NULL;
 	/* Find the index root attribute. */
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
 		return -ENOMEM;
@@ -1918,7 +1916,7 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		err = -ENOTSUP;
 		goto err_out;
 	}
-	err = ntfs_lookup_attr(AT_INDEX_ROOT, uname, name_len, ic, 0, NULL, 0,
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, uname, name_len, ic, 0, NULL, 0,
 			ctx);
 	if (uname)
 		free(uname);
@@ -1937,7 +1935,7 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	re = (INDEX_ENTRY*)re_start;
 	index_block_size = le32_to_cpu(r->index_block_size);
 	memset(bmp, 0, sizeof(bmp));
-	ntfs_set_bit(bmp, 0ULL, 1);
+	ntfs_bit_set(bmp, 0ULL, 1);
 	/* Bitmap has to be at least 8 bytes in size. */
 	err = add_attr_bitmap(m, name, name_len, ic, (char*)&bmp, sizeof(bmp));
 	if (err)
@@ -2009,16 +2007,16 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	/* Set VCN pointer to 0LL. */
 	*(VCN*)((char*)re + cpu_to_le16(re->length) - sizeof(VCN)) =
 			cpu_to_le64(0);
-	err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)ia_val, index_block_size);
+	err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)ia_val, index_block_size);
 	if (err) {
 		err = -errno;
-		Eprintf("ntfs_pre_write_mst_fixup() failed in "
+		Eprintf("ntfs_mst_pre_write_fixup() failed in "
 				"upgrade_to_large_index.\n");
 		goto err_out;
 	}
 	err = add_attr_index_alloc(m, name, name_len, ic, (char*)ia_val,
 			index_block_size);
-	ntfs_post_write_mst_fixup((NTFS_RECORD*)ia_val);
+	ntfs_mst_post_write_fixup((NTFS_RECORD*)ia_val);
 	if (err) {
 		// TODO: Remove the added bitmap!
 		// Revert index root from index allocation.
@@ -2028,7 +2026,7 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	return 0;
 err_out:
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (ia_val)
 		free(ia_val);
 	return err;
@@ -2759,7 +2757,7 @@ int main(int argc, char **argv)
 	 * must be set. This region also encompasses the backup boot sector.
 	 */
 	for (i = opt.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
-		ntfs_set_bit(lcn_bitmap, (u64)i, 1);
+		ntfs_bit_set(lcn_bitmap, (u64)i, 1);
 	/*
 	 * Determine mft_size: 16 mft records or 1 cluster, which ever is
 	 * bigger, rounded to multiples of cluster size.
@@ -2796,7 +2794,7 @@ int main(int argc, char **argv)
 	rl_mft_bmp[1].lcn = -1LL;
 	rl_mft_bmp[1].length = 0LL;
 	/* Allocate cluster for mft bitmap. */
-	ntfs_set_bit(lcn_bitmap, (s64)j, 1);
+	ntfs_bit_set(lcn_bitmap, (s64)j, 1);
 	/* If user didn't specify the mft lcn, determine it now. */
 	if (!opt.mft_lcn) {
 		/*
@@ -2846,7 +2844,7 @@ int main(int argc, char **argv)
 	rl_mft[1].length = 0LL;
 	/* Allocate clusters for mft. */
 	for (i = 0; i < j; i++)
-		ntfs_set_bit(lcn_bitmap, opt.mft_lcn + i, 1);
+		ntfs_bit_set(lcn_bitmap, opt.mft_lcn + i, 1);
 	/* Determine mftmirr_lcn (middle of volume). */
 	opt.mftmirr_lcn = (opt.nr_sectors * opt.sector_size >> 1)
 							/ vol->cluster_size;
@@ -2871,7 +2869,7 @@ int main(int argc, char **argv)
 	rl_mftmirr[1].length = 0LL;
 	/* Allocate clusters for mft mirror. */
 	for (i = 0; i < j; i++)
-		ntfs_set_bit(lcn_bitmap, opt.mftmirr_lcn + i, 1);
+		ntfs_bit_set(lcn_bitmap, opt.mftmirr_lcn + i, 1);
 	opt.logfile_lcn = opt.mftmirr_lcn + j;
 	Dprintf("$LogFile logical cluster number = 0x%x\n", opt.logfile_lcn);
 	/* Create runlist for log file. */
@@ -2922,7 +2920,7 @@ int main(int argc, char **argv)
 	rl_logfile[1].length = 0LL;
 	/* Allocate clusters for log file. */
 	for (i = 0; i < j; i++)
-		ntfs_set_bit(lcn_bitmap, opt.logfile_lcn + i, 1);
+		ntfs_bit_set(lcn_bitmap, opt.logfile_lcn + i, 1);
 	/* Create runlist for $Boot. */
 	rl_boot = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_boot)
@@ -2940,7 +2938,7 @@ int main(int argc, char **argv)
 	rl_boot[1].length = 0LL;
 	/* Allocate clusters for $Boot. */
 	for (i = 0; i < j; i++)
-		ntfs_set_bit(lcn_bitmap, 0LL + i, 1);
+		ntfs_bit_set(lcn_bitmap, 0LL + i, 1);
 	/* Allocate a buffer large enough to hold the mft. */
 	buf = calloc(1, opt.mft_size);
 	if (!buf)
@@ -3059,7 +3057,7 @@ int main(int argc, char **argv)
 
 		m = (MFT_RECORD*)(buf + i * vol->mft_record_size);
 		m->flags |= MFT_RECORD_IN_USE;
-		ntfs_set_bit(mft_bitmap, 0LL + i, 1);
+		ntfs_bit_set(mft_bitmap, 0LL + i, 1);
 		file_attrs = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM;
 		if (i == FILE_root) {
 			if (opt.disable_indexing)
@@ -3092,14 +3090,14 @@ int main(int argc, char **argv)
 	if (!err)
 		err = upgrade_to_large_index(m, "$I30", 4, 0, &index_block);
 	if (!err) {
-		ctx = ntfs_get_attr_search_ctx(NULL, m);
+		ctx = ntfs_attr_get_search_ctx(NULL, m);
 		if (!ctx)
 			err_exit("Failed to allocate attribute search "
 					"context: %s\n", strerror(errno));
 		/* There is exactly one file name so this is ok. */
-		if (ntfs_lookup_attr(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
+		if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
 				ctx)) {
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			err_exit("BUG: $FILE_NAME attribute not found.\n");
 		}
 		a = ctx->attr;
@@ -3107,7 +3105,7 @@ int main(int argc, char **argv)
 				(FILE_NAME_ATTR*)((char*)a +
 				le16_to_cpu(a->value_offset)),
 				le32_to_cpu(a->value_length));
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	}
 	if (err)
 		err_exit("Couldn't create root directory: %s\n",
@@ -3308,7 +3306,7 @@ int main(int argc, char **argv)
 	 */
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
-	if (!is_boot_sector_ntfs(bs, opt.verbose > 0 ? 0 : 1))
+	if (!ntfs_boot_sector_is_ntfs(bs, opt.verbose > 0 ? 0 : 1))
 		err_exit("FATAL: Generated boot sector is invalid!\n");
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, rl_boot, buf2, 8192);
 	if (!err)
@@ -3438,55 +3436,55 @@ bb_err:
 	Vprintf("Syncing root directory index record.\n");
 	m = (MFT_RECORD*)(buf + 5 * vol->mft_record_size);
 	i = 5 * sizeof(uchar_t);
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx)
 		err_exit("Failed to allocate attribute search context: %s\n",
 				strerror(errno));
 	// FIXME: This should be IGNORE_CASE!
-	if (ntfs_lookup_attr(AT_INDEX_ALLOCATION, I30, 4, 0, 0,
+	if (ntfs_attr_lookup(AT_INDEX_ALLOCATION, I30, 4, 0, 0,
 			NULL, 0, ctx)) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		err_exit("BUG: $INDEX_ALLOCATION attribute not found.\n");
 	}
 	a = ctx->attr;
-	rl_index = ntfs_decompress_mapping_pairs(vol, a, NULL);
+	rl_index = ntfs_mapping_pairs_decompress(vol, a, NULL);
 	if (!rl_index) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		err_exit("Failed to decompress runlist of $INDEX_ALLOCATION "
 				"attribute.\n");
 	}
 	if (sle64_to_cpu(a->initialized_size) < i) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		err_exit("BUG: $INDEX_ALLOCATION attribute too short.\n");
 	}
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	i = sizeof(INDEX_BLOCK) - sizeof(INDEX_HEADER) +
 			le32_to_cpu(index_block->index.allocated_size);
-	err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)index_block, i);
+	err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)index_block, i);
 	if (err)
-		err_exit("ntfs_pre_write_mst_fixup() failed while syncing "
+		err_exit("ntfs_mst_pre_write_fixup() failed while syncing "
 				"root directory index block.\n");
 	lw = ntfs_rlwrite(vol->fd, rl_index, (char*)index_block, i, NULL);
 	if (lw != i)
 		err_exit("Error writing $INDEX_ALLOCATION.\n");
 	/* No more changes to @index_block below here so no need for fixup: */
-	// ntfs_post_write_mst_fixup((NTFS_RECORD*)index_block);
+	// ntfs_mst_post_write_fixup((NTFS_RECORD*)index_block);
 	Vprintf("Syncing $Bitmap.\n");
 	m = (MFT_RECORD*)(buf + 6 * vol->mft_record_size);
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx)
 		err_exit("Failed to allocate attribute search context: %s\n",
 				strerror(errno));
-	if (ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		ntfs_put_attr_search_ctx(ctx);
+	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+		ntfs_attr_put_search_ctx(ctx);
 		err_exit("BUG: $DATA attribute not found.\n");
 	}
 	a = ctx->attr;
 	if (a->non_resident) {
-		rl = ntfs_decompress_mapping_pairs(vol, a, NULL);
-		ntfs_put_attr_search_ctx(ctx);
+		rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
+		ntfs_attr_put_search_ctx(ctx);
 		if (!rl)
-			err_exit("ntfs_decompress_mapping_pairs() failed\n");
+			err_exit("ntfs_mapping_pairs_decompress() failed\n");
 		lw = ntfs_rlwrite(vol->fd, rl, lcn_bitmap,
 				lcn_bitmap_byte_size, NULL);
 		if (lw != lcn_bitmap_byte_size)
@@ -3495,7 +3493,7 @@ bb_err:
 	} else {
 		memcpy((char*)a + le16_to_cpu(a->value_offset), lcn_bitmap,
 				le32_to_cpu(a->value_length));
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	}
 	/*
 	 * No need to sync $MFT/$BITMAP as that has never been modified since

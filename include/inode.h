@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * inode.h - Defines for NTFS inode handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
+ * Copyright (c) 2001,2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -100,11 +98,11 @@ struct _ntfs_inode {
 	};
 };
 
-extern ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref);
+extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
 
-extern int ntfs_close_inode(ntfs_inode *ni);
+extern int ntfs_inode_close(ntfs_inode *ni);
 
-extern ntfs_inode *ntfs_open_extent_inode(ntfs_inode *base_ni,
+extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);
 
 #endif /* defined _NTFS_INODE_H */

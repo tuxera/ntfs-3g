@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * dir.h - Exports for directory handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -29,7 +27,7 @@
 /* The little endian Unicode string $I30 as a global constant. */
 extern uchar_t I30[5];
 
-extern u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni,
+extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		const uchar_t *uname, const int uname_len);
 
 /*

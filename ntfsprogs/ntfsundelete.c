@@ -736,7 +736,7 @@ ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 	if (!ctx)
 		return NULL;
 
-	if (ntfs_lookup_attr (type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
+	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
 		Dprintf ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
 		return NULL;	/* None / no more of that type */
 	}
@@ -767,14 +767,14 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 	if (!mft)
 		return NULL;
 
-	ctx = ntfs_get_attr_search_ctx (NULL, mft);
+	ctx = ntfs_attr_get_search_ctx(NULL, mft);
 	if (!ctx) {
 		Eprintf ("Couldn't create a search context.\n");
 		return NULL;
 	}
 
 	rec = find_attribute (type, ctx);
-	ntfs_put_attr_search_ctx (ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	if (rec)
 		Dprintf ("find_first_attribute: found attr of type 0x%02x.\n", type);
 	else
@@ -813,7 +813,7 @@ int get_filenames (struct ufile *file)
 	if (!file)
 		return -1;
 
-	ctx = ntfs_get_attr_search_ctx (NULL, file->mft);
+	ctx = ntfs_attr_get_search_ctx (NULL, file->mft);
 	if (!ctx)
 		return -1;
 
@@ -857,7 +857,7 @@ int get_filenames (struct ufile *file)
 		count++;
 	}
 
-	ntfs_put_attr_search_ctx (ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	Dprintf ("File has %d names.\n", count);
 	return count;
 }
@@ -887,7 +887,7 @@ int get_data (struct ufile *file, ntfs_volume *vol)
 	if (!file)
 		return -1;
 
-	ctx = ntfs_get_attr_search_ctx (NULL, file->mft);
+	ctx = ntfs_attr_get_search_ctx (NULL, file->mft);
 	if (!ctx)
 		return -1;
 
@@ -923,7 +923,7 @@ int get_data (struct ufile *file, ntfs_volume *vol)
 			data->size_vcn   = sle64_to_cpu (rec->highest_vcn) + 1;
 		}
 
-		data->runlist = ntfs_decompress_mapping_pairs (vol, rec, NULL);
+		data->runlist = ntfs_mapping_pairs_decompress(vol, rec, NULL);
 		if (!data->runlist) {
 			Dprintf ("Couldn't decompress the data runs\n");
 		}
@@ -935,7 +935,7 @@ int get_data (struct ufile *file, ntfs_volume *vol)
 		count++;
 	}
 
-	ntfs_put_attr_search_ctx (ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	Dprintf ("File has %d data streams.\n", count);
 	return count;
 }
@@ -1823,7 +1823,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 							goto free;
 						}
 					} else {
-						if (ntfs_read_clusters (vol, j, 1, buffer) < 1) {
+						if (ntfs_clusters_read(vol, j, 1, buffer) < 1) {
 							Eprintf ("Read failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;

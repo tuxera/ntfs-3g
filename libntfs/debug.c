@@ -1,7 +1,7 @@
 /*
  * debug.c - Debugging output functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,9 +23,9 @@
 
 #ifdef DEBUG
 /**
- * ntfs_debug_dump_runlist - Dump a runlist.
+ * ntfs_debug_runlist_dump - Dump a runlist.
  */
-void ntfs_debug_dump_runlist(const runlist_element *rl)
+void ntfs_debug_runlist_dump(const runlist_element *rl)
 {
 	int i = 0;
 	const char *lcn_str[5] = { "LCN_HOLE         ", "LCN_RL_NOT_MAPPED",

@@ -154,12 +154,12 @@ void change_label(const char *dev, const unsigned long mnt_flags,
 				"chkdsk to fix this.\n");
 		goto err_out;
 	}
-	ctx = ntfs_get_attr_search_ctx(NULL, mrec);
+	ctx = ntfs_attr_get_search_ctx(NULL, mrec);
 	if (!ctx) {
 		perror("Failed to get attribute search context");
 		goto err_out;
 	}
-	if (ntfs_lookup_attr(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		perror("Lookup of $VOLUME_NAME attribute failed");
 		goto err_out;
 	}

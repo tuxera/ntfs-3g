@@ -89,14 +89,14 @@ void get_file_attribute_value(const char *dev, long int i)
 	vol = ntfs_mount(dev, 0);
 
 	mref = (MFT_REF) i;
-	inode = ntfs_open_inode(vol, mref);
+	inode = ntfs_inode_open(vol, mref);
 
 	if (ntfs_file_record_read(vol, mref, &mrec, NULL)) {
 		perror("Error reading file record!\n");
 		exit(1);
 	}
 
-	ctx = ntfs_get_attr_search_ctx(inode, mrec);
+	ctx = ntfs_attr_get_search_ctx(inode, mrec);
 
 //	print_file_name_attr(ctx);
 
@@ -122,7 +122,7 @@ void print_standard_information_attr(ntfs_attr_search_ctx *ctx)
 	ATTR_RECORD *attr = NULL;
 	STANDARD_INFORMATION *standard_information_attr = NULL;
 
-	if (ntfs_lookup_attr
+	if (ntfs_attr_lookup
 		(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		perror("Error looking up $STANDARD_INFORMATION!\n");
 		exit(1);
@@ -163,7 +163,7 @@ void print_file_name_attr(ntfs_attr_search_ctx *ctx)
 	FILE_NAME_ATTR *file_name_attr = NULL;
 	char *file_name;
 
-	if (ntfs_lookup_attr(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		perror("Error looking up $FILE_NAME_ATTR!\n");
 		exit(1);
 	}

@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * list.h - Linked list implementation. Part of the Linux-NTFS project.
  *
- * Copyright (c)
+ * Copyright (c) 2000-2002 Anton Altaparmakov and others
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published

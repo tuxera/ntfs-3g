@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * attrib.h - Exports for attribute handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -79,33 +77,33 @@ struct _ntfs_attr_search_ctx {
 	ATTR_RECORD *base_attr;
 };
 
-extern void ntfs_reinit_attr_search_ctx(ntfs_attr_search_ctx *ctx);
-extern ntfs_attr_search_ctx *ntfs_get_attr_search_ctx(ntfs_inode *ni,
+extern void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx);
+extern ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
-extern void ntfs_put_attr_search_ctx(ntfs_attr_search_ctx *ctx);
+extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
 
-extern int ntfs_lookup_attr(const ATTR_TYPES type, const uchar_t *name,
+extern int ntfs_attr_lookup(const ATTR_TYPES type, const uchar_t *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx);
 
 /**
- * ntfs_walk_attrs - syntactic sugar for walking all attributes in an inode
+ * ntfs_attrs_walk - syntactic sugar for walking all attributes in an inode
  * @ctx:	initialised attribute search context
  *
  * Syntactic sugar for walking attributes in an inode.
  *
  * Return 0 on success and -1 on error with errno set to the error code from
- * ntfs_lookup_attr().
+ * ntfs_attr_lookup().
  *
  * Example: When you want to enumerate all attributes in an open ntfs inode
  *	    @ni, you can simply do:
  *
  *	int err;
- *	ntfs_attr_search_ctx *ctx = ntfs_get_attr_search_ctx(ni, NULL);
+ *	ntfs_attr_search_ctx *ctx = ntfs_attr_get_search_ctx(ni, NULL);
  *	if (!ctx)
  *		// Error code is in errno. Handle this case.
- *	while (!(err = ntfs_walk_attrs(ctx))) {
+ *	while (!(err = ntfs_attrs_walk(ctx))) {
  *		ATTR_RECORD *attr = ctx->attr;
  *		// attr now contains the next attribute. Do whatever you want
  *		// with it and then just continue with the while loop.
@@ -114,9 +112,9 @@ extern int ntfs_lookup_attr(const ATTR_TYPES type, const uchar_t *name,
  *		// Ooops. An error occured! You should handle this case.
  *	// Now finished with all attributes in the inode.
  */
-static __inline__ int ntfs_walk_attrs(ntfs_attr_search_ctx *ctx)
+static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
 {
-	return ntfs_lookup_attr(0, NULL, 0, 0, 0, NULL, 0, ctx);
+	return ntfs_attr_lookup(0, NULL, 0, 0, 0, NULL, 0, ctx);
 }
 
 /**
@@ -276,7 +274,7 @@ extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
  *
  * FIXME: Describe possible errnos.
  */
-s64 get_attribute_value_length(const ATTR_RECORD *a);
+s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a);
 
 /**
  * get_attribute_value - return the attribute value of an attribute
@@ -292,7 +290,7 @@ s64 get_attribute_value_length(const ATTR_RECORD *a);
  * then nothing was read due to a zero-length attribute value, otherwise
  * errno describes the error.
  */
-s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
+s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 		const ATTR_RECORD *a, u8 *b);
 
 #endif /* defined _NTFS_ATTRIB_H */

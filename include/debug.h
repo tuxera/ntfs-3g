@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * debug.h - Debugging output functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -65,14 +63,14 @@ static __inline__ void Dperror(const char *s)
 	errno = eo;
 }
 
-extern void ntfs_debug_dump_runlist(const runlist_element *rl);
+extern void ntfs_debug_runlist_dump(const runlist_element *rl);
 
 #else
 
 static __inline__ void Dprintf(const char *fmt, ...) {}
 static __inline__ void Dputs(const char *s) {}
 static __inline__ void Dperror(const char *s) {}
-static __inline__ void ntfs_debug_dump_runlist(const runlist_element *rl) {}
+static __inline__ void ntfs_debug_runlist_dump(const runlist_element *rl) {}
 
 #endif
 

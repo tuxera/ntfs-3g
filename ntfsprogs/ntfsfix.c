@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 
 	puts("Attempting to correct errors.");
 
-	vol = ntfs_startup_volume(argv[1], 0);
+	vol = ntfs_volume_startup(argv[1], 0);
 	if (!vol) {
 		puts(FAILED);
 		perror("Failed to startup volume");
@@ -190,27 +190,27 @@ int main(int argc, char **argv)
 		else
 			s = "mft record";
 
-		if (is_baad_recordp(m + i * vol->mft_record_size)) {
+		if (ntfs_is_baad_recordp(m + i * vol->mft_record_size)) {
 			puts("FAILED");
 			fprintf(stderr, "$MFT error: Incomplete multi sector "
 					"transfer detected in %s.\nCannot "
 					"handle this yet. )-:\n", s);
 			goto error_exit;
 		}
-		if (!is_mft_recordp(m + i * vol->mft_record_size)) {
+		if (!ntfs_is_mft_recordp(m + i * vol->mft_record_size)) {
 			puts("FAILED");
 			fprintf(stderr, "$MFT error: Invalid mft record for "
 					"%s.\nCannot handle this yet. )-:\n",
 					s);
 			goto error_exit;
 		}
-		if (is_baad_recordp(m2 + i * vol->mft_record_size)) {
+		if (ntfs_is_baad_recordp(m2 + i * vol->mft_record_size)) {
 			puts("FAILED");
 			fprintf(stderr, "$MFTMirr error: Incomplete multi "
 					"sector transfer detected in %s.\n", s);
 			goto error_exit;
 		}
-		if (!is_mft_recordp(m2 + i * vol->mft_record_size)) {
+		if (!ntfs_is_mft_recordp(m2 + i * vol->mft_record_size)) {
 			puts("FAILED");
 			fprintf(stderr, "$MFTMirr error: Invalid mft record "
 					"for %s.\n", s);
@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 		}
 		if (memcmp((u8*)m + i * vol->mft_record_size, (u8*)m2 +
 				i * vol->mft_record_size,
-				ntfs_get_mft_record_data_size((MFT_RECORD*)(
+				ntfs_mft_record_get_data_size((MFT_RECORD*)(
 				(u8*)m + i * vol->mft_record_size)))) {
 			if (!done) {
 				done = TRUE;
@@ -255,7 +255,7 @@ mount_ok:
 	/* Check NTFS version is ok for us (in $Volume) */
 	printf("NTFS volume version is %i.%i.\n\n", vol->major_ver,
 			vol->minor_ver);
-	if (ntfs_is_version_supported(vol)) {
+	if (ntfs_version_is_supported(vol)) {
 		fprintf(stderr, "Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
@@ -269,7 +269,7 @@ mount_ok:
 	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
 	if (vol->major_ver >= 2)
 		flags |= VOLUME_MOUNTED_ON_NT4;
-	if (ntfs_set_volume_flags(vol, flags)) {
+	if (ntfs_volume_set_flags(vol, flags)) {
 		puts(FAILED);
 		fprintf(stderr, "Error setting volume flags.\n");
 		goto error_exit;
@@ -278,7 +278,7 @@ mount_ok:
 	printf("\n");
 
 	printf("Going to empty the journal ($LogFile)... ");
-	if (ntfs_reset_logfile(vol)) {
+	if (ntfs_logfile_reset(vol)) {
 		puts(FAILED);
 		perror("Failed to reset $LogFile");
 		goto error_exit;

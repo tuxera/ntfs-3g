@@ -1,8 +1,8 @@
 /*
  * runlist.c - Run list handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -87,7 +87,7 @@ static __inline__ runlist_element *ntfs_rl_realloc(runlist_element *rl,
 /**
  * Internal:
  *
- * ntfs_are_rl_mergeable - test if two runlists can be joined together
+ * ntfs_rl_are_mergeable - test if two runlists can be joined together
  * @dst:	original runlist
  * @src:	new runlist to test for mergeability with @dst
  *
@@ -97,11 +97,11 @@ static __inline__ runlist_element *ntfs_rl_realloc(runlist_element *rl,
  * Return: TRUE   Success, the runlists can be merged.
  *	   FALSE  Failure, the runlists cannot be merged.
  */
-static __inline__ BOOL ntfs_are_rl_mergeable(runlist_element *dst,
+static __inline__ BOOL ntfs_rl_are_mergeable(runlist_element *dst,
 		runlist_element *src)
 {
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_are_rl_mergeable() invoked with NULL "
+		Dputs("Eeek. ntfs_rl_are_mergeable() invoked with NULL "
 				"pointer!");
 		return FALSE;
 	}
@@ -151,7 +151,7 @@ static __inline__ void __ntfs_rl_merge(runlist_element *dst,
 static __inline__ BOOL ntfs_rl_merge(runlist_element *dst,
 		runlist_element *src)
 {
-	BOOL merge = ntfs_are_rl_mergeable(dst, src);
+	BOOL merge = ntfs_rl_are_mergeable(dst, src);
 
 	if (merge)
 		__ntfs_rl_merge(dst, src);
@@ -193,7 +193,7 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 	}
 
 	/* First, check if the right hand end needs merging. */
-	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
+	right = ntfs_rl_are_mergeable(src + ssize - 1, dst + loc + 1);
 
 	/* Space required: @dst size + @src size, less one if we merged. */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - right);
@@ -270,7 +270,7 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	else {
 		s64 merged_length;
 
-		left = ntfs_are_rl_mergeable(dst + loc - 1, src);
+		left = ntfs_rl_are_mergeable(dst + loc - 1, src);
 
 		merged_length = dst[loc - 1].length;
 		if (left)
@@ -369,9 +369,9 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 	}
 
 	/* First, merge the left and right ends, if necessary. */
-	right = ntfs_are_rl_mergeable(src + ssize - 1, dst + loc + 1);
+	right = ntfs_rl_are_mergeable(src + ssize - 1, dst + loc + 1);
 	if (loc > 0)
-		left = ntfs_are_rl_mergeable(dst + loc - 1, src);
+		left = ntfs_rl_are_mergeable(dst + loc - 1, src);
 
 	/* Allocate some space. We'll need less if the left, right, or both
 	 * ends were merged. */
@@ -454,7 +454,7 @@ static __inline__ runlist_element *ntfs_rl_split(runlist_element *dst,
 
 
 /**
- * ntfs_merge_runlists - merge two runlists into one
+ * ntfs_runlists_merge - merge two runlists into one
  * @drl:	original runlist to be worked on
  * @srl:	new runlist to be merged into @drl
  *
@@ -485,7 +485,7 @@ static __inline__ runlist_element *ntfs_rl_split(runlist_element *dst,
  *	EINVAL		Invalid parameters were passed in.
  *	ERANGE		The runlists overlap and cannot be merged.
  */
-runlist_element *ntfs_merge_runlists(runlist_element *drl,
+runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		runlist_element *srl)
 {
 	int di, si;		/* Current index into @[ds]rl. */
@@ -498,9 +498,9 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 	VCN marker_vcn = 0;
 
 	Dputs("dst:");
-	ntfs_debug_dump_runlist(drl);
+	ntfs_debug_runlist_dump(drl);
 	Dputs("src:");
-	ntfs_debug_dump_runlist(srl);
+	ntfs_debug_runlist_dump(srl);
 
 	/* Check for silly calling... */
 	if (!srl)
@@ -680,7 +680,7 @@ runlist_element *ntfs_merge_runlists(runlist_element *drl,
 finished:
 	/* The merge was completed successfully. */
 	Dputs("Merged runlist:");
-	ntfs_debug_dump_runlist(drl);
+	ntfs_debug_runlist_dump(drl);
 	return drl;
 
 critical_error:
@@ -692,7 +692,7 @@ critical_error:
 }
 
 /**
- * ntfs_decompress_mapping_pairs - convert mapping pairs array to runlist
+ * ntfs_mapping_pairs_decompress - convert mapping pairs array to runlist
  * @vol:	ntfs volume on which the attribute resides
  * @attr:	attribute record whose mapping pairs array to decompress
  * @old_rl:	optional runlist in which to insert @attr's runlist
@@ -718,7 +718,7 @@ critical_error:
  * two into one, if that is possible (we check for overlap and discard the new
  * runlist if overlap present before returning NULL, with errno = ERANGE).
  */
-runlist_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
+runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl)
 {
 	VCN vcn;		/* Current vcn. */
@@ -912,11 +912,11 @@ mpa_err:
 	/* If no existing runlist was specified, we are done. */
 	if (!old_rl) {
 		Dputs("Mapping pairs array successfully decompressed:");
-		ntfs_debug_dump_runlist(rl);
+		ntfs_debug_runlist_dump(rl);
 		return rl;
 	}
 	/* Now combine the new and old runlists checking for overlaps. */
-	old_rl = ntfs_merge_runlists(old_rl, rl);
+	old_rl = ntfs_runlists_merge(old_rl, rl);
 	if (old_rl)
 		return old_rl;
 	free(rl);
@@ -1098,7 +1098,7 @@ rl_err_out:
 }
 
 /**
- * ntfs_build_mapping_pairs - build the mapping pairs array from a runlist
+ * ntfs_mapping_pairs_build - build the mapping pairs array from a runlist
  * @vol:	ntfs volume (needed for the ntfs version)
  * @dst:	destination buffer to which to write the mapping pairs array
  * @dst_len:	size of destination buffer @dst in bytes
@@ -1115,7 +1115,7 @@ rl_err_out:
  *	EIO	- The runlist is corrupt.
  *	ENOSPC	- The destination buffer is too small.
  */
-int ntfs_build_mapping_pairs(const ntfs_volume *vol, s8 *dst,
+int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl)
 {
 	LCN prev_lcn;
@@ -1173,6 +1173,4 @@ err_out:
 		errno = EIO;
 	return -1;
 }
-
-
 

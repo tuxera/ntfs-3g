@@ -1,7 +1,7 @@
 /*
  * mst.c - Multi sector fixup handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,7 +23,7 @@
 #include <errno.h>
 
 /**
- * ntfs_post_read_mst_fixup - deprotect multi sector transfer protected data
+ * ntfs_mst_post_read_fixup - deprotect multi sector transfer protected data
  * @b:		pointer to the data to deprotect
  * @size:	size in bytes of @b
  *
@@ -37,7 +37,7 @@
  *	EIO	Mulit sector transfer error was detected. Magic of the NTFS
  *		record in @b will have been set to "BAAD".
  */
-int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
+int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 {
 	u16 usa_ofs, usa_count, usn;
 	u16 *usa_pos, *data_pos;
@@ -100,7 +100,7 @@ int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
 }
 
 /**
- * ntfs_pre_write_mst_fixup - apply multi sector transfer protection
+ * ntfs_mst_pre_write_fixup - apply multi sector transfer protection
  * @b:		pointer to the data to protect
  * @size:	size in bytes of @b
  *
@@ -119,13 +119,14 @@ int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
  * otherwise a random word will be used (whatever was in the record at that
  * position at that time).
  */
-int ntfs_pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
+int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 {
 	u16 usa_ofs, usa_count, usn;
 	u16 *usa_pos, *data_pos;
 
 	/* Sanity check + only fixup if it makes sense. */
-	if (!b || is_baad_record(b->magic) || is_hole_record(b->magic)) {
+	if (!b || ntfs_is_baad_record(b->magic) ||
+			ntfs_is_hole_record(b->magic)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -169,7 +170,7 @@ int ntfs_pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 }
 
 /**
- * ntfs_post_write_mst_fixup - deprotect multi sector transfer protected data
+ * ntfs_mst_post_write_fixup - deprotect multi sector transfer protected data
  * @b:		pointer to the data to deprotect
  *
  * Perform the necessary post write multi sector transfer fixup, not checking
@@ -177,7 +178,7 @@ int ntfs_pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
  * ntfs_pre_write_mst_fixup(), thus the data will be fine or we would never
  * have gotten here.
  */
-void ntfs_post_write_mst_fixup(NTFS_RECORD *b)
+void ntfs_mst_post_write_fixup(NTFS_RECORD *b)
 {
 	u16 *usa_pos, *data_pos;
 

@@ -1,7 +1,7 @@
 /*
  * mft.c - Mft record handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -210,7 +210,7 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		err = errno;
 		goto read_failed;
 	}
-	if (!is_file_record(m->magic))
+	if (!ntfs_is_file_record(m->magic))
 		goto file_corrupt;
 	if (MSEQNO(mref) && MSEQNO(mref) != le16_to_cpu(m->sequence_number))
 		goto file_corrupt;

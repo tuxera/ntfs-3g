@@ -1,8 +1,8 @@
 /*
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,9 +39,9 @@
 uchar_t AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
 /**
- * get_attribute_value_length
+ * ntfs_get_attribute_value_length
  */
-s64 get_attribute_value_length(const ATTR_RECORD *a)
+s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 {
 	if (!a) {
 		errno = EINVAL;
@@ -57,9 +57,9 @@ s64 get_attribute_value_length(const ATTR_RECORD *a)
 }
 
 /**
- * get_attribute_value
+ * ntfs_get_attribute_value
  */
-s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
+s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 			  const ATTR_RECORD *a, u8 *b)
 {
 	/* Sanity checks. */
@@ -98,7 +98,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 		 * FIXME: What about attribute lists?!? (AIA)
 		 */
 		/* Decompress the mapping pairs array into a runlist. */
-		rl = ntfs_decompress_mapping_pairs(vol, a, NULL);
+		rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 		if (!rl) {
 			errno = EINVAL;
 			return 0;
@@ -330,13 +330,13 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		return NULL;
 	__ntfs_attr_init(na, ni, type, name, name_len);
 
-	ctx = ntfs_get_attr_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
 		goto err_out;
 	}
 
-	if (ntfs_lookup_attr(type, name, name_len, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(type, name, name_len, 0, 0, NULL, 0, ctx)) {
 		err = errno;
 		goto put_err_out;
 	}
@@ -360,10 +360,10 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		}
 		ntfs_attr_init(na, FALSE, FALSE, FALSE, FALSE, l, l, l, 0, 0);
 	}
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	return na;
 put_err_out:
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	errno = err;
 	return NULL;
@@ -404,27 +404,27 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)vcn);
 
-	ctx = ntfs_get_attr_search_ctx(na->ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
 		return -1;
 
 	/* Find the attribute in the mft record. */
-	if (!ntfs_lookup_attr(na->type, na->name, na->name_len, CASE_SENSITIVE,
+	if (!ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
 			vcn, NULL, 0, ctx)) {
 		runlist_element *rl;
 
 		/* Decode the runlist. */
-		rl = ntfs_decompress_mapping_pairs(na->ni->vol, ctx->attr,
+		rl = ntfs_mapping_pairs_decompress(na->ni->vol, ctx->attr,
 				na->rl);
 		if (rl) {
 			na->rl = rl;
 
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			return 0;
 		}
 	}
 	err = errno;
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
 }
@@ -620,15 +620,15 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		ntfs_attr_search_ctx *ctx;
 		char *val;
 
-		ctx = ntfs_get_attr_search_ctx(na->ni, NULL);
+		ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 		if (!ctx)
 			return -1;
-		if (ntfs_lookup_attr(na->type, na->name, na->name_len, 0,
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
 				0, NULL, 0, ctx)) {
 			int eo;
 res_err_out:
 			eo = errno;
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			errno = eo;
 			return -1;
 		}
@@ -640,7 +640,7 @@ res_err_out:
 			goto res_err_out;
 		}
 		memcpy(b, val + pos, count);
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return count;
 	}
 	total = total2 = 0;
@@ -801,10 +801,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (!NAttrNonResident(na)) {
 		char *val;
 
-		ctx = ntfs_get_attr_search_ctx(na->ni, NULL);
+		ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 		if (!ctx)
 			goto err_out;
-		if (ntfs_lookup_attr(na->type, na->name, na->name_len, 0,
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
 				0, NULL, 0, ctx))
 			goto err_out;
 		val = (char*)ctx->attr + le16_to_cpu(ctx->attr->value_offset);
@@ -826,7 +826,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			 */
 			goto err_out;
 		}
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return count;
 	}
 	total = 0;
@@ -845,10 +845,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	/* Handle writes beyond initialized_size. */
 	if (pos + count > na->initialized_size) {
 		/* Set initialized_size to @pos + @count. */
-		ctx = ntfs_get_attr_search_ctx(na->ni, NULL);
+		ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 		if (!ctx)
 			goto err_out;
-		if (ntfs_lookup_attr(na->type, na->name, na->name_len, 0,
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
 				0, NULL, 0, ctx))
 			goto err_out;
 		/* If write starts beyond initialized_size, zero the gap. */
@@ -877,7 +877,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			goto err_out;
 		}
 		na->initialized_size = pos + count;
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		ctx = NULL;
 		/*
 		 * NOTE: At this point the initialized_size in the mft record
@@ -975,7 +975,7 @@ retry:
 	}
 done:
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	/* Finally, return the number of bytes written. */
 	return total;
 rl_err_out:
@@ -999,13 +999,13 @@ err_out:
 
 		err = 0;
 		if (!ctx) {
-			ctx = ntfs_get_attr_search_ctx(na->ni, NULL);
+			ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 			if (!ctx)
 				err = 1;
 		} else
-			ntfs_reinit_attr_search_ctx(ctx);
+			ntfs_attr_reinit_search_ctx(ctx);
 		if (!err) {
-			err = ntfs_lookup_attr(na->type, na->name,
+			err = ntfs_attr_lookup(na->type, na->name,
 					na->name_len, 0, 0, NULL, 0, ctx);
 			if (!err) {
 				na->initialized_size = old_initialized_size;
@@ -1026,7 +1026,7 @@ err_out:
 		}
 	}
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	errno = eo;
 	return -1;
 }
@@ -1078,7 +1078,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 		return br;
 	br /= bk_size;
 	for (end = (u8*)b + br * bk_size; (u8*)b < end; (u8*)b += bk_size)
-		ntfs_post_read_mst_fixup((NTFS_RECORD*)b, bk_size);
+		ntfs_mst_post_read_fixup((NTFS_RECORD*)b, bk_size);
 	/* Finally, return the number of blocks read. */
 	return br;
 }
@@ -1131,7 +1131,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	for (i = 0; i < bk_cnt; ++i) {
 		int err;
 
-		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)
+		err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)
 				((u8*)b + i * bk_size), bk_size);
 		if (err < 0) {
 			/* Abort write at this position. */
@@ -1145,7 +1145,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, b);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < bk_cnt; ++i)
-		ntfs_post_write_mst_fixup((NTFS_RECORD*)((u8*)b + i * bk_size));
+		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)b + i * bk_size));
 	if (written <= 0)
 		return written;
 	/* Finally, return the number of complete blocks written. */
@@ -1155,7 +1155,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 /**
  * Internal:
  *
- * ntfs_find_attr - find (next) attribute in mft record
+ * ntfs_attr_find - find (next) attribute in mft record
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1166,11 +1166,11 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  *
  * You shouldn't need to call this function directly. Use lookup_attr() instead.
  *
- * ntfs_find_attr() takes a search context @ctx as parameter and searches the
+ * ntfs_attr_find() takes a search context @ctx as parameter and searches the
  * mft record specified by @ctx->mrec, beginning at @ctx->attr, for an
- * attribute of @type, optionally @name and @val. If found, ntfs_find_attr()
+ * attribute of @type, optionally @name and @val. If found, ntfs_attr_find()
  * returns 0 and @ctx->attr will point to the found attribute. If not found,
- * ntfs_find_attr() returns -1, with errno set to the error code and @ctx->attr
+ * ntfs_attr_find() returns -1, with errno set to the error code and @ctx->attr
  * is undefined (i.e. do not rely on it not changing).
  *
  * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself. If it
@@ -1178,15 +1178,15 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  *
  * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
  * one can enumerate all attributes by setting @type to zero and then calling
- * ntfs_find_attr() repeatedly until it returns -1 with errno set to ENOENT to
+ * ntfs_attr_find() repeatedly until it returns -1 with errno set to ENOENT to
  * indicate that there are no more entries. During the enumeration, each
- * successful call of ntfs_find_attr() will return the next attribute in the
+ * successful call of ntfs_attr_find() will return the next attribute in the
  * mft record @ctx->mrec.
  *
  * If @type is AT_END, seek to the end and return -1 with errno set to ENOENT.
  * AT_END is not a valid attribute, its length is zero for example, thus it is
  * safer to return error instead of success in this case. This also allows us
- * to interoperate cleanly with ntfs_find_external_attr().
+ * to interoperate cleanly with ntfs_external_attr_find().
  *
  * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
  * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
@@ -1205,11 +1205,11 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * Finally, the resident attribute value @val is looked for, if present.
  * If @val is not present (NULL), @val_len is ignored.
  *
- * ntfs_find_attr() only searches the specified mft record and it ignores the
+ * ntfs_attr_find() only searches the specified mft record and it ignores the
  * presence of an attribute list attribute (unless it is the one being searched
  * for, obviously). If you need to take attribute lists into consideration, use
- * ntfs_lookup_attr() instead (see below). This also means that you cannot use
- * ntfs_find_attr() to search for extent records of non-resident attributes, as
+ * ntfs_attr_lookup() instead (see below). This also means that you cannot use
+ * ntfs_attr_find() to search for extent records of non-resident attributes, as
  * extents with lowest_vcn != 0 are usually described by the attribute list
  * attribute only. - Note that it is possible that the first extent is only in
  * the attribute list while the last extent is in the base mft record, so don't
@@ -1218,7 +1218,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * Warning: Never use @val when looking for attribute types which can be
  *	    non-resident as this most likely will result in a crash!
  */
-static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
+static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
@@ -1279,12 +1279,12 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
 				errno = ENOENT;
 				return -1;
 			}
-		} else if (name && !ntfs_are_names_equal(name, name_len,
+		} else if (name && !ntfs_names_are_equal(name, name_len,
 			    (uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
 			    a->name_length, ic, upcase, upcase_len)) {
 			register int rc;
 
-			rc = ntfs_collate_names(name, name_len,
+			rc = ntfs_names_collate(name, name_len,
 					(uchar_t*)((char*)a +
 					le16_to_cpu(a->name_offset)),
 					a->name_length, 1, IGNORE_CASE,
@@ -1300,7 +1300,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
 			/* If the strings are not equal, continue search. */
 			if (rc)
 				continue;
-			rc = ntfs_collate_names(name, name_len,
+			rc = ntfs_names_collate(name, name_len,
 					(uchar_t*)((char*)a +
 					le16_to_cpu(a->name_offset)),
 					a->name_length, 1, CASE_SENSITIVE,
@@ -1345,7 +1345,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
 			}
 		}
 	}
-	Dputs("ntfs_find_attr(): File is corrupt. Run chkdsk.");
+	Dputs("ntfs_attr_find(): File is corrupt. Run chkdsk.");
 	errno = EIO;
 	return -1;
 }
@@ -1353,7 +1353,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
 /**
  * Internal:
  *
- * ntfs_find_external_attr - find an attribute in the attribute list of an inode
+ * ntfs_external_attr_find - find an attribute in the attribute list of an inode
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1363,7 +1363,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
  * @val_len:	attribute value length
  * @ctx:	search context with mft record and attribute to search from
  *
- * You shouldn't need to call this function directly. Use ntfs_lookup_attr()
+ * You shouldn't need to call this function directly. Use ntfs_attr_lookup()
  * instead.
  *
  * Find an attribute by searching the attribute list for the corresponding
@@ -1373,9 +1373,9 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
  *
  * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
  * one can enumerate all attributes by setting @type to zero and then calling
- * ntfs_find_external_attr() repeatedly until it returns -1 with errno set to
+ * ntfs_external_attr_find() repeatedly until it returns -1 with errno set to
  * ENOENT to indicate that there are no more entries. During the enumeration,
- * each successful call of ntfs_find_external_attr() will return the next
+ * each successful call of ntfs_external_attr_find() will return the next
  * attribute described by the attribute list of the base mft record described
  * by the search context @ctx.
  *
@@ -1388,12 +1388,12 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
  * match both named and unnamed attributes.
  *
  * On first search @ctx->ntfs_ino must be the inode of the base mft record and
- * @ctx must have been obtained from a call to ntfs_get_attr_search_ctx().
+ * @ctx must have been obtained from a call to ntfs_attr_get_search_ctx().
  * On subsequent calls, @ctx->ntfs_ino can be any extent inode, too
  * (@ctx->base_ntfs_ino is then the base inode).
  *
  * After finishing with the attribute/mft record you need to call
- * ntfs_put_attr_search_ctx() to cleanup the search context (unmapping any
+ * ntfs_attr_put_search_ctx() to cleanup the search context (unmapping any
  * mapped extent inodes, etc).
  *
  * Return 0 if the search was successful and -1 if not, with errno set to the
@@ -1416,7 +1416,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
  *	EIO	I/O error or corrupt data structures found.
  *	ENOMEM	Not enough memory to allocate necessary buffers.
  */
-static int ntfs_find_external_attr(ATTR_TYPES type, const uchar_t *name,
+static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)
@@ -1495,12 +1495,12 @@ static int ntfs_find_external_attr(ATTR_TYPES type, const uchar_t *name,
 		if (name == AT_UNNAMED) {
 			if (al_name_len)
 				goto not_found;
-		} else if (name && !ntfs_are_names_equal(al_name, al_name_len,
+		} else if (name && !ntfs_names_are_equal(al_name, al_name_len,
 				name, name_len, ic, vol->upcase,
 				vol->upcase_len)) {
 			register int rc;
 
-			rc = ntfs_collate_names(name, name_len, al_name,
+			rc = ntfs_names_collate(name, name_len, al_name,
 					al_name_len, 1, IGNORE_CASE,
 					vol->upcase, vol->upcase_len);
 			/*
@@ -1514,13 +1514,13 @@ static int ntfs_find_external_attr(ATTR_TYPES type, const uchar_t *name,
 				continue;
 			/*
 			 * FIXME: Reverse engineering showed 0, IGNORE_CASE but
-			 * that is inconsistent with ntfs_find_attr(). The
+			 * that is inconsistent with ntfs_attr_find(). The
 			 * subsequent rc checks were also different. Perhaps I
 			 * made a mistake in one of the two. Need to recheck
 			 * which is correct or at least see what is going
 			 * on... (AIA)
 			 */
-			rc = ntfs_collate_names(name, name_len, al_name,
+			rc = ntfs_names_collate(name, name_len, al_name,
 					al_name_len, 1, CASE_SENSITIVE,
 					vol->upcase, vol->upcase_len);
 			if (rc == -1)
@@ -1542,7 +1542,7 @@ static int ntfs_find_external_attr(ATTR_TYPES type, const uchar_t *name,
 					sle64_to_cpu(lowest_vcn)	    &&
 				next_al_entry->type == al_entry->type	    &&
 				next_al_entry->name_length == al_name_len   &&
-				ntfs_are_names_equal((uchar_t*)((char*)
+				ntfs_names_are_equal((uchar_t*)((char*)
 					next_al_entry +
 					next_al_entry->name_offset),
 					next_al_entry->name_length,
@@ -1561,7 +1561,7 @@ is_enumeration:
 		} else { /* Mft references do not match. */
 			/* If there is a mapped extent inode unmap it first. */
 			if (ni != base_ni)
-				ntfs_close_inode(ni);
+				ntfs_inode_close(ni);
 			/* Do we want the base record back? */
 			if (MREF_LE(al_entry->mft_reference) ==
 					base_ni->mft_no) {
@@ -1569,7 +1569,7 @@ is_enumeration:
 				ctx->mrec = ctx->base_mrec;
 			} else {
 				/* We want an extent record. */
-				ni = ntfs_open_extent_inode(base_ni,
+				ni = ntfs_extent_inode_open(base_ni,
 						al_entry->mft_reference);
 				if (!ni) {
 					Dperror("Failed to map extent inode");
@@ -1587,14 +1587,14 @@ is_enumeration:
 		 * current al_entry.
 		 */
 		/*
-		 * We could call into ntfs_find_attr() to find the right
+		 * We could call into ntfs_attr_find() to find the right
 		 * attribute in this mft record but this would be less
-		 * efficient and not quite accurate as ntfs_find_attr() ignores
+		 * efficient and not quite accurate as ntfs_attr_find() ignores
 		 * the attribute instance numbers for example which become
 		 * important when one plays with attribute lists. Also, because
 		 * a proper match has been found in the attribute list entry
 		 * above, the comparison can now be optimized. So it is worth
-		 * re-implementing a simplified ntfs_find_attr() here.
+		 * re-implementing a simplified ntfs_attr_find() here.
 		 */
 		a = ctx->attr;
 		/*
@@ -1618,7 +1618,7 @@ do_next_attr_loop:
 		 */
 		if (al_entry->type != a->type)
 			break;
-		if (!ntfs_are_names_equal((uchar_t*)((char*)a +
+		if (!ntfs_names_are_equal((uchar_t*)((char*)a +
 				le16_to_cpu(a->name_offset)),
 				a->name_length, al_name,
 				al_name_len, CASE_SENSITIVE,
@@ -1643,7 +1643,7 @@ do_next_attr:
 	}
 	if (ni != base_ni) {
 		if (ni)
-			ntfs_close_inode(ni);
+			ntfs_inode_close(ni);
 		ctx->ntfs_ino = base_ni;
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
@@ -1661,20 +1661,20 @@ not_found:
 	 *
 	 * FIXME: Do we really want to do this here? Think about it... (AIA)
 	 */
-	ntfs_reinit_attr_search_ctx(ctx);
+	ntfs_attr_reinit_search_ctx(ctx);
 	/*
 	 * If we were enumerating and reached the end, we can't just use !@type
 	 * because that would return the first attribute instead of the last
 	 * one. Thus we just change @type to AT_END which causes
-	 * ntfs_find_attr() to seek to the end.
+	 * ntfs_attr_find() to seek to the end.
 	 */
 	if (!type)
 		type = AT_END;
-	return ntfs_find_attr(type, name, name_len, ic, val, val_len, ctx);
+	return ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
 }
 
 /**
- * ntfs_lookup_attr - find an attribute in an ntfs inode
+ * ntfs_attr_lookup - find an attribute in an ntfs inode
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1686,30 +1686,30 @@ not_found:
  *
  * Find an attribute in an ntfs inode. On first search @ctx->ntfs_ino must
  * be the base mft record and @ctx must have been obtained from a call to
- * ntfs_get_attr_search_ctx().
+ * ntfs_attr_get_search_ctx().
  *
  * This function transparently handles attribute lists and @ctx is used to
  * continue searches where they were left off at.
  *
  * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
  * one can enumerate all attributes by setting @type to zero and then calling
- * ntfs_lookup_attr() repeatedly until it returns -1 with errno set to ENOENT
+ * ntfs_attr_lookup() repeatedly until it returns -1 with errno set to ENOENT
  * to indicate that there are no more entries. During the enumeration, each
- * successful call of ntfs_lookup_attr() will return the next attribute, with
+ * successful call of ntfs_attr_lookup() will return the next attribute, with
  * the current attribute being described by the search context @ctx.
  *
  * If @type is AT_END, seek to the end of the attribute and return -1 with
  * errno set to ENOENT. AT_END is not a valid attribute, its length is zero for
  * example, thus it is safer to return error instead of success in this case.
  * It should never ne needed to do this, but we implement the functionality
- * because it allows for simpler code inside ntfs_find_external_attr().
+ * because it allows for simpler code inside ntfs_external_attr_find().
  *
  * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
  * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
  * match both named and unnamed attributes.
  *
  * After finishing with the attribute/mft record you need to call
- * ntfs_put_attr_search_ctx() to cleanup the search context (unmapping any
+ * ntfs_attr_put_search_ctx() to cleanup the search context (unmapping any
  * mapped extent inodes, etc).
  *
  * Return 0 if the search was successful and -1 if not, with errno set to the
@@ -1730,7 +1730,7 @@ not_found:
  *	EIO	I/O error or corrupt data structures found.
  *	ENOMEM	Not enough memory to allocate necessary buffers.
  */
-int ntfs_lookup_attr(const ATTR_TYPES type, const uchar_t *name,
+int ntfs_attr_lookup(const ATTR_TYPES type, const uchar_t *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)
@@ -1746,23 +1746,23 @@ int ntfs_lookup_attr(const ATTR_TYPES type, const uchar_t *name,
 	else
 		base_ni = ctx->ntfs_ino;
 	if (!base_ni || !NInoAttrList(base_ni) || type == AT_ATTRIBUTE_LIST)
-		return ntfs_find_attr(type, name, name_len, ic, val, val_len,
+		return ntfs_attr_find(type, name, name_len, ic, val, val_len,
 				ctx);
-	return ntfs_find_external_attr(type, name, name_len, ic, lowest_vcn,
+	return ntfs_external_attr_find(type, name, name_len, ic, lowest_vcn,
 			val, val_len, ctx);
 }
 
 /**
  * Internal:
  *
- * ntfs_init_attr_search_ctx - initialize an attribute search context
+ * ntfs_attr_init_search_ctx - initialize an attribute search context
  * @ctx:	attribute search context to initialize
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
  *
  * Initialize the attribute search context @ctx with @ni and @mrec.
  */
-static __inline__ void ntfs_init_attr_search_ctx(ntfs_attr_search_ctx *ctx,
+static __inline__ void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
 		ntfs_inode *ni, MFT_RECORD *mrec)
 {
 	if (ni && !mrec)
@@ -1780,7 +1780,7 @@ static __inline__ void ntfs_init_attr_search_ctx(ntfs_attr_search_ctx *ctx,
 }
 
 /**
- * ntfs_reinit_attr_search_ctx - reinitialize an attribute search context
+ * ntfs_attr_reinit_search_ctx - reinitialize an attribute search context
  * @ctx:	attribute search context to reinitialize
  *
  * Reinitialize the attribute search context @ctx, unmapping an associated
@@ -1789,7 +1789,7 @@ static __inline__ void ntfs_init_attr_search_ctx(ntfs_attr_search_ctx *ctx,
  * This is used when a search for a new attribute is being started to reset
  * the search context to the beginning.
  */
-void ntfs_reinit_attr_search_ctx(ntfs_attr_search_ctx *ctx)
+void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 {
 	if (!ctx->base_ntfs_ino) {
 		/* No attribute list. */
@@ -1800,13 +1800,13 @@ void ntfs_reinit_attr_search_ctx(ntfs_attr_search_ctx *ctx)
 		return;
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
-		ntfs_close_inode(ctx->ntfs_ino);
-	ntfs_init_attr_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
+		ntfs_inode_close(ctx->ntfs_ino);
+	ntfs_attr_init_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
 
 /**
- * ntfs_get_attr_search_ctx - allocate/initialize a new attribute search context
+ * ntfs_attr_get_search_ctx - allocate/initialize a new attribute search context
  * @ctx:	address of pointer in which to return the new search context
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
@@ -1824,25 +1824,25 @@ void ntfs_reinit_attr_search_ctx(ntfs_attr_search_ctx *ctx)
  * If both @ni and @mrec are specified, the mft record is taken from @mrec and
  * the value of @ni->mrec is ignored.
  */
-ntfs_attr_search_ctx *ntfs_get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 {
 	ntfs_attr_search_ctx *ctx = malloc(sizeof(ntfs_attr_search_ctx));
 	if (ctx)
-		ntfs_init_attr_search_ctx(ctx, ni, mrec);
+		ntfs_attr_init_search_ctx(ctx, ni, mrec);
 	return ctx;
 }
 
 /**
- * ntfs_put_attr_search_ctx - release an attribute search context
+ * ntfs_attr_put_search_ctx - release an attribute search context
  * @ctx:	attribute search context to free
  *
  * Release the attribute search context @ctx, unmapping an associated extent
  * mft record if present.
  */
-void ntfs_put_attr_search_ctx(ntfs_attr_search_ctx *ctx)
+void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 {
 	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
-		ntfs_close_inode(ctx->ntfs_ino);
+		ntfs_inode_close(ctx->ntfs_ino);
 	free(ctx);
 	return;
 }

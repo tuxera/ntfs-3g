@@ -1,7 +1,7 @@
 /*
  * disk_io.c - Disk io functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -191,7 +191,7 @@ s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
 	 */
 	count = br / bksize;
 	for (i = 0; i < count; ++i)
-		ntfs_post_read_mst_fixup((NTFS_RECORD*)
+		ntfs_mst_post_read_fixup((NTFS_RECORD*)
 				((u8*)b + i * bksize), bksize);
 	/* Finally, return the number of complete blocks read. */
 	return count;
@@ -242,7 +242,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 	for (i = 0; i < count; ++i) {
 		int err;
 
-		err = ntfs_pre_write_mst_fixup((NTFS_RECORD*)
+		err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)
 				((u8*)b + i * bksize), bksize);
 		if (err < 0) {
 			/* Abort write at this position. */
@@ -256,7 +256,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 	written = ntfs_pwrite(fd, pos, count * bksize, b);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < count; ++i)
-		ntfs_post_write_mst_fixup((NTFS_RECORD*)((u8*)b + i * bksize));
+		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)b + i * bksize));
 	if (written <= 0)
 		return written;
 	/* Finally, return the number of complete blocks written. */
@@ -264,7 +264,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 }
 
 /**
- * ntfs_read_clusters - read ntfs clusters
+ * ntfs_clusters_read - read ntfs clusters
  * @vol:	volume to read from
  * @lcn:	starting logical cluster number
  * @count:	number of clusters to read
@@ -274,7 +274,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
  * volume @vol into buffer @b. Return number of clusters read or -1 on error,
  * with errno set to the error code.
  */
-s64 ntfs_read_clusters(const ntfs_volume *vol, const s64 lcn,
+s64 ntfs_clusters_read(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b)
 {
 	s64 br;
@@ -297,7 +297,7 @@ s64 ntfs_read_clusters(const ntfs_volume *vol, const s64 lcn,
 }
 
 /**
- * ntfs_write_clusters - write ntfs clusters
+ * ntfs_clusters_write - write ntfs clusters
  * @vol:	volume to write to
  * @lcn:	starting logical cluster number
  * @count:	number of clusters to write
@@ -307,7 +307,7 @@ s64 ntfs_read_clusters(const ntfs_volume *vol, const s64 lcn,
  * buffer @b to volume @vol. Return the number of clusters written or -1 on
  * error, with errno set to the error code.
  */
-s64 ntfs_write_clusters(const ntfs_volume *vol, const s64 lcn,
+s64 ntfs_clusters_write(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b)
 {
 	s64 bw;

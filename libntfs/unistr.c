@@ -1,7 +1,7 @@
 /*
  * unistr.c - Unicode string handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -56,7 +56,7 @@ const u8 legal_ansi_char_array[0x40] = {
 };
 
 /**
- * ntfs_are_names_equal - compare two Unicode names for equality
+ * ntfs_names_are_equal - compare two Unicode names for equality
  * @s1:			name to compare to @s2
  * @s1_len:		length in Unicode characters of @s1
  * @s2:			name to compare to @s1
@@ -69,7 +69,7 @@ const u8 legal_ansi_char_array[0x40] = {
  * identical, or FALSE (0) if they are not identical. If @ic is IGNORE_CASE,
  * the @upcase table is used to performa a case insensitive comparison.
  */
-BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
+BOOL ntfs_names_are_equal(const uchar_t *s1, size_t s1_len,
 		const uchar_t *s2, size_t s2_len,
 		const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_size)
@@ -85,7 +85,7 @@ BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
 }
 
 /**
- * ntfs_collate_names - collate two Unicode names
+ * ntfs_names_collate - collate two Unicode names
  * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
  * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
  * @name1:	first Unicode name to compare
@@ -93,7 +93,7 @@ BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
  * @ic:		either CASE_SENSITIVE or IGNORE_CASE
  * @err_val:	if @name1 contains an invalid character return this value
  *
- * ntfs_collate_names collates two Unicode names and returns:
+ * ntfs_names_collate() collates two Unicode names and returns:
  *
  *  -1 if the first name collates before the second one,
  *   0 if the names match,
@@ -102,7 +102,7 @@ BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
  *
  * The following characters are considered invalid: '"', '*', '<', '>' and '?'.
  */
-int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
+int ntfs_names_collate(const uchar_t *name1, const u32 name1_len,
 		const uchar_t *name2, const u32 name2_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len)
@@ -228,9 +228,9 @@ int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
 }
 
 /**
- * ntfs_upcase_name
+ * ntfs_name_upcase
  */
-void ntfs_upcase_name(uchar_t *name, u32 name_len, const uchar_t *upcase,
+void ntfs_name_upcase(uchar_t *name, u32 name_len, const uchar_t *upcase,
 		const u32 upcase_len)
 {
 	u32 i;
@@ -242,24 +242,24 @@ void ntfs_upcase_name(uchar_t *name, u32 name_len, const uchar_t *upcase,
 }
 
 /**
- * ntfs_file_upcase_value
+ * ntfs_file_value_upcase
  */
 void ntfs_file_upcase_value(FILE_NAME_ATTR *file_name_attr,
 		const uchar_t *upcase, const u32 upcase_len)
 {
-	ntfs_upcase_name((uchar_t*)&file_name_attr->file_name,
+	ntfs_name_upcase((uchar_t*)&file_name_attr->file_name,
 			file_name_attr->file_name_length, upcase, upcase_len);
 }
 
 /**
- * ntfs_file_compare_values
+ * ntfs_file_values_compare
  */
 int ntfs_file_compare_values(FILE_NAME_ATTR *file_name_attr1,
 		FILE_NAME_ATTR *file_name_attr2,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len)
 {
-	return ntfs_collate_names((uchar_t*)&file_name_attr1->file_name,
+	return ntfs_names_collate((uchar_t*)&file_name_attr1->file_name,
 			file_name_attr1->file_name_length,
 			(uchar_t*)&file_name_attr2->file_name,
 			file_name_attr2->file_name_length,

@@ -1,7 +1,7 @@
 /*
  * dir.c - Directory handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -38,13 +38,13 @@ uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		   const_cpu_to_le16('\0') };
 
 /**
- * ntfs_lookup_inode_by_name - find an inode in a directory given its name
+ * ntfs_inode_lookup_by_name - find an inode in a directory given its name
  * @dir_ni:	ntfs inode of the directory in which to search for the name
  * @uname:	Unicode name for which to search in the directory
  * @uname_len:	length of the name @uname in Unicode characters
  *
  * Look for an inode with name @uname in the directory with inode @dir_ni.
- * ntfs_lookup_inode_by_name() walks the contents of the directory looking for
+ * ntfs_inode_lookup_by_name() walks the contents of the directory looking for
  * the Unicode name. If the name is found in the directory, the corresponding
  * inode number (>= 0) is returned as a mft reference in cpu format, i.e. it
  * is a 64-bit number containing the sequence number.
@@ -62,7 +62,7 @@ uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
  * If the volume is mounted with the case sensitive flag set, then we only
  * allow exact matches.
  */
-u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
+u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		const int uname_len)
 {
 	VCN vcn;
@@ -84,12 +84,12 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		return -1;
 	}
 
-	ctx = ntfs_get_attr_search_ctx(dir_ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(dir_ni, NULL);
 	if (!ctx)
 		return -1;
 
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
 				"0x%Lx: %s\n",
@@ -134,7 +134,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		 * consistency checking). We convert it to cpu format before
 		 * returning.
 		 */
-		if (ntfs_are_names_equal(uname, uname_len,
+		if (ntfs_names_are_equal(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
@@ -144,7 +144,7 @@ found_it:
 			 * about having matched imperfectly before.
 			 */
 			mref = le64_to_cpu(ie->indexed_file);
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			return mref;
 		}
 		/*
@@ -155,7 +155,7 @@ found_it:
 		 */
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
-				ntfs_are_names_equal(uname, uname_len,
+				ntfs_names_are_equal(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
@@ -175,7 +175,7 @@ found_it:
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
 		 */
-		rc = ntfs_collate_names(uname, uname_len,
+		rc = ntfs_names_collate(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
@@ -194,7 +194,7 @@ found_it:
 		 * case sensitive comparison, which is required for proper
 		 * collation.
 		 */
-		rc = ntfs_collate_names(uname, uname_len,
+		rc = ntfs_names_collate(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
@@ -216,7 +216,7 @@ found_it:
 	 * cached in mref in which case return mref.
 	 */
 	if (!(ie->flags & INDEX_ENTRY_NODE)) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		if (mref)
 			return mref;
 		Dputs("Entry not found.");
@@ -325,7 +325,7 @@ descend_into_child_node:
 		 * consistency checking). We convert it to cpu format before
 		 * returning.
 		 */
-		if (ntfs_are_names_equal(uname, uname_len,
+		if (ntfs_names_are_equal(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
@@ -336,7 +336,7 @@ found_it2:
 			 */
 			mref = le64_to_cpu(ie->indexed_file);
 			ntfs_attr_close(ia_na);
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			return mref;
 		}
 		/*
@@ -347,7 +347,7 @@ found_it2:
 		 */
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
-				ntfs_are_names_equal(uname, uname_len,
+				ntfs_names_are_equal(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
@@ -367,7 +367,7 @@ found_it2:
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
 		 */
-		rc = ntfs_collate_names(uname, uname_len,
+		rc = ntfs_names_collate(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
@@ -386,7 +386,7 @@ found_it2:
 		 * case sensitive comparison, which is required for proper
 		 * collation.
 		 */
-		rc = ntfs_collate_names(uname, uname_len,
+		rc = ntfs_names_collate(uname, uname_len,
 				(uchar_t*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
@@ -423,7 +423,7 @@ found_it2:
 		goto close_err_out;
 	}
 	ntfs_attr_close(ia_na);
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	/*
 	 * No child node present, return error code ENOENT, unless we have got
 	 * the mft reference of a matching name cached in mref in which case
@@ -438,7 +438,7 @@ put_err_out:
 	eo = EIO;
 	Dputs("Corrupt directory. Aborting lookup.");
 eo_put_err_out:
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	errno = eo;
 	return -1;
 close_err_out:
@@ -514,7 +514,7 @@ static inline int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 /**
  * Internal:
  *
- * ntfs_get_parent_mft_ref - find mft reference of parent directory of an inode
+ * ntfs_mft_get_parent_ref - find mft reference of parent directory of an inode
  * @ni:		ntfs inode whose parent directory to find
  *
  * Find the parent directory of the ntfs inode @ni. To do this, find the first
@@ -531,7 +531,7 @@ static inline int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
  * Return the mft reference of the parent directory on success or -1 on error
  * with errno set to the error code.
  */
-static MFT_REF ntfs_get_parent_mft_ref(ntfs_inode *ni)
+static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 {
 	MFT_REF mref;
 	ntfs_attr_search_ctx *ctx;
@@ -543,10 +543,10 @@ static MFT_REF ntfs_get_parent_mft_ref(ntfs_inode *ni)
 		return -1;
 	}
 
-	ctx = ntfs_get_attr_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
-	if (ntfs_lookup_attr(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		Dprintf("No file name found in inode 0x%Lx. Corrupt inode.\n",
 				(unsigned long long)ni->mft_no);
 		goto err_out;
@@ -565,13 +565,13 @@ static MFT_REF ntfs_get_parent_mft_ref(ntfs_inode *ni)
 		goto io_err_out;
 	}
 	mref = le64_to_cpu(fn->parent_directory);
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	return mref;
 io_err_out:
 	errno = EIO;
 err_out:
 	eo = errno;
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	errno = eo;
 	return -1;
 }
@@ -651,7 +651,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	if (*pos == 1) {
 		MFT_REF parent_mref;
 
-		parent_mref = ntfs_get_parent_mft_ref(dir_ni);
+		parent_mref = ntfs_mft_get_parent_ref(dir_ni);
 		if (parent_mref == -1) {
 			Dprintf("Parent directory not found: %s\n", errno);
 			goto dir_err_out;
@@ -664,14 +664,14 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		++*pos;
 	}
 
-	ctx = ntfs_get_attr_search_ctx(dir_ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(dir_ni, NULL);
 	if (!ctx)
 		goto err_out;
 
 	/* Get the offset into the index root attribute. */
 	ir_pos = (int)*pos;
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
 				"0x%Lx.\n", (unsigned long long)dir_ni->mft_no);
@@ -699,7 +699,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 
 	/* Are we jumping straight into the index allocation attribute? */
 	if (*pos >= vol->mft_record_size) {
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		ctx = NULL;
 		goto skip_index_root;
 	}
@@ -734,12 +734,12 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		rc = ntfs_filldir(dir_ni, pos, index_vcn_size_bits,
 				INDEX_TYPE_ROOT, ir, ie, dirent, filldir);
 		if (rc) {
-			ntfs_put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			ctx = NULL;
 			goto done;
 		}
 	}
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	ctx = NULL;
 
 	/* If there is no index allocation attribute we are finished. */
@@ -913,7 +913,7 @@ err_out:
 	eo = errno;
 	Dprintf("%s() failed.\n", __FUNCTION__);
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (bmp_na)
 		ntfs_attr_close(bmp_na);
 	ntfs_attr_close(ia_na);

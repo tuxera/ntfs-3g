@@ -127,20 +127,20 @@ version_error:
 				"to fix this.\n");
 		goto error_exit;
 	}
-	ctx = ntfs_get_attr_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		perror("Failed to allocate attribute search context");
 		goto error_exit;
 	}
 	/* Find the $DATA attribute of the $LogFile. */
-	if (ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		fprintf(stderr, "Error: Attribute $DATA was not found in" \
 				"$LogFile!\n");
 		goto log_file_error;
 	}
 	a = ctx->attr;
 	/* Get length of $LogFile contents. */
-	l = get_attribute_value_length(a);
+	l = ntfs_get_attribute_value_length(a);
 	if (!l) {
 		puts("$LogFile has zero length, no need to write to disk.");
 		goto log_file_error;
@@ -152,14 +152,14 @@ version_error:
 		goto log_file_error;
 	}
 	/* Read in the $LogFile into the buffer. */
-	if (l != get_attribute_value(vol, m, a, lfd)) {
+	if (l != ntfs_get_attribute_value(vol, m, a, lfd)) {
 		puts("Amount of data read does not correspond to expected "
 		     "length!");
 		free(lfd);
 		goto log_file_error;
 	}
 	/* Check restart area. */
-	if (!is_rstr_recordp(lfd)) {
+	if (!ntfs_is_rstr_recordp(lfd)) {
 		s64 _l;
 
 		for (_l = 0LL; _l < l; _l++)
@@ -176,8 +176,8 @@ version_error:
 	rph = (RESTART_PAGE_HEADER*)lfd;
 	lps = le32_to_cpu(rph->log_page_size);
 pass_loc:
-	if (ntfs_post_read_mst_fixup((NTFS_RECORD*)rph, lps) ||
-	    is_baad_record(rph->magic)) {
+	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)rph, lps) ||
+	    ntfs_is_baad_record(rph->magic)) {
 		puts("$LogFile incomplete multi sector transfer detected! "
 		     "Cannot handle this yet!");
 		goto log_file_error;
@@ -263,7 +263,7 @@ rcrd_pass_loc:
 	if ((char*)rcrd_ph + lps > (char*)lfd + l)
 		goto end_of_rcrd_passes;
 	printf("\nLog record page number %i", pass);
-	if (!is_rcrd_record(rcrd_ph->magic)) {
+	if (!ntfs_is_rcrd_record(rcrd_ph->magic)) {
 		for (i = 0; i < lps; i++)
 			if (((char*)rcrd_ph)[i] != (char)-1)
 				break;
@@ -356,7 +356,7 @@ final_exit:
 	if (lfd)
 		free(lfd);
 	if (ctx)
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		free(m);
 	if (vol && ntfs_umount(vol, 0))

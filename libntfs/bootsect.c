@@ -1,7 +1,7 @@
 /*
  * bootsect.c - Boot sector handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -28,7 +28,7 @@
 #include "debug.h"
 
 /**
- * is_boot_sector_ntfs - check if a buffer contains a valid ntfs boot sector
+ * ntfs_boot_sector_is_ntfs - check if buffer contains a valid ntfs boot sector
  * @b:		buffer containing putative boot sector to analyze
  * @silent:	if zero, output progress messages to stdout
  *
@@ -41,7 +41,7 @@
  *
  * Return TRUE if @b contains a valid ntfs boot sector and FALSE if not.
  */
-BOOL is_boot_sector_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
+BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent)
 {
 	u32 i;
 
@@ -166,7 +166,7 @@ not_ntfs:
 }
 
 /**
- * parse_ntfs_boot_sector - setup an ntfs volume from an ntfs boot sector
+ * ntfs_boot_sector_parse - setup an ntfs volume from an ntfs boot sector
  * @vol:	ntfs_volume to setup
  * @bs:		buffer containing ntfs boot sector to parse
  *
@@ -175,7 +175,7 @@ not_ntfs:
  *
  * Return 0 on success or -1 on error with errno set to the error code EINVAL.
  */
-int parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
+int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 {
 	u8 sectors_per_cluster;
 	s8 c;

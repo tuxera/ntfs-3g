@@ -47,7 +47,7 @@ typedef struct {
 	u8 *alist_old_base;
 } attr_search_context;
 
-BOOL find_attr(const ntfs_volume *vol, const ATTR_TYPES type,
+BOOL attr_find(const ntfs_volume *vol, const ATTR_TYPES type,
 		const wchar_t *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)
@@ -56,7 +56,7 @@ BOOL find_attr(const ntfs_volume *vol, const ATTR_TYPES type,
 
 #ifdef DEBUG
 	if (!vol || !ctx || !ctx->mrec || !ctx->attr) {
-		printf(stderr, "find_attr() received NULL pointer!\n");
+		printf(stderr, "attr_find() received NULL pointer!\n");
 		return FALSE;
 	}
 #endif
@@ -102,11 +102,11 @@ found_it:
 			goto do_next;
 		goto not_found;
 	}
-	if (ntfs_are_names_equal(name, name_len,
+	if (ntfs_names_are_equal(name, name_len,
 			    (wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
 			    a->name_length, ic, vol->upcase, vol->upcase_len))
 		goto found_it;
-	{	register int rc = ntfs_collate_names(vol->upcase,
+	{	register int rc = ntfs_names_collate(vol->upcase,
 			vol->upcase_len, name, name_len,
 			(wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
 			a->name_length, IGNORE_CASE, 1);
@@ -120,7 +120,7 @@ found_it:
 	}
 	/* If case sensitive collation of names doesn't collate @name before
 	   a->name, we continue the search. Otherwise we haven't found it. */
-	if (ntfs_collate_names(vol->upcase, vol->upcase_len, name, name_len,
+	if (ntfs_names_collate(vol->upcase, vol->upcase_len, name, name_len,
 			(wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
 			a->name_length, CASE_SENSITIVE, 1) != -1)
 		goto do_next;
@@ -133,7 +133,7 @@ file_corrupt:
 	goto not_found;
 }
 
-BOOL lookup_external_attr(const ntfs_volume *vol, const MFT_REFERENCE mref,
+BOOL external_attr_lookup(const ntfs_volume *vol, const MFT_REFERENCE mref,
 			  const ATTR_TYPES type, const wchar_t *name,
 			  const u32 name_len, const IGNORE_CASE_BOOL ic,
 			  const s64 lowest_vcn, const u8 *val,
@@ -186,7 +186,7 @@ already_have_the_base_and_is_first:
 	if (ntfs_file_record_read(vol, mref, &ctx->mrec, &ctx->attr) < 0)
 		return FALSE;
 	ctx->base = ctx->mrec;
-	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+	attr_find(vol, type, name, name_len, ic, val, val_len, ctx);
 	return FALSE;
 al_pos_below_alist_val_end:
 	if (al_pos < ctx->alist_val)
@@ -212,15 +212,15 @@ compare_names:
 		else
 			rc = FALSE;
 	} else /* IGNORE_CASE */
-		rc = ntfs_are_names_equal(al_name, al_name_len, name, name_len,
+		rc = ntfs_names_are_equal(al_name, al_name_len, name, name_len,
 					  ic, vol->upcase, vol->upcase_len);
 	if (rc)
 		goto compare_lowest_vcn;
-	rc = ntfs_collate_names(vol->upcase, vol->upcase_len, name, name_len,
+	rc = ntfs_names_collate(vol->upcase, vol->upcase_len, name, name_len,
 				al_name, al_name_len, IGNORE_CASE, 1);
 	if (rc == -1)
 		goto name_collates_before_al_name;
-	if (!rc && ntfs_collate_names(vol->upcase, vol->upcase_len, name,
+	if (!rc && ntfs_names_collate(vol->upcase, vol->upcase_len, name,
 				      name_len, al_name, al_name_len,
 				      IGNORE_CASE, 0) == -1)
 		goto name_collates_before_al_name;
@@ -313,7 +313,7 @@ loc_5217c:
 	if (ntfs_file_record_read(vol, mref, &mrec, &ctx->attr) < 0)
 		return FALSE;
 	ctx->base = mrec;
-	find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+	attr_find(vol, type, name, name_len, ic, val, val_len, ctx);
 	return FALSE;
 file_corrupt:
 #ifdef DEBUG
@@ -322,7 +322,7 @@ file_corrupt:
 	return FALSE;
 }
 
-BOOL lookup_attr(const ntfs_volume *vol, const MFT_REFERENCE *mref,
+BOOL attr_lookup(const ntfs_volume *vol, const MFT_REFERENCE *mref,
 		 const ATTR_TYPES type, const wchar_t *name,
 		 const u32 name_len, const IGNORE_CASE_BOOL ic,
 		 const s64 lowest_vcn, const u8 *val, const u32 val_len,
@@ -366,7 +366,7 @@ no_attr_list:
 			a->type == AT_STANDARD_INFORMATION)
 		goto found_it;
 call_find_attr:
-	return find_attr(vol, type, name, name_len, ic, val, val_len, ctx);
+	return attr_find(vol, type, name, name_len, ic, val, val_len, ctx);
 found_it:
 	ctx->attr = a;
 	return TRUE;
@@ -405,7 +405,7 @@ search_attr_list:
 	 * "a" contains the attribute list attribute at this stage.
 	 */
 	ctx->alist_attr = a;
-	len = get_attribute_value_length(a);
+	len = ntfs_get_attribute_value_length(a);
 #ifdef DEBUG
 	if (len > 0x40000LL) {
 		printf(stderr, "lookup_attr() found corrupt attribute list.\n");
@@ -420,7 +420,7 @@ search_attr_list:
 #endif
 		return FALSE;
 	}
-	if (get_attribute_value(vol, ctx->mrec, a, ctx->alist_val) !=
+	if (ntfs_get_attribute_value(vol, ctx->mrec, a, ctx->alist_val) !=
 	    ctx->alist_val_len) {
 #ifdef DEBUG
 		printf(stderr, "lookup_attr() failed to read attribute list "
@@ -438,11 +438,11 @@ search_attr_list:
 		ctx->base = NULL;
 	}
 lookup_external:
-	return lookup_external_attr(vol, mref, type, name, name_len, ic,
+	return external_attr_lookup(vol, mref, type, name, name_len, ic,
 				    lowest_vcn, val, val_len, ctx);
 file_corrupt:
 #ifdef DEBUG
-	fprintf(stderr, "lookup_attr() encountered corrupt file record.\n");
+	fprintf(stderr, "attr_lookup() encountered corrupt file record.\n");
 #endif
 	return FALSE;
 }

@@ -1,7 +1,8 @@
 /*
  * compat.c - Tweaks for Windows compatability
  *
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,7 +24,9 @@
 
 #include "compat.h"
 
-int ffs (int x)
+// TODO: Add check for FFS in the configure script... (AIA)
+#ifndef HAVE_FFS
+int ffs(int x)
 {
 	int r = 1;
 
@@ -51,6 +54,7 @@ int ffs (int x)
 	}
 	return r;
 }
+#endif /* HAVE_FFS */
 
 #endif /* WINDOWS */
 

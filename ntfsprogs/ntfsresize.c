@@ -1,4 +1,4 @@
-/**
+/*
  * ntfsresize - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Szabolcs Szakacsits
@@ -312,7 +312,7 @@ void build_lcn_usage_bitmap(ATTR_RECORD *a)
 	if (!a->non_resident)
 		return;
 
-	if (!(rl = ntfs_decompress_mapping_pairs(vol, a, NULL)))
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_decompress_mapping_pairs");
 
 	for (i = 0; rl[i].length; i++) {
@@ -320,7 +320,7 @@ void build_lcn_usage_bitmap(ATTR_RECORD *a)
 			continue;
 		for (j = 0; j < rl[i].length; j++) {
 			u64 k = (u64)rl[i].lcn + j;
-			if (ntfs_get_and_set_bit(lcn_bitmap.bm, k, 1))
+			if (ntfs_bit_get_and_set(lcn_bitmap.bm, k, 1))
 				err_exit("Cluster %lu referenced twice!\n"
 					 "You didn't shutdown your Windows"
 					 "properly?", k);
@@ -334,16 +334,16 @@ void walk_attributes(MFT_RECORD *mr)
 {
 	ntfs_attr_search_ctx *ctx;
 
-	if (!(ctx = ntfs_get_attr_search_ctx(NULL, mr)))
+	if (!(ctx = ntfs_attr_get_search_ctx(NULL, mr)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	while (!ntfs_walk_attrs(ctx)) {
+	while (!ntfs_attrs_walk(ctx)) {
 		if (ctx->attr->type == AT_END)
 			break;
 		build_lcn_usage_bitmap(ctx->attr);
 	}
 
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 }
 
 
@@ -352,26 +352,26 @@ void get_bitmap_data(ntfs_volume *vol, struct bitmap *bm)
 	ntfs_inode *ni;
 	ntfs_attr_search_ctx *ctx;
 
-	if (!(ni = ntfs_open_inode(vol, (MFT_REF)FILE_Bitmap)))
+	if (!(ni = ntfs_inode_open(vol, (MFT_REF)FILE_Bitmap)))
 		perr_exit("ntfs_open_inode");
 
-	if (!(ctx = ntfs_get_attr_search_ctx(ni, NULL)))
+	if (!(ctx = ntfs_attr_get_search_ctx(ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
-	if (ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx))
+	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx))
 		perr_exit("ntfs_lookup_attr");
 
 	/* FIXME: get_attribute_value_length() can't handle extents */
-	bm->size = get_attribute_value_length(ctx->attr);
+	bm->size = ntfs_get_attribute_value_length(ctx->attr);
 
 	if (!(bm->bm = (u8 *)malloc(bm->size)))
 	    perr_exit("get_bitmap_data");
 
-	if (get_attribute_value(vol, ni->mrec, ctx->attr, bm->bm) != bm->size)
+	if (ntfs_get_attribute_value(vol, ni->mrec, ctx->attr, bm->bm) != bm->size)
 		perr_exit("Couldn't get $Bitmap $DATA\n");
 
-	ntfs_put_attr_search_ctx(ctx);
-	ntfs_close_inode(ni);
+	ntfs_attr_put_search_ctx(ctx);
+	ntfs_inode_close(ni);
 }
 
 
@@ -453,7 +453,7 @@ void advise_on_resize()
 	int fragmanted_end;
 
 	for (i = vol->nr_clusters - 1; i > 0; i--)
-		if (ntfs_get_bit(lcn_bitmap.bm, i))
+		if (ntfs_bit_get(lcn_bitmap.bm, i))
 			break;
 
 	i += 2; /* first free + we reserve one for the backup boot sector */
@@ -495,9 +495,9 @@ void look_for_bad_sector(ATTR_RECORD *a)
 	runlist *rl;
 	int i;
 
-	rl = ntfs_decompress_mapping_pairs(vol, a, NULL);
+	rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 	if (!rl)
-		perr_exit("ntfs_decompress_mapping_pairs");
+		perr_exit("ntfs_mapping_pairs_decompress");
 
 	for (i = 0; rl[i].length; i++)
 		if (rl[i].lcn != LCN_HOLE)
@@ -522,7 +522,7 @@ void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
 void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 {
 	for (; cluster < bm->size << 3; cluster++)
-		ntfs_set_bit(bm->bm, (u64)cluster, 1);
+		ntfs_bit_set(bm->bm, (u64)cluster, 1);
 }
 
 
@@ -551,7 +551,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if (!(mp = (char *)calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
 
-	if (ntfs_build_mapping_pairs(vol, mp, mp_size, rl_bad))
+	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl_bad))
 		exit(1);
 
 	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
@@ -581,8 +581,8 @@ void truncate_bitmap_unnamed_attr(ATTR_RECORD *a, s64 nr_clusters)
 	bm_bsize = nr_clusters_to_bitmap_byte_size(nr_clusters);
 	nr_bm_clusters = rounded_up_division(bm_bsize, vol->cluster_size);
 
-	if (!(rl = ntfs_decompress_mapping_pairs(vol, a, NULL)))
-		perr_exit("ntfs_decompress_mapping_pairs");
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
+		perr_exit("ntfs_mapping_pairs_decompress");
 
 	/* Unallocate truncated clusters in $Bitmap */
 	for (i = 0; rl[i].length; i++) {
@@ -595,7 +595,7 @@ void truncate_bitmap_unnamed_attr(ATTR_RECORD *a, s64 nr_clusters)
 		for (j = 0; j < rl[i].length; j++)
 			if (rl[i].vcn + j >= nr_bm_clusters) {
 				u64 k = (u64)rl[i].lcn + j;
-				ntfs_set_bit(lcn_bitmap.bm, k, 0);
+				ntfs_bit_set(lcn_bitmap.bm, k, 0);
 				Dprintf("Unallocate cluster: "
 				       "%llu (%llx)\n", k, k);
 			}
@@ -631,7 +631,7 @@ void truncate_bitmap_unnamed_attr(ATTR_RECORD *a, s64 nr_clusters)
 	if (!(mp = (char *)calloc(1, mp_size)))
 		perr_exit("Couldn't get memory");
 
-	if (ntfs_build_mapping_pairs(vol, mp, mp_size, rl))
+	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
 		exit(1);
 
 	memcpy((char *)a + a->mapping_pairs_offset, mp, mp_size);
@@ -651,13 +651,13 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
 	uchar_t *ustr = NULL;
 	int len = 0;
 
-	if (!(ni = ntfs_open_inode(vol, mref)))
+	if (!(ni = ntfs_inode_open(vol, mref)))
 		perr_exit("ntfs_open_inode");
 
 	if (NInoAttrList(ni))
 		perr_exit("Attribute list attribute not yet supported");
 
-	if (!(*ctx = ntfs_get_attr_search_ctx(ni, NULL)))
+	if (!(*ctx = ntfs_attr_get_search_ctx(ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
 
 	if (aname && ((len = ntfs_mbstoucs(aname, &ustr, 0)) == -1))
@@ -668,7 +668,7 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
 		len = 0;
 	}
 
-	if (ntfs_lookup_attr(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
+	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
 		perr_exit("ntfs_lookup_attr");
 
 	if (ustr != AT_UNNAMED)
@@ -701,7 +701,7 @@ void truncate_badclust_file(s64 nr_clusters)
 		perr_exit("Couldn't update $BadClust");
 
 	/* FIXME: clean up API => ntfs_put_attr_search_ctx() also closes ni */
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 }
 
 
@@ -718,7 +718,7 @@ void truncate_bitmap_file(s64 nr_clusters)
 	if (write_mft_record(ctx))
 		perr_exit("Couldn't update $Bitmap");
 
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 }
 
 
@@ -805,7 +805,7 @@ void mount_volume()
 				 "please try again (or see -f option).\n");
 
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
-	if (ntfs_is_version_supported(vol))
+	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
 	Dprintf("Cluster size       : %u\n", vol->cluster_size);
@@ -823,12 +823,12 @@ void prepare_volume_fixup()
 			flags |= VOLUME_MOUNTED_ON_NT4;
 
 		printf("Schedule chkdsk NTFS consistency check at Windows boot time ...\n");
-		if (ntfs_set_volume_flags(vol, flags))
+		if (ntfs_volume_set_flags(vol, flags))
 			perr_exit("Failed to set $Volume dirty");
 
 		printf("Resetting $LogFile ... "
 		       "(this might take a while)\n");
-		if (ntfs_reset_logfile(vol))
+		if (ntfs_logfile_reset(vol))
 			perr_exit("Failed to reset $LogFile");
 	}
 }
@@ -880,7 +880,7 @@ int main(int argc, char **argv)
 	}
 
 	for (i = new_volume_size; i < vol->nr_clusters; i++)
-		if (ntfs_get_bit(lcn_bitmap.bm, (u64)i)) {
+		if (ntfs_bit_get(lcn_bitmap.bm, (u64)i)) {
 			/* FIXME: relocate cluster */
 			advise_on_resize();
 		}

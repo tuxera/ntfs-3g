@@ -1,7 +1,7 @@
 /*
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Anton Altaparmakov.
+ * Copyright (c) 2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -33,9 +33,9 @@
 /**
  * Internal:
  *
- * __allocate_ntfs_inode - desc
+ * __ntfs_inode_allocate - desc
  */
-static __inline__ ntfs_inode *__allocate_ntfs_inode(ntfs_volume *vol)
+static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 
@@ -48,19 +48,19 @@ static __inline__ ntfs_inode *__allocate_ntfs_inode(ntfs_volume *vol)
 /**
  * Internal:
  *
- * allocate_ntfs_inode - desc
+ * ntfs_inode_allocate - desc
  */
-ntfs_inode *allocate_ntfs_inode(ntfs_volume *vol)
+ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
 {
-	return __allocate_ntfs_inode(vol);
+	return __ntfs_inode_allocate(vol);
 }
 
 /**
  * Internal:
  *
- * __release_ntfs_inode - desc
+ * __ntfs_inode_release - desc
  */
-static __inline__ int __release_ntfs_inode(ntfs_inode *ni)
+static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
 {
 	if (NInoDirty(ni))
 		Dputs("Eeek. Discarding dirty inode!");
@@ -75,7 +75,7 @@ static __inline__ int __release_ntfs_inode(ntfs_inode *ni)
 }
 
 /**
- * ntfs_open_inode - open an inode ready for access
+ * ntfs_inode_open - open an inode ready for access
  * @vol:	volume to get the inode from
  * @mref:	inode number / mft record number to open
  *
@@ -99,7 +99,7 @@ static __inline__ int __release_ntfs_inode(ntfs_inode *ni)
  * Return a pointer to the ntfs_inode structure on success or NULL on error,
  * with errno set to the error code.
  */
-ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
+ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 {
 	s64 l;
 	ntfs_inode *ni;
@@ -111,7 +111,7 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 		errno = EINVAL;
 		return NULL;
 	}
-	ni = __allocate_ntfs_inode(vol);
+	ni = __ntfs_inode_allocate(vol);
 	if (!ni)
 		return NULL;
 	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
@@ -119,18 +119,18 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 	if (!(ni->mrec->flags & MFT_RECORD_IN_USE))
 		goto err_out;
 	ni->mft_no = MREF(mref);
-	ctx = ntfs_get_attr_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		goto err_out;
-	if (ntfs_lookup_attr(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
 		/* Attribute list attribute not present so we are done. */
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return ni;
 	}
 	NInoSetAttrList(ni);
-	l = get_attribute_value_length(ctx->attr);
+	l = ntfs_get_attribute_value_length(ctx->attr);
 	if (!l)
 		goto put_err_out;
 	if (l > 0x40000) {
@@ -141,7 +141,7 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 	ni->attr_list = malloc(ni->attr_list_size);
 	if (!ni->attr_list)
 		goto put_err_out;
-	l = get_attribute_value(vol, ni->mrec, ctx->attr, ni->attr_list);
+	l = ntfs_get_attribute_value(vol, ni->mrec, ctx->attr, ni->attr_list);
 	if (!l)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {
@@ -150,32 +150,32 @@ ntfs_inode *ntfs_open_inode(ntfs_volume *vol, const MFT_REF mref)
 	}
 	if (!ctx->attr->non_resident) {
 		/* Attribute list attribute is resident so we are done. */
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return ni;
 	}
 	NInoSetAttrListNonResident(ni);
 	// FIXME: We are duplicating work here! (AIA)
-	ni->attr_list_rl = ntfs_decompress_mapping_pairs(vol, ctx->attr, NULL);
+	ni->attr_list_rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL);
 	if (ni->attr_list_rl) {
 		/* We got the runlist, so we are done. */
-		ntfs_put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		return ni;
 	}
 	err = EIO;
 put_err_out:
 	if (!err)
 		err = errno;
-	ntfs_put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	if (!err)
 		err = errno;
-	__release_ntfs_inode(ni);
+	__ntfs_inode_release(ni);
 	errno = err;
 	return NULL;
 }
 
 /**
- * ntfs_close_inode - close an ntfs inode and free all associated memory
+ * ntfs_inode_close - close an ntfs inode and free all associated memory
  * @ni:		ntfs inode to close
  *
  * Make sure the ntfs inode @ni is clean.
@@ -185,17 +185,17 @@ err_out:
  * structure itself.
  *
  * If it is an extent inode, we postpone to when the base inode is being closed
- * with ntfs_close_inode() to tear down all structures and free all allocated
+ * with ntfs_inode_close() to tear down all structures and free all allocated
  * memory. That way we keep the extent records cached in memory so we get an
  * efficient ntfs_lookup_attr().
  *
  * Return 0 on success or -1 on error with errno set to the error code. On
  * error, @ni has not been freed. The user should attempt to handle the error
- * and call ntfs_close_inode() again. The following error codes are defined:
+ * and call ntfs_inode_close() again. The following error codes are defined:
  *
  *	EBUSY	@ni is dirty and/or the attribute list runlist is dirty.
  */
-int ntfs_close_inode(ntfs_inode *ni)
+int ntfs_inode_close(ntfs_inode *ni)
 {
 	// TODO: This needs to be replaced with a flush to disk attempt. (AIA)
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
@@ -208,14 +208,14 @@ int ntfs_close_inode(ntfs_inode *ni)
 
 		// FIXME: Handle dirty case for each extent inode! (AIA)
 		for (i = 0; i < ni->nr_extents; i++)
-			__release_ntfs_inode(ni->extent_nis[i]);
+			__ntfs_inode_release(ni->extent_nis[i]);
 		free(ni->extent_nis);
 	}
-	return __release_ntfs_inode(ni);
+	return __ntfs_inode_release(ni);
 }
 
 /**
- * ntfs_open_extent_inode - load an extent inode and attach it to its base
+ * ntfs_extent_inode_open - load an extent inode and attach it to its base
  * @base_ni:	base ntfs inode
  * @mref:	mft reference of the extent inode to load (in little endian)
  *
@@ -236,7 +236,7 @@ int ntfs_close_inode(ntfs_inode *ni)
  * pointer to the ntfs_inode structure on success or NULL on error, with errno
  * set to the error code.
  */
-ntfs_inode *ntfs_open_extent_inode(ntfs_inode *base_ni, const MFT_REF mref)
+ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 {
 	u64 mft_no = MREF_LE(mref);
 	ntfs_inode *ni;
@@ -274,7 +274,7 @@ ntfs_inode *ntfs_open_extent_inode(ntfs_inode *base_ni, const MFT_REF mref)
 		}
 	}
 	/* Wasn't there, we need to load the extent inode. */
-	ni = __allocate_ntfs_inode(base_ni->vol);
+	ni = __ntfs_inode_allocate(base_ni->vol);
 	if (!ni)
 		return NULL;
 	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
@@ -301,7 +301,7 @@ ntfs_inode *ntfs_open_extent_inode(ntfs_inode *base_ni, const MFT_REF mref)
 	return ni;
 err_out:
 	i = errno;
-	__release_ntfs_inode(ni);
+	__ntfs_inode_release(ni);
 	errno = i;
 	Dperror("Failed to open extent inode");
 	return NULL;

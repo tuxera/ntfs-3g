@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * logfile.h - Exports for $LogFile handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -34,10 +32,10 @@ typedef enum {
 /*
  * Specialised magic comparison macros.
  */
-#define is_rstr_record(x)	( is_magic (x, RSTR) )
-#define is_rstr_recordp(p)	( is_magicp(p, RSTR) )
-#define is_rcrd_record(x)       ( is_magic (x, RCRD) )
-#define is_rcrd_recordp(p)      ( is_magicp(p, RCRD) )
+#define ntfs_is_rstr_record(x)		( ntfs_is_magic (x, RSTR) )
+#define ntfs_is_rstr_recordp(p)		( ntfs_is_magicp(p, RSTR) )
+#define ntfs_is_rcrd_record(x)		( ntfs_is_magic (x, RCRD) )
+#define ntfs_is_rcrd_recordp(p)		( ntfs_is_magicp(p, RCRD) )
 
 /*
  * Log file organization:

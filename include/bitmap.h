@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * bitmap.h - Exports for bitmap handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -37,14 +35,14 @@
  */
 
 /**
- * ntfs_set_bit - set a bit in a field of bits
+ * ntfs_bit_set - set a bit in a field of bits
  * @bitmap:	field of bits
  * @bit:	bit to set
  * @new_value:	value to set bit to (0 or 1)
  *
  * Set the bit @bit in the @bitmap to @new_value. Ignore all errors.
  */
-static __inline__ void ntfs_set_bit(u8 *bitmap, const u64 bit,
+static __inline__ void ntfs_bit_set(u8 *bitmap, const u64 bit,
 		const u8 new_value)
 {
 //	Dprintf("bitmap %p, bit 0x%Lx, new_value %i\n", bitmap, bit, new_value);
@@ -57,21 +55,21 @@ static __inline__ void ntfs_set_bit(u8 *bitmap, const u64 bit,
 }
 
 /**
- * ntfs_get_bit - get value of a bit in a field of bits
+ * ntfs_bit_get - get value of a bit in a field of bits
  * @bitmap:	field of bits
  * @bit:	bit to get
  *
  * Get and return the value of the bit @bit in @bitmap (0 or 1).
  * Return -1 on error.
  */
-static __inline__ char ntfs_get_bit(const u8 *bitmap, const u64 bit)
+static __inline__ char ntfs_bit_get(const u8 *bitmap, const u64 bit)
 {
 	if (!bitmap)
 		return -1;
 	return (bitmap[bit >> 3] >> (bit & 7)) & 1;
 }
 
-static __inline__ void ntfs_change_bit(u8 *bitmap, const u64 bit)
+static __inline__ void ntfs_bit_change(u8 *bitmap, const u64 bit)
 {
 	if (!bitmap)
 		return;
@@ -79,7 +77,7 @@ static __inline__ void ntfs_change_bit(u8 *bitmap, const u64 bit)
 }
 
 /**
- * ntfs_get_and_set_bit - get value of a bit in a field of bits and set it
+ * ntfs_bit_get_and_set - get value of a bit in a field of bits and set it
  * @bitmap:	field of bits
  * @bit:	bit to get/set
  * @new_value:	value to set bit to (0 or 1)
@@ -87,7 +85,7 @@ static __inline__ void ntfs_change_bit(u8 *bitmap, const u64 bit)
  * Return the value of the bit @bit and set it to @new_value (0 or 1).
  * Return -1 on error.
  */
-static __inline__ char ntfs_get_and_set_bit(u8 *bitmap, const u64 bit,
+static __inline__ char ntfs_bit_get_and_set(u8 *bitmap, const u64 bit,
 		const u8 new_value)
 {
 	register u8 old_bit, shift;

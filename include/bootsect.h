@@ -1,10 +1,8 @@
 /*
- * $Id$
- *
  * bootsect.h - Exports for bootsector record handling. Part of the Linux-NTFS
  *		project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -41,8 +39,9 @@
  * disregarding the value of silent (but only if configure was run with
  * --enable-debug).
  */
-extern BOOL is_boot_sector_ntfs(const NTFS_BOOT_SECTOR *b, const BOOL silent);
-extern int parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b);
+extern BOOL ntfs_boot_sector_is_ntfs(const NTFS_BOOT_SECTOR *b,
+		const BOOL silent);
+extern int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b);
 
 #endif /* defined _NTFS_BOOTSECT_H */
 

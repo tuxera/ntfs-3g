@@ -1,11 +1,9 @@
 const char *EXEC_NAME = "dumplog";
 const char *EXEC_VERSION = "1.0";
 /*
- * $Id$
- *
  * DumpLog - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000,2001 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) specified
  * on the command line and display the results on stdout. Errors will be output
@@ -111,7 +109,7 @@ int main(int argc, char **argv)
 	/* Valid data length in buffer. */
 	l = min(br, l);
 	/* Check restart area. */
-	if (!is_rstr_recordp(lfd)) {
+	if (!ntfs_is_rstr_recordp(lfd)) {
 		s64 _l;
 
 		for (_l = 0LL; _l < l; _l++)
@@ -128,8 +126,8 @@ int main(int argc, char **argv)
 	rph = (RESTART_PAGE_HEADER*)lfd;
 	lps = le32_to_cpu(rph->log_page_size);
 pass_loc:
-	if (ntfs_post_read_mst_fixup((NTFS_RECORD*)rph, lps) ||
-			is_baad_record(rph->magic)) {
+	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)rph, lps) ||
+			ntfs_is_baad_record(rph->magic)) {
 		puts("Logfile incomplete multi sector transfer detected! "
 				"Cannot handle this yet!");
 		goto log_file_error;
@@ -212,7 +210,7 @@ rcrd_pass_loc:
 	if ((char*)rcrd_ph + lps > (char*)lfd + l)
 		goto end_of_rcrd_passes;
 	printf("\nLog record page number %i", pass);
-	if (!is_rcrd_record(rcrd_ph->magic)) {
+	if (!ntfs_is_rcrd_record(rcrd_ph->magic)) {
 		for (i = 0; i < lps; i++)
 			if (((char*)rcrd_ph)[i] != (char)-1)
 				break;

@@ -1,9 +1,7 @@
 /*
- * $Id$
- *
  * layout.h - Ntfs on-disk layout structures. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -110,25 +108,25 @@ typedef enum {
  * Generic magic comparison macros. Finally found a use for the ## preprocessor
  * operator! (-8
  */
-#define is_magic(x, m)		(   (u32)(x) == (u32)magic_##m )
-#define is_magicp(p, m)		( *(u32*)(p) == (u32)magic_##m )
+#define ntfs_is_magic(x, m)		(   (u32)(x) == (u32)magic_##m )
+#define ntfs_is_magicp(p, m)		( *(u32*)(p) == (u32)magic_##m )
 
 /*
  * Specialised magic comparison macros.
  */
-#define is_baad_record(x)	( is_magic (x, BAAD) )
-#define is_baad_recordp(p)	( is_magicp(p, BAAD) )
-#define is_chkd_record(x)	( is_magic (x, CHKD) )
-#define is_chkd_recordp(p)	( is_magicp(p, CHKD) )
-#define is_file_record(x)	( is_magic (x, FILE) )
-#define is_file_recordp(p)	( is_magicp(p, FILE) )
-#define is_hole_record(x)	( is_magic (x, HOLE) )
-#define is_hole_recordp(p)	( is_magicp(p, HOLE) )
-#define is_indx_record(x)	( is_magic (x, INDX) )
-#define is_indx_recordp(p)	( is_magicp(p, INDX) )
+#define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
+#define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
+#define ntfs_is_chkd_record(x)	( ntfs_is_magic (x, CHKD) )
+#define ntfs_is_chkd_recordp(p)	( ntfs_is_magicp(p, CHKD) )
+#define ntfs_is_file_record(x)	( ntfs_is_magic (x, FILE) )
+#define ntfs_is_file_recordp(p)	( ntfs_is_magicp(p, FILE) )
+#define ntfs_is_hole_record(x)	( ntfs_is_magic (x, HOLE) )
+#define ntfs_is_hole_recordp(p)	( ntfs_is_magicp(p, HOLE) )
+#define ntfs_is_indx_record(x)	( ntfs_is_magic (x, INDX) )
+#define ntfs_is_indx_recordp(p)	( ntfs_is_magicp(p, INDX) )
 
-#define is_mft_record(x)	( is_file_record(x) )
-#define is_mft_recordp(p)	( is_file_recordp(p) )
+#define ntfs_is_mft_record(x)	( ntfs_is_file_record(x) )
+#define ntfs_is_mft_recordp(p)	( ntfs_is_file_recordp(p) )
 
 /*
  * Defines for the NTFS filesystem. Don't want to use BLOCK_SIZE and

@@ -1,10 +1,8 @@
 /*
- * $Id$
- *
  * unistr.h - Exports for unicode string handling. Part of the Linux-NTFS
  *	      project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov.
+ * Copyright (c) 2000-2002 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -30,11 +28,11 @@
 
 extern const u8 legal_ansi_char_array[0x40];
 
-extern BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
+extern BOOL ntfs_names_are_equal(const uchar_t *s1, size_t s1_len,
 		const uchar_t *s2, size_t s2_len, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_size);
 
-extern int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
+extern int ntfs_names_collate(const uchar_t *name1, const u32 name1_len,
 		const uchar_t *name2, const u32 name2_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len);
@@ -44,7 +42,7 @@ extern int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n);
 extern int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
 		const uchar_t *upcase, const u32 upcase_size);
 
-extern void ntfs_upcase_name(uchar_t *name, u32 name_len,
+extern void ntfs_name_upcase(uchar_t *name, u32 name_len,
 		const uchar_t *upcase, const u32 upcase_len);
 
 extern void ntfs_file_upcase_value(FILE_NAME_ATTR *file_name_attr,
