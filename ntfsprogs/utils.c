@@ -968,8 +968,10 @@ int mft_next_record (struct mft_search_ctx *ctx)
 	}
 
 	for (ctx->mft_num++; (s64)ctx->mft_num < ctx->vol->nr_mft_records; ctx->mft_num++) {
+		int in_use;
+
 		ctx->flags_match = 0;
-		int in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
+		in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {
 			Eprintf ("Error reading inode %llu.  Aborting.",
 					(unsigned long long)ctx->mft_num);
