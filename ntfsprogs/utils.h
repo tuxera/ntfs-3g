@@ -39,8 +39,8 @@ extern const char *ntfs_gpl;
 #define PATH_SEP	'/'
 #define MAX_PATH	1024
 
-#if (REG_NOERROR != 0)
-#define REG_NOERROR	REG_OKAY
+#if !defined(REG_NOERROR) || (REG_NOERROR != 0)
+#	define REG_NOERROR	REG_OKAY
 #endif
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\

@@ -39,6 +39,9 @@
 #ifdef HAVE_SYS_ENDIAN_H
 #	include <sys/endian.h>
 #endif
+#ifdef HAVE_MACHINE_ENDIAN_H
+#	include <machine/endian.h>
+#endif
 #ifndef __BYTE_ORDER
 #	ifdef _BYTE_ORDER
 #		define __BYTE_ORDER _BYTE_ORDER

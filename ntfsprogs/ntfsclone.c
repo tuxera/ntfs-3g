@@ -18,7 +18,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/vfs.h>
+#ifdef HAVE_SYS_VFS_H
+#	include <sys/vfs.h>
+#endif
 #include <fcntl.h>
 #include <stdarg.h>
 #include <string.h>

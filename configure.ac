@@ -169,7 +169,7 @@ AC_CHECK_HEADERS([fcntl.h libintl.h limits.h locale.h mntent.h stddef.h \
 	stdint.h stdlib.h stdio.h stdarg.h string.h strings.h errno.h time.h \
 	unistd.h utime.h wchar.h getopt.h features.h endian.h byteswap.h \
 	sys/endian.h sys/param.h sys/ioctl.h sys/mount.h sys/stat.h \
-	sys/types.h linux/major.h linux/fd.h])
+	sys/types.h sys/vfs.h linux/major.h linux/fd.h machine/endian.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
