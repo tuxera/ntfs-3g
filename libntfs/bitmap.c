@@ -44,8 +44,8 @@
 static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit, s64 count,
 		int value)
 {
-	u8 *buf, *lastbyte_buf;
 	s64 bufsize, br;
+	u8 *buf, *lastbyte_buf;
 	int bit, firstbyte, lastbyte, lastbyte_pos, tmp, err;
 
 	if (!na || start_bit < 0 || count < 0) {

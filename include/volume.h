@@ -123,7 +123,7 @@ struct _ntfs_volume {
 
 	s64 nr_mft_records;	/* Number of records in the mft, equals the
 				   number of bits in mft_bitmap. */
-	s64 mft_lcn;		/* Logical cluster number of the data attribute
+	LCN mft_lcn;		/* Logical cluster number of the data attribute
 				   for FILE_MFT. */
 	ntfs_inode *mft_ni;	/* ntfs_inode structure for FILE_MFT. */
 	ntfs_attr *mft_na;	/* ntfs_attr structure for the data attribute
@@ -136,7 +136,7 @@ struct _ntfs_volume {
 				   vice versa. */
 
 	int mftmirr_size;	/* Size of the FILE_MFTMirr in mft records. */
-	s64 mftmirr_lcn;	/* Logical cluster number of the data attribute
+	LCN mftmirr_lcn;	/* Logical cluster number of the data attribute
 				   for FILE_MFTMirr. */
 	ntfs_inode *mftmirr_ni;	/* ntfs_inode structure for FILE_MFTMirr. */
 	ntfs_attr *mftmirr_na;	/* ntfs_attr structure for the data attribute
