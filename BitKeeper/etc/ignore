@@ -27,6 +27,7 @@ TAGS
 */TAGS
 .*swp
 */.*swp
+ntfsprogs-*.tar.gz
 
 # specific programs
 ntfsprogs/dumplog
