@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002-2003 Richard Russon
  *
- * This utility will overwrite usused space on an NTFS volume.
+ * This utility will overwrite unused space on an NTFS volume.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
