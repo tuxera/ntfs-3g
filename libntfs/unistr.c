@@ -451,16 +451,20 @@ int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 	}
 	/* Determine the length of the multi-byte string. */
 	s = ins;
-#ifdef HAVE_MBSINIT
+#if defined(HAVE_MBSINIT)
 	memset(&mbstate, 0, sizeof(mbstate));
 	ins_len = mbsrtowcs(NULL, (const char **)&s, 0, &mbstate);
-#else
-	ins_len = mbstowcs(NULL, s, 0);
-#endif
 #ifdef __CYGWIN32__
-	/* Eeek!!! Cygwin has broken mbstowcs() implementation!!! */
-	if (!ins_len)
+	if (!ins_len && *ins) {
+		/* Older Cygwin had broken mbsrtowcs() implementation. */
 		ins_len = strlen(ins);
+	}
+#endif
+#elif !defined(DJGPP)
+	ins_len = mbstowcs(NULL, s, 0);
+#else
+	/* Eeek!!! DJGPP has broken mbstowcs() implementation!!! */
+	ins_len = strlen(ins);
 #endif
 	if (ins_len == -1)
 		return ins_len;
@@ -550,4 +554,3 @@ err_out:
 	}
 	return -1;
 }
-
