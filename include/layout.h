@@ -475,8 +475,8 @@ typedef struct {
 					   FIXME: What does it mean? (AIA) */
 /* 88*/ COLLATION_RULES collation_rule;	/* Default collation rule. */
 /* 8c*/	ATTR_DEF_FLAGS flags;		/* Flags describing the attribute. */
-/* 90*/	u64 min_size;			/* Optional minimum attribute size. */
-/* 98*/	u64 max_size;			/* Maximum size of attribute. */
+/* 90*/	s64 min_size;			/* Optional minimum attribute size. */
+/* 98*/	s64 max_size;			/* Maximum size of attribute. */
 /* sizeof() = 0xa0 or 160 bytes */
 } __attribute__ ((__packed__)) ATTR_DEF;
 
