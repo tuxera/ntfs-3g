@@ -56,7 +56,7 @@ typedef struct ntfs_volume ntfs_volume;
 
 #ifndef DiskGeometryGetPartition
 #define DiskGeometryGetPartition(Geometry) \
-	((PDISK_PARTITION_INFO)((Geometry) + 1))
+	((PDISK_PARTITION_INFO)(&((PDISK_GEOMETRY_EX)buf)->Data))
 #endif
 
 #ifndef DiskGeometryGetDetect
@@ -1056,8 +1056,10 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	}
 
 	if (fd->vol_handle != INVALID_HANDLE_VALUE) {
-		ntfs_device_win32_dismount(fd->vol_handle);
-		ntfs_device_win32_unlock(fd->vol_handle);
+		if (!NDevReadOnly(dev)) {
+			ntfs_device_win32_dismount(fd->vol_handle);
+			ntfs_device_win32_unlock(fd->vol_handle);
+		}
 		if (!CloseHandle(fd->vol_handle))
 			Dputs("Error: CloseHandle failed for volume.");
 	}
