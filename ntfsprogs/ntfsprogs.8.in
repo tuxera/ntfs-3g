@@ -4,7 +4,7 @@
 .\"
 .TH NTFSPROGS 8 "August 2003" "ntfsprogs version @VERSION@"
 .SH NAME
-ntfstools \- several tools for doing neat things with NTFS partitions
+ntfsprogs \- several tools for doing neat things with NTFS partitions
 .SH OVERVIEW
 .B ntfsprogs
 is a suite of NTFS utilities based around a shared library.  The tools are
