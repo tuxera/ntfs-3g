@@ -147,6 +147,11 @@ struct _ntfs_volume {
 				   FILE_UpCase. */
 	u32 upcase_len;		/* Length in Unicode characters of the upcase
 				   table. */
+
+	ATTR_DEF *attrdef;	/* Attribute definitions. Obtained from
+				   FILE_AttrDef. */
+	u32 attrdef_len;	/* Size of the attribute definition table in
+				   bytes. */
 };
 
 extern ntfs_volume *ntfs_volume_startup(const char *name, unsigned long rwflag);
