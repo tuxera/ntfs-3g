@@ -3,6 +3,8 @@
 	- Add new API function runlist.[hc]:ntfs_rl_pread().
 	- Fix bug in run list encoding functions that hit sparse and compressed
 	  files with holes. (Szabolcs Szakacsits)
+	- Add compatibility for building with DJGPP under DOS. (Christophe
+	  Grenier, slightly modified by me)
 
 19/11/2003 - 1.8.0 - Final fixes and tidy ups.
 	- Cleanup build system wrt CFLAGS handling placing it all in one place

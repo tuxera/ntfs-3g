@@ -33,8 +33,12 @@
  * architectures requiring aligned memory accesses...
  */
 
-#include <endian.h>
-#include <byteswap.h>
+#ifdef HAVE_ENDIAN_H
+#	include <endian.h>
+#endif
+#ifdef HAVE_BYTESWAP_H
+#	include <byteswap.h>
+#endif
 
 #if (__BYTE_ORDER == __LITTLE_ENDIAN)
 

@@ -25,13 +25,15 @@
 #include "config.h"
 
 #include <stdio.h>
-#include <sys/mount.h>
+#ifdef HAVE_SYS_MOUNT_H
+#	include <sys/mount.h>
+#endif
 #ifdef HAVE_MNTENT_H
 #	include <mntent.h>
 #endif
 
-/* Cygwin doesn't seem to have MS_RDONLY, so we define it here. */
-#if defined(__CYGWIN32__) && !defined(MS_RDONLY)
+/* Both under Cygwin and DJGPP we do not have MS_RDONLY, so we define it. */
+#if !defined(MS_RDONLY)
 typedef enum {
 	MS_RDONLY = 1,
 } MS_MOUNT;

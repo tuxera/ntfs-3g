@@ -321,7 +321,9 @@ int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 	wchar_t wc;
 	int i, o, mbs_len;
 	int cnt = 0;
+#ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
+#endif
 
 	if (!ins || !outs) {
 		errno = EINVAL;
@@ -339,7 +341,11 @@ int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 		if (!mbs)
 			return -1;
 	}
+#ifdef HAVE_MBSINIT
 	memset(&mbstate, 0, sizeof(mbstate));
+#else
+	wctomb(NULL, 0);
+#endif
 	for (i = o = 0; i < ins_len; i++) {
 		/* Reallocate memory if necessary or abort. */
 		if ((int)(o + MB_CUR_MAX) > mbs_len) {
@@ -361,7 +367,11 @@ int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 		if (!wc)
 			break;
 		/* Convert the CPU endian wide character to multibyte. */
+#ifdef HAVE_MBSINIT
 		cnt = wcrtomb(mbs + o, wc, &mbstate);
+#else
+		cnt = wctomb(mbs + o, wc);
+#endif
 		if (cnt == -1)
 			goto err_out;
 		if (cnt <= 0) {
@@ -371,12 +381,14 @@ int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 		}
 		o += cnt;
 	}
+#ifdef HAVE_MBSINIT
 	/* Make sure we are back in the initial state. */
 	if (!mbsinit(&mbstate)) {
 		Dputs("Eeek. mbstate not in initial state!");
 		errno = EILSEQ;
 		goto err_out;
 	}
+#endif
 	/* Now write the NULL character. */
 	mbs[o] = '\0';
 	if (*outs != mbs)
@@ -421,7 +433,9 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 	char *s;
 	wchar_t wc;
 	int i, o, cnt, ins_len, ucs_len;
+#ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
+#endif
 
 	if (!ins || !outs) {
 		errno = EINVAL;
@@ -435,11 +449,19 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 	}
 	/* Determine the length of the multi-byte string. */
 	s = ins;
+#ifdef HAVE_MBSINIT
 	memset(&mbstate, 0, sizeof(mbstate));
 	ins_len = mbsrtowcs(NULL, (const char **)&s, 0, &mbstate);
+#else
+	ins_len = mbstowcs(NULL, s, 0);
+#endif
 	if (ins_len == -1)
 		return ins_len;
+#ifdef HAVE_MBSINIT
 	if ((s != ins) || !mbsinit(&mbstate)) {
+#else
+	if (s != ins) {
+#endif
 		errno = EILSEQ;
 		return -1;
 	}
@@ -451,7 +473,11 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 		if (!ucs)
 			return -1;
 	}
+#ifdef HAVE_MBSINIT
 	memset(&mbstate, 0, sizeof(mbstate));
+#else
+	mbtowc(NULL, NULL, 0);
+#endif
 	for (i = o = cnt = 0; o < ins_len; i += cnt, o++) {
 		/* Reallocate memory if necessary or abort. */
 		if (o >= ucs_len) {
@@ -472,7 +498,11 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 			ucs_len /= sizeof(uchar_t);
 		}
 		/* Convert the multibyte character to a wide character. */
+#ifdef HAVE_MBSINIT
 		cnt = mbrtowc(&wc, ins + i, ins_len - i, &mbstate);
+#else
+		cnt = mbtowc(&wc, ins + i, ins_len - i);
+#endif
 		if (!cnt)
 			break;
 		if (cnt == -1)
@@ -491,6 +521,7 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 		/* Convert the CPU wide character to a LE Unicode character. */
 		ucs[o] = cpu_to_le16(wc);
 	}
+#ifdef HAVE_MBSINIT
 	/* Make sure we are back in the initial state. */
 	if (!mbsinit(&mbstate)) {
 		Dprintf("%s(): Eeek. mbstate not in initial state!\n",
@@ -498,6 +529,7 @@ int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
 		errno = EILSEQ;
 		goto err_out;
 	}
+#endif
 	/* Now write the NULL character. */
 	ucs[o] = cpu_to_le16(L'\0');
 	if (*outs != ucs)
