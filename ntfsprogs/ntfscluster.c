@@ -327,27 +327,27 @@ int info (ntfs_volume *vol)
 	t = mc >> cb;
 	u = mc * 100 / b / e;
 
-	printf ("bytes per sector       : %lld\n", a);
-	printf ("bytes per cluster      : %lld\n", b);
-	printf ("sectors per cluster    : %lld\n", c);
-	printf ("bytes per volume       : %lld\n", d);
-	printf ("sectors per volume     : %lld\n", e);
-	printf ("clusters per volume    : %lld\n", f);
-	printf ("mft records total      : %lld\n", g);
-	printf ("mft records in use     : %lld\n", h);
-	printf ("mft records percentage : %lld\n", i);
-	printf ("bytes of free space    : %lld\n", j);
-	printf ("sectors of free space  : %lld\n", k);
-	printf ("clusters of free space : %lld\n", l);
-	printf ("percentage free space  : %lld\n", m);
-	printf ("bytes of user data     : %lld\n", n);
-	printf ("sectors of user data   : %lld\n", o);
-	printf ("clusters of user data  : %lld\n", p);
-	printf ("percentage user data   : %lld\n", q);
-	printf ("bytes of metadata      : %lld\n", r);
-	printf ("sectors of metadata    : %lld\n", s);
-	printf ("clusters of metadata   : %lld\n", t);
-	printf ("percentage metadata    : %lld\n", u);
+	printf ("bytes per sector       : %llu\n", (unsigned long long)a);
+	printf ("bytes per cluster      : %llu\n", (unsigned long long)b);
+	printf ("sectors per cluster    : %llu\n", (unsigned long long)c);
+	printf ("bytes per volume       : %llu\n", (unsigned long long)d);
+	printf ("sectors per volume     : %llu\n", (unsigned long long)e);
+	printf ("clusters per volume    : %llu\n", (unsigned long long)f);
+	printf ("mft records total      : %llu\n", (unsigned long long)g);
+	printf ("mft records in use     : %llu\n", (unsigned long long)h);
+	printf ("mft records percentage : %llu\n", (unsigned long long)i);
+	printf ("bytes of free space    : %llu\n", (unsigned long long)j);
+	printf ("sectors of free space  : %llu\n", (unsigned long long)k);
+	printf ("clusters of free space : %llu\n", (unsigned long long)l);
+	printf ("percentage free space  : %llu\n", (unsigned long long)m);
+	printf ("bytes of user data     : %llu\n", (unsigned long long)n);
+	printf ("sectors of user data   : %llu\n", (unsigned long long)o);
+	printf ("clusters of user data  : %llu\n", (unsigned long long)p);
+	printf ("percentage user data   : %llu\n", (unsigned long long)q);
+	printf ("bytes of metadata      : %llu\n", (unsigned long long)r);
+	printf ("sectors of metadata    : %llu\n", (unsigned long long)s);
+	printf ("clusters of metadata   : %llu\n", (unsigned long long)t);
+	printf ("percentage metadata    : %llu\n", (unsigned long long)u);
 
 	return 0;
 }
@@ -463,9 +463,10 @@ int main (int argc, char *argv[])
 	switch (opts.action) {
 		case act_sector:
 			if (opts.range_begin == opts.range_end)
-				Qprintf ("Searching for sector %lld\n", opts.range_begin);
+				Qprintf ("Searching for sector %llu\n",
+						(unsigned long long)opts.range_begin);
 			else
-				Qprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
+				Qprintf ("Searching for sector range %llu-%llu\n", (unsigned long long)opts.range_begin, (unsigned long long)opts.range_end);
 			/* Convert to clusters */
 			opts.range_begin >>= (vol->cluster_size_bits - vol->sector_size_bits);
 			opts.range_end   >>= (vol->cluster_size_bits - vol->sector_size_bits);
@@ -473,9 +474,10 @@ int main (int argc, char *argv[])
 			break;
 		case act_cluster:
 			if (opts.range_begin == opts.range_end)
-				Qprintf ("Searching for cluster %lld\n", opts.range_begin);
+				Qprintf ("Searching for cluster %llu\n",
+						(unsigned long long)opts.range_begin);
 			else
-				Qprintf ("Searching for cluster range %lld-%lld\n", opts.range_begin, opts.range_end);
+				Qprintf ("Searching for cluster range %llu-%llu\n", (unsigned long long)opts.range_begin, (unsigned long long)opts.range_end);
 			result = cluster_find (vol, opts.range_begin, opts.range_end, (cluster_cb*)&print_match, NULL);
 			break;
 		case act_file:

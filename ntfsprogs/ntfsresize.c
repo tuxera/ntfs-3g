@@ -693,7 +693,9 @@ static void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
 		return;
 	
 	printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
-	       "length %6lld\n", inode, resize->ctx->attr->type, start, len);
+			"length %6lld\n", (long long)inode,
+			resize->ctx->attr->type, (unsigned long long)start,
+			(long long)len);
 }
 
 /**
@@ -741,9 +743,11 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 				
 				if (++resize->multi_ref > 10)
 					continue;
-				
+
 				printf("Cluster %llu (0x%llx) referenced "
-				       "multiply times!\n", k, k);
+						"multiply times!\n",
+						(unsigned long long)k,
+						(unsigned long long)k);
 			}
 		}
 
@@ -834,9 +838,11 @@ static void compare_bitmaps(struct bitmap *a)
 				if (++mismatch > 10)
 					continue;
 
-				printf("Cluster accounting failed at %llu "
-				       "(0x%llx): %s cluster in $Bitmap\n",
-				       cl, cl, bit ? "missing" : "extra");
+				printf("Cluster accounting failed at %lld "
+						"(0x%llx): %s cluster in "
+						"$Bitmap\n", (long long)cl,
+						(unsigned long long)cl,
+						bit ? "missing" : "extra");
 			}
 		}
 	}
@@ -1463,7 +1469,8 @@ static void print_hint(const char *s, struct llcn_t llcn)
 	
 	runs_b = llcn.lcn * vol->cluster_size;
 	runs_mb = rounded_up_division(runs_b, NTFS_MBYTE);
-	printf("%-19s: %9lld MB      %8lld\n", s, runs_mb, llcn.inode);
+	printf("%-19s: %9lld MB      %8lld\n", s, (long long)runs_mb,
+			(long long)llcn.inode);
 }
 
 /**
@@ -1660,8 +1667,8 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	if (bm_bsize != size) {
 		if (size == -1)
 			perr_exit("Couldn't write $Bitmap");
-		err_exit("Couldn't write full $Bitmap file "
-			 "(%lld from %lld)\n", size, bm_bsize);
+		err_exit("Couldn't write full $Bitmap file (%lld from %lld)\n",
+				(long long)size, (long long)bm_bsize);
 	}
 
 	free(rl);
@@ -1810,8 +1817,8 @@ static s64 vol_size(ntfs_volume *v, s64 nr_clusters)
  */
 static void print_vol_size(const char *str, s64 bytes)
 {
-	printf("%s: %lld bytes (%lld MB)\n",
-	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
+	printf("%s: %lld bytes (%lld MB)\n", str, (long long)bytes,
+			(long long)rounded_up_division(bytes, NTFS_MBYTE));
 }
 
 /**
@@ -1827,7 +1834,7 @@ static void print_disk_usage(ntfs_resize_t *resize)
 	used = resize->inuse * vol->cluster_size;
 
 	printf("Space in use       : %lld MB (%.1f%%)\n",
-	       rounded_up_division(used, NTFS_MBYTE),
+	       (long long)rounded_up_division(used, NTFS_MBYTE),
 	       100.0 * ((float)used / total));
 }
 
@@ -1835,8 +1842,9 @@ static void print_num_of_relocations(ntfs_resize_t *resize)
 {
 	s64 relocations = resize->relocations * vol->cluster_size;
 	
-	printf("Needed relocations : %lld (%lld MB)\n", resize->relocations,
-	       rounded_up_division(relocations, NTFS_MBYTE));
+	printf("Needed relocations : %lld (%lld MB)\n",
+			(long long)resize->relocations, (long long)
+			rounded_up_division(relocations, NTFS_MBYTE));
 }
 
 /**
