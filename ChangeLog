@@ -35,6 +35,13 @@ xx/xx/2004 - 1.9.3-WIP
 	  working as getting the head-count is NT specific and as such wasn't
 	  implemented.  (Yuval)
 	- Added truncate option to ntfsundelete (mabs)
+	- Bugfix in ntfs_attr_size_bounds_check that caused it always fail,
+	  if no maximum limit for attribute size (Yura)
+	- Add new function attrib.c::ntfs_non_resident_attr_expand,
+	  thus we can expand non resident attributes (Yura)
+	- Add a @start_vcn parameter to lcnalloc.[ch]::ntfs_cluster_alloc (Yura)
+	- Add ntfscp utility, at present it can only overwrite files. It can
+	  increment or decrease file size if $ATTRIBUTE_LIST not present (Yura)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
