@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "dir.h"
 #include "lcnalloc.h"
+#include "mft.h"
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
@@ -245,6 +246,7 @@ struct ntfs_dir {
 	ntfs_attr	  *iroot;
 	ntfs_attr	  *ialloc;
 	ntfs_attr	  *ibmp;
+	int                index_size;
 };
 
 
@@ -469,7 +471,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 		//printf ("alloc i = %lld\n", dir->ialloc->initialized_size);
 		//printf ("vcn = %lld\n", vcn);
 
-		dt->data_len = parent->data_len;
+		dt->data_len = dt->dir->index_size;
 		//printf ("parent size = %d\n", dt->data_len);
 		dt->data     = malloc (dt->data_len);
 		//printf ("%lld\n", ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data));
@@ -509,7 +511,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 		ntfs_dt_count_root (dt);
 
 		dt->header = &((INDEX_ROOT*)dt->data)->index;
-		dt->data_len = ((INDEX_ROOT*)dt->data)->index_block_size;
+		//dt->data_len = ((INDEX_ROOT*)dt->data)->index_block_size;
 		//printf ("IBS = %d\n", ((INDEX_ROOT*)dt->data)->index_block_size);
 
 #if 0
@@ -692,6 +694,11 @@ static struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 		return NULL;
 	}
 
+	dir->inode  = inode;
+	dir->iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT,       I30, 4);
+	dir->ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
+	dir->ibmp   = ntfs_attr_open (inode, AT_BITMAP,           I30, 4);
+
 	dir->vol	  = vol;
 	dir->parent	  = NULL;
 	dir->name	  = NULL;
@@ -702,10 +709,10 @@ static struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 	dir->mft_num	  = mft_num;
 	dir->bitmap	  = NULL;
 
-	dir->inode  = inode;
-	dir->iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT,       I30, 4);
-	dir->ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
-	dir->ibmp   = ntfs_attr_open (inode, AT_BITMAP,           I30, 4);
+	if (dir->ialloc)
+		dir->index_size = dir->ialloc->allocated_size;
+	else
+		dir->index_size = 0;
 
 	if (!dir->iroot) {
 		free (dir);
@@ -826,7 +833,7 @@ static MFT_REF utils_pathname_to_mftref (ntfs_volume *vol, struct ntfs_dir *pare
 			q++;
 		}
 
-		//printf ("looking for %s\n", p);
+		//printf ("looking for %s in %p\n", p, parent);
 		mft_num = ntfs_dir_find (parent, p);
 		if (mft_num == (u64)-1) {
 			Eprintf ("Couldn't find name '%s' in pathname '%s'.\n", p, pathname);
@@ -922,23 +929,16 @@ static int utils_mftrec_mark_free (ntfs_volume *vol, MFT_REF mref)
 static int utils_mftrec_mark_free2 (ntfs_volume *vol, MFT_REF mref)
 {
 	u8 buffer[1024];
-	s64 pos;
-	s64 count;
-	u32 blk;
 	s64 res;
 	MFT_RECORD *rec;
 
 	if (!vol)
 		return -1;
 
-	pos   = MREF (mref) << vol->mft_record_size_bits;
-	count = 1;
-	blk   = vol->mft_record_size;
-
-	res = ntfs_attr_mst_pread (vol->mft_na, pos, count, blk, buffer);
-	printf ("res = %lld\n", res);
-
 	rec = (MFT_RECORD*) buffer;
+
+	res = ntfs_mft_record_read (vol, mref, rec);
+	printf ("res = %lld\n", res);
 
 	if ((rec->flags & MFT_RECORD_IN_USE) == 0) {
 		Eprintf ("MFT record isn't in use (2).\n");
@@ -950,7 +950,7 @@ static int utils_mftrec_mark_free2 (ntfs_volume *vol, MFT_REF mref)
 	//printf ("\n");
 	//utils_dump_mem (buffer, 0, 1024, 1);
 
-	res = ntfs_attr_mst_pwrite (vol->mft_na, pos, count, blk, buffer);
+	res = ntfs_mft_record_write (vol, mref, rec);
 	printf ("res = %lld\n", res);
 
 	return 0;
@@ -999,10 +999,108 @@ static int utils_free_non_residents (ntfs_inode *inode)
 	return 0;
 }
 
+
 /**
- * ntfs_dt_remove
+ * ntfs_mft_resize_resident
  */
-static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
+static int ntfs_mft_resize_resident (ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len, u8 *data, int data_len)
+{
+	int mft_size;
+	int mft_usage;
+	int mft_free;
+	int attr_orig;
+	int attr_new;
+	u8 *src;
+	u8 *dst;
+	u8 *end;
+	int len;
+	ntfs_attr_search_ctx *ctx = NULL;
+	ATTR_RECORD *arec = NULL;
+	MFT_RECORD *mrec = NULL;
+	int res = -1;
+
+	if ((!inode) || (!inode->mrec))
+		return -1;
+	if ((!data) || (data_len < 0))
+		return -1;
+
+	mrec = inode->mrec;
+
+	mft_size  = mrec->bytes_allocated;
+	mft_usage = mrec->bytes_in_use;
+	mft_free  = mft_size - mft_usage;
+
+	//printf ("mft_size  = %d\n", mft_size);
+	//printf ("mft_usage = %d\n", mft_usage);
+	//printf ("mft_free  = %d\n", mft_free);
+	//printf ("\n");
+
+	ctx = ntfs_attr_get_search_ctx (NULL, mrec);
+	if (!ctx)
+		goto done;
+
+	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE, 0, NULL, 0, ctx) != 0)
+		goto done;
+
+	arec = ctx->attr;
+
+	if (arec->non_resident) {
+		printf ("attributes isn't resident\n");
+		goto done;
+	}
+
+	attr_orig = arec->value_length;
+	attr_new  = data_len;
+
+	//printf ("attr orig = %d\n", attr_orig);
+	//printf ("attr new  = %d\n", attr_new);
+	//printf ("\n");
+
+	if (attr_new == attr_orig) {
+		printf ("nothing to do\n");
+		res = 0;
+		goto done;
+	}
+
+	if ((attr_new - attr_orig + mft_usage) > mft_size) {
+		printf ("attribute won't fit into mft record\n");
+		goto done;
+	}
+
+	//printf ("new free space = %d\n", mft_size - (attr_new - attr_orig + mft_usage));
+
+	src = (u8*)arec + arec->length;
+	dst = src + (attr_new - attr_orig);
+	end = (u8*)mrec + mft_usage;
+	len  = end - src;
+
+	//printf ("src = %d\n", src - (u8*)mrec);
+	//printf ("dst = %d\n", dst - (u8*)mrec);
+	//printf ("end = %d\n", end - (u8*)mrec);
+	//printf ("len = %d\n", len);
+
+	memmove (dst, src, len);
+	memcpy ((u8*)arec + arec->value_offset, data, data_len);
+
+	mrec->bytes_in_use += (attr_new - attr_orig);
+	arec->length       += (attr_new - attr_orig);
+	arec->value_length += (attr_new - attr_orig);
+
+	memset ((u8*)mrec + mrec->bytes_in_use, 'R', mft_size - mrec->bytes_in_use);
+
+	mft_usage += (attr_new - attr_orig);
+	//utils_dump_mem ((u8*) mrec, 0, mft_size, 1);
+	res = 0;
+done:
+	ntfs_attr_put_search_ctx (ctx);
+	return res;
+}
+
+
+/**
+ * ntfs_dt_remove_alloc
+ */
+static int ntfs_dt_remove_alloc (struct ntfs_dt *dt, int index_num)
 {
 	INDEX_ENTRY *ie = NULL;
 	int i;
@@ -1013,14 +1111,9 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 	int len;
 	s64 res;
 
-	if (!dt)
-		return 1;
-	if ((index_num < 0) || (index_num >= dt->child_count))
-		return 1;
-
-	//printf ("removing entry %d of %d\n", index_num, dt->child_count);
+	//printf ("removing entry %d of %d\n", index_num+1, dt->child_count);
 	//printf ("index size = %d\n", dt->data_len);
-	//printf ("index use  = %d\n", dt->header.index_length);
+	//printf ("index use  = %d\n", dt->header->index_length);
 
 	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
 	//write (2, dt->data, dt->data_len);
@@ -1115,6 +1208,145 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 }
 
 /**
+ * ntfs_dt_remove_root
+ */
+static int ntfs_dt_remove_root (struct ntfs_dt *dt, int index_num)
+{
+	INDEX_ENTRY *ie = NULL;
+	INDEX_ROOT *ir = NULL;
+	int i;
+	u8 *dest;
+	u8 *src;
+	u8 *end;
+	int off;
+	int len;
+	s64 res;
+
+	//printf ("removing entry %d of %d\n", index_num+1, dt->child_count);
+	//printf ("index size = %d\n", dt->data_len);
+	//printf ("index use  = %d\n", dt->header->index_length);
+
+	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
+	//write (2, dt->data, dt->data_len);
+
+	off = (u8*)dt->children[0] - dt->data;
+	for (i = 0; i < dt->child_count; i++) {
+		ie = dt->children[i];
+
+		//printf ("%2d  %4d ", i+1, off);
+		off += ie->length;
+
+		if (ie->flags & INDEX_ENTRY_END) {
+			//printf ("END (%d)\n", ie->length);
+			break;
+		}
+
+		//ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length);
+		//printf (" (%d)\n", ie->length);
+	}
+	//printf ("total = %d\n", off);
+
+	ie = dt->children[index_num];
+	dest = (u8*)ie;
+
+	src  = dest + ie->length;
+
+	ie = dt->children[dt->child_count-1];
+	end = (u8*)ie + ie->length;
+	
+	len  = end - src;
+
+	//printf ("move %d bytes\n", len);
+	//printf ("%d, %d, %d\n", dest - dt->data, src - dt->data, len);
+	memmove (dest, src, len);
+
+	dt->data_len -= (src - dt->data - sizeof (INDEX_ROOT));
+	dt->child_count--;
+
+	ir = (INDEX_ROOT*) dt->data;
+	ir->index.index_length   = dt->data_len - 16;
+	ir->index.allocated_size = dt->data_len - 16;
+
+	ntfs_mft_resize_resident (dt->dir->inode, AT_INDEX_ROOT, I30, 4, dt->data, dt->data_len);
+	dt->data = realloc (dt->data, dt->data_len);
+
+	//printf ("ih->index_length   = %d\n", ir->index.index_length);
+	//printf ("ih->allocated_size = %d\n", ir->index.allocated_size);
+	//printf ("dt->data_len       = %d\n", dt->data_len);
+
+	//utils_dump_mem (dt->data, 0, dt->data_len, 1);
+	//ntfs_dt_print (dt->dir->index, 0);
+#if 1
+	for (i = 0; i < dt->child_count; i++) {
+		if (dt->sub_nodes[i]) {
+			printf ("this shouldn't happen %p\n", dt->sub_nodes[i]);
+			ntfs_dt_free (dt->sub_nodes[i]);	// shouldn't be any, yet
+		}
+	}
+
+	free (dt->sub_nodes);
+	dt->sub_nodes = NULL;
+	free (dt->children);
+	dt->children = NULL;
+	dt->child_count = 0;
+
+	//printf ("before = %d\n", dt->header->index_length + 24);
+	dt->header->index_length -= src - dest;
+	//printf ("after  = %d\n", dt->header->index_length + 24);
+
+	ntfs_dt_count_root (dt);
+#endif
+	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
+	//write (2, dt->data, dt->data_len);
+
+#if 0
+	//printf ("\n");
+	//printf ("index size = %d\n", dt->data_len);
+	//printf ("index use  = %d\n", dt->header.index_length);
+
+	off = (u8*)dt->children[0] - dt->data;
+	for (i = 0; i < dt->child_count; i++) {
+		ie = dt->children[i];
+
+		printf ("%2d  %4d ", i, off);
+		off += ie->length;
+
+		if (ie->flags & INDEX_ENTRY_END) {
+			printf ("END (%d)\n", ie->length);
+			break;
+		}
+
+		ntfs_name_print (ie->key.file_name.file_name,
+				 ie->key.file_name.file_name_length);
+		printf (" (%d)\n", ie->length);
+	}
+#endif
+	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
+
+	res = ntfs_mft_record_write (dt->dir->inode->vol, dt->dir->inode->mft_no, dt->dir->inode->mrec);
+	printf ("res = %lld\n", res);
+
+	return 0;
+}
+
+/**
+ * ntfs_dt_remove
+ */
+static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
+{
+	if (!dt)
+		return 1;
+	if ((index_num < 0) || (index_num >= dt->child_count))
+		return 1;
+
+	if (dt->parent)
+		return ntfs_dt_remove_alloc (dt, index_num);
+	else
+		return ntfs_dt_remove_root (dt, index_num);
+}
+
+
+/**
  * ntfs_dt_del_child
  */
 static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
@@ -1150,10 +1382,12 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
+	/*
 	if (!del->parent) {
 		printf ("has 0xA0, but isn't in use\n");
 		goto close;
 	}
+	*/
 
 	ie = del->children[index_num];
 	if (ie->key.file_name.file_attributes & FILE_ATTR_DIRECTORY) {
@@ -1180,12 +1414,6 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 
 	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
 		arec = ctx->attr;
-		/*
-		if (arec->non_resident) {
-			printf ("can't delete non-resident files\n");
-			goto close;
-		}
-		*/
 		if (arec->type == AT_ATTRIBUTE_LIST) {
 			printf ("can't delete files with an attribute list\n");
 			goto close;
@@ -1212,13 +1440,15 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
+	/*
 	attr = ntfs_attr_open (iparent, AT_INDEX_ALLOCATION, I30, 4);
 	if (!attr) {
 		printf ("parent doesn't have 0xA0\n");
 		goto close;
 	}
+	*/
 
-	printf ("deleting file\n");
+	//printf ("deleting file\n");
 	//ntfs_dt_print (del->dir->index_num, 0);
 
 	if (1) res = utils_free_non_residents (ichild);
@@ -1234,7 +1464,6 @@ close:
 
 	return res;
 }
-
 
 /**
  * ntfsrm
@@ -1256,7 +1485,7 @@ static int ntfsrm (ntfs_volume *vol, char *name)
 
 	mft_num = utils_pathname_to_mftref (vol, dir, name, &finddir);
 	//printf ("mft_num = %lld\n", mft_num);
-	//ntfs_print_dir (finddir);
+	//ntfs_dir_print (finddir, 0);
 
 	if (rindex (name, PATH_SEP))
 		name = rindex (name, PATH_SEP) + 1;
