@@ -45,6 +45,7 @@ libntfs_la_SOURCES =	\
 	dir.c		\
 	disk_io.c	\
 	inode.c		\
+	lcnalloc.c	\
 	mft.c		\
 	mst.c		\
 	runlist.c	\

@@ -17,6 +17,7 @@ linux_ntfsinclude_HEADERS = \
 	endians.h	\
 	inode.h		\
 	layout.h	\
+	lcnalloc.h	\
 	list.h		\
 	logfile.h	\
 	mft.h		\
