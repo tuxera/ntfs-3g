@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright 2002-2004 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Feb 2004" "ntfsprogs @VERSION@"
+.TH NTFSRESIZE 8 "Mar 2004" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
@@ -101,9 +101,9 @@ By using this option ntfsresize will determine the theoretically smallest
 shrunken filesystem size supported. Most of the time the result is the space 
 already used on the filesystem. Ntfsresize will refuse shrinking to a 
 smaller size than what you got by this option and depending on several 
-factors it might be unable to shrink very close to this theoretically 
-size. Although the integrity of your data should be never in risk in 
-any case, it's recommended to make a test run using the
+factors it might be unable to shrink very close to this theoretical
+size. Although the integrity of your data should be never in risk,
+it's still strongly recommended to make a test run by using the
 .B --no-action
 option before real resizing. 
 
@@ -161,9 +161,11 @@ but the mailing list is moderated and it can take some time
 to approve your post. 
 .PP
 There are some very rarely met limitations at present: filesystems having 
-bad sectors, highly fragmented Master File Table (MFT) and relocation 
-of the first MFT extent aren't supported yet. These cases are 
-detected and resizing is refused or restricted to a safe size.
+bad sectors, highly fragmented Master File Table (MFT), relocation 
+of the first MFT extent and resizing in the middle of some metadata
+in some cases aren't supported yet. These cases are detected and 
+resizing is refused, restricted to a safe size or the closest safe 
+size is displayed.
 .PP
 .B ntfsresize
 schedules an NTFS consistency check and
