@@ -32,7 +32,7 @@
 #include "attrib.h"
 #include "mft.h"
 #include "bootsect.h"
-#include "disk_io.h"
+#include "device.h"
 #include "debug.h"
 #include "inode.h"
 #include "runlist.h"
@@ -944,7 +944,7 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 	struct ntfs_device *dev;
 
 	/* Allocate an ntfs_device structure. */
-	dev = ntfs_device_alloc(name, 0, &ntfs_device_disk_io_ops, NULL);
+	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev)
 		return NULL;
 	/* Call ntfs_device_mount() to do the actual mount. */

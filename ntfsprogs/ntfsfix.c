@@ -55,7 +55,6 @@
 #include "types.h"
 #include "attrib.h"
 #include "mft.h"
-#include "disk_io.h"
 #include "device.h"
 #include "logfile.h"
 
@@ -126,7 +125,7 @@ int main(int argc, char **argv)
 
 	printf("Attempting to correct errors... ");
 
-	dev = ntfs_device_alloc(argv[1], 0, &ntfs_device_disk_io_ops, NULL);
+	dev = ntfs_device_alloc(argv[1], 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev) {
 		puts(FAILED);
 		perror("Failed to allocate device");

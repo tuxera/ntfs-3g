@@ -90,7 +90,6 @@
 
 #include "types.h"
 #include "bootsect.h"
-#include "disk_io.h"
 #include "device.h"
 #include "attrib.h"
 #include "bitmap.h"
@@ -2555,7 +2554,7 @@ int main(int argc, char **argv)
 	 * the volume.
 	 */
 	if (!(vol->dev = ntfs_device_alloc(dev_name, 0,
-			&ntfs_device_disk_io_ops, NULL)))
+			&ntfs_device_default_io_ops, NULL)))
 		err_exit("Could not allocate memory for internal buffer.\n");
 	/* Open the device for reading or reading and writing. */
 	if (opts.no_action) {
