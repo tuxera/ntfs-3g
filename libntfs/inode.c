@@ -108,6 +108,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_inode *ni;
 	ntfs_attr_search_ctx *ctx;
 	int err = 0;
+	STANDARD_INFORMATION *std_info;
 
 	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
 	if (!vol) {
@@ -125,6 +126,22 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		goto err_out;
+	/* Receive some basic information about inode. */
+	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
+				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		err = errno;
+		Dprintf("%s(): Failed to receive STANDARD_INFORMATION "
+				"attribute.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
+			le16_to_cpu(ctx->attr->value_offset));
+	if (std_info->file_attributes & FILE_ATTR_COMPRESSED)
+		NInoSetCompressed(ni);
+	if (std_info->file_attributes & FILE_ATTR_ENCRYPTED)
+		NInoSetEncrypted(ni);
+	if (std_info->file_attributes & FILE_ATTR_SPARSE_FILE)
+		NInoSetSparse(ni);
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT)
