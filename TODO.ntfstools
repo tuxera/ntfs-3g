@@ -48,13 +48,12 @@ High priority
   - support fragmented volumes
   - recovery support, journaling
   - test suite
-  - man page
 
 Medium priority 
-  - easy usage by partitioning tools
-  - move useful things to libntfs
-  - meaningful error codes at exit()
-  - cleanup at exit()
+  - easy usage by partitioning tools:
+  	- move useful things to libntfs
+  	- extended error codes at exit()
+  	- cleanup at exit()
   - quiet operation 
 
 Low priority
