@@ -195,6 +195,8 @@
 	  new code in itself which needs a lot of testing!
 	- Fix library to never issue writes on volumes that have been mounted
 	  read-only.
+	- New API provided by mft.[hc]:
+		ntfs_mft_record_{alloc,free}(). -- WIP
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
