@@ -251,7 +251,7 @@ u64 meta_space (ntfs_volume *vol)
  */
 int info (ntfs_volume *vol)
 {
-	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n;
+	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q;
 	int cps;
 	u64 fs, us, ms;
 
@@ -265,30 +265,36 @@ int info (ntfs_volume *vol)
 	c = 1 << cps;
 	d = vol->nr_clusters >> cps;
 	e = vol->nr_clusters;
-	f = fs / a;
-	g = fs / b;
-	h = fs * 100 / a / d;
-	i = us / a;
-	j = us / b;
-	k = us * 100 / a / d;
-	l = ms / a;
-	m = ms / b;
-	n = ms * 100 / a / d;
+	f = vol->nr_mft_records;
+	g = 0;
+	h = 0;
+	i = fs / a;
+	j = fs / b;
+	k = fs * 100 / a / d;
+	l = us / a;
+	m = us / b;
+	n = us * 100 / a / d;
+	o = ms / a;
+	p = ms / b;
+	q = ms * 100 / a / d;
 
 	printf ("bytes per sector       : %lld\n", a);
 	printf ("bytes per cluster      : %lld\n", b);
 	printf ("sectors per cluster    : %lld\n", c);
 	printf ("sectors per volume     : %lld\n", d);
 	printf ("clusters per volume    : %lld\n", e);
-	printf ("sectors of free space  : %lld\n", f);
-	printf ("clusters of free space : %lld\n", g);
-	printf ("percentage free space  : %lld\n", h);
-	printf ("sectors of user data   : %lld\n", i);
-	printf ("clusters of user data  : %lld\n", j);
-	printf ("percentage user data   : %lld\n", k);
-	printf ("sectors of metadata    : %lld\n", l);
-	printf ("clusters of metadata   : %lld\n", m);
-	printf ("percentage metadata    : %lld\n", n);
+	printf ("mft records total      : %lld\n", f);
+	printf ("mft records in use     : %lld\n", g);
+	printf ("mft records percentage : %lld\n", h);
+	printf ("sectors of free space  : %lld\n", i);
+	printf ("clusters of free space : %lld\n", j);
+	printf ("percentage free space  : %lld\n", k);
+	printf ("sectors of user data   : %lld\n", l);
+	printf ("clusters of user data  : %lld\n", m);
+	printf ("percentage user data   : %lld\n", n);
+	printf ("sectors of metadata    : %lld\n", o);
+	printf ("clusters of metadata   : %lld\n", p);
+	printf ("percentage metadata    : %lld\n", q);
 
 	return 0;
 }
@@ -472,4 +478,5 @@ int main (int argc, char *argv[])
 	ntfs_umount (vol, FALSE);
 	return result;
 }
+
 
