@@ -4,9 +4,9 @@
 
 - write attribute resize function (see mkntfs) and implement ntfs_truncate*
 
-- write ntfs_cluster_{allocate,free} (see ntfs 2.4 driver in CVS)
+- write ntfs_cluster_allocate() (see ntfs 2.4 driver in CVS)
 
-- write ntfs_mft_record_{allocate,free} (see ntfs 2.4 driver in CVS)
+- write ntfs_mft_record_{allocate,free}() (see ntfs 2.4 driver in CVS)
 
 - add read of compressed attributes
 
