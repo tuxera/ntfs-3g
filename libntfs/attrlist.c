@@ -22,17 +22,24 @@
 
 #include "config.h"
 
+#include <errno.h>
+
 #include "types.h"
 #include "layout.h"
 #include "attrib.h"
 #include "attrlist.h"
 
 /**
- * ntfs_ - .
- * @:	.
+ * ntfs_attrlist_entry_rm - remove an attribute list attribute entry
+ * @ctx:	attribute search context describing the attrubute list entry
  *
- * .
+ * Remove the attribute list entry @ctx->al_entry from the attribute list
+ * attribute of the base mft record to which the attribute @ctx->attr belongs.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
  */
-static void ntfs_something_or_other(void)
+int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 {
+	errno = ENOTSUP;
+	return -1;
 }
