@@ -1,6 +1,6 @@
 /*
  * lcnalloc.h - Exports for cluster (de)allocation. Part of the Linux-NTFS
- * 		project.
+ *		project.
  *
  * Copyright (c) 2002 Anton Altaparmakov
  *

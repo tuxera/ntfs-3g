@@ -58,7 +58,7 @@
 
 #define test_and_clear_bit(bit, var)			\
 ({							\
- 	const BOOL old_state = test_bit(bit, var);	\
+	const BOOL old_state = test_bit(bit, var);	\
 	clear_bit(bit, var);				\
 	old_state;					\
 })

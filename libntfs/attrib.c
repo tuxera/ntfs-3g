@@ -2283,8 +2283,8 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	// TODO: update the attribute list attribute in ni->attr_list, removing
 	//	 all entries corresponding to deleted attributes
 	// TODO: if the attribute list attribute is resident:
-	// 		TODO: update the actual attribute in the base mft
-	// 			record from ni->attr_list
+	//		TODO: update the actual attribute in the base mft
+	//			record from ni->attr_list
 	//	 if the attribute list attribute is not resident:
 	//		TODO: update the attribute list attribute run list in
 	//			ni->attr_list_rl, freeing any no longer used
