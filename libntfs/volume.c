@@ -38,14 +38,28 @@
 #include "runlist.h"
 
 /**
- * Internal:
- *
- * __ntfs_volume_allocate -
+ * ntfs_volume_alloc -
  *
  */
-static ntfs_volume *__ntfs_volume_allocate(void)
+ntfs_volume *ntfs_volume_alloc(void)
 {
-	return (ntfs_volume*)calloc(1, sizeof(ntfs_volume));
+	ntfs_volume *vol;
+
+	vol = (ntfs_volume*)calloc(1, sizeof(ntfs_volume));
+	if (vol) {
+		vol->dev = NULL;
+		vol->vol_name = NULL;
+		vol->lcnbmp_ni = NULL;
+		vol->lcnbmp_na = NULL;
+		vol->mft_ni = NULL;
+		vol->mft_na = NULL;
+		vol->mftbmp_na = NULL;
+		vol->mftmirr_ni = NULL;
+		vol->mftmirr_na = NULL;
+		vol->upcase = NULL;
+		vol->attrdef = NULL;
+	}
+	return vol;
 }
 
 /**
@@ -385,7 +399,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 	const char *OK = "OK";
 	const char *FAILED = "FAILED";
 	ntfs_volume *vol;
-	NTFS_BOOT_SECTOR *bs = NULL;
+	NTFS_BOOT_SECTOR *bs;
 	int eo;
 #ifdef DEBUG
 	BOOL debug = 1;
@@ -398,23 +412,23 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 		return NULL;
 	}
 
-	/* Allocate the volume structure. */
-	vol = __ntfs_volume_allocate();
-	if (!vol)
-		return NULL;
-	/* Attach the device to the volume. */
-	vol->dev = dev;
-	if (rwflag & MS_RDONLY)
-		NVolSetReadOnly(vol);
 	/* Allocate the boot sector structure. */
 	if (!(bs = (NTFS_BOOT_SECTOR *)malloc(sizeof(NTFS_BOOT_SECTOR))))
+		return NULL;
+	/* Allocate the volume structure. */
+	vol = ntfs_volume_alloc();
+	if (!vol)
 		goto error_exit;
+	if (rwflag & MS_RDONLY)
+		NVolSetReadOnly(vol);
 	Dprintf("Reading bootsector... ");
 	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
 		Dputs(FAILED);
 		Dperror("Error opening partition device");
 		goto error_exit;
 	}
+	/* Attach the device to the volume. */
+	vol->dev = dev;
 	/* Now read the bootsector. */
 	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
 	if (br != sizeof(NTFS_BOOT_SECTOR)) {
@@ -538,8 +552,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 	return vol;
 error_exit:
 	eo = errno;
-	if (bs)
-		free(bs);
+	free(bs);
 	if (vol)
 		__ntfs_volume_release(vol);
 	errno = eo;
@@ -896,14 +909,10 @@ error_exit:
 		free(m);
 	if (m2)
 		free(m2);
-	if (vol)
-		__ntfs_volume_release(vol);
+	__ntfs_volume_release(vol);
 	errno = eo;
 	return NULL;
 }
-
-/* External declaration for internal structure. */
-extern struct ntfs_device_operations ntfs_device_disk_io_ops;
 
 /**
  * ntfs_mount - open ntfs volume
@@ -938,9 +947,43 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
 	dev = ntfs_device_alloc(name, 0, &ntfs_device_disk_io_ops, NULL);
 	if (!dev)
 		return NULL;
-
 	/* Call ntfs_device_mount() to do the actual mount. */
 	return ntfs_device_mount(dev, rwflag);
+}
+
+/**
+ * ntfs_device_umount - close ntfs volume
+ * @vol: address of ntfs_volume structure of volume to close
+ * @force: if true force close the volume even if it is busy
+ *
+ * Deallocate all structures (including @vol itself) associated with the ntfs
+ * volume @vol.
+ *
+ * Note it is up to the caller to destroy the device associated with the volume
+ * being unmounted after this function returns.
+ *
+ * Return 0 on success. On error return -1 with errno set appropriately
+ * (most likely to one of EAGAIN, EBUSY or EINVAL). The EAGAIN error means that
+ * an operation is in progress and if you try the close later the operation
+ * might be completed and the close succeed.
+ *
+ * If @force is true (i.e. not zero) this function will close the volume even
+ * if this means that data might be lost.
+ *
+ * @vol must have previously been returned by a call to ntfs_device_mount().
+ *
+ * @vol itself is deallocated and should no longer be dereferenced after this
+ * function returns success. If it returns an error then nothing has been done
+ * so it is safe to continue using @vol.
+ */
+int ntfs_device_umount(ntfs_volume *vol, const BOOL force)
+{
+	if (!vol) {
+		errno = EINVAL;
+		return -1;
+	}
+	__ntfs_volume_release(vol);
+	return 0;
 }
 
 /**
@@ -949,8 +992,7 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
  * @force: if true force close the volume even if it is busy
  *
  * Deallocate all structures (including @vol itself) associated with the ntfs
- * volume @vol. Can be used on volumes mounted with ntfs_mount() as well as
- * with volumes mounted with ntfs_device_mount().
+ * volume @vol.
  *
  * Return 0 on success. On error return -1 with errno set appropriately
  * (most likely to one of EAGAIN, EBUSY or EINVAL). The EAGAIN error means that
@@ -968,11 +1010,15 @@ ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag)
  */
 int ntfs_umount(ntfs_volume *vol, const BOOL force)
 {
+	struct ntfs_device *dev;
+
 	if (!vol) {
 		errno = EINVAL;
 		return -1;
 	}
+	dev = vol->dev;
 	__ntfs_volume_release(vol);
+	ntfs_device_free(dev);
 	return 0;
 }
 
