@@ -41,8 +41,9 @@ static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,     FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
+GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
+GEN_PRINTF (Printf,  stderr, NULL,          FALSE)
 
 /**
  * version - Print version information about the program
@@ -53,10 +54,10 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	printf ("\n%s v%s - Concatenate files and print on the standard output.\n\n",
+	Printf ("\n%s v%s - Concatenate files and print on the standard output.\n\n",
 		EXEC_NAME, VERSION);
-	printf ("Copyright (c) 2003 Richard Russon\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	Printf ("Copyright (c) 2003 Richard Russon\n");
+	Printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -68,7 +69,7 @@ void version (void)
  */
 void usage (void)
 {
-	printf ("\nUsage: %s [options] device file\n"
+	Printf ("\nUsage: %s [options] device file\n"
 		"    -f  --force      Use less caution\n"
 		"    -h  --help       Print this help\n"
 		"    -q  --quiet      Less output\n"
@@ -80,7 +81,7 @@ void usage (void)
 		//"    -N  --name       Display this attribute name",
 		//"    -r  --raw        Display the compressed or encrypted file",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -231,13 +232,13 @@ int main (int argc, char *argv[])
 
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
-		printf ("!vol\n");
+		Printf ("!vol\n");
 		return 1;
 	}
 
 	inode = utils_pathname_to_inode (vol, NULL, opts.file);
 	if (!inode) {
-		printf ("!inode\n");
+		Printf ("!inode\n");
 		return 1;
 	}
 
@@ -246,9 +247,9 @@ int main (int argc, char *argv[])
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);
 	if (result)
-		;//printf ("failed\n");
+		;//Printf ("failed\n");
 	else
-		;//printf ("success\n");
+		;//Printf ("success\n");
 	return result;
 }
 
