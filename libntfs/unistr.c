@@ -255,6 +255,37 @@ u32 ntfs_ucsnlen(const ntfschar *s, u32 maxlen)
 }
 
 /**
+ * ntfs_ucsndup - duplicate little endian Unicode string
+ * @s:		pointer to Unicode string
+ * @maxlen:	maximum length of string @s
+ *
+ * Return a pointer to a new little endian Unicode string which is a duplicate
+ * of the string s.  Memory for the new string is obtained with malloc(3), and
+ * can be freed with free(3).
+ *
+ * A maximum of @maxlen Unicode characters are copied and a terminating
+ * (ntfschar)'\0' little endian Unicode character is added.
+ *
+ * This function never looks beyond @s + @maxlen.
+ *
+ * Return a pointer to the new little endian Unicode string on success and NULL
+ * on failure with errno set to the error code.
+ */
+ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
+{
+	ntfschar *dst;
+	u32 len;
+
+	len = ntfs_ucsnlen(s, maxlen);
+	dst = malloc((len + 1) * sizeof(ntfschar));
+	if (dst) {
+		memcpy(dst, s, len * sizeof(ntfschar));
+		dst[len] = cpu_to_le16(L'\0');
+	}
+	return dst;
+}
+
+/**
  * ntfs_name_upcase
  */
 void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,

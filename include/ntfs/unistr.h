@@ -44,6 +44,8 @@ extern int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
 
 extern u32 ntfs_ucsnlen(const ntfschar *s, u32 maxlen);
 
+extern ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen);
+
 extern void ntfs_name_upcase(ntfschar *name, u32 name_len,
 		const ntfschar *upcase, const u32 upcase_len);
 
