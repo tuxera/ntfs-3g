@@ -426,7 +426,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			NInoAttrListTestAndClearDirty(ni)) {
 		ntfs_attr *na;
 
-		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, 0, 0);
+		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
 		if (!na) {
 			if (!err || errno == EIO) {
 				err = errno;
@@ -694,7 +694,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	if (size <= freed)
 		return 0;
 
-	ctx = ntfs_attr_get_search_ctx(ni, 0);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
 		Dprintf("%s(): Failed to get attribute search context.\n",

@@ -3280,7 +3280,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	}
 
 	/* Try to make other attributes non-resident and retry each time. */
-	ntfs_attr_init_search_ctx(ctx, 0, na->ni->mrec);
+	ntfs_attr_init_search_ctx(ctx, NULL, na->ni->mrec);
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		ntfs_attr *tna;
 		ATTR_RECORD *a;
@@ -3343,7 +3343,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	 */
 
 	/* Point search context back to attribute which we need resize. */
-	ntfs_attr_init_search_ctx(ctx, na->ni, 0);
+	ntfs_attr_init_search_ctx(ctx, na->ni, NULL);
 	if (ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
 			0, NULL, 0, ctx)) {
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
@@ -3645,7 +3645,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 	else
 		base_ni = na->ni;
 
-	ctx = ntfs_attr_get_search_ctx(base_ni, 0);
+	ctx = ntfs_attr_get_search_ctx(base_ni, NULL);
 	if (!ctx) {
 		err = errno;
 		Dprintf("%s(): Couldn't get search context.\n", __FUNCTION__);

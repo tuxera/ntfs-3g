@@ -158,7 +158,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			break;
 		err = ntfs_names_collate(ale->name, ale->name_length,
 			(ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset)),
-			attr->name_length, -2, CASE_SENSITIVE, 0, 0);
+			attr->name_length, -2, CASE_SENSITIVE, NULL, 0);
 		if (err == -2) {
 			err = EIO;
 			Dprintf("%s(): Corrupt attribute name. Run chkdsk.\n",
