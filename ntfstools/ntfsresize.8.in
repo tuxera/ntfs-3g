@@ -7,7 +7,7 @@ ntfsresize \- resize an NTFS filesystem
 .SH SYNOPSIS
 .B ntfsresize
 [\fB\-fhin\fR]
-[\fB\-s	\fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
+[\fB\-s \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
 .I device
 .SH DESCRIPTION
 The
