@@ -1,7 +1,7 @@
 /**
  * ntfsundelete - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -52,7 +52,6 @@
 #include "utils.h"
 #include "debug.h"
 
-static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
 static const char *UNNAMED   = "<unnamed>";
@@ -75,14 +74,11 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	Qprintf ("%s v%s Copyright (C) 2002 %s\nRecover deleted files from an "
-		"NTFS Volume\n\n%s is free software, released under the GNU "
-		"General Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
-		"WARRANTY; for details read the GNU\nGeneral Public License "
-		"to be found in the file COPYING in the main\nLinux-NTFS "
-		"distribution directory.\n\n",
-		EXEC_NAME, VERSION, AUTHOR, EXEC_NAME, EXEC_NAME);
+	printf ("\n%s v%s - Recover deleted files from an NTFS Volume.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -94,7 +90,7 @@ void version (void)
  */
 void usage (void)
 {
-	Qprintf ("Usage: %s [options] device\n"
+	printf ("\nUsage: %s [options] device\n"
 		"    -s          --scan             Scan for files (default)\n"
 		"    -p num      --percentage num   Minimum percentage recoverable\n"
 		"    -m pattern  --match pattern    Only work on files with matching names\n"
@@ -115,7 +111,7 @@ void usage (void)
 		"    -V          --version          Display version information\n"
 		"    -h          --help             Display this help\n\n",
 		EXEC_NAME);
-	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -272,7 +268,7 @@ int parse_time (const char *value, time_t *since)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fhm:o:p:sS:t:u:qvV";
+	static const char *sopt = "-b:Cc:d:fh?m:o:p:sS:t:u:qvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
@@ -349,6 +345,7 @@ int parse_options (int argc, char *argv[])
 			opts.force++;
 			break;
 		case 'h':
+		case '?':
 			help++;
 			break;
 		case 'm':
@@ -436,7 +433,8 @@ int parse_options (int argc, char *argv[])
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
-			Eprintf ("You must specify exactly one device.\n");
+			if (argc > 1)
+				Eprintf ("You must specify exactly one device.\n");
 			err++;
 		}
 
@@ -1653,10 +1651,10 @@ int main (int argc, char *argv[])
 	ntfs_volume *vol;
 	int result = 1;
 
-	utils_set_locale();
-
 	if (!parse_options (argc, argv))
 		goto free;
+
+	utils_set_locale();
 
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol)

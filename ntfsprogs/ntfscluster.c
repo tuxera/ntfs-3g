@@ -1,7 +1,7 @@
 /**
  * ntfscluster - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will locate the owner of any given sector or cluster.
  *
@@ -34,7 +34,6 @@
 #include "volume.h"
 #include "debug.h"
 
-static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfscluster";
 static struct options opts;
 
@@ -51,14 +50,11 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	Qprintf ("%s v%s Copyright (C) 2002 %s\n***XXX***on "
-		"an NTFS Volume\n\n%s is free software, released under the GNU "
-		"General Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
-		"WARRANTY; for details read the GNU\nGeneral Public License "
-		"to be found in the file COPYING in the main\nLinux-NTFS "
-		"distribution directory.\n\n",
-		EXEC_NAME, VERSION, AUTHOR, EXEC_NAME, EXEC_NAME);
+	printf ("\n%s v%s - Find the owner of any given sector or cluster.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -70,7 +66,7 @@ void version (void)
  */
 void usage (void)
 {
-	Qprintf ("Usage: %s [options] device\n"
+	printf ("\nUsage: %s [options] device\n"
 		"    -i        --info           Print information about the volume\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
 		"    -s range  --sector range   Look for objects in this range of sectors\n"
@@ -82,7 +78,7 @@ void usage (void)
 		"    -V        --version        Version information\n"
 		"    -h        --help           Print this help\n\n",
 		EXEC_NAME);
-	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -96,7 +92,7 @@ void usage (void)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-c:fhiqs:vV"; // l
+	static const char *sopt = "-c:fh?iqs:vV"; // l
 	static const struct option lopt[] = {
 		{ "cluster",	required_argument,	NULL, 'c' },
 		{ "force",	no_argument,		NULL, 'f' },
@@ -143,6 +139,7 @@ int parse_options (int argc, char **argv)
 			opts.force++;
 			break;
 		case 'h':
+		case '?':
 			help++;
 			break;
 		case 'i':
@@ -196,7 +193,8 @@ int parse_options (int argc, char **argv)
 			opts.quiet = 0;
 
 		if (opts.device == NULL) {
-			Eprintf ("You must specify exactly one device.\n");
+			if (argc > 1)
+				Eprintf ("You must specify exactly one device.\n");
 			err++;
 		}
 
@@ -211,7 +209,7 @@ int parse_options (int argc, char **argv)
 		} else if (opts.range_begin > opts.range_end) {
 			Eprintf ("The range must be in ascending order.\n");
 			err++;
-		} 
+		}
 	}
 
 	if (ver)

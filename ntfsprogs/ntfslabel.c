@@ -60,12 +60,12 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	printf ("\n%s v%s - Display, or set, the label for an NTFS Volume\n\n",
+	printf ("\n%s v%s - Display, or set, the label for an NTFS Volume.\n\n",
 		EXEC_NAME, VERSION);
 	printf ("Copyright (c)\n");
-	printf ("\tMatthew J. Fanto\n");
-	printf ("\tAnton Altaparmakov\n");
-	printf ("\tRichard Russon\n");
+	printf ("    2002      Matthew J. Fanto\n");
+	printf ("    2002      Anton Altaparmakov\n");
+	printf ("    2002-2003 Richard Russon\n");
 	printf ("\n%s\n\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -100,7 +100,7 @@ void usage (void)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fhnqvV";
+	static const char *sopt = "-fh?nqvV";
 	static const struct option lopt[] = {
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
@@ -132,6 +132,7 @@ int parse_options (int argc, char *argv[])
 			opts.force++;
 			break;
 		case 'h':
+		case '?':
 			help++;
 			break;
 		case 'n':
@@ -337,10 +338,10 @@ int main(int argc, char **argv)
 	int result = 0;
 	ntfs_volume *vol;
 
-	utils_set_locale();
-
 	if (!parse_options (argc, argv))
 		return 1;
+
+	utils_set_locale();
 
 	//XXX need to set and get mount flags
 	vol = utils_mount_volume (opts.device, 0, opts.force);

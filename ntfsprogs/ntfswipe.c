@@ -1,7 +1,7 @@
 /**
  * ntfswipe - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will overwrite usused space on an NTFS volume.
  *
@@ -39,13 +39,309 @@
 #include "utils.h"
 #include "debug.h"
 
-static const char *AUTHOR    = "Richard Russon (FlatCap)";
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+
+/**
+ * version - Print version information about the program
+ *
+ * Print a copyright statement and a brief description of the program.
+ *
+ * Return:  none
+ */
+void version (void)
+{
+	printf ("\n%s v%s - Overwrite the unused space on an NTFS Volume.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+/**
+ * usage - Print a list of the parameters to the program
+ *
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
+ */
+void usage (void)
+{
+	printf ("\nUsage: %s [options] device\n"
+		"    -i       --info        Show volume information (default)\n"
+		"\n"
+		"    -d       --directory   Wipe directory indexes\n"
+		"    -l       --logfile     Wipe the logfile (journal)\n"
+		"    -m       --mft         Wipe mft space\n"
+		"    -p       --pagefile    Wipe pagefile (swap space)\n"
+		"    -t       --tails       Wipe file tails\n"
+		"    -u       --unused      Wipe unused clusters\n"
+		"\n"
+		"    -a       --all         Wipe all unused space\n"
+		"\n"
+		"    -c num   --count num   Number of times to write (default = 1)\n"
+		"    -b list  --bytes list  List of values to write (default = 0)\n"
+		"\n"
+		"    -n       --no-action   Do not write to disk\n"
+		"    -f       --force       Use less caution\n"
+		"    -q       --quiet       Less output\n"
+		"    -v       --verbose     More output\n"
+		"    -V       --version     Version information\n"
+		"    -h       --help        Print this help\n\n",
+		EXEC_NAME);
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+}
+
+/**
+ * parse_list - Read a comma-separated list of numbers
+ * @list:    The comma-separated list of numbers
+ * @result:  Store the parsed list here (must be freed by caller)
+ *
+ * Read a comma-separated list of numbers and allocate an array of ints to store
+ * them in.  The numbers can be in decimal, octal or hex.
+ *
+ * N.B.  The caller must free the memory returned in @result.
+ * N.B.  If the function fails, @result is not changed.
+ *
+ * Return:  0  Error, invalid string
+ *	    n  Success, the count of numbers parsed
+ */
+int parse_list (const char *list, int **result)
+{
+	const char *ptr;
+	char *end;
+	int i;
+	int count;
+	int *mem = NULL;
+
+	if (!list || !result)
+		return 0;
+
+	for (count = 0, ptr = list; ptr; ptr = strchr (ptr+1, ','))
+		count++;
+
+	mem = malloc ((count+1) * sizeof (int));
+	if (!mem) {
+		Eprintf ("Couldn't allocate memory in parse_list().\n");
+		return 0;
+	}
+
+	memset (mem, 0xFF, (count+1) * sizeof (int));
+
+	for (ptr = list, i = 0; i < count; i++) {
+
+		end = NULL;
+		mem[i] = strtol (ptr, &end, 0);
+
+		if (!end || (end == ptr) || ((*end != ',') && (*end != 0))) {
+			Eprintf ("Invalid list '%s'\n", list);
+			free (mem);
+			return 0;
+		}
+
+		if ((mem[i] < 0) || (mem[i] > 255)) {
+			Eprintf ("Bytes must be in range 0-255.\n");
+			free (mem);
+			return 0;
+		}
+
+		ptr = end + 1;
+	}
+
+	Dprintf ("Parsing list '%s' - ", list);
+	for (i = 0; i <= count; i++)
+		Dprintf ("0x%02x ", mem[i]);
+	Dprintf ("\n");
+
+	*result = mem;
+	return count;
+}
+
+/**
+ * parse_options - Read and validate the programs command line
+ *
+ * Read the command line, verify the syntax and parse the options.
+ * This function is very long, but quite simple.
+ *
+ * Return:  1 Success
+ *	    0 Error, one or more problems
+ */
+int parse_options (int argc, char *argv[])
+{
+	static const char *sopt = "-ab:c:dfh?ilmnpqtuvV";
+	static const struct option lopt[] = {
+		{ "all",	no_argument,		NULL, 'a' },
+		{ "bytes",	required_argument,	NULL, 'b' },
+		{ "count",	required_argument,	NULL, 'c' },
+		{ "directory",	no_argument,		NULL, 'd' },
+		{ "force",	no_argument,		NULL, 'f' },
+		{ "help",	no_argument,		NULL, 'h' },
+		{ "info",	no_argument,		NULL, 'i' },
+		{ "logfile",	no_argument,		NULL, 'l' },
+		{ "mft",	no_argument,		NULL, 'm' },
+		{ "no-action",	no_argument,		NULL, 'n' },
+		{ "pagefile",	no_argument,		NULL, 'p' },
+		{ "quiet",	no_argument,		NULL, 'q' },
+		{ "tails",	no_argument,		NULL, 't' },
+		{ "unused",	no_argument,		NULL, 'u' },
+		{ "verbose",	no_argument,		NULL, 'v' },
+		{ "version",	no_argument,		NULL, 'V' },
+		{ NULL,		0,			NULL, 0   }
+	};
+
+	char c = -1;
+	char *end;
+	int err  = 0;
+	int ver  = 0;
+	int help = 0;
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	opts.count = 1;
+
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!opts.device) {
+				opts.device = argv[optind-1];
+			} else {
+				opts.device = NULL;
+				err++;
+			}
+			break;
+
+		case 'i':
+			opts.info++;		/* and fall through */
+		case 'a':
+			opts.directory++;
+			opts.logfile++;
+			opts.mft++;
+			opts.pagefile++;
+			opts.tails++;
+			opts.unused++;
+			break;
+		case 'b':
+			if (!opts.bytes) {
+				if (!parse_list (argv[optind-1], &opts.bytes))
+					err++;
+			} else {
+				err++;
+			}
+			break;
+		case 'c':
+			if (opts.count == 1) {
+				end = NULL;
+				opts.count = strtol (optarg, &end, 0);
+				if (end && *end)
+					err++;
+			} else {
+				err++;
+			}
+			break;
+		case 'd':
+			opts.directory++;
+			break;
+		case 'f':
+			opts.force++;
+			break;
+		case 'h':
+		case '?':
+			help++;
+			break;
+		case 'l':
+			opts.logfile++;
+			break;
+		case 'm':
+			opts.mft++;
+			break;
+		case 'n':
+			opts.noaction++;
+			break;
+		case 'p':
+			opts.pagefile++;
+			break;
+		case 'q':
+			opts.quiet++;
+			break;
+		case 't':
+			opts.tails++;
+			break;
+		case 'u':
+			opts.unused++;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		case 'V':
+			ver++;
+			break;
+		default:
+			if ((optopt == 'b') || (optopt == 'c')) {
+				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+			} else {
+				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			}
+			err++;
+			break;
+		}
+	}
+
+	if (help || ver) {
+		opts.quiet = 0;
+	} else {
+		if (opts.device == NULL) {
+			if (argc > 1)
+				Eprintf ("You must specify exactly one device.\n");
+			err++;
+		}
+
+		if (opts.quiet && opts.verbose) {
+			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			err++;
+		}
+
+		/*
+		if (opts.info && (opts.unused || opts.tails || opts.mft || opts.directory)) {
+			Eprintf ("You may not use any other options with --info.\n");
+			err++;
+		}
+		*/
+
+		if ((opts.count < 1) || (opts.count > 100)) {
+			Eprintf ("The iteration count must be between 1 and 100.\n");
+			err++;
+		}
+
+		/* Create a default list */
+		if (!opts.bytes) {
+			opts.bytes = malloc (2 * sizeof (int));
+			if (opts.bytes) {
+				opts.bytes[0] =  0;
+				opts.bytes[1] = -1;
+			} else {
+				Eprintf ("Couldn't allocate memory for byte list.\n");
+				err++;
+			}
+		}
+
+		if (!opts.directory && !opts.logfile && !opts.mft &&
+		    !opts.pagefile && !opts.tails && !opts.unused) {
+			opts.info = 1;
+		}
+	}
+
+	if (ver)
+		version();
+	if (help || err)
+		usage();
+
+	return (!err && !help && !ver);
+}
+
 
 /**
  * wipe_unused - Wipe unused clusters
@@ -299,25 +595,25 @@ bmpdone:
 
 	/*
 	 * wipe_unused - volume = n clusters, u unused (%age & MB)
-	 * 	$Bitmap
+	 *	$Bitmap
 	 *	vol->lcnbmp_na
 	 *
 	 * wipe_tails - volume = n files, total tail slack space
-	 * 	$MFT, $DATA
-	 * 	vol->mft_na
+	 *	$MFT, $DATA
+	 *	vol->mft_na
 	 *
 	 * wipe_mft - volume = n mft records, u unused, s total slack space
-	 * 	$MFT, $BITMAP
-	 * 	vol->mftbmp_na
+	 *	$MFT, $BITMAP
+	 *	vol->mftbmp_na
 	 *
 	 * wipe_directory - volume has d dirs, t total slack space
-	 * 	$MFT, $INDEX_ROOT, $INDEX_ALLOC, $BITMAP
+	 *	$MFT, $INDEX_ROOT, $INDEX_ALLOC, $BITMAP
 	 *
 	 * wipe_logfile - logfile is <size>
-	 * 	$MFT, $DATA
+	 *	$MFT, $DATA
 	 *
 	 * wipe_pagefile - pagefile is <size>
-	 * 	$MFT, $DATA
+	 *	$MFT, $DATA
 	 */
 
 	free (buffer);
@@ -340,304 +636,6 @@ bmpdone:
 #endif
 
 	return 1;
-}
-
-
-/**
- * version - Print version information about the program
- *
- * Print a copyright statement and a brief description of the program.
- *
- * Return:  none
- */
-void version (void)
-{
-	Qprintf ("%s v%s Copyright (C) 2002 %s\nOverwrite the unused space on "
-		"an NTFS Volume\n\n%s is free software, released under the GNU "
-		"General Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
-		"WARRANTY; for details read the GNU\nGeneral Public License "
-		"to be found in the file COPYING in the main\nLinux-NTFS "
-		"distribution directory.\n\n",
-		EXEC_NAME, VERSION, AUTHOR, EXEC_NAME, EXEC_NAME);
-}
-
-/**
- * usage - Print a list of the parameters to the program
- *
- * Print a list of the parameters and options for the program.
- *
- * Return:  none
- */
-void usage (void)
-{
-	Qprintf ("Usage: %s [options] device\n"
-		"    -i       --info        Show volume information (default)\n"
-		"\n"
-		"    -d       --directory   Wipe directory indexes\n"
-		"    -l       --logfile     Wipe the logfile (journal)\n"
-		"    -m       --mft         Wipe mft space\n"
-		"    -p       --pagefile    Wipe pagefile (swap space)\n"
-		"    -t       --tails       Wipe file tails\n"
-		"    -u       --unused      Wipe unused clusters\n"
-		"\n"
-		"    -a       --all         Wipe all unused space\n"
-		"\n"
-		"    -c num   --count num   Number of times to write (default = 1)\n"
-		"    -b list  --bytes list  List of values to write (default = 0)\n"
-		"\n"
-		"    -n       --no-action   Do not write to disk\n"
-		"    -f       --force       Use less caution\n"
-		"    -q       --quiet       Less output\n"
-		"    -v       --verbose     More output\n"
-		"    -V       --version     Version information\n"
-		"    -h       --help        Print this help\n\n",
-		EXEC_NAME);
-	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
-}
-
-/**
- * parse_list - Read a comma-separated list of numbers
- * @list:    The comma-separated list of numbers
- * @result:  Store the parsed list here (must be freed by caller)
- *
- * Read a comma-separated list of numbers and allocate an array of ints to store
- * them in.  The numbers can be in decimal, octal or hex.
- *
- * N.B.  The caller must free the memory returned in @result.
- * N.B.  If the function fails, @result is not changed.
- *
- * Return:  0  Error, invalid string
- *	    n  Success, the count of numbers parsed
- */
-int parse_list (const char *list, int **result)
-{
-	const char *ptr;
-	char *end;
-	int i;
-	int count;
-	int *mem = NULL;
-
-	if (!list || !result)
-		return 0;
-
-	for (count = 0, ptr = list; ptr; ptr = strchr (ptr+1, ','))
-		count++;
-
-	mem = malloc ((count+1) * sizeof (int));
-	if (!mem) {
-		Eprintf ("Couldn't allocate memory in parse_list().\n");
-		return 0;
-	}
-
-	memset (mem, 0xFF, (count+1) * sizeof (int));
-
-	for (ptr = list, i = 0; i < count; i++) {
-
-		end = NULL;
-		mem[i] = strtol (ptr, &end, 0);
-
-		if (!end || (end == ptr) || ((*end != ',') && (*end != 0))) {
-			Eprintf ("Invalid list '%s'\n", list);
-			free (mem);
-			return 0;
-		}
-
-		if ((mem[i] < 0) || (mem[i] > 255)) {
-			Eprintf ("Bytes must be in range 0-255.\n");
-			free (mem);
-			return 0;
-		}
-
-		ptr = end + 1;
-	}
-
-	Dprintf ("Parsing list '%s' - ", list);
-	for (i = 0; i <= count; i++)
-		Dprintf ("0x%02x ", mem[i]);
-	Dprintf ("\n");
-
-	*result = mem;
-	return count;
-}
-
-/**
- * parse_options - Read and validate the programs command line
- *
- * Read the command line, verify the syntax and parse the options.
- * This function is very long, but quite simple.
- *
- * Return:  1 Success
- *	    0 Error, one or more problems
- */
-int parse_options (int argc, char *argv[])
-{
-	static const char *sopt = "-ab:c:dfhilmnpqtuvV";
-	static const struct option lopt[] = {
-		{ "all",	no_argument,		NULL, 'a' },
-		{ "bytes",	required_argument,	NULL, 'b' },
-		{ "count",	required_argument,	NULL, 'c' },
-		{ "directory",	no_argument,		NULL, 'd' },
-		{ "force",	no_argument,		NULL, 'f' },
-		{ "help",	no_argument,		NULL, 'h' },
-		{ "info",	no_argument,		NULL, 'i' },
-		{ "logfile",	no_argument,		NULL, 'l' },
-		{ "mft",	no_argument,		NULL, 'm' },
-		{ "no-action",	no_argument,		NULL, 'n' },
-		{ "pagefile",	no_argument,		NULL, 'p' },
-		{ "quiet",	no_argument,		NULL, 'q' },
-		{ "tails",	no_argument,		NULL, 't' },
-		{ "unused",	no_argument,		NULL, 'u' },
-		{ "verbose",	no_argument,		NULL, 'v' },
-		{ "version",	no_argument,		NULL, 'V' },
-		{ NULL,		0,			NULL, 0   }
-	};
-
-	char c = -1;
-	char *end;
-	int err  = 0;
-	int ver  = 0;
-	int help = 0;
-
-	opterr = 0; /* We'll handle the errors, thank you. */
-
-	opts.count = 1;
-
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
-		switch (c) {
-		case 1:	/* A non-option argument */
-			if (!opts.device) {
-				opts.device = argv[optind-1];
-			} else {
-				opts.device = NULL;
-				err++;
-			}
-			break;
-
-		case 'i':
-			opts.info++;		/* and fall through */
-		case 'a':
-			opts.directory++;
-			opts.logfile++;
-			opts.mft++;
-			opts.pagefile++;
-			opts.tails++;
-			opts.unused++;
-			break;
-		case 'b':
-			if (!opts.bytes) {
-				if (!parse_list (argv[optind-1], &opts.bytes))
-					err++;
-			} else {
-				err++;
-			}
-			break;
-		case 'c':
-			if (opts.count == 1) {
-				end = NULL;
-				opts.count = strtol (optarg, &end, 0);
-				if (end && *end)
-					err++;
-			} else {
-				err++;
-			}
-			break;
-		case 'd':
-			opts.directory++;
-			break;
-		case 'f':
-			opts.force++;
-			break;
-		case 'h':
-			help++;
-			break;
-		case 'l':
-			opts.logfile++;
-			break;
-		case 'm':
-			opts.mft++;
-			break;
-		case 'n':
-			opts.noaction++;
-			break;
-		case 'p':
-			opts.pagefile++;
-			break;
-		case 'q':
-			opts.quiet++;
-			break;
-		case 't':
-			opts.tails++;
-			break;
-		case 'u':
-			opts.unused++;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
-		case 'V':
-			ver++;
-			break;
-		default:
-			if ((optopt == 'b') || (optopt == 'c')) {
-				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
-			} else {
-				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
-			}
-			err++;
-			break;
-		}
-	}
-
-	if (help || ver) {
-		opts.quiet = 0;
-	} else {
-		if (opts.device == NULL) {
-			Eprintf ("You must specify exactly one device.\n");
-			err++;
-		}
-
-		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
-			err++;
-		}
-
-		/*
-		if (opts.info && (opts.unused || opts.tails || opts.mft || opts.directory)) {
-			Eprintf ("You may not use any other options with --info.\n");
-			err++;
-		}
-		*/
-
-		if ((opts.count < 1) || (opts.count > 100)) {
-			Eprintf ("The iteration count must be between 1 and 100.\n");
-			err++;
-		}
-
-		/* Create a default list */
-		if (!opts.bytes) {
-			opts.bytes = malloc (2 * sizeof (int));
-			if (opts.bytes) {
-				opts.bytes[0] =  0;
-				opts.bytes[1] = -1;
-			} else {
-				Eprintf ("Couldn't allocate memory for byte list.\n");
-				err++;
-			}
-		}
-
-		if (!opts.directory && !opts.logfile && !opts.mft &&
-		    !opts.pagefile && !opts.tails && !opts.unused) {
-			opts.info = 1;
-		}
-	}
-
-	if (ver)
-		version();
-	if (help || err)
-		usage();
-
-	return (!err && !help && !ver);
 }
 
 
@@ -699,10 +697,10 @@ int main (int argc, char *argv[])
 	int i, j;
 	enum action act = act_info;
 
-	utils_set_locale();
-
 	if (!parse_options (argc, argv))
 		return 1;
+
+	utils_set_locale();
 
 	if (!opts.info)
 		print_summary();

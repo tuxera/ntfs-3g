@@ -36,7 +36,6 @@
 #include "inode.h"
 #include "utils.h"
 
-static const char *AUTHOR    = "Matthew J. Fanto";
 static const char *EXEC_NAME = "ntfsinfo";
 
 static struct options {
@@ -60,14 +59,13 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 void version (void)
 {
-	Qprintf ("%s v%s Copyright (C) 2002 %s\nDisplay information about an "
-		"NTFS Volume\n\n%s is free software, released under the GNU "
-		"General Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
-		"WARRANTY; for details read the GNU\nGeneral Public License "
-		"to be found in the file COPYING in the main\nLinux-NTFS "
-		"distribution directory.\n\n",
-		EXEC_NAME, VERSION, AUTHOR, EXEC_NAME, EXEC_NAME);
+	printf ("\n%s v%s - Display information about an NTFS Volume.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002      Matthew J. Fanto\n");
+	printf ("    2002      Anton Altaparmakov\n");
+	printf ("    2002-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -79,7 +77,7 @@ void version (void)
  */
 void usage (void)
 {
-	Qprintf ("Usage: %s [options] device\n"
+	printf ("\nUsage: %s [options] device\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"\n"
 		"    -f          --force            Use less caution\n"
@@ -88,7 +86,7 @@ void usage (void)
 		"    -V          --version          Display version information\n"
 		"    -h          --help             Display this help\n\n",
 		EXEC_NAME);
-	Qprintf ("Please report bugs to: linux-ntfs-dev@lists.sf.net\n\n");
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -102,7 +100,7 @@ void usage (void)
  */
 int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fhi:qvV";
+	static const char *sopt = "-fh?i:qvV";
 	static const struct option lopt[] = {
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
@@ -142,6 +140,7 @@ int parse_options (int argc, char *argv[])
 			opts.force++;
 			break;
 		case 'h':
+		case '?':
 			help++;
 			break;
 		case 'q':
@@ -168,12 +167,14 @@ int parse_options (int argc, char *argv[])
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
-			Eprintf ("You must specify exactly one device.\n");
+			if (argc > 1)
+				Eprintf ("You must specify exactly one device.\n");
 			err++;
 		}
 
 		if (opts.inode == -1) {
-			Eprintf ("You much specify an inode to learn about.\n");
+			if (argc > 1)
+				Eprintf ("You much specify an inode to learn about.\n");
 			err++;
 		}
 
@@ -313,15 +314,15 @@ int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
 
-	utils_set_locale();
-
 	if (!parse_options (argc, argv))
 		return 1;
+
+	utils_set_locale();
 
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol)
 		return 1;
-	
+
 	ntfs_get_file_attributes (vol, opts.inode);
 
 	ntfs_umount (vol, FALSE);
