@@ -25,7 +25,7 @@
 #   - If the interface is the same as the previous version, change to C:R+1:A
 #
 
-LTVERSION = 5:0:0
+LTVERSION_LIBNTFS = 5:0:0
 LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 
@@ -44,8 +44,9 @@ AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall $(GCCflag)
 endif
 
 linux_ntfsincludedir = -I$(top_srcdir)/include
+
 lib_LTLIBRARIES = libntfs.la
-libntfs_la_LDFLAGS = -version-info $(LTVERSION)
+libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS)
 libntfs_la_SOURCES =	\
 	attrib.c	\
 	bitmap.c	\
@@ -67,6 +68,7 @@ gnomevfsmoduleslibdir = $(libdir)/gnome-vfs-2.0/modules
 gnomevfsmoduleslib_LTLIBRARIES = libntfs-gnomevfs.la
 
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
+libntfs_gnomevfs_la_LIBADD = libntfs.la
 libntfs_gnomevfs_la_SOURCES =	\
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c
