@@ -41,6 +41,7 @@ xx/xx/2004 - 1.9.3-WIP
 	- Bugfix in ntfs_attr_map{_whole_,_}runlist: make it not fail if runlist
 	  already mapped.  (Yura)
 	- Make ntfslabel pay attention to --no-action.  (Yuval)
+	- Several bugfixes in ntfs_cluster_alloc.  (Anton)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
