@@ -21,7 +21,7 @@
 # Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-AC_PREREQ(2.57)
+AC_PREREQ(2.59)
 AC_INIT([ntfsprogs],[1.9.0],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
@@ -50,8 +50,8 @@ fi
 
 # Command-line options.
 AC_ARG_ENABLE(debug,
-	AC_HELP_STRING([--enable-debug],[enable additional debugging code and
-			output]), ,
+	AS_HELP_STRING(--enable-debug,enable additional debugging code and
+			output), ,
 	enable_debug=no
 )
 
@@ -63,23 +63,22 @@ AH_TEMPLATE([NO_NTFS_DEVICE_DEFAULT_IO_OPS],
 	     but have to use ntfs_device_mount() and provide your own device
 	     operations.])
 AC_ARG_ENABLE(default-device-io-ops,
-	AC_HELP_STRING([--disable-default-device-io-ops],
-		       [do not provide default device io operations]),
+	AS_HELP_STRING(--disable-default-device-io-ops,do not provide default
+		       device io operations),
 	if test "$enable_default_device_io_ops" == "no"; then
 		AC_DEFINE(NO_NTFS_DEVICE_DEFAULT_IO_OPS)
 	fi,
 )
 
 AC_ARG_ENABLE(gnome-vfs,
-	AC_HELP_STRING([--disable-gnome-vfs],
-		       [omit Gnome-VFS-2.0 'libntfs' interface
-			(default=detect)]), ,
+	AS_HELP_STRING(--disable-gnome-vfs,omit Gnome-VFS-2.0 'libntfs'
+		       interface [default=detect]), ,
 	enable_gnome_vfs=auto
 )
 
 AC_ARG_ENABLE(really-static,
-	AC_HELP_STRING([--enable-really-static],[create completely static
-			binaries for the utilities]), ,
+	AS_HELP_STRING(--enable-really-static,create completely static
+		       binaries for the utilities), ,
 	enable_really_static=no
 )
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
