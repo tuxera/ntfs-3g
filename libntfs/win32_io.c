@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <errno.h>
 
 /*
  * Cannot use "../include/types.h" since it conflicts with "wintypes.h".
@@ -35,9 +36,9 @@ typedef long long int s64;
 struct flock;
 struct stat;
 
-/*
- * Need device, but prevent ../include/types.h to be loaded.
- */
+#include "config.h"
+
+/* Need device, but prevent ../include/types.h to be loaded. */
 #define _NTFS_TYPES_H
 #include "device.h"
 
@@ -60,24 +61,20 @@ static __inline__ void Dprintf(const char *fmt, ...)
 	va_end(ap);
 }
 #else
-static void Dprintf(const char *fmt, ...)
-{
-}
+static __inline__ void Dprintf(const char *fmt, ...) {}
 #endif
 
 #define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
 
-int
-win32_perror(char *file, int line, char *func, char *msg)
+int win32_perror(char *file, int line, char *func, char *msg)
 {
 	char buffer[1024] = "";
 	DWORD err = GetLastError();
 
 	if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, buffer,
-			sizeof (buffer), NULL) <= 0) {
+			sizeof(buffer), NULL) <= 0)
 		sprintf(buffer, "HRESULT 0x%lx", err);
-	}
-	fprintf(stderr, "%s(%d):%s\t%s %s\n", file, line, func, buffer, msg);
+	fprintf(stderr, "%s(%d): %s\t%s %s\n", file, line, func, buffer, msg);
 	return 0;
 }
 
@@ -117,9 +114,11 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 		if (handle == INVALID_HANDLE_VALUE) {
 			char msg[1024];
+			int err = errno;
 
 			sprintf(msg, "CreateFile(%s) failed", filename);
 			perror(msg);
+			errno = err;
 			return -1;
 		}
 
@@ -139,15 +138,19 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 					&buffer, sizeof (buffer), &numread,
 					NULL);
 			if (!rvl) {
+				int err = errno;
 				perror("ioctl failed");
+				errno = err;
 				return -1;
 			}
 
 			drive_layout = (DRIVE_LAYOUT_INFORMATION *)buffer;
 
 			if (part >= drive_layout->PartitionCount) {
-				printf("partition %d not found on drive %d",
-						part, drive);
+				int err = errno;
+				fprintf(stderr, "partition %d not found on "
+						"drive %d\n", part, drive);
+				errno = err;
 				return -1;
 			}
 
@@ -172,7 +175,9 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 		rvl = GetFileInformationByHandle(handle, &info);
 		if (!rvl) {
+			int err = errno;
 			perror("ioctl failed");
+			errno = err;
 			return -1;
 		}
 
@@ -214,16 +219,25 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	case SEEK_END:
 		/* end of partition != end of disk */
 		disp = FILE_BEGIN;
+		if (fd.part_end.QuadPart == -1) {
+			fprintf(stderr, "win32_seek: position relative to end "
+					"of disk not implemented\n");
+			errno = ENOTSUP;
+			return -1;
+		}
 		abs_offset.QuadPart = fd->part_end.QuadPart + offset;
 		break;
 	default:
 		printf("win32_seek() wrong mode %d\n", whence);
+		errno = EINVAL;
 		return -1;
 	}
 
 	rvl = SetFilePointerEx(fd->handle, abs_offset, &fd->current_pos, disp);
 	if (!rvl) {
+		int err = errno;
 		perror("SetFilePointer failed");
+		errno = err;
 		return -1;
 	}
 
@@ -235,7 +249,7 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
 	LARGE_INTEGER base, offset, numtoread;
 	DWORD numread = 0;
-	BOOL rvl = -1;
+	BOOL rvl;
 
 	offset.QuadPart = fd->current_pos.QuadPart & 0x1FF;
 	base.QuadPart = fd->current_pos.QuadPart - offset.QuadPart;
@@ -251,6 +265,12 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 
 		rvl = ReadFile(fd->handle, (LPVOID)buf, count, &numread,
 				(LPOVERLAPPED)NULL);
+		if (!rvl) {
+			int err = errno;
+			perror("ReadFile failed");
+			errno = err;
+			return -1;
+		}
 	} else {
 		BYTE *alignedbuffer;
 
@@ -265,26 +285,40 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 				PAGE_READWRITE);
 
 		Dprintf("set SetFilePointerEx(%llx)\n", base.QuadPart);
-		// FIXME: Why is rvl not being checked? (AIA)
+
 		rvl = SetFilePointerEx(fd->handle, base, NULL, FILE_BEGIN);
+		if (!rvl) {
+			int err = errno;
+			fprintf(stderr, "SetFilePointerEx failed\n");
+			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
+			errno = err;
+			return -1;
+		}
+
 		rvl = ReadFile(fd->handle, (LPVOID) alignedbuffer,
 				numtoread.QuadPart, &numread,
 				(LPOVERLAPPED)NULL);
-
+		if (!rvl) {
+			int err = errno;
+			fprintf(stderr, "ReadFile failed\n");
+			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
+			errno = err;
+			return -1;
+		}
 		new_pos.QuadPart = fd->current_pos.QuadPart + count;
-
 		Dprintf("reset SetFilePointerEx(%llx)\n", new_pos.QuadPart);
 		rvl = SetFilePointerEx(fd->handle, new_pos, &fd->current_pos,
 				FILE_BEGIN);
-		if (!rvl)
-			printf("SetFilePointerEx failed");
+		if (!rvl) {
+			int err = errno;
+			fprintf(stderr, "SetFilePointerEx failed\n");
+			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
+			errno = err;
+			return -1;
+		}
 
 		memcpy((void *)buf, alignedbuffer + offset.QuadPart, count);
 		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-	}
-	if (!rvl) {
-		perror("ReadFile failed");
-		return -1;
 	}
 
 	if (numread > count)
@@ -305,7 +339,9 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	free(fd);
 
 	if (!rvl) {
+		int err = errno;
 		perror("CloseHandle failed");
+		errno = err;
 		return -1;
 	}
 
@@ -328,36 +364,37 @@ s64 win32_filepos(struct ntfs_device *dev)
 
 static int ntfs_device_win32_sync(struct ntfs_device *dev)
 {
-	Dprintf("win32_fsync() unimplemented\n");
-	// FIXME: Should be returning error, e.g. ENOTSUP. (AIA)
-	return 0;
+	fprintf(stderr, "win32_fsync() unimplemented\n");
+	errno = ENOTSUP;
+	return -1;
 }
 
 static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buffer,
 		s64 count)
 {
-	Dprintf("win32_write() unimplemented\n");
-	// FIXME: Should be setting errno to e.g. ENOTSUP. (AIA)
+	fprintf(stderr, "win32_write() unimplemented\n");
+	errno = ENOTSUP;
 	return -1;
 }
 
 static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 {
-	Dprintf("win32_fstat() unimplemented\n");
-	// FIXME: Should be returning error, e.g. ENOTSUP. (AIA)
+	fprintf(stderr, "win32_fstat() unimplemented\n");
+	errno = ENOTSUP;
 	return 0;
 }
 
 static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 		void *argp)
 {
-	Dprintf("win32_ioctl() unimplemented\n");
-	// FIXME: Should be returning error, e.g. ENOTSUP. (AIA)
+	fprintf(stderr, "win32_ioctl() unimplemented\n");
+	errno = ENOTSUP;
 	return 0;
 }
 
 extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
 		void *b);
+
 static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
 {
@@ -366,6 +403,7 @@ static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *buf,
 
 extern s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		const void *b);
+
 static s64 ntfs_device_win32_pwrite(struct ntfs_device *dev, const void *buf,
 		s64 count, s64 offset)
 {
