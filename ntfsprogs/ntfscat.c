@@ -40,7 +40,7 @@
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,     FALSE)
+GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
 GEN_PRINTF (Printf,  stderr, NULL,          FALSE)
@@ -69,17 +69,17 @@ void version (void)
  */
 void usage (void)
 {
-	Printf ("\nUsage: %s [options] device file\n"
-		"    -f  --force      Use less caution\n"
-		"    -h  --help       Print this help\n"
-		"    -q  --quiet      Less output\n"
-		"    -V  --version    Version information\n"
-		"    -v  --verbose    More output\n\n",
-		//"    -A  --attribute  Display this attribute",
-		//"    -I  --file       Display this file",
-		//"    -F  --inode      Display this inode",
-		//"    -N  --name       Display this attribute name",
-		//"    -r  --raw        Display the compressed or encrypted file",
+	Printf ("\nUsage: %s [options] device [file]\n\n"
+		"    -a, --attribute num   Display this attribute\n"
+		"    -i, --inode num       Display this inode\n\n"
+		"    -f  --force           Use less caution\n"
+		"    -h  --help            Print this help\n"
+		"    -q  --quiet           Less output\n"
+		"    -V  --version         Version information\n"
+		"    -v  --verbose         More output\n\n",
+		//"    -N  --name            Display this attribute name",
+		//"    -F  --file            Display this file",
+		//"    -r  --raw             Display the compressed or encrypted file",
 		EXEC_NAME);
 	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -95,16 +95,16 @@ void usage (void)
  */
 int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-fh?qVv"; // A:F:I:N:
+	static const char *sopt = "-a:fh?i:qVv"; // F:N:
 	static const struct option lopt[] = {
+		{ "attribute",	required_argument,	NULL, 'a' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
+		{ "inode",	required_argument,	NULL, 'i' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "version",	no_argument,		NULL, 'V' },
 		{ "verbose",	no_argument,		NULL, 'v' },
-	//	{ "attribute",	required_argument,	NULL, 'A' },
 	//	{ "file",	required_argument,	NULL, 'F' },
-	//	{ "inode",	required_argument,	NULL, 'I' },
 	//	{ "name",	required_argument,	NULL, 'N' },
 		{ NULL,		0,			NULL, 0   }
 	};
@@ -113,8 +113,12 @@ int parse_options (int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	s64 attr;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
+
+	opts.inode = -1;
+	opts.attr = -1;
 
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
@@ -124,17 +128,36 @@ int parse_options (int argc, char **argv)
 			} else if (!opts.file) {
 				opts.file = argv[optind-1];
 			} else {
-				opts.device = NULL;
-				opts.file   = NULL;
+				Eprintf("You must specify exactly one file.\n");
 				err++;
 			}
 			break;
+		case 'a':
+			if (opts.attr != (ATTR_TYPES)-1)
+				Eprintf("You must specify exactly one attribute.\n");
+			else if (utils_parse_size(argv[optind-1], &attr, FALSE)) {
+				opts.attr = (ATTR_TYPES)attr;
+				break;
+			} else
+				Eprintf("Couldn't parse attribute number.\n");
+			err++;
+			break;
+
 		case 'f':
 			opts.force++;
 			break;
 		case 'h':
 		case '?':
 			help++;
+			break;
+		case 'i':
+			if (opts.inode != -1)
+				Eprintf("You must specify exactly one inode.\n");
+			else if (utils_parse_size(argv[optind-1], &opts.inode, FALSE))
+				break;
+			else
+				Eprintf("Couldn't parse inode number.\n");
+			err++;
 			break;
 		case 'q':
 			opts.quiet++;
@@ -155,10 +178,17 @@ int parse_options (int argc, char **argv)
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
-		if ((opts.device == NULL) ||
-		    (opts.file   == NULL)) {
-			if (argc > 1)
-				Eprintf ("You must specify one device and one file.\n");
+		if (opts.device == NULL) {
+		       	Eprintf ("You must specify a device.\n");
+			err++;
+
+		} else if (opts.file == NULL && opts.inode == -1) {
+			Eprintf ("You must specify a file or inode "
+				 "with the -i option.\n");
+			err++;
+
+		} else if (opts.file != NULL && opts.inode != -1) {
+			Eprintf ("You can't specify both a file and inode.\n");
 			err++;
 		}
 
@@ -180,19 +210,20 @@ int parse_options (int argc, char **argv)
 /**
  * cat
  */
-int cat (ntfs_volume *vol, ntfs_inode *inode)
+int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type, uchar_t *name, int namelen)
 {
-	const int bufsize = 1024;
+	/* increase 1024 only if you fix partial writes below */
+	const int bufsize = 1024; 
 	char *buffer;
 	ntfs_attr *attr;
-	s64 read;
+	s64 read, written;
 	s64 offset;
 
 	buffer = malloc (bufsize);
 	if (!buffer)
 		return 1;
 
-	attr = ntfs_attr_open (inode, AT_DATA, NULL, 0);
+	attr = ntfs_attr_open (inode, type, NULL, 0);
 	if (!attr) {
 		Eprintf ("Cannot cat a directory.\n");
 		free (buffer);
@@ -200,11 +231,22 @@ int cat (ntfs_volume *vol, ntfs_inode *inode)
 	}
 
 	offset = 0;
-	do {
+	for (;;) {
 		read = ntfs_attr_pread (attr, offset, bufsize, buffer);
-		fwrite (buffer, read, 1, stdout);
+		if (read == -1) {
+			perror ("ERROR: Couldn't read file");
+			break;
+		}
+		if (!read)
+			break;
+
+		written = fwrite (buffer, 1, read, stdout);
+		if (written != read) {
+			perror ("ERROR: Couldn't output all data!");
+			break;
+		}
 		offset += read;
-	} while (read > 0);
+	}
 
 	ntfs_attr_close (attr);
 	free (buffer);
@@ -223,6 +265,7 @@ int main (int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	ntfs_inode *inode;
+	ATTR_TYPES attr;
 	int result = 1;
 
 	if (!parse_options (argc, argv))
@@ -230,19 +273,29 @@ int main (int argc, char *argv[])
 
 	utils_set_locale();
 
+	//XXX quieten errors, temporarily
+
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
-		Printf ("!vol\n");
+ 		perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
-	inode = utils_pathname_to_inode (vol, NULL, opts.file);
+ 	if (opts.inode != -1)
+ 		inode = ntfs_inode_open (vol, opts.inode);
+ 	else
+ 		inode = utils_pathname_to_inode (vol, NULL, opts.file);
+
 	if (!inode) {
-		Printf ("!inode\n");
+ 		perror("ERROR: Couldn't open inode");
 		return 1;
 	}
 
-	result = cat (vol, inode);
+ 	attr = AT_DATA;
+ 	if (opts.attr != (ATTR_TYPES)-1)
+ 		attr = opts.attr;
+ 
+ 	result = cat (vol, inode, attr, NULL, 0);
 
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);
