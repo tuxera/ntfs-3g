@@ -1,5 +1,8 @@
 Current news
 ============
+ntfsprogs should now work completely on windows 2000 and XP (Cygwin). 
+mkntfs does not create bootable volumes when on windows. Volumes are locked 
+when using a R/W utility in order to prevent data corruption.  (Yuval Fledel)
 
 ntfsinfo has been extended and now provides much more detailed information as
 well as being able to resolve a path/filename instead of requiring the inode
