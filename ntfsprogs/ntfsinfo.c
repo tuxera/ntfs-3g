@@ -22,7 +22,8 @@
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/* TODO LIST:
+/*
+ * TODO LIST:
  *	- Better error checking. (focus on ntfs_dump_volume)
  *	- Comment things better.
  *	- More things at verbose mode.
@@ -95,7 +96,7 @@ static void version (void)
 	printf ("    2002-2004 Matthew J. Fanto\n");
 	printf ("    2002-2004 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
-	printf ("    2003      Leonard Norrgård\n");
+	printf ("    2003      Leonard NorrgÃ¥rd\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -549,9 +550,8 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 	}
 }
 
-
-/*
- * ntfs_dump_object_id()
+/**
+ * ntfs_dump_object_id
  *
  * dump the $OBJECT_ID attribute - not present on all systems
  */
@@ -606,8 +606,8 @@ static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 				vol->major_ver);
 }
 
-/*
- * ntfs_dump_acl()
+/**
+ * ntfs_dump_acl
  *
  * given an acl, print it in a beautiful & lovley way.
  */
@@ -659,7 +659,7 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 	}
 }
 
-/*
+/**
  * ntfs_dump_security_descriptor()
  *
  * dump the security information about the file
@@ -733,7 +733,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	if (attr->non_resident) free(sec_desc_attr);
 }
 
-/*
+/**
  * ntfs_dump_volume_name()
  *
  * dump the name of the volume the inode belongs to
@@ -769,8 +769,7 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 	}
 }
 
-
-/*
+/**
  * ntfs_dump_volume_information()
  *
  * dump the information for the volume the inode belongs to
@@ -812,7 +811,7 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 			vol_information->flags & (0xFFFF - VOLUME_FLAGS_MASK));
 }
 
-/*
+/**
  * ntfs_dump_data_attr()
  *
  * dump some info about the data attribute
@@ -870,7 +869,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 	}
 }
 
-/*
+/**
  * ntfs_dump_attr_index_root()
  *
  * dump the index_root attribute
@@ -941,7 +940,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 	/* printf("\tIndex Entries Following\t %u\n", ???? );*/
 }
 
-/*
+/**
  * ntfs_dump_attr_index_allocation()
  *
  * dump the index_allocation attribute
@@ -983,7 +982,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
 	/* TODO: parse how many records does this B-*+/Tree contains */
 }
 
-/*
+/**
  * ntfs_dump_attr_bitmap()
  *
  * dump the bitmap attribute
@@ -1025,7 +1024,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 	}
 }
 
-/*
+/**
  * ntfs_dump_attr_reparse_point()
  *
  * of ntfs 3.x dumps the reparse_point attribute
@@ -1036,7 +1035,7 @@ static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr __attribute__((unused
 	printf("\tTODO\n");
 }
 
-/*
+/**
  * ntfs_dump_attr_ea_information()
  *
  * dump the ea_information attribute
@@ -1047,7 +1046,7 @@ static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr __attribute__((unuse
 	printf("\tTODO\n");
 }
 
-/*
+/**
  * ntfs_dump_attr_ea()
  *
  * dump the ea attribute
@@ -1058,7 +1057,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr __attribute__((unused)))
 	printf("\tTODO\n");
 }
 
-/*
+/**
  * ntfs_dump_attr_property_set()
  *
  * dump the property_set attribute
@@ -1069,7 +1068,7 @@ static void ntfs_dump_attr_property_set(ATTR_RECORD *attr __attribute__((unused)
 	printf("\tTODO\n");
 }
 
-/*
+/**
  * ntfs_dump_attr_logged_utility_stream()
  *
  * dump the property_set attribute
@@ -1184,6 +1183,9 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 	}
 }
 
+/**
+ * ntfs_dump_inode_general_info
+ */
 static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 {
 	u16 inode_flags = inode->mrec->flags;
@@ -1336,8 +1338,10 @@ int main(int argc, char **argv)
 	if (!vol)
 		return 1;
 
-	/* if opts.mft is not 0, then we will print out information about
-	 * the volume, such as the sector size and whatnot. */
+	/*
+	 * if opts.mft is not 0, then we will print out information about
+	 * the volume, such as the sector size and whatnot.
+	 */
 	if (opts.mft)
 		ntfs_dump_volume(vol);
 
@@ -1358,8 +1362,10 @@ int main(int argc, char **argv)
 			ntfs_dump_file_attributes(inode);
 		} else {
 			/* can't open inode */
-			/* note: when the specified inode does not exist, either EIO or
-			 *  or ESPIPE is returned, we should notify better in those cases */
+			/*
+			 * note: when the specified inode does not exist, either EIO or
+			 *  or ESPIPE is returned, we should notify better in those cases
+			 */
 			fprintf(stderr, "Error loading node: %s\n", strerror(errno));
 		}
 	}
