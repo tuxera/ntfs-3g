@@ -120,7 +120,7 @@ typedef struct {
 	int multi_ref;		     /* num of clusters referenced many times */
 	int flags;
 	struct bitmap lcn_bitmap;
-} ntfs_fsck_t;
+} ntfsck_t;
 
 typedef struct {
 	ntfs_volume *vol;
@@ -720,7 +720,7 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
  *
  * This serves as a rudimentary "chkdsk" operation.
  */
-static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfs_fsck_t *fsck)
+static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 {
 	s64 inode;
 	ATTR_RECORD *a;
@@ -781,7 +781,7 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfs_fsck_t *fsck)
  * For a given MFT Record, iterate through all its attributes.  Any non-resident
  * data runs will be marked in lcn_bitmap.
  */
-static void walk_attributes(ntfs_volume *vol, ntfs_fsck_t *fsck)
+static void walk_attributes(ntfs_volume *vol, ntfsck_t *fsck)
 {
 	if (!(fsck->ctx = ntfs_attr_get_search_ctx(fsck->ni, NULL)))
 		perr_exit("ntfs_get_attr_search_ctx");
@@ -911,7 +911,7 @@ static void progress_update(struct progress_bar *p, u64 current)
  * Read each record in the MFT, skipping the unused ones, and build up a bitmap
  * from all the non-resident attributes.
  */
-static void build_allocation_bitmap(ntfs_volume *vol, ntfs_fsck_t *fsck)
+static void build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 {
 	s64 inode = 0;
 	ntfs_inode *ni;
@@ -2088,7 +2088,7 @@ static void check_shrink_constraints(ntfs_resize_t *resize)
 
 int main(int argc, char **argv)
 {
-	ntfs_fsck_t fsck;
+	ntfsck_t fsck;
 	ntfs_resize_t resize;
 	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
