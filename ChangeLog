@@ -1,3 +1,9 @@
+03/09/2004 - 1.9.4 - Urgent bug fixes.
+	- Rewrite win32_io.c to allow device level write support (Yuval)
+	- Make ntfscp update file size in $FILE_NAME(0x30) attribute (Yura)
+	- Fix ntfsclone crash when --restore-image was used for block device
+	  outputs (Masaru Kawashima, Szaka)
+	
 03/09/2004 - 1.9.3 - Lots of fixes and enhancements all over the place.
 
 	- Fix access of MFT_RECORD->bytes_in_use to use le32_to_cpu() instead
@@ -58,6 +64,7 @@
 	- Change libntfs/runlist.c::ntfs_get_size_for_mapping_pairs() and
 	  libntfs/runlist.c::ntfs_mapping_pairs_build() to treat a NULL runlist
 	  to mean empty runlist.  (Anton)
+	- ntfsresize: some refactoring towards being able to reuse code (Szaka)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
