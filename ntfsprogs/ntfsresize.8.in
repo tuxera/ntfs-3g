@@ -1,22 +1,27 @@
 .\" -*- nroff -*-
-.\" Copyright 2002-2003 by Szabolcs Szakacsits  All Rights Reserved.
+.\" Copyright 2002-2004 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Oct 2003" "ntfsprogs @VERSION@"
+.TH NTFSRESIZE 8 "Feb 2004" "ntfsprogs @VERSION@"
 .SH NAME
-ntfsresize \- resize an NTFS filesystem
+ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
 .B ntfsresize
-[\fB\-fhin\fR]
-[\fB\-s \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
+[\fBOPTIONS\fR]
+.B --info 
+.I device
+.br
+.B ntfsresize
+[\fBOPTIONS\fR]
+[\fB\-\-size \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
 .I device
 .SH DESCRIPTION
 The
 .B ntfsresize
-program non-destructively resizes Windows NT4, 2000, XP or Windows Server 2003
-NTFS filesystems.  At present it can be used to enlarge any or shrink a
-defragmented NTFS filesystem located on an unmounted
+program non-destructively resizes Windows XP/2000/NT4, Windows Server 2003
+or Longhorn Beta NTFS filesystems. It can be used to shrink or enlarge 
+any NTFS filesystem located on an unmounted
 .I device
-(usually a disk partition). The new volume will have
+(usually a disk partition). The new filesystem will have
 .I size
 bytes.
 The
@@ -30,36 +35,11 @@ conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
 
 If both 
-.B -i
+.B --info
 and
-.B -s
+.B --size
 are omitted then the 
-NTFS filesystem will be enlarged to the device size.
-
-If the options
-.B -i 
-and 
-.B -s 
-are used together then list inodes (files) using space over 
-.I size\fR. At present
-.B ntfsresize 
-can not relocate the files listed to the beginning 
-of the partition thus it refuses to resize at
-.I size
-if there is any.
-To convert the inodes to meaningful file names, you must mount 
-the partition with the
-.I show_sys_files
-mount option and run for instance
-.RS
-.sp
-.B find /mount/point \-inum <inode1> \-o \-inum <inode2> ...
-.sp
-.RE
-Before a real resize operation, always make a read-only 
-test run using the 
-.B -n 
-option.
+NTFS filesystem will be enlarged to the underlying device size.
 .PP
 The
 .B ntfsresize
@@ -67,104 +47,158 @@ program doesn't manipulate the size of partitions.
 To do that you have to use a disk partitioning tool, for example
 .BR fdisk (8).
 .PP
-If you wish to enlarge an NTFS filesystem  then
-first you must enlarge the size of the
-underlying partition. This can be done using 
-.BR fdisk (8)
-by deleting the partition and recreating it with a larger size.
-Then  you may use
-.B ntfsresize
-to enlarge the size of the filesystem.
-.PP
+.B IMPORTANT!
+Generally it's a good practice making regular backups of your
+valuable data, especially before using any partitioning tools. To do so 
+for NTFS, you could use
+.BR ntfsclone (8).
+It's also included in the 
+.BR ntfsprogs (8)
+package.
+.SH SHRINKAGE
 If you wish to shrink an NTFS partition, first use
 .B ntfsresize
 to shrink the size of the filesystem. Then you may use
 .BR fdisk (8)
 to shrink the size of the partition by deleting the
 partition and recreating it with the smaller size.
-.PP
-.B IMPORTANT!
-When recreating the partition with
+But be careful, do not make the partition smaller than the new size of 
+the NTFS filesystem otherwise you won't be able to boot and 
+you might lose your data.
+.SH ENLARGEMENT
+To enlarge an NTFS filesystem, first you must enlarge the size of the
+underlying partition. This can be done using 
 .BR fdisk (8)
-make sure you create it with the same starting
-disk cylinder and partition type
-as before. 
-If you enlarge a partition make sure it will not overlap with 
-an other existing partition!
-If you shrink a partition, do not make 
-it smaller than the new size of the NTFS filesystem! 
+by deleting the partition and recreating it with a larger size.
+Make sure it will not overlap with an other existing partition.
+Then  you may use
+.B ntfsresize
+to enlarge the size of the filesystem.
+.SH PARTITIONING
+When recreating the partition by a disk partitioning tool,
+make sure you create it with the same 
+starting disk cylinder (sector) and partition type as before. 
 Otherwise you may lose your entire filesystem.
+
 Also make sure you set the bootable flag for the partition if it
 existed before. Failing to do so you might not be able to boot your
-computer from the disk!
-.PP
-Note,
-.B ntfsresize
-schedules an NTFS consistency check
-when you will boot Windows. Windows may force a reboot after
-the successful consistency check.
-
+computer from the disk.
 .SH OPTIONS
-.TP
-.B -f
-Forces ntfsresize to proceed with the filesystem resize operation, overriding
-some safety checks which
+Below is a summary of all the options that
 .B ntfsresize
-normally enforces. You can use this
-parameter multiply times if you want to overcome every single safety checks.
+accepts. All options have two equivalent names. The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fi
+is equivalent to
+.BR "\-f \-i".
 .TP
-.B -h
-Display help and exit.
+.B -i, --info
+By using this option ntfsresize will determine the theoretically smallest 
+shrunken filesystem size supported. Most of the time the result is the space 
+already used on the filesystem. Ntfsresize will refuse shrinking to a 
+smaller size than what you got by this option and depending on several 
+factors it might be unable to shrink very close to this theoretically 
+size. Although the integrity of your data should be never in risk in 
+any case, it's recommended to make a test run using the
+.B --no-action
+option before real resizing. 
+
+Practically the smallest shrunken size generally is
+at around "used space" + (20-200 MB). Please also take into account 
+that Windows might need about 50-100 MB free space left to boot safely.
+
+This option never causes any changes to the filesystem, the partition is
+opened read-only.
 .TP
-.B -i
-Using this option you can calculate the smallest shrunken volume size supported.
-This option will not make any changes to the filesystem. 
-You can use this option with 
-.B -s\fR. See the meaning of this case above.
-.TP
-.B -n
-Use this option to make a test run before doing the real resize operation.
-Volume will be opened read-only and
-.B ntfsresize
-displays what it would do if it were to resize the filesystem.
-.TP
-.B -s \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]
-Resize volume to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
+.B -s, --size \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]
+Resize filesystem to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
 The optional modifiers \fBk\fR, \fBM\fR, \fBG\fR mean the
 .I size
 parameter is given in kilo-, mega- or gigabytes respectively.
-Conforming to standards, k=10^3, M=10^6 and G=10^9. You can also use this option
+Conforming to standards, k=10^3, M=10^6 and G=10^9. Use this option
 with
-.B -i\fR. See the meaning of this case above.
+.B --no-action
+first.
+.TP
+.B -f, --force
+Forces ntfsresize to proceed with the resize operation if the filesystem
+is marked "dirty" for consistency check. 
+
+Please note, ntfsresize always marks the filesystem
+"dirty" before a real resize operation and it leaves that way for extra 
+safety. Thus if NTFS was marked by ntfsresize then it's safe to 
+use this option. If you need
+to resize several times without booting into Windows between each
+resizing steps then you must use this option.
+.TP
+.B -n, --no-action
+Use this option to make a test run before doing the real resize operation.
+Volume will be opened read-only and
+.B ntfsresize
+displays what it would do if it were to resize the filesystem. 
+Continue with the real resizing only if the test run passed.
+.TP
+.B -P, --no-progress-bar
+Don't show progress bars.
+.TP
+.B -v, --verbose
+More output.
+.TP
+.B -h, --help
+Display help and exit.
 .SH EXIT CODES
 The exit code is 0 on success, non-zero otherwise. 
-.SH BUGS
-No bugs are known or has been reported so far in the current version.
-If you find otherwise, please report it to <linux-ntfs-dev@lists.sourceforge.net>
-(no subscription needed). It's also strongly advised you
-.B MAKE SURE YOU HAVE A BACKUP
-of your important data in case of an unexpected failure.
+.SH KNOWN ISSUES
+No reliability problems are known or has been reported. If you need 
+help please try the ntfsresize FAQ first (see below) and if you 
+don't find your answer then send your question, comment or bug report to 
+<linux-ntfs-dev@lists.sourceforge.net>.  No subscription is needed 
+but the mailing list is moderated and it can take some time
+to approve your post. 
 .PP
-Future work is planned to include support for resizing fragmented NTFS volumes.
-Please note, Windows 2000, XP and Windows Server 2003 have built in NTFS 
-defragmenter. 
+There are some very rarely met limitations at present: filesystems having 
+bad sectors, highly fragmented Master File Table (MFT) and relocation 
+of the first MFT extent aren't supported yet. These cases are 
+detected and resizing is refused or restricted to a safe size.
+.PP
+.B ntfsresize
+schedules an NTFS consistency check and
+after the first boot into Windows you must see
+.B chkdsk 
+running on a blue background. This is intentional.
+Windows may force a quick reboot after the consistency check.
+Moreover after repartitioning your disk and depending on the 
+hardware configuration, the Windows message
+.B System Settings Change
+may also appear. Just acknowledge it and reboot again.
 .SH AUTHOR
 .B ntfsresize
 has been written by
 Szabolcs Szakacsits <szaka@sienet.hu>.
 .SH ACKNOWLEDGEMENT
-Many thanks to Anton Altaparmakov and Richard Russon (FlatCap)
-for libntfs, excellent documentation, comments, testing and fixes,
-moreover to Theodore Ts'o whose
+Many thanks to Anton Altaparmakov and Richard Russon
+for libntfs, the excellent documentation and comments, 
+to Gergely Madarasz, Dewey M. Sasser and Miguel Lastra and his colleagues 
+at the University of Granada for their continuous and highly valuable help, 
+furthermore to Erik Meade, Martin Fick, Sandro Hawke, Dave Croal, 
+Lorrin Nelson, Geert Hendrickx, Robert Bjorkman and Richard Burdick 
+for beta testing and to Theodore Ts'o whose 
 .BR resize2fs (8)
 man page formed the basis of this page.
 .SH AVAILABILITY
 .B ntfsresize
-is part of the linux-ntfs package and is available from
-http://linux-ntfs.sourceforge.net/ as source and pre-compiled binary.
+is part of the 
+.BR ntfsprogs (8) 
+package and is available from
+http://linux-ntfs.sourceforge.net/ as source and precompiled binary.
 .B ntfsresize
-related news, example of usage and FAQ (frequently asked questions)
-is maintained at 
+related news, example of usage, troubleshooting, statically linked binary and 
+FAQ (frequently asked questions) is maintained at
+.br
 http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .SH SEE ALSO
 .BR fdisk (8),
