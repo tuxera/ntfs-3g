@@ -3164,7 +3164,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		ntfs_attr *tna;
 		ATTR_RECORD *a;
-		
+
 		a = ctx->attr;
 		if (a->non_resident)
 			continue;
@@ -3190,6 +3190,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			ntfs_attr_close(tna);
 			continue;
 		}
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		ntfs_attr_close(tna);
 		ntfs_attr_put_search_ctx(ctx);
 		return ntfs_resident_attr_resize(na, newsize);
@@ -3200,13 +3201,13 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
 		goto put_err_out;
 	}
-	
+
 	/* We can't move out attribute list. */
 	if (na->type == AT_ATTRIBUTE_LIST) {
 		err = ENOSPC;
 		goto put_err_out;
 	}
-	
+
 	/*
 	 * Move the attribute to a new mft record, creating an attribute list
 	 * attribute or modifying it if it is already present.
