@@ -66,7 +66,7 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 /**
  * ntfs_get_attribute_value
  */
-s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
+s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 		const ATTR_RECORD *a, u8 *b)
 {
 	runlist *rl;
@@ -74,7 +74,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 	int i;
 
 	/* Sanity checks. */
-	if (!vol || !m || !a || !b) {
+	if (!vol || !a || !b) {
 		errno = EINVAL;
 		return 0;
 	}

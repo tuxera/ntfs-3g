@@ -148,7 +148,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ni->attr_list = malloc(ni->attr_list_size);
 	if (!ni->attr_list)
 		goto put_err_out;
-	l = ntfs_get_attribute_value(vol, ni->mrec, ctx->attr, ni->attr_list);
+	l = ntfs_get_attribute_value(vol, ctx->attr, ni->attr_list);
 	if (!l)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {

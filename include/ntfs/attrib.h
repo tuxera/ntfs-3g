@@ -306,8 +306,8 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a);
  * then nothing was read due to a zero-length attribute value, otherwise
  * errno describes the error.
  */
-s64 ntfs_get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
-		const ATTR_RECORD *a, u8 *b);
+s64 ntfs_get_attribute_value(const ntfs_volume *vol, const ATTR_RECORD *a,
+		u8 *b);
 
 #endif /* defined _NTFS_ATTRIB_H */
 

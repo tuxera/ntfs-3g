@@ -187,8 +187,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		Dputs("Error: failed to allocate buffer for attribute list.");
 		goto error_exit;
 	}
-	l = ntfs_get_attribute_value(vol, vol->mft_ni->mrec, ctx->attr,
-			vol->mft_ni->attr_list);
+	l = ntfs_get_attribute_value(vol, ctx->attr, vol->mft_ni->attr_list);
 	if (!l) {
 		Dputs("Error: failed to get value of $MFT/$ATTRIBUTE_LIST.");
 		goto io_error_exit;
