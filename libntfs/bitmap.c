@@ -1,0 +1,167 @@
+/*
+ * bitmap.c - Bitmap handling code. Part of the Linux-NTFS project.
+ *
+ * Copyright (c) 2002 Anton Altaparmakov
+ *
+ * This program/include file is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as published
+ * by the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program (in the main directory of the Linux-NTFS
+ * distribution in the file COPYING); if not, write to the Free Software
+ * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#include <stdlib.h>
+#include <errno.h>
+
+#include "types.h"
+#include "attrib.h"
+#include "bitmap.h"
+
+
+/**
+ * ntfs_bitmap_clear_run - clear a run of bits in a bitmap
+ * @na:		attribute containing the bitmap
+ * @start_bit:	first bit to clear
+ * @count:	number of bits to clear
+ *
+ * Clear @count bits starting at bit @start_bit in the bitmap described by the
+ * attribute @na.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ */
+int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
+{
+	u8 *buf, *lastbyte_buf;
+	s64 bufsize, br;
+	int bit, firstbyte, lastbyte, lastbyte_pos, tmp, err;
+
+	if (!na || start_bit < 0 || count < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	bit = start_bit & 7;
+	if (bit)
+		firstbyte = 1;
+	else
+		firstbyte = 0;
+
+	/* Calculate the required buffer size in bytes, capping it at 8kiB. */
+	bufsize = ((count - (bit ? 8 - bit : 0) + 7) >> 3) + firstbyte;
+	if (bufsize > 8192)
+		bufsize = 8192;
+
+	/* Allocate already zeroed memory. */
+	buf = (u8*)calloc(1, bufsize);
+	if (!buf)
+		return -1;
+
+	/* If there is a first partial byte... */
+	if (bit) {
+		/* read it in... */
+		br = ntfs_attr_pread(na, start_bit >> 3, 1, buf);
+		if (br != 1) {
+			free(buf);
+			errno = EIO;
+			return -1;
+		}
+		/* and clear the appropriate bits in it. */
+		while ((bit & 7) && count--)
+			*buf &= ~(1 << bit++);
+		/* Update @start_bit to the new position. */
+		start_bit = (start_bit + 7) & ~7;
+	}
+
+	/* Loop until @count reaches zero. */
+	lastbyte = 0;
+	lastbyte_buf = NULL;
+	bit = count & 7;
+	do {
+		/* If there is a last partial byte... */
+		if (bit) {
+			lastbyte_pos = ((count + 7) >> 3) + firstbyte;
+			if (!lastbyte_pos) {
+				// FIXME: Eeek! BUG!
+				fprintf(stderr, "%s(): Eeek! lastbyte is zero. "
+						"Leaving inconsistent "
+						"metadata.\n", __FUNCTION__);
+				err = EIO;
+				goto free_err_out;
+			}
+			/* and it is in the currently loaded bitmap window... */
+			if (lastbyte_pos <= bufsize) {
+				lastbyte_buf = buf + lastbyte_pos - 1;
+
+				/* read the byte in... */
+				br = ntfs_attr_pread(na, (start_bit + count) >>
+						3, 1, lastbyte_buf);
+				if (br != 1) {
+					// FIXME: Eeek! We need rollback! (AIA)
+					fprintf(stderr, "%s(): Eeek! Read of "
+							"last byte failed. "
+							"Leaving inconsistent "
+							"metadata.\n",
+							__FUNCTION__);
+					err = EIO;
+					goto free_err_out;
+				}
+				/* and clear the appropriate bits in it. */
+				while (bit && count--)
+					*lastbyte_buf &= ~(1 << --bit);
+				/* We don't want to come back here... */
+				bit = 0;
+				/* We have a last byte that we have handled. */
+				lastbyte = 1;
+			}
+		}
+
+		/* Write the prepared buffer to disk. */
+		tmp = (start_bit >> 3) - firstbyte;
+		br = ntfs_attr_pwrite(na, tmp, bufsize, buf);
+		if (br != tmp) {
+			// FIXME: Eeek! We need rollback! (AIA)
+			fprintf(stderr, "%s(): Eeek! Failed to write buffer "
+					"to bitmap. Leaving inconsistent "
+					"metadata.\n", __FUNCTION__);
+			err = EIO;
+			goto free_err_out;
+		}
+
+		/* Update counters. */
+		tmp = (bufsize - firstbyte - lastbyte) << 3;
+		firstbyte = 0;
+		start_bit += tmp;
+		count -= tmp;
+		if (bufsize > (count + 7) >> 3)
+			bufsize = (count + 7) >> 3;
+
+		if (lastbyte && count != 0) {
+			// FIXME: Eeek! BUG!
+			fprintf(stderr, "%s(): Eeek! Last buffer but count is "
+					"not zero (= %Li). Leaving "
+					"inconsistent metadata.\n",
+					__FUNCTION__, count);
+			err = EIO;
+			goto free_err_out;
+		}
+	} while (count > 0);
+
+	/* Done! */
+	free(buf);
+	return 0;
+
+free_err_out:
+	free(buf);
+	errno = err;
+	return -1;
+}
+
