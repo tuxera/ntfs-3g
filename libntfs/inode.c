@@ -110,7 +110,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_attr_search_ctx *ctx;
 	int err = 0;
 
-	Dprintf("%s(): Entering for inode 0x%Lx.\n", __FUNCTION__, MREF(mref));
+	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
 	if (!vol) {
 		errno = EINVAL;
 		return NULL;
@@ -290,7 +290,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		errno = EINVAL;
 		return NULL;
 	}
-	Dprintf("Opening extent inode %Lu (base mft record 0x%Lu).\n",
+	Dprintf("Opening extent inode %llu (base mft record 0x%llu).\n",
 			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	/* Is the extent inode already open and attached to the base inode? */

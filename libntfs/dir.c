@@ -92,7 +92,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
-				"0x%Lx: %s\n",
+				"0x%llx: %s\n",
 				(unsigned long long)dir_ni->mft_no,
 				strerror(errno));
 		goto put_err_out;
@@ -228,7 +228,7 @@ found_it:
 	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, I30, 4);
 	if (!ia_na) {
 		Dprintf("Failed to open index allocation attribute. Directory "
-				"inode 0x%Lx is corrupt or driver bug: %s\n",
+				"inode 0x%llx is corrupt or driver bug: %s\n",
 				(unsigned long long)dir_ni->mft_no,
 				strerror(errno));
 		goto put_err_out;
@@ -261,20 +261,20 @@ descend_into_child_node:
 	if (br != 1) {
 		if (br != -1)
 			errno = EIO;
-		Dprintf("Failed to read vcn 0x%Lx: %s\n", vcn, strerror(errno));
+		Dprintf("Failed to read vcn 0x%llx: %s\n", vcn, strerror(errno));
 		goto close_err_out;
 	}
 
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
-		Dprintf("Actual VCN (0x%Lx) of index buffer is different from "
-				"expected VCN (0x%Lx).\n",
+		Dprintf("Actual VCN (0x%llx) of index buffer is different from "
+				"expected VCN (0x%llx).\n",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)vcn);
 		errno = EIO;
 		goto close_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		Dprintf("Index buffer (VCN 0x%Lx) of directory inode 0x%Lx "
+		Dprintf("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
 				"has a size (%u) differing from the directory "
 				"specified size (%u).\n", (long long)vcn,
 				(unsigned long long)dir_ni->mft_no,
@@ -285,8 +285,8 @@ descend_into_child_node:
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + index_block_size) {
-		Dprintf("Size of index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx exceeds maximum size.\n", (long long)vcn,
+		Dprintf("Size of index buffer (VCN 0x%llx) of directory inode "
+				"0x%llx exceeds maximum size.\n", (long long)vcn,
 				(unsigned long long)dir_ni->mft_no);
 		errno = EIO;
 		goto close_err_out;
@@ -307,7 +307,7 @@ descend_into_child_node:
 				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end) {
 			Dprintf("Index entry out of bounds in directory inode "
-					"0x%Lx.\n",
+					"0x%llx.\n",
 					(unsigned long long)dir_ni->mft_no);
 			errno = EIO;
 			goto close_err_out;
@@ -408,7 +408,7 @@ found_it2:
 	if (ie->flags & INDEX_ENTRY_NODE) {
 		if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 			Dprintf("Index entry with child node found in a leaf "
-					"node in directory inode 0x%Lx.\n",
+					"node in directory inode 0x%llx.\n",
 					(unsigned long long)dir_ni->mft_no);
 			errno = EIO;
 			goto close_err_out;
@@ -417,7 +417,7 @@ found_it2:
 		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
 		if (vcn >= 0)
 			goto descend_into_child_node;
-		Dprintf("Negative child node vcn in directory inode 0x%Lx.\n",
+		Dprintf("Negative child node vcn in directory inode 0x%llx.\n",
 				(unsigned long long)dir_ni->mft_no);
 		errno = EIO;
 		goto close_err_out;
@@ -547,20 +547,20 @@ static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 	if (!ctx)
 		return ERR_MREF(-1);
 	if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		Dprintf("No file name found in inode 0x%Lx. Corrupt inode.\n",
+		Dprintf("No file name found in inode 0x%llx. Corrupt inode.\n",
 				(unsigned long long)ni->mft_no);
 		goto err_out;
 	}
 	if (ctx->attr->non_resident) {
 		Dprintf("File name attribute must be resident. Corrupt inode "
-				"0x%Lx.\n", (unsigned long long)ni->mft_no);
+				"0x%llx.\n", (unsigned long long)ni->mft_no);
 		goto io_err_out;
 	}
 	fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
 	if ((u8*)fn +	le32_to_cpu(ctx->attr->value_length) >
 			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length)) {
-		Dprintf("Corrupt file name attribute in inode 0x%Lx.\n",
+		Dprintf("Corrupt file name attribute in inode 0x%llx.\n",
 				(unsigned long long)ni->mft_no);
 		goto io_err_out;
 	}
@@ -619,7 +619,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 
 	vol = dir_ni->vol;
 
-	Dprintf("Entering for inode 0x%Lx, *pos 0x%Lx.\n",
+	Dprintf("Entering for inode 0x%llx, *pos 0x%llx.\n",
 			(unsigned long long)dir_ni->mft_no, (long long)*pos);
 
 	/* Open the index allocation attribute. */
@@ -627,7 +627,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	if (!ia_na) {
 		if (errno != ENOENT) {
 			Dprintf("Failed to open index allocation attribute. "
-					"Directory inode 0x%Lx is corrupt or "
+					"Directory inode 0x%llx is corrupt or "
 					"bug: %s\n",
 					(unsigned long long)dir_ni->mft_no,
 					strerror(errno));
@@ -679,7 +679,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
-				"0x%Lx.\n", (unsigned long long)dir_ni->mft_no);
+				"0x%llx.\n", (unsigned long long)dir_ni->mft_no);
 		goto dir_err_out;
 	}
 	/* Get to the index root value. */
@@ -820,7 +820,7 @@ find_next_index_buffer:
 		}
 	}
 
-	Dprintf("Handling index block 0x%Lx.", (long long)bmp_pos);
+	Dprintf("Handling index block 0x%llx.", (long long)bmp_pos);
 
 	/* Read the index block starting at bmp_pos. */
 	br = ntfs_attr_mst_pread(ia_na, bmp_pos << index_block_size_bits, 1,
@@ -835,15 +835,15 @@ find_next_index_buffer:
 	ia_start = ia_pos & ~(s64)(index_block_size - 1);
 	if (sle64_to_cpu(ia->index_block_vcn) != ia_start >>
 			index_vcn_size_bits) {
-		Dprintf("Actual VCN (0x%Lx) of index buffer is different from "
-				"expected VCN (0x%Lx) in inode 0x%Lx.\n",
+		Dprintf("Actual VCN (0x%llx) of index buffer is different from "
+				"expected VCN (0x%llx) in inode 0x%llx.\n",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)ia_start >> index_vcn_size_bits,
 				(unsigned long long)dir_ni->mft_no);
 		goto dir_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		Dprintf("Index buffer (VCN 0x%Lx) of directory inode 0x%Lx "
+		Dprintf("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
 				"has a size (%u) differing from the directory "
 				"specified size (%u).\n",
 				(long long)ia_start >> index_vcn_size_bits,
@@ -854,8 +854,8 @@ find_next_index_buffer:
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + index_block_size) {
-		Dprintf("Size of index buffer (VCN 0x%Lx) of directory inode "
-				"0x%Lx exceeds maximum size.\n",
+		Dprintf("Size of index buffer (VCN 0x%llx) of directory inode "
+				"0x%llx exceeds maximum size.\n",
 				(long long)ia_start >> index_vcn_size_bits,
 				(unsigned long long)dir_ni->mft_no);
 		goto dir_err_out;
@@ -869,7 +869,7 @@ find_next_index_buffer:
 	 * enough or signals an error (both covered by the rc test).
 	 */
 	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
-		Dprintf("In index allocation, offset 0x%Lx.\n",
+		Dprintf("In index allocation, offset 0x%llx.\n",
 				(long long)ia_start + ((u8*)ie - (u8*)ia));
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ia || (u8*)ie +
@@ -877,7 +877,7 @@ find_next_index_buffer:
 				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end) {
 			Dprintf("Index entry out of bounds in directory inode "
-					"0x%Lx.\n",
+					"0x%llx.\n",
 					(unsigned long long)dir_ni->mft_no);
 			goto dir_err_out;
 		}
@@ -907,9 +907,9 @@ done:
 		ntfs_attr_close(ia_na);
 #ifdef DEBUG
 	if (!rc)
-		Dprintf("EOD, *pos 0x%Lx, returning 0.\n", (long long)*pos);
+		Dprintf("EOD, *pos 0x%llx, returning 0.\n", (long long)*pos);
 	else
-		Dprintf("filldir returned %i, *pos 0x%Lx, returning 0.\n",
+		Dprintf("filldir returned %i, *pos 0x%llx, returning 0.\n",
 				rc, (long long)*pos);
 #endif
 	return 0;

@@ -436,7 +436,7 @@ void clone_ntfs(u64 nr_clusters)
 	while (1) {
 		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
 		if (count == -1)
-			perr_exit("Couldn't read $Bitmap (pos = %Ld)\n", pos);
+			perr_exit("Couldn't read $Bitmap (pos = %lld)\n", pos);
 
 		if (count == 0)
 			return;
@@ -609,7 +609,7 @@ void compare_bitmaps(struct bitmap *a)
 		if (count == 0) {
 			if (a->size != pos)
 				err_exit("$Bitmap file size doesn't match "
-					 "calculated size (%Ld != %Ld)\n",
+					 "calculated size (%lld != %lld)\n",
 					 a->size, pos);
 			break;
 		}
@@ -630,8 +630,8 @@ void compare_bitmaps(struct bitmap *a)
 				if (++mismatch > 10)
 					continue;
 
-				Printf("Cluster accounting failed at %Lu "
-				       "(0x%Lx): %s cluster in $Bitmap\n",
+				Printf("Cluster accounting failed at %llu "
+				       "(0x%llx): %s cluster in $Bitmap\n",
 				       cl, cl, bit ? "missing" : "extra");
 			}
 		}
@@ -767,7 +767,7 @@ out:
 		}		
 
 		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %Ld", inode);
+			perr_exit("ntfs_inode_close for inode %lld", inode);
 	}
 	
 	return 0;
@@ -952,13 +952,13 @@ int main(int argc, char **argv)
 	
 	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)
-		err_exit("Couldn't get device size (%Ld)!\n", device_size);
+		err_exit("Couldn't get device size (%lld)!\n", device_size);
 
 	print_volume_size("Current device size", device_size);
 
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
-			 "size (%Ld)!\nCorrupt partition table or incorrect "
+			 "size (%lld)!\nCorrupt partition table or incorrect "
 			 "device partitioning?\n", device_size);
 
 	if (opt.stdout) {
@@ -995,7 +995,7 @@ int main(int argc, char **argv)
 		} else {
 			s64 dest_size = device_size_get(fd_out);
 			if (dest_size < device_size)
-				err_exit("Output device size (%Ld) is too small"
+				err_exit("Output device size (%lld) is too small"
 				    " to fit an NTFS clone\n", dest_size);
 		}
 	}
@@ -1032,7 +1032,7 @@ int main(int argc, char **argv)
 
 	walk_clusters(vol, &backup_clusters);
 	
-	Printf("Num of MFT records       = %8Ld\n", vol->nr_mft_records); 
+	Printf("Num of MFT records       = %8lld\n", vol->nr_mft_records); 
 	Printf("Num of used MFT records  = %8d\n", nr_used_mft_records); 
 	
 	Printf("Wiped unused MFT data    = %8d\n", wiped_unused_mft_data); 

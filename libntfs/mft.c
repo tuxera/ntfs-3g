@@ -59,7 +59,7 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 	s64 br;
 	VCN m;
 
-	Dprintf("%s(): Entering for inode 0x%Lx.\n", __FUNCTION__, MREF(mref));
+	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
 	if (!vol || !vol->mft_na || !b || count < 0) {
 		errno = EINVAL;
 		return -1;
@@ -111,7 +111,7 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	void *bmirr = NULL;
 	int cnt = 0, res = 0;
 
-	Dprintf("%s(): Entering for inode 0x%Lx.\n", __FUNCTION__, MREF(mref));
+	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
 	if (!vol || !vol->mft_na || !b || count < 0) {
 		errno = EINVAL;
 		return -1;

@@ -261,8 +261,8 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	int err;
 	unsigned int nr_cbs, cb_clusters;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, pos 0x%Lx, "
-			"count 0x%Lx.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
+			"count 0x%llx.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type,
 			(long long)pos, (long long)count);
 	if (!na || !NAttrCompressed(na) || !na->ni || !na->ni->vol || !b ||

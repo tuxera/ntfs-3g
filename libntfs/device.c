@@ -135,7 +135,7 @@ s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 	s64 br, total;
 	struct ntfs_device_operations *dops;
 
-	Dprintf("%s(): Entering for pos 0x%Lx, count 0x%Lx.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for pos 0x%llx, count 0x%llx.\n", __FUNCTION__,
 			pos, count);
 	if (!b || count < 0 || pos < 0) {
 		errno = EINVAL;
@@ -146,7 +146,7 @@ s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 	dops = dev->d_ops;
 	/* Locate to position. */
 	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
-		Dprintf("ntfs_pread: device seek to 0x%Lx returned error: "
+		Dprintf("ntfs_pread: device seek to 0x%llx returned error: "
 				"%s\n", pos, strerror(errno));
 		return -1;
 	}
@@ -191,7 +191,7 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 	s64 written, total;
 	struct ntfs_device_operations *dops;
 
-	Dprintf("%s(): Entering for pos 0x%Lx, count 0x%Lx.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for pos 0x%llx, count 0x%llx.\n", __FUNCTION__,
 			pos, count);
 	if (!b || count < 0 || pos < 0) {
 		errno = EINVAL;
@@ -206,7 +206,7 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 	dops = dev->d_ops;
 	/* Locate to position. */
 	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
-		Dprintf("ntfs_pwrite: seek to 0x%Lx returned error: %s\n",
+		Dprintf("ntfs_pwrite: seek to 0x%llx returned error: %s\n",
 				pos, strerror(errno));
 		return -1;
 	}

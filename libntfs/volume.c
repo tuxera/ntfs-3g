@@ -280,7 +280,7 @@ mft_has_no_attr_list:
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
 		Dputs("Failed to load the complete runlist for $MFT/$DATA. "
 				"Bug or corrupt $MFT. Run chkdsk.");
-		Dprintf("highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx\n",
+		Dprintf("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx\n",
 				(long long)highest_vcn,
 				(long long)last_vcn - 1);
 		goto io_error_exit;
@@ -485,7 +485,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 
 	/* Setup the mft zone. */
 	vol->mft_zone_start = vol->mft_zone_pos = vol->mft_lcn;
-	Dprintf("mft_zone_pos = 0x%Lx\n", (long long)vol->mft_zone_pos);
+	Dprintf("mft_zone_pos = 0x%llx\n", (long long)vol->mft_zone_pos);
 
 	/*
 	 * Calculate the mft_lcn for an unmodified NTFS volume (see mkntfs
@@ -502,7 +502,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 				vol->cluster_size;
 	if (vol->mft_zone_start <= mft_lcn)
 		vol->mft_zone_start = 0;
-	Dprintf("mft_zone_start = 0x%Lx\n", (long long)vol->mft_zone_start);
+	Dprintf("mft_zone_start = 0x%llx\n", (long long)vol->mft_zone_start);
 
 	/*
 	 * Need to cap the mft zone on non-standard volumes so that it does
@@ -514,16 +514,16 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 		mft_zone_size >>= 1;
 		vol->mft_zone_end = vol->mft_lcn + mft_zone_size;
 	}
-	Dprintf("mft_zone_end = 0x%Lx\n", (long long)vol->mft_zone_end);
+	Dprintf("mft_zone_end = 0x%llx\n", (long long)vol->mft_zone_end);
 
 	/*
 	 * Set the current position within each data zone to the start of the
 	 * respective zone.
 	 */
 	vol->data1_zone_pos = vol->mft_zone_end;
-	Dprintf("data1_zone_pos = 0x%Lx\n", vol->data1_zone_pos);
+	Dprintf("data1_zone_pos = 0x%llx\n", vol->data1_zone_pos);
 	vol->data2_zone_pos = 0;
-	Dprintf("data2_zone_pos = 0x%Lx\n", vol->data2_zone_pos);
+	Dprintf("data2_zone_pos = 0x%llx\n", vol->data2_zone_pos);
 
 	/* Set the mft data allocation position to mft record 24. */
 	vol->mft_data_pos = 24;

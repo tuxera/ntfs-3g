@@ -195,7 +195,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	 * ntfs_boot_sector_is_ntfs but in this way we can just do this once.
 	 */
 	sectors_per_cluster = bs->bpb.sectors_per_cluster;
-	Dprintf("NumberOfSectors = %Li\n", sle64_to_cpu(bs->number_of_sectors));
+	Dprintf("NumberOfSectors = %lli\n", sle64_to_cpu(bs->number_of_sectors));
 	Dprintf("SectorsPerCluster = 0x%x\n", sectors_per_cluster);
 	if (sectors_per_cluster & (sectors_per_cluster - 1)) {
 		Dprintf("Error: %s is not a valid NTFS partition! "
@@ -208,8 +208,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 
 	vol->mft_lcn = sle64_to_cpu(bs->mft_lcn);
 	vol->mftmirr_lcn = sle64_to_cpu(bs->mftmirr_lcn);
-	Dprintf("MFT LCN = 0x%Lx\n", vol->mft_lcn);
-	Dprintf("MFTMirr LCN = 0x%Lx\n", vol->mftmirr_lcn);
+	Dprintf("MFT LCN = 0x%llx\n", vol->mft_lcn);
+	Dprintf("MFTMirr LCN = 0x%llx\n", vol->mftmirr_lcn);
 	if (vol->mft_lcn > vol->nr_clusters ||
 			vol->mftmirr_lcn > vol->nr_clusters) {
 		Dprintf("Error: %s is not a valid NTFS partition! ($Mft LCN "

@@ -46,11 +46,11 @@ void ntfs_debug_runlist_dump(const runlist_element *rl)
 
 			if (index > -LCN_EINVAL - 1)
 				index = 4;
-			Dprintf("%-16Lx %s %-16Lx%s\n", rl[i].vcn,
+			Dprintf("%-16llx %s %-16llx%s\n", rl[i].vcn,
 					lcn_str[index], rl[i].length,
 					rl[i].length ? "" : " (runlist end)");
 		} else
-			Dprintf("%-16Lx %-16Lx  %-16Lx%s\n", rl[i].vcn,
+			Dprintf("%-16llx %-16llx  %-16llx%s\n", rl[i].vcn,
 					rl[i].lcn, rl[i].length,
 					rl[i].length ? "" : " (runlist end)");
 	} while (rl[i++].length);

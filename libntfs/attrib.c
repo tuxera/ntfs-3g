@@ -327,7 +327,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ATTR_RECORD *a;
 	int err;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)ni->mft_no, type);
 	if (!ni || !ni->vol || !ni->mrec) {
 		errno = EINVAL;
@@ -410,7 +410,7 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 	ntfs_attr_search_ctx *ctx;
 	int err;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, vcn 0x%Lx.\n",
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, vcn 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)vcn);
 
@@ -459,7 +459,7 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 	ATTR_RECORD *a;
 	int err;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
 
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
@@ -528,7 +528,7 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 		Dprintf("%s(): Failed to load the complete run list for the "
 				"attribute. Bug or corrupt inode.\n",
 				__FUNCTION__);
-		Dprintf("%s(): highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx\n",
+		Dprintf("%s(): highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx\n",
 				__FUNCTION__, (long long)highest_vcn,
 				(long long)last_vcn - 1);
 		errno = EIO;
@@ -694,8 +694,8 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	ntfs_volume *vol;
 	runlist_element *rl;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, pos 0x%Lx, "
-			"count 0x%Lx.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
+			"count 0x%llx.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type,
 			(long long)pos, (long long)count);
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
@@ -802,8 +802,8 @@ res_err_out:
 		to_read = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		Dprintf("%s(): Reading 0x%Lx bytes from vcn 0x%Lx, lcn 0x%Lx, "
-				"ofs 0x%Lx.\n", __FUNCTION__, to_read,
+		Dprintf("%s(): Reading 0x%llx bytes from vcn 0x%llx, lcn 0x%llx, "
+				"ofs 0x%llx.\n", __FUNCTION__, to_read,
 				rl->vcn, rl->lcn, ofs);
 		br = ntfs_pread(vol->dev, (rl->lcn << vol->cluster_size_bits) +
 				ofs, to_read, b);
@@ -865,8 +865,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		unsigned int initialized_size	: 1;
 	} need_to_undo = { 0 };
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x, pos 0x%Lx, "
-			"count 0x%Lx.\n", __FUNCTION__, na->ni->mft_no,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
+			"count 0x%llx.\n", __FUNCTION__, na->ni->mft_no,
 			na->type, (long long)pos, (long long)count);
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
@@ -1059,8 +1059,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		Dprintf("%s(): Writing 0x%Lx bytes to vcn 0x%Lx, lcn 0x%Lx, "
-				"ofs 0x%Lx.\n", __FUNCTION__, to_write,
+		Dprintf("%s(): Writing 0x%llx bytes to vcn 0x%llx, lcn 0x%llx, "
+				"ofs 0x%llx.\n", __FUNCTION__, to_write,
 				rl->vcn, rl->lcn, ofs);
 		if (!NVolReadOnly(vol))
 			written = ntfs_pwrite(vol->dev, (rl->lcn <<
@@ -1175,7 +1175,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	s64 br;
 	u8 *end;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr type 0x%x, pos 0x%Lx.\n",
+	Dprintf("%s(): Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)pos);
 	if (bk_cnt < 0 || bk_size % NTFS_SECTOR_SIZE) {
@@ -1227,7 +1227,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 {
 	s64 written, i;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr type 0x%x, pos 0x%Lx.\n",
+	Dprintf("%s(): Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)pos);
 	if (bk_cnt < 0 || bk_size % NTFS_SECTOR_SIZE) {
@@ -1544,7 +1544,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
-	Dprintf("Entering for inode %Lu, attribute type 0x%x.\n",
+	Dprintf("Entering for inode %llu, attribute type 0x%x.\n",
 			(unsigned long long)ni->mft_no, type);
 	if (!base_ni) {
 		/* First call happens with the base mft record. */
@@ -2387,7 +2387,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		err = errno;
 		// FIXME: Eeek!
 		fprintf(stderr, "%s(): Eeek! Failed to write out attribute "
-				"value (bw = %Li, errno = %i). Aborting...\n",
+				"value (bw = %lli, errno = %i). Aborting...\n",
 				__FUNCTION__, (long long)bw, err);
 		if (bw >= 0)
 			err = EIO;
@@ -2518,7 +2518,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	ntfs_volume *vol;
 	int err;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
 	/* Get the attribute record that needs modification. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
@@ -2828,7 +2828,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	u32 new_alen, new_muse;
 	int err, mp_size;
 
-	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
 
 	vol = na->ni->vol;
@@ -2944,7 +2944,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			if (!newsize && na->compressed_size) {
 				fprintf(stderr, "%s(): Eeek! !newsize but "
 						"na->compressed_size not zero "
-						"(= %Li)! Fixing up by hand!\n",
+						"(= %lli)! Fixing up by hand!\n",
 						__FUNCTION__, (long long)
 						na->compressed_size);
 				na->compressed_size = 0;

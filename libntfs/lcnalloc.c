@@ -101,7 +101,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 	int err = 0, rlpos, rlsize, buf_size;
 	u8 pass, done_zones, search_zone, need_writeback, bit;
 
-	Dprintf("%s(): Entering with count = 0x%Lx, start_lcn = 0x%Lx, "
+	Dprintf("%s(): Entering with count = 0x%llx, start_lcn = 0x%llx, "
 			"zone = %s_ZONE.\n", __FUNCTION__, (long long)count,
 			(long long)start_lcn,
 			zone == MFT_ZONE ? "MFT" : "DATA");
@@ -192,15 +192,15 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 	while (1) {
 		Dprintf("%s(): Start of outer while loop: done_zones = 0x%x, "
 				"search_zone = %i, pass = %i, zone_start = "
-				"0x%Lx, zone_end = 0x%Lx, bmp_initial_pos = "
-				"0x%Lx, bmp_pos = 0x%Lx, rlpos = %i, rlsize = "
+				"0x%llx, zone_end = 0x%llx, bmp_initial_pos = "
+				"0x%llx, bmp_pos = 0x%llx, rlpos = %i, rlsize = "
 				"%i.\n", __FUNCTION__, done_zones, search_zone,
 				pass, (long long)zone_start,
 				(long long)zone_end, (long long)bmp_initial_pos,
 				(long long)bmp_pos, rlpos, rlsize);
 		/* Loop until we run out of free clusters. */
 		last_read_pos = bmp_pos >> 3;
-		Dprintf("%s(): last_read_pos = 0x%Lx.\n", __FUNCTION__,
+		Dprintf("%s(): last_read_pos = 0x%llx.\n", __FUNCTION__,
 				(long long)last_read_pos);
 		br = ntfs_attr_pread(vol->lcnbmp_na, last_read_pos, 8192, buf);
 		if (br <= 0) {
@@ -225,14 +225,14 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		bmp_pos &= ~7;
 		need_writeback = 0;
 		Dprintf("%s(): Before inner while loop: buf_size = %i, "
-				"lcn = 0x%Lx, bmp_pos = 0x%Lx, need_writeback "
+				"lcn = 0x%llx, bmp_pos = 0x%llx, need_writeback "
 				"= %i.\n", __FUNCTION__, buf_size,
 				(long long)lcn, (long long)bmp_pos,
 				need_writeback);
 		while (lcn < buf_size && lcn + bmp_pos < zone_end) {
 			byte = buf + (lcn >> 3);
 			Dprintf("%s(): In inner while loop: buf_size = %i, "
-					"lcn = 0x%Lx, bmp_pos = 0x%Lx, "
+					"lcn = 0x%llx, bmp_pos = 0x%llx, "
 					"need_writeback = %i, byte ofs = 0x%x, "
 					"*byte = 0x%x.\n", __FUNCTION__,
 					buf_size, (long long)lcn,
@@ -267,7 +267,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				/* Setup first free bit return value. */
 				if (!rl) {
 					start_lcn = lcn + bmp_pos;
-					Dprintf("%s(): start_lcn = 0x%Lx.\n",
+					Dprintf("%s(): start_lcn = 0x%llx.\n",
 							__FUNCTION__,
 							(long long)start_lcn);
 				}
@@ -290,23 +290,23 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 			 * Coalesce with previous run if adjacent LCNs.
 			 * Otherwise, append a new run.
 			 */
-			Dprintf("%s(): Adding run (lcn 0x%Lx, len 0x%Lx), "
-					"prev_lcn = 0x%Lx, lcn = 0x%Lx, "
-					"bmp_pos = 0x%Lx, prev_run_len = 0x%x, "
+			Dprintf("%s(): Adding run (lcn 0x%llx, len 0x%llx), "
+					"prev_lcn = 0x%llx, lcn = 0x%llx, "
+					"bmp_pos = 0x%llx, prev_run_len = 0x%x, "
 					"rlpos = %i.\n", __FUNCTION__,
 					(long long)(lcn + bmp_pos), 1LL,
 					(long long)prev_lcn, (long long)lcn,
 					(long long)bmp_pos,
 					(long long)prev_run_len, rlpos);
 			if (prev_lcn == lcn + bmp_pos - prev_run_len && rlpos) {
-				Dprintf("%s(): Coalescing to run (lcn 0x%Lx, "
-						"len 0x%Lx).\n", __FUNCTION__,
+				Dprintf("%s(): Coalescing to run (lcn 0x%llx, "
+						"len 0x%llx).\n", __FUNCTION__,
 						(long long)rl[rlpos - 1].lcn,
 						(long long)
 						rl[rlpos - 1].length);
 				rl[rlpos - 1].length = ++prev_run_len;
-				Dprintf("%s(): Run now (lcn 0x%Lx, len 0x%Lx), "
-						"prev_run_len = 0x%Lx.\n",
+				Dprintf("%s(): Run now (lcn 0x%llx, len 0x%llx), "
+						"prev_run_len = 0x%llx.\n",
 						__FUNCTION__,
 						(long long)rl[rlpos - 1].lcn,
 						(long long)rl[rlpos - 1].length,
@@ -315,7 +315,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				if (rlpos) {
 					Dprintf("%s(): Adding new run, "
 							"(previous run lcn "
-							"0x%Lx, len 0x%Lx).\n",
+							"0x%llx, len 0x%llx).\n",
 							__FUNCTION__,
 							(long long)
 							rl[rlpos - 1].lcn,
@@ -343,7 +343,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				 */
 				tc = lcn + bmp_pos + 1;
 				Dprintf("%s(): Done. Updating current zone "
-						"position, tc = 0x%Lx, "
+						"position, tc = 0x%llx, "
 						"search_zone = %i.\n",
 						__FUNCTION__, (long long)tc,
 						search_zone);
@@ -351,7 +351,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				case 1:
 					Dprintf("%s(): Before checks, "
 							"vol->mft_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->mft_zone_pos);
@@ -367,7 +367,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 						vol->mft_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->mft_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->mft_zone_pos);
@@ -375,7 +375,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				case 2:
 					Dprintf("%s(): Before checks, "
 							"vol->data1_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data1_zone_pos);
@@ -389,7 +389,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 						vol->data1_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->data1_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data1_zone_pos);
@@ -397,7 +397,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 				case 4:
 					Dprintf("%s(): Before checks, "
 							"vol->data2_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data2_zone_pos);
@@ -409,7 +409,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 						vol->data2_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->data2_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data2_zone_pos);
@@ -429,7 +429,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		}
 		bmp_pos += buf_size;
 		Dprintf("%s(): After inner while loop: buf_size = 0x%x, "
-				"lcn = 0x%Lx, bmp_pos = 0x%Lx, need_writeback "
+				"lcn = 0x%llx, bmp_pos = 0x%llx, need_writeback "
 				"= %i.\n", __FUNCTION__, buf_size,
 				(long long)lcn, (long long)bmp_pos,
 				need_writeback);
@@ -453,7 +453,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, s64 count, LCN start_lcn,
 		}
 		if (bmp_pos < zone_end) {
 			Dprintf("%s(): Continuing outer while loop, bmp_pos = "
-					"0x%Lx, zone_end = 0x%Lx.\n",
+					"0x%llx, zone_end = 0x%llx.\n",
 					__FUNCTION__, (long long)bmp_pos,
 					(long long)zone_end);
 			continue;
@@ -486,8 +486,8 @@ zone_pass_done:	/* Finished with the current zone pass. */
 				zone_end = zone_start;
 			bmp_pos = zone_start;
 			Dprintf("%s(): Continuing outer while loop, pass = 2, "
-					"zone_start = 0x%Lx, zone_end = 0x%Lx, "
-					"bmp_pos = 0x%Lx.\n", __FUNCTION__,
+					"zone_start = 0x%llx, zone_end = 0x%llx, "
+					"bmp_pos = 0x%llx.\n", __FUNCTION__,
 					zone_start, zone_end, bmp_pos);
 			continue;
 		} /* pass == 2 */
@@ -510,7 +510,7 @@ done_zones_check:
 					LCN tc;
 					Dprintf("%s(): Before checks, "
 							"vol->mft_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->mft_zone_pos);
@@ -528,7 +528,7 @@ done_zones_check:
 						vol->mft_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->mft_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->mft_zone_pos);
@@ -554,7 +554,7 @@ switch_to_data1_zone:		search_zone = 2;
 					LCN tc;
 					Dprintf("%s(): Before checks, "
 							"vol->data1_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data1_zone_pos);
@@ -570,7 +570,7 @@ switch_to_data1_zone:		search_zone = 2;
 						vol->data1_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->data1_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data1_zone_pos);
@@ -596,7 +596,7 @@ switch_to_data1_zone:		search_zone = 2;
 					LCN tc;
 					Dprintf("%s(): Before checks, "
 							"vol->data2_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data2_zone_pos);
@@ -610,7 +610,7 @@ switch_to_data1_zone:		search_zone = 2;
 						vol->data2_zone_pos = tc;
 					Dprintf("%s(): After checks, "
 							"vol->data2_zone_pos = "
-							"0x%Lx.\n",
+							"0x%llx.\n",
 							__FUNCTION__,
 							(long long)
 							vol->data2_zone_pos);
@@ -621,9 +621,9 @@ switch_to_data1_zone:		search_zone = 2;
 				NTFS_BUG("switch(search_zone) 3");
 			}
 			Dprintf("%s(): After zone switch, search_zone = %i, "
-					"pass = %i, bmp_initial_pos = 0x%Lx, "
-					"zone_start = 0x%Lx, zone_end = "
-					"0x%Lx.\n", __FUNCTION__, search_zone,
+					"pass = %i, bmp_initial_pos = 0x%llx, "
+					"zone_start = 0x%llx, zone_end = "
+					"0x%llx.\n", __FUNCTION__, search_zone,
 					pass, (long long)bmp_initial_pos,
 					(long long)zone_start,
 					(long long)zone_end);
@@ -645,8 +645,8 @@ switch_to_data1_zone:		search_zone = 2;
 		 * MFT_ZONE, we have really run out of space.
 		 */
 		mft_zone_size = vol->mft_zone_end - vol->mft_zone_start;
-		Dprintf("%s(): vol->mft_zone_start = 0x%Lx, vol->mft_zone_end "
-				"= 0x%Lx, mft_zone_size = 0x%Lx.\n",
+		Dprintf("%s(): vol->mft_zone_start = 0x%llx, vol->mft_zone_end "
+				"= 0x%llx, mft_zone_size = 0x%llx.\n",
 				__FUNCTION__, (long long)vol->mft_zone_start,
 				(long long)vol->mft_zone_end,
 				(long long)mft_zone_size);
@@ -676,12 +676,12 @@ switch_to_data1_zone:		search_zone = 2;
 		pass = 2;
 		done_zones &= ~2;
 		Dprintf("%s(): After shrinking mft zone, mft_zone_size = "
-				"0x%Lx, vol->mft_zone_start = 0x%Lx, "
-				"vol->mft_zone_end = 0x%Lx, vol->mft_zone_pos "
-				"= 0x%Lx, search_zone = 2, pass = 2, "
-				"dones_zones = 0x%x, zone_start = 0x%Lx, "
-				"zone_end = 0x%Lx, vol->data1_zone_pos = "
-				"0x%Lx, continuing outer while loop.\n",
+				"0x%llx, vol->mft_zone_start = 0x%llx, "
+				"vol->mft_zone_end = 0x%llx, vol->mft_zone_pos "
+				"= 0x%llx, search_zone = 2, pass = 2, "
+				"dones_zones = 0x%x, zone_start = 0x%llx, "
+				"zone_end = 0x%llx, vol->data1_zone_pos = "
+				"0x%llx, continuing outer while loop.\n",
 				__FUNCTION__, (long long)mft_zone_size,
 				(long long)vol->mft_zone_start,
 				(long long)vol->mft_zone_end,
@@ -744,8 +744,8 @@ err_ret:
 	Dprintf("%s(): At err_ret.\n", __FUNCTION__);
 	if (rl) {
 		if (err == ENOSPC) {
-			Dprintf("%s(): err = ENOSPC, first free lcn = 0x%Lx, "
-					"could allocate up to = 0x%Lx "
+			Dprintf("%s(): err = ENOSPC, first free lcn = 0x%llx, "
+					"could allocate up to = 0x%llx "
 					"clusters.\n", __FUNCTION__,
 					(long long)rl[0].lcn,
 					(long long)count - clusters);
@@ -766,7 +766,7 @@ err_ret:
 	} else {
 		if (err == ENOSPC) {
 			Dprintf("%s(): No space left at all, err = ENOSPC, "
-					"first free lcn = 0x%Lx.\n",
+					"first free lcn = 0x%llx.\n",
 					__FUNCTION__,
 					(long long)vol->data1_zone_pos);
 		}
@@ -846,7 +846,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		//	  list support! (AIA)
 		if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 			// FIXME: Eeek! We need rollback! (AIA)
-			fprintf(stderr, "%s(): Eeek! invalid lcn (= %Li). "
+			fprintf(stderr, "%s(): Eeek! invalid lcn (= %lli). "
 					"Should attempt to map runlist! "
 					"Leaving inconsistent metadata!\n",
 					__FUNCTION__, (long long)rl->lcn);
@@ -882,7 +882,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 
 	if (count != -1 && count != 0) {
 		// FIXME: Eeek! BUG()
-		fprintf(stderr, "%s(): Eeek! count still not zero (= %Li). "
+		fprintf(stderr, "%s(): Eeek! count still not zero (= %lli). "
 				"Leaving inconsistent metadata!\n",
 				__FUNCTION__, (long long)count);
 		errno = EIO;

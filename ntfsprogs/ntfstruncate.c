@@ -238,7 +238,7 @@ void parse_options(int argc, char *argv[])
 	if (*s || !ll || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid inode number: %s\n", argv[optind - 1]);
 	inode = ll;
-	Dprintf("inode = %Li\n", (long long)inode);
+	Dprintf("inode = %lli\n", (long long)inode);
 
 	if (optind == argc)
 		usage();
@@ -290,7 +290,7 @@ void parse_options(int argc, char *argv[])
 	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid new length: %s\n", s);
 	new_len = ll;
-	Dprintf("new length = %Li\n", new_len);
+	Dprintf("new length = %lli\n", new_len);
 }
 
 /**
@@ -511,9 +511,9 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 	int i;
 
 	l = sle64_to_cpu(a->lowest_vcn);
-	printf("Lowest VCN = %Li (0x%Lx)\n", l, l);
+	printf("Lowest VCN = %lli (0x%llx)\n", l, l);
 	l = sle64_to_cpu(a->highest_vcn);
-	printf("Highest VCN = %Li (0x%Lx)\n", l, l);
+	printf("Highest VCN = %lli (0x%llx)\n", l, l);
 	printf("Mapping pairs array offset = 0x%x\n",
 			le16_to_cpu(a->mapping_pairs_offset));
 	printf("Compression unit = 0x%x: %sCOMPRESSED\n", a->compression_unit,
@@ -522,14 +522,14 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 		printf("Attribute is not the first extent. The following "
 				"sizes are meaningless:\n");
 	l = sle64_to_cpu(a->allocated_size);
-	printf("Allocated size = %Li (0x%Lx)\n", l, l);
+	printf("Allocated size = %lli (0x%llx)\n", l, l);
 	l = sle64_to_cpu(a->data_size);
-	printf("Data size = %Li (0x%Lx)\n", l, l);
+	printf("Data size = %lli (0x%llx)\n", l, l);
 	l = sle64_to_cpu(a->initialized_size);
-	printf("Initialized size = %Li (0x%Lx)\n", l, l);
+	printf("Initialized size = %lli (0x%llx)\n", l, l);
 	if (a->flags & ATTR_COMPRESSION_MASK) {
 		l = sle64_to_cpu(a->compressed_size);
-		printf("Compressed size = %Li (0x%Lx)\n", l, l);
+		printf("Compressed size = %lli (0x%llx)\n", l, l);
 	}
 	i = le16_to_cpu(a->mapping_pairs_offset);
 	dump_mapping_pairs_array((char*)a + i, le32_to_cpu(a->length) - i);
@@ -648,7 +648,7 @@ void dump_mft_record(MFT_RECORD *m)
 	u = le16_to_cpu(m->usa_ofs);
 	printf("Update sequence array offset = %u (0x%x)\n", u, u);
 	printf("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
-	printf("$LogFile sequence number (lsn) = %Lu\n", le64_to_cpu(m->lsn));
+	printf("$LogFile sequence number (lsn) = %llu\n", le64_to_cpu(m->lsn));
 	printf("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
 	printf("Reference (hard link) count = %u\n",
 						le16_to_cpu(m->link_count));
@@ -667,7 +667,7 @@ void dump_mft_record(MFT_RECORD *m)
 	u = le32_to_cpu(m->bytes_allocated);
 	printf("Bytes allocated = %u (0x%x)\n", u, u);
 	r = le64_to_cpu(m->base_mft_record);
-	printf("Base mft record reference:\n\tMft record number = %Lu\n\t"
+	printf("Base mft record reference:\n\tMft record number = %llu\n\t"
 			"Sequence number = %u\n", MREF(r), MSEQNO(r));
 	printf("Next attribute instance = %u\n",
 			le16_to_cpu(m->next_attr_instance));
@@ -697,7 +697,7 @@ void ntfstruncate_exit(void)
 		ntfs_attr_close(na);
 	/* Close the inode. */
 	if (ni && ntfs_inode_close(ni)) {
-		fprintf(stderr, "Warning: Failed to close inode %Li: %s\n",
+		fprintf(stderr, "Warning: Failed to close inode %lli: %s\n",
 				(long long)inode, strerror(errno));
 	}
 	/* Unmount the volume. */
@@ -766,7 +766,7 @@ int main(int argc, char **argv)
 	/* Open the specified inode. */
 	ni = ntfs_inode_open(vol, inode);
 	if (!ni)
-		err_exit("Failed to open inode %Li: %s\n", (long long)inode,
+		err_exit("Failed to open inode %lli: %s\n", (long long)inode,
 				strerror(errno));
 
 	/* Open the specified attribute. */
@@ -800,7 +800,7 @@ int main(int argc, char **argv)
 	/* Close the inode. */
 	err = ntfs_inode_close(ni);
 	if (err)
-		err_exit("Failed to close inode %Li: %s\n", (long long)inode,
+		err_exit("Failed to close inode %lli: %s\n", (long long)inode,
 				strerror(errno));
 
 	/* Unmount the volume. */

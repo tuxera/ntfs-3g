@@ -46,7 +46,7 @@
 static __inline__ void ntfs_bit_set(u8 *bitmap, const u64 bit,
 		const u8 new_value)
 {
-//	Dprintf("bitmap %p, bit 0x%Lx, new_value %i\n", bitmap, bit, new_value);
+//	Dprintf("bitmap %p, bit 0x%llx, new_value %i\n", bitmap, bit, new_value);
 	if (!bitmap || new_value > 1)
 		return;
 	if (!new_value)

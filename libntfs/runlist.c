@@ -628,7 +628,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			int slots = 0;
 
 			if (drl[ds].vcn == marker_vcn) {
-				Dprintf("Old marker = %Li, replacing with "
+				Dprintf("Old marker = %lli, replacing with "
 						"LCN_ENOENT.\n",
 						(long long)drl[ds].lcn);
 				drl[ds].lcn = (LCN)LCN_ENOENT;
@@ -889,8 +889,8 @@ mpa_err:
 		 * likely, there are more extents following this one.
 		 */
 		if (deltaxcn < --max_cluster) {
-			Dprintf("More extents to follow; deltaxcn = 0x%Lx, "
-					"max_cluster = 0x%Lx\n",
+			Dprintf("More extents to follow; deltaxcn = 0x%llx, "
+					"max_cluster = 0x%llx\n",
 					(long long)deltaxcn,
 					(long long)max_cluster);
 			rl[rlpos].vcn = vcn;
@@ -898,8 +898,8 @@ mpa_err:
 			rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
 			rlpos++;
 		} else if (deltaxcn > max_cluster) {
-			Dprintf("Corrupt attribute. deltaxcn = 0x%Lx, "
-					"max_cluster = 0x%Lx",
+			Dprintf("Corrupt attribute. deltaxcn = 0x%llx, "
+					"max_cluster = 0x%llx",
 					(long long)deltaxcn,
 					(long long)max_cluster);
 			goto mpa_err;

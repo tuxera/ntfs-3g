@@ -207,12 +207,12 @@ pass_loc:
 				le16_to_cpu(rph->minor_ver));
 	printf("\n%s restart area:\n", pass == 1? "1st": "2nd");
 	printf("magic = RSTR\n");
-	printf("ChkDskLsn = 0x%Lx\n", sle64_to_cpu(rph->chkdsk_lsn));
+	printf("ChkDskLsn = 0x%llx\n", sle64_to_cpu(rph->chkdsk_lsn));
 	printf("SystemPageSize = %u\n", le32_to_cpu(rph->system_page_size));
 	printf("LogPageSize = %u\n", le32_to_cpu(rph->log_page_size));
 	printf("RestartOffset = 0x%x\n", le16_to_cpu(rph->restart_offset));
 	printf("\n(1st) restart record:\n");
-	printf("CurrentLsn = %Lx\n", sle64_to_cpu(rr->current_lsn));
+	printf("CurrentLsn = %llx\n", sle64_to_cpu(rr->current_lsn));
 	printf("LogClients = %u\n", le16_to_cpu(rr->log_clients));
 	printf("ClientFreeList = %i\n", sle16_to_cpu(rr->client_free_list));
 	printf("ClientInUseList = %i\n", sle16_to_cpu(rr->client_in_use_list));
@@ -223,7 +223,7 @@ pass_loc:
 			le16_to_cpu(rr->restart_area_length));
 	printf("ClientArrayOffset = 0x%x\n",
 			le16_to_cpu(rr->client_array_offset));
-	printf("FileSize = %Lu (0x%Lx)\n", sle64_to_cpu(rr->file_size),
+	printf("FileSize = %llu (0x%llx)\n", sle64_to_cpu(rr->file_size),
 			sle64_to_cpu(rr->file_size));
 	if (sle64_to_cpu(rr->file_size) != l)
 		puts("$LogFile restart area indicates a log file size"
@@ -235,12 +235,12 @@ pass_loc:
 			le16_to_cpu(rr->log_page_data_offset));
 	for (client = 0; client < le16_to_cpu(rr->log_clients); client++) {
 		printf("\nRestart client record number %i:\n", client);
-		printf("OldestLsn = 0x%Lx\n", sle64_to_cpu(cr->oldest_lsn));
-		printf("ClientRestartLsn = 0x%Lx\n",
+		printf("OldestLsn = 0x%llx\n", sle64_to_cpu(cr->oldest_lsn));
+		printf("ClientRestartLsn = 0x%llx\n",
 				sle64_to_cpu(cr->client_restart_lsn));
 		printf("PrevClient = %i\n", sle16_to_cpu(cr->prev_client));
 		printf("NextClient = %i\n", sle16_to_cpu(cr->next_client));
-		printf("SeqNumber = 0x%Lx\n", le64_to_cpu(cr->seq_number));
+		printf("SeqNumber = 0x%llx\n", le64_to_cpu(cr->seq_number));
 		printf("ClientNameLength = 0x%x\n",
 				le32_to_cpu(cr->client_name_length));
 		if (le32_to_cpu(cr->client_name_length)) {
@@ -279,14 +279,14 @@ rcrd_pass_loc:
 		printf(":");
 	/* Dump log record page */
 	printf("\nmagic = RCRD\n");
-	printf("copy.last_lsn/file_offset = 0x%Lx\n",
+	printf("copy.last_lsn/file_offset = 0x%llx\n",
 			le64_to_cpu(rcrd_ph->copy.last_lsn));
 	printf("flags = 0x%x\n", le32_to_cpu(rcrd_ph->flags));
 	printf("page count = %i\n", le16_to_cpu(rcrd_ph->page_count));
 	printf("page position = %i\n", le16_to_cpu(rcrd_ph->page_position));
-	printf("header.next_record_offset = 0x%Lx\n",
+	printf("header.next_record_offset = 0x%llx\n",
 			le64_to_cpu(rcrd_ph->header.packed.next_record_offset));
-	printf("header.last_end_lsn = 0x%Lx\n",
+	printf("header.last_end_lsn = 0x%llx\n",
 			le64_to_cpu(rcrd_ph->header.packed.last_end_lsn));
 	/*
 	 * Where does the 0x40 come from? Is it just usa_offset +
@@ -296,10 +296,10 @@ rcrd_pass_loc:
 	client = 0;
 log_record_pass:
 	printf("\nLog record %i:\n", client);
-	printf("this lsn = 0x%Lx\n", le64_to_cpu(lr->this_lsn));
-	printf("client previous lsn = 0x%Lx\n",
+	printf("this lsn = 0x%llx\n", le64_to_cpu(lr->this_lsn));
+	printf("client previous lsn = 0x%llx\n",
 			le64_to_cpu(lr->client_previous_lsn));
-	printf("client undo next lsn = 0x%Lx\n",
+	printf("client undo next lsn = 0x%llx\n",
 			le64_to_cpu(lr->client_undo_next_lsn));
 	printf("client data length = 0x%x\n",
 			le32_to_cpu(lr->client_data_length));
@@ -336,11 +336,11 @@ log_record_pass:
 	printf("lcns_to_follow = 0x%x\n", le16_to_cpu(lr->lcns_to_follow));
 	printf("record_offset = 0x%x\n", le16_to_cpu(lr->record_offset));
 	printf("attribute_offset = 0x%x\n", le16_to_cpu(lr->attribute_offset));
-	printf("target_vcn = 0x%Lx\n", sle64_to_cpu(lr->target_vcn));
+	printf("target_vcn = 0x%llx\n", sle64_to_cpu(lr->target_vcn));
 	if (le16_to_cpu(lr->lcns_to_follow) > 0)
 		printf("Array of lcns:\n");
 	for (i = 0; i < le16_to_cpu(lr->lcns_to_follow); i++)
-		printf("lcn_list[%i].lcn = 0x%Lx\n", i,
+		printf("lcn_list[%i].lcn = 0x%llx\n", i,
 				sle64_to_cpu(lr->lcn_list[i].lcn));
 	client++;
 	lr = (LOG_RECORD*)((char*)lr + 0x70);

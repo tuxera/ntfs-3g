@@ -574,8 +574,8 @@ void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
 		if (opt.info && !resize->new_volume_size)
 			return;
 		
-		printf("Relocation needed for inode %8Ld attr 0x%x LCN 0x%08Lx "
-			"length %6Ld\n", resize->ni->mft_no,
+		printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
+			"length %6lld\n", resize->ni->mft_no,
 		       resize->ctx->attr->type, start, len);
 	}
 }
@@ -626,7 +626,7 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 				if (++resize->multi_ref > 10)
 					continue;
 				
-				printf("Cluster %Lu (0x%Lx) referenced "
+				printf("Cluster %llu (0x%llx) referenced "
 				       "multiply times!\n", k, k);
 			}
 		}
@@ -688,7 +688,7 @@ void compare_bitmaps(struct bitmap *a)
 		if (count == 0) {
 			if (a->size != pos)
 				err_exit("$Bitmap file size doesn't match "
-					 "calculated size (%Ld != %Ld)\n",
+					 "calculated size (%lld != %lld)\n",
 					 a->size, pos);
 			break;
 		}
@@ -718,8 +718,8 @@ void compare_bitmaps(struct bitmap *a)
 				if (++mismatch > 10)
 					continue;
 
-				printf("Cluster accounting failed at %Lu "
-				       "(0x%Lx): %s cluster in $Bitmap\n",
+				printf("Cluster accounting failed at %llu "
+				       "(0x%llx): %s cluster in $Bitmap\n",
 				       cl, cl, bit ? "missing" : "extra");
 			}
 		}
@@ -805,7 +805,7 @@ void walk_inodes(ntfs_resize_t *resize)
 		walk_attributes(resize);
 close_inode:
 		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %Ld", inode);
+			perr_exit("ntfs_inode_close for inode %lld", inode);
 	}
 }
 
@@ -818,7 +818,7 @@ void print_hint(const char *s, struct llcn_t llcn)
 	
 	runs_b = llcn.lcn * vol->cluster_size;
 	runs_mb = rounded_up_division(runs_b, NTFS_MBYTE);
-	printf("%-19s: %9Ld MB      %8Ld\n", s, runs_mb, llcn.inode);
+	printf("%-19s: %9lld MB      %8lld\n", s, runs_mb, llcn.inode);
 }
 
 /**
@@ -1282,7 +1282,7 @@ void print_disk_usage(ntfs_resize_t *resize)
 	       100.0 * ((float)used / total));
 	
 	if (opt.bytes)
-		printf("Needed relocations : %Ld (%Ld MB)\n", 
+		printf("Needed relocations : %lld (%lld MB)\n", 
 		       resize->relocations,
 		       rounded_up_division(relocations, NTFS_MBYTE));
 }
@@ -1397,19 +1397,19 @@ int main(int argc, char **argv)
 	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
 	device_size *= vol->sector_size;
 	if (device_size <= 0)
-		err_exit("Couldn't get device size (%Ld)!\n", device_size);
+		err_exit("Couldn't get device size (%lld)!\n", device_size);
 
 	print_volume_size("Current device size", device_size);
 
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
-			 "size (%Ld)!\nCorrupt partition table or incorrect "
+			 "size (%lld)!\nCorrupt partition table or incorrect "
 			 "device partitioning?\n", device_size);
 
 	if (opt.bytes) {
 		if (device_size < opt.bytes)
 			err_exit("New size can't be bigger than the "
-				 "device size (%Ld bytes).\nIf you want to "
+				 "device size (%lld bytes).\nIf you want to "
 				 "enlarge NTFS then first enlarge the device "
 				 "size by e.g. fdisk.\n", device_size);
 	} else if (!opt.info)
