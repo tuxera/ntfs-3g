@@ -19,10 +19,15 @@ linux-ntfs.spec
 */.libs/*
 */*.o
 libntfs/*.l?
+tags
+TAGS
+*/tags
+*/TAGS
 
 # specific programs
 ntfsprogs/dumplog
 ntfsprogs/mkntfs
+ntfsprogs/ntfscluster
 ntfsprogs/ntfsdump_logfile
 ntfsprogs/ntfsfix
 ntfsprogs/ntfsinfo
