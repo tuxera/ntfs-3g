@@ -745,8 +745,9 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				if (errno != ENOENT) {
 					Dprintf("%s(): Attribute lookup failed."
 						"\n", __FUNCTION__);
-				}
-				break;
+				} else
+					err = ENOSPC;
+				goto put_err_out;
 			}
 		}
 
