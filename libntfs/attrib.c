@@ -2275,7 +2275,7 @@ static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 }
 
 /**
- * ntfs_not_resident_attr_record_add - 
+ * ntfs_non_resident_attr_record_add - 
  * @ni:			
  * @type:		
  * @name:		
@@ -2291,7 +2291,7 @@ static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  *	EEXIST -
  *	EIO - 
  */
-int ntfs_not_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
+int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
 		ATTR_FLAGS flags)
 {
@@ -2307,6 +2307,18 @@ int ntfs_not_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	
 	if (!ni || dataruns_size <= 0) {
 		errno = EINVAL;
+		return -1;
+	}
+	
+	if (ntfs_attr_can_be_non_resident(ni->vol, type)) {
+		err = errno;
+		if (errno == EPERM)
+			Dprintf("%s(): Attribute can't be resident.\n",
+				__FUNCTION__);
+		else
+			Dprintf("%s(): ntfs_attr_can_be_non_resident failed.\n",
+				__FUNCTION__);
+		errno = err;
 		return -1;
 	}
 	
@@ -2346,6 +2358,8 @@ int ntfs_not_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->lowest_vcn = cpu_to_le64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
 	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
+	memcpy((u8*)a + le16_to_cpu(a->name_offset), name,
+					sizeof(ntfschar) * name_len);
 	m->next_attr_instance =
 		cpu_to_le16(le16_to_cpu(m->next_attr_instance) + 1);
 	if (ntfs_attrlist_entry_add(ni, a)) {
@@ -3529,7 +3543,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			if (mp_size > cur_max_mp_size)
 				mp_size = cur_max_mp_size;
 			/* Add atribute extent to new record. */
-			err = ntfs_not_resident_attr_record_add(ni, na->type,
+			err = ntfs_non_resident_attr_record_add(ni, na->type,
 				 na->name, na->name_len, stop_vcn, mp_size, 0);
 			if (err == -1) {
 				err = errno;
