@@ -2554,6 +2554,7 @@ cluster_free_err_out:
  *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
+ *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
  */
 static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
@@ -2638,6 +2639,11 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	}
 
 	// TODO: Try to make other attributes non-resident and retry each time.
+
+	if (na->type == AT_ATTRIBUTE_LIST && errno == ENOSPC) {
+		err = errno;
+		goto put_err_out;
+	}
 
 	// TODO: Move the attribute to a new mft record, creating an attribute
 	// list attribute or modifying it if it is already present.
@@ -3134,6 +3140,7 @@ put_err_out:
  *	ENOTSUP	- The desired resize is not implemented yet.
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
+ *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
@@ -3287,9 +3294,13 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
 
 		if (mp_size > exp_max_mp_size) {
-			err = ENOTSUP;
-			Dprintf("%s(): Eeek! Maping pairs size is too big.\n",
-					__FUNCTION__);
+			if (na->type == AT_ATTRIBUTE_LIST)
+				err = ENOSPC;
+			else {
+				err = ENOTSUP;
+				Dprintf("%s(): Eeek! Maping pairs size is "
+						"too big.\n", __FUNCTION__);
+			}
 			goto rollback;
 		}
 
