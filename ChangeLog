@@ -101,6 +101,7 @@ xx/xx/2004 - 2.0.0-WIP
 	  during inode sync.  (Yura)
 	- Rename NTFS_SECTOR_SIZE to NTFS_BLOCK_SIZE to keep in sync with
 	  kernel driver.  (Yura)
+	- Port logfile checking routines from the kernel to the library.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
