@@ -14,6 +14,8 @@ xx/xx/2004 - 2.0.0-WIP
 	- Improvement to ntfs_non_resident_attr_expand: expand multi extent
 	  attributes if we don't need to allocate new mft records to perform
 	  this  (Yura).
+	- ntfsinfo: dump attribute list entries in verbose mode and display
+	  attribute instance of all attributes.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
