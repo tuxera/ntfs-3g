@@ -362,7 +362,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		printf("%s\n", todo);
 		return;
 	case AT_VOLUME_NAME:
-		printf("Volume name length = %i\n", val_len);
+		printf("Volume name length = %u\n", (unsigned int)val_len);
 		if (val_len) {
 			buf = calloc(1, val_len);
 			if (!buf)
