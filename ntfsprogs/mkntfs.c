@@ -1,8 +1,8 @@
-/*
+/**
  * mkntfs - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2003 Anton Altaparmakov
- * Copyright (c) 2001-2002 Richard Russon
+ * Copyright (c) 2001-2003 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
  * specified (block) device.
@@ -10,8 +10,6 @@
  * Some things (option handling and determination of mount status) have been
  * adapted from e2fsprogs-1.19 and lib/ext2fs/ismounted.c and misc/mke2fs.c in
  * particular.
- *
- *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -177,8 +175,142 @@ GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 void err_exit(const char *fmt, ...) __attribute__ ((noreturn));
+void usage(void) __attribute__ ((noreturn));
 
-/* Error output and terminate. Ignores quiet (-q). */
+/**
+ * version - Print version information about the program
+ *
+ * Print a copyright statement and a brief description of the program.
+ *
+ * Return:  none
+ */
+void version (void)
+{
+	printf ("\n%s v%s - Create an NTFS volume on a user specified (block) device.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2000-2003 Anton Altaparmakov\n");
+	printf ("    2001-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+/**
+ * usage - Print a list of the parameters to the program
+ *
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
+ */
+void usage (void)
+{
+	printf ("\nUsage: %s [options] device [number-of-sectors]\n"
+	       "    -s sector-size           Specify the sector size for the device\n"
+	       "    -c cluster-size          Specify the cluster size for the volume\n"
+	       "    -L volume-label          Set the volume label\n"
+	       "    -z mft-zone-multiplier   Set the MFT zone multiplier\n"
+	       "    -f                       Perform a quick format\n"
+	       "    -Q                       Perform a quick format\n"
+	       "    -C                       Enable compression on the volume\n"
+	       "    -I                       mft-zone-multiplier       \n"
+	       "\n"                       
+	       "    -n                       Do not write to disk\n"
+	       "    -F                       Use less caution\n"
+	       "    -q                       Quiet execution\n"
+	       "    -v                       Verbose execution\n"
+	       "    -v                       Very verbose execution\n"
+	       "    -V                       Display version information\n"
+	       "    -h                       Display this help\n\n",
+	       EXEC_NAME);
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	exit(1);
+}
+
+/**
+ * parse_options
+ */
+void parse_options(int argc, char *argv[])
+{
+	int c;
+	long l;
+	unsigned long u;
+	char *s;
+
+// Need to have: mft record size, index record size, ntfs version, mft size,
+//		 logfile size, list of bad blocks, check for bad blocks, ...
+	if (argc && *argv)
+		EXEC_NAME = *argv;
+	while ((c = getopt(argc, argv, "c:fh?nqs:vz:CFIL:QV")) != EOF)
+		switch (c) {
+		case 'n':
+			opts.no_action = 1;
+			break;
+		case 'c':
+			l = strtol(optarg, &s, 0);
+			if (!l || l > INT_MAX || *s)
+				err_exit("Invalid cluster size.\n");
+			vol->cluster_size = l;
+			break;
+		case 'f':
+		case 'Q':
+			opts.quick_format = 1;
+			break;
+		case 'q':
+			opts.quiet = 1;
+			break;
+		case 's':
+			l = strtol(optarg, &s, 0);
+			if (!l || l > INT_MAX || *s)
+				err_exit("Invalid sector size.\n");
+			opts.sector_size = l;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		case 'z':
+			l = strtol(optarg, &s, 0);
+			if (l < 1 || l > 4 || *s)
+				err_exit("Invalid MFT zone multiplier.\n");
+			opts.mft_zone_multiplier = l;
+			break;
+		case 'C':
+			opts.enable_compression = 1;
+			break;
+		case 'F':
+			opts.force = 1;
+			break;
+		case 'I':
+			opts.disable_indexing = 1;
+			break;
+		case 'L':
+			vol->vol_name = optarg;
+			break;
+		case 'V':
+			version();
+			exit(0);
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	if (optind == argc)
+		usage();
+	vol->dev_name = argv[optind++];
+	if (optind < argc) {
+		u = strtoul(argv[optind++], &s, 0);
+		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
+			err_exit("Invalid number of sectors: %s\n",
+					argv[optind - 1]);
+		opts.nr_sectors = u;
+	}
+	if (optind < argc)
+		usage();
+}
+
+
+/**
+ * err_exit
+ * Error output and terminate. Ignores quiet (-q).
+ */
 void err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -191,7 +323,10 @@ void err_exit(const char *fmt, ...)
 	exit(1);
 }
 
-/* Debugging output (-vv). Overriden by quiet (-q). */
+/**
+ * Dprintf
+ * Debugging output (-vv). Overriden by quiet (-q).
+ */
 void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -204,6 +339,9 @@ void Dprintf(const char *fmt, ...)
 	}
 }
 
+/**
+ * append_to_bad_blocks
+ */
 void append_to_bad_blocks(unsigned long block)
 {
 	long long *new_buf;
@@ -221,6 +359,9 @@ void append_to_bad_blocks(unsigned long block)
 	opts.bad_blocks[opts.nr_bad_blocks++] = block;
 }
 
+/**
+ * mkntfs_write
+ */
 __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 {
 	long long bytes_written, total;
@@ -251,7 +392,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 	return total;
 }
 
-/*
+/**
  * Write to disk the clusters contained in the runlist @rl taking the data
  * from @val. Take @val_len bytes from @val and pad the rest with zeroes.
  *
@@ -385,6 +526,9 @@ int stoucs(uchar_t *dest, const char *src, int maxlen)
 	return i;
 }
 
+/**
+ * dump_resident_attr_val
+ */
 void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 {
 	const char *don_t_know = "Don't know what to do with this attribute "
@@ -529,6 +673,9 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	}
 }
 
+/**
+ * dump_resident_attr
+ */
 void dump_resident_attr(ATTR_RECORD *a)
 {
 	int i;
@@ -549,12 +696,18 @@ void dump_resident_attr(ATTR_RECORD *a)
 			le32_to_cpu(a->value_length));
 }
 
+/**
+ * dump_mapping_pairs_array
+ */
 void dump_mapping_pairs_array(char *b, unsigned int max_len)
 {
 	// TODO
 	return;
 }
 
+/**
+ * dump_non_resident_attr
+ */
 void dump_non_resident_attr(ATTR_RECORD *a)
 {
 	s64 l;
@@ -585,6 +738,9 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 	dump_mapping_pairs_array((char*)a + i, le32_to_cpu(a->length) - i);
 }
 
+/**
+ * dump_attr_record
+ */
 void dump_attr_record(ATTR_RECORD *a)
 {
 	unsigned int u;
@@ -677,6 +833,9 @@ void dump_attr_record(ATTR_RECORD *a)
 	}
 }
 
+/**
+ * dump_mft_record
+ */
 void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
@@ -724,6 +883,9 @@ void dump_mft_record(MFT_RECORD *m)
 	printf("-- End of attributes. --\n");
 }
 
+/**
+ * format_mft_record
+ */
 void format_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
@@ -823,6 +985,9 @@ int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 	return 0;
 }
 
+/**
+ * deallocate_scattered_clusters
+ */
 void deallocate_scattered_clusters(const runlist *rl)
 {
 	LCN j;
@@ -851,6 +1016,9 @@ void deallocate_scattered_clusters(const runlist *rl)
  *
  * TODO: We should be returning the size as well, but for mkntfs this is not
  * necessary.
+ */
+/**
+ * allocate_scattered_clusters
  */
 runlist *allocate_scattered_clusters(s64 clusters)
 {
@@ -922,7 +1090,8 @@ err_end:
 	return NULL;
 }
 
-/*
+/**
+ * insert_positioned_attr_in_mft_record
  * Create a non-resident attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
@@ -1110,7 +1279,10 @@ err_out:
 	return err;
 }
 
-/* Return 0 on success and -errno on error. */
+/**
+ * insert_non_resident_attr_in_mft_record
+ * Return 0 on success and -errno on error.
+ */
 int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
 		const ATTR_FLAGS flags, const char *val, const s64 val_len)
@@ -1297,7 +1469,10 @@ err_out:
 	return err;
 }
 
-/* Return 0 on success and -errno on error. */
+/**
+ * insert_resident_attr_in_mft_record
+ * Return 0 on success and -errno on error.
+ */
 int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
 		const ATTR_FLAGS flags,	const RESIDENT_ATTR_FLAGS res_flags,
@@ -1397,13 +1572,19 @@ err_out:
 	return err;
 }
 
+/**
+ * time2ntfs
+ */
 s64 time2ntfs(s64 time)
 {
 	return cpu_to_le64((time + (s64)(369 * 365 + 89) * 24 * 3600)
 			* 10000000);
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_std_info
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
 {
 	STANDARD_INFORMATION si;
@@ -1437,7 +1618,10 @@ int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
 	return err;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_file_name
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 		const s64 allocated_size, const s64 data_size,
 		const FILE_ATTR_FLAGS flags, const u16 packed_ea_size,
@@ -1514,7 +1698,8 @@ int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	return i;
 }
 
-/*
+/**
+ * add_attr_sd
  * Create the security descriptor attribute adding the security descriptor @sd
  * of length @sd_len to the mft record @m.
  *
@@ -1539,7 +1724,10 @@ int add_attr_sd(MFT_RECORD *m, const char *sd, const s64 sd_len)
 	return err;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_data
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
 		const char *val, const s64 val_len)
@@ -1571,7 +1759,8 @@ int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 	return err;
 }
 
-/*
+/**
+ * add_attr_data_positioned
  * Create a non-resident data attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
@@ -1593,7 +1782,8 @@ int add_attr_data_positioned(MFT_RECORD *m, const char *name,
 	return err;
 }
 
-/*
+/**
+ * add_attr_vol_name
  * Create volume name attribute specifying the volume name @vol_name as a null
  * terminated char string of length @vol_name_len (number of characters not
  * including the terminating null), which is converted internally to a little
@@ -1635,7 +1825,10 @@ int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 	return i;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_vol_info
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
 		const u8 major_ver, const u8 minor_ver)
 {
@@ -1653,7 +1846,10 @@ int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
 	return err;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_index_root
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const ATTR_TYPES indexed_attr_type,
 		const COLLATION_RULES collation_rule,
@@ -1729,7 +1925,10 @@ int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
 	return err;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_index_alloc
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_index_alloc(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const char *index_alloc_val,
 		const u32 index_alloc_val_len)
@@ -1744,7 +1943,10 @@ int add_attr_index_alloc(MFT_RECORD *m, const char *name, const u32 name_len,
 	return err;
 }
 
-/* Return 0 on success or -errno on error. */
+/**
+ * add_attr_bitmap
+ * Return 0 on success or -errno on error.
+ */
 int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const char *bitmap,
 		const u32 bitmap_len)
@@ -1765,7 +1967,8 @@ int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 	return err;
 }
 
-/*
+/**
+ * add_attr_bitmap_positioned
  * Create a non-resident bitmap attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
@@ -1786,7 +1989,8 @@ int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
 	return err;
 }
 
-/*
+/**
+ * upgrade_to_large_index
  * Create bitmap and index allocation attributes, modify index root
  * attribute accordingly and move all of the index entries from the index root
  * into the index allocation.
@@ -1946,7 +2150,8 @@ err_out:
 	return err;
 }
 
-/*
+/**
+ * make_room_for_index_entry_in_index_block
  * Create space of @size bytes at position @pos inside the index block @index.
  *
  * Return 0 on success or -errno on error.
@@ -1996,7 +2201,8 @@ int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
 	return 0;
 }
 
-/*
+/**
+ * insert_file_link_in_dir_index
  * Insert the fully completed FILE_NAME_ATTR @file_name which is inside
  * the file with mft reference @file_ref into the index (allocation) block
  * @index (which belongs to @file_ref's parent directory).
@@ -2123,7 +2329,8 @@ do_next:
 	return 0;
 }
 
-/*
+/**
+ * create_hardlink
  * Create a file_name_attribute in the mft record @m_file which points to the
  * parent directory with mft reference @ref_parent.
  *
@@ -2219,6 +2426,9 @@ int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 	return 0;
 }
 
+/**
+ * init_options
+ */
 void init_options()
 {
 	memset(&opts, 0, sizeof(opts));
@@ -2228,96 +2438,9 @@ void init_options()
 	//Dprintf("Attr_defs table length = %u\n", opts.attr_defs_len);
 }
 
-void usage(void) __attribute__ ((noreturn));
-
-void usage(void)
-{
-	fprintf(stderr, "Copyright (c) 2001-2003 Anton Altaparmakov.\n"
-		"Create an NTFS volume on a user specified (block) device.\n"
-		"Usage: %s [-s sector-size] [-c cluster-size] "
-			"[-L volume-label]\n\t[-z mft-zone-multiplier] "
-			"[-fnqvvCFIQV] device [number-of-sectors]\n",
-		EXEC_NAME);
-	exit(1);
-}
-
-void parse_options(int argc, char *argv[])
-{
-	int c;
-	long l;
-	unsigned long u;
-	char *s;
-
-// Need to have: mft record size, index record size, ntfs version, mft size,
-//		 logfile size, list of bad blocks, check for bad blocks, ...
-	if (argc && *argv)
-		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "c:fnqs:vz:CFIL:QV")) != EOF)
-		switch (c) {
-		case 'n':
-			opts.no_action = 1;
-			break;
-		case 'c':
-			l = strtol(optarg, &s, 0);
-			if (!l || l > INT_MAX || *s)
-				err_exit("Invalid cluster size.\n");
-			vol->cluster_size = l;
-			break;
-		case 'f':
-		case 'Q':
-			opts.quick_format = 1;
-			break;
-		case 'q':
-			opts.quiet = 1;
-			break;
-		case 's':
-			l = strtol(optarg, &s, 0);
-			if (!l || l > INT_MAX || *s)
-				err_exit("Invalid sector size.\n");
-			opts.sector_size = l;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
-		case 'z':
-			l = strtol(optarg, &s, 0);
-			if (l < 1 || l > 4 || *s)
-				err_exit("Invalid MFT zone multiplier.\n");
-			opts.mft_zone_multiplier = l;
-			break;
-		case 'C':
-			opts.enable_compression = 1;
-			break;
-		case 'F':
-			opts.force = 1;
-			break;
-		case 'I':
-			opts.disable_indexing = 1;
-			break;
-		case 'L':
-			vol->vol_name = optarg;
-			break;
-		case 'V':
-			/* Version number already printed, so just exit. */
-			exit(0);
-		default:
-			usage();
-		}
-	if (optind == argc)
-		usage();
-	vol->dev_name = argv[optind++];
-	if (optind < argc) {
-		u = strtoul(argv[optind++], &s, 0);
-		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
-			err_exit("Invalid number of sectors: %s\n",
-					argv[optind - 1]);
-		opts.nr_sectors = u;
-	}
-	if (optind < argc)
-		usage();
-}
-
+/**
+ * mkntfs_exit
+ */
 void mkntfs_exit(void)
 {
 	int err;
@@ -2370,7 +2493,9 @@ void mkntfs_exit(void)
 // What's wrong with MK_MREF?
 #define MAKE_MFT_REF(_ref, _seqno)	cpu_to_le64((((u64)(_seqno)) << 48) \
 						| ((u64)(_ref)))
-
+/**
+ * main
+ */
 int main(int argc, char **argv)
 {
 	int i, j, err;
@@ -2384,6 +2509,8 @@ int main(int argc, char **argv)
 	char *sd;
 	NTFS_BOOT_SECTOR *bs;
 	unsigned long mnt_flags;
+
+	utils_set_locale();
 
 	/* Initialize the random number generator with the current time. */
 	srandom(time(NULL));
