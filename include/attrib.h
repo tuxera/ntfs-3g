@@ -254,14 +254,6 @@ extern int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn);
 extern LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn);
 extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
 
-extern int ntfs_get_nr_significant_bytes(const s64 n);
-
-extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const runlist_element *rl);
-
-extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
-		const s64 n);
-
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
 

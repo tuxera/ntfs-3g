@@ -1098,6 +1098,139 @@ rl_err_out:
 }
 
 /**
+ * ntfs_get_nr_significant_bytes - get number of bytes needed to store a number
+ * @n:		number for which to get the number of bytes for
+ *
+ * Return the number of bytes required to store @n unambiguously as
+ * a signed number.
+ *
+ * This is used in the context of the mapping pairs array to determine how
+ * many bytes will be needed in the array to store a given logical cluster
+ * number (lcn) or a specific run length.
+ *
+ * Return the number of bytes written. This function cannot fail.
+ */
+__inline__ int ntfs_get_nr_significant_bytes(const s64 n)
+{
+	s64 l = n;
+	int i;
+	s8 j;
+
+	i = 0;
+	do {
+		l >>= 8;
+		i++;
+	} while (l != 0LL && l != -1LL);
+	j = (n >> 8 * (i - 1)) & 0xff;
+	/* If the sign bit is wrong, we need an extra byte. */
+	if ((n < 0LL && j >= 0) || (n > 0LL && j < 0))
+		i++;
+	return i;
+}
+
+/**
+ * ntfs_get_size_for_mapping_pairs - get bytes needed for mapping pairs array
+ * @vol:	ntfs volume (needed for the ntfs version)
+ * @rl:		runlist for which to determine the size of the mapping pairs
+ *
+ * Walk the runlist @rl and calculate the size in bytes of the mapping pairs
+ * array corresponding to the runlist @rl. This for example allows us to
+ * allocate a buffer of the right size when building the mapping pairs array.
+ *
+ * Return the calculated size in bytes on success. If @rl is NULL return 0.
+ * On error, return -1 with errno set to the error code. The following error
+ * codes are defined:
+ *	EINVAL	- Run list contains unmapped elements. Make sure to only pass
+ *		  fully mapped runlists to this function.
+ *	EIO	- The runlist is corrupt.
+ */
+int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
+		const runlist_element *rl)
+{
+	LCN prev_lcn;
+	int i, rls;
+
+	if (!rl)
+		return 0;
+	/* Always need the termining zero byte. */
+	rls = 1;
+	for (prev_lcn = i = 0; rl[i].length; prev_lcn = rl[++i].lcn) {
+		if (rl[i].length < 0 || rl[i].lcn < LCN_HOLE)
+			goto err_out;
+		/* Header byte + length. */
+		rls += 1 + ntfs_get_nr_significant_bytes(rl[i].length);
+		/*
+		 * If the logical cluster number (lcn) denotes a hole and we
+		 * are on NTFS 3.0+, we don't store it at all, i.e. we need
+		 * zero space. On earlier NTFS versions we just store the lcn.
+		 */
+		if (rl[i].lcn == LCN_HOLE && vol->major_ver >= 3)
+			continue;
+		/* Change in lcn. */
+		rls += ntfs_get_nr_significant_bytes(rl[i].lcn - prev_lcn);
+	}
+	return rls;
+err_out:
+	if (rl[i].lcn == LCN_RL_NOT_MAPPED)
+		errno = EINVAL;
+	else
+		errno = EIO;
+	return -1;
+}
+
+/**
+ * ntfs_write_significant_bytes - write the significant bytes of a number
+ * @dst:	destination buffer to write to
+ * @dst_max:	pointer to last byte of destination buffer for bounds checking
+ * @n:		number whose significant bytes to write
+ *
+ * Store in @dst, the minimum bytes of the number @n which are required to
+ * identify @n unambiguously as a signed number, taking care not to exceed
+ * @dest_max, the maximum position within @dst to which we are allowed to
+ * write.
+ *
+ * This is used when building the mapping pairs array of a runlist to compress
+ * a given logical cluster number (lcn) or a specific run length to the minumum
+ * size possible.
+ *
+ * Return the number of bytes written on success. On error, i.e. the
+ * destination buffer @dst is too small, return -1 with errno set ENOSPC.
+ */
+__inline__ int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
+		const s64 n)
+{
+	s64 l = n;
+	int i;
+	s8 j;
+
+	i = 0;
+	do {
+		if (dst > dst_max)
+			goto err_out;
+		*dst++ = l & 0xffLL;
+		l >>= 8;
+		i++;
+	} while (l != 0LL && l != -1LL);
+	j = (n >> 8 * (i - 1)) & 0xff;
+	/* If the sign bit is wrong, we need an extra byte. */
+	if (n < 0LL && j >= 0) {
+		if (dst > dst_max)
+			goto err_out;
+		i++;
+		*dst = (s8)-1;
+	} else if (n > 0LL && j < 0) {
+		if (dst > dst_max)
+			goto err_out;
+		i++;
+		*dst = (s8)0;
+	}
+	return i;
+err_out:
+	errno = ENOSPC;
+	return -1;
+}
+
+/**
  * ntfs_mapping_pairs_build - build the mapping pairs array from a runlist
  * @vol:	ntfs volume (needed for the ntfs version)
  * @dst:	destination buffer to which to write the mapping pairs array

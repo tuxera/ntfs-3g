@@ -60,6 +60,14 @@ extern runlist_element *ntfs_runlists_merge(runlist_element *drl,
 extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
 
+extern int ntfs_get_nr_significant_bytes(const s64 n);
+
+extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
+		const runlist_element *rl);
+
+extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
+		const s64 n);
+
 extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
 		const int dst_len, const runlist_element *rl);
 
