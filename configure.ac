@@ -84,6 +84,9 @@ AC_ARG_ENABLE(really-static,
 )
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
 
+# Use GNU extensions if available.
+AC_GNU_SOURCE
+
 # For djgpp support.  (Note: This needs to be before AC_PROG_CC.)
 case "$target" in
 *-*-*djgpp)
@@ -99,9 +102,6 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
-
-# Use GNU extensions if available.(AIA)
-AC_GNU_SOURCE
 
 # Enable large file support.
 AC_SYS_LARGEFILE
