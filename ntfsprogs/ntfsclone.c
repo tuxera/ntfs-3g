@@ -1010,10 +1010,8 @@ static void print_image_info(void)
 	Printf("Cluster size       : %u bytes\n",
 	       (unsigned int)image_hdr.cluster_size);
 	print_volume_size("Image volume size  ",
-			  image_hdr.cluster_size
-			  * image_hdr.nr_clusters);
-	Printf("Image device size  : %lld bytes\n",
-	       image_hdr.device_size);
+			  image_hdr.nr_clusters * image_hdr.cluster_size);
+	Printf("Image device size  : %lld bytes\n", image_hdr.device_size);
 	print_disk_usage(image_hdr.cluster_size,
 			 image_hdr.nr_clusters,
 			 image_hdr.inuse);
@@ -1231,25 +1229,24 @@ static void initialise_image_hdr(s64 device_size, s64 inuse)
 	image_hdr.inuse = inuse;
 }
 
-static void check_output_filesize(s64 device_size)
+static void check_output_device(s64 input_size)
 {
 	if (opt.blkdev_out) {
 		s64 dest_size = device_size_get(fd_out);
-		s64 ntfs_size = vol->nr_clusters * vol->cluster_size;
-		ntfs_size += 512; /* add backup boot sector */
-		if (dest_size < ntfs_size)
-			err_exit("Output device size (%lld) is too small"
-				 " to fit the NTFS image.\n", dest_size);
+		if (dest_size < input_size)
+			err_exit("Output device is too small (%lld) to fit the "
+				 "NTFS image (%lld).\n", dest_size, input_size);
 		
 		check_if_mounted(opt.output, 0);
 	} else
-		set_filesize(device_size);
+		set_filesize(input_size);
 }
 
 int main(int argc, char **argv)
 {
 	ntfs_walk_clusters_ctx image;
-	s64 device_size;        /* in bytes */
+	s64 device_size;        /* input device size in bytes */
+	s64 ntfs_size;
 	int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
@@ -1260,10 +1257,14 @@ int main(int argc, char **argv)
 	
 	utils_set_locale();
 
-	if (opt.restore_image)
+	if (opt.restore_image) {
 		device_size = open_image();
-	else
+		ntfs_size = image_hdr.nr_clusters * image_hdr.cluster_size;
+	} else {
 		device_size = open_volume();
+		ntfs_size = vol->nr_clusters * vol->cluster_size;
+	}
+	ntfs_size += 512; /* add backup boot sector */
 
 	if (opt.std_out) {
 	       if ((fd_out = fileno(stdout)) == -1) 
@@ -1282,7 +1283,7 @@ int main(int argc, char **argv)
 			perr_exit("Opening file '%s' failed", opt.output);
 
 		if (!opt.save_image)
-			check_output_filesize(device_size);
+			check_output_device(ntfs_size);
 	}
 
 	if (opt.restore_image) {
