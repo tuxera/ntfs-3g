@@ -274,6 +274,10 @@ Recover the file with this inode number.  This option can be combined with
 .BR \-\-destination ,
 and
 .BR \-\-byte .
+.sp
+When the file is recovered it will be given its original name, unless the
+.B "\-\-output"
+option is used.
 .TP
 .B \-v
 .br
