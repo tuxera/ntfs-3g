@@ -1623,3 +1623,64 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	/* Done! */
 	return 0;
 }
+
+/**
+ * ntfs_runlist_sparse - check whether runlist have sparse regions or not.
+ * @rl:		runlist to check
+ *
+ * Return 1 if have, 0 if not, -1 on error with errno set to the error code.
+ */
+int ntfs_rl_sparse(runlist *rl)
+{
+	runlist *rlc;
+
+	if (!rl) {
+		Dprintf("%s(): Ivalid argument passed.\n");
+		errno = EINVAL;
+		return -1;
+	}
+
+	for (rlc = rl; rlc->length; rlc++)
+		if (rlc->lcn < 0) {
+			if (rlc->lcn != LCN_HOLE) {
+				Dprintf("%s(): Recevied unmapped runlist.\n",
+					__FUNCTION__);
+				errno = EINVAL;
+				return -1;
+			}
+			return 1;
+		}
+	return 0;
+}
+
+/**
+ * ntfs_runlist_get_compressed_size - calculate length of non sparse regions
+ * @vol:	ntfs volume (need for cluster size)
+ * @rl:		runlist to calculate for
+ *
+ * Return compressed size or -1 on error with errno set to the error code.
+ */
+s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
+{
+	runlist *rlc;
+	s64 ret = 0;
+
+	if (!rl) {
+		Dprintf("%s(): Ivalid argument passed.\n");
+		errno = EINVAL;
+		return -1;
+	}
+
+	for (rlc = rl; rlc->length; rlc++) {
+		if (rlc->lcn < 0) {
+			if (rlc->lcn != LCN_HOLE) {
+				Dprintf("%s(): Recevied unmapped runlist.\n",
+					__FUNCTION__);
+				errno = EINVAL;
+				return -1;
+			}
+		} else
+			ret = rlc->length << vol->cluster_size_bits;
+	}
+	return ret;
+}
