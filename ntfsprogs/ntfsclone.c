@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003 Szabolcs Szakacsits
  *
- * ntfsclone clones NTFS data and/or metadata to a sparse file or stdout.
+ * Clone NTFS data and/or metadata to a sparse file, device or stdout.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <string.h>
@@ -47,6 +48,7 @@ struct {
 	int force;
 	int overwrite;
 	int stdout;
+	int blkdev_out;		/* output file is block device */   
 	int metadata_only;
 	char *output;
 	char *volume;
@@ -103,6 +105,9 @@ int wiped_timestamp_data = 0;
 #define NTFS_MAX_CLUSTER_SIZE 	65536
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
+
+#define read_all(f, p, n)  io_all((f), (p), (n), 0)
+#define write_all(f, p, n) io_all((f), (p), (n), 1)
 
 GEN_PRINTF(Eprintf, stderr,  NULL,         FALSE)
 GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
@@ -165,15 +170,15 @@ int perr_exit(const char *fmt, ...)
 void usage()
 {
 	Eprintf("\nUsage: %s [options] device\n"
-		"    Clone NTFS data to a sparse file or send it to stdout.\n"
+		"    Efficiently clone NTFS to a sparse file, device or stdandard output.\n"
 		"\n"
-		"    -o FILE --output FILE  Clone NTFS to the non-existent FILE\n"
-		"    -O FILE                Clone NTFS to FILE, overwriting if exists\n"
-		"    -m      --metadata     Clone *only* metadata (for NTFS experts)\n"
-		"    -f      --force        Force to progress (DANGEROUS)\n"
-		"    -h      --help         Display this help\n"
+		"    -o FILE --output FILE      Clone NTFS to the non-existent FILE\n"
+		"    -O FILE --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
+		"    -m      --metadata         Clone *only* metadata (for NTFS experts)\n"
+		"    -f      --force            Force to progress (DANGEROUS)\n"
+		"    -h      --help             Display this help\n"
 #ifdef DEBUG
-		"    -d      --debug        Show debug information\n"
+		"    -d      --debug            Show debug information\n"
 #endif
 		"\n"
 		"    If FILE is '-' then send NTFS data to stdout replacing non used\n"
@@ -195,6 +200,7 @@ void parse_options(int argc, char **argv)
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "metadata",	no_argument,		NULL, 'm' },
 		{ "output",	required_argument,	NULL, 'o' },
+		{ "overwrite",	required_argument,	NULL, 'O' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -248,8 +254,29 @@ void parse_options(int argc, char **argv)
 	}
 
 	if (opt.metadata_only && opt.stdout)
-		err_exit("Cloning only metadata to stdout isn't supported yet!\n");
-	
+		err_exit("Cloning only metadata to stdout isn't supported!\n");
+
+	if (!opt.stdout) {
+		struct stat st;
+		
+		if (stat(opt.output, &st) == -1) {
+			if (errno != ENOENT)
+				perr_exit("Couldn't access '%s'", opt.output); 
+		} else {
+			if (!opt.overwrite)
+				err_exit("Output file '%s' already exists.\n"
+					 "Use option --overwrite if you want to"
+					 " replace its content.\n", opt.output);
+
+			if (S_ISBLK(st.st_mode)) {
+				opt.blkdev_out = 1;
+				if (opt.metadata_only)
+					err_exit("Cloning only metadata to a "
+					     "block device isn't supported!\n");
+			}
+		}
+	}	
+		
 	msg_out = stdout;
 	
 	/* FIXME: this is a workaround for loosing debug info if stdout != stderr
@@ -263,6 +290,27 @@ void parse_options(int argc, char **argv)
 			perr_exit("Couldn't open /dev/null");
 }
 
+void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
+{
+	p->start = start;
+	p->stop = stop;
+	p->unit = 100.0 / (stop - start);
+	p->resolution = res;
+}
+
+
+void progress_update(struct progress_bar *p, u64 current)
+{
+	float percent = p->unit * current;
+
+	if (current != p->stop) {
+		if ((current - p->start) % p->resolution)
+			return;
+		Printf("%6.2f percent completed\r", percent);
+	} else
+		Printf("100.00 percent completed\n");
+	fflush(msg_out);
+}
 
 /**
  * nr_clusters_to_bitmap_byte_size
@@ -283,7 +331,7 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-int is_critical_meatadata(ntfs_walk_clusters_ctx *image)
+int is_critical_metadata(ntfs_walk_clusters_ctx *image)
 {
 	s64 inode;
 	
@@ -299,31 +347,38 @@ int is_critical_meatadata(ntfs_walk_clusters_ctx *image)
 	return 0;
 }
 
-void write_cluster(const char *buff)
+
+int io_all(void *fd, void *buf, int count, int do_write)
 {
-	int count;
+	int i;
+	struct ntfs_device *dev = (struct ntfs_device *)fd;
 	
-	if ((count = write(fd_out, buff, vol->cluster_size)) == -1)
-		perr_exit("write");
-	
-	if (count != vol->cluster_size)
-		err_exit("Partial write not yet handled\n");
+	while (count > 0) {
+		if (do_write)
+			i = write(*(int *)fd, buf, count);
+		else
+			i = dev->d_ops->read(dev, buf, count);
+		if (i < 0) {
+			if (errno != EAGAIN && errno != EINTR)
+				return -1;
+		} else {
+			count -= i;
+			buf = i + (char *) buf;
+		}
+	}
+	return 0;
 }
+
 
 void copy_cluster()
 {
-	int count;
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 
-	/* FIXME: handle partial read/writes */
-	if ((count = vol->dev->d_ops->read(vol->dev, buff,
-			vol->cluster_size)) == -1)
-		perr_exit("read");
+	if (read_all(vol->dev, buff, vol->cluster_size) == -1)
+		perr_exit("read_all");
 
-	if (count != vol->cluster_size)
-		err_exit("Partial read not yet handled\n");
-	
-	write_cluster(buff);
+	if (write_all(&fd_out, buff, vol->cluster_size) == -1)
+		perr_exit("write_all");
 }
 
 void lseek_to_cluster(s64 lcn)
@@ -349,7 +404,7 @@ void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 	if (opt.stdout)
 		return;
 	
-	if (opt.metadata_only && !is_critical_meatadata(image))
+	if (!opt.metadata_only || !is_critical_metadata(image))
 		return;
 
 	lseek_to_cluster(rl->lcn);
@@ -359,16 +414,21 @@ void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 		copy_cluster();
 }
 
-void dump_to_stdout()
+void clone_ntfs(u64 nr_clusters)
 {
 	s64 i, pos, count;
 	u8 bm[NTFS_BUF_SIZE];
-	void *buff;
+	void *buf;
+	u32 csize = vol->cluster_size;
+	u64 p_counter = 0;
+	struct progress_bar progress;
 
-	Printf("Dumping NTFS to stdout ...\n");
+	Printf("Cloning NTFS ...\n");
 	
-	if ((buff = calloc(1, vol->cluster_size)) == NULL)
+	if ((buf = calloc(1, csize)) == NULL)
 		perr_exit("dump_to_stdout");
+	
+	progress_init(&progress, p_counter, nr_clusters, 100);
 	
 	pos = 0;
 	while (1) {
@@ -388,10 +448,17 @@ void dump_to_stdout()
 					return;
 				
 				if (ntfs_bit_get(bm, i * 8 + cl % 8)) {
+					progress_update(&progress, ++p_counter);
 					lseek_to_cluster(cl);
 					copy_cluster();
-				} else
-					write_cluster(buff);
+					continue;
+				}
+				
+				if (opt.stdout) {
+					progress_update(&progress, ++p_counter);
+					if (write_all(&fd_out, buf, csize) == -1)
+						perr_exit("write_all");
+				}
 			}
 		}
 	}
@@ -577,28 +644,6 @@ void compare_bitmaps(struct bitmap *a)
 }
 
 
-void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
-{
-	p->start = start;
-	p->stop = stop;
-	p->unit = 100.0 / (stop - start);
-	p->resolution = res;
-}
-
-
-void progress_update(struct progress_bar *p, u64 current)
-{
-	float percent = p->unit * current;
-
-	if (current != p->stop) {
-		if ((current - p->start) % p->resolution)
-			return;
-		Printf("%6.2f percent completed\r", percent);
-	} else
-		Printf("100.00 percent completed\n");
-	fflush(msg_out);
-}
-
 int wipe_data(char *p, int pos, int len)
 {
 	int wiped = 0;
@@ -619,7 +664,7 @@ void wipe_unused_mft_data(ntfs_inode *ni)
 	int unused;
 	MFT_RECORD *m = ni->mrec;
 	
-	/* FIXME: MFTMirr update is broken in libntfs */
+	/* FIXME: broken MFTMirr update was fixed in libntfs, check if OK now */
 	if (ni->mft_no <= LAST_METADATA_INODE)
 		return;
 	
@@ -632,7 +677,7 @@ void wipe_unused_mft(ntfs_inode *ni)
 	int unused;
 	MFT_RECORD *m = ni->mrec;
 	
-	/* FIXME: MFTMirr update is broken in libntfs */
+	/* FIXME: broken MFTMirr update was fixed in libntfs, check if OK now */
 	if (ni->mft_no <= LAST_METADATA_INODE)
 		return;
 	
@@ -661,7 +706,7 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 
 		progress_update(&progress, inode);
 
-		/* FIXME: Terribe kludge for libntfs not being able to return
+		/* FIXME: Terrible kludge for libntfs not being able to return
 		   a deleted MFT record as inode */
 		ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
 		if (!ni)
@@ -769,11 +814,10 @@ void print_volume_size(char *str, s64 bytes)
 
 void print_disk_usage(ntfs_walk_clusters_ctx *image)
 {
-	s64 total, used, free;
+	s64 total, used;
 
 	total = vol->nr_clusters * vol->cluster_size;
 	used = image->inuse * vol->cluster_size;
-	free = total - used;
 
 	Printf("Space in use       : %lld MB (%.1f%%)   ",
 	       rounded_up_division(used, NTFS_MBYTE),
@@ -836,12 +880,62 @@ void mount_volume(unsigned long new_mntflag)
 
 struct ntfs_walk_cluster backup_clusters = { NULL, NULL }; 
 
+int device_offset_valid(int fd, s64 ofs)
+{
+	char ch;
+
+	if (lseek(fd, ofs, SEEK_SET) >= 0 && read(fd, &ch, 1) == 1)
+		return 0;
+	return -1;
+}
+
+s64 device_size_get(int fd)
+{
+	s64 high, low;
+#ifdef BLKGETSIZE
+	long size;
+
+	if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
+		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
+				size);
+		return (s64)size * 512;
+	}
+#endif
+#ifdef FDGETPRM
+	{       struct floppy_struct this_floppy;
+
+		if (ioctl(fd, FDGETPRM, &this_floppy) >= 0) {
+			Dprintf("FDGETPRM nr 512 byte blocks = %ld (0x%ld)\n",
+					this_floppy.size, this_floppy.size);
+			return (s64)this_floppy.size * 512;
+		}
+	}
+#endif
+	/*
+	 * We couldn't figure it out by using a specialized ioctl,
+	 * so do binary search to find the size of the device.
+	 */
+	low = 0LL;
+	for (high = 1024LL; !device_offset_valid(fd, high); high <<= 1)
+		low = high;
+	while (low < high - 1LL) {
+		const s64 mid = (low + high) / 2;
+
+		if (!device_offset_valid(fd, mid))
+			low = mid;
+		else
+			high = mid;
+	}
+	lseek(fd, 0LL, SEEK_SET);
+	return (low + 1LL);
+}
+
 
 int main(int argc, char **argv)
 {
 	ntfs_walk_clusters_ctx image;
 	s64 device_size;        /* in bytes */
-	int flags, wiped_total = 0;
+	int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
 	Eprintf("%s v%s\n", EXEC_NAME, VERSION);
@@ -853,8 +947,7 @@ int main(int argc, char **argv)
 
 	mount_volume(MS_RDONLY);
 	
-	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
-	device_size *= vol->sector_size;
+	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)
 		err_exit("Couldn't get device size (%Ld)!\n", device_size);
 
@@ -869,15 +962,39 @@ int main(int argc, char **argv)
 	       if ((fd_out = fileno(stdout)) == -1) 
 		       perr_exit("fileno for stdout failed");
 	} else {
-		flags =	O_CREAT | O_TRUNC | O_WRONLY;
-		if (!opt.overwrite)
-			flags |= O_EXCL;
+		int flags = O_WRONLY;
+		
+		if (!opt.blkdev_out) {
+			flags |= O_CREAT | O_TRUNC;
+			if (!opt.overwrite)
+				flags |= O_EXCL;
+		}
 
 		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1) 
 			perr_exit("opening file '%s' failed", opt.output);
 	
-		if (ftruncate(fd_out, device_size) == -1)
-			perr_exit("ftruncate failed for file '%s'", opt.output);
+		if (!opt.blkdev_out) {
+			struct statfs stfs;
+			
+			if (fstatfs(fd_out, &stfs) == -1)
+				Printf("Couldn't get Linux filesystem type: "
+				       "%s\n", strerror(errno));
+			else if (stfs.f_type == 0x52654973) {
+				Printf("WARNING: You're using ReiserFS, it has "
+				       "very poor performance creating\nlarge "
+				       "sparse files. The next operation "
+				       "might take a very long time!\n"
+				       "Creating sparse output file ...\n");
+			}
+			if (ftruncate(fd_out, device_size) == -1)
+				perr_exit("ftruncate failed for file '%s'", 
+					  opt.output);
+		} else {
+			s64 dest_size = device_size_get(fd_out);
+			if (dest_size < device_size)
+				err_exit("Output device size (%Ld) is too small"
+				    " to fit an NTFS clone\n", dest_size);
+		}
 	}
 
 	setup_lcn_bitmap();
@@ -892,18 +1009,15 @@ int main(int argc, char **argv)
 	
 	/* FIXME: save backup boot sector */
 
-	if (opt.stdout) {
-		dump_to_stdout();
-		fsync(fd_out);
+	if (opt.stdout || !opt.metadata_only) {
+		u64 nr_clusters = opt.stdout ? vol->nr_clusters : image.inuse;
+		
+		clone_ntfs(nr_clusters);
+		Printf("Syncing ...\n");
+		if (fsync(fd_out) && errno != EINVAL)
+			perr_exit("fsync");
 		exit(0);
 	}
-	
-	Printf("Syncing image file ...\n");
-	if (fsync(fd_out) == -1)
-		perr_exit("fsync");
-
-	if (!opt.metadata_only)
-		exit(0);
 	
 	wipe = 1;	
 	opt.volume = opt.output;
