@@ -51,11 +51,11 @@
  * name:	name of the device (must be present)
  * state:	initial device state (usually zero)
  * dops:	ntfs device operations to use with the device (must be present)
- * private:	pointer to private data (optional)
+ * priv_data:	pointer to private data (optional)
  *
  * Allocate an ntfs device structure and pre-initialize it with the user-
  * specified device operations @dops, device state @state, device name @name,
- * and optional private data @private.
+ * and optional private data @priv_data.
  *
  * Note, @name is copied and can hence be freed after this functions returns.
  *
@@ -63,7 +63,7 @@
  * error return NULL with errno set to the error code returned by malloc().
  */
 struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
-		struct ntfs_device_operations *dops, void *private)
+		struct ntfs_device_operations *dops, void *priv_data)
 {
 	struct ntfs_device *dev;
 
@@ -82,7 +82,7 @@ struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
 		}
 		dev->d_ops = dops;
 		dev->d_state = state;
-		dev->d_private = private;
+		dev->d_private = priv_data;
 	}
 	return dev;
 }

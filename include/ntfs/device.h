@@ -89,7 +89,7 @@ struct ntfs_device_operations {
 };
 
 extern struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
-		struct ntfs_device_operations *dops, void *private);
+		struct ntfs_device_operations *dops, void *priv_data);
 extern int ntfs_device_free(struct ntfs_device *dev);
 
 extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
