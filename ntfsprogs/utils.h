@@ -30,6 +30,7 @@
 
 #include <errno.h>
 #include <stdarg.h>
+#include <regex.h>
 
 extern const char *ntfs_bugs;
 extern const char *ntfs_home;
@@ -38,7 +39,7 @@ extern const char *ntfs_gpl;
 #define PATH_SEP	'/'
 #define MAX_PATH	1024
 
-#ifndef REG_NOERROR
+#if (REG_NOERROR != 0)
 #define REG_NOERROR	REG_OKAY
 #endif
 
