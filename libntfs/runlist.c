@@ -896,7 +896,7 @@ mpa_err:
 		 * highest cluster, the runlist is either corrupt or, more
 		 * likely, there are more extents following this one.
 		 */
-		if (deltaxcn < --max_cluster) {
+		if (deltaxcn && deltaxcn < --max_cluster) {
 			Dprintf("More extents to follow; deltaxcn = 0x%llx, "
 					"max_cluster = 0x%llx\n",
 					(long long)deltaxcn,
