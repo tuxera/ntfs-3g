@@ -2530,7 +2530,7 @@ put_err_out:
  * ntfs_attr_record_rm - remove attribute extent
  * @ctx:	search context describing the attrubute which should be removed
  *
- * User should reinit search context after use of this function if he/she wants
+ * If this function succeed, user should reinit search context if he/she wants
  * use it anymore.
  *
  * Return 0 on success and -1 on error. On error the error code is stored in
@@ -2571,6 +2571,8 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 			return -1;
 		}
 	}
+
+	/* Remove attribute itself. */
 	if (ntfs_attr_record_resize(ctx->mrec, ctx->attr, 0)) {
 		Dprintf("%s(): Coudn't remove attribute record. Bug or "
 			"damaged MFT record.\n", __FUNCTION__);
@@ -2582,6 +2584,8 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 		return -1;
 	}
 	ntfs_inode_mark_dirty(ni);
+
+	/* Post $ATTRIBUTE_LIST delete setup. */
 	if (type == AT_ATTRIBUTE_LIST) {
 		if (NInoAttrList(base_ni) && base_ni->attr_list)
 			free(base_ni->attr_list);
@@ -2591,6 +2595,8 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 		NInoClearAttrListNonResident(base_ni);
 		NInoAttrListClearDirty(base_ni);
 	}
+
+	/* Free MFT record, if it isn't contain attributes. */
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) -
 			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(ni->vol, ni)) {
@@ -2604,8 +2610,11 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 		if (ni == base_ni)
 			return 0;
 	}
+
 	if (type == AT_ATTRIBUTE_LIST || !NInoAttrList(base_ni))
 		return 0;
+
+	/* Remove attribute list if we don't need it any more. */
 	if (!ntfs_attrlist_need(base_ni)) {
 		ntfs_attr_reinit_search_ctx(ctx);
 		if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, IGNORE_CASE,
@@ -2756,6 +2765,96 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	/* Finally update the length of the attribute value. */
 	a->value_length = cpu_to_le32(new_size);
 	return 0;
+}
+
+/**
+ * ntfs_attr_record_move_to - move attribute record to target inode
+ * @ctx:	attribute search context describing the attrubute record
+ * @ni:		opened ntfs inode to which move attribute record
+ *
+ * If this function succeed, user should reinit search context if he/she wants
+ * use it anymore.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
+{
+	ntfs_attr_search_ctx *nctx;
+	ATTR_RECORD *a;
+	int err;
+
+	if (!ctx || !ctx->attr || !ctx->ntfs_ino || !ni) {
+		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for ctx->attr->type 0x%x, ctx->ntfs_ino->mft_no"
+		" 0x%llx, ni->mft_no 0x%llx.\n", __FUNCTION__, ctx->attr->type,
+		(long long) ctx->ntfs_ino->mft_no, (long long) ni->mft_no);
+
+	if (ctx->ntfs_ino == ni)
+		return 0;
+
+	if (!ctx->al_entry) {
+		Dprintf("%s(): Inode should contain attribute list to use "
+			"this function.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Find place in MFT record where attribute will be moved. */
+	a = ctx->attr;
+	nctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	if (!nctx) {
+		err = errno;
+		Dprintf("%s(): Couldn't obtain search context.\n",
+			__FUNCTION__);
+		errno = err;
+		return -1;
+	}
+	if (!ntfs_attr_lookup(a->type, (ntfschar*)((u8*)a + le16_to_cpu(
+			a->name_offset)), ctx->attr->name_length,
+			CASE_SENSITIVE,	0, NULL, 0, nctx)) {
+		Dprintf("%s(): Attribute of such type, with same name already "
+			"present in this MFT record.\n", __FUNCTION__);
+		err = EEXIST;
+		goto put_err_out;
+	}
+	if (errno != ENOENT) {
+		err = errno;
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+
+	/* Make space and move attribute. */
+	if (ntfs_make_room_for_attr(ni->mrec, (u8*) nctx->attr, 
+					le32_to_cpu(a->length))) {
+		err = errno;
+		Dprintf("%s(): Couldn't make space for attribute.\n",
+			__FUNCTION__);
+		goto put_err_out;
+	}
+	memcpy(nctx->attr, a, le32_to_cpu(a->length));
+	nctx->attr->instance = nctx->mrec->next_attr_instance;
+	nctx->mrec->next_attr_instance = cpu_to_le16(
+		(le16_to_cpu(nctx->mrec->next_attr_instance) + 1) & 0xffff);
+	ntfs_attr_record_resize(ctx->mrec, a, 0);
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+	ntfs_inode_mark_dirty(ni);
+
+	/* Update attribute list. */
+	ctx->al_entry->mft_reference =
+		MK_LE_MREF(ni->mft_no, le16_to_cpu(ni->mrec->sequence_number));
+	ctx->al_entry->instance = nctx->attr->instance;
+	ntfs_attrlist_mark_dirty(ni);
+
+	ntfs_attr_put_search_ctx(nctx);
+	return 0;
+put_err_out:
+	ntfs_attr_put_search_ctx(nctx);
+	errno = err;
+	return -1;
 }
 
 /**
@@ -2984,6 +3083,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_volume *vol;
+	ntfs_inode *ni;
 	int err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
@@ -3064,19 +3164,47 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	// TODO: Try to make other attributes non-resident and retry each time.
 
-	if (na->type == AT_ATTRIBUTE_LIST && errno == ENOSPC) {
+	if (na->type == AT_ATTRIBUTE_LIST) {
 		err = errno;
 		goto put_err_out;
 	}
+	
+	/*
+	 * Move the attribute to a new mft record, creating an attribute list
+	 * attribute or modifying it if it is already present.
+	 */
 
-	// TODO: Move the attribute to a new mft record, creating an attribute
-	// list attribute or modifying it if it is already present.
+	/* Add attribute list if not present. */
+	if (na->ni->nr_extents == -1)
+		ni = na->ni->base_ni;
+	else
+		ni = na->ni;
+	if (!NInoAttrList(na->ni)) {
+		ntfs_inode_add_attrlist(ni);
+		ntfs_attr_put_search_ctx(ctx);
+		return ntfs_resident_attr_resize(na, newsize);
+	}
+	/* Allocate new mft record. */
+	ni = ntfs_mft_record_alloc(vol, ni);
+	if (!ni) {
+		err = errno;
+		Dprintf("%s(): Couldn't allocate new MFT record.\n",
+			__FUNCTION__);
+		goto put_err_out;
+	}
+	/* Move attribute to it. */
+	if (ntfs_attr_record_move_to(ctx, ni)) {
+		err = errno;
+		Dprintf("%s(): Couldn't move attribute to new MFT record.\n",
+			__FUNCTION__);
+		goto put_err_out;
+	}
+	/* Update ntfs attribute. */
+	na->ni = ni;
 
-	// TODO: If that is still not enough, split the attribute into multiple
-	// extents and save them to several mft records.
-
-	err = ENOTSUP;
-	goto put_err_out;
+	ntfs_attr_put_search_ctx(ctx);
+	/* Try to perform resize once again. */
+	return ntfs_resident_attr_resize(na, newsize);
 
 resize_done:
 	/*
