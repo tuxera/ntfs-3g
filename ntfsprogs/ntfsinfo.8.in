@@ -9,15 +9,23 @@ ntfsinfo \- dump a file's attributes
 .B ntfsinfo
 .I -d device
 .I -i inode-number
+.I -F path-filename
+.I -m
 .SH DESCRIPTION
 .B ntfsinfo
 will dump the attributes of inode
-.IR inode-number .
+.I inode-number
+or the file
+.I path-filename
+and/or information about the mft (
+.I -m
+option).
 Run ntfsinfo without arguments for a full list of options.
 .PP
 .SH AUTHOR
 .B ntfsinfo
-was written by Matthew J. Fanto (mattjf@uncompiled.com).
+was written by Matthew J. Fanto (mattjf@uncompiled.com) and largely rewritten
+by Yuval Fledel with a little help from Anton Altaparmakov.
 .SH AVAILABILITY
 .B ntfsinfo
 is part of the ntfsprogs package and is available from
