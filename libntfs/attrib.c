@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -4293,9 +4293,12 @@ retry:
 			goto put_err_out;
 		}
 		Dprintf("%s(): Deallocate done.\n", __FUNCTION__);
+		ntfs_attr_put_search_ctx(ctx);
 		return 0;
 	}
-	
+	ntfs_attr_put_search_ctx(ctx);
+	ctx = NULL;
+
 	/* Allocate new MFT records for the rest of mapping pairs. */
 	while (1) {
 		/* Calculate size of rest mapping pairs. */
@@ -4367,7 +4370,8 @@ retry:
 	}
 	return 0;
 put_err_out:
-	ntfs_attr_put_search_ctx(ctx);
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
 }
