@@ -1,4 +1,4 @@
-xx/10/2003 - 1.8.0beta - Work in progress.
+23/10/2003 - 1.8.0beta - The Long Overdue(TM) release.
 	- Further work on attribute resizing.
 	- Fix two logic inversion bugs in dir.c. Thanks to Russ Christensen for
 	  finding the first one.
