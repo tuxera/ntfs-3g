@@ -63,6 +63,7 @@ struct {
 	int blkdev_out;		/* output file is block device */   
 	int metadata_only;
 	int ignore_fs_check;
+	int rescue;
 	int save_image;
 	int restore_image;
 	char *output;
@@ -216,7 +217,8 @@ static void usage(void)
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"    -s, --save-image       Save to the special image format\n"
 		"    -r, --restore-image    Restore from the special image format\n"
-		"        --ignore-fs-check  Ignore the filesystem check\n"
+		"        --ignore-fs-check  Ignore the filesystem check result\n"
+		"        --rescue           Continue after disk read errors\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
@@ -245,6 +247,7 @@ static void parse_options(int argc, char **argv)
 		{ "overwrite",	      required_argument, NULL, 'O' },
 		{ "restore-image",    no_argument,	 NULL, 'r' },
 		{ "ignore-fs-check",  no_argument,	 NULL, 'C' },
+		{ "rescue",           no_argument,	 NULL, 'R' },
 		{ "save-image",	      no_argument,	 NULL, 's' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -284,6 +287,9 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 'C':
 			opt.ignore_fs_check++;
+			break;
+		case 'R':
+			opt.rescue++;
 			break;
 		case 's':
 			opt.save_image++;
@@ -466,8 +472,17 @@ static void copy_cluster(void)
 		: vol->cluster_size;
 
 	if (read_all(opt.restore_image ? (void *)&fd_in : vol->dev, buff,
-		     csize) == -1)
-		perr_exit("read_all");
+		     csize) == -1) {
+
+		const char *badcluster_magic = "BadClusteR";
+
+		if (!opt.rescue || errno != EIO)
+			perr_exit("read_all");
+
+		Printf("WARNING: Couldn't read a cluster, data is lost.\n");
+		memset(buff, 2, csize);
+		memmove(buff, badcluster_magic, sizeof(badcluster_magic));
+	}
 
 	if (opt.save_image) {
 		char cmd = 1;
