@@ -368,26 +368,6 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 }
 
 /**
- * ucslen - determine the length of a fixed-size unicode-character string
- * @s:	pointer to unicode-character string
- *
- * Return the number of unicode-characters in @s up to a maximum of maxlen
- * unicode-characters, not including the terminating (uchar_t)'\0'. If there
- * is no (uchar_t)'\0' between s and s+maxlen, maxlen is returned.
- *
- * This function never looks beyond s+maxlen.
- */
-int ucsnlen(const uchar_t *s, int maxlen)
-{
-	int i;
-
-	for (i = 0; i < maxlen; i++)
-		if (!s[i])
-			break;
-	return i;
-}
-
-/**
  * ucstos - convert unicode-character string to ASCII
  * @dest:	points to buffer to receive the converted string
  * @src:	points to string to convert
