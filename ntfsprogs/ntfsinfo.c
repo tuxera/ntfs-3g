@@ -394,7 +394,7 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 {
 	STANDARD_INFORMATION *standard_attr = NULL;
-	u32 value_length;
+	u32 value_length, flags;
 
 	standard_attr = (STANDARD_INFORMATION*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
@@ -424,8 +424,64 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
 	}
 	
-	/* TODO: file_attributes - Flags describing the file. */
-	
+	flags = standard_attr->file_attributes;
+	printf("\tFile attributes:\t");
+	if (flags & FILE_ATTR_READONLY) {
+		printf(" READONLY");
+		flags &= ~FILE_ATTR_READONLY;
+	}
+	if (flags & FILE_ATTR_HIDDEN) {
+		printf(" HIDDEN");
+		flags &= ~FILE_ATTR_HIDDEN;
+	}
+	if (flags & FILE_ATTR_SYSTEM) {
+		printf(" SYSTEM");
+		flags &= ~FILE_ATTR_SYSTEM;
+	}
+	if (flags & FILE_ATTR_ARCHIVE) {
+		printf(" ARCHIVE");
+		flags &= ~FILE_ATTR_ARCHIVE;
+	}
+	if (flags & FILE_ATTR_DEVICE) {
+		printf(" DEVICE");
+		flags &= ~FILE_ATTR_DEVICE;
+	}
+	if (flags & FILE_ATTR_NORMAL) {
+		printf(" NORMAL");
+		flags &= ~FILE_ATTR_NORMAL;
+	}
+	if (flags & FILE_ATTR_TEMPORARY) {
+		printf(" TEMPORARY");
+		flags &= ~FILE_ATTR_TEMPORARY;
+	}
+	if (flags & FILE_ATTR_SPARSE_FILE) {
+		printf(" SPARSE_FILE");
+		flags &= ~FILE_ATTR_SPARSE_FILE;
+	}
+	if (flags & FILE_ATTR_REPARSE_POINT) {
+		printf(" REPARSE_POINT");
+		flags &= ~FILE_ATTR_REPARSE_POINT;
+	}
+	if (flags & FILE_ATTR_COMPRESSED) {
+		printf(" COMPRESSED");
+		flags &= ~FILE_ATTR_COMPRESSED;
+	}
+	if (flags & FILE_ATTR_OFFLINE) {
+		printf(" OFFLINE");
+		flags &= ~FILE_ATTR_OFFLINE;
+	}
+	if (flags & FILE_ATTR_NOT_CONTENT_INDEXED) {
+		printf(" NOT_CONTENT_INDEXED");
+		flags &= ~FILE_ATTR_NOT_CONTENT_INDEXED;
+	}
+	if (flags & FILE_ATTR_ENCRYPTED) {
+		printf(" ENCRYPTED");
+		flags &= ~FILE_ATTR_ENCRYPTED;
+	}
+	if (flags)
+		printf(" UNKNOWN: 0x%x", le32_to_cpu(flags));
+	printf("\n");
+
 	printf("\tMax Number of Versions:\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->maximum_versions));
 	printf("\tVersion Number:\t\t %u \n",
@@ -555,6 +611,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
+	u32 flags;
 
 	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
@@ -593,8 +650,71 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		(long long)sle64_to_cpu(file_name_attr->allocated_size));
 	printf("\tReal File Size:\t\t %lld\n",
 		(long long)sle64_to_cpu(file_name_attr->data_size));
-	printf("\tFile attributes:\t %x\n",
-			le32_to_cpu(file_name_attr->file_attributes));
+	flags = file_name_attr->file_attributes;
+	printf("\tFile attributes:\t");
+	if (flags & FILE_ATTR_READONLY) {
+		printf(" READONLY");
+		flags &= ~FILE_ATTR_READONLY;
+	}
+	if (flags & FILE_ATTR_HIDDEN) {
+		printf(" HIDDEN");
+		flags &= ~FILE_ATTR_HIDDEN;
+	}
+	if (flags & FILE_ATTR_SYSTEM) {
+		printf(" SYSTEM");
+		flags &= ~FILE_ATTR_SYSTEM;
+	}
+	if (flags & FILE_ATTR_ARCHIVE) {
+		printf(" ARCHIVE");
+		flags &= ~FILE_ATTR_ARCHIVE;
+	}
+	if (flags & FILE_ATTR_DEVICE) {
+		printf(" DEVICE");
+		flags &= ~FILE_ATTR_DEVICE;
+	}
+	if (flags & FILE_ATTR_NORMAL) {
+		printf(" NORMAL");
+		flags &= ~FILE_ATTR_NORMAL;
+	}
+	if (flags & FILE_ATTR_TEMPORARY) {
+		printf(" TEMPORARY");
+		flags &= ~FILE_ATTR_TEMPORARY;
+	}
+	if (flags & FILE_ATTR_SPARSE_FILE) {
+		printf(" SPARSE_FILE");
+		flags &= ~FILE_ATTR_SPARSE_FILE;
+	}
+	if (flags & FILE_ATTR_REPARSE_POINT) {
+		printf(" REPARSE_POINT");
+		flags &= ~FILE_ATTR_REPARSE_POINT;
+	}
+	if (flags & FILE_ATTR_COMPRESSED) {
+		printf(" COMPRESSED");
+		flags &= ~FILE_ATTR_COMPRESSED;
+	}
+	if (flags & FILE_ATTR_OFFLINE) {
+		printf(" OFFLINE");
+		flags &= ~FILE_ATTR_OFFLINE;
+	}
+	if (flags & FILE_ATTR_NOT_CONTENT_INDEXED) {
+		printf(" NOT_CONTENT_INDEXED");
+		flags &= ~FILE_ATTR_NOT_CONTENT_INDEXED;
+	}
+	if (flags & FILE_ATTR_ENCRYPTED) {
+		printf(" ENCRYPTED");
+		flags &= ~FILE_ATTR_ENCRYPTED;
+	}
+	if (flags & FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
+		printf(" DIRECTORY");
+		flags &= ~FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+	}
+	if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
+		printf(" INDEX_VIEW");
+		flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+	}
+	if (flags)
+		printf(" UNKNOWN: 0x%x", le32_to_cpu(flags));
+	printf("\n");
 
 	/* time stuff stuff */
 	if (!opts.notime) {
@@ -1268,7 +1388,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
 	}
-	
+
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* dump index's size */
