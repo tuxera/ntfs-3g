@@ -91,11 +91,11 @@ all_libraries = @all_libraries@
 @DEBUG_TRUE@AM_CFLAGS = @DEBUG_TRUE@-D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
 @DEBUG_FALSE@AM_CFLAGS = @DEBUG_FALSE@-D_FILE_OFFSET_BITS=64
 
-SUBDIRS = doc include libntfs ntfstools
+SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh linux-ntfs.spec.in \
-		TODO.ntfstools
+		TODO.ntfsprogs
 
 
 AUTOMAKE_OPTIONS = gnu
@@ -395,7 +395,7 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
 strip:
-	$(MAKE) -C ntfstools strip
+	$(MAKE) -C ntfsprogs strip
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

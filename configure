@@ -6324,13 +6324,13 @@ trap 'rm -fr `echo "
 	doc/Makefile
 	include/Makefile
 	libntfs/Makefile
-	ntfstools/Makefile
-	ntfstools/mkntfs.8
-	ntfstools/ntfsfix.8
-	ntfstools/ntfslabel.8
-	ntfstools/ntfsinfo.8
-	ntfstools/ntfsundelete.8
-	ntfstools/ntfsresize.8
+	ntfsprogs/Makefile
+	ntfsprogs/mkntfs.8
+	ntfsprogs/ntfsfix.8
+	ntfsprogs/ntfslabel.8
+	ntfsprogs/ntfsinfo.8
+	ntfsprogs/ntfsundelete.8
+	ntfsprogs/ntfsresize.8
 	linux-ntfs.spec
  config.h" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
@@ -6457,13 +6457,13 @@ CONFIG_FILES=\${CONFIG_FILES-"Makefile
 	doc/Makefile
 	include/Makefile
 	libntfs/Makefile
-	ntfstools/Makefile
-	ntfstools/mkntfs.8
-	ntfstools/ntfsfix.8
-	ntfstools/ntfslabel.8
-	ntfstools/ntfsinfo.8
-	ntfstools/ntfsundelete.8
-	ntfstools/ntfsresize.8
+	ntfsprogs/Makefile
+	ntfsprogs/mkntfs.8
+	ntfsprogs/ntfsfix.8
+	ntfsprogs/ntfslabel.8
+	ntfsprogs/ntfsinfo.8
+	ntfsprogs/ntfsundelete.8
+	ntfsprogs/ntfsresize.8
 	linux-ntfs.spec
 "}
 EOF
