@@ -50,6 +50,7 @@ struct options {
 	int		 verbose;	/* Extra output */
 	int		 force;		/* Override common sense */
 	int              optimistic;    /* Undelete in-use clusters as well */
+	int		 parent;	/* Show parent directory */
 	time_t		 since;		/* Since this time */
 	s64		 size_begin;	/* Range for file size */
 	s64		 size_end;
@@ -72,6 +73,8 @@ struct filename {
 	time_t		 date_r;	/*	read */
 	char		*name;		/* Filename in current locale */
 	FILE_NAME_TYPE_FLAGS name_space;
+	long long	 parent_mref;
+	char		*parent_name;
 	char		 padding[7];	/* Unused: padding to 64 bit. */
 };
 
@@ -99,6 +102,7 @@ struct ufile {
 	struct list_head name;		/* A list of filenames */
 	struct list_head data;		/* A list of data streams */
 	char		*pref_name;	/* Preferred filename */
+	char		*pref_pname;	/* 	     parent filename */
 	long long	 max_size;	/* Largest size we find */
 	int		 attr_list;	/* MFT record may be one of many */
 	int		 directory;	/* MFT record represents a directory */
