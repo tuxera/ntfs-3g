@@ -1,0 +1,243 @@
+04/06/2002 - 1.6.99 - Work in progress.
+	- New tool ntfslabel written by Matthew Fanto with a few cleanups from
+	  me to make it fit in with e2label better.
+	- Extend ntfs_mount() to also read in the volume label.
+	- Add man page for ntfslabel.
+	- Silence verbosity of output from ntfs_mount(). It is now only output
+	  if ./configure was run with --enable-debug.
+	- Remove a LOT of dead code. Massive cleanup.
+	- Add full attribute search context and allocation/init/deallocation
+	  functions (see attrib.c).
+	- Remove find_first_attr(). Just use get_attr_search_ctx() +
+	  find_attr() which has the same effect.
+	- Rewrite disk_io.[ch] and mft.[ch] defining new access API:
+		disk_io.[ch] provide:	ntfs_p{read,write}(),
+					ntfs_mst_p{read,write}(), and
+					ntfs_{read,write}_clusters().
+		mft.[ch] provide:	ntfs_{read,write}_mft_record(),
+					ntfs_{read,write}_mft_records(), and
+					ntfs_get_mft_record_data_size().
+	- When writing mft records using the mft.c::ntfs_write_mft_record{s,}()
+	  interface, the mft mirror is now updated automatically.
+	- Add -Wall to compiler options when ./configure is run with
+	  --enable-debug.
+	- Fix minor error code path bugs in mkntfs.c that showed up with -Wall.
+	- Fix all compiler warnings that showed up with -Wall.
+	- Add new API function, provided by mft.[ch]: ntfs_read_file_record().
+	- Add new API calls provided by unistr.[ch]:
+		ntfs_ucstombs() and ntfs_mbstoucs().
+	- Define API for mst.[ch] providing:
+		ntfs_post_read_mst_fixup(),
+		ntfs_pre_write_mst_fixup(), and
+		ntfs_post_write_mst_fixup().
+	- Define API for bootsect.[ch] providing:
+		is_boot_sector_ntfs().
+	- Add beginning of new API with new files inode.[ch] providing:
+		ntfs_{open,close)_inode(), and
+		ntfs_open_extent_inode().
+		- Note the inode related API is subject to change.
+	- Start defining API provided by attrib.[ch]:
+		ntfs_attr_search_ctx typedef,
+		ntfs_{get,put,reinit}_attr_search_ctx(), and
+		ntfs_lookup_attr().
+	- Add a TODO.libntfs laying down my personal roadmap for the library.
+	- Remove find_attr() from API, everyone must use ntfs_lookup_attr()
+	  instead.
+	- Rename all attribute name constants from $blah to AT_blah.
+	- Rename all system file constants from FILE_$blah to FILE_blah.
+	- Port lookup_attr() stuff from ntfs tng driver.
+	- Implement loading of extent inodes. They are attached on open to the
+	  base inode and are cached there until the base inode is closed.
+	- Cleanup/streamline include file dependencies.
+	- Port attribute list merging code from ntfs tng driver. API to follow.
+	- Allocate a ntfs_volume in mkntfs and start initializing it instead
+	  of using the opt global structure. Necessary so can call the
+	  modified ntfs_decompress_mapping_pairs() from mkntfs.c.
+	- Add libntfs/debug.c providing:
+		ntfs_debug_dump_run_list().
+	- Add new API call ntfs_check_if_mounted() to volume.[ch]. (Matthew
+	  Fanto, me)
+	- Do folding assisting cleanups. (Richard Russon, me)
+	- Add new API call is_boot_sector_ntfs() provided by bootsect.[hc].
+	- Define and write more API calls provided by attrib.[ch]:
+		ntfs_merge_run_lists(),
+		ntfs_decompress_mapping_pairs(),
+		ntfs_attr_map_run_list(),
+		ntfs_{rl,attr}_vcn_to_lcn(),
+		ntfs_attr_find_vcn(),
+		ntfs_attr_init(),
+		ntfs_attr_{open,close}().
+	- Add new field mftmirr_size to ntfs_volume structure and initialize
+	  it to the number of mft records stored in the mft mirror in
+	  ntfs_mount().
+	- Add new fields mftmirr_ni and mftmirr_na to ntfs_volume structure and
+	  initialize them in ntfs_mount to the $MFTMirr inode and $DATA
+	  attribute. Ditto for mft_ni ($MFT inode), mft_na ($MFT/$DATA),
+	  mftbmp_na ($MFT/$BITMAP), lcnbmp_ni ($Bitmap inode), and
+	  lcnbmp_na ($Bitmap/$DATA). Remove previous fields replaced by these.
+	- Rename a few fields in ntfs_volume structure to make them shorter,
+	  e.g. now have nr_mft_records and nr_clusters.
+	- Add new API for doing I/O on both normal and multi sector transfer
+	  protected ntfs attributes described by the ntfs_attr structure,
+	  provided by attrib.[hc] (note writing is still restricted to
+	  overwrite only):
+		ntfs_attr_p{read,write}(), and
+		ntfs_attr_mst_p{read,write}().
+	- Fix detection of read-only mounts in volume.c::ntfs_check_mntent().
+	- Start modularising ntfs_mount():
+		- Split off the boot sector parsing code and move it to
+		  bootsect.c::parse_ntfs_boot_sector().
+		- Move $MFT loading and parsing code to separate function
+		  volume.c::ntfs_load_mft().
+		- Move $MFTMirr loading and parsing code to
+		  volume.c::ntfs_load_mftmirr().
+		- Move all startup code (loading and parsing of bootsector,
+		  $MFT, and $MFTMirr) to volume.c::ntfs_startup_volume().
+	- Update ntfsfix to above modularisation.
+	- Add detection of read-write mounted devices to ntfsfix and refuse to
+	  operate on them.
+	- POSIXify libntfs/disk_io.c. All functions now return partial reads
+	  and writes and deal with end of file properly. Affected functions:
+	  	ntfs_p{read,write}(),
+		ntfs_mst_p{read,write}(), and
+		ntfs_{read,write}_clusters().
+	- Change ntfsfix to take into account the automatic mft mirror updates.
+	- Add new API provided by new files dir.[ch]:
+		ntfs_lookup_inode_by_name(), and
+		ntfs_readdir().
+	- We now use u8, u16, u32, u64, s8, s16, s32, and s64 types and we
+	  typedef them ourselves from the C99 standard uint8_t, etc types which
+	  IMO are braindamaged.
+	- Better gcc detection in 'configure.in'. (Szakacsits Szabolcs)
+	  Tested with:	egcs-1.0.3 (egcs-2.90.29), egcs-1.1.2 (egcs-2.91.66),
+			gcc 2.95.3, 2.96 (from RH 7.1 and 7.3), and 3.0.4.
+	- Enable enumeration of attributes using ntfs_lookup_attr() which is
+	  requested by passing a type of AT_UNUSED (or simply zero) to
+	  ntfs_lookup_attr(). (Based on initial patch by Szakacsits Szabolcs.)
+	- Fix two minor buglets in ntfs_find_external_attr() where we would
+	  continue the search when we detect a mismatched type and/or name
+	  instead of aborting and returning error EIO to flag the corruption.
+	- Add new syntactic sugar API provided by attrib.h:
+		ntfs_walk_attrs(). (Szakacsits Szabolcs)
+	- Add new API for compressing run lists into mapping pairs arrays
+	  provided by attrib.[ch] (adapted from mkntfs.c):
+		ntfs_get_nr_significant_bytes(),
+		ntfs_get_size_for_mapping_pairs(),
+		ntfs_write_significant_bytes(), and
+		ntfs_build_mapping_pairs().
+	- Convert mkntfs.c to the above API.
+	- Implement attrib.[hc]::ntfs_rl_pwrite() as a low level scatter write
+	  function analogous in functionality to mkntfs.c::ntfs_rlwrite() but
+	  with arguments more like ntfs_attr_pwrite() to allow for more
+	  flexible use.
+	- Don't use string concatenation with __FUNCTION__ as gcc-3.x don't
+	  like it.
+	- Move run list functions to runlist.[hc]. (Richard Russon)
+	- Add new API to volume.[hc] and use it (Szakacsits Szabolcs):
+		ntfs_is_version_supported(),
+		NTFS_V{1_[12],2_x,3_[01]}() macros,
+		ntfs_reset_logfile(), and
+		ntfs_set_volume_flags().
+	- Change size autodetection of non-block device files in mkntfs to use
+	  the stat returned file size rather than the block allocation count to
+	  cope with precreated sparse files.
+	- Remove GPL message text from usage information in mkntfs.
+	- New tool, ntfsundelete, written by Richard Russon.
+
+12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
+	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
+	spotting it.
+	Change version number in mkntfs and ntfsfix to match the linux-ntfs
+	release version number.
+	Added two new options to mkntfs; -I, which disables content indexing
+	on the volume and -C, which enables compression on the volume.
+
+01/02/2002 - Attempt to fix compile warnings on powerpc.
+	Attempt to fix compile warnings on powerpc. It seems powerpc uses
+	char == unsigned char which was breaking some signed comparisons.
+
+26/01/2002 - 1.5.1 - Fix two buglets in ntfsfix and more compilation fixes.
+	Fix two silly buglets in ntfsfix, where we were calling is_baad_record
+	instead of is_baad_recordp. Silly me... Thanks to David Martinez Moreno
+	for reporting the compilation warnings on ia64 which led me to find the
+	bug.
+	Fix compilation problems in logfile.h on big endian arches. Hopefully,
+	now will really compile on all arches.
+
+10/01/2002 - 1.5.0 - Fix bug in $LogFile size calculation.
+	Fix bug in $LogFile size calculation where we would take the size to
+	be zero on partitions between 200 and 400MiB in size.
+	Add requirement for linux-ntfs to linux-ntfs-devel.
+
+15/12/2001 - Remove atomic ops and add compiler version check.
+	Hopefully this will preempt "it doesn't compile for me" messages from
+	people with gcc < 2.96.
+	Change bail out error check for seek to backup boot sector to a warning
+	since SuSE 7.2 + loads of stuff and 2.5.1-pre11 returns EINVAL instead
+	of ENOSPC.
+	Remove atomic code as it isn't defined on non-i386 arches.
+
+06/12/2001 - Change ntfs_mount to accept second argument for mount flags.
+	ntfs_mount() now supports mount flags as per "man 2 mount". Currently
+	only the MS_RDONLY flag is supported/implemented. This breaks
+	compatibility with older libntfs versions and hence the major version
+	number of the library has been increased.
+	Adapt utilities to make use of new ntfs_mount syntax.
+
+17/11/2001 - Add description of compression algorithm.
+
+09/11/2001 - 1.4.0 - Major fix in mkntfs, small update to ntfsfix and others.
+	Update ntfsfix to support Windows XP NTFS volumes (NTFS 3.1).
+	Update layout.h with more information.
+	(Re)enable shared libraries.
+	Changes to mkntfs:
+	  - Correct handling of directories on volumes with cluster sizes
+	    above 4096 bytes.
+	  - Lower minimum size of NTFS partitions to 1MiB, scaling down the
+	    logfile size as necessary.
+	  - Support a wider range of input parameters. Now should have all
+	    valid combinations covered.
+	  - Update man page.
+	  - Implement better determination of device size.
+	  - Various bug fixes.
+
+22/08/2001 - 1.2.2 - Small fix in mkntfs and minor updates.
+	Small fix in mkntfs for small volumes with non-standard sector sizes,
+	where the default values would result in a sector size smaller than the
+	sector size and mkntfs would refuse to run because of this. The man
+	page was updated accordingly.
+	Minor updates/clarifications to include/layout.h.
+
+02/08/2001 - 1.2.1 - Added ntfsfix man page and minor cleanup.
+	David Martínez Moreno <david.martinez@rediris.es> donated a man page
+	for ntfsfix as well as spelling mistake fixes all over the place.
+
+26/07/2001 - 1.2.0 - Important bug fixes to mkntfs.
+	Bug fixes for cluster sizes > 4kb involving corrections to mft mirror
+	size and contents, mft data attribute position and mft bitmap size.
+	Some of those were nasty so this is a major improvement. Hopefully these
+	were the last bugs.
+
+25/07/2001 - 1.0.2 - Small cleanup of the distribution.
+	Move mkntfs to sbin (was put in bin before).
+	Small bugfix to mkntfs man page.
+
+24/07/2001 - 1.0.1 - Small cleanup of the distribution.
+	Confirmed that at least gcc-2.96 is needed to compile linux-ntfs.
+	Removed ldm.c from linux-ntfs. It will reappear as ldminfo.c in a new
+	package, probably linux-ldm.
+	Taken out some file from the distribution, but they are still present
+	in CVS. This is because they are not really useful except if you are
+	a developer wanting to play about.
+
+10/06/2001 - 1.0.0 - mkntfs release and bugfixes to ntfslib and the others.
+	Also, released ldm which dumps the ldm database on Win2k/XP dynamic
+	disks.
+	A man page for mkntfs is also installed by make install so man 8 mkntfs
+	can be used to show the recognised command line options.
+	Building of shared libraries is disabled by default as it breaks on
+	some systems.
+	Probably need at least gcc-2.95 or something like that from now on.
+
+02/02/2001 - Started ChangeLog.
+
