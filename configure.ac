@@ -92,13 +92,7 @@ AH_VERBATIM([_GNU_SOURCE],
 #endif])
 AC_DEFINE(_GNU_SOURCE)
 
-# Checks for programs.
-AC_PROG_CC
-AC_PROG_INSTALL
-AC_PROG_LN_S
-AC_PROG_MAKE_SET
-AC_PROG_LIBTOOL
-
+# For djgpp support.  (Note: This needs to be before AC_PROG_CC.)
 case "$target" in
 *-*-*djgpp)
 	if test -z "$CC"; then CC=gcc; fi
@@ -106,6 +100,13 @@ case "$target" in
 	if test -z "$LD"; then LD=ld; fi
 ;;
 esac
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_LIBTOOL
 
 # Enable large file support.
 AC_SYS_LARGEFILE
