@@ -398,64 +398,47 @@ free:
  * wipe_compressed_attribute - Wipe compressed $DATA attribute
  * @vol:	An ntfs volume obtained from ntfs_mount
  * @byte:	Overwrite with this value
+ * @na:		Opened ntfs attribute
  * @act:	Wipe, test or info
- * @attr:	A vaild $DATA attribute record
- * @compr_unit:	Compression unit obtained from first $DATA attribute (because in other
- *		it 0)
- * @tail:	If last is not compressed, how many we have to wipe in it end
  *
  * Return: >0  Success, the atrribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action act,
-					ATTR_RECORD *attr, u8 compr_unit, u32 tail)
+static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, ntfs_attr *na,
+									enum action act)
 {
-	runlist *rl;
 	unsigned char *buf;
 	s64 size;
 	u64 offset;
 	u16 block_size;
-	u64 wiped = 0;
 	s64 ret;
-	runlist *rlc;
-	u64 cu_mask;
-	
-	if (compr_unit != 4)
-		Eprintf ("strange: compression unit is %u (not 4)\n", compr_unit);
-	
-	if (!compr_unit) {
-		Vprintf ("Internal error\n");
-		Eprintf ("Compression unit could not be 0");
-		return -1;
-	}
-	
-	cu_mask = (1 << compr_unit) - 1;
-
-	rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
-	if (!rl) {
-		Vprintf ("Internal error\n");
-		Eprintf ("Could not decompress mapping pairs inode");
-		return -1;
-	}
-
-	rlc = rl;
+	u64 wiped = 0;
+	VCN cur_vcn = 0;
+	runlist *rlc = na->rl;
+	u64 cu_mask = na->compression_block_clusters - 1;
+		
 	while (rlc->length) {
-		if ((!(rlc->length & cu_mask) && ((rlc+1)->length || !tail))
-								|| (rlc->lcn < 0)) {
+		cur_vcn += rlc->length;
+		if ((cur_vcn & cu_mask) ||
+			(((rlc + 1)->length) && (rlc->lcn != LCN_HOLE))) {
 			rlc++;
 			continue;
 		}
-		
-		if (rlc->length & cu_mask) {
-			offset = (rlc->length & (~cu_mask)) << vol->cluster_size_bits;
+
+		if (rlc->lcn == LCN_HOLE) {
+			offset = cur_vcn - rlc->length;
+			if (offset == (offset & (~cu_mask))) {
+				rlc++;
+				continue;
+			}
+			offset = (offset & (~cu_mask)) << vol->cluster_size_bits;
 			while (1) {
-				ret = ntfs_rl_pread (vol, rlc, offset, 2, &block_size);
+				ret = ntfs_rl_pread (vol, na->rl, offset, 2, &block_size);
 				if (ret != 2) {
 					Vprintf ("Internal error\n");
 					Eprintf ("ntfs_rl_pread failed");
-					wiped = -1;
-					goto free_rl;
+					return -1;
 				}
 				if (block_size == 0) {
 					offset += 2;
@@ -464,15 +447,24 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action ac
 				block_size &= 0x0FFF;
 				block_size += 3;
 				offset += block_size;
-				if (offset >= (rlc->length << vol->cluster_size_bits) - 2)
+				if (offset >= (((cur_vcn - rlc->length)
+							<< vol->cluster_size_bits) - 2))
 					goto next;
 			}
-			size = (rlc->length << vol->cluster_size_bits) - offset;
+			size = ((cur_vcn - rlc->length)
+					<< vol->cluster_size_bits) - offset;
 		} else {
-			size = tail;
-			offset = (rlc->length << vol->cluster_size_bits) - tail;
+			size = na->allocated_size - na->data_size;
+			offset = (cur_vcn << vol->cluster_size_bits) - size;
 		}
-
+		
+		if (size < 0) {
+			Vprintf ("Internal error\n");
+			Eprintf ("bug or damaged fs: we want allocate buffer "
+								"size %lld bytes", size);
+			return -1;
+		}
+		
 		if ((act == act_info) || (!size)) {
 			wiped += size;
 			rlc++;
@@ -483,26 +475,22 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte, enum action ac
 		if (!buf) {
 			Vprintf ("Not enough memory\n");
 			Eprintf ("Not enough memory to allocate %lld bytes", size);
-			wiped = -1;
-			goto free_rl;
+			return -1;
 		}
 		memset (buf, byte, size);
 		
-		ret = ntfs_rl_pwrite (vol, rlc, offset, size, buf);
+		ret = ntfs_rl_pwrite (vol, na->rl, offset, size, buf);
+		free (buf);
 		if (ret != size) {
 			Vprintf ("Internal error\n");
 			Eprintf ("ntfs_rl_pwrite failed");
-			free (buf);
-			wiped = -1;
-			goto free_rl;
+			return -1;
 		}
-		free (buf);
 		wiped += ret;
 next:
 		rlc++;
 	}
-free_rl:
-	free (rl);
+	
 	return wiped;
 }
 
@@ -510,19 +498,28 @@ free_rl:
  * wipe_attribute - Wipe not compressed $DATA attribute
  * @vol:	An ntfs volume obtained from ntfs_mount
  * @byte:	Overwrite with this value
- * @attr:	A vaild $DATA attribute record
- * @size:	How many bytes to wipe
- * @offset:	Offset where start wiping
+ * @na:		Opened ntfs attribute
+ * @act:	Wipe, test or info
  *
  * Return: >0  Success, the atrribute was wiped
+ *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_attribute (ntfs_volume *vol, int byte, ATTR_RECORD *attr,
-								s64 size, u64 offset)
+static s64 wipe_attribute (ntfs_volume *vol, int byte, ntfs_attr *na, enum action act)
 {
-	runlist *rl;
 	unsigned char *buf;
 	s64 wiped;
+	s64 size;
+	u64 offset = na->data_size;
+
+	if (!offset)
+		return 0;
+	if (NAttrEncrypted(na))
+		offset = (((offset - 1) >> 10) + 1) << 10;
+	size = (vol->cluster_size - offset) % vol->cluster_size;
+	
+	if (act == act_info)
+		return size;
 
 	buf = malloc (size);
 	if (!buf) {
@@ -532,22 +529,12 @@ static s64 wipe_attribute (ntfs_volume *vol, int byte, ATTR_RECORD *attr,
 	}
 	memset (buf, byte, size);
 
-	rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
-	if (!rl) {
-		Vprintf ("Internal error\n");
-		Eprintf ("Could not decompress mapping pairs");
-		wiped = -1;
-		goto free_buf;
-	}
-
-	wiped = ntfs_rl_pwrite (vol, rl, offset, size, buf);
+	wiped = ntfs_rl_pwrite (vol, na->rl, offset, size, buf);
 	if (wiped == -1) {
 		Vprintf ("Internal error\n");
 		Eprintf ("Couldn't wipe tail");
 	}
 
-	free (rl);
-free_buf:
 	free (buf);
 	return wiped;
 }
@@ -569,9 +556,8 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
 	s64 inode_num;
-	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *ni;
-	ATTR_RECORD *attr;
+	ntfs_attr *na;
 
 	if (!vol || (byte < 0))
 		return -1;
@@ -583,94 +569,51 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 			Vprintf ("Could not open inode\n");
 			continue;
 		}
-		
+
 		if (ni->mrec->base_mft_record) {
 			Vprintf ("Not base mft record. Skipping\n");
 			goto close_inode;
 		}
-		
-		ctx = ntfs_attr_get_search_ctx(ni, 0);
-		if (!ctx) {
-			Vprintf ("Internal error\n");
-			Eprintf ("Could not get search context (inode %lld)\n",inode_num);
+
+		na = ntfs_attr_open (ni, AT_DATA, AT_UNNAMED, 0);
+		if (!na) {
+			Vprintf ("Couldn't open $DATA attribute\n");
 			goto close_inode;
 		}
 
-		u64 wiped_in_file = 0;
-		u8 compr_unit;
-		s64 size = -1;
-		u64 offset;
-		VCN last_vcn;
-		u32 tail;
-		ATTR_RECORD *first_attr = 0;
-		while (!ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-			attr = ctx->attr;
-		
-			if (!attr->non_resident) {
-				Vprintf ("Resident $DATA atrribute. Skipping.\n");
-				goto put_search_ctx;
-			}
-			
-			if (!first_attr) {
-				first_attr = attr;
-				if (attr->compression_unit) {
-					compr_unit = attr->compression_unit;
-					tail = attr->allocated_size - attr->data_size;
-				}
-			}
-		
-			s64 wiped;
-			if (first_attr->flags & ATTR_IS_COMPRESSED) {
-				Vprintf ("Compressed $DATA attribute. Not supported yet ;(\n");
-				goto put_search_ctx;
-//				wiped = wipe_compressed_attribute (vol, byte, act,
-//								attr, compr_unit, tail);
-			} else {
-				if (size == -1) {
-					offset = attr->data_size;
-					if (!offset)
-						break;
-					if (attr->flags & ATTR_IS_ENCRYPTED)
-						offset = (((offset - 1) >> 10) + 1) << 10;
-					size = (vol->cluster_size - offset) %
-								vol->cluster_size;
-					last_vcn = attr->data_size >>
-								vol->cluster_size_bits;
-				}
-				if (!size) {
-					wiped_in_file = 0;
-					break;
-				}
-				if (act == act_info) {
-					wiped_in_file = size;
-					break;
-				}
-				if (attr->highest_vcn == last_vcn)
-					wiped = wipe_attribute (vol, byte, attr,
-									size, offset);
-				else
-					continue;
-			}
-
-			if (wiped != -1)
-				wiped_in_file += wiped;
-			else {
-				Eprintf (" (inode %lld)\n", inode_num);
-				goto put_search_ctx;
-			}
+		if (!NAttrNonResident(na)) {
+			Vprintf ("Resident $DATA atrribute. Skipping.\n");
+			goto close_attr;
 		}
 
-		if (wiped_in_file) {
-			Vprintf ("Wiped %llu bytes\n", wiped_in_file);
-			total += wiped_in_file;
+		if (ntfs_attr_map_whole_runlist(na)) {
+			Vprintf ("Internal error\n");
+			Eprintf ("Couldn't map runlist (inode %lld)", inode_num);
+			goto close_attr;
+		}
+
+		s64 wiped;
+		if (NAttrCompressed(na))
+			wiped = wipe_compressed_attribute (vol, byte, na, act);
+		else
+			wiped = wipe_attribute (vol, byte, na, act);
+
+		if (wiped == -1) {
+			Eprintf (" (inode %lld)\n", inode_num);
+			goto close_attr;
+		}
+		
+		if (wiped) {
+			Vprintf ("Wiped %llu bytes\n", wiped);
+			total += wiped;
 		} else
 			Vprintf ("Nothing to wipe\n");
-put_search_ctx:
-		ntfs_attr_put_search_ctx (ctx);
+close_attr:
+		ntfs_attr_close (na);
 close_inode:
 		ntfs_inode_close (ni);
 	}
-	Qprintf ("wipe_tails 0x%02x, %lld bytes\n", byte, (long long)total);
+	Qprintf ("wipe_tails 0x%02x, %lld bytes\n", byte, total);
 	return total;
 }
 
