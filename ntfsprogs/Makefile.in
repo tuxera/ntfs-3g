@@ -124,11 +124,11 @@ mkntfs_SOURCES = attrdef.c upcase.c boot.c sd.c mkntfs.c
 mkntfs_LDADD = $(AM_LIBS)
 mkntfs_LDFLAGS = $(AM_LFLAGS)
 
-ntfslabel_SOURCES = ntfslabel.c
+ntfslabel_SOURCES = ntfslabel.c utils.c utils.h
 ntfslabel_LDADD = $(AM_LIBS)
 ntfslabel_LDFLAGS = $(AM_LFLAGS)
 
-ntfsinfo_SOURCES = ntfsinfo.c
+ntfsinfo_SOURCES = ntfsinfo.c utils.c utils.h
 ntfsinfo_LDADD = $(AM_LIBS)
 ntfsinfo_LDFLAGS = $(AM_LFLAGS)
 
@@ -174,61 +174,61 @@ PROGRAMS =  $(bin_PROGRAMS) $(sbin_PROGRAMS)
 DEFS = @DEFS@ -I. -I$(srcdir) -I..
 LIBS = @LIBS@
 ntfsdump_logfile_OBJECTS =  ntfsdump_logfile.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsdump_logfile_DEPENDENCIES =  \
-@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@ntfsdump_logfile_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-dumplog_OBJECTS =  dumplog.$(OBJEXT)
-@REALLYSTATIC_FALSE@dumplog_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfsdump_logfile_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+dumplog_OBJECTS =  dumplog.$(OBJEXT)
 @REALLYSTATIC_TRUE@dumplog_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfswipe_OBJECTS =  ntfswipe.$(OBJEXT) utils.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfswipe_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@dumplog_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfswipe_OBJECTS =  ntfswipe.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfswipe_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfstruncate_OBJECTS =  attrdef.$(OBJEXT) ntfstruncate.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfstruncate_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfswipe_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfstruncate_OBJECTS =  attrdef.$(OBJEXT) ntfstruncate.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfstruncate_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfscluster_OBJECTS =  ntfscluster.$(OBJEXT) utils.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfscluster_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfstruncate_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfscluster_OBJECTS =  ntfscluster.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfscluster_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfsfix_OBJECTS =  ntfsfix.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsfix_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfscluster_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfsfix_OBJECTS =  ntfsfix.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsfix_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfsinfo_OBJECTS =  ntfsinfo.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsinfo_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfsfix_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfsinfo_OBJECTS =  ntfsinfo.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsinfo_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_FALSE@ntfsinfo_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 mkntfs_OBJECTS =  attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
 sd.$(OBJEXT) mkntfs.$(OBJEXT)
-@REALLYSTATIC_FALSE@mkntfs_DEPENDENCIES =  \
-@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@mkntfs_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfslabel_OBJECTS =  ntfslabel.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfslabel_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@mkntfs_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfslabel_OBJECTS =  ntfslabel.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfslabel_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT) utils.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsundelete_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfslabel_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsundelete_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
-ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@ntfsundelete_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)

@@ -41,11 +41,11 @@ mkntfs_SOURCES		= attrdef.c upcase.c boot.c sd.c mkntfs.c
 mkntfs_LDADD		= $(AM_LIBS)
 mkntfs_LDFLAGS		= $(AM_LFLAGS)
 
-ntfslabel_SOURCES	= ntfslabel.c
+ntfslabel_SOURCES	= ntfslabel.c utils.c utils.h
 ntfslabel_LDADD		= $(AM_LIBS)
 ntfslabel_LDFLAGS	= $(AM_LFLAGS)
 
-ntfsinfo_SOURCES	= ntfsinfo.c
+ntfsinfo_SOURCES	= ntfsinfo.c utils.c utils.h
 ntfsinfo_LDADD		= $(AM_LIBS)
 ntfsinfo_LDFLAGS	= $(AM_LFLAGS)
 
