@@ -1,4 +1,11 @@
+xx/xx/2004 - 2.0.0-WIP
+
+	- Add start_vcn parameter to ntfs_get_size_for_mapping_pairs() and
+	  ntfs_mapping_pairs_build() and adapt all callers.
+	- Bump library version due to source level API change above.
+
 04/09/2004 - 1.9.4 - Urgent bug fixes.
+
 	- Rewrite win32_io.c to allow device level write support.  (Yuval)
 	- Make ntfscp update file size in $FILE_NAME(0x30) attribute.  (Yura)
 	- Fix ntfsclone crash when --restore-image was used for block device
