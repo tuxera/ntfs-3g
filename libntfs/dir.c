@@ -89,7 +89,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		return -1;
 
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
 				"0x%Lx: %s\n",
@@ -671,7 +671,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	/* Get the offset into the index root attribute. */
 	ir_pos = (int)*pos;
 	/* Find the index root attribute in the mft record. */
-	if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		Dprintf("Index root attribute missing in directory inode "
 				"0x%Lx.\n", (unsigned long long)dir_ni->mft_no);
