@@ -31,7 +31,8 @@
  *
  * Perform the necessary post read multi sector transfer fixups and detect the
  * presence of incomplete multi sector transfers. - In that case, overwrite the
- * magic of the ntfs record header being processed with "BAAD" (in memory only!) * and abort processing.
+ * magic of the ntfs record header being processed with "BAAD" (in memory only!)
+ * and abort processing.
  *
  * Return 0 on success and -1 on error, with errno set to the error code. The
  * following error codes are defined:
