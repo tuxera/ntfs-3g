@@ -178,6 +178,8 @@
 		ntfs_cluster_{alloc,free}(). -- WIP
 	- New API functions provided by runlist.[hc]:
 		ntfs_rl_truncate(). -- WIP
+	- New API function provided by bitmap.[hc]:
+		ntfs_bitmap_clear_run(). -- WIP
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
