@@ -38,6 +38,7 @@
 #include "debug.h"
 #include "inode.h"
 #include "runlist.h"
+#include "logfile.h"
 
 /**
  * ntfs_volume_alloc -
@@ -1189,8 +1190,6 @@ int ntfs_logfile_reset(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na;
-	s64 len, pos, count;
-	char buf[NTFS_BUF_SIZE];
 	int eo;
 
 	if (!vol) {
@@ -1204,66 +1203,21 @@ int ntfs_logfile_reset(ntfs_volume *vol)
 	}
 
 	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+		eo = errno;
 		Dperror("Failed to open $FILE_LogFile/$DATA\n");
 		goto error_exit;
 	}
 
-	/* The $DATA attribute of the $LogFile has to be non-resident. */
-	if (!NAttrNonResident(na)) {
-		Dprintf("$LogFile $DATA attribute is resident!?!\n");
-		errno = EIO;
-		goto io_error_exit;
+	if (ntfs_empty_logfile(na)) {
+		eo = errno;
+		Dperror("Failed to empty $FILE_LogFile/$DATA\n");
+		ntfs_attr_close(na);
+		goto error_exit;
 	}
-
-	/* Get length of $LogFile contents. */
-	len = na->data_size;
-	if (!len) {
-		Dprintf("$LogFile has zero length, no disk write needed.\n");
-		return 0;
-	}
-
-	/* Read $LogFile until its end. We do this as a check for correct
-	   length thus making sure we are decompressing the mapping pairs
-	   array correctly and hence writing below is safe as well. */
-	pos = 0;
-	while ((count = ntfs_attr_pread(na, pos, NTFS_BUF_SIZE, buf)) > 0)
-		pos += count;
-
-	if (count == -1 || pos != len) {
-		Dprintf("Amount of $LogFile data read does not "
-			"correspond to expected length!");
-		if (count != -1)
-			errno = EIO;
-		goto io_error_exit;
-	}
-
-	/* Fill the buffer with 0xff's. */
-	memset(buf, -1, NTFS_BUF_SIZE);
-
-	/* Set the $DATA attribute. */
-	pos = 0;
-	while ((count = len - pos) > 0) {
-		if (count > NTFS_BUF_SIZE)
-			count = NTFS_BUF_SIZE;
-
-		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
-			Dprintf("Failed to set the $LogFile attribute value.");
-			if (count != -1)
-				errno = EIO;
-			goto io_error_exit;
-		}
-		pos += count;
-	}
-
 	ntfs_attr_close(na);
 	return ntfs_inode_close(ni);
 
-io_error_exit:
-	eo = errno;
-	ntfs_attr_close(na);
-	errno = eo;
 error_exit:
-	eo = errno;
 	ntfs_inode_close(ni);
 	errno = eo;
 	return -1;
