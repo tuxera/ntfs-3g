@@ -779,7 +779,8 @@ static void dump_non_resident_attr(ATTR_RECORD *a)
 	printf("Lowest VCN = %lli (0x%llx)\n", (long long)l,
 			(unsigned long long)l);
 	l = sle64_to_cpu(a->highest_vcn);
-	printf("Highest VCN = %lli (0x%llx)\n", l, l);
+	printf("Highest VCN = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	printf("Mapping pairs array offset = 0x%x\n",
 			le16_to_cpu(a->mapping_pairs_offset));
 	printf("Compression unit = 0x%x: %sCOMPRESSED\n", a->compression_unit,

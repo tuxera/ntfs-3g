@@ -300,9 +300,9 @@ int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL fo
 	}
 	label_len *= sizeof(uchar_t);
 	if (label_len > 0x100) {
-		fprintf(stderr, "New label is too long. Maximum %i characters "
+		fprintf(stderr, "New label is too long. Maximum %u characters "
 				"allowed. Truncating excess characters.\n",
-				0x100 / sizeof(uchar_t));
+				(unsigned)(0x100 / sizeof(uchar_t)));
 		label_len = 0x100;
 		new_label[label_len / sizeof(uchar_t)] = cpu_to_le16(L'\0');
 	}

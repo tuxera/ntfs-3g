@@ -355,8 +355,9 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 	    printf("\tSecurity ID: \t\t\t %u \n",
 			    le32_to_cpu(standard_attr->security_id));
 	} else {
-	    printf("\tSize of STANDARD_INFORMATION is %u. It should be either 72 or 48, \
-			something is wrong...\n", sizeof(STANDARD_INFORMATION));
+		printf("\tSize of STANDARD_INFORMATION is %u. It should be "
+				"either 72 or 48, something is wrong...\n",
+				(unsigned)sizeof(STANDARD_INFORMATION));
 	}
 
 	ntfs_attr_put_search_ctx(ctx); //free ctx
