@@ -804,7 +804,8 @@ static void dump_resident_attr(ATTR_RECORD *a)
 /**
  * dump_mapping_pairs_array
  */
-static void dump_mapping_pairs_array(char *b, unsigned int max_len)
+static void dump_mapping_pairs_array(char *b __attribute__((unused)),
+		unsigned int max_len __attribute__((unused)))
 {
 	// TODO
 	return;
@@ -1322,7 +1323,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
-		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
+		err = ntfs_mapping_pairs_build(vol, (u8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl, 0, NULL);
 	}
 	a->initialized_size = cpu_to_le64(inited_size);
@@ -1512,7 +1513,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
-		err = ntfs_mapping_pairs_build(vol, (s8*)a + hdr_size +
+		err = ntfs_mapping_pairs_build(vol, (u8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl, 0, NULL);
 	}
 	if (err < 0 || bw != val_len) {
