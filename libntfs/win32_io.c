@@ -62,21 +62,6 @@ typedef struct win32_fd {
 	int part_hidden_sectors;
 } win32_fd;
 
-#define perror(msg) win32_perror(__FILE__,__LINE__,__FUNCTION__,msg)
-
-static int win32_perror(const char *file, int line, const char *func,
-		const char *msg)
-{
-	char buffer[1024] = "";
-	DWORD err = GetLastError();
-
-	if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, buffer,
-			sizeof(buffer), NULL) <= 0)
-		sprintf(buffer, "HRESULT 0x%lx", err);
-	fprintf(stderr, "%s(%d): %s\t%s %s\n", file, line, func, buffer, msg);
-	return 0;
-}
-
 #ifdef EMULATE_SETFILEPOINTEREX
 static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
 		LARGE_INTEGER liDistanceToMove,
@@ -103,9 +88,13 @@ static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
  */
 static int ntfs_w32error_to_errno(DWORD w32error)
 {
+	Dprintf("win32_w32error_to_errno(%d).\n",w32error);
 	switch (w32error) {
+		case ERROR_INVALID_FUNCTION:
+			return ENOSYS;
 		case ERROR_FILE_NOT_FOUND:
 		case ERROR_PATH_NOT_FOUND:
+		case ERROR_INVALID_NAME:
 			return ENOENT;
 		case ERROR_TOO_MANY_OPEN_FILES:
 			return EMFILE;
@@ -130,6 +119,8 @@ static int ntfs_w32error_to_errno(DWORD w32error)
 			return ESPIPE;
 		case ERROR_NOT_SUPPORTED:
 			return ENOTSUP;
+		case ERROR_BAD_NETPATH:
+			return ENOSHARE;
 		default:
 			/* generic message */
 			return ENOMSG;
@@ -199,7 +190,7 @@ static int ntfs_win32_getsize(HANDLE handle,s64 *argp)
 
 	loword = GetFileSize(handle, &hiword);
 	if (loword==INVALID_FILE_SIZE) {
-		perror("ntfs_win32_getblksize(): FAILED!");
+		Dputs("win32_getblksize(): FAILED!");
 		errno = ntfs_w32error_to_errno(GetLastError());
 		return -errno;
 	}
@@ -433,24 +424,23 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 		/* end of partition != end of disk */
 		disp = FILE_BEGIN;
 		if (fd->part_end == -1) {
-			fprintf(stderr, "win32_seek: position relative to end "
-					"of disk not implemented\n");
+			Dputs("win32_seek: position relative to end "
+					"of disk not implemented.");
 			errno = ENOTSUP;
 			return -1;
 		}
 		abs_offset.QuadPart = fd->part_end + offset;
 		break;
 	default:
-		printf("win32_seek() wrong mode %d\n", whence);
+		printf("win32_seek() wrong mode %d.\n", whence);
 		errno = EINVAL;
 		return -1;
 	}
 
 	rvl = SetFilePointerEx(fd->handle, abs_offset, &fd->current_pos, disp);
 	if (!rvl) {
-		int err = errno;
-		perror("SetFilePointer failed");
-		errno = err;
+		Dputs("win32_seek(): SetFilePointer failed.");
+		errno = ntfs_w32error_to_errno(GetLastError());
 		return -1;
 	}
 
@@ -483,20 +473,19 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 #ifndef FORCE_ALIGNED_READ
 	if (((((long)buf) & ((s64)0x1FF)) == 0) && ((count & ((s64)0x1FF)) == 0)
 			&& ((fd->current_pos.QuadPart & 0x1FF) == 0)) {
-		Dprintf("normal read\n");
+		Dputs("normal read.");
 
 		rvl = ReadFile(fd->handle, (LPVOID)buf, count, &numread,
 				(LPOVERLAPPED)NULL);
 		if (!rvl) {
-			int err = errno;
-			perror("ReadFile failed");
-			errno = err;
+			Dputs("win32_read(): ReadFile failed.");
+			errno = ntfs_w32error_to_errno(GetLastError());
 			return -1;
 		}
 	} else {
 		BYTE *alignedbuffer;
 
-		Dprintf("aligned read\n");
+		Dputs("aligned read.");
 #else
 	{
 		BYTE *alignedbuffer;
@@ -510,10 +499,9 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 
 		rvl = SetFilePointerEx(fd->handle, base, NULL, FILE_BEGIN);
 		if (!rvl) {
-			int err = errno;
-			fprintf(stderr, "SetFilePointerEx failed\n");
+			Dputs("win32_read(): SetFilePointerEx failed.");
+			errno = ntfs_w32error_to_errno(GetLastError());
 			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-			errno = err;
 			return -1;
 		}
 
@@ -521,10 +509,9 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 				numtoread.QuadPart, &numread,
 				(LPOVERLAPPED)NULL);
 		if (!rvl) {
-			int err = errno;
-			fprintf(stderr, "ReadFile failed\n");
+			Dputs("win32_read(): ReadFile failed.");
+			errno = ntfs_w32error_to_errno(GetLastError());
 			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-			errno = err;
 			return -1;
 		}
 		new_pos.QuadPart = fd->current_pos.QuadPart + count;
@@ -532,10 +519,9 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 		rvl = SetFilePointerEx(fd->handle, new_pos, &fd->current_pos,
 				FILE_BEGIN);
 		if (!rvl) {
-			int err = errno;
-			fprintf(stderr, "SetFilePointerEx failed\n");
+			Dputs("win32_read(): SetFilePointerEx failed.");
+			errno = ntfs_w32error_to_errno(GetLastError());
 			VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-			errno = err;
 			return -1;
 		}
 
@@ -569,9 +555,8 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	free(fd);
 
 	if (!rvl) {
-		int err = errno;
-		perror("CloseHandle failed");
-		errno = err;
+		Dputs("win32_close: CloseHandle failed.");
+		errno = ntfs_w32error_to_errno(GetLastError());
 		return -1;
 	}
 
@@ -641,7 +626,7 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 
 	ret = ntfs_win32_getsize(dev,&st_size);
 	if (ret)
-		Dprintf("ntfs_device_win32_stat(): getsize failed");
+		Dputs("win32_stat(): getsize failed.");
 
 	memset(buf,0,sizeof (struct stat));
 	buf->st_mode = st_mode;
@@ -671,8 +656,7 @@ static __inline__ int ntfs_win32_hdio_getgeo(struct ntfs_device *dev,
 
 	if (fd->part_hidden_sectors==-1) {
 		/* not a partition */
-		Dprintf("ntfs_win32_hdio_getgeo(): error: not a partition");
-		fprintf(stderr, "ntfs_win32_hdio_getgeo(): unimplemented\n");
+		Dputs("win32_hdio_getgeo(): Not a partition, unimplemented.");
 		errno = ENOTSUP;
 		return -1;
 	} else {
@@ -710,7 +694,7 @@ static __inline__ int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
 		*argp=dg.BytesPerSector;
 		return 0;
 	} else {
-		perror("ntfs_win32_blksszget(): FAILED!");
+		Dputs("win32_blksszget(): FAILED!");
 		errno = ntfs_w32error_to_errno(GetLastError());
 		return -errno;
 	}
@@ -721,12 +705,12 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 {
 	win32_fd *fd = (win32_fd *)dev->d_private;
 
-	fprintf(stderr, "win32_ioctl(%d) called\n",request);
+	Dprintf("win32_ioctl(%d) called.\n",request);
 
 	switch (request) {
 #if defined(BLKGETSIZE)
 		case BLKGETSIZE:
-			Dprintf("win32_ioctl: BLKGETSIZE detected");
+			Dputs("win32_ioctl: BLKGETSIZE detected.");
 			if ((fd->part_end>=0) && (fd->part_start>=0)) {
 				*(int *)argp = (int)((fd->part_end - fd->part_start) / 512);
 				return 0;
@@ -737,7 +721,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 #endif
 #if defined(BLKGETSIZE64)
 		case BLKGETSIZE64:
-			Dprintf("win32_ioctl: BLKGETSIZE64 detected");
+			Dputs("win32_ioctl: BLKGETSIZE64 detected.");
 			if ((fd->part_end>=0) && (fd->part_start>=0)) {
 				*(s64 *)argp = (s64)(fd->part_end -	fd->part_start);
 				return 0;
@@ -748,17 +732,17 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 #endif
 #ifdef HDIO_GETGEO
 		case HDIO_GETGEO:
-			Dprintf("win32_ioctl: HDIO_GETGEO detected");
+			Dputs("win32_ioctl: HDIO_GETGEO detected.");
 			return ntfs_win32_hdio_getgeo(dev,(struct hd_geometry *)argp);
 #endif
 #ifdef BLKSSZGET
 		case BLKSSZGET:
-			Dprintf("win32_ioctl: BLKSSZGET detected");
+			Dputs("win32_ioctl: BLKSSZGET detected.");
 			return ntfs_win32_blksszget(dev,(int *)argp);
 			break;
 #endif
 		default:
-			fprintf(stderr, "win32_ioctl(): unimplemented ioctl %d\n",request);
+			fprintf(stderr, "win32_ioctl(): unimplemented ioctl %d.\n",request);
 			errno = ENOTSUP;
 			return -1;
 	}
