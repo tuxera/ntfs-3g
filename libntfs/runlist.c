@@ -888,9 +888,9 @@ mpa_err:
 	if (!attr->lowest_vcn) {
 		VCN max_cluster;
 
-		max_cluster = (sle64_to_cpu(attr->allocated_size) +
+		max_cluster = ((sle64_to_cpu(attr->allocated_size) +
 				vol->cluster_size - 1) >>
-				vol->cluster_size_bits;
+				vol->cluster_size_bits) - 1;
 		/*
 		 * A highest_vcn of zero means this is a single extent
 		 * attribute so simply terminate the runlist with LCN_ENOENT).
