@@ -102,6 +102,16 @@ struct _ntfs_volume {
 	u8 cluster_size_bits;	/* Log(2) of the byte size of a cluster. */
 	u8 mft_record_size_bits;/* Log(2) of the byte size of a mft record. */
 
+	/* Variables used by the cluster and mft allocators. */
+	u8 mft_zone_multiplier;	/* Initial mft zone multiplier. */
+	s64 mft_data_pos;	/* Mft record number at which to allocate the
+				   next mft record. */
+	LCN mft_zone_start;	/* First cluster of the mft zone. */
+	LCN mft_zone_end;	/* First cluster beyond the mft zone. */
+	LCN mft_zone_pos;	/* Current position in the mft zone. */
+	LCN data1_zone_pos;	/* Current position in the first data zone. */
+	LCN data2_zone_pos;	/* Current position in the second data zone. */
+
 	s64 nr_clusters;	/* Volume size in clusters, hence also the
 				   number of bits in lcn_bitmap. */
 	ntfs_inode *lcnbmp_ni;	/* ntfs_inode structure for FILE_Bitmap. */
