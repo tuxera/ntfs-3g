@@ -3,6 +3,8 @@ xx/xx/2004 - 2.0.0-WIP
 	- Add start_vcn parameter to ntfs_get_size_for_mapping_pairs() and
 	  ntfs_mapping_pairs_build() and adapt all callers.
 	- Bump library version due to source level API change above.
+	- Add ntfs_debug() and ntfs_error() to make kernel<->userspace porting
+	  easier.
 	- ntfsinfo: Added dumping of index records from $INDEX_ROOT and 
 	  $INDEX_ALLOCATION.  (Yura)
 	- ntfsinfo: Changed message for resident $INDEX_ALLOCATION to print
