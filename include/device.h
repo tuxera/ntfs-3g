@@ -1,7 +1,7 @@
 /*
  * device.h - Exports for low level device io. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2000-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -24,8 +24,10 @@
 
 #include <sys/stat.h>
 
+#include "device_io.h"
 #include "types.h"
 #include "support.h"
+#include "volume.h"
 
 /*
  * Defined bits for the state field in the ntfs_device structure.
@@ -85,8 +87,27 @@ struct ntfs_device_operations {
 	int (*ioctl)(struct ntfs_device *dev, int request, void *argp);
 };
 
-struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
+extern struct ntfs_device_operations ntfs_device_default_io_ops;
+
+extern struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
 		struct ntfs_device_operations *dops, void *private);
-int ntfs_device_free(struct ntfs_device *dev);
+extern int ntfs_device_free(struct ntfs_device *dev);
+
+extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
+		void *b);
+extern s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
+		const void *b);
+
+extern s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
+		const u32 bksize, void *b);
+extern s64 ntfs_mst_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
+		const u32 bksize, const void *b);
+
+extern s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
+		const s64 count, void *b);
+extern s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
+		const s64 count, const void *b);
+
+extern s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size);
 
 #endif /* defined _NTFS_DEVICE_H */
