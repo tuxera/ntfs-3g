@@ -36,6 +36,22 @@
 #ifdef HAVE_ENDIAN_H
 #	include <endian.h>
 #endif
+#ifdef HAVE_SYS_ENDIAN_H
+#	include <sys/endian.h>
+#endif
+#ifndef __BYTE_ORDER
+#	ifdef _BYTE_ORDER
+#		define __BYTE_ORDER _BYTE_ORDER
+#		define __LITTLE_ENDIAN _LITTLE_ENDIAN
+#		define __BIG_ENDIAN _BIG_ENDIAN
+#	else
+#		ifdef BYTE_ORDER
+#			define __BYTE_ORDER BYTE_ORDER
+#			define __LITTLE_ENDIAN LITTLE_ENDIAN
+#			define __BIG_ENDIAN BIG_ENDIAN
+#		endif
+#	endif
+#endif
 #ifdef HAVE_BYTESWAP_H
 #	include <byteswap.h>
 #endif

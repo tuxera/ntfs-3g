@@ -23,7 +23,9 @@
 
 #include "config.h"
 
-#include <features.h>
+#ifdef HAVE_FEATURES_H
+#	include <features.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

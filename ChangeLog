@@ -1,3 +1,7 @@
+06/01/2004 - 1.8.xx - WIP
+	- Compile fixes for DJGPP. (Chrisophe Grenier, me)
+	- Add compatibility for building on FreeBSD. (Christophe Grenier)
+
 06/01/2004 - 1.8.1 - Important bug fix and various enhancements.
 	- Add new API function attrib.[hc]:ntfs_attr_map_whole_runlist().
 	- Add new API function runlist.[hc]:ntfs_rl_pread().

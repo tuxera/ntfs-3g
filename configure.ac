@@ -167,8 +167,9 @@ AC_SUBST(AUTODIRS)
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h libintl.h limits.h locale.h mntent.h stddef.h \
 	stdint.h stdlib.h stdio.h stdarg.h string.h strings.h errno.h time.h \
-	endian.h byteswap.h sys/ioctl.h sys/mount.h unistd.h utime.h wchar.h \
-	getopt.h sys/stat.h sys/types.h linux/major.h linux/fd.h])
+	unistd.h utime.h wchar.h getopt.h features.h endian.h byteswap.h \
+	sys/endian.h sys/param.h sys/ioctl.h sys/mount.h sys/stat.h \
+	sys/types.h linux/major.h linux/fd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

@@ -31,7 +31,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <locale.h>
-#include <libintl.h>
+#ifdef HAVE_LIBINTL_H
+#	include <libintl.h>
+#endif
 #include <stdlib.h>
 #include <limits.h>
 
