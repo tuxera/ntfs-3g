@@ -12,8 +12,17 @@ xx/xx/2004 - 1.8.5 - WIP
 	- Update all source to include config.h before any other non-ntfs
 	  header files.
 	- Move include files from ntfsprogs/include to ntfsprogs/include/ntfs
-	  and adapt build system.  (Requested by Christophe Grenier.)
-	- Fix bug in ntfsprogs/mkntfs.c::stoucs().  Thanks to Andras Erdei.
+	  and adapt build system.  (Feature requested by Christophe Grenier.)
+	- Fix potential buffer overflow bug in ntfsprogs/mkntfs.c::stoucs().
+	  Thanks to Andras Erdei.
+	- Small cleanup of ./configure.ac to show better formatted option help
+	  text and other little bits.
+	- Add --disable-default-device-io-ops option to ./configure which makes
+	  for a smaller libntfs but results in ntfs_mount() always returning
+	  error with errno set to ENOTSUP.  You need to use ntfs_device_mount()
+	  instead.  This only makes sense with "make libs" and when an
+	  application linking statically against libntfs provides its own
+	  device io operations.  (Feature requested by Christophe Grenier.)
 
 23/01/2004 - 1.8.4 - Memory leak fixes.
 	- Fix memory leaks in libntfs/dir.c::ntfs_inode_lookup_by_name(),
