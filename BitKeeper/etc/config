@@ -1,7 +1,7 @@
 description: Linux NTFS userspace library and utilities
 category:    System Environment/Base
 homepage:    http://linux-ntfs.sf.net/
-bkweb:       http://linux-ntfs.bkbits.net:8080/ntfs-progs
+bkweb:       http://linux-ntfs.bkbits.net:8080/ntfsprogs
 contact:     Anton Altaparmakov
 email: 	     aia21@cantab.net
 logging:     logging@openlogging.org
