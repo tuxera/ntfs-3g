@@ -53,7 +53,7 @@ ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h utils.c utils.h
 ntfsundelete_LDADD	= $(AM_LIBS)
 ntfsundelete_LDFLAGS	= $(AM_LFLAGS)
 
-ntfsresize_SOURCES	= ntfsresize.c
+ntfsresize_SOURCES	= ntfsresize.c utils.c utils.h
 ntfsresize_LDADD	= $(AM_LIBS)
 ntfsresize_LDFLAGS	= $(AM_LFLAGS)
 

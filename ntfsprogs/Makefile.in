@@ -136,7 +136,7 @@ ntfsundelete_SOURCES = ntfsundelete.c ntfsundelete.h utils.c utils.h
 ntfsundelete_LDADD = $(AM_LIBS)
 ntfsundelete_LDFLAGS = $(AM_LFLAGS)
 
-ntfsresize_SOURCES = ntfsresize.c
+ntfsresize_SOURCES = ntfsresize.c utils.c utils.h
 ntfsresize_LDADD = $(AM_LIBS)
 ntfsresize_LDFLAGS = $(AM_LFLAGS)
 
@@ -225,7 +225,7 @@ ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfsundelete_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
-ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
+ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT) utils.$(OBJEXT)
 @REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 @REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
