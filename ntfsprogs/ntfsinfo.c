@@ -4,7 +4,7 @@
  * Copyright (c) 2002-2004 Matthew J. Fanto
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This utility will dump a file's attributes.
  *
@@ -64,6 +64,7 @@
 #include "inode.h"
 #include "utils.h"
 #include "security.h"
+#include "mst.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 
@@ -1346,6 +1347,11 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	bit = 0;
 	while((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
 		if (*byte & (1 << bit)) {
+			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
+						indx_record_size)) {
+				perror("Damaged INDX record");
+				goto free;
+			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
 			total_entries += ntfs_dump_index_entries(entry, type);
@@ -1361,6 +1367,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	}
 	printf("\tIndex entries total:\t %d\n", total_entries);
 	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
+free:
 	free(allocation);
 	free(bitmap);
 }
