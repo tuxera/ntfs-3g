@@ -273,7 +273,7 @@ static int parse_options (int argc, char *argv[])
  * Example of usage:
  *	char *time_str = ntfsinfo_time_to_str(
  *			sle64_to_cpu(standard_attr->creation_time));
- *	printf("\tFile Creation Time: \t %s", time_str);
+ *	printf("\tFile Creation Time:\t %s", time_str);
  */
 static char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 {
@@ -409,27 +409,27 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		char *ntfs_time_str = NULL;
 		
 		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->creation_time);
-		printf("\tFile Creation Time: \t %s",ntfs_time_str);
+		printf("\tFile Creation Time:\t %s",ntfs_time_str);
 		
 		ntfs_time_str = ntfsinfo_time_to_str(
 			standard_attr->last_data_change_time);
-		printf("\tFile Altered Time: \t %s",ntfs_time_str);
+		printf("\tFile Altered Time:\t %s",ntfs_time_str);
 		
 		ntfs_time_str = ntfsinfo_time_to_str(
 			standard_attr->last_mft_change_time);
-		printf("\tMFT Changed Time: \t %s",ntfs_time_str);
+		printf("\tMFT Changed Time:\t %s",ntfs_time_str);
 		
 		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->last_access_time);
-		printf("\tLast Accessed Time: \t %s",ntfs_time_str);
+		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
 	}
 	
 	/* TODO: file_attributes - Flags describing the file. */
 	
 	printf("\tMax Number of Versions:\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->maximum_versions));
-	printf("\tVersion Number: \t %u \n",
+	printf("\tVersion Number:\t\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->version_number));
-	printf("\tClass ID: \t\t %u \n",
+	printf("\tClass ID:\t\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->class_id));
 
 	
@@ -438,9 +438,9 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 /*		printf("\t$STANDARD_INFORMATION fields owner_id, security_id, quota \n"
 			"\t & usn are missing. This volume has not been upgraded\n"); */
 	} else if (value_length == 72) {
-		printf("\tUser ID: \t\t %u \n",
+		printf("\tUser ID:\t\t %u \n",
 			(unsigned int)le32_to_cpu(standard_attr->owner_id));
-		printf("\tSecurity ID: \t\t %u \n",
+		printf("\tSecurity ID:\t\t %u \n",
 			(unsigned int)le32_to_cpu(standard_attr->security_id));
 	} else {
 		printf("\tSize of STANDARD_INFORMATION is %u. It should be "
@@ -485,7 +485,7 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 			file_name_attr->file_name_length,&mbs_file_name,0);
 
 		if (mbs_file_name_size>0) {
-			printf("\tFile Name: \t\t '%s'\n", mbs_file_name);
+			printf("\tFile Name:\t\t '%s'\n", mbs_file_name);
 			free(mbs_file_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -493,15 +493,15 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 		/* any way, error or not, print the length */
-		printf("\tFile Name Length: \t %d\n", file_name_attr->file_name_length);
+		printf("\tFile Name Length:\t %d\n", file_name_attr->file_name_length);
 	} else {
-		printf("\tFile Name: \t\t unnamed?!?\n");
+		printf("\tFile Name:\t\t unnamed?!?\n");
 	}
 	
 	/* other basic stuff about the file */
-	printf("\tAllocated File Size: \t %lld\n",
+	printf("\tAllocated File Size:\t %lld\n",
 		(long long)sle64_to_cpu(file_name_attr->allocated_size));
-	printf("\tReal File Size: \t %lld\n",
+	printf("\tReal File Size:\t\t %lld\n",
 		(long long)sle64_to_cpu(file_name_attr->data_size));
 
 	/* time stuff stuff */
@@ -509,27 +509,26 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		char *ntfs_time_str;
 	
 		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->creation_time);
-		printf("\tFile Creation Time: \t %s",ntfs_time_str);
+		printf("\tFile Creation Time:\t %s",ntfs_time_str);
 
 		ntfs_time_str = ntfsinfo_time_to_str(
 			file_name_attr->last_data_change_time);
-		printf("\tFile Altered Time: \t %s",ntfs_time_str);
+		printf("\tFile Altered Time:\t %s",ntfs_time_str);
 
 		ntfs_time_str = ntfsinfo_time_to_str(
 			file_name_attr->last_mft_change_time);
-		printf("\tMFT Changed Time: \t %s",ntfs_time_str);
+		printf("\tMFT Changed Time:\t %s",ntfs_time_str);
 
 		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->last_access_time);
-		printf("\tLast Accessed Time: \t %s",ntfs_time_str);
+		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
 	}
 }
 
 
 /*
- * ntfs_dump_object_id
+ * ntfs_dump_object_id()
  *
  * dump the $OBJECT_ID attribute - not present on all systems
- *
  */
 static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 {
@@ -709,7 +708,7 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 
 		if (mbs_vol_name_size>0) {
 			/* output the converted name. */
-			printf("\tVolume Name: \t\t '%s'\n",mbs_vol_name);
+			printf("\tVolume Name:\t\t '%s'\n",mbs_vol_name);
 			free(mbs_vol_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -717,7 +716,7 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tVolume Name: \t\t unnamed\n");
+		printf("\tVolume Name:\t\t unnamed\n");
 	}
 }
 
@@ -737,9 +736,9 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 
 	printf("Dumping attribute $VOLUME_INFORMATION (0x70)\n");
 
-	printf("\tVolume Version: \t %d.%d\n", vol_information->major_ver,
+	printf("\tVolume Version:\t %d.%d\n", vol_information->major_ver,
 		vol_information->minor_ver);
-	printf("\tFlags: \t\t\t ");
+	printf("\tFlags:\t\t\t ");
 	if (vol_information->flags & VOLUME_IS_DIRTY)
 		printf("DIRTY ");
 	if (vol_information->flags & VOLUME_RESIZE_LOG_FILE)
@@ -779,7 +778,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 
 		stream_name = ntfs_attr_get_name(attr);
 		if (stream_name) {
-			printf("\tStream name: \t\t '%s'\n",stream_name);
+			printf("\tStream name:\t\t '%s'\n",stream_name);
 			free(stream_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -787,7 +786,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tStream name: \t\t unnamed\n");
+		printf("\tStream name:\t\t unnamed\n");
 	}
 
 /*	length
@@ -801,22 +800,22 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr)
 		VCN highest_vcn;  Highest valid vcn of this extent of
 		u16 mapping_pairs_offset; Byte offset from the ... */
 		printf("\tIs resident? \t\t No\n");
-		printf("\tData size: \t\t %llu\n",
+		printf("\tData size:\t\t %llu\n",
 			(long long)le64_to_cpu(attr->data_size));
-		printf("\tAllocated size: \t %llu\n",
+		printf("\tAllocated size:\t\t %llu\n",
 			(long long)le64_to_cpu(attr->allocated_size));
-		printf("\tInitialized size: \t %llu\n",
+		printf("\tInitialized size:\t %llu\n",
 			(long long)le64_to_cpu(attr->initialized_size));
 		if (attr->compression_unit) {
-			printf("\tCompression unit: \t %u\n",attr->compression_unit);
-			printf("\tCompressed size: \t %llu\n",
+			printf("\tCompression unit:\t %u\n",attr->compression_unit);
+			printf("\tCompressed size:\t %llu\n",
 				(long long)le64_to_cpu(attr->compressed_size));
 		} else {
 			printf("\tNot Compressed\n");
 		}
 	} else {
 		printf("\tIs resident? \t\t Yes\n");
-		printf("\tData size: \t\t %u\n",
+		printf("\tData size:\t\t %u\n",
 			(unsigned int)le32_to_cpu(attr->value_length));
 /*		u16 value_offset; Byte offset of the attribute
 		RESIDENT_ATTR_FLAGS resident_flags; */
@@ -842,7 +841,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 		index_name = ntfs_attr_get_name(attr);
 		
 		if (index_name) {
-			printf("\tIndex name: \t\t '%s'\n",index_name);
+			printf("\tIndex name:\t\t '%s'\n",index_name);
 			free(index_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -850,11 +849,11 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tIndex name: \t\t unnamed\n");
+		printf("\tIndex name:\t\t unnamed\n");
 	}
 
 	/* attr_type dumping */
-	printf("\tIndexed Attr Type: \t ");
+	printf("\tIndexed Attr Type:\t ");
 	if (index_root->type) {
 		if (index_root->type & (0xFFFF - AT_FILE_NAME)) {
 			/* wierd, this should be illgeal */
@@ -870,7 +869,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 	}
 
 	/* collation rule dumping */
-	printf("\tCollation Rule: \t %u\n",
+	printf("\tCollation Rule:\t\t %u\n",
 		(unsigned int)le32_to_cpu(index_root->collation_rule));
 /*	COLLATION_BINARY, COLLATION_FILE_NAME, COLLATION_UNICODE_STRING,
 	COLLATION_NTOFS_ULONG, COLLATION_NTOFS_SID,
@@ -905,7 +904,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
 		index_name = ntfs_attr_get_name(attr);
 		
 		if (index_name) {
-			printf("\tIndex name: \t\t '%s'\n",index_name);
+			printf("\tIndex name:\t\t '%s'\n",index_name);
 			free(index_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -913,7 +912,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tIndex name: \t\t unnamed\n");
+		printf("\tIndex name:\t\t unnamed\n");
 	}
 }
 
@@ -932,7 +931,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 		bitmap_name = ntfs_attr_get_name(attr);
 		
 		if (bitmap_name) {
-			printf("\tBitmap name: \t\t '%s'\n",bitmap_name);
+			printf("\tBitmap name:\t\t '%s'\n",bitmap_name);
 			free(bitmap_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -940,7 +939,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tBitmap name: \t\t unnamed\n");
+		printf("\tBitmap name:\t\t unnamed\n");
 	}
 }
 
@@ -1056,7 +1055,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 		attr_name = ntfs_attr_get_name(attr);
 
 		if (attr_name) {
-			printf("\tAttribute name: \t '%s'\n",attr_name);
+			printf("\tAttribute name:\t '%s'\n",attr_name);
 			free(attr_name);
 		} else {
 			/* an error occured, errno holds the reason - notify the user */
@@ -1064,7 +1063,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 				strerror(errno));
 		}
 	} else {
-		printf("\tAttribute name: \t unnamed\n");
+		printf("\tAttribute name:\t unnamed\n");
 	}
 
 	/* we could parse the flags */
@@ -1274,7 +1273,7 @@ int main(int argc, char **argv)
 		if (opts.filename) {
 			inode = utils_pathname_to_inode (vol, NULL, opts.filename);
 		} else {
-	   		inode = ntfs_inode_open(vol, MK_LE_MREF(opts.inode, 0));
+			inode = ntfs_inode_open(vol, MK_LE_MREF(opts.inode, 0));
 		}
 
 		/* dump the inode information */
