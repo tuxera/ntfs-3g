@@ -34,6 +34,54 @@
 #include "unistr.h"
 
 /**
+ * ntfs_attrlist_need - check whether attribute need attribute list
+ * @ni:		opened ntfs inode for which perform check
+ *
+ * Check whether all are atributes belong to one MFT record, in that case
+ * attribute list is not needed.
+ *
+ * Return 1 if inode need attribute list, 0 if not, -1 on error with errno set
+ * to the error code. If function succeed errno set to 0. The following error
+ * codes are defined:
+ *	EINVAL	- Invalid argumets passed to function or attribute haven't got
+ *		  attribute list.
+ */
+int ntfs_attrlist_need(ntfs_inode *ni) {
+	ATTR_LIST_ENTRY *ale;
+
+	if (!ni) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for inode 0x%llx.\n",
+			__FUNCTION__, (long long) ni->mft_no);
+
+	if (!NInoAttrList(ni)) {
+		Dprintf("%s(): Inode haven't got attribute list.\n",
+			__FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+	
+	if (!ni->attr_list) {
+		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	errno = 0;
+	ale = (ATTR_LIST_ENTRY *)ni->attr_list;
+	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
+		if (MREF_LE(ale->mft_reference) != ni->mft_no)
+			return 1;
+		ale = (ATTR_LIST_ENTRY *)((u8*)ale + le16_to_cpu(ale->length));
+	}
+	return 0;
+}
+
+/**
  * ntfs_attrlist_set - set new attribute list for ntfs inode
  * @ni:		opened ntfs inode attribute list set for
  * @new_al:	new attribute list
@@ -52,16 +100,16 @@ int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 	runlist *rl;
 	int rl_size;
 	int err;
-	
+
 	if (!ni || !new_al || new_al_len < 1) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx, new_al_len %d.\n",
 			__FUNCTION__, (long long) ni->mft_no, new_al_len);
-	
+
 	/* Make attribute list length 8 byte aligment. */
 	new_al_len = (new_al_len + 7) & ~7;
 
@@ -163,12 +211,12 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	mref = MK_LE_MREF(ni->mft_no, le16_to_cpu(ni->mrec->sequence_number));
 
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
-		
+
 	if (!NInoAttrList(ni)) {
 		Dprintf("%s(): Attribute list isn't present.\n", __FUNCTION__);
 		errno = ENOENT;
@@ -241,7 +289,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	ale->mft_reference = mref;
 	ale->instance = attr->instance;
 	memcpy(ale->name, (u8 *)attr + attr->name_offset, attr->name_length);
-	
+
 	/* Set new runlist. */
 	if (ntfs_attrlist_set(ni, new_al, new_al_len)) {
 		err = errno;
@@ -271,19 +319,19 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 	ntfs_inode *base_ni;
 	ATTR_LIST_ENTRY *ale;
 	int err;
-		
+
 	if (!ctx || !ctx->ntfs_ino || !ctx->attr || !ctx->al_entry) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (ctx->base_ntfs_ino)
 		base_ni = ctx->base_ntfs_ino;
 	else
 		base_ni = ctx->ntfs_ino;
 	ale = ctx->al_entry;
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
 		"%lld.\n", __FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
 		(unsigned) le32_to_cpu(ctx->attr->type),
@@ -294,7 +342,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		errno = ENOENT;
 		return -1;
 	}
-	
+
 	/* Allocate memory for new attribute list. */
 	new_al_len = base_ni->attr_list_size - le16_to_cpu(ale->length);
 	new_al = malloc(new_al_len);
@@ -303,7 +351,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		errno = ENOMEM;
 		return -1;
 	}
-	
+
 	/* Copy entries from old attribute list to new. */
 	memcpy(new_al, base_ni->attr_list, (u8*)ale - base_ni->attr_list);
 	memcpy(new_al + ((u8*)ale - base_ni->attr_list), (u8*)ale + le16_to_cpu(
