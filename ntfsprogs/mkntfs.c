@@ -567,12 +567,20 @@ int ucstos(char *dest, const uchar_t *src, int maxlen)
  *
  * Return the number of characters written to @dest, not including the
  * terminating null unicode character.
+ *
+ * If @maxlen is less than the size of a single unicode character we cannot
+ * write the terminating null unicode character and hence return -1 with errno
+ * set to EINVAL.
  */
 int stoucs(uchar_t *dest, const char *src, int maxlen)
 {
 	char c;
 	int i;
 
+	if (maxlen < sizeof(uchar_t)) {
+		errno = EINVAL;
+		return -1;
+	}
 	/* Convert maxlen from bytes to unicode characters. */
 	maxlen /= sizeof(uchar_t);
 	/* Need space for null terminator. */
