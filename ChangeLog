@@ -55,6 +55,12 @@ xx/xx/2004 - 2.0.0-WIP
 	- New API: attrlist.[ch]::ntfs_attrlist_need.  (Yura)
 	- ntfsclone: save by using our, not NTFS cluster allocation bitmap. 
 	  This gives more control in the future what to save (Szaka)
+	- Fix stupid bug in ntfs_attr_reinit_search_ctx() introduced during
+	  changes to ntfs_external_attr_find().  This is because
+	  ntfs_attr_lookup() intentionally does not clear ctx->al_entry but
+	  does clear ctx->base_ntfs_ino which in turn means that
+	  ntfs_attr_reinit_search_ctx() does not clear ctx->al_entry.  Now,
+	  ntfs_attr_reinit_search_ctx() always clears ctx->al_entry.
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
