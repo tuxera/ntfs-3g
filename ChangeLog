@@ -62,6 +62,8 @@
 	- Sanitize/update logfile.h somewhat and adapt ntfsdump_logfile.
 	- Move declaration of a variable in utils.c to beginning of block.
 	  Thanks to Alexei Alexandrov for the bug report and patch.
+	- Add the ability to read the logfile from a supplied file using the
+	  command line option -f to ntfsdump_logfile.
 
 11/03/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
