@@ -123,6 +123,7 @@ runlist *rl = NULL, *rl_mft = NULL, *rl_mft_bmp = NULL, *rl_mftmirr = NULL;
 runlist *rl_logfile = NULL, *rl_boot = NULL, *rl_bad = NULL, *rl_index;
 INDEX_ALLOCATION *index_block = NULL;
 ntfs_volume *vol;
+char *dev_name;
 
 struct {
 	int sector_size;		/* -s, in bytes, power of 2, default is
@@ -351,7 +352,7 @@ void parse_options(int argc, char *argv[])
 		}
 	if (optind == argc)
 		usage();
-	vol->dev->d_name = argv[optind++];
+	dev_name = argv[optind++];
 	if (optind < argc) {
 		u = strtoul(argv[optind++], &s, 0);
 		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
@@ -2553,7 +2554,7 @@ int main(int argc, char **argv)
 	 * Allocate and initialize an ntfs device structure and attach it to
 	 * the volume.
 	 */
-	if (!(vol->dev = ntfs_device_alloc(vol->dev->d_name, 0,
+	if (!(vol->dev = ntfs_device_alloc(dev_name, 0,
 			&ntfs_device_disk_io_ops, NULL)))
 		err_exit("Could not allocate memory for internal buffer.\n");
 	/* Open the device for reading or reading and writing. */
