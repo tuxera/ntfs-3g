@@ -1562,7 +1562,7 @@ typedef struct {
 	u8 alignment1;
 	u16 size;	/* Allocated space in bytes for ACL. Includes this
 			   header, the ACEs and the remaining free space. */
-	u16 ace_count;/* Number of ACEs in the ACL. */
+	u16 ace_count;	/* Number of ACEs in the ACL. */
 	u16 alignment2;
 /* sizeof() = 8 bytes */
 } __attribute__ ((__packed__)) ACL;
