@@ -540,12 +540,12 @@ static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 
 	if (!ni) {
 		errno = EINVAL;
-		return -1;
+		return ERR_MREF(-1);
 	}
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
-		return -1;
+		return ERR_MREF(-1);
 	if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		Dprintf("No file name found in inode 0x%Lx. Corrupt inode.\n",
 				(unsigned long long)ni->mft_no);
@@ -573,7 +573,7 @@ err_out:
 	eo = errno;
 	ntfs_attr_put_search_ctx(ctx);
 	errno = eo;
-	return -1;
+	return ERR_MREF(-1);
 }
 
 /**
@@ -657,7 +657,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		MFT_REF parent_mref;
 
 		parent_mref = ntfs_mft_get_parent_ref(dir_ni);
-		if (parent_mref == -1) {
+		if (parent_mref == ERR_MREF(-1)) {
 			Dprintf("Parent directory not found: %s\n", errno);
 			goto dir_err_out;
 		}
