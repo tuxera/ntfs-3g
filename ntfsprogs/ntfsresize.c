@@ -69,8 +69,15 @@ static const char *resize_important_msg =
 
 static const char *invalid_ntfs_msg =
 "Apparently device '%s' doesn't have a valid NTFS.\n"
-"Maybe you selected the wrong partition or the whole disk\n"
-"instead of a partition (e.g. /dev/hda, not /dev/hda1)?\n";
+"Maybe you selected the wrong partition? Or the whole disk instead of a\n"
+"partition (e.g. /dev/hda, not /dev/hda1)? This error might also occur\n"
+"if the disk was incorrectly repartitioned (see the ntfsresize FAQ).\n";
+
+static const char *corrupt_volume_msg =
+"Apparently you have a corrupted NTFS. Please run the filesystem checker\n"
+"on Windows by invoking chkdsk /f. Don't forget the /f (force) parameter,\n"
+"it's important! You probably also need to reboot Windows to take effect.\n"
+"Then you can try ntfsresize again. No modification was made to your NTFS.\n";
 
 struct {
 	int verbose;
@@ -610,7 +617,8 @@ static void collect_shrink_constraints(ntfs_resize_t *resize, runlist *rl)
 	if ((ret = has_bad_sectors(resize)) != 0) {
 		if (ret == -1)
 			perr_exit("Couldn't convert string to Unicode");
-		err_exit("Device has bad sectors, not supported yet.\n");
+		err_exit("Your disk has bad sectors (manufacturing faults or "
+			 "dying disk).\nThis situation isn't supported yet.\n");
 	} 
 
 	if (NInoAttrList(resize->ni)) {
@@ -727,8 +735,14 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 	if (!a->non_resident)
 		return;
 
-	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
-		perr_exit("ntfs_decompress_mapping_pairs");
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL))) {
+		int err = errno;
+		perr_printf("ntfs_decompress_mapping_pairs");
+		if (err == EIO)
+			printf(corrupt_volume_msg);
+		exit(1);
+	}
+		
 
 	for (i = 0; rl[i].length; i++) {
 		s64 lcn = rl[i].lcn;
@@ -855,11 +869,10 @@ static void compare_bitmaps(struct bitmap *a)
 	}
 
 	if (mismatch) {
-		printf("Totally %d cluster accounting mismatches.\n", 
-		       mismatch);
-		err_exit("Filesystem check failed! Windows wasn't shutdown "
-			 "properly or inconsistent\nfilesystem. Please run "
-			 "chkdsk /f on Windows.\n");
+		err_printf("Filesystem check failed! Totally %d cluster "
+			   "accounting mismatches.\n", mismatch);
+		printf(corrupt_volume_msg);
+		exit(1);
 	}
 }
 
@@ -1886,8 +1899,7 @@ static void mount_volume(void)
 		if (err == EINVAL)
 			printf(invalid_ntfs_msg, opt.volume);
 		else if (err == EIO)
-			printf("Apparently you have a corrupted volume. "
-			       "Please run chkdsk /f and try again!\n");
+			printf(corrupt_volume_msg);
 		exit(1);
 	}
 
@@ -2045,11 +2057,10 @@ int main(int argc, char **argv)
 	
 	walk_inodes(&resize);
 	if (resize.multi_ref) {
-		printf("Totally %d clusters referenced multiply times.\n", 
-		       resize.multi_ref);
-		err_exit("Filesystem check failed! Windows wasn't shutdown "
-			 "properly or inconsistent\nfilesystem. Please run "
-			 "chkdsk /f on Windows.\n");
+		err_printf("Filesystem check failed! Totally %d clusters "
+			   "referenced multiply times.\n", resize.multi_ref);
+		printf(corrupt_volume_msg);
+		exit(1);
 	}
 	compare_bitmaps(&lcn_bitmap);
 
