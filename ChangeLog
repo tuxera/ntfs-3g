@@ -93,6 +93,8 @@ xx/xx/2004 - 2.0.0-WIP
 	- Add new API's ntfs_rl_sparse and ntfs_rl_get_copmressed_size.  (Yura)
 	- Move NAttr{Sparse,Compressed,Encrypted} to inode struct preserving
 	  the previous interface.  (Yura, with fixes from Anton)
+	- Rename/move inode.[hc]::ntfs_inode_{add,rm}_attr() to
+	  attrib.[hc]::ntfs_attr_{add,rm}(), respectively.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
