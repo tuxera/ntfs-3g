@@ -387,7 +387,7 @@ s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 		total += vol->cluster_size;
 	}
 
-	Qprintf ("wipe_unused 0x%02x, %lld bytes\n", byte, total);
+	Qprintf ("wipe_unused 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
 	free (buffer);
 	return total;
@@ -448,7 +448,8 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst read %lld\n", i);
+				Eprintf ("error attr mst read %lld\n",
+						(long long)i);
 				total = -1;	// XXX just negate result?
 				goto free;
 			}
@@ -467,7 +468,8 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst write %lld\n", i);
+				Eprintf ("error attr mst write %lld\n",
+						(long long)i);
 				total = -1;
 				goto free;
 			}
@@ -484,7 +486,8 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 				result = ntfs_attr_mst_pwrite (vol->mftmirr_na, vol->mft_record_size * i,
 					1, vol->mft_record_size, buffer);
 				if (result != 1) {
-					Eprintf ("error attr mst write %lld\n", i);
+					Eprintf ("error attr mst write %lld\n",
+							(long long)i);
 					total = -1;
 					goto free;
 				}
@@ -524,7 +527,8 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst write %lld\n", i);
+				Eprintf ("error attr mst write %lld\n",
+						(long long)i);
 				total = -1;
 				goto free;
 			}
@@ -533,7 +537,7 @@ s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 		}
 	}
 
-	Qprintf ("wipe_mft 0x%02x, %lld bytes\n", byte, total);
+	Qprintf ("wipe_mft 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
 	free (buffer);
 	return total;
@@ -765,9 +769,11 @@ int ntfs_info (ntfs_volume *vol)
 	Qprintf ("\n");
 
 	Qprintf ("Cluster size = %u\n", vol->cluster_size);
-	Qprintf ("Volume size = %lld clusters\n", vol->nr_clusters);
-	Qprintf ("Volume size = %lld bytes\n", vol->nr_clusters * vol->cluster_size);
-	Qprintf ("Volume size = %lld MiB\n", vol->nr_clusters * vol->cluster_size / (1024*1024)); /* round up? */
+	Qprintf ("Volume size = %lld clusters\n", (long long)vol->nr_clusters);
+	Qprintf ("Volume size = %lld bytes\n",
+			(long long)vol->nr_clusters * vol->cluster_size);
+	Qprintf ("Volume size = %lld MiB\n", (long long)vol->nr_clusters *
+			vol->cluster_size / (1024*1024)); /* round up? */
 
 	Qprintf ("\n");
 
@@ -778,7 +784,7 @@ int ntfs_info (ntfs_volume *vol)
 
 	Qprintf ("cluster\n");
 	//Qprintf ("allocated_size = %lld\n", vol->lcnbmp_na->allocated_size);
-	Qprintf ("data_size = %lld\n", vol->lcnbmp_na->data_size);
+	Qprintf ("data_size = %lld\n", (long long)vol->lcnbmp_na->data_size);
 	//Qprintf ("initialized_size = %lld\n", vol->lcnbmp_na->initialized_size);
 
 	{
@@ -815,7 +821,8 @@ int ntfs_info (ntfs_volume *vol)
 	}
 done:
 
-	Qprintf ("cluster use %lld, not %lld, total %lld\n", use, not, use+not);
+	Qprintf ("cluster use %lld, not %lld, total %lld\n", (long long)use,
+			(long long)not, (long long)(use + not));
 	Qprintf ("\n");
 
 	}
@@ -832,13 +839,13 @@ done:
 	if (!bitmap)
 		return 0;
 
-	printf ("mft has %lld records\n", vol->nr_mft_records);
+	printf ("mft has %lld records\n", (long long)vol->nr_mft_records);
 
 	//Qprintf ("allocated_size = %lld\n", vol->mftbmp_na->allocated_size);
-	Qprintf ("data_size = %lld\n", vol->mftbmp_na->data_size);
+	Qprintf ("data_size = %lld\n", (long long)vol->mftbmp_na->data_size);
 	//Qprintf ("initialized_size = %lld\n", vol->mftbmp_na->initialized_size);
 
-	printf ("bmpsize = %lld\n", bmpsize);
+	printf ("bmpsize = %lld\n", (long long)bmpsize);
 	for (bmpoff = 0; bmpoff < bmpsize; bmpoff += bmpbufsize) {
 		if ((bmpoff + bmpbufsize) > bmpsize)
 			bmpbufsize = bmpsize - bmpoff;
@@ -867,7 +874,8 @@ done:
 
 bmpdone:
 	printf ("mft\n");
-	printf ("use %lld, not %lld, total %lld\n", use, not, use+not);
+	printf ("use %lld, not %lld, total %lld\n", (long long)use,
+			(long long)not, (long long)(use + not));
 
 	free (bitmap);
 	}
@@ -1014,9 +1022,12 @@ int main (int argc, char *argv[])
 		runlist_element *rl = vol->mft_na->rl;
 		printf ("________________________________________________________________________________\n\n");
 		for (; rl->length > 0; rl++, i++) {
-			printf ("%4d %lld,%lld,%lld\n", i, rl->vcn, rl->lcn, rl->length);
+			printf ("%4d %lld,%lld,%lld\n", i, (long long)rl->vcn,
+					(long long)rl->lcn,
+					(long long)rl->length);
 		}
-		printf ("%4d %lld,%lld,%lld\n", i, rl->vcn, rl->lcn, rl->length);
+		printf ("%4d %lld,%lld,%lld\n", i, (long long)rl->vcn,
+				(long long)rl->lcn, (long long)rl->length);
 		return 0;
 	}
 
@@ -1080,7 +1091,7 @@ int main (int argc, char *argv[])
 				break;
 		}
 
-		printf ("%llu bytes were wiped\n", total);
+		printf ("%lld bytes were wiped\n", (long long)total);
 	}
 
 	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {

@@ -238,7 +238,7 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 		}
 	} else {
 		if ((suffix[0] != '-') && (suffix[0] != 0)) {
-			Eprintf ("Invalid number '%.*s'.\n", (suffix - value + 1), value);
+			Eprintf ("Invalid number '%.*s'.\n", (int)(suffix - value + 1), value);
 			return 0;
 		}
 	}
@@ -472,7 +472,8 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 				temp = malloc (30);
 				if (!temp)
 					return 0;
-				snprintf (temp, 30, "<MFT%lld>", inode->mft_no);
+				snprintf (temp, 30, "<MFT%llu>", (unsigned
+						long long)inode->mft_no);
 				names[i] = temp;
 			}
 
@@ -492,7 +493,8 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 		inode = ntfs_inode_open (vol, parent);
 		if (!inode) {
-			Eprintf ("Couldn't open inode %lld.\n", MREF (parent));
+			Eprintf ("Couldn't open inode %llu.\n",
+					(unsigned long long)MREF(parent));
 			break;
 		}
 	}
@@ -776,7 +778,8 @@ ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, cons
 
 		ni = ntfs_inode_open (vol, inum);
 		if (!ni) {
-			Eprintf ("Cannot open inode %lld: %s.\n", inum, p);
+			Eprintf ("Cannot open inode %llu: %s.\n",
+					(unsigned long long)inum, p);
 			goto close;
 		}
 
@@ -968,7 +971,8 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		ctx->flags_match = 0;
 		int in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {
-			Eprintf ("Error reading inode %lld.  Aborting.", ctx->mft_num);
+			Eprintf ("Error reading inode %llu.  Aborting.",
+					(unsigned long long)ctx->mft_num);
 			return -1;
 		}
 
@@ -977,7 +981,8 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->inode = ntfs_inode_open (ctx->vol, (MFT_REF) ctx->mft_num);
 			if (ctx->inode == NULL) {
-				Eprintf ("Error reading inode %lld.", ctx->mft_num);
+				Eprintf ("Error reading inode %llu.", (unsigned
+						long long) ctx->mft_num);
 				return -1;
 			}
 
@@ -1046,7 +1051,9 @@ int mft_next_record (struct mft_search_ctx *ctx)
 			}
 
 			if (ntfs_attr_pread (mft, ctx->vol->mft_record_size * ctx->mft_num, ctx->vol->mft_record_size, ctx->inode->mrec) < ctx->vol->mft_record_size) {
-				Eprintf ("Couldn't read MFT Record %lld: %s.\n", ctx->mft_num, strerror (errno));
+				Eprintf ("Couldn't read MFT Record %llu: %s.\n",
+						(unsigned long long)
+						ctx->mft_num, strerror (errno));
 				// free / close
 				return -1;
 			}
@@ -1057,7 +1064,8 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		}
 
 		if (ntfs_inode_close (ctx->inode)) {
-			Eprintf ("Error closing inode %lld.", ctx->mft_num);
+			Eprintf ("Error closing inode %llu.",
+					(unsigned long long)ctx->mft_num);
 			return -errno;
 		}
 

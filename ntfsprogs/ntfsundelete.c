@@ -861,14 +861,17 @@ int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		}
 
 		if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
-			Vprintf ("Missing segment at beginning, %lld clusters\n", rl[0].length);
+			Vprintf ("Missing segment at beginning, %lld "
+					"clusters\n", (long long)rl[0].length);
 			inuse += rl[0].length;
 			rl++;
 		}
 
 		for (i = 0; rl[i].length > 0; i++) {
 			if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
-				Vprintf ("Missing segment at end, %lld clusters\n", rl[i].length);
+				Vprintf ("Missing segment at end, %lld "
+						"clusters\n",
+						(long long)rl[i].length);
 				inuse += rl[i].length;
 				continue;
 			}
@@ -994,7 +997,9 @@ void dump_record (struct ufile *file)
 			Qprintf ("    None\n");
 		} else {
 			for (i = 0; d->runlist[i].length > 0; i++) {
-				Qprintf ("    %lld @ %lld\n", d->runlist[i].length, d->runlist[i].lcn);
+				Qprintf ("    %lld @ %lld\n",
+						(long long)d->runlist[i].length,
+						(long long)d->runlist[i].lcn);
 			}
 		}
 
@@ -1478,7 +1483,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 			}
 
 			if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
-				Vprintf ("Missing segment at beginning, %lld clusters.\n", rl[0].length);
+				Vprintf ("Missing segment at beginning, %lld "
+						"clusters.\n",
+						(long long)rl[0].length);
 				memset (buffer, opts.fillbyte, bufsize);
 				for (k = 0; k < rl[0].length * vol->cluster_size; k += bufsize) {
 					if (write_data (fd, buffer, bufsize) < bufsize) {
@@ -1492,7 +1499,9 @@ int undelete_file (ntfs_volume *vol, long long inode)
 			for (i = 0; rl[i].length > 0; i++) {
 
 				if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
-					Vprintf ("Missing segment at end, %lld clusters.\n", rl[i].length);
+					Vprintf ("Missing segment at end, "
+							"%lld clusters.\n",
+							(long long)rl[i].length);
 					memset (buffer, opts.fillbyte, bufsize);
 					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
 						if (write_data (fd, buffer, bufsize) < bufsize) {
@@ -1684,7 +1693,9 @@ int main (int argc, char *argv[])
 		result = !copy_mft (vol, opts.mft_begin, opts.mft_end);
 		if (result)
 			Vprintf ("Failed to read MFT blocks %lld-%lld.\n",
-				opts.mft_begin, min (vol->nr_mft_records, opts.mft_end));
+					(long long)opts.mft_begin,
+					(long long)min(vol->nr_mft_records,
+					opts.mft_end));
 		break;
 	default:
 		; /* Cannot happen */
