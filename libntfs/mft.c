@@ -554,7 +554,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	 * mft bitmap cannot be zero so we are ok to do this.
 	 */
 	rl = ntfs_attr_find_vcn(mftbmp_na, (mftbmp_na->allocated_size - 1) >>
-			vol->cluster_size);
+			vol->cluster_size_bits);
 	if (!rl || !rl->length || rl->lcn < 0) {
 		ntfs_error(vol->sb, "Failed to determine last allocated "
 				"cluster of mft bitmap attribute.");
