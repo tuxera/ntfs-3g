@@ -3,8 +3,8 @@
  *		on Win32.  Can access an NTFS volume while it is mounted.
  *		Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Lode Leroy
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2004 Lode Leroy
+ * Copyright (c) 2003-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -101,7 +101,6 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 	numparams = sscanf(dev->d_name, "/dev/hd%c%d", &drive_char, &part);
 	drive = toupper(drive_char) - 'A';
-	part--;
 
 	if (numparams >= 1) {
 		if (numparams == 2)
@@ -137,6 +136,8 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 			DWORD numread;
 			DRIVE_LAYOUT_INFORMATION *drive_layout;
 			BOOL rvl;
+			int i;
+			int found = 0;
 
 			rvl = DeviceIoControl(handle,
 					IOCTL_DISK_GET_DRIVE_LAYOUT, NULL, 0,
@@ -151,23 +152,34 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 
 			drive_layout = (DRIVE_LAYOUT_INFORMATION *)buffer;
 
-			if (part >= drive_layout->PartitionCount) {
+			for (i = 0; i < drive_layout->PartitionCount; i++) {
+				if (drive_layout->PartitionEntry[i].
+						PartitionNumber == part) {
+					fd.handle = handle;
+					fd.part_start = drive_layout->
+							PartitionEntry[i].
+							StartingOffset;
+					fd.part_end.QuadPart = drive_layout->
+							PartitionEntry[i].
+							StartingOffset.
+							QuadPart +
+							drive_layout->
+							PartitionEntry[i].
+							PartitionLength.
+							QuadPart;
+					fd.current_pos.QuadPart = 0;
+					found = 1;
+					break;
+				}
+			}
+
+			if (!found) {
 				int err = errno;
 				fprintf(stderr, "partition %d not found on "
 						"drive %d\n", part, drive);
 				errno = err;
 				return -1;
 			}
-
-			fd.handle = handle;
-			fd.part_start = drive_layout->
-					PartitionEntry[part].StartingOffset;
-			fd.part_end.QuadPart = drive_layout->
-					PartitionEntry[0].StartingOffset.
-					QuadPart + drive_layout->
-					PartitionEntry[0].PartitionLength.
-					QuadPart;
-			fd.current_pos.QuadPart = 0;
 		}
 	} else {
 		BY_HANDLE_FILE_INFORMATION info;
