@@ -133,4 +133,14 @@ struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol);
 void mft_put_search_ctx (struct mft_search_ctx *ctx);
 int mft_next_record (struct mft_search_ctx *ctx);
 
+// Flags for dump mem
+#define DM_DEFAULTS	0
+#define DM_NO_ASCII	(1 << 0)
+#define DM_NO_DIVIDER	(1 << 1)
+#define DM_INDENT	(1 << 2)
+#define DM_RED		(1 << 3)
+#define DM_GREEN	(1 << 4)
+#define DM_BLUE		(1 << 5)
+#define DM_BOLD		(1 << 6)
+
 #endif /* _NTFS_UTILS_H_ */

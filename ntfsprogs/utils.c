@@ -874,28 +874,41 @@ int utils_is_metadata (ntfs_inode *inode)
  * Display a block of memory in a tradition hex-dump manner.
  * Optionally the ascii part can be turned off.
  */
-void utils_dump_mem (u8 *buf, int start, int length, int ascii)
+void utils_dump_mem (u8 *buf, int start, int length, int flags)
 {
-	int off, i, s, e;
+	int off, i, s, e, col;
 
 	s =  start                & ~15;	// round down
 	e = (start + length + 15) & ~15;	// round up
 
 	for (off = s; off < e; off += 16) {
+		col = 30;
+		if (flags & DM_RED)
+			col += 1;
+		if (flags & DM_GREEN)
+			col += 2;
+		if (flags & DM_BLUE)
+			col += 4;
+		if (flags & DM_INDENT)
+			printf ("\t");
+		if (flags & DM_BOLD)
+			printf ("[01m");
+		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
+			printf ("[%dm", col);
 		if (off == s)
 			printf("%6.6x ", start);
 		else
 			printf("%6.6x ", off);
 
 		for (i = 0; i < 16; i++) {
-			if (i == 8)
+			if ((i == 8) && (!(flags & DM_NO_DIVIDER)))
 				printf (" -");
 			if (((off+i) >= start) && ((off+i) < (start+length)))
 				printf (" %02X", buf[off+i]);
 			else
 				printf ("   ");
 		}
-		if (ascii) {
+		if (!(flags & DM_NO_ASCII)) {
 			printf ("  ");
 			for (i = 0; i < 16; i++) {
 				if (((off+i) < start) || ((off+i) >= (start+length)))
@@ -906,6 +919,8 @@ void utils_dump_mem (u8 *buf, int start, int length, int ascii)
 					printf (".");
 			}
 		}
+		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
+			printf ("[0m");
 		printf ("\n");
 	}
 }
