@@ -267,26 +267,26 @@ int main (int argc, char *argv[])
 		}
 		need_logfile_reset = 1;
 		
-		/* Update $FILE_NAME(0x30) attribute for new file size. */
+		/* Update $FILE_NAME(0x30) attributes for new file size. */
 		ctx = ntfs_attr_get_search_ctx(out, NULL);
 		if (!ctx) {
 			perror("ERROR: Couldn't get search context");
 			goto close_attr;
 		}
-		if (ntfs_attr_lookup(AT_FILE_NAME, 0, 0, 0, 0, NULL, 0, ctx)) {
-			perror("ERROR: Couldn't find $FILE_NAME attribute");
-			ntfs_attr_put_search_ctx(ctx);
-			goto close_attr;
-		}
-		fna = (FILE_NAME_ATTR *)((u8*)ctx->attr +
+		while (!ntfs_attr_lookup(AT_FILE_NAME, 0, 0, 0, 0, NULL, 0,
+									ctx)) {
+			fna = (FILE_NAME_ATTR *)((u8*)ctx->attr +
 					le16_to_cpu(ctx->attr->value_offset));
-		if (NAttrNonResident(na)) {
-			fna->allocated_size = scpu_to_le64(na->allocated_size);
-			fna->data_size = scpu_to_le64(na->data_size);
-		} else {
-			fna->allocated_size = 0;
-			fna->data_size = 0;
+			if (sle64_to_cpu(fna->allocated_size) ||
+						sle64_to_cpu(fna->data_size)) {
+				fna->allocated_size = scpu_to_le64(
+							na->allocated_size);
+				fna->data_size = scpu_to_le64(na->data_size);
+			}
 		}
+		if (errno != ENOENT)
+			perror("ERROR: Attribute lookup failed");
+
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		ntfs_attr_put_search_ctx(ctx);
 	}
