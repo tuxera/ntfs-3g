@@ -34,106 +34,36 @@
 #include "unistr.h"
 
 /**
- * ntfs_attrlist_entry_add - add an attribute list attribute entry
- * @ni:		opened ntfs inode, which contains that attribute
- * @attr:	attribute record to add to attribute list
+ * ntfs_attrlist_set - set new attribute list for ntfs inode
+ * @ni:		opened ntfs inode attribute list set for
+ * @new_al:	new attribute list
+ * @new_al_len:	length of new attribute list
  *
- * @mref should be in little endian, use MK_LE_MREF to build it.
- * 
  * Return 0 on success and -1 on error with errno set to the error code. The
  * following error codes are defined:
- *	EINVAL
- *	ENOMEM
- *	ENOTSUP
- *	EIO
+ *	EINVAL	- Invalid argumets passed to function.
+ *	ENOMEM	- Not enough memory to allocate necessary buffers.
+ *	ENOTSUP	- Code that required for set is not implemented yet.
+ *	EIO	- I/O error occured or damaged filesystem.
  */
-int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
+int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 {
-	ATTR_LIST_ENTRY *ale;
-	MFT_REF mref;
 	ntfs_attr *na = NULL;
-	u8 *new_al;
-	int new_al_len;
 	runlist *rl;
 	int rl_size;
 	int err;
-
-	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
-		 __FUNCTION__, (long long) ni->mft_no, (unsigned) attr->type);
-
-	if (!ni || !attr) {
+	
+	if (!ni || !new_al || new_al_len < 1) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
 	
-	mref = MK_LE_MREF(ni->mft_no, le16_to_cpu(ni->mrec->sequence_number));
-
-	if (ni->nr_extents == -1)
-		ni = ni->base_ni;
-
-	new_al_len = (ni->attr_list_size + sizeof(ATTR_LIST_ENTRY) +
-			sizeof(ntfschar) * attr->name_length + 7) & ~7;
-	new_al = malloc(new_al_len);
-	if (!new_al) {
-		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
-		err = ENOMEM;
-		return -1;
-	}
-
-	/* Find offset at which insert new entry. */
-	ale = (ATTR_LIST_ENTRY *) ni->attr_list;
-	for(; (u8 *)ale < ni->attr_list + ni->attr_list_size;
-				ale = (ATTR_LIST_ENTRY *)((u8 *) ale +
-				le16_to_cpu(ale->length))) {
-		if (le32_to_cpu(ale->type) < le32_to_cpu(attr->type))
-			continue;
-		if (le32_to_cpu(ale->type) > le32_to_cpu(attr->type))
-			break;
-		err = ntfs_names_collate(ale->name, ale->name_length,
-			(ntfschar *)((u8 *)attr + attr->name_length),
-			attr->name_length, -2, CASE_SENSITIVE, 0, 0);
-		if (err == -2) {
-			err = EIO;
-			Dprintf("%s(): Corrupt attribute name. Run chkdsk.\n",
-						__FUNCTION__);
-			goto err_out;
-		}
-		if (err < 0)
-			continue;
-		if (err > 0)
-			break;
-		if (sle64_to_cpu(ale->lowest_vcn) <
-				sle64_to_cpu(attr->lowest_vcn))
-			continue;
-		if (sle64_to_cpu(ale->lowest_vcn) ==
-				sle64_to_cpu(attr->lowest_vcn)) {
-			err = EINVAL;
-			Dprintf("%s(): Attribute with same type, name and "
-				"lowest vcn already present in attribute "
-				"list.\n", __FUNCTION__);
-			goto err_out;
-		}
-		break;
-	}
-
-	/* Copy entries from old attribute list to new. */
-	memcpy(new_al, ni->attr_list, (u8 *)ale - ni->attr_list);
-	memcpy(new_al + new_al_len - ni->attr_list_size + ((u8 *)ale -
-			ni->attr_list), ale, ni->attr_list_size -
-			((u8 *)ale - ni->attr_list));
-
-	/* Set pointer to new entry. */
-	ale = (ATTR_LIST_ENTRY *)(new_al + ((u8 *)ale - ni->attr_list));
-
-	/* Fill new entry with values. */
-	ale->type = attr->type;
-	ale->length = cpu_to_le16(new_al_len - ni->attr_list_size);
-	ale->name_length = attr->name_length;
-	ale->name_offset = (u8 *)ale->name - (u8 *)ale;
-	ale->lowest_vcn = attr->lowest_vcn;
-	ale->mft_reference = mref;
-	ale->instance = attr->instance;
-	memcpy(ale->name, (u8 *)attr + attr->name_offset, attr->name_length);
+	Dprintf("%s(): Entering for inode 0x%llx, new_al_len %d.\n",
+			__FUNCTION__, (long long) ni->mft_no, new_al_len);
+	
+	/* Make attribute list length 8 byte aligment. */
+	new_al_len = (new_al_len + 7) & ~7;
 
 	/* Resize $ATTRIBUTE_LIST attribute. */
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, 0, 0);
@@ -195,13 +125,132 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		free(ni->attr_list);
 	ni->attr_list = new_al;
 	ni->attr_list_size = new_al_len;
+	NInoSetAttrList(ni);
 	NInoAttrListSetDirty(ni);
 	return 0;
-
 err_out:
-	free(new_al);
 	if (na)
 		ntfs_attr_close(na);
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_attrlist_entry_add - add an attribute list attribute entry
+ * @ni:		opened ntfs inode, which contains that attribute
+ * @attr:	attribute record to add to attribute list
+ *
+ * Return 0 on success and -1 on error with errno set to the error code. The
+ * following error codes are defined:
+ *	EINVAL	- Invalid argumets passed to function.
+ *	ENOMEM	- Not enough memory to allocate necessary buffers.
+ *	ENOTSUP	- Code that required for set is not implemented yet.
+ *	EIO	- I/O error occured or damaged filesystem.
+ */
+int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
+{
+	ATTR_LIST_ENTRY *ale;
+	MFT_REF mref;
+	u8 *new_al;
+	int new_al_len;
+	int err;
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
+		 __FUNCTION__, (long long) ni->mft_no, (unsigned) attr->type);
+
+	if (!ni || !attr) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+	
+	mref = MK_LE_MREF(ni->mft_no, le16_to_cpu(ni->mrec->sequence_number));
+
+	if (ni->nr_extents == -1)
+		ni = ni->base_ni;
+		
+	if (!NInoAttrList(ni)) {
+		Dprintf("%s(): Attribute list isn't present.\n", __FUNCTION__);
+		errno = ENOENT;
+		return -1;
+	}
+
+	new_al_len = (ni->attr_list_size + sizeof(ATTR_LIST_ENTRY) +
+			sizeof(ntfschar) * attr->name_length + 7) & ~7;
+	new_al = malloc(new_al_len);
+	if (!new_al) {
+		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
+		err = ENOMEM;
+		return -1;
+	}
+
+	/* Find offset at which insert new entry. */
+	ale = (ATTR_LIST_ENTRY *) ni->attr_list;
+	for(; (u8 *)ale < ni->attr_list + ni->attr_list_size;
+				ale = (ATTR_LIST_ENTRY *)((u8 *) ale +
+				le16_to_cpu(ale->length))) {
+		if (le32_to_cpu(ale->type) < le32_to_cpu(attr->type))
+			continue;
+		if (le32_to_cpu(ale->type) > le32_to_cpu(attr->type))
+			break;
+		err = ntfs_names_collate(ale->name, ale->name_length,
+			(ntfschar *)((u8 *)attr + attr->name_length),
+			attr->name_length, -2, CASE_SENSITIVE, 0, 0);
+		if (err == -2) {
+			err = EIO;
+			Dprintf("%s(): Corrupt attribute name. Run chkdsk.\n",
+						__FUNCTION__);
+			goto err_out;
+		}
+		if (err < 0)
+			continue;
+		if (err > 0)
+			break;
+		if (sle64_to_cpu(ale->lowest_vcn) <
+				sle64_to_cpu(attr->lowest_vcn))
+			continue;
+		if (sle64_to_cpu(ale->lowest_vcn) ==
+				sle64_to_cpu(attr->lowest_vcn)) {
+			err = EINVAL;
+			Dprintf("%s(): Attribute with same type, name and "
+				"lowest vcn already present in attribute "
+				"list.\n", __FUNCTION__);
+			goto err_out;
+		}
+		break;
+	}
+
+	/* Copy entries from old attribute list to new. */
+	memcpy(new_al, ni->attr_list, (u8 *)ale - ni->attr_list);
+	memcpy(new_al + new_al_len - ni->attr_list_size + ((u8 *)ale -
+			ni->attr_list), ale, ni->attr_list_size -
+			((u8 *)ale - ni->attr_list));
+
+	/* Set pointer to new entry. */
+	ale = (ATTR_LIST_ENTRY *)(new_al + ((u8 *)ale - ni->attr_list));
+
+	/* Fill new entry with values. */
+	ale->type = attr->type;
+	ale->length = cpu_to_le16(new_al_len - ni->attr_list_size);
+	ale->name_length = attr->name_length;
+	ale->name_offset = (u8 *)ale->name - (u8 *)ale;
+	if (attr->non_resident)
+		ale->lowest_vcn = attr->lowest_vcn;
+	else
+		ale->lowest_vcn = 0;
+	ale->mft_reference = mref;
+	ale->instance = attr->instance;
+	memcpy(ale->name, (u8 *)attr + attr->name_offset, attr->name_length);
+	
+	/* Set new runlist. */
+	if (ntfs_attrlist_set(ni, new_al, new_al_len)) {
+		err = errno;
+		goto err_out;
+	}
+
+	return 0;
+err_out:
+	free(new_al);
 	errno = err;
 	return -1;
 }
@@ -220,12 +269,11 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 	u8 *new_al;
 	int new_al_len;
 	ntfs_inode *base_ni;
-	ntfs_attr *na;
 	ATTR_LIST_ENTRY *ale;
-	runlist *rl, *rln;
 	int err;
 		
 	if (!ctx || !ctx->ntfs_ino || !ctx->attr || !ctx->al_entry) {
+		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -241,6 +289,13 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		(unsigned) le32_to_cpu(ctx->attr->type),
 		(long long) le64_to_cpu(ctx->attr->lowest_vcn));
 	
+	if (!NInoAttrList(base_ni)) {
+		Dprintf("%s(): Attribute list isn't present.\n", __FUNCTION__);
+		errno = ENOENT;
+		return -1;
+	}
+	
+	/* Allocate memory for new attribute list. */
 	new_al_len = base_ni->attr_list_size - le16_to_cpu(ale->length);
 	new_al = malloc(new_al_len);
 	if (!new_al) {
@@ -248,61 +303,20 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		errno = ENOMEM;
 		return -1;
 	}
+	
+	/* Copy entries from old attribute list to new. */
 	memcpy(new_al, base_ni->attr_list, (u8*)ale - base_ni->attr_list);
 	memcpy(new_al + ((u8*)ale - base_ni->attr_list), (u8*)ale + le16_to_cpu(
 		ale->length), new_al_len - ((u8*)ale - base_ni->attr_list));
 
-	/* Resize $ATTRIBUTE_LIST attribute. */
-	na = ntfs_attr_open(base_ni, AT_ATTRIBUTE_LIST, 0, 0);
-	if (!na) {
+	/* Set new runlist. */
+	if (ntfs_attrlist_set(base_ni, new_al, new_al_len)) {
 		err = errno;
-		Dprintf("%s(): Coudn't open $ATTRIBUTE_LIST.\n", __FUNCTION__);
 		goto err_out;
 	}
-	if (ntfs_attr_truncate(na, new_al_len)) {
-		err = errno;
-		Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n", __FUNCTION__);
-		goto err_out;
-	}
-
-	/* Update ntfs inode. */
-	if (NAttrNonResident(na)) {
-		/* Create copy of new runlist. */
-		if (ntfs_attr_map_whole_runlist(na)) {
-			Dprintf("%s(): Failed to map runlist.\n", __FUNCTION__);
-			if (ntfs_attr_truncate(na, base_ni->attr_list_size))
-				Dprintf("%s(): Rollback failed. Leaving "
-					"inconsist metadata.\n", __FUNCTION__);
-			err = EIO;
-			goto err_out;
-		}
-		/* Assume that runlist shoudn't grow after resize. */
-		for (rl = na->rl, rln = base_ni->attr_list_rl;; rl++, rln++) {
-			rln->vcn = rl->vcn;
-			rln->lcn = rl->lcn;
-			rln->length = rl->length;
-			if (!rl->length)
-				break;
-		}
-		NInoSetAttrListNonResident(base_ni);
-	} else {
-		if (NInoAttrListNonResident(base_ni)) {
-			if (base_ni->attr_list_rl)
-				free(base_ni->attr_list_rl);
-			NInoClearAttrListNonResident(base_ni);
-		}
-	}
-
-	free(base_ni->attr_list);
-	base_ni->attr_list = new_al;
-	base_ni->attr_list_size = new_al_len;
-	NInoAttrListSetDirty(base_ni);
 	return 0;
-
 err_out:
 	free(new_al);
-	if (na)
-		ntfs_attr_close(na);
 	errno = err;
 	return -1;
 }
