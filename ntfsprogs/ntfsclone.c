@@ -62,6 +62,7 @@ struct {
 	int metadata_only;
 	char *output;
 	char *volume;
+	struct statfs stfs;
 } opt;
 
 struct bitmap {
@@ -189,13 +190,13 @@ static void usage(void)
 	Eprintf("\nUsage: %s [options] device\n"
 		"    Efficiently clone NTFS to a sparse file, device or standard output.\n"
 		"\n"
-		"    -o FILE --output FILE      Clone NTFS to the non-existent FILE\n"
-		"    -O FILE --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
-		"    -m      --metadata         Clone *only* metadata (for NTFS experts)\n"
-		"    -f      --force            Force to progress (DANGEROUS)\n"
-		"    -h      --help             Display this help\n"
+		"    -o, --output FILE      Clone NTFS to the non-existent FILE\n"
+		"    -O, --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
+		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
+		"    -f, --force            Force to progress (DANGEROUS)\n"
+		"    -h, --help             Display this help\n"
 #ifdef DEBUG
-		"    -d      --debug            Show debug information\n"
+		"    -d, --debug            Show debug information\n"
 #endif
 		"\n"
 		"    If FILE is '-' then send NTFS data to stdout replacing non used\n"
@@ -394,8 +395,16 @@ static void copy_cluster(void)
 	if (read_all(vol->dev, buff, vol->cluster_size) == -1)
 		perr_exit("read_all");
 
-	if (write_all(&fd_out, buff, vol->cluster_size) == -1)
-		perr_exit("write_all");
+	if (write_all(&fd_out, buff, vol->cluster_size) == -1) {
+		int err = errno;
+		perr_printf("Write failed");
+		if (err == EIO && opt.stfs.f_type == 0x517b)
+			Printf("Apparently you tried to clone to a remote "
+			       "Windows computer but they don't\nhave "
+			       "efficient sparse file handling by default. "
+			       "Please try a different method.\n");
+		exit(1);
+	}
 }
 
 static void lseek_to_cluster(s64 lcn)
@@ -973,6 +982,39 @@ static void fsync_clone(int fd)
 		perr_exit("fsync");
 }
 
+static void set_filesize(s64 filesize)
+{
+	if (fstatfs(fd_out, &opt.stfs) == -1)
+		Printf("WARNING: Couldn't get filesystem type: "
+		       "%s\n", strerror(errno));
+	else if (opt.stfs.f_type == 0x52654973)
+		Printf("WARNING: You're using ReiserFS, it has very poor "
+		       "performance creating\nlarge sparse files. The next "
+		       "operation might take a very long time!\n"
+		       "Creating sparse output file ...\n");
+	else if (opt.stfs.f_type == 0x517b)
+		Printf("WARNING: You're using SMBFS and if the remote share "
+		       "isn't Samba but a Windows\ncomputer then the clone "
+		       "operation will be very inefficient and may fail!\n");
+
+	if (ftruncate(fd_out, filesize) == -1) {
+		int err = errno;
+		perr_printf("ftruncate failed for file '%s'", opt.output);
+		if (err == E2BIG) {
+			Printf("Your system or the destination filesystem "
+			       "doesn't support large files.\n");
+			if (opt.stfs.f_type == 0x517b) {
+				Printf("SMBFS needs minimum Linux kernel "
+				       "version 2.4.25 and\n the 'lfs' option"
+				       "\nfor mount or smbmount to have large "
+				       "file support.\n");
+			}
+		}
+		exit(1);
+	}
+}
+	
+
 int main(int argc, char **argv)
 {
 	ntfs_walk_clusters_ctx image;
@@ -1015,23 +1057,7 @@ int main(int argc, char **argv)
 		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1) 
 			perr_exit("Opening file '%s' failed", opt.output);
 	
-		if (!opt.blkdev_out) {
-			struct statfs stfs;
-			
-			if (fstatfs(fd_out, &stfs) == -1)
-				Printf("Couldn't get Linux filesystem type: "
-				       "%s\n", strerror(errno));
-			else if (stfs.f_type == 0x52654973) {
-				Printf("WARNING: You're using ReiserFS, it has "
-				       "very poor performance creating\nlarge "
-				       "sparse files. The next operation "
-				       "might take a very long time!\n"
-				       "Creating sparse output file ...\n");
-			}
-			if (ftruncate(fd_out, device_size) == -1)
-				perr_exit("ftruncate failed for file '%s'", 
-					  opt.output);
-		} else {
+		if (opt.blkdev_out) {
 			s64 dest_size = device_size_get(fd_out);
 			s64 ntfs_size = vol->nr_clusters * vol->cluster_size;
 			ntfs_size += 512; /* add backup boot sector */
@@ -1040,7 +1066,8 @@ int main(int argc, char **argv)
 					 " to fit the NTFS image.\n", dest_size);
 			
 			check_if_mounted(opt.output, 0);
-		}
+		} else
+			set_filesize(device_size);
 	}
 
 	setup_lcn_bitmap();
