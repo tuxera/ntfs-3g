@@ -306,7 +306,7 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 
 void build_lcn_usage_bitmap(ATTR_RECORD *a)
 {
-	run_list *rl;
+	runlist *rl;
 	int i, j;
 
 	if (!a->non_resident)
@@ -492,7 +492,7 @@ void advise_on_resize()
 
 void look_for_bad_sector(ATTR_RECORD *a)
 {
-	run_list *rl;
+	runlist *rl;
 	int i;
 
 	rl = ntfs_decompress_mapping_pairs(vol, a, NULL);
@@ -507,7 +507,7 @@ void look_for_bad_sector(ATTR_RECORD *a)
 }
 
 
-void rl_set(run_list *rl, VCN vcn, LCN lcn, s64 len)
+void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
 {
 	rl->vcn = vcn;
 	rl->lcn = lcn;
@@ -532,7 +532,7 @@ void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  */
 void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 {
-	run_list *rl_bad;
+	runlist *rl_bad;
 	int mp_size;
 	char *mp;
 
@@ -540,7 +540,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 		/* FIXME: handle resident attribute value */
 		perr_exit("Resident attribute in $BadClust not supported!");
 
-	if (!(rl_bad = (run_list *)malloc(2 * sizeof(run_list))))
+	if (!(rl_bad = (runlist *)malloc(2 * sizeof(runlist))))
 		perr_exit("Couldn't get memory");
 
 	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
@@ -566,7 +566,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 
 void truncate_bitmap_unnamed_attr(ATTR_RECORD *a, s64 nr_clusters)
 {
-	run_list *rl;
+	runlist *rl;
 	s64 bm_bsize, size;
 	s64 nr_bm_clusters;
 	int i, j, mp_size;

@@ -129,8 +129,8 @@ int mft_bitmap_size, mft_bitmap_byte_size;
 unsigned char *mft_bitmap = NULL;
 int lcn_bitmap_byte_size;
 unsigned char *lcn_bitmap = NULL;
-run_list *rl = NULL, *rl_mft = NULL, *rl_mft_bmp = NULL, *rl_mftmirr = NULL;
-run_list *rl_logfile = NULL, *rl_boot = NULL, *rl_bad = NULL, *rl_index;
+runlist *rl = NULL, *rl_mft = NULL, *rl_mft_bmp = NULL, *rl_mftmirr = NULL;
+runlist *rl_logfile = NULL, *rl_boot = NULL, *rl_bad = NULL, *rl_index;
 INDEX_ALLOCATION *index_block = NULL;
 ntfs_volume *vol;
 
@@ -291,7 +291,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 }
 
 /*
- * Write to disk the clusters contained in the run list @rl taking the data
+ * Write to disk the clusters contained in the runlist @rl taking the data
  * from @val. Take @val_len bytes from @val and pad the rest with zeroes.
  *
  * If the @rl specifies a completely sparse file, @val is allowed to be NULL.
@@ -303,7 +303,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
  * Return the number of bytes written (minus padding) or -1 on error. Errno
  * will be set to the error code.
  */
-s64 ntfs_rlwrite(int fd, const run_list *rl, const char *val,
+s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 		const s64 val_len, s64 *inited_size)
 {
 	s64 bytes_written, total, length, delta;
@@ -911,14 +911,14 @@ int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
 	return 0;
 }
 
-void deallocate_scattered_clusters(const run_list *rl)
+void deallocate_scattered_clusters(const runlist *rl)
 {
 	LCN j;
 	int i;
 
 	if (!rl)
 		return;
-	/* Iterate over all runs in the run list @rl. */
+	/* Iterate over all runs in the runlist @rl. */
 	for (i = 0; rl[i].length; i++) {
 		/* Skip sparse runs. */
 		if (rl[i].lcn == -1LL)
@@ -930,9 +930,9 @@ void deallocate_scattered_clusters(const run_list *rl)
 }
 
 /*
- * Allocate @clusters and create a run list of the allocated clusters.
+ * Allocate @clusters and create a runlist of the allocated clusters.
  *
- * Return the allocated run list. Caller has to free the run list when finished
+ * Return the allocated runlist. Caller has to free the runlist when finished
  * with it.
  *
  * On error return NULL and errno is set to the error code.
@@ -940,9 +940,9 @@ void deallocate_scattered_clusters(const run_list *rl)
  * TODO: We should be returning the size as well, but for mkntfs this is not
  * necessary.
  */
-run_list *allocate_scattered_clusters(s64 clusters)
+runlist *allocate_scattered_clusters(s64 clusters)
 {
-	run_list *rl = NULL, *rlt;
+	runlist *rl = NULL, *rlt;
 	VCN vcn = 0LL;
 	LCN lcn, end, prev_lcn = 0LL;
 	int rlpos = 0;
@@ -962,7 +962,7 @@ run_list *allocate_scattered_clusters(s64 clusters)
 			 * Reallocate memory if necessary. Make sure we have
 			 * enough for the terminator entry as well.
 			 */
-			if ((rlpos + 2) * sizeof(run_list) >= rlsize) {
+			if ((rlpos + 2) * sizeof(runlist) >= rlsize) {
 				rlsize += 4096; /* PAGE_SIZE */
 				rlt = realloc(rl, rlsize);
 				if (!rlt)
@@ -1004,7 +1004,7 @@ err_end:
 		rl[rlpos].length = 0LL;
 		/* Deallocate all allocated clusters. */
 		deallocate_scattered_clusters(rl);
-		/* Free the run list. */
+		/* Free the runlist. */
 		free(rl);
 	}
 	return NULL;
@@ -1012,14 +1012,14 @@ err_end:
 
 /*
  * Create a non-resident attribute with a predefined on disk location
- * specified by the run_list @rl. The clusters specified by @rl are assumed to
+ * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
  *
  * Return 0 on success and -errno on error.
  */
 int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
-		const ATTR_FLAGS flags, const run_list *rl,
+		const ATTR_FLAGS flags, const runlist *rl,
 		const char *val, const s64 val_len)
 {
 	ntfs_attr_search_ctx *ctx;
@@ -1124,7 +1124,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
 		//	does the new attribute fit in there? yes -> do it.
-		// split up run_list into extents and place each in an extension
+		// split up runlist into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
@@ -1207,7 +1207,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	ATTR_RECORD *a;
 	u16 hdr_size;
 	int asize, mpa_size, err, i;
-	run_list *rl = NULL;
+	runlist *rl = NULL;
 	s64 bw = 0;
 	uchar_t *uname;
 /*
@@ -1307,7 +1307,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
 		//	does the new attribute fit in there? yes -> do it.
-		// split up run_list into extents and place each in an extension
+		// split up runlist into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
@@ -1445,7 +1445,7 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
 		//	does the new attribute fit in there? yes -> do it.
-		// split up run_list into extents and place each in an extension
+		// split up runlist into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
@@ -1661,14 +1661,14 @@ int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 
 /*
  * Create a non-resident data attribute with a predefined on disk location
- * specified by the run_list @rl. The clusters specified by @rl are assumed to
+ * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
  *
  * Return 0 on success or -errno on error.
  */
 int add_attr_data_positioned(MFT_RECORD *m, const char *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
-		const ATTR_FLAGS flags, const run_list *rl,
+		const ATTR_FLAGS flags, const runlist *rl,
 		const char *val, const s64 val_len)
 {
 	int err;
@@ -1855,14 +1855,14 @@ int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 
 /*
  * Create a non-resident bitmap attribute with a predefined on disk location
- * specified by the run_list @rl. The clusters specified by @rl are assumed to
+ * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
  *
  * Return 0 on success or -errno on error.
  */
 int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
-		const run_list *rl, const char *bitmap, const u32 bitmap_len)
+		const runlist *rl, const char *bitmap, const u32 bitmap_len)
 {
 	int err;
 
@@ -2779,8 +2779,8 @@ int main(int argc, char **argv)
 	if (!mft_bitmap)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	/* Create run list for mft bitmap. */
-	rl_mft_bmp = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for mft bitmap. */
+	rl_mft_bmp = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mft_bmp)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2832,8 +2832,8 @@ int main(int argc, char **argv)
 	 * of the device.
 	 */
 	opt.mft_zone_end += opt.mft_lcn;
-	/* Create run list for mft. */
-	rl_mft = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for mft. */
+	rl_mft = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mft)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2851,8 +2851,8 @@ int main(int argc, char **argv)
 	opt.mftmirr_lcn = (opt.nr_sectors * opt.sector_size >> 1)
 							/ vol->cluster_size;
 	Dprintf("$MFTMirr logical cluster number = 0x%x\n", opt.mftmirr_lcn);
-	/* Create run list for mft mirror. */
-	rl_mftmirr = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for mft mirror. */
+	rl_mftmirr = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_mftmirr)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2874,8 +2874,8 @@ int main(int argc, char **argv)
 		ntfs_set_bit(lcn_bitmap, opt.mftmirr_lcn + i, 1);
 	opt.logfile_lcn = opt.mftmirr_lcn + j;
 	Dprintf("$LogFile logical cluster number = 0x%x\n", opt.logfile_lcn);
-	/* Create run list for log file. */
-	rl_logfile = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for log file. */
+	rl_logfile = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_logfile)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2923,8 +2923,8 @@ int main(int argc, char **argv)
 	/* Allocate clusters for log file. */
 	for (i = 0; i < j; i++)
 		ntfs_set_bit(lcn_bitmap, opt.logfile_lcn + i, 1);
-	/* Create run list for $Boot. */
-	rl_boot = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for $Boot. */
+	rl_boot = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_boot)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2946,8 +2946,8 @@ int main(int argc, char **argv)
 	if (!buf)
 		err_exit("Failed to allocate internal buffer: %s\n",
 							strerror(errno));
-	/* Create run list for $BadClus, $DATA named stream $Bad. */
-	rl_bad = (run_list *)malloc(2 * sizeof(run_list));
+	/* Create runlist for $BadClus, $DATA named stream $Bad. */
+	rl_bad = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_bad)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
@@ -2955,7 +2955,7 @@ int main(int argc, char **argv)
 	rl_bad[0].lcn = -1LL;
 	/*
 	 * $BadClus named stream $Bad contains the whole volume as a single
-	 * sparse run list entry.
+	 * sparse runlist entry.
 	 */
 	rl_bad[1].vcn = rl_bad[0].length = opt.nr_clusters;
 	rl_bad[1].lcn = -1LL;
@@ -3452,7 +3452,7 @@ bb_err:
 	rl_index = ntfs_decompress_mapping_pairs(vol, a, NULL);
 	if (!rl_index) {
 		ntfs_put_attr_search_ctx(ctx);
-		err_exit("Failed to decompress run list of $INDEX_ALLOCATION "
+		err_exit("Failed to decompress runlist of $INDEX_ALLOCATION "
 				"attribute.\n");
 	}
 	if (sle64_to_cpu(a->initialized_size) < i) {

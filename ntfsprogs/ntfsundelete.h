@@ -83,7 +83,7 @@ struct data {
 	long long	 size_data;	/* Actual size of data */
 	long long	 size_init;	/* Initialised size, may be less than data size */
 	long long	 size_vcn;	/* Highest VCN in the data runs */
-	run_list_element*run_list;	/* Decoded data runs */
+	runlist_element *runlist;	/* Decoded data runs */
 	int		 percent;	/* Amont potentially recoverable */
 	void		*data;		/* If resident, a pointer to the data */
 };

@@ -694,8 +694,8 @@ void free_file (struct ufile *file)
 		Dprintf ("freeing data stream '%s'\n", d->name ? d->name : UNNAMED);
 		if (d->name)
 			free (d->name);
-		if (d->run_list)
-			free (d->run_list);
+		if (d->runlist)
+			free (d->runlist);
 		free (d);
 	}
 
@@ -923,8 +923,8 @@ int get_data (struct ufile *file, ntfs_volume *vol)
 			data->size_vcn   = sle64_to_cpu (rec->highest_vcn) + 1;
 		}
 
-		data->run_list = ntfs_decompress_mapping_pairs (vol, rec, NULL);
-		if (!data->run_list) {
+		data->runlist = ntfs_decompress_mapping_pairs (vol, rec, NULL);
+		if (!data->runlist) {
 			Dprintf ("Couldn't decompress the data runs\n");
 		}
 
@@ -1106,7 +1106,7 @@ int cluster_in_use (ntfs_volume *vol, long long lcn)
  */
 int calc_percentage (struct ufile *file, ntfs_volume *vol)
 {
-	run_list_element *rl = NULL;
+	runlist_element *rl = NULL;
 	struct list_head *pos;
 	struct data *data;
 	long long i, j;
@@ -1149,14 +1149,14 @@ int calc_percentage (struct ufile *file, ntfs_volume *vol)
 			continue;
 		}
 
-		rl = data->run_list;
+		rl = data->runlist;
 		if (!rl) {
-			Vprintf ("File has no run list, hence no data.\n");
+			Vprintf ("File has no runlist, hence no data.\n");
 			continue;
 		}
 
 		if (rl[0].length <= 0) {
-			Vprintf ("File has an empty run list, hence no data.\n");
+			Vprintf ("File has an empty runlist, hence no data.\n");
 			continue;
 		}
 
@@ -1290,11 +1290,11 @@ void dump_record (struct ufile *file)
 		Iprintf ("Size vcn: %lld\n", d->size_vcn);
 
 		Iprintf ("Data runs:\n");
-		if ((!d->run_list) || (d->run_list[0].length <= 0)) {
+		if ((!d->runlist) || (d->runlist[0].length <= 0)) {
 			Iprintf ("    None\n");
 		} else {
-			for (i = 0; d->run_list[i].length > 0; i++) {
-				Iprintf ("    %lld @ %lld\n", d->run_list[i].length, d->run_list[i].lcn);
+			for (i = 0; d->runlist[i].length > 0; i++) {
+				Iprintf ("    %lld @ %lld\n", d->runlist[i].length, d->runlist[i].lcn);
 			}
 		}
 
@@ -1683,7 +1683,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 	struct ufile *file;
 	int i, j;
 	long long start, end;
-	run_list_element *rl;
+	runlist_element *rl;
 	struct list_head *item;
 	int fd = -1;
 	long long k;
@@ -1754,14 +1754,14 @@ int undelete_file (ntfs_volume *vol, long long inode)
 			}
 			fd = -1;
 		} else {
-			rl = d->run_list;
+			rl = d->runlist;
 			if (!rl) {
-				Vprintf ("File has no run list, hence no data.\n");
+				Vprintf ("File has no runlist, hence no data.\n");
 				continue;
 			}
 
 			if (rl[0].length <= 0) {
-				Vprintf ("File has an empty run list, hence no data.\n");
+				Vprintf ("File has an empty runlist, hence no data.\n");
 				continue;
 			}
 
