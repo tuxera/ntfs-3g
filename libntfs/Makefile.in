@@ -85,15 +85,16 @@ am_libntfs_gnomevfs_la_OBJECTS =  \
 	libntfs_gnomevfs_la-gnome-vfs-module.lo
 libntfs_gnomevfs_la_OBJECTS = $(am_libntfs_gnomevfs_la_OBJECTS)
 libntfs_la_LIBADD =
-am_libntfs_la_OBJECTS = attrib.lo bitmap.lo bootsect.lo compat.lo \
-	compress.lo debug.lo device.lo device_io.lo dir.lo inode.lo \
-	lcnalloc.lo mft.lo mst.lo runlist.lo security.lo unistr.lo \
-	volume.lo
+am_libntfs_la_OBJECTS = attrib.lo attrlist.lo bitmap.lo bootsect.lo \
+	compat.lo compress.lo debug.lo device.lo device_io.lo dir.lo \
+	inode.lo lcnalloc.lo mft.lo mst.lo runlist.lo security.lo \
+	unistr.lo volume.lo
 libntfs_la_OBJECTS = $(am_libntfs_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrib.Plo ./$(DEPDIR)/bitmap.Plo \
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrib.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/attrlist.Plo ./$(DEPDIR)/bitmap.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/bootsect.Plo ./$(DEPDIR)/compat.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/compress.Plo ./$(DEPDIR)/debug.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/device.Plo ./$(DEPDIR)/device_io.Plo \
@@ -237,6 +238,7 @@ lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS)
 libntfs_la_SOURCES = \
 	attrib.c	\
+	attrlist.c	\
 	bitmap.c	\
 	bootsect.c	\
 	compat.c	\
@@ -372,6 +374,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/attrib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/attrlist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitmap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bootsect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compat.Plo@am__quote@
