@@ -1127,7 +1127,7 @@ int write_mft_record(ntfs_attr_search_ctx *ctx)
 	if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec))
 		perr_exit("ntfs_mft_record_write");
 
-	if (fdatasync(vol->fd) == -1)
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 
 	return 0;
@@ -1202,20 +1202,22 @@ void update_bootsector(s64 nr_clusters)
 
 	printf("Updating Boot record ...\n");
 
-	if (lseek(vol->fd, 0, SEEK_SET) == (off_t)-1)
+	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek");
 
-	if (read(vol->fd, &bs, sizeof(NTFS_BOOT_SECTOR)) == -1)
+	if (vol->dev->d_ops->read(vol->dev, &bs,
+			sizeof(NTFS_BOOT_SECTOR)) == -1)
 		perr_exit("read() error");
 
 	bs.number_of_sectors = nr_clusters * bs.bpb.sectors_per_cluster;
 	bs.number_of_sectors = cpu_to_le64(bs.number_of_sectors);
 
-	if (lseek(vol->fd, 0, SEEK_SET) == (off_t)-1)
+	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek");
 
 	if (!opt.ro_flag)
-		if (write(vol->fd, &bs, sizeof(NTFS_BOOT_SECTOR)) == -1)
+		if (vol->dev->d_ops->write(vol->dev, &bs,
+				sizeof(NTFS_BOOT_SECTOR)) == -1)
 			perr_exit("write() error");
 }
 
@@ -1334,7 +1336,7 @@ void prepare_volume_fixup()
 	if (ntfs_volume_set_flags(vol, flags))
 		perr_exit("Failed to set $Volume dirty");
 
-	if (fdatasync(vol->fd) == -1)
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 
 	printf("Resetting $LogFile ... (this might take a while)\n");
@@ -1342,7 +1344,7 @@ void prepare_volume_fixup()
 	if (ntfs_logfile_reset(vol))
 		perr_exit("Failed to reset $LogFile");
 
-	if (fdatasync(vol->fd) == -1)
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 }
 
@@ -1366,7 +1368,7 @@ int main(int argc, char **argv)
 
 	mount_volume();
 
-	device_size = ntfs_device_size_get(vol->fd, vol->sector_size);
+	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
 	device_size *= vol->sector_size;
 	if (device_size <= 0)
 		err_exit("Couldn't get device size (%Ld)!\n", device_size);
@@ -1458,10 +1460,10 @@ int main(int argc, char **argv)
 	}
 
 	printf("Syncing device ...\n");
-	if (fsync(vol->fd) == -1)
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("fsync");
 
-	printf("Successfully resized NTFS on device '%s'.\n", vol->dev_name);
+	printf("Successfully resized NTFS on device '%s'.\n", vol->dev->d_name);
 	if (new_size < vol->nr_clusters)
 		printf(resize_important_msg);
 
