@@ -22,6 +22,8 @@
 #ifndef _NTFS_DEVICE_H
 #define _NTFS_DEVICE_H
 
+#include "config.h"
+
 #include <sys/stat.h>
 
 #include "device_io.h"

@@ -2,6 +2,7 @@
  * utils.h - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2004 Anton Altaparmakov
  *
  * A set of shared functions for ntfs utilities
  *
@@ -23,6 +24,8 @@
 
 #ifndef _NTFS_UTILS_H_
 #define _NTFS_UTILS_H_
+
+#include "config.h"
 
 #include "types.h"
 #include "layout.h"

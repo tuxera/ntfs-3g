@@ -1,7 +1,7 @@
 /*
  * runlist.c - Run list handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Anton Altaparmakov
+ * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -19,6 +19,8 @@
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#include "config.h"
 
 #include <stdio.h>
 #include <string.h>

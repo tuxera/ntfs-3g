@@ -2,7 +2,7 @@
  * compat.h - Tweaks for Windows compatability.
  *
  * Copyright (c) 2002 Richard Russon
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -22,6 +22,8 @@
 
 #ifndef _NTFS_COMPAT_H
 #define _NTFS_COMPAT_H
+
+#include "config.h"
 
 #ifdef WINDOWS
 

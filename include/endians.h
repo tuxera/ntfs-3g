@@ -23,6 +23,8 @@
 #ifndef _NTFS_ENDIANS_H
 #define _NTFS_ENDIANS_H
 
+#include "config.h"
+
 /*
  * Notes:
  *

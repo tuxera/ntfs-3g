@@ -1,7 +1,7 @@
 /**
  * DumpLog - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2002 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) specified
  * on the command line and display the results on stdout. Errors will be output
@@ -22,6 +22,8 @@
  * in the file COPYING); if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#include "config.h"
 
 #include <unistd.h>
 #include <stdlib.h>

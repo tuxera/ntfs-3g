@@ -1,7 +1,7 @@
 /**
  * NtfsDump_LogFile - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2004 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) of an
  * NTFS partition and display the results on stdout. Errors will be output to
@@ -37,6 +37,8 @@
  *
  *	Anton Altaparmakov <aia21@cantab.net>
  */
+
+#include "config.h"
 
 #include <unistd.h>
 #include <stdlib.h>

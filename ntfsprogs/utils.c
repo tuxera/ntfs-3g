@@ -2,7 +2,7 @@
  * utils.c - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2003 Richard Russon
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2004 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
  *
  * A set of shared functions for ntfs utilities
@@ -22,6 +22,8 @@
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#include "config.h"
 
 #include <stdio.h>
 #include <stdarg.h>

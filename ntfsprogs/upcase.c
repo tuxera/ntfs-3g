@@ -2,7 +2,7 @@
  * upcase - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001 Richard Russon
- * Copyright (c) 2001-2002 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  *
  * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
  *
@@ -21,6 +21,8 @@
  * in the file COPYING); if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#include "config.h"
 
 #include <string.h>
 
