@@ -309,13 +309,13 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 				"corrupt:  Update sequence array overlaps or "
 				"is behind first protected sequence number.  "
 				"Cannot handle this yet.\n");
-	if (usa_end_ofs > le16_to_cpu(rstr->restart_offset))
+	if (usa_end_ofs > le16_to_cpu(rstr->restart_area_offset))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array overlaps or "
 				"is behind restart area.  Cannot handle this "
 				"yet.\n");
 	/* Finally, verify the offset of the restart area. */
-	if (le16_to_cpu(rstr->restart_offset) & 7)
+	if (le16_to_cpu(rstr->restart_area_offset) & 7)
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Restart area offset is not aligned "
 				"to 8-byte boundary.  Cannot handle this "
@@ -341,8 +341,8 @@ static void dump_restart_areas_header(RESTART_PAGE_HEADER *rstr)
 			(unsigned int)le32_to_cpu(rstr->log_page_size),
 			(unsigned int)le32_to_cpu(rstr->log_page_size));
 	printf("restart_offset = %u (0x%x)\n",
-			le16_to_cpu(rstr->restart_offset),
-			le16_to_cpu(rstr->restart_offset));
+			le16_to_cpu(rstr->restart_area_offset),
+			le16_to_cpu(rstr->restart_area_offset));
 }
 
 static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
@@ -351,7 +351,8 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 	RESTART_AREA *ra;
 	int client;
 
-	ra = (RESTART_AREA*)((u8*)rstr + le16_to_cpu(rstr->restart_offset));
+	ra = (RESTART_AREA*)((u8*)rstr +
+			le16_to_cpu(rstr->restart_area_offset));
 	printf("current_lsn = %lli (0x%llx)\n",
 			(long long)sle64_to_cpu(ra->current_lsn),
 			(unsigned long long)sle64_to_cpu(ra->current_lsn));
@@ -379,13 +380,15 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 	printf("last_lsn_data_length = %u (0x%x)\n",
 			(unsigned int)le32_to_cpu(ra->last_lsn_data_length),
 			(unsigned int)le32_to_cpu(ra->last_lsn_data_length));
-	printf("record_length = %u (0x%x)\n", le16_to_cpu(ra->record_length),
-			le16_to_cpu(ra->record_length));
+	printf("log_record_header_length = %u (0x%x)\n",
+			le16_to_cpu(ra->log_record_header_length),
+			le16_to_cpu(ra->log_record_header_length));
 	printf("log_page_data_offset = %u (0x%x)\n",
 			le16_to_cpu(ra->log_page_data_offset),
 			le16_to_cpu(ra->log_page_data_offset));
-	printf("unknown = %u (0x%x)\n", le16_to_cpu(ra->unknown),
-			le16_to_cpu(ra->unknown));
+	printf("restart_log_open_count = %u (0x%x)\n",
+			le32_to_cpu(ra->restart_log_open_count),
+			le32_to_cpu(ra->restart_log_open_count));
 	lcr = (LOG_CLIENT_RECORD*)((u8*)ra +
 			le16_to_cpu(ra->client_array_offset));
 	for (client = 0; client < le16_to_cpu(ra->log_clients); client++) {
@@ -467,11 +470,11 @@ rstr_pass_loc:
 
 		/* Exclude the usa from the comparison. */
 		ra = (RESTART_AREA*)((u8*)rstr1 +
-				le16_to_cpu(rstr1->restart_offset));
+				le16_to_cpu(rstr1->restart_area_offset));
 		if (!memcmp(rstr1, rstr, le16_to_cpu(rstr1->usa_ofs)) &&
 				!memcmp((u8*)rstr1 + le16_to_cpu(
-				rstr1->restart_offset), (u8*)rstr +
-				le16_to_cpu(rstr->restart_offset),
+				rstr1->restart_area_offset), (u8*)rstr +
+				le16_to_cpu(rstr->restart_area_offset),
 				le16_to_cpu(ra->restart_area_length))) {
 			puts("\nSkipping analysis of second restart page "
 					"because it fully matches the first "
