@@ -360,7 +360,7 @@ do_next_cb:
 		ofs = 0;
 		total += to_read;
 		count -= to_read;
-		(u8*)b += to_read;
+		b = (u8*)b + to_read;
 	} else if (rl->length - (vcn - rl->vcn) >= cb_clusters) {
 		s64 tdata_size, tinitialized_size;
 		/*
@@ -396,7 +396,7 @@ do_next_cb:
 			}
 			total += br;
 			count -= br;
-			(u8*)b += br;
+			b = (u8*)b + br;
 			to_read -= br;
 			ofs += br;
 		} while (to_read > 0);
@@ -462,7 +462,7 @@ do_next_cb:
 		memcpy(b, dest + ofs, to_read);
 		total += to_read;
 		count -= to_read;
-		(u8*)b += to_read;
+		b = (u8*)b + to_read;
 		ofs = 0;
 	}
 	/* Do we have more work to do? */

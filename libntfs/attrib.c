@@ -799,7 +799,7 @@ res_err_out:
 			/* Update progress counters. */
 			total += to_read;
 			count -= to_read;
-			(u8*)b += to_read;
+			b = (u8*)b + to_read;
 			continue;
 		}
 		/* It is a real lcn, read it into @dst. */
@@ -815,7 +815,7 @@ retry:
 		if (br > 0) {
 			total += br;
 			count -= br;
-			(u8*)b += br;
+			b = (u8*)b + br;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
@@ -1056,7 +1056,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			 */
 			total += to_write;
 			count -= to_write;
-			(u8*)b += to_write;
+			b = (u8*)b + to_write;
 			continue;
 		}
 		/* It is a real lcn, write it to the volume. */
@@ -1076,7 +1076,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
-			(u8*)b += written;
+			b = (u8*)b + written;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
@@ -1190,7 +1190,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	if (br <= 0)
 		return br;
 	br /= bk_size;
-	for (end = (u8*)b + br * bk_size; (u8*)b < end; (u8*)b += bk_size)
+	for (end = (u8*)b + br * bk_size; (u8*)b < end; b = (u8*)b + bk_size)
 		ntfs_mst_post_read_fixup((NTFS_RECORD*)b, bk_size);
 	/* Finally, return the number of blocks read. */
 	return br;

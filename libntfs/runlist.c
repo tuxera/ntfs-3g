@@ -1049,7 +1049,7 @@ s64 ntfs_rl_pread(const ntfs_volume *vol, const runlist_element *rl,
 			/* Update counters and proceed with next run. */
 			total += to_read;
 			count -= to_read;
-			(u8*)b += to_read;
+			b = (u8*)b + to_read;
 			continue;
 		}
 		/* It is a real lcn, read it from the volume. */
@@ -1062,7 +1062,7 @@ retry:
 		if (bytes_read > 0) {
 			total += bytes_read;
 			count -= bytes_read;
-			(u8*)b += bytes_read;
+			b = (u8*)b + bytes_read;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
@@ -1157,7 +1157,7 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 			 */
 			total += to_write;
 			count -= to_write;
-			(u8*)b += to_write;
+			b = (u8*)b + to_write;
 			continue;
 		}
 		/* It is a real lcn, write it to the volume. */
@@ -1174,7 +1174,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
-			(u8*)b += written;
+			b = (u8*)b + written;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */
