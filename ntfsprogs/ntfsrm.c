@@ -191,84 +191,6 @@ int parse_options (int argc, char **argv)
 }
 
 
-static int my_alloc = 0;
-static int my_free  = 0;
-
-/**
- * ntfs_malloc
- */
-void * ntfs_malloc (int size)
-{
-	void *ptr;
-	my_alloc++;
-	ptr = malloc (size);
-	//printf ("alloc %p\n", ptr);
-	return ptr;
-}
-
-/**
- * ntfs_calloc
- */
-void * ntfs_calloc (int count, int size)
-{
-	void *ptr;
-	my_alloc++;
-	ptr = calloc (count, size);
-	//printf ("alloc %p\n", ptr);
-	return ptr;
-}
-
-/**
- * ntfs_realloc
- */
-void * ntfs_realloc (void *ptr, int size)
-{
-	void *new;
-
-	new = realloc (ptr, size);
-
-	if (ptr) {
-		//printf ("free %p\n", ptr);
-		my_free++;
-	}
-	if (new) {
-		//printf ("alloc %p\n", new);
-		my_alloc++;
-	}
-	return new;
-}
-
-/**
- * ntfs_free
- */
-void ntfs_free (void *ptr)
-{
-	if (!ptr)
-		return;
-	my_free++;
-	//printf ("free %p\n", ptr);
-	free (ptr);
-}
-
-/**
- * ntfs_print_name
- */
-void ntfs_print_name (ntfschar *name, int name_len)
-{
-	char *buffer = NULL;
-
-	ntfs_ucstombs (name, name_len, (char**) &buffer, 0);
-	printf ("%s", buffer);
-	free (buffer);
-}
-
-
-// ntfs_dir_child_open (ntfs_dir *parent, ntfschar *name)
-// ntfs_dir_add_child  (ntfs_dir *parent, ntfschar *name, int flags) file/dir
-// ntfs_dir_del_child  (ntfs_dir *parent, ntfschar *name, int flags) file/dir/unlink
-// ntfs_dir_link       (ntfs_dir *parent, ntfschar *name, inode *child)
-// ntfs_dir_list       (ntfs_dir *parent, funct *callback)
-
 struct ntfs_dir;
 
 /**
@@ -294,13 +216,13 @@ struct mft_bitmap {
 struct ntfs_dt {
 	struct ntfs_dir	 *dir;
 	struct ntfs_dt	 *parent;
-	u8		 *data;		/* Raw index data */
+	u8		 *data;
 	int		  data_len;
 	struct ntfs_dt	**sub_nodes;
-	int		  child_count;	/* All my descendents */
+	int		  child_count;
 	INDEX_ENTRY	**children;
 	INDEX_HEADER	 *header;
-	BOOL		  changed;	/* How do I commit myself */
+	BOOL		  changed;
 	VCN		  vcn;
 };
 
@@ -310,7 +232,7 @@ struct ntfs_dt {
 struct ntfs_dir {
 	ntfs_volume	  *vol;
 	struct ntfs_dir	  *parent;
-	ntfschar		  *name;
+	ntfschar	  *name;
 	int		   name_len;
 	struct ntfs_dt	  *index;
 	struct ntfs_dir	 **children;
@@ -325,6 +247,44 @@ struct ntfs_dir {
 
 
 /**
+ * ntfs_print_name
+ */
+void ntfs_print_name (ntfschar *name, int name_len)
+{
+	char *buffer = NULL;
+
+	ntfs_ucstombs (name, name_len, (char**) &buffer, 0);
+	printf ("%s", buffer);
+	free (buffer);
+}
+
+/**
+ * ntfs_print_dir
+ */
+void ntfs_print_dir (struct ntfs_dir *dir)
+{
+	if (!dir)
+		return;
+
+	printf ("vol         = %p\n", dir->vol);
+	printf ("parent      = %p\n", dir->parent);
+	printf ("name        = "); ntfs_print_name (dir->name, dir->name_len); printf ("\n");
+	printf ("name_len    = %d\n", dir->name_len);
+	printf ("index       = %p\n", dir->index);
+	printf ("children    = %p\n", dir->children);
+	printf ("child_count = %d\n", dir->child_count);
+	printf ("mft_num     = %8.8llx\n", dir->mft_num);
+	printf ("bitmap      = %p\n", dir->bitmap);
+	printf ("inode       = %p\n", dir->inode);
+	printf ("iroot       = %p\n", dir->iroot);
+	printf ("ialloc      = %p\n", dir->ialloc);
+	printf ("ibmp        = %p\n", dir->ibmp);
+}
+
+
+
+
+/**
  * ntfs_dt_alloc_children
  */
 INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
@@ -335,7 +295,7 @@ INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
 	if (old == new)
 		return children;
 
-	return ntfs_realloc (children, new * sizeof (INDEX_ENTRY*));
+	return realloc (children, new * sizeof (INDEX_ENTRY*));
 }
 
 /**
@@ -398,7 +358,7 @@ int ntfs_dt_count_root (struct ntfs_dt *dt)
 
 	if (dt->child_count > 0) {
 		//printf ("%d subnodes\n", dt->child_count);
-		dt->sub_nodes = ntfs_calloc (dt->child_count, sizeof (struct ntfs_dt *));
+		dt->sub_nodes = calloc (dt->child_count, sizeof (struct ntfs_dt *));
 	}
 	return dt->child_count;
 }
@@ -460,7 +420,7 @@ int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 
 	if (dt->child_count > 0) {
 		//printf ("%d subnodes\n", dt->child_count);
-		dt->sub_nodes = ntfs_calloc (dt->child_count, sizeof (struct ntfs_dt *));
+		dt->sub_nodes = calloc (dt->child_count, sizeof (struct ntfs_dt *));
 	}
 
 	return dt->child_count;
@@ -478,7 +438,7 @@ struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 	if (!dir)
 		return NULL;
 	
-	dt = ntfs_calloc (1, sizeof (*dt));
+	dt = calloc (1, sizeof (*dt));
 	if (!dt)
 		return NULL;
 
@@ -498,7 +458,7 @@ struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 
 		dt->data_len = parent->data_len;
 		//printf ("parent size = %d\n", dt->data_len);
-		dt->data     = ntfs_malloc (dt->data_len);
+		dt->data     = malloc (dt->data_len);
 		//printf ("%lld\n", ntfs_attr_mst_pread (dir->ialloc, vcn*512, 2, 2048, dt->data));
 		ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data);
 		//utils_dump_mem (dt->data, 0, dt->data_len, 1);
@@ -528,7 +488,7 @@ struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 		//printf ("root i  = %lld\n", dir->iroot->initialized_size);
 
 		dt->data_len = dir->iroot->allocated_size;
-		dt->data     = ntfs_malloc (dt->data_len);
+		dt->data     = malloc (dt->data_len);
 		//printf ("%lld\n", ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data));
 		ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data);
 		//utils_dump_mem (dt->data, 0, dt->data_len, 1);
@@ -571,10 +531,10 @@ void ntfs_dt_free (struct ntfs_dt *dt)
 	for (i = 0; i < dt->child_count; i++)
 		ntfs_dt_free (dt->sub_nodes[i]);
 
-	ntfs_free (dt->sub_nodes);
-	ntfs_free (dt->children);
-	ntfs_free (dt->data);
-	ntfs_free (dt);
+	free (dt->sub_nodes);
+	free (dt->children);
+	free (dt->data);
+	free (dt);
 }
 
 /**
@@ -699,6 +659,24 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *uname, int len, in
 
 
 /**
+ * ntfs_dt_print
+ */
+void ntfs_dt_print (struct ntfs_dt *dt, int indent)
+{
+	char *space = "                                                                                ";
+	int i;
+
+	if (!dt)
+		return;
+
+	printf ("%.*s%p\n", indent, space, dt);
+
+	for (i = 0; i < dt->child_count; i++) {
+		ntfs_dt_print (dt->sub_nodes[i], indent + 4);
+	}
+}
+
+/**
  * ntfs_dt_remove
  */
 int ntfs_dt_remove (struct ntfs_dt *dt, int index)
@@ -756,25 +734,28 @@ int ntfs_dt_remove (struct ntfs_dt *dt, int index)
 
 	//printf ("clear %d bytes\n", dt->data_len - (dest - dt->data) - len);
 	//printf ("%d, %d, %d\n", dest - dt->data + len, 0, dt->data_len - (dest - dt->data) - len);
+#if 1
 	memset (dest + len, 0, dt->data_len - (dest - dt->data) - len);
 
 	for (i = index; i < dt->child_count; i++) {
+		printf ("this shouldn't happen\n");
 		ntfs_dt_free (dt->sub_nodes[i]);	// shouldn't be any, yet
 	}
 
-	ntfs_free (dt->sub_nodes);
+	free (dt->sub_nodes);
 	dt->sub_nodes = NULL;
-	ntfs_free (dt->children);
+	free (dt->children);
 	dt->children = NULL;
 	dt->child_count = 0;
 
 	dt->header->index_length -= src - dest;
 
 	ntfs_dt_count_alloc (dt);
+#endif
 	//utils_dump_mem (dt->data, 0, dt->data_len, TRUE);
-	//write (2, dt->data, 48);
+	//write (2, dt->data, dt->data_len);
 
-#if 1
+#if 0
 	//printf ("\n");
 	//printf ("index size = %d\n", dt->data_len);
 	//printf ("index use  = %d\n", dt->header.index_length);
@@ -811,6 +792,9 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	ntfs_attr *attr = NULL;
 	int index = 0;
 	int res = 1;
+	ATTR_RECORD *arec;
+	FILE_NAME_ATTR *file;
+	MFT_REF mft_num;
 
 	del = ntfs_dt_find2 (dt, uname, len, &index);
 	if (!del) {
@@ -851,15 +835,11 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	ntfs_attr_close (attr);
-
-	attr = ntfs_attr_open (inode, AT_INDEX_ROOT, NULL, 0);
+	attr = ntfs_attr_open (inode, AT_INDEX_ROOT, I30, 4);
 	if (attr) {
 		printf ("can't delete directories\n");
 		goto close;
 	}
-
-	ntfs_attr_close (attr);
 
 	attr = ntfs_attr_open (inode, AT_DATA, NULL, 0);
 	if (!attr) {
@@ -872,9 +852,35 @@ int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	//printf ("deleting file\n");
+	ntfs_attr_close (attr);
+	attr = NULL;
 
-	res = ntfs_dt_remove (del, index);
+	arec = find_first_attribute (AT_FILE_NAME, inode->mrec);
+	if (!arec) {
+		printf ("can't read filename\n");
+		goto close;
+	}
+
+	file = (FILE_NAME_ATTR*) ((u8*) arec + arec->value_offset);
+	mft_num = MREF (file->parent_directory);
+
+	ntfs_inode_close (inode);
+
+	inode = ntfs_inode_open (dt->dir->vol, mft_num);
+	if (!inode) {
+		printf ("can't open parent directory\n");
+		goto close;
+	}
+
+	attr = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
+	if (!attr) {
+		printf ("parent doesn't have 0xA0\n");
+		goto close;
+	}
+
+	printf ("deleting file\n");
+	//ntfs_dt_print (del->dir->index, 0);
+	//res = ntfs_dt_remove (del, index);
 close:
 	ntfs_attr_close (attr);
 	ntfs_inode_close (inode);
@@ -897,7 +903,7 @@ struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 	if (!inode)
 		return NULL;
 
-	dir = ntfs_calloc (1, sizeof (*dir));
+	dir = calloc (1, sizeof (*dir));
 	if (!dir) {
 		ntfs_inode_close (inode);
 		return NULL;
@@ -919,7 +925,7 @@ struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
 	dir->ibmp   = ntfs_attr_open (inode, AT_BITMAP,           I30, 4);
 
 	if (!dir->iroot) {
-		ntfs_free (dir);
+		free (dir);
 		return NULL;
 	}
 
@@ -931,10 +937,20 @@ struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
  */
 void ntfs_dir_free (struct ntfs_dir *dir)
 {
+	struct ntfs_dir *parent;
 	int i;
 
 	if (!dir)
 		return;
+
+	parent = dir->parent;
+	if (parent) {
+		for (i = 0; i < parent->child_count; i++) {
+			if (parent->children[i] == dir) {
+				parent->children[i] = NULL;
+			}
+		}
+	}
 
 	ntfs_attr_close  (dir->iroot);
 	ntfs_attr_close  (dir->ialloc);
@@ -944,10 +960,10 @@ void ntfs_dir_free (struct ntfs_dir *dir)
 	for (i = 0; i < dir->child_count; i++)
 		ntfs_dir_free (dir->children[i]);
 
-	ntfs_free (dir->children);
+	free (dir->children);
 
 	ntfs_dt_free (dir->index);
-	ntfs_free (dir);
+	free (dir);
 }
 
 /**
@@ -988,7 +1004,7 @@ void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
 	
 	parent->child_count++;
 	//printf ("child count = %d\n", parent->child_count);
-	parent->children = ntfs_realloc (parent->children, parent->child_count * sizeof (struct ntfs_dir*));
+	parent->children = realloc (parent->children, parent->child_count * sizeof (struct ntfs_dir*));
 	child->parent = parent;
 
 	parent->children[parent->child_count-1] = child;
@@ -1082,10 +1098,11 @@ int ntfsrm2 (ntfs_volume *vol, char *name)
 
 	mft_num = utils_pathname_to_mftref (vol, dir, name, &finddir);
 	//printf ("mft_num = %lld\n", mft_num);
-	//printf ("finddir = %p\n", finddir);
+	//ntfs_print_dir (finddir);
 
 	if (rindex (name, PATH_SEP))
 		name = rindex (name, PATH_SEP) + 1;
+
 	len = ntfs_mbstoucs (name, &uname, 0);
 	if (len < 0)
 		return 1;
@@ -1222,23 +1239,23 @@ int ntfsrm (ntfs_volume *vol, ntfs_inode *inode, struct options *opts)
  */
 int main (int argc, char *argv[])
 {
-	ntfs_volume *vol;
-	ntfs_inode *inode;
+	ntfs_volume *vol = NULL;
+	ntfs_inode *inode = NULL;
 	int flags = 0;
 	int result = 1;
 
 	if (!parse_options (argc, argv))
-		return 1;
+		goto done;
 
 	utils_set_locale();
 
-	/*
+#if 0
 	printf ("sizeof (bmp_page)   = %d\n", sizeof (struct bmp_page));
 	printf ("sizeof (mft_bitmap) = %d\n", sizeof (struct mft_bitmap));
 	printf ("sizeof (ntfs_dt)    = %d\n", sizeof (struct ntfs_dt));
 	printf ("sizeof (ntfs_dir)   = %d\n", sizeof (struct ntfs_dir));
 	printf ("\n");
-	*/
+#endif
 
 	if (opts.noaction)
 		flags |= MS_RDONLY;
@@ -1246,13 +1263,13 @@ int main (int argc, char *argv[])
 	vol = utils_mount_volume (opts.device, flags, opts.force);
 	if (!vol) {
 		printf ("!vol\n");
-		return 1;
+		goto done;
 	}
 
 	inode = utils_pathname_to_inode (vol, NULL, opts.file);
 	if (!inode) {
 		printf ("!inode\n");
-		return 1;
+		goto done;
 	}
 
 	//result = ntfsrm (vol, inode, &opts);
@@ -1264,9 +1281,10 @@ int main (int argc, char *argv[])
 		printf ("success\n");
 	*/
 
+done:
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);
-	//printf ("mem (%d,%d)\n", my_alloc, my_free);
+
 	return result;
 }
 
