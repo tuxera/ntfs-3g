@@ -997,7 +997,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			errno = ENOTSUP;
 			goto err_out;
 		}
-		ctx->attr->initialized_size = scpu_to_le64(pos + count);
+		ctx->attr->initialized_size = cpu_to_sle64(pos + count);
 		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
 			/*
@@ -1005,7 +1005,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			 * back for writing.
 			 */
 			ctx->attr->initialized_size =
-					scpu_to_le64(old_initialized_size);
+					cpu_to_sle64(old_initialized_size);
 			ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 					ctx->mrec);
 			goto err_out;
@@ -1147,7 +1147,7 @@ err_out:
 					na->name_len, 0, 0, NULL, 0, ctx);
 			if (!err) {
 				na->initialized_size = old_initialized_size;
-				ctx->attr->initialized_size = scpu_to_le64(
+				ctx->attr->initialized_size = cpu_to_sle64(
 						old_initialized_size);
 				err = ntfs_mft_record_write(vol,
 						ctx->ntfs_ino->mft_no,
@@ -2486,7 +2486,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 				sizeof(ntfschar) * name_len);
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
-	a->lowest_vcn = scpu_to_le64(lowest_vcn);
+	a->lowest_vcn = cpu_to_sle64(lowest_vcn);
 	a->mapping_pairs_offset = cpu_to_le16(length - dataruns_size);
 	a->compression_unit = (flags & ATTR_COMPRESSION_MASK) ? 4 : 0;
 	if (name_len)
@@ -2912,8 +2912,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 			ATTR_COMPRESSION_MASK);
 
 	/* Setup the fields specific to non-resident attributes. */
-	a->lowest_vcn = scpu_to_le64(0);
-	a->highest_vcn = scpu_to_le64((new_allocated_size - 1) >>
+	a->lowest_vcn = cpu_to_sle64(0);
+	a->highest_vcn = cpu_to_sle64((new_allocated_size - 1) >>
 						vol->cluster_size_bits);
 
 	a->mapping_pairs_offset = cpu_to_le16(mp_ofs);
@@ -2922,8 +2922,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	memset(&a->reserved1, 0, sizeof(a->reserved1));
 
-	a->allocated_size = scpu_to_le64(new_allocated_size);
-	a->data_size = a->initialized_size = scpu_to_le64(na->data_size);
+	a->allocated_size = cpu_to_sle64(new_allocated_size);
+	a->data_size = a->initialized_size = cpu_to_sle64(na->data_size);
 
 	/* Generate the mapping pairs array in the attribute record. */
 	if (ntfs_mapping_pairs_build(vol, (u8*)a + mp_ofs, arec_size - mp_ofs,
@@ -3335,7 +3335,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			Dprintf("%s(): Marked attr 0x%x for delete in inode "
 				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
 				ctx->ntfs_ino->mft_no);
-			a->highest_vcn = scpu_to_le64(NTFS_VCN_DELETE_MARK);
+			a->highest_vcn = cpu_to_sle64(NTFS_VCN_DELETE_MARK);
 			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			continue;
 		}
@@ -3429,12 +3429,12 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		}
 
 		/* Update lowest vcn. */
-		a->lowest_vcn = scpu_to_le64(stop_vcn);
+		a->lowest_vcn = cpu_to_sle64(stop_vcn);
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		if ((ctx->ntfs_ino->nr_extents == -1 ||
 					NInoAttrList(ctx->ntfs_ino)) &&
 					ctx->attr->type != AT_ATTRIBUTE_LIST) {
-			ctx->al_entry->lowest_vcn = scpu_to_le64(stop_vcn);
+			ctx->al_entry->lowest_vcn = cpu_to_sle64(stop_vcn);
 			ntfs_attrlist_mark_dirty(ctx->ntfs_ino);
 		}
 
@@ -3455,7 +3455,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 				__FUNCTION__);
 			goto put_err_out;
 		}
-		a->highest_vcn = scpu_to_le64(stop_vcn - 1);
+		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
 	}
 	/* Check wether error occured. */
 	if (errno != ENOENT) {
@@ -3558,7 +3558,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 					__FUNCTION__);
 			goto put_err_out;
 		}
-		a->highest_vcn = scpu_to_le64(stop_vcn - 1);
+		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
 		ntfs_inode_mark_dirty(ni);
 		/* All mapping pairs are writed. */
 		if (!err)
@@ -3691,15 +3691,15 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	/* Update allocated size only if it is changed. */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
-		a->allocated_size = scpu_to_le64(na->allocated_size);
+		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
 
 	/* Update data and initialized size. */
 	na->data_size = newsize;
-	a->data_size = scpu_to_le64(newsize);
+	a->data_size = cpu_to_sle64(newsize);
 	if (newsize < na->initialized_size) {
 		na->initialized_size = newsize;
-		a->initialized_size = scpu_to_le64(newsize);
+		a->initialized_size = cpu_to_sle64(newsize);
 	}
 
 	/* If the attribute now has zero size, make it resident. */
@@ -3868,11 +3868,11 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Update allocated size only if it is changed. */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
-		a->allocated_size = scpu_to_le64(na->allocated_size);
+		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
 	/* Update data size. */
 	na->data_size = newsize;
-	a->data_size = scpu_to_le64(newsize);
+	a->data_size = cpu_to_sle64(newsize);
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */

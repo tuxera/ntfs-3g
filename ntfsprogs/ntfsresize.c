@@ -1947,7 +1947,7 @@ static void update_bootsector(ntfs_resize_t *r)
 	if (vol->dev->d_ops->read(vol->dev, &bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs.number_of_sectors = scpu_to_le64(r->new_volume_size *
+	bs.number_of_sectors = cpu_to_sle64(r->new_volume_size *
 			bs.bpb.sectors_per_cluster);
 
 	if (r->mftmir_old) {

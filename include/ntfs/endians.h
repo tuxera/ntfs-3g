@@ -180,13 +180,13 @@
 
 /* Signed from CPU to LE conversion. */
 
-#define scpu_to_le16(x)		(s16)__cpu_to_le16((s16)(x))
-#define scpu_to_le32(x)		(s32)__cpu_to_le32((s32)(x))
-#define scpu_to_le64(x)		(s64)__cpu_to_le64((s64)(x))
+#define cpu_to_sle16(x)		(s16)__cpu_to_le16((s16)(x))
+#define cpu_to_sle32(x)		(s32)__cpu_to_le32((s32)(x))
+#define cpu_to_sle64(x)		(s64)__cpu_to_le64((s64)(x))
 
-#define scpu_to_le16p(x)	(s16)__cpu_to_le16(*(s16*)(x))
-#define scpu_to_le32p(x)	(s32)__cpu_to_le32(*(s32*)(x))
-#define scpu_to_le64p(x)	(s64)__cpu_to_le64(*(s64*)(x))
+#define cpu_to_sle16p(x)	(s16)__cpu_to_le16(*(s16*)(x))
+#define cpu_to_sle32p(x)	(s32)__cpu_to_le32(*(s32*)(x))
+#define cpu_to_sle64p(x)	(s64)__cpu_to_le64(*(s64*)(x))
 
 /* Constant endianness conversion defines. */
 

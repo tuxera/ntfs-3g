@@ -66,6 +66,8 @@ xx/xx/2004 - 2.0.0-WIP
 	  does clear ctx->base_ntfs_ino which in turn means that
 	  ntfs_attr_reinit_search_ctx() does not clear ctx->al_entry.  Now,
 	  ntfs_attr_reinit_search_ctx() always clears ctx->al_entry.
+	- Rename scpu_to_le{16,32,64}() to cpu_to_sle{16,32,64}() to match the
+	  kernel.
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

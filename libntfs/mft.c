@@ -679,7 +679,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		goto undo_alloc;
 	}
 	/* Update the highest_vcn. */
-	a->highest_vcn = scpu_to_le64(rl[1].vcn - 1);
+	a->highest_vcn = cpu_to_sle64(rl[1].vcn - 1);
 	/*
 	 * We now have extended the mft bitmap allocated_size by one cluster.
 	 * Reflect this in the ntfs_attr structure and the attribute record.
@@ -700,7 +700,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		a = ctx->attr;
 	}
 	mftbmp_na->allocated_size += vol->cluster_size;
-	a->allocated_size = scpu_to_le64(mftbmp_na->allocated_size);
+	a->allocated_size = cpu_to_sle64(mftbmp_na->allocated_size);
 	/* Ensure the changes make it to disk. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
@@ -723,7 +723,7 @@ restore_undo_alloc:
 	}
 	m = ctx->mrec;
 	a = ctx->attr;
-	a->highest_vcn = scpu_to_le64(rl[1].vcn - 2);
+	a->highest_vcn = cpu_to_sle64(rl[1].vcn - 2);
 	errno = ret;
 undo_alloc:
 	ret = errno;
@@ -796,10 +796,10 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	old_data_size = mftbmp_na->data_size;
 	old_initialized_size = mftbmp_na->initialized_size;
 	mftbmp_na->initialized_size += 8;
-	a->initialized_size = scpu_to_le64(mftbmp_na->initialized_size);
+	a->initialized_size = cpu_to_sle64(mftbmp_na->initialized_size);
 	if (mftbmp_na->initialized_size > mftbmp_na->data_size) {
 		mftbmp_na->data_size = mftbmp_na->initialized_size;
-		a->data_size = scpu_to_le64(mftbmp_na->data_size);
+		a->data_size = cpu_to_sle64(mftbmp_na->data_size);
 	}
 	/* Ensure the changes make it to disk. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
@@ -831,10 +831,10 @@ put_err_out:
 	}
 	a = ctx->attr;
 	mftbmp_na->initialized_size = old_initialized_size;
-	a->initialized_size = scpu_to_le64(old_initialized_size);
+	a->initialized_size = cpu_to_sle64(old_initialized_size);
 	if (mftbmp_na->data_size != old_data_size) {
 		mftbmp_na->data_size = old_data_size;
-		a->data_size = scpu_to_le64(old_data_size);
+		a->data_size = cpu_to_sle64(old_data_size);
 	}
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
@@ -1003,7 +1003,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		goto undo_alloc;
 	}
 	/* Update the highest_vcn. */
-	a->highest_vcn = scpu_to_le64(rl[1].vcn - 1);
+	a->highest_vcn = cpu_to_sle64(rl[1].vcn - 1);
 	/*
 	 * We now have extended the mft data allocated_size by nr clusters.
 	 * Reflect this in the ntfs_attr structure and the attribute record.
@@ -1026,7 +1026,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		a = ctx->attr;
 	}
 	mft_na->allocated_size += nr << vol->cluster_size_bits;
-	a->allocated_size = scpu_to_le64(mft_na->allocated_size);
+	a->allocated_size = cpu_to_sle64(mft_na->allocated_size);
 	/* Ensure the changes make it to disk. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
@@ -1049,7 +1049,7 @@ restore_undo_alloc:
 	}
 	m = ctx->mrec;
 	a = ctx->attr;
-	a->highest_vcn = scpu_to_le64(old_last_vcn - 1);
+	a->highest_vcn = cpu_to_sle64(old_last_vcn - 1);
 	errno = err;
 undo_alloc:
 	err = errno;
@@ -1318,8 +1318,8 @@ found_free_rec:
 		goto undo_data_init;
 	}
 	a = ctx->attr;
-	a->initialized_size = scpu_to_le64(mft_na->initialized_size);
-	a->data_size = scpu_to_le64(mft_na->data_size);
+	a->initialized_size = cpu_to_sle64(mft_na->initialized_size);
+	a->data_size = cpu_to_sle64(mft_na->data_size);
 	/* Ensure the changes make it to disk. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);

@@ -3464,9 +3464,9 @@ static void mkntfs_create_root_structures(void)
 	 * If there are problems go back to bs->unused[0-3] and set them. See
 	 * ../include/layout.h for details.
 	 */
-	bs->number_of_sectors = scpu_to_le64(opts.nr_sectors);
-	bs->mft_lcn = scpu_to_le64(opts.mft_lcn);
-	bs->mftmirr_lcn = scpu_to_le64(opts.mftmirr_lcn);
+	bs->number_of_sectors = cpu_to_sle64(opts.nr_sectors);
+	bs->mft_lcn = cpu_to_sle64(opts.mft_lcn);
+	bs->mftmirr_lcn = cpu_to_sle64(opts.mftmirr_lcn);
 	if (vol->mft_record_size >= vol->cluster_size)
 		bs->clusters_per_mft_record = vol->mft_record_size /
 			vol->cluster_size;
@@ -3496,7 +3496,7 @@ static void mkntfs_create_root_structures(void)
 			bs->clusters_per_index_record,
 			bs->clusters_per_index_record);
 	/* Generate a 64-bit random number for the serial number. */
-	bs->volume_serial_number = scpu_to_le64(((s64)random() << 32) |
+	bs->volume_serial_number = cpu_to_sle64(((s64)random() << 32) |
 			((s64)random() & 0xffffffff));
 	/*
 	 * Leave zero for now as NT4 leaves it zero, too. If want it later, see

@@ -284,9 +284,9 @@ int main (int argc, char *argv[])
 					le16_to_cpu(ctx->attr->value_offset));
 			if (sle64_to_cpu(fna->allocated_size) ||
 						sle64_to_cpu(fna->data_size)) {
-				fna->allocated_size = scpu_to_le64(
+				fna->allocated_size = cpu_to_sle64(
 							na->allocated_size);
-				fna->data_size = scpu_to_le64(na->data_size);
+				fna->data_size = cpu_to_sle64(na->data_size);
 				ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			}
 		}
