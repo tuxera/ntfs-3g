@@ -25,7 +25,11 @@ fi
 }
 
 echo Running autoreconf --verbose --install --warnings=all
-autoreconf --verbose --install --warnings=all
+autoreconf --force --verbose --install --warnings=all
+
+# This gets around the BitKeeper problem that it checks out files with the
+# current time stamp rather than the time stamp at check in time.
+touch config.h.in
 
 if test -z "$*"; then
   echo "**Warning**: I am going to run \`configure' with no arguments."
