@@ -1,4 +1,4 @@
-06/01/2004 - 1.8.xx - WIP
+06/01/2004 - 1.8.2-WIP
 	- Compile fixes for DJGPP. (Chrisophe Grenier, me)
 	- Add compatibility for building on FreeBSD. (Christophe Grenier)
 
