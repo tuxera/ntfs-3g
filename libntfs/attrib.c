@@ -1986,8 +1986,8 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	if (!ad)
 		return -1;
 	/* We found the attribute. - Do the bounds check. */
-	if (size >= le64_to_cpu(ad->min_size) &&
-			size <= le64_to_cpu(ad->max_size))
+	if (size >= sle64_to_cpu(ad->min_size) &&
+			size <= sle64_to_cpu(ad->max_size))
 		return 0;
 	/* @size is out of range! */
 	errno = ERANGE;
@@ -2560,11 +2560,24 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	}
 
 	// FIXME: For now we cheat and assume there is no attribute list
-	//	  present. (AIA)
+	//	  attribute present. (AIA)
 	if (NInoAttrList(na->ni)) {
 		errno = ENOTSUP;
 		return -1;
 	}
+
+	// Is there enough space for the attribute to be resident?
+	// If not: errno = ENOSPC; return -1;
+
+	// Read and cache runlist if not already done.
+
+	// Convert to resident attribute & resize attribute record.
+
+	// Copy data from run list to resident attribute value.
+
+	// Deallocate clusters from runlist and throw away runlist.
+
+	// Update in-memory struct ntfs_attribute if not done already.
 
 	errno = ENOTSUP;
 	return -1;
