@@ -26,10 +26,13 @@
 #define _NTFSCAT_H_
 
 #include "types.h"
+#include "layout.h"
 
 struct options {
 	char		*device;	/* Device/File to work with */
 	char		*file;		/* File to display */
+	ATTR_TYPES	 attr;		/* Attribute type to display */
+	s64		 inode;		/* Inode to work with */
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
