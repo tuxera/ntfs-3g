@@ -33,6 +33,9 @@ xx/xx/2004 - 1.8.6-WIP
 	  David Martínez Moreno for the bug report.)
 	- Use head -n 1 instead of -1 in getgccver script.  (From SUSE LINUX)
 	- Fix typo in ntfsinfo.c.  (From SUSE LINUX)
+	- Make the device fd in unix_io.c be stored in malloc()ed space pointed
+	  to by the d_private pointer instead of inside the d_private pointer
+	  itself.  Makes the warnings on 64 bit architectures go away.
 	  
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
