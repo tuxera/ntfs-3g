@@ -18,8 +18,6 @@
 
 - write ntfs_mft_record_allocate() (see ntfs 2.4 driver in CVS)
 
-- add read of compressed attributes
-
 *******************
 * MEDIUM priority *
 *******************

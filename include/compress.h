@@ -26,7 +26,7 @@
 #include "types.h"
 #include "attrib.h"
 
-extern s64 ntfs_compressed_attr_pread(ntfs_attr *na, const s64 pos, s64 count,
+extern s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count,
 		void *b);
 
 #endif /* defined _NTFS_COMPRESS_H */
