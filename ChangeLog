@@ -5,6 +5,10 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	- Fix attempt to release I30 internal constant. (Russ Christensen)
 	- Fix off-by-one error in disk_io.c::ntfs_cluster_{read,write}(). (Ian
 	  Jackson)
+	- Add -fms-extensions when compiling with gcc-3.2+.
+	- Update for newer autoconf/automake.
+	- Abstract low level device operations (include/device,h and
+	  libntfs/device.c).
 	- Added ntfsclone utility written by Szabolcs Szakacsits.
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
