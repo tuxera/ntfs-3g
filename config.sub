@@ -3,7 +3,7 @@
 #   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
 #   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
-timestamp='2004-08-29'
+timestamp='2004-11-30'
 
 # This file is (in principle) common to ALL GNU software.
 # The presence of a machine in this file suggests that SOME GNU software
@@ -267,7 +267,7 @@ case $basic_machine in
 	| tahoe | thumb | tic4x | tic80 | tron \
 	| v850 | v850e \
 	| we32k \
-	| x86 | xscale | xstormy16 | xtensa \
+	| x86 | xscale | xscalee[bl] | xstormy16 | xtensa \
 	| z8k)
 		basic_machine=$basic_machine-unknown
 		;;
@@ -343,8 +343,8 @@ case $basic_machine in
 	| tron-* \
 	| v850-* | v850e-* | vax-* \
 	| we32k-* \
-	| x86-* | x86_64-* | xps100-* | xscale-* | xstormy16-* \
-	| xtensa-* \
+	| x86-* | x86_64-* | xps100-* | xscale-* | xscalee[bl]-* \
+	| xstormy16-* | xtensa-* \
 	| ymp-* \
 	| z8k-*)
 		;;
@@ -488,6 +488,10 @@ case $basic_machine in
 	delta88)
 		basic_machine=m88k-motorola
 		os=-sysv3
+		;;
+	djgpp)
+		basic_machine=i586-pc
+		os=-msdosdjgpp
 		;;
 	dpx20 | dpx20-*)
 		basic_machine=rs6000-bull
@@ -1029,6 +1033,10 @@ case $basic_machine in
 		basic_machine=hppa1.1-winbond
 		os=-proelf
 		;;
+	xbox)
+		basic_machine=i686-pc
+		os=-mingw32
+		;;
 	xps | xps100)
 		basic_machine=xps100-honeywell
 		;;
@@ -1164,7 +1172,7 @@ case $os in
 	      | -udi* | -eabi* | -lites* | -ieee* | -go32* | -aux* \
 	      | -chorusos* | -chorusrdb* \
 	      | -cygwin* | -pe* | -psos* | -moss* | -proelf* | -rtems* \
-	      | -mingw32* | -linux* | -linux-uclibc* | -uxpv* | -beos* | -mpeix* | -udk* \
+	      | -mingw32* | -linux-gnu* | -linux-uclibc* | -uxpv* | -beos* | -mpeix* | -udk* \
 	      | -interix* | -uwin* | -mks* | -rhapsody* | -darwin* | -opened* \
 	      | -openstep* | -oskit* | -conix* | -pw32* | -nonstopux* \
 	      | -storm-chaos* | -tops10* | -tenex* | -tops20* | -its* \
@@ -1196,6 +1204,9 @@ case $os in
 		;;
 	-linux-dietlibc)
 		os=-linux-dietlibc
+		;;
+	-linux*)
+		os=`echo $os | sed -e 's|linux|linux-gnu|'`
 		;;
 	-sunos5*)
 		os=`echo $os | sed -e 's|sunos5|solaris2|'`
@@ -1293,6 +1304,9 @@ case $os in
 		;;
 	-kaos*)
 		os=-kaos
+		;;
+	-zvmoe)
+		os=-zvmoe
 		;;
 	-none)
 		;;
