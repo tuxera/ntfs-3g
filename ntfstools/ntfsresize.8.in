@@ -9,7 +9,7 @@ ntfsresize \- resize an NTFS filesystem
 [\fB\-fhin\fR]
 [\fB\-c
 .I clusters\fR]
-[\fB\-s	\fIsize\fR[\fBK\fR|\fBM\fR|\fBG\fR]]
+[\fB\-s	\fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
 .I device
 .SH DESCRIPTION
 The
@@ -24,9 +24,12 @@ bytes.
 The
 .I size
 parameter may have one of the optional modifiers
-\fBK\fR, \fBM\fR, \fBG\fR, which means the
+\fBk\fR, \fBM\fR, \fBG\fR, which means the
 .I size
 parameter is given in kilo-, mega- or gigabytes respectively.
+.B ntfsresize
+conforms to the SI, ATA, IEEE standards and the disk manufacturers 
+by using k=10^3, M=10^6 and G=10^9.
 .PP
 The
 .B ntfsresize
@@ -82,12 +85,12 @@ displays what it would do if it were to resize the filesystem.
 Shrink volume to size given in NTFS
 .I clusters\fR.
 .TP
-.B -s \fIsize\fR[\fBK\fR|\fBM\fR|\fBG\fR]
-Shrink volume to \fIsize\fR[\fBK\fR|\fBM\fR|\fBG\fR] bytes.
-The optional modifiers \fBK\fR, \fBM\fR, \fBG\fR mean the
+.B -s \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]
+Shrink volume to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
+The optional modifiers \fBk\fR, \fBM\fR, \fBG\fR mean the
 .I size
 parameter is given in kilo-, mega- or gigabytes respectively.
-The corresponding lowercase letters are also accepted.
+Conforming to standards, k=10^3, M=10^6 and G=10^9.
 .SH BUGS
 No bugs are known or has been reported so far in the current version.
 If you find otherwise, please report it to <linux-ntfs-dev@lists.sf.net>

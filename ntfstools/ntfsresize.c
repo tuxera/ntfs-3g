@@ -90,6 +90,7 @@ struct progress_bar {
 ntfs_volume *vol = NULL;
 struct bitmap lcn_bitmap;
 
+#define NTFS_MBYTE (1000 * 1000)
 
 #define ERR_PREFIX   "ERROR"
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
@@ -146,7 +147,7 @@ int perr_exit(const char *fmt, ...)
 void usage()
 {
 	printf("\n");
-	printf ("Usage: %s [-fhin] [-c clusters] [-s size[K|M|G]] device\n", EXEC_NAME);
+	printf ("Usage: %s [-fhin] [-c clusters] [-s size[k|M|G]] device\n", EXEC_NAME);
 	printf("Shrink a defragmented NTFS volume.\n");
 	printf("\n");
 	printf ("   -c clusters     Shrink volume to size given in NTFS clusters\n");
@@ -155,7 +156,7 @@ void usage()
 	printf ("   -h              This help text\n");
 	printf ("   -i              Calculate the smallest shrunken size supported (read-only)\n");
 	printf ("   -n              Make a test run without write operations (read-only)\n");
-	printf ("   -s size[K|M|G]  Shrink volume to size[K|M|G] bytes\n");
+	printf ("   -s size[k|M|G]  Shrink volume to size[k|M|G] bytes (k=10^3, M=10^6, G=10^9)\n");
 /*	printf ("   -v              Verbose operation\n"); */
 	printf("%s", NTFS_REPORT_BANNER);
 	exit(1);
@@ -195,17 +196,26 @@ s64 get_new_volume_size(char *s)
 	if (strlen(suffix) > 1)
 		usage();
 
+	/* We follow the SI prefixes:
+	   http://physics.nist.gov/cuu/Units/prefixes.html
+	   http://physics.nist.gov/cuu/Units/binary.html
+	   Disk partitioning tools use prefixes as,
+	                       k        M          G
+	   old fdisk         2^10     2^20      10^3*2^20
+	   recent fdisk     10^3     10^6       10^9
+	   cfdisk           10^3     10^6       10^9
+	   sfdisk            2^10     2^20
+	   parted            2^10     2^20  (may change)
+	   fdisk (DOS)       2^10     2^20 
+	*/
 	/* FIXME: check for overflow */
 	switch (*suffix) {
 	case 'G':
-	case 'g':
-		size *= 1024;
+		size *= 1000;
 	case 'M':
-	case 'm':
-		size *= 1024;
-	case 'K':
+		size *= 1000;
 	case 'k':
-		size *= 1024;
+		size *= 1000;
 		break;
 	default:
 		usage();
@@ -465,7 +475,7 @@ void advise_on_resize()
 		printf(NERR_PREFIX "However, ");
 
 	printf("You could resize at cluster %lld gaining %lld MB.\n",
-	       i, ((vol->nr_clusters - i) * vol->cluster_size) >> 20);
+	       i, ((vol->nr_clusters - i) * vol->cluster_size) / NTFS_MBYTE);
 	exit(1);
 }
 
@@ -741,8 +751,11 @@ void update_bootsector(s64 nr_clusters)
 
 void print_volume_size(char *str, ntfs_volume *v, s64 nr_clusters)
 {
-	printf("%s: %lld clusters (%lld MB)\n", 
-	       str, nr_clusters, (nr_clusters * v->cluster_size) >> 20);
+	s64 b; /* volume size in bytes */
+	
+	b = nr_clusters * v->cluster_size;
+	printf("%s: %lld bytes (%lld MB)\n", 
+	       str, b, rounded_up_division(b, NTFS_MBYTE));
 }
 
 
@@ -822,6 +835,10 @@ int main(int argc, char **argv)
 	mount_volume();
 
 	if (opt.size || opt.bytes) {
+		/* Take the integer part: when shrinking we don't want 
+		   to make the volume to be bigger than requested.
+		   Later on we will also decrease this value to save
+		   room for the backup boot sector */
 		new_volume_size = opt.bytes / vol->cluster_size;
 		if (opt.size)
 			new_volume_size = opt.size;
