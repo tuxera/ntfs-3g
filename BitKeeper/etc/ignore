@@ -5,7 +5,7 @@ PENDING/*
 # configure
 Makefile
 */Makefile
-ntfstools/*.8
+ntfsprogs/*.8
 config.log
 config.h
 config.cache
