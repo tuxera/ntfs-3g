@@ -191,7 +191,7 @@ In-place compressing an NTFS volume. Note, gzip is faster usually
 at least 2-4  times but it creates also bigger compressed files.
 .RS
 .sp
-.B ntfsclone \-\-output ntfs.img /dev/hda1 | bzip2 \-c > ntfs.img.bz2
+.B ntfsclone \-\-output \- /dev/hda1 | bzip2 \-c > ntfs.img.bz2
 .sp
 .RE
 Restore an NTFS volume from a compressed image
