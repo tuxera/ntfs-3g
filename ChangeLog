@@ -59,7 +59,7 @@
 	  cleanups.
 	- Remove some compiler warnings that appeared with the latest gcc
 	  update from SUSE 9.1 beta 3.
-	- Sanitize logfile.h somewhat and adapt ntfsdump_logfile so it compiles.
+	- Sanitize/update logfile.h somewhat and adapt ntfsdump_logfile.
 	- Move declaration of a variable in utils.c to beginning of block.
 	  Thanks to Alexei Alexandrov for the bug report and patch.
 
