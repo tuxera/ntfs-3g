@@ -786,8 +786,11 @@ void mount_volume()
 	}
 
 	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag))) {
+
+		int err = errno;
+
 		perr_printf("ntfs_mount failed");
-		if (errno == EINVAL) {
+		if (err == EINVAL) {
 			printf("Apparently device '%s' doesn't have a "
 			       "valid NTFS. Maybe you selected\nthe whole "
 			       "disk instead of a partition (e.g. /dev/hda, "
