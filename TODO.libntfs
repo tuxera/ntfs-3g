@@ -2,8 +2,6 @@
 * HIGH priority *
 *****************
 
-- implement ntfs_rl_truncate().
-
 - write attribute resize function (see mkntfs) and implement
   ntfs_attr_truncate()
 
