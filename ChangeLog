@@ -11,6 +11,9 @@ xx/xx/2004 - 2.0.0-WIP
 	  error, because $INDEX_ALLOCATION can't be resident.  (Yura)
 	- ntfscp: Not longer update $FILE_NAME attributes, because Windows
 	  doesn't update them unless a rename operation occur.  (Yura)
+	- Improvement to ntfs_non_resident_attr_expand: expand multi extent
+	  attributes if we don't need to allocate new mft records to perform
+	  this  (Yura).
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
