@@ -93,7 +93,6 @@ struct progress_bar {
 struct __ntfs_resize_t {
 	s64 new_volume_size;
 	ntfs_inode *ni;			/* inode being processed */
-	MFT_RECORD *mrec;		/* MFT buffer being processed */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
 	u64 relocations;		/* num of clusters to relocate */
 	u64 inuse;			/* num of clusters in use */
@@ -565,50 +564,47 @@ void walk_attributes(ntfs_resize_t *resize)
  */
 void compare_bitmaps(struct bitmap *a)
 {
-	s64 i, count;
-	int k, mismatch = 0;
-	char bit;
+	s64 i, pos, count;
+	int mismatch = 0;
 	u8 bm[NTFS_BUF_SIZE];
 
 	printf("Accounting clusters ...\n");
 
-	i = 0;
+	pos = 0;
 	while (1) {
-		count = ntfs_attr_pread(vol->lcnbmp_na, i, NTFS_BUF_SIZE, bm);
+		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
 		if (count == -1)
 			perr_exit("Couldn't get $Bitmap $DATA");
 
 		if (count == 0) {
-			if (a->size != i)
+			if (a->size != pos)
 				err_exit("$Bitmap file size doesn't match "
 					 "calculated size ((%Ld != %Ld)\n",
-					 a->size, i);
+					 a->size, pos);
 			break;
 		}
 
-		for (k = 0; k < count; k++) {
-			u64 j, start;
+		for (i = 0; i < count; i++, pos++) {
+			u64 cl;  /* current cluster */	  
 
-			if (a->bm[i + k] == bm[k])
+			if (a->bm[pos] == bm[i])
 				continue;
 
-			start = (i + k) * 8;
-			for (j = start; j < start + 8; j++) {
+			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
+				char bit;
 
-				bit = ntfs_bit_get(a->bm, j);
-				if (bit == ntfs_bit_get(bm, k + j % 8))
+				bit = ntfs_bit_get(a->bm, cl);
+				if (bit == ntfs_bit_get(bm, i * 8 + cl % 8))
 					continue;
 
 				if (++mismatch > 10)
 					continue;
 
-				printf("Cluster accounting failed at %llu "
+				printf("Cluster accounting failed at %Lu "
 				       "(0x%Lx): %s cluster in $Bitmap\n",
-				       j, j, bit ? "missing" : "extra");
+				       cl, cl, bit ? "missing" : "extra");
 			}
 		}
-
-		i += count;
 	}
 
 	if (mismatch) {
@@ -681,17 +677,16 @@ void walk_inodes(ntfs_resize_t *resize)
 		}
 
 		if (!(ni->mrec->flags & MFT_RECORD_IN_USE))
-			continue;
+			goto close_inode;
 
 		if ((ni->mrec->base_mft_record) != 0)
-			continue;
+			goto close_inode;
 
 		resize->ni = ni;
-		resize->mrec = ni->mrec;
 		walk_attributes(resize);
-
+close_inode:
 		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %lld", inode);
+			perr_exit("ntfs_inode_close for inode %Ld", inode);
 	}
 }
 
