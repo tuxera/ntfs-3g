@@ -10,6 +10,11 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	- Abstract low level device operations (include/device,h and
 	  libntfs/device.c) and adapt utilities to changes.
 	- Added ntfsclone utility written by Szabolcs Szakacsits.
+	- Added ntfsls utility written by Lode Leroy.
+	- Fix bugs in dir.c::ntfs_readdir() where we try to close ia_na when
+	  it is NULL.
+	- Return errno ENOTDIR from dir.c::ntfs_readdir() when called with a
+	  file inode.
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
 	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):
