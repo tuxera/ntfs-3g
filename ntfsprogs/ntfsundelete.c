@@ -814,7 +814,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 	struct data *data;
 	long long i, j;
 	long long start, end;
-	int inuse, free;
+	int clusters_inuse, clusters_free;
 	int percent = 0;
 
 	if (!file || !vol)
@@ -832,8 +832,8 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 
 	list_for_each (pos, &file->data) {
 		data  = list_entry (pos, struct data, list);
-		inuse = 0;
-		free  = 0;
+		clusters_inuse = 0;
+		clusters_free  = 0;
 
 		if (data->encrypted) {
 			Vprintf ("File is encrypted, recovery is impossible.\n");
@@ -866,7 +866,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
 			Vprintf ("Missing segment at beginning, %lld "
 					"clusters\n", (long long)rl[0].length);
-			inuse += rl[0].length;
+			clusters_inuse += rl[0].length;
 			rl++;
 		}
 
@@ -875,12 +875,12 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 				Vprintf ("Missing segment at end, %lld "
 						"clusters\n",
 						(long long)rl[i].length);
-				inuse += rl[i].length;
+				clusters_inuse += rl[i].length;
 				continue;
 			}
 
 			if (rl[i].lcn == LCN_HOLE) {
-				free += rl[i].length;
+				clusters_free += rl[i].length;
 				continue;
 			}
 
@@ -889,18 +889,19 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 
 			for (j = start; j < end; j++) {
 				if (utils_cluster_in_use (vol, j))
-					inuse++;
+					clusters_inuse++;
 				else
-					free++;
+					clusters_free++;
 			}
 		}
-
-		if ((inuse + free) == 0) {
+		
+		if ((clusters_inuse + clusters_free) == 0) {
 			Eprintf ("Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
 			continue;
 		}
 
-		data->percent = (free * 100) / (inuse + free);
+		data->percent = (clusters_free * 100) /
+				(clusters_inuse + clusters_free);
 
 		percent = max (percent, data->percent);
 	}
@@ -1268,7 +1269,6 @@ static int scan_disk (ntfs_volume *vol)
 	int results = 0;
 	ntfs_attr *attr;
 	long long size;
-	long long read;
 	long long bmpsize;
 	int i, j, k, b;
 	int percent;
@@ -1306,8 +1306,8 @@ static int scan_disk (ntfs_volume *vol)
 	Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
 	Qprintf ("---------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
-		read = min ((bmpsize - i), BUFSIZE);
-		size = ntfs_attr_pread (attr, i, read, buffer);
+		long long read_count = min ((bmpsize - i), BUFSIZE);
+		size = ntfs_attr_pread (attr, i, read_count, buffer);
 		if (size < 0)
 			break;
 
