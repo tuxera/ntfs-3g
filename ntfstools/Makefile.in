@@ -1,0 +1,588 @@
+# Makefile.in generated automatically by automake 1.4-p5 from Makefile.am
+
+# Copyright (C) 1994, 1995-8, 1999, 2001 Free Software Foundation, Inc.
+# This Makefile.in is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+# Need this to enable 64-bit (device) file access functions and parameters.
+
+
+SHELL = @SHELL@
+
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+bindir = @bindir@
+sbindir = @sbindir@
+libexecdir = @libexecdir@
+datadir = @datadir@
+sysconfdir = @sysconfdir@
+sharedstatedir = @sharedstatedir@
+localstatedir = @localstatedir@
+libdir = @libdir@
+infodir = @infodir@
+mandir = @mandir@
+includedir = @includedir@
+oldincludedir = /usr/include
+
+DESTDIR =
+
+pkgdatadir = $(datadir)/@PACKAGE@
+pkglibdir = $(libdir)/@PACKAGE@
+pkgincludedir = $(includedir)/@PACKAGE@
+
+top_builddir = ..
+
+ACLOCAL = @ACLOCAL@
+AUTOCONF = @AUTOCONF@
+AUTOMAKE = @AUTOMAKE@
+AUTOHEADER = @AUTOHEADER@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@ $(AM_INSTALL_PROGRAM_FLAGS)
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+transform = @program_transform_name@
+
+NORMAL_INSTALL = :
+PRE_INSTALL = :
+POST_INSTALL = :
+NORMAL_UNINSTALL = :
+PRE_UNINSTALL = :
+POST_UNINSTALL = :
+build_alias = @build_alias@
+build_triplet = @build@
+host_alias = @host_alias@
+host_triplet = @host@
+target_alias = @target_alias@
+target_triplet = @target@
+AS = @AS@
+AUTODIRS = @AUTODIRS@
+CC = @CC@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+CXX = @CXX@
+DLLTOOL = @DLLTOOL@
+ECHO = @ECHO@
+EXEEXT = @EXEEXT@
+LDFLAGS = @LDFLAGS@
+LIBTOOL = @LIBTOOL@
+LIBTOOL_DEPS = @LIBTOOL_DEPS@
+LN_S = @LN_S@
+MAINT = @MAINT@
+MAKEINFO = @MAKEINFO@
+OBJDUMP = @OBJDUMP@
+OBJEXT = @OBJEXT@
+PACKAGE = @PACKAGE@
+RANLIB = @RANLIB@
+STRIP = @STRIP@
+VERSION = @VERSION@
+all_includes = @all_includes@
+all_libraries = @all_libraries@
+@DEBUG_TRUE@AM_CFLAGS = @DEBUG_TRUE@-D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
+@DEBUG_FALSE@AM_CFLAGS = @DEBUG_FALSE@-D_FILE_OFFSET_BITS=64
+@REALLYSTATIC_TRUE@AM_LIBS = @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+@REALLYSTATIC_FALSE@AM_LIBS = @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@AM_LFLAGS = @REALLYSTATIC_TRUE@-static
+@REALLYSTATIC_FALSE@AM_LFLAGS = @REALLYSTATIC_FALSE@$(all_libraries)
+@REALLYSTATIC_TRUE@LINK = @REALLYSTATIC_TRUE@$(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
+@REALLYSTATIC_FALSE@LINK = @REALLYSTATIC_FALSE@$(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
+
+bin_PROGRAMS = ntfsfix ntfsinfo
+sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete
+EXTRA_PROGRAMS = ntfsresize ntfsdump_logfile dumplog ntfswipe
+
+man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 ntfsundelete.8
+EXTRA_MANS = 
+
+CLEANFILES = $(EXTRA_PROGRAMS)
+
+linux_ntfsincludedir = -I$(top_srcdir)/include
+
+# Set the include path.
+INCLUDES = -I$(top_srcdir)/include $(all_includes)
+
+ntfsfix_SOURCES = ntfsfix.c
+ntfsfix_LDADD = $(AM_LIBS)
+ntfsfix_LDFLAGS = $(AM_LFLAGS)
+
+mkntfs_SOURCES = attrdef.c upcase.c boot.c sd.c mkntfs.c
+mkntfs_LDADD = $(AM_LIBS)
+mkntfs_LDFLAGS = $(AM_LFLAGS)
+
+ntfslabel_SOURCES = ntfslabel.c
+ntfslabel_LDADD = $(AM_LIBS)
+ntfslabel_LDFLAGS = $(AM_LFLAGS)
+
+ntfsinfo_SOURCES = ntfsinfo.c
+ntfsinfo_LDADD = $(AM_LIBS)
+ntfsinfo_LDFLAGS = $(AM_LFLAGS)
+
+ntfsundelete_SOURCES = ntfsundelete.c ntfsundelete.h
+ntfsundelete_LDADD = $(AM_LIBS)
+ntfsundelete_LDFLAGS = $(AM_LFLAGS)
+
+# We don't distribute these
+
+ntfswipe_SOURCES = ntfswipe.c ntfswipe.h
+ntfswipe_LDADD = $(AM_LIBS)
+ntfswipe_LDFLAGS = $(AM_LFLAGS)
+
+ntfsresize_SOURCES = ntfsresize.c
+ntfsresize_LDADD = $(AM_LIBS)
+ntfsresize_LDFLAGS = $(AM_LFLAGS)
+
+ntfsdump_logfile_SOURCES = ntfsdump_logfile.c
+ntfsdump_logfile_LDADD = $(AM_LIBS)
+ntfsdump_logfile_LDFLAGS = $(AM_LFLAGS)
+
+dumplog_SOURCES = dumplog.c
+dumplog_LDADD = $(AM_LIBS)
+dumplog_LDFLAGS = $(AM_LFLAGS)
+mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+CONFIG_HEADER = ../config.h
+CONFIG_CLEAN_FILES =  mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
+ntfsundelete.8
+bin_PROGRAMS =  ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT)
+sbin_PROGRAMS =  mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
+ntfsundelete$(EXEEXT)
+PROGRAMS =  $(bin_PROGRAMS) $(sbin_PROGRAMS)
+
+
+DEFS = @DEFS@ -I. -I$(srcdir) -I..
+LIBS = @LIBS@
+ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsdump_logfile_OBJECTS =  ntfsdump_logfile.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsdump_logfile_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsdump_logfile_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+dumplog_OBJECTS =  dumplog.$(OBJEXT)
+@REALLYSTATIC_FALSE@dumplog_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@dumplog_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfswipe_OBJECTS =  ntfswipe.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfswipe_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfswipe_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsfix_OBJECTS =  ntfsfix.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsfix_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsfix_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsinfo_OBJECTS =  ntfsinfo.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsinfo_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsinfo_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+mkntfs_OBJECTS =  attrdef.$(OBJEXT) upcase.$(OBJEXT) boot.$(OBJEXT) \
+sd.$(OBJEXT) mkntfs.$(OBJEXT)
+@REALLYSTATIC_FALSE@mkntfs_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@mkntfs_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfslabel_OBJECTS =  ntfslabel.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfslabel_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfslabel_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsundelete_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsundelete_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
+man8dir = $(mandir)/man8
+MANS = $(man_MANS)
+
+NROFF = nroff
+DIST_COMMON =  Makefile.am Makefile.in mkntfs.8.in ntfsfix.8.in \
+ntfsinfo.8.in ntfslabel.8.in ntfsundelete.8.in
+
+
+DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
+
+TAR = gtar
+GZIP_ENV = --best
+DEP_FILES =  .deps/attrdef.P .deps/boot.P .deps/dumplog.P .deps/mkntfs.P \
+.deps/ntfsdump_logfile.P .deps/ntfsfix.P .deps/ntfsinfo.P \
+.deps/ntfslabel.P .deps/ntfsresize.P .deps/ntfsundelete.P \
+.deps/ntfswipe.P .deps/sd.P .deps/upcase.P
+SOURCES = $(ntfsresize_SOURCES) $(ntfsdump_logfile_SOURCES) $(dumplog_SOURCES) $(ntfswipe_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(mkntfs_SOURCES) $(ntfslabel_SOURCES) $(ntfsundelete_SOURCES)
+OBJECTS = $(ntfsresize_OBJECTS) $(ntfsdump_logfile_OBJECTS) $(dumplog_OBJECTS) $(ntfswipe_OBJECTS) $(ntfsfix_OBJECTS) $(ntfsinfo_OBJECTS) $(mkntfs_OBJECTS) $(ntfslabel_OBJECTS) $(ntfsundelete_OBJECTS)
+
+all: all-redirect
+.SUFFIXES:
+.SUFFIXES: .S .c .lo .o .obj .s
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am $(top_srcdir)/configure.in $(ACLOCAL_M4) 
+	cd $(top_srcdir) && $(AUTOMAKE) --gnu ntfstools/Makefile
+
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status $(BUILT_SOURCES)
+	cd $(top_builddir) \
+	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+mkntfs.8: $(top_builddir)/config.status mkntfs.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfsfix.8: $(top_builddir)/config.status ntfsfix.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfslabel.8: $(top_builddir)/config.status ntfslabel.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfsinfo.8: $(top_builddir)/config.status ntfsinfo.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfsundelete.8: $(top_builddir)/config.status ntfsundelete.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+mostlyclean-binPROGRAMS:
+
+clean-binPROGRAMS:
+	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+
+distclean-binPROGRAMS:
+
+maintainer-clean-binPROGRAMS:
+
+install-binPROGRAMS: $(bin_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	@list='$(bin_PROGRAMS)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    echo " $(LIBTOOL)  --mode=install $(INSTALL_PROGRAM) $$p $(DESTDIR)$(bindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`"; \
+	    $(LIBTOOL)  --mode=install $(INSTALL_PROGRAM) $$p $(DESTDIR)$(bindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`; \
+	  else :; fi; \
+	done
+
+uninstall-binPROGRAMS:
+	@$(NORMAL_UNINSTALL)
+	list='$(bin_PROGRAMS)'; for p in $$list; do \
+	  rm -f $(DESTDIR)$(bindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`; \
+	done
+
+mostlyclean-sbinPROGRAMS:
+
+clean-sbinPROGRAMS:
+	-test -z "$(sbin_PROGRAMS)" || rm -f $(sbin_PROGRAMS)
+
+distclean-sbinPROGRAMS:
+
+maintainer-clean-sbinPROGRAMS:
+
+install-sbinPROGRAMS: $(sbin_PROGRAMS)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(sbindir)
+	@list='$(sbin_PROGRAMS)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    echo " $(LIBTOOL)  --mode=install $(INSTALL_PROGRAM) $$p $(DESTDIR)$(sbindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`"; \
+	    $(LIBTOOL)  --mode=install $(INSTALL_PROGRAM) $$p $(DESTDIR)$(sbindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`; \
+	  else :; fi; \
+	done
+
+uninstall-sbinPROGRAMS:
+	@$(NORMAL_UNINSTALL)
+	list='$(sbin_PROGRAMS)'; for p in $$list; do \
+	  rm -f $(DESTDIR)$(sbindir)/`echo $$p|sed 's/$(EXEEXT)$$//'|sed '$(transform)'|sed 's/$$/$(EXEEXT)/'`; \
+	done
+
+# FIXME: We should only use cygpath when building on Windows,
+# and only if it is available.
+.c.obj:
+	$(COMPILE) -c `cygpath -w $<`
+
+.s.o:
+	$(COMPILE) -c $<
+
+.S.o:
+	$(COMPILE) -c $<
+
+mostlyclean-compile:
+	-rm -f *.o core *.core
+	-rm -f *.$(OBJEXT)
+
+clean-compile:
+
+distclean-compile:
+	-rm -f *.tab.c
+
+maintainer-clean-compile:
+
+.s.lo:
+	$(LIBTOOL) --mode=compile $(COMPILE) -c $<
+
+.S.lo:
+	$(LIBTOOL) --mode=compile $(COMPILE) -c $<
+
+mostlyclean-libtool:
+	-rm -f *.lo
+
+clean-libtool:
+	-rm -rf .libs _libs
+
+distclean-libtool:
+
+maintainer-clean-libtool:
+
+ntfsresize$(EXEEXT): $(ntfsresize_OBJECTS) $(ntfsresize_DEPENDENCIES)
+	@rm -f ntfsresize$(EXEEXT)
+	$(LINK) $(ntfsresize_LDFLAGS) $(ntfsresize_OBJECTS) $(ntfsresize_LDADD) $(LIBS)
+
+ntfsdump_logfile$(EXEEXT): $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_DEPENDENCIES)
+	@rm -f ntfsdump_logfile$(EXEEXT)
+	$(LINK) $(ntfsdump_logfile_LDFLAGS) $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_LDADD) $(LIBS)
+
+dumplog$(EXEEXT): $(dumplog_OBJECTS) $(dumplog_DEPENDENCIES)
+	@rm -f dumplog$(EXEEXT)
+	$(LINK) $(dumplog_LDFLAGS) $(dumplog_OBJECTS) $(dumplog_LDADD) $(LIBS)
+
+ntfswipe$(EXEEXT): $(ntfswipe_OBJECTS) $(ntfswipe_DEPENDENCIES)
+	@rm -f ntfswipe$(EXEEXT)
+	$(LINK) $(ntfswipe_LDFLAGS) $(ntfswipe_OBJECTS) $(ntfswipe_LDADD) $(LIBS)
+
+ntfsfix$(EXEEXT): $(ntfsfix_OBJECTS) $(ntfsfix_DEPENDENCIES)
+	@rm -f ntfsfix$(EXEEXT)
+	$(LINK) $(ntfsfix_LDFLAGS) $(ntfsfix_OBJECTS) $(ntfsfix_LDADD) $(LIBS)
+
+ntfsinfo$(EXEEXT): $(ntfsinfo_OBJECTS) $(ntfsinfo_DEPENDENCIES)
+	@rm -f ntfsinfo$(EXEEXT)
+	$(LINK) $(ntfsinfo_LDFLAGS) $(ntfsinfo_OBJECTS) $(ntfsinfo_LDADD) $(LIBS)
+
+mkntfs$(EXEEXT): $(mkntfs_OBJECTS) $(mkntfs_DEPENDENCIES)
+	@rm -f mkntfs$(EXEEXT)
+	$(LINK) $(mkntfs_LDFLAGS) $(mkntfs_OBJECTS) $(mkntfs_LDADD) $(LIBS)
+
+ntfslabel$(EXEEXT): $(ntfslabel_OBJECTS) $(ntfslabel_DEPENDENCIES)
+	@rm -f ntfslabel$(EXEEXT)
+	$(LINK) $(ntfslabel_LDFLAGS) $(ntfslabel_OBJECTS) $(ntfslabel_LDADD) $(LIBS)
+
+ntfsundelete$(EXEEXT): $(ntfsundelete_OBJECTS) $(ntfsundelete_DEPENDENCIES)
+	@rm -f ntfsundelete$(EXEEXT)
+	$(LINK) $(ntfsundelete_LDFLAGS) $(ntfsundelete_OBJECTS) $(ntfsundelete_LDADD) $(LIBS)
+
+install-man8:
+	$(mkinstalldirs) $(DESTDIR)$(man8dir)
+	@list='$(man8_MANS)'; \
+	l2='$(man_MANS)'; for i in $$l2; do \
+	  case "$$i" in \
+	    *.8*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  if test -f $(srcdir)/$$i; then file=$(srcdir)/$$i; \
+	  else file=$$i; fi; \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " $(INSTALL_DATA) $$file $(DESTDIR)$(man8dir)/$$inst"; \
+	  $(INSTALL_DATA) $$file $(DESTDIR)$(man8dir)/$$inst; \
+	done
+
+uninstall-man8:
+	@list='$(man8_MANS)'; \
+	l2='$(man_MANS)'; for i in $$l2; do \
+	  case "$$i" in \
+	    *.8*) list="$$list $$i" ;; \
+	  esac; \
+	done; \
+	for i in $$list; do \
+	  ext=`echo $$i | sed -e 's/^.*\\.//'`; \
+	  inst=`echo $$i | sed -e 's/\\.[0-9a-z]*$$//'`; \
+	  inst=`echo $$inst | sed '$(transform)'`.$$ext; \
+	  echo " rm -f $(DESTDIR)$(man8dir)/$$inst"; \
+	  rm -f $(DESTDIR)$(man8dir)/$$inst; \
+	done
+install-man: $(MANS)
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) install-man8
+uninstall-man:
+	@$(NORMAL_UNINSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) uninstall-man8
+
+tags: TAGS
+
+ID: $(HEADERS) $(SOURCES) $(LISP)
+	list='$(SOURCES) $(HEADERS)'; \
+	unique=`for i in $$list; do echo $$i; done | \
+	  awk '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	here=`pwd` && cd $(srcdir) \
+	  && mkid -f$$here/ID $$unique $(LISP)
+
+TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) $(LISP)
+	tags=; \
+	here=`pwd`; \
+	list='$(SOURCES) $(HEADERS)'; \
+	unique=`for i in $$list; do echo $$i; done | \
+	  awk '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	test -z "$(ETAGS_ARGS)$$unique$(LISP)$$tags" \
+	  || (cd $(srcdir) && etags $(ETAGS_ARGS) $$tags  $$unique $(LISP) -o $$here/TAGS)
+
+mostlyclean-tags:
+
+clean-tags:
+
+distclean-tags:
+	-rm -f TAGS ID
+
+maintainer-clean-tags:
+
+distdir = $(top_builddir)/$(PACKAGE)-$(VERSION)/$(subdir)
+
+subdir = ntfstools
+
+distdir: $(DISTFILES)
+	here=`cd $(top_builddir) && pwd`; \
+	top_distdir=`cd $(top_distdir) && pwd`; \
+	distdir=`cd $(distdir) && pwd`; \
+	cd $(top_srcdir) \
+	  && $(AUTOMAKE) --include-deps --build-dir=$$here --srcdir-name=$(top_srcdir) --output-dir=$$top_distdir --gnu ntfstools/Makefile
+	@for file in $(DISTFILES); do \
+	  d=$(srcdir); \
+	  if test -d $$d/$$file; then \
+	    cp -pr $$d/$$file $(distdir)/$$file; \
+	  else \
+	    test -f $(distdir)/$$file \
+	    || ln $$d/$$file $(distdir)/$$file 2> /dev/null \
+	    || cp -p $$d/$$file $(distdir)/$$file || :; \
+	  fi; \
+	done
+
+DEPS_MAGIC := $(shell mkdir .deps > /dev/null 2>&1 || :)
+
+-include $(DEP_FILES)
+
+mostlyclean-depend:
+
+clean-depend:
+
+distclean-depend:
+	-rm -rf .deps
+
+maintainer-clean-depend:
+
+%.o: %.c
+	@echo '$(COMPILE) -c $<'; \
+	$(COMPILE) -Wp,-MD,.deps/$(*F).pp -c $<
+	@-cp .deps/$(*F).pp .deps/$(*F).P; \
+	tr ' ' '\012' < .deps/$(*F).pp \
+	  | sed -e 's/^\\$$//' -e '/^$$/ d' -e '/:$$/ d' -e 's/$$/ :/' \
+	    >> .deps/$(*F).P; \
+	rm .deps/$(*F).pp
+
+%.lo: %.c
+	@echo '$(LTCOMPILE) -c $<'; \
+	$(LTCOMPILE) -Wp,-MD,.deps/$(*F).pp -c $<
+	@-sed -e 's/^\([^:]*\)\.o[ 	]*:/\1.lo \1.o :/' \
+	  < .deps/$(*F).pp > .deps/$(*F).P; \
+	tr ' ' '\012' < .deps/$(*F).pp \
+	  | sed -e 's/^\\$$//' -e '/^$$/ d' -e '/:$$/ d' -e 's/$$/ :/' \
+	    >> .deps/$(*F).P; \
+	rm -f .deps/$(*F).pp
+info-am:
+info: info-am
+dvi-am:
+dvi: dvi-am
+check-am: all-am
+check: check-am
+installcheck-am:
+installcheck: installcheck-am
+install-exec-am: install-binPROGRAMS install-sbinPROGRAMS
+install-exec: install-exec-am
+
+install-data-am: install-man
+install-data: install-data-am
+
+install-am: all-am
+	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
+install: install-am
+uninstall-am: uninstall-binPROGRAMS uninstall-sbinPROGRAMS uninstall-man
+uninstall: uninstall-am
+all-am: Makefile $(PROGRAMS) $(MANS)
+all-redirect: all-am
+install-strip:
+	$(MAKE) $(AM_MAKEFLAGS) AM_INSTALL_PROGRAM_FLAGS=-s install
+installdirs:
+	$(mkinstalldirs)  $(DESTDIR)$(bindir) $(DESTDIR)$(sbindir) \
+		$(DESTDIR)$(mandir)/man8
+
+
+mostlyclean-generic:
+
+clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
+
+distclean-generic:
+	-rm -f Makefile $(CONFIG_CLEAN_FILES)
+	-rm -f config.cache config.log stamp-h stamp-h[0-9]*
+
+maintainer-clean-generic:
+mostlyclean-am:  mostlyclean-binPROGRAMS mostlyclean-sbinPROGRAMS \
+		mostlyclean-compile mostlyclean-libtool \
+		mostlyclean-tags mostlyclean-depend mostlyclean-generic
+
+mostlyclean: mostlyclean-am
+
+clean-am:  clean-binPROGRAMS clean-sbinPROGRAMS clean-compile \
+		clean-libtool clean-tags clean-depend clean-generic \
+		mostlyclean-am
+
+clean: clean-am
+
+distclean-am:  distclean-binPROGRAMS distclean-sbinPROGRAMS \
+		distclean-compile distclean-libtool distclean-tags \
+		distclean-depend distclean-generic clean-am
+	-rm -f libtool
+
+distclean: distclean-am
+
+maintainer-clean-am:  maintainer-clean-binPROGRAMS \
+		maintainer-clean-sbinPROGRAMS maintainer-clean-compile \
+		maintainer-clean-libtool maintainer-clean-tags \
+		maintainer-clean-depend maintainer-clean-generic \
+		distclean-am
+	@echo "This command is intended for maintainers to use;"
+	@echo "it deletes files that may require special tools to rebuild."
+
+maintainer-clean: maintainer-clean-am
+
+.PHONY: mostlyclean-binPROGRAMS distclean-binPROGRAMS clean-binPROGRAMS \
+maintainer-clean-binPROGRAMS uninstall-binPROGRAMS install-binPROGRAMS \
+mostlyclean-sbinPROGRAMS distclean-sbinPROGRAMS clean-sbinPROGRAMS \
+maintainer-clean-sbinPROGRAMS uninstall-sbinPROGRAMS \
+install-sbinPROGRAMS mostlyclean-compile distclean-compile \
+clean-compile maintainer-clean-compile mostlyclean-libtool \
+distclean-libtool clean-libtool maintainer-clean-libtool install-man8 \
+uninstall-man8 install-man uninstall-man tags mostlyclean-tags \
+distclean-tags clean-tags maintainer-clean-tags distdir \
+mostlyclean-depend distclean-depend clean-depend \
+maintainer-clean-depend info-am info dvi-am dvi check check-am \
+installcheck-am installcheck install-exec-am install-exec \
+install-data-am install-data install-am install uninstall-am uninstall \
+all-redirect all-am all installdirs mostlyclean-generic \
+distclean-generic clean-generic maintainer-clean-generic clean \
+mostlyclean distclean maintainer-clean
+
+
+# Extra targets
+
+strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
+	$(STRIP) $^
+
+# Tell versions [3.59,3.63) of GNU make to not export all variables.
+# Otherwise a system limit (for SysV at least) may be exceeded.
+.NOEXPORT:
