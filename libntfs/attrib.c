@@ -3731,9 +3731,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  * isn't set. So until we have no API for updating index entries it's the best
  * choice.
  *
- * WARNING: Don't enable set/clean sparse bit code until complete attribute
- * move out in case it have no spase for mapping pairs.
- *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
  *	ENOMEM	- Not enough memory to complete operation.
@@ -3747,8 +3744,9 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 	ATTR_RECORD *a;
 	VCN stop_vcn;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
-	BOOL finished_build = FALSE;
+	BOOL finished_build;
 
+retry:
 	if (!na || !na->rl) {
 		Dprintf("%s(): Invalid parameters passed.\n", __FUNCTION__);
 		errno = EINVAL;
@@ -3780,6 +3778,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 
 	/* Fill attribute records with new mapping pairs. */
 	stop_vcn = 0;
+	finished_build = FALSE;
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		a = ctx->attr;
@@ -3821,12 +3820,42 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			
 			sparse = ntfs_rl_sparse(na->rl);
 			if (sparse == -1) {
-				Dprintf("%s(): Bad runlist.");
+				Dprintf("%s(): Bad runlist.\n", __FUNCTION__);
 				err = EIO;
 				goto put_err_out;
 			}
 			if (sparse && !(a->flags & (ATTR_IS_SPARSE |
 							ATTR_IS_COMPRESSED))) {
+				/*
+				 * We need to move attribute to another mft
+				 * record, if attribute is to small to add
+				 * compressed_size field to it and we have no
+				 * free space in the current mft record.
+				 */
+				if ((le32_to_cpu(a->length) - le16_to_cpu(
+						a->mapping_pairs_offset)
+						== 8) && !(le32_to_cpu(
+						m->bytes_allocated) -
+						le32_to_cpu(m->bytes_in_use))) {
+					if (!NInoAttrList(na->ni)) {
+						ntfs_attr_put_search_ctx(ctx);
+						if (ntfs_inode_add_attrlist(
+									na->ni))
+							return -1;
+						goto retry;
+					}
+					if (ntfs_attr_record_move_away(ctx,
+								8)) {
+						Dprintf("%s(): Failed to move "
+							"attribute to another "
+							"extent. Aborting...\n",
+							__FUNCTION__);
+						err = errno;
+						goto put_err_out;
+					}
+					ntfs_attr_put_search_ctx(ctx);
+					goto retry;
+				}
 				if (!(le32_to_cpu(a->length) - le16_to_cpu(
 						a->mapping_pairs_offset))) {
 					Dprintf("%s(): Size of the space "
@@ -3889,20 +3918,6 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		 */
 		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
-#if 0
-		/*
-		 * If we have no space for mapping pairs (we can receive such
-		 * attribute after allocating spase for compressed_size) then
-		 * move attribute to different mft record with more free space.
-		 */
-		if (!exp_max_mp_size) {
-			// TODO
-			Dprintf("%s(): Here we shall move attribute to the "
-					"another extent.\n", __FUNCTION__);
-			err = ENOTSUP;
-			goto put_err_out;
-		}
-#endif
 		/* Test mapping pairs for fitting in the current mft record. */
 		if (mp_size > exp_max_mp_size) {
 			/*
@@ -3924,7 +3939,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 					errno = ENOSPC;
 					return -1;
 				}
-				return ntfs_attr_update_mapping_pairs(na);
+				goto retry;
 			}
 
 			/* Add attribute list if it isn't present, and retry. */
@@ -3938,7 +3953,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 					errno = err;
 					return -1;
 				}
-				return ntfs_attr_update_mapping_pairs(na);
+				goto retry;
 			}
 
 			/*
