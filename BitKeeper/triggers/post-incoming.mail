@@ -50,7 +50,6 @@ bk changes -f -d'$unless(:MERGE:){ChangeSet|:CSETREV:\n}' -r$rev 2>/dev/null |
 bk -R prs -h -d'$unless(:MERGE:){ChangeSet@:I:, 20:Dy:-:Dm:-:Dd: :T::TZ:, :P:@:HOST:\n}' - 2>/dev/null
 
 cat <<EOT
-
 This will update the following files:
 
 EOT
@@ -66,11 +65,21 @@ EOT
 bk changes -v -r$rev 2>/dev/null
 
 cat <<EOT
+---
 Unified diff:
 
 EOT
 
 bk export -tpatch -du -h -r$rev 2>/dev/null
+
+cat <<EOT
+
+---
+BK Patch (from "bk send -wgzip_uu -r$rev -"):
+
+EOT
+
+bk send -wgzip_uu -r$rev - 2>/dev/null
 
 } | mail -R "\"${REPLYTO}\"" -s "\"${SUBJECT}\"" "\"${EMAIL}\""
 
