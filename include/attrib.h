@@ -87,6 +87,9 @@ extern int ntfs_attr_lookup(const ATTR_TYPES type, const uchar_t *name,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx);
 
+extern ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
+		const ATTR_TYPES type);
+
 /**
  * ntfs_attrs_walk - syntactic sugar for walking all attributes in an inode
  * @ctx:	initialised attribute search context

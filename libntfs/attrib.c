@@ -1925,7 +1925,7 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
  *	ENOENT	- The attribute @type is not specified in $AttrDef.
  *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
  */
-static ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
+ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		const ATTR_TYPES type)
 {
 	ATTR_DEF *ad;
