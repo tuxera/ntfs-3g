@@ -60,12 +60,23 @@ AC_ARG_ENABLE(really-static,
 
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
 
+# Enable GNU extensions on systems that have them.
+AH_VERBATIM([_GNU_SOURCE],
+[/* Enable GNU extensions on systems that have them. */
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif])
+AC_DEFINE(_GNU_SOURCE)
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
+
+# Enable large file support.
+AC_SYS_LARGEFILE
 
 AC_ARG_ENABLE(gnome-vfs,
 	[  --disable-gnome-vfs     Omit Gnome-VFS-2.0 'libntfs' interface (default=detect)], ,
@@ -124,9 +135,8 @@ AC_MSG_RESULT($cc_version)
 
 # Add our compiler switches not discarding 'CFLAGS' as they may have been
 # passed to us by rpmbuild(8).
-# We add -Wall to enable compiler warnings and define _FILE_OFFSET_BITS to 64
-# enable 64-bit (device) file access functions and parameters.
-CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -Wall"
+# We add -Wall to enable compiler warnings.
+CFLAGS="$CFLAGS -Wall"
 
 # Add lots of extra warnings if in maintainer mode.
 if test "$USE_MAINTAINER_MODE" = "yes";then
