@@ -18,6 +18,8 @@ xx/xx/2004 - 1.8.6-WIP
 	  INCLUDES to AM_CPPFLAGS; add $srcdir to getgccver invocation.
 	- Rename private to priv_data in ntfs_device_alloc() to avoid name
 	  space clashes with C++.  (Yuval Fledel, modified fix by me)
+	- Rename 'opt' struct member stdout to std_out in ntfsclone.c because
+	  stdout is a macro on Cygwin and compilation fails. (Yuval Fledel)
 
 27/02/2004 - 1.8.5 - Springclean of the build process, cleanups, bug fixes
 	- Fixup ntfsinfo a little bit and give its manpage a small update to
