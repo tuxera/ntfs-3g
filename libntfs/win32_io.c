@@ -578,20 +578,6 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	return 0;
 }
 
-static s64 win32_bias(struct ntfs_device *dev)
-{
-	struct win32_fd *fd = (win32_fd *)dev->d_private;
-
-	return fd->part_start;
-}
-
-static s64 win32_filepos(struct ntfs_device *dev)
-{
-	struct win32_fd *fd = (win32_fd *)dev->d_private;
-
-	return fd->current_pos.QuadPart;
-}
-
 /**
  * ntfs_device_win32_sync - Flush write buffers to disk.
  * @dev:		An NTFS_DEVICE obtained via the open command.
