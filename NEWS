@@ -5,8 +5,16 @@ Renamed ntfstools to ntfsprogs everywhere.
 
 Added new utility ntfslabel by Matthew Fanto. See man 8 ntfslabel for details.
 
-Added new utility ntfsundelete by Richard Russon.  See man 8 ntfsundelete for
+Added new utility ntfsundelete by Richard Russon. See man 8 ntfsundelete for
 more details.
+
+Added new utility ntfsresize by Szakacsits Szabolcs. See man 8 ntfsresize for
+details.
+
+The API has been fully reworked and the library mostly rewritten since the
+last release (1.6.0). It should now offer a much more solid and stable basis
+for development of software accessing NTFS volumes. All utilities have been
+ported to the new API.
 
 
 Older news
