@@ -2,6 +2,7 @@
  * attrib.h - Exports for attribute handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -272,8 +273,16 @@ extern int ntfs_attr_can_be_non_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
 extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
+		
+extern int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
+
+extern int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
+		ATTR_FLAGS flags);
+
+extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
