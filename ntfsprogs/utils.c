@@ -38,6 +38,7 @@
 #endif
 #include <stdlib.h>
 #include <limits.h>
+#include <ctype.h>
 
 #include "config.h"
 #include "utils.h"
@@ -864,6 +865,52 @@ int utils_is_metadata (ntfs_inode *inode)
 	return 0;
 }
 
+/**
+ * utils_dump_mem - Display a block of memory in hex and ascii
+ * @buf:     Buffer to be displayed
+ * @start:   Offset into @buf to start from
+ * @length:  Number of bytes to display
+ * @ascii:   Whether or not to display the ascii values
+ *
+ * Display a block of memory in a tradition hex-dump manner.
+ * Optionally the ascii part can be turned off.
+ */
+void utils_dump_mem (u8 *buf, int start, int length, int ascii)
+{
+	int off, i, s, e;
+
+	s =  start                & ~15;	// round down
+	e = (start + length + 15) & ~15;	// round up
+
+	for (off = s; off < e; off += 16) {
+		if (off == s)
+			printf("%6.6x ", start);
+		else
+			printf("%6.6x ", off);
+
+		for (i = 0; i < 16; i++) {
+			if (i == 8)
+				printf (" -");
+			if (((off+i) >= start) && ((off+i) < (start+length)))
+				printf (" %02X", buf[off+i]);
+			else
+				printf ("   ");
+		}
+		if (ascii) {
+			printf ("  ");
+			for (i = 0; i < 16; i++) {
+				if (((off+i) < start) || ((off+i) >= (start+length)))
+					printf (" ");
+				else if (isprint (buf[off + i]))
+					printf ("%c", buf[off + i]);
+				else
+					printf (".");
+			}
+		}
+		printf ("\n");
+	}
+}
+
 
 /**
  * mft_get_search_ctx
@@ -1020,63 +1067,4 @@ int mft_next_record (struct mft_search_ctx *ctx)
 	return (ctx->inode == NULL);
 }
 
-
-#if 0
-hamming weight
-inline unsigned int hweight32(unsigned int w)
-{
-	unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
-	res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
-	res = (res & 0x0F0F0F0F) + ((res >> 4) & 0x0F0F0F0F);
-	res = (res & 0x00FF00FF) + ((res >> 8) & 0x00FF00FF);
-	return (res & 0x0000FFFF) + ((res >> 16) & 0x0000FFFF);
-}
-
-inline unsigned int hweight16(unsigned int w)
-{
-	unsigned int res = (w & 0x5555) + ((w >> 1) & 0x5555);
-	res = (res & 0x3333) + ((res >> 2) & 0x3333);
-	res = (res & 0x0F0F) + ((res >> 4) & 0x0F0F);
-	return (res & 0x00FF) + ((res >> 8) & 0x00FF);
-}
-
-inline unsigned int hweight8(unsigned int w)
-{
-	unsigned int res = (w & 0x55) + ((w >> 1) & 0x55);
-	res = (res & 0x33) + ((res >> 2) & 0x33);
-	return (res & 0x0F) + ((res >> 4) & 0x0F);
-}
-
-inline int set_bit(int nr,long * addr)
-{
-	int	mask, retval;
-
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *addr) != 0;
-	*addr |= mask;
-	return retval;
-}
-
-inline int clear_bit(int nr, long * addr)
-{
-	int	mask, retval;
-
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	retval = (mask & *addr) != 0;
-	*addr &= ~mask;
-	return retval;
-}
-
-inline int test_bit(int nr, long * addr)
-{
-	int	mask;
-
-	addr += nr >> 5;
-	mask = 1 << (nr & 0x1f);
-	return ((mask & *addr) != 0);
-}
-
-#endif
 
