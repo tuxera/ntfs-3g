@@ -208,8 +208,89 @@ err_out:
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
-int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx __attribute__((unused)))
+int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 {
-	errno = ENOTSUP;
+	u8 *new_al;
+	int new_al_len;
+	ntfs_inode *base_ni;
+	ntfs_attr *na;
+	ATTR_LIST_ENTRY *ale;
+	runlist *rl, *rln;
+	int err;
+		
+	if (!ctx || !ctx->ntfs_ino || !ctx->attr || !ctx->al_entry) {
+		errno = EINVAL;
+		return -1;
+	}
+	
+	if (ctx->base_ntfs_ino)
+		base_ni = ctx->base_ntfs_ino;
+	else
+		base_ni = ctx->ntfs_ino;
+	ale = ctx->al_entry;
+	
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
+			"%lld.\n", __FUNCTION__, ctx->ntfs_ino->mft_no,
+			le32_to_cpu(ctx->attr->type),
+			le64_to_cpu(ctx->attr->lowest_vcn));
+	
+	new_al_len = base_ni->attr_list_size - le16_to_cpu(ale->length);
+	new_al = malloc(new_al_len);
+	if (!new_al) {
+		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(new_al, base_ni->attr_list, (u8*)ale - base_ni->attr_list);
+	memcpy(new_al + ((u8*)ale - base_ni->attr_list), (u8*)ale + le16_to_cpu(
+		ale->length), new_al_len - ((u8*)ale - base_ni->attr_list));
+
+	/* Resize $ATTRIBUTE_LIST attribute. */
+	na = ntfs_attr_open(base_ni, AT_ATTRIBUTE_LIST, 0, 0);
+	if (!na) {
+		err = errno;
+		Dprintf("%s(): Coudn't open $ATTRIBUTE_LIST.\n", __FUNCTION__);
+		goto err_out;
+	}
+	if (ntfs_attr_truncate(na, new_al_len)) {
+		err = errno;
+		Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n", __FUNCTION__);
+		goto err_out;
+	}
+
+	/* Update ntfs inode. */
+	if (NAttrNonResident(na)) {
+		/* Create copy of new runlist. */
+		if (ntfs_attr_map_whole_runlist(na)) {
+			Dprintf("%s(): Failed to map runlist.\n", __FUNCTION__);
+			if (ntfs_attr_truncate(na, base_ni->attr_list_size))
+				Dprintf("%s(): Rollback failed. Leaving "
+					"inconsist metadata.\n", __FUNCTION__);
+			err = EIO;
+			goto err_out;
+		}
+		/* Assume that runlist shoudn't grow after resize. */
+		for (rl = na->rl, rln = base_ni->attr_list_rl;; rl++, rln++) {
+			rln->vcn = rl->vcn;
+			rln->lcn = rl->lcn;
+			rln->length = rl->length;
+			if (!rl->length)
+				break;
+		}
+		NInoSetAttrListNonResident(base_ni);
+	} else
+		NInoClearAttrListNonResident(base_ni);
+
+	free(base_ni->attr_list);
+	base_ni->attr_list = new_al;
+	base_ni->attr_list_size = new_al_len;
+	NInoAttrListSetDirty(base_ni);
+	return 0;
+
+err_out:
+	free(new_al);
+	if (na)
+		ntfs_attr_close(na);
+	errno = err;
 	return -1;
 }
