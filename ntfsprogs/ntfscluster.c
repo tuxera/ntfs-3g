@@ -239,63 +239,12 @@ int parse_options (int argc, char **argv)
 }
 
 /**
- * mftrec_in_use - Determine if a MFT Record is in use
- * @vol:   An ntfs volume obtained from ntfs_mount
- * @mref:  MFT Reference (inode number)
- *
- * The metadata file $BITMAP has one binary bit representing each record in the
- * MFT.  The bit will be set for each record that is in use.  The function
- * reads the relevant part of $BITMAP into a buffer and tests the bit.
- *
- * This function has a static buffer in which it caches a section of $BITMAP.
- * If the mref, being tested, lies outside the range, the buffer will be
- * refreshed.
- *
- * Return:  1  MFT Record is in use
- *	    0  MFT Record is unused
- *	   -1  Error occurred
- */
-int mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
-{
-	static u8 buffer[512];
-	static s64 bmpmref = -sizeof (buffer) - 1; /* Which bit of $BITMAP is in the buffer */
-
-	int byte, bit;
-
-	if (!vol)
-		return -1;
-
-	/* Does mref lie in the section of $Bitmap we already have cached? */
-	if ((mref < bmpmref) || (mref >= (bmpmref + (sizeof (buffer) << 3)))) {
-		Dprintf ("Bit lies outside cache.\n");
-
-		/* Mark the buffer as not in use, in case the read is shorter. */
-		memset (buffer, 0, sizeof (buffer));
-		bmpmref = mref & (~((sizeof (buffer) << 3) - 1));
-
-		if (ntfs_attr_pread (vol->mftbmp_na, (bmpmref>>3), sizeof (buffer), buffer) < 0) {
-			Eprintf ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
-			return -1;
-		}
-
-		Dprintf ("Reloaded bitmap buffer.\n");
-	}
-
-	bit  = 1 << (mref & 7);
-	byte = (mref >> 3) & (sizeof (buffer) - 1);
-	Dprintf ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n",
-		mref, bmpmref, byte, bit, buffer[byte] & bit);
-
-	return (buffer[byte] & bit);
-}
-
-/**
  * cluster_find
  */
 int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 {
-	int i;
-	int result = 1;
+	u64 i;
+	int in_use = 0, result = 1;
 	u8 *buffer;
 
 	if (!vol)
@@ -307,29 +256,44 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 		return 1;
 	}
 
+	for (i = s_begin; i < s_end; i++) {
+		if (utils_cluster_in_use (vol, i) == 1) {
+			in_use = 1;
+			break;
+		}
+	}
+
+	if (!in_use) {
+		if (s_begin == s_end)
+			printf ("clusters isn't in use\n");
+		else
+			printf ("clusters aren't in use\n");
+		return 0;
+	}
+
 	// first, is the cluster in use in $Bitmap?
 
 	for (i = 0; i < vol->nr_mft_records; i++) {
 		ntfs_inode *inode;
 		ntfs_attr_search_ctx *ctx;
 
-		if (!mftrec_in_use (vol, i)) {
+		if (!utils_mftrec_in_use (vol, i)) {
 			//printf ("%d skipped\n", i);
 			continue;
 		}
 
 		inode = ntfs_inode_open (vol, i);
 		if (!inode) {
-			Eprintf ("Can't read inode %d\n", i);
+			Eprintf ("Can't read inode %lld\n", i);
 			goto free;
 		}
 
 		if (inode->nr_extents == -1) {
-			printf ("inode %d is an extent record\n", i);
+			printf ("inode %lld is an extent record\n", i);
 			goto close;
 		}
 
-		Vprintf ("Inode: %d\n", i);
+		Vprintf ("Inode: %lld\n", i);
 		ctx = ntfs_attr_get_search_ctx (inode, NULL);
 
 		if (ntfs_attr_lookup (AT_STANDARD_INFORMATION, NULL, 0, IGNORE_CASE, 0, NULL, 0, ctx) < 0) {
@@ -376,7 +340,7 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 					char buffer[256];
 					utils_inode_get_name (inode, buffer, sizeof (buffer));
 					//XXX distinguish between file/dir
-					printf ("inode %d %s", i, buffer);
+					printf ("inode %lld %s", i, buffer);
 					utils_attr_get_name (vol, ctx->attr, buffer, sizeof (buffer));
 					printf ("%c%s\n", PATH_SEP, buffer);
 					//printf ("\n");
