@@ -49,6 +49,11 @@ const char *EXEC_NAME = "ntfsresize";
 #define NTFS_REPORT_BANNER "\nReport bugs to linux-ntfs-dev@lists.sf.net. " \
                            "Homepage: http://linux-ntfs.sf.net\n"
 
+#define NTFS_RESIZE_WARNING \
+"WARNING: Every sanity checks passed and only the DANGEROUS \n" \
+"operations left. Please make sure all your important data \n" \
+"had been backed up in case of an unexpected failure!\n"
+
 struct {
 	int verbose;
 	int debug;
@@ -129,6 +134,24 @@ void usage()
 /*	printf ("   -v              Verbose operation\n"); */
 	printf("%s", NTFS_REPORT_BANNER);
 	exit(1);
+}
+
+
+/* Copy-paste from e2fsprogs */
+void proceed_question(void)
+{
+	char buf[256];
+	const char *short_yes = "yY";
+
+	fflush(stdout);
+	fflush(stderr);
+	printf("Are you sure you want to proceed (y/[n])? ");
+	buf[0] = 0;
+	fgets(buf, sizeof(buf), stdin);
+	if (strchr(short_yes, buf[0]) == 0) {
+		printf("OK quitting. NO CHANGES has been made to your NTFS volume.\n");
+		exit(1);
+	}
 }
 
 
@@ -716,7 +739,7 @@ void mount_volume()
                 perr_exit("ntfs_mount failed");
 
 	if (vol->flags & VOLUME_IS_DIRTY)
-		if (!opt.force--)
+		if (opt.force-- <= 0)
 			err_exit("Volume is dirty. Run chkdsk and "
 				 "please try again (or see -f option).\n");
 
@@ -800,7 +823,10 @@ int main(int argc, char **argv)
 			advise_on_resize();
 		}
 
-	/* FIXME: first do all checks before any write attempt */
+	if (opt.force-- <= 0) {
+		printf(NTFS_RESIZE_WARNING);
+		proceed_question();
+	}
 
 	prepare_volume_fixup();
 
