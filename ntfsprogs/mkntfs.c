@@ -63,7 +63,6 @@
 #	include <errno.h>
 #endif
 #include <time.h>
-#include <fcntl.h>
 #ifdef HAVE_GETOPT_H
 #	include <getopt.h>
 #else
@@ -71,6 +70,7 @@
 	extern int optind;
 #endif
 #include <sys/stat.h>
+#include <fcntl.h>
 #ifdef HAVE_LINUX_MAJOR_H
 #	include <linux/major.h>
 #endif
@@ -84,13 +84,14 @@
 #endif
 #include <limits.h>
 
-#if defined(__linux__) && defined(_IO) && !defined(BLKSSZGET)
+#if defined(__LINUX__) && defined(_IO) && !defined(BLKSSZGET)
 #	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytse. */
 #endif
 
 #include "types.h"
 #include "bootsect.h"
 #include "disk_io.h"
+#include "device.h"
 #include "attrib.h"
 #include "bitmap.h"
 #include "mst.h"
@@ -111,7 +112,6 @@ extern void init_upcase_table(uchar_t *uc, u32 uc_len);
 const char *EXEC_NAME = "mkntfs";
 
 /* Need these global so mkntfs_exit can access them. */
-struct flock flk;
 char *buf = NULL;
 char *buf2 = NULL;
 int buf2_size = 0;
@@ -351,7 +351,7 @@ void parse_options(int argc, char *argv[])
 		}
 	if (optind == argc)
 		usage();
-	vol->dev_name = argv[optind++];
+	vol->dev->d_name = argv[optind++];
 	if (optind < argc) {
 		u = strtoul(argv[optind++], &s, 0);
 		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
@@ -386,7 +386,8 @@ void append_to_bad_blocks(unsigned long block)
 /**
  * mkntfs_write
  */
-__inline__ long long mkntfs_write(int fd, const void *buf, long long count)
+__inline__ long long mkntfs_write(struct ntfs_device *dev, const void *buf,
+		long long count)
 {
 	long long bytes_written, total;
 	int retry;
@@ -396,11 +397,11 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 	total = 0LL;
 	retry = 0;
 	do {
-		bytes_written = write(fd, buf, count);
+		bytes_written = dev->d_ops->write(dev, buf, count);
 		if (bytes_written == -1LL) {
 			retry = errno;
-			Eprintf("Error writing to %s: %s\n", vol->dev_name,
-							     strerror(errno));
+			Eprintf("Error writing to %s: %s\n", vol->dev->d_name,
+					strerror(errno));
 			errno = retry;
 			return bytes_written;
 		} else if (!bytes_written)
@@ -412,7 +413,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
 	} while (count && retry < 3);
 	if (count)
 		Eprintf("Failed to complete writing to %s after three retries."
-			"\n", vol->dev_name);
+			"\n", vol->dev->d_name);
 	return total;
 }
 
@@ -429,7 +430,7 @@ __inline__ long long mkntfs_write(int fd, const void *buf, long long count)
  * Return the number of bytes written (minus padding) or -1 on error. Errno
  * will be set to the error code.
  */
-s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
+s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl, const char *val,
 		const s64 val_len, s64 *inited_size)
 {
 	s64 bytes_written, total, length, delta;
@@ -450,8 +451,8 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 			// TODO: Check that *val is really zero at pos and len.
 			continue;
 		}
-		if (lseek(fd, rl[i].lcn * vol->cluster_size, SEEK_SET) ==
-				(off_t)-1)
+		if (dev->d_ops->seek(dev, rl[i].lcn * vol->cluster_size,
+				SEEK_SET) == (off_t)-1)
 			return -1LL;
 		retry = 0;
 		do {
@@ -460,11 +461,13 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 				length = val_len - total;
 				delta -= length;
 			}
-			bytes_written = write(fd, val + total, length);
+			bytes_written = dev->d_ops->write(dev, val + total,
+					length);
 			if (bytes_written == -1LL) {
 				retry = errno;
 				Eprintf("Error writing to %s: %s\n",
-						vol->dev_name, strerror(errno));
+						vol->dev->d_name,
+						strerror(errno));
 				errno = retry;
 				return bytes_written;
 			}
@@ -478,7 +481,7 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 		} while (length && retry < 3);
 		if (length) {
 			Eprintf("Failed to complete writing to %s after three "
-					"retries.\n", vol->dev_name);
+					"retries.\n", vol->dev->d_name);
 			return total;
 		}
 	}
@@ -487,7 +490,7 @@ s64 ntfs_rlwrite(int fd, const runlist *rl, const char *val,
 		if (!buf)
 			err_exit("Error allocating internal buffer: "
 					"%s\n", strerror(errno));
-		bytes_written = mkntfs_write(fd, buf, delta);
+		bytes_written = mkntfs_write(dev, buf, delta);
 		free(buf);
 		if (bytes_written == -1LL)
 			return bytes_written;
@@ -1276,7 +1279,7 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		err = -ENOTSUP;
 	} else {
 		a->compression_unit = 0;
-		bw = ntfs_rlwrite(vol->fd, rl, val, val_len, &inited_size);
+		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, &inited_size);
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
@@ -1465,7 +1468,7 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 		err = -ENOTSUP;
 	} else {
 		a->compression_unit = 0;
-		bw = ntfs_rlwrite(vol->fd, rl, val, val_len, NULL);
+		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, NULL);
 		if (bw != val_len)
 			Eprintf("Error writing non-resident attribute value."
 				"\n");
@@ -2456,8 +2459,6 @@ void init_options()
  */
 void mkntfs_exit(void)
 {
-	int err;
-
 	if (index_block)
 		free(index_block);
 	if (buf)
@@ -2488,19 +2489,17 @@ void mkntfs_exit(void)
 		free(opts.bad_blocks);
 	if (opts.attr_defs != (ATTR_DEF*)attrdef_ntfs12_array)
 		free(opts.attr_defs);
+	if (!vol)
+		return;
 	if (vol->upcase)
 		free(vol->upcase);
-	flk.l_type = F_UNLCK;
-	err = fcntl(vol->fd, F_SETLK, &flk);
-	if (err == -1)
-		Eprintf("Warning: Could not unlock %s: %s\n", vol->dev_name,
-				strerror(errno));
-	err = close(vol->fd);
-	if (err == -1)
-		Eprintf("Warning: Could not close %s: %s\n", vol->dev_name,
-				strerror(errno));
-	if (vol)
-		free(vol);
+	if (vol->dev) {
+		if (NDevOpen(vol->dev) && vol->dev->d_ops->close(vol->dev))
+			Eprintf("Warning: Could not close %s: %s\n",
+					vol->dev->d_name, strerror(errno));
+		ntfs_device_free(vol->dev);
+	}
+	free(vol);
 }
 
 /**
@@ -2522,13 +2521,20 @@ int main(int argc, char **argv)
 
 	/* Setup the correct locale for string output and conversion. */
 	utils_set_locale();
-
 	/* Initialize the random number generator with the current time. */
 	srandom(time(NULL));
-	/* Initialize ntfs_volume structure vol. */
-	vol = (ntfs_volume*)calloc(1, sizeof(*vol));
+	/* Allocate and initialize ntfs_volume structure vol. */
+	vol = ntfs_volume_alloc();
 	if (!vol)
 		err_exit("Could not allocate memory for internal buffer.\n");
+	/* Register our exit function which will cleanup everything. */
+	err = atexit(&mkntfs_exit);
+	if (err == -1) {
+		Eprintf("Could not set up exit() function because atexit() "
+				"failed. Aborting...\n");
+		mkntfs_exit();
+		exit(1);
+	}
 	vol->major_ver = 1;
 	vol->minor_ver = 2;
 	vol->mft_record_size = 1024;
@@ -2543,16 +2549,33 @@ int main(int argc, char **argv)
 	init_options();
 	/* Parse command line options. */
 	parse_options(argc, argv);
-	/* Verify we are dealing with a block device. */
-	if (stat(vol->dev_name, &sbuf) == -1) {
+	/*
+	 * Allocate and initialize an ntfs device structure and attach it to
+	 * the volume.
+	 */
+	if (!(vol->dev = ntfs_device_alloc(vol->dev->d_name, 0,
+			&ntfs_device_disk_io_ops, NULL)))
+		err_exit("Could not allocate memory for internal buffer.\n");
+	/* Open the device for reading or reading and writing. */
+	if (opts.no_action) {
+		Qprintf("Running in READ-ONLY mode!\n");
+		i = O_RDONLY;
+	} else
+		i = O_RDWR;
+	if (vol->dev->d_ops->open(vol->dev, i)) {
 		if (errno == ENOENT)
 			err_exit("The device doesn't exist; did you specify "
 					"it correctly?\n");
+		err_exit("Could not open %s: %s\n", vol->dev->d_name,
+				strerror(errno));
+	}
+	/* Verify we are dealing with a block device. */
+	if (vol->dev->d_ops->stat(vol->dev, &sbuf)) {
 		err_exit("Error getting information about %s: %s\n",
-				vol->dev_name, strerror(errno));
+				vol->dev->d_name, strerror(errno));
 	}
 	if (!S_ISBLK(sbuf.st_mode)) {
-		Eprintf("%s is not a block device.\n", vol->dev_name);
+		Eprintf("%s is not a block device.\n", vol->dev->d_name);
 		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
 		if (!opts.nr_sectors) {
@@ -2582,64 +2605,27 @@ int main(int argc, char **argv)
 			(SCSI_BLK_MAJOR(MAJOR(sbuf.st_rdev)) &&
 			MINOR(sbuf.st_rdev) % 16 == 0)) {
 		err_exit("%s is entire device, not just one partition!\n",
-				vol->dev_name);
+				vol->dev->d_name);
 	}
 #endif
 	/* Make sure the file system is not mounted. */
-	if (ntfs_check_if_mounted(vol->dev_name, &mnt_flags))
+	if (ntfs_check_if_mounted(vol->dev->d_name, &mnt_flags))
 		Eprintf("Failed to determine whether %s is mounted: %s\n",
-				vol->dev_name, strerror(errno));
+				vol->dev->d_name, strerror(errno));
 	else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Eprintf("%s is mounted.\n", vol->dev_name);
+		Eprintf("%s is mounted.\n", vol->dev->d_name);
 		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
 		fprintf(stderr, "mkntfs forced anyway. Hope /etc/mtab is "
 				"incorrect.\n");
-	}
-
-	/* Open the device for reading or reading and writing. */
-	if (opts.no_action) {
-		Qprintf("Running in READ-ONLY mode!\n");
-		i = O_RDONLY;
-	} else
-		i = O_RDWR;
-	vol->fd = open(vol->dev_name, i);
-	if (vol->fd == -1)
-		err_exit("Could not open %s: %s\n", vol->dev_name,
-							strerror(errno));
-	/* Acquire exlusive (mandatory) write lock on the whole device. */
-	memset(&flk, 0, sizeof(flk));
-	if (opts.no_action)
-		flk.l_type = F_RDLCK;
-	else
-		flk.l_type = F_WRLCK;
-	flk.l_whence = SEEK_SET;
-	flk.l_start = flk.l_len = 0LL;
-	err = fcntl(vol->fd, F_SETLK, &flk);
-	if (err == -1) {
-		Eprintf("Could not lock %s for %s: %s\n", vol->dev_name,
-				opts.no_action ? "reading" : "writing",
-				strerror(errno));
-		err = close(vol->fd);
-		if (err == -1)
-			Eprintf("Warning: Could not close %s: %s\n",
-						vol->dev_name, strerror(errno));
-		exit(1);
-	}
-	/* Register our exit function which will unlock and close the device. */
-	err = atexit(&mkntfs_exit);
-	if (err == -1) {
-		Eprintf("Could not set up exit() function because atexit() "
-				"failed. Aborting...\n");
-		mkntfs_exit();
-		exit(1);
 	}
 	/* If user didn't specify the sector size, determine it now. */
 	if (!opts.sector_size) {
 #ifdef BLKSSZGET
 		int _sect_size = 0;
 
-		if (ioctl(vol->fd, BLKSSZGET, &_sect_size) >= 0)
+		if (vol->dev->d_ops->ioctl(vol->dev, BLKSSZGET, &_sect_size)
+				>= 0)
 			opts.sector_size = _sect_size;
 		else
 #endif
@@ -2647,24 +2633,25 @@ int main(int argc, char **argv)
 			Eprintf("No sector size specified for %s and it could "
 					"not be obtained automatically.\n"
 					"Assuming sector size is 512 bytes.\n",
-					vol->dev_name);
+					vol->dev->d_name);
 			opts.sector_size = 512;
 		}
 	}
 	/* Validate sector size. */
 	if ((opts.sector_size - 1) & opts.sector_size ||
-	    opts.sector_size < 256 || opts.sector_size > 4096)
+			opts.sector_size < 256 || opts.sector_size > 4096)
 		err_exit("Error: sector_size is invalid. It must be a power "
 			 "of two, and it must be\n greater or equal 256 and "
 			 "less than or equal 4096 bytes.\n");
 	Dprintf("sector size = %i bytes\n", opts.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
 	if (!opts.nr_sectors) {
-		opts.nr_sectors = ntfs_device_size_get(vol->fd, opts.sector_size);
+		opts.nr_sectors = ntfs_device_size_get(vol->dev,
+				opts.sector_size);
 		if (opts.nr_sectors <= 0)
 			err_exit("ntfs_device_size_get(%s) failed. Please "
 					"specify it manually.\n",
-					vol->dev_name);
+					vol->dev->d_name);
 	}
 	Dprintf("number of sectors = %Ld (0x%Lx)\n", opts.nr_sectors,
 			opts.nr_sectors);
@@ -2979,7 +2966,7 @@ int main(int argc, char **argv)
 						progress_inc);
 				fflush(stdout);
 			}
-			bw = mkntfs_write(vol->fd, buf, vol->cluster_size);
+			bw = mkntfs_write(vol->dev, buf, vol->cluster_size);
 			if (bw != vol->cluster_size) {
 				if (bw != -1 || errno != EIO)
 					err_exit("This should not happen.\n");
@@ -3001,7 +2988,8 @@ int main(int argc, char **argv)
 					"device with zeroes: %3.0f%%", position,
 					position / progress_inc);
 				/* Seek to next cluster. */
-				lseek(vol->fd, ((off_t)position + 1) *
+				vol->dev->d_ops->seek(vol->dev,
+						((off_t)position + 1) *
 						vol->cluster_size, SEEK_SET);
 			}
 		}
@@ -3009,7 +2997,7 @@ int main(int argc, char **argv)
 		position = (opts.volume_size & (vol->cluster_size - 1)) /
 				opts.sector_size;
 		for (i = 0; i < position; i++) {
-			bw = mkntfs_write(vol->fd, buf, opts.sector_size);
+			bw = mkntfs_write(vol->dev, buf, opts.sector_size);
 			if (bw != opts.sector_size) {
 				if (bw != -1 || errno != EIO)
 					err_exit("This should not happen.\n");
@@ -3021,7 +3009,8 @@ int main(int argc, char **argv)
 						"location reserved for system "
 						"file $Boot.\n");
 				/* Seek to next sector. */
-				lseek(vol->fd, opts.sector_size, SEEK_CUR);
+				vol->dev->d_ops->seek(vol->dev,
+						opts.sector_size, SEEK_CUR);
 			}
 		}
 		Qprintf(" - Done.\n");
@@ -3327,10 +3316,10 @@ int main(int argc, char **argv)
 	 * Write the first max(512, opts.sector_size) bytes from buf2 to the
 	 * last sector.
 	 */
-	if (lseek(vol->fd, (opts.nr_sectors + 1) * opts.sector_size - i,
-			SEEK_SET) == (off_t)-1)
+	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
+			opts.sector_size - i, SEEK_SET) == (off_t)-1)
 		goto bb_err;
-	bw = mkntfs_write(vol->fd, buf2, i);
+	bw = mkntfs_write(vol->dev, buf2, i);
 	free(buf2);
 	buf2 = NULL;
 	if (bw != i) {
@@ -3464,7 +3453,7 @@ bb_err:
 	if (err)
 		err_exit("ntfs_mst_pre_write_fixup() failed while syncing "
 				"root directory index block.\n");
-	lw = ntfs_rlwrite(vol->fd, rl_index, (char*)index_block, i, NULL);
+	lw = ntfs_rlwrite(vol->dev, rl_index, (char*)index_block, i, NULL);
 	if (lw != i)
 		err_exit("Error writing $INDEX_ALLOCATION.\n");
 	/* No more changes to @index_block below here so no need for fixup: */
@@ -3485,7 +3474,7 @@ bb_err:
 		ntfs_attr_put_search_ctx(ctx);
 		if (!rl)
 			err_exit("ntfs_mapping_pairs_decompress() failed\n");
-		lw = ntfs_rlwrite(vol->fd, rl, lcn_bitmap,
+		lw = ntfs_rlwrite(vol->dev, rl, lcn_bitmap,
 				lcn_bitmap_byte_size, NULL);
 		if (lw != lcn_bitmap_byte_size)
 			err_exit("%s\n", lw == -1 ? strerror(errno) :
@@ -3504,7 +3493,7 @@ bb_err:
 	lw = 1;
 	for (i = 0; i < opts.mft_size / vol->mft_record_size; i++) {
 		if (!opts.no_action)
-			lw = ntfs_mst_pwrite(vol->fd, pos, 1,
+			lw = ntfs_mst_pwrite(vol->dev, pos, 1,
 					vol->mft_record_size,
 					buf + i * vol->mft_record_size);
 		if (lw != 1)
@@ -3531,7 +3520,7 @@ bb_err:
 			usn = 0xfffe;
 		*usnp = cpu_to_le16(usn);
 		if (!opts.no_action)
-			lw = ntfs_mst_pwrite(vol->fd, pos, 1,
+			lw = ntfs_mst_pwrite(vol->dev, pos, 1,
 					vol->mft_record_size,
 					buf + i * vol->mft_record_size);
 		if (lw != 1)
@@ -3540,7 +3529,7 @@ bb_err:
 		pos += vol->mft_record_size;
 	}
 	Vprintf("Syncing device.\n");
-	if (fdatasync(vol->fd) == -1)
+	if (vol->dev->d_ops->sync(vol->dev))
 		err_exit("Syncing device. FAILED: %s", strerror(errno));
 	Qprintf("mkntfs completed successfully. Have a nice day.\n");
 	/*
