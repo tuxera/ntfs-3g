@@ -23,6 +23,8 @@ tags
 TAGS
 */tags
 */TAGS
+.*swp
+*/.*swp
 
 # specific programs
 ntfsprogs/dumplog
