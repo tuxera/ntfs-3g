@@ -1,7 +1,8 @@
 /**
  * ntfsundelete - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2002-2004 Richard Russon
+ * Copyright (c) 2004 Holger Ohmacht
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -55,15 +56,135 @@
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
 static const char *UNNAMED   = "<unnamed>";
-static       char *NONE      = "<none>";
-static       char *UNKNOWN   = "unknown";
+static const char *NONE      = "<none>";
+static const char *UNKNOWN   = "unknown";
 static struct options opts;
+
+typedef struct
+{
+	u32 begin;
+	u32 end;
+} range;
+
+static range *ranges;
+static long  nr_entries;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 #define _(S)	gettext(S)
+
+/**
+ * parse_inode_arg - parses the inode expression
+ *
+ * Parses the optarg after parameter -u for valid ranges
+ *
+ * Return: Number of correct inode specifications or -1 for error
+ */
+static int parse_inode_arg (void)
+{
+	int p;
+	u32 imax;
+	u32 range_begin;
+	u32 range_end;
+	u32 range_temp;
+	u32 inode;
+	char *opt_arg_ptr;
+	char *opt_arg_temp;
+	char *opt_arg_end1;
+	char *opt_arg_end2;
+
+	/* init variables */
+	p = strlen (optarg);
+	imax = p;
+	opt_arg_ptr = optarg;
+	opt_arg_end1 = optarg;
+	opt_arg_end2 = &(optarg[p]);
+	nr_entries = 0;
+
+	/* alloc mem for range table */
+	ranges = (range *) malloc ((p + 1) * sizeof (range));
+	if (ranges == NULL)
+	{
+		printf ("ERROR: Couldn't alloc mem for parsing inodes!\n");
+		return (-1);
+	}
+
+	/* loop */
+	while ((opt_arg_end1 != opt_arg_end2) && (p > 0))
+	{
+		inode = strtoul (opt_arg_ptr, &opt_arg_end1, 0);
+		p--;
+
+		/* invalid char at begin */
+		if ((opt_arg_ptr == opt_arg_end1) || (opt_arg_ptr == opt_arg_end2))
+		{
+			printf ("ERROR: Invalid Number: %s\n", opt_arg_ptr);
+			return (-1);
+		}
+
+		/* RANGE - Check for range */
+		if (opt_arg_end1[0] == '-')
+		{
+			/* get range end */
+			opt_arg_temp = opt_arg_end1;
+			opt_arg_end1 = & (opt_arg_temp[1]);
+			if (opt_arg_temp >= opt_arg_end2)
+			{
+				printf ("ERROR: Missing range end!\n");
+				return (-1);
+			}
+			range_begin = inode;
+
+			/* get count */
+			range_end = strtoul (opt_arg_end1, &opt_arg_temp, 0);
+			if (opt_arg_temp == opt_arg_end1)
+			{
+				printf ("ERROR: Invalid Number: %s\n", opt_arg_temp);
+				return (-1);
+			}
+
+			/* check for correct values */
+			if (range_begin > range_end)
+			{
+				range_temp = range_end;
+				range_end = range_begin;
+				range_begin = range_temp;
+			}
+
+			/* put into struct */
+			ranges[nr_entries].begin = range_begin;
+			ranges[nr_entries].end = range_end;
+			nr_entries++;
+
+			/* Last check */
+			opt_arg_ptr = & (opt_arg_temp[1]);
+			if (opt_arg_ptr >= opt_arg_end2)
+				break;
+		} else if (opt_arg_end1[0] == ',') {
+			/* SINGLE VALUE, BUT CONTINUING */
+			/* put inode into range list */
+			ranges[nr_entries].begin = inode;
+			ranges[nr_entries].end = inode;
+			nr_entries++;
+
+			/* Next inode */
+			opt_arg_ptr = & (opt_arg_end1[1]);
+			if (opt_arg_ptr >= opt_arg_end2)
+			{
+				printf ("ERROR: Missing new value at end of input!\n");
+				return (-1);
+			}
+			continue;
+		} else { /* SINGLE VALUE, END */
+			ranges[nr_entries].begin = inode;
+			ranges[nr_entries].end = inode;
+			nr_entries++;
+		}
+	}
+	return (nr_entries);
+}
 
 /**
  * version - Print version information about the program
@@ -98,7 +219,7 @@ static void usage (void)
 		"    -S range    --size range       Match files of this size\n"
 		"    -t since    --time since       Last referenced since this time\n"
 		"\n"
-		"    -u num      --undelete num     Undelete inode\n"
+		"    -u nums     --undelete nums    Undelete inodes\n"
 		"    -o file     --output file      Save with this filename\n"
 		"    -d dir      --destination dir  Destination directory\n"
 		"    -b num      --byte num         Fill missing parts with this byte\n"
@@ -398,10 +519,13 @@ static int parse_options (int argc, char *argv[])
 			}
 			break;
 		case 'u':
-			if (opts.mode == MODE_NONE) {
+			if (opts.mode == MODE_NONE)
+			{
 				end = NULL;
 				opts.mode = MODE_UNDELETE;
-				opts.uinode = strtol (optarg, &end, 0);
+				/* parse inodes */
+				if (parse_inode_arg() == -1)
+					err++;
 				if (end && *end)
 					err++;
 			} else {
@@ -894,7 +1018,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 					clusters_free++;
 			}
 		}
-		
+
 		if ((clusters_inuse + clusters_free) == 0) {
 			Eprintf ("Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
 			continue;
@@ -928,7 +1052,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 static void dump_record (struct ufile *file)
 {
 	char buffer[20];
-	char *name;
+	const char *name;
 	struct list_head *item;
 	int i;
 
@@ -1040,7 +1164,7 @@ static void list_record (struct ufile *file)
 {
 	char buffer[20];
 	struct list_head *item;
-	char *name = NULL;
+	const char *name = NULL;
 	long long size = 0;
 	int percent = 0;
 
@@ -1179,7 +1303,7 @@ static unsigned int write_data (int fd, const char *buffer,
  *
  * Return:  n  Length of the allocated name
  */
-static int create_pathname (const char *dir, const char *name, 
+static int create_pathname (const char *dir, const char *name,
 	const char *stream, char *buffer, int bufsize)
 {
 	if (!name)
@@ -1672,6 +1796,8 @@ int main (int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	int result = 1;
+	int i;
+	u32 inode;
 
 	if (!parse_options (argc, argv))
 		goto free;
@@ -1689,17 +1815,27 @@ int main (int argc, char *argv[])
 			Vprintf ("Failed to scan device '%s'.\n", opts.device);
 		break;
 	case MODE_UNDELETE:
-		result = !undelete_file (vol, opts.uinode);
-		if (result)
-			Vprintf ("Failed to undelete inode %d.\n", opts.uinode);
+		if (nr_entries == 0)
+		{
+			printf ("ERROR: No inode(s) specified!\n");
+			break;
+		}
+
+		for (i = 0; i < nr_entries; i++)
+		{
+			for (inode = ranges[i].begin; inode <= ranges[i].end; inode ++)
+			{
+				result = !undelete_file (vol, inode);
+				if (result)
+					Vprintf ("ERROR: Failed to undelete inode %d\n!", inode);
+			}
+		}
 		break;
 	case MODE_COPY:
 		result = !copy_mft (vol, opts.mft_begin, opts.mft_end);
 		if (result)
 			Vprintf ("Failed to read MFT blocks %lld-%lld.\n",
-					(long long)opts.mft_begin,
-					(long long)min(vol->nr_mft_records,
-					opts.mft_end));
+				opts.mft_begin, min(vol->nr_mft_records, opts.mft_end));
 		break;
 	default:
 		; /* Cannot happen */

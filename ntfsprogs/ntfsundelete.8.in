@@ -264,12 +264,14 @@ option.  Only match files that have been altered since this time.  The time must
 be given as number using a suffix of d, w, m, y for days, weeks, months or years
 ago.
 .TP
-.BI "\-u " num
+.BI "\-u " nums
 .br
 .ns
 .TP
-.BI "\-\-undelete " num
-Recover the file with this inode number.  This option can be combined with
+.BI "\-\-undelete " nums
+Recover the files with these inode numbers. You can specify more than
+one inode by separating with "," or a range of inodes by using
+"-". This option can be combined with
 .BR \-\-output ,
 .BR \-\-destination ,
 and
@@ -321,6 +323,12 @@ Look for deleted files altered in the last two days
 .B ntfsundelete /dev/hda1 \-t 2d
 .sp
 .RE
+Undelete inodes 2, 5 and 100 to 131 of device /dev/sda1
+.RS
+.sp
+.B ntfsundelete /dev/sda1 -u 2,5,100-131
+.sp
+.RE
 Undelete inode number 3689, call the file 'work.doc' and put it in the user's
 home directory.
 .RS
@@ -339,9 +347,9 @@ If you find one, please send an email to
 .nh
 <linux-ntfs-dev@lists.sourceforge.net>
 .hy
-.SH AUTHOR
+.SH AUTHORS
 .B ntfsundelete
-was written by Richard Russon (FlatCap)
+was written by Richard Russon (FlatCap) and Holger Ohmacht.
 .SH AVAILABILITY
 .B ntfsundelete
 is part of the ntfsprogs package and is available from
