@@ -439,6 +439,114 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 }
 
 /**
+ * ntfs_attr_map_whole_runlist - map the whole runlist of an ntfs attribute
+ * @na:		ntfs attribute for which to map the runlist
+ *
+ * Map the whole runlist of an the ntfs attribute @na.  For an attribute made
+ * up of only one attribute extent this is the same as calling
+ * ntfs_attr_map_runlist(na, 0) but for an attribute with multiple extents this
+ * will map the runlist fragments from each of the extents thus giving access
+ * to the entirety of the disk allocation of an attribute.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_attr_map_whole_runlist(ntfs_attr *na)
+{
+	VCN next_vcn, last_vcn, highest_vcn;
+	ntfs_attr_search_ctx *ctx;
+	ntfs_volume *vol = na->ni->vol;
+	ATTR_RECORD *a;
+	int err;
+
+	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+			(unsigned long long)na->ni->mft_no, na->type);
+
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+
+	/* Map all attribute extents one by one. */
+	next_vcn = last_vcn = highest_vcn = 0;
+	a = NULL;
+	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+			CASE_SENSITIVE, next_vcn, NULL, 0, ctx)) {
+		runlist_element *rl;
+
+		a = ctx->attr;
+
+		/* Decode the runlist. */
+		rl = ntfs_mapping_pairs_decompress(na->ni->vol, a, na->rl);
+		if (!rl)
+			goto err_out;
+		na->rl = rl;
+
+		/* Are we in the first extent? */
+		if (!next_vcn) {
+			 if (a->lowest_vcn) {
+				Dprintf("%s(): First extent of attribute "
+						"has non zero lowest_vcn. "
+						"Inode is corrupt.\n",
+						__FUNCTION__);
+				errno = EIO;
+				goto err_out;
+			}
+			/* Get the last vcn in the attribute. */
+			last_vcn = sle64_to_cpu(a->allocated_size) >>
+					vol->cluster_size_bits;
+		}
+
+		/* Get the lowest vcn for the next extent. */
+		highest_vcn = sle64_to_cpu(a->highest_vcn);
+		next_vcn = highest_vcn + 1;
+
+		/* Only one extent or error, which we catch below. */
+		if (next_vcn <= 0) {
+			errno = ENOENT;
+			break;
+		}
+
+		/* Avoid endless loops due to corruption. */
+		if (next_vcn < sle64_to_cpu(a->lowest_vcn)) {
+			Dprintf("%s(): Inode has corrupt attribute list "
+					"attribute.\n", __FUNCTION__);
+			errno = EIO;
+			goto err_out;
+		}
+	}
+	if (!a) {
+		err = errno;
+		if (err == ENOENT)
+			Dprintf("%s(): Attribute not found. Inode is "
+					"corrupt.\n", __FUNCTION__);
+		else
+			Dprintf("%s(): Inode is corrupt.\n", __FUNCTION__);
+		errno = err;
+		goto err_out;
+	}
+	if (highest_vcn && highest_vcn != last_vcn - 1) {
+		Dprintf("%s(): Failed to load the complete run list for the "
+				"attribute. Bug or corrupt inode.\n",
+				__FUNCTION__);
+		Dprintf("%s(): highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx\n",
+				__FUNCTION__, (long long)highest_vcn,
+				(long long)last_vcn - 1);
+		errno = EIO;
+		goto err_out;
+	}
+	err = errno;
+	ntfs_attr_put_search_ctx(ctx);
+	if (err == ENOENT)
+		return 0;
+out_now:
+	errno = err;
+	return -1;
+err_out:
+	err = errno;
+	ntfs_attr_put_search_ctx(ctx);
+	goto out_now;
+}
+
+/**
  * ntfs_attr_vcn_to_lcn - convert a vcn into a lcn given an ntfs attribute
  * @na:		ntfs attribute whose runlist to use for conversion
  * @vcn:	vcn to convert
@@ -2527,6 +2635,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 {
 	ntfs_volume *vol = na->ni->vol;
 	ATTR_REC *a = ctx->attr;
+	int name_ofs, val_ofs;
+	s64 arec_size;
 
 	/* Some preliminary sanity checking. */
 	if (!NAttrNonResident(na)) {
@@ -2569,10 +2679,22 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		return -1;
 	}
 
-	// Is there enough space for the attribute to be resident?
-	// If not: errno = ENOSPC; return -1;
+	/* Work out offsets into and size of the resident attribute. */
+	name_ofs = 24; /* = sizeof(resident_ATTR_REC); */
+	val_ofs = (name_ofs + a->name_length + 7) & ~7;
+	arec_size = (val_ofs + na->data_size + 7) & ~7;
 
-	// Read and cache runlist if not already done.
+	/* Read and cache the whole runlist if not already done. */
+	if (ntfs_attr_map_whole_runlist(na))
+		return -1;
+
+	// Can be done by ntfs_attr_record_resize() itself!
+	if (ctx->mrec->bytes_in_use - le32_to_cpu(a->length) + arec_size >
+			ctx->mrec->bytes_allocated) {
+		errno = ENOSPC;
+		return -1;
+	}
+
 
 	// Convert to resident attribute & resize attribute record.
 

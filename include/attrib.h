@@ -253,6 +253,7 @@ extern s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos,
 		s64 bk_cnt, const u32 bk_size, void *src);
 
 extern int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn);
+extern int ntfs_attr_map_whole_runlist(ntfs_attr *na);
 
 extern LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn);
 extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
