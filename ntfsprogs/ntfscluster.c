@@ -67,7 +67,7 @@ void version (void)
 void usage (void)
 {
 	printf ("\nUsage: %s [options] device\n"
-		"    -i        --info           Print information about the volume\n"
+		"    -i        --info           Print information about the volume (default)\n"
 		"    -c range  --cluster range  Look for objects in this range of clusters\n"
 		"    -s range  --sector range   Look for objects in this range of sectors\n"
 	/*	"    -l        --last           Find the last file on the volume\n" */
@@ -204,7 +204,8 @@ int parse_options (int argc, char **argv)
 		}
 
 		if (opts.action == act_error) {
-			Eprintf ("You may only specify one action: --info, --cluster, --sector or --last.\n");
+			//Eprintf ("You may only specify one action: --info, --cluster, --sector or --last.\n");
+			Eprintf ("You may only specify one action: --info, --cluster or --sector.\n");
 			err++;
 		} else if (opts.range_begin > opts.range_end) {
 			Eprintf ("The range must be in ascending order.\n");
@@ -219,6 +220,79 @@ int parse_options (int argc, char **argv)
 
 	return (!err && !help && !ver);
 }
+
+
+/**
+ * free_space - Calculate the amount of space which isn't in use
+ */
+u64 free_space (ntfs_volume *vol)
+{
+	return 0;
+}
+
+/**
+ * user_space - Calculate the amount of space of the user's files
+ */
+u64 user_space (ntfs_volume *vol)
+{
+	return 0;
+}
+
+/**
+ * meta_space - Calculate the amount of space used by the filesystem structures
+ */
+u64 meta_space (ntfs_volume *vol)
+{
+	return 0;
+}
+
+/**
+ * info - Display information about the volume
+ */
+int info (ntfs_volume *vol)
+{
+	u64 a, b, c, d, e, f, g, h, i, j, k, l, m, n;
+	int cps;
+	u64 fs, us, ms;
+
+	cps = vol->cluster_size_bits - vol->sector_size_bits;
+	fs  = free_space (vol);
+	ms  = meta_space (vol);
+	us  = user_space (vol);
+
+	a = vol->sector_size;
+	b = vol->cluster_size;
+	c = 1 << cps;
+	d = vol->nr_clusters >> cps;
+	e = vol->nr_clusters;
+	f = fs / a;
+	g = fs / b;
+	h = fs * 100 / a / d;
+	i = us / a;
+	j = us / b;
+	k = us * 100 / a / d;
+	l = ms / a;
+	m = ms / b;
+	n = ms * 100 / a / d;
+
+	printf ("bytes per sector       : %lld\n", a);
+	printf ("bytes per cluster      : %lld\n", b);
+	printf ("sectors per cluster    : %lld\n", c);
+	printf ("sectors per volume     : %lld\n", d);
+	printf ("clusters per volume    : %lld\n", e);
+	printf ("sectors of free space  : %lld\n", f);
+	printf ("clusters of free space : %lld\n", g);
+	printf ("percentage free space  : %lld\n", h);
+	printf ("sectors of user data   : %lld\n", i);
+	printf ("clusters of user data  : %lld\n", j);
+	printf ("percentage user data   : %lld\n", k);
+	printf ("sectors of metadata    : %lld\n", l);
+	printf ("clusters of metadata   : %lld\n", m);
+	printf ("percentage metadata    : %lld\n", n);
+
+	return 0;
+}
+
 
 /**
  * cluster_find
@@ -261,7 +335,7 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 		ntfs_attr_search_ctx *ctx;
 
 		if (!utils_mftrec_in_use (vol, i)) {
-			//printf ("%d skipped\n", i);
+			//printf ("%lld skipped\n", i);
 			continue;
 		}
 
@@ -326,9 +400,8 @@ int cluster_find (ntfs_volume *vol, LCN s_begin, LCN s_end)
 					printf ("inode %lld %s", i, buffer);
 					utils_attr_get_name (vol, ctx->attr, buffer, sizeof (buffer));
 					printf ("%c%s\n", PATH_SEP, buffer);
-					//printf ("\n");
 				}
-				break;
+				break;	// XXX if verbose, we should list all matching runs
 			}
 		}
 
@@ -343,6 +416,7 @@ free:
 	result = 0;
 	return result;
 }
+
 
 /**
  * main - Begin here
@@ -373,8 +447,8 @@ int main (int argc, char *argv[])
 			else
 				Qprintf ("Searching for sector range %lld-%lld\n", opts.range_begin, opts.range_end);
 			/* Convert to clusters */
-			opts.range_begin <<= (vol->cluster_size_bits - vol->sector_size_bits);
-			opts.range_end   <<= (vol->cluster_size_bits - vol->sector_size_bits);
+			opts.range_begin >>= (vol->cluster_size_bits - vol->sector_size_bits);
+			opts.range_end   >>= (vol->cluster_size_bits - vol->sector_size_bits);
 			result = cluster_find (vol, opts.range_begin, opts.range_end);
 			break;
 		case act_cluster:
@@ -391,7 +465,7 @@ int main (int argc, char *argv[])
 		*/
 		case act_info:
 		default:
-			printf ("Info\n");
+			info (vol);
 			break;
 	}
 
