@@ -92,8 +92,9 @@ int utils_valid_device (const char *name, int force)
 	unsigned long mnt_flags = 0;
 	struct stat st;
 
-#ifndef __CYGWIN32__
-	return 1; /* FIXME: This doesn't work for Cygwin, so just skip it for now... */
+#ifdef __CYGWIN32__
+	/* FIXME: This doesn't work for Cygwin, so just return success for now... */
+	return 1;
 #endif
 	if (!name) {
 		errno = EINVAL;
