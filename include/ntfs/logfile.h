@@ -376,5 +376,8 @@ typedef struct {
 	} __attribute__((__packed__)) lcn_list[0];
 } __attribute__ ((__packed__)) LOG_RECORD;
 
-#endif /* defined _NTFS_LOGFILE_H */
+extern BOOL ntfs_check_logfile(ntfs_attr *log_na);
+extern BOOL ntfs_is_logfile_clean(ntfs_attr *log_na);
+extern int ntfs_empty_logfile(ntfs_attr *na);
 
+#endif /* defined _NTFS_LOGFILE_H */
