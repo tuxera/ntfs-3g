@@ -2441,7 +2441,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			goto put_err_out;
 		}
-		/* Attribute is not allowed to be non-resident. */
+		/* Attribute is not allowed to be non-resident, continue. */
 	}
 
 	// TODO: Try to make other attributes non-resident.
