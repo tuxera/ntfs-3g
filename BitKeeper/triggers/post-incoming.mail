@@ -38,7 +38,7 @@ if [ -z "$(echo ${BKD_HOST} | grep bkbits.net)" ]; then
 fi
 
 EMAIL="ntfs-cvs <linux-ntfs-cvs@lists.sourceforge.net>"
-REPLYTO="Anton Altaparmakov <aia21@cantab.net>"
+REPLYTO="ntfs-dev <linux-ntfs-dev@lists.sourceforge.net>"
 
 SUBJECT="Subject: bk-$(echo ${BKD_ROOT} 2>/dev/null | sed "s#.*/##" 2>/dev/null): ChangeSet@${rev} by ${BK_USER}@${BK_HOST}"
 
