@@ -128,6 +128,8 @@ extern int ntfs_inode_close(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);
+		
+extern int ntfs_inode_attach_all_extents(ntfs_inode *ni);
 
 /**
  * ntfs_inode_mark_dirty - set the inode (and its base inode if it exists) dirty
@@ -148,6 +150,8 @@ static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni) {
 extern int ntfs_inode_sync(ntfs_inode *ni);
 
 extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
+
+extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
 #endif /* defined _NTFS_INODE_H */
 
