@@ -3,7 +3,7 @@
  *		project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -103,7 +103,8 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	int err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
-		 __FUNCTION__, (long long) ni->mft_no, (unsigned) attr->type);
+			__FUNCTION__, (long long) ni->mft_no,
+			(unsigned) le32_to_cpu(attr->type));
 
 	if (!ni || !attr) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
@@ -122,7 +123,14 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		return -1;
 	}
 
-	/* Determine size and allocate memory for new attribute list. */
+	/*
+	 * Determine size and allocate memory for new attribute list. We need
+	 * to form new attribute list before on-disk atribute list truncate
+	 * will be performed, because position of attribute for which we make
+	 * attribute list entry can be changed inside mft record (but it can
+	 * not be moved outside mft record, because we don't have attribute
+	 * list entry for it yet) during on-disk atribute list truncate.
+	 */
 	new_al_len = (ni->attr_list_size + sizeof(ATTR_LIST_ENTRY) +
 			sizeof(ntfschar) * attr->name_length + 7) & ~7;
 	new_al = malloc(new_al_len);
@@ -130,20 +138,6 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
 		err = ENOMEM;
 		return -1;
-	}
-
-	/* Reisze $ATTRIBUTE_LIST to new length. */
-	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
-	if (!na) {
-		err = errno;
-		Dprintf("%s(): Failed to open $ATTRIBUTE_LIST attribute.\n",
-					__FUNCTION__);
-		goto err_out;
-	}
-	if (ntfs_attr_truncate(na, new_al_len)) {
-		err = errno;
-		Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n", __FUNCTION__);
-		goto err_out;
 	}
 
 	/* Find offset at which insert new entry. */
@@ -162,7 +156,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			err = EIO;
 			Dprintf("%s(): Corrupt attribute name. Run chkdsk.\n",
 						__FUNCTION__);
-			goto rollback;
+			goto err_out;
 		}
 		if (err < 0)
 			continue;
@@ -177,7 +171,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			Dprintf("%s(): Attribute with same type, name and "
 				"lowest vcn already present in attribute "
 				"list.\n", __FUNCTION__);
-			goto rollback;
+			goto err_out;
 		}
 		break;
 	}
@@ -205,6 +199,20 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	memcpy(ale->name, (u8 *)attr + le16_to_cpu(attr->name_offset),
 			attr->name_length * sizeof(ntfschar));
 
+	/* Reisze $ATTRIBUTE_LIST to new length. */
+	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
+	if (!na) {
+		err = errno;
+		Dprintf("%s(): Failed to open $ATTRIBUTE_LIST attribute.\n",
+					__FUNCTION__);
+		goto err_out;
+	}
+	if (ntfs_attr_truncate(na, new_al_len)) {
+		err = errno;
+		Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n", __FUNCTION__);
+		goto err_out;
+	}
+
 	/* Set new runlist. */
 	if (ni->attr_list)
 		free(ni->attr_list);
@@ -214,11 +222,6 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	/* Done! */
 	ntfs_attr_close(na);
 	return 0;
-rollback:
-	if (ntfs_attr_truncate(na, ni->attr_list_size)) {
-		Dprintf("%s(): $ATTRIBUTE_LIST resize failed. Rollback failed. "
-				"Leaving inconsist metadata.\n", __FUNCTION__);
-	}
 err_out:
 	if (na)
 		ntfs_attr_close(na);
