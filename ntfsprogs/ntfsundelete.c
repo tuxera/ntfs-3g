@@ -55,9 +55,7 @@
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
-#ifdef DEBUG
 static const char *UNNAMED   = "<unnamed>";
-#endif
 static const char *NONE      = "<none>";
 static const char *UNKNOWN   = "unknown";
 static struct options opts;
@@ -227,6 +225,7 @@ static void usage (void)
 		"    -d dir      --destination dir  Destination directory\n"
 		"    -b num      --byte num         Fill missing parts with this byte\n"
 		"    -T          --truncate         Truncate 100%% recoverable file to exact size.\n"
+		"    -P          --parent           Show parent directory\n"
 		"\n"
 		"    -c range    --copy range       Write a range of MFT records to a file\n"
 		"\n"
@@ -394,7 +393,7 @@ static int parse_time (const char *value, time_t *since)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fh?m:o:Op:sS:t:Tu:qvV";
+	static const char *sopt = "-b:Cc:d:fh?m:o:OPp:sS:t:Tu:qvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
@@ -408,6 +407,7 @@ static int parse_options (int argc, char *argv[])
 		{ "percentage",  required_argument,	NULL, 'p' },
 		{ "scan",	 no_argument,		NULL, 's' },
 		{ "size",	 required_argument,	NULL, 'S' },
+		{ "parent",	 no_argument,		NULL, 'P' },
 		{ "time",	 required_argument,	NULL, 't' },
 		{ "truncate",	 no_argument,		NULL, 'T' },
 		{ "undelete",	 required_argument,	NULL, 'u' },
@@ -496,6 +496,13 @@ static int parse_options (int argc, char *argv[])
 				opts.optimistic++;
 			} else {
 			        err++;
+			}
+			break;
+		case 'P':
+			if (!opts.parent) {
+				opts.parent++;
+			} else {
+				err++;
 			}
 			break;
 		case 'p':
@@ -633,6 +640,11 @@ static int parse_options (int argc, char *argv[])
 				err++;
 			}
 		}
+
+		if (opts.parent && !opts.verbose) {
+			Eprintf ("To use --parent, you must also use --verbose.\n");
+			err++;
+		}
 	}
 
 	if (opts.fillbyte == (char)-1)
@@ -668,6 +680,10 @@ static void free_file (struct ufile *file)
 		Dprintf ("freeing filename '%s'\n", f->name ? f->name : NONE);
 		if (f->name)
 			free (f->name);
+		if (f->parent_name) {
+			Dprintf ("\tand parent filename '%s'\n", f->parent_name ? f->parent_name : NONE);
+			free (f->parent_name);
+		}
 		free (f);
 	}
 
@@ -683,6 +699,122 @@ static void free_file (struct ufile *file)
 
 	free (file->mft);
 	free (file);
+}
+
+/**
+ * verify_parent - confirm a record is parent of a file
+ * @name:	a filename of the file
+ * @rec:	the mft record of the possible parent
+ *
+ * Check that @rec is the parent of the file represented by @name.
+ * If @rec is a directory, but it is created after @name, then we
+ * can't determine wheter @rec is really @name's parent.
+ *
+ * Return:	@rec's filename, either same name space as @name or lowest space.
+ *		NULL if can't determine parenthood or on error.
+ */
+static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec) {
+	ATTR_RECORD *attr30;
+	FILE_NAME_ATTR *filename_attr = NULL, *lowest_space_name = NULL;
+	ntfs_attr_search_ctx *ctx;
+	int found_same_space = 1;
+
+	if (!name || !rec)
+		return NULL;
+
+	if (!(rec->flags & MFT_RECORD_IS_DIRECTORY)) {
+		return NULL;
+	}
+
+	ctx = ntfs_attr_get_search_ctx(NULL, rec);
+	if (!ctx) {
+		Eprintf ("Couldn't create a search context.\n");
+		return NULL;
+	}
+
+	attr30 = find_attribute(AT_FILE_NAME, ctx);
+	if (!attr30) {
+		return NULL;
+	}
+
+	filename_attr = (FILE_NAME_ATTR*)((char*)attr30 + le16_to_cpu(attr30->value_offset));
+	/* if name is older than this dir -> can't determine */
+	if (ntfs2utc(filename_attr->creation_time) > name->date_c) {
+		return NULL;
+	}
+
+	if (filename_attr->file_name_type != name->name_space) {
+		found_same_space = 0;
+		lowest_space_name = filename_attr;
+
+		while (!found_same_space && (attr30 = find_attribute(AT_FILE_NAME, ctx))) {
+			filename_attr = (FILE_NAME_ATTR*)((char*)attr30 + le16_to_cpu(attr30->value_offset));
+
+			if (filename_attr->file_name_type == name->name_space) {
+				found_same_space = 1;
+			}
+			else {
+				if (filename_attr->file_name_type < lowest_space_name->file_name_type) {
+					lowest_space_name = filename_attr;
+				}
+			}
+		}
+	}
+	
+	ntfs_attr_put_search_ctx(ctx);
+
+	return (found_same_space ? filename_attr : lowest_space_name);
+}
+
+/**
+ * get_parent_name - Find the name of a file's parent.
+ * @name:	the filename whose parent's name to find
+ *
+ */
+static void get_parent_name(struct filename* name, ntfs_volume* vol) {
+	ntfs_attr* mft_data;
+	MFT_RECORD* rec;
+	FILE_NAME_ATTR* filename_attr;
+	long long inode_num;
+
+	if (!name || !vol)
+		return;
+	
+	rec = calloc(1, vol->mft_record_size);
+	if (!rec) {
+		Eprintf ("Couldn't allocate memory in get_parent_name()\n");
+		return;
+	}
+
+	mft_data = ntfs_attr_open(vol->mft_ni, AT_DATA, NULL, 0);
+	if (!mft_data) {
+		Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+	}
+	else {
+		inode_num = MREF(name->parent_mref);
+
+		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num, vol->mft_record_size, rec) < 1) {
+			Eprintf ("Couldn't read MFT Record %lld.\n", inode_num);
+		}
+		else {
+			if ((filename_attr = verify_parent(name, rec))) {
+				if (ntfs_ucstombs(filename_attr->file_name, filename_attr->file_name_length, &name->parent_name, 0) < 0) {
+					Dprintf ("Couldn't translate filename to current locale.\n");
+					name->parent_name = NULL;
+				}
+			}
+		}
+	}
+
+	if (mft_data) {
+		ntfs_attr_close(mft_data);
+	}
+
+	if (rec) {
+		free(rec);
+	}
+
+	return;
 }
 
 /**
@@ -704,7 +836,7 @@ static void free_file (struct ufile *file)
  * Return:  n  The number of $FILENAME attributes found
  *	   -1  Error
  */
-static int get_filenames (struct ufile *file)
+static int get_filenames (struct ufile *file, ntfs_volume* vol)
 {
 	ATTR_RECORD *rec;
 	FILE_NAME_ATTR *attr;
@@ -748,8 +880,16 @@ static int get_filenames (struct ufile *file)
 			Dprintf ("Couldn't translate filename to current locale.\n");
 		}
 
+		name->parent_name = NULL;
+
+		if (opts.parent) {
+			name->parent_mref = attr->parent_directory;
+			get_parent_name(name, vol);
+		}
+
 		if (name->name_space < space) {
 			file->pref_name = name->name;
+			file->pref_pname = name->parent_name;
 			space = name->name_space;
 		}
 
@@ -915,7 +1055,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 	if (attr90)
 		file->directory = 1;
 
-	if (get_filenames (file) < 0) {
+	if (get_filenames (file, vol) < 0) {
 		Eprintf ("Couldn't get filenames.\n");
 	}
 	if (get_data (file, vol) < 0) {
@@ -1105,7 +1245,13 @@ static void dump_record (struct ufile *file)
 		    FILE_ATTR_COMPRESSED | FILE_ATTR_ENCRYPTED))) {
 			Qprintf (NONE);
 		}
+
 		Qprintf ("\n");
+
+		if (opts.parent) {
+			Qprintf ("Parent: %s\n", f->parent_name ? f->parent_name : "<non-determined>");
+		}
+
 		Qprintf ("Size alloc: %lld\n", f->size_alloc);
 		Qprintf ("Size data: %lld\n", f->size_data);
 
