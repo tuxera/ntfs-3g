@@ -196,6 +196,8 @@ static int parse_options (int argc, char **argv)
 
 
 struct ntfs_dir;
+static void ntfs_ie_dump (INDEX_ENTRY *ie);
+static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype);
 
 /**
  * struct bmp_page
@@ -678,7 +680,65 @@ static struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int n
 			//printf ("recurse\n");
 			res = ntfs_dt_find2 (dt->sub_nodes[i], name, name_len, index_num);
 		} else {
-			//printf ("error collating name\n");
+			printf ("error collating name\n");
+		}
+		break;
+	}
+
+	return res;
+}
+
+/**
+ * ntfs_dt_find3
+ */
+static struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
+{
+	struct ntfs_dt *res = NULL;
+	INDEX_ENTRY *ie;
+	int i;
+	int r;
+
+	if (!dt || !name)
+		return NULL;
+
+	//printf ("child_count = %d\n", dt->child_count);
+	for (i = 0; i < dt->child_count; i++) {
+		ie = dt->children[i];
+
+		if (ie->flags & INDEX_ENTRY_END) {
+			r = -1;
+		} else {
+			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
+			r = ntfs_names_collate (name, name_len,
+						ie->key.file_name.file_name,
+						ie->key.file_name.file_name_length,
+						2, IGNORE_CASE,
+						dt->dir->vol->upcase,
+						dt->dir->vol->upcase_len);
+		}
+
+		//printf ("%d, %d\n", i, r);
+
+		if (r == 1) {
+			//printf ("keep searching\n");
+			continue;
+		} else if (r == 0) {
+			res = dt;
+			//printf ("match %p\n", res);
+			if (index_num)
+				*index_num = i;
+		} else if (r == -1) {
+			if (ie->flags & INDEX_ENTRY_NODE) {
+				//printf ("recurse\n");
+				res = ntfs_dt_find3 (dt->sub_nodes[i], name, name_len, index_num);
+			} else {
+				//printf ("no match\n");
+				res = dt;
+				if (index_num)
+					*index_num = i;
+			}
+		} else {
+			printf ("error collating name\n");
 		}
 		break;
 	}
@@ -1114,6 +1174,102 @@ done:
 
 
 /**
+ * ntfs_dt_add_alloc
+ */
+static int ntfs_dt_add_alloc (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie)
+{
+	INDEX_BLOCK *block;
+	int need;
+	int space;
+	u8 *src;
+	u8 *dst;
+	int len;
+
+	if (!parent || !ie)
+		return 0;
+
+	block = (INDEX_BLOCK*) parent->data;
+
+	need  = ie->length;
+	space = parent->data_len - block->index.index_length - 24;
+
+	printf ("need %d, have %d\n", need, space);
+	if (ie->length > space) {
+		printf ("no room");
+		return 0;
+	}
+
+	//printf ("[01;31m--------------------------------------------------------------------------------\n");
+	//utils_dump_mem (parent->data, 0, parent->data_len, 1);
+	//printf ("\n");
+
+	src = (u8*) parent->children[index_num];
+	dst = src + need;
+	len = parent->data + parent->data_len - src - space;
+	//printf ("src = %d\n", src - parent->data);
+	//printf ("dst = %d\n", dst - parent->data);
+	//printf ("len = %d\n", len);
+
+	memmove (dst, src, len);
+
+	dst = src;
+	src = (u8*) ie;
+	len = need;
+
+	memcpy (dst, src, len);
+
+	block->index.index_length += len;
+
+	dst = parent->data + block->index.index_length + 24;
+	len = parent->data_len - block->index.index_length - 24;
+
+	memset (dst, 0, len);
+
+	//printf ("[01;33m--------------------------------------------------------------------------------\n");
+	//utils_dump_mem (parent->data, 0, parent->data_len, 1);
+	//printf ("[0m\n");
+	return 0;
+}
+
+/**
+ * ntfs_dt_add_root
+ */
+static int ntfs_dt_add_root (struct ntfs_dt *parent, struct ntfs_dt *child)
+{
+	return 0;
+}
+
+/**
+ * ntfs_dt_add
+ */
+static int ntfs_dt_add (struct ntfs_dt *parent, INDEX_ENTRY *ie)
+{
+	FILE_NAME_ATTR *file;
+	struct ntfs_dt *dt;
+	int index_num = -1;
+
+	if (!ie)
+		return 0;
+
+	file = &ie->key.file_name;
+
+	dt = ntfs_dt_find3 (parent, file->file_name, file->file_name_length, &index_num);
+	if (!dt)
+		return 0;
+
+	//printf ("dt = %p, index = %d\n", dt, index_num);
+	//ntfs_ie_dump (dt->children[index_num]);
+	utils_dump_mem ((u8*)dt->children[index_num], 0, dt->children[index_num]->length, 1);
+	printf ("\n");
+
+	ntfs_dt_add_alloc (dt, index_num, ie);
+
+	if (0) ntfs_dt_add_root (parent, NULL);
+	return 0;
+}
+
+
+/**
  * ntfs_dt_remove_alloc
  */
 static int ntfs_dt_remove_alloc (struct ntfs_dt *dt, int index_num)
@@ -1361,7 +1517,6 @@ static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
 		return ntfs_dt_remove_root (dt, index_num);
 }
 
-
 /**
  * ntfs_dt_del_child
  */
@@ -1480,6 +1635,7 @@ close:
 
 	return res;
 }
+
 
 /**
  * ntfsrm
@@ -1908,6 +2064,9 @@ static int ntfs_index_dump (ntfs_inode *inode)
 	int size;
 	VCN *vcn;
 
+	if (!inode)
+		return 0;
+
 	iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT, I30, 4);
 	ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
 
@@ -1938,6 +2097,77 @@ static int ntfs_index_dump (ntfs_inode *inode)
 		ptr += entry->length;
 	}
 	printf ("fill = %d\n", ptr - buffer);
+	return 0;
+}
+
+
+/**
+ * ntfsadd
+ */
+static int ntfsadd (ntfs_volume *vol, char *name)
+{
+	struct ntfs_dir *dir = NULL;
+	struct ntfs_dir *finddir = NULL;
+	struct ntfs_dt *del = NULL;
+	INDEX_ENTRY *ie = NULL;
+	MFT_REF mft_num;
+	ntfschar *uname = NULL;
+	int len;
+	int index_num = 0;
+
+	dir = ntfs_dir_alloc (vol, FILE_root);
+	if (!dir)
+		return 1;
+
+	mft_num = utils_pathname_to_mftref (vol, dir, name, &finddir);
+	//printf ("mft_num = %lld\n", mft_num);
+	//ntfs_dir_print (finddir, 0);
+
+	if (!finddir) {
+		printf ("Couldn't find the index entry for %s\n", name);
+		return 1;
+	}
+
+	if (rindex (name, PATH_SEP))
+		name = rindex (name, PATH_SEP) + 1;
+
+	len = ntfs_mbstoucs (name, &uname, 0);
+	if (len < 0)
+		return 1;
+
+	del = ntfs_dt_find2 (finddir->index, uname, len, &index_num);
+	if (!del) {
+		printf ("can't find item to delete\n");
+		goto done;
+	}
+
+	ie = ntfs_ie_copy (del->children[index_num]);
+	if (!ie)
+		goto done;
+
+	free (uname);
+	uname = NULL;
+
+	len = ntfs_mbstoucs ("file26a", &uname, 0);
+	if (len < 0)
+		goto done;
+
+	ie = ntfs_ie_set_name (ie, uname, len, FILE_NAME_WIN32);
+	if (!ie)
+		goto done;
+
+	utils_dump_mem ((u8*)ie, 0, ie->length, 1);
+	printf ("\n");
+	//printf ("ie = %lld\n", MREF (ie->indexed_file));
+	//ntfs_dt_del_child (finddir->index, uname, len);
+
+	//ntfs_dt_print (finddir->index, 0);
+	ntfs_dt_add (finddir->index, ie);
+
+done:
+	ntfs_dir_free (dir);
+	free (uname);
+	free (ie);
 	return 0;
 }
 
@@ -1988,6 +2218,7 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_index_dump (inode);
 	if (0) result = ntfsrm (vol, opts.file);
 	if (0) result = ntfs_ie_test();
+	if (1) result = ntfsadd (vol, opts.file);
 
 done:
 	ntfs_inode_close (inode);
