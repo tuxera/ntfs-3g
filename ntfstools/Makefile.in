@@ -98,10 +98,12 @@ all_libraries = @all_libraries@
 @REALLYSTATIC_FALSE@LINK = @REALLYSTATIC_FALSE@$(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 
 bin_PROGRAMS = ntfsfix ntfsinfo
-sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete
-EXTRA_PROGRAMS = ntfsresize ntfsdump_logfile dumplog ntfswipe
+sbin_PROGRAMS = mkntfs ntfslabel ntfsundelete ntfsresize
+EXTRA_PROGRAMS = ntfsdump_logfile dumplog ntfswipe
 
-man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 ntfsundelete.8
+man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 ntfsundelete.8 \
+			  ntfsresize.8
+
 EXTRA_MANS = 
 
 CLEANFILES = $(EXTRA_PROGRAMS)
@@ -131,15 +133,15 @@ ntfsundelete_SOURCES = ntfsundelete.c ntfsundelete.h
 ntfsundelete_LDADD = $(AM_LIBS)
 ntfsundelete_LDFLAGS = $(AM_LFLAGS)
 
+ntfsresize_SOURCES = ntfsresize.c
+ntfsresize_LDADD = $(AM_LIBS)
+ntfsresize_LDFLAGS = $(AM_LFLAGS)
+
 # We don't distribute these
 
 ntfswipe_SOURCES = ntfswipe.c ntfswipe.h
 ntfswipe_LDADD = $(AM_LIBS)
 ntfswipe_LDFLAGS = $(AM_LFLAGS)
-
-ntfsresize_SOURCES = ntfsresize.c
-ntfsresize_LDADD = $(AM_LIBS)
-ntfsresize_LDFLAGS = $(AM_LFLAGS)
 
 ntfsdump_logfile_SOURCES = ntfsdump_logfile.c
 ntfsdump_logfile_LDADD = $(AM_LIBS)
@@ -151,20 +153,15 @@ dumplog_LDFLAGS = $(AM_LFLAGS)
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = ../config.h
 CONFIG_CLEAN_FILES =  mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
-ntfsundelete.8
+ntfsundelete.8 ntfsresize.8
 bin_PROGRAMS =  ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT)
 sbin_PROGRAMS =  mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
-ntfsundelete$(EXEEXT)
+ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT)
 PROGRAMS =  $(bin_PROGRAMS) $(sbin_PROGRAMS)
 
 
 DEFS = @DEFS@ -I. -I$(srcdir) -I..
 LIBS = @LIBS@
-ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
-@REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
-@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
-@REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES =  \
-@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 ntfsdump_logfile_OBJECTS =  ntfsdump_logfile.$(OBJEXT)
 @REALLYSTATIC_FALSE@ntfsdump_logfile_DEPENDENCIES =  \
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
@@ -206,6 +203,11 @@ ntfsundelete_OBJECTS =  ntfsundelete.$(OBJEXT)
 @REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
 @REALLYSTATIC_TRUE@ntfsundelete_DEPENDENCIES =  \
 @REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
+ntfsresize_OBJECTS =  ntfsresize.$(OBJEXT)
+@REALLYSTATIC_FALSE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_FALSE@$(top_srcdir)/libntfs/libntfs.la
+@REALLYSTATIC_TRUE@ntfsresize_DEPENDENCIES =  \
+@REALLYSTATIC_TRUE@$(top_srcdir)/libntfs/.libs/libntfs.a
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
@@ -214,7 +216,7 @@ MANS = $(man_MANS)
 
 NROFF = nroff
 DIST_COMMON =  Makefile.am Makefile.in mkntfs.8.in ntfsfix.8.in \
-ntfsinfo.8.in ntfslabel.8.in ntfsundelete.8.in
+ntfsinfo.8.in ntfslabel.8.in ntfsresize.8.in ntfsundelete.8.in
 
 
 DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
@@ -225,8 +227,8 @@ DEP_FILES =  .deps/attrdef.P .deps/boot.P .deps/dumplog.P .deps/mkntfs.P \
 .deps/ntfsdump_logfile.P .deps/ntfsfix.P .deps/ntfsinfo.P \
 .deps/ntfslabel.P .deps/ntfsresize.P .deps/ntfsundelete.P \
 .deps/ntfswipe.P .deps/sd.P .deps/upcase.P
-SOURCES = $(ntfsresize_SOURCES) $(ntfsdump_logfile_SOURCES) $(dumplog_SOURCES) $(ntfswipe_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(mkntfs_SOURCES) $(ntfslabel_SOURCES) $(ntfsundelete_SOURCES)
-OBJECTS = $(ntfsresize_OBJECTS) $(ntfsdump_logfile_OBJECTS) $(dumplog_OBJECTS) $(ntfswipe_OBJECTS) $(ntfsfix_OBJECTS) $(ntfsinfo_OBJECTS) $(mkntfs_OBJECTS) $(ntfslabel_OBJECTS) $(ntfsundelete_OBJECTS)
+SOURCES = $(ntfsdump_logfile_SOURCES) $(dumplog_SOURCES) $(ntfswipe_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(mkntfs_SOURCES) $(ntfslabel_SOURCES) $(ntfsundelete_SOURCES) $(ntfsresize_SOURCES)
+OBJECTS = $(ntfsdump_logfile_OBJECTS) $(dumplog_OBJECTS) $(ntfswipe_OBJECTS) $(ntfsfix_OBJECTS) $(ntfsinfo_OBJECTS) $(mkntfs_OBJECTS) $(ntfslabel_OBJECTS) $(ntfsundelete_OBJECTS) $(ntfsresize_OBJECTS)
 
 all: all-redirect
 .SUFFIXES:
@@ -247,6 +249,8 @@ ntfslabel.8: $(top_builddir)/config.status ntfslabel.8.in
 ntfsinfo.8: $(top_builddir)/config.status ntfsinfo.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 ntfsundelete.8: $(top_builddir)/config.status ntfsundelete.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfsresize.8: $(top_builddir)/config.status ntfsresize.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 
 mostlyclean-binPROGRAMS:
@@ -337,10 +341,6 @@ distclean-libtool:
 
 maintainer-clean-libtool:
 
-ntfsresize$(EXEEXT): $(ntfsresize_OBJECTS) $(ntfsresize_DEPENDENCIES)
-	@rm -f ntfsresize$(EXEEXT)
-	$(LINK) $(ntfsresize_LDFLAGS) $(ntfsresize_OBJECTS) $(ntfsresize_LDADD) $(LIBS)
-
 ntfsdump_logfile$(EXEEXT): $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_DEPENDENCIES)
 	@rm -f ntfsdump_logfile$(EXEEXT)
 	$(LINK) $(ntfsdump_logfile_LDFLAGS) $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_LDADD) $(LIBS)
@@ -372,6 +372,10 @@ ntfslabel$(EXEEXT): $(ntfslabel_OBJECTS) $(ntfslabel_DEPENDENCIES)
 ntfsundelete$(EXEEXT): $(ntfsundelete_OBJECTS) $(ntfsundelete_DEPENDENCIES)
 	@rm -f ntfsundelete$(EXEEXT)
 	$(LINK) $(ntfsundelete_LDFLAGS) $(ntfsundelete_OBJECTS) $(ntfsundelete_LDADD) $(LIBS)
+
+ntfsresize$(EXEEXT): $(ntfsresize_OBJECTS) $(ntfsresize_DEPENDENCIES)
+	@rm -f ntfsresize$(EXEEXT)
+	$(LINK) $(ntfsresize_LDFLAGS) $(ntfsresize_OBJECTS) $(ntfsresize_LDADD) $(LIBS)
 
 install-man8:
 	$(mkinstalldirs) $(DESTDIR)$(man8dir)
