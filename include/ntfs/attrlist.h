@@ -32,4 +32,20 @@ extern int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len);
 extern int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr);
 extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
 
+/**
+ * ntfs_attrlist_mark_dirty - set the attribute list dirty
+ * @ni:		ntfs inode which base inode contain dirty attribute list
+ *
+ * Set the attribute list dirty so it is written out later (at the latest at
+ * ntfs_inode_close() time).
+ *
+ * This function cannot fail.
+ */
+static __inline__ void ntfs_attrlist_mark_dirty(ntfs_inode *ni) {
+	if (ni->nr_extents == -1)
+		NInoAttrListSetDirty(ni->base_ni);
+	else
+		NInoAttrListSetDirty(ni);
+}
+
 #endif /* defined _NTFS_ATTRLIST_H */
