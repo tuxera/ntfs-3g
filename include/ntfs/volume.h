@@ -70,6 +70,7 @@ extern int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags);
 typedef enum {
 	NV_ReadOnly,		/* 1: Volume is read-only. */
 	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
+	NV_LogFileEmpty,	/* 1: $logFile journal is empty. */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -83,6 +84,10 @@ typedef enum {
 #define NVolCaseSensitive(nv)		 test_nvol_flag(nv, CaseSensitive)
 #define NVolSetCaseSensitive(nv)	  set_nvol_flag(nv, CaseSensitive)
 #define NVolClearCaseSensitive(nv)	clear_nvol_flag(nv, CaseSensitive)
+
+#define NVolLogFileEmpty(nv)		 test_nvol_flag(nv, LogFileEmpty)
+#define NVolSetLogFileEmpty(nv)		  set_nvol_flag(nv, LogFileEmpty)
+#define NVolClearLogFileEmpty(nv)	clear_nvol_flag(nv, LogFileEmpty)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.
