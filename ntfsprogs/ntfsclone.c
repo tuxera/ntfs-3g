@@ -62,6 +62,7 @@ struct {
 	int std_out;
 	int blkdev_out;		/* output file is block device */   
 	int metadata_only;
+	int ignore_fs_check;
 	int save_image;
 	int restore_image;
 	char *output;
@@ -215,6 +216,7 @@ static void usage(void)
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"    -s, --save-image       Save to the special image format\n"
 		"    -r, --restore-image    Restore from the special image format\n"
+		"        --ignore-fs-check  Ignore the filesystem check\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
@@ -234,15 +236,16 @@ static void parse_options(int argc, char **argv)
 	static const char *sopt = "-dfhmo:O:rs";
 	static const struct option lopt[] = {
 #ifdef DEBUG
-		{ "debug",	   no_argument,		NULL, 'd' },
+		{ "debug",	      no_argument,	 NULL, 'd' },
 #endif
-		{ "force",	   no_argument,		NULL, 'f' },
-		{ "help",	   no_argument,		NULL, 'h' },
-		{ "metadata",	   no_argument,		NULL, 'm' },
-		{ "output",	   required_argument,	NULL, 'o' },
-		{ "overwrite",	   required_argument,	NULL, 'O' },
-		{ "restore-image", no_argument,		NULL, 'r' },
-		{ "save-image",	   no_argument,		NULL, 's' },
+		{ "force",	      no_argument,	 NULL, 'f' },
+		{ "help",	      no_argument,	 NULL, 'h' },
+		{ "metadata",	      no_argument,	 NULL, 'm' },
+		{ "output",	      required_argument, NULL, 'o' },
+		{ "overwrite",	      required_argument, NULL, 'O' },
+		{ "restore-image",    no_argument,	 NULL, 'r' },
+		{ "ignore-fs-check",  no_argument,	 NULL, 'C' },
+		{ "save-image",	      no_argument,	 NULL, 's' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -279,6 +282,9 @@ static void parse_options(int argc, char **argv)
 		case 'r':
 			opt.restore_image++;
 			break;
+		case 'C':
+			opt.ignore_fs_check++;
+			break;
 		case 's':
 			opt.save_image++;
 			break;
@@ -311,6 +317,10 @@ static void parse_options(int argc, char **argv)
 	
 	if (opt.metadata_only && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
+
+	if (opt.ignore_fs_check && !opt.metadata_only)
+		err_exit("Filesystem check can be ignored only for metadata "
+			 "cloning!\n");
 
 	if (opt.save_image && opt.restore_image)
 		err_exit("Saving and restoring an image at the same time "
@@ -405,6 +415,7 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 			return rl->length;
 
 		if (image->ctx->attr->type == AT_DATA) {
+
 			/* Save at least the first 8 KiB of FILE_LogFile */
 			s64 s = (s64)8192 - rl->vcn * vol->cluster_size;
 			if (s > 0) {
@@ -487,7 +498,7 @@ static void lseek_to_cluster(s64 lcn)
 
 	if (opt.std_out || opt.save_image)
 		return;
-	
+
 	if (lseek(fd_out, pos, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek output");
 }
@@ -780,6 +791,11 @@ static void compare_bitmaps(struct bitmap *a)
 				bit = ntfs_bit_get(a->bm, cl);
 				if (bit == ntfs_bit_get(bm, i * 8 + cl % 8))
 					continue;
+				
+				if (opt.ignore_fs_check) {
+					lseek_to_cluster(cl);
+					copy_cluster();
+				}
 
 				if (++mismatch > 10)
 					continue;
@@ -794,8 +810,12 @@ static void compare_bitmaps(struct bitmap *a)
 	}
 
 	if (mismatch) {
-		Printf("Totally %d cluster accounting mismatches.\n", 
-		       mismatch);
+		Printf("Totally %d cluster accounting mismatches.\n", mismatch);
+		if (opt.ignore_fs_check) {
+			Printf("WARNING: The NTFS inconsistency was overruled "
+			       "by the --ignore-fs-check option.\n");
+			return;
+		}
 		err_exit("Filesystem check failed! Windows wasn't shutdown "
 			 "properly or inconsistent\nfilesystem. Please run "
 			 "chkdsk on Windows.\n");
