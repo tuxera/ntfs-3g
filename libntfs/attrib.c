@@ -2121,6 +2121,25 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			goto put_err_out;
 		}
+		/*
+		 * If the attribute now has zero size, need to convert it to a
+		 * resident attribute.
+		 */
+		if (!newsize) {
+			// TODO: Perform the conversion! (AIA)
+
+			/* Update the ntfs attribute structure accordingly. */
+/*
+			na->allocated_size = na->data_size =
+					na->initialized_size = newsize;
+			if (NAttrCompressed(na) || NAttrSparse(na))
+				na->compressed_size = newsize;
+			NAttrClearNonResident(na);
+			free(na->rl);
+			na->rl = NULL;
+			goto done;
+*/
+		}
 		/* Truncate the runlist itself. */
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
 			// FIXME: Eeek! We need rollback! (AIA)
@@ -2213,6 +2232,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->initialized_size = newsize;
 		a->initialized_size = scpu_to_le64(newsize);
 	}
+done:
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
