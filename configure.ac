@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.4-WIP, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.4, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])
@@ -65,7 +65,7 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
-AC_PROG_RANLIB
+AC_PROG_LIBTOOL
 
 AC_ARG_ENABLE(gnome-vfs,
 	[  --disable-gnome-vfs     Omit Gnome-VFS-2.0 'libntfs' interface (default=detect)], ,
@@ -88,18 +88,6 @@ if test "$enable_gnome_vfs" != "no"; then
 	])
 fi
 AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
-
-# create a working libtool-script
-if test -z "$LIBTOOL"; then
-  AC_LANG_PUSH(C)
-  AM_PROG_LIBTOOL
-  #LIBTOOL="$LIBTOOL --silent"
-  AC_LANG_POP
-  AC_SUBST(LIBTOOL_DEPS)
-  LIBTOOL_SHELL='/bin/sh ./libtool'
-else
-  LIBTOOL_SHELL=$LIBTOOL
-fi
 
 # add --with-extra-includes and --with-extra-libs switch to ./configure
 all_libraries="$all_libraries $USER_LDFLAGS"
