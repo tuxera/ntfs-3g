@@ -2,7 +2,7 @@
 * libntfs-gnomevfs *
 ********************
 
-Be generic GnomeVFS filter; how to redirect ntfs_mount(3) to GnomeVFS parent?
+- be generic filter: provide ntfs_device_operations from parent GnomeVFSHandle
 
 ***********
 * libntfs *

@@ -67,22 +67,29 @@ if test "$USE_MAINTAINER_MODE" = "yes";then
 fi
 
 # Checks for programs.
-AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
-AM_PATH_GLIB_2_0(,,[AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 library.])],[gmodule gobject])
-dnl Force glib-2.0 for the whole package
-LIBNTFS_GNOMEVFS_CFLAGS="$CFLAGS $GLIB_CFLAGS"
-LIBNTFS_GNOMEVFS_LIBS="$LIBS $GLIB_LIBS"
-
-PKG_CHECK_MODULES(GNOME_VFS_MODULE,gnome-vfs-module-2.0)
-dnl Force gnome-vfs-module-2.0 for the whole package
-LIBNTFS_GNOMEVFS_CFLAGS="$LIBNTFS_GNOMEVFS_CFLAGS $CFLAGS $GNOME_VFS_MODULE_CFLAGS"
-LIBNTFS_GNOMEVFS_LIBS="$LIBNTFS_GNOMEVFS_LIBS $LIBS $GNOME_VFS_MODULE_LIBS"
+AC_ARG_ENABLE(gnome-vfs,
+	[  --disable-gnome-vfs     Omit Gnome-VFS-2.0 'libntfs' interface (default=detect)], ,
+	enable_gnome_vfs=auto
+)
+compile_gnome_vfs=false
+if test "$enable_gnome_vfs" != "no";then
+	PKG_CHECK_MODULES(LIBNTFS_GNOMEVFS, [glib-2.0 gthread-2.0 gnome-vfs-module-2.0],
+	[ compile_gnome_vfs=true ],
+	[
+		if test "$enable_gnome_vfs" = "yes";then
+			AC_MSG_ERROR([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
+		else
+			AC_MSG_WARN([Linux-NTFS Gnome VFS module requires glib-2.0 and gnome-vfs-module-2.0 librares.])
+		fi
+	])
+fi
+AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
 
 # create a working libtool-script
 if test -z "$LIBTOOL"; then
