@@ -46,7 +46,8 @@
  *	EINVAL	- Invalid argumets passed to function or attribute haven't got
  *		  attribute list.
  */
-int ntfs_attrlist_need(ntfs_inode *ni) {
+int ntfs_attrlist_need(ntfs_inode *ni)
+{
 	ATTR_LIST_ENTRY *ale;
 
 	if (!ni) {
@@ -113,34 +114,57 @@ int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 	/* Make attribute list length 8 byte aligment. */
 	new_al_len = (new_al_len + 7) & ~7;
 
-	/* Resize $ATTRIBUTE_LIST attribute. */
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, 0, 0);
 	if (!na) {
 		err = errno;
 		Dprintf("%s(): Coudn't open $ATTRIBUTE_LIST.\n", __FUNCTION__);
 		goto err_out;
 	}
+	/*
+	 * Setup im-memory attribute list. We need this to perform attribute
+	 * truncate (we need update attribute list in case other attributes
+	 * will be moved away from their current MFT record).
+	 */
+	if (NInoAttrList(ni) && ni->attr_list)
+		free(ni->attr_list);
+	ni->attr_list = new_al;
+	ni->attr_list_size = new_al_len;
+	NInoSetAttrList(ni);
+	NInoAttrListSetDirty(ni);
+	/* Resize $ATTRIBUTE_LIST attribute. */
 	if (ntfs_attr_truncate(na, new_al_len)) {
-		if (errno == ENOSPC) {
-			// FIXME: Free space in mft record and try again.
-			err = ENOTSUP;
-			goto err_out;
-		} else {
-			err = errno;
-			Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n",
-						__FUNCTION__);
-			goto err_out;
-		}
+		/*
+		 * FIXME: We leave new attribute list. But need to restore old
+		 * and update in it records for moved attributes. Difficult to
+		 * do if we haven't attribute list before truncate and records
+		 * were moved.
+		 */
+		err = errno;
+		Dprintf("%s(): Eeek! $ATTRIBUTE_LIST resize failed. Probably "
+			"leaving inconsist metadata.\n", __FUNCTION__);
+		goto err_out;
 	}
 
-	/* Update ntfs inode. */
+	/* Update in-memory ntfs inode. */
 	if (NAttrNonResident(na)) {
 		/* Create copy of new runlist. */
 		if (ntfs_attr_map_whole_runlist(na)) {
-			Dprintf("%s(): Failed to map runlist.\n", __FUNCTION__);
+			/*
+			 * FIXME: Probably leaving inconsist na->attr_list_rl.
+			 * What shall we do here? We can't simply restore old
+			 * attribute list, because attributes maybe moved. But
+			 * we can't get runlist for new attribute list so we
+			 * can't update in-memory structs.
+			 */
+			Dprintf("%s(): Failed to map runlist. Probably leaving "
+				"inconsist na->attr_list_rl.\n", __FUNCTION__);
 			if (ntfs_attr_truncate(na, ni->attr_list_size))
 				Dprintf("%s(): Rollback failed. Leaving "
 					"inconsist metadata.\n", __FUNCTION__);
+			if (NAttrNonResident(na))
+				NInoSetAttrListNonResident(ni);
+			else
+				NInoClearAttrListNonResident(ni);
 			err = EIO;
 			goto err_out;
 		}
@@ -149,10 +173,22 @@ int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 		rl_size = (rl_size * sizeof(runlist_element) + 0xfff) & ~0xfff;	
 		rl = malloc(rl_size);
 		if (!rl) {
-			Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
+			/*
+			 * FIXME: Probably leaving inconsist na->attr_list_rl.
+			 * What shall we do here? We can't simply restore old
+			 * attribute list, because attributes maybe moved. But
+			 * we can't get runlist for new attribute list so we
+			 * can't update in-memory structs.
+			 */
+			Dprintf("%s(): Not enough memory. Probably leaving "
+				"inconsist na->attr_list_rl.\n", __FUNCTION__);
 			if (ntfs_attr_truncate(na, ni->attr_list_size))
 				Dprintf("%s(): Rollback failed. Leaving "
 					"inconsist metadata.\n", __FUNCTION__);
+			if (NAttrNonResident(na))
+				NInoSetAttrListNonResident(ni);
+			else
+				NInoClearAttrListNonResident(ni);
 			err = ENOMEM;
 			goto err_out;
 		}
@@ -169,12 +205,8 @@ int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 		}
 	}
 
-	if (ni->attr_list)
-		free(ni->attr_list);
-	ni->attr_list = new_al;
-	ni->attr_list_size = new_al_len;
-	NInoSetAttrList(ni);
-	NInoAttrListSetDirty(ni);
+	/* Done! */
+	ntfs_attr_close(na);
 	return 0;
 err_out:
 	if (na)
