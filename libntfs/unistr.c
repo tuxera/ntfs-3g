@@ -120,8 +120,10 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 #endif
 	for (cnt = 0; cnt < min(name1_len, name2_len); ++cnt)
 	{
-		c1 = le16_to_cpu(*name1++);
-		c2 = le16_to_cpu(*name2++);
+		c1 = le16_to_cpu(*name1);
+		name1++;
+		c2 = le16_to_cpu(*name2);
+		name2++;
 		if (ic) {
 			if (c1 < upcase_len)
 				c1 = le16_to_cpu(upcase[c1]);
