@@ -422,8 +422,8 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 		if (image->ctx->attr->type == AT_DATA) {
 
-			/* Save at least the first 8 KiB of FILE_LogFile */
-			s64 s = (s64)8192 - rl->vcn * vol->cluster_size;
+			/* Save at least the first 16 KiB of FILE_LogFile */
+			s64 s = (s64)16384 - rl->vcn * vol->cluster_size;
 			if (s > 0) {
 				s = rounded_up_division(s, vol->cluster_size);
 				if (rl->length < s)
@@ -699,6 +699,27 @@ static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 	wiped_resident_data += n;
 }
 
+static void clone_logfile_parts(ntfs_walk_clusters_ctx *image, runlist *rl)
+{
+	s64 offset = 0, lcn, vcn;
+	
+	while (1) {
+
+		vcn = offset / image->ni->vol->cluster_size;
+		lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
+		if (lcn < 0)
+			break;
+
+		lseek_to_cluster(lcn);
+		copy_cluster();
+
+		if (offset == 0)
+			offset = NTFS_BLOCK_SIZE >> 1;
+		else
+			offset <<= 1;
+	}
+}
+
 static void walk_runs(struct ntfs_walk_cluster *walk)
 {
 	int i, j;
@@ -747,6 +768,10 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 		walk->image->inuse += lcn_length;
 	}
+	if (!wipe && !opt.std_out && opt.metadata_only &&
+	    walk->image->ni->mft_no == FILE_LogFile &&
+	    walk->image->ctx->attr->type == AT_DATA)
+		clone_logfile_parts(walk->image, rl);
 	
 	free(rl);
 }
