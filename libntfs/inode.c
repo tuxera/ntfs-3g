@@ -624,9 +624,9 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	/* Free space if there is not enough it for $ATTRIBUTE_LIST. */
 	if (le32_to_cpu(ni->mrec->bytes_allocated) -
 			le32_to_cpu(ni->mrec->bytes_in_use) <
-			offsetof(ATTR_RECORD, resident_attr_end)) {
+			offsetof(ATTR_RECORD, resident_end)) {
 		if (ntfs_inode_free_space(ni,
-				offsetof(ATTR_RECORD, resident_attr_end))) {
+				offsetof(ATTR_RECORD, resident_end))) {
 			/* Failed to free space. */
 			err = errno;
 			Dprintf("%s(): Failed to free space for "
@@ -917,17 +917,17 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 			goto err_out;
 		}
 		/* Attribute can't be resident. */
-		attr_rec_size = offsetof(ATTR_RECORD, non_resident_attr_end) +
+		attr_rec_size = offsetof(ATTR_RECORD, non_resident_end) +
 				((name_len * sizeof(ntfschar) + 7) & ~7) + 8;
 	} else {
 		/* Attribute can be resident. */
-		attr_rec_size = offsetof(ATTR_RECORD, resident_attr_end) +
+		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
 			((name_len * sizeof(ntfschar) + 7) & ~7);
 		/* Check whether attribute will fit into the MFT record. */
 		if (size + attr_rec_size >= ni->vol->mft_record_size)
 			/* Will not fit, make it non resident. */
 			attr_rec_size = offsetof(ATTR_RECORD,
-					non_resident_attr_end) + ((name_len *
+					non_resident_end) + ((name_len *
 					sizeof(ntfschar) + 7) & ~7) + 8;
 	}
 
@@ -973,7 +973,7 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 add_attr_record:
-	if (attr_rec_size == offsetof(ATTR_RECORD, resident_attr_end)) {
+	if (attr_rec_size == offsetof(ATTR_RECORD, resident_end)) {
 		/* Add resident attribute. */
 		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
 				name_len, 0);

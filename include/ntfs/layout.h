@@ -709,9 +709,9 @@ typedef struct {
 /* 22 */		RESIDENT_ATTR_FLAGS resident_flags; /* See above. */
 /* 23 */		s8 reservedR;	    /* Reserved/alignment to 8-byte
 					       boundary. */
-/* 24 */		void *resident_attr_end[0]; /* Use offsetof(
-					ATTR_RECORD, resident_attr_end) to
-					get size of resident attribute. */
+/* 24 */		void *resident_end[0]; /* Use offsetof(ATTR_RECORD,
+						  resident_end) to get size of
+						  a resident attribute. */
 		} __attribute__ ((__packed__));
 		/* Non-resident attributes. */
 		struct {
@@ -755,19 +755,19 @@ typedef struct {
 /* 56*/			s64 initialized_size;	/* Byte size of initialized
 				portion of the attribute value. Usually equals
 				data_size. */
-/* 64 */		void *non_resident_attr_end[0]; /* Use offsetof(
-					ATTR_RECORD, non_resident_attr_end) to
-					get size of non resident attribute. */
+/* 64 */		void *non_resident_end[0]; /* Use offsetof(ATTR_RECORD,
+						      non_resident_end) to get
+						      size of a non resident
+						      attribute. */
 /* sizeof(uncompressed attr) = 64*/
 /* 64*/			s64 compressed_size;	/* Byte size of the attribute
 				value after compression. Only present when
 				compressed. Always is a multiple of the
 				cluster size. Represents the actual amount of
 				disk space being used on the disk. */
-/* 72 */		void *compressed_non_resident_attr_end[0];
-				/* Use offsetof(ATTR_RECORD,
-				compressed_non_resident_attr_end) to get size
-				of non resident compressed attribute. */
+/* 72 */		void *compressed_end[0];
+				/* Use offsetof(ATTR_RECORD, compressed_end) to
+				   get size of a compressed attribute. */
 /* sizeof(compressed attr) = 72*/
 		} __attribute__ ((__packed__));
 	} __attribute__ ((__packed__));
