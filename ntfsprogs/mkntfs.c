@@ -660,7 +660,7 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		printf("%s\n", todo);
 		return;
 	case AT_VOLUME_NAME:
-		printf("Volume name length = %i\n", val_len);
+		printf("Volume name length = %i\n", (unsigned int)val_len);
 		if (val_len) {
 			buf = calloc(1, val_len);
 			if (!buf)
@@ -849,7 +849,8 @@ static void dump_attr_record(ATTR_RECORD *a)
 
 	printf("-- Beginning dump of attribute record. --\n");
 	if (a->type == AT_END) {
-		printf("Attribute type = 0x%x ($END)\n", le32_to_cpu(AT_END));
+		printf("Attribute type = 0x%x ($END)\n",
+				(unsigned int)le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
 		printf("Length of resident part = %u (0x%x)\n", u, u);
 		return;
@@ -2536,52 +2537,14 @@ static void mkntfs_exit(void)
 }
 
 /**
- * main
+ * mkntfs_open_partition -
  */
-int main(int argc, char **argv)
+static void mkntfs_open_partition(void)
 {
-	int i, j, err;
-	ssize_t bw;
+	int i;
 	struct stat sbuf;
-	long long lw, pos;
-	MFT_RECORD *m;
-	ATTR_RECORD *a;
-	MFT_REF root_ref;
-	ntfs_attr_search_ctx *ctx;
-	char *sd;
-	NTFS_BOOT_SECTOR *bs;
 	unsigned long mnt_flags;
 
-	/* Setup the correct locale for string output and conversion. */
-	utils_set_locale();
-	/* Initialize the random number generator with the current time. */
-	srandom(time(NULL));
-	/* Allocate and initialize ntfs_volume structure vol. */
-	vol = ntfs_volume_alloc();
-	if (!vol)
-		err_exit("Could not allocate memory for internal buffer.\n");
-	/* Register our exit function which will cleanup everything. */
-	err = atexit(&mkntfs_exit);
-	if (err == -1) {
-		Eprintf("Could not set up exit() function because atexit() "
-				"failed. Aborting...\n");
-		mkntfs_exit();
-		exit(1);
-	}
-	vol->major_ver = 1;
-	vol->minor_ver = 2;
-	vol->mft_record_size = 1024;
-	vol->mft_record_size_bits = 10;
-	/* Length is in unicode characters. */
-	vol->upcase_len = 65536;
-	vol->upcase = (uchar_t*)malloc(vol->upcase_len * sizeof(uchar_t));
-	if (!vol->upcase)
-		err_exit("Could not allocate memory for internal buffer.\n");
-	init_upcase_table(vol->upcase, vol->upcase_len * sizeof(uchar_t));
-	/* Initialize opts to zero / required values. */
-	init_options();
-	/* Parse command line options. */
-	parse_options(argc, argv);
 	/*
 	 * Allocate and initialize an ntfs device structure and attach it to
 	 * the volume.
@@ -2655,6 +2618,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "mkntfs forced anyway. Hope /etc/mtab is "
 				"incorrect.\n");
 	}
+}
+
+/**
+ * mkntfs_override_phys_params -
+ */
+static void mkntfs_override_phys_params(void)
+{
 	/* If user didn't specify the sector size, determine it now. */
 	if (!opts.sector_size) {
 #ifdef BLKSSZGET
@@ -2857,6 +2827,15 @@ int main(int argc, char **argv)
 				"smallest possible\ncluster size for the size "
 				"of the device will be used.\n");
 	}
+}
+
+/**
+ * mkntfs_initialize_bitmaps -
+ */
+static void mkntfs_initialize_bitmaps(void)
+{
+	int i, j;
+	
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap_byte_size = (opts.nr_clusters + 7) >> 3;
 	/* Needs to be multiple of 8 bytes. */
@@ -2912,6 +2891,15 @@ int main(int argc, char **argv)
 	rl_mft_bmp[1].length = 0LL;
 	/* Allocate cluster for mft bitmap. */
 	ntfs_bit_set(lcn_bitmap, (s64)j, 1);
+}
+
+/**
+ * mkntfs_initialize_rl_mft -
+ */
+static void mkntfs_initialize_rl_mft(void)
+{
+	int i, j;
+	
 	/* If user didn't specify the mft lcn, determine it now. */
 	if (!opts.mft_lcn) {
 		/*
@@ -2989,6 +2977,15 @@ int main(int argc, char **argv)
 		ntfs_bit_set(lcn_bitmap, opts.mftmirr_lcn + i, 1);
 	opts.logfile_lcn = opts.mftmirr_lcn + j;
 	Dprintf("$LogFile logical cluster number = 0x%x\n", opts.logfile_lcn);
+}
+
+/**
+ * mkntfs_initialize_rl_logfile -
+ */
+static void mkntfs_initialize_rl_logfile(void)
+{
+	int i, j;
+
 	/* Create runlist for log file. */
 	rl_logfile = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_logfile)
@@ -3038,6 +3035,14 @@ int main(int argc, char **argv)
 	/* Allocate clusters for log file. */
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, opts.logfile_lcn + i, 1);
+}
+
+/**
+ * mkntfs_initialize_rl_boot -
+ */
+static void mkntfs_initialize_rl_boot(void)
+{
+	int i, j;
 	/* Create runlist for $Boot. */
 	rl_boot = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_boot)
@@ -3056,11 +3061,13 @@ int main(int argc, char **argv)
 	/* Allocate clusters for $Boot. */
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, 0LL + i, 1);
-	/* Allocate a buffer large enough to hold the mft. */
-	buf = calloc(1, opts.mft_size);
-	if (!buf)
-		err_exit("Failed to allocate internal buffer: %s\n",
-							strerror(errno));
+}
+
+/**
+ * mkntfs_initialize_rl_bad -
+ */
+static void mkntfs_initialize_rl_bad(void)
+{
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */
 	rl_bad = (runlist *)malloc(2 * sizeof(runlist));
 	if (!rl_bad)
@@ -3077,74 +3084,95 @@ int main(int argc, char **argv)
 	rl_bad[1].length = 0LL;
 
 	// TODO: Mark bad blocks as such.
+}
 
+/**
+ * mkntfs_fill_device_with_zeroes -
+ */
+static void mkntfs_fill_device_with_zeroes(void)
+{
 	/*
 	 * If not quick format, fill the device with 0s.
 	 * FIXME: Except bad blocks! (AIA)
 	 */
-	if (!opts.quick_format) {
-		unsigned long position;
-		unsigned long mid_clust;
-		float progress_inc = (float)opts.nr_clusters / 100;
+	int i;
+	ssize_t bw;
+	unsigned long position;
+	unsigned long mid_clust;
+	float progress_inc = (float)opts.nr_clusters / 100;
 
-		Qprintf("Initialising device with zeroes:   0%%");
-		fflush(stdout);
-		mid_clust = (opts.volume_size >> 1) / vol->cluster_size;
-		for (position = 0; position < opts.nr_clusters; position++) {
-			if (!(position % (int)(progress_inc+1))) {
-				Qprintf("\b\b\b\b%3.0f%%", position /
-						progress_inc);
-				fflush(stdout);
-			}
-			bw = mkntfs_write(vol->dev, buf, vol->cluster_size);
-			if (bw != (ssize_t)vol->cluster_size) {
-				if (bw != -1 || errno != EIO)
-					err_exit("This should not happen.\n");
-				if (!position)
-					err_exit("Error: Cluster zero is bad. "
-						"Cannot create NTFS file "
-						"system.\n");
-				if (position == mid_clust &&
-						(vol->major_ver < 1 ||
-						 (vol->major_ver == 1 &&
-						  vol->minor_ver < 2)))
-					err_exit("Error: Bad cluster found in "
-						"location reserved for system "
-						"file $Boot.\n");
-				/* Add the baddie to our bad blocks list. */
-				append_to_bad_blocks(position);
-				Qprintf("\nFound bad cluster (%ld). Adding to "
-					"list of bad blocks.\nInitialising "
-					"device with zeroes: %3.0f%%", position,
-					position / progress_inc);
-				/* Seek to next cluster. */
-				vol->dev->d_ops->seek(vol->dev,
-						((off_t)position + 1) *
-						vol->cluster_size, SEEK_SET);
-			}
+	Qprintf("Initialising device with zeroes:   0%%");
+	fflush(stdout);
+	mid_clust = (opts.volume_size >> 1) / vol->cluster_size;
+	for (position = 0; position < opts.nr_clusters; position++) {
+		if (!(position % (int)(progress_inc+1))) {
+			Qprintf("\b\b\b\b%3.0f%%", position /
+					progress_inc);
+			fflush(stdout);
 		}
-		Qprintf("\b\b\b\b100%%");
-		position = (opts.volume_size & (vol->cluster_size - 1)) /
-				opts.sector_size;
-		for (i = 0; (unsigned long)i < position; i++) {
-			bw = mkntfs_write(vol->dev, buf, opts.sector_size);
-			if (bw != opts.sector_size) {
-				if (bw != -1 || errno != EIO)
-					err_exit("This should not happen.\n");
-				else if (i + 1UL == position &&
-						(vol->major_ver >= 2 ||
-						 (vol->major_ver == 1 &&
-						  vol->minor_ver >= 2)))
-					err_exit("Error: Bad cluster found in "
-						"location reserved for system "
-						"file $Boot.\n");
-				/* Seek to next sector. */
-				vol->dev->d_ops->seek(vol->dev,
-						opts.sector_size, SEEK_CUR);
-			}
+		bw = mkntfs_write(vol->dev, buf, vol->cluster_size);
+		if (bw != (ssize_t)vol->cluster_size) {
+			if (bw != -1 || errno != EIO)
+				err_exit("This should not happen.\n");
+			if (!position)
+				err_exit("Error: Cluster zero is bad. "
+					"Cannot create NTFS file "
+					"system.\n");
+			if (position == mid_clust &&
+					(vol->major_ver < 1 ||
+					 (vol->major_ver == 1 &&
+					  vol->minor_ver < 2)))
+				err_exit("Error: Bad cluster found in "
+					"location reserved for system "
+					"file $Boot.\n");
+			/* Add the baddie to our bad blocks list. */
+			append_to_bad_blocks(position);
+			Qprintf("\nFound bad cluster (%ld). Adding to "
+				"list of bad blocks.\nInitialising "
+				"device with zeroes: %3.0f%%", position,
+				position / progress_inc);
+			/* Seek to next cluster. */
+			vol->dev->d_ops->seek(vol->dev,
+					((off_t)position + 1) *
+					vol->cluster_size, SEEK_SET);
 		}
-		Qprintf(" - Done.\n");
 	}
+	Qprintf("\b\b\b\b100%%");
+	position = (opts.volume_size & (vol->cluster_size - 1)) /
+			opts.sector_size;
+	for (i = 0; (unsigned long)i < position; i++) {
+		bw = mkntfs_write(vol->dev, buf, opts.sector_size);
+		if (bw != opts.sector_size) {
+			if (bw != -1 || errno != EIO)
+				err_exit("This should not happen.\n");
+			else if (i + 1UL == position &&
+					(vol->major_ver >= 2 ||
+					 (vol->major_ver == 1 &&
+					  vol->minor_ver >= 2)))
+				err_exit("Error: Bad cluster found in "
+					"location reserved for system "
+					"file $Boot.\n");
+			/* Seek to next sector. */
+			vol->dev->d_ops->seek(vol->dev,
+					opts.sector_size, SEEK_CUR);
+		}
+	}
+	Qprintf(" - Done.\n");
+}
+
+/**
+ * mkntfs_create_root_structures -
+ */
+static void mkntfs_create_root_structures(void)
+{
+	NTFS_BOOT_SECTOR *bs;
+	ATTR_RECORD *a;
+	MFT_RECORD *m;
+	MFT_REF root_ref;
+	ssize_t bw;
+	int i, j, err;
+	char *sd;
+
 	Qprintf("Creating NTFS volume structures.\n");
 	/*
 	 * Setup an empty mft record.  Note, we can just give 0 as the mft
@@ -3218,6 +3246,7 @@ int main(int argc, char **argv)
 	if (!err)
 		err = upgrade_to_large_index(m, "$I30", 4, 0, &index_block);
 	if (!err) {
+		ntfs_attr_search_ctx *ctx;
 		ctx = ntfs_attr_get_search_ctx(NULL, m);
 		if (!ctx)
 			err_exit("Failed to allocate attribute search "
@@ -3559,6 +3588,73 @@ bb_err:
 					i, i, strerror(-err));
 		//dump_mft_record(m);
 	}
+}
+
+/**
+ * main
+ */
+int main(int argc, char **argv)
+{
+	ntfs_attr_search_ctx *ctx;
+	long long lw, pos;
+	ATTR_RECORD *a;
+	MFT_RECORD *m;
+	int i, err;
+
+	/* Setup the correct locale for string output and conversion. */
+	utils_set_locale();
+	/* Initialize the random number generator with the current time. */
+	srandom(time(NULL));
+	/* Allocate and initialize ntfs_volume structure vol. */
+	vol = ntfs_volume_alloc();
+	if (!vol)
+		err_exit("Could not allocate memory for internal buffer.\n");
+	/* Register our exit function which will cleanup everything. */
+	err = atexit(&mkntfs_exit);
+	if (err == -1) {
+		Eprintf("Could not set up exit() function because atexit() "
+				"failed. Aborting...\n");
+		mkntfs_exit();
+		exit(1);
+	}
+	vol->major_ver = 1;
+	vol->minor_ver = 2;
+	vol->mft_record_size = 1024;
+	vol->mft_record_size_bits = 10;
+	/* Length is in unicode characters. */
+	vol->upcase_len = 65536;
+	vol->upcase = (uchar_t*)malloc(vol->upcase_len * sizeof(uchar_t));
+	if (!vol->upcase)
+		err_exit("Could not allocate memory for internal buffer.\n");
+	init_upcase_table(vol->upcase, vol->upcase_len * sizeof(uchar_t));
+	/* Initialize opts to zero / required values. */
+	init_options();
+	/* Parse command line options. */
+	parse_options(argc, argv);
+	/* Open the partition. */
+	mkntfs_open_partition();
+	/* Decide on the sectors/tracks/heads/size, etc. */
+	mkntfs_override_phys_params();
+	/* Initialize $Bitmap and $MFT/$BITMAP related stuff. */
+	mkntfs_initialize_bitmaps();
+	/* Initialize MFT & set opts.logfile_lcn. */
+	mkntfs_initialize_rl_mft();
+	/* Initlialize $LogFile. */
+	mkntfs_initialize_rl_logfile();
+	/* Initialize $Boot. */
+	mkntfs_initialize_rl_boot();
+	/* Allocate a buffer large enough to hold the mft. */
+	buf = calloc(1, opts.mft_size);
+	if (!buf)
+		err_exit("Failed to allocate internal buffer: %s\n",
+				strerror(errno));
+	/* Create runlist for $BadClus, $DATA named stream $Bad. */
+	mkntfs_initialize_rl_bad();
+	/* If not quick format, fill the device with 0s. */
+	if (!opts.quick_format)
+		mkntfs_fill_device_with_zeroes();
+	/* Create NTFS volume structures. */
+	mkntfs_create_root_structures();
 // - Do not step onto bad blocks!!!
 // - If any bad blocks were specified or found, modify $BadClus, allocating the
 //   bad clusters in $Bitmap.
@@ -3686,4 +3782,3 @@ bb_err:
 	 */
 	return 0;
 }
-
