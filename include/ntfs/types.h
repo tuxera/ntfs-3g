@@ -1,5 +1,5 @@
 /*
- * types.h - Misc type definitions not related to on-disk structure. Part of
+ * types.h - Misc type definitions not related to on-disk structure.  Part of
  *	     the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
@@ -46,11 +46,18 @@ typedef u16 uchar_t;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1
 
 /*
- * Clusters are signed 64-bit values on NTFS volumes. We define two types, LCN
+ * Clusters are signed 64-bit values on NTFS volumes.  We define two types, LCN
  * and VCN, to allow for type checking and better code readability.
  */
 typedef s64 VCN;
 typedef s64 LCN;
+
+/*
+ * The NTFS journal $LogFile uses log sequence numbers which are signed 64-bit
+ * values.  We define our own type LSN, to allow for type checking and better
+ * code readability.
+ */
+typedef s64 LSN;
 
 /*
  * These are just to make the code more readable...
