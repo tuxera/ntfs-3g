@@ -98,8 +98,6 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 {
 	ntfs_attr *na = NULL;
-	runlist *rl;
-	int rl_size;
 	int err;
 
 	if (!ni || !new_al || new_al_len < 1) {
@@ -143,66 +141,6 @@ int ntfs_attrlist_set(ntfs_inode *ni, u8 *new_al, int new_al_len)
 		Dprintf("%s(): Eeek! $ATTRIBUTE_LIST resize failed. Probably "
 			"leaving inconsist metadata.\n", __FUNCTION__);
 		goto err_out;
-	}
-
-	/* Update in-memory ntfs inode. */
-	if (NAttrNonResident(na)) {
-		/* Create copy of new runlist. */
-		if (ntfs_attr_map_whole_runlist(na)) {
-			/*
-			 * FIXME: Probably leaving inconsist na->attr_list_rl.
-			 * What shall we do here? We can't simply restore old
-			 * attribute list, because attributes maybe moved. But
-			 * we can't get runlist for new attribute list so we
-			 * can't update in-memory structs.
-			 */
-			Dprintf("%s(): Failed to map runlist. Probably leaving "
-				"inconsist na->attr_list_rl.\n", __FUNCTION__);
-			if (ntfs_attr_truncate(na, ni->attr_list_size))
-				Dprintf("%s(): Rollback failed. Leaving "
-					"inconsist metadata.\n", __FUNCTION__);
-			if (NAttrNonResident(na))
-				NInoSetAttrListNonResident(ni);
-			else
-				NInoClearAttrListNonResident(ni);
-			err = EIO;
-			goto err_out;
-		}
-		for (rl = na->rl, rl_size = 1; rl->length; rl++)
-			rl_size++;
-		rl_size = (rl_size * sizeof(runlist_element) + 0xfff) & ~0xfff;	
-		rl = malloc(rl_size);
-		if (!rl) {
-			/*
-			 * FIXME: Probably leaving inconsist na->attr_list_rl.
-			 * What shall we do here? We can't simply restore old
-			 * attribute list, because attributes maybe moved. But
-			 * we can't get runlist for new attribute list so we
-			 * can't update in-memory structs.
-			 */
-			Dprintf("%s(): Not enough memory. Probably leaving "
-				"inconsist na->attr_list_rl.\n", __FUNCTION__);
-			if (ntfs_attr_truncate(na, ni->attr_list_size))
-				Dprintf("%s(): Rollback failed. Leaving "
-					"inconsist metadata.\n", __FUNCTION__);
-			if (NAttrNonResident(na))
-				NInoSetAttrListNonResident(ni);
-			else
-				NInoClearAttrListNonResident(ni);
-			err = ENOMEM;
-			goto err_out;
-		}
-		memcpy(rl, na->rl, rl_size);
-		if (NInoAttrListNonResident(ni) && ni->attr_list_rl)
-			free(ni->attr_list_rl);
-		ni->attr_list_rl = rl;
-		NInoSetAttrListNonResident(ni);
-	} else {
-		if (NInoAttrListNonResident(ni)) {
-			if (ni->attr_list_rl)
-				free(ni->attr_list_rl);
-			NInoClearAttrListNonResident(ni);
-		}
 	}
 
 	/* Done! */

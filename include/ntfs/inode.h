@@ -39,8 +39,6 @@ typedef enum {
 
 	/* The NI_AttrList* tests only make sense for base inodes. */
 	NI_AttrList,		/* 1: Mft record contains an attribute list. */
-	NI_AttrListNonResident,	/* 1: Attribute list is non-resident. Implies
-				      NI_AttrList is set. */
 	NI_AttrListDirty,	/* 1: Attribute list needs to be written to the
 				      mft record and then to disk. */
 } ntfs_inode_state_bits;
@@ -74,10 +72,6 @@ typedef enum {
 #define test_and_clear_nino_al_flag(ni, flag)	\
 			       test_and_clear_nino_flag(ni, AttrList##flag)
 
-#define NInoAttrListNonResident(ni)	   test_nino_al_flag(ni, NonResident)
-#define NInoSetAttrListNonResident(ni)	    set_nino_al_flag(ni, NonResident)
-#define NInoClearAttrListNonResident(ni)  clear_nino_al_flag(ni, NonResident)
-
 #define NInoAttrListDirty(ni)			    test_nino_al_flag(ni, Dirty)
 #define NInoAttrListSetDirty(ni)		     set_nino_al_flag(ni, Dirty)
 #define NInoAttrListClearDirty(ni)		   clear_nino_al_flag(ni, Dirty)
@@ -97,12 +91,10 @@ struct _ntfs_inode {
 	/*
 	 * Attribute list support (for use by the attribute lookup functions).
 	 * Setup during ntfs_open_inode() for all inodes with attribute lists.
-	 * Only valid if NI_AttrList is set in state, further attr_list_rl is
-	 * only valid if NI_AttrListNonResident is set.
+	 * Only valid if NI_AttrList is set in state.
 	 */
 	u32 attr_list_size;	/* Length of attribute list value in bytes. */
 	u8 *attr_list;		/* Attribute list value itself. */
-	runlist *attr_list_rl;	/* Run list for the attribute list value. */
 	/* Below fields are always valid. */
 	s32 nr_extents;		/* For a base mft record, the number of
 				   attached extent inodes (0 if none), for

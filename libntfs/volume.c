@@ -200,17 +200,6 @@ static int ntfs_mft_load(ntfs_volume *vol)
 				"$MFT/$ATTRIBUTE_LIST.");
 		goto io_error_exit;
 	}
-	if (ctx->attr->non_resident) {
-		NInoSetAttrListNonResident(vol->mft_ni);
-		// FIXME: We are duplicating work here! (AIA)
-		vol->mft_ni->attr_list_rl = ntfs_mapping_pairs_decompress(vol,
-				ctx->attr, NULL);
-		if (!vol->mft_ni->attr_list_rl) {
-			Dperror("Error: failed to get runlist for "
-					"$MFT/$ATTRIBUTE_LIST");
-			goto error_exit;
-		}
-	}
 mft_has_no_attr_list:
 	/* We now have a fully setup ntfs inode for $MFT in vol->mft_ni. */
 

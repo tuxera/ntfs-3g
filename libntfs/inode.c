@@ -72,8 +72,6 @@ static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
 		Dputs("Eeek. Discarding dirty inode!");
 	if (NInoAttrList(ni) && ni->attr_list)
 		free(ni->attr_list);
-	if (NInoAttrListNonResident(ni) && ni->attr_list_rl)
-		free(ni->attr_list_rl);
 	if (ni->mrec)
 		free(ni->mrec);
 	free(ni);
@@ -98,9 +96,7 @@ static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
  * Finally, search for an attribute list attribute in the mft record and if one
  * is found, load the attribute list attribute value and attach it to the
  * ntfs_inode structure (->attr_list). Also set the NI_AttrList bit to indicate
- * this as well as the NI_AttrListNonResident bit if the the attribute list is
- * non-resident. In that case, also attach the decompressed runlist to the
- * ntfs_inode structure (->attr_list_rl).
+ * this.
  *
  * Return a pointer to the ntfs_inode structure on success or NULL on error,
  * with errno set to the error code.
@@ -155,20 +151,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		err = EIO;
 		goto put_err_out;
 	}
-	if (!ctx->attr->non_resident) {
-		/* Attribute list attribute is resident so we are done. */
-		ntfs_attr_put_search_ctx(ctx);
-		return ni;
-	}
-	NInoSetAttrListNonResident(ni);
-	// FIXME: We are duplicating work here! (AIA)
-	ni->attr_list_rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL);
-	if (ni->attr_list_rl) {
-		/* We got the runlist, so we are done. */
-		ntfs_attr_put_search_ctx(ctx);
-		return ni;
-	}
-	err = EIO;
+	ntfs_attr_put_search_ctx(ctx);
+	return ni;
 put_err_out:
 	if (!err)
 		err = errno;

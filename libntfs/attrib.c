@@ -2589,10 +2589,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	if (type == AT_ATTRIBUTE_LIST) {
 		if (NInoAttrList(base_ni) && base_ni->attr_list)
 			free(base_ni->attr_list);
-		if (NInoAttrListNonResident(base_ni) && base_ni->attr_list_rl)
-			free(base_ni->attr_list_rl);
 		NInoClearAttrList(base_ni);
-		NInoClearAttrListNonResident(base_ni);
 		NInoAttrListClearDirty(base_ni);
 	}
 
@@ -2629,15 +2626,24 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 			return 0;
 		}
 		/* Deallocate clusters. */
-		if (NInoAttrListNonResident(base_ni)) {
-			if (ntfs_cluster_free_from_rl(base_ni->vol,
-						base_ni->attr_list_rl)) {
-				Dprintf("%s(): Leaking clusters! Run chkdsk. "
-					"Couldn't free clusters from attribute "
+		if (ctx->attr->non_resident) {
+			runlist *al_rl;
+
+			al_rl = ntfs_mapping_pairs_decompress(base_ni->vol,
+					ctx->attr, NULL);
+			if (!al_rl) {
+				Dprintf("%s(): Couldn't decompress attribute "
 					"list runlist. Succeed anyway.\n",
-					 __FUNCTION__);
+					__FUNCTION__);
 				return 0;
 			}
+			if (ntfs_cluster_free_from_rl(base_ni->vol, al_rl)) {
+				Dprintf("%s(): Leaking clusters! Run chkdsk. "
+					"Couldn't free clusters from attribute "
+					"list runlist.\n",
+					 __FUNCTION__);
+			}
+			free(al_rl);
 		}
 		/* Remove attribute record itself. */
 		if (ntfs_attr_record_rm(ctx)) {
