@@ -1,0 +1,213 @@
+.\" -*- nroff -*-
+.\" Copyright (c) 2001,2002 Anton Altaparmakov. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\" Adapted from e2fsprogs-1.19/misc/mke2fs.8.in by Theodore Ts'o.
+.\" 
+.TH MKNTFS 8 "March 2002" "Linux-NTFS version @VERSION@"
+.SH NAME
+mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
+.SH SYNOPSIS
+.B mkntfs
+[
+.B \-s
+.I sector-size
+]
+[
+.B \-c
+.I cluster-size
+]
+[
+.B \-L
+.I volume-label
+]
+[
+.B \-z
+.I mft-zone-multiplier
+]
+[
+.B \-f
+| 
+.B \-Q
+]
+[
+.B -n
+]
+[
+.B \-q
+]
+[
+.B \-v
+]
+[
+.B \-vv
+]
+[
+.B \-C
+]
+[
+.B \-F
+]
+[
+.B \-I
+]
+[
+.B \-V
+]
+.I device
+[
+.I number-of-sectors
+]
+.SH DESCRIPTION
+.B mkntfs
+is used to create a NTFS 1.2 (Windows NT 4.0) file system on a device (usually
+a disk partition).
+.I device
+is the special file corresponding to the device (e.g 
+.IR /dev/hdXX ).
+.I number-of-sectors
+is the number of blocks on the device.  If omitted,
+.B mkntfs
+automagically figures the file system size.
+.SH OPTIONS
+.TP
+.BI \-s " sector-size"
+Specify the size of sectors in bytes. Valid sector size values are 256, 512,
+1024, 2048 and 4096 bytes per sector. If omitted,
+.B mkntfs
+.I sector-size
+is determined automatically and if that fails a default of 512
+bytes per sector is used.
+.TP
+.BI \-c " cluster-size"
+Specify the size of clusters in bytes. Valid cluster size values are powers of
+two, with at least 256, and at most 65536 bytes per cluster. If omitted,
+.B mkntfs
+.I cluster-size
+is determined by the volume size. The value is determined as
+follows:
+.TS
+lB lB lB
+l l r.
+Volume	size	Default cluster
+0	- 512MB	512 bytes
+512MB	- 1GB	1024 bytes
+1GB	- 2GB	2048 bytes
+2GB	+	4096 bytes
+.TE
+
+Note that the default cluster size is set to be at least equal to the sector
+size as a cluster cannot be smaller than a sector. Also, note that values
+greater than 4096 have the side effect that compression is disabled on the
+volume (due to limitations in the NTFS compression algorithm currently in use
+by Windows).
+.TP
+.BI \-L " volume-label"
+Set the volume label for the filesystem.
+.TP
+.BI \-z " mft-zone-multiplier"
+Set the MFT zone multiplier, which determines the size of the MFT zone to use
+on the volume. The MFT zone is the area at the beginning of the volume reserved
+for the master file table (MFT), which stores the on disk inodes (MFT records).
+It is noteworthy that small files are stored entirely within the inode;
+thus, if you expect to use the volume for storing large numbers of very small
+files, it is useful to set the zone multiplier to a higher value. Note, that
+the MFT zone is resized on the fly as required during operation of the NTFS
+driver but choosing a good value will reduce fragmentation. Valid values
+are 1, 2, 3 and 4. The values have the following meaning:
+.TS
+lB lB
+lB lB
+c l.
+MFT zone	MFT zone size
+multiplier	(% of volume size)
+1	12.5% (default)
+2	25.0%
+3	37.5%
+4	50.0%
+.TE
+.TP
+.B \-f
+Same as
+.BR \-Q .
+.TP
+.B \-Q
+Perform quick format. This will skip both zeroing of the volume and bad sector
+checking.
+.TP
+.B \-n
+Causes
+.B mkntfs
+to not actually create a filesystem, but display what it would do if it were
+to create a filesystem. All steps of the format are carried out except the
+actual writing to the device.
+.TP
+.B \-q
+Quiet execution; only errors are written to stderr, no output to stdout
+occurs at all. Useful if 
+.B mkntfs
+is run in a script.
+.TP
+.B \-v
+Verbose execution.
+.TP
+.B \-vv
+Really verbose execution; includes the verbose output from the
+.B \-v
+option as well as additional output useful for debugging
+.B mkntfs.
+.TP
+.B \-C
+Enable compression on the volume.
+.TP
+.B \-F
+Force 
+.B mkntfs
+to run, even if the specified
+.I device
+is not a block special device, or appears to be mounted.
+.TP
+.B \-I
+Disable content indexing on the volume. (This is only meaningful on
+Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
+not implement content indexing at all.)
+.TP
+.B \-V
+Print the version number of 
+.B mkntfs
+and exit.
+.SH AUTHOR
+This version of
+.B mkntfs
+has been written by Anton Altaparmakov <aia21@cantab.net> (if that fails, use
+<antona@users.sf.net>).
+.SH BUGS
+.B mkntfs
+writes the backup boot sector to the last sector of the block
+.I device
+being formatted. However, current versions of the Linux kernel (all versions
+up to and including todays 2.4.18) either only report an even number of sectors
+when the sector size is below 1024 bytes, which is the case for most hard
+drives today (512 bytes sector size) or they return the correct number but
+accessing the last sector fails. Either way, this means that when a partition
+has an odd number of 512-byte sectors, the last sector is either not reported
+to us at all or it is not writable by us and hence the created NTFS volume
+will either have the backup boot sector placed one sector ahead of where it
+should be or it cannot be written at all. For this reason,
+.B mkntfs
+marks the NTFS volume dirty, so that when you reboot into Windows, check disk
+runs automatically and creates a copy of the backup boot sector in the correct
+location. This also has the benefit of catching any bugs in
+.B mkntfs
+as check disk would find any corrupt structures and repair them, as well as
+report them. - If you do see any problems reported, please report the messages
+to the author.
+.br
+There may be other bugs. Please, report them to the author.
+.SH AVAILABILITY
+.B mkntfs
+is part of the Linux-NTFS project and is available for download from 
+http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
+rpm) and pre-compiled binary (i386 rpm and deb) form.
+.SH SEE ALSO
+.BR badblocks (8)
+
