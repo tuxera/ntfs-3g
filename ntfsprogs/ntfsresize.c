@@ -63,12 +63,13 @@ static const char *resize_important_msg =
 "  4)  set the bootable flag for the partition if it existed before\n"
 "Otherwise you may lose your data or can't boot your computer from the disk!\n";
 
-static const char *fragmented_volume_msg =
-"The volume end is fragmented, this case is not yet supported.\n";
+static const char *invalid_ntfs_msg =
+"Apparently device '%s' doesn't have a valid NTFS.\n"
+"Maybe you selected the wrong partition or the whole disk\n"
+"instead of a partition (e.g. /dev/hda, not /dev/hda1)?\n";
 
 struct {
 	int verbose;
-	int quiet;
 	int debug;
 	int ro_flag;
 	int force;
@@ -96,13 +97,19 @@ struct llcn_t {
 };	
 	
 struct __ntfs_resize_t {
-	s64 new_volume_size;		/* in clusters */
+	s64 new_volume_size;		/* in clusters; 0 = --info w/o --size */
 	int shrink;			/* shrink = 1, enlarge = 0 */
 	ntfs_inode *ni;			/* inode being processed */
+	MFT_REF mref;                   /* mft reference */
+	MFT_RECORD *mrec;               /* mft record */
 	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
 	u64 relocations;		/* num of clusters to relocate */
-	u64 inuse;			/* num of clusters in use */
+	s64 inuse;			/* num of clusters in use */
 	int multi_ref;			/* num of clusters ref'd many times */
+	runlist mftmir_rl;		/* $MFTMirr AT_DATA's new position */
+	s64 mftmir_old;			/* $MFTMirr AT_DATA's old LCN */
+	int dirty_inode;		/* some inode data got relocated */
+	struct progress_bar progress;
 	/* Temporary statistics until all case is supported */
 	struct llcn_t last_mft;
 	struct llcn_t last_mftmir;
@@ -110,13 +117,19 @@ struct __ntfs_resize_t {
 	struct llcn_t last_sparse;
 	struct llcn_t last_compressed;
 	struct llcn_t last_lcn;
+	s64 last_unsafe;		/* last "unsafe-to-move" cluster */
 	s64 last_unsupp;		/* last unsupported cluster */
 };
 
 typedef struct __ntfs_resize_t ntfs_resize_t;
 
+/* FIXME: This will go to struct __ntfs_resize_t */
 ntfs_volume *vol = NULL;
+
+/* FIXME: These and 'pos' from find_free_cluster() will make a cluster
+   allocation related structure, attached to struct __ntfs_resize_t */
 struct bitmap lcn_bitmap;
+s64 max_free_cluster_range = 0;
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -124,16 +137,22 @@ struct bitmap lcn_bitmap;
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
 #define NERR_PREFIX  ERR_PREFIX ": "
 
+#define DIRTY_NONE		(0)
+#define DIRTY_INODE		(1)
+#define DIRTY_ATTRIB		(2)
+
+#define NTFS_MAX_CLUSTER_SIZE 	(65536)
+
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
 
 /* FIXME: They should be included but Eprintf conflicts with mkntfs's Eprintf */
-extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Eprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Vprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Qprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 
-GEN_PRINTF (Eprintf, stderr, NULL,         FALSE)
-GEN_PRINTF (Vprintf, stdout, &opt.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opt.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,         FALSE)
+GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, NULL,   FALSE)
 
 /**
  * perr_printf
@@ -149,7 +168,19 @@ static void perr_printf(const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
-	printf(": %s\n", strerror(eo));
+	fprintf(stdout, ": %s\n", strerror(eo));
+	fflush(stdout);
+	fflush(stderr);
+}
+
+static void err_printf(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stdout, NERR_PREFIX);
+	va_start(ap, fmt);
+	vfprintf(stdout, fmt, ap);
+	va_end(ap);
 	fflush(stdout);
 	fflush(stderr);
 }
@@ -211,8 +242,7 @@ static void usage(void)
 		"    -n      --no-action        Do not write to disk\n"
 		"    -f      --force            Force to progress (DANGEROUS)\n"
 		"    -P      --no-progress-bar  Don't show progress bar\n"
-	/*	"    -q      --quiet            Less output\n"*/
-	/*	"    -v      --verbose          More output\n"*/
+		"    -v      --verbose          More output\n"
 		"    -V      --version          Display version information\n"
 		"    -h      --help             Display this help\n"
 #ifdef DEBUG
@@ -222,7 +252,8 @@ static void usage(void)
 		"    If -i and -s are used together then print information about relocations.\n"
 		"    If both are omitted then the volume will be enlarged to the device size.\n"
 		"\n", EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf ("%s%s", ntfs_bugs, ntfs_home);
+	printf ("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
 	exit(1);
 }
 
@@ -259,10 +290,10 @@ static void proceed_question(void)
 static void version (void)
 {
 	printf ("\nResize an NTFS Volume, without data loss.\n\n");
-	printf ("Copyright (c) 2002-2003  Szabolcs Szakacsits\n");
+	printf ("Copyright (c) 2002-2004  Szabolcs Szakacsits\n");
 	printf ("Copyright (c) 2002-2003  Anton Altaparmakov\n");
 	printf ("Copyright (c) 2002-2003  Richard Russon\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf ("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -295,8 +326,8 @@ static s64 get_new_volume_size(char *s)
 	   http://physics.nist.gov/cuu/Units/binary.html
 	   Disk partitioning tools use prefixes as,
 	                       k        M          G
-	   old fdisk         2^10     2^20      10^3*2^20
-	   recent fdisk     10^3     10^6       10^9
+	   fdisk 2.11x-      2^10     2^20      10^3*2^20
+	   fdisk 2.11y+     10^3     10^6       10^9
 	   cfdisk           10^3     10^6       10^9
 	   sfdisk            2^10     2^20
 	   parted            2^10     2^20  (may change)
@@ -338,10 +369,9 @@ static int parse_options(int argc, char **argv)
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "info",	no_argument,		NULL, 'i' },
 		{ "no-action",	no_argument,		NULL, 'n' },
-	/*	{ "quiet",	no_argument,		NULL, 'q' },*/
-		{ "size",	required_argument,	NULL, 's' },
 		{ "no-progress-bar", no_argument,	NULL, 'P' },
-	/*	{ "verbose",	no_argument,		NULL, 'v' },*/
+		{ "size",	required_argument,	NULL, 's' },
+		{ "verbose",	no_argument,		NULL, 'v' },
 		{ "version",	no_argument,		NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -381,9 +411,6 @@ static int parse_options(int argc, char **argv)
 		case 'P':
 			opt.show_progress = 0;
 			break;
-		case 'q':
-			opt.quiet++;
-			break;
 		case 's':
 			if (!err && (opt.bytes == 0))
 				opt.bytes = get_new_volume_size(optarg);
@@ -407,22 +434,12 @@ static int parse_options(int argc, char **argv)
 		}
 	}
 
-	if (help || ver) {
-		opt.quiet = 0;
-	} else {
+	if (!help && !ver) {
 		if (opt.volume == NULL) {
 			if (argc > 1)
 				Eprintf ("You must specify exactly one device.\n");
 			err++;
 		}
-
-		/*
-		if (opt.quiet && opt.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
-			err++;
-		}
-		*/
-
 		if (opt.info)
 			opt.ro_flag = MS_RDONLY;
 	}
@@ -441,6 +458,76 @@ static int parse_options(int argc, char **argv)
 		usage();
 
 	return (!err && !help && !ver);
+}
+
+static void print_advise(s64 supp_lcn, int flags)
+{
+	s64 old_b, new_b, freed_b, old_mb, new_mb, freed_mb;
+	int beta  = flags & 1;
+	int final = flags & 2;
+	
+	old_b = vol->nr_clusters * vol->cluster_size;
+	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
+
+	/* Take the next supported cluster (free or relocatable)
+	   plus reserve a cluster for the backup boot sector */
+	supp_lcn += 2;
+
+	if (supp_lcn > vol->nr_clusters) {
+		if (final)
+			printf("This fragmentation type "
+			       "isn't supported yet. Sorry.\n");
+		return;
+	}
+
+	new_b = supp_lcn * vol->cluster_size;
+	new_mb = rounded_up_division(new_b, NTFS_MBYTE);
+	freed_b = (vol->nr_clusters - supp_lcn + 1) * vol->cluster_size;
+	freed_mb = freed_b / NTFS_MBYTE;
+
+	printf("You %s resize at %lld bytes ", beta ? "might" : "could", new_b);
+	if ((new_mb * NTFS_MBYTE) < old_b)
+		printf("or %lld MB ", new_mb);
+
+	printf("(freeing ");
+	if (freed_mb && (old_mb - new_mb))
+	    printf("%lld MB", old_mb - new_mb);
+	else
+	    printf("%lld bytes", freed_b);
+	printf("). %s\n", beta ? "BETA." : "STABLE.");
+	
+	if (final)
+		printf("Please make a test run using both the -n and -s "
+		       "options before real resizing!\n");
+}
+
+static void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
+{
+	rl->vcn = vcn;
+	rl->lcn = lcn;
+	rl->length = len;
+}
+
+static int rl_items(runlist *rl)
+{
+	int i = 0;
+	
+	while (rl[i++].length)
+		;
+	
+	return i;
+}
+
+static void dump_run(runlist_element *r)
+{
+	Vprintf(" %8lld  %8lld (0x%08llx)  %lld\n",
+		r->vcn, r->lcn, r->lcn, r->length);
+}
+
+static void dump_runlist(runlist *rl)
+{
+	while (rl->length)
+		dump_run(rl++);
 }
 
 /**
@@ -481,7 +568,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 	uchar_t *ustr = NULL;
 	ATTR_RECORD *a = resize->ctx->attr;
 	
-	if (resize->ni->mft_no != 8)
+	if (resize->ni->mft_no != FILE_BadClus)
 		return 0;
 
 	if (str2unicode("$Bad", &ustr, &len) == -1)
@@ -498,43 +585,68 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 	return ret;	
 }
 
-static void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
+static void collect_shrink_constraints(ntfs_resize_t *resize, runlist *rl)
 {
-	s64 inode;
+	s64 inode, last_lcn;
 	ATTR_FLAGS flags;
 	struct llcn_t *llcn = NULL;
-	int ret;
+	int ret, supported = 0;
+
+	last_lcn = rl->lcn + (rl->length - 1);
 
 	inode = resize->ni->mft_no;
 	flags = resize->ctx->attr->flags;
 	
-	if (NInoAttrList(resize->ni))
-		llcn = &resize->last_multi_mft;
-	
-	else if (flags & ATTR_IS_SPARSE)
-		llcn = &resize->last_sparse;
-	
-	else if (flags & ATTR_IS_COMPRESSED)
-		llcn = &resize->last_compressed;
-
-	else if ((ret = has_bad_sectors(resize)) != 0) {
+	if ((ret = has_bad_sectors(resize)) != 0) {
 		if (ret == -1)
-			perr_exit("Couldn't convert string to Unicode.");
+			perr_exit("Couldn't convert string to Unicode");
 		err_exit("Device has bad sectors, not supported yet.\n");
+	} 
 
-	} else if (inode == 0)
+	if (NInoAttrList(resize->ni)) {
+		llcn = &resize->last_multi_mft;
+
+		if (inode != FILE_MFT && inode != FILE_MFTMirr)
+			supported = 1;
+	
+	} else if (flags & ATTR_IS_SPARSE) {
+		llcn = &resize->last_sparse;
+		supported = 1;
+	
+	} else if (flags & ATTR_IS_COMPRESSED) {
+		llcn = &resize->last_compressed;
+		supported = 1;
+	
+	} else if (inode == FILE_MFT) {
 		llcn = &resize->last_mft;
+
+		/* First run of $MFT DATA attribute isn't supported yet */
+		if (resize->ctx->attr->type != AT_DATA || rl->vcn)
+			supported = 1;
 	
-	else if (inode == 1)
+	} else if (inode == FILE_MFTMirr) {
 		llcn = &resize->last_mftmir;
-	
-	else 
+		supported = 1;
+
+		/* Fragmented $MFTMirr DATA attribute isn't supported yet */
+		if (resize->ctx->attr->type == AT_DATA)
+			if (rl[1].length != 0 || rl->vcn)
+				supported = 0;
+	} else {
 		llcn = &resize->last_lcn;
+		supported = 1;
+	}
 	
 	if (llcn->lcn < last_lcn) {
 		llcn->lcn = last_lcn;
 		llcn->inode = inode;
 	}	
+
+	if (resize->last_unsafe < last_lcn)
+		resize->last_unsafe = last_lcn;
+
+	if (supported)
+		return;
 
 	if (resize->last_unsupp < last_lcn)
 		resize->last_unsupp = last_lcn;
@@ -543,31 +655,45 @@ static void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 
 static void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
 {
-	s64 new_volume_size, lcn, lcn_length;
+	s64 lcn, lcn_length, start, len, inode;
+	s64 new_vol_size;	/* (last LCN on the volume) + 1 */
 	
 	lcn = rl->lcn;
 	lcn_length = rl->length;
-	new_volume_size = resize->new_volume_size;
+	inode = resize->ni->mft_no;
+	new_vol_size = resize->new_volume_size;
 	
-	if (lcn + (lcn_length - 1) > new_volume_size) {
+	if (lcn + lcn_length <= new_vol_size)
+		return;
 
-		s64 start = lcn;
-		s64 len = lcn_length;
+	start = lcn;
+	len = lcn_length;
 
-		if (start <= new_volume_size) {
-			start = new_volume_size + 1;
-			len = lcn_length - (start - lcn);
+	if (lcn < new_vol_size) {
+		start = new_vol_size;
+		len = lcn_length - (new_vol_size - lcn);
+
+		if (!opt.info && (inode == FILE_MFT || inode == FILE_MFTMirr)) {
+			int unsafe = 3;
+			s64 last_lcn;
+
+			err_printf("$MFT%s can't be split up yet. Please try "
+				   "a different size.\n", inode ? "Mirr" : "");
+			last_lcn = lcn + lcn_length - 1;
+			if (last_lcn == resize->last_unsafe)
+				unsafe = 2;
+			print_advise(last_lcn, unsafe);
+			exit(1);
 		}
-
-		resize->relocations += len;
-
-		if (opt.info && !resize->new_volume_size)
-			return;
-		
-		printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
-			"length %6lld\n", resize->ni->mft_no,
-		       resize->ctx->attr->type, start, len);
 	}
+
+	resize->relocations += len;
+
+	if (!opt.info || !resize->new_volume_size)
+		return;
+	
+	printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
+	       "length %6lld\n", inode, resize->ctx->attr->type, start, len);
 }
 
 /**
@@ -623,7 +749,7 @@ static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 
 		resize->inuse += lcn_length;
 		
-		collect_shrink_constraints(resize, lcn + (lcn_length - 1));
+		collect_shrink_constraints(resize, rl + i);
 		
 		if (resize->shrink)
 			collect_shrink_info(resize, rl + i);
@@ -770,15 +896,14 @@ static void walk_inodes(ntfs_resize_t *resize)
 	s64 inode = 0;
 	s64 last_mft_rec;
 	ntfs_inode *ni;
-	struct progress_bar progress;
 
 	printf("Checking filesystem consistency ...\n");
 
 	last_mft_rec = vol->nr_mft_records - 1;
-	progress_init(&progress, inode, last_mft_rec, 100);
+	progress_init(&resize->progress, inode, last_mft_rec, 100);
 
 	for (; inode <= last_mft_rec; inode++) {
-		progress_update(&progress, inode);
+		progress_update(&resize->progress, inode);
 
 		if ((ni = ntfs_inode_open(vol, (MFT_REF)inode)) == NULL) {
 			/* FIXME: continue only if it make sense, e.g.
@@ -797,6 +922,536 @@ close_inode:
 		if (ntfs_inode_close(ni))
 			perr_exit("ntfs_inode_close for inode %lld", inode);
 	}
+}
+
+static void rl_fixup(runlist **rl)
+{
+	runlist *tmp = *rl;
+
+	if (tmp->lcn == LCN_RL_NOT_MAPPED) {
+		s64 unmapped_len = tmp->length;
+
+		Vprintf("Skip unmapped run at the beginning ...\n");
+
+		if (!tmp->length)
+			err_exit("Empty unmapped runlist! Please report!\n");
+		(*rl)++;
+		for (tmp = *rl; tmp->length; tmp++)
+			tmp->vcn -= unmapped_len;
+	}
+
+	for (tmp = *rl; tmp->length; tmp++) {
+		if (tmp->lcn == LCN_RL_NOT_MAPPED) {
+			Vprintf("Skip unmapped run at the end  ...\n");
+
+			if (tmp[1].length)
+				err_exit("Unmapped runlist in the middle! "
+					 "Please report!\n");
+			tmp->lcn = LCN_ENOENT;
+			tmp->length = 0;
+		}
+	}
+}
+
+static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
+{
+	int mp_size, l;
+	void *mp;
+	char *next_attr;
+	ATTR_RECORD *a = ctx->attr;
+	
+	rl_fixup(&rl);
+
+	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
+		perr_exit("ntfs_get_size_for_mapping_pairs");
+	
+	if (a->name_length) {
+		u16 name_offs = le16_to_cpu(a->name_offset);
+		u16 mp_offs = le16_to_cpu(a->mapping_pairs_offset);
+
+		if (name_offs >= mp_offs)
+			err_exit("Attribute name is after mapping pairs! "
+				 "Please report!\n");
+	}
+
+	/* CHECKME: don't trust mapping_pairs is always the last item in the
+	   attribute, instead check for the real size/space */
+	l = (int)le32_to_cpu(a->length) - le16_to_cpu(a->mapping_pairs_offset);
+	if (mp_size > l) {
+		s64 remains_size; //, new_attr_size;
+
+		Vprintf("Enlarging attribute header ...\n");
+	
+		mp_size = (mp_size + 7) & ~7;
+		
+		Vprintf("Old mp size      : %d\n", l);
+		Vprintf("New mp size      : %d\n", mp_size);
+		Vprintf("Bytes in use     : %d\n", ctx->mrec->bytes_in_use);
+	
+		next_attr = (char *)a + le16_to_cpu(a->length);
+		l = mp_size - l;
+		
+		Vprintf("Bytes in use new : %d\n", ctx->mrec->bytes_in_use + l);
+		Vprintf("Bytes allocated  : %d\n", ctx->mrec->bytes_allocated);
+
+		remains_size = ctx->mrec->bytes_in_use;
+		remains_size -= (next_attr - (char *)ctx->mrec);
+
+		Vprintf("increase         : %d\n", l);
+		Vprintf("shift            : %lld\n", remains_size);
+		
+		if (ctx->mrec->bytes_in_use + l > ctx->mrec->bytes_allocated)
+			err_exit("Extended record needed (%d > %d), not yet "
+				 "supported!\nPlease try to free less space.\n",
+				 ctx->mrec->bytes_in_use + l,
+				 ctx->mrec->bytes_allocated);
+
+		memmove(next_attr + l, next_attr, remains_size);
+		ctx->mrec->bytes_in_use += l;
+		a->length += l;
+	}
+
+	if (!(mp = calloc(1, mp_size)))
+		perr_exit("Couldn't get memory");
+
+	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
+		perr_exit("ntfs_mapping_pairs_build");
+
+	memmove((char *)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
+
+	free(mp);
+}
+
+static void set_bitmap_range(s64 pos, s64 length, u8 bit)
+{
+	while (length--)
+		ntfs_bit_set(lcn_bitmap.bm, pos++, bit);
+}
+
+static void set_bitmap_clusters(runlist *rl, u8 bit)
+{
+	for (; rl->length; rl++)
+		set_bitmap_range(rl->lcn, rl->length, bit);
+}
+
+static void release_bitmap_clusters(runlist *rl)
+{
+	max_free_cluster_range = 0;
+	set_bitmap_clusters(rl, 0);
+}
+
+static void set_max_free_zone(s64 length, s64 end, runlist_element *rle)
+{
+	if (length > rle->length) {
+		rle->lcn = end - length;
+		rle->length = length;
+	}
+}
+
+static int find_free_cluster(runlist_element *rle, s64 nr_vol_clusters, int hint)
+{
+	/* FIXME: get rid of this 'static' variable */
+	static s64 pos = 0;
+	s64 i, items = rle->length;
+	s64 free_zone = 0;
+
+	if (pos >= nr_vol_clusters)
+		pos = 0;
+	if (!max_free_cluster_range)
+		max_free_cluster_range = nr_vol_clusters;
+	rle->lcn = rle->length = 0;
+	if (hint)
+		pos = nr_vol_clusters / 2;
+	i = pos;
+
+	do {
+		if (!ntfs_bit_get(lcn_bitmap.bm, i)) {
+			if (++free_zone == items) {
+				set_max_free_zone(free_zone, i + 1, rle);
+				break;
+			}
+		} else {
+			set_max_free_zone(free_zone, i, rle);
+			free_zone = 0;
+		}
+		if (++i == nr_vol_clusters) {
+			set_max_free_zone(free_zone, i, rle);
+			i = free_zone = 0;
+		}
+		if (rle->length == max_free_cluster_range)
+			break;
+	} while (i != pos);
+
+	if (i)
+		set_max_free_zone(free_zone, i, rle);
+
+	if (!rle->lcn) {
+		errno = ENOSPC;
+		return -1;
+	}
+	if (rle->length < items && rle->length < max_free_cluster_range) {
+		max_free_cluster_range = rle->length;
+		Vprintf("Max free range: %7lld     \n", max_free_cluster_range);
+	}
+	pos = rle->lcn + items;
+	if (pos == nr_vol_clusters)
+		pos = 0;
+
+	set_bitmap_range(rle->lcn, rle->length, 1);
+	return 0;
+}
+
+static runlist *alloc_cluster(s64 items, s64 nr_vol_clusters, int hint)
+{
+	runlist_element rle;
+	runlist *rl = NULL;
+	int rl_size, runs = 0;
+	s64 vcn = 0;
+
+	if (items <= 0) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	while (items > 0) {
+
+		if (runs)
+			hint = 0;
+		rle.length = items;
+		if (find_free_cluster(&rle, nr_vol_clusters, hint) == -1)
+			return NULL;
+		
+		rl_size = (runs + 2) * sizeof(runlist_element);
+		if (!(rl = (runlist *)realloc(rl, rl_size)))
+			return NULL;
+
+		rl_set(rl + runs, vcn, rle.lcn, rle.length);
+
+		vcn += rle.length;
+		items -= rle.length;
+		runs++;
+	}
+
+	rl_set(rl + runs, vcn, -1LL, 0LL);
+	
+	if (runs > 1) {
+		Vprintf("Multi-run allocation:    \n");
+		dump_runlist(rl);
+	}
+	return rl;
+}
+
+static int read_all(struct ntfs_device *dev, void *buf, int count)
+{
+	int i;
+	
+	while (count > 0) {
+		
+		i = count;
+		if (!NDevReadOnly(dev))
+			i = dev->d_ops->read(dev, buf, count);
+
+		if (i < 0) {
+			if (errno != EAGAIN && errno != EINTR)
+				return -1;
+		} else if (i > 0) {
+			count -= i;
+			buf = i + (char *)buf;
+		} else
+			err_exit("Unexpected end of file!\n");
+	}
+	return 0;
+}
+
+static int write_all(struct ntfs_device *dev, void *buf, int count)
+{
+	int i;
+	
+	while (count > 0) {
+
+		i = count;
+		if (!NDevReadOnly(dev))
+			i = dev->d_ops->write(dev, buf, count);
+
+		if (i < 0) {
+			if (errno != EAGAIN && errno != EINTR)
+				return -1;
+		} else {
+			count -= i;
+			buf = i + (char *)buf;
+		}
+	}
+	return 0;
+}
+
+/**
+ * write_mft_record
+ *
+ * Write an MFT Record back to the disk.  If the read-only command line option
+ * was given, this function will do nothing.
+ */
+static int write_mft_record(const MFT_REF mref, MFT_RECORD *mrec)
+{
+	if (ntfs_mft_record_write(vol, mref, mrec))
+		perr_exit("ntfs_mft_record_write");
+
+//	if (vol->dev->d_ops->sync(vol->dev) == -1)
+//		perr_exit("Failed to sync device");
+
+	return 0;
+}
+
+static void lseek_to_cluster(s64 lcn)
+{
+	off_t pos;
+	
+	pos = (off_t)(lcn * vol->cluster_size);
+	
+	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
+		perr_exit("seek failed to position %lld", lcn);
+}
+
+static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
+{
+	s64 i;
+	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	
+	for (i = 0; i < len; i++) {
+
+		lseek_to_cluster(src + i);
+	
+		if (read_all(vol->dev, buff, vol->cluster_size) == -1)
+			perr_exit("read_all");
+		
+		lseek_to_cluster(dest + i);
+	
+		if (write_all(vol->dev, buff, vol->cluster_size) == -1)
+			perr_exit("write_all");
+		
+		resize->relocations++;
+		progress_update(&resize->progress, resize->relocations);
+	}
+}
+
+static void relocate_clusters(ntfs_resize_t *r, runlist *dest_rl, s64 src_lcn)
+{
+	/* collect_shrink_constraints() ensured $MFTMir DATA is one run */
+	if (r->mref == FILE_MFTMirr && r->ctx->attr->type == AT_DATA) {
+		if (!r->mftmir_old) {
+			r->mftmir_rl.lcn = dest_rl->lcn;
+			r->mftmir_rl.length = dest_rl->length;
+			r->mftmir_old = src_lcn;
+		} else
+			err_exit("Multi-run $MFTMirr. Please report!\n");
+	}
+
+	for (; dest_rl->length; src_lcn += dest_rl->length, dest_rl++)
+		copy_clusters(r, dest_rl->lcn, src_lcn, dest_rl->length);
+}
+	
+static void rl_split_run(runlist **rl, int run, s64 pos)
+{
+	runlist *rl_new, *rle_new, *rle;
+	int items, new_size, size_head, size_tail;
+	s64 len_head, len_tail;
+	
+	items = rl_items(*rl);
+	new_size = (items + 1) * sizeof(runlist_element);
+	size_head = run * sizeof(runlist_element);
+	size_tail = (items - run - 1) * sizeof(runlist_element);
+
+	if (!(rl_new = (runlist *)malloc(new_size)))
+		perr_exit("malloc");
+
+	rle_new = rl_new + run;
+	rle = *rl + run;
+
+	memmove(rl_new, *rl, size_head);
+	memmove(rle_new + 2, rle + 1, size_tail);
+
+	len_tail = rle->length - (pos - rle->lcn);
+	len_head = rle->length - len_tail;
+	
+	rl_set(rle_new, rle->vcn, rle->lcn, len_head);
+	rl_set(rle_new + 1, rle->vcn + len_head, rle->lcn + len_head, len_tail);
+	
+	Vprintf("Splitting run at cluster %lld:\n", pos);
+	dump_run(rle); dump_run(rle_new); dump_run(rle_new + 1);
+
+	free(*rl);
+	*rl = rl_new;
+}
+
+static void rl_insert_at_run(runlist **rl, int run, runlist *ins)
+{
+	int items, ins_items;
+	int new_size, size_tail;
+	runlist *rle;
+	s64 vcn;
+
+	items  = rl_items(*rl);
+	ins_items = rl_items(ins) - 1;
+	new_size = ((items - 1) + ins_items) * sizeof(runlist_element);
+	size_tail = (items - run - 1) * sizeof(runlist_element);
+
+	if (!(*rl = (runlist *)realloc(*rl, new_size)))
+		perr_exit("realloc");
+
+	rle = *rl + run;
+
+	memmove(rle + ins_items, rle + 1, size_tail);
+
+	for (vcn = rle->vcn; ins->length; rle++, vcn += ins->length, ins++) {
+		rl_set(rle, vcn, ins->lcn, ins->length);
+//		dump_run(rle);
+	}
+
+	return;
+
+	/* FIXME: fastpath if ins_items = 1 */
+//	(*rl + run)->lcn = ins->lcn;
+}
+
+static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
+{
+	s64 lcn, lcn_length;
+	s64 new_vol_size;	/* (last LCN on the volume) + 1 */
+	runlist *relocate_rl;	/* relocate runlist to relocate_rl */
+	int hint;
+
+	lcn = (*rl + run)->lcn;
+	lcn_length = (*rl + run)->length;
+	new_vol_size = resize->new_volume_size;
+	
+	if (lcn + lcn_length <= new_vol_size)
+		return;
+
+	if (lcn < new_vol_size) {
+		rl_split_run(rl, run, new_vol_size);
+		return;
+	}
+
+	hint = (resize->mref == FILE_MFTMirr) ? 1 : 0;
+	if (!(relocate_rl = alloc_cluster(lcn_length, new_vol_size, hint)))
+		perr_exit("Cluster allocation failed for %llu:%lld",
+			  resize->mref, lcn_length);
+	
+	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
+	Vprintf("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> 0x%08llx\n",
+	       resize->mref, resize->ctx->attr->type, lcn_length, lcn,
+	       relocate_rl->lcn);
+
+	relocate_clusters(resize, relocate_rl, lcn);
+	rl_insert_at_run(rl, run, relocate_rl);
+
+	/* We don't release old clusters in the bitmap, that area isn't
+	   used by the allocator and will be truncated later on */
+	free(relocate_rl);
+
+	resize->dirty_inode = DIRTY_ATTRIB;
+}
+
+static void relocate_attribute(ntfs_resize_t *resize)
+{
+	ATTR_RECORD *a;
+	runlist *rl;
+	int i;
+
+	a = resize->ctx->attr;
+
+	if (!a->non_resident)
+		return;
+
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
+		perr_exit("ntfs_decompress_mapping_pairs");
+
+	for (i = 0; rl[i].length; i++) {
+		s64 lcn = rl[i].lcn;
+		s64 lcn_length = rl[i].length;
+
+		if (lcn == LCN_HOLE || lcn == LCN_RL_NOT_MAPPED)
+			continue;
+
+		/* FIXME: ntfs_mapping_pairs_decompress should return error */
+		if (lcn < 0 || lcn_length <= 0)
+			err_exit("Corrupt runlist in MTF %llu attr %x LCN "
+				 "%llx length %llx\n", resize->mref,
+				 le32_to_cpu (a->type), lcn, lcn_length);
+
+		relocate_run(resize, &rl, i);
+	}
+
+	if (resize->dirty_inode == DIRTY_ATTRIB) {
+		replace_attribute_runlist(resize->ctx, rl);
+		resize->dirty_inode = DIRTY_INODE;
+	}
+
+	free(rl);
+}
+
+static void relocate_attributes(ntfs_resize_t *resize)
+{
+	ntfs_attr_search_ctx *ctx;
+
+	if (!(ctx = ntfs_attr_get_search_ctx(NULL, resize->mrec)))
+		perr_exit("ntfs_get_attr_search_ctx");
+
+	while (!ntfs_attrs_walk(ctx)) {
+		if (ctx->attr->type == AT_END)
+			break;
+		resize->ctx = ctx;
+		relocate_attribute(resize);
+	}
+
+	ntfs_attr_put_search_ctx(ctx);
+}
+
+static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref)
+{
+	if (ntfs_file_record_read(vol, mref, &resize->mrec, NULL)) {
+		/* FIXME: continue only if it make sense, e.g.
+		   MFT record not in use based on $MFT bitmap */
+		if (errno == EIO || errno == ENOENT)
+			return;
+		perr_exit("ntfs_file_record_record");
+	}
+
+	if (!(resize->mrec->flags & MFT_RECORD_IN_USE))
+		return;
+
+	resize->mref = mref;
+	resize->dirty_inode = DIRTY_NONE;
+
+	relocate_attributes(resize);
+
+	if (resize->dirty_inode == DIRTY_INODE) {
+//		if (vol->dev->d_ops->sync(vol->dev) == -1)
+//			perr_exit("Failed to sync device");
+		if (write_mft_record(mref, resize->mrec))
+			perr_exit("Couldn't update inode %llu", mref);
+	}
+}
+
+static void relocate_inodes(ntfs_resize_t *resize)
+{
+	MFT_REF mref;
+
+	printf("Relocating needed data ...\n");
+
+	progress_init(&resize->progress, 0, resize->relocations, 100);
+	resize->relocations = 0;
+	
+	resize->mrec = (MFT_RECORD *)malloc(vol->mft_record_size);
+	if (!resize->mrec)
+		perr_exit("malloc failed");
+
+   	for (mref = 1; mref < (MFT_REF)vol->nr_mft_records; mref++)
+		relocate_inode(resize, mref);
+
+	relocate_inode(resize, 0);
+
+	if (resize->mrec)
+		free(resize->mrec);
 }
 
 static void print_hint(const char *s, struct llcn_t llcn)
@@ -820,65 +1475,27 @@ static void print_hint(const char *s, struct llcn_t llcn)
  */
 static void advise_on_resize(ntfs_resize_t *resize)
 {
-	s64 old_b, new_b, g_b, old_mb, new_mb, g_mb;
-	s64 supp_lcn = 0; /* smallest size supported in LCN */ 
-	int fragmanted_end;
+	int final;
 
 	printf("Calculating smallest shrunken size supported ...\n");
 
-	old_b = vol->nr_clusters * vol->cluster_size;
-	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
-	
 	printf("File feature         Last used at      By inode\n");
 	print_hint("$MFT", resize->last_mft);
-	print_hint("$MFTMirr", resize->last_mftmir);
-	print_hint("Compressed", resize->last_compressed);
-	print_hint("Sparse", resize->last_sparse);
 	print_hint("Multi-Record", resize->last_multi_mft);
-	print_hint("Ordinary", resize->last_lcn);
-
-	supp_lcn = resize->last_unsupp;
-	
-	supp_lcn += 2; /* first free + one for the backup boot sector */
-	fragmanted_end = (supp_lcn >= vol->nr_clusters) ? 1 : 0;
-
-	if (fragmanted_end || !opt.info) {
-		printf(fragmented_volume_msg);
-		if (fragmanted_end)
-			return;
-		printf("Now ");
+	if (opt.verbose) {
+		print_hint("$MFTMirr", resize->last_mftmir);
+		print_hint("Compressed", resize->last_compressed);
+		print_hint("Sparse", resize->last_sparse);
+		print_hint("Ordinary", resize->last_lcn);
 	}
 
-	new_b = supp_lcn * vol->cluster_size;
-	new_mb = rounded_up_division(new_b, NTFS_MBYTE);
-	g_b = (vol->nr_clusters - supp_lcn) * vol->cluster_size;
-	g_mb = g_b / NTFS_MBYTE;
+	final = (resize->last_unsafe == resize->last_unsupp) ? 2 : 0;
+	print_advise(resize->last_unsafe, final);
 
-	printf("You could resize at %lld bytes ", new_b);
+	if (final)
+		return;
 
-	if ((new_mb * NTFS_MBYTE) < old_b)
-		printf("or %lld MB ", new_mb);
-
-	printf("(freeing ");
-
-	if (g_mb && (old_mb - new_mb))
-	    printf("%lld MB", old_mb - new_mb);
-	else
-	    printf("%lld bytes", g_b);
-
-	printf(").\n");
-}
-
-/**
- * rl_set
- *
- * Helper to set up a runlist object
- */
-static void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
-{
-	rl->vcn = vcn;
-	rl->lcn = lcn;
-	rl->length = len;
+	print_advise(resize->last_unsupp, 3);
 }
 
 /**
@@ -901,42 +1518,28 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  * FIXME: this function should go away and instead using a generalized
  * "truncate_bitmap_data_attr()"
  */
-static void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
+static void truncate_badclust_bad_attr(ntfs_attr_search_ctx *ctx, s64 nr_clusters)
 {
 	runlist *rl_bad;
-	int mp_size;
-	char *mp;
+	ATTR_RECORD *a = ctx->attr;
 
 	if (!a->non_resident)
 		/* FIXME: handle resident attribute value */
-		perr_exit("Resident attribute in $BadClust not supported!");
+		err_exit("Resident attribute in $BadClust isn't supported!\n");
 
-	if (!(rl_bad = (runlist *)malloc(2 * sizeof(runlist))))
+	if (!(rl_bad = (runlist *)malloc(2 * sizeof(runlist_element))))
 		perr_exit("Couldn't get memory");
 
-	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
-	rl_set(rl_bad + 1, nr_clusters, -1LL, 0LL);
-
-	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad)) == -1)
-		perr_exit("ntfs_get_size_for_mapping_pairs");
-
-	if (mp_size > (int)(le32_to_cpu (a->length) -
-			le16_to_cpu (a->mapping_pairs_offset)))
-		err_exit("Enlarging attribute header isn't supported yet.\n");
-
-	if (!(mp = (char *)calloc(1, mp_size)))
-		perr_exit("Couldn't get memory");
-
-	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl_bad))
-		perr_exit("ntfs_mapping_pairs_build");
-
-	memcpy((char *)a + le16_to_cpu (a->mapping_pairs_offset), mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
 	a->data_size = cpu_to_le64(nr_clusters * vol->cluster_size);
 
+	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
+	rl_set(rl_bad + 1, nr_clusters, -1LL, 0LL);
+
+	replace_attribute_runlist(ctx, rl_bad);
+
 	free(rl_bad);
-	free(mp);
 }
 
 /**
@@ -990,38 +1593,18 @@ static void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new
  * Enlarge the metadata file $Bitmap.  It must be large enough for one bit per
  * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-static void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
+static void enlarge_bitmap_data_attr(runlist **rl, s64 nr_bm_clusters, s64 new_size)
 {
-	runlist *rl = *rlist;
-	s64 i, j, free_zone = 0;
+	s64 i;
 
-	for (i = 0; rl[i].length; i++)
-		for (j = 0; j < rl[i].length; j++)
-			ntfs_bit_set(lcn_bitmap.bm, rl[i].lcn + j, 0);
-	free(rl);
-
-	if (!(rl = *rlist = (runlist *)malloc(2 * sizeof(runlist))))
-		perr_exit("Couldn't get memory");
+	release_bitmap_clusters(*rl);
+	free(*rl);
 
 	for (i = vol->nr_clusters; i < new_size; i++)
 		ntfs_bit_set(lcn_bitmap.bm, i, 0);
 
-	for (i = 0; i < new_size; i++) {
-		if (!ntfs_bit_get(lcn_bitmap.bm, i)) {
-			if (++free_zone == nr_bm_clusters)
-				break;
-		} else
-			free_zone = 0;
-	}
-
-	if (free_zone != nr_bm_clusters)
-		err_exit("Couldn't allocate $Bitmap clusters.\n");
-
-	for (; free_zone; free_zone--, i--)
-		ntfs_bit_set(lcn_bitmap.bm, i, 1);
-
-	rl_set(rl, 0LL, i + 1, nr_bm_clusters);
-	rl_set(rl + 1, nr_bm_clusters, -1LL, 0LL);
+	if (!(*rl = alloc_cluster(nr_bm_clusters, new_size, 0)))
+		perr_exit("Couldn't allocate $Bitmap clusters");
 }
 
 /**
@@ -1034,14 +1617,12 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	s64 bm_bsize, size;
 	s64 nr_bm_clusters;
 	s64 nr_clusters;
-	int mp_size;
-	char *mp;
 	u8 *tmp;
 
 	a = resize->ctx->attr;
 	if (!a->non_resident)
 		/* FIXME: handle resident attribute value */
-		perr_exit("Resident data attribute in $Bitmap not supported!");
+		err_exit("Resident attribute in $Bitmap isn't supported!\n");
 
 	nr_clusters = resize->new_volume_size;
 	bm_bsize = nr_clusters_to_bitmap_byte_size(nr_clusters);
@@ -1063,24 +1644,12 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	else
 		enlarge_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
 
-	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
-		perr_exit("ntfs_get_size_for_mapping_pairs");
-
-	if (mp_size > (int)(le32_to_cpu (a->length) -
-			le16_to_cpu (a->mapping_pairs_offset)))
-		err_exit("Enlarging attribute header isn't supported yet.\n");
-
-	if (!(mp = (char *)calloc(1, mp_size)))
-		perr_exit("Couldn't get memory");
-
-	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl))
-		perr_exit("ntfs_mapping_pairs_build");
-
-	memcpy((char *)a + le16_to_cpu (a->mapping_pairs_offset), mp, mp_size);
 	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
 	a->data_size = cpu_to_le64(bm_bsize);
 	a->initialized_size = cpu_to_le64(bm_bsize);
+	
+	replace_attribute_runlist(resize->ctx, rl);
 
 	/*
 	 * FIXME: update allocated/data sizes and timestamps in $FILE_NAME
@@ -1091,13 +1660,11 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	if (bm_bsize != size) {
 		if (size == -1)
 			perr_exit("Couldn't write $Bitmap");
-		printf("Couldn't write full $Bitmap file "
-		       "(%lld from %lld)\n", size, bm_bsize);
-		exit(1);
+		err_exit("Couldn't write full $Bitmap file "
+			 "(%lld from %lld)\n", size, bm_bsize);
 	}
 
 	free(rl);
-	free(mp);
 }
 
 /**
@@ -1132,23 +1699,6 @@ static void lookup_data_attr(MFT_REF mref, const char *aname, ntfs_attr_search_c
 }
 
 /**
- * write_mft_record
- *
- * Write an MFT Record back to the disk.  If the read-only command line option
- * was given, this function will do nothing.
- */
-static int write_mft_record(ntfs_attr_search_ctx *ctx)
-{
-	if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec))
-		perr_exit("ntfs_mft_record_write");
-
-	if (vol->dev->d_ops->sync(vol->dev) == -1)
-		perr_exit("Failed to sync device");
-
-	return 0;
-}
-
-/**
  * truncate_badclust_file
  *
  * Shrink the $BadClus file to match the new volume size.
@@ -1161,9 +1711,9 @@ static void truncate_badclust_file(s64 nr_clusters)
 
 	lookup_data_attr((MFT_REF)FILE_BadClus, "$Bad", &ctx);
 	/* FIXME: sanity_check_attr(ctx->attr); */
-	truncate_badclust_bad_attr(ctx->attr, nr_clusters);
+	truncate_badclust_bad_attr(ctx, nr_clusters);
 
-	if (write_mft_record(ctx))
+	if (write_mft_record(ctx->ntfs_ino->mft_no, ctx->mrec))
 		perr_exit("Couldn't update $BadClust");
 
 	ntfs_attr_put_search_ctx(ctx);
@@ -1181,7 +1731,7 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 	lookup_data_attr((MFT_REF)FILE_Bitmap, NULL, &resize->ctx);
 	truncate_bitmap_data_attr(resize);
 
-	if (write_mft_record(resize->ctx))
+	if (write_mft_record(resize->ctx->ntfs_ino->mft_no, resize->ctx->mrec))
 		perr_exit("Couldn't update $Bitmap");
 
 	ntfs_attr_put_search_ctx(resize->ctx);
@@ -1210,45 +1760,55 @@ static void setup_lcn_bitmap(void)
  *
  * FIXME: should be done using ntfs_* functions
  */
-static void update_bootsector(s64 nr_clusters)
+static void update_bootsector(ntfs_resize_t *r)
 {
 	NTFS_BOOT_SECTOR bs;
+	s64  bs_size = sizeof(NTFS_BOOT_SECTOR);
 
 	printf("Updating Boot record ...\n");
 
 	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek");
 
-	if (vol->dev->d_ops->read(vol->dev, &bs,
-			sizeof(NTFS_BOOT_SECTOR)) == -1)
+	if (vol->dev->d_ops->read(vol->dev, &bs, bs_size) == -1)
 		perr_exit("read() error");
 
-	bs.number_of_sectors = nr_clusters * bs.bpb.sectors_per_cluster;
+	bs.number_of_sectors = r->new_volume_size * bs.bpb.sectors_per_cluster;
 	bs.number_of_sectors = cpu_to_le64(bs.number_of_sectors);
+
+	if (r->mftmir_old) {
+		int save_progress = opt.show_progress;
+
+		opt.show_progress = 0;
+		copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old, 
+			      r->mftmir_rl.length);
+		bs.mftmirr_lcn = cpu_to_le64(r->mftmir_rl.lcn);
+		opt.show_progress = save_progress;
+	}
 
 	if (vol->dev->d_ops->seek(vol->dev, 0, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek");
 
 	if (!opt.ro_flag)
-		if (vol->dev->d_ops->write(vol->dev, &bs,
-				sizeof(NTFS_BOOT_SECTOR)) == -1)
+		if (vol->dev->d_ops->write(vol->dev, &bs, bs_size) == -1)
 			perr_exit("write() error");
 }
 
 /**
- * volume_size
+ * vol_size
  */
-static s64 volume_size(ntfs_volume *v, s64 nr_clusters)
+static s64 vol_size(ntfs_volume *v, s64 nr_clusters)
 {
-	return nr_clusters * v->cluster_size;
+	/* add one sector_size for the backup boot sector */
+	return nr_clusters * v->cluster_size + v->sector_size;
 }
 
 /**
- * print_volume_size
+ * print_vol_size
  *
  * Print the volume size in bytes and decimal megabytes.
  */
-static void print_volume_size(const char *str, s64 bytes)
+static void print_vol_size(const char *str, s64 bytes)
 {
 	printf("%s: %lld bytes (%lld MB)\n",
 	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
@@ -1261,20 +1821,22 @@ static void print_volume_size(const char *str, s64 bytes)
  */
 static void print_disk_usage(ntfs_resize_t *resize)
 {
-	s64 total, used, relocations;
+	s64 total, used;
 
 	total = vol->nr_clusters * vol->cluster_size;
 	used = resize->inuse * vol->cluster_size;
-	relocations = resize->relocations * vol->cluster_size;
 
 	printf("Space in use       : %lld MB (%.1f%%)\n",
 	       rounded_up_division(used, NTFS_MBYTE),
 	       100.0 * ((float)used / total));
+}
+
+static void print_num_of_relocations(ntfs_resize_t *resize)
+{
+	s64 relocations = resize->relocations * vol->cluster_size;
 	
-	if (opt.bytes)
-		printf("Needed relocations : %lld (%lld MB)\n", 
-		       resize->relocations,
-		       rounded_up_division(relocations, NTFS_MBYTE));
+	printf("Needed relocations : %lld (%lld MB)\n", resize->relocations,
+	       rounded_up_division(relocations, NTFS_MBYTE));
 }
 
 /**
@@ -1308,12 +1870,8 @@ static void mount_volume(void)
 		int err = errno;
 
 		perr_printf("ntfs_mount failed");
-		if (err == EINVAL) {
-			printf("Apparently device '%s' doesn't have a "
-			       "valid NTFS. Maybe you selected\nthe whole "
-			       "disk instead of a partition (e.g. /dev/hda, "
-			       "not /dev/hda1)?\n", opt.volume);
-		}
+		if (err == EINVAL)
+			printf(invalid_ntfs_msg, opt.volume);
 		exit(1);
 	}
 
@@ -1321,14 +1879,16 @@ static void mount_volume(void)
 		if (opt.force-- <= 0)
 			err_exit("Volume is dirty. Run chkdsk /f and "
 				 "please try again (or see -f option).\n");
+	
+	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
+		err_exit("Cluster size %u is too large!\n", vol->cluster_size);
 
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
 	printf("Cluster size       : %u bytes\n", vol->cluster_size);
-	print_volume_size("Current volume size",
-			  volume_size(vol, vol->nr_clusters));
+	print_vol_size("Current volume size", vol_size(vol, vol->nr_clusters));
 }
 
 /**
@@ -1364,15 +1924,51 @@ static void prepare_volume_fixup(void)
 		perr_exit("Failed to sync device");
 }
 
-/**
- * main
- *
- * Start here
- */
+
+static void set_disk_usage_constraint(ntfs_resize_t *resize)
+{
+	/* last lcn for a filled up volume (no empty space) */
+	s64 last = resize->inuse - 1;
+	
+	if (resize->last_unsupp < last)
+		resize->last_unsupp = last;
+}
+
+static void check_shrink_constraints(ntfs_resize_t *resize)
+{
+	s64 new_size = resize->new_volume_size;
+
+	/* FIXME: resize.shrink true also if only -i is used */
+	if (!resize->shrink)
+		return;
+
+	if (resize->inuse == vol->nr_clusters)
+		err_exit("Volume is full. To shrink it, "
+			 "delete unused files.\n");
+	
+	if (opt.info)
+		return;
+
+	/* FIXME: reserve some extra space so Windows can boot ... */
+	if (new_size < resize->inuse)
+		err_exit("New size can't be less than the space already"
+			 " occupied by data.\nYou either need to delete unused"
+			 " files or see the -i option.\n");
+
+	if (new_size <= resize->last_unsupp)
+		err_exit("The fragmentation type, you have, isn't "
+			 "supported yet. Rerun ntfsresize\nwith "
+			 "the -i option to calculate the smallest "
+			 "shrunken volume size supported.\n");
+
+	print_num_of_relocations(resize);
+}
+
+
 int main(int argc, char **argv)
 {
 	ntfs_resize_t resize;
-	s64 new_size = 0;	/* in clusters */
+	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
 
 	printf("%s v%s\n", EXEC_NAME, VERSION);
@@ -1389,38 +1985,31 @@ int main(int argc, char **argv)
 	if (device_size <= 0)
 		err_exit("Couldn't get device size (%lld)!\n", device_size);
 
-	print_volume_size("Current device size", device_size);
+	print_vol_size("Current device size", device_size);
 
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
-			 "size (%lld)!\nCorrupt partition table or incorrect "
-			 "device partitioning?\n", device_size);
+			 "size!\nCorrupt partition table or incorrect device "
+			 "partitioning?\n");
 
-	if (opt.bytes) {
-		if (device_size < opt.bytes)
-			err_exit("New size can't be bigger than the "
-				 "device size (%lld bytes).\nIf you want to "
-				 "enlarge NTFS then first enlarge the device "
-				 "size by e.g. fdisk.\n", device_size);
-	} else if (!opt.info)
+	if (!opt.bytes && !opt.info)
 		opt.bytes = device_size;
 
-	/*
-	 * Take the integer part: we don't want to make the volume bigger
-	 * than requested. Later on we will also decrease this value to save
-	 * room for the backup boot sector.
-	 */
+	/* Take the integer part: don't make the volume bigger than requested */
 	new_size = opt.bytes / vol->cluster_size;
 
-	if (!opt.info)
-		print_volume_size("New volume size    ",
-				  volume_size(vol, new_size));
-
 	/* Backup boot sector at the end of device isn't counted in NTFS
-	   volume size thus we have to reserve space for. We don't trust
-	   the user does this for us: better to be on the safe side ;) */
+	   volume size thus we have to reserve space for it. */
 	if (new_size)
 		--new_size;
+
+	if (!opt.info) {
+		print_vol_size("New volume size    ", vol_size(vol, new_size));
+		if (device_size < opt.bytes)
+			err_exit("New size can't be bigger than the device size"
+				 ".\nIf you want to enlarge NTFS then first "
+				 "enlarge the device size by e.g. fdisk.\n");
+	}
 
 	if (!opt.info && (new_size == vol->nr_clusters ||
 			  (opt.bytes == device_size &&
@@ -1433,6 +2022,8 @@ int main(int argc, char **argv)
 
 	memset(&resize, 0, sizeof(resize));
 	resize.new_volume_size = new_size;
+
+	/* This is also true if --info was used w/o --size (new_size = 0) */
 	if (new_size < vol->nr_clusters)
 		resize.shrink = 1;
 	
@@ -1447,15 +2038,13 @@ int main(int argc, char **argv)
 	compare_bitmaps(&lcn_bitmap);
 
 	print_disk_usage(&resize);
+	
+	set_disk_usage_constraint(&resize);
+	check_shrink_constraints(&resize);
 
 	if (opt.info) {
-		advise_on_resize(&resize);
+	       	advise_on_resize(&resize);
 		exit(0);
-	}
-	
-	if (resize.last_unsupp >= new_size) {
-		advise_on_resize(&resize);
-		exit(1);
 	}
 
 	if (opt.force-- <= 0 && !opt.ro_flag) {
@@ -1463,14 +2052,18 @@ int main(int argc, char **argv)
 		proceed_question();
 	}
 
+	/* FIXME: performance - relocate logfile here if it's needed */
 	prepare_volume_fixup();
+
+	if (resize.relocations)
+		relocate_inodes(&resize);
 
 	truncate_badclust_file(new_size);
 	truncate_bitmap_file(&resize);
-	update_bootsector(new_size);
+	update_bootsector(&resize);
 
 	/* We don't create backup boot sector because we don't know where the
-	   partition will be split. The scheduled chkdsk will fix it anyway */
+	   partition will be split. The scheduled chkdsk will fix it */
 
 	if (opt.ro_flag) {
 		printf("The read-only test run ended successfully.\n");
@@ -1482,9 +2075,8 @@ int main(int argc, char **argv)
 		perr_exit("fsync");
 
 	printf("Successfully resized NTFS on device '%s'.\n", vol->dev->d_name);
-	if (new_size < vol->nr_clusters)
+	if (resize.shrink)
 		printf(resize_important_msg);
 
 	return 0;
 }
-
