@@ -31,10 +31,6 @@
 #include "cluster.h"
 #include "utils.h"
 
-DEC_PRINTF (Eprintf)
-DEC_PRINTF (Vprintf)
-DEC_PRINTF (Qprintf)
-
 #define RED	"[31m"
 #define YELLOW	"[33m"
 #define GREEN	"[01;32m"

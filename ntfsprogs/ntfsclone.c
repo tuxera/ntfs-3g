@@ -119,17 +119,10 @@ int wiped_timestamp_data = 0;
 #define read_all(f, p, n)  io_all((f), (p), (n), 0)
 #define write_all(f, p, n) io_all((f), (p), (n), 1)
 
-/* FIXME: They should be #included but Eprintf conflicts with mkntfs's Eprintf */
-extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-/* FIXME: should be 'static' */
-extern int Printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-
 GEN_PRINTF(Eprintf, stderr,  NULL,         FALSE)
 GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
 GEN_PRINTF(Qprintf, msg_out, &opt.quiet,   FALSE)
-GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
+static GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
 
 
 static void perr_printf(const char *fmt, ...)

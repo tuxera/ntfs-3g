@@ -58,11 +58,6 @@ const char *ntfs_gpl = "This program is free software, released under the GNU "
 
 #define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
 
-/* These utilities require the following functions */
-extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-
 /**
  * utils_set_locale
  */

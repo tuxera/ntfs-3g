@@ -227,8 +227,7 @@ static void Dprintf(const char *fmt, ...)
 /**
  * Eprintf - error output; ignores quiet (-q)
  */
-void Eprintf(const char *fmt, ...);
-void Eprintf(const char *fmt, ...)
+int Eprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -236,6 +235,7 @@ void Eprintf(const char *fmt, ...)
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
+	return 0;
 }
 
 /* Generate code for Vprintf() function: Verbose output (-v). */

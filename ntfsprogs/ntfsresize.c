@@ -156,14 +156,9 @@ s64 max_free_cluster_range = 0;
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
 
-/* FIXME: They should be included but Eprintf conflicts with mkntfs's Eprintf */
-extern int Eprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Vprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-extern int Qprintf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-
 GEN_PRINTF(Eprintf, stderr, NULL,         FALSE)
 GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, NULL,   FALSE)
+GEN_PRINTF(Qprintf, stdout, NULL,         FALSE)
 
 /**
  * perr_printf

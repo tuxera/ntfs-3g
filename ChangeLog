@@ -11,10 +11,12 @@ xx/xx/2004 - 1.9.2-WIP
 	  $LogFile.  (Szaka)
 	- Fix incorrect getopt_long() usage: converted argv[optind-1] to optarg
 	  so utilities won't do bogus and unexpected things.  (Szaka)
-	- Add new API security.[hc]::ntfs_sid_is_valid(), ntfs_sid_to_mbs(), and
-	  ntfs_sid_to_mbs_size().
+	- Add new API security.[hc]::ntfs_sid_is_valid(), ntfs_sid_to_mbs(),
+	  and ntfs_sid_to_mbs_size().
 	- Big enhancement of ntfsinfo.  (Yuval, me)
 	- Split mkntfs into multiple functions.  (Yuval)
+	- Compiler warning fixes in utilities related to GEN_PRINTF() and other
+	  things.  (Yuval)
 
 05/04/2004 - 1.9.1 - Make mkntfs create bootable volumes and fixes/updates.
 	- Update with SuSE 9.1 beta 1 versions of GNU build system.

@@ -70,6 +70,16 @@ extern const char *ntfs_gpl;
 		return ret;							\
 	}
 
+/* utils.c's utilities require the following functions implemented.
+ * Example of implementation is:
+ *	GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
+ *	GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
+ *	GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
+ */
+extern DEC_PRINTF(Eprintf)
+extern DEC_PRINTF(Vprintf)
+extern DEC_PRINTF(Qprintf)
+
 struct _IO_FILE;
 
 int ntfs_printf (struct _IO_FILE *stream, int *control, BOOL trigger,

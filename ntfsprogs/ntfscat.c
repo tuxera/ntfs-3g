@@ -299,10 +299,12 @@ int main (int argc, char *argv[])
 
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);
+#if 0
 	if (result)
-		;//Printf ("failed\n");
+		Printf ("failed\n");
 	else
-		;//Printf ("success\n");
+		Printf ("success\n");
+#endif
 	return result;
 }
 
