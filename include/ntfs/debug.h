@@ -30,7 +30,7 @@
 #	include <stdio.h>
 #endif
 
-#include "attrib.h"
+struct runlist_element;
 
 #ifdef DEBUG
 
