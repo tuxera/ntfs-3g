@@ -40,7 +40,9 @@ extern const char *ntfs_home;
 extern const char *ntfs_gpl;
 
 #define PATH_SEP	'/'
-#define MAX_PATH	1024
+#ifndef MAX_PATH
+#	define MAX_PATH 1024
+#endif
 
 #if !defined(REG_NOERROR) || (REG_NOERROR != 0)
 #	define REG_NOERROR 0
