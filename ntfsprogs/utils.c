@@ -92,6 +92,14 @@ int utils_valid_device (const char *name, int force)
 	unsigned long mnt_flags = 0;
 	struct stat st;
 
+#ifndef __CYGWIN32__
+	return 1; /* FIXME: This doesn't work for Cygwin, so just skip it for now... */
+#endif
+	if (!name) {
+		errno = EINVAL;
+		return 0;
+	}
+
 	if (stat (name, &st) == -1) {
 		if (errno == ENOENT) {
 			Eprintf ("The device %s doesn't exist\n", name);
@@ -137,14 +145,13 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 {
 	ntfs_volume *vol;
 
-	if (!device)
+	if (!device) {
+		errno = EINVAL;
 		return NULL;
+	}
 
-/* FIXME: This doesn't work for Cygwin, so just skip it for now... */
-#ifndef __CYGWIN32__
 	if (!utils_valid_device (device, force))
 		return NULL;
-#endif
 
 	vol = ntfs_mount (device, flags);
 	if (!vol) {
@@ -169,7 +176,7 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
  * utils_parse_size - Convert a string representing a size
  * @value:  String to be parsed
  * @size:   Parsed size
- * @scale:  XXX FIXME
+ * @scale:  Whether or not to allow a suffix to scale the value
  *
  * Read a string and convert it to a number.  Strings may be suffixed to scale
  * them.  Any number without a suffix is assumed to be in bytes.
@@ -193,8 +200,10 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 	long long result;
 	char *suffix = NULL;
 
-	if (!value || !size)
+	if (!value || !size) {
+		errno = EINVAL;
 		return 0;
+	}
 
 	Dprintf ("Parsing size '%s'.\n", value);
 
@@ -251,8 +260,10 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 	s64 a, b;
 	char *middle;
 
-	if (!string || !start || !finish)
+	if (!string || !start || !finish) {
+		errno = EINVAL;
 		return 0;
+	}
 
 	middle = strchr (string, '-');
 	if (string == middle) {
@@ -297,7 +308,7 @@ time_t ntfs2utc (s64 time)
 }
 
 /**
- * utc2ntfs - convert Linux time to NTFS time
+ * utc2ntfs - Convert Linux time to NTFS time
  * @time:  Linux time to convert to NTFS
  *
  * Convert the Linux time @time to its corresponding NTFS time.
@@ -333,8 +344,10 @@ s64 utc2ntfs (time_t time)
  */
 ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 {
-	if (!ctx)
+	if (!ctx) {
+		errno = EINVAL;
 		return NULL;
+	}
 
 	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
 		Dprintf ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
@@ -364,8 +377,10 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *rec;
 
-	if (!mft)
+	if (!mft) {
+		errno = EINVAL;
 		return NULL;
+	}
 
 	ctx = ntfs_attr_get_search_ctx (NULL, mft);
 	if (!ctx) {
@@ -407,8 +422,10 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 	char *names[max_path + 1];// XXX malloc? and make max bigger?
 	int i, len, offset = 0;
 
-	if (!inode || !buffer)
+	if (!inode || !buffer) {
+		errno = EINVAL;
 		return 0;
+	}
 
 	vol = inode->vol;
 
@@ -513,8 +530,10 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	ATTR_DEF *attrdef;
 
 	// flags: attr, name, or both
-	if (!attr || !buffer)
+	if (!attr || !buffer) {
+		errno = EINVAL;
 		return 0;
+	}
 
 	attrdef = ntfs_attr_find_in_attrdef (vol, attr->type);
 	if (attrdef) {
@@ -589,8 +608,10 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
 	int byte, bit;
 	ntfs_attr *attr;
 
-	if (!vol)
+	if (!vol) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	/* Does lcn lie in the section of $Bitmap we already have cached? */
 	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
@@ -647,8 +668,10 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 
 	int byte, bit;
 
-	if (!vol)
+	if (!vol) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	/* Does mref lie in the section of $Bitmap we already have cached? */
 	if ((mref < bmpmref) || (mref >= (bmpmref + (sizeof (buffer) << 3)))) {
@@ -698,6 +721,7 @@ ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, cons
 	char       *ascii   = NULL;
 
 	if (!vol || !pathname) {
+		errno = EINVAL;
 		return NULL;
 	}
 
@@ -799,8 +823,10 @@ int utils_is_metadata (ntfs_inode *inode)
 	MFT_RECORD *file;
 	u64 num;
 
-	if (!inode)
+	if (!inode) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	vol = inode->vol;
 	if (!vol)
@@ -840,6 +866,11 @@ struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol)
 {
 	struct mft_search_ctx *ctx;
 
+	if (!vol) {
+		errno = EINVAL;
+		return NULL;
+	}
+
 	ctx = calloc (1, sizeof *ctx);
 
 	ctx->mft_num = -1;
@@ -870,8 +901,10 @@ int mft_next_record (struct mft_search_ctx *ctx)
 	ATTR_RECORD *attr80 = NULL;
 	ntfs_attr_search_ctx *attr_ctx;
 
-	if (!ctx)
+	if (!ctx) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	if (ctx->inode) {
 		ntfs_inode_close (ctx->inode);
