@@ -40,34 +40,68 @@
 
 #include "config.h"
 
-#include <unistd.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
 
 #include "types.h"
+#include "endians.h"
+#include "volume.h"
+#include "inode.h"
 #include "attrib.h"
-#include "mft.h"
-#include "device.h"
+#include "layout.h"
 #include "logfile.h"
 #include "mst.h"
 
-const char *EXEC_NAME = "NtfsDump_LogFile";
-const char *EXEC_VERSION = "1.0";
+/* Need these global so ntfsdump_logfile_exit can access them. */
+static char *EXEC_NAME;
+static ntfs_volume *vol;
+static ntfs_inode *ni;
+static ntfs_attr *na;
+static u8 *lfd;
+
+/**
+ * err_exit - error output and terminate
+ */
+void err_exit(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "ERROR: ");
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "Aborting...\n");
+	exit(1);
+}
+
+/**
+ * ntfsdump_logfile_exit
+ */
+void ntfsdump_logfile_exit(void)
+{
+	if (lfd)
+		free(lfd);
+	if (na)
+		ntfs_attr_close(na);
+	if (ni && ntfs_inode_close(ni))
+		fprintf(stderr, "Warning: Failed to close $LogFile (inode "
+				"%i): %s\n", FILE_LogFile, strerror(errno));
+	if (ntfs_umount(vol, 0))
+		fprintf(stderr, "Warning: Failed to umount %s: %s\n",
+				EXEC_NAME, strerror(errno));
+}
 
 /**
  * main
  */
 int main(int argc, char **argv)
 {
-	MFT_RECORD *m = NULL;
-	ATTR_RECORD *a;
-	s64 l;
-	unsigned char *lfd = NULL;
-	ntfs_volume *vol = NULL;
-	ntfs_attr_search_ctx *ctx = NULL;
+	s64 br;
+	int err;
+
 	RESTART_PAGE_HEADER *rph;
 	RESTART_AREA *rr;
 	RESTART_CLIENT *cr;
@@ -75,101 +109,70 @@ int main(int argc, char **argv)
 	LOG_RECORD *lr;
 	int pass = 1;
 	int i, lps, client;
-	char zero[4096];
 
-	memset(zero, 0, sizeof(zero));
+	EXEC_NAME = argv[0];
 	printf("\n");
-	if (argc != 2) {
-		printf("%s v%s - Interpret and display information about the "
-		       "journal\n($LogFile) of an NTFS volume.\n\n"
-		       /* Generic copyright / disclaimer. */
-		       "Copyright (c) 2000, 2001 Anton Altaparmakov.\n\n"
-		       "%s is free software, released under the GNU "
-		       "General Public License\nand you are welcome to "
-		       "redistribute it under certain conditions.\n"
-		       "%s comes with ABSOLUTELY NO WARRANTY; for details "
-		       "read the GNU\nGeneral Public License to be found "
-		       "in the file COPYING in the main Linux-NTFS\n"
-		       "distribution directory.\n\n"
-		       /* Generic part ends here. */
-		       "Syntax: ntfsdump_logfile partition_or_file_name\n"
-		       "        e.g. ntfsdump_logfile /dev/hda6\n\n",
-		       EXEC_NAME, EXEC_VERSION, EXEC_NAME, EXEC_NAME);
-		fprintf(stderr, "Error: incorrect syntax\n");
-		exit(1);
-	}
+	if (argc != 2)
+		err_exit("%s v%s - Interpret and display information about "
+				"the journal\n($LogFile) of an NTFS volume.\n"
+				"Copyright (c) 2000-2004 Anton Altaparmakov.\n"
+				"%s is free software, released under the GNU "
+				"General Public License\nand you are welcome "
+				"to redistribute it under certain "
+				"conditions.\n%s comes with ABSOLUTELY NO "
+				"WARRANTY; for details read the GNU\nGeneral "
+				"Public License to be found in the file "
+				"COPYING in the main Linux-NTFS\ndistribution "
+				"directory.\nUsage: %s device\n    e.g. %s "
+				"/dev/hda6\n", EXEC_NAME, VERSION, EXEC_NAME,
+				EXEC_NAME, EXEC_NAME, EXEC_NAME);
 	vol = ntfs_mount(argv[1], MS_RDONLY);
-	if (!vol) {
-		perror("ntfs_mount(MS_RDONLY) failed");
-		exit(1);
+	if (!vol)
+		err_exit("Failed to mount %s: %s\n", argv[1], strerror(errno));
+	err = atexit(&ntfsdump_logfile_exit);
+	if (err < 0) {
+		err = errno;
+		ntfsdump_logfile_exit();
+		err_exit("Could not set up exit() function because atexit() "
+				"failed: %s\n", strerror(err));
 	}
-	/* Check NTFS version is ok for us. */
-	printf("\nNTFS volume version is %i.%i.\n", vol->major_ver,
-						  vol->minor_ver);
-	switch (vol->major_ver) {
-		case 1:
-			if (vol->minor_ver == 1 || vol->minor_ver == 2)
-				break;
-			else
-				goto version_error;
-		case 2:	case 3:
-			if (vol->minor_ver == 0)
-				break;
-			/* Fall through on error. */
-		default:
-version_error:
-		fprintf(stderr, "Error: Unknown NTFS version.\n");
-			goto error_exit;
-	}
-	/* Read in $LogFile. */
-	if (ntfs_file_record_read(vol, FILE_LogFile, &m, NULL)) {
-		fprintf(stderr, "Error reading mft record for $LogFile.\n");
-		goto error_exit;
-	}
-	if (!(m->flags & MFT_RECORD_IN_USE)) {
-		fprintf(stderr, "Error: $LogFile has been deleted. Run chkdsk "
-				"to fix this.\n");
-		goto error_exit;
-	}
-	ctx = ntfs_attr_get_search_ctx(NULL, m);
-	if (!ctx) {
-		perror("Failed to allocate attribute search context");
-		goto error_exit;
-	}
-	/* Find the $DATA attribute of the $LogFile. */
-	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		fprintf(stderr, "Error: Attribute $DATA was not found in" \
-				"$LogFile!\n");
-		goto log_file_error;
-	}
-	a = ctx->attr;
-	/* Get length of $LogFile contents. */
-	l = ntfs_get_attribute_value_length(a);
-	if (!l) {
-		puts("$LogFile has zero length, no need to write to disk.");
-		goto log_file_error;
-	}
-	/* Allocate a buffer to hold all of the $LogFile contents. */
-	lfd = (unsigned char*)malloc(l);
-	if (!lfd) {
-		puts("Not enough memory to load $LogFile.");
-		goto log_file_error;
-	}
-	/* Read in the $LogFile into the buffer. */
-	if (l != ntfs_get_attribute_value(vol, a, lfd)) {
-		puts("Amount of data read does not correspond to expected "
-		     "length!");
-		free(lfd);
-		goto log_file_error;
-	}
+	printf("\nMounted NTFS volume %s (NTFS v%i.%i) on device %s.\n",
+			vol->vol_name ? vol->vol_name : "<NO_NAME>",
+			vol->major_ver, vol->minor_ver, argv[1]);
+	if (ntfs_version_is_supported(vol))
+		err_exit("Unsupported NTFS version.\n");
+	ni = ntfs_inode_open(vol, FILE_LogFile);
+	if (!ni)
+		err_exit("Failed to open $LogFile (inode %i): %s\n",
+				FILE_LogFile, strerror(errno));
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na)
+		err_exit("Failed to open $LogFile/$DATA (attribute 0x%x): "
+				"%s\n", le32_to_cpu(AT_DATA), strerror(errno));
+	if (!na->data_size)
+		err_exit("$LogFile has zero length.  Run chkdsk /f to correct "
+				"this.\n");
+	/* For simplicity we hold the entirety of $LogFile/$DATA in memory. */
+	lfd = malloc(na->data_size);
+	if (!lfd)
+		err_exit("Failed to allocate buffer for $LogFile/$DATA: %s",
+				strerror(errno));
+	br = ntfs_attr_pread(na, 0, na->data_size, lfd);
+	if (br != na->data_size)
+			err_exit("Failed to read $LogFile/$DATA: %s", br < 0 ?
+					strerror(errno) : "Partial read.");
+	/*
+	 * We now have the entirety of $LogFile/$DATA in the memory buffer lfd.
+	 */
+// FIXME: TODO: I am here... (AIA)
 	/* Check restart area. */
 	if (!ntfs_is_rstr_recordp(lfd)) {
 		s64 _l;
 
-		for (_l = 0LL; _l < l; _l++)
+		for (_l = 0LL; _l < na->data_size; _l++)
 			if (lfd[_l] != (unsigned char)-1)
 				break;
-		if (_l < l)
+		if (_l < na->data_size)
 			puts("$LogFile contents are corrupt (magic RSTR "
 					"missing)!");
 		else
@@ -230,7 +233,7 @@ pass_loc:
 	printf("FileSize = %lld (0x%llx)\n",
 			(long long)sle64_to_cpu(rr->file_size),
 			(unsigned long long)sle64_to_cpu(rr->file_size));
-	if (sle64_to_cpu(rr->file_size) != l)
+	if (sle64_to_cpu(rr->file_size) != na->data_size)
 		puts("$LogFile restart area indicates a log file size"
 		     "different from the actual size!");
 	printf("LastLsnDataLength = 0x%x\n",
@@ -269,7 +272,7 @@ skip_rstr_pass:
 	printf("\nFinished with restart area. Beginning with log area.\n");
 rcrd_pass_loc:
 	rcrd_ph = (RECORD_PAGE_HEADER*)((char*)rcrd_ph + lps);
-	if ((char*)rcrd_ph + lps > (char*)lfd + l)
+	if ((char*)rcrd_ph + lps > (char*)lfd + na->data_size)
 		goto end_of_rcrd_passes;
 	printf("\nLog record page number %i", pass);
 	if (!ntfs_is_rcrd_record(rcrd_ph->magic)) {
@@ -361,20 +364,6 @@ log_record_pass:
 end_of_rcrd_passes:
 log_file_error:
 	printf("\n");
-	/* Set return code to 0. */
-	i = 0;
-final_exit:
-	if (lfd)
-		free(lfd);
-	if (ctx)
-		ntfs_attr_put_search_ctx(ctx);
-	if (m)
-		free(m);
-	if (vol && ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
-	return i;
-error_exit:
-	i = 1;
-	goto final_exit;
+	return 0;
 }
 
