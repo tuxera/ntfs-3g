@@ -3017,6 +3017,9 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		/*
 		 * Reminder: It is ok for a->highest_vcn to be -1 for zero
 		 * length files.
+		 * FIXME: We may not update a->highest_vcn if it equal to 0.
+		 * But bug in runlist mapping code prevent us from doing so.
+		 * Find and remove this bug.
 		 */
 		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 		/* Get the size for the new mapping pairs array. */
@@ -3139,8 +3142,9 @@ put_err_out:
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
+	int mft_changed = 0;
 	u8 *mft_rec_copy = NULL;
-	u32 mft_rec_copy_size;
+	u32 mft_rec_copy_size = 0;
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
 	s64 nr_need_allocate;
@@ -3276,27 +3280,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = errno;
 			fprintf(stderr, "%s(): Eeek! Get size for mapping "
 					"pairs failed.\n", __FUNCTION__);
-			if (ntfs_cluster_free(vol, na, na->allocated_size >>
-					vol->cluster_size_bits, -1) < 0) {
-				// FIXME: Eeek!  Leaving inconsistent metadata!
-				// (AIA)
-				fprintf(stderr, "%s(): Eeek!  Leaking "
-						"clusters.  Run chkdsk!\n",
-						__FUNCTION__);
-				err = EIO;
-			}
-			/* Now, truncate the runlist itself. */
-			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
-					vol->cluster_size_bits)) {
-				/*
-				 * Failed to truncate the runlist, so just
-				 * throw it away, it will be mapped afresh on
-				 * next use.
-				 */
-				free(na->rl);
-				na->rl = NULL;
-			}
-			goto put_err_out;
+			goto rollback;
 		}
 		/*
 		 * Determine maximum possible length of mapping pairs,
@@ -3315,27 +3299,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = ENOTSUP;
 			fprintf(stderr, "%s(): Eeek! Maping pairs size is"
 					" too big.\n", __FUNCTION__);
-			if (ntfs_cluster_free(vol, na, na->allocated_size >>
-					vol->cluster_size_bits, -1) < 0) {
-				// FIXME: Eeek!  Leaving inconsistent metadata!
-				// (AIA)
-				fprintf(stderr, "%s(): Eeek!  Leaking "
-						"clusters.  Run chkdsk!\n",
-						__FUNCTION__);
-				err = EIO;
-			}
-			/* Now, truncate the runlist itself. */
-			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
-					vol->cluster_size_bits)) {
-				/*
-				 * Failed to truncate the runlist, so just
-				 * throw it away, it will be mapped afresh on
-				 * next use.
-				 */
-				free(na->rl);
-				na->rl = NULL;
-			}
-			goto put_err_out;
+			goto rollback;
 		}
 
 		/* Backup mft record. We need this for rollback. */
@@ -3346,27 +3310,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			fprintf(stderr, "%s(): Eeek! Not enough memory to "
 					"allocate %d bytes.\n", __FUNCTION__,
 					le32_to_cpu(m->bytes_in_use));
-			if (ntfs_cluster_free(vol, na, na->allocated_size >>
-					vol->cluster_size_bits, -1) < 0) {
-				// FIXME: Eeek!  Leaving inconsistent metadata!
-				// (AIA)
-				fprintf(stderr, "%s(): Eeek!  Leaking "
-						"clusters.  Run chkdsk!\n",
-						__FUNCTION__);
-				err = EIO;
-			}
-			/* Now, truncate the runlist itself. */
-			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
-					vol->cluster_size_bits)) {
-				/*
-				 * Failed to truncate the runlist, so just
-				 * throw it away, it will be mapped afresh on
-				 * next use.
-				 */
-				free(na->rl);
-				na->rl = NULL;
-			}
-			goto put_err_out;
+			goto rollback;
 		}
 		memcpy(mft_rec_copy, m, mft_rec_copy_size);
 
@@ -3388,31 +3332,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 						"this message to "
 						"linux-ntfs-dev@lists.sf.net."
 						"\n", __FUNCTION__);
-				if (ntfs_cluster_free(vol, na,
-						na->allocated_size >>
-						vol->cluster_size_bits, -1) <
-						0) {
-					// FIXME: Eeek!  Leaving inconsistent
-					// metadata! (AIA)
-					fprintf(stderr, "%s(): Eeek!  Leaking "
-							"clusters.  Run "
-							"chkdsk!\n",
-							__FUNCTION__);
-				}
-				/* Now, truncate the runlist itself. */
-				if (ntfs_rl_truncate(&na->rl,
-						na->allocated_size >>
-						vol->cluster_size_bits)) {
-					/*
-					 * Failed to truncate the runlist, so
-					 * just throw it away, it will be
-					 * mapped afresh on next use.
-					 */
-					free(na->rl);
-					na->rl = NULL;
-				}
 				err = EIO;
-				goto put_err_out;
+				goto rollback;
 			}
 			/* Move the following attributes making space. */
 			memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(
@@ -3436,34 +3357,18 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					"report you saw this message to "
 					"linux-ntfs-dev@lists.sf.net.\n",
 					__FUNCTION__);
-			if (ntfs_cluster_free(vol, na, na->allocated_size >>
-					vol->cluster_size_bits, -1) < 0) {
-				// FIXME: Eeek!  Leaving inconsistent metadata!
-				// (AIA)
-				fprintf(stderr, "%s(): Eeek!  Leaking "
-						"clusters.  Run chkdsk!\n",
-						__FUNCTION__);
-				err = EIO;
-			}
-			/* Now, truncate the runlist itself. */
-			if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
-					vol->cluster_size_bits)) {
-				/*
-				 * Failed to truncate the runlist, so just
-				 * throw it away, it will be mapped afresh on
-				 * next use.
-				 */
-				free(na->rl);
-				na->rl = NULL;
-			}
-			/* Restote mft record. */
-			memcpy(m, mft_rec_copy, mft_rec_copy_size);
-			goto put_err_out;
+			mft_changed = 1;
+			goto rollback;
 		}
 
 		/* Update the attribute record and the ntfs_attr structure. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = scpu_to_le64(na->allocated_size);
+		/*
+		 * FIXME: We may not update a->highest_vcn if it equal to 0.
+		 * But bug in runlist mapping code prevent us from doing so.
+		 * Find and remove this bug.
+		 */
 		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
 	}
 	/* Update the attribute record and the ntfs attribute structure. */
@@ -3476,9 +3381,29 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		free(mft_rec_copy);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
-put_err_out:
+rollback:
+	if (ntfs_cluster_free(vol, na, na->allocated_size >>
+					vol->cluster_size_bits, -1) < 0) {
+		fprintf(stderr, "%s(): Eeek!  Leaking clusters.  Run chkdsk!\n",
+				__FUNCTION__);
+		err = EIO;
+	}
+	/* Now, truncate the runlist itself. */
+	if (ntfs_rl_truncate(&na->rl, na->allocated_size >>
+					vol->cluster_size_bits)) {
+		/*
+		 * Failed to truncate the runlist, so just throw it away, it
+		 * will be mapped afresh on next use.
+		 */
+		free(na->rl);
+		na->rl = NULL;
+	}
+	/* Restote mft record. */
+	if (mft_changed)
+		memcpy(m, mft_rec_copy, mft_rec_copy_size);
 	if (mft_rec_copy)
 		free(mft_rec_copy);
+put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
