@@ -1,7 +1,7 @@
 /**
  * ntfsresize - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Szabolcs Szakacsits
+ * Copyright (c) 2002-2004 Szabolcs Szakacsits
  * Copyright (c) 2002-2003 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
@@ -126,6 +126,11 @@ struct bitmap lcn_bitmap;
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
 
+/* FIXME: They should be included but Eprintf conflicts with mkntfs's Eprintf */
+extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+
 GEN_PRINTF (Eprintf, stderr, NULL,         FALSE)
 GEN_PRINTF (Vprintf, stdout, &opt.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opt.quiet,   FALSE)
@@ -135,7 +140,7 @@ GEN_PRINTF (Qprintf, stdout, &opt.quiet,   FALSE)
  *
  * Print an error message.
  */
-void perr_printf(const char *fmt, ...)
+static void perr_printf(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -154,7 +159,7 @@ void perr_printf(const char *fmt, ...)
  *
  * Print and error message and exit the program.
  */
-int err_exit(const char *fmt, ...)
+static int err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -172,7 +177,7 @@ int err_exit(const char *fmt, ...)
  *
  * Print and error message and exit the program
  */
-int perr_exit(const char *fmt, ...)
+static int perr_exit(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -194,7 +199,7 @@ int perr_exit(const char *fmt, ...)
  *
  * Return:  none
  */
-void usage(void)
+static void usage(void)
 {
 
 	printf ("\nUsage: %s [options] device\n"
@@ -227,7 +232,7 @@ void usage(void)
  * Force the user to confirm an action before performing it.
  * Copy-paste from e2fsprogs
  */
-void proceed_question(void)
+static void proceed_question(void)
 {
 	char buf[256];
 	const char *short_yes = "yY";
@@ -251,7 +256,7 @@ void proceed_question(void)
  *
  * Return:  none
  */
-void version (void)
+static void version (void)
 {
 	printf ("\nResize an NTFS Volume, without data loss.\n\n");
 	printf ("Copyright (c) 2002-2003  Szabolcs Szakacsits\n");
@@ -267,7 +272,7 @@ void version (void)
  * will be assumed to be in bytes.  If the number has a suffix of k, M or G it
  * will be scaled up by 1000, 1000000, or 1000000000.
  */
-s64 get_new_volume_size(char *s)
+static s64 get_new_volume_size(char *s)
 {
 	s64 size;
 	char *suffix;
@@ -322,7 +327,7 @@ s64 get_new_volume_size(char *s)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-int parse_options(int argc, char **argv)
+static int parse_options(int argc, char **argv)
 {
 	static const char *sopt = "-dfhinPs:vV";
 	static const struct option lopt[] = {
@@ -439,27 +444,12 @@ int parse_options(int argc, char **argv)
 }
 
 /**
- * runlist_extent_number
- *
- * Count the runs in a runlist.
- */
-int runlist_extent_number(runlist *rl)
-{
-	int i;
-
-	for (i = 0; rl[i].length; i++)
-		;
-
-	return i;
-}
-
-/**
  * nr_clusters_to_bitmap_byte_size
  *
  * Take the number of clusters in the volume and calculate the size of $Bitmap.
  * The size will always be a multiple of 8 bytes.
  */
-s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
+static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 {
 	s64 bm_bsize;
 
@@ -472,7 +462,7 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-int str2unicode(char *aname, uchar_t **ustr, int *len)
+static int str2unicode(const char *aname, uchar_t **ustr, int *len)
 {
 	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1))
 		return -1;
@@ -485,7 +475,7 @@ int str2unicode(char *aname, uchar_t **ustr, int *len)
 	return 0;
 }
 
-int has_bad_sectors(ntfs_resize_t *resize)
+static int has_bad_sectors(ntfs_resize_t *resize)
 {
 	int len, ret = 0;
 	uchar_t *ustr = NULL;
@@ -508,7 +498,7 @@ int has_bad_sectors(ntfs_resize_t *resize)
 	return ret;	
 }
 
-void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
+static void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 {
 	s64 inode;
 	ATTR_FLAGS flags;
@@ -551,7 +541,7 @@ void collect_shrink_constraints(ntfs_resize_t *resize, s64 last_lcn)
 }
 
 
-void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
+static void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
 {
 	s64 new_volume_size, lcn, lcn_length;
 	
@@ -589,7 +579,7 @@ void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
  *
  * This serves as a rudimentary "chkdsk" operation.
  */
-void build_lcn_usage_bitmap(ntfs_resize_t *resize)
+static void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 {
 	s64 inode;
 	ATTR_RECORD *a;
@@ -647,7 +637,7 @@ void build_lcn_usage_bitmap(ntfs_resize_t *resize)
  * For a given MFT Record, iterate through all its attributes.  Any non-resident
  * data runs will be marked in lcn_bitmap.
  */
-void walk_attributes(ntfs_resize_t *resize)
+static void walk_attributes(ntfs_resize_t *resize)
 {
 	ntfs_attr_search_ctx *ctx;
 
@@ -670,7 +660,7 @@ void walk_attributes(ntfs_resize_t *resize)
  * Compare two bitmaps.  In this case, $Bitmap as read from the disk and
  * lcn_bitmap which we built from the MFT Records.
  */
-void compare_bitmaps(struct bitmap *a)
+static void compare_bitmaps(struct bitmap *a)
 {
 	s64 i, pos, count;
 	int mismatch = 0;
@@ -739,7 +729,7 @@ void compare_bitmaps(struct bitmap *a)
  *
  * Create and scale our progress bar.
  */
-void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
+static void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
 {
 	p->start = start;
 	p->stop = stop;
@@ -752,7 +742,7 @@ void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
  *
  * Update the progress bar and tell the user.
  */
-void progress_update(struct progress_bar *p, u64 current)
+static void progress_update(struct progress_bar *p, u64 current)
 {
 	float percent;
 	
@@ -775,7 +765,7 @@ void progress_update(struct progress_bar *p, u64 current)
  * Read each record in the MFT, skipping the unused ones, and build up a bitmap
  * from all the non-resident attributes.
  */
-void walk_inodes(ntfs_resize_t *resize)
+static void walk_inodes(ntfs_resize_t *resize)
 {
 	s64 inode = 0;
 	s64 last_mft_rec;
@@ -809,7 +799,7 @@ close_inode:
 	}
 }
 
-void print_hint(const char *s, struct llcn_t llcn)
+static void print_hint(const char *s, struct llcn_t llcn)
 {
 	s64 runs_b, runs_mb;
 	
@@ -828,7 +818,7 @@ void print_hint(const char *s, struct llcn_t llcn)
  * already been read into lcn_bitmap.  By looking for the last used cluster on
  * the disk, we can work out by how much we can shrink the volume.
  */
-void advise_on_resize(ntfs_resize_t *resize)
+static void advise_on_resize(ntfs_resize_t *resize)
 {
 	s64 old_b, new_b, g_b, old_mb, new_mb, g_mb;
 	s64 supp_lcn = 0; /* smallest size supported in LCN */ 
@@ -884,7 +874,7 @@ void advise_on_resize(ntfs_resize_t *resize)
  *
  * Helper to set up a runlist object
  */
-void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
+static void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
 {
 	rl->vcn = vcn;
 	rl->lcn = lcn;
@@ -897,7 +887,7 @@ void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
  * $Bitmap can overlap the end of the volume. Any bits in this region
  * must be set. This region also encompasses the backup boot sector.
  */
-void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
+static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 {
 	for (; cluster < bm->size << 3; cluster++)
 		ntfs_bit_set(bm->bm, (u64)cluster, 1);
@@ -911,7 +901,7 @@ void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  * FIXME: this function should go away and instead using a generalized
  * "truncate_bitmap_data_attr()"
  */
-void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
+static void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 {
 	runlist *rl_bad;
 	int mp_size;
@@ -955,7 +945,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
  * Shrink the metadata file $Bitmap.  It must be large enough for one bit per
  * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
+static void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 {
 	runlist *rl = *rlist;
 	int i, j;
@@ -1000,7 +990,7 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
  * Enlarge the metadata file $Bitmap.  It must be large enough for one bit per
  * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
+static void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 {
 	runlist *rl = *rlist;
 	s64 i, j, free_zone = 0;
@@ -1037,7 +1027,7 @@ void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 /**
  * truncate_bitmap_data_attr
  */
-void truncate_bitmap_data_attr(ntfs_resize_t *resize)
+static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 {
 	ATTR_RECORD *a;
 	runlist *rl;
@@ -1116,7 +1106,7 @@ void truncate_bitmap_data_attr(ntfs_resize_t *resize)
  * Find the $DATA attribute (with or without a name) for the given MFT reference
  * (inode number).
  */
-void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
+static void lookup_data_attr(MFT_REF mref, const char *aname, ntfs_attr_search_ctx **ctx)
 {
 	ntfs_inode *ni;
 	uchar_t *ustr = NULL;
@@ -1147,7 +1137,7 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
  * Write an MFT Record back to the disk.  If the read-only command line option
  * was given, this function will do nothing.
  */
-int write_mft_record(ntfs_attr_search_ctx *ctx)
+static int write_mft_record(ntfs_attr_search_ctx *ctx)
 {
 	if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec))
 		perr_exit("ntfs_mft_record_write");
@@ -1163,7 +1153,7 @@ int write_mft_record(ntfs_attr_search_ctx *ctx)
  *
  * Shrink the $BadClus file to match the new volume size.
  */
-void truncate_badclust_file(s64 nr_clusters)
+static void truncate_badclust_file(s64 nr_clusters)
 {
 	ntfs_attr_search_ctx *ctx = NULL;
 
@@ -1184,7 +1174,7 @@ void truncate_badclust_file(s64 nr_clusters)
  *
  * Shrink the $Bitmap file to match the new volume size.
  */
-void truncate_bitmap_file(ntfs_resize_t *resize)
+static void truncate_bitmap_file(ntfs_resize_t *resize)
 {
 	printf("Updating $Bitmap file ...\n");
 
@@ -1204,7 +1194,7 @@ void truncate_bitmap_file(ntfs_resize_t *resize)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-void setup_lcn_bitmap(void)
+static void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
@@ -1220,7 +1210,7 @@ void setup_lcn_bitmap(void)
  *
  * FIXME: should be done using ntfs_* functions
  */
-void update_bootsector(s64 nr_clusters)
+static void update_bootsector(s64 nr_clusters)
 {
 	NTFS_BOOT_SECTOR bs;
 
@@ -1248,9 +1238,9 @@ void update_bootsector(s64 nr_clusters)
 /**
  * volume_size
  */
-s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
+static s64 volume_size(ntfs_volume *v, s64 nr_clusters)
 {
-	return nr_clusters * vol->cluster_size;
+	return nr_clusters * v->cluster_size;
 }
 
 /**
@@ -1258,7 +1248,7 @@ s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
  *
  * Print the volume size in bytes and decimal megabytes.
  */
-void print_volume_size(char *str, s64 bytes)
+static void print_volume_size(const char *str, s64 bytes)
 {
 	printf("%s: %lld bytes (%lld MB)\n",
 	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
@@ -1269,7 +1259,7 @@ void print_volume_size(char *str, s64 bytes)
  *
  * Display the amount of disk space in use.
  */
-void print_disk_usage(ntfs_resize_t *resize)
+static void print_disk_usage(ntfs_resize_t *resize)
 {
 	s64 total, used, relocations;
 
@@ -1294,7 +1284,7 @@ void print_disk_usage(ntfs_resize_t *resize)
  * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
  * the volume (load the metadata into memory).
  */
-void mount_volume(void)
+static void mount_volume(void)
 {
 	unsigned long mntflag;
 
@@ -1348,7 +1338,7 @@ void mount_volume(void)
  * boots it will automatically run chkdsk to check for any problems.  If the
  * read-only command line option was given, this function will do nothing.
  */
-void prepare_volume_fixup(void)
+static void prepare_volume_fixup(void)
 {
 	u16 flags;
 

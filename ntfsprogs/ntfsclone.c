@@ -1,7 +1,7 @@
 /**
  * ntfsclone - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Szabolcs Szakacsits
+ * Copyright (c) 2003-2004 Szabolcs Szakacsits
  *
  * Clone NTFS data and/or metadata to a sparse file, device or stdout.
  *
@@ -111,13 +111,20 @@ int wiped_timestamp_data = 0;
 #define read_all(f, p, n)  io_all((f), (p), (n), 0)
 #define write_all(f, p, n) io_all((f), (p), (n), 1)
 
+/* FIXME: They should be #included but Eprintf conflicts with mkntfs's Eprintf */
+extern int Eprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Vprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int Qprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+/* FIXME: should be 'static' */
+extern int Printf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+
 GEN_PRINTF(Eprintf, stderr,  NULL,         FALSE)
 GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
 GEN_PRINTF(Qprintf, msg_out, &opt.quiet,   FALSE)
 GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
 
 
-void perr_printf(const char *fmt, ...)
+static void perr_printf(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -130,7 +137,7 @@ void perr_printf(const char *fmt, ...)
 	fflush(msg_out);
 }
 
-void err_printf(const char *fmt, ...)
+static void err_printf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -141,7 +148,7 @@ void err_printf(const char *fmt, ...)
 	fflush(msg_out);
 }
 
-int err_exit(const char *fmt, ...)
+static int err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -154,7 +161,7 @@ int err_exit(const char *fmt, ...)
 }
 
 
-int perr_exit(const char *fmt, ...)
+static int perr_exit(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -169,7 +176,7 @@ int perr_exit(const char *fmt, ...)
 }
 
 
-void usage(void)
+static void usage(void)
 {
 	Eprintf("\nUsage: %s [options] device\n"
 		"    Efficiently clone NTFS to a sparse file, device or standard output.\n"
@@ -191,7 +198,7 @@ void usage(void)
 }
 
 
-void parse_options(int argc, char **argv)
+static void parse_options(int argc, char **argv)
 {
 	static const char *sopt = "-dfhmo:O:";
 	static const struct option lopt[] = {
@@ -292,7 +299,7 @@ void parse_options(int argc, char **argv)
 			perr_exit("Couldn't open /dev/null");
 }
 
-void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
+static void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
 {
 	p->start = start;
 	p->stop = stop;
@@ -301,7 +308,7 @@ void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
 }
 
 
-void progress_update(struct progress_bar *p, u64 current)
+static void progress_update(struct progress_bar *p, u64 current)
 {
 	float percent = p->unit * current;
 
@@ -320,7 +327,7 @@ void progress_update(struct progress_bar *p, u64 current)
  * Take the number of clusters in the volume and calculate the size of $Bitmap.
  * The size will always be a multiple of 8 bytes.
  */
-s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
+static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 {
 	s64 bm_bsize;
 
@@ -333,7 +340,7 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-int is_critical_metadata(ntfs_walk_clusters_ctx *image)
+static int is_critical_metadata(ntfs_walk_clusters_ctx *image)
 {
 	s64 inode;
 	
@@ -350,7 +357,7 @@ int is_critical_metadata(ntfs_walk_clusters_ctx *image)
 }
 
 
-int io_all(void *fd, void *buf, int count, int do_write)
+static int io_all(void *fd, void *buf, int count, int do_write)
 {
 	int i;
 	struct ntfs_device *dev = (struct ntfs_device *)fd;
@@ -372,7 +379,7 @@ int io_all(void *fd, void *buf, int count, int do_write)
 }
 
 
-void copy_cluster(void)
+static void copy_cluster(void)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 
@@ -383,7 +390,7 @@ void copy_cluster(void)
 		perr_exit("write_all");
 }
 
-void lseek_to_cluster(s64 lcn)
+static void lseek_to_cluster(s64 lcn)
 {
 	off_t pos;
 	
@@ -399,7 +406,7 @@ void lseek_to_cluster(s64 lcn)
 		perr_exit("lseek output");
 }
 
-void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
+static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
 	int i;
 	
@@ -416,7 +423,7 @@ void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 		copy_cluster();
 }
 
-void clone_ntfs(u64 nr_clusters)
+static void clone_ntfs(u64 nr_clusters)
 {
 	s64 i, pos, count;
 	u8 bm[NTFS_BUF_SIZE];
@@ -480,7 +487,7 @@ do {								\
 								\
 } while(0)
 
-void wipe_timestamps(ntfs_walk_clusters_ctx *image)
+static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a = image->ctx->attr;
 	
@@ -494,7 +501,7 @@ void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a);
 }
 
-void wipe_resident_data(ntfs_walk_clusters_ctx *image)
+static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a;
 	u32 i;
@@ -520,7 +527,7 @@ void wipe_resident_data(ntfs_walk_clusters_ctx *image)
 	wiped_resident_data += n;
 }
 
-void walk_runs(struct ntfs_walk_cluster *walk)
+static void walk_runs(struct ntfs_walk_cluster *walk)
 {
 	int i, j;
 	runlist *rl;
@@ -572,7 +579,7 @@ void walk_runs(struct ntfs_walk_cluster *walk)
 }
 
 
-void walk_attributes(struct ntfs_walk_cluster *walk)
+static void walk_attributes(struct ntfs_walk_cluster *walk)
 {
 	ntfs_attr_search_ctx *ctx;
 
@@ -592,7 +599,7 @@ void walk_attributes(struct ntfs_walk_cluster *walk)
 
 
 
-void compare_bitmaps(struct bitmap *a)
+static void compare_bitmaps(struct bitmap *a)
 {
 	s64 i, pos, count;
 	int mismatch = 0;
@@ -647,7 +654,7 @@ void compare_bitmaps(struct bitmap *a)
 }
 
 
-int wipe_data(char *p, int pos, int len)
+static int wipe_data(char *p, int pos, int len)
 {
 	int wiped = 0;
 	
@@ -662,7 +669,7 @@ int wipe_data(char *p, int pos, int len)
 	return wiped;
 }
 
-void wipe_unused_mft_data(ntfs_inode *ni)
+static void wipe_unused_mft_data(ntfs_inode *ni)
 {
 	int unused;
 	MFT_RECORD *m = ni->mrec;
@@ -675,7 +682,7 @@ void wipe_unused_mft_data(ntfs_inode *ni)
 	wiped_unused_mft_data += wipe_data((char *)m, m->bytes_in_use, unused);
 }
 
-void wipe_unused_mft(ntfs_inode *ni)
+static void wipe_unused_mft(ntfs_inode *ni)
 {
 	int unused;
 	MFT_RECORD *m = ni->mrec;
@@ -690,7 +697,7 @@ void wipe_unused_mft(ntfs_inode *ni)
 }
 
 
-int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
+static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 {
 	s64 inode = 0;
 	s64 last_mft_rec;
@@ -699,7 +706,7 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 
 	Printf("Scanning volume ...\n");
 
-	last_mft_rec = vol->nr_mft_records - 1;
+	last_mft_rec = volume->nr_mft_records - 1;
 	progress_init(&progress, inode, last_mft_rec, 100);
 
 	for (; inode <= last_mft_rec; inode++) {
@@ -715,9 +722,9 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 		if (!ni)
 			perr_exit("walk_clusters");
 		
-		ni->vol = vol;
+		ni->vol = volume;
 
-		err = ntfs_file_record_read(vol, mref, &ni->mrec, NULL);
+		err = ntfs_file_record_read(volume, mref, &ni->mrec, NULL);
 		if (err == -1) {
 			free(ni);
 			continue;
@@ -731,7 +738,7 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 			if (wipe) {
 				wipe_unused_mft(ni);
 				wipe_unused_mft_data(ni);
-				if (ntfs_mft_record_write(vol, ni->mft_no, ni->mrec))
+				if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
 					perr_exit("ntfs_mft_record_write");
 			}		
 		}
@@ -743,7 +750,7 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 	        if (deleted_inode) 
 			continue;
 		
-		if ((ni = ntfs_inode_open(vol, mref)) == NULL) {
+		if ((ni = ntfs_inode_open(volume, mref)) == NULL) {
 			/* FIXME: continue only if it make sense, e.g.
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO || errno == ENOENT)
@@ -762,7 +769,7 @@ int walk_clusters(ntfs_volume *vol, struct ntfs_walk_cluster *walk)
 out:		
 		if (wipe) {
 			wipe_unused_mft_data(ni);
-			if (ntfs_mft_record_write(vol, ni->mft_no, ni->mrec))
+			if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
 				perr_exit("ntfs_mft_record_write");
 		}		
 
@@ -778,7 +785,7 @@ out:
  * $Bitmap can overlap the end of the volume. Any bits in this region
  * must be set. This region also encompasses the backup boot sector.
  */
-void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
+static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 {
 	for (; cluster < bm->size << 3; cluster++)
 		ntfs_bit_set(bm->bm, (u64)cluster, 1);
@@ -790,7 +797,7 @@ void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  * All the bits are set to 0, except those representing the region beyond the
  * end of the disk.
  */
-void setup_lcn_bitmap(void)
+static void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
@@ -802,20 +809,20 @@ void setup_lcn_bitmap(void)
 }
 
 
-s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
+static s64 volume_size(ntfs_volume *volume, s64 nr_clusters)
 {
-	return nr_clusters * vol->cluster_size;
+	return nr_clusters * volume->cluster_size;
 }
 
 
-void print_volume_size(char *str, s64 bytes)
+static void print_volume_size(const char *str, s64 bytes)
 {
 	Printf("%s: %lld bytes (%lld MB)\n",
 	       str, bytes, rounded_up_division(bytes, NTFS_MBYTE));
 }
 
 
-void print_disk_usage(ntfs_walk_clusters_ctx *image)
+static void print_disk_usage(ntfs_walk_clusters_ctx *image)
 {
 	s64 total, used;
 
@@ -834,7 +841,7 @@ void print_disk_usage(ntfs_walk_clusters_ctx *image)
  * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
  * the volume (load the metadata into memory).
  */
-void mount_volume(unsigned long new_mntflag)
+static void mount_volume(unsigned long new_mntflag)
 {
 	unsigned long mntflag;
 	
@@ -883,7 +890,7 @@ void mount_volume(unsigned long new_mntflag)
 
 struct ntfs_walk_cluster backup_clusters = { NULL, NULL }; 
 
-int device_offset_valid(int fd, s64 ofs)
+static int device_offset_valid(int fd, s64 ofs)
 {
 	char ch;
 
@@ -892,7 +899,7 @@ int device_offset_valid(int fd, s64 ofs)
 	return -1;
 }
 
-s64 device_size_get(int fd)
+static s64 device_size_get(int fd)
 {
 	s64 high, low;
 #ifdef BLKGETSIZE
@@ -933,6 +940,12 @@ s64 device_size_get(int fd)
 	return (low + 1LL);
 }
 
+static void fsync_clone(int fd)
+{
+	Printf("Syncing ...\n");
+	if (fsync(fd) && errno != EINVAL)
+		perr_exit("fsync");
+}
 
 int main(int argc, char **argv)
 {
@@ -1016,14 +1029,15 @@ int main(int argc, char **argv)
 		s64 nr_clusters = opt.stdout ? vol->nr_clusters : image.inuse;
 		
 		clone_ntfs(nr_clusters);
-		Printf("Syncing ...\n");
-		if (fsync(fd_out) && errno != EINVAL)
-			perr_exit("fsync");
+		fsync_clone(fd_out);
 		exit(0);
 	}
 	
 	wipe = 1;	
 	opt.volume = opt.output;
+	/* 'force' again mount for dirty volumes (e.g. after resize). 
+	   FIXME: use mount flags to avoid potential side-effects in future */
+	opt.force++;
 	mount_volume(0);
 
 	setup_lcn_bitmap();
@@ -1046,6 +1060,7 @@ int main(int argc, char **argv)
 	wiped_total += wiped_timestamp_data;
 	Printf("Wiped totally            = %8d\n", wiped_total);
 	
+	fsync_clone(fd_out);
 	exit(0);
 }
 

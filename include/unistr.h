@@ -57,7 +57,7 @@ extern int ntfs_file_values_compare(FILE_NAME_ATTR *file_name_attr1,
 
 extern int ntfs_ucstombs(const uchar_t *ins, const int ins_len, char **outs,
 		int outs_len);
-extern int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len);
+extern int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len);
 
 #endif /* defined _NTFS_UNISTR_H */
 

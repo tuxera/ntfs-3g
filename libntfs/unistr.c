@@ -427,7 +427,7 @@ err_out:
  *	ENAMETOOLONG	Destination buffer is too small for input string.
  *	ENOMEM		Not enough memory to allocate destination buffer.
  */
-int ntfs_mbstoucs(char *ins, uchar_t **outs, int outs_len)
+int ntfs_mbstoucs(const char *ins, uchar_t **outs, int outs_len)
 {
 	uchar_t *ucs;
 	char *s;
