@@ -24,6 +24,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <sys/mount.h>
 #ifdef HAVE_MNTENT_H
 #	include <mntent.h>
