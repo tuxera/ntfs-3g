@@ -673,6 +673,67 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 }
 
 
+/**
+ * __metadata
+ */
+static int __metadata (ntfs_volume *vol, u64 num)
+{
+	if (num == FILE_root)
+		return 0;
+	if (num <= FILE_UpCase)
+		return 1;
+	if (!vol)
+		return -1;
+	if ((vol->major_ver == 3) && (num == FILE_Extend))
+		return 1;
+
+	return 0;
+}
+
+/**
+ * utils_is_metadata - Determine if an inode represents a metadata file
+ * @inode:  An ntfs inode to be tested
+ *
+ * A handful of files in the volume contain filesystem data - metadata.
+ * They can be identified by their inode number (offset in MFT/$DATA) or by
+ * their parent.
+ *
+ * Return:  1  inode is a metadata file
+ *	    0  inode is not a metadata file
+ *	   -1  Error occurred
+ */
+int utils_is_metadata (ntfs_inode *inode)
+{
+	ntfs_volume *vol;
+	ATTR_RECORD *rec;
+	FILE_NAME_ATTR *attr;
+	u64 num;
+
+	if (!inode)
+		return -1;
+	vol = inode->vol;
+	if (!vol)
+		return -1;
+
+	num = inode->mft_no;
+	if (__metadata (vol, num) == 1)
+		return 1;
+
+	rec = find_first_attribute (AT_FILE_NAME, inode->mrec);
+	if (!rec)
+		return -1;
+
+	/* We know this will always be resident. */
+	attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+
+	num = MREF (attr->parent_directory);
+	if (__metadata (vol, num) == 1)
+		return 1;
+
+	return 0;
+}
+
+
 #if 0
 hamming weight
 inline unsigned int hweight32(unsigned int w)
