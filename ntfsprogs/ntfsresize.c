@@ -230,7 +230,6 @@ s64 get_new_volume_size(char *s)
 
 void parse_options(int argc, char **argv)
 {
-	char *s;
 	int i;
 
 	printf("%s v%s\n", EXEC_NAME, VERSION);
@@ -786,9 +785,6 @@ void mount_volume()
 	}
 
 	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag))) {
-
-		int err = errno;
-
 		perr_printf("ntfs_mount failed");
 		if (errno == EINVAL) {
 			printf("Apparently device '%s' doesn't have a "
