@@ -117,6 +117,7 @@ xx/xx/2005 - 2.0.0-WIP
 	  so disks having bad sectors (dying disks) can be rescued. The content
 	  of the cluster having bad sectors is filled by character '2' and the
 	  start of the cluster is marked by "BadClusteR". (Szaka)
+	- ntfsfix: fix invalid mft records in $MFTMirr. (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
