@@ -6,6 +6,18 @@
 /* Define to 1 if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
 
+/* Define to 1 if you have the declaration of `__bswap_constant_16', and to 0
+   if you don't. */
+#undef HAVE_DECL___BSWAP_CONSTANT_16
+
+/* Define to 1 if you have the declaration of `__bswap_constant_32', and to 0
+   if you don't. */
+#undef HAVE_DECL___BSWAP_CONSTANT_32
+
+/* Define to 1 if you have the declaration of `__bswap_constant_64', and to 0
+   if you don't. */
+#undef HAVE_DECL___BSWAP_CONSTANT_64
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
