@@ -1289,8 +1289,8 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself. If it
  * is FALSE, the search begins after @ctx->attr.
  *
- * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
- * one can enumerate all attributes by setting @type to zero and then calling
+ * If @type is AT_UNUSED, return the first found attribute, i.e. one can
+ * enumerate all attributes by setting @type to AT_UNUSED and then calling
  * ntfs_attr_find() repeatedly until it returns -1 with errno set to ENOENT to
  * indicate that there are no more entries. During the enumeration, each
  * successful call of ntfs_attr_find() will return the next attribute in the
@@ -1369,7 +1369,8 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
 			break;
 		ctx->attr = a;
 		/* We catch $END with this more general check, too... */
-		if ((type && (le32_to_cpu(a->type) > le32_to_cpu(type))) ||
+		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
+				le32_to_cpu(type))) ||
 				(a->type == AT_END)) {
 			errno = ENOENT;
 			return -1;
@@ -1377,7 +1378,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
 		if (!a->length)
 			break;
 		/* If this is an enumeration return this attribute. */
-		if (!type)
+		if (type == AT_UNUSED)
 			return 0;
 		if (a->type != type)
 			continue;
@@ -1484,8 +1485,8 @@ static int ntfs_attr_find(const ATTR_TYPES type, const uchar_t *name,
  * if the attribute is in a different mft record/inode, find the attribute in
  * there and return it.
  *
- * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
- * one can enumerate all attributes by setting @type to zero and then calling
+ * If @type is AT_UNUSED, return the first found attribute, i.e. one can
+ * enumerate all attributes by setting @type to AT_UNUSED and then calling
  * ntfs_external_attr_find() repeatedly until it returns -1 with errno set to
  * ENOENT to indicate that there are no more entries. During the enumeration,
  * each successful call of ntfs_external_attr_find() will return the next
@@ -1578,7 +1579,8 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 		 * the attribute list itself, need to return the attribute list
 		 * attribute.
 		 */
-		if (!type && is_first_search && le16_to_cpu(al_entry->type) >
+		if ((type == AT_UNUSED) && is_first_search &&
+				le16_to_cpu(al_entry->type) >
 				le16_to_cpu(AT_ATTRIBUTE_LIST))
 			goto find_attr_list_attr;
 	} else {
@@ -1590,7 +1592,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const uchar_t *name,
 		 * attribute list attribute from the base mft record as it is
 		 * not listed in the attribute list itself.
 		 */
-		if (!type && le16_to_cpu(ctx->al_entry->type) <
+		if ((type == AT_UNUSED) && le16_to_cpu(ctx->al_entry->type) <
 				le16_to_cpu(AT_ATTRIBUTE_LIST) &&
 				le16_to_cpu(al_entry->type) >
 				le16_to_cpu(AT_ATTRIBUTE_LIST)) {
@@ -1654,7 +1656,7 @@ find_attr_list_attr:
 			break;
 		next_al_entry = (ATTR_LIST_ENTRY*)((char*)al_entry +
 				le16_to_cpu(al_entry->length));
-		if (type) {
+		if (type != AT_UNUSED) {
 			if (le32_to_cpu(al_entry->type) > le32_to_cpu(type))
 				goto not_found;
 			if (type != al_entry->type)
@@ -1666,7 +1668,7 @@ find_attr_list_attr:
 		 * If !@type we want the attribute represented by this
 		 * attribute list entry.
 		 */
-		if (!type)
+		if (type == AT_UNUSED)
 			goto is_enumeration;
 		/*
 		 * If @name is AT_UNNAMED we want an unnamed attribute.
@@ -1808,7 +1810,7 @@ do_next_attr_loop:
 		 * have found it! Also, if !@type, it is an enumeration, so we
 		 * want the current attribute.
 		 */
-		if (!type || !val || (!a->non_resident &&
+		if ((type == AT_UNUSED) || !val || (!a->non_resident &&
 				le32_to_cpu(a->value_length) == val_len &&
 				!memcmp((char*)a + le16_to_cpu(a->value_offset),
 				val, val_len))) {
@@ -1841,7 +1843,7 @@ not_found:
 	 * one. Thus we just use AT_END which causes ntfs_attr_find() to seek
 	 * to the end.
 	 */
-	if (!type)
+	if (type == AT_UNUSED)
 		return ntfs_attr_find(AT_END, name, name_len, ic, val, val_len,
 				ctx);
 	/*
@@ -1880,8 +1882,8 @@ not_found:
  * This function transparently handles attribute lists and @ctx is used to
  * continue searches where they were left off at.
  *
- * If @type is zero (i.e. AT_UNUSED), return the first found attribute, i.e.
- * one can enumerate all attributes by setting @type to zero and then calling
+ * If @type is AT_UNUSED, return the first found attribute, i.e. one can
+ * enumerate all attributes by setting @type to AT_UNUSED and then calling
  * ntfs_attr_lookup() repeatedly until it returns -1 with errno set to ENOENT
  * to indicate that there are no more entries. During the enumeration, each
  * successful call of ntfs_attr_lookup() will return the next attribute, with
