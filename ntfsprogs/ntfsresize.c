@@ -586,7 +586,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
 			(uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
-			le16_to_cpu(a->name_length), 0, NULL, 0)) 
+			a->name_length, 0, NULL, 0)) 
 		ret = 1;
 									
 	if (ustr != AT_UNNAMED)
@@ -979,7 +979,7 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 	
-	if (le16_to_cpu(a->name_length)) {
+	if (a->name_length) {
 		u16 name_offs = le16_to_cpu(a->name_offset);
 		u16 mp_offs = le16_to_cpu(a->mapping_pairs_offset);
 
