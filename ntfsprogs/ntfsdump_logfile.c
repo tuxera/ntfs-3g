@@ -301,7 +301,7 @@ int main(int argc, char **argv)
 				"corrupt:  Update sequence array overlaps "
 				"restart page header.  Cannot handle this "
 				"yet.\n");
-	if (usa_end_ofs >= NTFS_SECTOR_SIZE - sizeof(u16))
+	if (usa_end_ofs > NTFS_SECTOR_SIZE - sizeof(u16))
 		log_err_exit(buf, "Restart page header in $LogFile is "
 				"corrupt:  Update sequence array overlaps or "
 				"is behind first protected sequence number.  "
