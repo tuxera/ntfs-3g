@@ -2096,12 +2096,15 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	if (!ad)
 		return -1;
 	/* We found the attribute. - Do the bounds check. */
-	if (size >= sle64_to_cpu(ad->min_size) &&
-			size <= sle64_to_cpu(ad->max_size))
-		return 0;
-	/* @size is out of range! */
-	errno = ERANGE;
-	return -1;
+	if ((sle64_to_cpu(ad->min_size) && size <
+			sle64_to_cpu(ad->min_size)) ||
+			(sle64_to_cpu(ad->max_size) && size >
+			sle64_to_cpu(ad->max_size))) {
+		/* @size is out of range! */
+		errno = ERANGE;
+		return -1;
+	}
+	return 0;
 }
 
 /**
