@@ -479,7 +479,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			__FUNCTION__, (long long) ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
-	if (ntfs_inode_sync_standard_information(ni)) {
+	if (ni->nr_extents != -1 && ntfs_inode_sync_standard_information(ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
 			if (err != EIO)
