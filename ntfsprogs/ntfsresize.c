@@ -32,8 +32,6 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
-#include <locale.h>
-#include <libintl.h>
 
 #include "debug.h"
 #include "types.h"
@@ -47,12 +45,9 @@
 #include "bitmap.h"
 #include "inode.h"
 #include "runlist.h"
+#include "utils.h"
 
 static const char *EXEC_NAME = "ntfsresize";
-
-static const char *ntfs_report_banner =
-"\nReport bugs to linux-ntfs-dev@lists.sf.net  "
-"Homepage: http://linux-ntfs.sf.net\n";
 
 static const char *resize_warning_msg =
 "WARNING: Every sanity check passed and only the DANGEROUS operations left.\n"
@@ -74,6 +69,7 @@ static const char *fragmented_volume_msg =
 
 struct {
 	int verbose;
+	int quiet;
 	int debug;
 	int ro_flag;
 	int force;
@@ -115,6 +111,10 @@ struct bitmap lcn_bitmap;
 #define NERR_PREFIX  ERR_PREFIX ": "
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
+
+GEN_PRINTF (Eprintf, stderr, NULL,         FALSE)
+GEN_PRINTF (Vprintf, stdout, &opt.verbose, TRUE)
+GEN_PRINTF (Qprintf, stdout, &opt.quiet,   FALSE)
 
 /**
  * perr_printf
@@ -174,27 +174,35 @@ int perr_exit(const char *fmt, ...)
 }
 
 /**
- * usage
+ * usage - Print a list of the parameters to the program
  *
- * Print a brief list of program options.
+ * Print a list of the parameters and options for the program.
+ *
+ * Return:  none
  */
 void usage()
 {
-	printf("\n");
-	printf ("Usage: %s [-fhin] [-s size[k|M|G]] device\n", EXEC_NAME);
-	printf("Resize an NTFS volume non-destructively.\n");
-	printf("\n");
-	Dprintf("   -d              Show debug information\n");
-	printf ("   -f              Force to progress (DANGEROUS)\n");
-	printf ("   -h              This help text\n");
-	printf ("   -i              Calculate the smallest shrunken size supported (read-only)\n");
-	printf ("   -n              Make a test run without write operations (read-only)\n");
-	printf ("   -s size[k|M|G]  Resize volume to size[k|M|G] bytes (k=10^3, M=10^6, G=10^9)\n");
-/*	printf ("   -v              Verbose operation\n"); */
-	printf ("   -V              Version information\n");
-	printf("\nThe options -i and -s are mutually exclusive. If both options are "
-	       "omitted then\nthe NTFS volume will be enlarged to the device size.\n");
-	printf(ntfs_report_banner);
+
+	printf ("\nUsage: %s [options] device\n"
+		"    Resize an NTFS volume non-destructively.\n"
+		"\n"
+		"    -i      --info       Calculate the smallest shrunken size supported\n"
+		"    -s num  --size num   Resize volume to num[k|M|G] bytes\n"
+		"\n"
+		"    -n      --no-action  Do not write to disk\n"
+		"    -f      --force      Force to progress (DANGEROUS)\n"
+	/*	"    -q      --quiet      Less output\n"*/
+		"    -v      --verbose    More output\n"
+		"    -V      --version    Display version information\n"
+		"    -h      --help       Display this help\n"
+#ifdef DEBUG
+		"    -d      --debug      Show debug information\n"
+#endif
+		"\n"
+		"    The options -i and -s are mutually exclusive. If both options are\n"
+		"    omitted then the NTFS volume will be enlarged to the device size.\n"
+		"\n", EXEC_NAME);
+	printf ("%s%s\n", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
@@ -230,15 +238,13 @@ void proceed_question(void)
  */
 void version (void)
 {
-	printf ("Resize an NTFS Volume, without data loss.\n\n"
-		"%s is free software, released under the GNU "
-		"General Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with ABSOLUTELY NO "
-		"WARRANTY; for details read the GNU\nGeneral Public License "
-		"to be found in the file COPYING in the main\nLinux-NTFS "
-		"distribution directory.\n\n",
-		EXEC_NAME, EXEC_NAME);
-	exit(1);
+	printf ("\n%s v%s - Resize an NTFS Volume, without data loss.\n\n",
+		EXEC_NAME, VERSION);
+	printf ("Copyright (c)\n");
+	printf ("    2002-2003 Szabolcs Szakacsits\n");
+	printf ("    2002-2003 Anton Altaparmakov\n");
+	printf ("    2002-2003 Richard Russon\n");
+	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -292,65 +298,129 @@ s64 get_new_volume_size(char *s)
 }
 
 /**
- * parse_options
+ * parse_options - Read and validate the programs command line
  *
- * Parse the command line options
+ * Read the command line, verify the syntax and parse the options.
+ * This function is very long, but quite simple.
+ *
+ * Return:  1 Success
+ *	    0 Error, one or more problems
  */
-void parse_options(int argc, char **argv)
+int parse_options(int argc, char **argv)
 {
-	int i;
+	static const char *sopt = "-dfhins:vV";
+	static const struct option lopt[] = {
+#ifdef DEBUG
+		{ "debug",	no_argument,		NULL, 'd' },
+#endif
+		{ "force",	no_argument,		NULL, 'f' },
+		{ "help",	no_argument,		NULL, 'h' },
+		{ "info",	no_argument,		NULL, 'i' },
+		{ "no-action",	no_argument,		NULL, 'n' },
+	/*	{ "quiet",	no_argument,		NULL, 'q' },*/
+		{ "size",	required_argument,	NULL, 's' },
+		{ "verbose",	no_argument,		NULL, 'v' },
+		{ "version",	no_argument,		NULL, 'V' },
+		{ NULL, 0, NULL, 0 }
+	};
 
-	printf("%s v%s\n", EXEC_NAME, VERSION);
+	char c;
+	int err  = 0;
+	int ver  = 0;
+	int help = 0;
 
 	memset(&opt, 0, sizeof(opt));
 
-	while ((i = getopt(argc, argv, "dfh?ins:V")) != EOF)
-		switch (i) {
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!err && !opt.volume)
+				opt.volume = argv[optind-1];
+			else
+				err++;
+			break;
 		case 'd':
-			opt.debug = 1;
+			opt.debug++;
 			break;
 		case 'f':
 			opt.force++;
 			break;
 		case 'h':
 		case '?':
-			usage();
+			help++;
+			break;
 		case 'i':
-			opt.info = 1;
+			opt.info++;
 			break;
 		case 'n':
 			opt.ro_flag = MS_RDONLY;
 			break;
+		case 'q':
+			opt.quiet++;
+			break;
 		case 's':
-			opt.bytes = get_new_volume_size(optarg);
+			if (!err && (opt.bytes == 0))
+				opt.bytes = get_new_volume_size(optarg);
+			else
+				err++;
 			break;
 		case 'v':
 			opt.verbose++;
 			break;
 		case 'V':
-			version();
+			ver++;
+			break;
 		default:
-			usage();
+			if (optopt == 's') {
+				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+			} else {
+				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			}
+			err++;
+			break;
 		}
-	if (optind == argc)
-		usage();
-	opt.volume = argv[optind++];
-	if (optind < argc)
-		usage();
+	}
+
+	if (help || ver) {
+		opt.quiet = 0;
+	} else {
+		if (opt.volume == NULL) {
+			if (argc > 1)
+				Eprintf ("You must specify exactly one device.\n");
+			err++;
+		}
+
+		/*
+		if (opt.quiet && opt.verbose) {
+			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			err++;
+		}
+		*/
+
+		if (opt.info) {
+			opt.ro_flag = MS_RDONLY;
+			if (opt.bytes > 0) {
+				Eprintf (NERR_PREFIX "Options --info and --size"
+					" can't be used together.\n");
+				err++;
+			}
+		}
+	}
 
 	stderr = stdout;
+
+#ifdef DEBUG
 	if (!opt.debug)
 		if (!(stderr = fopen("/dev/null", "rw")))
 			perr_exit("Couldn't open /dev/null");
+#endif
 
-	if (opt.info) {
-		if (opt.bytes) {
-			printf(NERR_PREFIX "Options -i and -s can't be used "
-					   "together.\n");
-			usage();
-		}
-		opt.ro_flag = MS_RDONLY;
-	}
+	if (ver)
+		version();
+	if (help || err)
+		usage();
+
+	return (!err && !help && !ver);
 }
 
 /**
@@ -1194,15 +1264,11 @@ int main(int argc, char **argv)
 	s64 new_size = 0;	/* in clusters */
 	s64 device_size;        /* in bytes */
 	int i;
-	const char *locale;
 
-	locale = setlocale (LC_ALL, "");
-	if (!locale) {
-		locale = setlocale (LC_ALL, NULL);
-		printf ("Failed to set locale, using default (%s).\n", locale);
-	}
+	if (!parse_options (argc, argv))
+		return 1;
 
-	parse_options(argc, argv);
+	utils_set_locale();
 
 	mount_volume();
 
