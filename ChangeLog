@@ -20,6 +20,13 @@ xx/xx/2004 - 1.9.1-WIP
 	  ntfsclone appropriately.
 	- Add new API mft.[hc]::ntfs_mft_record_{layout,format}() and make
 	  mkntfs use it.
+	- Add new API device.[hc]::ntfs_device_partition_start_sector_get() and
+	  make mkntfs use it.
+	- Provide a new command line option "-p" to mkntfs to allow the user to
+	  specify the partition start sector manually.
+	- Fix mkntfs and ntfsclone to include sys/ioctl.h.
+	- Define the ioctls we use in ntfsclone if they are not defined, as it
+	  is done in device.c.
 
 11/04/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
