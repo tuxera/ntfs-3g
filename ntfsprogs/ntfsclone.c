@@ -3,8 +3,9 @@
  *
  * Copyright (c) 2003-2004 Szabolcs Szakacsits
  * Copyright (c) 2004 Anton Altaparmakov
+ * Special image format support copyright (c) 2004 Per Olofsson
  *
- * Clone NTFS data and/or metadata to a sparse file, device or stdout.
+ * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,6 +62,8 @@ struct {
 	int std_out;
 	int blkdev_out;		/* output file is block device */   
 	int metadata_only;
+	int save_image;
+	int restore_image;
 	char *output;
 	char *volume;
 	struct statfs stfs;
@@ -95,6 +98,7 @@ struct ntfs_walk_cluster {
 ntfs_volume *vol = NULL;
 struct bitmap lcn_bitmap;
 
+int fd_in;
 int fd_out;
 FILE *msg_out = NULL;
 
@@ -104,6 +108,19 @@ int wiped_unused_mft_data = 0;
 int wiped_unused_mft = 0;
 int wiped_resident_data = 0;
 int wiped_timestamp_data = 0;
+
+#define IMAGE_MAGIC "\0ntfsclone-image"
+#define IMAGE_MAGIC_SIZE 16
+
+struct {
+	char magic[IMAGE_MAGIC_SIZE];
+	u8 major_ver;
+	u8 minor_ver;
+	u32 cluster_size;
+	s64 device_size;
+	s64 nr_clusters;
+	s64 inuse;
+} __attribute__ ((__packed__)) image_hdr;
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -180,12 +197,14 @@ static int perr_exit(const char *fmt, ...)
 
 static void usage(void)
 {
-	Eprintf("\nUsage: %s [options] device\n"
-		"    Efficiently clone NTFS to a sparse file, device or standard output.\n"
+	Eprintf("\nUsage: %s [options] source\n"
+		"    Efficiently clone NTFS to a sparse file, image, device or standard output.\n"
 		"\n"
 		"    -o, --output FILE      Clone NTFS to the non-existent FILE\n"
 		"    -O, --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
+		"    -s, --save-image       Save to the special image format\n"
+		"    -r, --restore-image    Restore from the special image format\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
@@ -202,16 +221,18 @@ static void usage(void)
 
 static void parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhmo:O:";
+	static const char *sopt = "-dfhmo:O:rs";
 	static const struct option lopt[] = {
 #ifdef DEBUG
-		{ "debug",	no_argument,		NULL, 'd' },
+		{ "debug",	   no_argument,		NULL, 'd' },
 #endif
-		{ "force",	no_argument,		NULL, 'f' },
-		{ "help",	no_argument,		NULL, 'h' },
-		{ "metadata",	no_argument,		NULL, 'm' },
-		{ "output",	required_argument,	NULL, 'o' },
-		{ "overwrite",	required_argument,	NULL, 'O' },
+		{ "force",	   no_argument,		NULL, 'f' },
+		{ "help",	   no_argument,		NULL, 'h' },
+		{ "metadata",	   no_argument,		NULL, 'm' },
+		{ "output",	   required_argument,	NULL, 'o' },
+		{ "overwrite",	   required_argument,	NULL, 'O' },
+		{ "restore-image", no_argument,		NULL, 'r' },
+		{ "save-image",	   no_argument,		NULL, 's' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -245,6 +266,12 @@ static void parse_options(int argc, char **argv)
 				usage();
 			opt.output = optarg;
 			break;
+		case 'r':
+			opt.restore_image++;
+			break;
+		case 's':
+			opt.save_image++;
+			break;
 		default:
 			err_printf("Unknown option '%s'.\n", argv[optind-1]);
 			usage();
@@ -264,9 +291,21 @@ static void parse_options(int argc, char **argv)
 		usage();
 	}
 
+	if (opt.metadata_only && opt.save_image)
+		err_exit("Saving only metadata to an image is not "
+			 "supported!\n");
+
+	if (opt.metadata_only && opt.restore_image)
+		err_exit("Restoring only metadata from an image is not "
+			 "supported!\n");
+	
 	if (opt.metadata_only && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
 
+	if (opt.save_image && opt.restore_image)
+		err_exit("Saving and restoring an image at the same time "
+			 "is not supported!\n");
+	
 	if (!opt.std_out) {
 		struct stat st;
 		
@@ -378,6 +417,8 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 	while (count > 0) {
 		if (do_write)
 			i = write(*(int *)fd, buf, count);
+		else if (opt.restore_image)
+			i = read(*(int *)fd, buf, count);
 		else
 			i = dev->d_ops->read(dev, buf, count);
 		if (i < 0) {
@@ -395,11 +436,20 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 static void copy_cluster(void)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
+	u32 csize = opt.restore_image ? image_hdr.cluster_size
+		: vol->cluster_size;
 
-	if (read_all(vol->dev, buff, vol->cluster_size) == -1)
+	if (read_all(opt.restore_image ? (void *)&fd_in : vol->dev, buff,
+		     csize) == -1)
 		perr_exit("read_all");
 
-	if (write_all(&fd_out, buff, vol->cluster_size) == -1) {
+	if (opt.save_image) {
+		char cmd = 1;
+		if (write_all(&fd_out, &cmd, sizeof(cmd)) == -1)
+			perr_exit("write_all");
+	}
+	
+	if (write_all(&fd_out, buff, csize) == -1) {
 		int err = errno;
 		perr_printf("Write failed");
 		if (err == EIO && opt.stfs.f_type == 0x517b)
@@ -420,11 +470,24 @@ static void lseek_to_cluster(s64 lcn)
 	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek input");
 
-	if (opt.std_out)
+	if (opt.std_out || opt.save_image)
 		return;
 	
 	if (lseek(fd_out, pos, SEEK_SET) == (off_t)-1)
 		perr_exit("lseek output");
+}
+
+static void image_skip_clusters(s64 count)
+{
+	if (opt.save_image && count > 0) {
+		char buff[1 + sizeof(count)];
+
+		buff[0] = 0;
+		memcpy(buff + 1, &count, sizeof(count));
+		
+		if (write_all(&fd_out, buff, sizeof(buff)) == -1)
+			perr_exit("write_all");
+	}
 }
 
 static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
@@ -446,51 +509,121 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 static void clone_ntfs(u64 nr_clusters)
 {
-	s64 i, pos, count;
+	s64 i, pos, count, last_cl;
 	u8 bm[NTFS_BUF_SIZE];
 	void *buf;
 	u32 csize = vol->cluster_size;
 	u64 p_counter = 0;
 	struct progress_bar progress;
 
-	Printf("Cloning NTFS ...\n");
-	
+	if (opt.save_image)
+		Printf("Saving NTFS to image ...\n");
+	else
+		Printf("Cloning NTFS ...\n");
+
 	if ((buf = calloc(1, csize)) == NULL)
 		perr_exit("dump_to_stdout");
-	
+
 	progress_init(&progress, p_counter, nr_clusters, 100);
+
+	if (opt.save_image) {
+		if (write_all(&fd_out, &image_hdr, sizeof(image_hdr))
+		    == -1)
+			perr_exit("write_all");
+	}
 	
 	pos = 0;
+	last_cl = 0;
 	while (1) {
 		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
 		if (count == -1)
 			perr_exit("Couldn't read $Bitmap (pos = %lld)\n", pos);
 
-		if (count == 0)
+		if (count == 0) {
+			image_skip_clusters(pos * 8 - last_cl - 1);
 			return;
+		}
 
 		for (i = 0; i < count; i++, pos++) {
 			s64 cl;  /* current cluster */	  
 
 			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
 
-				if (cl > vol->nr_clusters - 1)
+				if (cl > vol->nr_clusters - 1) {
+					image_skip_clusters(cl - last_cl - 1);
 					return;
+				}
 				
 				if (ntfs_bit_get(bm, i * 8 + cl % 8)) {
 					progress_update(&progress, ++p_counter);
 					lseek_to_cluster(cl);
+					image_skip_clusters(cl - last_cl - 1);
+					
 					copy_cluster();
+					last_cl = cl;
 					continue;
 				}
 				
-				if (opt.std_out) {
+				if (opt.std_out && !opt.save_image) {
 					progress_update(&progress, ++p_counter);
 					if (write_all(&fd_out, buf, csize) == -1)
 						perr_exit("write_all");
 				}
 			}
 		}
+	}
+}
+
+static void write_empty_clusters(s32 csize, s64 count,
+				 struct progress_bar *progress, u64 *p_counter)
+{
+	s64 i;
+	char buff[NTFS_MAX_CLUSTER_SIZE];
+	
+	memset(buff, 0, csize);
+
+	for (i = 0; i < count; i++) {
+		if (write_all(&fd_out, buff, csize) == -1)
+			perr_exit("write_all");
+		progress_update(progress, ++(*p_counter));
+	}
+}
+
+static void restore_image(void)
+{
+	s64 pos = 0, count;
+	s32 csize = image_hdr.cluster_size;
+	char cmd;
+	u64 p_counter = 0;
+	struct progress_bar progress;
+
+	Printf("Restoring NTFS from image ...\n");
+
+	progress_init(&progress, p_counter, opt.std_out ?
+		      image_hdr.nr_clusters : image_hdr.inuse, 100);
+
+	while (pos < image_hdr.nr_clusters) {
+		if (read_all(&fd_in, &cmd, sizeof(cmd)) == -1)
+			perr_exit("read_all");
+
+		if (cmd == 0) {
+			if (read_all(&fd_in, &count, sizeof(count)) == -1)
+				perr_exit("read_all");
+			if (opt.std_out)
+				write_empty_clusters(csize, count,
+						     &progress, &p_counter);
+			else {
+				if (lseek(fd_out, count * csize, SEEK_CUR)
+				    == (off_t)-1)
+					perr_exit("lseek output");
+			}
+			pos += count;
+		} else if (cmd == 1) {
+			copy_cluster();
+			pos++;
+			progress_update(&progress, ++p_counter);
+		} else
+			err_exit("Invalid command code in image\n");
 	}
 }
 
@@ -845,18 +978,34 @@ static void print_volume_size(const char *str, s64 bytes)
 }
 
 
-static void print_disk_usage(ntfs_walk_clusters_ctx *image)
+static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
 {
 	s64 total, used;
 
-	total = vol->nr_clusters * vol->cluster_size;
-	used = image->inuse * vol->cluster_size;
+	total = nr_clusters * cluster_size;
+	used = inuse * cluster_size;
 
 	Printf("Space in use       : %lld MB (%.1f%%)   ",
 			(long long)rounded_up_division(used, NTFS_MBYTE),
 			100.0 * ((float)used / total));
 
 	Printf("\n");
+}
+
+static void print_image_info(void)
+{
+	Printf("NTFS volume version: %d.%d\n",
+	       image_hdr.major_ver, image_hdr.minor_ver);
+	Printf("Cluster size       : %u bytes\n",
+	       image_hdr.cluster_size);
+	print_volume_size("Image volume size  ",
+			  image_hdr.cluster_size
+			  * image_hdr.nr_clusters);
+	Printf("Image device size  : %lld bytes\n",
+	       image_hdr.device_size);
+	print_disk_usage(image_hdr.cluster_size,
+			 image_hdr.nr_clusters,
+			 image_hdr.inuse);
 }
 
 static void check_if_mounted(const char *device, unsigned long new_mntflag)
@@ -1019,7 +1168,71 @@ static void set_filesize(s64 filesize)
 		exit(1);
 	}
 }
+
+static s64 open_image(void)
+{
+	if (strcmp(opt.volume, "-") == 0) {
+		if ((fd_in = fileno(stdin)) == -1) 
+			perr_exit("fileno for stdout failed");
+	} else {
+		if ((fd_in = open(opt.volume, O_RDONLY)) == -1)
+			perr_exit("failed to open image");
+	}
+
+	if (read_all(&fd_in, &image_hdr, sizeof(image_hdr)) == -1)
+		perr_exit("read_all");
+
+	if (memcmp(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE) != 0)
+		err_exit("Input file is not an image! (invalid magic)\n");
+
+	return image_hdr.device_size;
+}
+
+static s64 open_volume(void)
+{
+	s64 device_size;
 	
+	mount_volume(MS_RDONLY);
+	
+	device_size = ntfs_device_size_get(vol->dev, 1);
+	if (device_size <= 0)
+		err_exit("Couldn't get device size (%lld)!\n", device_size);
+	
+	print_volume_size("Current device size", device_size);
+	
+	if (device_size < vol->nr_clusters * vol->cluster_size)
+		err_exit("Current NTFS volume size is bigger than the device "
+			 "size (%lld)!\nCorrupt partition table or incorrect "
+			 "device partitioning?\n", device_size);
+
+	return device_size;
+}
+
+static void initialise_image_hdr(s64 device_size, s64 inuse)
+{
+	memcpy(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE);
+	image_hdr.major_ver = vol->major_ver;
+	image_hdr.minor_ver = vol->minor_ver;
+	image_hdr.cluster_size = vol->cluster_size;
+	image_hdr.device_size = device_size;
+	image_hdr.nr_clusters = vol->nr_clusters;
+	image_hdr.inuse = inuse;
+}
+
+static void check_output_filesize(s64 device_size)
+{
+	if (opt.blkdev_out) {
+		s64 dest_size = device_size_get(fd_out);
+		s64 ntfs_size = vol->nr_clusters * vol->cluster_size;
+		ntfs_size += 512; /* add backup boot sector */
+		if (dest_size < ntfs_size)
+			err_exit("Output device size (%lld) is too small"
+				 " to fit the NTFS image.\n", dest_size);
+		
+		check_if_mounted(opt.output, 0);
+	} else
+		set_filesize(device_size);
+}
 
 int main(int argc, char **argv)
 {
@@ -1035,18 +1248,10 @@ int main(int argc, char **argv)
 	
 	utils_set_locale();
 
-	mount_volume(MS_RDONLY);
-	
-	device_size = ntfs_device_size_get(vol->dev, 1);
-	if (device_size <= 0)
-		err_exit("Couldn't get device size (%lld)!\n", device_size);
-
-	print_volume_size("Current device size", device_size);
-
-	if (device_size < vol->nr_clusters * vol->cluster_size)
-		err_exit("Current NTFS volume size is bigger than the device "
-			 "size (%lld)!\nCorrupt partition table or incorrect "
-			 "device partitioning?\n", device_size);
+	if (opt.restore_image)
+		device_size = open_image();
+	else
+		device_size = open_volume();
 
 	if (opt.std_out) {
 	       if ((fd_out = fileno(stdout)) == -1) 
@@ -1063,34 +1268,36 @@ int main(int argc, char **argv)
 
 		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1) 
 			perr_exit("Opening file '%s' failed", opt.output);
-	
-		if (opt.blkdev_out) {
-			s64 dest_size = device_size_get(fd_out);
-			s64 ntfs_size = vol->nr_clusters * vol->cluster_size;
-			ntfs_size += 512; /* add backup boot sector */
-			if (dest_size < ntfs_size)
-				err_exit("Output device size (%lld) is too small"
-					 " to fit the NTFS image.\n", dest_size);
-			
-			check_if_mounted(opt.output, 0);
-		} else
-			set_filesize(device_size);
+
+		if (!opt.save_image)
+			check_output_filesize(device_size);
 	}
 
+	if (opt.restore_image) {
+		print_image_info();
+		restore_image();
+		fsync_clone(fd_out);
+		exit(0);
+	}
+	
 	setup_lcn_bitmap();
 	memset(&image, 0, sizeof(image));
 	backup_clusters.image = &image; 
 
 	walk_clusters(vol, &backup_clusters);
 	compare_bitmaps(&lcn_bitmap);
-	print_disk_usage(&image);
+	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
 	
 	free(lcn_bitmap.bm);
+
+	if (opt.save_image)
+		initialise_image_hdr(device_size, image.inuse);
 	
 	/* FIXME: save backup boot sector */
 
 	if (opt.std_out || !opt.metadata_only) {
-		s64 nr_clusters = opt.std_out ? vol->nr_clusters : image.inuse;
+		s64 nr_clusters = (opt.std_out && !opt.save_image)
+			? vol->nr_clusters : image.inuse;
 		
 		clone_ntfs(nr_clusters);
 		fsync_clone(fd_out);
