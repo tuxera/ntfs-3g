@@ -1,5 +1,5 @@
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8-devel, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.0beta, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])

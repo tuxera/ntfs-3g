@@ -68,3 +68,15 @@ ntfsundelete for more details.
 
 ntfsresize - Resize NTFS volumes. See man 8 ntfsresize for details.
 
+ntfsclone - Efficiently create/restore an image of an NTFS partition. See
+man 8 ntfsclone for details.
+
+ntfscluster - Locate the owner of any given sector or cluster on an NTFS
+partition. See man 8 ntfscluster for details.
+
+ntfsinfo - Show some information about an NTFS partition or one of the files
+or directories within it. See man 8 ntfsinfo for details.
+
+ntfsls - List information about files in a directory residing on an NTFS
+partition. See man 8 ntfsls for details.
+

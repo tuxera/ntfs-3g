@@ -21,8 +21,10 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	  causing the program doing the enumeration to hang in a tight loop.
 	  NOTE: There is still work to do as ctx->al_entry is set to NULL
 	  instead of to the position in the attribute list at which to insert.
-	- Added man page for ntfsls.
+	- Added man pages for ntfsls and other utilities (Richard Russon and
+	  me).
 	- Lots of extensions and cleanups to ntfsls.
+	- Other assorted bugfixes and developments (see bk changes).
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
 	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):

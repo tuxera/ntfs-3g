@@ -1,6 +1,19 @@
 Current news
 ============
 
+Added new utilities: ntfsclone by Szakacsits Szabolcs, ntfscluster by Richard
+Russon, ntfsinfo by Matthew Fanto, ntfsls originally by Lode Leroy, modified
+by Anton Altaparmakov.
+
+Library internal enhancements and API additions.  Of particular note is the
+device io abstraction layer and the addition of the win32 device operations
+(these haven't been integrated in the build process yet but do work when
+integrated manually).  Thanks to Lode Leroy for the win32 code.
+
+
+Older news
+==========
+
 Renamed ntfstools to ntfsprogs everywhere.
 
 Added new utility ntfslabel by Matthew Fanto. See man 8 ntfslabel for details.
@@ -15,10 +28,6 @@ The API has been fully reworked and the library mostly rewritten since the
 last release (1.6.0). It should now offer a much more solid and stable basis
 for development of software accessing NTFS volumes. All utilities have been
 ported to the new API.
-
-
-Older news
-==========
 
 linux-ntfs should now compile and work on all architectures.
 
