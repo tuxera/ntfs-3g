@@ -1,5 +1,3 @@
-$Id$
- 
 System files mft record numbers. All these files are always marked as used
 in the bitmap attribute of the mft; presumably in order to avoid accidental
 allocation for random other mft records. Also, the sequence number for each

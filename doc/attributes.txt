@@ -1,5 +1,3 @@
-$Id$
-
 Notes on the storage of attributes.
 ===================================
 
