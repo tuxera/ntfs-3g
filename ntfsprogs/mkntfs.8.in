@@ -17,6 +17,14 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 .I part-start-sect
 ]
 [
+.B \-H
+.I heads
+]
+[
+.B \-S
+.I sectors-per-track
+]
+[
 .B \-c
 .I cluster-size
 ]
@@ -94,7 +102,28 @@ omitted,
 .B mkntfs
 attempts to determine
 .I part-start-sect
-automatically and if that fails a default of 0 is used.
+automatically and if that fails a default of 0 is used. Note that
+.I part-start-sect
+is required for Windows to be able to boot from the created volume.
+.TP
+.BI \-H " heads"
+Specify the number of heads. The maximum is 65535 (0xffff). If omitted,
+.B mkntfs
+attempts to determine the number of
+.I heads
+automatically and if that fails a default of 0 is used. Note that
+.I heads
+is required for Windows to be able to boot from the created volume.
+.TP
+.BI \-S " sectors-per-track"
+Specify the number of sectors per track. The maximum is 65535 (0xffff). If
+omitted,
+.B mkntfs
+attempts to determine the number of
+.I sectors-per-track
+automatically and if that fails a default of 0 is used. Note that
+.I sectors-per-track
+is required for Windows to be able to boot from the created volume.
 .TP
 .BI \-c " cluster-size"
 Specify the size of clusters in bytes. Valid cluster size values are powers of
