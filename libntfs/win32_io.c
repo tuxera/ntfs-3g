@@ -381,7 +381,7 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
 {
 	fprintf(stderr, "win32_fstat() unimplemented\n");
 	errno = ENOTSUP;
-	return 0;
+	return -1;
 }
 
 static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
@@ -389,7 +389,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 {
 	fprintf(stderr, "win32_ioctl() unimplemented\n");
 	errno = ENOTSUP;
-	return 0;
+	return -1;
 }
 
 extern s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count,
@@ -410,7 +410,7 @@ static s64 ntfs_device_win32_pwrite(struct ntfs_device *dev, const void *buf,
 	return ntfs_pwrite(dev, offset, count, buf);
 }
 
-struct ntfs_device_operations ntfs_device_win32_ops = {
+struct ntfs_device_operations ntfs_device_win32_io_ops = {
 	.open		= ntfs_device_win32_open,
 	.close		= ntfs_device_win32_close,
 	.seek		= ntfs_device_win32_seek,
