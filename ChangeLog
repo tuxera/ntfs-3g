@@ -18,8 +18,9 @@ xx/xx/2004 - 1.9.3-WIP
 	  endian, 64-bit machine will just disappear as we will emulate the
 	  calls even though they exist with a different name (bswap16(), etc
 	  instead of bswap_16(), etc).  (Anton)
+	- Undelete: add ability to recover ranges of inodes.  (Holger Ohmacht)
 
-11/05/2004 - 1.9.2 - Decomrpession bug fixes, ntfsinfo enhancements, updates.
+11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
 	  config.h.in sledge hammers.  (Anton)
 	- Fix the incorrect ntfsclone usage example in the man page.  (Szaka)
@@ -28,7 +29,7 @@ xx/xx/2004 - 1.9.3-WIP
 	  always available.  (Yuval)
 	- Add conditional include of sys/param.h in endians.h which provides
 	  endianness support on Cygwin.  (Yuval)
-	- ntfsclone --metadata also saves at least the first 8 KiB of the 
+	- ntfsclone --metadata also saves at least the first 8 KiB of the
 	  $LogFile.  (Szaka)
 	- Fix incorrect getopt_long() usage: converted argv[optind-1] to optarg
 	  so utilities won't do bogus and unexpected things.  (Szaka)
@@ -100,8 +101,8 @@ xx/xx/2004 - 1.9.3-WIP
 	  inserted in @ctx->al_entry (see descritpion for ntfs_attr_lookup() in
 	  attrib.c for details).
 	- Check the mount state of the output device in ntfsclone.
-	- Correct a too strong sanity check in ntfsclone that prevented 
-	  cloning from larger device to a smaller one but the NTFS image 
+	- Correct a too strong sanity check in ntfsclone that prevented
+	  cloning from larger device to a smaller one but the NTFS image
 	  could have fit fully.
 	- Added a few (hopefully) better explanatory messages to ntfsresize.
 	- Add new API device.[hc]::ntfs_device_heads_get() and make mkntfs use
