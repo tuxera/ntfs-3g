@@ -1092,7 +1092,7 @@ static void ntfs_dt_free (struct ntfs_dt *dt)
 	free (dt->sub_nodes);
 	free (dt->children);
 	free (dt->inodes);
-	free (dt->data);
+	free (dt->data);	// XXX is this always ours?
 	free (dt);
 }
 
@@ -1742,7 +1742,7 @@ static ntfs_inode *ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
 	}
 
 	if (ino) {
-		printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
+		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
 		ino->ref_count++;
 		return ino;
 	}
@@ -1761,7 +1761,7 @@ static ntfs_inode *ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
 
 	ino->ref_count = 1;
 
-	printf (BOLD YELLOW "inode open %lld\n" END, mref);
+	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
 	return ino;
 }
 
@@ -1773,7 +1773,7 @@ static int ntfs_inode_close2 (ntfs_inode *ni)
 	if (!ni)
 		return 0;
 	
-	printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
+	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
 
 	ni->ref_count--;
 	if (ni->ref_count > 0)
@@ -1860,17 +1860,17 @@ static void ntfs_dir_free (struct ntfs_dir *dir)
 		}
 	}
 
-	ntfs_attr_close  (dir->iroot);
-	ntfs_attr_close  (dir->ialloc);
-	ntfs_attr_close  (dir->ibmp);
+	ntfs_attr_close (dir->iroot);
+	ntfs_attr_close (dir->ialloc);
+	ntfs_attr_close (dir->ibmp);
 	ntfs_inode_close2 (dir->inode);
+
+	ntfs_dt_free (dir->index);
 
 	for (i = 0; i < dir->child_count; i++)
 		ntfs_dir_free (dir->children[i]);
 
 	free (dir->children);
-
-	ntfs_dt_free (dir->index);
 	free (dir);
 }
 
@@ -1952,16 +1952,16 @@ static int ntfs_dir_rollback (struct ntfs_dir *dir)
  */
 static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
 {
+	struct ntfs_dt *dt;
+
 	if (!vol)
 		return 0;
 
-	// unlink
-	//   vol->lcnbmp_ni->private_data
-	//   vol->mft_ni->private_data
-	//   vol->mftmirr_ni->private_data
-
-	// ntfs_dir_free (vol->private_data);
-	// now dt_free
+	dt = (struct ntfs_dt *) vol->private_data;
+	if (dt) {
+		vol->private_data = NULL;
+		ntfs_dir_free (dt->dir);
+	}
 
 	return ntfs_umount (vol, force);
 }
