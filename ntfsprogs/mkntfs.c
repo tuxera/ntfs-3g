@@ -205,7 +205,7 @@ struct {
 /**
  * Dprintf - debugging output (-vv); overriden by quiet (-q)
  */
-void Dprintf(const char *fmt, ...)
+static void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -220,6 +220,7 @@ void Dprintf(const char *fmt, ...)
 /**
  * Eprintf - error output; ignores quiet (-q)
  */
+void Eprintf(const char *fmt, ...);
 void Eprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -239,7 +240,7 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
-void err_exit(const char *fmt, ...)
+static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -255,7 +256,7 @@ void err_exit(const char *fmt, ...)
 /**
  * copyright - print copyright statements
  */
-void copyright(void)
+static void copyright(void)
 {
 	fprintf(stderr, "Copyright (c) 2000-2003 Anton Altaparmakov\n"
 			"Copyright (c) 2001-2003 Richard Russon\n"
@@ -266,7 +267,7 @@ void copyright(void)
 /**
  * license - print license statement
  */
-void license(void)
+static void license(void)
 {
 	fprintf(stderr, "%s", ntfs_gpl);
 }
@@ -274,8 +275,8 @@ void license(void)
 /**
  * usage - print a list of the parameters to the program
  */
-void usage(void) __attribute__ ((noreturn));
-void usage(void)
+static void usage(void) __attribute__ ((noreturn));
+static void usage(void)
 {
 	copyright();
 	fprintf(stderr,	"Usage: %s [options] device "
@@ -312,7 +313,7 @@ void usage(void)
 /**
  * parse_options
  */
-void parse_options(int argc, char *argv[])
+static void parse_options(int argc, char *argv[])
 {
 	int c;
 	long l;
@@ -398,7 +399,7 @@ void parse_options(int argc, char *argv[])
 /**
  * append_to_bad_blocks
  */
-void append_to_bad_blocks(unsigned long block)
+static void append_to_bad_blocks(unsigned long block)
 {
 	long long *new_buf;
 
@@ -416,8 +417,8 @@ void append_to_bad_blocks(unsigned long block)
 /**
  * mkntfs_write
  */
-__inline__ long long mkntfs_write(struct ntfs_device *dev, const void *buf,
-		long long count)
+static __inline__ long long mkntfs_write(struct ntfs_device *dev,
+		const void *buf, long long count)
 {
 	long long bytes_written, total;
 	int retry;
@@ -460,8 +461,8 @@ __inline__ long long mkntfs_write(struct ntfs_device *dev, const void *buf,
  * Return the number of bytes written (minus padding) or -1 on error. Errno
  * will be set to the error code.
  */
-s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl, const char *val,
-		const s64 val_len, s64 *inited_size)
+static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
+		const char *val, const s64 val_len, s64 *inited_size)
 {
 	s64 bytes_written, total, length, delta;
 	int retry, i;
@@ -538,7 +539,7 @@ s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl, const char *val,
  * terminating null byte. If a unicode character was encountered which could
  * not be converted -1 is returned.
  */
-int ucstos(char *dest, const uchar_t *src, int maxlen)
+static int ucstos(char *dest, const uchar_t *src, int maxlen)
 {
 	uchar_t u;
 	int i;
@@ -570,12 +571,12 @@ int ucstos(char *dest, const uchar_t *src, int maxlen)
  * write the terminating null unicode character and hence return -1 with errno
  * set to EINVAL.
  */
-int stoucs(uchar_t *dest, const char *src, int maxlen)
+static int stoucs(uchar_t *dest, const char *src, int maxlen)
 {
 	char c;
 	int i;
 
-	if (maxlen < sizeof(uchar_t)) {
+	if (maxlen < (int)sizeof(uchar_t)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -596,7 +597,7 @@ int stoucs(uchar_t *dest, const char *src, int maxlen)
 /**
  * dump_resident_attr_val
  */
-void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
+static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 {
 	const char *don_t_know = "Don't know what to do with this attribute "
 			"type yet.";
@@ -737,7 +738,7 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 /**
  * dump_resident_attr
  */
-void dump_resident_attr(ATTR_RECORD *a)
+static void dump_resident_attr(ATTR_RECORD *a)
 {
 	int i;
 
@@ -760,7 +761,7 @@ void dump_resident_attr(ATTR_RECORD *a)
 /**
  * dump_mapping_pairs_array
  */
-void dump_mapping_pairs_array(char *b, unsigned int max_len)
+static void dump_mapping_pairs_array(char *b, unsigned int max_len)
 {
 	// TODO
 	return;
@@ -769,7 +770,7 @@ void dump_mapping_pairs_array(char *b, unsigned int max_len)
 /**
  * dump_non_resident_attr
  */
-void dump_non_resident_attr(ATTR_RECORD *a)
+static void dump_non_resident_attr(ATTR_RECORD *a)
 {
 	s64 l;
 	int i;
@@ -802,7 +803,7 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 /**
  * dump_attr_record
  */
-void dump_attr_record(ATTR_RECORD *a)
+static void dump_attr_record(ATTR_RECORD *a)
 {
 	unsigned int u;
 	char s[0x200];
@@ -897,7 +898,7 @@ void dump_attr_record(ATTR_RECORD *a)
 /**
  * dump_mft_record
  */
-void dump_mft_record(MFT_RECORD *m)
+static void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
 	unsigned int u;
@@ -947,7 +948,7 @@ void dump_mft_record(MFT_RECORD *m)
 /**
  * format_mft_record
  */
-void format_mft_record(MFT_RECORD *m)
+static void format_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;
 
@@ -1009,7 +1010,7 @@ void format_mft_record(MFT_RECORD *m)
  *	-EINVAL		Can only occur if mkntfs was compiled with -DEBUG. Means
  *			the input parameters were faulty.
  */
-int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
+static int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 {
 	u32 biu;
 
@@ -1049,7 +1050,7 @@ int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 /**
  * deallocate_scattered_clusters
  */
-void deallocate_scattered_clusters(const runlist *rl)
+static void deallocate_scattered_clusters(const runlist *rl)
 {
 	LCN j;
 	int i;
@@ -1079,7 +1080,7 @@ void deallocate_scattered_clusters(const runlist *rl)
  * TODO: We should be returning the size as well, but for mkntfs this is not
  * necessary.
  */
-runlist *allocate_scattered_clusters(s64 clusters)
+static runlist *allocate_scattered_clusters(s64 clusters)
 {
 	runlist *rl = NULL, *rlt;
 	VCN vcn = 0LL;
@@ -1157,10 +1158,10 @@ err_end:
  *
  * Return 0 on success and -errno on error.
  */
-int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
-		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
-		const ATTR_FLAGS flags, const runlist *rl,
-		const char *val, const s64 val_len)
+static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
+		const ATTR_TYPES type, const char *name, u32 name_len,
+		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
+		const runlist *rl, const char *val, const s64 val_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -1342,9 +1343,10 @@ err_out:
  * insert_non_resident_attr_in_mft_record
  * Return 0 on success and -errno on error.
  */
-int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
-		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
-		const ATTR_FLAGS flags, const char *val, const s64 val_len)
+static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
+		const ATTR_TYPES type, const char *name, u32 name_len,
+		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
+		const char *val, const s64 val_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -1532,9 +1534,10 @@ err_out:
  * insert_resident_attr_in_mft_record
  * Return 0 on success and -errno on error.
  */
-int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
-		const char *name, u32 name_len, const IGNORE_CASE_BOOL ic,
-		const ATTR_FLAGS flags,	const RESIDENT_ATTR_FLAGS res_flags,
+static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
+		const ATTR_TYPES type, const char *name, u32 name_len,
+		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
+		const RESIDENT_ATTR_FLAGS res_flags,
 		const char *val, const u32 val_len)
 {
 	ntfs_attr_search_ctx *ctx;
@@ -1635,7 +1638,7 @@ err_out:
  * add_attr_std_info
  * Return 0 on success or -errno on error.
  */
-int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
+static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
 {
 	STANDARD_INFORMATION si;
 	int err;
@@ -1672,7 +1675,7 @@ int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
  * add_attr_file_name
  * Return 0 on success or -errno on error.
  */
-int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
+static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 		const s64 allocated_size, const s64 data_size,
 		const FILE_ATTR_FLAGS flags, const u16 packed_ea_size,
 		const u32 reparse_point_tag, const char *file_name,
@@ -1755,7 +1758,7 @@ int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
  *
  * Return 0 on success or -errno on error.
  */
-int add_attr_sd(MFT_RECORD *m, const char *sd, const s64 sd_len)
+static int add_attr_sd(MFT_RECORD *m, const char *sd, const s64 sd_len)
 {
 	int err;
 
@@ -1778,7 +1781,7 @@ int add_attr_sd(MFT_RECORD *m, const char *sd, const s64 sd_len)
  * add_attr_data
  * Return 0 on success or -errno on error.
  */
-int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
+static int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
 		const char *val, const s64 val_len)
 {
@@ -1817,7 +1820,7 @@ int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
  *
  * Return 0 on success or -errno on error.
  */
-int add_attr_data_positioned(MFT_RECORD *m, const char *name,
+static int add_attr_data_positioned(MFT_RECORD *m, const char *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const ATTR_FLAGS flags, const runlist *rl,
 		const char *val, const s64 val_len)
@@ -1842,7 +1845,7 @@ int add_attr_data_positioned(MFT_RECORD *m, const char *name,
  *
  * Return 0 on success or -errno on error.
  */
-int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
+static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 		const int vol_name_len)
 {
 	uchar_t *uname;
@@ -1879,7 +1882,7 @@ int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
  * add_attr_vol_info
  * Return 0 on success or -errno on error.
  */
-int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
+static int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
 		const u8 major_ver, const u8 minor_ver)
 {
 	VOLUME_INFORMATION vi;
@@ -1900,8 +1903,9 @@ int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
  * add_attr_index_root
  * Return 0 on success or -errno on error.
  */
-int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
-		const IGNORE_CASE_BOOL ic, const ATTR_TYPES indexed_attr_type,
+static int add_attr_index_root(MFT_RECORD *m, const char *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const ATTR_TYPES indexed_attr_type,
 		const COLLATION_RULES collation_rule,
 		const u32 index_block_size)
 {
@@ -1979,9 +1983,9 @@ int add_attr_index_root(MFT_RECORD *m, const char *name, const u32 name_len,
  * add_attr_index_alloc
  * Return 0 on success or -errno on error.
  */
-int add_attr_index_alloc(MFT_RECORD *m, const char *name, const u32 name_len,
-		const IGNORE_CASE_BOOL ic, const char *index_alloc_val,
-		const u32 index_alloc_val_len)
+static int add_attr_index_alloc(MFT_RECORD *m, const char *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const char *index_alloc_val, const u32 index_alloc_val_len)
 {
 	int err;
 
@@ -1997,7 +2001,7 @@ int add_attr_index_alloc(MFT_RECORD *m, const char *name, const u32 name_len,
  * add_attr_bitmap
  * Return 0 on success or -errno on error.
  */
-int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
+static int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const char *bitmap,
 		const u32 bitmap_len)
 {
@@ -2025,7 +2029,7 @@ int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
  *
  * Return 0 on success or -errno on error.
  */
-int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
+static int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const runlist *rl, const char *bitmap, const u32 bitmap_len)
 {
@@ -2047,7 +2051,7 @@ int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
  *
  * Return 0 on success or -errno on error.
  */
-int upgrade_to_large_index(MFT_RECORD *m, const char *name,
+static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		u32 name_len, const IGNORE_CASE_BOOL ic,
 		INDEX_ALLOCATION **index)
 {
@@ -2206,7 +2210,7 @@ err_out:
  *
  * Return 0 on success or -errno on error.
  */
-int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
+static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
 		INDEX_ENTRY *pos, u32 size)
 {
 	u32 biu;
@@ -2259,7 +2263,7 @@ int make_room_for_index_entry_in_index_block(INDEX_BLOCK *index,
  *
  * Return 0 on success or -errno on error.
  */
-int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
+static int insert_file_link_in_dir_index(INDEX_BLOCK *index, MFT_REF file_ref,
 		FILE_NAME_ATTR *file_name, u32 file_name_size)
 {
 	int err, i;
@@ -2391,7 +2395,7 @@ do_next:
  *
  * Return 0 on success or -errno on error.
  */
-int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
+static int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 		MFT_RECORD *m_file, const MFT_REF ref_file,
 		const s64 allocated_size, const s64 data_size,
 		const FILE_ATTR_FLAGS flags, const u16 packed_ea_size,
@@ -2479,7 +2483,7 @@ int create_hardlink(INDEX_BLOCK *index, const MFT_REF ref_parent,
 /**
  * init_options
  */
-void init_options(void)
+static void init_options(void)
 {
 	memset(&opts, 0, sizeof(opts));
 	opts.index_block_size = 4096;
@@ -2491,7 +2495,7 @@ void init_options(void)
 /**
  * mkntfs_exit
  */
-void mkntfs_exit(void)
+static void mkntfs_exit(void)
 {
 	if (index_block)
 		free(index_block);
@@ -2521,7 +2525,7 @@ void mkntfs_exit(void)
 		free(rl_index);
 	if (opts.bad_blocks)
 		free(opts.bad_blocks);
-	if (opts.attr_defs != (ATTR_DEF*)attrdef_ntfs12_array)
+	if (opts.attr_defs != (const ATTR_DEF*)attrdef_ntfs12_array)
 		free(opts.attr_defs);
 	if (!vol)
 		return;
@@ -2677,7 +2681,7 @@ int main(int argc, char **argv)
 	/* Validate sector size. */
 	if ((opts.sector_size - 1) & opts.sector_size ||
 			opts.sector_size < 256 || opts.sector_size > 4096)
-		err_exit("Error: sector_size is invalid. It must be a power "
+		err_exit("sector_size is invalid. It must be a power "
 			 "of two, and it must be\n greater or equal 256 and "
 			 "less than or equal 4096 bytes.\n");
 	Dprintf("sector size = %i bytes\n", opts.sector_size);
@@ -2698,12 +2702,11 @@ int main(int argc, char **argv)
 	if (!opts.volume_size)
 		opts.volume_size = opts.nr_sectors * opts.sector_size;
 	else if (opts.volume_size & (opts.sector_size - 1))
-		err_exit("Error: volume_size is not a multiple of "
-			 "sector_size.\n");
+		err_exit("volume_size is not a multiple of sector_size.\n");
 	/* Validate volume size. */
 	if (opts.volume_size < 1 << 20 /* 1MiB */)
-		err_exit("Error: device is too small (%ikiB). Minimum NTFS "
-			 "volume size is 1MiB.\n", opts.volume_size / 1024);
+		err_exit("Device is too small (%ikiB). Minimum NTFS volume "
+			 "size is 1MiB.\n", opts.volume_size / 1024);
 	Dprintf("volume size = %llikiB\n", opts.volume_size / 1024);
 	/* If user didn't specify the cluster size, determine it now. */
 	if (!vol->cluster_size) {
@@ -2718,24 +2721,36 @@ int main(int argc, char **argv)
 		/* For small volumes on devices with large sector sizes. */
 		if (vol->cluster_size < (u32)opts.sector_size)
 			vol->cluster_size = opts.sector_size;
+		/*
+		 * For huge volumes, grow the cluster size until the number of
+		 * clusters fits into 32 bits or the cluster size exceeds the
+		 * maximum limit of 64kiB.
+		 */
+		while (opts.volume_size >> (ffs(vol->cluster_size) - 1 + 32)) {
+			vol->cluster_size <<= 1;
+			if (vol->cluster_size > 65536)
+				err_exit("Device is too large to hold an NTFS "
+						"volume (maximum size is "
+						"256TiB).\n");
+		}
 	}
 	/* Validate cluster size. */
 	if (vol->cluster_size & (vol->cluster_size - 1) ||
 	    vol->cluster_size < (u32)opts.sector_size ||
 	    vol->cluster_size > 128 * (u32)opts.sector_size ||
 	    vol->cluster_size > 65536)
-		err_exit("Error: cluster_size is invalid. It must be a power "
-			 "of two, be at least\nthe same as sector_size, be "
-			 "maximum 64kB, and the sectors per cluster value "
-			 "has\nto fit inside eight bits. (We do not support "
-			 "larger cluster sizes yet.)\n");
+		err_exit("Cluster_size is invalid. It must be a power of two, "
+			 "be at least\nthe same as sector_size, be maximum "
+			 "64kiB, and the sectors per cluster value has\n"
+			 "to fit inside eight bits. (We do not support larger "
+			 "cluster sizes yet.)\n");
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
 	Dprintf("cluster size = %i bytes\n", vol->cluster_size);
 	if (vol->cluster_size > 4096) {
 		if (opts.enable_compression) {
 			if (!opts.force)
-				err_exit("Error: cluster_size is above 4096 "
-						"bytes and compression is "
+				err_exit("Cluster_size is above 4096 bytes "
+						"and compression is "
 						"requested.\nThis is not "
 						"possible due to limitations "
 						"in the compression algorithm "
@@ -2764,6 +2779,17 @@ int main(int argc, char **argv)
 			 "and/or cluster/sector number.\n");
 	Dprintf("number of clusters = %llu (0x%llx)\n", opts.nr_clusters,
 			opts.nr_clusters);
+	/* Number of clusters must fit within 32 bits (Win2k limitation). */
+	if (opts.nr_clusters >> 32) {
+		if (vol->cluster_size >= 65536)
+			err_exit("Device is too large to hold an NTFS volume "
+					"(maximum size is 256TiB).\n");
+		err_exit("Number of clusters exceeds 32 bits. Please try "
+				"again with a larger\ncluster size or leave "
+				"the cluster size unspecified and the "
+				"smallest possible\ncluster size for the size "
+				"of the device will be used.\n");
+	}
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap_byte_size = (opts.nr_clusters + 7) >> 3;
 	/* Needs to be multiple of 8 bytes. */
@@ -3362,7 +3388,7 @@ int main(int argc, char **argv)
 	buf2 = NULL;
 	if (bw != i) {
 		int _e = errno;
-		char *_s;
+		const char *_s;
 
 		if (bw == -1LL)
 			_s = strerror(_e);
