@@ -2238,7 +2238,7 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
  * Warning: If you make a record smaller without having copied all the data you
  *	    are interested in the data may be overwritten!
  */
-static int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
+int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 {
 	/* Align to 8 bytes, just in case the caller hasn't. */
 	new_size = (new_size + 7) & ~7;

@@ -273,6 +273,8 @@ extern int ntfs_attr_can_be_non_resident(const ntfs_volume *vol,
 extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
 
+extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
+
 extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 newsize);
 
