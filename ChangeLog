@@ -2,6 +2,7 @@ xx/xx/2003 - 1.7.2-WIP - Work in progress.
 	- Further work on attribute resizing.
 	- Fix two logic inversion bugs in dir.c. Thanks to Russ Christensen for
 	  finding the first one.
+	- Fix attempt to release I30 internal constant. (Russ Christensen)
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
 	- Urgent bug fixes in ntfsresize (Szabolcs Szakacsits):
