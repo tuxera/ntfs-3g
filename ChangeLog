@@ -34,6 +34,7 @@ xx/xx/2004 - 1.9.3-WIP
 	  mounted or not in Windows.  Also mkntfs still has no chance of
 	  working as getting the head-count is NT specific and as such wasn't
 	  implemented.  (Yuval)
+	- Added truncate option to ntfsundelete (mabs)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
