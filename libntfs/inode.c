@@ -442,8 +442,8 @@ int ntfs_inode_sync_standard_information(ntfs_inode *ni) {
 		std_info->file_attributes |= FILE_ATTR_SPARSE_FILE;
 	else
 		std_info->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
-	ntfs_inode_mark_dirty(ni);
 	return 0;
 }
 
