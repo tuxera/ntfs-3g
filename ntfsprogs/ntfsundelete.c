@@ -221,6 +221,7 @@ static void usage (void)
 		"\n"
 		"    -u nums     --undelete nums    Undelete inodes\n"
 		"    -o file     --output file      Save with this filename\n"
+		"    -O          --optimistic       Undelete in-use clusters as well\n"
 		"    -d dir      --destination dir  Destination directory\n"
 		"    -b num      --byte num         Fill missing parts with this byte\n"
 		"    -T          --truncate         Truncate 100%% recoverable file to exact size.\n"
@@ -390,7 +391,7 @@ static int parse_time (const char *value, time_t *since)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fh?m:o:p:sS:t:Tu:qvV";
+	static const char *sopt = "-b:Cc:d:fh?m:o:Op:sS:t:Tu:qvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
@@ -400,6 +401,7 @@ static int parse_options (int argc, char *argv[])
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "match",	 required_argument,	NULL, 'm' },
 		{ "output",	 required_argument,	NULL, 'o' },
+		{ "optimistic",  no_argument,           NULL, 'O' },
 		{ "percentage",  required_argument,	NULL, 'p' },
 		{ "scan",	 no_argument,		NULL, 's' },
 		{ "size",	 required_argument,	NULL, 'S' },
@@ -484,6 +486,13 @@ static int parse_options (int argc, char *argv[])
 				opts.output = optarg;
 			} else {
 				err++;
+			}
+			break;
+		case 'O':
+		        if (!opts.optimistic) {
+				opts.optimistic++;
+			} else {
+			        err++;
 			}
 			break;
 		case 'p':
@@ -1666,7 +1675,7 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 				end   = rl[i].lcn + rl[i].length;
 
 				for (j = start; j < end; j++) {
-					if (utils_cluster_in_use (vol, j)) {
+					if (utils_cluster_in_use (vol, j) && !opts.optimistic) {
 						memset (buffer, opts.fillbyte, bufsize);
 						if (write_data (fd, buffer, bufsize) < bufsize) {
 							Eprintf ("Write failed: %s\n", strerror (errno));

@@ -50,6 +50,7 @@ struct options {
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
 	int		 force;		/* Override common sense */
+	int              optimistic;    /* Undelete in-use clusters as well */
 	time_t		 since;		/* Since this time */
 	s64		 size_begin;	/* Range for file size */
 	s64		 size_end;
