@@ -212,7 +212,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		if (le32_to_cpu(ale->type) > le32_to_cpu(attr->type))
 			break;
 		err = ntfs_names_collate(ale->name, ale->name_length,
-			(ntfschar *)((u8 *)attr + attr->name_length),
+			(ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset)),
 			attr->name_length, -2, CASE_SENSITIVE, 0, 0);
 		if (err == -2) {
 			err = EIO;

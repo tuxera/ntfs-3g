@@ -2486,7 +2486,6 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Setup record fields. */
-	offset = ((u8*)a - (u8*)m);
 	a->type = type;
 	a->length = cpu_to_le32(length);
 	a->non_resident = 1;
@@ -2518,6 +2517,23 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		}
 	}
 	ntfs_inode_mark_dirty(ni);
+	/*
+	 * Locate offset from start of the MFT record where new attribute is
+	 * placed. We need relookup it, because record maybe moved during update
+	 * of attribute list.
+	 */
+	ntfs_attr_reinit_search_ctx(ctx);
+	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
+					lowest_vcn, NULL, 0, ctx)) {
+		err = errno;
+		Dprintf("%s(): Attribute lookup failed. Probably leaving "
+			"inconsist metadata.\n", __FUNCTION__);
+		ntfs_attr_put_search_ctx(ctx);
+		errno = err;
+		return -1;
+		
+	}
+	offset = (u8*)ctx->attr - (u8*)ctx->mrec;
 	ntfs_attr_put_search_ctx(ctx);
 	return offset;
 put_err_out:
@@ -2614,7 +2630,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	/* Remove attribute list if we don't need it any more. */
 	if (!ntfs_attrlist_need(base_ni)) {
 		ntfs_attr_reinit_search_ctx(ctx);
-		if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, IGNORE_CASE,
+		if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, CASE_SENSITIVE,
 				0, NULL, 0, ctx)) {
 			/*
 			 * FIXME: Should we succeed here? Definitely something
@@ -2822,8 +2838,8 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 		return -1;
 	}
 	if (!ntfs_attr_lookup(a->type, (ntfschar*)((u8*)a + le16_to_cpu(
-			a->name_offset)), ctx->attr->name_length,
-			CASE_SENSITIVE,	0, NULL, 0, nctx)) {
+			a->name_offset)), a->name_length, CASE_SENSITIVE,
+			0, NULL, 0, nctx)) {
 		Dprintf("%s(): Attribute of such type, with same name already "
 			"present in this MFT record.\n", __FUNCTION__);
 		err = EEXIST;
@@ -3075,8 +3091,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	arec_size = (mp_ofs + mp_size + 7) & ~7;
 
 	/* Sanity check. */
-	if (a->name_length && (le16_to_cpu(a->name_offset) + a->name_length >
-			arec_size)) {
+	if (a->name_length && ((le16_to_cpu(a->name_offset) +
+			a->name_length * sizeof(ntfschar)) > (u32) arec_size)) {
 		// FIXME: Eeek!
 		Dprintf("%s(): Eeek!  Name exceeds new record size! "
 				"Not supported.  Aborting...\n", __FUNCTION__);
@@ -3232,17 +3248,10 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	/* Make the attribute non-resident if possible. */
 	if (!ntfs_attr_make_non_resident(na, ctx)) {
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		ntfs_attr_put_search_ctx(ctx);
 		/* Resize non-resident attribute */
-		if (ntfs_attr_truncate(na, newsize)) {
-			/* 
-			 * Resize failed, but mark inode dirty because we made
-			 * it non-resident.
-			 */
-			err = errno;
-			ntfs_inode_mark_dirty(ctx->ntfs_ino);
-			goto put_err_out;
-		}
-		goto resize_done;
+		return ntfs_attr_truncate(na, newsize);
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
 		Dprintf("%s(): Eeek!  Failed to make attribute non-resident.  "
@@ -3306,8 +3315,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	/* Point search context back to attribute which we need resize. */
 	ntfs_attr_init_search_ctx(ctx, na->ni, 0);
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
-			ctx)) {
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
 		err = errno;
 		goto put_err_out;
@@ -3453,7 +3462,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	/* Move the attribute name if it exists and update the offset. */
 	if (a->name_length) {
 		/* Sanity check. */
-		if (le16_to_cpu(a->name_offset) + a->name_length > arec_size) {
+		if (le16_to_cpu(a->name_offset) +
+				a->name_length * sizeof(ntfschar) > arec_size) {
 			// FIXME: Eeek!
 			Dprintf("%s(): Eeek! Name exceeds new record "
 					"size! Not supported. Aborting...\n",
@@ -3566,7 +3576,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 {
 	ntfs_attr_search_ctx *ctx;
-	ntfs_inode *ni;
+	ntfs_inode *ni, *base_ni;
 	MFT_RECORD *m;
 	ATTR_RECORD *a;
 	VCN stop_vcn;
@@ -3588,8 +3598,13 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
+	
+	if (na->ni->nr_extents == -1)		
+		base_ni = na->ni->base_ni;
+	else
+		base_ni = na->ni;
 
-	ctx = ntfs_attr_get_search_ctx(na->ni, 0);
+	ctx = ntfs_attr_get_search_ctx(base_ni, 0);
 	if (!ctx) {
 		err = errno;
 		Dprintf("%s(): Couldn't get search context.\n", __FUNCTION__);
@@ -3681,9 +3696,9 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			}
 
 			/* Add attribute list if it isn't present, and retry. */
-			if (!NInoAttrList(na->ni)) {
+			if (!NInoAttrList(base_ni)) {
 				ntfs_attr_put_search_ctx(ctx);
-				if (ntfs_inode_add_attrlist(na->ni)) {
+				if (ntfs_inode_add_attrlist(base_ni)) {
 					err = errno;
 					Dprintf("%s(): Eeek! Coudn't add "
 						"attribute list.\n",
@@ -3795,7 +3810,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			goto put_err_out;
 		}
 		/* Allocate new mft record. */
-		ni = ntfs_mft_record_alloc(na->ni->vol, na->ni);
+		ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
 		if (!ni) {
 			err = errno;
 			Dprintf("%s(): Couldn't allocate new MFT record.\n",
@@ -3968,8 +3983,8 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		errno = err;
 		return -1;
 	}
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
-			ctx)) {
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
 		err = errno;
 		if (err == ENOENT)
 			err = EIO;
@@ -4067,7 +4082,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	 * Compare the new allocation with the old one and only allocate
 	 * clusters if there is a change.
 	 */
-	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
+	if ((na->allocated_size >> vol->cluster_size_bits) < first_free_vcn) {
 		if (ntfs_attr_map_whole_runlist(na)) {
 			err = errno;
 			Dprintf("%s(): Eeek! ntfs_attr_map_whole_runlist "
@@ -4146,8 +4161,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			goto rollback;
 	}
 
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
-			ctx)) {
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
 		Dprintf("%s(): Eeek! Lookup of first attribute extent "
 				"failed.\n", __FUNCTION__);
 		err = errno;
@@ -4163,7 +4178,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	a = ctx->attr;
 
 	/* Update allocated size only if it is changed. */
-	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
+	if ((na->allocated_size >> vol->cluster_size_bits) < first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
 	}
