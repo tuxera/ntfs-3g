@@ -3167,6 +3167,23 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	}
 	a = ctx->attr;
 	m = ctx->mrec;
+
+	/*
+	 * Check that the attribute name hasn't been placed after the mapping
+	 * pairs array. If it has we need to move it.
+	 * TODO: Implement the move, if someone will hit it.
+	 */
+	if (a->name_length) {
+		if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->mapping_pairs_offset)) {
+			fprintf(stderr, "%s(): Eeek! Name is placed after the "
+					"mapping pairs array. Aborting...\n",
+					__FUNCTION__);
+			err = ENOTSUP;
+			goto put_err_out;
+		}
+	}
+
 	/*
 	 * Check the attribute type and the corresponding maximum size
 	 * against @newsize and fail if @newsize is too big.
@@ -3274,9 +3291,12 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					le32_to_cpu(a->length) + new_alen;
 			if (new_muse > le32_to_cpu(m->bytes_allocated)) {
 				fprintf(stderr, "%s(): BUG! Ran out of space in"
-						" mft record. Please report to "
-						"linux-ntfs-dev@lists.sf.net\n",
-						__FUNCTION__);
+						" mft record. Please run chkdsk"
+						" and if that doesn't find any "
+						"errors please report you saw "
+						"this message to "
+						"linux-ntfs-dev@lists.sf.net."
+						"\n", __FUNCTION__);
 				ntfs_cluster_free (vol, na, na->allocated_size
 						>> vol->cluster_size_bits, -1);
 				err = EIO;
