@@ -1,7 +1,7 @@
 /*
  * utils.h - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2003 Richard Russon
  *
  * A set of shared functions for ntfs utilities
  *
@@ -36,6 +36,7 @@ extern const char *ntfs_home;
 extern const char *ntfs_gpl;
 
 #define PATH_SEP	'/'
+#define MAX_PATH	1024
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
 	__attribute__ ((format (printf, 1, 2)))					\
@@ -72,6 +73,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 int utils_cluster_in_use (ntfs_volume *vol, long long lcn);
 int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata (ntfs_inode *inode);
+ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, const char *pathname);
 
 time_t ntfs2utc (s64 time);
 s64 utc2ntfs (time_t time);
