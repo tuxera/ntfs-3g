@@ -2,6 +2,7 @@
  * utils.c - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2003 Anton Altaparmakov
  *
  * A set of shared functions for ntfs utilities
  *
@@ -137,8 +138,11 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 	if (!device)
 		return NULL;
 
+/* FIXME: This doesn't work for Cygwin, so just skip it for now... */
+#ifndef __CYGWIN32__
 	if (!utils_valid_device (device, force))
 		return NULL;
+#endif
 
 	vol = ntfs_mount (device, flags);
 	if (!vol) {
