@@ -103,14 +103,21 @@ CXX = @CXX@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
 ECHO = @ECHO@
+GLIB_CFLAGS = @GLIB_CFLAGS@
+GLIB_GENMARSHAL = @GLIB_GENMARSHAL@
+GLIB_LIBS = @GLIB_LIBS@
+GLIB_MKENUMS = @GLIB_MKENUMS@
+GOBJECT_QUERY = @GOBJECT_QUERY@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LN_S = @LN_S@
 MAINT = @MAINT@
 OBJDUMP = @OBJDUMP@
 PACKAGE = @PACKAGE@
+PKG_CONFIG = @PKG_CONFIG@
 RANLIB = @RANLIB@
 STRIP = @STRIP@
 VERSION = @VERSION@
@@ -121,7 +128,7 @@ am__quote = @am__quote@
 install_sh = @install_sh@
 
 LTVERSION = 5:0:0
-LTVERSION_GNOMEVFS = 1:0:0
+LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 # Later gcc require -fms-extensions to work.
 @GCC_NEEDS_MS_EXTENSIONS_TRUE@GCCflag = -fms-extensions
@@ -132,8 +139,7 @@ LTVERSION_GNOMEVFS = 1:0:0
 @DEBUG_FALSE@AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall $(GCCflag)
 
 linux_ntfsincludedir = -I$(top_srcdir)/include
-lib_LTLIBRARIES = libntfs.la libntfs-gnomevfs.la
-
+lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION)
 libntfs_la_SOURCES = \
 	attrib.c	\
@@ -153,11 +159,17 @@ libntfs_la_SOURCES = \
 	volume.c
 
 
-libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_GNOMEVFS)
+gnomevfsmoduleslibdir = $(libdir)/gnome-vfs-2.0/modules
+gnomevfsmoduleslib_LTLIBRARIES = libntfs-gnomevfs.la
+
+libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
 libntfs_gnomevfs_la_SOURCES = \
-	gnome-vfs-method.c		\
+	gnome-vfs-method.c	\
 	gnome-vfs-module.c
 
+
+gnomevfsmodulesconfdir = $(sysconfdir)/gnome-vfs-2.0/modules
+gnomevfsmodulesconf_DATA = libntfs.conf
 
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
@@ -165,8 +177,8 @@ EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 subdir = libntfs
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES =
-LTLIBRARIES = $(lib_LTLIBRARIES)
+CONFIG_CLEAN_FILES = libntfs.conf
+LTLIBRARIES = $(gnomevfsmoduleslib_LTLIBRARIES) $(lib_LTLIBRARIES)
 
 libntfs_gnomevfs_la_LIBADD =
 am_libntfs_gnomevfs_la_OBJECTS = gnome-vfs-method.lo gnome-vfs-module.lo
@@ -179,7 +191,6 @@ libntfs_la_OBJECTS = $(am_libntfs_la_OBJECTS)
 
 DEFS = @DEFS@
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
-LIBS = @LIBS@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/attrib.Plo ./$(DEPDIR)/bitmap.Plo \
@@ -200,7 +211,9 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
-DIST_COMMON = Makefile.am Makefile.in
+DATA = $(gnomevfsmodulesconf_DATA)
+
+DIST_COMMON = Makefile.am Makefile.in libntfs.conf.in
 SOURCES = $(libntfs_gnomevfs_la_SOURCES) $(libntfs_la_SOURCES)
 
 all: all-am
@@ -212,6 +225,36 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am  $(top_srcdir)/configu
 	  $(AUTOMAKE) --gnu  libntfs/Makefile
 Makefile: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)
+libntfs.conf: $(top_builddir)/config.status libntfs.conf.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+gnomevfsmoduleslibLTLIBRARIES_INSTALL = $(INSTALL)
+install-gnomevfsmoduleslibLTLIBRARIES: $(gnomevfsmoduleslib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(gnomevfsmoduleslibdir)
+	@list='$(gnomevfsmoduleslib_LTLIBRARIES)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    f="`echo $$p | sed -e 's|^.*/||'`"; \
+	    echo " $(LIBTOOL) --mode=install $(gnomevfsmoduleslibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) $$p $(DESTDIR)$(gnomevfsmoduleslibdir)/$$f"; \
+	    $(LIBTOOL) --mode=install $(gnomevfsmoduleslibLTLIBRARIES_INSTALL) $(INSTALL_STRIP_FLAG) $$p $(DESTDIR)$(gnomevfsmoduleslibdir)/$$f; \
+	  else :; fi; \
+	done
+
+uninstall-gnomevfsmoduleslibLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(gnomevfsmoduleslib_LTLIBRARIES)'; for p in $$list; do \
+	    p="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " $(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(gnomevfsmoduleslibdir)/$$p"; \
+	  $(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(gnomevfsmoduleslibdir)/$$p; \
+	done
+
+clean-gnomevfsmoduleslibLTLIBRARIES:
+	-test -z "$(gnomevfsmoduleslib_LTLIBRARIES)" || rm -f $(gnomevfsmoduleslib_LTLIBRARIES)
+	@list='$(gnomevfsmoduleslib_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test -z "$dir" && dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
 libLTLIBRARIES_INSTALL = $(INSTALL)
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
@@ -241,7 +284,7 @@ clean-libLTLIBRARIES:
 	  rm -f "$${dir}/so_locations"; \
 	done
 libntfs-gnomevfs.la: $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_DEPENDENCIES) 
-	$(LINK) -rpath $(libdir) $(libntfs_gnomevfs_la_LDFLAGS) $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_LIBADD) $(LIBS)
+	$(LINK) -rpath $(gnomevfsmoduleslibdir) $(libntfs_gnomevfs_la_LDFLAGS) $(libntfs_gnomevfs_la_OBJECTS) $(libntfs_gnomevfs_la_LIBADD) $(LIBS)
 libntfs.la: $(libntfs_la_OBJECTS) $(libntfs_la_DEPENDENCIES) 
 	$(LINK) -rpath $(libdir) $(libntfs_la_LDFLAGS) $(libntfs_la_OBJECTS) $(libntfs_la_LIBADD) $(LIBS)
 
@@ -300,6 +343,24 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool
 uninstall-info-am:
+gnomevfsmodulesconfDATA_INSTALL = $(INSTALL_DATA)
+install-gnomevfsmodulesconfDATA: $(gnomevfsmodulesconf_DATA)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(gnomevfsmodulesconfdir)
+	@list='$(gnomevfsmodulesconf_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " $(gnomevfsmodulesconfDATA_INSTALL) $$d$$p $(DESTDIR)$(gnomevfsmodulesconfdir)/$$f"; \
+	  $(gnomevfsmodulesconfDATA_INSTALL) $$d$$p $(DESTDIR)$(gnomevfsmodulesconfdir)/$$f; \
+	done
+
+uninstall-gnomevfsmodulesconfDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(gnomevfsmodulesconf_DATA)'; for p in $$list; do \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " rm -f $(DESTDIR)$(gnomevfsmodulesconfdir)/$$f"; \
+	  rm -f $(DESTDIR)$(gnomevfsmodulesconfdir)/$$f; \
+	done
 
 ETAGS = etags
 ETAGSFLAGS =
@@ -364,10 +425,10 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES)
+all-am: Makefile $(LTLIBRARIES) $(DATA)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(libdir)
+	$(mkinstalldirs) $(DESTDIR)$(gnomevfsmoduleslibdir) $(DESTDIR)$(libdir) $(DESTDIR)$(gnomevfsmodulesconfdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -395,8 +456,8 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	mostlyclean-am
+clean-am: clean-generic clean-gnomevfsmoduleslibLTLIBRARIES \
+	clean-libLTLIBRARIES clean-libtool mostlyclean-am
 
 distclean: distclean-am
 
@@ -411,7 +472,8 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-gnomevfsmodulesconfDATA \
+	install-gnomevfsmoduleslibLTLIBRARIES
 
 install-exec-am: install-libLTLIBRARIES
 
@@ -430,19 +492,25 @@ mostlyclean: mostlyclean-am
 mostlyclean-am: mostlyclean-compile mostlyclean-generic \
 	mostlyclean-libtool
 
-uninstall-am: uninstall-info-am uninstall-libLTLIBRARIES
+uninstall-am: uninstall-gnomevfsmodulesconfDATA \
+	uninstall-gnomevfsmoduleslibLTLIBRARIES uninstall-info-am \
+	uninstall-libLTLIBRARIES
 
 .PHONY: GTAGS all all-am check check-am clean clean-generic \
-	clean-libLTLIBRARIES clean-libtool distclean distclean-compile \
-	distclean-depend distclean-generic distclean-libtool \
-	distclean-tags distdir dvi dvi-am info info-am install \
-	install-am install-data install-data-am install-exec \
-	install-exec-am install-info install-info-am \
-	install-libLTLIBRARIES install-man install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool tags uninstall \
-	uninstall-am uninstall-info-am uninstall-libLTLIBRARIES
+	clean-gnomevfsmoduleslibLTLIBRARIES clean-libLTLIBRARIES \
+	clean-libtool distclean distclean-compile distclean-depend \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am info info-am install install-am install-data \
+	install-data-am install-exec install-exec-am \
+	install-gnomevfsmodulesconfDATA \
+	install-gnomevfsmoduleslibLTLIBRARIES install-info \
+	install-info-am install-libLTLIBRARIES install-man \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	tags uninstall uninstall-am uninstall-gnomevfsmodulesconfDATA \
+	uninstall-gnomevfsmoduleslibLTLIBRARIES uninstall-info-am \
+	uninstall-libLTLIBRARIES
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
