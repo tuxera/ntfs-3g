@@ -34,6 +34,7 @@
 #include <limits.h>
 
 #include "config.h"
+#include "utils.h"
 #include "types.h"
 #include "volume.h"
 #include "debug.h"
@@ -364,6 +365,185 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 	else
 		Dprintf ("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
 	return rec;
+}
+
+/**
+ * utils_inode_get_name
+ *
+ * using inode
+ * get filename
+ * add name to list
+ * get parent
+ * if parent is 5 (/) stop
+ * get inode of parent
+ */
+int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
+{
+	// XXX endian
+	// XXX option: names = posix/win32 or dos
+	// flags: path, filename, or both
+	const int max_path = 20;
+
+	ntfs_volume *vol;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *rec;
+	FILE_NAME_ATTR *attr;
+	int name_space;
+	MFT_REF parent = FILE_root;
+	char *names[max_path + 1];// XXX malloc? and make max bigger?
+	int i, len, offset = 0;
+
+	if (!inode || !buffer)
+		return 0;
+
+	vol = inode->vol;
+
+	//printf ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
+	memset (names, 0, sizeof (names));
+
+	for (i = 0; i < max_path; i++) {
+
+		ctx = ntfs_attr_get_search_ctx (inode, NULL);
+		if (!ctx) {
+			Eprintf ("Couldn't create a search context.\n");
+			return 0;
+		}
+
+		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
+
+		name_space = 4;
+		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+			/* We know this will always be resident. */
+			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+
+			if (attr->file_name_type >= name_space) { //XXX find the ...
+				continue;
+			}
+
+			name_space = attr->file_name_type;
+			parent     = attr->parent_directory;
+
+			if (names[i]) {
+				free (names[i]);
+				names[i] = NULL;
+			}
+
+			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
+			    &names[i], attr->file_name_length) < 0) {
+				char *temp;
+				Eprintf ("Couldn't translate filename to current locale.\n");
+				temp = malloc (30);
+				if (!temp)
+					return 0;
+				snprintf (temp, 30, "<MFT%lld>", inode->mft_no);
+				names[i] = temp;
+			}
+
+			//printf ("names[%d] %s\n", i, names[i]);
+			//printf ("parent = %lld\n", MREF (parent));
+		}
+
+		ntfs_attr_put_search_ctx(ctx);
+
+		if (i > 0)			/* Don't close the original inode */
+			ntfs_inode_close (inode);
+
+		if (MREF (parent) == FILE_root) {	/* The root directory, stop. */
+			//printf ("inode 5\n");
+			break;
+		}
+
+		inode = ntfs_inode_open (vol, parent);
+		if (!inode) {
+			Eprintf ("Couldn't open inode %lld.\n", MREF (parent));
+			break;
+		}
+	}
+
+	if (i >= max_path) {
+		/* If we get into an infinite loop, we'll end up here. */
+		Eprintf ("The directory structure is too deep (over %d) nested directories.\n", max_path);
+		return 0;
+	}
+
+	/* Assemble the names in the correct order. */
+	for (i = max_path; i >= 0; i--) {
+		if (!names[i])
+			continue;
+
+		len = snprintf (buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[i]);
+		if (len >= (bufsize - offset)) {
+			Eprintf ("Pathname was truncated.\n");
+			break;
+		}
+
+		offset += len;
+	}
+
+	/* Free all the allocated memory */
+	for (i = 0; i < max_path; i++)
+		free (names[i]);
+
+	Dprintf ("Pathname: %s\n", buffer);
+
+	return 0;
+}
+
+/**
+ * utils_attr_get_name
+ */
+int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize)
+{
+	int len, namelen, offset = 0;
+	char *name = NULL;
+	ATTR_DEF *attrdef;
+
+	// flags: attr, name, or both
+	if (!attr || !buffer)
+		return 0;
+
+	attrdef = ntfs_attr_find_in_attrdef (vol, attr->type);
+	if (attrdef) {
+		namelen = ntfs_ucsnlen (attrdef->name, sizeof (attrdef->name));
+		if (ntfs_ucstombs (attrdef->name, namelen, &name, namelen) < 0) {
+			Eprintf ("Couldn't translate attribute type to current locale.\n");
+			// <UNKNOWN>?
+			return 0;
+		}
+		len = snprintf (buffer, bufsize, "%s", name);
+	} else {
+		Eprintf ("Unknown attribute type 0x%02x\n", attr->type);
+		len = snprintf (buffer, bufsize, "<UNKNOWN>");
+	}
+
+	if (len >= bufsize) {
+		Eprintf ("Attribute type was truncated.\n");
+		return 0;
+	}
+
+	offset += len;
+
+	if (!attr->name_length) {
+		return 0;
+	}
+
+	namelen = attr->name_length;
+	if (ntfs_ucstombs ((uchar_t *)((char *)attr + attr->name_offset),
+	    namelen, &name, namelen) < 0) {
+		Eprintf ("Couldn't translate attribute name to current locale.\n");
+		// <UNKNOWN>?
+		return 0;
+	}
+
+	len = snprintf (buffer + offset, bufsize - offset, "(%s)", name);
+	free (name);
+
+	if ((len + offset) >= bufsize) {
+		Eprintf ("Attribute name was truncated.\n");
+		return 0;
+	}
+
+	return 0;
 }
 
 

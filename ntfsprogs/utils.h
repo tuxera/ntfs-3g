@@ -26,6 +26,9 @@
 
 #include "types.h"
 #include "layout.h"
+#include "volume.h"
+
+#define PATH_SEP	'/'
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
 	__attribute__ ((format (printf, 1, 2)))					\
@@ -57,6 +60,8 @@ int utils_set_locale (void);
 ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
 int utils_parse_size (const char *value, s64 *size, BOOL scale);
 int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale);
+int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize);
+int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize);
 
 time_t ntfs2utc (s64 time);
 s64 utc2ntfs (time_t time);
