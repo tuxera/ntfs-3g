@@ -290,7 +290,7 @@ s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		errno = EINVAL;
 		return -1;
 	}
-	if (vol->nr_clusters <= lcn + count) {
+	if (vol->nr_clusters < lcn + count) {
 		errno = ESPIPE;
 		return -1;
 	}
@@ -323,7 +323,7 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		errno = EINVAL;
 		return -1;
 	}
-	if (vol->nr_clusters <= lcn + count) {
+	if (vol->nr_clusters < lcn + count) {
 		errno = ESPIPE;
 		return -1;
 	}
