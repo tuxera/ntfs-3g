@@ -201,20 +201,15 @@ static VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie);
 static INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype);
 
 /**
- * struct bmp_page
+ * struct ntfs_bmp
+ * a cache for either dir/$BITMAP, $MFT/$BITMAP or $MFT/$Bitmap
  */
-struct bmp_page {
-	u8		  *data;
-	VCN		   vcn;
-};
-
-/**
- * struct mft_bitmap
- */
-struct mft_bitmap {
-	ntfs_attr	  *bmp;
-	struct bmp_page	 **pages;
-	int		   count;
+struct ntfs_bmp {
+	ntfs_attr	 *attr;
+	u8		**data;
+	VCN		 *data_vcn;
+	int		  count;
+	//int		  cluster_size;
 };
 
 /**
@@ -299,6 +294,225 @@ static void ntfs_dt_print (struct ntfs_dt *dt, int indent)
 	for (i = 0; i < dt->child_count; i++) {
 		ntfs_dt_print (dt->sub_nodes[i], indent + 4);
 	}
+}
+
+
+/**
+ * ntfs_bmp_free
+ */
+static void ntfs_bmp_free (struct ntfs_bmp *bmp)
+{
+	int i;
+
+	if (!bmp)
+		return;
+
+	for (i = 0; i < bmp->count; i++)
+		free (bmp->data[i]);
+
+	ntfs_attr_close (bmp->attr);
+
+	free (bmp->data);
+	free (bmp->data_vcn);
+	free (bmp);
+}
+
+/**
+ * ntfs_bmp_alloc
+ */
+static struct ntfs_bmp * ntfs_bmp_alloc (ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len)
+{
+	struct ntfs_bmp *bmp;
+	ntfs_attr *attr;
+
+	if (!inode)
+		return NULL;
+
+	attr = ntfs_attr_open (inode, type, name, name_len);
+	if (!attr)
+		return NULL;
+
+	bmp = calloc (1, sizeof (*bmp));
+	if (!bmp)
+		return NULL;
+
+	bmp->attr      = attr;
+	bmp->data      = calloc (16, sizeof (*bmp->data));
+	bmp->data_vcn  = calloc (16, sizeof (*bmp->data_vcn));
+	bmp->count     = 0;
+
+	if (!bmp->data || !bmp->data_vcn) {
+		ntfs_bmp_free (bmp);
+		return NULL;
+	}
+
+	return bmp;
+}
+
+/**
+ * ntfs_bmp_add_data
+ */
+static int ntfs_bmp_add_data (struct ntfs_bmp *bmp, VCN vcn, u8 *data)
+{
+	int i = 0;
+	int old;
+	int new;
+
+	if (!bmp || !data)
+		return -1;
+
+	old = ((bmp->count + 15) & ~15);
+	bmp->count++;
+	new = ((bmp->count + 15) & ~15);
+
+	if (old != new) {
+		bmp->data     = realloc (bmp->data,      new * sizeof (*bmp->data));
+		bmp->data_vcn = realloc (bmp->data_vcn , new * sizeof (*bmp->data_vcn));
+	}
+
+	for (i = 0; i < bmp->count-1; i++)
+		if (bmp->data_vcn[i] > vcn)
+			break;
+
+	if ((bmp->count-i) > 0) {
+		memmove (&bmp->data[i+1],     &bmp->data[i],     (bmp->count-i) * sizeof (*bmp->data));
+		memmove (&bmp->data_vcn[i+1], &bmp->data_vcn[i], (bmp->count-i) * sizeof (*bmp->data_vcn));
+	}
+
+	bmp->data[i]     = data;
+	bmp->data_vcn[i] = vcn;
+
+	return bmp->count;
+}
+
+/**
+ * ntfs_bmp_get_data
+ */
+static u8 * ntfs_bmp_get_data (struct ntfs_bmp *bmp, VCN vcn)
+{
+	u8 *buffer;
+	int i;
+	VCN begin;
+	VCN end;
+	
+	if (!bmp)
+		return NULL;
+
+	for (i = 0; i < bmp->count; i++) {
+		begin = (bmp->data_vcn[i] >> 3) & (~(512-1));
+		end   = begin + (512 << 3);
+		if ((vcn >= begin) && (vcn < end)) {
+			//printf ("%lld, %lld, %lld\n", begin, vcn, end);
+			return bmp->data[i];
+		}
+	}
+
+	buffer = malloc (512);
+	if (!buffer)
+		return NULL;
+
+	begin = (vcn>>3) & (~(512-1));
+	//printf ("loading from offset %lld\n", begin);
+	if (ntfs_attr_pread (bmp->attr, begin, 512, buffer) < 0) {
+		free (buffer);
+		return NULL;
+	}
+
+	ntfs_bmp_add_data (bmp, vcn, buffer);
+	return buffer;
+}
+
+/**
+ * ntfs_bmp_set_range
+ */
+static int ntfs_bmp_set_range (struct ntfs_bmp *bmp, VCN vcn, u64 length, int value)
+{
+	u64 i;
+	u8 *buffer;
+	VCN begin;
+	VCN end;
+	int start;
+	int finish;
+	u8 sta_part;
+	u8 fin_part;
+
+	if (!bmp)
+		return -1;
+
+	//printf ("\n");
+	//printf ("set range: %lld - %lld\n", vcn, vcn+length-1);
+
+	for (i = vcn; i < (vcn+length); i += 4096) {
+		buffer = ntfs_bmp_get_data (bmp, i);
+		if (!buffer)
+			return -1;
+
+#if 0
+		memset (buffer, 0xFF, 512);
+		value = 0;
+#else
+		memset (buffer, 0x00, 512);
+		value = 1;
+#endif
+		//utils_dump_mem (buffer, 0, 32, DM_DEFAULTS);
+		//printf ("\n");
+
+		begin = i & ~4095;
+		end   = begin + 4095;
+		//printf ("begin = %lld, vcn = %lld,%lld end = %lld\n", begin, vcn, vcn+length-1, end);
+
+		if ((vcn > begin) && (vcn < end)) {
+			//printf ("1\n");
+			start = ((vcn+8) >> 3) & 511;
+			sta_part = 0xff << (vcn&7);
+		} else {
+			//printf ("2\n");
+			start = 0;
+		}
+
+		if (((vcn+length-1) >= begin) && ((vcn+length-1) <= end)) {
+			//printf ("3\n");
+			finish = ((vcn+length-1) >> 3) & 511;
+			fin_part = 0xff >> (7-((vcn+length-1)&7));
+		} else {
+			//printf ("4\n");
+			finish = 511;
+		}
+
+#if 0
+		//printf ("\n");
+		printf ("%lld) ", i>>12);
+		if (start > 0) {
+			printf ("(%02x) ", sta_part);
+		} else {
+			printf ("     ");
+		}
+
+		printf ("%d - %d", start, finish);
+
+		if (finish < 511) {
+			printf (" (%02x)\n", fin_part);
+		} else {
+			printf ("     \n");
+		}
+#endif
+		if (value) {
+			if (start != 0)
+				buffer[start-1] |= sta_part;
+			if ((finish - start) > 0)
+				memset (buffer+start, 0xff, finish-start);
+			buffer[finish] |= fin_part;
+		} else {
+			if (start != 0)
+				buffer[start-1] &= ~sta_part;
+			if ((finish - start) > 0)
+				memset (buffer+start, 0x00, finish-start);
+			buffer[finish] &= ~fin_part;
+		}
+		utils_dump_mem (buffer, 0, 16, DM_DEFAULTS);
+	}
+
+	return 1;
 }
 
 
@@ -1165,6 +1379,47 @@ static int utils_free_non_residents (ntfs_inode *inode)
 					//printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
 					//printf ("freed %d\n", ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length));
 					ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length);
+				}
+				ntfs_attr_close (na);
+			}
+		}
+	}
+
+	ntfs_attr_put_search_ctx (ctx);
+	return 0;
+}
+
+/**
+ * utils_free_non_residents2
+ */
+static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfs_attr *na;
+	ATTR_RECORD *arec;
+
+	if (!inode)
+		return -1;
+
+	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	if (!ctx) {
+		printf ("can't create a search context\n");
+		return -1;
+	}
+
+	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
+		arec = ctx->attr;
+		if (arec->non_resident) {
+			na = ntfs_attr_open (inode, arec->type, NULL, 0);
+			if (na) {
+				runlist_element *rl;
+				LCN size;
+				LCN count;
+				ntfs_attr_map_whole_runlist (na);
+				rl = na->rl;
+				size = na->allocated_size >> inode->vol->cluster_size_bits;
+				for (count = 0; count < size; count += rl->length, rl++) {
+					ntfs_bmp_set_range (bmp, rl->lcn, rl->length, 0);
 				}
 				ntfs_attr_close (na);
 			}
@@ -2969,6 +3224,32 @@ done:
 	return 0;
 }
 
+/**
+ * ntfs_test_bmp
+ */
+static int ntfs_test_bmp (ntfs_volume *vol, ntfs_inode *inode, int s, int f)
+{
+	ntfs_inode *volbmp;
+	struct ntfs_bmp *bmp;
+	//u8 *buffer;
+	//int i;
+
+	volbmp = ntfs_inode_open (vol, FILE_Bitmap);
+	if (!volbmp)
+		return 1;
+
+	bmp = ntfs_bmp_alloc (volbmp, AT_DATA, NULL, 0);
+	if (!bmp)
+		return 1;
+
+	if (0) utils_free_non_residents2 (inode, bmp);
+
+	ntfs_bmp_set_range (bmp, s, f, 1);
+
+	ntfs_bmp_free (bmp);
+	return 0;
+}
+
 
 /**
  * main - Begin here
@@ -3018,6 +3299,7 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_ie_test();
 	if (0) result = ntfs_file_add (vol, opts.file);
 	if (0) result = ntfs_file_remove (vol, opts.file);
+	if (0) result = ntfs_test_bmp (vol, inode, s, f-s+1);
 
 done:
 	ntfs_inode_close (inode);
