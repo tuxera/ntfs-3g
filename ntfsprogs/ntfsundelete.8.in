@@ -73,6 +73,19 @@ with data.
 .B ntfsundelete
 cannot recover compressed or encrypted files.  When scanning for them, it will
 display as being 0% recoverable.
+.SS The Recovered File's Size and Date
+To recover a file
+.B ntfsundelete
+has to read the file's metadata.  Unfortunately, this isn't always intact.
+When a file is deleted, the metadata can be left in an inconsistant state. e.g.
+the file size may be zero; the dates of the file may be set to the time it was
+deleted, or random.
+.br
+To be safe
+.B ntfsundelete
+will pick the largest file size it finds and write that to disk.  It will also
+try and set the file's date to the last modified date.  This date may be the
+correct last modified date, or something unexpected.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfsundelete
