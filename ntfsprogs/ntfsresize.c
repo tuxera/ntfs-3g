@@ -136,7 +136,6 @@ typedef struct {
 	struct llcn_t last_sparse;
 	struct llcn_t last_compressed;
 	struct llcn_t last_lcn;
-	s64 last_unsafe;	     /* last "unsafe-to-move" cluster */
 	s64 last_unsupp;	     /* last unsupported cluster */
 } ntfs_resize_t;
 
@@ -660,9 +659,6 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		llcn->lcn = last_lcn;
 		llcn->inode = inode;
 	}	
-
-	if (resize->last_unsafe < last_lcn)
-		resize->last_unsafe = last_lcn;
 
 	if (supported)
 		return;
