@@ -152,7 +152,7 @@ int mft_bitmap_size, mft_bitmap_byte_size;
 unsigned char *mft_bitmap = NULL;
 int lcn_bitmap_byte_size;
 unsigned char *lcn_bitmap = NULL;
-runlist *rl = NULL, *rl_mft = NULL, *rl_mft_bmp = NULL, *rl_mftmirr = NULL;
+runlist *rl_mft = NULL, *rl_mft_bmp = NULL, *rl_mftmirr = NULL;
 runlist *rl_logfile = NULL, *rl_boot = NULL, *rl_bad = NULL, *rl_index;
 INDEX_ALLOCATION *index_block = NULL;
 ntfs_volume *vol;
@@ -2503,8 +2503,6 @@ static void mkntfs_exit(void)
 		free(lcn_bitmap);
 	if (mft_bitmap)
 		free(mft_bitmap);
-	if (rl)
-		free(rl);
 	if (rl_mft)
 		free(rl_mft);
 	if (rl_mft_bmp)
@@ -3714,14 +3712,16 @@ int main(int argc, char **argv)
 	}
 	a = ctx->attr;
 	if (a->non_resident) {
-		rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
+		runlist *rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 		ntfs_attr_put_search_ctx(ctx);
 		if (!rl)
 			err_exit("ntfs_mapping_pairs_decompress() failed\n");
 		lw = ntfs_rlwrite(vol->dev, rl, lcn_bitmap,
 				lcn_bitmap_byte_size, NULL);
+		err = errno;
+		free(rl);
 		if (lw != lcn_bitmap_byte_size)
-			err_exit("%s\n", lw == -1 ? strerror(errno) :
+			err_exit("%s\n", lw == -1 ? strerror(err) :
 					"unknown error");
 	} else {
 		memcpy((char*)a + le16_to_cpu(a->value_offset), lcn_bitmap,
