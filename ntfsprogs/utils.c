@@ -546,6 +546,116 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	return 0;
 }
 
+/**
+ * utils_cluster_in_use - Determine if a cluster is in use
+ * @vol:  An ntfs volume obtained from ntfs_mount
+ * @lcn:  The Logical Cluster Number to test
+ *
+ * The metadata file $Bitmap has one binary bit representing each cluster on
+ * disk.  The bit will be set for each cluster that is in use.  The function
+ * reads the relevant part of $Bitmap into a buffer and tests the bit.
+ *
+ * This function has a static buffer in which it caches a section of $Bitmap.
+ * If the lcn, being tested, lies outside the range, the buffer will be
+ * refreshed.
+ *
+ * Return:  1  Cluster is in use
+ *	    0  Cluster is free space
+ *	   -1  Error occurred
+ */
+int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
+{
+	static unsigned char buffer[512];
+	static long long bmplcn = -sizeof (buffer) - 1;	/* Which bit of $Bitmap is in the buffer */
+
+	int byte, bit;
+	ntfs_attr *attr;
+
+	if (!vol)
+		return -1;
+
+	/* Does lcn lie in the section of $Bitmap we already have cached? */
+	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
+		Dprintf ("Bit lies outside cache.\n");
+		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, NULL, 0);
+		if (!attr) {
+			Eprintf ("Couldn't open $Bitmap: %s\n", strerror (errno));
+			return -1;
+		}
+
+		/* Mark the buffer as in use, in case the read is shorter. */
+		memset (buffer, 0xFF, sizeof (buffer));
+		bmplcn = lcn & (~((sizeof (buffer) << 3) - 1));
+
+		if (ntfs_attr_pread (attr, (bmplcn>>3), sizeof (buffer), buffer) < 0) {
+			Eprintf ("Couldn't read $Bitmap: %s\n", strerror (errno));
+			ntfs_attr_close (attr);
+			return -1;
+		}
+
+		Dprintf ("Reloaded bitmap buffer.\n");
+		ntfs_attr_close (attr);
+	}
+
+	bit  = 1 << (lcn & 7);
+	byte = (lcn >> 3) & (sizeof (buffer) - 1);
+	Dprintf ("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n",
+		lcn, bmplcn, byte, bit, buffer[byte] & bit);
+
+	return (buffer[byte] & bit);
+}
+
+/**
+ * utils_mftrec_in_use - Determine if a MFT Record is in use
+ * @vol:   An ntfs volume obtained from ntfs_mount
+ * @mref:  MFT Reference (inode number)
+ *
+ * The metadata file $BITMAP has one binary bit representing each record in the
+ * MFT.  The bit will be set for each record that is in use.  The function
+ * reads the relevant part of $BITMAP into a buffer and tests the bit.
+ *
+ * This function has a static buffer in which it caches a section of $BITMAP.
+ * If the mref, being tested, lies outside the range, the buffer will be
+ * refreshed.
+ *
+ * Return:  1  MFT Record is in use
+ *	    0  MFT Record is unused
+ *	   -1  Error occurred
+ */
+int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
+{
+	static u8 buffer[512];
+	static s64 bmpmref = -sizeof (buffer) - 1; /* Which bit of $BITMAP is in the buffer */
+
+	int byte, bit;
+
+	if (!vol)
+		return -1;
+
+	/* Does mref lie in the section of $Bitmap we already have cached? */
+	if ((mref < bmpmref) || (mref >= (bmpmref + (sizeof (buffer) << 3)))) {
+		Dprintf ("Bit lies outside cache.\n");
+
+		/* Mark the buffer as not in use, in case the read is shorter. */
+		memset (buffer, 0, sizeof (buffer));
+		bmpmref = mref & (~((sizeof (buffer) << 3) - 1));
+
+		if (ntfs_attr_pread (vol->mftbmp_na, (bmpmref>>3), sizeof (buffer), buffer) < 0) {
+			Eprintf ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
+			return -1;
+		}
+
+		Dprintf ("Reloaded bitmap buffer.\n");
+	}
+
+	bit  = 1 << (mref & 7);
+	byte = (mref >> 3) & (sizeof (buffer) - 1);
+	Dprintf ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n",
+		mref, bmpmref, byte, bit, buffer[byte] & bit);
+
+	return (buffer[byte] & bit);
+}
+
 
 #if 0
 hamming weight

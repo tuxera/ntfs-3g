@@ -62,6 +62,8 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale);
 int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale);
 int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize);
 int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize);
+int utils_cluster_in_use (ntfs_volume *vol, long long lcn);
+int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 
 time_t ntfs2utc (s64 time);
 s64 utc2ntfs (time_t time);
