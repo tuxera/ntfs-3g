@@ -149,7 +149,7 @@ Anton Altaparmakov <aia21@cantab.net>.  This man page has been written by
 Anton Altaparmakov.
 .SH AVAILABILITY
 .B ntfsls
-is part of the Linux-NTFS project and is available for download from
+is part of the ntfsprogs package and is available for download from
 http://sourceforge.net/project/showfiles.php?group_id=13956 in source (tar ball
 and rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
