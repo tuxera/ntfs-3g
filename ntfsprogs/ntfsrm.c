@@ -956,6 +956,38 @@ static int utils_mftrec_mark_free2 (ntfs_volume *vol, MFT_REF mref)
 }
 
 /**
+ * utils_free_non_residents
+ */
+static int utils_free_non_residents (ntfs_inode *inode)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfs_attr *na;
+	ATTR_RECORD *arec;
+
+	if (!inode)
+		return -1;
+
+	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	if (!ctx) {
+		printf ("can't create a search context\n");
+		return -1;
+	}
+
+	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
+		arec = ctx->attr;
+		if (arec->non_resident) {
+			na = ntfs_attr_open (inode, arec->type, NULL, 0);
+			if (na) {
+				printf ("truncate = %d\n", ntfs_attr_truncate (na, 0));
+			}
+		}
+	}
+
+	ntfs_attr_put_search_ctx (ctx);
+	return 0;
+}
+
+/**
  * ntfs_dt_remove
  */
 static int ntfs_dt_remove (struct ntfs_dt *dt, int index_num)
@@ -1077,7 +1109,8 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 {
 	struct ntfs_dt *del;
 	INDEX_ENTRY *ie;
-	ntfs_inode *inode = NULL;
+	ntfs_inode *ichild = NULL;
+	ntfs_inode *iparent = NULL;
 	ntfs_attr *attr = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
 	int index_num = 0;
@@ -1119,25 +1152,13 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	inode = ntfs_inode_open (dt->dir->vol, MREF (ie->indexed_file));
-	if (!inode) {
+	ichild = ntfs_inode_open (dt->dir->vol, MREF (ie->indexed_file));
+	if (!ichild) {
 		printf ("can't open inode\n");
 		goto close;
 	}
 
-	attr = ntfs_attr_open (inode, AT_ATTRIBUTE_LIST, NULL, 0);
-	if (attr) {
-		printf ("can't delete files with an attribute list\n");
-		goto close;
-	}
-
-	attr = ntfs_attr_open (inode, AT_INDEX_ROOT, I30, 4);
-	if (attr) {
-		printf ("can't delete directories\n");
-		goto close;
-	}
-
-	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	ctx = ntfs_attr_get_search_ctx (NULL, ichild->mrec);
 	if (!ctx) {
 		printf ("can't create a search context\n");
 		goto close;
@@ -1146,7 +1167,29 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
 		arec = ctx->attr;
 		if (arec->non_resident) {
+			ntfs_attr *a;
 			printf ("can't delete non-resident files\n");
+			a = ntfs_attr_open (ichild, arec->type, NULL, 0);
+			if (a) {
+				runlist_element *rl;
+				LCN size;
+				LCN count;
+				ntfs_attr_map_whole_runlist (a);
+				rl = a->rl;
+				size = a->allocated_size >> ichild->vol->cluster_size_bits;
+				for (count = 0; count < size; count += rl->length, rl++) {
+					printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
+				}
+				ntfs_attr_close (a);
+			}
+			//goto close;
+		}
+		if (arec->type == AT_ATTRIBUTE_LIST) {
+			printf ("can't delete files with an attribute list\n");
+			goto close;
+		}
+		if (arec->type == AT_INDEX_ROOT) {
+			printf ("can't delete directories\n");
 			goto close;
 		}
 		if (arec->type == AT_FILE_NAME) {
@@ -1161,33 +1204,35 @@ static int ntfs_dt_del_child (struct ntfs_dt *dt, ntfschar *uname, int len)
 		goto close;
 	}
 
-	ntfs_inode_close (inode);
-
-	inode = ntfs_inode_open (dt->dir->vol, mft_num);
-	if (!inode) {
+	iparent = ntfs_inode_open (dt->dir->vol, mft_num);
+	if (!iparent) {
 		printf ("can't open parent directory\n");
 		goto close;
 	}
 
-	attr = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
+	attr = ntfs_attr_open (iparent, AT_INDEX_ALLOCATION, I30, 4);
 	if (!attr) {
 		printf ("parent doesn't have 0xA0\n");
 		goto close;
 	}
 
-	//printf ("deleting file\n");
+	printf ("deleting file\n");
 	//ntfs_dt_print (del->dir->index_num, 0);
 
-#if 1
+	if (0) {
+	res = utils_free_non_residents (ichild);
 	res = utils_mftrec_mark_free (dt->dir->vol, del->children[index_num]->indexed_file);
-	res = utils_mftrec_mark_free2 (dt->dir->vol, del->children[index_num]->indexed_file);
 	res = ntfs_dt_remove (del, index_num);
-#endif
+	// chkdsk will recover up to this point
+	res = utils_mftrec_mark_free2 (dt->dir->vol, del->children[index_num]->indexed_file);
+	}
 
 close:
 	ntfs_attr_put_search_ctx (ctx);
 	ntfs_attr_close (attr);
-	ntfs_inode_close (inode);
+	ntfs_inode_close (iparent);
+	ntfs_inode_close (ichild);
+
 	return res;
 }
 
