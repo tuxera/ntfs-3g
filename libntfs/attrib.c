@@ -3142,7 +3142,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	u32 mft_rec_copy_size = 0;
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
-	s64 nr_need_allocate;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -3156,35 +3155,9 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 	vol = na->ni->vol;
 
-	/* Get the first attribute record that needs modification. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
 		return -1;
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0,
-							NULL, 0, ctx)) {
-		err = errno;
-		if (err == ENOENT)
-			err = EIO;
-		goto put_err_out;
-	}
-	a = ctx->attr;
-	m = ctx->mrec;
-
-	/*
-	 * Check that the attribute name hasn't been placed after the mapping
-	 * pairs array. If it has we need to move it.
-	 * TODO: Implement the move, if someone will hit it.
-	 */
-	if (a->name_length) {
-		if (le16_to_cpu(a->name_offset) >=
-					le16_to_cpu(a->mapping_pairs_offset)) {
-			Dprintf("%s(): Eeek! Name is placed after the "
-					"mapping pairs array. Aborting...\n",
-					__FUNCTION__);
-			err = ENOTSUP;
-			goto put_err_out;
-		}
-	}
 
 	/*
 	 * Check the attribute type and the corresponding maximum size
@@ -3197,12 +3170,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					"failed. Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
-		goto put_err_out;
-	}
-
-	if (NInoAttrList(na->ni)) {
-		err = ENOTSUP;
-		goto put_err_out;
+		errno = err;
+		return -1;
 	}
 
 	/* The first cluster outside the new allocation. */
@@ -3213,14 +3182,38 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
-		nr_need_allocate = first_free_vcn -
-				(na->allocated_size >> vol->cluster_size_bits);
-
-		if (ntfs_attr_map_whole_runlist(na)) {
+		/* Get the last extent of the attribute. */
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 
+			(na->allocated_size >> vol->cluster_size_bits) - 1,
+							NULL, 0, ctx)) {
 			err = errno;
-			Dprintf("%s(): Eeek! "
-					"ntfs_attr_map_whole_runlist failed.\n",
-					 __FUNCTION__);
+			if (err == ENOENT)
+				err = EIO;
+			goto put_err_out;
+		}
+		a = ctx->attr;
+		m = ctx->mrec;
+
+		/*
+		 * Check that the attribute name hasn't been placed after the
+		 * mapping pairs array. If it has we need to move it.
+		 * TODO: Implement the move, if someone will hit it.
+		 */
+		if (a->name_length) {
+			if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->mapping_pairs_offset)) {
+				Dprintf("%s(): Eeek! Name is placed after the "
+					"mapping pairs array. Aborting...\n",
+					__FUNCTION__);
+				err = ENOTSUP;
+				goto put_err_out;
+			}
+		}
+
+		if (ntfs_attr_map_runlist(na, sle64_to_cpu(a->lowest_vcn))) {
+			err = errno;
+			Dprintf("%s(): Eeek! ntfs_attr_map_runlist failed.\n",
+								 __FUNCTION__);
 			goto put_err_out;
 		}
 
@@ -3246,7 +3239,9 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				lcn_seek_from = rl->lcn + rl->length;
 		}
 
-		rl = ntfs_cluster_alloc(vol, nr_need_allocate, lcn_seek_from,
+		rl = ntfs_cluster_alloc(vol, first_free_vcn - 
+					(na->allocated_size >>
+					vol->cluster_size_bits), lcn_seek_from,
 					DATA_ZONE, na->allocated_size >>
 					vol->cluster_size_bits);
 		if (!rl) {
@@ -3256,21 +3251,22 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			goto put_err_out;
 		}
 
-		/* Append new clusters to attribute runlist */
-		rln = ntfs_runlists_merge (na->rl, rl);
+		/* Append new clusters to attribute runlist. */
+		rln = ntfs_runlists_merge(na->rl, rl);
 		if (!rln) {
-			/* Failed, free just allocated clusters */
+			/* Failed, free just allocated clusters. */
 			err = errno;
 			Dprintf("%s(): Eeek! Run list merge "
 					"failed.\n", __FUNCTION__);
-			ntfs_cluster_free_from_rl (vol, rl);
-			free (rl);
+			ntfs_cluster_free_from_rl(vol, rl);
+			free(rl);
 			goto put_err_out;
 		}
 		na->rl = rln;
 
 		/* Get the size for the new mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
+		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl,
+						sle64_to_cpu(a->lowest_vcn));
 		if (mp_size <= 0) {
 			err = errno;
 			Dprintf("%s(): Eeek! Get size for mapping "
@@ -3344,7 +3340,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * correct destination, i.e. the attribute record itself.
 		 */
 		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl, 0)) {
+					a->mapping_pairs_offset), mp_size,
+					na->rl, sle64_to_cpu(a->lowest_vcn))) {
 			err = errno;
 			Dprintf("%s(): BUG!  Mapping pairs build "
 					"failed.  Please run chkdsk and if "
@@ -3356,14 +3353,52 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			goto rollback;
 		}
 
-		/* Update the attribute record and the ntfs_attr structure. */
-		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
-		a->allocated_size = scpu_to_le64(na->allocated_size);
 		/*
-		 * Reminder: We may not update a->highest_vcn if it equal to 0.
+		 * Reminder: We may not update a->highest_vcn if it equal to 0
+		 * and attribute is single-extent.
 		 */
 		if (a->highest_vcn)
 			a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
+
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		ntfs_attr_reinit_search_ctx(ctx);
+	}
+	
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 
+							0, NULL, 0, ctx)) {
+		Dprintf("%s(): Eeek! Lookup of first attribute extent "
+						"failed.\n", __FUNCTION__);
+		err = errno;
+		if (err == ENOENT)
+			err = EIO;
+		if ((na->allocated_size >> vol->cluster_size_bits) !=
+							first_free_vcn) {
+			Dprintf("%s(): Trying perform rollback.\n",
+							__FUNCTION__);
+			ntfs_attr_reinit_search_ctx(ctx);
+			if (ntfs_attr_lookup(na->type, na->name, na->name_len,
+					0, (na->allocated_size >>
+					vol->cluster_size_bits) - 1,
+					NULL, 0, ctx)) {
+				Dprintf("%s(): Eeek! Rollback failed. "
+					"Run chkdsk.\n", __FUNCTION__);
+				err = errno;
+				if (err == ENOENT)
+					err = EIO;
+				goto put_err_out;
+			}
+			a = ctx->attr;
+			m = ctx->mrec;
+			goto rollback;
+		} else
+			goto put_err_out;
+	}
+	a = ctx->attr;
+	
+	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
+		/* Update the attribute record and the ntfs_attr structure. */
+		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
+		a->allocated_size = scpu_to_le64(na->allocated_size);
 	}
 	/* Update the attribute record and the ntfs attribute structure. */
 	na->data_size = newsize;
@@ -3395,9 +3430,9 @@ rollback:
 	/* Restote mft record. */
 	if (mft_changed)
 		memcpy(m, mft_rec_copy, mft_rec_copy_size);
+put_err_out:
 	if (mft_rec_copy)
 		free(mft_rec_copy);
-put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
