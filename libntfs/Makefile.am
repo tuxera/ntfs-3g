@@ -38,17 +38,18 @@ linux_ntfsincludedir = -I$(top_srcdir)/include
 lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION)
 libntfs_la_SOURCES =	\
-        attrib.c	\
-        bootsect.c	\
+	attrib.c	\
+	bootsect.c	\
+	compat.c	\
 	debug.c		\
 	dir.c		\
-        disk_io.c	\
+	disk_io.c	\
 	inode.c		\
-        mft.c		\
+	mft.c		\
 	mst.c		\
 	runlist.c	\
 	unistr.c	\
-        volume.c
+	volume.c
 
 INCLUDES = $(linux_ntfsincludedir) $(all_includes)
 
