@@ -408,8 +408,6 @@ void append_to_bad_blocks(unsigned long block)
 		if (!new_buf)
 			err_exit("Reallocating memory for bad blocks list "
 				 "failed: %s\n", strerror(errno));
-		if (opts.bad_blocks != new_buf)
-			free(opts.bad_blocks);
 		opts.bad_blocks = new_buf;
 	}
 	opts.bad_blocks[opts.nr_bad_blocks++] = block;
@@ -656,50 +654,44 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		}
 		j = 0;
 		if (i & VOLUME_MODIFIED_BY_CHKDSK) {
-			j = 1;
 			printf("VOLUME_MODIFIED_BY_CHKDSK");
+			j = 1;
 		}
 		if (i & VOLUME_REPAIR_OBJECT_ID) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_REPAIR_OBJECT_ID");
+			j = 1;
 		}
 		if (i & VOLUME_DELETE_USN_UNDERWAY) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_DELETE_USN_UNDERWAY");
+			j = 1;
 		}
 		if (i & VOLUME_MOUNTED_ON_NT4) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_MOUNTED_ON_NT4");
+			j = 1;
 		}
 		if (i & VOLUME_UPGRADE_ON_MOUNT) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_UPGRADE_ON_MOUNT");
+			j = 1;
 		}
 		if (i & VOLUME_RESIZE_LOG_FILE) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_RESIZE_LOG_FILE");
+			j = 1;
 		}
 		if (i & VOLUME_IS_DIRTY) {
 			if (j)
 				printf(" | ");
-			else
-				j = 0;
 			printf("VOLUME_IS_DIRTY");
+			j = 1;
 		}
 		printf("\n");
 		return;
