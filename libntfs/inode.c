@@ -35,6 +35,7 @@
 #include "attrib.h"
 #include "attrlist.h"
 #include "runlist.h"
+#include "lcnalloc.h"
 
 /**
  * Internal:
@@ -817,7 +818,8 @@ put_err_out:
  * set to the error code.
  */
 ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, s64 size) {
+		ntfschar *name, u8 name_len, s64 size)
+{
 	int attr_rec_size, err, i, offset;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
@@ -827,6 +829,9 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 		errno = EINVAL;
 		return NULL;
 	}
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr %x, size %lld.\n",
+			__FUNCTION__, (long long) ni->mft_no, type, size);
 
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
@@ -932,18 +937,14 @@ add_attr_record:
 		return na;
 	if (ntfs_attr_truncate(na, size)) {
 		err = errno;
-		Dprintf("%s(): Failed to resize just added attribute. Probably "
-				"leaving inconsist metadata.\n", __FUNCTION__);
-		/*
-		 * We can't goto rm_attr_err_out, because attribute maybe moved
-		 * during attempt of resize. FIXME: Call ntfs_inode_rm_attr when
-		 * it's will be implemented.
-		 */
-		// ntfs_inode_rm_attr(na);
-		// ntfs_attr_close(na);
-		// goto err_out;
-		ntfs_attr_close(na);
-		goto free_err_out;
+		Dprintf("%s(): Failed to resize just added attribute.\n",
+				__FUNCTION__);
+		if (ntfs_inode_rm_attr(na)) {
+			Dprintf("%s(): Failed to remove just added attribute. "
+				"Probably leaving inconsist metadata.\n",
+				__FUNCTION__);
+		}
+		goto err_out;
 	}
 	/* Done !*/
 	return na;
@@ -967,4 +968,63 @@ free_err_out:
 err_out:
 	errno = err;
 	return NULL;
+}
+
+/**
+ * ntfs_inode_rm_attr - remove attribute from ntfs inode
+ * @na:		opened ntfs attribute to delete
+ *
+ * Remove attribute and all it's extents from ntfs inode. If attribute was non
+ * resident also free all clusters allocated by attribute.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_inode_rm_attr(ntfs_attr *na)
+{
+	ntfs_attr_search_ctx *ctx;
+	int ret = 0;
+	
+	if (!na) {
+		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
+			__FUNCTION__, (long long) na->ni->mft_no, na->type);
+
+	/* Free cluster allocation. */
+	if (NAttrNonResident(na)) {
+		if (ntfs_attr_map_whole_runlist(na))
+			return -1;
+		if (ntfs_cluster_free(na->ni->vol, na, 0, -1) < 0) {
+			Dprintf("%s(): Failed to free cluster allocation. "
+				"Leaving inconsist metadata.\n", __FUNCTION__);
+			ret = -1;
+		}
+	}
+
+	/* Search for attribute extents and remove them all. */
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		if (ntfs_attr_record_rm(ctx)) {
+			Dprintf("%s(): Failed to remove attribute extent. "
+				"Leaving inconsist metadata.\n", __FUNCTION__);
+			ret = -1;
+		}
+		ntfs_attr_reinit_search_ctx(ctx);
+	}
+	if (errno != ENOENT) {
+		Dprintf("%s(): Attribute lookup failed. Probably leaving "
+				"inconsist metadata.\n", __FUNCTION__);
+		ret = -1;
+	}
+
+	/* Throw away now non-exist attribute. */
+	ntfs_attr_close(na);
+	/* Done. */
+	return ret;
 }
