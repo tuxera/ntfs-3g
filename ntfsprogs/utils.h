@@ -46,6 +46,10 @@ extern const char *ntfs_gpl;
 #	define REG_NOERROR 0
 #endif
 
+#define	DEC_PRINTF(NAME)							\
+	int NAME (const char *format, ...)					\
+	__attribute__ ((format (printf, 1, 2)));
+
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
 	__attribute__ ((format (printf, 1, 2)))					\
 	int NAME (const char *format, ...)					\
@@ -82,6 +86,7 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn);
 int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata (ntfs_inode *inode);
 ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, const char *pathname);
+void utils_dump_mem (u8 *buf, int start, int length, int ascii);
 
 time_t ntfs2utc (s64 ntfs_time);
 s64 utc2ntfs (time_t utc_time);
