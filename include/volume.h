@@ -35,6 +35,7 @@ typedef struct _ntfs_volume ntfs_volume;
 #include "types.h"
 #include "support.h"
 #include "inode.h"
+#include "device.h"
 
 /*
  * Flags returned by the ntfs_check_if_mounted() function.
@@ -86,8 +87,9 @@ typedef enum {
  * ntfs_volume - structure describing an open volume in memory
  */
 struct _ntfs_volume {
-	int fd;			/* File descriptor associated with volume. */
-	char *dev_name;		/* Name of the device/file the volume is in. */
+	int fd;		//FIXME: Remove this. -> Use *dev instead.
+	char *dev_name; //FIXME: Remove this. -> Use *dev instead.
+	struct ntfs_device *dev;/* NTFS device associated with the volume. */
 	char *vol_name;		/* Name of the volume. */
 	unsigned long state;	/* NTFS specific flags describing this volume.
 				   See ntfs_volume_state_bits above. */
@@ -164,5 +166,4 @@ extern int ntfs_logfile_reset(ntfs_volume *vol);
 extern int ntfs_volume_set_flags(ntfs_volume *v, const u16 flags);
 
 #endif /* defined _NTFS_VOLUME_H */
-
 
