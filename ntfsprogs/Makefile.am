@@ -25,13 +25,13 @@ endif
 # Workaround to make REALLYSTATIC work with automake 1.5.
 LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
-bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls
+bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone
-EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate ntfscat
+EXTRA_PROGRAMS		= ntfsdump_logfile dumplog ntfswipe ntfstruncate
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
-			  ntfsclone.8 ntfscluster.8
+			  ntfsclone.8 ntfscluster.8 ntfscat.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
@@ -77,11 +77,11 @@ ntfsls_SOURCES		= ntfsls.c utils.c utils.h
 ntfsls_LDADD		= $(AM_LIBS)
 ntfsls_LDFLAGS		= $(AM_LFLAGS)
 
-# We don't distribute these
-
 ntfscat_SOURCES		= ntfscat.c ntfscat.h utils.c utils.h
 ntfscat_LDADD		= $(AM_LIBS)
 ntfscat_LDFLAGS		= $(AM_LFLAGS)
+
+# We don't distribute these
 
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)

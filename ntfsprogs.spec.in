@@ -42,7 +42,8 @@ NTFS partition. See man 8 ntfscluster for details.
 files or directories within it. See man 8 ntfsinfo for details.
 	ntfsls - List information about files in a directory residing on an
 NTFS partition. See man 8 ntfsls for details.
-
+	ntfscat - Concatenate files and print their contents on the standard
+output.  See man 8 ntfscat for details.
 
 %package devel
 Summary		: files required to compile software that uses libntfs
@@ -87,6 +88,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{prefix}/lib/*.la*
 
 %changelog
+* Fri Oct 19 2003 Richard Russon <ntfs@flatcap.org>
+- added the new utility ntfscat
+
 * Tue Sep 30 2003 Anton Altaparmakov <aia21@cantab.net>
 - added the new utilities, ntfsclone, ntfscluster, ntfsinfo, ntfsls.
 

@@ -11026,7 +11026,7 @@ done
 
 
 # Makefiles to be created by configure.
-                                                                                                                                                                ac_config_files="$ac_config_files Makefile doc/Makefile include/Makefile libntfs/Makefile ntfsprogs/Makefile ntfsprogs/mkntfs.8 ntfsprogs/ntfsclone.8 ntfsprogs/ntfscluster.8 ntfsprogs/ntfsfix.8 ntfsprogs/ntfsinfo.8 ntfsprogs/ntfslabel.8 ntfsprogs/ntfsls.8 ntfsprogs/ntfsprogs.8 ntfsprogs/ntfsresize.8 ntfsprogs/ntfsundelete.8 ntfsprogs.spec"
+                                                                                                                                                                          ac_config_files="$ac_config_files Makefile doc/Makefile include/Makefile libntfs/Makefile ntfsprogs/Makefile ntfsprogs/mkntfs.8 ntfsprogs/ntfscat.8 ntfsprogs/ntfsclone.8 ntfsprogs/ntfscluster.8 ntfsprogs/ntfsfix.8 ntfsprogs/ntfsinfo.8 ntfsprogs/ntfslabel.8 ntfsprogs/ntfsls.8 ntfsprogs/ntfsprogs.8 ntfsprogs/ntfsresize.8 ntfsprogs/ntfsundelete.8 ntfsprogs.spec"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11603,6 +11603,7 @@ do
   "libntfs/Makefile" ) CONFIG_FILES="$CONFIG_FILES libntfs/Makefile" ;;
   "ntfsprogs/Makefile" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/Makefile" ;;
   "ntfsprogs/mkntfs.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/mkntfs.8" ;;
+  "ntfsprogs/ntfscat.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfscat.8" ;;
   "ntfsprogs/ntfsclone.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfsclone.8" ;;
   "ntfsprogs/ntfscluster.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfscluster.8" ;;
   "ntfsprogs/ntfsfix.8" ) CONFIG_FILES="$CONFIG_FILES ntfsprogs/ntfsfix.8" ;;
