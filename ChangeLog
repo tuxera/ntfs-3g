@@ -1,3 +1,8 @@
+12/02/2003 - 1.7.0 - Small bug fixes and updates.
+	- Bug fixes in mapping pairs array generation in libntfs.
+	- Bug fixes and updates in ntfsresize. (Szabolcs Szakacsits)
+	- Tidyups and standardisations. (Richard Russon)
+
 18/01/2003 - 1.7.0beta - Library rewrite and many new tools.
 	- Highlights of this release are the now hopefully stable API sported
 	  by an almost completely rewritten library and the new utilities;
