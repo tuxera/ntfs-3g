@@ -1,16 +1,9 @@
 
-# Need this to enable 64-bit (device) file access functions and parameters.
-if DEBUG
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -g -DDEBUG -Wall
-else
-AM_CFLAGS = -D_FILE_OFFSET_BITS=64
-endif
-
 SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh ntfsprogs.spec.in \
-		TODO.ntfsprogs
+		TODO.ntfsprogs getgccver
 
 AUTOMAKE_OPTIONS = gnu
 
