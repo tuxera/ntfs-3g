@@ -278,7 +278,8 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, u64 start)
 int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 {
 	u64 mft_no;
-	u16 seq_no;
+	int err;
+	u16 seq_no, old_seq_no;
 
 	if (!vol || !vol->mftbmp_na || !ni) {
 		errno = EINVAL;
@@ -292,34 +293,44 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	ni->mrec->flags &= ~MFT_RECORD_IN_USE;
 
 	/* Increment the sequence number, skipping zero, if it is not zero. */
-	seq_no = le16_to_cpu(ni->mrec->sequence_number);
+	old_seq_no = seq_no = le16_to_cpu(ni->mrec->sequence_number);
 	if (seq_no == 0xffff)
 		seq_no = 1;
 	else if (seq_no)
 		seq_no++;
 	ni->mrec->sequence_number = cpu_to_le16(seq_no);
 
-	/* Set the inode dirty and close it so it is written out. */
+	/* Set the inode dirty and write it out. */
 	ntfs_inode_mark_dirty(ni);
-	if (ntfs_inode_close(ni)) {
-		int eo = errno;
-		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Failed to close the inode."
-				"Leaving inconsistent metadata!\n",
-				__FUNCTION__);
-		errno = eo;
-		return -1;
+	if (ntfs_inode_sync(ni)) {
+		err = errno;
+		goto sync_rollback;
 	}
 
 	/* Clear the bit in the $MFT/$BITMAP corresponding to this record. */
 	if (ntfs_bitmap_clear_run(vol->mftbmp_na, mft_no, 1)) {
-		// FIXME: Eeek! We need rollback! (AIA)
-		fprintf(stderr, "%s(): Eeek! Failed to clear the allocation "
-				"in the mft bitmap. Leaving deleted mft record "
-				"marked as in use in the mft bitmap and "
-				"pretending we succeeded. Error: %s\n",
-				__FUNCTION__, strerror(errno));
+		err = errno;
+		// FIXME: If ntfs_bitmap_clear_run() guarantees atomicity on
+		//	  error, this could be changed to goto sync_rollback;
+		goto bitmap_rollback;
 	}
-	return 0;
+
+	/* Throw away the now freed inode. */
+	if (!ntfs_inode_close(ni))
+		return 0;
+	err = errno;
+
+	/* Rollback what we did... */
+bitmap_rollback:
+	if (ntfs_bitmap_set_run(vol->mftbmp_na, mft_no, 1))
+		fprintf(stderr, "Eeek! Rollback failed in "
+				"ntfs_mft_record_free(). Leaving inconsistent "
+				"metadata!");
+sync_rollback:
+	ni->mrec->flags |= MFT_RECORD_IN_USE;
+	ni->mrec->sequence_number = cpu_to_le16(old_seq_no);
+	ntfs_inode_mark_dirty(ni);
+	errno = err;
+	return -1;
 }
 
