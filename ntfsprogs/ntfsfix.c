@@ -58,6 +58,12 @@
 #include "device.h"
 #include "logfile.h"
 
+#ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+#	error "No default device io operations!  Cannot build ntfsfix.  \
+You need to run ./configure without the --disable-default-device-io-ops \
+switch if you want to be able to build the NTFS utilities."
+#endif
+
 /**
  * main
  */

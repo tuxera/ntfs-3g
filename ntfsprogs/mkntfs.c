@@ -125,6 +125,12 @@
 #include "runlist.h"
 #include "utils.h"
 
+#ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+#	error "No default device io operations!  Cannot build mkntfs.  \
+You need to run ./configure without the --disable-default-device-io-ops \
+switch if you want to be able to build the NTFS utilities."
+#endif
+
 extern const unsigned char attrdef_ntfs12_array[2400];
 extern const unsigned char boot_array[3429];
 extern void init_system_file_sd(int sys_file_no, char **sd_val,
