@@ -1,3 +1,6 @@
+xx/xx/2004 - 1.8.5 - WIP
+	- .
+
 23/01/2004 - 1.8.4 - Memory leak fixes.
 	- Fix memory leaks in libntfs/dir.c::ntfs_inode_lookup_by_name(),
 	  libntfs/dir.c::ntfs_readdir() and libntfs/attrib.c::ntfs_attr_open().
