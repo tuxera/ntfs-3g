@@ -99,8 +99,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	MFT_REF mref;
 	ntfs_attr *na = NULL;
 	u8 *new_al;
-	int new_al_len;
-	int err;
+	int entry_len, entry_offset, err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
 			__FUNCTION__, (long long) ni->mft_no,
@@ -123,17 +122,10 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		return -1;
 	}
 
-	/*
-	 * Determine size and allocate memory for new attribute list. We need
-	 * to form new attribute list before on-disk atribute list truncate
-	 * will be performed, because position of attribute for which we make
-	 * attribute list entry can be changed inside mft record (but it can
-	 * not be moved outside mft record, because we don't have attribute
-	 * list entry for it yet) during on-disk atribute list truncate.
-	 */
-	new_al_len = (ni->attr_list_size + sizeof(ATTR_LIST_ENTRY) +
-			sizeof(ntfschar) * attr->name_length + 7) & ~7;
-	new_al = malloc(new_al_len);
+	/* Determine size and allocate memory for new attribute list. */
+	entry_len = (sizeof(ATTR_LIST_ENTRY) + sizeof(ntfschar) *
+			attr->name_length + 7) & ~7;
+	new_al = malloc(ni->attr_list_size + entry_len);
 	if (!new_al) {
 		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
 		err = ENOMEM;
@@ -176,20 +168,15 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		break;
 	}
 
-	/* Copy entries from old attribute list to new. */
-	memcpy(new_al, ni->attr_list, (u8 *)ale - ni->attr_list);
-	memcpy(new_al + new_al_len - ni->attr_list_size + ((u8 *)ale -
-			ni->attr_list), ale, ni->attr_list_size -
-			((u8 *)ale - ni->attr_list));
-
+	/* Determine new entry offset. */
+	entry_offset = ((u8 *)ale - ni->attr_list);
 	/* Set pointer to new entry. */
-	ale = (ATTR_LIST_ENTRY *)(new_al + ((u8 *)ale - ni->attr_list));
-
-	/* Fill new entry with values. */
+	ale = (ATTR_LIST_ENTRY *)(new_al + entry_offset);
+	/* Form new entry. */
 	ale->type = attr->type;
-	ale->length = cpu_to_le16(new_al_len - ni->attr_list_size);
+	ale->length = cpu_to_le16(entry_len);
 	ale->name_length = attr->name_length;
-	ale->name_offset = (u8 *)ale->name - (u8 *)ale;
+	ale->name_offset = offsetof(ATTR_LIST_ENTRY, name);
 	if (attr->non_resident)
 		ale->lowest_vcn = attr->lowest_vcn;
 	else
@@ -199,7 +186,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	memcpy(ale->name, (u8 *)attr + le16_to_cpu(attr->name_offset),
 			attr->name_length * sizeof(ntfschar));
 
-	/* Reisze $ATTRIBUTE_LIST to new length. */
+	/* Resize $ATTRIBUTE_LIST to new length. */
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
 	if (!na) {
 		err = errno;
@@ -207,17 +194,22 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 					__FUNCTION__);
 		goto err_out;
 	}
-	if (ntfs_attr_truncate(na, new_al_len)) {
+	if (ntfs_attr_truncate(na, ni->attr_list_size + entry_len)) {
 		err = errno;
 		Dprintf("%s(): $ATTRIBUTE_LIST resize failed.\n", __FUNCTION__);
 		goto err_out;
 	}
 
+	/* Copy entries from old attribute list to new. */
+	memcpy(new_al, ni->attr_list, entry_offset);
+	memcpy(new_al + entry_offset + entry_len, ni->attr_list +
+			entry_offset, ni->attr_list_size - entry_offset);
+
 	/* Set new runlist. */
 	if (ni->attr_list)
 		free(ni->attr_list);
 	ni->attr_list = new_al;
-	ni->attr_list_size = new_al_len;
+	ni->attr_list_size = ni->attr_list_size + entry_len;
 	NInoAttrListSetDirty(ni);
 	/* Done! */
 	ntfs_attr_close(na);
