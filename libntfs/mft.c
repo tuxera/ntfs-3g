@@ -1470,6 +1470,8 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	u64 mft_no;
 	int err;
 	u16 seq_no, old_seq_no;
+	
+	Dprintf("%s(): Entring for inode 0x%llx.\n", __FUNCTION__, ni->mft_no);
 
 	if (!vol || !vol->mftbmp_na || !ni) {
 		errno = EINVAL;
