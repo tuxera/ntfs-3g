@@ -205,7 +205,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 		cnt = sid_str_size;
 	}
 	/* Start with "S-R-". */
-	i = snprintf(s, cnt, "S-%c-", (char)sid->revision);
+	i = snprintf(s, cnt, "S-%hhu-", (unsigned char)sid->revision);
 	if (i < 0 || i >= cnt)
 		goto err_out;
 	s += i;
