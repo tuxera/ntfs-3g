@@ -28,9 +28,8 @@
 	- Add AC_CANONICAL_HOST([]) to configure.ac and before AC_PROG_CC add
 	  manual provision of CC=gcc, AR=ar, and LD=ld if they are not set and
 	  the target is *-*-*djgpp.  (Requested by Christophe Grenier)
-	- Use bswap_xx instead of __bswap_constant_xx when the constant version
-	  is not available as is the case on some architectures.  (Thanks to
-	  David Martínez Moreno for the bug report.)
+	- Provide our own byteswap constant versions in endians.h so we avoid
+	  the mess that some architectures define only some of them.
 	- Use head -n 1 instead of -1 in getgccver script.  (From SUSE LINUX)
 	- Fix typo in ntfsinfo.c.  (From SUSE LINUX)
 	- Make the device fd in unix_io.c be stored in malloc()ed space pointed
