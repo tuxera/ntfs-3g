@@ -2609,11 +2609,22 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 				"anyway.\n", __FUNCTION__);
 			return 0;
 		}
+		/* Deallocate clusters. */
+		if (NInoAttrListNonResident(base_ni)) {
+			if (ntfs_cluster_free_from_rl(base_ni->vol,
+						base_ni->attr_list_rl)) {
+				Dprintf("%s(): Leaking clusters! Run chkdsk. "
+					"Couldn't free clusters from attribute "
+					"list runlist. Succeed anyway.\n",
+					 __FUNCTION__);
+			}
+		}
+		/* Remove attribute record itself. */
 		if (ntfs_attr_record_rm(ctx)) {
 			/*
 			 * FIXME: Should we succeed here? BTW, chkdsk doesn't
 			 * complain if it find MFT record with attribute list,
-			 * but wothout extents.
+			 * but without extents.
 			 */
 			Dprintf("%s(): Coudn't remove attribute list. Succeed "
 				"anyway.\n", __FUNCTION__);
@@ -3261,6 +3272,311 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	return 0;
 }
 
+#define NTFS_VCN_DELETE_MARK -2
+/**
+ * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
+ * @na:		non-resident ntfs open attribute for which we need update
+ *
+ * Build mapping pairs from na->runlist and write them to the disk.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ *	ENOMEM	- Not enough memory to complete operation.
+ *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
+ */
+int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfs_inode *ni;
+	MFT_RECORD *m;
+	ATTR_RECORD *a;
+	VCN stop_vcn;
+	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
+	BOOL finished_build = FALSE;
+
+	if (!na || !na->rl) {
+		Dprintf("%s(): Invalid parameters passed.\n", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!NAttrNonResident(na)) {
+		Dprintf("%s(): Attribute should be non resident.\n",
+			__FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
+			(unsigned long long)na->ni->mft_no, na->type);
+
+	ctx = ntfs_attr_get_search_ctx(na->ni, 0);
+	if (!ctx) {
+		err = errno;
+		Dprintf("%s(): Couldn't get search context.\n", __FUNCTION__);
+		errno = err;
+		return -1;
+	}
+
+	/* Fill attribute records with new mapping pairs. */
+	stop_vcn = 0;
+	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				IGNORE_CASE, 0, NULL, 0, ctx)) {
+		a = ctx->attr;
+		m = ctx->mrec;
+		
+		/*
+		 * Check whether we finished mapping pairs build, if so mark
+		 * extent as need to delete (by setting highest vcn to -1, we
+		 * shall check it later and delete extent) and continue search.
+		 */
+		if (finished_build) {
+			Dprintf("%s(): Marked attr 0x%x for delete in inode "
+				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
+				ctx->ntfs_ino->mft_no);
+			a->highest_vcn = scpu_to_le64(NTFS_VCN_DELETE_MARK);
+			ntfs_inode_mark_dirty(ctx->ntfs_ino);
+			continue;
+		}
+		
+		/*
+		 * Check that the attribute name hasn't been placed after the
+		 * mapping pairs array. Windows account this as corruption.
+		 */
+		if (a->name_length) {
+			if (le16_to_cpu(a->name_offset) >=
+					le16_to_cpu(a->mapping_pairs_offset)) {
+				Dprintf("%s(): Eeek! Damaged attribute. Name is"
+					" placed after the mapping pairs array."
+					" Run chkdsk.\n", __FUNCTION__);
+				err = EIO;
+				goto put_err_out;
+			}
+		}
+
+		/* Get the size for the rest of mapping pairs array. */
+		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
+								stop_vcn);
+		if (mp_size <= 0) {
+			err = errno;
+			Dprintf("%s(): Eeek! Get size for mapping "
+					"pairs failed.\n", __FUNCTION__);
+			goto put_err_out;
+		}
+		/*
+		 * Determine maximum possible length of mapping pairs,
+		 * if we shall *not* expand space for mapping pairs.
+		 */
+		cur_max_mp_size = le32_to_cpu(a->length) - 
+				le16_to_cpu(a->mapping_pairs_offset);
+		/*
+		 * Determine maximum possible length of mapping pairs in the
+		 * current mft record, if we shall expand space for mapping
+		 * pairs.
+		 */
+		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
+				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
+
+		/* Test mapping pairs for fitting in the current mft record. */
+		if (mp_size > exp_max_mp_size) {
+			/*
+			 * Mapping pairs of $ATTRIBUTE_LIST attribute must fit
+			 * in the base mft record.
+			 */
+			if (na->type == AT_ATTRIBUTE_LIST) {
+				err = ENOSPC;
+				goto put_err_out;
+			}
+
+			/* Add attribute list if it isn't present, and retry. */
+			if (!NInoAttrList(na->ni)) {
+				ntfs_attr_put_search_ctx(ctx);
+				if (ntfs_inode_add_attrlist(na->ni)) {
+					err = errno;
+					Dprintf("%s(): Eeek! Coudn't add "
+						"attribute list.\n",
+						__FUNCTION__);
+					errno = err;
+					return -1;
+				}
+				return ntfs_attr_update_mapping_pairs(na);
+			}
+
+			/*
+			 * Set mapping pairs size to maximum possible for this
+			 * mft record. We shall write the rest of mapping pairs
+			 * to another MFT records.
+			 */
+			mp_size = exp_max_mp_size;
+		}
+
+		/* Change space for mapping pairs if we need it. */
+		if (((mp_size + 7) & ~7) != cur_max_mp_size) {
+			if (ntfs_attr_record_resize(m, a,
+					le16_to_cpu(a->mapping_pairs_offset) +
+					mp_size)) {
+				Dprintf("%s(): BUG! Ran out of space in"
+						" mft record. Please run chkdsk"
+						" and if that doesn't find any "
+						"errors please report you saw "
+						"this message to "
+						"linux-ntfs-dev@lists.sf.net."
+						"\n", __FUNCTION__);
+				err = EIO;
+				goto put_err_out;
+			}
+		}
+
+		/* Update lowest vcn. */
+		a->lowest_vcn = scpu_to_le64(stop_vcn);
+		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		if ((ctx->ntfs_ino->nr_extents == -1 ||
+					NInoAttrList(ctx->ntfs_ino)) &&
+					ctx->attr->type != AT_ATTRIBUTE_LIST) {
+			ctx->al_entry->lowest_vcn = scpu_to_le64(stop_vcn);
+			ntfs_attrlist_mark_dirty(ctx->ntfs_ino);
+		}
+
+		/*
+		 * Generate the new mapping pairs array directly into the
+		 * correct destination, i.e. the attribute record itself.
+		 */
+		if (!ntfs_mapping_pairs_build(na->ni->vol, (u8*)a + le16_to_cpu(
+				a->mapping_pairs_offset), mp_size, na->rl,
+				stop_vcn, &stop_vcn))
+			finished_build = TRUE;
+		if (!finished_build && errno != ENOSPC) {
+			err = errno;
+			Dprintf("%s(): BUG!  Mapping pairs build failed.  "
+				"Please run chkdsk and if that doesn't find "
+				"any errors please report you saw this message"
+				" to linux-ntfs-dev@lists.sf.net.\n",
+				__FUNCTION__);
+			goto put_err_out;
+		}
+		a->highest_vcn = scpu_to_le64(stop_vcn - 1);
+	}
+	/* Check wether error occured. */
+	if (errno != ENOENT) {
+		err = errno;
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	
+	/* Deallocate not used attribute extents and return with success. */
+	if (finished_build) {
+		/*
+		 * FIXME: We use ntfs_attr_init_search_ctx instead of
+		 * ntfs_attr_reinit_search_ctx because last seems to be buggy.
+		 */
+		//ntfs_attr_reinit_search_ctx(ctx);
+		ntfs_attr_init_search_ctx(ctx, na->ni, NULL);
+		Dprintf("%s(): Deallocate marked extents.\n", __FUNCTION__);
+		while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				IGNORE_CASE, 0, NULL, 0, ctx)) {
+			Dprintf("%s(): Found attr 0x%x in inode "
+				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
+				ctx->ntfs_ino->mft_no);
+			if (sle64_to_cpu(ctx->attr->highest_vcn) !=
+							NTFS_VCN_DELETE_MARK)
+				continue;
+			Dprintf("%s(): It is marked. Delete it.\n",
+				__FUNCTION__);
+			/* Remove unused attribute record. */
+			if (ntfs_attr_record_rm(ctx)) {
+				err = errno;
+				Dprintf("%s(): Coudn't remove unused attribute "
+					"record.\n", __FUNCTION__);
+				goto put_err_out;
+			}
+			//ntfs_attr_init_search_ctx(ctx, na->ni, NULL);
+			ntfs_attr_reinit_search_ctx(ctx);
+		}
+		if (errno != ENOENT) {
+			err = errno;
+			Dprintf("%s(): Attribute lookup failed.\n",
+				__FUNCTION__);
+			goto put_err_out;
+		}
+		Dprintf("%s(): Deallocate done.\n", __FUNCTION__);
+		return 0;
+	}
+	
+	/* Allocate new MFT records for the rest of mapping pairs. */
+	while (1) {
+		/* Calculate size of rest mapping pairs. */
+		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol,
+						na->rl, stop_vcn);
+		if (mp_size <= 0) {
+			err = errno;
+			Dprintf("%s(): Eeek! Get size for mapping "
+					"pairs failed.\n", __FUNCTION__);
+			goto put_err_out;
+		}
+		/* Allocate new mft record. */
+		ni = ntfs_mft_record_alloc(na->ni->vol, na->ni);
+		if (!ni) {
+			err = errno;
+			Dprintf("%s(): Couldn't allocate new MFT record.\n",
+				__FUNCTION__);
+			goto put_err_out;
+		}
+		m = ni->mrec;
+		/*
+		 * If mapping size exceed avaible space, set them to
+		 * possible maximum.
+		 */
+		cur_max_mp_size = le32_to_cpu(m->bytes_allocated) -
+				le32_to_cpu(m->bytes_in_use) - 0x40 -
+				sizeof(ntfschar) * na->name_len;
+		if (mp_size > cur_max_mp_size)
+			mp_size = cur_max_mp_size;
+		/* Add atribute extent to new record. */
+		err = ntfs_non_resident_attr_record_add(ni, na->type,
+			 na->name, na->name_len, stop_vcn, mp_size, 0);
+		if (err == -1) {
+			err = errno;
+			Dprintf("%s(): Couldn't add attribute extent "
+				"into the MFT record.\n", __FUNCTION__);
+			if (ntfs_mft_record_free(na->ni->vol, ni)) {
+				Dprintf("%s(): Coudn't free MFT record.\n",
+					__FUNCTION__);
+			}
+			goto put_err_out;
+		}
+		a = (ATTR_RECORD*)((u8*)m + err);
+
+		err = ntfs_mapping_pairs_build(na->ni->vol, (u8*)a +
+			le16_to_cpu(a->mapping_pairs_offset), mp_size, na->rl,
+			stop_vcn, &stop_vcn);
+		if (err < 0 && errno != ENOSPC) {
+			err = errno;
+			Dprintf("%s(): BUG!  Mapping pairs build "
+				"failed.  Please run chkdsk and if "
+				"that doesn't find any errors please "
+				"report you saw this message to "
+				"linux-ntfs-dev@lists.sf.net.\n",
+				__FUNCTION__);
+			if (ntfs_mft_record_free(na->ni->vol, ni))
+				Dprintf("%s(): Coudn't free MFT record.\n",
+					__FUNCTION__);
+			goto put_err_out;
+		}
+		a->highest_vcn = scpu_to_le64(stop_vcn - 1);
+		ntfs_inode_mark_dirty(ni);
+		/* All mapping pairs are writed. */
+		if (!err)
+			break;
+	}
+	return 0;
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+#undef NTFS_VCN_DELETE_MARK
+
 /**
  * ntfs_non_resident_attr_shrink - shrink a non-resident, open ntfs attribute
  * @na:		non-resident ntfs attribute to shrink
@@ -3279,30 +3595,15 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
-	MFT_RECORD *m;
 	VCN first_free_vcn;
 	s64 nr_freed_clusters;
-	u32 new_alen, new_muse;
-	int err, mp_size;
+	int err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
 
 	vol = na->ni->vol;
 
-	/* Get the first attribute record that needs modification. */
-	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
-	if (!ctx)
-		return -1;
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, newsize >>
-			vol->cluster_size_bits, NULL, 0, ctx)) {
-		err = errno;
-		if (err == ENOENT)
-			err = EIO;
-		goto put_err_out;
-	}
-	a = ctx->attr;
-	m = ctx->mrec;
 	/*
 	 * Check the attribute type and the corresponding minimum size
 	 * against @newsize and fail if @newsize is too small.
@@ -3310,59 +3611,12 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
 		err = errno;
 		if (err == ERANGE) {
-			// FIXME: Eeek!
 			Dprintf("%s(): Eeek! Size bounds check "
 					"failed. Aborting...\n", __FUNCTION__);
 		} else if (err == ENOENT)
 			err = EIO;
 		goto put_err_out;
 	}
-
-	// When extents/an attribute list is/are present it is very complicated:
-	// TODO: For the current extent:
-	//	TODO: free the required clusters
-	//	FIXME: how do we deal with extents that haven't been loaded yet?
-	//		do we just fault them in first so that the runlist is
-	//		complete and we are done with deallocations in one go?
-	//	TODO: update the run list in na->rl
-	//	TODO: update the sizes, etc in the ntfs attribute structure na
-	//	TODO: update the mapping pairs array
-	//	TODO: mark the inode dirty
-	// TODO: For all subsequent extents:
-	//	TODO: free all clusters specified by the extent (FIXME: unless
-	//		already done above!)
-	//	TODO: completely delete each extent attribute record from its
-	//		mft record
-	//	TODO: free the mft record if there are no attributes left in it
-	//		(to do so update the $MFT/$Bitmap as well as the mft
-	//		 record header in use flag, etc)
-	//	TODO: write the updated mft record to disk
-	//	TODO: remove the extent inode from the list of loaded extent
-	//		inodes in the base inode
-	//	TODO: free all memory associated with the extent inode
-	// TODO: update the attribute list attribute in ni->attr_list, removing
-	//	 all entries corresponding to deleted attributes
-	// TODO: if the attribute list attribute is resident:
-	//		TODO: update the actual attribute in the base mft
-	//			record from ni->attr_list
-	//	 if the attribute list attribute is not resident:
-	//		TODO: update the attribute list attribute run list in
-	//			ni->attr_list_rl, freeing any no longer used
-	//			clusters
-	//		TODO: mark the inode attribute list as containing
-	//			dirty data
-	//		TODO: update the mapping pairs array from
-	//			ni->attr_list_rl
-	// TODO: mark the base inode dirty
-
-	// TODO: Implement attribute list support as desribed above. (AIA)
-	if (NInoAttrList(na->ni)) {
-		err = ENOTSUP;
-		goto put_err_out;
-	}
-	// FIXME: We now know that we don't have an attribute list. Thus we
-	//	  are in the base inode only and hence it is all easier, even
-	//	  if we are cheating for now... (AIA)
 
 	/* The first cluster outside the new allocation. */
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
@@ -3372,145 +3626,95 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
+		if (ntfs_attr_map_whole_runlist(na)) {
+			err = errno;
+			Dprintf("%s(): Eeek! ntfs_attr_map_whole_runlist "
+				"failed.\n", __FUNCTION__);
+			errno = err;
+			return -1;
+		}
 		/* Deallocate all clusters starting with the first free one. */
 		nr_freed_clusters = ntfs_cluster_free(vol, na, first_free_vcn,
 				-1);
 		if (nr_freed_clusters < 0) {
 			err = errno;
-			// FIXME: Eeek!
 			Dprintf("%s(): Eeek! Freeing of clusters "
-					"failed. Aborting...\n", __FUNCTION__);
-			goto put_err_out;
+				"failed. Aborting...\n", __FUNCTION__);
+			errno = err;
+			return -1;
 		}
+		
 		/* Truncate the runlist itself. */
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
 			err = errno;
-			// FIXME: Eeek! We need rollback! (AIA)
-			Dprintf("%s(): Eeek! Run list truncation "
-					"failed. Leaving inconsistent "
-					"metadata!\n", __FUNCTION__);
-			goto put_err_out;
+			/*
+			 * Failed to truncate the runlist, so just throw it
+			 * away, it will be mapped afresh on next use.
+			 */
+			free(na->rl);
+			na->rl = NULL;
+			Dprintf("%s(): Eeek! Run list truncation failed.\n",
+				__FUNCTION__);
+			errno = err;
+			return -1;
 		}
-		/* Update the attribute record and the ntfs_attr structure. */
+		
+		/* Write mapping pairs for new runlist. */
+		if (ntfs_attr_update_mapping_pairs(na)) {
+			err = errno;
+			Dprintf("%s(): Eeek! Mapping pairs update failed. "
+				"Leaving inconsist metadata. Run chkdsk.\n",
+				__FUNCTION__);
+			errno = err;
+			return -1;
+		}
+	}
+	
+	/* Get the first attribute record. */
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx) {
+		if ((na->allocated_size >> vol->cluster_size_bits)
+						!= first_free_vcn)
+			Dprintf("%s(): Coudn't get attribute search context. "
+				"Leaving inconsist metadata.\n", __FUNCTION__);
+		else
+			Dprintf("%s(): Coudn't get attribute search context.\n",
+				 __FUNCTION__);
+		return -1;
+	}
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
+			ctx)) {
+		err = errno;
+		if (err == ENOENT)
+			err = EIO;
+		Dprintf("%s(): Eeek! Lookup of first attribute extent failed. "
+			"Leaving inconsist metadata.\n", __FUNCTION__);
+		goto put_err_out;
+	}
+	a = ctx->attr;
+		
+	/* Update allocated size only if it is changed. */
+	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = scpu_to_le64(na->allocated_size);
-		if (NAttrCompressed(na) || NAttrSparse(na)) {
-			na->compressed_size -= nr_freed_clusters <<
-					vol->cluster_size_bits;
-			// FIXME: Bug catcher. Remove later... (AIA)
-			if (!newsize && na->compressed_size) {
-				Dprintf("%s(): Eeek! !newsize but "
-						"na->compressed_size not zero "
-						"(= %lli)! Fixing up by hand!\n",
-						__FUNCTION__, (long long)
-						na->compressed_size);
-				na->compressed_size = 0;
-			}
-			a->compressed_size = scpu_to_le64(na->compressed_size);
-
-			// FIXME: Bug catcher. Remove later... (AIA)
-			if (na->compressed_size < 0) {
-				// FIXME: Eeek! BUG!
-				Dprintf("%s(): Eeek! Compressed size "
-						"is negative. Leaving "
-						"inconsistent metadata!\n",
-						__FUNCTION__);
-				err = EIO;
-				goto put_err_out;
-			}
-		}
-		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
-		/* Get the size for the new mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 0);
-		if (mp_size <= 0) {
-			err = errno;
-			// FIXME: Eeek! We need rollback! (AIA)
-			Dprintf("%s(): Eeek! Get size for mapping "
-					"pairs failed. Leaving inconsistent "
-					"metadata!\n", __FUNCTION__);
-			goto put_err_out;
-		}
-		/*
-		 * Generate the new mapping pairs array directly into the
-		 * correct destination, i.e. the attribute record itself.
-		 */
-		if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-					a->mapping_pairs_offset), mp_size,
-					na->rl, 0, NULL)) {
-			err = errno;
-			// FIXME: Eeek! We need rollback! (AIA)
-			Dprintf("%s(): Eeek! Mapping pairs build "
-					"failed. Leaving inconsistent "
-					"metadata!\n", __FUNCTION__);
-			goto put_err_out;
-		}
-		/*
-		 * Check that the attribute name hasn't been placed after the
-		 * attribute value/mapping pairs array. If it has we need to
-		 * move it. TODO: Implement the move. For now just abort. (AIA)
-		 */
-		if (a->name_length) {
-			BOOL move_name = FALSE;
-			if (a->non_resident) {
-				if (le16_to_cpu(a->name_offset) >= le16_to_cpu(
-						a->mapping_pairs_offset))
-					move_name = TRUE;
-			} else {
-				if (le16_to_cpu(a->name_offset) >=
-						le16_to_cpu(a->value_offset))
-					move_name = TRUE;
-					
-			}
-			if (move_name) {
-				// FIXME: Eeek!
-				Dprintf("%s(): Eeek! Name is placed "
-						"after the %s. Aborting...\n",
-						__FUNCTION__, a->non_resident ?
-						"mapping pairs array":
-						"attribute value");
-				err = ENOTSUP;
-				goto put_err_out;
-			}
-		}
-		/*
-		 * Calculate the new attribute length and mft record bytes
-		 * used.
-		 */
-		new_alen = (le16_to_cpu(a->mapping_pairs_offset) + mp_size +
-				7) & ~7;
-		new_muse = le32_to_cpu(m->bytes_in_use) -
-				le32_to_cpu(a->length) + new_alen;
-		if (new_muse > le32_to_cpu(m->bytes_allocated)) {
-			// FIXME: Eeek! BUG()
-			Dprintf("%s(): Eeek! Ran out of space in mft "
-					"record. Leaving inconsistent "
-					"metadata!\n", __FUNCTION__);
-			err = EIO;
-			goto put_err_out;
-		}
-		/* Move the following attributes forward. */
-		memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
-				le32_to_cpu(m->bytes_in_use) - ((u8*)a -
-				(u8*)m) - le32_to_cpu(a->length));
-		/* Update the sizes of the attribute and mft records. */
-		a->length = cpu_to_le32(new_alen);
-		m->bytes_in_use = cpu_to_le32(new_muse);
 	}
-	/* Update the attribute record and the ntfs attribute structure. */
+
+	/* Update data and initialized size. */
 	na->data_size = newsize;
 	a->data_size = scpu_to_le64(newsize);
 	if (newsize < na->initialized_size) {
 		na->initialized_size = newsize;
 		a->initialized_size = scpu_to_le64(newsize);
 	}
+
 	/* If the attribute now has zero size, make it resident. */
 	if (!newsize) {
 		if (ntfs_attr_make_resident(na, ctx)) {
 			/* If couldn't make resident, just continue. */
 			if (errno != EPERM)
 				Dprintf("%s(): Failed to make attribute "
-						"resident. Leaving as is...\n",
-						__FUNCTION__);
+					"resident. Leaving as is...\n",
+					__FUNCTION__);
 		}
 	}
 
@@ -3543,16 +3747,12 @@ put_err_out:
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
 	LCN lcn_seek_from;
-	VCN first_free_vcn, stop_vcn;
+	VCN first_free_vcn;
+	ATTR_RECORD *a;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
-	ATTR_RECORD *a;
-	MFT_RECORD *m;
 	runlist *rl, *rln;
-	ntfs_inode *ni;
-	int err, mp_size, cur_max_mp_size, exp_max_mp_size;
-	BOOL add_attr_list_and_retry = FALSE;
-	BOOL mft_records_changed = FALSE;
+	int err;
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
@@ -3574,10 +3774,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		return -1;
 	}
 
-	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
-	if (!ctx)
-		return -1;
-
 	/* The first cluster outside the new allocation. */
 	first_free_vcn = (newsize + vol->cluster_size - 1) >>
 			vol->cluster_size_bits;
@@ -3586,38 +3782,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
-		/* Get the last extent of the attribute. */
-		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
-				(na->allocated_size >>
-				vol->cluster_size_bits) - 1, NULL, 0, ctx)) {
+		if (ntfs_attr_map_whole_runlist(na)) {
 			err = errno;
-			if (err == ENOENT)
-				err = EIO;
-			goto put_err_out;
-		}
-		a = ctx->attr;
-		m = ctx->mrec;
-
-		/*
-		 * Check that the attribute name hasn't been placed after the
-		 * mapping pairs array. If it has we need to move it.
-		 * TODO: Implement the move, if someone will hit it.
-		 */
-		if (a->name_length) {
-			if (le16_to_cpu(a->name_offset) >=
-					le16_to_cpu(a->mapping_pairs_offset)) {
-				Dprintf("%s(): Eeek! Name is placed after the "
-					"mapping pairs array. Aborting...\n",
-					__FUNCTION__);
-				err = ENOTSUP;
-				goto put_err_out;
-			}
-		}
-
-		if (ntfs_attr_map_runlist(na, sle64_to_cpu(a->lowest_vcn))) {
-			err = errno;
-			Dprintf("%s(): Eeek! ntfs_attr_map_runlist failed.\n",
-								 __FUNCTION__);
+			Dprintf("%s(): Eeek! ntfs_attr_map_whole_runlist "
+				"failed.\n", __FUNCTION__);
 			goto put_err_out;
 		}
 
@@ -3668,136 +3836,24 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		}
 		na->rl = rln;
 
-		/* Get the size for the new mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl,
-				sle64_to_cpu(a->lowest_vcn));
-		if (mp_size <= 0) {
+		/* Write mapping pairs for new runlist. */
+		if (ntfs_attr_update_mapping_pairs(na)) {
 			err = errno;
-			Dprintf("%s(): Eeek! Get size for mapping "
-					"pairs failed.\n", __FUNCTION__);
+			Dprintf("%s(): Eeek! Mapping pairs update failed.\n",
+				__FUNCTION__);
 			goto rollback;
 		}
-		/*
-		 * Determine maximum possible length of mapping pairs,
-		 * if we shall *not* expand space for mapping pairs.
-		 */
-		cur_max_mp_size = le32_to_cpu(a->length) - 
-				le16_to_cpu(a->mapping_pairs_offset);
-		/*
-		 * Determine maximum possible length of mapping pairs in the
-		 * current mft record, if we shall expand space for mapping
-		 * pairs.
-		 */
-		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
-				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
-
-		/* Test mapping pairs for fitting in the current mft record. */
-		if (mp_size > exp_max_mp_size) {
-			/*
-			 * Mapping pairs of $ATTRIBUTE_LIST attribute must fit
-			 * in the base mft record.
-			 */
-			if (na->type == AT_ATTRIBUTE_LIST) {
-				err = ENOSPC;
-				goto rollback;
-			}
-
-			/* Add attribute list, if it isn't present and retry. */
-			if (!NInoAttrList(na->ni)) {
-			        err = ENOTSUP; /* to suppress gcc complain */
-				add_attr_list_and_retry = TRUE;
-				goto rollback;
-			}
-
-			/*
-			 * Set mapping pairs size to maximum possible for this
-			 * mft record. We shall allocate new mft records for
-			 * rest of mapping pairs.
-			 */
-			mp_size = exp_max_mp_size;
-		}
-
-		/* Expand space for mapping pairs if we need this. */
-		if (mp_size > cur_max_mp_size) {
-			if (ntfs_attr_record_resize(m, a,
-					le16_to_cpu(a->mapping_pairs_offset) +
-					mp_size)) {
-				Dprintf("%s(): BUG! Ran out of space in"
-						" mft record. Please run chkdsk"
-						" and if that doesn't find any "
-						"errors please report you saw "
-						"this message to "
-						"linux-ntfs-dev@lists.sf.net."
-						"\n", __FUNCTION__);
-				err = EIO;
-				goto rollback;
-			}
-			mft_records_changed = TRUE;
-		}
-		/*
-		 * Generate the new mapping pairs array directly into the
-		 * correct destination, i.e. the attribute record itself.
-		 * If we ran out of space than allocate new MFT record, add
-		 * attribute extent to it and continue generation.
-		 */
-		stop_vcn = sle64_to_cpu(a->lowest_vcn);
-		ni = ctx->ntfs_ino;
-		while(ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl,
-				stop_vcn, &stop_vcn)) {
-			if (errno != ENOSPC) {
-				err = errno;
-				Dprintf("%s(): BUG!  Mapping pairs build "
-					"failed.  Please run chkdsk and if "
-					"that doesn't find any errors please "
-					"report you saw this message to "
-					"linux-ntfs-dev@lists.sf.net.\n",
-					__FUNCTION__);
-				goto rollback;
-			}
-			a->highest_vcn = scpu_to_le64(stop_vcn - 1);
-			mft_records_changed = TRUE;
-			ntfs_inode_mark_dirty(ni);
-			
-			/* Calculate size of rest mapping pairs. */
-			mp_size = ntfs_get_size_for_mapping_pairs(vol,
-					na->rl, stop_vcn);
-	
-			/* Allocate new mft record. */
-			ni = ntfs_mft_record_alloc(vol, na->ni);
-			if (!ni) {
-				err = errno;
-				Dprintf("%s(): Couldn't allocate new MFT "
-					"record.\n", __FUNCTION__);
-				goto rollback;
-			}
-			m = ni->mrec;
-			/*
-			 * If mapping size exceed avaible space, set them to
-			 * possible maximum.
-			 */
-			cur_max_mp_size = le32_to_cpu(m->bytes_allocated) -
-					le32_to_cpu(m->bytes_in_use) - 0x40 -
-					sizeof(ntfschar) * na->name_len;
-			if (mp_size > cur_max_mp_size)
-				mp_size = cur_max_mp_size;
-			/* Add atribute extent to new record. */
-			err = ntfs_non_resident_attr_record_add(ni, na->type,
-				 na->name, na->name_len, stop_vcn, mp_size, 0);
-			if (err == -1) {
-				err = errno;
-				Dprintf("%s(): Couldn't add attribute extent "
-					"into the MFT record.\n", __FUNCTION__);
-				goto rollback;
-			}
-			a = (ATTR_RECORD*)((u8*)m + err);
-		}
-		a->highest_vcn = scpu_to_le64(first_free_vcn - 1);
-		mft_records_changed = TRUE;
-		ntfs_inode_mark_dirty(ni);
-		ntfs_attr_reinit_search_ctx(ctx);
 	}
-	
+
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx) {
+		if ((na->allocated_size >> vol->cluster_size_bits) !=
+				first_free_vcn)
+			goto rollback;
+		else
+			goto put_err_out;
+	}
+
 	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
 			ctx)) {
 		Dprintf("%s(): Eeek! Lookup of first attribute extent "
@@ -3807,20 +3863,19 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 			err = EIO;
 		if ((na->allocated_size >> vol->cluster_size_bits) !=
 				first_free_vcn) {
-			Dprintf("%s(): Trying perform rollback.\n",
-					__FUNCTION__);
+			ntfs_attr_put_search_ctx(ctx);
 			goto rollback;
 		} else
 			goto put_err_out;
 	}
 	a = ctx->attr;
-	
+
+	/* Update allocated size only if it is changed. */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
-		/* Update the attribute record and the ntfs_attr structure. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = scpu_to_le64(na->allocated_size);
 	}
-	/* Update the attribute record and the ntfs attribute structure. */
+	/* Update data size. */
 	na->data_size = newsize;
 	a->data_size = scpu_to_le64(newsize);
 	/* Set the inode dirty so it is written out later. */
@@ -3845,73 +3900,17 @@ rollback:
 		 */
 		free(na->rl);
 		na->rl = NULL;
-	}
-	/* Add attribute list and try again. */
-	if (add_attr_list_and_retry) {
-		ntfs_attr_put_search_ctx(ctx);
-		if (ntfs_inode_add_attrlist(na->ni)) {
-			err = errno;
-			Dprintf("%s(): Eeek! Coudn't add attribute list.\n",
-					__FUNCTION__);
-			errno = err;
-			return -1;
+		Dprintf("%s(): Eeek! Coudn't truncate runlist. Rollback "
+			"failed.\n", __FUNCTION__);
+	} else {
+		/* Retore mapping pairs. */
+		if (ntfs_attr_update_mapping_pairs(na)) {
+			Dprintf("%s(): Eeek! Coudn't restore old mapping "
+				"pairs. Rollback failed.\n", __FUNCTION__);
 		}
-		return ntfs_non_resident_attr_expand(na, newsize);
 	}
-	/* Do we need rollback changes inside MFT records.*/
-	if (!mft_records_changed)
-		goto put_err_out;
-	/* Rollback changes inside MFT records. */
-	ntfs_attr_reinit_search_ctx(ctx);
-	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
-			(na->allocated_size >> vol->cluster_size_bits) - 1,
-			 NULL, 0, ctx)) {
-		Dprintf("%s(): Eeek! Rollback failed. Run chkdsk.\n",
-				__FUNCTION__);
-		goto put_err_out;
-	}
-	a = ctx->attr;
-	m = ctx->mrec;
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, na->rl, 
-					sle64_to_cpu(a->lowest_vcn));
-	if (mp_size <= 0) {
-		Dprintf("%s(): Eeek! Get size for mapping pairs failed. "
-			"Rollback failed. Run chkdsk.\n", __FUNCTION__);
-		goto put_err_out;
-	}
-	if (ntfs_attr_record_resize(m, a,
-			le16_to_cpu(a->mapping_pairs_offset) + mp_size)) {
-		Dprintf("%s(): Eeek! Attribuite record resize failed. Rollback "
-			"failed. Run chkdsk.\n", __FUNCTION__);
-		goto put_err_out;
-	}
-	if (ntfs_mapping_pairs_build(vol, (u8*)a + le16_to_cpu(
-				a->mapping_pairs_offset), mp_size, na->rl,
-				sle64_to_cpu(a->lowest_vcn), 0)) {
-		Dprintf("%s(): Eeek! Mapping pairs build failed. Rollback "
-			"failed. Run chkdsk.\n", __FUNCTION__);
-		goto put_err_out;
-	}
-	a->highest_vcn = scpu_to_le64((na->allocated_size >>
-					vol->cluster_size_bits) - 1);
-	stop_vcn = 0;
-	while (!ntfs_attr_lookup(na->type, na->name,
-			na->name_len, 0, 0, NULL, 0, ctx)) {
-		if (stop_vcn > sle64_to_cpu(ctx->attr->highest_vcn))
-			continue;
-		stop_vcn = sle64_to_cpu(ctx->attr->highest_vcn) + 1;
-		if (ntfs_attr_record_rm(ctx)) {
-			Dprintf("%s(): Eeek! Removing attribute extent failed. "
-				"Rollback failed. Run chkdsk.\n", __FUNCTION__);
-			goto put_err_out;
-		}
-		ntfs_attr_reinit_search_ctx(ctx);
-	}
-	if (errno != ENOENT) {
-		Dprintf("%s(): Eeek! Attribute extent lookup failed. Rollback "
-			"failed. Run chkdsk.\n", __FUNCTION__);
-	} else
-		Dprintf("%s(): Rollback success.\n", __FUNCTION__);
+	errno = err;
+	return -1;
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
