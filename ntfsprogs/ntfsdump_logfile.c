@@ -31,8 +31,9 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
 
 #include "types.h"
 #include "endians.h"
@@ -88,7 +89,7 @@ void device_err_exit(char *dev_name, ntfs_volume *vol, ntfs_inode *ni,
 /**
  * usage -
  */
-void usage(void) __attribute__ ((noreturn));
+void usage(const char *exec_name) __attribute__ ((noreturn));
 void usage(const char *exec_name)
 {
 	fprintf(stderr, "%s v%s - Interpret and display information about the "
@@ -229,7 +230,7 @@ int main(int argc, char **argv)
 		err = errno;
 		if (close(fd))
 			fprintf(stderr, "Warning: Failed to close file %s: "
-					"%s\n", strerror(errno));
+					"%s\n", argv[2], strerror(errno));
 		if (br != buf_size) {
 			free(buf);
 			err_exit("Failed to read data from %s: %s", argv[2],
