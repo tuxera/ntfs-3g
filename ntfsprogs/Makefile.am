@@ -13,7 +13,8 @@ LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone
-EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove ntfsrm
+EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
+			  ntfsrm ntfscp
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -88,6 +89,10 @@ ntfswipe_LDFLAGS	= $(AM_LFLAGS)
 ntfsdump_logfile_SOURCES= ntfsdump_logfile.c
 ntfsdump_logfile_LDADD	= $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
+
+ntfscp_SOURCES		= ntfscp.c utils.c utils.h
+ntfscp_LDADD		= $(AM_LIBS)
+ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
 # Extra targets
 
