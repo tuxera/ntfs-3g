@@ -122,7 +122,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		goto err_out;
-	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
+			ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
 		/* Attribute list attribute not present so we are done. */
@@ -184,10 +185,8 @@ err_out:
  * then deallocate all memory attached to it, and finally free the ntfs inode
  * structure itself.
  *
- * If it is an extent inode, we postpone to when the base inode is being closed
- * with ntfs_inode_close() to tear down all structures and free all allocated
- * memory. That way we keep the extent records cached in memory so we get an
- * efficient ntfs_lookup_attr().
+ * If it is an extent inode, we disconnect it from its base inode before we
+ * destroy it.
  *
  * Return 0 on success or -1 on error with errno set to the error code. On
  * error, @ni has not been freed. The user should attempt to handle the error
@@ -200,13 +199,6 @@ err_out:
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
-	/* If the inode is an extent inode, complain rudely! */
-	if (ni->nr_extents == -1) {
-		Dprintf("%s(): BUG: Tried to close extent inode!\n",
-				__FUNCTION__);
-		errno = EINVAL;
-		return -1;
-	}
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
@@ -223,6 +215,37 @@ int ntfs_inode_close(ntfs_inode *ni)
 		for (i = 0; i < ni->nr_extents; i++)
 			__ntfs_inode_release(ni->extent_nis[i]);
 		free(ni->extent_nis);
+	} else if (ni->nr_extents == -1) {
+		ntfs_inode **tmp_nis;
+		ntfs_inode *base_ni;
+		s32 i;
+
+		/*
+		 * If the inode is an extent inode, disconnect it from the
+		 * base inode before destroying it.
+		 */
+		base_ni = ni->base_ni;
+		for (i = 0; i < base_ni->nr_extents; ++i) {
+			tmp_nis = base_ni->extent_nis;
+			if (tmp_nis[i] != ni)
+				continue;
+			/* Found it. Disconnect. */
+			memmove(tmp_nis + i, tmp_nis + i + 1,
+					(base_ni->nr_extents - i - 1) *
+					sizeof(ntfs_inode *));
+			base_ni->nr_extents--;
+			/* Resize the memory buffer. */
+			tmp_nis = realloc(tmp_nis, base_ni->nr_extents *
+					sizeof(ntfs_inode *));
+			/* Ignore errors, they don't really matter. */
+			if (tmp_nis)
+				base_ni->extent_nis = tmp_nis;
+			/* Allow for error checking. */
+			i = -1;
+		}
+		if (i != -1)
+			Dputs("Extent inode was not attached to base inode! "
+					"Weird! Continuing regardless.");
 	}
 	return __ntfs_inode_release(ni);
 }
