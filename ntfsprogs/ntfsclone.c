@@ -519,8 +519,7 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 static void clone_ntfs(u64 nr_clusters)
 {
-	s64 i, pos, count, last_cl;
-	u8 bm[NTFS_BUF_SIZE];
+	u64 cl, last_cl;  /* current and last used cluster */
 	void *buf;
 	u32 csize = vol->cluster_size;
 	u64 p_counter = 0;
@@ -532,56 +531,34 @@ static void clone_ntfs(u64 nr_clusters)
 		Printf("Cloning NTFS ...\n");
 
 	if ((buf = calloc(1, csize)) == NULL)
-		perr_exit("dump_to_stdout");
+		perr_exit("clone_ntfs");
 
 	progress_init(&progress, p_counter, nr_clusters, 100);
 
 	if (opt.save_image) {
-		if (write_all(&fd_out, &image_hdr, sizeof(image_hdr))
-		    == -1)
+		if (write_all(&fd_out, &image_hdr, sizeof(image_hdr)) == -1)
 			perr_exit("write_all");
 	}
 	
-	pos = 0;
-	last_cl = 0;
-	while (1) {
-		count = ntfs_attr_pread(vol->lcnbmp_na, pos, NTFS_BUF_SIZE, bm);
-		if (count == -1)
-			perr_exit("Couldn't read $Bitmap (pos = %lld)\n", pos);
-
-		if (count == 0) {
-			image_skip_clusters(pos * 8 - last_cl - 1);
-			return;
+	for (last_cl = cl = 0; cl < vol->nr_clusters; cl++) {
+	
+		if (ntfs_bit_get(lcn_bitmap.bm, cl)) {
+			progress_update(&progress, ++p_counter);
+			lseek_to_cluster(cl);
+			image_skip_clusters(cl - last_cl - 1);
+			
+			copy_cluster();
+			last_cl = cl;
+			continue;
 		}
-
-		for (i = 0; i < count; i++, pos++) {
-			s64 cl;  /* current cluster */	  
-
-			for (cl = pos * 8; cl < (pos + 1) * 8; cl++) {
-
-				if (cl > vol->nr_clusters - 1) {
-					image_skip_clusters(cl - last_cl - 1);
-					return;
-				}
-				
-				if (ntfs_bit_get(bm, i * 8 + cl % 8)) {
-					progress_update(&progress, ++p_counter);
-					lseek_to_cluster(cl);
-					image_skip_clusters(cl - last_cl - 1);
-					
-					copy_cluster();
-					last_cl = cl;
-					continue;
-				}
-				
-				if (opt.std_out && !opt.save_image) {
-					progress_update(&progress, ++p_counter);
-					if (write_all(&fd_out, buf, csize) == -1)
-						perr_exit("write_all");
-				}
-			}
+		
+		if (opt.std_out && !opt.save_image) {
+			progress_update(&progress, ++p_counter);
+			if (write_all(&fd_out, buf, csize) == -1)
+				perr_exit("write_all");
 		}
 	}
+	image_skip_clusters(cl - last_cl - 1);
 }
 
 static void write_empty_clusters(s32 csize, s64 count,
@@ -1302,8 +1279,6 @@ int main(int argc, char **argv)
 	compare_bitmaps(&lcn_bitmap);
 	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
 	
-	free(lcn_bitmap.bm);
-
 	if (opt.save_image)
 		initialise_image_hdr(device_size, image.inuse);
 	
@@ -1317,7 +1292,7 @@ int main(int argc, char **argv)
 		fsync_clone(fd_out);
 		exit(0);
 	}
-	
+
 	wipe = 1;	
 	opt.volume = opt.output;
 	/* 'force' again mount for dirty volumes (e.g. after resize). 
@@ -1325,6 +1300,7 @@ int main(int argc, char **argv)
 	opt.force++;
 	mount_volume(0);
 
+	free(lcn_bitmap.bm);
 	setup_lcn_bitmap();
 	memset(&image, 0, sizeof(image));
 	backup_clusters.image = &image; 
