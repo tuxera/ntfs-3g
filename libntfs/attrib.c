@@ -3772,11 +3772,12 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		
 		/*
 		 * Check whether we finished mapping pairs build, if so mark
-		 * extent as need to delete (by setting highest vcn to -1, we
-		 * shall check it later and delete extent) and continue search.
+		 * extent as need to delete (by setting highest vcn to
+		 * NTFS_VCN_DELETE_MARK (-2), we shall check it later and
+		 * delete extent) and continue search.
 		 */
 		if (finished_build) {
-			Dprintf("%s(): Marked attr 0x%x for delete in inode "
+			Dprintf("%s(): Mark attr 0x%x for delete in inode "
 				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
 				ctx->ntfs_ino->mft_no);
 			a->highest_vcn = cpu_to_sle64(NTFS_VCN_DELETE_MARK);
@@ -3786,7 +3787,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 		
 		/*
 		 * Check that the attribute name hasn't been placed after the
-		 * mapping pairs array. Windows account this as corruption.
+		 * mapping pairs array. Windows treat this as a corruption.
 		 */
 		if (a->name_length) {
 			if (le16_to_cpu(a->name_offset) >=
