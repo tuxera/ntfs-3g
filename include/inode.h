@@ -35,6 +35,8 @@ typedef struct _ntfs_inode ntfs_inode;
  */
 typedef enum {
 	NI_Dirty,		/* 1: Mft record needs to be written to disk. */
+
+	/* The NI_AttrList* tests only make sense for base inodes. */
 	NI_AttrList,		/* 1: Mft record contains an attribute list. */
 	NI_AttrListNonResident,	/* 1: Attribute list is non-resident. Implies
 				      NI_AttrList is set. */
@@ -42,17 +44,25 @@ typedef enum {
 				      mft record and then to disk. */
 } ntfs_inode_state_bits;
 
-#define  test_nino_flag(ni, flag)	 test_bit(NI_##flag, (ni)->state)
-#define   set_nino_flag(ni, flag)	  set_bit(NI_##flag, (ni)->state)
-#define clear_nino_flag(ni, flag)	clear_bit(NI_##flag, (ni)->state)
+#define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
+#define   set_nino_flag(ni, flag)	    set_bit(NI_##flag, (ni)->state)
+#define clear_nino_flag(ni, flag)	  clear_bit(NI_##flag, (ni)->state)
 
-#define NInoDirty(ni)		 test_nino_flag(ni, Dirty)
-#define NInoSetDirty(ni)	  set_nino_flag(ni, Dirty)
-#define NInoClearDirty(ni)	clear_nino_flag(ni, Dirty)
+#define test_and_set_nino_flag(ni, flag)	\
+				   test_and_set_bit(NI_##flag, (ni)->state)
+#define test_and_clear_nino_flag(ni, flag)	\
+				 test_and_clear_bit(NI_##flag, (ni)->state)
 
-#define NInoAttrList(ni)	 test_nino_flag(ni, AttrList)
-#define NInoSetAttrList(ni)	  set_nino_flag(ni, AttrList)
-#define NInoClearAttrList(ni)	clear_nino_flag(ni, AttrList)
+#define NInoDirty(ni)				  test_nino_flag(ni, Dirty)
+#define NInoSetDirty(ni)			   set_nino_flag(ni, Dirty)
+#define NInoClearDirty(ni)			 clear_nino_flag(ni, Dirty)
+#define NInoTestAndSetDirty(ni)		  test_and_set_nino_flag(ni, Dirty)
+#define NInoTestAndClearDirty(ni)	test_and_clear_nino_flag(ni, Dirty)
+
+#define NInoAttrList(ni)			  test_nino_flag(ni, AttrList)
+#define NInoSetAttrList(ni)			   set_nino_flag(ni, AttrList)
+#define NInoClearAttrList(ni)			 clear_nino_flag(ni, AttrList)
+
 
 #define  test_nino_al_flag(ni, flag)	 test_nino_flag(ni, AttrList##flag)
 #define   set_nino_al_flag(ni, flag)	  set_nino_flag(ni, AttrList##flag)
