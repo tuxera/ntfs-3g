@@ -4,6 +4,8 @@
  * Copyright (c) 2003 Lode Leroy
  * Copyright (c) 2003 Anton Altaparmakov
  * Copyright (c) 2003 Richard Russon
+ * Copyright (c) 2004 Carmelo Kintana
+ * Copyright (c) 2004 Giang Nguyen
  *
  * This utility will list a directory's files.
  *
@@ -83,12 +85,12 @@ struct path_component {
  * dir_list_insert_pos keeps track of where to insert a sub-dir
  * into the list.
  */
-struct list_head *dir_list_insert_pos = NULL;
+static struct list_head *dir_list_insert_pos = NULL;
 
 /* The global depth relative to opts.path.
  * ie: opts.path has depth 0, a sub-dir of opts.path has depth 1
  */
-int depth = 0;
+static int depth = 0;
 
 static struct options {
 	char *device;	/* Device/File to work with */
@@ -483,7 +485,10 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 	if (dt_type == NTFS_DT_DIR && opts.classify)
 		sprintf(filename + strlen(filename), "/");
 
-	if (dt_type == NTFS_DT_DIR && opts.recursive) {
+	if (dt_type == NTFS_DT_DIR && opts.recursive
+	    && strcmp(filename, ".") && strcmp(filename, "./")
+	    && strcmp(filename, "..") && strcmp(filename, "../"))
+	{
 		dir = (struct dir *)calloc(1, sizeof(struct dir));
 
 		if (!dir) {
@@ -554,7 +559,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 			printf("%8lld %s %s\n", (long long)filesize, t_buf + 4,
 					filename);
 
-		if (dt_type == NTFS_DT_DIR && opts.recursive) {
+		if (dir) {
 			dir->ni = ni;
 			ni = NULL;	/* so release does not close inode */
 		}
@@ -568,10 +573,14 @@ release:
 			ntfs_inode_close(ni);
 	}
 
-	/* add dir to list */
-	if (dir && !result) {
-		list_add(&dir->list, dir_list_insert_pos);
-		dir_list_insert_pos = &dir->list;
+	if (dir) {
+		if (result == 0) {
+			list_add(&dir->list, dir_list_insert_pos);
+			dir_list_insert_pos = &dir->list;
+		} else {
+			free(dir);
+			dir = NULL;
+		}
 	}
 
 free:
