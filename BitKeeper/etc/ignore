@@ -11,6 +11,7 @@ libntfs/*.8
 ntfsprogs/*.8
 config.log
 config.h
+config.h.in~
 config.cache
 config.status
 stamp-h
