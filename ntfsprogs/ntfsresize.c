@@ -5,7 +5,11 @@
  * Copyright (c) 2002-2003 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
- * This utility will resize an NTFS volume.
+ * This utility will resize an NTFS volume without data loss.
+ *
+ * WARNING FOR DEVELOPERS!!! Several external tools grep for text messages
+ * to control execution thus if you would like to change any message
+ * then PLEASE think twice before doing so then don't modify it. Thanks!
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -133,6 +137,7 @@ s64 max_free_cluster_range = 0;
 
 #define NTFS_MBYTE (1000 * 1000)
 
+/* WARNING: don't modify the text, external tools grep for it */
 #define ERR_PREFIX   "ERROR"
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
 #define NERR_PREFIX  ERR_PREFIX ": "
@@ -236,21 +241,21 @@ static void usage(void)
 	printf ("\nUsage: %s [options] device\n"
 		"    Resize an NTFS volume non-destructively.\n"
 		"\n"
-		"    -i      --info             Calculate the smallest shrunken size supported\n"
-		"    -s num  --size num         Resize volume to num[k|M|G] bytes\n"
+		"    -i, --info             Estimate the smallest shrunken size supported\n"
+		"    -s, --size SIZE        Resize volume to SIZE[k|M|G] bytes\n"
 		"\n"
-		"    -n      --no-action        Do not write to disk\n"
-		"    -f      --force            Force to progress (DANGEROUS)\n"
-		"    -P      --no-progress-bar  Don't show progress bar\n"
-		"    -v      --verbose          More output\n"
-		"    -V      --version          Display version information\n"
-		"    -h      --help             Display this help\n"
+		"    -n, --no-action        Do not write to disk\n"
+		"    -f, --force            Force to progress (DANGEROUS)\n"
+		"    -P, --no-progress-bar  Don't show progress bar\n"
+		"    -v, --verbose          More output\n"
+		"    -V, --version          Display version information\n"
+		"    -h, --help             Display this help\n"
 #ifdef DEBUG
-		"    -d      --debug            Show debug information\n"
+		"    -d, --debug            Show debug information\n"
 #endif
 		"\n"
-		"    If -i and -s are used together then print information about relocations.\n"
-		"    If both are omitted then the volume will be enlarged to the device size.\n"
+		"    The options -i and -s are mutually exclusive. If both options are\n"
+		"    omitted then the NTFS volume will be enlarged to the device size.\n"
 		"\n", EXEC_NAME);
 	printf ("%s%s", ntfs_bugs, ntfs_home);
 	printf ("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
@@ -425,9 +430,9 @@ static int parse_options(int argc, char **argv)
 			break;
 		default:
 			if (optopt == 's') {
-				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+				Eprintf("Option '%s' requires an argument.\n", argv[optind-1]);
 			} else {
-				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+				Eprintf("Unknown option '%s'.\n", argv[optind-1]);
 			}
 			err++;
 			break;
@@ -437,11 +442,17 @@ static int parse_options(int argc, char **argv)
 	if (!help && !ver) {
 		if (opt.volume == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify exactly one device.\n");
+				Eprintf("You must specify exactly one device.\n");
 			err++;
 		}
-		if (opt.info)
+		if (opt.info) {
 			opt.ro_flag = MS_RDONLY;
+			if (opt.bytes) {
+				Eprintf(NERR_PREFIX "Options --info and --size "
+					"can't be used together.\n");
+				usage();
+			}
+		}
 	}
 
 	stderr = stdout;
@@ -460,11 +471,9 @@ static int parse_options(int argc, char **argv)
 	return (!err && !help && !ver);
 }
 
-static void print_advise(s64 supp_lcn, int flags)
+static void print_advise(s64 supp_lcn)
 {
 	s64 old_b, new_b, freed_b, old_mb, new_mb, freed_mb;
-	int beta  = flags & 1;
-	int final = flags & 2;
 	
 	old_b = vol->nr_clusters * vol->cluster_size;
 	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
@@ -474,10 +483,10 @@ static void print_advise(s64 supp_lcn, int flags)
 	supp_lcn += 2;
 
 	if (supp_lcn > vol->nr_clusters) {
-		if (final)
-			printf("This fragmentation type "
-			       "isn't supported yet. Sorry.\n");
-		return;
+		err_printf("Very rare fragmentation type detected. "
+			   "Sorry, it's not supported yet.\n"
+			   "Try to defragment your NTFS, perhaps it helps.\n");
+		exit(1);
 	}
 
 	new_b = supp_lcn * vol->cluster_size;
@@ -485,8 +494,8 @@ static void print_advise(s64 supp_lcn, int flags)
 	freed_b = (vol->nr_clusters - supp_lcn + 1) * vol->cluster_size;
 	freed_mb = freed_b / NTFS_MBYTE;
 
-	printf("You %s resize at %lld bytes ", beta ? "might" : "could",
-			(long long)new_b);
+	/* WARNING: don't modify the text, external tools grep for it */
+	printf("You might resize at %lld bytes ", (long long)new_b);
 	if ((new_mb * NTFS_MBYTE) < old_b)
 		printf("or %lld MB ", (long long)new_mb);
 
@@ -495,11 +504,10 @@ static void print_advise(s64 supp_lcn, int flags)
 	    printf("%lld MB", (long long)(old_mb - new_mb));
 	else
 	    printf("%lld bytes", (long long)freed_b);
-	printf("). %s\n", beta ? "BETA." : "STABLE.");
+	printf(").\n");
 	
-	if (final)
-		printf("Please make a test run using both the -n and -s "
-		       "options before real resizing!\n");
+	printf("Please make a test run using both the -n and -s options "
+	       "before real resizing!\n");
 }
 
 static void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
@@ -578,7 +586,7 @@ static int has_bad_sectors(ntfs_resize_t *resize)
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
 			(uchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
-			a->name_length, 0, NULL, 0)) 
+			le16_to_cpu(a->name_length), 0, NULL, 0)) 
 		ret = 1;
 									
 	if (ustr != AT_UNNAMED)
@@ -676,15 +684,12 @@ static void collect_shrink_info(ntfs_resize_t *resize, runlist *rl)
 		len = lcn_length - (new_vol_size - lcn);
 
 		if (!opt.info && (inode == FILE_MFT || inode == FILE_MFTMirr)) {
-			int unsafe = 3;
 			s64 last_lcn;
 
 			err_printf("$MFT%s can't be split up yet. Please try "
 				   "a different size.\n", inode ? "Mirr" : "");
 			last_lcn = lcn + lcn_length - 1;
-			if (last_lcn == resize->last_unsafe)
-				unsafe = 2;
-			print_advise(last_lcn, unsafe);
+			print_advise(last_lcn);
 			exit(1);
 		}
 	}
@@ -883,6 +888,7 @@ static void progress_update(struct progress_bar *p, u64 current)
 	if (!opt.show_progress)
 		return;
 	
+	/* WARNING: don't modify the texts, external tools grep for them */
 	percent = p->unit * current;
 	if (current != p->stop) {
 		if ((current - p->start) % p->resolution)
@@ -905,6 +911,7 @@ static void walk_inodes(ntfs_resize_t *resize)
 	s64 last_mft_rec;
 	ntfs_inode *ni;
 
+	/* WARNING: don't modify the text, external tools grep for it */
 	printf("Checking filesystem consistency ...\n");
 
 	last_mft_rec = vol->nr_mft_records - 1;
@@ -965,7 +972,6 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 {
 	int mp_size, l;
 	void *mp;
-	char *next_attr;
 	ATTR_RECORD *a = ctx->attr;
 	
 	rl_fixup(&rl);
@@ -973,7 +979,7 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 	
-	if (a->name_length) {
+	if (le16_to_cpu(a->name_length)) {
 		u16 name_offs = le16_to_cpu(a->name_offset);
 		u16 mp_offs = le16_to_cpu(a->mapping_pairs_offset);
 
@@ -986,7 +992,8 @@ static void replace_attribute_runlist(ntfs_attr_search_ctx *ctx, runlist *rl)
 	   attribute, instead check for the real size/space */
 	l = (int)le32_to_cpu(a->length) - le16_to_cpu(a->mapping_pairs_offset);
 	if (mp_size > l) {
-		s64 remains_size; //, new_attr_size;
+		s64 remains_size;
+		char *next_attr;
 
 		Vprintf("Enlarging attribute header ...\n");
 	
@@ -1487,9 +1494,7 @@ static void print_hint(const char *s, struct llcn_t llcn)
  */
 static void advise_on_resize(ntfs_resize_t *resize)
 {
-	int final;
-
-	printf("Calculating smallest shrunken size supported ...\n");
+	printf("Estimating smallest shrunken size supported ...\n");
 
 	printf("File feature         Last used at      By inode\n");
 	print_hint("$MFT", resize->last_mft);
@@ -1501,13 +1506,7 @@ static void advise_on_resize(ntfs_resize_t *resize)
 		print_hint("Ordinary", resize->last_lcn);
 	}
 
-	final = (resize->last_unsafe == resize->last_unsupp) ? 2 : 0;
-	print_advise(resize->last_unsafe, final);
-
-	if (final)
-		return;
-
-	print_advise(resize->last_unsupp, 3);
+	print_advise(resize->last_unsupp);
 }
 
 /**
@@ -1838,6 +1837,7 @@ static void print_disk_usage(ntfs_resize_t *resize)
 	total = vol->nr_clusters * vol->cluster_size;
 	used = resize->inuse * vol->cluster_size;
 
+	/* WARNING: don't modify the text, external tools grep for it */
 	printf("Space in use       : %lld MB (%.1f%%)\n",
 	       (long long)rounded_up_division(used, NTFS_MBYTE),
 	       100.0 * ((float)used / total));
@@ -1885,6 +1885,9 @@ static void mount_volume(void)
 		perr_printf("ntfs_mount failed");
 		if (err == EINVAL)
 			printf(invalid_ntfs_msg, opt.volume);
+		else if (err == EIO)
+			printf("Apparently you have a corrupted volume. "
+			       "Please run chkdsk /f and try again!\n");
 		exit(1);
 	}
 
@@ -1971,7 +1974,7 @@ static void check_shrink_constraints(ntfs_resize_t *resize)
 	if (new_size <= resize->last_unsupp)
 		err_exit("The fragmentation type, you have, isn't "
 			 "supported yet. Rerun ntfsresize\nwith "
-			 "the -i option to calculate the smallest "
+			 "the -i option to estimate the smallest "
 			 "shrunken volume size supported.\n");
 
 	print_num_of_relocations(resize);
@@ -2083,6 +2086,7 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
+	/* WARNING: don't modify the texts, external tools grep for them */
 	printf("Syncing device ...\n");
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("fsync");
