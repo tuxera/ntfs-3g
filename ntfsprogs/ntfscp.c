@@ -246,7 +246,6 @@ int main (int argc, char *argv[])
 	int flags = 0;
 	int result = 1;
 	s64 new_size;
-	int need_logfile_reset = 0;
 	u64 offset;
 	char *buf;
 	s64 br, bw;
@@ -323,7 +322,6 @@ int main (int argc, char *argv[])
 			perror("ERROR: Couldn't add attribute");
 			goto close_dst;
 		}
-		need_logfile_reset = 1;
 	}
 	
 	Vprintf("Old file size: %lld\n", na->data_size);
@@ -332,7 +330,6 @@ int main (int argc, char *argv[])
 			perror("ERROR: Couldn't resize attribute");
 			goto close_attr;
 		}
-		need_logfile_reset = 1;
 	}
 
 	buf = malloc(NTFS_BUF_SIZE);
@@ -355,19 +352,12 @@ int main (int argc, char *argv[])
 		}
 		offset += bw;
 	}
-	need_logfile_reset = 1;
 	result = 0;
 	free(buf);
 close_attr:
 	ntfs_attr_close(na);
 close_dst:
 	ntfs_inode_close(out);
-
-	if (need_logfile_reset) {
-		printf("Resetting logfile.\n");
-		ntfs_logfile_reset (vol);
-	}
-
 close_src:
 	fclose (in);
 umount:

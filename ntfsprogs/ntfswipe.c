@@ -1064,6 +1064,9 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 	s64 len, pos, count;
 	char buf[NTFS_BUF_SIZE2];
 	int eo;
+	
+	/* We can wipe logfile only with 0xff. */
+	byte = 0xff;
 
 	if (!vol || (byte < 0))
 		return -1;
@@ -1383,14 +1386,6 @@ int main (int argc, char *argv[])
 		}
 
 		printf ("%lld bytes were wiped\n", (long long)total);
-	}
-	/*
-	 * We need to reset the logfile so Windows can boot and so journal
-	 * replay does not cause corruption.
-	 */
-	if (act != act_info) {
-		printf ("Resetting logfile.\n");
-		ntfs_logfile_reset(vol);
 	}
 	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
 		Eprintf ("Couldn't mark volume dirty\n");
