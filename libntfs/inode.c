@@ -545,7 +545,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 			if (!aln) {
 				Dprintf("%s(): Not enough memory.\n",
 						__FUNCTION__);
-				errno = ENOMEM;
+				err = ENOMEM;
 				goto put_err_out;
 			}
 			ale = (ATTR_LIST_ENTRY *)(aln + ((u8 *)ale - al));
