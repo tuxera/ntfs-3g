@@ -1932,8 +1932,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 	//	  name, too. (AIA)
 
 	/* Calculate the new attribute length and mft record bytes used. */
-	new_alen = (le32_to_cpu(a->length) - le32_to_cpu(a->value_length) +
-			newsize + 7) & ~7;
+	new_alen = (le16_to_cpu(a->value_offset) + newsize + 7) & ~7;
 	/* If the actual attribute length has changed, move tihings around. */
 	if (new_alen != le32_to_cpu(a->length)) {
 		new_muse = le32_to_cpu(m->bytes_in_use) -
