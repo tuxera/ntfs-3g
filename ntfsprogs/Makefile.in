@@ -155,8 +155,8 @@ dumplog_LDADD = $(AM_LIBS)
 dumplog_LDFLAGS = $(AM_LFLAGS)
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = ../config.h
-CONFIG_CLEAN_FILES =  mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
-ntfsundelete.8 ntfsresize.8 ntfsprogs.8
+CONFIG_CLEAN_FILES =  mkntfs.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 \
+ntfsprogs.8 ntfsresize.8 ntfsundelete.8
 bin_PROGRAMS =  ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT)
 sbin_PROGRAMS =  mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT)
@@ -219,7 +219,8 @@ MANS = $(man_MANS)
 
 NROFF = nroff
 DIST_COMMON =  Makefile.am Makefile.in mkntfs.8.in ntfsfix.8.in \
-ntfsinfo.8.in ntfslabel.8.in ntfsresize.8.in ntfsundelete.8.in ntfsprogs.8.in
+ntfsinfo.8.in ntfslabel.8.in ntfsprogs.8.in ntfsresize.8.in \
+ntfsundelete.8.in
 
 
 DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
@@ -247,15 +248,15 @@ mkntfs.8: $(top_builddir)/config.status mkntfs.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 ntfsfix.8: $(top_builddir)/config.status ntfsfix.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
-ntfslabel.8: $(top_builddir)/config.status ntfslabel.8.in
-	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 ntfsinfo.8: $(top_builddir)/config.status ntfsinfo.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
-ntfsundelete.8: $(top_builddir)/config.status ntfsundelete.8.in
+ntfslabel.8: $(top_builddir)/config.status ntfslabel.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 ntfsprogs.8: $(top_builddir)/config.status ntfsprogs.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 ntfsresize.8: $(top_builddir)/config.status ntfsresize.8.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+ntfsundelete.8: $(top_builddir)/config.status ntfsundelete.8.in
 	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
 
 mostlyclean-binPROGRAMS:
