@@ -2,6 +2,12 @@
 * HIGH priority *
 *****************
 
+- write attribute resize function (see mkntfs) and implement ntfs_truncate*
+
+- write ntfs_cluster_{allocate,free} (see ntfs 2.4 driver in CVS)
+
+- write ntfs_mft_record_{allocate,free} (see ntfs 2.4 driver in CVS)
+
 - add read of compressed attributes
 
 *******************
@@ -13,14 +19,8 @@
 
 - add write of compressed attributes
 
-- write attribute resize function (see mkntfs) and implement ntfs_truncate*
-
-- write ntfs_cluster(s)_{allocate,free} (see ntfs 2.4 driver in CVS)
-
 - extend ntfs_attr_pwrite to cope with extending the attribute size and with
   instantiating holes
-
-- write ntfs_mft_record_{allocate,free} (see ntfs 2.4 driver in CVS)
 
 - write ntfs_attr_{rm,create,add}()
 
