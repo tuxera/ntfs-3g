@@ -402,6 +402,8 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		le16_to_cpu(attr->value_offset));
 
 	printf("Dumping attribute $STANDARD_INFORMATION (0x10)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* let's start with mandatory? fields */
 
@@ -454,10 +456,14 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 /**
  * ntfs_dump_attr_list()
  */
-static void ntfs_dump_attr_list(ATTR_RECORD *attr)
+static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 {
-	printf("Dumping attribute AT_ATTRIBUTE_LIST (0x20)\n");
+	ATTR_LIST_ENTRY *entry;
+	u8 *value;
+	s64 l;
 
+	printf("Dumping attribute AT_ATTRIBUTE_LIST (0x20)\n");
+	
 	/* Dump list's name */
 	if (attr->name_length) {
 		char *stream_name = NULL;
@@ -474,6 +480,8 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr)
 	} else {
 		printf("\tList name:\t\t unnamed\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* Dump list's size */
 	if (attr->non_resident) {
@@ -488,6 +496,59 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr)
 		printf("\tList's size:\t\t %u bytes\n",
 			(unsigned int)le32_to_cpu(attr->value_length));
 	}
+	
+	if (!opts.verbose)
+		return;
+	
+	l = ntfs_get_attribute_value_length(attr);
+	if (!l) {
+		perror("ntfs_get_attribute_value_length failed");
+		return;
+	}
+	value = malloc(l);
+	if (!value) {
+		perror("malloc failed");
+		return;
+	}
+	l = ntfs_get_attribute_value(vol, attr, value);
+	if (!l) {
+		perror("ntfs_get_attribute_value failed");
+		free(value);
+		return;
+	}
+	printf("\tDumping attribute list:");
+	entry = (ATTR_LIST_ENTRY *) value;
+	for(;(u8 *)entry < (u8 *) value + l; entry = (ATTR_LIST_ENTRY *)
+				((u8 *) entry + le16_to_cpu(entry->length))) {
+		printf("\n");
+		printf("\t\tAtrribute type:\t0x%X\n", le32_to_cpu(entry->type));
+		printf("\t\tRecord length:\t%u\n",
+				le16_to_cpu(entry->length));
+		printf("\t\tName length:\t%u\n", entry->name_length);
+		printf("\t\tName offset:\t%u\n", entry->name_offset);
+		printf("\t\tStarting VCN:\t%lld\n",
+				sle64_to_cpu(entry->lowest_vcn));
+		printf("\t\tMFT reference:\t%lld\n",
+				MREF_LE(entry->mft_reference));
+		printf("\t\tInstance:\t%u\n", le16_to_cpu(entry->instance));
+		printf("\t\tName:\t\t");
+		if (entry->name_length) {
+			char *name = NULL;
+			int name_size;
+
+			name_size = ntfs_ucstombs(entry->name,
+					entry->name_length, &name, 0);
+
+			if (name_size > 0) {
+				printf("%s\n", name);
+				free(name);
+			} else
+				perror("ntfs_ucstombs failed");
+		} else
+			printf("unnamed\n");
+	}
+	free(value);
+	printf("\tEnd of attribute list reached.\n");
 }
 
 /**
@@ -526,6 +587,8 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 	} else {
 		printf("\tFile Name:\t\t unnamed?!?\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 	
 	/* other basic stuff about the file */
 	printf("\tAllocated File Size:\t %lld\n",
@@ -566,6 +629,8 @@ static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 			le16_to_cpu(attr->value_offset));
 
 	printf("Dumping attribute $OBJECT_ID (0x40)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	if (vol->major_ver >= 3.0) {
 		u32 value_length;
@@ -673,6 +738,8 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	char *sid;
 	
 	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	if (attr->non_resident) {
 		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
@@ -752,6 +819,8 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 	ntfschar *ucs_vol_name = NULL;
 
 	printf("Dumping attribute $VOLUME_NAME (0x60)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	if (attr->value_length>0) {
 		char *mbs_vol_name = NULL;
@@ -792,6 +861,8 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 		le16_to_cpu(attr->value_offset));
 
 	printf("Dumping attribute $VOLUME_INFORMATION (0x70)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	printf("\tVolume Version:\t %d.%d\n", vol_information->major_ver,
 		vol_information->minor_ver);
@@ -845,6 +916,8 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 	} else {
 		printf("\tStream name:\t\t unnamed\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* TODO: parse the flags */
 	printf("\tFlags:\t\t\t 0x%04hx\n",le16_to_cpu(attr->flags));
@@ -997,6 +1070,8 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* attr_type dumping */
 	printf("\tIndexed Attr Type:\t ");
@@ -1212,6 +1287,8 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* dump index's size */
 	if (attr->non_resident) {
@@ -1253,6 +1330,8 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 	} else {
 		printf("\tBitmap name:\t\t unnamed\n");
 	}
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* dump bitmap size */
 	if (attr->non_resident) {
@@ -1502,7 +1581,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_standard_information(ctx->attr);
 			break;
 		case AT_ATTRIBUTE_LIST:
-			ntfs_dump_attr_list(ctx->attr);
+			ntfs_dump_attr_list(ctx->attr, inode->vol);
 			break;
 		case AT_FILE_NAME:
 			ntfs_dump_attr_file_name(ctx->attr);
