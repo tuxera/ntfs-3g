@@ -885,32 +885,39 @@ mpa_err:
 		goto err_out;
 	}
 	/* Setup not mapped runlist element if this is the base extent. */
-	if (deltaxcn && !attr->lowest_vcn) {
+	if (!attr->lowest_vcn) {
 		VCN max_cluster;
 
 		max_cluster = (sle64_to_cpu(attr->allocated_size) +
 				vol->cluster_size - 1) >>
 				vol->cluster_size_bits;
 		/*
-		 * If there is a difference between the highest_vcn and the
-		 * highest cluster, the runlist is either corrupt or, more
-		 * likely, there are more extents following this one.
+		 * A highest_vcn of zero means this is a single extent
+		 * attribute so simply terminate the runlist with LCN_ENOENT).
 		 */
-		if (deltaxcn < --max_cluster) {
-			Dprintf("More extents to follow; deltaxcn = 0x%llx, "
-					"max_cluster = 0x%llx\n",
-					(long long)deltaxcn,
-					(long long)max_cluster);
-			rl[rlpos].vcn = vcn;
-			vcn += rl[rlpos].length = max_cluster - deltaxcn;
-			rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
-			rlpos++;
-		} else if (deltaxcn > max_cluster) {
-			Dprintf("Corrupt attribute. deltaxcn = 0x%llx, "
-					"max_cluster = 0x%llx",
-					(long long)deltaxcn,
-					(long long)max_cluster);
-			goto mpa_err;
+		if (deltaxcn) {
+			/*
+			 * If there is a difference between the highest_vcn and
+			 * the highest cluster, the runlist is either corrupt
+			 * or, more likely, there are more extents following
+			 * this one.
+			 */
+			if (deltaxcn < max_cluster) {
+				Dprintf("More extents to follow; deltaxcn = 0x%llx, "
+						"max_cluster = 0x%llx\n",
+						(long long)deltaxcn,
+						(long long)max_cluster);
+				rl[rlpos].vcn = vcn;
+				vcn += rl[rlpos].length = max_cluster - deltaxcn;
+				rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
+				rlpos++;
+			} else if (deltaxcn > max_cluster) {
+				Dprintf("Corrupt attribute. deltaxcn = 0x%llx, "
+						"max_cluster = 0x%llx",
+						(long long)deltaxcn,
+						(long long)max_cluster);
+				goto mpa_err;
+			}
 		}
 		rl[rlpos].lcn = (LCN)LCN_ENOENT;
 	} else /* Not the base extent. There may be more extents to follow. */
