@@ -129,6 +129,8 @@ static void version(void)
 	printf("Copyright (c) 2003 Lode Leroy\n");
 	printf("Copyright (c) 2003 Anton Altaparmakov\n");
 	printf("Copyright (c) 2003 Richard Russon\n");
+	printf("Copyright (c) 2004 Carmelo Kintana\n");
+	printf("Copyright (c) 2004 Giang Nguyen\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -159,6 +161,9 @@ static void usage(void)
 		"    -x         --dos            Use short (DOS 8.3) names\n"
 		"\n",
 		EXEC_NAME);
+
+	printf("NOTE: If neither -a nor -s is specified, the program defaults to -a.\n\n");
+
 	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
@@ -254,6 +259,10 @@ static int parse_options(int argc, char *argv[])
 			break;
 		}
 	}
+
+	/* defaults to -a if -s is not specified */
+	if (!opts.system)
+	        opts.all++;
 
 	if (help || ver)
 		opts.quiet = 0;
