@@ -398,12 +398,12 @@ s64 ntfs_device_size_get(int f, int block_size)
 	 * so do binary search to find the size of the device.
 	 */
 	low = 0LL;
-	for (high = 1024LL; ntfs_device_offset_valid(f, high); high <<= 1)
+	for (high = 1024LL; !ntfs_device_offset_valid(f, high); high <<= 1)
 		low = high;
 	while (low < high - 1LL) {
 		const s64 mid = (low + high) / 2;
 
-		if (ntfs_device_offset_valid(f, mid))
+		if (!ntfs_device_offset_valid(f, mid))
 			low = mid;
 		else
 			high = mid;
