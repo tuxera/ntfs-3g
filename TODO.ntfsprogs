@@ -14,6 +14,11 @@ Thanks,
   and the subsequent chkdsk (which will happen on reboot into Windows
   automatically) recreates the backup boot sector if the Linux kernel lied to
   us about the number of sectors.
+- Got a report that creating a floppy with mkntfs failed.  Difference between
+  this floppy and the floppy created by the special tool found on the net was
+  said to be that the bitmap is 256kib on the special floppy while mkntfs will
+  make it much smaller.  Need to verify this and experiment with the bitmap
+  size to make it work.  Note, reporter was using win2k.
 
 
 
