@@ -50,8 +50,7 @@
 IRCCHANNEL=irc.freenode.net/ntfs
 
 # The email address where we send the commit messages.
-#COMMITADDRESS=commits@picogui.org
-COMMITADDRESS=leonard.norrgard@pp.inet.fi
+COMMITADDRESS=commits@picogui.org
 
 #
 # --- end config section ---
