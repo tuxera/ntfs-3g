@@ -260,7 +260,8 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 		if (!opts.inode)
 			printf("%s\n", filename);
 		else
-			printf("%7lld %s\n", MREF(mref), filename);
+			printf("%7llu %s\n", (unsigned long long)MREF(mref),
+					filename);
 		result = 0;
 	} else {
 		s64 filesize = 0;
@@ -304,10 +305,13 @@ int list_entry(ntfsls_dirent *dirent, const uchar_t *name,
 		}
 
 		if (opts.inode)
-			printf("%7lld    %8lld %s %s\n", MREF(mref), filesize,
-					t_buf + 4, filename);
+			printf("%7llu    %8lld %s %s\n",
+					(unsigned long long)MREF(mref),
+					(long long)filesize, t_buf + 4,
+					filename);
 		else
-			printf("%8lld %s %s\n", filesize, t_buf + 4, filename);
+			printf("%8lld %s %s\n", (long long)filesize, t_buf + 4,
+					filename);
 
 		result = 0;
 release:

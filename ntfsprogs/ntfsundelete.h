@@ -50,10 +50,10 @@ struct options {
 	int		 verbose;	/* Extra output */
 	int		 force;		/* Override common sense */
 	time_t		 since;		/* Since this time */
-	long long	 size_begin;	/* Range for file size */
-	long long	 size_end;
-	long long	 mft_begin;	/* Range for mft copy */
-	long long	 mft_end;
+	s64		 size_begin;	/* Range for file size */
+	s64		 size_end;
+	s64		 mft_begin;	/* Range for mft copy */
+	s64		 mft_end;
 };
 
 struct filename {

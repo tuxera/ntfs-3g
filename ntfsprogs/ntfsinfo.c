@@ -254,27 +254,31 @@ void ntfs_dump_volume(ntfs_volume *vol)
     printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
     printf("\tSector Size: %hu\n", vol->sector_size);
     printf("\tCluster Size: %u\n", vol->cluster_size);
-    printf("\tVolume Size in Clusters: %lld\n", vol->nr_clusters);
-    
+    printf("\tVolume Size in Clusters: %lld\n", (long long)vol->nr_clusters);
     
     printf("MFT Information \n");
     printf("\tMFT Record Size: %u\n", vol->mft_record_size);
     printf("\tMFT Zone Multiplier: %u\n", vol->mft_zone_multiplier);
-    printf("\tMFT Data Position: %lld\n", vol->mft_data_pos);
-    printf("\tMFT Zone Start: %lld\n", vol->mft_zone_start);
-    printf("\tMFT Zone End: %lld\n", vol->mft_zone_end);
-    printf("\tMFT Zone Position: %lld\n", vol->mft_zone_pos);
-    printf("\tCurrent Position in First Data Zone: %lld\n", vol->data1_zone_pos);
-    printf("\tCurrent Position in Second Data Zone: %lld\n", vol->data2_zone_pos);
-    printf("\tNumber of Records in MFT: %lld\n", vol->nr_mft_records);
-    printf("\tLCN of Data Attribute for FILE_MFT: %lld\n", vol->mft_lcn);
+    printf("\tMFT Data Position: %lld\n", (long long)vol->mft_data_pos);
+    printf("\tMFT Zone Start: %lld\n", (long long)vol->mft_zone_start);
+    printf("\tMFT Zone End: %lld\n", (long long)vol->mft_zone_end);
+    printf("\tMFT Zone Position: %lld\n", (long long)vol->mft_zone_pos);
+    printf("\tCurrent Position in First Data Zone: %lld\n",
+		    (long long)vol->data1_zone_pos);
+    printf("\tCurrent Position in Second Data Zone: %lld\n",
+		    (long long)vol->data2_zone_pos);
+    printf("\tNumber of Records in MFT: %lld\n",
+		    (long long)vol->nr_mft_records);
+    printf("\tLCN of Data Attribute for FILE_MFT: %lld\n",
+		    (long long)vol->mft_lcn);
     printf("\tFILE_MFTMirr Size: %d\n", vol->mftmirr_size);
-    printf("\tLCN of Data Attribute for File_MFTMirr: %lld\n", vol->mftmirr_lcn);
+    printf("\tLCN of Data Attribute for File_MFTMirr: %lld\n",
+		    (long long)vol->mftmirr_lcn);
     printf("\tSize of Attribute Definition Table: %d\n", vol->attrdef_len);
    
-
     printf("FILE_Bitmap Information \n");
-    printf("\tFILE_Bitmap MFT Record Number: %lld\n", vol->lcnbmp_ni->mft_no);
+    printf("\tFILE_Bitmap MFT Record Number: %llu\n",
+		    (unsigned long long)vol->lcnbmp_ni->mft_no);
     printf("\tState of FILE_Bitmap Inode: %lu\n", vol->lcnbmp_ni->state);
     printf("\tLength of Attribute List: %u\n", vol->lcnbmp_ni->attr_list_size);
     printf("\tAttribute List: %s\n", vol->lcnbmp_ni->attr_list);
@@ -284,25 +288,29 @@ void ntfs_dump_volume(ntfs_volume *vol)
     
     printf("FILE_Bitmap Data Attribute Information\n");
     printf("\tDecompressed Runlist: not done yet\n");
-    printf("\tBase Inode: %lld\n", vol->lcnbmp_na->ni->mft_no);
+    printf("\tBase Inode: %llu\n",
+		    (unsigned long long)vol->lcnbmp_na->ni->mft_no);
     printf("\tAttribute Types: not done yet\n");
     //printf("\tAttribute Name: %s\n", vol->lcnbmp_na->name);
     printf("\tAttribute Name Length: %u\n", vol->lcnbmp_na->name_len);
     printf("\tAttribute State: %lu\n", vol->lcnbmp_na->state);
-    printf("\tAttribute Allocated Size: %lld\n", vol->lcnbmp_na->allocated_size);
-    printf("\tAttribute Data Size: %lld\n", vol->lcnbmp_na->data_size);
-    printf("\tAttribute Initialized Size: %lld\n", vol->lcnbmp_na->initialized_size);
-    printf("\tAttribute Compressed Size: %lld\n", vol->lcnbmp_na->compressed_size);
-    printf("\tCompression Block Size: %u\n", vol->lcnbmp_na->compression_block_size);
-    printf("\tCompression Block Size Bits: %u\n", vol->lcnbmp_na->compression_block_size_bits);
-    printf("\tCompression Block Clusters: %u\n", vol->lcnbmp_na->compression_block_clusters);
-
+    printf("\tAttribute Allocated Size: %lld\n",
+		    (long long)vol->lcnbmp_na->allocated_size);
+    printf("\tAttribute Data Size: %lld\n",
+		    (long long)vol->lcnbmp_na->data_size);
+    printf("\tAttribute Initialized Size: %lld\n",
+		    (long long)vol->lcnbmp_na->initialized_size);
+    printf("\tAttribute Compressed Size: %lld\n",
+		    (long long)vol->lcnbmp_na->compressed_size);
+    printf("\tCompression Block Size: %u\n",
+		    vol->lcnbmp_na->compression_block_size);
+    printf("\tCompression Block Size Bits: %u\n",
+		    vol->lcnbmp_na->compression_block_size_bits);
+    printf("\tCompression Block Clusters: %u\n",
+		    vol->lcnbmp_na->compression_block_clusters);
 		
     //TODO: Still need to add a few more attributes
-    
 }
-
-
 
 /**
  * ntfs_dump_standard_information
@@ -336,24 +344,24 @@ void ntfs_dump_standard_information_attr(ntfs_inode *inode)
 		      not been upgraded\n");
 	}
 	if (sizeof(STANDARD_INFORMATION) == 72) {
-	    printf("\tMaximum Number of Versions: \t %d \n", le32_to_cpu (standard_attr->maximum_versions));
-	    printf("\tVersion Number: \t\t %d \n", le32_to_cpu (standard_attr->version_number));
-	    printf("\tClass ID: \t\t\t %d \n", le32_to_cpu (standard_attr->class_id));
-	    printf("\tUser ID: \t\t\t %d \n",  le32_to_cpu (standard_attr->owner_id));
-	    printf("\tSecurity ID: \t\t\t %d \n",  le32_to_cpu (standard_attr->security_id));
+	    printf("\tMaximum Number of Versions: \t %u \n",
+			    le32_to_cpu(standard_attr->maximum_versions));
+	    printf("\tVersion Number: \t\t %u \n",
+			    le32_to_cpu(standard_attr->version_number));
+	    printf("\tClass ID: \t\t\t %u \n",
+			    le32_to_cpu(standard_attr->class_id));
+	    printf("\tUser ID: \t\t\t %u \n",
+			    le32_to_cpu (standard_attr->owner_id));
+	    printf("\tSecurity ID: \t\t\t %u \n",
+			    le32_to_cpu(standard_attr->security_id));
+	} else {
+	    printf("\tSize of STANDARD_INFORMATION is %u. It should be either 72 or 48, \
+			something is wrong...\n", sizeof(STANDARD_INFORMATION));
 	}
-
-	else {
-	    printf("\tSize of STANDARD_INFORMATION is %d. It should be either 72 or 48, \
-			something is wrong...\n",sizeof(STANDARD_INFORMATION));
-	}
-
 
 	ntfs_attr_put_search_ctx(ctx); //free ctx
 	
 }
-
-
 
 /**
  * ntfs_dump_file_name_attribute
@@ -385,10 +393,12 @@ do_next:
 	printf("Dumping $FILE_NAME (0x30)\n");
 
 	//basic stuff about the file
-	printf("\tFile Name: \t\t %s\n",file_name);
-	printf("\tFile Name Length: \t %d\n",file_name_attr->file_name_length);
-	printf("\tAllocated File Size: \t %lld\n", sle64_to_cpu(file_name_attr->allocated_size));
-	printf("\tReal File Size: \t %lld\n", sle64_to_cpu(file_name_attr->data_size));
+	printf("\tFile Name: \t\t %s\n", file_name);
+	printf("\tFile Name Length: \t %d\n", file_name_attr->file_name_length);
+	printf("\tAllocated File Size: \t %lld\n",
+			(long long)sle64_to_cpu(file_name_attr->allocated_size));
+	printf("\tReal File Size: \t %lld\n",
+			(long long)sle64_to_cpu(file_name_attr->data_size));
 
 	//time conversion stuff
 	if (!opts.notime) {

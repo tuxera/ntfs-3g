@@ -511,9 +511,11 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 	int i;
 
 	l = sle64_to_cpu(a->lowest_vcn);
-	printf("Lowest VCN = %lli (0x%llx)\n", l, l);
+	printf("Lowest VCN = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	l = sle64_to_cpu(a->highest_vcn);
-	printf("Highest VCN = %lli (0x%llx)\n", l, l);
+	printf("Highest VCN = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	printf("Mapping pairs array offset = 0x%x\n",
 			le16_to_cpu(a->mapping_pairs_offset));
 	printf("Compression unit = 0x%x: %sCOMPRESSED\n", a->compression_unit,
@@ -522,14 +524,18 @@ void dump_non_resident_attr(ATTR_RECORD *a)
 		printf("Attribute is not the first extent. The following "
 				"sizes are meaningless:\n");
 	l = sle64_to_cpu(a->allocated_size);
-	printf("Allocated size = %lli (0x%llx)\n", l, l);
+	printf("Allocated size = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	l = sle64_to_cpu(a->data_size);
-	printf("Data size = %lli (0x%llx)\n", l, l);
+	printf("Data size = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	l = sle64_to_cpu(a->initialized_size);
-	printf("Initialized size = %lli (0x%llx)\n", l, l);
+	printf("Initialized size = %lli (0x%llx)\n", (long long)l,
+			(unsigned long long)l);
 	if (a->flags & ATTR_COMPRESSION_MASK) {
 		l = sle64_to_cpu(a->compressed_size);
-		printf("Compressed size = %lli (0x%llx)\n", l, l);
+		printf("Compressed size = %lli (0x%llx)\n", (long long)l,
+				(unsigned long long)l);
 	}
 	i = le16_to_cpu(a->mapping_pairs_offset);
 	dump_mapping_pairs_array((char*)a + i, le32_to_cpu(a->length) - i);
@@ -545,7 +551,7 @@ void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	int i;
 
 	printf("-- Beginning dump of attribute record at offset 0x%x. --\n",
-			(u8*)a - (u8*)m);
+			(unsigned)((u8*)a - (u8*)m));
 	if (a->type == AT_END) {
 		printf("Attribute type = 0x%x ($END)\n", le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
@@ -648,7 +654,8 @@ void dump_mft_record(MFT_RECORD *m)
 	u = le16_to_cpu(m->usa_ofs);
 	printf("Update sequence array offset = %u (0x%x)\n", u, u);
 	printf("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
-	printf("$LogFile sequence number (lsn) = %llu\n", le64_to_cpu(m->lsn));
+	printf("$LogFile sequence number (lsn) = %llu\n",
+			(unsigned long long)le64_to_cpu(m->lsn));
 	printf("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
 	printf("Reference (hard link) count = %u\n",
 						le16_to_cpu(m->link_count));
@@ -668,7 +675,8 @@ void dump_mft_record(MFT_RECORD *m)
 	printf("Bytes allocated = %u (0x%x)\n", u, u);
 	r = le64_to_cpu(m->base_mft_record);
 	printf("Base mft record reference:\n\tMft record number = %llu\n\t"
-			"Sequence number = %u\n", MREF(r), MSEQNO(r));
+			"Sequence number = %u\n",
+			(unsigned long long)MREF(r), MSEQNO(r));
 	printf("Next attribute instance = %u\n",
 			le16_to_cpu(m->next_attr_instance));
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
