@@ -25,21 +25,52 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
 #ifdef HAVE_STDIO_H
 #	include <stdio.h>
 #endif
-
-struct _runlist_element;
-
-#ifdef DEBUG
-
 #ifdef HAVE_STDARG_H
 #	include <stdarg.h>
 #endif
 #include <errno.h>
 
-/* Debug output to stderr. To get it run ./configure --enable-debug. */
+#include "types.h"
+
+struct _runlist_element;
+
+/**
+ * Sprintf - silencable output to stderr
+ * @silent:	if false string is output to stderr
+ * @fmt:	printf style format string
+ * @...:	optional arguments for the printf style format string
+ *
+ * If @silent is false, output the string @fmt to stderror.
+ *
+ * This is basically a replacelment for:
+ *
+ *	if (!silent)
+ *		fprintf(stderr, fmt, ...);
+ *
+ * It is more convenient to use Sprintf instead of the above code and perhaps
+ * more importantly, Sprintf makes it much easier to turn it into a "do
+ * nothing" function with an #ifdef, thus removing the whole output completely.
+ */
+static __inline__ void Sprintf(const BOOL silent, const char *fmt, ...)
+{
+	int eo;
+	va_list ap;
+
+	if (silent)
+		return;
+	eo = errno;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	errno = eo;
+}
+
+#ifdef DEBUG
+
+/* Debug output to stderr.  To get it run ./configure --enable-debug. */
 
 static __inline__ void Dprintf(const char *fmt, ...)
 {
@@ -86,4 +117,3 @@ static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl
 }
 
 #endif /* defined _NTFS_DEBUG_H */
-
