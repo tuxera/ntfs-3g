@@ -958,8 +958,12 @@ retry:
 		Dprintf("%s(): Writing 0x%Lx bytes to vcn 0x%Lx, lcn 0x%Lx, "
 				"ofs 0x%Lx.\n", __FUNCTION__, to_write,
 				rl->vcn, rl->lcn, ofs);
-		written = ntfs_pwrite(f, (rl->lcn << vol->cluster_size_bits) +
-				ofs, to_write, b);
+		if (!NVolReadOnly(vol))
+			written = ntfs_pwrite(f, (rl->lcn <<
+					vol->cluster_size_bits) + ofs,
+					to_write, b);
+		else
+			written = to_write;
 		/* If everything ok, update progress counters and continue. */
 		if (written > 0) {
 			total += written;

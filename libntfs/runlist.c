@@ -1072,8 +1072,12 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		written = ntfs_pwrite(f, (rl->lcn << vol->cluster_size_bits) +
-				ofs, to_write, b);
+		if (!NVolReadOnly(vol))
+			written = ntfs_pwrite(f, (rl->lcn <<
+					vol->cluster_size_bits) + ofs,
+					to_write, b);
+		else
+			written = to_write;
 		/* If everything ok, update progress counters and continue. */
 		if (written > 0) {
 			total += written;

@@ -320,8 +320,11 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		errno = ESPIPE;
 		return -1;
 	}
-	bw = ntfs_pwrite(vol->fd, lcn << vol->cluster_size_bits,
-			count << vol->cluster_size_bits, b);
+	if (!NVolReadOnly(vol))
+		bw = ntfs_pwrite(vol->fd, lcn << vol->cluster_size_bits,
+				count << vol->cluster_size_bits, b);
+	else
+		bw = count << vol->cluster_size_bits;
 	if (bw < 0) {
 		Dperror("Error writing cluster(s)");
 		return bw;
