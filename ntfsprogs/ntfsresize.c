@@ -192,7 +192,7 @@ void usage()
 		"    -n      --no-action  Do not write to disk\n"
 		"    -f      --force      Force to progress (DANGEROUS)\n"
 	/*	"    -q      --quiet      Less output\n"*/
-		"    -v      --verbose    More output\n"
+	/*	"    -v      --verbose    More output\n"*/
 		"    -V      --version    Display version information\n"
 		"    -h      --help       Display this help\n"
 #ifdef DEBUG
@@ -238,8 +238,7 @@ void proceed_question(void)
  */
 void version (void)
 {
-	printf ("\n%s v%s - Resize an NTFS Volume, without data loss.\n\n",
-		EXEC_NAME, VERSION);
+	printf ("\nResize an NTFS Volume, without data loss.\n\n");
 	printf ("Copyright (c)\n");
 	printf ("    2002-2003 Szabolcs Szakacsits\n");
 	printf ("    2002-2003 Anton Altaparmakov\n");
@@ -319,7 +318,7 @@ int parse_options(int argc, char **argv)
 		{ "no-action",	no_argument,		NULL, 'n' },
 	/*	{ "quiet",	no_argument,		NULL, 'q' },*/
 		{ "size",	required_argument,	NULL, 's' },
-		{ "verbose",	no_argument,		NULL, 'v' },
+	/*	{ "verbose",	no_argument,		NULL, 'v' },*/
 		{ "version",	no_argument,		NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -1043,7 +1042,13 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
  */
 int write_mft_record(ntfs_attr_search_ctx *ctx)
 {
-	return ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec);
+	if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no, ctx->mrec))
+		perr_exit("ntfs_mft_record_write");
+
+	if (fdatasync(vol->fd) == -1)
+		perr_exit("Failed to sync device");
+
+	return 0;
 }
 
 /**
@@ -1247,10 +1252,16 @@ void prepare_volume_fixup()
 	if (ntfs_volume_set_flags(vol, flags))
 		perr_exit("Failed to set $Volume dirty");
 
+	if (fdatasync(vol->fd) == -1)
+		perr_exit("Failed to sync device");
+
 	printf("Resetting $LogFile ... (this might take a while)\n");
 
 	if (ntfs_logfile_reset(vol))
 		perr_exit("Failed to reset $LogFile");
+
+	if (fdatasync(vol->fd) == -1)
+		perr_exit("Failed to sync device");
 }
 
 /**
@@ -1264,6 +1275,8 @@ int main(int argc, char **argv)
 	s64 new_size = 0;	/* in clusters */
 	s64 device_size;        /* in bytes */
 	int i;
+
+	printf("%s v%s\n", EXEC_NAME, VERSION);
 
 	if (!parse_options (argc, argv))
 		return 1;
