@@ -454,7 +454,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 {
 	s64 high, low;
 #ifdef BLKGETSIZE
-	long size;
+	unsigned long size;
 
 	if (dev->d_ops->ioctl(dev, BLKGETSIZE, &size) >= 0) {
 		Dprintf("BLKGETSIZE nr 512 byte blocks = %ld (0x%ld)\n", size,
