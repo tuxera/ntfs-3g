@@ -1555,9 +1555,13 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	if (name_len) {
 		i = (name_len + 1) * sizeof(ntfschar);
 		uname = (ntfschar*)calloc(1, i);
+		if (!uname)
+			return -errno;
 		name_len = stoucs(uname, name, i);
-		if (name_len > 0xff)
+		if (name_len > 0xff) {
+			free(uname);
 			return -ENAMETOOLONG;
+		}
 	} else
 		uname = AT_UNNAMED;
 	/* Check if the attribute is already there. */
@@ -2084,11 +2088,15 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		Eprintf("Failed to allocate attribute search context.\n");
+		if (uname)
+			free(uname);
 		return -ENOMEM;
 	}
 	if (ic == IGNORE_CASE) {
 		Eprintf("FIXME: Hit unimplemented code path #4.\n");
 		err = -ENOTSUP;
+		if (uname)
+			free(uname);
 		goto err_out;
 	}
 	err = ntfs_attr_lookup(AT_INDEX_ROOT, uname, name_len, ic, 0, NULL, 0,
