@@ -67,10 +67,10 @@ extern int ntfs_get_nr_significant_bytes(const s64 n);
 extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		const runlist_element *rl, const VCN start_vcn);
 
-extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
+extern int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
 		const s64 n);
 
-extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
+extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 		const int dst_len, const runlist_element *rl,
 		const VCN start_vcn, VCN *const stop_vcn);
 

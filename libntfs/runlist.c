@@ -1334,7 +1334,7 @@ err_out:
  * Return the number of bytes written on success. On error, i.e. the
  * destination buffer @dst is too small, return -1 with errno set ENOSPC.
  */
-__inline__ int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
+__inline__ int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
 		const s64 n)
 {
 	s64 l = n;
@@ -1399,12 +1399,12 @@ err_out:
  *	EIO	- The runlist is corrupt.
  *	ENOSPC	- The destination buffer is too small.
  */
-int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
+int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 		const int dst_len, const runlist_element *rl,
 		const VCN start_vcn, VCN *const stop_vcn)
 {
 	LCN prev_lcn;
-	s8 *dst_max, *dst_next;
+	u8 *dst_max, *dst_next;
 	s8 len_len, lcn_len;
 
 	if (start_vcn < 0)
