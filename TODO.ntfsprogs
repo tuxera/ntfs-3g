@@ -67,8 +67,10 @@ Low priority
 * ntfsundelete *
 ****************
 
+- undelete by name rather than inode number
 - support for compressed files
 - support for internationalisation
 - recover by type?
-
+- display parent directory
+- name "<none>" to MFTn
 
