@@ -13,7 +13,7 @@
  * adapted from e2fsprogs-1.19 and lib/ext2fs/ismounted.c and misc/mke2fs.c in
  * particular.
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
  * If anyone using a non-little endian and/or an aligned access only CPU tries
  * this program please let me know whether it works or not!
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  */
 
 #include "config.h"
@@ -839,11 +839,11 @@ void format_mft_record(MFT_RECORD *m)
  *
  * Return 0 on success or -errno on error. Possible error codes are:
  *
- * 	-ENOSPC		There is not enough space available to complete
- * 			operation. The caller has to make space before calling
- * 			this.
- * 	-EINVAL		Can only occur if mkntfs was compiled with -DEBUG. Means
- * 			the input parameters were faulty.
+ *	-ENOSPC		There is not enough space available to complete
+ *			operation. The caller has to make space before calling
+ *			this.
+ *	-EINVAL		Can only occur if mkntfs was compiled with -DEBUG. Means
+ *			the input parameters were faulty.
  */
 int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 {
@@ -1116,14 +1116,14 @@ int insert_positioned_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	if (err == -ENOSPC) {
 		// FIXME: Make space! (AIA)
 		// can we make it non-resident? if yes, do that.
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m's $DATA or $BITMAP+$INDEX_ALLOCATION resident?
 		// yes -> make non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// make all attributes non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
-		// 	does the new attribute fit in there? yes -> do it.
+		//	does the new attribute fit in there? yes -> do it.
 		// split up run_list into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
@@ -1299,14 +1299,14 @@ int insert_non_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	if (err == -ENOSPC) {
 		// FIXME: Make space! (AIA)
 		// can we make it non-resident? if yes, do that.
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m's $DATA or $BITMAP+$INDEX_ALLOCATION resident?
 		// yes -> make non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// make all attributes non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
-		// 	does the new attribute fit in there? yes -> do it.
+		//	does the new attribute fit in there? yes -> do it.
 		// split up run_list into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
@@ -1437,14 +1437,14 @@ int insert_resident_attr_in_mft_record(MFT_RECORD *m, const ATTR_TYPES type,
 	if (err == -ENOSPC) {
 		// FIXME: Make space! (AIA)
 		// can we make it non-resident? if yes, do that.
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m's $DATA or $BITMAP+$INDEX_ALLOCATION resident?
 		// yes -> make non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// make all attributes non-resident
-		// 	does it fit now? yes -> do it.
+		//	does it fit now? yes -> do it.
 		// m is a base record? yes -> allocate extension record
-		// 	does the new attribute fit in there? yes -> do it.
+		//	does the new attribute fit in there? yes -> do it.
 		// split up run_list into extents and place each in an extension
 		// record.
 		// FIXME: the check for needing extension records should be
@@ -2547,14 +2547,14 @@ int main(int argc, char **argv)
 	/* Parse command line options. */
 	parse_options(argc, argv);
 	/* Verify we are dealing with a block device. */
-        if (stat(vol->dev_name, &sbuf) == -1) {
+	if (stat(vol->dev_name, &sbuf) == -1) {
 		if (errno == ENOENT)
 			err_exit("The device doesn't exist; did you specify "
 					"it correctly?\n");
 		err_exit("Error getting information about %s: %s\n",
 				vol->dev_name, strerror(errno));
 	}
-        if (!S_ISBLK(sbuf.st_mode)) {
+	if (!S_ISBLK(sbuf.st_mode)) {
 		Eprintf("%s is not a block device.\n", vol->dev_name);
 		if (!opt.force)
 			err_exit("Refusing to make a filesystem here!\n");

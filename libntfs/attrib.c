@@ -83,7 +83,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 			return 0;
 		}
 		memcpy(b, (char*)a + le16_to_cpu(a->value_offset),
-			  		le32_to_cpu(a->value_length));
+					le32_to_cpu(a->value_length));
 		errno = 0;
 		return (s64)le32_to_cpu(a->value_length);
 	} else {			/* Attribute is not resident. */
@@ -122,12 +122,12 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 				 * going to overflow when executing the
 				 * ntfs_pread() which is BAAAAAAAD!
 				 * Temporary fix:
-				 * 	Allocate a new buffer with size:
-				 * 	rl[i].length << vol->cluster_size_bits,
-				 * 	do the read into our buffer, then
-				 * 	memcpy the correct amount of data into
-				 * 	the caller supplied buffer, free our
-				 * 	buffer, and continue.
+				 *	Allocate a new buffer with size:
+				 *	rl[i].length << vol->cluster_size_bits,
+				 *	do the read into our buffer, then
+				 *	memcpy the correct amount of data into
+				 *	the caller supplied buffer, free our
+				 *	buffer, and continue.
 				 */
 				intbuf = malloc(rl[i].length <<
 							vol->cluster_size_bits);
@@ -167,7 +167,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 							"out of input data.\n");
 						errno = EIO;
 					} else {
-			                        fprintf(stderr, ESTR ": "
+						fprintf(stderr, ESTR ": "
 							   "unknown error\n");
 						errno = EIO;
 					}
@@ -206,7 +206,7 @@ s64 get_attribute_value(const ntfs_volume *vol, const MFT_RECORD *m,
 							"out of input data.\n");
 						errno = EIO;
 					} else {
-			                        fprintf(stderr, ESTR ": "
+						fprintf(stderr, ESTR ": "
 							   "unknown error\n");
 						errno = EIO;
 					}
@@ -605,7 +605,7 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (NAttrCompressed(na)) {
 		// TODO: Implement reading compressed attributes! (AIA)
 		// return ntfs_attr_pread_compressed(ntfs_attr *na,
-		// 		const s64 pos, s64 count, void *b);
+		//		const s64 pos, s64 count, void *b);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -782,7 +782,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (NAttrCompressed(na)) {
 		// TODO: Implement writing compressed attributes! (AIA)
 		// return ntfs_attr_pwrite_compressed(ntfs_attr *na,
-		// 		const s64 pos, s64 count, void *b);
+		//		const s64 pos, s64 count, void *b);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -1301,7 +1301,7 @@ static int ntfs_find_attr(const ATTR_TYPES type, const uchar_t *name,
 			}
 			/* If the strings are not equal, continue search. */
 			if (rc)
-	 			continue;
+				continue;
 			rc = ntfs_collate_names(name, name_len,
 					(uchar_t*)((char*)a +
 					le16_to_cpu(a->name_offset)),

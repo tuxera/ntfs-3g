@@ -30,18 +30,18 @@
  * Generic macro to convert pointers to values for comparison purposes.
  */
 #ifndef p2n
-#define p2n(p)          ((ptrdiff_t)((ptrdiff_t*)(p)))
+#define p2n(p)		((ptrdiff_t)((ptrdiff_t*)(p)))
 #endif
 
 /*
  * The classical min and max macros.
  */
 #ifndef min
-#define min(a,b)        ((a) <= (b) ? (a) : (b))
+#define min(a,b)	((a) <= (b) ? (a) : (b))
 #endif
 
 #ifndef max
-#define max(a,b)        ((a) >= (b) ? (a) : (b))
+#define max(a,b)	((a) >= (b) ? (a) : (b))
 #endif
 
 /*

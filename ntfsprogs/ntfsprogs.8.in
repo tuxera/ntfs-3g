@@ -1,7 +1,7 @@
 .\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
 .\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
-.\" 
+.\"
 .TH NTFSPROGS 8 "May 2002" "Linux-NTFS version @VERSION@"
 
 .SH OVERVIEW

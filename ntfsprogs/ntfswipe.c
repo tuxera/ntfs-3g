@@ -107,7 +107,7 @@ void Dprintf (const char *format, ...)
  * Read $Bitmap and wipe any clusters that are marked as not in use.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_unused (ntfs_volume *vol, int byte)
 {
@@ -127,7 +127,7 @@ int wipe_unused (ntfs_volume *vol, int byte)
  * the cluster size, there is some slack space at the end.  Wipe this space.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_tails (ntfs_volume *vol, int byte)
 {
@@ -147,7 +147,7 @@ int wipe_tails (ntfs_volume *vol, int byte)
  * unused space at the end of the record and wipe any unused records.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_mft (ntfs_volume *vol, int byte)
 {
@@ -167,7 +167,7 @@ int wipe_mft (ntfs_volume *vol, int byte)
  * the unused space at the ends of these blocks.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_directory (ntfs_volume *vol, int byte)
 {
@@ -187,7 +187,7 @@ int wipe_directory (ntfs_volume *vol, int byte)
  * volume is in a consistant state, then this information can be erased.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_logfile (ntfs_volume *vol, int byte)
 {
@@ -207,7 +207,7 @@ int wipe_logfile (ntfs_volume *vol, int byte)
  * Windows recreates the file at bootup, so it can be wiped without harm.
  *
  * Return:  1  Success, the clusters were wiped
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int wipe_pagefile (ntfs_volume *vol, int byte)
 {
@@ -224,9 +224,9 @@ int wipe_pagefile (ntfs_volume *vol, int byte)
  *
  * Tell the user how much could be cleaned up.  List the number of free
  * clusters, MFT records, etc.
- * 
+ *
  * Return:  1  Success, displayed some info
- *          0  Error, something went wrong
+ *	    0  Error, something went wrong
  */
 int ntfs_info (ntfs_volume *vol)
 {
@@ -303,7 +303,7 @@ void usage (void)
  * N.B.  If the function fails, @result is not changed.
  *
  * Return:  0  Error, invalid string
- *          n  Success, the count of numbers parsed
+ *	    n  Success, the count of numbers parsed
  */
 int parse_list (const char *list, int **result)
 {
@@ -363,7 +363,7 @@ int parse_list (const char *list, int **result)
  * This function is very long, but quite simple.
  *
  * Return:  1 Success
- *          0 Error, one or more problems
+ *	    0 Error, one or more problems
  */
 int parse_options (int argc, char *argv[])
 {
@@ -545,14 +545,14 @@ int parse_options (int argc, char *argv[])
  * These checks can be overridden by using the force option.
  *
  * Return:  1  Success, we can continue
- *          0  Error, we cannot use this device
+ *	    0  Error, we cannot use this device
  */
 int valid_device (const char *name, int force)
 {
 	unsigned long mnt_flags = 0;
 	struct stat st;
 
-        if (stat (name, &st) == -1) {
+	if (stat (name, &st) == -1) {
 		if (errno == ENOENT) {
 			Eprintf ("The device %s doesn't exist\n", name);
 		} else {
@@ -561,7 +561,7 @@ int valid_device (const char *name, int force)
 		return 0;
 	}
 
-        if (!S_ISBLK (st.st_mode)) {
+	if (!S_ISBLK (st.st_mode)) {
 		Vprintf ("%s is not a block device.\n", name);
 		if (!force) {
 			Eprintf ("Use the force option to work with files.\n");
@@ -640,7 +640,7 @@ void print_summary (void)
  * Start from here.
  *
  * Return:  0  Success, the program worked
- *          1  Error, something went wrong
+ *	    1  Error, something went wrong
  */
 int main (int argc, char *argv[])
 {

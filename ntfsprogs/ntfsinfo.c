@@ -150,10 +150,10 @@ void print_standard_information_attr(ntfs_attr_search_ctx *ctx)
 		standard_information_attr->version_number);
 	printf("Class ID: %d\n",
 		standard_information_attr->class_id);
-        printf("Owner ID: %d\n",
-                standard_information_attr->owner_id);
-        printf("Security ID: %d\n",
-                standard_information_attr->security_id);
+	printf("Owner ID: %d\n",
+		standard_information_attr->owner_id);
+	printf("Security ID: %d\n",
+		standard_information_attr->security_id);
 
 */
 }

@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
-.\" 
+.\"
 .TH NTFSINFO 8 "May 2002" "Linux-NTFS version @VERSION@"
 .SH NAME
 ntfsinfo \- dump a file's attributes
@@ -19,7 +19,7 @@ will dump the attributes of inode
 was written by Matthew J. Fanto (fanto1mj@cmich.edu).
 .SH AVAILABILITY
 .B ntfsinfo
-is part of the linux-ntfs package and is available from 
+is part of the linux-ntfs package and is available from
 http://linux-ntfs.sourceforge.net/.
 .SH SEE ALSO
 .BR ntfsprogs (8)

@@ -2,7 +2,7 @@
 .\" Copyright (c) 2001,2002 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\" Adapted from e2fsprogs-1.19/misc/mke2fs.8.in by Theodore Ts'o.
-.\" 
+.\"
 .TH MKNTFS 8 "March 2002" "Linux-NTFS version @VERSION@"
 .SH NAME
 mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
@@ -26,7 +26,7 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 ]
 [
 .B \-f
-| 
+|
 .B \-Q
 ]
 [
@@ -62,7 +62,7 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 is used to create a NTFS 1.2 (Windows NT 4.0) file system on a device (usually
 a disk partition).
 .I device
-is the special file corresponding to the device (e.g 
+is the special file corresponding to the device (e.g
 .IR /dev/hdXX ).
 .I number-of-sectors
 is the number of blocks on the device.  If omitted,
@@ -143,7 +143,7 @@ actual writing to the device.
 .TP
 .B \-q
 Quiet execution; only errors are written to stderr, no output to stdout
-occurs at all. Useful if 
+occurs at all. Useful if
 .B mkntfs
 is run in a script.
 .TP
@@ -160,7 +160,7 @@ option as well as additional output useful for debugging
 Enable compression on the volume.
 .TP
 .B \-F
-Force 
+Force
 .B mkntfs
 to run, even if the specified
 .I device
@@ -172,7 +172,7 @@ Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
 not implement content indexing at all.)
 .TP
 .B \-V
-Print the version number of 
+Print the version number of
 .B mkntfs
 and exit.
 .SH BUGS
@@ -205,7 +205,7 @@ has been written by Anton Altaparmakov <aia21@cantab.net> (if that fails, use
 <antona@users.sf.net>).
 .SH AVAILABILITY
 .B mkntfs
-is part of the Linux-NTFS project and is available for download from 
+is part of the Linux-NTFS project and is available for download from
 http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
 rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO

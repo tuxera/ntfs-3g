@@ -50,12 +50,12 @@ static const char *ntfs_report_banner =
 "\nReport bugs to linux-ntfs-dev@lists.sf.net. "
 "Homepage: http://linux-ntfs.sf.net\n";
 
-static const char *resize_warning_msg = 
+static const char *resize_warning_msg =
 "WARNING: Every sanity check passed and only the DANGEROUS operations left.\n"
 "Please make sure all your important data had been backed up in case of an\n"
 "unexpected failure!\n";
 
-static const char *resize_important_msg = 
+static const char *resize_important_msg =
 "NTFS had been successfully resized on device '%s'.\n"
 "You can go on to resize the device e.g. with 'fdisk'.\n"
 "IMPORTANT: When recreating the partition, make sure you\n"
@@ -65,7 +65,7 @@ static const char *resize_important_msg =
 "  4)  set the bootable flag for the partition if it existed before\n"
 "Otherwise you may lose your data or can't boot your computer from the disk!\n";
 
-static const char *fragmented_volume_msg = 
+static const char *fragmented_volume_msg =
 "The volume end is fragmented, this case is not yet supported. Defragment it\n"
 "(Windows 2000, XP and .NET have built in defragmentation tool) and try again.\n";
 
@@ -188,11 +188,11 @@ s64 get_new_volume_size(char *s)
 {
 	s64 size;
 	char *suffix;
-	
+
 	size = strtoll(s, &suffix, 10);
 	if (size <= 0 || errno == ERANGE)
 		err_exit("Illegal new volume size\n");
-	
+
 	if (!*suffix)
 		return size;
 
@@ -209,7 +209,7 @@ s64 get_new_volume_size(char *s)
 	   cfdisk           10^3     10^6       10^9
 	   sfdisk            2^10     2^20
 	   parted            2^10     2^20  (may change)
-	   fdisk (DOS)       2^10     2^20 
+	   fdisk (DOS)       2^10     2^20
 	*/
 	/* FIXME: check for overflow */
 	switch (*suffix) {
@@ -223,7 +223,7 @@ s64 get_new_volume_size(char *s)
 	default:
 		usage();
 	}
-	
+
 	return size;
 }
 
@@ -285,7 +285,7 @@ void parse_options(int argc, char **argv)
 			usage();
 		}
 		opt.ro_flag = MS_RDONLY;
-	} 
+	}
 }
 
 
@@ -335,7 +335,7 @@ void walk_attributes(MFT_RECORD *mr)
 	ntfs_attr_search_ctx *ctx;
 
 	if (!(ctx = ntfs_get_attr_search_ctx(NULL, mr)))
-                perr_exit("ntfs_get_attr_search_ctx");
+		perr_exit("ntfs_get_attr_search_ctx");
 
 	while (!ntfs_walk_attrs(ctx)) {
 		if (ctx->attr->type == AT_END)
@@ -356,7 +356,7 @@ void get_bitmap_data(ntfs_volume *vol, struct bitmap *bm)
 		perr_exit("ntfs_open_inode");
 
 	if (!(ctx = ntfs_get_attr_search_ctx(ni, NULL)))
-                perr_exit("ntfs_get_attr_search_ctx");
+		perr_exit("ntfs_get_attr_search_ctx");
 
 	if (ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx))
 		perr_exit("ntfs_lookup_attr");
@@ -418,7 +418,7 @@ void walk_inodes()
 	s32 inode = 0;
 	s64 last_mft_rec;
 	MFT_REF mref;
-        MFT_RECORD *mrec = NULL;
+	MFT_RECORD *mrec = NULL;
 	struct progress_bar progress;
 
 	printf("Scanning volume ...\n");
@@ -426,7 +426,7 @@ void walk_inodes()
 	last_mft_rec = vol->nr_mft_records - 1;
 	progress_init(&progress, inode, last_mft_rec, 100);
 
-   	for (; inode <= last_mft_rec; inode++) {
+	for (; inode <= last_mft_rec; inode++) {
 		progress_update(&progress, inode);
 
 		mref = (MFT_REF)inode;
@@ -435,7 +435,7 @@ void walk_inodes()
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO)
 				continue;
- 			perr_exit("Reading inode %ld failed", inode);
+			perr_exit("Reading inode %ld failed", inode);
 		}
 		if (!(mrec->flags & MFT_RECORD_IN_USE))
 			continue;
@@ -455,31 +455,31 @@ void advise_on_resize()
 	for (i = vol->nr_clusters - 1; i > 0; i--)
 		if (ntfs_get_bit(lcn_bitmap.bm, i))
 			break;
-	
+
 	i += 2; /* first free + we reserve one for the backup boot sector */
 	fragmanted_end = (i >= vol->nr_clusters) ? 1 : 0;
-	
+
 	if (fragmanted_end || !opt.info) {
 		printf(fragmented_volume_msg);
 		if (fragmanted_end)
 			exit(1);
 		printf("Now ");
 	}
-	
+
 	old_b = vol->nr_clusters * vol->cluster_size;
 	old_mb = rounded_up_division(old_b, NTFS_MBYTE);
 	new_b = i * vol->cluster_size;
 	new_mb = rounded_up_division(new_b, NTFS_MBYTE);
 	g_b = (vol->nr_clusters - i) * vol->cluster_size;
 	g_mb = g_b / NTFS_MBYTE;
-	
+
 	printf("You could resize at %lld bytes ", new_b);
-	
+
 	if ((new_mb * NTFS_MBYTE) < old_b)
 		printf("or %lld MB ", new_mb);
-	
+
 	printf("(freeing ");
-	
+
 	if (g_mb && (old_mb - new_mb))
 	    printf("%lld MB", old_mb - new_mb);
 	else
@@ -658,7 +658,7 @@ void lookup_data_attr(MFT_REF mref, char *aname, ntfs_attr_search_ctx **ctx)
 		perr_exit("Attribute list attribute not yet supported");
 
 	if (!(*ctx = ntfs_get_attr_search_ctx(ni, NULL)))
-                perr_exit("ntfs_get_attr_search_ctx");
+		perr_exit("ntfs_get_attr_search_ctx");
 
 	if (aname && ((len = ntfs_mbstoucs(aname, &ustr, 0)) == -1))
 		perr_exit("Unable to convert string to Unicode");
@@ -745,7 +745,7 @@ void update_bootsector(s64 nr_clusters)
 		perr_exit("lseek");
 
 	if (read(vol->fd, &bs, sizeof(NTFS_BOOT_SECTOR)) == -1)
-                perr_exit("read() error");
+		perr_exit("read() error");
 
 	bs.number_of_sectors = nr_clusters * bs.bpb.sectors_per_cluster;
 	bs.number_of_sectors = cpu_to_le64(bs.number_of_sectors);
@@ -762,9 +762,9 @@ void update_bootsector(s64 nr_clusters)
 void print_volume_size(char *str, ntfs_volume *v, s64 nr_clusters)
 {
 	s64 b; /* volume size in bytes */
-	
+
 	b = nr_clusters * v->cluster_size;
-	printf("%s: %lld bytes (%lld MB)\n", 
+	printf("%s: %lld bytes (%lld MB)\n",
 	       str, b, rounded_up_division(b, NTFS_MBYTE));
 }
 
@@ -806,7 +806,7 @@ void mount_volume()
 
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
 	if (ntfs_is_version_supported(vol))
-		perr_exit("Unknown NTFS version"); 
+		perr_exit("Unknown NTFS version");
 
 	Dprintf("Cluster size       : %u\n", vol->cluster_size);
 	print_volume_size("Current volume size", vol, vol->nr_clusters);
@@ -817,11 +817,11 @@ void prepare_volume_fixup()
 {
 	if (!opt.ro_flag) {
 		u16 flags;
-		
+
 		flags = vol->flags | VOLUME_IS_DIRTY;
 		if (vol->major_ver >= 2)
 			flags |= VOLUME_MOUNTED_ON_NT4;
-		
+
 		printf("Schedule chkdsk NTFS consistency check at Windows boot time ...\n");
 		if (ntfs_set_volume_flags(vol, flags))
 			perr_exit("Failed to set $Volume dirty");
@@ -841,11 +841,11 @@ int main(int argc, char **argv)
 	int i;
 
 	parse_options(argc, argv);
-	
+
 	mount_volume();
 
 	if (opt.bytes) {
-		/* Take the integer part: when shrinking we don't want 
+		/* Take the integer part: when shrinking we don't want
 		   to make the volume to be bigger than requested.
 		   Later on we will also decrease this value to save
 		   room for the backup boot sector */
@@ -865,9 +865,9 @@ int main(int argc, char **argv)
 		advise_on_resize();
 
 	/* FIXME: check new_volume_size validity */
-	
-	/* Backup boot sector at the end of device isn't counted in NTFS 
-	   volume size thus we have to reserve space for. We don't trust 
+
+	/* Backup boot sector at the end of device isn't counted in NTFS
+	   volume size thus we have to reserve space for. We don't trust
 	   the user does this for us: better to be on the safe side ;) */
 	if (new_volume_size)
 		--new_volume_size;
@@ -896,7 +896,7 @@ int main(int argc, char **argv)
 	truncate_bitmap_file(new_volume_size);
 	update_bootsector(new_volume_size);
 
-	/* We don't create backup boot sector because we don't know where the 
+	/* We don't create backup boot sector because we don't know where the
 	   partition will be split. The scheduled chkdsk will fix it anyway */
 
 	if (opt.ro_flag) {

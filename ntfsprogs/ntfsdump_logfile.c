@@ -11,7 +11,7 @@ const char *EXEC_VERSION = "1.0";
  * NTFS partition and display the results on stdout. Errors will be output to
  * stderr.
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ const char *EXEC_VERSION = "1.0";
  * If anyone using a non-little endian and/or an aligned access only CPU tries
  * this program please let me know whether it works or not!
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  */
 
 #include <unistd.h>
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 			/* Fall through on error. */
 		default:
 version_error:
-                	fprintf(stderr, "Error: Unknown NTFS version.\n");
+		fprintf(stderr, "Error: Unknown NTFS version.\n");
 			goto error_exit;
 	}
 	/* Read in $LogFile. */
@@ -137,7 +137,7 @@ version_error:
 	/* Find the $DATA attribute of the $LogFile. */
 	if (ntfs_lookup_attr(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		fprintf(stderr, "Error: Attribute $DATA was not found in" \
-		                "$LogFile!\n");
+				"$LogFile!\n");
 		goto log_file_error;
 	}
 	a = ctx->attr;

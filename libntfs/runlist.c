@@ -71,7 +71,7 @@ static __inline__ void ntfs_rl_mc(run_list_element *dstbase, int dst,
  * of memory.
  *
  * N.B.	If the new allocation doesn't require a different number of 4kiB
- * 	blocks in memory, the function will return the original pointer.
+ *	blocks in memory, the function will return the original pointer.
  *
  * On success, return a pointer to the newly allocated, or recycled, memory.
  * On error, return NULL with errno set to the error code.
@@ -97,7 +97,7 @@ static __inline__ run_list_element *ntfs_rl_realloc(run_list_element *rl,
  * must be adjacent.
  *
  * Return: TRUE   Success, the run lists can be merged.
- *         FALSE  Failure, the run lists cannot be merged.
+ *	   FALSE  Failure, the run lists cannot be merged.
  */
 static __inline__ BOOL ntfs_are_rl_mergeable(run_list_element *dst,
 		run_list_element *src)
@@ -147,7 +147,7 @@ static __inline__ void __ntfs_rl_merge(run_list_element *dst,
  * the destination run list @dst.
  *
  * Return: TRUE   Success, the run lists have been merged.
- *         FALSE  Failure, the run lists cannot be merged and have not been
+ *	   FALSE  Failure, the run lists cannot be merged and have not been
  *		  modified.
  */
 static __inline__ BOOL ntfs_rl_merge(run_list_element *dst,
@@ -264,9 +264,9 @@ static __inline__ run_list_element *ntfs_rl_insert(run_list_element *dst,
 	}
 
 	/* disc => Discontinuity between the end of @dst and the start of @src.
-	 *         This means we might need to insert a hole.
+	 *	   This means we might need to insert a hole.
 	 * hole => @dst ends with a hole or an unmapped region which we can
-	 *         extend to match the discontinuity. */
+	 *	   extend to match the discontinuity. */
 	if (loc == 0)
 		disc = (src[0].vcn > 0);
 	else {
@@ -447,9 +447,9 @@ static __inline__ run_list_element *ntfs_rl_split(run_list_element *dst,
 	ntfs_rl_mc(dst, loc + 1, src, 0, ssize);
 
 	/* Adjust the size of the holes either size of @src. */
-	dst[loc].length         = dst[loc+1].vcn       - dst[loc].vcn;
-	dst[loc+ssize+1].vcn    = dst[loc+ssize].vcn   + dst[loc+ssize].length;
-	dst[loc+ssize+1].length = dst[loc+ssize+2].vcn - dst[loc+ssize+1].vcn;
+	dst[loc].length		= dst[loc+1].vcn       - dst[loc].vcn;
+	dst[loc+ssize+1].vcn	= dst[loc+ssize].vcn   + dst[loc+ssize].length;
+	dst[loc+ssize+1].length	= dst[loc+ssize+2].vcn - dst[loc+ssize+1].vcn;
 
 	return dst;
 }
@@ -504,7 +504,7 @@ run_list_element *ntfs_merge_run_lists(run_list_element *drl,
 	Dputs("src:");
 	ntfs_debug_dump_run_list(srl);
 
- 	/* Check for silly calling... */
+	/* Check for silly calling... */
 	if (!srl)
 		return drl;
 
@@ -710,10 +710,10 @@ critical_error:
  * unmodified in that case.
  *
  * The following error codes are defined:
- * 	ENOMEM		Not enough memory to allocate run list array.
- * 	EIO		Corrupt run list.
- * 	EINVAL		Invalid parameters were passed in.
- * 	ERANGE		The two run lists overlap.
+ *	ENOMEM		Not enough memory to allocate run list array.
+ *	EIO		Corrupt run list.
+ *	EINVAL		Invalid parameters were passed in.
+ *	ERANGE		The two run lists overlap.
  *
  * FIXME: For now we take the conceptionally simplest approach of creating the
  * new run list disregarding the already existing one and then splicing the
@@ -724,7 +724,7 @@ run_list_element *ntfs_decompress_mapping_pairs(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, run_list_element *old_rl)
 {
 	VCN vcn;		/* Current vcn. */
-	LCN lcn; 		/* Current lcn. */
+	LCN lcn;		/* Current lcn. */
 	s64 deltaxcn;		/* Change in [vl]cn. */
 	run_list_element *rl;	/* The output run list. */
 	u8 *buf;		/* Current position in mapping pairs array. */

@@ -26,7 +26,7 @@ parameter may have one of the optional modifiers
 .I size
 parameter is given in kilo-, mega- or gigabytes respectively.
 .B ntfsresize
-conforms to the SI, ATA, IEEE standards and the disk manufacturers 
+conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
 .PP
 The
@@ -37,13 +37,13 @@ If you wish to shrink an NTFS partition, first use
 to shrink the size of the filesystem. Then you may use
 .BR fdisk (8)
 to shrink the size of the partition by deleting the
-partition and recreating it with the smaller size. 
+partition and recreating it with the smaller size.
 .PP
 .B IMPORTANT!
 When recreating the partition with
 .BR fdisk (8)
 make sure you create it with the same starting
-disk cylinder and partition type 
+disk cylinder and partition type
 as before and you do not make it smaller than the new size
 of the NTFS filesystem! Otherwise you may lose your entire filesystem.
 Also make sure you set the bootable flag for the partition if it
@@ -54,7 +54,7 @@ Note,
 .B ntfsresize
 schedules 'chkdsk' to make an NTFS consistency check
 when you will boot Windows. If your partition was a
-system partition than Windows may intentionally reboot after 
+system partition than Windows may intentionally reboot after
 the successful consistency check.
 
 .SH OPTIONS

@@ -2,7 +2,7 @@
  * $Id$
  *
  * mst.h - Exports for multi sector transfer fixup functions. Part of the
- * 	   Linux-NTFS project.
+ *	   Linux-NTFS project.
  *
  * Copyright (c) 2000-2002 Anton Altaparmakov.
  *

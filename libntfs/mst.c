@@ -26,8 +26,8 @@
 
 /**
  * ntfs_post_read_mst_fixup - deprotect multi sector transfer protected data
- * @b:          pointer to the data to deprotect
- * @size:       size in bytes of @b
+ * @b:		pointer to the data to deprotect
+ * @size:	size in bytes of @b
  *
  * Perform the necessary post read multi sector transfer fixups and detect the
  * presence of incomplete multi sector transfers. - In that case, overwrite the
@@ -69,11 +69,11 @@ int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
 	 * Position in protected data of first u16 that needs fixing up.
 	 */
 	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
-        /*
+	/*
 	 * Check for incomplete multi sector transfer(s).
 	 */
 	while (usa_count--) {
-                if (*data_pos != usn) {
+		if (*data_pos != usn) {
 			/*
 			 * Incomplete multi sector transfer detected! )-:
 			 * Set the magic to "BAAD" and return failure.
@@ -81,7 +81,7 @@ int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
 			 */
 			b->magic = magic_BAAD;
 			errno = EIO;
-	                return -1;
+			return -1;
 		}
 		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
 	}
@@ -95,16 +95,16 @@ int ntfs_post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
 		 * the usa into the data buffer.
 		 */
 		*data_pos = *(++usa_pos);
-                /* Increment position in data as well. */
+		/* Increment position in data as well. */
 		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
-        }
+	}
 	return 0;
 }
 
 /**
  * ntfs_pre_write_mst_fixup - apply multi sector transfer protection
- * @b:          pointer to the data to protect
- * @size:       size in bytes of @b
+ * @b:		pointer to the data to protect
+ * @size:	size in bytes of @b
  *
  * Perform the necessary pre write multi sector transfer fixup on the data
  * pointer to by @b of @size.
@@ -155,8 +155,8 @@ int ntfs_pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 	*usa_pos = usn;
 	/* Position in data of first u16 that needs fixing up. */
 	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
-        /* Fixup all sectors. */
-        while (usa_count--) {
+	/* Fixup all sectors. */
+	while (usa_count--) {
 		/*
 		 * Increment the position in the usa and save the
 		 * original data from the data buffer into the usa.
@@ -166,13 +166,13 @@ int ntfs_pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 		*data_pos = usn;
 		/* Increment position in data as well. */
 		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
-        }
+	}
 	return 0;
 }
 
 /**
  * ntfs_post_write_mst_fixup - deprotect multi sector transfer protected data
- * @b:          pointer to the data to deprotect
+ * @b:		pointer to the data to deprotect
  *
  * Perform the necessary post write multi sector transfer fixup, not checking
  * for any errors, because we assume we have just used
@@ -192,7 +192,7 @@ void ntfs_post_write_mst_fixup(NTFS_RECORD *b)
 	/* Position in protected data of first u16 that needs fixing up. */
 	data_pos = (u16*)b + NTFS_SECTOR_SIZE/sizeof(u16) - 1;
 
-        /* Fixup all sectors. */
+	/* Fixup all sectors. */
 	while (usa_count--) {
 		/*
 		 * Increment position in usa and restore original data from
@@ -200,8 +200,8 @@ void ntfs_post_write_mst_fixup(NTFS_RECORD *b)
 		 */
 		*data_pos = *(++usa_pos);
 
-                /* Increment position in data as well. */
+		/* Increment position in data as well. */
 		data_pos += NTFS_SECTOR_SIZE/sizeof(u16);
-        }
+	}
 }
 

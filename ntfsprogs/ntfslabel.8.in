@@ -2,7 +2,7 @@
 .\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\" Adapted from e2fsprogs-1.26/misc/e2label.8.in by Theodore Ts'o.
-.\" 
+.\"
 .TH NTFSLABEL 8 "April 2002" "Linux-NTFS version @VERSION@"
 .SH NAME
 ntfslabel \- display/change the label on an ntfs file system
@@ -42,12 +42,12 @@ option of
 during creation of the file system.
 .PP
 .SH AUTHOR
-.B ntfslabel 
+.B ntfslabel
 was written by Matthew J. Fanto (fanto1mj@cmich.edu). This man page was written
 by Anton Altaparmakov (aia21@cantab.net).
 .SH AVAILABILITY
 .B ntfslabel
-is part of the linux-ntfs package and is available from 
+is part of the linux-ntfs package and is available from
 http://linux-ntfs.sourceforge.net/.
 .SH SEE ALSO
 .BR mkntfs (8),

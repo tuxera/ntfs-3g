@@ -12,7 +12,7 @@
  * the partition, but it might be too late and irreversible damage to the data
  * might have been done already.
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@
  * If anyone using a non-little endian and/or an aligned access only CPU tries
  * this program please let me know whether it works or not!
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  */
 
 #include "config.h"
@@ -258,7 +258,7 @@ mount_ok:
 	printf("NTFS volume version is %i.%i.\n\n", vol->major_ver,
 			vol->minor_ver);
 	if (ntfs_is_version_supported(vol)) {
-               	fprintf(stderr, "Error: Unknown NTFS version.\n");
+		fprintf(stderr, "Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
 

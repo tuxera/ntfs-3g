@@ -7,7 +7,7 @@ const char *EXEC_VERSION= "0.0.1";
  *
  * Short description here.
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ const char *EXEC_VERSION= "0.0.1";
  * If anyone using a non-little endian and/or an aligned access only CPU tries
  * this program please let me know whether it works or not!
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  */
 
 int main(int argc, char **argv)

@@ -41,9 +41,9 @@ typedef enum {
 
 /*
  * Log file organization:
- * 	Two restart areas present in the first two pages (restart pages). When
+ *	Two restart areas present in the first two pages (restart pages). When
  * the volume is unmounted they should be identical.
- * 	These are followed by log records organized in pages headed by a record
+ *	These are followed by log records organized in pages headed by a record
  * header going up to log file size. Not all pages contain log records when a
  * volume is first formatted, but as the volume ages, all records will be used.
  * When the log file fills up, the records at the beginning are purged (by

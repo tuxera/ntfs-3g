@@ -11,7 +11,7 @@ const char *EXEC_VERSION = "1.0";
  * on the command line and display the results on stdout. Errors will be output
  * to stderr.
  *
- * 	Anton Altaparmakov <aia21@cantab.net>
+ *	Anton Altaparmakov <aia21@cantab.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: incorrect syntax\n");
 		exit(1);
 	}
-        if (stat(argv[1], &sbuf) == -1) {
+	if (stat(argv[1], &sbuf) == -1) {
 		if (errno == ENOENT)
 			fprintf(stderr, "The file doesn't exist; did you "
 					"specify it correctly?\n");

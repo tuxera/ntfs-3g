@@ -86,7 +86,7 @@ static __inline__ int ntfs_write_mft_record(const ntfs_volume *vol,
  * or 0 on error (i.e. @m is not a valid mft record). Zero is not a valid size
  * for an mft record as it at least has to have the MFT_RECORD, thus making the
  * minimum size:
- * 	(sizeof(MFT_RECORD) + 7) & ~7 + sizeof(ATTR_TYPES) = 52 bytes
+ *	(sizeof(MFT_RECORD) + 7) & ~7 + sizeof(ATTR_TYPES) = 52 bytes
  * Aside: The 8-byte alignment and the 4 bytes for the attribute type are needed
  * as each mft record has to have a list of attributes even if it only contains
  * the attribute $END which doesn't contain anything else apart from its type.

@@ -1,6 +1,6 @@
 .\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
-.\" 
+.\"
 .TH NTFSUNDELETE 8 "June 2002" "Linux\-NTFS version @VERSION@"
 .SH NAME
 ntfsundelete \- recover a deleted file from an NTFS volume.
@@ -52,7 +52,7 @@ representing the disk usage is updated.  If the power isn't turned off
 immediately, the free space, where the file used to live, may become
 overwritten.  Worse, the MFT Record may be reused for another file.  If this
 happens it is impossible to tell where the file was on disk.
-.PP 
+.PP
 Even if all the clusters of a file are not in use, there is no guarantee that
 they haven't been overwritten by some short\-lived file.
 .SS Locale
@@ -128,7 +128,7 @@ This option controls where to put the output file of the
 .B \-\-undelete
 and
 .B \-\-copy
-options.  
+options.
 .TP
 .B \-f
 .br
@@ -329,7 +329,7 @@ was written by Richard Russon (FlatCap) <ntfs@flatcap.org>
 If you find this tool useful, make FlatCap happy and send him an email.
 .SH AVAILABILITY
 .B ntfsundelete
-is part of the linux\-ntfs package and is available from 
+is part of the linux\-ntfs package and is available from
 .br
 .nh
 http://linux\-ntfs.sourceforge.net/downloads.html

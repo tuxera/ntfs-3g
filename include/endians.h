@@ -2,7 +2,7 @@
  * $Id$
  *
  * endians.h - Definitions related to handling of byte ordering. Part of the
- * 	       Linux-NTFS project.
+ *	       Linux-NTFS project.
  *
  * Copyright (c) 2000,2001 Anton Altaparmakov.
  *
@@ -28,9 +28,9 @@
 /*
  * Notes:
  *
- * 	We define the conversion functions including typecasts since the
+ *	We define the conversion functions including typecasts since the
  * defaults don't necessarily perform appropriate typecasts.
- * 	Also, using our own functions means that we can change them if it
+ *	Also, using our own functions means that we can change them if it
  * turns out that we do need to use the unaligned access macros on
  * architectures requirering aligned memory accesses...
  */

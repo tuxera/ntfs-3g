@@ -116,14 +116,14 @@ found_it:
 			goto not_found;
 		/* If the strings are not equal, continue search. */
 		if (rc)
-	 		goto do_next;
+			goto do_next;
 	}
 	/* If case sensitive collation of names doesn't collate @name before
 	   a->name, we continue the search. Otherwise we haven't found it. */
 	if (ntfs_collate_names(vol->upcase, vol->upcase_len, name, name_len,
 			(wchar_t*)((char*)a + le16_to_cpu(a->name_offset)),
 			a->name_length, CASE_SENSITIVE, 1) != -1)
-	 	goto do_next;
+		goto do_next;
 not_found:
 	return FALSE;
 file_corrupt:

@@ -900,16 +900,16 @@ int ntfs_is_version_supported(ntfs_volume *vol)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	major = vol->major_ver;
 	minor = vol->minor_ver;
 
 	if (NTFS_V1_1(major, minor) || NTFS_V1_2(major, minor))
 		return 0;
-	
+
 	if (NTFS_V2_X(major, minor))
 		return 0;
-	
+
 	if (NTFS_V3_0(major, minor) || NTFS_V3_1(major, minor))
 		return 0;
 
@@ -943,7 +943,7 @@ int ntfs_reset_logfile(ntfs_volume *vol)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if ((ni = ntfs_open_inode(vol, FILE_LogFile)) == NULL) {
 		Dperror("Failed to open inode FILE_LogFile.\n");
 		return -1;
@@ -953,7 +953,7 @@ int ntfs_reset_logfile(ntfs_volume *vol)
 		Dperror("Failed to open $FILE_LogFile/$DATA\n");
 		goto error_exit;
 	}
-	
+
 	/* The $DATA attribute of the $LogFile has to be non-resident. */
 	if (!NAttrNonResident(na)) {
 		Dprintf("$LogFile $DATA attribute is resident!?!\n");
@@ -967,9 +967,9 @@ int ntfs_reset_logfile(ntfs_volume *vol)
 		Dprintf("$LogFile has zero length, no disk write needed.\n");
 		return 0;
 	}
-	
-	/* Read $LogFile until its end. We do this as a check for correct 
-	   length thus making sure we are decompressing the mapping pairs 
+
+	/* Read $LogFile until its end. We do this as a check for correct
+	   length thus making sure we are decompressing the mapping pairs
 	   array correctly and hence writing below is safe as well. */
 	pos = 0;
 	while ((count = ntfs_attr_pread(na, pos, NTFS_BUF_SIZE, buf)) > 0)
@@ -991,7 +991,7 @@ int ntfs_reset_logfile(ntfs_volume *vol)
 	while ((count = len - pos) > 0) {
 		if (count > NTFS_BUF_SIZE)
 			count = NTFS_BUF_SIZE;
-		
+
 		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
 			Dprintf("Failed to set the $LogFile attribute value.");
 			if (count != -1)
@@ -1000,7 +1000,7 @@ int ntfs_reset_logfile(ntfs_volume *vol)
 		}
 		pos += count;
 	}
-	
+
 	ntfs_attr_close(na);
 	return ntfs_close_inode(ni);
 
@@ -1020,8 +1020,8 @@ error_exit:
  * @vol:	ntfs volume where we set the volume flags
  * @flags:	new flags
  *
- * Set the on-disk volume flags in the mft record of $Volume and 
- * on volume @vol to @flags. 
+ * Set the on-disk volume flags in the mft record of $Volume and
+ * on volume @vol to @flags.
  *
  * Return 0 on successful and -1 if not, with errno set to the error code.
  */
@@ -1076,7 +1076,7 @@ int ntfs_set_volume_flags(ntfs_volume *vol, const u16 flags)
 	/* Sanity checks. */
 	if ((char*)c + le32_to_cpu(r->value_length) >
 			le16_to_cpu(m->bytes_in_use) + (char*)m ||
-	    		le16_to_cpu(r->value_offset) +
+			le16_to_cpu(r->value_offset) +
 			le32_to_cpu(r->value_length) > le32_to_cpu(r->length)) {
 		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "
 				"corrupt!");
@@ -1090,11 +1090,11 @@ int ntfs_set_volume_flags(ntfs_volume *vol, const u16 flags)
 		Dperror("Error writing $Volume");
 		goto err_out;
 	}
-	
+
 	ret = 0; /* success */
 err_out:
 	ntfs_put_attr_search_ctx(ctx);
-err_exit:	
+err_exit:
 	if (m)
 		free(m);
 	return ret;

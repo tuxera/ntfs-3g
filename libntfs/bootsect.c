@@ -238,7 +238,7 @@ int parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	 * When clusters_per_mft_record is negative, it means that it is to
 	 * be taken to be the negative base 2 logarithm of the mft_record_size
 	 * min bytes. Then:
-	 *   	 mft_record_size = 2^(-clusters_per_mft_record) bytes.
+	 *	 mft_record_size = 2^(-clusters_per_mft_record) bytes.
 	 */
 	if (c < 0)
 		vol->mft_record_size = 1 << -c;

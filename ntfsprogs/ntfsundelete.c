@@ -185,7 +185,7 @@ void usage (void)
  *     If transform fails, @regex will not be changed.
  *
  * Return:  1, Success, the string was transformed
- *          0, An error occurred
+ *	    0, An error occurred
  */
 int transform (const char *pattern, char **regex)
 {
@@ -260,7 +260,7 @@ int transform (const char *pattern, char **regex)
  *     If parse_time fails, @since will not be changed
  *
  * Return:  1  Success
- *          0  Error, the string was malformed
+ *	    0  Error, the string was malformed
  */
 int parse_time (const char *value, time_t *since)
 {
@@ -329,7 +329,7 @@ int parse_time (const char *value, time_t *since)
  *     If parse_size fails, @size will not be changed
  *
  * Return:  1  Success
- *          0  Error, the string was malformed
+ *	    0  Error, the string was malformed
  */
 int parse_size (const char *value, long long *size)
 {
@@ -352,7 +352,7 @@ int parse_size (const char *value, long long *size)
 		return 0;
 	}
 
-	
+
 	/*if (strlen (suffix) > 1) {
 		Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
 		return 0;
@@ -386,7 +386,7 @@ int parse_size (const char *value, long long *size)
  * string cannot be parsed correctly, @start and @finish will not be changed.
  *
  * Return:  1  Success, a valid string was found
- *          0  Error, the string was not a valid range
+ *	    0  Error, the string was not a valid range
  */
 int parse_range (const char *string, long long *start, long long *finish)
 {
@@ -431,7 +431,7 @@ int parse_range (const char *string, long long *start, long long *finish)
  * This function is very long, but quite simple.
  *
  * Return:  1 Success
- *          0 Error, one or more problems
+ *	    0 Error, one or more problems
  */
 int parse_options (int argc, char *argv[])
 {
@@ -728,7 +728,7 @@ time_t ntfs2utc (long long time)
  *       has been created without an inode, it won't overflow the buffer.
  *
  * Return:  Pointer  Success, an attribute was found
- *          NULL     Error, no matching attributes were found
+ *	    NULL     Error, no matching attributes were found
  */
 ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 {
@@ -756,7 +756,7 @@ ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
  *       the buffer, since we created the search context without an inode.
  *
  * Return:  Pointer  Success, an attribute was found
- *          NULL     Error, no matching attributes were found
+ *	    NULL     Error, no matching attributes were found
  */
 ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 {
@@ -798,7 +798,7 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
  * and its locale friendly name is put in pref_name.
  *
  * Return:  n  The number of $FILENAME attributes found
- *         -1  Error
+ *	   -1  Error
  */
 int get_filenames (struct ufile *file)
 {
@@ -879,7 +879,7 @@ int get_filenames (struct ufile *file)
  * list of data streams in the file object.
  *
  * Return:  n  The number of $FILENAME attributes found
- *         -1  Error
+ *	   -1  Error
  */
 int get_data (struct ufile *file, ntfs_volume *vol)
 {
@@ -953,7 +953,7 @@ int get_data (struct ufile *file, ntfs_volume *vol)
  * possible.
  *
  * Return:  Pointer  A ufile object containing the results
- *          NULL     Error
+ *	    NULL     Error
  */
 struct ufile * read_record (ntfs_volume *vol, long long record)
 {
@@ -998,9 +998,9 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
 	ntfs_attr_close (mft);
 	mft = NULL;
 
-	attr10 = find_first_attribute (AT_STANDARD_INFORMATION, file->mft);
-	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,       file->mft);
-	attr90 = find_first_attribute (AT_INDEX_ROOT,           file->mft);
+	attr10 = find_first_attribute (AT_STANDARD_INFORMATION,	file->mft);
+	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,	file->mft);
+	attr90 = find_first_attribute (AT_INDEX_ROOT,		file->mft);
 
 	Dprintf ("Attributes present: %s %s %s\n", attr10?"0x10":"", attr20?"0x20":"", attr90?"0x90":"");
 
@@ -1041,8 +1041,8 @@ struct ufile * read_record (ntfs_volume *vol, long long record)
  * refreshed.
  *
  * Return:  1  Cluster is in use
- *          0  Cluster is free space
- *         -1  Error occurred
+ *	    0  Cluster is free space
+ *	   -1  Error occurred
  */
 int cluster_in_use (ntfs_volume *vol, long long lcn)
 {
@@ -1106,7 +1106,7 @@ int cluster_in_use (ntfs_volume *vol, long long lcn)
  *       will return 0%.
  *
  * Return:  n  The percentage of the file that _could_ be recovered
- *         -1  Error
+ *	   -1  Error
  */
 int calc_percentage (struct ufile *file, ntfs_volume *vol)
 {
@@ -1250,12 +1250,12 @@ void dump_record (struct ufile *file)
 
 		Iprintf ("Filename: (%d) %s\n", f->name_space, f->name);
 		Iprintf ("File Flags: ");
-		if (f->flags & FILE_ATTR_SYSTEM)        Iprintf ("System ");
-		if (f->flags & FILE_ATTR_DIRECTORY)     Iprintf ("Directory ");
-		if (f->flags & FILE_ATTR_SPARSE_FILE)   Iprintf ("Sparse ");
-		if (f->flags & FILE_ATTR_REPARSE_POINT) Iprintf ("Reparse ");
-		if (f->flags & FILE_ATTR_COMPRESSED)    Iprintf ("Compressed ");
-		if (f->flags & FILE_ATTR_ENCRYPTED)     Iprintf ("Encrypted ");
+		if (f->flags & FILE_ATTR_SYSTEM)	Iprintf ("System ");
+		if (f->flags & FILE_ATTR_DIRECTORY)	Iprintf ("Directory ");
+		if (f->flags & FILE_ATTR_SPARSE_FILE)	Iprintf ("Sparse ");
+		if (f->flags & FILE_ATTR_REPARSE_POINT)	Iprintf ("Reparse ");
+		if (f->flags & FILE_ATTR_COMPRESSED)	Iprintf ("Compressed ");
+		if (f->flags & FILE_ATTR_ENCRYPTED)	Iprintf ("Encrypted ");
 		if (!(f->flags & (FILE_ATTR_SYSTEM || FILE_ATTR_DIRECTORY ||
 		    FILE_ATTR_SPARSE_FILE || FILE_ATTR_REPARSE_POINT ||
 		    FILE_ATTR_COMPRESSED || FILE_ATTR_ENCRYPTED))) {
@@ -1356,7 +1356,7 @@ void list_record (struct ufile *file)
 
 		if (!d->name) {
 			if (d->resident)   flagr = 'R';
-			else               flagr = 'N';
+			else		   flagr = 'N';
 			if (d->compressed) flagc = 'C';	/* These two are mutually exclusive */
 			if (d->encrypted)  flagc = 'E';
 
@@ -1386,7 +1386,7 @@ void list_record (struct ufile *file)
  * regular expression, created with regcomp.
  *
  * Return:  1  There is a matching filename.
- *          0  There is no match.
+ *	    0  There is no match.
  */
 int name_match (regex_t *re, struct ufile *file)
 {
@@ -1424,7 +1424,7 @@ int name_match (regex_t *re, struct ufile *file)
  * Write a block of data to a file descriptor.
  *
  * Return:  -1  Error, something went wrong
- *           0  Success, all the data was written
+ *	     0  Success, all the data was written
  */
 unsigned int write_data (int fd, const char *buffer, unsigned int bufsize)
 {
@@ -1462,7 +1462,7 @@ unsigned int write_data (int fd, const char *buffer, unsigned int bufsize)
  * name is present it will be appended to the filename, delimited by a colon.
  *
  * Return:  -1  Error, failed to create the file
- *           n  Success, this is the file descriptor
+ *	     n  Success, this is the file descriptor
  */
 int open_file (const char *dir, const char *name, const char *stream)
 {
@@ -1504,7 +1504,7 @@ int open_file (const char *dir, const char *name, const char *stream)
  * The list can be filtered by name, size and date, using command line options.
  *
  * Return:  -1  Error, something went wrong
- *           n  Success, the number of recoverable files
+ *	     n  Success, the number of recoverable files
  */
 int scan_disk (ntfs_volume *vol)
 {
@@ -1627,7 +1627,7 @@ out:
  *       file was deleted.
  *
  * Return:  0  Error, something went wrong
- *          1  Success, the data was recovered
+ *	    1  Success, the data was recovered
  */
 int undelete_file (ntfs_volume *vol, long long inode)
 {
@@ -1808,14 +1808,14 @@ free:
 
 /**
  * copy_mft - Write a range of MFT Records to a file
- * @vol:        An ntfs volume obtained from ntfs_mount
- * @mft_begin:  First MFT Record to save
- * @mft_end:    Last MFT Record to save
+ * @vol:	An ntfs volume obtained from ntfs_mount
+ * @mft_begin:	First MFT Record to save
+ * @mft_end:	Last MFT Record to save
  *
  * Read a number of MFT Records and write them to a file.
  *
  * Return:  0  Success, all the records were written
- *          1  Error, something went wrong
+ *	    1  Error, something went wrong
  */
 int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 {
@@ -1897,14 +1897,14 @@ free:
  * These checks can be overridden by using the force option.
  *
  * Return:  1  Success, we can continue
- *          0  Error, we cannot use this device
+ *	    0  Error, we cannot use this device
  */
 int valid_device (const char *name, int force)
 {
 	unsigned long mnt_flags = 0;
 	struct stat st;
 
-        if (stat (name, &st) == -1) {
+	if (stat (name, &st) == -1) {
 		if (errno == ENOENT) {
 			Eprintf ("The device %s doesn't exist\n", name);
 		} else {
@@ -1913,7 +1913,7 @@ int valid_device (const char *name, int force)
 		return 0;
 	}
 
-        if (!S_ISBLK (st.st_mode)) {
+	if (!S_ISBLK (st.st_mode)) {
 		Vprintf ("%s is not a block device.\n", name);
 		if (!force) {
 			Eprintf ("Use the force option to work with files.\n");
@@ -1949,7 +1949,7 @@ int valid_device (const char *name, int force)
  * Start from here.
  *
  * Return:  0  Success, the program worked
- *          1  Error, something went wrong
+ *	    1  Error, something went wrong
  */
 int main (int argc, char *argv[])
 {
