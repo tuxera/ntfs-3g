@@ -12,14 +12,11 @@
 * HIGH priority *
 *****************
 
-- write attribute resize function (see mkntfs)
+- complete the implementation of ntfs_attr_truncate() (for compressed files)
 
-- complete the implementation of ntfs_attr_truncate()
+- add write of compressed attributes
 
-- write ntfs_mft_record_allocate() (see ntfs 2.4 driver in CVS)
-
-- extend ntfs_attr_pwrite to cope with extending the attribute size and with
-  instantiating holes
+- write ntfs_index_{rm_from,add_to,create,rm}()
 
 *******************
 * MEDIUM priority *
@@ -27,12 +24,6 @@
 
 - create API reference book template (cf. linux kernel)
 - enable automatic creation of API reference
-
-- add write of compressed attributes
-
-- write ntfs_attr_{rm,create,add}()
-
-- write ntfs_index_{rm_from,add_to,create,rm}()
 
 - write ntfs_file_name_{add,rm}_from_mft_record() or _from_ntfs_inode(?)
 
