@@ -1348,6 +1348,7 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	while (rl->length) {
 		if (start_vcn < rl[1].vcn)
 			break;
+		rl++;
 	}
 	if (!rl->length) {
 		// FIXME: Weird, probably a BUG()!
