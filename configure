@@ -5712,9 +5712,9 @@ fi
 
 echo $ac_n "checking version of $_cc""... $ac_c" 1>&6
 echo "configure:5715: checking version of $_cc" >&5
-cc_version=`$_cc --version 2>&1`
-cc_major=`echo $cc_version | sed 's/egcs-//' | cut -d'.' -f1`
-cc_minor=`echo $cc_version | sed 's/egcs-//' | cut -d'.' -f2`
+cc_version=`$_cc --version 2>&1 | head -1 | sed 's/egcs-//' | sed 's/gcc (GCC) \([0-9]\.[0-9]\).*/\1/'`
+cc_major=`echo $cc_version | cut -d'.' -f1`
+cc_minor=`echo $cc_version | cut -d'.' -f2`
 if test -z $cc_version; then
 	cc_version="v. ?.??"
 	cc_major=1
