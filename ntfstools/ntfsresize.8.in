@@ -7,8 +7,6 @@ ntfsresize \- resize an NTFS filesystem
 .SH SYNOPSIS
 .B ntfsresize
 [\fB\-fhin\fR]
-[\fB\-c
-.I clusters\fR]
 [\fB\-s	\fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
 .I device
 .SH DESCRIPTION
@@ -80,10 +78,6 @@ You can use this option to make a test run before doing the real resize operatio
 Volume will be opened read-only and
 .B ntfsresize
 displays what it would do if it were to resize the filesystem.
-.TP
-.B -c \fIclusters
-Shrink volume to size given in NTFS
-.I clusters\fR.
 .TP
 .B -s \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]
 Shrink volume to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
