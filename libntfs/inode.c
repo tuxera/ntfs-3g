@@ -525,6 +525,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	u8 *al, *aln;
 	int al_len, al_allocated;
 	ATTR_LIST_ENTRY *ale;
+	ntfs_attr *na;
 
 	if (!ni) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
@@ -617,52 +618,47 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	al = aln;
 	ntfs_attr_put_search_ctx(ctx);
 
+	/* Set in-memory attribute list. */
+	ni->attr_list = al;
+	ni->attr_list_size = al_len;
+	NInoSetAttrList(ni);
+
 	/* Free space if there is not enough it for $ATTRIBUTE_LIST. */
 	if (le32_to_cpu(ni->mrec->bytes_allocated) -
 			le32_to_cpu(ni->mrec->bytes_in_use) <
 			offsetof(ATTR_RECORD, resident_attr_end)) {
-		/*
-		 * Set temporary in-memory attribute list. We need this to be
-		 * able perform attribute lookups and move out attributes.
-		 */
-		ni->attr_list = al;
-		ni->attr_list_size = al_len;
-		NInoSetAttrList(ni);
-		/* Free space. */
 		if (ntfs_inode_free_space(ni,
 				offsetof(ATTR_RECORD, resident_attr_end))) {
-			/*
-			 * Couldn't free space, unset temporary in-memory
-			 * attribute list and fail.
-			 */
+			/* Failed to free space. */
 			err = errno;
 			Dprintf("%s(): Failed to free space for "
 				"$ATTRIBUTE_LIST.\n", __FUNCTION__);
-			ni->attr_list = NULL;
-			NInoClearAttrList(ni);
-			goto err_out;
+			free(al);
+			goto rollback;
 		}
-		/* Unset temporary in-memory attribute list. */
-		ni->attr_list = NULL;
-		NInoClearAttrList(ni);
 	}
 
 	/* Add $ATTRIBUTE_LIST to mft record. */
-	if (ntfs_resident_attr_record_add(ni, AT_ATTRIBUTE_LIST, 0, 0, 0) < 0) {
+	na = ntfs_inode_add_attr(ni, AT_ATTRIBUTE_LIST, NULL, 0, al_len);
+	if (!na) {
 		err = errno;
-		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
-			__FUNCTION__);
-		goto err_out;
+		Dprintf("%s(): Failed to add $ATTRIBUTE_LIST.\n", __FUNCTION__);
+		goto rollback;
 	}
-
-	/* Set new attribute list. */	
-	if (ntfs_attrlist_set(ni, al, al_len)) {
-		err = errno;
-		Dprintf("%s(): Coudn't set attribute list.\n", __FUNCTION__);
-		goto err_out;
-	}
+	/* Done! */
+	ntfs_attr_close(na);
 	return 0;
+rollback:
+	/*
+	 * FIXME: We should here scan attribute list for attributes that placed
+	 * not in the base MFT record and move them to it.
+	 */
 
+	/* Unset in-memory attribute list. */
+	ni->attr_list = NULL;
+	NInoClearAttrList(ni);
+	errno = err;
+	return -1;
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
@@ -681,7 +677,7 @@ err_out:
 int ntfs_inode_free_space(ntfs_inode *ni, int size)
 {
 	ntfs_attr_search_ctx *ctx;
-	int freed = 0, err;
+	int freed, err;
 
 	if (!ni || size < 0) {
 		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
@@ -691,8 +687,11 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	
 	Dprintf("%s(): Entering for inode 0x%llx, size %d.\n",
 			__FUNCTION__, (long long) ni->mft_no, size);
+			
+	freed = (le32_to_cpu(ni->mrec->bytes_allocated) -
+				le32_to_cpu(ni->mrec->bytes_in_use));
 
-	if (!size)
+	if (size <= freed)
 		return 0;
 
 	ctx = ntfs_attr_get_search_ctx(ni, 0);
@@ -820,11 +819,12 @@ put_err_out:
 ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, s64 size)
 {
-	int attr_rec_size, err, i, offset;
+	u32 attr_rec_size;
+	int err, i, offset;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
 	
-	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
+	if (!ni || size < 0) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return NULL;
@@ -881,6 +881,12 @@ ntfs_attr *ntfs_inode_add_attr(ntfs_inode *ni, ATTR_TYPES type,
 			le32_to_cpu(ni->mrec->bytes_in_use) >= attr_rec_size) {
 		attr_ni = ni;
 		goto add_attr_record;
+	}
+
+	/* Attribute list can be placed only in the base MFT record. */
+	if (type == AT_ATTRIBUTE_LIST) {
+		err = ENOSPC;
+		goto err_out;
 	}
 
 	/* Try to add to extent inodes. */

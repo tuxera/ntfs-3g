@@ -2396,7 +2396,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		base_ni = ni->base_ni;
 	else
 		base_ni = ni;
-	if (NInoAttrList(base_ni)) {
+	if (type != AT_ATTRIBUTE_LIST && NInoAttrList(base_ni)) {
 		if (ntfs_attrlist_entry_add(ni, a)) {
 			err = errno;
 			ntfs_attr_record_resize(m, a, 0);
@@ -2526,7 +2526,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		base_ni = ni->base_ni;
 	else
 		base_ni = ni;
-	if (NInoAttrList(base_ni)) {
+	if (type != AT_ATTRIBUTE_LIST && NInoAttrList(base_ni)) {
 		if (ntfs_attrlist_entry_add(ni, a)) {
 			err = errno;
 			ntfs_attr_record_resize(m, a, 0);
@@ -2583,29 +2583,15 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 		return -1;
 	}
 
-	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
-		"%lld.\n", __FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
-		(unsigned) le32_to_cpu(ctx->attr->type),
-		(long long) sle64_to_cpu(ctx->attr->lowest_vcn));
+	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n",
+		__FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
+		(unsigned) le32_to_cpu(ctx->attr->type));
 	type = ctx->attr->type;
 	ni = ctx->ntfs_ino;
 	if (ctx->base_ntfs_ino)
 		base_ni = ctx->base_ntfs_ino;
 	else
 		base_ni = ctx->ntfs_ino;
-	/*
-	 * Remove record from $ATTRIBUTE_LIST if present and we don't want
-	 * delete $ATTRIBUTE_LIST itself.
-	 */
-	if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST) {
-		if (ntfs_attrlist_entry_rm(ctx)) {
-			err = errno;
-			Dprintf("%s(): Coudn't delete record from "
-				"$ATTRIBUTE_LIST.\n",  __FUNCTION__);
-			errno = err;
-			return -1;
-		}
-	}
 
 	/* Remove attribute itself. */
 	if (ntfs_attr_record_resize(ctx->mrec, ctx->attr, 0)) {
@@ -2620,10 +2606,25 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	}
 	ntfs_inode_mark_dirty(ni);
 
+	/*
+	 * Remove record from $ATTRIBUTE_LIST if present and we don't want
+	 * delete $ATTRIBUTE_LIST itself.
+	 */
+	if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST) {
+		if (ntfs_attrlist_entry_rm(ctx)) {
+			err = errno;
+			Dprintf("%s(): Coudn't delete record from "
+				"$ATTRIBUTE_LIST.\n",  __FUNCTION__);
+			errno = err;
+			return -1;
+		}
+	}
+
 	/* Post $ATTRIBUTE_LIST delete setup. */
 	if (type == AT_ATTRIBUTE_LIST) {
 		if (NInoAttrList(base_ni) && base_ni->attr_list)
 			free(base_ni->attr_list);
+		base_ni->attr_list = NULL;
 		NInoClearAttrList(base_ni);
 		NInoAttrListClearDirty(base_ni);
 	}
@@ -3321,10 +3322,19 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		goto put_err_out;
 	}
 
-	/* We can't move out attribute list. */
+	/* We can't move out attribute list, thus move out others. */
 	if (na->type == AT_ATTRIBUTE_LIST) {
-		err = ENOSPC;
-		goto put_err_out;
+		ntfs_attr_put_search_ctx(ctx);
+		if (ntfs_inode_free_space(na->ni, offsetof(ATTR_RECORD,
+				non_resident_attr_end) + 8)) {
+			err = errno;
+			Dprintf("%s(): Couldn't free space in the MFT record "
+				"to make attribute list non resident.\n",
+				__FUNCTION__);
+			errno = err;
+			return -1;
+		}
+		return ntfs_resident_attr_resize(na, newsize);
 	}
 
 	/*
@@ -3712,7 +3722,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 			if (na->type == AT_ATTRIBUTE_LIST) {
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_free_space(na->ni, mp_size -
-							exp_max_mp_size)) {
+							cur_max_mp_size)) {
 					if (errno != ENOSPC)
 						return -1;
 					Dprintf("%s(): Attribute list mapping "
@@ -4287,6 +4297,7 @@ put_err_out:
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
 	if (!na || newsize < 0 || (na->ni == FILE_MFT && na->type == AT_DATA)) {
+		Dprintf("%s(): Invalid aruments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
