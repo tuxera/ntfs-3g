@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.57)
-AC_INIT(ntfsprogs, 1.8.3-WIP, linux-ntfs-dev@lists.sourceforge.net)
+AC_INIT(ntfsprogs, 1.8.3, linux-ntfs-dev@lists.sourceforge.net)
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
 AM_CONFIG_HEADER([config.h])
@@ -73,6 +73,10 @@ AC_ARG_ENABLE(gnome-vfs,
 )
 compile_gnome_vfs=false
 if test "$enable_gnome_vfs" != "no"; then
+	# Make compilation work on SuSE 9.0.
+	if test -d "/opt/gnome"; then
+		export PKG_CONFIG_PATH="/opt/gnome/lib/pkgconfig"
+	fi
 	PKG_CHECK_MODULES(LIBNTFS_GNOMEVFS, [glib-2.0 gthread-2.0 gnome-vfs-module-2.0],
 	[ compile_gnome_vfs=true ],
 	[
