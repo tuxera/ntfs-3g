@@ -1,7 +1,10 @@
 description: Linux NTFS userspace library and utilities
-category: System Environment/Base
-logging: logging@openlogging.org
+category:    System Environment/Base
+homepage:    http://linux-ntfs.sf.net/
+bkweb:       http://linux-ntfs.bkbits.net:8080/ntfs-progs
+contact:     Anton Altaparmakov
+email: 	     aia21@cantab.net
+logging:     logging@openlogging.org
+checkout:    get
 compression: gzip
-autofix: yes
-contact: Anton Altaparmakov <aia21@cantab.net>
-email: aia21@cantab.net
+autofix:     yes
