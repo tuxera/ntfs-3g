@@ -361,14 +361,14 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 	if (!mft)
 		return NULL;
 
-	ctx = ntfs_attr_get_search_ctx(NULL, mft);
+	ctx = ntfs_attr_get_search_ctx (NULL, mft);
 	if (!ctx) {
 		Eprintf ("Couldn't create a search context.\n");
 		return NULL;
 	}
 
 	rec = find_attribute (type, ctx);
-	ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_put_search_ctx (ctx);
 	if (rec)
 		Dprintf ("find_first_attribute: found attr of type 0x%02x.\n", type);
 	else
@@ -388,7 +388,6 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
  */
 int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 {
-	// XXX endian
 	// XXX option: names = posix/win32 or dos
 	// flags: path, filename, or both
 	const int max_path = 20;
@@ -430,7 +429,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 			}
 
 			name_space = attr->file_name_type;
-			parent     = attr->parent_directory;
+			parent     = le64_to_cpu (attr->parent_directory);
 
 			if (names[i]) {
 				free (names[i]);
