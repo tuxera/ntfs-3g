@@ -664,16 +664,33 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
  *
  * dump the security information about the file
  */
-static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr)
+static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *vol)
 {
 	SECURITY_DESCRIPTOR_ATTR *sec_desc_attr;
 	char *sid;
-
-	sec_desc_attr = (SECURITY_DESCRIPTOR_ATTR *)((u8*)attr +
-			le16_to_cpu(attr->value_offset));
-
-	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
 	
+	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
+
+	if (attr->non_resident) {
+		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+		if (rl) {
+			sec_desc_attr = malloc(attr->data_size);
+			s64 bytes_read = ntfs_rl_pread(vol, rl, 0,
+						attr->data_size, sec_desc_attr);
+			if (bytes_read != attr->data_size) {
+				Eprintf("ntfsinfo error: could not read secutiry descriptor\n");
+				free(sec_desc_attr);
+				return;
+			}
+		} else {
+			Eprintf("ntfsinfo error: could not decompress runlist\n");
+			return;
+		}
+	} else {
+		sec_desc_attr = (SECURITY_DESCRIPTOR_ATTR *)((u8*)attr +
+				le16_to_cpu(attr->value_offset));
+	}
+
 	printf("\tRevision:\t\t %u\n",sec_desc_attr->revision);
 
 	/* TODO: parse the flags */
@@ -713,6 +730,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr)
 		printf("missing\n");
 	}
 	
+	if (attr->non_resident) free(sec_desc_attr);
 }
 
 /*
@@ -1236,10 +1254,10 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_file_name(ctx->attr);
 			break;
 		case AT_OBJECT_ID:
-			ntfs_dump_attr_object_id(ctx->attr,inode->vol);
+			ntfs_dump_attr_object_id(ctx->attr, inode->vol);
 			break;
 		case AT_SECURITY_DESCRIPTOR:
-			ntfs_dump_attr_security_descriptor(ctx->attr);
+			ntfs_dump_attr_security_descriptor(ctx->attr, inode->vol);
 			break;
 		case AT_VOLUME_NAME:
 			ntfs_dump_attr_volume_name(ctx->attr);
