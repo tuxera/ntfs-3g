@@ -88,19 +88,56 @@ is the special file corresponding to the device (e.g
 Display all files.  If this option is not specified file names in the POSIX
 namespace will not be displayed.
 .TP
-.BI "\-d, \-\-device" " DEVICE"
-The special file corresponding to the device that contains the NTFS partition
-to read.
+.B \-F, \-\-classify
+Append indicator (one of */=@|) to entries.
+.TP
+.B \-f, \-\-force
+Force execution.  For example necessary to run on an NTFS partition stored in
+a normal file.
+.TP
+.B \-h, \-?, \-\-help
+Print the usage information of 
+.B ntfsls
+and exit.
+.TP
+.B \-i, \-\-inode
+Print inode number of each file.  This is the MFT reference number in NTFS
+terminology.
+.TP
+.B \-l, \-\-long
+Use a long listing format.
+.TP
+.B \-p, \-\-path
+The directory whose contents to list or the file (including the path) about
+which to display information.
+.TP
+.B \-q, \-\-quiet
+Suppress some debug/warning/error messages.
+.TP
+.B \-s, \-\-system
+Unless this options is specified, all files beginning with a dollar sign
+character will not be listed as these files are usually system files.
 .TP
 .B \-V, \-\-version
 Print the version number of
 .B ntfsls
 and exit.
 .TP
-.B \-h, \-?, \-\-help
-Print the usage information of 
-.B ntfsls
-and exit.
+.B \-v, \-\-verbose
+Display more debug/warning/error messages.
+.TP
+.B \-x, \-\-dos
+Display short file names, i.e. files in the DOS namespace, instead of long
+file names, i.e. files in the WIN32 namespace.
+.TP
+.BI "\-d, \-\-device" " DEVICE"
+The special file corresponding to the device that contains the NTFS partition
+to read.  If you want to use an image of an NTFS partition stored on a normal
+file, you will also need to specify the
+.B \-f
+or
+.B \-\-force
+options.
 .SH BUGS
 We are not aware of any bugs.  If you find a bug, please report it to
 <linux-ntfs-dev@lists.sf.net>.  Thank you.
