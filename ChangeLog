@@ -184,6 +184,14 @@
 	- Extend the volume.h::ntfs_volume structure with variables required by
 	  the cluster and mft allocators and set them up in
 	  volume.c::ntfs_volume_startup().
+	- ntfs_umount() now also does an fdatasync() on the device before
+	  closing it.
+	- Added new utility ntfstruncate, primarily to be able to test the
+	  new ntfs_attr_truncate() function, it is not compiled by default.
+	  Note, the library can currently only make attributes smaller and it
+	  only works on uncompressed, unencrypted inodes which do not contain
+	  attribute lists, i.e. on simple files, but that was quite a lot of
+	  new code in itself which needs a lot of testing!
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for
