@@ -8,7 +8,7 @@ xx/xx/2003 - 1.8.0-devel - Work in progress.
 	- Add -fms-extensions when compiling with gcc-3.2+.
 	- Update for newer autoconf/automake.
 	- Abstract low level device operations (include/device,h and
-	  libntfs/device.c).
+	  libntfs/device.c) and adapt utilities to changes.
 	- Added ntfsclone utility written by Szabolcs Szakacsits.
 
 13/02/2003 - 1.7.1 - Urgent bug fixes.
