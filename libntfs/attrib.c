@@ -2235,7 +2235,7 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
  *		 caller has to make space before calling this.
  *	EINVAL - Input parameters were faulty.
  */
-static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
+int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 {
 	u32 biu;
 	
@@ -2274,7 +2274,7 @@ static int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 }
 
 /**
- * ntfs_non_resident_attr_record_add - 
+ * ntfs_non_resident_attr_record_add - add extent of non-resident attribute
  * @ni:			
  * @type:		
  * @name:		
@@ -2381,7 +2381,7 @@ put_err_out:
 }
 
 /**
- * ntfs_attr_record_rm - 
+ * ntfs_attr_record_rm - remove attribute extent.
  * @ctx:	
  *
  * User should reinit search context after use of this function if he/she wants
