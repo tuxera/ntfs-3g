@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright 2002-2004 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Mar 2004" "ntfsprogs @VERSION@"
+.TH NTFSRESIZE 8 "Mar 2004" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
