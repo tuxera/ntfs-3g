@@ -218,12 +218,12 @@ There may be other bugs. Please, report them to the author.
 This version of
 .B mkntfs
 has been written by Anton Altaparmakov <aia21@cantab.net> (if that fails, use
-<antona@users.sf.net>).
+<antona@users.sourceforge.net>).
 .SH AVAILABILITY
 .B mkntfs
 is part of the Linux-NTFS project and is available for download from
-http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
-rpm) and pre-compiled binary (i386 rpm and deb) form.
+http://sourceforge.net/project/showfiles.php?group_id=13956 in source (tar ball
+and rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
 .BR badblocks (8),
 .BR ntfsprogs (8)

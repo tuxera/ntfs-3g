@@ -337,7 +337,7 @@ Save MFT Records 3689 to 3690 to a file 'debug'
 There are some small limitations to this program, but currently no known bugs.
 If you find one, please send an email to
 .nh
-<linux-ntfs-dev@lists.sf.net>
+<linux-ntfs-dev@lists.sourceforge.net>
 .hy
 .SH AUTHOR
 .B ntfsundelete

@@ -140,7 +140,7 @@ or
 options.
 .SH BUGS
 We are not aware of any bugs.  If you find a bug, please report it to
-<linux-ntfs-dev@lists.sf.net>.  Thank you.
+<linux-ntfs-dev@lists.sourceforge.net>.  Thank you.
 .SH AUTHOR
 This version of
 .B ntfsls
@@ -150,8 +150,8 @@ Anton Altaparmakov.
 .SH AVAILABILITY
 .B ntfsls
 is part of the Linux-NTFS project and is available for download from
-http://sf.net/project/showfiles.php?group_id=13956 in source (tar ball and
-rpm) and pre-compiled binary (i386 rpm and deb) form.
+http://sourceforge.net/project/showfiles.php?group_id=13956 in source (tar ball
+and rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
 .BR ntfsprogs (8)
 

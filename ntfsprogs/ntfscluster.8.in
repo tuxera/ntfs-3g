@@ -124,7 +124,7 @@ The
 mode isn't implemented yet.  This program is quite limited, but it has no known
 bugs.  If you find one, please send an email to
 .nh
-<linux-ntfs-dev@lists.sf.net>
+<linux-ntfs-dev@lists.sourceforge.net>
 .hy
 .SH AUTHOR
 .B ntfscluster

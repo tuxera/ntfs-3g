@@ -246,7 +246,7 @@ Pack NTFS metadata for NTFS experts
 .SH BUGS
 This program has no known bugs.  If you find one, please send an email to
 .nh
-<linux-ntfs-dev@lists.sf.net>.
+<linux-ntfs-dev@lists.sourceforge.net>.
 
 Sometimes it might appear ntfsclone froze if the clone is on ReiserFS 
 and even CTRL-C won't stop it. This is not a bug in ntfsclone, however
