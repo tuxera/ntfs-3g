@@ -18,6 +18,8 @@ xx/xx/2004 - 1.9.1-WIP
 	- Copy MFT_RECORD typedef to MFT_RECORD_OLD and modify MFT_RECORD to
 	  contain the NTFS 3.1+ specific fields.  Also, update mkntfs and
 	  ntfsclone appropriately.
+	- Add new API mft.[hc]::ntfs_mft_record_{layout,format}() and make
+	  mkntfs use it.
 
 11/04/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
