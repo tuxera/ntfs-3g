@@ -395,6 +395,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *rec;
+	ATTR_RECORD *oldrec;
 	FILE_NAME_ATTR *attr;
 	int name_space;
 	MFT_REF parent = FILE_root;
@@ -420,11 +421,15 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
 
 		name_space = 4;
+		oldrec = NULL;
 		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+			if (rec == oldrec)
+				break;
+			oldrec = rec;
 			/* We know this will always be resident. */
 			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
 
-			if (attr->file_name_type >= name_space) { //XXX find the ...
+			if (attr->file_name_type > name_space) { //XXX find the ...
 				continue;
 			}
 
@@ -502,8 +507,8 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
  */
 int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize)
 {
-	int len, namelen, offset = 0;
-	char *name = NULL;
+	int len, namelen;
+	char *name;
 	ATTR_DEF *attrdef;
 
 	// flags: attr, name, or both
@@ -512,6 +517,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 
 	attrdef = ntfs_attr_find_in_attrdef (vol, attr->type);
 	if (attrdef) {
+		name    = NULL;
 		namelen = ntfs_ucsnlen (attrdef->name, sizeof (attrdef->name));
 		if (ntfs_ucstombs (attrdef->name, namelen, &name, namelen) < 0) {
 			Eprintf ("Couldn't translate attribute type to current locale.\n");
@@ -529,24 +535,27 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 		return 0;
 	}
 
-	offset += len;
-
 	if (!attr->name_length) {
 		return 0;
 	}
 
+	buffer  += len;
+	bufsize -= len;
+
+	name    = NULL;
 	namelen = attr->name_length;
 	if (ntfs_ucstombs ((uchar_t *)((char *)attr + attr->name_offset),
 	    namelen, &name, namelen) < 0) {
 		Eprintf ("Couldn't translate attribute name to current locale.\n");
 		// <UNKNOWN>?
+		len = snprintf (buffer, bufsize, "<UNKNOWN>");
 		return 0;
 	}
 
-	len = snprintf (buffer + offset, bufsize - offset, "(%s)", name);
+	len = snprintf (buffer, bufsize, "(%s)", name);
 	free (name);
 
-	if ((len + offset) >= bufsize) {
+	if (len >= bufsize) {
 		Eprintf ("Attribute name was truncated.\n");
 		return 0;
 	}
