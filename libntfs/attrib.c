@@ -2249,7 +2249,7 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 	u32 biu;
 	
 	Dprintf("%s(): Entering for pos 0x%d, size %u.\n",
-		 __FUNCTION__, (int)(pos - (u8*)m), size);
+		 __FUNCTION__, (int)(pos - (u8*)m), (unsigned) size);
 
 	/* Make size 8-byte aligment. */
 	size = (size + 7) & ~7;
@@ -2310,8 +2310,9 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	int err, offset;
 	
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
-		"dataruns_size %d, flags 0x%x.\n", __FUNCTION__, ni->mft_no,
-		type, lowest_vcn, dataruns_size, flags);
+		"dataruns_size %d, flags 0x%x.\n", __FUNCTION__,
+		(long long) ni->mft_no, (unsigned) type, (long long) lowest_vcn,
+		dataruns_size, (unsigned) flags);
 	
 	if (!ni || dataruns_size <= 0) {
 		errno = EINVAL;
@@ -2412,9 +2413,9 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
 	}
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, lowest_vcn "
-			"%lld.\n", __FUNCTION__, ctx->ntfs_ino->mft_no,
-			le32_to_cpu(ctx->attr->type),
-			le64_to_cpu(ctx->attr->lowest_vcn));
+		"%lld.\n", __FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
+		(unsigned) le32_to_cpu(ctx->attr->type),
+		(long long) sle64_to_cpu(ctx->attr->lowest_vcn));
 	type = ctx->attr->type;
 	ni = ctx->ntfs_ino;
 	if (ctx->base_ntfs_ino)
@@ -2489,7 +2490,8 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
  */
 int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 {
-	Dprintf("%s(): Entering for new_size %u.\n",  __FUNCTION__, new_size);
+	Dprintf("%s(): Entering for new_size %u.\n",
+			__FUNCTION__, (unsigned) new_size);
 	/* Align to 8 bytes, just in case the caller hasn't. */
 	new_size = (new_size + 7) & ~7;
 	/* If the actual attribute length has changed, move things around. */
@@ -3668,8 +3670,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Update the attribute record and the ntfs attribute structure. */
 	na->data_size = newsize;
 	a->data_size = scpu_to_le64(newsize);
-	na->initialized_size = newsize;
-	a->initialized_size = scpu_to_le64(newsize);
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
