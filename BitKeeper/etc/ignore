@@ -32,6 +32,7 @@ ntfsprogs-*.tar.gz
 # specific programs
 ntfsprogs/dumplog
 ntfsprogs/mkntfs
+ntfsprogs/ntfscat
 ntfsprogs/ntfsclone
 ntfsprogs/ntfscluster
 ntfsprogs/ntfsdump_logfile
