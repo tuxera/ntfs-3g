@@ -1,8 +1,8 @@
 .\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
-.\" Copyright (c) 2002 Anton Altaparmakov. All Rights Reserved.
+.\" Copyright (c) 2002-2003 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "May 2002" "Linux-NTFS version @VERSION@"
+.TH NTFSPROGS 8 "August 2003" "Linux-NTFS version @VERSION@"
 
 .SH OVERVIEW
 .B ntfsprogs
@@ -28,6 +28,10 @@ or directories within it.
 .PP
 .BR ntfslabel (8)
 : Show, or set, an NTFS partition's volume label.
+.SS ntfsls
+.PP
+.BR ntfsls (8)
+: List information about files in a directory residing on an NTFS partition.
 .SS ntfsresize
 .PP
 .BR ntfsresize (8)
@@ -39,8 +43,7 @@ or directories within it.
 
 .SH AUTHORS
 .PP
-The tools have been written by Anton Altaparmakov, Richard Russon, Matthew Fanto
-and Szabolcs Szakacsits.
+The tools have been written by Anton Altaparmakov, Richard Russon, Matthew Fanto, Szabolcs Szakacsits, and Lode Leroy.
 
 .SH AVAILABILITY
 The
