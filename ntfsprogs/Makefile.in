@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
+SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -45,7 +45,7 @@ sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 	ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT) ntfsclone$(EXEEXT)
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) ntfswipe$(EXEEXT) \
 	ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT) ntfsrm$(EXEEXT) \
-	ntfscp$(EXEEXT)
+	ntfscp$(EXEEXT) ntfsmftalloc$(EXEEXT)
 subdir = ntfsprogs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/mkntfs.8.in $(srcdir)/ntfscat.8.in \
@@ -104,6 +104,9 @@ ntfslabel_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfsls_OBJECTS = ntfsls.$(OBJEXT) utils.$(OBJEXT)
 ntfsls_OBJECTS = $(am_ntfsls_OBJECTS)
 ntfsls_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_ntfsmftalloc_OBJECTS = ntfsmftalloc.$(OBJEXT) utils.$(OBJEXT)
+ntfsmftalloc_OBJECTS = $(am_ntfsmftalloc_OBJECTS)
+ntfsmftalloc_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfsmove_OBJECTS = ntfsmove.$(OBJEXT) utils.$(OBJEXT)
 ntfsmove_OBJECTS = $(am_ntfsmove_OBJECTS)
 ntfsmove_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -136,14 +139,16 @@ SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) \
 	$(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
 	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
 	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
+	$(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) \
+	$(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 DIST_SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
 	$(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
 	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
 	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
+	$(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) \
+	$(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 man8dir = $(mandir)/man8
@@ -319,6 +324,9 @@ ntfsrm_LDFLAGS = $(AM_LFLAGS)
 ntfstruncate_SOURCES = attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD = $(AM_LIBS)
 ntfstruncate_LDFLAGS = $(AM_LFLAGS)
+ntfsmftalloc_SOURCES = ntfsmftalloc.c utils.c utils.h
+ntfsmftalloc_LDADD = $(AM_LIBS)
+ntfsmftalloc_LDFLAGS = $(AM_LFLAGS)
 ntfsmove_SOURCES = ntfsmove.c ntfsmove.h utils.c utils.h
 ntfsmove_LDADD = $(AM_LIBS)
 ntfsmove_LDFLAGS = $(AM_LFLAGS)
@@ -472,6 +480,9 @@ ntfslabel$(EXEEXT): $(ntfslabel_OBJECTS) $(ntfslabel_DEPENDENCIES)
 ntfsls$(EXEEXT): $(ntfsls_OBJECTS) $(ntfsls_DEPENDENCIES) 
 	@rm -f ntfsls$(EXEEXT)
 	$(LINK) $(ntfsls_LDFLAGS) $(ntfsls_OBJECTS) $(ntfsls_LDADD) $(LIBS)
+ntfsmftalloc$(EXEEXT): $(ntfsmftalloc_OBJECTS) $(ntfsmftalloc_DEPENDENCIES) 
+	@rm -f ntfsmftalloc$(EXEEXT)
+	$(LINK) $(ntfsmftalloc_LDFLAGS) $(ntfsmftalloc_OBJECTS) $(ntfsmftalloc_LDADD) $(LIBS)
 ntfsmove$(EXEEXT): $(ntfsmove_OBJECTS) $(ntfsmove_DEPENDENCIES) 
 	@rm -f ntfsmove$(EXEEXT)
 	$(LINK) $(ntfsmove_LDFLAGS) $(ntfsmove_OBJECTS) $(ntfsmove_LDADD) $(LIBS)
@@ -510,6 +521,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsinfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfslabel.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsls.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmftalloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmove.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsresize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsrm.Po@am__quote@
