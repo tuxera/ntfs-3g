@@ -3290,7 +3290,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			ntfs_attr_close(tna);
 			continue;
 		}
-		ntfs_inode_mark_dirty(ctx->ntfs_ino);
+		ntfs_inode_mark_dirty(tna->ni);
 		ntfs_attr_close(tna);
 		ntfs_attr_put_search_ctx(ctx);
 		return ntfs_resident_attr_resize(na, newsize);
@@ -3321,6 +3321,17 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		err = errno;
 		goto put_err_out;
 	}
+
+	/*
+	 * Check whether attribute is already single in the this MFT record.
+	 * 8 added for the attribute terminator.
+	 */
+	if (le32_to_cpu(ctx->mrec->bytes_in_use) ==
+			le16_to_cpu(ctx->mrec->attrs_offset) +
+			le32_to_cpu(ctx->attr->length) + 8) {
+		err = ENOSPC;
+		goto put_err_out;
+	}
 	
 	/* Add attribute list if not present. */
 	if (na->ni->nr_extents == -1)
@@ -3349,7 +3360,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		goto put_err_out;
 	}
 	/* Update ntfs attribute. */
-	na->ni = ni;
+	if (na->ni->nr_extents == -1)
+		na->ni = ni;
 
 	ntfs_attr_put_search_ctx(ctx);
 	/* Try to perform resize once again. */
@@ -4255,7 +4267,7 @@ put_err_out:
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
-	if (!na || newsize < 0) {
+	if (!na || newsize < 0 || (na->ni == FILE_MFT && na->type == AT_DATA)) {
 		errno = EINVAL;
 		return -1;
 	}
