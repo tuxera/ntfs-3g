@@ -333,6 +333,7 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 	const char *todo = "This is still work in progress.";
 	char *buf;
 	int i, j;
+	u32 u;
 
 	switch (type) {
 	case AT_STANDARD_INFORMATION:
@@ -461,11 +462,11 @@ void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		printf("%s\n", don_t_know);
 		return;
 	default:
-		i = le32_to_cpu(type);
+		u = le32_to_cpu(type);
 		printf("Cannot display unknown %s defined attribute type 0x%x"
-				".\n", i >=
+				".\n", u >=
 				le32_to_cpu(AT_FIRST_USER_DEFINED_ATTRIBUTE) ?
-				"user" : "system", i);
+				"user" : "system", u);
 	}
 }
 
@@ -579,7 +580,8 @@ void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 	if (a->name_length) {
 		if (ucstos(s, (uchar_t*)((char*)a +
 				cpu_to_le16(a->name_offset)),
-				min(sizeof(s), a->name_length + 1)) == -1) {
+				min((int)sizeof(s),
+						a->name_length + 1)) == -1) {
 			Eprintf("Could not convert Unicode string to single "
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
