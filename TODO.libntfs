@@ -4,6 +4,7 @@
 
 - be generic filter: provide ntfs_device_operations from parent GnomeVFSHandle
 
+
 ***********
 * libntfs *
 ***********
