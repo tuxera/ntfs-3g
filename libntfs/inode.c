@@ -193,22 +193,25 @@ err_out:
  * error, @ni has not been freed. The user should attempt to handle the error
  * and call ntfs_inode_close() again. The following error codes are defined:
  *
- *	EBUSY	@ni is dirty and/or the attribute list runlist is dirty.
+ *	EBUSY	@ni and/or its attribute list runlist is/are dirty and the
+ *		attempt to write it/them to disk failed.
  *	EINVAL	@ni is invalid (probably it is an extent inode!)
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
-	/* If the inode is an extent inode, comply rudely! */
+	/* If the inode is an extent inode, complain rudely! */
 	if (ni->nr_extents == -1) {
 		Dprintf("%s(): BUG: Tried to close extent inode!\n",
 				__FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
-	// TODO: This needs to be replaced with a flush to disk attempt. (AIA)
+	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
-		errno = EBUSY;
-		return -1;
+		if (ntfs_inode_sync(ni)) {
+			errno = EBUSY;
+			return -1;
+		}
 	}
 	/* Is this a base inode with mapped extent inodes? */
 	if (ni->nr_extents > 0) {
@@ -316,5 +319,25 @@ err_out:
 	errno = i;
 	Dperror("Failed to open extent inode");
 	return NULL;
+}
+
+/**
+ * ntfs_inode_sync - write the inode (and its dirty extents) to disk
+ * @ni:		ntfs inode to write
+ *
+ * Write the inode @ni to disk as well as its dirty extent inodes if such
+ * exist.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_inode_sync(ntfs_inode *ni)
+{
+	if (!ni) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	errno = ENOTSUP;
+	return -1;
 }
 

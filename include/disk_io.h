@@ -32,9 +32,9 @@ extern s64 ntfs_mst_pread(const int fd, const s64 pos, s64 count,
 extern s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 		const u32 bksize, const void *b);
 
-extern s64 ntfs_clusters_read(const ntfs_volume *vol, const s64 lcn,
+extern s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b);
-extern s64 ntfs_clusters_write(const ntfs_volume *vol, const s64 lcn,
+extern s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b);
 
 #endif /* defined _NTFS_DISK_IO_H */

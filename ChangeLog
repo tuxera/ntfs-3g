@@ -13,7 +13,7 @@
 	- Rewrite disk_io.[ch] and mft.[ch] defining new access API:
 		disk_io.[ch] provide:	ntfs_p{read,write}(),
 					ntfs_mst_p{read,write}(), and
-					ntfs_clusters_{read,write}().
+					ntfs_cluster_{read,write}().
 		mft.[ch] provide:	ntfs_mft_record_{read,write}(),
 					ntfs_mft_records_{read,write}(), and
 					ntfs_mft_record_get_data_size().
@@ -100,7 +100,7 @@
 	  and writes and deal with end of file properly. Affected functions:
 	  	ntfs_p{read,write}(),
 		ntfs_mst_p{read,write}(), and
-		ntfs_clusters_{read,write}().
+		ntfs_cluster_{read,write}().
 	- Change ntfsfix to take into account the automatic mft mirror updates.
 	- Add new API provided by new files dir.[ch]:
 		ntfs_inode_lookup_by_name(), and
@@ -167,6 +167,15 @@
 	  Thanks to Szakacsits Szabolcs for pointing this problem out.
 	- New API function provided by unistr.[hc] and use it in mkntfs:
 		ntfs_ucsnlen().
+	- New API function provided by attrib.[hc] and use it in mkntfs:
+		ntfs_resident_attr_value_resize(),
+		ntfs_attr_truncate(). -- WIP
+	- New API functions provided by inode.[hc]:
+		ntfs_inode_mark_dirty(),
+		ntfs_inode_sync(). -- WIP
+	- Change ntfs_inode_close() to write out dirty inodes and inode extents.
+	- New API functions provided by lcnalloc.[hc]:
+		ntfs_cluster_{alloc,free}().
 
 12/03/2002 - 1.6.0 - More mkntfs options and cleanups.
 	Fix typo in usage information of mkntfs. Thanks to Richard Russon for

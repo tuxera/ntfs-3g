@@ -2037,3 +2037,156 @@ err_out:
 	return -1;
 }
 
+/**
+ * ntfs_non_resident_attr_shrink - shrink a non-resident, open ntfs attribute
+ * @na:		non-resident ntfs attribute to shrink
+ * @newsize:	new size (in bytes) to which to shrink the attribute
+ *
+ * Reduce the size of a non-resident, open ntfs attribute @na to @newsize bytes.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ */
+static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize) {
+	errno = ENOTSUP;
+	return -1;
+}
+
+/**
+ * ntfs_resident_attr_value_resize - resize the value of a resident attribute
+ * @m:		mft record containing attribute record
+ * @a:		attribute record whose value to resize
+ * @newsize:	new size in bytes to which to resize the attribute value of @a
+ *
+ * Resize the value of the attribute @a in the mft record @m to @newsize bytes.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOSPC	- Not enough space in mft record to perform the resize.
+ * Note that on error no modifications have been performed whatsoever.
+ */
+int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
+		const u32 newsize)
+{
+	u32 new_alen, new_muse;
+
+	/* Calculate the new attribute length and mft record bytes used. */
+	new_alen = (le32_to_cpu(a->length) - le32_to_cpu(a->value_length) +
+			newsize + 7) & ~7;
+	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
+			new_alen;
+	/* Not enough space in this mft record. */
+	if (new_muse > le32_to_cpu(m->bytes_allocated)) {
+		errno = ENOSPC;
+		return -1;
+	}
+	/* Move attributes following @a to their new location. */
+	memmove((u8*)a + new_alen, (u8*)a + le32_to_cpu(a->length),
+			le32_to_cpu(m->bytes_in_use) - ((u8*)a - (u8*)m) -
+			le32_to_cpu(a->length));
+	/* Adjust @a to reflect the new value size. */
+	a->length = cpu_to_le32(new_alen);
+	a->value_length = cpu_to_le32(newsize);
+	/* Adjust @m to reflect the change in used space. */
+	m->bytes_in_use = cpu_to_le32(new_muse);
+	return 0;
+}
+
+/**
+ * ntfs_resident_attr_shrink - shrink a resident, open ntfs attribute
+ * @na:		resident ntfs attribute to shrink
+ * @newsize:	new size (in bytes) to which to shrink the attribute
+ *
+ * Reduce the size of a resident, open ntfs attribute @na to @newsize bytes.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ */
+static int ntfs_resident_attr_shrink(ntfs_attr *na, const u32 newsize) {
+	ntfs_attr_search_ctx *ctx;
+	int err;
+
+	Dprintf("%s(): Entering for inode 0x%Lx, attr 0x%x.\n", __FUNCTION__,
+			(unsigned long long)na->ni->mft_no, na->type);
+	/* Get the attribute record that needs modification. */
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+	if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0, 0, NULL, 0,
+			ctx)) {
+		err = errno;
+		goto put_err_out;
+	}
+
+	// TODO: Check the attribute type and the corresponding minimum size
+	// against @newsize and fail if @newsize is too small! (AIA)
+
+	/* Perform the resize of the attribute record. */
+	if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr, newsize)) {
+		err = errno;
+		goto put_err_out;
+	}
+	/* Update the ntfs attribute structure, too. */
+	na->allocated_size = na->data_size = na->initialized_size = newsize;
+	if (NAttrCompressed(na) || NAttrSparse(na))
+		na->compressed_size = newsize;
+
+	/*
+	 * Set the inode (and its base inode if it exists) dirty so it is
+	 * written out later.
+	 */
+	ntfs_inode_mark_dirty(ctx->ntfs_ino);
+
+	ntfs_attr_put_search_ctx(ctx);
+	return 0;
+put_err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_attr_truncate - resize an ntfs attribute
+ * @na:		open ntfs attribute to resize
+ * @newsize:	new size (in bytes) to which to resize the attribute
+ *
+ * Change the size of an open ntfs attribute @na to @newsize bytes.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	EINVAL	- Invalid arguments were passed to the function.
+ *	ENOTSUP	- The desired resize is not implemented yet.
+ *
+ * NOTE: At present attributes can only be made smaller using this function,
+ *	 never bigger.
+ */
+int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
+{
+	if (!na || newsize < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	/*
+	 * Encrypted attributes are not supported. We return access denied,
+	 * which is what Windows NT4 does, too.
+	 */
+	if (NAttrEncrypted(na)) {
+		errno = EACCES;
+		return -1;
+	}
+	/*
+	 * TODO: Implement making attributes bigger/filling in of uninitialized
+	 * holes as well as handling of compressed attributes. (AIA)
+	 */
+	if (newsize > na->initialized_size || NAttrCompressed(na)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	if (NAttrNonResident(na))
+		return ntfs_non_resident_attr_shrink(na, newsize);
+	return ntfs_resident_attr_shrink(na, newsize);
+}
+

@@ -264,7 +264,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
 }
 
 /**
- * ntfs_clusters_read - read ntfs clusters
+ * ntfs_cluster_read - read ntfs clusters
  * @vol:	volume to read from
  * @lcn:	starting logical cluster number
  * @count:	number of clusters to read
@@ -274,7 +274,7 @@ s64 ntfs_mst_pwrite(const int fd, const s64 pos, s64 count,
  * volume @vol into buffer @b. Return number of clusters read or -1 on error,
  * with errno set to the error code.
  */
-s64 ntfs_clusters_read(const ntfs_volume *vol, const s64 lcn,
+s64 ntfs_cluster_read(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b)
 {
 	s64 br;
@@ -297,7 +297,7 @@ s64 ntfs_clusters_read(const ntfs_volume *vol, const s64 lcn,
 }
 
 /**
- * ntfs_clusters_write - write ntfs clusters
+ * ntfs_cluster_write - write ntfs clusters
  * @vol:	volume to write to
  * @lcn:	starting logical cluster number
  * @count:	number of clusters to write
@@ -307,7 +307,7 @@ s64 ntfs_clusters_read(const ntfs_volume *vol, const s64 lcn,
  * buffer @b to volume @vol. Return the number of clusters written or -1 on
  * error, with errno set to the error code.
  */
-s64 ntfs_clusters_write(const ntfs_volume *vol, const s64 lcn,
+s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
 		const s64 count, const void *b)
 {
 	s64 bw;

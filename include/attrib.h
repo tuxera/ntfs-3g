@@ -261,6 +261,10 @@ extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 extern int ntfs_write_significant_bytes(s8 *dst, const s8 *dst_max,
 		const s64 n);
 
+extern int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
+		const u32 newsize);
+
+extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
 
 // FIXME / TODO: Above here the file is cleaned up. (AIA)
 /**

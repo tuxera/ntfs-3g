@@ -85,6 +85,7 @@ struct _ntfs_inode {
 	u32 attr_list_size;	/* Length of attribute list value in bytes. */
 	u8 *attr_list;		/* Attribute list value itself. */
 	runlist *attr_list_rl;	/* Run list for the attribute list value. */
+	/* Below fields are always valid. */
 	s32 nr_extents;		/* For a base mft record, the number of
 				   attached extent inodes (0 if none), for
 				   extent records this is -1. */
@@ -104,6 +105,24 @@ extern int ntfs_inode_close(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);
+
+/**
+ * ntfs_inode_mark_dirty - set the inode (and its base inode if it exists) dirty
+ * @ni:		ntfs inode to set dirty
+ *
+ * Set the inode @ni dirty so it is written out later (at the latest at
+ * ntfs_inode_close() time). If @ni is an extent inode, set the base inode
+ * dirty, too.
+ *
+ * This function cannot fail.
+ */
+static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni) {
+	NInoSetDirty(ni);
+	if (ni->nr_extents == -1)
+		NInoSetDirty(ni->base_ni);
+}
+
+extern int ntfs_inode_sync(ntfs_inode *ni);
 
 #endif /* defined _NTFS_INODE_H */
 

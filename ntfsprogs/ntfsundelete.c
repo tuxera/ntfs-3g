@@ -1823,7 +1823,7 @@ int undelete_file (ntfs_volume *vol, long long inode)
 							goto free;
 						}
 					} else {
-						if (ntfs_clusters_read(vol, j, 1, buffer) < 1) {
+						if (ntfs_cluster_read(vol, j, 1, buffer) < 1) {
 							Eprintf ("Read failed: %s\n", strerror (errno));
 							close (fd);
 							goto free;

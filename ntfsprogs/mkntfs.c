@@ -860,35 +860,6 @@ int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 	return 0;
 }
 
-/* Return 0 on success and -errno on error. */
-int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
-		const u32 new_vsize)
-{
-	int new_alen, new_muse;
-
-	/* New attribute length and mft record bytes used. */
-	new_alen = (le32_to_cpu(a->length) - le32_to_cpu(a->value_length) +
-			new_vsize + 7) & ~7;
-	new_muse = le32_to_cpu(m->bytes_in_use) - le32_to_cpu(a->length) +
-			new_alen;
-	/* Check for sufficient space. */
-	if (new_muse > le32_to_cpu(m->bytes_allocated) ) {
-		// Aarrgghh! Need to make space. Probably want generic function
-		// for this as we need to call it from other places, too.
-		return -ENOTSUP;
-	}
-	/* Move attributes behind @a to their new location. */
-	memmove((char*)a + new_alen, (char*)a + le32_to_cpu(a->length),
-			le32_to_cpu(m->bytes_in_use) - ((char*)a - (char*)m) -
-			le32_to_cpu(a->length));
-	/* Adjust @m to reflect change in used space. */
-	m->bytes_in_use = cpu_to_le32(new_muse);
-	/* Adjust @a to reflect new value size. */
-	a->length = cpu_to_le32(new_alen);
-	a->value_length = cpu_to_le32(new_vsize);
-	return 0;
-}
-
 void deallocate_scattered_clusters(const runlist *rl)
 {
 	LCN j;
@@ -1976,12 +1947,12 @@ int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 			+ le16_to_cpu(re->length));
 	r->index.allocated_size = r->index.index_length;
 	/* Resize index root attribute. */
-	err = resize_resident_attribute_value(m, a, sizeof(INDEX_ROOT) -
+	if (ntfs_resident_attr_value_resize(m, a, sizeof(INDEX_ROOT) -
 			sizeof(INDEX_HEADER) +
-			le32_to_cpu(r->index.allocated_size));
-	if (err) {
+			le32_to_cpu(r->index.allocated_size))) {
 		// TODO: Remove the added bitmap!
 		// Revert index root from index allocation.
+		err = -errno;
 		goto err_out;
 	}
 	/* Set VCN pointer to 0LL. */
