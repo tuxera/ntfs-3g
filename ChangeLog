@@ -32,6 +32,9 @@
 	- Create new config option --enable-warnings and make that enable all
 	  the compiler warnings (this used to be done in maintainer mode).
 	- Remove AM_MAINTAINER_MODE from configure.ac.
+	- Support the case where $Volume does not have a $VOLUME_NAME
+	  attribute in ntfs_device_mount() and let ntfslabel create the
+	  attribute when it is not present.
 
 11/03/2004 - 1.9.0 - Added ntfsresize relocation support and a lot of cleanups.
 	- In include/ntfs/*.h Wrap all #include "config.h" by #ifdef
