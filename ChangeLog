@@ -48,6 +48,15 @@ xx/xx/2004 - 1.9.3-WIP
 	  can be #ifdef-ed out if people want it to be truly silent.  (Anton)
 	- Fix memory leaks in libntfs/attrib.c, ntfsprogs/mkntfs.c and
 	  ntfsprogs/ntfsundelete.c.  (Christophe)
+	- Change libntfs/attrib.c::ntfs_attr_make_non_resident() to only
+	  allocate clusters and attempt to write out data if the attribute size
+	  is not zero.  (Anton)
+	- Fix libntfs/attrib.c::ntfs_non_resident_attr_expand() to use
+	  libntfs/attrib.c::ntfs_attr_map_whole_runlist() instead of
+	  libntfs/attrib.c::ntfs_attr_map_runlist().  (Anton)
+	- Change libntfs/runlist.c::ntfs_get_size_for_mapping_pairs() and
+	  libntfs/runlist.c::ntfs_mapping_pairs_build() to treat a NULL runlist
+	  to mean empty runlist.  (Anton)
 
 11/05/2004 - 1.9.2 - Decompression bug fixes, ntfsinfo enhancements, updates.
 	- Hopefully fix the autogen.sh problems using the --force and touch
