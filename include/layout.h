@@ -271,6 +271,8 @@ typedef u64 MFT_REF;
 
 #define MK_MREF(m, s)	((MFT_REF)(((MFT_REF)(s) << 48) |		\
 					((MFT_REF)(m) & MFT_REF_MASK_CPU)))
+#define MK_LE_MREF(m, s) const_cpu_to_le64(((MFT_REF)(((MFT_REF)(s) << 48) | \
+					((MFT_REF)(m) & MFT_REF_MASK_CPU))))
 
 #define MREF(x)		((u64)((x) & MFT_REF_MASK_CPU))
 #define MSEQNO(x)	((u16)(((x) >> 48) & 0xffff))
