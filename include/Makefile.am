@@ -11,6 +11,7 @@ linux_ntfsinclude_HEADERS = \
 	attrib.h	\
 	bitmap.h	\
 	bootsect.h	\
+	compat.h	\
 	debug.h		\
 	dir.h		\
 	disk_io.h	\
