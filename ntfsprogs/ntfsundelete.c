@@ -489,6 +489,9 @@ int parse_options (int argc, char *argv[])
 		}
 	}
 
+	if (opts.fillbyte == -1)
+		opts.fillbyte = 0;
+
 	if (ver)
 		version();
 	if (help || err)
