@@ -46,6 +46,9 @@
 #ifdef HAVE_MACHINE_ENDIAN_H
 #	include <machine/endian.h>
 #endif
+#ifdef HAVE_SYS_PARAM_H
+#	include <sys/param.h>
+#endif
 #ifndef __BYTE_ORDER
 #	ifdef _BYTE_ORDER
 #		define __BYTE_ORDER _BYTE_ORDER
@@ -56,40 +59,14 @@
 #			define __BYTE_ORDER BYTE_ORDER
 #			define __LITTLE_ENDIAN LITTLE_ENDIAN
 #			define __BIG_ENDIAN BIG_ENDIAN
+#		else
+#			error "__BYTE_ORDER is not defined."
 #		endif
 #	endif
 #endif
 #ifdef HAVE_BYTESWAP_H
 #	include <byteswap.h>
 #endif
-
-#if (__BYTE_ORDER == __LITTLE_ENDIAN)
-
-#define __le16_to_cpu(x) (x)
-#define __le32_to_cpu(x) (x)
-#define __le64_to_cpu(x) (x)
-
-#define __cpu_to_le16(x) (x)
-#define __cpu_to_le32(x) (x)
-#define __cpu_to_le64(x) (x)
-
-#define __constant_le16_to_cpu(x) (x)
-#define __constant_le32_to_cpu(x) (x)
-#define __constant_le64_to_cpu(x) (x)
-
-#define __constant_cpu_to_le16(x) (x)
-#define __constant_cpu_to_le32(x) (x)
-#define __constant_cpu_to_le64(x) (x)
-
-#elif (__BYTE_ORDER == __BIG_ENDIAN)
-
-#define __le16_to_cpu(x) bswap_16(x)
-#define __le32_to_cpu(x) bswap_32(x)
-#define __le64_to_cpu(x) bswap_64(x)
-
-#define __cpu_to_le16(x) bswap_16(x)
-#define __cpu_to_le32(x) bswap_32(x)
-#define __cpu_to_le64(x) bswap_64(x)
 
 #define __ntfs_bswap_constant_16(x)		\
 	  (u16)((((u16)(x) & 0xff00) >> 8) |	\
@@ -111,6 +88,34 @@
 		(((u64)(x) & 0x000000000000ff00ull) << 40) |	\
 		(((u64)(x) & 0x00000000000000ffull) << 56))
 
+#if defined(__LITTLE_ENDIAN) && (__BYTE_ORDER == __LITTLE_ENDIAN)
+
+#define __le16_to_cpu(x) (x)
+#define __le32_to_cpu(x) (x)
+#define __le64_to_cpu(x) (x)
+
+#define __cpu_to_le16(x) (x)
+#define __cpu_to_le32(x) (x)
+#define __cpu_to_le64(x) (x)
+
+#define __constant_le16_to_cpu(x) (x)
+#define __constant_le32_to_cpu(x) (x)
+#define __constant_le64_to_cpu(x) (x)
+
+#define __constant_cpu_to_le16(x) (x)
+#define __constant_cpu_to_le32(x) (x)
+#define __constant_cpu_to_le64(x) (x)
+
+#elif defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
+
+#define __le16_to_cpu(x) bswap_16(x)
+#define __le32_to_cpu(x) bswap_32(x)
+#define __le64_to_cpu(x) bswap_64(x)
+
+#define __cpu_to_le16(x) bswap_16(x)
+#define __cpu_to_le32(x) bswap_32(x)
+#define __cpu_to_le64(x) bswap_64(x)
+
 #define __constant_le16_to_cpu(x) __ntfs_bswap_constant_16((u16)(x))
 #define __constant_le32_to_cpu(x) __ntfs_bswap_constant_32((u32)(x))
 #define __constant_le64_to_cpu(x) __ntfs_bswap_constant_64((u64)(x))
@@ -121,7 +126,7 @@
 
 #else
 
-#error "You must define __BYTE_ORDER to be __LITTLE_ENDIAN or __BIG_ENDIAN"
+#error "You must define __BYTE_ORDER to be __LITTLE_ENDIAN or __BIG_ENDIAN."
 
 #endif
 
