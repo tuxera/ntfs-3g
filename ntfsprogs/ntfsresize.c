@@ -98,7 +98,7 @@ struct __ntfs_resize_t {
 	s64 new_volume_size;
 	ntfs_inode *ni;			/* inode being processed */
 	MFT_RECORD *mrec;		/* MFT buffer being processed */
-	ntfs_attr_search_ctx *ctx;  	/* inode attribute being processed */
+	ntfs_attr_search_ctx *ctx;	/* inode attribute being processed */
 	u64 relocations;		/* number of clusters to relocate */
 	u64 inuse;			/* number of clusters in use */
 };
@@ -304,7 +304,7 @@ void parse_options(int argc, char **argv)
 
 	memset(&opt, 0, sizeof(opt));
 
-	while ((i = getopt(argc, argv, "dfhins:V")) != EOF)
+	while ((i = getopt(argc, argv, "dfh?ins:V")) != EOF)
 		switch (i) {
 		case 'd':
 			opt.debug = 1;
@@ -313,6 +313,7 @@ void parse_options(int argc, char **argv)
 			opt.force++;
 			break;
 		case 'h':
+		case '?':
 			usage();
 		case 'i':
 			opt.info = 1;
@@ -361,7 +362,7 @@ int runlist_extent_number(runlist *rl)
 {
 	int i;
 
-	for (i = 0; rl[i].length; i++) 
+	for (i = 0; rl[i].length; i++)
 		;
 
 	return i;
@@ -393,7 +394,7 @@ s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
  * has no bits set.  As each attribute record is read the bits in lcn_bitmap are
  * checked to ensure that no other file already references that cluster.
  *
- * This serves as a rudimentary "chkdsk" operation.  
+ * This serves as a rudimentary "chkdsk" operation.
  */
 void build_lcn_usage_bitmap(ntfs_resize_t *resize)
 {
@@ -491,19 +492,19 @@ void compare_bitmaps(struct bitmap *a)
 	int k, mismatch = 0;
 	char bit;
 	u8 bm[NTFS_BUF_SIZE];
-	
+
 	printf("Accounting clusters ...\n");
-	
+
 	i = 0;
 	while (1) {
 		count = ntfs_attr_pread(vol->lcnbmp_na, i, NTFS_BUF_SIZE, bm);
 		if (count == -1)
 			perr_exit("Couldn't get $Bitmap $DATA");
-		
+
 		if (count == 0) {
 			if (a->size != i)
 				err_exit("$Bitmap file size doesn't match "
-					 "calculated size ((%Ld != %Ld)\n", 
+					 "calculated size ((%Ld != %Ld)\n",
 					 a->size, i);
 			break;
 		}
@@ -513,13 +514,13 @@ void compare_bitmaps(struct bitmap *a)
 
 			if (a->bm[i + k] == bm[k])
 				continue;
-		
+
 			for (j = i * 8; j < i * 8 + 8; j++) {
-	
+
 				bit = ntfs_bit_get(a->bm, j);
 				if (bit != ntfs_bit_get(bm, k + j % 8))
 					continue;
-				
+
 				if (++mismatch > 10)
 					continue;
 
@@ -528,15 +529,15 @@ void compare_bitmaps(struct bitmap *a)
 				       j, j, bit ? "missing" : "extra");
 			}
 		}
-		
+
 		i += count;
 	}
-	
+
 	if (mismatch) {
 		printf("Totally %d cluster accounting mismatches.\n"
 		       "You didn't shutdown Windows properly?\n", mismatch);
 		exit(1);
-	}	
+	}
 }
 
 /**
@@ -627,25 +628,25 @@ void advise_on_resize()
 	int fragmanted_end;
 
 	printf("Calculating smallest shrunken size supported ...\n");
-	       
+
 	for (i = vol->nr_clusters - 1; i > 0 && (i % 8); i--)
 		if (ntfs_bit_get(lcn_bitmap.bm, i))
 			goto found_used_cluster;
-	
+
 	if (i > 0) {
 		if (ntfs_bit_get(lcn_bitmap.bm, i))
 			goto found_used_cluster;
-	} else 
+	} else
 		goto found_used_cluster;
-	
+
 	for (i -=  8; i >= 0; i -= 8)
 		if (lcn_bitmap.bm[i / 8])
 			break;
-		
+
 	for (i += 7; i > 0; i--)
 		if (ntfs_bit_get(lcn_bitmap.bm, i))
 			break;
-		
+
 found_used_cluster:
 	i += 2; /* first free + we reserve one for the backup boot sector */
 	fragmanted_end = (i >= vol->nr_clusters) ? 1 : 0;
@@ -750,7 +751,7 @@ void truncate_badclust_bad_attr(ATTR_RECORD *a, s64 nr_clusters)
 
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl_bad)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
- 
+
 	if (mp_size > le32_to_cpu (a->length) -
 			le16_to_cpu (a->mapping_pairs_offset))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
@@ -792,7 +793,7 @@ void shrink_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
 			continue;
 		for (j = 0; j < rl[i].length; j++) {
-			if (rl[i].vcn + j < nr_bm_clusters) 
+			if (rl[i].vcn + j < nr_bm_clusters)
 				continue;
 
 			k = (u64)rl[i].lcn + j;
@@ -829,7 +830,7 @@ void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 	for (i = 0; i < rl->length; i++)
 		ntfs_bit_set(lcn_bitmap.bm, rl->lcn + i, 0);
 	free(rl);
-	
+
 	if (!(rl = *rlist = (runlist *)malloc(2 * sizeof(runlist))))
 		perr_exit("Couldn't get memory");
 
@@ -846,10 +847,10 @@ void enlarge_bitmap_data_attr(runlist **rlist, s64 nr_bm_clusters, s64 new_size)
 
 	if (free_zone != nr_bm_clusters)
 		err_exit("Couldn't allocate $Bitmap clusters.\n");
-	
+
 	for (; free_zone; free_zone--, i--)
 		ntfs_bit_set(lcn_bitmap.bm, i, 1);
-	
+
 	rl_set(rl, 0LL, i + 1, nr_bm_clusters);
 	rl_set(rl + 1, nr_bm_clusters, -1LL, 0LL);
 }
@@ -872,20 +873,20 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 
 	bm_bsize = nr_clusters_to_bitmap_byte_size(nr_clusters);
 	nr_bm_clusters = rounded_up_division(bm_bsize, vol->cluster_size);
-	
+
 	if (!(tmp = (u8 *)realloc(lcn_bitmap.bm, bm_bsize)))
 		perr_exit("realloc");
 	lcn_bitmap.bm = tmp;
 	lcn_bitmap.size = bm_bsize;
 	bitmap_file_data_fixup(nr_clusters, &lcn_bitmap);
-	
+
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
-	
+
 	if (runlist_extent_number(rl) != 1)
 		err_exit("$Bitmap data has more than one extent, unusual.\n"
 			 "Please report it to linux-ntfs-dev@lists.sf.net");
-	
+
 	if (nr_clusters < vol->nr_clusters)
 		shrink_bitmap_data_attr(&rl, nr_bm_clusters, nr_clusters);
 	else
@@ -893,7 +894,7 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
- 
+
 	if (mp_size > le32_to_cpu (a->length) -
 			le16_to_cpu (a->mapping_pairs_offset))
 		err_exit("Enlarging attribute header isn't supported yet.\n");
@@ -910,11 +911,11 @@ void truncate_bitmap_data_attr(ATTR_RECORD *a, s64 nr_clusters)
 	a->data_size = cpu_to_le64(bm_bsize);
 	a->initialized_size = cpu_to_le64(bm_bsize);
 
-	/* 
-	 * FIXME: update allocated/data sizes and timestamps in $FILE_NAME 
-	 * attribute too, for now chkdsk will do this for us. 
+	/*
+	 * FIXME: update allocated/data sizes and timestamps in $FILE_NAME
+	 * attribute too, for now chkdsk will do this for us.
 	 */
-	
+
 	size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, lcn_bitmap.bm);
 	if (bm_bsize != size) {
 		if (size == -1)
@@ -1064,7 +1065,9 @@ void update_bootsector(s64 nr_clusters)
 			perr_exit("write() error");
 }
 
-
+/**
+ * volume_size
+ */
 s64 volume_size(ntfs_volume *vol, s64 nr_clusters)
 {
 	return nr_clusters * vol->cluster_size;
@@ -1089,16 +1092,16 @@ void print_volume_size(char *str, s64 bytes)
 void print_disk_usage(ntfs_resize_t *resize)
 {
 	s64 total, used, free, relocations;
-	 
+
 	total = vol->nr_clusters * vol->cluster_size;
 	used = resize->inuse * vol->cluster_size;
 	free = total - used;
 	relocations = resize->relocations * vol->cluster_size;
-	
+
 	printf("Space in use       : %lld MB (%.1f%%)   ",
 	       rounded_up_division(used, NTFS_MBYTE),
 	       100.0 * ((float)used / total));
-	
+
 	printf("\n");
 }
 
@@ -1149,7 +1152,7 @@ void mount_volume()
 		perr_exit("Unknown NTFS version");
 
 	printf("Cluster size       : %u bytes\n", vol->cluster_size);
-	print_volume_size("Current volume size", 
+	print_volume_size("Current volume size",
 			  volume_size(vol, vol->nr_clusters));
 }
 
@@ -1170,7 +1173,7 @@ void prepare_volume_fixup()
 
 	printf("Schedule chkdsk for NTFS consistency check at Windows "
 		"boot time ...\n");
-		
+
 	if (ntfs_volume_set_flags(vol, flags))
 		perr_exit("Failed to set $Volume dirty");
 
@@ -1209,7 +1212,7 @@ int main(int argc, char **argv)
 		err_exit("Couldn't get device size (%Ld)!\n", device_size);
 
 	print_volume_size("Current device size", device_size);
-	
+
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
 			 "size (%Ld)!\nCorrupt partition table or incorrect "
@@ -1220,27 +1223,27 @@ int main(int argc, char **argv)
 			err_exit("New size can't be bigger than the "
 				 "device size (%Ld bytes).\n", device_size);
 	} else
-		opt.bytes = device_size;	
+		opt.bytes = device_size;
 
-	/* 
+	/*
 	 * Take the integer part: we don't want to make the volume bigger
-	 * than requested. Later on we will also decrease this value to save 
+	 * than requested. Later on we will also decrease this value to save
 	 * room for the backup boot sector.
 	 */
 	new_size = opt.bytes / vol->cluster_size;
 
 	if (!opt.info)
-		print_volume_size("New volume size    ", 
+		print_volume_size("New volume size    ",
 				  volume_size(vol, new_size));
-	
+
 	/* Backup boot sector at the end of device isn't counted in NTFS
 	   volume size thus we have to reserve space for. We don't trust
 	   the user does this for us: better to be on the safe side ;) */
 	if (new_size)
 		--new_size;
 
-	if (!opt.info && (new_size == vol->nr_clusters || 
-			  (opt.bytes == device_size && 
+	if (!opt.info && (new_size == vol->nr_clusters ||
+			  (opt.bytes == device_size &&
 			   new_size == vol->nr_clusters - 1))) {
 		printf("Nothing to do: NTFS volume size is already OK.\n");
 		exit(0);
