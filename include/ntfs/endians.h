@@ -46,26 +46,36 @@
 #ifdef HAVE_MACHINE_ENDIAN_H
 #	include <machine/endian.h>
 #endif
+#ifdef HAVE_SYS_BYTEORDER_H
+#	include <sys/byteorder.h>
+#endif
 #ifdef HAVE_SYS_PARAM_H
 #	include <sys/param.h>
 #endif
 #ifndef __BYTE_ORDER
-#	ifdef _BYTE_ORDER
+#	if defined(_BYTE_ORDER)
 #		define __BYTE_ORDER _BYTE_ORDER
 #		define __LITTLE_ENDIAN _LITTLE_ENDIAN
 #		define __BIG_ENDIAN _BIG_ENDIAN
+#	elif defined(BYTE_ORDER)
+#		define __BYTE_ORDER BYTE_ORDER
+#		define __LITTLE_ENDIAN LITTLE_ENDIAN
+#		define __BIG_ENDIAN BIG_ENDIAN
+#	elif defined(__BYTE_ORDER__)
+#		define __BYTE_ORDER __BYTE_ORDER__
+#		define __LITTLE_ENDIAN __LITTLE_ENDIAN__
+#		define __BIG_ENDIAN __BIG_ENDIAN__
+#	elif defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)
+#		define __BYTE_ORDER 1
+#		define __LITTLE_ENDIAN 1
+#		define __BIG_ENDIAN 0
+#	elif !defined(_LITTLE_ENDIAN) && defined(_BIG_ENDIAN)
+#		define __BYTE_ORDER 0
+#		define __LITTLE_ENDIAN 1
+#		define __BIG_ENDIAN 0
 #	else
-#		ifdef BYTE_ORDER
-#			define __BYTE_ORDER BYTE_ORDER
-#			define __LITTLE_ENDIAN LITTLE_ENDIAN
-#			define __BIG_ENDIAN BIG_ENDIAN
-#		else
-#			error "__BYTE_ORDER is not defined."
-#		endif
+#		error "__BYTE_ORDER is not defined."
 #	endif
-#endif
-#ifdef HAVE_BYTESWAP_H
-#	include <byteswap.h>
 #endif
 
 #define __ntfs_bswap_constant_16(x)		\
@@ -87,6 +97,14 @@
 		(((u64)(x) & 0x0000000000ff0000ull) << 24) |	\
 		(((u64)(x) & 0x000000000000ff00ull) << 40) |	\
 		(((u64)(x) & 0x00000000000000ffull) << 56))
+
+#ifdef HAVE_BYTESWAP_H
+#	include <byteswap.h>
+#else
+#	define bswap_16(x) __ntfs_bswap_constant_16(x)
+#	define bswap_32(x) __ntfs_bswap_constant_32(x)
+#	define bswap_64(x) __ntfs_bswap_constant_64(x)
+#endif
 
 #if defined(__LITTLE_ENDIAN) && (__BYTE_ORDER == __LITTLE_ENDIAN)
 
@@ -170,9 +188,8 @@
 #define scpu_to_le32p(x)	(s32)__cpu_to_le32(*(s32*)(x))
 #define scpu_to_le64p(x)	(s64)__cpu_to_le64(*(s64*)(x))
 
-/*
- * Constant endianness conversion defines.
- */
+/* Constant endianness conversion defines. */
+
 #define const_le16_to_cpu(x)	__constant_le16_to_cpu(x)
 #define const_le32_to_cpu(x)	__constant_le32_to_cpu(x)
 #define const_le64_to_cpu(x)	__constant_le64_to_cpu(x)
@@ -182,4 +199,3 @@
 #define const_cpu_to_le64(x)	__constant_cpu_to_le64(x)
 
 #endif /* defined _NTFS_ENDIANS_H */
-
