@@ -271,14 +271,14 @@ static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 			res = -1;
 
 		if (lcn < (LCN)0) {
-			int index = -lcn - 1;
+			int j = -lcn - 1;
 
-			if ((index < 0) || (index > 4)) {
-				index = 4;
+			if ((j < 0) || (j > 4)) {
+				j = 4;
 				res = -1;
 			}
 			printf("%s%8lld %8s %8lld\n", prefix,
-				rl->vcn, lcn_str[index], rl->length);
+				rl->vcn, lcn_str[j], rl->length);
 		} else
 			printf("%s%8lld %8lld %8lld\n", prefix,
 				rl->vcn, rl->lcn, rl->length);
@@ -370,9 +370,7 @@ static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc, int flags)
 	const int bufsize = 8192;
 	u8 *buffer;
 	int clus;
-	int read;
 	int i;
-	int j;
 	int curr = 0;
 	int count = 0;
 	s64 start = 0;
@@ -392,8 +390,11 @@ static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc, int flags)
 	//printf ("clus = %d\n", clus);
 
 	for (i = 0; i < clus; i++) {
-		read = ntfs_attr_pread (vol->lcnbmp_na, i*bufsize, bufsize, buffer);
-		if (read != bufsize) {
+		int bytes_read, j;
+
+		bytes_read = ntfs_attr_pread (vol->lcnbmp_na, i*bufsize,
+				bufsize, buffer);
+		if (bytes_read != bufsize) {
 			printf ("!read\n");
 			return NULL;
 		}
