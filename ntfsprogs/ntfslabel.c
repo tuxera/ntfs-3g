@@ -2,7 +2,7 @@
  * ntfslabel - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
- * Copyright (c) 2002 Anton Altaparmakov
+ * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will display/change the label on an NTFS partition.
@@ -64,7 +64,7 @@ void version (void)
 		EXEC_NAME, VERSION);
 	printf ("Copyright (c)\n");
 	printf ("    2002      Matthew J. Fanto\n");
-	printf ("    2002      Anton Altaparmakov\n");
+	printf ("    2002-2004 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
@@ -164,7 +164,8 @@ int parse_options (int argc, char *argv[])
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			Eprintf ("You may not use --quiet and --verbose at "
+					"the same time.\n");
 			err++;
 		}
 	}
@@ -283,15 +284,21 @@ int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL fo
 		perror("Failed to get attribute search context");
 		goto err_out;
 	}
-	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		perror("Lookup of $VOLUME_NAME attribute failed");
-		goto err_out;
-	}
-	a = ctx->attr;
-	if (a->non_resident) {
-		fprintf(stderr, "Error: Attribute $VOLUME_NAME must be "
-				"resident.\n");
-		goto err_out;
+	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
+			ctx)) {
+		if (errno != ENOENT) {
+			perror("Lookup of $VOLUME_NAME attribute failed");
+			goto err_out;
+		}
+		/* The volume name attribute does not exist.  Need to add it. */
+		a = NULL;
+	} else {
+		a = ctx->attr;
+		if (a->non_resident) {
+			fprintf(stderr, "Error: Attribute $VOLUME_NAME must be "
+					"resident.\n");
+			goto err_out;
+		}
 	}
 	label_len = ntfs_mbstoucs(label, &new_label, 0);
 	if (label_len == -1) {
@@ -306,11 +313,38 @@ int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL fo
 		label_len = 0x100;
 		new_label[label_len / sizeof(uchar_t)] = cpu_to_le16(L'\0');
 	}
-	if (resize_resident_attribute_value(mrec, a, label_len)) {
-		perror("Error resizing resident attribute");
-		goto err_out;
+	if (a) {
+		if (resize_resident_attribute_value(mrec, a, label_len)) {
+			perror("Error resizing resident attribute");
+			goto err_out;
+		}
+	} else {
+		/* sizeof(resident attribute record header) == 24 */
+		int asize = (24 + label_len + 7) & ~7;
+		u32 biu = le32_to_cpu(mrec->bytes_in_use);
+		if (biu + asize > le32_to_cpu(mrec->bytes_allocated)) {
+			errno = ENOSPC;
+			perror("Error adding resident attribute");
+			goto err_out;
+		}
+		a = ctx->attr;
+		memmove((u8*)a + asize, a, biu - ((u8*)a - (u8*)mrec));
+		mrec->bytes_in_use = cpu_to_le32(biu + asize);
+		a->type = AT_VOLUME_NAME;
+		a->length = cpu_to_le32(asize);
+		a->non_resident = 0;
+		a->name_length = 0;
+		a->name_offset = cpu_to_le16(24);
+		a->flags = cpu_to_le16(0);
+		a->instance = mrec->next_attr_instance;
+		mrec->next_attr_instance = cpu_to_le16((le16_to_cpu(
+				mrec->next_attr_instance) + 1) & 0xffff);
+		a->value_length = cpu_to_le32(label_len);
+		a->value_offset = a->name_offset;
+		a->resident_flags = 0;
+		a->reservedR = 0;
 	}
-	memcpy((char*)a + le16_to_cpu(a->value_offset), new_label, label_len);
+	memcpy((u8*)a + le16_to_cpu(a->value_offset), new_label, label_len);
 	if (ntfs_mft_record_write(vol, (MFT_REF)FILE_Volume, mrec)) {
 		perror("Error writing MFT Record to disk");
 		goto err_out;

@@ -764,7 +764,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 		Dperror("Failed to open inode");
 		goto error_exit;
 	}
-	/* Get an ntfs attribute for $UpCase/$DATA. */
+	/* Get a search context for the $Volume/$VOLUME_INFORMATION lookup. */
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		Dputs(FAILED);
@@ -807,46 +807,70 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	/* Do not use le16_to_cpu() macro here as our VOLUME_FLAGS are
 	   defined using cpu_to_le16() macro and hence are consistent. */
 	vol->flags = vinf->flags;
-	/* Find the $VOLUME_NAME attribute. */
+	/*
+	 * Reinitialize the search context for the $Volume/$VOLUME_NAME lookup.
+	 */
 	ntfs_attr_reinit_search_ctx(ctx);
 	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
-		Dputs(FAILED);
-		Dputs("$VOLUME_NAME attribute not found in $Volume?!?");
-		goto error_exit;
-	}
-	a = ctx->attr;
-	/* Has to be resident. */
-	if (a->non_resident) {
-		Dputs(FAILED);
-		Dputs("Error: Attribute $VOLUME_NAME must be resident!");
-		errno = EIO;
-		goto error_exit;
-	}
-	/* Get a pointer to the value of the attribute. */
-	vname = (uchar_t*)(le16_to_cpu(a->value_offset) + (char*)a);
-	u = le32_to_cpu(a->value_length) / 2;
-	/* Convert Unicode volume name to current locale multibyte format. */
-	vol->vol_name = NULL;
-	if (ntfs_ucstombs(vname, u, &vol->vol_name, 0) == -1) {
-		Dperror("Error: Volume name could not be converted to "
-				"current locale");
-		Dputs("Forcing name into ASCII by replacing non-ASCII "
-				"characters with underscores.");
-		vol->vol_name = malloc(u + 1);
+		if (errno != ENOENT) {
+			Dputs(FAILED);
+			Dputs("Error: Lookup of $VOLUME_NAME attribute in "
+					"$Volume failed.  This probably means "
+					"something is corrupt.  Run chkdsk.");
+			goto error_exit;
+		}
+		/*
+		 * Attribute not present.  This has been seen in the field.
+		 * Treat this the same way as if the attribute was present but
+		 * had zero length.
+		 */
+		vol->vol_name = malloc(1);
 		if (!vol->vol_name) {
 			Dputs(FAILED);
 			Dputs("Error: Unable to allocate memory for volume "
 					"name!");
 			goto error_exit;
 		}
-		for (j = 0; j < (s32)u; j++) {
-			uchar_t uc = le16_to_cpu(vname[j]);
-			if (uc > 0xff)
-				uc = (uchar_t)'_';
-			vol->vol_name[j] = (char)uc;
+		vol->vol_name[0] = '\0';
+	} else {
+		a = ctx->attr;
+		/* Has to be resident. */
+		if (a->non_resident) {
+			Dputs(FAILED);
+			Dputs("Error: Attribute $VOLUME_NAME must be "
+					"resident!");
+			errno = EIO;
+			goto error_exit;
 		}
-		vol->vol_name[u] = '\0';
+		/* Get a pointer to the value of the attribute. */
+		vname = (uchar_t*)(le16_to_cpu(a->value_offset) + (char*)a);
+		u = le32_to_cpu(a->value_length) / 2;
+		/*
+		 * Convert Unicode volume name to current locale multibyte
+		 * format.
+		 */
+		vol->vol_name = NULL;
+		if (ntfs_ucstombs(vname, u, &vol->vol_name, 0) == -1) {
+			Dperror("Error: Volume name could not be converted to "
+					"current locale");
+			Dputs("Forcing name into ASCII by replacing non-ASCII "
+					"characters with underscores.");
+			vol->vol_name = malloc(u + 1);
+			if (!vol->vol_name) {
+				Dputs(FAILED);
+				Dputs("Error: Unable to allocate memory for "
+						"volume name!");
+				goto error_exit;
+			}
+			for (j = 0; j < (s32)u; j++) {
+				uchar_t uc = le16_to_cpu(vname[j]);
+				if (uc > 0xff)
+					uc = (uchar_t)'_';
+				vol->vol_name[j] = (char)uc;
+			}
+			vol->vol_name[u] = '\0';
+		}
 	}
 	Dputs(OK);
 	ntfs_attr_put_search_ctx(ctx);

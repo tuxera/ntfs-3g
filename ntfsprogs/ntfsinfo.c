@@ -517,29 +517,28 @@ void ntfs_dump_object_id_attr(ntfs_inode *inode)
  */
 void ntfs_dump_volume_name_attr(ntfs_inode *inode)
 {
-    VOLUME_NAME *vol_name = NULL;
-    ATTR_RECORD *attr = NULL;
-    ntfs_attr_search_ctx *ctx = NULL;
+	VOLUME_NAME *vol_name = NULL;
+	ATTR_RECORD *attr = NULL;
+	ntfs_attr_search_ctx *ctx = NULL;
 
-    ctx = ntfs_attr_get_search_ctx(inode, NULL);
-
-    if(ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-	if (errno != ENOENT)
-		fprintf(stderr, "ntfsinfo error: cannot look up attribute AT_VOLUME_NAME: %s\n", 
-		    strerror(errno));
+	ctx = ntfs_attr_get_search_ctx(inode, NULL);
+	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
+			ctx)) {
+		if (errno != ENOENT)
+			fprintf(stderr, "ntfsinfo error: cannot look up "
+					"attribute AT_VOLUME_NAME: %s\n",
+					strerror(errno));
+		ntfs_attr_put_search_ctx(ctx);
+		return;
+	}
+	attr = ctx->attr;
+	vol_name = (VOLUME_NAME*)((char *)attr +
+			le16_to_cpu(attr->value_offset));
+	printf("Dumping $VOLUME_NAME (0x60)\n");
+	// FIXME: convert the name to current locale multibyte sequence
+	// then output the converted name.
+	//printf("\tVolume Name: \t\t\t %s\n", vol_name->name);
 	ntfs_attr_put_search_ctx(ctx);
-	return;
-    }
-
-    attr = ctx->attr;
-
-    vol_name = (VOLUME_NAME*)((char *)attr + le16_to_cpu(attr->value_offset));
-
-    printf("Dumping $VOLUME_NAME (0x60)\n");
-
-    //printf("\tVolume Name: \t\t\t %s\n", vol_name->name);
-
-    ntfs_attr_put_search_ctx(ctx);
 }
 
 
