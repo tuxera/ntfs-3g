@@ -142,7 +142,8 @@ GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
 GEN_PRINTF(Qprintf, msg_out, &opt.quiet,   FALSE)
 static GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
 
-
+static void perr_printf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
 static void perr_printf(const char *fmt, ...)
 {
 	va_list ap;
@@ -157,6 +158,8 @@ static void perr_printf(const char *fmt, ...)
 }
 
 static void err_printf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
+static void err_printf(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -167,6 +170,9 @@ static void err_printf(const char *fmt, ...)
 	fflush(msg_out);
 }
 
+static int err_exit(const char *fmt, ...)
+		__attribute__((noreturn))
+		__attribute__((format(printf, 1, 2)));
 static int err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -179,7 +185,9 @@ static int err_exit(const char *fmt, ...)
 	exit(1);
 }
 
-
+static int perr_exit(const char *fmt, ...)
+		__attribute__((noreturn))
+		__attribute__((format(printf, 1, 2)));
 static int perr_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -195,6 +203,7 @@ static int perr_exit(const char *fmt, ...)
 }
 
 
+static void usage(void)	__attribute__((noreturn));
 static void usage(void)
 {
 	Eprintf("\nUsage: %s [options] source\n"

@@ -179,6 +179,8 @@ static s64 rounded_up_division(s64 numer, s64 denom)
  * Print an error message.
  */
 static void perr_printf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
+static void perr_printf(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -192,6 +194,8 @@ static void perr_printf(const char *fmt, ...)
 	fflush(stderr);
 }
 
+static void err_printf(const char *fmt, ...)
+		__attribute__((format(printf, 1, 2)));
 static void err_printf(const char *fmt, ...)
 {
 	va_list ap;
@@ -210,6 +214,9 @@ static void err_printf(const char *fmt, ...)
  * Print and error message and exit the program.
  */
 static int err_exit(const char *fmt, ...)
+		__attribute__((noreturn))
+		__attribute__((format(printf, 1, 2)));
+static int err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -227,6 +234,9 @@ static int err_exit(const char *fmt, ...)
  *
  * Print and error message and exit the program
  */
+static int perr_exit(const char *fmt, ...)
+		__attribute__((noreturn))
+		__attribute__((format(printf, 1, 2)));
 static int perr_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -249,6 +259,7 @@ static int perr_exit(const char *fmt, ...)
  *
  * Return:  none
  */
+static void usage(void) __attribute__((noreturn));
 static void usage(void)
 {
 

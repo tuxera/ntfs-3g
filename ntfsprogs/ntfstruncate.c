@@ -95,6 +95,7 @@ struct {
 /**
  * Dprintf - debugging output (-vv); overriden by quiet (-q)
  */
+static void Dprintf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void Dprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -130,6 +131,9 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
+static void err_exit(const char *fmt, ...)
+		__attribute__((noreturn))
+		__attribute__((format(printf, 1, 2)));
 static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
