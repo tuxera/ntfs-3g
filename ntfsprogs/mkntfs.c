@@ -3427,8 +3427,7 @@ static void mkntfs_create_root_structures(void)
 			opts.part_start_sect);
 	/*
 	 * If there are problems go back to bs->unused[0-3] and set them. See
-	 * ../include/layout.h for details. Other fields to also consider
-	 * setting are: bs->bpb.sectors_per_track and .heads.
+	 * ../include/layout.h for details.
 	 */
 	bs->number_of_sectors = scpu_to_le64(opts.nr_sectors);
 	bs->mft_lcn = scpu_to_le64(opts.mft_lcn);
