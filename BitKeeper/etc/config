@@ -5,6 +5,7 @@ bkweb:       http://linux-ntfs.bkbits.net:8080/ntfs-progs
 contact:     Anton Altaparmakov
 email: 	     aia21@cantab.net
 logging:     logging@openlogging.org
+logging_ask: no
 checkout:    get
 compression: gzip
 autofix:     yes
