@@ -99,6 +99,7 @@ static void version (void)
 	printf ("    2002-2004 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("    2003      Leonard Norrgård\n");
+	printf ("    2004      Yura Pakhuchiy\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -895,6 +896,77 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 }
 
 /**
+ * ntfs_dump_index_entries()
+ *
+ * dump sequence of index_entries and return number of entries dumped.
+ */
+static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
+{
+	int numb_entries = 1;
+	char *name = NULL;
+	
+	Vprintf("\tDumping index entries:");
+	while(1) {
+		if (!opts.verbose) {
+			if (entry->flags & INDEX_ENTRY_END)
+				break;
+			entry = (INDEX_ENTRY *)((u8 *)entry +
+						le16_to_cpu(entry->length));
+			numb_entries++;
+			continue;
+		}
+		Vprintf("\n");
+		Vprintf("\t\tEntry length:\t\t %u\n",
+				le16_to_cpu(entry->length));
+		Vprintf("\t\tKey length:\t\t %u\n",
+				le16_to_cpu(entry->key_length));
+		Vprintf("\t\tFlags:\t\t\t 0x%02x\n", le16_to_cpu(entry->flags));
+
+		if (entry->flags & INDEX_ENTRY_END)
+			break;
+		
+		switch(type) {
+			case(AT_FILE_NAME):
+				Vprintf("\t\tFILE record number:\t %llu\n",
+						MREF_LE(entry->indexed_file));
+				Vprintf("\t\tFile attributes:\t 0x%02x\n",
+					le32_to_cpu(
+					entry->key.file_name.file_attributes));
+				Vprintf("\t\tFile name namespace:\t 0x%02x\n",
+					entry->key.file_name.file_name_type);
+				ntfs_ucstombs(entry->key.file_name.file_name,
+					entry->key.file_name.file_name_length,
+					&name, 0);
+				Vprintf("\t\tName:\t\t\t %s\n", name);
+				free(name);
+				name = NULL;
+				Vprintf("\t\tParent directory:\t %lld\n",
+					 MREF_LE(entry->
+					 key.file_name.parent_directory));
+				Vprintf("\t\tData size:\t\t %lld\n",
+					sle64_to_cpu(
+					entry->key.file_name.data_size));
+				Vprintf("\t\tAllocated size:\t\t %lld\n",
+					sle64_to_cpu(
+					entry->key.file_name.allocated_size));
+				break;
+			default:
+				// TODO: determine more attribute types
+				Vprintf("\t\tData offset:\t\t %u\n",
+					le16_to_cpu(entry->data_offset));
+				Vprintf("\t\tData length:\t\t %u\n",
+					le16_to_cpu(entry->data_length));
+				break;
+		}
+		entry = (INDEX_ENTRY *)((u8 *)entry +
+						le16_to_cpu(entry->length));
+		numb_entries++;
+	}
+	Vprintf("\tEnd of index block reached\n");
+	return numb_entries;
+}
+
+/**
  * ntfs_dump_attr_index_root()
  *
  * dump the index_root attribute
@@ -903,6 +975,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 {
 	unsigned int type;
 	INDEX_ROOT *index_root = NULL;
+	INDEX_ENTRY *entry;
 	
 	index_root = (INDEX_ROOT*)((u8*)attr + le16_to_cpu(attr->value_offset));
 	
@@ -962,7 +1035,156 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 
 	/* the flags are 8bit long, no need for byte-order handling */
 	printf("\tFlags:\t\t\t 0x%02x\n",index_root->index.flags);
-	/* printf("\tIndex Entries Following\t %u\n", ???? );*/
+
+	entry = (INDEX_ENTRY *)((u8 *)index_root +
+			le32_to_cpu(index_root->index.entries_offset) + 0x10);
+	printf("\tIndex entries total:\t %d\n",
+			ntfs_dump_index_entries(entry, index_root->type));
+}
+
+/**
+ * ntfs_dump_attr_index_allocation()
+ *
+ * determine size and type of INDX record
+ */
+static void get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
+						ATTR_TYPES *type, u32 *size)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfschar *name = 0;
+	INDEX_ROOT *root;
+	
+	if (attr->name_length) {
+		name = malloc(attr->name_length * sizeof(ntfschar));
+		if (!name) {
+			perror("malloc failed");
+			return;
+		}
+		memcpy(name, (u8 *)attr + attr->name_offset, 
+				attr->name_length * sizeof(ntfschar));
+	}
+	ctx = ntfs_attr_get_search_ctx(ni, 0);
+	if (!ctx) {
+		perror("ntfs_get_search_ctx failed");
+		free(name);
+		return;
+	}
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0,
+							0, NULL, 0, ctx)) {
+		perror("ntfs_attr_lookup failed");
+		ntfs_attr_put_search_ctx(ctx);
+		free(name);
+		return;
+	}
+	
+	root = (INDEX_ROOT*)((u8*)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset));
+	*size = le32_to_cpu(root->index_block_size);
+	*type = root->type;
+	ntfs_attr_put_search_ctx(ctx);
+	free(name);
+}
+
+/**
+ * ntfs_dump_attr_index_allocation()
+ *
+ * dump context of the index_allocation attribute
+ */
+static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
+{
+	INDEX_ALLOCATION *allocation, *tmp_alloc;
+	INDEX_ENTRY *entry;
+	ATTR_TYPES type;
+	u32 indx_record_size;
+	int total_entries = 0;
+	int total_indx_blocks = 0;
+	ntfs_attr *na;
+	u8 *bitmap, *byte;
+	int bit;
+	ntfschar *name;
+
+	get_type_and_size_of_indx(ni, attr, &type, &indx_record_size);
+
+	name = malloc(attr->name_length * sizeof(ntfschar));
+	if (!name) {
+		perror("malloc failed");
+		return;
+	}
+	memcpy(name, (u8 *)attr + attr->name_offset, 
+			attr->name_length * sizeof(ntfschar));
+	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
+	if (!na) {
+		perror("ntfs_attr_open failed");
+		free(name);
+		return;
+	}
+	bitmap = malloc(na->data_size);
+	if (!bitmap) {
+		perror("malloc failed");
+		free(name);
+		return;
+	}
+	if (ntfs_attr_pread(na, 0, na->data_size, bitmap) != na->data_size) {
+		perror("ntfs_attr_pread failed");
+		free(bitmap);
+		free(name);
+		return;
+	}
+	ntfs_attr_close(na);
+	byte = bitmap;
+		
+	name = malloc(attr->name_length * sizeof(ntfschar));
+	if (!name) {
+		perror("malloc failed");
+		return;
+	}
+	memcpy(name, (u8 *)attr + attr->name_offset, 
+			attr->name_length * sizeof(ntfschar));
+	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, attr->name_length);
+	if (!na) {
+		perror("ntfs_attr_open failed");
+		free(name);
+		free(bitmap);
+		return;
+	}
+	allocation = malloc(na->data_size);
+	if (!allocation) {
+		perror("malloc failed");
+		free(name);
+		free(bitmap);
+		return;
+	}
+	if (ntfs_attr_pread(na, 0, na->data_size, allocation)
+							 != na->data_size) {
+		perror("ntfs_attr_pread failed");
+		free(name);
+		free(allocation);
+		free(bitmap);
+		return;
+	}
+	ntfs_attr_close(na);
+	tmp_alloc = allocation;
+	
+	bit = 0;
+	while((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
+		if (*byte & (1 << bit)) {
+			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
+				tmp_alloc->index.entries_offset) + 0x18);
+			total_entries += ntfs_dump_index_entries(entry, type);
+			total_indx_blocks++;
+		}
+		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc +
+							indx_record_size);
+		bit++;
+		if (bit > 7) {
+			bit = 0;
+			byte++;
+		}
+	}
+	printf("\tIndex entries total:\t %d\n", total_entries);
+	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
+	free(allocation);
+	free(bitmap);
 }
 
 /**
@@ -970,7 +1192,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
  *
  * dump the index_allocation attribute
  */
-static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
+static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	printf("Dumping attribute $INDEX_ALLOCATION (0xA0)\n");
 
@@ -999,12 +1221,11 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr)
 		printf("\tUsed data size:\t\t %llu\n",
 			(unsigned long long)le64_to_cpu(attr->data_size));
 	} else {
-		/* print only the payload's size */
-		printf("\tValue's size:\t\t %u\n",
-			(unsigned int)le32_to_cpu(attr->value_length));
+		Eprintf("Invalid $INDEX_ALLOCTION attribute. Should be be"
+						    " non-resident\n");
 	}
 	
-	/* TODO: parse how many records does this B-*+/Tree contains */
+	ntfs_dump_index_allocation(attr, ni);
 }
 
 /**
@@ -1305,7 +1526,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_index_root(ctx->attr);
 			break;
 		case AT_INDEX_ALLOCATION:
-			ntfs_dump_attr_index_allocation(ctx->attr);
+			ntfs_dump_attr_index_allocation(ctx->attr, inode);
 			break;
 		case AT_BITMAP:
 			ntfs_dump_attr_bitmap(ctx->attr);
