@@ -1,3 +1,6 @@
+xx/xx/2004 - 1.8.4 - WIP
+	- .
+
 19/01/2004 - 1.8.3 - Lots of small fixes.
 	- Update ntfsinfo (Matthew J. Fanto, me)
 	- Add new API attrib.[hc]:ntfs_compressed_attr_pread(). NOTE: You want
