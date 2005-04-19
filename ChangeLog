@@ -128,6 +128,8 @@ xx/xx/2005 - 2.0.0-WIP
 	  should always be included if present). Save also records used for
 	  checking empty $Logfile. (Szaka)
 	- ntfscp: add ability to specify directory as destination file.  (Yura)
+	- ntfsresize: fix segfault during filesystem check if NTFS was corrupted
+	  in a way that clusters were referenced outside of the volume.  (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
