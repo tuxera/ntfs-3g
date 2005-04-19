@@ -1,7 +1,7 @@
 /**
  * ntfsresize - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Szabolcs Szakacsits
+ * Copyright (c) 2002-2005 Szabolcs Szakacsits
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
@@ -121,6 +121,8 @@ typedef struct {
 	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
 	s64 inuse;		     /* num of clusters in use */
 	int multi_ref;		     /* num of clusters referenced many times */
+	int outsider;		     /* num of clusters outside the volume */
+	int show_outsider;	     /* controls showing the above information */
 	int flags;
 	struct bitmap lcn_bitmap;
 } ntfsck_t;
@@ -323,7 +325,7 @@ static void proceed_question(void)
 static void version (void)
 {
 	printf ("\nResize an NTFS Volume, without data loss.\n\n");
-	printf ("Copyright (c) 2002-2004  Szabolcs Szakacsits\n");
+	printf ("Copyright (c) 2002-2005  Szabolcs Szakacsits\n");
 	printf ("Copyright (c) 2002-2004  Anton Altaparmakov\n");
 	printf ("Copyright (c) 2002-2003  Richard Russon\n");
 	printf ("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
@@ -776,16 +778,29 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 				 lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
-			u64 k = (u64)lcn + j;
-			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
-				
-				if (++fsck->multi_ref > 10)
-					continue;
 
-				printf("Cluster %llu (0x%llx) referenced "
-						"multiply times!\n",
-						(unsigned long long)k,
-						(unsigned long long)k);
+			u64 k = (u64)lcn + j;
+
+			if (k >= (u64)vol->nr_clusters) {
+
+				long long outsiders = lcn_length - j;
+				
+				fsck->outsider += outsiders;
+
+				if (++fsck->show_outsider <= 10 || opt.verbose)
+					printf("Outside of the volume reference"
+					       " for inode %lld at %lld:%lld\n",
+					       inode, (long long)k, outsiders);
+
+				break;
+			}
+
+			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
+				if (++fsck->multi_ref <= 10 || opt.verbose)
+					printf("Cluster %lld is referenced "
+					       "multiply times!\n", 
+					       (long long)k);
+				continue;
 			}
 		}
 		fsck->inuse += lcn_length;
@@ -2210,9 +2225,14 @@ int main(int argc, char **argv)
 		perr_exit("Failed to setup allocation bitmap");
 	if (build_allocation_bitmap(vol, &fsck) != 0)
 		exit(1);
-	if (fsck.multi_ref) {
-		err_printf("Filesystem check failed! Totally %d clusters "
-			   "referenced multiply times.\n", fsck.multi_ref);
+	if (fsck.outsider || fsck.multi_ref) {
+		err_printf("Filesystem check failed!\n");
+		if (fsck.outsider)
+			err_printf("%d clusters are referenced outside "
+				   "of the volume.\n", fsck.outsider);
+		if (fsck.multi_ref)
+			err_printf("%d clusters are referenced multiply"
+				   " times.\n", fsck.multi_ref);
 		printf(corrupt_volume_msg);
 		exit(1);
 	}
