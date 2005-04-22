@@ -4,7 +4,7 @@
  *		Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2004 Lode Leroy
- * Copyright (c) 2003-2004 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -36,8 +36,8 @@
  * Cannot use "../include/types.h" since it conflicts with "wintypes.h".
  * define our own...
  */
-typedef long long int s64;
-typedef unsigned long int u32;
+typedef long long s64;
+typedef unsigned long u32;
 struct stat;
 struct ntfs_volume;
 typedef struct ntfs_volume ntfs_volume;
@@ -72,7 +72,8 @@ typedef struct win32_fd {
 	int part_hidden_sectors;
 	s64 part_start;
 	s64 part_length;
-	LARGE_INTEGER current_pos;
+	s64 real_pos;
+	int real_ofs;
 	s64 geo_size, geo_cylinders;
 	DWORD geo_sectors, geo_heads;
 	HANDLE vol_handle;
@@ -366,7 +367,7 @@ static s64 ntfs_device_win32_getntfssize(HANDLE handle)
  * In Windows XP+: fills the members: size, sectors, cylinders and heads.
  *
  * Note: in pre XP, this requires write permission, even though nothing is
- *	 actuallt written.
+ *	 actually written.
  *
  * if fails, set sectors, cylinders and heads to -1.
  */
@@ -478,7 +479,8 @@ static __inline__ int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
 	fd->handle = handle;
 	fd->part_start = 0;
 	fd->part_length = ntfs_device_win32_getsize(handle);
-	fd->current_pos.QuadPart = 0;
+	fd->real_pos = 0;
+	fd->real_ofs = 0;
 	fd->part_hidden_sectors = -1;
 	fd->geo_size = -1;	/* used as a marker that this is a file */
 	fd->vol_handle = INVALID_HANDLE_VALUE;
@@ -520,7 +522,8 @@ static __inline__ int ntfs_device_win32_open_drive(int drive_id, win32_fd *fd,
 	fd->handle = handle;
 	fd->part_start = 0;
 	fd->part_length = fd->geo_size;
-	fd->current_pos.QuadPart = 0;
+	fd->real_pos = 0;
+	fd->real_ofs = 0;
 	fd->part_hidden_sectors = -1;
 	fd->vol_handle = INVALID_HANDLE_VALUE;
 
@@ -699,7 +702,8 @@ static int ntfs_device_win32_open_partition(int drive_id,
 		ntfs_device_win32_getgeo(handle, fd);
 
 		fd->handle = handle;
-		fd->current_pos.QuadPart = 0;
+		fd->real_pos = 0;
+		fd->real_ofs = 0;
 		fd->part_start = part_start;
 		fd->part_length = part_length;
 		fd->part_hidden_sectors = hidden_sectors;
@@ -814,40 +818,38 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
  * Return Succeed: The new position in the file
  *	  Fail: -1 and errno set.
  */
-static s64 ntfs_device_win32_abs_seek(struct win32_fd *fd, LARGE_INTEGER pos)
+static s64 ntfs_device_win32_abs_seek(struct win32_fd *fd, s64 pos)
 {
-	if ((pos.QuadPart < 0) || (pos.QuadPart > fd->part_length)) {
+	LARGE_INTEGER li;
+	HANDLE handle;
+
+	if (pos < 0 || pos > fd->part_length) {
 		Dputs("Error: Seeking outsize seekable area.");
 		errno = EINVAL;
 		return -1;
 	}
-
-	if (!(pos.QuadPart & 0x1FF)) {
-		LARGE_INTEGER pos2;
-		HANDLE handle;
-
-		if ((fd->vol_handle != INVALID_HANDLE_VALUE) &&
-				(pos.QuadPart < fd->geo_size)) {
-			Dputs("Seeking via vol_handle");
-			handle = fd->vol_handle;
-			pos2.QuadPart = pos.QuadPart;
-		} else {
-			Dputs("Seeking via handle");
-			handle = fd->handle;
-			pos2.QuadPart = pos.QuadPart + fd->part_start;
-		}
-		if (!SetFilePointerEx(handle, pos2, NULL, FILE_BEGIN)) {
+	li.QuadPart = pos;
+	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
+		Dputs("Seeking via vol_handle");
+		handle = fd->vol_handle;
+	} else {
+		Dputs("Seeking via handle");
+		handle = fd->handle;
+		li.QuadPart += fd->part_start;
+	}
+	/* If the address is not alligned, we round down to nearest sector. */
+	li.QuadPart &= ~(s64)(NTFS_BLOCK_SIZE - 1);
+	/* Only seek if we are not there already. */
+	if (li.QuadPart != fd->real_pos) {
+		if (!SetFilePointerEx(handle, li, NULL, FILE_BEGIN)) {
 			errno = ntfs_w32error_to_errno(GetLastError());
 			Dputs("Error: SetFilePointer failed.");
 			return -1;
 		}
+		fd->real_pos = li.QuadPart;
 	}
-
-	/* Notice: If the address is not alligned, we leave it for the
-		read/write operation. */
-	fd->current_pos.QuadPart = pos.QuadPart;
-
-	return pos.QuadPart;
+	fd->real_ofs = pos & (NTFS_BLOCK_SIZE - 1);
+	return pos;
 }
 
 /**
@@ -865,17 +867,16 @@ static s64 ntfs_device_win32_abs_seek(struct win32_fd *fd, LARGE_INTEGER pos)
 static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
 {
-	LARGE_INTEGER abs_offset;
+	s64 abs_ofs;
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
 
 	Dprintf("win32_seek(%lld=0x%llx,%d)\n", offset, offset, whence);
-
 	switch (whence) {
 	case SEEK_SET:
-		abs_offset.QuadPart = offset;
+		abs_ofs = offset;
 		break;
 	case SEEK_CUR:
-		abs_offset.QuadPart = fd->current_pos.QuadPart + offset;
+		abs_ofs = fd->real_pos + fd->real_ofs + offset;
 		break;
 	case SEEK_END:
 		/* end of partition != end of disk */
@@ -885,64 +886,56 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 			errno = ENOTSUP;
 			return -1;
 		}
-		abs_offset.QuadPart = fd->part_length + offset;
+		abs_ofs = fd->part_length + offset;
 		break;
 	default:
 		Dprintf("win32_seek() wrong mode %d.\n", whence);
 		errno = EINVAL;
 		return -1;
 	}
-
-	return ntfs_device_win32_abs_seek(fd, abs_offset);
+	return ntfs_device_win32_abs_seek(fd, abs_ofs);
 }
 
 /**
  * ntfs_device_win32_read_simple - Positioned simple read.
  * @fd:			The private data of the NTFS_DEVICE.
- * @pos:		Absolute offset in the file.
  * @buf:		A pointer to where to put the contents.
  * @count:		How many bytes should be read.
  *
- * On success returns the number of bytes read (could be <count)
- * otherwise ((DWORD)-1) with errno.
+ * On success returns the number of bytes read (can be < @count) and on error
+ * returns (DWORD)-1 and errno set.
  *
- * Note:
- *	As count must be a multiple of the sector size, ((DWORD)-1) never
- *	successfully occur.
- *
- * Limitations:
- *	buf must be aligned to page boundery
- *	pos & count must be aligned to sector bounderies.
- *	When dealing with volumes, a single call must not span both volume
- *	and disk extents.
+ * Notes:
+ *	- Reads from fd->real_pos NOT considering fd->real_ofs.
+ *	- Does NOT advance fd->real_pos and fd->real_ofs.
+ *	- @buf must be aligned to page boundary.
+ *	- @count must be a multiple of the sector size.
+ *	- When dealing with volumes, a single call must not span both volume
+ *	  and disk extents.
  */
-static DWORD ntfs_device_win32_read_simple(win32_fd *fd, void *buf,
-		DWORD count)
+static DWORD ntfs_device_win32_read_simple(win32_fd *fd, void *buf, DWORD count)
 {
 	HANDLE handle;
-	DWORD rvl, i;
+	DWORD br;
 
-	if ((fd->geo_size > fd->current_pos.QuadPart) &&
-			(fd->vol_handle != INVALID_HANDLE_VALUE)) {
-		Dputs("Reading via vol_handle");
+	if (fd->real_pos + fd->real_ofs < fd->geo_size &&
+			fd->vol_handle != INVALID_HANDLE_VALUE) {
+		Dputs("Reading via vol_handle.");
 		handle = fd->vol_handle;
 	} else {
-		Dputs("Reading via handle");
+		Dputs("Reading via handle.");
 		handle = fd->handle;
 	}
-
-	rvl = ReadFile(handle, buf, count, &i, (LPOVERLAPPED)NULL);
-	if (!rvl) {
+	if (!ReadFile(handle, buf, count, &br, NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: ReadFile failed.");
-		return -1;
-	} else if (!i) {
-		errno = ENXIO;
-		Dputs("Error: ReadFile failed: EOF.");
-		return -1;
+		Dputs("Error: ReadFile() failed.");
+		return (DWORD)-1;
 	}
-
-	return i;
+	/*
+	 * NOTE: The caller *MUST* update fd->real_pos and fd->real_ofs!!!
+	 * Alternatively, caller can call ntfs_device_win32_{,abs_}seek().
+	 */
+	return br;
 }
 
 /**
@@ -956,77 +949,80 @@ static DWORD ntfs_device_win32_read_simple(win32_fd *fd, void *buf,
  */
 static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *buf, s64 count)
 {
+	s64 pos, to_read;
 	struct win32_fd *fd = (win32_fd *)dev->d_private;
-	LARGE_INTEGER base, offset, numtoread;
 	BYTE *alignedbuffer;
-	DWORD i, numread = 0;
+	int old_ofs;
+	DWORD i, br = 0;
 
-	offset.QuadPart = fd->current_pos.QuadPart & 0x1FF;
-	base.QuadPart = fd->current_pos.QuadPart - offset.QuadPart;
-	numtoread.QuadPart = ((count + offset.QuadPart - 1) | 0x1FF) + 1;
-
-	Dprintf("win32_read(fd=%p,b=%p,count=0x%llx)->(%llx+%llx:%llx)\n", fd,
-			buf, count, base.QuadPart, offset.QuadPart,
-			numtoread.QuadPart);
-
-	if (((((long)buf) & ((s64)0x1FF)) == 0) && ((count & ((s64)0x1FF)) == 0)
-			&& ((fd->current_pos.QuadPart & 0x1FF) == 0)) {
+	old_ofs = fd->real_ofs;
+	pos = fd->real_pos + old_ofs;
+	to_read = (old_ofs + count + NTFS_BLOCK_SIZE - 1) &
+			~(s64)(NTFS_BLOCK_SIZE - 1);
+	/* Impose maximum of 2GB to be on the safe side. */
+	if (to_read > 0x80000000) {
+		int delta = to_read - count;
+		to_read = 0x80000000;
+		count = to_read - delta;
+	}
+	Dprintf("win32_read(fd=%p,b=%p,count=0x%llx)->(%llx+%x:%llx)\n", fd,
+			buf, count, (long long)fd->real_pos, old_ofs,
+			(long long)to_read);
+	if (!((unsigned long)buf & (NTFS_BLOCK_SIZE - 1)) && !old_ofs &&
+			!(count & (NTFS_BLOCK_SIZE - 1)))
 		alignedbuffer = buf;
-	} else {
-		alignedbuffer = (BYTE *)VirtualAlloc(NULL, numtoread.LowPart,
-				MEM_COMMIT, PAGE_READWRITE);
-		if (alignedbuffer == NULL) {
+	else {
+		alignedbuffer = (BYTE *)VirtualAlloc(NULL, to_read, MEM_COMMIT,
+				PAGE_READWRITE);
+		if (!alignedbuffer) {
 			errno = ntfs_w32error_to_errno(GetLastError());
 			Dputs("Error: VirtualAlloc failed for read.");
 			return -1;
 		}
 	}
-
-	/* seek to base, if we are not in place */
-	if ((fd->current_pos.QuadPart & 0x1FF) &&
-			(ntfs_device_win32_abs_seek(fd, base) == -1))
-		goto read_error;
-
-	if ((fd->vol_handle != INVALID_HANDLE_VALUE) &&
-			(fd->current_pos.QuadPart < fd->geo_size)) {
-		s64 vol_numtoread = fd->geo_size - fd->current_pos.QuadPart;
-		if (count > vol_numtoread) {
-			numread = ntfs_device_win32_read_simple(fd,
-					(LPVOID)alignedbuffer, vol_numtoread);
-			if (numread==(DWORD)-1)
+	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
+		s64 vol_to_read = fd->geo_size - pos;
+		if (count > vol_to_read) {
+			br = ntfs_device_win32_read_simple(fd,
+					alignedbuffer, old_ofs + vol_to_read);
+			if (br == (DWORD)-1)
 				goto read_error;
-			if (numread!=vol_numtoread)
+			to_read -= br;
+			if (br < old_ofs) {
+				br = 0;
 				goto read_partial;
-
-			base.QuadPart = fd->geo_size;
-			numtoread.QuadPart -= numread;
-			if (ntfs_device_win32_abs_seek(fd, base) == -1)
+			}
+			br -= old_ofs;
+			pos += br;
+			fd->real_pos = pos & ~(s64)(NTFS_BLOCK_SIZE - 1);
+			fd->real_ofs = pos & (NTFS_BLOCK_SIZE - 1);
+			if (br != vol_to_read)
 				goto read_partial;
 		}
 	}
-
-	if ((i = ntfs_device_win32_read_simple(fd, (LPVOID)(alignedbuffer +
-			numread), numtoread.QuadPart)) == (DWORD)-1) {
-		if (numread>0)
+	if ((i = ntfs_device_win32_read_simple(fd, alignedbuffer + br,
+			to_read)) == (DWORD)-1) {
+		if (br)
 			goto read_partial;
 		goto read_error;
 	}
-	numread += i;
-
+	if (i < fd->real_ofs)
+		goto read_partial;
+	i -= fd->real_ofs;
+	br += i;
+	if (br > count)
+		br = count;
+	pos += br;
+	fd->real_pos = pos & ~(s64)(NTFS_BLOCK_SIZE - 1);
+	fd->real_ofs = pos & (NTFS_BLOCK_SIZE - 1);
 read_partial:
-	numread = (numread < offset.LowPart) ? 0 : ((numread - offset.LowPart >
-			count) ? count : (numread - offset.LowPart));
-	fd->current_pos.QuadPart += numread;
-
-	if (buf != alignedbuffer) {
-		memcpy((void *)buf, alignedbuffer + offset.QuadPart, numread);
+	if (alignedbuffer != buf) {
+		memcpy((void*)buf, alignedbuffer + old_ofs, br);
 		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
 	}
-
-	return numread;
-
+	return br;
 read_error:
-	if (buf != alignedbuffer)
+	if (alignedbuffer != buf)
 		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
 	return -1;
 }
@@ -1045,12 +1041,10 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	BOOL rvl;
 
 	Dprintf("win32_close(%p)\n", dev);
-
 	if (!NDevOpen(dev)) {
 		errno = EBADF;
 		return -errno;
 	}
-
 	if (fd->vol_handle != INVALID_HANDLE_VALUE) {
 		if (!NDevReadOnly(dev)) {
 			ntfs_device_win32_dismount(fd->vol_handle);
@@ -1059,17 +1053,13 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 		if (!CloseHandle(fd->vol_handle))
 			Dputs("Error: CloseHandle failed for volume.");
 	}
-
 	rvl = CloseHandle(fd->handle);
-
 	free(fd);
-
 	if (!rvl) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		Dputs("Error: CloseHandle failed.");
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -1085,32 +1075,30 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
  */
 static int ntfs_device_win32_sync(struct ntfs_device *dev)
 {
+	int err = 0;
+	BOOL to_clear = TRUE;
+
 	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
 		struct win32_fd *fd = (win32_fd *)dev->d_private;
 
 		if ((fd->vol_handle != INVALID_HANDLE_VALUE) &&
-				FlushFileBuffers(fd->handle))
-			NDevClearDirty(dev);
-		
-		if (FlushFileBuffers(fd->handle)) {
-			NDevClearDirty(dev);
-			return 0;
-		} else {
-			/* We want to set errno even if we return 0 to
-			   let the user to know about failure even in
-			   the disk/volume case. */
-			errno = ntfs_w32error_to_errno(GetLastError());
-			/* Don't fail in case of volume/disk */
-			if (fd->geo_size != -1)
-				return 0;
-			/* fail on the other cases */
-			Dputs("Error: Couldn't sync.");
+				!FlushFileBuffers(fd->vol_handle)) {
+			to_clear = FALSE;
+			err = ntfs_w32error_to_errno(GetLastError());
+		}
+		if (!FlushFileBuffers(fd->handle)) {
+			to_clear = FALSE;
+			if (!err)
+				err = ntfs_w32error_to_errno(GetLastError());
+		}
+		if (!to_clear) {
+			errno = err;
+			Dputs("Error: Could not sync.");
 			return -1;
 		}
-	} else {
-		/* no need/ability for a sync(), just exit gracefully */
-		return 0;
+		NDevClearDirty(dev);
 	}
+	return 0;
 }
 
 /**
@@ -1120,31 +1108,41 @@ static int ntfs_device_win32_sync(struct ntfs_device *dev)
  * @count:		How many bytes should be written.
  *
  * On success returns the amount of bytes actually written.
- * On fail returns -1 and errno set.
+ * On success returns the number of bytes written and on error returns
+ * (DWORD)-1 and errno set.
  *
- * Limitations:
- * buf must be aligned to page boundery
- * pos & count must be aligned to sector bounderies.
- * When dealing with volumes, a single call must not span both volume and disk
- *  extents.
+ * Notes:
+ *	- Writes to fd->real_pos NOT considering fd->real_ofs.
+ *	- Does NOT advance fd->real_pos and fd->real_ofs.
+ *	- @buf must be aligned to page boundary.
+ *	- @count must be a multiple of the sector size.
+ *	- When dealing with volumes, a single call must not span both volume
+ *	  and disk extents.
  */
-static DWORD ntfs_device_win32_write_simple(win32_fd *fd,
-		const void *buf, DWORD count)
+static DWORD ntfs_device_win32_write_simple(win32_fd *fd, const void *buf,
+		DWORD count)
 {
-	DWORD rvl, i;
+	HANDLE handle;
+	DWORD bw;
 
-	if ((fd->geo_size > fd->current_pos.QuadPart) &&
-			(fd->vol_handle != INVALID_HANDLE_VALUE))
-		rvl = WriteFile(fd->vol_handle, buf, count, &i, NULL);
-	else
-		rvl = WriteFile(fd->handle, buf, count, &i, NULL);
-
-	if (!rvl) {
+	if (fd->real_pos + fd->real_ofs < fd->geo_size &&
+			fd->vol_handle != INVALID_HANDLE_VALUE) {
+		Dputs("Writing via vol_handle");
+		handle = fd->vol_handle;
+	} else {
+		Dputs("Writing via handle");
+		handle = fd->handle;
+	}
+	if (!WriteFile(handle, buf, count, &bw, NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		Dputs("Error: WriteFile failed.");
 		return (DWORD)-1;
 	}
-	return i;
+	/*
+	 * NOTE: The caller *MUST* update fd->real_pos and fd->real_ofs!!!
+	 * Alternatively, caller can call ntfs_device_win32_{,abs_}seek().
+	 */
+	return bw;
 }
 
 /**
@@ -1159,111 +1157,122 @@ static DWORD ntfs_device_win32_write_simple(win32_fd *fd,
 static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *buf,
 		s64 count)
 {
+	s64 pos, to_write;
 	win32_fd *fd = (win32_fd *)dev->d_private;
-	LARGE_INTEGER base, offset, actual_count;
-	BYTE *alignedbuffer = NULL;
-	DWORD i;
+	BYTE *alignedbuffer;
+	int old_ofs;
+	DWORD i, bw = 0;
 
-	Dprintf("win32_write: Writing %lld bytes\n",count);
-	
+	Dprintf("win32_write: Writing %lld bytes\n", (long long)count);
 	if (NDevReadOnly(dev)) {
 		Dputs("win32_write: Device R/O, exiting.");
 		errno = EROFS;
 		return -1;
 	}
-
 	if (!count)
 		return 0;
-
 	NDevSetDirty(dev);
-
-	offset.QuadPart = fd->current_pos.QuadPart & 0x1FF;
-	base.QuadPart = fd->current_pos.QuadPart - offset.QuadPart;
-	actual_count.QuadPart = ((count + offset.QuadPart - 1) | 0x1FF) + 1;
-
-	if ((actual_count.QuadPart != count) || (((long)buf) & 0x1FF) ||
-			(fd->current_pos.QuadPart & 0x1FF)) {
-		alignedbuffer = (BYTE *)VirtualAlloc(NULL,
-			actual_count.QuadPart, MEM_COMMIT, PAGE_READWRITE);
-		if (alignedbuffer == NULL) {
+	old_ofs = fd->real_ofs;
+	pos = fd->real_pos + old_ofs;
+	to_write = (old_ofs + count + NTFS_BLOCK_SIZE - 1) &
+			~(s64)(NTFS_BLOCK_SIZE - 1);
+	/* Impose maximum of 2GB to be on the safe side. */
+	if (to_write > 0x80000000) {
+		int delta = to_write - count;
+		to_write = 0x80000000;
+		count = to_write - delta;
+	}
+	if (!((unsigned long)buf & (NTFS_BLOCK_SIZE - 1)) && !old_ofs &&
+			!(count & (NTFS_BLOCK_SIZE - 1)))
+		alignedbuffer = buf;
+	else {
+		alignedbuffer = (BYTE *)VirtualAlloc(NULL, to_write,
+				MEM_COMMIT, PAGE_READWRITE);
+		if (!alignedbuffer) {
 			errno = ntfs_w32error_to_errno(GetLastError());
 			Dputs("Error: VirtualAlloc failed for write.");
 			return -1;
 		}
-		
-		/* read last sector */
-		if ((offset.QuadPart + count) & 0x1FF) {
-			LARGE_INTEGER pos;
-			pos.QuadPart = base.QuadPart + actual_count.QuadPart -
-					512;
-			if (ntfs_device_win32_abs_seek(fd, pos) == -1)
-				goto write_error;
-			if (!ntfs_device_win32_read_simple(fd,
-					(LPVOID)(alignedbuffer +
-					actual_count.QuadPart - 512), 512))
-				goto write_error;
-		}
-
-		/* read first sector */
-		if (offset.LowPart) {
-			if (ntfs_device_win32_abs_seek(fd, base) == -1)
-				goto write_error;
-			if (!ntfs_device_win32_read_simple(fd,
-					(LPVOID)(alignedbuffer), 512)) {
+		/* Read first sector if start of write not sector aligned. */
+		if (old_ofs) {
+			i = ntfs_device_win32_read_simple(fd, alignedbuffer,
+					NTFS_BLOCK_SIZE);
+			if (i != NTFS_BLOCK_SIZE) {
+				if (i >= 0)
+					errno = EIO;
 				goto write_error;
 			}
 		}
-
-		/* copy the rest of the contents */
- 		memcpy((void *)(alignedbuffer + offset.LowPart), buf,
-				(size_t)count);
-
-		/* ReAligning */
-		if (ntfs_device_win32_abs_seek(fd, base) == -1)
+		/* Read last sector if end of write not sector aligned. */
+		if ((pos + count) & (NTFS_BLOCK_SIZE - 1)) {
+			if (ntfs_device_win32_abs_seek(fd, (pos + count) &
+					~(NTFS_BLOCK_SIZE - 1)) == -1)
+				goto write_error;
+			i = ntfs_device_win32_read_simple(fd, alignedbuffer +
+					to_write - NTFS_BLOCK_SIZE,
+					NTFS_BLOCK_SIZE);
+			if (i != NTFS_BLOCK_SIZE) {
+				if (ntfs_device_win32_abs_seek(fd, pos) == -1) {
+					fd->real_pos = pos & ~(s64)
+							(NTFS_BLOCK_SIZE - 1);
+					fd->real_ofs = old_ofs;
+				}
+				if (i >= 0)
+					errno = EIO;
+				goto write_error;
+			}
+		}
+		/* Move the file position back so we can start writing. */
+		if (ntfs_device_win32_abs_seek(fd, pos) == -1) {
+			fd->real_pos = pos & ~(s64)(NTFS_BLOCK_SIZE - 1);
+			fd->real_ofs = old_ofs;
 			goto write_error;
-		
-		/* hack to share code */
-		buf = (const void *)alignedbuffer;
+		}
+		/* Copy the data to be written into @alignedbuffer. */
+ 		memcpy(alignedbuffer + old_ofs, buf, count);
 	}
-
-	if ((fd->geo_size > base.QuadPart) &&
-			(fd->vol_handle != INVALID_HANDLE_VALUE)) {
-		s64 tmp = min((fd->geo_size - base.QuadPart),
-				actual_count.QuadPart);
-		i = ntfs_device_win32_write_simple(fd, buf, tmp);
-		if (i == (DWORD)-1)
-			goto write_error;
-		if (i != tmp)
-			goto partial_write;
-		base.QuadPart -= i;
-	} else
-		i = 0;
-
-	if (fd->geo_size <= base.QuadPart) {
-		const void *newp = (const void *)(((const BYTE *)buf) + i);
-		i += ntfs_device_win32_write_simple(fd, newp,
-				actual_count.LowPart - i);
-		if (!i || (i == (DWORD)-1))
-			goto write_error;
+	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
+		s64 vol_to_write = fd->geo_size - pos;
+		if (count > vol_to_read) {
+			bw = ntfs_device_win32_write_simple(fd, alignedbuffer,
+					old_ofs + vol_to_write);
+			if (bw == (DWORD)-1)
+				goto write_error;
+			to_write -= bw;
+			if (bw < old_ofs) {
+				bw = 0;
+				goto write_partial;
+			}
+			bw -= old_ofs;
+			pos += bw;
+			fd->real_pos = pos & ~(s64)(NTFS_BLOCK_SIZE - 1);
+			fd->real_ofs = pos & (NTFS_BLOCK_SIZE - 1);
+			if (bw != vol_to_write)
+				goto write_partial;
+		}
 	}
-partial_write:
-	if (alignedbuffer)
+	if ((i = ntfs_device_win32_write_simple(fd, alignedbuffer + bw,
+			to_write)) == (DWORD)-1) {
+		if (bw)
+			goto write_partial;
+		goto write_error;
+	}
+	if (i < fd->real_ofs)
+		goto write_partial;
+	i -= fd->real_ofs;
+	bw += i;
+	if (bw > count)
+		bw = count;
+	pos += bw;
+	fd->real_pos = pos & ~(s64)(NTFS_BLOCK_SIZE - 1);
+	fd->real_ofs = pos & (NTFS_BLOCK_SIZE - 1);
+write_partial:
+	if (alignedbuffer != buf)
 		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-
-	actual_count.QuadPart = (s64)i - actual_count.QuadPart + count;
-	if (actual_count.QuadPart < 0)
-		return 0;
-	return actual_count.QuadPart;
-
+	return bw;
 write_error:
-	if (alignedbuffer)
-		VirtualFree(alignedbuffer, 0, MEM_RELEASE);
-
-	fd->current_pos.QuadPart = base.QuadPart + offset.QuadPart;
-	if (!(fd->current_pos.QuadPart & 512))
-		ntfs_device_win32_abs_seek(fd, base);
-
-	return -1;
+	bw = -1;
+	goto write_partial;
 }
 
 /**
