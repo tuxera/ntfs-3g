@@ -130,6 +130,8 @@ xx/xx/2005 - 2.0.0-WIP
 	- ntfscp: add ability to specify directory as destination file.  (Yura)
 	- ntfsresize: fix segfault during filesystem check if NTFS was corrupted
 	  in a way that clusters were referenced outside of the volume.  (Szaka)
+	- Major rewrite of libntfs/win32_io.c and in particular seek, read, and
+	  write related code.
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
