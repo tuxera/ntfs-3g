@@ -1,7 +1,7 @@
 /**
  * ntfsclone - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003-2004 Szabolcs Szakacsits
+ * Copyright (c) 2003-2005 Szabolcs Szakacsits
  * Copyright (c) 2004 Anton Altaparmakov
  * Special image format support copyright (c) 2004 Per Olofsson
  *
@@ -134,6 +134,7 @@ struct {
 #define LAST_METADATA_INODE  	11
 
 #define NTFS_MAX_CLUSTER_SIZE 	65536
+#define NTFS_SECTOR_SIZE 	  512
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
 
@@ -444,7 +445,7 @@ static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 static int io_all(void *fd, void *buf, int count, int do_write)
 {
 	int i;
-	struct ntfs_device *dev = (struct ntfs_device *)fd;
+	struct ntfs_device *dev = fd;
 	
 	while (count > 0) {
 		if (do_write)
@@ -465,23 +466,49 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 }
 
 
-static void copy_cluster(void)
+static void rescue_sector(void *fd, off_t pos, void *buff)
+{
+	const char *badsector_magic = "BadSectoR\0";
+	struct ntfs_device *dev = fd;
+
+	if (opt.restore_image) {
+		if (lseek(*(int *)fd, pos, SEEK_SET) == (off_t)-1)
+			perr_exit("lseek");
+	} else {
+		if (vol->dev->d_ops->seek(dev, pos, SEEK_SET) == (off_t)-1)
+			perr_exit("seek input");
+	}
+
+	if (read_all(fd, buff, NTFS_SECTOR_SIZE) == -1) {
+		Printf("WARNING: Can't read sector at %llu, lost data.\n",
+		       (unsigned long long)pos);
+		memset(buff, '?', NTFS_SECTOR_SIZE);
+		memmove(buff, badsector_magic, sizeof(badsector_magic));
+	}
+}
+
+
+static void copy_cluster(int rescue, off_t rescue_pos)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
-	u32 csize = opt.restore_image ? image_hdr.cluster_size
-		: vol->cluster_size;
+	/* vol is NULL if opt.restore_image is set */
+	u32 csize = image_hdr.cluster_size;
+	void *fd = (void *)&fd_in;
+	
+	if (!opt.restore_image) {
+		csize = vol->cluster_size;
+		fd = vol->dev;
+	}
 
-	if (read_all(opt.restore_image ? (void *)&fd_in : vol->dev, buff,
-		     csize) == -1) {
+	if (read_all(fd, buff, csize) == -1) {
 
-		const char *badcluster_magic = "BadClusteR";
+		u32 i;
 
-		if (!opt.rescue || errno != EIO)
+		if (!rescue || errno != EIO)
 			perr_exit("read_all");
 
-		Printf("WARNING: Couldn't read a cluster, data is lost.\n");
-		memset(buff, 2, csize);
-		memmove(buff, badcluster_magic, sizeof(badcluster_magic));
+		for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
+			rescue_sector(fd, rescue_pos + i, buff + i);
 	}
 
 	if (opt.save_image) {
@@ -545,7 +572,7 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 	
 	/* FIXME: this could give pretty suboptimal performance */
 	for (i = 0; i < len; i++)
-		copy_cluster();
+		copy_cluster(opt.rescue, rl->lcn + i);
 }
 
 static void clone_ntfs(u64 nr_clusters)
@@ -578,7 +605,7 @@ static void clone_ntfs(u64 nr_clusters)
 			lseek_to_cluster(cl);
 			image_skip_clusters(cl - last_cl - 1);
 			
-			copy_cluster();
+			copy_cluster(opt.rescue, cl);
 			last_cl = cl;
 			continue;
 		}
@@ -633,11 +660,11 @@ static void restore_image(void)
 			else {
 				if (lseek(fd_out, count * csize, SEEK_CUR)
 				    == (off_t)-1)
-					perr_exit("lseek output");
+					perr_exit("restore_image: lseek");
 			}
 			pos += count;
 		} else if (cmd == 1) {
-			copy_cluster();
+			copy_cluster(0, 0);
 			pos++;
 			progress_update(&progress, ++p_counter);
 		} else
@@ -711,7 +738,7 @@ static void clone_logfile_parts(ntfs_walk_clusters_ctx *image, runlist *rl)
 			break;
 
 		lseek_to_cluster(lcn);
-		copy_cluster();
+		copy_cluster(opt.rescue, lcn);
 
 		if (offset == 0)
 			offset = NTFS_BLOCK_SIZE >> 1;
@@ -834,17 +861,16 @@ static void compare_bitmaps(struct bitmap *a)
 				
 				if (opt.ignore_fs_check) {
 					lseek_to_cluster(cl);
-					copy_cluster();
+					copy_cluster(opt.rescue, cl);
 				}
 
 				if (++mismatch > 10)
 					continue;
 
 				Printf("Cluster accounting failed at %lld "
-						"(0x%llx): %s cluster in "
-						"$Bitmap\n", (long long)cl,
-						(unsigned long long)cl,
-						bit ? "missing" : "extra");
+				       "(0x%llx): %s cluster in $Bitmap\n",
+				       (long long)cl, (unsigned long long)cl,
+				       bit ? "missing" : "extra");
 			}
 		}
 	}
@@ -867,8 +893,7 @@ static int wipe_data(char *p, int pos, int len)
 {
 	int wiped = 0;
 	
-	p += pos;
-	for (; len > 0; len--) {
+	for (p += pos; --len >= 0;) {
 		if (p[len]) {
 			p[len] = 0;
 			wiped++;
@@ -1138,8 +1163,8 @@ static s64 device_size_get(int fd)
 
 		if (ioctl(fd, BLKGETSIZE64, &size) >= 0) {
 			Dprintf("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
-					(unsigned long long)size,
-					(unsigned long long)size);
+				(unsigned long long)size, 
+				(unsigned long long)size);
 			return (s64)size;
 		}
 	}
@@ -1149,7 +1174,7 @@ static s64 device_size_get(int fd)
 
 		if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
 			Dprintf("BLKGETSIZE nr 512 byte blocks = %lu "
-					"(0x%lx)\n", size, size);
+				"(0x%lx)\n", size, size);
 			return (s64)size * 512;
 		}
 	}
@@ -1159,7 +1184,7 @@ static s64 device_size_get(int fd)
 
 		if (ioctl(fd, FDGETPRM, &this_floppy) >= 0) {
 			Dprintf("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
-					this_floppy.size, this_floppy.size);
+				this_floppy.size, this_floppy.size);
 			return (s64)this_floppy.size * 512;
 		}
 	}
