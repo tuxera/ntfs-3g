@@ -113,10 +113,9 @@ xx/xx/2005 - 2.0.0-WIP
 	- ntfsclone: added a new option, --ignore-fs-check. It can be used
 	  only with the --metadata option. The clusters causing the 
 	  inconsistency are saved too. (Szaka)
-	- ntfsclone: added a new option, --rescue. It ignores read errors
-	  so disks having bad sectors (dying disks) can be rescued. The content
-	  of the cluster having bad sectors is filled by character '2' and the
-	  start of the cluster is marked by "BadClusteR". (Szaka)
+	- ntfsclone: added a new option, --rescue. It ignores read errors so
+	  disks having bad sectors (dying disks) can be rescued efficiently,
+	  with minimal stress on them. (Szaka)
 	- ntfsfix: fix invalid mft records in $MFTMirr. (Szaka)
 	- Added a trigger script to the BK repository that will send an email
 	  to linux-ntfs-cvs@lists.sourceforge.net mailing list when someone
@@ -132,6 +131,12 @@ xx/xx/2005 - 2.0.0-WIP
 	  in a way that clusters were referenced outside of the volume.  (Szaka)
 	- Major rewrite of libntfs/win32_io.c and in particular seek, read, and
 	  write related code.
+	- ntfsclone: --rescue works at the lowest, sector and not cluster level
+	  thus more data can be rescued. The contents of the unreadable sectors
+	  are filled by character '?' and the beginning of such sectors are
+	  marked by "BadSectoR\0".  (Krishna Mohan Gundu, Szaka)
+	- ntfsclone: fixed an off-by-one error during --metadata in function
+	  wipe_data().  (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
