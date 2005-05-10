@@ -1183,7 +1183,7 @@ int ntfs_check_if_mounted(const char *file __attribute__((unused)),
  * Version 1.1 and 1.2 are used by Windows NT3.x and NT4.
  * Version 2.x is used by Windows 2000 Betas.
  * Version 3.0 is used by Windows 2000.
- * Version 3.1 is used by Windows XP and Windows Server 2003.
+ * Version 3.1 is used by Windows XP, Windows Server 2003 and Longhorn.
  *
  * Return 0 if NTFS version is supported otherwise -1 with errno set.
  *

@@ -93,7 +93,7 @@ typedef enum {
  * NTFS version 1.1 and 1.2 are used by Windows NT4.
  * NTFS version 2.x is used by Windows 2000 Beta
  * NTFS version 3.0 is used by Windows 2000.
- * NTFS version 3.1 is used by Windows XP and Windows Server 2003.
+ * NTFS version 3.1 is used by Windows XP, Windows Server 2003 and Longhorn.
  */
 
 #define NTFS_V1_1(major, minor) ((major) == 1 && (minor) == 1)
