@@ -137,6 +137,8 @@ xx/xx/2005 - 2.0.0-WIP
 	  marked by "BadSectoR\0".  (Krishna Mohan Gundu, Szaka)
 	- ntfsclone: fixed an off-by-one error during --metadata in function
 	  wipe_data().  (Szaka)
+	- Detect and refuse to mount hibernated Windows during ntfs_mount() if 
+	  the volume is tried to be opened read-write.  (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

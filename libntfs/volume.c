@@ -2,6 +2,7 @@
  * volume.c - NTFS volume handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,6 +40,7 @@
 #include "inode.h"
 #include "runlist.h"
 #include "logfile.h"
+#include "dir.h"
 
 /**
  * ntfs_volume_alloc -
@@ -589,6 +591,128 @@ exit:
 }
 
 /**
+ * ntfs_hiberfile_open - Find and open '/hiberfil.sys'
+ * @vol:    An ntfs volume obtained from ntfs_mount
+ *
+ * Return:  inode  Success, hibefil.sys is valid
+ *	    NULL   hibefil.sys doesn't exist or some other error occurred
+ */
+static ntfs_inode *ntfs_hiberfile_open(ntfs_volume *vol)
+{
+	u64 inode;
+	ntfs_inode *ni_root;
+	ntfs_inode *ni_hibr = NULL;
+	ntfschar   *unicode = NULL;
+	int unicode_len;
+	const char *hiberfile = "hiberfil.sys";
+
+	if (!vol) {
+		errno = EINVAL;
+		return NULL;
+	}
+	
+	ni_root = ntfs_inode_open(vol, FILE_root);
+	if (!ni_root) {
+		Dprintf("Couldn't open the root directory.\n");
+		return NULL;
+	}
+	
+	unicode_len = ntfs_mbstoucs(hiberfile, &unicode, 0);
+	if (unicode_len < 0) {
+		Dperror("Couldn't convert 'hiberfil.sys' to Unicode");
+		goto out;
+	}
+
+	inode = ntfs_inode_lookup_by_name(ni_root, unicode, unicode_len);
+	if (inode == (u64)-1) {
+		Dprintf("Couldn't find file '%s'.\n", hiberfile);
+		goto out;
+	}
+
+	inode = MREF(inode);
+	ni_hibr = ntfs_inode_open(vol, inode);
+	if (!ni_hibr) {
+		Dprintf("Couldn't open inode %lld.\n", (long long)inode);
+		goto out;
+	}
+out:
+	ntfs_inode_close(ni_root);
+	if (unicode)
+		free(unicode);
+	return ni_hibr;
+}
+
+
+#define NTFS_HIBERFILE_HEADER_SIZE	4096
+
+/**
+ * ntfs_volume_check_hiberfile - check hiberfil.sys whether Windows is
+ *                               hibernated on the target volume
+ * @vol:    volume on which to check hiberfil.sys
+ *
+ * Return:  0 if Windows isn't hibernated for sure
+ *         -1 otherwise and errno is set to the appropriate value
+ */
+static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na = NULL;
+	int i, bytes_read, ret = -1;
+	char *buf = NULL;
+	
+	ni = ntfs_hiberfile_open(vol);
+	if (!ni) {
+		if (errno == ENOENT)
+			return 0;
+		return -1;
+	}
+
+	buf = malloc(NTFS_HIBERFILE_HEADER_SIZE);
+	if (!buf) {
+		Dperror("Error allocating memory for hiberfile.sys header");
+		goto out;
+	}
+
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		Dperror("Failed to open hiberfil.sys data attribute");
+		goto out;
+	}
+
+	bytes_read = ntfs_attr_pread(na, 0, NTFS_HIBERFILE_HEADER_SIZE, buf);
+	if (bytes_read == -1) {
+		Dperror("Failed to read hiberfil.sys");
+		goto out;
+	}
+	if (bytes_read < NTFS_HIBERFILE_HEADER_SIZE) {
+		Dprintf("Hibernated non-system partition, refused to mount!\n");
+		errno = EPERM;
+		goto out;
+	}
+	if (memcmp(buf, "hibr", 4) == 0) {
+		Dprintf("Windows is hibernated, refused to mount!\n");
+		errno = EPERM;
+		goto out;
+	}
+	for (i = 0; i < NTFS_HIBERFILE_HEADER_SIZE; i++) {
+		if (buf[i]) {
+			Dprintf("Windows is hibernated, won't mount!\n");
+			errno = EPERM;
+			goto out;
+		}
+	}
+        /* All right, all header bytes are zero */
+	ret = 0;
+out:
+	if (na)
+		ntfs_attr_close(na);
+	if (buf)
+		free(buf);
+	ntfs_inode_close(ni);
+	return ret;
+}
+
+/**
  * ntfs_device_mount - open ntfs volume
  * @dev:	device to open
  * @rwflag:	optional mount flags
@@ -954,11 +1078,15 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 		Dperror("Failed to close inode, leaking memory");
 
 	/*
-	 * Check logfile. We care about not clean logfile only during
-	 * read-write mount, so for read-only mount don't check logfile at all.
+	 * Check for dirty logfile and hibernated Windows.
+	 * We care only about read-write mounts.
 	 */
-	if (!(rwflag & MS_RDONLY) && ntfs_volume_check_logfile(vol))
-		goto error_exit;
+	if (!(rwflag & MS_RDONLY)) {
+		if (ntfs_volume_check_logfile(vol) < 0)
+			goto error_exit;
+		if (ntfs_volume_check_hiberfile(vol) < 0)
+			goto error_exit;
+	}
 
 	return vol;
 io_error_exit:
