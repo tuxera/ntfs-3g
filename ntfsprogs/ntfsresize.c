@@ -79,6 +79,10 @@ static const char *corrupt_volume_msg =
 "it's important! You probably also need to reboot Windows to take effect.\n"
 "Then you can try ntfsresize again. No modification was made to your NTFS.\n";
 
+static const char *hibernated_volume_msg =
+"Apparently the NTFS partition is hibernated. Windows must be resumed and\n"
+"turned off properly, thus resizing will be possible later on.\n";
+
 struct {
 	int verbose;
 	int debug;
@@ -2064,6 +2068,8 @@ static ntfs_volume *mount_volume(void)
 			printf(invalid_ntfs_msg, opt.volume);
 		else if (err == EIO)
 			printf(corrupt_volume_msg);
+		else if (err == EPERM)
+			printf(hibernated_volume_msg);
 		exit(1);
 	}
 
