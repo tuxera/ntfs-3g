@@ -2002,7 +2002,7 @@ free:
  * handle_undelete
  * Handles the undelete
  */
-int handle_undelete (ntfs_volume *vol)
+static int handle_undelete (ntfs_volume *vol)
 {
 	int result = 1;
 	int i;
