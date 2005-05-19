@@ -1,6 +1,8 @@
 Current news
 ============
 
+Moved back from BitKeeper to CVS on SF.net.
+
 ntfsprogs should now work completely on Windows 2000 and XP (Cygwin). 
 mkntfs does not create bootable volumes when on Windows.  Volumes are locked 
 when using a R/W utility in order to prevent data corruption.  (Yuval Fledel)
