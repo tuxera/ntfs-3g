@@ -139,6 +139,8 @@ xx/xx/2005 - 2.0.0-WIP
 	  wipe_data().  (Szaka)
 	- Detect and refuse to mount hibernated Windows during ntfs_mount() if 
 	  the volume is tried to be opened read-write.  (Szaka)
+	- Move back from BitKeeper to CVS on SF.net and fix executable
+	  permissions that got lost during the move.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
