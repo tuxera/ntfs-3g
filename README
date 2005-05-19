@@ -27,9 +27,8 @@ The Linux-NTFS home page is at:
 The SourceForge.net Linux-NTFS project page is at:
 	http://sourceforge.net/projects/linux-ntfs/
 
-The latest Linux-NTFS source code is available from our BitKeeper repositories
-which can be found at:
-	http://linux-ntfs.bkbits.net/
+The latest Linux-NTFS source code is available from our CVS repositories which
+can be found on our SourceForge.net project page.
 
 If you would like to take part in the development of Linux-NTFS, you are
 invited to subscribe to the development mailing list,
