@@ -688,7 +688,7 @@ static void free_file (struct ufile *file)
 		if (f->name)
 			free (f->name);
 		if (f->parent_name) {
-			Dprintf ("\tand parent filename '%s'\n", f->parent_name ? f->parent_name : NONE);
+			Dprintf ("\tand parent filename '%s'\n", f->parent_name);
 			free (f->parent_name);
 		}
 		free (f);
