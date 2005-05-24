@@ -141,6 +141,8 @@ xx/xx/2005 - 2.0.0-WIP
 	  the volume is tried to be opened read-write.  (Szaka)
 	- Move back from BitKeeper to CVS on SF.net and fix executable
 	  permissions that got lost during the move.  (Anton)
+	- ntfsresize: fix segfault during filesystem check if NTFS $Bitmap file
+	  size was larger than it should have been.  (Szaka)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

@@ -873,6 +873,11 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 			break;
 		}
 
+		if (a->size < pos + count)
+			err_exit("$Bitmap file size is larger than "
+				 "expected (%lld+ versus %lld)\n",
+				 pos + count, a->size);
+
 		for (i = 0; i < count; i++, pos++) {
 			s64 cl;  /* current cluster */	  
 
