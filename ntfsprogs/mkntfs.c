@@ -3196,6 +3196,77 @@ static void mkntfs_fill_device_with_zeroes(void)
 	Qprintf(" - Done.\n");
 }
 
+static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
+{
+	int i, err;
+	char *sd;
+
+	Vprintf("Creating $Volume (mft record 3)\n");
+	m = (MFT_RECORD*)(buf + 3 * vol->mft_record_size);
+	err = create_hardlink(index_block, root_ref, m,
+			MK_LE_MREF(FILE_Volume, FILE_Volume), 0LL, 0LL,
+			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
+			"$Volume", FILE_NAME_WIN32_AND_DOS);
+	if (!err) {
+		init_system_file_sd(FILE_Volume, &sd, &i);
+		err = add_attr_sd(m, sd, i);
+	}
+	if (!err)
+		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
+	if (!err)
+		err = add_attr_vol_name(m, vol->vol_name, vol->vol_name ?
+				strlen(vol->vol_name) : 0);
+	if (!err) {
+		Qprintf("Setting the volume dirty so check disk runs on next "
+				"reboot into Windows.\n");
+		err = add_attr_vol_info(m, fl, vol->major_ver,
+				vol->minor_ver);
+	}
+	if (err < 0)
+		err_exit("Couldn't create $Volume: %s\n", strerror(-err));
+}
+
+/**
+ * create_backup_boot_sector
+ *
+ * Return 0 on success or 1 if it couldn't be created.
+ */
+static int create_backup_boot_sector(char *buff, int size)
+{
+	ssize_t bw;
+	int _e = errno;
+	const char *_s;
+
+	Vprintf("Creating backup boot sector.\n");
+	/*
+	 * Write the first max(512, opts.sector_size) bytes from buf to the
+	 * last sector.
+	 */
+	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
+			opts.sector_size - size, SEEK_SET) == (off_t)-1)
+		goto bb_err;
+
+	bw = mkntfs_write(vol->dev, buff, size);
+	if (bw == size)
+		return 0;
+
+	if (bw == -1LL)
+		_s = strerror(_e);
+	else
+		_s = "unknown error";
+	if (bw != -1LL || (bw == -1LL && _e != ENOSPC)) {
+		err_exit("Couldn't write backup boot sector: %s\n", _s);
+bb_err:
+		Eprintf("Seek failed: %s\n", strerror(errno));
+	}
+	Eprintf("Couldn't write backup boot sector. This is due to a "
+			"limitation in the\nLinux kernel. This is not "
+			"a major problem as Windows check disk will "
+			"create the\nbackup boot sector when it "
+			"is run on your next boot into Windows.\n");
+	return 1;
+}
+
 /**
  * mkntfs_create_root_structures -
  *
@@ -3207,9 +3278,9 @@ static void mkntfs_create_root_structures(void)
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
 	MFT_REF root_ref;
-	ssize_t bw;
 	int i, j, err;
 	char *sd;
+	VOLUME_FLAGS volume_flags = 0;
 
 	Qprintf("Creating NTFS volume structures.\n");
 	/*
@@ -3370,30 +3441,7 @@ static void mkntfs_create_root_structures(void)
 	if (err < 0)
 		err_exit("Couldn't create $LogFile: %s\n", strerror(-err));
 	//dump_mft_record(m);
-	Vprintf("Creating $Volume (mft record 3)\n");
-	m = (MFT_RECORD*)(buf + 3 * vol->mft_record_size);
-	err = create_hardlink(index_block, root_ref, m,
-			MK_LE_MREF(FILE_Volume, FILE_Volume), 0LL, 0LL,
-			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
-			"$Volume", FILE_NAME_WIN32_AND_DOS);
-	if (!err) {
-		init_system_file_sd(FILE_Volume, &sd, &i);
-		err = add_attr_sd(m, sd, i);
-	}
-	if (!err)
-		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
-	if (!err)
-		err = add_attr_vol_name(m, vol->vol_name, vol->vol_name ?
-				strlen(vol->vol_name) : 0);
-	if (!err) {
-		Qprintf("Setting the volume dirty so check disk runs on next "
-				"reboot into Windows.\n");
-		err = add_attr_vol_info(m, VOLUME_IS_DIRTY, vol->major_ver,
-				vol->minor_ver);
-	}
-	if (err < 0)
-		err_exit("Couldn't create $Volume: %s\n", strerror(-err));
-	//dump_mft_record(m);
+
 	Vprintf("Creating $AttrDef (mft record 4)\n");
 	m = (MFT_RECORD*)(buf + 4 * vol->mft_record_size);
 	if (vol->major_ver < 3)
@@ -3525,37 +3573,20 @@ static void mkntfs_create_root_structures(void)
 	}
 	if (err < 0)
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
-	Vprintf("Creating backup boot sector.\n");
-	/*
-	 * Write the first max(512, opts.sector_size) bytes from buf2 to the
-	 * last sector.
-	 */
-	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
-			opts.sector_size - i, SEEK_SET) == (off_t)-1)
-		goto bb_err;
-	bw = mkntfs_write(vol->dev, buf2, i);
+	
+	if (create_backup_boot_sector(buf2, i) != 0) {
+		/*
+		 *   Pre-2.6 kernels couldn't  access  the  last  sector
+		 *   if it was odd hence we schedule chkdsk to create it.
+		 */
+		volume_flags |= VOLUME_IS_DIRTY;
+	}
+
 	free(buf2);
 	buf2 = NULL;
-	if (bw != i) {
-		int _e = errno;
-		const char *_s;
 
-		if (bw == -1LL)
-			_s = strerror(_e);
-		else
-			_s = "unknown error";
-		if (bw != -1LL || (bw == -1LL && _e != ENOSPC)) {
-			err_exit("Couldn't write backup boot sector: %s\n", _s);
-bb_err:
-			Eprintf("Seek failed: %s\n", strerror(errno));
-		}
-		Eprintf("Couldn't write backup boot sector. This is due to a "
-				"limitation in the\nLinux kernel. This is not "
-				"a major problem as Windows check disk will "
-				"create the\nbackup boot sector when it "
-				"is run on your next boot into Windows.\n");
-	}
-	//dump_mft_record(m);
+	create_file_volume(m, root_ref, volume_flags);
+
 	Vprintf("Creating $BadClus (mft record 8)\n");
 	m = (MFT_RECORD*)(buf + 8 * vol->mft_record_size);
 	// FIXME: This should be IGNORE_CASE
