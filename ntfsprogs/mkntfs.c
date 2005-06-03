@@ -207,6 +207,8 @@ struct {
 	char disable_indexing;		/* -I, disables indexing of file
 					   contents on the volume by default. */
 					/* -V, print version and exit. */
+	char use_epoch_time;		/* -T, fake the time to be
+					   00:00:00 UTC, Jan 1, 1970. */
 } opts;
 
 /**
@@ -315,6 +317,8 @@ static void usage(void)
 			"    -n                       Do not write to disk\n"
 			"    -F                       Force execution despite "
 			"errors\n"
+			"    -T                       Fake the time to be "
+			"00:00:00 UTC, Jan 1, 1970\n"
 			"    -q                       Quiet execution\n"
 			"    -v                       Verbose execution\n"
 			"    -vv                      Very verbose execution\n"
@@ -343,7 +347,7 @@ static void parse_options(int argc, char *argv[])
 	if (argc && *argv)
 		EXEC_NAME = *argv;
 	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "c:fh?np:qs:vz:CFIL:QVl")) != EOF)
+	while ((c = getopt(argc, argv, "c:fh?np:qs:vz:CFTIL:QVl")) != EOF)
 		switch (c) {
 		case 'n':
 			opts.no_action = 1;
@@ -401,6 +405,9 @@ static void parse_options(int argc, char *argv[])
 		case 'F':
 			opts.force = 1;
 			break;
+		case 'T':
+			opts.use_epoch_time = 1;
+			break;
 		case 'I':
 			opts.disable_indexing = 1;
 			break;
@@ -431,6 +438,16 @@ static void parse_options(int argc, char *argv[])
 	}
 	if (optind < argc)
 		usage();
+}
+
+/**
+ * mkntfs_time
+ */
+static time_t mkntfs_time(void)
+{
+	if (!opts.use_epoch_time)
+		return time(NULL);
+	return 0;
 }
 
 /**
@@ -1652,7 +1669,7 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags)
 	STANDARD_INFORMATION si;
 	int err;
 
-	si.creation_time = utc2ntfs(time(NULL));
+	si.creation_time = utc2ntfs(mkntfs_time());
 	si.last_data_change_time = si.creation_time;
 	si.last_mft_change_time = si.creation_time;
 	si.last_access_time = si.creation_time;
@@ -2426,7 +2443,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 	fn->parent_directory = ref_parent;
 	// FIXME: Is this correct? Or do we have to copy the creation_time
 	// from the std info?
-	fn->creation_time = utc2ntfs(time(NULL));
+	fn->creation_time = utc2ntfs(mkntfs_time());
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -3672,7 +3689,7 @@ int main(int argc, char **argv)
 	/* Setup the correct locale for string output and conversion. */
 	utils_set_locale();
 	/* Initialize the random number generator with the current time. */
-	srandom(time(NULL));
+	srandom(mkntfs_time());
 	/* Allocate and initialize ntfs_volume structure vol. */
 	vol = ntfs_volume_alloc();
 	if (!vol)
