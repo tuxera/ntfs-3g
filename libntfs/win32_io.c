@@ -866,7 +866,7 @@ static s64 ntfs_device_win32_abs_seek(struct win32_fd *fd, s64 pos)
 	li.QuadPart &= ~(s64)(NTFS_BLOCK_SIZE - 1);
 	/* Only seek if we are not there already. */
 	if (li.QuadPart != fd->real_pos) {
-		if (!SetFilePointerEx(handle, li, NULL, FILE_BEGIN)) {
+		if (!fnSetFilePointerEx(handle, li, NULL, FILE_BEGIN)) {
 			errno = ntfs_w32error_to_errno(GetLastError());
 			Dputs("Error: SetFilePointer failed.");
 			return -1;
