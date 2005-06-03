@@ -54,17 +54,22 @@ typedef struct ntfs_volume ntfs_volume;
 #define IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS 5636096
 #endif
 
-/* windows 2k+ imports */
-typedef HANDLE (WINAPI *LPFN_FINDFIRSTVOLUME) (LPTSTR,DWORD);
-typedef BOOL (WINAPI *LPFN_FINDNEXTVOLUME) (HANDLE,LPTSTR,DWORD);
-typedef BOOL (WINAPI *LPFN_FINDVOLUMECLOSE) (HANDLE);
+/* Windows 2k+ imports. */
+typedef HANDLE (WINAPI *LPFN_FINDFIRSTVOLUME)(LPTSTR, DWORD);
+typedef BOOL (WINAPI *LPFN_FINDNEXTVOLUME)(HANDLE, LPTSTR, DWORD);
+typedef BOOL (WINAPI *LPFN_FINDVOLUMECLOSE)(HANDLE);
+typedef BOOL (WINAPI *LPFN_SETFILEPOINTEREX)(HANDLE, LARGE_INTEGER,
+		PLARGE_INTEGER, DWORD);
+
 static LPFN_FINDFIRSTVOLUME fnFindFirstVolume = NULL;
 static LPFN_FINDNEXTVOLUME fnFindNextVolume = NULL;
 static LPFN_FINDVOLUMECLOSE fnFindVolumeClose = NULL;
+static LPFN_SETFILEPOINTEREX fnSetFilePointerEx = NULL;
+
 #ifdef UNICODE
-#define FUNCTIONPOSTFIX "W"
+#define FNPOSTFIX "W"
 #else
-#define FUNCTIONPOSTFIX "A"
+#define FNPOSTFIX "A"
 #endif
 
 typedef struct win32_fd {
@@ -79,29 +84,11 @@ typedef struct win32_fd {
 	HANDLE vol_handle;
 } win32_fd;
 
-#ifndef HAVE_SETFILEPOINTEREX
-static BOOL WINAPI SetFilePointerEx(HANDLE hFile,
-		LARGE_INTEGER liDistanceToMove,
-		PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
-{
-	liDistanceToMove.LowPart = SetFilePointer(hFile,
-			liDistanceToMove.LowPart, &liDistanceToMove.HighPart,
-			dwMoveMethod);
-	if (liDistanceToMove.LowPart == INVALID_SET_FILE_POINTER &&
-			GetLastError() != NO_ERROR) {
-		lpNewFilePointer->QuadPart = -1;
-		return FALSE;
-	}
-	lpNewFilePointer->QuadPart = liDistanceToMove.QuadPart;
-	return TRUE;
-}
-#endif
-
 /**
  * ntfs_w32error_to_errno - Convert a win32 error code to the unix one
  * @w32error	The win32 error code.
  *
- * Limited to a reletevly small but useful number of codes
+ * Limited to a relatively small but useful number of codes.
  */
 static int ntfs_w32error_to_errno(unsigned int w32error)
 {
@@ -144,6 +131,80 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 			/* generic message */
 			return ENOMSG;
 	}
+}
+
+/**
+ * libntfs_SetFilePointerEx - emulation for SetFilePointerEx()
+ *
+ * We use this to emulate SetFilePointerEx() when it is not present.  This can
+ * happen since SetFilePointerEx() only exists in Win2k+.
+ */
+static BOOL WINAPI libntfs_SetFilePointerEx(HANDLE hFile,
+		LARGE_INTEGER liDistanceToMove,
+		PLARGE_INTEGER lpNewFilePointer, DWORD dwMoveMethod)
+{
+	liDistanceToMove.LowPart = SetFilePointer(hFile,
+			liDistanceToMove.LowPart, &liDistanceToMove.HighPart,
+			dwMoveMethod);
+	if (liDistanceToMove.LowPart == INVALID_SET_FILE_POINTER &&
+			GetLastError() != NO_ERROR) {
+		if (lpNewFilePointer)
+			lpNewFilePointer->QuadPart = -1;
+		return FALSE;
+	}
+	if (lpNewFilePointer)
+		lpNewFilePointer->QuadPart = liDistanceToMove.QuadPart;
+	return TRUE;
+}
+
+/**
+ * ntfs_device_win32_init_imports - initialize the function pointers.
+ *
+ * The Find*Volume and SetFilePointerEx functions exist only on win2k+, as such
+ * we cannot just staticly import them.
+ * 
+ * This function initializes the imports if the functions do exist and in the
+ * SetFilePointerEx case, we emulate the function ourselves if it is not
+ * present.
+ *
+ * Note: The values are cached, do be afraid to run it more than once.
+ */
+static void ntfs_device_win32_init_imports(void)
+{
+	HMODULE kernel32 = GetModuleHandle("kernel32");
+	if (!kernel32) {
+		errno = ntfs_w32error_to_errno(GetLastError());
+		Dputs("Error: kernel32.dll not found in memory.");
+	}
+	if (!fnSetFilePointerEx) {
+		if (kernel32)
+			fnSetFilePointerEx = (LPFN_SETFILEPOINTEREX)
+					GetProcAddress(kernel32,
+					"SetFilePointerEx");
+		/*
+		 * If we did not get kernel32.dll or it is not Win2k+, emulate
+		 * SetFilePointerEx().
+		 */
+		if (!fnSetFilePointerEx) {
+			Dputs("SetFilePonterEx() not found in kernel32.dll: "
+					"Enabling emulation.");
+			fnSetFilePointerEx = libntfs_SetFilePointerEx;
+		}
+	}
+	/* Cannot do lookups if we could not get kernel32.dll... */
+	if (!kernel32)
+		return;
+	if (!fnFindFirstVolume)
+		fnFindFirstVolume = (LPFN_FINDFIRSTVOLUME)
+				GetProcAddress(kernel32, "FindFirstVolume"
+				FNPOSTFIX);
+	if (!fnFindNextVolume)
+		fnFindNextVolume = (LPFN_FINDNEXTVOLUME)
+				GetProcAddress(kernel32, "FindNextVolume"
+				FNPOSTFIX);
+	if (!fnFindVolumeClose)
+		fnFindVolumeClose = (LPFN_FINDVOLUMECLOSE)
+				GetProcAddress(kernel32, "FindVolumeClose");
 }
 
 /**
@@ -432,30 +493,6 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 }
 
 /**
- * ntfs_device_win32_init_imports - initialize the fnFind*Volume variables.
- *
- * The Find*Volume functions exist only on win2k+, as such we can't
- * just staticly import it.
- * This function initialize the imports if the function do exist.
- *
- * Note: The values are cached, do be afraid to run it more than once.
- */
-static void ntfs_device_win32_init_imports(void)
-{
-	if (!fnFindFirstVolume)
-		fnFindFirstVolume = (LPFN_FINDFIRSTVOLUME)
-			GetProcAddress(GetModuleHandle("kernel32"),
-			"FindFirstVolume"FUNCTIONPOSTFIX);
-	if (!fnFindNextVolume)
-		fnFindNextVolume = (LPFN_FINDNEXTVOLUME)
-			GetProcAddress(GetModuleHandle("kernel32"),
-			"FindNextVolume"FUNCTIONPOSTFIX);
-	if (!fnFindVolumeClose)
-		fnFindVolumeClose = (LPFN_FINDVOLUMECLOSE)
-			GetProcAddress(GetModuleHandle("kernel32"), "FindVolumeClose");
-}
-
-/**
  * ntfs_device_win32_open_file - Open a file via win32 API
  * @filename:	Name of the file to open.
  * @fd:			Pointer to win32 file device in which to put the result.
@@ -549,24 +586,20 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
 	HANDLE vol_find_handle;
 	TCHAR vol_name[MAX_PATH];
 
-	ntfs_device_win32_init_imports();
-	/* make sure all the required imports exist */
+	/* Make sure all the required imports exist. */
 	if (!fnFindFirstVolume || !fnFindNextVolume || !fnFindVolumeClose) {
-		Dputs("win32_is_mounted: Imports not found.");
+		Dputs("win32_is_mounted: Required dll imports not found.");
 		return INVALID_HANDLE_VALUE;
 	}
-
-	/* start iterating through volumes. */
+	/* Start iterating through volumes. */
 	Dprintf("win32_open_volume_for_partition: Start\n");
 	vol_find_handle = fnFindFirstVolume(vol_name, MAX_PATH);
-
-	/* if a valid handle could not be aquired, reply with "don't know" */
-	if (vol_find_handle==INVALID_HANDLE_VALUE) {
+	/* If a valid handle could not be aquired, reply with "don't know". */
+	if (vol_find_handle == INVALID_HANDLE_VALUE) {
 		Dprintf("win32_open_volume_for_partition: "
 				"FindFirstVolume failed.");
 		return INVALID_HANDLE_VALUE;
 	}
-
 	do {
 		int vol_name_length;
 		HANDLE handle;
@@ -766,47 +799,39 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 		errno = EBUSY;
 		return -1;
 	}
-
+	ntfs_device_win32_init_imports();
 	numparams = sscanf(dev->d_name, "/dev/hd%c%u", &drive_char, &part);
 	drive_id = toupper(drive_char) - 'A';
-
 	switch (numparams) {
-		case 0:
-			Dprintf("win32_open(%s) -> file\n", dev->d_name);
-			err = ntfs_device_win32_open_file(dev->d_name,&fd,flags);
-			break;
-		case 1:
-			Dprintf("win32_open(%s) -> drive %d\n", dev->d_name, drive_id);
-			err = ntfs_device_win32_open_drive(drive_id,&fd,flags);
-			break;
-		case 2:
-			Dprintf("win32_open(%s) -> drive %d, part %u\n",
-					dev->d_name, drive_id, part);
-			err = ntfs_device_win32_open_partition(drive_id,part,&fd,flags);
-			break;
-		default:
-			Dprintf("win32_open(%s) -> unknwon file format\n", dev->d_name);
-			err = -1;
+	case 0:
+		Dprintf("win32_open(%s) -> file\n", dev->d_name);
+		err = ntfs_device_win32_open_file(dev->d_name, &fd, flags);
+		break;
+	case 1:
+		Dprintf("win32_open(%s) -> drive %d\n", dev->d_name, drive_id);
+		err = ntfs_device_win32_open_drive(drive_id, &fd, flags);
+		break;
+	case 2:
+		Dprintf("win32_open(%s) -> drive %d, part %u\n", dev->d_name,
+				drive_id, part);
+		err = ntfs_device_win32_open_partition(drive_id, part, &fd,
+				flags);
+		break;
+	default:
+		Dprintf("win32_open(%s) -> unknwon file format\n", dev->d_name);
+		err = -1;
 	}
-
-	if (err) {
-		/* error */
+	if (err)
 		return err;
-	}
-
 	Dprintf("win32_open(%s) -> %p, offset 0x%llx\n", dev->d_name, dev,
 			fd.part_start);
-
 	/* Setup our read-only flag. */
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
-
 	dev->d_private = malloc(sizeof(win32_fd));
 	memcpy(dev->d_private, &fd, sizeof(win32_fd));
-
 	NDevSetOpen(dev);
 	NDevClearDirty(dev);
-
 	return 0;
 }
 
