@@ -3217,10 +3217,10 @@ static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
 		err = add_attr_vol_name(m, vol->vol_name, vol->vol_name ?
 				strlen(vol->vol_name) : 0);
 	if (!err) {
-		Qprintf("Setting the volume dirty so check disk runs on next "
-				"reboot into Windows.\n");
-		err = add_attr_vol_info(m, fl, vol->major_ver,
-				vol->minor_ver);
+		if (fl & VOLUME_IS_DIRTY)
+			Qprintf("Setting the volume dirty so check disk runs "
+					"on next reboot into Windows.\n");
+		err = add_attr_vol_info(m, fl, vol->major_ver, vol->minor_ver);
 	}
 	if (err < 0)
 		err_exit("Couldn't create $Volume: %s\n", strerror(-err));
