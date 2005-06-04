@@ -29,12 +29,15 @@
 
 /**
  * ntfs_index_ctx_get - allocate and initialize a new index context
- * @idx_ni:	ntfs inode with which to initialize the context
+ * @ni:		ntfs inode with which to initialize the context
+ * @name:	name of the which context describes
+ * @name_len:	length of the index name
  *
  * Allocate a new index context, initialize it with @ni and return it.
  * Return NULL if allocation failed.
  */
-ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni)
+ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
+					ntfschar *name, u32 name_len)
 {
 	ntfs_index_context *ictx;
 
@@ -48,7 +51,8 @@ ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni)
 	if (ictx)
 		*ictx = (ntfs_index_context) {
 			.ni = ni,
-			.ia_dirty = FALSE,
+			.name = name,
+			.name_len = name_len
 		};
 	return ictx;
 }
@@ -144,12 +148,12 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	}
 
 	/* Find the index root attribute in the mft record. */
-	err = ntfs_attr_lookup(AT_INDEX_ROOT, NULL, 0,
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, ictx->name, ictx->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, actx);
 	if (err) {
 		if (errno == ENOENT) {
 			ntfs_error(sb, "Index root attribute missing in inode "
-					"0x%lx.", ni->mft_no);
+					"0x%llx.", ni->mft_no);
 			err = EIO;
 		} else
 			err = errno;
@@ -188,14 +192,6 @@ int ntfs_index_lookup(const void *key, const int key_len,
 		 */
 		if (ie->flags & INDEX_ENTRY_END)
 			break;
-		/* Further bounds checks. */
-		if ((u32)sizeof(INDEX_ENTRY_HEADER) +
-				le16_to_cpu(ie->key_length) >
-				le16_to_cpu(ie->data_offset) ||
-				(u32)le16_to_cpu(ie->data_offset) +
-				le16_to_cpu(ie->data_length) >
-				le16_to_cpu(ie->length))
-			goto idx_err_out;
 		/* If the keys match perfectly, we setup @ictx and return 0. */
 		if ((key_len == le16_to_cpu(ie->key_length)) && !memcmp(key,
 				&ie->key, key_len)) {
@@ -205,9 +201,8 @@ ir_done:
 			ictx->ia = NULL;
 done:
 			ictx->entry = ie;
-			ictx->data = (u8*)ie +
-					le16_to_cpu(ie->data_offset);
-			ictx->data_len = le16_to_cpu(ie->data_length);
+			ictx->data = (u8*)ie + offsetof(INDEX_ENTRY, key);
+			ictx->data_len = le16_to_cpu(ie->key_length);
 			ntfs_debug("Done.");
 			if (err) {
 				errno = err;
@@ -252,10 +247,11 @@ done:
 	ntfs_attr_put_search_ctx(actx);
 	actx = NULL;
 	/* Open INDEX_ALLOCATION. */
-	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, AT_UNNAMED, 0);
+	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION,
+				ictx->name, ictx->name_len);
 	if (!na) {
 		ntfs_error(sb, "No index allocation attribute but index entry "
-				"requires one.  Inode 0x%lx is corrupt or "
+				"requires one.  Inode 0x%llx is corrupt or "
 				"library bug.", ni->mft_no);
 		goto err_out;
 	}
@@ -277,21 +273,21 @@ descend_into_child_node:
 	/* Catch multi sector transfer fixup errors. */
 	if (!ntfs_is_indx_record(ia->magic)) {
 		ntfs_error(sb, "Index record with vcn 0x%llx is corrupt.  "
-				"Corrupt inode 0x%lx.  Run chkdsk.",
+				"Corrupt inode 0x%llx.  Run chkdsk.",
 				(long long)vcn, ni->mft_no);
 		goto err_out;
 	}
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
 		ntfs_error(sb, "Actual VCN (0x%llx) of index buffer is "
 				"different from expected VCN (0x%llx).  Inode "
-				"0x%lx is corrupt or driver bug.",
+				"0x%llx is corrupt or driver bug.",
 				(unsigned long long)
 				sle64_to_cpu(ia->index_block_vcn),
 				(unsigned long long)vcn, ni->mft_no);
 		goto err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != ictx->block_size) {
-		ntfs_error(sb, "Index buffer (VCN 0x%llx) of inode 0x%lx has "
+		ntfs_error(sb, "Index buffer (VCN 0x%llx) of inode 0x%llx has "
 				"a size (%u) differing from the index "
 				"specified size (%u).  Inode is corrupt or "
 				"driver bug.", (unsigned long long)vcn,
@@ -303,8 +299,8 @@ descend_into_child_node:
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + ictx->block_size) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%llx) of inode "
-				"0x%lx exceeds maximum size.",
-				(unsigned long long)vcn, idx_ni->mft_no);
+				"0x%llx exceeds maximum size.",
+				(unsigned long long)vcn, ni->mft_no);
 		goto err_out;
 	}
 	/* The first index entry. */
@@ -321,7 +317,7 @@ descend_into_child_node:
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
 				(u8*)ie + le16_to_cpu(ie->length) > index_end) {
 			ntfs_error(sb, "Index entry out of bounds in inode "
-					"0x%lx.", ni->mft_no);
+					"0x%llx.", ni->mft_no);
 			goto err_out;
 		}
 		/*
@@ -330,17 +326,6 @@ descend_into_child_node:
 		 */
 		if (ie->flags & INDEX_ENTRY_END)
 			break;
-		/* Further bounds checks. */
-		if ((u32)sizeof(INDEX_ENTRY_HEADER) +
-				le16_to_cpu(ie->key_length) >
-				le16_to_cpu(ie->data_offset) ||
-				(u32)le16_to_cpu(ie->data_offset) +
-				le16_to_cpu(ie->data_length) >
-				le16_to_cpu(ie->length)) {
-			ntfs_error(sb, "Index entry out of bounds in inode "
-					"0x%lx.", ni->mft_no);
-			goto err_out;
-		}
 		/* If the keys match perfectly, we setup @ictx and return 0. */
 		if ((key_len == le16_to_cpu(ie->key_length)) && !memcmp(key,
 				&ie->key, key_len)) {
@@ -384,14 +369,14 @@ ia_done:
 	}
 	if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 		ntfs_error(sb, "Index entry with child node found in a leaf "
-				"node in inode 0x%lx.", idx_ni->mft_no);
+				"node in inode 0x%llx.", ni->mft_no);
 		goto err_out;
 	}
 	/* Child node present, descend into it. */
 	vcn = sle64_to_cpup((sle64*)((u8*)ie + le16_to_cpu(ie->length) - 8));
 	if (vcn >= 0)
 		goto descend_into_child_node;
-	ntfs_error(sb, "Negative child node vcn in inode 0x%lx.", ni->mft_no);
+	ntfs_error(sb, "Negative child node vcn in inode 0x%llx.", ni->mft_no);
 err_out:
 	if (na)
 		ntfs_attr_close(na);
@@ -407,4 +392,3 @@ idx_err_out:
 	ntfs_error(sb, "Corrupt index.  Aborting lookup.");
 	goto err_out;
 }
-

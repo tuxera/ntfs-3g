@@ -24,7 +24,7 @@
 #include "debug.h"
 #include "unistr.h"
 
-static int ntfs_collate_binary(ntfs_volume *vol,
+static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len)
 {
@@ -42,7 +42,7 @@ static int ntfs_collate_binary(ntfs_volume *vol,
 	return rc;
 }
 
-static int ntfs_collate_ntofs_ulong(ntfs_volume *vol,
+static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len)
 {
@@ -51,7 +51,7 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol,
 
 	ntfs_debug("Entering.");
 	if (data1_len != data2_len || data1_len != 4) {
-		ntfs_error("data1_len or/and data2_len not equal to 4.");
+		ntfs_error(, "data1_len or/and data2_len not equal to 4.");
 		return NTFS_COLLATION_ERROR;
 	}
 	d1 = le32_to_cpup(data1);
@@ -69,14 +69,14 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol,
 }
 
 static int ntfs_collate_file_name(ntfs_volume *vol,
-		const void *data1, const int data1_len,
-		const void *data2, const int data2_len) {
+		const void *data1, const int data1_len __attribute__((unused)),
+		const void *data2, const int data2_len __attribute__((unused))){
 	int rc;
-	FILE_NAME_ATTR *fn1, *fn2;
+	const FILE_NAME_ATTR *fn1, *fn2;
 		
 	ntfs_debug("Entering.");
-	fn1 = (FILE_NAME_ATTR *)data1;
-	fn2 = (FILE_NAME_ATTR *)data2;
+	fn1 = (const FILE_NAME_ATTR *)data1;
+	fn2 = (const FILE_NAME_ATTR *)data2;
 	rc = ntfs_names_collate(fn1->file_name, fn1->file_name_length,
 			fn2->file_name, fn2->file_name_length,
 			NTFS_COLLATION_ERROR, CASE_SENSITIVE, vol->upcase,
@@ -127,7 +127,7 @@ int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 
 	ntfs_debug("Entering.");
 	if (!vol || !data1 || !data2 || data1_len < 0 || data2_len < 0) {
-		ntfs_error("Invalid arguments passed.");
+		ntfs_error(, "Invalid arguments passed.");
 		return NTFS_COLLATION_ERROR;
 	}
 	/*
@@ -151,6 +151,6 @@ int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 		return ntfs_do_collate0x1[i](vol, data1, data1_len,
 				data2, data2_len);
 err:
-	ntfs_error("Unknown collation rule.");
+	ntfs_error(, "Unknown collation rule.");
 	return NTFS_COLLATION_ERROR;
 }
