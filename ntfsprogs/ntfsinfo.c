@@ -1123,7 +1123,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 			case(AT_FILE_NAME):
 				Vprintf("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
-				Vprintf("\t\tFile attributes:\t 0x%02x\n",
+				Vprintf("\t\tFile attributes:\t 0x%08x\n",
 					le32_to_cpu(
 					entry->key.file_name.file_attributes));
 				Vprintf("\t\tFile name namespace:\t 0x%02x\n",
