@@ -38,12 +38,14 @@ libntfs_la_SOURCES =	\
 	attrlist.c	\
 	bitmap.c	\
 	bootsect.c	\
+	collate.c	\
 	compat.c	\
 	compress.c	\
 	debug.c		\
 	device.c	\
 	device_io.c	\
 	dir.c		\
+	index.c		\
 	inode.c		\
 	lcnalloc.c	\
 	logfile.c	\

@@ -5,6 +5,7 @@ linux_ntfsinclude_HEADERS = \
 	attrlist.h		\
 	bitmap.h		\
 	bootsect.h		\
+	collate.h		\
 	compat.h		\
 	compress.h		\
 	debug.h			\
@@ -14,6 +15,7 @@ linux_ntfsinclude_HEADERS = \
 	endians.h		\
 	gnome-vfs-method.h	\
 	gnome-vfs-module.h	\
+	index.h			\
 	inode.h			\
 	layout.h		\
 	lcnalloc.h		\

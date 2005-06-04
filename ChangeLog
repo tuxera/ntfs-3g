@@ -148,6 +148,11 @@ xx/xx/2005 - 2.0.0-WIP
 	  successfully created.  (Szaka)
 	- mkntfs: Add new option -T which fakes the time to be 00:00:00 UTC,
 	  Jan 1, 1970 instead of the current system time.
+	- Port collate.[ch] from kernel to library and implement
+	  ntfs_collate_file_name. Thus we have new API's: ntfs_collate and
+	  ntfs_is_collation_rule_supported.  (Yura)
+	- Port index.[ch] from kernel to library. New API's: ntfs_index_lookup,
+	  ntfs_index_ctx_{get,put}, ntfs_index_entry_mark_dirty.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
