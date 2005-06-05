@@ -1390,9 +1390,12 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			printf("\tIndex name:\t\t '%s'\n",index_name);
 			free(index_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse index name: %s\n",
-				strerror(errno));
+			/*
+			 * An error occured, errno holds the reason -
+			 * notify the user
+			 */
+			fprintf(stderr, "ntfsinfo error: could not parse "
+					"index name: %s\n", strerror(errno));
 		}
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");

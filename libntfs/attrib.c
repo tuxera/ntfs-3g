@@ -3976,12 +3976,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  * function updates sparse bit and allocates/frees space for compressed_size,
  * but doesn't change it, so caller should update it manually.
  *
- * NOTE: Code that set/clean sparse bit currently disabled, because chkdsk
- * complain if we don't update index entry's for inode to which we set sparse
- * bit. But it doesn't if attribute's runlist has lcn holes and sparse bit
- * isn't set. So until we have no API for updating index entries it's the best
- * choice.
- *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
  *	ENOMEM	- Not enough memory to complete operation.
@@ -4064,7 +4058,6 @@ retry:
 				goto put_err_out;
 			}
 		}
-#if 0
 		/* If we in the first extent, then set/clean sparse bit. */
 		if (!a->lowest_vcn) {
 			int sparse;
@@ -4130,6 +4123,13 @@ retry:
 				a->mapping_pairs_offset =
 						cpu_to_le16(le16_to_cpu(
 						a->mapping_pairs_offset) + 8);
+				/*
+				 * Set FILE_NAME dirty flag, to update
+				 * sparse bit in the index.
+				 */
+				if (na->type == AT_DATA &&
+						na->name == AT_UNNAMED)
+					NInoFileNameSetDirty(na->ni);
 			}
 			if (!sparse && (a->flags & ATTR_IS_SPARSE) &&
 					!(a->flags & ATTR_IS_COMPRESSED)) {
@@ -4144,9 +4144,15 @@ retry:
 				a->mapping_pairs_offset =
 						cpu_to_le16(le16_to_cpu(
 						a->mapping_pairs_offset) - 8);
+				/*
+				 * Set FILE_NAME dirty flag, to update
+				 * sparse bit in the index.
+				 */
+				if (na->type == AT_DATA &&
+						na->name == AT_UNNAMED)
+					NInoFileNameSetDirty(na->ni);
 			}
 		}
-#endif
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
 								stop_vcn);
@@ -4811,6 +4817,8 @@ put_err_out:
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
+	int ret;
+
 	if (!na || newsize < 0 ||
 			(na->ni->mft_no == FILE_MFT && na->type == AT_DATA)) {
 		Dprintf("%s(): Invalid aruments passed.\n", __FUNCTION__);
@@ -4837,9 +4845,24 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	}
 	if (NAttrNonResident(na)) {
 		if (newsize > na->data_size)
-			return ntfs_non_resident_attr_expand(na, newsize);
+			ret = ntfs_non_resident_attr_expand(na, newsize);
 		else
-			return ntfs_non_resident_attr_shrink(na, newsize);
+			ret = ntfs_non_resident_attr_shrink(na, newsize);
+	} else
+		ret = ntfs_resident_attr_resize(na, newsize);
+	/* Set FILE_NAME dirty flag, to update file length in the index. */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		NInoFileNameSetDirty(na->ni);
+		na->ni->data_size = na->data_size;
+		/*
+		 * If attribute sparse or commpreseed then allocated size in
+		 * index should be euqal to compressed size, not to allocated
+		 * size.
+		 */
+		if (NAttrCompressed(na) || NAttrSparse(na))
+			na->ni->allocated_size = na->compressed_size;
+		else
+			na->ni->allocated_size = na->allocated_size;
 	}
-	return ntfs_resident_attr_resize(na, newsize);
+	return ret;
 }

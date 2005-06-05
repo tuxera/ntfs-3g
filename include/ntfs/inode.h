@@ -45,6 +45,8 @@ typedef enum {
 	NI_Compressed,		/* 1: Inode is compressed. */
 	NI_Encrypted,		/* 1: Inode is encrypted. */
 	NI_Sparse,		/* 1: Inode is sparse. */
+	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
+				      in the index. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -94,6 +96,17 @@ typedef enum {
 #define NInoSetSparse(ni)		  set_nino_flag(ni, Sparse)
 #define NInoClearSparse(ni)		clear_nino_flag(ni, Sparse)
 
+#define NInoFileNameDirty(ni)			\
+					  test_nino_flag(ni, FileNameDirty)
+#define NInoFileNameSetDirty(ni)		\
+					   set_nino_flag(ni, FileNameDirty)
+#define NInoFileNameClearDirty(ni)		\
+					 clear_nino_flag(ni, FileNameDirty)
+#define NInoFileNameTestAndSetDirty(ni)		\
+				  test_and_set_nino_flag(ni, FileNameDirty)
+#define NInoFileNameTestAndClearDirty(ni)	\
+				test_and_clear_nino_flag(ni, FileNameDirty)
+
 /*
  * The NTFS in-memory inode structure. It is just used as an extension to the
  * fields already provided in the VFS inode.
@@ -126,6 +139,9 @@ struct _ntfs_inode {
 
 	void *private_data;	/* Temp: for directory handling */
 	int ref_count;
+	/* Belows fields needed to update indexes. They valid if != -1. */
+	s64 data_size;
+	s64 allocated_size;
 };
 
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);

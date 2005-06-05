@@ -36,6 +36,8 @@
 #include "attrlist.h"
 #include "runlist.h"
 #include "lcnalloc.h"
+#include "index.h"
+#include "dir.h"
 
 /**
  * Internal:
@@ -123,6 +125,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (!(ni->mrec->flags & MFT_RECORD_IN_USE))
 		goto err_out;
 	ni->mft_no = MREF(mref);
+	ni->data_size = -1;
+	ni->allocated_size = -1;
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		goto err_out;
@@ -454,6 +458,113 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni) {
 }
 
 /**
+ * ntfs_inode_sync_standard_information - update FILE_NAME attribute's
+ * @ni:		ntfs inode to update FILE_NAME attribute's
+ *
+ * Update all FILE_NAME attribute's for inode @ni in the index.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+static int ntfs_inode_sync_file_name(ntfs_inode *ni) {
+	ntfs_attr_search_ctx *ctx = NULL;
+	ntfs_index_context *ictx;
+	ntfs_inode *index_ni;
+	FILE_NAME_ATTR *fn;
+	int err = 0;
+
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx) {
+		err = errno;
+		Dprintf("%s(): Failed to get attribute search context.\n",
+				__FUNCTION__);
+		goto err_out;
+	}
+	/* Walk through all FILE_NAME attributes and update them. */
+	while (!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		fn = (FILE_NAME_ATTR *)((u8 *)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset));
+		if (MREF_LE(fn->parent_directory) == ni->mft_no) {
+			/*
+			 * WARNING: We cheater here and obtain 2 attribute
+			 * search contextes for one inode (first we obtained
+			 * above, second will be obtained inside
+			 * ntfs_index_lookup), it's acceptable for library,
+			 * but will lock kernel.
+			 */
+			index_ni = ni;
+		} else
+			index_ni = ntfs_inode_open(ni->vol,
+				le64_to_cpu(fn->parent_directory));
+		if (!index_ni) {
+			if (!err)
+				err = errno;
+			Dprintf("%s(): Failed to open inode with index.\n",
+					__FUNCTION__);
+			continue;
+		}
+		ictx = ntfs_index_ctx_get(index_ni, I30, 4);
+		if (!ictx) {
+			if (!err)
+				err = errno;
+			Dprintf("%s(): Failed to get index context.\n",
+					__FUNCTION__);
+			ntfs_inode_close(index_ni);
+			continue;
+		}
+		if (ntfs_index_lookup(fn, sizeof(FILE_NAME_ATTR), ictx)) {
+			if (!err) {
+				if (errno == ENOENT)
+					err = EIO;
+				else
+					err = errno;
+			}
+			Dprintf("%s(): Index lookup failed.\n", __FUNCTION__);
+			ntfs_index_ctx_put(ictx);
+			ntfs_inode_close(index_ni);
+			continue;
+		}
+		/* Update flags and file size. */
+		fn = (FILE_NAME_ATTR *)ictx->data;
+		if (NInoCompressed(ni))
+			fn->file_attributes |= FILE_ATTR_COMPRESSED;
+		else
+			fn->file_attributes &= ~FILE_ATTR_COMPRESSED;
+		if (NInoEncrypted(ni))
+			fn->file_attributes |= FILE_ATTR_ENCRYPTED;
+		else
+			fn->file_attributes &= ~FILE_ATTR_ENCRYPTED;
+		if (NInoSparse(ni))
+			fn->file_attributes |= FILE_ATTR_SPARSE_FILE;
+		else
+			fn->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
+		if (ni->allocated_size != -1)
+			fn->allocated_size = cpu_to_sle64(ni->allocated_size);
+		if (ni->data_size != -1)
+			fn->data_size = cpu_to_sle64(ni->data_size);
+		ntfs_index_entry_mark_dirty(ictx);
+		ntfs_index_ctx_put(ictx);
+		ntfs_inode_close(index_ni);
+	}
+	/* Check for real error occured. */
+	if (errno != ENOENT) {
+		err = errno;
+		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		goto err_out;
+	}
+	ntfs_attr_put_search_ctx(ctx);
+	if (err) {
+		errno = err;
+		return -1;
+	}
+	return 0;
+err_out:
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
+	errno = err;
+	return -1;
+}
+
+/**
  * ntfs_inode_sync - write the inode (and its dirty extents) to disk
  * @ni:		ntfs inode to write
  *
@@ -480,7 +591,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx.\n",
 			__FUNCTION__, (long long) ni->mft_no);
 
@@ -493,6 +604,19 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		}
 		Dprintf("%s(): Failed to sync standard information.\n",
 				__FUNCTION__);
+	}
+
+	/* Update FILE_NAME's in the index. */
+	if (ni->nr_extents != -1 && NInoFileNameTestAndClearDirty(ni) &&
+			ntfs_inode_sync_file_name(ni)) {
+		if (!err || errno == EIO) {
+			err = errno;
+			if (err != EIO)
+				err = EBUSY;
+		}
+		Dprintf("%s(): Failed to sync FILE_NAME attributes.\n",
+				__FUNCTION__);
+		NInoFileNameSetDirty(ni);
 	}
 
 	/* Write out attribute list from cache to disk. */
@@ -522,7 +646,6 @@ int ntfs_inode_sync(ntfs_inode *ni)
 						Dprintf("%s(): Attribute list "
 						"sync failed (write failed).\n",
 						 __FUNCTION__);
-
 					}
 					NInoAttrListSetDirty(ni);
 				}
@@ -573,8 +696,6 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			}
 		}
 	}
-
-	// TODO: Update FILE_NAME attribute in the index.
 
 	if (!err)
 		return 0;

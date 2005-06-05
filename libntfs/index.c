@@ -26,6 +26,7 @@
 #include "collate.h"
 #include "debug.h"
 #include "index.h"
+#include "mst.h"
 
 /**
  * ntfs_index_ctx_get - allocate and initialize a new index context
@@ -71,14 +72,15 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 				ntfs_attr_put_search_ctx(ictx->actx);
 		} else {
 			/* Write out index block it it's dirty. */
-			if (ictx->ia_dirty)
-				if (ntfs_attr_pwrite(ictx->ia_na,
+			if (ictx->ia_dirty) {
+				if (ntfs_attr_mst_pwrite(ictx->ia_na,
 						ictx->ia_vcn <<
-						ictx->ni->vol->cluster_size,
+						ictx->ni->vol->cluster_size, 1,
 						ictx->block_size, ictx->ia) !=
-						ictx->block_size)
+						1)
 					ntfs_error(, "Failed to write out "
 							"index block.");
+			}
 			/* Free resources. */
 			free(ictx->ia);
 			ntfs_attr_close(ictx->ia_na);
@@ -264,12 +266,13 @@ done:
 		goto err_out;
 	}
 descend_into_child_node:
+	ntfs_debug("Descend into node with VCN %lld.", vcn);
 	/* Read index allocation block. */
-	if (ntfs_attr_pread(na, vcn << vol->cluster_size_bits, ictx->block_size,
-				ia) != ictx->block_size) {
+	if (ntfs_attr_mst_pread(na, vcn << vol->cluster_size_bits, 1, 
+				ictx->block_size, ia) != 1) {
 		ntfs_error(, "Failed to read index allocation.");
 		goto err_out;
-	}	
+	}
 	/* Catch multi sector transfer fixup errors. */
 	if (!ntfs_is_indx_record(ia->magic)) {
 		ntfs_error(sb, "Index record with vcn 0x%llx is corrupt.  "
@@ -392,3 +395,4 @@ idx_err_out:
 	ntfs_error(sb, "Corrupt index.  Aborting lookup.");
 	goto err_out;
 }
+

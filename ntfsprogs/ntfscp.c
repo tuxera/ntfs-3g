@@ -273,7 +273,7 @@ int main (int argc, char *argv[])
 		return 1;
 
 	utils_set_locale();
-	
+
 	/* Set SIGINT handler. */
 	if (signal(SIGINT, sigint_handler) == SIG_ERR) {
 		perror("Failed to set SIGINT handler");
@@ -288,7 +288,7 @@ int main (int argc, char *argv[])
  		perror("ERROR: couldn't mount volume");
 		return 1;
 	}
-	
+
 	if ((vol->flags & VOLUME_IS_DIRTY) && (!opts.force))
 		goto umount;
 
@@ -382,7 +382,7 @@ int main (int argc, char *argv[])
 			goto close_dst;
 		}
 	}
-	
+
 	Vprintf("Old file size: %lld\n", na->data_size);
 	if (na->data_size != new_size) {
 		if (ntfs_attr_truncate(na, new_size)) {

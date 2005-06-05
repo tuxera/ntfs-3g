@@ -79,7 +79,7 @@ static int ntfs_collate_file_name(ntfs_volume *vol,
 	fn2 = (const FILE_NAME_ATTR *)data2;
 	rc = ntfs_names_collate(fn1->file_name, fn1->file_name_length,
 			fn2->file_name, fn2->file_name_length,
-			NTFS_COLLATION_ERROR, CASE_SENSITIVE, vol->upcase,
+			NTFS_COLLATION_ERROR, IGNORE_CASE, vol->upcase,
 			vol->upcase_len);
 	ntfs_debug("Done, returning %i.", rc);
 	return rc;

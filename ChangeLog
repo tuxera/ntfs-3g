@@ -153,6 +153,11 @@ xx/xx/2005 - 2.0.0-WIP
 	  ntfs_is_collation_rule_supported.  (Yura)
 	- Port index.[ch] from kernel to library. New API's: ntfs_index_lookup,
 	  ntfs_index_ctx_{get,put}, ntfs_index_entry_mark_dirty.  (Yura)
+	- Implement FILE_NAME attributes update in index during inode sync and
+	  enable code that set/clean sparse bit. Also add new inode state bit
+	  FileNameDirty to indicate that FILE_NAME attributes need update.
+	  At least after attribute resize we leave absolutely consist
+	  volume.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
