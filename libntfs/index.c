@@ -75,9 +75,10 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 			if (ictx->ia_dirty) {
 				if (ntfs_attr_mst_pwrite(ictx->ia_na,
 						ictx->ia_vcn <<
-						ictx->ni->vol->cluster_size, 1,
-						ictx->block_size, ictx->ia) !=
-						1)
+						ictx->ni->vol->
+						cluster_size_bits,
+						1, ictx->block_size,
+						ictx->ia) != 1)
 					ntfs_error(, "Failed to write out "
 							"index block.");
 			}

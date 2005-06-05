@@ -2,7 +2,7 @@
 .\" Copyright (c) 2004 Yura Pakhuchiy. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCP 8 "October 2004" "ntfsprogs version @VERSION@"
+.TH NTFSCP 8 "June 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfscp \- overwrite file on an NTFS volume.
 .SH SYNOPSIS
@@ -10,12 +10,22 @@ ntfscp \- overwrite file on an NTFS volume.
 [
 .I options
 ]
-.B device src_file dest_file
+.B device source_file destination
 .SH DESCRIPTION
 .B ntfscp
 will overwrite file on an NTFS volume. At present
 .B ntfscp
 can't create new files.
+.B destination
+can be either file or directory. In case if
+.B destination
+is directory specified by name then
+.B source_file
+is copied into this directory, in case if
+.B destination
+is directory and specified by inode number then unnamed data attribute is created for this inode and
+.B source_file
+is copied into it (WARNING: it's unusual to have unnamed data streams in the directories, think twice before specifying directory by inode number). 
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfscp
@@ -35,7 +45,7 @@ Write to this attribute.
 .TP
 .B \-i, \-\-inode
 Treat
-.I dest_file
+.I destination
 as inode number.
 .TP
 .BI "\-N, \-\-attr-name " name
@@ -61,17 +71,19 @@ Show the version number, copyright and license
 .TP
 .B \-v, \-\-vebose
 Display more debug/warning/error messages.
+.SH DATA STREAMS
+All data on NTFS is stored in streams, which can have names. A file can have more than one data streams, but exactly one must have no name. The size of a file is the size of its unnamed data stream. Usually when you don't specify stream name you are access to unnamed data stream. If you want access to named data stream you need to add ":stream_name" to the filename. For example: by opening "some.mp3:artist" you will open stream "artist" in "some.mp3". But windows usually prevent you from accessing to named data streams, so you need to use some program like FAR or utils from cygwin to access named data streams.
 .SH EXAMPLES
-Copy boot.ini from /home/user to the root of an /dev/hda1 NTFS volume:
+Copy new_boot.ini from /home/user as boot.ini to the root of an /dev/hda1 NTFS volume:
 .RS
 .sp
-.B ntfscp /dev/hda1 /home/user/boot.ini boot.ini
+.B ntfscp /dev/hda1 /home/user/new_boot.ini boot.ini
 .sp
 .RE
-Copy myfile to C:\\some\\path\\file:stream (assume that /dev/hda1 letter in windows is C):
+Copy myfile to C:\\some\\path\\myfile:stream (assume that /dev/hda1 letter in windows is C):
 .RS
 .sp
-.B ntfscp -N stream /dev/hda1 myfile /some/path/file
+.B ntfscp -N stream /dev/hda1 myfile /some/path
 .SH BUGS
 No bugs are known at present. If you find any bugs, please send an email to
 .nh
@@ -83,7 +95,10 @@ was written by Yura Pakhuchiy.
 .B ntfscp
 and this manual page is based on
 .B ntfscat
-and it's manaul page by Richard Russon, so many thanks to him.
+and it's manaul page by Richard Russon, so many thanks to him. Information about named data streams was partly taken from
+.B ntfsdoc.
+.SH DEDICATION
+With love to Marina Sapego.
 .SH AVAILABILITY
 .B ntfscp
 is part of the ntfsprogs package and is available from

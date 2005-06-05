@@ -70,7 +70,7 @@ static void version (void)
 {
 	Printf ("\n%s v%s - Overwrite files on NTFS volume.\n\n",
 		EXEC_NAME, VERSION);
-	Printf ("Copyright (c) 2004 Yura Pakhuchiy\n");
+	Printf ("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
 	Printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 

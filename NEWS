@@ -1,6 +1,10 @@
 Current news
 ============
 
+Attribute resize code for normal and sparse files is completed. Thus ntfscp
+should always successfully overwrite any normal or sparse even if file size is
+changed.
+
 Moved back from BitKeeper to CVS on SF.net.
 
 ntfsprogs should now work completely on Windows 2000 and XP (Cygwin). 

@@ -651,6 +651,8 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		(long long)sle64_to_cpu(file_name_attr->allocated_size));
 	printf("\tReal File Size:\t\t %lld\n",
 		(long long)sle64_to_cpu(file_name_attr->data_size));
+	printf("\tParent directory:\t %lld\n",
+		(long long)MREF_LE(file_name_attr->parent_directory));
 	flags = file_name_attr->file_attributes;
 	printf("\tFile attributes:\t");
 	if (flags & FILE_ATTR_READONLY) {
