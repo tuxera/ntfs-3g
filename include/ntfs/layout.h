@@ -52,12 +52,12 @@ typedef struct {
 	u16 sectors;			/* zero */
 	u8  media_type;			/* 0xf8 = hard disk */
 	u16 sectors_per_fat;		/* zero */
-	u16 sectors_per_track;		/* Required to boot Windows. */
-	u16 heads;			/* Required to boot Windows. */
-	u32 hidden_sectors;		/* Offset to the start of the partition
+/*0x0d*/u16 sectors_per_track;		/* Required to boot Windows. */
+/*0x0f*/u16 heads;			/* Required to boot Windows. */
+/*0x11*/u32 hidden_sectors;		/* Offset to the start of the partition
 					   relative to the disk in sectors.
 					   Required to boot Windows. */
-	u32 large_sectors;		/* zero */
+/*0x15*/u32 large_sectors;		/* zero */
 /* sizeof() = 25 (0x19) bytes */
 } __attribute__ ((__packed__)) BIOS_PARAMETER_BLOCK;
 
@@ -67,7 +67,7 @@ typedef struct {
 typedef struct {
 	u8  jump[3];			/* Irrelevant (jump to boot up code).*/
 	u64 oem_id;			/* Magic "NTFS    ". */
-	BIOS_PARAMETER_BLOCK bpb;	/* See BIOS_PARAMETER_BLOCK. */
+/*0x0b*/BIOS_PARAMETER_BLOCK bpb;	/* See BIOS_PARAMETER_BLOCK. */
 	u8  unused[4];			/* zero, NTFS diskedit.exe states that
 					   this is actually:
 					    u8 physical_drive;		// 0x80
