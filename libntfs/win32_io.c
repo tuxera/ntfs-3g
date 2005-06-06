@@ -669,23 +669,47 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
  * the partition attributes are returned back.
  *
  * Return TRUE  if found, and sets the output parameters.
- *        FALSE if not.
+ *        FALSE if not and errno is set to the error code.
  */
 static BOOL ntfs_device_win32_find_partition(HANDLE handle, DWORD partition_id,
 		s64 *part_offset, s64 *part_length, int *hidden_sectors)
 {
 	DRIVE_LAYOUT_INFORMATION *drive_layout;
+	unsigned int err, buf_size, part_count;
 	DWORD i;
-	char buf[sizeof(DRIVE_LAYOUT_INFORMATION) +
-			9 * sizeof(PARTITION_INFORMATION)];
 
-	if (!DeviceIoControl(handle, IOCTL_DISK_GET_DRIVE_LAYOUT, NULL, 0,
-			&buf, sizeof(buf), &i, NULL)) {
-		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: GetDriveLayout failed.");
-		return FALSE;
-	}
-	drive_layout = (DRIVE_LAYOUT_INFORMATION *)buf;
+	/*
+	 * There is no way to know the required buffer, so if the ioctl fails,
+	 * try doubling the buffer size each time until the ioctl succeeds.
+	 */
+	part_count = 8;
+	do {
+		buf_size = sizeof(DRIVE_LAYOUT_INFORMATION) +
+				part_count * sizeof(PARTITION_INFORMATION);
+		drive_layout = malloc(buf_size);
+		if (!drive_layout) {
+			errno = ENOMEM;
+			return FALSE;
+		}
+		if (DeviceIoControl(handle, IOCTL_DISK_GET_DRIVE_LAYOUT, NULL,
+				0, (BYTE*)drive_layout, buf_size, &i, NULL))
+			break;
+		err = GetLastError();
+		free(drive_layout);
+		if (err != ERROR_INSUFFICIENT_BUFFER) {
+			Dputs("Error: GetDriveLayout failed.");
+			errno = ntfs_w32error_to_errno(err);
+			return FALSE;
+		}
+		Dprintf("More than %u partitions.\n", part_count);
+		part_count <<= 1;
+		if (part_count > 512) {
+			Dputs("Error: GetDriveLayout failed: More than 512 "
+					"partitions?");
+			errno = ENOBUFS;
+			return FALSE;
+		}
+	} while (1);
 	for (i = 0; i < drive_layout->PartitionCount; i++) {
 		if (drive_layout->PartitionEntry[i].PartitionNumber ==
 				partition_id) {
@@ -695,9 +719,12 @@ static BOOL ntfs_device_win32_find_partition(HANDLE handle, DWORD partition_id,
 					PartitionLength.QuadPart;
 			*hidden_sectors = drive_layout->PartitionEntry[i].
 					HiddenSectors;
+			free(drive_layout);
 			return TRUE;
 		}
 	}
+	free(drive_layout);
+	errno = ENOENT;
 	return FALSE;
 }
 
