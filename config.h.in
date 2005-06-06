@@ -6,6 +6,9 @@
 /* Define to 1 if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
 
+/* Define to 1 if you have the <ctype.h> header file. */
+#undef HAVE_CTYPE_H
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -92,9 +95,6 @@
 
 /* Define to 1 if you have the `regcomp' function. */
 #undef HAVE_REGCOMP
-
-/* Define to 1 if you have the `SetFilePointerEx' function. */
-#undef HAVE_SETFILEPOINTEREX
 
 /* Define to 1 if you have the `setlocale' function. */
 #undef HAVE_SETLOCALE

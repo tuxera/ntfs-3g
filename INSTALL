@@ -1,7 +1,7 @@
 Installation Instructions
 *************************
 
-Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004 Free
+Copyright (C) 1994, 1995, 1996, 1999, 2000, 2001, 2002, 2004, 2005 Free
 Software Foundation, Inc.
 
 This file is free documentation; the Free Software Foundation gives
@@ -189,8 +189,13 @@ them in the `configure' command line, using `VAR=value'.  For example:
 
      ./configure CC=/usr/local2/bin/gcc
 
-will cause the specified gcc to be used as the C compiler (unless it is
-overridden in the site shell script).
+causes the specified `gcc' to be used as the C compiler (unless it is
+overridden in the site shell script).  Here is a another example:
+
+     /bin/bash ./configure CONFIG_SHELL=/bin/bash
+
+Here the `CONFIG_SHELL=/bin/bash' operand causes subsequent
+configuration-related scripts to be executed by `/bin/bash'.
 
 `configure' Invocation
 ======================

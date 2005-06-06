@@ -190,11 +190,11 @@ AC_SUBST(AUTODIRS)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h libintl.h limits.h locale.h mntent.h stddef.h \
-	stdint.h stdlib.h stdio.h stdarg.h string.h strings.h errno.h time.h \
-	unistd.h utime.h wchar.h getopt.h features.h endian.h byteswap.h \
-	sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h sys/mount.h \
-	sys/stat.h sys/types.h sys/vfs.h linux/major.h linux/fd.h \
+AC_CHECK_HEADERS([ctype.h fcntl.h libintl.h limits.h locale.h mntent.h \
+	stddef.h stdint.h stdlib.h stdio.h stdarg.h string.h strings.h \
+	errno.h time.h unistd.h utime.h wchar.h getopt.h features.h endian.h \
+	byteswap.h sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h \
+	sys/mount.h sys/stat.h sys/types.h sys/vfs.h linux/major.h linux/fd.h \
 	linux/hdreg.h machine/endian.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -219,7 +219,7 @@ AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
-	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit SetFilePointerEx])
+	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([
