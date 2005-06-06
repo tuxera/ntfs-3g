@@ -480,7 +480,7 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		flags &= ~FILE_ATTR_ENCRYPTED;
 	}
 	if (flags)
-		printf(" UNKNOWN: 0x%x", le32_to_cpu(flags));
+		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
 	printf("\n");
 
 	printf("\tMax Number of Versions:\t %u \n",
@@ -576,7 +576,8 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 	for(;(u8 *)entry < (u8 *) value + l; entry = (ATTR_LIST_ENTRY *)
 				((u8 *) entry + le16_to_cpu(entry->length))) {
 		printf("\n");
-		printf("\t\tAtrribute type:\t0x%X\n", le32_to_cpu(entry->type));
+		printf("\t\tAtrribute type:\t0x%x\n",
+				(unsigned int)le32_to_cpu(entry->type));
 		printf("\t\tRecord length:\t%u\n",
 				le16_to_cpu(entry->length));
 		printf("\t\tName length:\t%u\n", entry->name_length);
@@ -716,7 +717,7 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
 	}
 	if (flags)
-		printf(" UNKNOWN: 0x%x", le32_to_cpu(flags));
+		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
 	printf("\n");
 
 	/* time stuff stuff */
@@ -1126,7 +1127,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 				Vprintf("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
 				Vprintf("\t\tFile attributes:\t 0x%08x\n",
-					le32_to_cpu(
+					(unsigned int)le32_to_cpu(
 					entry->key.file_name.file_attributes));
 				Vprintf("\t\tFile name namespace:\t 0x%02x\n",
 					entry->key.file_name.file_name_type);
