@@ -1,7 +1,7 @@
 /**
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2001-2003 Richard Russon
  *
  * This utility will create an NTFS 1.2 (Windows NT 4.0) volume on a user
@@ -540,16 +540,21 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 			// TODO: Check that *val is really zero at pos and len.
 			continue;
 		}
+		/*
+		 * Break up the write into the real data write and then a write
+		 * of zeroes between the end of the real data and the end of
+		 * the (last) run.
+		 */
+		if (total + length > val_len) {
+			delta = length;
+			length = val_len - total;
+			delta -= length;
+		}
 		if (dev->d_ops->seek(dev, rl[i].lcn * vol->cluster_size,
 				SEEK_SET) == (off_t)-1)
 			return -1LL;
 		retry = 0;
 		do {
-			if (total + length > val_len) {
-				delta = length;
-				length = val_len - total;
-				delta -= length;
-			}
 			bytes_written = dev->d_ops->write(dev, val + total,
 					length);
 			if (bytes_written == -1LL) {
@@ -575,12 +580,15 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 		}
 	}
 	if (delta) {
+		int eo;
 		char *b = (char*)calloc(1, delta);
 		if (!b)
 			err_exit("Error allocating internal buffer: "
 					"%s\n", strerror(errno));
 		bytes_written = mkntfs_write(dev, b, delta);
+		eo = errno;
 		free(b);
+		errno = eo;
 		if (bytes_written == -1LL)
 			return bytes_written;
 	}
