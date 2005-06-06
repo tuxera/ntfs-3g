@@ -81,9 +81,14 @@ static int ntfs_collate_file_name(ntfs_volume *vol,
 			fn2->file_name, fn2->file_name_length,
 			NTFS_COLLATION_ERROR, IGNORE_CASE, vol->upcase,
 			vol->upcase_len);
+	if (!rc) {
+		rc = ntfs_names_collate(fn1->file_name, fn1->file_name_length,
+				fn2->file_name, fn2->file_name_length,
+				NTFS_COLLATION_ERROR, CASE_SENSITIVE,
+				vol->upcase, vol->upcase_len);
+	}
 	ntfs_debug("Done, returning %i.", rc);
 	return rc;
-
 }
 
 typedef int (*ntfs_collate_func_t)(ntfs_volume *, const void *, const int,
