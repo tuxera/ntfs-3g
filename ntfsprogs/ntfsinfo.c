@@ -100,7 +100,7 @@ static void version (void)
 	printf ("    2002-2004 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("    2003      Leonard Norrgård\n");
-	printf ("    2004      Yura Pakhuchiy\n");
+	printf ("    2004-2005 Yura Pakhuchiy\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -387,45 +387,13 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	//TODO: Still need to add a few more attributes
 }
 
-
-/* *************** functions for dumping attributes ******************** */
 /**
- * ntfs_dump_standard_information
+ * ntfs_dump_flags - Dump flags for STANDARD_INFORMATION and FILE_NAME.
+ * @type:	dump flags for this attribute type
+ * @flags:	flags for dumping
  */
-static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
+static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 {
-	STANDARD_INFORMATION *standard_attr = NULL;
-	u32 value_length, flags;
-
-	standard_attr = (STANDARD_INFORMATION*)((char *)attr +
-		le16_to_cpu(attr->value_offset));
-
-	printf("Dumping attribute $STANDARD_INFORMATION (0x10)\n");
-	
-	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
-
-	/* let's start with mandatory? fields */
-
-	/* time conversion stuff */
-	if (!opts.notime) {
-		char *ntfs_time_str = NULL;
-		
-		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->creation_time);
-		printf("\tFile Creation Time:\t %s",ntfs_time_str);
-		
-		ntfs_time_str = ntfsinfo_time_to_str(
-			standard_attr->last_data_change_time);
-		printf("\tFile Altered Time:\t %s",ntfs_time_str);
-		
-		ntfs_time_str = ntfsinfo_time_to_str(
-			standard_attr->last_mft_change_time);
-		printf("\tMFT Changed Time:\t %s",ntfs_time_str);
-		
-		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->last_access_time);
-		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
-	}
-	
-	flags = standard_attr->file_attributes;
 	printf("\tFile attributes:\t");
 	if (flags & FILE_ATTR_READONLY) {
 		printf(" READONLY");
@@ -479,9 +447,58 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		printf(" ENCRYPTED");
 		flags &= ~FILE_ATTR_ENCRYPTED;
 	}
+	if (type == AT_FILE_NAME) {
+		if (flags & FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
+			printf(" DIRECTORY");
+			flags &= ~FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+		}
+		if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
+			printf(" INDEX_VIEW");
+			flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+		}
+	}
 	if (flags)
 		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
 	printf("\n");
+}
+
+/* *************** functions for dumping attributes ******************** */
+/**
+ * ntfs_dump_standard_information
+ */
+static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
+{
+	STANDARD_INFORMATION *standard_attr = NULL;
+	u32 value_length;
+
+	standard_attr = (STANDARD_INFORMATION*)((char *)attr +
+		le16_to_cpu(attr->value_offset));
+
+	printf("Dumping attribute $STANDARD_INFORMATION (0x10)\n");
+	
+	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
+
+	/* let's start with mandatory? fields */
+
+	/* time conversion stuff */
+	if (!opts.notime) {
+		char *ntfs_time_str = NULL;
+		
+		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->creation_time);
+		printf("\tFile Creation Time:\t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(
+			standard_attr->last_data_change_time);
+		printf("\tFile Altered Time:\t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(
+			standard_attr->last_mft_change_time);
+		printf("\tMFT Changed Time:\t %s",ntfs_time_str);
+		
+		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->last_access_time);
+		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
+	}
+	ntfs_dump_flags(attr->type, standard_attr->file_attributes);
 
 	printf("\tMax Number of Versions:\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->maximum_versions));
@@ -489,7 +506,6 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		(unsigned int)le32_to_cpu(standard_attr->version_number));
 	printf("\tClass ID:\t\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->class_id));
-
 	
 	value_length = le32_to_cpu(attr->value_length);
 	if (value_length == 48) {
@@ -505,7 +521,6 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 			"either 72 or 48, something is wrong...\n",
 			(unsigned int)value_length);
 	}
-	
 }
 
 /**
@@ -613,7 +628,6 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
-	u32 flags;
 
 	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
@@ -654,71 +668,7 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		(long long)sle64_to_cpu(file_name_attr->data_size));
 	printf("\tParent directory:\t %lld\n",
 		(long long)MREF_LE(file_name_attr->parent_directory));
-	flags = file_name_attr->file_attributes;
-	printf("\tFile attributes:\t");
-	if (flags & FILE_ATTR_READONLY) {
-		printf(" READONLY");
-		flags &= ~FILE_ATTR_READONLY;
-	}
-	if (flags & FILE_ATTR_HIDDEN) {
-		printf(" HIDDEN");
-		flags &= ~FILE_ATTR_HIDDEN;
-	}
-	if (flags & FILE_ATTR_SYSTEM) {
-		printf(" SYSTEM");
-		flags &= ~FILE_ATTR_SYSTEM;
-	}
-	if (flags & FILE_ATTR_ARCHIVE) {
-		printf(" ARCHIVE");
-		flags &= ~FILE_ATTR_ARCHIVE;
-	}
-	if (flags & FILE_ATTR_DEVICE) {
-		printf(" DEVICE");
-		flags &= ~FILE_ATTR_DEVICE;
-	}
-	if (flags & FILE_ATTR_NORMAL) {
-		printf(" NORMAL");
-		flags &= ~FILE_ATTR_NORMAL;
-	}
-	if (flags & FILE_ATTR_TEMPORARY) {
-		printf(" TEMPORARY");
-		flags &= ~FILE_ATTR_TEMPORARY;
-	}
-	if (flags & FILE_ATTR_SPARSE_FILE) {
-		printf(" SPARSE_FILE");
-		flags &= ~FILE_ATTR_SPARSE_FILE;
-	}
-	if (flags & FILE_ATTR_REPARSE_POINT) {
-		printf(" REPARSE_POINT");
-		flags &= ~FILE_ATTR_REPARSE_POINT;
-	}
-	if (flags & FILE_ATTR_COMPRESSED) {
-		printf(" COMPRESSED");
-		flags &= ~FILE_ATTR_COMPRESSED;
-	}
-	if (flags & FILE_ATTR_OFFLINE) {
-		printf(" OFFLINE");
-		flags &= ~FILE_ATTR_OFFLINE;
-	}
-	if (flags & FILE_ATTR_NOT_CONTENT_INDEXED) {
-		printf(" NOT_CONTENT_INDEXED");
-		flags &= ~FILE_ATTR_NOT_CONTENT_INDEXED;
-	}
-	if (flags & FILE_ATTR_ENCRYPTED) {
-		printf(" ENCRYPTED");
-		flags &= ~FILE_ATTR_ENCRYPTED;
-	}
-	if (flags & FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
-		printf(" DIRECTORY");
-		flags &= ~FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
-	}
-	if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
-		printf(" INDEX_VIEW");
-		flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
-	}
-	if (flags)
-		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
-	printf("\n");
+	ntfs_dump_flags(attr->type, file_name_attr->file_attributes);
 
 	/* time stuff stuff */
 	if (!opts.notime) {
@@ -1126,9 +1076,10 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 			case(AT_FILE_NAME):
 				Vprintf("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
-				Vprintf("\t\tFile attributes:\t 0x%08x\n",
-					(unsigned int)le32_to_cpu(
-					entry->key.file_name.file_attributes));
+				Vprintf("\t");
+				if (opts.verbose)
+					ntfs_dump_flags(type, entry->key.
+						file_name.file_attributes);
 				Vprintf("\t\tFile name namespace:\t 0x%02x\n",
 					entry->key.file_name.file_name_type);
 				ntfs_ucstombs(entry->key.file_name.file_name,
