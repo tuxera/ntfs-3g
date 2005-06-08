@@ -421,7 +421,8 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-static int ntfs_inode_sync_standard_information(ntfs_inode *ni) {
+static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
+{
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
 	int err;
@@ -465,7 +466,8 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni) {
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-static int ntfs_inode_sync_file_name(ntfs_inode *ni) {
+static int ntfs_inode_sync_file_name(ntfs_inode *ni)
+{
 	ntfs_attr_search_ctx *ctx = NULL;
 	ntfs_index_context *ictx;
 	ntfs_inode *index_ni;
