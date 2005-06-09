@@ -1,0 +1,8 @@
+Makefile
+autom4te.cache
+config.h
+config.log
+config.status
+libtool
+ntfsprogs.spec
+stamp-h1
