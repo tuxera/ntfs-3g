@@ -463,6 +463,30 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 	printf("\n");
 }
 
+static void ntfs_dump_namespace(u8 file_name_type)
+{
+	const char *mbs_file_type = NULL;
+
+	/* name space */
+	switch (file_name_type) {
+	case FILE_NAME_POSIX:
+		mbs_file_type = "POSIX";
+		break;
+	case FILE_NAME_WIN32:
+		mbs_file_type = "Win32";
+		break;
+	case FILE_NAME_DOS:
+		mbs_file_type = "DOS";
+		break;
+	case FILE_NAME_WIN32_AND_DOS:
+		mbs_file_type = "Win32 & DOS";
+		break;
+	}
+	if (mbs_file_type == NULL)      /* should never happen */
+	    mbs_file_type = "(unknown)";
+	printf("\tNamespace:\t\t %s\n", mbs_file_type);
+}
+
 /* *************** functions for dumping attributes ******************** */
 /**
  * ntfs_dump_standard_information
@@ -629,7 +653,6 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
-	const char *mbs_file_type = NULL;
 
 	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
@@ -660,25 +683,8 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 	} else {
 		printf("\tFile Name:\t\t unnamed?!?\n");
 	}
-	
-	/* name space */
-	switch (file_name_attr->file_name_type) {
-	case FILE_NAME_POSIX:
-		mbs_file_type = "POSIX";
-		break;
-	case FILE_NAME_WIN32:
-		mbs_file_type = "Win32";
-		break;
-	case FILE_NAME_DOS:
-		mbs_file_type = "DOS";
-		break;
-	case FILE_NAME_WIN32_AND_DOS:
-		mbs_file_type = "Win32 & DOS";
-		break;
-	}
-	if (mbs_file_type == NULL)      // should never happen
-	    mbs_file_type = "(unknown)";
-	printf("\tNamespace:\t\t %s\n", mbs_file_type);
+
+	ntfs_dump_namespace(file_name_attr->file_name_type);
 
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 	
@@ -1097,12 +1103,14 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 			case(AT_FILE_NAME):
 				Vprintf("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
-				Vprintf("\t");
-				if (opts.verbose)
+				if (opts.verbose) {
+					printf("\t");
 					ntfs_dump_flags(type, entry->key.
 						file_name.file_attributes);
-				Vprintf("\t\tFile name namespace:\t 0x%02x\n",
-					entry->key.file_name.file_name_type);
+					printf("\t");
+					ntfs_dump_namespace(entry->key.
+						file_name.file_name_type);
+				}
 				ntfs_ucstombs(entry->key.file_name.file_name,
 					entry->key.file_name.file_name_length,
 					&name, 0);
