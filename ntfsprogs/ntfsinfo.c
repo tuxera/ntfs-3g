@@ -3,8 +3,9 @@
  *
  * Copyright (c) 2002-2004 Matthew J. Fanto
  * Copyright (c) 2002-2004 Anton Altaparmakov
- * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c)      2005 Cristian Klein
  *
  * This utility will dump a file's attributes.
  *
@@ -628,6 +629,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 {
 	FILE_NAME_ATTR *file_name_attr = NULL;
+	const char *mbs_file_type = NULL;
 
 	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
@@ -659,6 +661,25 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 		printf("\tFile Name:\t\t unnamed?!?\n");
 	}
 	
+	/* name space */
+	switch (file_name_attr->file_name_type) {
+	case FILE_NAME_POSIX:
+		mbs_file_type = "POSIX";
+		break;
+	case FILE_NAME_WIN32:
+		mbs_file_type = "Win32";
+		break;
+	case FILE_NAME_DOS:
+		mbs_file_type = "DOS";
+		break;
+	case FILE_NAME_WIN32_AND_DOS:
+		mbs_file_type = "Win32 & DOS";
+		break;
+	}
+	if (mbs_file_type == NULL)      // should never happen
+	    mbs_file_type = "(unknown)";
+	printf("\tNamespace:\t\t %s\n", mbs_file_type);
+
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 	
 	/* other basic stuff about the file */
