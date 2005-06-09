@@ -2358,21 +2358,16 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 {
 	ATTR_DEF *ad;
 
-	/*
-	 * $DATA is always allowed to be non-resident even if $AttrDef does not
-	 * specify this in the flags of the $DATA attribute definition record.
-	 */
-	if (type == AT_DATA)
-		return 0;
 	/* Find the attribute definition record in $AttrDef. */
 	ad = ntfs_attr_find_in_attrdef(vol, type);
 	if (!ad)
 		return -1;
 	/* Check the flags and return the result. */
-	if (ad->flags & CAN_BE_NON_RESIDENT)
-		return 0;
-	errno = EPERM;
-	return -1;
+	if (ad->flags & ATTR_DEF_RESIDENT) {
+		errno = EPERM;
+		return -1;
+	}
+	return 0;
 }
 
 /**

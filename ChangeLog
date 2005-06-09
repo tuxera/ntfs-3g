@@ -158,6 +158,7 @@ xx/xx/2005 - 2.0.0-WIP
 	  FileNameDirty to indicate that FILE_NAME attributes need update.
 	  At least after attribute resize we leave absolutely consist
 	  volume.  (Yura)
+	- Update attribute definition handling.  (Anton, Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 
