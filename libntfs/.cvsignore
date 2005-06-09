@@ -1,0 +1,7 @@
+.deps
+.libs
+Makefile
+libntfs-gnomevfs.8
+libntfs.conf
+libntfs.la
+*.lo
