@@ -5,7 +5,7 @@
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Feb 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "Jun 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .SH SYNOPSIS
@@ -168,14 +168,10 @@ standard output.
 Clone NTFS to 
 .I FILE\fR, overwriting if exists.
 .TP
-.B \-m, \-\-metadata
-Clone 
-.B ONLY METADATA
-(for NTFS experts). Moreover only cloning to a file is allowed.
-You can't metadata-only clone to a device, image or standard output.
-.TP
 .B \-s, \-\-save\-image
-Save to the special image format.
+Save to the special image format. This is the most efficient way space and
+speed-wise if imaging is done to the standard output, e.g. for image 
+compression, encryption or streaming through a network.
 .TP
 .B \-r, \-\-restore\-image
 Restore from the special image format specified by
@@ -183,6 +179,25 @@ Restore from the special image format specified by
 If the
 .I source
 is '\-' then the image is read from the standard input.
+.TP
+.B \-\-rescue
+Ignore disk read errors so disks having bad sectors, e.g. dying disks, can be
+rescued the most efficiently way, with minimal stress on them. Ntfsclone works
+at the lowest, sector level in this mode too thus more data can be rescued. 
+The contents of the unreadable sectors are filled by character '?' and the 
+beginning of such sectors are marked by "BadSectoR\\0".
+.TP
+.B \-m, \-\-metadata
+Clone 
+.B ONLY METADATA
+(for NTFS experts). Moreover only cloning to a file is allowed.
+You can't metadata-only clone to a device, image or standard output.
+.TP
+.B \-\-ignore\-fs\-check
+Ignore the result of the filesystem consistency check. This option is allowed
+to be used only with the 
+.BR --metadata 
+option, for the safety of user's data.
 .TP
 .B \-f, \-\-force
 Forces ntfsclone to proceed if the filesystem is marked 
