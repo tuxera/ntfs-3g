@@ -1094,10 +1094,10 @@ static void check_if_mounted(const char *device, unsigned long new_mntflag)
 
 	if (mntflag & NTFS_MF_MOUNTED) {
 		if (!(mntflag & NTFS_MF_READONLY))
-			err_exit("Device %s is mounted read-write. "
+			err_exit("Device '%s' is mounted read-write. "
 				 "You must 'umount' it first.\n", device);
 		if (!new_mntflag)
-			err_exit("Device %s is mounted. "
+			err_exit("Device '%s' is mounted. "
 				 "You must 'umount' it first.\n", device);
 	}
 }
@@ -1115,7 +1115,7 @@ static void mount_volume(unsigned long new_mntflag)
 
 		int err = errno;
 
-		perr_printf("ntfs_mount failed");
+		perr_printf("Opening '%s' as NTFS failed", opt.volume);
 		if (err == EINVAL) {
 			Printf("Apparently device '%s' doesn't have a "
 			       "valid NTFS. Maybe you selected\nthe whole "
