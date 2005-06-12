@@ -17,9 +17,15 @@ ntfsresize \- resize an NTFS filesystem without data loss
 .SH DESCRIPTION
 The
 .B ntfsresize
-program non-destructively resizes Windows XP/2000/NT4, Windows Server 2003
-or Longhorn Beta NTFS filesystems. It can be used to shrink or enlarge 
-any NTFS filesystem located on an unmounted
+program safely resizes Windows XP, Windows Server 2003, Windows 2000, Windows 
+NT4 and Longhorn NTFS filesystems without data loss. All NTFS versions are
+supported, used by 32-bit and 64-bit Windows.
+.B Defragmentation is NOT required prior resizing 
+because the program can relocate any data if needed, without risking data 
+integrity.
+.PP
+Ntfsresize can be used to shrink or enlarge any NTFS filesystem located
+on an unmounted
 .I DEVICE
 (usually a disk partition). The new filesystem will have
 .I SIZE
@@ -30,7 +36,7 @@ parameter may have one of the optional modifiers
 \fBk\fR, \fBM\fR, \fBG\fR, which means the
 .I SIZE
 parameter is given in kilo-, mega- or gigabytes respectively.
-.B ntfsresize
+.B Ntfsresize
 conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
 
@@ -43,30 +49,34 @@ NTFS filesystem will be enlarged to the underlying
 .I DEVICE 
 size.
 .PP
-The
+To resize a filesystem on a partition, you must resize BOTH the filesystem
+and the partition by editing the partition table on the disk. Similarly to
+other command line filesystem resizers,
 .B ntfsresize
-program doesn't manipulate the size of partitions.
-To do that you have to use a disk partitioning tool, for example
+doesn't manipulate the size of the partitions, hence
+to do that you must use a disk partitioning tool as well, for example
 .BR fdisk (8).
+Alternatively you could use one of the many user friendly partitioners that
+uses 
+.B ntfsresize
+internally, like Mandriva's DiskDrake, QTParted, SUSE/Novell's YaST Partitioner,
+IBM's EVMS, GParted or Debian/Ubuntu's Partman.
 .PP
 .B IMPORTANT!
-Generally it's a good practice making regular backups of your
-valuable data, especially before using any partitioning tools. To do so 
-for NTFS, you could use
-.BR ntfsclone (8).
-It's also included in the 
-.BR ntfsprogs (8)
-package.
+It's a good practice making REGULAR BACKUPS of your valuable data, especially 
+before using ANY partitioning tools. To do so for NTFS, you could use
+.BR ntfsclone (8). 
+Don't forget to save the partition table as well!
 .SH SHRINKAGE
 If you wish to shrink an NTFS partition, first use
 .B ntfsresize
-to shrink the size of the filesystem. Then you may use
+to shrink the size of the filesystem. Then you could use
 .BR fdisk (8)
 to shrink the size of the partition by deleting the
 partition and recreating it with the smaller size.
-But be careful, do not make the partition smaller than the new size of 
-the NTFS filesystem otherwise you won't be able to boot and 
-you might lose your data.
+Do not make the partition smaller than the new size of 
+NTFS otherwise you won't be able to boot. If you did so notwithstanding 
+then just recreate the partition to be as large as NTFS.
 .SH ENLARGEMENT
 To enlarge an NTFS filesystem, first you must enlarge the size of the
 underlying partition. This can be done using 
@@ -78,9 +88,9 @@ Then  you may use
 to enlarge the size of the filesystem.
 .SH PARTITIONING
 When recreating the partition by a disk partitioning tool,
-make sure you create it with the same 
-starting disk cylinder (sector) and partition type as before. 
-Otherwise you may lose your entire filesystem.
+make sure you create it at the same 
+starting sector and with the same partition type as before. 
+Otherwise you won't be able to access your filesystem.
 
 Also make sure you set the bootable flag for the partition if it
 existed before. Failing to do so you might not be able to boot your
@@ -155,11 +165,11 @@ Display help and exit.
 .SH EXIT CODES
 The exit code is 0 on success, non-zero otherwise. 
 .SH KNOWN ISSUES
-No reliability problems are known or has been reported. If you need 
-help please try the ntfsresize FAQ first (see below) and if you 
+No reliability problem is known. If you need 
+help please try the Ntfsresize FAQ first (see below) and if you 
 don't find your answer then send your question, comment or bug report to 
 <linux-ntfs-dev@lists.sourceforge.net>.  No subscription is needed 
-but the mailing list is moderated and it can take some time
+but the mailing list is moderated and it can take a short time
 to approve your post. 
 .PP
 There are some very rarely met limitations at present: filesystems having 
@@ -169,7 +179,7 @@ in some cases aren't supported yet. These cases are detected and
 resizing is refused, restricted to a safe size or the closest safe 
 size is displayed.
 .PP
-.B ntfsresize
+.B Ntfsresize
 schedules an NTFS consistency check and
 after the first boot into Windows you must see
 .B chkdsk 
@@ -179,8 +189,19 @@ Moreover after repartitioning your disk and depending on the
 hardware configuration, the Windows message
 .B System Settings Change
 may also appear. Just acknowledge it and reboot again.
+.PP
+The disk geometry handling semantic (HDIO_GETGEO ioctl) has changed 
+in an incompatible way in Linux 2.6 kernels and this triggered multitudinous 
+partition table corruptions resulting unbootable Windows systems, even if
+NTFS was consistent, if 
+.BR parted (8)
+was involved in some way. This problem was often attributed to ntfsresize 
+but in fact it's completely independent of NTFS thus ntfsresize. Moreover 
+ntfsresize never touches the partition table at all. By changing
+the 'Disk Access Mode' to LBA in the BIOS makes booting work 
+again, most of the time.
 .SH AUTHOR
-.B ntfsresize
+.B Ntfsresize
 has been written by
 Szabolcs Szakacsits <szaka@sienet.hu>.
 .SH ACKNOWLEDGEMENT
@@ -194,12 +215,12 @@ for beta testing and to Theodore Ts'o whose
 .BR resize2fs (8)
 man page formed the basis of this page.
 .SH AVAILABILITY
-.B ntfsresize
+.B Ntfsresize
 is part of the 
 .BR ntfsprogs (8) 
 package and is available from
 http://linux-ntfs.sourceforge.net/ as source and precompiled binary.
-.B ntfsresize
+.B Ntfsresize
 related news, example of usage, troubleshooting, statically linked binary and 
 FAQ (frequently asked questions) is maintained at
 .br
@@ -209,7 +230,8 @@ http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .BR cfdisk (8),
 .BR sfdisk (8),
 .BR parted (8),
-.BR mkntfs (8),
+.BR evms (8),
 .BR ntfsclone (8),
+.BR mkntfs (8),
 .BR ntfsprogs (8)
 
