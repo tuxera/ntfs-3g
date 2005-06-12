@@ -210,7 +210,7 @@ static int perr_exit(const char *fmt, ...)
 static void usage(void)	__attribute__((noreturn));
 static void usage(void)
 {
-	Eprintf("\nUsage: %s [options] SOURCE\n"
+	Eprintf("\nUsage: %s [OPTIONS] SOURCE\n"
 		"    Efficiently clone NTFS to a sparse file, image, device or standard output.\n"
 		"\n"
 		"    -o, --output FILE      Clone NTFS to the non-existent FILE\n"

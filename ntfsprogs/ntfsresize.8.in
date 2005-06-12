@@ -1,34 +1,34 @@
 .\" -*- nroff -*-
-.\" Copyright 2002-2004 by Szabolcs Szakacsits  All Rights Reserved.
+.\" Copyright 2002-2005 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Mar 2004" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "Jun 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
 .B ntfsresize
-[\fBOPTIONS\fR]
+[\fIOPTIONS\fR]
 .B --info 
-.I device
+.I DEVICE
 .br
 .B ntfsresize
-[\fBOPTIONS\fR]
-[\fB\-\-size \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
-.I device
+[\fIOPTIONS\fR]
+[\fB\-\-size \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR]]
+.I DEVICE
 .SH DESCRIPTION
 The
 .B ntfsresize
 program non-destructively resizes Windows XP/2000/NT4, Windows Server 2003
 or Longhorn Beta NTFS filesystems. It can be used to shrink or enlarge 
 any NTFS filesystem located on an unmounted
-.I device
+.I DEVICE
 (usually a disk partition). The new filesystem will have
-.I size
+.I SIZE
 bytes.
 The
-.I size
+.I SIZE
 parameter may have one of the optional modifiers
 \fBk\fR, \fBM\fR, \fBG\fR, which means the
-.I size
+.I SIZE
 parameter is given in kilo-, mega- or gigabytes respectively.
 .B ntfsresize
 conforms to the SI, ATA, IEEE standards and the disk manufacturers
@@ -39,7 +39,9 @@ If both
 and
 .B --size
 are omitted then the 
-NTFS filesystem will be enlarged to the underlying device size.
+NTFS filesystem will be enlarged to the underlying 
+.I DEVICE 
+size.
 .PP
 The
 .B ntfsresize
@@ -114,10 +116,10 @@ that Windows might need about 50-100 MB free space left to boot safely.
 This option never causes any changes to the filesystem, the partition is
 opened read-only.
 .TP
-.B -s, --size \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR]
+.B -s, --size \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR]
 Resize filesystem to \fIsize\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
 The optional modifiers \fBk\fR, \fBM\fR, \fBG\fR mean the
-.I size
+.I SIZE
 parameter is given in kilo-, mega- or gigabytes respectively.
 Conforming to standards, k=10^3, M=10^6 and G=10^9. Use this option
 with

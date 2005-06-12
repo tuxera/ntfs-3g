@@ -10,20 +10,20 @@
 ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .SH SYNOPSIS
 .B ntfsclone
-[\fBOPTIONS\fR]
-.I source
+[\fIOPTIONS\fR]
+.I SOURCE
 .br
 .B ntfsclone \-\-save-image
-[\fBOPTIONS\fR]
-.I source
+[\fIOPTIONS\fR]
+.I SOURCE
 .br
 .B ntfsclone \-\-restore-image
-[\fBOPTIONS\fR]
-.I source
+[\fIOPTIONS\fR]
+.I SOURCE
 .br
 .B ntfsclone \-\-metadata
-[\fBOPTIONS\fR]
-.I source
+[\fIOPTIONS\fR]
+.I SOURCE
 .SH DESCRIPTION
 .B ntfsclone
 will efficiently clone (copy, save, backup, restore) an NTFS filesystem to a 
@@ -116,7 +116,7 @@ or the
 .B \-\-restore\-image
 option. Note that you can restore images from standard input by
 using '\-' as the 
-.I source
+.I SOURCE
 file.
 .SH METADATA-ONLY CLONING
 One of the features of
@@ -175,9 +175,9 @@ compression, encryption or streaming through a network.
 .TP
 .B \-r, \-\-restore\-image
 Restore from the special image format specified by
-.I source\fR.
+.I SOURCE\fR.
 If the
-.I source
+.I SOURCE
 is '\-' then the image is read from the standard input.
 .TP
 .B \-\-rescue

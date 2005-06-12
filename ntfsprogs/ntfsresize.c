@@ -272,10 +272,10 @@ static void usage(void) __attribute__((noreturn));
 static void usage(void)
 {
 
-	printf ("\nUsage: %s [options] device\n"
-		"    Resize an NTFS volume non-destructively.\n"
+	printf ("\nUsage: %s [OPTIONS] DEVICE\n"
+		"    Resize an NTFS volume non-destructively, safely move any data if needed.\n"
 		"\n"
-		"    -i, --info             Estimate the smallest shrunken size supported\n"
+		"    -i, --info             Estimate the smallest shrunken size possible\n"
 		"    -s, --size SIZE        Resize volume to SIZE[k|M|G] bytes\n"
 		"\n"
 		"    -n, --no-action        Do not write to disk\n"
@@ -289,7 +289,7 @@ static void usage(void)
 #endif
 		"\n"
 		"    The options -i and -s are mutually exclusive. If both options are\n"
-		"    omitted then the NTFS volume will be enlarged to the device size.\n"
+		"    omitted then the NTFS volume will be enlarged to the DEVICE size.\n"
 		"\n", EXEC_NAME);
 	printf ("%s%s", ntfs_bugs, ntfs_home);
 	printf ("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
