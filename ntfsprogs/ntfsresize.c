@@ -1879,7 +1879,7 @@ static void lookup_data_attr(ntfs_volume *vol,
 		perr_exit("ntfs_open_inode");
 
 	if (NInoAttrList(ni))
-		perr_exit("Attribute list attribute not yet supported");
+		err_exit("Attribute list attribute not yet supported");
 
 	if (!(*ctx = attr_get_search_ctx(ni, NULL)))
 		exit(1);
