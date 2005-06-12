@@ -105,12 +105,12 @@ int fd_in;
 int fd_out;
 FILE *msg_out = NULL;
 
-int nr_used_mft_records = 0;
 int wipe = 0;
-int wiped_unused_mft_data = 0;
-int wiped_unused_mft = 0;
-int wiped_resident_data = 0;
-int wiped_timestamp_data = 0;
+unsigned int nr_used_mft_records   = 0;
+unsigned int wiped_unused_mft_data = 0;
+unsigned int wiped_unused_mft      = 0;
+unsigned int wiped_resident_data   = 0;
+unsigned int wiped_timestamp_data  = 0;
 
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
@@ -1406,7 +1406,7 @@ int main(int argc, char **argv)
 	ntfs_walk_clusters_ctx image;
 	s64 device_size;        /* input device size in bytes */
 	s64 ntfs_size;
-	int wiped_total = 0;
+	unsigned int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
 	Eprintf("%s v%s\n", EXEC_NAME, VERSION);
@@ -1491,21 +1491,21 @@ int main(int argc, char **argv)
 
 	walk_clusters(vol, &backup_clusters);
 	
-	Printf("Num of MFT records       = %8lld\n",
+	Printf("Num of MFT records       = %10lld\n",
 			(long long)vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits); 
-	Printf("Num of used MFT records  = %8d\n", nr_used_mft_records); 
+	Printf("Num of used MFT records  = %10u\n", nr_used_mft_records); 
 	
-	Printf("Wiped unused MFT data    = %8d\n", wiped_unused_mft_data); 
-	Printf("Wiped deleted MFT data   = %8d\n", wiped_unused_mft); 
-	Printf("Wiped resident user data = %8d\n", wiped_resident_data);
-	Printf("Wiped timestamp data     = %8d\n", wiped_timestamp_data);
+	Printf("Wiped unused MFT data    = %10u\n", wiped_unused_mft_data); 
+	Printf("Wiped deleted MFT data   = %10u\n", wiped_unused_mft); 
+	Printf("Wiped resident user data = %10u\n", wiped_resident_data);
+	Printf("Wiped timestamp data     = %10u\n", wiped_timestamp_data);
 	
 	wiped_total += wiped_unused_mft_data;
 	wiped_total += wiped_unused_mft;
 	wiped_total += wiped_resident_data;
 	wiped_total += wiped_timestamp_data;
-	Printf("Wiped totally            = %8d\n", wiped_total);
+	Printf("Wiped totally            = %10u\n", wiped_total);
 	
 	fsync_clone(fd_out);
 	exit(0);

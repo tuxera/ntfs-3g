@@ -27,9 +27,7 @@ Thanks,
 - get rid of the unneeded lseek()'s during reads/writes (probably it 
   doesn't improve performance much, or any at all)
 - catch if source and dest are the same
-- rescue: when reading a cluster fails then try rescue at the sector level 
 - disable consistency check for --metadata (e.g. if the check is crashing)
-- make "wiped", etc statistic variables long long
 - option: --inode 
 - option: --data
 - metadata cloning: skip more non-needed inodes
