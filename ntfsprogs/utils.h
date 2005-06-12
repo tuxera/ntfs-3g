@@ -39,11 +39,6 @@ extern const char *ntfs_bugs;
 extern const char *ntfs_home;
 extern const char *ntfs_gpl;
 
-#define PATH_SEP	'/'
-#ifndef MAX_PATH
-#	define MAX_PATH 1024
-#endif
-
 #if !defined(REG_NOERROR) || (REG_NOERROR != 0)
 #	define REG_NOERROR 0
 #endif
@@ -97,7 +92,6 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 int utils_cluster_in_use (ntfs_volume *vol, long long lcn);
 int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata (ntfs_inode *inode);
-ntfs_inode * utils_pathname_to_inode (ntfs_volume *vol, ntfs_inode *parent, const char *pathname);
 void utils_dump_mem (u8 *buf, int start, int length, int ascii);
 
 time_t ntfs2utc (s64 ntfs_time);

@@ -404,7 +404,7 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 			dir_list_insert_pos = &dirs.list;
 			if (!subdir->ni) {
 				subdir->ni =
-				    utils_pathname_to_inode(ni->vol, ni,
+				    ntfs_pathname_to_inode(ni->vol, ni,
 							    subdir->name);
 
 				if (!subdir->ni) {
@@ -628,7 +628,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	ni = utils_pathname_to_inode (vol, NULL, opts.path);
+	ni = ntfs_pathname_to_inode (vol, NULL, opts.path);
 	if (!ni) {
 		// FIXME: Print error... (AIA)
 		ntfs_umount(vol, FALSE);

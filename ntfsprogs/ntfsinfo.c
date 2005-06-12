@@ -66,6 +66,7 @@
 #include "utils.h"
 #include "security.h"
 #include "mst.h"
+#include "dir.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 
@@ -1776,7 +1777,7 @@ int main(int argc, char **argv)
 		ntfs_inode *inode;
 		/* obtain the inode */
 		if (opts.filename) {
-			inode = utils_pathname_to_inode (vol, NULL, opts.filename);
+			inode = ntfs_pathname_to_inode(vol, NULL, opts.filename);
 		} else {
 			inode = ntfs_inode_open(vol, MK_LE_MREF(opts.inode, 0));
 		}

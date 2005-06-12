@@ -35,6 +35,7 @@
 #include "attrib.h"
 #include "utils.h"
 #include "volume.h"
+#include "dir.h"
 #include "debug.h"
 
 struct options {
@@ -319,7 +320,7 @@ int main (int argc, char *argv[])
 		}
 		out = ntfs_inode_open(vol, inode_num);
 	} else
-		out = utils_pathname_to_inode(vol, NULL, opts.dest_file);
+		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
 	if (!out) {
  		perror("ERROR: Couldn't open destination file");
 		goto close_src;
@@ -353,7 +354,7 @@ int main (int argc, char *argv[])
 		strcat(new_dest_file, "/");
 		strcat(new_dest_file, filename);
 		ntfs_inode_close(out);
-		out = utils_pathname_to_inode(vol, NULL, new_dest_file);
+		out = ntfs_pathname_to_inode(vol, NULL, new_dest_file);
 		free(new_dest_file);
 		if (!out) {
 			perror("ERROR: Failed to open destination file");

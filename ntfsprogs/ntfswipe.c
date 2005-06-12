@@ -1175,7 +1175,7 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 
 	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
 	
-	ni = utils_pathname_to_inode (vol, NULL, "pagefile.sys");
+	ni = ntfs_pathname_to_inode(vol, NULL, "pagefile.sys");
 	if (!ni) {
 		Dprintf("Failed to open inode of pagefile.sys.\n");
 		return 0;

@@ -286,7 +286,7 @@ int main (int argc, char *argv[])
  	if (opts.inode != -1)
  		inode = ntfs_inode_open (vol, opts.inode);
  	else
- 		inode = utils_pathname_to_inode (vol, NULL, opts.file);
+ 		inode = ntfs_pathname_to_inode (vol, NULL, opts.file);
 
 	if (!inode) {
  		perror("ERROR: Couldn't open inode");

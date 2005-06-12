@@ -487,7 +487,7 @@ int main (int argc, char *argv[])
 			result = cluster_find (vol, opts.range_begin, opts.range_end, (cluster_cb*)&print_match, NULL);
 			break;
 		case act_file:
-			ino = utils_pathname_to_inode (vol, NULL, opts.filename);
+			ino = ntfs_pathname_to_inode(vol, NULL, opts.filename);
 			if (ino)
 				result = dump_file (vol, ino);
 			break;

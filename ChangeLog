@@ -159,6 +159,9 @@ xx/xx/2005 - 2.0.0-WIP
 	  At least after attribute resize we leave absolutely consist
 	  volume.  (Yura)
 	- Update attribute definition handling.  (Anton, Yura)
+	- Move utils_pathname_to_inode from to library (dir.c), adapt it
+	  for the library, rename it to ntfs_pathname_to_inode, update all
+	  users.  (Yura)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

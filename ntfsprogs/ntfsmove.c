@@ -858,7 +858,7 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	inode = utils_pathname_to_inode (vol, NULL, opts.file);
+	inode = ntfs_pathname_to_inode(vol, NULL, opts.file);
 	if (!inode) {
 		printf ("!inode\n");
 		return 1;

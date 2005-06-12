@@ -459,6 +459,111 @@ close_err_out:
 	goto eo_put_err_out;
 }
 
+/**
+ * ntfs_pathname_to_inode - Find the inode which represents the given pathname
+ * @vol:       An ntfs volume obtained from ntfs_mount
+ * @parent:    A directory inode to begin the search (may be NULL)
+ * @pathname:  Pathname to be located
+ *
+ * Take an ASCII pathname and find the inode that represents it.  The function
+ * splits the path and then descends the directory tree.  If @parent is NULL,
+ * then the root directory '.' will be used as the base for the search.
+ *
+ * Return:  inode  Success, the pathname was valid
+ *	    NULL   Error, the pathname was invalid, or some other error occurred
+ */
+ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
+		const char *pathname)
+{
+	u64 inum;
+	int len, err = 0;
+	char *p, *q;
+	ntfs_inode *ni;
+	ntfs_inode *result = NULL;
+	ntfschar *unicode = NULL;
+	char *ascii = NULL;
+
+	if (!vol || !pathname) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (parent) {
+		ni = parent;
+	} else {
+		ni = ntfs_inode_open(vol, FILE_root);
+		if (!ni) {
+			Dprintf("Couldn't open the inode of the root "
+					"directory.\n");
+			err = EIO;
+			goto close;
+		}
+	}
+
+	unicode = calloc(1, MAX_PATH);
+	ascii = strdup(pathname);
+	if (!unicode || !ascii) {
+		Dprintf("Out of memory.\n");
+		err = ENOMEM;
+		goto close;
+	}
+
+	p = ascii;
+	/* Remove leading /'s. */
+	while (p && *p && *p == PATH_SEP)
+		p++;
+	while (p && *p) {
+		/* Find the end of the first token. */
+		q = strchr(p, PATH_SEP);
+		if (q != NULL) {
+			*q = '\0';
+			q++;
+		}
+
+		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
+		if (len < 0) {
+			Dprintf("Couldn't convert name to Unicode: %s.\n", p);
+			err = EILSEQ;
+			goto close;
+		}
+
+		inum = ntfs_inode_lookup_by_name(ni, unicode, len);
+		if (inum == (u64) -1) {
+			Dprintf("Couldn't find name '%s' in "
+					"pathname '%s'.\n", p, pathname);
+			err = ENOENT;
+			goto close;
+		}
+
+		if (ni != parent)
+			ntfs_inode_close(ni);
+
+		inum = MREF(inum);
+		ni = ntfs_inode_open(vol, inum);
+		if (!ni) {
+			Dprintf("Cannot open inode %llu: %s.\n",
+					(unsigned long long)inum, p);
+			err = EIO;
+			goto close;
+		}
+
+		p = q;
+		while (p && *p && *p == PATH_SEP)
+			p++;
+	}
+
+	result = ni;
+	ni = NULL;
+close:
+	if (ni && (ni != parent))
+		ntfs_inode_close(ni);
+	free(ascii);
+	free(unicode);
+	if (err)
+		errno = err;
+	return result;
+}
+
 /*
  * The little endian Unicode string ".." for ntfs_readdir().
  */

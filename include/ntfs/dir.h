@@ -24,11 +24,20 @@
 
 #include "types.h"
 
+#define PATH_SEP '/'
+
+#ifndef MAX_PATH
+#define MAX_PATH 1024
+#endif
+
 /* The little endian Unicode string $I30 as a global constant. */
 extern ntfschar I30[5];
 
 extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		const ntfschar *uname, const int uname_len);
+
+extern ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
+		const char *pathname);
 
 /*
  * File types (adapted from include <linux/fs.h>)
