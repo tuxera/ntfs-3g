@@ -1212,9 +1212,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 					eo = errno;
 					Dprintf("%s(): Failed to zero area.\n",
 							__FUNCTION__);
+					free(buf);
 					errno = eo;
 					goto err_out;
 				}
+				free(buf);
 			}
 			if (rl->vcn < cur_vcn) {
 				/* 

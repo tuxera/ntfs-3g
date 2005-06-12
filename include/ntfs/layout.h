@@ -27,7 +27,8 @@
 #include "support.h"
 
 /* The NTFS oem_id */
-#define magicNTFS	const_cpu_to_le64(0x202020205346544e) /* "NTFS    " */
+#define magicNTFS	const_cpu_to_le64(0x202020205346544e)	/* "NTFS    " */
+#define NTFS_SB_MAGIC	0x5346544e				/* 'NTFS' */
 
 /*
  * Location of bootsector on partition:
@@ -1003,7 +1004,7 @@ typedef struct {
 /*
  * The maximum allowed length for a file name.
  */
-#define MAXIMUM_FILE_NAME_LENGTH	255
+#define NTFS_MAX_NAME_LEN	255
 
 /*
  * Possible namespaces for filenames in ntfs (8-bit).
