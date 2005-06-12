@@ -210,26 +210,26 @@ static int perr_exit(const char *fmt, ...)
 static void usage(void)	__attribute__((noreturn));
 static void usage(void)
 {
-	Eprintf("\nUsage: %s [options] source\n"
+	Eprintf("\nUsage: %s [options] SOURCE\n"
 		"    Efficiently clone NTFS to a sparse file, image, device or standard output.\n"
 		"\n"
 		"    -o, --output FILE      Clone NTFS to the non-existent FILE\n"
 		"    -O, --overwrite FILE   Clone NTFS to FILE, overwriting if exists\n"
-		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"    -s, --save-image       Save to the special image format\n"
 		"    -r, --restore-image    Restore from the special image format\n"
-		"        --ignore-fs-check  Ignore the filesystem check result\n"
 		"        --rescue           Continue after disk read errors\n"
+		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
+		"        --ignore-fs-check  Ignore the filesystem check result\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
 		"    -d, --debug            Show debug information\n"
 #endif
 		"\n"
-		"    If FILE is '-' then send NTFS data to stdout replacing non used\n"
-		"    NTFS and partition space with zeros.\n"
+		"    If FILE is '-' then send the image to the standard output. If SOURCE is '-'\n"
+		"    and --restore-image is used then read the image from the standard input.\n"
 		"\n", EXEC_NAME);
-	Eprintf("%s%s\n", ntfs_bugs, ntfs_home);
+	Eprintf("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
