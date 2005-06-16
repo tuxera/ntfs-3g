@@ -27,7 +27,7 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_STDINT_H
+#if HAVE_STDINT_H || !HAVE_CONFIG_H
 #include <stdint.h>
 #endif
 #include <sys/types.h>

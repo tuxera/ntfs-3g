@@ -547,8 +547,9 @@ static int ntfs_bmp_set_range (struct ntfs_bmp *bmp, VCN vcn, s64 length, int va
 
 	printf (GREEN "Modified: inode %lld, ", bmp->attr->ni->mft_no);
 	switch (bmp->attr->type) {
-		case AT_BITMAP: printf ("$BITMAP"); break;
-		case AT_DATA:   printf ("$DATA");   break;
+		case AT_BITMAP: printf("$BITMAP");	break;
+		case AT_DATA:   printf("$DATA");	break;
+		default:	printf("???");		break;
 	}
 	printf (" vcn %lld-%lld\n" END, vcn>>12, (vcn+length-1)>>12);
 
