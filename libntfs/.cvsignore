@@ -2,6 +2,7 @@
 .libs
 Makefile
 libntfs-gnomevfs.8
+libntfs-gnomevfs.la
 libntfs.conf
 libntfs.la
 *.lo
