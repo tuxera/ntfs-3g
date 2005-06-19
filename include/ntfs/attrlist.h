@@ -40,7 +40,8 @@ extern int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx);
  *
  * This function cannot fail.
  */
-static __inline__ void ntfs_attrlist_mark_dirty(ntfs_inode *ni) {
+static __inline__ void ntfs_attrlist_mark_dirty(ntfs_inode *ni)
+{
 	if (ni->nr_extents == -1)
 		NInoAttrListSetDirty(ni->base_ni);
 	else

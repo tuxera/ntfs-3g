@@ -27,10 +27,10 @@
  * Do NOT free *@sd_val as it is static memory. This also means that you can
  * only use *@sd_val until the next call to this function.
  */
-void init_system_file_sd(int sys_file_no, char **sd_val, int *sd_val_len);
-void init_system_file_sd(int sys_file_no, char **sd_val, int *sd_val_len)
+void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len);
+void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 {
-	static char sd_array[0x68];
+	static u8 sd_array[0x68];
 	SECURITY_DESCRIPTOR_RELATIVE *sd;
 	ACL *acl;
 	ACCESS_ALLOWED_ACE *aa_ace;
@@ -41,7 +41,7 @@ void init_system_file_sd(int sys_file_no, char **sd_val, int *sd_val_len)
 		*sd_val_len = 0;
 		return;
 	}
-	*sd_val = (char*)&sd_array;
+	*sd_val = sd_array;
 	sd = (SECURITY_DESCRIPTOR_RELATIVE*)&sd_array;
 	sd->revision = 1;
 	sd->alignment = 0;

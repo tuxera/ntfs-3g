@@ -419,7 +419,7 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 	VCN cur_vcn = 0;
 	runlist *rlc = na->rl;
 	s64 cu_mask = na->compression_block_clusters - 1;
-		
+
 	while (rlc->length) {
 		cur_vcn += rlc->length;
 		if ((cur_vcn & cu_mask) ||
@@ -465,20 +465,20 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 			size = na->allocated_size - na->data_size;
 			offset = (cur_vcn << vol->cluster_size_bits) - size;
 		}
-		
+
 		if (size < 0) {
 			Vprintf ("Internal error\n");
 			Eprintf ("bug or damaged fs: we want "
 				"allocate buffer size %lld bytes", size);
 			return -1;
 		}
-		
+
 		if ((act == act_info) || (!size)) {
 			wiped += size;
 			rlc++;
 			continue;
 		}
-		
+
 		buf = malloc (size);
 		if (!buf) {
 			Vprintf ("Not enough memory\n");
@@ -487,7 +487,7 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 			return -1;
 		}
 		memset (buf, byte, size);
-		
+
 		ret = ntfs_rl_pwrite (vol, na->rl, offset, size, buf);
 		free (buf);
 		if (ret != size) {
@@ -500,7 +500,7 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 next:
 		rlc++;
 	}
-	
+
 	return wiped;
 }
 
@@ -515,7 +515,7 @@ next:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act, 
+static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
 								ntfs_attr *na)
 {
 	unsigned char *buf;
@@ -528,7 +528,7 @@ static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
 	if (NAttrEncrypted(na))
 		offset = (((offset - 1) >> 10) + 1) << 10;
 	size = (vol->cluster_size - offset) % vol->cluster_size;
-	
+
 	if (act == act_info)
 		return size;
 
@@ -617,7 +617,7 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 			Eprintf (" (inode %lld)\n", inode_num);
 			goto close_attr;
 		}
-		
+
 		if (wiped) {
 			Vprintf ("Wiped %llu bytes\n", wiped);
 			total += wiped;
@@ -780,8 +780,10 @@ free:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
-			ntfs_attr *naa, ntfs_attr *nab, u32 indx_record_size) {
+static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
+	__attribute__((unused)), ntfs_attr *naa, ntfs_attr *nab,
+	u32 indx_record_size)
+{
 	s64 total = 0;
 	s64 wiped = 0;
 	s64 offset = 0;
@@ -792,14 +794,14 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 	u8 mask;
 	u8 *bitmap;
 	u8 *buf;
-	
+
 	bitmap = malloc (nab->data_size);
 	if (!bitmap) {
 		Vprintf ("malloc failed\n");
 		Eprintf ("Couldn't allocate %lld bytes", nab->data_size);
 		return -1;
 	}
-	
+
 	if (ntfs_attr_pread (nab, 0, nab->data_size, bitmap)
 						!= nab->data_size) {
 		Vprintf ("Internal error\n");
@@ -807,7 +809,7 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 		total = -1;
 		goto free_bitmap;
 	}
-	
+
 	buf = malloc (indx_record_size);
 	if (!buf) {
 		Vprintf ("malloc failed\n");
@@ -816,12 +818,12 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 		total = -1;
 		goto free_bitmap;
 	}
-	
+
 	while (offset < naa->allocated_size) {
 		mask = 1 << obit;
 		if (bitmap[obyte] & mask) {
 			INDEX_ALLOCATION *indx;
-			
+
 			s64 ret = ntfs_rl_pread (vol, naa->rl,
 					offset, indx_record_size, buf);
 			if (ret != indx_record_size) {
@@ -830,13 +832,13 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 				total = -1;
 				goto free_buf;
 			}
-			
+
 			indx = (INDEX_ALLOCATION *) buf;
 			if (ntfs_mst_post_read_fixup ((NTFS_RECORD *)buf,
 								indx_record_size))
 				Eprintf ("damaged fs: mst_post_read_fixup failed");
-    			
-			if ((le32_to_cpu(indx->index.allocated_size) + 0x18) != 
+
+			if ((le32_to_cpu(indx->index.allocated_size) + 0x18) !=
 							indx_record_size) {
 				Vprintf ("Internal error\n");
 				Eprintf ("INDX record should be %u bytes",
@@ -844,7 +846,7 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 				total = -1;
 				goto free_buf;
 			}
-			
+
 			wipe_offset = le32_to_cpu(indx->index.index_length) + 0x18;
 			wipe_size = indx_record_size - wipe_offset;
 			memset (buf + wipe_offset, byte, wipe_size);
@@ -859,7 +861,7 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act,
 			if (opts.verbose > 1)
 				Vprintf ("x");
 		}
-		
+
 		wiped = ntfs_rl_pwrite (vol, naa->rl, offset, indx_record_size, buf);
 		if (wiped != indx_record_size) {
 			Vprintf ("ntfs_rl_pwrite failed\n");
@@ -895,13 +897,13 @@ free_bitmap:
 static u32 get_indx_record_size (ntfs_attr *nar)
 {
 	u32 indx_record_size;
-	
+
 	if (ntfs_attr_pread (nar, 8, 4, &indx_record_size) != 4) {
 		Vprintf ("Couldn't determine size of INDX record\n");
 		Eprintf ("ntfs_attr_pread failed");
 		return 0;
 	}
-	
+
 	indx_record_size = le32_to_cpu (indx_record_size);
 	if (!indx_record_size) {
 		Vprintf ("Internal error\n");
@@ -968,7 +970,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 				Vprintf ("\r");
 			goto close_inode;
 		}
-		
+
 		if (!NAttrNonResident(naa)) {
 			Vprintf ("Resident $INDEX_ALLOCATION\n");
 			Eprintf ("damaged fs: Resident $INDEX_ALLOCATION "
@@ -991,7 +993,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 					"name (inode %lld)\n", inode_num);
 			goto close_attr_allocation;
 		}
-		
+
 		nar = ntfs_attr_open (ni, AT_INDEX_ROOT, I30, 4);
 		if (!nar) {
 			Vprintf ("Couldn't open $INDEX_ROOT\n");
@@ -1000,27 +1002,27 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 					" (inode %lld)\n", inode_num);
 			goto close_attr_bitmap;
 		}
-		
+
 		if (NAttrNonResident(nar)) {
 			Vprintf ("Not resident $INDEX_ROOT\n");
 			Eprintf ("damaged fs: Not resident $INDEX_ROOT "
 					"(inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
-		
+
 		indx_record_size = get_indx_record_size (nar);
 		if (!indx_record_size) {
 			Eprintf (" (inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
-		
+
 		wiped = wipe_index_allocation (vol, byte, act,
 						naa, nab, indx_record_size);
 		if (wiped == -1) {
 			Eprintf (" (inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
-		
+
 		if (wiped) {
 			Vprintf ("Wiped %llu bytes\n", wiped);
 			total += wiped;
@@ -1053,7 +1055,8 @@ close_inode:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
+	__attribute__((unused)))
 {
 	const int NTFS_BUF_SIZE2 = 8192;
 	//FIXME(?): We might need to zero the LSN field of every single mft
@@ -1064,7 +1067,7 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act)
 	s64 len, pos, count;
 	char buf[NTFS_BUF_SIZE2];
 	int eo;
-	
+
 	/* We can wipe logfile only with 0xff. */
 	byte = 0xff;
 
@@ -1160,7 +1163,8 @@ error_exit:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
+	__attribute__((unused)))
 {
 	// wipe completely, chkdsk doesn't do anything, booting writes header
 	const int NTFS_BUF_SIZE2 = 4096;
@@ -1174,7 +1178,7 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act)
 		return -1;
 
 	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
-	
+
 	ni = ntfs_pathname_to_inode(vol, NULL, "pagefile.sys");
 	if (!ni) {
 		Dprintf("Failed to open inode of pagefile.sys.\n");

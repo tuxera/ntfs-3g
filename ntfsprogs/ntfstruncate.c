@@ -503,7 +503,8 @@ static void dump_resident_attr(ATTR_RECORD *a)
 /**
  * dump_mapping_pairs_array
  */
-static void dump_mapping_pairs_array(char *b, unsigned int max_len)
+static void dump_mapping_pairs_array(char *b __attribute__((unused)),
+	unsigned int max_len __attribute__((unused)))
 {
 	// TODO
 	return;

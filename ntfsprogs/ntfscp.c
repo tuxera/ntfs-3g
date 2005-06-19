@@ -115,7 +115,7 @@ static int parse_options (int argc, char **argv)
 		{ "inode",	no_argument,		NULL, 'i' },
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
-		{ "attr-name",	required_argument,	NULL, 'N' },		
+		{ "attr-name",	required_argument,	NULL, 'N' },
 		{ "no-action",	no_argument,		NULL, 'n' },
 		{ "quiet",	no_argument,		NULL, 'q' },
 		{ "version",	no_argument,		NULL, 'V' },
@@ -129,7 +129,7 @@ static int parse_options (int argc, char **argv)
 	int ver  = 0;
 	int help = 0;
 	s64 attr;
-	
+
 	opts.device = NULL;
 	opts.src_file = NULL;
 	opts.dest_file = NULL;
@@ -182,7 +182,7 @@ static int parse_options (int argc, char **argv)
 				Eprintf("You can specify only one attribute "
 						"name.\n");
 				err++;
-			} else 
+			} else
 				opts.attr_name = argv[optind - 1];
 			break;
 		case 'n':
@@ -286,7 +286,7 @@ int main (int argc, char *argv[])
 
 	vol = utils_mount_volume(opts.device, flags, opts.force);
 	if (!vol) {
- 		perror("ERROR: couldn't mount volume");
+		perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
@@ -322,7 +322,7 @@ int main (int argc, char *argv[])
 	} else
 		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
 	if (!out) {
- 		perror("ERROR: Couldn't open destination file");
+		perror("ERROR: Couldn't open destination file");
 		goto close_src;
 	}
 	if ((le16_to_cpu(out->mrec->flags) & MFT_RECORD_IS_DIRECTORY) &&
@@ -362,7 +362,7 @@ int main (int argc, char *argv[])
 		}
 	}
 
-	if (opts.attr_name) { 
+	if (opts.attr_name) {
 		attr_name_len = ntfs_mbstoucs(opts.attr_name, &attr_name, 0);
 		if (attr_name_len == -1) {
 			perror("ERROR: Failed to parse attribute name");

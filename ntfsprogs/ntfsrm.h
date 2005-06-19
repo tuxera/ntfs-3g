@@ -27,11 +27,6 @@
 #include "types.h"
 #include "layout.h"
 
-#define ntfs_malloc	malloc
-#define ntfs_realloc	realloc
-#define ntfs_calloc	calloc
-#define ntfs_free	free
-
 /**
  * struct options
  */

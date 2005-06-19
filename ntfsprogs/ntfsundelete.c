@@ -720,7 +720,8 @@ static void free_file (struct ufile *file)
  * Return:	@rec's filename, either same name space as @name or lowest space.
  *		NULL if can't determine parenthood or on error.
  */
-static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec) {
+static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec)
+{
 	ATTR_RECORD *attr30;
 	FILE_NAME_ATTR *filename_attr = NULL, *lowest_space_name = NULL;
 	ntfs_attr_search_ctx *ctx;
@@ -785,7 +786,7 @@ static void get_parent_name (struct filename* name, ntfs_volume* vol)
 
 	if (!name || !vol)
 		return;
-	
+
 	rec = calloc(1, vol->mft_record_size);
 	if (!rec) {
 		Eprintf ("ERROR: Couldn't allocate memory in get_parent_name()\n");

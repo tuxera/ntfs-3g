@@ -73,7 +73,7 @@ static int ntfs_collate_file_name(ntfs_volume *vol,
 		const void *data2, const int data2_len __attribute__((unused))){
 	int rc;
 	const FILE_NAME_ATTR *fn1, *fn2;
-		
+
 	ntfs_debug("Entering.");
 	fn1 = (const FILE_NAME_ATTR *)data1;
 	fn2 = (const FILE_NAME_ATTR *)data2;

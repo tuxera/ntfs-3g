@@ -46,8 +46,8 @@ struct options {
 	int		 force;		/* Override common sense */
 	char		*filename;	/* File to examine */
 	u64		 inode;		/* Inode to examine */
-	u64		 range_begin;	/* Look for objects in this range */
-	u64		 range_end;
+	s64		 range_begin;	/* Look for objects in this range */
+	s64		 range_end;
 };
 
 struct match {

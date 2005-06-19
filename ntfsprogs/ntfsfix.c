@@ -91,7 +91,7 @@ static int usage(void)
 		   "    -h, --help             Display this help\n"
 		   "    -V, --version          Display version information\n"
 		   "\n"
-		   "For example: %s /dev/hda6\n\n", 
+		   "For example: %s /dev/hda6\n\n",
 		   EXEC_NAME, VERSION, EXEC_NAME, EXEC_NAME);
 	printf("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
@@ -139,7 +139,7 @@ static void parse_options(int argc, char **argv)
 			usage();
 		}
 	}
-	
+
 	if (opt.volume == NULL) {
 		printf("ERROR: You must specify a device.\n");
 		usage();

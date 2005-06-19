@@ -111,7 +111,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 		errno = EINVAL;
 		return NULL;
 	}
-	
+
 	/* Return empty runlist if @count == 0 */
 	if (!count) {
 		rl = malloc(0x1000);

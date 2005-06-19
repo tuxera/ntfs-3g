@@ -152,7 +152,7 @@ extern int ntfs_inode_close(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);
-		
+
 extern int ntfs_inode_attach_all_extents(ntfs_inode *ni);
 
 /**
@@ -165,7 +165,8 @@ extern int ntfs_inode_attach_all_extents(ntfs_inode *ni);
  *
  * This function cannot fail.
  */
-static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni) {
+static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni)
+{
 	NInoSetDirty(ni);
 	if (ni->nr_extents == -1)
 		NInoSetDirty(ni->base_ni);

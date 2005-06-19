@@ -428,7 +428,7 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, vcn 0x%llx.\n",
 			__FUNCTION__, (unsigned long long)na->ni->mft_no,
 			na->type, (long long)vcn);
-	
+
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
 	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
 		return 0;
@@ -490,7 +490,7 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 	a = NULL;
 	while (1) {
 		runlist_element *rl;
-		
+
 		int not_mapped = 0;
 		if (ntfs_rl_vcn_to_lcn(na->rl, next_vcn) == LCN_RL_NOT_MAPPED)
 			not_mapped = 1;
@@ -1219,7 +1219,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				free(buf);
 			}
 			if (rl->vcn < cur_vcn) {
-				/* 
+				/*
 				 * Clusters that replaced hole are merged with
 				 * previous run, so we need to update offset.
 				 */
@@ -2423,7 +2423,7 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 {
 	u32 biu;
-	
+
 	Dprintf("%s(): Entering for pos 0x%d, size %u.\n",
 		 __FUNCTION__, (int)(pos - (u8*)m), (unsigned) size);
 
@@ -2705,7 +2705,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfs_attr_put_search_ctx(ctx);
 		errno = err;
 		return -1;
-		
+
 	}
 	offset = (u8*)ctx->attr - (u8*)ctx->mrec;
 	ntfs_attr_put_search_ctx(ctx);
@@ -2867,7 +2867,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
  * added transparently to caller. So, this function should not be called with
  * @type == AT_ATTRIBUTE_LIST, if you really need to add attribute list call
  * ntfs_inode_add_attrlist instead.
- * 
+ *
  * On success return opened new ntfs attribute. On error return NULL with errno
  * set to the error code.
  */
@@ -2878,7 +2878,7 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	int err, i, offset;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
-	
+
 	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
@@ -2908,7 +2908,7 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/*
-	 * Determine resident or not will be new attribute. We add 8 to size in 
+	 * Determine resident or not will be new attribute. We add 8 to size in
 	 * non resident case for mapping pairs.
 	 */
 	if (ntfs_attr_can_be_resident(ni->vol, type)) {
@@ -3056,7 +3056,7 @@ int ntfs_attr_rm(ntfs_attr *na)
 {
 	ntfs_attr_search_ctx *ctx;
 	int ret = 0;
-	
+
 	if (!na) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
@@ -3262,7 +3262,7 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 	}
 
 	/* Make space and move attribute. */
-	if (ntfs_make_room_for_attr(ni->mrec, (u8*) nctx->attr, 
+	if (ntfs_make_room_for_attr(ni->mrec, (u8*) nctx->attr,
 					le32_to_cpu(a->length))) {
 		err = errno;
 		Dprintf("%s(): Couldn't make space for attribute.\n",
@@ -3298,7 +3298,7 @@ put_err_out:
  *
  * New attribute record holder must have free @extra bytes after moving
  * attribute record to it.
- * 
+ *
  * If this function succeed, user should reinit search context if he/she wants
  * use it anymore.
  *
@@ -3319,7 +3319,7 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 	Dprintf("%s(): Entering for attr 0x%x, inode 0x%llx.\n", __FUNCTION__,
 			(unsigned) le32_to_cpu(ctx->attr->type),
 			(long long) ctx->ntfs_ino->mft_no);
-	
+
 	if (ctx->ntfs_ino->nr_extents == -1)
 		base_ni = ctx->base_ntfs_ino;
 	else
@@ -3356,7 +3356,7 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 			return 0;
 	}
 
-	/* 
+	/*
 	 * Failed to move attribute to one of the current extents, so allocate
 	 * new extent and move attribute to it.
 	 */
@@ -3467,7 +3467,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
 
-	if (rl) {	
+	if (rl) {
 		/* Now copy the attribute value to the allocated cluster(s). */
 		bw = ntfs_attr_pwrite(na, 0, le32_to_cpu(a->value_length),
 				(u8*)a + le16_to_cpu(a->value_offset));
@@ -3736,14 +3736,14 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		err = ENOSPC;
 		goto put_err_out;
 	}
-	
+
 	/* Add attribute list if not present. */
 	if (na->ni->nr_extents == -1)
 		ni = na->ni->base_ni;
 	else
 		ni = na->ni;
 	if (!NInoAttrList(ni)) {
-		ntfs_attr_put_search_ctx(ctx);	
+		ntfs_attr_put_search_ctx(ctx);
 		if (ntfs_inode_add_attrlist(ni))
 			return -1;
 		return ntfs_resident_attr_resize(na, newsize);
@@ -4004,8 +4004,8 @@ retry:
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x.\n", __FUNCTION__,
 			(unsigned long long)na->ni->mft_no, na->type);
-	
-	if (na->ni->nr_extents == -1)		
+
+	if (na->ni->nr_extents == -1)
 		base_ni = na->ni->base_ni;
 	else
 		base_ni = na->ni;
@@ -4058,7 +4058,7 @@ retry:
 		/* If we in the first extent, then set/clean sparse bit. */
 		if (!a->lowest_vcn) {
 			int sparse;
-			
+
 			sparse = ntfs_rl_sparse(na->rl);
 			if (sparse == -1) {
 				Dprintf("%s(): Bad runlist.\n", __FUNCTION__);
@@ -4163,7 +4163,7 @@ retry:
 		 * Determine maximum possible length of mapping pairs,
 		 * if we shall *not* expand space for mapping pairs.
 		 */
-		cur_max_mp_size = le32_to_cpu(a->length) - 
+		cur_max_mp_size = le32_to_cpu(a->length) -
 				le16_to_cpu(a->mapping_pairs_offset);
 		/*
 		 * Determine maximum possible length of mapping pairs in the
@@ -4270,7 +4270,7 @@ retry:
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
 		goto put_err_out;
 	}
-	
+
 	/* Deallocate not used attribute extents and return with success. */
 	if (finished_build) {
 		ntfs_attr_reinit_search_ctx(ctx);
@@ -4446,7 +4446,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			errno = err;
 			return -1;
 		}
-		
+
 		/* Truncate the runlist itself. */
 		if (ntfs_rl_truncate(&na->rl, first_free_vcn)) {
 			err = errno;
@@ -4461,7 +4461,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			errno = err;
 			return -1;
 		}
-		
+
 		/* Write mapping pairs for new runlist. */
 		if (ntfs_attr_update_mapping_pairs(na)) {
 			err = errno;
@@ -4472,7 +4472,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 			return -1;
 		}
 	}
-	
+
 	/* Get the first attribute record. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx) {
@@ -4497,7 +4497,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		goto put_err_out;
 	}
 	a = ctx->attr;
-		
+
 	/* Update allocated size only if it is changed. */
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
@@ -4822,7 +4822,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (na->data_size == newsize)
 		return 0;
 	/*

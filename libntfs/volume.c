@@ -563,7 +563,7 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
 	int ret, err = 0;
-	
+
 	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
 		Dprintf("Failed to open inode FILE_LogFile.\n");
 		errno = EIO;
@@ -610,13 +610,13 @@ static ntfs_inode *ntfs_hiberfile_open(ntfs_volume *vol)
 		errno = EINVAL;
 		return NULL;
 	}
-	
+
 	ni_root = ntfs_inode_open(vol, FILE_root);
 	if (!ni_root) {
 		Dprintf("Couldn't open the root directory.\n");
 		return NULL;
 	}
-	
+
 	unicode_len = ntfs_mbstoucs(hiberfile, &unicode, 0);
 	if (unicode_len < 0) {
 		Dperror("Couldn't convert 'hiberfil.sys' to Unicode");
@@ -659,7 +659,7 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 	ntfs_attr *na = NULL;
 	int i, bytes_read, ret = -1;
 	char *buf = NULL;
-	
+
 	ni = ntfs_hiberfile_open(vol);
 	if (!ni) {
 		if (errno == ENOENT)

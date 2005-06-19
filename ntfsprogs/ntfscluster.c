@@ -357,7 +357,7 @@ static int info (ntfs_volume *vol)
  */
 static int dump_file (ntfs_volume *vol, ntfs_inode *ino)
 {
-	u8 buffer[1024];
+	char buffer[1024];
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *rec;
 	int i;

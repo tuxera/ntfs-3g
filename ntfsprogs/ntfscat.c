@@ -215,7 +215,7 @@ static int cat (ntfs_volume *vol __attribute__((unused)), ntfs_inode *inode,
 		int namelen __attribute__((unused)))
 {
 	/* increase 1024 only if you fix partial writes below */
-	const int bufsize = 1024; 
+	const int bufsize = 1024;
 	char *buffer;
 	ntfs_attr *attr;
 	s64 bytes_read, written;
@@ -279,25 +279,25 @@ int main (int argc, char *argv[])
 
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
- 		perror("ERROR: couldn't mount volume");
+		perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
- 	if (opts.inode != -1)
- 		inode = ntfs_inode_open (vol, opts.inode);
- 	else
- 		inode = ntfs_pathname_to_inode (vol, NULL, opts.file);
+	if (opts.inode != -1)
+		inode = ntfs_inode_open (vol, opts.inode);
+	else
+		inode = ntfs_pathname_to_inode (vol, NULL, opts.file);
 
 	if (!inode) {
- 		perror("ERROR: Couldn't open inode");
+		perror("ERROR: Couldn't open inode");
 		return 1;
 	}
 
- 	attr = AT_DATA;
- 	if (opts.attr != (ATTR_TYPES)-1)
- 		attr = opts.attr;
- 
- 	result = cat (vol, inode, attr, NULL, 0);
+	attr = AT_DATA;
+	if (opts.attr != (ATTR_TYPES)-1)
+		attr = opts.attr;
+
+	result = cat (vol, inode, attr, NULL, 0);
 
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);

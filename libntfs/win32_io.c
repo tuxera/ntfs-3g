@@ -165,7 +165,7 @@ static BOOL WINAPI libntfs_SetFilePointerEx(HANDLE hFile,
  *
  * The Find*Volume and SetFilePointerEx functions exist only on win2k+, as such
  * we cannot just staticly import them.
- * 
+ *
  * This function initializes the imports if the functions do exist and in the
  * SetFilePointerEx case, we emulate the function ourselves if it is not
  * present.
@@ -257,11 +257,11 @@ static int ntfs_device_win32_simple_open_file(const char *filename,
 	*handle = CreateFile(filename,
 			ntfs_device_unix_status_flags_to_win32(flags),
 			locking ? 0 : (FILE_SHARE_WRITE | FILE_SHARE_READ),
- 			NULL, OPEN_EXISTING, 0, NULL);
+			NULL, OPEN_EXISTING, 0, NULL);
 	if (*handle == INVALID_HANDLE_VALUE) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		Dprintf("CreateFile(%s) failed.\n", filename);
- 		return -1;
+		return -1;
 	}
 	return 0;
 }
@@ -512,7 +512,7 @@ static __inline__ int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
 	if (ntfs_device_win32_simple_open_file(filename, &handle, flags,
 			FALSE)) {
 		/* open error */
- 		return -1;
+		return -1;
 	}
 	/* fill fd */
 	fd->handle = handle;
@@ -545,7 +545,7 @@ static __inline__ int ntfs_device_win32_open_drive(int drive_id, win32_fd *fd,
 	if ((err = ntfs_device_win32_simple_open_file(filename, &handle, flags,
 			TRUE))) {
 		/* open error */
- 		return err;
+		return err;
 	}
 	/* store the drive geometry */
 	ntfs_device_win32_getgeo(handle, fd);
@@ -798,7 +798,7 @@ static int ntfs_device_win32_open_partition(int drive_id,
 				drive_id);
 		CloseHandle(handle);
 		errno = ENODEV;
- 		return -1;
+		return -1;
 	}
 }
 
@@ -1257,7 +1257,7 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 			}
 		}
 		/* Copy the data to be written into @alignedbuffer. */
- 		memcpy(alignedbuffer + ofs, b, count);
+		memcpy(alignedbuffer + ofs, b, count);
 	}
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && old_pos < fd->geo_size) {
 		s64 vol_to_write = fd->geo_size - old_pos;
@@ -1379,8 +1379,8 @@ static __inline__ int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
 	DWORD bytesReturned;
 	DISK_GEOMETRY dg;
 
- 	if (DeviceIoControl(fd->handle, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
- 			&dg, sizeof(DISK_GEOMETRY), &bytesReturned, NULL)) {
+	if (DeviceIoControl(fd->handle, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
+			&dg, sizeof(DISK_GEOMETRY), &bytesReturned, NULL)) {
 		/* success */
 		*argp = dg.BytesPerSector;
 		return 0;

@@ -154,9 +154,9 @@
 #define le32_to_cpu(x)		(u32)__le32_to_cpu((u32)(x))
 #define le64_to_cpu(x)		(u64)__le64_to_cpu((u64)(x))
 
-#define le16_to_cpup(x)		(u16)__le16_to_cpu(*(u16*)(x))
-#define le32_to_cpup(x)		(u32)__le32_to_cpu(*(u32*)(x))
-#define le64_to_cpup(x)		(u64)__le64_to_cpu(*(u64*)(x))
+#define le16_to_cpup(x)		(u16)__le16_to_cpu(*(const u16*)(x))
+#define le32_to_cpup(x)		(u32)__le32_to_cpu(*(const u32*)(x))
+#define le64_to_cpup(x)		(u64)__le64_to_cpu(*(const u64*)(x))
 
 /* Signed from LE to CPU conversion. */
 

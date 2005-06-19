@@ -58,7 +58,7 @@
  * If @is_in_root is FALSE, @entry is in the index allocation attribute and @ia
  * and @ia_vcn point to the index allocation block and VCN where it's placed,
  * respectively. @ir and @actx are NULL in this case. @ia_na is opened
- * INDEX_ALLOCTAION attribute. @ia_dirty is TRUE if index block was changed and 
+ * INDEX_ALLOCTAION attribute. @ia_dirty is TRUE if index block was changed and
  * FALSE otherwise.
  *
  * To obtain a context call ntfs_index_ctx_get().

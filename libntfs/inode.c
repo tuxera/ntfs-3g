@@ -389,7 +389,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	/* Inode haven't got attribute list, thus nothing to attach. */
 	if (!NInoAttrList(ni))
 		return 0;
-	
+
 	if (!ni->attr_list) {
 		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
 		errno = EINVAL;
@@ -681,7 +681,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 		for (i = 0; i < ni->nr_extents; ++i) {
 			ntfs_inode *eni;
-			
+
 			eni = ni->extent_nis[i];
 			if (NInoTestAndClearDirty(eni)) {
 				if (ntfs_mft_record_write(eni->vol, eni->mft_no,
@@ -740,7 +740,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		errno = EEXIST;
 		return -1;
 	}
-	
+
 	al_allocated = 0x40;
 	al_len = 0;
 	al = malloc(al_allocated);
@@ -750,7 +750,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		errno = ENOMEM;
 		return -1;
 	}
-	
+
 	/* Form attribute list. */
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
@@ -937,10 +937,10 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	Dprintf("%s(): Entering for inode 0x%llx, size %d.\n",
 			__FUNCTION__, (long long) ni->mft_no, size);
-			
+
 	freed = (le32_to_cpu(ni->mrec->bytes_allocated) -
 				le32_to_cpu(ni->mrec->bytes_in_use));
 

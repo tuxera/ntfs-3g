@@ -269,7 +269,7 @@ done:
 descend_into_child_node:
 	ntfs_debug("Descend into node with VCN %lld.", vcn);
 	/* Read index allocation block. */
-	if (ntfs_attr_mst_pread(na, vcn << vol->cluster_size_bits, 1, 
+	if (ntfs_attr_mst_pread(na, vcn << vol->cluster_size_bits, 1,
 				ictx->block_size, ia) != 1) {
 		ntfs_error(, "Failed to read index allocation.");
 		goto err_out;

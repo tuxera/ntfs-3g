@@ -365,7 +365,8 @@ static void dump_runs (u8 *buffer, int len)
 /**
  * find_unused
  */
-static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc, int flags)
+static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc
+	__attribute__((unused)), int flags __attribute__((unused)))
 {
 	const int bufsize = 8192;
 	u8 *buffer;
@@ -703,7 +704,7 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 		Eprintf ("!move_runlist\n");
 		return -1;
 	}
-	
+
 	// wipe orig runs
 	memset (((u8*)rec) +rec->mapping_pairs_offset, 0, need_to - rec->mapping_pairs_offset);
 

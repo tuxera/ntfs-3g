@@ -65,7 +65,7 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (!ni->attr_list) {
 		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
 		errno = EINVAL;
@@ -255,7 +255,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		"%lld.\n", __FUNCTION__, (long long) ctx->ntfs_ino->mft_no,
 		(unsigned) le32_to_cpu(ctx->al_entry->type),
 		(long long) le64_to_cpu(ctx->al_entry->lowest_vcn));
-	
+
 	if (!NInoAttrList(base_ni)) {
 		Dprintf("%s(): Attribute list isn't present.\n", __FUNCTION__);
 		errno = ENOENT;
@@ -270,7 +270,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		errno = ENOMEM;
 		return -1;
 	}
-	
+
 	/* Reisze $ATTRIBUTE_LIST to new length. */
 	na = ntfs_attr_open(base_ni, AT_ATTRIBUTE_LIST, NULL, 0);
 	if (!na) {

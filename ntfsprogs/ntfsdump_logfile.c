@@ -505,7 +505,7 @@ skip_rstr_pass:
 		++pass;
 		goto rstr_pass_loc;
 	}
-	
+
 	return rstr;
 }
 
@@ -714,7 +714,7 @@ int main(int argc, char **argv)
 		puts("$LogFile is not initialized.");
 		return 0;
 	}
-	
+
 	/*
 	 * First, verify the restart page header for consistency.
 	 */
@@ -739,7 +739,7 @@ int main(int argc, char **argv)
 	 */
 	rcrd = (RECORD_PAGE_HEADER*)dump_restart_areas(rstr, buf, page_size);
 	printf("\n\nFinished with restart pages.  "
- 		"Beginning with log pages.\n");
+		"Beginning with log pages.\n");
 
 	/*
 	 * Dump the log areas.
