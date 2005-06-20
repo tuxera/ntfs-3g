@@ -256,7 +256,7 @@ static __inline__ void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
 		na->name     = name;
 		na->name_len = name_len;
 	} else {
-		na->name     = AT_UNNAMED;
+		na->name     = NULL;
 		na->name_len = 0;
 	}
 }
@@ -2728,7 +2728,8 @@ put_err_out:
  *	EINVAL	- Invalid argumets passed to function.
  *	EIO	- I/O error occured or damaged filesystem.
  */
-int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx) {
+int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
+{
 	ntfs_inode *base_ni, *ni;
 	ATTR_TYPES type;
 	int err;
