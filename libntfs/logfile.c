@@ -1,7 +1,7 @@
 /*
  * logfile.c - NTFS journal handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -162,7 +162,8 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	 */
 	ca_ofs = le16_to_cpu(ra->client_array_offset);
 	if (((ca_ofs + 7) & ~7) != ca_ofs ||
-			ra_ofs + ca_ofs > NTFS_BLOCK_SIZE - sizeof(u16)) {
+			ra_ofs + ca_ofs > (u16)(NTFS_BLOCK_SIZE -
+			sizeof(u16))) {
 		ntfs_error(vi->i_sb, "$LogFile restart area specifies "
 				"inconsistent client array offset.");
 		return FALSE;
@@ -174,8 +175,8 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	 */
 	ra_len = ca_ofs + le16_to_cpu(ra->log_clients) *
 			sizeof(LOG_CLIENT_RECORD);
-	if (ra_ofs + ra_len > le32_to_cpu(rp->system_page_size) ||
-			ra_ofs + le16_to_cpu(ra->restart_area_length) >
+	if ((u32)(ra_ofs + ra_len) > le32_to_cpu(rp->system_page_size) ||
+			(u32)(ra_ofs + le16_to_cpu(ra->restart_area_length)) >
 			le32_to_cpu(rp->system_page_size) ||
 			ra_len > le16_to_cpu(ra->restart_area_length)) {
 		ntfs_error(vi->i_sb, "$LogFile restart area is out of bounds "

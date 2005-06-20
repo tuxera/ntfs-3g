@@ -2,7 +2,7 @@
  * attrlist.c - Attribute list attribute handling code.  Part of the Linux-NTFS
  *		project.
  *
- * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -187,7 +187,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			attr->name_length * sizeof(ntfschar));
 
 	/* Resize $ATTRIBUTE_LIST to new length. */
-	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
+	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 	if (!na) {
 		err = errno;
 		Dprintf("%s(): Failed to open $ATTRIBUTE_LIST attribute.\n",
@@ -272,7 +272,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 	}
 
 	/* Reisze $ATTRIBUTE_LIST to new length. */
-	na = ntfs_attr_open(base_ni, AT_ATTRIBUTE_LIST, NULL, 0);
+	na = ntfs_attr_open(base_ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 	if (!na) {
 		err = errno;
 		Dprintf("%s(): Failed to open $ATTRIBUTE_LIST attribute.\n",

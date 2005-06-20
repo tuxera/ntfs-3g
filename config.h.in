@@ -60,10 +60,6 @@
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H
 
-/* Define to 1 if long double works and has more range or precision than
-   double. */
-#undef HAVE_LONG_DOUBLE
-
 /* Define to 1 if you have the <machine/endian.h> header file. */
 #undef HAVE_MACHINE_ENDIAN_H
 
@@ -238,6 +234,14 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* Define to 1 if your processor stores words with the most significant byte
+   first (like Motorola and SPARC, unlike Intel and VAX). */
+#undef WORDS_BIGENDIAN
+
+/* Define to 1 if your processor stores words with the least significant byte
+   first (like Intel and VAX, unlike Motorola and SPARC). */
+#undef WORDS_LITTLEENDIAN
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS

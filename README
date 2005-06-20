@@ -117,3 +117,5 @@ ntfsls - List information about files in a directory residing on an NTFS
 partition.  See man 8 ntfsls for details.
 
 ntfscat - Concatenate files and print their contents on the standard output.
+
+ntfscp - Overwrite files on an NTFS partition.

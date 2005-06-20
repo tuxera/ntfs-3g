@@ -2,7 +2,7 @@
  * utils.c - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Richard Russon
- * Copyright (c) 2003-2004 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
  *
  * A set of shared functions for ntfs utilities
@@ -619,7 +619,7 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
 	/* Does lcn lie in the section of $Bitmap we already have cached? */
 	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
 		Dprintf ("Bit lies outside cache.\n");
-		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, NULL, 0);
+		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 		if (!attr) {
 			Eprintf ("Couldn't open $Bitmap: %s\n", strerror (errno));
 			return -1;
@@ -967,7 +967,8 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				return -1;
 			}
 
-			mft = ntfs_attr_open (ctx->vol->mft_ni, AT_DATA, NULL, 0);
+			mft = ntfs_attr_open (ctx->vol->mft_ni, AT_DATA,
+					AT_UNNAMED, 0);
 			if (!mft) {
 				Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 				// free / close

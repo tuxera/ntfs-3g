@@ -9,7 +9,8 @@ Moved back from BitKeeper to CVS on SF.net.
 
 ntfsprogs should now work completely on Windows 2000 and XP (Cygwin). 
 mkntfs does not create bootable volumes when on Windows.  Volumes are locked 
-when using a R/W utility in order to prevent data corruption.  (Yuval Fledel)
+when using a R/W utility in order to prevent data corruption.  (Yuval Fledel,
+Anton Altaparmakov)
 
 ntfsinfo has been extended and now provides much more detailed information as
 well as being able to resolve a path/filename instead of requiring the inode
@@ -29,8 +30,7 @@ Linux.
 
 ntfsprogs ("make libs" only) now compiles on FreeBSD, NetBSD, Windows (Cygwin),
 and DOS (DJGPP).  Thanks to Christophe Grenier for DOS and FreeBSD testing
-and fixes and to Lode Leroy for Windows testing and fixes.  Note, the Windows
-version is read-only and has limited functionality at present.
+and fixes and to Lode Leroy for Windows testing and fixes.
 
 
 Older news

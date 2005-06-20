@@ -24,8 +24,8 @@ fi
   exit 1
 }
 
-echo Running autoreconf --verbose --install --warnings=all
-autoreconf --force --verbose --install --warnings=all
+echo Running autoreconf --verbose --install
+autoreconf --force --verbose --install
 
 # This gets around the BitKeeper problem that it checks out files with the
 # current time stamp rather than the time stamp at check in time.

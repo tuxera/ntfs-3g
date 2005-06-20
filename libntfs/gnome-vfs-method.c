@@ -3,7 +3,7 @@
  *			libntfs. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Jan Kratochvil <project-captive@jankratochvil.net>
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -393,8 +393,8 @@ static int libntfs_gnomevfs_read_directory_filldir(
 
 			attr = ntfs_attr_open(inode,	/* ni */
 					AT_DATA,	/* type */
-					NULL,	/* name */
-					0);	/* name_len */
+					AT_UNNAMED,	/* name */
+					0);		/* name_len */
 			/* FIXME: Check failed 'attr' open. */
 			if (attr) {
 				/* FIXME: Is 'data_size' the right field? */
@@ -488,7 +488,7 @@ static GnomeVFSResult libntfs_open_attr(struct libntfs_file *libntfs_file)
 		libntfs_file->attr = ntfs_attr_open(
 				libntfs_file->inode,	/* ni */
 				AT_DATA,	/* type */
-				NULL,	/* name */
+				AT_UNNAMED,	/* name */
 				0);	/* name_len */
 		G_UNLOCK(libntfs);
 		if (!libntfs_file->attr)

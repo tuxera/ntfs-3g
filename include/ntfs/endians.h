@@ -2,7 +2,7 @@
  * endians.h - Definitions related to handling of byte ordering. Part of the
  *	       Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -65,11 +65,13 @@
 #		define __BYTE_ORDER __BYTE_ORDER__
 #		define __LITTLE_ENDIAN __LITTLE_ENDIAN__
 #		define __BIG_ENDIAN __BIG_ENDIAN__
-#	elif defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)
+#	elif (defined(_LITTLE_ENDIAN) && !defined(_BIG_ENDIAN)) || \
+			defined(WORDS_LITTLEENDIAN)
 #		define __BYTE_ORDER 1
 #		define __LITTLE_ENDIAN 1
 #		define __BIG_ENDIAN 0
-#	elif !defined(_LITTLE_ENDIAN) && defined(_BIG_ENDIAN)
+#	elif (!defined(_LITTLE_ENDIAN) && defined(_BIG_ENDIAN)) || \
+			defined(WORDS_BIGENDIAN)
 #		define __BYTE_ORDER 0
 #		define __LITTLE_ENDIAN 1
 #		define __BIG_ENDIAN 0

@@ -1,4 +1,4 @@
-xx/xx/2005 - 2.0.0-WIP
+20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 
 	- Add start_vcn parameter to ntfs_get_size_for_mapping_pairs() and
 	  ntfs_mapping_pairs_build() and adapt all callers.
@@ -162,6 +162,11 @@ xx/xx/2005 - 2.0.0-WIP
 	- Move utils_pathname_to_inode from to library (dir.c), adapt it
 	  for the library, rename it to ntfs_pathname_to_inode, update all
 	  users.  (Yura)
+	- Set attr_name to NULL in libntfs/attrib.c::__ntfs_attr_init() and
+	  fixup all callers apropriately.  Thanks to FlatCap/Rich for pointing
+	  this out.  (Anton)
+	- Determine endianness in ./configure and use that in addition to
+	  existing mechanisms for determining endianness.  (Anton)
 
 04/09/2004 - 1.9.4 - Urgent bug fixes.
 

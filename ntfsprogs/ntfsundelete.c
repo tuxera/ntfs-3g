@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2005 Holger Ohmacht
+ * Copyright (c) 2005 Anton Altaparmakov
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -793,7 +794,7 @@ static void get_parent_name (struct filename* name, ntfs_volume* vol)
 		return;
 	}
 
-	mft_data = ntfs_attr_open(vol->mft_ni, AT_DATA, NULL, 0);
+	mft_data = ntfs_attr_open(vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft_data) {
 		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 	} else {
@@ -1025,7 +1026,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 		return NULL;
 	}
 
-	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, NULL, 0);
+	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft) {
 		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 		free_file (file);
@@ -1947,7 +1948,7 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 		return 1;
 	}
 
-	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, NULL, 0);
+	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft) {
 		Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 		goto free;

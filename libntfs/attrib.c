@@ -1,7 +1,7 @@
 /*
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
@@ -252,13 +252,11 @@ static __inline__ void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
 	na->rl = NULL;
 	na->ni = ni;
 	na->type = type;
-	if (name) {
-		na->name     = name;
+	na->name = name;
+	if (name)
 		na->name_len = name_len;
-	} else {
-		na->name     = NULL;
+	else
 		na->name_len = 0;
-	}
 }
 
 /**
@@ -2693,8 +2691,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_inode_mark_dirty(ni);
 	/*
 	 * Locate offset from start of the MFT record where new attribute is
-	 * placed. We need relookup it, because record maybe moved during update
-	 * of attribute list.
+	 * placed. We need relookup it, because record maybe moved during
+	 * update of attribute list.
 	 */
 	ntfs_attr_reinit_search_ctx(ctx);
 	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,

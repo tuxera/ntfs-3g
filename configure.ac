@@ -2,7 +2,7 @@
 # configure.ac - Source file to generate "./configure" to prepare package for
 #		 compilation.
 #
-# Copyright (c) 2000-2004 Anton Altaparmakov
+# Copyright (c) 2000-2005 Anton Altaparmakov
 # Copyright (c) 2003 Jan Kratochvil
 #
 # This program/include file is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[2.0.0-WIP],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.10.0],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
@@ -199,9 +199,13 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libintl.h limits.h locale.h mntent.h \
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
+AC_C_BIGENDIAN(,
+	[AC_DEFINE([WORDS_LITTLEENDIAN], 1,
+	[Define to 1 if your processor stores words with the least significant
+	byte first (like Intel and VAX, unlike Motorola and SPARC).])]
+	,)
 AC_C_CONST
 AC_C_INLINE
-AC_C_LONG_DOUBLE
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_STRUCT_ST_BLOCKS

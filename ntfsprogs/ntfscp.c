@@ -2,6 +2,7 @@
  * ntfscp - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2005 Anton Altaparmakov
  *
  * This utility will overwrite files on ntfs volume
  *
@@ -267,7 +268,7 @@ int main (int argc, char *argv[])
 	u64 offset;
 	char *buf;
 	s64 br, bw;
-	ntfschar *attr_name = NULL;
+	ntfschar *attr_name = AT_UNNAMED;
 	int attr_name_len = 0;
 
 	if (!parse_options(argc, argv))

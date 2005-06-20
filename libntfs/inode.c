@@ -1,7 +1,7 @@
 /*
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -626,7 +626,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			NInoAttrListTestAndClearDirty(ni)) {
 		ntfs_attr *na;
 
-		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
+		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 		if (!na) {
 			if (!err || errno == EIO) {
 				err = errno;
@@ -845,7 +845,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	}
 
 	/* Resize it. */
-	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, NULL, 0);
+	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 	if (!na) {
 		err = errno;
 		Dprintf("%s(): Failed to open just added $ATTRIBUTE_LIST.\n",
