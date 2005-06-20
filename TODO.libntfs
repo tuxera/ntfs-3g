@@ -19,6 +19,9 @@
 
 - write ntfs_index_{rm_from,add_to,create,rm}()
 
+- detect presence of usnjrnl and if present and mounting rw, re-stamp it (see
+  current ntfs wip driver)
+
 *******************
 * MEDIUM priority *
 *******************
