@@ -70,7 +70,8 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 
 static int ntfs_collate_file_name(ntfs_volume *vol,
 		const void *data1, const int data1_len __attribute__((unused)),
-		const void *data2, const int data2_len __attribute__((unused))){
+		const void *data2, const int data2_len __attribute__((unused)))
+{
 	int rc;
 	const FILE_NAME_ATTR *fn1, *fn2;
 
@@ -127,7 +128,8 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
  */
 int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 		const void *data1, const int data1_len,
-		const void *data2, const int data2_len) {
+		const void *data2, const int data2_len)
+{
 	int i;
 
 	ntfs_debug("Entering.");
