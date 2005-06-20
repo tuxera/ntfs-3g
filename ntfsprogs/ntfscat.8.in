@@ -32,13 +32,48 @@ is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.B \-f
+.B "\-a " desc
 .br
 .ns
 .TP
-.B \-\-force
-This will override some sensible defaults, such as not working with a mounted
-volume.  Use this option with caution.
+.B "\-\-attribute " desc
+Display the contents of a particular attribute.  By default, the unname $DATA
+attribute will be shown.  The attribute can be specified by number (in decimal
+or hexadecimal), or by name.
+.TS
+lB lB lB
+l l l.
+Hex	Decimal	Name
+0x10	16	"$STANDARD_INFORMATION",
+0x20	32	"$ATTRIBUTE_LIST",
+0x30	48	"$FILE_NAME",
+0x40	64	"$OBJECT_ID",
+0x50	80	"$SECURITY_DESCRIPTOR",
+0x60	96	"$VOLUME_NAME",
+0x70	112	"$VOLUME_INFORMATION",
+0x80	128	"$DATA",
+0x90	144	"$INDEX_ROOT",
+0xA0	160	"$INDEX_ALLOCATION",
+0xB0	176	"$BITMAP",
+0xC0	192	"$REPARSE_POINT",
+0xD0	208	"$EA_INFORMATION",
+0xE0	224	"$EA",
+0xF0	240	"$PROPERTY_SET",
+0x100	256	"$LOGGED_UTILITY_STREAM",
+.TE
+.br
+.B Notes
+.br
+The attribute names may be given without the leading $ symbol.
+.br
+If you use the $ symbol, you must escape it from the shell.
+.TP
+.B "\-i " num
+.br
+.ns
+.TP
+.B "\-\-inode " num
+Specify a file by its inode number instead of its name.
 .TP
 .B \-h
 .br
@@ -66,7 +101,7 @@ Show the version number, copyright and license
 .br
 .ns
 .TP
-.B \-\-vebose
+.B \-\-verbose
 Display more debug/warning/error messages.
 .SH EXAMPLES
 Display the contents of a file in the root of an NTFS volume.
@@ -79,6 +114,14 @@ Display the contents of a file in a subdirectory of an NTFS volume.
 .RS
 .sp
 .B ntfscat /dev/hda1 /winnt/system32/drivers/etc/hosts
+.RE
+.sp
+Display the contents of the $INDEX_ROOT attribute of the root directory (inode
+5).
+.RS
+.sp
+.B ntfscat /dev/hda1 \-a INDEX_ROOT \-i 5 | hexdump \-C
+.RE
 .SH BUGS
 .B ntfscat
 was written in a short time, to get something "out there".  It needs a lot more work.

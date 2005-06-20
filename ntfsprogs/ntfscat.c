@@ -1,8 +1,8 @@
 /**
  * ntfscat - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Richard Russon
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Richard Russon
+ * Copyright (c) 2003      Anton Altaparmakov
  *
  * This utility will concatenate files and print on the standard output.
  *
@@ -70,7 +70,7 @@ static void version (void)
 static void usage (void)
 {
 	Printf ("\nUsage: %s [options] device [file]\n\n"
-		"    -a, --attribute num   Display this attribute\n"
+		"    -a, --attribute desc  Display this attribute (name or number)\n"
 		"    -i, --inode num       Display this inode\n\n"
 		"    -f  --force           Use less caution\n"
 		"    -h  --help            Print this help\n"
@@ -82,6 +82,60 @@ static void usage (void)
 		//"    -r  --raw             Display the compressed or encrypted file",
 		EXEC_NAME);
 	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
+}
+
+/**
+ * parse_attribute - Read an attribute name, or number
+ * @value:   String to be parsed
+ * @attr:    Resulting attribute id (on success)
+ *
+ * Read a string representing an attribute.  It may be a decimal, octal or
+ * hexadecimal number, or the attribute name in full.  The leading $ sign is
+ * optional.
+ *
+ * Return:  1  Success, a valid attribute name or number
+ *	    0  Error, not an attribute name or number
+ */
+static int parse_attribute (const char *value, ATTR_TYPES *attr)
+{
+	static const char *attr_name[] = {
+		"$STANDARD_INFORMATION",
+		"$ATTRIBUTE_LIST",
+		"$FILE_NAME",
+		"$OBJECT_ID",
+		"$SECURITY_DESCRIPTOR",
+		"$VOLUME_NAME",
+		"$VOLUME_INFORMATION",
+		"$DATA",
+		"$INDEX_ROOT",
+		"$INDEX_ALLOCATION",
+		"$BITMAP",
+		"$REPARSE_POINT",
+		"$EA_INFORMATION",
+		"$EA",
+		"$PROPERTY_SET",
+		"$LOGGED_UTILITY_STREAM",
+		NULL
+	};
+
+	int i;
+	long num;
+
+	for (i = 0; attr_name[i]; i++) {
+		if ((strcmp (value, attr_name[i]) == 0) ||
+		    (strcmp (value, attr_name[i]+1) == 0)) {
+			*attr = (ATTR_TYPES) ((i+1)*16);
+			return 1;
+		}
+	}
+
+	num = strtol (value, NULL, 0);
+	if ((num > 0) && (num < 257)) {
+		*attr = (ATTR_TYPES) num;
+		return 1;
+	}
+
+	return 0;
 }
 
 /**
@@ -113,7 +167,7 @@ static int parse_options (int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
-	s64 attr;
+	ATTR_TYPES attr = AT_UNUSED;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -133,16 +187,16 @@ static int parse_options (int argc, char **argv)
 			}
 			break;
 		case 'a':
-			if (opts.attr != (ATTR_TYPES)-1)
+			if (opts.attr != (ATTR_TYPES)-1) {
 				Eprintf("You must specify exactly one attribute.\n");
-			else if (utils_parse_size(optarg, &attr, FALSE)) {
-				opts.attr = (ATTR_TYPES)attr;
+			} else if (parse_attribute (optarg, &attr) > 0) {
+				opts.attr = attr;
 				break;
-			} else
-				Eprintf("Couldn't parse attribute number.\n");
+			} else {
+				Eprintf("Couldn't parse attribute.\n");
+			}
 			err++;
 			break;
-
 		case 'f':
 			opts.force++;
 			break;
@@ -208,18 +262,41 @@ static int parse_options (int argc, char **argv)
 }
 
 /**
+ * index_get_size - Find the INDX block size from the index root
+ * @inode:  Inode of the directory to be checked
+ *
+ * Find the size of a directory's INDX block from the INDEX_ROOT attribute.
+ *
+ * Return:  n  Success, the INDX blocks are n bytes in size
+ *	    0  Error, not a directory
+ */
+static int index_get_size (ntfs_inode *inode)
+{
+	ATTR_RECORD *attr90;
+	INDEX_ROOT *iroot;
+
+	attr90 = find_first_attribute (AT_INDEX_ROOT, inode->mrec);
+	if (!attr90)
+		return 0;	// not a directory
+
+	iroot = (INDEX_ROOT*)((u8*)attr90 + le16_to_cpu(attr90->value_offset));
+
+	return iroot->index_block_size;
+}
+
+/**
  * cat
  */
-static int cat (ntfs_volume *vol __attribute__((unused)), ntfs_inode *inode,
-		ATTR_TYPES type, ntfschar *name __attribute__((unused)),
+static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
+		ntfschar *name __attribute__((unused)),
 		int namelen __attribute__((unused)))
 {
-	/* increase 1024 only if you fix partial writes below */
-	const int bufsize = 1024;
+	const int bufsize = 4096;
 	char *buffer;
 	ntfs_attr *attr;
 	s64 bytes_read, written;
 	s64 offset;
+	u32 block_size;
 
 	buffer = malloc (bufsize);
 	if (!buffer)
@@ -227,14 +304,28 @@ static int cat (ntfs_volume *vol __attribute__((unused)), ntfs_inode *inode,
 
 	attr = ntfs_attr_open (inode, type, NULL, 0);
 	if (!attr) {
-		Eprintf ("Cannot cat a directory.\n");
+		Eprintf ("Cannot find attribute type 0x%lx.\n", (long) type);
 		free (buffer);
 		return 1;
 	}
 
+	if ((inode->mft_no < 2) && (attr->type == AT_DATA))
+		block_size = vol->mft_record_size;
+	else if (attr->type == AT_INDEX_ALLOCATION)
+		block_size = index_get_size (inode);
+	else
+		block_size = 0;
+
 	offset = 0;
 	for (;;) {
-		bytes_read = ntfs_attr_pread (attr, offset, bufsize, buffer);
+		if (block_size > 0) {
+			// These types have fixup
+			bytes_read = ntfs_attr_mst_pread(attr, offset, 1, block_size, buffer);
+			bytes_read *= block_size;
+		} else {
+			bytes_read = ntfs_attr_pread (attr, offset, bufsize, buffer);
+		}
+		//fprintf (stderr, "read %lld bytes\n", bytes_read);
 		if (bytes_read == -1) {
 			perror ("ERROR: Couldn't read file");
 			break;
@@ -275,8 +366,6 @@ int main (int argc, char *argv[])
 
 	utils_set_locale();
 
-	//XXX quieten errors, temporarily
-
 	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
 		perror("ERROR: couldn't mount volume");
@@ -301,12 +390,8 @@ int main (int argc, char *argv[])
 
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);
-#if 0
-	if (result)
-		Printf ("failed\n");
-	else
-		Printf ("success\n");
-#endif
+
 	return result;
 }
+
 
