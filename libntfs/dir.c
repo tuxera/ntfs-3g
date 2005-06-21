@@ -1,7 +1,7 @@
 /*
  * dir.c - Directory handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -111,7 +111,8 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	index_block_size = le32_to_cpu(ir->index_block_size);
 	if (index_block_size < NTFS_BLOCK_SIZE ||
 			index_block_size & (index_block_size - 1)) {
-		Dprintf("Index block size %u is invalid.\n", index_block_size);
+		Dprintf("Index block size %u is invalid.\n",
+				(unsigned)index_block_size);
 		goto put_err_out;
 	}
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
@@ -286,9 +287,9 @@ descend_into_child_node:
 		Dprintf("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
 				"has a size (%u) differing from the directory "
 				"specified size (%u).\n", (long long)vcn,
-				(unsigned long long)dir_ni->mft_no,
+				(unsigned long long)dir_ni->mft_no, (unsigned)
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				index_block_size);
+				(unsigned)index_block_size);
 		errno = EIO;
 		goto close_err_out;
 	}
@@ -806,7 +807,8 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	index_block_size = le32_to_cpu(ir->index_block_size);
 	if (index_block_size < NTFS_BLOCK_SIZE ||
 			index_block_size & (index_block_size - 1)) {
-		Dprintf("Index block size %u is invalid.\n", index_block_size);
+		Dprintf("Index block size %u is invalid.\n",
+				(unsigned)index_block_size);
 		goto dir_err_out;
 	}
 	index_block_size_bits = ffs(index_block_size) - 1;
@@ -963,9 +965,9 @@ find_next_index_buffer:
 				"has a size (%u) differing from the directory "
 				"specified size (%u).\n",
 				(long long)ia_start >> index_vcn_size_bits,
-				(unsigned long long)dir_ni->mft_no,
+				(unsigned long long)dir_ni->mft_no, (unsigned)
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				index_block_size);
+				(unsigned)index_block_size);
 		goto dir_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);

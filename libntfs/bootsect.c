@@ -1,7 +1,7 @@
 /*
  * bootsect.c - Boot sector handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -213,7 +213,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	 * illegal, thus signed char is actually ok!
 	 */
 	c = bs->clusters_per_mft_record;
-	Dprintf("ClusterSize = 0x%x\n", vol->cluster_size);
+	Dprintf("ClusterSize = 0x%x\n", (unsigned)vol->cluster_size);
 	Dprintf("ClusterSizeBits = %u\n", vol->cluster_size_bits);
 	Dprintf("ClustersPerMftRecord = 0x%x\n", c);
 	/*
@@ -233,7 +233,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 		return -1;
 	}
 	vol->mft_record_size_bits = ffs(vol->mft_record_size) - 1;
-	Dprintf("MftRecordSize = 0x%x\n", vol->mft_record_size);
+	Dprintf("MftRecordSize = 0x%x\n", (unsigned)vol->mft_record_size);
 	Dprintf("MftRecordSizeBits = %u\n", vol->mft_record_size_bits);
 	/*
 	 * Work out the size of the MFT mirror in number of mft records. If the

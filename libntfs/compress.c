@@ -2,7 +2,7 @@
  * compress.c - Compressed attribute handling code.  Part of the Linux-NTFS
  *		project.
  *
- * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -84,7 +84,7 @@ static int ntfs_decompress(u8 *dest, const u32 dest_size,
 	u8 tag;			/* Current tag. */
 	int token;		/* Loop counter for the eight tokens in tag. */
 
-	Dprintf("Entering, cb_size = 0x%x.\n", cb_size);
+	Dprintf("Entering, cb_size = 0x%x.\n", (unsigned)cb_size);
 do_next_sb:
 	Dprintf("Beginning sub-block at offset = 0x%x in the cb.\n",
 			cb - cb_start);

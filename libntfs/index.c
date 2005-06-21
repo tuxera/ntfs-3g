@@ -1,7 +1,7 @@
 /*
  * index.c - NTFS index handling.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -172,7 +172,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	cr = ir->collation_rule;
 	if (!ntfs_is_collation_rule_supported(cr)) {
 		ntfs_error(sb, "Index uses unsupported collation rule 0x%x.  "
-				"Aborting lookup.", le32_to_cpu(cr));
+				"Aborting lookup.", (unsigned)le32_to_cpu(cr));
 		err = EOPNOTSUPP;
 		goto err_out;
 	}
@@ -295,9 +295,9 @@ descend_into_child_node:
 				"a size (%u) differing from the index "
 				"specified size (%u).  Inode is corrupt or "
 				"driver bug.", (unsigned long long)vcn,
-				ni->mft_no,
+				ni->mft_no, (unsigned)
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
-				ictx->block_size);
+				(unsigned)ictx->block_size);
 		goto err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);

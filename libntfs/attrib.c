@@ -4033,8 +4033,9 @@ retry:
 		 */
 		if (finished_build) {
 			Dprintf("%s(): Mark attr 0x%x for delete in inode "
-				"0x%llx.\n", __FUNCTION__, le32_to_cpu(a->type),
-				ctx->ntfs_ino->mft_no);
+					"0x%llx.\n", __FUNCTION__,
+					(unsigned)le32_to_cpu(a->type),
+					ctx->ntfs_ino->mft_no);
 			a->highest_vcn = cpu_to_sle64(NTFS_VCN_DELETE_MARK);
 			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			continue;

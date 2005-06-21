@@ -1,7 +1,7 @@
 /*
  * runlist.c - Run list handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  * Copyright (c) 2004 Yura Pakhuchiy
  *
@@ -721,7 +721,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	u8 b;			/* Current byte offset in buf. */
 
 	Dprintf("%s(): Entering for attr 0x%x.\n", __FUNCTION__,
-			le32_to_cpu(attr->type));
+			(unsigned)le32_to_cpu(attr->type));
 	/* Make sure attr exists and is non-resident. */
 	if (!attr || !attr->non_resident ||
 			sle64_to_cpu(attr->lowest_vcn) < (VCN)0) {
