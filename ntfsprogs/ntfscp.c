@@ -54,7 +54,7 @@ struct options {
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
-static int caught_sigint = 0;
+static int caught_terminate = 0;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
@@ -235,17 +235,18 @@ static int parse_options (int argc, char **argv)
 }
 
 /**
- * sigint_handler - Handle SIGINT: abort write, sync and exit.
+ * signal_handler - Handle SIGINT and SIGTERM: abort write, sync and exit.
  */
-static void sigint_handler(int arg __attribute__((unused)))
+static void signal_handler(int arg)
 {
-	caught_sigint++;
-	if (caught_sigint > 3) {
-		Eprintf("SIGTERM received more than 3 times. "
+	caught_terminate++;
+	if (caught_terminate > 3) {
+		Eprintf("SIGTERM or SIGINT received more than 3 times. "
 				"Exit immediately.\n");
 		exit(2);
 	} else
-		Eprintf("SIGTERM received. Aborting write.\n");
+		Eprintf("%s received. Aborting write.\n",
+				(arg == SIGINT) ? "SIGINT" : "SIGTERM");
 }
 
 /**
@@ -277,8 +278,13 @@ int main (int argc, char *argv[])
 	utils_set_locale();
 
 	/* Set SIGINT handler. */
-	if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+	if (signal(SIGINT, signal_handler) == SIG_ERR) {
 		perror("Failed to set SIGINT handler");
+		return 1;
+	}
+	/* Set SIGTERM handler. */
+	if (signal(SIGTERM, signal_handler) == SIG_ERR) {
+		perror("Failed to set SIGTERM handler");
 		return 1;
 	}
 
@@ -401,7 +407,7 @@ int main (int argc, char *argv[])
 
 	Vprintf("Starting write.\n");
 	offset = 0;
-	while (!feof(in) && !caught_sigint) {
+	while (!feof(in) && !caught_terminate) {
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
 		if (!br) {
 			if (!feof(in)) perror("ERROR: fread failed");
