@@ -1,7 +1,7 @@
 /**
  * ntfsdump_logfile - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  *
  * This utility will interpret the contents of the journal ($LogFile) of an
  * NTFS partition and display the results on stdout.  Errors will be output to
@@ -387,8 +387,8 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 			le16_to_cpu(ra->log_page_data_offset),
 			le16_to_cpu(ra->log_page_data_offset));
 	printf("restart_log_open_count = %u (0x%x)\n",
-			le32_to_cpu(ra->restart_log_open_count),
-			le32_to_cpu(ra->restart_log_open_count));
+			(unsigned)le32_to_cpu(ra->restart_log_open_count),
+			(unsigned)le32_to_cpu(ra->restart_log_open_count));
 	lcr = (LOG_CLIENT_RECORD*)((u8*)ra +
 			le16_to_cpu(ra->client_array_offset));
 	for (client = 0; client < le16_to_cpu(ra->log_clients); client++) {

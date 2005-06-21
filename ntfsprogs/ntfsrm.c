@@ -2,6 +2,7 @@
  * ntfsrm - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004 Richard Russon
+ * Copyright (c) 2005 Anton Altaparmakov
  *
  * This utility will delete files from an NTFS volume.
  *
@@ -4276,7 +4277,8 @@ static int ntfs_index_dump_alloc (ntfs_attr *attr, VCN vcn, int indent)
 			break;
 	}
 	printf ("%.*s", indent, space_line);
-	printf ("fill = %u/%u\n", block->index.index_length, block->index.allocated_size);
+	printf ("fill = %u/%u\n", (unsigned)block->index.index_length,
+			(unsigned)block->index.allocated_size);
 	return 0;
 }
 
