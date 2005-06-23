@@ -1,8 +1,7 @@
 /**
  * ntfsrm - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Richard Russon
- * Copyright (c) 2005 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This utility will delete files from an NTFS volume.
  *
@@ -21,7 +20,6 @@
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
 
 #include <stdio.h>
 #include <getopt.h>
@@ -44,7 +42,7 @@ GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
-//#define RM_WRITE 1
+#define RM_WRITE 1
 
 static int ntfs_inode_close2 (ntfs_inode *ni);
 
@@ -252,6 +250,29 @@ static void ntfs_dt_print (struct ntfs_dt *dt, int indent)
 }
 
 /**
+ * ntfs_binary_print
+ */
+static void ntfs_binary_print (u8 num, BOOL backwards, BOOL colour)
+{
+	int i;
+
+	if (backwards)
+		for (i = 1; i < 129; i<<=1) {
+			if (colour)
+				printf ("%s", (num&i) ? "[31m1[0m" : "0");
+			else
+				printf ("%s", (num&i) ? "1" : "0");
+		}
+	else
+		for (i = 128; i > 0; i>>=1) {
+			if (colour)
+				printf ("%s", (num&i) ? "[31m1[0m" : "0");
+			else
+				printf ("%s", (num&i) ? "1" : "0");
+		}
+}
+
+/**
  * ntfsinfo_time_to_str
  */
 static const char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
@@ -271,6 +292,7 @@ static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
 {
 	int i;
 	u32 cs;
+	u32 ws; // write size
 
 	if (!bmp)
 		return 0;
@@ -283,24 +305,27 @@ static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
 
 	cs = bmp->vol->cluster_size;
 
-	printf ("commit bmp 0x%02X (%sresident)\n", bmp->attr->type, bmp->attr->rl ? "non-" : "");
+	printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
 
-	if (bmp->attr->rl) {
+	if (NAttrNonResident (bmp->attr)) {
 		// non-resident
 		for (i = 0; i < bmp->count; i++) {
 #ifdef RM_WRITE
-			ntfs_attr_pwrite (bmp->attr, bmp->data_vcn[i] * cs, cs, bmp->data[i]); // XXX retval
-#else
-			printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, bmp->data_vcn[i]);
+			if (((bmp->data_vcn[i]+1) * cs) < bmp->attr->data_size)
+				ws = cs;
+			else
+				ws = bmp->attr->data_size & (cs - 1);
+			//printf ("writing %d bytes\n", ws);
+			ntfs_attr_pwrite (bmp->attr, bmp->data_vcn[i] * cs, ws, bmp->data[i]); // XXX retval
 #endif
+			printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, bmp->data_vcn[i]);
 		}
 	} else {
 		// resident
 #ifdef RM_WRITE
 		ntfs_attr_pwrite (bmp->attr, bmp->data_vcn[0], bmp->attr->data_size, bmp->data[0]); // XXX retval
-#else
-		printf (RED "\tntfs_attr_pwrite resident\n" END);
 #endif
+		printf (RED "\tntfs_attr_pwrite resident (%lld)\n" END, bmp->attr->data_size);
 	}
 
 	for (i = 0; i < bmp->count; i++)
@@ -452,7 +477,8 @@ static u8 * ntfs_bmp_get_data (struct ntfs_bmp *bmp, VCN vcn)
 		return NULL;
 
 	//printf ("loading from bitmap cluster %lld\n", vcn);
-	if (ntfs_attr_pread (bmp->attr, vcn, cs, buffer) < 0) {
+	//printf ("loading from bitmap byte    %lld\n", vcn<<cb);
+	if (ntfs_attr_pread (bmp->attr, vcn<<cb, cs, buffer) < 0) {
 		free (buffer);
 		return NULL;
 	}
@@ -466,98 +492,66 @@ static u8 * ntfs_bmp_get_data (struct ntfs_bmp *bmp, VCN vcn)
  */
 static int ntfs_bmp_set_range (struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 {
+	// shouldn't all the vcns be lcns?
 	s64 i;
 	u8 *buffer;
-	VCN begin;
-	VCN end;
-	int start;
-	int finish;
-	u8 sta_part = 0;
-	u8 fin_part = 0;
-	int cs;
-	int cb;
-	VCN a;
-	VCN b;
+	int clust_size;
+
+	int block_start, block_finish;	// rename to c[sf]  (rename to clust_)
+	int vcn_start, vcn_finish;	// rename to v[sf]
+	int byte_start, byte_finish;	// rename to b[sf]
+	u8 mask_start, mask_finish;	// rename to m[sf]
 
 	if (!bmp)
 		return -1;
 
-	cs = bmp->vol->cluster_size;
-	cb = bmp->vol->cluster_size_bits;
+	if (value)
+		value = 0xFF;
 
-	//printf ("\n");
-	//printf ("set range: %lld - %lld (%d)\n", vcn, vcn+length-1, cs<<3);
+	clust_size = bmp->vol->cluster_size;
 
-	a = ROUND_DOWN (vcn, cs<<3);
-	b = ROUND_UP (vcn + length -1, cs<<3);
-	//printf ("vcn   = %lld\n", vcn);
-	//printf ("a     = %lld\n", a >> (cb+3));
-	//printf ("b     = %lld\n", b >> (cb+3));
-	//printf ("count = %lld\n", (b-a)/(cs<<3));
+	vcn_start  = vcn;
+	vcn_finish = vcn + length - 1;
 
-	for (i = a; i < b; i += (cs<<3)) {
-		buffer = ntfs_bmp_get_data (bmp, i);
+	for (i = vcn_start; i < ROUND_UP (vcn_finish, clust_size<<3); i += (clust_size<<3)) {
+		buffer = ntfs_bmp_get_data (bmp, ROUND_DOWN (i, clust_size<<3));
 		if (!buffer)
 			return -1;
 
-#if 0
-		memset (buffer, 0xFF, cs);
-		value = 0;
-		memset (buffer, 0x00, cs);
-		value = 1;
-#endif
-		//utils_dump_mem (buffer, 0, 32, DM_DEFAULTS);
-		//printf ("\n");
+		block_start  = ROUND_DOWN (i, clust_size<<3);
+		block_finish = block_start + (clust_size<<3) - 1;
 
-		begin = i;
-		end   = begin + (cs<<3) - 1;
-		//printf ("begin = %lld, vcn = %lld,%lld end = %lld\n", begin, vcn, vcn+length-1, end);
+		mask_start  = (0xFF << (vcn_start & 7));
+		mask_finish = (0xFF >> (7 - (vcn_finish & 7)));
 
-		if ((vcn > begin) && (vcn < end)) {
-			start = ((vcn+8) >> 3) & (cs-1);
-			sta_part = 0xff << (vcn&7);
+		if ((vcn_start >= block_start) && (vcn_start <= block_finish)) {
+			byte_start = (vcn_start - block_start) >> 3;
 		} else {
-			start = 0;
+			byte_start = 0;
+			mask_start = 0xFF;
 		}
 
-		if (((vcn+length-1) >= begin) && ((vcn+length-1) <= end)) {
-			finish = ((vcn+length-1) >> 3) & (cs-1);
-			fin_part = 0xff >> (7-((vcn+length-1)&7));
+		if ((vcn_finish >= block_start) && (vcn_finish <= block_finish)) {
+			byte_finish = (vcn_finish - block_start) >> 3;
 		} else {
-			finish = cs-1;
+			byte_finish = clust_size - 1;
+			mask_finish = 0xFF;
 		}
 
-#if 0
-		//printf ("\n");
-		printf ("%lld) ", i>>12);
-		if (start > 0) {
-			printf ("(%02x) ", sta_part);
-		} else {
-			printf ("     ");
+		if ((byte_finish - byte_start) > 1) {
+			memset (buffer+byte_start+1, value, byte_finish-byte_start-1);
+		} else if (byte_finish == byte_start) {
+			mask_start &= mask_finish;
+			mask_finish = value;
 		}
 
-		printf ("%d - %d", start, finish);
-
-		if (finish < (cs-1)) {
-			printf (" (%02x)\n", fin_part);
-		} else {
-			printf ("     \n");
-		}
-#endif
 		if (value) {
-			if (start != 0)
-				buffer[start-1] |= sta_part;
-			if ((finish - start) > 0)
-				memset (buffer+start, 0xff, finish-start);
-			buffer[finish] |= fin_part;
+			buffer[byte_start]  |= mask_start;
+			buffer[byte_finish] |= mask_finish;
 		} else {
-			if (start != 0)
-				buffer[start-1] &= ~sta_part;
-			if ((finish - start) > 0)
-				memset (buffer+start, 0x00, finish-start);
-			buffer[finish] &= ~fin_part;
+			buffer[byte_start]  &= (~mask_start);
+			buffer[byte_finish] &= (~mask_finish);
 		}
-		//utils_dump_mem (buffer, 0, 16, DM_DEFAULTS);
 	}
 
 	printf (GREEN "Modified: inode %lld, ", bmp->attr->ni->mft_no);
@@ -910,7 +904,7 @@ static BOOL ntfs_dt_alloc_children2 (struct ntfs_dt *dt, int count)
 
 	dt->children  = realloc (dt->children,  new * sizeof (*dt->children));
 	dt->sub_nodes = realloc (dt->sub_nodes, new * sizeof (*dt->sub_nodes));
-	dt->inodes    = realloc (dt->sub_nodes, new * sizeof (*dt->inodes));
+	dt->inodes    = realloc (dt->inodes,    new * sizeof (*dt->inodes));
 
 	// XXX wipe new space
 
@@ -1075,10 +1069,10 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 		}
 
 #ifdef RM_WRITE
-		ntfs_attr_pwrite (attr, dt->vcn * dt->dir->index_size, dt->dir->index_size, dt->data);
-#else
-		printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, dt->vcn);
+		//utils_dump_mem (dt->data, 0, 16, DM_DEFAULTS);
+		ntfs_attr_mst_pwrite(attr, dt->vcn * dt->dir->index_size, 1, dt->dir->index_size, dt->data); // XXX retval
 #endif
+		printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, dt->vcn);
 
 		dt->changed = FALSE;
 	}
@@ -1087,9 +1081,8 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 		if ((dt->inodes[i]) && (NInoDirty (dt->inodes[i]))) {
 #ifdef RM_WRITE
 			ntfs_inode_sync (dt->inodes[i]);
-#else
-			printf (RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
 #endif
+			printf (RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
 		}
 
 		if (ntfs_dt_commit (dt->sub_nodes[i]) < 0)
@@ -1200,6 +1193,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 		//printf ("%lld\n", ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data));
 		ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data);
 		//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
+		//printf ("\n");
 
 		ntfs_dt_count_root (dt);
 
@@ -1914,9 +1908,8 @@ static int ntfs_dir_commit (struct ntfs_dir *dir)
 	if (NInoDirty (dir->inode)) {
 #ifdef RM_WRITE
 		ntfs_inode_sync (dir->inode);
-#else
-		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
 #endif
+		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
 	}
 
 	if (ntfs_dt_commit (dir->index) < 0)
@@ -4277,8 +4270,7 @@ static int ntfs_index_dump_alloc (ntfs_attr *attr, VCN vcn, int indent)
 			break;
 	}
 	printf ("%.*s", indent, space_line);
-	printf ("fill = %u/%u\n", (unsigned)block->index.index_length,
-			(unsigned)block->index.allocated_size);
+	printf ("fill = %u/%u\n", (unsigned)block->index.index_length, (unsigned)block->index.allocated_size);
 	return 0;
 }
 
@@ -4543,7 +4535,8 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	//utils_dump_mem (par->data, 0, par->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
 
-	file = &par->children[par_num]->key.file_name; printf ("\tpar name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+	if (par)
+			file = &par->children[par_num]->key.file_name; printf ("\tpar name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
 
 	if (par == NULL) {
 		// unhook everything
@@ -4710,19 +4703,18 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 	ino = dt->inodes[dt_num];
 	dir = dt->dir;
 
-	bmp_mft = (struct ntfs_bmp *) vol->private_bmp1;
-	bmp_vol = (struct ntfs_bmp *) vol->private_bmp2;
+	bmp_mft = vol->private_bmp1;
+	bmp_vol = vol->private_bmp2;
 
-	utils_mftrec_mark_free5 (ino, bmp_mft, ie->indexed_file);
+	if (1) utils_mftrec_mark_free5 (ino, bmp_mft, ie->indexed_file);
 
-	utils_free_non_residents2 (ino, bmp_vol);
+	if (1) utils_free_non_residents2 (ino, bmp_vol);
 
-	ntfs_file_remove (vol, dt, dt_num);
+	if (1) ntfs_file_remove (vol, dt, dt_num); // remove name from index
 
-	ntfs_dir_truncate (vol, dir);
+	if (0) ntfs_dir_truncate (vol, dir);
 
-	//commit volume
-	utils_volume_commit (vol);
+	if (1) utils_volume_commit (vol);
 
 	if (0) utils_volume_rollback (vol);
 
@@ -4816,8 +4808,10 @@ int main (int argc, char *argv[])
 	if (0) result = ntfs_test_bmp (vol, inode);
 
 done:
-	ntfs_inode_close2 (inode);
-	ntfs_umount2 (vol, FALSE);
+	if (1) ntfs_inode_close2 (inode);
+	if (1) ntfs_umount2 (vol, FALSE);
+
+	if (0) ntfs_binary_print (0, FALSE, FALSE);
 
 	return result;
 }
