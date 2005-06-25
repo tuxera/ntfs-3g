@@ -54,7 +54,7 @@ struct options {
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
-static int caught_terminate = 0;
+volatile sig_atomic_t caught_terminate = 0;
 
 GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
@@ -237,16 +237,9 @@ static int parse_options (int argc, char **argv)
 /**
  * signal_handler - Handle SIGINT and SIGTERM: abort write, sync and exit.
  */
-static void signal_handler(int arg)
+static void signal_handler(int arg __attribute__((unused)))
 {
 	caught_terminate++;
-	if (caught_terminate > 3) {
-		Eprintf("SIGTERM or SIGINT received more than 3 times. "
-				"Exit immediately.\n");
-		exit(2);
-	} else
-		Eprintf("%s received. Aborting write.\n",
-				(arg == SIGINT) ? "SIGINT" : "SIGTERM");
 }
 
 /**
@@ -407,7 +400,11 @@ int main (int argc, char *argv[])
 
 	Vprintf("Starting write.\n");
 	offset = 0;
-	while (!feof(in) && !caught_terminate) {
+	while (!feof(in)) {
+		if (caught_terminate) {
+			printf("SIGTERM or SIGINT received. Aborting write.\n");
+			break;
+		}
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
 		if (!br) {
 			if (!feof(in)) perror("ERROR: fread failed");
