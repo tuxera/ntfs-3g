@@ -459,10 +459,10 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 }
 
 /**
- * ntfs_inode_sync_standard_information - update FILE_NAME attribute's
- * @ni:		ntfs inode to update FILE_NAME attribute's
+ * ntfs_inode_sync_file_name - update FILE_NAME attributes
+ * @ni:		ntfs inode to update FILE_NAME attributes
  *
- * Update all FILE_NAME attribute's for inode @ni in the index.
+ * Update all FILE_NAME attributes for inode @ni in the index.
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
