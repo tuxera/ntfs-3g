@@ -1,8 +1,9 @@
 .\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
 .\" Copyright (c) 2002-2003 Anton Altaparmakov. All Rights Reserved.
+.\" Copyright (c) 2005 Szabolcs Szakacsits. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "August 2003" "ntfsprogs version @VERSION@"
+.TH NTFSPROGS 8 "June 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsprogs \- several tools for doing neat things with NTFS partitions
 .SH OVERVIEW
@@ -23,16 +24,20 @@ available for free and come with full source code.
 .SS ntfsclone
 .PP
 .BR ntfsclone (8)
-: Efficiently create/restore an image of an NTFS partition.
+: Efficiently clone, create, restore or rescue an image of an NTFS partition.
 .SS ntfscluster
 .PP
 .BR ntfscluster (8)
 : Locate the owner of any given sector or cluster on an NTFS partition.
+.SS ntfscp
+.PP
+.BR ntfscp (8)
+: Overwrite file on an NTFS partition.
 .SS ntfsfix
 .PP
 .BR ntfsfix (8)
-: Clear the LogFile of a partition to make Windows perform a thorough
-check next time it boots.
+: Check and fix some common errors, clear the LogFile and make Windows 
+perform a thorough check next time it boots.
 .SS ntfsinfo
 .PP
 .BR ntfsinfo (8)
@@ -57,7 +62,7 @@ or directories within it.
 
 .SH AUTHORS
 .PP
-The tools have been written by Anton Altaparmakov, Richard Russon, Matthew Fanto, Szabolcs Szakacsits, and Lode Leroy.
+The tools have been written by Anton Altaparmakov, Richard Russon, Matthew Fanto, Szabolcs Szakacsits, Lode Leroy, Yuval Fledel and Yura Pakhuchiy.
 
 .SH AVAILABILITY
 The
