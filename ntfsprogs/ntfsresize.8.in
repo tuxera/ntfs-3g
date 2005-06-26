@@ -199,7 +199,8 @@ was involved in some way. This problem was often attributed to ntfsresize
 but in fact it's completely independent of NTFS thus ntfsresize. Moreover 
 ntfsresize never touches the partition table at all. By changing
 the 'Disk Access Mode' to LBA in the BIOS makes booting work 
-again, most of the time.
+again, most of the time. You can find more information about this issue
+in the Troubleshooting section of the below referred Ntfsresize FAQ.
 .SH AUTHOR
 .B Ntfsresize
 has been written by
@@ -223,7 +224,6 @@ http://linux-ntfs.sourceforge.net/ as source and precompiled binary.
 .B Ntfsresize
 related news, example of usage, troubleshooting, statically linked binary and 
 FAQ (frequently asked questions) is maintained at
-.br
 http://mlf.linux.rulez.org/mlf/ezaz/ntfsresize.html
 .SH SEE ALSO
 .BR fdisk (8),
