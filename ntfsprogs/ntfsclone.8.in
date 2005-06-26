@@ -7,7 +7,7 @@
 .\"
 .TH NTFSCLONE 8 "Jun 2005" "ntfsprogs version @VERSION@"
 .SH NAME
-ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
+ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
 .B ntfsclone
 [\fIOPTIONS\fR]
@@ -26,8 +26,8 @@ ntfsclone \- Efficiently clone, image or restore an NTFS filesystem
 .I SOURCE
 .SH DESCRIPTION
 .B ntfsclone
-will efficiently clone (copy, save, backup, restore) an NTFS filesystem to a 
-sparse file, image, device (partition) or standard output. 
+will efficiently clone (copy, save, backup, restore) or rescue an NTFS 
+filesystem to a sparse file, image, device (partition) or standard output. 
 It works at disk sector level and
 copies only the used data. Unused disk space becomes zero (cloning to 
 sparse file), encoded with control codes (saving in special image format),
