@@ -2087,6 +2087,7 @@ static ntfs_volume *mount_volume(void)
 		err_exit("Cluster size %u is too large!\n",
 			(unsigned int)vol->cluster_size);
 
+	printf("Device name        : %s\n", opt.volume);
 	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
