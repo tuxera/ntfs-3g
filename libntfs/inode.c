@@ -249,13 +249,19 @@ int ntfs_inode_close(ntfs_inode *ni)
 			memmove(tmp_nis + i, tmp_nis + i + 1,
 					(base_ni->nr_extents - i - 1) *
 					sizeof(ntfs_inode *));
-			base_ni->nr_extents--;
-			/* Resize the memory buffer. */
-			tmp_nis = realloc(tmp_nis, base_ni->nr_extents *
-					sizeof(ntfs_inode *));
-			/* Ignore realloc errors, they don't really matter. */
-			if (tmp_nis)
-				base_ni->extent_nis = tmp_nis;
+			/* 
+			 * ElectricFence is unhappy with realloc(x,0) as free(x)
+			 * thus we explicitely separate these two cases.
+			 */
+			if (--base_ni->nr_extents) {
+				/* Resize the memory buffer. */
+				tmp_nis = realloc(tmp_nis, base_ni->nr_extents *
+						  sizeof(ntfs_inode *));
+				/* Ignore errors, they don't really matter. */
+				if (tmp_nis)
+					base_ni->extent_nis = tmp_nis;
+			} else if(tmp_nis)
+				free(tmp_nis);
 			/* Allow for error checking. */
 			i = -1;
 			break;
