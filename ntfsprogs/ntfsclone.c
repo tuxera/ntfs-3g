@@ -1217,15 +1217,20 @@ static void fsync_clone(int fd)
 
 static void set_filesize(s64 filesize)
 {
+	long fs_type = 0; /* Unknown filesystem type */
+
 	if (fstatfs(fd_out, &opt.stfs) == -1)
 		Printf("WARNING: Couldn't get filesystem type: "
 		       "%s\n", strerror(errno));
-	else if (opt.stfs.f_type == 0x52654973)
+	else 
+		fs_type = opt.stfs.f_type;
+		
+	if (fs_type == 0x52654973)
 		Printf("WARNING: You're using ReiserFS, it has very poor "
 		       "performance creating\nlarge sparse files. The next "
 		       "operation might take a very long time!\n"
 		       "Creating sparse output file ...\n");
-	else if (opt.stfs.f_type == 0x517b)
+	else if (fs_type == 0x517b)
 		Printf("WARNING: You're using SMBFS and if the remote share "
 		       "isn't Samba but a Windows\ncomputer then the clone "
 		       "operation will be very inefficient and may fail!\n");
@@ -1233,15 +1238,24 @@ static void set_filesize(s64 filesize)
 	if (ftruncate(fd_out, filesize) == -1) {
 		int err = errno;
 		perr_printf("ftruncate failed for file '%s'", opt.output);
+		if (fs_type)
+			Printf("Destination filesystem type is 0x%lx.\n",
+			       (unsigned long)fs_type);
 		if (err == E2BIG) {
 			Printf("Your system or the destination filesystem "
 			       "doesn't support large files.\n");
-			if (opt.stfs.f_type == 0x517b) {
+			if (fs_type == 0x517b) {
 				Printf("SMBFS needs minimum Linux kernel "
 				       "version 2.4.25 and\n the 'lfs' option"
 				       "\nfor smbmount to have large "
 				       "file support.\n");
 			}
+		} else if (err == EPERM) {
+			Printf("Apparently the destination filesystem doesn't "
+			       "support sparse files.\nYou can overcome this "
+			       "by using the more efficient --save-image "
+			       "option\nof ntfsclone. Use the --restore-image "
+			       "option to restore the image.\n");
 		}
 		exit(1);
 	}
