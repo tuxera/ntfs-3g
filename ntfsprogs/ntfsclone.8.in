@@ -211,26 +211,25 @@ The exit code is 0 on success, non-zero otherwise.
 Save an NTFS to a file in the special image format
 .RS
 .sp
-.B ntfsclone \-\-save\-image \-\-output ntfs-backup.img /dev/hda1
+.B ntfsclone \-\-save\-image \-\-output backup.img /dev/hda1
 .sp
 .RE
 Restore an NTFS from a special image file to its original partition
 .RS
 .sp
-.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 ntfs-backup.img 
+.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 backup.img 
 .sp
 .RE
-Save an NTFS into a compressed image. Note, gzip is faster usually 
-at least 2-4 times than bzip2 but it creates also bigger compressed files.
+Save an NTFS into a compressed image.
 .RS
 .sp
-.B ntfsclone \-\-save-image \-o \- /dev/hda1 | bzip2 \-c > ntfs.img.bz2
+.B ntfsclone \-\-save-image \-o \- /dev/hda1 | gzip \-c > backup.img.gz
 .sp
 .RE
 Restore an NTFS volume from a compressed image file
 .RS
 .sp
-.B bunzip2 \-c ntfs.img.bz2 | \\\\
+.B gunzip \-c backup.img.gz | \\\\
 .br
 .B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
 .sp
@@ -240,13 +239,13 @@ Backup an NTFS volume to a remote host, using ssh.
 .sp
 .B ntfsclone \-\-save-image \-\-output \- /dev/hda1 | \\\\
 .br
-.B gzip \-c | ssh host 'cat > ntfs.img.gz'
+.B gzip \-c | ssh host 'cat > backup.img.gz'
 .sp
 .RE
 Restore an NTFS volume from a remote host via ssh.
 .RS
 .sp
-.B ssh host 'cat ntfs.img.gz' | gunzip -c | \\\\
+.B ssh host 'cat backup.img.gz' | gunzip -c | \\\\
 .br
 .B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
 .sp
@@ -254,7 +253,7 @@ Restore an NTFS volume from a remote host via ssh.
 Stream an image from a web server and restore it to a partition
 .RS
 .sp
-.B wget \-qO \- http://server/ntfs.img | \\\\
+.B wget \-qO \- http://server/backup.img | \\\\
 .br
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
