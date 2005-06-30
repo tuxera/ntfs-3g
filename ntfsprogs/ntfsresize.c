@@ -1726,60 +1726,12 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 }
 
 /**
- * shrink_bitmap_data_attr
+ * realloc_bitmap_data_attr
  *
- * Shrink the metadata file $Bitmap.  It must be large enough for one bit per
- * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
+ * Reallocate the metadata file $Bitmap.  It must be large enough for one bit
+ * per cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-static void shrink_bitmap_data_attr(struct bitmap *bm,
-				    runlist **rlist,
-				    s64 nr_bm_clusters,
-				    s64 new_size)
-{
-	runlist *rl = *rlist;
-	int i, j;
-	s64 k;
-	int trunc_at = -1;	/* FIXME: -1 means unset */
-
-	/* Unallocate truncated clusters in $Bitmap */
-	for (i = 0; rl[i].length; i++) {
-		if (rl[i].vcn + rl[i].length <= nr_bm_clusters)
-			continue;
-		if (trunc_at == -1)
-			trunc_at = i;
-		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
-			continue;
-		for (j = 0; j < rl[i].length; j++) {
-			if (rl[i].vcn + j < nr_bm_clusters)
-				continue;
-
-			k = rl[i].lcn + j;
-			if (k < new_size) {
-				ntfs_bit_set(bm->bm, k, 0);
-				Dprintf("Unallocate cluster: "
-				       "%lld (%llx)\n", k, k);
-			}
-		}
-	}
-
-	if (trunc_at != -1) {
-		/* NOTE: 'i' always > 0 */
-		i = nr_bm_clusters - rl[trunc_at].vcn;
-		rl[trunc_at].length = i;
-		rl_set(rl + trunc_at + 1, nr_bm_clusters, -1LL, 0LL);
-
-		Dprintf("Runlist truncated at index %d, "
-				"new cluster length %d\n", trunc_at, i);
-	}
-}
-
-/**
- * enlarge_bitmap_data_attr
- *
- * Enlarge the metadata file $Bitmap.  It must be large enough for one bit per
- * cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
- */
-static void enlarge_bitmap_data_attr(ntfs_volume *vol,
+static void realloc_bitmap_data_attr(ntfs_volume *vol,
 				     struct bitmap *bm,
 				     runlist **rl,
 				     s64 nr_bm_clusters,
@@ -1828,14 +1780,8 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
 
-	/* NOTE: shrink could use enlarge_bitmap_data_attr() also. Advantages:
-	   less code, better code coverage. "Drawback": could be relocated */
-	if (resize->shrink)
-		shrink_bitmap_data_attr(&resize->lcn_bitmap, &rl,
-					nr_bm_clusters, nr_clusters);
-	else
-		enlarge_bitmap_data_attr(vol, &resize->lcn_bitmap, &rl,
-					 nr_bm_clusters, nr_clusters);
+	realloc_bitmap_data_attr(vol, &resize->lcn_bitmap, &rl, nr_bm_clusters,
+				 nr_clusters);
 
 	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
