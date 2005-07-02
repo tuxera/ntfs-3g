@@ -172,6 +172,8 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	entry_offset = ((u8 *)ale - ni->attr_list);
 	/* Set pointer to new entry. */
 	ale = (ATTR_LIST_ENTRY *)(new_al + entry_offset);
+	/* Zero it to fix valgrid warning. */
+	memset(ale, 0, entry_len);
 	/* Form new entry. */
 	ale->type = attr->type;
 	ale->length = cpu_to_le16(entry_len);
