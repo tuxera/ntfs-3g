@@ -1,3 +1,7 @@
+xx/xx/xxxx - 1.10.1-WIP
+
+	- Fix memory managament error in ntfs_inode_close.  (Yura)
+
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 
 	- Add start_vcn parameter to ntfs_get_size_for_mapping_pairs() and

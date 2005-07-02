@@ -255,7 +255,8 @@ int ntfs_inode_close(ntfs_inode *ni)
 			 */
 			if (--base_ni->nr_extents) {
 				/* Resize the memory buffer. */
-				tmp_nis = realloc(tmp_nis, base_ni->nr_extents *
+				tmp_nis = realloc(tmp_nis, ((base_ni->
+						  nr_extents + 3) & ~3) *
 						  sizeof(ntfs_inode *));
 				/* Ignore errors, they don't really matter. */
 				if (tmp_nis)
