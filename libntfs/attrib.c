@@ -878,7 +878,7 @@ rl_err_out:
  * appropriately to the return code of ntfs_pwrite(), or to EINVAL in case of
  * invalid arguments.
  */
-s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
+s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 {
 	s64 written, to_write, ofs, total, old_initialized_size, old_data_size;
 	ntfs_volume *vol;
@@ -1073,7 +1073,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			written = to_write / sizeof(unsigned long);
 			eo = 0;
 			for (t = 0; t < written; t++) {
-				if (((unsigned long*)b)[t]) {
+				if (((const unsigned long*)b)[t]) {
 					eo = 1;
 					break;
 				}
@@ -1081,9 +1081,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			cnt = to_write & (sizeof(unsigned long) - 1);
 			if (cnt && !eo) {
 				int i;
-				u8 *b2;
+				const u8 *b2;
 
-				b2 = (u8*)b + (to_write &
+				b2 = (const u8*)b + (to_write &
 						~(sizeof(unsigned long) - 1));
 				for (i = 0; i < cnt; i++) {
 					if (b2[i]) {
@@ -1099,7 +1099,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, void *b)
 				 */
 				total += to_write;
 				count -= to_write;
-				b = (u8*)b + to_write;
+				b = (const u8*)b + to_write;
 				continue;
 			}
 			/* The buffer is non zero, instantiate the hole. */
@@ -1250,7 +1250,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
-			b = (u8*)b + written;
+			b = (const u8*)b + written;
 			continue;
 		}
 		/* If the syscall was interrupted, try again. */

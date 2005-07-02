@@ -267,7 +267,7 @@ extern void ntfs_attr_close(ntfs_attr *na);
 extern s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count,
 		void *b);
 extern s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count,
-		void *b);
+		const void *b);
 
 extern s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos,
 		const s64 bk_cnt, const u32 bk_size, void *dst);
