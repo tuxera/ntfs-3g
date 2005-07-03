@@ -640,11 +640,12 @@ static char *parse_options(char *options, char **device)
 	
 	*device = NULL;
 	/*
-	 * +10 for different in length of "fsname=... (ntfs)" and "dev=...".
+	 * +8 for different in length of "fsname=ntfs#..." and "dev=...".
+	 * +1 for comma
 	 * +1 for null-terminator.
-	 * Total: +11
+	 * Total: +10
 	 */
-	ret = malloc(strlen(def_opts) + strlen(options) + 11);
+	ret = malloc(strlen(def_opts) + strlen(options) + 10);
 	if (!ret) {
 		perror("malloc failed");
 		return NULL;
@@ -701,12 +702,13 @@ static char *parse_options(char *options, char **device)
 			strcat(ret, ",");
 		}
 	}
+	if (!*device)
+		goto err_exit;
 	if (!no_def_opts) {
 		strcat(ret, def_opts);
 		if (!no_fsname) {
-			strcat(ret, "fsname=");
+			strcat(ret, "fsname=ntfs#");
 			strcat(ret, *device);
-			strcat(ret, " (ntfs)");
 		}
 	}
 exit:
@@ -729,7 +731,7 @@ static void usage(void)
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
 		"fsname\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
 		"uid\n\tgid\n\tshow_system_files\n\tdev\n\n");
-	Eprintf("Default options are: \"%sfsname=device (ntfs)\".\n", def_opts);
+	Eprintf("Default options are: \"%sfsname=ntfs#device\".\n", def_opts);
 }
 
 int main(int argc, char *argv[])
@@ -760,14 +762,14 @@ int main(int argc, char *argv[])
 	ntfs_fuse_init();
 	/* Parse options. */
 	parsed_options = parse_options(options, &device);
-	if (!parsed_options) {
-		ntfs_fuse_destroy();
-		return 6;
-	}
 	if (!device) {
 		Eprintf("dev option is mandatory.\n");
 		ntfs_fuse_destroy();
 		return 5;
+	}
+	if (!parsed_options) {
+		ntfs_fuse_destroy();
+		return 6;
 	}
 
 	/* Create filesystem. */
