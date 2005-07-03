@@ -8,6 +8,8 @@ xx/xx/xxxx - 1.10.1-WIP
 	- Fix memory managament error in ntfs_inode_close.  (Yura)
 	- Add new utility - ntfsmount. It's a FUSE module that
 	  rely on libntfs.  (Yura)
+	- ntfsresize: support bad clusters list ($BadClus:$Bad), a.k.a. disks
+	  having bad sectors if the new --bad-sectors option is used.  (Szaka)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 

@@ -75,12 +75,12 @@ High priority
     bad sectors, etc) 
 
 Medium priority 
-  - support disks having bad sectors
   - cope with the rare, unsupported cases, see man ntfsresize 'KNOWN ISSUES'
   - save $Bitmap if it was modified and an error occures (e.g. bad sector).
   - handle signals (^C, etc)
 
 Low priority
+  - fully support disks with bad sectors (attrlist attr, unknown bad sectors)
   - move volume start
 
 

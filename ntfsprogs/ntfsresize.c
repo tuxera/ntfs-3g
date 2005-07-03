@@ -54,9 +54,9 @@
 static const char *EXEC_NAME = "ntfsresize";
 
 static const char *resize_warning_msg =
-"WARNING: Every sanity check passed and only the DANGEROUS operations left.\n"
-"Please make sure all your important data had been backed up in case of an\n"
-"unexpected failure!\n";
+"WARNING: Every sanity check passed and only the dangerous operations left.\n"
+"Make sure that important data has been backed up! Power outage or computer\n"
+"crash may result major data loss!\n";
 
 static const char *resize_important_msg =
 "You can go on to shrink the device e.g. with 'fdisk'.\n"
@@ -83,6 +83,16 @@ static const char *hibernated_volume_msg =
 "Apparently the NTFS partition is hibernated. Windows must be resumed and\n"
 "turned off properly, thus resizing will be possible later on.\n";
 
+static const char *bad_sectors_warning_msg =
+"****************************************************************************\n"
+"* WARNING: The disk has bad sector. This means physical damage on the disk *\n"
+"* surface caused by deterioration, manufacturing faults or other reason.   *\n"
+"* The reliability of the disk may stay stable or degrade fast. We suggest  *\n"
+"* making a full backup urgently by running 'ntfsclone --rescue ...' then   *\n"
+"* run 'chkdsk /f /r volume:' on Windows then you should be able to resize  *\n"
+"* safely by additionally using the --bad-sectors option to ntfsresize.     *\n"
+"****************************************************************************\n";
+
 struct {
 	int verbose;
 	int debug;
@@ -90,9 +100,9 @@ struct {
 	int force;
 	int info;
 	int show_progress;
+	int badsectors;
 	s64 bytes;
 	char *volume;
-	u8 padding[4];		/* Unused: padding to 64 bit. */
 } opt;
 
 struct bitmap {
@@ -144,6 +154,7 @@ typedef struct {
 	s64 mftmir_old;		     /* $MFTMirr AT_DATA's old LCN */
 	int dirty_inode;	     /* some inode data got relocated */
 	int shrink;		     /* shrink = 1, enlarge = 0 */
+	s64 badclusters;	     /* num of physically dead clusters */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */
@@ -279,7 +290,8 @@ static void usage(void)
 		"    -s, --size SIZE        Resize volume to SIZE[k|M|G] bytes\n"
 		"\n"
 		"    -n, --no-action        Do not write to disk\n"
-		"    -f, --force            Force to progress (DANGEROUS)\n"
+		"    -b, --bad-sectors      Support disks having bad sectors\n"
+		"    -f, --force            Force to progress\n"
 		"    -P, --no-progress-bar  Don't show progress bar\n"
 		"    -v, --verbose          More output\n"
 		"    -V, --version          Display version information\n"
@@ -399,8 +411,9 @@ static s64 get_new_volume_size(char *s)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhinPs:vV";
+	static const char *sopt = "-bdfhinPs:vV";
 	static const struct option lopt[] = {
+		{ "bad-sectors",no_argument,		NULL, 'b' },
 #ifdef DEBUG
 		{ "debug",	no_argument,		NULL, 'd' },
 #endif
@@ -430,6 +443,9 @@ static int parse_options(int argc, char **argv)
 				opt.volume = argv[optind-1];
 			else
 				err++;
+			break;
+		case 'b':
+			opt.badsectors++;
 			break;
 		case 'd':
 			opt.debug++;
@@ -592,8 +608,10 @@ static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 
 static int str2unicode(const char *aname, ntfschar **ustr, int *len)
 {
-	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1))
+	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1)) {
+		perr_printf("Couldn't convert string to Unicode");
 		return -1;
+	}
 
 	if (!*ustr || !*len) {
 		*ustr = AT_UNNAMED;
@@ -603,14 +621,19 @@ static int str2unicode(const char *aname, ntfschar **ustr, int *len)
 	return 0;
 }
 
-static int has_bad_sectors(ntfs_resize_t *resize)
+static int has_bad_sectors(ntfs_resize_t *resize, int is_inode)
 {
 	int len, ret = 0;
 	ntfschar *ustr = NULL;
 	ATTR_RECORD *a = resize->ctx->attr;
 
-	if (resize->ni->mft_no != FILE_BadClus)
-		return 0;
+	if (is_inode) {
+		if (resize->ni->mft_no != FILE_BadClus)
+			return 0;
+	} else {
+		if (resize->mref != FILE_BadClus)
+			return 0;
+	}
 
 	if (str2unicode("$Bad", &ustr, &len) == -1)
 		return -1;
@@ -638,11 +661,17 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 	inode = resize->ni->mft_no;
 	flags = resize->ctx->attr->flags;
 
-	if ((ret = has_bad_sectors(resize)) != 0) {
+	if ((ret = has_bad_sectors(resize, 1)) != 0) {
 		if (ret == -1)
-			perr_exit("Couldn't convert string to Unicode");
-		err_exit("Your disk has bad sectors (manufacturing faults or "
-			 "dying disk).\nThis situation isn't supported yet.\n");
+			exit(1);
+		if (NInoAttrList(resize->ni))
+			err_exit("Hopelessly many bad sectors! Not supported.");
+		if (resize->badclusters == 0)
+			printf("WARNING: The disk has bad sector! "
+			       "This can cause reliability problems!\n");
+		resize->badclusters += last_lcn - rl->lcn + 1;
+		Vprintf("Bad clusters: %8lld - %lld\n", rl->lcn, last_lcn);
+		return;
 	}
 
 	if (NInoAttrList(resize->ni)) {
@@ -1576,12 +1605,21 @@ static void relocate_attribute(ntfs_resize_t *resize)
 
 static void relocate_attributes(ntfs_resize_t *resize)
 {
+	int ret;
+
 	if (!(resize->ctx = attr_get_search_ctx(NULL, resize->mrec)))
 		exit(1);
 
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
 			break;
+		
+		ret = has_bad_sectors(resize, 0);
+		if (ret == -1)
+			exit(1);
+		else if (ret == 1)
+			return;
+
 		relocate_attribute(resize);
 	}
 
@@ -1679,6 +1717,36 @@ static void advise_on_resize(ntfs_resize_t *resize)
 	print_advise(vol, resize->last_unsupp);
 }
 
+
+static void rl_expand(runlist **rl, const VCN last_vcn)
+{
+	int len;
+	runlist *p = *rl;
+
+	len = rl_items(p);
+	if (len <= 1)
+		err_exit("ntfs_rl_expand: bad runlist length: %d\n", len);
+
+	if (p[len - 2].lcn == LCN_HOLE) {
+
+		p[len - 2].length += last_vcn - p[len - 1].vcn;
+		p[len - 1].vcn = last_vcn;
+
+	} else if (p[len - 2].lcn >= 0) {
+
+		p = realloc(*rl, ++len * sizeof(runlist_element));
+		if (!p)
+			perr_exit("ntfs_rl_expand: realloc");
+
+		p[len - 2].lcn = LCN_HOLE;
+		p[len - 2].length = last_vcn - p[len - 2].vcn;
+		rl_set(p + len - 1, last_vcn, LCN_ENOENT, 0LL);
+		*rl = p;
+
+	} else 
+		err_exit("ntfs_rl_expand: bad LCN: %lld\n", p[len - 2].lcn);
+}
+
 /**
  * bitmap_file_data_fixup
  *
@@ -1701,24 +1769,28 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
  */
 static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 {
+	ATTR_RECORD *a;
 	runlist *rl_bad;
-	ATTR_RECORD *a = resize->ctx->attr;
 	s64 nr_clusters = resize->new_volume_size;
 	ntfs_volume *vol = resize->vol;
 
+	a = resize->ctx->attr;
 	if (!a->non_resident)
 		/* FIXME: handle resident attribute value */
 		err_exit("Resident attribute in $BadClust isn't supported!\n");
 
-	if (!(rl_bad = (runlist *)malloc(2 * sizeof(runlist_element))))
-		perr_exit("Couldn't get memory");
+	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, a, NULL)))
+		perr_exit("ntfs_mapping_pairs_decompress");
+	
+	if (resize->shrink) {
+		if (ntfs_rl_truncate(&rl_bad, nr_clusters) == -1)
+			perr_exit("ntfs_rl_truncate");
+	} else
+		rl_expand(&rl_bad, nr_clusters);
 
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
 	a->data_size = cpu_to_le64(nr_clusters * vol->cluster_size);
-
-	rl_set(rl_bad, 0LL, (LCN)LCN_HOLE, nr_clusters);
-	rl_set(rl_bad + 1, nr_clusters, -1LL, 0LL);
 
 	replace_attribute_runlist(vol, resize->ctx, rl_bad);
 
@@ -1831,7 +1903,7 @@ static void lookup_data_attr(ntfs_volume *vol,
 		exit(1);
 
 	if (str2unicode(aname, &ustr, &len) == -1)
-		perr_exit("Unable to convert string to Unicode");
+		exit(1);
 
 	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
 		perr_exit("ntfs_lookup_attr");
@@ -2088,10 +2160,21 @@ static void set_disk_usage_constraint(ntfs_resize_t *resize)
 		resize->last_unsupp = last;
 }
 
-static void check_shrink_constraints(ntfs_resize_t *resize)
+static void check_resize_constraints(ntfs_resize_t *resize)
 {
 	s64 new_size = resize->new_volume_size;
 
+	if (resize->badclusters) {
+		printf("%sThe NTFS volume has at least %lld bad sector%s.\n",
+		       !opt.badsectors ? NERR_PREFIX : "",
+		       resize->badclusters, 
+		       resize->badclusters  - 1 ? "s" : "");
+		if (!opt.badsectors) {
+			printf(bad_sectors_warning_msg);
+			exit(1);
+		}
+	}
+		
 	/* FIXME: resize.shrink true also if only -i is used */
 	if (!resize->shrink)
 		return;
@@ -2212,7 +2295,7 @@ int main(int argc, char **argv)
 
 	set_resize_constrains(&resize);
 	set_disk_usage_constraint(&resize);
-	check_shrink_constraints(&resize);
+	check_resize_constraints(&resize);
 
 	if (opt.info) {
 	       	advise_on_resize(&resize);
