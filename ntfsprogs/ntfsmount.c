@@ -598,8 +598,8 @@ static int ntfs_fuse_init(void)
 	}
 	*ctx = (ntfs_fuse_context_t) {
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
-		.uid = getuid(),
-		.gid = getgid(),
+		.uid = geteuid(),
+		.gid = getegid(),
 		.fmask = 0111,
 	};
 	return 0;
