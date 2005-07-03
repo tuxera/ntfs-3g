@@ -211,6 +211,9 @@ static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
 				stbuf->st_blocks = na->allocated_size >>
 					vol->sector_size_bits;
 				ntfs_attr_close(na);
+			} else {
+				stbuf->st_size = 0;
+				stbuf->st_blocks = 0;
 			}
 		} else {
 			stbuf->st_mode = S_IFREG | (0777 & ~ctx->fmask);
@@ -220,8 +223,10 @@ static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
 				stbuf->st_blocks = na->allocated_size >>
 					vol->sector_size_bits;
 				ntfs_attr_close(na);
-			} else 
-				res = -errno;
+			} else {
+				stbuf->st_size = 0;
+				stbuf->st_blocks = 0;
+			}
 		}
 		stbuf->st_uid = ctx->uid;
 		stbuf->st_gid = ctx->gid;
