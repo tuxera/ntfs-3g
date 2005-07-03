@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
+SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -40,13 +40,14 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 bin_PROGRAMS = ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT) ntfscluster$(EXEEXT) \
-	ntfsls$(EXEEXT) ntfscat$(EXEEXT)
+	ntfsls$(EXEEXT) ntfscat$(EXEEXT) $(am__EXEEXT_1)
 sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 	ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT) ntfsclone$(EXEEXT) \
 	ntfscp$(EXEEXT)
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) ntfswipe$(EXEEXT) \
 	ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT) ntfsrm$(EXEEXT) \
 	ntfsmftalloc$(EXEEXT)
+@ENABLE_FUSE_MODULE_TRUE@am__append_1 = ntfsmount
 subdir = ntfsprogs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/mkntfs.8.in $(srcdir)/ntfscat.8.in \
@@ -64,6 +65,7 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES = mkntfs.8 ntfscat.8 ntfsclone.8 ntfscluster.8 \
 	ntfscp.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 ntfsls.8 ntfsprogs.8 \
 	ntfsresize.8 ntfsundelete.8
+@ENABLE_FUSE_MODULE_TRUE@am__EXEEXT_1 = ntfsmount$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" \
 	"$(DESTDIR)$(man8dir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
@@ -108,6 +110,14 @@ ntfsls_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfsmftalloc_OBJECTS = ntfsmftalloc.$(OBJEXT) utils.$(OBJEXT)
 ntfsmftalloc_OBJECTS = $(am_ntfsmftalloc_OBJECTS)
 ntfsmftalloc_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am__ntfsmount_SOURCES_DIST = ntfsmount.c
+@ENABLE_FUSE_MODULE_TRUE@am_ntfsmount_OBJECTS =  \
+@ENABLE_FUSE_MODULE_TRUE@	ntfsmount-ntfsmount.$(OBJEXT)
+ntfsmount_OBJECTS = $(am_ntfsmount_OBJECTS)
+am__DEPENDENCIES_2 =
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_DEPENDENCIES =  \
+@ENABLE_FUSE_MODULE_TRUE@	$(am__DEPENDENCIES_1) \
+@ENABLE_FUSE_MODULE_TRUE@	$(am__DEPENDENCIES_2)
 am_ntfsmove_OBJECTS = ntfsmove.$(OBJEXT) utils.$(OBJEXT)
 ntfsmove_OBJECTS = $(am_ntfsmove_OBJECTS)
 ntfsmove_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -140,16 +150,16 @@ SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) \
 	$(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
 	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
 	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) \
-	$(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
+	$(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) \
+	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 DIST_SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
 	$(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
 	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
 	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmftalloc_SOURCES) $(ntfsmove_SOURCES) \
-	$(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
+	$(ntfsmftalloc_SOURCES) $(am__ntfsmount_SOURCES_DIST) \
+	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 man8dir = $(mandir)/man8
@@ -185,11 +195,15 @@ ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
+ENABLE_FUSE_MODULE_FALSE = @ENABLE_FUSE_MODULE_FALSE@
+ENABLE_FUSE_MODULE_TRUE = @ENABLE_FUSE_MODULE_TRUE@
 ENABLE_GNOME_VFS_FALSE = @ENABLE_GNOME_VFS_FALSE@
 ENABLE_GNOME_VFS_TRUE = @ENABLE_GNOME_VFS_TRUE@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+FUSE_MODULE_CFLAGS = @FUSE_MODULE_CFLAGS@
+FUSE_MODULE_LIBS = @FUSE_MODULE_LIBS@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -225,6 +239,7 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
+ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -320,6 +335,10 @@ ntfscat_LDFLAGS = $(AM_LFLAGS)
 ntfscp_SOURCES = ntfscp.c utils.c utils.h
 ntfscp_LDADD = $(AM_LIBS)
 ntfscp_LDFLAGS = $(AM_LFLAGS)
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_SOURCES = ntfsmount.c
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_LDADD = $(AM_LIBS) $(FUSE_MODULE_LIBS)
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_LDFLAGS = $(AM_LFLAGS)
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_CFLAGS = $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22
 
 # We don't distribute these
 ntfsrm_SOURCES = ntfsrm.c ntfsrm.h utils.c utils.h
@@ -486,6 +505,9 @@ ntfsls$(EXEEXT): $(ntfsls_OBJECTS) $(ntfsls_DEPENDENCIES)
 ntfsmftalloc$(EXEEXT): $(ntfsmftalloc_OBJECTS) $(ntfsmftalloc_DEPENDENCIES) 
 	@rm -f ntfsmftalloc$(EXEEXT)
 	$(LINK) $(ntfsmftalloc_LDFLAGS) $(ntfsmftalloc_OBJECTS) $(ntfsmftalloc_LDADD) $(LIBS)
+ntfsmount$(EXEEXT): $(ntfsmount_OBJECTS) $(ntfsmount_DEPENDENCIES) 
+	@rm -f ntfsmount$(EXEEXT)
+	$(LINK) $(ntfsmount_LDFLAGS) $(ntfsmount_OBJECTS) $(ntfsmount_LDADD) $(LIBS)
 ntfsmove$(EXEEXT): $(ntfsmove_OBJECTS) $(ntfsmove_DEPENDENCIES) 
 	@rm -f ntfsmove$(EXEEXT)
 	$(LINK) $(ntfsmove_LDFLAGS) $(ntfsmove_OBJECTS) $(ntfsmove_LDADD) $(LIBS)
@@ -525,6 +547,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfslabel.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmftalloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmount-ntfsmount.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmove.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsresize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsrm.Po@am__quote@
@@ -555,6 +578,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
+
+ntfsmount-ntfsmount.o: ntfsmount.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -MT ntfsmount-ntfsmount.o -MD -MP -MF "$(DEPDIR)/ntfsmount-ntfsmount.Tpo" -c -o ntfsmount-ntfsmount.o `test -f 'ntfsmount.c' || echo '$(srcdir)/'`ntfsmount.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/ntfsmount-ntfsmount.Tpo" "$(DEPDIR)/ntfsmount-ntfsmount.Po"; else rm -f "$(DEPDIR)/ntfsmount-ntfsmount.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ntfsmount.c' object='ntfsmount-ntfsmount.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -c -o ntfsmount-ntfsmount.o `test -f 'ntfsmount.c' || echo '$(srcdir)/'`ntfsmount.c
+
+ntfsmount-ntfsmount.obj: ntfsmount.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -MT ntfsmount-ntfsmount.obj -MD -MP -MF "$(DEPDIR)/ntfsmount-ntfsmount.Tpo" -c -o ntfsmount-ntfsmount.obj `if test -f 'ntfsmount.c'; then $(CYGPATH_W) 'ntfsmount.c'; else $(CYGPATH_W) '$(srcdir)/ntfsmount.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/ntfsmount-ntfsmount.Tpo" "$(DEPDIR)/ntfsmount-ntfsmount.Po"; else rm -f "$(DEPDIR)/ntfsmount-ntfsmount.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ntfsmount.c' object='ntfsmount-ntfsmount.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -c -o ntfsmount-ntfsmount.obj `if test -f 'ntfsmount.c'; then $(CYGPATH_W) 'ntfsmount.c'; else $(CYGPATH_W) '$(srcdir)/ntfsmount.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

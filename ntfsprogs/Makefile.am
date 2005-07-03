@@ -26,6 +26,10 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
+if ENABLE_FUSE_MODULE
+bin_PROGRAMS		+= ntfsmount
+endif
+
 # Set the include path.
 AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
 
@@ -72,6 +76,13 @@ ntfscat_LDFLAGS		= $(AM_LFLAGS)
 ntfscp_SOURCES		= ntfscp.c utils.c utils.h
 ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
+
+if ENABLE_FUSE_MODULE
+ntfsmount_SOURCES	= ntfsmount.c
+ntfsmount_LDADD		= $(AM_LIBS) $(FUSE_MODULE_LIBS)
+ntfsmount_LDFLAGS	= $(AM_LFLAGS)
+ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22
+endif
 
 # We don't distribute these
 

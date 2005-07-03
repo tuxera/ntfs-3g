@@ -3,9 +3,11 @@ xx/xx/xxxx - 1.10.1-WIP
 	- ntfscp: fix signal hanling: handle both SIGTERM and SIGINT, print
 	  correct message.  (Yura)
 	- Update manual pages for ntfsprogs, ntfsclone, ntfsresize.  (Szaka)
-	- Detect and hint users if the destination fs doesn't support
+	- ntfsclone: detect and hint users if the destination fs doesn't support
 	  sparse files.  (Szaka)
 	- Fix memory managament error in ntfs_inode_close.  (Yura)
+	- Add new utility - ntfsmount. It's a FUSE module that
+	  rely on libntfs.  (Yura)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 

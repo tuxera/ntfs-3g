@@ -75,6 +75,12 @@ AC_ARG_ENABLE(gnome-vfs,
 	enable_gnome_vfs=auto
 )
 
+AC_ARG_ENABLE(fuse-module,
+	AS_HELP_STRING(--disable-fuse-module,omit FUSE 'libntfs'
+			interface (default=detect)), ,
+	enable_fuse_module=auto
+)
+
 AC_ARG_ENABLE(really-static,
 	AS_HELP_STRING(--enable-really-static,create completely static
 		       binaries for the utilities), ,
@@ -127,6 +133,20 @@ if test "$enable_gnome_vfs" != "no"; then
 	])
 fi
 AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
+
+# Autodetect whether to build FUSE module or not.
+compile_fuse_module=false
+if test "$enable_fuse_module" != "no"; then
+	PKG_CHECK_MODULES(FUSE_MODULE, [fuse], [ compile_fuse_module=true ],
+	[
+		if test "$enable_fuse_module" = "yes"; then
+			AC_MSG_ERROR([Linux-NTFS FUSE module requires fuse library.])
+		else
+			AC_MSG_WARN([Linux-NTFS FUSE module requires fuse library.])
+		fi
+	])
+fi
+AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 
 # add --with-extra-includes and --with-extra-libs switch to ./configure
 all_libraries="$all_libraries $USER_LDFLAGS"
@@ -223,7 +243,8 @@ AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
-	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit])
+	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit \
+	setxattr])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([
