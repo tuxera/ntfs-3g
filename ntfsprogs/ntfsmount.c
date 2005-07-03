@@ -59,7 +59,7 @@ typedef struct {
 	mode_t fmask;
 	mode_t dmask;
 	BOOL ro;
-	BOOL show_system_files;
+	BOOL show_sys_files;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -262,7 +262,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		free(filename);
 		return err;
 	}
-	if (MREF(mref) >= FILE_first_user || ctx->show_system_files)
+	if (MREF(mref) >= FILE_first_user || ctx->show_sys_files)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
 	free(filename);
 	return err;
@@ -386,6 +386,13 @@ static int ntfs_fuse_chmod(const char *path __attribute__((unused)),
 }
 
 #ifdef HAVE_SETXATTR
+
+static const char nf_ns_streams[] = "user.stream.";
+static const int nf_ns_streams_len = 12;
+
+static const char nf_ns_eas[] = "user.ea.";
+static const int nf_ns_eas_len = 8;
+
 static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
@@ -410,11 +417,10 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 				0, NULL, 0, actx)) {
 		if (!actx->attr->name_length)
 			continue;
-		ret += actx->attr->name_length + 6; /* 5 bytes for 'user.',
-						      1 byte for terminator. */
+		ret += actx->attr->name_length + nf_ns_streams_len + 1;
 		if (size && (size_t)ret <= size) {
-			strcpy(to, "user.");
-			to += 5;
+			strcpy(to, nf_ns_streams);
+			to += nf_ns_streams_len;
 			if (ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
 					le16_to_cpu(actx->attr->name_offset)),
 					actx->attr->name_length, &to,
@@ -444,7 +450,8 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	int res;
 	ntfschar *lename = NULL;
 
-	if (strncmp(name, "user.", 5))
+	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
+			strlen(name) == nf_ns_streams_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
@@ -452,11 +459,12 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + 5, &lename, 0) == -1) {
+	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename, strlen(name) - 5);
+	na = ntfs_attr_open(ni, AT_DATA, lename,
+			strlen(name) - nf_ns_streams_len);
 	if (!na) {
 		res = -ENODATA;
 		goto exit;
@@ -489,7 +497,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	int res;
 	ntfschar *lename = NULL;
 
-	if (strncmp(name, "user.", 5))
+	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
+			strlen(name) == nf_ns_streams_len)
 		return -EACCES;
 	vol = ctx->vol;
 	if (!vol)
@@ -497,11 +506,12 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + 5, &lename, 0) == -1) {
+	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename, strlen(name) - 5);
+	na = ntfs_attr_open(ni, AT_DATA, lename,
+			strlen(name) - nf_ns_streams_len);
 	if (na && flags == XATTR_CREATE) {
 		res = -EEXIST;
 		goto exit;
@@ -511,7 +521,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -ENODATA;
 			goto exit;
 		}
-		na = ntfs_attr_add(ni, AT_DATA, lename, strlen(name) - 5, 0);
+		na = ntfs_attr_add(ni, AT_DATA, lename, strlen(name) -
+				nf_ns_streams_len, 0);
 		if (!na) {
 			res = -errno;
 			goto exit;
@@ -540,7 +551,8 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	int res = 0;
 	ntfschar *lename = NULL;
 
-	if (strncmp(name, "user.", 5) || strlen(name) == 5)
+	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
+			strlen(name) == nf_ns_streams_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
@@ -548,11 +560,12 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + 5, &lename, 0) == -1) {
+	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename, strlen(name) - 5);
+	na = ntfs_attr_open(ni, AT_DATA, lename,
+			strlen(name) - nf_ns_streams_len);
 	if (!na) {
 		res = -ENODATA;
 		goto exit;
@@ -667,6 +680,10 @@ static char *parse_options(char *options, char **device)
 			*device = malloc(strlen(val) + 1);
 			strcpy(*device, val);
 		} else if (!strcmp(opt, "ro")) { /* Read-only mount. */
+			if (val) {
+				Eprintf("ro option should not have value.\n");
+				goto err_exit;
+			}
 			ctx->ro =TRUE;
 			strcat(ret, "ro,");
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
@@ -679,20 +696,50 @@ static char *parse_options(char *options, char **device)
 			strcat(ret, val);
 			strcat(ret, ",");
 		} else if (!strcmp(opt, "no_def_opts")) {
+			if (val) {
+				Eprintf("no_def_opts option should not have "
+						"value.\n");
+				goto err_exit;
+			}
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "umask")) {
+			if (!val) {
+				Eprintf("umask option should have value.\n");
+				goto err_exit;
+			}
 			sscanf(val, "%i", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 		} else if (!strcmp(opt, "fmask")) {
+			if (!val) {
+				Eprintf("fmask option should have value.\n");
+				goto err_exit;
+			}
 			sscanf(val, "%i", &ctx->fmask);
 		} else if (!strcmp(opt, "dmask")) {
+			if (!val) {
+				Eprintf("dmask option should have value.\n");
+				goto err_exit;
+			}
 			sscanf(val, "%i", &ctx->dmask);
 		} else if (!strcmp(opt, "uid")) {
+			if (!val) {
+				Eprintf("uid option should have value.\n");
+				goto err_exit;
+			}
 			sscanf(val, "%i", &ctx->uid);
 		} else if (!strcmp(opt, "gid")) {
+			if (!val) {
+				Eprintf("gid option should have value.\n");
+				goto err_exit;
+			}
 			sscanf(val, "%i", &ctx->gid);
-		} else if (!strcmp(opt, "show_system_files")) {
-			ctx->show_system_files = TRUE;
+		} else if (!strcmp(opt, "show_sys_files")) {
+			if (val) {
+				Eprintf("show_sys_files option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->show_sys_files = TRUE;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -730,7 +777,7 @@ static void usage(void)
 	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
 		"fsname\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
-		"uid\n\tgid\n\tshow_system_files\n\tdev\n\n");
+		"uid\n\tgid\n\tshow_sys_files\n\tdev\n\n");
 	Eprintf("Default options are: \"%sfsname=ntfs#device\".\n", def_opts);
 }
 
