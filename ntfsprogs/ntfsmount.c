@@ -451,7 +451,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 
 	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == nf_ns_streams_len)
+			strlen(name) == (size_t)nf_ns_streams_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
@@ -498,7 +498,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 
 	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == nf_ns_streams_len)
+			strlen(name) == (size_t)nf_ns_streams_len)
 		return -EACCES;
 	vol = ctx->vol;
 	if (!vol)
@@ -552,7 +552,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ntfschar *lename = NULL;
 
 	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == nf_ns_streams_len)
+			strlen(name) == (size_t)nf_ns_streams_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
