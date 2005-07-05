@@ -1,0 +1,201 @@
+.\" -*- nroff -*-
+.\" Copyright (c) 2005 Yura Pakhuchiy. All Rights Reserved.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFSMOUNT 8 "July 2005" "ntfsprogs version @VERSION@"
+.SH NAME
+ntfsmount \- NTFS module for FUSE.
+.SH SYNOPSIS
+.BI "ntfsmount " mount_point " \-o " device "[," other_options "]"
+.SH DESCRIPTION
+.B ntfsmount
+is a
+.B FUSE
+module that rely on
+.B libntfs.
+You need
+.B FUSE
+to compile it,
+.B xattr
+is also highly recommended.
+.sp
+.TP
+.B NTFS FUSE features:
+
+* Full read/only access to normal, sparse and compressed files.
+
+* Can overwrite and change size of normal and sparse files.
+
+* Can list/read/write/add/remove named data streams.
+
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfsmount
+accepts.
+
+.TP
+.B uid=, gid=, umask=
+Provide default owner, group, and access mode mask.
+These options work as documented in mount(8).  By
+default, the files/directories are owned by user that mounted volume and
+he/she has read and write permissions, as well as
+browse permission for directories.  No one else has any
+access permissions.  I.e. the mode on all files is by
+default rw------- and for directories rwx------, a
+consequence of the default fmask=0177 and dmask=0077.
+Using a umask of zero will grant all permissions to
+everyone, i.e. all files and directories will have mode
+rwxrwxrwx.
+
+.TP
+.B fmask=, dmask=
+Instead of specifying umask which applies both to
+files and directories, fmask applies only to files and
+mask only to directories.
+
+.TP
+.B show_sys_files
+If show_sys_files is specified, show the system files
+in directory listings.  Otherwise the default behaviour
+is to hide the system files.
+Note that even when show_sys_files is specified, "$MFT"
+may will not be visible due to bugs/mis-features in glibc.
+Further, note that irrespective of show_sys_files, all
+files are accessible by name, i.e. you can always do
+"ls -l \$UpCase" for example to specifically show the
+system file containing the Unicode upcase table.
+
+.TP
+.B default_permissions
+By default FUSE doesn't check file access permissions, the
+filesystem is free to implement it's access policy or leave it to
+the underlying file access mechanism (e.g. in case of network
+filesystems).  This option enables permission checking, restricting
+access based on file mode.  This is option is usually useful
+together with the 'allow_other' mount option.
+
+.TP
+.B allow_other
+This option overrides the security measure restricting file access
+to the user mounting the filesystem.  This option is by default only
+allowed to root, but this restriction can be removed with a
+configuration option described in the previous section.
+
+.TP
+.B kernel_cache
+This option disables flushing the cache of the file contents on
+every open().  This should only be enabled on filesystems, where the
+file data is never changed externally (not through the mounted FUSE
+filesystem).  Thus it is not suitable for network filesystems and
+other "intermediate" filesystems.
+
+NOTE: if this option is not specified (and neither 'direct_io') data
+is still cached after the open(), so a read() system call will not
+always initiate a read operation.
+
+.TP
+.B large_read
+Issue large read requests.  This can improve performance for some
+filesystems, but can also degrade performance.  This option is only
+useful on 2.4.X kernels, as on 2.6 kernels requests size is
+automatically determined for optimum performance.
+
+.TP
+.B direct_io
+This option disables the use of page cache (file content cache) in
+the kernel for this filesystem.  This has several affects:
+
+- Each read() or write() system call will initiate one or more
+read or write operations, data will not be cached in the
+kernel.
+
+- The return value of the read() and write() system calls will
+correspond to the return values of the read and write
+operations.  This is useful for example if the file size is not
+known in advance (before reading it).
+
+.TP
+.B max_read=
+With this option the maximum size of read operations can be set.
+The default is infinite.  Note that the size of read requests is
+limited anyway to 32 pages (which is 128kbyte on i386).
+
+.TP
+.B fsname=
+Sets the filesystem name.  The default is the program name.
+
+.TP
+.B ro
+Mount filesystem read-only.
+
+.TP
+.B no_def_opts
+By default ntfsmount acts as "default_permissions,kernel_cache,allow_other,fsname=ntfs#device" was passed to it, this option cancel this behaviour.
+
+.TP
+.B dev=
+Mount this device.
+
+.SH DATA STREAMS
+All data on NTFS is stored in streams, which can have names. A file can have more than one data streams, but exactly one must have no name. The size of a file is the size of its unnamed data stream. Usually when you don't specify stream name you are access to unnamed data stream. If you want access to named data stream you need to add ":stream_name" to the filename. For example: by opening "some.mp3:artist" you will open stream "artist" in "some.mp3". But windows usually prevent you from accessing to named data streams, so you need to use some program like FAR or utils from cygwin to access named data streams.
+.sp
+NTFS FUSE module don't prevent you from accessing to named data streams so you can use your preferred utils to access them. You can even delete them using
+.B rm.
+You can list all named data streams by getting "ntfs.streams.list" extended attribute. NOTE: The last feauture is unique for NTFS FUSE module and maybe will be never supported by kernel driver.
+.SH EXAMPLES
+Mount /dev/hda1 to /mnt/ntfs-fuse using NTFS FUSE module:
+.RS
+.sp
+.B ntfsmount /mnt/ntfs-fuse -o dev=/dev/hda1
+.sp
+.RE
+Read-only mount /dev/hda5 to /home/user/tmp and make root to be owner of all files:
+.RS
+.sp
+.B ntfsmount /home/user/tmp -o dev=/dev/hda5,ro,uid=0
+.sp
+.RE
+Cat "artist" named data of "some.mp3":
+.RS
+.sp
+.B cat some.mp3:artist
+.sp
+.RE
+Write "Sympho Black Metal" to "genre" named data stream of "some.mp3":
+.RS
+.sp
+.B echo Sympho Black Metal > some.mp3:genre
+.sp
+.RE
+Remove "album" named data stream from "some.mp3":
+.RS
+.sp
+.B rm some.mp3:album
+.sp
+.RE
+List all named data streams for "some.mp3":
+.RS
+.sp
+.B getfattr -n ntfs.streams.list some.mp3
+.SH BUGS
+No bugs are known at present. If you find any bugs, please send an email to
+.nh
+<linux-ntfs-dev@lists.sourceforge.net>.
+.hy
+.SH AUTHOR
+.B ntfsmount
+was written by Yura Pakhuchiy. This manual page use information from Documentation/filesystems/ntfs.txt from linux kernel source, and from README from FUSE.
+.SH DEDICATION
+With love to Marina Sapego.
+.SH THANKS
+Many thanks to Miklos Szeredi for advices and answers about FUSE.
+.SH AVAILABILITY
+.B ntfsmount
+is part of the ntfsprogs package and is available from
+.br
+.nh
+http://linux\-ntfs.sourceforge.net/downloads.html.
+.hy
+.SH SEE ALSO
+.BR "ntfsprogs" (8), " attr" (5), " getfattr" (1)
+
