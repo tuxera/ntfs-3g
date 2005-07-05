@@ -133,6 +133,10 @@ Mount filesystem read-only.
 By default ntfsmount acts as "default_permissions,kernel_cache,allow_other,fsname=ntfs#device" was passed to it, this option cancel this behaviour.
 
 .TP
+.B succeed_chmod
+Don't change any permissions and don't return error on chmod operation.
+
+.TP
 .B dev=
 Mount this device.
 
@@ -155,7 +159,13 @@ Read-only mount /dev/hda5 to /home/user/tmp and make root to be owner of all fil
 .B ntfsmount /home/user/tmp -o dev=/dev/hda5,ro,uid=0
 .sp
 .RE
-Cat "artist" named data of "some.mp3":
+Umount /mnt/ntfs-fuse:
+.RS
+.sp
+.B fusermount -u /mnt/ntfs-fuse
+.sp
+.RE
+Cat "artist" named data stream of "some.mp3":
 .RS
 .sp
 .B cat some.mp3:artist

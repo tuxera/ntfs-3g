@@ -60,6 +60,7 @@ typedef struct {
 	mode_t dmask;
 	BOOL ro;
 	BOOL show_sys_files;
+	BOOL succeed_chmod;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -193,17 +194,59 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	return 0;
 }
 
-static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
+/**
+ * ntfs_fuse_parse_path - split path to path and stream name.
+ * @org_path:		path to split
+ * @path:		pointer to buffer in which parsed path saved
+ * @stream_name:	pointer to buffer where stream name in unicode saved
+ *
+ * This function allocates buffers for @*path and @*stream, user must free them
+ * after use.
+ *
+ * Return values:
+ *	<0	Error occured, return -errno;
+ *	 0	No stream name, @*stream is not allocated and set to AT_UNMAMED.
+ *	>0	Stream name length in unicode characters.
+ */
+static int ntfs_fuse_parse_path(const char *org_path, char **path,
+		ntfschar **stream_name)
+{
+	char *stream_name_mbs;
+	int res;
+
+	stream_name_mbs = strdup(org_path);
+	if (!stream_name_mbs)
+		return -errno;
+	*path = strsep(&stream_name_mbs, ":");
+	if (stream_name_mbs) {
+		*stream_name = NULL;
+		res = ntfs_mbstoucs(stream_name_mbs, stream_name, 0);
+		if (res < 0)
+			return -errno;
+		return res;
+	}
+	*stream_name = AT_UNNAMED;
+	return 0;
+}
+
+static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
 	int res = 0;
 	ntfs_inode *ni;
 	ntfs_attr *na;
 	ntfs_volume *vol;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
 
 	vol = ctx->vol;
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
 	memset(stbuf, 0, sizeof(struct stat));
 	if ((ni = ntfs_pathname_to_inode(vol, NULL, path))) {
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY &&
+				!stream_name_len) {
 			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
 			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, I30, 0);
 			if (na) {
@@ -217,7 +260,8 @@ static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
 			}
 		} else {
 			stbuf->st_mode = S_IFREG | (0777 & ~ctx->fmask);
-			na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+			na = ntfs_attr_open(ni, AT_DATA, stream_name,
+					stream_name_len);
 			if (na) {
 				stbuf->st_size = na->data_size;
 				stbuf->st_blocks = na->allocated_size >>
@@ -226,6 +270,8 @@ static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
 			} else {
 				stbuf->st_size = 0;
 				stbuf->st_blocks = 0;
+				if (stream_name_len)
+					res = -ENOENT;
 			}
 		}
 		stbuf->st_uid = ctx->uid;
@@ -241,6 +287,9 @@ static int ntfs_fuse_getattr(const char *path, struct stat *stbuf)
 		ntfs_inode_close(ni);
 	} else
 		res = -ENOENT;
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
 	return res;
 }
 
@@ -278,8 +327,6 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	s64 pos = 0;
 
 	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
 	fill_ctx.filler = filler;
 	fill_ctx.buf = buf;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
@@ -290,102 +337,295 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	return 0;
 }
 
-static int ntfs_fuse_open(const char *path,
+static int ntfs_fuse_open(const char *org_path,
 		struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni;
-	
+	ntfs_attr *na;
+	int res = 0;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
 	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni)
-		return -errno;
-	ntfs_inode_close(ni);
-	return 0;
+	if (ni) {
+		if (stream_name_len) {
+			na = ntfs_attr_open(ni, AT_DATA, stream_name,
+					stream_name_len);
+			if (na)
+				ntfs_attr_close(na);
+			else
+				res = -errno;
+		}
+		ntfs_inode_close(ni);
+	} else
+		res = -errno;
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
 }
 
-static int ntfs_fuse_read(const char *path, char *buf, size_t size,
+static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_volume *vol;
-	ntfs_inode *ni;
+	ntfs_inode *ni = NULL;
 	ntfs_attr *na;
 	int res;
-	
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
 	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni)
-		return -errno;
-	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
-	if (!na)
-		return -errno;
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
 	res = ntfs_attr_pread(na, offset, size, buf);
 	ntfs_attr_close(na);
-	if (ntfs_inode_close(ni))
+exit:
+	if (ni && ntfs_inode_close(ni))
 		perror("Failed to close inode");
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
 	return res;
 }
 
-static int ntfs_fuse_write(const char *path, const char *buf, size_t size,
+static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_volume *vol;
-	ntfs_inode *ni;
+	ntfs_inode *ni = NULL;
 	ntfs_attr *na;
 	int res;
-	
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
 	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni)
-		return -errno;
-	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
-	if (!na)
-		return -errno;
-	res = ntfs_attr_pwrite(na, offset, size,  buf);
-	ntfs_attr_close(na);
-	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	res = ntfs_attr_pwrite(na, offset, size, buf);
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
+	ntfs_attr_close(na);
+exit:
+	if (ni && ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
 	return res;
 }
 
-static int ntfs_fuse_truncate(const char *path, off_t size)
+static int ntfs_fuse_truncate(const char *org_path, off_t size)
 {
 	ntfs_volume *vol;
-	ntfs_inode *ni;
+	ntfs_inode *ni = NULL;
 	ntfs_attr *na;
 	int res;
-	
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
 	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni)
-		return -errno;
-	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
-	if (!na)
-		return -errno;
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
 	res = ntfs_attr_truncate(na, size);
-	ntfs_attr_close(na);
-	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
+	ntfs_attr_close(na);
+exit:
+	if (ni && ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
 	return res;
 }
 
 static int ntfs_fuse_chmod(const char *path __attribute__((unused)),
 		mode_t mode __attribute__((unused)))
 {
-	return 0;
+	if (ctx->succeed_chmod)
+		return 0;
+	return -EOPNOTSUPP;
+}
+
+static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
+		dev_t dev __attribute__((unused)))
+{
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+	int res = 0;
+
+	if (mode && !(mode & S_IFREG))
+		return -EOPNOTSUPP;
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	if (!stream_name_len) {
+		res = -EOPNOTSUPP;
+		goto exit;
+	}
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		if (res == -ENOENT)
+			res = -EOPNOTSUPP;
+		goto exit;
+	}
+	na = ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, 0);
+	if (na)
+		ntfs_attr_close(na);
+	else
+		res = -errno;
+exit:
+	if (ni && ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
+}
+
+static int ntfs_fuse_unlink(const char *org_path)
+{
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+	int res = 0;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	if (!stream_name_len) {
+		res = -EOPNOTSUPP;
+		goto exit;
+	}
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		if (res == -ENOENT)
+			res = -EOPNOTSUPP;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	if (ntfs_attr_rm(na)) {
+		res = -errno;
+		ntfs_attr_close(na);
+	}
+exit:
+	if (ni && ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
 }
 
 #ifdef HAVE_SETXATTR
+
+static int ntfs_fuse_getxattr(const char *path, const char *name,
+				char *value, size_t size)
+{
+	ntfs_attr_search_ctx *actx = NULL;
+	ntfs_volume *vol;
+	ntfs_inode *ni;
+	char *to = value;
+	int ret = 0;
+
+	if (strcmp(name, "ntfs.streams.list"))
+		return -EOPNOTSUPP;
+	vol = ctx->vol;
+	if (!vol)
+		return -ENODEV;
+	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	if (!ni)
+		return -errno;
+	actx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!actx) {
+		ret = -errno;
+		ntfs_inode_close(ni);
+		goto exit;
+	}
+	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
+				0, NULL, 0, actx)) {
+		if (!actx->attr->name_length)
+			continue;
+		if (ret)
+			ret++;
+		ret += actx->attr->name_length;
+		if ((size_t)ret <= size) {
+			if (to != value) {
+				*to = ' ';
+				to++;
+			}
+			if (ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
+					le16_to_cpu(actx->attr->name_offset)),
+					actx->attr->name_length, &to,
+					actx->attr->name_length + 1) < 0) {
+				ret = -errno;
+				goto exit;
+			}
+			to += actx->attr->name_length;
+		}
+	}
+	if (errno != ENOENT)
+		ret = -errno;
+exit:
+	if (actx)
+		ntfs_attr_put_search_ctx(actx);
+	ntfs_inode_close(ni);
+	return ret;
+}
+
+#if 0
 
 static const char nf_ns_streams[] = "user.stream.";
 static const int nf_ns_streams_len = 12;
@@ -583,7 +823,10 @@ exit:
 		perror("Failed to close inode");
 	return res;
 }
-#endif
+
+#endif /* 0 */
+
+#endif /* HAVE_SETXATTR */
 
 static struct fuse_operations ntfs_fuse_oper = {
 	.getattr	= ntfs_fuse_getattr,
@@ -594,12 +837,16 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.truncate	= ntfs_fuse_truncate,
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
+	.mknod		= ntfs_fuse_mknod,
+	.unlink		= ntfs_fuse_unlink,
 #ifdef HAVE_SETXATTR
-	.listxattr	= ntfs_fuse_listxattr,
 	.getxattr	= ntfs_fuse_getxattr,
+#if 0	
 	.setxattr	= ntfs_fuse_setxattr,
 	.removexattr	= ntfs_fuse_removexattr,
-#endif	
+	.listxattr	= ntfs_fuse_listxattr,
+#endif /* 0 */
+#endif /* HAVE_SETXATTR */
 };
 
 static int ntfs_fuse_init(void)
@@ -741,6 +988,13 @@ static char *parse_options(char *options, char **device)
 				goto err_exit;
 			}
 			ctx->show_sys_files = TRUE;
+		} else if (!strcmp(opt, "succeed_chmod")) {
+			if (val) {
+				Eprintf("succeed_chmod option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->succeed_chmod = TRUE;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -778,7 +1032,7 @@ static void usage(void)
 	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
 		"fsname\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
-		"uid\n\tgid\n\tshow_sys_files\n\tdev\n\n");
+		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tdev\n\n");
 	Eprintf("Default options are: \"%sfsname=ntfs#device\".\n", def_opts);
 }
 
