@@ -5,11 +5,11 @@ Add new utility - ntfsmount. It's a FUSE module that rely on libntfs. So,
 you need FUSE to compile it, xattr is also highly recommended. This module
 support file overwrite changing it size and can read/write/add/remove
 named data streams via "file:stream" interface and list them via
-"ntfs.streams.list" extended attribute.  (Yura)
+"ntfs.streams.list" extended attribute.  (Yura Pakhuchiy)
 
 Attribute resize code for normal and sparse files is completed.  Thus, ntfscp
 should always successfully overwrite any normal or sparse file even if file
-size is changed.
+size is changed.  (Yura Pakhuchiy)
 
 Moved back from BitKeeper to CVS on SF.net.
 
