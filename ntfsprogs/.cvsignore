@@ -12,6 +12,7 @@ ntfsinfo
 ntfslabel
 ntfsls
 ntfsmftalloc
+ntfsmount
 ntfsmove
 ntfsresize
 ntfsrm

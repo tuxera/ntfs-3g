@@ -613,7 +613,8 @@ static int ntfs_fuse_init(void)
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
 		.uid = geteuid(),
 		.gid = getegid(),
-		.fmask = 0111,
+		.fmask = 0177,
+		.dmask = 0077,
 	};
 	return 0;
 }

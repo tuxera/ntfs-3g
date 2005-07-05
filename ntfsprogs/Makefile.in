@@ -54,8 +54,9 @@ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/ntfsclone.8.in $(srcdir)/ntfscluster.8.in \
 	$(srcdir)/ntfscp.8.in $(srcdir)/ntfsfix.8.in \
 	$(srcdir)/ntfsinfo.8.in $(srcdir)/ntfslabel.8.in \
-	$(srcdir)/ntfsls.8.in $(srcdir)/ntfsprogs.8.in \
-	$(srcdir)/ntfsresize.8.in $(srcdir)/ntfsundelete.8.in
+	$(srcdir)/ntfsls.8.in $(srcdir)/ntfsmount.8.in \
+	$(srcdir)/ntfsprogs.8.in $(srcdir)/ntfsresize.8.in \
+	$(srcdir)/ntfsundelete.8.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -63,8 +64,8 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES = mkntfs.8 ntfscat.8 ntfsclone.8 ntfscluster.8 \
-	ntfscp.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 ntfsls.8 ntfsprogs.8 \
-	ntfsresize.8 ntfsundelete.8
+	ntfscp.8 ntfsfix.8 ntfsinfo.8 ntfslabel.8 ntfsls.8 ntfsmount.8 \
+	ntfsprogs.8 ntfsresize.8 ntfsundelete.8
 @ENABLE_FUSE_MODULE_TRUE@am__EXEEXT_1 = ntfsmount$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(sbindir)" \
 	"$(DESTDIR)$(man8dir)"
@@ -294,7 +295,8 @@ target_vendor = @target_vendor@
 LINK = $(STATIC_LINK) $(LIBTOOL_LINK)
 man_MANS = mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
-			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8
+			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8 \
+			  ntfsmount.8
 
 EXTRA_MANS = 
 CLEANFILES = $(EXTRA_PROGRAMS)
@@ -409,6 +411,8 @@ ntfsinfo.8: $(top_builddir)/config.status $(srcdir)/ntfsinfo.8.in
 ntfslabel.8: $(top_builddir)/config.status $(srcdir)/ntfslabel.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsls.8: $(top_builddir)/config.status $(srcdir)/ntfsls.8.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+ntfsmount.8: $(top_builddir)/config.status $(srcdir)/ntfsmount.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 ntfsprogs.8: $(top_builddir)/config.status $(srcdir)/ntfsprogs.8.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@

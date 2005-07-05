@@ -51,6 +51,10 @@ or directories within it.
 .PP
 .BR ntfsls (8)
 : List information about files in a directory residing on an NTFS partition.
+.SS ntfsmount
+.PP
+.BR ntfsmount (8)
+: NTFS module for FUSE.
 .SS ntfsresize
 .PP
 .BR ntfsresize (8)

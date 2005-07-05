@@ -265,6 +265,7 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfsinfo.8
 	ntfsprogs/ntfslabel.8
 	ntfsprogs/ntfsls.8
+	ntfsprogs/ntfsmount.8
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
