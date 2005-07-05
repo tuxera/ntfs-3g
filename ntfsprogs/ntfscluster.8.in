@@ -21,7 +21,7 @@ and
 .PP
 The default mode,
 .I info
-is currently not implemented.  It will display general infomation about the NTFS
+is currently not implemented.  It will display general information about the NTFS
 volume when it is working.
 .SS Sector
 .PP

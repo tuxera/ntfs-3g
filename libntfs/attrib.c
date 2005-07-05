@@ -83,7 +83,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	}
 	/* Complex attribute? */
 	if (a->flags) {
-		Dputs("Enountered non-zero attribute flags.  Cannot handle "
+		Dputs("Encountered non-zero attribute flags.  Cannot handle "
 				"this yet.");
 		errno = ENOTSUP;
 		return 0;
