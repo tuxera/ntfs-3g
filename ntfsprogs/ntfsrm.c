@@ -1887,7 +1887,7 @@ static int ntfs_inode_close2 (ntfs_inode *ni)
 	// unlink
 	//   ino->private_data
 
-	// XXX tempoarary until we have commit/rollback
+	// XXX temporary until we have commit/rollback
 	NInoClearDirty(ni);
 
 	return ntfs_inode_close (ni);
@@ -4524,7 +4524,7 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	 * successor.
 	 */
 
-	// find the key nearest the root which has no descendents
+	// find the key nearest the root which has no descendants
 	printf ("\n");
 	printf (BOLD YELLOW "Find childless parent:\n" END);
 	for (par = del->parent, old = par; par; old = par, par = par->parent) {

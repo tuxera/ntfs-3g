@@ -640,7 +640,7 @@ static s64 move_runlist (ntfs_volume *vol, runlist_element *from,
 
 // got to get the runlist out of this function
 //      requires a mrec arg, not an ino (ino->mrec will do for now)
-// check size of new runlist before allocting / moving
+// check size of new runlist before allocating / moving
 // replace one datarun with another (by hand)
 static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	runlist_element *run, u64 loc, int flags)

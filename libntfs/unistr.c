@@ -69,7 +69,7 @@ const u8 legal_ansi_char_array[0x40] = {
  *
  * Compare the names @s1 and @s2 and return TRUE (1) if the names are
  * identical, or FALSE (0) if they are not identical. If @ic is IGNORE_CASE,
- * the @upcase table is used to performa a case insensitive comparison.
+ * the @upcase table is used to perform a case insensitive comparison.
  */
 BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
 		const ntfschar *s2, size_t s2_len,

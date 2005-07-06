@@ -910,7 +910,7 @@ skip_index_root:
 	if (br != bmp_buf_size) {
 		if (br != -1)
 			errno = EIO;
-		Dperror("Failed to read from inde bitmap attribute");
+		Dperror("Failed to read from index bitmap attribute");
 		goto err_out;
 	}
 
@@ -933,7 +933,7 @@ find_next_index_buffer:
 		if (br != bmp_buf_size) {
 			if (br != -1)
 				errno = EIO;
-			Dperror("Failed to read from inde bitmap attribute");
+			Dperror("Failed to read from index bitmap attribute");
 			goto err_out;
 		}
 	}

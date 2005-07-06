@@ -1261,7 +1261,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		return -1;
 	}
 	prev_lcn = 0;
-	/* Always need the termining zero byte. */
+	/* Always need the terminating zero byte. */
 	rls = 1;
 	/* Do the first partial run if present. */
 	if (start_vcn > rl->vcn) {
@@ -1331,7 +1331,7 @@ err_out:
  * write.
  *
  * This is used when building the mapping pairs array of a runlist to compress
- * a given logical cluster number (lcn) or a specific run length to the minumum
+ * a given logical cluster number (lcn) or a specific run length to the minimum
  * size possible.
  *
  * Return the number of bytes written on success. On error, i.e. the

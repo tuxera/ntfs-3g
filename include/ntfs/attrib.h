@@ -115,7 +115,7 @@ extern ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
  *		// with it and then just continue with the while loop.
  *	}
  *	if (err && errno != ENOENT)
- *		// Ooops. An error occured! You should handle this case.
+ *		// Ooops. An error occurred! You should handle this case.
  *	// Now finished with all attributes in the inode.
  */
 static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
@@ -131,7 +131,7 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
  * @type:		attribute type
  * @name:		Unicode name of the attribute
  * @name_len:		length of @name in Unicode characters
- * @state:		NTFS attribute specific flags descibing this attribute
+ * @state:		NTFS attribute specific flags describing this attribute
  * @allocated_size:	copy from the attribute record
  * @data_size:		copy from the attribute record
  * @initialized_size:	copy from the attribute record
@@ -154,16 +154,16 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
  *
  * @rl is the decompressed runlist of the attribute described by this
  * structure. Obviously this only makes sense if the attribute is not resident,
- * i.e. NAttrNonResident() is true. If the runlist hasn't been decomressed yet
+ * i.e. NAttrNonResident() is true. If the runlist hasn't been decompressed yet
  * @rl is NULL, so be prepared to cope with @rl == NULL.
  *
  * @ni is the base ntfs inode of the attribute described by this structure.
  *
  * @type is the attribute type (see layout.h for the definition of ATTR_TYPES),
  * @name and @name_len are the little endian Unicode name and the name length
- * in Unicode characters of the attribute, respecitvely.
+ * in Unicode characters of the attribute, respectively.
  *
- * @state contains NTFS attribute specific flags descibing this attribute
+ * @state contains NTFS attribute specific flags describing this attribute
  * structure. See ntfs_attr_state_bits above.
  */
 struct _ntfs_attr {

@@ -171,7 +171,7 @@ typedef enum {
  * been written to disk. The values 0 and -1 (ie. 0xffff) are not used. All
  * last u16's of each sector have to be equal to the usn (during reading) or
  * are set to it (during writing). If they are not, an incomplete multi sector
- * transfer has occured when the data was written.
+ * transfer has occurred when the data was written.
  * The maximum size for the update sequence array is fixed to:
  *	maximum size = usa_ofs + (usa_count * 2) = 510 bytes
  * The 510 bytes comes from the fact that the last u16 in the array has to
@@ -279,7 +279,7 @@ typedef enum {
  * fragmented. Volume free space includes the empty part of the mft zone and
  * when the volume's free 88% are used up, the mft zone is shrunk by a factor
  * of 2, thus making more space available for more files/data. This process is
- * repeated everytime there is no more free space except for the mft zone until
+ * repeated every time there is no more free space except for the mft zone until
  * there really is no more free space.
  */
 
@@ -951,7 +951,7 @@ typedef struct {
  * itself. The list is sorted: first by attribute type, second by attribute
  * name (if present), third by instance number. The extents of one
  * non-resident attribute (if present) immediately follow after the initial
- * extent. They are ordered by lowest_vcn and have their instace set to zero.
+ * extent. They are ordered by lowest_vcn and have their instance set to zero.
  * It is not allowed to have two attributes with all sorting keys equal.
  * - Further restrictions:
  *	- If not resident, the vcn to lcn mapping array has to fit inside the
@@ -1522,7 +1522,7 @@ typedef enum {
 	 * Write access. For files, this maps onto:
 	 *	FILE_APPEND_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_DATA |
 	 *	FILE_WRITE_EA | STANDARD_RIGHTS_WRITE | SYNCHRONIZE
-	 * For directories, the mapping has the same numberical value. See
+	 * For directories, the mapping has the same numerical value. See
 	 * above for the descriptions of the rights granted.
 	 */
 	GENERIC_WRITE			= const_cpu_to_le32(0x40000000),
@@ -1531,7 +1531,7 @@ typedef enum {
 	 * Read access. For files, this maps onto:
 	 *	FILE_READ_ATTRIBUTES | FILE_READ_DATA | FILE_READ_EA |
 	 *	STANDARD_RIGHTS_READ | SYNCHRONIZE
-	 * For directories, the mapping has the same numberical value. See
+	 * For directories, the mapping has the same numerical value. See
 	 * above for the descriptions of the rights granted.
 	 */
 	GENERIC_READ			= const_cpu_to_le32(0x80000000),
@@ -1633,14 +1633,14 @@ typedef enum {
  *	SID pointed to by the Owner field was provided by a
  *	defaulting mechanism rather than explicitly provided by the
  *	original provider of the security descriptor.  This may
- *	affect the treatment of the SID with respect to inheritence
+ *	affect the treatment of the SID with respect to inheritance
  *	of an owner.
  *
  * SE_GROUP_DEFAULTED - This boolean flag, when set, indicates that the
  *	SID in the Group field was provided by a defaulting mechanism
  *	rather than explicitly provided by the original provider of
  *	the security descriptor.  This may affect the treatment of
- *	the SID with respect to inheritence of a primary group.
+ *	the SID with respect to inheritance of a primary group.
  *
  * SE_DACL_PRESENT - This boolean flag, when set, indicates that the
  *	security descriptor contains a discretionary ACL.  If this
@@ -1651,7 +1651,7 @@ typedef enum {
  *	ACL pointed to by the Dacl field was provided by a defaulting
  *	mechanism rather than explicitly provided by the original
  *	provider of the security descriptor.  This may affect the
- *	treatment of the ACL with respect to inheritence of an ACL.
+ *	treatment of the ACL with respect to inheritance of an ACL.
  *	This flag is ignored if the DaclPresent flag is not set.
  *
  * SE_SACL_PRESENT - This boolean flag, when set,  indicates that the
@@ -1664,7 +1664,7 @@ typedef enum {
  *	ACL pointed to by the Sacl field was provided by a defaulting
  *	mechanism rather than explicitly provided by the original
  *	provider of the security descriptor.  This may affect the
- *	treatment of the ACL with respect to inheritence of an ACL.
+ *	treatment of the ACL with respect to inheritance of an ACL.
  *	This flag is ignored if the SaclPresent flag is not set.
  *
  * SE_SELF_RELATIVE - This boolean flag, when set, indicates that the
@@ -1791,7 +1791,7 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
  * matching hash is found, but the security descriptors do not match, the
  * search in the $SDH index is continued, searching for a next matching hash.
  *
- * When a precise match is found, the security_id coresponding to the security
+ * When a precise match is found, the security_id corresponding to the security
  * descriptor in the $SDS attribute is read from the found $SDH index entry and
  * is stored in the $STANDARD_INFORMATION attribute of the file/directory to
  * which the security descriptor is being applied. The $STANDARD_INFORMATION
@@ -1968,14 +1968,14 @@ typedef struct {
  *
  * When a directory is small enough to fit inside the index root then this
  * is the only attribute describing the directory. When the directory is too
- * large to fit in the index root, on the other hand, two aditional attributes
+ * large to fit in the index root, on the other hand, two additional attributes
  * are present: an index allocation attribute, containing sub-nodes of the B+
  * directory tree (see below), and a bitmap attribute, describing which virtual
  * cluster numbers (vcns) in the index allocation attribute are in use by an
  * index block.
  *
  * NOTE: The root directory (FILE_root) contains an entry for itself. Other
- * dircetories do not contain entries for themselves, though.
+ * directories do not contain entries for themselves, though.
  */
 typedef struct {
 	ATTR_TYPES type;		/* Type of the indexed attribute. Is
@@ -2244,7 +2244,7 @@ typedef struct {
  *
  * The reparse point tag is an unsigned 32-bit value divided in three parts:
  *
- * 1. The least significant 16 bits (i.e. bits 0 to 15) specifiy the type of
+ * 1. The least significant 16 bits (i.e. bits 0 to 15) specify the type of
  *    the reparse point.
  * 2. The 13 bits after this (i.e. bits 16 to 28) are reserved for future use.
  * 3. The most significant three bits are flags describing the reparse point.

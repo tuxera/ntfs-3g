@@ -447,7 +447,7 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 	if (tofree)
 		free_dir(tofree);
 
-	/* if at the outter-most readdir_recursive, then clean up */
+	/* if at the outer-most readdir_recursive, then clean up */
 	if (ni_depth == 0) {
 		free_dirs(&dirs.list);
 	}
@@ -575,7 +575,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 
 		result = 0;
 release:
-		/* Release atrtibute search context and close the inode. */
+		/* Release attribute search context and close the inode. */
 		if (ctx)
 			ntfs_attr_put_search_ctx(ctx);
 		if (ni)

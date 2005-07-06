@@ -228,7 +228,7 @@ done:
 			break;
 		/*
 		 * A match should never happen as the memcmp() call should have
-		 * cought it, but we still treat it correctly.
+		 * caught it, but we still treat it correctly.
 		 */
 		if (!rc)
 			goto ir_done;
@@ -356,7 +356,7 @@ ia_done:
 			break;
 		/*
 		 * A match should never happen as the memcmp() call should have
-		 * cought it, but we still treat it correctly.
+		 * caught it, but we still treat it correctly.
 		 */
 		if (!rc)
 			goto ia_done;

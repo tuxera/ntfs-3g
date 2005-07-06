@@ -37,13 +37,13 @@
  * ntfs_attrlist_need - check whether attribute need attribute list
  * @ni:		opened ntfs inode for which perform check
  *
- * Check whether all are atributes belong to one MFT record, in that case
+ * Check whether all are attributes belong to one MFT record, in that case
  * attribute list is not needed.
  *
  * Return 1 if inode need attribute list, 0 if not, -1 on error with errno set
  * to the error code. If function succeed errno set to 0. The following error
  * codes are defined:
- *	EINVAL	- Invalid argumets passed to function or attribute haven't got
+ *	EINVAL	- Invalid arguments passed to function or attribute haven't got
  *		  attribute list.
  */
 int ntfs_attrlist_need(ntfs_inode *ni)
@@ -51,7 +51,7 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 	ATTR_LIST_ENTRY *ale;
 
 	if (!ni) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -67,7 +67,7 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 	}
 
 	if (!ni->attr_list) {
-		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
+		Dprintf("%s(): Corrupt in-memory struct.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -89,9 +89,9 @@ int ntfs_attrlist_need(ntfs_inode *ni)
  *
  * Return 0 on success and -1 on error with errno set to the error code. The
  * following error codes are defined:
- *	EINVAL	- Invalid argumets passed to function.
+ *	EINVAL	- Invalid arguments passed to function.
  *	ENOMEM	- Not enough memory to allocate necessary buffers.
- *	EIO	- I/O error occured or damaged filesystem.
+ *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 {
@@ -106,7 +106,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			(unsigned) le32_to_cpu(attr->type));
 
 	if (!ni || !attr) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -172,7 +172,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	entry_offset = ((u8 *)ale - ni->attr_list);
 	/* Set pointer to new entry. */
 	ale = (ATTR_LIST_ENTRY *)(new_al + entry_offset);
-	/* Zero it to fix valgrid warning. */
+	/* Zero it to fix valgrind warning. */
 	memset(ale, 0, entry_len);
 	/* Form new entry. */
 	ale->type = attr->type;
@@ -226,7 +226,7 @@ err_out:
 
 /**
  * ntfs_attrlist_entry_rm - remove an attribute list attribute entry
- * @ctx:	attribute search context describing the attrubute list entry
+ * @ctx:	attribute search context describing the attribute list entry
  *
  * Remove the attribute list entry @ctx->al_entry from the attribute list.
  *
@@ -242,7 +242,7 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 	int err;
 
 	if (!ctx || !ctx->ntfs_ino || !ctx->al_entry) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}

@@ -84,7 +84,7 @@ static struct {
 } opts;
 
 /**
- * mkDprintf - debugging output (-vv); overriden by quiet (-q)
+ * mkDprintf - debugging output (-vv); overridden by quiet (-q)
  */
 static void mkDprintf(const char *fmt, ...)
 		__attribute__((format(printf, 1, 2)));
@@ -152,7 +152,7 @@ static void copyright(void)
 }
 
 /**
- * license - print licese statement
+ * license - print license statement
  */
 static void license(void)
 {

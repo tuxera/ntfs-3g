@@ -204,7 +204,7 @@ static int parse_options (int argc, char *argv[])
 			opts.notime++;
 			break;
 		case 'T':
-			/* 'T' is depreceted, notify */
+			/* 'T' is deprecated, notify */
 			Eprintf ("Option 'T' is deprecated, it was replaced by 't'.\n");
 			err++;
 			break;
@@ -287,7 +287,7 @@ static char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 
 /**
  * ntfs_attr_get_name()
- * @attr:	a vaild attribute record
+ * @attr:	a valid attribute record
  *
  * return multi-byte string containing the attribute name if exist. the user
  *             is then responsible of freeing that memory.
@@ -569,7 +569,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 			printf("\tList name:\t\t '%s'\n",stream_name);
 			free(stream_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
 				strerror(errno));
 		}
@@ -617,7 +617,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 	for(;(u8 *)entry < (u8 *) value + l; entry = (ATTR_LIST_ENTRY *)
 				((u8 *) entry + le16_to_cpu(entry->length))) {
 		printf("\n");
-		printf("\t\tAtrribute type:\t0x%x\n",
+		printf("\t\tAttribute type:\t0x%x\n",
 				(unsigned int)le32_to_cpu(entry->type));
 		printf("\t\tRecord length:\t%u\n",
 				le16_to_cpu(entry->length));
@@ -675,7 +675,7 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 			printf("\tFile Name:\t\t '%s'\n", mbs_file_name);
 			free(mbs_file_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse file name: %s\n",
 				strerror(errno));
 		}
@@ -854,7 +854,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 						data_size, sec_desc_attr);
 			if (bytes_read != data_size) {
 				Eprintf("ntfsinfo error: could not "
-						"read secutiry descriptor\n");
+						"read security descriptor\n");
 				free(sec_desc_attr);
 				return;
 			}
@@ -940,7 +940,7 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 			printf("\tVolume Name:\t\t '%s'\n",mbs_vol_name);
 			free(mbs_vol_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr,"ntfsinfo error: could not parse volume name: %s\n",
 				strerror(errno));
 		}
@@ -1011,7 +1011,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 			printf("\tStream name:\t\t '%s'\n",stream_name);
 			free(stream_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
 				strerror(errno));
 		}
@@ -1168,7 +1168,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 			printf("\tIndex name:\t\t '%s'\n",index_name);
 			free(index_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse index name: %s\n",
 				strerror(errno));
 		}
@@ -1183,7 +1183,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 	type = le32_to_cpu(index_root->type);
 	if (type) {
 		if (index_root->type != AT_FILE_NAME) {
-			/* wierd, this should be illgeal */
+			/* weird, this should be illgeal */
 			printf("0x%0X\n", type);
 			fprintf(stderr, "ntfsinfo error: Unknown Indexed Attr Type: 0x%0X\n",
 				type);
@@ -1375,7 +1375,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			free(index_name);
 		} else {
 			/*
-			 * An error occured, errno holds the reason -
+			 * An error occurred, errno holds the reason -
 			 * notify the user
 			 */
 			fprintf(stderr, "ntfsinfo error: could not parse "
@@ -1395,7 +1395,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 		printf("\tUsed data size:\t\t %llu\n",
 			(unsigned long long)le64_to_cpu(attr->data_size));
 	} else {
-		Eprintf("Invalid $INDEX_ALLOCTION attribute. Should be be"
+		Eprintf("Invalid $INDEX_ALLOCATION attribute. Should be be"
 						    " non-resident\n");
 	}
 
@@ -1420,7 +1420,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 			printf("\tBitmap name:\t\t '%s'\n",bitmap_name);
 			free(bitmap_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse bitmap name: %s\n",
 				strerror(errno));
 		}
@@ -1567,7 +1567,7 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 			printf("\tAttribute name:\t '%s'\n",attr_name);
 			free(attr_name);
 		} else {
-			/* an error occured, errno holds the reason - notify the user */
+			/* an error occurred, errno holds the reason - notify the user */
 			fprintf(stderr, "ntfsinfo error: could not parse attribute name: %s\n",
 				strerror(errno));
 		}
@@ -1666,7 +1666,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 	ntfs_attr_search_ctx *ctx = NULL;
 
 	/* then start enumerating attributes
-	   see ntfs_attr_lookup documentation for detailed explenation */
+	   see ntfs_attr_lookup documentation for detailed explanation */
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		switch (ctx->attr->type) {

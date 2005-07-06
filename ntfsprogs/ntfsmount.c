@@ -204,8 +204,8 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
  * after use.
  *
  * Return values:
- *	<0	Error occured, return -errno;
- *	 0	No stream name, @*stream is not allocated and set to AT_UNMAMED.
+ *	<0	Error occurred, return -errno;
+ *	 0	No stream name, @*stream is not allocated and set to AT_UNNAMED.
  *	>0	Stream name length in unicode characters.
  */
 static int ntfs_fuse_parse_path(const char *org_path, char **path,

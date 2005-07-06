@@ -264,7 +264,7 @@ static __inline__ void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
  * @na:
  * @non_resident:
  * @compressed:
- * @ecnrypted:
+ * @encrypted:
  * @sparse:
  * @allocated_size:
  * @data_size:
@@ -1105,7 +1105,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			/* The buffer is non zero, instantiate the hole. */
 			cur_vcn = rl->vcn;
 			from_vcn = rl->vcn + (ofs >> vol->cluster_size_bits);
-			Dprintf("%s(): Isntantiate the hole with vcn 0x%llx.\n",
+			Dprintf("%s(): Instantiate the hole with vcn 0x%llx.\n",
 					__FUNCTION__, cur_vcn);
 			/*
 			 * Search backwards to find the best lcn to start
@@ -1154,7 +1154,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				if (ntfs_cluster_free_from_rl(vol, rlc)) {
 					Dprintf("%s(): Failed to free just "
 						"allocated clusters. Leaving "
-						"inconsist metadata. "
+						"inconstant metadata. "
 						"Run chkdsk", __FUNCTION__);
 				}
 				errno = eo;
@@ -1167,7 +1167,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				/*
 				 * It's definitely a BUG, if we failed to find
 				 * @cur_vcn, because we missed it during
-				 * instatiating of the hole.
+				 * instantiating of the hole.
 				 */
 				Dprintf("%s(): BUG! Failed to find run after "
 					"instantiating. Please report to the "
@@ -1179,7 +1179,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			/* If leaved part of the hole go to the next run. */
 			if (rl->lcn < 0)
 				rl++;
-			/* Now LCN should shoudn't be lesser than 0. */
+			/* Now LCN shoudn't be less than 0. */
 			if (rl->lcn < 0) {
 				Dprintf("%s(): BUG! LCN is lesser than 0. "
 						"Please report to the "
@@ -1494,7 +1494,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
  * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
  * match both named and unnamed attributes.
  *
- * If @ic is IGNORE_CASE, the @name comparisson is not case sensitive and
+ * If @ic is IGNORE_CASE, the @name comparison is not case sensitive and
  * @ctx->ntfs_ino must be set to the ntfs inode to which the mft record
  * @ctx->mrec belongs. This is so we can get at the ntfs volume and hence at
  * the upcase table. If @ic is CASE_SENSITIVE, the comparison is case
@@ -2260,7 +2260,7 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
  * @type in the $AttrDef system file.
  *
  * Return the attribute type definition record if found and NULL if not found
- * or an error occured. On error the error code is stored in errno. The
+ * or an error occurred. On error the error code is stored in errno. The
  * following error codes are defined:
  *	ENOENT	- The attribute @type is not specified in $AttrDef.
  *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
@@ -2299,7 +2299,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
  * Check whether the @size in bytes is valid for an attribute of @type on the
  * ntfs volume @vol. This information is obtained from $AttrDef system file.
  *
- * Return 0 if valid and -1 if not valid or an error occured. On error the
+ * Return 0 if valid and -1 if not valid or an error occurred. On error the
  * error code is stored in errno. The following error codes are defined:
  *	ERANGE	- @size is not valid for the attribute @type.
  *	ENOENT	- The attribute @type is not specified in $AttrDef.
@@ -2348,7 +2348,7 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
  * be non-resident. This information is obtained from $AttrDef system file.
  *
  * Return 0 if the attribute is allowed to be non-resident and -1 if not or an
- * error occured. On error the error code is stored in errno. The following
+ * error occurred. On error the error code is stored in errno. The following
  * error codes are defined:
  *	EPERM	- The attribute is not allowed to be non-resident.
  *	ENOENT	- The attribute @type is not specified in $AttrDef.
@@ -2382,7 +2382,7 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
  * allocation and extended attribute attributes.
  *
  * Return 0 if the attribute is allowed to be resident and -1 if not or an
- * error occured. On error the error code is stored in errno. The following
+ * error occurred. On error the error code is stored in errno. The following
  * error codes are defined:
  *	EPERM	- The attribute is not allowed to be resident.
  *	EINVAL	- Invalid parameters (e.g. @vol is not valid).
@@ -2425,7 +2425,7 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 	Dprintf("%s(): Entering for pos 0x%d, size %u.\n",
 		 __FUNCTION__, (int)(pos - (u8*)m), (unsigned) size);
 
-	/* Make size 8-byte aligment. */
+	/* Make size 8-byte alignment. */
 	size = (size + 7) & ~7;
 
 	/* Rigorous consistency checks. */
@@ -2467,9 +2467,9 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  * Return offset to attribute from the beginning of the mft record on success
  * and -1 on error. On error the error code is stored in errno.
  * Possible error codes are:
- *	EINVAL	- Invalid argumets passed to function.
+ *	EINVAL	- Invalid arguments passed to function.
  *	EEXIST	- Attribute of such type and with same name already exists.
- *	EIO	- I/O error occured or damaged filesystem.
+ *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 			ntfschar *name, u8 name_len, ATTR_FLAGS flags)
@@ -2502,7 +2502,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		return -1;
 	}
 
-	/* Locate place where record shoud be. */
+	/* Locate place where record should be. */
 	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
@@ -2580,10 +2580,10 @@ put_err_out:
  * Return offset to attribute from the beginning of the mft record on success
  * and -1 on error. On error the error code is stored in errno.
  * Possible error codes are:
- *	EINVAL	- Invalid argumets passed to function.
+ *	EINVAL	- Invalid arguments passed to function.
  *	EEXIST	- Attribute of such type, with same lowest vcn and with same
  *		  name already exists.
- *	EIO	- I/O error occured or damaged filesystem.
+ *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
@@ -2618,7 +2618,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		return -1;
 	}
 
-	/* Locate place where record shoud be. */
+	/* Locate place where record should be. */
 	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
@@ -2699,7 +2699,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 					lowest_vcn, NULL, 0, ctx)) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed. Probably leaving "
-			"inconsist metadata.\n", __FUNCTION__);
+			"inconstant metadata.\n", __FUNCTION__);
 		ntfs_attr_put_search_ctx(ctx);
 		errno = err;
 		return -1;
@@ -2716,15 +2716,15 @@ put_err_out:
 
 /**
  * ntfs_attr_record_rm - remove attribute extent
- * @ctx:	search context describing the attrubute which should be removed
+ * @ctx:	search context describing the attribute which should be removed
  *
  * If this function succeed, user should reinit search context if he/she wants
  * use it anymore.
  *
  * Return 0 on success and -1 on error. On error the error code is stored in
  * errno. Possible error codes are:
- *	EINVAL	- Invalid argumets passed to function.
- *	EIO	- I/O error occured or damaged filesystem.
+ *	EINVAL	- Invalid arguments passed to function.
+ *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 {
@@ -2749,12 +2749,12 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 
 	/* Remove attribute itself. */
 	if (ntfs_attr_record_resize(ctx->mrec, ctx->attr, 0)) {
-		Dprintf("%s(): Coudn't remove attribute record. Bug or "
+		Dprintf("%s(): Couldn't remove attribute record. Bug or "
 			"damaged MFT record.\n", __FUNCTION__);
 		if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST)
 			if (ntfs_attrlist_entry_add(ni, ctx->attr))
 				Dprintf("%s(): Rollback failed. Leaving "
-					"inconsist metadata.\n", __FUNCTION__);
+					"inconstant metadata.\n", __FUNCTION__);
 		err = EIO;
 		return -1;
 	}
@@ -2767,7 +2767,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 	if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST) {
 		if (ntfs_attrlist_entry_rm(ctx)) {
 			err = errno;
-			Dprintf("%s(): Coudn't delete record from "
+			Dprintf("%s(): Couldn't delete record from "
 				"$ATTRIBUTE_LIST.\n",  __FUNCTION__);
 			errno = err;
 			return -1;
@@ -2788,7 +2788,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(ni->vol, ni)) {
 			// FIXME: We need rollback here.
-			Dprintf("%s(): Coudn't free MFT record.\n",
+			Dprintf("%s(): Couldn't free MFT record.\n",
 					__FUNCTION__);
 			errno = EIO;
 			return -1;
@@ -2811,7 +2811,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			 * goes wrong because NInoAttrList(base_ni) returned
 			 * that we have got attribute list.
 			 */
-			Dprintf("%s(): Coudn't find attribute list. Succeed "
+			Dprintf("%s(): Couldn't find attribute list. Succeed "
 				"anyway.\n", __FUNCTION__);
 			return 0;
 		}
@@ -2842,7 +2842,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			 * complain if it find MFT record with attribute list,
 			 * but without extents.
 			 */
-			Dprintf("%s(): Coudn't remove attribute list. Succeed "
+			Dprintf("%s(): Couldn't remove attribute list. Succeed "
 				"anyway.\n", __FUNCTION__);
 			return 0;
 		}
@@ -2855,10 +2855,10 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
  * @ni:		opened ntfs inode to which add attribute
  * @type:	type of the new attribute
  * @name:	name in unicode of the new attribute
- * @name_len:	name length in unicode charcters of the new attribute
+ * @name_len:	name length in unicode characters of the new attribute
  * @size:	size of the new attribute
  *
- * If inode haven't got enogh space to add attribute, add attribute to one of it
+ * If inode haven't got enough space to add attribute, add attribute to one of it
  * extents, if no extents present or no one of them have enough space, than
  * allocate new extent and add attribute to it.
  *
@@ -3013,7 +3013,7 @@ add_attr_record:
 				__FUNCTION__);
 		if (ntfs_attr_rm(na)) {
 			Dprintf("%s(): Failed to remove just added attribute. "
-				"Probably leaving inconsist metadata.\n",
+				"Probably leaving inconstant metadata.\n",
 				__FUNCTION__);
 		}
 		goto err_out;
@@ -3034,7 +3034,7 @@ free_err_out:
 			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni)) {
 			Dprintf("%s(): Failed to free MFT record. Leaving "
-					"inconsist metadata.\n", __FUNCTION__);
+					"inconstant metadata.\n", __FUNCTION__);
 		}
 	}
 err_out:
@@ -3071,7 +3071,7 @@ int ntfs_attr_rm(ntfs_attr *na)
 			return -1;
 		if (ntfs_cluster_free(na->ni->vol, na, 0, -1) < 0) {
 			Dprintf("%s(): Failed to free cluster allocation. "
-				"Leaving inconsist metadata.\n", __FUNCTION__);
+				"Leaving inconstant metadata.\n", __FUNCTION__);
 			ret = -1;
 		}
 	}
@@ -3084,14 +3084,14 @@ int ntfs_attr_rm(ntfs_attr *na)
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (ntfs_attr_record_rm(ctx)) {
 			Dprintf("%s(): Failed to remove attribute extent. "
-				"Leaving inconsist metadata.\n", __FUNCTION__);
+				"Leaving inconstant metadata.\n", __FUNCTION__);
 			ret = -1;
 		}
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
 	if (errno != ENOENT) {
 		Dprintf("%s(): Attribute lookup failed. Probably leaving "
-				"inconsist metadata.\n", __FUNCTION__);
+				"inconstant metadata.\n", __FUNCTION__);
 		ret = -1;
 	}
 
@@ -3165,7 +3165,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 {
 	/*
 	 * Check that the attribute name hasn't been placed after the
-	 * attribute valuy. Chkdsk treat this as corruption.
+	 * attribute value. Chkdsk treat this as corruption.
 	 */
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->value_offset)) {
@@ -3201,7 +3201,7 @@ int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 
 /**
  * ntfs_attr_record_move_to - move attribute record to target inode
- * @ctx:	attribute search context describing the attrubute record
+ * @ctx:	attribute search context describing the attribute record
  * @ni:		opened ntfs inode to which move attribute record
  *
  * If this function succeed, user should reinit search context if he/she wants
@@ -3292,8 +3292,8 @@ put_err_out:
 
 /**
  * ntfs_attr_record_move_away - move away attribute record from it's mft record
- * @ctx:	attribute search context describing the attrubute record
- * @extra:	minimum amount of free spase in the new holder of record
+ * @ctx:	attribute search context describing the attribute record
+ * @extra:	minimum amount of free space in the new holder of record
  *
  * New attribute record holder must have free @extra bytes after moving
  * attribute record to it.
@@ -3419,7 +3419,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 
 	/*
 	 * Check that the attribute name hasn't been placed after the
-	 * attribute valuy. Chkdsk treat this as corruption.
+	 * attribute value. Chkdsk treat this as corruption.
 	 */
 	if (a->name_length && le16_to_cpu(a->name_offset) >=
 			le16_to_cpu(a->value_offset)) {
@@ -3580,7 +3580,7 @@ cluster_free_err_out:
  * The following error codes are defined:
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
- *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
+ *	ENOSPC  - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
 static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
@@ -3689,7 +3689,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		ntfs_attr_put_search_ctx(ctx);
 		return ntfs_resident_attr_resize(na, newsize);
 	}
-	/* Check whether error occured. */
+	/* Check whether error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
@@ -3921,7 +3921,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		if (bytes_read < 0)
 			err = errno;
 		Dprintf("%s(): Eeek! Failed to read attribute data. "
-				"Leaving inconsist metadata. Run chkdsk.  "
+				"Leaving inconstant metadata. Run chkdsk.  "
 				"Aborting...\n", __FUNCTION__);
 		errno = err;
 		return -1;
@@ -3975,7 +3975,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
  *	ENOMEM	- Not enough memory to complete operation.
- *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
+ *	ENOSPC  - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
 int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
 {
@@ -4177,7 +4177,7 @@ retry:
 			/*
 			 * Mapping pairs of $ATTRIBUTE_LIST attribute must fit
 			 * in the base mft record. Try to move out other
-			 * attibutes and try again.
+			 * attributes and try again.
 			 */
 			if (na->type == AT_ATTRIBUTE_LIST) {
 				ntfs_attr_put_search_ctx(ctx);
@@ -4201,7 +4201,7 @@ retry:
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_add_attrlist(base_ni)) {
 					err = errno;
-					Dprintf("%s(): Eeek! Coudn't add "
+					Dprintf("%s(): Eeek! Couldn't add "
 						"attribute list.\n",
 						__FUNCTION__);
 					errno = err;
@@ -4264,7 +4264,7 @@ retry:
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
 	}
-	/* Check whether error occured. */
+	/* Check whether error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
@@ -4283,7 +4283,7 @@ retry:
 			/* Remove unused attribute record. */
 			if (ntfs_attr_record_rm(ctx)) {
 				err = errno;
-				Dprintf("%s(): Coudn't remove unused attribute "
+				Dprintf("%s(): Couldn't remove unused attribute "
 					"record.\n", __FUNCTION__);
 				goto put_err_out;
 			}
@@ -4323,7 +4323,7 @@ retry:
 		}
 		m = ni->mrec;
 		/*
-		 * If mapping size exceed avaible space, set them to
+		 * If mapping size exceed available space, set them to
 		 * possible maximum.
 		 */
 		cur_max_mp_size = le32_to_cpu(m->bytes_allocated) -
@@ -4334,7 +4334,7 @@ retry:
 				((sizeof(ntfschar) * na->name_len + 7) & ~7);
 		if (mp_size > cur_max_mp_size)
 			mp_size = cur_max_mp_size;
-		/* Add atribute extent to new record. */
+		/* Add attribute extent to new record. */
 		err = ntfs_non_resident_attr_record_add(ni, na->type,
 			 na->name, na->name_len, stop_vcn, mp_size, 0);
 		if (err == -1) {
@@ -4342,7 +4342,7 @@ retry:
 			Dprintf("%s(): Couldn't add attribute extent "
 				"into the MFT record.\n", __FUNCTION__);
 			if (ntfs_mft_record_free(na->ni->vol, ni)) {
-				Dprintf("%s(): Coudn't free MFT record.\n",
+				Dprintf("%s(): Couldn't free MFT record.\n",
 					__FUNCTION__);
 			}
 			goto put_err_out;
@@ -4361,7 +4361,7 @@ retry:
 				"linux-ntfs-dev@lists.sf.net.\n",
 				__FUNCTION__);
 			if (ntfs_mft_record_free(na->ni->vol, ni))
-				Dprintf("%s(): Coudn't free MFT record.\n",
+				Dprintf("%s(): Couldn't free MFT record.\n",
 					__FUNCTION__);
 			goto put_err_out;
 		}
@@ -4466,7 +4466,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (ntfs_attr_update_mapping_pairs(na)) {
 			err = errno;
 			Dprintf("%s(): Eeek! Mapping pairs update failed. "
-				"Leaving inconsist metadata. Run chkdsk.\n",
+				"Leaving inconstant metadata. Run chkdsk.\n",
 				__FUNCTION__);
 			errno = err;
 			return -1;
@@ -4479,10 +4479,10 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		err = errno;
 		if ((na->allocated_size >> vol->cluster_size_bits)
 						!= first_free_vcn)
-			Dprintf("%s(): Coudn't get attribute search context. "
-				"Leaving inconsist metadata.\n", __FUNCTION__);
+			Dprintf("%s(): Couldn't get attribute search context. "
+				"Leaving inconstant metadata.\n", __FUNCTION__);
 		else
-			Dprintf("%s(): Coudn't get attribute search context.\n",
+			Dprintf("%s(): Couldn't get attribute search context.\n",
 				 __FUNCTION__);
 		errno = err;
 		return -1;
@@ -4493,7 +4493,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (err == ENOENT)
 			err = EIO;
 		Dprintf("%s(): Eeek! Lookup of first attribute extent failed. "
-			"Leaving inconsist metadata.\n", __FUNCTION__);
+			"Leaving inconstant metadata.\n", __FUNCTION__);
 		goto put_err_out;
 	}
 	a = ctx->attr;
@@ -4511,7 +4511,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		new_compr_size = ntfs_rl_get_compressed_size(vol, na->rl);
 		if (new_compr_size == -1) {
 			err = errno;
-			Dprintf("%s(): BUG! Leaving inconsist metadata.\n",
+			Dprintf("%s(): BUG! Leaving inconstant metadata.\n",
 					__FUNCTION__);
 			goto put_err_out;
 		}
@@ -4561,7 +4561,7 @@ put_err_out:
  * The following error codes are defined:
  *	ENOMEM	- Not enough memory to complete operation.
  *	ERANGE	- @newsize is not valid for the attribute type of @na.
- *	ENOSPC  - There is no enogh space in base mft to resize $ATTRIBUTE_LIST.
+ *	ENOSPC  - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 {
@@ -4611,7 +4611,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 
 		/*
 		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
-		 * sparse runs instead of real alloction of clusters.
+		 * sparse runs instead of real allocation of clusters.
 		 */
 		if (na->type == AT_DATA && vol->major_ver >= 3) {
 			rl = malloc(0x1000);
@@ -4643,7 +4643,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				for (rl = na->rl; (rl + 1)->length; rl++)
 					;
 				/*
-				 * If the last LCN is a hole or simillar seek
+				 * If the last LCN is a hole or similar seek
 				 * back to last valid LCN.
 				 */
 				while (rl->lcn < 0 && rl != na->rl)
@@ -4733,7 +4733,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		new_compr_size = ntfs_rl_get_compressed_size(vol, na->rl);
 		if (new_compr_size == -1) {
 			err = errno;
-			Dprintf("%s(): BUG! Leaving inconsist metadata.\n",
+			Dprintf("%s(): BUG! Leaving inconstant metadata.\n",
 					__FUNCTION__);
 			goto put_err_out;
 		}
@@ -4766,12 +4766,12 @@ rollback:
 		 */
 		free(na->rl);
 		na->rl = NULL;
-		Dprintf("%s(): Eeek! Coudn't truncate runlist. Rollback "
+		Dprintf("%s(): Eeek! Couldn't truncate runlist. Rollback "
 			"failed.\n", __FUNCTION__);
 	} else {
-		/* Retore mapping pairs. */
+		/* Restore mapping pairs. */
 		if (ntfs_attr_update_mapping_pairs(na)) {
-			Dprintf("%s(): Eeek! Coudn't restore old mapping "
+			Dprintf("%s(): Eeek! Couldn't restore old mapping "
 				"pairs. Rollback failed.\n", __FUNCTION__);
 		}
 	}
@@ -4818,7 +4818,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 
 	if (!na || newsize < 0 ||
 			(na->ni->mft_no == FILE_MFT && na->type == AT_DATA)) {
-		Dprintf("%s(): Invalid aruments passed.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -4852,8 +4852,8 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		NInoFileNameSetDirty(na->ni);
 		na->ni->data_size = na->data_size;
 		/*
-		 * If attribute sparse or commpreseed then allocated size in
-		 * index should be euqal to compressed size, not to allocated
+		 * If attribute sparse or compressed then allocated size in
+		 * index should be equal to compressed size, not to allocated
 		 * size.
 		 */
 		if (NAttrCompressed(na) || NAttrSparse(na))

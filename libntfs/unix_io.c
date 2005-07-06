@@ -1,5 +1,5 @@
 /*
- * unix_io.c - Unix stule disk io functions. Part of the Linux-NTFS project.
+ * unix_io.c - Unix style disk io functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2003 Anton Altaparmakov
  *
@@ -64,7 +64,7 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	/* Setup our read-only flag. */
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
-	/* Acquire exlusive (mandatory) lock on the whole device. */
+	/* Acquire exclusive (mandatory) lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
 	if (NDevReadOnly(dev))
 		flk.l_type = F_RDLCK;
@@ -103,7 +103,7 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 	}
 	if (NDevDirty(dev))
 		fsync(DEV_FD(dev));
-	/* Release exlusive (mandatory) lock on the whole device. */
+	/* Release exclusive (mandatory) lock on the whole device. */
 	memset(&flk, 0, sizeof(flk));
 	flk.l_type = F_UNLCK;
 	flk.l_whence = SEEK_SET;

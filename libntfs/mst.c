@@ -37,7 +37,7 @@
  * Return 0 on success and -1 on error, with errno set to the error code. The
  * following error codes are defined:
  *	EINVAL	Invalid arguments or invalid NTFS record in buffer @b.
- *	EIO	Mulit sector transfer error was detected. Magic of the NTFS
+ *	EIO	Multi sector transfer error was detected. Magic of the NTFS
  *		record in @b will have been set to "BAAD".
  */
 int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
@@ -63,7 +63,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 	 * u16 values before they are fixed up. Note no need to care for
 	 * endianness since we are comparing and moving data for on disk
 	 * structures which means the data is consistent. - If it is
-	 * consistenty the wrong endianness it doesn't make any difference.
+	 * consistency the wrong endianness it doesn't make any difference.
 	 */
 	usn = *usa_pos;
 	/*

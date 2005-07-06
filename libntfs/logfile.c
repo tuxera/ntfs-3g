@@ -222,7 +222,7 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 				"inconsistent log record header length.");
 		return FALSE;
 	}
-	/* Dito for the log page data offset. */
+	/* Ditto for the log page data offset. */
 	if (((le16_to_cpu(ra->log_page_data_offset) + 7) & ~7) !=
 			le16_to_cpu(ra->log_page_data_offset)) {
 		ntfs_error(vi->i_sb, "$LogFile restart area specifies "
@@ -378,7 +378,7 @@ err_out:
 }
 
 /**
- * ntfs_ckeck_logfile - check in the journal if the volume is consistent
+ * ntfs_check_logfile - check in the journal if the volume is consistent
  * @log_na:	ntfs attribute of loaded journal $LogFile to check
  *
  * Check the $LogFile journal for consistency and return TRUE if it is
@@ -442,7 +442,7 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na)
 	 * page header is at the beginning of a page we only need to search at
 	 * what could be the beginning of a page (for each page size) rather
 	 * than scanning the whole file byte by byte.  If all potential places
-	 * contain empty and uninitialzed records, the log file can be assumed
+	 * contain empty and uninitialized records, the log file can be assumed
 	 * to be empty.
 	 */
 	for (pos = 0; pos < size; pos <<= 1) {
@@ -573,7 +573,7 @@ err_out:
  * of cases where we think that a volume is dirty when in fact it is clean.
  * This should only affect volumes that have not been shutdown cleanly but did
  * not have any pending, non-check-pointed i/o, i.e. they were completely idle
- * at least for the five seconds preceeding the unclean shutdown.
+ * at least for the five seconds preceding the unclean shutdown.
  *
  * This function assumes that the $LogFile journal has already been consistency
  * checked by a call to ntfs_check_logfile() and in particular if the $LogFile

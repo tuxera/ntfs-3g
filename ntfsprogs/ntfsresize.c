@@ -1049,7 +1049,7 @@ close_inode:
 	return 0;
 }
 
-static void build_resize_constrains(ntfs_resize_t *resize)
+static void build_resize_constraints(ntfs_resize_t *resize)
 {
 	s64 i;
 	runlist *rl;
@@ -1073,7 +1073,7 @@ static void build_resize_constrains(ntfs_resize_t *resize)
 	free(rl);
 }
 
-static void resize_constrains_by_attributes(ntfs_resize_t *resize)
+static void resize_constraints_by_attributes(ntfs_resize_t *resize)
 {
 	if (!(resize->ctx = attr_get_search_ctx(resize->ni, NULL)))
 		exit(1);
@@ -1081,18 +1081,18 @@ static void resize_constrains_by_attributes(ntfs_resize_t *resize)
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
 			break;
-		build_resize_constrains(resize);
+		build_resize_constraints(resize);
 	}
 
 	ntfs_attr_put_search_ctx(resize->ctx);
 }
 
-static void set_resize_constrains(ntfs_resize_t *resize)
+static void set_resize_constraints(ntfs_resize_t *resize)
 {
 	s64 nr_mft_records, inode;
 	ntfs_inode *ni;
 
-	printf("Collecting shrinkage constrains ...\n");
+	printf("Collecting shrinkage constraints ...\n");
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
@@ -1110,7 +1110,7 @@ static void set_resize_constrains(ntfs_resize_t *resize)
 			goto close_inode;
 
 		resize->ni = ni;
-		resize_constrains_by_attributes(resize);
+		resize_constraints_by_attributes(resize);
 close_inode:
 		if (inode_close(ni) != 0)
 			exit(1);
@@ -1518,7 +1518,7 @@ static void rl_insert_at_run(runlist **rl, int run, runlist *ins)
 
 	return;
 
-	/* FIXME: fastpath if ins_items = 1 */
+	/* FIXME: fast path if ins_items = 1 */
 //	(*rl + run)->lcn = ins->lcn;
 }
 
@@ -2293,7 +2293,7 @@ int main(int argc, char **argv)
 	if (new_size < vol->nr_clusters)
 		resize.shrink = 1;
 
-	set_resize_constrains(&resize);
+	set_resize_constraints(&resize);
 	set_disk_usage_constraint(&resize);
 	check_resize_constraints(&resize);
 

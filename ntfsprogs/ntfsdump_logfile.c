@@ -25,7 +25,7 @@
 /* TODO:
  *	- Remove the need for clipping at 64MiB.
  *	- Add normal command line switchs (use getopt_long()).
- *	- For a volume: allow dumping only uncommited records.
+ *	- For a volume: allow dumping only uncommitted records.
  *	- For a file:   get an optional command line parameter for the last SN.
  *	- Sanity checks.
  */

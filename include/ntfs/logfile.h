@@ -124,7 +124,7 @@ typedef struct {
 				   when the restart area was last written.
 				   This happens often but what is the interval?
 				   Is it just fixed time or is it every time a
-				   check point is written or somethine else?
+				   check point is written or something else?
 				   On create set to 0. */
 /*  8*/	le16 log_clients;	/* Number of log client records in the array of
 				   log client records which follows this
@@ -217,7 +217,7 @@ typedef struct {
 /* 24*/	sle64 file_size;	/* Usable byte size of the log file.  If the
 				   restart_area_offset + the offset of the
 				   file_size are > 510 then corruption has
-				   occured.  This is the very first check when
+				   occurred.  This is the very first check when
 				   starting with the restart_area as if it
 				   fails it means that some of the above values
 				   will be corrupted by the multi sector

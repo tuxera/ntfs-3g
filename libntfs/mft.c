@@ -400,7 +400,7 @@ static inline unsigned int ntfs_ffz(unsigned int word)
  *
  * Return the free mft record on success and -1 on error with errno set to the
  * error code.  An error code of ENOSPC means that there are no free mft
- * records in the currently initialized mft bitmal.
+ * records in the currently initialized mft bitmap.
  */
 static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 {
@@ -607,7 +607,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 			ntfs_error(vol->sb, "Failed to merge runlists for mft "
 					"bitmap.");
 			if (ntfs_cluster_free_from_rl(vol, rl2))
-				ntfs_error(vol->sb, "Failed to dealocate "
+				ntfs_error(vol->sb, "Failed to deallocate "
 						"cluster.%s", es);
 			free(rl2);
 			errno = ret;
@@ -665,7 +665,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		// TODO: Deal with this by moving this extent to a new mft
 		// record or by starting a new extent in a new mft record.
 		ntfs_error(vol->sb, "Not enough space in this mft record to "
-				"accomodate extended mft bitmap attribute "
+				"accommodate extended mft bitmap attribute "
 				"extent.  Cannot handle this yet.");
 		errno = ENOTSUP;
 		goto undo_alloc;
@@ -931,7 +931,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		ntfs_error(vol->sb, "Failed to merge runlists for mft data "
 				"attribute.");
 		if (ntfs_cluster_free_from_rl(vol, rl2))
-			ntfs_error(vol->sb, "Failed to dealocate clusters "
+			ntfs_error(vol->sb, "Failed to deallocate clusters "
 					"from the mft data attribute.%s", es);
 		free(rl2);
 		errno = err;
@@ -987,7 +987,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		// this extent is not required to find the mft record in
 		// question.
 		ntfs_error(vol->sb, "Not enough space in this mft record to "
-				"accomodate extended mft data attribute "
+				"accommodate extended mft data attribute "
 				"extent.  Cannot handle this yet.");
 		errno = ENOTSUP;
 		goto undo_alloc;
@@ -1133,7 +1133,7 @@ undo_alloc:
  * extend the initialized size (and data size) by 8 bytes, allocating another
  * cluster if required.  The bitmap data size has to be at least equal to the
  * number of mft records in the mft, but it can be bigger, in which case the
- * superflous bits are padded with zeroes.
+ * superfluous bits are padded with zeroes.
  *
  * Thus, when we return successfully (return value non-zero), we will have:
  *	- initialized / extended the mft bitmap if necessary,
@@ -1144,7 +1144,7 @@ undo_alloc:
  *	- return the ntfs_inode.
  *
  * On error (return value zero), nothing will have changed.  If we had changed
- * anything before the error occured, we will have reverted back to the
+ * anything before the error occurred, we will have reverted back to the
  * starting state before returning to the caller.  Thus, except for bugs, we
  * should always leave the volume in a consistent state when returning from
  * this function.
@@ -1241,7 +1241,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	bit = mftbmp_na->initialized_size << 3;
 	if (ntfs_mft_bitmap_extend_initialized(vol))
 		goto err_out;
-	ntfs_debug("Status of mftbmp after initialized extention: "
+	ntfs_debug("Status of mftbmp after initialized extension: "
 			"allocated_size 0x%llx, data_size 0x%llx, "
 			"initialized_size 0x%llx.",
 			(long long)mftbmp_na->allocated_size,
@@ -1289,7 +1289,7 @@ found_free_rec:
 	old_data_size = mft_na->data_size;
 	/*
 	 * Extend mft data initialized size (and data size of course) to reach
-	 * the allocated mft record, formatting the mft records allong the way.
+	 * the allocated mft record, formatting the mft records along the way.
 	 * Note: We only modify the ntfs_attr structure as that is all that is
 	 * needed by ntfs_mft_record_format().  We will update the attribute
 	 * record itself in one fell swoop later on.

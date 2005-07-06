@@ -124,7 +124,7 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
  * For speed we use the collation rule @cr as an index into two tables of
  * function pointers to call the appropriate collation function.
  *
- * Return NTFS_COLLATION_ERROR if error occured.
+ * Return NTFS_COLLATION_ERROR if error occurred.
  */
 int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 		const void *data1, const int data1_len,

@@ -1,5 +1,5 @@
 /*
- * compat.h - Tweaks for Windows compatability.
+ * compat.h - Tweaks for Windows compatibility.
  *
  * Copyright (c) 2002 Richard Russon
  * Copyright (c) 2002-2004 Anton Altaparmakov

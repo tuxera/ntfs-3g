@@ -352,7 +352,7 @@ static int parse_options (int argc, char *argv[])
  *
  * Read $Bitmap and wipe any clusters that are marked as not in use.
  *
- * Return: >0  Success, the atrribute was wiped
+ * Return: >0  Success, the attribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
@@ -406,7 +406,7 @@ free:
  * @act:	Wipe, test or info
  * @na:		Opened ntfs attribute
  *
- * Return: >0  Success, the atrribute was wiped
+ * Return: >0  Success, the attribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
@@ -511,7 +511,7 @@ next:
  * @act:	Wipe, test or info
  * @na:		Opened ntfs attribute
  *
- * Return: >0  Success, the atrribute was wiped
+ * Return: >0  Success, the attribute was wiped
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
@@ -598,7 +598,7 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 		}
 
 		if (!NAttrNonResident(na)) {
-			Vprintf ("Resident $DATA atrribute. Skipping.\n");
+			Vprintf ("Resident $DATA attribute. Skipping.\n");
 			goto close_attr;
 		}
 
@@ -773,7 +773,7 @@ free:
  * @byte:		Overwrite with this value
  * @act:		Wipe, test or info
  * @naa:		Opened ntfs $INDEX_ALLOCATION attribute
- * @nab:		Opened ntfs $BIMTAP attribute
+ * @nab:		Opened ntfs $BITMAP attribute
  * @indx_record_size:	Size of INDX record
  *
  * Return: >0  Success, the clusters were wiped
@@ -1049,7 +1049,7 @@ close_inode:
  * @act:   Wipe, test or info
  *
  * The logfile journals the metadata to give the volume fault-tolerance.  If the
- * volume is in a consistant state, then this information can be erased.
+ * volume is in a consistent state, then this information can be erased.
  *
  * Return: >0  Success, the clusters were wiped
  *          0  Nothing to wipe
@@ -1197,7 +1197,7 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 		goto io_error_exit;
 	}
 
-	/* Get length of pagfile.sys contents. */
+	/* Get length of pagefile.sys contents. */
 	len = na->data_size;
 	if (!len) {
 		Dprintf("pagefile.sys has zero length, no disk write needed.\n");

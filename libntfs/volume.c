@@ -199,7 +199,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		goto io_error_exit;
 	}
 	if (l != vol->mft_ni->attr_list_size) {
-		Dputs("Error: got unexepected amount of data when reading "
+		Dputs("Error: got unexpected amount of data when reading "
 				"$MFT/$ATTRIBUTE_LIST.");
 		goto io_error_exit;
 	}
@@ -1288,7 +1288,7 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
  * Finally, check if the file system is mounted read-only, and if so set the
  * NTFS_MF_READONLY flag in *@mnt_flags.
  *
- * On sucess return 0 with *@mnt_flags set to the ntfs mount flags.
+ * On success return 0 with *@mnt_flags set to the ntfs mount flags.
  *
  * On error return -1 with errno set to the error code.
  */

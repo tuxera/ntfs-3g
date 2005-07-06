@@ -163,7 +163,7 @@ static int parse_options (int argc, char **argv)
 
 			attr = strtol(optarg, &s, 0);
 			if (*s) {
-				Eprintf("Coudn't parse attribute.\n");
+				Eprintf("Couldn't parse attribute.\n");
 				err++;
 			} else
 				opts.attribute = (ATTR_TYPES)attr;

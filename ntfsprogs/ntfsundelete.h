@@ -91,7 +91,7 @@ struct data {
 	long long	 size_init;	/* Initialised size, may be less than data size */
 	long long	 size_vcn;	/* Highest VCN in the data runs */
 	runlist_element *runlist;	/* Decoded data runs */
-	int		 percent;	/* Amont potentially recoverable */
+	int		 percent;	/* Amount potentially recoverable */
 	void		*data;		/* If resident, a pointer to the data */
 	char		 padding[4];	/* Unused: padding to 64 bit. */
 };

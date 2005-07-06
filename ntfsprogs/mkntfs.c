@@ -113,7 +113,7 @@
 #include <limits.h>
 
 #if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
-#	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytse. */
+#	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytes. */
 #endif
 
 #include "types.h"
@@ -211,7 +211,7 @@ struct {
 } opts;
 
 /**
- * mkDprintf - debugging output (-vv); overriden by quiet (-q)
+ * mkDprintf - debugging output (-vv); overridden by quiet (-q)
  */
 static void mkDprintf(const char *fmt, ...)
 		__attribute__((format(printf, 1, 2)));
@@ -3015,7 +3015,7 @@ static void mkntfs_initialize_rl_mft(void)
 	 * The mft mirror is either 4kb (the first four records) or one cluster
 	 * in size, which ever is bigger. In either case, it contains a
 	 * byte-for-byte identical copy of the beginning of the mft (i.e. either
-	 * ther first four records (4kb) or the first cluster worth of records,
+	 * the first four records (4kb) or the first cluster worth of records,
 	 * whichever is bigger).
 	 */
 	j = (4 * vol->mft_record_size + vol->cluster_size - 1) / vol->cluster_size;
@@ -3731,7 +3731,7 @@ int main(int argc, char **argv)
 	mkntfs_initialize_bitmaps();
 	/* Initialize MFT & set opts.logfile_lcn. */
 	mkntfs_initialize_rl_mft();
-	/* Initlialize $LogFile. */
+	/* Initialise $LogFile. */
 	mkntfs_initialize_rl_logfile();
 	/* Initialize $Boot. */
 	mkntfs_initialize_rl_boot();

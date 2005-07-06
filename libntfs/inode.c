@@ -256,7 +256,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 			}
 			/* 
 			 * ElectricFence is unhappy with realloc(x,0) as free(x)
-			 * thus we explicitely separate these two cases.
+			 * thus we explicitly separate these two cases.
 			 */
 			if (base_ni->nr_extents) {
 				/* Resize the memory buffer. */
@@ -375,8 +375,8 @@ err_out:
 }
 
 /**
- * ntfs_inode_attach_all_extents - atach all extents for target inode
- * @ni:		opened ntfs inode for which perform atach
+ * ntfs_inode_attach_all_extents - attach all extents for target inode
+ * @ni:		opened ntfs inode for which perform attach
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
@@ -386,7 +386,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	u64 prev_attached = 0;
 
 	if (!ni) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -402,7 +402,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 		return 0;
 
 	if (!ni->attr_list) {
-		Dprintf("%s(): Corrput in-memory struct.\n", __FUNCTION__);
+		Dprintf("%s(): Corrupt in-memory struct.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -427,7 +427,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 }
 
 /**
- * ntfs_inode_sync_standard_information - update standard informaiton attribute
+ * ntfs_inode_sync_standard_information - update standard information attribute
  * @ni:		ntfs inode to update standard information
  *
  * Return 0 on success or -1 on error with errno set to the error code.
@@ -499,7 +499,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		if (MREF_LE(fn->parent_directory) == ni->mft_no) {
 			/*
 			 * WARNING: We cheater here and obtain 2 attribute
-			 * search contextes for one inode (first we obtained
+			 * search contexts for one inode (first we obtained
 			 * above, second will be obtained inside
 			 * ntfs_index_lookup), it's acceptable for library,
 			 * but will lock kernel.
@@ -558,7 +558,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		ntfs_index_ctx_put(ictx);
 		ntfs_inode_close(index_ni);
 	}
-	/* Check for real error occured. */
+	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
@@ -723,9 +723,9 @@ int ntfs_inode_sync(ntfs_inode *ni)
  * Return 0 on success or -1 on error with errno set to the error code.
  * The following error codes are defined:
  *	EINVAL	- Invalid arguments were passed to the function.
- *	EEXIST	- Attibute list already exist.
- *	EIO	- Input/Ouput error occured.
- *	ENOMEM	- Not enogh memory to perform add.
+ *	EEXIST	- Attribute list already exist.
+ *	EIO	- Input/Ouput error occurred.
+ *	ENOMEM	- Not enough memory to perform add.
  */
 int ntfs_inode_add_attrlist(ntfs_inode *ni)
 {
@@ -737,7 +737,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ntfs_attr *na;
 
 	if (!ni) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -766,7 +766,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		Dprintf("%s(): Coudn't get search context.\n", __FUNCTION__);
+		Dprintf("%s(): Couldn't get search context.\n", __FUNCTION__);
 		goto err_out;
 	}
 	/* Walk through all attributes. */
@@ -811,7 +811,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 				ctx->attr->name_length * sizeof(ntfschar));
 		ale = (ATTR_LIST_ENTRY *)(al + al_len);
 	}
-	/* Check for real error occured. */
+	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
 		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
@@ -885,7 +885,7 @@ remove_attrlist_record:
 			Dprintf("%s(): Rollback failed. Failed to remove "
 				"attribute list record.\n", __FUNCTION__);
 	} else
-		Dprintf("%s(): Rollback failed. Coudn't find attribute list "
+		Dprintf("%s(): Rollback failed. Couldn't find attribute list "
 			"record.\n", __FUNCTION__);
 	/* Setup back in-memory runlist. */
 	ni->attr_list = al;
@@ -944,7 +944,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	int freed, err;
 
 	if (!ni || size < 0) {
-		Dprintf("%s(): Invalid argumets.\n", __FUNCTION__);
+		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
 		errno = EINVAL;
 		return -1;
 	}
@@ -968,9 +968,9 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	}
 
 	/*
-	 * Chkdsk complain if $STANDART_INFORMATION is not in the base MFT
+	 * Chkdsk complain if $STANDARD_INFORMATION is not in the base MFT
 	 * record. FIXME: I'm not sure in this, need to recheck. For now simply
-	 * do not move $STANDART_INFORMATION at all.
+	 * do not move $STANDARD_INFORMATION at all.
 	 *
 	 * Also we can't move $ATTRIBUTE_LIST from base MFT_RECORD, so position
 	 * search context on first attribute after $STANDARD_INFORMATION and
@@ -1033,7 +1033,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		}
 
 		/*
-		 * Repostion to first attribute after $STANDARD_INFORMATION and
+		 * Reposition to first attribute after $STANDARD_INFORMATION and
 		 * $ATTRIBUTE_LIST (see comments upwards).
 		 */
 		ntfs_attr_reinit_search_ctx(ctx);

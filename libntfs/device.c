@@ -307,7 +307,7 @@ s64 ntfs_mst_pread(struct ntfs_device *dev, const s64 pos, s64 count,
  * @dev at position @pos.
  *
  * On success, return the number of successfully written blocks. If this number
- * is lower than @count this means that the write has been interrutped or that
+ * is lower than @count this means that the write has been interrupted or that
  * an error was encountered during the write so that the write is partial. 0
  * means nothing was written (also return 0 when @count or @bksize are 0).
  *

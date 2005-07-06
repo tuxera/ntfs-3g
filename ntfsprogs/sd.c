@@ -4,7 +4,7 @@
 /**
  * init_system_file_sd
  *
- * NTFS 1.2 - System files security decriptors
+ * NTFS 1.2 - System files security descriptors
  * ===========================================
  *
  * Create the security descriptor for system file number @sys_file_no and
@@ -15,14 +15,14 @@
  *
  * $Volume, $Quota, and system files 0xb-0xf are the same. They are almost the
  * same as the above, the only difference being that the two SIDs present in
- * the DACL grant GENERIC_WRITE and GENERIC_READ equivalent priviledges while
- * the above only grant GENERIC_READ equivalent priviledges. (For some reason
+ * the DACL grant GENERIC_WRITE and GENERIC_READ equivalent privileges while
+ * the above only grant GENERIC_READ equivalent privileges. (For some reason
  * the flags for GENERIC_READ/GENERIC_WRITE are not set by NT4, even though
  * the permissions are equivalent, so we comply.
  *
  * Root directory system file (".") is different altogether.
  *
- * The sd is recturned in *@sd_val and has length *@sd_val_len.
+ * The sd is returned in *@sd_val and has length *@sd_val_len.
  *
  * Do NOT free *@sd_val as it is static memory. This also means that you can
  * only use *@sd_val until the next call to this function.

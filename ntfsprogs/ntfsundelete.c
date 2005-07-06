@@ -716,7 +716,7 @@ static void free_file (struct ufile *file)
  *
  * Check that @rec is the parent of the file represented by @name.
  * If @rec is a directory, but it is created after @name, then we
- * can't determine wheter @rec is really @name's parent.
+ * can't determine whether @rec is really @name's parent.
  *
  * Return:	@rec's filename, either same name space as @name or lowest space.
  *		NULL if can't determine parenthood or on error.
