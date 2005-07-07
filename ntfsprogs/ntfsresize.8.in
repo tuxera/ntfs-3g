@@ -154,6 +154,14 @@ Volume will be opened read-only and
 displays what it would do if it were to resize the filesystem. 
 Continue with the real resizing only if the test run passed.
 .TP
+.B -b, --bad-sectors
+Support disks having physical errors, bad sectors. Make a backup by
+.BR ntfsclone (8)
+using option --rescue, then run from the command line 'chkdsk /f /r 
+volume:' on Windows prior using this option with ntfsresize. 
+
+If the guarantee is still valid for the disk then replace it. It's defected.
+.TP
 .B -P, --no-progress-bar
 Don't show progress bars.
 .TP
@@ -173,7 +181,7 @@ but the mailing list is moderated and it can take a short time
 to approve your post. 
 .PP
 There are some very rarely met limitations at present: filesystems having 
-bad sectors, highly fragmented Master File Table (MFT), relocation 
+unknown bad sectors, highly fragmented Master File Table (MFT), relocation
 of the first MFT extent and resizing in the middle of some metadata
 in some cases aren't supported yet. These cases are detected and 
 resizing is refused, restricted to a safe size or the closest safe 
@@ -212,9 +220,11 @@ to Gergely Madarasz, Dewey M. Sasser and Miguel Lastra and his colleagues
 at the University of Granada for their continuous and highly valuable help, 
 furthermore to Erik Meade, Martin Fick, Sandro Hawke, Dave Croal, 
 Lorrin Nelson, Geert Hendrickx, Robert Bjorkman and Richard Burdick 
-for beta testing and to Theodore Ts'o whose 
+for beta testing the relocation support, to Florian Eyben, Fritz Oppliger,
+Richard Ebling, Sid-Ahmed Touati, Jan Kiszka for the valued
+contributions and to Theodore Ts'o whose 
 .BR resize2fs (8)
-man page formed the basis of this page.
+man page originally formed the basis of this page.
 .SH AVAILABILITY
 .B Ntfsresize
 is part of the 
