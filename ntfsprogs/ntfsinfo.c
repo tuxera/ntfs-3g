@@ -1499,6 +1499,8 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		data_size = sle64_to_cpu(attr->data_size);	
 		printf("\tIs resident? \t\t No\n");
 		printf("\tData size:\t\t %lld\n", data_size);
+		if (!opts.verbose)
+			return;
 		/* FIXME: We don't handle fragmented mapping pairs case. */
 		rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 		if (rl) {
@@ -1527,6 +1529,8 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		printf("\tIs resident? \t\t Yes\n");
 		printf("\tAttribute value length:\t %u\n",
 				le32_to_cpu(attr->value_length));
+		if (!opts.verbose)
+			return;
 		ea = (EA_ATTR*)((u8*)attr + le16_to_cpu(attr->value_offset));
 	}
 	while (ea) {
