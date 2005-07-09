@@ -2,6 +2,7 @@
  * layout.h - Ntfs on-disk layout structures.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -2294,7 +2295,7 @@ typedef struct {
 /*
  * Attribute: Extended attribute (EA) information (0xd0).
  *
- * NOTE: Always resident. (Is this true???)
+ * NOTE: Always resident.
  */
 typedef struct {
 	u16 ea_length;		/* Byte size of the packed extended
@@ -2318,21 +2319,20 @@ typedef enum {
 /*
  * Attribute: Extended attribute (EA) (0xe0).
  *
- * NOTE: Always non-resident. (Is this true?)
- *
  * Like the attribute list and the index buffer list, the EA attribute value is
  * a sequence of EA_ATTR variable length records.
  *
  * FIXME: It appears weird that the EA name is not Unicode. Is it true?
+ * FIXME: It seems that name is always uppercased. Is it true?
  */
 typedef struct {
 	u32 next_entry_offset;	/* Offset to the next EA_ATTR. */
 	EA_FLAGS flags;		/* Flags describing the EA. */
-	u8 ea_name_length;	/* Length of the name of the extended
+	u8 name_length;		/* Length of the name of the extended
 				   attribute in bytes. */
-	u16 ea_value_length;	/* Byte size of the EA's value. */
-	u8 ea_name[0];		/* Name of the EA. */
-	u8 ea_value[0];		/* The value of the EA. Immediately
+	u16 value_length;	/* Byte size of the EA's value. */
+	u8 name[0];		/* Name of the EA. */
+	u8 value[0];		/* The value of the EA. Immediately
 				   follows the name. */
 } __attribute__ ((__packed__)) EA_ATTR;
 

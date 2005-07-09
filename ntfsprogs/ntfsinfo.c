@@ -40,8 +40,6 @@
  *
  *	Still need to do:
  *	    $REPARSE_POINT/$SYMBOLIC_LINK
- *	    $EA_INFORMATION
- *	    $EA
  *	    $PROPERTY_SET
  *	    $LOGGED_UTILITY_STREAM
  */
@@ -844,21 +842,28 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	if (attr->non_resident) {
+		/* FIXME: We don't handle fragmented mapping pairs case. */
 		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 		if (rl) {
 			s64 data_size, bytes_read;
 
 			data_size = sle64_to_cpu(attr->data_size);
 			sec_desc_attr = malloc(data_size);
+			if (!sec_desc_attr) {
+				perror("malloc failed");
+				free(rl);
+				return;
+			}
 			bytes_read = ntfs_rl_pread(vol, rl, 0,
 						data_size, sec_desc_attr);
 			if (bytes_read != data_size) {
 				Eprintf("ntfsinfo error: could not "
 						"read security descriptor\n");
+				free(rl);
 				free(sec_desc_attr);
 				return;
 			}
-			free (rl);
+			free(rl);
 		} else {
 			Eprintf("ntfsinfo error: could not "
 						"decompress runlist\n");
@@ -1462,10 +1467,18 @@ static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr __attribute__((unused
  *
  * dump the ea_information attribute
  */
-static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr __attribute__((unused)))
+static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
 {
+	EA_INFORMATION *ea_info;
+	
+	ea_info = (EA_INFORMATION*)((u8*)attr +
+			le16_to_cpu(attr->value_offset));
 	printf("Dumping attribute $EA_INFORMATION (0xD0)\n");
-	printf("\tTODO\n");
+	printf("\tPacked EA length:\t %u\n", le16_to_cpu(ea_info->ea_length));
+	printf("\tNEED_EA count:\t\t %u\n",
+			le16_to_cpu(ea_info->need_ea_count));
+	printf("\tUnpacked EA length:\t %u\n",
+			le32_to_cpu(ea_info->ea_query_length));
 }
 
 /**
@@ -1473,10 +1486,71 @@ static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr __attribute__((unuse
  *
  * dump the ea attribute
  */
-static void ntfs_dump_attr_ea(ATTR_RECORD *attr __attribute__((unused)))
+static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 {
+	EA_ATTR *ea;
+	u8 *buf = NULL;
+
 	printf("Dumping attribute $EA (0xE0)\n");
-	printf("\tTODO\n");
+	if (attr->non_resident) {
+		runlist *rl;
+		s64 data_size;
+
+		data_size = sle64_to_cpu(attr->data_size);	
+		printf("\tIs resident? \t\t No\n");
+		printf("\tData size:\t\t %lld\n", data_size);
+		/* FIXME: We don't handle fragmented mapping pairs case. */
+		rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+		if (rl) {
+			s64 bytes_read;
+
+			buf = malloc(data_size);
+			if (!buf) {
+				perror("malloc failed");
+				free(rl);
+				return;
+			}
+			bytes_read = ntfs_rl_pread(vol, rl, 0, data_size, buf);
+			if (bytes_read != data_size) {
+				perror("ntfs_rl_pread failed");
+				free(buf);
+				free(rl);
+				return;
+			}
+			free(rl);
+			ea = (EA_ATTR*)buf;
+		} else {
+			perror("ntfs_mapping_pairs_decompress failed");
+			return;
+		}
+	} else {
+		printf("\tIs resident? \t\t Yes\n");
+		printf("\tAttribute value length:\t %u\n",
+				le32_to_cpu(attr->value_length));
+		ea = (EA_ATTR*)((u8*)attr + le16_to_cpu(attr->value_offset));
+	}
+	while (ea) {
+		printf("\n\tFlags:\t\t ");
+		if (ea->flags) {
+			if (ea->flags == NEED_EA)
+				printf("NEED_EA\n");
+			else
+				printf("Unknown (0x%02x)\n", ea->flags);
+		} else
+			printf("\n");
+		printf("\tName length:\t %d\n", ea->name_length);
+		printf("\tValue length:\t %d\n",
+				le16_to_cpu(ea->value_length));
+		printf("\tName:\t\t '%s'\n", ea->name);
+		printf("\tValue:\t\t '%s'\n", ea->value + ea->name_length + 1);
+		if (ea->next_entry_offset)
+			ea = (EA_ATTR*)((u8*)ea +
+					le32_to_cpu(ea->next_entry_offset));
+		else
+			ea = NULL;
+	}
+	if (buf)
+		free(buf);
 }
 
 /**
@@ -1714,7 +1788,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_ea_information(ctx->attr);
 			break;
 		case AT_EA:
-			ntfs_dump_attr_ea(ctx->attr);
+			ntfs_dump_attr_ea(ctx->attr, inode->vol);
 			break;
 		case AT_PROPERTY_SET:
 			ntfs_dump_attr_property_set(ctx->attr);

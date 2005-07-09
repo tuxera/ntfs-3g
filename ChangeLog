@@ -10,6 +10,7 @@ xx/xx/xxxx - 1.10.1-WIP
 	  rely on libntfs.  (Yura)
 	- ntfsresize: support bad clusters list ($BadClus:$Bad), a.k.a. disks
 	  having bad sectors if the new --bad-sectors option is used.  (Szaka)
+	- ntfsinfo: Dump $EA_INFORMATION and $EA attributes.  (Yura)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 
