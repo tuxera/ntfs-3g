@@ -28,7 +28,7 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
 if ENABLE_FUSE_MODULE
-bin_PROGRAMS		+= ntfsmount
+EXTRA_PROGRAMS		+= ntfsmount
 endif
 
 # Set the include path.

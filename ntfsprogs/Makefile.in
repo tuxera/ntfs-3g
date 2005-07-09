@@ -40,13 +40,13 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 bin_PROGRAMS = ntfsfix$(EXEEXT) ntfsinfo$(EXEEXT) ntfscluster$(EXEEXT) \
-	ntfsls$(EXEEXT) ntfscat$(EXEEXT) $(am__EXEEXT_1)
+	ntfsls$(EXEEXT) ntfscat$(EXEEXT)
 sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 	ntfsundelete$(EXEEXT) ntfsresize$(EXEEXT) ntfsclone$(EXEEXT) \
 	ntfscp$(EXEEXT)
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) ntfswipe$(EXEEXT) \
 	ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT) ntfsrm$(EXEEXT) \
-	ntfsmftalloc$(EXEEXT)
+	ntfsmftalloc$(EXEEXT) $(am__EXEEXT_1)
 @ENABLE_FUSE_MODULE_TRUE@am__append_1 = ntfsmount
 subdir = ntfsprogs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
@@ -240,7 +240,6 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
-ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
