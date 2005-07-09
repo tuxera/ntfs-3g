@@ -1,16 +1,19 @@
-xx/xx/xxxx - 1.10.1-WIP
+xx/07/2005 - 1.10.1-WIP
 
 	- ntfscp: fix signal hanling: handle both SIGTERM and SIGINT, print
 	  correct message.  (Yura)
 	- Update manual pages for ntfsprogs, ntfsclone, ntfsresize.  (Szaka)
-	- ntfsclone: detect and hint users if the destination fs doesn't support
-	  sparse files.  (Szaka)
+	- ntfsclone: detect and hint users if the destination fs does not
+	  support sparse files.  (Szaka)
 	- Fix memory managament error in ntfs_inode_close.  (Yura)
-	- Add new utility - ntfsmount. It's a FUSE module that
-	  rely on libntfs.  (Yura)
+	- Add new utility - ntfsmount.  It is a FUSE module that reles on
+	  libntfs.  (Yura)
 	- ntfsresize: support bad clusters list ($BadClus:$Bad), a.k.a. disks
 	  having bad sectors if the new --bad-sectors option is used.  (Szaka)
 	- ntfsinfo: Dump $EA_INFORMATION and $EA attributes.  (Yura)
+	- mkntfs: Fix backup bootsector creation.  Thanks to Timur Amirkhanov
+	  for pointing this stupidity out.  (We forgot to set the size before
+	  doing it.)  (Anton)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 

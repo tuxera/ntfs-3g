@@ -3255,17 +3255,20 @@ static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
  *
  * Return 0 on success or 1 if it couldn't be created.
  */
-static int create_backup_boot_sector(u8 *buff, int size)
+static int create_backup_boot_sector(u8 *buff)
 {
-	ssize_t bw;
-	int _e = errno;
 	const char *_s;
+	ssize_t bw;
+	int size, _e = errno;
 
 	Vprintf("Creating backup boot sector.\n");
 	/*
 	 * Write the first max(512, opts.sector_size) bytes from buf to the
 	 * last sector.
 	 */
+	size = 512;
+	if (size < opts.sector_size)
+		size = opts.sector_size;
 	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
 			opts.sector_size - size, SEEK_SET) == (off_t)-1)
 		goto bb_err;
@@ -3598,7 +3601,7 @@ static void mkntfs_create_root_structures(void)
 	if (err < 0)
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
 
-	if (create_backup_boot_sector(buf2, i) != 0) {
+	if (create_backup_boot_sector(buf2) != 0) {
 		/*
 		 *   Pre-2.6 kernels couldn't  access  the  last  sector
 		 *   if it was odd hence we schedule chkdsk to create it.
