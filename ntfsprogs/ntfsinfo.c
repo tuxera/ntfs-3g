@@ -1490,11 +1490,11 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 {
 	EA_ATTR *ea;
 	u8 *buf = NULL;
+	s64 data_size;
 
 	printf("Dumping attribute $EA (0xE0)\n");
 	if (attr->non_resident) {
 		runlist *rl;
-		s64 data_size;
 
 		data_size = sle64_to_cpu(attr->data_size);	
 		printf("\tIs resident? \t\t No\n");
@@ -1526,14 +1526,14 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			return;
 		}
 	} else {
+		data_size = le32_to_cpu(attr->value_length);
 		printf("\tIs resident? \t\t Yes\n");
-		printf("\tAttribute value length:\t %u\n",
-				le32_to_cpu(attr->value_length));
+		printf("\tAttribute value length:\t %lld\n", data_size);
 		if (!opts.verbose)
 			return;
 		ea = (EA_ATTR*)((u8*)attr + le16_to_cpu(attr->value_offset));
 	}
-	while (ea) {
+	while (1) {
 		printf("\n\tFlags:\t\t ");
 		if (ea->flags) {
 			if (ea->flags == NEED_EA)
@@ -1551,7 +1551,9 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			ea = (EA_ATTR*)((u8*)ea +
 					le32_to_cpu(ea->next_entry_offset));
 		else
-			ea = NULL;
+			break;
+		if ((u8*)ea - buf >= data_size)
+			break;
 	}
 	if (buf)
 		free(buf);

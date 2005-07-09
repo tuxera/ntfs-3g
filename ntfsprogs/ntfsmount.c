@@ -1,5 +1,5 @@
 /**
- * ntfsfuse - Part of the Linux-NTFS project.
+ * ntfsmount - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2005 Yura Pakhuchiy
  *
