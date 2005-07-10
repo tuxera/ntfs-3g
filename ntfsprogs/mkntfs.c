@@ -2670,6 +2670,8 @@ static void mkntfs_open_partition(void)
  */
 static void mkntfs_override_phys_params(void)
 {
+	int i;
+
 	/* If user didn't specify the sector size, determine it now. */
 	if (!opts.sector_size) {
 #ifdef BLKSSZGET
@@ -2706,8 +2708,15 @@ static void mkntfs_override_phys_params(void)
 	}
 	mkDprintf("number of sectors = %lld (0x%llx)\n", opts.nr_sectors,
 			opts.nr_sectors);
-	/* Reserve the last sector for the backup boot sector. */
-	opts.nr_sectors--;
+	/*
+	 * Reserve the last sector for the backup boot sector unless the
+	 * sector size is less than 512 bytes in which case reserve 512 bytes
+	 * worth of secstors.
+	 */
+	i = 1;
+	if (opts.sector_size < 512)
+		i = 512 / opts.sector_size;
+	opts.nr_sectors -= i;
 	/* If user didn't specify the partition start sector, determine it. */
 	if (opts.part_start_sect < 0) {
 		opts.part_start_sect = ntfs_device_partition_start_sector_get(
@@ -3264,7 +3273,8 @@ static int create_backup_boot_sector(u8 *buff)
 	Vprintf("Creating backup boot sector.\n");
 	/*
 	 * Write the first max(512, opts.sector_size) bytes from buf to the
-	 * last sector.
+	 * last sector, but limit that to 8192 bytes of written data since that
+	 * is how big $Boot is (and how big our buffer is)..
 	 */
 	size = 512;
 	if (size < opts.sector_size)
@@ -3272,11 +3282,11 @@ static int create_backup_boot_sector(u8 *buff)
 	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
 			opts.sector_size - size, SEEK_SET) == (off_t)-1)
 		goto bb_err;
-
+	if (size > 8192)
+		size = 8192;
 	bw = mkntfs_write(vol->dev, buff, size);
 	if (bw == size)
 		return 0;
-
 	if (bw == -1LL)
 		_s = strerror(_e);
 	else

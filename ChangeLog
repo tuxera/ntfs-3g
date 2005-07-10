@@ -1,4 +1,4 @@
-xx/07/2005 - 1.10.1-WIP
+xx/07/2005 - 1.11.0-WIP - Fixes and a new utility ntfsmount, a FUSE ntfsmodule.
 
 	- ntfscp: fix signal hanling: handle both SIGTERM and SIGINT, print
 	  correct message.  (Yura)
@@ -12,8 +12,11 @@ xx/07/2005 - 1.10.1-WIP
 	  having bad sectors if the new --bad-sectors option is used.  (Szaka)
 	- ntfsinfo: Dump $EA_INFORMATION and $EA attributes.  (Yura)
 	- mkntfs: Fix backup bootsector creation.  Thanks to Timur Amirkhanov
-	  for pointing this stupidity out.  (We forgot to set the size before
-	  doing it.)  (Anton)
+	  for pointing these stupidities out.  (We forgot to set the size
+	  before doing it and we wrote more bytes then there were in the buffer
+	  if sector size was above 8kiB and we only reserved one sector even
+	  when sector size was less than 512 bytes and then we wrote 512 bytes,
+	  i.e. beyond the end of the device.)  (Anton)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 
