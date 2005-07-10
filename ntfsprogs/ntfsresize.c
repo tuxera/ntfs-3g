@@ -2098,8 +2098,8 @@ static ntfs_volume *mount_volume(void)
 
 	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
-			err_exit("Volume is dirty. Run chkdsk /f and "
-				 "please try again (or see -f option).\n");
+			err_exit("Volume is scheduled for check.\nRun chkdsk /f"
+				 " and please try again, or see option -f.\n");
 
 	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
 		err_exit("Cluster size %u is too large!\n",

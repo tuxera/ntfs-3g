@@ -137,11 +137,12 @@ with
 first.
 .TP
 .B -f, --force
-Forces ntfsresize to proceed with the resize operation if the filesystem
-is marked "dirty" for consistency check. 
+Forces ntfsresize to proceed with the resize operation even if the filesystem
+is marked for consistency check. 
 
 Please note, ntfsresize always marks the filesystem
-"dirty" before a real resize operation and it leaves that way for extra 
+for consistency check before a real resize operation 
+and it leaves that way for extra 
 safety. Thus if NTFS was marked by ntfsresize then it's safe to 
 use this option. If you need
 to resize several times without booting into Windows between each
