@@ -137,12 +137,12 @@ AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
 # Autodetect whether to build FUSE module or not.
 compile_fuse_module=false
 if test "$enable_fuse_module" != "no"; then
-	PKG_CHECK_MODULES(FUSE_MODULE, [fuse], [ compile_fuse_module=true ],
+	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.3.0, [ compile_fuse_module=true ],
 	[
 		if test "$enable_fuse_module" = "yes"; then
-			AC_MSG_ERROR([Linux-NTFS FUSE module requires fuse library.])
+			AC_MSG_ERROR([Linux-NTFS FUSE module requires FUSE version >= 2.3.0.])
 		else
-			AC_MSG_WARN([Linux-NTFS FUSE module requires fuse library.])
+			AC_MSG_WARN([Linux-NTFS FUSE module requires FUSE version >= 2.3.0.])
 		fi
 	])
 fi
