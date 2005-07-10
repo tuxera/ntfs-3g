@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH NTFSFIX 8 "March 2004" "ntfsprogs version @VERSION@"
+.TH NTFSFIX 8 "July 2005" "ntfsprogs version @VERSION@"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -16,41 +16,25 @@
 .\" .sp <n> insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-ntfsfix \- tool for fixing NTFS partitions altered by the Linux kernel NTFS driver.
+ntfsfix \- fix common errors and force Windows to check NTFS
 .SH SYNOPSIS
 .B ntfsfix
 .I device
 .SH DESCRIPTION
-This manual page documents briefly the
-.B ntfsfix
-command.
-.PP
-.\" TeX users may be more comfortable with the \fB<whatever>\fP and
-.\" \fI<whatever>\fP escape sequences to invode bold face and italics,
-.\" respectively.
-\fBntfsfix\fP is a program that fixes NTFS partitions altered in any
-manner with the Linux NTFS driver. \fBntfsfix\fP is \fBNOT\fP a Linux
-version of chkdsk. It only tries to leave the NTFS partition in a
-not-so-inconsistent state after the NTFS driver has written to it.
+\fBntfsfix\fP is a utility that fixes some common NTFS problems. 
+\fBntfsfix\fP is \fBNOT\fP a Linux
+version of chkdsk. It only repairs some fundamental NTFS inconsistencies,
+resets the NTFS journal file and schedules an NTFS consistency check for 
+the first boot into Windows.
 .sp
-\fBntfsfix\fP appeared because MS chkdsk is well known for its
-stupidity when fixing altered partitions. Because the main problems
-are journal files, \fBntfsfix\fP aims to fix those issues.
-.sp
-Running ntfsfix after mounting NTFS partitions read-write is recommended
-for reducing the chance of severe data loss when NT/W2K/XP tries to remount
-the affected partition(s).
-.sp
-In order to use \fBntfsfix\fP you must unmount the NTFS partition, and run
-ntfsfix device, where device is the NTFS partition. After this, you can
-safely reboot into NT/W2K/XP. Please note that \fBntfsfix\fP is not a
-chkdsk-like tool, and so is not guaranteed that it could fix all the
-alterations provoked by the NTFS driver.
-
+You may run 
+.B ntfsfix 
+on an NTFS volume if you think it's damaged and it can't be mounted.
 .SH AUTHOR
-This manual page was written by David Martínez Moreno
-<ender@debian.org>, for Debian the GNU/Linux
-system (but may be used by others).
+The original ntfsfix manual page was written by David Martínez Moreno
+<ender@debian.org> and rewritten 
+by Szabolcs Szakacsits to reflect the current role of
+.B ntfsfix.
 .SH AVAILABILITY
 .B ntfsfix
 is part of the ntfsprogs package and is available from
