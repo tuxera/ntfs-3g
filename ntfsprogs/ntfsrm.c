@@ -46,6 +46,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 static int ntfs_inode_close2 (ntfs_inode *ni);
 static int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie);
+static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir);
 
 /**
  * version - Print version information about the program
@@ -287,6 +288,28 @@ static const char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 
 
 /**
+ * ntfs_bmp_rollback
+ */
+static int ntfs_bmp_rollback (struct ntfs_bmp *bmp)
+{
+	int i;
+
+	if ((!bmp) || (bmp->count == 0))
+		return 0;
+
+	for (i = 0; i < bmp->count; i++)
+		free (bmp->data[i]);
+
+	free (bmp->data);
+	free (bmp->data_vcn);
+	bmp->data = NULL;
+	bmp->data_vcn = NULL;
+	bmp->count = 0;
+
+	return 0;
+}
+
+/**
  * ntfs_bmp_commit
  */
 static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
@@ -310,11 +333,11 @@ static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
 	printf ("\ti size = %lld\n", bmp->attr->initialized_size);
 #endif
 
-	cs = bmp->vol->cluster_size;
-
-	printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
+	//printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
 
 	if (NAttrNonResident (bmp->attr)) {
+		cs = bmp->vol->cluster_size;
+
 		// non-resident
 		for (i = 0; i < bmp->count; i++) {
 #ifdef RM_WRITE
@@ -335,34 +358,7 @@ static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
 		printf (RED "\tntfs_attr_pwrite resident (%lld)\n" END, bmp->attr->data_size);
 	}
 
-	for (i = 0; i < bmp->count; i++)
-		free (bmp->data[i]);
-
-	free (bmp->data);	// XXX wipe ->data and ->data_vcn
-	free (bmp->data_vcn);
-	bmp->count = 0;
-
-	return 0;
-}
-
-/**
- * ntfs_bmp_rollback
- */
-static int ntfs_bmp_rollback (struct ntfs_bmp *bmp)
-{
-	int i;
-
-	if ((!bmp) || (bmp->count == 0))
-		return 0;
-
-	printf ("rollback bmp\n");
-
-	for (i = 0; i < bmp->count; i++)
-		free (bmp->data[i]);
-
-	free (bmp->data);
-	free (bmp->data_vcn);
-	bmp->count = 0;
+	ntfs_bmp_rollback (bmp);
 
 	return 0;
 }
@@ -379,7 +375,6 @@ static void ntfs_bmp_free (struct ntfs_bmp *bmp)
 
 	ntfs_attr_close (bmp->attr);
 
-	free (bmp->cache);
 	free (bmp);
 }
 
@@ -409,8 +404,6 @@ static struct ntfs_bmp * ntfs_bmp_alloc (ntfs_inode *inode, ATTR_TYPES type, ntf
 	bmp->data      = NULL;
 	bmp->data_vcn  = NULL;
 	bmp->count     = 0;
-	bmp->cache     = NULL;
-	bmp->cache_vcn = -1;
 
 	return bmp;
 }
@@ -1190,6 +1183,8 @@ static int ntfs_dt_rollback (struct ntfs_dt *dt)
 	if (!dt)
 		return -1;
 
+	return 0; // TEMP
+
 	for (i = 0; i < dt->child_count; i++) {
 		if (dt->sub_nodes)
 			ntfs_dt_rollback (dt->sub_nodes[i]);
@@ -1223,9 +1218,9 @@ static void ntfs_dt_free (struct ntfs_dt *dt)
 	ntfs_dt_rollback (dt);
 
 	for (i = 0; i < dt->child_count; i++) {
-		if (dt->sub_nodes)
-			ntfs_dt_rollback (dt->sub_nodes[i]);
-		if (dt->inodes)
+		//if (dt->sub_nodes)
+			ntfs_dt_free (dt->sub_nodes[i]);
+		//if (dt->inodes)
 			ntfs_inode_close2 (dt->inodes[i]);
 	}
 
@@ -1459,7 +1454,7 @@ static struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int n
 			//printf ("match %p\n", res);
 			if (index_num)
 				*index_num = i;
-		} else if (r == -1) {
+		} else if ((r == -1) && (ie->flags & INDEX_ENTRY_NODE)) {
 			//printf ("recurse\n");
 			if (!dt->sub_nodes[i]) {
 				vcn = ntfs_ie_get_vcn (ie);
@@ -2116,6 +2111,8 @@ static int ntfs_dir_commit (struct ntfs_dir *dir)
 		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
 	}
 
+	ntfs_dir_truncate (dir->vol, dir);
+
 	if (ntfs_dt_commit (dir->index) < 0)
 		return -1;
 
@@ -2414,8 +2411,7 @@ static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir)
 		dir->index->header->flags = 0;
 
 		//rollback dir's bmp
-		ntfs_bmp_rollback (dir->bitmap);
-		free (dir->bitmap);
+		ntfs_bmp_free (dir->bitmap);
 		dir->bitmap = NULL;
 
 		/*
@@ -3050,12 +3046,16 @@ static BOOL utils_pathname_to_inode2 (ntfs_volume *vol, struct ntfs_dir *parent,
 			child = ntfs_dir_find2 (dir, unicode, len);
 			if (!child) {
 				printf ("can't find %s in %s\n", p, pathname);
-				break;
+				goto close;
 			}
 		} else {
 			//printf ("file: %s\n", p);
 
 			dt = ntfs_dt_find2 (dir->index, unicode, len, &dt_num);
+			if (!dt) {
+				printf ("can't find %s in %s (2)\n", p, pathname);
+				goto close;
+			}
 
 			if (dt->inodes[dt_num] == NULL) {
 				dt->inodes[dt_num] = ntfs_inode_open (dir->vol, dt->children[dt_num]->indexed_file);
@@ -3246,13 +3246,13 @@ static int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *
 	src = (u8*) del->data;
 	dst = attr;
 
-	len = del->data_len + suc_ie->length - del_ie->length;
+	len = suc_ie->length - del_ie->length;
 	free (del->data);
 	del->data = attr;
-	del->data_len = len;
+	del->data_len += len;
 	del->header = (INDEX_HEADER*) (del->data + 0x10);
-	del->header->index_length   += (suc_ie->length - del_ie->length);
-	del->header->allocated_size += (suc_ie->length - del_ie->length);
+	del->header->index_length   += len;
+	del->header->allocated_size += len;
 
 	ntfs_mft_resize_resident (del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
 
@@ -3264,7 +3264,6 @@ static int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *
 	//	printf ("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
 	//printf ("\n");
 
-	len = suc_ie->length - del_ie->length;
 	//printf ("src = %p, dst = %p, len = %d\n", src, dst, len); fflush (stdout);
 
 	for (i = 0; i < del->child_count; i++)
@@ -5006,8 +5005,6 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 	if (1) utils_free_non_residents2 (ino, bmp_vol);
 
 	if (1) ntfs_file_remove (vol, dt, dt_num); // remove name from index
-
-	if (1) ntfs_dir_truncate (vol, dir);
 
 	if (1) utils_volume_commit (vol);
 

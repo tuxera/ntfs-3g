@@ -52,8 +52,6 @@ struct ntfs_bmp {
 	int		  count;
 	u8		**data;
 	VCN		 *data_vcn;
-	u8		 *cache;
-	VCN		  cache_vcn;
 };
 
 /**
