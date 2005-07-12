@@ -673,11 +673,22 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		Vprintf("Bad clusters: %8lld - %lld\n", rl->lcn, last_lcn);
 		return;
 	}
+	
+	if (inode == FILE_MFT) {
+		llcn = &resize->last_mft;
 
-	if (NInoAttrList(resize->ni)) {
+		/*
+		 *  First run of $MFT AT_DATA and $MFT with AT_ATTRIBUTE_LIST
+		 *  isn't supported yet.
+		 */
+		if ((resize->ctx->attr->type != AT_DATA || rl->vcn) &&
+		    !NInoAttrList(resize->ni))
+			supported = 1;
+
+	} else if (NInoAttrList(resize->ni)) {
 		llcn = &resize->last_multi_mft;
 
-		if (inode != FILE_MFT && inode != FILE_MFTMirr)
+		if (inode != FILE_MFTMirr)
 			supported = 1;
 
 	} else if (flags & ATTR_IS_SPARSE) {
@@ -687,13 +698,6 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 	} else if (flags & ATTR_IS_COMPRESSED) {
 		llcn = &resize->last_compressed;
 		supported = 1;
-
-	} else if (inode == FILE_MFT) {
-		llcn = &resize->last_mft;
-
-		/* First run of $MFT DATA attribute isn't supported yet */
-		if (resize->ctx->attr->type != AT_DATA || rl->vcn)
-			supported = 1;
 
 	} else if (inode == FILE_MFTMirr) {
 		llcn = &resize->last_mftmir;
