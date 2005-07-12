@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2003 Anton Altaparmakov.
  *
  * This utility will attempt to fix a partition that has been damaged by the
- * current Linux-NTFS driver. It should be run after dismounting a NTFS
+ * current Linux-NTFS driver. It should be run after dismounting an NTFS
  * partition that has been mounted read-write under Linux and before rebooting
  * into Windows NT/2000. NtfsFix can be run even after Windows has had mounted
  * the partition, but it might be too late and irreversible damage to the data

@@ -393,7 +393,7 @@ static s64 ntfs_device_win32_getdisklength(HANDLE handle)
  * @argp:	pointer to result buffer
  *
  * Only works on NTFS volume handles.
- * An annoying bug in windows is that a NTFS volume does not occupy the entire
+ * An annoying bug in windows is that an NTFS volume does not occupy the entire
  * partition, namely not the last sector (which holds the backup boot sector,
  * and normally not interesting).
  * Use this function to get the length of the accessible space through a given

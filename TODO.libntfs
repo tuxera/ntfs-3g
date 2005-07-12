@@ -39,7 +39,7 @@
 
 - implement loads of utilities a-la ntcp, ntrm, ntcreat, etc...
 
-- implement a ntfs shell where can use the above much faster with caching,
+- implement an ntfs shell where can use the above much faster with caching,
   probably extending the library in the process
 
 ****************

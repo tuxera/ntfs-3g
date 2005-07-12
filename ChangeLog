@@ -609,7 +609,7 @@ xx/07/2005 - 1.11.0-WIP - Fixes and a new utility ntfsmount, a FUSE ntfsmodule.
 	  base inode and are cached there until the base inode is closed.
 	- Cleanup/streamline include file dependencies.
 	- Port attribute list merging code from ntfs tng driver. API to follow.
-	- Allocate a ntfs_volume in mkntfs and start initializing it instead
+	- Allocate an ntfs_volume in mkntfs and start initializing it instead
 	  of using the opt global structure. Necessary so can call the
 	  modified ntfs_mapping_pairs_decompress() from mkntfs.c.
 	- Add libntfs/debug.c providing:

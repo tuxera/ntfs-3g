@@ -5,7 +5,7 @@
 .\"
 .TH MKNTFS 8 "June 2005" "ntfsprogs version @VERSION@"
 .SH NAME
-mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
+mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 .SH SYNOPSIS
 .B mkntfs
 [
@@ -80,7 +80,7 @@ mkntfs \- create a NTFS 1.2 (Windows NT/2000/XP) file system
 ]
 .SH DESCRIPTION
 .B mkntfs
-is used to create a NTFS 1.2 (Windows NT 4.0) file system on a device (usually
+is used to create an NTFS 1.2 (Windows NT 4.0) file system on a device (usually
 a disk partition).
 .I device
 is the special file corresponding to the device (e.g

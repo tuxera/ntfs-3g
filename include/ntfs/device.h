@@ -72,7 +72,7 @@ struct stat;
 
 /*
  * The ntfs device operations defining all operations that can be performed on
- * the low level device described by a ntfs device structure.
+ * the low level device described by an ntfs device structure.
  */
 struct ntfs_device_operations {
 	int (*open)(struct ntfs_device *dev, int flags);
