@@ -44,10 +44,6 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
 //#define RM_WRITE 1
 
-static int ntfs_inode_close2 (ntfs_inode *ni);
-static int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie);
-static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir);
-
 /**
  * version - Print version information about the program
  *
@@ -284,6 +280,108 @@ static const char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 		return "none\n";
 	else
 		return ctime(&unix_clock);
+}
+
+/**
+ * ntfs_inode_dir_map
+ */
+static void ntfs_inode_dir_map (ntfs_inode *ino)
+{
+	ATTR_RECORD *rec;
+	FILE_NAME_ATTR *fn;
+	ntfs_inode *parent;
+
+	if (!ino)
+		return;
+
+	printf ("open inode %lld\n", ino->mft_no);
+
+	if (ino->mft_no == FILE_root) {
+		printf ("done\n");
+		return;
+	}
+
+	rec = find_first_attribute (AT_FILE_NAME, ino->mrec);
+	if (!rec)
+		return;
+
+	fn = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+
+	parent = ntfs_inode_open (ino->vol, fn->parent_directory);
+	if (parent) {
+		ntfs_inode_dir_map (parent);
+		ntfs_inode_close (parent);
+	}
+}
+
+/**
+ * ntfs_inode_open2
+ */
+static ntfs_inode *ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ino = NULL;
+	struct ntfs_dir *dir;
+
+	if (!vol)
+		return NULL;
+
+	switch (mref) {
+		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
+		case FILE_MFT:     ino = vol->mft_ni;     break;
+		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
+		case FILE_root:
+			dir = vol->private_data;
+			if (dir)
+				ino = dir->inode;
+			break;
+	}
+
+	if (ino) {
+		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
+		ino->ref_count++;
+		return ino;
+	}
+
+	ino = ntfs_inode_open (vol, mref);
+	if (!ino)
+		return NULL;
+
+	/*
+	if (mref != FILE_root)
+		ntfs_inode_dir_map (ino);
+	*/
+
+	// link
+	//   ino->private_data
+
+	ino->private_data = NULL;
+	ino->ref_count = 1;
+
+	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
+	return ino;
+}
+
+/**
+ * ntfs_inode_close2
+ */
+static int ntfs_inode_close2 (ntfs_inode *ni)
+{
+	if (!ni)
+		return 0;
+
+	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
+
+	ni->ref_count--;
+	if (ni->ref_count > 0)
+		return 0;
+
+	// unlink
+	//   ino->private_data
+
+	// XXX temporary until we have commit/rollback
+	NInoClearDirty(ni);
+
+	return ntfs_inode_close (ni);
 }
 
 
@@ -948,6 +1046,123 @@ static int ntfs_ie_test (void)
 
 
 /**
+ * ntfs_dt_rollback
+ */
+static int ntfs_dt_rollback (struct ntfs_dt *dt)
+{
+	int i;
+
+	if (!dt)
+		return -1;
+
+	return 0; // TEMP
+
+	for (i = 0; i < dt->child_count; i++) {
+		if (dt->sub_nodes)
+			ntfs_dt_rollback (dt->sub_nodes[i]);
+		if (dt->inodes)
+			ntfs_inode_close2 (dt->inodes[i]);
+	}
+
+	free (dt->data);
+	free (dt->children);
+	free (dt->sub_nodes);
+	free (dt->inodes);
+
+	dt->data = NULL;
+	dt->children = NULL;
+	dt->sub_nodes = NULL;
+	dt->inodes = NULL;
+
+	return 0;
+}
+
+/**
+ * ntfs_dt_commit
+ */
+static int ntfs_dt_commit (struct ntfs_dt *dt)
+{
+	ntfs_volume *vol;
+	ntfs_attr *attr;
+	struct ntfs_dir *dir;
+	int i;
+	int size;
+
+	if (!dt)
+		return 0;
+
+	dir = dt->dir;
+	if (!dir)
+		return -1;
+
+	vol = dir->vol; // cluster size
+
+	if (dt->changed) {
+		if (dt->parent) {
+			printf ("commit dt (alloc)\n");
+			attr = dt->dir->ialloc;
+			size = dt->dir->index_size;
+			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
+#ifdef RM_WRITE
+			ntfs_attr_mst_pwrite(attr, dt->vcn * size, 1, size, dt->data); // XXX retval
+#endif
+		} else {
+			printf ("commit dt (root)\n");
+			attr = dt->dir->iroot;
+			size = dt->data_len;
+			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
+#ifdef RM_WRITE
+			ntfs_attr_pwrite(attr, 0, size, dt->data); // XXX retval
+#endif
+		}
+
+		printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, dt->vcn);
+
+		dt->changed = FALSE;
+	}
+
+	for (i = 0; i < dt->child_count; i++) {
+		if ((dt->inodes[i]) && (NInoDirty (dt->inodes[i]))) {
+#ifdef RM_WRITE
+			ntfs_inode_sync (dt->inodes[i]);
+#endif
+			printf (RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
+		}
+
+		if (ntfs_dt_commit (dt->sub_nodes[i]) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * ntfs_dt_free
+ */
+static void ntfs_dt_free (struct ntfs_dt *dt)
+{
+	int i;
+
+	if (!dt)
+		return;
+
+	ntfs_dt_rollback (dt);
+
+	for (i = 0; i < dt->child_count; i++) {
+		//if (dt->sub_nodes)
+			ntfs_dt_free (dt->sub_nodes[i]);
+		//if (dt->inodes)
+			ntfs_inode_close2 (dt->inodes[i]);
+	}
+
+	free (dt->sub_nodes);
+	free (dt->children);
+	free (dt->inodes);
+	free (dt->data);	// XXX is this always ours?
+	free (dt);
+}
+
+/**
  * ntfs_dt_alloc_children
  */
 static INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
@@ -1112,123 +1327,6 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 	}
 
 	return dt->child_count;
-}
-
-/**
- * ntfs_dt_commit
- */
-static int ntfs_dt_commit (struct ntfs_dt *dt)
-{
-	ntfs_volume *vol;
-	ntfs_attr *attr;
-	struct ntfs_dir *dir;
-	int i;
-	int size;
-
-	if (!dt)
-		return 0;
-
-	dir = dt->dir;
-	if (!dir)
-		return -1;
-
-	vol = dir->vol; // cluster size
-
-	if (dt->changed) {
-		if (dt->parent) {
-			printf ("commit dt (alloc)\n");
-			attr = dt->dir->ialloc;
-			size = dt->dir->index_size;
-			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
-#ifdef RM_WRITE
-			ntfs_attr_mst_pwrite(attr, dt->vcn * size, 1, size, dt->data); // XXX retval
-#endif
-		} else {
-			printf ("commit dt (root)\n");
-			attr = dt->dir->iroot;
-			size = dt->data_len;
-			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
-#ifdef RM_WRITE
-			ntfs_attr_pwrite(attr, 0, size, dt->data); // XXX retval
-#endif
-		}
-
-		printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, dt->vcn);
-
-		dt->changed = FALSE;
-	}
-
-	for (i = 0; i < dt->child_count; i++) {
-		if ((dt->inodes[i]) && (NInoDirty (dt->inodes[i]))) {
-#ifdef RM_WRITE
-			ntfs_inode_sync (dt->inodes[i]);
-#endif
-			printf (RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
-		}
-
-		if (ntfs_dt_commit (dt->sub_nodes[i]) < 0)
-			return -1;
-	}
-
-	return 0;
-}
-
-/**
- * ntfs_dt_rollback
- */
-static int ntfs_dt_rollback (struct ntfs_dt *dt)
-{
-	int i;
-
-	if (!dt)
-		return -1;
-
-	return 0; // TEMP
-
-	for (i = 0; i < dt->child_count; i++) {
-		if (dt->sub_nodes)
-			ntfs_dt_rollback (dt->sub_nodes[i]);
-		if (dt->inodes)
-			ntfs_inode_close2 (dt->inodes[i]);
-	}
-
-	free (dt->data);
-	free (dt->children);
-	free (dt->sub_nodes);
-	free (dt->inodes);
-
-	dt->data = NULL;
-	dt->children = NULL;
-	dt->sub_nodes = NULL;
-	dt->inodes = NULL;
-
-	return 0;
-}
-
-/**
- * ntfs_dt_free
- */
-static void ntfs_dt_free (struct ntfs_dt *dt)
-{
-	int i;
-
-	if (!dt)
-		return;
-
-	ntfs_dt_rollback (dt);
-
-	for (i = 0; i < dt->child_count; i++) {
-		//if (dt->sub_nodes)
-			ntfs_dt_free (dt->sub_nodes[i]);
-		//if (dt->inodes)
-			ntfs_inode_close2 (dt->inodes[i]);
-	}
-
-	free (dt->sub_nodes);
-	free (dt->children);
-	free (dt->inodes);
-	free (dt->data);	// XXX is this always ours?
-	free (dt);
 }
 
 /**
@@ -1896,107 +1994,49 @@ static int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start
 
 
 /**
- * ntfs_inode_dir_map
+ * utils_free_non_residents
  */
-static void ntfs_inode_dir_map (ntfs_inode *ino)
+static int utils_free_non_residents (ntfs_inode *inode)
 {
-	ATTR_RECORD *rec;
-	FILE_NAME_ATTR *fn;
-	ntfs_inode *parent;
+	// XXX need to do this in memory
 
-	if (!ino)
-		return;
+	ntfs_attr_search_ctx *ctx;
+	ntfs_attr *na;
+	ATTR_RECORD *arec;
 
-	printf ("open inode %lld\n", ino->mft_no);
+	if (!inode)
+		return -1;
 
-	if (ino->mft_no == FILE_root) {
-		printf ("done\n");
-		return;
+	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	if (!ctx) {
+		printf ("can't create a search context\n");
+		return -1;
 	}
 
-	rec = find_first_attribute (AT_FILE_NAME, ino->mrec);
-	if (!rec)
-		return;
-
-	fn = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
-
-	parent = ntfs_inode_open (ino->vol, fn->parent_directory);
-	if (parent) {
-		ntfs_inode_dir_map (parent);
-		ntfs_inode_close (parent);
+	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
+		arec = ctx->attr;
+		if (arec->non_resident) {
+			na = ntfs_attr_open (inode, arec->type, NULL, 0);
+			if (na) {
+				runlist_element *rl;
+				LCN size;
+				LCN count;
+				ntfs_attr_map_whole_runlist (na);
+				rl = na->rl;
+				size = na->allocated_size >> inode->vol->cluster_size_bits;
+				for (count = 0; count < size; count += rl->length, rl++) {
+					//printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
+					//printf ("freed %d\n", ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length));
+					ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length);
+				}
+				ntfs_attr_close (na);
+			}
+		}
 	}
+
+	ntfs_attr_put_search_ctx (ctx);
+	return 0;
 }
-
-/**
- * ntfs_inode_open2
- */
-static ntfs_inode *ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
-{
-	ntfs_inode *ino = NULL;
-	struct ntfs_dir *dir;
-
-	if (!vol)
-		return NULL;
-
-	switch (mref) {
-		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
-		case FILE_MFT:     ino = vol->mft_ni;     break;
-		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
-		case FILE_root:
-			dir = vol->private_data;
-			if (dir)
-				ino = dir->inode;
-			break;
-	}
-
-	if (ino) {
-		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
-		ino->ref_count++;
-		return ino;
-	}
-
-	ino = ntfs_inode_open (vol, mref);
-	if (!ino)
-		return NULL;
-
-	/*
-	if (mref != FILE_root)
-		ntfs_inode_dir_map (ino);
-	*/
-
-	// link
-	//   ino->private_data
-
-	ino->private_data = NULL;
-	ino->ref_count = 1;
-
-	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
-	return ino;
-}
-
-/**
- * ntfs_inode_close2
- */
-static int ntfs_inode_close2 (ntfs_inode *ni)
-{
-	if (!ni)
-		return 0;
-
-	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
-
-	ni->ref_count--;
-	if (ni->ref_count > 0)
-		return 0;
-
-	// unlink
-	//   ino->private_data
-
-	// XXX temporary until we have commit/rollback
-	NInoClearDirty(ni);
-
-	return ntfs_inode_close (ni);
-}
-
 
 /**
  * utils_free_non_residents3
@@ -2035,728 +2075,31 @@ static int utils_free_non_residents3 (struct ntfs_bmp *bmp, ntfs_inode *inode, A
 }
 
 /**
- * ntfs_mft_remove_attr
+ * utils_free_non_residents2
  */
-static int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES type)
+static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
 {
-	ATTR_RECORD *attr20, *attrXX;
-	MFT_RECORD *mft;
-	u8 *src, *dst;
-	int len;
+	ntfs_attr_search_ctx *ctx;
 
 	if (!inode)
-		return 1;
+		return -1;
+	if (!bmp)
+		return -1;
 
-	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST, inode->mrec);
-	if (attr20)
-		return 1;
+	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	if (!ctx) {
+		printf ("can't create a search context\n");
+		return -1;
+	}
 
-	printf ("remove inode %lld, attr 0x%02X\n", inode->mft_no, type);
+	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
+		utils_free_non_residents3 (bmp, inode, ctx->attr);
+	}
 
-	attrXX = find_first_attribute (type, inode->mrec);
-	if (!attrXX)
-		return 1;
-
-	if (utils_free_non_residents3 (bmp, inode, attrXX))
-		return 1;
-
-	// remove entry
-	// inode->mrec
-
-	mft = inode->mrec;
-	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
-
-	//utils_dump_mem ((u8*)attrXX, 0, attrXX->length, DM_DEFAULTS); printf ("\n");
-
-	//printf ("mrec = %p, attr = %p, diff = %d (0x%02X)\n", mft, attrXX, (u8*)attrXX - (u8*)mft, (u8*)attrXX - (u8*)mft);
-	// memmove
-
-	dst = (u8*) attrXX;
-	src = dst + attrXX->length;
-	len = (((u8*) mft + mft->bytes_in_use) - src);
-
-	// fix mft header
-	mft->bytes_in_use -= attrXX->length;
-
-#if 0
-	printf ("dst = 0x%02X, src = 0x%02X, len = 0x%02X\n", (dst - (u8*)mft), (src - (u8*)mft), len);
-	printf ("attr %02X, len = 0x%02X\n", attrXX->type, attrXX->length);
-	printf ("bytes in use = 0x%02X\n", mft->bytes_in_use);
-	printf ("\n");
-#endif
-
-	memmove (dst, src, len);
-	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
-
-	NInoSetDirty(inode);
+	ntfs_attr_put_search_ctx (ctx);
 	return 0;
 }
 
-
-/**
- * ntfs_dir_commit
- */
-static int ntfs_dir_commit (struct ntfs_dir *dir)
-{
-	int i;
-
-	if (!dir)
-		return 0;
-
-	printf ("commit dir inode %llu\n", dir->inode->mft_no);
-	if (NInoDirty (dir->inode)) {
-#ifdef RM_WRITE
-		ntfs_inode_sync (dir->inode);
-#endif
-		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
-	}
-
-	ntfs_dir_truncate (dir->vol, dir);
-
-	if (ntfs_dt_commit (dir->index) < 0)
-		return -1;
-
-	if (ntfs_bmp_commit (dir->bitmap) < 0)
-		return -1;
-
-	for (i = 0; i < dir->child_count; i++) {
-		if (ntfs_dir_commit (dir->children[i]) < 0)
-			return -1;
-	}
-
-	return 0;
-}
-
-/**
- * ntfs_dir_rollback
- */
-static int ntfs_dir_rollback (struct ntfs_dir *dir)
-{
-	int i;
-
-	if (!dir)
-		return -1;
-
-	if (ntfs_dt_rollback (dir->index) < 0)
-		return -1;
-
-	if (ntfs_bmp_rollback (dir->bitmap) < 0)
-		return -1;
-
-	for (i = 0; i < dir->child_count; i++) {
-		if (ntfs_dir_rollback (dir->children[i]) < 0)
-			return -1;
-	}
-
-	return 0;
-}
-
-/**
- * ntfs_dir_free
- */
-static void ntfs_dir_free (struct ntfs_dir *dir)
-{
-	struct ntfs_dir *parent;
-	int i;
-
-	if (!dir)
-		return;
-
-	ntfs_dir_rollback (dir);
-
-	parent = dir->parent;
-	if (parent) {
-		for (i = 0; i < parent->child_count; i++) {
-			if (parent->children[i] == dir) {
-				parent->children[i] = NULL;
-			}
-		}
-	}
-
-	ntfs_attr_close (dir->iroot);
-	ntfs_attr_close (dir->ialloc);
-	ntfs_inode_close2 (dir->inode);
-
-	ntfs_dt_free  (dir->index);
-	ntfs_bmp_free (dir->bitmap);
-
-	for (i = 0; i < dir->child_count; i++)
-		ntfs_dir_free (dir->children[i]);
-
-	free (dir->children);
-	free (dir);
-}
-
-/**
- * ntfs_dir_alloc
- */
-static struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
-{
-	struct ntfs_dir *dir   = NULL;
-	ntfs_inode      *inode = NULL;
-	ATTR_RECORD	*rec   = NULL;
-	INDEX_ROOT	*ir    = NULL;
-
-	if (!vol)
-		return NULL;
-
-	//printf ("ntfs_dir_alloc %lld\n", MREF (mft_num));
-	inode = ntfs_inode_open2 (vol, mft_num);
-	if (!inode)
-		return NULL;
-
-	dir = calloc (1, sizeof (*dir));
-	if (!dir) {
-		ntfs_inode_close2 (inode);
-		return NULL;
-	}
-
-	dir->inode  = inode;
-	dir->iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT,       I30, 4);
-	dir->ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
-
-	dir->vol	  = vol;
-	dir->parent	  = NULL;
-	dir->name	  = NULL;
-	dir->name_len	  = 0;
-	dir->index	  = NULL;
-	dir->children	  = NULL;
-	dir->child_count  = 0;
-	dir->mft_num	  = mft_num;
-
-	// This may not exist
-	dir->bitmap = ntfs_bmp_alloc (inode, AT_BITMAP, I30, 4);
-
-	if (dir->ialloc) {
-		rec = find_first_attribute (AT_INDEX_ROOT, inode->mrec);
-		ir  = (INDEX_ROOT*) ((u8*)rec + rec->value_offset);
-		dir->index_size = ir->index_block_size;
-	} else {
-		dir->index_size = 0;
-	}
-
-	if (!dir->iroot) {
-		ntfs_dir_free (dir);
-		return NULL;
-	}
-
-	return dir;
-}
-
-/**
- * ntfs_dir_add
- */
-static void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
-{
-	if (!parent || !child)
-		return;
-
-	parent->child_count++;
-	//printf ("child count = %d\n", parent->child_count);
-	parent->children = realloc (parent->children, parent->child_count * sizeof (struct ntfs_dir*));
-	child->parent = parent;
-
-	parent->children[parent->child_count-1] = child;
-}
-
-/**
- * ntfs_dir_find
- */
-static MFT_REF ntfs_dir_find (struct ntfs_dir *dir, char *name)
-{
-	MFT_REF mft_num;
-	ntfschar *uname = NULL;
-	int len;
-
-	if (!dir || !name)
-		return -1;
-
-	len = ntfs_mbstoucs (name, &uname, 0);
-	if (len < 0)
-		return -1;
-
-	if (!dir->index)
-		dir->index = ntfs_dt_alloc (dir, NULL, -1);
-
-	//printf ("dir->index = %p\n", dir->index);
-	//printf ("dir->child_count = %d\n", dir->child_count);
-	//printf ("uname = %p\n", uname);
-	mft_num = ntfs_dt_find (dir->index, uname, len);
-
-	free (uname);
-	return mft_num;
-}
-
-/**
- * ntfs_dir_find2
- */
-static struct ntfs_dir * ntfs_dir_find2 (struct ntfs_dir *dir, ntfschar *name, int name_len)
-{
-	int i;
-	struct ntfs_dir *child = NULL;
-	struct ntfs_dt *dt = NULL;
-	int dt_num = 0;
-	INDEX_ENTRY *ie;
-	MFT_REF mft_num;
-
-	if (!dir || !name)
-		return NULL;
-
-	if (!dir->index) {	// XXX when will this happen?
-		printf ("ntfs_dir_find2 - directory has no index\n");
-		return NULL;
-	}
-
-	for (i = 0; i < dir->child_count; i++) {
-		if (0 == ntfs_names_collate (name, name_len,
-					dir->children[i]->name,
-					dir->children[i]->name_len,
-					2, IGNORE_CASE,
-					dir->vol->upcase,
-					dir->vol->upcase_len))
-			return dir->children[i];
-	}
-
-	dt = ntfs_dt_find2 (dir->index, name, name_len, &dt_num);
-	if (!dt) {
-		printf ("can't find name in dir\n");
-		return NULL;
-	}
-
-	ie = dt->children[dt_num];
-
-	mft_num = ie->indexed_file;
-
-	child = ntfs_dir_alloc (dir->vol, mft_num);
-	if (!child)
-		return NULL;
-
-	child->index = ntfs_dt_alloc (child, NULL, -1);
-
-	ntfs_dir_add (dir, child);
-
-	return child;
-}
-
-/**
- * ntfs_dir_truncate
- */
-static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir)
-{
-	//int i;
-	//u8 *buffer;
-	//int buf_count;
-	s64 last_bit;
-	INDEX_ENTRY *ie;
-
-	if (!vol || !dir)
-		return -1;
-
-	if ((dir->ialloc == NULL) || (dir->bitmap == NULL))
-		return 0;
-
-#if 0
-	buf_count = ROUND_UP (dir->bitmap->attr->allocated_size, vol->cluster_size) >> vol->cluster_size_bits;
-	printf ("alloc = %lld bytes\n", dir->ialloc->allocated_size);
-	printf ("alloc = %lld clusters\n", dir->ialloc->allocated_size >> vol->cluster_size_bits);
-	printf ("bitmap bytes 0 to %lld\n", ((dir->ialloc->allocated_size >> vol->cluster_size_bits)-1)>>3);
-	printf ("bitmap = %p\n", dir->bitmap);
-	printf ("bitmap = %lld bytes\n", dir->bitmap->attr->allocated_size);
-	printf ("bitmap = %d buffers\n", buf_count);
-#endif
-
-	last_bit = ntfs_bmp_find_last_set (dir->bitmap);
-	if (dir->ialloc->allocated_size == (dir->index_size * (last_bit + 1))) {
-		//printf ("nothing to do\n");
-		return 0;
-	}
-
-	printf (BOLD YELLOW "Truncation needed\n" END);
-
-#if 0
-	printf ("\tlast bit = %lld\n", last_bit);
-	printf ("\tactual IALLOC size = %lld\n", dir->ialloc->allocated_size);
-	printf ("\tshould IALLOC size = %lld\n", dir->index_size * (last_bit + 1));
-#endif
-
-	if ((dir->index_size * (last_bit + 1)) == 0) {
-		printf ("root dt %d, vcn = %lld\n", dir->index->changed, dir->index->vcn);
-		//rollback all dts
-		//ntfs_dt_rollback (dir->index);
-		//dir->index = NULL;
-		// What about the ROOT dt?
-
-		ie = ntfs_ie_copy (dir->index->children[0]);
-		if (!ie) {
-			printf (RED "IE copy failed\n" END);
-			return -1;
-		}
-
-		ie = ntfs_ie_remove_vcn (ie);
-		if (!ie) {
-			printf (RED "IE remove vcn failed\n" END);
-			return -1;
-		}
-
-		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
-		//utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS); printf ("\n");
-		ntfs_dt_root_replace (dir->index, 0, dir->index->children[0], ie);
-		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
-		//printf ("root dt %d, vcn = %lld\n", dir->index->changed, dir->index->vcn);
-
-		free (ie);
-		ie = NULL;
-
-		//index flags remove LARGE_INDEX
-		dir->index->header->flags = 0;
-
-		//rollback dir's bmp
-		ntfs_bmp_free (dir->bitmap);
-		dir->bitmap = NULL;
-
-		/*
-		for (i = 0; i < dir->index->child_count; i++) {
-			ntfs_dt_rollback (dir->index->sub_nodes[i]);
-			dir->index->sub_nodes[i] = NULL;
-		}
-		*/
-
-		//printf ("dir->index->inodes[0] = %p\n", dir->index->inodes[0]);
-
-		//remove 0xA0 attribute
-		ntfs_mft_remove_attr (vol->private_bmp2, dir->inode, AT_INDEX_ALLOCATION);
-
-		//remove 0xB0 attribute
-		ntfs_mft_remove_attr (vol->private_bmp2, dir->inode, AT_BITMAP);
-	} else {
-		printf (RED "Cannot shrink directory\n" END);
-		//ntfs_dir_shrink_alloc
-		//ntfs_dir_shrink_bitmap
-		//make bitmap resident?
-	}
-
-	/*
-	 * Remove
-	 *   dt -> dead
-	 *   bitmap updated
-	 *   rollback dead dts
-	 *   commit bitmap
-	 *   commit dts
-	 *   commit dir
-	 */
-	/*
-	 * Reuse
-	 *   search for lowest dead
-	 *   update bitmap
-	 *   init dt
-	 *   remove from dead
-	 *   insert into tree
-	 *   init INDX
-	 */
-
-#if 0
-	buffer = ntfs_bmp_get_data (dir->bitmap, 0);
-	if (!buffer)
-		return -1;
-
-	utils_dump_mem (buffer, 0, 8, DM_NO_ASCII);
-	for (i = buf_count-1; i >= 0; i--) {
-		if (buffer[i]) {
-			printf ("alloc in use\n");
-			return 0;
-		}
-	}
-#endif
-
-	// <dir>/$BITMAP($I30)
-	// <dir>/$INDEX_ALLOCATION($I30)
-	// $Bitmap
-
-	// Find the highest set bit in the directory bitmap
-	// can we free any clusters of the alloc?
-	// if yes, resize attribute
-
-	// Are *any* bits set?
-	// If not remove ialloc
-
-	return 0;
-}
-
-
-/**
- * utils_volume_commit
- */
-static int utils_volume_commit (ntfs_volume *vol)
-{
-	if (!vol)
-		return -1;
-
-	printf ("commit volume\n");
-	if (ntfs_bmp_commit (vol->private_bmp1) < 0)
-		return -1;
-
-	if (ntfs_bmp_commit (vol->private_bmp2) < 0)
-		return -1;
-
-	if (ntfs_dir_commit (vol->private_data) < 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * utils_volume_rollback
- */
-static int utils_volume_rollback (ntfs_volume *vol)
-{
-	if (!vol)
-		return -1;
-
-	if (ntfs_bmp_rollback (vol->private_bmp1) < 0)
-		return -1;
-
-	if (ntfs_bmp_rollback (vol->private_bmp2) < 0)
-		return -1;
-
-	if (ntfs_dir_rollback (vol->private_data) < 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * ntfs_umount2
- */
-static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
-{
-	struct ntfs_dir *dir;
-	struct ntfs_bmp *bmp;
-
-	if (!vol)
-		return 0;
-
-	utils_volume_rollback (vol);
-
-	dir = (struct ntfs_dir *) vol->private_data;
-	vol->private_data = NULL;
-	ntfs_dir_free (dir);
-
-	bmp = (struct ntfs_bmp *) vol->private_bmp1;
-	vol->private_bmp1 = NULL;
-	ntfs_bmp_free (bmp);
-
-	bmp = (struct ntfs_bmp *) vol->private_bmp2;
-	vol->private_bmp2 = NULL;
-	ntfs_bmp_free (bmp);
-
-	return ntfs_umount (vol, force);
-}
-
-/**
- * utils_mount_volume2
- */
-static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flags, BOOL force)
-{
-	// XXX can we replace these and search by mft number?  Hmm... NO.
-	static ntfschar bmp[8] = {
-		const_cpu_to_le16('$'),
-		const_cpu_to_le16('B'),
-		const_cpu_to_le16('i'),
-		const_cpu_to_le16('t'),
-		const_cpu_to_le16('m'),
-		const_cpu_to_le16('a'),
-		const_cpu_to_le16('p'),
-		const_cpu_to_le16(0)
-	};
-
-	static ntfschar mft[5] = {
-		const_cpu_to_le16('$'),
-		const_cpu_to_le16('M'),
-		const_cpu_to_le16('F'),
-		const_cpu_to_le16('T'),
-		const_cpu_to_le16(0)
-	};
-
-	static ntfschar mftmirr[9] = {
-		const_cpu_to_le16('$'),
-		const_cpu_to_le16('M'),
-		const_cpu_to_le16('F'),
-		const_cpu_to_le16('T'),
-		const_cpu_to_le16('M'),
-		const_cpu_to_le16('i'),
-		const_cpu_to_le16('r'),
-		const_cpu_to_le16('r'),
-		const_cpu_to_le16(0)
-	};
-
-	static ntfschar dot[2] = {
-		const_cpu_to_le16('.'),
-		const_cpu_to_le16(0)
-	};
-
-	ntfs_volume *vol;
-	struct ntfs_dir *dir;
-	struct ntfs_dt *root;
-	struct ntfs_dt *found;
-	int num;
-
-	vol = utils_mount_volume (device, flags, force);
-	if (!vol)
-		return NULL;
-
-	vol->lcnbmp_ni ->ref_count = 1;
-	vol->mft_ni    ->ref_count = 1;
-	vol->mftmirr_ni->ref_count = 1;
-
-	vol->lcnbmp_ni ->private_data = NULL;
-	vol->mft_ni    ->private_data = NULL;
-	vol->mftmirr_ni->private_data = NULL;
-
-	dir = ntfs_dir_alloc (vol, FILE_root);
-	if (!dir) {
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-
-	dir->index = ntfs_dt_alloc (dir, NULL, -1);
-
-	root = dir->index;
-
-	//$Bitmap
-	num = -1;
-	found = ntfs_dt_find2 (root, bmp, 7, &num);
-	if ((!found) || (num < 0)) {
-		printf ("can't find $Bitmap\n");
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-	vol->lcnbmp_ni->ref_count++;
-	vol->lcnbmp_ni->private_data = found->dir;
-	found->inodes[num] = vol->lcnbmp_ni;
-
-	//$MFT
-	num = -1;
-	found = ntfs_dt_find2 (root, mft, 4, &num);
-	if ((!found) || (num < 0)) {
-		printf ("can't find $MFT\n");
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-	vol->mft_ni->ref_count++;
-	vol->mft_ni->private_data = found->dir;
-	found->inodes[num] = vol->mft_ni;
-
-	//$MFTMirr
-	num = -1;
-	found = ntfs_dt_find2 (root, mftmirr, 8, &num);
-	if ((!found) || (num < 0)) {
-		printf ("can't find $MFTMirr\n");
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-	vol->mftmirr_ni->ref_count++;
-	vol->mftmirr_ni->private_data = found->dir;
-	found->inodes[num] = vol->mftmirr_ni;
-
-	// root directory
-	num = -1;
-	found = ntfs_dt_find2 (root, dot, 1, &num);
-	if ((!found) || (num < 0)) {
-		printf ("can't find the root directory\n");
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-
-	vol->private_data = found->dir;
-	found->inodes[num] = dir->inode;
-	dir->inode->private_data = found;
-	dir->inode->ref_count = 2;
-
-	vol->private_bmp1 = ntfs_bmp_alloc (vol->mft_ni,    AT_BITMAP, NULL, 0);
-	vol->private_bmp2 = ntfs_bmp_alloc (vol->lcnbmp_ni, AT_DATA,   NULL, 0);
-
-	if (!vol->private_bmp1 || !vol->private_bmp2) {
-		printf ("can't find the bitmaps\n");
-		ntfs_umount2 (vol, FALSE);
-		vol = NULL;
-		goto done;
-	}
-
-done:
-	return vol;
-}
-
-
-/**
- * utils_pathname_to_mftref
- */
-static MFT_REF utils_pathname_to_mftref (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_dir **finddir)
-{
-	MFT_REF mft_num;
-	MFT_REF result = -1;
-	char *p, *q;
-	char *ascii = NULL;
-	struct ntfs_dir *dir = NULL;
-
-	if (!vol || !parent || !pathname) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	ascii = strdup (pathname);		// Work with a r/w copy
-	if (!ascii) {
-		Eprintf ("Out of memory.\n");
-		goto close;
-	}
-
-	p = ascii;
-	while (p && *p && *p == PATH_SEP)	// Remove leading /'s
-		p++;
-	while (p && *p) {
-		q = strchr (p, PATH_SEP);	// Find the end of the first token
-		if (q != NULL) {
-			*q = '\0';
-			q++;
-		}
-
-		//printf ("looking for %s in %p\n", p, parent);
-		mft_num = ntfs_dir_find (parent, p);
-		if (mft_num == (u64)-1) {
-			Eprintf ("Couldn't find name '%s' in pathname '%s'.\n", p, pathname);
-			goto close;
-		}
-
-		if (q) {
-			dir = ntfs_dir_alloc (vol, mft_num);
-			if (!dir) {
-				Eprintf ("Couldn't allocate a new directory (%lld).\n", mft_num);
-				goto close;
-			}
-
-			ntfs_dir_add (parent, dir);
-			parent = dir;
-		} else {
-			//printf ("file %s\n", p);
-			result = mft_num;
-			if (finddir)
-				*finddir = dir ? dir : parent;
-			break;
-		}
-
-		p = q;
-		while (p && *p && *p == PATH_SEP)
-			p++;
-	}
-
-close:
-	free (ascii);	// from strdup
-	return result;
-}
 
 /**
  * utils_mftrec_mark_free
@@ -2915,183 +2258,64 @@ static int utils_mftrec_mark_free5 (ntfs_inode *inode, struct ntfs_bmp *bmp, MFT
 	return 0;
 }
 
-/**
- * utils_free_non_residents
- */
-static int utils_free_non_residents (ntfs_inode *inode)
-{
-	// XXX need to do this in memory
-
-	ntfs_attr_search_ctx *ctx;
-	ntfs_attr *na;
-	ATTR_RECORD *arec;
-
-	if (!inode)
-		return -1;
-
-	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
-	if (!ctx) {
-		printf ("can't create a search context\n");
-		return -1;
-	}
-
-	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
-		arec = ctx->attr;
-		if (arec->non_resident) {
-			na = ntfs_attr_open (inode, arec->type, NULL, 0);
-			if (na) {
-				runlist_element *rl;
-				LCN size;
-				LCN count;
-				ntfs_attr_map_whole_runlist (na);
-				rl = na->rl;
-				size = na->allocated_size >> inode->vol->cluster_size_bits;
-				for (count = 0; count < size; count += rl->length, rl++) {
-					//printf ("rl(%llu,%llu,%lld)\n", rl->vcn, rl->lcn, rl->length);
-					//printf ("freed %d\n", ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length));
-					ntfs_cluster_free (inode->vol, na, rl->vcn, rl->length);
-				}
-				ntfs_attr_close (na);
-			}
-		}
-	}
-
-	ntfs_attr_put_search_ctx (ctx);
-	return 0;
-}
 
 /**
- * utils_free_non_residents2
+ * ntfs_mft_remove_attr
  */
-static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
+static int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES type)
 {
-	ntfs_attr_search_ctx *ctx;
-
-	if (!inode)
-		return -1;
-	if (!bmp)
-		return -1;
-
-	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
-	if (!ctx) {
-		printf ("can't create a search context\n");
-		return -1;
-	}
-
-	while (ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx) == 0) {
-		utils_free_non_residents3 (bmp, inode, ctx->attr);
-	}
-
-	ntfs_attr_put_search_ctx (ctx);
-	return 0;
-}
-
-/**
- * utils_pathname_to_inode2
- */
-static BOOL utils_pathname_to_inode2 (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_find *found)
-{
+	ATTR_RECORD *attr20, *attrXX;
+	MFT_RECORD *mft;
+	u8 *src, *dst;
 	int len;
-	char *p, *q;
-	ntfschar *unicode = NULL;
-	char *ascii = NULL;
-	struct ntfs_dir *dir = NULL;
-	struct ntfs_dir *child = NULL;
-	struct ntfs_dt *dt = NULL;
-	int dt_num;
-	BOOL result = FALSE;
 
-	if (!vol || !pathname || !found) {
-		errno = EINVAL;
-		return FALSE;
-	}
+	if (!inode)
+		return 1;
 
-	memset (found, 0, sizeof (*found));
+	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST, inode->mrec);
+	if (attr20)
+		return 1;
 
-	if (parent) {
-		dir = parent;
-	} else {
-		dir = (struct ntfs_dir *) vol->private_data;
-		if (!dir) {
-			Eprintf ("Couldn't open the inode of the root directory.\n");
-			goto close;
-		}
-	}
+	printf ("remove inode %lld, attr 0x%02X\n", inode->mft_no, type);
 
-	unicode = malloc (MAX_PATH * sizeof (ntfschar));
-	ascii   = strdup (pathname);		// Work with a r/w copy
-	if (!unicode || !ascii) {
-		Eprintf ("Out of memory.\n");
-		goto close;
-	}
+	attrXX = find_first_attribute (type, inode->mrec);
+	if (!attrXX)
+		return 1;
 
-	p = ascii;
-	while (p && *p && *p == PATH_SEP)	// Remove leading /'s
-		p++;
-	while (p && *p) {
-		q = strchr (p, PATH_SEP);	// Find the end of the first token
-		if (q != NULL) {
-			*q = '\0';
-			q++;
-		}
+	if (utils_free_non_residents3 (bmp, inode, attrXX))
+		return 1;
 
-		len = ntfs_mbstoucs (p, &unicode, MAX_PATH);
-		if (len < 0) {
-			Eprintf ("Couldn't convert name to Unicode: %s.\n", p);
-			goto close;
-		}
+	// remove entry
+	// inode->mrec
 
-		//printf ("looking for %s\n", p);
-		if (q) {
-			child = ntfs_dir_find2 (dir, unicode, len);
-			if (!child) {
-				printf ("can't find %s in %s\n", p, pathname);
-				goto close;
-			}
-		} else {
-			//printf ("file: %s\n", p);
+	mft = inode->mrec;
+	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
 
-			dt = ntfs_dt_find2 (dir->index, unicode, len, &dt_num);
-			if (!dt) {
-				printf ("can't find %s in %s (2)\n", p, pathname);
-				goto close;
-			}
+	//utils_dump_mem ((u8*)attrXX, 0, attrXX->length, DM_DEFAULTS); printf ("\n");
 
-			if (dt->inodes[dt_num] == NULL) {
-				dt->inodes[dt_num] = ntfs_inode_open (dir->vol, dt->children[dt_num]->indexed_file);
-				if (!dt->inodes[dt_num]) {
-					printf ("Can't open inode %lld\n", MREF (dt->children[dt_num]->indexed_file));
-					goto close;
-				}
-				dt->inodes[dt_num]->ref_count = 2;
-				dt->inodes[dt_num]->private_data = dt;
-			}
+	//printf ("mrec = %p, attr = %p, diff = %d (0x%02X)\n", mft, attrXX, (u8*)attrXX - (u8*)mft, (u8*)attrXX - (u8*)mft);
+	// memmove
 
-			//printf ("dt = %p,%d\n", dt, dt_num);
+	dst = (u8*) attrXX;
+	src = dst + attrXX->length;
+	len = (((u8*) mft + mft->bytes_in_use) - src);
 
-			break;
-		}
+	// fix mft header
+	mft->bytes_in_use -= attrXX->length;
 
-		dir   = child;
-		child = NULL;
-		p = q;
-		while (p && *p && *p == PATH_SEP)
-			p++;
-	}
+#if 0
+	printf ("dst = 0x%02X, src = 0x%02X, len = 0x%02X\n", (dst - (u8*)mft), (src - (u8*)mft), len);
+	printf ("attr %02X, len = 0x%02X\n", attrXX->type, attrXX->length);
+	printf ("bytes in use = 0x%02X\n", mft->bytes_in_use);
+	printf ("\n");
+#endif
 
-	found->dir      = dir;
-	found->dt       = dt;
-	found->dt_index = dt_num;
-	found->inode    = dt->inodes[dt_num];
-	found->mref     = found->inode->mft_no;
-	result = TRUE;
-	//printf ("dir %p, dt %p, num %d, ino %p, %lld\n", dir, dt, dt_num, dt->inodes[dt_num], MREF (found->inode->mft_no));
-close:
-	free (ascii);	// from strdup
-	free (unicode);
-	return result;
+	memmove (dst, src, len);
+	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
+
+	NInoSetDirty(inode);
+	return 0;
 }
-
 
 /**
  * ntfs_mft_resize_resident
@@ -4482,6 +3706,777 @@ done:
 
 
 /**
+ * ntfs_dir_rollback
+ */
+static int ntfs_dir_rollback (struct ntfs_dir *dir)
+{
+	int i;
+
+	if (!dir)
+		return -1;
+
+	if (ntfs_dt_rollback (dir->index) < 0)
+		return -1;
+
+	if (ntfs_bmp_rollback (dir->bitmap) < 0)
+		return -1;
+
+	for (i = 0; i < dir->child_count; i++) {
+		if (ntfs_dir_rollback (dir->children[i]) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * ntfs_dir_truncate
+ */
+static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir)
+{
+	//int i;
+	//u8 *buffer;
+	//int buf_count;
+	s64 last_bit;
+	INDEX_ENTRY *ie;
+
+	if (!vol || !dir)
+		return -1;
+
+	if ((dir->ialloc == NULL) || (dir->bitmap == NULL))
+		return 0;
+
+#if 0
+	buf_count = ROUND_UP (dir->bitmap->attr->allocated_size, vol->cluster_size) >> vol->cluster_size_bits;
+	printf ("alloc = %lld bytes\n", dir->ialloc->allocated_size);
+	printf ("alloc = %lld clusters\n", dir->ialloc->allocated_size >> vol->cluster_size_bits);
+	printf ("bitmap bytes 0 to %lld\n", ((dir->ialloc->allocated_size >> vol->cluster_size_bits)-1)>>3);
+	printf ("bitmap = %p\n", dir->bitmap);
+	printf ("bitmap = %lld bytes\n", dir->bitmap->attr->allocated_size);
+	printf ("bitmap = %d buffers\n", buf_count);
+#endif
+
+	last_bit = ntfs_bmp_find_last_set (dir->bitmap);
+	if (dir->ialloc->allocated_size == (dir->index_size * (last_bit + 1))) {
+		//printf ("nothing to do\n");
+		return 0;
+	}
+
+	printf (BOLD YELLOW "Truncation needed\n" END);
+
+#if 0
+	printf ("\tlast bit = %lld\n", last_bit);
+	printf ("\tactual IALLOC size = %lld\n", dir->ialloc->allocated_size);
+	printf ("\tshould IALLOC size = %lld\n", dir->index_size * (last_bit + 1));
+#endif
+
+	if ((dir->index_size * (last_bit + 1)) == 0) {
+		printf ("root dt %d, vcn = %lld\n", dir->index->changed, dir->index->vcn);
+		//rollback all dts
+		//ntfs_dt_rollback (dir->index);
+		//dir->index = NULL;
+		// What about the ROOT dt?
+
+		ie = ntfs_ie_copy (dir->index->children[0]);
+		if (!ie) {
+			printf (RED "IE copy failed\n" END);
+			return -1;
+		}
+
+		ie = ntfs_ie_remove_vcn (ie);
+		if (!ie) {
+			printf (RED "IE remove vcn failed\n" END);
+			return -1;
+		}
+
+		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
+		//utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS); printf ("\n");
+		ntfs_dt_root_replace (dir->index, 0, dir->index->children[0], ie);
+		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
+		//printf ("root dt %d, vcn = %lld\n", dir->index->changed, dir->index->vcn);
+
+		free (ie);
+		ie = NULL;
+
+		//index flags remove LARGE_INDEX
+		dir->index->header->flags = 0;
+
+		//rollback dir's bmp
+		ntfs_bmp_free (dir->bitmap);
+		dir->bitmap = NULL;
+
+		/*
+		for (i = 0; i < dir->index->child_count; i++) {
+			ntfs_dt_rollback (dir->index->sub_nodes[i]);
+			dir->index->sub_nodes[i] = NULL;
+		}
+		*/
+
+		//printf ("dir->index->inodes[0] = %p\n", dir->index->inodes[0]);
+
+		//remove 0xA0 attribute
+		ntfs_mft_remove_attr (vol->private_bmp2, dir->inode, AT_INDEX_ALLOCATION);
+
+		//remove 0xB0 attribute
+		ntfs_mft_remove_attr (vol->private_bmp2, dir->inode, AT_BITMAP);
+	} else {
+		printf (RED "Cannot shrink directory\n" END);
+		//ntfs_dir_shrink_alloc
+		//ntfs_dir_shrink_bitmap
+		//make bitmap resident?
+	}
+
+	/*
+	 * Remove
+	 *   dt -> dead
+	 *   bitmap updated
+	 *   rollback dead dts
+	 *   commit bitmap
+	 *   commit dts
+	 *   commit dir
+	 */
+	/*
+	 * Reuse
+	 *   search for lowest dead
+	 *   update bitmap
+	 *   init dt
+	 *   remove from dead
+	 *   insert into tree
+	 *   init INDX
+	 */
+
+#if 0
+	buffer = ntfs_bmp_get_data (dir->bitmap, 0);
+	if (!buffer)
+		return -1;
+
+	utils_dump_mem (buffer, 0, 8, DM_NO_ASCII);
+	for (i = buf_count-1; i >= 0; i--) {
+		if (buffer[i]) {
+			printf ("alloc in use\n");
+			return 0;
+		}
+	}
+#endif
+
+	// <dir>/$BITMAP($I30)
+	// <dir>/$INDEX_ALLOCATION($I30)
+	// $Bitmap
+
+	// Find the highest set bit in the directory bitmap
+	// can we free any clusters of the alloc?
+	// if yes, resize attribute
+
+	// Are *any* bits set?
+	// If not remove ialloc
+
+	return 0;
+}
+
+/**
+ * ntfs_dir_commit
+ */
+static int ntfs_dir_commit (struct ntfs_dir *dir)
+{
+	int i;
+
+	if (!dir)
+		return 0;
+
+	printf ("commit dir inode %llu\n", dir->inode->mft_no);
+	if (NInoDirty (dir->inode)) {
+#ifdef RM_WRITE
+		ntfs_inode_sync (dir->inode);
+#endif
+		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
+	}
+
+	ntfs_dir_truncate (dir->vol, dir);
+
+	if (ntfs_dt_commit (dir->index) < 0)
+		return -1;
+
+	if (ntfs_bmp_commit (dir->bitmap) < 0)
+		return -1;
+
+	for (i = 0; i < dir->child_count; i++) {
+		if (ntfs_dir_commit (dir->children[i]) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * ntfs_dir_free
+ */
+static void ntfs_dir_free (struct ntfs_dir *dir)
+{
+	struct ntfs_dir *parent;
+	int i;
+
+	if (!dir)
+		return;
+
+	ntfs_dir_rollback (dir);
+
+	parent = dir->parent;
+	if (parent) {
+		for (i = 0; i < parent->child_count; i++) {
+			if (parent->children[i] == dir) {
+				parent->children[i] = NULL;
+			}
+		}
+	}
+
+	ntfs_attr_close (dir->iroot);
+	ntfs_attr_close (dir->ialloc);
+	ntfs_inode_close2 (dir->inode);
+
+	ntfs_dt_free  (dir->index);
+	ntfs_bmp_free (dir->bitmap);
+
+	for (i = 0; i < dir->child_count; i++)
+		ntfs_dir_free (dir->children[i]);
+
+	free (dir->children);
+	free (dir);
+}
+
+/**
+ * ntfs_dir_alloc
+ */
+static struct ntfs_dir * ntfs_dir_alloc (ntfs_volume *vol, MFT_REF mft_num)
+{
+	struct ntfs_dir *dir   = NULL;
+	ntfs_inode      *inode = NULL;
+	ATTR_RECORD	*rec   = NULL;
+	INDEX_ROOT	*ir    = NULL;
+
+	if (!vol)
+		return NULL;
+
+	//printf ("ntfs_dir_alloc %lld\n", MREF (mft_num));
+	inode = ntfs_inode_open2 (vol, mft_num);
+	if (!inode)
+		return NULL;
+
+	dir = calloc (1, sizeof (*dir));
+	if (!dir) {
+		ntfs_inode_close2 (inode);
+		return NULL;
+	}
+
+	dir->inode  = inode;
+	dir->iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT,       I30, 4);
+	dir->ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
+
+	dir->vol	  = vol;
+	dir->parent	  = NULL;
+	dir->name	  = NULL;
+	dir->name_len	  = 0;
+	dir->index	  = NULL;
+	dir->children	  = NULL;
+	dir->child_count  = 0;
+	dir->mft_num	  = mft_num;
+
+	// This may not exist
+	dir->bitmap = ntfs_bmp_alloc (inode, AT_BITMAP, I30, 4);
+
+	if (dir->ialloc) {
+		rec = find_first_attribute (AT_INDEX_ROOT, inode->mrec);
+		ir  = (INDEX_ROOT*) ((u8*)rec + rec->value_offset);
+		dir->index_size = ir->index_block_size;
+	} else {
+		dir->index_size = 0;
+	}
+
+	if (!dir->iroot) {
+		ntfs_dir_free (dir);
+		return NULL;
+	}
+
+	return dir;
+}
+
+/**
+ * ntfs_dir_add
+ */
+static void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child)
+{
+	if (!parent || !child)
+		return;
+
+	parent->child_count++;
+	//printf ("child count = %d\n", parent->child_count);
+	parent->children = realloc (parent->children, parent->child_count * sizeof (struct ntfs_dir*));
+	child->parent = parent;
+
+	parent->children[parent->child_count-1] = child;
+}
+
+/**
+ * ntfs_dir_find
+ */
+static MFT_REF ntfs_dir_find (struct ntfs_dir *dir, char *name)
+{
+	MFT_REF mft_num;
+	ntfschar *uname = NULL;
+	int len;
+
+	if (!dir || !name)
+		return -1;
+
+	len = ntfs_mbstoucs (name, &uname, 0);
+	if (len < 0)
+		return -1;
+
+	if (!dir->index)
+		dir->index = ntfs_dt_alloc (dir, NULL, -1);
+
+	//printf ("dir->index = %p\n", dir->index);
+	//printf ("dir->child_count = %d\n", dir->child_count);
+	//printf ("uname = %p\n", uname);
+	mft_num = ntfs_dt_find (dir->index, uname, len);
+
+	free (uname);
+	return mft_num;
+}
+
+/**
+ * ntfs_dir_find2
+ */
+static struct ntfs_dir * ntfs_dir_find2 (struct ntfs_dir *dir, ntfschar *name, int name_len)
+{
+	int i;
+	struct ntfs_dir *child = NULL;
+	struct ntfs_dt *dt = NULL;
+	int dt_num = 0;
+	INDEX_ENTRY *ie;
+	MFT_REF mft_num;
+
+	if (!dir || !name)
+		return NULL;
+
+	if (!dir->index) {	// XXX when will this happen?
+		printf ("ntfs_dir_find2 - directory has no index\n");
+		return NULL;
+	}
+
+	for (i = 0; i < dir->child_count; i++) {
+		if (0 == ntfs_names_collate (name, name_len,
+					dir->children[i]->name,
+					dir->children[i]->name_len,
+					2, IGNORE_CASE,
+					dir->vol->upcase,
+					dir->vol->upcase_len))
+			return dir->children[i];
+	}
+
+	dt = ntfs_dt_find2 (dir->index, name, name_len, &dt_num);
+	if (!dt) {
+		printf ("can't find name in dir\n");
+		return NULL;
+	}
+
+	ie = dt->children[dt_num];
+
+	mft_num = ie->indexed_file;
+
+	child = ntfs_dir_alloc (dir->vol, mft_num);
+	if (!child)
+		return NULL;
+
+	child->index = ntfs_dt_alloc (child, NULL, -1);
+
+	ntfs_dir_add (dir, child);
+
+	return child;
+}
+
+
+/**
+ * utils_volume_commit
+ */
+static int utils_volume_commit (ntfs_volume *vol)
+{
+	if (!vol)
+		return -1;
+
+	printf ("commit volume\n");
+	if (ntfs_bmp_commit (vol->private_bmp1) < 0)
+		return -1;
+
+	if (ntfs_bmp_commit (vol->private_bmp2) < 0)
+		return -1;
+
+	if (ntfs_dir_commit (vol->private_data) < 0)
+		return -1;
+
+	return 0;
+}
+
+/**
+ * utils_volume_rollback
+ */
+static int utils_volume_rollback (ntfs_volume *vol)
+{
+	if (!vol)
+		return -1;
+
+	if (ntfs_bmp_rollback (vol->private_bmp1) < 0)
+		return -1;
+
+	if (ntfs_bmp_rollback (vol->private_bmp2) < 0)
+		return -1;
+
+	if (ntfs_dir_rollback (vol->private_data) < 0)
+		return -1;
+
+	return 0;
+}
+
+/**
+ * utils_pathname_to_mftref
+ */
+static MFT_REF utils_pathname_to_mftref (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_dir **finddir)
+{
+	MFT_REF mft_num;
+	MFT_REF result = -1;
+	char *p, *q;
+	char *ascii = NULL;
+	struct ntfs_dir *dir = NULL;
+
+	if (!vol || !parent || !pathname) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	ascii = strdup (pathname);		// Work with a r/w copy
+	if (!ascii) {
+		Eprintf ("Out of memory.\n");
+		goto close;
+	}
+
+	p = ascii;
+	while (p && *p && *p == PATH_SEP)	// Remove leading /'s
+		p++;
+	while (p && *p) {
+		q = strchr (p, PATH_SEP);	// Find the end of the first token
+		if (q != NULL) {
+			*q = '\0';
+			q++;
+		}
+
+		//printf ("looking for %s in %p\n", p, parent);
+		mft_num = ntfs_dir_find (parent, p);
+		if (mft_num == (u64)-1) {
+			Eprintf ("Couldn't find name '%s' in pathname '%s'.\n", p, pathname);
+			goto close;
+		}
+
+		if (q) {
+			dir = ntfs_dir_alloc (vol, mft_num);
+			if (!dir) {
+				Eprintf ("Couldn't allocate a new directory (%lld).\n", mft_num);
+				goto close;
+			}
+
+			ntfs_dir_add (parent, dir);
+			parent = dir;
+		} else {
+			//printf ("file %s\n", p);
+			result = mft_num;
+			if (finddir)
+				*finddir = dir ? dir : parent;
+			break;
+		}
+
+		p = q;
+		while (p && *p && *p == PATH_SEP)
+			p++;
+	}
+
+close:
+	free (ascii);	// from strdup
+	return result;
+}
+
+/**
+ * ntfs_umount2
+ */
+static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
+{
+	struct ntfs_dir *dir;
+	struct ntfs_bmp *bmp;
+
+	if (!vol)
+		return 0;
+
+	utils_volume_rollback (vol);
+
+	dir = (struct ntfs_dir *) vol->private_data;
+	vol->private_data = NULL;
+	ntfs_dir_free (dir);
+
+	bmp = (struct ntfs_bmp *) vol->private_bmp1;
+	vol->private_bmp1 = NULL;
+	ntfs_bmp_free (bmp);
+
+	bmp = (struct ntfs_bmp *) vol->private_bmp2;
+	vol->private_bmp2 = NULL;
+	ntfs_bmp_free (bmp);
+
+	return ntfs_umount (vol, force);
+}
+
+/**
+ * utils_mount_volume2
+ */
+static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flags, BOOL force)
+{
+	// XXX can we replace these and search by mft number?  Hmm... NO.
+	static ntfschar bmp[8] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('B'),
+		const_cpu_to_le16('i'),
+		const_cpu_to_le16('t'),
+		const_cpu_to_le16('m'),
+		const_cpu_to_le16('a'),
+		const_cpu_to_le16('p'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar mft[5] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('F'),
+		const_cpu_to_le16('T'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar mftmirr[9] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('F'),
+		const_cpu_to_le16('T'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('i'),
+		const_cpu_to_le16('r'),
+		const_cpu_to_le16('r'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar dot[2] = {
+		const_cpu_to_le16('.'),
+		const_cpu_to_le16(0)
+	};
+
+	ntfs_volume *vol;
+	struct ntfs_dir *dir;
+	struct ntfs_dt *root;
+	struct ntfs_dt *found;
+	int num;
+
+	vol = utils_mount_volume (device, flags, force);
+	if (!vol)
+		return NULL;
+
+	vol->lcnbmp_ni ->ref_count = 1;
+	vol->mft_ni    ->ref_count = 1;
+	vol->mftmirr_ni->ref_count = 1;
+
+	vol->lcnbmp_ni ->private_data = NULL;
+	vol->mft_ni    ->private_data = NULL;
+	vol->mftmirr_ni->private_data = NULL;
+
+	dir = ntfs_dir_alloc (vol, FILE_root);
+	if (!dir) {
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+	dir->index = ntfs_dt_alloc (dir, NULL, -1);
+
+	root = dir->index;
+
+	//$Bitmap
+	num = -1;
+	found = ntfs_dt_find2 (root, bmp, 7, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $Bitmap\n");
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->lcnbmp_ni->ref_count++;
+	vol->lcnbmp_ni->private_data = found->dir;
+	found->inodes[num] = vol->lcnbmp_ni;
+
+	//$MFT
+	num = -1;
+	found = ntfs_dt_find2 (root, mft, 4, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $MFT\n");
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->mft_ni->ref_count++;
+	vol->mft_ni->private_data = found->dir;
+	found->inodes[num] = vol->mft_ni;
+
+	//$MFTMirr
+	num = -1;
+	found = ntfs_dt_find2 (root, mftmirr, 8, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $MFTMirr\n");
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->mftmirr_ni->ref_count++;
+	vol->mftmirr_ni->private_data = found->dir;
+	found->inodes[num] = vol->mftmirr_ni;
+
+	// root directory
+	num = -1;
+	found = ntfs_dt_find2 (root, dot, 1, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find the root directory\n");
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+	vol->private_data = found->dir;
+	found->inodes[num] = dir->inode;
+	dir->inode->private_data = found;
+	dir->inode->ref_count = 2;
+
+	vol->private_bmp1 = ntfs_bmp_alloc (vol->mft_ni,    AT_BITMAP, NULL, 0);
+	vol->private_bmp2 = ntfs_bmp_alloc (vol->lcnbmp_ni, AT_DATA,   NULL, 0);
+
+	if (!vol->private_bmp1 || !vol->private_bmp2) {
+		printf ("can't find the bitmaps\n");
+		ntfs_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+done:
+	return vol;
+}
+
+/**
+ * utils_pathname_to_inode2
+ */
+static BOOL utils_pathname_to_inode2 (ntfs_volume *vol, struct ntfs_dir *parent, const char *pathname, struct ntfs_find *found)
+{
+	int len;
+	char *p, *q;
+	ntfschar *unicode = NULL;
+	char *ascii = NULL;
+	struct ntfs_dir *dir = NULL;
+	struct ntfs_dir *child = NULL;
+	struct ntfs_dt *dt = NULL;
+	int dt_num;
+	BOOL result = FALSE;
+
+	if (!vol || !pathname || !found) {
+		errno = EINVAL;
+		return FALSE;
+	}
+
+	memset (found, 0, sizeof (*found));
+
+	if (parent) {
+		dir = parent;
+	} else {
+		dir = (struct ntfs_dir *) vol->private_data;
+		if (!dir) {
+			Eprintf ("Couldn't open the inode of the root directory.\n");
+			goto close;
+		}
+	}
+
+	unicode = malloc (MAX_PATH * sizeof (ntfschar));
+	ascii   = strdup (pathname);		// Work with a r/w copy
+	if (!unicode || !ascii) {
+		Eprintf ("Out of memory.\n");
+		goto close;
+	}
+
+	p = ascii;
+	while (p && *p && *p == PATH_SEP)	// Remove leading /'s
+		p++;
+	while (p && *p) {
+		q = strchr (p, PATH_SEP);	// Find the end of the first token
+		if (q != NULL) {
+			*q = '\0';
+			q++;
+		}
+
+		len = ntfs_mbstoucs (p, &unicode, MAX_PATH);
+		if (len < 0) {
+			Eprintf ("Couldn't convert name to Unicode: %s.\n", p);
+			goto close;
+		}
+
+		//printf ("looking for %s\n", p);
+		if (q) {
+			child = ntfs_dir_find2 (dir, unicode, len);
+			if (!child) {
+				printf ("can't find %s in %s\n", p, pathname);
+				goto close;
+			}
+		} else {
+			//printf ("file: %s\n", p);
+
+			dt = ntfs_dt_find2 (dir->index, unicode, len, &dt_num);
+			if (!dt) {
+				printf ("can't find %s in %s (2)\n", p, pathname);
+				goto close;
+			}
+
+			if (dt->inodes[dt_num] == NULL) {
+				dt->inodes[dt_num] = ntfs_inode_open (dir->vol, dt->children[dt_num]->indexed_file);
+				if (!dt->inodes[dt_num]) {
+					printf ("Can't open inode %lld\n", MREF (dt->children[dt_num]->indexed_file));
+					goto close;
+				}
+				dt->inodes[dt_num]->ref_count = 2;
+				dt->inodes[dt_num]->private_data = dt;
+			}
+
+			//printf ("dt = %p,%d\n", dt, dt_num);
+
+			break;
+		}
+
+		dir   = child;
+		child = NULL;
+		p = q;
+		while (p && *p && *p == PATH_SEP)
+			p++;
+	}
+
+	found->dir      = dir;
+	found->dt       = dt;
+	found->dt_index = dt_num;
+	found->inode    = dt->inodes[dt_num];
+	found->mref     = found->inode->mft_no;
+	result = TRUE;
+	//printf ("dir %p, dt %p, num %d, ino %p, %lld\n", dir, dt, dt_num, dt->inodes[dt_num], MREF (found->inode->mft_no));
+close:
+	free (ascii);	// from strdup
+	free (unicode);
+	return result;
+}
+
+
+/**
  * ntfsrm
  */
 static int ntfsrm (ntfs_volume *vol, char *name)
@@ -5174,3 +5169,4 @@ done:
 
 	return result;
 }
+
