@@ -521,7 +521,7 @@ static int parse_options(int argc, char **argv)
 	return (!err && !help && !ver);
 }
 
-static void print_advise(ntfs_volume *vol, s64 supp_lcn)
+static void __print_advise(ntfs_volume *vol, s64 supp_lcn)
 {
 	s64 old_b, new_b, freed_b, old_mb, new_mb, freed_mb;
 
@@ -555,7 +555,11 @@ static void print_advise(ntfs_volume *vol, s64 supp_lcn)
 	else
 	    printf("%lld bytes", (long long)freed_b);
 	printf(").\n");
+}
 
+static void print_advise(ntfs_volume *vol, s64 supp_lcn)
+{
+	__print_advise(vol, supp_lcn);
 	printf("Please make a test run using both the -n and -s options "
 	       "before real resizing!\n");
 }
@@ -751,6 +755,9 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 			err_printf("$MFT%s can't be split up yet. Please try "
 				   "a different size.\n", inode ? "Mirr" : "");
 			last_lcn = lcn + lcn_length - 1;
+			if (!(inode == FILE_MFT && rl->vcn == 0) && 
+			    lcn - 1 >= resize->inuse)
+				__print_advise(resize->vol, lcn - 1);
 			print_advise(resize->vol, last_lcn);
 			exit(1);
 		}
