@@ -1046,6 +1046,28 @@ static int ntfs_ie_test (void)
 
 
 /**
+ * ntfs_dt_free
+ */
+static void ntfs_dt_free (struct ntfs_dt *dt)
+{
+	int i;
+
+	if (!dt)
+		return;
+
+	for (i = 0; i < dt->child_count; i++) {
+		ntfs_dt_free (dt->sub_nodes[i]);
+		ntfs_inode_close2 (dt->inodes[i]);
+	}
+
+	free (dt->sub_nodes);
+	free (dt->children);
+	free (dt->inodes);
+	free (dt->data);	// XXX is this always ours?
+	free (dt);
+}
+
+/**
  * ntfs_dt_rollback
  */
 static int ntfs_dt_rollback (struct ntfs_dt *dt)
@@ -1053,28 +1075,41 @@ static int ntfs_dt_rollback (struct ntfs_dt *dt)
 	int i;
 
 	if (!dt)
-		return -1;
+		return 0;
+	if (dt->child_count == 0)	// No children or nothing mapped
+		return 0;
 
-	return 0; // TEMP
-
-	for (i = 0; i < dt->child_count; i++) {
-		if (dt->sub_nodes)
-			ntfs_dt_rollback (dt->sub_nodes[i]);
-		if (dt->inodes)
+	if (dt->changed) {
+		// We can't trust anything below us in the tree
+		for (i = 0; i < dt->child_count; i++) {
+			ntfs_dt_free (dt->sub_nodes[i]);
 			ntfs_inode_close2 (dt->inodes[i]);
+		}
+
+		dt->child_count = 0;
+
+		free (dt->data);
+		free (dt->children);
+		free (dt->sub_nodes);
+		free (dt->inodes);
+
+		dt->data = NULL;
+		dt->children = NULL;
+		dt->sub_nodes = NULL;
+		dt->inodes = NULL;
+	} else {
+		// This node is OK, check the su-nodes
+		for (i = 0; i < dt->child_count; i++) {
+			if (ntfs_dt_rollback (dt->sub_nodes[i])) {
+				ntfs_inode_close2 (dt->inodes[i]);
+				// Child was changed so unmap it
+				dt->sub_nodes[i] = NULL;
+				dt->inodes[i] = NULL;
+			}
+		}
 	}
 
-	free (dt->data);
-	free (dt->children);
-	free (dt->sub_nodes);
-	free (dt->inodes);
-
-	dt->data = NULL;
-	dt->children = NULL;
-	dt->sub_nodes = NULL;
-	dt->inodes = NULL;
-
-	return 0;
+	return (dt->child_count == 0);
 }
 
 /**
@@ -1134,32 +1169,6 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 	}
 
 	return 0;
-}
-
-/**
- * ntfs_dt_free
- */
-static void ntfs_dt_free (struct ntfs_dt *dt)
-{
-	int i;
-
-	if (!dt)
-		return;
-
-	ntfs_dt_rollback (dt);
-
-	for (i = 0; i < dt->child_count; i++) {
-		//if (dt->sub_nodes)
-			ntfs_dt_free (dt->sub_nodes[i]);
-		//if (dt->inodes)
-			ntfs_inode_close2 (dt->inodes[i]);
-	}
-
-	free (dt->sub_nodes);
-	free (dt->children);
-	free (dt->inodes);
-	free (dt->data);	// XXX is this always ours?
-	free (dt);
 }
 
 /**
