@@ -1629,7 +1629,7 @@ static void relocate_attributes(ntfs_resize_t *resize)
 		if (ret == -1)
 			exit(1);
 		else if (ret == 1)
-			return;
+			break;
 
 		relocate_attribute(resize);
 	}
