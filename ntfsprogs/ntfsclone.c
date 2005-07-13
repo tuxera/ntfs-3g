@@ -1383,7 +1383,7 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 {
 	ntfs_inode *ni;
 	ntfs_attr_search_ctx *ctx = NULL;
-	runlist *rl;
+	runlist *rl, *rl_bad;
 	s64 nr_bad_clusters = 0;
 
 	if (!(ni = ntfs_inode_open(vol, FILE_BadClus)))
@@ -1392,10 +1392,10 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 	if ((ctx = lookup_data_attr(ni, "$Bad")) == NULL)
 		exit(1);
 
-	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
+	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
 
-	for (; rl->length; rl++) {
+	for (rl = rl_bad; rl->length; rl++) {
 		s64 lcn = rl->lcn;
 
 		if (lcn == LCN_HOLE || lcn < 0)
@@ -1409,6 +1409,7 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 	if (nr_bad_clusters)
 		Printf("WARNING: The disk has %lld or more bad sectors"
 		       " (hardware faults).\n", nr_bad_clusters);
+	free(rl_bad);
 
 	ntfs_attr_put_search_ctx(ctx);
 	if (ntfs_inode_close(ni))
