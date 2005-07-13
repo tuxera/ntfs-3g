@@ -1,7 +1,7 @@
 /**
  * utils.c - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Richard Russon
+ * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2003-2005 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
  *
@@ -895,7 +895,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		ctx->flags_match = 0;
 		in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {
-			Eprintf ("Error reading inode %llu.  Aborting.",
+			Eprintf ("Error reading inode %llu.  Aborting.\n",
 					(unsigned long long)ctx->mft_num);
 			return -1;
 		}
@@ -905,9 +905,9 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->inode = ntfs_inode_open (ctx->vol, (MFT_REF) ctx->mft_num);
 			if (ctx->inode == NULL) {
-				Eprintf ("Error reading inode %llu.", (unsigned
+				Eprintf ("Error reading inode %llu.\n", (unsigned
 						long long) ctx->mft_num);
-				return -1;
+				continue;
 			}
 
 			attr10 = find_first_attribute (AT_STANDARD_INFORMATION, ctx->inode->mrec);
@@ -943,7 +943,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				case 0: ctx->flags_match |= FEMR_NOT_METADATA; break;
 				default:
 					ctx->flags_match |= FEMR_NOT_METADATA; break;
-					//Eprintf ("Error reading inode %lld.", ctx->mft_num);
+					//Eprintf ("Error reading inode %lld.\n", ctx->mft_num);
 					//return -1;
 			}
 
@@ -954,7 +954,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->inode = calloc (1, sizeof (*ctx->inode));
 			if (!ctx->inode) {
-				Eprintf ("Out of memory.  Aborting.");
+				Eprintf ("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
@@ -963,7 +963,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 			ctx->inode->mrec   = malloc (ctx->vol->mft_record_size);
 			if (!ctx->inode->mrec) {
 				free (ctx->inode); // == ntfs_inode_close
-				Eprintf ("Out of memory.  Aborting.");
+				Eprintf ("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
@@ -989,7 +989,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		}
 
 		if (ntfs_inode_close (ctx->inode)) {
-			Eprintf ("Error closing inode %llu.",
+			Eprintf ("Error closing inode %llu.\n",
 					(unsigned long long)ctx->mft_num);
 			return -errno;
 		}
