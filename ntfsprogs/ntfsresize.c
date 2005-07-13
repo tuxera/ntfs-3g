@@ -1814,13 +1814,18 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
  * Reallocate the metadata file $Bitmap.  It must be large enough for one bit
  * per cluster of the shrunken volume.  Also it must be a of 8 bytes in size.
  */
-static void realloc_bitmap_data_attr(ntfs_volume *vol,
-				     struct bitmap *bm,
+static void realloc_bitmap_data_attr(ntfs_resize_t *resize,
 				     runlist **rl,
-				     s64 nr_bm_clusters,
-				     s64 new_size)
+				     s64 nr_bm_clusters)
 {
 	s64 i;
+	ntfs_volume *vol = resize->vol;
+	ATTR_RECORD *a = resize->ctx->attr;
+	s64 new_size = resize->new_volume_size;
+	struct bitmap *bm = &resize->lcn_bitmap;
+
+	if (!(*rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
+		perr_exit("ntfs_mapping_pairs_decompress");
 
 	release_bitmap_clusters(bm, *rl);
 	free(*rl);
@@ -1832,6 +1837,18 @@ static void realloc_bitmap_data_attr(ntfs_volume *vol,
 		perr_exit("Couldn't allocate $Bitmap clusters");
 }
 
+static void realloc_lcn_bitmap(ntfs_resize_t *resize, s64 bm_bsize)
+{
+	u8 *tmp;
+
+	if (!(tmp = realloc(resize->lcn_bitmap.bm, bm_bsize)))
+		perr_exit("realloc");
+	
+	resize->lcn_bitmap.bm = tmp;
+	resize->lcn_bitmap.size = bm_bsize;
+	bitmap_file_data_fixup(resize->new_volume_size, &resize->lcn_bitmap);
+}
+
 /**
  * truncate_bitmap_data_attr
  */
@@ -1841,8 +1858,6 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	runlist *rl;
 	s64 bm_bsize, size;
 	s64 nr_bm_clusters;
-	s64 nr_clusters;
-	u8 *tmp;
 	ntfs_volume *vol = resize->vol;
 
 	a = resize->ctx->attr;
@@ -1850,21 +1865,16 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 		/* FIXME: handle resident attribute value */
 		err_exit("Resident attribute in $Bitmap isn't supported!\n");
 
-	nr_clusters = resize->new_volume_size;
-	bm_bsize = nr_clusters_to_bitmap_byte_size(nr_clusters);
+	bm_bsize = nr_clusters_to_bitmap_byte_size(resize->new_volume_size);
 	nr_bm_clusters = rounded_up_division(bm_bsize, vol->cluster_size);
 
-	if (!(tmp = (u8 *)realloc(resize->lcn_bitmap.bm, bm_bsize)))
-		perr_exit("realloc");
-	resize->lcn_bitmap.bm = tmp;
-	resize->lcn_bitmap.size = bm_bsize;
-	bitmap_file_data_fixup(nr_clusters, &resize->lcn_bitmap);
-
-	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
-		perr_exit("ntfs_mapping_pairs_decompress");
-
-	realloc_bitmap_data_attr(vol, &resize->lcn_bitmap, &rl, nr_bm_clusters,
-				 nr_clusters);
+	if (resize->shrink) {
+		realloc_bitmap_data_attr(resize, &rl, nr_bm_clusters);
+		realloc_lcn_bitmap(resize, bm_bsize);
+	} else {
+		realloc_lcn_bitmap(resize, bm_bsize);
+		realloc_bitmap_data_attr(resize, &rl, nr_bm_clusters);
+	}
 
 	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
