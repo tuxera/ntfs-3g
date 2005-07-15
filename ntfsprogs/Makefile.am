@@ -79,7 +79,7 @@ ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
 if ENABLE_FUSE_MODULE
-ntfsmount_SOURCES	= ntfsmount.c
+ntfsmount_SOURCES	= ntfsmount.c utils.c utils.h
 ntfsmount_LDADD		= $(AM_LIBS) $(FUSE_MODULE_LIBS)
 ntfsmount_LDFLAGS	= $(AM_LFLAGS)
 ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22

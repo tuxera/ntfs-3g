@@ -43,6 +43,7 @@
 #include "dir.h"
 #include "unistr.h"
 #include "layout.h"
+#include "utils.h"
 
 typedef struct {
 	fuse_fill_dir_t filler;
@@ -61,6 +62,7 @@ typedef struct {
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL succeed_chmod;
+	BOOL force;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -74,7 +76,9 @@ static const char *EXEC_NAME = "ntfsmount";
 static char def_opts[] = "default_permissions,kernel_cache,allow_other,";
 static ntfs_fuse_context_t *ctx;
 
-#define Eprintf(arg...) fprintf(stderr, ##arg)
+GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
+GEN_PRINTF(Vprintf, stderr, NULL,  TRUE)
+GEN_PRINTF(Qprintf, stderr, NULL, FALSE)
 
 static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 {
@@ -870,9 +874,9 @@ static int ntfs_fuse_mount(const char *device)
 {
 	ntfs_volume *vol;
 
-	vol = ntfs_mount(device, (ctx->ro) ? MS_RDONLY : 0);
+	vol = utils_mount_volume(device, (ctx->ro) ? MS_RDONLY : 0, ctx->force);
 	if (!vol) {
-		perror("Mount failed");
+		Eprintf("Mount failed.\n");
 		return -1;
 	}
 	ctx->vol = vol;
@@ -897,16 +901,16 @@ static void signal_handler(int arg __attribute__((unused)))
 static char *parse_options(char *options, char **device)
 {
 	char *opts, *s, *opt, *val, *ret;
-	BOOL no_def_opts = FALSE, no_fsname = FALSE;
+	BOOL no_def_opts = FALSE;
 	
 	*device = NULL;
 	/*
-	 * +8 for different in length of "fsname=ntfs#..." and "dev=...".
+	 * +3 for different in length of "fsname=..." and "dev=...".
 	 * +1 for comma
 	 * +1 for null-terminator.
-	 * Total: +10
+	 * Total: +5
 	 */
-	ret = malloc(strlen(def_opts) + strlen(options) + 10);
+	ret = malloc(strlen(def_opts) + strlen(options) + 5);
 	if (!ret) {
 		perror("malloc failed");
 		return NULL;
@@ -935,14 +939,12 @@ static char *parse_options(char *options, char **device)
 			ctx->ro =TRUE;
 			strcat(ret, "ro,");
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
-			if (!val) {
-				Eprintf("fsname option should have value.\n");
-				goto err_exit;
-			}
-			no_fsname = TRUE;
-			strcat(ret, "fsname=");
-			strcat(ret, val);
-			strcat(ret, ",");
+			/*
+			 * We need this to be able to check whether filesystem
+			 * mounted or not.
+			 */
+			Eprintf("fsname is unsupported option.\n");
+			goto err_exit;
 		} else if (!strcmp(opt, "no_def_opts")) {
 			if (val) {
 				Eprintf("no_def_opts option should not have "
@@ -995,6 +997,13 @@ static char *parse_options(char *options, char **device)
 				goto err_exit;
 			}
 			ctx->succeed_chmod = TRUE;
+		} else if (!strcmp(opt, "force")) {
+			if (val) {
+				Eprintf("force option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->force = TRUE;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -1006,13 +1015,10 @@ static char *parse_options(char *options, char **device)
 	}
 	if (!*device)
 		goto err_exit;
-	if (!no_def_opts) {
+	if (!no_def_opts)
 		strcat(ret, def_opts);
-		if (!no_fsname) {
-			strcat(ret, "fsname=ntfs#");
-			strcat(ret, *device);
-		}
-	}
+	strcat(ret, "fsname=");
+	strcat(ret, *device);
 exit:
 	free(opts);
 	return ret;
@@ -1031,9 +1037,9 @@ static void usage(void)
 			EXEC_NAME);
 	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
-		"fsname\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
+		"force\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
 		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tdev\n\n");
-	Eprintf("Default options are: \"%sfsname=ntfs#device\".\n", def_opts);
+	Eprintf("Default options are: \"%s\".\n", def_opts);
 }
 
 int main(int argc, char *argv[])
@@ -1067,18 +1073,27 @@ int main(int argc, char *argv[])
 	if (!device) {
 		Eprintf("dev option is mandatory.\n");
 		ntfs_fuse_destroy();
-		return 5;
+		return 2;
 	}
 	if (!parsed_options) {
+		free(device);
 		ntfs_fuse_destroy();
-		return 6;
+		return 3;
 	}
 
+	/* Mount volume. */
+	if (ntfs_fuse_mount(device)) {
+		free(device);
+		ntfs_fuse_destroy();
+		return 4;
+	}
+	free(device);
 	/* Create filesystem. */
 	ffd = fuse_mount(mnt_point, parsed_options);
 	if (ffd == -1) {
 		Eprintf("fuse_mount failed.\n");
-		return 2;
+		ntfs_fuse_destroy();
+		return 5;
 	}
 	free(parsed_options);
 #ifndef DEBUG
@@ -1091,14 +1106,8 @@ int main(int argc, char *argv[])
 		Eprintf("fuse_new failed.\n");
 		close(ffd);
 		fuse_unmount(mnt_point);
-		return 3;
-	}
-	/* Mount volume. */
-	if (ntfs_fuse_mount(device)) {
-		fuse_destroy(fh);
-		close(ffd);
-		fuse_unmount(mnt_point);
-		return 4;
+		ntfs_fuse_destroy();
+		return 6;
 	}
 #ifndef DEBUG
 	if (daemon(0, 0))

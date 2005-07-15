@@ -121,8 +121,8 @@ The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 
 .TP
-.B fsname=
-Sets the filesystem name.  The default is the program name.
+.B force=
+Force mount even if errors occured. Use this option only if you know what are you doing and don't cry about data loss.
 
 .TP
 .B ro
@@ -130,7 +130,7 @@ Mount filesystem read-only.
 
 .TP
 .B no_def_opts
-By default ntfsmount acts as "default_permissions,kernel_cache,allow_other,fsname=ntfs#device" was passed to it, this option cancel this behaviour.
+By default ntfsmount acts as "default_permissions,kernel_cache,allow_other" was passed to it, this option cancel this behaviour.
 
 .TP
 .B succeed_chmod

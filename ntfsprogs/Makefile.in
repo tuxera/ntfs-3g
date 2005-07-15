@@ -111,9 +111,10 @@ ntfsls_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfsmftalloc_OBJECTS = ntfsmftalloc.$(OBJEXT) utils.$(OBJEXT)
 ntfsmftalloc_OBJECTS = $(am_ntfsmftalloc_OBJECTS)
 ntfsmftalloc_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am__ntfsmount_SOURCES_DIST = ntfsmount.c
+am__ntfsmount_SOURCES_DIST = ntfsmount.c utils.c utils.h
 @ENABLE_FUSE_MODULE_TRUE@am_ntfsmount_OBJECTS =  \
-@ENABLE_FUSE_MODULE_TRUE@	ntfsmount-ntfsmount.$(OBJEXT)
+@ENABLE_FUSE_MODULE_TRUE@	ntfsmount-ntfsmount.$(OBJEXT) \
+@ENABLE_FUSE_MODULE_TRUE@	ntfsmount-utils.$(OBJEXT)
 ntfsmount_OBJECTS = $(am_ntfsmount_OBJECTS)
 am__DEPENDENCIES_2 =
 @ENABLE_FUSE_MODULE_TRUE@ntfsmount_DEPENDENCIES =  \
@@ -240,6 +241,7 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
+ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -336,7 +338,7 @@ ntfscat_LDFLAGS = $(AM_LFLAGS)
 ntfscp_SOURCES = ntfscp.c utils.c utils.h
 ntfscp_LDADD = $(AM_LIBS)
 ntfscp_LDFLAGS = $(AM_LFLAGS)
-@ENABLE_FUSE_MODULE_TRUE@ntfsmount_SOURCES = ntfsmount.c
+@ENABLE_FUSE_MODULE_TRUE@ntfsmount_SOURCES = ntfsmount.c utils.c utils.h
 @ENABLE_FUSE_MODULE_TRUE@ntfsmount_LDADD = $(AM_LIBS) $(FUSE_MODULE_LIBS)
 @ENABLE_FUSE_MODULE_TRUE@ntfsmount_LDFLAGS = $(AM_LFLAGS)
 @ENABLE_FUSE_MODULE_TRUE@ntfsmount_CFLAGS = $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22
@@ -551,6 +553,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmftalloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmount-ntfsmount.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmount-utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsmove.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsresize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsrm.Po@am__quote@
@@ -595,6 +598,20 @@ ntfsmount-ntfsmount.obj: ntfsmount.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ntfsmount.c' object='ntfsmount-ntfsmount.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -c -o ntfsmount-ntfsmount.obj `if test -f 'ntfsmount.c'; then $(CYGPATH_W) 'ntfsmount.c'; else $(CYGPATH_W) '$(srcdir)/ntfsmount.c'; fi`
+
+ntfsmount-utils.o: utils.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -MT ntfsmount-utils.o -MD -MP -MF "$(DEPDIR)/ntfsmount-utils.Tpo" -c -o ntfsmount-utils.o `test -f 'utils.c' || echo '$(srcdir)/'`utils.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/ntfsmount-utils.Tpo" "$(DEPDIR)/ntfsmount-utils.Po"; else rm -f "$(DEPDIR)/ntfsmount-utils.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='utils.c' object='ntfsmount-utils.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -c -o ntfsmount-utils.o `test -f 'utils.c' || echo '$(srcdir)/'`utils.c
+
+ntfsmount-utils.obj: utils.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -MT ntfsmount-utils.obj -MD -MP -MF "$(DEPDIR)/ntfsmount-utils.Tpo" -c -o ntfsmount-utils.obj `if test -f 'utils.c'; then $(CYGPATH_W) 'utils.c'; else $(CYGPATH_W) '$(srcdir)/utils.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/ntfsmount-utils.Tpo" "$(DEPDIR)/ntfsmount-utils.Po"; else rm -f "$(DEPDIR)/ntfsmount-utils.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='utils.c' object='ntfsmount-utils.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntfsmount_CFLAGS) $(CFLAGS) -c -o ntfsmount-utils.obj `if test -f 'utils.c'; then $(CYGPATH_W) 'utils.c'; else $(CYGPATH_W) '$(srcdir)/utils.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
