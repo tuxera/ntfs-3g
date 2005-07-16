@@ -57,8 +57,10 @@ GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
 static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
 
-static const wchar_t *efs_name = L"$EFS";
-static const int efs_name_length = 4;
+static ntfschar EFS[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('E'),
+		   const_cpu_to_le16('F'), const_cpu_to_le16('S'),
+		   const_cpu_to_le16('\0') };
+static const int EFS_name_length = 4;
 
 /**
  * version - Print version information about the program
@@ -286,7 +288,7 @@ static decrypt_key *get_fek (ntfs_inode *inode)
 
 	/* obtain the $EFS contents */
 	na = ntfs_attr_open (inode, AT_LOGGED_UTILITY_STREAM,
-				efs_name, efs_name_length);
+				EFS, EFS_name_length);
 	if (!na) {
 		perror("Error");
 		return NULL;
@@ -386,7 +388,7 @@ int main (int argc, char *argv[])
  	if (opts.inode != -1)
  		inode = ntfs_inode_open (vol, opts.inode);
  	else
- 		inode = utils_pathname_to_inode (vol, NULL, opts.file);
+ 		inode = ntfs_pathname_to_inode (vol, NULL, opts.file);
 
 	if (!inode) {
  		perror("ERROR: Couldn't open inode");

@@ -29,6 +29,8 @@
 
 #include "decrypt.h"
 
+#include "types.h"
+
 #ifdef __CYGWIN__
 //#define USE_CRYPTOAPI_RSA 1
 #define _WIN32_WINNT 0x501
