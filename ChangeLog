@@ -18,6 +18,7 @@ xx/07/2005 - 1.11.0-WIP - Fixes and a new utility ntfsmount, a FUSE ntfsmodule.
 	  if sector size was above 8kiB and we only reserved one sector even
 	  when sector size was less than 512 bytes and then we wrote 512 bytes,
 	  i.e. beyond the end of the device.)  (Anton)
+	- Add new utility (make extra) - ntfsdecrypt.  (Yuval)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 

@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
+SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) $(ntfsdecrypt_SOURCES) $(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) $(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) $(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) $(ntfswipe_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -46,7 +46,7 @@ sbin_PROGRAMS = mkntfs$(EXEEXT) ntfslabel$(EXEEXT) \
 	ntfscp$(EXEEXT)
 EXTRA_PROGRAMS = ntfsdump_logfile$(EXEEXT) ntfswipe$(EXEEXT) \
 	ntfstruncate$(EXEEXT) ntfsmove$(EXEEXT) ntfsrm$(EXEEXT) \
-	ntfsmftalloc$(EXEEXT)
+	ntfsmftalloc$(EXEEXT) ntfsdecrypt$(EXEEXT)
 @ENABLE_FUSE_MODULE_TRUE@am__append_1 = ntfsmount
 subdir = ntfsprogs
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
@@ -93,6 +93,10 @@ ntfscluster_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfscp_OBJECTS = ntfscp.$(OBJEXT) utils.$(OBJEXT)
 ntfscp_OBJECTS = $(am_ntfscp_OBJECTS)
 ntfscp_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_ntfsdecrypt_OBJECTS = ntfsdecrypt.$(OBJEXT) decrypt.$(OBJEXT) \
+	utils.$(OBJEXT)
+ntfsdecrypt_OBJECTS = $(am_ntfsdecrypt_OBJECTS)
+ntfsdecrypt_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_ntfsdump_logfile_OBJECTS = ntfsdump_logfile.$(OBJEXT)
 ntfsdump_logfile_OBJECTS = $(am_ntfsdump_logfile_OBJECTS)
 ntfsdump_logfile_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -150,18 +154,19 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) $(ntfsclone_SOURCES) \
 	$(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
-	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
-	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) \
+	$(ntfsdecrypt_SOURCES) $(ntfsdump_logfile_SOURCES) \
+	$(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) \
+	$(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) $(ntfsmount_SOURCES) \
 	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 DIST_SOURCES = $(mkntfs_SOURCES) $(ntfscat_SOURCES) \
 	$(ntfsclone_SOURCES) $(ntfscluster_SOURCES) $(ntfscp_SOURCES) \
-	$(ntfsdump_logfile_SOURCES) $(ntfsfix_SOURCES) \
-	$(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) $(ntfsls_SOURCES) \
-	$(ntfsmftalloc_SOURCES) $(am__ntfsmount_SOURCES_DIST) \
-	$(ntfsmove_SOURCES) $(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
+	$(ntfsdecrypt_SOURCES) $(ntfsdump_logfile_SOURCES) \
+	$(ntfsfix_SOURCES) $(ntfsinfo_SOURCES) $(ntfslabel_SOURCES) \
+	$(ntfsls_SOURCES) $(ntfsmftalloc_SOURCES) \
+	$(am__ntfsmount_SOURCES_DIST) $(ntfsmove_SOURCES) \
+	$(ntfsresize_SOURCES) $(ntfsrm_SOURCES) \
 	$(ntfstruncate_SOURCES) $(ntfsundelete_SOURCES) \
 	$(ntfswipe_SOURCES)
 man8dir = $(mandir)/man8
@@ -241,7 +246,6 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
-ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -344,6 +348,9 @@ ntfscp_LDFLAGS = $(AM_LFLAGS)
 @ENABLE_FUSE_MODULE_TRUE@ntfsmount_CFLAGS = $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22
 
 # We don't distribute these
+ntfsdecrypt_SOURCES = ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
+ntfsdecrypt_LDADD = $(AM_LIBS)
+ntfsdecrypt_LDFLAGS = $(AM_LFLAGS) -lgcrypt
 ntfsrm_SOURCES = ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD = $(AM_LIBS)
 ntfsrm_LDFLAGS = $(AM_LFLAGS)
@@ -492,6 +499,9 @@ ntfscluster$(EXEEXT): $(ntfscluster_OBJECTS) $(ntfscluster_DEPENDENCIES)
 ntfscp$(EXEEXT): $(ntfscp_OBJECTS) $(ntfscp_DEPENDENCIES) 
 	@rm -f ntfscp$(EXEEXT)
 	$(LINK) $(ntfscp_LDFLAGS) $(ntfscp_OBJECTS) $(ntfscp_LDADD) $(LIBS)
+ntfsdecrypt$(EXEEXT): $(ntfsdecrypt_OBJECTS) $(ntfsdecrypt_DEPENDENCIES) 
+	@rm -f ntfsdecrypt$(EXEEXT)
+	$(LINK) $(ntfsdecrypt_LDFLAGS) $(ntfsdecrypt_OBJECTS) $(ntfsdecrypt_LDADD) $(LIBS)
 ntfsdump_logfile$(EXEEXT): $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_DEPENDENCIES) 
 	@rm -f ntfsdump_logfile$(EXEEXT)
 	$(LINK) $(ntfsdump_logfile_LDFLAGS) $(ntfsdump_logfile_OBJECTS) $(ntfsdump_logfile_LDADD) $(LIBS)
@@ -541,11 +551,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/attrdef.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/boot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cluster.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/decrypt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mkntfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfscat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsclone.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfscluster.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfscp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsdecrypt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsdump_logfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsfix.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntfsinfo.Po@am__quote@

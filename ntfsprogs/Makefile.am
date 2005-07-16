@@ -15,7 +15,7 @@ bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsrm ntfsmftalloc
+			  ntfsrm ntfsmftalloc ntfsdecrypt
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -86,6 +86,10 @@ ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=22
 endif
 
 # We don't distribute these
+
+ntfsdecrypt_SOURCES		= ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
+ntfsdecrypt_LDADD		= $(AM_LIBS)
+ntfsdecrypt_LDFLAGS		= $(AM_LFLAGS) -lgcrypt
 
 ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD		= $(AM_LIBS)
