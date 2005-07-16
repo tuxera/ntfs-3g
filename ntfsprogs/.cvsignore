@@ -6,6 +6,7 @@ ntfscat
 ntfsclone
 ntfscluster
 ntfscp
+ntfsdecrypt
 ntfsdump_logfile
 ntfsfix
 ntfsinfo
