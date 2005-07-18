@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.11.0-WIP],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.11.0],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
@@ -107,6 +107,7 @@ esac
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_GCC_TRADITIONAL
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
@@ -233,11 +234,8 @@ AC_CHECK_MEMBERS([struct stat.st_rdev])
 
 # Checks for library functions.
 AC_FUNC_GETMNTENT
-AC_PROG_GCC_TRADITIONAL
-AC_FUNC_MALLOC
 AC_FUNC_MBRTOWC
 AC_FUNC_MEMCMP
-AC_FUNC_REALLOC
 AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL

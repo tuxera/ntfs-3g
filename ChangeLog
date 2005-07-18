@@ -1,4 +1,4 @@
-xx/07/2005 - 1.11.0-WIP - Fixes and a new utility ntfsmount, a FUSE ntfsmodule.
+18/07/2005 - 1.11.0 - Fixes and a new utility ntfsmount, a FUSE ntfs module.
 
 	- ntfscp: fix signal hanling: handle both SIGTERM and SIGINT, print
 	  correct message.  (Yura)
@@ -20,6 +20,9 @@ xx/07/2005 - 1.11.0-WIP - Fixes and a new utility ntfsmount, a FUSE ntfsmodule.
 	  i.e. beyond the end of the device.)  (Anton)
 	- Add new utility (make extra) - ntfsdecrypt.  (Yuval)
 	- Improve "already mounted" ckeck.  (Yura)
+	- Remove AC_FUNC_MALLOC and AC_FUNC_REALLOC from configure.ac as we
+	  do not provide replacement functions for them and they break cross
+	  compilation.  (Christophe)
 
 20/06/2005 - 1.10.0 - Lots of new features, enhancements, and bug fixes.
 
