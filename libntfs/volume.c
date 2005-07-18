@@ -1246,16 +1246,35 @@ int ntfs_umount(ntfs_volume *vol,
 static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 {
 	struct mntent *mnt;
+	char *real_file = NULL, *real_fsname = NULL;
 	FILE *f;
+	int err = 0;
 
-	if (!(f = setmntent(MOUNTED, "r")))
+	real_file = malloc(PATH_MAX + 1);
+	if (!real_file)
 		return -1;
-	while ((mnt = getmntent(f)))
-		if (!strcmp(file, mnt->mnt_fsname))
+	real_fsname = malloc(PATH_MAX + 1);
+	if (!real_fsname) {
+		err = errno;
+		goto exit;
+	}
+	if (!realpath(file, real_file)) {
+		err = errno;
+		goto exit;
+	}
+	if (!(f = setmntent(MOUNTED, "r"))) {
+		err = errno;
+		goto exit;
+	}
+	while ((mnt = getmntent(f))) {
+		if (!realpath(mnt->mnt_fsname, real_fsname))
+			continue;
+		if (!strcmp(real_file, real_fsname))
 			break;
+	}
 	endmntent(f);
 	if (!mnt)
-		return 0;
+		goto exit;
 	*mnt_flags = NTFS_MF_MOUNTED;
 	if (!strcmp(mnt->mnt_dir, "/"))
 		*mnt_flags |= NTFS_MF_ISROOT;
@@ -1263,6 +1282,15 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 	if (hasmntopt(mnt, "ro") && !hasmntopt(mnt, "rw"))
 		*mnt_flags |= NTFS_MF_READONLY;
 #endif
+exit:
+	if (real_file)
+		free(real_file);
+	if (real_fsname)
+		free(real_fsname);
+	if (err) {
+		errno = err;
+		return -1;
+	}
 	return 0;
 }
 #endif /* HAVE_MNTENT_H */

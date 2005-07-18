@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <signal.h>
+#include <limits.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -905,12 +906,12 @@ static char *parse_options(char *options, char **device)
 	
 	*device = NULL;
 	/*
-	 * +3 for different in length of "fsname=..." and "dev=...".
-	 * +1 for comma
-	 * +1 for null-terminator.
-	 * Total: +5
+	 * +3		for different in length of "fsname=..." and "dev=...".
+	 * +1		for comma.
+	 * +1		for null-terminator.
+	 * +PATH_MAX	for resolved by realpath() device name
 	 */
-	ret = malloc(strlen(def_opts) + strlen(options) + 5);
+	ret = malloc(strlen(def_opts) + strlen(options) + 5 + PATH_MAX);
 	if (!ret) {
 		perror("malloc failed");
 		return NULL;
@@ -929,8 +930,19 @@ static char *parse_options(char *options, char **device)
 				Eprintf("dev option should have value.\n");
 				goto err_exit;
 			}
-			*device = malloc(strlen(val) + 1);
-			strcpy(*device, val);
+			*device = malloc(PATH_MAX + 1);
+			if (!*device)
+				goto err_exit;
+			/* We don't want relative path in /etc/mtab. */
+			if (val[0] != '/') {
+				if (!realpath(val, *device)) {
+					perror("");
+					free(*device);
+					*device = NULL;
+					goto err_exit;
+				}
+			} else
+				strcpy(*device, val);
 		} else if (!strcmp(opt, "ro")) { /* Read-only mount. */
 			if (val) {
 				Eprintf("ro option should not have value.\n");
