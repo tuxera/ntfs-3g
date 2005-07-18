@@ -42,6 +42,8 @@
 - implement an ntfs shell where can use the above much faster with caching,
   probably extending the library in the process
 
+- implement {a,m,r}time updates in the library.
+
 ****************
 * LOW priority *
 ****************

@@ -40,6 +40,13 @@ Thanks,
 - check whether the O_WRONLY -> O_RDWR change made effect on performance
 
 
+**********
+* ntfscp *
+**********
+
+- add ability to copy multiply files at once.
+
+
 ***********
 * ntfsfix *
 ***********
