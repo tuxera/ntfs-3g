@@ -750,6 +750,9 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 	if (lcn + lcn_length <= new_vol_size)
 		return;
 
+	if (inode == FILE_Bitmap && resize->ctx->attr->type == AT_DATA)
+		return;
+	
 	start = lcn;
 	len = lcn_length;
 
@@ -1637,6 +1640,10 @@ static void relocate_attributes(ntfs_resize_t *resize)
 		if (ret == -1)
 			exit(1);
 		else if (ret == 1)
+			break;
+
+		if (resize->mref == FILE_Bitmap && 
+		    resize->ctx->attr->type == AT_DATA)
 			break;
 
 		relocate_attribute(resize);
