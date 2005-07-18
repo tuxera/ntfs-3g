@@ -29,8 +29,6 @@
 
 #include "decrypt.h"
 
-#include "types.h"
-
 #ifdef __CYGWIN__
 //#define USE_CRYPTOAPI_RSA 1
 #define _WIN32_WINNT 0x501
@@ -83,6 +81,9 @@ static HMODULE hCrypt32 = INVALID_HANDLE_VALUE;
 #define CALG_AES_256 (0x6610)
 
 #endif /* defined(__CYGWIN__) */
+
+/* This must be after windows.h include. */
+#include "types.h"
 
 typedef struct {
 #ifdef __CYGWIN__
