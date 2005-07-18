@@ -657,6 +657,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 {
 	s64 inode, last_lcn;
 	ATTR_FLAGS flags;
+	ATTR_TYPES atype;
 	struct llcn_t *llcn = NULL;
 	int ret, supported = 0;
 
@@ -664,6 +665,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 
 	inode = resize->ni->mft_no;
 	flags = resize->ctx->attr->flags;
+	atype = resize->ctx->attr->type;
 
 	if ((ret = has_bad_sectors(resize, 1)) != 0) {
 		if (ret == -1)
@@ -678,15 +680,21 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		return;
 	}
 	
-	if (inode == FILE_MFT) {
+	if (inode == FILE_Bitmap) {
+		llcn = &resize->last_lcn;
+		if (atype == AT_DATA && NInoAttrList(resize->ni))
+		    err_exit("Highly fragmented $Bitmap isn't supported yet.");
+
+		supported = 1;
+
+	} else if (inode == FILE_MFT) {
 		llcn = &resize->last_mft;
 
 		/*
 		 *  First run of $MFT AT_DATA and $MFT with AT_ATTRIBUTE_LIST
 		 *  isn't supported yet.
 		 */
-		if ((resize->ctx->attr->type != AT_DATA || rl->vcn) &&
-		    !NInoAttrList(resize->ni))
+		if ((atype != AT_DATA || rl->vcn) && !NInoAttrList(resize->ni))
 			supported = 1;
 
 	} else if (NInoAttrList(resize->ni)) {
@@ -708,7 +716,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 		supported = 1;
 
 		/* Fragmented $MFTMirr DATA attribute isn't supported yet */
-		if (resize->ctx->attr->type == AT_DATA)
+		if (atype == AT_DATA)
 			if (rl[1].length != 0 || rl->vcn)
 				supported = 0;
 	} else {
@@ -1916,9 +1924,6 @@ static void lookup_data_attr(ntfs_volume *vol,
 
 	if (!(ni = ntfs_inode_open(vol, mref)))
 		perr_exit("ntfs_open_inode");
-
-	if (NInoAttrList(ni))
-		err_exit("Attribute list attribute not yet supported");
 
 	if (!(*ctx = attr_get_search_ctx(ni, NULL)))
 		exit(1);
