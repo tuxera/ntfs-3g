@@ -273,7 +273,7 @@ static void ntfs_binary_print (u8 num, BOOL backwards, BOOL colour)
 /**
  * ntfsinfo_time_to_str
  */
-static const char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
+static const char * ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 {
 	time_t unix_clock = ntfs2utc(sle64_to_cpu(sle_ntfs_clock));
 	if (sle_ntfs_clock == 0)
@@ -317,7 +317,7 @@ static void ntfs_inode_dir_map (ntfs_inode *ino)
 /**
  * ntfs_inode_open2
  */
-static ntfs_inode *ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
+static ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
 {
 	ntfs_inode *ino = NULL;
 	struct ntfs_dir *dir;
@@ -431,7 +431,7 @@ static int ntfs_bmp_commit (struct ntfs_bmp *bmp)
 	printf ("\ti size = %lld\n", bmp->attr->initialized_size);
 #endif
 
-	//printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
+	printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
 
 	if (NAttrNonResident (bmp->attr)) {
 		cs = bmp->vol->cluster_size;
@@ -2643,8 +2643,6 @@ static BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
 	del->data = realloc (del->data, del->data_len);
 	del->header = (INDEX_HEADER*) (del->data + 0x10);
 
-	del->header->index_length   -= del_len;
-	del->header->allocated_size -= del_len;
 
 	//utils_dump_mem (del->data, 0, del->data_len, DM_GREEN | DM_RED);
 
@@ -4834,8 +4832,12 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	//utils_dump_mem (par->data, 0, par->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
 
-	if (par)
-		file = &par->children[par_num]->key.file_name; printf ("\tpar name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+	if (par) {
+		file = &par->children[par_num]->key.file_name;
+		printf ("\tpar name: ");
+		ntfs_name_print (file->file_name, file->file_name_length);
+		printf ("\n");
+	}
 
 	if (par == NULL) {
 		// unhook everything
@@ -5010,6 +5012,7 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 
 	if (1) ntfs_file_remove (vol, dt, dt_num); // remove name from index
 
+	if (1) utils_volume_commit (vol);
 	if (1) utils_volume_commit (vol);
 
 	if (0) utils_volume_rollback (vol);
