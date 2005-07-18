@@ -1478,7 +1478,7 @@ static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
 	printf("\tNEED_EA count:\t\t %u\n",
 			le16_to_cpu(ea_info->need_ea_count));
 	printf("\tUnpacked EA length:\t %u\n",
-			le32_to_cpu(ea_info->ea_query_length));
+			(unsigned)le32_to_cpu(ea_info->ea_query_length));
 }
 
 /**
