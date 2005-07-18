@@ -37,6 +37,18 @@ This package contains the NTFS GNOME virtual filesystem (VFS) module which
 allows GNOME VFS clients to seamlessly utilize the NTFS library (libntfs).
 
 
+%package fuse
+Summary		: NTFS FUSE module (ntfsmount)
+Group		: System Environment/Base
+Requires	: ntfsprogs = %{ver}-%{rel}
+Requires	: fuse >= 2.3.0
+%description fuse
+This package contains the ntfsmount utility which is an NTFS filesystem in
+userspace (FUSE) module allowing users to mount an ntfs filesystem from
+userspace and accessing it using the functionality provided by the NTFS
+library (libntfs).
+
+
 %package devel
 Summary		: files required to compile software that uses libntfs
 Group		: Development/System
@@ -51,7 +63,7 @@ with the NTFS library (libntfs).
 
 %build
 if [ -n "$LINGUAS" ]; then unset LINGUAS; fi
-%configure --enable-gnome-vfs
+%configure --enable-gnome-vfs --enable-fuse-module
 make
 
 
@@ -75,7 +87,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files
 %defattr(-,root,root)
 %doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
-%{bindir}/*
+%{bindir}/ntfs[^m][^o]*
 %{sbindir}/*
 %{mandir}/man8/mkntfs.8*
 %{mandir}/man8/ntfs*.8*
@@ -87,6 +99,11 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*so*
 %config %{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
 
+%files fuse
+%defattr(-,root,root)
+%{bindir}/ntfsmount*
+%{mandir}/man8/ntfsmount.8*
+
 %files devel
 %defattr(-,root,root)
 %{_includedir}/*
@@ -94,6 +111,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Mon Jul 18 2005 Anton Altaparmakov <aia21@cantab.net>
+- Add ntfsmount fuse module in separate rpm ntfsprogs-fuse.
+
 * Wed Mar 10 2004 Anton Altaparmakov <aia21@cantab.net>
 - Cleanup descriptions ready for 1.9.0 release.
 
