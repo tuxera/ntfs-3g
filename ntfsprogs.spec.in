@@ -90,7 +90,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{bindir}/ntfs[^m][^o]*
 %{sbindir}/*
 %{mandir}/man8/mkntfs.8*
-%{mandir}/man8/ntfs*.8*
+%{mandir}/man8/ntfs[^m][^o]*.8*
 %{_libdir}/libntfs.*so*
 
 %files gnomevfs
