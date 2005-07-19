@@ -882,7 +882,7 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 		name->date_r     = ntfs2utc (sle64_to_cpu (attr->last_access_time));
 
 		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
-		    name->uname_len) < 0) {
+				0) < 0) {
 			Dprintf ("ERROR: Couldn't translate filename to current locale.\n");
 		}
 
@@ -957,7 +957,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 			data->uname_len = rec->name_length;
 
 			if (ntfs_ucstombs (data->uname, data->uname_len, &data->name,
-			    data->uname_len) < 0) {
+					0) < 0) {
 				Eprintf ("ERROR: Cannot translate name into current locale.\n");
 			}
 		}

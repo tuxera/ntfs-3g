@@ -461,7 +461,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 			}
 
 			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
-			    &names[i], attr->file_name_length) < 0) {
+			    &names[i], 0) < 0) {
 				char *temp;
 				Eprintf ("Couldn't translate filename to current locale.\n");
 				temp = malloc (30);
@@ -542,7 +542,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	if (attrdef) {
 		name    = NULL;
 		namelen = ntfs_ucsnlen (attrdef->name, sizeof (attrdef->name));
-		if (ntfs_ucstombs (attrdef->name, namelen, &name, namelen) < 0) {
+		if (ntfs_ucstombs (attrdef->name, namelen, &name, 0) < 0) {
 			Eprintf ("Couldn't translate attribute type to current locale.\n");
 			// <UNKNOWN>?
 			return 0;
@@ -568,7 +568,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	name    = NULL;
 	namelen = attr->name_length;
 	if (ntfs_ucstombs ((ntfschar *)((char *)attr + attr->name_offset),
-	    namelen, &name, namelen) < 0) {
+	    namelen, &name, 0) < 0) {
 		Eprintf ("Couldn't translate attribute name to current locale.\n");
 		// <UNKNOWN>?
 		len = snprintf (buffer, bufsize, "<UNKNOWN>");

@@ -1270,7 +1270,7 @@ static int ntfs_dt_count_root (struct ntfs_dt *dt)
 		}
 
 		if (!(entry->flags & INDEX_ENTRY_END)) {
-			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, entry->key.file_name.file_name_length);
+			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
 			//printf ("\tinode %8lld %s\n", MREF (entry->indexed_file), name);
 			free (name);
 			name = NULL;
@@ -1337,7 +1337,7 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 		if (entry->flags & INDEX_ENTRY_END) {
 			break;
 		} else {
-			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, entry->key.file_name.file_name_length);
+			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
 			//printf ("\tinode %8lld %s\n", MREF (entry->indexed_file), name);
 			free (name);
 			name = NULL;
