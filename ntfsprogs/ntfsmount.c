@@ -597,25 +597,31 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	}
 	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
 				0, NULL, 0, actx)) {
+		char *tmp_name = NULL;
+		int tmp_name_len;
+
 		if (!actx->attr->name_length)
 			continue;
+		tmp_name_len = ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
+				le16_to_cpu(actx->attr->name_offset)),
+				actx->attr->name_length, &tmp_name, 0);
+		if (tmp_name_len < 0) {
+			ret = -errno;
+			goto exit;
+		}
 		if (ret)
-			ret++;
-		ret += actx->attr->name_length;
+			ret++; /* For space delimiter .*/
+		ret += tmp_name_len;
 		if ((size_t)ret <= size) {
+			/* Don't add space to the beginning of line. */
 			if (to != value) {
 				*to = ' ';
 				to++;
 			}
-			if (ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
-					le16_to_cpu(actx->attr->name_offset)),
-					actx->attr->name_length, &to,
-					actx->attr->name_length + 1) < 0) {
-				ret = -errno;
-				goto exit;
-			}
-			to += actx->attr->name_length;
+			strncpy(to, tmp_name, tmp_name_len);
+			to += tmp_name_len;
 		}
+		free(tmp_name);
 	}
 	if (errno != ENOENT)
 		ret = -errno;
@@ -627,6 +633,7 @@ exit:
 }
 
 #if 0
+/* If this will be enabled, need to fix bug before.  (bug description below) */
 
 static const char nf_ns_streams[] = "user.stream.";
 static const int nf_ns_streams_len = 12;
@@ -662,6 +669,11 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 		if (size && (size_t)ret <= size) {
 			strcpy(to, nf_ns_streams);
 			to += nf_ns_streams_len;
+			/*
+			 * BUG: destination buffer length can be bigger than
+			 * actx->attr->name_length + 1.  (eg. internatinal
+			 * characters in utf8)
+			 */
 			if (ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
 					le16_to_cpu(actx->attr->name_offset)),
 					actx->attr->name_length, &to,

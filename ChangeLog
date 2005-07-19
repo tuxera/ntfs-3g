@@ -1,7 +1,8 @@
 xx/xx/2005 - 1.11.1-WIP
 
-	- ntfsmount: fix buffer allocation in ntfs_fuse_filler.  (Yura, thanks
-	  to Rich for finding bug)
+	- ntfsmount: Fix several bugs when too small buffer was allocated for
+	  filenames on systems with utf8 locale.  (Yura, many thanks to Rich
+	  for finding bug)
 
 19/07/2005 - 1.11.0 - Fixes and a new utility ntfsmount, a FUSE ntfs module.
 
