@@ -303,23 +303,16 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		const s64 pos __attribute__((unused)), const MFT_REF mref,
 		const unsigned dt_type __attribute__((unused)))
 {
-	char *filename;
-	int err = 0;
+	char *filename = NULL;
 
 	if (name_type == FILE_NAME_DOS)
 		return 0;
-	filename = malloc(name_len + 1);
-	if (!filename)
+	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0)
 		return -errno;
-	if (ntfs_ucstombs(name, name_len, &filename, name_len + 1) < 0) {
-		err = -errno;
-		free(filename);
-		return err;
-	}
 	if (MREF(mref) >= FILE_first_user || ctx->show_sys_files)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
 	free(filename);
-	return err;
+	return 0;
 }
 
 static int ntfs_fuse_readdir(const char *path, void *buf,
@@ -330,6 +323,7 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	ntfs_volume *vol;
 	ntfs_inode *ni;
 	s64 pos = 0;
+	int err = 0;
 
 	vol = ctx->vol;
 	fill_ctx.filler = filler;
@@ -337,9 +331,11 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	ntfs_readdir(ni, &pos, &fill_ctx, (ntfs_filldir_t)ntfs_fuse_filler);
+	if (ntfs_readdir(ni, &pos, &fill_ctx,
+			(ntfs_filldir_t)ntfs_fuse_filler))
+		err = -errno;
 	ntfs_inode_close(ni);
-	return 0;
+	return err;
 }
 
 static int ntfs_fuse_open(const char *org_path,
