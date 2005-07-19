@@ -1,3 +1,8 @@
+xx/xx/2005 - 1.11.1-WIP
+
+	- ntfsmount: fix buffer allocation in ntfs_fuse_filler.  (Yura, thanks
+	  to Rich for finding bug)
+
 19/07/2005 - 1.11.0 - Fixes and a new utility ntfsmount, a FUSE ntfs module.
 
 	- ntfscp: fix signal hanling: handle both SIGTERM and SIGINT, print

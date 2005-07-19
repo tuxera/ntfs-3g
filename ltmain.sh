@@ -17,7 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # As a special exception to the GNU General Public License, if you
 # distribute this file as part of a program that contains a
@@ -43,8 +43,8 @@ EXIT_FAILURE=1
 
 PROGRAM=ltmain.sh
 PACKAGE=libtool
-VERSION=1.5.14
-TIMESTAMP=" (1.1220.2.195 2005/02/12 12:12:33)"
+VERSION=1.5.18
+TIMESTAMP=" (1.1220.2.245 2005/05/16 08:55:27)"
 
 # See if we are running on zsh, and set the options which allow our
 # commands through without removal of \ escapes.
@@ -112,8 +112,9 @@ if test "${LANG+set}" = set; then
 fi
 
 # Make sure IFS has a sensible default
-: ${IFS=" 	
-"}
+lt_nl='
+'
+IFS=" 	$lt_nl"
 
 if test "$build_libtool_libs" != yes && test "$build_old_libs" != yes; then
   $echo "$modename: not configured to build any kind of library" 1>&2
@@ -250,37 +251,14 @@ func_extract_an_archive ()
 {
     f_ex_an_ar_dir="$1"; shift
     f_ex_an_ar_oldlib="$1"
-    f_ex_an_ar_lib=`$echo "X$f_ex_an_ar_oldlib" | $Xsed -e 's%^.*/%%'`
 
     $show "(cd $f_ex_an_ar_dir && $AR x $f_ex_an_ar_oldlib)"
     $run eval "(cd \$f_ex_an_ar_dir && $AR x \$f_ex_an_ar_oldlib)" || exit $?
     if ($AR t "$f_ex_an_ar_oldlib" | sort | sort -uc >/dev/null 2>&1); then
      :
     else
-      $echo "$modename: warning: object name conflicts; renaming object files" 1>&2
-      $echo "$modename: warning: to ensure that they will not overwrite" 1>&2
-      $show "cp $f_ex_an_ar_oldlib $f_ex_an_ar_dir/$f_ex_an_ar_lib"
-      $run eval "cp \$f_ex_an_ar_oldlib \$f_ex_an_ar_dir/\$f_ex_an_ar_lib"
-      $AR t "$f_ex_an_ar_oldlib" | sort | uniq -c \
-	| $EGREP -v '^[ 	]*1[ 	]' | while read count name
-      do
-	i=1
-	while test "$i" -le "$count"
-	  do
-	  # Put our $i before any first dot (extension)
-	  # Never overwrite any file
-	  name_to="$name"
-	  while test "X$name_to" = "X$name" || test -f "$f_ex_an_ar_dir/$name_to"
-	    do
-	    name_to=`$echo "X$name_to" | $Xsed -e "s/\([^.]*\)/\1-$i/"`
-	  done
-	  $show "(cd $f_ex_an_ar_dir && $AR x  $f_ex_an_ar_lib '$name' && $mv '$name' '$name_to')"
-	  $run eval "(cd \$f_ex_an_ar_dir && $AR x \$f_ex_an_ar_lib '$name' && $mv '$name' '$name_to' && $AR -d \$f_ex_an_ar_lib '$name')" || exit $?
-	  i=`expr $i + 1`
-	done
-      done
-      $show "$rm $f_ex_an_ar_dir/$f_ex_an_ar_lib"
-      $run eval "$rm \$f_ex_an_ar_dir/\$f_ex_an_ar_lib"
+      $echo "$modename: ERROR: object name conflicts: $f_ex_an_ar_dir/$f_ex_an_ar_oldlib" 1>&2
+      exit $EXIT_FAILURE
     fi
 }
 
@@ -757,6 +735,15 @@ if test -z "$show_help"; then
       esac
     done
 
+    qlibobj=`$echo "X$libobj" | $Xsed -e "$sed_quote_subst"`
+    case $qlibobj in
+      *$quote_scanset* | *]* | *\|* | *\&* | *\(* | *\)* | "")
+	qlibobj="\"$qlibobj\"" ;;
+    esac
+    if test "X$libobj" != "X$qlibobj"; then
+	$echo "$modename: libobj name \`$libobj' may not contain shell special characters."
+	exit $EXIT_FAILURE
+    fi
     objname=`$echo "X$obj" | $Xsed -e 's%^.*/%%'`
     xdir=`$echo "X$obj" | $Xsed -e 's%/[^/]*$%%'`
     if test "X$xdir" = "X$obj"; then
@@ -829,12 +816,17 @@ compiler."
 	$run $rm $removelist
 	exit $EXIT_FAILURE
       fi
-      $echo $srcfile > "$lockfile"
+      $echo "$srcfile" > "$lockfile"
     fi
 
     if test -n "$fix_srcfile_path"; then
       eval srcfile=\"$fix_srcfile_path\"
     fi
+    qsrcfile=`$echo "X$srcfile" | $Xsed -e "$sed_quote_subst"`
+    case $qsrcfile in
+      *$quote_scanset* | *]* | *\|* | *\&* | *\(* | *\)* | "")
+      qsrcfile="\"$qsrcfile\"" ;;
+    esac
 
     $run $rm "$libobj" "${libobj}T"
 
@@ -856,10 +848,10 @@ EOF
       fbsd_hideous_sh_bug=$base_compile
 
       if test "$pic_mode" != no; then
-	command="$base_compile $srcfile $pic_flag"
+	command="$base_compile $qsrcfile $pic_flag"
       else
 	# Don't build PIC code
-	command="$base_compile $srcfile"
+	command="$base_compile $qsrcfile"
       fi
 
       if test ! -d "${xdir}$objdir"; then
@@ -939,9 +931,9 @@ EOF
     if test "$build_old_libs" = yes; then
       if test "$pic_mode" != yes; then
 	# Don't build PIC code
-	command="$base_compile $srcfile"
+	command="$base_compile $qsrcfile"
       else
-	command="$base_compile $srcfile $pic_flag"
+	command="$base_compile $qsrcfile $pic_flag"
       fi
       if test "$compiler_c_o" = yes; then
 	command="$command -o $obj"
@@ -1365,6 +1357,8 @@ EOF
 	  ;;
         darwin_framework)
 	  compiler_flags="$compiler_flags $arg"
+	  compile_command="$compile_command $arg"
+	  finalize_command="$finalize_command $arg"
 	  prev=
 	  continue
 	  ;;
@@ -1429,6 +1423,8 @@ EOF
       -framework)
         prev=darwin_framework
         compiler_flags="$compiler_flags $arg"
+	compile_command="$compile_command $arg"
+	finalize_command="$finalize_command $arg"
         continue
         ;;
 
@@ -2852,12 +2848,12 @@ EOF
 	      *) continue ;;
 	      esac
 	      case " $deplibs " in
-	      *" $depdepl "*) ;;
-	      *) deplibs="$depdepl $deplibs" ;;
+	      *" $path "*) ;;
+	      *) deplibs="$path $deplibs" ;;
 	      esac
 	      case " $deplibs " in
-	      *" $path "*) ;;
-	      *) deplibs="$deplibs $path" ;;
+	      *" $depdepl "*) ;;
+	      *) deplibs="$depdepl $deplibs" ;;
 	      esac
 	    done
 	  fi # link_all_deplibs != no
@@ -3124,7 +3120,7 @@ EOF
 	case $current in
 	0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]) ;;
 	*)
-	  $echo "$modename: CURRENT \`$current' is not a nonnegative integer" 1>&2
+	  $echo "$modename: CURRENT \`$current' must be a nonnegative integer" 1>&2
 	  $echo "$modename: \`$vinfo' is not valid version information" 1>&2
 	  exit $EXIT_FAILURE
 	  ;;
@@ -3133,7 +3129,7 @@ EOF
 	case $revision in
 	0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]) ;;
 	*)
-	  $echo "$modename: REVISION \`$revision' is not a nonnegative integer" 1>&2
+	  $echo "$modename: REVISION \`$revision' must be a nonnegative integer" 1>&2
 	  $echo "$modename: \`$vinfo' is not valid version information" 1>&2
 	  exit $EXIT_FAILURE
 	  ;;
@@ -3142,7 +3138,7 @@ EOF
 	case $age in
 	0|[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]|[1-9][0-9][0-9][0-9][0-9]) ;;
 	*)
-	  $echo "$modename: AGE \`$age' is not a nonnegative integer" 1>&2
+	  $echo "$modename: AGE \`$age' must be a nonnegative integer" 1>&2
 	  $echo "$modename: \`$vinfo' is not valid version information" 1>&2
 	  exit $EXIT_FAILURE
 	  ;;
@@ -5091,6 +5087,63 @@ fi\
       if test -n "$old_archive_from_new_cmds" && test "$build_libtool_libs" = yes; then
        cmds=$old_archive_from_new_cmds
       else
+	# POSIX demands no paths to be encoded in archives.  We have
+	# to avoid creating archives with duplicate basenames if we
+	# might have to extract them afterwards, e.g., when creating a
+	# static archive out of a convenience library, or when linking
+	# the entirety of a libtool archive into another (currently
+	# not supported by libtool).
+	if (for obj in $oldobjs
+	    do
+	      $echo "X$obj" | $Xsed -e 's%^.*/%%'
+	    done | sort | sort -uc >/dev/null 2>&1); then
+	  :
+	else
+	  $echo "copying selected object files to avoid basename conflicts..."
+
+	  if test -z "$gentop"; then
+	    gentop="$output_objdir/${outputname}x"
+	    generated="$generated $gentop"
+
+	    $show "${rm}r $gentop"
+	    $run ${rm}r "$gentop"
+	    $show "$mkdir $gentop"
+	    $run $mkdir "$gentop"
+	    status=$?
+	    if test "$status" -ne 0 && test ! -d "$gentop"; then
+	      exit $status
+	    fi
+	  fi
+
+	  save_oldobjs=$oldobjs
+	  oldobjs=
+	  counter=1
+	  for obj in $save_oldobjs
+	  do
+	    objbase=`$echo "X$obj" | $Xsed -e 's%^.*/%%'`
+	    case " $oldobjs " in
+	    " ") oldobjs=$obj ;;
+	    *[\ /]"$objbase "*)
+	      while :; do
+		# Make sure we don't pick an alternate name that also
+		# overlaps.
+		newobj=lt$counter-$objbase
+		counter=`expr $counter + 1`
+		case " $oldobjs " in
+		*[\ /]"$newobj "*) ;;
+		*) if test ! -f "$gentop/$newobj"; then break; fi ;;
+		esac
+	      done
+	      $show "ln $obj $gentop/$newobj || cp $obj $gentop/$newobj"
+	      $run ln "$obj" "$gentop/$newobj" ||
+	      $run cp "$obj" "$gentop/$newobj"
+	      oldobjs="$oldobjs $gentop/$newobj"
+	      ;;
+	    *) oldobjs="$oldobjs $obj" ;;
+	    esac
+	  done
+	fi
+
 	eval cmds=\"$old_archive_cmds\"
 
 	if len=`expr "X$cmds" : ".*"` &&
@@ -5104,20 +5157,7 @@ fi\
 	  objlist=
 	  concat_cmds=
 	  save_oldobjs=$oldobjs
-	  # GNU ar 2.10+ was changed to match POSIX; thus no paths are
-	  # encoded into archives.  This makes 'ar r' malfunction in
-	  # this piecewise linking case whenever conflicting object
-	  # names appear in distinct ar calls; check, warn and compensate.
-	    if (for obj in $save_oldobjs
-	    do
-	      $echo "X$obj" | $Xsed -e 's%^.*/%%'
-	    done | sort | sort -uc >/dev/null 2>&1); then
-	    :
-	  else
-	    $echo "$modename: warning: object name conflicts; overriding AR_FLAGS to 'cq'" 1>&2
-	    $echo "$modename: warning: to ensure that POSIX-compatible ar will work" 1>&2
-	    AR_FLAGS=cq
-	  fi
+
 	  # Is there a better way of finding the last object in the list?
 	  for obj in $save_oldobjs
 	  do
@@ -6026,14 +6066,14 @@ relink_command=\"$relink_command\""
       fi
 
       # Now prepare to actually exec the command.
-      exec_cmd="\"\$cmd\"$args"
+      exec_cmd="\$cmd$args"
     else
       # Display what would be done.
       if test -n "$shlibpath_var"; then
 	eval "\$echo \"\$shlibpath_var=\$$shlibpath_var\""
 	$echo "export $shlibpath_var"
       fi
-      eval \$echo \"\$cmd\"$args
+      $echo "$cmd$args"
       exit $EXIT_SUCCESS
     fi
     ;;
