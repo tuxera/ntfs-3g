@@ -1157,7 +1157,7 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 			size = dt->dir->index_size;
 			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
 #ifdef RM_WRITE
-			ntfs_attr_mst_pwrite(attr, dt->vcn * size, 1, size, dt->data); // XXX retval
+			ntfs_attr_mst_pwrite(attr, dt->vcn * vol->cluster_size, 1, size, dt->data); // XXX retval
 #endif
 		} else {
 			printf ("commit dt (root)\n");
@@ -3355,8 +3355,6 @@ static int ntfs_dir_commit (struct ntfs_dir *dir)
 		printf (RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
 	}
 
-	ntfs_dir_truncate (dir->vol, dir);
-
 	if (ntfs_dt_commit (dir->index) < 0)
 		return -1;
 
@@ -4268,7 +4266,8 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 
 	if (1) ntfs_file_remove (vol, dt, dt_num); // remove name from index
 
-	if (1) utils_volume_commit (vol);
+	if (1) ntfs_dir_truncate (vol, dt->dir);
+
 	if (1) utils_volume_commit (vol);
 
 	if (0) utils_volume_rollback (vol);
