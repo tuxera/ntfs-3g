@@ -76,8 +76,9 @@ static HMODULE hCrypt32 = INVALID_HANDLE_VALUE;
 
 #include <malloc.h>
 #include <string.h>
-#define CALG_DESX (0x6603)
-#define CALG_3DES (0x6604)
+/* If not one of the below three, use standard Des. */
+#define CALG_3DES (0x6603)
+#define CALG_DESX (0x6604)
 #define CALG_AES_256 (0x6610)
 
 #endif /* defined(__CYGWIN__) */
@@ -436,23 +437,16 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 		}
 	}
 
-	switch (dkey->gcry_algo) {
-		case GCRY_CIPHER_DES_SK:
-			// don't know!
-		case GCRY_CIPHER_3DES:
-			((unsigned long long *)data)[0] ^=
-					0x169119629891ad13LL + offset;
-			break;
-		case GCRY_CIPHER_AES256:
-			((unsigned long long *)data)[0] ^=
-					0x5816657be9161312LL + offset;
-			((unsigned long long *)data)[1] ^=
-					0x1989adbe44918961LL + offset;
-			break;
-		default:
-			break;
+	if (dkey->gcry_algo == GCRY_CIPHER_AES256) {
+		((unsigned long long *)data)[0] ^=
+				0x5816657be9161312LL + offset;
+		((unsigned long long *)data)[1] ^=
+				0x1989adbe44918961LL + offset;
+	} else {
+		/* All other algos (Des, 3Des, DesX) use the same IV. */
+		((unsigned long long *)data)[0] ^=
+				0x169119629891ad13LL + offset;
 	}
-
 	return 512;
 }
 
@@ -468,6 +462,7 @@ static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 
 	switch (gcry_algo) {
 		case GCRY_CIPHER_DES_SK:
+			/* FIXME: This should be MODE_CBC, no? */
 			gcry_mode = GCRY_CIPHER_MODE_ECB;
 			gcry_length = 8;
 			break;
@@ -480,6 +475,7 @@ static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 			gcry_length = 32;
 			break;
 		default:
+			/* FIXME: This should use standard Des. */
 			errno = ENOTSUP;
 			return 0;
 	}
@@ -501,9 +497,9 @@ static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 }
 
 decrypt_key *decrypt_make_key(
-			decrypt_session *session __attribute__((unused)), 
-			unsigned int data_size __attribute__((unused)),
-			void *data) {
+		decrypt_session *session __attribute__((unused)), 
+		unsigned int data_size __attribute__((unused)),
+		void *data) {
 	unsigned int key_size, alg_id;
 	char *key_data;
 
@@ -526,10 +522,9 @@ decrypt_key *decrypt_make_key(
 			return decrypt_make_gcry_key(key_data,
 						GCRY_CIPHER_AES256);
 		default:
-			fprintf(stderr, "Error: Unknown algorithm: 0x%x\n",
-						(unsigned int)alg_id);
+			//fprintf(stderr, "DES key of %u bytes\n", key_size);
+			fprintf(stderr, "DES is not supported yet.\n");
 			errno = ENOTSUP;
 			return NULL;
 	}
-
 }
