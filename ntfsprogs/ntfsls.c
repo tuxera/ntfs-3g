@@ -481,7 +481,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 	}
 
 	result = 0;					// These are successful
-	if ((filename[0] == '$') && (!opts.system))
+	if ((MREF(mref) < FILE_first_user) && (!opts.system))
 		goto free;
 	if (name_type == FILE_NAME_POSIX && !opts.all)
 		goto free;
