@@ -1,4 +1,4 @@
-xx/xx/2005 - 1.11.1-WIP
+20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
 	- ntfsmount: Fix several bugs when too small buffer was allocated for
 	  filenames on systems with utf8 locale.  (Yura, many thanks to Rich
