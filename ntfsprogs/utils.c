@@ -56,8 +56,6 @@ const char *ntfs_gpl = "This program is free software, released under the GNU "
 	"\"COPYING\" distributed with this program, or online at:\n"
 	"http://www.gnu.org/copyleft/gpl.html\n";
 
-#define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
-
 /**
  * utils_set_locale
  */
@@ -292,41 +290,6 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 	*start  = a;
 	*finish = b;
 	return 1;
-}
-
-/**
- * ntfs2utc - Convert an NTFS time to Unix time
- * @ntfs_time:  An NTFS time in 100ns units since 1601
- *
- * NTFS stores times as the number of 100ns intervals since January 1st 1601 at
- * 00:00 UTC.  This system will not suffer from Y2K problems until ~57000AD.
- *
- * Return:  n  A Unix time (number of seconds since 1970)
- */
-time_t ntfs2utc (s64 ntfs_time)
-{
-	return (ntfs_time - (NTFS_TIME_OFFSET)) / 10000000;
-}
-
-/**
- * utc2ntfs - Convert Linux time to NTFS time
- * @utc_time:  Linux time to convert to NTFS
- *
- * Convert the Linux time @utc_time to its corresponding NTFS time.
- *
- * Linux stores time in a long at present and measures it as the number of
- * 1-second intervals since 1st January 1970, 00:00:00 UTC.
- *
- * NTFS uses Microsoft's standard time format which is stored in a s64 and is
- * measured as the number of 100 nano-second intervals since 1st January 1601,
- * 00:00:00 UTC.
- *
- * Return:  n  An NTFS time (100ns units since Jan 1601)
- */
-s64 utc2ntfs (time_t utc_time)
-{
-	/* Convert to 100ns intervals and then add the NTFS time offset. */
-	return (s64)utc_time * 10000000 + NTFS_TIME_OFFSET;
 }
 
 /**

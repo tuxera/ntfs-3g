@@ -132,6 +132,7 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
+ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -202,6 +203,7 @@ linux_ntfsinclude_HEADERS = \
 	runlist.h		\
 	security.h		\
 	support.h		\
+	timeconv.h		\
 	types.h			\
 	unistr.h		\
 	volume.h

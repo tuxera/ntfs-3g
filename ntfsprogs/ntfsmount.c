@@ -283,12 +283,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		stbuf->st_gid = ctx->gid;
 		stbuf->st_ino = ni->mft_no;
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
-		/*
-		 * TODO: Need support in libntfs for this.
-		 * stbuf->st_atime = 
-		 * stbuf->st_ctime = 
-		 * stbuf->st_mtime = 
-		 */
+		stbuf->st_atime = ni->atime;
+		stbuf->st_ctime = ni->ctime;
+		stbuf->st_mtime = ni->mtime;
 		ntfs_inode_close(ni);
 	} else
 		res = -ENOENT;

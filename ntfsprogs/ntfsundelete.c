@@ -40,7 +40,6 @@
 #include <time.h>
 #include <limits.h>
 #include <regex.h>
-#include <time.h>
 #include <stdarg.h>
 #include <utime.h>
 
@@ -53,6 +52,7 @@
 #include "device.h"
 #include "utils.h"
 #include "debug.h"
+#include "timeconv.h"
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";

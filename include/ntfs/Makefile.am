@@ -26,6 +26,7 @@ linux_ntfsinclude_HEADERS = \
 	runlist.h		\
 	security.h		\
 	support.h		\
+	timeconv.h		\
 	types.h			\
 	unistr.h		\
 	volume.h

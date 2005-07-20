@@ -139,9 +139,14 @@ struct _ntfs_inode {
 
 	void *private_data;	/* Temp: for directory handling */
 	int ref_count;
-	/* Belows fields needed to update indexes. They valid if != -1. */
+
+	/* Below 2 fields needed to update indexes. They valid if != -1. */
 	s64 data_size;
 	s64 allocated_size;
+
+	time_t atime; /* Last access to the data within the file. */
+	time_t mtime; /* Last change of the data within the file. */
+	time_t ctime; /* Last change of the metadata of the file. */
 };
 
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);

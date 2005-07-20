@@ -33,6 +33,7 @@
 #include "dir.h"
 #include "lcnalloc.h"
 #include "mft.h"
+#include "timeconv.h"
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;

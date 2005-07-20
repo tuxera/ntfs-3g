@@ -94,9 +94,6 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata (ntfs_inode *inode);
 void utils_dump_mem (u8 *buf, int start, int length, int ascii);
 
-time_t ntfs2utc (s64 ntfs_time);
-s64 utc2ntfs (time_t utc_time);
-
 ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft);
 

@@ -38,6 +38,7 @@
 #include "lcnalloc.h"
 #include "index.h"
 #include "dir.h"
+#include "timeconv.h"
 
 /**
  * Internal:
@@ -146,6 +147,10 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		NInoSetEncrypted(ni);
 	if (std_info->file_attributes & FILE_ATTR_SPARSE_FILE)
 		NInoSetSparse(ni);
+	ni->mtime = ntfs2utc(sle64_to_cpu(std_info->last_data_change_time));
+	ni->ctime = ntfs2utc(sle64_to_cpu(std_info->last_mft_change_time));
+	ni->atime = ntfs2utc(sle64_to_cpu(std_info->last_access_time));
+	/* Set attribute list information. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT)
