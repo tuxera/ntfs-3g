@@ -246,7 +246,6 @@ ac_ct_CXX = @ac_ct_CXX@
 ac_ct_F77 = @ac_ct_F77@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
-ac_pt_PKG_CONFIG = @ac_pt_PKG_CONFIG@
 all_includes = @all_includes@
 all_libraries = @all_libraries@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -351,7 +350,7 @@ ntfscp_LDFLAGS = $(AM_LFLAGS)
 # We don't distribute these
 ntfsdecrypt_SOURCES = ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
 ntfsdecrypt_LDADD = $(AM_LIBS)
-ntfsdecrypt_LDFLAGS = $(AM_LFLAGS) -lgcrypt
+ntfsdecrypt_LDFLAGS = $(AM_LFLAGS) -lgcrypt -lcrypto
 ntfsrm_SOURCES = ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD = $(AM_LIBS)
 ntfsrm_LDFLAGS = $(AM_LFLAGS)

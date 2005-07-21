@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <gcrypt.h>
+#include <openssl/md5.h>
 
 #include "decrypt.h"
 
@@ -425,16 +426,12 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 		fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
 	}
 
-	if (dkey->gcry_algo == GCRY_CIPHER_DES_SK) {
-		/* CALG_DESX */
-		fprintf(stderr, "DESX is not supported yet.\n");
-		errno = -1;
-		return 0;
-	} else {
-		if ((gcry_error2 = gcry_cipher_decrypt(dkey->gcry_cipher_hd,
-					data, 512, NULL, 0))) {
-			fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
-		}
+	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
+	// doing it by hand after the decryption?
+
+	if ((gcry_error2 = gcry_cipher_decrypt(dkey->gcry_cipher_hd,
+				data, 512, NULL, 0))) {
+		fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
 	}
 
 	if (dkey->gcry_algo == GCRY_CIPHER_AES256) {
@@ -450,6 +447,43 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 	return 512;
 }
 
+/**
+ * desx_key_expand - expand a 128-bit desx key to the needed 192-bit key
+ * @src:	source buffer containing 128-bit key
+ * @dst:	destination buffer to write 192-bit key to
+ *
+ * Expands the on-disk 128-bit desx key to the needed full 192-bit desx key
+ * required to perform desx {de,en}cryption.
+ *
+ * FIXME: Is this endianness safe?  I think so but I may be wrong...
+ */
+void desx_key_expand(u8 *src, u8* dst) {
+	static const int salt_len = 12;
+	static const u8 *salt1 = "Dan Simon  ";
+	static const u8 *salt2 = "Scott Field";
+	u8 md[16];
+	MD5_CTX ctx1, ctx2;
+
+	MD5_Init(&ctx1);
+
+	/* Hash the on-disk key. */
+	MD5_Update(&ctx1, src, 128 / 8);
+	memcpy(&ctx2, &ctx1, sizeof(ctx1));
+
+	/* Hash with the first salt and store the result. */
+	MD5_Update(&ctx1, salt1, salt_len);
+	MD5_Final(md, &ctx1);
+	((u32*)dst)[0] = ((u32*)md)[0] ^ ((u32*)md)[1];
+	((u32*)dst)[1] = ((u32*)md)[2] ^ ((u32*)md)[3];
+
+	/* Hash with the second salt and store the result. */
+	MD5_Update(&ctx2, salt2, salt_len);
+	MD5_Final(md, &ctx2);
+	memcpy(dst + 8, md, sizeof(md));
+
+	return;
+}
+
 static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 	int gcry_mode, gcry_length;
 	gcry_error_t gcry_error2;
@@ -462,9 +496,8 @@ static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 
 	switch (gcry_algo) {
 		case GCRY_CIPHER_DES_SK:
-			/* FIXME: This should be MODE_CBC, no? */
-			gcry_mode = GCRY_CIPHER_MODE_ECB;
-			gcry_length = 8;
+			gcry_mode = GCRY_CIPHER_MODE_CBC;
+			gcry_length = 24;
 			break;
 		case GCRY_CIPHER_3DES:
 			gcry_mode = GCRY_CIPHER_MODE_CBC;
@@ -481,7 +514,7 @@ static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
 	}
 
 	if ((gcry_error2 = gcry_cipher_open(&key->gcry_cipher_hd, gcry_algo,
-				gcry_mode, 0))!=GPG_ERR_NO_ERROR) {
+				gcry_mode, 0)) != GPG_ERR_NO_ERROR) {
 		errno = -1;
 		return 0;
 	}
@@ -502,6 +535,7 @@ decrypt_key *decrypt_make_key(
 		void *data) {
 	unsigned int key_size, alg_id;
 	char *key_data;
+	u8 desx_key[192 / 16];
 
 	key_size = *((unsigned int *)data);
 	alg_id   = *(((unsigned int *)data) + 2);
@@ -509,10 +543,10 @@ decrypt_key *decrypt_make_key(
 
 	switch (alg_id) {
 		case CALG_DESX:
+			desx_key_expand(key_data, desx_key);
 			//fprintf(stderr, "DESX key of %u bytes\n", key_size);
-			fprintf(stderr, "DESX is not supported yet.\n");
-			errno = ENOTSUP;
-			return 0;
+			return decrypt_make_gcry_key(desx_key,
+						GCRY_CIPHER_DES_SK); 
 		case CALG_3DES:
 			//fprintf(stderr, "3DES Key of %u bytes\n", key_size);
 			return decrypt_make_gcry_key(key_data,

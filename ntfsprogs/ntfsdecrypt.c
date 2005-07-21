@@ -400,7 +400,7 @@ int main (int argc, char *argv[])
 		result = cat_decrypt (inode, fek);
 		decrypt_user_key_close(fek);
 	} else {
-		Eprintf("Could not obtain FEK.");
+		Eprintf("Could not obtain FEK.\n");
 		result = 1;
 	}
 

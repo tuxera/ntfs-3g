@@ -89,7 +89,7 @@ endif
 
 ntfsdecrypt_SOURCES		= ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
 ntfsdecrypt_LDADD		= $(AM_LIBS)
-ntfsdecrypt_LDFLAGS		= $(AM_LFLAGS) -lgcrypt
+ntfsdecrypt_LDFLAGS		= $(AM_LFLAGS) -lgcrypt -lcrypto
 
 ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD		= $(AM_LIBS)
