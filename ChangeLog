@@ -3,7 +3,9 @@ xx/xx/xxxx - 1.12.0-WIP
 	- ntfsls: fix showing not system files started with '$'.  (Yura)
 	- Move ntfs2utc and utc2ntfs from utils.[ch] to timeconv.h.  (Yura)
 	- Add [acm]time fields to struct ntfs_inode and set them during
-	  ntfs_inode_open.  Update ntfsmount to use them. (Yura)
+	  ntfs_inode_open.  Update ntfsmount to use them.  (Yura)
+	- index.c::ntfs_index_lookup: fix bug when index context didn't point
+	  on index root in which entry located.  (Yura)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 

@@ -92,6 +92,7 @@ int ntfs_attrlist_need(ntfs_inode *ni)
  *	EINVAL	- Invalid arguments passed to function.
  *	ENOMEM	- Not enough memory to allocate necessary buffers.
  *	EIO	- I/O error occurred or damaged filesystem.
+ *	EEXIST	- Such attribute already present in attribute list.
  */
 int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 {
@@ -159,7 +160,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 			continue;
 		if (sle64_to_cpu(ale->lowest_vcn) ==
 				sle64_to_cpu(attr->lowest_vcn)) {
-			err = EINVAL;
+			err = EEXIST;
 			Dprintf("%s(): Attribute with same type, name and "
 				"lowest vcn already present in attribute "
 				"list.\n", __FUNCTION__);

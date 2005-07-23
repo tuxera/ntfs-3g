@@ -2858,8 +2858,8 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
  * @name_len:	name length in unicode characters of the new attribute
  * @size:	size of the new attribute
  *
- * If inode haven't got enough space to add attribute, add attribute to one of it
- * extents, if no extents present or no one of them have enough space, than
+ * If inode haven't got enough space to add attribute, add attribute to one of
+ * it extents, if no extents present or no one of them have enough space, than
  * allocate new extent and add attribute to it.
  *
  * If on one of this steps attribute list is needed but not present, than it is
@@ -4792,20 +4792,7 @@ put_err_out:
  * attribute is made bigger and the attribute is resident the newly
  * "allocated" space is cleared and if the attribute is non-resident the
  * newly allocated space is marked as not initialised and no real allocation
- * on disk is performed. FIXME: Do we have to create sparse runs or can we just
- * leave the runlist to finish below data_size, i.e. can we have
- * allocated_size < data_size? I guess that what we can't and thus we will have
- * to set the sparse bit of the attribute and create sparse runs to ensure that
- * allocated_size is >= data_size. We don't need to clear the partial run at
- * the end of the real allocation because we leave initialized_size low enough.
- * FIXME: Do we want that? Alternatively, we leave initialized_size = data_size
- * and do clear the partial run. The latter approach would be more inline with
- * what windows would do, even though windows wouldn't even make the attribute
- * sparse, it would just allocate clusters instead. TODO: Check what happens on
- * WinXP and 2003. FIXME: Make sure to check what NT4 does with an NTFS1.2
- * volume that has sparse files. I suspect it will blow up so we will need to
- * perform allocations of clusters, like NT4 would do for NTFS1.2 while we can
- * use sparse attributes on NTFS3.x.
+ * on disk is performed.
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:

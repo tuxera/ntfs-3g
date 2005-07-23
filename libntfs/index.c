@@ -53,7 +53,7 @@ ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
 		*ictx = (ntfs_index_context) {
 			.ni = ni,
 			.name = name,
-			.name_len = name_len
+			.name_len = name_len,
 		};
 	return ictx;
 }
@@ -88,7 +88,6 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 		}
 	}
 	free(ictx);
-	return;
 }
 
 /**
@@ -202,6 +201,7 @@ ir_done:
 			ictx->is_in_root = TRUE;
 			ictx->actx = actx;
 			ictx->ia = NULL;
+			ictx->ir = ir;
 done:
 			ictx->entry = ie;
 			ictx->data = (u8*)ie + offsetof(INDEX_ENTRY, key);
