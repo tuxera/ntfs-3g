@@ -1640,11 +1640,11 @@ static void relocate_attributes(ntfs_resize_t *resize)
 		if (ret == -1)
 			exit(1);
 		else if (ret == 1)
-			break;
+			continue;
 
 		if (resize->mref == FILE_Bitmap && 
 		    resize->ctx->attr->type == AT_DATA)
-			break;
+			continue;
 
 		relocate_attribute(resize);
 	}
