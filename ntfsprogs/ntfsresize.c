@@ -155,6 +155,7 @@ typedef struct {
 	int dirty_inode;	     /* some inode data got relocated */
 	int shrink;		     /* shrink = 1, enlarge = 0 */
 	s64 badclusters;	     /* num of physically dead clusters */
+	VCN mft_highest_vcn;	     /* used for relocating the $MFT */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */
@@ -689,12 +690,10 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 
 	} else if (inode == FILE_MFT) {
 		llcn = &resize->last_mft;
-
 		/*
-		 *  First run of $MFT AT_DATA and $MFT with AT_ATTRIBUTE_LIST
-		 *  isn't supported yet.
+		 *  First run of $MFT AT_DATA isn't supported yet.
 		 */
-		if ((atype != AT_DATA || rl->vcn) && !NInoAttrList(resize->ni))
+		if (atype != AT_DATA || rl->vcn)
 			supported = 1;
 
 	} else if (NInoAttrList(resize->ni)) {
@@ -1625,7 +1624,56 @@ static void relocate_attribute(ntfs_resize_t *resize)
 	free(rl);
 }
 
-static void relocate_attributes(ntfs_resize_t *resize)
+static int is_mftdata(ntfs_resize_t *resize)
+{
+	if (resize->ctx->attr->type != AT_DATA)
+		return 0;
+
+	if (resize->mref == 0)
+		return 1;
+	
+	if (  MREF(resize->mrec->base_mft_record) == 0  &&
+	    MSEQNO(resize->mrec->base_mft_record) != 0)
+		return 1;
+	
+	return 0;
+}
+
+static int handle_mftdata(ntfs_resize_t *resize, int do_mftdata)
+{
+	ATTR_RECORD *attr = resize->ctx->attr;
+	VCN highest_vcn, lowest_vcn;
+	
+	if (do_mftdata) {
+		
+		if (!is_mftdata(resize))
+			return 0;
+		
+		highest_vcn = sle64_to_cpu(attr->highest_vcn);
+		lowest_vcn  = sle64_to_cpu(attr->lowest_vcn);
+		
+		if (resize->mft_highest_vcn != highest_vcn)
+			return 0;
+		
+		if (lowest_vcn == 0)
+			resize->mft_highest_vcn = lowest_vcn;
+		else
+			resize->mft_highest_vcn = lowest_vcn - 1;
+
+	} else if (is_mftdata(resize)) {
+		
+		highest_vcn = sle64_to_cpu(attr->highest_vcn);
+		
+		if (resize->mft_highest_vcn < highest_vcn)
+			resize->mft_highest_vcn = highest_vcn;
+		
+		return 0;
+	}
+
+	return 1;
+}
+
+static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 {
 	int ret;
 
@@ -1636,6 +1684,9 @@ static void relocate_attributes(ntfs_resize_t *resize)
 		if (resize->ctx->attr->type == AT_END)
 			break;
 		
+		if (handle_mftdata(resize, do_mftdata) == 0)
+			continue;
+			
 		ret = has_bad_sectors(resize, 0);
 		if (ret == -1)
 			exit(1);
@@ -1652,7 +1703,7 @@ static void relocate_attributes(ntfs_resize_t *resize)
 	ntfs_attr_put_search_ctx(resize->ctx);
 }
 
-static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref)
+static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 {
 	if (ntfs_file_record_read(resize->vol, mref, &resize->mrec, NULL)) {
 		/* FIXME: continue only if it make sense, e.g.
@@ -1668,7 +1719,7 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref)
 	resize->mref = mref;
 	resize->dirty_inode = DIRTY_NONE;
 
-	relocate_attributes(resize);
+	relocate_attributes(resize, do_mftdata);
 
 	if (resize->dirty_inode == DIRTY_INODE) {
 //		if (vol->dev->d_ops->sync(vol->dev) == -1)
@@ -1682,6 +1733,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 {
 	s64 nr_mft_records;
 	MFT_REF mref;
+	VCN highest_vcn;
 
 	printf("Relocating needed data ...\n");
 
@@ -1695,11 +1747,23 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
 
-   	for (mref = 1; mref < (MFT_REF)nr_mft_records; mref++)
-		relocate_inode(resize, mref);
+   	for (mref = 0; mref < (MFT_REF)nr_mft_records; mref++)
+		relocate_inode(resize, mref, 0);
 
-	relocate_inode(resize, 0);
+	while(1) {
+		highest_vcn = resize->mft_highest_vcn;
+		mref = nr_mft_records;
+		do {
+			relocate_inode(resize, --mref, 1);
+			if (resize->mft_highest_vcn == 0)
+				goto done;
+		} while (mref);
 
+		if (highest_vcn == resize->mft_highest_vcn)
+			err_exit("Sanity check failed! Highest_vcn = %lld. "
+				 "Please report!", highest_vcn);
+	}
+done:
 	if (resize->mrec)
 		free(resize->mrec);
 }

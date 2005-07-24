@@ -73,7 +73,6 @@ Thanks,
 **************
 
 High priority
-  - support $MFT with $ATTRIBUTE_LIST
   - support splitting up $MFT runs
   - move ntfs consistency check to libntfs (for ntfsck, ntfsclone, etc)
   - use different exit codes (e.g. corrupt volume detected, unsupported case, 

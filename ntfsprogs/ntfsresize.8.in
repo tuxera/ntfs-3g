@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright 2002-2005 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Jun 2005" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "Jul 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
@@ -159,7 +159,7 @@ Continue with the real resizing only if the test run passed.
 Support disks having physical errors, bad sectors. Make a backup by
 .BR ntfsclone (8)
 using option --rescue, then run from the command line 'chkdsk /f /r 
-volume:' on Windows prior using this option with ntfsresize. 
+volume:' on Windows prior using this option.
 
 If the guarantee is still valid for the disk then replace it. It's defected.
 .TP
@@ -181,8 +181,8 @@ don't find your answer then send your question, comment or bug report to
 but the mailing list is moderated and it can take a short time
 to approve your post. 
 .PP
-There are some very rarely met limitations at present: filesystems having 
-unknown bad sectors, highly fragmented Master File Table (MFT), relocation
+There are a few very rarely met restrictions at present: filesystems having 
+unknown bad sectors, relocation
 of the first MFT extent and resizing in the middle of some metadata
 in some cases aren't supported yet. These cases are detected and 
 resizing is refused, restricted to a safe size or the closest safe 
@@ -192,7 +192,7 @@ size is displayed.
 schedules an NTFS consistency check and
 after the first boot into Windows you must see
 .B chkdsk 
-running on a blue background. This is intentional.
+running on a blue background. This is intentional and no need to worry about it.
 Windows may force a quick reboot after the consistency check.
 Moreover after repartitioning your disk and depending on the 
 hardware configuration, the Windows message
@@ -222,7 +222,8 @@ at the University of Granada for their continuous and highly valuable help,
 furthermore to Erik Meade, Martin Fick, Sandro Hawke, Dave Croal, 
 Lorrin Nelson, Geert Hendrickx, Robert Bjorkman and Richard Burdick 
 for beta testing the relocation support, to Florian Eyben, Fritz Oppliger,
-Richard Ebling, Sid-Ahmed Touati, Jan Kiszka for the valued
+Richard Ebling, Sid-Ahmed Touati, Jan Kiszka, Benjamin Redelings, Christopher
+Haney, Ryan Durk for the valued
 contributions and to Theodore Ts'o whose 
 .BR resize2fs (8)
 man page originally formed the basis of this page.
