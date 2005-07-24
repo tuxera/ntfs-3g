@@ -96,9 +96,9 @@ typedef struct {
 } DECRYPT_SESSION;
 
 typedef struct {
-	unsigned int gcry_algo;
-	unsigned int gcry_mode;
-	char *key_data;
+	u64 desx_key[3];
+	u8 *key_data;
+	u32 alg_id;
 	gcry_cipher_hd_t gcry_cipher_hd; // handle to the decrypted FEK.
 	gcry_sexp_t sexp_key;  // the user's RSA key.
 #ifdef USE_CRYPTOAPI_RSA
@@ -430,49 +430,41 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
 	// doing it by hand after the decryption?
 
-	if (dkey->gcry_mode == GCRY_CIPHER_MODE_CBC) {
+	if (dkey->alg_id != CALG_DESX) {
 		if ((gcry_error2 = gcry_cipher_decrypt(dkey->gcry_cipher_hd,
-					data, 512, NULL, 0))) {
+				data, 512, NULL, 0)))
 			fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
-		}
 	} else {
-		u64 *pos, *end;
-		u64 k2, k3;
+		u64 *pos;
 
-		/* DesX is special. */
-		// FIXME: Need to find out which 8 bytes are the DES key...
-		pos = data;
-		end = data + (512/8);
-
-		k2 = *(u64*)dkey->key_data;
-		//k2 = *(u64*)(dkey->key_data + 8);
-		//k2 = *(u64*)(dkey->key_data + 16);
-
-		//k3 = *(u64*)(dkey->key_data);
-		k3 = *(u64*)(dkey->key_data + 8);
-		//k3 = *(u64*)(dkey->key_data + 16);
-
+		/* Set @pos to last eight bytes of sector @data. */
+		pos = (u64*)(data + 512 - 8);
 		do {
-			*pos ^= k2;
+			/* Apply in-whitening. */
+			*pos ^= dkey->desx_key[0];
+			/* Apply DES decyption. */
 			if ((gcry_error2 = gcry_cipher_decrypt(
-					dkey->gcry_cipher_hd,
-					(unsigned char*)pos, 8, NULL, 0))) {
+					dkey->gcry_cipher_hd, (u8*)pos, 8,
+					NULL, 0)))
 				fprintf(stderr, "gcry_error2 is %u.\n",
 						gcry_error2);
+			/* Apply out-whitening. */
+			*pos ^= dkey->desx_key[1];
+			if (pos == (u64*)data)
 				break;
-			}
-			*pos ^= k3;
-		} while (++pos < end);
+			*pos ^= *(pos - 1);
+			pos--;
+		} while (1);
 	}
-
-	if (dkey->gcry_algo == GCRY_CIPHER_AES256) {
-		((unsigned long long *)data)[0] ^=
+	/* Apply the IV. */
+	if (dkey->alg_id == CALG_AES) {
+		((u64*)data)[0] ^=
 				0x5816657be9161312LL + offset;
-		((unsigned long long *)data)[1] ^=
+		((u64*)data)[1] ^=
 				0x1989adbe44918961LL + offset;
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((unsigned long long *)data)[0] ^=
+		((u64*)data)[0] ^=
 				0x169119629891ad13LL + offset;
 	}
 	return 512;
@@ -488,7 +480,7 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
  *
  * FIXME: Is this endianness safe?  I think so but I may be wrong...
  */
-void desx_key_expand(u8 *src, u8* dst) {
+static void desx_key_expand(u8 *src, u8* dst) {
 	static const int salt_len = 12;
 	static const u8 *salt1 = "Dan Simon  ";
 	static const u8 *salt2 = "Scott Field";
@@ -515,85 +507,64 @@ void desx_key_expand(u8 *src, u8* dst) {
 	return;
 }
 
-static decrypt_key *decrypt_make_gcry_key(char *key_data, int gcry_algo) {
-	int gcry_length;
-	gcry_error_t gcry_error2;
+decrypt_key *decrypt_make_key(decrypt_session *session __attribute__((unused)), 
+		unsigned int data_size __attribute__((unused)),
+		unsigned char *data) {
 	DECRYPT_KEY *key;
+	unsigned int key_size, gcry_algo;
+	int gcry_length, gcry_mode;
+	gcry_error_t gcry_error2;
+
+	key_size = *(u32*)data;
 
 	if (!(key = (DECRYPT_KEY *)malloc(sizeof(DECRYPT_KEY)))) {
 		errno = -1;
 		return NULL;
 	}
 
-	key->key_data = key_data;
+	key->alg_id = *(u32*)(data + 8);
+	key->key_data = data + 16;
+	gcry_mode = GCRY_CIPHER_MODE_CBC;
 
-	switch (gcry_algo) {
-	case GCRY_CIPHER_DES_SK:
+	switch (key->alg_id) {
+	case CALG_DESX:
+		fprintf(stderr, "DESX key of %u bytes\n", key_size);
+		fprintf(stderr, "on-disk key (hex) = 0x%llx, 0x%llx\n",
+				*(u64*)key->key_data, *(u64*)(key->key_data+8));
+		desx_key_expand(key->key_data, (u8*)&key->desx_key);
+		fprintf(stderr, "expanded keys (hex) = 0x%llx, 0x%llx, "
+				"0x%llx\n", key->desx_key[0], key->desx_key[1],
+				key->desx_key[2]);
+		key->key_data = (u8*)&key->desx_key[2];
+		gcry_mode = GCRY_CIPHER_MODE_ECB;
+		gcry_length = 8;
 		gcry_algo = GCRY_CIPHER_DES;
-		key->gcry_mode = GCRY_CIPHER_MODE_ECB;
-		gcry_length = 8;
-		//key_data += 8;
-		key_data += 16;
 		break;
-	case GCRY_CIPHER_3DES:
-		key->gcry_mode = GCRY_CIPHER_MODE_CBC;
+	case CALG_3DES:
+		fprintf(stderr, "3DES Key of %u bytes\n", key_size);
 		gcry_length = 24;
+		gcry_algo = GCRY_CIPHER_3DES; 
 		break;
-	case GCRY_CIPHER_AES256:
-		key->gcry_mode = GCRY_CIPHER_MODE_CBC;
+	case CALG_AES_256:
+		fprintf(stderr, "AES Key of %u bytes\n", key_size);
 		gcry_length = 32;
-		break;
-	case GCRY_CIPHER_DES:
-		key->gcry_mode = GCRY_CIPHER_MODE_CBC;
-		gcry_length = 8;
+		gcry_algo = GCRY_CIPHER_AES256;
 		break;
 	default:
-		errno = ENOTSUP;
-		return 0;
+		fprintf(stderr, "DES key of %u bytes\n", key_size);
+		gcry_length = 8;
+		gcry_algo = GCRY_CIPHER_DES;
+		break;
 	}
-
-	if ((gcry_error2 = gcry_cipher_open(&key->gcry_cipher_hd, gcry_algo,
-				key->gcry_mode, 0)) != GPG_ERR_NO_ERROR) {
+	if ((gcry_error2 = gcry_cipher_open(&key->gcry_cipher_hd,
+			gcry_algo, gcry_mode, 0)) != GPG_ERR_NO_ERROR) {
 		fprintf(stderr, "gcry_error1 is %u.\n", gcry_error2);
 		errno = -1;
 		return 0;
 	}
-
 	if ((gcry_error2 = gcry_cipher_setkey(key->gcry_cipher_hd,
-			key_data, gcry_length))) {
+			key->key_data, gcry_length))) {
 		fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
 	}
-
-	key->gcry_algo = gcry_algo;
-
 	return (decrypt_key *)key;
-}
-
-decrypt_key *decrypt_make_key(
-		decrypt_session *session __attribute__((unused)), 
-		unsigned int data_size __attribute__((unused)),
-		void *data) {
-	unsigned int key_size, alg_id;
-	char *key_data;
-	u8 desx_key[192 / 8];
-
-	key_size = *((unsigned int *)data);
-	alg_id   = *(((unsigned int *)data) + 2);
-	key_data = (((char *)data) + 16);
-
-	switch (alg_id) {
-	case CALG_DESX:
-		fprintf(stderr, "DESX key of %u bytes\n", key_size);
-		desx_key_expand(key_data, desx_key);
-		return decrypt_make_gcry_key(desx_key, GCRY_CIPHER_DES_SK); 
-	case CALG_3DES:
-		fprintf(stderr, "3DES Key of %u bytes\n", key_size);
-		return decrypt_make_gcry_key(key_data, GCRY_CIPHER_3DES); 
-	case CALG_AES_256:
-		fprintf(stderr, "AES Key of %u bytes\n", key_size);
-		return decrypt_make_gcry_key(key_data, GCRY_CIPHER_AES256);
-	default:
-		fprintf(stderr, "DES key of %u bytes\n", key_size);
-		return decrypt_make_gcry_key(key_data, GCRY_CIPHER_DES);
-	}
 }
