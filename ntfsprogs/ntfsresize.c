@@ -522,7 +522,7 @@ static int parse_options(int argc, char **argv)
 	return (!err && !help && !ver);
 }
 
-static void __print_advise(ntfs_volume *vol, s64 supp_lcn)
+static void print_advise(ntfs_volume *vol, s64 supp_lcn)
 {
 	s64 old_b, new_b, freed_b, old_mb, new_mb, freed_mb;
 
@@ -556,11 +556,7 @@ static void __print_advise(ntfs_volume *vol, s64 supp_lcn)
 	else
 	    printf("%lld bytes", (long long)freed_b);
 	printf(").\n");
-}
 
-static void print_advise(ntfs_volume *vol, s64 supp_lcn)
-{
-	__print_advise(vol, supp_lcn);
 	printf("Please make a test run using both the -n and -s options "
 	       "before real resizing!\n");
 }
@@ -1107,7 +1103,7 @@ static void set_resize_constraints(ntfs_resize_t *resize)
 	s64 nr_mft_records, inode;
 	ntfs_inode *ni;
 
-	printf("Collecting shrinkage constraints ...\n");
+	printf("Collecting resizing constraints ...\n");
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
@@ -1786,16 +1782,15 @@ static void advise_on_resize(ntfs_resize_t *resize)
 {
 	ntfs_volume *vol = resize->vol;
 
-	printf("Estimating smallest shrunken size supported ...\n");
-
-	printf("File feature         Last used at      By inode\n");
-	print_hint(vol, "$MFT", resize->last_mft);
-	print_hint(vol, "Multi-Record", resize->last_multi_mft);
 	if (opt.verbose) {
-		print_hint(vol, "$MFTMirr", resize->last_mftmir);
-		print_hint(vol, "Compressed", resize->last_compressed);
-		print_hint(vol, "Sparse", resize->last_sparse);
-		print_hint(vol, "Ordinary", resize->last_lcn);
+		printf("Estimating smallest shrunken size supported ...\n");
+		printf("File feature         Last used at      By inode\n");
+		print_hint(vol, "$MFT", 	resize->last_mft);
+		print_hint(vol, "Multi-Record", resize->last_multi_mft);
+		print_hint(vol, "$MFTMirr", 	resize->last_mftmir);
+		print_hint(vol, "Compressed", 	resize->last_compressed);
+		print_hint(vol, "Sparse", 	resize->last_sparse);
+		print_hint(vol, "Ordinary", 	resize->last_lcn);
 	}
 
 	print_advise(vol, resize->last_unsupp);
