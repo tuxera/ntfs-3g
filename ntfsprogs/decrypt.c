@@ -232,6 +232,7 @@ decrypt_key *decrypt_user_key_open(decrypt_session *session
 		goto decrypt_key_open_err;
 	}
 
+	key_size = sizeof(key_blob);
 	if (!CryptExportKey(hCryptKey, 0, PRIVATEKEYBLOB, 0, key_blob, &key_size)) {
 		fprintf(stderr, "Could not export key: Error 0x%x\n",
 					(unsigned int)GetLastError());
@@ -423,14 +424,12 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 	gcry_error_t gcry_error2;
 	DECRYPT_KEY *dkey = (DECRYPT_KEY *)key;
 
-	if ((gcry_error2 = gcry_cipher_reset(dkey->gcry_cipher_hd))) {
-		fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
-	}
-
 	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
 	// doing it by hand after the decryption?
 
 	if (dkey->alg_id != CALG_DESX) {
+		if ((gcry_error2 = gcry_cipher_reset(dkey->gcry_cipher_hd)))
+			fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
 		if ((gcry_error2 = gcry_cipher_decrypt(dkey->gcry_cipher_hd,
 				data, 512, NULL, 0)))
 			fprintf(stderr, "gcry_error2 is %u.\n", gcry_error2);
@@ -440,6 +439,10 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 		/* Set @pos to last eight bytes of sector @data. */
 		pos = (u64*)(data + 512 - 8);
 		do {
+			if ((gcry_error2 = gcry_cipher_reset(
+					dkey->gcry_cipher_hd)))
+				fprintf(stderr, "gcry_error2 is %u.\n",
+						gcry_error2);
 			/* Apply in-whitening. */
 			*pos ^= dkey->desx_key[0];
 			/* Apply DES decyption. */
@@ -457,15 +460,12 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 		} while (1);
 	}
 	/* Apply the IV. */
-	if (dkey->alg_id == CALG_AES) {
-		((u64*)data)[0] ^=
-				0x5816657be9161312LL + offset;
-		((u64*)data)[1] ^=
-				0x1989adbe44918961LL + offset;
+	if (dkey->alg_id == CALG_AES_256) {
+		((u64*)data)[0] ^= 0x5816657be9161312LL + offset;
+		((u64*)data)[1] ^= 0x1989adbe44918961LL + offset;
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((u64*)data)[0] ^=
-				0x169119629891ad13LL + offset;
+		((u64*)data)[0] ^= 0x169119629891ad13LL + offset;
 	}
 	return 512;
 }
