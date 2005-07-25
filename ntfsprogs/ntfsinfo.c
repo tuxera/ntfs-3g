@@ -1086,7 +1086,6 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 	int numb_entries = 1;
 	char *name = NULL;
 
-	Vprintf("\tDumping index entries:");
 	while(1) {
 		if (!opts.verbose) {
 			if (entry->flags & INDEX_ENTRY_END)
@@ -1103,6 +1102,10 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 				le16_to_cpu(entry->key_length));
 		Vprintf("\t\tFlags:\t\t\t 0x%02x\n", le16_to_cpu(entry->flags));
 
+		if (entry->flags & INDEX_ENTRY_NODE)
+			Vprintf("\t\tSubnode VCN:\t\t %lld\n", le64_to_cpu(
+					*((u8*)entry + le16_to_cpu(
+					entry->length) - sizeof(VCN))));
 		if (entry->flags & INDEX_ENTRY_END)
 			break;
 
@@ -1224,6 +1227,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
+	Vprintf("\tDumping index block:");
 	printf("\tIndex entries total:\t %d\n",
 			ntfs_dump_index_entries(entry, index_root->type));
 }
@@ -1344,6 +1348,12 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
+			Vprintf("\tDumping index block "
+					"(VCN %lld, used %u/%u):", le64_to_cpu(
+					tmp_alloc->index_block_vcn),
+					le32_to_cpu(tmp_alloc->index.
+					index_length), le32_to_cpu(tmp_alloc->
+					index.allocated_size));
 			total_entries += ntfs_dump_index_entries(entry, type);
 			total_indx_blocks++;
 		}

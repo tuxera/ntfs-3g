@@ -262,7 +262,7 @@ int main (int argc, char *argv[])
 	u64 offset;
 	char *buf;
 	s64 br, bw;
-	ntfschar *attr_name = AT_UNNAMED;
+	ntfschar *attr_name;
 	int attr_name_len = 0;
 
 	if (!parse_options(argc, argv))
@@ -363,12 +363,14 @@ int main (int argc, char *argv[])
 	}
 
 	if (opts.attr_name) {
+		attr_name = NULL;
 		attr_name_len = ntfs_mbstoucs(opts.attr_name, &attr_name, 0);
 		if (attr_name_len == -1) {
 			perror("ERROR: Failed to parse attribute name");
 			goto close_dst;
 		}
-	}
+	} else
+		attr_name = AT_UNNAMED;
 	na = ntfs_attr_open(out, opts.attribute, attr_name, attr_name_len);
 	if (!na) {
 		if (errno != ENOENT) {
@@ -383,6 +385,8 @@ int main (int argc, char *argv[])
 			goto close_dst;
 		}
 	}
+	if (attr_name != AT_UNNAMED)
+		free(attr_name);
 
 	Vprintf("Old file size: %lld\n", na->data_size);
 	if (na->data_size != new_size) {

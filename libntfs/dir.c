@@ -938,7 +938,7 @@ find_next_index_buffer:
 		}
 	}
 
-	Dprintf("Handling index block 0x%llx.", (long long)bmp_pos);
+	Dprintf("Handling index block 0x%llx.\n", (long long)bmp_pos);
 
 	/* Read the index block starting at bmp_pos. */
 	br = ntfs_attr_mst_pread(ia_na, bmp_pos << index_block_size_bits, 1,

@@ -2221,7 +2221,7 @@ typedef struct {
 	//		   follows the INDEX_ENTRY_HEADER. Regardless of
 	//		   key_length, the address of the 8-byte boundary
 	//		   aligned vcn of INDEX_ENTRY{_HEADER} *ie is given by
-	//		   (char*)ie + le16_to_cpu(ie*)->length) - sizeof(VCN),
+	//		   (char*)ie + le16_to_cpu(ie->length) - sizeof(VCN),
 	//		   where sizeof(VCN) can be hardcoded as 8 if wanted. */
 } __attribute__ ((__packed__)) INDEX_ENTRY;
 
