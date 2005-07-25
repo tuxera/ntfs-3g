@@ -759,16 +759,10 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 		start = new_vol_size;
 		len = lcn_length - (new_vol_size - lcn);
 
-		if (!opt.info && (inode == FILE_MFT || inode == FILE_MFTMirr)) {
-			s64 last_lcn;
-
-			err_printf("$MFT%s can't be split up yet. Please try "
-				   "a different size.\n", inode ? "Mirr" : "");
-			last_lcn = lcn + lcn_length - 1;
-			if (!(inode == FILE_MFT && rl->vcn == 0) && 
-			    lcn - 1 >= resize->inuse)
-				__print_advise(resize->vol, lcn - 1);
-			print_advise(resize->vol, last_lcn);
+		if (!opt.info && (inode == FILE_MFTMirr)) {
+			err_printf("$MFTMirr can't be split up yet. Please try "
+				   "a different size.\n");
+			print_advise(resize->vol, lcn + lcn_length - 1);
 			exit(1);
 		}
 	}

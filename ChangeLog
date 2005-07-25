@@ -10,7 +10,9 @@ xx/xx/xxxx - 1.12.0-WIP
 	  record attributes at AT_DATA of $BadClus and $Bitmap. In practice, 
 	  there aren't non-resident attributes after them so this bug,
 	  introduced in 1.11.0, shouldn't have ever caused data loss.  (Szaka)
-	- ntfsresize: support relocation of $MFT with $ATTRIBUTE_LIST. (Szaka)
+	- ntfsresize: support relocation of $MFT with $ATTRIBUTE_LIST.  (Szaka)
+	- ntfsresize: support resizing into the middle of a $MFT $DATA
+	  extent. (Szaka)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 

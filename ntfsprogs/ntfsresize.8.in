@@ -183,9 +183,9 @@ to approve your post.
 .PP
 There are a few very rarely met restrictions at present: filesystems having 
 unknown bad sectors, relocation
-of the first MFT extent and resizing in the middle of some metadata
-in some cases aren't supported yet. These cases are detected and 
-resizing is refused, restricted to a safe size or the closest safe 
+of the first MFT extent and resizing into the middle of a $MFTMirr extent
+aren't supported yet. These cases are detected and 
+resizing is restricted to a safe size or the closest safe 
 size is displayed.
 .PP
 .B Ntfsresize
