@@ -444,7 +444,7 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 				fprintf(stderr, "gcry_error2 is %u.\n",
 						gcry_error2);
 			/* Apply in-whitening. */
-			*pos ^= dkey->desx_key[0];
+			*pos ^= dkey->desx_key[2];
 			/* Apply DES decyption. */
 			if ((gcry_error2 = gcry_cipher_decrypt(
 					dkey->gcry_cipher_hd, (u8*)pos, 8,
@@ -535,7 +535,7 @@ decrypt_key *decrypt_make_key(decrypt_session *session __attribute__((unused)),
 		fprintf(stderr, "expanded keys (hex) = 0x%llx, 0x%llx, "
 				"0x%llx\n", key->desx_key[0], key->desx_key[1],
 				key->desx_key[2]);
-		key->key_data = (u8*)&key->desx_key[2];
+		key->key_data = (u8*)&key->desx_key[0];
 		gcry_mode = GCRY_CIPHER_MODE_ECB;
 		gcry_length = 8;
 		gcry_algo = GCRY_CIPHER_DES;
