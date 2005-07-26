@@ -419,6 +419,8 @@ unsigned int decrypt_decrypt(decrypt_key *key, unsigned int data_size,
 #endif // USER_CRYPTOAPI_RSA (else)
 }
 
+static BOOL is_first = TRUE;
+
 unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 			unsigned long long offset) {
 	gcry_error_t gcry_error2;
@@ -426,6 +428,8 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 
 	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
 	// doing it by hand after the decryption?
+	// It wants iv length 8 but we give it 16 for AES256 so it does not
+	// like it...
 
 	if (dkey->alg_id != CALG_DESX) {
 		if ((gcry_error2 = gcry_cipher_reset(dkey->gcry_cipher_hd)))
@@ -443,20 +447,45 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
 					dkey->gcry_cipher_hd)))
 				fprintf(stderr, "gcry_error2 is %u.\n",
 						gcry_error2);
+			if (is_first) {
+				fprintf(stderr, "encrypted data = 0x%llx\n",
+						*pos);
+				fprintf(stderr, "in-whitening = 0x%llx\n",
+						dkey->desx_key[1]);
+			}
 			/* Apply in-whitening. */
-			*pos ^= dkey->desx_key[2];
+			*pos ^= dkey->desx_key[1];
+			if (is_first)
+				fprintf(stderr, "whitened data = 0x%llx\n",
+						*pos);
 			/* Apply DES decyption. */
 			if ((gcry_error2 = gcry_cipher_decrypt(
 					dkey->gcry_cipher_hd, (u8*)pos, 8,
 					NULL, 0)))
 				fprintf(stderr, "gcry_error2 is %u.\n",
 						gcry_error2);
+			if (is_first) {
+				fprintf(stderr, "data after des = 0x%llx\n",
+						*pos);
+				fprintf(stderr, "out-whitening = 0x%llx\n",
+						dkey->desx_key[2]);
+			}
 			/* Apply out-whitening. */
-			*pos ^= dkey->desx_key[1];
+			*pos ^= dkey->desx_key[2];
+			if (is_first)
+				fprintf(stderr, "out-whitened data = 0x%llx\n",
+						*pos);
 			if (pos == (u64*)data)
 				break;
+			if (is_first)
+				fprintf(stderr, "next encrypted data = "
+						"0x%llx\n", *(pos - 1));
 			*pos ^= *(pos - 1);
+			if (is_first)
+				fprintf(stderr, "decrypted data = 0x%llx\n",
+						*pos);
 			pos--;
+			is_first = FALSE;
 		} while (1);
 	}
 	/* Apply the IV. */
@@ -480,7 +509,7 @@ unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
  *
  * FIXME: Is this endianness safe?  I think so but I may be wrong...
  */
-static void desx_key_expand(u8 *src, u8* dst) {
+static void desx_key_expand(const u8 *src, u8* dst) {
 	static const int salt_len = 12;
 	static const u8 *salt1 = "Dan Simon  ";
 	static const u8 *salt2 = "Scott Field";
@@ -507,6 +536,82 @@ static void desx_key_expand(u8 *src, u8* dst) {
 	return;
 }
 
+#define DO_CRYPTO_TESTS 1
+
+#ifdef DO_CRYPTO_TESTS
+/* Do not remove this test code from this file! AIA */
+static BOOL desx_key_expand_test(void) {
+	const u8 known_desx_on_disk_key[16] = {
+			0xa1, 0xf9, 0xe0, 0xb2, 0x53, 0x23, 0x9e, 0x8f,
+			0x0f, 0x91, 0x45, 0xd9, 0x8e, 0x20, 0xec, 0x30 };
+	const u8 known_desx_expanded_key[24] = {
+			0x27, 0xd1, 0x93, 0x09, 0xcb, 0x78, 0x93, 0x1f,
+			0xed, 0xda, 0x4c, 0x47, 0x60, 0x49, 0xdb, 0x8d,
+			0x75, 0xf6, 0xa0, 0x1a, 0xc0, 0xca, 0x28, 0x1e };
+	u8 test_desx_expanded_key[24];
+	int res;
+
+	desx_key_expand(known_desx_on_disk_key, test_desx_expanded_key);
+	res = !memcmp(test_desx_expanded_key, known_desx_expanded_key,
+			sizeof(known_desx_expanded_key));
+	fprintf(stderr, "Testing whether desx_key_expand() works: %s\n",
+		res ? "SUCCESS" : "FAILED");
+	return res;
+}
+
+static BOOL des_test(void) {
+	const u8 known_des_key[8] = {
+			0x27, 0xd1, 0x93, 0x09, 0xcb, 0x78, 0x93, 0x1f };
+	const u8 known_des_encrypted_data[8] = {
+			0xdc, 0xf7, 0x68, 0x2a, 0xaf, 0x48, 0x53, 0x0f };
+	const u8 known_decrypted_data[8] = {
+			0xd8, 0xd9, 0x15, 0x23, 0x5b, 0x88, 0x0e, 0x09 };
+	u8 test_decrypted_data[8];
+	int res;
+	gcry_error_t gcry_error2;
+	gcry_cipher_hd_t gcry_cipher_hd;
+
+	if ((gcry_error2 = gcry_cipher_open(&gcry_cipher_hd, GCRY_CIPHER_DES,
+			GCRY_CIPHER_MODE_ECB, 0)) != GPG_ERR_NO_ERROR) {
+		fprintf(stderr, "Failed to open des cipher (gcry_error2 is "
+				"%u).\n", gcry_error2);
+		return FALSE;
+	}
+	if ((gcry_error2 = gcry_cipher_setkey(gcry_cipher_hd,
+			known_des_key, sizeof(known_des_key)))) {
+		fprintf(stderr, "Failed to set des key (gcry_error2 is %u).\n",
+				gcry_error2);
+		gcry_cipher_close(gcry_cipher_hd);
+		return FALSE;
+	}
+	memcpy(test_decrypted_data, known_des_encrypted_data,
+			sizeof(known_des_encrypted_data));
+	/* Apply DES decyption. */
+	gcry_error2 = gcry_cipher_decrypt(gcry_cipher_hd,
+			test_decrypted_data, sizeof(test_decrypted_data),
+			NULL, 0);
+	gcry_cipher_close(gcry_cipher_hd);
+	if (gcry_error2) {
+		fprintf(stderr, "Failed to des decrypt test data (gcry_error2 "
+				"is %u).\n", gcry_error2);
+		return FALSE;
+	}
+	res = !memcmp(test_decrypted_data, known_decrypted_data,
+			sizeof(known_decrypted_data));
+	fprintf(stderr, "Testing whether des decryption works: %s\n",
+		res ? "SUCCESS" : "FAILED");
+	return res;
+}
+
+#else
+static inline BOOL desx_key_expand_test(void) {
+	return TRUE;
+}
+static inline BOOL des_test(void) {
+	return TRUE;
+}
+#endif
+
 decrypt_key *decrypt_make_key(decrypt_session *session __attribute__((unused)), 
 		unsigned int data_size __attribute__((unused)),
 		unsigned char *data) {
@@ -528,17 +633,30 @@ decrypt_key *decrypt_make_key(decrypt_session *session __attribute__((unused)),
 
 	switch (key->alg_id) {
 	case CALG_DESX:
+		if (!desx_key_expand_test()) {
+			free(key);
+			errno = -1;
+			return NULL;
+		}
 		fprintf(stderr, "DESX key of %u bytes\n", key_size);
 		fprintf(stderr, "on-disk key (hex) = 0x%llx, 0x%llx\n",
 				*(u64*)key->key_data, *(u64*)(key->key_data+8));
 		desx_key_expand(key->key_data, (u8*)&key->desx_key);
-		fprintf(stderr, "expanded keys (hex) = 0x%llx, 0x%llx, "
-				"0x%llx\n", key->desx_key[0], key->desx_key[1],
+		fprintf(stderr, "expanded keys (hex) =\n\t0x%llx (des)\n\t"
+				"0x%llx (in-whitening)\n\t"
+				"0x%llx (out-whitening)\n", key->desx_key[0],
+				key->desx_key[1],
 				key->desx_key[2]);
+		if (!des_test()) {
+			free(key);
+			errno = -1;
+			return NULL;
+		}
 		key->key_data = (u8*)&key->desx_key[0];
 		gcry_mode = GCRY_CIPHER_MODE_ECB;
 		gcry_length = 8;
 		gcry_algo = GCRY_CIPHER_DES;
+		is_first = TRUE;
 		break;
 	case CALG_3DES:
 		fprintf(stderr, "3DES Key of %u bytes\n", key_size);
@@ -552,6 +670,11 @@ decrypt_key *decrypt_make_key(decrypt_session *session __attribute__((unused)),
 		break;
 	default:
 		fprintf(stderr, "DES key of %u bytes\n", key_size);
+		if (!des_test()) {
+			free(key);
+			errno = -1;
+			return NULL;
+		}
 		gcry_length = 8;
 		gcry_algo = GCRY_CIPHER_DES;
 		break;
