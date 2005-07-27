@@ -210,13 +210,14 @@ static int parse_options(int argc, char **argv)
 /**
  * cat
  */
-static int cat_decrypt(ntfs_inode *inode, decrypt_key *fek)
+static int cat_decrypt(ntfs_inode *inode, ntfs_decrypt_data_key *fek)
 {
 	int bufsize = 512;
 	char *buffer;
 	ntfs_attr *attr;
 	s64 bytes_read, written, offset, total;
-	unsigned int i;
+	s64 old_data_size, old_initialized_size;
+	unsigned i;
 
 	buffer = malloc(bufsize);
 	if (!buffer)
@@ -233,6 +234,8 @@ static int cat_decrypt(ntfs_inode *inode, decrypt_key *fek)
 	// clear the encrypted bit, otherwise the library won't allow reading.
 	NAttrClearEncrypted(attr);
 	// extend the size, we may need to read past the end of the stream.
+	old_data_size = attr->data_size;
+	old_initialized_size = attr->initialized_size;
 	attr->data_size = attr->initialized_size = attr->allocated_size;
 
 	offset = 0;
@@ -244,8 +247,8 @@ static int cat_decrypt(ntfs_inode *inode, decrypt_key *fek)
 		}
 		if (!bytes_read)
 			break;
-		if ((i = decrypt_decrypt_sector(fek, buffer, offset)) <
-				bytes_read) {
+		if ((i = ntfs_decrypt_data_key_decrypt_sector(fek, buffer,
+				offset)) < bytes_read) {
 			perror("ERROR: Couldn't decrypt all data!");
 			Eprintf("%u/%lld/%lld/%lld\n", i, (long long)bytes_read,
 					(long long)offset, (long long)total);
@@ -261,6 +264,9 @@ static int cat_decrypt(ntfs_inode *inode, decrypt_key *fek)
 		offset += bytes_read;
 		total -= bytes_read;
 	}
+	attr->data_size = old_data_size;
+	attr->initialized_size = old_initialized_size;
+	NAttrSetEncrypted(attr);
 	ntfs_attr_close(attr);
 	free(buffer);
 	return 0;
@@ -269,41 +275,44 @@ static int cat_decrypt(ntfs_inode *inode, decrypt_key *fek)
 /**
  * get_fek
  */
-static decrypt_key *get_fek(ntfs_inode * inode)
+static ntfs_decrypt_data_key *get_fek(ntfs_inode *inode)
 {
 	ntfs_attr *na;
-	char *efs_buffer, *ddf, *certificate, *hash_data, *fek_buf;
+	unsigned char *efs_buffer, *ddf, *certificate, *hash_data, *fek_buf;
 	u32 ddf_count, hash_size, fek_size;
-	unsigned int i;
-	decrypt_session *session;
-	decrypt_key *key;
+	unsigned i;
+	ntfs_decrypt_user_key_session *session;
+	ntfs_decrypt_user_key *key;
 
-	/* obtain the $EFS contents */
+	/* Obtain the $EFS contents. */
 	na = ntfs_attr_open(inode, AT_LOGGED_UTILITY_STREAM,
 			EFS, EFS_name_length);
 	if (!na) {
-		perror("Error");
+		perror("Failed to open $EFS attribute");
 		return NULL;
 	}
 	efs_buffer = malloc(na->data_size);
 	if (!efs_buffer) {
-		perror("malloc failed");
+		perror("Failed to allocate internal buffer");
+		ntfs_attr_close(na);
 		return NULL;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, efs_buffer) !=
 			na->data_size) {
-		perror("ntfs_attr_pread failed");
+		perror("Failed to read $EFS attribute");
 		free(efs_buffer);
+		ntfs_attr_close(na);
 		return NULL;
 	}
 	ntfs_attr_close(na);
 
 	/* Init the CryptoAPI. */
-	if (!(session = decrypt_open())) {
-		perror("Could not init the cryptoAPI.");
+	if (!(session = ntfs_decrypt_user_key_session_open())) {
+		perror("Failed to initialize the cryptoAPI");
+		free(efs_buffer);
 		return NULL;
 	}
-	/* Iterate through the DDFs & DRFs until you obtain a key. */
+	/* Iterate through the DDFs & DRFs until we obtain a key. */
 	ddf = efs_buffer + le32_to_cpu(*(u32*)(efs_buffer + 0x40));
 	ddf_count = le32_to_cpu(*(u32*)ddf);
 
@@ -315,32 +324,32 @@ static decrypt_key *get_fek(ntfs_inode * inode)
 					le32_to_cpu(*(u32*)(ddf + 0x18)));
 		else
 			certificate = (ddf + 0x30);
-
-		hash_size = (unsigned int)le32_to_cpu(*(u32*)certificate);
-		hash_data = certificate + (unsigned int)
+		hash_size = (unsigned)le32_to_cpu(*(u32*)certificate);
+		hash_data = certificate + (unsigned)
 				le32_to_cpu(*(u32*)(certificate + 0x04));
-		fek_size = (unsigned int)le32_to_cpu(*(u32*)(ddf + 0x08));
-		fek_buf = ddf + (unsigned int)le32_to_cpu(*(u32*)(ddf + 0x0c));
+		fek_size = (unsigned)le32_to_cpu(*(u32*)(ddf + 0x08));
+		fek_buf = ddf + (unsigned)le32_to_cpu(*(u32*)(ddf + 0x0c));
+		if ((key = ntfs_decrypt_user_key_open(session, hash_data,
+				hash_size))) {
+			fek_size = ntfs_decrypt_user_key_decrypt(key, fek_buf,
+					fek_size);
+			ntfs_decrypt_user_key_close(key);
+			if (fek_size) {
+				ntfs_decrypt_data_key *fek;
 
-		if ((key = decrypt_user_key_open(session, hash_size,
-				hash_data))) {
-			if ((fek_size = decrypt_decrypt(key, fek_size,
-					fek_buf)))
-				return decrypt_make_key(session, fek_size,
-						fek_buf);
-			perror("error decrypting the FEK.");
-			decrypt_user_key_close(key);
-			decrypt_close(session);
-			errno = -1;
-			return NULL;
-			decrypt_user_key_close(key);
+				ntfs_decrypt_user_key_session_close(session);
+				fek = ntfs_decrypt_data_key_open(fek_buf,
+						fek_size);
+				free(efs_buffer);
+				return fek;
+			}
+			fprintf(stderr, "Failed to decrypt the FEK.\n");
 		} else
-			Eprintf("Could not open key.\n");
-
+			perror("Failed to open user key");
 		ddf = ddf + le32_to_cpu(*(u32*)(ddf + 0x08)) +
 				le32_to_cpu(*(u32*)(ddf + 0x0c));
 	}
-	decrypt_close(session);
+	ntfs_decrypt_user_key_session_close(session);
 	return NULL;
 }
 
@@ -356,7 +365,7 @@ int main(int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	ntfs_inode *inode;
-	decrypt_key *fek;
+	ntfs_decrypt_data_key *fek;
 	int result = 1;
 
 	if (!parse_options(argc, argv))
@@ -381,7 +390,7 @@ int main(int argc, char *argv[])
 	fek = get_fek(inode);
 	if (fek) {
 		result = cat_decrypt(inode, fek);
-		decrypt_user_key_close(fek);
+		ntfs_decrypt_data_key_close(fek);
 	} else {
 		Eprintf("Could not obtain FEK.\n");
 		result = 1;

@@ -1,8 +1,9 @@
 /*
- * decrypt.h - interface for decryption rutines.
- * Part of the Linux-NTFS project.
+ * decrypt.h - Interface for decryption rutines.  Part of the Linux-NTFS
+ *	       project.
  *
  * Copyright (c) 2005 Yuval Fledel
+ * Copyright (c) 2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,20 +24,27 @@
 #ifndef _NTFS_DECRYPT_H
 #define _NTFS_DECRYPT_H
 
-typedef void *decrypt_session;
-typedef void *decrypt_key;
+typedef void *ntfs_decrypt_user_key_session;
+typedef void *ntfs_decrypt_user_key;
+typedef void *ntfs_decrypt_data_key;
 
-extern decrypt_session *decrypt_open(void);
-extern void decrypt_close(decrypt_session * session);
-extern decrypt_key *decrypt_user_key_open(decrypt_session * session,
-		int thumb_size, void *thumb_print);
-extern void decrypt_user_key_close(decrypt_key * key);
-extern unsigned int decrypt_decrypt(decrypt_key * key, unsigned int data_size,
-		unsigned char *data);
-extern unsigned int decrypt_decrypt_sector(decrypt_key * key, void *data,
-		unsigned long long offset);
-extern decrypt_key *decrypt_make_key(decrypt_session * session,
-		unsigned int data_size, unsigned char *data);
-extern int decrypt_get_block_size(decrypt_key * key);
+extern ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void);
+extern void ntfs_decrypt_user_key_session_close(
+		ntfs_decrypt_user_key_session *session);
+
+extern ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
+		ntfs_decrypt_user_key_session *session,
+		unsigned char *thumb_print, unsigned thumb_size);
+extern void ntfs_decrypt_user_key_close(ntfs_decrypt_user_key *key);
+
+extern unsigned ntfs_decrypt_user_key_decrypt(ntfs_decrypt_user_key *key,
+		unsigned char *data, unsigned data_size);
+
+extern ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
+		unsigned data_size);
+extern void ntfs_decrypt_data_key_close(ntfs_decrypt_data_key *key);
+
+extern unsigned ntfs_decrypt_data_key_decrypt_sector(ntfs_decrypt_data_key *key,
+		unsigned char *data, unsigned long long offset);
 
 #endif /* defined _NTFS_DECRYPT_H */
