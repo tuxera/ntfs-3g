@@ -1,5 +1,5 @@
 /*
- * decrypt.c - $EFS decryption routined.  Part of the Linux-NTFS project.
+ * decrypt.c - $EFS decryption routines.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2005 Anton Altaparmakov
