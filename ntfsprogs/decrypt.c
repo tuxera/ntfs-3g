@@ -161,7 +161,8 @@ ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 		return NULL;
 	}
 	if (!(hSystemStore = fnCertOpenStore(((LPCSTR)CERT_STORE_PROV_SYSTEM),
-			0, NULL, CERT_SYSTEM_STORE_CURRENT_USER, L"MY"))) {
+			0, (HCRYPTPROV)NULL, CERT_SYSTEM_STORE_CURRENT_USER,
+			L"MY"))) {
 		fprintf(stderr, "Could not open system store.\n");
 		errno = EINVAL;
 		return NULL;
@@ -193,6 +194,18 @@ void ntfs_decrypt_user_key_session_close(ntfs_decrypt_user_key_session *session)
 	free(session);
 }
 
+static inline void reverse_buffer(unsigned char *buf, unsigned buf_size)
+{
+	unsigned char t;
+	unsigned i;
+
+	for (i = 0; i < buf_size / 2; i++) {
+		t = buf[i];
+		buf[i] = buf[buf_size - i - 1];
+		buf[buf_size - i - 1] = t;
+	}
+}
+
 ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 		ntfs_decrypt_user_key_session *session __attribute__((unused)),
 		unsigned char *thumb_print, unsigned thumb_size)
@@ -220,7 +233,7 @@ ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 	hash_blob.pbData = thumb_print;
 
 	if (!(pCert = fnCertFindCertificateInStore(
-			((DECRYPT_SESSION*)session)->hSystemStore,
+			((NTFS_DECRYPT_USER_KEY_SESSION*)session)->hSystemStore,
 			(PKCS_7_ASN_ENCODING | X509_ASN_ENCODING), 0,
 			CERT_FIND_HASH, &hash_blob, NULL))) {
 		fprintf(stderr, "Could not find cert in store.\n");
@@ -287,7 +300,8 @@ ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 		errno = EINVAL;
 		return NULL;
 	}
-	if ((key = (decrypt_key*)malloc(sizeof(NTFS_DECRYPT_USER_KEY))))
+	if ((key = (ntfs_decrypt_user_key*)malloc(
+			sizeof(NTFS_DECRYPT_USER_KEY))))
 		((NTFS_DECRYPT_USER_KEY*)key)->sexp_key = sexp_key;
 	// todo: release all
 	return key;
@@ -305,18 +319,6 @@ void ntfs_decrypt_user_key_close(ntfs_decrypt_user_key *key)
 {
 	gcry_sexp_release(((NTFS_DECRYPT_USER_KEY*)key)->sexp_key);
 	free(key);
-}
-
-static inline void reverse_buffer(unsigned char *buf, unsigned buf_size)
-{
-	unsigned char t;
-	unsigned i;
-
-	for (i = 0; i < buf_size / 2; i++) {
-		t = buf[i];
-		buf[i] = buf[buf_size - i - 1];
-		buf[buf_size - i - 1] = t;
-	}
 }
 
 /**
