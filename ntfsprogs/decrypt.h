@@ -27,16 +27,16 @@ typedef void *decrypt_session;
 typedef void *decrypt_key;
 
 extern decrypt_session *decrypt_open(void);
-extern void decrypt_close(decrypt_session *session);
-extern decrypt_key *decrypt_user_key_open(decrypt_session *session, 
-			int thumb_size, void *thumb_print);
-extern void decrypt_user_key_close(decrypt_key *key);
-extern unsigned int decrypt_decrypt(decrypt_key *key, unsigned int data_size, 
-					unsigned char *data);
-extern unsigned int decrypt_decrypt_sector(decrypt_key *key, void *data,
-			unsigned long long offset);
-extern decrypt_key *decrypt_make_key(decrypt_session *session,
-			unsigned int data_size, unsigned char *data);
-extern int decrypt_get_block_size(decrypt_key *key);
+extern void decrypt_close(decrypt_session * session);
+extern decrypt_key *decrypt_user_key_open(decrypt_session * session,
+		int thumb_size, void *thumb_print);
+extern void decrypt_user_key_close(decrypt_key * key);
+extern unsigned int decrypt_decrypt(decrypt_key * key, unsigned int data_size,
+		unsigned char *data);
+extern unsigned int decrypt_decrypt_sector(decrypt_key * key, void *data,
+		unsigned long long offset);
+extern decrypt_key *decrypt_make_key(decrypt_session * session,
+		unsigned int data_size, unsigned char *data);
+extern int decrypt_get_block_size(decrypt_key * key);
 
 #endif /* defined _NTFS_DECRYPT_H */
