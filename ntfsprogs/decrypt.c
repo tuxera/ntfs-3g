@@ -172,6 +172,7 @@ ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 #ifdef __CYGWIN__
 	((NTFS_DECRYPT_USER_KEY_SESSION*)session)->hSystemStore = hSystemStore;
 #endif /* defined(__CYGWIN__) */
+	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
 	return session;
 }
 
@@ -265,6 +266,7 @@ ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 		errno = -1;
 		return NULL;
 	}
+	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
 	e = gcry_mpi_set_ui(NULL, rsa_pub_key->pubexp);
 	mpi_data = (key_blob + 0x14);
 	size = rsa_pub_key->bitlen / 8;
@@ -464,6 +466,10 @@ static void ntfs_desx_decrypt(void *context, u8 *outbuf, const u8 *inbuf)
 	ntfs_desx_ctx *ctx = context;
 	gcry_error_t err;
 
+	err = gcry_cipher_reset(ctx->gcry_cipher_hd);
+	if (err != GPG_ERR_NO_ERROR)
+		fprintf(stderr, "Failed to reset des cipher (error 0x%x).\n",
+				err);
 	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->out_whitening;
 	err = gcry_cipher_encrypt(ctx->gcry_cipher_hd, outbuf, 8, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR)
@@ -595,6 +601,7 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 	key->des_gcry_cipher_hd_ptr = (gcry_cipher_hd_t*)(key->key_data +
 			((key_size + 7) & ~7));
 	*key->des_gcry_cipher_hd_ptr = NULL;
+	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
 	switch (key->alg_id) {
 	case CALG_DESX:
 		/* FIXME: This really needs locking so it is safe from races. */
@@ -614,7 +621,6 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 				errno = EINVAL;
 				return NULL;
 			}
-			gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
 		}
 		wanted_key_size = 16;
 		gcry_algo = ntfs_desx_algorithm_id;
@@ -689,13 +695,16 @@ unsigned ntfs_decrypt_data_key_decrypt_sector(ntfs_decrypt_data_key *key,
 	NTFS_DECRYPT_DATA_KEY *dkey = (NTFS_DECRYPT_DATA_KEY*)key;
 	gcry_error_t err;
 
+	err = gcry_cipher_reset(dkey->gcry_cipher_hd);
+	if (err != GPG_ERR_NO_ERROR)
+		fprintf(stderr, "Failed to reset cipher (error 0x%x).\n", err);
 	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
 	// doing it by hand after the decryption?
 	// It wants iv length 8 but we give it 16 for AES256 so it does not
 	// like it...
 	if ((err = gcry_cipher_decrypt(dkey->gcry_cipher_hd, data, 512, NULL,
 			0)))
-		fprintf(stderr, "sector_decrypt: error is %u.\n", err);
+		fprintf(stderr, "Decryption failed (error 0x%x).\n", err);
 	/* Apply the IV. */
 	if (dkey->alg_id == CALG_AES_256) {
 		((u64*)data)[0] ^= 0x5816657be9161312LL + offset;
