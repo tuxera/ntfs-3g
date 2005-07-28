@@ -145,6 +145,11 @@ static int cryptoAPI_init_imports(void)
 }
 #endif /* defined(__CYGWIN__) */
 
+static void ntfs_desx_key_expand(const u8 *src, u32 *des_key,
+		u64 *out_whitening, u64 *in_whitening);
+static BOOL ntfs_desx_key_expand_test(void);
+static BOOL ntfs_des_test(void);
+
 ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 {
 	ntfs_decrypt_user_key_session *session;
@@ -172,6 +177,11 @@ ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 	((NTFS_DECRYPT_USER_KEY_SESSION*)session)->hSystemStore = hSystemStore;
 #endif /* defined(__CYGWIN__) */
 	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
+	if (!ntfs_desx_key_expand_test() || !ntfs_des_test()) {
+		free(session);
+		errno = EINVAL;
+		return NULL;
+	}
 	return session;
 }
 
@@ -503,11 +513,12 @@ static gcry_cipher_spec_t ntfs_desx_cipher = {
 	.decrypt = ntfs_desx_decrypt,
 };
 
-//#define DO_CRYPTO_TESTS 1
+#define DO_CRYPTO_TESTS 1
 
 #ifdef DO_CRYPTO_TESTS
+
 /* Do not remove this test code from this file! AIA */
-static BOOL desx_key_expand_test(void)
+static BOOL ntfs_desx_key_expand_test(void)
 {
 	const u8 known_desx_on_disk_key[16] = {
 		0xa1, 0xf9, 0xe0, 0xb2, 0x53, 0x23, 0x9e, 0x8f,
@@ -522,14 +533,18 @@ static BOOL desx_key_expand_test(void)
 	const u8 known_in_whitening[8] = {
 		0x75, 0xf6, 0xa0, 0x1a, 0xc0, 0xca, 0x28, 0x1e
 	};
-	u64 test_des_key, test_out_whitening, test_in_whitening;
+	u64 test_out_whitening, test_in_whitening;
+	union {
+		u64 u64;
+		u32 u32[2];
+	} test_des_key;
 	BOOL res;
 
-	desx_key_expand(known_desx_on_disk_key, (u32*)test_des_key,
-			(u64*)test_out_whitening, (u64*)test_in_whitening);
-	res = test_des_key != *(u64*)known_des_key ||
-			test_out_whitening != *(u64*)known_out_whitening ||
-			test_in_whitening != *(u64*)known_in_whitening;
+	ntfs_desx_key_expand(known_desx_on_disk_key, test_des_key.u32,
+			&test_out_whitening, &test_in_whitening);
+	res = test_des_key.u64 == *(u64*)known_des_key &&
+			test_out_whitening == *(u64*)known_out_whitening &&
+			test_in_whitening == *(u64*)known_in_whitening;
 	fprintf(stderr, "Testing whether ntfs_desx_key_expand() works: %s\n",
 			res ? "SUCCESS" : "FAILED");
 	return res;
@@ -586,12 +601,12 @@ static BOOL ntfs_des_test(void)
 
 #else /* !defined(DO_CRYPTO_TESTS) */
 
-static inline BOOL desx_key_expand_test(void)
+static inline BOOL ntfs_desx_key_expand_test(void)
 {
 	return TRUE;
 }
 
-static inline BOOL des_test(void)
+static inline BOOL ntfs_des_test(void)
 {
 	return TRUE;
 }
@@ -623,7 +638,7 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 	case CALG_DESX:
 		/* FIXME: This really needs locking so it is safe from races. */
 		if (!ntfs_desx_module_count++) {
-			if (!desx_key_expand_test() || !des_test()) {
+			if (!ntfs_desx_key_expand_test() || !ntfs_des_test()) {
 				errno = EINVAL;
 				return NULL;
 			}
@@ -713,10 +728,12 @@ unsigned ntfs_decrypt_data_key_decrypt_sector(ntfs_decrypt_data_key *key,
 	err = gcry_cipher_reset(dkey->gcry_cipher_hd);
 	if (err != GPG_ERR_NO_ERROR)
 		fprintf(stderr, "Failed to reset cipher (error 0x%x).\n", err);
-	// FIXME: Why are we not calling gcry_cipher_setiv() here instead of
-	// doing it by hand after the decryption?
-	// It wants iv length 8 but we give it 16 for AES256 so it does not
-	// like it...
+	/*
+	 * Note: You may wonder why are we not calling gcry_cipher_setiv() here
+	 * instead of doing it by hand after the decryption.  The answer is
+	 * that gcry_cipher_setiv() wants an iv of length 8 bytes but we give
+	 * it a length of 16 for AES256 so it does not like it.
+	 */
 	if ((err = gcry_cipher_decrypt(dkey->gcry_cipher_hd, data, 512, NULL,
 			0)))
 		fprintf(stderr, "Decryption failed (error 0x%x).\n", err);
