@@ -161,8 +161,7 @@ ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 		return NULL;
 	}
 	if (!(hSystemStore = fnCertOpenStore(((LPCSTR)CERT_STORE_PROV_SYSTEM),
-			0, (HCRYPTPROV)NULL, CERT_SYSTEM_STORE_CURRENT_USER,
-			L"MY"))) {
+			0, 0, CERT_SYSTEM_STORE_CURRENT_USER, L"MY"))) {
 		fprintf(stderr, "Could not open system store.\n");
 		errno = EINVAL;
 		return NULL;
@@ -195,6 +194,13 @@ void ntfs_decrypt_user_key_session_close(ntfs_decrypt_user_key_session *session)
 	free(session);
 }
 
+/**
+ * reverse_buffer -
+ *
+ * This is a utility function for reversing the order of a buffer in place.
+ * Users of this function should be very careful not to sweep byte order
+ * problems under the rug.
+ */
 static inline void reverse_buffer(unsigned char *buf, unsigned buf_size)
 {
 	unsigned char t;
@@ -256,14 +262,14 @@ ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 			&key_size)) {
 		fprintf(stderr, "Could not export key: Error 0x%x\n",
 				(unsigned)GetLastError());
-		errno = -1;
+		errno = EINVAL;
 		return NULL;
 	}
 	CryptDestroyKey(hCryptKey);
 	rsa_pub_key = (RSAPUBKEY*)(key_blob + sizeof(PUBLICKEYSTRUC));
 	if ((err = gcry_ac_open(&gcry_handle, GCRY_AC_RSA, 0))) {
 		fprintf(stderr, "Could not init gcrypt handle\n");
-		errno = -1;
+		errno = EINVAL;
 		return NULL;
 	}
 	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
@@ -302,8 +308,8 @@ ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 		errno = EINVAL;
 		return NULL;
 	}
-	if ((key = (ntfs_decrypt_user_key*)malloc(
-			sizeof(NTFS_DECRYPT_USER_KEY))))
+	if ((key = (ntfs_decrypt_user_key*)
+			malloc(sizeof(NTFS_DECRYPT_USER_KEY))))
 		((NTFS_DECRYPT_USER_KEY*)key)->sexp_key = sexp_key;
 	// todo: release all
 	return key;
@@ -312,8 +318,10 @@ decrypt_key_open_err:
 		CryptDestroyKey(hCryptKey);
 	if (pCert)
 		fnCertFreeCertificateContext(pCert);
-#endif /* defined(__CYGWIN__) */
+	errno = EINVAL;
+#else /* !defined(__CYGWIN__) */
 	errno = ENOTSUP;
+#endif /* !defined(__CYGWIN__) */
 	return NULL;
 }
 
@@ -427,6 +435,14 @@ static void ntfs_desx_key_expand(const u8 *src, u32 *des_key,
 	*in_whitening = *(u64*)(md + 2);
 }
 
+/**
+ * ntfs_desx_setkey - libgcrypt set_key implementation for DES-X-MS128
+ * @context:	pointer to a variable of type ntfs_desx_ctx
+ * @key:	the 128 bit DES-X-MS128 key, concated with the DES handle
+ * @keylen:	must always be 16
+ * 
+ * This is the libgcrypt set_key implementation for DES-X-MS128.
+ */
 static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
 		unsigned keylen)
 {
@@ -606,8 +622,6 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 	case CALG_DESX:
 		/* FIXME: This really needs locking so it is safe from races. */
 		if (!ntfs_desx_module_count++) {
-			gcry_error_t err;
-
 			if (!desx_key_expand_test() || !des_test()) {
 				errno = EINVAL;
 				return NULL;

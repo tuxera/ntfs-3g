@@ -272,17 +272,60 @@ static int cat_decrypt(ntfs_inode *inode, ntfs_decrypt_data_key *fek)
 	return 0;
 }
 
+static ntfs_decrypt_data_key *get_fek_from_df_array(
+		ntfs_decrypt_user_key_session *session,
+		EFS_DF_ARRAY_HEADER *efs_df_array)
+{
+	u32 ddf_count, hash_size, fek_size;
+	EFS_DF_CREDENTIAL_HEADER *efs_df_cred;
+	EFS_DF_CERTIFICATE_HEADER *efs_df_cert;
+	EFS_DF_HEADER *efs_df_header;
+	ntfs_decrypt_user_key *key;
+	u8 *hash_data, *fek_buf;
+	unsigned i;
+
+	efs_df_header = (EFS_DF_HEADER*)(efs_df_array + 1);
+	ddf_count = le32_to_cpu(efs_df_array->df_count);
+	for (i = 0; i < ddf_count; i++) {
+		//Eprintf("ddf #%u.\n", i);
+		efs_df_cred = (EFS_DF_CREDENTIAL_HEADER*)((u8*)efs_df_header +
+				le32_to_cpu(efs_df_header->cred_header_offset));
+		efs_df_cert = (EFS_DF_CERTIFICATE_HEADER*)((u8*)efs_df_cred +
+				le32_to_cpu(efs_df_cred->cert_header_offset));
+		hash_size = le32_to_cpu(efs_df_cert->thumbprint_size);
+		hash_data = (u8*)efs_df_cert +
+				le32_to_cpu(efs_df_cert->thumbprint_offset);
+		fek_size = le32_to_cpu(efs_df_header->fek_size);
+		fek_buf = (u8*)efs_df_header +
+				le32_to_cpu(efs_df_header->fek_offset);
+		if ((key = ntfs_decrypt_user_key_open(session, hash_data,
+				hash_size))) {
+			fek_size = ntfs_decrypt_user_key_decrypt(key, fek_buf,
+					fek_size);
+			ntfs_decrypt_user_key_close(key);
+			if (fek_size)
+				return ntfs_decrypt_data_key_open(fek_buf,
+						fek_size);
+			fprintf(stderr, "Failed to decrypt the FEK.\n");
+		} else
+			perror("Failed to open user key");
+		efs_df_header = (EFS_DF_HEADER*)((u8*)efs_df_header +
+				le32_to_cpu(efs_df_header->df_length));
+	}
+	return NULL;
+}
+
 /**
  * get_fek
  */
 static ntfs_decrypt_data_key *get_fek(ntfs_inode *inode)
 {
-	ntfs_attr *na;
-	unsigned char *efs_buffer, *ddf, *certificate, *hash_data, *fek_buf;
-	u32 ddf_count, hash_size, fek_size;
-	unsigned i;
 	ntfs_decrypt_user_key_session *session;
-	ntfs_decrypt_user_key *key;
+	EFS_DF_ARRAY_HEADER *efs_df_array;
+	ntfs_decrypt_data_key *fek;
+	EFS_ATTR_HEADER *efs_attr;
+	u8 *efs_buffer;
+	ntfs_attr *na;
 
 	/* Obtain the $EFS contents. */
 	na = ntfs_attr_open(inode, AT_LOGGED_UTILITY_STREAM,
@@ -313,44 +356,19 @@ static ntfs_decrypt_data_key *get_fek(ntfs_inode *inode)
 		return NULL;
 	}
 	/* Iterate through the DDFs & DRFs until we obtain a key. */
-	ddf = efs_buffer + le32_to_cpu(*(u32*)(efs_buffer + 0x40));
-	ddf_count = le32_to_cpu(*(u32*)ddf);
-
-	ddf = ddf + 0x04;
-	for (i = 0; i < ddf_count; i++) {
-		//Eprintf("ddf #%u.\n", i);
-		if (*(u32*)(ddf + 0x18))
-			certificate = (ddf + 0x30 +
-					le32_to_cpu(*(u32*)(ddf + 0x18)));
-		else
-			certificate = (ddf + 0x30);
-		hash_size = (unsigned)le32_to_cpu(*(u32*)certificate);
-		hash_data = certificate + (unsigned)
-				le32_to_cpu(*(u32*)(certificate + 0x04));
-		fek_size = (unsigned)le32_to_cpu(*(u32*)(ddf + 0x08));
-		fek_buf = ddf + (unsigned)le32_to_cpu(*(u32*)(ddf + 0x0c));
-		if ((key = ntfs_decrypt_user_key_open(session, hash_data,
-				hash_size))) {
-			fek_size = ntfs_decrypt_user_key_decrypt(key, fek_buf,
-					fek_size);
-			ntfs_decrypt_user_key_close(key);
-			if (fek_size) {
-				ntfs_decrypt_data_key *fek;
-
-				ntfs_decrypt_user_key_session_close(session);
-				fek = ntfs_decrypt_data_key_open(fek_buf,
-						fek_size);
-				free(efs_buffer);
-				return fek;
-			}
-			fprintf(stderr, "Failed to decrypt the FEK.\n");
-		} else
-			perror("Failed to open user key");
-		ddf = ddf + le32_to_cpu(*(u32*)(ddf + 0x08)) +
-				le32_to_cpu(*(u32*)(ddf + 0x0c));
+	efs_attr = (EFS_ATTR_HEADER*)efs_buffer;
+	efs_df_array = (EFS_DF_ARRAY_HEADER*)(efs_buffer +
+				le32_to_cpu(efs_attr->offset_to_ddf_array));
+	fek = get_fek_from_df_array(session, efs_df_array);
+	if (!fek) {
+		efs_df_array = (EFS_DF_ARRAY_HEADER*)(efs_buffer +
+				le32_to_cpu(efs_attr->offset_to_drf_array));
+		fek = get_fek_from_df_array(session, efs_df_array);
 	}
+	/* Close all and return. */
 	ntfs_decrypt_user_key_session_close(session);
-	return NULL;
+	free(efs_buffer);
+	return fek;
 }
 
 /**

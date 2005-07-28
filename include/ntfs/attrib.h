@@ -251,7 +251,7 @@ typedef union {
 	EA_ATTR ea;
 	PROPERTY_SET property_set;
 	LOGGED_UTILITY_STREAM logged_util_stream;
-	EFS_ATTR efs;
+	EFS_ATTR_HEADER efs;
 } attr_val;
 
 extern void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,

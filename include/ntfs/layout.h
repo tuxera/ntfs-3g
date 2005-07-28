@@ -1,8 +1,9 @@
 /*
  * layout.h - Ntfs on-disk layout structures.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c)      2005 Yuval Fledel
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -2354,14 +2355,97 @@ typedef struct {
  * Operations on this attribute are logged to the journal ($LogFile) like
  * normal metadata changes.
  *
- * Used by the Encrypting File System (EFS). All encrypted files have this
- * attribute with the name $EFS.
+ * Used by the Encrypting File System (EFS).  All encrypted files have this
+ * attribute with the name $EFS.  See below for the relevant structures.
  */
 typedef struct {
 	/* Can be anything the creator chooses. */
-	/* EFS uses it as follows: */
-	// FIXME: Type this info, verifying it along the way. (AIA)
-} __attribute__ ((__packed__)) LOGGED_UTILITY_STREAM, EFS_ATTR;
+} __attribute__ ((__packed__)) LOGGED_UTILITY_STREAM;
 
+/*
+ * $EFS Data Structure:
+ *
+ * The following information is about the data structures that are contained
+ * inside a logged utility stream (0x100) with a name of "$EFS".
+ *
+ * The stream starts with an instance of EFS_ATTR_HEADER.
+ *
+ * Next, at offsets offset_to_ddf_array and offset_to_drf_array (unless any of
+ * them is 0) there is a EFS_DF_ARRAY_HEADER immediately followed by a sequence
+ * of multiple data decryption/recovery fields.
+ *
+ * Each data decryption/recovery field starts with a EFS_DF_HEADER and the next
+ * one (if it exists) can be found by adding EFS_DF_HEADER->df_length bytes to
+ * the offset of the beginning of the current EFS_DF_HEADER.
+ *
+ * The data decryption/recovery field contains an EFS_DF_CERTIFICATE_HEADER, a
+ * SID, an optional GUID, an optional container name, a non-optional user name,
+ * and the encrypted FEK.
+ *
+ * Note all the below are best guesses so may have mistakes/inaccuracies.
+ * Corrections/clarifications/additions are always welcome!
+ */
+
+/* The header of the 0x100 attribute named "$EFS". */
+typedef struct {
+/*  0*/	u32 efs_length;		/* Length of attribute in bytes. */
+	u32 unknown1;		/* always 0? */
+	u32 unknown2;		/* number of DDFs? */
+	u32 unknown3;		/* number of DRFs? */
+/* 16*/	u8 unknown4[16];	/* MD5 hash related to DDFs? */
+/* 32*/	u8 unknown5[16];	/* MD5 hash related to DRFs? */
+/* 48*/	u8 unknown6[16];	/* always 0? */
+/* 64*/	u32 offset_to_ddf_array;/* Offset in bytes to the array of data
+				   decryption fields (DDF), see below.  Zero if
+				   no DDFs are present. */
+	u32 offset_to_drf_array;/* Offset in bytes to the array of data
+				   recovery fields (DRF), see below.  Zero if
+				   no DRFs are present. */
+} __attribute__ ((__packed__)) EFS_ATTR_HEADER;
+
+typedef struct {
+	u32 df_count;		/* Number of data decryption/recovery fields in
+				   the array. */
+} __attribute__ ((__packed__)) EFS_DF_ARRAY_HEADER;
+
+typedef struct {
+/*  0*/	u32 df_length;		/* Length of this data decryption/recovery
+				   field in bytes. */
+	u32 cred_header_offset;	/* Offset in bytes to the credential header. */
+	u32 fek_size;		/* Size in bytes of the encrypted file
+				   encryption key (FEK). */
+	u32 fek_offset;		/* Offset in bytes to the FEK from the start of
+				   the data decryption/recovery field. */
+/* 16*/	u32 unknown1;		/* always 0? */
+} __attribute__ ((__packed__)) EFS_DF_HEADER;
+
+typedef struct {
+/*  0*/	u32 cred_length;	/* Length of this credential in bytes. */
+	u32 sid_offset;		/* Offset in bytes to the user's sid from start
+				   of this structure. */
+	u32 cred_version;	/* always 3? */
+	u32 cert_header_size;	/* Size in bytes of the certificate header. */
+/* 16*/	u32 cert_header_offset;	/* Offset in bytes to the certificate header
+				   from start of this structure. */
+	u32 unknown1;		/* always 0? */
+	u32 unknown2;		/* always 0? */
+} __attribute__ ((__packed__)) EFS_DF_CREDENTIAL_HEADER;
+
+typedef EFS_DF_CREDENTIAL_HEADER EFS_DF_CRED_HEADER;
+
+typedef struct {
+/*  0*/	u32 thumbprint_offset;		/* Offset in bytes to the thumbprint. */
+	u32 thumbprint_size;		/* Size of thumbprint in bytes. */
+/*  8*/	u32 guid_offset;		/* Offset in bytes to GUID from start
+					   if this structure or 0 if no GUID
+					   present. */
+	u32 container_name_offset;	/* Offset in bytes to the name of the
+					   container from start of this
+					   structure or 0 if no name present. */
+/* 16*/	u32 user_name_offset;		/* Offset in bytes to the user name
+					   from start of this structure. */
+} __attribute__ ((__packed__)) EFS_DF_CERTIFICATE_HEADER;
+
+typedef EFS_DF_CERTIFICATE_HEADER EFS_DF_CERT_HEADER;
+	
 #endif /* defined _NTFS_LAYOUT_H */
-
