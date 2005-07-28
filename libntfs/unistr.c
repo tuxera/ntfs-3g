@@ -467,7 +467,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 	ntfschar *ucs;
 	const char *s;
 	wchar_t wc;
-	int i, o, cnt, ins_len, ucs_len;
+	int i, o, cnt, ins_len, ucs_len, ins_size;
 #ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
 #endif
@@ -482,6 +482,8 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 		errno = ENAMETOOLONG;
 		return -1;
 	}
+	/* Determine the size of the multi-byte string in bytes. */
+	ins_size = strlen(ins);
 	/* Determine the length of the multi-byte string. */
 	s = ins;
 #if defined(HAVE_MBSINIT)
@@ -543,9 +545,9 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 		}
 		/* Convert the multibyte character to a wide character. */
 #ifdef HAVE_MBSINIT
-		cnt = mbrtowc(&wc, ins + i, ins_len - i, &mbstate);
+		cnt = mbrtowc(&wc, ins + i, ins_size - i, &mbstate);
 #else
-		cnt = mbtowc(&wc, ins + i, ins_len - i);
+		cnt = mbtowc(&wc, ins + i, ins_size - i);
 #endif
 		if (!cnt)
 			break;

@@ -15,6 +15,7 @@ xx/xx/xxxx - 1.12.0-WIP
 	  extent. (Szaka)
 	- ntfscp: fix attribute name parsing bug introduced in 1.10.0.  (Yura)
 	- ntfsinfo: dump more information for indexes.  (Yura)
+	- Fix unistr.c::ntfs_mbstoucs on systems with utf8 locale.  (Yura)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
