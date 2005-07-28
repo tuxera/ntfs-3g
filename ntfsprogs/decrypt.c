@@ -145,11 +145,6 @@ static int cryptoAPI_init_imports(void)
 }
 #endif /* defined(__CYGWIN__) */
 
-static void ntfs_desx_key_expand(const u8 *src, u32 *des_key,
-		u64 *out_whitening, u64 *in_whitening);
-static BOOL ntfs_desx_key_expand_test(void);
-static BOOL ntfs_des_test(void);
-
 ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 {
 	ntfs_decrypt_user_key_session *session;
@@ -177,11 +172,6 @@ ntfs_decrypt_user_key_session *ntfs_decrypt_user_key_session_open(void)
 	((NTFS_DECRYPT_USER_KEY_SESSION*)session)->hSystemStore = hSystemStore;
 #endif /* defined(__CYGWIN__) */
 	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
-	if (!ntfs_desx_key_expand_test() || !ntfs_des_test()) {
-		free(session);
-		errno = EINVAL;
-		return NULL;
-	}
 	return session;
 }
 
@@ -410,6 +400,8 @@ unsigned ntfs_decrypt_user_key_decrypt(ntfs_decrypt_user_key *key,
 	return size - padding_length;
 }
 
+#if 0
+// This is the old code based on OpenSSL.  Please do not remove it.  AIA
 /**
  * ntfs_desx_key_expand - expand a 128-bit desx key to the needed 192-bit key
  * @src:	source buffer containing 128-bit key
@@ -444,6 +436,53 @@ static void ntfs_desx_key_expand(const u8 *src, u32 *des_key,
 	*out_whitening = *(u64*)md;
 	*in_whitening = *(u64*)(md + 2);
 }
+#endif
+
+/**
+ * ntfs_desx_key_expand - expand a 128-bit desx key to the needed 192-bit key
+ * @src:	source buffer containing 128-bit key
+ *
+ * Expands the on-disk 128-bit desx key to the needed des key, the in-, and the
+ * out-whitening keys required to perform desx {de,en}cryption.
+ */
+static gcry_error_t ntfs_desx_key_expand(const u8 *src, u32 *des_key,
+		u64 *out_whitening, u64 *in_whitening)
+{
+	static const u8 *salt1 = "Dan Simon  ";
+	static const u8 *salt2 = "Scott Field";
+	static const int salt_len = 12;
+	gcry_md_hd_t hd1, hd2;
+	u32 *md;
+	gcry_error_t err;
+
+	err = gcry_md_open(&hd1, GCRY_MD_MD5, 0);
+	if (err != GPG_ERR_NO_ERROR) {
+		fprintf(stderr, "Failed to open MD5 digest.\n");
+		return err;
+	}
+	/* Hash the on-disk key. */
+	gcry_md_write(hd1, src, 128 / 8);
+	/* Copy the current hash for efficiency. */
+	err = gcry_md_copy(&hd2, hd1);
+	if (err != GPG_ERR_NO_ERROR) {
+		fprintf(stderr, "Failed to copy MD5 digest object.\n");
+		goto out;
+	}
+	/* Hash with the first salt and store the result. */
+	gcry_md_write(hd1, salt1, salt_len);
+	md = (u32*)gcry_md_read(hd1, 0);
+	des_key[0] = md[0] ^ md[1];
+	des_key[1] = md[2] ^ md[3];
+	/* Hash with the second salt and store the result. */
+	gcry_md_write(hd2, salt2, salt_len);
+	md = (u32*)gcry_md_read(hd2, 0);
+	*out_whitening = *(u64*)md;
+	*in_whitening = *(u64*)(md + 2);
+	gcry_md_close(hd2);
+out:
+	gcry_md_close(hd1);
+	return err;
+}
 
 /**
  * ntfs_desx_setkey - libgcrypt set_key implementation for DES-X-MS128
@@ -471,11 +510,17 @@ static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
 				err);
 		return err;
 	}
-	ntfs_desx_key_expand(key, (u32*)des_key, &ctx->out_whitening,
+	err = ntfs_desx_key_expand(key, (u32*)des_key, &ctx->out_whitening,
 			&ctx->in_whitening);
+	if (err != GPG_ERR_NO_ERROR) {
+		fprintf(stderr, "Failed to expand desx key (error 0x%x).\n",
+				err);
+		gcry_cipher_close(ctx->gcry_cipher_hd);
+		return err;
+	}
 	err = gcry_cipher_setkey(ctx->gcry_cipher_hd, des_key, sizeof(des_key));
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to set des key (error 0x%x.\n", err);
+		fprintf(stderr, "Failed to set des key (error 0x%x).\n", err);
 		gcry_cipher_close(ctx->gcry_cipher_hd);
 		return err;
 	}
@@ -513,7 +558,7 @@ static gcry_cipher_spec_t ntfs_desx_cipher = {
 	.decrypt = ntfs_desx_decrypt,
 };
 
-#define DO_CRYPTO_TESTS 1
+//#define DO_CRYPTO_TESTS 1
 
 #ifdef DO_CRYPTO_TESTS
 
@@ -538,13 +583,19 @@ static BOOL ntfs_desx_key_expand_test(void)
 		u64 u64;
 		u32 u32[2];
 	} test_des_key;
+	gcry_error_t err;
 	BOOL res;
 
-	ntfs_desx_key_expand(known_desx_on_disk_key, test_des_key.u32,
+	err = ntfs_desx_key_expand(known_desx_on_disk_key, test_des_key.u32,
 			&test_out_whitening, &test_in_whitening);
-	res = test_des_key.u64 == *(u64*)known_des_key &&
-			test_out_whitening == *(u64*)known_out_whitening &&
-			test_in_whitening == *(u64*)known_in_whitening;
+	if (err != GPG_ERR_NO_ERROR)
+		res = FALSE;
+	else
+		res = test_des_key.u64 == *(u64*)known_des_key &&
+				test_out_whitening ==
+				*(u64*)known_out_whitening &&
+				test_in_whitening ==
+				*(u64*)known_in_whitening;
 	fprintf(stderr, "Testing whether ntfs_desx_key_expand() works: %s\n",
 			res ? "SUCCESS" : "FAILED");
 	return res;
