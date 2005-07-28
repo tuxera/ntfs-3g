@@ -473,7 +473,8 @@ static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
 	 * Take a note of the ctx->gcry_cipher_hd since we need to close it at
 	 * ntfs_decrypt_data_key_close() time.
 	 */
-	*(gcry_cipher_hd_t*)(key + ((keylen + 7) & ~7)) = ctx->gcry_cipher_hd;
+	**(gcry_cipher_hd_t***)(key + ((keylen + 7) & ~7)) =
+			&ctx->gcry_cipher_hd;
 	return GPG_ERR_NO_ERROR;
 }
 
@@ -614,9 +615,9 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 	key->alg_id = *(u32*)(data + 8);
 	key->key_data = (u8*)key + ((sizeof(*key) + 7) & ~7);
 	memcpy(key->key_data, data + 16, key_size);
-	key->des_gcry_cipher_hd_ptr = (gcry_cipher_hd_t*)(key->key_data +
-			((key_size + 7) & ~7));
-	*key->des_gcry_cipher_hd_ptr = NULL;
+	key->des_gcry_cipher_hd_ptr = NULL;
+	*(gcry_cipher_hd_t***)(key->key_data + ((key_size + 7) & ~7)) =
+			&key->des_gcry_cipher_hd_ptr;
 	gcry_control(GCRYCTL_DISABLE_SECMEM, 0);
 	switch (key->alg_id) {
 	case CALG_DESX:
@@ -691,7 +692,7 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 void ntfs_decrypt_data_key_close(ntfs_decrypt_data_key *key)
 {
 	NTFS_DECRYPT_DATA_KEY *dkey = (NTFS_DECRYPT_DATA_KEY*)key;
-	if (*dkey->des_gcry_cipher_hd_ptr)
+	if (dkey->des_gcry_cipher_hd_ptr)
 		gcry_cipher_close(*dkey->des_gcry_cipher_hd_ptr);
 	gcry_cipher_close(dkey->gcry_cipher_hd);
 	free(key);
