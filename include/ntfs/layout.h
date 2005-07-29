@@ -2392,9 +2392,9 @@ typedef struct {
 	u32 unknown1;		/* always 0? */
 	u32 unknown2;		/* number of DDFs? */
 	u32 unknown3;		/* number of DRFs? */
-/* 16*/	u8 unknown4[16];	/* MD5 hash related to DDFs? */
-/* 32*/	u8 unknown5[16];	/* MD5 hash related to DRFs? */
-/* 48*/	u8 unknown6[16];	/* always 0? */
+/* 16*/	u8 unknown4[16];	/* MD5 hash of decrypted FEK? */
+/* 32*/	u8 unknown5[16];	/* MD5 hash of DDFs? */
+/* 48*/	u8 unknown6[16];	/* MD5 hash of DRFs? */
 /* 64*/	u32 offset_to_ddf_array;/* Offset in bytes to the array of data
 				   decryption fields (DDF), see below.  Zero if
 				   no DDFs are present. */
