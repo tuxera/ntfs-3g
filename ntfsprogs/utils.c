@@ -154,7 +154,14 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 
 	vol = ntfs_mount (device, flags);
 	if (!vol) {
-		Eprintf ("Couldn't mount device '%s': %s\n", device, strerror (errno));
+		int err;
+
+		err = errno;
+		Eprintf("Couldn't mount device '%s': %s\n", device,
+				strerror(err));
+		if (err == EOPNOTSUPP)
+			Eprintf("It's seems that logfile check failed. "
+					"Try to mount volume in windows.\n");
 		return NULL;
 	}
 

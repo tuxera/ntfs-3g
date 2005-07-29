@@ -562,7 +562,7 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int ret, err = 0;
+	int err = 0;
 
 	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
 		Dprintf("Failed to open inode FILE_LogFile.\n");
@@ -571,23 +571,20 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 	}
 	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
 		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
-		ret = -1;
 		err = EIO;
 		goto exit;
 	}
-	if (ntfs_check_logfile(na) && ntfs_is_logfile_clean(na))
-		ret = 0;
-	else {
-		ret = -1;
-		err = EIO;
-	}
+	if (!ntfs_check_logfile(na) || !ntfs_is_logfile_clean(na))
+		err = EOPNOTSUPP;
 exit:
 	if (na)
 		ntfs_attr_close(na);
 	ntfs_inode_close(ni);
-	if (ret)
+	if (err) {
 		errno = err;
-	return ret;
+		return -1;
+	}
+	return 0;
 }
 
 /**
