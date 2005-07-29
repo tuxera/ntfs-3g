@@ -80,5 +80,7 @@ AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
 
 EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 
+MAINTAINERCLEANFILES = Makefile.in
+
 libs:	$(lib_LTLIBRARIES)
 

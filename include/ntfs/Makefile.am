@@ -31,3 +31,4 @@ linux_ntfsinclude_HEADERS = \
 	unistr.h		\
 	volume.h
 
+MAINTAINERCLEANFILES = Makefile.in

@@ -25,6 +25,8 @@ EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
 
+MAINTAINERCLEANFILES = Makefile.in
+
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
 if ENABLE_FUSE_MODULE

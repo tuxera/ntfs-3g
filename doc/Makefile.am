@@ -9,3 +9,4 @@ EXTRA_DIST = \
 	system_files.txt \
 	system_security_descriptors.txt
 
+MAINTAINERCLEANFILES = Makefile.in
