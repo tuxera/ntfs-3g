@@ -1,6 +1,7 @@
 .deps
 .libs
 Makefile
+Makefile.in
 mkntfs
 ntfscat
 ntfsclone
