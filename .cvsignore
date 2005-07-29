@@ -12,3 +12,11 @@ configure
 libtool
 ntfsprogs.spec
 stamp-h1
+depcomp
+ltmain.sh
+mkinstalldirs
+compile
+install-sh
+stamp-h.in
+ltconfig
+missing
