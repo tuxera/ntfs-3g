@@ -31,7 +31,7 @@
 
 /**
  * @ni:		inode containing the @entry described by this context
- * @name:	name of the which context describes
+ * @name:	name of the index described by this context
  * @name_len:	length of the index name
  * @entry:	index entry (points into @ir or @ia)
  * @data:	index entry data (points into @entry)
@@ -115,5 +115,5 @@ static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 	else
 		ictx->ia_dirty = TRUE;
 }
-#endif /* _NTFS_INDEX_H */
 
+#endif /* _NTFS_INDEX_H */

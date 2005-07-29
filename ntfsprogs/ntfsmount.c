@@ -304,8 +304,11 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 
 	if (name_type == FILE_NAME_DOS)
 		return 0;
-	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0)
-		return -errno;
+	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
+		Eprintf("Skipping unrepresentable file (inode %lld): %s\n",
+				MREF(mref), strerror(errno));
+		return 0;
+	}
 	if (MREF(mref) >= FILE_first_user || ctx->show_sys_files)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
 	free(filename);
@@ -955,6 +958,15 @@ static char *parse_options(char *options, char **device)
 			}
 			ctx->ro =TRUE;
 			strcat(ret, "ro,");
+#ifdef DEBUG
+		} else if (!strcmp(opt, "fake_ro")) {
+			if (val) {
+				Eprintf("fake_ro option should not have "
+						"value.\n");
+				goto err_exit;
+			}
+			ctx->ro =TRUE;
+#endif
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
 			/*
 			 * We need this to be able to check whether filesystem
