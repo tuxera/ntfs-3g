@@ -18,6 +18,8 @@ xx/xx/xxxx - 1.12.0-WIP
 	- Fix unistr.c::ntfs_mbstoucs on systems with utf8 locale.  (Yura)
 	- Change errno and print more verbose message in case if logfile check
 	  failed.  (Yura)
+	- Fix random errno returned by ntfs_inode_open() if the MFT record 
+	  wasn't in use.  (Szaka)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 

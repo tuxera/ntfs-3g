@@ -123,8 +123,10 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		return NULL;
 	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
 		goto err_out;
-	if (!(ni->mrec->flags & MFT_RECORD_IN_USE))
+	if (!(ni->mrec->flags & MFT_RECORD_IN_USE)) {
+		err = ENOENT;
 		goto err_out;
+	}
 	ni->mft_no = MREF(mref);
 	ni->data_size = -1;
 	ni->allocated_size = -1;
