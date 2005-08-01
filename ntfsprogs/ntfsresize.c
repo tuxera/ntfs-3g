@@ -1688,7 +1688,7 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 		else if (ret == 1)
 			continue;
 
-		if (resize->mref == FILE_Bitmap && 
+		if (resize->mref == FILE_Bitmap &&
 		    resize->ctx->attr->type == AT_DATA)
 			continue;
 
@@ -1827,7 +1827,7 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 		rl_set(p + len - 1, last_vcn, LCN_ENOENT, 0LL);
 		*rl = p;
 
-	} else 
+	} else
 		err_exit("ntfs_rl_expand: bad LCN: %lld\n", p[len - 2].lcn);
 }
 
@@ -2186,7 +2186,7 @@ static ntfs_volume *mount_volume(void)
 			printf(hibernated_volume_msg);
         	else if (err == EOPNOTSUPP) /* NOTE: same as ENOTSUP !!! */
 			printf(unclean_journal_msg);
-	 exit(1);
+		exit(1);
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY)
@@ -2260,7 +2260,7 @@ static void check_resize_constraints(ntfs_resize_t *resize)
 	if (resize->badclusters) {
 		printf("%sThe NTFS volume has at least %lld bad sector%s.\n",
 		       !opt.badsectors ? NERR_PREFIX : "",
-		       resize->badclusters, 
+		       resize->badclusters,
 		       resize->badclusters  - 1 ? "s" : "");
 		if (!opt.badsectors) {
 			printf(bad_sectors_warning_msg);
