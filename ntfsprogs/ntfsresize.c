@@ -2184,7 +2184,7 @@ static ntfs_volume *mount_volume(void)
 			printf(corrupt_volume_msg);
 		else if (err == EPERM)
 			printf(hibernated_volume_msg);
-        	else if (err == EOPNOTSUPP) /* NOTE: same as ENOTSUP !!! */
+        	else if (err == EOPNOTSUPP)
 			printf(unclean_journal_msg);
 		exit(1);
 	}

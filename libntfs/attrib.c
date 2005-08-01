@@ -85,7 +85,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	if (a->flags) {
 		Dputs("Encountered non-zero attribute flags.  Cannot handle "
 				"this yet.");
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return 0;
 	}
 	if (!a->non_resident) {
@@ -920,7 +920,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		// TODO: Implement writing compressed attributes! (AIA)
 		// return ntfs_attr_pwrite_compressed(ntfs_attr *na,
 		//		const s64 pos, s64 count, void *b);
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 	if (!count)
@@ -1292,7 +1292,7 @@ rl_err_out:
 				goto done;
 			// TODO: Need to try to change initialized_size. If it
 			// succeeds goto done, otherwise goto err_out. (AIA)
-			errno = ENOTSUP;
+			errno = EOPNOTSUPP;
 			goto err_out;
 		}
 		goto done;
@@ -3810,11 +3810,11 @@ put_err_out:
  *
  * Return 0 on success and -1 on error with errno set to the error code. The
  * following error codes are defined:
- *	EINVAL	- Invalid arguments passed.
- *	EPERM	- The attribute is not allowed to be resident.
- *	EIO	- I/O error, damaged inode or bug.
- *	ENOSPC	- There is no enough space to perform conversion.
- *	ENOTSUP	- Requested conversion is not supported yet.
+ *	EINVAL	   - Invalid arguments passed.
+ *	EPERM	   - The attribute is not allowed to be resident.
+ *	EIO	   - I/O error, damaged inode or bug.
+ *	ENOSPC	   - There is no enough space to perform conversion.
+ *	EOPNOTSUPP - Requested conversion is not supported yet.
  *
  * Warning: We do not set the inode dirty and we do not write out anything!
  *	    We expect the caller to do this as this is a fairly low level
@@ -3870,7 +3870,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		Dprintf("%s(): Making compressed or encrypted files "
 				"resident is not implemented yet.\n",
 				__FUNCTION__);
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 
@@ -4812,8 +4812,8 @@ put_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	EINVAL	- Invalid arguments were passed to the function.
- *	ENOTSUP	- The desired resize is not implemented yet.
+ *	EINVAL	   - Invalid arguments were passed to the function.
+ *	EOPNOTSUPP - The desired resize is not implemented yet.
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
@@ -4840,7 +4840,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	 * TODO: Implement making handling of compressed attributes.
 	 */
 	if (NAttrCompressed(na)) {
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 	if (NAttrNonResident(na)) {

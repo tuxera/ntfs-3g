@@ -320,7 +320,7 @@ decrypt_key_open_err:
 		fnCertFreeCertificateContext(pCert);
 	errno = EINVAL;
 #else /* !defined(__CYGWIN__) */
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 #endif /* !defined(__CYGWIN__) */
 	return NULL;
 }
@@ -722,7 +722,7 @@ ntfs_decrypt_data_key *ntfs_decrypt_data_key_open(unsigned char *data,
 				"and say that you saw this message.  We will "
 				"then implement support for DES.\n");
 		free(key);
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return NULL;
 	}
 	if (key_size != wanted_key_size) {

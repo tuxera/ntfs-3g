@@ -667,7 +667,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		ntfs_error(vol->sb, "Not enough space in this mft record to "
 				"accommodate extended mft bitmap attribute "
 				"extent.  Cannot handle this yet.");
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		goto undo_alloc;
 	}
 	status.mp_rebuilt = 1;
@@ -989,7 +989,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		ntfs_error(vol->sb, "Not enough space in this mft record to "
 				"accommodate extended mft data attribute "
 				"extent.  Cannot handle this yet.");
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		goto undo_alloc;
 	}
 	mp_rebuilt = TRUE;

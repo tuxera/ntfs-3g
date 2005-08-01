@@ -1226,7 +1226,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	}
 	if (ic == IGNORE_CASE) {
 		Eprintf("FIXME: Hit unimplemented code path #1.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
@@ -1243,12 +1243,12 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		Eprintf("Compressed attributes not supported yet.\n");
 		// FIXME: Compress attribute into a temporary buffer, set
 		// val accordingly and save the compressed size.
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (flags & (ATTR_IS_ENCRYPTED || ATTR_IS_SPARSE)) {
 		Eprintf("Encrypted/sparse attributes not supported yet.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (flags & ATTR_COMPRESSION_MASK) {
@@ -1299,7 +1299,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 #ifdef DEBUG
@@ -1341,7 +1341,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		a->compressed_size = cpu_to_le64(0);
 		// FIXME: Write out the compressed data.
 		// FIXME: err = build_mapping_pairs_compressed();
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 	} else {
 		a->compression_unit = 0;
 		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, &inited_size);
@@ -1411,7 +1411,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	}
 	if (ic == IGNORE_CASE) {
 		Eprintf("FIXME: Hit unimplemented code path #2.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
@@ -1428,12 +1428,12 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		Eprintf("Compressed attributes not supported yet.\n");
 		// FIXME: Compress attribute into a temporary buffer, set
 		// val accordingly and save the compressed size.
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (flags & (ATTR_IS_ENCRYPTED || ATTR_IS_SPARSE)) {
 		Eprintf("Encrypted/sparse attributes not supported yet.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (val_len) {
@@ -1486,7 +1486,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 #ifdef DEBUG
@@ -1531,7 +1531,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		a->compressed_size = cpu_to_le64(0);
 		// FIXME: Write out the compressed data.
 		// FIXME: err = build_mapping_pairs_compressed();
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 	} else {
 		a->compression_unit = 0;
 		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, NULL);
@@ -1600,7 +1600,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	}
 	if (ic == IGNORE_CASE) {
 		Eprintf("FIXME: Hit unimplemented code path #3.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, val, val_len,
@@ -1632,7 +1632,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 		// record.
 		// FIXME: the check for needing extension records should be
 		// earlier on as it is very quick: asize > m->bytes_allocated?
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		goto err_out;
 	}
 #ifdef DEBUG
@@ -2121,7 +2121,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	}
 	if (ic == IGNORE_CASE) {
 		Eprintf("FIXME: Hit unimplemented code path #4.\n");
-		err = -ENOTSUP;
+		err = -EOPNOTSUPP;
 		if (uname)
 			free(uname);
 		goto err_out;

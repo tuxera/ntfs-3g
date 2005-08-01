@@ -529,7 +529,7 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
  *
  * The following error codes are defined:
  *	EINVAL		Input parameter error
- *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
  *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
  */
 s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
@@ -548,7 +548,7 @@ s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
 		}
 	}
 #else
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 #endif
 	return -1;
 }
@@ -562,7 +562,7 @@ s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev)
  *
  * The following error codes are defined:
  *	EINVAL		Input parameter error
- *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
  *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
  */
 int ntfs_device_heads_get(struct ntfs_device *dev)
@@ -582,7 +582,7 @@ int ntfs_device_heads_get(struct ntfs_device *dev)
 		}
 	}
 #else
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 #endif
 	return -1;
 }
@@ -596,7 +596,7 @@ int ntfs_device_heads_get(struct ntfs_device *dev)
  *
  * The following error codes are defined:
  *	EINVAL		Input parameter error
- *	ENOTSUP		System does not support HDIO_GETGEO ioctl
+ *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
  *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
  */
 int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
@@ -616,7 +616,7 @@ int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
 		}
 	}
 #else
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 #endif
 	return -1;
 }

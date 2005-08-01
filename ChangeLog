@@ -23,6 +23,8 @@ xx/xx/xxxx - 1.12.0-WIP
 	- Fix ntfs_attr_p{read,write} to not return less bytes if trapped on
 	  unmapped runlist region.  (Yura)
 	- Make find work correctly on volumes mounted by ntfsmount.  (Yura)
+	- Replaced all occurances of ENOTSUP to EOPNOTSUPP to be in better
+	  harmony with the kernel driver.  (Szaka)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
@@ -475,10 +477,11 @@ xx/xx/xxxx - 1.12.0-WIP
 	  text and other little bits.
 	- Add --disable-default-device-io-ops option to ./configure which makes
 	  for a smaller libntfs but results in ntfs_mount() always returning
-	  error with errno set to ENOTSUP.  You need to use ntfs_device_mount()
-	  instead.  This only makes sense with "make libs" and when an
-	  application linking statically against libntfs provides its own
-	  device io operations.  (Feature requested by Christophe Grenier.)
+	  error with errno set to EOPNOTSUPP.  You need to use
+	  ntfs_device_mount() instead.  This only makes sense with "make libs"
+	  and when an application linking statically against libntfs provides
+	  its own device io operations.  (Feature requested by 
+	  Christophe Grenier.)
 	- Fix a duplicated free() in mkntfs. (Andras Erdei)
 	- Fix option display in mkntfs. (Andras Erdei)
 

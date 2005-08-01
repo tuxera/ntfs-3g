@@ -127,7 +127,7 @@ static int ntfs_w32error_to_errno(unsigned int w32error)
 		case ERROR_NEGATIVE_SEEK:
 			return ESPIPE;
 		case ERROR_NOT_SUPPORTED:
-			return ENOTSUP;
+			return EOPNOTSUPP;
 		case ERROR_BAD_NETPATH:
 			return ENOSHARE;
 		default:
@@ -787,7 +787,7 @@ static int ntfs_device_win32_open_partition(int drive_id,
 						"volumes are not supported in "
 						"R/W status yet");
 				CloseHandle(handle);
-				errno = ENOTSUP;
+				errno = EOPNOTSUPP;
 				return -1;
 			}
 			fd->vol_handle = INVALID_HANDLE_VALUE;
@@ -895,7 +895,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 		if (fd->part_length == -1) {
 			Dputs("win32_seek(): Error: Position relative to end "
 					"of disk not implemented.");
-			errno = ENOTSUP;
+			errno = EOPNOTSUPP;
 			return -1;
 		}
 		abs_ofs = fd->part_length + offset;
@@ -1404,7 +1404,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 			*(int *)argp = (int)(fd->part_length / 512);
 			return 0;
 		}
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 #endif
 #if defined(BLKGETSIZE64)
@@ -1414,7 +1414,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 			*(s64 *)argp = fd->part_length;
 			return 0;
 		}
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 #endif
 #ifdef HDIO_GETGEO
@@ -1429,7 +1429,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 #endif
 	default:
 		Dprintf("win32_ioctl(): unimplemented ioctl %d.\n", request);
-		errno = ENOTSUP;
+		errno = EOPNOTSUPP;
 		return -1;
 	}
 }

@@ -1151,7 +1151,7 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 	 * defined as there are no device operations available in libntfs in
 	 * this case.
 	 */
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 	return NULL;
 #endif
 }
@@ -1341,8 +1341,8 @@ int ntfs_check_if_mounted(const char *file __attribute__((unused)),
  * Return 0 if NTFS version is supported otherwise -1 with errno set.
  *
  * The following error codes are defined:
- *	ENOTSUP   Unknown NTFS version
- *	EINVAL	  Invalid argument
+ *	EOPNOTSUPP - Unknown NTFS version
+ *	EINVAL	   - Invalid argument
  */
 int ntfs_version_is_supported(ntfs_volume *vol)
 {
@@ -1365,7 +1365,7 @@ int ntfs_version_is_supported(ntfs_volume *vol)
 	if (NTFS_V3_0(major, minor) || NTFS_V3_1(major, minor))
 		return 0;
 
-	errno = ENOTSUP;
+	errno = EOPNOTSUPP;
 	return -1;
 }
 
