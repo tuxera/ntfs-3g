@@ -264,6 +264,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				stbuf->st_size = 0;
 				stbuf->st_blocks = 0;
 			}
+			stbuf->st_nlink = 1; /* Needed for correct find work. */
 		} else {
 			stbuf->st_mode = S_IFREG | (0777 & ~ctx->fmask);
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
@@ -279,11 +280,11 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				if (stream_name_len)
 					res = -ENOENT;
 			}
+			stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		}
 		stbuf->st_uid = ctx->uid;
 		stbuf->st_gid = ctx->gid;
 		stbuf->st_ino = ni->mft_no;
-		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		stbuf->st_atime = ni->atime;
 		stbuf->st_ctime = ni->ctime;
 		stbuf->st_mtime = ni->mtime;

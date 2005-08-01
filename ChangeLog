@@ -22,6 +22,7 @@ xx/xx/xxxx - 1.12.0-WIP
 	  wasn't in use.  (Szaka)
 	- Fix ntfs_attr_p{read,write} to not return less bytes if trapped on
 	  unmapped runlist region.  (Yura)
+	- Make find work correctly on volumes mounted by ntfsmount.  (Yura)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
