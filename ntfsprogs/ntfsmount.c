@@ -44,6 +44,7 @@
 #include "dir.h"
 #include "unistr.h"
 #include "layout.h"
+#include "index.h"
 #include "utils.h"
 
 typedef struct {
@@ -253,7 +254,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY &&
 				!stream_name_len) {
 			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
-			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, I30, 0);
+			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, I30, 4);
 			if (na) {
 				stbuf->st_size = na->data_size;
 				stbuf->st_blocks = na->allocated_size >>
@@ -355,14 +356,13 @@ static int ntfs_fuse_open(const char *org_path,
 	vol = ctx->vol;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (ni) {
-		if (stream_name_len) {
-			na = ntfs_attr_open(ni, AT_DATA, stream_name,
-					stream_name_len);
-			if (na)
-				ntfs_attr_close(na);
-			else
-				res = -errno;
-		}
+		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+		if (na) {
+			if (NAttrEncrypted(na))
+				res = -EACCES;
+			ntfs_attr_close(na);
+		} else
+			res = -errno;
 		ntfs_inode_close(ni);
 	} else
 		res = -errno;
@@ -398,6 +398,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		goto exit;
 	}
 	res = ntfs_attr_pread(na, offset, size, buf);
+	if (res == -1)
+		res = -errno;		
 	ntfs_attr_close(na);
 exit:
 	if (ni && ntfs_inode_close(ni))
@@ -434,6 +436,10 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		goto exit;
 	}
 	res = ntfs_attr_pwrite(na, offset, size, buf);
+	if (res == -1)
+		res = -errno;
+	if (res < size)
+		perror("ntfs_attr_pwrite returned less than requested.");
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	ntfs_attr_close(na);
 exit:
@@ -529,6 +535,11 @@ exit:
 	return res;
 }
 
+static int ntfs_fuse_rm_file(char *file)
+{
+	return -EOPNOTSUPP;
+}
+
 static int ntfs_fuse_unlink(const char *org_path)
 {
 	ntfs_inode *ni = NULL;
@@ -541,15 +552,11 @@ static int ntfs_fuse_unlink(const char *org_path)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	if (!stream_name_len) {
-		res = -EOPNOTSUPP;
-		goto exit;
-	}
+	if (!stream_name_len)
+		return ntfs_fuse_rm_file(path);
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
-		if (res == -ENOENT)
-			res = -EOPNOTSUPP;
 		goto exit;
 	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
@@ -935,7 +942,7 @@ static char *parse_options(char *options, char **device)
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "dev")) { /* Device to mount. */
 			if (!val) {
-				Eprintf("dev option should have value.\n");
+				Eprintf("'dev' option should have value.\n");
 				goto err_exit;
 			}
 			*device = malloc(PATH_MAX + 1);
@@ -953,7 +960,7 @@ static char *parse_options(char *options, char **device)
 				strcpy(*device, val);
 		} else if (!strcmp(opt, "ro")) { /* Read-only mount. */
 			if (val) {
-				Eprintf("ro option should not have value.\n");
+				Eprintf("'ro' option should not have value.\n");
 				goto err_exit;
 			}
 			ctx->ro =TRUE;
@@ -961,7 +968,7 @@ static char *parse_options(char *options, char **device)
 #ifdef DEBUG
 		} else if (!strcmp(opt, "fake_ro")) {
 			if (val) {
-				Eprintf("fake_ro option should not have "
+				Eprintf("'fake_ro' option should not have "
 						"value.\n");
 				goto err_exit;
 			}
@@ -972,63 +979,63 @@ static char *parse_options(char *options, char **device)
 			 * We need this to be able to check whether filesystem
 			 * mounted or not.
 			 */
-			Eprintf("fsname is unsupported option.\n");
+			Eprintf("'fsname' is unsupported option.\n");
 			goto err_exit;
 		} else if (!strcmp(opt, "no_def_opts")) {
 			if (val) {
-				Eprintf("no_def_opts option should not have "
+				Eprintf("'no_def_opts' option should not have "
 						"value.\n");
 				goto err_exit;
 			}
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "umask")) {
 			if (!val) {
-				Eprintf("umask option should have value.\n");
+				Eprintf("'umask' option should have value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 		} else if (!strcmp(opt, "fmask")) {
 			if (!val) {
-				Eprintf("fmask option should have value.\n");
+				Eprintf("'fmask' option should have value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->fmask);
 		} else if (!strcmp(opt, "dmask")) {
 			if (!val) {
-				Eprintf("dmask option should have value.\n");
+				Eprintf("'dmask' option should have value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->dmask);
 		} else if (!strcmp(opt, "uid")) {
 			if (!val) {
-				Eprintf("uid option should have value.\n");
+				Eprintf("'uid' option should have value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->uid);
 		} else if (!strcmp(opt, "gid")) {
 			if (!val) {
-				Eprintf("gid option should have value.\n");
+				Eprintf("'gid' option should have value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->gid);
 		} else if (!strcmp(opt, "show_sys_files")) {
 			if (val) {
-				Eprintf("show_sys_files option should not "
+				Eprintf("'show_sys_files' option should not "
 						"have value.\n");
 				goto err_exit;
 			}
 			ctx->show_sys_files = TRUE;
 		} else if (!strcmp(opt, "succeed_chmod")) {
 			if (val) {
-				Eprintf("succeed_chmod option should not "
+				Eprintf("'succeed_chmod' option should not "
 						"have value.\n");
 				goto err_exit;
 			}
 			ctx->succeed_chmod = TRUE;
 		} else if (!strcmp(opt, "force")) {
 			if (val) {
-				Eprintf("force option should not "
+				Eprintf("'force' option should not "
 						"have value.\n");
 				goto err_exit;
 			}
@@ -1100,7 +1107,7 @@ int main(int argc, char *argv[])
 	/* Parse options. */
 	parsed_options = parse_options(options, &device);
 	if (!device) {
-		Eprintf("dev option is mandatory.\n");
+		Eprintf("'dev' option is mandatory.\n");
 		ntfs_fuse_destroy();
 		return 2;
 	}

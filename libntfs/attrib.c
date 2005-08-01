@@ -810,6 +810,14 @@ res_err_out:
 	 */
 	ofs = pos - (rl->vcn << vol->cluster_size_bits);
 	for (; count; rl++, ofs = 0) {
+		if (rl->lcn == LCN_RL_NOT_MAPPED) {
+			rl = ntfs_attr_find_vcn(na, rl->vcn);
+			if (!rl) {
+				if (errno == ENOENT)
+					errno = EIO;
+				goto rl_err_out;
+			}
+		}
 		if (!rl->length)
 			goto rl_err_out;
 		if (rl->lcn < (LCN)0) {
@@ -829,9 +837,9 @@ res_err_out:
 		to_read = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		Dprintf("%s(): Reading 0x%llx bytes from vcn 0x%llx, lcn 0x%llx, "
-				"ofs 0x%llx.\n", __FUNCTION__, to_read,
-				rl->vcn, rl->lcn, ofs);
+		Dprintf("%s(): Reading 0x%llx bytes from vcn 0x%llx, "
+				"lcn 0x%llx, ofs 0x%llx.\n", __FUNCTION__,
+				to_read, rl->vcn, rl->lcn, ofs);
 		br = ntfs_pread(vol->dev, (rl->lcn << vol->cluster_size_bits) +
 				ofs, to_read, b);
 		/* If everything ok, update progress counters and continue. */
@@ -1049,6 +1057,14 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	 */
 	ofs = pos - (rl->vcn << vol->cluster_size_bits);
 	for (; count; rl++, ofs = 0) {
+		if (rl->lcn == LCN_RL_NOT_MAPPED) {
+			rl = ntfs_attr_find_vcn(na, rl->vcn);
+			if (!rl) {
+				if (errno == ENOENT)
+					errno = EIO;
+				goto rl_err_out;
+			}
+		}
 		if (!rl->length) {
 			errno = EIO;
 			goto rl_err_out;

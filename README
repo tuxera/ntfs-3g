@@ -47,6 +47,7 @@ Quick Installation
 
    In most cases it should be sufficient to do:
 
+	./autogen.sh    <-- Only in case you received source from CVS.
 	./configure
 	make
 	make install	<-- You usually need to be root for this one.
