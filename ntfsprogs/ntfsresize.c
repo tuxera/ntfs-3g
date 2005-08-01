@@ -83,6 +83,11 @@ static const char *hibernated_volume_msg =
 "Apparently the NTFS partition is hibernated. Windows must be resumed and\n"
 "turned off properly, thus resizing will be possible later on.\n";
 
+static const char *unclean_journal_msg =
+"Apparently the NTFS journal file is unclean. Please shutdown Windows\n"
+"properly before using this software. If it wouldn't help then please\n"
+"report it to linux-ntfs-dev@lists.sf.net. Thank you.\n";
+
 static const char *bad_sectors_warning_msg =
 "****************************************************************************\n"
 "* WARNING: The disk has bad sector. This means physical damage on the disk *\n"
@@ -2179,7 +2184,9 @@ static ntfs_volume *mount_volume(void)
 			printf(corrupt_volume_msg);
 		else if (err == EPERM)
 			printf(hibernated_volume_msg);
-		exit(1);
+        	else if (err == EOPNOTSUPP) /* NOTE: same as ENOTSUP !!! */
+			printf(unclean_journal_msg);
+	 exit(1);
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY)
