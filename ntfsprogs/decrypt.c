@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <gcrypt.h>
-#include <openssl/md5.h>
 
 #include "decrypt.h"
 
@@ -403,6 +402,9 @@ unsigned ntfs_decrypt_user_key_decrypt(ntfs_decrypt_user_key *key,
 
 #if 0
 // This is the old code based on OpenSSL.  Please do not remove it.  AIA
+
+#include <openssl/md5.h>
+
 /**
  * ntfs_desx_key_expand - expand a 128-bit desx key to the needed 192-bit key
  * @src:	source buffer containing 128-bit key
