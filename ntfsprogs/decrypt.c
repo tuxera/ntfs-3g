@@ -215,7 +215,8 @@ static inline void reverse_buffer(unsigned char *buf, unsigned buf_size)
 
 ntfs_decrypt_user_key *ntfs_decrypt_user_key_open(
 		ntfs_decrypt_user_key_session *session __attribute__((unused)),
-		unsigned char *thumb_print, unsigned thumb_size)
+		unsigned char *thumb_print __attribute__((unused)),
+		unsigned thumb_size __attribute__((unused)))
 {
 #ifdef __CYGWIN__
 	CRYPT_HASH_BLOB hash_blob;
