@@ -1807,32 +1807,32 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 	int len;
 	runlist *p = *rl;
 
-	len = rl_items(p);
-	if (len <= 1)
+	len = rl_items(p) - 1;
+	if (len <= 0)
 		err_exit("rl_expand: bad runlist length: %d\n", len);
 
-	if (p[len - 1].vcn > last_vcn)
+	if (p[len].vcn > last_vcn)
 		err_exit("rl_expand: length is already more than requested "
-			 "(%lld > %lld)\n", p[len - 1].vcn, last_vcn);
+			 "(%lld > %lld)\n", p[len].vcn, last_vcn);
 
-	if (p[len - 2].lcn == LCN_HOLE) {
+	if (p[len - 1].lcn == LCN_HOLE) {
 
-		p[len - 2].length += last_vcn - p[len - 1].vcn;
-		p[len - 1].vcn = last_vcn;
+		p[len - 1].length += last_vcn - p[len].vcn;
+		p[len].vcn = last_vcn;
 
-	} else if (p[len - 2].lcn >= 0) {
+	} else if (p[len - 1].lcn >= 0) {
 
-		p = realloc(*rl, ++len * sizeof(runlist_element));
+		p = realloc(*rl, (++len + 1) * sizeof(runlist_element));
 		if (!p)
 			perr_exit("rl_expand: realloc");
 
-		p[len - 2].lcn = LCN_HOLE;
-		p[len - 2].length = last_vcn - p[len - 2].vcn;
-		rl_set(p + len - 1, last_vcn, LCN_ENOENT, 0LL);
+		p[len - 1].lcn = LCN_HOLE;
+		p[len - 1].length = last_vcn - p[len - 1].vcn;
+		rl_set(p + len, last_vcn, LCN_ENOENT, 0LL);
 		*rl = p;
 
 	} else
-		err_exit("rl_expand: bad LCN: %lld\n", p[len - 2].lcn);
+		err_exit("rl_expand: bad LCN: %lld\n", p[len - 1].lcn);
 }
 
 /**
