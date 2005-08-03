@@ -378,11 +378,10 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
-	int res;
+	ntfs_attr *na = NULL;
 	char *path = NULL;
 	ntfschar *stream_name;
-	int stream_name_len;
+	int stream_name_len, res, total = 0;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -398,11 +397,25 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	res = ntfs_attr_pread(na, offset, size, buf);
-	if (res == -1)
-		res = -errno;		
-	ntfs_attr_close(na);
+	if (offset + size > na->data_size)
+		size = na->data_size - offset;
+	while (size) {
+		res = ntfs_attr_pread(na, offset, size, buf);
+		if (res < size)
+			perror("ntfs_attr_pread returned less bytes than "
+					"requested.");
+		if (res <= 0) {
+			res = -errno;
+			goto exit;
+		}
+		size -= res;
+		offset += res;
+		total += res;
+	}
+	res = total;
 exit:
+	if (na)
+		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
 		perror("Failed to close inode");
 	free(path);
@@ -416,11 +429,10 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
-	int res;
+	ntfs_attr *na = NULL;
 	char *path = NULL;
 	ntfschar *stream_name;
-	int stream_name_len;
+	int stream_name_len, res, total = 0;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -436,14 +448,24 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	res = ntfs_attr_pwrite(na, offset, size, buf);
-	if (res == -1)
-		res = -errno;
-	if (res < size)
-		perror("ntfs_attr_pwrite returned less than requested.");
+	while (size) {
+		res = ntfs_attr_pwrite(na, offset, size, buf);
+		if (res < size)
+			perror("ntfs_attr_pwrite returned less bytes than "
+					"requested.");
+		if (res <= 0) {
+			res = -errno;
+			goto exit;
+		}
+		size -= res;
+		offset += res;
+		total += res;
+	}
+	res = total;
+exit:	
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
-	ntfs_attr_close(na);
-exit:
+	if (na)
+		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
 		perror("Failed to close inode");
 	free(path);

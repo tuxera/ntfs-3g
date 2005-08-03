@@ -817,6 +817,8 @@ res_err_out:
 					errno = EIO;
 				goto rl_err_out;
 			}
+			/* Needed for case when runs merged. */
+			ofs = pos + total - (rl->vcn << vol->cluster_size_bits);
 		}
 		if (!rl->length)
 			goto rl_err_out;
@@ -1064,6 +1066,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 					errno = EIO;
 				goto rl_err_out;
 			}
+			/* Needed for case when runs merged. */
+			ofs = pos + total - (rl->vcn << vol->cluster_size_bits);
 		}
 		if (!rl->length) {
 			errno = EIO;
