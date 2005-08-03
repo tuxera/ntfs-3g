@@ -3,6 +3,7 @@
  *		project.
  *
  * Copyright (c) 2004-2005 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -265,9 +266,17 @@ static __inline__ BOOL ntfs_is_cb_compressed(ntfs_attr *na,
 		rl++;
 		/* Map the next runlist fragment if it is not mapped. */
 		if (rl->lcn < LCN_HOLE || !rl->length) {
-			rl = ntfs_attr_find_vcn(na, rl->vcn);
+			VCN tvcn;
+
+			tvcn = rl->vcn;
+			rl = ntfs_attr_find_vcn(na, tvcn);
 			if (!rl || rl->lcn < LCN_HOLE || !rl->length)
 				return TRUE;
+			if (rl->vcn < tvcn) {
+				/* Runs merged. Need special handling. */
+				cb_clusters -= rl->length - (tvcn - rl->vcn);
+				continue;
+			}
 		}
 		/* If the current run is sparse, the cb is compressed. */
 		if (rl->lcn == LCN_HOLE)

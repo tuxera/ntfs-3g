@@ -25,6 +25,8 @@ xx/xx/xxxx - 1.12.0-WIP
 	- Make find work correctly on volumes mounted by ntfsmount.  (Yura)
 	- Replaced all occurances of ENOTSUP to EOPNOTSUPP to be in better
 	  harmony with the kernel driver.  (Szaka)
+	- Fix ntfs_is_cb_compressed for nasty runlist merging case in which
+	  compression block was incorrectly treated as not compressed.  (Yura)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
