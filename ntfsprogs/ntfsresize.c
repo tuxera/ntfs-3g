@@ -1835,6 +1835,25 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 		err_exit("rl_expand: bad LCN: %lld\n", p[len - 1].lcn);
 }
 
+static void rl_truncate(runlist **rl, const VCN last_vcn)
+{
+	int len;
+	VCN vcn;
+	
+	len = rl_items(*rl) - 1;
+	if (len <= 0)
+		err_exit("rl_truncate: bad runlist length: %d\n", len);
+
+	vcn = (*rl)[len].vcn;
+	
+	if (vcn < last_vcn)
+		rl_expand(rl, last_vcn);
+	
+	else if (vcn > last_vcn)
+		if (ntfs_rl_truncate(rl, last_vcn) == -1)
+			perr_exit("ntfs_rl_truncate");
+}
+
 /**
  * bitmap_file_data_fixup
  *
@@ -1870,11 +1889,7 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
 	
-	if (resize->shrink) {
-		if (ntfs_rl_truncate(&rl_bad, nr_clusters) == -1)
-			perr_exit("ntfs_rl_truncate");
-	} else
-		rl_expand(&rl_bad, nr_clusters);
+	rl_truncate(&rl_bad, nr_clusters);
 
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
 	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
