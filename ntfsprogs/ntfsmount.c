@@ -401,7 +401,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		size = na->data_size - offset;
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
-		if (res < size)
+		if (res < (s64)size)
 			Eprintf("ntfs_attr_pread returned less bytes than "
 					"requested.\n");
 		if (res <= 0) {
@@ -450,7 +450,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < size)
+		if (res < (s64)size)
 			Eprintf("ntfs_attr_pwrite returned less bytes than "
 					"requested.\n");
 		if (res <= 0) {
@@ -558,7 +558,7 @@ exit:
 	return res;
 }
 
-static int ntfs_fuse_rm_file(char *file)
+static int ntfs_fuse_rm_file(char *file __attribute__((unused)))
 {
 	return -EOPNOTSUPP;
 }
@@ -640,7 +640,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 			goto exit;
 		}
 		if (ret)
-			ret++; /* For space delimiter .*/
+			ret++; /* For space delimiter. */
 		ret += tmp_name_len;
 		if ((size_t)ret <= size) {
 			/* Don't add space to the beginning of line. */
