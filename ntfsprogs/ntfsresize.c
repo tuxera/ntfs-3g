@@ -1809,7 +1809,11 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 
 	len = rl_items(p);
 	if (len <= 1)
-		err_exit("ntfs_rl_expand: bad runlist length: %d\n", len);
+		err_exit("rl_expand: bad runlist length: %d\n", len);
+
+	if (p[len - 1].vcn > last_vcn)
+		err_exit("rl_expand: length is already more than requested "
+			 "(%lld > %lld)\n", p[len - 1].vcn, last_vcn);
 
 	if (p[len - 2].lcn == LCN_HOLE) {
 
@@ -1820,7 +1824,7 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 
 		p = realloc(*rl, ++len * sizeof(runlist_element));
 		if (!p)
-			perr_exit("ntfs_rl_expand: realloc");
+			perr_exit("rl_expand: realloc");
 
 		p[len - 2].lcn = LCN_HOLE;
 		p[len - 2].length = last_vcn - p[len - 2].vcn;
@@ -1828,7 +1832,7 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 		*rl = p;
 
 	} else
-		err_exit("ntfs_rl_expand: bad LCN: %lld\n", p[len - 2].lcn);
+		err_exit("rl_expand: bad LCN: %lld\n", p[len - 2].lcn);
 }
 
 /**
