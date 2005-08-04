@@ -128,6 +128,9 @@ endif
 strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
 	$(STRIP) $^
 
+libs:
+	(cd ../libntfs && $(MAKE) libs) || exit 1;
+
 extra:	extras
 
-extras:	$(EXTRA_PROGRAMS)
+extras:	libs $(EXTRA_PROGRAMS)

@@ -19,11 +19,10 @@ libtool: $(LIBTOOL_DEPS)
 strip:
 	(cd ntfsprogs && $(MAKE) strip) || exit 1;
 
-extra:	extras
-
-extras:
-	(cd ntfsprogs && $(MAKE) extras) || exit 1;
-
 libs:
 	(cd libntfs && $(MAKE) libs) || exit 1;
 
+extra:	extras
+
+extras: libs
+	(cd ntfsprogs && $(MAKE) extras) || exit 1;

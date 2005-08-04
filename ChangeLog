@@ -42,6 +42,10 @@
 	  Anton)
 	- Add information about $EFS on-disk structures to layout.h.  (Yuval,
 	  Anton)
+	- Fix build so that make extra directly after ./configure works.
+	  Thanks to Yuval for the bug report.  (Anton)
+	- Add ./configure option --enable-crypto and if enabled detect whether
+	  libgcrypt is present or not.  (Anton)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
