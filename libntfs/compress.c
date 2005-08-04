@@ -254,29 +254,27 @@ static __inline__ BOOL ntfs_is_cb_compressed(ntfs_attr *na,
 		runlist_element *rl, VCN cb_start_vcn, int cb_clusters)
 {
 	/*
-	 * The simplest case:  the run starting at @cb_start_vcn contains
+	 * The simplest case: the run starting at @cb_start_vcn contains
 	 * @cb_clusters clusters which are all not sparse, thus the cb is not
 	 * compressed.
 	 */
-	if (rl->length - (cb_start_vcn - rl->vcn) >= cb_clusters)
-		return FALSE;
+restart:
 	cb_clusters -= rl->length - (cb_start_vcn - rl->vcn);
-	do {
+	while (cb_clusters > 0) {
 		/* Go to the next run. */
 		rl++;
 		/* Map the next runlist fragment if it is not mapped. */
 		if (rl->lcn < LCN_HOLE || !rl->length) {
-			VCN tvcn;
-
-			tvcn = rl->vcn;
-			rl = ntfs_attr_find_vcn(na, tvcn);
+			cb_start_vcn = rl->vcn;
+			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl || rl->lcn < LCN_HOLE || !rl->length)
 				return TRUE;
-			if (rl->vcn < tvcn) {
-				/* Runs merged. Need special handling. */
-				cb_clusters -= rl->length - (tvcn - rl->vcn);
-				continue;
-			}
+			/*
+			 * If the runs were merged need to deal with the
+			 * resulting partial run so simply restart.
+			 */
+			if (rl->vcn < cb_start_vcn)
+				goto restart;
 		}
 		/* If the current run is sparse, the cb is compressed. */
 		if (rl->lcn == LCN_HOLE)
@@ -285,7 +283,7 @@ static __inline__ BOOL ntfs_is_cb_compressed(ntfs_attr *na,
 		if (rl->length >= cb_clusters)
 			return FALSE;
 		cb_clusters -= rl->length;
-	} while (cb_clusters > 0);
+	};
 	/* All cb_clusters were not sparse thus the cb is not compressed. */
 	return FALSE;
 }
