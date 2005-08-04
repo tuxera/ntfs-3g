@@ -1,4 +1,4 @@
-xx/xx/xxxx - 1.12.0-WIP
+04/07/2005 - 1.11.2 - A lot of fixes and improvements.
 
 	- ntfsls: fix showing not system files started with '$'.  (Yura)
 	- Move ntfs2utc and utc2ntfs from utils.[ch] to timeconv.h.  (Yura)
@@ -29,6 +29,8 @@ xx/xx/xxxx - 1.12.0-WIP
 	  compression block was incorrectly treated as not compressed.  (Yura)
 	- ntfsresize: fix for ntfs_rl_truncate() EIO: always set the correct
 	  size for $BadClus:$Bad, even if Windows set it incorrectly.  (Szaka)
+	- Make ntfs_attr_open resolve attribute name for ntfs_attr struct
+	  in case NULL passed instead of name.  (Yura)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 

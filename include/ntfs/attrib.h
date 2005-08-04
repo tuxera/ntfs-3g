@@ -2,7 +2,7 @@
  * attrib.h - Exports for attribute handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -261,7 +261,7 @@ extern void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
 		const u8 compression_unit);
 
 extern ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		ntfschar *name, const u32 name_len);
+		ntfschar *name, u32 name_len);
 extern void ntfs_attr_close(ntfs_attr *na);
 
 extern s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count,

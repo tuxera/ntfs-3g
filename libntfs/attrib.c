@@ -322,7 +322,7 @@ void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
  * both those cases @name_len is not used at all.
  */
 ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		ntfschar *name, const u32 name_len)
+		ntfschar *name, u32 name_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na;
@@ -348,20 +348,34 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 			return NULL;
 		}
 	}
-	__ntfs_attr_init(na, ni, type, name, name_len);
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
 		goto err_out;
 	}
-
 	if (ntfs_attr_lookup(type, name, name_len, 0, 0, NULL, 0, ctx)) {
 		err = errno;
 		goto put_err_out;
 	}
+
 	a = ctx->attr;
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+	if (!name) {
+		if (a->name_length) {
+			name = ntfs_ucsndup((ntfschar*)((u8*)a + le16_to_cpu(
+					a->name_offset)), a->name_length);
+			if (!name) {
+				err = errno;
+				goto put_err_out;
+			}
+			name_len = a->name_length;
+		} else {
+			name = AT_UNNAMED;
+			name_len = 0;
+		}
+	}
+	__ntfs_attr_init(na, ni, type, name, name_len);
 	if (a->non_resident) {
 		ntfs_attr_init(na, TRUE, a->flags & ATTR_IS_COMPRESSED,
 				a->flags & ATTR_IS_ENCRYPTED,
