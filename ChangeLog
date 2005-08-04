@@ -40,6 +40,8 @@
 	  on Windows is that it needs the user's private key to be able to
 	  decrypt the File Encryption Key so it can decrypt the file.  (Yuval,
 	  Anton)
+	- Add information about $EFS on-disk structures to layout.h.  (Yuval,
+	  Anton)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
