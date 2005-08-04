@@ -1,7 +1,3 @@
-Finish layout.h: in particular, add:
-
-- more about EFS and the EFS attribute.
-
 Add usnjrnl.h (copy from kernel driver):
 
 - describe the $UsnJrnl on disk structures
