@@ -124,3 +124,5 @@ partition.  See man 8 ntfsls for details.
 ntfscat - Concatenate files and print their contents on the standard output.
 
 ntfscp - Overwrite files on an NTFS partition.
+
+ntfsmount - Mount an NTFS partition from user-space using libntfs and FUSE.
