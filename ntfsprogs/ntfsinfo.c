@@ -65,7 +65,7 @@
 #include "security.h"
 #include "mst.h"
 #include "dir.h"
-#include "timeconv.h"
+#include "ntfstime.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 

@@ -1,6 +1,7 @@
 /*
- * timeconv.h - NTFS time conversion functions.  Part of the Linux-NTFS project.
+ * ntfstime.h - NTFS time related functions.  Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -19,10 +20,12 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _NTFS_TIMECONV_H
-#define _NTFS_TIMECONV_H
+#ifndef _NTFS_NTFSTIME_H
+#define _NTFS_NTFSTIME_H
 
 #include <time.h>
+
+#include "types.h"
 
 #define NTFS_TIME_OFFSET ((s64)(369 * 365 + 89) * 24 * 3600 * 10000000)
 
@@ -61,4 +64,4 @@ static __inline__ s64 utc2ntfs(time_t utc_time)
 	return (s64)utc_time * 10000000 + NTFS_TIME_OFFSET;
 }
 
-#endif /* _NTFS_TIMECONV_H */
+#endif /* _NTFS_NTFSTIME_H */

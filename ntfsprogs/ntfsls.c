@@ -40,7 +40,7 @@
 #include "utils.h"
 #include "dir.h"
 #include "list.h"
-#include "timeconv.h"
+#include "ntfstime.h"
 
 static const char *EXEC_NAME = "ntfsls";
 

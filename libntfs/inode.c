@@ -38,7 +38,7 @@
 #include "lcnalloc.h"
 #include "index.h"
 #include "dir.h"
-#include "timeconv.h"
+#include "ntfstime.h"
 
 /**
  * Internal:

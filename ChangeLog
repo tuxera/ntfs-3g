@@ -1,36 +1,45 @@
-04/07/2005 - 1.11.2 - A lot of fixes and improvements.
+04/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
-	- ntfsls: fix showing not system files started with '$'.  (Yura)
-	- Move ntfs2utc and utc2ntfs from utils.[ch] to timeconv.h.  (Yura)
+	- ntfsls: Fix display of non-system files whose name begins with the
+	  '$' character.  (Yura)
+	- Move ntfs2utc and utc2ntfs from utils.[ch] to ntfstime.h.  (Yura,
+	  Anton)
 	- Add [acm]time fields to struct ntfs_inode and set them during
-	  ntfs_inode_open.  Update ntfsmount to use them.  (Yura)
-	- index.c::ntfs_index_lookup: fix bug when index context didn't point
-	  on index root in which entry located.  (Yura)
-	- ntfsresize: relocate_attributes(): don't stop processing of MFT 
-	  record attributes at AT_DATA of $BadClus and $Bitmap. In practice, 
-	  there aren't non-resident attributes after them so this bug,
-	  introduced in 1.11.0, shouldn't have ever caused data loss.  (Szaka)
-	- ntfsresize: support relocation of $MFT with $ATTRIBUTE_LIST.  (Szaka)
-	- ntfsresize: support resizing into the middle of a $MFT $DATA
+	  ntfs_inode_openi().  Update ntfsmount to use them.  (Yura)
+	- index.c::ntfs_index_lookup(): Fix bug when index context did not
+	  point to the index root in which the entry located.  (Yura)
+	- ntfsresize: relocate_attributes(): Do not stop processing MFT record
+	  attributes at AT_DATA of $BadClus and $Bitmap.  In practice, there
+	  are no non-resident attributes after them so this is a bug which was
+	  introduced in 1.11.0 which should not have caused data loss.  (Szaka)
+	- ntfsresize: Support relocation of $MFT with $ATTRIBUTE_LIST.  (Szaka)
+	- ntfsresize: Support resizing into the middle of a $MFT $DATA
 	  extent. (Szaka)
-	- ntfscp: fix attribute name parsing bug introduced in 1.10.0.  (Yura)
-	- ntfsinfo: dump more information for indexes.  (Yura)
-	- Fix unistr.c::ntfs_mbstoucs on systems with utf8 locale.  (Yura)
-	- Change errno and print more verbose message in case if logfile check
-	  failed.  (Yura)
-	- Fix random errno returned by ntfs_inode_open() if the MFT record 
-	  wasn't in use.  (Szaka)
-	- Fix ntfs_attr_p{read,write} to not return less bytes if trapped on
+	- ntfscp: Fix attribute name parsing bug introduced in 1.10.0.  (Yura)
+	- ntfsinfo: Dump more information about indexes.  (Yura)
+	- Fix unistr.c::ntfs_mbstoucs() on systems with utf8 locale.  (Yura)
+	- Change errno and print more verbose message in the case of a failing
+	  logfile check.  (Yura)
+	- Fix random errno returned by ntfs_inode_open() if the MFT record  was
+	  not in use.  (Szaka)
+	- Fix ntfs_attr_p{read,write}() to not return less bytes if trapped on
 	  unmapped runlist region.  (Yura)
 	- Make find work correctly on volumes mounted by ntfsmount.  (Yura)
-	- Replaced all occurances of ENOTSUP to EOPNOTSUPP to be in better
+	- Replaced all occurances of ENOTSUP with EOPNOTSUPP to be in better
 	  harmony with the kernel driver.  (Szaka)
-	- Fix ntfs_is_cb_compressed for nasty runlist merging case in which
-	  compression block was incorrectly treated as not compressed.  (Yura)
-	- ntfsresize: fix for ntfs_rl_truncate() EIO: always set the correct
-	  size for $BadClus:$Bad, even if Windows set it incorrectly.  (Szaka)
-	- Make ntfs_attr_open resolve attribute name for ntfs_attr struct
+	- Fix ntfs_is_cb_compressed() for nasty runlist merging case in which
+	  compression block was incorrectly treated as not compressed.  (Yura,
+	  Anton)
+	- ntfsresize: Fix for ntfs_rl_truncate() EIO: Always set the correct
+	  size for $BadClus::$Bad, even if Windows set it incorrectly.  (Szaka)
+	- Make ntfs_attr_open() resolve attribute name for ntfs_attr struct
 	  in case NULL passed instead of name.  (Yura)
+	- ntfsdecrypt (make extra) is now fully functional under Windows/Cygwin
+	  using libgcrypt.  It decrypts all types of compressed files that ntfs
+	  creates, i.e. DesX, AES-256, and 3Des.  The only reason it only works
+	  on Windows is that it needs the user's private key to be able to
+	  decrypt the File Encryption Key so it can decrypt the file.  (Yuval,
+	  Anton)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 

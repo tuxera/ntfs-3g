@@ -126,7 +126,7 @@
 #include "mst.h"
 #include "runlist.h"
 #include "utils.h"
-#include "timeconv.h"
+#include "ntfstime.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build mkntfs.  \

@@ -7,6 +7,9 @@ changing the file size and can read/write/add/remove named data streams via
 "file:stream" interface and list them via "ntfs.streams.list" extended
 attribute (this only if xattr support is enabled).  (Yura Pakhuchiy)
 
+Older news
+==========
+
 Attribute resize code for normal and sparse files is completed.  Thus, ntfscp
 should always successfully overwrite any normal or sparse file even if file
 size is changed.  (Yura Pakhuchiy)
@@ -30,9 +33,6 @@ resize to any size you like (as long as there is enough free space).  Note,
 this modifies the command line options a little as well as the returned output
 so applications using ntfsresize might need modifications before they will
 work with the updated ntfsresize.  (Szakacsits Szabolcs)
-
-Older news
-==========
 
 ntfsprogs now should ./configure and compile cleanly on SuSE as well as RedHat
 Linux.
