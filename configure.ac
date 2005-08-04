@@ -51,7 +51,7 @@ fi
 # Command-line options.
 AC_ARG_ENABLE(debug,
 	AS_HELP_STRING(--enable-debug,enable additional debugging code and
-			output), ,
+		       output), ,
 	enable_debug=no
 )
 
@@ -77,14 +77,20 @@ AC_ARG_ENABLE(gnome-vfs,
 )
 
 AC_ARG_ENABLE(fuse-module,
-	AS_HELP_STRING(--disable-fuse-module,omit FUSE 'libntfs'
-			interface (default=detect)), ,
+	AS_HELP_STRING(--disable-fuse-module,omit FUSE 'libntfs' interface
+		       (default=detect)), ,
 	enable_fuse_module=auto
 )
 
+AC_ARG_ENABLE(crypto,
+	AS_HELP_STRING(--enable-crypto,enable crypto related code and utilities
+		       (default=no)), ,
+	enable_crypto=no
+)
+
 AC_ARG_ENABLE(really-static,
-	AS_HELP_STRING(--enable-really-static,create completely static
-		       binaries for the utilities), ,
+	AS_HELP_STRING(--enable-really-static,create completely static binaries
+		       for the utilities), ,
 	enable_really_static=no
 )
 AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
@@ -149,6 +155,20 @@ if test "$enable_fuse_module" != "no"; then
 	])
 fi
 AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
+
+# Autodetect whether we can build crypto stuff or not.
+compile_crypto=false
+if test "$enable_crypto" != "no"; then
+	PKG_CHECK_MODULES(CRYPTO, [libgcrypt], [ compile_crypto=true ],
+	[
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([Linux-NTFS crypto code requires the gcrypt library.])
+		else
+			AC_MSG_WARN([Linux-NTFS crypto code requires the gcrypt library.])
+		fi
+	])
+fi
+AM_CONDITIONAL(ENABLE_CRYPTO, $compile_crypto)
 
 # add --with-extra-includes and --with-extra-libs switch to ./configure
 all_libraries="$all_libraries $USER_LDFLAGS"
@@ -217,7 +237,7 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libintl.h limits.h locale.h mntent.h \
 	errno.h time.h unistd.h utime.h wchar.h getopt.h features.h endian.h \
 	byteswap.h sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h \
 	sys/mount.h sys/stat.h sys/types.h sys/vfs.h linux/major.h linux/fd.h \
-	linux/hdreg.h machine/endian.h])
+	linux/hdreg.h machine/endian.h gcrypt.h windows.h wincrypt.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -243,7 +263,7 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
 	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit \
-	setxattr])
+	setxattr getopt_long ])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([

@@ -15,7 +15,7 @@ bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsrm ntfsmftalloc ntfsdecrypt
+			  ntfsrm ntfsmftalloc
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -31,6 +31,10 @@ linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
 if ENABLE_FUSE_MODULE
 bin_PROGRAMS		+= ntfsmount
+endif
+
+if ENABLE_CRYPTO
+EXTRA_PROGRAMS		+= ntfsdecrypt
 endif
 
 # Set the include path.
@@ -89,10 +93,6 @@ endif
 
 # We don't distribute these
 
-ntfsdecrypt_SOURCES	= ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
-ntfsdecrypt_LDADD	= $(AM_LIBS)
-ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS) -lgcrypt
-
 ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD		= $(AM_LIBS)
 ntfsrm_LDFLAGS		= $(AM_LFLAGS)
@@ -117,6 +117,12 @@ ntfsdump_logfile_SOURCES= ntfsdump_logfile.c
 ntfsdump_logfile_LDADD	= $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
 
+if ENABLE_CRYPTO
+ntfsdecrypt_SOURCES	= ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
+ntfsdecrypt_LDADD	= $(AM_LIBS)
+ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS) -lgcrypt
+endif
+
 # Extra targets
 
 strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
@@ -125,4 +131,3 @@ strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
 extra:	extras
 
 extras:	$(EXTRA_PROGRAMS)
-

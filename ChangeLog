@@ -5,7 +5,7 @@
 	- Move ntfs2utc and utc2ntfs from utils.[ch] to ntfstime.h.  (Yura,
 	  Anton)
 	- Add [acm]time fields to struct ntfs_inode and set them during
-	  ntfs_inode_openi().  Update ntfsmount to use them.  (Yura)
+	  ntfs_inode_open().  Update ntfsmount to use them.  (Yura)
 	- index.c::ntfs_index_lookup(): Fix bug when index context did not
 	  point to the index root in which the entry located.  (Yura)
 	- ntfsresize: relocate_attributes(): Do not stop processing MFT record
