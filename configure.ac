@@ -159,7 +159,7 @@ AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 # Autodetect whether we can build crypto stuff or not.
 compile_crypto=false
 if test "$enable_crypto" != "no"; then
-	PKG_CHECK_MODULES(CRYPTO, [libgcrypt], [ compile_crypto=true ],
+	AM_PATH_LIBGCRYPT(, [ compile_crypto=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gcrypt library.])
