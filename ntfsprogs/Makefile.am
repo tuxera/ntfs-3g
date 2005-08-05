@@ -118,9 +118,9 @@ ntfsdump_logfile_LDADD	= $(AM_LIBS)
 ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
 
 if ENABLE_CRYPTO
-ntfsdecrypt_SOURCES	= ntfsdecrypt.c decrypt.c decrypt.h utils.c utils.h
+ntfsdecrypt_SOURCES	= ntfsdecrypt.c utils.c utils.h
 ntfsdecrypt_LDADD	= $(AM_LIBS)
-ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS) -lgcrypt
+ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS) -lgcrypt -lgnutls
 endif
 
 # Extra targets
