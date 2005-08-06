@@ -524,7 +524,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 #else
 	mbtowc(NULL, NULL, 0);
 #endif
-	for (i = o = cnt = 0; o < ins_len; i += cnt, o++) {
+	for (i = o = cnt = 0; i < ins_size; i += cnt, o++) {
 		/* Reallocate memory if necessary or abort. */
 		if (o >= ucs_len) {
 			ntfschar *tc;
