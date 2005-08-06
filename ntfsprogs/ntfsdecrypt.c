@@ -368,7 +368,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	}
 	/* Build the gcrypt private key. */
 	if (gcry_sexp_build(&rsa_key, NULL,
-			"(private-key(rsa(n%m)(e%m)(d%m)(q%m)(p%m)(u%m)))",
+			"(private-key(rsa(n%m)(e%m)(d%m)(p%m)(q%m)(u%m)))",
 			rm[0], rm[1], rm[2], rm[3], rm[4], rm[5]) != 0) {
 		fprintf(stderr, "Failed to build RSA private key s-exp.\n");
 		return NULL;
