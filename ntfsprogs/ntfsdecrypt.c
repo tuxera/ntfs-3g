@@ -456,6 +456,8 @@ check_again:
 						"%s\n", gnutls_strerror(err));
 				goto bag_out;
 			}
+			if (password && !strlen(password))
+				flags = GNUTLS_PKCS_PLAIN;
 			/* Decrypt the private key into GNU TLS format. */
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
 					GNUTLS_X509_FMT_DER, password, flags);
@@ -1143,14 +1145,10 @@ int main(int argc, char *argv[])
 		ntfs_crypto_deinit();
 		return 1;
 	}
-	/* If password is empty string set it to NULL. */
-	if (!strlen(password))
-		password = NULL;
 	/* Obtain the user's private RSA key from the key file. */
 	rsa_key = ntfs_pkcs12_extract_rsa_key(pfx_buf, pfx_size, password);
 	/* Destroy the password. */
-	if (password)
-		memset(password, 0, strlen(password));
+	memset(password, 0, strlen(password));
 	/* No longer need the pfx file contents. */
 	free(pfx_buf);
 	if (!rsa_key) {
