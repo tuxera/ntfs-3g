@@ -237,7 +237,7 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libintl.h limits.h locale.h mntent.h \
 	errno.h time.h unistd.h utime.h wchar.h getopt.h features.h endian.h \
 	byteswap.h sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h \
 	sys/mount.h sys/stat.h sys/types.h sys/vfs.h linux/major.h linux/fd.h \
-	linux/hdreg.h machine/endian.h gcrypt.h windows.h wincrypt.h])
+	linux/hdreg.h machine/endian.h gcrypt.h windows.h gnutls/pkcs12.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

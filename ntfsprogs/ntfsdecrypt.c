@@ -25,6 +25,10 @@
 
 #include "config.h"
 
+#if !defined(HAVE_GCRYPT_H) || !defined(HAVE_GNUTLS_PKCS12_H)
+#error A required header file is missing. Aborting.
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -252,7 +256,7 @@ static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 		unsigned *pfx_size)
 {
 	int f, to_read, total, attempts, br;
-	struct stat stat;
+	struct stat key_stat;
 
 	if (!keyfile || !pfx || !pfx_size) {
 		fprintf(stderr, "You have to specify the key file, a pointer "
@@ -265,25 +269,25 @@ static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 		perror("Failed to open key file");
 		return -1;
 	}
-	if (fstat(f, &stat) == -1) {
+	if (fstat(f, &key_stat) == -1) {
 		perror("Failed to stat key file");
 		goto file_out;
 	}
-	if (!S_ISREG(stat.st_mode)) {
+	if (!S_ISREG(key_stat.st_mode)) {
 		fprintf(stderr, "Key file is not a regular file, cannot read "
 				"it.");
 		goto file_out;
 	}
-	if (!stat.st_size) {
+	if (!key_stat.st_size) {
 		fprintf(stderr, "Key file has zero size.");
 		goto file_out;
 	}
-	*pfx = malloc(stat.st_size + 1);
+	*pfx = malloc(key_stat.st_size + 1);
 	if (!*pfx) {
 		perror("Failed to allocate buffer for key file contents");
 		goto file_out;
 	}
-	to_read = stat.st_size;
+	to_read = key_stat.st_size;
 	total = attempts = 0;
 	do {
 		br = read(f, *pfx + total, to_read);
@@ -298,8 +302,8 @@ static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 	} while (to_read > 0 && attempts < 3);
 	close(f);
 	/* Make sure it is zero terminated. */
-	(*pfx)[stat.st_size] = 0;
-	*pfx_size = stat.st_size;
+	(*pfx)[key_stat.st_size] = 0;
+	*pfx_size = key_stat.st_size;
 	return 0;
 free_out:
 	free(*pfx);
@@ -364,7 +368,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	}
 	/* Build the gcrypt private key. */
 	if (gcry_sexp_build(&rsa_key, NULL,
-			"(private-key(rsa((n%m)(e%m)(d%m)(p%m)(q%m)(u%m))))",
+			"(private-key(rsa(n%m)(e%m)(d%m)(q%m)(p%m)(u%m)))",
 			rm[0], rm[1], rm[2], rm[3], rm[4], rm[5]) != 0) {
 		fprintf(stderr, "Failed to build RSA private key s-exp.\n");
 		return NULL;
@@ -881,8 +885,8 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 	if (key_size != wanted_key_size) {
 		fprintf(stderr, "%s key of %u bytes but needed size is %u "
 				"bytes, assuming corrupt key.  Aborting.\n",
-				gcry_cipher_algo_name(gcry_algo), key_size,
-				wanted_key_size);
+				gcry_cipher_algo_name(gcry_algo),
+				(unsigned)key_size, (unsigned)wanted_key_size);
 		err = EIO;
 		goto out;
 	}
@@ -1000,7 +1004,7 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	return fek;
 }
 
-int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
+static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 {
 	gcry_error_t err;
 
