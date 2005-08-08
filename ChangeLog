@@ -1,4 +1,4 @@
-04/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
+08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
 	- ntfsls: Fix display of non-system files whose name begins with the
 	  '$' character.  (Yura)
@@ -34,18 +34,22 @@
 	  size for $BadClus::$Bad, even if Windows set it incorrectly.  (Szaka)
 	- Make ntfs_attr_open() resolve attribute name for ntfs_attr struct
 	  in case NULL passed instead of name.  (Yura)
-	- ntfsdecrypt (make extra) is now fully functional under Windows/Cygwin
-	  using libgcrypt.  It decrypts all types of compressed files that ntfs
-	  creates, i.e. DesX, AES-256, and 3Des.  The only reason it only works
-	  on Windows is that it needs the user's private key to be able to
-	  decrypt the File Encryption Key so it can decrypt the file.  (Yuval,
-	  Anton)
+	- ntfsdecrypt (make extra) is now fully functional using libgcrypt and
+	  gnutls 1.2.0 (not later, that is broken at present).  It decrypts all
+	  types of compressed files that ntfs creates, i.e. DesX, AES-256, and
+	  3Des.  The only thing it requires is the user's private key which
+	  needs to be supplied via a .pfx file (a PKCS#12 file).  Such a file
+	  can be created in windows XP SP2 by running cipher with the exporty
+	  key option or in older windows versions by running the certificates
+	  snap-in to the microsoft management console (mmc).  Note that due to
+	  a bug in gnutls you have to protect the .pfx file with a password.
+	  An empty password will not work.  (Yuval, Anton)
 	- Add information about $EFS on-disk structures to layout.h.  (Yuval,
 	  Anton)
 	- Fix build so that make extra directly after ./configure works.
 	  Thanks to Yuval for the bug report.  (Anton)
 	- Add ./configure option --enable-crypto and if enabled detect whether
-	  libgcrypt is present or not.  (Anton)
+	  libgcrypt is present or not and only then build ntfsdecrypt.  (Anton)
 
 20/07/2005 - 1.11.1 - Fix several ntfsmount bugs.
 
