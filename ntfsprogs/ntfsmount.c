@@ -558,8 +558,9 @@ exit:
 	return res;
 }
 
-static int ntfs_fuse_rm_file(char *file __attribute__((unused)))
+static int ntfs_fuse_rm_file(char *file)
 {
+	free(file);
 	return -EOPNOTSUPP;
 }
 
