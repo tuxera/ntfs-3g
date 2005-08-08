@@ -2,6 +2,7 @@ Makefile
 Makefile.in
 aclocal.m4
 autom4te.cache
+conf.libgnutlstest
 config.guess
 config.h
 config.h.in

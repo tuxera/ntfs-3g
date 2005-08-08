@@ -8,7 +8,7 @@ EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 AUTOMAKE_OPTIONS = gnu
 
 MAINTAINERCLEANFILES = configure Makefile.in aclocal.m4 compile depcomp \
-	install-sh missing config.guess config.sub config.h.in INSTALL
+	install-sh missing config.guess config.sub config.h.in INSTALL \
 
 dist-hook: ntfsprogs.spec
 	cp ntfsprogs.spec $(distdir)
