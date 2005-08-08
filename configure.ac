@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.11.2],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.11.3-WIP],[linux-ntfs-dev@lists.sourceforge.net])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
@@ -159,7 +159,8 @@ AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 # Autodetect whether we can build crypto stuff or not.
 compile_crypto=false
 if test "$enable_crypto" != "no"; then
-	AM_PATH_LIBGCRYPT(, [ compile_crypto=true ],
+	have_libgcrypt=false
+	AM_PATH_LIBGCRYPT(1.2.0, [ have_libgcrypt=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gcrypt library.])
@@ -167,6 +168,20 @@ if test "$enable_crypto" != "no"; then
 			AC_MSG_WARN([Linux-NTFS crypto code requires the gcrypt library.])
 		fi
 	])
+	have_libgnutls=false
+	AM_PATH_LIBGNUTLS(1.2.3, [ have_libgnutls=true ],
+	[
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([Linux-NTFS crypto code requires the gnutls library.])
+		else
+			AC_MSG_WARN([Linux-NTFS crypto code requires the gnutls library.])
+		fi
+	])
+	if test "$have_libgcrypt" = "yes"; then
+		if test "$have_libgnutls" = "yes"; then
+			compile_crypto=true
+		fi
+	fi
 fi
 AM_CONDITIONAL(ENABLE_CRYPTO, $compile_crypto)
 

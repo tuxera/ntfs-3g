@@ -1,3 +1,10 @@
+xx/xx/2005 - 1.11.3-WIP
+
+	- Add configure.ac detection for gnutls library and make minimum
+	  version 1.2.3 which is the one that has the rsa key export fixed.
+	- Put in a minimum version for libgcrypt of 1.2.0 as I do not know if
+	  our code works with earlier versions.
+
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
 	- ntfsls: Fix display of non-system files whose name begins with the
