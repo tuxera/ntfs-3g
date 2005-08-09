@@ -485,6 +485,8 @@ check_again:
 				goto bag_out;
 			}
 			/* Decrypt the private key into GNU TLS format. */
+			// FIXME: Due to bugs (?) in gnutls this fails when an
+			// empty password is used.
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
 					GNUTLS_X509_FMT_DER, password, flags);
 			if (err) {
