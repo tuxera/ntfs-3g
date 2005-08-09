@@ -1,9 +1,10 @@
 xx/xx/2005 - 1.11.3-WIP
 
-	- Add configure.ac detection for gnutls library and make minimum
-	  version 1.2.3 which is the one that has the rsa key export fixed.
+	- ntfsmount: Fix small memleak.  (Yura)
+	- Add ./configure detection for gnutls library and make minimum version
+	  1.2.3 which is the one that has the rsa key export fixed.  (Anton)
 	- Put in a minimum version for libgcrypt of 1.2.0 as I do not know if
-	  our code works with earlier versions.
+	  our code works with earlier versions.  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
@@ -46,7 +47,7 @@ xx/xx/2005 - 1.11.3-WIP
 	  types of compressed files that ntfs creates, i.e. DesX, AES-256, and
 	  3Des.  The only thing it requires is the user's private key which
 	  needs to be supplied via a .pfx file (a PKCS#12 file).  Such a file
-	  can be created in windows XP SP2 by running cipher with the exporty
+	  can be created in windows XP SP2 by running cipher with the export
 	  key option or in older windows versions by running the certificates
 	  snap-in to the microsoft management console (mmc).  Note that due to
 	  a bug in gnutls you have to protect the .pfx file with a password.
