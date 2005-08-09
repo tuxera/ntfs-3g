@@ -5,6 +5,7 @@ xx/xx/2005 - 1.11.3-WIP
 	  1.2.3 which is the one that has the rsa key export fixed.  (Anton)
 	- Put in a minimum version for libgcrypt of 1.2.0 as I do not know if
 	  our code works with earlier versions.  (Anton)
+	- Fix some memory leaks in ntfsdecrypt and do some cleanups.  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

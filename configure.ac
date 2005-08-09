@@ -177,8 +177,8 @@ if test "$enable_crypto" != "no"; then
 			AC_MSG_WARN([Linux-NTFS crypto code requires the gnutls library.])
 		fi
 	])
-	if test "$have_libgcrypt" = "yes"; then
-		if test "$have_libgnutls" = "yes"; then
+	if test "$have_libgcrypt" = "true"; then
+		if test "$have_libgnutls" = "true"; then
 			compile_crypto=true
 		fi
 	fi

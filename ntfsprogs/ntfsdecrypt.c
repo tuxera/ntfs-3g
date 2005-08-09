@@ -344,14 +344,14 @@ static void ntfs_crypto_deinit(void)
 static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 		gnutls_x509_privkey_t priv_key)
 {
-	int i, tmp_size;
+	int i, j, tmp_size;
 	gnutls_datum_t rd[6];
 	gcry_mpi_t rm[6];
 	gcry_sexp_t rsa_key;
 
 	/* Extract the RSA parameters from the GNU TLS private key. */
 	if (gnutls_x509_privkey_export_rsa_raw(priv_key, &rd[0], &rd[1],
-			&rd[2], &rd[3], &rd[4], &rd[5]) != 0) {
+			&rd[2], &rd[3], &rd[4], &rd[5])) {
 		fprintf(stderr, "Failed to export rsa parameters.  (Is the "
 				"key an RSA private key?)\n");
 		return NULL;
@@ -359,20 +359,43 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	/* Convert each RSA parameter to mpi format. */
 	for (i = 0; i < 6; i++) {
 		if (gcry_mpi_scan(&rm[i], GCRYMPI_FMT_USG, rd[i].data,
-				rd[i].size, &tmp_size) !=0) {
+				rd[i].size, &tmp_size) != GPG_ERR_NO_ERROR) {
 			fprintf(stderr, "Failed to convert RSA parameter %i "
 					"to mpi format (size %d)\n", i,
 					rd[i].size);
-			return NULL;
+			rsa_key = NULL;
+			break;
 		}
 	}
-	/* Build the gcrypt private key. */
-	if (gcry_sexp_build(&rsa_key, NULL,
-			"(private-key(rsa(n%m)(e%m)(d%m)(p%m)(q%m)(u%m)))",
-			rm[0], rm[1], rm[2], rm[3], rm[4], rm[5]) != 0) {
-		fprintf(stderr, "Failed to build RSA private key s-exp.\n");
-		return NULL;
+	/* Release the no longer needed datum values. */
+	for (j = 0; j < 6; j++) {
+		/*
+		 * FIXME: _gnutls_free_datum() is not exported from libgnutls
+		 * so we do it by hand...  )-:  Let us just hope the
+		 * gnutls_datum_t structure does not change across versions of
+		 * the gnutls library.
+		 */
+#if 0
+		_gnutls_free_datum(&rd[j]);
+#else
+		if (rd[j].data && rd[j].size)
+			gnutls_free(rd[j].data);
+#endif
 	}
+	/*
+	 * Build the gcrypt private key, note libgcrypt uses p and q inversed
+	 * to what gnutls uses.
+	 */
+	if (i == 6 && gcry_sexp_build(&rsa_key, NULL,
+			"(private-key(rsa(n%m)(e%m)(d%m)(p%m)(q%m)(u%m)))",
+			rm[0], rm[1], rm[2], rm[4], rm[3], rm[5]) !=
+			GPG_ERR_NO_ERROR) {
+		fprintf(stderr, "Failed to build RSA private key s-exp.\n");
+		rsa_key = NULL;
+	}
+	/* Release the no longer needed mpi values. */
+	for (j = 0; j < i; j++)
+		gcry_mpi_release(rm[j]);
 	return (ntfs_rsa_private_key)rsa_key;
 }
 
@@ -388,7 +411,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 
 	/* Create a pkcs12 structure. */
 	err = gnutls_pkcs12_init(&pkcs12);
-	if (err < 0) {
+	if (err) {
 		fprintf(stderr, "Failed to initialize PKCS#12 structure: %s\n",
 				gnutls_strerror(err));
 		return NULL;
@@ -397,7 +420,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	dpfx.data = pfx;
 	dpfx.size = pfx_size;
 	err = gnutls_pkcs12_import(pkcs12, &dpfx, GNUTLS_X509_FMT_DER, 0);
-	if (err < 0) {
+	if (err) {
 		fprintf(stderr, "Failed to convert the PFX file from DER to "
 				"native PKCS#12 format: %s\n",
 				gnutls_strerror(err));
@@ -408,21 +431,21 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	 * been tampered with.
 	 */
 	err = gnutls_pkcs12_verify_mac(pkcs12, password);
-	if (err < 0) {
+	if (err) {
 		fprintf(stderr, "Failed to verify the MAC (%s).  Is the "
 				"password correct?\n", gnutls_strerror(err));
 		goto out;
 	}
 	for (bag_index = 0; ; bag_index++) {
 		err = gnutls_pkcs12_bag_init(&bag);
-		if (err < 0) {
+		if (err) {
 			fprintf(stderr, "Failed to initialize PKCS#12 Bag "
 					"structure: %s\n",
 					gnutls_strerror(err));
 			goto out;
 		}
 		err = gnutls_pkcs12_get_bag(pkcs12, bag_index, bag);
-		if (err < 0) {
+		if (err) {
 			if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
 				break;
 			fprintf(stderr, "Failed to obtain Bag from PKCS#12 "
@@ -448,32 +471,35 @@ check_again:
 		case GNUTLS_BAG_PKCS8_KEY:
 			flags = GNUTLS_PKCS_PLAIN;
 		case GNUTLS_BAG_PKCS8_ENCRYPTED_KEY:
-			gnutls_x509_privkey_init(&pkey);
-
 			err = gnutls_pkcs12_bag_get_data(bag, 0, &dkey);
 			if (err < 0) {
 				fprintf(stderr, "Failed to obtain Bag data: "
 						"%s\n", gnutls_strerror(err));
 				goto bag_out;
 			}
-			if (password && !strlen(password))
-				flags = GNUTLS_PKCS_PLAIN;
+			err = gnutls_x509_privkey_init(&pkey);
+			if (err) {
+				fprintf(stderr, "Failed to initialized "
+						"private key structure: %s\n",
+						gnutls_strerror(err));
+				goto bag_out;
+			}
 			/* Decrypt the private key into GNU TLS format. */
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
 					GNUTLS_X509_FMT_DER, password, flags);
-			if (err < 0) {
+			if (err) {
 				fprintf(stderr, "Failed to convert private "
 						"key from DER to GNU TLS "
 						"format: %s\n",
 						gnutls_strerror(err));
-				goto bag_out;
+				goto key_out;
 			}
 			/* Convert the private key to our internal format. */
 			rsa_key = ntfs_rsa_private_key_import_from_gnutls(pkey);
-			goto bag_out;
+			goto key_out;
 		case GNUTLS_BAG_ENCRYPTED:
 			err = gnutls_pkcs12_bag_decrypt(bag, password);
-			if (err < 0) {
+			if (err) {
 				fprintf(stderr, "Failed to decrypt Bag: %s\n",
 						gnutls_strerror(err));
 				goto bag_out;
@@ -485,6 +511,8 @@ check_again:
 		}
 		gnutls_pkcs12_bag_deinit(bag);
 	}
+key_out:
+	gnutls_x509_privkey_deinit(pkey);
 bag_out:
 	gnutls_pkcs12_bag_deinit(bag);
 out:
