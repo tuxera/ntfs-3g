@@ -6,6 +6,8 @@ xx/xx/2005 - 1.11.3-WIP
 	- Put in a minimum version for libgcrypt of 1.2.0 as I do not know if
 	  our code works with earlier versions.  (Anton)
 	- Fix some memory leaks in ntfsdecrypt and do some cleanups.  (Anton)
+	- Fix ntfsdecrypt to also work with passwordless files.  Note this
+	  requires a patched gnutls library or it still does not work.  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

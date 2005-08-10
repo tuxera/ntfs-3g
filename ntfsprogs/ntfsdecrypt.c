@@ -428,12 +428,21 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	}
 	/*
 	 * Verify that the password is correct and that the key file has not
-	 * been tampered with.
+	 * been tampered with.  Note if the password has zero length and the
+	 * verification fails, retry with password set to NULL.  This is needed
+	 * to get passwordless .pfx files generated with Windows XP SP1 (and
+	 * probably earlier versions of Windows) to work.
 	 */
+retry_verify:
 	err = gnutls_pkcs12_verify_mac(pkcs12, password);
 	if (err) {
 		fprintf(stderr, "Failed to verify the MAC (%s).  Is the "
 				"password correct?\n", gnutls_strerror(err));
+		if (err == GNUTLS_E_MAC_VERIFY_FAILED &&
+				password && !strlen(password)) {
+			password = NULL;
+			goto retry_verify;
+		}
 		goto out;
 	}
 	for (bag_index = 0; ; bag_index++) {
@@ -485,8 +494,6 @@ check_again:
 				goto bag_out;
 			}
 			/* Decrypt the private key into GNU TLS format. */
-			// FIXME: Due to bugs (?) in gnutls this fails when an
-			// empty password is used.
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
 					GNUTLS_X509_FMT_DER, password, flags);
 			if (err) {
