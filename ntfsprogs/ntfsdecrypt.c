@@ -436,13 +436,13 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 retry_verify:
 	err = gnutls_pkcs12_verify_mac(pkcs12, password);
 	if (err) {
-		fprintf(stderr, "Failed to verify the MAC (%s).  Is the "
-				"password correct?\n", gnutls_strerror(err));
 		if (err == GNUTLS_E_MAC_VERIFY_FAILED &&
 				password && !strlen(password)) {
 			password = NULL;
 			goto retry_verify;
 		}
+		fprintf(stderr, "Failed to verify the MAC (%s).  Is the "
+				"password correct?\n", gnutls_strerror(err));
 		goto out;
 	}
 	for (bag_index = 0; ; bag_index++) {
