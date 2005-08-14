@@ -2388,10 +2388,10 @@ typedef struct {
 
 /* The header of the 0x100 attribute named "$EFS". */
 typedef struct {
-/*  0*/	u32 efs_length;		/* Length of attribute in bytes. */
-	u32 unknown1;		/* always 0? */
-	u32 unknown2;		/* number of DDFs? */
-	u32 unknown3;		/* number of DRFs? */
+/*  0*/	u32 length;		/* Length of EFS attribute in bytes. */
+	u32 state;		/* Always 0? */
+	u32 version;		/* Efs version.  Always 2? */
+	u32 crypto_api_version;	/* Always 0? */
 /* 16*/	u8 unknown4[16];	/* MD5 hash of decrypted FEK? */
 /* 32*/	u8 unknown5[16];	/* MD5 hash of DDFs? */
 /* 48*/	u8 unknown6[16];	/* MD5 hash of DRFs? */
@@ -2401,6 +2401,7 @@ typedef struct {
 	u32 offset_to_drf_array;/* Offset in bytes to the array of data
 				   recovery fields (DRF), see below.  Zero if
 				   no DRFs are present. */
+	u32 reserved;		/* Reserved. */
 } __attribute__ ((__packed__)) EFS_ATTR_HEADER;
 
 typedef struct {
@@ -2416,19 +2417,46 @@ typedef struct {
 				   encryption key (FEK). */
 	u32 fek_offset;		/* Offset in bytes to the FEK from the start of
 				   the data decryption/recovery field. */
-/* 16*/	u32 unknown1;		/* always 0? */
+/* 16*/	u32 unknown1;		/* always 0?  Might be just padding. */
 } __attribute__ ((__packed__)) EFS_DF_HEADER;
 
 typedef struct {
 /*  0*/	u32 cred_length;	/* Length of this credential in bytes. */
 	u32 sid_offset;		/* Offset in bytes to the user's sid from start
-				   of this structure. */
-	u32 cred_version;	/* always 3? */
-	u32 cert_header_size;	/* Size in bytes of the certificate header. */
-/* 16*/	u32 cert_header_offset;	/* Offset in bytes to the certificate header
-				   from start of this structure. */
-	u32 unknown1;		/* always 0? */
-	u32 unknown2;		/* always 0? */
+				   of this structure.  Zero if no sid is
+				   present. */
+/*  8*/	u32 type;		/* Type of this credential:
+					1 = CryptoAPI container.
+					2 = Unexpected type.
+					3 = Certificate thumbprint.
+					other = Unknown type. */
+        union {
+		/* CryptoAPI container. */
+		struct {
+/* 12*/			u32 container_name_offset;	/* Offset in bytes to
+				   the name of the container from start of this
+				   structure (may not be zero). */
+/* 16*/			u32 provider_name_offset;	/* Offset in bytes to
+				   the name of the provider from start of this
+				   structure (may not be zero). */
+			u32 public_key_blob_offset;	/* Offset in bytes to
+				   the public key blob from start of this
+				   structure. */
+/* 24*/			u32 public_key_blob_size;	/* Size in bytes of
+				   public key blob. */
+		} __attribute__ ((__packed__));
+		/* Certificate thumbprint. */
+		struct {
+/* 12*/			u32 cert_thumbprint_header_size;	/* Size in
+				   bytes of the header of the certificate
+				   thumbprint. */
+/* 16*/			u32 cert_thumbprint_header_offset;	/* Offset in
+				   bytes to the header of the certificate
+				   thumbprint from start of this structure. */
+			u32 unknown1;	/* Always 0?  Might be padding... */
+			u32 unknown2;	/* Always 0?  Might be padding... */
+		} __attribute__ ((__packed__));
+	} __attribute__ ((__packed__));
 } __attribute__ ((__packed__)) EFS_DF_CREDENTIAL_HEADER;
 
 typedef EFS_DF_CREDENTIAL_HEADER EFS_DF_CRED_HEADER;
@@ -2436,16 +2464,19 @@ typedef EFS_DF_CREDENTIAL_HEADER EFS_DF_CRED_HEADER;
 typedef struct {
 /*  0*/	u32 thumbprint_offset;		/* Offset in bytes to the thumbprint. */
 	u32 thumbprint_size;		/* Size of thumbprint in bytes. */
-/*  8*/	u32 guid_offset;		/* Offset in bytes to GUID from start
-					   if this structure or 0 if no GUID
-					   present. */
-	u32 container_name_offset;	/* Offset in bytes to the name of the
+/*  8*/	u32 container_name_offset;	/* Offset in bytes to the name of the
 					   container from start of this
 					   structure or 0 if no name present. */
+	u32 provider_name_offset;	/* Offset in bytes to the name of the
+					   cryptographic provider from start of
+					   this structure or 0 if no name
+					   present. */
 /* 16*/	u32 user_name_offset;		/* Offset in bytes to the user name
-					   from start of this structure. */
-} __attribute__ ((__packed__)) EFS_DF_CERTIFICATE_HEADER;
+					   from start of this structure or 0 if
+					   no user name present.  (This is also
+					   known as lpDisplayInformation.) */
+} __attribute__ ((__packed__)) EFS_DF_CERTIFICATE_THUMBPRINT_HEADER;
 
-typedef EFS_DF_CERTIFICATE_HEADER EFS_DF_CERT_HEADER;
+typedef EFS_DF_CERTIFICATE_THUMBPRINT_HEADER EFS_DF_CERT_THUMBPRINT_HEADER;
 	
 #endif /* defined _NTFS_LAYOUT_H */
