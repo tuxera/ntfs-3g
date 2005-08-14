@@ -455,8 +455,8 @@ int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
 	ntfs_debug("Entering.");
 	if (!ni || !fn) {
 		ntfs_error(, "Invalid arguments.");
-		err = EINVAL;
-		goto err_out;
+		errno = EINVAL;
+		return -1;
 	}
 	ictx = ntfs_index_ctx_get(ni, I30, 4);
 	if (!ictx)
