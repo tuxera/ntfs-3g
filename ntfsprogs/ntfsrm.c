@@ -385,7 +385,6 @@ static ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
 
 	ino->mft_no = mref;
 	ino->vol = vol;
-	ino->state = NI_Dirty;
 
 	ino->data_size = -1;
 	ino->allocated_size = -1;
@@ -393,14 +392,14 @@ static ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
 	ino->private_data = NULL;
 	ino->ref_count = 1;
 
-	if (1 != ntfs_mst_pread (vol->dev, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
-		printf ("mft record read failed\n");
+	if (1 != ntfs_attr_mst_pread (vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
 		//ntfs_inode_close2 (ino); ???
 		free (ino->mrec);
 		free (ino);
 		return NULL;
 	}
 
+	NInoSetDirty (ino);
 	return ino;
 }
 
@@ -1233,21 +1232,6 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_alloc_children
- */
-static INDEX_ENTRY ** ntfs_dt_alloc_children (INDEX_ENTRY **children, int count)
-{
-	// XXX calculate for 2K and 4K indexes max and min filenames (inc/exc VCN)
-	int old = (count + 0x1e) & ~0x1f;
-	int new = (count + 0x1f) & ~0x1f;
-
-	if (old == new)
-		return children;
-
-	return realloc (children, new * sizeof (INDEX_ENTRY*));
-}
-
-/**
  * ntfs_dt_alloc_children2
  */
 static BOOL ntfs_dt_alloc_children2 (struct ntfs_dt *dt, int count)
@@ -1264,7 +1248,12 @@ static BOOL ntfs_dt_alloc_children2 (struct ntfs_dt *dt, int count)
 	dt->sub_nodes = realloc (dt->sub_nodes, new * sizeof (*dt->sub_nodes));
 	dt->inodes    = realloc (dt->inodes,    new * sizeof (*dt->inodes));
 
-	// XXX wipe new space
+	if (!dt->children || !dt->sub_nodes || !dt->inodes)
+		return FALSE;		// dt->child_count = -1 ?
+
+	memset ((u8*)dt->children  + old, 0, (new - old) * sizeof (*dt->children)); 
+	memset ((u8*)dt->sub_nodes + old, 0, (new - old) * sizeof (*dt->sub_nodes)); 
+	memset ((u8*)dt->inodes    + old, 0, (new - old) * sizeof (*dt->inodes)); 
 
 	return (dt->children && dt->sub_nodes && dt->inodes);
 }
@@ -1303,9 +1292,9 @@ static int ntfs_dt_count_root (struct ntfs_dt *dt)
 
 	while (ptr < (buffer + size)) {
 		entry = (INDEX_ENTRY*) ptr;
-		dt->child_count++;
 
-		dt->children  = ntfs_dt_alloc_children  (dt->children,  dt->child_count);
+		dt->child_count++;
+		ntfs_dt_alloc_children2 (dt, dt->child_count); // XXX retval
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
 			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
@@ -1327,11 +1316,6 @@ static int ntfs_dt_count_root (struct ntfs_dt *dt)
 
 	//printf ("count = %d\n\n", dt->child_count);
 
-	if (dt->child_count > 0) {
-		//printf ("%d subnodes\n", dt->child_count);
-		dt->sub_nodes = calloc (dt->child_count, sizeof (struct ntfs_dt *));
-		dt->inodes    = calloc (dt->child_count, sizeof (struct ntfs_inode *));
-	}
 	return dt->child_count;
 }
 
@@ -1366,9 +1350,9 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 	dt->child_count = 0;
 	while (ptr < (buffer + 0x18 + block->index.index_length)) {
 		entry = (INDEX_ENTRY*) ptr;
-		dt->child_count++;
 
-		dt->children = ntfs_dt_alloc_children  (dt->children,  dt->child_count);
+		dt->child_count++;
+		ntfs_dt_alloc_children2 (dt, dt->child_count); // XXX retval
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
 			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
@@ -1389,12 +1373,6 @@ static int ntfs_dt_count_alloc (struct ntfs_dt *dt)
 		ptr += entry->length;
 	}
 	//printf ("count = %d\n", dt->child_count);
-
-	if (dt->child_count > 0) {
-		//printf ("%d subnodes\n", dt->child_count);
-		dt->sub_nodes = calloc (dt->child_count, sizeof (struct ntfs_dt *));
-		dt->inodes    = calloc (dt->child_count, sizeof (struct ntfs_inode *));
-	}
 
 	return dt->child_count;
 }
@@ -2127,33 +2105,39 @@ static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
 
 
 /**
- * utils_mftrec_mark_free5
+ * utils_mftrec_mark_free6
  */
-static int utils_mftrec_mark_free5 (ntfs_inode *inode, struct ntfs_bmp *bmp, MFT_REF mref)
+static int utils_mftrec_set_inuse6 (ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inuse)
 {
 	MFT_RECORD *rec;
 
 	if (!inode)
 		return -1;
 
-	if (ntfs_bmp_set_range (bmp, (VCN) MREF (mref), 1, 0) < 0)
+	if (ntfs_bmp_set_range (bmp, (VCN) MREF (inode->mft_no), 1, inuse) < 0)
 		return -1;
 
 	rec = (MFT_RECORD*) inode->mrec;
 
 	// XXX extent inodes?
-	if ((rec->flags & MFT_RECORD_IN_USE) == 0) {
-		Eprintf ("MFT record isn't in use (4).\n");
-		return -1;
+
+	if (inuse) {
+		if ((rec->flags & MFT_RECORD_IN_USE) == 1) {
+			Eprintf ("MFT record is already in use.\n");
+			return -1;
+		}
+		rec->flags |= MFT_RECORD_IN_USE;
+	} else {
+		if ((rec->flags & MFT_RECORD_IN_USE) == 0) {
+			Eprintf ("MFT record isn't in use.\n");
+			return -1;
+		}
+		rec->flags &= ~MFT_RECORD_IN_USE;
 	}
 
-	rec->flags &= ~MFT_RECORD_IN_USE;
-	//printf ("inode %llu, %lu\n", inode->mft_no, inode->state);
-	NInoSetDirty(inode);
-	//printf ("inode %llu, %lu\n", inode->mft_no, inode->state);
+	// XXX inc sequence number
 
-	//printf ("\n");
-	//utils_dump_mem (buffer, 0, 1024, DM_DEFAULTS);
+	NInoSetDirty(inode);
 
 	printf (GREEN "Modified: inode %lld MFT_RECORD header\n" END, inode->mft_no);
 	return 0;
@@ -2268,8 +2252,11 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 	memset (attr, 0, 0x18);
 	*(u32*)((u8*) attr + 0x00) = type;
 	*(u32*)((u8*) attr + 0x04) = data_len + 0x18;
+	*(u16*)((u8*) attr + 0x0E) = mrec->next_attr_instance;
 	*(u32*)((u8*) attr + 0x10) = data_len;
 	*(u32*)((u8*) attr + 0x14) = 0x18;
+
+	mrec->next_attr_instance++;
 
 	return 0;
 }
@@ -2834,6 +2821,7 @@ static int ntfs_dt_root_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
 	add->data = attr;
 	add->data_len += need;
 
+	add->header = (INDEX_HEADER*) (add->data + 0x10);
 	add->header->index_length   = add->data_len - 16;
 	add->header->allocated_size = add->data_len - 16;
 
@@ -4451,7 +4439,7 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 	bmp_mft = vol->private_bmp1;
 	bmp_vol = vol->private_bmp2;
 
-	if (1) utils_mftrec_mark_free5 (ino, bmp_mft, ie->indexed_file);
+	if (1) utils_mftrec_set_inuse6 (ino, bmp_mft, FALSE);
 
 	if (1) utils_free_non_residents2 (ino, bmp_vol);
 
@@ -4482,7 +4470,6 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	ntfschar *uname = NULL;
 	int uname_len = 0;
 	ntfs_inode *ino = NULL;
-	ntfs_inode *ino2 = NULL;
 	u8 *tmp = NULL;
 	u8 *buffer = NULL;
 	s64 now = 0;
@@ -4513,7 +4500,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 		goto close;
 
 	ie = ntfs_ie_create();
-	ie = ntfs_ie_set_name (ie, uname, uname_len, FILE_NAME_WIN32);
+	ie = ntfs_ie_set_name (ie, uname, uname_len, FILE_NAME_POSIX);
 	if (!ie) {
 		printf ("!ie\n");
 		goto close;
@@ -4521,7 +4508,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 
 	// These two NEED the sequence number in the top 8 bits
 	ie->indexed_file                        = new_num;		// MFT Ref: new file
-	ie->key.file_name.parent_directory      = find.mref;		// MFT Ref: parent dir
+	ie->key.file_name.parent_directory      = MK_MREF (find.mref, 2);// MFT Ref: parent dir
 
 	now = utc2ntfs (time(NULL));
 	ie->key.file_name.creation_time         = now;
@@ -4535,6 +4522,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 
 	//ntfs_ie_dump (ie);
 
+	//printf ("new inode %lld\n", new_num);
 	ino = ntfs_inode_open3 (vol, new_num);
 	if (!ino) {
 		printf ("!ino\n");
@@ -4544,11 +4532,23 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	//printf ("attributes start at offset 0x%02X\n", ino->mrec->attrs_offset);
 
 	tmp = (u8*) ino->mrec;
+
+	// Wipe all the attributes
 	memset (tmp + ino->mrec->attrs_offset, 0, vol->mft_record_size - ino->mrec->attrs_offset);
 
+	// Add new end marker
 	*(u32*) (tmp + ino->mrec->attrs_offset) = 0xFFFFFFFF;
-
 	ino->mrec->bytes_in_use = ino->mrec->attrs_offset + 8;
+
+	// Reset headers...
+	ino->mrec->lsn = 0;
+	ino->mrec->link_count = 1;
+	ino->mrec->base_mft_record = 0;
+	ino->mrec->next_attr_instance = 0;
+
+	utils_mftrec_set_inuse6 (ino, vol->private_bmp1, TRUE);
+
+	ie->indexed_file = MK_MREF (new_num, ino->mrec->sequence_number);
 
 	//utils_dump_mem ((u8*)ino->mrec, 0, ino->mrec->bytes_in_use, DM_DEFAULTS);
 
@@ -4567,7 +4567,9 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 
 	// File name
 	memset (buffer, 0, 128);
-	*(u64*)(buffer + 0x00) = find.mref;	// MFT Ref of parent dir
+	printf ("parent = 0x%llX\n", find.mref);
+	printf ("ino mref = %lld\n", ino->mft_no);
+	*(u64*)(buffer + 0x00) = MK_MREF (find.mref, 2);	// MFT Ref of parent dir
 	*(u64*)(buffer + 0x08) = now;		// Time
 	*(u64*)(buffer + 0x10) = now;		// Time
 	*(u64*)(buffer + 0x18) = now;		// Time
@@ -4577,7 +4579,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	*(u32*)(buffer + 0x38) = 0;		// Flags
 	*(u32*)(buffer + 0x3C) = 0;		// Not relevant
 	*(u8* )(buffer + 0x40) = uname_len;	// Filename length
-	*(u8* )(buffer + 0x41) = FILE_NAME_WIN32;// Filename namespace
+	*(u8* )(buffer + 0x41) = FILE_NAME_POSIX;// Filename namespace
 	memcpy (buffer + 0x42, uname, uname_len * sizeof (ntfschar));
 	ntfs_mft_add_attr (ino, AT_FILE_NAME, buffer, ATTR_SIZE (0x42 + (uname_len * sizeof (ntfschar))));
 	//utils_dump_mem (buffer, 0, 0x50, DM_DEFAULTS);
@@ -4589,26 +4591,24 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	//utils_dump_mem ((u8*)ino->mrec, 0, ino->mrec->bytes_in_use, DM_DEFAULTS);
 
 	//printf ("orig inode = %p\n", find.inode);
-	dt = find.inode->private_data;
-	dir = dt->dir;
-	//printf ("dt = %p\n", dt);
-	//printf ("dir = %p\n", dir);
-	//printf ("num = %lld\n", dir->mft_num);
-	//printf ("\n");
-
-	ino2 = find.dt->inodes[find.dt_index];
-	//printf ("num = %lld\n", ino2->mft_no);
-	//printf ("data = %p\n", ino2->private_data);
-	//printf ("children = %p\n", dir->children);
-	//printf ("child? = %p\n", dir->children[find.dt_index]);
-
-	if (0) ntfs_dir_map (vol, dir);
+	dir = dt->dir->children[0];
+	dt = dir->index;
+	printf ("dir = %p (%lld)\n", dir, MREF (dir->mft_num));
+	printf ("dt = %p (%d)\n", dt, dt->child_count);
+	printf ("\n");
 
 	//printf ("\n");
 	//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
 	//printf ("\n");
 
-	//ntfs_dt_root_add (dt, ie);
+	ntfs_dt_root_add (dt, ie);
+	ino->ref_count++;
+	dt->inodes[0] = ino;
+
+	*(((u8*) ino->mrec) + 166) = RESIDENT_ATTR_IS_INDEXED;
+	*(((u8*) ino->mrec) + 154) = 0x18; // offset to name
+
+	// add inode to dt's list
 
 	//printf ("\n");
 	//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
@@ -4754,6 +4754,7 @@ done:
 	if (0) ntfs_dt_root_add (NULL, NULL);
 	if (0) ntfs_dt_alloc_add (NULL, NULL);
 	if (0) utils_pathname_to_inode2 (NULL, NULL, NULL, NULL);
+	if (0) ntfs_dir_map (NULL, NULL);
 
 	return result;
 }
