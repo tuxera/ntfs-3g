@@ -33,6 +33,7 @@
 #include <locale.h>
 #include <signal.h>
 #include <limits.h>
+#include <time.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -285,9 +286,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		stbuf->st_uid = ctx->uid;
 		stbuf->st_gid = ctx->gid;
 		stbuf->st_ino = ni->mft_no;
-		stbuf->st_atime = ni->atime;
-		stbuf->st_ctime = ni->ctime;
-		stbuf->st_mtime = ni->mtime;
+		stbuf->st_atime = ni->last_access_time;
+		stbuf->st_ctime = ni->last_mft_change_time;
+		stbuf->st_mtime = ni->last_data_change_time;
 		ntfs_inode_close(ni);
 	} else
 		res = -ENOENT;
@@ -518,11 +519,86 @@ static int ntfs_fuse_chmod(const char *path __attribute__((unused)),
 	return -EOPNOTSUPP;
 }
 
+static int ntfs_fuse_create(const char *org_path, const unsigned type)
+{
+	char *name;
+	ntfschar *uname = NULL;
+	ntfs_inode *dir_ni = NULL, *ni;
+	char *path;
+	int res = 0, uname_len;
+
+	path = strdup(org_path);
+	if (!path)
+		return -errno;
+	/* Generate unicode filename. */
+	name = strrchr(path, '/');
+	name++;
+	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	if (uname_len < 0) {
+		res = -errno;
+		goto exit;
+	}
+	/* Open parent directory. */
+	*name = 0;
+	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!dir_ni) {
+		res = -errno;
+		if (res == -ENOENT)
+			res = -EIO;
+		goto exit;
+	}
+	/* Create object specified in @type. */
+	ni = ntfs_create(dir_ni, uname, uname_len, type);
+	if (ni)
+		ntfs_inode_close(ni);
+	else
+		res = -errno;
+exit:
+	if (uname)
+		free(uname);
+	if (dir_ni)
+		ntfs_inode_close(dir_ni);
+	free(path);
+	return res;
+}
+
+static int ntfs_fuse_create_stream(const char *path,
+		ntfschar *stream_name, const int stream_name_len)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	int res = 0;
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		if (res == -ENOENT) {
+			/*
+			 * If such file does not exist, create it and try once
+			 * again to add stream to it.
+			 */
+			res = ntfs_fuse_create(path, NTFS_DT_REG);
+			if (!res)
+				return ntfs_fuse_create_stream(path,
+						stream_name, stream_name_len);
+			else
+				res = -errno;
+		}
+		return res;
+	}
+	na = ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, 0);
+	if (na)
+		ntfs_attr_close(na);
+	else
+		res = -errno;
+	if (ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	return res;
+}
+
 static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
 		dev_t dev __attribute__((unused)))
 {
-	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
@@ -533,56 +609,76 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	if (!stream_name_len) {
-		res = -EOPNOTSUPP;
-		goto exit;
-	}
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!ni) {
-		res = -errno;
-		if (res == -ENOENT)
-			res = -EOPNOTSUPP;
-		goto exit;
-	}
-	na = ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, 0);
-	if (na)
-		ntfs_attr_close(na);
+	if (!stream_name_len)
+		res = ntfs_fuse_create(path, NTFS_DT_REG);
 	else
-		res = -errno;
-exit:
-	if (ni && ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		res = ntfs_fuse_create_stream(path, stream_name,
+				stream_name_len);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
 	return res;
 }
 
-static int ntfs_fuse_rm_file(char *file)
+static int ntfs_fuse_rm(const char *org_path)
 {
-	free(file);
-	return -EOPNOTSUPP;
-}
+	char *name;
+	ntfschar *uname = NULL;
+	ntfs_inode *dir_ni = NULL, *ni;
+	char *path;
+	int res = 0, uname_len;
 
-static int ntfs_fuse_unlink(const char *org_path)
-{
-	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
-	char *path = NULL;
-	ntfschar *stream_name;
-	int stream_name_len;
-	int res = 0;
-
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	if (!stream_name_len)
-		return ntfs_fuse_rm_file(path);
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	path = strdup(org_path);
+	if (!path)
+		return -errno;
+	/* Open object for delete. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);		
 	if (!ni) {
 		res = -errno;
 		goto exit;
 	}
+	/* Generate unicode filename. */
+	name = strrchr(path, '/');
+	name++;
+	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	if (uname_len < 0) {
+		res = -errno;
+		goto exit;
+	}
+	/* Open parent directory. */
+	*name = 0;
+	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!dir_ni) {
+		res = -errno;
+		if (res == -ENOENT)
+			res = -EIO;
+		goto exit;
+	}
+	/* Delete object. */
+	if (ntfs_delete(ni, dir_ni, uname, uname_len))
+		res = -errno;
+	ni = NULL;
+exit:
+	if (ni)
+		ntfs_inode_close(ni);
+	if (uname)
+		free(uname);
+	if (dir_ni)
+		ntfs_inode_close(dir_ni);
+	free(path);
+	return res;
+}
+
+static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
+		const int stream_name_len)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	int res = 0;
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na) {
 		res = -errno;
@@ -593,12 +689,68 @@ static int ntfs_fuse_unlink(const char *org_path)
 		ntfs_attr_close(na);
 	}
 exit:
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		perror("Failed to close inode");
+	return res;
+}
+
+static int ntfs_fuse_unlink(const char *org_path)
+{
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+	int res = 0;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	if (!stream_name_len)
+		res = ntfs_fuse_rm(path);
+	else
+		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
 	return res;
+}
+
+static int ntfs_fuse_mkdir(const char *path,
+		mode_t mode __attribute__((unused)))
+{
+	return ntfs_fuse_create(path, NTFS_DT_DIR);
+}
+
+static int ntfs_fuse_rmdir(const char *path)
+{
+	return ntfs_fuse_rm(path);
+}
+
+static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
+{
+	ntfs_inode *ni;
+
+	if (strchr(path, ':'))
+		return 0; /* Unable to change time for named data streams. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+	if (buf) {
+		ni->last_access_time = buf->actime;
+		ni->last_data_change_time = buf->modtime;
+		ni->last_mft_change_time = buf->modtime;
+	} else {
+		time_t now;
+
+		now = time(NULL);
+		ni->last_access_time = now;
+		ni->last_data_change_time = now;
+		ni->last_mft_change_time = now;
+	}
+	NInoFileNameSetDirty(ni);
+	NInoSetDirty(ni);
+	if (ntfs_inode_close(ni))
+		perror("Failed to close inode");
+	return 0;
 }
 
 #ifdef HAVE_SETXATTR
@@ -883,6 +1035,9 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.chmod		= ntfs_fuse_chmod,
 	.mknod		= ntfs_fuse_mknod,
 	.unlink		= ntfs_fuse_unlink,
+	.mkdir		= ntfs_fuse_mkdir,
+	.rmdir		= ntfs_fuse_rmdir,
+	.utime		= ntfs_fuse_utime,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
 #if 0	

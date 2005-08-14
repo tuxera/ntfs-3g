@@ -149,9 +149,10 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		NInoSetEncrypted(ni);
 	if (std_info->file_attributes & FILE_ATTR_SPARSE_FILE)
 		NInoSetSparse(ni);
-	ni->mtime = ntfs2utc(sle64_to_cpu(std_info->last_data_change_time));
-	ni->ctime = ntfs2utc(sle64_to_cpu(std_info->last_mft_change_time));
-	ni->atime = ntfs2utc(sle64_to_cpu(std_info->last_access_time));
+	ni->creation_time = ntfs2utc(std_info->creation_time);
+	ni->last_data_change_time = ntfs2utc(std_info->last_data_change_time);
+	ni->last_mft_change_time = ntfs2utc(std_info->last_mft_change_time);
+	ni->last_access_time = ntfs2utc(std_info->last_access_time);
 	/* Set attribute list information. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
@@ -471,6 +472,10 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 		std_info->file_attributes |= FILE_ATTR_SPARSE_FILE;
 	else
 		std_info->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
+	std_info->creation_time = utc2ntfs(ni->creation_time);
+	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+	std_info->last_access_time = utc2ntfs(ni->last_access_time);
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
@@ -561,6 +566,10 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 		if (ni->data_size != -1)
 			fn->data_size = cpu_to_sle64(ni->data_size);
+		fn->creation_time = utc2ntfs(ni->creation_time);
+		fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+		fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+		fn->last_access_time = utc2ntfs(ni->last_access_time);
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
 		ntfs_inode_close(index_ni);
@@ -616,7 +625,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			__FUNCTION__, (long long) ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
-	if (ni->nr_extents != -1 && ntfs_inode_sync_standard_information(ni)) {
+	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+			ntfs_inode_sync_standard_information(ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
 			if (err != EIO)
@@ -627,7 +637,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	}
 
 	/* Update FILE_NAME's in the index. */
-	if (ni->nr_extents != -1 && NInoFileNameTestAndClearDirty(ni) &&
+	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+			NInoFileNameTestAndClearDirty(ni) &&
 			ntfs_inode_sync_file_name(ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
@@ -640,8 +651,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	}
 
 	/* Write out attribute list from cache to disk. */
-	if (ni->nr_extents != -1 && NInoAttrList(ni) &&
-			NInoAttrListTestAndClearDirty(ni)) {
+	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
+			NInoAttrList(ni) && NInoAttrListTestAndClearDirty(ni)) {
 		ntfs_attr *na;
 
 		na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);

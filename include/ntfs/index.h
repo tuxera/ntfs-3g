@@ -90,9 +90,14 @@ typedef struct {
 extern ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
 						ntfschar *name, u32 name_len);
 extern void ntfs_index_ctx_put(ntfs_index_context *ictx);
+extern void ntfs_index_ctx_reinit(ntfs_index_context *ictx);
 
 extern int ntfs_index_lookup(const void *key, const int key_len,
 		ntfs_index_context *ictx);
+
+extern int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn,
+		MFT_REF mref);
+extern int ntfs_index_rm(ntfs_index_context *ictx);
 
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty

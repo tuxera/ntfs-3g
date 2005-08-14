@@ -2,6 +2,7 @@
  * volume.h - Exports for NTFS volume handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -124,8 +125,10 @@ struct _ntfs_volume {
 	u8 sector_size_bits;	/* Log(2) of the byte size of a sector. */
 	u32 cluster_size;	/* Byte size of a cluster. */
 	u32 mft_record_size;	/* Byte size of a mft record. */
+	u32 indx_record_size;	/* Byte size of a INDX record. */
 	u8 cluster_size_bits;	/* Log(2) of the byte size of a cluster. */
 	u8 mft_record_size_bits;/* Log(2) of the byte size of a mft record. */
+	u8 indx_record_size_bits;/* Log(2) of the byte size of a INDX record. */
 
 	/* Variables used by the cluster and mft allocators. */
 	u8 mft_zone_multiplier;	/* Initial mft zone multiplier. */

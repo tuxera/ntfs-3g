@@ -2573,7 +2573,10 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->instance = m->next_attr_instance;
 	a->value_length = 0;
 	a->value_offset = cpu_to_le16(length);
-	a->resident_flags = 0;
+	if (type == AT_FILE_NAME)
+		a->resident_flags = RESIDENT_ATTR_IS_INDEXED;
+	else
+		a->resident_flags = 0;
 	if (name_len)
 		memcpy((u8*)a + le16_to_cpu(a->name_offset),
 			name, sizeof(ntfschar) * name_len);

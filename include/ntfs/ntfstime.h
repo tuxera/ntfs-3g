@@ -40,7 +40,7 @@
  */
 static __inline__ time_t ntfs2utc(s64 ntfs_time)
 {
-	return (ntfs_time - (NTFS_TIME_OFFSET)) / 10000000;
+	return (sle64_to_cpu(ntfs_time) - (NTFS_TIME_OFFSET)) / 10000000;
 }
 
 /**
@@ -61,7 +61,7 @@ static __inline__ time_t ntfs2utc(s64 ntfs_time)
 static __inline__ s64 utc2ntfs(time_t utc_time)
 {
 	/* Convert to 100ns intervals and then add the NTFS time offset. */
-	return (s64)utc_time * 10000000 + NTFS_TIME_OFFSET;
+	return cpu_to_sle64((s64)utc_time * 10000000 + NTFS_TIME_OFFSET);
 }
 
 #endif /* _NTFS_NTFSTIME_H */

@@ -883,8 +883,11 @@ typedef struct {
 /* 32*/	FILE_ATTR_FLAGS file_attributes; /* Flags describing the file. */
 /* 36*/	union {
 		/* NTFS 1.2 (and previous, presumably) */
-/* 36 */	u8 reserved12[12];	/* Reserved/alignment to 8-byte
-					   boundary. */
+		struct {
+		/* 36 */ u8 reserved12[12];	/* Reserved/alignment to 8-byte
+						   boundary. */
+		/* 48 */ void *v1_end[0];	/* Marker for offsetof(). */
+		} __attribute__ ((__packed__));
 /* sizeof() = 48 bytes */
 		/* NTFS 3.0 */
 		struct {
@@ -937,6 +940,7 @@ typedef struct {
 				partition. This, in contrast to disabling the
 				journal is a very fast process, so the user
 				won't even notice it. */
+		/* 72*/ void *v3_end[0]; /* Marker for offsetof(). */
 		} __attribute__ ((__packed__));
 	} __attribute__ ((__packed__));
 /* sizeof() = 72 bytes (NTFS 3.0) */
@@ -1989,10 +1993,10 @@ typedef struct {
 					   this must be COLLATION_FILE_NAME. */
 	u32 index_block_size;		/* Size of each index block in bytes (in
 					   the index allocation attribute). */
-	u8 clusters_per_index_block;	/* Cluster size of each index block (in
+	s8 clusters_per_index_block;	/* Cluster size of each index block (in
 					   the index allocation attribute), when
 					   an index block is >= than a cluster,
-					   otherwise this will be the log of
+					   otherwise this will be the -log of
 					   the size (like how the encoding of
 					   the mft record size and the index
 					   record size found in the boot sector
@@ -2168,13 +2172,11 @@ typedef struct {
  */
 typedef struct {
 /*  0	INDEX_ENTRY_HEADER; -- Unfolded here as gcc dislikes unnamed structs. */
-	union {
-		struct { /* Only valid when INDEX_ENTRY_END is not set. */
-			MFT_REF indexed_file;	/* The mft reference of the file
+	union {		/* Only valid when INDEX_ENTRY_END is not set. */
+		MFT_REF indexed_file;		/* The mft reference of the file
 						   described by this index
 						   entry. Used for directory
 						   indexes. */
-		} __attribute__ ((__packed__));
 		struct { /* Used for views/indexes to find the entry's data. */
 			u16 data_offset;	/* Data byte offset from this
 						   INDEX_ENTRY. Follows the

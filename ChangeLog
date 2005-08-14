@@ -1,6 +1,5 @@
-xx/xx/2005 - 1.11.3-WIP
+xx/xx/2005 - 1.12.0-WIP
 
-	- ntfsmount: Fix small memleak.  (Yura)
 	- Add ./configure detection for gnutls library and make minimum version
 	  1.2.3 which is the one that has the rsa key export fixed.  (Anton)
 	- Put in a minimum version for libgcrypt of 1.2.0 as I do not know if
@@ -8,6 +7,32 @@ xx/xx/2005 - 1.11.3-WIP
 	- Fix some memory leaks in ntfsdecrypt and do some cleanups.  (Anton)
 	- Fix ntfsdecrypt to also work with passwordless files.  Note this
 	  requires a patched gnutls library or it still does not work.  (Anton)
+	- Add new APIs for index adding/remove:
+	    index.[ch]::ntfs_index_add_filename and index.[ch]::ntfs_index_rm.
+	  They support only basic cases, so can fail with EOPNOTSUPP.  (Yura)
+	- Add new API for index context reinitialization:
+	    ntfs_index_ctx_reinit.  (Yura)
+	- Add new high-level APIs for file and directory creation/deletion that
+	  rely on ntfs_index_{add_filename,rm}:
+	    dir.[ch]::ntfs_create and dir.[ch]::ntfs_delete.  (Yura)
+	- Add @creation_time field to struct ntfs_inode and rename [acm]time
+	  fields to @last_{data_change,mft_change,access}_time. Update them in
+	  STANDARD_INFORMATION and FILE_NAMEs during inode sync.  (Yura)
+	- layout.h: Add @v1_end and @v3_end markers for offsetof to struct
+	  FILE_NAME_ATTR. Change type of @clusters_per_index_block from u8 to
+	  s8, fix error in comment. Simplify a bit INDEX_ENTRY struct.  (Yura)
+	- ntfstime.h: Use cpu_to_sle64 and sle64_to_cpu in utc2ntfs and
+	  ntfs2utc respectively. Update all users.  (Yura)
+	- Add @indx_record_size and @inx_record_size_bits to struct ntfs_volume.
+	  Set them during mount.  (Yura)
+	- attrib.c: Set RESIDENT_ATTR_IS_INDEXED flag for FILE_NAME attribute in
+	  ntfs_attr_add.  (Yura)
+	- inode.c: Do not sync STANDARD_INFORMATION and FILE_NAMEs for
+	  freed inodes.  (Yura)
+	- mft.c: Set *time and *size fields of struct ntfs_inode in
+	  ntfs_mft_record_alloc.  (Yura)
+	- Make ntfsmount use new APIs for file and directory creation/deletion.
+	  Implement utime operation.  (Yura)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

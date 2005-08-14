@@ -876,10 +876,10 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 		name->size_data  = sle64_to_cpu (attr->data_size);
 		name->flags      = attr->file_attributes;
 
-		name->date_c     = ntfs2utc (sle64_to_cpu (attr->creation_time));
-		name->date_a     = ntfs2utc (sle64_to_cpu (attr->last_data_change_time));
-		name->date_m     = ntfs2utc (sle64_to_cpu (attr->last_mft_change_time));
-		name->date_r     = ntfs2utc (sle64_to_cpu (attr->last_access_time));
+		name->date_c     = ntfs2utc (attr->creation_time);
+		name->date_a     = ntfs2utc (attr->last_data_change_time);
+		name->date_m     = ntfs2utc (attr->last_mft_change_time);
+		name->date_r     = ntfs2utc (attr->last_access_time);
 
 		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
 				0) < 0) {
@@ -1052,7 +1052,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 	if (attr10) {
 		STANDARD_INFORMATION *si;
 		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu (attr10->value_offset));
-		file->date = ntfs2utc (sle64_to_cpu (si->last_data_change_time));
+		file->date = ntfs2utc (si->last_data_change_time);
 	}
 
 	if (attr20 || !attr10)

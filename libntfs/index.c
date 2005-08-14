@@ -27,6 +27,7 @@
 #include "debug.h"
 #include "index.h"
 #include "mst.h"
+#include "dir.h"
 
 /**
  * ntfs_index_ctx_get - allocate and initialize a new index context
@@ -88,6 +89,42 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 		}
 	}
 	free(ictx);
+}
+
+/**
+ * ntfs_index_ctx_reinit - reinitialize an index context
+ * @ictx:	index context to reinitialize
+ *
+ * Reintialize the index context @ictx so it can be used for ntfs_index_lookup.
+ */
+void ntfs_index_ctx_reinit(ntfs_index_context *ictx)
+{
+	if (ictx->entry) {
+		if (ictx->is_in_root) {
+			if (ictx->actx)
+				ntfs_attr_put_search_ctx(ictx->actx);
+		} else {
+			/* Write out index block it it's dirty. */
+			if (ictx->ia_dirty) {
+				if (ntfs_attr_mst_pwrite(ictx->ia_na,
+						ictx->ia_vcn <<
+						ictx->ni->vol->
+						cluster_size_bits,
+						1, ictx->block_size,
+						ictx->ia) != 1)
+					ntfs_error(, "Failed to write out "
+							"index block.");
+			}
+			/* Free resources. */
+			free(ictx->ia);
+			ntfs_attr_close(ictx->ia_na);
+		}
+	}
+	*ictx = (ntfs_index_context) {
+		.ni = ictx->ni,
+		.name = ictx->name,
+		.name_len = ictx->name_len,
+	};
 }
 
 /**
@@ -397,3 +434,195 @@ idx_err_out:
 	goto err_out;
 }
 
+/**
+ * ntfs_index_add_filename - add filename to directory index
+ * @ni:		ntfs inode describing directory to which index add filename
+ * @fn:		FILE_NAME attribute to add
+ * @mref:	reference of the inode which @fn describes
+ *
+ * NOTE: This function does not support all cases, so it can fail with
+ * EOPNOTSUPP error code.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
+{
+	ntfs_index_context *ictx;
+	INDEX_ENTRY *ie;
+	INDEX_HEADER *ih;
+	int err, fn_size, ie_size, allocated_size = 0;
+
+	ntfs_debug("Entering.");
+	if (!ni || !fn) {
+		ntfs_error(, "Invalid arguments.");
+		err = EINVAL;
+		goto err_out;
+	}
+	ictx = ntfs_index_ctx_get(ni, I30, 4);
+	if (!ictx)
+		return -1;
+	fn_size = (fn->file_name_length * sizeof(ntfschar)) +
+			sizeof(FILE_NAME_ATTR);
+	ie_size = (sizeof(INDEX_ENTRY_HEADER) + fn_size + 7) & ~7;
+retry:
+	/* Find place where insert new entry. */
+	if (!ntfs_index_lookup(fn, fn_size, ictx)) {
+		err = EEXIST;
+		ntfs_error(, "Index already have such entry.");
+		goto err_out;
+	}
+	if (errno != ENOENT) {
+		err = errno;
+		ntfs_error(, "Failed to find place where to insert new entry.");
+		goto err_out;
+	}
+	/* Some setup. */
+	if (ictx->is_in_root)
+		ih = &ictx->ir->index;
+	else
+		ih = &ictx->ia->index;
+	if (!allocated_size)
+		allocated_size = le16_to_cpu(ih->allocated_size);
+	/* Check whether we have enough space in the index. */
+	if (le16_to_cpu(ih->index_length) + ie_size > allocated_size) {
+		/* If we in the index root try to resize it. */
+		if (ictx->is_in_root) {
+			ntfs_attr *na;
+
+			allocated_size = le16_to_cpu(ih->index_length) +
+					ie_size;
+			na = ntfs_attr_open(ictx->ni, AT_INDEX_ROOT, ictx->name,
+					ictx->name_len);
+			if (!na) {
+				err = errno;
+				ntfs_error(, "Failed to open INDEX_ROOT.");
+				goto err_out;
+			}
+			if (ntfs_attr_truncate(na, allocated_size + offsetof(
+					INDEX_ROOT, index))) {
+				err = EOPNOTSUPP;
+				ntfs_attr_close(na);
+				ntfs_error(, "Failed to truncate INDEX_ROOT.");
+				goto err_out;
+			}
+			ntfs_attr_close(na);
+			ntfs_index_ctx_reinit(ictx);
+			goto retry;
+		}
+		ntfs_debug("Not implemented case.");
+		err = EOPNOTSUPP;
+		goto err_out;
+	}
+	/* Update allocated size if we in INDEX_ROOT. */
+	if (ictx->is_in_root)
+		ih->allocated_size = cpu_to_le16(allocated_size);
+	/* Create entry. */
+	ie = calloc(1, ie_size);
+	if (!ie) {
+		err = errno;
+		goto err_out;
+	}
+	ie->indexed_file = cpu_to_le64(mref);
+	ie->length = cpu_to_le16(ie_size);
+	ie->key_length = cpu_to_le16(fn_size);
+	memcpy(&ie->key, fn, fn_size);
+	/* Update index length, move following entries forard and copy entry. */
+	ih->index_length = cpu_to_le16(le16_to_cpu(ih->index_length) + ie_size);
+	memmove((u8*)ictx->entry + ie_size, ictx->entry,
+			le16_to_cpu(ih->index_length) -
+			((u8*)ictx->entry - (u8*)ih) - ie_size);
+	memcpy(ictx->entry, ie, ie_size);
+	/* Done! */
+	ntfs_index_entry_mark_dirty(ictx);
+	ntfs_index_ctx_put(ictx);
+	free(ie);
+	ntfs_debug("Done.");
+	return 0;
+err_out:
+	ntfs_debug("Failed.");
+	ntfs_index_ctx_put(ictx);
+	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_index_rm - remove entry from the index
+ * @ictx:	index context describing entry to delete
+ *
+ * Delete entry described by @ictx from the index. NOTE: This function does not
+ * support all cases, so it can fail with EOPNOTSUPP error code. In any case
+ * index context is always reinitialized after use of this function, so it can
+ * be used for index lookup once again.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_index_rm(ntfs_index_context *ictx)
+{
+	INDEX_HEADER *ih;
+	u32 new_index_length;
+	int err;
+
+	ntfs_debug("Entering.");
+	if (!ictx || (!ictx->ia && !ictx->ir) ||
+			ictx->entry->flags & INDEX_ENTRY_END) {
+		ntfs_error(, "Invalid arguments.");
+		err = EINVAL;
+		goto err_out;
+	}
+	if (ictx->is_in_root)
+		ih = &ictx->ir->index;
+	else
+		ih = &ictx->ia->index;
+	/* Don't support deletion of entries with subnodes yet. */
+	if (ictx->entry->flags & INDEX_ENTRY_NODE) {
+		err = EOPNOTSUPP;
+		goto err_out;
+	}
+	/* Calculate new length of the index. */
+	new_index_length = le32_to_cpu(ih->index_length) -
+			le16_to_cpu(ictx->entry->length);
+	/* Don't support deletion of the last entry in the allocation block. */
+	if (!ictx->is_in_root && (new_index_length <=
+			le32_to_cpu(ih->entries_offset) +
+			sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN))) {
+		err = EOPNOTSUPP;
+		goto err_out;
+	}
+	/* Update index length and remove index entry. */
+	ih->index_length = cpu_to_le32(new_index_length);
+	if (ictx->is_in_root)
+		ih->allocated_size = ih->index_length;
+	memmove(ictx->entry, (u8*)ictx->entry + le16_to_cpu(
+			ictx->entry->length), new_index_length -
+			((u8*)ictx->entry - (u8*)ih));
+	ntfs_index_entry_mark_dirty(ictx);
+	/* Resize INDEX_ROOT attribute. */
+	if (ictx->is_in_root) {
+		ntfs_attr *na;
+
+		na = ntfs_attr_open(ictx->ni, AT_INDEX_ROOT, ictx->name,
+				ictx->name_len);
+		if (!na) {
+			err = errno;
+			ntfs_error(, "Failed to open INDEX_ROOT attribute.  "
+					"Leaving inconsist metadata.");
+			goto err_out;
+		}
+		if (ntfs_attr_truncate(na, new_index_length + offsetof(
+				INDEX_ROOT, index))) {
+			err = errno;
+			ntfs_error(, "Failed to truncate INDEX_ROOT attribute. "
+					" Leaving inconsist metadata.");
+			goto err_out;
+		}
+		ntfs_attr_close(na);
+	}
+	ntfs_index_ctx_reinit(ictx);
+	ntfs_debug("Done.");
+	return 0;
+err_out:
+	ntfs_index_ctx_reinit(ictx);
+	ntfs_debug("Failed.");
+	errno = err;
+	return -1;
+}

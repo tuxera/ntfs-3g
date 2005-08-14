@@ -2,6 +2,7 @@
  * bootsect.c - Boot sector handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -225,7 +226,7 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	if (c < 0)
 		vol->mft_record_size = 1 << -c;
 	else
-		vol->mft_record_size = vol->cluster_size * c;
+		vol->mft_record_size = c << vol->cluster_size_bits;
 	if (vol->mft_record_size & (vol->mft_record_size - 1)) {
 		Dprintf("Error: %s is not a valid NTFS partition! "
 				"mft_record_size is not a power of 2.\n",
@@ -235,6 +236,16 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	vol->mft_record_size_bits = ffs(vol->mft_record_size) - 1;
 	Dprintf("MftRecordSize = 0x%x\n", (unsigned)vol->mft_record_size);
 	Dprintf("MftRecordSizeBits = %u\n", vol->mft_record_size_bits);
+	/* Same as above for INDX record. */
+	c = bs->clusters_per_index_record;
+	Dprintf("ClustersPerINDXRecord = 0x%x\n", c);
+	if (c < 0)
+		vol->indx_record_size = 1 << -c;
+	else
+		vol->indx_record_size = c << vol->cluster_size_bits;
+	vol->indx_record_size_bits = ffs(vol->indx_record_size) - 1;
+	Dprintf("INDXRecordSize = 0x%x\n", (unsigned)vol->indx_record_size);
+	Dprintf("INDXRecordSizeBits = %u\n", vol->indx_record_size_bits);
 	/*
 	 * Work out the size of the MFT mirror in number of mft records. If the
 	 * cluster size is less than or equal to the size taken by four mft

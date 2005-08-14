@@ -2,6 +2,7 @@
  * mft.c - Mft record handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -25,6 +26,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #include "compat.h"
 
@@ -1361,7 +1363,7 @@ mft_rec_already_initialized:
 	if (ntfs_is_file_record(m->magic) && (m->flags & MFT_RECORD_IN_USE)) {
 		ntfs_error(vol->sb, "Mft record 0x%llx was marked unused in "
 				"mft bitmap but is marked used itself.  "
-				"Corrupt filesystem or driver bug!  "
+				"Corrupt filesystem or library bug!  "
 				"Run chkdsk immediately!", (long long)bit);
 		free(m);
 		errno = EIO;
@@ -1435,6 +1437,11 @@ mft_rec_already_initialized:
 	}
 	/* Make sure the allocated inode is written out to disk later. */
 	ntfs_inode_mark_dirty(ni);
+	/* Initialize time, allocated and data size in ntfs_inode struct. */
+	ni->data_size = ni->allocated_size = -1;
+	ni->creation_time = ni->last_data_change_time =
+			ni->last_mft_change_time =
+			ni->last_access_time = time(NULL);
 	/* Update the default mft allocation position if it was used. */
 	if (!base_ni)
 		vol->mft_data_pos = bit + 1;

@@ -548,8 +548,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		if (!file_name_attr)
 			goto release;
 
-		ntfs_time = ntfs2utc(sle64_to_cpu(
-				file_name_attr->last_data_change_time));
+		ntfs_time = ntfs2utc(file_name_attr->last_data_change_time);
 		strcpy(t_buf, ctime(&ntfs_time));
 		memmove(t_buf+16, t_buf+19, 5);
 		t_buf[21] = '\0';

@@ -276,7 +276,7 @@ static void ntfs_binary_print (u8 num, BOOL backwards, BOOL colour)
  */
 static const char * ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 {
-	time_t unix_clock = ntfs2utc(sle64_to_cpu(sle_ntfs_clock));
+	time_t unix_clock = ntfs2utc(sle_ntfs_clock);
 	if (sle_ntfs_clock == 0)
 		return "none\n";
 	else

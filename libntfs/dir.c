@@ -2,6 +2,7 @@
  * dir.c - Directory handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
+ * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -37,6 +38,10 @@
 #include "inode.h"
 #include "dir.h"
 #include "volume.h"
+#include "mft.h"
+#include "index.h"
+#include "ntfstime.h"
+#include "lcnalloc.h"
 
 /*
  * The little endian Unicode string "$I30" as a global constant.
@@ -1054,3 +1059,356 @@ err_out:
 	return -1;
 }
 
+/**
+ * ntfs_create - create file or directory on ntfs volume
+ * @dir_ni:	ntfs inode for directory in which create new object
+ * @name:	unicode name of new object
+ * @name_len:	length of the name in unicode characters
+ * @type:	type of the object to create
+ *
+ * @type can be either NTFS_DT_REG to create regular file or NTFS_DT_DIR to
+ * create directory, other valuer are invalid.
+ *
+ * Return opened ntfs inode that describes created file on success or NULL
+ * on error with errno set to the error code.
+ */
+ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
+		const unsigned type)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	FILE_NAME_ATTR *fn = NULL;
+	STANDARD_INFORMATION *si = NULL;
+	int err, fn_len, si_len;
+
+	ntfs_debug("Entering.");
+	/* Sanity checks. */
+	if (!dir_ni || !name || !name_len ||
+			(type != NTFS_DT_REG && type != NTFS_DT_DIR)) {
+		ntfs_error(, "Invalid arguments.");
+		return NULL;
+	}
+	/* Allocate MFT record for new file. */
+	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
+	if (!ni) {
+		ntfs_error(, "Failed to allocate new MFT record.");
+		return NULL;
+	}
+	/*
+	 * Create STANDARD_INFORMATION attribute. Write STANDARD_INFORMATION
+	 * version 1.2, windows will upgrade it to version 3 if needed.
+	 */
+	si_len = offsetof(STANDARD_INFORMATION, v1_end);
+	si = calloc(1, si_len);
+	if (!si) {
+		err = errno;
+		ntfs_error(, "Not enough memory.");
+		goto err_out;
+	}
+	si->creation_time = utc2ntfs(ni->creation_time);
+	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+	si->last_access_time = utc2ntfs(ni->last_access_time);
+	/* Add STANDARD_INFORMATION to inode. */
+	na = ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0, si_len);
+	if (!na) {
+		err = errno;
+		ntfs_error(, "Failed to add STANDARD_INFORMATION attribute.");
+		goto err_out;
+	}
+	if (ntfs_attr_pwrite(na, 0, si_len, si) != si_len) {
+		err = errno;
+		ntfs_error(, "Failed to initialize STANDARD_INFORMATION "
+				"attribute.");
+		goto err_out;
+	}
+	ntfs_attr_close(na);
+	if (type == NTFS_DT_DIR) {
+		INDEX_ROOT *ir = NULL;
+		INDEX_ENTRY *ie;
+		int ir_len, index_len;
+
+		/* Create INDEX_ROOT attribute. */
+		index_len = sizeof(INDEX_HEADER) + sizeof(INDEX_ENTRY_HEADER);
+		ir_len = offsetof(INDEX_ROOT, index) + index_len;
+		ir = calloc(1, ir_len);
+		if (!ir) {
+			err = errno;
+			ntfs_error(, "Not enough memory.");
+			goto err_out;
+		}
+		ir->type = AT_FILE_NAME;
+		ir->collation_rule = COLLATION_FILE_NAME;
+		ir->index_block_size = cpu_to_le32(ni->vol->indx_record_size);
+		if (ni->vol->cluster_size <= ni->vol->indx_record_size)
+			ir->clusters_per_index_block =
+					ni->vol->indx_record_size >>
+					ni->vol->cluster_size_bits;
+		else
+			ir->clusters_per_index_block =
+					-ni->vol->indx_record_size_bits;
+		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
+		ir->index.index_length = cpu_to_le32(index_len);
+		ir->index.allocated_size = cpu_to_le32(index_len);
+		ie = (INDEX_ENTRY*)((u8*)ir + sizeof(INDEX_ROOT));
+		ie->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
+		ie->key_length = 0;
+		ie->flags = INDEX_ENTRY_END;
+		/* Add INDEX_ROOT attribute to inode. */
+		na = ntfs_attr_add(ni, AT_INDEX_ROOT, I30, 4, ir_len);
+		if (!na) {
+			err = errno;
+			free(ir);
+			ntfs_error(, "Failed to add INDEX_ROOT attribute.");
+			goto err_out;
+		}
+		if (ntfs_attr_pwrite(na, 0, ir_len, ir) != ir_len) {
+			err = errno;
+			free(ir);
+			ntfs_error(, "Failed to initialize INDEX_ROOT.");
+			goto err_out;
+		}
+		ntfs_attr_close(na);
+	} else {
+		/* Add DATA attribute to inode. */
+		na = ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, 0);
+		if (!na) {
+			err = errno;
+			ntfs_error(, "Failed to add DATA attribute.");
+			goto err_out;
+		}
+		ntfs_attr_close(na);
+	}
+	/* Create FILE_NAME attribute. */
+	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
+	fn = calloc(1, fn_len);
+	if (!fn) {
+		err = errno;
+		ntfs_error(, "Not enough memory.");
+		goto err_out;
+	}
+	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
+			le16_to_cpu(dir_ni->mrec->sequence_number));
+	fn->file_name_length = name_len;
+	fn->file_name_type = FILE_NAME_POSIX;
+	if (type == NTFS_DT_DIR)
+		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+	fn->creation_time = utc2ntfs(ni->creation_time);
+	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
+	/* Add FILE_NAME attribute to inode. */
+	na = ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, fn_len);
+	if (!na) {
+		err = errno;
+		ntfs_error(, "Failed to add FILE_NAME attribute.");
+		goto err_out;
+	}
+	if (ntfs_attr_pwrite(na, 0, fn_len, fn) != fn_len) {
+		err = errno;
+		ntfs_error(, "Failed to initialize FILE_NAME attribute.");
+		goto err_out;
+	}
+	ntfs_attr_close(na);
+	/* Add FILE_NAME attribute to index. */
+	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
+			le16_to_cpu(ni->mrec->sequence_number)))) {
+		err = errno;
+		ntfs_error(, "Failed to add entry to the index.");
+		goto err_out;
+	}
+	/* Set hard links count and directory flag. */
+	ni->mrec->link_count = cpu_to_le16(1);
+	if (type == NTFS_DT_DIR)
+		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
+	ntfs_inode_mark_dirty(ni);
+	/* Done! */
+	free(fn);
+	free(si);
+	ntfs_debug("Done.");
+	return ni;
+err_out:
+	ntfs_debug("Failed.");
+	if (ntfs_mft_record_free(ni->vol, ni))
+		ntfs_error(, "Failed to free MFT record.  "
+				"Leaving inconsist metadata. Run chkdsk.");
+	if (fn)
+		free(fn);
+	if (si)
+		free(si);
+	errno = err;
+	return NULL;
+}
+
+/**
+ * ntfs_delete - delete file or directory from ntfs volume
+ * @ni:		ntfs inode for object to delte
+ * @dir_ni:	ntfs inode for directory in which delete object
+ * @name:	unicode name of the object to delete
+ * @name_len:	length of the name in unicode characters
+ *
+ * @ni is always closed after using of this function (even if it failed),
+ * user do not need to call ntfs_inode_close himself.
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+{
+	ntfs_attr_search_ctx *actx = NULL;
+	ntfs_index_context *ictx = NULL;
+	FILE_NAME_ATTR *fn = NULL;
+	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
+	int err = 0;
+
+	ntfs_debug("Entering.");
+	if (!ni || !dir_ni || !name || !name_len) {
+		ntfs_error(, "Invalid arguments.");
+		errno = EINVAL;
+		goto err_out;
+	}
+	if (ni->nr_extents == -1)
+		ni = ni->base_ni;
+	if (dir_ni->nr_extents == -1)
+		dir_ni = dir_ni->base_ni;
+	/*
+	 * Search for FILE_NAME attribute with such name. If it's in POSIX or
+	 * WIN32_AND_DOS namespace, then simply remove it from index and inode.
+	 * If filename in DOS or in WIN32 namespace, then remove DOS name first,
+	 * only then remove WIN32 name. Mark WIN32 name as POSIX name to prevent
+	 * chkdsk to complain about DOS name absentation, in case if DOS name
+	 * had been successfully deleted, but WIN32 name removing failed.
+	 */
+	actx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!actx)
+		goto err_out;
+search:
+	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
+			0, NULL, 0, actx)) {
+		errno = 0;			
+		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
+				le16_to_cpu(actx->attr->value_offset));
+		if (looking_for_dos_name && fn->file_name_type == FILE_NAME_DOS)
+			break;
+		if (looking_for_win32_name &&
+				fn->file_name_type == FILE_NAME_WIN32)
+			break;
+		if (dir_ni->mft_no == MREF_LE(fn->parent_directory) &&
+				ntfs_names_are_equal(fn->file_name,
+				fn->file_name_length, name,
+				name_len, (fn->file_name_type ==
+				FILE_NAME_POSIX) ? CASE_SENSITIVE : IGNORE_CASE,
+				ni->vol->upcase, ni->vol->upcase_len)) {
+			if (fn->file_name_type == FILE_NAME_WIN32) {
+				looking_for_dos_name = TRUE;
+				ntfs_attr_reinit_search_ctx(actx);
+				continue;
+			}
+			if (fn->file_name_type == FILE_NAME_DOS)
+				looking_for_dos_name = TRUE;
+			break;
+		}
+	}
+	if (errno)
+		goto err_out;
+	/* Search for such FILE_NAME in index. */
+	ictx = ntfs_index_ctx_get(dir_ni, I30, 4);
+	if (!ictx)
+		goto err_out;
+	if (ntfs_index_lookup(fn, le32_to_cpu(actx->attr->value_length), ictx))
+		goto err_out;
+	/* Set namespace to POSIX for WIN32 name. */
+	if (fn->file_name_type == FILE_NAME_WIN32) {
+		fn->file_name_type = FILE_NAME_POSIX;
+		ntfs_inode_mark_dirty(actx->ntfs_ino);
+		((FILE_NAME_ATTR*)ictx->data)->file_name_type = FILE_NAME_POSIX;
+		ntfs_index_entry_mark_dirty(ictx);
+	}
+	/* Do not support reparse oint deletion yet. */
+	if (((FILE_NAME_ATTR*)ictx->data)->file_attributes &
+			FILE_ATTR_REPARSE_POINT) {
+		errno = EOPNOTSUPP;
+		goto err_out;
+	}
+	/* Remove FILE_NAME from index. */
+	if (ntfs_index_rm(ictx))
+		goto err_out;
+	ictx = NULL;
+	/* Remove FILE_NAME from inode. */
+	if (ntfs_attr_record_rm(actx))
+		goto err_out;
+	/* Decerement hard link count. */
+	ni->mrec->link_count = cpu_to_le16(le16_to_cpu(
+			ni->mrec->link_count) - 1);
+	ntfs_inode_mark_dirty(ni);
+	if (looking_for_dos_name) {
+		looking_for_dos_name = FALSE;
+		looking_for_win32_name = TRUE;
+		ntfs_attr_reinit_search_ctx(actx);
+		goto search;
+	}
+	/*
+	 * If hard link count is not equal to zero then we are done. In other
+	 * case there are no reference to this inode left, so we should free all
+	 * non-resident atributes and mark inode as not in use. 
+	 */
+	if (ni->mrec->link_count)
+		goto out;
+	ntfs_attr_reinit_search_ctx(actx);
+	while (!ntfs_attrs_walk(actx)) {
+		if (actx->attr->non_resident) {
+			runlist *rl;
+
+			rl = ntfs_mapping_pairs_decompress(ni->vol, actx->attr,
+					NULL);
+			if (!rl) {
+				err = errno;
+				ntfs_error(, "Failed to decompress runlist.  "
+						"Leaving inconsist metadata.");
+				continue;
+			}
+			if (ntfs_cluster_free_from_rl(ni->vol, rl)) {
+				err = errno;
+				ntfs_error(, "Failed to free clusters.  "
+						"Leaving inconsist metadata.");
+				continue;
+			}
+			free(rl);
+		}
+	}
+	if (errno != ENOENT) {
+		err = errno;
+		ntfs_error(, "Atribute enumeration failed.  "
+				"Probably leaving inconsist metadata.");
+	}
+	/* All extents should be attached after attribute walk. */
+	while (ni->nr_extents)
+		if (ntfs_mft_record_free(ni->vol, *(ni->extent_nis))) {
+			err = errno;
+			ntfs_error(, "Failed to free extent MFT record.  "
+					"Leaving inconsist metadata.");
+		}
+	if (ntfs_mft_record_free(ni->vol, ni)) {
+		err = errno;
+		ntfs_error(, "Failed to free base MFT record.  "
+				"Leaving inconsist metadata.");
+	}
+	ni = NULL;
+out:
+	if (actx)
+		ntfs_attr_put_search_ctx(actx);
+	if (ictx)
+		ntfs_index_ctx_put(ictx);
+	if (ni)
+		ntfs_inode_close(ni);
+	if (err) {
+		ntfs_error(, "Failed.");
+		errno = err;
+		return -1;
+	}
+	ntfs_debug("Done.");
+	return 0;
+err_out:
+	err = errno;
+	goto out;
+}

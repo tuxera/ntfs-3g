@@ -2,7 +2,7 @@
  * inode.h - Defines for NTFS inode handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -144,9 +144,10 @@ struct _ntfs_inode {
 	s64 data_size;
 	s64 allocated_size;
 
-	time_t atime; /* Last access to the data within the file. */
-	time_t mtime; /* Last change of the data within the file. */
-	time_t ctime; /* Last change of the metadata of the file. */
+	time_t creation_time;
+	time_t last_data_change_time;
+	time_t last_mft_change_time;
+	time_t last_access_time;
 };
 
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
