@@ -2213,11 +2213,14 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 	u8 *src;
 	u8 *dst;
 	int len;
+	int attr_size;
 
 	if (!inode)
 		return 1;
 	if (!data)
 		return 1;
+
+	attr_size = ATTR_SIZE (data_len);
 
 	mrec = inode->mrec;
 	if (!mrec)
@@ -2237,7 +2240,7 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 
 	len = ((u8*) mrec + mrec->bytes_in_use) - ((u8*) attr);
 	src = (u8*) attr;
-	dst = src + data_len + 0x18;
+	dst = src + attr_size + 0x18;
 
 	memmove (dst, src, len);
 
@@ -2245,13 +2248,15 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 	dst = (u8*) attr + 0x18;
 	len = data_len;
 
+	// XXX wipe slack space after attr?
+
 	memcpy (dst, src, len);
 
-	mrec->bytes_in_use += data_len + 0x18;
+	mrec->bytes_in_use += attr_size + 0x18;
 
 	memset (attr, 0, 0x18);
 	*(u32*)((u8*) attr + 0x00) = type;
-	*(u32*)((u8*) attr + 0x04) = data_len + 0x18;
+	*(u32*)((u8*) attr + 0x04) = attr_size + 0x18;
 	*(u16*)((u8*) attr + 0x0E) = mrec->next_attr_instance;
 	*(u32*)((u8*) attr + 0x10) = data_len;
 	*(u32*)((u8*) attr + 0x14) = 0x18;
@@ -3235,7 +3240,7 @@ ascend:
 	//printf ("new's vcn    = %lld\n", new->vcn);
 
 	// adjust parents
-	// 	attach new to median
+	//	attach new to median
 	// escape clause for root node?
 	// goto ascend
 
@@ -4475,6 +4480,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	s64 now = 0;
 	struct ntfs_dir *dir;
 	struct ntfs_dt *dt;
+	int data_len = 0;
 
 	new_num = utils_mft_find_free_entry (vol);
 	if (new_num == (MFT_REF) -1)
@@ -4515,10 +4521,6 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	ie->key.file_name.last_data_change_time = now;
 	ie->key.file_name.last_mft_change_time  = now;
 	ie->key.file_name.last_access_time      = now;
-
-	// Need to be filled in later
-	ie->key.file_name.allocated_size        = 0;
-	ie->key.file_name.data_size             = 0;
 
 	//ntfs_ie_dump (ie);
 
@@ -4565,28 +4567,29 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	ntfs_mft_add_attr (ino, AT_STANDARD_INFORMATION, buffer, 0x48);
 	//utils_dump_mem (buffer, 0, 0x48, DM_DEFAULTS);
 
+	// Data
+	memset (buffer, 0, 128);
+	data_len = sprintf ((char*)buffer, "Contents of file: %s\n", filename);
+	ntfs_mft_add_attr (ino, AT_DATA, buffer, data_len);
+
 	// File name
 	memset (buffer, 0, 128);
 	printf ("parent = 0x%llX\n", find.mref);
 	printf ("ino mref = %lld\n", ino->mft_no);
 	*(u64*)(buffer + 0x00) = MK_MREF (find.mref, 2);	// MFT Ref of parent dir
-	*(u64*)(buffer + 0x08) = now;		// Time
-	*(u64*)(buffer + 0x10) = now;		// Time
-	*(u64*)(buffer + 0x18) = now;		// Time
-	*(u64*)(buffer + 0x20) = now;		// Time
-	*(u64*)(buffer + 0x28) = 0;		// Allocated size
-	*(u64*)(buffer + 0x30) = 0;		// Initialised size
-	*(u32*)(buffer + 0x38) = 0;		// Flags
-	*(u32*)(buffer + 0x3C) = 0;		// Not relevant
-	*(u8* )(buffer + 0x40) = uname_len;	// Filename length
-	*(u8* )(buffer + 0x41) = FILE_NAME_POSIX;// Filename namespace
+	*(u64*)(buffer + 0x08) = now;				// Time
+	*(u64*)(buffer + 0x10) = now;				// Time
+	*(u64*)(buffer + 0x18) = now;				// Time
+	*(u64*)(buffer + 0x20) = now;				// Time
+	*(u64*)(buffer + 0x28) = ATTR_SIZE (data_len);		// Allocated size
+	*(u64*)(buffer + 0x30) = data_len;			// Initialised size
+	*(u32*)(buffer + 0x38) = 0;				// Flags
+	*(u32*)(buffer + 0x3C) = 0;				// Not relevant
+	*(u8* )(buffer + 0x40) = uname_len;			// Filename length
+	*(u8* )(buffer + 0x41) = FILE_NAME_POSIX;		// Filename namespace
 	memcpy (buffer + 0x42, uname, uname_len * sizeof (ntfschar));
 	ntfs_mft_add_attr (ino, AT_FILE_NAME, buffer, ATTR_SIZE (0x42 + (uname_len * sizeof (ntfschar))));
 	//utils_dump_mem (buffer, 0, 0x50, DM_DEFAULTS);
-
-	// Data
-	memset (buffer, 0, 128);
-	ntfs_mft_add_attr (ino, AT_DATA, buffer, 0);
 
 	//utils_dump_mem ((u8*)ino->mrec, 0, ino->mrec->bytes_in_use, DM_DEFAULTS);
 
@@ -4600,6 +4603,9 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	//printf ("\n");
 	//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
 	//printf ("\n");
+
+	ie->key.file_name.allocated_size        = ATTR_SIZE (data_len);
+	ie->key.file_name.data_size             = data_len;
 
 	ntfs_dt_root_add (dt, ie);
 	ino->ref_count++;
