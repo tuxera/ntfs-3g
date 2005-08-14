@@ -2205,7 +2205,7 @@ static int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_T
 /**
  * ntfs_mft_add_attr
  */
-static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int data_len)
+static ATTR_RECORD * ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int data_len)
 {
 	MFT_RECORD *mrec;
 	ATTR_RECORD *attr;
@@ -2216,15 +2216,15 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 	int attr_size;
 
 	if (!inode)
-		return 1;
+		return NULL;
 	if (!data)
-		return 1;
+		return NULL;
 
 	attr_size = ATTR_SIZE (data_len);
 
 	mrec = inode->mrec;
 	if (!mrec)
-		return 1;
+		return NULL;
 
 	ptr = (u8*) inode->mrec + mrec->attrs_offset;
 	while (1) {
@@ -2263,7 +2263,7 @@ static int ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int 
 
 	mrec->next_attr_instance++;
 
-	return 0;
+	return attr;
 }
 
 /**
@@ -2796,7 +2796,7 @@ static int ntfs_dt_root_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
 
 	// hmm, suc == add
 
-	printf ("need %d, have %d\n", need, space);
+	//printf ("need %d, have %d\n", need, space);
 	if (need > space) {
 		printf ("no room");
 		return 0;
@@ -4481,6 +4481,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	struct ntfs_dir *dir;
 	struct ntfs_dt *dt;
 	int data_len = 0;
+	ATTR_RECORD *attr;
 
 	new_num = utils_mft_find_free_entry (vol);
 	if (new_num == (MFT_REF) -1)
@@ -4493,6 +4494,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 		filename = ptr + 1;
 	}
 
+	//printf ("looking for %s\n", dirname);
 	if (utils_pathname_to_inode2 (vol, NULL, dirname, &find) == FALSE) {
 		printf ("!inode\n");
 		return 0;
@@ -4505,25 +4507,6 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	if (uname_len < 0)
 		goto close;
 
-	ie = ntfs_ie_create();
-	ie = ntfs_ie_set_name (ie, uname, uname_len, FILE_NAME_POSIX);
-	if (!ie) {
-		printf ("!ie\n");
-		goto close;
-	}
-
-	// These two NEED the sequence number in the top 8 bits
-	ie->indexed_file                        = new_num;		// MFT Ref: new file
-	ie->key.file_name.parent_directory      = MK_MREF (find.mref, 2);// MFT Ref: parent dir
-
-	now = utc2ntfs (time(NULL));
-	ie->key.file_name.creation_time         = now;
-	ie->key.file_name.last_data_change_time = now;
-	ie->key.file_name.last_mft_change_time  = now;
-	ie->key.file_name.last_access_time      = now;
-
-	//ntfs_ie_dump (ie);
-
 	//printf ("new inode %lld\n", new_num);
 	ino = ntfs_inode_open3 (vol, new_num);
 	if (!ino) {
@@ -4531,9 +4514,8 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 		goto close;
 	}
 
-	//printf ("attributes start at offset 0x%02X\n", ino->mrec->attrs_offset);
-
 	tmp = (u8*) ino->mrec;
+	now = utc2ntfs (time(NULL));
 
 	// Wipe all the attributes
 	memset (tmp + ino->mrec->attrs_offset, 0, vol->mft_record_size - ino->mrec->attrs_offset);
@@ -4550,10 +4532,6 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 
 	utils_mftrec_set_inuse6 (ino, vol->private_bmp1, TRUE);
 
-	ie->indexed_file = MK_MREF (new_num, ino->mrec->sequence_number);
-
-	//utils_dump_mem ((u8*)ino->mrec, 0, ino->mrec->bytes_in_use, DM_DEFAULTS);
-
 	buffer = malloc (128);
 	if (!buffer)
 		goto close;
@@ -4564,18 +4542,15 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	*(u64*)(buffer + 0x08) = now;		// Time
 	*(u64*)(buffer + 0x10) = now;		// Time
 	*(u64*)(buffer + 0x18) = now;		// Time
-	ntfs_mft_add_attr (ino, AT_STANDARD_INFORMATION, buffer, 0x48);
-	//utils_dump_mem (buffer, 0, 0x48, DM_DEFAULTS);
+	attr = ntfs_mft_add_attr (ino, AT_STANDARD_INFORMATION, buffer, 0x48);
 
 	// Data
 	memset (buffer, 0, 128);
 	data_len = sprintf ((char*)buffer, "Contents of file: %s\n", filename);
-	ntfs_mft_add_attr (ino, AT_DATA, buffer, data_len);
+	attr = ntfs_mft_add_attr (ino, AT_DATA, buffer, data_len);
 
 	// File name
 	memset (buffer, 0, 128);
-	printf ("parent = 0x%llX\n", find.mref);
-	printf ("ino mref = %lld\n", ino->mft_no);
 	*(u64*)(buffer + 0x00) = MK_MREF (find.mref, 2);	// MFT Ref of parent dir
 	*(u64*)(buffer + 0x08) = now;				// Time
 	*(u64*)(buffer + 0x10) = now;				// Time
@@ -4588,37 +4563,34 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	*(u8* )(buffer + 0x40) = uname_len;			// Filename length
 	*(u8* )(buffer + 0x41) = FILE_NAME_POSIX;		// Filename namespace
 	memcpy (buffer + 0x42, uname, uname_len * sizeof (ntfschar));
-	ntfs_mft_add_attr (ino, AT_FILE_NAME, buffer, ATTR_SIZE (0x42 + (uname_len * sizeof (ntfschar))));
-	//utils_dump_mem (buffer, 0, 0x50, DM_DEFAULTS);
+	attr = ntfs_mft_add_attr (ino, AT_FILE_NAME, buffer, ATTR_SIZE (0x42 + (uname_len * sizeof (ntfschar))));
+	attr->resident_flags = RESIDENT_ATTR_IS_INDEXED;
+	attr->name_offset = 0x18;
 
-	//utils_dump_mem ((u8*)ino->mrec, 0, ino->mrec->bytes_in_use, DM_DEFAULTS);
+	ie = ntfs_ie_create();
+	ie = ntfs_ie_set_name (ie, uname, uname_len, FILE_NAME_POSIX);
+	if (!ie) {
+		printf ("!ie\n");
+		goto close;
+	}
 
-	//printf ("orig inode = %p\n", find.inode);
-	dir = dt->dir->children[0];
-	dt = dir->index;
-	printf ("dir = %p (%lld)\n", dir, MREF (dir->mft_num));
-	printf ("dt = %p (%d)\n", dt, dt->child_count);
-	printf ("\n");
+	// These two NEED the sequence number in the top 8 bits
+	ie->key.file_name.parent_directory      = MK_MREF (find.mref, 2);// MFT Ref: parent dir
+	ie->indexed_file = MK_MREF (new_num, ino->mrec->sequence_number);
 
-	//printf ("\n");
-	//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
-	//printf ("\n");
-
+	ie->key.file_name.creation_time         = now;
+	ie->key.file_name.last_data_change_time = now;
+	ie->key.file_name.last_mft_change_time  = now;
+	ie->key.file_name.last_access_time      = now;
 	ie->key.file_name.allocated_size        = ATTR_SIZE (data_len);
 	ie->key.file_name.data_size             = data_len;
+
+	dir = dt->dir->children[0];
+	dt = dir->index;
 
 	ntfs_dt_root_add (dt, ie);
 	ino->ref_count++;
 	dt->inodes[0] = ino;
-
-	*(((u8*) ino->mrec) + 166) = RESIDENT_ATTR_IS_INDEXED;
-	*(((u8*) ino->mrec) + 154) = 0x18; // offset to name
-
-	// add inode to dt's list
-
-	//printf ("\n");
-	//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
-	//printf ("\n");
 
 close:
 	free (buffer);
