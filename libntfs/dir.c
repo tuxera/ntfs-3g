@@ -1271,6 +1271,25 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		ni = ni->base_ni;
 	if (dir_ni->nr_extents == -1)
 		dir_ni = dir_ni->base_ni;
+	/* If deleting directory check it to be empty. */
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		ntfs_attr *na;
+
+		na = ntfs_attr_open(ni, AT_INDEX_ROOT, I30, 4);
+		if (!na) {
+			ntfs_error(, "Corrupt directory or library bug.");
+			errno = EIO;
+			goto err_out;
+		}
+		if (na->data_size != sizeof(INDEX_ROOT) +
+				sizeof(INDEX_ENTRY_HEADER)) {
+			ntfs_attr_close(na);
+			ntfs_error(, "Directory is not empty.");
+			errno = ENOTEMPTY;
+			goto err_out;
+		}
+		ntfs_attr_close(na);
+	}
 	/*
 	 * Search for FILE_NAME attribute with such name. If it's in POSIX or
 	 * WIN32_AND_DOS namespace, then simply remove it from index and inode.
