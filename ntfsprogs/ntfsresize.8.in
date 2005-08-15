@@ -156,12 +156,19 @@ displays what it would do if it were to resize the filesystem.
 Continue with the real resizing only if the test run passed.
 .TP
 .B -b, --bad-sectors
-Support disks having physical errors, bad sectors. Make a backup by
-.BR ntfsclone (8)
-using option --rescue, then run from the command line 'chkdsk /f /r 
-volume:' on Windows prior using this option.
+Support disks having hardware errors, bad sectors with those
+.B ntfsresize
+would refuse to work by default. 
 
-If the guarantee is still valid for the disk then replace it. It's defected.
+Prior using this option, it's strongly recommended to make a backup by
+.BR ntfsclone (8)
+using the --rescue option, then running 'chkdsk /f /r volume:' on Windows 
+from the command line. If the disk guarantee is still valid then replace it.
+It's defected. Please also note, that no software can repair these type of
+hardware errors. The most what they can do is to work around the permanent 
+defects.
+
+This option doesn't have any effect if the disk is flawless.
 .TP
 .B -P, --no-progress-bar
 Don't show progress bars.
