@@ -134,3 +134,16 @@ libs:
 extra:	extras
 
 extras:	libs $(EXTRA_PROGRAMS)
+
+# mkfs.ntfs[.8] hard links
+
+install-exec-hook:
+	$(LN) -f $(DESTDIR)$(sbindir)/mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
+
+install-data-hook:
+	$(LN) -f $(DESTDIR)$(man8dir)/mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+
+uninstall-local:
+	rm -f $(DESTDIR)$(sbindir)/mkfs.ntfs
+	rm -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+			

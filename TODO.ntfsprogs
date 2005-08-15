@@ -8,7 +8,6 @@ Thanks,
 * mkntfs *
 **********
 
-- mkntfs should be hard linked with mkfs.ntfs for the mkfs utility.
 - Got a report that creating a floppy with mkntfs failed.  Difference between
   this floppy and the floppy created by the special tool found on the net was
   said to be that the bitmap is 256kib on the special floppy while mkntfs will
