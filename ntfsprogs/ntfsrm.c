@@ -1218,6 +1218,7 @@ static int ntfs_dt_commit (struct ntfs_dt *dt)
 
 	for (i = 0; i < dt->child_count; i++) {
 		if ((dt->inodes[i]) && (NInoDirty (dt->inodes[i]))) {
+			//utils_dump_mem (dt->inodes[i]->mrec, 0, vol->mft_record_size, DM_DEFAULTS);
 #ifdef RM_WRITE
 			ntfs_inode_sync (dt->inodes[i]);
 #endif
@@ -2774,58 +2775,58 @@ static int ntfs_dt_root_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
 	int suc_num;
 	int need;
 	int space;
-	u8 *attr;
 	u8 *src;
 	u8 *dst;
 	int len;
+	u8 *new_data = NULL;
+	int i;
 
 	if (!add || !add_ie)
-		return 0;
-
-	//utils_dump_mem (add->data, 0, add->data_len, DM_DEFAULTS);
-	//printf ("\n");
+		return -1;
 
 	need  = add_ie->length;
 	space = ntfs_mft_free_space (add->dir);
+
+	printf ("need %d, have %d\n", need, space);
+	if (need > space) {
+		printf ("no room");
+		return -1;
+	}
+
+	new_data = realloc (add->data, add->data_len + need);
+	if (!new_data) {
+		return -1;
+	}
+
+	memset (new_data + add->data_len, 0, need);
+
+	for (i = 0; i < add->child_count; i++)
+		add->children[i] = (INDEX_ENTRY*) ((long)add->children[i] + (long)new_data - (long)add->data);	// rebase the children
+	
+	add->data = new_data;
+	new_data = NULL;
 
 	file = &add_ie->key.file_name;
 
 	suc = ntfs_dt_find3 (add, file->file_name, file->file_name_length, &suc_num);
 	if (!suc)
-		return 0;
+		return -1;
 
-	// hmm, suc == add
+	// hmm, suc == add (i.e. entry already exists)
 
-	//printf ("need %d, have %d\n", need, space);
-	if (need > space) {
-		printf ("no room");
-		return 0;
-	}
+	src = (u8*) suc->children[suc_num];
+	dst = src + need;
+	len = ((add->data + add->data_len) - src);
 
-	attr = malloc (add->data_len + need);
+	memmove (dst, src, len);
 
-	src = add->data;
-	dst = attr;
-	len = add->header->entries_offset + 16;
-
-	memcpy (dst, src, len);
-
-	dst += len;
+	dst = src;
 	src = (u8*) add_ie;
 	len = add_ie->length;
 
 	memcpy (dst, src, len);
 
-	dst += len;
-	src = (u8*) suc->children[suc_num];
-	len = add->data + add->data_len - src;
-
-	memcpy (dst, src, len);
-
-	free (add->data);
-	add->data = attr;
 	add->data_len += need;
-
 	add->header = (INDEX_HEADER*) (add->data + 0x10);
 	add->header->index_length   = add->data_len - 16;
 	add->header->allocated_size = add->data_len - 16;
@@ -2838,7 +2839,7 @@ static int ntfs_dt_root_add (struct ntfs_dt *add, INDEX_ENTRY *add_ie)
 	add->changed = TRUE;
 
 	printf (GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, add->dir->inode->mft_no);
-	return 0;
+	return suc_num;
 }
 
 /**
@@ -4480,6 +4481,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	s64 now = 0;
 	struct ntfs_dir *dir;
 	struct ntfs_dt *dt;
+	int dt_index = 0;
 	int data_len = 0;
 	ATTR_RECORD *attr;
 
@@ -4494,7 +4496,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 		filename = ptr + 1;
 	}
 
-	//printf ("looking for %s\n", dirname);
+	printf ("looking for %s\n", dirname);
 	if (utils_pathname_to_inode2 (vol, NULL, dirname, &find) == FALSE) {
 		printf ("!inode\n");
 		return 0;
@@ -4507,7 +4509,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	if (uname_len < 0)
 		goto close;
 
-	//printf ("new inode %lld\n", new_num);
+	printf ("new inode %lld\n", new_num);
 	ino = ntfs_inode_open3 (vol, new_num);
 	if (!ino) {
 		printf ("!ino\n");
@@ -4542,6 +4544,10 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	*(u64*)(buffer + 0x08) = now;		// Time
 	*(u64*)(buffer + 0x10) = now;		// Time
 	*(u64*)(buffer + 0x18) = now;		// Time
+	ino->creation_time         = time (NULL);
+	ino->last_data_change_time = time (NULL);
+	ino->last_mft_change_time  = time (NULL);
+	ino->last_access_time      = time (NULL);
 	attr = ntfs_mft_add_attr (ino, AT_STANDARD_INFORMATION, buffer, 0x48);
 
 	// Data
@@ -4588,9 +4594,9 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	dir = dt->dir->children[0];
 	dt = dir->index;
 
-	ntfs_dt_root_add (dt, ie);
+	dt_index = ntfs_dt_root_add (dt, ie);
+	dt->inodes[dt_index] = ino;
 	ino->ref_count++;
-	dt->inodes[0] = ino;
 
 close:
 	free (buffer);
