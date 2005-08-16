@@ -746,14 +746,19 @@ int utils_is_metadata (ntfs_inode *inode)
  * @buf:     Buffer to be displayed
  * @start:   Offset into @buf to start from
  * @length:  Number of bytes to display
- * @ascii:   Whether or not to display the ascii values
+ * @flags:   Options to change the style of the output
  *
  * Display a block of memory in a tradition hex-dump manner.
  * Optionally the ascii part can be turned off.
+ *
+ * The flags, described fully in utils.h, default to 0 (DM_DEFAULTS).
+ * Examples are: DM_INDENT (indent the output by one tab); DM_RED (colour the
+ * output); DM_NO_ASCII (only print the hex values).
  */
-void utils_dump_mem (u8 *buf, int start, int length, int flags)
+void utils_dump_mem (void *buf, int start, int length, int flags)
 {
 	int off, i, s, e, col;
+	u8 *mem = buf;
 
 	s =  start                & ~15;	// round down
 	e = (start + length + 15) & ~15;	// round up
@@ -781,7 +786,7 @@ void utils_dump_mem (u8 *buf, int start, int length, int flags)
 			if ((i == 8) && (!(flags & DM_NO_DIVIDER)))
 				printf (" -");
 			if (((off+i) >= start) && ((off+i) < (start+length)))
-				printf (" %02X", buf[off+i]);
+				printf (" %02X", mem[off+i]);
 			else
 				printf ("   ");
 		}
@@ -790,8 +795,8 @@ void utils_dump_mem (u8 *buf, int start, int length, int flags)
 			for (i = 0; i < 16; i++) {
 				if (((off+i) < start) || ((off+i) >= (start+length)))
 					printf (" ");
-				else if (isprint (buf[off + i]))
-					printf ("%c", buf[off + i]);
+				else if (isprint (mem[off + i]))
+					printf ("%c", mem[off + i]);
 				else
 					printf (".");
 			}

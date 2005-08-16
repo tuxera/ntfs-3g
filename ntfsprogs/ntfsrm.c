@@ -802,7 +802,7 @@ static void ntfs_ie_dump (INDEX_ENTRY *ie)
 
 	printf ("________________________________________________");
 	printf ("\n");
-	utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS);
+	utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
 
 	printf ("MFT Ref: 0x%llx\n", ie->indexed_file);
 	printf ("length: %d\n", ie->length);
@@ -1429,7 +1429,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 				printf ("IE (%d)\n", ie->length);
 			else
 				printf ("IE %lld (%d)\n", MREF (ie->key.file_name.parent_directory), ie->length);
-			utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS);
+			utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
 			printf ("\n");
 		}
 #endif
@@ -1460,7 +1460,7 @@ static struct ntfs_dt * ntfs_dt_alloc (struct ntfs_dir *dir, struct ntfs_dt *par
 				printf ("IE (%d)\n", ie->length);
 			else
 				printf ("IE %lld (%d)\n", MREF (ie->key.file_name.parent_directory), ie->length);
-			utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS);
+			utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
 			printf ("\n");
 		}
 #endif
@@ -2174,9 +2174,9 @@ static int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_T
 	// inode->mrec
 
 	mft = inode->mrec;
-	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
+	//utils_dump_mem (mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
 
-	//utils_dump_mem ((u8*)attrXX, 0, attrXX->length, DM_DEFAULTS); printf ("\n");
+	//utils_dump_mem (attrXX, 0, attrXX->length, DM_DEFAULTS); printf ("\n");
 
 	//printf ("mrec = %p, attr = %p, diff = %d (0x%02X)\n", mft, attrXX, (u8*)attrXX - (u8*)mft, (u8*)attrXX - (u8*)mft);
 	// memmove
@@ -2196,7 +2196,7 @@ static int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_T
 #endif
 
 	memmove (dst, src, len);
-	//utils_dump_mem ((u8*)mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
+	//utils_dump_mem (mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
 
 	NInoSetDirty(inode);
 	return 0;
@@ -2353,7 +2353,7 @@ static int ntfs_mft_resize_resident (ntfs_inode *inode, ATTR_TYPES type, ntfscha
 	memset ((u8*)mrec + mrec->bytes_in_use, 0, mft_size - mrec->bytes_in_use);
 
 	mft_usage += (attr_new - attr_orig);
-	//utils_dump_mem ((u8*) mrec, 0, mft_size, DM_DEFAULTS);
+	//utils_dump_mem (mrec, 0, mft_size, DM_DEFAULTS);
 	res = 0;
 done:
 	ntfs_attr_put_search_ctx (ctx);
@@ -3346,7 +3346,7 @@ static int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir)
 		}
 
 		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
-		//utils_dump_mem ((u8*)ie, 0, ie->length, DM_DEFAULTS); printf ("\n");
+		//utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS); printf ("\n");
 		ntfs_dt_root_replace (dir->index, 0, dir->index->children[0], ie);
 		//utils_dump_mem (dir->index->data, 0, dir->index->data_len, DM_DEFAULTS); printf ("\n");
 		//printf ("root dt %d, vcn = %lld\n", dir->index->changed, dir->index->vcn);
@@ -4159,7 +4159,7 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	//ntfs_dt_print (top, 0);
 
 	del_ie = del->children[del_num];
-	//utils_dump_mem ((u8*)del_ie, 0, del_ie->length, DM_DEFAULTS);
+	//utils_dump_mem (del_ie, 0, del_ie->length, DM_DEFAULTS);
 	//printf ("\n");
 
 	/*
@@ -4186,11 +4186,11 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		//printf ("\n");
 
 		suc_ie = ntfs_ie_copy (suc->children[suc_num]);
-		//utils_dump_mem ((u8*)suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
+		//utils_dump_mem (suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
 		//printf ("\n");
 
 		suc_ie = ntfs_ie_set_vcn (suc_ie, vcn);
-		//utils_dump_mem ((u8*)suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
+		//utils_dump_mem (suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
 		//printf ("\n");
 
 		file = &del_ie->key.file_name; printf ("\trep name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
@@ -4303,11 +4303,11 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		par_ie = par->children[par_num];
 		vcn = ntfs_ie_get_vcn (par_ie);
 		//printf ("\toffset = %d\n", (u8*)par_ie - par->data); printf ("\tflags = %d\n", par_ie->flags); printf ("\tvcn = %lld\n", vcn); printf ("\tlength = %d\n", par_ie->length);
-		//utils_dump_mem ((u8*)par_ie, 0, par_ie->length, DM_DEFAULTS);
+		//utils_dump_mem (par_ie, 0, par_ie->length, DM_DEFAULTS);
 		//printf ("\n");
 
 		//printf ("\toffset = %d\n", (u8*)par_ie - par->data); printf ("\tflags = %d\n", par_ie->flags); printf ("\tvcn = %lld\n", vcn); printf ("\tlength = %d\n", par_ie->length);
-		//utils_dump_mem ((u8*)par_ie, 0, par_ie->length, DM_DEFAULTS);
+		//utils_dump_mem (par_ie, 0, par_ie->length, DM_DEFAULTS);
 		//printf ("\n");
 
 		file = &par->children[par_num]  ->key.file_name; printf ("\tpar name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
@@ -4348,7 +4348,7 @@ static int ntfs_file_remove (ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		goto done;
 
 	//printf ("\n");
-	//utils_dump_mem ((u8*)add_ie, 0, add_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
+	//utils_dump_mem (add_ie, 0, add_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
 
 	ded = par->sub_nodes[par_num];
 	par->sub_nodes[par_num] = NULL;
