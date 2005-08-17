@@ -248,224 +248,6 @@ static void ntfs_dt_print (struct ntfs_dt *dt, int indent)
 	}
 }
 
-/**
- * ntfs_binary_print
- */
-static void ntfs_binary_print (u8 num, BOOL backwards, BOOL colour)
-{
-	int i;
-
-	if (backwards)
-		for (i = 1; i < 129; i<<=1) {
-			if (colour)
-				printf ("%s", (num&i) ? "[31m1[0m" : "0");
-			else
-				printf ("%s", (num&i) ? "1" : "0");
-		}
-	else
-		for (i = 128; i > 0; i>>=1) {
-			if (colour)
-				printf ("%s", (num&i) ? "[31m1[0m" : "0");
-			else
-				printf ("%s", (num&i) ? "1" : "0");
-		}
-}
-
-/**
- * ntfsinfo_time_to_str
- */
-static const char * ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
-{
-	time_t unix_clock = ntfs2utc(sle_ntfs_clock);
-	if (sle_ntfs_clock == 0)
-		return "none\n";
-	else
-		return ctime(&unix_clock);
-}
-
-/**
- * ntfs_inode_dir_map
- */
-static void ntfs_inode_dir_map (ntfs_inode *ino)
-{
-	ATTR_RECORD *rec;
-	FILE_NAME_ATTR *fn;
-	ntfs_inode *parent;
-
-	if (!ino)
-		return;
-
-	printf ("open inode %lld\n", ino->mft_no);
-
-	if (ino->mft_no == FILE_root) {
-		printf ("done\n");
-		return;
-	}
-
-	rec = find_first_attribute (AT_FILE_NAME, ino->mrec);
-	if (!rec)
-		return;
-
-	fn = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
-
-	parent = ntfs_inode_open (ino->vol, fn->parent_directory);
-	if (parent) {
-		ntfs_inode_dir_map (parent);
-		ntfs_inode_close (parent);
-	}
-}
-
-/**
- * ntfs_inode_open2
- */
-static ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
-{
-	ntfs_inode *ino = NULL;
-	struct ntfs_dir *dir;
-
-	if (!vol)
-		return NULL;
-
-	switch (mref) {
-		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
-		case FILE_MFT:     ino = vol->mft_ni;     break;
-		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
-		case FILE_root:
-			dir = vol->private_data;
-			if (dir)
-				ino = dir->inode;
-			break;
-	}
-
-	if (ino) {
-		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
-		ino->ref_count++;
-		return ino;
-	}
-
-	ino = ntfs_inode_open (vol, mref);
-	if (!ino)
-		return NULL;
-
-	/*
-	if (mref != FILE_root)
-		ntfs_inode_dir_map (ino);
-	*/
-
-	// link
-	//   ino->private_data
-
-	ino->private_data = NULL;
-	ino->ref_count = 1;
-
-	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
-	return ino;
-}
-
-/**
- * ntfs_inode_open3
- * open a deleted inode
- */
-static ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
-{
-	ntfs_inode *ino = NULL;
-
-	if (!vol)
-		return NULL;
-
-	ino = calloc (1, sizeof (*ino));
-	if (!ino)
-		return NULL;
-
-	ino->mrec = malloc (vol->mft_record_size);
-	if (!ino->mrec) {
-		free (ino);
-		return NULL;
-	}
-
-	ino->mft_no = mref;
-	ino->vol = vol;
-
-	ino->data_size = -1;
-	ino->allocated_size = -1;
-
-	ino->private_data = NULL;
-	ino->ref_count = 1;
-
-	if (1 != ntfs_attr_mst_pread (vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
-		//ntfs_inode_close2 (ino); ???
-		free (ino->mrec);
-		free (ino);
-		return NULL;
-	}
-
-	NInoSetDirty (ino);
-	return ino;
-}
-
-/**
- * ntfs_inode_close2
- */
-static int ntfs_inode_close2 (ntfs_inode *ni)
-{
-	if (!ni)
-		return 0;
-
-	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
-
-	ni->ref_count--;
-	if (ni->ref_count > 0)
-		return 0;
-
-	// unlink
-	//   ino->private_data
-
-	// XXX temporary until we have commit/rollback
-	NInoClearDirty(ni);
-
-	return ntfs_inode_close (ni);
-}
-
-/**
- * utils_index_init
- */
-static int utils_index_init (ntfs_volume *vol, u8 *buffer, int size)
-{
-	INDEX_ALLOCATION *alloc;
-	INDEX_ENTRY_HEADER *header;
-
-	if (!vol)
-		return 1;
-	if (!buffer)
-		return 1;
-	if (size < 512)
-		return 1;
-
-	memset (buffer, 0, size);
-
-	alloc = (INDEX_ALLOCATION*) buffer;
-
-	alloc->magic           = magic_INDX;
-	alloc->usa_ofs         = 0x28;
-	alloc->usa_count       = (size >> vol->sector_size_bits) + 1;
-	alloc->lsn             = 0;
-	alloc->index_block_vcn = 0;
-
-	alloc->index.entries_offset   = 0x40;
-	alloc->index.index_length     = 0x10;
-	alloc->index.allocated_size   = size - 0x18;
-	alloc->index.flags            = 0;
-
-	header = (INDEX_ENTRY_HEADER*) (buffer + 0x40);
-
-	header->indexed_file = 0;
-	header->length       = 0x10;
-	header->key_length   = 0;
-	header->flags        = INDEX_ENTRY_END;
-
-	return 0;
-}
-
 
 /**
  * ntfs_bmp_rollback
@@ -848,73 +630,6 @@ static void ntfs_ie_free (INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_get_vcn
- */
-static VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie)
-{
-	if (!ie)
-		return -1;
-	if (!(ie->flags & INDEX_ENTRY_NODE))
-		return -1;
-
-	return *((VCN*) ((u8*) ie + ie->length - 8));
-}
-
-/**
- * ntfs_ie_dump
- */
-static void ntfs_ie_dump (INDEX_ENTRY *ie)
-{
-	if (!ie)
-		return;
-
-	printf ("________________________________________________");
-	printf ("\n");
-	utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
-
-	printf ("MFT Ref: 0x%llx\n", ie->indexed_file);
-	printf ("length: %d\n", ie->length);
-	printf ("keylen: %d\n", ie->key_length);
-	printf ("flags: ");
-		if (ie->flags & INDEX_ENTRY_NODE) printf ("NODE ");
-		if (ie->flags & INDEX_ENTRY_END)  printf ("END");
-		if (!(ie->flags & (INDEX_ENTRY_NODE | INDEX_ENTRY_END))) printf ("none");
-	printf ("\n");
-	printf ("reserved 0x%04x\n", ie->reserved);
-	if (ie->key_length > 0) {
-		printf ("mft parent: 0x%llx\n", ie->key.file_name.parent_directory);
-
-		printf ("ctime: %s", ntfsinfo_time_to_str(ie->key.file_name.creation_time));
-		printf ("dtime: %s", ntfsinfo_time_to_str(ie->key.file_name.last_data_change_time));
-		printf ("mtime: %s", ntfsinfo_time_to_str(ie->key.file_name.last_mft_change_time));
-		printf ("atime: %s", ntfsinfo_time_to_str(ie->key.file_name.last_access_time));
-		printf ("alloc size: %lld\n", ie->key.file_name.allocated_size);
-		printf ("data size: %lld\n", ie->key.file_name.data_size);
-		printf ("file flags: 0x%04x\n", ie->key.file_name.file_attributes);
-		printf ("reserved: 0x%04x\n", ie->key.file_name.reserved); printf ("name len: %d\n", ie->key.file_name.file_name_length);
-		if (ie->key.file_name.file_name_length > 0) {
-			int i, r;
-			printf ("name type: %d\n", ie->key.file_name.file_name_type);
-			printf ("name: ");
-			ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length);
-			printf ("\n");
-			r = ATTR_SIZE (2 * (ie->key.file_name.file_name_length+1)) - (2 * (ie->key.file_name.file_name_length+1));
-			if (r > 0) {
-				u8 *ptr;
-				printf ("padding: ");
-				ptr = (u8*) (ie->key.file_name.file_name +  ie->key.file_name.file_name_length);
-				for (i = 0; i < r; i++, ptr++)
-					printf ("0x%02x ", *ptr);
-				printf ("\n");
-			}
-		}
-	}
-	if (ie->flags == INDEX_ENTRY_NODE) {
-		printf ("child vcn = %lld\n", ntfs_ie_get_vcn (ie));
-	}
-}
-
-/**
  * ntfs_ie_create
  */
 static INDEX_ENTRY * ntfs_ie_create (void)
@@ -933,6 +648,19 @@ static INDEX_ENTRY * ntfs_ie_create (void)
 	ie->flags        = INDEX_ENTRY_END;
 	ie->reserved     = 0;
 	return ie;
+}
+
+/**
+ * ntfs_ie_get_vcn
+ */
+static VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie)
+{
+	if (!ie)
+		return -1;
+	if (!(ie->flags & INDEX_ENTRY_NODE))
+		return -1;
+
+	return *((VCN*) ((u8*) ie + ie->length - 8));
 }
 
 /**
@@ -1105,70 +833,67 @@ static INDEX_ENTRY * ntfs_ie_remove_name (INDEX_ENTRY *ie)
 	return ie;
 }
 
+
 /**
- * ntfs_ie_test
+ * ntfs_inode_close2
  */
-static int ntfs_ie_test (void)
+static int ntfs_inode_close2 (ntfs_inode *ni)
 {
-	INDEX_ENTRY *ie1 = NULL;
-	INDEX_ENTRY *ie2 = NULL;
-	int namelen = 0;
-	ntfschar *name = NULL;
+	if (!ni)
+		return 0;
 
-	if (1) {
-		ie1 = ntfs_ie_create();
-		//ntfs_ie_dump (ie1);
-	}
+	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
 
-	if (0) {
-		ie2 = ntfs_ie_copy (ie1);
-		ntfs_ie_dump (ie2);
-	}
+	ni->ref_count--;
+	if (ni->ref_count > 0)
+		return 0;
 
-	if (1) {
-		namelen = ntfs_mbstoucs("richard", &name, 0);
-		ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
-		free (name);
-		name = NULL;
-		ntfs_ie_dump (ie1);
-	}
+	// unlink
+	//   ino->private_data
 
-	if (1) {
-		namelen = ntfs_mbstoucs("richard2", &name, 0);
-		ie1 = ntfs_ie_set_name (ie1, name, namelen, FILE_NAME_WIN32);
-		free (name);
-		name = NULL;
-		ntfs_ie_dump (ie1);
-	}
+	// XXX temporary until we have commit/rollback
+	NInoClearDirty(ni);
 
-	if (1) {
-		ie1 = ntfs_ie_set_vcn (ie1, 1234);
-		ntfs_ie_dump (ie1);
-	}
+	return ntfs_inode_close (ni);
+}
 
-	if (1) {
-		ie1 = ntfs_ie_remove_vcn (ie1);
-		ntfs_ie_dump (ie1);
-	}
+/**
+ * utils_index_init
+ */
+static int utils_index_init (ntfs_volume *vol, u8 *buffer, int size)
+{
+	INDEX_ALLOCATION *alloc;
+	INDEX_ENTRY_HEADER *header;
 
-	if (0) {
-		ie1 = ntfs_ie_remove_name (ie1);
-		ntfs_ie_dump (ie1);
-	} else {
-		ie1->indexed_file = 1234;
-		ie1->key.file_name.parent_directory = 5;
-		ie1->key.file_name.creation_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_data_change_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_mft_change_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.last_access_time = utc2ntfs (time(NULL));
-		ie1->key.file_name.allocated_size = 4096;
-		ie1->key.file_name.data_size = 3973;
-	}
+	if (!vol)
+		return 1;
+	if (!buffer)
+		return 1;
+	if (size < 512)
+		return 1;
 
-	ntfs_ie_dump (ie1);
-	free (name);
-	ntfs_ie_free (ie1);
-	ntfs_ie_free (ie2);
+	memset (buffer, 0, size);
+
+	alloc = (INDEX_ALLOCATION*) buffer;
+
+	alloc->magic           = magic_INDX;
+	alloc->usa_ofs         = 0x28;
+	alloc->usa_count       = (size >> vol->sector_size_bits) + 1;
+	alloc->lsn             = 0;
+	alloc->index_block_vcn = 0;
+
+	alloc->index.entries_offset   = 0x40;
+	alloc->index.index_length     = 0x10;
+	alloc->index.allocated_size   = size - 0x18;
+	alloc->index.flags            = 0;
+
+	header = (INDEX_ENTRY_HEADER*) (buffer + 0x40);
+
+	header->indexed_file = 0;
+	header->length       = 0x10;
+	header->key_length   = 0;
+	header->flags        = INDEX_ENTRY_END;
+
 	return 0;
 }
 
@@ -2178,36 +1903,6 @@ static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
 	return 0;
 }
 
-/**
- * utils_mftrec_mark_free6
- */
-static int utils_mftrec_set_inuse6 (ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inuse)
-{
-	MFT_RECORD *rec;
-
-	if (!inode)
-		return -1;
-
-	if (ntfs_bmp_set_range (bmp, (VCN) MREF (inode->mft_no), 1, inuse) < 0)
-		return -1;
-
-	rec = (MFT_RECORD*) inode->mrec;
-
-	// XXX extent inodes?
-
-	if (inuse)
-		rec->flags |= MFT_RECORD_IN_USE;
-	else
-		rec->flags &= ~MFT_RECORD_IN_USE;
-
-	// XXX inc sequence number
-
-	NInoSetDirty(inode);
-
-	printf (GREEN "Modified: inode %lld MFT_RECORD header\n" END, inode->mft_no);
-	return 0;
-}
-
 
 /**
  * ntfs_mft_remove_attr
@@ -2479,7 +2174,7 @@ static int ntfs_mft_add_index (struct ntfs_dir *dir)
 	dt = ntfs_dt_create (dir, dir->index, -1);
 	if (!dt)
 		return 1;
-	
+
 	dt->vcn = 0;		// New alloc record
 
 	ie = ntfs_ie_copy (dir->index->children[dir->index->child_count-1]);
@@ -2532,6 +2227,95 @@ static int ntfs_mft_add_index (struct ntfs_dir *dir)
 
 	free (buffer);
 	return 0;
+}
+
+
+/**
+ * ntfs_inode_open2
+ */
+static ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ino = NULL;
+	struct ntfs_dir *dir;
+
+	if (!vol)
+		return NULL;
+
+	switch (mref) {
+		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
+		case FILE_MFT:     ino = vol->mft_ni;     break;
+		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
+		case FILE_root:
+			dir = vol->private_data;
+			if (dir)
+				ino = dir->inode;
+			break;
+	}
+
+	if (ino) {
+		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
+		ino->ref_count++;
+		return ino;
+	}
+
+	ino = ntfs_inode_open (vol, mref);
+	if (!ino)
+		return NULL;
+
+	/*
+	if (mref != FILE_root)
+		ntfs_inode_dir_map (ino);
+	*/
+
+	// link
+	//   ino->private_data
+
+	ino->private_data = NULL;
+	ino->ref_count = 1;
+
+	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
+	return ino;
+}
+
+/**
+ * ntfs_inode_open3
+ * open a deleted inode
+ */
+static ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ino = NULL;
+
+	if (!vol)
+		return NULL;
+
+	ino = calloc (1, sizeof (*ino));
+	if (!ino)
+		return NULL;
+
+	ino->mrec = malloc (vol->mft_record_size);
+	if (!ino->mrec) {
+		free (ino);
+		return NULL;
+	}
+
+	ino->mft_no = mref;
+	ino->vol = vol;
+
+	ino->data_size = -1;
+	ino->allocated_size = -1;
+
+	ino->private_data = NULL;
+	ino->ref_count = 1;
+
+	if (1 != ntfs_attr_mst_pread (vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
+		//ntfs_inode_close2 (ino); ???
+		free (ino->mrec);
+		free (ino);
+		return NULL;
+	}
+
+	NInoSetDirty (ino);
+	return ino;
 }
 
 
@@ -3646,47 +3430,11 @@ static struct ntfs_dir * ntfs_dir_find2 (struct ntfs_dir *dir, ntfschar *name, i
 	return child;
 }
 
-/**
- * ntfs_dir_map
- */
-static int ntfs_dir_map (ntfs_volume *vol, struct ntfs_dir *dir)
-{
-	//struct ntfs_dt *dt;
-
-	if (!vol)
-		return 1;
-	if (!dir)
-		return 1;
-
-#if 0
-	printf ("dir = %p\n", dir);
-	printf ("vol = %p\n", dir->vol);
-	printf ("parent = %p\n", dir->parent);
-	printf ("name = "); ntfs_name_print (dir->name, dir->name_len); printf ("\n");
-	printf ("mftnum = %lld\n", MREF (dir->mft_num));
-	printf ("dt = %p\n", dir->index);
-	printf ("children = %p (%d)\n", dir->children, dir->child_count);
-	printf ("bitmap = %p\n", dir->bitmap);
-	printf ("inode = %p\n", dir->inode);
-	printf ("iroot = %p\n", dir->iroot);
-	printf ("ialloc = %p\n", dir->ialloc);
-	printf ("isize = %d\n", dir->index_size);
-#endif
-
-	//dt->data_len = dir->iroot->allocated_size;
-	//dt->data     = malloc (dt->data_len);
-	//ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data);
-
-	//ntfs_dt_root_count (dt);
-
-	return 0;
-}
-
 
 /**
- * utils_volume_commit
+ * ntfs_volume_commit
  */
-static int utils_volume_commit (ntfs_volume *vol)
+static int ntfs_volume_commit (ntfs_volume *vol)
 {
 	if (!vol)
 		return -1;
@@ -3705,9 +3453,9 @@ static int utils_volume_commit (ntfs_volume *vol)
 }
 
 /**
- * utils_volume_rollback
+ * ntfs_volume_rollback
  */
-static int utils_volume_rollback (ntfs_volume *vol)
+static int ntfs_volume_rollback (ntfs_volume *vol)
 {
 	if (!vol)
 		return -1;
@@ -3725,9 +3473,9 @@ static int utils_volume_rollback (ntfs_volume *vol)
 }
 
 /**
- * ntfs_umount2
+ * ntfs_volume_umount2
  */
-static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
+static int ntfs_volume_umount2 (ntfs_volume *vol, const BOOL force)
 {
 	struct ntfs_dir *dir;
 	struct ntfs_bmp *bmp;
@@ -3735,7 +3483,7 @@ static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
 	if (!vol)
 		return 0;
 
-	utils_volume_rollback (vol);
+	ntfs_volume_rollback (vol);
 
 	dir = (struct ntfs_dir *) vol->private_data;
 	vol->private_data = NULL;
@@ -3753,9 +3501,9 @@ static int ntfs_umount2 (ntfs_volume *vol, const BOOL force)
 }
 
 /**
- * utils_mount_volume2
+ * ntfs_volume_mount2
  */
-static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flags, BOOL force)
+static ntfs_volume * ntfs_volume_mount2 (const char *device, unsigned long flags, BOOL force)
 {
 	// XXX can we replace these and search by mft number?  Hmm... NO.
 	static ntfschar bmp[8] = {
@@ -3814,7 +3562,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 
 	dir = ntfs_dir_create (vol, FILE_root);
 	if (!dir) {
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -3828,7 +3576,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 	found = ntfs_dt_find2 (root, bmp, 7, &num);
 	if ((!found) || (num < 0)) {
 		printf ("can't find $Bitmap\n");
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -3841,7 +3589,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 	found = ntfs_dt_find2 (root, mft, 4, &num);
 	if ((!found) || (num < 0)) {
 		printf ("can't find $MFT\n");
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -3854,7 +3602,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 	found = ntfs_dt_find2 (root, mftmirr, 8, &num);
 	if ((!found) || (num < 0)) {
 		printf ("can't find $MFTMirr\n");
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -3867,7 +3615,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 	found = ntfs_dt_find2 (root, dot, 1, &num);
 	if ((!found) || (num < 0)) {
 		printf ("can't find the root directory\n");
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -3882,7 +3630,7 @@ static ntfs_volume * utils_mount_volume2 (const char *device, unsigned long flag
 
 	if (!vol->private_bmp1 || !vol->private_bmp2) {
 		printf ("can't find the bitmaps\n");
-		ntfs_umount2 (vol, FALSE);
+		ntfs_volume_umount2 (vol, FALSE);
 		vol = NULL;
 		goto done;
 	}
@@ -4010,10 +3758,11 @@ close:
 	return result;
 }
 
+
 /**
- * utils_mft_find_free_entry
+ * ntfs_mft_find_free_entry
  */
-static s64 utils_mft_find_free_entry (ntfs_volume *vol)
+static s64 ntfs_mft_find_free_entry (ntfs_volume *vol)
 {
 	MFT_REF i;
 	u64 recs;
@@ -4030,112 +3779,36 @@ static s64 utils_mft_find_free_entry (ntfs_volume *vol)
 	return -1;
 }
 
-
 /**
- * ntfs_index_dump_alloc
+ * ntfs_mft_set_inuse6
  */
-static int ntfs_index_dump_alloc (ntfs_attr *attr, VCN vcn, int indent)
+static int ntfs_mft_set_inuse6 (ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inuse)
 {
-	u8 buffer[4096];
-	INDEX_BLOCK *block;
-	INDEX_ENTRY *entry;
-	u8 *ptr;
-	int size;
-	VCN *newvcn = 0;
-
-	ntfs_attr_mst_pread (attr, vcn*512, 1, sizeof (buffer), buffer);
-
-	block = (INDEX_BLOCK*) buffer;
-	size = block->index.allocated_size;
-
-	for (ptr = buffer + 64; ptr < (buffer + size); ptr += entry->length) {
-		entry = (INDEX_ENTRY*) ptr;
-
-		if (entry->flags & INDEX_ENTRY_NODE) {
-			newvcn = (VCN*) (ptr + ROUND_UP(entry->length, 8) - 8);
-			ntfs_index_dump_alloc (attr, *newvcn, indent+4);
-		}
-
-		printf ("%.*s", indent, space_line);
-
-		if (entry->flags & INDEX_ENTRY_END) {
-			printf ("[END]");
-		} else {
-			ntfs_name_print (entry->key.file_name.file_name, entry->key.file_name.file_name_length);
-		}
-
-		if (entry->flags & INDEX_ENTRY_NODE) {
-			printf (" (%lld)\n", *newvcn);
-		} else {
-			printf ("\n");
-		}
-
-		if (entry->flags & INDEX_ENTRY_END)
-			break;
-	}
-	//printf ("%.*s", indent, space_line);
-	//printf ("fill = %u/%u\n", (unsigned)block->index.index_length, (unsigned)block->index.allocated_size);
-	return 0;
-}
-
-/**
- * ntfs_index_dump
- */
-static int ntfs_index_dump (ntfs_inode *inode)
-{
-	u8 buffer[1024];
-	ntfs_attr *iroot;
-	ntfs_attr *ialloc;
-	INDEX_ROOT *root;
-	INDEX_ENTRY *entry;
-	u8 *ptr;
-	int size;
-	VCN *vcn = 0;
+	MFT_RECORD *rec;
 
 	if (!inode)
-		return 0;
+		return -1;
 
-	iroot  = ntfs_attr_open (inode, AT_INDEX_ROOT, I30, 4);
-	if (!iroot) {
-		printf ("not a directory\n");
-		return 0;
-	}
+	if (ntfs_bmp_set_range (bmp, (VCN) MREF (inode->mft_no), 1, inuse) < 0)
+		return -1;
 
-	ialloc = ntfs_attr_open (inode, AT_INDEX_ALLOCATION, I30, 4);
+	rec = (MFT_RECORD*) inode->mrec;
 
-	size = (int) ntfs_attr_pread (iroot, 0, sizeof (buffer), buffer);
+	// XXX extent inodes?
 
-	root = (INDEX_ROOT*) buffer;
+	if (inuse)
+		rec->flags |= MFT_RECORD_IN_USE;
+	else
+		rec->flags &= ~MFT_RECORD_IN_USE;
 
-	ptr = buffer + root->index.entries_offset + 0x10;
+	// XXX inc sequence number
 
-	while (ptr < (buffer + size)) {
-		entry = (INDEX_ENTRY*) ptr;
-		if (entry->flags & INDEX_ENTRY_NODE) {
-			vcn = (VCN*) (ptr + ROUND_UP(entry->length, 8) - 8);
-			ntfs_index_dump_alloc (ialloc, *vcn, 4);
-		}
+	NInoSetDirty(inode);
 
-		if (entry->flags & INDEX_ENTRY_END) {
-			printf ("[END]");
-		} else {
-			ntfs_name_print (entry->key.file_name.file_name, entry->key.file_name.file_name_length);
-		}
-
-		if (entry->flags & INDEX_ENTRY_NODE) {
-			printf (" (%lld)", *vcn);
-		}
-		printf ("\n");
-
-		ptr += entry->length;
-	}
-
-	ntfs_attr_close (iroot);
-	ntfs_attr_close (ialloc);
-
-	//printf ("fill = %d\n", ptr - buffer);
+	printf (GREEN "Modified: inode %lld MFT_RECORD header\n" END, inode->mft_no);
 	return 0;
 }
+
 
 /**
  * ntfs_file_remove
@@ -4460,7 +4133,7 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 	bmp_mft = vol->private_bmp1;
 	bmp_vol = vol->private_bmp2;
 
-	if (1) utils_mftrec_set_inuse6 (ino, bmp_mft, FALSE);
+	if (1) ntfs_mft_set_inuse6 (ino, bmp_mft, FALSE);
 
 	if (1) utils_free_non_residents2 (ino, bmp_vol);
 
@@ -4468,9 +4141,9 @@ static int ntfs_file_remove2 (ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 
 	if (1) ntfs_dir_truncate (vol, dt->dir);
 
-	if (1) utils_volume_commit (vol);
+	if (1) ntfs_volume_commit (vol);
 
-	if (0) utils_volume_rollback (vol);
+	if (0) ntfs_volume_rollback (vol);
 
 	if (0) printf ("last mft = %lld\n", ntfs_bmp_find_last_set (bmp_mft));
 	if (0) printf ("last vol = %lld\n", ntfs_bmp_find_last_set (bmp_vol));
@@ -4502,7 +4175,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	struct ntfs_dt *suc = NULL;
 	int suc_num = 0;
 
-	new_num = utils_mft_find_free_entry (vol);
+	new_num = ntfs_mft_find_free_entry (vol);
 	if (new_num == (MFT_REF) -1)
 		return 1;
 
@@ -4550,7 +4223,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	ino->mrec->next_attr_instance = 0;
 	ino->mrec->flags = MFT_RECORD_IN_USE;
 
-	utils_mftrec_set_inuse6 (ino, vol->private_bmp1, TRUE);
+	ntfs_mft_set_inuse6 (ino, vol->private_bmp1, TRUE);
 
 	buffer = malloc (128);
 	if (!buffer)
@@ -4634,73 +4307,6 @@ close:
 }
 
 /**
- * ntfs_test_bmp2
- */
-static int ntfs_test_bmp2 (ntfs_volume *vol)
-{
-	struct ntfs_bmp *bmp;
-	int i, j;
-	u8 value = 0xFF;
-
-	bmp = calloc (1, sizeof (*bmp));
-	if (!bmp)
-		return 1;
-
-	bmp->vol = vol;
-	bmp->attr = calloc (1, sizeof (*bmp->attr));
-	bmp->attr->type = 0xB0;
-	bmp->attr->ni = calloc (1, sizeof (*bmp->attr->ni));
-	bmp->count = 2;
-	bmp->data = calloc (4, sizeof (u8*));
-	bmp->data[0] = calloc (1, vol->cluster_size);
-	bmp->data[1] = calloc (1, vol->cluster_size);
-	bmp->data_vcn = calloc (4, sizeof (VCN));
-	bmp->data_vcn[0] = 0;
-	bmp->data_vcn[1] = 1;
-
-	for (j = 4090; j < 4103; j++) {
-		memset (bmp->data[0], ~value, vol->cluster_size);
-		memset (bmp->data[1], ~value, vol->cluster_size);
-		ntfs_bmp_set_range (bmp, j, 7, value);
-		for (i = 0; i < 4; i++) { ntfs_binary_print (bmp->data[0][508+i], TRUE, TRUE); printf (" "); } printf ("| ");
-		for (i = 0; i < 4; i++) { ntfs_binary_print (bmp->data[1][i], TRUE, TRUE); printf (" "); } printf ("\n");
-	}
-
-	printf ("\n");
-	for (j = 0; j < 15; j++) {
-		memset (bmp->data[0], ~value, vol->cluster_size);
-		ntfs_bmp_set_range (bmp, j, 1, value);
-		for (i = 0; i < 8; i++) { ntfs_binary_print (bmp->data[0][i], TRUE, TRUE); printf (" "); } printf ("\n");
-	}
-
-	printf ("\n");
-	for (j = 0; j < 15; j++) {
-		memset (bmp->data[0], ~value, vol->cluster_size);
-		ntfs_bmp_set_range (bmp, j, 2, value);
-		for (i = 0; i < 8; i++) { ntfs_binary_print (bmp->data[0][i], TRUE, TRUE); printf (" "); } printf ("\n");
-	}
-
-	printf ("\n");
-	for (j = 0; j < 15; j++) {
-		memset (bmp->data[0], ~value, vol->cluster_size);
-		ntfs_bmp_set_range (bmp, j, 7, value);
-		for (i = 0; i < 8; i++) { ntfs_binary_print (bmp->data[0][i], TRUE, TRUE); printf (" "); } printf ("\n");
-	}
-
-	printf ("\n");
-	for (j = 0; j < 15; j++) {
-		memset (bmp->data[0], ~value, vol->cluster_size);
-		ntfs_bmp_set_range (bmp, j, 8, value);
-		for (i = 0; i < 8; i++) { ntfs_binary_print (bmp->data[0][i], TRUE, TRUE); printf (" "); } printf ("\n");
-	}
-
-	free (bmp->attr->ni);
-	ntfs_bmp_free (bmp);
-
-	return 0;
-}
-
-/**
  * main - Begin here
  *
  * Start from here.
@@ -4731,7 +4337,7 @@ int main (int argc, char *argv[])
 	if (opts.noaction)
 		flags |= MS_RDONLY;
 
-	vol = utils_mount_volume2 (opts.device, flags, opts.force);
+	vol = ntfs_volume_mount2 (opts.device, flags, opts.force);
 	if (!vol) {
 		printf ("!vol\n");
 		goto done;
@@ -4748,21 +4354,17 @@ int main (int argc, char *argv[])
 
 	//printf ("inode = %lld\n", inode->mft_no);
 
-	if (0) result = ntfs_index_dump (inode);
-	if (0) result = ntfs_ie_test();
 	if (0) result = ntfs_file_remove2 (vol, find.dt, find.dt_index);
 	if (1) result = ntfs_file_add2 (vol, opts.file);
-	if (0) result = ntfs_test_bmp2 (vol);
 
 done:
-	if (1) utils_volume_commit (vol);
-	if (0) utils_volume_rollback (vol);
+	if (1) ntfs_volume_commit (vol);
+	if (0) ntfs_volume_rollback (vol);
 	if (0) ntfs_inode_close2 (inode);
-	if (1) ntfs_umount2 (vol, FALSE);
+	if (1) ntfs_volume_umount2 (vol, FALSE);
 
-	if (0) ntfs_binary_print (0, FALSE, FALSE);
 	if (0) utils_pathname_to_inode2 (NULL, NULL, NULL, NULL);
-	if (0) ntfs_dir_map (NULL, NULL);
+	if (0) ntfs_ie_remove_name (NULL);
 
 	return result;
 }
