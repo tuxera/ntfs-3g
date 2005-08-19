@@ -33,7 +33,9 @@ xx/xx/2005 - 1.12.0-WIP
 	  ntfs_mft_record_alloc.  (Yura)
 	- Make ntfsmount use new APIs for file and directory creation/deletion.
 	  Implement utime operation.  (Yura)
-	- Hard link mkfs.ntfs and mkfs.ntfs.8 with mkntfs and mkntfs.8  (Szaka).
+	- Hard link mkfs.ntfs and mkfs.ntfs.8 with mkntfs and mkntfs.8.  (Szaka)
+	- Only include sys/ioctl.h in libntfs/device.c if ./configure detected
+	  it to be present.  (Christophe)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

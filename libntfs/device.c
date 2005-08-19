@@ -29,7 +29,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
+#ifdef HAVE_SYS_IOCTL_H
+#	include <sys/ioctl.h>
+#endif
 #ifdef HAVE_LINUX_FD_H
 #	include <linux/fd.h>
 #endif
