@@ -269,7 +269,7 @@ static int info (ntfs_volume *vol)
 
 		inuse++;
 
-		a_ctx = ntfs_attr_get_search_ctx (NULL, m_ctx->inode->mrec);
+		a_ctx = ntfs_attr_get_search_ctx (m_ctx->inode, NULL);
 
 		while ((rec = find_attribute (AT_UNUSED, a_ctx))) {
 
