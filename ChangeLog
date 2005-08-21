@@ -37,6 +37,7 @@ xx/xx/2005 - 1.12.0-WIP
 	- Only include sys/ioctl.h in libntfs/device.c if ./configure detected
 	  it to be present.  (Christophe)
 	- ntfscluster: fix incorrect volume usage calculation.  (Szaka)
+	- ntfscluster, utils.c::mft_next_record(): fix gigaleak.  (Szaka)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

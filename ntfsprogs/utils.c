@@ -955,8 +955,11 @@ int mft_next_record (struct mft_search_ctx *ctx)
 						(unsigned long long)
 						ctx->mft_num, strerror (errno));
 				// free / close
+				ntfs_attr_close(mft);
 				return -1;
 			}
+			
+			ntfs_attr_close(mft);
 		}
 
 		if (ctx->flags_match & ctx->flags_search) {
