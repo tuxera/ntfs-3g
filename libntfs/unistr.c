@@ -314,8 +314,8 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 /**
  * ntfs_file_values_compare
  */
-int ntfs_file_values_compare(FILE_NAME_ATTR *file_name_attr1,
-		FILE_NAME_ATTR *file_name_attr2,
+int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
+		const FILE_NAME_ATTR *file_name_attr2,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const ntfschar *upcase, const u32 upcase_len)
 {

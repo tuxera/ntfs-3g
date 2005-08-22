@@ -632,7 +632,7 @@ static int ntfs_fuse_rm(const char *org_path)
 	if (!path)
 		return -errno;
 	/* Open object for delete. */
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);		
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;

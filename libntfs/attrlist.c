@@ -34,7 +34,7 @@
 #include "unistr.h"
 
 /**
- * ntfs_attrlist_need - check whether attribute need attribute list
+ * ntfs_attrlist_need - check whether inode need attribute list
  * @ni:		opened ntfs inode for which perform check
  *
  * Check whether all are attributes belong to one MFT record, in that case

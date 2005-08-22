@@ -1118,6 +1118,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	}
 	if (ntfs_attr_pwrite(na, 0, si_len, si) != si_len) {
 		err = errno;
+		ntfs_attr_close(na);
 		ntfs_error(, "Failed to initialize STANDARD_INFORMATION "
 				"attribute.");
 		goto err_out;
@@ -1165,6 +1166,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		if (ntfs_attr_pwrite(na, 0, ir_len, ir) != ir_len) {
 			err = errno;
 			free(ir);
+			ntfs_attr_close(na);
 			ntfs_error(, "Failed to initialize INDEX_ROOT.");
 			goto err_out;
 		}
@@ -1207,6 +1209,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	}
 	if (ntfs_attr_pwrite(na, 0, fn_len, fn) != fn_len) {
 		err = errno;
+		ntfs_attr_close(na);
 		ntfs_error(, "Failed to initialize FILE_NAME attribute.");
 		goto err_out;
 	}
