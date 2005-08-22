@@ -1,4 +1,4 @@
-$SD attribute value for the system files:
+$SD attribute value for the system files on an NTFS 1.2 volume:
 
 $MFT, $MFTMirr, $LogFile, $AttrDef, $Bitmap, $Boot, $BadClus, and $UpCase:
 
