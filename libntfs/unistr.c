@@ -88,12 +88,14 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
 
 /**
  * ntfs_names_collate - collate two Unicode names
+ * @name1:	first Unicode name to compare
+ * @name1_len:	length of first Unicode name to compare
+ * @name2:	second Unicode name to compare
+ * @name2_len:	length of second Unicode name to compare
+ * @err_val:	if @name1 contains an invalid character return this value
+ * @ic:		either CASE_SENSITIVE or IGNORE_CASE
  * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
  * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
- * @name1:	first Unicode name to compare
- * @name2:	second Unicode name to compare
- * @ic:		either CASE_SENSITIVE or IGNORE_CASE
- * @err_val:	if @name1 contains an invalid character return this value
  *
  * ntfs_names_collate() collates two Unicode names and returns:
  *
@@ -113,7 +115,7 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 	ntfschar c1, c2;
 
 #ifdef DEBUG
-	if (!name1 || !name2 || (ic && !upcase && upcase_len)) {
+	if (!name1 || !name2 || (ic && (!upcase || upcase_len))) {
 		Dputs("ntfs_names_collate received NULL pointer!");
 		exit(1);
 	}
