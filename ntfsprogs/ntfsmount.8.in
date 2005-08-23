@@ -62,7 +62,7 @@ Note that even when show_sys_files is specified, "$MFT"
 may will not be visible due to bugs/mis-features in glibc.
 Further, note that irrespective of show_sys_files, all
 files are accessible by name, i.e. you can always do
-"ls -l \$UpCase" for example to specifically show the
+"ls -l $UpCase" for example to specifically show the
 system file containing the Unicode upcase table.
 
 .TP
