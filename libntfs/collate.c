@@ -1,5 +1,5 @@
 /*
- * collate.c - NTFS kernel collation handling.  Part of the Linux-NTFS project.
+ * collate.c - NTFS collation handling.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy

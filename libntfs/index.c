@@ -256,6 +256,12 @@ done:
 		 */
 		rc = ntfs_collate(vol, cr, key, key_len, &ie->key,
 				le16_to_cpu(ie->key_length));
+		if (rc == NTFS_COLLATION_ERROR) {
+			ntfs_error(, "Collation error. Probably filename "
+					"contain invalid characters.");
+			err = ERANGE;
+			goto err_out;
+		}
 		/*
 		 * If @key collates before the key of the current entry, there
 		 * is definitely no such key in this index but we might need to
@@ -384,6 +390,12 @@ ia_done:
 		 */
 		rc = ntfs_collate(vol, cr, key,	key_len, &ie->key,
 				le16_to_cpu(ie->key_length));
+		if (rc == NTFS_COLLATION_ERROR) {
+			ntfs_error(, "Collation error. Probably filename "
+					"contain invalid characters.");
+			err = ERANGE;
+			goto err_out;
+		}
 		/*
 		 * If @key collates before the key of the current entry, there
 		 * is definitely no such key in this index but we might need to
