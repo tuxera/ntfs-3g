@@ -42,6 +42,10 @@
 #include "logfile.h"
 #include "dir.h"
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 /**
  * ntfs_volume_alloc -
  *

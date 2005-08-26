@@ -48,6 +48,10 @@
 #include "index.h"
 #include "utils.h"
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
