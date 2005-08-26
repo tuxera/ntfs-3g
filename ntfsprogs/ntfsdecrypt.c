@@ -965,7 +965,7 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 {
 	EFS_DF_HEADER *df_header;
 	EFS_DF_CREDENTIAL_HEADER *df_cred;
-	EFS_DF_CERTIFICATE_HEADER *df_cert;
+	EFS_DF_CERT_THUMBPRINT_HEADER *df_cert;
 	u8 *fek_buf;
 	ntfs_fek *fek;
 	u32 df_count, fek_size;
@@ -976,8 +976,9 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 	for (i = 0; i < df_count; i++) {
 		df_cred = (EFS_DF_CREDENTIAL_HEADER*)((u8*)df_header +
 				le32_to_cpu(df_header->cred_header_offset));
-		df_cert = (EFS_DF_CERTIFICATE_HEADER*)((u8*)df_cred +
-				le32_to_cpu(df_cred->cert_header_offset));
+		df_cert = (EFS_DF_CERT_THUMBPRINT_HEADER*)((u8*)df_cred +
+				le32_to_cpu(
+				df_cred->cert_thumbprint_header_offset));
 		fek_size = le32_to_cpu(df_header->fek_size);
 		fek_buf = (u8*)df_header + le32_to_cpu(df_header->fek_offset);
 		/* Decrypt the FEK.  Note: This is done in place. */
