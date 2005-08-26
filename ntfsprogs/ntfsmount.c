@@ -33,6 +33,7 @@
 #include <locale.h>
 #include <signal.h>
 #include <limits.h>
+#include <getopt.h>
 #include <time.h>
 
 #ifdef HAVE_SETXATTR
@@ -79,13 +80,20 @@ typedef enum {
 						free MFT records is outdated. */
 } ntfs_fuse_state_bits;
 
+static struct options {
+	char	*mnt_point;	/* Mount point */
+	char	*options;	/* Mount options */
+	int	 quiet;		/* Less output */
+	int	 verbose;	/* Extra output */
+} opts;
+
 static const char *EXEC_NAME = "ntfsmount";
-static char def_opts[] = "default_permissions,kernel_cache,allow_other,";
+static char def_opts[] = "default_permissions,allow_other,";
 static ntfs_fuse_context_t *ctx;
 
-GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
-GEN_PRINTF(Vprintf, stderr, NULL,  TRUE)
-GEN_PRINTF(Qprintf, stderr, NULL, FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
 
 static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 {
@@ -1097,11 +1105,11 @@ static void signal_handler(int arg __attribute__((unused)))
 	fuse_exit((fuse_get_context())->fuse);
 }
 
-static char *parse_options(char *options, char **device)
+static char *parse_mount_options(char *org_options, char **device)
 {
-	char *opts, *s, *opt, *val, *ret;
+	char *options, *s, *opt, *val, *ret;
 	BOOL no_def_opts = FALSE;
-	
+
 	*device = NULL;
 	/*
 	 * +3		for different in length of "fsname=..." and "dev=...".
@@ -1109,18 +1117,18 @@ static char *parse_options(char *options, char **device)
 	 * +1		for null-terminator.
 	 * +PATH_MAX	for resolved by realpath() device name
 	 */
-	ret = malloc(strlen(def_opts) + strlen(options) + 5 + PATH_MAX);
+	ret = malloc(strlen(def_opts) + strlen(org_options) + 5 + PATH_MAX);
 	if (!ret) {
 		perror("malloc failed");
 		return NULL;
 	}
 	*ret = 0;
-	opts = strdup(options);
-	if (!opts) {
+	options = strdup(org_options);
+	if (!options) {
 		perror("strdump failed");
 		return NULL;
 	}
-	s = opts;
+	s = options;
 	while ((val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "dev")) { /* Device to mount. */
@@ -1239,7 +1247,7 @@ static char *parse_options(char *options, char **device)
 	strcat(ret, "fsname=");
 	strcat(ret, *device);
 exit:
-	free(opts);
+	free(options);
 	return ret;
 err_exit:
 	free(ret);
@@ -1261,9 +1269,102 @@ static void usage(void)
 	Eprintf("Default options are: \"%s\".\n", def_opts);
 }
 
+/**
+ * parse_options - Read and validate the programs command line
+ *
+ * Read the command line, verify the syntax and parse the options.
+ * This function is very long, but quite simple.
+ *
+ * Return:  1 Success
+ *	    0 Error, one or more problems
+ */
+static int parse_options (int argc, char *argv[])
+{
+	int err = 0, help = 0;
+	char c = -1;
+
+	static const char *sopt = "-o:h?qv";
+	static const struct option lopt[] = {
+		{ "options",	 required_argument,	NULL, 'o' },
+		{ "help",	 no_argument,		NULL, 'h' },
+		{ "quiet",	 no_argument,		NULL, 'q' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ NULL,		 0,			NULL,  0  }
+	};
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	opts.mnt_point = NULL;
+	opts.options = NULL;
+
+	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!opts.mnt_point)
+				opts.mnt_point = argv[optind - 1];
+			else {
+				Eprintf("You must specify exactly one "
+						"mount point.\n");
+				err++;
+			}
+			break;
+		case 'o':
+			if (!opts.options)
+				opts.options = argv[optind - 1];
+			else {
+				Eprintf("You must specify exactly one "
+						"set of options.\n");
+				err++;
+			}
+			break;
+		case 'h':
+		case '?':
+			help++;
+			break;
+		case 'q':
+			opts.quiet++;
+			break;
+		case 'v':
+			opts.verbose++;
+			break;
+		default:
+			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+			err++;
+			break;
+		}
+	}
+
+	if (help) {
+		opts.quiet = 0;
+	} else {
+		if (!opts.options) {
+			Eprintf("No mount options passed, but 'dev' option is "
+					"mandatory.\n");
+			err++;
+		}
+
+		if (!opts.mnt_point) {
+			if (argc > 1)
+				Eprintf("No mount point specified.\n");
+			err++;
+		}
+
+		if (opts.quiet && opts.verbose) {
+			Eprintf("You may not use --quiet and --verbose at "
+					"the same time.\n");
+			err++;
+		}
+	}
+
+	if (help || err)
+		usage();
+
+	return (!help && !err);
+}
+
 int main(int argc, char *argv[])
 {
-	char *options, *parsed_options, *mnt_point, *device;
+	char *parsed_options, *device;
 	struct fuse *fh;
 	int ffd;
 
@@ -1271,24 +1372,12 @@ int main(int argc, char *argv[])
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	/* Simple arguments parse code. */
-	if (argc != 4) {
-		usage();
+	if (!parse_options(argc, argv))
 		return 1;
-	}
-	if (!strcmp(argv[1], "-o")) {
-		options = argv[2];
-		mnt_point = argv[3];
-	} else if (!strcmp(argv[2], "-o")) {
-		options = argv[3];
-		mnt_point = argv[1];
-	} else {
-		usage();
-		return 1;
-	}
+
 	ntfs_fuse_init();
 	/* Parse options. */
-	parsed_options = parse_options(options, &device);
+	parsed_options = parse_mount_options(opts.options, &device);
 	if (!device) {
 		Eprintf("'dev' option is mandatory.\n");
 		ntfs_fuse_destroy();
@@ -1308,7 +1397,7 @@ int main(int argc, char *argv[])
 	}
 	free(device);
 	/* Create filesystem. */
-	ffd = fuse_mount(mnt_point, parsed_options);
+	ffd = fuse_mount(opts.mnt_point, parsed_options);
 	if (ffd == -1) {
 		Eprintf("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
@@ -1324,7 +1413,7 @@ int main(int argc, char *argv[])
 	if (!fh) {
 		Eprintf("fuse_new failed.\n");
 		close(ffd);
-		fuse_unmount(mnt_point);
+		fuse_unmount(opts.mnt_point);
 		ntfs_fuse_destroy();
 		return 6;
 	}
@@ -1339,7 +1428,7 @@ int main(int argc, char *argv[])
 	/* Destroy. */
 	fuse_destroy(fh);
 	close(ffd);
-	fuse_unmount(mnt_point);
+	fuse_unmount(opts.mnt_point);
 	ntfs_fuse_destroy();
 	return 0;
 }
