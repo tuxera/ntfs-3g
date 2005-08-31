@@ -188,7 +188,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	/* Type of filesystem. */
 	sfs->f_type = NTFS_SB_MAGIC;
 	/* Optimal transfer block size. */
-	sfs->f_bsize = NTFS_BLOCK_SIZE;
+	sfs->f_bsize = vol->cluster_size;
 	/*
 	 * Total data blocks in file system in units of f_bsize and since
 	 * inodes are also stored in data blocs ($MFT is a file) this is just

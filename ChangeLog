@@ -40,7 +40,8 @@ xx/xx/2005 - 1.12.0-WIP
 	- ntfscluster, utils.c::mft_next_record(): fix gigaleak.  (Szaka)
 	- Define PATH_MAX if not defined in ntfsprogs/ntfsmount.c and
 	  libntfs/volume.c.  Needed to compile on DOS with djgpp.  (Christophe)
-	- Switch ntfsmount to use getoptlong.  (Yuval, minor fixes by Yura)
+	- Switch ntfsmount to use getopt_long.  (Yuval, minor fixes by Yura)
+	- ntfsmount: Fix 'df' output.  (Yuval)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
