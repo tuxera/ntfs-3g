@@ -160,8 +160,10 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 		Eprintf("Couldn't mount device '%s': %s\n", device,
 				strerror(err));
 		if (err == EOPNOTSUPP)
-			Eprintf("It seems that the logfile check failed. "
-					"Try to mount volume in windows.\n");
+			Eprintf("Windows was either hibernated or did not "
+					"shut down properly.  Try to mount "
+					"volume in windows, shut down and try "
+					"again.\n");
 		return NULL;
 	}
 
