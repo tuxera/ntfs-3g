@@ -1,8 +1,8 @@
-/*
+/**
  * runlist.c - Run list handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
- * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -52,7 +52,7 @@ static __inline__ void ntfs_rl_mm(runlist_element *base, int dst, int src,
 /**
  * Internal:
  *
- * rl_mc - runlist memory copy
+ * ntfs_rl_mc - runlist memory copy
  */
 static __inline__ void ntfs_rl_mc(runlist_element *dstbase, int dst,
 		runlist_element *srcbase, int src, int size)
@@ -381,7 +381,7 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 	ntfs_rl_mc(dst, loc, src, left, ssize - left);
 
 	/* We may have changed the length of the file, so fix the end marker */
-	if (dst[magic].lcn == LCN_ENOENT)
+	if (((dsize - loc - right - 1) > 0) && (dst[magic].lcn == LCN_ENOENT))
 		dst[magic].vcn = dst[magic - 1].vcn + dst[magic - 1].length;
 	return dst;
 }
