@@ -439,3 +439,340 @@ res:
       40     2039       40
       80   ENOENT        0
 
+Test 21 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+       0     1999       40
+      40   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0     1999       40
+      40   NOTMAP       60
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 22 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+      40     2039       40
+      80   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP       40
+      40     2039       40
+      80   NOTMAP       20
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 23 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+      60     2059       40
+     100   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP       60
+      60     2059       40
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 24 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+       0     1999      100
+     100   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0     1999      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 25 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     200     2199       40
+     240   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200     2199       40
+     240   NOTMAP       60
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 26 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     240     2239       40
+     280   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP       40
+     240     2239       40
+     280   NOTMAP       20
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 27 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     260     2259       40
+     300   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP       60
+     260     2259       40
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 28 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     200     2199      100
+     300   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200     2199      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+Test 29 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     400     2399       40
+     440   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400     2399       40
+     440   NOTMAP       60
+     500   ENOENT        0
+
+Test 30 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     440     2439       40
+     480   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP       40
+     440     2439       40
+     480   NOTMAP       20
+     500   ENOENT        0
+
+Test 31 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     460     2459       40
+     500   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP       60
+     460     2459       40
+     500   ENOENT        0
+
+Test 32 ----------
+dst:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400   NOTMAP      100
+     500   ENOENT        0
+
+src:
+     VCN      LCN      len
+     400     2399      100
+     500   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0   NOTMAP      100
+     100     1100      100
+     200   NOTMAP      100
+     300     1300      100
+     400     2399      100
+     500   ENOENT        0
+
+Test 33 ----------
+dst:
+     VCN      LCN      len
+       0     1000      100
+     100   NOTMAP      100
+     200   ENOENT        0
+
+src:
+     VCN      LCN      len
+     160     2159      100
+     260   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0     1000      100
+     100   NOTMAP       60
+     160     2159      100
+     260   ENOENT        0
+
+Test 34 ----------
+dst:
+     VCN      LCN      len
+       0     1000      100
+     100   NOTMAP      100
+     200   ENOENT        0
+
+src:
+     VCN      LCN      len
+     100     2099      140
+     240   NOTMAP        0
+
+res:
+     VCN      LCN      len
+       0     1000      100
+     100     2099      140
+     240   ENOENT        0
+

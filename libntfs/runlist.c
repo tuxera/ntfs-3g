@@ -310,8 +310,6 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 			dst[loc].lcn = LCN_RL_NOT_MAPPED;
 		}
 
-		magic += hole;
-
 		if (dst[magic].lcn == LCN_ENOENT)
 			dst[magic].vcn = dst[magic - 1].vcn +
 					dst[magic - 1].length;
@@ -1782,7 +1780,6 @@ static int test_rl_read_buffer (const char *file, u8 *buf, int bufsize)
 		return 0;
 	}
 
-	memset (buf, 0, bufsize);
 	if (fread (buf, bufsize, 1, fptr) == 99) {
 		printf ("read %s\n", file);
 		return 0;
@@ -1806,7 +1803,6 @@ static runlist_element * test_rl_pure_src (BOOL contig, BOOL multi, int vcn, int
 		fudge = 999;
 
 	result = malloc (4096);
-	memset (result, -7, 4096);
 	if (multi) {
 		MKRL (result+0, vcn + (0*len/4), fudge + vcn + 1000 + (0*len/4), len / 4)
 		MKRL (result+1, vcn + (1*len/4), fudge + vcn + 1000 + (1*len/4), len / 4)
@@ -1832,7 +1828,6 @@ static void test_rl_pure_test (int test, BOOL contig, BOOL multi, int vcn, int l
 	src = test_rl_pure_src (contig, multi, vcn, len);
 	dst = malloc (4096);
 
-	memset (dst, -7, 4096);
 	memcpy (dst, file, size);
 
 	printf ("Test %2d ----------\n", test);
@@ -1868,28 +1863,19 @@ static void test_rl_pure (char *contig, char *multi)
 	static runlist_element file4[] = {
 		{    0,   -3,   0 }	/* NOENT */
 	};
-#if 0
 	static runlist_element file5[] = {
-		{    0,   -1, 100 },	/* HOLE */
+		{    0,   -2, 100 },	/* NOTMAP */
 		{  100, 1100, 100 },	/* DATA */
-		{  200,   -1, 100 },	/* HOLE */
+		{  200,   -2, 100 },	/* NOTMAP */
 		{  300, 1300, 100 },	/* DATA */
-		{  400,   -1, 100 },	/* HOLE */
-		{  500,   -2,   0 }	/* NOT_MAPPED */
+		{  400,   -2, 100 },	/* NOTMAP */
+		{  500,   -3,   0 }	/* NOENT */
 	};
 	static runlist_element file6[] = {
 		{    0, 1000, 100 },	/* DATA */
-		{  100,   -1, 100 },	/* HOLE */
-		{  200,   -2,   0 }	/* NOT_MAPPED */
+		{  100,   -2, 100 },	/* NOTMAP */
+		{  200,   -3,   0 }	/* NOENT */
 	};
-	static runlist_element file7[] = {
-		{    0, 1000, 100 },	/* DATA */
-		{  100,   -2,   0 }	/* NOT_MAPPED */
-	};
-	static runlist_element file8[] = {
-		{    0,   -2,   0 }	/* NOT_MAPPED */
-	};
-#endif
 	BOOL c, m;
 
 	if (strcmp (contig, "contig") == 0)
@@ -1929,8 +1915,6 @@ static void test_rl_pure (char *contig, char *multi)
 	test_rl_pure_test (18, c, m, 140,  40, file3, sizeof (file3));
 	test_rl_pure_test (19, c, m,   0,  40, file4, sizeof (file4));
 	test_rl_pure_test (20, c, m,  40,  40, file4, sizeof (file4));
-
-#if 0
 	test_rl_pure_test (21, c, m,   0,  40, file5, sizeof (file5));
 	test_rl_pure_test (22, c, m,  40,  40, file5, sizeof (file5));
 	test_rl_pure_test (23, c, m,  60,  40, file5, sizeof (file5));
@@ -1945,13 +1929,6 @@ static void test_rl_pure (char *contig, char *multi)
 	test_rl_pure_test (32, c, m, 400, 100, file5, sizeof (file5));
 	test_rl_pure_test (33, c, m, 160, 100, file6, sizeof (file6));
 	test_rl_pure_test (34, c, m, 100, 140, file6, sizeof (file6));
-	test_rl_pure_test (35, c, m, 200,  40, file6, sizeof (file6));
-	test_rl_pure_test (36, c, m, 240,  40, file6, sizeof (file6));
-	test_rl_pure_test (37, c, m, 100,  40, file7, sizeof (file7));
-	test_rl_pure_test (38, c, m, 140,  40, file7, sizeof (file7));
-	test_rl_pure_test (39, c, m,   0,  40, file8, sizeof (file8));
-	test_rl_pure_test (40, c, m,  40,  40, file8, sizeof (file8));
-#endif
 }
 
 /**
