@@ -1,5 +1,5 @@
 
-SUBDIRS = doc include libntfs ntfsprogs
+SUBDIRS = doc include libntfs ntfsprogs test
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh ntfsprogs.spec.in \
@@ -26,3 +26,13 @@ extra:	extras
 
 extras: libs
 	(cd ntfsprogs && $(MAKE) extras) || exit 1;
+
+if ENABLE_TEST
+test:	libs
+	(cd test && $(MAKE) all test) || exit 1;
+else
+test:
+	@echo The libntfs test code has been configured out of this release.
+	@echo "./configure --enable-test" and rebuild.
+endif
+

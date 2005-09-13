@@ -1687,3 +1687,375 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 	}
 	return ret << vol->cluster_size_bits;
 }
+
+
+#ifdef NTFS_TEST
+/**
+ * test_rl_helper
+ */
+#define MKRL(R,V,L,S)				\
+	(R)->vcn = V;				\
+	(R)->lcn = L;				\
+	(R)->length = S;
+/*
+}
+*/
+/**
+ * test_rl_dump_runlist
+ */
+static void test_rl_dump_runlist (const runlist_element *rl)
+{
+	int abbr = 0;	/* abbreviate long lists */
+	int len = 0;
+	int i;
+	const char *lcn_str[5] = { "HOLE", "NOTMAP", "ENOENT", "XXXX" };
+
+	if (!rl) {
+		printf("    Run list not present.\n");
+		return;
+	}
+
+	if (abbr)
+		for (len = 0; rl[len].length; len++) ;
+	
+	printf("     VCN      LCN      len\n");
+	for (i = 0; ; i++, rl++) {
+		LCN lcn = rl->lcn;
+
+		if ((abbr) && (len > 20)) {
+			if (i == 4)
+				printf ("     ...\n");
+			if ((i > 3) && (i < (len - 3)))
+				continue;
+		}
+
+		if (lcn < (LCN)0) {
+			int ind = -lcn - 1;
+
+			if (ind > -LCN_ENOENT - 1)
+				ind = 3;
+			//printf("%8llx %8s %8llx\n",
+			printf("%8lld %8s %8lld\n",
+				rl->vcn, lcn_str[ind], rl->length);
+		} else
+			//printf("%8llx %8llx %8llx\n",
+			printf("%8lld %8lld %8lld\n",
+				rl->vcn, rl->lcn, rl->length);
+		if (!rl->length)
+			break;
+	}
+	if ((abbr) && (len > 20))
+		printf ("    (%d entries)\n", len+1);
+	printf ("\n");
+}
+
+/**
+ * test_rl_runlists_merge
+ */
+static runlist_element * test_rl_runlists_merge (runlist_element *drl, runlist_element *srl)
+{
+	runlist_element *res = NULL;
+
+	printf ("dst:\n");
+	test_rl_dump_runlist (drl);
+	printf ("src:\n");
+	test_rl_dump_runlist (srl);
+
+	res = ntfs_runlists_merge (drl, srl);
+
+	printf ("res:\n");
+	test_rl_dump_runlist (res);
+
+	return res;
+}
+
+/**
+ * test_rl_read_buffer
+ */
+static int test_rl_read_buffer (const char *file, u8 *buf, int bufsize)
+{
+	FILE *fptr;
+
+	fptr = fopen (file, "r");
+	if (!fptr) {
+		printf ("open %s\n", file);
+		return 0;
+	}
+
+	memset (buf, 0, bufsize);
+	if (fread (buf, bufsize, 1, fptr) == 99) {
+		printf ("read %s\n", file);
+		return 0;
+	}
+
+	fclose (fptr);
+	return 1;
+}
+
+/**
+ * test_rl_pure_src
+ */
+static runlist_element * test_rl_pure_src (BOOL contig, BOOL multi, int vcn, int len)
+{
+	runlist_element *result;
+	int fudge;
+
+	if (contig)
+		fudge = 0;
+	else
+		fudge = 999;
+
+	result = malloc (4096);
+	memset (result, -7, 4096);
+	if (multi) {
+		MKRL (result+0, vcn + (0*len/4), fudge + vcn + 1000 + (0*len/4), len / 4)
+		MKRL (result+1, vcn + (1*len/4), fudge + vcn + 1000 + (1*len/4), len / 4)
+		MKRL (result+2, vcn + (2*len/4), fudge + vcn + 1000 + (2*len/4), len / 4)
+		MKRL (result+3, vcn + (3*len/4), fudge + vcn + 1000 + (3*len/4), len / 4)
+		MKRL (result+4, vcn + (4*len/4), LCN_RL_NOT_MAPPED,              0)
+	} else {
+		MKRL (result+0, vcn,       fudge + vcn + 1000, len)
+		MKRL (result+1, vcn + len, LCN_RL_NOT_MAPPED,  0)
+	}
+	return result;
+}
+
+/**
+ * test_rl_pure_test
+ */
+static void test_rl_pure_test (int test, BOOL contig, BOOL multi, int vcn, int len, runlist_element *file, int size)
+{
+	runlist_element *src;
+	runlist_element *dst;
+	runlist_element *res;
+
+	src = test_rl_pure_src (contig, multi, vcn, len);
+	dst = malloc (4096);
+
+	memset (dst, -7, 4096);
+	memcpy (dst, file, size);
+
+	printf ("Test %2d ----------\n", test);
+	res = test_rl_runlists_merge (dst, src);
+
+	free (res);
+	test = 0;
+}
+
+/**
+ * test_rl_pure
+ */
+static void test_rl_pure (char *contig, char *multi)
+{
+		/* VCN,  LCN, len */
+	static runlist_element file1[] = {
+		{    0,   -1, 100 },	/* HOLE */
+		{  100, 1100, 100 },	/* DATA */
+		{  200,   -1, 100 },	/* HOLE */
+		{  300, 1300, 100 },	/* DATA */
+		{  400,   -1, 100 },	/* HOLE */
+		{  500,   -3,   0 }	/* NOENT */
+	};
+	static runlist_element file2[] = {
+		{    0, 1000, 100 },	/* DATA */
+		{  100,   -1, 100 },	/* HOLE */
+		{  200,   -3,   0 }	/* NOENT */
+	};
+	static runlist_element file3[] = {
+		{    0, 1000, 100 },	/* DATA */
+		{  100,   -3,   0 }	/* NOENT */
+	};
+	static runlist_element file4[] = {
+		{    0,   -3,   0 }	/* NOENT */
+	};
+#if 0
+	static runlist_element file5[] = {
+		{    0,   -1, 100 },	/* HOLE */
+		{  100, 1100, 100 },	/* DATA */
+		{  200,   -1, 100 },	/* HOLE */
+		{  300, 1300, 100 },	/* DATA */
+		{  400,   -1, 100 },	/* HOLE */
+		{  500,   -2,   0 }	/* NOT_MAPPED */
+	};
+	static runlist_element file6[] = {
+		{    0, 1000, 100 },	/* DATA */
+		{  100,   -1, 100 },	/* HOLE */
+		{  200,   -2,   0 }	/* NOT_MAPPED */
+	};
+	static runlist_element file7[] = {
+		{    0, 1000, 100 },	/* DATA */
+		{  100,   -2,   0 }	/* NOT_MAPPED */
+	};
+	static runlist_element file8[] = {
+		{    0,   -2,   0 }	/* NOT_MAPPED */
+	};
+#endif
+	BOOL c, m;
+
+	if (strcmp (contig, "contig") == 0)
+		c = TRUE;
+	else if (strcmp (contig, "noncontig") == 0)
+		c = FALSE;
+	else {
+		printf ("rl pure [contig|noncontig] [single|multi]\n");
+		return;
+	}
+	if (strcmp (multi, "multi") == 0)
+		m = TRUE;
+	else if (strcmp (multi, "single") == 0)
+		m = FALSE;
+	else {
+		printf ("rl pure [contig|noncontig] [single|multi]\n");
+		return;
+	}
+
+	test_rl_pure_test (1,  c, m,   0,  40, file1, sizeof (file1));
+	test_rl_pure_test (2,  c, m,  40,  40, file1, sizeof (file1));
+	test_rl_pure_test (3,  c, m,  60,  40, file1, sizeof (file1));
+	test_rl_pure_test (4,  c, m,   0, 100, file1, sizeof (file1));
+	test_rl_pure_test (5,  c, m, 200,  40, file1, sizeof (file1));
+	test_rl_pure_test (6,  c, m, 240,  40, file1, sizeof (file1));
+	test_rl_pure_test (7,  c, m, 260,  40, file1, sizeof (file1));
+	test_rl_pure_test (8,  c, m, 200, 100, file1, sizeof (file1));
+	test_rl_pure_test (9,  c, m, 400,  40, file1, sizeof (file1));
+	test_rl_pure_test (10, c, m, 440,  40, file1, sizeof (file1));
+	test_rl_pure_test (11, c, m, 460,  40, file1, sizeof (file1));
+	test_rl_pure_test (12, c, m, 400, 100, file1, sizeof (file1));
+	test_rl_pure_test (13, c, m, 160, 100, file2, sizeof (file2));
+	test_rl_pure_test (14, c, m, 100, 140, file2, sizeof (file2));
+	test_rl_pure_test (15, c, m, 200,  40, file2, sizeof (file2));
+	test_rl_pure_test (16, c, m, 240,  40, file2, sizeof (file2));
+	test_rl_pure_test (17, c, m, 100,  40, file3, sizeof (file3));
+	test_rl_pure_test (18, c, m, 140,  40, file3, sizeof (file3));
+	test_rl_pure_test (19, c, m,   0,  40, file4, sizeof (file4));
+	test_rl_pure_test (20, c, m,  40,  40, file4, sizeof (file4));
+
+#if 0
+	test_rl_pure_test (21, c, m,   0,  40, file5, sizeof (file5));
+	test_rl_pure_test (22, c, m,  40,  40, file5, sizeof (file5));
+	test_rl_pure_test (23, c, m,  60,  40, file5, sizeof (file5));
+	test_rl_pure_test (24, c, m,   0, 100, file5, sizeof (file5));
+	test_rl_pure_test (25, c, m, 200,  40, file5, sizeof (file5));
+	test_rl_pure_test (26, c, m, 240,  40, file5, sizeof (file5));
+	test_rl_pure_test (27, c, m, 260,  40, file5, sizeof (file5));
+	test_rl_pure_test (28, c, m, 200, 100, file5, sizeof (file5));
+	test_rl_pure_test (29, c, m, 400,  40, file5, sizeof (file5));
+	test_rl_pure_test (30, c, m, 440,  40, file5, sizeof (file5));
+	test_rl_pure_test (31, c, m, 460,  40, file5, sizeof (file5));
+	test_rl_pure_test (32, c, m, 400, 100, file5, sizeof (file5));
+	test_rl_pure_test (33, c, m, 160, 100, file6, sizeof (file6));
+	test_rl_pure_test (34, c, m, 100, 140, file6, sizeof (file6));
+	test_rl_pure_test (35, c, m, 200,  40, file6, sizeof (file6));
+	test_rl_pure_test (36, c, m, 240,  40, file6, sizeof (file6));
+	test_rl_pure_test (37, c, m, 100,  40, file7, sizeof (file7));
+	test_rl_pure_test (38, c, m, 140,  40, file7, sizeof (file7));
+	test_rl_pure_test (39, c, m,   0,  40, file8, sizeof (file8));
+	test_rl_pure_test (40, c, m,  40,  40, file8, sizeof (file8));
+#endif
+}
+
+/**
+ * test_rl_zero
+ */
+static void test_rl_zero (void)
+{
+	runlist_element *jim = NULL;
+	runlist_element *bob = NULL;
+
+	bob = calloc (3, sizeof (runlist_element));
+	if (!bob)
+		return;
+
+	MKRL(bob+0, 10, 99, 5)
+	MKRL(bob+1, 15, LCN_RL_NOT_MAPPED, 0)
+
+	jim = test_rl_runlists_merge (jim, bob);
+	if (!jim)
+		return;
+
+	free (jim);
+}
+
+/**
+ * test_rl_frag_combine
+ */
+static void test_rl_frag_combine (ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECORD *attr2, ATTR_RECORD *attr3)
+{
+	runlist_element *run1;
+	runlist_element *run2;
+	runlist_element *run3;
+
+	run1 = ntfs_mapping_pairs_decompress (vol, attr1, NULL);
+	if (!run1)
+		return;
+
+	run2 = ntfs_mapping_pairs_decompress (vol, attr2, NULL);
+	if (!run2)
+		return;
+
+	run1 = test_rl_runlists_merge (run1, run2);
+
+	run3 = ntfs_mapping_pairs_decompress (vol, attr3, NULL);
+	if (!run3)
+		return;
+
+	run1 = test_rl_runlists_merge (run1, run3);
+
+	free (run1);
+}
+
+/**
+ * test_rl_frag
+ */
+static void test_rl_frag (char *test)
+{
+	ntfs_volume vol;
+	ATTR_RECORD *attr1 = malloc (1024);
+	ATTR_RECORD *attr2 = malloc (1024);
+	ATTR_RECORD *attr3 = malloc (1024);
+
+	if (!attr1 || !attr2 || !attr3)
+		goto out;
+
+	vol.sb = NULL;
+	vol.sector_size_bits = 9;
+	vol.cluster_size = 2048;
+	vol.cluster_size_bits = 11;
+	vol.major_ver = 3;
+
+	if (!test_rl_read_buffer ("runlist-data/attr1.bin", (u8*) attr1, 1024))
+		goto out;
+	if (!test_rl_read_buffer ("runlist-data/attr2.bin", (u8*) attr2, 1024))
+		goto out;
+	if (!test_rl_read_buffer ("runlist-data/attr3.bin", (u8*) attr3, 1024))
+		goto out;
+
+	if      (strcmp (test, "123") == 0)  test_rl_frag_combine (&vol, attr1, attr2, attr3);
+	else if (strcmp (test, "132") == 0)  test_rl_frag_combine (&vol, attr1, attr3, attr2);
+	else if (strcmp (test, "213") == 0)  test_rl_frag_combine (&vol, attr2, attr1, attr3);
+	else if (strcmp (test, "231") == 0)  test_rl_frag_combine (&vol, attr2, attr3, attr1);
+	else if (strcmp (test, "312") == 0)  test_rl_frag_combine (&vol, attr3, attr1, attr2);
+	else if (strcmp (test, "321") == 0)  test_rl_frag_combine (&vol, attr3, attr2, attr1);
+	else printf ("Frag: No such test '%s'\n", test);
+
+out:
+	free (attr1);
+	free (attr2);
+	free (attr3);
+}
+
+/**
+ * test_rl_main
+ */
+int test_rl_main (int argc, char *argv[])
+{
+	if      ((argc == 2) && (strcmp (argv[1], "zero") == 0)) test_rl_zero();
+	else if ((argc == 3) && (strcmp (argv[1], "frag") == 0)) test_rl_frag (argv[2]);
+	else if ((argc == 4) && (strcmp (argv[1], "pure") == 0)) test_rl_pure (argv[2], argv[3]);
+	else printf ("rl [zero|frag|pure] {args}\n");
+
+	return 0;
+}
+
+#endif
+

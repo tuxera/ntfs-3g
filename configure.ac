@@ -100,6 +100,15 @@ AC_ARG_ENABLE(warnings,
 	enable_warnings=no
 )
 
+AC_ARG_ENABLE(test,
+	AS_HELP_STRING(--enable-test,compile in test code for libntfs), ,
+	enable_test=no
+)
+AM_CONDITIONAL(ENABLE_TEST, test "$enable_test" = yes)
+if test "$enable_test" = "yes"; then
+	CFLAGS="$CFLAGS -DNTFS_TEST"
+fi
+
 # Use GNU extensions if available.
 AC_GNU_SOURCE
 
@@ -305,5 +314,6 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8
 	ntfsprogs.spec
+	test/Makefile
 ])
 AC_OUTPUT

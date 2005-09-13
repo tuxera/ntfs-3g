@@ -79,5 +79,9 @@ extern int ntfs_rl_truncate(runlist **rl, const VCN start_vcn);
 extern int ntfs_rl_sparse(runlist *rl);
 extern s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl);
 
+#ifdef NTFS_TEST
+int test_rl_main (int argc, char *argv[]);
+#endif
+
 #endif /* defined _NTFS_RUNLIST_H */
 
