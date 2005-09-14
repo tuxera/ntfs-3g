@@ -31,6 +31,7 @@ if ENABLE_TEST
 test:	libs
 	(cd test && $(MAKE) all test) || exit 1;
 else
+.PHONY: test
 test:
 	@echo The libntfs test code has been configured out of this release.
 	@echo "./configure --enable-test" and rebuild.
