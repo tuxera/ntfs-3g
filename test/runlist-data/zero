@@ -9,5 +9,5 @@ res:
      VCN      LCN      len
        0   NOTMAP       10
       10       99        5
-       0        0        0
+      15   NOTMAP        0
 

@@ -166,8 +166,8 @@ static __inline__ void __ntfs_rl_merge(runlist_element *dst,
 static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
-	BOOL right;
-	int magic;
+	BOOL right;		/* Right end of @src needs merging */
+	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
 		Dputs("Eeek. ntfs_rl_append() invoked with NULL pointer!");
@@ -181,7 +181,7 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 	/* Space required: @dst size + @src size, less one if we merged. */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - right);
 	if (!dst)
-		return dst;
+		return NULL;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
 	 * original runlists.
@@ -191,19 +191,19 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 	if (right)
 		__ntfs_rl_merge(src + ssize - 1, dst + loc + 1);
 
-	/* FIXME: What does this mean? (AIA) */
-	magic = loc + ssize;
+	/* marker - First run after the @src runs that have been inserted */
+	marker = loc + ssize + 1;
 
 	/* Move the tail of @dst out of the way, then copy in @src. */
-	ntfs_rl_mm(dst, magic + 1, loc + 1 + right, dsize - loc - 1 - right);
+	ntfs_rl_mm(dst, marker, loc + 1 + right, dsize - loc - 1 - right);
 	ntfs_rl_mc(dst, loc + 1, src, 0, ssize);
 
 	/* Adjust the size of the preceding hole. */
 	dst[loc].length = dst[loc + 1].vcn - dst[loc].vcn;
 
 	/* We may have changed the length of the file, so fix the end marker */
-	if (dst[magic + 1].lcn == LCN_ENOENT)
-		dst[magic + 1].vcn = dst[magic].vcn + dst[magic].length;
+	if (dst[marker].lcn == LCN_ENOENT)
+		dst[marker].vcn = dst[marker-1].vcn + dst[marker-1].length;
 
 	return dst;
 }
@@ -233,10 +233,9 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
-	BOOL left = FALSE;
-	BOOL disc = FALSE;	/* Discontinuity */
-	BOOL hole = FALSE;	/* Following a hole */
-	int magic;
+	BOOL left = FALSE;	/* Left end of @src needs merging */
+	BOOL disc = FALSE;	/* Discontinuity between @dst and @src */
+	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
 		Dputs("Eeek. ntfs_rl_insert() invoked with NULL pointer!");
@@ -245,9 +244,7 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	}
 
 	/* disc => Discontinuity between the end of @dst and the start of @src.
-	 *	   This means we might need to insert a hole.
-	 * hole => @dst ends with a hole or an unmapped region which we can
-	 *	   extend to match the discontinuity.
+	 *	   This means we might need to insert a "notmapped" run.
 	 */
 	if (loc == 0)
 		disc = (src[0].vcn > 0);
@@ -261,16 +258,14 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 			merged_length += src->length;
 
 		disc = (src[0].vcn > dst[loc - 1].vcn + merged_length);
-		if (disc)
-			hole = (dst[loc - 1].lcn == LCN_HOLE);
 	}
 
 	/* Space required: @dst size + @src size, less one if we merged, plus
-	 * one if there was a discontinuity, less one for a trailing hole.
+	 * one if there was a discontinuity.
 	 */
-	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left + disc - hole);
+	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left + disc);
 	if (!dst)
-		return dst;
+		return NULL;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
 	 * original runlist.
@@ -279,40 +274,34 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	if (left)
 		__ntfs_rl_merge(dst + loc - 1, src);
 
-	/* FIXME: What does this mean? (AIA) */
-	magic = loc + ssize - left + disc - hole;
+	/*
+	 * marker - First run after the @src runs that have been inserted
+	 * Nominally: marker = @loc + @ssize (location + number of runs in @src)
+	 * If "left", then the first run in @src has been merged with one in @dst.
+	 * If "disc", then @dst and @src don't meet and we need an extra run to fill the gap.
+	 */
+	marker = loc + ssize - left + disc;
 
 	/* Move the tail of @dst out of the way, then copy in @src. */
-	ntfs_rl_mm(dst, magic, loc, dsize - loc);
-	ntfs_rl_mc(dst, loc + disc - hole, src, left, ssize - left);
+	ntfs_rl_mm(dst, marker, loc, dsize - loc);
+	ntfs_rl_mc(dst, loc + disc, src, left, ssize - left);
 
-	/* Adjust the VCN of the last run ... */
-	if (dst[magic].lcn <= LCN_HOLE)
-		dst[magic].vcn = dst[magic - 1].vcn + dst[magic - 1].length;
+	/* Adjust the VCN of the first run after the insertion ... */
+	dst[marker].vcn = dst[marker - 1].vcn + dst[marker - 1].length;
 	/* ... and the length. */
-	if (dst[magic].lcn == LCN_HOLE || dst[magic].lcn == LCN_RL_NOT_MAPPED)
-		dst[magic].length = dst[magic + 1].vcn - dst[magic].vcn;
+	if (dst[marker].lcn == LCN_HOLE || dst[marker].lcn == LCN_RL_NOT_MAPPED)
+		dst[marker].length = dst[marker + 1].vcn - dst[marker].vcn;
 
 	/* Writing beyond the end of the file and there's a discontinuity. */
 	if (disc) {
-		if (hole)
-			dst[loc - 1].length = dst[loc].vcn - dst[loc - 1].vcn;
-		else {
-			if (loc > 0) {
-				dst[loc].vcn = dst[loc - 1].vcn +
-						dst[loc - 1].length;
-				dst[loc].length = dst[loc + 1].vcn -
-						dst[loc].vcn;
-			} else {
-				dst[loc].vcn = 0;
-				dst[loc].length = dst[loc + 1].vcn;
-			}
-			dst[loc].lcn = LCN_RL_NOT_MAPPED;
+		if (loc > 0) {
+			dst[loc].vcn = dst[loc - 1].vcn + dst[loc - 1].length;
+			dst[loc].length = dst[loc + 1].vcn - dst[loc].vcn;
+		} else {
+			dst[loc].vcn = 0;
+			dst[loc].length = dst[loc + 1].vcn;
 		}
-
-		if (dst[magic].lcn == LCN_ENOENT)
-			dst[magic].vcn = dst[magic - 1].vcn +
-					dst[magic - 1].length;
+		dst[loc].lcn = LCN_RL_NOT_MAPPED;
 	}
 	return dst;
 }
@@ -341,9 +330,9 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
-	BOOL left = FALSE;
-	BOOL right;
-	int magic;
+	BOOL left = FALSE;	/* Left end of @src needs merging */
+	BOOL right;		/* Right end of @src needs merging */
+	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
 		Dputs("Eeek. ntfs_rl_replace() invoked with NULL pointer!");
@@ -361,7 +350,7 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 	 */
 	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left - right);
 	if (!dst)
-		return dst;
+		return NULL;
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
 	 * original runlists.
@@ -371,16 +360,21 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 	if (left)
 		__ntfs_rl_merge(dst + loc - 1, src);
 
-	/* FIXME: What does this mean? (AIA) */
-	magic = loc + ssize - left;
+	/*
+	 * marker - First run after the @src runs that have been inserted
+	 * Nominally: marker = @loc + @ssize (location + number of runs in @src)
+	 * If "left", then the first run in @src has been merged with one in @dst.
+	 */
+	marker = loc + ssize - left;
 
 	/* Move the tail of @dst out of the way, then copy in @src. */
-	ntfs_rl_mm(dst, magic, loc + right + 1, dsize - loc - right - 1);
+	ntfs_rl_mm(dst, marker, loc + right + 1, dsize - loc - right - 1);
 	ntfs_rl_mc(dst, loc, src, left, ssize - left);
 
 	/* We may have changed the length of the file, so fix the end marker */
-	if (((dsize - loc - right - 1) > 0) && (dst[magic].lcn == LCN_ENOENT))
-		dst[magic].vcn = dst[magic - 1].vcn + dst[magic - 1].length;
+	if (((dsize - loc - right - 1) > 0) && (dst[marker].lcn == LCN_ENOENT))
+		dst[marker].vcn = dst[marker - 1].vcn + dst[marker - 1].length;
+
 	return dst;
 }
 
@@ -498,6 +492,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			/* Scan to the end of the source runlist. */
 			for (dend = 0; drl[dend].length; dend++)
 				;
+			dend++;
 			drl = ntfs_rl_realloc(drl, dend, dend + 1);
 			if (!drl)
 				return drl;
@@ -574,7 +569,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		  (srl[send - 1].vcn + srl[send - 1].length)));
 
 	/* Or we'll lose an end marker */
-	if (start && finish && (drl[dins].length == 0))
+	if (finish && !drl[dins].length)
 		ss++;
 	if (marker && (drl[dins].vcn + drl[dins].length > srl[send - 1].vcn))
 		finish = FALSE;
@@ -1732,11 +1727,9 @@ static void test_rl_dump_runlist (const runlist_element *rl)
 
 			if (ind > -LCN_ENOENT - 1)
 				ind = 3;
-			//printf("%8llx %8s %8llx\n",
 			printf("%8lld %8s %8lld\n",
 				rl->vcn, lcn_str[ind], rl->length);
 		} else
-			//printf("%8llx %8llx %8llx\n",
 			printf("%8lld %8lld %8lld\n",
 				rl->vcn, rl->lcn, rl->length);
 		if (!rl->length)
@@ -1834,7 +1827,6 @@ static void test_rl_pure_test (int test, BOOL contig, BOOL multi, int vcn, int l
 	res = test_rl_runlists_merge (dst, src);
 
 	free (res);
-	test = 0;
 }
 
 /**

@@ -360,7 +360,8 @@ src:
 res:
      VCN      LCN      len
        0     1000      100
-     100     HOLE      140
+     100     HOLE      100
+     200   NOTMAP       40
      240     1240       40
      280   ENOENT        0
 
