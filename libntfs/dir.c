@@ -1076,7 +1076,6 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		const unsigned type)
 {
 	ntfs_inode *ni;
-	ntfs_attr *na;
 	FILE_NAME_ATTR *fn = NULL;
 	STANDARD_INFORMATION *si = NULL;
 	int err, fn_len, si_len;
@@ -1110,20 +1109,12 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	si->last_access_time = utc2ntfs(ni->last_access_time);
 	/* Add STANDARD_INFORMATION to inode. */
-	na = ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0, si_len);
-	if (!na) {
+	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
+			(u8*)si, si_len)) {
 		err = errno;
 		ntfs_error(, "Failed to add STANDARD_INFORMATION attribute.");
 		goto err_out;
 	}
-	if (ntfs_attr_pwrite(na, 0, si_len, si) != si_len) {
-		err = errno;
-		ntfs_attr_close(na);
-		ntfs_error(, "Failed to initialize STANDARD_INFORMATION "
-				"attribute.");
-		goto err_out;
-	}
-	ntfs_attr_close(na);
 	if (type == NTFS_DT_DIR) {
 		INDEX_ROOT *ir = NULL;
 		INDEX_ENTRY *ie;
@@ -1156,30 +1147,19 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ie->key_length = 0;
 		ie->flags = INDEX_ENTRY_END;
 		/* Add INDEX_ROOT attribute to inode. */
-		na = ntfs_attr_add(ni, AT_INDEX_ROOT, I30, 4, ir_len);
-		if (!na) {
+		if (ntfs_attr_add(ni, AT_INDEX_ROOT, I30, 4, (u8*)ir, ir_len)) {
 			err = errno;
 			free(ir);
 			ntfs_error(, "Failed to add INDEX_ROOT attribute.");
 			goto err_out;
 		}
-		if (ntfs_attr_pwrite(na, 0, ir_len, ir) != ir_len) {
-			err = errno;
-			free(ir);
-			ntfs_attr_close(na);
-			ntfs_error(, "Failed to initialize INDEX_ROOT.");
-			goto err_out;
-		}
-		ntfs_attr_close(na);
 	} else {
 		/* Add DATA attribute to inode. */
-		na = ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, 0);
-		if (!na) {
+		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0)) {
 			err = errno;
 			ntfs_error(, "Failed to add DATA attribute.");
 			goto err_out;
 		}
-		ntfs_attr_close(na);
 	}
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
@@ -1201,19 +1181,11 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	fn->last_access_time = utc2ntfs(ni->last_access_time);
 	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
 	/* Add FILE_NAME attribute to inode. */
-	na = ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, fn_len);
-	if (!na) {
+	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
 		err = errno;
 		ntfs_error(, "Failed to add FILE_NAME attribute.");
 		goto err_out;
 	}
-	if (ntfs_attr_pwrite(na, 0, fn_len, fn) != fn_len) {
-		err = errno;
-		ntfs_attr_close(na);
-		ntfs_error(, "Failed to initialize FILE_NAME attribute.");
-		goto err_out;
-	}
-	ntfs_attr_close(na);
 	/* Add FILE_NAME attribute to index. */
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number)))) {

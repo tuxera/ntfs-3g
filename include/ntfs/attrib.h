@@ -290,14 +290,15 @@ extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 extern int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size);
 
 extern int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, ATTR_FLAGS flags);
+		ntfschar *name, u8 name_len, u8 *val, u32 size,
+		ATTR_FLAGS flags);
 extern int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
 		ATTR_FLAGS flags);
 extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 
-extern ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, s64 size);
+extern int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, u8 *val, s64 size);
 extern int ntfs_attr_rm(ntfs_attr *na);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);

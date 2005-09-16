@@ -2496,6 +2496,8 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  * @type:	type of the new attribute
  * @name:	name of the new attribute
  * @name_len:	name length of the new attribute
+ * @val:	value of the new attribute
+ * @size:	size of new attribute (length of @val, if @val != NULL)
  * @flags:	flags of the new attribute
  *
  * Return offset to attribute from the beginning of the mft record on success
@@ -2506,7 +2508,8 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-			ntfschar *name, u8 name_len, ATTR_FLAGS flags)
+			ntfschar *name, u8 name_len, u8 *val, u32 size,
+			ATTR_FLAGS flags)
 {
 	ntfs_attr_search_ctx *ctx;
 	u32 length;
@@ -2541,7 +2544,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (!ctx)
 		return -1;
 	if (!ntfs_attr_lookup(type, name, name_len,
-				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+				CASE_SENSITIVE, 0, val, size, ctx)) {
 		err = EEXIST;
 		Dprintf("%s(): Attribute already present.\n", __FUNCTION__);
 		goto put_err_out;
@@ -2554,7 +2557,9 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	m = ctx->mrec;
 
 	/* Make room for attribute. */
-	length = (0x18 + sizeof(ntfschar) * name_len + 7) & ~7;
+	length = offsetof(ATTR_RECORD, resident_end) +
+				((name_len * sizeof(ntfschar) + 7) & ~7) +
+				((size + 7) & ~7);
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
 		Dprintf("%s(): Failed to make room for attribute.\n",
@@ -2568,11 +2573,15 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->length = cpu_to_le32(length);
 	a->non_resident = 0;
 	a->name_length = name_len;
-	a->name_offset = cpu_to_le16(0x18);
+	a->name_offset = cpu_to_le16(offsetof(ATTR_RECORD, resident_end));
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
-	a->value_length = 0;
-	a->value_offset = cpu_to_le16(length);
+	a->value_length = cpu_to_le32(size);
+	a->value_offset = cpu_to_le16(length - ((size + 7) & ~7));
+	if (val)
+		memcpy((u8*)a + le16_to_cpu(a->value_offset), val, size);
+	else
+		memset((u8*)a + le16_to_cpu(a->value_offset), 0, size);
 	if (type == AT_FILE_NAME)
 		a->resident_flags = RESIDENT_ATTR_IS_INDEXED;
 	else
@@ -2893,7 +2902,14 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
  * @type:	type of the new attribute
  * @name:	name in unicode of the new attribute
  * @name_len:	name length in unicode characters of the new attribute
- * @size:	size of the new attribute
+ * @val:	value of new attribute
+ * @size:	size of the new attribute / length of @val (if specified)
+ *
+ * @val should always be specified for always resident attributes (eg. FILE_NAME
+ * attribute), for attributes that can become non-resident @val can be NULL
+ * (eg. DATA attribute). @size can be specified even if @val is NULL, in this
+ * case data size will be equal to @size and initialized size will be equal
+ * to 0.
  *
  * If inode haven't got enough space to add attribute, add attribute to one of
  * it extents, if no extents present or no one of them have enough space, than
@@ -2904,21 +2920,21 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
  * @type == AT_ATTRIBUTE_LIST, if you really need to add attribute list call
  * ntfs_inode_add_attrlist instead.
  *
- * On success return opened new ntfs attribute. On error return NULL with errno
- * set to the error code.
+ * On success return 0. On error return -1 with errno set to the error code.
  */
-ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, s64 size)
+int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
+		ntfschar *name, u8 name_len, u8 *val, s64 size)
 {
 	u32 attr_rec_size;
 	int err, i, offset;
+	BOOL is_resident;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
 
 	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
 		Dprintf("%s(): Invalid arguments passed.\n", __FUNCTION__);
 		errno = EINVAL;
-		return NULL;
+		return -1;
 	}
 
 	Dprintf("%s(): Entering for inode 0x%llx, attr %x, size %lld.\n",
@@ -2927,19 +2943,40 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
 
-	/* Validate attribute type. */
-	if (!ntfs_attr_find_in_attrdef(ni->vol, type)) {
-		if (errno == ENOENT) {
-			Dprintf("%s(): Invalid attribute type.\n",
-					__FUNCTION__);
-			errno = EINVAL;
-			return NULL;
-		} else {
+	/* Check the attribute type and the size. */
+	if (ntfs_attr_size_bounds_check(ni->vol, type, size)) {
+		err = errno;
+		if (err == ERANGE) {
+			Dprintf("%s(): Size bounds check failed. "
+					"Aborting...\n", __FUNCTION__);
+		} else if (err == ENOENT) {
+			Dprintf("%s(): Invalid attribute type. "
+					"Aborting...\n", __FUNCTION__);
+			err = EIO;
+		}
+		errno = err;
+		return -1;
+	}
+
+	/* Sanity checks for always resident attributes. */
+	if (ntfs_attr_can_be_non_resident(ni->vol, type)) {
+		if (errno != EPERM) {
 			err = errno;
-			Dprintf("%s(): ntfs_attr_find_in_attrdef failed.\n",
+			Dprintf("%s(): ntfs_attr_can_be_non_resident failed.\n",
 					__FUNCTION__);
-			errno = err;
-			return NULL;
+			goto err_out;
+		}
+		/* @val is mandatory. */
+		if (!val) {
+			Dprintf("%s(): @val is mandatory for always resident "
+					"atributes.\n", __FUNCTION__);
+			errno = EINVAL;
+			return -1;
+		}
+		if (size > ni->vol->mft_record_size) {
+			Dprintf("%s(): Attribute is too big.\n", __FUNCTION__);
+			errno = ERANGE;
+			return -1;
 		}
 	}
 
@@ -2947,28 +2984,38 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	 * Determine resident or not will be new attribute. We add 8 to size in
 	 * non resident case for mapping pairs.
 	 */
-	if (ntfs_attr_can_be_resident(ni->vol, type)) {
+	if (!ntfs_attr_can_be_resident(ni->vol, type)) {
+		/* Attribute can be resident. */
+		is_resident = TRUE;
+		/* Check if it is better to make attribute non resident. */
+		if (!ntfs_attr_can_be_non_resident(ni->vol, type) &&
+				offsetof(ATTR_RECORD, resident_end) + size >= 
+				offsetof(ATTR_RECORD, non_resident_end) + 8)
+			/* Make it non resident. */
+			is_resident = FALSE;
+	} else {
 		if (errno != EPERM) {
 			err = errno;
-			Dprintf("%s(): ntfs_attr_can_be resident failed.\n",
+			Dprintf("%s(): ntfs_attr_can_be_resident failed.\n",
 					__FUNCTION__);
 			goto err_out;
 		}
 		/* Attribute can't be resident. */
+		is_resident = FALSE;
+	}
+	/* Calculate atribute record size. */
+	if (is_resident)
+		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
+				((name_len * sizeof(ntfschar) + 7) & ~7) +
+				((size + 7) & ~7);
+	else
 		attr_rec_size = offsetof(ATTR_RECORD, non_resident_end) +
 				((name_len * sizeof(ntfschar) + 7) & ~7) + 8;
-	} else {
-		/* Attribute can be resident. */
-		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
-			((name_len * sizeof(ntfschar) + 7) & ~7);
-		/* Check whether attribute will fit into the MFT record. */
-		if (size + attr_rec_size >= ni->vol->mft_record_size)
-			/* Will not fit, make it non resident. */
-			attr_rec_size = offsetof(ATTR_RECORD,
-					non_resident_end) + ((name_len *
-					sizeof(ntfschar) + 7) & ~7) + 8;
-	}
 
+	/*
+	 * If we have enough free space for the new attribute in the base MFT
+	 * record, then add attribute to it.
+	 */
 	if (le32_to_cpu(ni->mrec->bytes_allocated) -
 			le32_to_cpu(ni->mrec->bytes_in_use) >= attr_rec_size) {
 		attr_ni = ni;
@@ -2999,7 +3046,7 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 					__FUNCTION__);
 			goto err_out;
 		}
-		return ntfs_attr_add(ni, type, name, name_len, size);
+		return ntfs_attr_add(ni, type, name, name_len, val, size);
 	}
 	/* Allocate new extent. */
 	attr_ni = ntfs_mft_record_alloc(ni->vol, ni);
@@ -3011,28 +3058,32 @@ ntfs_attr *ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 add_attr_record:
-	if (attr_rec_size == offsetof(ATTR_RECORD, resident_end) +
-			((name_len * sizeof(ntfschar) + 7) & ~7)) {
+	if (is_resident) {
 		/* Add resident attribute. */
 		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
-				name_len, 0);
+				name_len, val, size, 0);
 		if (offset < 0) {
 			err = errno;
 			Dprintf("%s(): Failed to add resident attribute.\n",
 					__FUNCTION__);
 			goto free_err_out;
 		}
-	} else {
-		/* Add non resident attribute. */
-		offset = ntfs_non_resident_attr_record_add(attr_ni, type, name,
-				name_len, 0, 8, 0);
-		if (offset < 0) {
-			err = errno;
-			Dprintf("%s(): Failed to add non resident attribute.\n",
-					__FUNCTION__);
-			goto free_err_out;
-		}
+		return 0;
 	}
+
+	/* Add non resident attribute. */
+	offset = ntfs_non_resident_attr_record_add(attr_ni, type, name,
+				name_len, 0, 8, 0);
+	if (offset < 0) {
+		err = errno;
+		Dprintf("%s(): Failed to add non resident attribute.\n",
+				__FUNCTION__);
+		goto free_err_out;
+	}
+
+	/* If @size == 0, we are done. */
+	if (!size)
+		return 0;
 
 	/* Open new attribute and resize it. */
 	na = ntfs_attr_open(ni, type, name, name_len);
@@ -3042,21 +3093,23 @@ add_attr_record:
 				__FUNCTION__);
 		goto rm_attr_err_out;
 	}
-	if (!size)
-		return na;
-	if (ntfs_attr_truncate(na, size)) {
+	/* Resize and set attribute value. */
+	if (ntfs_attr_truncate(na, size) ||
+			(val && (ntfs_attr_pwrite(na, 0, size, val) != size))) {
 		err = errno;
-		Dprintf("%s(): Failed to resize just added attribute.\n",
+		Dprintf("%s(): Failed to initialize just added attribute.\n",
 				__FUNCTION__);
 		if (ntfs_attr_rm(na)) {
 			Dprintf("%s(): Failed to remove just added attribute. "
 				"Probably leaving inconstant metadata.\n",
 				__FUNCTION__);
+			ntfs_attr_close(na);
 		}
 		goto err_out;
 	}
+	ntfs_attr_close(na);
 	/* Done !*/
-	return na;
+	return 0;
 
 rm_attr_err_out:
 	/* Remove just added attribute. */
@@ -3076,7 +3129,7 @@ free_err_out:
 	}
 err_out:
 	errno = err;
-	return NULL;
+	return -1;
 }
 
 /**

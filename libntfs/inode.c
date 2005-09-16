@@ -866,7 +866,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 
 	/* Add $ATTRIBUTE_LIST to mft record. */
 	if (ntfs_resident_attr_record_add(ni,
-				AT_ATTRIBUTE_LIST, NULL, 0, 0) < 0) {
+				AT_ATTRIBUTE_LIST, NULL, 0, NULL, 0, 0) < 0) {
 		err = errno;
 		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
 			__FUNCTION__);

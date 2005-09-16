@@ -378,10 +378,15 @@ int main (int argc, char *argv[])
 			goto close_dst;
 		}
 		/* Requested attribute isn't present, add it. */
-		na = ntfs_attr_add(out, opts.attribute, attr_name,
-				attr_name_len, 0);
-		if (!na) {
+		if (ntfs_attr_add(out, opts.attribute, attr_name,
+				attr_name_len, NULL, 0)) {
 			perror("ERROR: Couldn't add attribute");
+			goto close_dst;
+		}
+		na = ntfs_attr_open(out, opts.attribute, attr_name,
+				attr_name_len);
+		if (!na) {
+			perror("ERROR: Couldn't open just added attribute");
 			goto close_dst;
 		}
 	}

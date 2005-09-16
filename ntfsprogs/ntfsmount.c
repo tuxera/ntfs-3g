@@ -578,7 +578,6 @@ static int ntfs_fuse_create_stream(const char *path,
 		ntfschar *stream_name, const int stream_name_len)
 {
 	ntfs_inode *ni;
-	ntfs_attr *na;
 	int res = 0;
 
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
@@ -598,10 +597,7 @@ static int ntfs_fuse_create_stream(const char *path,
 		}
 		return res;
 	}
-	na = ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, 0);
-	if (na)
-		ntfs_attr_close(na);
-	else
+	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
 	if (ntfs_inode_close(ni))
 		perror("Failed to close inode");
