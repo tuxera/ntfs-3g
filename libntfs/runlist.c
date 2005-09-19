@@ -1871,7 +1871,6 @@ static void test_rl_pure (char *contig, char *multi)
 	static runlist_element file4[] = {
 		{    0,   -3,   0 }	/* NOENT */
 	};
-#if 0
 	static runlist_element file5[] = {
 		{    0,   -2, 100 },	/* NOTMAP */
 		{  100, 1100, 100 },	/* DATA */
@@ -1885,7 +1884,6 @@ static void test_rl_pure (char *contig, char *multi)
 		{  100,   -2, 100 },	/* NOTMAP */
 		{  200,   -3,   0 }	/* NOENT */
 	};
-#endif
 	BOOL c, m;
 
 	if (strcmp (contig, "contig") == 0)
@@ -1925,7 +1923,6 @@ static void test_rl_pure (char *contig, char *multi)
 	test_rl_pure_test (18, c, m, 140,  40, file3, sizeof (file3));
 	test_rl_pure_test (19, c, m,   0,  40, file4, sizeof (file4));
 	test_rl_pure_test (20, c, m,  40,  40, file4, sizeof (file4));
-#if 0
 	test_rl_pure_test (21, c, m,   0,  40, file5, sizeof (file5));
 	test_rl_pure_test (22, c, m,  40,  40, file5, sizeof (file5));
 	test_rl_pure_test (23, c, m,  60,  40, file5, sizeof (file5));
@@ -1940,7 +1937,6 @@ static void test_rl_pure (char *contig, char *multi)
 	test_rl_pure_test (32, c, m, 400, 100, file5, sizeof (file5));
 	test_rl_pure_test (33, c, m, 160, 100, file6, sizeof (file6));
 	test_rl_pure_test (34, c, m, 100, 140, file6, sizeof (file6));
-#endif
 }
 
 /**
