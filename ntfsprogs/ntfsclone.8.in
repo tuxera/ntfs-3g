@@ -5,7 +5,7 @@
 .\" All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Jun 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "Sep 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
@@ -197,7 +197,8 @@ You can't metadata-only clone to a device, image or standard output.
 Ignore the result of the filesystem consistency check. This option is allowed
 to be used only with the 
 .BR --metadata 
-option, for the safety of user's data.
+option, for the safety of user's data. The clusters which cause the 
+inconsistency are saved too.
 .TP
 .B \-f, \-\-force
 Forces ntfsclone to proceed if the filesystem is marked 
