@@ -1,5 +1,5 @@
 
-SUBDIRS = doc include libntfs ntfsprogs test
+SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh ntfsprogs.spec.in \
@@ -8,7 +8,7 @@ EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 AUTOMAKE_OPTIONS = gnu
 
 MAINTAINERCLEANFILES = configure Makefile.in aclocal.m4 compile depcomp \
-	install-sh missing config.guess config.sub config.h.in INSTALL
+	install-sh ltmain.sh missing config.guess config.sub config.h.in INSTALL
 
 dist-hook: ntfsprogs.spec
 	cp ntfsprogs.spec $(distdir)
@@ -30,6 +30,7 @@ extras: libs
 if ENABLE_TEST
 test:	libs
 	(cd test && $(MAKE) all test) || exit 1;
+SUBDIRS += test
 else
 .PHONY: test
 test:

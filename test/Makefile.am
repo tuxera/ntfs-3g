@@ -38,9 +38,6 @@ test:	$(TEST_RUNLIST) testz testp testf
 testz:	$(TEST_RUNLIST)
 	@$(TEST_VALGRIND) $(TEST_RUNLIST) zero > zero
 	@diff -qs {runlist-data/,}zero
-	@echo
-	@echo Success
-	@echo
 
 testp:	$(TEST_RUNLIST)
 	@for i in contig noncontig; do						\
@@ -49,19 +46,13 @@ testp:	$(TEST_RUNLIST)
 			L2=`echo $$j | cut -b1`;				\
 			FILE=pure-$$L1$$L2;					\
 			$(TEST_VALGRIND) $(TEST_RUNLIST) pure $$i $$j > $$FILE;	\
-			diff -qs {runlist-data/,}$$FILE;				\
+			diff -qs {runlist-data/,}$$FILE;			\
 		done;								\
 	done
-	@echo
-	@echo Success
-	@echo
 
 testf:	$(TEST_RUNLIST)
 	@for i in 123 132 213 231 312 321; do					\
 		$(TEST_VALGRIND) $(TEST_RUNLIST) frag $$i > frag$$i;		\
-		diff -qs {runlist-data/,}frag$$i;					\
+		diff -qs {runlist-data/,}frag$$i;				\
 	done
-	@echo
-	@echo Success
-	@echo
 
