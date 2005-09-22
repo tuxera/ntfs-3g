@@ -54,6 +54,7 @@ libntfs_la_SOURCES =	\
 	runlist.c	\
 	security.c	\
 	unistr.c	\
+	version.c	\
 	volume.c
 
 if ENABLE_GNOME_VFS

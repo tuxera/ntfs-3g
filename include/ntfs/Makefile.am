@@ -29,6 +29,7 @@ linux_ntfsinclude_HEADERS = \
 	ntfstime.h		\
 	types.h			\
 	unistr.h		\
+	version.h		\
 	volume.h
 
 MAINTAINERCLEANFILES = Makefile.in
