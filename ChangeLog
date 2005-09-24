@@ -45,6 +45,10 @@ xx/xx/2005 - 1.12.0-WIP
 	- Support journals which have been modified by chkdsk.  (Anton, Szaka)
 	- Support journals ($LogFile) with only one restart page as well as
           journals with two different restart pages.  (Anton, Szaka)
+	- Add @val parameter to ntfs_attr_add and @val and @size parameters to
+	  ntfs_resident_attr_record_add.  (Yura)
+	- Fix attribute list adding for always resident attributes.  (Yura)
+	- New API for hard link creating: dir.[ch]::ntfs_link.  (Yura)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

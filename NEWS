@@ -1,6 +1,10 @@
 Current news
 ============
 
+ntfsmount can create/delete/move files and directories! It's not full
+implementation, thus sometimes it will say 'Operation is not supported',
+nothing bad will happen to user data in this case.  (Yura Pakhuchiy)
+
 Add new utility: ntfsmount.  It is a FUSE module that uses on libntfs.  So,
 you need FUSE 2.3 to compile it.  This module supports file overwrite including
 changing the file size and can read/write/add/remove named data streams via
