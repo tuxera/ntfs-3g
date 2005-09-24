@@ -53,6 +53,14 @@
 
 static const char *EXEC_NAME = "ntfsclone";
 
+static const char *bad_sectors_warning_msg =
+"*************************************************************************\n"
+"* WARNING: The disk has bad sector. This means physical damage on the   *\n"
+"* disk surface caused by deterioration, manufacturing faults or other   *\n"
+"* reason. The reliability of the disk may stay stable or degrade fast.  *\n"
+"* Use the --rescue option to efficiently save as much data as possible! *\n"
+"*************************************************************************\n";
+
 struct {
 	int verbose;
 	int quiet;
@@ -502,13 +510,16 @@ static void copy_cluster(int rescue, off_t rescue_pos)
 
 	if (read_all(fd, buff, csize) == -1) {
 
-		u32 i;
-
-		if (!rescue || errno != EIO)
+		if (errno != EIO)
 			perr_exit("read_all");
-
-		for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
-			rescue_sector(fd, rescue_pos + i, buff + i);
+		else if (rescue){
+			u32 i;
+			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
+				rescue_sector(fd, rescue_pos + i, buff + i);
+		} else {
+			Printf(bad_sectors_warning_msg);
+			err_exit("Disk is faulty, can't make full backup!");
+		}
 	}
 
 	if (opt.save_image) {
