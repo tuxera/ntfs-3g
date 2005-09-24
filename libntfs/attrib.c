@@ -4373,8 +4373,8 @@ retry:
 			/* Remove unused attribute record. */
 			if (ntfs_attr_record_rm(ctx)) {
 				err = errno;
-				Dprintf("%s(): Couldn't remove unused attribute "
-					"record.\n", __FUNCTION__);
+				Dprintf("%s(): Couldn't remove unused attribute"
+					" record.\n", __FUNCTION__);
 				goto put_err_out;
 			}
 			ntfs_attr_reinit_search_ctx(ctx);
