@@ -115,7 +115,7 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 	ntfschar c1, c2;
 
 #ifdef DEBUG
-	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
+	if (!name1 || !name2 || (ic && !upcase && upcase_len)) {
 		Dputs("ntfs_names_collate received NULL pointer!");
 		exit(1);
 	}
