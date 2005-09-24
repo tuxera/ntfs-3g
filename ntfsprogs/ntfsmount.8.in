@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Yura Pakhuchiy. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "July 2005" "ntfsprogs version @VERSION@"
+.TH NTFSMOUNT 8 "September 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
@@ -20,13 +20,20 @@ to compile it,
 is also highly recommended.
 .sp
 .TP
-.B NTFS FUSE features:
+.B Fully implemented ntfsmount features are:
 
-* Full read/only access to normal, sparse and compressed files.
+* Read-only access to normal, sparse and compressed files.
 
-* Can overwrite and change size of normal and sparse files.
+* Overwrite normal and sparse files *with* changes to size.
 
-* Can list/read/write/add/remove named data streams.
+* List/Read/Write/Add/Remove named data streams.
+
+.TP
+.B Partly implented features:
+
+* Create/Delete/Move files and directories.
+
+* Hard link files.
 
 .SH OPTIONS
 Below is a summary of all the options that
@@ -83,6 +90,7 @@ configuration option described in the previous section.
 
 .TP
 .B kernel_cache
+(NOTE: Work only with FUSE-2.3.0)
 This option disables flushing the cache of the file contents on
 every open().  This should only be enabled on filesystems, where the
 file data is never changed externally (not through the mounted FUSE
@@ -122,7 +130,8 @@ limited anyway to 32 pages (which is 128kbyte on i386).
 
 .TP
 .B force=
-Force mount even if errors occured. Use this option only if you know what are you doing and don't cry about data loss.
+Force mount even if errors occured. Use this option only if you know what
+are you doing and don't cry about data loss.
 
 .TP
 .B ro
@@ -130,7 +139,8 @@ Mount filesystem read-only.
 
 .TP
 .B no_def_opts
-By default ntfsmount acts as "default_permissions,kernel_cache,allow_other" was passed to it, this option cancel this behaviour.
+By default ntfsmount acts as "default_permissions,allow_other" was passed to it,
+this option cancel this behaviour.
 
 .TP
 .B succeed_chmod
@@ -141,11 +151,25 @@ Don't change any permissions and don't return error on chmod operation.
 Mount this device.
 
 .SH DATA STREAMS
-All data on NTFS is stored in streams, which can have names. A file can have more than one data streams, but exactly one must have no name. The size of a file is the size of its unnamed data stream. Usually when you don't specify stream name you are access to unnamed data stream. If you want access to named data stream you need to add ":stream_name" to the filename. For example: by opening "some.mp3:artist" you will open stream "artist" in "some.mp3". But windows usually prevent you from accessing to named data streams, so you need to use some program like FAR or utils from cygwin to access named data streams.
+All data on NTFS is stored in streams, which can have names.
+A file can have more than one data streams, but exactly one must have no name.
+The size of a file is the size of its unnamed data stream.
+Usually when you don't specify stream name you are access to the unnamed data
+stream.
+If you want access to named data stream you need to add ":stream_name" to the
+filename. For example: by opening "some.mp3:artist" you will open stream
+"artist" in "some.mp3".
+But windows usually prevent you from accessing to named data streams,
+so you need to use some program like FAR or utils from cygwin to access named
+data streams.
 .sp
-NTFS FUSE module don't prevent you from accessing to named data streams so you can use your preferred utils to access them. You can even delete them using
+NTFS FUSE module don't prevent you from accessing to named data streams so you
+can use your preferred utils to access them. You can even delete them using
 .B rm.
-You can list all named data streams by getting "ntfs.streams.list" extended attribute. NOTE: The last feauture is unique for NTFS FUSE module and maybe will be never supported by kernel driver.
+You can list all named data streams by getting "ntfs.streams.list" extended
+attribute. NOTE: The last feauture is unique for NTFS FUSE module and maybe
+will be never supported by kernel driver.
+
 .SH EXAMPLES
 Mount /dev/hda1 to /mnt/ntfs-fuse using NTFS FUSE module:
 .RS
@@ -153,40 +177,48 @@ Mount /dev/hda1 to /mnt/ntfs-fuse using NTFS FUSE module:
 .B ntfsmount /mnt/ntfs-fuse -o dev=/dev/hda1
 .sp
 .RE
-Read-only mount /dev/hda5 to /home/user/tmp and make root to be owner of all files:
+
+Read-only mount /dev/hda5 to /home/user/tmp and make root to be owner of all
+files:
 .RS
 .sp
 .B ntfsmount /home/user/tmp -o dev=/dev/hda5,ro,uid=0
 .sp
 .RE
+
 Umount /mnt/ntfs-fuse:
 .RS
 .sp
 .B fusermount -u /mnt/ntfs-fuse
 .sp
 .RE
+
 Cat "artist" named data stream of "some.mp3":
 .RS
 .sp
 .B cat some.mp3:artist
 .sp
 .RE
+
 Write "Sympho Black Metal" to "genre" named data stream of "some.mp3":
 .RS
 .sp
 .B echo Sympho Black Metal > some.mp3:genre
 .sp
 .RE
+
 Remove "album" named data stream from "some.mp3":
 .RS
 .sp
 .B rm some.mp3:album
 .sp
 .RE
+
 List all named data streams for "some.mp3":
 .RS
 .sp
 .B getfattr -n ntfs.streams.list some.mp3
+
 .SH BUGS
 No bugs are known at present. If you find any bugs, please send an email to
 .nh

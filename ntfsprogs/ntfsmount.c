@@ -770,6 +770,19 @@ static int ntfs_fuse_unlink(const char *org_path)
 	return res;
 }
 
+static int ntfs_fuse_rename(const char *old_path, const char *new_path)
+{
+	int ret;
+	
+	if ((ret = ntfs_fuse_link(old_path, new_path)))
+		return ret;
+	if ((ret = ntfs_fuse_unlink(old_path))) {
+		ntfs_fuse_unlink(new_path);
+		return ret;
+	}
+	return 0;
+}
+
 static int ntfs_fuse_mkdir(const char *path,
 		mode_t mode __attribute__((unused)))
 {
@@ -1092,6 +1105,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.mknod		= ntfs_fuse_mknod,
 	.link		= ntfs_fuse_link,
 	.unlink		= ntfs_fuse_unlink,
+	.rename		= ntfs_fuse_rename,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
 	.utime		= ntfs_fuse_utime,
