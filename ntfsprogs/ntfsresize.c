@@ -59,13 +59,15 @@ static const char *resize_warning_msg =
 "crash may result major data loss!\n";
 
 static const char *resize_important_msg =
-"You can go on to shrink the device e.g. with 'fdisk'.\n"
-"IMPORTANT: When recreating the partition, make sure you\n"
-"  1)  create it with the same starting disk cylinder\n"
+"You can go on to shrink the device for example with Linux fdisk.\n"
+"IMPORTANT: When recreating the partition, make sure that you\n"
+"  1)  create it at the same disk sector (use sector as the unit!)\n"
 "  2)  create it with the same partition type (usually 7, HPFS/NTFS)\n"
 "  3)  do not make it smaller than the new NTFS filesystem size\n"
 "  4)  set the bootable flag for the partition if it existed before\n"
-"Otherwise you may lose your data or can't boot your computer from the disk!\n";
+"Otherwise you won't be able to access NTFS or can't boot from the disk!\n"
+"If you make a mistake and don't have a partition table backup then you\n"
+"can recover the partition table by TestDisk or Parted's rescue mode.\n";
 
 static const char *invalid_ntfs_msg =
 "Apparently device '%s' doesn't have a valid NTFS.\n"

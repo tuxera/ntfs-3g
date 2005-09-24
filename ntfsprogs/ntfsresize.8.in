@@ -1,7 +1,7 @@
 .\" -*- nroff -*-
 .\" Copyright 2002-2005 by Szabolcs Szakacsits  All Rights Reserved.
 .\"
-.TH NTFSRESIZE 8 "Aug 2005" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "Sep 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
@@ -89,8 +89,10 @@ to enlarge the size of the filesystem.
 .SH PARTITIONING
 When recreating the partition by a disk partitioning tool,
 make sure you create it at the same 
-starting sector and with the same partition type as before. 
-Otherwise you won't be able to access your filesystem.
+starting sector and with the same partition type as before.
+Otherwise you won't be able to access your filesystem. Use the 'u'
+fdisk command to switch to the reliable sector unit from the 
+default cylinder one.
 
 Also make sure you set the bootable flag for the partition if it
 existed before. Failing to do so you might not be able to boot your
