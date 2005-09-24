@@ -867,7 +867,8 @@ int main (int argc, char *argv[])
 
 	count = move_file (vol, inode, opts.location, 0);
 	if ((count > 0) && (!opts.nodirty)) {
-		if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
+		if (ntfs_volume_set_flags (vol, vol->flags | VOLUME_IS_DIRTY) <
+				0) {
 			Eprintf ("Couldn't mark volume dirty\n");
 		}
 		printf ("Relocated %lld bytes\n", count);
@@ -884,4 +885,3 @@ int main (int argc, char *argv[])
 	ntfs_umount (vol, FALSE);
 	return result;
 }
-

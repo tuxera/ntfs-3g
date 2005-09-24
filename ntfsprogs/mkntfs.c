@@ -1181,6 +1181,297 @@ err_end:
 }
 
 /**
+ * Internal:
+ *
+ * ntfs_attr_find - find (next) attribute in mft record
+ * @type:	attribute type to find
+ * @name:	attribute name to find (optional, i.e. NULL means don't care)
+ * @name_len:	attribute name length (only needed if @name present)
+ * @ic:		IGNORE_CASE or CASE_SENSITIVE (ignored if @name not present)
+ * @val:	attribute value to find (optional, resident attributes only)
+ * @val_len:	attribute value length
+ * @ctx:	search context with mft record and attribute to search from
+ *
+ * You shouldn't need to call this function directly. Use lookup_attr() instead.
+ *
+ * ntfs_attr_find() takes a search context @ctx as parameter and searches the
+ * mft record specified by @ctx->mrec, beginning at @ctx->attr, for an
+ * attribute of @type, optionally @name and @val. If found, ntfs_attr_find()
+ * returns 0 and @ctx->attr will point to the found attribute.
+ *
+ * If not found, ntfs_attr_find() returns -1, with errno set to ENOENT and
+ * @ctx->attr will point to the attribute before which the attribute being
+ * searched for would need to be inserted if such an action were to be desired.
+ *
+ * On actual error, ntfs_attr_find() returns -1 with errno set to the error
+ * code but not to ENOENT.  In this case @ctx->attr is undefined and in
+ * particular do not rely on it not changing.
+ *
+ * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself. If it
+ * is FALSE, the search begins after @ctx->attr.
+ *
+ * If @type is AT_UNUSED, return the first found attribute, i.e. one can
+ * enumerate all attributes by setting @type to AT_UNUSED and then calling
+ * ntfs_attr_find() repeatedly until it returns -1 with errno set to ENOENT to
+ * indicate that there are no more entries. During the enumeration, each
+ * successful call of ntfs_attr_find() will return the next attribute in the
+ * mft record @ctx->mrec.
+ *
+ * If @type is AT_END, seek to the end and return -1 with errno set to ENOENT.
+ * AT_END is not a valid attribute, its length is zero for example, thus it is
+ * safer to return error instead of success in this case. This also allows us
+ * to interoperate cleanly with ntfs_external_attr_find().
+ *
+ * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
+ * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
+ * match both named and unnamed attributes.
+ *
+ * If @ic is IGNORE_CASE, the @name comparison is not case sensitive and
+ * @ctx->ntfs_ino must be set to the ntfs inode to which the mft record
+ * @ctx->mrec belongs. This is so we can get at the ntfs volume and hence at
+ * the upcase table. If @ic is CASE_SENSITIVE, the comparison is case
+ * sensitive. When @name is present, @name_len is the @name length in Unicode
+ * characters.
+ *
+ * If @name is not present (NULL), we assume that the unnamed attribute is
+ * being searched for.
+ *
+ * Finally, the resident attribute value @val is looked for, if present.
+ * If @val is not present (NULL), @val_len is ignored.
+ *
+ * ntfs_attr_find() only searches the specified mft record and it ignores the
+ * presence of an attribute list attribute (unless it is the one being searched
+ * for, obviously). If you need to take attribute lists into consideration, use
+ * ntfs_attr_lookup() instead (see below). This also means that you cannot use
+ * ntfs_attr_find() to search for extent records of non-resident attributes, as
+ * extents with lowest_vcn != 0 are usually described by the attribute list
+ * attribute only. - Note that it is possible that the first extent is only in
+ * the attribute list while the last extent is in the base mft record, so don't
+ * rely on being able to find the first extent in the base mft record.
+ *
+ * Warning: Never use @val when looking for attribute types which can be
+ *	    non-resident as this most likely will result in a crash!
+ */
+static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
+{
+	ATTR_RECORD *a;
+	ntfschar *upcase = vol->upcase;
+	u32 upcase_len = vol->upcase_len;
+
+	/*
+	 * Iterate over attributes in mft record starting at @ctx->attr, or the
+	 * attribute following that, if @ctx->is_first is TRUE.
+	 */
+	if (ctx->is_first) {
+		a = ctx->attr;
+		ctx->is_first = FALSE;
+	} else
+		a = (ATTR_RECORD*)((char*)ctx->attr +
+				le32_to_cpu(ctx->attr->length));
+	for (;;	a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length))) {
+		if (p2n(a) < p2n(ctx->mrec) || (char*)a > (char*)ctx->mrec +
+				le32_to_cpu(ctx->mrec->bytes_allocated))
+			break;
+		ctx->attr = a;
+		if (((type != AT_UNUSED) && (le32_to_cpu(a->type) >
+				le32_to_cpu(type))) ||
+				(a->type == AT_END)) {
+			errno = ENOENT;
+			return -1;
+		}
+		if (!a->length)
+			break;
+		/* If this is an enumeration return this attribute. */
+		if (type == AT_UNUSED)
+			return 0;
+		if (a->type != type)
+			continue;
+		/*
+		 * If @name is AT_UNNAMED we want an unnamed attribute.
+		 * If @name is present, compare the two names.
+		 * Otherwise, match any attribute.
+		 */
+		if (name == AT_UNNAMED) {
+			/* The search failed if the found attribute is named. */
+			if (a->name_length) {
+				errno = ENOENT;
+				return -1;
+			}
+		} else if (name && !ntfs_names_are_equal(name, name_len,
+			    (ntfschar*)((char*)a + le16_to_cpu(a->name_offset)),
+			    a->name_length, ic, upcase, upcase_len)) {
+			register int rc;
+
+			rc = ntfs_names_collate(name, name_len,
+					(ntfschar*)((char*)a +
+					le16_to_cpu(a->name_offset)),
+					a->name_length, 1, IGNORE_CASE,
+					upcase, upcase_len);
+			/*
+			 * If @name collates before a->name, there is no
+			 * matching attribute.
+			 */
+			if (rc == -1) {
+				errno = ENOENT;
+				return -1;
+			}
+			/* If the strings are not equal, continue search. */
+			if (rc)
+				continue;
+			rc = ntfs_names_collate(name, name_len,
+					(ntfschar*)((char*)a +
+					le16_to_cpu(a->name_offset)),
+					a->name_length, 1, CASE_SENSITIVE,
+					upcase, upcase_len);
+			if (rc == -1) {
+				errno = ENOENT;
+				return -1;
+			}
+			if (rc)
+				continue;
+		}
+		/*
+		 * The names match or @name not present and attribute is
+		 * unnamed. If no @val specified, we have found the attribute
+		 * and are done.
+		 */
+		if (!val)
+			return 0;
+		/* @val is present; compare values. */
+		else {
+			register int rc;
+
+			rc = memcmp(val, (char*)a +le16_to_cpu(a->value_offset),
+					min(val_len,
+					le32_to_cpu(a->value_length)));
+			/*
+			 * If @val collates before the current attribute's
+			 * value, there is no matching attribute.
+			 */
+			if (!rc) {
+				register u32 avl;
+				avl = le32_to_cpu(a->value_length);
+				if (val_len == avl)
+					return 0;
+				if (val_len < avl) {
+					errno = ENOENT;
+					return -1;
+				}
+			} else if (rc < 0) {
+				errno = ENOENT;
+				return -1;
+			}
+		}
+	}
+	Dputs("mkntfs_attr_find(): File is corrupt. Run chkdsk.");
+	errno = EIO;
+	return -1;
+}
+
+/**
+ * ntfs_attr_lookup - find an attribute in an ntfs inode
+ * @type:	attribute type to find
+ * @name:	attribute name to find (optional, i.e. NULL means don't care)
+ * @name_len:	attribute name length (only needed if @name present)
+ * @ic:		IGNORE_CASE or CASE_SENSITIVE (ignored if @name not present)
+ * @lowest_vcn:	lowest vcn to find (optional, non-resident attributes only)
+ * @val:	attribute value to find (optional, resident attributes only)
+ * @val_len:	attribute value length
+ * @ctx:	search context with mft record and attribute to search from
+ *
+ * Find an attribute in an ntfs inode. On first search @ctx->ntfs_ino must
+ * be the base mft record and @ctx must have been obtained from a call to
+ * ntfs_attr_get_search_ctx().
+ *
+ * This function transparently handles attribute lists and @ctx is used to
+ * continue searches where they were left off at.
+ *
+ * If @type is AT_UNUSED, return the first found attribute, i.e. one can
+ * enumerate all attributes by setting @type to AT_UNUSED and then calling
+ * ntfs_attr_lookup() repeatedly until it returns -1 with errno set to ENOENT
+ * to indicate that there are no more entries. During the enumeration, each
+ * successful call of ntfs_attr_lookup() will return the next attribute, with
+ * the current attribute being described by the search context @ctx.
+ *
+ * If @type is AT_END, seek to the end of the base mft record ignoring the
+ * attribute list completely and return -1 with errno set to ENOENT.  AT_END is
+ * not a valid attribute, its length is zero for example, thus it is safer to
+ * return error instead of success in this case.  It should never ne needed to
+ * do this, but we implement the functionality because it allows for simpler
+ * code inside ntfs_external_attr_find().
+ *
+ * If @name is AT_UNNAMED search for an unnamed attribute. If @name is present
+ * but not AT_UNNAMED search for a named attribute matching @name. Otherwise,
+ * match both named and unnamed attributes.
+ *
+ * After finishing with the attribute/mft record you need to call
+ * ntfs_attr_put_search_ctx() to cleanup the search context (unmapping any
+ * mapped extent inodes, etc).
+ *
+ * Return 0 if the search was successful and -1 if not, with errno set to the
+ * error code.
+ *
+ * On success, @ctx->attr is the found attribute, it is in mft record
+ * @ctx->mrec, and @ctx->al_entry is the attribute list entry for this
+ * attribute with @ctx->base_* being the base mft record to which @ctx->attr
+ * belongs.  If no attribute list attribute is present @ctx->al_entry and
+ * @ctx->base_* are NULL.
+ *
+ * On error ENOENT, i.e. attribute not found, @ctx->attr is set to the
+ * attribute which collates just after the attribute being searched for in the
+ * base ntfs inode, i.e. if one wants to add the attribute to the mft record
+ * this is the correct place to insert it into, and if there is not enough
+ * space, the attribute should be placed in an extent mft record.
+ * @ctx->al_entry points to the position within @ctx->base_ntfs_ino->attr_list
+ * at which the new attribute's attribute list entry should be inserted.  The
+ * other @ctx fields, base_ntfs_ino, base_mrec, and base_attr are set to NULL.
+ * The only exception to this is when @type is AT_END, in which case
+ * @ctx->al_entry is set to NULL also (see above).
+ *
+ *
+ * The following error codes are defined:
+ *	ENOENT	Attribute not found, not an error as such.
+ *	EINVAL	Invalid arguments.
+ *	EIO	I/O error or corrupt data structures found.
+ *	ENOMEM	Not enough memory to allocate necessary buffers.
+ */
+int mkntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const VCN lowest_vcn, const u8 *val, const u32 val_len,
+		ntfs_attr_search_ctx *ctx)
+{
+	ntfs_inode *base_ni;
+
+	if (!ctx || !ctx->mrec || !ctx->attr) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (ctx->base_ntfs_ino)
+		base_ni = ctx->base_ntfs_ino;
+	else
+		base_ni = ctx->ntfs_ino;
+	if (!base_ni || !NInoAttrList(base_ni) || type == AT_ATTRIBUTE_LIST)
+		return mkntfs_attr_find(type, name, name_len, ic, val, val_len,
+				ctx);
+	errno = EOPNOTSUPP;
+	return -1;
+}
+
+/**
+ * ntfs_attr_put_search_ctx - release an attribute search context
+ * @ctx:	attribute search context to free
+ *
+ * Release the attribute search context @ctx.
+ */
+void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
+{
+	free(ctx);
+	return;
+}
+
+/**
  * insert_positioned_attr_in_mft_record
  * Create a non-resident attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
@@ -1229,7 +1520,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
+	if (!mkntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
 		err = -EEXIST;
 		goto err_out;
 	}
@@ -1414,7 +1705,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
+	if (!mkntfs_attr_lookup(type, uname, name_len, ic, 0, NULL, 0, ctx)) {
 		err = -EEXIST;
 		goto err_out;
 	}
@@ -1576,7 +1867,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	ntfschar *uname;
 /*
 	if (base record)
-		ntfs_attr_lookup();
+		mkntfs_attr_lookup();
 	else
 */
 	if (name_len) {
@@ -1603,7 +1894,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
-	if (!ntfs_attr_lookup(type, uname, name_len, ic, 0, val, val_len,
+	if (!mkntfs_attr_lookup(type, uname, name_len, ic, 0, val, val_len,
 			ctx)) {
 		err = -EEXIST;
 		goto err_out;
@@ -1726,7 +2017,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 		Eprintf("Failed to allocate attribute search context.\n");
 		return -ENOMEM;
 	}
-	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0,
+	if (mkntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		int eo = errno;
 		Eprintf("BUG: Standard information attribute not present in "
@@ -2126,7 +2417,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 			free(uname);
 		goto err_out;
 	}
-	err = ntfs_attr_lookup(AT_INDEX_ROOT, uname, name_len, ic, 0, NULL, 0,
+	err = mkntfs_attr_lookup(AT_INDEX_ROOT, uname, name_len, ic, 0, NULL, 0,
 			ctx);
 	if (uname)
 		free(uname);
@@ -3399,7 +3690,7 @@ static void mkntfs_create_root_structures(void)
 			err_exit("Failed to allocate attribute search "
 					"context: %s\n", strerror(errno));
 		/* There is exactly one file name so this is ok. */
-		if (ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
+		if (mkntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
 				ctx)) {
 			ntfs_attr_put_search_ctx(ctx);
 			err_exit("BUG: $FILE_NAME attribute not found.\n");
@@ -3780,7 +4071,7 @@ int main(int argc, char **argv)
 		err_exit("Failed to allocate attribute search context: %s\n",
 				strerror(errno));
 	// FIXME: This should be IGNORE_CASE!
-	if (ntfs_attr_lookup(AT_INDEX_ALLOCATION, I30, 4, 0, 0,
+	if (mkntfs_attr_lookup(AT_INDEX_ALLOCATION, I30, 4, 0, 0,
 			NULL, 0, ctx)) {
 		ntfs_attr_put_search_ctx(ctx);
 		err_exit("BUG: $INDEX_ALLOCATION attribute not found.\n");
@@ -3814,7 +4105,7 @@ int main(int argc, char **argv)
 	if (!ctx)
 		err_exit("Failed to allocate attribute search context: %s\n",
 				strerror(errno));
-	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+	if (mkntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		ntfs_attr_put_search_ctx(ctx);
 		err_exit("BUG: $DATA attribute not found.\n");
 	}

@@ -1335,11 +1335,11 @@ static void check_output_device(s64 input_size)
 		set_filesize(input_size);
 }
 
-static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni)
 {
 	ntfs_attr_search_ctx *ret;
 
-	if ((ret = ntfs_attr_get_search_ctx(ni, mrec)) == NULL)
+	if ((ret = ntfs_attr_get_search_ctx(ni, NULL)) == NULL)
 		perr_printf("ntfs_attr_get_search_ctx");
 
 	return ret;
@@ -1371,7 +1371,7 @@ static ntfs_attr_search_ctx *lookup_data_attr(ntfs_inode *ni, const char *aname)
 	ntfschar *ustr = NULL;
 	int len = 0;
 
-	if ((ctx = attr_get_search_ctx(ni, NULL)) == NULL)
+	if ((ctx = attr_get_search_ctx(ni)) == NULL)
 		return NULL;
 
 	if (str2unicode(aname, &ustr, &len) == -1)

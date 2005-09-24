@@ -117,6 +117,8 @@ struct _ntfs_volume {
 	char *vol_name;		/* Name of the volume. */
 	unsigned long state;	/* NTFS specific flags describing this volume.
 				   See ntfs_volume_state_bits above. */
+
+	ntfs_inode *vol_ni;	/* ntfs_inode structure for FILE_Volume. */
 	u8 major_ver;		/* Ntfs major version of volume. */
 	u8 minor_ver;		/* Ntfs minor version of volume. */
 	u16 flags;		/* Bit array of VOLUME_* flags. */
@@ -198,7 +200,8 @@ extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
-extern int ntfs_volume_set_flags(ntfs_volume *v, const u16 flags);
+
+extern int ntfs_volume_write_flags(ntfs_volume *v, const u16 flags);
 
 #endif /* defined _NTFS_VOLUME_H */
 

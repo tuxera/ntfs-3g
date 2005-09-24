@@ -237,11 +237,11 @@ static void parse_options(int argc, char **argv)
 #endif
 }
 
-static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni)
 {
 	ntfs_attr_search_ctx *ret;
 
-	if ((ret = ntfs_attr_get_search_ctx(ni, mrec)) == NULL)
+	if ((ret = ntfs_attr_get_search_ctx(ni, NULL)) == NULL)
 		perr_println("ntfs_attr_get_search_ctx");
 
 	return ret;
@@ -612,9 +612,9 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 	ATTR_TYPES prev_atype, atype1, atype2;
 	ntfs_attr_search_ctx *ctx1, *ctx2;
 	
-	if (!(ctx1 = attr_get_search_ctx(ni1, NULL)))
+	if (!(ctx1 = attr_get_search_ctx(ni1)))
 		return -1;
-	if (!(ctx2 = attr_get_search_ctx(ni2, NULL)))
+	if (!(ctx2 = attr_get_search_ctx(ni2)))
 		goto out;
 	
 	atype1 = ctx1->attr->type; 

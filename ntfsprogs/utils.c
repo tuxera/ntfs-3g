@@ -903,7 +903,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				ctx->flags_match |= FEMR_FILE;
 
 			if (ctx->flags_search & FEMR_DIR) {
-				attr_ctx = ntfs_attr_get_search_ctx (NULL, ctx->inode->mrec);
+				attr_ctx = ntfs_attr_get_search_ctx (ctx->inode, NULL);
 				if (attr_ctx) {
 					if (ntfs_attr_lookup (AT_INDEX_ROOT, I30, 4, 0, 0, NULL, 0, attr_ctx) == 0)
 						ctx->flags_match |= FEMR_DIR;

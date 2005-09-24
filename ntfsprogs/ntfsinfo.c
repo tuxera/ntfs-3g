@@ -1253,7 +1253,7 @@ static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 		memcpy(name, (u8 *)attr + attr->name_offset,
 				attr->name_length * sizeof(ntfschar));
 	}
-	ctx = ntfs_attr_get_search_ctx(ni, 0);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		perror("ntfs_get_search_ctx failed");
 		free(name);

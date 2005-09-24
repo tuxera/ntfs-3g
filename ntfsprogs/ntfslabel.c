@@ -248,9 +248,8 @@ static int resize_resident_attribute_value(MFT_RECORD *m, ATTR_RECORD *a,
  */
 static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
 {
-	ntfs_attr_search_ctx *ctx = NULL;
+	ntfs_attr_search_ctx *ctx;
 	ntfschar *new_label = NULL;
-	MFT_RECORD *mrec = NULL;
 	ATTR_RECORD *a;
 	int label_len;
 	int result = 0;
@@ -269,17 +268,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 			}
 		}
 	}
-
-	if (ntfs_file_record_read(vol, (MFT_REF)FILE_Volume, &mrec, NULL)) {
-		perror("Error reading file record");
-		goto err_out;
-	}
-	if (!(mrec->flags & MFT_RECORD_IN_USE)) {
-		fprintf(stderr, "Error: $Volume has been deleted. Run "
-				"chkdsk to fix this.\n");
-		goto err_out;
-	}
-	ctx = ntfs_attr_get_search_ctx(NULL, mrec);
+	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
 	if (!ctx) {
 		perror("Failed to get attribute search context");
 		goto err_out;
@@ -314,39 +303,38 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		new_label[label_len / sizeof(ntfschar)] = cpu_to_le16(L'\0');
 	}
 	if (a) {
-		if (resize_resident_attribute_value(mrec, a, label_len)) {
+		if (resize_resident_attribute_value(ctx->mrec, a, label_len)) {
 			perror("Error resizing resident attribute");
 			goto err_out;
 		}
 	} else {
 		/* sizeof(resident attribute record header) == 24 */
 		int asize = (24 + label_len + 7) & ~7;
-		u32 biu = le32_to_cpu(mrec->bytes_in_use);
-		if (biu + asize > le32_to_cpu(mrec->bytes_allocated)) {
+		u32 biu = le32_to_cpu(ctx->mrec->bytes_in_use);
+		if (biu + asize > le32_to_cpu(ctx->mrec->bytes_allocated)) {
 			errno = ENOSPC;
 			perror("Error adding resident attribute");
 			goto err_out;
 		}
 		a = ctx->attr;
-		memmove((u8*)a + asize, a, biu - ((u8*)a - (u8*)mrec));
-		mrec->bytes_in_use = cpu_to_le32(biu + asize);
+		memmove((u8*)a + asize, a, biu - ((u8*)a - (u8*)ctx->mrec));
+		ctx->mrec->bytes_in_use = cpu_to_le32(biu + asize);
 		a->type = AT_VOLUME_NAME;
 		a->length = cpu_to_le32(asize);
 		a->non_resident = 0;
 		a->name_length = 0;
 		a->name_offset = cpu_to_le16(24);
 		a->flags = cpu_to_le16(0);
-		a->instance = mrec->next_attr_instance;
-		mrec->next_attr_instance = cpu_to_le16((le16_to_cpu(
-				mrec->next_attr_instance) + 1) & 0xffff);
+		a->instance = ctx->mrec->next_attr_instance;
+		ctx->mrec->next_attr_instance = cpu_to_le16((le16_to_cpu(
+				ctx->mrec->next_attr_instance) + 1) & 0xffff);
 		a->value_length = cpu_to_le32(label_len);
 		a->value_offset = a->name_offset;
 		a->resident_flags = 0;
 		a->reservedR = 0;
 	}
 	memcpy((u8*)a + le16_to_cpu(a->value_offset), new_label, label_len);
-	if (!opts.noaction &&
-			ntfs_mft_record_write(vol, (MFT_REF)FILE_Volume, mrec)) {
+	if (!opts.noaction && ntfs_inode_sync(vol->vol_ni)) {
 		perror("Error writing MFT Record to disk");
 		goto err_out;
 	}
@@ -354,8 +342,6 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 err_out:
 	if (new_label)
 		free(new_label);
-	if (mrec)
-		free(mrec);
 	return result;
 }
 

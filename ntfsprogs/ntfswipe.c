@@ -1391,10 +1391,6 @@ int main (int argc, char *argv[])
 
 		printf ("%lld bytes were wiped\n", (long long)total);
 	}
-	if (ntfs_volume_set_flags (vol, VOLUME_IS_DIRTY) < 0) {
-		Eprintf ("Couldn't mark volume dirty\n");
-	}
-
 	result = 0;
 umount:
 	ntfs_umount (vol, FALSE);
@@ -1403,4 +1399,3 @@ free:
 		free (opts.bytes);
 	return result;
 }
-

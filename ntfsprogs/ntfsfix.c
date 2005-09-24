@@ -73,7 +73,6 @@ GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
 static const char *EXEC_NAME = "ntfsfix";
 static const char *OK        = "OK";
 static const char *FAILED    = "FAILED";
-static BOOL vol_is_dirty     = FALSE;
 static BOOL journal_is_empty = FALSE;
 
 struct {
@@ -144,32 +143,6 @@ static void parse_options(int argc, char **argv)
 		printf("ERROR: You must specify a device.\n");
 		usage();
 	}
-}
-
-static int set_dirty_flag(ntfs_volume *vol)
-{
-	u16 flags;
-
-	if (vol_is_dirty == TRUE)
-		return 0;
-
-	printf("Setting required flags on partition... ");
-	/*
-	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
-	 * and fix it for us.
-	 */
-	flags = vol->flags | VOLUME_IS_DIRTY;
-	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
-	if (ntfs_volume_set_flags(vol, flags)) {
-		puts(FAILED);
-		fprintf(stderr, "Error setting volume flags.\n");
-		return -1;
-	}
-	puts(OK);
-	vol_is_dirty = TRUE;
-	return 0;
 }
 
 static int empty_journal(ntfs_volume *vol)
@@ -349,9 +322,6 @@ int main(int argc, char **argv)
 
 	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
 
-	if (set_dirty_flag(vol) < 0)
-		goto error_exit;
-
 	if (empty_journal(vol) < 0)
 		goto error_exit;
 
@@ -373,9 +343,6 @@ mount_ok:
 		fprintf(stderr, "Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
-
-	if (set_dirty_flag(vol) < 0)
-		goto error_exit;
 
 	if (empty_journal(vol) < 0)
 		goto error_exit;

@@ -2249,7 +2249,7 @@ static void prepare_volume_fixup(ntfs_volume *vol)
 	printf("Schedule chkdsk for NTFS consistency check at Windows "
 		"boot time ...\n");
 
-	if (ntfs_volume_set_flags(vol, flags))
+	if (ntfs_volume_write_flags(vol, flags))
 		perr_exit("Failed to set $Volume dirty");
 
 	if (vol->dev->d_ops->sync(vol->dev) == -1)

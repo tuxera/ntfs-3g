@@ -61,5 +61,7 @@ extern int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		int outs_len);
 extern int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len);
 
+extern void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len);
+
 #endif /* defined _NTFS_UNISTR_H */
 

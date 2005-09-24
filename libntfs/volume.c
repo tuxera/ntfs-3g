@@ -79,6 +79,8 @@ ntfs_volume *ntfs_volume_alloc(void)
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
+	if (v->vol_ni && NInoDirty(v->vol_ni))
+		ntfs_inode_close(v->vol_ni);
 	if (v->lcnbmp_ni && NInoDirty(v->lcnbmp_ni))
 		ntfs_inode_sync(v->lcnbmp_ni);
 	if (v->lcnbmp_na)
@@ -166,7 +168,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		Dputs("Error: $MFT has invalid magic.");
 		goto io_error_exit;
 	}
-	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, mb);
+	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, NULL);
 	if (!ctx) {
 		Dperror("Failed to allocate attribute search context");
 		goto error_exit;
@@ -416,6 +418,15 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 	vol = ntfs_volume_alloc();
 	if (!vol)
 		goto error_exit;
+	/* Create the default upcase table. */
+	vol->upcase_len = 65536;
+	vol->upcase = (ntfschar*)malloc(vol->upcase_len * sizeof(ntfschar));
+	if (!vol->upcase) {
+		Dperror("Error allocating memory for upcase table.");
+		goto error_exit;
+	}
+	ntfs_upcase_table_build(vol->upcase,
+			vol->upcase_len * sizeof(ntfschar));
 	if ((rwflag & MS_RDONLY) == MS_RDONLY)
 		NVolSetReadOnly(vol);
 	Dprintf("Reading bootsector... ");
@@ -889,12 +900,16 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 		errno = EINVAL;
 		goto error_exit;
 	}
-	vol->upcase_len = na->data_size >> 1;
-	vol->upcase = (ntfschar*)malloc(na->data_size);
-	if (!vol->upcase) {
-		Dputs(FAILED);
-		Dputs("Not enough memory to load $UpCase.");
-		goto error_exit;
+	if (vol->upcase_len != na->data_size >> 1) {
+		vol->upcase_len = na->data_size >> 1;
+		/* Throw away default table. */
+		free(vol->upcase);
+		vol->upcase = (ntfschar*)malloc(na->data_size);
+		if (!vol->upcase) {
+			Dputs(FAILED);
+			Dputs("Not enough memory to load $UpCase.");
+			goto error_exit;
+		}
 	}
 	/* Read in the $DATA attribute value into the buffer. */
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->upcase);
@@ -916,14 +931,14 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	 * vol structure accordingly.
 	 */
 	Dprintf("Loading $Volume... ");
-	ni = ntfs_inode_open(vol, FILE_Volume);
-	if (!ni) {
+	vol->vol_ni = ntfs_inode_open(vol, FILE_Volume);
+	if (!vol->vol_ni) {
 		Dputs(FAILED);
 		Dperror("Failed to open inode");
 		goto error_exit;
 	}
 	/* Get a search context for the $Volume/$VOLUME_INFORMATION lookup. */
-	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
 	if (!ctx) {
 		Dputs(FAILED);
 		Dperror("Failed to allocate attribute search context");
@@ -1033,9 +1048,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	Dputs(OK);
 	ntfs_attr_put_search_ctx(ctx);
 	ctx = NULL;
-	if (ntfs_inode_close(ni))
-		Dperror("Failed to close inode, leaking memory");
-
 	/* Now load the attribute definitions from $AttrDef. */
 	Dprintf("Loading $AttrDef... ");
 	ni = ntfs_inode_open(vol, FILE_AttrDef);
@@ -1080,7 +1092,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni))
 		Dperror("Failed to close inode, leaking memory");
-
 	/*
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
@@ -1429,7 +1440,7 @@ error_exit:
 }
 
 /**
- * ntfs_volume_set_flags - set the flags of an ntfs volume
+ * ntfs_volume_write_flags - set the flags of an ntfs volume
  * @vol:	ntfs volume where we set the volume flags
  * @flags:	new flags
  *
@@ -1438,37 +1449,22 @@ error_exit:
  *
  * Return 0 if successful and -1 if not with errno set to the error code.
  */
-int ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
+int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 {
-	MFT_RECORD *m = NULL;
-	ATTR_RECORD *r;
+	ATTR_RECORD *a;
 	VOLUME_INFORMATION *c;
 	ntfs_attr_search_ctx *ctx;
 	int ret = -1;	/* failure */
 
-	if (!vol) {
+	if (!vol || !vol->vol_ni) {
 		errno = EINVAL;
 		return -1;
 	}
-
-	if (ntfs_file_record_read(vol, FILE_Volume, &m, NULL)) {
-		Dperror("Failed to read $Volume");
-		return -1;
-	}
-
-	/* Sanity check */
-	if (!(m->flags & MFT_RECORD_IN_USE)) {
-		Dprintf("Error: $Volume has been deleted. Cannot "
-			"handle this yet. Run chkdsk to fix this.\n");
-		errno = EIO;
-		goto err_exit;
-	}
-
 	/* Get a pointer to the volume information attribute. */
-	ctx = ntfs_attr_get_search_ctx(NULL, m);
+	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
 	if (!ctx) {
 		Dperror("Failed to allocate attribute search context");
-		goto err_exit;
+		return -1;
 	}
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
@@ -1476,40 +1472,36 @@ int ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 				"$Volume!");
 		goto err_out;
 	}
-	r = ctx->attr;
+	a = ctx->attr;
 	/* Sanity check. */
-	if (r->non_resident) {
+	if (a->non_resident) {
 		Dputs("Error: Attribute $VOLUME_INFORMATION must be resident "
 				"(and it isn't)!");
 		errno = EIO;
 		goto err_out;
 	}
 	/* Get a pointer to the value of the attribute. */
-	c = (VOLUME_INFORMATION*)(le16_to_cpu(r->value_offset) + (char*)r);
+	c = (VOLUME_INFORMATION*)(le16_to_cpu(a->value_offset) + (char*)a);
 	/* Sanity checks. */
-	if ((char*)c + le32_to_cpu(r->value_length) >
-			le16_to_cpu(m->bytes_in_use) + (char*)m ||
-			le16_to_cpu(r->value_offset) +
-			le32_to_cpu(r->value_length) > le32_to_cpu(r->length)) {
+	if ((char*)c + le32_to_cpu(a->value_length) >
+			le16_to_cpu(ctx->mrec->bytes_in_use) +
+			(char*)ctx->mrec || le16_to_cpu(a->value_offset) +
+			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
 		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "
 				"corrupt!");
 		errno = EIO;
 		goto err_out;
 	}
 	/* Set the volume flags. */
-	vol->flags = c->flags = cpu_to_le16(flags);
-
-	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
+	vol->flags = c->flags = flags & VOLUME_FLAGS_MASK;
+	/* Write them to disk. */
+	ntfs_inode_mark_dirty(vol->vol_ni);
+	if (ntfs_inode_sync(vol->vol_ni)) {
 		Dperror("Error writing $Volume");
 		goto err_out;
 	}
-
 	ret = 0; /* success */
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
-err_exit:
-	if (m)
-		free(m);
 	return ret;
 }
-

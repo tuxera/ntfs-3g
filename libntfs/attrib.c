@@ -1559,10 +1559,23 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ATTR_RECORD *a;
-	ntfs_volume *vol = ctx->ntfs_ino->vol;
-	ntfschar *upcase = vol->upcase;
-	u32 upcase_len = vol->upcase_len;
+	ntfs_volume *vol;
+	ntfschar *upcase;
+	u32 upcase_len;
 
+	if (ctx->ntfs_ino) {
+		vol = ctx->ntfs_ino->vol;
+		upcase = vol->upcase;
+		upcase_len = vol->upcase_len;
+	} else {
+		if (name) {
+			errno = EINVAL;
+			return -1;
+		}
+		vol = NULL;
+		upcase = NULL;
+		upcase_len = 0;
+	}
 	/*
 	 * Iterate over attributes in mft record starting at @ctx->attr, or the
 	 * attribute following that, if @ctx->is_first is TRUE.
@@ -2196,7 +2209,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 static __inline__ void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
 		ntfs_inode *ni, MFT_RECORD *mrec)
 {
-	if (ni && !mrec)
+	if (!mrec)
 		mrec = ni->mrec;
 	ctx->mrec = mrec;
 	/* Sanity checks are performed elsewhere. */
@@ -2245,19 +2258,22 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
  * Allocate a new attribute search context, initialize it with @ni and @mrec,
  * and return it. Return NULL on error with errno set to ENOMEM.
  *
- * @ni can be NULL if the search context is only going to be used for searching
- * for the attribute list attribute and for searches ignoring the contents of
- * the attribute list attribute.
+ * @mrec can be NULL, in which case the mft record is taken from @ni.
  *
- * If @ni is specified, @mrec can be NULL, in which case the mft record is
- * taken from @ni.
- *
- * If both @ni and @mrec are specified, the mft record is taken from @mrec and
- * the value of @ni->mrec is ignored.
+ * Note: For low level utilities which know what they are doing we allow @ni to
+ * be NULL and @mrec to be set.  Do NOT do this unless you understand the
+ * implications!!!  For example it is no longer safe to call ntfs_attr_lookup()
+ * if you 
  */
 ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 {
-	ntfs_attr_search_ctx *ctx = malloc(sizeof(ntfs_attr_search_ctx));
+	ntfs_attr_search_ctx *ctx;
+
+	if (!ni && !mrec) {
+		errno = EINVAL;
+		return NULL;
+	}
+	ctx = malloc(sizeof(ntfs_attr_search_ctx));
 	if (ctx)
 		ntfs_attr_init_search_ctx(ctx, ni, mrec);
 	return ctx;
@@ -2530,7 +2546,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
 	if (!ntfs_attr_lookup(type, name, name_len,
@@ -2655,7 +2671,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
 	if (!ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
@@ -3318,7 +3334,7 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 
 	/* Find place in MFT record where attribute will be moved. */
 	a = ctx->attr;
-	nctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	nctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!nctx) {
 		err = errno;
 		Dprintf("%s(): Couldn't obtain search context.\n",

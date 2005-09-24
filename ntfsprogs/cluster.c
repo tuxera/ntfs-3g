@@ -81,7 +81,7 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 		Vprintf ("Inode: %llu\n", (unsigned long long)
 				m_ctx->inode->mft_no);
 
-		a_ctx = ntfs_attr_get_search_ctx (NULL, m_ctx->inode->mrec);
+		a_ctx = ntfs_attr_get_search_ctx (m_ctx->inode, NULL);
 
 		while ((rec = find_attribute (AT_UNUSED, a_ctx))) {
 

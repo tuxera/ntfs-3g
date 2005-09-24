@@ -44,13 +44,22 @@ xx/xx/2005 - 1.12.0-WIP
 	- ntfsmount: Fix 'df' output.  (Yuval)
 	- Support journals which have been modified by chkdsk.  (Anton, Szaka)
 	- Support journals ($LogFile) with only one restart page as well as
-          journals with two different restart pages.  (Anton, Szaka)
+	  journals with two different restart pages.  (Anton, Szaka)
 	- Add @val parameter to ntfs_attr_add and @val and @size parameters to
 	  ntfs_resident_attr_record_add.  (Yura)
 	- Fix attribute list adding for always resident attributes.  (Yura)
 	- New API for hard link creating: dir.[ch]::ntfs_link.  (Yura)
 	- ntfsresize: emphasize that disk partitioning must use sector as the
 	  unit instead of cylinder to avoid shifting of the partition.  (Szaka)
+	- Rename API: ntfs_volume_set_flags() as it is misleading.  It does not
+	  set a flag, it overwrites the flags!  Rename it to
+	  ntfs_volume_write_flags() and clean it up a lot.  Update all
+	  callers.  (Anton)
+	- Change ntfsfix to no longer set the volume dirty.
+	- Change everything to supply an ntfs_inode and NULL for mft record
+	  when calling ntfs_attr_get_search_ctx() except a very few cases which
+	  genuinely need this functionality as they work on a too low level.
+	  Make sure all those cases are ok.
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

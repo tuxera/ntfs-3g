@@ -2301,7 +2301,7 @@ static int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp)
 	if (!bmp)
 		return -1;
 
-	ctx = ntfs_attr_get_search_ctx (NULL, inode->mrec);
+	ctx = ntfs_attr_get_search_ctx (inode, NULL);
 	if (!ctx) {
 		printf ("can't create a search context\n");
 		return -1;
@@ -2480,7 +2480,7 @@ static int ntfs_mft_resize_resident (ntfs_inode *inode, ATTR_TYPES type, ntfscha
 	//printf ("mft_free  = %d\n", mft_free);
 	//printf ("\n");
 
-	ctx = ntfs_attr_get_search_ctx (NULL, mrec);
+	ctx = ntfs_attr_get_search_ctx (inode, NULL);
 	if (!ctx)
 		goto done;
 

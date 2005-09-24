@@ -534,7 +534,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		if (!ni)
 			goto release;
 
-		ctx = ntfs_attr_get_search_ctx(ni, ni->mrec);
+		ctx = ntfs_attr_get_search_ctx(ni, NULL);
 		if (!ctx)
 			goto release;
 
@@ -658,7 +658,7 @@ int main(int argc, char **argv)
 		ntfschar *name = NULL;
 		int name_len = 0;;
 
-		ctx = ntfs_attr_get_search_ctx (NULL, ni->mrec);
+		ctx = ntfs_attr_get_search_ctx(ni, NULL);
 		if (!ctx)
 			return -1;
 
