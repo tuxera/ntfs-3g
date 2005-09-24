@@ -1406,3 +1406,96 @@ err_out:
 	err = errno;
 	goto out;
 }
+
+/**
+ * ntfs_link - create hard link for file or directory
+ * @ni:		ntfs inode for object to create hard link
+ * @dir_ni:	ntfs inode for directory in which new link should be placed
+ * @name:	unicode name of the new link
+ * @name_len:	length of the name in unicode characters
+ *
+ * Return 0 on success or -1 on error with errno set to the error code.
+ */
+int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+{
+	FILE_NAME_ATTR *fn = NULL;
+	int fn_len, err;
+
+	ntfs_debug("Entering.");
+	if (!ni || !dir_ni || !name || !name_len) {
+		err = errno;
+		ntfs_error(, "Invalid arguments.");
+		goto err_out;
+	}
+	/* Create FILE_NAME attribute. */
+	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
+	fn = calloc(1, fn_len);
+	if (!fn) {
+		err = errno;
+		ntfs_error(, "Not enough memory.");
+		goto err_out;
+	}
+	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
+			le16_to_cpu(dir_ni->mrec->sequence_number));
+	fn->file_name_length = name_len;
+	fn->file_name_type = FILE_NAME_POSIX;
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+	fn->creation_time = utc2ntfs(ni->creation_time);
+	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
+	/* Add FILE_NAME attribute to index. */
+	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
+			le16_to_cpu(ni->mrec->sequence_number)))) {
+		err = errno;
+		ntfs_error(, "Failed to add entry to the index.");
+		goto err_out;
+	}
+	/* Add FILE_NAME attribute to inode. */
+	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
+		ntfs_index_context *ictx;
+
+		err = errno;
+		ntfs_error(, "Failed to add FILE_NAME attribute.");
+		/* Try to remove just added attribute from index. */
+		ictx = ntfs_index_ctx_get(dir_ni, I30, 4);
+		if (!ictx)
+			goto rollback_failed;
+		if (ntfs_index_lookup(fn, fn_len, ictx)) {
+			ntfs_index_ctx_put(ictx);
+			goto rollback_failed;
+		}
+		if (ntfs_index_rm(ictx)) {
+			ntfs_index_ctx_put(ictx);
+			goto rollback_failed;
+		}
+		goto err_out;
+	}
+	/* Increment hard links count. */
+	ni->mrec->link_count = cpu_to_le16(le16_to_cpu(
+			ni->mrec->link_count) + 1);
+	/*
+	 * Do not set attributes and file size, instead of this mark filenames
+	 * dirty to force attribute and size update during sync. 
+	 * NOTE: File size may will be not updated and not all attributes will
+	 * be set, but it is acceptable since windows driver does not update
+	 * all file names when one of the hard links changed.
+	 * FIXME: It will be nice to update them all.
+	 */
+	NInoFileNameSetDirty(ni);
+	/* Done! */
+	ntfs_inode_mark_dirty(ni);
+	free(fn);
+	ntfs_debug("Done.");
+	return 0;
+rollback_failed:
+	ntfs_error(, "Rollback failed. Leaving inconsist metadata.");
+err_out:
+	ntfs_error(, "Failed.");
+	if (fn)
+		free(fn);
+	errno = err;
+	return -1;
+}

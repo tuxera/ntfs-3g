@@ -628,6 +628,54 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
 	return res;
 }
 
+static int ntfs_fuse_link(const char *old_path, const char *new_path)
+{
+	char *name;
+	ntfschar *uname = NULL;
+	ntfs_inode *dir_ni = NULL, *ni;
+	char *path;
+	int res = 0, uname_len;
+
+	path = strdup(new_path);
+	if (!path)
+		return -errno;
+	/* Open file for which create hard link. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, old_path);
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	/* Generate unicode filename. */
+	name = strrchr(path, '/');
+	name++;
+	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	if (uname_len < 0) {
+		res = -errno;
+		goto exit;
+	}
+	/* Open parent directory. */
+	*name = 0;
+	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!dir_ni) {
+		res = -errno;
+		if (res == -ENOENT)
+			res = -EIO;
+		goto exit;
+	}
+	/* Create hard link. */
+	if (ntfs_link(ni, dir_ni, uname, uname_len))
+		res = -errno;
+exit:
+	if (ni)
+		ntfs_inode_close(ni);
+	if (uname)
+		free(uname);
+	if (dir_ni)
+		ntfs_inode_close(dir_ni);
+	free(path);
+	return res;
+}
+
 static int ntfs_fuse_rm(const char *org_path)
 {
 	char *name;
@@ -1042,6 +1090,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.mknod		= ntfs_fuse_mknod,
+	.link		= ntfs_fuse_link,
 	.unlink		= ntfs_fuse_unlink,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,

@@ -44,6 +44,8 @@ extern ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		const unsigned type);
 extern int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		u8 name_len);
+extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
+		u8 name_len);
 
 /*
  * File types (adapted from include <linux/fs.h>)
