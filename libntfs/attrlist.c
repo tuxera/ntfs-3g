@@ -99,6 +99,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	ATTR_LIST_ENTRY *ale;
 	MFT_REF mref;
 	ntfs_attr *na = NULL;
+	ntfs_attr_search_ctx *ctx;
 	u8 *new_al;
 	int entry_len, entry_offset, err;
 
@@ -133,41 +134,46 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		return -1;
 	}
 
-	/* Find offset at which insert new entry. */
-	ale = (ATTR_LIST_ENTRY *) ni->attr_list;
-	for(; (u8 *)ale < ni->attr_list + ni->attr_list_size;
-				ale = (ATTR_LIST_ENTRY *)((u8 *) ale +
-				le16_to_cpu(ale->length))) {
-		if (le32_to_cpu(ale->type) < le32_to_cpu(attr->type))
-			continue;
-		if (le32_to_cpu(ale->type) > le32_to_cpu(attr->type))
-			break;
-		err = ntfs_names_collate(ale->name, ale->name_length,
-			(ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset)),
-			attr->name_length, -2, CASE_SENSITIVE, NULL, 0);
-		if (err == -2) {
-			err = EIO;
-			Dprintf("%s(): Corrupt attribute name. Run chkdsk.\n",
-						__FUNCTION__);
-			goto err_out;
-		}
-		if (err < 0)
-			continue;
-		if (err > 0)
-			break;
-		if (sle64_to_cpu(ale->lowest_vcn) <
-				sle64_to_cpu(attr->lowest_vcn))
-			continue;
-		if (sle64_to_cpu(ale->lowest_vcn) ==
-				sle64_to_cpu(attr->lowest_vcn)) {
-			err = EEXIST;
-			Dprintf("%s(): Attribute with same type, name and "
-				"lowest vcn already present in attribute "
-				"list.\n", __FUNCTION__);
-			goto err_out;
-		}
-		break;
+	/* Find place for the new entry. */
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx) {
+		err = errno;
+		Dprintf("%s(): Failed to obtain attribute search context.\n",
+				__FUNCTION__);
+		goto err_out;
 	}
+	if (!ntfs_attr_lookup(attr->type, (attr->name_length) ? (ntfschar*)
+			((u8*)attr + le16_to_cpu(attr->name_offset)) :
+			AT_UNNAMED, attr->name_length, CASE_SENSITIVE,
+			(attr->non_resident) ? le64_to_cpu(attr->lowest_vcn) :
+			0, (attr->non_resident) ? NULL : ((u8*)attr +
+			le16_to_cpu(attr->value_offset)), (attr->non_resident) ?
+			0 : le32_to_cpu(attr->value_length), ctx)) {
+		/* Found some extent, check it to be before new extent. */
+		if (ctx->al_entry->lowest_vcn == attr->lowest_vcn) {
+			err = EEXIST;
+			Dprintf("%s(): Such attribute already present in the "
+					"attribute list.\n", __FUNCTION__);
+			ntfs_attr_put_search_ctx(ctx);
+			goto err_out;
+		}
+		/* Add new entry after this extent. */
+		ale = (ATTR_LIST_ENTRY*)((u8*)ctx->al_entry +
+				le16_to_cpu(ctx->al_entry->length));
+	} else {
+		/* Check for real errors. */
+		if (errno != ENOENT) {
+			err = errno;
+			Dprintf("%s(): Attribute lookup failed.\n",
+					__FUNCTION__);
+			ntfs_attr_put_search_ctx(ctx);
+			goto err_out;
+		}
+		/* No previous extents found. */
+		ale = ctx->al_entry;
+	}
+	/* Don't need it anymore, @ctx->al_entry points to @ni->attr_list. */
+	ntfs_attr_put_search_ctx(ctx);
 
 	/* Determine new entry offset. */
 	entry_offset = ((u8 *)ale - ni->attr_list);
