@@ -1,7 +1,7 @@
 /*
  * logfile.h - Exports for $LogFile handling.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -376,8 +376,8 @@ typedef struct {
 	} __attribute__((__packed__)) lcn_list[0];
 } __attribute__ ((__packed__)) LOG_RECORD;
 
-extern BOOL ntfs_check_logfile(ntfs_attr *log_na);
-extern BOOL ntfs_is_logfile_clean(ntfs_attr *log_na);
+extern BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp);
+extern BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp);
 extern int ntfs_empty_logfile(ntfs_attr *na);
 
 #endif /* defined _NTFS_LOGFILE_H */

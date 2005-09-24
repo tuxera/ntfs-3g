@@ -112,7 +112,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	 */
 	if (!ntfs_is_chkd_record(rp->magic) && sle64_to_cpu(rp->chkdsk_lsn)) {
 		ntfs_error(vi->i_sb, "$LogFile restart page is not modified "
-				"chkdsk but a chkdsk LSN is specified.");
+				"by chkdsk but a chkdsk LSN is specified.");
 		return FALSE;
 	}
 	ntfs_debug("Done.");
@@ -301,10 +301,12 @@ err_out:
  * @log_na:	opened ntfs attribute for journal $LogFile
  * @rp:		restart page to check
  * @pos:	position in @log_na at which the restart page resides
- * @wrp:	copy of the multi sector transfer deprotected restart page
+ * @wrp:       [OUT] copy of the multi sector transfer deprotected restart page
+ * @lsn:       [OUT] set to the current logfile lsn on success
  *
- * Check the restart page @rp for consistency and return TRUE if it is
- * consistent and FALSE otherwise.
+ * Check the restart page @rp for consistency and return 0 if it is consistent
+ * and errno otherwise.  The restart page may have been modified by chkdsk in
+ * which case its magic is CHKD instead of RSTR.
  *
  * This function only needs NTFS_BLOCK_SIZE bytes in @rp, i.e. it does not
  * require the full restart page.
@@ -312,24 +314,33 @@ err_out:
  * If @wrp is not NULL, on success, *@wrp will point to a buffer containing a
  * copy of the complete multi sector transfer deprotected page.  On failure,
  * *@wrp is undefined.
+ *
+ * Simillarly, if @lsn is not NULL, on succes *@lsn will be set to the current
+ * logfile lsn according to this restart page.  On failure, *@lsn is undefined.
+ *
+ * The following error codes are defined:
+ *     EINVAL - The restart page is inconsistent.
+ *     ENOMEM - Not enough memory to load the restart page.
+ *     EIO    - Failed to reading from $LogFile.
  */
-static BOOL ntfs_check_and_load_restart_page(ntfs_attr *log_na,
-		RESTART_PAGE_HEADER *rp, s64 pos, RESTART_PAGE_HEADER **wrp)
+static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
+		RESTART_PAGE_HEADER *rp, s64 pos, RESTART_PAGE_HEADER **wrp,
+		LSN *lsn)
 {
 	RESTART_AREA *ra;
 	RESTART_PAGE_HEADER *trp;
-	BOOL ret;
+	int err;
 
 	ntfs_debug("Entering.");
 	/* Check the restart page header for consistency. */
 	if (!ntfs_check_restart_page_header(rp, pos)) {
 		/* Error output already done inside the function. */
-		return FALSE;
+		return EINVAL;
 	}
 	/* Check the restart area for consistency. */
 	if (!ntfs_check_restart_area(rp)) {
 		/* Error output already done inside the function. */
-		return FALSE;
+		return EINVAL;
 	}
 	ra = (RESTART_AREA*)((u8*)rp + le16_to_cpu(rp->restart_area_offset));
 	/*
@@ -340,7 +351,7 @@ static BOOL ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 	if (!trp) {
 		ntfs_error(vi->i_sb, "Failed to allocate memory for $LogFile "
 				"restart page buffer.");
-		return FALSE;
+		return ENOMEM;
 	}
 	/*
 	 * Read the whole of the restart page into the buffer.  If it fits
@@ -353,36 +364,67 @@ static BOOL ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 		if (ntfs_attr_pread(log_na, pos, le32_to_cpu(
 					rp->system_page_size), trp) !=
 					le32_to_cpu(rp->system_page_size)) {
+			err = errno;
 			ntfs_error(, "Failed to read whole restart page into "
 					"the buffer.");
+			if (err != ENOMEM)
+				err = EIO;
 			goto err_out;
 		}
 	/* Perform the multi sector transfer deprotection on the buffer. */
 	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)trp,
 			le32_to_cpu(rp->system_page_size))) {
-		ntfs_error(vi->i_sb, "Multi sector transfer error detected in "
-				"$LogFile restart page.");
-		goto err_out;
+		/*
+		 * A multi sector tranfer error was detected.  We only need to
+		 * abort if the restart page contents exceed the multi sector
+		 * transfer fixup of the first sector.
+		 */
+		if (le16_to_cpu(rp->restart_area_offset) +
+				le16_to_cpu(ra->restart_area_length) >
+				NTFS_BLOCK_SIZE - sizeof(u16)) {
+			ntfs_error(vi->i_sb, "Multi sector transfer error "
+				   "detected in $LogFile restart page.");
+			err = EINVAL;
+			goto err_out;
+	       }
 	}
-	/* Check the log client records for consistency. */
-	ret = ntfs_check_log_client_array(trp);
-	if (ret && wrp)
-		*wrp = trp;
-	else
-		free(trp);
+	/*
+	 * If the restart page is modified by chkdsk or there are no active
+	 * logfile clients, the logfile is consistent.  Otherwise, need to
+	 * check the log client records for consistency, too.
+	 */
+	err = 0;
+	if (ntfs_is_rstr_record(rp->magic) &&
+			ra->client_in_use_list != LOGFILE_NO_CLIENT) {
+		if (!ntfs_check_log_client_array(trp)) {
+			err = EINVAL;
+			goto err_out;
+		}
+	}
+	if (lsn) {
+		if (ntfs_is_rstr_record(rp->magic))
+			*lsn = sle64_to_cpu(ra->current_lsn);
+		else /* if (ntfs_is_chkd_record(rp->magic)) */
+			*lsn = sle64_to_cpu(rp->chkdsk_lsn);
+	}
 	ntfs_debug("Done.");
-	return ret;
+	if (wrp)
+		*wrp = trp;
+	else {
 err_out:
-	free(trp);
-	return FALSE;
+		free(trp);
+	}
+	return err;
 }
 
 /**
  * ntfs_check_logfile - check in the journal if the volume is consistent
  * @log_na:	ntfs attribute of loaded journal $LogFile to check
+ * @rp:         [OUT] on success this is a copy of the current restart page
  *
  * Check the $LogFile journal for consistency and return TRUE if it is
- * consistent and FALSE if not.
+ * consistent and FALSE if not.  On success, the current restart page is
+ * returned in *@rp.  Caller must call ntfs_free(*@rp) when finished with it.
  *
  * At present we only check the two restart pages and ignore the log record
  * pages.
@@ -392,17 +434,16 @@ err_out:
  * if the $LogFile was created on a system with a different page size to ours
  * yet and mst deprotection would fail if our page size is smaller.
  */
-BOOL ntfs_check_logfile(ntfs_attr *log_na)
+BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp)
 {
-	s64 size, pos, rstr1_pos, rstr2_pos;
+	s64 size, pos;
+	LSN rstr1_lsn, rstr2_lsn;
 	ntfs_volume *vol = log_na->ni->vol;
-	u8 *buf = NULL;
+	u8 *kaddr = NULL;
 	RESTART_PAGE_HEADER *rstr1_ph = NULL;
 	RESTART_PAGE_HEADER *rstr2_ph = NULL;
-	int log_page_size, log_page_mask, ofs;
+	int log_page_size, log_page_mask, err;
 	BOOL logfile_is_empty = TRUE;
-	BOOL rstr1_found = FALSE;
-	BOOL rstr2_found = FALSE;
 	u8 log_page_bits;
 
 	ntfs_debug("Entering.");
@@ -432,8 +473,8 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na)
 		return FALSE;
 	}
 	/* Allocate memory for restart page. */
-	buf = malloc(NTFS_BLOCK_SIZE);
-	if (!buf) {
+	kaddr = malloc(NTFS_BLOCK_SIZE);
+	if (!kaddr) {
 		ntfs_error(, "Not enough memory.");
 		return FALSE;
 	}
@@ -449,7 +490,7 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na)
 		/*
 		 * Read first NTFS_BLOCK_SIZE bytes of potential restart page.
 		 */
-		if (ntfs_attr_pread(log_na, pos, NTFS_BLOCK_SIZE, buf) !=
+		if (ntfs_attr_pread(log_na, pos, NTFS_BLOCK_SIZE, kaddr) !=
 				NTFS_BLOCK_SIZE) {
 			ntfs_error(, "Failed to read first NTFS_BLOCK_SIZE "
 					"bytes of potential restart page.");
@@ -461,7 +502,7 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na)
 		 * empty block after a non-empty block has been encountered
 		 * means we are done.
 		 */
-		if (!ntfs_is_empty_recordp((le32*)buf))
+		if (!ntfs_is_empty_recordp((le32*)kaddr))
 			logfile_is_empty = FALSE;
 		else if (!logfile_is_empty)
 			break;
@@ -469,59 +510,53 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na)
 		 * A log record page means there cannot be a restart page after
 		 * this so no need to continue searching.
 		 */
-		if (ntfs_is_rcrd_recordp((le32*)buf))
+		if (ntfs_is_rcrd_recordp((le32*)kaddr))
 			break;
-		/*
-		 * A modified by chkdsk restart page means we cannot handle
-		 * this log file.
-		 */
-		if (ntfs_is_chkd_recordp((le32*)buf)) {
-			ntfs_error(vol->sb, "$LogFile has been modified by "
-					"chkdsk.  Mount this volume in "
-					"Windows.");
-			goto err_out;
-		}
-		/* If not a restart page, continue. */
-		if (!ntfs_is_rstr_recordp((le32*)buf)) {
-			/* Skip to the minimum page size for the next one. */
+		/* If not a (modified by chkdsk) restart page, continue. */
+		if (!ntfs_is_rstr_recordp((le32*)kaddr) &&
+				!ntfs_is_chkd_recordp((le32*)kaddr)) {
 			if (!pos)
 				pos = NTFS_BLOCK_SIZE >> 1;
 			continue;
 		}
-		/* We now know we have a restart page. */
-		if (!pos) {
-			rstr1_found = TRUE;
-			rstr1_pos = pos;
-		} else {
-			if (rstr2_found) {
-				ntfs_error(vol->sb, "Found more than two "
-						"restart pages in $LogFile.");
-				goto err_out;
+		/*
+		 * Check the (modified by chkdsk) restart page for consistency
+		 * and get a copy of the complete multi sector transfer
+		 * deprotected restart page.
+		 */
+		err = ntfs_check_and_load_restart_page(log_na,
+				(RESTART_PAGE_HEADER*)kaddr, pos,
+				!rstr1_ph ? &rstr1_ph : &rstr2_ph,
+				!rstr1_ph ? &rstr1_lsn : &rstr2_lsn);
+		if (!err) {
+			/*
+			 * If we have now found the first (modified by chkdsk)
+			 * restart page, continue looking for the second one.
+			 */
+			if (!pos) {
+				pos = NTFS_BLOCK_SIZE >> 1;
+				continue;
 			}
-			rstr2_found = TRUE;
-			rstr2_pos = pos;
+			/*
+			 * We have now found the second (modified by chkdsk)
+			 * restart page, so we can stop looking.
+			 */
+			break;
 		}
 		/*
-		 * Check the restart page for consistency and get a copy of the
-		 * complete multi sector transfer deprotected restart page.
+		 * Error output already done inside the function.  Note, we do
+		 * not abort if the restart page was invalid as we might still
+		 * find a valid one further in the file.
 		 */
-		if (!ntfs_check_and_load_restart_page(log_na,
-				(RESTART_PAGE_HEADER*)buf, pos,
-				!pos ? &rstr1_ph : &rstr2_ph)) {
-			/* Error output already done inside the function. */
-			goto err_out;
-		}
-		/*
-		 * We have a valid restart page.  The next one must be after
-		 * a whole system page size as specified by the valid restart
-		 * page.
-		 */
+		if (err != EINVAL)
+		      goto err_out;
+		/* Continue looking. */
 		if (!pos)
-			pos = le32_to_cpu(rstr1_ph->system_page_size) >> 1;
+			pos = NTFS_BLOCK_SIZE >> 1;
 	}
-	if (buf) {
-		free(buf);
-		buf = NULL;
+	if (kaddr) {
+		free(kaddr);
+		kaddr = NULL;
 	}
 	if (logfile_is_empty) {
 		NVolSetLogFileEmpty(vol);
@@ -529,31 +564,37 @@ is_empty:
 		ntfs_debug("Done.  ($LogFile is empty.)");
 		return TRUE;
 	}
-	if (!rstr1_found || !rstr2_found) {
-		ntfs_error(vol->sb, "Did not find two restart pages in "
-				"$LogFile.");
-		goto err_out;
+	if (!rstr1_ph) {
+		if (rstr2_ph)
+			ntfs_error(vol->sb, "BUG: rstr2_ph isn't NULL!");
+		ntfs_error(vol->sb, "Did not find any restart pages in "
+			   "$LogFile and it was not empty.");
+		return FALSE;
 	}
-	/*
-	 * The two restart areas must be identical except for the update
-	 * sequence number.
-	 */
-	ofs = le16_to_cpu(rstr1_ph->usa_ofs);
-	if (memcmp(rstr1_ph, rstr2_ph, ofs) || (ofs += sizeof(u16),
-			memcmp((u8*)rstr1_ph + ofs, (u8*)rstr2_ph + ofs,
-			le32_to_cpu(rstr1_ph->system_page_size) - ofs))) {
-		ntfs_error(vol->sb, "The two restart pages in $LogFile do not "
-				"match.");
-		goto err_out;
+	/* If both restart pages were found, use the more recent one. */
+	if (rstr2_ph) {
+		/*
+		 * If the second restart area is more recent, switch to it.
+		 * Otherwise just throw it away.
+		 */
+		if (rstr2_lsn > rstr1_lsn) {
+			free(rstr1_ph);
+			rstr1_ph = rstr2_ph;
+			/* rstr1_lsn = rstr2_lsn; */
+		} else  
+			free(rstr2_ph);
+		rstr2_ph = NULL;
 	}
-	free(rstr1_ph);
-	free(rstr2_ph);
 	/* All consistency checks passed. */
+	if (rp)
+		*rp = rstr1_ph;
+	else
+		free(rstr1_ph);
 	ntfs_debug("Done.");
 	return TRUE;
 err_out:
-	if (buf)
-		free(buf);
+	if (kaddr)
+		free(kaddr);
 	if (rstr1_ph)
 		free(rstr1_ph);
 	if (rstr2_ph)
@@ -564,6 +605,7 @@ err_out:
 /**
  * ntfs_is_logfile_clean - check in the journal if the volume is clean
  * @log_na:	ntfs attribute of loaded journal $LogFile to check
+ * @rp:         copy of the current restart page
  *
  * Analyze the $LogFile journal and return TRUE if it indicates the volume was
  * shutdown cleanly and FALSE if not.
@@ -580,9 +622,8 @@ err_out:
  * is empty this function requires that NVolLogFileEmpty() is true otherwise an
  * empty volume will be reported as dirty.
  */
-BOOL ntfs_is_logfile_clean(ntfs_attr *log_na)
+BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 {
-	RESTART_PAGE_HEADER *rp;
 	RESTART_AREA *ra;
 
 	ntfs_debug("Entering.");
@@ -591,29 +632,19 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na)
 		ntfs_debug("Done.  ($LogFile is empty.)");
 		return TRUE;
 	}
-	/* Allocate memory. */
-	rp = malloc(NTFS_BLOCK_SIZE);
 	if (!rp) {
-		ntfs_error(, "Not enough memory.");
+		ntfs_error(, "Restart page header is NULL.");
 		return FALSE;
 	}
-	/*
-	 * Read the first restart page.  It will be possibly incomplete and
-	 * will not be multi sector transfer deprotected but we only need the
-	 * first NTFS_BLOCK_SIZE bytes so it does not matter.
-	 */
-	if (ntfs_attr_pread(log_na, 0, NTFS_BLOCK_SIZE, rp) !=
-			NTFS_BLOCK_SIZE) {
-		ntfs_error(, "Failed to read first restart page.");
-		goto err_out;
+	if (!ntfs_is_rstr_record(rp->magic) &&
+			!ntfs_is_chkd_record(rp->magic)) {
+		ntfs_error(vol->sb, "Restart page buffer is invalid.  This is "
+			   "probably a bug in that the $LogFile should "
+			   "have been consistency checked before calling "
+			   "this function.");
+		return FALSE;
 	}
-	if (!ntfs_is_rstr_record(rp->magic)) {
-		ntfs_error(vol->sb, "No restart page found at offset zero in "
-				"$LogFile.  This is probably a bug in that "
-				"the $LogFile should have been consistency "
-				"checked before calling this function.");
-		goto err_out;
-	}
+
 	ra = (RESTART_AREA*)((u8*)rp + le16_to_cpu(rp->restart_area_offset));
 	/*
 	 * If the $LogFile has active clients, i.e. it is open, and we do not
@@ -623,15 +654,11 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na)
 	if (ra->client_in_use_list != LOGFILE_NO_CLIENT &&
 			!(ra->flags & RESTART_VOLUME_IS_CLEAN)) {
 		ntfs_debug("Done.  $LogFile indicates a dirty shutdown.");
-		goto err_out;
+		return FALSE;
 	}
-	free(rp);
 	/* $LogFile indicates a clean shutdown. */
 	ntfs_debug("Done.  $LogFile indicates a clean shutdown.");
 	return TRUE;
-err_out:
-	free(rp);
-	return FALSE;
 }
 
 /**

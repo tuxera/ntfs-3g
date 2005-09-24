@@ -1,7 +1,7 @@
 /*
  * volume.c - NTFS volume handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -566,6 +566,7 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
+	RESTART_PAGE_HEADER *rp = NULL;
 	int err = 0;
 
 	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
@@ -578,8 +579,10 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 		err = EIO;
 		goto exit;
 	}
-	if (!ntfs_check_logfile(na) || !ntfs_is_logfile_clean(na))
+	if (!ntfs_check_logfile(na, &rp) || !ntfs_is_logfile_clean(na, rp))
 		err = EOPNOTSUPP;
+	if (rp)
+		free(rp);
 exit:
 	if (na)
 		ntfs_attr_close(na);

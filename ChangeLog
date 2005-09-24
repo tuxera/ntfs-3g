@@ -42,6 +42,9 @@ xx/xx/2005 - 1.12.0-WIP
 	  libntfs/volume.c.  Needed to compile on DOS with djgpp.  (Christophe)
 	- Switch ntfsmount to use getopt_long.  (Yuval, minor fixes by Yura)
 	- ntfsmount: Fix 'df' output.  (Yuval)
+	- Support journals which have been modified by chkdsk.  (Anton, Szaka)
+	- Support journals ($LogFile) with only one restart page as well as
+          journals with two different restart pages.  (Anton, Szaka)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
