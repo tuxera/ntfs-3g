@@ -773,7 +773,7 @@ static int ntfs_fuse_unlink(const char *org_path)
 static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 {
 	int ret;
-	
+
 	if ((ret = ntfs_fuse_link(old_path, new_path)))
 		return ret;
 	if ((ret = ntfs_fuse_unlink(old_path))) {
@@ -1427,7 +1427,7 @@ int main(int argc, char *argv[])
 	struct fuse *fh;
 	int ffd;
 
-	setlocale(LC_ALL, "");
+	utils_set_locale();
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
