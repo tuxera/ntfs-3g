@@ -1460,18 +1460,6 @@ int mkntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 }
 
 /**
- * ntfs_attr_put_search_ctx - release an attribute search context
- * @ctx:	attribute search context to free
- *
- * Release the attribute search context @ctx.
- */
-void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
-{
-	free(ctx);
-	return;
-}
-
-/**
  * insert_positioned_attr_in_mft_record
  * Create a non-resident attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
