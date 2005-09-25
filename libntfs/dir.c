@@ -1282,11 +1282,18 @@ search:
 		errno = 0;			
 		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
 				le16_to_cpu(actx->attr->value_offset));
-		if (looking_for_dos_name && fn->file_name_type == FILE_NAME_DOS)
-			break;
-		if (looking_for_win32_name &&
-				fn->file_name_type == FILE_NAME_WIN32)
-			break;
+		if (looking_for_dos_name) {
+			if (fn->file_name_type == FILE_NAME_DOS)
+				break;
+			else
+				continue;
+		}
+		if (looking_for_win32_name) {
+			if  (fn->file_name_type == FILE_NAME_WIN32)
+				break;
+			else
+				continue;
+		}
 		if (dir_ni->mft_no == MREF_LE(fn->parent_directory) &&
 				ntfs_names_are_equal(fn->file_name,
 				fn->file_name_length, name,
@@ -1295,7 +1302,6 @@ search:
 				ni->vol->upcase, ni->vol->upcase_len)) {
 			if (fn->file_name_type == FILE_NAME_WIN32) {
 				looking_for_dos_name = TRUE;
-				ntfs_attr_reinit_search_ctx(actx);
 				continue;
 			}
 			if (fn->file_name_type == FILE_NAME_DOS)
