@@ -583,10 +583,12 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 	} else if (prev_name || name)
 		return 1;
 
-	print_inode(base_inode(ctx)->mft_no);
-	print_attribute_ctx(ctx);
-	Vprintf("extent %llu lowest_vcn %lld:    SKIPPED\n",
-		ctx->ntfs_ino->mft_no, ctx->attr->lowest_vcn);
+	if (opt.verbose) {
+		print_inode(base_inode(ctx)->mft_no);
+		print_attribute_ctx(ctx);
+		printf("record %llu lowest_vcn %lld:    SKIPPED\n",
+			ctx->ntfs_ino->mft_no, ctx->attr->lowest_vcn);
+	}
 	
 	return 0;
 }
