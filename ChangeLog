@@ -60,6 +60,7 @@ xx/xx/2005 - 1.12.0-WIP
 	  when calling ntfs_attr_get_search_ctx() except a very few cases which
 	  genuinely need this functionality as they work on a too low level.
 	  Make sure all those cases are ok.
+	- ntfsclone: fix saving by sectors during --rescue (Scott Hansen, Szaka)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

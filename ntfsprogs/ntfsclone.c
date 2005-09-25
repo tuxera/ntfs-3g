@@ -496,17 +496,20 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
 }
 
 
-static void copy_cluster(int rescue, off_t rescue_pos)
+static void copy_cluster(int rescue, u64 rescue_lcn)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 	/* vol is NULL if opt.restore_image is set */
 	u32 csize = image_hdr.cluster_size;
 	void *fd = (void *)&fd_in;
+	off_t rescue_pos;
 
 	if (!opt.restore_image) {
 		csize = vol->cluster_size;
 		fd = vol->dev;
 	}
+
+	rescue_pos = (off_t)(rescue_lcn * csize);
 
 	if (read_all(fd, buff, csize) == -1) {
 
