@@ -42,7 +42,8 @@
 static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 {
 	u32 logfile_system_page_size, logfile_log_page_size;
-	u16 usa_count, usa_ofs, usa_end, ra_ofs;
+	u16 ra_ofs, usa_count, usa_ofs, usa_end = 0;
+	BOOL have_usa = TRUE;
 
 	ntfs_debug("Entering.");
 	/*
@@ -77,6 +78,14 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 				(int)sle16_to_cpu(rp->minor_ver));
 		return FALSE;
 	}
+	/*
+	 * If chkdsk has been run the restart page may not be protected by an
+	 * update sequence array.
+	 */
+	if (ntfs_is_chkd_record(rp->magic) && !le16_to_cpu(rp->usa_count)) {
+		have_usa = FALSE;
+		goto skip_usa_checks;
+	}
 	/* Verify the size of the update sequence array. */
 	usa_count = 1 + (logfile_system_page_size >> NTFS_BLOCK_SIZE_BITS);
 	if (usa_count != le16_to_cpu(rp->usa_count)) {
@@ -93,6 +102,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 				"inconsistent update sequence array offset.");
 		return FALSE;
 	}
+skip_usa_checks:
 	/*
 	 * Verify the position of the restart area.  It must be:
 	 *	- aligned to 8-byte boundary,
@@ -100,7 +110,8 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	 *	- within the system page size.
 	 */
 	ra_ofs = le16_to_cpu(rp->restart_area_offset);
-	if (ra_ofs & 7 || ra_ofs < usa_end ||
+	if (ra_ofs & 7 || (have_usa ? ra_ofs < usa_end :
+			ra_ofs < sizeof(RESTART_PAGE_HEADER)) ||
 			ra_ofs > logfile_system_page_size) {
 		ntfs_error(vi->i_sb, "$LogFile restart page specifies "
 				"inconsistent restart area offset.");
@@ -360,19 +371,22 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 	 */
 	if (le32_to_cpu(rp->system_page_size) <= NTFS_BLOCK_SIZE)
 		memcpy(trp, rp, le32_to_cpu(rp->system_page_size));
-	else
-		if (ntfs_attr_pread(log_na, pos, le32_to_cpu(
-					rp->system_page_size), trp) !=
-					le32_to_cpu(rp->system_page_size)) {
-			err = errno;
-			ntfs_error(, "Failed to read whole restart page into "
-					"the buffer.");
-			if (err != ENOMEM)
-				err = EIO;
-			goto err_out;
-		}
-	/* Perform the multi sector transfer deprotection on the buffer. */
-	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)trp,
+	else if (ntfs_attr_pread(log_na, pos,
+			le32_to_cpu(rp->system_page_size), trp) !=
+			le32_to_cpu(rp->system_page_size)) {
+		err = errno;
+		ntfs_error(, "Failed to read whole restart page into the "
+				"buffer.");
+		if (err != ENOMEM)
+			err = EIO;
+		goto err_out;
+	}
+	/*
+	 * Perform the multi sector transfer deprotection on the buffer if the
+	 * restart page is protected.
+	 */
+	if ((!ntfs_is_chkd_record(trp->magic) || le16_to_cpu(trp->usa_count))
+			&& ntfs_mst_post_read_fixup((NTFS_RECORD*)trp,
 			le32_to_cpu(rp->system_page_size))) {
 		/*
 		 * A multi sector tranfer error was detected.  We only need to
@@ -578,11 +592,16 @@ is_empty:
 		 * Otherwise just throw it away.
 		 */
 		if (rstr2_lsn > rstr1_lsn) {
+			ntfs_debug("Using second restart page as it is more "
+					"recent.");
 			free(rstr1_ph);
 			rstr1_ph = rstr2_ph;
 			/* rstr1_lsn = rstr2_lsn; */
-		} else  
+		} else {
+			ntfs_debug("Using first restart page as it is more "
+					"recent.");
 			free(rstr2_ph);
+		}
 		rstr2_ph = NULL;
 	}
 	/* All consistency checks passed. */
