@@ -61,6 +61,8 @@ xx/xx/2005 - 1.12.0-WIP
 	  genuinely need this functionality as they work on a too low level.
 	  Make sure all those cases are ok.
 	- ntfsclone: fix saving by sectors during --rescue (Scott Hansen, Szaka)
+	- Fix the definition of the CHKD ntfs record magic.  It had an off by
+	  two error causing it to be CHKB instead of CHKD.
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
