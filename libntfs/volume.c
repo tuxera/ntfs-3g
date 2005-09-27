@@ -101,6 +101,8 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		ntfs_attr_close(v->mftmirr_na);
 	if (v->mftmirr_ni)
 		ntfs_inode_close(v->mftmirr_ni);
+	if (v->vol_ni)
+		ntfs_inode_close(v->vol_ni);
 	if (v->dev) {
 		struct ntfs_device *dev = v->dev;
 
