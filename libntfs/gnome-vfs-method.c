@@ -34,7 +34,9 @@
 #include <glib/gmessages.h>
 #include "gnome-vfs-module.h"
 #include <glib/ghash.h>
+#ifdef HAVE_STRING_H
 #include <string.h>
+#endif
 #include <libgnomevfs/gnome-vfs-utils.h>
 
 #include "volume.h"

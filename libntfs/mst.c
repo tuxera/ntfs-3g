@@ -22,7 +22,9 @@
 #include "config.h"
 
 #include "mst.h"
+#ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
 
 /**
  * ntfs_mst_post_read_fixup - deprotect multi sector transfer protected data

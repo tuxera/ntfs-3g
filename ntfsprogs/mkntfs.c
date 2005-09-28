@@ -62,16 +62,24 @@
 #ifdef HAVE_ERRNO_H
 #	include <errno.h>
 #endif
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
 #ifdef HAVE_GETOPT_H
 #	include <getopt.h>
 #else
 	extern char *optarg;
 	extern int optind;
 #endif
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
+#endif
+#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
 #ifdef HAVE_LINUX_MAJOR_H
 #	include <linux/major.h>
 #	ifndef MAJOR
@@ -110,7 +118,9 @@
 				(M) <= SCSI_DISK7_MAJOR))
 #	endif
 #endif
+#ifdef HAVE_LIMITS_H
 #include <limits.h>
+#endif
 
 #if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
 #	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytes. */

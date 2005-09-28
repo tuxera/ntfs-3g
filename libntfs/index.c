@@ -20,7 +20,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
 
 #include "attrib.h"
 #include "collate.h"

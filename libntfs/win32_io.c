@@ -24,13 +24,23 @@
 
 #include "config.h"
 
+#ifdef HAVE_WINDOWS_H
 #include <windows.h>
+#endif
 #include <winioctl.h>
 
+#ifdef HAVE_STDIO_H
 #include <stdio.h>
+#endif
+#ifdef HAVE_CTYPE_H
 #include <ctype.h>
+#endif
+#ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
+#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
 
 /*
  * Cannot use "../include/types.h" since it conflicts with "wintypes.h".

@@ -46,11 +46,21 @@
 
 #include "config.h"
 
+#ifdef HAVE_STDIO_H
 #include <stdio.h>
+#endif
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
 #include <string.h>
+#endif
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
+#ifdef HAVE_GETOPT_H
 #include <getopt.h>
+#endif
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>

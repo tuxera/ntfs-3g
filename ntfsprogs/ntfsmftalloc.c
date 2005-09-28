@@ -41,13 +41,17 @@
 #ifdef HAVE_ERRNO_H
 #	include <errno.h>
 #endif
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
 #ifdef HAVE_GETOPT_H
 #	include <getopt.h>
 #else
 	extern int optind;
 #endif
+#ifdef HAVE_LIMITS_H
 #include <limits.h>
+#endif
 #ifndef LLONG_MAX
 #	define LLONG_MAX 9223372036854775807LL
 #endif
