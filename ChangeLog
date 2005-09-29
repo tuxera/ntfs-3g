@@ -63,6 +63,11 @@ xx/xx/2005 - 1.12.0-WIP
 	- ntfsclone: fix saving by sectors during --rescue (Scott Hansen, Szaka)
 	- Fix the definition of the CHKD ntfs record magic.  It had an off by
 	  two error causing it to be CHKB instead of CHKD.  (Anton)
+	- Add new utility ntfscmp (make extra) which compares two NTFS volumes
+	  and tell the differences. It's used for development, debugging,
+	  testing, etc.  (Szaka)
+	- ntfsresize, ntfsclone: accept incorrect $Bitmap size if it covers
+	  the entire volume.  (Szaka)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

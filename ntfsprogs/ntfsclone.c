@@ -419,25 +419,6 @@ static void progress_update(struct progress_bar *p, u64 current)
 	fflush(msg_out);
 }
 
-/**
- * nr_clusters_to_bitmap_byte_size
- *
- * Take the number of clusters in the volume and calculate the size of $Bitmap.
- * The size will always be a multiple of 8 bytes.
- */
-static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
-{
-	s64 bm_bsize;
-
-	bm_bsize = rounded_up_division(nr_clusters, 8);
-
-	bm_bsize = (bm_bsize + 7) & ~7;
-	Dprintf("Bitmap byte size  : %lld (%lld clusters)\n",
-	       bm_bsize, rounded_up_division(bm_bsize, vol->cluster_size));
-
-	return bm_bsize;
-}
-
 static s64 is_critical_metadata(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
 	s64 inode = image->ni->mft_no;
@@ -875,15 +856,17 @@ static void compare_bitmaps(struct bitmap *a)
 			perr_exit("Couldn't get $Bitmap $DATA");
 
 		if (count == 0) {
-			if (a->size != pos)
-				err_exit("$Bitmap file size doesn't match "
-					 "calculated size (%lld != %lld)\n",
-					 a->size, pos);
+			if (a->size > pos)
+				err_exit("$Bitmap size is smaller than expected"
+					 " (%lld != %lld)\n", a->size, pos);
 			break;
 		}
 
 		for (i = 0; i < count; i++, pos++) {
 			s64 cl;  /* current cluster */
+
+			if (a->size <= pos)
+				goto done;
 
 			if (a->bm[pos] == bm[i])
 				continue;
@@ -910,7 +893,7 @@ static void compare_bitmaps(struct bitmap *a)
 			}
 		}
 	}
-
+done:
 	if (mismatch) {
 		Printf("Totally %d cluster accounting mismatches.\n", mismatch);
 		if (opt.ignore_fs_check) {
@@ -1071,7 +1054,7 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 static void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
-	lcn_bitmap.size = nr_clusters_to_bitmap_byte_size(vol->nr_clusters);
+	lcn_bitmap.size = rounded_up_division(vol->nr_clusters, 8);
 
 	if (!(lcn_bitmap.bm = (unsigned char *)calloc(1, lcn_bitmap.size)))
 		perr_exit("Failed to allocate internal buffer");

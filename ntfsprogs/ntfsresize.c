@@ -616,7 +616,7 @@ static void dump_runlist(runlist *rl)
  * nr_clusters_to_bitmap_byte_size
  *
  * Take the number of clusters in the volume and calculate the size of $Bitmap.
- * The size will always be a multiple of 8 bytes.
+ * The size must be always a multiple of 8 bytes.
  */
 static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 {
@@ -927,20 +927,17 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 			perr_exit("Couldn't get $Bitmap $DATA");
 
 		if (count == 0) {
-			if (a->size != pos)
-				err_exit("$Bitmap file size doesn't match "
-					 "calculated size (%lld != %lld)\n",
-					 a->size, pos);
+			if (a->size > pos)
+				err_exit("$Bitmap size is smaller than expected"
+					 " (%lld != %lld)\n", a->size, pos);
 			break;
 		}
 
-		if (a->size < pos + count)
-			err_exit("$Bitmap file size is larger than "
-				 "expected (%lld+ versus %lld)\n",
-				 pos + count, a->size);
-
 		for (i = 0; i < count; i++, pos++) {
 			s64 cl;  /* current cluster */
+
+			if (a->size <= pos)
+				goto done;
 
 			if (a->bm[pos] == bm[i])
 				continue;
@@ -972,7 +969,7 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 			}
 		}
 	}
-
+done:
 	if (mismatch) {
 		err_printf("Filesystem check failed! Totally %d cluster "
 			   "accounting mismatches.\n", mismatch);
@@ -2087,7 +2084,7 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 static int setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
-	bm->size = nr_clusters_to_bitmap_byte_size(nr_clusters);
+	bm->size = rounded_up_division(nr_clusters, 8);
 
 	if (!(bm->bm = (unsigned char *)calloc(1, bm->size)))
 		return -1;
