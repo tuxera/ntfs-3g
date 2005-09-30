@@ -1324,7 +1324,7 @@ search:
 		((FILE_NAME_ATTR*)ictx->data)->file_name_type = FILE_NAME_POSIX;
 		ntfs_index_entry_mark_dirty(ictx);
 	}
-	/* Do not support reparse oint deletion yet. */
+	/* Do not support reparse point deletion yet. */
 	if (((FILE_NAME_ATTR*)ictx->data)->file_attributes &
 			FILE_ATTR_REPARSE_POINT) {
 		errno = EOPNOTSUPP;
