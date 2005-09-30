@@ -100,9 +100,9 @@ static const char *hibernated_volume_msg =
 "turned off properly, thus resizing will be possible later on.\n";
 
 static const char *unclean_journal_msg =
-"Apparently the NTFS journal file is unclean. Please shutdown Windows\n"
-"properly before using this software. If it wouldn't help then please\n"
-"report it to linux-ntfs-dev@lists.sf.net. Thank you.\n";
+"The NTFS journal file is unclean. Please shutdown Windows properly before\n"
+"using this software! Note, if you have run chkdsk previously then boot\n"
+"Windows again which will automatically initialize the journal correctly.\n";
 
 static const char *bad_sectors_warning_msg =
 "****************************************************************************\n"
