@@ -77,11 +77,6 @@ extern DEC_PRINTF(Eprintf)
 extern DEC_PRINTF(Vprintf)
 extern DEC_PRINTF(Qprintf)
 
-struct _IO_FILE;
-
-int ntfs_printf (struct _IO_FILE *stream, int *control, BOOL trigger,
-		const char *format, ...) __attribute__ ((format (printf, 4, 5)));
-
 int utils_valid_device (const char *name, int force);
 int utils_set_locale (void);
 ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
