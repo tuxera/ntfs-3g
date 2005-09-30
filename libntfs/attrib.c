@@ -3365,7 +3365,7 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 	 * attribute in @ni->mrec, not any extent inode in case if @ni is base
 	 * file record.
 	 */
-	if (!ntfs_attr_lookup(a->type, (ntfschar*)((u8*)a + le16_to_cpu(
+	if (!ntfs_attr_find(a->type, (ntfschar*)((u8*)a + le16_to_cpu(
 			a->name_offset)), a->name_length, CASE_SENSITIVE, NULL,
 			0, nctx)) {
 		Dprintf("%s(): Attribute of such type, with same name already "
