@@ -169,8 +169,8 @@ ntfs_volume *vol;
 char *dev_name;
 
 struct {
-	long long part_start_sect;	/* start sector of partition on parent
-					   device */
+	long long part_start_sect;	/* -p, start sector of partition on
+					   parent device */
 	long long nr_sectors;		/* size of device in sectors */
 	long long nr_clusters;		/* Note: Win2k treats clusters as
 					   32-bit entities! */
@@ -198,9 +198,9 @@ struct {
 	u32 upcase_len;			/* Determined automatically. */
 	int sector_size;		/* -s, in bytes, power of 2, default is
 					   512 bytes. */
-	int sectors_per_track;		/* number of sectors per track on
+	int sectors_per_track;		/* -S, number of sectors per track on
 					   device */
-	int heads;			/* number of heads on device */
+	int heads;			/* -H, number of heads on device */
 	int quiet;			/* -q, quiet execution. */
 	int verbose;			/* -v, verbose execution, given twice,
 					 * really verbose execution (debug
@@ -357,7 +357,7 @@ static void parse_options(int argc, char *argv[])
 	if (argc && *argv)
 		EXEC_NAME = *argv;
 	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
-	while ((c = getopt(argc, argv, "c:fh?np:qs:vz:CFTIL:QVl")) != EOF)
+	while ((c = getopt(argc, argv, "c:fH:h?np:qS:s:vz:CFTIL:QVl")) != EOF)
 		switch (c) {
 		case 'n':
 			opts.no_action = 1;
