@@ -70,7 +70,7 @@ xx/xx/2005 - 1.12.0-WIP
 	  the entire volume.  (Szaka)
 	- mkntfs: Fix silly bug where I forgot to add the "H:S:p:" string to
 	  the getopt() parsing string for those options.  Cannot be used very
-	  often if people only now noticed!
+	  often if people only now noticed!  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
