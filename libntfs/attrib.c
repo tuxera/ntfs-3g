@@ -2554,11 +2554,16 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
-	if (!ntfs_attr_lookup(type, name, name_len,
-				CASE_SENSITIVE, 0, val, size, ctx)) {
+	/*
+	 * Use ntfs_attr_find instead of ntfs_attr_lookup to find place for
+	 * attribute in @ni->mrec, not any extent inode in case if @ni is base
+	 * file record.
+	 */
+	if (!ntfs_attr_find(type, name, name_len, CASE_SENSITIVE, val, size,
+			ctx)) {
 		err = EEXIST;
 		Dprintf("%s(): Attribute already present.\n", __FUNCTION__);
 		goto put_err_out;
@@ -2679,11 +2684,16 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
-	if (!ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
-					lowest_vcn, NULL, 0, ctx)) {
+	/*
+	 * Use ntfs_attr_find instead of ntfs_attr_lookup to find place for
+	 * attribute in @ni->mrec, not any extent inode in case if @ni is base
+	 * file record.
+	 */
+	if (!ntfs_attr_find(type, name, name_len, CASE_SENSITIVE, NULL, 0,
+			ctx)) {
 		err = EEXIST;
 		Dprintf("%s(): Attribute already present.\n", __FUNCTION__);
 		goto put_err_out;
@@ -3342,7 +3352,7 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 
 	/* Find place in MFT record where attribute will be moved. */
 	a = ctx->attr;
-	nctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
+	nctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!nctx) {
 		err = errno;
 		Dprintf("%s(): Couldn't obtain search context.\n",
@@ -3350,9 +3360,14 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 		errno = err;
 		return -1;
 	}
+	/*
+	 * Use ntfs_attr_find instead of ntfs_attr_lookup to find place for
+	 * attribute in @ni->mrec, not any extent inode in case if @ni is base
+	 * file record.
+	 */
 	if (!ntfs_attr_lookup(a->type, (ntfschar*)((u8*)a + le16_to_cpu(
-			a->name_offset)), a->name_length, CASE_SENSITIVE,
-			0, NULL, 0, nctx)) {
+			a->name_offset)), a->name_length, CASE_SENSITIVE, NULL,
+			0, nctx)) {
 		Dprintf("%s(): Attribute of such type, with same name already "
 			"present in this MFT record.\n", __FUNCTION__);
 		err = EEXIST;
@@ -3455,6 +3470,11 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 				le32_to_cpu(ctx->attr->length) + extra)
 			continue;
 
+		/*
+		 * ntfs_attr_record_move_to can fail if extent with other lowest
+		 * VCN already present in inode we trying move record to. So,
+		 * do not return error.
+		 */
 		if (!ntfs_attr_record_move_to(ctx, ni))
 			return 0;
 	}
