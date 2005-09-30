@@ -68,6 +68,9 @@ xx/xx/2005 - 1.12.0-WIP
 	  testing, etc.  (Szaka)
 	- ntfsresize, ntfsclone: accept incorrect $Bitmap size if it covers
 	  the entire volume.  (Szaka)
+	- mkntfs: Fix silly bug where I forgot to add the "H:S:p:" string to
+	  the getopt() parsing string for those options.  Cannot be used very
+	  often if people only now noticed!
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
