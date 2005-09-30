@@ -2554,7 +2554,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
 	if (!ntfs_attr_lookup(type, name, name_len,
@@ -2679,7 +2679,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 	/* Locate place where record should be. */
-	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	ctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!ctx)
 		return -1;
 	if (!ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
@@ -3342,7 +3342,7 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 
 	/* Find place in MFT record where attribute will be moved. */
 	a = ctx->attr;
-	nctx = ntfs_attr_get_search_ctx(ni, NULL);
+	nctx = ntfs_attr_get_search_ctx(NULL, ni->mrec);
 	if (!nctx) {
 		err = errno;
 		Dprintf("%s(): Couldn't obtain search context.\n",
