@@ -84,20 +84,19 @@ static const char *resize_important_msg =
 "can recover the partition table by TestDisk or Parted's rescue mode.\n";
 
 static const char *invalid_ntfs_msg =
-"Apparently device '%s' doesn't have a valid NTFS.\n"
+"The device '%s' doesn't have a valid NTFS.\n"
 "Maybe you selected the wrong partition? Or the whole disk instead of a\n"
 "partition (e.g. /dev/hda, not /dev/hda1)? This error might also occur\n"
 "if the disk was incorrectly repartitioned (see the ntfsresize FAQ).\n";
 
 static const char *corrupt_volume_msg =
-"Apparently you have a corrupted NTFS. Please run the filesystem checker\n"
-"on Windows by invoking chkdsk /f. Don't forget the /f (force) parameter,\n"
-"it's important! You probably also need to reboot Windows to take effect.\n"
-"Then you can try ntfsresize again. No modification was made to your NTFS.\n";
+"This software has detected that your NTFS is corrupted. Please run chkdsk /f\n"
+"on Windows then reboot it TWICE! Important, don't forget the /f parameter!\n"
+"Afterwards you can run ntfsresize. No modification was made to NTFS.\n";
 
 static const char *hibernated_volume_msg =
-"Apparently the NTFS partition is hibernated. Windows must be resumed and\n"
-"turned off properly, thus resizing will be possible later on.\n";
+"The NTFS partition is hibernated. Windows must be resumed and turned off\n"
+"properly, so resizing could be done safely.\n";
 
 static const char *unclean_journal_msg =
 "The NTFS journal file is unclean. Please shutdown Windows properly before\n"
@@ -110,8 +109,8 @@ static const char *bad_sectors_warning_msg =
 "* surface caused by deterioration, manufacturing faults or other reason.   *\n"
 "* The reliability of the disk may stay stable or degrade fast. We suggest  *\n"
 "* making a full backup urgently by running 'ntfsclone --rescue ...' then   *\n"
-"* run 'chkdsk /f /r volume:' on Windows then you should be able to resize  *\n"
-"* safely by additionally using the --bad-sectors option to ntfsresize.     *\n"
+"* run 'chkdsk /f /r' on Windows and rebooot it TWICE! Then you can resize  *\n"
+"* NTFS safely by additionally using the --bad-sectors option of ntfsresize.*\n"
 "****************************************************************************\n";
 
 struct {

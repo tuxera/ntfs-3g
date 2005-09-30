@@ -903,7 +903,7 @@ done:
 		}
 		err_exit("Filesystem check failed! Windows wasn't shutdown "
 			 "properly or inconsistent\nfilesystem. Please run "
-			 "chkdsk on Windows.\n");
+			 "chkdsk /f on Windows then reboot it TWICE.\n");
 	}
 }
 
