@@ -1302,6 +1302,7 @@ search:
 				ni->vol->upcase, ni->vol->upcase_len)) {
 			if (fn->file_name_type == FILE_NAME_WIN32) {
 				looking_for_dos_name = TRUE;
+				ntfs_attr_reinit_search_ctx(actx);
 				continue;
 			}
 			if (fn->file_name_type == FILE_NAME_DOS)
