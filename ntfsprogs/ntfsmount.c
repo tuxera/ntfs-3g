@@ -1306,6 +1306,14 @@ static char *parse_mount_options(char *org_options, char **device)
 				goto err_exit;
 			}
 			ctx->force = TRUE;
+		} else if (!strcmp(opt, "locale")) {
+			if (!val) {
+				Eprintf("'locale' option should have value.\n");
+				goto err_exit;
+			}
+			if (!setlocale(LC_ALL, val))
+				Eprintf("Failed to set locale to %s.  "
+						"Continue anyway.\n", val);
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -1340,7 +1348,8 @@ static void usage(void)
 	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
 		"force\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
-		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tdev\n\n");
+		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tdev\n\t"
+		"locale\n\n");
 	Eprintf("Default options are: \"%s\".\n", def_opts);
 }
 
