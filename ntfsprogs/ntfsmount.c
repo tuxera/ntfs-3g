@@ -99,6 +99,7 @@ typedef enum {
 static struct options {
 	char	*mnt_point;	/* Mount point */
 	char	*options;	/* Mount options */
+	char	*device;	/* Device to mount */
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 } opts;
@@ -1180,19 +1181,18 @@ static void signal_handler(int arg __attribute__((unused)))
 	fuse_exit((fuse_get_context())->fuse);
 }
 
-static char *parse_mount_options(char *org_options, char **device)
+static char *parse_mount_options(const char *org_options)
 {
 	char *options, *s, *opt, *val, *ret;
 	BOOL no_def_opts = FALSE;
 
-	*device = NULL;
 	/*
-	 * +3		for different in length of "fsname=..." and "dev=...".
+	 * +7		for "fsname=".
 	 * +1		for comma.
 	 * +1		for null-terminator.
-	 * +PATH_MAX	for resolved by realpath() device name
+	 * +PATH_MAX	for resolved by realpath() device name.
 	 */
-	ret = malloc(strlen(def_opts) + strlen(org_options) + 5 + PATH_MAX);
+	ret = malloc(strlen(def_opts) + strlen(org_options) + 9 + PATH_MAX);
 	if (!ret) {
 		perror("malloc failed");
 		return NULL;
@@ -1206,25 +1206,7 @@ static char *parse_mount_options(char *org_options, char **device)
 	s = options;
 	while ((val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
-		if (!strcmp(opt, "dev")) { /* Device to mount. */
-			if (!val) {
-				Eprintf("'dev' option should have value.\n");
-				goto err_exit;
-			}
-			*device = malloc(PATH_MAX + 1);
-			if (!*device)
-				goto err_exit;
-			/* We don't want relative path in /etc/mtab. */
-			if (val[0] != '/') {
-				if (!realpath(val, *device)) {
-					perror("");
-					free(*device);
-					*device = NULL;
-					goto err_exit;
-				}
-			} else
-				strcpy(*device, val);
-		} else if (!strcmp(opt, "ro")) { /* Read-only mount. */
+		if (!strcmp(opt, "ro")) { /* Read-only mount. */
 			if (val) {
 				Eprintf("'ro' option should not have value.\n");
 				goto err_exit;
@@ -1323,12 +1305,10 @@ static char *parse_mount_options(char *org_options, char **device)
 			strcat(ret, ",");
 		}
 	}
-	if (!*device)
-		goto err_exit;
 	if (!no_def_opts)
 		strcat(ret, def_opts);
 	strcat(ret, "fsname=");
-	strcat(ret, *device);
+	strcat(ret, opts.device);
 exit:
 	free(options);
 	return ret;
@@ -1343,13 +1323,12 @@ static void usage(void)
 	Eprintf("\n%s v%s - NTFS module for FUSE.\n\n",
 			EXEC_NAME, VERSION);
 	Eprintf("Copyright (c) 2005 Yura Pakhuchiy\n\n");
-	Eprintf("usage:  %s mount_point -o dev=device[,other_options]\n\n",
+	Eprintf("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);
 	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
 		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
 		"force\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
-		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tdev\n\t"
-		"locale\n\n");
+		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tlocale\n\n");
 	Eprintf("Default options are: \"%s\".\n", def_opts);
 }
 
@@ -1380,15 +1359,36 @@ static int parse_options(int argc, char *argv[])
 
 	opts.mnt_point = NULL;
 	opts.options = NULL;
+	opts.device = NULL;
 
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
-			if (!opts.mnt_point)
+			if (!opts.device) {
+				opts.device = malloc(PATH_MAX + 1);
+				if (!opts.device) {
+					perror("malloc");
+					err++;
+					break;
+				}
+				/* We don't want relative path in /etc/mtab. */
+				if (argv[optind - 1][0] != '/') {
+					if (!realpath(argv[optind - 1],
+							opts.device)) {
+						perror("realpath");
+						free(opts.device);
+						opts.device = NULL;
+						err++;
+						break;
+					}
+				} else
+					strcpy(opts.device, argv[optind - 1]);
+			} else if (!opts.mnt_point)
 				opts.mnt_point = argv[optind - 1];
 			else {
-				Eprintf("You must specify exactly one "
-						"mount point.\n");
+				Eprintf("You must specify exactly one device "
+						"and exactly one mount "
+						"point.\n");
 				err++;
 			}
 			break;
@@ -1412,7 +1412,7 @@ static int parse_options(int argc, char *argv[])
 			opts.verbose++;
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
 			err++;
 			break;
 		}
@@ -1421,9 +1421,8 @@ static int parse_options(int argc, char *argv[])
 	if (help) {
 		opts.quiet = 0;
 	} else {
-		if (!opts.options) {
-			Eprintf("No mount options passed, but 'dev' option is "
-					"mandatory.\n");
+		if (!opts.device) {
+			Eprintf("No mount point specified.\n");
 			err++;
 		}
 
@@ -1448,7 +1447,7 @@ static int parse_options(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char *parsed_options, *device;
+	char *parsed_options;
 	struct fuse *fh;
 	int ffd;
 
@@ -1461,25 +1460,22 @@ int main(int argc, char *argv[])
 
 	ntfs_fuse_init();
 	/* Parse options. */
-	parsed_options = parse_mount_options(opts.options, &device);
-	if (!device) {
-		Eprintf("'dev' option is mandatory.\n");
-		ntfs_fuse_destroy();
-		return 2;
-	}
+	parsed_options = parse_mount_options((opts.options) ?
+			opts.options : "");
 	if (!parsed_options) {
-		free(device);
+		if (opts.device)
+			free(opts.device);
 		ntfs_fuse_destroy();
 		return 3;
 	}
 
 	/* Mount volume. */
-	if (ntfs_fuse_mount(device)) {
-		free(device);
+	if (ntfs_fuse_mount(opts.device)) {
 		ntfs_fuse_destroy();
+		free(opts.device);
 		return 4;
 	}
-	free(device);
+	free(opts.device);
 	/* Create filesystem. */
 	ffd = fuse_mount(opts.mnt_point, parsed_options);
 	if (ffd == -1) {

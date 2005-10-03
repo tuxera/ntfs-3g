@@ -2,11 +2,11 @@
 .\" Copyright (c) 2005 Yura Pakhuchiy. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "September 2005" "ntfsprogs version @VERSION@"
+.TH NTFSMOUNT 8 "October 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
-.BI "ntfsmount " mount_point " \-o " device "[," other_options "]"
+.BI "ntfsmount " device " " mount_point " [\-o " options "]"
 .SH DESCRIPTION
 .B ntfsmount
 is a
@@ -129,7 +129,7 @@ The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 
 .TP
-.B force=
+.B force
 Force mount even if errors occured. Use this option only if you know what
 are you doing and don't cry about data loss.
 
@@ -147,8 +147,9 @@ this option cancel this behaviour.
 Don't change any permissions and don't return error on chmod operation.
 
 .TP
-.B dev=
-Mount this device.
+.B locale=
+You can set locale with this option. It's useful if locale enviroment variables
+are not set before partitions from /etc/fstab had been mounted.
 
 .SH DATA STREAMS
 All data on NTFS is stored in streams, which can have names.
@@ -171,18 +172,25 @@ attribute. NOTE: The last feauture is unique for NTFS FUSE module and maybe
 will be never supported by kernel driver.
 
 .SH EXAMPLES
-Mount /dev/hda1 to /mnt/ntfs-fuse using NTFS FUSE module:
+Mount /dev/hda1 to /mnt/ntfs-fuse using ntfsmount:
 .RS
 .sp
-.B ntfsmount /mnt/ntfs-fuse -o dev=/dev/hda1
+.B ntfsmount /dev/hda1 /mnt/ntfs-fuse
 .sp
 .RE
 
-Read-only mount /dev/hda5 to /home/user/tmp and make root to be owner of all
-files:
+Read-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 to be
+owner of all files:
 .RS
 .sp
-.B ntfsmount /home/user/tmp -o dev=/dev/hda5,ro,uid=0
+.B ntfsmount /dev/hda5 /home/user/mnt -o ro,uid=1000
+.sp
+.RE
+
+/etc/fstab entry for above:
+.RS
+.sp
+.B /dev/hda5 /home/user/mnt ntfs-fuse ro,uid=1000 0 0
 .sp
 .RE
 

@@ -139,10 +139,11 @@ extra:	extras
 
 extras:	libs $(EXTRA_PROGRAMS)
 
-# mkfs.ntfs[.8] hard links
+# mkfs.ntfs[.8] and mount.ntfs-fuse hard links
 
 install-exec-hook:
 	$(LN) -f $(DESTDIR)$(sbindir)/mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
+	$(LN) -f $(DESTDIR)$(bindir)/ntfsmount /sbin/mount.ntfs-fuse
 
 install-data-hook:
 	$(LN) -f $(DESTDIR)$(man8dir)/mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
@@ -150,4 +151,4 @@ install-data-hook:
 uninstall-local:
 	rm -f $(DESTDIR)$(sbindir)/mkfs.ntfs
 	rm -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
-			
+	rm -f /sbin/mount.ntfs-fuse
