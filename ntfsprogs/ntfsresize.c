@@ -821,7 +821,7 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 		int err = errno;
 		perr_printf("ntfs_decompress_mapping_pairs");
 		if (err == EIO)
-			puts(corrupt_volume_msg);
+			printf("%s", corrupt_volume_msg);
 		exit(1);
 	}
 
@@ -972,7 +972,7 @@ done:
 	if (mismatch) {
 		err_printf("Filesystem check failed! Totally %d cluster "
 			   "accounting mismatches.\n", mismatch);
-		puts(corrupt_volume_msg);
+		printf("%s", corrupt_volume_msg);
 		exit(1);
 	}
 }
@@ -2212,11 +2212,11 @@ static ntfs_volume *mount_volume(void)
 		if (err == EINVAL)
 			printf(invalid_ntfs_msg, opt.volume);
 		else if (err == EIO)
-			puts(corrupt_volume_msg);
+			printf("%s", corrupt_volume_msg);
 		else if (err == EPERM)
-			puts(hibernated_volume_msg);
+			printf("%s", hibernated_volume_msg);
         	else if (err == EOPNOTSUPP)
-			puts(unclean_journal_msg);
+			printf("%s", unclean_journal_msg);
 		exit(1);
 	}
 
@@ -2294,7 +2294,7 @@ static void check_resize_constraints(ntfs_resize_t *resize)
 		       resize->badclusters,
 		       resize->badclusters  - 1 ? "s" : "");
 		if (!opt.badsectors) {
-			puts(bad_sectors_warning_msg);
+			printf("%s", bad_sectors_warning_msg);
 			exit(1);
 		}
 	}
@@ -2398,7 +2398,7 @@ int main(int argc, char **argv)
 		if (fsck.multi_ref)
 			err_printf("%d clusters are referenced multiply"
 				   " times.\n", fsck.multi_ref);
-		puts(corrupt_volume_msg);
+		printf("%s", corrupt_volume_msg);
 		exit(1);
 	}
 	compare_bitmaps(vol, &fsck.lcn_bitmap);
@@ -2427,7 +2427,7 @@ int main(int argc, char **argv)
 	}
 
 	if (opt.force-- <= 0 && !opt.ro_flag) {
-		puts(resize_warning_msg);
+		printf("%s", resize_warning_msg);
 		proceed_question();
 	}
 
@@ -2456,7 +2456,7 @@ int main(int argc, char **argv)
 
 	printf("Successfully resized NTFS on device '%s'.\n", vol->dev->d_name);
 	if (resize.shrink)
-		puts(resize_important_msg);
+		printf("%s", resize_important_msg);
 
 	return 0;
 }
