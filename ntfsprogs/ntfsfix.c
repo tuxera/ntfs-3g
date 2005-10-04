@@ -93,9 +93,9 @@ struct {
 	char *volume;
 } opt;
 
+static int usage(void) __attribute__((noreturn));
 static int usage(void)
 {
-
 	printf("%s v%s\n"
 		   "\n"
 		   "Usage: %s [options] device\n"

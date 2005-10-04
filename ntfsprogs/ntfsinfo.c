@@ -475,7 +475,7 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 
 static void ntfs_dump_namespace(u8 file_name_type)
 {
-	const char *mbs_file_type = NULL;
+	const char *mbs_file_type;
 
 	/* name space */
 	switch (file_name_type) {
@@ -491,9 +491,9 @@ static void ntfs_dump_namespace(u8 file_name_type)
 	case FILE_NAME_WIN32_AND_DOS:
 		mbs_file_type = "Win32 & DOS";
 		break;
+	default:
+		mbs_file_type = "(unknown)";
 	}
-	if (mbs_file_type == NULL)      /* should never happen */
-	    mbs_file_type = "(unknown)";
 	printf("\tNamespace:\t\t %s\n", mbs_file_type);
 }
 
@@ -982,7 +982,7 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
-	printf("\tVolume Version:\t %d.%d\n", vol_information->major_ver,
+	printf("\tVolume Version:\t\t %d.%d\n", vol_information->major_ver,
 		vol_information->minor_ver);
 	printf("\tFlags:\t\t\t ");
 	if (vol_information->flags & VOLUME_IS_DIRTY)

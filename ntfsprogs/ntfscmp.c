@@ -768,9 +768,9 @@ static ntfs_volume *mount_volume(const char *volume)
 		if (err == EINVAL)
 			printf(invalid_ntfs_msg, volume);
 		else if (err == EIO)
-			printf(corrupt_volume_msg);
+			puts(corrupt_volume_msg);
 		else if (err == EPERM)
-			printf(hibernated_volume_msg);
+			puts(hibernated_volume_msg);
 		exit(1);
 	}
 

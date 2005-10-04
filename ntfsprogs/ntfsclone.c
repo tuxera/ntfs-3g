@@ -523,7 +523,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn)
 			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
 				rescue_sector(fd, rescue_pos + i, buff + i);
 		} else {
-			Printf(bad_sectors_warning_msg);
+			Printf("%s", bad_sectors_warning_msg);
 			err_exit("Disk is faulty, can't make full backup!");
 		}
 	}
