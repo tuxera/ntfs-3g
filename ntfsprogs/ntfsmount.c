@@ -1296,6 +1296,8 @@ static char *parse_mount_options(const char *org_options)
 			if (!setlocale(LC_ALL, val))
 				Eprintf("Failed to set locale to %s.  "
 						"Continue anyway.\n", val);
+		} else if (!strcmp(opt, "noauto")) {
+			/* Don't pass noauto option to fuse. */
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
