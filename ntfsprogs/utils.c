@@ -133,7 +133,7 @@ int utils_valid_device (const char *name, int force)
 	if (!S_ISBLK (st.st_mode)) {
 		Vprintf ("%s is not a block device.\n", name);
 		if (!force) {
-			Eprintf ("Use the --force option to work with files.\n");
+			Eprintf ("Use the force option to work with files.\n");
 			return 0;
 		}
 		Vprintf ("Forced to continue.\n");
@@ -143,14 +143,14 @@ int utils_valid_device (const char *name, int force)
 	if (ntfs_check_if_mounted (name, &mnt_flags)) {
 		Vprintf ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
 		if (!force) {
-			Eprintf ("Use the --force option to ignore this error.\n");
+			Eprintf ("Use the force option to ignore this error.\n");
 			return 0;
 		}
 		Vprintf ("Forced to continue.\n");
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
 		Vprintf ("The device %s, is mounted.\n", name);
 		if (!force) {
-			Eprintf ("Use the --force option to work a mounted filesystem.\n");
+			Eprintf ("Use the force option to work a mounted filesystem.\n");
 			return 0;
 		}
 		Vprintf ("Forced to continue.\n");
