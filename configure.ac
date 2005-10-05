@@ -235,7 +235,7 @@ CFLAGS="$CFLAGS -Wall"
 
 # Add lots of extra warnings if --enable-warnings was specified.
 if test "$enable_warnings" = "yes"; then
-	CFLAGS="$CFLAGS -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes -Wstrict-prototypes -Wshadow -Wwrite-strings -W -Wcast-align -Waggregate-return -Wbad-function-cast -Wcast-qual -Wundef -Wredundant-decls -Wsign-compare"
+	CFLAGS="$CFLAGS -W -Wall -Waggregate-return -Wbad-function-cast -Wcast-align -Wcast-qual -Wdisabled-optimization -Wdiv-by-zero -Wfloat-equal -Winline -Wmissing-declarations -Wmissing-format-attribute -Wmissing-noreturn -Wmissing-prototypes -Wmultichar -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-compare -Wstrict-prototypes -Wundef -Wwrite-strings"
 fi
 
 # Add debugging switches if --enable-debug was specified.
