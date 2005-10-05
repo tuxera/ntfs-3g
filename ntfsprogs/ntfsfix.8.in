@@ -16,15 +16,16 @@
 .\" .sp <n> insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-ntfsfix \- fix common errors
+ntfsfix \- fix common errors and force Windows to check NTFS
 .SH SYNOPSIS
 .B ntfsfix
 .I device
 .SH DESCRIPTION
 \fBntfsfix\fP is a utility that fixes some common NTFS problems. 
 \fBntfsfix\fP is \fBNOT\fP a Linux
-version of chkdsk. It only repairs some fundamental NTFS inconsistencies and
-resets the NTFS journal file.
+version of chkdsk. It only repairs some fundamental NTFS inconsistencies,
+resets the NTFS journal file and schedules an NTFS consistency check for
+the first boot into Windows.
 .sp
 You may run 
 .B ntfsfix 
