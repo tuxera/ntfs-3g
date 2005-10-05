@@ -1,7 +1,7 @@
 /**
  * NtfsFix - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov.
+ * Copyright (c) 2000-2005 Anton Altaparmakov.
  *
  * This utility will attempt to fix a partition that has been damaged by the
  * current Linux-NTFS driver. It should be run after dismounting an NTFS
@@ -87,6 +87,7 @@ GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
 static const char *EXEC_NAME = "ntfsfix";
 static const char *OK        = "OK";
 static const char *FAILED    = "FAILED";
+static BOOL vol_is_dirty     = FALSE;
 static BOOL journal_is_empty = FALSE;
 
 struct {
@@ -157,6 +158,128 @@ static void parse_options(int argc, char **argv)
 		printf("ERROR: You must specify a device.\n");
 		usage();
 	}
+}
+
+static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
+{
+	MFT_RECORD *m = NULL;
+	ATTR_RECORD *a;
+	VOLUME_INFORMATION *c;
+	ntfs_attr_search_ctx *ctx;
+	int ret = -1;   /* failure */
+
+	if (!vol) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (ntfs_file_record_read(vol, FILE_Volume, &m, NULL)) {
+		Dperror("Failed to read $Volume");
+		return -1;
+	}
+	/* Sanity check */
+	if (!(m->flags & MFT_RECORD_IN_USE)) {
+		Dprintf("Error: $Volume has been deleted. Cannot "
+				"handle this yet. Run chkdsk to fix this.\n");
+		errno = EIO;
+		goto err_exit;
+	}
+	/* Get a pointer to the volume information attribute. */
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
+	if (!ctx) {
+		Dperror("Failed to allocate attribute search context");
+		goto err_exit;
+	}
+	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
+			0, ctx)) {
+		Dputs("Error: Attribute $VOLUME_INFORMATION was not found in "
+				"$Volume!");
+		goto err_out;
+	}
+	a = ctx->attr;
+	/* Sanity check. */
+	if (a->non_resident) {
+		Dputs("Error: Attribute $VOLUME_INFORMATION must be resident "
+				"(and it isn't)!");
+		errno = EIO;
+		goto err_out;
+	}
+	/* Get a pointer to the value of the attribute. */
+	c = (VOLUME_INFORMATION*)(le16_to_cpu(a->value_offset) + (char*)a);
+	/* Sanity checks. */
+	if ((char*)c + le32_to_cpu(a->value_length) >
+			le16_to_cpu(m->bytes_in_use) + (char*)m ||
+			le16_to_cpu(a->value_offset) +
+			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
+		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "
+				"corrupt!");
+		errno = EIO;
+		goto err_out;
+	}
+	/* Set the volume flags. */
+	vol->flags = c->flags = cpu_to_le16(flags);
+	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
+		Dperror("Error writing $Volume");
+		goto err_out;
+	}
+	ret = 0; /* success */
+err_out:
+	ntfs_attr_put_search_ctx(ctx);
+err_exit:
+	if (m)
+		free(m);
+	return ret;
+}
+
+static int set_dirty_flag(ntfs_volume *vol)
+{
+	u16 flags;
+
+	if (vol_is_dirty == TRUE)
+		return 0;
+
+	printf("Setting required flags on partition... ");
+	/*
+	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
+	 * and fix it for us.
+	 */
+	flags = vol->flags | VOLUME_IS_DIRTY;
+	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
+	if (vol->major_ver >= 2)
+		flags |= VOLUME_MOUNTED_ON_NT4;
+	if (OLD_ntfs_volume_set_flags(vol, flags)) {
+		puts(FAILED);
+		fprintf(stderr, "Error setting volume flags.\n");
+		return -1;
+	}
+	puts(OK);
+	vol_is_dirty = TRUE;
+	return 0;
+}
+
+static int set_dirty_flag_mount(ntfs_volume *vol)
+{
+	u16 flags;
+
+	if (vol_is_dirty == TRUE)
+		return 0;
+
+	printf("Setting required flags on partition... ");
+	/*
+	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
+	 * and fix it for us.
+	 */
+	flags = vol->flags | VOLUME_IS_DIRTY;
+	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
+	if (vol->major_ver >= 2)
+		flags |= VOLUME_MOUNTED_ON_NT4;
+	if (ntfs_volume_write_flags(vol, flags)) {
+		puts(FAILED);
+		fprintf(stderr, "Error setting volume flags.\n");
+		return -1;
+	}
+	puts(OK);
+	vol_is_dirty = TRUE;
+	return 0;
 }
 
 static int empty_journal(ntfs_volume *vol)
@@ -336,6 +459,10 @@ int main(int argc, char **argv)
 
 	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
 
+	/* FIXME: Will this fail?  Probably... */
+	if (set_dirty_flag(vol) < 0)
+		goto error_exit;
+
 	if (empty_journal(vol) < 0)
 		goto error_exit;
 
@@ -357,6 +484,9 @@ mount_ok:
 		fprintf(stderr, "Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
+
+	if (set_dirty_flag_mount(vol) < 0)
+		goto error_exit;
 
 	if (empty_journal(vol) < 0)
 		goto error_exit;
