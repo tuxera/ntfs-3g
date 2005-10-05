@@ -17,7 +17,7 @@ You need
 .B FUSE
 to compile it,
 .B xattr
-is also highly recommended.
+is recommended, but not mandatory.
 .sp
 .TP
 .B Fully implemented ntfsmount features are:

@@ -1,16 +1,12 @@
 .\" -*- nroff -*-
-.\" Copyright (c) 2004 Yura Pakhuchiy. All Rights Reserved.
+.\" Copyright (c) 2004-2005 Yura Pakhuchiy. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCP 8 "June 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCP 8 "October 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfscp \- overwrite file on an NTFS volume.
 .SH SYNOPSIS
-.B ntfscp
-[
-.I options
-]
-.B device source_file destination
+.BI "ntfscp [" options "] device source_file destination"
 .SH DESCRIPTION
 .B ntfscp
 will overwrite file on an NTFS volume. At present
