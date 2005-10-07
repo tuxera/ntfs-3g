@@ -154,5 +154,5 @@ uninstall-local:
 	rm -f $(DESTDIR)$(sbindir)/mkfs.ntfs
 	rm -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
 if ENABLE_FUSE_MODULE
-	rm -f /sbin/mount.ntfs-fuse
+	rm -f $(DESTDIR)$(sbindir)/mount.ntfs-fuse
 endif
