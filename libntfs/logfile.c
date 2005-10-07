@@ -399,7 +399,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 		 */
 		if (le16_to_cpu(rp->restart_area_offset) +
 				le16_to_cpu(ra->restart_area_length) >
-				NTFS_BLOCK_SIZE - sizeof(u16)) {
+				NTFS_BLOCK_SIZE - (int)sizeof(u16)) {
 			ntfs_error(vi->i_sb, "Multi sector transfer error "
 				   "detected in $LogFile restart page.");
 			err = EINVAL;
