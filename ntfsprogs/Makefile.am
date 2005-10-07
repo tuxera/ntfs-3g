@@ -144,7 +144,7 @@ extras:	libs $(EXTRA_PROGRAMS)
 install-exec-hook:
 	$(LN) -f $(DESTDIR)$(sbindir)/mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
 if ENABLE_FUSE_MODULE
-	$(LN) -f $(DESTDIR)$(bindir)/ntfsmount mount.ntfs-fuse
+	$(LN) -f $(DESTDIR)$(bindir)/ntfsmount /sbin/mount.ntfs-fuse
 endif
 
 install-data-hook:
