@@ -111,7 +111,8 @@ static int usage(void)
 	exit(1);
 }
 
-static void version (void)
+static void version(void) __attribute__((noreturn));
+static void version(void)
 {
 	printf("%s v%s\n\n"
 		   "Attempt to fix an NTFS partition.\n\n"
