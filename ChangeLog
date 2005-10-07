@@ -1,3 +1,8 @@
+xx/xx/2005 - 1.12.1-WIP
+
+	- Fix hardcoded location for uninstalling mount.ntfs-fuse hardlink to
+	  match the relocatable location for installing it.  (Anton, Szaka)
+
 07/10/2005 - 1.12.0 - Lots of fixes and enhancements!
 
 	- Add ./configure detection for gnutls library and make minimum version
