@@ -3555,13 +3555,13 @@ static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
 /**
  * create_backup_boot_sector
  *
- * Return 0 on success or 1 if it couldn't be created.
+ * Return 0 on success or -1 if it couldn't be created.
  */
 static int create_backup_boot_sector(u8 *buff)
 {
 	const char *_s;
 	ssize_t bw;
-	int size, _e = errno;
+	int size, _e;
 
 	Vprintf("Creating backup boot sector.\n");
 	/*
@@ -3580,6 +3580,7 @@ static int create_backup_boot_sector(u8 *buff)
 	bw = mkntfs_write(vol->dev, buff, size);
 	if (bw == size)
 		return 0;
+	_e = errno;
 	if (bw == -1LL)
 		_s = strerror(_e);
 	else
@@ -3594,7 +3595,7 @@ bb_err:
 			"a major problem as Windows check disk will "
 			"create the\nbackup boot sector when it "
 			"is run on your next boot into Windows.\n");
-	return 1;
+	return -1;
 }
 
 /**
@@ -3904,7 +3905,7 @@ static void mkntfs_create_root_structures(void)
 	if (err < 0)
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
 
-	if (create_backup_boot_sector(buf2) != 0) {
+	if (create_backup_boot_sector(buf2)) {
 		/*
 		 *   Pre-2.6 kernels couldn't  access  the  last  sector
 		 *   if it was odd hence we schedule chkdsk to create it.

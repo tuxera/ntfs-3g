@@ -1,4 +1,4 @@
-xx/xx/2005 - 1.12.0-WIP
+07/10/2005 - 1.12.0 - Lots of fixes and enhancements!
 
 	- Add ./configure detection for gnutls library and make minimum version
 	  1.2.3 which is the one that has the rsa key export fixed.  (Anton)
@@ -74,6 +74,9 @@ xx/xx/2005 - 1.12.0-WIP
 	- ntfsmount: Change interface to 'ntfsmount device mount_point'.  (Yura)
 	- Hardlink ntfsmount to /sbin/mount.ntfs-fuse, thus it possible mounting
 	  from fstab by specifying ntfs-fuse filesystem type.  (Yura, Szaka)
+	- Fix stupid bug in mkntfs which caused it to fail even though only the
+	  backup boot sector could not be written because a 2.4 kernel is used
+	  and the partition has an odd number of sectors.  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 
