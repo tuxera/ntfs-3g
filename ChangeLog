@@ -1,7 +1,11 @@
-xx/xx/2005 - 1.12.1-WIP
+08/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
 	- Fix hardcoded location for uninstalling mount.ntfs-fuse hardlink to
 	  match the relocatable location for installing it.  (Anton, Szaka)
+	- Move mount.ntfs-fuse and mkfs.ntfs to be symlinks instead of
+	  hardlinks and move both to /sbin rather than prefix/sbin.  Note we
+	  still obey $destdir so building packages works as well as installing
+	  into alternate chroot / other system still works.
 
 07/10/2005 - 1.12.0 - Lots of fixes and enhancements!
 

@@ -88,8 +88,8 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
 %{bindir}/ntfs[^m][^o]*
-%{sbindir}/mk*
-%{sbindir}/ntfs*
+%{sbindir}/*
+/sbin/mkfs.ntfs
 %{mandir}/man8/mkntfs.8*
 %{mandir}/man8/mkfs.ntfs.8*
 %{mandir}/man8/ntfs[^m][^o]*.8*
@@ -106,6 +106,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{bindir}/ntfsmount*
 /sbin/mount.ntfs-fuse
 %{mandir}/man8/ntfsmount.8*
+%{mandir}/man8/mount.ntfs-fuse.8*
 
 %files devel
 %defattr(-,root,root)

@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.12.1-WIP],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.12.1],[linux-ntfs-dev@lists.sourceforge.net])
 
 #
 # Before making a release, the LTVERSION string should be modified.
@@ -155,7 +155,7 @@ esac
 AC_PROG_CC
 AC_PROG_GCC_TRADITIONAL
 AC_PROG_INSTALL
-AC_PATH_PROG(LN, ln, ln)
+AC_PATH_PROG(RM, rm, rm)
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL

@@ -142,17 +142,23 @@ extras:	libs $(EXTRA_PROGRAMS)
 # mkfs.ntfs[.8] and mount.ntfs-fuse hard links
 
 install-exec-hook:
-	$(LN) -f $(DESTDIR)$(sbindir)/mkntfs $(DESTDIR)$(sbindir)/mkfs.ntfs
+	$(INSTALL) -d $(DESTDIR)/sbin
+	$(LN_S) -f $(sbindir)/mkntfs $(DESTDIR)/sbin/mkfs.ntfs
 if ENABLE_FUSE_MODULE
-	$(LN) -f $(DESTDIR)$(bindir)/ntfsmount /sbin/mount.ntfs-fuse
+	$(LN_S) -f $(bindir)/ntfsmount $(DESTDIR)/sbin/mount.ntfs-fuse
 endif
 
 install-data-hook:
-	$(LN) -f $(DESTDIR)$(man8dir)/mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+	$(INSTALL) -d $(DESTDIR)$(man8dir)
+	$(LN_S) -f mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+if ENABLE_FUSE_MODULE
+	$(LN_S) -f ntfsmount.8 $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
+endif
 
 uninstall-local:
-	rm -f $(DESTDIR)$(sbindir)/mkfs.ntfs
-	rm -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+	$(RM) -f $(DESTDIR)/sbin/mkfs.ntfs
+	$(RM) -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
 if ENABLE_FUSE_MODULE
-	rm -f $(DESTDIR)$(sbindir)/mount.ntfs-fuse
+	$(RM) -f $(DESTDIR)/sbin/mount.ntfs-fuse
+	$(RM) -f $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
 endif
