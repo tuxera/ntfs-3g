@@ -12,9 +12,8 @@ endif
 LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 #TEST_VALGRIND		= valgrind
-TEST_RUNLIST		= runlist
 
-bin_PROGRAMS		= $(TEST_RUNLIST)
+bin_PROGRAMS		= runlist
 
 CLEANFILES		= attr[123].bin frag[123][123][123] pure-[cn][ms] zero
 MAINTAINERCLEANFILES	= Makefile.in
@@ -33,26 +32,26 @@ runlist_LDFLAGS		= $(AM_LFLAGS)
 libs:
 	(cd ../libntfs && $(MAKE) libs) || exit 1;
 
-test:	$(TEST_RUNLIST) testz testp testf
+test:	runlist testz testp testf
 
-testz:	$(TEST_RUNLIST)
-	@$(TEST_VALGRIND) $(TEST_RUNLIST) zero > zero
+testz:	runlist
+	@$(TEST_VALGRIND) ./runlist zero > zero
 	@diff -qs {runlist-data/,}zero
 
-testp:	$(TEST_RUNLIST)
+testp:	runlist
 	@for i in contig noncontig; do						\
 		for j in single multi; do					\
 			L1=`echo $$i | cut -b1`;				\
 			L2=`echo $$j | cut -b1`;				\
 			FILE=pure-$$L1$$L2;					\
-			$(TEST_VALGRIND) $(TEST_RUNLIST) pure $$i $$j > $$FILE;	\
+			$(TEST_VALGRIND) ./runlist pure $$i $$j > $$FILE;	\
 			diff -qs {runlist-data/,}$$FILE;			\
 		done;								\
 	done
 
-testf:	$(TEST_RUNLIST)
+testf:	runlist
 	@for i in 123 132 213 231 312 321; do					\
-		$(TEST_VALGRIND) $(TEST_RUNLIST) frag $$i > frag$$i;		\
+		$(TEST_VALGRIND) ./runlist frag $$i > frag$$i;		\
 		diff -qs {runlist-data/,}frag$$i;				\
 	done
 
