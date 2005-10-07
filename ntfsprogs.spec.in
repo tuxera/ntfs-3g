@@ -104,7 +104,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files fuse
 %defattr(-,root,root)
 %{bindir}/ntfsmount*
-%{sbindir}/mount.ntfs-fuse
+/sbin/mount.ntfs-fuse
 %{mandir}/man8/ntfsmount.8*
 
 %files devel
