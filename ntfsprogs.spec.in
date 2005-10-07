@@ -88,7 +88,8 @@ rm -rf "$RPM_BUILD_ROOT"
 %defattr(-,root,root)
 %doc AUTHORS COPYING CREDITS ChangeLog INSTALL NEWS README TODO.include TODO.libntfs TODO.ntfsprogs doc/CodingStyle doc/attribute_definitions doc/attributes.txt doc/compression.txt doc/tunable_settings doc/template.c doc/template.h doc/system_files.txt doc/system_security_descriptors.txt
 %{bindir}/ntfs[^m][^o]*
-%{sbindir}/*
+%{sbindir}/mk*
+%{sbindir}/ntfs*
 %{mandir}/man8/mkntfs.8*
 %{mandir}/man8/mkfs.ntfs.8*
 %{mandir}/man8/ntfs[^m][^o]*.8*
@@ -103,6 +104,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %files fuse
 %defattr(-,root,root)
 %{bindir}/ntfsmount*
+%{sbindir}/mount.ntfs-fuse
 %{mandir}/man8/ntfsmount.8*
 
 %files devel
@@ -112,6 +114,10 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Fri Oct 7 2005 Anton Altaparmakov <aia21@cantab.net>
+- Fix the file distribution after new binaries have been added as they were
+  ending up in the wrong rpms.
+
 * Mon Aug 15 2005 Szabolcs Szakacsits <szaka@sienet.hu>
 - Add mkfs.ntfs.
 
