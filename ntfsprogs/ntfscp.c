@@ -50,6 +50,7 @@
 #include "volume.h"
 #include "dir.h"
 #include "debug.h"
+#include "version.h"
 
 struct options {
 	char		*device;	/* Device/File to work with */
@@ -82,8 +83,8 @@ static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
  */
 static void version (void)
 {
-	Printf ("\n%s v%s - Overwrite files on NTFS volume.\n\n",
-		EXEC_NAME, VERSION);
+	Printf("\n%s v%s (libntfs %s) - Overwrite files on NTFS volume.\n\n",
+		EXEC_NAME, VERSION, ntfs_libntfs_version());
 	Printf ("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
 	Printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

@@ -2,7 +2,7 @@
  * ntfsclone - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2005 Szabolcs Szakacsits
- * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Anton Altaparmakov
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -65,6 +65,7 @@
 #include "inode.h"
 #include "runlist.h"
 #include "utils.h"
+#include "version.h"
 
 #if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
 #define BLKGETSIZE	_IO(0x12,96)  /* Get device size in 512-byte blocks. */
@@ -1443,7 +1444,8 @@ int main(int argc, char **argv)
 	unsigned int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
-	Eprintf("%s v%s\n", EXEC_NAME, VERSION);
+	Eprintf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	msg_out = stderr;
 
 	parse_options(argc, argv);

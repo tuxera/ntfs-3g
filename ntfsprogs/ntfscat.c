@@ -2,7 +2,7 @@
  * ntfscat - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2005 Richard Russon
- * Copyright (c) 2003      Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  *
  * This utility will concatenate files and print on the standard output.
  *
@@ -44,6 +44,7 @@
 #include "debug.h"
 #include "dir.h"
 #include "ntfscat.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
@@ -62,10 +63,11 @@ static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
  */
 static void version (void)
 {
-	Printf ("\n%s v%s - Concatenate files and print on the standard output.\n\n",
-		EXEC_NAME, VERSION);
-	Printf ("Copyright (c) 2003 Richard Russon\n");
-	Printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	Printf("\n%s v%s (libntfs %s) - Concatenate files and print on the "
+			"standard output.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
+	Printf("Copyright (c) 2003 Richard Russon\n");
+	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**

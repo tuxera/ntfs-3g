@@ -2,7 +2,7 @@
  * ntfslabel - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Matthew J. Fanto
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will display/change the label on an NTFS partition.
@@ -47,6 +47,7 @@
 #include "debug.h"
 #include "mft.h"
 #include "utils.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfslabel";
 
@@ -72,11 +73,12 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Display, or set, the label for an NTFS Volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf ("\n%s v%s (libntfs %s) - Display, or set, the label for an "
+			"NTFS Volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf ("Copyright (c)\n");
 	printf ("    2002      Matthew J. Fanto\n");
-	printf ("    2002-2004 Anton Altaparmakov\n");
+	printf ("    2002-2005 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

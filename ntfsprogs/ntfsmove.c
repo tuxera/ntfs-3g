@@ -2,7 +2,7 @@
  * ntfsmove - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Richard Russon
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  *
  * This utility will move files on an NTFS volume.
  *
@@ -45,6 +45,7 @@
 #include "dir.h"
 #include "bitmap.h"
 #include "ntfsmove.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsmove";
 static struct options opts;
@@ -67,8 +68,9 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Move files and directories on an NTFS volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf ("\n%s v%s (libntfs %s) - Move files and directories on an "
+			"NTFS volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf ("Copyright (c) 2003 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

@@ -1,7 +1,7 @@
 /**
  * ntfstruncate - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  *
  * This utility will truncate a specified attribute belonging to a
  * specified inode, i.e. file or directory, to a specified length.
@@ -64,6 +64,7 @@
 #include "layout.h"
 #include "volume.h"
 #include "utils.h"
+#include "version.h"
 
 extern const unsigned char attrdef_ntfs12_array[2400];
 
@@ -156,7 +157,7 @@ static void err_exit(const char *fmt, ...)
  */
 static void copyright(void)
 {
-	fprintf(stderr, "Copyright (c) 2002-2003 Anton Altaparmakov\n"
+	fprintf(stderr, "Copyright (c) 2002-2005 Anton Altaparmakov\n"
 			"Copyright (c) 2003 Richard Russon\n"
 			"Truncate a specified attribute of a specified "
 			"inode.\n");
@@ -206,7 +207,8 @@ static void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
+	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF)
 		switch (c) {
 		case 'f':

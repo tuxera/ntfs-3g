@@ -77,6 +77,17 @@
 	- Fix stupid bug in mkntfs which caused it to fail even though only the
 	  backup boot sector could not be written because a 2.4 kernel is used
 	  and the partition has an odd number of sectors.  (Anton)
+	- Add API (actually renamed from what Rich/FlatCap did):
+	  volume.[hc]::ntfs_libntfs_version() which returns a pointer to a
+	  static const string of the libntfs verion, i.e. at the moment this is
+	  "8.0.0".  This required moving the version specifications from
+	  libntfs/Makefile.am to configure.ac.  This should hopefully have the
+	  sideeffect that I will remember to increment it when incrementing the
+	  ntfsprogs version number when making a release given the two are
+	  right under one another.  (Anton)
+	- Change ALL utilities to display the libntfs version they are running
+	  on.  This should make debugging easier in the case that people are
+	  running mismatched utilities/library.  (Anton)
 
 08/08/2005 - 1.11.2 - ntfsdecrypt now works and lots of fixes and improvements.
 

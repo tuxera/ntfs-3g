@@ -1,6 +1,7 @@
 /**
  * ntfsrm - Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This utility will delete files from an NTFS volume.
@@ -46,6 +47,7 @@
 #include "lcnalloc.h"
 #include "mft.h"
 #include "ntfstime.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
@@ -66,8 +68,8 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Delete files from an NTFS volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf("\n%s v%s (libntfs %s) - Delete files from an NTFS volume.\n\n",
+			EXEC_NAME, VERSION, ntfs_libntfs_version());
 	printf ("Copyright (c) 2004 Richard Russon\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

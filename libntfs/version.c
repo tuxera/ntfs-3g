@@ -1,6 +1,7 @@
 /**
- * version.c - Info about the NTFS library. Part of the Linux-NTFS project.
+ * version.c - Info about the NTFS library.  Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -25,17 +26,20 @@
 
 #include "version.h"
 
-#ifndef VERSION
-#define VERSION "unknown"
+#ifdef LTVERSION_LIBNTFS
+#define LIBNTFS_VERSION_STRING LTVERSION_LIBNTFS
+#else
+#define LIBNTFS_VERSION_STRING "unknown"
 #endif
 
-/**
- * ntfs_get_library_version - Version number of the library release
- *
- * Returns a text string representing the release of libntfs, e.g. "1.9.4".
- */
-const char * ntfs_get_library_version (void)
-{
-	return VERSION;
-}
+static const char *libntfs_version_string = LIBNTFS_VERSION_STRING;
 
+/**
+ * ntfs_libntfs_version - query version number of the ntfs library libntfs
+ *
+ * Returns pointer to a text string representing the version of libntfs.
+ */
+const char *ntfs_libntfs_version(void)
+{
+	return libntfs_version_string;
+}

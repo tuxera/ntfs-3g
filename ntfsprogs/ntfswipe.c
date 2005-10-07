@@ -1,6 +1,7 @@
 /**
  * ntfswipe - Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2004 Yura Pakhuchiy
  *
@@ -53,6 +54,7 @@
 #include "debug.h"
 #include "dir.h"
 #include "mst.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;
@@ -70,8 +72,9 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Overwrite the unused space on an NTFS Volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf("\n%s v%s (libntfs %s) - Overwrite the unused space on an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf ("Copyright (c) 2002-2003 Richard Russon\n");
 	printf ("Copyright (c) 2004 Yura Pakhuchiy\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);

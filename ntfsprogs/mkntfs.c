@@ -137,6 +137,7 @@
 #include "runlist.h"
 #include "utils.h"
 #include "ntfstime.h"
+#include "version.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build mkntfs.  \
@@ -282,7 +283,7 @@ static void err_exit(const char *fmt, ...)
  */
 static void copyright(void)
 {
-	fprintf(stderr, "Copyright (c) 2000-2004 Anton Altaparmakov\n"
+	fprintf(stderr, "Copyright (c) 2000-2005 Anton Altaparmakov\n"
 			"Copyright (c) 2001-2003 Richard Russon\n"
 			"Create an NTFS volume on a user specified (block) "
 			"device.\n");
@@ -342,6 +343,7 @@ static void usage(void)
 	exit(1);
 }
 
+#include "version.h"
 /**
  * parse_options
  */
@@ -356,7 +358,8 @@ static void parse_options(int argc, char *argv[])
 //		 logfile size, list of bad blocks, check for bad blocks, ...
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
+	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	while ((c = getopt(argc, argv, "c:fH:h?np:qS:s:vz:CFTIL:QVl")) != EOF)
 		switch (c) {
 		case 'n':

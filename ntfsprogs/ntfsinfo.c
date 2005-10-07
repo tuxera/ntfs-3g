@@ -2,7 +2,7 @@
  * ntfsinfo - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Matthew J. Fanto
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
@@ -76,6 +76,7 @@
 #include "mst.h"
 #include "dir.h"
 #include "ntfstime.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 
@@ -104,11 +105,12 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Display information about an NTFS Volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf ("\n%s v%s (libntfs %s) - Display information about an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf ("Copyright (c)\n");
 	printf ("    2002-2004 Matthew J. Fanto\n");
-	printf ("    2002-2004 Anton Altaparmakov\n");
+	printf ("    2002-2005 Anton Altaparmakov\n");
 	printf ("    2002-2003 Richard Russon\n");
 	printf ("    2003      Leonard Norrgård\n");
 	printf ("    2004-2005 Yura Pakhuchiy\n");

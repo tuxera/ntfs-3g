@@ -68,6 +68,7 @@
 #include "volume.h"
 #include "debug.h"
 #include "dir.h"
+#include "version.h"
 
 const char *ntfs_bugs = "Developers' email address: linux-ntfs-dev@lists.sourceforge.net\n";
 const char *ntfs_home = "Linux NTFS homepage: http://linux-ntfs.sourceforge.net\n";

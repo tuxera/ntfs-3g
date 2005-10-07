@@ -69,6 +69,7 @@
 #include "logfile.h"
 #include "mst.h"
 #include "utils.h"
+#include "version.h"
 
 typedef struct {
 	BOOL is_volume;
@@ -171,19 +172,20 @@ void log_err_exit(u8 *buf, const char *fmt, ...)
 void usage(const char *exec_name) __attribute__ ((noreturn));
 void usage(const char *exec_name)
 {
-	Eprintf("%s v%s - Interpret and display information about the "
-		"journal\n($LogFile) of an NTFS volume.\n"
-		"Copyright (c) 2000-2004 Anton Altaparmakov.\n"
-		"%s is free software, released under the GNU General "
-		"Public License\nand you are welcome to redistribute "
-		"it under certain conditions.\n%s comes with "
-		"ABSOLUTELY NO WARRANTY; for details read the GNU\n"
-		"General Public License to be found in the file "
-		"COPYING in the main Linux-NTFS\ndistribution "
-		"directory.\nUsage: %s device\n    e.g. %s /dev/hda6\n"
-		"Alternative usage: %s -f file\n    e.g. %s -f "
-		"MyCopyOfTheLogFile\n", exec_name, VERSION, exec_name,
-		exec_name, exec_name, exec_name, exec_name, exec_name);
+	Eprintf("%s v%s (libntfs %s) - Interpret and display information "
+			"about the journal\n($LogFile) of an NTFS volume.\n"
+			"Copyright (c) 2000-2005 Anton Altaparmakov.\n"
+			"%s is free software, released under the GNU General "
+			"Public License\nand you are welcome to redistribute "
+			"it under certain conditions.\n%s comes with "
+			"ABSOLUTELY NO WARRANTY; for details read the GNU\n"
+			"General Public License to be found in the file "
+			"COPYING in the main Linux-NTFS\ndistribution "
+			"directory.\nUsage: %s device\n    e.g. %s /dev/hda6\n"
+			"Alternative usage: %s -f file\n    e.g. %s -f "
+			"MyCopyOfTheLogFile\n", exec_name, VERSION,
+			ntfs_libntfs_version(), exec_name, exec_name,
+			exec_name, exec_name, exec_name, exec_name);
 	exit(1);
 }
 

@@ -2,7 +2,7 @@
  * ntfsls - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Lode Leroy
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Anton Altaparmakov
  * Copyright (c) 2003 Richard Russon
  * Copyright (c) 2004 Carmelo Kintana
  * Copyright (c) 2004 Giang Nguyen
@@ -51,6 +51,7 @@
 #include "dir.h"
 #include "list.h"
 #include "ntfstime.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsls";
 
@@ -135,10 +136,11 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version(void)
 {
-	printf("\n%s v%s - Display information about an NTFS Volume.\n\n",
-			EXEC_NAME, VERSION);
+	printf("\n%s v%s (libntfs %s) - Display information about an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf("Copyright (c) 2003 Lode Leroy\n");
-	printf("Copyright (c) 2003 Anton Altaparmakov\n");
+	printf("Copyright (c) 2003-2005 Anton Altaparmakov\n");
 	printf("Copyright (c) 2003 Richard Russon\n");
 	printf("Copyright (c) 2004 Carmelo Kintana\n");
 	printf("Copyright (c) 2004 Giang Nguyen\n");

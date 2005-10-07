@@ -1,6 +1,7 @@
 /**
- * version.h - Info about the NTFS library. Part of the Linux-NTFS project.
+ * version.h - Info about the NTFS library.  Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -22,7 +23,7 @@
 #ifndef _NTFS_VERSION_H_
 #define _NTFS_VERSION_H_
 
-extern const char * ntfs_get_library_version (void);
+extern const char *ntfs_libntfs_version(void);
 
 #endif /* _NTFS_VERSION_H_ */
 

@@ -70,6 +70,7 @@
 #include "debug.h"
 #include "dir.h"
 #include "layout.h"
+#include "version.h"
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
 
@@ -128,8 +129,9 @@ static ntfschar EFS[5] = {
  */
 static void version(void)
 {
-	Printf("\n%s v%s - Decrypt files and print on the standard output.\n\n",
-			EXEC_NAME, VERSION);
+	Printf("\n%s v%s (libntfs %s) - Decrypt files and print on the "
+			"standard output.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	Printf("Copyright (c) 2005 Yuval Fledel\n");
 	Printf("Copyright (c) 2005 Anton Altaparmakov\n");
 	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);

@@ -1,6 +1,7 @@
 /**
  * ntfsmount - Part of the Linux-NTFS project.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
  *
  * NTFS module for FUSE.
@@ -64,6 +65,7 @@
 #include "layout.h"
 #include "index.h"
 #include "utils.h"
+#include "version.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -1322,8 +1324,8 @@ err_exit:
 
 static void usage(void)
 {
-	Eprintf("\n%s v%s - NTFS module for FUSE.\n\n",
-			EXEC_NAME, VERSION);
+	Eprintf("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
+			EXEC_NAME, VERSION, ntfs_libntfs_version());
 	Eprintf("Copyright (c) 2005 Yura Pakhuchiy\n\n");
 	Eprintf("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);

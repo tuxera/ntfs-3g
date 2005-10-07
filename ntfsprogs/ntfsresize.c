@@ -2,7 +2,7 @@
  * ntfsresize - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Szabolcs Szakacsits
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
  * This utility will resize an NTFS volume without data loss.
@@ -64,6 +64,7 @@
 #include "inode.h"
 #include "runlist.h"
 #include "utils.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsresize";
 
@@ -2334,7 +2335,8 @@ int main(int argc, char **argv)
 	s64 device_size;        /* in bytes */
 	ntfs_volume *vol;
 
-	printf("%s v%s\n", EXEC_NAME, VERSION);
+	printf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 
 	if (!parse_options(argc, argv))
 		return 1;

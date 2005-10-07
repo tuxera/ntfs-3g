@@ -25,7 +25,7 @@
 #   - If the interface is the same as the previous version, change to C:R+1:A
 #
 
-LTVERSION_LIBNTFS = 8:0:0
+# For LTVERSION_LIBNTFS see configure.ac!
 LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 
@@ -33,6 +33,8 @@ linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs
 
 lib_LTLIBRARIES = libntfs.la
 libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS)
+libntfs_la_CFLAGS = $(LIBNTFS_CFLAGS) \
+	-DLTVERSION_LIBNTFS=\"$(LTVERSION_LIBNTFS)\"
 libntfs_la_SOURCES =	\
 	attrib.c	\
 	attrlist.c	\
@@ -84,4 +86,3 @@ EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
 MAINTAINERCLEANFILES = Makefile.in
 
 libs:	$(lib_LTLIBRARIES)
-

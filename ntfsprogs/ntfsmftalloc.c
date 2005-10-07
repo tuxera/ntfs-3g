@@ -1,7 +1,7 @@
 /**
  * ntfsmftalloc - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Anton Altaparmakov
+ * Copyright (c) 2002-2005 Anton Altaparmakov
  *
  * This utility will allocate and initialize an mft record.
  *
@@ -63,6 +63,7 @@
 #include "volume.h"
 #include "mft.h"
 #include "utils.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsmftalloc";
 
@@ -146,7 +147,7 @@ static void err_exit(const char *fmt, ...)
  */
 static void copyright(void)
 {
-	fprintf(stderr, "Copyright (c) 2004 Anton Altaparmakov\n"
+	fprintf(stderr, "Copyright (c) 2004-2005 Anton Altaparmakov\n"
 			"Allocate and initialize a base or an extent mft "
 			"record.  If a base mft record\nis not specified, a "
 			"base mft record is allocated and initialized.  "
@@ -194,7 +195,8 @@ static void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s\n", EXEC_NAME, VERSION);
+	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF)
 		switch (c) {
 		case 'f':

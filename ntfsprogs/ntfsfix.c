@@ -73,6 +73,7 @@
 #include "device.h"
 #include "logfile.h"
 #include "utils.h"
+#include "version.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \
@@ -97,7 +98,7 @@ struct {
 static int usage(void) __attribute__((noreturn));
 static int usage(void)
 {
-	printf("%s v%s\n"
+	printf("%s v%s (libntfs %s)\n"
 		   "\n"
 		   "Usage: %s [options] device\n"
 		   "    Attempt to fix an NTFS partition.\n"
@@ -106,7 +107,8 @@ static int usage(void)
 		   "    -V, --version          Display version information\n"
 		   "\n"
 		   "For example: %s /dev/hda6\n\n",
-		   EXEC_NAME, VERSION, EXEC_NAME, EXEC_NAME);
+		   EXEC_NAME, VERSION, ntfs_libntfs_version(), EXEC_NAME,
+		   EXEC_NAME);
 	printf("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }

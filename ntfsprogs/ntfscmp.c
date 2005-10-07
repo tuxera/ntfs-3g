@@ -1,10 +1,10 @@
 /**
  * ntfscmp - compare two NTFS volumes.
  *
+ * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Szabolcs Szakacsits
  *
  * This utility is part of the Linux-NTFS project.
- *
  */
 
 #include "config.h"
@@ -18,6 +18,7 @@
 #include <getopt.h>
 
 #include "utils.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfscmp";
 
@@ -782,7 +783,8 @@ int main(int argc, char **argv)
 	ntfs_volume *vol1;
 	ntfs_volume *vol2;
 
-	printf("%s v%s\n", EXEC_NAME, VERSION);
+	printf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 
 	parse_options(argc, argv);
 

@@ -79,6 +79,7 @@
 #include "utils.h"
 #include "debug.h"
 #include "ntfstime.h"
+#include "version.h"
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
@@ -225,8 +226,9 @@ static int parse_inode_arg (void)
  */
 static void version (void)
 {
-	printf ("\n%s v%s - Recover deleted files from an NTFS Volume.\n\n",
-		EXEC_NAME, VERSION);
+	printf("\n%s v%s (libntfs %s) - Recover deleted files from an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
 	printf ("Copyright (c) 2002-2005 Richard Russon\n"
 		"Copyright (c) 2004-2005 Holger Ohmacht\n");
 	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
