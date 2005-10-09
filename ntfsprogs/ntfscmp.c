@@ -327,15 +327,6 @@ static const char *err2string(int err)
 	return ntfscmp_errs[err]; 
 }
 
-static const char *ret2string(int ret)
-{
-	if (ret == -1)
-		return "FAILED";
-	else if (ret != 0)
-		err_exit("Unhandled return code: %d\n", ret);
-	return "OK";
-}
-
 static const char *pret2str(void *p)
 {
 	if (p == NULL)
@@ -399,6 +390,14 @@ static void print_attribute_name(char *name)
 #define	GET_ATTR_NAME(a) \
 	((ntfschar *)(((u8 *)(a)) + ((a)->name_offset))), ((a)->name_length)
 
+static void free_name(char **name)
+{
+	if (*name) {
+		free(*name);
+		*name = NULL;
+	}
+}
+
 static char *get_attr_name(u64 mft_no,
 			   ATTR_TYPES atype,
 			   const ntfschar *uname, 
@@ -421,6 +420,7 @@ static char *get_attr_name(u64 mft_no,
 	} else if (name_len > 0)
 		return name;
 
+	free_name(&name);
 	return NULL;
 }
 
@@ -446,19 +446,25 @@ static void print_attribute(ATTR_TYPES atype, char *name)
 
 static void print_na(ntfs_attr *na)
 {
+	char *name = get_attr_name_na(na);
 	print_inode_ni(na->ni);
-	print_attribute(na->type, get_attr_name_na(na));
+	print_attribute(na->type, name);
+	free_name(&name);
 }
 
 static void print_attribute_ctx(ntfs_attr_search_ctx *ctx)
 {
-	print_attribute(ctx->attr->type, get_attr_name_ctx(ctx));
+	char *name = get_attr_name_ctx(ctx);
+	print_attribute(ctx->attr->type, name);
+	free_name(&name);
 }
 
 static void print_ctx(ntfs_attr_search_ctx *ctx)
 {
+	char *name = get_attr_name_ctx(ctx);
 	print_inode_ni(base_inode(ctx));
-	print_attribute(ctx->attr->type, get_attr_name_ctx(ctx));
+	print_attribute(ctx->attr->type, name);
+	free_name(&name);
 }
 
 static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
@@ -568,22 +574,36 @@ static void print_attributes(ntfs_inode *ni,
 	Vprintf("\n");
 }
 
+static int new_name(ntfs_attr_search_ctx *ctx, char *prev_name)
+{
+	int ret = 0;
+	char *name = get_attr_name_ctx(ctx);
+	
+	if (prev_name && name) {
+		if (strcmp(prev_name, name) != 0)
+			ret = 1;
+	} else if (prev_name || name)
+		ret = 1;
+
+	free_name(&name);
+	return ret;
+
+}
+
 static int new_attribute(ntfs_attr_search_ctx *ctx,
 			 ATTR_TYPES prev_atype,
 			 char *prev_name)
 {
-	char *name = get_attr_name_ctx(ctx);
-
+	if (!prev_atype && !prev_name)
+		return 1;
+	
 	if (!ctx->attr->non_resident)
 		return 1;
 
 	if (prev_atype != ctx->attr->type)
 		return 1;
 	    
-	if (prev_name && name) {
-		if (strcmp(prev_name, name) != 0)
-			return 1;
-	} else if (prev_name || name)
+	if (new_name(ctx, prev_name))
 		return 1;
 
 	if (opt.verbose) {
@@ -595,26 +615,51 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 	
 	return 0;
 }
-
-static void set_prev(char **prev_name, char *name, char *name_unused,
-		     ATTR_TYPES *prev_atype, ATTR_TYPES atype)
+	
+static void set_prev(char **prev_name, ATTR_TYPES *prev_atype, 
+		     char *name, ATTR_TYPES atype)
 {
-	if (*prev_name)
-		free(*prev_name);
-	*prev_name  = name;
-	
-	free(name_unused);
-	
+	free_name(prev_name);
+	if (name) {
+		*prev_name = strdup(name);
+		if (!*prev_name)
+			perr_exit("strdup error");
+	}
+
 	*prev_atype = atype;
+}
+
+static void set_cmp_attr(ntfs_attr_search_ctx *ctx, ATTR_TYPES *atype, char **name)
+{
+	*atype = ctx->attr->type; 
+	
+	free_name(name);
+	*name = get_attr_name_ctx(ctx);
+}
+
+static int next_attr(ntfs_attr_search_ctx *ctx, ATTR_TYPES *atype, char **name,
+		     int *err)
+{
+	int ret;
+	 
+	ret = ntfs_attrs_walk(ctx);
+	*err = errno;
+       	if (ret) {
+		*atype = AT_END;
+		free_name(name);
+	} else
+		set_cmp_attr(ctx, atype, name);
+	
+	return ret;
 }
 
 static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 {
 	int ret = -1;
-	int ret1 = 0, ret2 = 0;
-	int prev_first = 1;
-	char  *prev_name = NULL, *name1, *name2;
-	ATTR_TYPES prev_atype, atype1, atype2;
+	int old_ret1, ret1 = 0, ret2 = 0;
+	int errno1 = 0, errno2 = 0;
+	char  *prev_name = NULL, *name1 = NULL, *name2 = NULL;
+	ATTR_TYPES old_atype1, prev_atype = 0, atype1, atype2;
 	ntfs_attr_search_ctx *ctx1, *ctx2;
 	
 	if (!(ctx1 = attr_get_search_ctx(ni1)))
@@ -622,58 +667,52 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 	if (!(ctx2 = attr_get_search_ctx(ni2)))
 		goto out;
 	
-	atype1 = ctx1->attr->type; 
-	atype2 = ctx2->attr->type;
+	set_cmp_attr(ctx1, &atype1, &name1);
+	set_cmp_attr(ctx2, &atype2, &name2);
 
 	while (1) {
-		if (atype1 <= atype2)
-			ret1 = ntfs_attrs_walk(ctx1);
-		if (atype1 >= atype2)
-			ret2 = ntfs_attrs_walk(ctx2);
-		
-		atype1 = ctx1->attr->type;
-		atype2 = ctx2->attr->type;
-		name1 = get_attr_name_ctx(ctx1);
-		name2 = get_attr_name_ctx(ctx2);
+
+		old_atype1 = atype1;
+		old_ret1 = ret1;
+		if (!ret1 && (atype1 <= atype2 || ret2))
+			ret1 = next_attr(ctx1, &atype1, &name1, &errno1);
+		if (!ret2 && (old_atype1 >= atype2 || old_ret1))
+			ret2 = next_attr(ctx2, &atype2, &name2, &errno2);
 
 		print_attributes(ni1, atype1, atype2, name1, name2);
-
-		if (atype1 != AT_END && atype2 != AT_END && ret1 != ret2) {
-			print_inode_ni(ni1);
-			printf("attribute_walk:   %s  !=  %s\n",
-			       ret2string(ret1), ret2string(ret2));
+		
+		if (ret1 && ret2) {
+			if (errno1 != errno2) {
+				print_inode_ni(ni1);
+				printf("attribute walk (errno):   %d  !=  %d\n",
+				       errno1, errno2);
+			}
 			break;
 		}
 
-		if (atype1 == atype2) {
-
-			if (atype1 == AT_END)
-				break;
-
-			if (prev_first || new_attribute(ctx1, prev_atype, prev_name)) {
-				prev_first = 0;
-				cmp_attribute(ctx1, ctx2);
-				set_prev(&prev_name, name1, name2, &prev_atype, atype1);
-			}
-		
-		} else if (atype2 == AT_END || atype1 < atype2) {
-			if (prev_first || new_attribute(ctx1, prev_atype, prev_name)) {
-				prev_first = 0;
+		if (ret2 || atype1 < atype2) {
+			if (new_attribute(ctx1, prev_atype, prev_name)) {
 				print_ctx(ctx1);
 				printf("presence:   EXISTS   !=   MISSING\n");
-				set_prev(&prev_name, name1, name2, &prev_atype, atype1);
+				set_prev(&prev_name, &prev_atype, name1, atype1);
 			}
 		
-		} else /* atype1 == AT_END || atype1 > atype2) */ {
-			if (prev_first || new_attribute(ctx2, prev_atype, prev_name)) {
-				prev_first = 0;
+		} else if (ret1 || atype1 > atype2) {
+			if (new_attribute(ctx2, prev_atype, prev_name)) {
 				print_ctx(ctx2);
 				printf("presence:   MISSING  !=  EXISTS \n");
-				set_prev(&prev_name, name2, name1, &prev_atype, atype2);
+				set_prev(&prev_name, &prev_atype, name2, atype2);
+			}
+		
+		} else /* atype1 == atype2 */ {
+			if (new_attribute(ctx1, prev_atype, prev_name)) {
+				cmp_attribute(ctx1, ctx2);
+				set_prev(&prev_name, &prev_atype, name1, atype1);
 			}
 		}
 	}
 
+	free_name(&prev_name);
 	ret = 0;
 	ntfs_attr_put_search_ctx(ctx2);
 out:
@@ -795,6 +834,9 @@ int main(int argc, char **argv)
 
 	if (cmp_inodes(vol1, vol2) != 0)
 		exit(1);
+
+	ntfs_umount(vol1, FALSE);
+	ntfs_umount(vol2, FALSE);
 
 	exit(0);
 }
