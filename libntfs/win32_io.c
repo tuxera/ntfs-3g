@@ -414,8 +414,8 @@ static s64 ntfs_device_win32_getdisklength(HANDLE handle)
  */
 static s64 ntfs_device_win32_getntfssize(HANDLE handle)
 {
-#ifdef FSCTL_GET_NTFS_VOLUME_DATA
 	s64 rvl;
+#ifdef FSCTL_GET_NTFS_VOLUME_DATA
 	DWORD i;
 	NTFS_VOLUME_DATA_BUFFER buf;
 
