@@ -1,4 +1,4 @@
-08/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
+10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
 	- Fix hardcoded location for uninstalling mount.ntfs-fuse hardlink to
 	  match the relocatable location for installing it.  (Anton, Szaka)
