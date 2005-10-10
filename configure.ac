@@ -317,7 +317,7 @@ AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset regcomp setlocale \
+AC_CHECK_FUNCS([atexit fdatasync hasmntopt memmove memset realpath regcomp setlocale \
 	strcasecmp strchr strdup strerror strtol strtoul utime mbsinit \
 	setxattr getopt_long ])
 

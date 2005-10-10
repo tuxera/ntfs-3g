@@ -1375,6 +1375,7 @@ static int parse_options(int argc, char *argv[])
 					err++;
 					break;
 				}
+#ifdef HAVE_REALPATH
 				/* We don't want relative path in /etc/mtab. */
 				if (argv[optind - 1][0] != '/') {
 					if (!realpath(argv[optind - 1],
@@ -1387,6 +1388,9 @@ static int parse_options(int argc, char *argv[])
 					}
 				} else
 					strcpy(opts.device, argv[optind - 1]);
+#else
+				strcpy(opts.device, argv[optind - 1]);
+#endif
 			} else if (!opts.mnt_point)
 				opts.mnt_point = argv[optind - 1];
 			else {
