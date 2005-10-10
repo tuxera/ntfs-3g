@@ -8,6 +8,9 @@
 	  into alternate chroot / other system still works.  (Anton)
 	- ntfscmp: fix some corner cases and all memory leaks; handle corrupt
 	  NTFS more gracefully.  (Szaka)
+	- If the system does not have realpath(), supply our own dummy version
+	  which just copies the string without any kind of checking or
+	  expansion.  (Anton)
 
 07/10/2005 - 1.12.0 - Lots of fixes and enhancements!
 

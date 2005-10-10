@@ -1336,6 +1336,16 @@ static void usage(void)
 	Eprintf("Default options are: \"%s\".\n", def_opts);
 }
 
+#ifndef HAVE_REALPATH
+/* If there is no realpath() on the system, provide a dummy one. */
+static char *realpath(const char *path, char *resolved_path)
+{
+	strncpy(resolved_path, path, PATH_MAX);
+	resolved_path[PATH_MAX] = '\0';
+	return resolved_path;
+}
+#endif
+
 /**
  * parse_options - Read and validate the programs command line
  *
@@ -1375,7 +1385,6 @@ static int parse_options(int argc, char *argv[])
 					err++;
 					break;
 				}
-#ifdef HAVE_REALPATH
 				/* We don't want relative path in /etc/mtab. */
 				if (argv[optind - 1][0] != '/') {
 					if (!realpath(argv[optind - 1],
@@ -1388,9 +1397,6 @@ static int parse_options(int argc, char *argv[])
 					}
 				} else
 					strcpy(opts.device, argv[optind - 1]);
-#else
-				strcpy(opts.device, argv[optind - 1]);
-#endif
 			} else if (!opts.mnt_point)
 				opts.mnt_point = argv[optind - 1];
 			else {

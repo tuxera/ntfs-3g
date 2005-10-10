@@ -1264,6 +1264,17 @@ int ntfs_umount(ntfs_volume *vol,
 }
 
 #ifdef HAVE_MNTENT_H
+
+#ifndef HAVE_REALPATH
+/* If there is no realpath() on the system, provide a dummy one. */
+static char *realpath(const char *path, char *resolved_path)
+{
+	strncpy(resolved_path, path, PATH_MAX);
+	resolved_path[PATH_MAX] = '\0';
+	return resolved_path;
+}
+#endif
+
 /**
  * Internal:
  *
@@ -1277,13 +1288,10 @@ int ntfs_umount(ntfs_volume *vol,
 static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 {
 	struct mntent *mnt;
-#ifdef HAVE_REALPATH
 	char *real_file = NULL, *real_fsname = NULL;
-#endif
 	FILE *f;
 	int err = 0;
 
-#ifdef HAVE_REALPATH
 	real_file = malloc(PATH_MAX + 1);
 	if (!real_file)
 		return -1;
@@ -1296,21 +1304,15 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 		err = errno;
 		goto exit;
 	}
-#endif
 	if (!(f = setmntent(MOUNTED, "r"))) {
 		err = errno;
 		goto exit;
 	}
 	while ((mnt = getmntent(f))) {
-#ifdef HAVE_REALPATH
 		if (!realpath(mnt->mnt_fsname, real_fsname))
 			continue;
 		if (!strcmp(real_file, real_fsname))
 			break;
-#else
-		if (!strcmp(file, mnt->mnt_fsname))
-			break;
-#endif
 	}
 	endmntent(f);
 	if (!mnt)
@@ -1323,12 +1325,9 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 		*mnt_flags |= NTFS_MF_READONLY;
 #endif
 exit:
-#ifdef HAVE_REALPATH
-	if (real_file)
-		free(real_file);
+	free(real_file);
 	if (real_fsname)
 		free(real_fsname);
-#endif
 	if (err) {
 		errno = err;
 		return -1;
