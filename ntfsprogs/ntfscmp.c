@@ -123,7 +123,6 @@ static int err_exit(const char *fmt, ...)
 	exit(1);
 }
 
-#ifdef DEBUG
 /**
  * perr_exit
  *
@@ -146,7 +145,6 @@ static int perr_exit(const char *fmt, ...)
 	fflush(stderr);
 	exit(1);
 }
-#endif /* DEBUG */
 
 /**
  * usage - Print a list of the parameters to the program
