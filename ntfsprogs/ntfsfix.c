@@ -95,7 +95,7 @@ struct {
 	char *volume;
 } opt;
 
-static int usage(void) __attribute__((noreturn));
+__attribute__((noreturn))
 static int usage(void)
 {
 	printf("%s v%s (libntfs %s)\n"
@@ -113,7 +113,7 @@ static int usage(void)
 	exit(1);
 }
 
-static void version(void) __attribute__((noreturn));
+__attribute__((noreturn))
 static void version(void)
 {
 	printf("%s v%s\n\n"

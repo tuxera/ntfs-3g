@@ -67,8 +67,7 @@ GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
 GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
 GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
 
-static void perr_printf(int newline, const char *fmt, ...)
-		__attribute__((format(printf, 2, 3)));
+__attribute__((format(printf, 2, 3)))
 static void perr_printf(int newline, const char *fmt, ...)
 {
 	va_list ap;
@@ -88,8 +87,7 @@ static void perr_printf(int newline, const char *fmt, ...)
 #define perr_print(...)     perr_printf(0, __VA_ARGS__)
 #define perr_println(...)   perr_printf(1, __VA_ARGS__)
 
-static void err_printf(const char *fmt, ...)
-		__attribute__((format(printf, 1, 2)));
+__attribute__((format(printf, 1, 2)))
 static void err_printf(const char *fmt, ...)
 {
 	va_list ap;
@@ -107,9 +105,8 @@ static void err_printf(const char *fmt, ...)
  *
  * Print and error message and exit the program.
  */
-static int err_exit(const char *fmt, ...)
-		__attribute__((noreturn))
-		__attribute__((format(printf, 1, 2)));
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
 static int err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -128,9 +125,8 @@ static int err_exit(const char *fmt, ...)
  *
  * Print and error message and exit the program
  */
-static int perr_exit(const char *fmt, ...)
-		__attribute__((noreturn))
-		__attribute__((format(printf, 1, 2)));
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
 static int perr_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -153,7 +149,7 @@ static int perr_exit(const char *fmt, ...)
  *
  * Return:  none
  */
-static void usage(void) __attribute__((noreturn));
+__attribute__((noreturn))
 static void usage(void)
 {
 

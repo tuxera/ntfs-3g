@@ -225,8 +225,7 @@ struct {
 /**
  * mkDprintf - debugging output (-vv); overridden by quiet (-q)
  */
-static void mkDprintf(const char *fmt, ...)
-		__attribute__((format(printf, 1, 2)));
+__attribute__((format(printf, 1, 2)))
 static void mkDprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -262,9 +261,8 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
-static void err_exit(const char *fmt, ...)
-		__attribute__((noreturn))
-		__attribute__((format(printf, 1, 2)));
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
 static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -300,7 +298,7 @@ static void license(void)
 /**
  * usage - print a list of the parameters to the program
  */
-static void usage(void) __attribute__ ((noreturn));
+__attribute__ ((noreturn))
 static void usage(void)
 {
 	copyright();
@@ -987,7 +985,7 @@ static void dump_attr_record(ATTR_RECORD *a)
 /**
  * dump_mft_record
  */
-static void dump_mft_record(MFT_RECORD *m) __attribute__((unused));
+__attribute__((unused))
 static void dump_mft_record(MFT_RECORD *m)
 {
 	ATTR_RECORD *a;

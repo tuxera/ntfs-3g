@@ -100,8 +100,7 @@ struct {
 /**
  * mkDprintf - debugging output (-vv); overridden by quiet (-q)
  */
-static void mkDprintf(const char *fmt, ...)
-		__attribute__((format(printf, 1, 2)));
+__attribute__((format(printf, 1, 2)))
 static void mkDprintf(const char *fmt, ...)
 {
 	va_list ap;
@@ -137,9 +136,8 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
-static void err_exit(const char *fmt, ...)
-		__attribute__((noreturn))
-		__attribute__((format(printf, 1, 2)));
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
 static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
@@ -174,8 +172,8 @@ static void license(void)
 /**
  * usage - print a list of the parameters to the program
  */
-void usage(void) __attribute__ ((noreturn));
-void usage (void)
+__attribute__ ((noreturn))
+static void usage (void)
 {
 	copyright();
 	fprintf(stderr, "Usage: %s [options] device inode [attr-type "

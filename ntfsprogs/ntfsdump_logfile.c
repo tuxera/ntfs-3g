@@ -120,10 +120,9 @@ static int logfile_close(logfile_file *logfile)
  * Use when you wish to exit and collate all the cleanups together.
  * if you don't have some parameter to pass, just pass NULL.
  */
-void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
-		ntfs_attr *na, const char *fmt, ...) __attribute__ ((noreturn))
-		__attribute__ ((format(printf, 4, 5)));
-void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
+__attribute__ ((noreturn))
+__attribute__ ((format(printf, 4, 5)))
+static void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
 		ntfs_attr *na, const char *fmt, ...)
 {
 	va_list ap;
@@ -148,9 +147,9 @@ void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
 /**
  * log_err_exit -
  */
-void log_err_exit(u8 *buf, const char *fmt, ...) __attribute__ ((noreturn))
-		__attribute__((format(printf, 2, 3)));
-void log_err_exit(u8 *buf, const char *fmt, ...)
+__attribute__ ((noreturn))
+__attribute__((format(printf, 2, 3)))
+static void log_err_exit(u8 *buf, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -169,8 +168,8 @@ void log_err_exit(u8 *buf, const char *fmt, ...)
 /**
  * usage -
  */
-void usage(const char *exec_name) __attribute__ ((noreturn));
-void usage(const char *exec_name)
+__attribute__ ((noreturn))
+static void usage(const char *exec_name)
 {
 	Eprintf("%s v%s (libntfs %s) - Interpret and display information "
 			"about the journal\n($LogFile) of an NTFS volume.\n"
