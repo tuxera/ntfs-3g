@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.12.1],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.12.2-WIP],[linux-ntfs-dev@lists.sourceforge.net])
 
 #
 # Before making a release, the LTVERSION string should be modified.
@@ -50,7 +50,7 @@ AC_INIT([ntfsprogs],[1.12.1],[linux-ntfs-dev@lists.sourceforge.net])
 #
 #   - If the interface is the same as the previous version, change to C:R+1:A
 #
-LTVERSION_LIBNTFS="8:1:0"
+LTVERSION_LIBNTFS="9:0:0"
 AC_SUBST(LTVERSION_LIBNTFS)
 
 AC_CANONICAL_HOST([])

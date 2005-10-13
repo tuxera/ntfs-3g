@@ -26,8 +26,6 @@
 #include "types.h"
 #include "layout.h"
 
-extern const u8 legal_ansi_char_array[0x40];
-
 extern BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
 		const ntfschar *s2, size_t s2_len, const IGNORE_CASE_BOOL ic,
 		const ntfschar *upcase, const u32 upcase_size);

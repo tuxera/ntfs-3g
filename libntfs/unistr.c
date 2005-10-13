@@ -53,7 +53,8 @@
  * This is used by the name collation functions to quickly determine what
  * characters are (in)valid.
  */
-const u8 legal_ansi_char_array[0x40] = {
+#if 0
+static const u8 legal_ansi_char_array[0x40] = {
 	0x00, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10,
 	0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10,
 
@@ -66,6 +67,7 @@ const u8 legal_ansi_char_array[0x40] = {
 	0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
 	0x17, 0x17, 0x04, 0x16, 0x18, 0x16, 0x18, 0x18,
 };
+#endif
 
 /**
  * ntfs_names_are_equal - compare two Unicode names for equality
@@ -118,8 +120,9 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
  */
 int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
-		const int err_val, const IGNORE_CASE_BOOL ic,
-		const ntfschar *upcase, const u32 upcase_len)
+		const int err_val __attribute__((__unused__)),
+		const IGNORE_CASE_BOOL ic, const ntfschar *upcase,
+		const u32 upcase_len)
 {
 	u32 cnt;
 	ntfschar c1, c2;
@@ -130,8 +133,7 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		exit(1);
 	}
 #endif
-	for (cnt = 0; cnt < min(name1_len, name2_len); ++cnt)
-	{
+	for (cnt = 0; cnt < min(name1_len, name2_len); ++cnt) {
 		c1 = le16_to_cpu(*name1);
 		name1++;
 		c2 = le16_to_cpu(*name2);
@@ -142,8 +144,10 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 			if (c2 < upcase_len)
 				c2 = le16_to_cpu(upcase[c2]);
 		}
+#if 0
 		if (c1 < 64 && legal_ansi_char_array[c1] & 8)
 			return err_val;
+#endif
 		if (c1 < c2)
 			return -1;
 		if (c1 > c2)
@@ -154,9 +158,11 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 	if (name1_len == name2_len)
 		return 0;
 	/* name1_len > name2_len */
+#if 0
 	c1 = le16_to_cpu(*name1);
 	if (c1 < 64 && legal_ansi_char_array[c1] & 8)
 		return err_val;
+#endif
 	return 1;
 }
 
