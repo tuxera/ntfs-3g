@@ -1813,8 +1813,8 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		 * attribute.
 		 */
 		if ((type == AT_UNUSED) && is_first_search &&
-				le16_to_cpu(al_entry->type) >
-				le16_to_cpu(AT_ATTRIBUTE_LIST))
+				le32_to_cpu(al_entry->type) >
+				le32_to_cpu(AT_ATTRIBUTE_LIST))
 			goto find_attr_list_attr;
 	} else {
 		al_entry = (ATTR_LIST_ENTRY*)((char*)ctx->al_entry +
@@ -1825,10 +1825,10 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 		 * attribute list attribute from the base mft record as it is
 		 * not listed in the attribute list itself.
 		 */
-		if ((type == AT_UNUSED) && le16_to_cpu(ctx->al_entry->type) <
-				le16_to_cpu(AT_ATTRIBUTE_LIST) &&
-				le16_to_cpu(al_entry->type) >
-				le16_to_cpu(AT_ATTRIBUTE_LIST)) {
+		if ((type == AT_UNUSED) && le32_to_cpu(ctx->al_entry->type) <
+				le32_to_cpu(AT_ATTRIBUTE_LIST) &&
+				le32_to_cpu(al_entry->type) >
+				le32_to_cpu(AT_ATTRIBUTE_LIST)) {
 			int rc;
 find_attr_list_attr:
 
