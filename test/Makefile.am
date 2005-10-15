@@ -15,6 +15,8 @@ LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
 bin_PROGRAMS		= runlist
 
+EXTRA_DIST = runlist-data
+
 CLEANFILES		= attr[123].bin frag[123][123][123] pure-[cn][ms] zero
 MAINTAINERCLEANFILES	= Makefile.in
 
