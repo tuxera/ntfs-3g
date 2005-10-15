@@ -2386,6 +2386,9 @@ typedef struct {
  *
  * Note all the below are best guesses so may have mistakes/inaccuracies.
  * Corrections/clarifications/additions are always welcome!
+ *
+ * Ntfs.sys takes an EFS value length of <= 0x54 or > 0x40000 to BSOD, i.e. it
+ * is invalid.
  */
 
 /* The header of the 0x100 attribute named "$EFS". */
