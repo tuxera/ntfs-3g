@@ -368,7 +368,8 @@ static void ntfs_crypto_deinit(void)
 static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 		gnutls_x509_privkey_t priv_key)
 {
-	int i, j, tmp_size;
+	int i, j;
+	size_t tmp_size;
 	gnutls_datum_t rd[6];
 	gcry_mpi_t rm[6];
 	gcry_sexp_t rsa_key;
@@ -577,6 +578,21 @@ static inline void ntfs_buffer_reverse(u8 *buf, unsigned buf_size)
 	}
 }
 
+#ifndef HAVE_STRNLEN
+/**             
+ *  * strnlen - strnlen is a gnu extension so emulate it if not present
+ *   */     
+static size_t strnlen(const char *s, size_t maxlen)
+{       
+	const char *p, *end;
+
+	/* Look for a '\0' character. */
+	for (p = s, end = s + maxlen; p < end && *p; p++)
+		;
+	return p - s;
+}
+#endif /* ! HAVE_STRNLEN */
+
 /**
  * ntfs_raw_fek_decrypt -
  *
@@ -648,7 +664,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	 * Finally, remove the PKCS#1 padding and return the size of the
 	 * decrypted FEK.
 	 */
-	padding = strnlen(fek, size) + 1;
+	padding = strnlen((char *)fek, size) + 1;
 	if (padding > size) {
 		fprintf(stderr, "Failed to remove PKCS#1 padding from "
 				"decrypted file encryption key.\n");
@@ -669,8 +685,8 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 static gcry_error_t ntfs_desx_key_expand(const u8 *src, u32 *des_key,
 		u64 *out_whitening, u64 *in_whitening)
 {
-	static const u8 *salt1 = "Dan Simon  ";
-	static const u8 *salt2 = "Scott Field";
+	static const u8 *salt1 = (const u8*)"Dan Simon  ";
+	static const u8 *salt2 = (const u8*)"Scott Field";
 	static const int salt_len = 12;
 	gcry_md_hd_t hd1, hd2;
 	u32 *md;
@@ -1107,7 +1123,7 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 {
 	int bufsize = 512;
-	char *buffer;
+	unsigned char *buffer;
 	ntfs_attr *attr;
 	s64 bytes_read, written, offset, total;
 	s64 old_data_size, old_initialized_size;
@@ -1176,12 +1192,14 @@ static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
  */
 int main(int argc, char *argv[])
 {
-	u8 *pfx_buf, *password;
+	u8 *pfx_buf;
+	char *password;
 	ntfs_rsa_private_key rsa_key;
 	ntfs_volume *vol;
 	ntfs_inode *inode;
 	ntfs_fek *fek;
-	int pfx_size, res;
+	unsigned pfx_size;
+	int res;
 
 	if (!parse_options(argc, argv))
 		return 1;

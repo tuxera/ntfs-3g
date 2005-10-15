@@ -6,7 +6,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- Rewrite gcc version detection logic using the -dumpversion option.
 	  Tested on various OS and architectures and gcc versions from 2.95 to
 	  4.0.1 with some weird ones like 3.5-blah thrown in, too.  (Anton)
-	- Fix bogus le16_to_cpu() which shouldbe le32_to_cpu() when accessing
+	- Fix bogus le16_to_cpu() which should be le32_to_cpu() when accessing
 	  the attribute list entry attribute type in some places in
 	  libntfs/attrib.c.  (Anton)
 	- Fix silly bug introduced in 1.12.0 which breaks ntfsfix (and others
@@ -19,6 +19,10 @@ xx/xx/2005 - 1.12.2-WIP
 	  distribution otherwise make test fails on released sources.  Solution
 	  is not perfect as it also adds the test/runlist-data/CVS directory
 	  but it will do at least for me.  (Anton)
+	- Fix compilation and warnings in ntfsdecrypt.c on OSX/gcc4.0.1.  The
+	  compilation failure was because we use strnlen() which is gnu
+	  specific and not present on my current version of OSX so ntfsdecrypt
+	  now provides own version if it is not present on system.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

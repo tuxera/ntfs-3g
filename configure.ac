@@ -317,9 +317,9 @@ AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit fdatasync getopt_long hasmntopt mbsinit memmove memset \
-	realpath regcomp setlocale setxattr strcasecmp strchr strdup strerror \
-	strtol strtoul utime])
+AC_CHECK_FUNCS([atexit dup2 fdatasync getopt_long hasmntopt mbsinit memmove \
+	memset realpath regcomp setlocale setxattr strcasecmp strchr strdup \
+	strerror strnlen strtol strtoul utime])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([
