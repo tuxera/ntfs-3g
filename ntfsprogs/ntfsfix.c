@@ -210,7 +210,7 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 	c = (VOLUME_INFORMATION*)(le16_to_cpu(a->value_offset) + (char*)a);
 	/* Sanity checks. */
 	if ((char*)c + le32_to_cpu(a->value_length) >
-			le16_to_cpu(m->bytes_in_use) + (char*)m ||
+			(char*)m + le32_to_cpu(m->bytes_in_use) ||
 			le16_to_cpu(a->value_offset) +
 			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
 		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "

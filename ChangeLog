@@ -23,6 +23,9 @@ xx/xx/2005 - 1.12.2-WIP
 	  compilation failure was because we use strnlen() which is gnu
 	  specific and not present on my current version of OSX so ntfsdecrypt
 	  now provides own version if it is not present on system.  (Anton)
+	- Fix endianness bug (le16 instead of le32 when accessing mft record
+	  bytes_in_use) in volume.c::ntfs_volume_write_flags() and
+	  ntfsfix.c::OLD_ntfs_volume_set_flags().  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

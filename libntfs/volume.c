@@ -1509,9 +1509,9 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	/* Get a pointer to the value of the attribute. */
 	c = (VOLUME_INFORMATION*)(le16_to_cpu(a->value_offset) + (char*)a);
 	/* Sanity checks. */
-	if ((char*)c + le32_to_cpu(a->value_length) >
-			le16_to_cpu(ctx->mrec->bytes_in_use) +
-			(char*)ctx->mrec || le16_to_cpu(a->value_offset) +
+	if ((char*)c + le32_to_cpu(a->value_length) > (char*)ctx->mrec +
+			le32_to_cpu(ctx->mrec->bytes_in_use) ||
+			le16_to_cpu(a->value_offset) +
 			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
 		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "
 				"corrupt!");
