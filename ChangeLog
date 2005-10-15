@@ -12,6 +12,9 @@ xx/xx/2005 - 1.12.2-WIP
 	- Fix silly bug introduced in 1.12.0 which breaks ntfsfix (and others
 	  possibly) when calling ntfs_attr_lookup() with AT_UNNAMED name and
 	  no ntfs inode in the search context.  (Anton)
+	- Fix compilation on OSX in ntfsresize.c where stderr = stdout is not
+	  legal (but happens to work on Linux) to do proper low-level file
+	  descriptor mangling which is portable.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
