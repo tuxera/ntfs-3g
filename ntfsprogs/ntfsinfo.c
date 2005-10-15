@@ -807,7 +807,7 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 	ace = (ACCESS_ALLOWED_ACE *)((char *)acl + 8);
 
 	/* iterate through ACE's */
-	for (i=0;i<acl->ace_count;i++) {
+	for (i=1;i<ace_count;i++) {
 		const char *ace_type;
 		char *sid;
 
@@ -893,12 +893,12 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	printf("\tFlags:\t\t\t 0x%0x\n",sec_desc_attr->control);
 
 	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc_attr +
-		sec_desc_attr->owner), NULL, 0);
+		le32_to_cpu(sec_desc_attr->owner)), NULL, 0);
 	printf("\tOwner SID:\t\t %s\n",sid);
 	free(sid);
 
 	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc_attr +
-		sec_desc_attr->group), NULL, 0);
+		le32_to_cpu(sec_desc_attr->group)), NULL, 0);
 	printf("\tGroup SID:\t\t %s\n",sid);
 	free(sid);
 
@@ -909,7 +909,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 		}
 		printf("\n");
 		ntfs_dump_acl("\t\t",(ACL *)((char *)sec_desc_attr +
-			sec_desc_attr->sacl));
+			le32_to_cpu(sec_desc_attr->sacl)));
 	} else {
 		printf("missing\n");
 	}
@@ -921,7 +921,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 		}
 		printf("\n");
 		ntfs_dump_acl("\t\t",(ACL *)((char *)sec_desc_attr +
-			sec_desc_attr->dacl));
+			le32_to_cpu(sec_desc_attr->dacl)));
 	} else {
 		printf("missing\n");
 	}
