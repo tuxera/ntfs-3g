@@ -1576,7 +1576,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		upcase = vol->upcase;
 		upcase_len = vol->upcase_len;
 	} else {
-		if (name) {
+		if (name && name != AT_UNNAMED) {
 			errno = EINVAL;
 			return -1;
 		}
@@ -2187,9 +2187,9 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 	ntfs_volume *vol;
 	ntfs_inode *base_ni;
 
-	if (!ctx || !ctx->mrec || !ctx->attr || (name && (!ctx->ntfs_ino ||
-			!(vol = ctx->ntfs_ino->vol) || !vol->upcase ||
-			!vol->upcase_len))) {
+	if (!ctx || !ctx->mrec || !ctx->attr || (name && name != AT_UNNAMED &&
+			(!ctx->ntfs_ino || !(vol = ctx->ntfs_ino->vol) ||
+			!vol->upcase || !vol->upcase_len))) {
 		errno = EINVAL;
 		return -1;
 	}
