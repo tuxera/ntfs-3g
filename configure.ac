@@ -240,9 +240,9 @@ fi
 
 # Check for gcc version being >= 2.96.
 AC_MSG_CHECKING(version of $_cc)
-cc_version=`getgccver $_cc version`
-cc_major=`getgccver $_cc major`
-cc_minor=`getgccver $_cc minor`
+cc_version=`$srcdir/getgccver $_cc version`
+cc_major=`$srcdir/getgccver $_cc major`
+cc_minor=`$srcdir/getgccver $_cc minor`
 if test -z "$cc_version"; then
 	cc_version="v. ?.??"
 	cc_major=1
