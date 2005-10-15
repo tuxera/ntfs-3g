@@ -26,6 +26,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- Fix endianness bug (le16 instead of le32 when accessing mft record
 	  bytes_in_use) in volume.c::ntfs_volume_write_flags() and
 	  ntfsfix.c::OLD_ntfs_volume_set_flags().  (Anton)
+	- Fix endianness bug in ntfsinfo.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
