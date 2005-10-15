@@ -209,7 +209,7 @@ if test "$enable_crypto" != "no"; then
 		fi
 	])
 	have_libgnutls=false
-	AM_PATH_LIBGNUTLS(1.2.3, [ have_libgnutls=true ],
+	AM_PATH_LIBGNUTLS(1.2.8, [ have_libgnutls=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gnutls library.])
@@ -240,7 +240,7 @@ fi
 
 # Check for gcc version being >= 2.96.
 AC_MSG_CHECKING(version of $_cc)
-cc_version=`$srcdir/getgccver $_cc`
+cc_version=`$_cc -dumpversion`
 cc_major=`echo $cc_version | cut -d'.' -f1`
 cc_minor=`echo $cc_version | cut -d'.' -f2`
 if test -z "$cc_version"; then

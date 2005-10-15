@@ -3,6 +3,9 @@ xx/xx/2005 - 1.12.2-WIP
 	- Temporarily disable use of the legal ansi character checking in
 	  libntfs/unistr.c::ntfs_names_collate() pending a proper fix at some
 	  point.  (Anton)
+	- Remove getgccver script and just get the version with the simple gcc
+	  option -dumpversion.  I wish I had known about it earlier!  Tested on
+	  various architectures and versions from 2.95 to 4.0.1.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
