@@ -802,9 +802,9 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 		if (flags & DM_INDENT)
 			printf ("\t");
 		if (flags & DM_BOLD)
-			printf ("[01m");
+			printf ("\e[01m");
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			printf ("[%dm", col);
+			printf ("\e[%dm", col);
 		if (off == s)
 			printf("%6.6x ", start);
 		else
@@ -830,7 +830,7 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 			}
 		}
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			printf ("[0m");
+			printf ("\e[0m");
 		printf ("\n");
 	}
 }
