@@ -4584,7 +4584,7 @@ static int ntfs_file_add2 (ntfs_volume *vol, char *filename)
 	char *ptr = NULL;
 	char *dirname = NULL;
 	struct ntfs_find find;
-	INDEX_ENTRY *ie;
+	INDEX_ENTRY *ie = NULL;
 	ntfschar *uname = NULL;
 	int uname_len = 0;
 	ntfs_inode *ino = NULL;
