@@ -268,7 +268,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 				i = -1;
 				break;
 			}
-			/* 
+			/*
 			 * ElectricFence is unhappy with realloc(x,0) as free(x)
 			 * thus we explicitly separate these two cases.
 			 */

@@ -1279,7 +1279,7 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 search:
 	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
 			0, NULL, 0, actx)) {
-		errno = 0;			
+		errno = 0;
 		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
 				le16_to_cpu(actx->attr->value_offset));
 		if (looking_for_dos_name) {
@@ -1351,7 +1351,7 @@ search:
 	/*
 	 * If hard link count is not equal to zero then we are done. In other
 	 * case there are no reference to this inode left, so we should free all
-	 * non-resident atributes and mark inode as not in use. 
+	 * non-resident atributes and mark inode as not in use.
 	 */
 	if (ni->mrec->link_count)
 		goto out;
@@ -1485,7 +1485,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 			ni->mrec->link_count) + 1);
 	/*
 	 * Do not set attributes and file size, instead of this mark filenames
-	 * dirty to force attribute and size update during sync. 
+	 * dirty to force attribute and size update during sync.
 	 * NOTE: File size may will be not updated and not all attributes will
 	 * be set, but it is acceptable since windows driver does not update
 	 * all file names when one of the hard links changed.

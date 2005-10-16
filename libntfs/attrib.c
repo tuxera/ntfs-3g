@@ -2271,7 +2271,7 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
  * Note: For low level utilities which know what they are doing we allow @ni to
  * be NULL and @mrec to be set.  Do NOT do this unless you understand the
  * implications!!!  For example it is no longer safe to call ntfs_attr_lookup()
- * if you 
+ * if you
  */
 ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 {
@@ -3013,7 +3013,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		is_resident = TRUE;
 		/* Check if it is better to make attribute non resident. */
 		if (!ntfs_attr_can_be_non_resident(ni->vol, type) &&
-				offsetof(ATTR_RECORD, resident_end) + size >= 
+				offsetof(ATTR_RECORD, resident_end) + size >=
 				offsetof(ATTR_RECORD, non_resident_end) + 8)
 			/* Make it non resident. */
 			is_resident = FALSE;

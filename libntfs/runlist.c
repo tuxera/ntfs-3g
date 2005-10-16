@@ -1734,7 +1734,7 @@ static void test_rl_dump_runlist (const runlist_element *rl)
 
 	if (abbr)
 		for (len = 0; rl[len].length; len++) ;
-	
+
 	printf("     VCN      LCN      len\n");
 	for (i = 0; ; i++, rl++) {
 		LCN lcn = rl->lcn;

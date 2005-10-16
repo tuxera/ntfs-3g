@@ -986,7 +986,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				ntfs_attr_close(mft);
 				return -1;
 			}
-			
+
 			ntfs_attr_close(mft);
 		}
 

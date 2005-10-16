@@ -2481,5 +2481,5 @@ typedef struct {
 } __attribute__ ((__packed__)) EFS_DF_CERTIFICATE_THUMBPRINT_HEADER;
 
 typedef EFS_DF_CERTIFICATE_THUMBPRINT_HEADER EFS_DF_CERT_THUMBPRINT_HEADER;
-	
+
 #endif /* defined _NTFS_LAYOUT_H */
