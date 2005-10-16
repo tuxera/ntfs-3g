@@ -2330,6 +2330,31 @@ static void check_resize_constraints(ntfs_resize_t *resize)
 	print_num_of_relocations(resize);
 }
 
+static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
+{
+	memset(fsck, 0, sizeof(ntfsck_t));
+
+	if (opt.show_progress)
+		fsck->flags |= NTFSCK_PROGBAR;
+
+	if (setup_lcn_bitmap(&fsck->lcn_bitmap, vol->nr_clusters) != 0)
+		perr_exit("Failed to setup allocation bitmap");
+	if (build_allocation_bitmap(vol, fsck) != 0)
+		exit(1);
+	if (fsck->outsider || fsck->multi_ref) {
+		err_printf("Filesystem check failed!\n");
+		if (fsck->outsider)
+			err_printf("%d clusters are referenced outside "
+				   "of the volume.\n", fsck->outsider);
+		if (fsck->multi_ref)
+			err_printf("%d clusters are referenced multiply"
+				   " times.\n", fsck->multi_ref);
+		printf("%s", corrupt_volume_msg);
+		exit(1);
+	}
+	
+	compare_bitmaps(vol, &fsck->lcn_bitmap);
+}
 
 int main(int argc, char **argv)
 {
@@ -2388,26 +2413,7 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
-	memset(&fsck, 0, sizeof(fsck));
-	if (opt.show_progress)
-		fsck.flags |= NTFSCK_PROGBAR;
-
-	if (setup_lcn_bitmap(&fsck.lcn_bitmap, vol->nr_clusters) != 0)
-		perr_exit("Failed to setup allocation bitmap");
-	if (build_allocation_bitmap(vol, &fsck) != 0)
-		exit(1);
-	if (fsck.outsider || fsck.multi_ref) {
-		err_printf("Filesystem check failed!\n");
-		if (fsck.outsider)
-			err_printf("%d clusters are referenced outside "
-				   "of the volume.\n", fsck.outsider);
-		if (fsck.multi_ref)
-			err_printf("%d clusters are referenced multiply"
-				   " times.\n", fsck.multi_ref);
-		printf("%s", corrupt_volume_msg);
-		exit(1);
-	}
-	compare_bitmaps(vol, &fsck.lcn_bitmap);
+	check_cluster_allocation(vol, &fsck);
 
 	print_disk_usage(vol, fsck.inuse);
 
