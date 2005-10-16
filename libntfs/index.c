@@ -207,7 +207,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 			le16_to_cpu(actx->attr->value_offset));
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* Save index block size for future use. */
-	ictx->block_size = ir->index_block_size;
+	ictx->block_size = le32_to_cpu(ir->index_block_size);
 	/* Get collation rule type and validate it. */
 	cr = ir->collation_rule;
 	if (!ntfs_is_collation_rule_supported(cr)) {
