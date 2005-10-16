@@ -28,7 +28,9 @@ xx/xx/2005 - 1.12.2-WIP
 	  ntfsfix.c::OLD_ntfs_volume_set_flags().  (Anton)
 	- Fix endianness bugs in ntfsinfo.  (Anton)
 	- Fix endianness bug in libntfs/index.c.  (Anton)
-
+	- ntfsresize: check and report bad sectors before cluster allocation
+	  check because chkdsk doesn't fix $Bitmap with bad sectors.  (Szaka)
+	    
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
 	- Fix hardcoded location for uninstalling mount.ntfs-fuse hardlink to

@@ -692,13 +692,6 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 	if ((ret = has_bad_sectors(resize, 1)) != 0) {
 		if (ret == -1)
 			exit(1);
-		if (NInoAttrList(resize->ni))
-			err_exit("Hopelessly many bad sectors! Not supported.");
-		if (resize->badclusters == 0)
-			printf("WARNING: The disk has bad sector! "
-			       "This can cause reliability problems!\n");
-		resize->badclusters += last_lcn - rl->lcn + 1;
-		Vprintf("Bad clusters: %8lld - %lld\n", rl->lcn, last_lcn);
 		return;
 	}
 	
@@ -1773,7 +1766,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 
 		if (highest_vcn == resize->mft_highest_vcn)
 			err_exit("Sanity check failed! Highest_vcn = %lld. "
-				 "Please report!", highest_vcn);
+				 "Please report!\n", highest_vcn);
 	}
 done:
 	if (resize->mrec)
@@ -2039,6 +2032,56 @@ static void lookup_data_attr(ntfs_volume *vol,
 		free(ustr);
 }
 
+static int check_bad_sectors(ntfs_volume *vol)
+{
+	ntfs_attr_search_ctx *ctx;
+	runlist *rl;
+	s64 i, badclusters = 0;
+	
+	Vprintf("Checking for bad sectors ...\n");
+
+	lookup_data_attr(vol, FILE_BadClus, "$Bad", &ctx);
+	
+	if (NInoAttrList(ctx->ntfs_ino))
+		err_exit("Hopelessly many bad sectors! Please report to "
+			 "linux-ntfs@lists.sf.net\n");
+	
+	if (!ctx->attr->non_resident)
+		err_exit("Resident attribute in $BadClust! Please report to "
+			 "linux-ntfs@lists.sf.net\n");
+
+	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
+		perr_exit("Decompressing $BadClust:$Bad mapping pairs failed");
+	
+	for (i = 0; rl[i].length; i++) {
+		/* CHECKME: LCN_RL_NOT_MAPPED check isn't needed */
+		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
+			continue;
+		
+		badclusters += rl[i].length;
+		Vprintf("Bad cluster: %8lld - %lld\n", rl[i].lcn, 
+			rl[i].lcn + rl[i].length - 1);
+	}
+
+	if (badclusters) {
+		printf("%sThis software has detected that the disk has at least"
+		       " %lld bad sector%s.\n", 
+		       !opt.badsectors ? NERR_PREFIX : "WARNING: ",
+		       badclusters, badclusters - 1 ? "s" : "");
+		if (!opt.badsectors) {
+			printf("%s", bad_sectors_warning_msg);
+			exit(1);
+		} else 
+			printf("WARNING: Bad sectors can cause reliability "
+			       "problems and massive data loss!!!\n");
+	}
+
+	free(rl);
+	ntfs_attr_put_search_ctx(ctx);
+
+	return badclusters;
+}
+
 /**
  * truncate_badclust_file
  *
@@ -2293,17 +2336,6 @@ static void check_resize_constraints(ntfs_resize_t *resize)
 {
 	s64 new_size = resize->new_volume_size;
 
-	if (resize->badclusters) {
-		printf("%sThe NTFS volume has at least %lld bad sector%s.\n",
-		       !opt.badsectors ? NERR_PREFIX : "",
-		       resize->badclusters,
-		       resize->badclusters  - 1 ? "s" : "");
-		if (!opt.badsectors) {
-			printf("%s", bad_sectors_warning_msg);
-			exit(1);
-		}
-	}
-		
 	/* FIXME: resize.shrink true also if only -i is used */
 	if (!resize->shrink)
 		return;
@@ -2412,22 +2444,28 @@ int main(int argc, char **argv)
 		printf("Nothing to do: NTFS volume size is already OK.\n");
 		exit(0);
 	}
-
+	
+	memset(&resize, 0, sizeof(resize));
+	resize.vol = vol;
+	resize.new_volume_size = new_size;
+	/* This is also true if --info was used w/o --size (new_size = 0) */
+	if (new_size < vol->nr_clusters)
+		resize.shrink = 1;
+	if (opt.show_progress)
+		resize.progress.flags |= NTFS_PROGBAR;
+	/* 
+	 * Checking and __reporting__ of bad sectors must be done before cluster
+	 * allocation check because chkdsk doesn't fix $Bitmap's w/ bad sectors
+	 * thus users would (were) quite confused why chkdsk doesn't work.
+	 */  
+	resize.badclusters = check_bad_sectors(vol);
+	
 	check_cluster_allocation(vol, &fsck);
 
 	print_disk_usage(vol, fsck.inuse);
 
-	memset(&resize, 0, sizeof(resize));
-	resize.new_volume_size = new_size;
 	resize.inuse = fsck.inuse;
 	resize.lcn_bitmap = fsck.lcn_bitmap;
-	resize.vol = vol;
-	if (opt.show_progress)
-		resize.progress.flags |= NTFS_PROGBAR;
-
-	/* This is also true if --info was used w/o --size (new_size = 0) */
-	if (new_size < vol->nr_clusters)
-		resize.shrink = 1;
 
 	set_resize_constraints(&resize);
 	set_disk_usage_constraint(&resize);
