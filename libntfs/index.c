@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2004-2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -642,3 +643,228 @@ err_out:
 	errno = err;
 	return -1;
 }
+
+
+#ifdef NTFS_RICH
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "index.h"
+#include "rich.h"
+
+/**
+ * ntfs_ie_free
+ */
+void ntfs_ie_free (INDEX_ENTRY *ie)
+{
+	free (ie);
+}
+
+/**
+ * ntfs_ie_create
+ */
+INDEX_ENTRY * ntfs_ie_create (void)
+{
+	int length;
+	INDEX_ENTRY *ie;
+
+	length = 16;
+	ie = calloc (1, length);
+	if (!ie)
+		return NULL;
+
+	ie->indexed_file = 0;
+	ie->length       = length;
+	ie->key_length   = 0;
+	ie->flags        = INDEX_ENTRY_END;
+	ie->reserved     = 0;
+	return ie;
+}
+
+/**
+ * ntfs_ie_get_vcn
+ */
+VCN ntfs_ie_get_vcn (INDEX_ENTRY *ie)
+{
+	if (!ie)
+		return -1;
+	if (!(ie->flags & INDEX_ENTRY_NODE))
+		return -1;
+
+	return *((VCN*) ((u8*) ie + ie->length - 8));
+}
+
+/**
+ * ntfs_ie_copy
+ */
+INDEX_ENTRY * ntfs_ie_copy (INDEX_ENTRY *ie)
+{
+	INDEX_ENTRY *copy = NULL;
+
+	if (!ie)
+		return NULL;
+
+	copy = malloc (ie->length);
+	if (!copy)
+		return NULL;
+	memcpy (copy, ie, ie->length);
+
+	return copy;
+}
+
+/**
+ * ntfs_ie_set_vcn
+ */
+INDEX_ENTRY * ntfs_ie_set_vcn (INDEX_ENTRY *ie, VCN vcn)
+{
+	if (!ie)
+		return 0;
+
+	if (!(ie->flags & INDEX_ENTRY_NODE)) {
+		ie->length += 8;
+		ie = realloc (ie, ie->length);
+		if (!ie)
+			return NULL;
+
+		ie->flags |= INDEX_ENTRY_NODE;
+	}
+
+	*((VCN*) ((u8*) ie + ie->length - 8)) = vcn;
+	return ie;
+}
+
+/**
+ * ntfs_ie_remove_vcn
+ */
+INDEX_ENTRY * ntfs_ie_remove_vcn (INDEX_ENTRY *ie)
+{
+	if (!ie)
+		return NULL;
+	if (!(ie->flags & INDEX_ENTRY_NODE))
+		return ie;
+
+	ie->length -= 8;
+	ie->flags &= ~INDEX_ENTRY_NODE;
+	ie = realloc (ie, ie->length);
+	return ie;
+}
+
+/**
+ * ntfs_ie_set_name
+ */
+INDEX_ENTRY * ntfs_ie_set_name (INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype)
+{
+	FILE_NAME_ATTR *file;
+	int need;
+	BOOL wipe = FALSE;
+	VCN vcn = 0;
+
+	if (!ie || !name)
+		return NULL;
+
+	/*
+	 * INDEX_ENTRY
+	 *	MFT_REF indexed_file;
+	 *	u16 length;
+	 *	u16 key_length;
+	 *	INDEX_ENTRY_FLAGS flags;
+	 *	u16 reserved;
+	 *
+	 *	FILENAME
+	 *		MFT_REF parent_directory;
+	 *		s64 creation_time;
+	 *		s64 last_data_change_time;
+	 *		s64 last_mft_change_time;
+	 *		s64 last_access_time;
+	 *		s64 allocated_size;
+	 *		s64 data_size;
+	 *		FILE_ATTR_FLAGS file_attributes;
+	 *		u32 reserved;
+	 *		u8 file_name_length;
+	 *		FILE_NAME_TYPE_FLAGS file_name_type;
+	 *		ntfschar file_name[l];
+	 *		u8 reserved[n]
+	 *
+	 *	VCN vcn;
+	 */
+
+	//printf ("key length = 0x%02X\n", ie->key_length);
+	//printf ("new name length = %d\n", namelen);
+	if (ie->key_length > 0) {
+		file = &ie->key.file_name;
+		//printf ("filename, length %d\n", file->file_name_length);
+		need =  ATTR_SIZE (namelen * sizeof (ntfschar) + 2) -
+			ATTR_SIZE (file->file_name_length * sizeof (ntfschar) + 2);
+	} else {
+		//printf ("no filename\n");
+		need = ATTR_SIZE (sizeof (FILE_NAME_ATTR) + (namelen * sizeof (ntfschar)));
+		wipe = TRUE;
+	}
+
+	//printf ("need 0x%02X bytes\n", need);
+
+	if (need != 0) {
+		if (ie->flags & INDEX_ENTRY_NODE)
+			vcn = ntfs_ie_get_vcn (ie);
+
+		ie->length += need;
+		ie->key_length += need;
+
+		//printf ("realloc 0x%02X\n", ie->length);
+		ie = realloc (ie, ie->length);
+		if (!ie)
+			return NULL;
+
+		if (ie->flags & INDEX_ENTRY_NODE)
+			ie = ntfs_ie_set_vcn (ie, vcn);
+
+		if (wipe)
+			memset (&ie->key.file_name, 0, sizeof (FILE_NAME_ATTR));
+		if (need > 0)
+			memset ((u8*)ie + ie->length - need, 0, need);
+	}
+
+	memcpy (ie->key.file_name.file_name, name, namelen * sizeof (ntfschar));
+
+	ie->key.file_name.file_name_length = namelen;
+	ie->key.file_name.file_name_type = nametype;
+	ie->flags &= ~INDEX_ENTRY_END;
+
+	//printf ("ie->length     = 0x%02X\n", ie->length);
+	//printf ("ie->key_length = 0x%02X\n", ie->key_length);
+
+	return ie;
+}
+
+/**
+ * ntfs_ie_remove_name
+ */
+INDEX_ENTRY * ntfs_ie_remove_name (INDEX_ENTRY *ie)
+{
+	VCN vcn = 0;
+
+	if (!ie)
+		return NULL;
+	if (ie->key_length == 0)
+		return ie;
+
+	if (ie->flags & INDEX_ENTRY_NODE)
+		vcn = ntfs_ie_get_vcn (ie);
+
+	ie->length -= ATTR_SIZE (ie->key_length);
+	ie->key_length = 0;
+	ie->flags |= INDEX_ENTRY_END;
+
+	ie = realloc (ie, ie->length);
+	if (!ie)
+		return NULL;
+
+	if (ie->flags & INDEX_ENTRY_NODE)
+		ie = ntfs_ie_set_vcn (ie, vcn);
+	return ie;
+}
+
+
+#endif /* NTFS_RICH */
+

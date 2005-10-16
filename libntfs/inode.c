@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1083,3 +1084,121 @@ put_err_out:
 	errno = err;
 	return -1;
 }
+
+
+#ifdef NTFS_RICH
+
+/**
+ * ntfs_inode_close2
+ */
+int ntfs_inode_close2 (ntfs_inode *ni)
+{
+	if (!ni)
+		return 0;
+
+	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
+
+	ni->ref_count--;
+	if (ni->ref_count > 0)
+		return 0;
+
+	// unlink
+	//   ino->private_data
+
+	// XXX temporary until we have commit/rollback
+	NInoClearDirty(ni);
+
+	return ntfs_inode_close (ni);
+}
+
+/**
+ * ntfs_inode_open2
+ */
+ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ino = NULL;
+	struct ntfs_dir *dir;
+
+	if (!vol)
+		return NULL;
+
+	switch (mref) {
+		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
+		case FILE_MFT:     ino = vol->mft_ni;     break;
+		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
+		case FILE_root:
+			dir = vol->private_data;
+			if (dir)
+				ino = dir->inode;
+			break;
+	}
+
+	if (ino) {
+		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
+		ino->ref_count++;
+		return ino;
+	}
+
+	ino = ntfs_inode_open (vol, mref);
+	if (!ino)
+		return NULL;
+
+	/*
+	if (mref != FILE_root)
+		ntfs_inode_dir_map (ino);
+	*/
+
+	// link
+	//   ino->private_data
+
+	ino->private_data = NULL;
+	ino->ref_count = 1;
+
+	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
+	return ino;
+}
+
+/**
+ * ntfs_inode_open3
+ * open a deleted inode
+ */
+ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ino = NULL;
+
+	if (!vol)
+		return NULL;
+
+	ino = calloc (1, sizeof (*ino));
+	if (!ino)
+		return NULL;
+
+	ino->mrec = malloc (vol->mft_record_size);
+	if (!ino->mrec) {
+		free (ino);
+		return NULL;
+	}
+
+	ino->mft_no = mref;
+	ino->vol = vol;
+
+	ino->data_size = -1;
+	ino->allocated_size = -1;
+
+	ino->private_data = NULL;
+	ino->ref_count = 1;
+
+	if (1 != ntfs_attr_mst_pread (vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
+		//ntfs_inode_close2 (ino); ???
+		free (ino->mrec);
+		free (ino);
+		return NULL;
+	}
+
+	NInoSetDirty (ino);
+	return ino;
+}
+
+
+#endif /* NTFS_RICH */
+

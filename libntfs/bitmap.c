@@ -2,6 +2,7 @@
  * bitmap.c - Bitmap handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -220,3 +221,388 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 {
 	return ntfs_bitmap_set_bits_in_run(na, start_bit, count, 0);
 }
+
+
+#ifdef NTFS_RICH
+
+#include <stdlib.h>
+
+#include "layout.h"
+#include "volume.h"
+#include "bitmap.h"
+#include "rich.h"
+
+/**
+ * ntfs_bmp_rollback
+ */
+int ntfs_bmp_rollback (struct ntfs_bmp *bmp)
+{
+	int i;
+
+	if ((!bmp) || (bmp->count == 0))
+		return 0;
+
+	for (i = 0; i < bmp->count; i++)
+		free (bmp->data[i]);
+
+	free (bmp->data);
+	free (bmp->data_vcn);
+	bmp->data = NULL;
+	bmp->data_vcn = NULL;
+	bmp->count = 0;
+
+	return 0;
+}
+
+/**
+ * ntfs_bmp_commit
+ */
+int ntfs_bmp_commit (struct ntfs_bmp *bmp)
+{
+	int i;
+	u32 cs;
+#ifdef RM_WRITE
+	u32 ws; // write size
+#endif
+
+	if (!bmp)
+		return 0;
+	if (bmp->count == 0)
+		return 0;
+
+#if 0
+	printf ("attr = 0x%02X\n", bmp->attr->type);
+	printf ("resident = %d\n", !NAttrNonResident (bmp->attr));
+	printf ("\ta size = %lld\n", bmp->attr->allocated_size);
+	printf ("\td size = %lld\n", bmp->attr->data_size);
+	printf ("\ti size = %lld\n", bmp->attr->initialized_size);
+#endif
+
+	printf ("commit bmp inode %lld, 0x%02X (%sresident)\n", bmp->attr->ni->mft_no, bmp->attr->type, NAttrNonResident (bmp->attr) ? "non-" : "");
+
+	if (NAttrNonResident (bmp->attr)) {
+		cs = bmp->vol->cluster_size;
+
+		// non-resident
+		for (i = 0; i < bmp->count; i++) {
+#ifdef RM_WRITE
+			if (((bmp->data_vcn[i]+1) * cs) < bmp->attr->data_size)
+				ws = cs;
+			else
+				ws = bmp->attr->data_size & (cs - 1);
+			//printf ("writing %d bytes\n", ws);
+			ntfs_attr_pwrite (bmp->attr, bmp->data_vcn[i] * cs, ws, bmp->data[i]); // XXX retval
+#endif
+			printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, bmp->data_vcn[i]);
+		}
+	} else {
+		// resident
+#ifdef RM_WRITE
+		ntfs_attr_pwrite (bmp->attr, bmp->data_vcn[0], bmp->attr->data_size, bmp->data[0]); // XXX retval
+#endif
+		printf (RED "\tntfs_attr_pwrite resident (%lld)\n" END, bmp->attr->data_size);
+	}
+
+	ntfs_bmp_rollback (bmp);
+
+	return 0;
+}
+
+/**
+ * ntfs_bmp_free
+ */
+void ntfs_bmp_free (struct ntfs_bmp *bmp)
+{
+	if (!bmp)
+		return;
+
+	ntfs_bmp_rollback (bmp);
+
+	ntfs_attr_close (bmp->attr);
+
+	free (bmp);
+}
+
+/**
+ * ntfs_bmp_create
+ */
+struct ntfs_bmp * ntfs_bmp_create (ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len)
+{
+	struct ntfs_bmp *bmp;
+	ntfs_attr *attr;
+
+	if (!inode)
+		return NULL;
+
+	attr = ntfs_attr_open (inode, type, name, name_len);
+	if (!attr)
+		return NULL;
+
+	bmp = calloc (1, sizeof (*bmp));
+	if (!bmp) {
+		ntfs_attr_close (attr);
+		return NULL;
+	}
+
+	bmp->vol       = inode->vol;
+	bmp->attr      = attr;
+	bmp->data      = NULL;
+	bmp->data_vcn  = NULL;
+	bmp->count     = 0;
+
+	return bmp;
+}
+
+/**
+ * ntfs_bmp_add_data
+ */
+int ntfs_bmp_add_data (struct ntfs_bmp *bmp, VCN vcn, u8 *data)
+{
+	int i = 0;
+	int old;
+	int new;
+
+	if (!bmp || !data)
+		return -1;
+
+	old = ROUND_UP (bmp->count, 16);
+	bmp->count++;
+	new = ROUND_UP (bmp->count, 16);
+
+	if (old != new) {
+		bmp->data     = realloc (bmp->data,      new * sizeof (*bmp->data));
+		bmp->data_vcn = realloc (bmp->data_vcn , new * sizeof (*bmp->data_vcn));
+	}
+
+	for (i = 0; i < bmp->count-1; i++)
+		if (bmp->data_vcn[i] > vcn)
+			break;
+
+	if ((bmp->count-i) > 0) {
+		memmove (&bmp->data[i+1],     &bmp->data[i],     (bmp->count-i) * sizeof (*bmp->data));
+		memmove (&bmp->data_vcn[i+1], &bmp->data_vcn[i], (bmp->count-i) * sizeof (*bmp->data_vcn));
+	}
+
+	bmp->data[i]     = data;
+	bmp->data_vcn[i] = vcn;
+
+	return bmp->count;
+}
+
+/**
+ * ntfs_bmp_get_data
+ */
+u8 * ntfs_bmp_get_data (struct ntfs_bmp *bmp, VCN vcn)
+{
+	u8 *buffer;
+	int i;
+	int cs;
+	int cb;
+
+	if (!bmp)
+		return NULL;
+
+	cs = bmp->vol->cluster_size;
+	cb = bmp->vol->cluster_size_bits;
+
+	// XXX range check against vol,attr
+	// never compressed, so data = init
+
+	vcn >>= (cb + 3);	// convert to bitmap clusters
+
+	for (i = 0; i < bmp->count; i++) {
+		if (vcn == bmp->data_vcn[i]) {
+			//printf ("reusing bitmap cluster %lld\n", vcn);
+			return bmp->data[i];
+		}
+	}
+
+	buffer = calloc (1, cs);	// XXX could be smaller if attr size < cluster size
+	if (!buffer)
+		return NULL;
+
+	//printf ("loading from bitmap cluster %lld\n", vcn);
+	//printf ("loading from bitmap byte    %lld\n", vcn<<cb);
+	if (ntfs_attr_pread (bmp->attr, vcn<<cb, cs, buffer) < 0) {
+		free (buffer);
+		return NULL;
+	}
+
+	ntfs_bmp_add_data (bmp, vcn, buffer);	// XXX retval
+	return buffer;
+}
+
+/**
+ * ntfs_bmp_set_range
+ */
+int ntfs_bmp_set_range (struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
+{
+	// shouldn't all the vcns be lcns?
+	s64 i;
+	u8 *buffer;
+	int csib;			// cluster size in bits
+
+	int block_start, block_finish;	// rename to c[sf]  (rename to clust_)
+	int vcn_start, vcn_finish;	// rename to v[sf]
+	int byte_start, byte_finish;	// rename to b[sf]
+	u8 mask_start, mask_finish;	// rename to m[sf]
+
+	s64 a,b;
+
+	if (!bmp)
+		return -1;
+
+	if (value)
+		value = 0xFF;
+
+	csib = bmp->vol->cluster_size << 3;
+
+	vcn_start  = vcn;
+	vcn_finish = vcn + length - 1;
+
+	//printf ("vcn_start = %d, vcn_finish = %d\n", vcn_start, vcn_finish);
+	a = ROUND_DOWN (vcn_start,  csib);
+	b = ROUND_DOWN (vcn_finish, csib) + 1;
+
+	//printf ("a = %lld, b = %lld\n", a, b);
+
+	for (i = a; i < b; i += csib) {
+		//printf ("ntfs_bmp_get_data %lld\n", i);
+		buffer = ntfs_bmp_get_data (bmp, i);
+		if (!buffer)
+			return -1;
+
+		block_start  = i;
+		block_finish = block_start + csib - 1;
+
+		mask_start  = (0xFF << (vcn_start & 7));
+		mask_finish = (0xFF >> (7 - (vcn_finish & 7)));
+
+		if ((vcn_start >= block_start) && (vcn_start <= block_finish)) {
+			byte_start = (vcn_start - block_start) >> 3;
+		} else {
+			byte_start = 0;
+			mask_start = 0xFF;
+		}
+
+		if ((vcn_finish >= block_start) && (vcn_finish <= block_finish)) {
+			byte_finish = (vcn_finish - block_start) >> 3;
+		} else {
+			byte_finish = bmp->vol->cluster_size - 1;
+			mask_finish = 0xFF;
+		}
+
+		if ((byte_finish - byte_start) > 1) {
+			memset (buffer+byte_start+1, value, byte_finish-byte_start-1);
+		} else if (byte_finish == byte_start) {
+			mask_start &= mask_finish;
+			mask_finish = 0x00;
+		}
+
+		if (value) {
+			buffer[byte_start]  |= mask_start;
+			buffer[byte_finish] |= mask_finish;
+		} else {
+			buffer[byte_start]  &= (~mask_start);
+			buffer[byte_finish] &= (~mask_finish);
+		}
+	}
+
+#if 1
+	printf (GREEN "Modified: inode %lld, ", bmp->attr->ni->mft_no);
+	switch (bmp->attr->type) {
+		case AT_BITMAP: printf ("$BITMAP"); break;
+		case AT_DATA:   printf ("$DATA");   break;
+		default:			    break;
+	}
+	printf (" vcn %lld-%lld\n" END, vcn>>12, (vcn+length-1)>>12);
+#endif
+	return 1;
+}
+
+/**
+ * ntfs_bmp_find_last_set
+ */
+s64 ntfs_bmp_find_last_set (struct ntfs_bmp *bmp)
+{
+	s64 clust_count;
+	s64 byte_count;
+	s64 clust;
+	int byte;
+	int bit;
+	int note;
+	u8 *buffer;
+
+	if (!bmp)
+		return -2;
+
+	// find byte size of bmp
+	// find cluster size of bmp
+
+	byte_count = bmp->attr->data_size;
+	clust_count = ROUND_UP (byte_count, bmp->vol->cluster_size) >> bmp->vol->cluster_size_bits;
+
+	//printf ("bitmap = %lld bytes\n", byte_count);
+	//printf ("bitmap = %lld buffers\n", clust_count);
+
+	// for each cluster backwards
+	for (clust = clust_count-1; clust >= 0; clust--) {
+		//printf ("cluster %lld\n", clust);
+		//printf ("get vcn %lld\n", clust << (bmp->vol->cluster_size_bits + 3));
+		buffer = ntfs_bmp_get_data (bmp, clust << (bmp->vol->cluster_size_bits + 3));
+		//utils_dump_mem (buffer, 0, 8, DM_NO_ASCII);
+		if (!buffer)
+			return -2;
+		if ((clust == (clust_count-1) && ((byte_count % bmp->vol->cluster_size) != 0))) {
+			byte = byte_count % bmp->vol->cluster_size;
+		} else {
+			byte = bmp->vol->cluster_size;
+		}
+		//printf ("start byte = %d\n", byte);
+		// for each byte backward
+		for (byte--; byte >= 0; byte--) {
+			//printf ("\tbyte %d (%d)\n", byte, buffer[byte]);
+			// for each bit shift up
+			note = -1;
+			for (bit = 7; bit >= 0; bit--) {
+				//printf ("\t\tbit %d (%d)\n", (1<<bit), buffer[byte] & (1<<bit));
+				if (buffer[byte] & (1<<bit)) {
+					// if set, keep note
+					note = bit;
+					break;
+				}
+			}
+			if (note >= 0) {
+				// if note, return value
+				//printf ("match %lld (c=%lld,b=%d,n=%d)\n", (((clust << bmp->vol->cluster_size_bits) + byte) << 3) + note, clust, byte, note);
+				return ((((clust << bmp->vol->cluster_size_bits) + byte) << 3) + note);
+			}
+		}
+	}
+
+	return -1;
+}
+
+/**
+ * ntfs_bmp_find_space
+ */
+int ntfs_bmp_find_space (struct ntfs_bmp *bmp, LCN start, long size)
+{
+	if (!bmp)
+		return 0;
+
+	start = 0;
+	size = 0;
+
+	/*
+	bmp find space - uncached bmp's
+		$Bitmap/$DATA	free space on volume
+		dir/$BITMAP	free index record
+		$MFT/$BITMAP	free record in mft
+	*/
+	return 0;
+}
+
+
+#endif /* NTFS_RICH */
+

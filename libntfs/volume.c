@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Szabolcs Szakacsits
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1531,3 +1532,332 @@ err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	return ret;
 }
+
+
+#ifdef NTFS_RICH
+
+#include "tree.h"
+
+// XXX temp
+#define Eprintf printf
+#define Vprintf printf
+#define Qprintf printf
+
+/**
+ * utils_valid_device - Perform some safety checks on the device, before we start
+ * @name:   Full pathname of the device/file to work with
+ * @force:  Continue regardless of problems
+ *
+ * Check that the name refers to a device and that is isn't already mounted.
+ * These checks can be overridden by using the force option.
+ *
+ * Return:  1  Success, we can continue
+ *	    0  Error, we cannot use this device
+ */
+int utils_valid_device (const char *name, int force)
+{
+	unsigned long mnt_flags = 0;
+	struct stat st;
+
+#ifdef __CYGWIN32__
+	/* FIXME: This doesn't work for Cygwin, so just return success for now... */
+	return 1;
+#endif
+	if (!name) {
+		errno = EINVAL;
+		return 0;
+	}
+
+	if (stat (name, &st) == -1) {
+		if (errno == ENOENT) {
+			Eprintf ("The device %s doesn't exist\n", name);
+		} else {
+			Eprintf ("Error getting information about %s: %s\n", name, strerror (errno));
+		}
+		return 0;
+	}
+
+	if (!S_ISBLK (st.st_mode)) {
+		Vprintf ("%s is not a block device.\n", name);
+		if (!force) {
+			Eprintf ("Use the force option to work with files.\n");
+			return 0;
+		}
+		Vprintf ("Forced to continue.\n");
+	}
+
+	/* Make sure the file system is not mounted. */
+	if (ntfs_check_if_mounted (name, &mnt_flags)) {
+		Vprintf ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
+		if (!force) {
+			Eprintf ("Use the force option to ignore this error.\n");
+			return 0;
+		}
+		Vprintf ("Forced to continue.\n");
+	} else if (mnt_flags & NTFS_MF_MOUNTED) {
+		Vprintf ("The device %s, is mounted.\n", name);
+		if (!force) {
+			Eprintf ("Use the force option to work a mounted filesystem.\n");
+			return 0;
+		}
+		Vprintf ("Forced to continue.\n");
+	}
+
+	return 1;
+}
+
+/**
+ * utils_mount_volume
+ */
+ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force)
+{
+	ntfs_volume *vol;
+
+	if (!device) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (!utils_valid_device (device, force))
+		return NULL;
+
+	vol = ntfs_mount (device, flags);
+	if (!vol) {
+		int err;
+
+		err = errno;
+		Eprintf("Couldn't mount device '%s': %s\n", device,
+				strerror(err));
+		if (err == EOPNOTSUPP)
+			Eprintf("Windows was either hibernated or did not "
+					"shut down properly.  Try to mount "
+					"volume in windows, shut down and try "
+					"again.\n");
+		return NULL;
+	}
+
+	if (vol->flags & VOLUME_IS_DIRTY) {
+		Qprintf ("Volume is dirty.\n");
+		if (!force) {
+			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
+			ntfs_umount (vol, FALSE);
+			return NULL;
+		}
+		Qprintf ("Forced to continue.\n");
+	}
+
+	return vol;
+}
+
+/**
+ * ntfs_volume_commit
+ */
+int ntfs_volume_commit (ntfs_volume *vol)
+{
+	if (!vol)
+		return -1;
+
+	printf ("commit volume\n");
+	if (ntfs_bmp_commit (vol->private_bmp1) < 0)
+		return -1;
+
+	if (ntfs_bmp_commit (vol->private_bmp2) < 0)
+		return -1;
+
+	if (ntfs_dir_commit (vol->private_data) < 0)
+		return -1;
+
+	return 0;
+}
+
+/**
+ * ntfs_volume_rollback
+ */
+int ntfs_volume_rollback (ntfs_volume *vol)
+{
+	if (!vol)
+		return -1;
+
+	if (ntfs_bmp_rollback (vol->private_bmp1) < 0)
+		return -1;
+
+	if (ntfs_bmp_rollback (vol->private_bmp2) < 0)
+		return -1;
+
+	if (ntfs_dir_rollback (vol->private_data) < 0)
+		return -1;
+
+	return 0;
+}
+
+/**
+ * ntfs_volume_umount2
+ */
+int ntfs_volume_umount2 (ntfs_volume *vol, const BOOL force)
+{
+	struct ntfs_dir *dir;
+	struct ntfs_bmp *bmp;
+
+	if (!vol)
+		return 0;
+
+	ntfs_volume_rollback (vol);
+
+	dir = (struct ntfs_dir *) vol->private_data;
+	vol->private_data = NULL;
+	ntfs_dir_free (dir);
+
+	bmp = (struct ntfs_bmp *) vol->private_bmp1;
+	vol->private_bmp1 = NULL;
+	ntfs_bmp_free (bmp);
+
+	bmp = (struct ntfs_bmp *) vol->private_bmp2;
+	vol->private_bmp2 = NULL;
+	ntfs_bmp_free (bmp);
+
+	return ntfs_umount (vol, force);
+}
+
+/**
+ * ntfs_volume_mount2
+ */
+ntfs_volume * ntfs_volume_mount2 (const char *device, unsigned long flags, BOOL force)
+{
+	// XXX can we replace these and search by mft number?  Hmm... NO.
+	// unless I have a recursive search for an MFT number
+	static ntfschar bmp[8] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('B'),
+		const_cpu_to_le16('i'),
+		const_cpu_to_le16('t'),
+		const_cpu_to_le16('m'),
+		const_cpu_to_le16('a'),
+		const_cpu_to_le16('p'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar mft[5] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('F'),
+		const_cpu_to_le16('T'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar mftmirr[9] = {
+		const_cpu_to_le16('$'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('F'),
+		const_cpu_to_le16('T'),
+		const_cpu_to_le16('M'),
+		const_cpu_to_le16('i'),
+		const_cpu_to_le16('r'),
+		const_cpu_to_le16('r'),
+		const_cpu_to_le16(0)
+	};
+
+	static ntfschar dot[2] = {
+		const_cpu_to_le16('.'),
+		const_cpu_to_le16(0)
+	};
+
+	ntfs_volume *vol;
+	struct ntfs_dir *dir;
+	struct ntfs_dt *root;
+	struct ntfs_dt *found;
+	int num;
+
+	vol = utils_mount_volume (device, flags, force);
+	if (!vol)
+		return NULL;
+
+	vol->lcnbmp_ni ->ref_count = 1;
+	vol->mft_ni    ->ref_count = 1;
+	vol->mftmirr_ni->ref_count = 1;
+
+	vol->lcnbmp_ni ->private_data = NULL;
+	vol->mft_ni    ->private_data = NULL;
+	vol->mftmirr_ni->private_data = NULL;
+
+	dir = ntfs_dir_create (vol, FILE_root);
+	if (!dir) {
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+	dir->index = ntfs_dt_create (dir, NULL, -1);
+
+	root = dir->index;
+
+	//$Bitmap
+	num = -1;
+	found = ntfs_dt_find2 (root, bmp, sizeof (bmp) - 1, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $Bitmap\n");
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->lcnbmp_ni->ref_count++;
+	vol->lcnbmp_ni->private_data = found->dir;
+	found->inodes[num] = vol->lcnbmp_ni;
+
+	//$MFT
+	num = -1;
+	found = ntfs_dt_find2 (root, mft, sizeof (mft) - 1, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $MFT\n");
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->mft_ni->ref_count++;
+	vol->mft_ni->private_data = found->dir;
+	found->inodes[num] = vol->mft_ni;
+
+	//$MFTMirr
+	num = -1;
+	found = ntfs_dt_find2 (root, mftmirr, sizeof (mftmirr) - 1, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find $MFTMirr\n");
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+	vol->mftmirr_ni->ref_count++;
+	vol->mftmirr_ni->private_data = found->dir;
+	found->inodes[num] = vol->mftmirr_ni;
+
+	// root directory
+	num = -1;
+	found = ntfs_dt_find2 (root, dot, 1, &num);
+	if ((!found) || (num < 0)) {
+		printf ("can't find the root directory\n");
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+	vol->private_data = found->dir;
+	found->inodes[num] = dir->inode;
+	dir->inode->private_data = found;
+	dir->inode->ref_count = 2;
+
+	vol->private_bmp1 = ntfs_bmp_create (vol->mft_ni,    AT_BITMAP, NULL, 0);
+	vol->private_bmp2 = ntfs_bmp_create (vol->lcnbmp_ni, AT_DATA,   NULL, 0);
+
+	if (!vol->private_bmp1 || !vol->private_bmp2) {
+		printf ("can't find the bitmaps\n");
+		ntfs_volume_umount2 (vol, FALSE);
+		vol = NULL;
+		goto done;
+	}
+
+done:
+	return vol;
+}
+
+
+#endif /* NTFS_RICH */
+

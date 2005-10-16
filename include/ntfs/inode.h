@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -183,5 +184,13 @@ extern int ntfs_inode_sync(ntfs_inode *ni);
 extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
 
 extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
+
+#ifdef NTFS_RICH
+
+int ntfs_inode_close2 (ntfs_inode *ni);
+ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref);
+ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref);
+
+#endif /* NTFS_RICH */
 
 #endif /* defined _NTFS_INODE_H */

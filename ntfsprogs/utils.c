@@ -97,6 +97,7 @@ int utils_set_locale (void)
 	}
 }
 
+#ifndef NTFS_RICH
 /**
  * utils_valid_device - Perform some safety checks on the device, before we start
  * @name:   Full pathname of the device/file to work with
@@ -206,6 +207,7 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 	return vol;
 }
 
+#endif
 /**
  * utils_parse_size - Convert a string representing a size
  * @value:  String to be parsed
@@ -327,6 +329,7 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 	return 1;
 }
 
+#ifndef NTFS_RICH
 /**
  * find_attribute - Find an attribute of the given type
  * @type:  An attribute type, e.g. AT_FILE_NAME
@@ -396,6 +399,7 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 	return rec;
 }
 
+#endif
 /**
  * utils_inode_get_name
  *

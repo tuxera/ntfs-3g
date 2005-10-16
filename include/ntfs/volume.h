@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -202,6 +203,17 @@ extern int ntfs_version_is_supported(ntfs_volume *vol);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
 
 extern int ntfs_volume_write_flags(ntfs_volume *v, const u16 flags);
+
+#ifdef NTFS_RICH
+
+int ntfs_volume_commit (ntfs_volume *vol);
+int ntfs_volume_rollback (ntfs_volume *vol);
+int ntfs_volume_umount2 (ntfs_volume *vol, const BOOL force);
+ntfs_volume * ntfs_volume_mount2 (const char *device, unsigned long flags, BOOL force);
+int utils_valid_device (const char *name, int force);
+ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
+
+#endif /* NTFS_RICH */
 
 #endif /* defined _NTFS_VOLUME_H */
 

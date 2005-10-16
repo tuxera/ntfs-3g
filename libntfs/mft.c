@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1543,3 +1544,340 @@ sync_rollback:
 	errno = err;
 	return -1;
 }
+
+
+#ifdef NTFS_RICH
+
+#include "bitmap.h"
+#include "dir.h"
+#include "tree.h"
+#include "index.h"
+#include "rich.h"
+
+/**
+ * ntfs_mft_remove_attr
+ */
+int ntfs_mft_remove_attr (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES type)
+{
+	ATTR_RECORD *attr20, *attrXX;
+	MFT_RECORD *mft;
+	u8 *src, *dst;
+	int len;
+
+	if (!inode)
+		return 1;
+
+	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST, inode->mrec);
+	if (attr20)
+		return 1;
+
+	printf ("remove inode %lld, attr 0x%02X\n", inode->mft_no, type);
+
+	attrXX = find_first_attribute (type, inode->mrec);
+	if (!attrXX)
+		return 1;
+
+	if (utils_free_non_residents3 (bmp, inode, attrXX))
+		return 1;
+
+	// remove entry
+	// inode->mrec
+
+	mft = inode->mrec;
+	//utils_dump_mem (mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
+
+	//utils_dump_mem (attrXX, 0, attrXX->length, DM_DEFAULTS); printf ("\n");
+
+	//printf ("mrec = %p, attr = %p, diff = %d (0x%02X)\n", mft, attrXX, (u8*)attrXX - (u8*)mft, (u8*)attrXX - (u8*)mft);
+	// memmove
+
+	dst = (u8*) attrXX;
+	src = dst + attrXX->length;
+	len = (((u8*) mft + mft->bytes_in_use) - src);
+
+	// fix mft header
+	mft->bytes_in_use -= attrXX->length;
+
+#if 0
+	printf ("dst = 0x%02X, src = 0x%02X, len = 0x%02X\n", (dst - (u8*)mft), (src - (u8*)mft), len);
+	printf ("attr %02X, len = 0x%02X\n", attrXX->type, attrXX->length);
+	printf ("bytes in use = 0x%02X\n", mft->bytes_in_use);
+	printf ("\n");
+#endif
+
+	memmove (dst, src, len);
+	//utils_dump_mem (mft, 0, mft->bytes_in_use, DM_DEFAULTS); printf ("\n");
+
+	NInoSetDirty(inode);
+	return 0;
+}
+
+/**
+ * ntfs_mft_add_attr
+ */
+ATTR_RECORD * ntfs_mft_add_attr (ntfs_inode *inode, ATTR_TYPES type, u8 *data, int data_len)
+{
+	MFT_RECORD *mrec;
+	ATTR_RECORD *attr;
+	u8 *ptr;
+	u8 *src;
+	u8 *dst;
+	int len;
+	int attr_size;
+
+	if (!inode)
+		return NULL;
+	if (!data)
+		return NULL;
+
+	attr_size = ATTR_SIZE (data_len);
+
+	mrec = inode->mrec;
+	if (!mrec)
+		return NULL;
+
+	if ((mrec->bytes_in_use + attr_size + 0x18) > mrec->bytes_allocated) {
+		printf ("attribute is too big to fit in the record\n");
+		return NULL;
+	}
+
+	ptr = (u8*) inode->mrec + mrec->attrs_offset;
+	while (1) {
+		attr = (ATTR_RECORD*) ptr;
+
+		if (type < attr->type)
+			break;
+
+		ptr += attr->length;
+	}
+
+	//printf ("insert before attr 0x%02X\n", attr->type);
+
+	len = ((u8*) mrec + mrec->bytes_in_use) - ((u8*) attr);
+	src = (u8*) attr;
+	dst = src + attr_size + 0x18;
+
+	memmove (dst, src, len);
+
+	src = data;
+	dst = (u8*) attr + 0x18;
+	len = data_len;
+
+	// XXX wipe slack space after attr?
+
+	memcpy (dst, src, len);
+
+	mrec->bytes_in_use += attr_size + 0x18;
+
+	memset (attr, 0, 0x18);
+	*(u32*)((u8*) attr + 0x00) = type;
+	*(u32*)((u8*) attr + 0x04) = attr_size + 0x18;
+	*(u16*)((u8*) attr + 0x0E) = mrec->next_attr_instance;
+	*(u32*)((u8*) attr + 0x10) = data_len;
+	*(u32*)((u8*) attr + 0x14) = 0x18;
+
+	mrec->next_attr_instance++;
+
+	return attr;
+}
+
+/**
+ * ntfs_mft_resize_resident
+ */
+int ntfs_mft_resize_resident (ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len, u8 *data, int data_len)
+{
+	int mft_size;
+	int mft_usage;
+	int mft_free;
+	int attr_orig;
+	int attr_new;
+	u8 *src;
+	u8 *dst;
+	u8 *end;
+	int len;
+	ntfs_attr_search_ctx *ctx = NULL;
+	ATTR_RECORD *arec = NULL;
+	MFT_RECORD *mrec = NULL;
+	int res = -1;
+
+	// XXX only works when attr is in base inode
+
+	if ((!inode) || (!inode->mrec))
+		return -1;
+	if ((!data) || (data_len < 0))
+		return -1;
+
+	mrec = inode->mrec;
+
+	mft_size  = mrec->bytes_allocated;
+	mft_usage = mrec->bytes_in_use;
+	mft_free  = mft_size - mft_usage;
+
+	//printf ("mft_size  = %d\n", mft_size);
+	//printf ("mft_usage = %d\n", mft_usage);
+	//printf ("mft_free  = %d\n", mft_free);
+	//printf ("\n");
+
+	ctx = ntfs_attr_get_search_ctx (NULL, mrec);
+	if (!ctx)
+		goto done;
+
+	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE, 0, NULL, 0, ctx) != 0)
+		goto done;
+
+	arec = ctx->attr;
+
+	if (arec->non_resident) {
+		printf ("attribute isn't resident\n");
+		goto done;
+	}
+
+	attr_orig = arec->value_length;
+	attr_new  = data_len;
+
+	//printf ("attr orig = %d\n", attr_orig);
+	//printf ("attr new  = %d\n", attr_new);
+	//printf ("\n");
+
+	if ((attr_new - attr_orig + mft_usage) > mft_size) {
+		printf ("attribute won't fit into mft record\n");
+		goto done;
+	}
+
+	//printf ("new free space = %d\n", mft_size - (attr_new - attr_orig + mft_usage));
+
+	src = (u8*)arec + arec->length;
+	dst = src + (attr_new - attr_orig);
+	end = (u8*)mrec + mft_usage;
+	len  = end - src;
+
+	//printf ("src = %d\n", src - (u8*)mrec);
+	//printf ("dst = %d\n", dst - (u8*)mrec);
+	//printf ("end = %d\n", end - (u8*)mrec);
+	//printf ("len = %d\n", len);
+
+	if (src != dst)
+		memmove (dst, src, len);
+
+	memcpy ((u8*)arec + arec->value_offset, data, data_len);
+
+	mrec->bytes_in_use += (attr_new - attr_orig);
+	arec->length       += (attr_new - attr_orig);
+	arec->value_length += (attr_new - attr_orig);
+
+	memset ((u8*)mrec + mrec->bytes_in_use, 0, mft_size - mrec->bytes_in_use);
+
+	mft_usage += (attr_new - attr_orig);
+	//utils_dump_mem (mrec, 0, mft_size, DM_DEFAULTS);
+	res = 0;
+done:
+	ntfs_attr_put_search_ctx (ctx);
+	return res;
+}
+
+/**
+ * ntfs_mft_free_space
+ */
+int ntfs_mft_free_space (struct ntfs_dir *dir)
+{
+	int res = 0;
+	MFT_RECORD *mft;
+
+	if ((!dir) || (!dir->inode))
+		return -1;
+
+	mft = (MFT_RECORD*) dir->inode->mrec;
+
+	res = mft->bytes_allocated - mft->bytes_in_use;
+
+	return res;
+}
+
+/**
+ * ntfs_mft_add_index
+ */
+int ntfs_mft_add_index (struct ntfs_dir *dir)
+{
+	ntfs_volume *vol;
+	u8 *buffer = NULL;
+	ATTR_RECORD *attr = NULL;
+	struct ntfs_dt *dt = NULL;
+	INDEX_ENTRY *ie = NULL;
+
+	if (!dir)
+		return 1;
+	if (dir->bitmap && dir->ialloc)
+		return 0;
+	if (dir->bitmap || dir->ialloc)
+		return 1;
+	if (dir->index_size < 512)
+		return 1;
+
+	vol = dir->vol;
+	printf ("add two attrs to " YELLOW); ntfs_name_print (dir->name, dir->name_len); printf (END "\n");
+	printf ("index size = %d\n", dir->index_size);
+
+	buffer = malloc (dir->index_size);
+	if (!buffer)
+		return 1;
+
+	dt = ntfs_dt_create (dir, dir->index, -1);
+	if (!dt)
+		return 1;
+
+	dt->vcn = 0;		// New alloc record
+
+	ie = ntfs_ie_copy (dir->index->children[dir->index->child_count-1]);
+	ie = ntfs_ie_set_vcn (ie, dt->vcn);
+
+	// can't replace ie yet, there may not be room
+	ntfs_ie_free (ie);
+
+	ntfs_dt_transfer2 (dir->index, dt, 0, dir->index->child_count - 1);
+
+	printf ("root has %d children\n", dir->index->child_count);
+	printf ("node has %d children\n", dt->child_count);
+
+	ntfs_dt_free (dt);
+
+	// create a new dt
+	// attach dt to dir
+	// move entries into alloc
+	// shrink root
+
+	// transfer keys to new node
+	// hook up root & alloc dts
+
+	// need disk allocation before here
+
+	// Index Allocation
+	memset (buffer, 0, 128);
+	attr = ntfs_mft_add_attr (dir->inode, AT_INDEX_ALLOCATION, buffer, 0x48);
+
+	// Bitmap
+	memset (buffer, 0, 8);
+	buffer[0] = 0x01;
+	//printf ("inode = %p\n", dir->inode);
+	attr = ntfs_mft_add_attr (dir->inode, AT_BITMAP, buffer, 8);
+
+	// attach alloc and bitmap to dir
+	// need to create ntfs_attr's for them
+
+	// one indx record
+	// 8 bits of bitmap
+
+	if (0) ntfs_bmp_find_space (NULL, 0, 0);
+
+	//printf ("m1 = %lld\n", vol->mft_zone_start);
+	//printf ("m2 = %lld\n", vol->mft_zone_end);
+	//printf ("m3 = %lld\n", vol->mft_zone_pos);
+	//printf ("z1 = %lld\n", vol->data1_zone_pos);
+	//printf ("z2 = %lld\n", vol->data2_zone_pos);
+
+	free (buffer);
+	return 0;
+}
+
+
+#endif /* NTFS_RICH */
+

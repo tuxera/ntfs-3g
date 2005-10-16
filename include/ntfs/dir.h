@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -72,6 +73,38 @@ typedef int (*ntfs_filldir_t)(void *dirent, const ntfschar *name,
 
 extern int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		void *dirent, ntfs_filldir_t filldir);
+
+#ifdef NTFS_RICH
+
+/**
+ * struct ntfs_dir
+ */
+struct ntfs_dir {
+	ntfs_volume	  *vol;
+	struct ntfs_dir	  *parent;
+	ntfschar	  *name;
+	int		   name_len;
+	MFT_REF		   mft_num;
+	struct ntfs_dt	  *index;
+	struct ntfs_dir	 **children;
+	int		   child_count;
+	struct ntfs_bmp	  *bitmap;
+	ntfs_inode	  *inode;
+	ntfs_attr	  *iroot;
+	ntfs_attr	  *ialloc;
+	int                index_size;
+};
+
+
+int ntfs_dir_rollback (struct ntfs_dir *dir);
+int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir);
+int ntfs_dir_commit (struct ntfs_dir *dir);
+void ntfs_dir_free (struct ntfs_dir *dir);
+struct ntfs_dir * ntfs_dir_create (ntfs_volume *vol, MFT_REF mft_num);
+void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child);
+struct ntfs_dir * ntfs_dir_find2 (struct ntfs_dir *dir, ntfschar *name, int name_len);
+
+#endif /* NTFS_RICH */
 
 #endif /* defined _NTFS_DIR_H */
 

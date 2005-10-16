@@ -15,7 +15,7 @@ bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsrm ntfsmftalloc ntfscmp
+			  ntfsmftalloc ntfscmp
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -35,6 +35,10 @@ endif
 
 if ENABLE_CRYPTO
 EXTRA_PROGRAMS		+= ntfsdecrypt
+endif
+
+if ENABLE_RICH
+EXTRA_PROGRAMS		+= ntfsrm
 endif
 
 # Set the include path.
@@ -93,9 +97,11 @@ endif
 
 # We don't distribute these
 
+if ENABLE_RICH
 ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
 ntfsrm_LDADD		= $(AM_LIBS)
 ntfsrm_LDFLAGS		= $(AM_LFLAGS)
+endif
 
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)

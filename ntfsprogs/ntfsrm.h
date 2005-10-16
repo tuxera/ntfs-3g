@@ -1,7 +1,7 @@
 /*
  * ntfsrm - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Richard Russon
+ * Copyright (c) 2004-2005 Richard Russon
  *
  * This utility will delete files from an NTFS volume.
  *
@@ -26,6 +26,11 @@
 
 #include "types.h"
 #include "layout.h"
+#include "volume.h"
+#include "inode.h"
+
+struct ntfs_dir;
+struct ntfs_dt;
 
 /**
  * struct options
@@ -43,54 +48,6 @@ struct options {
 };
 
 /**
- * struct ntfs_bmp
- * a cache for either dir/$BITMAP, $MFT/$BITMAP or $Bitmap/$DATA
- */
-struct ntfs_bmp {
-	ntfs_volume	 *vol;
-	ntfs_attr	 *attr;
-	int		  count;
-	u8		**data;
-	VCN		 *data_vcn;
-};
-
-/**
- * struct ntfs_dt
- */
-struct ntfs_dt {
-	struct ntfs_dir	 *dir;
-	struct ntfs_dt	 *parent;
-	u8		 *data;
-	int		  data_len;
-	int		  child_count;
-	INDEX_ENTRY	**children;
-	struct ntfs_dt	**sub_nodes;
-	ntfs_inode	**inodes;
-	VCN		  vcn;
-	INDEX_HEADER	 *header;
-	BOOL		  changed;
-};
-
-/**
- * struct ntfs_dir
- */
-struct ntfs_dir {
-	ntfs_volume	  *vol;
-	struct ntfs_dir	  *parent;
-	ntfschar	  *name;
-	int		   name_len;
-	MFT_REF		   mft_num;
-	struct ntfs_dt	  *index;
-	struct ntfs_dir	 **children;
-	int		   child_count;
-	struct ntfs_bmp	  *bitmap;
-	ntfs_inode	  *inode;
-	ntfs_attr	  *iroot;
-	ntfs_attr	  *ialloc;
-	int                index_size;
-};
-
-/**
  * struct ntfs_find
  */
 struct ntfs_find {
@@ -101,19 +58,6 @@ struct ntfs_find {
 	MFT_REF		   mref;
 };
 
-
-#define RED	"[31m"
-#define GREEN	"[32m"
-#define YELLOW	"[33m"
-#define BLUE	"[34m"
-#define MAGENTA	"[35m"
-#define CYAN	"[36m"
-#define BOLD	"[01m"
-#define END	"[0m"
-
-#define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
-#define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
-#define ATTR_SIZE(s) ROUND_UP(s,8)
 
 #endif /* _NTFSRM_H_ */
 

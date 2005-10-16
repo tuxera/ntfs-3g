@@ -1,7 +1,7 @@
 /*
  * utils.h - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004 Anton Altaparmakov
  *
  * A set of shared functions for ntfs utilities
@@ -77,9 +77,7 @@ extern DEC_PRINTF(Eprintf)
 extern DEC_PRINTF(Vprintf)
 extern DEC_PRINTF(Qprintf)
 
-int utils_valid_device (const char *name, int force);
 int utils_set_locale (void);
-ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
 int utils_parse_size (const char *value, s64 *size, BOOL scale);
 int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale);
 int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize);
@@ -89,8 +87,15 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata (ntfs_inode *inode);
 void utils_dump_mem (void *buf, int start, int length, int ascii);
 
+#ifndef _RICH_H_
 ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft);
+#endif
+
+#if !(defined (_NTFS_VOLUME_H) && defined (NTFS_RICH))
+int utils_valid_device (const char *name, int force);
+ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
+#endif
 
 /**
  * defines...
@@ -130,5 +135,28 @@ int mft_next_record (struct mft_search_ctx *ctx);
 #define DM_GREEN	(1 << 4)
 #define DM_BLUE		(1 << 5)
 #define DM_BOLD		(1 << 6)
+
+#ifdef NTFS_RICH
+
+#include "layout.h"
+#include "volume.h"
+#include "inode.h"
+#include "bitmap.h"
+#include "dir.h"
+
+#define RED	"\e[31m"
+#define GREEN	"\e[32m"
+#define YELLOW	"\e[33m"
+#define BLUE	"\e[34m"
+#define MAGENTA	"\e[35m"
+#define CYAN	"\e[36m"
+#define BOLD	"\e[01m"
+#define END	"\e[0m"
+
+#define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
+#define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
+#define ATTR_SIZE(s) ROUND_UP(s,8)
+
+#endif /* NTFS_RICH */
 
 #endif /* _NTFS_UTILS_H_ */
