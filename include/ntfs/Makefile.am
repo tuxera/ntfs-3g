@@ -21,6 +21,7 @@ linux_ntfsinclude_HEADERS = \
 	lcnalloc.h		\
 	list.h			\
 	logfile.h		\
+	logging.h		\
 	mft.h			\
 	mst.h			\
 	runlist.h		\

@@ -51,6 +51,7 @@ libntfs_la_SOURCES =	\
 	inode.c		\
 	lcnalloc.c	\
 	logfile.c	\
+	logging.c	\
 	mft.c		\
 	mst.c		\
 	runlist.c	\

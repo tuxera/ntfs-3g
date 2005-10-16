@@ -139,6 +139,16 @@ if test "$enable_test" = "yes"; then
 	CFLAGS="$CFLAGS -DNTFS_TEST"
 fi
 
+AH_TEMPLATE([NTFS_DISABLE_DEBUG_LOGGING],
+	    [Define this if you want to compile out the debug log messages.
+	     This will reduce the size of the binaries.])
+AC_ARG_ENABLE(debug-logging,
+	AS_HELP_STRING(--disable-debug-logging,Remove debug logging from the code),
+	if test "$enable_debug_logging" == "no"; then
+		AC_DEFINE(NTFS_DISABLE_DEBUG_LOGGING)
+	fi,
+)
+
 # Use GNU extensions if available.
 AC_GNU_SOURCE
 
