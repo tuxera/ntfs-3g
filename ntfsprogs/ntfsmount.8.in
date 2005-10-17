@@ -29,7 +29,7 @@ is recommended, but not mandatory.
 * List/Read/Write/Add/Remove named data streams.
 
 .TP
-.B Partly implented features:
+.B Partly implemented features:
 
 * Create/Delete/Move files and directories.
 
