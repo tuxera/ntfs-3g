@@ -4284,7 +4284,8 @@ static void mkntfs_create_root_structures(void)
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
 	MFT_REF root_ref, extend_ref;
-	int i, j, err, mft_total_cluster_size;
+	int i, j, err;
+	unsigned mft_total_cluster_size;
 	u8 *sd;
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
