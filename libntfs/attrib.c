@@ -2446,7 +2446,7 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 		errno = EINVAL;
 		return -1;
 	}
-	if (type != AT_INDEX_ALLOCATION && type != AT_EA)
+	if (type != AT_INDEX_ALLOCATION)
 		return 0;
 	errno = EPERM;
 	return -1;
