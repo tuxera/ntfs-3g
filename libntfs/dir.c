@@ -45,11 +45,22 @@
 #include "lcnalloc.h"
 
 /*
- * The little endian Unicode string "$I30" as a global constant.
+ * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
+ *  and "$Q" as global constants.
  */
 ntfschar I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		   const_cpu_to_le16('3'), const_cpu_to_le16('0'),
 		   const_cpu_to_le16('\0') };
+ntfschar SII[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
+                   const_cpu_to_le16('I'), const_cpu_to_le16('I'),
+                   const_cpu_to_le16('\0') };
+ntfschar SDH[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
+                   const_cpu_to_le16('D'), const_cpu_to_le16('H'),
+                   const_cpu_to_le16('\0') };
+ntfschar O[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('O'),
+                   const_cpu_to_le16('\0') };
+ntfschar Q[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('Q'),
+                   const_cpu_to_le16('\0') };
 
 /**
  * ntfs_inode_lookup_by_name - find an inode in a directory given its name

@@ -32,6 +32,8 @@ xx/xx/2005 - 1.12.2-WIP
 	  check because chkdsk doesn't fix $Bitmap with bad sectors.  (Szaka)
 	- $EA can be resident and non-resident.  Fix libntfs/attrib.c::
 	  ntfs_attr_can_be_resident() apropriately.  (Anton)
+	- mkntfs: optionally create NTFS version 3.0 (W2K) or 3.1 (XP, W2K3, 
+	  Vista).  (Implementation by Erik Sornes, adaption by Szaka)
 	    
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

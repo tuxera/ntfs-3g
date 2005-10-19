@@ -248,3 +248,26 @@ err_out:
 	errno = i;
 	return NULL;
 }
+
+/*
+ * GUID generate_guid(GUID *guid) 
+ * generatates a random current guid
+ * perhaps not a very good random number generator though...
+ */
+
+GUID *generate_guid(GUID *guid) {
+
+	int i;
+	static u8 array[16];
+
+	for (i = 0; i < 16; i++) {
+		array[i] = (u8)(random() & 0xFF);
+		if (i == 7) 
+			array[7] = (array[7] & 0x0F) | 0x40;
+		if (i == 8) 
+			array[8] = (array[8] & 0x3F) | 0x80;
+	}
+	memcpy(guid, array, sizeof(guid));
+	return guid;
+}
+
