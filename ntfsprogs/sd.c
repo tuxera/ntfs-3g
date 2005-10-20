@@ -223,7 +223,7 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	static char sd_array[0x1200];
         //char* sd_val = NULL;
 	*sd_val_len = 0x1200; 
-        *sd_val = (char*)&sd_array;
+        *sd_val = (u8*)&sd_array;
 
         //security descriptor relative
         sd = (SECURITY_DESCRIPTOR_RELATIVE*)&sd_array;

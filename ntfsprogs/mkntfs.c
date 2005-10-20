@@ -2135,12 +2135,12 @@ static int add_attr_object_id(MFT_RECORD *m, OBJECT_ID_ATTR *objid_attr,
         if (le32_to_cpu(m->bytes_in_use) + 24 + objid_attr_len > 
                                                 le32_to_cpu(m->bytes_allocated))
                 err = insert_non_resident_attr_in_mft_record(m,
-                                AT_OBJECT_ID, NULL, 0, 0, 0, (char*)objid_attr,
+                                AT_OBJECT_ID, NULL, 0, 0, 0, (u8*)objid_attr,
                                 objid_attr_len);
         else
                 err = insert_resident_attr_in_mft_record(m,
                                 AT_OBJECT_ID, NULL, 0, 0, 0, 0,
-				 (char*)objid_attr, objid_attr_len);
+				 (u8*)objid_attr, objid_attr_len);
         if (err < 0)
                 Eprintf("add_attr_volume_id failed: %s\n", strerror(-err));
         return err;
@@ -3288,7 +3288,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
         m_file->link_count = cpu_to_le16(i + 1);
         /* Add the file_name to @m_file. */
         i = insert_resident_attr_in_mft_record(m_file, AT_FILE_NAME, NULL, 0, 0,
-                        0, RESIDENT_ATTR_IS_INDEXED, (char*)fn, fn_size);
+                        0, RESIDENT_ATTR_IS_INDEXED, (u8*)fn, fn_size);
         if (i < 0) {
                 Eprintf("create_hardlink failed adding file name attribute: "
                                 "%s\n", strerror(-i));
@@ -4739,7 +4739,7 @@ static void mkntfs_create_root_structures(void)
 				buf_sds_first_size);  
                         memcpy((char*)buf_sds + 0x40000, (char*)buf_sds_init, 
 				buf_sds_first_size);
-                	err = add_attr_data(m, "$SDS", 4, 0, 0, buf_sds,
+                	err = add_attr_data(m, "$SDS", 4, 0, 0, (u8*)buf_sds,
 				 buf_sds_size);
 		}
         	// FIXME: This should be IGNORE_CASE
