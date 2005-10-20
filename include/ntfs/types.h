@@ -45,6 +45,11 @@ typedef int64_t s64;
 typedef u16 le16;
 typedef u32 le32;
 typedef u64 le64;
+
+/*
+ * Declare sle{16,32,64} to be unsigned because we do not want sign extension
+ * on BE architectures.
+ */
 typedef u16 sle16;
 typedef u32 sle32;
 typedef u64 sle64;
