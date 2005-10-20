@@ -32,7 +32,7 @@ LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs
 
 lib_LTLIBRARIES = libntfs.la
-libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS)
+libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS) -no-undefined
 libntfs_la_CFLAGS = $(LIBNTFS_CFLAGS) \
 	-DLTVERSION_LIBNTFS=\"$(LTVERSION_LIBNTFS)\"
 libntfs_la_SOURCES =	\
