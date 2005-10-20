@@ -542,9 +542,11 @@ exit:
 	return res;
 }
 
-static int ntfs_fuse_chmod(const char *path __attribute__((unused)),
+static int ntfs_fuse_chmod(const char *path,
 		mode_t mode __attribute__((unused)))
 {
+	if (strchr(path, ':'))
+		return -EINVAL; /* n/a for named data streams. */
 	if (ctx->succeed_chmod)
 		return 0;
 	return -EOPNOTSUPP;
@@ -655,6 +657,10 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	char *path;
 	int res = 0, uname_len;
 
+	if (strchr(old_path, ':'))
+		return -EINVAL; /* n/a for named data streams. */
+	if (strchr(new_path, ':'))
+		return -EINVAL; /* n/a for named data streams. */
 	path = strdup(new_path);
 	if (!path)
 		return -errno;
@@ -805,11 +811,15 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 static int ntfs_fuse_mkdir(const char *path,
 		mode_t mode __attribute__((unused)))
 {
+	if (strchr(path, ':'))
+		return -EINVAL; /* n/a for named data streams. */
 	return ntfs_fuse_create(path, NTFS_DT_DIR);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
 {
+	if (strchr(path, ':'))
+		return -EINVAL; /* n/a for named data streams. */
 	return ntfs_fuse_rm(path);
 }
 
