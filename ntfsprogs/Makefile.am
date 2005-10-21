@@ -48,7 +48,7 @@ ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)
 ntfsfix_LDFLAGS		= $(AM_LFLAGS)
 
-mkntfs_SOURCES		= attrdef.c upcase.c boot.c sd.c mkntfs.c utils.c utils.h
+mkntfs_SOURCES		= attrdef.c attrdef.h upcase.c upcase.h boot.c boot.h sd.c sd.h mkntfs.c utils.c utils.h
 mkntfs_LDADD		= $(AM_LIBS)
 mkntfs_LDFLAGS		= $(AM_LFLAGS)
 

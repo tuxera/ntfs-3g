@@ -1,4 +1,4 @@
-/*
+/**
  * debug.c - Debugging output functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
@@ -19,11 +19,14 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #include "types.h"
 #include "attrib.h"
 #include "debug.h"
+#include "logging.h"
 
 /**
  * Sprintf - silencable output to stderr
@@ -61,6 +64,9 @@ void __Sprintf(const int silent, const char *fmt, ...)
 
 /* Debug output to stderr.  To get it run ./configure --enable-debug. */
 
+/**
+ * __ntfs_error
+ */
 void __ntfs_error(const char *function, const char *fmt, ...)
 {
 	int eo = errno;
@@ -78,7 +84,10 @@ void __ntfs_error(const char *function, const char *fmt, ...)
 	errno = eo;
 }
 
-void __ntfs_debug (const char *file, int line, const char *function,
+/**
+ * __ntfs_debug
+ */
+void __ntfs_debug(const char *file, int line, const char *function,
 		const char *fmt, ...)
 {
 	int eo = errno;
@@ -96,6 +105,9 @@ void __ntfs_debug (const char *file, int line, const char *function,
 	errno = eo;
 }
 
+/**
+ * __Dprintf
+ */
 void __Dprintf(const char *fmt, ...)
 {
 	int eo = errno;
@@ -107,6 +119,9 @@ void __Dprintf(const char *fmt, ...)
 	errno = eo;
 }
 
+/**
+ * __Dputs
+ */
 void __Dputs(const char *s)
 {
 	int eo = errno;
@@ -114,6 +129,9 @@ void __Dputs(const char *s)
 	errno = eo;
 }
 
+/**
+ * __Dperror
+ */
 void __Dperror(const char *s)
 {
 	int eo = errno;
@@ -121,6 +139,9 @@ void __Dperror(const char *s)
 	errno = eo;
 }
 
+#endif
+
+#ifndef NTFS_DISABLE_DEBUG_LOGGING
 /**
  * ntfs_debug_runlist_dump - Dump a runlist.
  */
@@ -131,12 +152,12 @@ void ntfs_debug_runlist_dump(const runlist_element *rl)
 				   "LCN_ENOENT       ", "LCN_EINVAL       ",
 				   "LCN_unknown      " };
 
-	Dputs("NTFS-fs DEBUG: Dumping runlist (values in hex):");
+	ntfs_log_debug("NTFS-fs DEBUG: Dumping runlist (values in hex):\n");
 	if (!rl) {
-		Dputs("Run list not present.");
+		ntfs_log_debug("Run list not present.\n");
 		return;
 	}
-	Dputs("VCN              LCN               Run length");
+	ntfs_log_debug("VCN              LCN               Run length\n");
 	do {
 		LCN lcn = (rl + i)->lcn;
 
@@ -145,14 +166,11 @@ void ntfs_debug_runlist_dump(const runlist_element *rl)
 
 			if (idx > -LCN_EINVAL - 1)
 				idx = 4;
-			Dprintf("%-16llx %s %-16llx%s\n", rl[i].vcn,
-					lcn_str[idx], rl[i].length,
-					rl[i].length ? "" : " (runlist end)");
+			ntfs_log_debug("%-16llx %s %-16llx%s\n", rl[i].vcn, lcn_str[idx], rl[i].length, rl[i].length ? "" : " (runlist end)");
 		} else
-			Dprintf("%-16llx %-16llx  %-16llx%s\n", rl[i].vcn,
-					rl[i].lcn, rl[i].length,
-					rl[i].length ? "" : " (runlist end)");
+			ntfs_log_debug("%-16llx %-16llx  %-16llx%s\n", rl[i].vcn, rl[i].lcn, rl[i].length, rl[i].length ? "" : " (runlist end)");
 	} while (rl[i++].length);
 }
 
 #endif
+

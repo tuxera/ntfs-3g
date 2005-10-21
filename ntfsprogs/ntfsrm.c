@@ -264,7 +264,7 @@ static int utils_array_insert (void *ptr, int asize, int before, int count)
 		return -1;
 
 	src = (u8*) ptr + (before * esize);
- 	dst = src + (count * esize);
+	dst = src + (count * esize);
 	len = (asize - before) * esize;
 
 	// XXX what about realloc?
@@ -291,7 +291,7 @@ static int utils_array_remove (void *ptr, int asize, int first, int count)
 		return -1;
 
 	dst = (u8*) ptr + (first * esize);
- 	src = dst + (count * esize);
+	src = dst + (count * esize);
 	len = (asize - first) * esize;
 
 	memmove (dst, src, len);

@@ -176,7 +176,7 @@ static void parse_options(int argc, char **argv)
 		{ "debug",		no_argument,	NULL, 'd' },
 #endif
 		{ "help",		no_argument,	NULL, 'h' },
-		{ "no-progress-bar", 	no_argument,	NULL, 'P' },
+		{ "no-progress-bar",	no_argument,	NULL, 'P' },
 		{ "verbose",		no_argument,	NULL, 'v' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -193,7 +193,7 @@ static void parse_options(int argc, char **argv)
 				opt.vol1 = argv[optind - 1];
 			} else if (!opt.vol2) {
 				opt.vol2 = argv[optind - 1];
-			} else	{
+			} else {
 				err_printf("Too many arguments!\n");
 				usage();
 			}
@@ -284,7 +284,7 @@ static u64 inumber(ntfs_inode *ni)
 {
 	if (ni->nr_extents >= 0)
 		return ni->mft_no;
-	
+
 	return ni->base_ni->mft_no;
 }
 
@@ -312,7 +312,7 @@ static inline s64 get_nr_mft_records(ntfs_volume *vol)
 #define  NTFSCMP_EXTENSION_RECORD		4
 #define  NTFSCMP_INODE_CLOSE_ERROR		5
 
-const char *ntfscmp_errs[] = { 
+const char *ntfscmp_errs[] = {
 	"OK",
 	"INODE_OPEN_ERROR",
 	"INODE_OPEN_IO_ERROR",
@@ -325,7 +325,7 @@ const char *ntfscmp_errs[] = {
 
 static const char *err2string(int err)
 {
-	return ntfscmp_errs[err]; 
+	return ntfscmp_errs[err];
 }
 
 static const char *pret2str(void *p)
@@ -352,7 +352,7 @@ static int inode_open(ntfs_volume *vol, MFT_REF mref, ntfs_inode **ni)
 
 		if (inode_close(*ni) != 0)
 			return NTFSCMP_INODE_CLOSE_ERROR;
-		
+
 		return NTFSCMP_EXTENSION_RECORD;
 	}
 
@@ -363,7 +363,7 @@ static ntfs_inode *base_inode(ntfs_attr_search_ctx *ctx)
 {
 	if (ctx->base_ntfs_ino)
 		return ctx->base_ntfs_ino;
-	
+
 	return ctx->ntfs_ino;
 }
 
@@ -401,7 +401,7 @@ static void free_name(char **name)
 
 static char *get_attr_name(u64 mft_no,
 			   ATTR_TYPES atype,
-			   const ntfschar *uname, 
+			   const ntfschar *uname,
 			   const int uname_len)
 {
 	char *name = NULL;
@@ -417,7 +417,7 @@ static char *get_attr_name(u64 mft_no,
 		print_attribute_type(atype);
 		puts("");
 		exit(1);
-	
+
 	} else if (name_len > 0)
 		return name;
 
@@ -495,9 +495,9 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			printf("len = %lld, pos = %lld\n", na1->data_size, pos);
 			exit(1);
 		}
-		
+
 		if (count1 == 0) {
-			
+
 			if (pos + count1 == na1->data_size)
 				return; /* we are ready */
 
@@ -506,7 +506,7 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			printf("%lld  !=  %lld\n", pos + count1, na1->data_size);
 			exit(1);
 		}
-		
+
 		if (memcmp(buf1, buf2, count1)) {
 			print_na(na1);
 			printf("content");
@@ -515,15 +515,15 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			return;
 		}
 	}
-	
+
 	err_printf("%s read overrun: ", __FUNCTION__);
 	print_na(na1);
-	err_printf("(len = %lld, pos = %lld, count = %lld)\n", 
+	err_printf("(len = %lld, pos = %lld, count = %lld)\n",
 		  na1->data_size, pos, count1);
 	exit(1);
 }
 
-static void cmp_attribute(ntfs_attr_search_ctx *ctx1, 
+static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 			  ntfs_attr_search_ctx *ctx2)
 {
 	ATTR_RECORD *a1 = ctx1->attr;
@@ -532,7 +532,7 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 
 	na1 = ntfs_attr_open(base_inode(ctx1), a1->type, GET_ATTR_NAME(a1));
 	na2 = ntfs_attr_open(base_inode(ctx2), a2->type, GET_ATTR_NAME(a2));
-	
+
 	if ((!na1 && na2) || (na1 && !na2)) {
 		print_ctx(ctx1);
 		printf("open:   %s  !=  %s\n", pret2str(na1), pret2str(na2));
@@ -579,7 +579,7 @@ static int new_name(ntfs_attr_search_ctx *ctx, char *prev_name)
 {
 	int ret = 0;
 	char *name = get_attr_name_ctx(ctx);
-	
+
 	if (prev_name && name) {
 		if (strcmp(prev_name, name) != 0)
 			ret = 1;
@@ -597,13 +597,13 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 {
 	if (!prev_atype && !prev_name)
 		return 1;
-	
+
 	if (!ctx->attr->non_resident)
 		return 1;
 
 	if (prev_atype != ctx->attr->type)
 		return 1;
-	    
+
 	if (new_name(ctx, prev_name))
 		return 1;
 
@@ -613,11 +613,11 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 		printf("record %llu lowest_vcn %lld:    SKIPPED\n",
 			ctx->ntfs_ino->mft_no, ctx->attr->lowest_vcn);
 	}
-	
+
 	return 0;
 }
-	
-static void set_prev(char **prev_name, ATTR_TYPES *prev_atype, 
+
+static void set_prev(char **prev_name, ATTR_TYPES *prev_atype,
 		     char *name, ATTR_TYPES atype)
 {
 	free_name(prev_name);
@@ -632,8 +632,8 @@ static void set_prev(char **prev_name, ATTR_TYPES *prev_atype,
 
 static void set_cmp_attr(ntfs_attr_search_ctx *ctx, ATTR_TYPES *atype, char **name)
 {
-	*atype = ctx->attr->type; 
-	
+	*atype = ctx->attr->type;
+
 	free_name(name);
 	*name = get_attr_name_ctx(ctx);
 }
@@ -642,15 +642,15 @@ static int next_attr(ntfs_attr_search_ctx *ctx, ATTR_TYPES *atype, char **name,
 		     int *err)
 {
 	int ret;
-	 
+
 	ret = ntfs_attrs_walk(ctx);
 	*err = errno;
-       	if (ret) {
+	if (ret) {
 		*atype = AT_END;
 		free_name(name);
 	} else
 		set_cmp_attr(ctx, atype, name);
-	
+
 	return ret;
 }
 
@@ -662,12 +662,12 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 	char  *prev_name = NULL, *name1 = NULL, *name2 = NULL;
 	ATTR_TYPES old_atype1, prev_atype = 0, atype1, atype2;
 	ntfs_attr_search_ctx *ctx1, *ctx2;
-	
+
 	if (!(ctx1 = attr_get_search_ctx(ni1)))
 		return -1;
 	if (!(ctx2 = attr_get_search_ctx(ni2)))
 		goto out;
-	
+
 	set_cmp_attr(ctx1, &atype1, &name1);
 	set_cmp_attr(ctx2, &atype2, &name2);
 
@@ -681,7 +681,7 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 			ret2 = next_attr(ctx2, &atype2, &name2, &errno2);
 
 		print_attributes(ni1, atype1, atype2, name1, name2);
-		
+
 		if (ret1 && ret2) {
 			if (errno1 != errno2) {
 				print_inode_ni(ni1);
@@ -697,14 +697,14 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 				printf("presence:   EXISTS   !=   MISSING\n");
 				set_prev(&prev_name, &prev_atype, name1, atype1);
 			}
-		
+
 		} else if (ret1 || atype1 > atype2) {
 			if (new_attribute(ctx2, prev_atype, prev_name)) {
 				print_ctx(ctx2);
 				printf("presence:   MISSING  !=  EXISTS \n");
 				set_prev(&prev_name, &prev_atype, name2, atype2);
 			}
-		
+
 		} else /* atype1 == atype2 */ {
 			if (new_attribute(ctx1, prev_atype, prev_name)) {
 				cmp_attribute(ctx1, ctx2);
@@ -759,7 +759,7 @@ static int cmp_inodes(ntfs_volume *vol1, ntfs_volume *vol2)
 
 		if (ret1 != ret2) {
 			print_inode(inode);
-			printf("open:   %s  !=  %s\n", 
+			printf("open:   %s  !=  %s\n",
 			       err2string(ret1), err2string(ret2));
 			goto close_inodes;
 		}

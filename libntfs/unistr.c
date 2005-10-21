@@ -1,4 +1,4 @@
-/*
+/**
  * unistr.c - Unicode string handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
@@ -19,7 +19,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -40,6 +42,7 @@
 #include "types.h"
 #include "unistr.h"
 #include "debug.h"
+#include "logging.h"
 
 /*
  * IMPORTANT
@@ -129,7 +132,7 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 
 #ifdef DEBUG
 	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
-		Dputs("ntfs_names_collate received NULL pointer!");
+		ntfs_log_debug("ntfs_names_collate received NULL pointer!\n");
 		exit(1);
 	}
 #endif
@@ -187,7 +190,7 @@ int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 
 #ifdef DEBUG
 	if (!s1 || !s2) {
-		Dputs("ntfs_wcsncmp() received NULL pointer!");
+		ntfs_log_debug("ntfs_wcsncmp() received NULL pointer!\n");
 		exit(1);
 	}
 #endif
@@ -230,7 +233,7 @@ int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
 
 #ifdef DEBUG
 	if (!s1 || !s2 || !upcase) {
-		Dputs("ntfs_wcsncasecmp() received NULL pointer!");
+		ntfs_log_debug("ntfs_wcsncasecmp() received NULL pointer!\n");
 		exit(1);
 	}
 #endif
@@ -428,7 +431,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		if (cnt == -1)
 			goto err_out;
 		if (cnt <= 0) {
-			Dprintf("Eeek. cnt <= 0, cnt = %i\n", cnt);
+			ntfs_log_debug("Eeek. cnt <= 0, cnt = %i\n", cnt);
 			errno = EINVAL;
 			goto err_out;
 		}
@@ -437,7 +440,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 #ifdef HAVE_MBSINIT
 	/* Make sure we are back in the initial state. */
 	if (!mbsinit(&mbstate)) {
-		Dputs("Eeek. mbstate not in initial state!");
+		ntfs_log_debug("Eeek. mbstate not in initial state!\n");
 		errno = EILSEQ;
 		goto err_out;
 	}
@@ -572,7 +575,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 		if (cnt == -1)
 			goto err_out;
 		if (cnt < -1) {
-			Dprintf("%s(): Eeek. cnt = %i\n", __FUNCTION__, cnt);
+			ntfs_log_trace("Eeek. cnt = %i\n", cnt);
 			errno = EINVAL;
 			goto err_out;
 		}
@@ -588,8 +591,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 #ifdef HAVE_MBSINIT
 	/* Make sure we are back in the initial state. */
 	if (!mbsinit(&mbstate)) {
-		Dprintf("%s(): Eeek. mbstate not in initial state!\n",
-				__FUNCTION__);
+		ntfs_log_trace("Eeek. mbstate not in initial state!\n");
 		errno = EILSEQ;
 		goto err_out;
 	}

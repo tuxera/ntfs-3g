@@ -29,11 +29,11 @@
 #endif
 
 #include "types.h"
+#include "upcase.h"
 
 /**
  * init_upcase_table
  */
-void init_upcase_table(ntfschar *uc, u32 uc_len);
 void init_upcase_table(ntfschar *uc, u32 uc_len)
 {
 	static int uc_run_table[][3] = { /* Start, End, Add */

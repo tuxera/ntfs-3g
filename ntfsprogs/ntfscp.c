@@ -222,7 +222,7 @@ static int parse_options (int argc, char **argv)
 		opts.quiet = 0;
 	} else {
 		if (!opts.device) {
-		       	Eprintf("You must specify a device.\n");
+			Eprintf("You must specify a device.\n");
 			err++;
 		} else if (!opts.src_file) {
 			Eprintf("You must specify a source file.\n");

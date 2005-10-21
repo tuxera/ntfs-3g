@@ -39,7 +39,7 @@ struct options {
 	int		 verbose;	/* Extra output */
 	int		 noaction;	/* Do not write to disk */
 	int		 nodirty;	/* Do not mark volume dirty */
-	u8 		 padding[4];	/* Unused: alignment to 64 bit. */
+	u8		 padding[4];	/* Unused: alignment to 64 bit. */
 };
 
 #endif /* _NTFSMOVE_H_ */

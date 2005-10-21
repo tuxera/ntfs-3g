@@ -21,7 +21,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -37,13 +39,13 @@
 #endif
 
 #include "compat.h"
-
 #include "types.h"
 #include "attrib.h"
 #include "volume.h"
 #include "layout.h"
 #include "debug.h"
 #include "device.h"
+#include "logging.h"
 
 /**
  * Internal:
@@ -114,8 +116,8 @@ static __inline__ BOOL ntfs_rl_are_mergeable(runlist_element *dst,
 		runlist_element *src)
 {
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_rl_are_mergeable() invoked with NULL "
-				"pointer!");
+		ntfs_log_debug("Eeek. ntfs_rl_are_mergeable() invoked with NULL "
+				"pointer!\n");
 		return FALSE;
 	}
 
@@ -182,7 +184,8 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_rl_append() invoked with NULL pointer!");
+		ntfs_log_debug("Eeek. ntfs_rl_append() invoked with NULL "
+				"pointer!\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -251,7 +254,8 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_rl_insert() invoked with NULL pointer!");
+		ntfs_log_debug("Eeek. ntfs_rl_insert() invoked with NULL "
+				"pointer!\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -349,7 +353,8 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 	int marker;		/* End of the inserted runs */
 
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_rl_replace() invoked with NULL pointer!");
+		ntfs_log_debug("Eeek. ntfs_rl_replace() invoked with NULL "
+				"pointer!\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -428,7 +433,7 @@ static __inline__ runlist_element *ntfs_rl_split(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	if (!dst || !src) {
-		Dputs("Eeek. ntfs_rl_split() invoked with NULL pointer!");
+		ntfs_log_debug("Eeek. ntfs_rl_split() invoked with NULL pointer!\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -499,9 +504,9 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	int marker = 0;
 	VCN marker_vcn = 0;
 
-	Dputs("dst:");
+	ntfs_log_debug("dst:\n");
 	ntfs_debug_runlist_dump(drl);
-	Dputs("src:");
+	ntfs_log_debug("src:\n");
 	ntfs_debug_runlist_dump(srl);
 
 	/* Check for silly calling... */
@@ -537,8 +542,8 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 
 	/* Can't have an entirely unmapped source runlist. */
 	if (!srl[si].length) {
-		Dputs("Eeek! ntfs_runlists_merge() received entirely "
-				"unmapped source runlist.");
+		ntfs_log_debug("Eeek! ntfs_runlists_merge() received entirely "
+				"unmapped source runlist.\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -560,7 +565,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	/* Sanity check for illegal overlaps. */
 	if ((drl[di].vcn == srl[si].vcn) && (drl[di].lcn >= 0) &&
 			(srl[si].lcn >= 0)) {
-		Dputs("Run lists overlap. Cannot merge!");
+		ntfs_log_debug("Run lists overlap. Cannot merge!\n");
 		errno = ERANGE;
 		return NULL;
 	}
@@ -598,10 +603,10 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	if (marker && (drl[dins].vcn + drl[dins].length > srl[send - 1].vcn))
 		finish = FALSE;
 #ifdef DEBUG
-	Dprintf("dfinal = %i, dend = %i\n", dfinal, dend);
-	Dprintf("sstart = %i, sfinal = %i, send = %i\n", sstart, sfinal, send);
-	Dprintf("start = %i, finish = %i\n", start, finish);
-	Dprintf("ds = %i, ss = %i, dins = %i\n", ds, ss, dins);
+	ntfs_log_debug("dfinal = %i, dend = %i\n", dfinal, dend);
+	ntfs_log_debug("sstart = %i, sfinal = %i, send = %i\n", sstart, sfinal, send);
+	ntfs_log_debug("start = %i, finish = %i\n", start, finish);
+	ntfs_log_debug("ds = %i, ss = %i, dins = %i\n", ds, ss, dins);
 #endif
 	if (start) {
 		if (finish)
@@ -615,13 +620,12 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			drl = ntfs_rl_split(drl, ds, srl + sstart, ss, dins);
 	}
 	if (!drl) {
-		Dprintf("%s(): Merge failed: %s\n", __FUNCTION__,
-				strerror(errno));
+		ntfs_log_perror("Merge failed");
 		return drl;
 	}
 	free(srl);
 	if (marker) {
-		Dputs("Triggering marker code.");
+		ntfs_log_debug("Triggering marker code.\n");
 		for (ds = dend; drl[ds].length; ds++)
 			;
 		/* We only need to care if @srl ended after @drl. */
@@ -629,7 +633,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			int slots = 0;
 
 			if (drl[ds].vcn == marker_vcn) {
-				Dprintf("Old marker = %lli, replacing with "
+				ntfs_log_debug("Old marker = %lli, replacing with "
 						"LCN_ENOENT.\n",
 						(long long)drl[ds].lcn);
 				drl[ds].lcn = (LCN)LCN_ENOENT;
@@ -684,14 +688,14 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 
 finished:
 	/* The merge was completed successfully. */
-	Dputs("Merged runlist:");
+	ntfs_log_debug("Merged runlist:\n");
 	ntfs_debug_runlist_dump(drl);
 	return drl;
 
 critical_error:
 	/* Critical error! We cannot afford to fail here. */
-	Dperror("libntfs: Critical error");
-	Dputs("Forcing segmentation fault!");
+	ntfs_log_perror("libntfs: Critical error");
+	ntfs_log_debug("Forcing segmentation fault!\n");
 	marker_vcn = ((runlist*)NULL)->lcn;
 	return drl;
 }
@@ -737,7 +741,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 				   runlist_elements. */
 	u8 b;			/* Current byte offset in buf. */
 
-	Dprintf("%s(): Entering for attr 0x%x.\n", __FUNCTION__,
+	ntfs_log_trace("Entering for attr 0x%x.\n",
 			(unsigned)le32_to_cpu(attr->type));
 	/* Make sure attr exists and is non-resident. */
 	if (!attr || !attr->non_resident ||
@@ -752,7 +756,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	buf = (const u8*)attr + le16_to_cpu(attr->mapping_pairs_offset);
 	attr_end = (const u8*)attr + le32_to_cpu(attr->length);
 	if (buf < (const u8*)attr || buf > attr_end) {
-		Dputs("Corrupt attribute.");
+		ntfs_log_debug("Corrupt attribute.\n");
 		errno = EIO;
 		return NULL;
 	}
@@ -803,7 +807,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 			for (deltaxcn = (s8)buf[b--]; b; b--)
 				deltaxcn = (deltaxcn << 8) + buf[b];
 		} else { /* The length entry is compulsory. */
-			Dputs("Missing length entry in mapping pairs array.");
+			ntfs_log_debug("Missing length entry in mapping pairs "
+					"array.\n");
 			deltaxcn = (s64)-1;
 		}
 		/*
@@ -811,7 +816,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		 * hence clean-up and return NULL.
 		 */
 		if (deltaxcn < 0) {
-			Dputs("Invalid length in mapping pairs array.");
+			ntfs_log_debug("Invalid length in mapping pairs array.\n");
 			goto err_out;
 		}
 		/*
@@ -848,15 +853,15 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 			 */
 			if (vol->major_ver < 3) {
 				if (deltaxcn == (LCN)-1)
-					Dputs("lcn delta == -1");
+					ntfs_log_debug("lcn delta == -1\n");
 				if (lcn == (LCN)-1)
-					Dputs("lcn == -1");
+					ntfs_log_debug("lcn == -1\n");
 			}
 #endif
 			/* Check lcn is not below -1. */
 			if (lcn < (LCN)-1) {
-				Dputs("Invalid LCN < -1 in mapping pairs "
-						"array.");
+				ntfs_log_debug("Invalid LCN < -1 in mapping pairs "
+						"array.\n");
 				goto err_out;
 			}
 			/* Enter the current lcn into the runlist element. */
@@ -876,7 +881,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	deltaxcn = sle64_to_cpu(attr->highest_vcn);
 	if (deltaxcn && vcn - 1 != deltaxcn) {
 mpa_err:
-		Dputs("Corrupt mapping pairs array in non-resident attribute.");
+		ntfs_log_debug("Corrupt mapping pairs array in non-resident "
+				"attribute.\n");
 		goto err_out;
 	}
 	/* Setup not mapped runlist element if this is the base extent. */
@@ -898,8 +904,8 @@ mpa_err:
 			 * this one.
 			 */
 			if (deltaxcn < max_cluster) {
-				Dprintf("More extents to follow; deltaxcn = 0x%llx, "
-						"max_cluster = 0x%llx\n",
+				ntfs_log_debug("More extents to follow; deltaxcn = "
+						"0x%llx, max_cluster = 0x%llx\n",
 						(long long)deltaxcn,
 						(long long)max_cluster);
 				rl[rlpos].vcn = vcn;
@@ -907,8 +913,8 @@ mpa_err:
 				rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
 				rlpos++;
 			} else if (deltaxcn > max_cluster) {
-				Dprintf("Corrupt attribute. deltaxcn = 0x%llx, "
-						"max_cluster = 0x%llx",
+				ntfs_log_debug("Corrupt attribute. deltaxcn = "
+						"0x%llx, max_cluster = 0x%llx",
 						(long long)deltaxcn,
 						(long long)max_cluster);
 				goto mpa_err;
@@ -923,7 +929,7 @@ mpa_err:
 	rl[rlpos].length = (s64)0;
 	/* If no existing runlist was specified, we are done. */
 	if (!old_rl) {
-		Dputs("Mapping pairs array successfully decompressed:");
+		ntfs_log_debug("Mapping pairs array successfully decompressed:\n");
 		ntfs_debug_runlist_dump(rl);
 		return rl;
 	}
@@ -933,11 +939,11 @@ mpa_err:
 		return old_rl;
 	err = errno;
 	free(rl);
-	Dputs("Failed to merge runlists.");
+	ntfs_log_debug("Failed to merge runlists.\n");
 	errno = err;
 	return NULL;
 io_error:
-	Dputs("Corrupt attribute.");
+	ntfs_log_debug("Corrupt attribute.\n");
 err_out:
 	free(rl);
 	errno = EIO;
@@ -1256,15 +1262,15 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 	int rls;
 
 	if (start_vcn < 0) {
-		Dprintf("%s(): start_vcn %lld (should be >= 0)",
-			__FUNCTION__, (long long) start_vcn);
+		ntfs_log_trace("start_vcn %lld (should be >= 0)\n",
+				(long long) start_vcn);
 		errno = EINVAL;
 		return -1;
 	}
 	if (!rl) {
 		if (start_vcn) {
-			Dprintf("%s(): rl NULL, start_vcn %lld (should be > 0)",
-				__FUNCTION__, (long long) start_vcn);
+			ntfs_log_trace("rl NULL, start_vcn %lld (should be > 0)\n",
+					(long long) start_vcn);
 			errno = EINVAL;
 			return -1;
 		}
@@ -1581,8 +1587,8 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	rl = *arl;
 	if (start_vcn < rl->vcn) {
 		// FIXME: Eeek! BUG()
-		Dprintf("%s(): Eeek! start_vcn lies outside front of "
-				"runlist!  Aborting.\n", __FUNCTION__);
+		ntfs_log_trace("Eeek! start_vcn lies outside front of runlist!  "
+				"Aborting.\n");
 		errno = EIO;
 		return -1;
 	}
@@ -1594,15 +1600,14 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	}
 	if (!rl->length) {
 		// FIXME: Weird, probably a BUG()!
-		Dprintf("%s(): Weird!  Asking to truncate already truncated "
-				"runlist?!?  Abort.\n", __FUNCTION__);
+		ntfs_log_trace("Weird!  Asking to truncate already truncated "
+				"runlist?!?  Abort.\n");
 		errno = EIO;
 		return -1;
 	}
 	if (start_vcn < rl->vcn) {
 		// FIXME: Eeek! BUG()
-		Dprintf("%s(): Eeek!  start_vcn < rl->vcn!  Aborting.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Eeek!  start_vcn < rl->vcn!  Aborting.\n");
 		errno = EIO;
 		return -1;
 	}
@@ -1635,9 +1640,8 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 			*arl = NULL;
 		else {
 			// FIXME: Eeek!
-			Dprintf("%s(): Eeek!  Failed to reallocate runlist "
-					"buffer!  Continuing regardless and "
-					"returning success.\n", __FUNCTION__);
+			ntfs_log_trace("Eeek!  Failed to reallocate runlist buffer!  "
+				"Continuing regardless and returning success.\n");
 		}
 	}
 	/* Done! */
@@ -1655,7 +1659,7 @@ int ntfs_rl_sparse(runlist *rl)
 	runlist *rlc;
 
 	if (!rl) {
-		Dprintf("%s(): Invalid argument passed.\n", __FUNCTION__);
+		ntfs_log_trace("Invalid argument passed.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -1663,8 +1667,7 @@ int ntfs_rl_sparse(runlist *rl)
 	for (rlc = rl; rlc->length; rlc++)
 		if (rlc->lcn < 0) {
 			if (rlc->lcn != LCN_HOLE) {
-				Dprintf("%s(): Received unmapped runlist.\n",
-					__FUNCTION__);
+				ntfs_log_trace("Received unmapped runlist.\n");
 				errno = EINVAL;
 				return -1;
 			}
@@ -1686,7 +1689,7 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 	s64 ret = 0;
 
 	if (!rl) {
-		Dprintf("%s(): Invalid argument passed.\n", __FUNCTION__);
+		ntfs_log_trace("Invalid argument passed.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -1694,8 +1697,7 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 	for (rlc = rl; rlc->length; rlc++) {
 		if (rlc->lcn < 0) {
 			if (rlc->lcn != LCN_HOLE) {
-				Dprintf("%s(): Received unmapped runlist.\n",
-					__FUNCTION__);
+				ntfs_log_trace("Received unmapped runlist.\n");
 				errno = EINVAL;
 				return -1;
 			}
@@ -1720,7 +1722,7 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 /**
  * test_rl_dump_runlist
  */
-static void test_rl_dump_runlist (const runlist_element *rl)
+static void test_rl_dump_runlist(const runlist_element *rl)
 {
 	int abbr = 0;	/* abbreviate long lists */
 	int len = 0;
@@ -1728,20 +1730,20 @@ static void test_rl_dump_runlist (const runlist_element *rl)
 	const char *lcn_str[5] = { "HOLE", "NOTMAP", "ENOENT", "XXXX" };
 
 	if (!rl) {
-		printf("    Run list not present.\n");
+		ntfs_log_debug("    Run list not present.\n");
 		return;
 	}
 
 	if (abbr)
 		for (len = 0; rl[len].length; len++) ;
 
-	printf("     VCN      LCN      len\n");
+	ntfs_log_debug("     VCN      LCN      len\n");
 	for (i = 0; ; i++, rl++) {
 		LCN lcn = rl->lcn;
 
 		if ((abbr) && (len > 20)) {
 			if (i == 4)
-				printf ("     ...\n");
+				ntfs_log_debug("     ...\n");
 			if ((i > 3) && (i < (len - 3)))
 				continue;
 		}
@@ -1751,35 +1753,35 @@ static void test_rl_dump_runlist (const runlist_element *rl)
 
 			if (ind > -LCN_ENOENT - 1)
 				ind = 3;
-			printf("%8lld %8s %8lld\n",
+			ntfs_log_debug("%8lld %8s %8lld\n",
 				rl->vcn, lcn_str[ind], rl->length);
 		} else
-			printf("%8lld %8lld %8lld\n",
+			ntfs_log_debug("%8lld %8lld %8lld\n",
 				rl->vcn, rl->lcn, rl->length);
 		if (!rl->length)
 			break;
 	}
 	if ((abbr) && (len > 20))
-		printf ("    (%d entries)\n", len+1);
-	printf ("\n");
+		ntfs_log_debug("    (%d entries)\n", len+1);
+	ntfs_log_debug("\n");
 }
 
 /**
  * test_rl_runlists_merge
  */
-static runlist_element * test_rl_runlists_merge (runlist_element *drl, runlist_element *srl)
+static runlist_element * test_rl_runlists_merge(runlist_element *drl, runlist_element *srl)
 {
 	runlist_element *res = NULL;
 
-	printf ("dst:\n");
-	test_rl_dump_runlist (drl);
-	printf ("src:\n");
-	test_rl_dump_runlist (srl);
+	ntfs_log_debug("dst:\n");
+	test_rl_dump_runlist(drl);
+	ntfs_log_debug("src:\n");
+	test_rl_dump_runlist(srl);
 
-	res = ntfs_runlists_merge (drl, srl);
+	res = ntfs_runlists_merge(drl, srl);
 
-	printf ("res:\n");
-	test_rl_dump_runlist (res);
+	ntfs_log_debug("res:\n");
+	test_rl_dump_runlist(res);
 
 	return res;
 }
@@ -1787,29 +1789,29 @@ static runlist_element * test_rl_runlists_merge (runlist_element *drl, runlist_e
 /**
  * test_rl_read_buffer
  */
-static int test_rl_read_buffer (const char *file, u8 *buf, int bufsize)
+static int test_rl_read_buffer(const char *file, u8 *buf, int bufsize)
 {
 	FILE *fptr;
 
-	fptr = fopen (file, "r");
+	fptr = fopen(file, "r");
 	if (!fptr) {
-		printf ("open %s\n", file);
+		ntfs_log_debug("open %s\n", file);
 		return 0;
 	}
 
-	if (fread (buf, bufsize, 1, fptr) == 99) {
-		printf ("read %s\n", file);
+	if (fread(buf, bufsize, 1, fptr) == 99) {
+		ntfs_log_debug("read %s\n", file);
 		return 0;
 	}
 
-	fclose (fptr);
+	fclose(fptr);
 	return 1;
 }
 
 /**
  * test_rl_pure_src
  */
-static runlist_element * test_rl_pure_src (BOOL contig, BOOL multi, int vcn, int len)
+static runlist_element * test_rl_pure_src(BOOL contig, BOOL multi, int vcn, int len)
 {
 	runlist_element *result;
 	int fudge;
@@ -1819,16 +1821,16 @@ static runlist_element * test_rl_pure_src (BOOL contig, BOOL multi, int vcn, int
 	else
 		fudge = 999;
 
-	result = malloc (4096);
+	result = malloc(4096);
 	if (multi) {
-		MKRL (result+0, vcn + (0*len/4), fudge + vcn + 1000 + (0*len/4), len / 4)
-		MKRL (result+1, vcn + (1*len/4), fudge + vcn + 1000 + (1*len/4), len / 4)
-		MKRL (result+2, vcn + (2*len/4), fudge + vcn + 1000 + (2*len/4), len / 4)
-		MKRL (result+3, vcn + (3*len/4), fudge + vcn + 1000 + (3*len/4), len / 4)
-		MKRL (result+4, vcn + (4*len/4), LCN_RL_NOT_MAPPED,              0)
+		MKRL(result+0, vcn + (0*len/4), fudge + vcn + 1000 + (0*len/4), len / 4)
+		MKRL(result+1, vcn + (1*len/4), fudge + vcn + 1000 + (1*len/4), len / 4)
+		MKRL(result+2, vcn + (2*len/4), fudge + vcn + 1000 + (2*len/4), len / 4)
+		MKRL(result+3, vcn + (3*len/4), fudge + vcn + 1000 + (3*len/4), len / 4)
+		MKRL(result+4, vcn + (4*len/4), LCN_RL_NOT_MAPPED,              0)
 	} else {
-		MKRL (result+0, vcn,       fudge + vcn + 1000, len)
-		MKRL (result+1, vcn + len, LCN_RL_NOT_MAPPED,  0)
+		MKRL(result+0, vcn,       fudge + vcn + 1000, len)
+		MKRL(result+1, vcn + len, LCN_RL_NOT_MAPPED,  0)
 	}
 	return result;
 }
@@ -1836,27 +1838,27 @@ static runlist_element * test_rl_pure_src (BOOL contig, BOOL multi, int vcn, int
 /**
  * test_rl_pure_test
  */
-static void test_rl_pure_test (int test, BOOL contig, BOOL multi, int vcn, int len, runlist_element *file, int size)
+static void test_rl_pure_test(int test, BOOL contig, BOOL multi, int vcn, int len, runlist_element *file, int size)
 {
 	runlist_element *src;
 	runlist_element *dst;
 	runlist_element *res;
 
-	src = test_rl_pure_src (contig, multi, vcn, len);
-	dst = malloc (4096);
+	src = test_rl_pure_src(contig, multi, vcn, len);
+	dst = malloc(4096);
 
-	memcpy (dst, file, size);
+	memcpy(dst, file, size);
 
-	printf ("Test %2d ----------\n", test);
-	res = test_rl_runlists_merge (dst, src);
+	ntfs_log_debug("Test %2d ----------\n", test);
+	res = test_rl_runlists_merge(dst, src);
 
-	free (res);
+	free(res);
 }
 
 /**
  * test_rl_pure
  */
-static void test_rl_pure (char *contig, char *multi)
+static void test_rl_pure(char *contig, char *multi)
 {
 		/* VCN,  LCN, len */
 	static runlist_element file1[] = {
@@ -1894,118 +1896,118 @@ static void test_rl_pure (char *contig, char *multi)
 	};
 	BOOL c, m;
 
-	if (strcmp (contig, "contig") == 0)
+	if (strcmp(contig, "contig") == 0)
 		c = TRUE;
-	else if (strcmp (contig, "noncontig") == 0)
+	else if (strcmp(contig, "noncontig") == 0)
 		c = FALSE;
 	else {
-		printf ("rl pure [contig|noncontig] [single|multi]\n");
+		ntfs_log_debug("rl pure [contig|noncontig] [single|multi]\n");
 		return;
 	}
-	if (strcmp (multi, "multi") == 0)
+	if (strcmp(multi, "multi") == 0)
 		m = TRUE;
-	else if (strcmp (multi, "single") == 0)
+	else if (strcmp(multi, "single") == 0)
 		m = FALSE;
 	else {
-		printf ("rl pure [contig|noncontig] [single|multi]\n");
+		ntfs_log_debug("rl pure [contig|noncontig] [single|multi]\n");
 		return;
 	}
 
-	test_rl_pure_test (1,  c, m,   0,  40, file1, sizeof (file1));
-	test_rl_pure_test (2,  c, m,  40,  40, file1, sizeof (file1));
-	test_rl_pure_test (3,  c, m,  60,  40, file1, sizeof (file1));
-	test_rl_pure_test (4,  c, m,   0, 100, file1, sizeof (file1));
-	test_rl_pure_test (5,  c, m, 200,  40, file1, sizeof (file1));
-	test_rl_pure_test (6,  c, m, 240,  40, file1, sizeof (file1));
-	test_rl_pure_test (7,  c, m, 260,  40, file1, sizeof (file1));
-	test_rl_pure_test (8,  c, m, 200, 100, file1, sizeof (file1));
-	test_rl_pure_test (9,  c, m, 400,  40, file1, sizeof (file1));
-	test_rl_pure_test (10, c, m, 440,  40, file1, sizeof (file1));
-	test_rl_pure_test (11, c, m, 460,  40, file1, sizeof (file1));
-	test_rl_pure_test (12, c, m, 400, 100, file1, sizeof (file1));
-	test_rl_pure_test (13, c, m, 160, 100, file2, sizeof (file2));
-	test_rl_pure_test (14, c, m, 100, 140, file2, sizeof (file2));
-	test_rl_pure_test (15, c, m, 200,  40, file2, sizeof (file2));
-	test_rl_pure_test (16, c, m, 240,  40, file2, sizeof (file2));
-	test_rl_pure_test (17, c, m, 100,  40, file3, sizeof (file3));
-	test_rl_pure_test (18, c, m, 140,  40, file3, sizeof (file3));
-	test_rl_pure_test (19, c, m,   0,  40, file4, sizeof (file4));
-	test_rl_pure_test (20, c, m,  40,  40, file4, sizeof (file4));
-	test_rl_pure_test (21, c, m,   0,  40, file5, sizeof (file5));
-	test_rl_pure_test (22, c, m,  40,  40, file5, sizeof (file5));
-	test_rl_pure_test (23, c, m,  60,  40, file5, sizeof (file5));
-	test_rl_pure_test (24, c, m,   0, 100, file5, sizeof (file5));
-	test_rl_pure_test (25, c, m, 200,  40, file5, sizeof (file5));
-	test_rl_pure_test (26, c, m, 240,  40, file5, sizeof (file5));
-	test_rl_pure_test (27, c, m, 260,  40, file5, sizeof (file5));
-	test_rl_pure_test (28, c, m, 200, 100, file5, sizeof (file5));
-	test_rl_pure_test (29, c, m, 400,  40, file5, sizeof (file5));
-	test_rl_pure_test (30, c, m, 440,  40, file5, sizeof (file5));
-	test_rl_pure_test (31, c, m, 460,  40, file5, sizeof (file5));
-	test_rl_pure_test (32, c, m, 400, 100, file5, sizeof (file5));
-	test_rl_pure_test (33, c, m, 160, 100, file6, sizeof (file6));
-	test_rl_pure_test (34, c, m, 100, 140, file6, sizeof (file6));
+	test_rl_pure_test(1,  c, m,   0,  40, file1, sizeof(file1));
+	test_rl_pure_test(2,  c, m,  40,  40, file1, sizeof(file1));
+	test_rl_pure_test(3,  c, m,  60,  40, file1, sizeof(file1));
+	test_rl_pure_test(4,  c, m,   0, 100, file1, sizeof(file1));
+	test_rl_pure_test(5,  c, m, 200,  40, file1, sizeof(file1));
+	test_rl_pure_test(6,  c, m, 240,  40, file1, sizeof(file1));
+	test_rl_pure_test(7,  c, m, 260,  40, file1, sizeof(file1));
+	test_rl_pure_test(8,  c, m, 200, 100, file1, sizeof(file1));
+	test_rl_pure_test(9,  c, m, 400,  40, file1, sizeof(file1));
+	test_rl_pure_test(10, c, m, 440,  40, file1, sizeof(file1));
+	test_rl_pure_test(11, c, m, 460,  40, file1, sizeof(file1));
+	test_rl_pure_test(12, c, m, 400, 100, file1, sizeof(file1));
+	test_rl_pure_test(13, c, m, 160, 100, file2, sizeof(file2));
+	test_rl_pure_test(14, c, m, 100, 140, file2, sizeof(file2));
+	test_rl_pure_test(15, c, m, 200,  40, file2, sizeof(file2));
+	test_rl_pure_test(16, c, m, 240,  40, file2, sizeof(file2));
+	test_rl_pure_test(17, c, m, 100,  40, file3, sizeof(file3));
+	test_rl_pure_test(18, c, m, 140,  40, file3, sizeof(file3));
+	test_rl_pure_test(19, c, m,   0,  40, file4, sizeof(file4));
+	test_rl_pure_test(20, c, m,  40,  40, file4, sizeof(file4));
+	test_rl_pure_test(21, c, m,   0,  40, file5, sizeof(file5));
+	test_rl_pure_test(22, c, m,  40,  40, file5, sizeof(file5));
+	test_rl_pure_test(23, c, m,  60,  40, file5, sizeof(file5));
+	test_rl_pure_test(24, c, m,   0, 100, file5, sizeof(file5));
+	test_rl_pure_test(25, c, m, 200,  40, file5, sizeof(file5));
+	test_rl_pure_test(26, c, m, 240,  40, file5, sizeof(file5));
+	test_rl_pure_test(27, c, m, 260,  40, file5, sizeof(file5));
+	test_rl_pure_test(28, c, m, 200, 100, file5, sizeof(file5));
+	test_rl_pure_test(29, c, m, 400,  40, file5, sizeof(file5));
+	test_rl_pure_test(30, c, m, 440,  40, file5, sizeof(file5));
+	test_rl_pure_test(31, c, m, 460,  40, file5, sizeof(file5));
+	test_rl_pure_test(32, c, m, 400, 100, file5, sizeof(file5));
+	test_rl_pure_test(33, c, m, 160, 100, file6, sizeof(file6));
+	test_rl_pure_test(34, c, m, 100, 140, file6, sizeof(file6));
 }
 
 /**
  * test_rl_zero
  */
-static void test_rl_zero (void)
+static void test_rl_zero(void)
 {
 	runlist_element *jim = NULL;
 	runlist_element *bob = NULL;
 
-	bob = calloc (3, sizeof (runlist_element));
+	bob = calloc(3, sizeof(runlist_element));
 	if (!bob)
 		return;
 
 	MKRL(bob+0, 10, 99, 5)
 	MKRL(bob+1, 15, LCN_RL_NOT_MAPPED, 0)
 
-	jim = test_rl_runlists_merge (jim, bob);
+	jim = test_rl_runlists_merge(jim, bob);
 	if (!jim)
 		return;
 
-	free (jim);
+	free(jim);
 }
 
 /**
  * test_rl_frag_combine
  */
-static void test_rl_frag_combine (ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECORD *attr2, ATTR_RECORD *attr3)
+static void test_rl_frag_combine(ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECORD *attr2, ATTR_RECORD *attr3)
 {
 	runlist_element *run1;
 	runlist_element *run2;
 	runlist_element *run3;
 
-	run1 = ntfs_mapping_pairs_decompress (vol, attr1, NULL);
+	run1 = ntfs_mapping_pairs_decompress(vol, attr1, NULL);
 	if (!run1)
 		return;
 
-	run2 = ntfs_mapping_pairs_decompress (vol, attr2, NULL);
+	run2 = ntfs_mapping_pairs_decompress(vol, attr2, NULL);
 	if (!run2)
 		return;
 
-	run1 = test_rl_runlists_merge (run1, run2);
+	run1 = test_rl_runlists_merge(run1, run2);
 
-	run3 = ntfs_mapping_pairs_decompress (vol, attr3, NULL);
+	run3 = ntfs_mapping_pairs_decompress(vol, attr3, NULL);
 	if (!run3)
 		return;
 
-	run1 = test_rl_runlists_merge (run1, run3);
+	run1 = test_rl_runlists_merge(run1, run3);
 
-	free (run1);
+	free(run1);
 }
 
 /**
  * test_rl_frag
  */
-static void test_rl_frag (char *test)
+static void test_rl_frag(char *test)
 {
 	ntfs_volume vol;
-	ATTR_RECORD *attr1 = malloc (1024);
-	ATTR_RECORD *attr2 = malloc (1024);
-	ATTR_RECORD *attr3 = malloc (1024);
+	ATTR_RECORD *attr1 = malloc(1024);
+	ATTR_RECORD *attr2 = malloc(1024);
+	ATTR_RECORD *attr3 = malloc(1024);
 
 	if (!attr1 || !attr2 || !attr3)
 		goto out;
@@ -2016,36 +2018,36 @@ static void test_rl_frag (char *test)
 	vol.cluster_size_bits = 11;
 	vol.major_ver = 3;
 
-	if (!test_rl_read_buffer ("runlist-data/attr1.bin", (u8*) attr1, 1024))
+	if (!test_rl_read_buffer("runlist-data/attr1.bin", (u8*) attr1, 1024))
 		goto out;
-	if (!test_rl_read_buffer ("runlist-data/attr2.bin", (u8*) attr2, 1024))
+	if (!test_rl_read_buffer("runlist-data/attr2.bin", (u8*) attr2, 1024))
 		goto out;
-	if (!test_rl_read_buffer ("runlist-data/attr3.bin", (u8*) attr3, 1024))
+	if (!test_rl_read_buffer("runlist-data/attr3.bin", (u8*) attr3, 1024))
 		goto out;
 
-	if      (strcmp (test, "123") == 0)  test_rl_frag_combine (&vol, attr1, attr2, attr3);
-	else if (strcmp (test, "132") == 0)  test_rl_frag_combine (&vol, attr1, attr3, attr2);
-	else if (strcmp (test, "213") == 0)  test_rl_frag_combine (&vol, attr2, attr1, attr3);
-	else if (strcmp (test, "231") == 0)  test_rl_frag_combine (&vol, attr2, attr3, attr1);
-	else if (strcmp (test, "312") == 0)  test_rl_frag_combine (&vol, attr3, attr1, attr2);
-	else if (strcmp (test, "321") == 0)  test_rl_frag_combine (&vol, attr3, attr2, attr1);
-	else printf ("Frag: No such test '%s'\n", test);
+	if      (strcmp(test, "123") == 0)  test_rl_frag_combine(&vol, attr1, attr2, attr3);
+	else if (strcmp(test, "132") == 0)  test_rl_frag_combine(&vol, attr1, attr3, attr2);
+	else if (strcmp(test, "213") == 0)  test_rl_frag_combine(&vol, attr2, attr1, attr3);
+	else if (strcmp(test, "231") == 0)  test_rl_frag_combine(&vol, attr2, attr3, attr1);
+	else if (strcmp(test, "312") == 0)  test_rl_frag_combine(&vol, attr3, attr1, attr2);
+	else if (strcmp(test, "321") == 0)  test_rl_frag_combine(&vol, attr3, attr2, attr1);
+	else ntfs_log_debug("Frag: No such test '%s'\n", test);
 
 out:
-	free (attr1);
-	free (attr2);
-	free (attr3);
+	free(attr1);
+	free(attr2);
+	free(attr3);
 }
 
 /**
  * test_rl_main
  */
-int test_rl_main (int argc, char *argv[])
+int test_rl_main(int argc, char *argv[])
 {
-	if      ((argc == 2) && (strcmp (argv[1], "zero") == 0)) test_rl_zero();
-	else if ((argc == 3) && (strcmp (argv[1], "frag") == 0)) test_rl_frag (argv[2]);
-	else if ((argc == 4) && (strcmp (argv[1], "pure") == 0)) test_rl_pure (argv[2], argv[3]);
-	else printf ("rl [zero|frag|pure] {args}\n");
+	if      ((argc == 2) && (strcmp(argv[1], "zero") == 0)) test_rl_zero();
+	else if ((argc == 3) && (strcmp(argv[1], "frag") == 0)) test_rl_frag(argv[2]);
+	else if ((argc == 4) && (strcmp(argv[1], "pure") == 0)) test_rl_pure(argv[2], argv[3]);
+	else ntfs_log_debug("rl [zero|frag|pure] {args}\n");
 
 	return 0;
 }

@@ -28,15 +28,17 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_STDIO_H
 #include <stdio.h>
+#endif
 #ifdef HAVE_SYS_PARAM_H
-#	include <sys/param.h>
+#include <sys/param.h>
 #endif
 #ifdef HAVE_SYS_MOUNT_H
-#	include <sys/mount.h>
+#include <sys/mount.h>
 #endif
 #ifdef HAVE_MNTENT_H
-#	include <mntent.h>
+#include <mntent.h>
 #endif
 
 /* Both under Cygwin and DJGPP we do not have MS_RDONLY, so we define it. */
@@ -206,12 +208,12 @@ extern int ntfs_volume_write_flags(ntfs_volume *v, const u16 flags);
 
 #ifdef NTFS_RICH
 
-int ntfs_volume_commit (ntfs_volume *vol);
-int ntfs_volume_rollback (ntfs_volume *vol);
-int ntfs_volume_umount2 (ntfs_volume *vol, const BOOL force);
-ntfs_volume * ntfs_volume_mount2 (const char *device, unsigned long flags, BOOL force);
-int utils_valid_device (const char *name, int force);
-ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
+int ntfs_volume_commit(ntfs_volume *vol);
+int ntfs_volume_rollback(ntfs_volume *vol);
+int ntfs_volume_umount2(ntfs_volume *vol, const BOOL force);
+ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL force);
+int utils_valid_device(const char *name, int force);
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force);
 
 #endif /* NTFS_RICH */
 

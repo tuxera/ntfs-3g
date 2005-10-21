@@ -30,7 +30,9 @@
 #if HAVE_STDINT_H || !HAVE_CONFIG_H
 #include <stdint.h>
 #endif
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 
 typedef uint8_t  u8;			/* Unsigned types of an exact size */
 typedef uint16_t u16;

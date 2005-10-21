@@ -625,7 +625,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 	}
 	printf("\tDumping attribute list:");
 	entry = (ATTR_LIST_ENTRY *) value;
-	for(;(u8 *)entry < (u8 *) value + l; entry = (ATTR_LIST_ENTRY *)
+	for (;(u8 *)entry < (u8 *) value + l; entry = (ATTR_LIST_ENTRY *)
 				((u8 *) entry + le16_to_cpu(entry->length))) {
 		printf("\n");
 		printf("\t\tAttribute type:\t0x%x\n",
@@ -832,8 +832,7 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 		/* get a SID string */
 		sid = ntfs_sid_to_mbs(&ace->sid, NULL, 0);
 		printf("%s\t\t SID: %s\n",prefix,sid);
-		if (sid)
-			free(sid);
+		free(sid);
 
 		/* proceed to next ACE */
 		ace = (ACCESS_ALLOWED_ACE *)(((char *)ace) + le32_to_cpu(ace->size));
@@ -1098,7 +1097,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 	int numb_entries = 1;
 	char *name = NULL;
 
-	while(1) {
+	while (1) {
 		if (!opts.verbose) {
 			if (entry->flags & INDEX_ENTRY_END)
 				break;
@@ -1121,7 +1120,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 		if (entry->flags & INDEX_ENTRY_END)
 			break;
 
-		switch(type) {
+		switch (type) {
 			case(AT_FILE_NAME):
 				Vprintf("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
@@ -1351,7 +1350,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	tmp_alloc = allocation;
 
 	bit = 0;
-	while((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
+	while ((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
 		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
 						indx_record_size)) {
@@ -1493,7 +1492,7 @@ static void ntfs_dump_attr_reparse_point(ATTR_RECORD *attr __attribute__((unused
 static void ntfs_dump_attr_ea_information(ATTR_RECORD *attr)
 {
 	EA_INFORMATION *ea_info;
-	
+
 	ea_info = (EA_INFORMATION*)((u8*)attr +
 			le16_to_cpu(attr->value_offset));
 	printf("Dumping attribute $EA_INFORMATION (0xD0)\n");
@@ -1519,7 +1518,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 	if (attr->non_resident) {
 		runlist *rl;
 
-		data_size = sle64_to_cpu(attr->data_size);	
+		data_size = sle64_to_cpu(attr->data_size);
 		printf("\tIs resident? \t\t No\n");
 		printf("\tData size:\t\t %lld\n", data_size);
 		if (!opts.verbose)
@@ -1578,8 +1577,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		if ((u8*)ea - buf >= data_size)
 			break;
 	}
-	if (buf)
-		free(buf);
+	free(buf);
 }
 
 /**

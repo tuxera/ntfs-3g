@@ -1,6 +1,5 @@
-/*
- * security.c - Code for handling security/ACLs in NTFS.  Part of the
- *		Linux-NTFS project.
+/**
+ * security.c - Handling security/ACLs in NTFS.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
  *
@@ -20,7 +19,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -249,12 +250,11 @@ err_out:
 	return NULL;
 }
 
-/*
- * GUID generate_guid(GUID *guid) 
+/**
+ * GUID generate_guid(GUID *guid)
  * generatates a random current guid
  * perhaps not a very good random number generator though...
  */
-
 GUID *generate_guid(GUID *guid) {
 
 	int i;
@@ -262,9 +262,9 @@ GUID *generate_guid(GUID *guid) {
 
 	for (i = 0; i < 16; i++) {
 		array[i] = (u8)(random() & 0xFF);
-		if (i == 7) 
+		if (i == 7)
 			array[7] = (array[7] & 0x0F) | 0x40;
-		if (i == 8) 
+		if (i == 8)
 			array[8] = (array[8] & 0x3F) | 0x80;
 	}
 	memcpy(guid, array, sizeof(guid));

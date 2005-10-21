@@ -102,7 +102,7 @@ struct ufile {
 	struct list_head name;		/* A list of filenames */
 	struct list_head data;		/* A list of data streams */
 	char		*pref_name;	/* Preferred filename */
-	char		*pref_pname;	/* 	     parent filename */
+	char		*pref_pname;	/*	     parent filename */
 	long long	 max_size;	/* Largest size we find */
 	int		 attr_list;	/* MFT record may be one of many */
 	int		 directory;	/* MFT record represents a directory */

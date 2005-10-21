@@ -31,9 +31,13 @@
 #include "layout.h"
 #include "volume.h"
 
+#ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
+#ifdef HAVE_STDARG_H
 #include <stdarg.h>
-#include <regex.h>
+#endif
+//#include <regex.h>
 
 extern const char *ntfs_bugs;
 extern const char *ntfs_home;
@@ -42,7 +46,6 @@ extern const char *ntfs_gpl;
 #if !defined(REG_NOERROR) || (REG_NOERROR != 0)
 #	define REG_NOERROR 0
 #endif
-
 #define	DEC_PRINTF(NAME)							\
 	int NAME (const char *format, ...)					\
 	__attribute__ ((format (printf, 1, 2)));
@@ -66,6 +69,7 @@ extern const char *ntfs_gpl;
 		errno = olderr;							\
 		return ret;							\
 	}
+
 
 /* utils.c's utilities require the following functions implemented.
  * Example of implementation is:

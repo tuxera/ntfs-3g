@@ -204,7 +204,7 @@ s64 max_free_cluster_range = 0;
 #define DIRTY_INODE		(1)
 #define DIRTY_ATTRIB		(2)
 
-#define NTFS_MAX_CLUSTER_SIZE 	(65536)
+#define NTFS_MAX_CLUSTER_SIZE	(65536)
 
 GEN_PRINTF(Eprintf, stderr, NULL,         FALSE)
 GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
@@ -694,7 +694,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 			exit(1);
 		return;
 	}
-	
+
 	if (inode == FILE_Bitmap) {
 		llcn = &resize->last_lcn;
 		if (atype == AT_DATA && NInoAttrList(resize->ni))
@@ -765,7 +765,7 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 
 	if (inode == FILE_Bitmap && resize->ctx->attr->type == AT_DATA)
 		return;
-	
+
 	start = lcn;
 	len = lcn_length;
 
@@ -1636,11 +1636,11 @@ static int is_mftdata(ntfs_resize_t *resize)
 
 	if (resize->mref == 0)
 		return 1;
-	
+
 	if (  MREF(resize->mrec->base_mft_record) == 0  &&
 	    MSEQNO(resize->mrec->base_mft_record) != 0)
 		return 1;
-	
+
 	return 0;
 }
 
@@ -1648,30 +1648,30 @@ static int handle_mftdata(ntfs_resize_t *resize, int do_mftdata)
 {
 	ATTR_RECORD *attr = resize->ctx->attr;
 	VCN highest_vcn, lowest_vcn;
-	
+
 	if (do_mftdata) {
-		
+
 		if (!is_mftdata(resize))
 			return 0;
-		
+
 		highest_vcn = sle64_to_cpu(attr->highest_vcn);
 		lowest_vcn  = sle64_to_cpu(attr->lowest_vcn);
-		
+
 		if (resize->mft_highest_vcn != highest_vcn)
 			return 0;
-		
+
 		if (lowest_vcn == 0)
 			resize->mft_highest_vcn = lowest_vcn;
 		else
 			resize->mft_highest_vcn = lowest_vcn - 1;
 
 	} else if (is_mftdata(resize)) {
-		
+
 		highest_vcn = sle64_to_cpu(attr->highest_vcn);
-		
+
 		if (resize->mft_highest_vcn < highest_vcn)
 			resize->mft_highest_vcn = highest_vcn;
-		
+
 		return 0;
 	}
 
@@ -1688,10 +1688,10 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 	while (!ntfs_attrs_walk(resize->ctx)) {
 		if (resize->ctx->attr->type == AT_END)
 			break;
-		
+
 		if (handle_mftdata(resize, do_mftdata) == 0)
 			continue;
-			
+
 		ret = has_bad_sectors(resize, 0);
 		if (ret == -1)
 			exit(1);
@@ -1752,10 +1752,10 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
 
-   	for (mref = 0; mref < (MFT_REF)nr_mft_records; mref++)
+	for (mref = 0; mref < (MFT_REF)nr_mft_records; mref++)
 		relocate_inode(resize, mref, 0);
 
-	while(1) {
+	while (1) {
 		highest_vcn = resize->mft_highest_vcn;
 		mref = nr_mft_records;
 		do {
@@ -1769,8 +1769,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 				 "Please report!\n", highest_vcn);
 	}
 done:
-	if (resize->mrec)
-		free(resize->mrec);
+	free(resize->mrec);
 }
 
 static void print_hint(ntfs_volume *vol, const char *s, struct llcn_t llcn)
@@ -1800,12 +1799,12 @@ static void advise_on_resize(ntfs_resize_t *resize)
 	if (opt.verbose) {
 		printf("Estimating smallest shrunken size supported ...\n");
 		printf("File feature         Last used at      By inode\n");
-		print_hint(vol, "$MFT", 	resize->last_mft);
+		print_hint(vol, "$MFT",		resize->last_mft);
 		print_hint(vol, "Multi-Record", resize->last_multi_mft);
-		print_hint(vol, "$MFTMirr", 	resize->last_mftmir);
-		print_hint(vol, "Compressed", 	resize->last_compressed);
-		print_hint(vol, "Sparse", 	resize->last_sparse);
-		print_hint(vol, "Ordinary", 	resize->last_lcn);
+		print_hint(vol, "$MFTMirr",	resize->last_mftmir);
+		print_hint(vol, "Compressed",	resize->last_compressed);
+		print_hint(vol, "Sparse",	resize->last_sparse);
+		print_hint(vol, "Ordinary",	resize->last_lcn);
 	}
 
 	print_advise(vol, resize->last_unsupp);
@@ -1849,16 +1848,16 @@ static void rl_truncate(runlist **rl, const VCN last_vcn)
 {
 	int len;
 	VCN vcn;
-	
+
 	len = rl_items(*rl) - 1;
 	if (len <= 0)
 		err_exit("rl_truncate: bad runlist length: %d\n", len);
 
 	vcn = (*rl)[len].vcn;
-	
+
 	if (vcn < last_vcn)
 		rl_expand(rl, last_vcn);
-	
+
 	else if (vcn > last_vcn)
 		if (ntfs_rl_truncate(rl, last_vcn) == -1)
 			perr_exit("ntfs_rl_truncate");
@@ -1898,7 +1897,7 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 
 	if (!(rl_bad = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_mapping_pairs_decompress");
-	
+
 	rl_truncate(&rl_bad, nr_clusters);
 
 	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
@@ -1945,7 +1944,7 @@ static void realloc_lcn_bitmap(ntfs_resize_t *resize, s64 bm_bsize)
 
 	if (!(tmp = realloc(resize->lcn_bitmap.bm, bm_bsize)))
 		perr_exit("realloc");
-	
+
 	resize->lcn_bitmap.bm = tmp;
 	resize->lcn_bitmap.size = bm_bsize;
 	bitmap_file_data_fixup(resize->new_volume_size, &resize->lcn_bitmap);
@@ -2037,41 +2036,41 @@ static int check_bad_sectors(ntfs_volume *vol)
 	ntfs_attr_search_ctx *ctx;
 	runlist *rl;
 	s64 i, badclusters = 0;
-	
+
 	Vprintf("Checking for bad sectors ...\n");
 
 	lookup_data_attr(vol, FILE_BadClus, "$Bad", &ctx);
-	
+
 	if (NInoAttrList(ctx->ntfs_ino))
 		err_exit("Hopelessly many bad sectors! Please report to "
 			 "linux-ntfs@lists.sf.net\n");
-	
+
 	if (!ctx->attr->non_resident)
 		err_exit("Resident attribute in $BadClust! Please report to "
 			 "linux-ntfs@lists.sf.net\n");
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
 		perr_exit("Decompressing $BadClust:$Bad mapping pairs failed");
-	
+
 	for (i = 0; rl[i].length; i++) {
 		/* CHECKME: LCN_RL_NOT_MAPPED check isn't needed */
 		if (rl[i].lcn == LCN_HOLE || rl[i].lcn == LCN_RL_NOT_MAPPED)
 			continue;
-		
+
 		badclusters += rl[i].length;
-		Vprintf("Bad cluster: %8lld - %lld\n", rl[i].lcn, 
+		Vprintf("Bad cluster: %8lld - %lld\n", rl[i].lcn,
 			rl[i].lcn + rl[i].length - 1);
 	}
 
 	if (badclusters) {
 		printf("%sThis software has detected that the disk has at least"
-		       " %lld bad sector%s.\n", 
+		       " %lld bad sector%s.\n",
 		       !opt.badsectors ? NERR_PREFIX : "WARNING: ",
 		       badclusters, badclusters - 1 ? "s" : "");
 		if (!opt.badsectors) {
 			printf("%s", bad_sectors_warning_msg);
 			exit(1);
-		} else 
+		} else
 			printf("WARNING: Bad sectors can cause reliability "
 			       "problems and massive data loss!!!\n");
 	}
@@ -2263,7 +2262,7 @@ static ntfs_volume *mount_volume(void)
 			printf("%s", corrupt_volume_msg);
 		else if (err == EPERM)
 			printf("%s", hibernated_volume_msg);
-        	else if (err == EOPNOTSUPP)
+		else if (err == EOPNOTSUPP)
 			printf("%s", unclean_journal_msg);
 		exit(1);
 	}
@@ -2384,7 +2383,7 @@ static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
 		printf("%s", corrupt_volume_msg);
 		exit(1);
 	}
-	
+
 	compare_bitmaps(vol, &fsck->lcn_bitmap);
 }
 
@@ -2444,7 +2443,7 @@ int main(int argc, char **argv)
 		printf("Nothing to do: NTFS volume size is already OK.\n");
 		exit(0);
 	}
-	
+
 	memset(&resize, 0, sizeof(resize));
 	resize.vol = vol;
 	resize.new_volume_size = new_size;
@@ -2453,13 +2452,13 @@ int main(int argc, char **argv)
 		resize.shrink = 1;
 	if (opt.show_progress)
 		resize.progress.flags |= NTFS_PROGBAR;
-	/* 
+	/*
 	 * Checking and __reporting__ of bad sectors must be done before cluster
 	 * allocation check because chkdsk doesn't fix $Bitmap's w/ bad sectors
 	 * thus users would (were) quite confused why chkdsk doesn't work.
-	 */  
+	 */
 	resize.badclusters = check_bad_sectors(vol);
-	
+
 	check_cluster_allocation(vol, &fsck);
 
 	print_disk_usage(vol, fsck.inuse);
@@ -2472,7 +2471,7 @@ int main(int argc, char **argv)
 	check_resize_constraints(&resize);
 
 	if (opt.info) {
-	       	advise_on_resize(&resize);
+		advise_on_resize(&resize);
 		exit(0);
 	}
 

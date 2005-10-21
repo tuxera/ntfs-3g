@@ -1,4 +1,4 @@
-/**
+/*
  * rich.h - Temporary junk file.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004-2005 Richard Russon
@@ -40,11 +40,11 @@
 #define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
 #define ATTR_SIZE(s) ROUND_UP(s,8)
 
-ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
-ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft);
-int utils_free_non_residents3 (struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECORD *attr);
-int utils_free_non_residents2 (ntfs_inode *inode, struct ntfs_bmp *bmp);
-void ntfs_name_print (ntfschar *name, int name_len);
+ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
+ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
+int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECORD *attr);
+int utils_free_non_residents2(ntfs_inode *inode, struct ntfs_bmp *bmp);
+void ntfs_name_print(ntfschar *name, int name_len);
 
 #endif /* _NTFS_RICH_H_ */
 

@@ -21,7 +21,9 @@
 
 #ifdef NTFS_RICH
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -29,17 +31,17 @@
 
 #include "volume.h"
 #include "dir.h"
-
 #include "tree.h"
 #include "bitmap.h"
 #include "index.h"
 #include "inode.h"
+#include "logging.h"
 #include "rich.h"
 
 /**
  * ntfs_dt_free
  */
-void ntfs_dt_free (struct ntfs_dt *dt)
+void ntfs_dt_free(struct ntfs_dt *dt)
 {
 	int i;
 
@@ -47,21 +49,21 @@ void ntfs_dt_free (struct ntfs_dt *dt)
 		return;
 
 	for (i = 0; i < dt->child_count; i++) {
-		ntfs_dt_free (dt->sub_nodes[i]);
-		ntfs_inode_close2 (dt->inodes[i]);
+		ntfs_dt_free(dt->sub_nodes[i]);
+		ntfs_inode_close2(dt->inodes[i]);
 	}
 
-	free (dt->sub_nodes);
-	free (dt->children);
-	free (dt->inodes);
-	free (dt->data);	// XXX is this always ours?
-	free (dt);
+	free(dt->sub_nodes);
+	free(dt->children);
+	free(dt->inodes);
+	free(dt->data);	// XXX is this always ours?
+	free(dt);
 }
 
 /**
  * ntfs_dt_rollback
  */
-int ntfs_dt_rollback (struct ntfs_dt *dt)
+int ntfs_dt_rollback(struct ntfs_dt *dt)
 {
 	int i;
 
@@ -73,16 +75,16 @@ int ntfs_dt_rollback (struct ntfs_dt *dt)
 	if (dt->changed) {
 		// We can't trust anything below us in the tree
 		for (i = 0; i < dt->child_count; i++) {
-			ntfs_dt_free (dt->sub_nodes[i]);
-			ntfs_inode_close2 (dt->inodes[i]);
+			ntfs_dt_free(dt->sub_nodes[i]);
+			ntfs_inode_close2(dt->inodes[i]);
 		}
 
 		dt->child_count = 0;
 
-		free (dt->data);
-		free (dt->children);
-		free (dt->sub_nodes);
-		free (dt->inodes);
+		free(dt->data);
+		free(dt->children);
+		free(dt->sub_nodes);
+		free(dt->inodes);
 
 		dt->data = NULL;
 		dt->children = NULL;
@@ -91,8 +93,8 @@ int ntfs_dt_rollback (struct ntfs_dt *dt)
 	} else {
 		// This node is OK, check the su-nodes
 		for (i = 0; i < dt->child_count; i++) {
-			if (ntfs_dt_rollback (dt->sub_nodes[i])) {
-				ntfs_inode_close2 (dt->inodes[i]);
+			if (ntfs_dt_rollback(dt->sub_nodes[i])) {
+				ntfs_inode_close2(dt->inodes[i]);
 				// Child was changed so unmap it
 				dt->sub_nodes[i] = NULL;
 				dt->inodes[i] = NULL;
@@ -106,7 +108,7 @@ int ntfs_dt_rollback (struct ntfs_dt *dt)
 /**
  * ntfs_dt_commit
  */
-int ntfs_dt_commit (struct ntfs_dt *dt)
+int ntfs_dt_commit(struct ntfs_dt *dt)
 {
 	ntfs_volume *vol;
 	ntfs_attr *attr;
@@ -125,38 +127,38 @@ int ntfs_dt_commit (struct ntfs_dt *dt)
 
 	if (dt->changed) {
 		if (dt->parent) {
-			printf ("commit dt (alloc)\n");
+			ntfs_log_debug("commit dt (alloc)\n");
 			attr = dt->dir->ialloc;
 			size = dt->dir->index_size;
-			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
+			//utils_dump_mem(dt->data, 0, size, DM_DEFAULTS);
 #ifdef RM_WRITE
 			ntfs_attr_mst_pwrite(attr, dt->vcn * vol->cluster_size, 1, size, dt->data); // XXX retval
 #endif
 		} else {
-			printf ("commit dt (root)\n");
+			ntfs_log_debug("commit dt (root)\n");
 			attr = dt->dir->iroot;
 			size = dt->data_len;
-			//utils_dump_mem (dt->data, 0, size, DM_DEFAULTS);
+			//utils_dump_mem(dt->data, 0, size, DM_DEFAULTS);
 #ifdef RM_WRITE
 			ntfs_attr_pwrite(attr, 0, size, dt->data); // XXX retval
 #endif
 		}
 
-		printf (RED "\tntfs_attr_pwrite (vcn %lld)\n" END, dt->vcn);
+		ntfs_log_debug(RED "\tntfs_attr_pwrite(vcn %lld)\n" END, dt->vcn);
 
 		dt->changed = FALSE;
 	}
 
 	for (i = 0; i < dt->child_count; i++) {
-		if ((dt->inodes[i]) && (NInoDirty (dt->inodes[i]))) {
-			//utils_dump_mem (dt->inodes[i]->mrec, 0, vol->mft_record_size, DM_DEFAULTS);
+		if ((dt->inodes[i]) && (NInoDirty(dt->inodes[i]))) {
+			//utils_dump_mem(dt->inodes[i]->mrec, 0, vol->mft_record_size, DM_DEFAULTS);
 #ifdef RM_WRITE
-			ntfs_inode_sync (dt->inodes[i]);
+			ntfs_inode_sync(dt->inodes[i]);
 #endif
-			printf (RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
+			ntfs_log_debug(RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
 		}
 
-		if (ntfs_dt_commit (dt->sub_nodes[i]) < 0)
+		if (ntfs_dt_commit(dt->sub_nodes[i]) < 0)
 			return -1;
 	}
 
@@ -166,7 +168,7 @@ int ntfs_dt_commit (struct ntfs_dt *dt)
 /**
  * ntfs_dt_create_children2
  */
-BOOL ntfs_dt_create_children2 (struct ntfs_dt *dt, int count)
+BOOL ntfs_dt_create_children2(struct ntfs_dt *dt, int count)
 {
 	// XXX calculate for 2K and 4K indexes max and min filenames (inc/exc VCN)
 
@@ -176,16 +178,16 @@ BOOL ntfs_dt_create_children2 (struct ntfs_dt *dt, int count)
 	if (old == new)
 		return TRUE;
 
-	dt->children  = realloc (dt->children,  new * sizeof (*dt->children));
-	dt->sub_nodes = realloc (dt->sub_nodes, new * sizeof (*dt->sub_nodes));
-	dt->inodes    = realloc (dt->inodes,    new * sizeof (*dt->inodes));
+	dt->children  = realloc(dt->children,  new * sizeof(*dt->children));
+	dt->sub_nodes = realloc(dt->sub_nodes, new * sizeof(*dt->sub_nodes));
+	dt->inodes    = realloc(dt->inodes,    new * sizeof(*dt->inodes));
 
 	if (!dt->children || !dt->sub_nodes || !dt->inodes)
 		return FALSE;		// dt->child_count = -1 ?
 
-	memset ((u8*)dt->children  + old, 0, (new - old) * sizeof (*dt->children));
-	memset ((u8*)dt->sub_nodes + old, 0, (new - old) * sizeof (*dt->sub_nodes));
-	memset ((u8*)dt->inodes    + old, 0, (new - old) * sizeof (*dt->inodes));
+	memset((u8*)dt->children  + old, 0, (new - old) * sizeof(*dt->children));
+	memset((u8*)dt->sub_nodes + old, 0, (new - old) * sizeof(*dt->sub_nodes));
+	memset((u8*)dt->inodes    + old, 0, (new - old) * sizeof(*dt->inodes));
 
 	return TRUE;
 }
@@ -193,12 +195,12 @@ BOOL ntfs_dt_create_children2 (struct ntfs_dt *dt, int count)
 /**
  * ntfs_dt_resize_children3
  */
-BOOL ntfs_dt_resize_children3 (struct ntfs_dt *dt, int new)
+BOOL ntfs_dt_resize_children3(struct ntfs_dt *dt, int new)
 {
 	int old;
 
 	// XXX calculate for 2K and 4K indexes max and min filenames (inc/exc VCN)
-	// XXX assumption:  sizeof (*dt->children) == sizeof (*dt->sub_nodes) == sizeof (*dt->inodes)
+	// XXX assumption:  sizeof(*dt->children) == sizeof(*dt->sub_nodes) == sizeof(*dt->inodes)
 	// XXX put back blocking factor
 
 	if (!dt)
@@ -210,20 +212,20 @@ BOOL ntfs_dt_resize_children3 (struct ntfs_dt *dt, int new)
 
 	dt->child_count = new;
 
-	old *= sizeof (*dt->children);
-	new *= sizeof (*dt->children);
+	old *= sizeof(*dt->children);
+	new *= sizeof(*dt->children);
 
-	dt->children  = realloc (dt->children,  new);
-	dt->sub_nodes = realloc (dt->sub_nodes, new);
-	dt->inodes    = realloc (dt->inodes,    new);
+	dt->children  = realloc(dt->children,  new);
+	dt->sub_nodes = realloc(dt->sub_nodes, new);
+	dt->inodes    = realloc(dt->inodes,    new);
 
 	if (!dt->children || !dt->sub_nodes || !dt->inodes)
 		return FALSE;
 
 	if (new > old) {
-		memset ((u8*)dt->children  + old, 0, (new - old));
-		memset ((u8*)dt->sub_nodes + old, 0, (new - old));
-		memset ((u8*)dt->inodes    + old, 0, (new - old));
+		memset((u8*)dt->children  + old, 0, (new - old));
+		memset((u8*)dt->sub_nodes + old, 0, (new - old));
+		memset((u8*)dt->inodes    + old, 0, (new - old));
 	}
 
 	return TRUE;
@@ -232,7 +234,7 @@ BOOL ntfs_dt_resize_children3 (struct ntfs_dt *dt, int new)
 /**
  * ntfs_dt_root_count
  */
-int ntfs_dt_root_count (struct ntfs_dt *dt)
+int ntfs_dt_root_count(struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
@@ -264,27 +266,27 @@ int ntfs_dt_root_count (struct ntfs_dt *dt)
 	while (ptr < (buffer + size)) {
 		entry = (INDEX_ENTRY*) ptr;
 
-		ntfs_dt_resize_children3 (dt, dt->child_count + 1); // XXX retval
+		ntfs_dt_resize_children3(dt, dt->child_count + 1); // XXX retval
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
-			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
-			//printf ("VCN %lld\n", vcn);
+			vcn = ntfs_ie_get_vcn((INDEX_ENTRY*) ptr);
+			//ntfs_log_debug("VCN %lld\n", vcn);
 		}
 
 		if (!(entry->flags & INDEX_ENTRY_END)) {
-			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
-			//printf ("\tinode %8lld %s\n", MREF (entry->indexed_file), name);
-			free (name);
+			ntfs_ucstombs(entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
+			//ntfs_log_debug("\tinode %8lld %s\n", MREF(entry->indexed_file), name);
+			free(name);
 			name = NULL;
 		}
 
-		//printf ("CC[%d] = %p\n", dt->child_count-1, entry);
+		//ntfs_log_debug("CC[%d] = %p\n", dt->child_count-1, entry);
 		dt->children[dt->child_count-1] = entry;
 
 		ptr += entry->length;
 	}
 
-	//printf ("count = %d\n\n", dt->child_count);
+	//ntfs_log_debug("count = %d\n\n", dt->child_count);
 
 	return dt->child_count;
 }
@@ -292,7 +294,7 @@ int ntfs_dt_root_count (struct ntfs_dt *dt)
 /**
  * ntfs_dt_alloc_count
  */
-int ntfs_dt_alloc_count (struct ntfs_dt *dt)
+int ntfs_dt_alloc_count(struct ntfs_dt *dt)
 {
 	u8 *buffer = NULL;
 	u8 *ptr = NULL;
@@ -309,24 +311,24 @@ int ntfs_dt_alloc_count (struct ntfs_dt *dt)
 	buffer = dt->data;
 	size   = dt->data_len;
 
-	//utils_dump_mem (buffer, 0, 128, DM_DEFAULTS);
+	//utils_dump_mem(buffer, 0, 128, DM_DEFAULTS);
 
 	block = (INDEX_BLOCK*) buffer;
-	//printf ("INDX %lld\n", block->index_block_vcn);
+	//ntfs_log_debug("INDX %lld\n", block->index_block_vcn);
 
 	ptr = buffer + 0x18 + block->index.entries_offset;
 
-	//printf ("block size %d\n", block->index.index_length);
+	//ntfs_log_debug("block size %d\n", block->index.index_length);
 	dt->child_count = 0;
-	//printf ("start = 0x%02X, end = 0x%02X\n", 0x18 + block->index.entries_offset, 0x18 + block->index.index_length);
+	//ntfs_log_debug("start = 0x%02X, end = 0x%02X\n", 0x18 + block->index.entries_offset, 0x18 + block->index.index_length);
 	while (ptr < (buffer + 0x18 + block->index.index_length)) {
 		entry = (INDEX_ENTRY*) ptr;
 
-		ntfs_dt_resize_children3 (dt, dt->child_count + 1); // XXX retval
+		ntfs_dt_resize_children3(dt, dt->child_count + 1); // XXX retval
 
 		if (entry->flags & INDEX_ENTRY_NODE) {
-			vcn = ntfs_ie_get_vcn ((INDEX_ENTRY*) ptr);
-			//printf ("\tVCN %lld\n", vcn);
+			vcn = ntfs_ie_get_vcn((INDEX_ENTRY*) ptr);
+			//ntfs_log_debug("\tVCN %lld\n", vcn);
 		}
 
 		dt->children[dt->child_count-1] = entry;
@@ -334,15 +336,15 @@ int ntfs_dt_alloc_count (struct ntfs_dt *dt)
 		if (entry->flags & INDEX_ENTRY_END) {
 			break;
 		} else {
-			ntfs_ucstombs (entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
-			//printf ("\tinode %8lld %s\n", MREF (entry->indexed_file), name);
-			free (name);
+			ntfs_ucstombs(entry->key.file_name.file_name, entry->key.file_name.file_name_length, &name, 0);
+			//ntfs_log_debug("\tinode %8lld %s\n", MREF(entry->indexed_file), name);
+			free(name);
 			name = NULL;
 		}
 
 		ptr += entry->length;
 	}
-	//printf ("count = %d\n", dt->child_count);
+	//ntfs_log_debug("count = %d\n", dt->child_count);
 
 	return dt->child_count;
 }
@@ -350,7 +352,7 @@ int ntfs_dt_alloc_count (struct ntfs_dt *dt)
 /**
  * ntfs_dt_initialise2
  */
-int ntfs_dt_initialise2 (ntfs_volume *vol, struct ntfs_dt *dt)
+int ntfs_dt_initialise2(ntfs_volume *vol, struct ntfs_dt *dt)
 {
 	INDEX_ALLOCATION *alloc;
 	INDEX_ENTRY *entry;
@@ -360,7 +362,7 @@ int ntfs_dt_initialise2 (ntfs_volume *vol, struct ntfs_dt *dt)
 	if (!dt)
 		return 1;
 
-	memset (dt->data, 0, dt->data_len);
+	memset(dt->data, 0, dt->data_len);
 
 	alloc = (INDEX_ALLOCATION*) dt->data;
 
@@ -382,7 +384,7 @@ int ntfs_dt_initialise2 (ntfs_volume *vol, struct ntfs_dt *dt)
 	entry->key_length   = 0;
 	entry->flags        = INDEX_ENTRY_END;
 
-	ntfs_dt_resize_children3 (dt, 1);		// XXX retval
+	ntfs_dt_resize_children3(dt, 1);		// XXX retval
 
 	dt->children[0] = entry;
 
@@ -392,7 +394,7 @@ int ntfs_dt_initialise2 (ntfs_volume *vol, struct ntfs_dt *dt)
 /**
  * ntfs_dt_create
  */
-struct ntfs_dt * ntfs_dt_create (struct ntfs_dir *dir, struct ntfs_dt *parent, VCN vcn)
+struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VCN vcn)
 {
 	struct ntfs_dt *dt = NULL;
 	//int i;
@@ -400,7 +402,7 @@ struct ntfs_dt * ntfs_dt_create (struct ntfs_dir *dir, struct ntfs_dt *parent, V
 	if (!dir)
 		return NULL;
 
-	dt = calloc (1, sizeof (*dt));
+	dt = calloc(1, sizeof(*dt));
 	if (!dt)
 		return NULL;
 
@@ -414,76 +416,76 @@ struct ntfs_dt * ntfs_dt_create (struct ntfs_dir *dir, struct ntfs_dt *parent, V
 	dt->changed	= FALSE;
 
 	if (parent) {
-		//printf ("alloc a = %lld\n", dir->ialloc->allocated_size);
-		//printf ("alloc d = %lld\n", dir->ialloc->data_size);
-		//printf ("alloc i = %lld\n", dir->ialloc->initialized_size);
-		//printf ("vcn = %lld\n", vcn);
+		//ntfs_log_debug("alloc a = %lld\n", dir->ialloc->allocated_size);
+		//ntfs_log_debug("alloc d = %lld\n", dir->ialloc->data_size);
+		//ntfs_log_debug("alloc i = %lld\n", dir->ialloc->initialized_size);
+		//ntfs_log_debug("vcn = %lld\n", vcn);
 
 		dt->data_len = dt->dir->index_size;
-		//printf ("parent size = %d\n", dt->data_len);
-		dt->data     = malloc (dt->data_len);
+		//ntfs_log_debug("parent size = %d\n", dt->data_len);
+		dt->data     = malloc(dt->data_len);
 
 		if (vcn >= 0) {
-			//printf ("%lld\n", ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data));
-			ntfs_attr_mst_pread (dir->ialloc, vcn*512, 1, dt->data_len, dt->data);
+			//ntfs_log_debug("%lld\n", ntfs_attr_mst_pread(dir->ialloc, vcn*512, 1, dt->data_len, dt->data));
+			ntfs_attr_mst_pread(dir->ialloc, vcn*512, 1, dt->data_len, dt->data);
 		} else {
-			ntfs_dt_initialise2 (dir->vol, dt);
+			ntfs_dt_initialise2(dir->vol, dt);
 		}
 
-		//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
-		//printf ("\n");
+		//utils_dump_mem(dt->data, 0, dt->data_len, DM_DEFAULTS);
+		//ntfs_log_debug("\n");
 
-		ntfs_dt_alloc_count (dt);
+		ntfs_dt_alloc_count(dt);
 
 		dt->header = &((INDEX_BLOCK*)dt->data)->index;
-		//printf ("USA = %d\n", ((INDEX_BLOCK*)dt->data)->usa_count);
+		//ntfs_log_debug("USA = %d\n", ((INDEX_BLOCK*)dt->data)->usa_count);
 
 #if 0
 		for (i = 0; i < dt->child_count; i++) {
 			INDEX_ENTRY *ie = dt->children[i];
 
-			printf ("%d\n", ((u8*)ie) - dt->data);
+			ntfs_log_debug("%d\n", ((u8*)ie) - dt->data);
 			if (ie->flags & INDEX_ENTRY_END)
-				printf ("IE (%d)\n", ie->length);
+				ntfs_log_debug("IE (%d)\n", ie->length);
 			else
-				printf ("IE %lld (%d)\n", MREF (ie->key.file_name.parent_directory), ie->length);
-			utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
-			printf ("\n");
+				ntfs_log_debug("IE %lld (%d)\n", MREF(ie->key.file_name.parent_directory), ie->length);
+			utils_dump_mem(ie, 0, ie->length, DM_DEFAULTS);
+			ntfs_log_debug("\n");
 		}
 #endif
 	} else {
-		//printf ("root a  = %lld\n", dir->iroot->allocated_size);
-		//printf ("root d  = %lld\n", dir->iroot->data_size);
-		//printf ("root i  = %lld\n", dir->iroot->initialized_size);
+		//ntfs_log_debug("root a  = %lld\n", dir->iroot->allocated_size);
+		//ntfs_log_debug("root d  = %lld\n", dir->iroot->data_size);
+		//ntfs_log_debug("root i  = %lld\n", dir->iroot->initialized_size);
 
 		dt->data_len = dir->iroot->allocated_size;
-		dt->data     = malloc (dt->data_len);
-		//printf ("%lld\n", ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data));
-		ntfs_attr_pread (dir->iroot, 0, dt->data_len, dt->data);
-		//utils_dump_mem (dt->data, 0, dt->data_len, DM_DEFAULTS);
-		//printf ("\n");
+		dt->data     = malloc(dt->data_len);
+		//ntfs_log_debug("%lld\n", ntfs_attr_pread(dir->iroot, 0, dt->data_len, dt->data));
+		ntfs_attr_pread(dir->iroot, 0, dt->data_len, dt->data);
+		//utils_dump_mem(dt->data, 0, dt->data_len, DM_DEFAULTS);
+		//ntfs_log_debug("\n");
 
-		ntfs_dt_root_count (dt);
+		ntfs_dt_root_count(dt);
 
 		dt->header = &((INDEX_ROOT*)dt->data)->index;
 		//dt->data_len = ((INDEX_ROOT*)dt->data)->index_block_size;
-		//printf ("IBS = %d\n", ((INDEX_ROOT*)dt->data)->index_block_size);
+		//ntfs_log_debug("IBS = %d\n", ((INDEX_ROOT*)dt->data)->index_block_size);
 
 #if 0
 		for (i = 0; i < dt->child_count; i++) {
 			INDEX_ENTRY *ie = dt->children[i];
 
-			printf ("%d\n", ((u8*)ie) - dt->data);
+			ntfs_log_debug("%d\n", ((u8*)ie) - dt->data);
 			if (ie->flags & INDEX_ENTRY_END)
-				printf ("IE (%d)\n", ie->length);
+				ntfs_log_debug("IE (%d)\n", ie->length);
 			else
-				printf ("IE %lld (%d)\n", MREF (ie->key.file_name.parent_directory), ie->length);
-			utils_dump_mem (ie, 0, ie->length, DM_DEFAULTS);
-			printf ("\n");
+				ntfs_log_debug("IE %lld (%d)\n", MREF(ie->key.file_name.parent_directory), ie->length);
+			utils_dump_mem(ie, 0, ie->length, DM_DEFAULTS);
+			ntfs_log_debug("\n");
 		}
 #endif
 	}
-	//printf ("index_header (%d,%d)\n", dt->header.index_length, dt->header.allocated_size);
+	//ntfs_log_debug("index_header (%d,%d)\n", dt->header.index_length, dt->header.allocated_size);
 
 	return dt;
 }
@@ -493,7 +495,7 @@ struct ntfs_dt * ntfs_dt_create (struct ntfs_dir *dir, struct ntfs_dt *parent, V
  * find dt by name, return MFT_REF
  * maps dt's as necessary
  */
-MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
+MFT_REF ntfs_dt_find(struct ntfs_dt *dt, ntfschar *name, int name_len)
 {
 	MFT_REF res = -1;
 	INDEX_ENTRY *ie;
@@ -516,15 +518,15 @@ MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 	 * end marker          yes    map & recurse
 	 */
 
-	//printf ("child_count = %d\n", dt->child_count);
+	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
 		ie = dt->children[i];
 
 		if (ie->flags & INDEX_ENTRY_END) {
 			r = -1;
 		} else {
-			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
-			r = ntfs_names_collate (name, name_len,
+			//ntfs_log_debug("\t"); ntfs_name_print(ie->key.file_name.file_name, ie->key.file_name.file_name_length); ntfs_log_debug("\n");
+			r = ntfs_names_collate(name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
 						2, IGNORE_CASE,
@@ -532,30 +534,30 @@ MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
 						dt->dir->vol->upcase_len);
 		}
 
-		//printf ("%d, %d\n", i, r);
+		//ntfs_log_debug("%d, %d\n", i, r);
 
 		if (r == 1) {
-			//printf ("keep searching\n");
+			//ntfs_log_debug("keep searching\n");
 			continue;
 		} else if (r == 0) {
-			res = MREF (ie->indexed_file);
-			//printf ("match %lld\n", res);
+			res = MREF(ie->indexed_file);
+			//ntfs_log_debug("match %lld\n", res);
 		} else if (r == -1) {
 			if (ie->flags & INDEX_ENTRY_NODE) {
-				//printf ("map & recurse\n");
-				//printf ("sub %p\n", dt->sub_nodes);
+				//ntfs_log_debug("map & recurse\n");
+				//ntfs_log_debug("sub %p\n", dt->sub_nodes);
 				if (!dt->sub_nodes[i]) {
-					vcn = ntfs_ie_get_vcn (ie);
-					//printf ("vcn = %lld\n", vcn);
-					sub = ntfs_dt_create (dt->dir, dt, vcn);
+					vcn = ntfs_ie_get_vcn(ie);
+					//ntfs_log_debug("vcn = %lld\n", vcn);
+					sub = ntfs_dt_create(dt->dir, dt, vcn);
 					dt->sub_nodes[i] = sub;
 				}
-				res = ntfs_dt_find (dt->sub_nodes[i], name, name_len);
+				res = ntfs_dt_find(dt->sub_nodes[i], name, name_len);
 			} else {
-				//printf ("ENOENT\n");
+				//ntfs_log_debug("ENOENT\n");
 			}
 		} else {
-			printf ("error collating name\n");
+			ntfs_log_debug("error collating name\n");
 		}
 		break;
 	}
@@ -568,7 +570,7 @@ MFT_REF ntfs_dt_find (struct ntfs_dt *dt, ntfschar *name, int name_len)
  * find dt by name, returns dt and index
  * maps dt's as necessary
  */
-struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
+struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
 {
 	struct ntfs_dt *res = NULL;
 	INDEX_ENTRY *ie;
@@ -592,15 +594,15 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int name_len
 	 * end marker          yes    map & recurse
 	 */
 
-	//printf ("child_count = %d\n", dt->child_count);
+	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
 		ie = dt->children[i];
 
 		if (ie->flags & INDEX_ENTRY_END) {
 			r = -1;
 		} else {
-			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
-			r = ntfs_names_collate (name, name_len,
+			//ntfs_log_debug("\t"); ntfs_name_print(ie->key.file_name.file_name, ie->key.file_name.file_name_length); ntfs_log_debug("\n");
+			r = ntfs_names_collate(name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
 						2, IGNORE_CASE,
@@ -608,26 +610,26 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int name_len
 						dt->dir->vol->upcase_len);
 		}
 
-		//printf ("%d, %d\n", i, r);
+		//ntfs_log_debug("%d, %d\n", i, r);
 
 		if (r == 1) {
-			//printf ("keep searching\n");
+			//ntfs_log_debug("keep searching\n");
 			continue;
 		} else if (r == 0) {
 			res = dt;
-			//printf ("match %p\n", res);
+			//ntfs_log_debug("match %p\n", res);
 			if (index_num)
 				*index_num = i;
 		} else if ((r == -1) && (ie->flags & INDEX_ENTRY_NODE)) {
-			//printf ("recurse\n");
+			//ntfs_log_debug("recurse\n");
 			if (!dt->sub_nodes[i]) {
-				vcn = ntfs_ie_get_vcn (ie);
-				//printf ("vcn = %lld\n", vcn);
-				dt->sub_nodes[i] = ntfs_dt_create (dt->dir, dt, vcn);
+				vcn = ntfs_ie_get_vcn(ie);
+				//ntfs_log_debug("vcn = %lld\n", vcn);
+				dt->sub_nodes[i] = ntfs_dt_create(dt->dir, dt, vcn);
 			}
-			res = ntfs_dt_find2 (dt->sub_nodes[i], name, name_len, index_num);
+			res = ntfs_dt_find2(dt->sub_nodes[i], name, name_len, index_num);
 		} else {
-			printf ("error collating name\n");
+			ntfs_log_debug("error collating name\n");
 		}
 		break;
 	}
@@ -640,7 +642,7 @@ struct ntfs_dt * ntfs_dt_find2 (struct ntfs_dt *dt, ntfschar *name, int name_len
  * find dt by name, returns dt and index
  * does not map new dt's
  */
-struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
+struct ntfs_dt * ntfs_dt_find3(struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
 {
 	struct ntfs_dt *res = NULL;
 	INDEX_ENTRY *ie;
@@ -650,15 +652,15 @@ struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int name_len
 	if (!dt || !name)
 		return NULL;
 
-	//printf ("child_count = %d\n", dt->child_count);
+	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
 		ie = dt->children[i];
 
 		if (ie->flags & INDEX_ENTRY_END) {
 			r = -1;
 		} else {
-			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
-			r = ntfs_names_collate (name, name_len,
+			//ntfs_log_debug("\t"); ntfs_name_print(ie->key.file_name.file_name, ie->key.file_name.file_name_length); ntfs_log_debug("\n");
+			r = ntfs_names_collate(name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
 						2, IGNORE_CASE,
@@ -666,28 +668,28 @@ struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int name_len
 						dt->dir->vol->upcase_len);
 		}
 
-		//printf ("%d, %d\n", i, r);
+		//ntfs_log_debug("%d, %d\n", i, r);
 
 		if (r == 1) {
-			//printf ("keep searching\n");
+			//ntfs_log_debug("keep searching\n");
 			continue;
 		} else if (r == 0) {
 			res = dt;
-			//printf ("match %p\n", res);
+			//ntfs_log_debug("match %p\n", res);
 			if (index_num)
 				*index_num = i;
 		} else if (r == -1) {
 			if (ie->flags & INDEX_ENTRY_NODE) {
-				//printf ("recurse\n");
-				res = ntfs_dt_find3 (dt->sub_nodes[i], name, name_len, index_num);
+				//ntfs_log_debug("recurse\n");
+				res = ntfs_dt_find3(dt->sub_nodes[i], name, name_len, index_num);
 			} else {
-				//printf ("no match\n");
+				//ntfs_log_debug("no match\n");
 				res = dt;
 				if (index_num)
 					*index_num = i;
 			}
 		} else {
-			printf ("error collating name\n");
+			ntfs_log_debug("error collating name\n");
 		}
 		break;
 	}
@@ -700,7 +702,7 @@ struct ntfs_dt * ntfs_dt_find3 (struct ntfs_dt *dt, ntfschar *name, int name_len
  * find successor to specified name, returns dt and index
  * maps dt's as necessary
  */
-struct ntfs_dt * ntfs_dt_find4 (struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
+struct ntfs_dt * ntfs_dt_find4(struct ntfs_dt *dt, ntfschar *name, int name_len, int *index_num)
 {
 	struct ntfs_dt *res = NULL;
 	struct ntfs_dt *sub = NULL;
@@ -712,16 +714,16 @@ struct ntfs_dt * ntfs_dt_find4 (struct ntfs_dt *dt, ntfschar *name, int name_len
 	if (!dt || !name)
 		return NULL;
 
-	//printf ("child_count = %d\n", dt->child_count);
+	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
 		ie = dt->children[i];
 
-		//printf ("ie->flags = %d\n", ie->flags);
+		//ntfs_log_debug("ie->flags = %d\n", ie->flags);
 		if (ie->flags & INDEX_ENTRY_END) {
 			r = -1;
 		} else {
-			//printf ("\t"); ntfs_name_print (ie->key.file_name.file_name, ie->key.file_name.file_name_length); printf ("\n");
-			r = ntfs_names_collate (name, name_len,
+			//ntfs_log_debug("\t"); ntfs_name_print(ie->key.file_name.file_name, ie->key.file_name.file_name_length); ntfs_log_debug("\n");
+			r = ntfs_names_collate(name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
 						2, IGNORE_CASE,
@@ -729,33 +731,33 @@ struct ntfs_dt * ntfs_dt_find4 (struct ntfs_dt *dt, ntfschar *name, int name_len
 						dt->dir->vol->upcase_len);
 		}
 
-		//printf ("%d, %d\n", i, r);
+		//ntfs_log_debug("%d, %d\n", i, r);
 
 		if (r == 1) {
-			//printf ("keep searching\n");
+			//ntfs_log_debug("keep searching\n");
 		} else if (r == 0) {
 			//res = dt;
-			//printf ("match\n");
+			//ntfs_log_debug("match\n");
 			// ignore
 		} else if (r == -1) {
 			if (ie->flags & INDEX_ENTRY_NODE) {
-				//printf ("recurse\n");
+				//ntfs_log_debug("recurse\n");
 				if (!dt->sub_nodes[i]) {
-					vcn = ntfs_ie_get_vcn (ie);
-					//printf ("vcn = %lld\n", vcn);
-					sub = ntfs_dt_create (dt->dir, dt, vcn);
+					vcn = ntfs_ie_get_vcn(ie);
+					//ntfs_log_debug("vcn = %lld\n", vcn);
+					sub = ntfs_dt_create(dt->dir, dt, vcn);
 					dt->sub_nodes[i] = sub;
 				}
-				res = ntfs_dt_find4 (dt->sub_nodes[i], name, name_len, index_num);
+				res = ntfs_dt_find4(dt->sub_nodes[i], name, name_len, index_num);
 			} else {
-				//printf ("no match\n");
+				//ntfs_log_debug("no match\n");
 				res = dt;
 				if (index_num)
 					*index_num = i;
 			}
 			break;
 		} else {
-			printf ("error collating name\n");
+			ntfs_log_debug("error collating name\n");
 		}
 		//break;
 	}
@@ -767,7 +769,7 @@ struct ntfs_dt * ntfs_dt_find4 (struct ntfs_dt *dt, ntfschar *name, int name_len
  * ntfs_dt_find_all
  * maps all dt's into memory
  */
-void ntfs_dt_find_all (struct ntfs_dt *dt)
+void ntfs_dt_find_all(struct ntfs_dt *dt)
 {
 	INDEX_ENTRY *ie;
 	VCN vcn;
@@ -781,10 +783,10 @@ void ntfs_dt_find_all (struct ntfs_dt *dt)
 
 		if (ie->flags & INDEX_ENTRY_NODE) {
 			if (!dt->sub_nodes[i]) {
-				vcn = ntfs_ie_get_vcn (ie);
-				dt->sub_nodes[i] = ntfs_dt_create (dt->dir, dt, vcn);
+				vcn = ntfs_ie_get_vcn(ie);
+				dt->sub_nodes[i] = ntfs_dt_create(dt->dir, dt, vcn);
 			}
-			ntfs_dt_find_all (dt->sub_nodes[i]);
+			ntfs_dt_find_all(dt->sub_nodes[i]);
 		}
 	}
 }
@@ -792,7 +794,7 @@ void ntfs_dt_find_all (struct ntfs_dt *dt)
 /**
  * ntfs_dt_find_parent
  */
-int ntfs_dt_find_parent (struct ntfs_dt *dt)
+int ntfs_dt_find_parent(struct ntfs_dt *dt)
 {
 	int i;
 	struct ntfs_dt *parent;
@@ -814,7 +816,7 @@ int ntfs_dt_find_parent (struct ntfs_dt *dt)
 /**
  * ntfs_dt_isroot
  */
-BOOL ntfs_dt_isroot (struct ntfs_dt *dt)
+BOOL ntfs_dt_isroot(struct ntfs_dt *dt)
 {
 	if (!dt)
 		return FALSE;
@@ -824,7 +826,7 @@ BOOL ntfs_dt_isroot (struct ntfs_dt *dt)
 /**
  * ntfs_dt_root_freespace
  */
-int ntfs_dt_root_freespace (struct ntfs_dt *dt)
+int ntfs_dt_root_freespace(struct ntfs_dt *dt)
 {
 	int recsize;
 	int inuse;
@@ -844,7 +846,7 @@ int ntfs_dt_root_freespace (struct ntfs_dt *dt)
 /**
  * ntfs_dt_alloc_freespace
  */
-int ntfs_dt_alloc_freespace (struct ntfs_dt *dt)
+int ntfs_dt_alloc_freespace(struct ntfs_dt *dt)
 {
 	int recsize;
 	int inuse;
@@ -864,7 +866,7 @@ int ntfs_dt_alloc_freespace (struct ntfs_dt *dt)
 /**
  * ntfs_dt_transfer
  */
-int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
+int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
 {
 	int i;
 	int need;
@@ -884,26 +886,26 @@ int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 	if ((start < 0) || ((start+count) >= old->child_count))
 		return -1;
 
-	printf ("\n");
-	printf (BOLD YELLOW "Transferring children\n" END);
+	ntfs_log_debug("\n");
+	ntfs_log_debug(BOLD YELLOW "Transferring children\n" END);
 
 	need = 0;
 	for (i = start; i < (start+count+1); i++) {
 		mov_ie = old->children[i];
 		need += mov_ie->length;
-		//file = &mov_ie->key.file_name; printf ("\ttrn name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+		//file = &mov_ie->key.file_name; ntfs_log_debug("\ttrn name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_debug("\n");
 	}
 
-	if (ntfs_dt_isroot (new))
-		space = ntfs_dt_root_freespace (new);
+	if (ntfs_dt_isroot(new))
+		space = ntfs_dt_root_freespace(new);
 	else
-		space = ntfs_dt_alloc_freespace (new);
+		space = ntfs_dt_alloc_freespace(new);
 
 	// XXX if this is an index root, it'll go badly wrong
 	// restrict to allocs only?
 
-	printf ("\tneed  = %d\n", need);
-	printf ("\tspace = %d\n", space);
+	ntfs_log_debug("\tneed  = %d\n", need);
+	ntfs_log_debug("\tspace = %d\n", space);
 
 	if (space < need)
 		return -1;
@@ -920,7 +922,7 @@ int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 		n2 = old->children[start]->key.file_name.file_name;
 		l2 = old->children[start]->key.file_name.file_name_length;
 
-		i = ntfs_names_collate (n1, l1, n2, l2,
+		i = ntfs_names_collate(n1, l1, n2, l2,
 					2, IGNORE_CASE,
 					old->dir->vol->upcase,
 					old->dir->vol->upcase_len);
@@ -939,44 +941,44 @@ int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 	dst = src + need;
 	len = (u8*) new->children[new->child_count-1] + new->children[new->child_count-1]->length - src;
 
-	//printf ("src = %d, dst = %d, len = %d\n", src - new->data, dst - new->data, len);
-	memmove (dst, src, len);
+	//ntfs_log_debug("src = %d, dst = %d, len = %d\n", src - new->data, dst - new->data, len);
+	memmove(dst, src, len);
 
 	dst = src;
 	src = (u8*) old->children[start];
 	len = need;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	src = (u8*) old->children[start+count-1];
 	dst = (u8*) old->children[start];
 	len = (u8*) old->children[old->child_count-1] + old->children[old->child_count-1]->length - src;
 
-	//printf ("src = %d, dst = %d, len = %d\n", src - old->data, dst - old->data, len);
-	memmove (dst, src, len);
+	//ntfs_log_debug("src = %d, dst = %d, len = %d\n", src - old->data, dst - old->data, len);
+	memmove(dst, src, len);
 
 	dst += len;
 	len = old->data + old->dir->index_size - dst;
 
-	//printf ("dst = %d, len = %d\n", dst - old->data, len);
-	memset (dst, 0, len);
+	//ntfs_log_debug("dst = %d, len = %d\n", dst - old->data, len);
+	memset(dst, 0, len);
 
-	if (!ntfs_dt_resize_children3 (new, new->child_count + count))
+	if (!ntfs_dt_resize_children3(new, new->child_count + count))
 		return -1;
 
 	src = (u8*) &old->sub_nodes[start+count-1];
 	dst = (u8*) &old->sub_nodes[start];
-	len = (old->child_count - start - count + 1) * sizeof (struct ntfs_dt*);
+	len = (old->child_count - start - count + 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	src = (u8*) &new->sub_nodes[insert];
 	dst = (u8*) &new->sub_nodes[insert+count-1];
-	len = (new->child_count - insert - count + 1) * sizeof (struct ntfs_dt*);
+	len = (new->child_count - insert - count + 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
-	if (!ntfs_dt_resize_children3 (old, old->child_count - count))
+	if (!ntfs_dt_resize_children3(old, old->child_count - count))
 		return -1;
 
 	src = (u8*) new->children[0];
@@ -1004,8 +1006,8 @@ int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 	old->changed = TRUE;
 	new->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
 
 	return 0;
 }
@@ -1013,7 +1015,7 @@ int ntfs_dt_transfer (struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 /**
  * ntfs_dt_alloc_insert
  */
-int ntfs_dt_alloc_insert (struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
+int ntfs_dt_alloc_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 {
 	// XXX don't bother measuring, just subtract the children pointers
 
@@ -1037,46 +1039,46 @@ int ntfs_dt_alloc_insert (struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 		ie = (INDEX_ENTRY*) ((u8*)ie + ie->length);
 	}
 
-	printf ("alloc insert %d bytes\n", need);
+	ntfs_log_debug("alloc insert %d bytes\n", need);
 
 	alloc = (INDEX_ALLOCATION*) dt->data;
-	printf ("entries_offset = %d\n", alloc->index.entries_offset);
-	printf ("index_length   = %d\n", alloc->index.index_length);
-	printf ("allocated_size = %d\n", alloc->index.allocated_size);
+	ntfs_log_debug("entries_offset = %d\n", alloc->index.entries_offset);
+	ntfs_log_debug("index_length   = %d\n", alloc->index.index_length);
+	ntfs_log_debug("allocated_size = %d\n", alloc->index.allocated_size);
 
-	printf ("insert has %d children\n", dt->child_count);
-	printf ("children = %p\n", dt->children);
-	//utils_dump_mem (dt->data, 0, 128, DM_DEFAULTS);
+	ntfs_log_debug("insert has %d children\n", dt->child_count);
+	ntfs_log_debug("children = %p\n", dt->children);
+	//utils_dump_mem(dt->data, 0, 128, DM_DEFAULTS);
 
 	ie = dt->children[dt->child_count-1];
 
-	printf ("last child = %p (%ld)\n", ie, (long)ie - (long)dt->data);
-	printf ("size = %d\n", ie->length);
+	ntfs_log_debug("last child = %p (%ld)\n", ie, (long)ie - (long)dt->data);
+	ntfs_log_debug("size = %d\n", ie->length);
 
 	src = (u8*) ie;
 	dst = src + need;
 	len = ie->length;
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	src = (u8*) first;
 	dst = (u8*) ie;
 	len = need;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	// use create children
 	// measure need and update children list
 	// adjust headers
 
-	//utils_dump_mem (dt->data, 0, 256, DM_DEFAULTS);
+	//utils_dump_mem(dt->data, 0, 256, DM_DEFAULTS);
 	return 0;
 }
 
 /**
  * ntfs_dt_alloc_insert2
  */
-INDEX_ENTRY * ntfs_dt_alloc_insert2 (struct ntfs_dt *dt, int before, int count, int bytes)
+INDEX_ENTRY * ntfs_dt_alloc_insert2(struct ntfs_dt *dt, int before, int count, int bytes)
 {
 	int space;
 	u8 *src;
@@ -1095,7 +1097,7 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2 (struct ntfs_dt *dt, int before, int count, 
 		return NULL;
 
 	// check alloc has enough space
-	space = ntfs_dt_alloc_freespace (dt);
+	space = ntfs_dt_alloc_freespace(dt);
 	if (bytes > space)
 		return NULL;
 
@@ -1104,37 +1106,37 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2 (struct ntfs_dt *dt, int before, int count, 
 	dst = src + bytes;
 	len = dt->header->index_length - ((int)dt->children[before] - (int)dt->data) + 24;
 
-	//printf ("%d, %d, %d\n", (int)src - (int)dt->data, (int)dst - (int)dt->data, len);
+	//ntfs_log_debug("%d, %d, %d\n", (int)src - (int)dt->data, (int)dst - (int)dt->data, len);
 
-	memmove (dst, src, len);
-	memset (dst, 0, bytes);
+	memmove(dst, src, len);
+	memset(dst, 0, bytes);
 
 	// resize arrays
-	ntfs_dt_resize_children3 (dt, dt->child_count + count);
+	ntfs_dt_resize_children3(dt, dt->child_count + count);
 
 	// move keys (children)
 	src = (u8*) (dt->children + before);
-	dst = src + (count * sizeof (u8*));
-	len = (dt->child_count - count - before) * sizeof (u8*);
+	dst = src + (count * sizeof(u8*));
+	len = (dt->child_count - count - before) * sizeof(u8*);
 
-	memmove (dst, src, len);
-	memset (src, 0, count * sizeof (u8*));
+	memmove(dst, src, len);
+	memset(src, 0, count * sizeof(u8*));
 
 	// move keys (inodes)
 	src = (u8*) (dt->inodes + before);
-	dst = src + (count * sizeof (u8*));
-	len = (dt->child_count - count - before) * sizeof (u8*);
+	dst = src + (count * sizeof(u8*));
+	len = (dt->child_count - count - before) * sizeof(u8*);
 
-	memmove (dst, src, len);
-	memset (src, 0, count * sizeof (u8*));
+	memmove(dst, src, len);
+	memset(src, 0, count * sizeof(u8*));
 
 	// move keys (sub_nodes)
 	src = (u8*) (dt->sub_nodes + before);
-	dst = src + (count * sizeof (u8*));
-	len = (dt->child_count - count - before) * sizeof (u8*);
+	dst = src + (count * sizeof(u8*));
+	len = (dt->child_count - count - before) * sizeof(u8*);
 
-	memmove (dst, src, len);
-	memset (src, 0, count * sizeof (u8*));
+	memmove(dst, src, len);
+	memset(src, 0, count * sizeof(u8*));
 
 	return NULL;
 }
@@ -1142,7 +1144,7 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2 (struct ntfs_dt *dt, int before, int count, 
 /**
  * ntfs_dt_root_insert
  */
-int ntfs_dt_root_insert (struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
+int ntfs_dt_root_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 {
 	if (!dt)
 		return 1;
@@ -1155,7 +1157,7 @@ int ntfs_dt_root_insert (struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 /**
  * ntfs_dt_alloc_remove2
  */
-int ntfs_dt_alloc_remove2 (struct ntfs_dt *dt, int start, int count)
+int ntfs_dt_alloc_remove2(struct ntfs_dt *dt, int start, int count)
 {
 	int i;
 	int size;
@@ -1174,7 +1176,7 @@ int ntfs_dt_alloc_remove2 (struct ntfs_dt *dt, int start, int count)
 /**
  * ntfs_dt_root_remove2
  */
-int ntfs_dt_root_remove2 (struct ntfs_dt *dt, int start, int count)
+int ntfs_dt_root_remove2(struct ntfs_dt *dt, int start, int count)
 {
 	int i;
 	int size;
@@ -1186,18 +1188,18 @@ int ntfs_dt_root_remove2 (struct ntfs_dt *dt, int start, int count)
 	if ((count < 1) || ((start + count - 1) >= dt->child_count))
 		return -1;
 
-	printf ("s c/t %d %d/%d\n", start, count, dt->child_count);
+	ntfs_log_debug("s c/t %d %d/%d\n", start, count, dt->child_count);
 
 	size = 0;
 	for (i = start; i < (start + count); i++)
 		size += dt->children[i]->length;
-	printf ("size1 = %d\n", size);
+	ntfs_log_debug("size1 = %d\n", size);
 
 	size = (int) dt->children[start+count] - (int) dt->children[start];
-	printf ("size2 = %d\n", size);
+	ntfs_log_debug("size2 = %d\n", size);
 
 	size = (int) dt->children[start+count-1] - (int) dt->children[start] + dt->children[start+count-1]->length;
-	printf ("size3 = %d\n", size);
+	ntfs_log_debug("size3 = %d\n", size);
 
 	// XXX what shall we do with the inodes?
 	// transfer them to the dir (commit them for now)
@@ -1206,16 +1208,16 @@ int ntfs_dt_root_remove2 (struct ntfs_dt *dt, int start, int count)
 	// rearrange arrays
 	// shrink attribute
 
-	ntfs_dt_resize_children3 (dt, dt->child_count - count);
+	ntfs_dt_resize_children3(dt, dt->child_count - count);
 
-	printf ("ntfs_dt_root_remove2\n");
+	ntfs_log_debug("ntfs_dt_root_remove2\n");
 	return dt->child_count;
 }
 
 /**
  * ntfs_dt_transfer2
  */
-int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
+int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
 {
 	int i;
 	int need;
@@ -1236,39 +1238,39 @@ int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int 
 	if ((start + count) >= old->child_count)
 		return -1;
 
-	printf ("\n");
-	printf (BOLD YELLOW "Transferring children\n" END);
+	ntfs_log_debug("\n");
+	ntfs_log_debug(BOLD YELLOW "Transferring children\n" END);
 
 	need = 0;
 	for (i = start; i < (start+count); i++) {
 		mov_ie = old->children[i];
 		need += mov_ie->length;
-		//file = &mov_ie->key.file_name; printf ("\ttrn name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+		//file = &mov_ie->key.file_name; ntfs_log_debug("\ttrn name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_debug("\n");
 	}
 
-	if (ntfs_dt_isroot (new))
-		space = ntfs_dt_root_freespace (new);
+	if (ntfs_dt_isroot(new))
+		space = ntfs_dt_root_freespace(new);
 	else
-		space = ntfs_dt_alloc_freespace (new);
+		space = ntfs_dt_alloc_freespace(new);
 
-	printf ("\tneed  = %d\n", need);
-	printf ("\tspace = %d\n", space);
+	ntfs_log_debug("\tneed  = %d\n", need);
+	ntfs_log_debug("\tspace = %d\n", space);
 
 	if (need > space)
 		return -1;
 
-	if (ntfs_dt_isroot (new))
-		ntfs_dt_root_insert (new, old->children[0], count);
+	if (ntfs_dt_isroot(new))
+		ntfs_dt_root_insert(new, old->children[0], count);
 	else
-		ntfs_dt_alloc_insert2 (new, 0, count, need);
+		ntfs_dt_alloc_insert2(new, 0, count, need);
 
-	if (ntfs_dt_isroot (old))
-		ntfs_dt_root_remove2 (old, 0, count);
+	if (ntfs_dt_isroot(old))
+		ntfs_dt_root_remove2(old, 0, count);
 	else
-		ntfs_dt_alloc_remove2 (old, 0, count);
+		ntfs_dt_alloc_remove2(old, 0, count);
 
 	if (1) return -1;
-	if (0) ntfs_dt_alloc_insert (NULL, NULL, 0);
+	if (0) ntfs_dt_alloc_insert(NULL, NULL, 0);
 
 	if (new->child_count == 1) {
 		i = -1;
@@ -1282,7 +1284,7 @@ int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int 
 		n2 = old->children[start]->key.file_name.file_name;
 		l2 = old->children[start]->key.file_name.file_name_length;
 
-		i = ntfs_names_collate (n1, l1, n2, l2,
+		i = ntfs_names_collate(n1, l1, n2, l2,
 					2, IGNORE_CASE,
 					old->dir->vol->upcase,
 					old->dir->vol->upcase_len);
@@ -1301,44 +1303,44 @@ int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int 
 	dst = src + need;
 	len = (u8*) new->children[new->child_count-1] + new->children[new->child_count-1]->length - src;
 
-	//printf ("src = %d, dst = %d, len = %d\n", src - new->data, dst - new->data, len);
-	memmove (dst, src, len);
+	//ntfs_log_debug("src = %d, dst = %d, len = %d\n", src - new->data, dst - new->data, len);
+	memmove(dst, src, len);
 
 	dst = src;
 	src = (u8*) old->children[start];
 	len = need;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	src = (u8*) old->children[start+count-1];
 	dst = (u8*) old->children[start];
 	len = (u8*) old->children[old->child_count-1] + old->children[old->child_count-1]->length - src;
 
-	//printf ("src = %d, dst = %d, len = %d\n", src - old->data, dst - old->data, len);
-	memmove (dst, src, len);
+	//ntfs_log_debug("src = %d, dst = %d, len = %d\n", src - old->data, dst - old->data, len);
+	memmove(dst, src, len);
 
 	dst += len;
 	len = old->data + old->dir->index_size - dst;
 
-	//printf ("dst = %d, len = %d\n", dst - old->data, len);
-	memset (dst, 0, len);
+	//ntfs_log_debug("dst = %d, len = %d\n", dst - old->data, len);
+	memset(dst, 0, len);
 
-	if (!ntfs_dt_resize_children3 (new, new->child_count + count))
+	if (!ntfs_dt_resize_children3(new, new->child_count + count))
 		return -1;
 
 	src = (u8*) &old->sub_nodes[start+count-1];
 	dst = (u8*) &old->sub_nodes[start];
-	len = (old->child_count - start - count + 1) * sizeof (struct ntfs_dt*);
+	len = (old->child_count - start - count + 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	src = (u8*) &new->sub_nodes[insert];
 	dst = (u8*) &new->sub_nodes[insert+count-1];
-	len = (new->child_count - insert - count + 1) * sizeof (struct ntfs_dt*);
+	len = (new->child_count - insert - count + 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
-	if (!ntfs_dt_resize_children3 (old, old->child_count - count))
+	if (!ntfs_dt_resize_children3(old, old->child_count - count))
 		return -1;
 
 	src = (u8*) new->children[0];
@@ -1366,8 +1368,8 @@ int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int 
 	old->changed = TRUE;
 	new->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
 
 	return 0;
 }
@@ -1375,7 +1377,7 @@ int ntfs_dt_transfer2 (struct ntfs_dt *old, struct ntfs_dt *new, int start, int 
 /**
  * ntfs_dt_root_replace
  */
-int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
+int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
 {
 	u8 *src;
 	u8 *dst;
@@ -1386,51 +1388,51 @@ int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie,
 	if (!del || !del_ie || !suc_ie)
 		return FALSE;
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
-	//printf ("\n");
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
+	//ntfs_log_debug("\n");
 
-	attr = malloc (del->data_len + suc_ie->length - del_ie->length);
+	attr = malloc(del->data_len + suc_ie->length - del_ie->length);
 
 	dst = attr;
 	src = del->data;
 	len = (u8*) del_ie - del->data;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	dst += len;
 	src = (u8*) suc_ie;
 	len = suc_ie->length;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	dst += len;
 	src = (u8*) del_ie + del_ie->length;
 	len = del->data_len + (del->data - (u8*) del_ie) - del_ie->length;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	src = (u8*) del->data;
 	dst = attr;
 
 	len = suc_ie->length - del_ie->length;
-	free (del->data);
+	free(del->data);
 	del->data = attr;
 	del->data_len += len;
 	del->header = (INDEX_HEADER*) (del->data + 0x10);
 	del->header->index_length   += len;
 	del->header->allocated_size += len;
 
-	ntfs_mft_resize_resident (del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
+	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
 
-	//utils_dump_mem (attr, 0, del->data_len, DM_DEFAULTS);
+	//utils_dump_mem(attr, 0, del->data_len, DM_DEFAULTS);
 
-	//printf ("\n");
-	//printf (BOLD YELLOW "Adjust children\n" END);
+	//ntfs_log_debug("\n");
+	//ntfs_log_debug(BOLD YELLOW "Adjust children\n" END);
 	//for (i = 0; i < del->child_count; i++)
-	//	printf ("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
-	//printf ("\n");
+	//	ntfs_log_debug("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
+	//ntfs_log_debug("\n");
 
-	//printf ("src = %p, dst = %p, len = %d\n", src, dst, len); fflush (stdout);
+	//ntfs_log_debug("src = %p, dst = %p, len = %d\n", src, dst, len); fflush (stdout);
 
 	for (i = 0; i < del->child_count; i++)
 		del->children[i] = (INDEX_ENTRY*) (dst + ((u8*) del->children[i] - src));
@@ -1439,22 +1441,22 @@ int ntfs_dt_root_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie,
 		del->children[i] = (INDEX_ENTRY*) ((u8*) del->children[i] + len);
 
 	//for (i = 0; i < del->child_count; i++)
-	//	printf ("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
-	//printf ("\n");
+	//	ntfs_log_debug("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
+	//ntfs_log_debug("\n");
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
-	//printf ("\n");
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
+	//ntfs_log_debug("\n");
 
 	del->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
 	return TRUE;
 }
 
 /**
  * ntfs_dt_alloc_replace
  */
-BOOL ntfs_dt_alloc_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
+BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
 {
 	u8 *src;
 	u8 *dst;
@@ -1464,59 +1466,59 @@ BOOL ntfs_dt_alloc_replace (struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_i
 	if (!del || !del_ie || !suc_ie)
 		return FALSE;
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 
 	src = (u8*) del_ie + del_ie->length;
 	dst = (u8*) del_ie + suc_ie->length;
 	len = del->header->index_length + 24 + (del->data - src);
-	//printf ("src = %d\n", src - del->data);
-	//printf ("dst = %d\n", dst - del->data);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - del->data);
+	//ntfs_log_debug("dst = %d\n", dst - del->data);
+	//ntfs_log_debug("len = %d\n", len);
 
 	if (src != dst)
-		memmove (dst, src, len);
+		memmove(dst, src, len);
 
 	src = (u8*) suc_ie;
 	dst = (u8*) del_ie;
 	len = suc_ie->length;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 
 	del->header->index_length += suc_ie->length - del_ie->length;
 
 	dst = del->data + del->header->index_length + 24;
 	len = del->data_len - del->header->index_length - 24;
 
-	memset (dst, 0, len);
+	memset(dst, 0, len);
 
 	//for (i = 0; i < del->child_count; i++)
-	//	printf ("Child %d %p\n", i, del->children[i]);
-	//printf ("\n");
+	//	ntfs_log_debug("Child %d %p\n", i, del->children[i]);
+	//ntfs_log_debug("\n");
 
 	len = suc_ie->length - del_ie->length;
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("len = %d\n", len);
 
 	for (i = del_num+1; i < del->child_count; i++)
 		del->children[i] = (INDEX_ENTRY*) ((u8*) del->children[i] + len);
 
 	//for (i = 0; i < del->child_count; i++)
-	//	printf ("Child %d %p\n", i, del->children[i]);
-	//printf ("\n");
+	//	ntfs_log_debug("Child %d %p\n", i, del->children[i]);
+	//ntfs_log_debug("\n");
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 
 	del->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
 	return TRUE;
 }
 
 /**
  * ntfs_dt_root_remove
  */
-BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
+BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 {
 	INDEX_ENTRY *del_ie = NULL;
 	u8 *src;
@@ -1530,26 +1532,26 @@ BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
 	if (!del)
 		return FALSE;
 
-	//utils_dump_mem (del->data, 0, del->header->index_length+16, DM_RED);
-	//printf ("\n");
+	//utils_dump_mem(del->data, 0, del->header->index_length+16, DM_RED);
+	//ntfs_log_debug("\n");
 
 #if 0
 	off = (u8*) del->children[0] - del->data;
 	for (i = 0; i < del->child_count; i++) {
 		del_ie = del->children[i];
 
-		printf ("%2d  %4d ", i+1, off);
+		ntfs_log_debug("%2d  %4d ", i+1, off);
 		off += del_ie->length;
 
 		if (del_ie->flags & INDEX_ENTRY_END) {
-			printf ("END (%d)\n", del_ie->length);
+			ntfs_log_debug("END (%d)\n", del_ie->length);
 			break;
 		}
 
-		ntfs_name_print (del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
-		printf (" (%d)\n", del_ie->length);
+		ntfs_name_print(del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
+		ntfs_log_debug(" (%d)\n", del_ie->length);
 	}
-	printf ("total = %d\n", off);
+	ntfs_log_debug("total = %d\n", off);
 #endif
 
 	del_ie  = del->children[del_num];
@@ -1559,11 +1561,11 @@ BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
 	dst = (u8*) del_ie;
 	len = del->header->index_length + 16 - (src - del->data);
 
-	//printf ("src = %d\n", src - del->data);
-	//printf ("dst = %d\n", dst - del->data);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - del->data);
+	//ntfs_log_debug("dst = %d\n", dst - del->data);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	del->data_len -= del_len;
 	del->child_count--;
@@ -1571,40 +1573,40 @@ BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
 	del->header->index_length   = del->data_len - 16;
 	del->header->allocated_size = del->data_len - 16;
 
-	ntfs_mft_resize_resident (del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
+	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
 	old = del->data;
-	del->data = realloc (del->data, del->data_len);
+	del->data = realloc(del->data, del->data_len);
 	del->header = (INDEX_HEADER*) (del->data + 0x10);
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_GREEN | DM_RED);
+	//utils_dump_mem(del->data, 0, del->data_len, DM_GREEN | DM_RED);
 
 	src = (u8*) (&del->children[del_num+1]);
 	dst = (u8*) (&del->children[del_num]);
-	len = (del->child_count - del_num) * sizeof (INDEX_ENTRY*);
+	len = (del->child_count - del_num) * sizeof(INDEX_ENTRY*);
 
-	//printf ("src = %d\n", src - (u8*) del->children);
-	//printf ("dst = %d\n", dst - (u8*) del->children);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - (u8*) del->children);
+	//ntfs_log_debug("dst = %d\n", dst - (u8*) del->children);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	src = (u8*) (&del->sub_nodes[del_num+1]);
 	dst = (u8*) (&del->sub_nodes[del_num]);
-	len = (del->child_count - del_num) * sizeof (struct ntfs_dt*);
+	len = (del->child_count - del_num) * sizeof(struct ntfs_dt*);
 
-	//printf ("src = %d\n", src - (u8*) del->children);
-	//printf ("dst = %d\n", dst - (u8*) del->children);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - (u8*) del->children);
+	//ntfs_log_debug("dst = %d\n", dst - (u8*) del->children);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
-	//printf ("del_num = %d\n", del_num);
+	//ntfs_log_debug("del_num = %d\n", del_num);
 	for (i = 0; i < del->child_count; i++)
 		del->children[i] = (INDEX_ENTRY*) ((u8*) del->children[i] - old + del->data);
 	for (i = del_num; i < del->child_count; i++)
 		del->children[i] = (INDEX_ENTRY*) ((u8*) del->children[i] - del_len);
 
-	if (!ntfs_dt_create_children2 (del, del->child_count))
+	if (!ntfs_dt_create_children2(del, del->child_count))
 		return FALSE;
 
 #if 0
@@ -1612,32 +1614,32 @@ BOOL ntfs_dt_root_remove (struct ntfs_dt *del, int del_num)
 	for (i = 0; i < del->child_count; i++) {
 		del_ie = del->children[i];
 
-		printf ("%2d  %4d ", i+1, off);
+		ntfs_log_debug("%2d  %4d ", i+1, off);
 		off += del_len;
 
 		if (del_ie->flags & INDEX_ENTRY_END) {
-			printf ("END (%d)\n", del_len);
+			ntfs_log_debug("END (%d)\n", del_len);
 			break;
 		}
 
-		ntfs_name_print (del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
-		printf (" (%d)\n", del_len);
+		ntfs_name_print(del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
+		ntfs_log_debug(" (%d)\n", del_len);
 	}
-	printf ("total = %d\n", off);
+	ntfs_log_debug("total = %d\n", off);
 #endif
 
-	//utils_dump_mem (del->data, 0, del->header->index_length+16, DM_DEFAULTS);
+	//utils_dump_mem(del->data, 0, del->header->index_length+16, DM_DEFAULTS);
 
 	del->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
 	return TRUE;
 }
 
 /**
  * ntfs_dt_alloc_remove
  */
-BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
+BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 {
 	INDEX_ENTRY *del_ie = NULL;
 	u8 *dst;
@@ -1654,23 +1656,23 @@ BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 	for (i = 0; i < del->child_count; i++) {
 		del_ie = del->children[i];
 
-		printf ("%2d  %4d ", i, off);
+		ntfs_log_debug("%2d  %4d ", i, off);
 		off += del_ie->length;
 
 		if (del_ie->flags & INDEX_ENTRY_END) {
-			printf ("END (%d)\n", del_ie->length);
+			ntfs_log_debug("END (%d)\n", del_ie->length);
 			break;
 		}
 
-		ntfs_name_print (del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
-		printf (" (%d)\n", del_ie->length);
+		ntfs_name_print(del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
+		ntfs_log_debug(" (%d)\n", del_ie->length);
 	}
-	printf ("total = %d\n", off);
-	printf ("\n");
+	ntfs_log_debug("total = %d\n", off);
+	ntfs_log_debug("\n");
 #endif
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
-	//printf ("\n");
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
+	//ntfs_log_debug("\n");
 
 	del_ie = del->children[del_num];
 
@@ -1678,11 +1680,11 @@ BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 	dst = (u8*) del_ie;
 	len = del->header->index_length + 24 - (src - del->data);
 
-	//printf ("src = %d\n", src - del->data);
-	//printf ("dst = %d\n", dst - del->data);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - del->data);
+	//ntfs_log_debug("dst = %d\n", dst - del->data);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	del->header->index_length -= src - dst;
 	del->child_count--;
@@ -1690,67 +1692,67 @@ BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 	dst += len;
 	len = del->data_len - del->header->index_length - 24;
 
-	//printf ("dst = %d\n", dst - del->data);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("dst = %d\n", dst - del->data);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memset (dst, 0, len);
+	memset(dst, 0, len);
 
 	src = (u8*) (&del->children[del_num+1]);
 	dst = (u8*) (&del->children[del_num]);
-	len = (del->child_count - del_num) * sizeof (INDEX_ENTRY*);
+	len = (del->child_count - del_num) * sizeof(INDEX_ENTRY*);
 
-	//printf ("src = %d\n", src - (u8*) del->children);
-	//printf ("dst = %d\n", dst - (u8*) del->children);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - (u8*) del->children);
+	//ntfs_log_debug("dst = %d\n", dst - (u8*) del->children);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	src = (u8*) (&del->sub_nodes[del_num+1]);
 	dst = (u8*) (&del->sub_nodes[del_num]);
-	len = (del->child_count - del_num) * sizeof (struct ntfs_dt*);
+	len = (del->child_count - del_num) * sizeof(struct ntfs_dt*);
 
-	//printf ("src = %d\n", src - (u8*) del->children);
-	//printf ("dst = %d\n", dst - (u8*) del->children);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - (u8*) del->children);
+	//ntfs_log_debug("dst = %d\n", dst - (u8*) del->children);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
-	//printf ("del_num = %d\n", del_num);
+	//ntfs_log_debug("del_num = %d\n", del_num);
 	for (i = del_num; i < del->child_count; i++)
 		del->children[i] = (INDEX_ENTRY*) ((u8*) del->children[i] - del_ie->length);
 
-	if (!ntfs_dt_create_children2 (del, del->child_count))
+	if (!ntfs_dt_create_children2(del, del->child_count))
 		return FALSE;
 
-	//utils_dump_mem (del->data, 0, del->data_len, DM_DEFAULTS);
+	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 
 #if 0
 	off = (u8*)del->children[0] - del->data;
 	for (i = 0; i < del->child_count; i++) {
 		del_ie = del->children[i];
 
-		printf ("%2d  %4d ", i, off);
+		ntfs_log_debug("%2d  %4d ", i, off);
 		off += del_ie->length;
 
 		if (del_ie->flags & INDEX_ENTRY_END) {
-			printf ("END (%d)\n", del_ie->length);
+			ntfs_log_debug("END (%d)\n", del_ie->length);
 			break;
 		}
 
-		ntfs_name_print (del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
-		printf (" (%d)\n", del_ie->length);
+		ntfs_name_print(del_ie->key.file_name.file_name, del_ie->key.file_name.file_name_length);
+		ntfs_log_debug(" (%d)\n", del_ie->length);
 	}
-	printf ("total = %d\n", off);
-	printf ("\n");
+	ntfs_log_debug("total = %d\n", off);
+	ntfs_log_debug("\n");
 #endif
 
 	del->changed = TRUE;
 
-	printf (GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
+	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
 
 	if (del->child_count < 2) {
-		printf ("indx is empty\n");
-		ntfs_bmp_set_range (del->dir->bitmap, del->vcn, 1, 0);
+		ntfs_log_debug("indx is empty\n");
+		ntfs_bmp_set_range(del->dir->bitmap, del->vcn, 1, 0);
 	}
 
 	return TRUE;
@@ -1759,7 +1761,7 @@ BOOL ntfs_dt_alloc_remove (struct ntfs_dt *del, int del_num)
 /**
  * ntfs_dt_alloc_add
  */
-int ntfs_dt_alloc_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
+int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
 {
 	INDEX_BLOCK *block;
 	INDEX_ENTRY *entry;
@@ -1777,39 +1779,39 @@ int ntfs_dt_alloc_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, s
 	need  = ie->length;
 	space = parent->data_len - block->index.index_length - 24;
 
-	printf ("need %d, have %d\n", need, space);
+	ntfs_log_debug("need %d, have %d\n", need, space);
 	if (need > space) {
-		printf ("no room");
+		ntfs_log_debug("no room");
 		return 0;
 	}
 
-	//utils_dump_mem (parent->data, 0, parent->data_len, DM_DEFAULTS);
-	//printf ("\n");
+	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
+	//ntfs_log_debug("\n");
 
 	src = (u8*) parent->children[index_num];
 	dst = src + need;
 	len = parent->data + parent->data_len - src - space;
-	//printf ("src = %d\n", src - parent->data);
-	//printf ("dst = %d\n", dst - parent->data);
-	//printf ("len = %d\n", len);
+	//ntfs_log_debug("src = %d\n", src - parent->data);
+	//ntfs_log_debug("dst = %d\n", dst - parent->data);
+	//ntfs_log_debug("len = %d\n", len);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	dst = src;
 	src = (u8*) ie;
 	len = need;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	block->index.index_length += len;
 
 	dst = parent->data + block->index.index_length + 24;
 	len = parent->data_len - block->index.index_length - 24;
 
-	memset (dst, 0, len);
+	memset(dst, 0, len);
 
 	//realloc children, sub_nodes
-	ntfs_dt_create_children2 (parent, parent->child_count + 1);
+	ntfs_dt_create_children2(parent, parent->child_count + 1);
 
 	// regen children pointers
 	parent->child_count = 0;
@@ -1828,26 +1830,26 @@ int ntfs_dt_alloc_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, s
 
 		src += entry->length;
 	}
-	printf ("count = %d\n", parent->child_count);
+	ntfs_log_debug("count = %d\n", parent->child_count);
 
 	src = (u8*) &parent->sub_nodes[index_num+parent->child_count-1];
 	dst = (u8*) &parent->sub_nodes[index_num];
-	len = (parent->child_count - index_num - 1) * sizeof (struct ntfs_dt*);
+	len = (parent->child_count - index_num - 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	//insert sub_node pointer
 	parent->sub_nodes[index_num] = child;
 
-	//utils_dump_mem (parent->data, 0, parent->data_len, DM_DEFAULTS);
-	//printf ("\n");
+	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
+	//ntfs_log_debug("\n");
 	return 0;
 }
 
 /**
  * ntfs_dt_root_add
  */
-int ntfs_dt_root_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
+int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
 {
 	INDEX_ROOT *root;
 	INDEX_ENTRY *entry;
@@ -1863,39 +1865,39 @@ int ntfs_dt_root_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 
 	root = (INDEX_ROOT*) parent->data;
 
-	//utils_dump_mem (parent->data, 0, parent->data_len, DM_DEFAULTS);
-	printf ("\n");
+	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
+	ntfs_log_debug("\n");
 
 	need  = ie->length;
-	space = ntfs_mft_free_space (parent->dir);
+	space = ntfs_mft_free_space(parent->dir);
 
-	printf ("need %d, have %d\n", need, space);
+	ntfs_log_debug("need %d, have %d\n", need, space);
 	if (need > space) {
-		printf ("no room");
+		ntfs_log_debug("no room");
 		return 0;
 	}
 
-	attr = malloc (parent->data_len + need);
+	attr = malloc(parent->data_len + need);
 
 	src = parent->data;
 	dst = attr;
 	len = root->index.entries_offset + 16;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	dst += len;
 	src = (u8*) ie;
 	len = ie->length;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
 	dst += len;
 	src = (u8*) parent->children[index_num];
 	len = parent->data + parent->data_len - src;
 
-	memcpy (dst, src, len);
+	memcpy(dst, src, len);
 
-	free (parent->data);
+	free(parent->data);
 	parent->data = attr;
 	parent->data_len += need;
 
@@ -1903,13 +1905,13 @@ int ntfs_dt_root_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 	root->index.index_length   = parent->data_len - 16;
 	root->index.allocated_size = parent->data_len - 16;
 
-	//utils_dump_mem (parent->data, 0, parent->data_len, DM_DEFAULTS);
-	printf ("\n");
+	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
+	ntfs_log_debug("\n");
 
-	ntfs_mft_resize_resident (parent->dir->inode, AT_INDEX_ROOT, I30, 4, parent->data, parent->data_len);
+	ntfs_mft_resize_resident(parent->dir->inode, AT_INDEX_ROOT, I30, 4, parent->data, parent->data_len);
 
 	//realloc children, sub_nodes
-	ntfs_dt_create_children2 (parent, parent->child_count + 1);
+	ntfs_dt_create_children2(parent, parent->child_count + 1);
 
 	// regen children pointers
 	parent->child_count = 0;
@@ -1929,13 +1931,13 @@ int ntfs_dt_root_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 
 		src += entry->length;
 	}
-	printf ("count = %d\n", parent->child_count);
+	ntfs_log_debug("count = %d\n", parent->child_count);
 
 	src = (u8*) &parent->sub_nodes[index_num+parent->child_count-1];
 	dst = (u8*) &parent->sub_nodes[index_num];
-	len = (parent->child_count - index_num - 1) * sizeof (struct ntfs_dt*);
+	len = (parent->child_count - index_num - 1) * sizeof(struct ntfs_dt*);
 
-	memmove (dst, src, len);
+	memmove(dst, src, len);
 
 	//insert sub_node pointer
 	parent->sub_nodes[index_num] = child;
@@ -1946,7 +1948,7 @@ int ntfs_dt_root_add (struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 /**
  * ntfs_dt_add2
  */
-int ntfs_dt_add2 (INDEX_ENTRY *ie, struct ntfs_dt *suc, int suc_num, struct ntfs_dt *ded)
+int ntfs_dt_add2(INDEX_ENTRY *ie, struct ntfs_dt *suc, int suc_num, struct ntfs_dt *ded)
 {
 	int need;
 	int space;
@@ -1961,10 +1963,10 @@ int ntfs_dt_add2 (INDEX_ENTRY *ie, struct ntfs_dt *suc, int suc_num, struct ntfs
 	if (!ie || !suc)
 		return -1;
 
-	printf ("\n");
-	printf (BOLD YELLOW "Add key to leaf\n" END);
+	ntfs_log_debug("\n");
+	ntfs_log_debug(BOLD YELLOW "Add key to leaf\n" END);
 
-	//utils_dump_mem (suc->data, 0, suc->data_len, DM_DEFAULTS);
+	//utils_dump_mem(suc->data, 0, suc->data_len, DM_DEFAULTS);
 
 	chl = NULL;
 ascend:
@@ -1972,7 +1974,7 @@ ascend:
 
 #if 0
 	for (; ded; ded = ded->sub_nodes[0]) {
-		printf ("\tded vcn = %lld\n", ded->vcn);
+		ntfs_log_debug("\tded vcn = %lld\n", ded->vcn);
 	}
 #endif
 
@@ -1984,19 +1986,19 @@ ascend:
 	 */
 	need = ie->length;
 
-	if (ntfs_dt_isroot (suc))
-		space = ntfs_dt_root_freespace (suc);
+	if (ntfs_dt_isroot(suc))
+		space = ntfs_dt_root_freespace(suc);
 	else
-		space = ntfs_dt_alloc_freespace (suc);
+		space = ntfs_dt_alloc_freespace(suc);
 
-	printf ("\tneed %d\n", need);
-	printf ("\tspace %d\n", space);
+	ntfs_log_debug("\tneed %d\n", need);
+	ntfs_log_debug("\tspace %d\n", space);
 
 	if (space >= need) {
-		if (ntfs_dt_isroot (suc))
-			ntfs_dt_root_add (suc, suc_num, ie, chl);
+		if (ntfs_dt_isroot(suc))
+			ntfs_dt_root_add(suc, suc_num, ie, chl);
 		else
-			ntfs_dt_alloc_add (suc, suc_num, ie, chl);
+			ntfs_dt_alloc_add(suc, suc_num, ie, chl);
 		goto done;
 	}
 
@@ -2010,9 +2012,9 @@ ascend:
 		new = ded;
 		vcn = ded->vcn;
 		ded = ded->sub_nodes[0];
-		printf ("\treusing vcn %lld\n", new->vcn);
+		ntfs_log_debug("\treusing vcn %lld\n", new->vcn);
 	} else {
-		ntfs_mft_add_index (suc->dir);
+		ntfs_mft_add_index(suc->dir);
 		/*
 		 * ALLOC
 		 * any unused records?
@@ -2038,7 +2040,7 @@ ascend:
 		 */
 	}
 
-	//printf ("\tnode has %d children\n", suc->child_count);
+	//ntfs_log_debug("\tnode has %d children\n", suc->child_count);
 
 	// initialise new node
 	// XXX ntfs_dt_initialise (new, vcn);
@@ -2047,37 +2049,37 @@ ascend:
 
 	// find median key
 	median = (suc->child_count+1) / 2;
-	med_ie = ntfs_ie_copy (suc->children[median]);
-	//file = &med_ie->key.file_name; printf ("\tmed name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+	med_ie = ntfs_ie_copy(suc->children[median]);
+	//file = &med_ie->key.file_name; ntfs_log_debug("\tmed name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_debug("\n");
 
-	ntfs_ie_free (med_ie);
+	ntfs_ie_free(med_ie);
 	med_ie = NULL;
 
-	//printf ("suc key count = %d\n", suc->child_count);
-	//printf ("new key count = %d\n", new->child_count);
+	//ntfs_log_debug("suc key count = %d\n", suc->child_count);
+	//ntfs_log_debug("new key count = %d\n", new->child_count);
 
-	//printf ("median's child = %p\n", suc->sub_nodes[median]);
+	//ntfs_log_debug("median's child = %p\n", suc->sub_nodes[median]);
 	// need to pass the child when ascending
 	chl = suc->sub_nodes[median];
 
 	// transfer keys
-	if (ntfs_dt_transfer (suc, new, 0, median-1) < 0)
+	if (ntfs_dt_transfer(suc, new, 0, median-1) < 0)
 		goto done;
 
-	//printf ("suc key count = %d\n", suc->child_count);
-	//printf ("new key count = %d\n", new->child_count);
+	//ntfs_log_debug("suc key count = %d\n", suc->child_count);
+	//ntfs_log_debug("new key count = %d\n", new->child_count);
 
-	//file = &suc->children[0]->key.file_name; printf ("\tmed name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
+	//file = &suc->children[0]->key.file_name; ntfs_log_debug("\tmed name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_debug("\n");
 
 	// can this be a root node?
-	if (ntfs_dt_isroot (suc))
-		ntfs_dt_root_remove (suc, 0);
+	if (ntfs_dt_isroot(suc))
+		ntfs_dt_root_remove(suc, 0);
 	else
-		ntfs_dt_alloc_remove (suc, 0);
+		ntfs_dt_alloc_remove(suc, 0);
 
-	//file = &suc->children[0]->key.file_name; printf ("\tmed name: "); ntfs_name_print (file->file_name, file->file_name_length); printf ("\n");
-	//printf ("suc key count = %d\n", suc->child_count);
-	//printf ("new key count = %d\n", new->child_count);
+	//file = &suc->children[0]->key.file_name; ntfs_log_debug("\tmed name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_debug("\n");
+	//ntfs_log_debug("suc key count = %d\n", suc->child_count);
+	//ntfs_log_debug("new key count = %d\n", new->child_count);
 
 	// remove the median key
 
@@ -2086,12 +2088,12 @@ ascend:
 	// median child is new
 	// ascend
 
-	med_ie = ntfs_ie_set_vcn (med_ie, new->vcn);
+	med_ie = ntfs_ie_set_vcn(med_ie, new->vcn);
 	if (!med_ie)
 		goto done;
 
-	//printf ("median child = %lld\n", ntfs_ie_get_vcn (med_ie));
-	//printf ("new's vcn    = %lld\n", new->vcn);
+	//ntfs_log_debug("median child = %lld\n", ntfs_ie_get_vcn(med_ie));
+	//ntfs_log_debug("new's vcn    = %lld\n", new->vcn);
 
 	// adjust parents
 	//	attach new to median
@@ -2107,8 +2109,8 @@ ascend:
 	suc = suc->parent;
 	suc_num = 0;
 
-	printf ("\n");
-	printf (BOLD YELLOW "Ascend\n" END);
+	ntfs_log_debug("\n");
+	ntfs_log_debug(BOLD YELLOW "Ascend\n" END);
 	goto ascend;
 done:
 	return 0;

@@ -29,7 +29,6 @@
 
 /*
  * Notes:
- *
  *	We define the conversion functions including typecasts since the
  * defaults don't necessarily perform appropriate typecasts.
  *	Also, using our own functions means that we can change them if it
@@ -38,20 +37,21 @@
  */
 
 #ifdef HAVE_ENDIAN_H
-#	include <endian.h>
+#include <endian.h>
 #endif
 #ifdef HAVE_SYS_ENDIAN_H
-#	include <sys/endian.h>
+#include <sys/endian.h>
 #endif
 #ifdef HAVE_MACHINE_ENDIAN_H
-#	include <machine/endian.h>
+#include <machine/endian.h>
 #endif
 #ifdef HAVE_SYS_BYTEORDER_H
-#	include <sys/byteorder.h>
+#include <sys/byteorder.h>
 #endif
 #ifdef HAVE_SYS_PARAM_H
-#	include <sys/param.h>
+#include <sys/param.h>
 #endif
+
 #ifndef __BYTE_ORDER
 #	if defined(_BYTE_ORDER)
 #		define __BYTE_ORDER _BYTE_ORDER

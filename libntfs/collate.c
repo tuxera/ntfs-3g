@@ -1,4 +1,4 @@
-/*
+/**
  * collate.c - NTFS collation handling.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2004 Anton Altaparmakov
@@ -20,17 +20,25 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "collate.h"
 #include "debug.h"
 #include "unistr.h"
+#include "logging.h"
 
+/**
+ * ntfs_collate_binary
+ */
 static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len)
 {
 	int rc;
 
-	ntfs_debug("Entering.");
+	ntfs_log_trace("Entering.\n");
 	rc = memcmp(data1, data2, min(data1_len, data2_len));
 	if (!rc && (data1_len != data2_len)) {
 		if (data1_len < data2_len)
@@ -38,10 +46,13 @@ static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 		else
 			rc = 1;
 	}
-	ntfs_debug("Done, returning %i.", rc);
+	ntfs_log_trace("Done, returning %i.", rc);
 	return rc;
 }
 
+/**
+ * ntfs_collate_ntofs_ulong
+ */
 static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len)
@@ -49,9 +60,9 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 	int rc;
 	u32 d1, d2;
 
-	ntfs_debug("Entering.");
+	ntfs_log_trace("Entering.\n");
 	if (data1_len != data2_len || data1_len != 4) {
-		ntfs_error(, "data1_len or/and data2_len not equal to 4.");
+		ntfs_log_error("data1_len or/and data2_len not equal to 4.");
 		return NTFS_COLLATION_ERROR;
 	}
 	d1 = le32_to_cpup(data1);
@@ -64,24 +75,27 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 		else
 			rc = 1;
 	}
-	ntfs_debug("Done, returning %i.", rc);
+	ntfs_log_trace("Done, returning %i.\n", rc);
 	return rc;
 }
 
+/**
+ * ntfs_collate_file_name
+ */
 static int ntfs_collate_file_name(ntfs_volume *vol,
 		const void *data1, const int data1_len __attribute__((unused)),
 		const void *data2, const int data2_len __attribute__((unused)))
 {
 	int rc;
 
-	ntfs_debug("Entering.");
+	ntfs_log_trace("Entering.\n");
 	rc = ntfs_file_values_compare(data1, data2, NTFS_COLLATION_ERROR,
 			IGNORE_CASE, vol->upcase, vol->upcase_len);
 	if (!rc)
 		rc = ntfs_file_values_compare(data1, data2,
 				NTFS_COLLATION_ERROR, CASE_SENSITIVE,
 				vol->upcase, vol->upcase_len);
-	ntfs_debug("Done, returning %i.", rc);
+	ntfs_log_trace("Done, returning %i.\n", rc);
 	return rc;
 }
 
@@ -125,9 +139,9 @@ int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 {
 	int i;
 
-	ntfs_debug("Entering.");
+	ntfs_log_trace("Entering.\n");
 	if (!vol || !data1 || !data2 || data1_len < 0 || data2_len < 0) {
-		ntfs_error(, "Invalid arguments passed.");
+		ntfs_log_error("Invalid arguments passed.");
 		return NTFS_COLLATION_ERROR;
 	}
 	/*
@@ -151,6 +165,6 @@ int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 		return ntfs_do_collate0x1[i](vol, data1, data1_len,
 				data2, data2_len);
 err:
-	ntfs_error(, "Unknown collation rule.");
+	ntfs_log_debug("Unknown collation rule.\n");
 	return NTFS_COLLATION_ERROR;
 }

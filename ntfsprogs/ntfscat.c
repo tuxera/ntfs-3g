@@ -243,7 +243,7 @@ static int parse_options (int argc, char **argv)
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
-		       	Eprintf ("You must specify a device.\n");
+			Eprintf ("You must specify a device.\n");
 			err++;
 
 		} else if (opts.file == NULL && opts.inode == -1) {

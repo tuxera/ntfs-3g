@@ -50,7 +50,7 @@
 #include <locale.h>
 #endif
 #ifdef HAVE_LIBINTL_H
-#	include <libintl.h>
+#include <libintl.h>
 #endif
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -69,6 +69,7 @@
 #include "debug.h"
 #include "dir.h"
 #include "version.h"
+#include "logging.h"
 
 const char *ntfs_bugs = "Developers' email address: linux-ntfs-dev@lists.sourceforge.net\n";
 const char *ntfs_home = "Linux NTFS homepage: http://linux-ntfs.sourceforge.net\n";
@@ -89,10 +90,10 @@ int utils_set_locale (void)
 	locale = setlocale (LC_ALL, "");
 	if (!locale) {
 		locale = setlocale (LC_ALL, NULL);
-		Eprintf ("Failed to set locale, using default '%s'.\n", locale);
+		ntfs_log_error ("Failed to set locale, using default '%s'.\n", locale);
 		return 1;
 	} else {
-		Vprintf ("Using locale '%s'.\n", locale);
+		ntfs_log_verbose ("Using locale '%s'.\n", locale);
 		return 0;
 	}
 }
@@ -125,37 +126,37 @@ int utils_valid_device (const char *name, int force)
 
 	if (stat (name, &st) == -1) {
 		if (errno == ENOENT) {
-			Eprintf ("The device %s doesn't exist\n", name);
+			ntfs_log_error ("The device %s doesn't exist\n", name);
 		} else {
-			Eprintf ("Error getting information about %s: %s\n", name, strerror (errno));
+			ntfs_log_error ("Error getting information about %s: %s\n", name, strerror (errno));
 		}
 		return 0;
 	}
 
 	if (!S_ISBLK (st.st_mode)) {
-		Vprintf ("%s is not a block device.\n", name);
+		ntfs_log_verbose ("%s is not a block device.\n", name);
 		if (!force) {
-			Eprintf ("Use the force option to work with files.\n");
+			ntfs_log_error ("Use the force option to work with files.\n");
 			return 0;
 		}
-		Vprintf ("Forced to continue.\n");
+		ntfs_log_verbose ("Forced to continue.\n");
 	}
 
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted (name, &mnt_flags)) {
-		Vprintf ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
+		ntfs_log_verbose ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
 		if (!force) {
-			Eprintf ("Use the force option to ignore this error.\n");
+			ntfs_log_error ("Use the force option to ignore this error.\n");
 			return 0;
 		}
-		Vprintf ("Forced to continue.\n");
+		ntfs_log_verbose ("Forced to continue.\n");
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Vprintf ("The device %s, is mounted.\n", name);
+		ntfs_log_verbose ("The device %s, is mounted.\n", name);
 		if (!force) {
-			Eprintf ("Use the force option to work a mounted filesystem.\n");
+			ntfs_log_error ("Use the force option to work a mounted filesystem.\n");
 			return 0;
 		}
-		Vprintf ("Forced to continue.\n");
+		ntfs_log_verbose ("Forced to continue.\n");
 	}
 
 	return 1;
@@ -181,27 +182,27 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 		int err;
 
 		err = errno;
-		Eprintf("Couldn't mount device '%s': %s\n", device,
+		ntfs_log_error("Couldn't mount device '%s': %s\n", device,
 				strerror(err));
 		if (err == EPERM)
-			Eprintf("Windows was hibernated.  Try to mount volume "
+			ntfs_log_error("Windows was hibernated.  Try to mount volume "
 					"in windows, shut down and try "
 					"again.\n");
 		if (err == EOPNOTSUPP)
-			Eprintf("Windows did not shut down properly.  Try to "
+			ntfs_log_error("Windows did not shut down properly.  Try to "
 					"mount volume in windows, shut down "
 					"and try again.\n");
 		return NULL;
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		Qprintf ("Volume is dirty.\n");
+		ntfs_log_quiet ("Volume is dirty.\n");
 		if (!force) {
-			Eprintf ("Run chkdsk and try again, or use the --force option.\n");
+			ntfs_log_error ("Run chkdsk and try again, or use the --force option.\n");
 			ntfs_umount (vol, FALSE);
 			return NULL;
 		}
-		Qprintf ("Forced to continue.\n");
+		ntfs_log_quiet ("Forced to continue.\n");
 	}
 
 	return vol;
@@ -241,16 +242,16 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 		return 0;
 	}
 
-	Dprintf ("Parsing size '%s'.\n", value);
+	ntfs_log_debug ("Parsing size '%s'.\n", value);
 
 	result = strtoll (value, &suffix, 10);
 	if (result < 0 || errno == ERANGE) {
-		Eprintf ("Invalid size '%s'.\n", value);
+		ntfs_log_error ("Invalid size '%s'.\n", value);
 		return 0;
 	}
 
 	if (!suffix) {
-		Eprintf ("Internal error, strtoll didn't return a suffix.\n");
+		ntfs_log_error ("Internal error, strtoll didn't return a suffix.\n");
 		return 0;
 	}
 
@@ -263,17 +264,17 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 			case '-': case 0:
 				break;
 			default:
-				Eprintf ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
+				ntfs_log_error ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
 				return 0;
 		}
 	} else {
 		if ((suffix[0] != '-') && (suffix[0] != 0)) {
-			Eprintf ("Invalid number '%.*s'.\n", (int)(suffix - value + 1), value);
+			ntfs_log_error ("Invalid number '%.*s'.\n", (int)(suffix - value + 1), value);
 			return 0;
 		}
 	}
 
-	Dprintf ("Parsed size = %lld.\n", result);
+	ntfs_log_debug ("Parsed size = %lld.\n", result);
 	*size = result;
 	return 1;
 }
@@ -303,7 +304,7 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 
 	middle = strchr (string, '-');
 	if (string == middle) {
-		Dprintf ("Range has no beginning, defaulting to 0.\n");
+		ntfs_log_debug ("Range has no beginning, defaulting to 0.\n");
 		a = 0;
 	} else {
 		if (!utils_parse_size (string, &a, scale))
@@ -313,7 +314,7 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 	if (middle) {
 		if (middle[1] == 0) {
 			b = LONG_MAX;		// XXX ULLONG_MAX
-			Dprintf ("Range has no end, defaulting to %lld.\n", b);
+			ntfs_log_debug ("Range has no end, defaulting to %lld.\n", b);
 		} else {
 			if (!utils_parse_size (middle+1, &b, scale))
 				return 0;
@@ -322,7 +323,7 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 		b = a;
 	}
 
-	Dprintf ("Range '%s' = %lld - %lld\n", string, a, b);
+	ntfs_log_debug ("Range '%s' = %lld - %lld\n", string, a, b);
 
 	*start  = a;
 	*finish = b;
@@ -352,11 +353,11 @@ ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 	}
 
 	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
-		Dprintf ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
+		ntfs_log_debug ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
 		return NULL;	/* None / no more of that type */
 	}
 
-	Dprintf ("find_attribute found an attribute of type: 0x%02x.\n", type);
+	ntfs_log_debug ("find_attribute found an attribute of type: 0x%02x.\n", type);
 	return ctx->attr;
 }
 
@@ -386,16 +387,16 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 
 	ctx = ntfs_attr_get_search_ctx (NULL, mft);
 	if (!ctx) {
-		Eprintf ("Couldn't create a search context.\n");
+		ntfs_log_error ("Couldn't create a search context.\n");
 		return NULL;
 	}
 
 	rec = find_attribute (type, ctx);
 	ntfs_attr_put_search_ctx (ctx);
 	if (rec)
-		Dprintf ("find_first_attribute: found attr of type 0x%02x.\n", type);
+		ntfs_log_debug ("find_first_attribute: found attr of type 0x%02x.\n", type);
 	else
-		Dprintf ("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
+		ntfs_log_debug ("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
 	return rec;
 }
 
@@ -432,18 +433,18 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 	vol = inode->vol;
 
-	//printf ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
+	//ntfs_log_debug ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
 	memset (names, 0, sizeof (names));
 
 	for (i = 0; i < max_path; i++) {
 
 		ctx = ntfs_attr_get_search_ctx (inode, NULL);
 		if (!ctx) {
-			Eprintf ("Couldn't create a search context.\n");
+			ntfs_log_error ("Couldn't create a search context.\n");
 			return 0;
 		}
 
-		//printf ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
+		//ntfs_log_debug ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
 
 		name_space = 4;
 		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
@@ -465,7 +466,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
 			    &names[i], 0) < 0) {
 				char *temp;
-				Eprintf ("Couldn't translate filename to current locale.\n");
+				ntfs_log_error ("Couldn't translate filename to current locale.\n");
 				temp = malloc (30);
 				if (!temp)
 					return 0;
@@ -474,8 +475,8 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 				names[i] = temp;
 			}
 
-			//printf ("names[%d] %s\n", i, names[i]);
-			//printf ("parent = %lld\n", MREF (parent));
+			//ntfs_log_debug ("names[%d] %s\n", i, names[i]);
+			//ntfs_log_debug ("parent = %lld\n", MREF (parent));
 		}
 
 		ntfs_attr_put_search_ctx(ctx);
@@ -484,13 +485,13 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 			ntfs_inode_close (inode);
 
 		if (MREF (parent) == FILE_root) {	/* The root directory, stop. */
-			//printf ("inode 5\n");
+			//ntfs_log_debug ("inode 5\n");
 			break;
 		}
 
 		inode = ntfs_inode_open (vol, parent);
 		if (!inode) {
-			Eprintf ("Couldn't open inode %llu.\n",
+			ntfs_log_error ("Couldn't open inode %llu.\n",
 					(unsigned long long)MREF(parent));
 			break;
 		}
@@ -498,7 +499,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 	if (i >= max_path) {
 		/* If we get into an infinite loop, we'll end up here. */
-		Eprintf ("The directory structure is too deep (over %d) nested directories.\n", max_path);
+		ntfs_log_error ("The directory structure is too deep (over %d) nested directories.\n", max_path);
 		return 0;
 	}
 
@@ -509,7 +510,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 		len = snprintf (buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[i]);
 		if (len >= (bufsize - offset)) {
-			Eprintf ("Pathname was truncated.\n");
+			ntfs_log_error ("Pathname was truncated.\n");
 			break;
 		}
 
@@ -520,7 +521,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 	for (i = 0; i < max_path; i++)
 		free (names[i]);
 
-	Dprintf ("Pathname: %s\n", buffer);
+	ntfs_log_debug ("Pathname: %s\n", buffer);
 
 	return 0;
 }
@@ -545,18 +546,18 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 		name    = NULL;
 		namelen = ntfs_ucsnlen (attrdef->name, sizeof (attrdef->name));
 		if (ntfs_ucstombs (attrdef->name, namelen, &name, 0) < 0) {
-			Eprintf ("Couldn't translate attribute type to current locale.\n");
+			ntfs_log_error ("Couldn't translate attribute type to current locale.\n");
 			// <UNKNOWN>?
 			return 0;
 		}
 		len = snprintf (buffer, bufsize, "%s", name);
 	} else {
-		Eprintf ("Unknown attribute type 0x%02x\n", attr->type);
+		ntfs_log_error ("Unknown attribute type 0x%02x\n", attr->type);
 		len = snprintf (buffer, bufsize, "<UNKNOWN>");
 	}
 
 	if (len >= bufsize) {
-		Eprintf ("Attribute type was truncated.\n");
+		ntfs_log_error ("Attribute type was truncated.\n");
 		return 0;
 	}
 
@@ -571,7 +572,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	namelen = attr->name_length;
 	if (ntfs_ucstombs ((ntfschar *)((char *)attr + attr->name_offset),
 	    namelen, &name, 0) < 0) {
-		Eprintf ("Couldn't translate attribute name to current locale.\n");
+		ntfs_log_error ("Couldn't translate attribute name to current locale.\n");
 		// <UNKNOWN>?
 		len = snprintf (buffer, bufsize, "<UNKNOWN>");
 		return 0;
@@ -581,7 +582,7 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 	free (name);
 
 	if (len >= bufsize) {
-		Eprintf ("Attribute name was truncated.\n");
+		ntfs_log_error ("Attribute name was truncated.\n");
 		return 0;
 	}
 
@@ -620,10 +621,10 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
 
 	/* Does lcn lie in the section of $Bitmap we already have cached? */
 	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
-		Dprintf ("Bit lies outside cache.\n");
+		ntfs_log_debug ("Bit lies outside cache.\n");
 		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 		if (!attr) {
-			Eprintf ("Couldn't open $Bitmap: %s\n", strerror (errno));
+			ntfs_log_error ("Couldn't open $Bitmap: %s\n", strerror (errno));
 			return -1;
 		}
 
@@ -632,19 +633,18 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
 		bmplcn = lcn & (~((sizeof (buffer) << 3) - 1));
 
 		if (ntfs_attr_pread (attr, (bmplcn>>3), sizeof (buffer), buffer) < 0) {
-			Eprintf ("Couldn't read $Bitmap: %s\n", strerror (errno));
+			ntfs_log_error ("Couldn't read $Bitmap: %s\n", strerror (errno));
 			ntfs_attr_close (attr);
 			return -1;
 		}
 
-		Dprintf ("Reloaded bitmap buffer.\n");
+		ntfs_log_debug ("Reloaded bitmap buffer.\n");
 		ntfs_attr_close (attr);
 	}
 
 	bit  = 1 << (lcn & 7);
 	byte = (lcn >> 3) & (sizeof (buffer) - 1);
-	Dprintf ("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n",
-		lcn, bmplcn, byte, bit, buffer[byte] & bit);
+	ntfs_log_debug ("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n", lcn, bmplcn, byte, bit, buffer[byte] & bit);
 
 	return (buffer[byte] & bit);
 }
@@ -681,24 +681,23 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 	/* Does mref lie in the section of $Bitmap we already have cached? */
 	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
 			(sizeof (buffer) << 3)))) {
-		Dprintf ("Bit lies outside cache.\n");
+		ntfs_log_debug ("Bit lies outside cache.\n");
 
 		/* Mark the buffer as not in use, in case the read is shorter. */
 		memset (buffer, 0, sizeof (buffer));
 		bmpmref = mref & (~((sizeof (buffer) << 3) - 1));
 
 		if (ntfs_attr_pread (vol->mftbmp_na, (bmpmref>>3), sizeof (buffer), buffer) < 0) {
-			Eprintf ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
+			ntfs_log_error ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
 			return -1;
 		}
 
-		Dprintf ("Reloaded bitmap buffer.\n");
+		ntfs_log_debug ("Reloaded bitmap buffer.\n");
 	}
 
 	bit  = 1 << (mref & 7);
 	byte = (mref >> 3) & (sizeof (buffer) - 1);
-	Dprintf ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n",
-		mref, bmpmref, byte, bit, buffer[byte] & bit);
+	ntfs_log_debug ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n", mref, bmpmref, byte, bit, buffer[byte] & bit);
 
 	return (buffer[byte] & bit);
 }
@@ -804,38 +803,38 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 		if (flags & DM_BLUE)
 			col += 4;
 		if (flags & DM_INDENT)
-			printf ("\t");
+			ntfs_log_debug ("\t");
 		if (flags & DM_BOLD)
-			printf ("\e[01m");
+			ntfs_log_debug ("\e[01m");
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			printf ("\e[%dm", col);
+			ntfs_log_debug ("\e[%dm", col);
 		if (off == s)
-			printf("%6.6x ", start);
+			ntfs_log_debug("%6.6x ", start);
 		else
-			printf("%6.6x ", off);
+			ntfs_log_debug("%6.6x ", off);
 
 		for (i = 0; i < 16; i++) {
 			if ((i == 8) && (!(flags & DM_NO_DIVIDER)))
-				printf (" -");
+				ntfs_log_debug (" -");
 			if (((off+i) >= start) && ((off+i) < (start+length)))
-				printf (" %02X", mem[off+i]);
+				ntfs_log_debug (" %02X", mem[off+i]);
 			else
-				printf ("   ");
+				ntfs_log_debug ("   ");
 		}
 		if (!(flags & DM_NO_ASCII)) {
-			printf ("  ");
+			ntfs_log_debug ("  ");
 			for (i = 0; i < 16; i++) {
 				if (((off+i) < start) || ((off+i) >= (start+length)))
-					printf (" ");
+					ntfs_log_debug (" ");
 				else if (isprint (mem[off + i]))
-					printf ("%c", mem[off + i]);
+					ntfs_log_debug ("%c", mem[off + i]);
 				else
-					printf (".");
+					ntfs_log_debug (".");
 			}
 		}
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			printf ("\e[0m");
-		printf ("\n");
+			ntfs_log_debug ("\e[0m");
+		ntfs_log_debug ("\n");
 	}
 }
 
@@ -902,7 +901,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		ctx->flags_match = 0;
 		in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {
-			Eprintf ("Error reading inode %llu.  Aborting.\n",
+			ntfs_log_error ("Error reading inode %llu.  Aborting.\n",
 					(unsigned long long)ctx->mft_num);
 			return -1;
 		}
@@ -912,7 +911,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->inode = ntfs_inode_open (ctx->vol, (MFT_REF) ctx->mft_num);
 			if (ctx->inode == NULL) {
-				Eprintf ("Error reading inode %llu.\n", (unsigned
+				ntfs_log_error ("Error reading inode %llu.\n", (unsigned
 						long long) ctx->mft_num);
 				continue;
 			}
@@ -940,7 +939,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 					ntfs_attr_put_search_ctx (attr_ctx);
 				} else {
-					Eprintf ("Couldn't create a search context.\n");
+					ntfs_log_error ("Couldn't create a search context.\n");
 					return -1;
 				}
 			}
@@ -950,7 +949,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				case 0: ctx->flags_match |= FEMR_NOT_METADATA; break;
 				default:
 					ctx->flags_match |= FEMR_NOT_METADATA; break;
-					//Eprintf ("Error reading inode %lld.\n", ctx->mft_num);
+					//ntfs_log_error ("Error reading inode %lld.\n", ctx->mft_num);
 					//return -1;
 			}
 
@@ -961,7 +960,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->inode = calloc (1, sizeof (*ctx->inode));
 			if (!ctx->inode) {
-				Eprintf ("Out of memory.  Aborting.\n");
+				ntfs_log_error ("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
@@ -970,20 +969,20 @@ int mft_next_record (struct mft_search_ctx *ctx)
 			ctx->inode->mrec   = malloc (ctx->vol->mft_record_size);
 			if (!ctx->inode->mrec) {
 				free (ctx->inode); // == ntfs_inode_close
-				Eprintf ("Out of memory.  Aborting.\n");
+				ntfs_log_error ("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
 			mft = ntfs_attr_open (ctx->vol->mft_ni, AT_DATA,
 					AT_UNNAMED, 0);
 			if (!mft) {
-				Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+				ntfs_log_error ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
 				// free / close
 				return -1;
 			}
 
 			if (ntfs_attr_pread (mft, ctx->vol->mft_record_size * ctx->mft_num, ctx->vol->mft_record_size, ctx->inode->mrec) < ctx->vol->mft_record_size) {
-				Eprintf ("Couldn't read MFT Record %llu: %s.\n",
+				ntfs_log_error ("Couldn't read MFT Record %llu: %s.\n",
 						(unsigned long long)
 						ctx->mft_num, strerror (errno));
 				// free / close
@@ -999,7 +998,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		}
 
 		if (ntfs_inode_close (ctx->inode)) {
-			Eprintf ("Error closing inode %llu.\n",
+			ntfs_log_error ("Error closing inode %llu.\n",
 					(unsigned long long)ctx->mft_num);
 			return -errno;
 		}

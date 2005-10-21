@@ -92,7 +92,7 @@ typedef struct {
 /* 28*/	sle16 major_ver;	/* Log file major version.  We only support
 				   version 1.1. */
 /* sizeof() = 30 (0x1e) bytes */
-} __attribute__ ((__packed__)) RESTART_PAGE_HEADER;
+} __attribute__((__packed__)) RESTART_PAGE_HEADER;
 
 /*
  * Constant for the log client indices meaning that there are no client records
@@ -109,7 +109,7 @@ typedef struct {
 enum {
 	RESTART_VOLUME_IS_CLEAN	= const_cpu_to_le16(0x0002),
 	RESTART_SPACE_FILLER	= 0xffff, /* gcc: Force enum bit width to 16. */
-} __attribute__ ((__packed__));
+} __attribute__((__packed__));
 
 typedef le16 RESTART_AREA_FLAGS;
 
@@ -250,7 +250,7 @@ typedef struct {
 				   system time in NTFS format (see time.h). */
 /* 44*/	le32 reserved;		/* Reserved/alignment to 8-byte boundary. */
 /* sizeof() = 48 (0x30) bytes */
-} __attribute__ ((__packed__)) RESTART_AREA;
+} __attribute__((__packed__)) RESTART_AREA;
 
 /*
  * Log client record.  The offset of this record is found by adding the offset
@@ -289,7 +289,7 @@ typedef struct {
 				   always be "NTFS" with the remaining bytes
 				   set to 0. */
 /* sizeof() = 160 (0xa0) bytes */
-} __attribute__ ((__packed__)) LOG_CLIENT_RECORD;
+} __attribute__((__packed__)) LOG_CLIENT_RECORD;
 
 /*
  * Log page record page header. Each log page begins with this header and is
@@ -309,7 +309,7 @@ typedef struct {
 	union {
 		LSN last_lsn;
 		s64 file_offset;
-	} __attribute__ ((__packed__)) copy;
+	} __attribute__((__packed__)) copy;
 	u32 flags;
 	u16 page_count;
 	u16 page_position;
@@ -318,9 +318,9 @@ typedef struct {
 			u16 next_record_offset;
 			u8 reserved[6];
 			LSN last_end_lsn;
-		} __attribute__ ((__packed__)) packed;
-	} __attribute__ ((__packed__)) header;
-} __attribute__ ((__packed__)) RECORD_PAGE_HEADER;
+		} __attribute__((__packed__)) packed;
+	} __attribute__((__packed__)) header;
+} __attribute__((__packed__)) RECORD_PAGE_HEADER;
 
 /*
  * Possible 16-bit flags for log records.  (Or is it log record pages?)
@@ -330,7 +330,7 @@ typedef enum {
 	LOG_RECORD_SIZE_PLACE_HOLDER = 0xffff,
 		/* This has nothing to do with the log record. It is only so
 		   gcc knows to make the flags 16-bit. */
-} __attribute__ ((__packed__)) LOG_RECORD_FLAGS;
+} __attribute__((__packed__)) LOG_RECORD_FLAGS;
 
 /*
  * The log client id structure identifying a log client.
@@ -338,7 +338,7 @@ typedef enum {
 typedef struct {
 	u16 seq_number;
 	u16 client_index;
-} __attribute__ ((__packed__)) LOG_CLIENT_ID;
+} __attribute__((__packed__)) LOG_CLIENT_ID;
 
 /*
  * Log record header.  Each log record seems to have a constant size of 0x70
@@ -374,7 +374,7 @@ typedef struct {
 					      is not 0. */
 		LCN lcn;
 	} __attribute__((__packed__)) lcn_list[0];
-} __attribute__ ((__packed__)) LOG_RECORD;
+} __attribute__((__packed__)) LOG_RECORD;
 
 extern BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp);
 extern BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp);

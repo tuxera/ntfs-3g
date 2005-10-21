@@ -1,4 +1,4 @@
-/*
+/**
  * mst.c - Multi sector fixup handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
@@ -19,12 +19,15 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
-#include "mst.h"
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+
+#include "mst.h"
 
 /**
  * ntfs_mst_post_read_fixup - deprotect multi sector transfer protected data

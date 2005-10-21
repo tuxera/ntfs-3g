@@ -1,4 +1,4 @@
-/*
+/**
  * unix_io.c - Unix style disk io functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2003 Anton Altaparmakov
@@ -19,7 +19,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -49,13 +51,14 @@
 #include <sys/ioctl.h>
 #endif
 #ifdef HAVE_LINUX_FD_H
-#	include <linux/fd.h>
+#include <linux/fd.h>
 #endif
 
 #include "types.h"
 #include "mst.h"
 #include "debug.h"
 #include "device.h"
+#include "logging.h"
 
 #if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
 #	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
@@ -63,6 +66,9 @@
 
 #define DEV_FD(dev)	(*(int *)dev->d_private)
 
+/**
+ * ntfs_device_unix_io_open
+ */
 static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 {
 	struct flock flk;
@@ -92,13 +98,11 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
 		err = errno;
-		Dprintf("ntfs_device_unix_io_open: Could not lock %s for %s: "
-				"%s\n", dev->d_name, NDevReadOnly(dev) ?
-				"reading" : "writing", strerror(errno));
+		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s for %s",
+				dev->d_name, NDevReadOnly(dev) ? "reading" : "writing");
 		if (close(DEV_FD(dev)))
-			Dprintf("ntfs_device_unix_io_open: Warning: Could not "
-					"close %s: %s\n", dev->d_name,
-					strerror(errno));
+			ntfs_log_perror("ntfs_device_unix_io_open: Warning: Could not "
+					"close %s", dev->d_name);
 		goto err_out;
 	}
 	/* Set our open flag. */
@@ -111,6 +115,9 @@ err_out:
 	return -1;
 }
 
+/**
+ * ntfs_device_unix_io_close
+ */
 static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 {
 	struct flock flk;
@@ -127,8 +134,8 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 	flk.l_whence = SEEK_SET;
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk))
-		Dprintf("ntfs_device_unix_io_close: Warning: Could not unlock "
-				"%s: %s\n", dev->d_name, strerror(errno));
+		ntfs_log_perror("ntfs_device_unix_io_close: Warning: Could not "
+				"unlock %s", dev->d_name);
 	/* Close the file descriptor and clear our open flag. */
 	if (close(DEV_FD(dev)))
 		return -1;
@@ -138,18 +145,27 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 	return 0;
 }
 
+/**
+ * ntfs_device_unix_io_seek
+ */
 static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
 {
 	return lseek(DEV_FD(dev), offset, whence);
 }
 
+/**
+ * ntfs_device_unix_io_read
+ */
 static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
 		s64 count)
 {
 	return read(DEV_FD(dev), buf, count);
 }
 
+/**
+ * ntfs_device_unix_io_write
+ */
 static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 		s64 count)
 {
@@ -161,12 +177,18 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 	return write(DEV_FD(dev), buf, count);
 }
 
+/**
+ * ntfs_device_unix_io_pread
+ */
 static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
 {
 	return ntfs_pread(dev, offset, count, buf);
 }
 
+/**
+ * ntfs_device_unix_io_pwrite
+ */
 static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 		s64 count, s64 offset)
 {
@@ -178,6 +200,9 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 	return ntfs_pwrite(dev, offset, count, buf);
 }
 
+/**
+ * ntfs_device_unix_io_sync
+ */
 static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 {
 	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
@@ -189,11 +214,17 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 	return 0;
 }
 
+/**
+ * ntfs_device_unix_io_stat
+ */
 static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 {
 	return fstat(DEV_FD(dev), buf);
 }
 
+/**
+ * ntfs_device_unix_io_ioctl
+ */
 static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev, int request,
 		void *argp)
 {

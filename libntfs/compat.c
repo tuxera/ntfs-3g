@@ -1,4 +1,4 @@
-/*
+/**
  * compat.c - Tweaks for Windows compatibility
  *
  * Copyright (c) 2002 Richard Russon
@@ -22,7 +22,9 @@
 
 #ifdef WINDOWS
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #include "compat.h"
 

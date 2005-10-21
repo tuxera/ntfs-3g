@@ -187,9 +187,9 @@ extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
 #ifdef NTFS_RICH
 
-int ntfs_inode_close2 (ntfs_inode *ni);
-ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref);
-ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref);
+int ntfs_inode_close2(ntfs_inode *ni);
+ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref);
+ntfs_inode * ntfs_inode_open3(ntfs_volume *vol, const MFT_REF mref);
 
 #endif /* NTFS_RICH */
 

@@ -33,6 +33,7 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 #include "runlist.h"
 #include "volume.h"
 #include "debug.h"
+#include "logging.h"
 
 extern ntfschar AT_UNNAMED[];
 
@@ -135,7 +136,7 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
  * @allocated_size:	copy from the attribute record
  * @data_size:		copy from the attribute record
  * @initialized_size:	copy from the attribute record
- * @compressed_size: 	copy from the attribute record
+ * @compressed_size:	copy from the attribute record
  * @compression_block_size:		size of a compression block (cb)
  * @compression_block_size_bits:	log2 of the size of a cb
  * @compression_block_clusters:		number of clusters per cb
@@ -214,9 +215,8 @@ static inline void NAttrSet##flag(ntfs_attr *na)		\
 	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
 		NInoSet##flag(na->ni);				\
 	else							\
-		Dprintf("%s(): BUG! Should be called only for "	\
-			"unnamed data attribute.\n",		\
-			__FUNCTION__);				\
+		ntfs_log_trace("BUG! Should be called only for "\
+			"unnamed data attribute.\n");		\
 }								\
 static inline void NAttrClear##flag(ntfs_attr *na)		\
 {								\

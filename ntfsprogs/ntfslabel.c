@@ -354,8 +354,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	}
 	result = 0;
 err_out:
-	if (new_label)
-		free(new_label);
+	free(new_label);
 	return result;
 }
 

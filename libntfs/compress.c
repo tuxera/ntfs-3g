@@ -1,4 +1,4 @@
-/*
+/**
  * compress.c - Compressed attribute handling code.  Part of the Linux-NTFS
  *		project.
  *
@@ -21,7 +21,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -43,6 +45,7 @@
 #include "layout.h"
 #include "runlist.h"
 #include "compress.h"
+#include "logging.h"
 
 /**
  * ntfs_compression_constants - enum of constants used in the compression code
@@ -93,9 +96,9 @@ static int ntfs_decompress(u8 *dest, const u32 dest_size,
 	u8 tag;			/* Current tag. */
 	int token;		/* Loop counter for the eight tokens in tag. */
 
-	Dprintf("Entering, cb_size = 0x%x.\n", (unsigned)cb_size);
+	ntfs_log_trace("Entering, cb_size = 0x%x.\n", (unsigned)cb_size);
 do_next_sb:
-	Dprintf("Beginning sub-block at offset = 0x%x in the cb.\n",
+	ntfs_log_debug("Beginning sub-block at offset = 0x%x in the cb.\n",
 			cb - cb_start);
 	/*
 	 * Have we reached the end of the compression block or the end of the
@@ -104,7 +107,7 @@ do_next_sb:
 	 * first two checks do not detect it.
 	 */
 	if (cb == cb_end || !le16_to_cpup((u16*)cb) || dest == dest_end) {
-		Dprintf("Completed. Returning success (0).\n");
+		ntfs_log_debug("Completed. Returning success (0).\n");
 		return 0;
 	}
 	/* Setup offset for the current sub-block destination. */
@@ -124,7 +127,7 @@ do_next_sb:
 		goto return_overflow;
 	/* Now, we are ready to process the current sub-block (sb). */
 	if (!(le16_to_cpup((u16*)cb) & NTFS_SB_IS_COMPRESSED)) {
-		Dprintf("Found uncompressed sub-block.\n");
+		ntfs_log_debug("Found uncompressed sub-block.\n");
 		/* This sb is not compressed, just copy it into destination. */
 		/* Advance source position to first data byte. */
 		cb += 2;
@@ -138,7 +141,7 @@ do_next_sb:
 		dest += NTFS_SB_SIZE;
 		goto do_next_sb;
 	}
-	Dprintf("Found compressed sub-block.\n");
+	ntfs_log_debug("Found compressed sub-block.\n");
 	/* This sb is compressed, decompress it into destination. */
 	/* Forward to the first tag in the sub-block. */
 	cb += 2;
@@ -148,7 +151,7 @@ do_next_tag:
 		if (dest < dest_sb_end) {
 			int nr_bytes = dest_sb_end - dest;
 
-			Dprintf("Filling incomplete sub-block with zeroes.\n");
+			ntfs_log_debug("Filling incomplete sub-block with zeroes.\n");
 			/* Zero remainder and update destination position. */
 			memset(dest, 0, nr_bytes);
 			dest += nr_bytes;
@@ -238,7 +241,7 @@ do_next_tag:
 	/* No tokens left in the current tag. Continue with the next tag. */
 	goto do_next_tag;
 return_overflow:
-	Dprintf("Failed. Returning -EOVERFLOW.\n");
+	ntfs_log_debug("Failed. Returning -EOVERFLOW.\n");
 	errno = EOVERFLOW;
 	return -1;
 }
@@ -329,8 +332,7 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	int err;
 	unsigned int nr_cbs, cb_clusters;
 
-	Dprintf("%s(): Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
-			"count 0x%llx.\n", __FUNCTION__,
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count 0x%llx.\n",
 			(unsigned long long)na->ni->mft_no, na->type,
 			(long long)pos, (long long)count);
 	if (!na || !NAttrCompressed(na) || !na->ni || !na->ni->vol || !b ||
@@ -421,7 +423,7 @@ do_next_cb:
 	}
 	if (rl->lcn == LCN_HOLE) {
 		/* Sparse cb, zero out destination range overlapping the cb. */
-		Dprintf("Found sparse compression block.\n");
+		ntfs_log_debug("Found sparse compression block.\n");
 		to_read = min(count, cb_size - ofs);
 		memset(b, 0, to_read);
 		ofs = 0;
@@ -434,7 +436,7 @@ do_next_cb:
 		 * Uncompressed cb, read it straight into the destination range
 		 * overlapping the cb.
 		 */
-		Dprintf("Found uncompressed compression block.\n");
+		ntfs_log_debug("Found uncompressed compression block.\n");
 		/*
 		 * Read the uncompressed data into the destination buffer.
 		 * NOTE: We cheat a little bit here by marking the attribute as
@@ -480,7 +482,7 @@ do_next_cb:
 		 * Compressed cb, decompress it into the temporary buffer, then
 		 * copy the data to the destination range overlapping the cb.
 		 */
-		Dprintf("Found compressed compression block.\n");
+		ntfs_log_debug("Found compressed compression block.\n");
 		/*
 		 * Read the compressed data into the temporary buffer.
 		 * NOTE: We cheat a little bit here by marking the attribute as
@@ -520,7 +522,7 @@ do_next_cb:
 		/* Just a precaution. */
 		if (cb_pos + 2 <= cb_end)
 			*(u16*)cb_pos = 0;
-		Dprintf("Successfully read the compression block.\n");
+		ntfs_log_debug("Successfully read the compression block.\n");
 		if (ntfs_decompress(dest, cb_size, cb, cb_size) < 0) {
 			err = errno;
 			free(cb);

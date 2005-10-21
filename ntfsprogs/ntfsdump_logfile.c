@@ -153,8 +153,7 @@ static void log_err_exit(u8 *buf, const char *fmt, ...)
 {
 	va_list ap;
 
-	if (buf)
-		free(buf);
+	free(buf);
 
 	fprintf(stderr, "ERROR: ");
 	va_start(ap, fmt);

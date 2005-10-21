@@ -64,9 +64,8 @@
 #include "layout.h"
 #include "volume.h"
 #include "utils.h"
+#include "attrdef.h"
 #include "version.h"
-
-extern const unsigned char attrdef_ntfs12_array[2400];
 
 const char *EXEC_NAME = "ntfstruncate";
 

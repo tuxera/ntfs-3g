@@ -25,26 +25,31 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #ifdef HAVE_STDIO_H
-#	include <stdio.h>
+#include <stdio.h>
 #endif
 #ifdef HAVE_STDARG_H
-#	include <stdarg.h>
+#include <stdarg.h>
 #endif
+#ifdef HAVE_STRING_H
 #include <string.h>
+#endif
+#ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
 
 struct _runlist_element;
 
 extern void __Sprintf(const int silent, const char *fmt, ...)
-		__attribute__ ((format (printf, 2, 3)));
+		__attribute__((format(printf, 2, 3)));
 #define Sprintf(silent, f, a...)	__Sprintf(silent, f, ##a)
 
 #ifdef DEBUG
 
 /* Debug output to stderr.  To get it run ./configure --enable-debug. */
 
-extern void __ntfs_debug (const char *file, int line, const char *function,
+extern void __ntfs_debug(const char *file, int line, const char *function,
 		const char *format, ...) __attribute__((format(printf, 4, 5)));
 #define ntfs_debug(f, a...)						\
 		__ntfs_debug(__FILE__, __LINE__, __FUNCTION__, f, ##a)
@@ -54,7 +59,7 @@ extern void __ntfs_error(const char *function,
 #define ntfs_error(sb, f, a...)		__ntfs_error(__FUNCTION__, f, ##a)
 
 extern void __Dprintf(const char *fmt, ...)
-		__attribute__ ((format (printf, 1, 2)));
+		__attribute__((format(printf, 1, 2)));
 #define Dprintf(f, a...)	__Dprintf(f, ##a)
 
 extern void __Dputs(const char *s);
@@ -62,8 +67,6 @@ extern void __Dputs(const char *s);
 
 extern void __Dperror(const char *s);
 #define Dperror(s)		__Dperror(s)
-
-extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
 
 #else /* if !DEBUG */
 
@@ -74,9 +77,13 @@ extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
 #define Dputs(s)		do {} while (0)
 #define Dperror(s)		do {} while (0)
 
-static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}
-
 #endif /* !DEBUG */
+
+#ifdef NTFS_DISABLE_DEBUG_LOGGING
+static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}
+#else
+extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
+#endif
 
 #define NTFS_BUG(msg)							  \
 {									  \

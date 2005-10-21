@@ -105,10 +105,6 @@ GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
 
-static int undelete_file (ntfs_volume *vol, long long inode);
-
-#define _(S)	gettext(S)
-
 /**
  * parse_inode_arg - parses the inode expression
  *
@@ -1572,130 +1568,6 @@ static int set_date (const char *pathname, time_t date)
 }
 
 /**
- * scan_disk - Search an NTFS volume for files that could be undeleted
- * @vol:  An ntfs volume obtained from ntfs_mount
- *
- * Read through all the MFT entries looking for deleted files.  For each one
- * determine how much of the data lies in unused disk space.
- *
- * The list can be filtered by name, size and date, using command line options.
- *
- * Return:  -1  Error, something went wrong
- *	     n  Success, the number of recoverable files
- */
-static int scan_disk (ntfs_volume *vol)
-{
-	s64 nr_mft_records;
-	const int BUFSIZE = 8192;
-	char *buffer = NULL;
-	int results = 0;
-	ntfs_attr *attr;
-	long long size;
-	long long bmpsize;
-	int i, j, k, b;
-	int percent;
-	struct ufile *file;
-	regex_t re;
-
-	if (!vol)
-		return -1;
-
-	attr = ntfs_attr_open (vol->mft_ni, AT_BITMAP, AT_UNNAMED, 0);
-	if (!attr) {
-		Eprintf ("ERROR: Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
-		return -1;
-	}
-	bmpsize = attr->initialized_size;
-
-	buffer = malloc (BUFSIZE);
-	if (!buffer) {
-		Eprintf ("ERROR: Couldn't allocate memory in scan_disk()\n");
-		results = -1;
-		goto out;
-	}
-
-	if (opts.match) {
-		int flags = REG_NOSUB;
-
-		if (!opts.match_case)
-			flags |= REG_ICASE;
-		if (regcomp (&re, opts.match, flags)) {
-			Eprintf ("ERROR: Couldn't create a regex.\n");
-			goto out;
-		}
-	}
-
-	nr_mft_records = vol->mft_na->initialized_size >>
-			vol->mft_record_size_bits;
-
-	Qprintf ("Inode    Flags  %%age  Date           Size  Filename\n");
-	Qprintf ("---------------------------------------------------------------\n");
-	for (i = 0; i < bmpsize; i += BUFSIZE) {
-		long long read_count = min ((bmpsize - i), BUFSIZE);
-		size = ntfs_attr_pread (attr, i, read_count, buffer);
-		if (size < 0)
-			break;
-
-		for (j = 0; j < size; j++) {
-			b = buffer[j];
-			for (k = 0; k < 8; k++, b>>=1) {
-				if (((i+j)*8+k) >= nr_mft_records)
-					goto done;
-				if (b & 1)
-					continue;
-				file = read_record (vol, (i+j)*8+k);
-				if (!file) {
-					Eprintf ("Couldn't read MFT Record %d.\n", (i+j)*8+k);
-					continue;
-				}
-
-				if ((opts.since > 0) && (file->date <= opts.since))
-					goto skip;
-				if (opts.match && !name_match (&re, file))
-					goto skip;
-				if (opts.size_begin && (opts.size_begin > file->max_size))
-					goto skip;
-				if (opts.size_end && (opts.size_end < file->max_size))
-					goto skip;
-
-				percent = calc_percentage (file, vol);
-				if ((opts.percent == -1) || (percent >= opts.percent)) {
-					if (opts.verbose)
-						dump_record (file);
-					else
-						list_record (file);
-
-					/* Was -u specified with no inode
-					   so undelete file by regex */
-					if (opts.mode == MODE_UNDELETE) {
-						if  (!undelete_file (vol, file->inode))
-							Vprintf ("ERROR: Failed to undelete "
-							          "inode %lli\n!",
-							          file->inode);
-						printf ("\n");
-					}
-				}
-				if (((opts.percent == -1) && (percent > 0)) ||
-				    ((opts.percent > 0)  && (percent >= opts.percent))) {
-					results++;
-				}
-skip:
-				free_file (file);
-			}
-		}
-	}
-done:
-	Qprintf ("\nFiles with potentially recoverable content: %d\n", results);
-out:
-	if (opts.match)
-		regfree (&re);
-	free (buffer);
-	if (attr)
-		ntfs_attr_close (attr);
-	return results;
-}
-
-/**
  * undelete_file - Recover a deleted file from an NTFS volume
  * @vol:    An ntfs volume obtained from ntfs_mount
  * @inode:  MFT Record number to be recovered
@@ -1938,6 +1810,130 @@ free:
 		free (buffer);
 	free_file (file);
 	return result;
+}
+
+/**
+ * scan_disk - Search an NTFS volume for files that could be undeleted
+ * @vol:  An ntfs volume obtained from ntfs_mount
+ *
+ * Read through all the MFT entries looking for deleted files.  For each one
+ * determine how much of the data lies in unused disk space.
+ *
+ * The list can be filtered by name, size and date, using command line options.
+ *
+ * Return:  -1  Error, something went wrong
+ *	     n  Success, the number of recoverable files
+ */
+static int scan_disk (ntfs_volume *vol)
+{
+	s64 nr_mft_records;
+	const int BUFSIZE = 8192;
+	char *buffer = NULL;
+	int results = 0;
+	ntfs_attr *attr;
+	long long size;
+	long long bmpsize;
+	int i, j, k, b;
+	int percent;
+	struct ufile *file;
+	regex_t re;
+
+	if (!vol)
+		return -1;
+
+	attr = ntfs_attr_open (vol->mft_ni, AT_BITMAP, AT_UNNAMED, 0);
+	if (!attr) {
+		Eprintf ("ERROR: Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
+		return -1;
+	}
+	bmpsize = attr->initialized_size;
+
+	buffer = malloc (BUFSIZE);
+	if (!buffer) {
+		Eprintf ("ERROR: Couldn't allocate memory in scan_disk()\n");
+		results = -1;
+		goto out;
+	}
+
+	if (opts.match) {
+		int flags = REG_NOSUB;
+
+		if (!opts.match_case)
+			flags |= REG_ICASE;
+		if (regcomp (&re, opts.match, flags)) {
+			Eprintf ("ERROR: Couldn't create a regex.\n");
+			goto out;
+		}
+	}
+
+	nr_mft_records = vol->mft_na->initialized_size >>
+			vol->mft_record_size_bits;
+
+	Qprintf ("Inode    Flags  %%age  Date           Size  Filename\n");
+	Qprintf ("---------------------------------------------------------------\n");
+	for (i = 0; i < bmpsize; i += BUFSIZE) {
+		long long read_count = min ((bmpsize - i), BUFSIZE);
+		size = ntfs_attr_pread (attr, i, read_count, buffer);
+		if (size < 0)
+			break;
+
+		for (j = 0; j < size; j++) {
+			b = buffer[j];
+			for (k = 0; k < 8; k++, b>>=1) {
+				if (((i+j)*8+k) >= nr_mft_records)
+					goto done;
+				if (b & 1)
+					continue;
+				file = read_record (vol, (i+j)*8+k);
+				if (!file) {
+					Eprintf ("Couldn't read MFT Record %d.\n", (i+j)*8+k);
+					continue;
+				}
+
+				if ((opts.since > 0) && (file->date <= opts.since))
+					goto skip;
+				if (opts.match && !name_match (&re, file))
+					goto skip;
+				if (opts.size_begin && (opts.size_begin > file->max_size))
+					goto skip;
+				if (opts.size_end && (opts.size_end < file->max_size))
+					goto skip;
+
+				percent = calc_percentage (file, vol);
+				if ((opts.percent == -1) || (percent >= opts.percent)) {
+					if (opts.verbose)
+						dump_record (file);
+					else
+						list_record (file);
+
+					/* Was -u specified with no inode
+					   so undelete file by regex */
+					if (opts.mode == MODE_UNDELETE) {
+						if  (!undelete_file (vol, file->inode))
+							Vprintf ("ERROR: Failed to undelete "
+							          "inode %lli\n!",
+							          file->inode);
+						printf ("\n");
+					}
+				}
+				if (((opts.percent == -1) && (percent > 0)) ||
+				    ((opts.percent > 0)  && (percent >= opts.percent))) {
+					results++;
+				}
+skip:
+				free_file (file);
+			}
+		}
+	}
+done:
+	Qprintf ("\nFiles with potentially recoverable content: %d\n", results);
+out:
+	if (opts.match)
+		regfree (&re);
+	free (buffer);
+	if (attr)
+		ntfs_attr_close (attr);
+	return results;
 }
 
 /**

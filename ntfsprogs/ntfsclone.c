@@ -162,10 +162,10 @@ struct {
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
 #define NERR_PREFIX  ERR_PREFIX ": "
 
-#define LAST_METADATA_INODE  	11
+#define LAST_METADATA_INODE	11
 
-#define NTFS_MAX_CLUSTER_SIZE 	65536
-#define NTFS_SECTOR_SIZE 	  512
+#define NTFS_MAX_CLUSTER_SIZE	65536
+#define NTFS_SECTOR_SIZE	  512
 
 #define rounded_up_division(a, b) (((a) + (b - 1)) / (b))
 
@@ -383,7 +383,7 @@ static void parse_options(int argc, char **argv)
 
 	msg_out = stdout;
 
-	/* FIXME: this is a workaround for loosing debug info if stdout != stderr
+	/* FIXME: this is a workaround for losing debug info if stdout != stderr
 	   and for the uncontrollable verbose messages in libntfs. Ughhh. */
 	if (opt.std_out)
 		msg_out = stderr;
@@ -699,7 +699,7 @@ static void restore_image(void)
 #define WIPE_TIMESTAMPS(atype, attr)				\
 do {								\
 	atype *ats;						\
-	ats = (atype *)((char*)(attr) + (attr)->value_offset); 	\
+	ats = (atype *)((char*)(attr) + (attr)->value_offset);	\
 								\
 	ats->creation_time = 0;					\
 	ats->last_data_change_time = 0;				\
@@ -708,7 +708,7 @@ do {								\
 								\
 	wiped_timestamp_data += 32;				\
 								\
-} while(0)
+} while (0)
 
 static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
@@ -1004,8 +1004,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			}
 		}
 
-	       	if (ni->mrec)
-	        	free(ni->mrec);
+		free(ni->mrec);
 		free(ni);
 
 	        if (deleted_inode)
@@ -1248,9 +1247,9 @@ static void set_filesize(s64 filesize)
 	if (fstatfs(fd_out, &opt.stfs) == -1)
 		Printf("WARNING: Couldn't get filesystem type: "
 		       "%s\n", strerror(errno));
-	else 
+	else
 		fs_type = opt.stfs.f_type;
-		
+
 	if (fs_type == 0x52654973)
 		Printf("WARNING: You're using ReiserFS, it has very poor "
 		       "performance creating\nlarge sparse files. The next "

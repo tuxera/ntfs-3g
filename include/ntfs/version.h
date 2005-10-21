@@ -1,4 +1,4 @@
-/**
+/*
  * version.h - Info about the NTFS library.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2005 Anton Altaparmakov

@@ -26,7 +26,9 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_STDDEF_H
 #include <stddef.h>
+#endif
 
 /*
  * Generic macro to convert pointers to values for comparison purposes.

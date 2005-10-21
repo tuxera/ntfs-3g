@@ -1,4 +1,4 @@
-/*
+/**
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
@@ -21,7 +21,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -34,7 +36,6 @@
 #endif
 
 #include "compat.h"
-
 #include "types.h"
 #include "attrib.h"
 #include "inode.h"
@@ -46,6 +47,7 @@
 #include "index.h"
 #include "dir.h"
 #include "ntfstime.h"
+#include "logging.h"
 
 /**
  * Internal:
@@ -80,11 +82,10 @@ ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
 static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
 {
 	if (NInoDirty(ni))
-		Dputs("Eeek. Discarding dirty inode!");
+		ntfs_log_debug("Eeek. Discarding dirty inode!\n");
 	if (NInoAttrList(ni) && ni->attr_list)
 		free(ni->attr_list);
-	if (ni->mrec)
-		free(ni->mrec);
+	free(ni->mrec);
 	free(ni);
 	return 0;
 }
@@ -120,7 +121,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	int err = 0;
 	STANDARD_INFORMATION *std_info;
 
-	Dprintf("%s(): Entering for inode 0x%llx.\n", __FUNCTION__, MREF(mref));
+	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
 	if (!vol) {
 		errno = EINVAL;
 		return NULL;
@@ -144,8 +145,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		err = errno;
-		Dprintf("%s(): Failed to receive STANDARD_INFORMATION "
-				"attribute.\n", __FUNCTION__);
+		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
+				"attribute.\n");
 		goto put_err_out;
 	}
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
@@ -280,15 +281,15 @@ int ntfs_inode_close(ntfs_inode *ni)
 				/* Ignore errors, they don't really matter. */
 				if (tmp_nis)
 					base_ni->extent_nis = tmp_nis;
-			} else if(tmp_nis)
+			} else if (tmp_nis)
 				free(tmp_nis);
 			/* Allow for error checking. */
 			i = -1;
 			break;
 		}
 		if (i != -1)
-			Dputs("Extent inode was not attached to base inode! "
-					"Weird! Continuing regardless.");
+			ntfs_log_debug("Extent inode was not attached to base inode! "
+					"Weird! Continuing regardless.\n");
 	}
 	return __ntfs_inode_release(ni);
 }
@@ -329,8 +330,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		errno = EINVAL;
 		return NULL;
 	}
-	Dprintf("%s(): Opening extent inode 0x%llx (base mft record 0x%llx).\n",
-			__FUNCTION__, (unsigned long long)mft_no,
+	ntfs_log_trace("Opening extent inode 0x%llx (base mft record 0x%llx).\n",
+			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	/* Is the extent inode already open and attached to the base inode? */
 	if (base_ni->nr_extents > 0) {
@@ -345,9 +346,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 			seq_no = MSEQNO_LE(mref);
 			if (seq_no && seq_no != le16_to_cpu(
 					ni->mrec->sequence_number)) {
-				Dputs("Found stale extent mft reference! "
-						"Corrupt file system. Run "
-						"chkdsk.");
+				ntfs_log_debug("Found stale extent mft reference! "
+					"Corrupt file system. Run chkdsk.\n");
 				errno = EIO;
 				return NULL;
 			}
@@ -385,7 +385,7 @@ err_out:
 	i = errno;
 	__ntfs_inode_release(ni);
 	errno = i;
-	Dperror("Failed to open extent inode");
+	ntfs_log_perror("Failed to open extent inode");
 	return NULL;
 }
 
@@ -401,7 +401,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	u64 prev_attached = 0;
 
 	if (!ni) {
-		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
+		ntfs_log_trace("Invalid arguments.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -409,15 +409,14 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
 
-	Dprintf("%s(): Entering for inode 0x%llx.\n",
-			__FUNCTION__, (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
 	/* Inode haven't got attribute list, thus nothing to attach. */
 	if (!NInoAttrList(ni))
 		return 0;
 
 	if (!ni->attr_list) {
-		Dprintf("%s(): Corrupt in-memory struct.\n", __FUNCTION__);
+		ntfs_log_trace("Corrupt in-memory struct.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -430,8 +429,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 				prev_attached != MREF_LE(ale->mft_reference)) {
 			if (!ntfs_extent_inode_open(ni,
 					MREF_LE(ale->mft_reference))) {
-				Dprintf("%s(): Couldn't attach extent inode.\n",
-						__FUNCTION__);
+				ntfs_log_trace("Couldn't attach extent inode.\n");
 				return -1;
 			}
 			prev_attached = MREF_LE(ale->mft_reference);
@@ -459,8 +457,8 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		err = errno;
-		Dprintf("%s(): Failed to receive STANDARD_INFORMATION "
-				"attribute.\n", __FUNCTION__);
+		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
+				"attribute.\n");
 		ntfs_attr_put_search_ctx(ctx);
 		errno = err;
 		return -1;
@@ -507,8 +505,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		Dprintf("%s(): Failed to get attribute search context.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to get attribute search context.\n");
 		goto err_out;
 	}
 	/* Walk through all FILE_NAME attributes and update them. */
@@ -530,16 +527,14 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		if (!index_ni) {
 			if (!err)
 				err = errno;
-			Dprintf("%s(): Failed to open inode with index.\n",
-					__FUNCTION__);
+			ntfs_log_trace("Failed to open inode with index.\n");
 			continue;
 		}
 		ictx = ntfs_index_ctx_get(index_ni, I30, 4);
 		if (!ictx) {
 			if (!err)
 				err = errno;
-			Dprintf("%s(): Failed to get index context.\n",
-					__FUNCTION__);
+			ntfs_log_trace("Failed to get index context.\n");
 			ntfs_inode_close(index_ni);
 			continue;
 		}
@@ -550,7 +545,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				else
 					err = errno;
 			}
-			Dprintf("%s(): Index lookup failed.\n", __FUNCTION__);
+			ntfs_log_trace("Index lookup failed.\n");
 			ntfs_index_ctx_put(ictx);
 			ntfs_inode_close(index_ni);
 			continue;
@@ -584,7 +579,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
-		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		ntfs_log_trace("Attribute lookup failed.\n");
 		goto err_out;
 	}
 	ntfs_attr_put_search_ctx(ctx);
@@ -628,8 +623,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		return -1;
 	}
 
-	Dprintf("%s(): Entering for inode 0x%llx.\n",
-			__FUNCTION__, (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
@@ -639,8 +633,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			if (err != EIO)
 				err = EBUSY;
 		}
-		Dprintf("%s(): Failed to sync standard information.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to sync standard information.\n");
 	}
 
 	/* Update FILE_NAME's in the index. */
@@ -652,8 +645,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			if (err != EIO)
 				err = EBUSY;
 		}
-		Dprintf("%s(): Failed to sync FILE_NAME attributes.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to sync FILE_NAME attributes.\n");
 		NInoFileNameSetDirty(ni);
 	}
 
@@ -668,8 +660,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 				err = errno;
 				if (err != EIO)
 					err = EBUSY;
-				Dprintf("%s(): Attribute list sync failed "
-					"(open failed).\n", __FUNCTION__);
+				ntfs_log_trace("Attribute list sync failed (open "
+						"failed).\n");
 			}
 			NInoAttrListSetDirty(ni);
 		} else {
@@ -681,16 +673,14 @@ int ntfs_inode_sync(ntfs_inode *ni)
 						err = errno;
 						if (err != EIO)
 							err = EBUSY;
-						Dprintf("%s(): Attribute list "
-						"sync failed (write failed).\n",
-						 __FUNCTION__);
+						ntfs_log_trace("Attribute list sync "
+							"failed (write failed).\n");
 					}
 					NInoAttrListSetDirty(ni);
 				}
 			} else {
 				err = EIO;
-				Dprintf("%s(): Attribute list sync failed "
-					"(invalid size).\n", __FUNCTION__);
+				ntfs_log_trace("Attribute list sync failed (invalid size).\n");
 				NInoAttrListSetDirty(ni);
 			}
 			ntfs_attr_close(na);
@@ -706,8 +696,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 					err = EBUSY;
 			}
 			NInoSetDirty(ni);
-			Dprintf("%s(): Base MFT record sync failed.\n",
-					__FUNCTION__);
+			ntfs_log_trace("Base MFT record sync failed.\n");
 		}
 	}
 
@@ -728,8 +717,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 							err = EBUSY;
 					}
 					NInoSetDirty(eni);
-					Dprintf("%s(): Extent MFT record sync "
-						"failed.\n", __FUNCTION__);
+					ntfs_log_trace("Extent MFT record sync "
+							"failed.\n");
 				}
 			}
 		}
@@ -762,17 +751,15 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ntfs_attr *na;
 
 	if (!ni) {
-		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
+		ntfs_log_trace("Invalid arguments.\n");
 		errno = EINVAL;
 		return -1;
 	}
 
-	Dprintf("%s(): Entering for inode 0x%llx.\n",
-			__FUNCTION__, (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
 	if (NInoAttrList(ni) || ni->nr_extents) {
-		Dprintf("%s(): Inode already has got attribute list.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Inode already has got attribute list.\n");
 		errno = EEXIST;
 		return -1;
 	}
@@ -782,7 +769,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	al = malloc(al_allocated);
 	ale = (ATTR_LIST_ENTRY *) al;
 	if (!al) {
-		Dprintf("%s(): Not enough memory.\n", __FUNCTION__);
+		ntfs_log_trace("Not enough memory.\n");
 		errno = ENOMEM;
 		return -1;
 	}
@@ -791,15 +778,14 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		Dprintf("%s(): Couldn't get search context.\n", __FUNCTION__);
+		ntfs_log_trace("Couldn't get search context.\n");
 		goto err_out;
 	}
 	/* Walk through all attributes. */
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		if (ctx->attr->type == AT_ATTRIBUTE_LIST) {
 			err = EIO;
-			Dprintf("%s(): Eeek! Attribute list already present.\n",
-					__FUNCTION__);
+			ntfs_log_trace("Eeek! Attribute list already present.\n");
 			goto put_err_out;
 		}
 		/* Calculate new length of attribute list. */
@@ -810,8 +796,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 			al_allocated += 0x40;
 			aln = realloc(al, al_allocated);
 			if (!aln) {
-				Dprintf("%s(): Not enough memory.\n",
-						__FUNCTION__);
+				ntfs_log_trace("Not enough memory.\n");
 				err = ENOMEM;
 				goto put_err_out;
 			}
@@ -839,14 +824,14 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
-		Dprintf("%s(): Attribute lookup failed.\n", __FUNCTION__);
+		ntfs_log_trace("Attribute lookup failed.\n");
 		goto put_err_out;
 	}
 	/* Deallocate trailing memory. */
 	aln = realloc(al, al_len);
 	if (!aln) {
 		err = errno;
-		Dprintf("%s(): realloc() failed.\n", __FUNCTION__);
+		ntfs_log_trace("realloc() failed.\n");
 		goto put_err_out;
 	}
 	al = aln;
@@ -865,8 +850,8 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 				offsetof(ATTR_RECORD, resident_end))) {
 			/* Failed to free space. */
 			err = errno;
-			Dprintf("%s(): Failed to free space for "
-				"$ATTRIBUTE_LIST.\n", __FUNCTION__);
+			ntfs_log_trace("Failed to free space for "
+					"$ATTRIBUTE_LIST.\n");
 			goto rollback;
 		}
 	}
@@ -875,8 +860,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	if (ntfs_resident_attr_record_add(ni,
 				AT_ATTRIBUTE_LIST, NULL, 0, NULL, 0, 0) < 0) {
 		err = errno;
-		Dprintf("%s(): Couldn't add $ATTRIBUTE_LIST to MFT record.\n",
-			__FUNCTION__);
+		ntfs_log_trace("Couldn't add $ATTRIBUTE_LIST to MFT record.\n");
 		goto rollback;
 	}
 
@@ -884,14 +868,12 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 	if (!na) {
 		err = errno;
-		Dprintf("%s(): Failed to open just added $ATTRIBUTE_LIST.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to open just added $ATTRIBUTE_LIST.\n");
 		goto remove_attrlist_record;
 	}
 	if (ntfs_attr_truncate(na, al_len)) {
 		err = errno;
-		Dprintf("%s(): Failed to resize just added $ATTRIBUTE_LIST.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to resize just added $ATTRIBUTE_LIST.\n");
 		ntfs_attr_close(na);
 		goto remove_attrlist_record;;
 	}
@@ -907,11 +889,11 @@ remove_attrlist_record:
 	if (!ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0,
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (ntfs_attr_record_rm(ctx))
-			Dprintf("%s(): Rollback failed. Failed to remove "
-				"attribute list record.\n", __FUNCTION__);
+			ntfs_log_trace("Rollback failed. Failed to remove attribute "
+					"list record.\n");
 	} else
-		Dprintf("%s(): Rollback failed. Couldn't find attribute list "
-			"record.\n", __FUNCTION__);
+		ntfs_log_trace("Rollback failed. Couldn't find attribute list "
+				"record.\n");
 	/* Setup back in-memory runlist. */
 	ni->attr_list = al;
 	ni->attr_list_size = al_len;
@@ -931,14 +913,11 @@ rollback:
 						sle64_to_cpu(ale->lowest_vcn),
 						NULL, 0, ctx)) {
 				if (ntfs_attr_record_move_to(ctx, ni))
-					Dprintf("%s(): Rollback failed. "
-						"Couldn't back attribute to "
-						"base MFT record.\n",
-						__FUNCTION__);
+					ntfs_log_trace("Rollback failed. Couldn't "
+						"back attribute to base MFT record.\n");
 			} else
-				Dprintf("%s(): Rollback failed. "
-					"ntfs_attr_lookup failed.\n",
-					__FUNCTION__);
+				ntfs_log_trace("Rollback failed. ntfs_attr_lookup "
+						"failed.\n");
 			ntfs_attr_reinit_search_ctx(ctx);
 		}
 		ale = (ATTR_LIST_ENTRY*)((u8*)ale + le16_to_cpu(ale->length));
@@ -969,13 +948,13 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	int freed, err;
 
 	if (!ni || size < 0) {
-		Dprintf("%s(): Invalid arguments.\n", __FUNCTION__);
+		ntfs_log_trace("Invalid arguments.\n");
 		errno = EINVAL;
 		return -1;
 	}
 
-	Dprintf("%s(): Entering for inode 0x%llx, size %d.\n",
-			__FUNCTION__, (long long) ni->mft_no, size);
+	ntfs_log_trace("Entering for inode 0x%llx, size %d.\n",
+			(long long) ni->mft_no, size);
 
 	freed = (le32_to_cpu(ni->mrec->bytes_allocated) -
 				le32_to_cpu(ni->mrec->bytes_in_use));
@@ -986,8 +965,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		Dprintf("%s(): Failed to get attribute search context.\n",
-				__FUNCTION__);
+		ntfs_log_trace("Failed to get attribute search context.\n");
 		errno = err;
 		return -1;
 	}
@@ -1010,8 +988,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				0, ctx)) {
 		if (errno != ENOENT) {
 			err = errno;
-			Dprintf("%s(): Attribute lookup failed.\n",
-				__FUNCTION__);
+			ntfs_log_trace("Attribute lookup failed.\n");
 			goto put_err_out;
 		}
 		if (ctx->attr->type == AT_END) {
@@ -1032,8 +1009,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 						0, NULL, 0, ctx)) {
 				err = errno;
 				if (errno != ENOENT) {
-					Dprintf("%s(): Attribute lookup failed."
-						"\n", __FUNCTION__);
+					ntfs_log_trace("Attribute lookup failed.\n");
 				} else
 					err = ENOSPC;
 				goto put_err_out;
@@ -1045,8 +1021,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		/* Move away attribute. */
 		if (ntfs_attr_record_move_away(ctx, 0)) {
 			err = errno;
-			Dprintf("%s(): Failed to move out attribute.\n",
-					__FUNCTION__);
+			ntfs_log_trace("Failed to move out attribute.\n");
 			break;
 		}
 		freed += record_size;
@@ -1066,8 +1041,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				NULL, 0, ctx)) {
 			if (errno != ENOENT) {
 				err = errno;
-				Dprintf("%s(): Attribute lookup failed.\n",
-					__FUNCTION__);
+				ntfs_log_trace("Attribute lookup failed.\n");
 				break;
 			}
 			if (ctx->attr->type == AT_END) {
@@ -1079,8 +1053,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	if (err == ENOSPC)
-		Dprintf("%s(): No attributes left that can be moved out.\n",
-			__FUNCTION__);
+		ntfs_log_trace("No attributes left that can be moved out.\n");
 	errno = err;
 	return -1;
 }
@@ -1091,12 +1064,12 @@ put_err_out:
 /**
  * ntfs_inode_close2
  */
-int ntfs_inode_close2 (ntfs_inode *ni)
+int ntfs_inode_close2(ntfs_inode *ni)
 {
 	if (!ni)
 		return 0;
 
-	//printf (BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
+	//ntfs_log_debug(BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
 
 	ni->ref_count--;
 	if (ni->ref_count > 0)
@@ -1108,13 +1081,13 @@ int ntfs_inode_close2 (ntfs_inode *ni)
 	// XXX temporary until we have commit/rollback
 	NInoClearDirty(ni);
 
-	return ntfs_inode_close (ni);
+	return ntfs_inode_close(ni);
 }
 
 /**
  * ntfs_inode_open2
  */
-ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
+ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 {
 	ntfs_inode *ino = NULL;
 	struct ntfs_dir *dir;
@@ -1134,12 +1107,12 @@ ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
 	}
 
 	if (ino) {
-		//printf (BOLD YELLOW "inode reuse %lld\n" END, mref);
+		//ntfs_log_debug(BOLD YELLOW "inode reuse %lld\n" END, mref);
 		ino->ref_count++;
 		return ino;
 	}
 
-	ino = ntfs_inode_open (vol, mref);
+	ino = ntfs_inode_open(vol, mref);
 	if (!ino)
 		return NULL;
 
@@ -1154,7 +1127,7 @@ ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
 	ino->private_data = NULL;
 	ino->ref_count = 1;
 
-	//printf (BOLD YELLOW "inode open %lld\n" END, mref);
+	//ntfs_log_debug(BOLD YELLOW "inode open %lld\n" END, mref);
 	return ino;
 }
 
@@ -1162,20 +1135,20 @@ ntfs_inode * ntfs_inode_open2 (ntfs_volume *vol, const MFT_REF mref)
  * ntfs_inode_open3
  * open a deleted inode
  */
-ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
+ntfs_inode * ntfs_inode_open3(ntfs_volume *vol, const MFT_REF mref)
 {
 	ntfs_inode *ino = NULL;
 
 	if (!vol)
 		return NULL;
 
-	ino = calloc (1, sizeof (*ino));
+	ino = calloc(1, sizeof(*ino));
 	if (!ino)
 		return NULL;
 
-	ino->mrec = malloc (vol->mft_record_size);
+	ino->mrec = malloc(vol->mft_record_size);
 	if (!ino->mrec) {
-		free (ino);
+		free(ino);
 		return NULL;
 	}
 
@@ -1188,14 +1161,14 @@ ntfs_inode * ntfs_inode_open3 (ntfs_volume *vol, const MFT_REF mref)
 	ino->private_data = NULL;
 	ino->ref_count = 1;
 
-	if (1 != ntfs_attr_mst_pread (vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
-		//ntfs_inode_close2 (ino); ???
-		free (ino->mrec);
-		free (ino);
+	if (1 != ntfs_attr_mst_pread(vol->mft_na, MREF(mref) * vol->mft_record_size, 1, vol->mft_record_size, ino->mrec)) {
+		//ntfs_inode_close2(ino); ???
+		free(ino->mrec);
+		free(ino);
 		return NULL;
 	}
 
-	NInoSetDirty (ino);
+	NInoSetDirty(ino);
 	return ino;
 }
 

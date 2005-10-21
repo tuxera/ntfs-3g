@@ -119,7 +119,7 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 	u8 *buf;
 	long nr_free = 0;
 	s64 br, total = 0;
-	
+
 	if (!(ctx->state & NF_FreeMFTOutdate))
 		return ctx->free_mft;
 	buf = malloc(vol->cluster_size);
@@ -494,7 +494,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		total += res;
 	}
 	res = total;
-exit:	
+exit:
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	if (na)
 		ntfs_attr_close(na);
@@ -587,8 +587,7 @@ static int ntfs_fuse_create(const char *org_path, const unsigned type)
 	else
 		res = -errno;
 exit:
-	if (uname)
-		free(uname);
+	free(uname);
 	if (dir_ni)
 		ntfs_inode_close(dir_ni);
 	free(path);
@@ -693,8 +692,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 exit:
 	if (ni)
 		ntfs_inode_close(ni);
-	if (uname)
-		free(uname);
+	free(uname);
 	if (dir_ni)
 		ntfs_inode_close(dir_ni);
 	free(path);
@@ -742,8 +740,7 @@ static int ntfs_fuse_rm(const char *org_path)
 exit:
 	if (ni)
 		ntfs_inode_close(ni);
-	if (uname)
-		free(uname);
+	free(uname);
 	if (dir_ni)
 		ntfs_inode_close(dir_ni);
 	free(path);
@@ -1015,8 +1012,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (lename)
-		free(lename);
+	free(lename);
 	if (ntfs_inode_close(ni))
 		perror("Failed to close inode");
 	return res;
@@ -1070,8 +1066,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (lename)
-		free(lename);
+	free(lename);
 	if (ntfs_inode_close(ni))
 		perror("Failed to close inode");
 	return res;
@@ -1111,8 +1106,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (lename)
-		free(lename);
+	free(lename);
 	if (ntfs_inode_close(ni))
 		perror("Failed to close inode");
 	return res;
@@ -1140,7 +1134,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.utime		= ntfs_fuse_utime,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
-#if 0	
+#if 0
 	.setxattr	= ntfs_fuse_setxattr,
 	.removexattr	= ntfs_fuse_removexattr,
 	.listxattr	= ntfs_fuse_listxattr,
@@ -1487,8 +1481,7 @@ int main(int argc, char *argv[])
 	parsed_options = parse_mount_options((opts.options) ?
 			opts.options : "");
 	if (!parsed_options) {
-		if (opts.device)
-			free(opts.device);
+		free(opts.device);
 		ntfs_fuse_destroy();
 		return 3;
 	}

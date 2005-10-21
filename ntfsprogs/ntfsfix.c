@@ -228,8 +228,7 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_exit:
-	if (m)
-		free(m);
+	free(m);
 	return ret;
 }
 
@@ -509,10 +508,8 @@ mount_ok:
 	/* Set return code to 0. */
 	i = 0;
 final_exit:
-	if (m)
-		free(m);
-	if (m2)
-		free(m2);
+	free(m);
+	free(m2);
 	if (vol && ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
 	return i;

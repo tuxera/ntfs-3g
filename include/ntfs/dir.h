@@ -102,13 +102,13 @@ struct ntfs_dir {
 };
 
 
-int ntfs_dir_rollback (struct ntfs_dir *dir);
-int ntfs_dir_truncate (ntfs_volume *vol, struct ntfs_dir *dir);
-int ntfs_dir_commit (struct ntfs_dir *dir);
-void ntfs_dir_free (struct ntfs_dir *dir);
-struct ntfs_dir * ntfs_dir_create (ntfs_volume *vol, MFT_REF mft_num);
-void ntfs_dir_add (struct ntfs_dir *parent, struct ntfs_dir *child);
-struct ntfs_dir * ntfs_dir_find2 (struct ntfs_dir *dir, ntfschar *name, int name_len);
+int ntfs_dir_rollback(struct ntfs_dir *dir);
+int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir);
+int ntfs_dir_commit(struct ntfs_dir *dir);
+void ntfs_dir_free(struct ntfs_dir *dir);
+struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num);
+void ntfs_dir_add(struct ntfs_dir *parent, struct ntfs_dir *child);
+struct ntfs_dir * ntfs_dir_find2(struct ntfs_dir *dir, ntfschar *name, int name_len);
 
 #endif /* NTFS_RICH */
 

@@ -22,7 +22,9 @@
 #ifndef _LOGGING_H_
 #define _LOGGING_H_
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
@@ -33,8 +35,8 @@
 struct ntfs_logging;
 
 /* Function prototype for the logging handlers */
-typedef int (logging_handler) (const char *handler, const char *file, int line,
-	int level, FILE *stream, const char *format, va_list args);
+typedef int (ntfs_logging_handler)(const char *function, const char *file, int line,
+	u32 level, void *data, const char *format, va_list args);
 
 /**
  * struct ntfs_logging - Control info for the logging system
@@ -45,69 +47,72 @@ typedef int (logging_handler) (const char *handler, const char *file, int line,
 struct ntfs_logging {
 	u32 levels;
 	u32 flags;
-	logging_handler *handler;
+	ntfs_logging_handler *handler;
 };
 
 extern struct ntfs_logging ntfs_log;
 
-void ntfs_logging_set_handler (logging_handler *handler);
+void ntfs_logging_set_handler(ntfs_logging_handler *handler);
 
 /* Enable/disable certain log levels */
-u32 ntfs_logging_set_levels   (u32 levels);
-u32 ntfs_logging_clear_levels (u32 levels);
-u32 ntfs_logging_get_levels   (void);
+u32 ntfs_logging_set_levels(u32 levels);
+u32 ntfs_logging_clear_levels(u32 levels);
+u32 ntfs_logging_get_levels(void);
 
 /* Enable/disable certain log flags */
-u32 ntfs_logging_set_flags   (u32 flags);
-u32 ntfs_logging_clear_flags (u32 flags);
-u32 ntfs_logging_get_flags   (void);
+u32 ntfs_logging_set_flags(u32 flags);
+u32 ntfs_logging_clear_flags(u32 flags);
+u32 ntfs_logging_get_flags(void);
 
-BOOL ntfs_logging_parse_option (const char *option);
+BOOL ntfs_logging_parse_option(const char *option);
 
-int ntfs_logging_redirect (const char *handler, const char *file, int line,
-	int level, FILE *stream, const char *format, ...)
-	__attribute__ ((format (printf, 6, 7)));
+int ntfs_logging_redirect(const char *function, const char *file, int line,
+	u32 level, void *data, const char *format, ...)
+	__attribute__((format(printf, 6, 7)));
 
 /* Logging handlers */
-logging_handler ntfs_logging_handler_printf __attribute__ ((format (printf, 6, 0)));
-logging_handler ntfs_logging_handler_colour __attribute__ ((format (printf, 6, 0)));
+ntfs_logging_handler ntfs_logging_handler_printf __attribute__((format(printf, 6, 0)));
+ntfs_logging_handler ntfs_logging_handler_colour __attribute__((format(printf, 6, 0)));
 
 /* Logging levels - Determine what gets logged */
-#define LOG_LEVEL_DEBUG		(1 << 0) /* x = 42 */
-#define LOG_LEVEL_TRACE		(1 << 1) /* Entering function x() */
-#define LOG_LEVEL_QUIET		(1 << 2) /* Quietable output */
-#define LOG_LEVEL_INFO		(1 << 3) /* Volume needs defragmenting */
-#define LOG_LEVEL_VERBOSE	(1 << 4) /* Forced to continue */
-#define LOG_LEVEL_PROGRESS	(1 << 5) /* 54% complete */
-#define LOG_LEVEL_WARNING	(1 << 6) /* You should backup before starting */
-#define LOG_LEVEL_ERROR		(1 << 7) /* Operation failed, no damage done */
-#define LOG_LEVEL_PERROR	(1 << 8) /* Message : standard error description */
-#define LOG_LEVEL_CRITICAL	(1 << 9) /* Operation failed,damage may have occurred */
+#define NTFS_LOG_LEVEL_DEBUG	(1 <<  0) /* x = 42 */
+#define NTFS_LOG_LEVEL_TRACE	(1 <<  1) /* Entering function x() */
+#define NTFS_LOG_LEVEL_QUIET	(1 <<  2) /* Quietable output */
+#define NTFS_LOG_LEVEL_INFO	(1 <<  3) /* Volume needs defragmenting */
+#define NTFS_LOG_LEVEL_VERBOSE	(1 <<  4) /* Forced to continue */
+#define NTFS_LOG_LEVEL_PROGRESS	(1 <<  5) /* 54% complete */
+#define NTFS_LOG_LEVEL_WARNING	(1 <<  6) /* You should backup before starting */
+#define NTFS_LOG_LEVEL_ERROR	(1 <<  7) /* Operation failed, no damage done */
+#define NTFS_LOG_LEVEL_PERROR	(1 <<  8) /* Message : standard error description */
+#define NTFS_LOG_LEVEL_CRITICAL	(1 <<  9) /* Operation failed,damage may have occurred */
+#define NTFS_LOG_LEVEL_REASON	(1 << 10) /* Human readable reason for failure */
 
 /* Logging style flags - Manage the style of the output */
-#define LOG_FLAG_PREFIX		(1 << 0) /* Prefix messages with "ERROR: ", etc */
-#define LOG_FLAG_FILENAME	(1 << 1) /* Show the file origin of the message */
-#define LOG_FLAG_LINE		(1 << 2) /* Show the line number of the message */
-#define LOG_FLAG_FUNCTION	(1 << 3) /* Show the function name containing the message */
+#define NTFS_LOG_FLAG_PREFIX	(1 << 0) /* Prefix messages with "ERROR: ", etc */
+#define NTFS_LOG_FLAG_FILENAME	(1 << 1) /* Show the file origin of the message */
+#define NTFS_LOG_FLAG_LINE	(1 << 2) /* Show the line number of the message */
+#define NTFS_LOG_FLAG_FUNCTION	(1 << 3) /* Show the function name containing the message */
+#define NTFS_LOG_FLAG_ONLYNAME	(1 << 4) /* Only display the filename, not the pathname */
 
 /* Macros to simplify logging.  One for each level defined above.
- * Note, if DEBUG isn't defined, then log_debug has no effect.
+ * Note, if NTFS_DISABLE_DEBUG_LOGGING is defined, then ntfs_log_debug/trace have no effect.
  */
-#define log_crit(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_CRITICAL,NULL,FORMAT,##ARGS)
-#define log_error(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_ERROR,NULL,FORMAT,##ARGS)
-#define log_info(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_INFO,NULL,FORMAT,##ARGS)
-#define log_perror(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_PERROR,NULL,FORMAT,##ARGS)
-#define log_progress(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_PROGRESS,NULL,FORMAT,##ARGS)
-#define log_quiet(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_QUIET,NULL,FORMAT,##ARGS)
-#define log_verbose(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_VERBOSE,NULL,FORMAT,##ARGS)
-#define log_warn(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_WARNING,NULL,FORMAT,##ARGS)
+#define ntfs_log_critical(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_CRITICAL,NULL,FORMAT,##ARGS)
+#define ntfs_log_error(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_ERROR,NULL,FORMAT,##ARGS)
+#define ntfs_log_info(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_INFO,NULL,FORMAT,##ARGS)
+#define ntfs_log_perror(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_PERROR,NULL,FORMAT,##ARGS)
+#define ntfs_log_progress(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_PROGRESS,NULL,FORMAT,##ARGS)
+#define ntfs_log_quiet(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_QUIET,NULL,FORMAT,##ARGS)
+#define ntfs_log_verbose(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_VERBOSE,NULL,FORMAT,##ARGS)
+#define ntfs_log_warning(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_WARNING,NULL,FORMAT,##ARGS)
+#define ntfs_log_reason(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_REASON,NULL,FORMAT,##ARGS)
 
 #ifdef NTFS_DISABLE_DEBUG_LOGGING
-#define log_debug(FORMAT, ARGS...)do {} while (0)
-#define log_trace(FORMAT, ARGS...)do {} while (0)
+#define ntfs_log_debug(FORMAT, ARGS...)do {} while (0)
+#define ntfs_log_trace(FORMAT, ARGS...)do {} while (0)
 #else
-#define log_debug(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_DEBUG,NULL,FORMAT,##ARGS)
-#define log_trace(FORMAT, ARGS...) ntfs_logging_redirect (__FUNCTION__,__FILE__,__LINE__,LOG_LEVEL_TRACE,NULL,FORMAT,##ARGS)
+#define ntfs_log_debug(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_DEBUG,NULL,FORMAT,##ARGS)
+#define ntfs_log_trace(FORMAT, ARGS...) ntfs_logging_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_TRACE,NULL,FORMAT,##ARGS)
 #endif /* NTFS_DISABLE_DEBUG_LOGGING */
 
 #endif /* _LOGGING_H_ */

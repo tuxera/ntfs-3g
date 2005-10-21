@@ -23,7 +23,9 @@
 #ifndef _NTFS_NTFSTIME_H
 #define _NTFS_NTFSTIME_H
 
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
 
 #include "types.h"
 

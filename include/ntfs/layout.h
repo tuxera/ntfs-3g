@@ -62,7 +62,7 @@ typedef struct {
 					   Required to boot Windows. */
 /*0x15*/u32 large_sectors;		/* zero */
 /* sizeof() = 25 (0x19) bytes */
-} __attribute__ ((__packed__)) BIOS_PARAMETER_BLOCK;
+} __attribute__((__packed__)) BIOS_PARAMETER_BLOCK;
 
 /*
  * NTFS boot sector structure.
@@ -95,7 +95,7 @@ typedef struct {
 	u16 end_of_sector_marker;	/* End of bootsector magic. Always is
 					   0xaa55 in little endian. */
 /* sizeof() = 512 (0x200) bytes */
-} __attribute__ ((__packed__)) NTFS_BOOT_SECTOR;
+} __attribute__((__packed__)) NTFS_BOOT_SECTOR;
 
 /*
  * Magic identifiers present at the beginning of all ntfs record containing
@@ -190,7 +190,7 @@ typedef struct {
 				   including the Update Sequence Number (usn),
 				   thus the number of fixups is the usa_count
 				   minus 1. */
-} __attribute__ ((__packed__)) NTFS_RECORD;
+} __attribute__((__packed__)) NTFS_RECORD;
 
 /*
  * System files mft record numbers. All these files are always marked as used
@@ -241,7 +241,7 @@ typedef enum {
 /*
  * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
- * _4 and _8 are needed by $Extend sub-files (don't know what to 
+ * _4 and _8 are needed by $Extend sub-files (don't know what to
  * call them yet...)
  */
 
@@ -251,7 +251,7 @@ typedef enum {
 	MFT_RECORD_IS_4         = const_cpu_to_le16(0x0004),
         MFT_RECORD_IS_8         = const_cpu_to_le16(0x0008),
 	MFT_REC_SPACE_FILLER	= 0xffff	/* Just to make flags 16-bit. */
-} __attribute__ ((__packed__)) MFT_RECORD_FLAGS;
+} __attribute__((__packed__)) MFT_RECORD_FLAGS;
 
 /*
  * mft references (aka file references or file record segment references) are
@@ -390,7 +390,7 @@ typedef struct {
  * by overwriting it since you then can't get it back...
  * When reading we obviously use the data from the ntfs record header.
  */
-} __attribute__ ((__packed__)) MFT_RECORD;
+} __attribute__((__packed__)) MFT_RECORD;
 
 /* This is the version without the NTFS 3.1+ specific fields. */
 typedef struct {
@@ -457,7 +457,7 @@ typedef struct {
  * by overwriting it since you then can't get it back...
  * When reading we obviously use the data from the ntfs record header.
  */
-} __attribute__ ((__packed__)) MFT_RECORD_OLD;
+} __attribute__((__packed__)) MFT_RECORD_OLD;
 
 /*
  * System defined attributes (32-bit). Each attribute type has a corresponding
@@ -599,7 +599,7 @@ typedef struct {
 /* 90*/	s64 min_size;			/* Optional minimum attribute size. */
 /* 98*/	s64 max_size;			/* Maximum size of attribute. */
 /* sizeof() = 0xa0 or 160 bytes */
-} __attribute__ ((__packed__)) ATTR_DEF;
+} __attribute__((__packed__)) ATTR_DEF;
 
 /*
  * Attribute flags (16-bit).
@@ -611,7 +611,7 @@ typedef enum {
 						illegal value. */
 	ATTR_IS_ENCRYPTED	= const_cpu_to_le16(0x4000),
 	ATTR_IS_SPARSE		= const_cpu_to_le16(0x8000),
-} __attribute__ ((__packed__)) ATTR_FLAGS;
+} __attribute__((__packed__)) ATTR_FLAGS;
 
 /*
  * Attribute compression.
@@ -687,7 +687,7 @@ typedef enum {
 	RESIDENT_ATTR_IS_INDEXED = 0x01, /* Attribute is referenced in an index
 					    (has implications for deleting and
 					    modifying the attribute). */
-} __attribute__ ((__packed__)) RESIDENT_ATTR_FLAGS;
+} __attribute__((__packed__)) RESIDENT_ATTR_FLAGS;
 
 /*
  * Attribute record header. Always aligned to 8-byte boundary.
@@ -733,7 +733,7 @@ typedef struct {
 /* 24 */		void *resident_end[0]; /* Use offsetof(ATTR_RECORD,
 						  resident_end) to get size of
 						  a resident attribute. */
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 		/* Non-resident attributes. */
 		struct {
 /* 16*/			VCN lowest_vcn;	/* Lowest valid virtual cluster number
@@ -790,9 +790,9 @@ typedef struct {
 				/* Use offsetof(ATTR_RECORD, compressed_end) to
 				   get size of a compressed attribute. */
 /* sizeof(compressed attr) = 72*/
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
-} __attribute__ ((__packed__)) ATTR_RECORD;
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
+} __attribute__((__packed__)) ATTR_RECORD;
 
 typedef ATTR_RECORD ATTR_REC;
 
@@ -848,7 +848,7 @@ typedef enum {
 	   us whether this file has a view index present (eg. object id index,
 	   quota index, one of the security indexes or the encrypting file
 	   system related indexes). */
-} __attribute__ ((__packed__)) FILE_ATTR_FLAGS;
+} __attribute__((__packed__)) FILE_ATTR_FLAGS;
 
 /*
  * NOTE on times in NTFS: All times are in MS standard time format, i.e. they
@@ -890,7 +890,7 @@ typedef struct {
 		/* 36 */ u8 reserved12[12];	/* Reserved/alignment to 8-byte
 						   boundary. */
 		/* 48 */ void *v1_end[0];	/* Marker for offsetof(). */
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 /* sizeof() = 48 bytes */
 		/* NTFS 3.0 */
 		struct {
@@ -944,10 +944,10 @@ typedef struct {
 				journal is a very fast process, so the user
 				won't even notice it. */
 		/* 72*/ void *v3_end[0]; /* Marker for offsetof(). */
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
 /* sizeof() = 72 bytes (NTFS 3.0) */
-} __attribute__ ((__packed__)) STANDARD_INFORMATION;
+} __attribute__((__packed__)) STANDARD_INFORMATION;
 
 /*
  * Attribute: Attribute list (0x20).
@@ -1008,7 +1008,7 @@ typedef struct {
 				   name_offset to determine the location of the
 				   name. */
 /* sizeof() = 26 + (attribute_name_length * 2) bytes */
-} __attribute__ ((__packed__)) ATTR_LIST_ENTRY;
+} __attribute__((__packed__)) ATTR_LIST_ENTRY;
 
 /*
  * The maximum allowed length for a file name.
@@ -1039,7 +1039,7 @@ typedef enum {
 		/* 3 means that both the Win32 and the DOS filenames are
 		   identical and hence have been saved in this single filename
 		   record. */
-} __attribute__ ((__packed__)) FILE_NAME_TYPE_FLAGS;
+} __attribute__((__packed__)) FILE_NAME_TYPE_FLAGS;
 
 /*
  * Attribute: Filename (0x30).
@@ -1077,17 +1077,17 @@ typedef struct {
 						   pack the extended attributes
 						   (EAs), if such are present.*/
 		/* 3e*/	u16 reserved;		/* Reserved for alignment. */
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 	/* 3c*/	u32 reparse_point_tag;		/* Type of reparse point,
 						   present only in reparse
 						   points and only if there are
 						   no EAs. */
-	} __attribute__ ((__packed__));
+	} __attribute__((__packed__));
 /* 40*/	u8 file_name_length;			/* Length of file name in
 						   (Unicode) characters. */
 /* 41*/	FILE_NAME_TYPE_FLAGS file_name_type;	/* Namespace of the file name.*/
 /* 42*/	ntfschar file_name[0];			/* File name in Unicode. */
-} __attribute__ ((__packed__)) FILE_NAME_ATTR;
+} __attribute__((__packed__)) FILE_NAME_ATTR;
 
 /*
  * GUID structures store globally unique identifiers (GUID). A GUID is a
@@ -1105,7 +1105,7 @@ typedef struct {
 	u8 data4[8];	/* The first two bytes are the third group of four
 			   hexadecimal digits. The remaining six bytes are the
 			   final 12 hexadecimal digits. */
-} __attribute__ ((__packed__)) GUID;
+} __attribute__((__packed__)) GUID;
 
 /*
  * FILE_Extend/$ObjId contains an index named $O. This index contains all
@@ -1126,10 +1126,10 @@ typedef struct {
 			GUID birth_volume_id;
 			GUID birth_object_id;
 			GUID domain_id;
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 		u8 extended_info[48];
-	} __attribute__ ((__packed__));
-} __attribute__ ((__packed__)) OBJ_ID_INDEX_DATA;
+	} __attribute__((__packed__));
+} __attribute__((__packed__)) OBJ_ID_INDEX_DATA;
 
 /*
  * Attribute: Object id (NTFS 3.0+) (0x40).
@@ -1153,10 +1153,10 @@ typedef struct {
 			GUID birth_object_id;	/* Unique id of file when it was
 						   first created. */
 			GUID domain_id;		/* Reserved, zero. */
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 		u8 extended_info[48];
-	} __attribute__ ((__packed__));
-} __attribute__ ((__packed__)) OBJECT_ID_ATTR;
+	} __attribute__((__packed__));
+} __attribute__((__packed__)) OBJECT_ID_ATTR;
 
 /*
  * The pre-defined IDENTIFIER_AUTHORITIES used as SID_IDENTIFIER_AUTHORITY in
@@ -1297,9 +1297,9 @@ typedef union {
 	struct {
 		u16 high_part;		/* High 16-bits. */
 		u32 low_part;		/* Low 32-bits. */
-	} __attribute__ ((__packed__));
+	} __attribute__((__packed__));
 	u8 value[6];			/* Value as individual bytes. */
-} __attribute__ ((__packed__)) SID_IDENTIFIER_AUTHORITY;
+} __attribute__((__packed__)) SID_IDENTIFIER_AUTHORITY;
 
 /*
  * The SID structure is a variable-length structure used to uniquely identify
@@ -1332,7 +1332,7 @@ typedef struct {
 	u8 sub_authority_count;
 	SID_IDENTIFIER_AUTHORITY identifier_authority;
 	u32 sub_authority[1];		/* At least one sub_authority. */
-} __attribute__ ((__packed__)) SID;
+} __attribute__((__packed__)) SID;
 
 /*
  * Current constants for SIDs.
@@ -1370,7 +1370,7 @@ typedef enum {
 
 	/* This one is for WinNT&2k. */
 	ACCESS_MAX_MS_ACE_TYPE		= 8,
-} __attribute__ ((__packed__)) ACE_TYPES;
+} __attribute__((__packed__)) ACE_TYPES;
 
 /*
  * The ACE flags (8-bit) for audit and inheritance (see below).
@@ -1394,7 +1394,7 @@ typedef enum {
 	/* The audit flags. */
 	SUCCESSFUL_ACCESS_ACE_FLAG	= 0x40,
 	FAILED_ACCESS_ACE_FLAG		= 0x80,
-} __attribute__ ((__packed__)) ACE_FLAGS;
+} __attribute__((__packed__)) ACE_FLAGS;
 
 /*
  * An ACE is an access-control entry in an access-control list (ACL).
@@ -1411,7 +1411,7 @@ typedef struct {
 	ACE_TYPES type;		/* Type of the ACE. */
 	ACE_FLAGS flags;	/* Flags describing the ACE. */
 	u16 size;		/* Size in bytes of the ACE. */
-} __attribute__ ((__packed__)) ACE_HEADER;
+} __attribute__((__packed__)) ACE_HEADER;
 
 /*
  * The access mask (32-bit). Defines the access rights.
@@ -1557,7 +1557,7 @@ typedef struct {
 	ACCESS_MASK generic_write;
 	ACCESS_MASK generic_execute;
 	ACCESS_MASK generic_all;
-} __attribute__ ((__packed__)) GENERIC_MAPPING;
+} __attribute__((__packed__)) GENERIC_MAPPING;
 
 /*
  * The predefined ACE type structures are as defined below.
@@ -1574,7 +1574,7 @@ typedef struct {
 
 /*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
 /*  8*/	SID sid;		/* The SID associated with the ACE. */
-} __attribute__ ((__packed__)) ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE,
+} __attribute__((__packed__)) ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE,
 			       SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE;
 
 /*
@@ -1596,7 +1596,7 @@ typedef struct {
 /* 12*/	GUID object_type;
 /* 28*/	GUID inherited_object_type;
 /* 44*/	SID sid;		/* The SID associated with the ACE. */
-} __attribute__ ((__packed__)) ACCESS_ALLOWED_OBJECT_ACE,
+} __attribute__((__packed__)) ACCESS_ALLOWED_OBJECT_ACE,
 			       ACCESS_DENIED_OBJECT_ACE,
 			       SYSTEM_AUDIT_OBJECT_ACE,
 			       SYSTEM_ALARM_OBJECT_ACE;
@@ -1616,7 +1616,7 @@ typedef struct {
 	u16 ace_count;	/* Number of ACEs in the ACL. */
 	u16 alignment2;
 /* sizeof() = 8 bytes */
-} __attribute__ ((__packed__)) ACL;
+} __attribute__((__packed__)) ACL;
 
 /*
  * Current constants for ACLs.
@@ -1697,7 +1697,7 @@ typedef enum {
 	SE_SACL_PROTECTED		= const_cpu_to_le16(0x2000),
 	SE_RM_CONTROL_VALID		= const_cpu_to_le16(0x4000),
 	SE_SELF_RELATIVE		= const_cpu_to_le16(0x8000),
-} __attribute__ ((__packed__)) SECURITY_DESCRIPTOR_CONTROL;
+} __attribute__((__packed__)) SECURITY_DESCRIPTOR_CONTROL;
 
 /*
  * Self-relative security descriptor. Contains the owner and group SIDs as well
@@ -1723,7 +1723,7 @@ typedef struct {
 			   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
 			   (unconditionally granting access) is specified. */
 /* sizeof() = 0x14 bytes */
-} __attribute__ ((__packed__)) SECURITY_DESCRIPTOR_RELATIVE;
+} __attribute__((__packed__)) SECURITY_DESCRIPTOR_RELATIVE;
 
 /*
  * Absolute security descriptor. Does not contain the owner and group SIDs, nor
@@ -1751,7 +1751,7 @@ typedef struct {
 			   SE_DACL_PRESENT is set in the control field. If
 			   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
 			   (unconditionally granting access) is specified. */
-} __attribute__ ((__packed__)) SECURITY_DESCRIPTOR;
+} __attribute__((__packed__)) SECURITY_DESCRIPTOR;
 
 /*
  * Current constants for security descriptors.
@@ -1825,16 +1825,16 @@ typedef struct {
 	u32 security_id;   /* The security_id assigned to the descriptor. */
 	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
 	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
-} __attribute__ ((__packed__)) SECURITY_DESCRIPTOR_HEADER;
+} __attribute__((__packed__)) SECURITY_DESCRIPTOR_HEADER;
 
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
-	u32 security_id;   /* The security_id assigned to the descriptor. */	
+	u32 security_id;   /* The security_id assigned to the descriptor. */
 	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
 	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
 	u64 reserved_II;   /* Padding - always unicode "II" */
 } __attribute__ ((__packed__)) SDH_INDEX_DATA;
-	
+
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
@@ -1843,7 +1843,7 @@ typedef struct {
 } __attribute__ ((__packed__)) SII_INDEX_DATA;
 
 typedef struct {
-	u64 owner_id;     
+	u64 owner_id;
 } __attribute__ ((__packed__)) QUOTA_O_INDEX_DATA;
 
 /*
@@ -1866,7 +1866,7 @@ typedef struct {
 	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
 /* 20*/	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
 					     descriptor. */
-} __attribute__ ((__packed__)) SDS_ENTRY;
+} __attribute__((__packed__)) SDS_ENTRY;
 
 /*
  * The index entry key used in the $SII index. The collation type is
@@ -1874,7 +1874,7 @@ typedef struct {
  */
 typedef struct {
 	u32 security_id;   /* The security_id assigned to the descriptor. */
-} __attribute__ ((__packed__)) SII_INDEX_KEY;
+} __attribute__((__packed__)) SII_INDEX_KEY;
 
 /*
  * The index entry key used in the $SDH index. The keys are sorted first by
@@ -1884,7 +1884,7 @@ typedef struct {
 typedef struct {
 	u32 hash;	   /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
-} __attribute__ ((__packed__)) SDH_INDEX_KEY;
+} __attribute__((__packed__)) SDH_INDEX_KEY;
 
 /*
  * Attribute: Volume name (0x60).
@@ -1894,7 +1894,7 @@ typedef struct {
  */
 typedef struct {
 	ntfschar name[0];	/* The name of the volume in Unicode. */
-} __attribute__ ((__packed__)) VOLUME_NAME;
+} __attribute__((__packed__)) VOLUME_NAME;
 
 /*
  * Possible flags for the volume (16-bit).
@@ -1908,7 +1908,7 @@ typedef enum {
 	VOLUME_REPAIR_OBJECT_ID		= const_cpu_to_le16(0x0020),
 	VOLUME_MODIFIED_BY_CHKDSK	= const_cpu_to_le16(0x8000),
 	VOLUME_FLAGS_MASK		= const_cpu_to_le16(0x803f),
-} __attribute__ ((__packed__)) VOLUME_FLAGS;
+} __attribute__((__packed__)) VOLUME_FLAGS;
 
 /*
  * Attribute: Volume information (0x70).
@@ -1923,7 +1923,7 @@ typedef struct {
 	u8 major_ver;		/* Major version of the ntfs format. */
 	u8 minor_ver;		/* Minor version of the ntfs format. */
 	VOLUME_FLAGS flags;	/* Bit array of VOLUME_* flags. */
-} __attribute__ ((__packed__)) VOLUME_INFORMATION;
+} __attribute__((__packed__)) VOLUME_INFORMATION;
 
 /*
  * Attribute: Data attribute (0x80).
@@ -1934,7 +1934,7 @@ typedef struct {
  */
 typedef struct {
 	u8 data[0];		/* The file's data contents. */
-} __attribute__ ((__packed__)) DATA_ATTR;
+} __attribute__((__packed__)) DATA_ATTR;
 
 /*
  * Index header flags (8-bit).
@@ -1956,7 +1956,7 @@ typedef enum {
 	INDEX_NODE	= 1, /* This node indexes other nodes, i.e. is not a
 				leaf node. */
 	NODE_MASK	= 1, /* Mask for accessing the *_NODE bits. */
-} __attribute__ ((__packed__)) INDEX_HEADER_FLAGS;
+} __attribute__((__packed__)) INDEX_HEADER_FLAGS;
 
 /*
  * This is the header for indexes, describing the INDEX_ENTRY records, which
@@ -1984,7 +1984,7 @@ typedef struct {
 	   belongs to. */
 	INDEX_HEADER_FLAGS flags;	/* Bit field of INDEX_HEADER_FLAGS. */
 	u8 reserved[3];			/* Reserved/align to 8-byte boundary. */
-} __attribute__ ((__packed__)) INDEX_HEADER;
+} __attribute__((__packed__)) INDEX_HEADER;
 
 /*
  * Attribute: Index root (0x90).
@@ -2026,7 +2026,7 @@ typedef struct {
 	u8 reserved[3];			/* Reserved/align to 8-byte boundary. */
 	INDEX_HEADER index;		/* Index header describing the
 					   following index entries. */
-} __attribute__ ((__packed__)) INDEX_ROOT;
+} __attribute__((__packed__)) INDEX_ROOT;
 
 /*
  * Attribute: Index allocation (0xa0).
@@ -2057,7 +2057,7 @@ typedef struct {
  * by overwriting it since you then can't get it back...
  * When reading use the data from the ntfs record header.
  */
-} __attribute__ ((__packed__)) INDEX_BLOCK;
+} __attribute__((__packed__)) INDEX_BLOCK;
 
 typedef INDEX_BLOCK INDEX_ALLOCATION;
 
@@ -2074,7 +2074,7 @@ typedef struct {
 	u32 reparse_tag;	/* Reparse point type (inc. flags). */
 	MFT_REF file_id;	/* Mft record of the file containing the
 				   reparse point attribute. */
-} __attribute__ ((__packed__)) REPARSE_INDEX_KEY;
+} __attribute__((__packed__)) REPARSE_INDEX_KEY;
 
 /*
  * Quota flags (32-bit).
@@ -2132,7 +2132,7 @@ typedef struct {
 	SID sid;		/* The SID of the user/object associated with
 				   this quota entry. Equals zero for the quota
 				   defaults entry. */
-} __attribute__ ((__packed__)) QUOTA_CONTROL_ENTRY;
+} __attribute__((__packed__)) QUOTA_CONTROL_ENTRY;
 
 /*
  * Predefined owner_id values (32-bit).
@@ -2156,7 +2156,7 @@ typedef enum {
 					entry does not represent a file but it
 					can point to a sub-node. */
 	INDEX_ENTRY_SPACE_FILLER = 0xffff, /* Just to force 16-bit width. */
-} __attribute__ ((__packed__)) INDEX_ENTRY_FLAGS;
+} __attribute__((__packed__)) INDEX_ENTRY_FLAGS;
 
 /*
  * This the index entry header (see below).
@@ -2173,8 +2173,8 @@ typedef struct {
 						   index key. */
 			u16 data_length;	/* Data length in bytes. */
 			u32 reservedV;	/* Reserved (zero). */
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
 /*  8*/	u16 length;		 /* Byte size of this index entry, multiple of
 				    8-bytes. */
 /* 10*/	u16 key_length;		 /* Byte size of the key value, which is in the
@@ -2183,7 +2183,7 @@ typedef struct {
 /* 12*/	INDEX_ENTRY_FLAGS flags; /* Bit field of INDEX_ENTRY_* flags. */
 /* 14*/	u16 reserved;		 /* Reserved/align to 8-byte boundary. */
 /* sizeof() = 16 bytes */
-} __attribute__ ((__packed__)) INDEX_ENTRY_HEADER;
+} __attribute__((__packed__)) INDEX_ENTRY_HEADER;
 
 /*
  * This is an index entry. A sequence of such entries follows each INDEX_HEADER
@@ -2205,8 +2205,8 @@ typedef struct {
 						   index key. */
 			u16 data_length;	/* Data length in bytes. */
 			u32 reservedV;		/* Reserved (zero). */
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
 	u16 length;		 /* Byte size of this index entry, multiple of
 				    8-bytes. */
 	u16 key_length;		 /* Byte size of the key value, which is in the
@@ -2234,7 +2234,7 @@ typedef struct {
 					   user_id of the owner of the quota
 					   control entry in the data part of
 					   the index. */
-	} __attribute__ ((__packed__)) key;
+	} __attribute__((__packed__)) key;
 
 	/* The (optional) index data is inserted here when creating. */
 	// VCN vcn;	/* If INDEX_ENTRY_NODE bit in flags is set, the last
@@ -2249,7 +2249,7 @@ typedef struct {
 	//		   aligned vcn of INDEX_ENTRY{_HEADER} *ie is given by
 	//		   (char*)ie + le16_to_cpu(ie->length) - sizeof(VCN),
 	//		   where sizeof(VCN) can be hardcoded as 8 if wanted. */
-} __attribute__ ((__packed__)) INDEX_ENTRY;
+} __attribute__((__packed__)) INDEX_ENTRY;
 
 /*
  * Attribute: Bitmap (0xb0).
@@ -2263,7 +2263,7 @@ typedef struct {
  */
 typedef struct {
 	u8 bitmap[0];			/* Array of bits. */
-} __attribute__ ((__packed__)) BITMAP_ATTR;
+} __attribute__((__packed__)) BITMAP_ATTR;
 
 /*
  * The reparse point tag defines the type of the reparse point. It also
@@ -2316,7 +2316,7 @@ typedef struct {
 	u16 reparse_data_length;	/* Byte size of reparse data. */
 	u16 reserved;			/* Align to 8-byte boundary. */
 	u8 reparse_data[0];		/* Meaning depends on reparse_tag. */
-} __attribute__ ((__packed__)) REPARSE_POINT;
+} __attribute__((__packed__)) REPARSE_POINT;
 
 /*
  * Attribute: Extended attribute (EA) information (0xd0).
@@ -2333,14 +2333,14 @@ typedef struct {
 				   ZwQueryEaFile() in Windows NT/2k. I.e. the
 				   byte size of the unpacked extended
 				   attributes. */
-} __attribute__ ((__packed__)) EA_INFORMATION;
+} __attribute__((__packed__)) EA_INFORMATION;
 
 /*
  * Extended attribute flags (8-bit).
  */
 typedef enum {
 	NEED_EA	= 0x80,
-} __attribute__ ((__packed__)) EA_FLAGS;
+} __attribute__((__packed__)) EA_FLAGS;
 
 /*
  * Attribute: Extended attribute (EA) (0xe0).
@@ -2360,7 +2360,7 @@ typedef struct {
 	u8 name[0];		/* Name of the EA. */
 	u8 value[0];		/* The value of the EA. Immediately
 				   follows the name. */
-} __attribute__ ((__packed__)) EA_ATTR;
+} __attribute__((__packed__)) EA_ATTR;
 
 /*
  * Attribute: Property set (0xf0).
@@ -2370,7 +2370,7 @@ typedef struct {
  */
 typedef struct {
 	/* Irrelevant as feature unused. */
-} __attribute__ ((__packed__)) PROPERTY_SET;
+} __attribute__((__packed__)) PROPERTY_SET;
 
 /*
  * Attribute: Logged utility stream (0x100).
@@ -2385,7 +2385,7 @@ typedef struct {
  */
 typedef struct {
 	/* Can be anything the creator chooses. */
-} __attribute__ ((__packed__)) LOGGED_UTILITY_STREAM;
+} __attribute__((__packed__)) LOGGED_UTILITY_STREAM;
 
 /*
  * $EFS Data Structure:
@@ -2430,12 +2430,12 @@ typedef struct {
 				   recovery fields (DRF), see below.  Zero if
 				   no DRFs are present. */
 	u32 reserved;		/* Reserved. */
-} __attribute__ ((__packed__)) EFS_ATTR_HEADER;
+} __attribute__((__packed__)) EFS_ATTR_HEADER;
 
 typedef struct {
 	u32 df_count;		/* Number of data decryption/recovery fields in
 				   the array. */
-} __attribute__ ((__packed__)) EFS_DF_ARRAY_HEADER;
+} __attribute__((__packed__)) EFS_DF_ARRAY_HEADER;
 
 typedef struct {
 /*  0*/	u32 df_length;		/* Length of this data decryption/recovery
@@ -2446,7 +2446,7 @@ typedef struct {
 	u32 fek_offset;		/* Offset in bytes to the FEK from the start of
 				   the data decryption/recovery field. */
 /* 16*/	u32 unknown1;		/* always 0?  Might be just padding. */
-} __attribute__ ((__packed__)) EFS_DF_HEADER;
+} __attribute__((__packed__)) EFS_DF_HEADER;
 
 typedef struct {
 /*  0*/	u32 cred_length;	/* Length of this credential in bytes. */
@@ -2472,7 +2472,7 @@ typedef struct {
 				   structure. */
 /* 24*/			u32 public_key_blob_size;	/* Size in bytes of
 				   public key blob. */
-		} __attribute__ ((__packed__));
+		} __attribute__((__packed__));
 		/* Certificate thumbprint. */
 		struct {
 /* 12*/			u32 cert_thumbprint_header_size;	/* Size in
@@ -2483,9 +2483,9 @@ typedef struct {
 				   thumbprint from start of this structure. */
 			u32 unknown1;	/* Always 0?  Might be padding... */
 			u32 unknown2;	/* Always 0?  Might be padding... */
-		} __attribute__ ((__packed__));
-	} __attribute__ ((__packed__));
-} __attribute__ ((__packed__)) EFS_DF_CREDENTIAL_HEADER;
+		} __attribute__((__packed__));
+	} __attribute__((__packed__));
+} __attribute__((__packed__)) EFS_DF_CREDENTIAL_HEADER;
 
 typedef EFS_DF_CREDENTIAL_HEADER EFS_DF_CRED_HEADER;
 
@@ -2503,7 +2503,7 @@ typedef struct {
 					   from start of this structure or 0 if
 					   no user name present.  (This is also
 					   known as lpDisplayInformation.) */
-} __attribute__ ((__packed__)) EFS_DF_CERTIFICATE_THUMBPRINT_HEADER;
+} __attribute__((__packed__)) EFS_DF_CERTIFICATE_THUMBPRINT_HEADER;
 
 typedef EFS_DF_CERTIFICATE_THUMBPRINT_HEADER EFS_DF_CERT_THUMBPRINT_HEADER;
 
