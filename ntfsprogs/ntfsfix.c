@@ -300,68 +300,26 @@ static int empty_journal(ntfs_volume *vol)
 	return 0;
 }
 
-/**
- * main
- */
-int main(int argc, char **argv)
+static int fix_mftmirr(ntfs_volume *vol)
 {
 	s64 l, br;
-	unsigned char *m = NULL, *m2 = NULL;
-	ntfs_volume *vol;
-	struct ntfs_device *dev;
-	unsigned long mnt_flags;
-	int i;
-	BOOL done, force = FALSE;
-
-	parse_options(argc, argv);
-
-	if (!ntfs_check_if_mounted(opt.volume, &mnt_flags)) {
-		if ((mnt_flags & NTFS_MF_MOUNTED) &&
-				!(mnt_flags & NTFS_MF_READONLY) && !force) {
-			fprintf(stderr, "Refusing to operate on read-write "
-					"mounted device %s.\n", opt.volume);
-			exit(1);
-		}
-	} else
-		fprintf(stderr, "Failed to determine whether %s is mounted: "
-				"%s\n", opt.volume, strerror(errno));
-	/* Attempt a full mount first. */
-	printf("Mounting volume... ");
-	vol = ntfs_mount(opt.volume, 0);
-	if (vol) {
-		puts(OK);
-		printf("Processing of $MFT and $MFTMirr completed "
-				"successfully.\n");
-		goto mount_ok;
-	}
-	puts(FAILED);
-
-	printf("Attempting to correct errors... ");
-
-	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);
-	if (!dev) {
-		puts(FAILED);
-		perror("Failed to allocate device");
-		goto error_exit;
-	}
-
-	vol = ntfs_volume_startup(dev, 0);
-	if (!vol) {
-		puts(FAILED);
-		perror("Failed to startup volume");
-		fprintf(stderr, "Volume is corrupt. You should run chkdsk.\n");
-		ntfs_device_free(dev);
-		goto error_exit;
-	}
-
+	unsigned char *m, *m2;
+	int i, ret = -1; /* failure */
+	BOOL done;
+	
 	puts("\nProcessing $MFT and $MFTMirr... ");
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
 	m = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
-	m2 = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
-	if (!m || !m2) {
+	if (!m) {
 		perror("Failed to allocate memory");
-		goto error_exit;
+		return -1;
+	}
+	m2 = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
+	if (!m2) {
+		perror("Failed to allocate memory");
+		free(m);
+		return -1;
 	}
 
 	printf("Reading $MFT... ");
@@ -454,12 +412,40 @@ int main(int argc, char **argv)
 		}
 	}
 	puts(OK);
-
+	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
+	ret = 0;
+error_exit:
 	free(m);
 	free(m2);
-	m = m2 = NULL;
+	return ret;
+}
 
-	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
+static int fix_mount(void)
+{
+	int ret = -1; /* failure */
+	ntfs_volume *vol;
+	struct ntfs_device *dev;
+	
+	printf("Attempting to correct errors... ");
+
+	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);
+	if (!dev) {
+		puts(FAILED);
+		perror("Failed to allocate device");
+		return -1;
+	}
+
+	vol = ntfs_volume_startup(dev, 0);
+	if (!vol) {
+		puts(FAILED);
+		perror("Failed to startup volume");
+		fprintf(stderr, "Volume is corrupt. You should run chkdsk.\n");
+		ntfs_device_free(dev);
+		return -1;
+	}
+
+	if (fix_mftmirr(vol) < 0)
+		goto error_exit;
 
 	/* FIXME: Will this fail?  Probably... */
 	if (set_dirty_flag(vol) < 0)
@@ -468,16 +454,53 @@ int main(int argc, char **argv)
 	if (empty_journal(vol) < 0)
 		goto error_exit;
 
+	ret = 0;
+error_exit:
 	/* ntfs_umount() will invoke ntfs_device_free() for us. */
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
+	return ret;
+}
+
+/**
+ * main
+ */
+int main(int argc, char **argv)
+{
+	ntfs_volume *vol;
+	unsigned long mnt_flags;
+	int ret = 1; /* failure */
+	BOOL force = FALSE;
+
+	parse_options(argc, argv);
+
+	if (!ntfs_check_if_mounted(opt.volume, &mnt_flags)) {
+		if ((mnt_flags & NTFS_MF_MOUNTED) &&
+				!(mnt_flags & NTFS_MF_READONLY) && !force) {
+			fprintf(stderr, "Refusing to operate on read-write "
+					"mounted device %s.\n", opt.volume);
+			exit(1);
+		}
+	} else
+		fprintf(stderr, "Failed to determine whether %s is mounted: "
+				"%s\n", opt.volume, strerror(errno));
+	/* Attempt a full mount first. */
+	printf("Mounting volume... ");
 	vol = ntfs_mount(opt.volume, 0);
-	if (!vol) {
-		perror("Remount failed");
-		goto error_exit;
+	if (vol) {
+		puts(OK);
+		printf("Processing of $MFT and $MFTMirr completed "
+				"successfully.\n");
+	} else {
+		puts(FAILED);
+		if (fix_mount() < 0)
+			exit(1);
+		vol = ntfs_mount(opt.volume, 0);
+		if (!vol) {
+			perror("Remount failed");
+			exit(1);
+		}
 	}
-mount_ok:
-	m = NULL;
 
 	/* Check NTFS version is ok for us (in $Volume) */
 	printf("NTFS volume version is %i.%i.\n", vol->major_ver,
@@ -506,15 +529,10 @@ mount_ok:
 	printf("NTFS partition %s was processed successfully.\n",
 			vol->dev->d_name);
 	/* Set return code to 0. */
-	i = 0;
-final_exit:
-	free(m);
-	free(m2);
-	if (vol && ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
-	return i;
+	ret = 0;
 error_exit:
-	i = 1;
-	goto final_exit;
+	if (ntfs_umount(vol, 0))
+		ntfs_umount(vol, 1);
+	return ret;
 }
 
