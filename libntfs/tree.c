@@ -1422,7 +1422,7 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 	del->header->index_length   += len;
 	del->header->allocated_size += len;
 
-	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
+	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, del->data, del->data_len);
 
 	//utils_dump_mem(attr, 0, del->data_len, DM_DEFAULTS);
 
@@ -1573,7 +1573,7 @@ BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 	del->header->index_length   = del->data_len - 16;
 	del->header->allocated_size = del->data_len - 16;
 
-	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, I30, 4, del->data, del->data_len);
+	ntfs_mft_resize_resident(del->dir->inode, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, del->data, del->data_len);
 	old = del->data;
 	del->data = realloc(del->data, del->data_len);
 	del->header = (INDEX_HEADER*) (del->data + 0x10);
@@ -1908,7 +1908,7 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
 	ntfs_log_debug("\n");
 
-	ntfs_mft_resize_resident(parent->dir->inode, AT_INDEX_ROOT, I30, 4, parent->data, parent->data_len);
+	ntfs_mft_resize_resident(parent->dir->inode, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, parent->data, parent->data_len);
 
 	//realloc children, sub_nodes
 	ntfs_dt_create_children2(parent, parent->child_count + 1);

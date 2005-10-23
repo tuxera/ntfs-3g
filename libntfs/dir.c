@@ -51,18 +51,18 @@
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
  *  and "$Q" as global constants.
  */
-ntfschar I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
+ntfschar NTFS_INDEX_I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		   const_cpu_to_le16('3'), const_cpu_to_le16('0'),
 		   const_cpu_to_le16('\0') };
-ntfschar SII[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
+ntfschar NTFS_INDEX_SII[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
                    const_cpu_to_le16('I'), const_cpu_to_le16('I'),
                    const_cpu_to_le16('\0') };
-ntfschar SDH[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
+ntfschar NTFS_INDEX_SDH[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('S'),
                    const_cpu_to_le16('D'), const_cpu_to_le16('H'),
                    const_cpu_to_le16('\0') };
-ntfschar O[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('O'),
+ntfschar NTFS_INDEX_O[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('O'),
                    const_cpu_to_le16('\0') };
-ntfschar Q[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('Q'),
+ntfschar NTFS_INDEX_Q[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('Q'),
                    const_cpu_to_le16('\0') };
 
 /**
@@ -117,7 +117,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		return -1;
 
 	/* Find the index root attribute in the mft record. */
-	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, NTFS_INDEX_I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		ntfs_log_perror("Index root attribute missing in directory inode "
 				"0x%llx", (unsigned long long)dir_ni->mft_no);
@@ -252,7 +252,7 @@ found_it:
 	} /* Child node present, descend into it. */
 
 	/* Open the index allocation attribute. */
-	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, I30, 4);
+	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 	if (!ia_na) {
 		ntfs_log_perror("Failed to open index allocation attribute. Directory "
 				"inode 0x%llx is corrupt or driver bug",
@@ -757,7 +757,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 			(unsigned long long)dir_ni->mft_no, (long long)*pos);
 
 	/* Open the index allocation attribute. */
-	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, I30, 4);
+	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 	if (!ia_na) {
 		if (errno != ENOENT) {
 			ntfs_log_perror("Failed to open index allocation attribute. "
@@ -808,7 +808,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	/* Get the offset into the index root attribute. */
 	ir_pos = (int)*pos;
 	/* Find the index root attribute in the mft record. */
-	if (ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, NTFS_INDEX_I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
 		ntfs_log_debug("Index root attribute missing in directory inode "
 				"0x%llx.\n", (unsigned long long)dir_ni->mft_no);
@@ -899,7 +899,7 @@ skip_index_root:
 		goto err_out;
 	}
 
-	bmp_na = ntfs_attr_open(dir_ni, AT_BITMAP, I30, 4);
+	bmp_na = ntfs_attr_open(dir_ni, AT_BITMAP, NTFS_INDEX_I30, 4);
 	if (!bmp_na) {
 		ntfs_log_perror("Failed to open index bitmap attribute");
 		goto dir_err_out;
@@ -1153,7 +1153,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ie->key_length = 0;
 		ie->flags = INDEX_ENTRY_END;
 		/* Add INDEX_ROOT attribute to inode. */
-		if (ntfs_attr_add(ni, AT_INDEX_ROOT, I30, 4, (u8*)ir, ir_len)) {
+		if (ntfs_attr_add(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, (u8*)ir, ir_len)) {
 			err = errno;
 			free(ir);
 			ntfs_log_error("Failed to add INDEX_ROOT attribute.");
@@ -1254,7 +1254,7 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
 		ntfs_attr *na;
 
-		na = ntfs_attr_open(ni, AT_INDEX_ROOT, I30, 4);
+		na = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
 		if (!na) {
 			ntfs_log_error("Corrupt directory or library bug.");
 			errno = EIO;
@@ -1317,7 +1317,7 @@ search:
 	if (errno)
 		goto err_out;
 	/* Search for such FILE_NAME in index. */
-	ictx = ntfs_index_ctx_get(dir_ni, I30, 4);
+	ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 	if (!ictx)
 		goto err_out;
 	if (ntfs_index_lookup(fn, le32_to_cpu(actx->attr->value_length), ictx))
@@ -1471,7 +1471,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		err = errno;
 		ntfs_log_error("Failed to add FILE_NAME attribute.");
 		/* Try to remove just added attribute from index. */
-		ictx = ntfs_index_ctx_get(dir_ni, I30, 4);
+		ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 		if (!ictx)
 			goto rollback_failed;
 		if (ntfs_index_lookup(fn, fn_len, ictx)) {
@@ -1787,8 +1787,8 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 	}
 
 	dir->inode  = inode;
-	dir->iroot  = ntfs_attr_open(inode, AT_INDEX_ROOT,       I30, 4);
-	dir->ialloc = ntfs_attr_open(inode, AT_INDEX_ALLOCATION, I30, 4);
+	dir->iroot  = ntfs_attr_open(inode, AT_INDEX_ROOT,       NTFS_INDEX_I30, 4);
+	dir->ialloc = ntfs_attr_open(inode, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 
 	if (!dir->iroot) {
 		ntfs_dir_free(dir);
@@ -1805,7 +1805,7 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 	dir->mft_num	  = mft_num;
 
 	// This may not exist
-	dir->bitmap = ntfs_bmp_create(inode, AT_BITMAP, I30, 4);
+	dir->bitmap = ntfs_bmp_create(inode, AT_BITMAP, NTFS_INDEX_I30, 4);
 
 	if (dir->iroot) {
 		rec = find_first_attribute(AT_INDEX_ROOT, inode->mrec);

@@ -2897,12 +2897,12 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m) {
 		sii_data->size_in_sds = sds_header->length;
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sdh,
 			sdh_size, m,
-			SDH, 4, AT_UNUSED)))
+			NTFS_INDEX_SDH, 4, AT_UNUSED)))
 			break;
 
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sii,
 			sii_size, m,
-			SII, 4, AT_UNUSED)))
+			NTFS_INDEX_SII, 4, AT_UNUSED)))
 			break;
 		sds_header = (SECURITY_DESCRIPTOR_HEADER*)((char*)sds_header +
 				(cpu_to_le32(sds_header->length + 0x0F) &
@@ -2961,7 +2961,7 @@ static int initialize_quota(MFT_RECORD *m) {
 
 	err = insert_index_entry_in_res_dir_index(idx_entry_o,
 		o_size, m,
-		O, 2, AT_UNUSED);
+		NTFS_INDEX_O, 2, AT_UNUSED);
 	free(idx_entry_o);
 	if (err) return err;
 
@@ -2988,7 +2988,7 @@ static int initialize_quota(MFT_RECORD *m) {
 
 	err = insert_index_entry_in_res_dir_index(idx_entry_q1,
 		q1_size, m,
-		Q, 2, AT_UNUSED);
+		NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q1);
 	if (err) return err;
 
@@ -3023,7 +3023,7 @@ static int initialize_quota(MFT_RECORD *m) {
 
 	err = insert_index_entry_in_res_dir_index(idx_entry_q2,
 		q2_size, m,
-		Q, 2, AT_UNUSED);
+		NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q2);
 
 	return err;
@@ -3063,7 +3063,7 @@ static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref) {
 	idx_entry_o_data->domain_id = *zero_guid;
 	err = insert_index_entry_in_res_dir_index(idx_entry_o,
 		o_size, m,
-		O, 2, AT_UNUSED);
+		NTFS_INDEX_O, 2, AT_UNUSED);
 	if (idx_entry_o) free (idx_entry_o);
 
 	return err;
@@ -3294,7 +3294,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	idx_entry_new->key_length = fn_size;
 	memcpy((char*)idx_entry_new+0x10, (char*)fn, fn_size);
 	i = insert_index_entry_in_res_dir_index(idx_entry_new, idx_size + 0x10
-		 , m_parent, I30, 4, AT_FILE_NAME);
+		 , m_parent, NTFS_INDEX_I30, 4, AT_FILE_NAME);
 	if (i < 0) {
 		Eprintf("create_hardlink failed inserting index entry: %s\n",
 				strerror(-i));
@@ -4966,7 +4966,7 @@ int main(int argc, char **argv)
 //   update during each subsequent c&w of each system file.
 	Vprintf("Syncing root directory index record.\n");
 	mkntfs_sync_index_record(index_block, (MFT_RECORD*)(buf +
-		5 * vol->mft_record_size), I30, 4);
+		5 * vol->mft_record_size), NTFS_INDEX_I30, 4);
 
 	Vprintf("Syncing $Bitmap.\n");
 	m = (MFT_RECORD*)(buf + 6 * vol->mft_record_size);

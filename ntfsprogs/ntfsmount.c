@@ -298,7 +298,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY &&
 				!stream_name_len) {
 			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
-			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, I30, 4);
+			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 			if (na) {
 				stbuf->st_size = na->data_size;
 				stbuf->st_blocks = na->allocated_size >>

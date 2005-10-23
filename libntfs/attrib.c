@@ -349,7 +349,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	na = calloc(sizeof(ntfs_attr), 1);
 	if (!na)
 		return NULL;
-	if (name && name != AT_UNNAMED && name != I30) {
+	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {
 		name = ntfs_ucsndup(name, name_len);
 		if (!name) {
 			err = errno;
@@ -427,7 +427,7 @@ void ntfs_attr_close(ntfs_attr *na)
 	if (NAttrNonResident(na) && na->rl)
 		free(na->rl);
 	/* Don't release if using an internal constant. */
-	if (na->name != AT_UNNAMED && na->name != I30)
+	if (na->name != AT_UNNAMED && na->name != NTFS_INDEX_I30)
 		free(na->name);
 	free(na);
 }

@@ -477,7 +477,7 @@ int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
 		errno = EINVAL;
 		return -1;
 	}
-	ictx = ntfs_index_ctx_get(ni, I30, 4);
+	ictx = ntfs_index_ctx_get(ni, NTFS_INDEX_I30, 4);
 	if (!ictx)
 		return -1;
 	fn_size = (fn->file_name_length * sizeof(ntfschar)) +

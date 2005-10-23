@@ -979,7 +979,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			goto close_inode;
 		}
 
-		naa = ntfs_attr_open (ni, AT_INDEX_ALLOCATION, I30, 4);
+		naa = ntfs_attr_open (ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (!naa) {
 			if (opts.verbose > 2)
 				Vprintf ("Couldn't open $INDEX_ALLOCATION\n");
@@ -1002,7 +1002,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			goto close_attr_allocation;
 		}
 
-		nab = ntfs_attr_open (ni, AT_BITMAP, I30, 4);
+		nab = ntfs_attr_open (ni, AT_BITMAP, NTFS_INDEX_I30, 4);
 		if (!nab) {
 			Vprintf ("Couldn't open $BITMAP\n");
 			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, "
@@ -1011,7 +1011,7 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 			goto close_attr_allocation;
 		}
 
-		nar = ntfs_attr_open (ni, AT_INDEX_ROOT, I30, 4);
+		nar = ntfs_attr_open (ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
 		if (!nar) {
 			Vprintf ("Couldn't open $INDEX_ROOT\n");
 			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, but "

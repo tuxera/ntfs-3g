@@ -530,7 +530,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			ntfs_log_trace("Failed to open inode with index.\n");
 			continue;
 		}
-		ictx = ntfs_index_ctx_get(index_ni, I30, 4);
+		ictx = ntfs_index_ctx_get(index_ni, NTFS_INDEX_I30, 4);
 		if (!ictx) {
 			if (!err)
 				err = errno;
