@@ -34,7 +34,10 @@ xx/xx/2005 - 1.12.2-WIP
 	  ntfs_attr_can_be_resident() apropriately.  (Anton)
 	- mkntfs: optionally create NTFS version 3.0 (W2K) or 3.1 (XP, W2K3, 
 	  Vista).  (Implementation by Erik Sornes, adaption by Szaka)
-	    
+	- ntfsmount: Add 'streams_interface=' option to select named data
+	  streams access interface. Currently supported interfaces are 'none'
+	  and 'windows'.  (Yura)
+
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
 	- Fix hardcoded location for uninstalling mount.ntfs-fuse hardlink to

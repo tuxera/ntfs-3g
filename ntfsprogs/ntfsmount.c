@@ -76,6 +76,14 @@ typedef struct {
 	void *buf;
 } ntfs_fuse_fill_context_t;
 
+typedef enum {
+	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
+#if 0
+	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
+#endif	
+	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
+} ntfs_fuse_streams_interface;
+
 typedef struct {
 	ntfs_volume *vol;
 	int state;
@@ -85,6 +93,7 @@ typedef struct {
 	gid_t gid;
 	mode_t fmask;
 	mode_t dmask;
+	ntfs_fuse_streams_interface streams;
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL succeed_chmod;
@@ -255,14 +264,17 @@ static int ntfs_fuse_parse_path(const char *org_path, char **path,
 	stream_name_mbs = strdup(org_path);
 	if (!stream_name_mbs)
 		return -errno;
-	*path = strsep(&stream_name_mbs, ":");
-	if (stream_name_mbs) {
-		*stream_name = NULL;
-		res = ntfs_mbstoucs(stream_name_mbs, stream_name, 0);
-		if (res < 0)
-			return -errno;
-		return res;
-	}
+	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS) {
+		*path = strsep(&stream_name_mbs, ":");
+		if (stream_name_mbs) {
+			*stream_name = NULL;
+			res = ntfs_mbstoucs(stream_name_mbs, stream_name, 0);
+			if (res < 0)
+				return -errno;
+			return res;
+		}
+	} else
+		*path = stream_name_mbs;
 	*stream_name = AT_UNNAMED;
 	return 0;
 }
@@ -545,7 +557,7 @@ exit:
 static int ntfs_fuse_chmod(const char *path,
 		mode_t mode __attribute__((unused)))
 {
-	if (strchr(path, ':'))
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
 	if (ctx->succeed_chmod)
 		return 0;
@@ -656,10 +668,12 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	char *path;
 	int res = 0, uname_len;
 
-	if (strchr(old_path, ':'))
-		return -EINVAL; /* n/a for named data streams. */
-	if (strchr(new_path, ':'))
-		return -EINVAL; /* n/a for named data streams. */
+	if (strchr(old_path, ':') &&	/* n/a for named data streams. */
+			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return -EINVAL; 
+	if (strchr(new_path, ':') &&	/* n/a for named data streams. */
+			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return -EINVAL;
 	path = strdup(new_path);
 	if (!path)
 		return -errno;
@@ -808,14 +822,14 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 static int ntfs_fuse_mkdir(const char *path,
 		mode_t mode __attribute__((unused)))
 {
-	if (strchr(path, ':'))
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
 	return ntfs_fuse_create(path, NTFS_DT_DIR);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
 {
-	if (strchr(path, ':'))
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
 	return ntfs_fuse_rm(path);
 }
@@ -824,7 +838,7 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
 
-	if (strchr(path, ':'))
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return 0; /* Unable to change time for named data streams. */
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
@@ -1155,6 +1169,7 @@ static int ntfs_fuse_init(void)
 		.gid = getegid(),
 		.fmask = 0177,
 		.dmask = 0077,
+		.streams = NF_STREAMS_INTERFACE_NONE,
 	};
 	return 0;
 }
@@ -1302,6 +1317,25 @@ static char *parse_mount_options(const char *org_options)
 			if (!setlocale(LC_ALL, val))
 				Eprintf("Failed to set locale to %s.  "
 						"Continue anyway.\n", val);
+		} else if (!strcmp(opt, "streams_interface")) {
+			if (!val) {
+				Eprintf("'streams_interface' option "
+						"should have value.\n");
+				goto err_exit;
+			}
+			if (!strcmp(val, "none"))
+				ctx->streams = NF_STREAMS_INTERFACE_NONE;
+#if 0
+			else if (!strcmp(val, "xattr"))
+				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+#endif
+			else if (!strcmp(val, "windows"))
+				ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
+			else {
+				Eprintf("Invalid named data streams access "
+						"interface.\n");
+				goto err_exit;
+			}
 		} else if (!strcmp(opt, "noauto")) {
 			/* Don't pass noauto option to fuse. */
 		} else { /* Probably FUSE option. */
