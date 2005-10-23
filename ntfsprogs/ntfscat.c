@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003-2005 Richard Russon
  * Copyright (c) 2003-2005 Anton Altaparmakov
+ * Copyright (c) 2003-2005 Szabolcs Szakacsits
  *
  * This utility will concatenate files and print on the standard output.
  *
@@ -80,16 +81,15 @@ static void version (void)
 static void usage (void)
 {
 	Printf ("\nUsage: %s [options] device [file]\n\n"
-		"    -a, --attribute desc  Display this attribute (name or number)\n"
-		"    -i, --inode num       Display this inode\n\n"
-		"    -f  --force           Use less caution\n"
-		"    -h  --help            Print this help\n"
-		"    -q  --quiet           Less output\n"
-		"    -V  --version         Version information\n"
-		"    -v  --verbose         More output\n\n",
-		//"    -N  --name            Display this attribute name",
-		//"    -F  --file            Display this file",
-		//"    -r  --raw             Display the compressed or encrypted file",
+		"    -a, --attribute type  	Display this attribute type\n"
+		"    -n, --attribute-name name	Display this attribute name\n"
+		"    -i, --inode num       	Display this inode\n\n"
+		"    -f  --force           	Use less caution\n"
+		"    -h  --help           	Print this help\n"
+		"    -q  --quiet           	Less output\n"
+		"    -V  --version         	Version information\n"
+		"    -v  --verbose         	More output\n\n",
+		//"    -r  --raw     Display the compressed or encrypted file",
 		EXEC_NAME);
 	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -159,18 +159,17 @@ static int parse_attribute (const char *value, ATTR_TYPES *attr)
  */
 static int parse_options (int argc, char **argv)
 {
-	static const char *sopt = "-a:fh?i:qVv"; // F:N:
+	static const char *sopt = "-a:fh?i:n:qVv";
 	static const struct option lopt[] = {
-		{ "attribute",	required_argument,	NULL, 'a' },
-		{ "force",	no_argument,		NULL, 'f' },
-		{ "help",	no_argument,		NULL, 'h' },
-		{ "inode",	required_argument,	NULL, 'i' },
-		{ "quiet",	no_argument,		NULL, 'q' },
-		{ "version",	no_argument,		NULL, 'V' },
-		{ "verbose",	no_argument,		NULL, 'v' },
-	//	{ "file",	required_argument,	NULL, 'F' },
-	//	{ "name",	required_argument,	NULL, 'N' },
-		{ NULL,		0,			NULL, 0   }
+		{ "attribute",      required_argument,	NULL, 'a' },
+		{ "attribute-name", required_argument,	NULL, 'n' },
+		{ "force",	    no_argument,	NULL, 'f' },
+		{ "help",	    no_argument,	NULL, 'h' },
+		{ "inode",	    required_argument,	NULL, 'i' },
+		{ "quiet",	    no_argument,	NULL, 'q' },
+		{ "version",	    no_argument,	NULL, 'V' },
+		{ "verbose",	    no_argument,	NULL, 'v' },
+		{ NULL,		    0,			NULL, 0   }
 	};
 
 	char c = -1;
@@ -183,6 +182,8 @@ static int parse_options (int argc, char **argv)
 
 	opts.inode = -1;
 	opts.attr = -1;
+	opts.attr_name = NULL;
+	opts.attr_name_len = 0;
 
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
@@ -223,6 +224,16 @@ static int parse_options (int argc, char **argv)
 				Eprintf("Couldn't parse inode number.\n");
 			err++;
 			break;
+
+		case 'n':
+			opts.attr_name_len = ntfs_mbstoucs(optarg, 
+							   &opts.attr_name, 0);
+			if (opts.attr_name_len < 0) {
+				Eprintf("Invalid attribute name '%s': %s\n",
+					optarg, strerror(errno));
+				usage();
+			}
+
 		case 'q':
 			opts.quiet++;
 			break;
@@ -298,8 +309,7 @@ static int index_get_size (ntfs_inode *inode)
  * cat
  */
 static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
-		ntfschar *name __attribute__((unused)),
-		int namelen __attribute__((unused)))
+		ntfschar *name, int namelen)
 {
 	const int bufsize = 4096;
 	char *buffer;
@@ -312,7 +322,7 @@ static int cat (ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 	if (!buffer)
 		return 1;
 
-	attr = ntfs_attr_open (inode, type, NULL, 0);
+	attr = ntfs_attr_open (inode, type, name, namelen);
 	if (!attr) {
 		Eprintf ("Cannot find attribute type 0x%lx.\n", (long) type);
 		free (buffer);
@@ -396,7 +406,7 @@ int main (int argc, char *argv[])
 	if (opts.attr != (ATTR_TYPES)-1)
 		attr = opts.attr;
 
-	result = cat (vol, inode, attr, NULL, 0);
+	result = cat(vol, inode, attr, opts.attr_name, opts.attr_name_len);
 
 	ntfs_inode_close (inode);
 	ntfs_umount (vol, FALSE);

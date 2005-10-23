@@ -33,6 +33,8 @@ struct options {
 	char		*file;		/* File to display */
 	s64		 inode;		/* Inode to work with */
 	ATTR_TYPES	 attr;		/* Attribute type to display */
+	ntfschar	*attr_name;	/* Attribute name to display */
+	int		 attr_name_len;	/* Attribute name length */
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */

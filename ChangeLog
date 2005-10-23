@@ -37,6 +37,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfsmount: Add 'streams_interface=' option to select named data
 	  streams access interface. Currently supported interfaces are 'none'
 	  and 'windows'.  (Yura)
+	- ntfscat can display named attributes, streams too.  (Szaka)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

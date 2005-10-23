@@ -2,9 +2,9 @@
 .\" Copyright (c) 2003 Richard Russon. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCAT 8 "October 2003" "ntfsprogs version @VERSION@"
+.TH NTFSCAT 8 "October 2005" "ntfsprogs version @VERSION@"
 .SH NAME
-ntfscat \- concatenate files and print them on the standard output
+ntfscat \- print NTFS files and streams on the standard output
 .SH SYNOPSIS
 .B ntfscat
 [
@@ -13,7 +13,8 @@ ntfscat \- concatenate files and print them on the standard output
 .B device file
 .SH DESCRIPTION
 .B ntfscat
-will read a file from an NTFS volume and display the contents on the standard output.
+will read a file or stream from an NTFS volume and display the contents 
+on the standard output.
 .PP
 The case of the filename passed to
 .B ntfscat
@@ -32,14 +33,14 @@ is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.B "\-a " desc
+.B "\-a " type
 .br
 .ns
 .TP
-.B "\-\-attribute " desc
-Display the contents of a particular attribute.  By default, the unname $DATA
-attribute will be shown.  The attribute can be specified by number (in decimal
-or hexadecimal), or by name.
+.B "\-\-attribute " type
+Display the contents of a particular attribute type.  By default, the unnamed
+$DATA attribute will be shown.  The attribute can be specified by a number 
+in decimal or hexadecimal, or by name.
 .TS
 lB lB lB
 l l l.
@@ -67,6 +68,13 @@ Hex	Decimal	Name
 The attribute names may be given without the leading $ symbol.
 .br
 If you use the $ symbol, you must escape it from the shell.
+.TP
+.B "\-n " name
+.br
+.ns
+.TP
+.B "\-\-attribute-name " name
+Display this named attribute, stream.
 .TP
 .B "\-i " num
 .br
@@ -122,10 +130,9 @@ Display the contents of the $INDEX_ROOT attribute of the root directory (inode
 .sp
 .B ntfscat /dev/hda1 \-a INDEX_ROOT \-i 5 | hexdump \-C
 .RE
-.SH BUGS
-.B ntfscat
-was written in a short time, to get something "out there".  It needs a lot more work.
-If you find any bugs, please send an email to
+.SH KNOWN ISSUES
+There are no known problems. If you think you had found any then 
+please report it to
 .nh
 <linux-ntfs-dev@lists.sourceforge.net>
 .hy
