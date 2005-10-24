@@ -42,27 +42,19 @@
 #include <fcntl.h>
 #endif
 
-/*
- * Cannot use "../include/types.h" since it conflicts with "wintypes.h".
- * define our own...
- */
-typedef long long s64;
-typedef unsigned long u32;
-struct stat;
+/* Prevent volume.h from being be loaded, as it conflicts with winnt.h. */
+#define _NTFS_VOLUME_H
 struct ntfs_volume;
 typedef struct ntfs_volume ntfs_volume;
+
+#include "debug.h"
+#include "types.h"
+#include "device.h"
 
 #ifndef NTFS_BLOCK_SIZE
 #define NTFS_BLOCK_SIZE		512
 #define NTFS_BLOCK_SIZE_BITS	9
 #endif
-
-#include "debug.h"
-
-/* Need device, but prevent ../include/types.h to be loaded. */
-#define _NTFS_TYPES_H
-#define _NTFS_VOLUME_H
-#include "device.h"
 
 #ifndef IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS
 #define IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS 5636096
@@ -105,7 +97,7 @@ typedef struct {
  */
 static int ntfs_w32error_to_errno(unsigned int w32error)
 {
-	Dprintf("win32_w32error_to_errno(%d).\n",w32error);
+	ntfs_log_trace("Converting w32error 0x%x.\n",w32error);
 	switch (w32error) {
 		case ERROR_INVALID_FUNCTION:
 			return EBADRQC;
@@ -187,7 +179,7 @@ static void ntfs_device_win32_init_imports(void)
 	HMODULE kernel32 = GetModuleHandle("kernel32");
 	if (!kernel32) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: kernel32.dll not found in memory.");
+		ntfs_log_trace("kernel32.dll could not be imported.\n");
 	}
 	if (!fnSetFilePointerEx) {
 		if (kernel32)
@@ -199,8 +191,8 @@ static void ntfs_device_win32_init_imports(void)
 		 * SetFilePointerEx().
 		 */
 		if (!fnSetFilePointerEx) {
-			Dputs("SetFilePonterEx() not found in kernel32.dll: "
-					"Enabling emulation.");
+			ntfs_log_debug("SetFilePonterEx() not found in "
+					"kernel32.dll: Enabling emulation.\n");
 			fnSetFilePointerEx = libntfs_SetFilePointerEx;
 		}
 	}
@@ -242,7 +234,7 @@ static __inline__ int ntfs_device_unix_status_flags_to_win32(int flags)
 		break;
 	default:
 		/* error */
-		Dputs("win32_unix_status_flags_to_win32: unknown flags");
+		ntfs_log_trace("Unknown status flags.\n");
 		win_mode = 0;
 	}
 	return win_mode;
@@ -270,7 +262,7 @@ static int ntfs_device_win32_simple_open_file(const char *filename,
 			NULL, OPEN_EXISTING, 0, NULL);
 	if (*handle == INVALID_HANDLE_VALUE) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dprintf("CreateFile(%s) failed.\n", filename);
+		ntfs_log_trace("CreateFile(%s) failed.\n", filename);
 		return -1;
 	}
 	return 0;
@@ -293,10 +285,10 @@ static int ntfs_device_win32_lock(HANDLE handle)
 	if (!DeviceIoControl(handle, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0, &i,
 			NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: Couldn't lock volume.");
+		ntfs_log_trace("Couldn't lock volume.\n");
 		return -1;
 	}
-	Dputs("Volume locked.");
+	ntfs_log_debug("Volume locked.\n");
 	return 0;
 }
 
@@ -314,10 +306,10 @@ static int ntfs_device_win32_unlock(HANDLE handle)
 	if (!DeviceIoControl(handle, FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0, &i,
 			NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: Couldn't unlock volume.");
+		ntfs_log_trace("Couldn't unlock volume.\n");
 		return -1;
 	}
-	Dputs("Volume unlocked.");
+	ntfs_log_debug("Volume unlocked.\n");
 	return 0;
 }
 
@@ -341,12 +333,11 @@ static int ntfs_device_win32_dismount(HANDLE handle)
 	if (!DeviceIoControl(handle, FSCTL_DISMOUNT_VOLUME, NULL, 0, NULL, 0,
 			&i, NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: Couldn't dismount volume.");
+		ntfs_log_trace("Couldn't dismount volume.\n");
 		return -1;
-	} else {
-		Dputs("Volume dismounted.");
-		return 0;
 	}
+	ntfs_log_debug("Volume dismounted.\n");
+	return 0;
 }
 
 /**
@@ -365,7 +356,7 @@ static s64 ntfs_device_win32_getsize(HANDLE handle)
 	loword = GetFileSize(handle, &hiword);
 	if (loword == INVALID_FILE_SIZE) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: Couldn't get file size.");
+		ntfs_log_trace("Couldn't get file size.\n");
 		return -1;
 	}
 	return ((s64)hiword << 32) + loword;
@@ -389,12 +380,11 @@ static s64 ntfs_device_win32_getdisklength(HANDLE handle)
 	if (!DeviceIoControl(handle, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0, &buf,
 			sizeof(buf), &i, NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: Couldn't get disk length.");
+		ntfs_log_trace("Couldn't get disk length.\n");
 		return -1;
-	} else {
-		Dprintf("Disk length: %lld\n", buf.Length.QuadPart);
-		return buf.Length.QuadPart;
 	}
+	ntfs_log_debug("Disk length: %lld.\n", buf.Length.QuadPart);
+	return buf.Length.QuadPart;
 }
 
 /**
@@ -422,11 +412,11 @@ static s64 ntfs_device_win32_getntfssize(HANDLE handle)
 	if (!DeviceIoControl(handle, FSCTL_GET_NTFS_VOLUME_DATA, NULL, 0, &buf,
 			sizeof(buf), &i, NULL)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Warnning: Couldn't get NTFS volume length.");
+		ntfs_log_trace("Couldn't get NTFS volume length.\n");
 		return -1;
 	}
 	rvl = buf.NumberSectors.QuadPart * buf.BytesPerSector;
-	Dprintf("NTFS volume length: 0x%llx\n", (long long)rvl);
+	ntfs_log_debug("NTFS volume length: 0x%llx.\n", (long long)rvl);
 #else
 	errno = EINVAL;
 	rvl = -1;
@@ -460,7 +450,7 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 	rvl = DeviceIoControl(handle, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, NULL,
 			0, &b, sizeof(b), &i, NULL);
 	if (rvl) {
-		Dputs("GET_DRIVE_GEOMETRY_EX detected.");
+		ntfs_log_debug("GET_DRIVE_GEOMETRY_EX detected.\n");
 		DISK_DETECTION_INFO *ddi = (PDISK_DETECTION_INFO)
 				(((PBYTE)(&((PDISK_GEOMETRY_EX)b)->Data)) +
 				(((PDISK_PARTITION_INFO)
@@ -489,7 +479,7 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 	rvl = DeviceIoControl(handle, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0,
 			&b, sizeof(b), &i, NULL);
 	if (rvl) {
-		Dputs("GET_DRIVE_GEOMETRY detected.");
+		ntfs_log_debug("GET_DRIVE_GEOMETRY detected.\n");
 		fd->geo_cylinders = ((DISK_GEOMETRY*)&b)->Cylinders.QuadPart;
 		fd->geo_sectors = ((DISK_GEOMETRY*)&b)->SectorsPerTrack;
 		fd->geo_size = fd->geo_cylinders * fd->geo_sectors *
@@ -498,7 +488,7 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
 		return 0;
 	}
 	errno = ntfs_w32error_to_errno(GetLastError());
-	Dputs("Error: Couldn't retrieve disk geometry.");
+	ntfs_log_trace("Couldn't retrieve disk geometry.\n");
 	fd->geo_cylinders = -1;
 	fd->geo_sectors = -1;
 	fd->geo_size = -1;
@@ -593,16 +583,18 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
 
 	/* Make sure all the required imports exist. */
 	if (!fnFindFirstVolume || !fnFindNextVolume || !fnFindVolumeClose) {
-		Dputs("win32_is_mounted: Required dll imports not found.");
+		ntfs_log_trace("Required dll imports not found.\n");
 		return INVALID_HANDLE_VALUE;
 	}
 	/* Start iterating through volumes. */
-	Dprintf("win32_open_volume_for_partition: Start\n");
+	ntfs_log_trace("Entering with drive_id=%d, part_offset=%lld, "
+			"path_length=%lld, flags=%d.\n", drive_id,
+			(unsigned long long)part_offset,
+			(unsigned long long)part_length, flags);
 	vol_find_handle = fnFindFirstVolume(vol_name, MAX_PATH);
 	/* If a valid handle could not be aquired, reply with "don't know". */
 	if (vol_find_handle == INVALID_HANDLE_VALUE) {
-		Dprintf("win32_open_volume_for_partition: "
-				"FindFirstVolume failed.");
+		ntfs_log_trace("FindFirstVolume failed.\n");
 		return INVALID_HANDLE_VALUE;
 	}
 	do {
@@ -618,8 +610,7 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
 		if (vol_name_length>0)
 			vol_name[vol_name_length-1]=0;
 
-		Dprintf("win32_open_volume_for_partition: Processing %s\n",
-				vol_name);
+		ntfs_log_debug("Processing %s.\n", vol_name);
 		/* open the file */
 		handle = CreateFile(vol_name,
 				ntfs_device_unix_status_flags_to_win32(flags),
@@ -657,11 +648,10 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
 				}
 			}
 		} else
-			Dputs("win32_open_volume_for_partition: getExtents "
-					"Failed!" );
+			ntfs_log_trace("getExtents() Failed.\n");
 	} while (fnFindNextVolume(vol_find_handle, vol_name, MAX_PATH));
 	/* End of iteration through volumes. */
-	Dprintf("win32_open_volume_for_partition: Closing.\n");
+	ntfs_log_trace("Closing, volume was not found.\n");
 	fnFindVolumeClose(vol_find_handle);
 	return INVALID_HANDLE_VALUE;
 }
@@ -707,15 +697,15 @@ static BOOL ntfs_device_win32_find_partition(HANDLE handle, DWORD partition_id,
 		err = GetLastError();
 		free(drive_layout);
 		if (err != ERROR_INSUFFICIENT_BUFFER) {
-			Dputs("Error: GetDriveLayout failed.");
+			ntfs_log_trace("GetDriveLayout failed.");
 			errno = ntfs_w32error_to_errno(err);
 			return FALSE;
 		}
-		Dprintf("More than %u partitions.\n", part_count);
+		ntfs_log_debug("More than %u partitions.\n", part_count);
 		part_count <<= 1;
 		if (part_count > 512) {
-			Dputs("Error: GetDriveLayout failed: More than 512 "
-					"partitions?");
+			ntfs_log_trace("GetDriveLayout failed: More than 512 "
+					"partitions?\n");
 			errno = ENOBUFS;
 			return FALSE;
 		}
@@ -793,9 +783,10 @@ static int ntfs_device_win32_open_partition(int drive_id,
 		} else {
 			if ((flags & O_RDWR) == O_RDWR) {
 				/* Access if read-write, no volume found. */
-				Dputs("Partitions containing Spanned/Mirrored "
-						"volumes are not supported in "
-						"R/W status yet");
+				ntfs_log_trace("Partitions containing Spanned/"
+						"Mirrored volumes are not "
+						"supported in R/W status "
+						"yet.\n");
 				CloseHandle(handle);
 				errno = EOPNOTSUPP;
 				return -1;
@@ -804,8 +795,8 @@ static int ntfs_device_win32_open_partition(int drive_id,
 		}
 		return 0;
 	} else {
-		Dprintf("Partition %u not found on drive %d.\n", partition_id,
-				drive_id);
+		ntfs_log_debug("Partition %u not found on drive %d.\n",
+				partition_id, drive_id);
 		CloseHandle(handle);
 		errno = ENODEV;
 		return -1;
@@ -841,27 +832,29 @@ static int ntfs_device_win32_open(struct ntfs_device *dev, int flags)
 	drive_id = toupper(drive_char) - 'A';
 	switch (numparams) {
 	case 0:
-		Dprintf("win32_open(%s) -> file\n", dev->d_name);
+		ntfs_log_debug("win32_open(%s) -> file.\n", dev->d_name);
 		err = ntfs_device_win32_open_file(dev->d_name, &fd, flags);
 		break;
 	case 1:
-		Dprintf("win32_open(%s) -> drive %d\n", dev->d_name, drive_id);
+		ntfs_log_debug("win32_open(%s) -> drive %d.\n", dev->d_name,
+				drive_id);
 		err = ntfs_device_win32_open_drive(drive_id, &fd, flags);
 		break;
 	case 2:
-		Dprintf("win32_open(%s) -> drive %d, part %u\n", dev->d_name,
-				drive_id, part);
+		ntfs_log_debug("win32_open(%s) -> drive %d, part %u.\n",
+				dev->d_name, drive_id, part);
 		err = ntfs_device_win32_open_partition(drive_id, part, &fd,
 				flags);
 		break;
 	default:
-		Dprintf("win32_open(%s) -> unknwon file format\n", dev->d_name);
+		ntfs_log_debug("win32_open(%s) -> unknwon file format.\n",
+				dev->d_name);
 		err = -1;
 	}
 	if (err)
 		return err;
-	Dprintf("win32_open(%s) -> %p, offset 0x%llx\n", dev->d_name, dev,
-			fd.part_start);
+	ntfs_log_debug("win32_open(%s) -> %p, offset 0x%llx.\n", dev->d_name,
+			dev, fd.part_start);
 	/* Setup our read-only flag. */
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
@@ -892,7 +885,7 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	s64 abs_ofs;
 	win32_fd *fd = (win32_fd *)dev->d_private;
 
-	Dprintf("win32_seek(): offset = 0x%llx, whence = %d\n", offset, whence);
+	ntfs_log_trace("seek offset = 0x%llx, whence = %d.\n", offset, whence);
 	switch (whence) {
 	case SEEK_SET:
 		abs_ofs = offset;
@@ -903,20 +896,20 @@ static s64 ntfs_device_win32_seek(struct ntfs_device *dev, s64 offset,
 	case SEEK_END:
 		/* End of partition != end of disk. */
 		if (fd->part_length == -1) {
-			Dputs("win32_seek(): Error: Position relative to end "
-					"of disk not implemented.");
+			ntfs_log_trace("Position relative to end of disk not "
+					"implemented.\n");
 			errno = EOPNOTSUPP;
 			return -1;
 		}
 		abs_ofs = fd->part_length + offset;
 		break;
 	default:
-		Dprintf("win32_seek(): Error: Wrong mode %d.\n", whence);
+		ntfs_log_trace("Wrong mode %d.\n", whence);
 		errno = EINVAL;
 		return -1;
 	}
 	if (abs_ofs < 0 || abs_ofs > fd->part_length) {
-		Dputs("Error: Seeking outsize seekable area.");
+		ntfs_log_trace("Seeking outsize seekable area.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -949,21 +942,21 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 	DWORD bt;
 	BOOL res;
 
-	Dprintf("win32_pio(): pos = 0x%llx, count = 0x%llx, direction = %s",
+	ntfs_log_trace("pos = 0x%llx, count = 0x%llx, direction = %s.\n",
 			(long long)pos, (long long)count, write ? "write" :
 			"read");
 	li.QuadPart = pos;
 	if (fd->vol_handle != INVALID_HANDLE_VALUE && pos < fd->geo_size) {
-		Dputs("Transfering via vol_handle.");
+		ntfs_log_debug("Transfering via vol_handle.\n");
 		handle = fd->vol_handle;
 	} else {
-		Dputs("Transfering via handle.");
+		ntfs_log_debug("Transfering via handle.\n");
 		handle = fd->handle;
 		li.QuadPart += fd->part_start;
 	}
 	if (!fnSetFilePointerEx(handle, li, NULL, FILE_BEGIN)) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: SetFilePointer failed.");
+		ntfs_log_trace("SetFilePointer failed.\n");
 		return -1;
 	}
 	if (write)
@@ -972,7 +965,7 @@ static s64 ntfs_device_win32_pio(win32_fd *fd, const s64 pos,
 		res = ReadFile(handle, b, count, &bt, NULL);
 	if (!res) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dprintf("Error: %sFile() failed.\n", write ? "Write" : "Read");
+		ntfs_log_trace("%sFile() failed.\n", write ? "Write" : "Read");
 		return -1;
 	}
 	return bt;
@@ -1026,8 +1019,8 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *b, s64 count)
 		to_read = 0x80000000;
 		count = to_read - delta;
 	}
-	Dprintf("win32_read(): fd = %p, b = %p, count = 0x%llx, pos = 0x%llx, "
-			"ofs = %i, to_read = 0x%llx\n", fd, b,
+	ntfs_log_trace("fd = %p, b = %p, count = 0x%llx, pos = 0x%llx, "
+			"ofs = %i, to_read = 0x%llx.\n", fd, b,
 			(long long)count, (long long)old_pos, ofs,
 			(long long)to_read);
 	if (!((unsigned long)b & (NTFS_BLOCK_SIZE - 1)) && !old_ofs &&
@@ -1038,7 +1031,7 @@ static s64 ntfs_device_win32_read(struct ntfs_device *dev, void *b, s64 count)
 				PAGE_READWRITE);
 		if (!alignedbuffer) {
 			errno = ntfs_w32error_to_errno(GetLastError());
-			Dputs("Error: VirtualAlloc failed for read.");
+			ntfs_log_trace("VirtualAlloc failed for read.\n");
 			return -1;
 		}
 	}
@@ -1101,7 +1094,7 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	win32_fd *fd = (win32_fd *)dev->d_private;
 	BOOL rvl;
 
-	Dprintf("win32_close(%p)\n", dev);
+	ntfs_log_trace("Closing device %p.\n", dev);
 	if (!NDevOpen(dev)) {
 		errno = EBADF;
 		return -1;
@@ -1112,13 +1105,13 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 			ntfs_device_win32_unlock(fd->vol_handle);
 		}
 		if (!CloseHandle(fd->vol_handle))
-			Dputs("Error: CloseHandle() failed for volume.");
+			ntfs_log_trace("CloseHandle() failed for volume.\n");
 	}
 	rvl = CloseHandle(fd->handle);
 	free(fd);
 	if (!rvl) {
 		errno = ntfs_w32error_to_errno(GetLastError());
-		Dputs("Error: CloseHandle failed.");
+		ntfs_log_trace("CloseHandle() failed.\n");
 		return -1;
 	}
 	return 0;
@@ -1153,8 +1146,8 @@ static int ntfs_device_win32_sync(struct ntfs_device *dev)
 				err = ntfs_w32error_to_errno(GetLastError());
 		}
 		if (!to_clear) {
+			ntfs_log_trace("Could not sync.\n");
 			errno = err;
-			Dputs("Error: Could not sync.");
 			return -1;
 		}
 		NDevClearDirty(dev);
@@ -1211,12 +1204,12 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 		to_write = 0x80000000;
 		count = to_write - delta;
 	}
-	Dprintf("win32_write(): fd = %p, b = %p, count = 0x%llx, "
-			"pos = 0x%llx, ofs = %i, to_write = 0x%llx\n", fd, b,
+	ntfs_log_trace("fd = %p, b = %p, count = 0x%llx, pos = 0x%llx, "
+			"ofs = %i, to_write = 0x%llx.\n", fd, b,
 			(long long)count, (long long)old_pos, ofs,
 			(long long)to_write);
 	if (NDevReadOnly(dev)) {
-		Dputs("win32_write: Device R/O, exiting.");
+		ntfs_log_trace("Can't write on a R/O device.\n");
 		errno = EROFS;
 		return -1;
 	}
@@ -1233,7 +1226,7 @@ static s64 ntfs_device_win32_write(struct ntfs_device *dev, const void *b,
 				MEM_COMMIT, PAGE_READWRITE);
 		if (!alignedbuffer) {
 			errno = ntfs_w32error_to_errno(GetLastError());
-			Dputs("Error: VirtualAlloc failed for write.");
+			ntfs_log_trace("VirtualAlloc failed for write.\n");
 			return -1;
 		}
 		/* Read first sector if start of write not sector aligned. */
@@ -1396,7 +1389,7 @@ static __inline__ int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
 		return 0;
 	}
 	errno = ntfs_w32error_to_errno(GetLastError());
-	Dputs("Error: GET_DRIVE_GEOMETRY failed.");
+	ntfs_log_trace("GET_DRIVE_GEOMETRY failed.\n");
 	return -1;
 }
 
@@ -1405,11 +1398,11 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 {
 	win32_fd *fd = (win32_fd *)dev->d_private;
 
-	Dprintf("win32_ioctl(%d) called.\n", request);
+	ntfs_log_trace("win32_ioctl(%d) called.\n", request);
 	switch (request) {
 #if defined(BLKGETSIZE)
 	case BLKGETSIZE:
-		Dputs("win32_ioctl(): BLKGETSIZE detected.");
+		ntfs_log_debug("BLKGETSIZE detected.\n");
 		if (fd->part_length >= 0) {
 			*(int *)argp = (int)(fd->part_length / 512);
 			return 0;
@@ -1419,7 +1412,7 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 #endif
 #if defined(BLKGETSIZE64)
 	case BLKGETSIZE64:
-		Dputs("win32_ioctl(): BLKGETSIZE64 detected.");
+		ntfs_log_debug("BLKGETSIZE64 detected.\n");
 		if (fd->part_length >= 0) {
 			*(s64 *)argp = fd->part_length;
 			return 0;
@@ -1429,16 +1422,16 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 #endif
 #ifdef HDIO_GETGEO
 	case HDIO_GETGEO:
-		Dputs("win32_ioctl(): HDIO_GETGEO detected.");
+		ntfs_log_debug("HDIO_GETGEO detected.\n");
 		return ntfs_win32_hdio_getgeo(dev, (struct hd_geometry *)argp);
 #endif
 #ifdef BLKSSZGET
 	case BLKSSZGET:
-		Dputs("win32_ioctl(): BLKSSZGET detected.");
+		ntfs_log_debug("BLKSSZGET detected.\n");
 		return ntfs_win32_blksszget(dev, (int *)argp);
 #endif
 	default:
-		Dprintf("win32_ioctl(): unimplemented ioctl %d.\n", request);
+		ntfs_log_debug("unimplemented ioctl %d.\n", request);
 		errno = EOPNOTSUPP;
 		return -1;
 	}

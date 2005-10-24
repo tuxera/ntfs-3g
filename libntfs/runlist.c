@@ -40,7 +40,6 @@
 
 #include "compat.h"
 #include "types.h"
-#include "attrib.h"
 #include "volume.h"
 #include "layout.h"
 #include "debug.h"

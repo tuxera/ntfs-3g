@@ -24,6 +24,10 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+
 #include "collate.h"
 #include "debug.h"
 #include "unistr.h"
