@@ -29,6 +29,10 @@
 #include <stdlib.h>
 #endif
 
+#ifdef HAVE_ERRNO_H
+#include <errno.h>
+#endif
+
 #include "rich.h"
 #include "layout.h"
 #include "logging.h"
