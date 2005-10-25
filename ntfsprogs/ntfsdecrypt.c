@@ -394,18 +394,8 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	}
 	/* Release the no longer needed datum values. */
 	for (j = 0; j < 6; j++) {
-		/*
-		 * FIXME: _gnutls_free_datum() is not exported from libgnutls
-		 * so we do it by hand...  )-:  Let us just hope the
-		 * gnutls_datum_t structure does not change across versions of
-		 * the gnutls library.
-		 */
-#if 0
-		_gnutls_free_datum(&rd[j]);
-#else
 		if (rd[j].data && rd[j].size)
 			gnutls_free(rd[j].data);
-#endif
 	}
 	/*
 	 * Build the gcrypt private key, note libgcrypt uses p and q inversed
@@ -528,6 +518,28 @@ check_again:
 						gnutls_strerror(err));
 				goto key_out;
 			}
+#if 0
+			/*
+			 * Export the key again, but unencrypted, and output it
+			 * to stderr.  Note the output has an RSA header so to
+			 * compare to openssl pkcs12 -nodes -in myfile.pfx
+			 * output need to ignore the part of the key between
+			 * the first "MII..." up to the second "MII...".  The
+			 * actual RSA private key begins at the second "MII..."
+			 * and in my testing at least was identical to openssl
+			 * output and was also identical both on big and little
+			 * endian so gnutls should be endianness safe.
+			 */
+			char *buf = malloc(8192);
+			size_t bufsize = 8192;
+			err = gnutls_x509_privkey_export_pkcs8(pkey, GNUTLS_X509_FMT_PEM, "", GNUTLS_PKCS_PLAIN, buf, &bufsize);
+			if (err) {
+				fprintf(stderr, "eek1\n");
+				exit(1);
+			}
+			fprintf(stderr, "%s\n", buf);
+			free(buf);
+#endif
 			/* Convert the private key to our internal format. */
 			rsa_key = ntfs_rsa_private_key_import_from_gnutls(pkey);
 			goto key_out;

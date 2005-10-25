@@ -40,6 +40,8 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfscat can display named attributes, streams too.  (Szaka)
 	- Remove Dputs(), Dprintf(), Dperror(), ntfs_debug(), ntfs_error() and
 	  Sprintf(). Forward callers to ntfs_log_*().  (Yuval)
+	- Add some debugging to ntfsdecrypt.c to allow printing of the private
+	  key after it is decrypted (this is ifdeffed out by default).  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
