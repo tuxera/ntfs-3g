@@ -26,51 +26,9 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_STDIO_H
-#include <stdio.h>
-#endif
-
 #include "logging.h"
 
 struct _runlist_element;
-
-extern void __Sprintf(const int silent, const char *fmt, ...)
-		__attribute__((format(printf, 2, 3)));
-#define Sprintf(silent, f, a...)	__Sprintf(silent, f, ##a)
-
-#ifdef DEBUG
-
-/* Debug output to stderr.  To get it run ./configure --enable-debug. */
-
-extern void __ntfs_debug(const char *file, int line, const char *function,
-		const char *format, ...) __attribute__((format(printf, 4, 5)));
-#define ntfs_debug(f, a...)						\
-		__ntfs_debug(__FILE__, __LINE__, __FUNCTION__, f, ##a)
-
-extern void __ntfs_error(const char *function,
-		const char *fmt, ...) __attribute__((format(printf, 2, 3)));
-#define ntfs_error(sb, f, a...)		__ntfs_error(__FUNCTION__, f, ##a)
-
-extern void __Dprintf(const char *fmt, ...)
-		__attribute__((format(printf, 1, 2)));
-#define Dprintf(f, a...)	__Dprintf(f, ##a)
-
-extern void __Dputs(const char *s);
-#define Dputs(s)		__Dputs(s)
-
-extern void __Dperror(const char *s);
-#define Dperror(s)		__Dperror(s)
-
-#else /* if !DEBUG */
-
-#define ntfs_debug(f, a...)		do {} while (0)
-#define ntfs_error(f, a...)		do {} while (0)
-
-#define Dprintf(f, a...)	do {} while (0)
-#define Dputs(s)		do {} while (0)
-#define Dperror(s)		do {} while (0)
-
-#endif /* !DEBUG */
 
 #ifdef NTFS_DISABLE_DEBUG_LOGGING
 static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}

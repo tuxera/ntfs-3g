@@ -176,33 +176,34 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 		return -1;
 	}
 	if (ntfs_file_record_read(vol, FILE_Volume, &m, NULL)) {
-		Dperror("Failed to read $Volume");
+		ntfs_log_perror("Failed to read $Volume");
 		return -1;
 	}
 	/* Sanity check */
 	if (!(m->flags & MFT_RECORD_IN_USE)) {
-		Dprintf("Error: $Volume has been deleted. Cannot "
-				"handle this yet. Run chkdsk to fix this.\n");
+		ntfs_log_error("$Volume has been deleted. Cannot handle this "
+				"yet. Run chkdsk to fix this.\n");
 		errno = EIO;
 		goto err_exit;
 	}
 	/* Get a pointer to the volume information attribute. */
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
-		Dperror("Failed to allocate attribute search context");
+		ntfs_log_debug("Failed to allocate attribute search "
+				"context.\n");
 		goto err_exit;
 	}
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
-		Dputs("Error: Attribute $VOLUME_INFORMATION was not found in "
-				"$Volume!");
+		ntfs_log_error("Attribute $VOLUME_INFORMATION was not found in "
+				"$Volume!\n");
 		goto err_out;
 	}
 	a = ctx->attr;
 	/* Sanity check. */
 	if (a->non_resident) {
-		Dputs("Error: Attribute $VOLUME_INFORMATION must be resident "
-				"(and it isn't)!");
+		ntfs_log_error("Attribute $VOLUME_INFORMATION must be resident "
+				"(and it isn't)!\n");
 		errno = EIO;
 		goto err_out;
 	}
@@ -213,15 +214,15 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 			(char*)m + le32_to_cpu(m->bytes_in_use) ||
 			le16_to_cpu(a->value_offset) +
 			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
-		Dputs("Error: Attribute $VOLUME_INFORMATION in $Volume is "
-				"corrupt!");
+		ntfs_log_error("Attribute $VOLUME_INFORMATION in $Volume is "
+				"corrupt!\n");
 		errno = EIO;
 		goto err_out;
 	}
 	/* Set the volume flags. */
 	vol->flags = c->flags = cpu_to_le16(flags);
 	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
-		Dperror("Error writing $Volume");
+		ntfs_log_perror("Error writing $Volume");
 		goto err_out;
 	}
 	ret = 0; /* success */

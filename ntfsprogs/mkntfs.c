@@ -1412,7 +1412,7 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			}
 		}
 	}
-	Dputs("mkntfs_attr_find(): File is corrupt. Run chkdsk.");
+	ntfs_log_trace("File is corrupt. Run chkdsk.\n");
 	errno = EIO;
 	return -1;
 }

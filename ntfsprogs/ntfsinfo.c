@@ -153,7 +153,7 @@ static void usage (void)
  */
 static int parse_options (int argc, char *argv[])
 {
-	static const char *sopt = "-fh?i:F:mqtTvVd:";
+	static const char *sopt = "-:fhi:F:mqtTvVd:";
 	static const struct option lopt[] = {
 		{ "device",	 required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
@@ -179,6 +179,8 @@ static int parse_options (int argc, char *argv[])
 	opts.filename = NULL;
 
 	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+		ntfs_log_trace("optind=%d; c='%c' optarg=\"%s\".\n", optind, c,
+				optarg);
 		switch (c) {
 		case 'd':
 			if (!opts.device)
@@ -205,7 +207,6 @@ static int parse_options (int argc, char *argv[])
 			opts.force++;
 			break;
 		case 'h':
-		case '?':
 			help++;
 			break;
 		case 'q':
@@ -228,12 +229,24 @@ static int parse_options (int argc, char *argv[])
 		case 'm':
 			opts.mft++;
 			break;
-		default:
-			if ((optopt == 'i') && (!optarg)) {
-				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
-			} else {
-				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+		case '?':
+			if (optopt=='?') {
+				help++;
+				continue;
 			}
+			if (ntfs_logging_parse_option(argv[optind-1]))
+				continue;
+			ntfs_log_error("Unknown option '%s'.\n",
+					argv[optind-1]);
+			err++;
+			break;
+		case ':':
+			ntfs_log_error("Option '%s' requires an "
+					"argument.\n", argv[optind-1]);
+			err++;
+			break;
+		default:
+			ntfs_log_error("Unhandled option case: %d.\n", c);
 			err++;
 			break;
 		}
@@ -1362,9 +1375,10 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			Vprintf("\tDumping index block "
 					"(VCN %lld, used %u/%u):", le64_to_cpu(
 					tmp_alloc->index_block_vcn),
+					(unsigned int)le32_to_cpu(tmp_alloc->
+					index.index_length), (unsigned int)
 					le32_to_cpu(tmp_alloc->index.
-					index_length), le32_to_cpu(tmp_alloc->
-					index.allocated_size));
+					allocated_size));
 			total_entries += ntfs_dump_index_entries(entry, type);
 			total_indx_blocks++;
 		}

@@ -485,7 +485,7 @@ BOOL ntfs_logging_parse_option(const char *option)
 		return TRUE;
 	}
 
-	ntfs_log_warning("Unknown logging option '%s'\n", option);
+	ntfs_log_debug("Unknown logging option '%s'\n", option);
 	return FALSE;
 }
 

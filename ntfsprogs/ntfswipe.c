@@ -170,10 +170,10 @@ static int parse_list (char *list, int **result)
 		ptr = end + 1;
 	}
 
-	Dprintf ("Parsing list '%s' - ", list);
+	ntfs_log_debug("Parsing list '%s' - ", list);
 	for (i = 0; i <= count; i++)
-		Dprintf ("0x%02x ", mem[i]);
-	Dprintf ("\n");
+		ntfs_log_debug("0x%02x ", mem[i]);
+	ntfs_log_debug("\n");
 
 	*result = mem;
 	return count;
@@ -1094,18 +1094,18 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 	//Qprintf ("wipe_logfile (not implemented) 0x%02x\n", byte);
 
 	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
-		Dprintf("Failed to open inode FILE_LogFile.\n");
+		ntfs_log_debug("Failed to open inode FILE_LogFile.\n");
 		return -1;
 	}
 
 	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
-		Dprintf("Failed to open $FILE_LogFile/$DATA\n");
+		ntfs_log_debug("Failed to open $FILE_LogFile/$DATA.\n");
 		goto error_exit;
 	}
 
 	/* The $DATA attribute of the $LogFile has to be non-resident. */
 	if (!NAttrNonResident(na)) {
-		Dprintf("$LogFile $DATA attribute is resident!?!\n");
+		ntfs_log_debug("$LogFile $DATA attribute is resident!?!\n");
 		errno = EIO;
 		goto io_error_exit;
 	}
@@ -1113,7 +1113,8 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 	/* Get length of $LogFile contents. */
 	len = na->data_size;
 	if (!len) {
-		Dprintf("$LogFile has zero length, no disk write needed.\n");
+		ntfs_log_debug("$LogFile has zero length, no disk write "
+				"needed.\n");
 		return 0;
 	}
 
@@ -1125,8 +1126,8 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 		pos += count;
 
 	if (count == -1 || pos != len) {
-		Dprintf("Amount of $LogFile data read does not "
-			"correspond to expected length!");
+		ntfs_log_debug("Amount of $LogFile data read does not "
+			"correspond to expected length!\n");
 		if (count != -1)
 			errno = EIO;
 		goto io_error_exit;
@@ -1142,7 +1143,8 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 			count = NTFS_BUF_SIZE2;
 
 		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
-			Dprintf("Failed to set the $LogFile attribute value.");
+			ntfs_log_debug("Failed to set the $LogFile attribute "
+					"value.\n");
 			if (count != -1)
 				errno = EIO;
 			goto io_error_exit;
@@ -1198,18 +1200,18 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 
 	ni = ntfs_pathname_to_inode(vol, NULL, "pagefile.sys");
 	if (!ni) {
-		Dprintf("Failed to open inode of pagefile.sys.\n");
+		ntfs_log_debug("Failed to open inode of pagefile.sys.\n");
 		return 0;
 	}
 
 	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
-		Dprintf("Failed to open pagefile.sys/$DATA\n");
+		ntfs_log_debug("Failed to open pagefile.sys/$DATA.\n");
 		goto error_exit;
 	}
 
 	/* The $DATA attribute of the pagefile.sys has to be non-resident. */
 	if (!NAttrNonResident(na)) {
-		Dprintf("pagefile.sys $DATA attribute is resident!?!\n");
+		ntfs_log_debug("pagefile.sys $DATA attribute is resident!?!\n");
 		errno = EIO;
 		goto io_error_exit;
 	}
@@ -1217,7 +1219,8 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 	/* Get length of pagefile.sys contents. */
 	len = na->data_size;
 	if (!len) {
-		Dprintf("pagefile.sys has zero length, no disk write needed.\n");
+		ntfs_log_debug("pagefile.sys has zero length, no disk write "
+				"needed.\n");
 		return 0;
 	}
 
@@ -1230,7 +1233,8 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 			count = NTFS_BUF_SIZE2;
 
 		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
-			Dprintf("Failed to set the pagefile.sys attribute value.");
+			ntfs_log_debug("Failed to set the pagefile.sys "
+					"attribute value.\n");
 			if (count != -1)
 				errno = EIO;
 			goto io_error_exit;

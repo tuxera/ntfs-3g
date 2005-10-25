@@ -26,7 +26,7 @@
 #include "config.h"
 
 #ifdef HAVE_FEATURES_H
-#	include <features.h>
+#include <features.h>
 #endif
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -83,9 +83,7 @@
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
-#ifdef DEBUG
 static const char *UNNAMED   = "<unnamed>";
-#endif
 static const char *NONE      = "<none>";
 static const char *UNKNOWN   = "unknown";
 static struct options opts;
@@ -333,7 +331,8 @@ static int transform (const char *pattern, char **regex)
 
 	result[j]   = '$';
 	result[j+1] = 0;
-	Dprintf ("Pattern '%s' replaced with regex '%s'\n", pattern, result);
+	ntfs_log_debug("Pattern '%s' replaced with regex '%s'.\n", pattern,
+			result);
 
 	*regex = result;
 	return 1;
@@ -372,7 +371,7 @@ static int parse_time (const char *value, time_t *since)
 	if (!value || !since)
 		return -1;
 
-	Dprintf ("parsing time '%s' ago\n", value);
+	ntfs_log_trace("Parsing time '%s' ago.\n", value);
 
 	result = strtoll (value, &suffix, 10);
 	if (result < 0 || errno == ERANGE) {
@@ -406,7 +405,8 @@ static int parse_time (const char *value, time_t *since)
 
 	now = time (NULL);
 
-	Dprintf ("Time now = %lld, Time then = %lld.\n", (long long) now, (long long) result);
+	ntfs_log_debug("Time now = %lld, Time then = %lld.\n", (long long) now,
+			(long long) result);
 	*since = now - result;
 	return 1;
 }
@@ -709,19 +709,23 @@ static void free_file (struct ufile *file)
 
 	list_for_each_safe (item, tmp, &file->name) { /* List of filenames */
 		struct filename *f = list_entry (item, struct filename, list);
-		Dprintf ("freeing filename '%s'\n", f->name ? f->name : NONE);
+		ntfs_log_debug("freeing filename '%s'", f->name ? f->name :
+				NONE);
 		if (f->name)
 			free (f->name);
 		if (f->parent_name) {
-			Dprintf ("\tand parent filename '%s'\n", f->parent_name);
+			ntfs_log_debug(" and parent filename '%s'",
+					f->parent_name);
 			free (f->parent_name);
 		}
+		ntfs_log_debug(".\n");
 		free (f);
 	}
 
 	list_for_each_safe (item, tmp, &file->data) { /* List of data streams */
 		struct data *d = list_entry (item, struct data, list);
-		Dprintf ("freeing data stream '%s'\n", d->name ? d->name : UNNAMED);
+		ntfs_log_debug("Freeing data stream '%s'.\n", d->name ?
+				d->name : UNNAMED);
 		if (d->name)
 			free (d->name);
 		if (d->runlist)
@@ -826,12 +830,14 @@ static void get_parent_name (struct filename* name, ntfs_volume* vol)
 
 		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num, vol->mft_record_size, rec) < 1) {
 			Eprintf ("ERROR: Couldn't read MFT Record %lld.\n", inode_num);
-		} else {
-			if ((filename_attr = verify_parent(name, rec))) {
-				if (ntfs_ucstombs(filename_attr->file_name, filename_attr->file_name_length, &name->parent_name, 0) < 0) {
-					Dprintf ("Couldn't translate filename to current locale.\n");
-					name->parent_name = NULL;
-				}
+		} else if ((filename_attr = verify_parent(name, rec))) {
+			if (ntfs_ucstombs(filename_attr->file_name,
+					filename_attr->file_name_length,
+					&name->parent_name, 0) < 0) {
+				ntfs_log_debug("ERROR: Couldn't translate "
+						"filename to current "
+						"locale.\n");
+				name->parent_name = NULL;
 			}
 		}
 	}
@@ -907,7 +913,8 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 
 		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
 				0) < 0) {
-			Dprintf ("ERROR: Couldn't translate filename to current locale.\n");
+			ntfs_log_debug("ERROR: Couldn't translate filename to "
+					"current locale.\n");
 		}
 
 		name->parent_name = NULL;
@@ -931,7 +938,7 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 	}
 
 	ntfs_attr_put_search_ctx(ctx);
-	Dprintf ("File has %d names.\n", count);
+	ntfs_log_debug("File has %d names.\n", count);
 	return count;
 }
 
@@ -998,7 +1005,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 
 		data->runlist = ntfs_mapping_pairs_decompress(vol, rec, NULL);
 		if (!data->runlist) {
-			Dprintf ("Couldn't decompress the data runs\n");
+			ntfs_log_debug("Couldn't decompress the data runs.\n");
 		}
 
 		file->max_size = max (file->max_size, data->size_data);
@@ -1009,7 +1016,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 	}
 
 	ntfs_attr_put_search_ctx(ctx);
-	Dprintf ("File has %d data streams.\n", count);
+	ntfs_log_debug("File has %d data streams.\n", count);
 	return count;
 }
 
@@ -1071,7 +1078,8 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,	file->mft);
 	attr90 = find_first_attribute (AT_INDEX_ROOT,		file->mft);
 
-	Dprintf ("Attributes present: %s %s %s\n", attr10?"0x10":"", attr20?"0x20":"", attr90?"0x90":"");
+	ntfs_log_debug("Attributes present: %s %s %s.\n", attr10?"0x10":"",
+			attr20?"0x20":"", attr90?"0x90":"");
 
 	if (attr10) {
 		STANDARD_INFORMATION *si;
@@ -1131,7 +1139,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		return -1;
 
 	if (file->directory) {
-		Dprintf ("Found a directory: not recoverable.\n");
+		ntfs_log_debug("Found a directory: not recoverable.\n");
 		return 0;
 	}
 
@@ -1297,7 +1305,7 @@ static void dump_record (struct ufile *file)
 	Qprintf ("Data Streams:\n");
 	list_for_each (item, &file->data) {
 		struct data *d = list_entry (item, struct data, list);
-		Qprintf ("Name: %s\n", (d->name) ? d->name : "<unnamed>");
+		Qprintf ("Name: %s\n", (d->name) ? d->name : UNNAMED);
 		Qprintf ("Flags: ");
 		if (d->resident)   Qprintf ("Resident\n");
 		if (d->compressed) Qprintf ("Compressed\n");
@@ -1428,12 +1436,12 @@ static int name_match (regex_t *re, struct ufile *file)
 			Eprintf ("Couldn't compare filename with regex: %s\n", strerror (errno));
 			return 0;
 		} else if (result == REG_NOERROR) {
-			Dprintf ("Found a matching filename.\n");
+			ntfs_log_debug("Found a matching filename.\n");
 			return 1;
 		}
 	}
 
-	Dprintf ("Filename '%s' doesn't match regex.\n", file->pref_name);
+	ntfs_log_debug("Filename '%s' doesn't match regex.\n", file->pref_name);
 	return 0;
 }
 
@@ -1981,7 +1989,8 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 	name = opts.output;
 	if (!name) {
 		name = MFTFILE;
-		Dprintf ("No output filename, defaulting to '%s'.\n", name);
+		ntfs_log_debug("No output filename, defaulting to '%s'.\n",
+				name);
 	}
 
 	create_pathname (opts.dest, name, NULL, pathname, sizeof (pathname));
@@ -1996,10 +2005,10 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 
 	mft_end = min (mft_end, nr_mft_records - 1);
 
-	Dprintf ("MFT records\n");
-	Dprintf ("    Total: %8lld\n", nr_mft_records);
-	Dprintf ("    Begin: %8lld\n", mft_begin);
-	Dprintf ("    End:   %8lld\n", mft_end);
+	ntfs_log_debug("MFT records:\n");
+	ntfs_log_debug("\tTotal: %8lld\n", nr_mft_records);
+	ntfs_log_debug("\tBegin: %8lld\n", mft_begin);
+	ntfs_log_debug("\tEnd:   %8lld\n", mft_end);
 
 	for (i = mft_begin; i <= mft_end; i++) {
 		if (ntfs_attr_pread (mft, vol->mft_record_size * i, vol->mft_record_size, buffer) < vol->mft_record_size) {

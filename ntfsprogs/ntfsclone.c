@@ -1187,8 +1187,8 @@ static s64 device_size_get(int fd)
 	{	u64 size;
 
 		if (ioctl(fd, BLKGETSIZE64, &size) >= 0) {
-			Dprintf("BLKGETSIZE64 nr bytes = %llu (0x%llx)\n",
-				(unsigned long long)size,
+			ntfs_log_debug("BLKGETSIZE64 nr bytes = %llu "
+				"(0x%llx).\n", (unsigned long long)size,
 				(unsigned long long)size);
 			return (s64)size;
 		}
@@ -1198,8 +1198,8 @@ static s64 device_size_get(int fd)
 	{	unsigned long size;
 
 		if (ioctl(fd, BLKGETSIZE, &size) >= 0) {
-			Dprintf("BLKGETSIZE nr 512 byte blocks = %lu "
-				"(0x%lx)\n", size, size);
+			ntfs_log_debug("BLKGETSIZE nr 512 byte blocks = %lu "
+				"(0x%lx).\n", size, size);
 			return (s64)size * 512;
 		}
 	}
@@ -1208,8 +1208,9 @@ static s64 device_size_get(int fd)
 	{       struct floppy_struct this_floppy;
 
 		if (ioctl(fd, FDGETPRM, &this_floppy) >= 0) {
-			Dprintf("FDGETPRM nr 512 byte blocks = %lu (0x%lx)\n",
-				this_floppy.size, this_floppy.size);
+			ntfs_log_debug("FDGETPRM nr 512 byte blocks = %lu "
+				"(0x%lx).\n", this_floppy.size,
+				this_floppy.size);
 			return (s64)this_floppy.size * 512;
 		}
 	}
