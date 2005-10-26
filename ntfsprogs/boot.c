@@ -1,4 +1,7 @@
-/* The first 3429 bytes of $Boot. The rest is just zero. Total 8192 bytes. */
+/**
+ * boot_array - the first 3429 bytes of $Boot
+ * The first 3429 bytes of $Boot. The rest is just zero. Total 8192 bytes.
+ */
 const unsigned char boot_array[3429] = {
 235,  91, 144,  78,  84,  70,  83,  32,  32,  32,  32,   0,   0,   0,   0,   0,
   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -214,5 +217,6 @@ const unsigned char boot_array[3429] = {
 116,  32,  49,  13,  10,   0,  68, 101,  98, 117, 103,  32,  80, 111, 105, 110,
 116,  32,  50,  13,  10,   0,  68, 101,  98, 117, 103,  32,  80, 111, 105, 110,
 116,  32,  51,  13,  10,   0,  68, 101,  98, 117, 103,  32,  80, 111, 105, 110,
-116,  32,  52,  13,  10 };
+116,  32,  52,  13,  10
+};
 
