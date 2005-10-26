@@ -138,7 +138,8 @@ struct _ntfs_inode {
 					   inode of the base mft record. */
 	};
 
-	void *private_data;	/* Temp: for directory handling */
+	/* Temp: for directory handling */
+	void *private_data;	/* ntfs_dt containing this inode */
 	int ref_count;
 
 	/* Below 2 fields needed to update indexes. They valid if != -1. */
