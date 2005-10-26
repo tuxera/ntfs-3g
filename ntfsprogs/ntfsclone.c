@@ -1456,8 +1456,7 @@ int main(int argc, char **argv)
 
 	parse_options(argc, argv);
 
-	/* FIXME: this started to corrupt stdout due to logging changes */
-//	utils_set_locale();
+	utils_set_locale();
 
 	if (opt.restore_image) {
 		device_size = open_image();
