@@ -305,7 +305,7 @@ static void license(void)
 /**
  * usage - print a list of the parameters to the program
  */
-__attribute__ ((noreturn))
+__attribute__((noreturn))
 static void usage(void)
 {
 	copyright();
@@ -1486,7 +1486,7 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
  */
 static int mkntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
-		const VCN lowest_vcn __attribute__ ((unused)), const u8 *val,
+		const VCN lowest_vcn __attribute__((unused)), const u8 *val,
 		const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ntfs_inode *base_ni;
@@ -3064,7 +3064,7 @@ static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref) {
 	err = insert_index_entry_in_res_dir_index(idx_entry_o,
 		o_size, m,
 		NTFS_INDEX_O, 2, AT_UNUSED);
-	if (idx_entry_o) free (idx_entry_o);
+	if (idx_entry_o) free(idx_entry_o);
 
 	return err;
 }

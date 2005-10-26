@@ -46,7 +46,7 @@
 /**
  * cluster_find
  */
-int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void *data)
+int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void *data)
 {
 	u64 i;
 	int j;
@@ -62,7 +62,7 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 
 	// Quick check that at least one cluster is in use
 	for (i = c_begin; (LCN)i < c_end; i++) {
-		if (utils_cluster_in_use (vol, i) == 1) {
+		if (utils_cluster_in_use(vol, i) == 1) {
 			in_use = 1;
 			break;
 		}
@@ -70,44 +70,44 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 
 	if (!in_use) {
 		if (c_begin == c_end)
-			Vprintf ("cluster isn't in use\n");
+			Vprintf("cluster isn't in use\n");
 		else
-			Vprintf ("clusters aren't in use\n");
+			Vprintf("clusters aren't in use\n");
 		return 0;
 	}
 
-	m_ctx = mft_get_search_ctx (vol);
+	m_ctx = mft_get_search_ctx(vol);
 	m_ctx->flags_search = FEMR_IN_USE | FEMR_BASE_RECORD;
 
-	while (mft_next_record (m_ctx) == 0) {
-		//Qprintf (RED "Inode: %llu\n" NORM, (unsigned long long)
-		Qprintf ("Inode: %llu\n", (unsigned long long)
+	while (mft_next_record(m_ctx) == 0) {
+		//Qprintf(RED "Inode: %llu\n" NORM, (unsigned long long)
+		Qprintf("Inode: %llu\n", (unsigned long long)
 				m_ctx->inode->mft_no);
 
 		if (!(m_ctx->flags_match & FEMR_BASE_RECORD))
 			continue;
 
-		Vprintf ("Inode: %llu\n", (unsigned long long)
+		Vprintf("Inode: %llu\n", (unsigned long long)
 				m_ctx->inode->mft_no);
 
-		a_ctx = ntfs_attr_get_search_ctx (m_ctx->inode, NULL);
+		a_ctx = ntfs_attr_get_search_ctx(m_ctx->inode, NULL);
 
-		while ((rec = find_attribute (AT_UNUSED, a_ctx))) {
+		while ((rec = find_attribute(AT_UNUSED, a_ctx))) {
 
 			if (!rec->non_resident) {
-				Vprintf ("0x%02x skipped - attr is resident\n", a_ctx->attr->type);
+				Vprintf("0x%02x skipped - attr is resident\n", a_ctx->attr->type);
 				continue;
 			}
 
-			runs = ntfs_mapping_pairs_decompress (vol, a_ctx->attr, NULL);
+			runs = ntfs_mapping_pairs_decompress(vol, a_ctx->attr, NULL);
 			if (!runs) {
-				Eprintf ("Couldn't read the data runs.\n");
+				Eprintf("Couldn't read the data runs.\n");
 				goto done;
 			}
 
-			Vprintf ("\t[0x%02X]\n", a_ctx->attr->type);
+			Vprintf("\t[0x%02X]\n", a_ctx->attr->type);
 
-			Vprintf ("\t\tVCN\tLCN\tLength\n");
+			Vprintf("\t\tVCN\tLCN\tLength\n");
 			for (j = 0; runs[j].length > 0; j++) {
 				LCN a_begin = runs[j].lcn;
 				LCN a_end   = a_begin + runs[j].length - 1;
@@ -115,7 +115,7 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 				if (a_begin < 0)
 					continue;	// sparse, discontiguous, etc
 
-				Vprintf ("\t\t%lld\t%lld-%lld (%lld)\n",
+				Vprintf("\t\t%lld\t%lld-%lld (%lld)\n",
 						(long long)runs[j].vcn,
 						(long long)runs[j].lcn,
 						(long long)(runs[j].lcn +
@@ -131,14 +131,14 @@ int cluster_find (ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void
 			}
 		}
 
-		ntfs_attr_put_search_ctx (a_ctx);
+		ntfs_attr_put_search_ctx(a_ctx);
 		a_ctx = NULL;
 	}
 
 	result = 0;
 done:
-	ntfs_attr_put_search_ctx (a_ctx);
-	mft_put_search_ctx (m_ctx);
+	ntfs_attr_put_search_ctx(a_ctx);
+	mft_put_search_ctx(m_ctx);
 
 	return result;
 }

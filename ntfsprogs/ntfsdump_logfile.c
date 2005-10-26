@@ -87,7 +87,7 @@ typedef struct {
 	};
 } logfile_file;
 
-GEN_PRINTF (Eprintf, stderr, NULL, FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
 
 /**
  * logfile_close
@@ -120,8 +120,8 @@ static int logfile_close(logfile_file *logfile)
  * Use when you wish to exit and collate all the cleanups together.
  * if you don't have some parameter to pass, just pass NULL.
  */
-__attribute__ ((noreturn))
-__attribute__ ((format(printf, 4, 5)))
+__attribute__((noreturn))
+__attribute__((format(printf, 4, 5)))
 static void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
 		ntfs_attr *na, const char *fmt, ...)
 {
@@ -147,7 +147,7 @@ static void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
 /**
  * log_err_exit -
  */
-__attribute__ ((noreturn))
+__attribute__((noreturn))
 __attribute__((format(printf, 2, 3)))
 static void log_err_exit(u8 *buf, const char *fmt, ...)
 {
@@ -167,7 +167,7 @@ static void log_err_exit(u8 *buf, const char *fmt, ...)
 /**
  * usage -
  */
-__attribute__ ((noreturn))
+__attribute__((noreturn))
 static void usage(const char *exec_name)
 {
 	Eprintf("%s v%s (libntfs %s) - Interpret and display information "

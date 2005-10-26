@@ -59,9 +59,9 @@
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -70,14 +70,14 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
 	printf("\n%s v%s (libntfs %s) - Overwrite the unused space on an NTFS "
 			"Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf ("Copyright (c) 2002-2003 Richard Russon\n");
-	printf ("Copyright (c) 2004 Yura Pakhuchiy\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("Copyright (c) 2002-2003 Richard Russon\n");
+	printf("Copyright (c) 2004 Yura Pakhuchiy\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -87,9 +87,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	printf ("\nUsage: %s [options] device\n"
+	printf("\nUsage: %s [options] device\n"
 		"    -i       --info        Show volume information (default)\n"
 		"\n"
 		"    -d       --directory   Wipe directory indexes\n"
@@ -101,8 +101,8 @@ static void usage (void)
 		"\n"
 		"    -a       --all         Wipe all unused space\n"
 		"\n"
-		"    -c num   --count num   Number of times to write (default = 1)\n"
-		"    -b list  --bytes list  List of values to write (default = 0)\n"
+		"    -c num   --count num   Number of times to write(default = 1)\n"
+		"    -b list  --bytes list  List of values to write(default = 0)\n"
 		"\n"
 		"    -n       --no-action   Do not write to disk\n"
 		"    -f       --force       Use less caution\n"
@@ -111,7 +111,7 @@ static void usage (void)
 		"    -V       --version     Version information\n"
 		"    -h       --help        Print this help\n\n",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -128,7 +128,7 @@ static void usage (void)
  * Return:  0  Error, invalid string
  *	    n  Success, the count of numbers parsed
  */
-static int parse_list (char *list, int **result)
+static int parse_list(char *list, int **result)
 {
 	char *ptr;
 	char *end;
@@ -139,31 +139,31 @@ static int parse_list (char *list, int **result)
 	if (!list || !result)
 		return 0;
 
-	for (count = 0, ptr = list; ptr; ptr = strchr (ptr+1, ','))
+	for (count = 0, ptr = list; ptr; ptr = strchr(ptr+1, ','))
 		count++;
 
-	mem = malloc ((count+1) * sizeof (int));
+	mem = malloc((count+1) * sizeof(int));
 	if (!mem) {
-		Eprintf ("Couldn't allocate memory in parse_list().\n");
+		Eprintf("Couldn't allocate memory in parse_list().\n");
 		return 0;
 	}
 
-	memset (mem, 0xFF, (count+1) * sizeof (int));
+	memset(mem, 0xFF, (count+1) * sizeof(int));
 
 	for (ptr = list, i = 0; i < count; i++) {
 
 		end = NULL;
-		mem[i] = strtol (ptr, &end, 0);
+		mem[i] = strtol(ptr, &end, 0);
 
 		if (!end || (end == ptr) || ((*end != ',') && (*end != 0))) {
-			Eprintf ("Invalid list '%s'\n", list);
-			free (mem);
+			Eprintf("Invalid list '%s'\n", list);
+			free(mem);
 			return 0;
 		}
 
 		if ((mem[i] < 0) || (mem[i] > 255)) {
-			Eprintf ("Bytes must be in range 0-255.\n");
-			free (mem);
+			Eprintf("Bytes must be in range 0-255.\n");
+			free(mem);
 			return 0;
 		}
 
@@ -188,7 +188,7 @@ static int parse_list (char *list, int **result)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char *argv[])
+static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-ab:c:dfh?ilmnpqtuvV";
 	static struct option lopt[] = {
@@ -222,7 +222,7 @@ static int parse_options (int argc, char *argv[])
 
 	opts.count = 1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
@@ -245,7 +245,7 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'b':
 			if (!opts.bytes) {
-				if (!parse_list (optarg, &opts.bytes))
+				if (!parse_list(optarg, &opts.bytes))
 					err++;
 			} else {
 				err++;
@@ -254,7 +254,7 @@ static int parse_options (int argc, char *argv[])
 		case 'c':
 			if (opts.count == 1) {
 				end = NULL;
-				opts.count = strtol (optarg, &end, 0);
+				opts.count = strtol(optarg, &end, 0);
 				if (end && *end)
 					err++;
 			} else {
@@ -300,9 +300,9 @@ static int parse_options (int argc, char *argv[])
 			break;
 		default:
 			if ((optopt == 'b') || (optopt == 'c')) {
-				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+				Eprintf("Option '%s' requires an argument.\n", argv[optind-1]);
 			} else {
-				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+				Eprintf("Unknown option '%s'.\n", argv[optind-1]);
 			}
 			err++;
 			break;
@@ -314,35 +314,35 @@ static int parse_options (int argc, char *argv[])
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify exactly one device.\n");
+				Eprintf("You must specify exactly one device.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			Eprintf("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
 
 		/*
 		if (opts.info && (opts.unused || opts.tails || opts.mft || opts.directory)) {
-			Eprintf ("You may not use any other options with --info.\n");
+			Eprintf("You may not use any other options with --info.\n");
 			err++;
 		}
 		*/
 
 		if ((opts.count < 1) || (opts.count > 100)) {
-			Eprintf ("The iteration count must be between 1 and 100.\n");
+			Eprintf("The iteration count must be between 1 and 100.\n");
 			err++;
 		}
 
 		/* Create a default list */
 		if (!opts.bytes) {
-			opts.bytes = malloc (2 * sizeof (int));
+			opts.bytes = malloc(2 * sizeof(int));
 			if (opts.bytes) {
 				opts.bytes[0] =  0;
 				opts.bytes[1] = -1;
 			} else {
-				Eprintf ("Couldn't allocate memory for byte list.\n");
+				Eprintf("Couldn't allocate memory for byte list.\n");
 				err++;
 			}
 		}
@@ -373,7 +373,7 @@ static int parse_options (int argc, char *argv[])
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_unused(ntfs_volume *vol, int byte, enum action act)
 {
 	s64 i;
 	s64 total = 0;
@@ -384,25 +384,25 @@ static s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 		return -1;
 
 	if (act != act_info) {
-		buffer = malloc (vol->cluster_size);
+		buffer = malloc(vol->cluster_size);
 		if (!buffer) {
-			Eprintf ("malloc failed\n");
+			Eprintf("malloc failed\n");
 			return -1;
 		}
-		memset (buffer, byte, vol->cluster_size);
+		memset(buffer, byte, vol->cluster_size);
 	}
 
 	for (i = 0; i < vol->nr_clusters; i++) {
-		if (utils_cluster_in_use (vol, i)) {
-			//Vprintf ("cluster %lld is in use\n", i);
+		if (utils_cluster_in_use(vol, i)) {
+			//Vprintf("cluster %lld is in use\n", i);
 			continue;
 		}
 
 		if (act == act_wipe) {
-			//Vprintf ("cluster %lld is not in use\n", i);
-			result = ntfs_pwrite (vol->dev, vol->cluster_size * i, vol->cluster_size, buffer);
+			//Vprintf("cluster %lld is not in use\n", i);
+			result = ntfs_pwrite(vol->dev, vol->cluster_size * i, vol->cluster_size, buffer);
 			if (result != vol->cluster_size) {
-				Eprintf ("write failed\n");
+				Eprintf("write failed\n");
 				goto free;
 			}
 		}
@@ -410,9 +410,9 @@ static s64 wipe_unused (ntfs_volume *vol, int byte, enum action act)
 		total += vol->cluster_size;
 	}
 
-	Qprintf ("wipe_unused 0x%02x, %lld bytes\n", byte, (long long)total);
+	Qprintf("wipe_unused 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
-	free (buffer);
+	free(buffer);
 	return total;
 }
 
@@ -427,7 +427,7 @@ free:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
+static s64 wipe_compressed_attribute(ntfs_volume *vol, int byte,
 						enum action act, ntfs_attr *na)
 {
 	unsigned char *buf;
@@ -458,12 +458,12 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 			rlt = rlc;
 			while ((rlt - 1)->lcn == LCN_HOLE) rlt--;
 			while (1) {
-				ret = ntfs_rl_pread (vol, na->rl,
+				ret = ntfs_rl_pread(vol, na->rl,
 						offset, 2, &block_size);
-				block_size = le16_to_cpu (block_size);
+				block_size = le16_to_cpu(block_size);
 				if (ret != 2) {
-					Vprintf ("Internal error\n");
-					Eprintf ("ntfs_rl_pread failed");
+					Vprintf("Internal error\n");
+					Eprintf("ntfs_rl_pread failed");
 					return -1;
 				}
 				if (block_size == 0) {
@@ -484,8 +484,8 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 		}
 
 		if (size < 0) {
-			Vprintf ("Internal error\n");
-			Eprintf ("bug or damaged fs: we want "
+			Vprintf("Internal error\n");
+			Eprintf("bug or damaged fs: we want "
 				"allocate buffer size %lld bytes", size);
 			return -1;
 		}
@@ -496,20 +496,20 @@ static s64 wipe_compressed_attribute (ntfs_volume *vol, int byte,
 			continue;
 		}
 
-		buf = malloc (size);
+		buf = malloc(size);
 		if (!buf) {
-			Vprintf ("Not enough memory\n");
-			Eprintf ("Not enough memory to allocate "
+			Vprintf("Not enough memory\n");
+			Eprintf("Not enough memory to allocate "
 							"%lld bytes", size);
 			return -1;
 		}
-		memset (buf, byte, size);
+		memset(buf, byte, size);
 
-		ret = ntfs_rl_pwrite (vol, na->rl, offset, size, buf);
-		free (buf);
+		ret = ntfs_rl_pwrite(vol, na->rl, offset, size, buf);
+		free(buf);
 		if (ret != size) {
-			Vprintf ("Internal error\n");
-			Eprintf ("ntfs_rl_pwrite failed, offset %llu, "
+			Vprintf("Internal error\n");
+			Eprintf("ntfs_rl_pwrite failed, offset %llu, "
 				"size %lld, vcn %lld",	offset, size, rlc->vcn);
 			return -1;
 		}
@@ -532,7 +532,7 @@ next:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
+static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 								ntfs_attr *na)
 {
 	unsigned char *buf;
@@ -549,21 +549,21 @@ static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
 	if (act == act_info)
 		return size;
 
-	buf = malloc (size);
+	buf = malloc(size);
 	if (!buf) {
-		Vprintf ("Not enough memory\n");
-		Eprintf ("Not enough memory to allocate %lld bytes", size);
+		Vprintf("Not enough memory\n");
+		Eprintf("Not enough memory to allocate %lld bytes", size);
 		return -1;
 	}
-	memset (buf, byte, size);
+	memset(buf, byte, size);
 
-	wiped = ntfs_rl_pwrite (vol, na->rl, offset, size, buf);
+	wiped = ntfs_rl_pwrite(vol, na->rl, offset, size, buf);
 	if (wiped == -1) {
-		Vprintf ("Internal error\n");
-		Eprintf ("Couldn't wipe tail");
+		Vprintf("Internal error\n");
+		Eprintf("Couldn't wipe tail");
 	}
 
-	free (buf);
+	free(buf);
 	return wiped;
 }
 
@@ -580,7 +580,7 @@ static s64 wipe_attribute (ntfs_volume *vol, int byte, enum action act,
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
 	s64 nr_mft_records, inode_num;
@@ -596,56 +596,56 @@ static s64 wipe_tails (ntfs_volume *vol, int byte, enum action act)
 	for (inode_num = 16; inode_num < nr_mft_records; inode_num++) {
 		s64 wiped;
 
-		Vprintf ("Inode %lld - ", inode_num);
-		ni = ntfs_inode_open (vol, inode_num);
+		Vprintf("Inode %lld - ", inode_num);
+		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
-			Vprintf ("Could not open inode\n");
+			Vprintf("Could not open inode\n");
 			continue;
 		}
 
 		if (ni->mrec->base_mft_record) {
-			Vprintf ("Not base mft record. Skipping\n");
+			Vprintf("Not base mft record. Skipping\n");
 			goto close_inode;
 		}
 
-		na = ntfs_attr_open (ni, AT_DATA, AT_UNNAMED, 0);
+		na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 		if (!na) {
-			Vprintf ("Couldn't open $DATA attribute\n");
+			Vprintf("Couldn't open $DATA attribute\n");
 			goto close_inode;
 		}
 
 		if (!NAttrNonResident(na)) {
-			Vprintf ("Resident $DATA attribute. Skipping.\n");
+			Vprintf("Resident $DATA attribute. Skipping.\n");
 			goto close_attr;
 		}
 
 		if (ntfs_attr_map_whole_runlist(na)) {
-			Vprintf ("Internal error\n");
-			Eprintf ("Can't map runlist (inode %lld)\n", inode_num);
+			Vprintf("Internal error\n");
+			Eprintf("Can't map runlist (inode %lld)\n", inode_num);
 			goto close_attr;
 		}
 
 		if (NAttrCompressed(na))
-			wiped = wipe_compressed_attribute (vol, byte, act, na);
+			wiped = wipe_compressed_attribute(vol, byte, act, na);
 		else
-			wiped = wipe_attribute (vol, byte, act, na);
+			wiped = wipe_attribute(vol, byte, act, na);
 
 		if (wiped == -1) {
-			Eprintf (" (inode %lld)\n", inode_num);
+			Eprintf(" (inode %lld)\n", inode_num);
 			goto close_attr;
 		}
 
 		if (wiped) {
-			Vprintf ("Wiped %llu bytes\n", wiped);
+			Vprintf("Wiped %llu bytes\n", wiped);
 			total += wiped;
 		} else
-			Vprintf ("Nothing to wipe\n");
+			Vprintf("Nothing to wipe\n");
 close_attr:
-		ntfs_attr_close (na);
+		ntfs_attr_close(na);
 close_inode:
-		ntfs_inode_close (ni);
+		ntfs_inode_close(ni);
 	}
-	Qprintf ("wipe_tails 0x%02x, %lld bytes\n", byte, total);
+	Qprintf("wipe_tails 0x%02x, %lld bytes\n", byte, total);
 	return total;
 }
 
@@ -662,7 +662,7 @@ close_inode:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 {
 	// by considering the individual attributes we might be able to
 	// wipe a few more bytes at the attr's tail.
@@ -675,9 +675,9 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 	if (!vol || (byte < 0))
 		return -1;
 
-	buffer = malloc (vol->mft_record_size);
+	buffer = malloc(vol->mft_record_size);
 	if (!buffer) {
-		Eprintf ("malloc failed\n");
+		Eprintf("malloc failed\n");
 		return -1;
 	}
 
@@ -685,11 +685,11 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			vol->mft_record_size_bits;
 
 	for (i = 0; i < nr_mft_records; i++) {
-		if (utils_mftrec_in_use (vol, i)) {
-			result = ntfs_attr_mst_pread (vol->mft_na, vol->mft_record_size * i,
+		if (utils_mftrec_in_use(vol, i)) {
+			result = ntfs_attr_mst_pread(vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst read %lld\n",
+				Eprintf("error attr mst read %lld\n",
 						(long long)i);
 				total = -1;	// XXX just negate result?
 				goto free;
@@ -699,17 +699,17 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			size = *((u32*) (buffer + 0x18)) - 4;
 
 			if (act == act_info) {
-				//printf ("mft %d\n", size);
+				//printf("mft %d\n", size);
 				total += size;
 				continue;
 			}
 
-			memset (buffer + size, byte, vol->mft_record_size - size);
+			memset(buffer + size, byte, vol->mft_record_size - size);
 
-			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
+			result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst write %lld\n",
+				Eprintf("error attr mst write %lld\n",
 						(long long)i);
 				total = -1;
 				goto free;
@@ -720,14 +720,14 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 				// We have to reduce the update sequence number, or else...
 				u16 offset;
 				u16 usa;
-				offset = le16_to_cpu (*(buffer + 0x04));
-				usa = le16_to_cpu (*(buffer + offset));
-				*((u16*) (buffer + offset)) = cpu_to_le16 (usa - 1);
+				offset = le16_to_cpu(*(buffer + 0x04));
+				usa = le16_to_cpu(*(buffer + offset));
+				*((u16*) (buffer + offset)) = cpu_to_le16(usa - 1);
 
-				result = ntfs_attr_mst_pwrite (vol->mftmirr_na, vol->mft_record_size * i,
+				result = ntfs_attr_mst_pwrite(vol->mftmirr_na, vol->mft_record_size * i,
 					1, vol->mft_record_size, buffer);
 				if (result != 1) {
-					Eprintf ("error attr mst write %lld\n",
+					Eprintf("error attr mst write %lld\n",
 							(long long)i);
 					total = -1;
 					goto free;
@@ -742,33 +742,33 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 			}
 
 			// Build the record from scratch
-			memset (buffer, 0, vol->mft_record_size);
+			memset(buffer, 0, vol->mft_record_size);
 
 			// Common values
 			*((u32*) (buffer + 0x00)) = magic_FILE;				// Magic
-			*((u16*) (buffer + 0x06)) = cpu_to_le16 (0x0003);		// USA size
-			*((u16*) (buffer + 0x10)) = cpu_to_le16 (0x0001);		// Seq num
-			*((u32*) (buffer + 0x1C)) = cpu_to_le32 (vol->mft_record_size);	// FILE size
-			*((u16*) (buffer + 0x28)) = cpu_to_le16 (0x0001);		// Attr ID
+			*((u16*) (buffer + 0x06)) = cpu_to_le16(0x0003);		// USA size
+			*((u16*) (buffer + 0x10)) = cpu_to_le16(0x0001);		// Seq num
+			*((u32*) (buffer + 0x1C)) = cpu_to_le32(vol->mft_record_size);	// FILE size
+			*((u16*) (buffer + 0x28)) = cpu_to_le16(0x0001);		// Attr ID
 
 			if (vol->major_ver == 3) {
 				// Only XP and 2K3
-				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x0030);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0038);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000040);	// FILE usage
-				*((u32*) (buffer + 0x38)) = cpu_to_le32 (0xFFFFFFFF);	// End marker
+				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x0030);	// USA offset
+				*((u16*) (buffer + 0x14)) = cpu_to_le16(0x0038);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32(0x00000040);	// FILE usage
+				*((u32*) (buffer + 0x38)) = cpu_to_le32(0xFFFFFFFF);	// End marker
 			} else {
 				// Only NT and 2K
-				*((u16*) (buffer + 0x04)) = cpu_to_le16 (0x002A);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16 (0x0030);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32 (0x00000038);	// FILE usage
-				*((u32*) (buffer + 0x30)) = cpu_to_le32 (0xFFFFFFFF);	// End marker
+				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x002A);	// USA offset
+				*((u16*) (buffer + 0x14)) = cpu_to_le16(0x0030);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32(0x00000038);	// FILE usage
+				*((u32*) (buffer + 0x30)) = cpu_to_le32(0xFFFFFFFF);	// End marker
 			}
 
-			result = ntfs_attr_mst_pwrite (vol->mft_na, vol->mft_record_size * i,
+			result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
 				1, vol->mft_record_size, buffer);
 			if (result != 1) {
-				Eprintf ("error attr mst write %lld\n",
+				Eprintf("error attr mst write %lld\n",
 						(long long)i);
 				total = -1;
 				goto free;
@@ -778,9 +778,9 @@ static s64 wipe_mft (ntfs_volume *vol, int byte, enum action act)
 		}
 	}
 
-	Qprintf ("wipe_mft 0x%02x, %lld bytes\n", byte, (long long)total);
+	Qprintf("wipe_mft 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
-	free (buffer);
+	free(buffer);
 	return total;
 }
 
@@ -797,7 +797,7 @@ free:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
+static s64 wipe_index_allocation(ntfs_volume *vol, int byte, enum action act
 	__attribute__((unused)), ntfs_attr *naa, ntfs_attr *nab,
 	u32 indx_record_size)
 {
@@ -812,25 +812,25 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
 	u8 *bitmap;
 	u8 *buf;
 
-	bitmap = malloc (nab->data_size);
+	bitmap = malloc(nab->data_size);
 	if (!bitmap) {
-		Vprintf ("malloc failed\n");
-		Eprintf ("Couldn't allocate %lld bytes", nab->data_size);
+		Vprintf("malloc failed\n");
+		Eprintf("Couldn't allocate %lld bytes", nab->data_size);
 		return -1;
 	}
 
-	if (ntfs_attr_pread (nab, 0, nab->data_size, bitmap)
+	if (ntfs_attr_pread(nab, 0, nab->data_size, bitmap)
 						!= nab->data_size) {
-		Vprintf ("Internal error\n");
-		Eprintf ("Couldn't read $BITMAP");
+		Vprintf("Internal error\n");
+		Eprintf("Couldn't read $BITMAP");
 		total = -1;
 		goto free_bitmap;
 	}
 
-	buf = malloc (indx_record_size);
+	buf = malloc(indx_record_size);
 	if (!buf) {
-		Vprintf ("malloc failed\n");
-		Eprintf ("Couldn't allocate %u bytes",
+		Vprintf("malloc failed\n");
+		Eprintf("Couldn't allocate %u bytes",
 				(unsigned int)indx_record_size);
 		total = -1;
 		goto free_bitmap;
@@ -841,24 +841,24 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
 		if (bitmap[obyte] & mask) {
 			INDEX_ALLOCATION *indx;
 
-			s64 ret = ntfs_rl_pread (vol, naa->rl,
+			s64 ret = ntfs_rl_pread(vol, naa->rl,
 					offset, indx_record_size, buf);
 			if (ret != indx_record_size) {
-				Vprintf ("ntfs_rl_pread failed\n");
-				Eprintf ("Couldn't read INDX record");
+				Vprintf("ntfs_rl_pread failed\n");
+				Eprintf("Couldn't read INDX record");
 				total = -1;
 				goto free_buf;
 			}
 
 			indx = (INDEX_ALLOCATION *) buf;
-			if (ntfs_mst_post_read_fixup ((NTFS_RECORD *)buf,
+			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)buf,
 								indx_record_size))
-				Eprintf ("damaged fs: mst_post_read_fixup failed");
+				Eprintf("damaged fs: mst_post_read_fixup failed");
 
 			if ((le32_to_cpu(indx->index.allocated_size) + 0x18) !=
 							indx_record_size) {
-				Vprintf ("Internal error\n");
-				Eprintf ("INDX record should be %u bytes",
+				Vprintf("Internal error\n");
+				Eprintf("INDX record should be %u bytes",
 						(unsigned int)indx_record_size);
 				total = -1;
 				goto free_buf;
@@ -866,23 +866,23 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
 
 			wipe_offset = le32_to_cpu(indx->index.index_length) + 0x18;
 			wipe_size = indx_record_size - wipe_offset;
-			memset (buf + wipe_offset, byte, wipe_size);
-			if (ntfs_mst_pre_write_fixup ((NTFS_RECORD *)indx,
+			memset(buf + wipe_offset, byte, wipe_size);
+			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)indx,
 								indx_record_size))
-				Eprintf ("damaged fs: mst_pre_write_protect failed");
+				Eprintf("damaged fs: mst_pre_write_protect failed");
 			if (opts.verbose > 1)
-				Vprintf ("+");
+				Vprintf("+");
 		} else {
 			wipe_size = indx_record_size;
-			memset (buf, byte, wipe_size);
+			memset(buf, byte, wipe_size);
 			if (opts.verbose > 1)
-				Vprintf ("x");
+				Vprintf("x");
 		}
 
-		wiped = ntfs_rl_pwrite (vol, naa->rl, offset, indx_record_size, buf);
+		wiped = ntfs_rl_pwrite(vol, naa->rl, offset, indx_record_size, buf);
 		if (wiped != indx_record_size) {
-			Vprintf ("ntfs_rl_pwrite failed\n");
-			Eprintf ("Couldn't wipe tail of INDX record");
+			Vprintf("ntfs_rl_pwrite failed\n");
+			Eprintf("Couldn't wipe tail of INDX record");
 			total = -1;
 			goto free_buf;
 		}
@@ -896,11 +896,11 @@ static s64 wipe_index_allocation (ntfs_volume *vol, int byte, enum action act
 		}
 	}
 	if ((opts.verbose > 1) && (wiped != -1))
-		Vprintf ("\n\t");
+		Vprintf("\n\t");
 free_buf:
-	free (buf);
+	free(buf);
 free_bitmap:
-	free (bitmap);
+	free(bitmap);
 	return total;
 }
 
@@ -911,20 +911,20 @@ free_bitmap:
  * Return: >0  Success, return INDX record size
  *          0  Error, something went wrong
  */
-static u32 get_indx_record_size (ntfs_attr *nar)
+static u32 get_indx_record_size(ntfs_attr *nar)
 {
 	u32 indx_record_size;
 
-	if (ntfs_attr_pread (nar, 8, 4, &indx_record_size) != 4) {
-		Vprintf ("Couldn't determine size of INDX record\n");
-		Eprintf ("ntfs_attr_pread failed");
+	if (ntfs_attr_pread(nar, 8, 4, &indx_record_size) != 4) {
+		Vprintf("Couldn't determine size of INDX record\n");
+		Eprintf("ntfs_attr_pread failed");
 		return 0;
 	}
 
-	indx_record_size = le32_to_cpu (indx_record_size);
+	indx_record_size = le32_to_cpu(indx_record_size);
 	if (!indx_record_size) {
-		Vprintf ("Internal error\n");
-		Eprintf ("INDX record should be 0");
+		Vprintf("Internal error\n");
+		Eprintf("INDX record should be 0");
 	}
 	return indx_record_size;
 }
@@ -942,7 +942,7 @@ static u32 get_indx_record_size (ntfs_attr *nar)
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
+static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
 	s64 nr_mft_records, inode_num;
@@ -961,101 +961,101 @@ static s64 wipe_directory (ntfs_volume *vol, int byte, enum action act)
 		u32 indx_record_size;
 		s64 wiped;
 
-		Vprintf ("Inode %lld - ", inode_num);
-		ni = ntfs_inode_open (vol, inode_num);
+		Vprintf("Inode %lld - ", inode_num);
+		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
 			if (opts.verbose > 2)
-				Vprintf ("Could not open inode\n");
+				Vprintf("Could not open inode\n");
 			else
-				Vprintf ("\r");
+				Vprintf("\r");
 			continue;
 		}
 
 		if (ni->mrec->base_mft_record) {
 			if (opts.verbose > 2)
-				Vprintf ("Not base mft record. Skipping\n");
+				Vprintf("Not base mft record. Skipping\n");
 			else
-				Vprintf ("\r");
+				Vprintf("\r");
 			goto close_inode;
 		}
 
-		naa = ntfs_attr_open (ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
+		naa = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (!naa) {
 			if (opts.verbose > 2)
-				Vprintf ("Couldn't open $INDEX_ALLOCATION\n");
+				Vprintf("Couldn't open $INDEX_ALLOCATION\n");
 			else
-				Vprintf ("\r");
+				Vprintf("\r");
 			goto close_inode;
 		}
 
 		if (!NAttrNonResident(naa)) {
-			Vprintf ("Resident $INDEX_ALLOCATION\n");
-			Eprintf ("damaged fs: Resident $INDEX_ALLOCATION "
+			Vprintf("Resident $INDEX_ALLOCATION\n");
+			Eprintf("damaged fs: Resident $INDEX_ALLOCATION "
 					"(inode %lld)\n", inode_num);
 			goto close_attr_allocation;
 		}
 
 		if (ntfs_attr_map_whole_runlist(naa)) {
-			Vprintf ("Internal error\n");
-			Eprintf ("Can't map runlist for $INDEX_ALLOCATION "
+			Vprintf("Internal error\n");
+			Eprintf("Can't map runlist for $INDEX_ALLOCATION "
 					"(inode %lld)\n", inode_num);
 			goto close_attr_allocation;
 		}
 
-		nab = ntfs_attr_open (ni, AT_BITMAP, NTFS_INDEX_I30, 4);
+		nab = ntfs_attr_open(ni, AT_BITMAP, NTFS_INDEX_I30, 4);
 		if (!nab) {
-			Vprintf ("Couldn't open $BITMAP\n");
-			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, "
+			Vprintf("Couldn't open $BITMAP\n");
+			Eprintf("damaged fs: $INDEX_ALLOCATION is present, "
 					"but we can't open $BITMAP with same "
 					"name (inode %lld)\n", inode_num);
 			goto close_attr_allocation;
 		}
 
-		nar = ntfs_attr_open (ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
+		nar = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
 		if (!nar) {
-			Vprintf ("Couldn't open $INDEX_ROOT\n");
-			Eprintf ("damaged fs: $INDEX_ALLOCATION is present, but "
+			Vprintf("Couldn't open $INDEX_ROOT\n");
+			Eprintf("damaged fs: $INDEX_ALLOCATION is present, but "
 					"we can't open $INDEX_ROOT with same name"
 					" (inode %lld)\n", inode_num);
 			goto close_attr_bitmap;
 		}
 
 		if (NAttrNonResident(nar)) {
-			Vprintf ("Not resident $INDEX_ROOT\n");
-			Eprintf ("damaged fs: Not resident $INDEX_ROOT "
+			Vprintf("Not resident $INDEX_ROOT\n");
+			Eprintf("damaged fs: Not resident $INDEX_ROOT "
 					"(inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
 
-		indx_record_size = get_indx_record_size (nar);
+		indx_record_size = get_indx_record_size(nar);
 		if (!indx_record_size) {
-			Eprintf (" (inode %lld)\n", inode_num);
+			Eprintf(" (inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
 
-		wiped = wipe_index_allocation (vol, byte, act,
+		wiped = wipe_index_allocation(vol, byte, act,
 						naa, nab, indx_record_size);
 		if (wiped == -1) {
-			Eprintf (" (inode %lld)\n", inode_num);
+			Eprintf(" (inode %lld)\n", inode_num);
 			goto close_attr_root;
 		}
 
 		if (wiped) {
-			Vprintf ("Wiped %llu bytes\n", wiped);
+			Vprintf("Wiped %llu bytes\n", wiped);
 			total += wiped;
 		} else
-			Vprintf ("Nothing to wipe\n");
+			Vprintf("Nothing to wipe\n");
 close_attr_root:
-		ntfs_attr_close (nar);
+		ntfs_attr_close(nar);
 close_attr_bitmap:
-		ntfs_attr_close (nab);
+		ntfs_attr_close(nab);
 close_attr_allocation:
-		ntfs_attr_close (naa);
+		ntfs_attr_close(naa);
 close_inode:
-		ntfs_inode_close (ni);
+		ntfs_inode_close(ni);
 	}
 
-	Qprintf ("wipe_directory 0x%02x, %lld bytes\n", byte, total);
+	Qprintf("wipe_directory 0x%02x, %lld bytes\n", byte, total);
 	return total;
 }
 
@@ -1072,7 +1072,7 @@ close_inode:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
+static s64 wipe_logfile(ntfs_volume *vol, int byte, enum action act
 	__attribute__((unused)))
 {
 	const int NTFS_BUF_SIZE2 = 8192;
@@ -1091,7 +1091,7 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 	if (!vol || (byte < 0))
 		return -1;
 
-	//Qprintf ("wipe_logfile (not implemented) 0x%02x\n", byte);
+	//Qprintf("wipe_logfile(not implemented) 0x%02x\n", byte);
 
 	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
 		ntfs_log_debug("Failed to open inode FILE_LogFile.\n");
@@ -1155,7 +1155,7 @@ static s64 wipe_logfile (ntfs_volume *vol, int byte, enum action act
 
 	ntfs_attr_close(na);
 	ntfs_inode_close(ni);
-	Qprintf ("wipe_logfile 0x%02x, %lld bytes\n", byte, pos);
+	Qprintf("wipe_logfile 0x%02x, %lld bytes\n", byte, pos);
 	return pos;
 
 io_error_exit:
@@ -1182,7 +1182,7 @@ error_exit:
  *          0  Nothing to wipe
  *         -1  Error, something went wrong
  */
-static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
+static s64 wipe_pagefile(ntfs_volume *vol, int byte, enum action act
 	__attribute__((unused)))
 {
 	// wipe completely, chkdsk doesn't do anything, booting writes header
@@ -1196,7 +1196,7 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 	if (!vol || (byte < 0))
 		return -1;
 
-	//Qprintf ("wipe_pagefile (not implemented) 0x%02x\n", byte);
+	//Qprintf("wipe_pagefile(not implemented) 0x%02x\n", byte);
 
 	ni = ntfs_pathname_to_inode(vol, NULL, "pagefile.sys");
 	if (!ni) {
@@ -1245,7 +1245,7 @@ static s64 wipe_pagefile (ntfs_volume *vol, int byte, enum action act
 
 	ntfs_attr_close(na);
 	ntfs_inode_close(ni);
-	Qprintf ("wipe_pagefile 0x%02x, %lld bytes\n", byte, pos);
+	Qprintf("wipe_pagefile 0x%02x, %lld bytes\n", byte, pos);
 	return pos;
 
 io_error_exit:
@@ -1267,38 +1267,38 @@ error_exit:
  *
  * Return:  none
  */
-static void print_summary (void)
+static void print_summary(void)
 {
 	int i;
 
 	if (opts.noaction)
-		Qprintf ("%s is in 'no-action' mode, it will NOT write to disk."
+		Qprintf("%s is in 'no-action' mode, it will NOT write to disk."
 			 "\n\n", EXEC_NAME);
 
-	Qprintf ("%s is about to wipe:\n", EXEC_NAME);
+	Qprintf("%s is about to wipe:\n", EXEC_NAME);
 	if (opts.unused)
-		Qprintf ("\tunused disk space\n");
+		Qprintf("\tunused disk space\n");
 	if (opts.tails)
-		Qprintf ("\tfile tails\n");
+		Qprintf("\tfile tails\n");
 	if (opts.mft)
-		Qprintf ("\tunused mft areas\n");
+		Qprintf("\tunused mft areas\n");
 	if (opts.directory)
-		Qprintf ("\tunused directory index space\n");
+		Qprintf("\tunused directory index space\n");
 	if (opts.logfile)
-		Qprintf ("\tthe logfile (journal)\n");
+		Qprintf("\tthe logfile (journal)\n");
 	if (opts.pagefile)
-		Qprintf ("\tthe pagefile (swap space)\n");
+		Qprintf("\tthe pagefile (swap space)\n");
 
-	Qprintf ("\n%s will overwrite these areas with: ", EXEC_NAME);
+	Qprintf("\n%s will overwrite these areas with: ", EXEC_NAME);
 	if (opts.bytes) {
 		for (i = 0; opts.bytes[i] >= 0; i++)
-			Qprintf ("0x%02x ", opts.bytes[i]);
+			Qprintf("0x%02x ", opts.bytes[i]);
 	}
-	Qprintf ("\n");
+	Qprintf("\n");
 
 	if (opts.count > 1)
-		Qprintf ("%s will repeat these operations %d times.\n", EXEC_NAME, opts.count);
-	Qprintf ("\n");
+		Qprintf("%s will repeat these operations %d times.\n", EXEC_NAME, opts.count);
+	Qprintf("\n");
 }
 
 /**
@@ -1309,7 +1309,7 @@ static void print_summary (void)
  * Return:  0  Success, the program worked
  *	    1  Error, something went wrong
  */
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	int result = 1;
@@ -1317,7 +1317,7 @@ int main (int argc, char *argv[])
 	int i, j;
 	enum action act = act_info;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv))
 		return 1;
 
 	utils_set_locale();
@@ -1328,7 +1328,7 @@ int main (int argc, char *argv[])
 	if (opts.info || opts.noaction)
 		flags = MS_RDONLY;
 
-	vol = utils_mount_volume (opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags, opts.force);
 	if (!vol)
 		goto free;
 
@@ -1346,11 +1346,11 @@ int main (int argc, char *argv[])
 
 	/* Even if the output it quieted, you still get 5 seconds to abort. */
 	if ((act == act_wipe) && !opts.force) {
-		Qprintf ("\n%s will begin in 5 seconds, press CTRL-C to abort.\n", EXEC_NAME);
-		sleep (5);
+		Qprintf("\n%s will begin in 5 seconds, press CTRL-C to abort.\n", EXEC_NAME);
+		sleep(5);
 	}
 
-	printf ("\n");
+	printf("\n");
 	for (i = 0; i < opts.count; i++) {
 		int byte;
 		s64 total = 0;
@@ -1359,7 +1359,7 @@ int main (int argc, char *argv[])
 		for (j = 0; byte = opts.bytes[j], byte >= 0; j++) {
 
 			if (opts.directory) {
-				wiped = wipe_directory (vol, byte, act);
+				wiped = wipe_directory(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1367,7 +1367,7 @@ int main (int argc, char *argv[])
 			}
 
 			if (opts.tails) {
-				wiped = wipe_tails (vol, byte, act);
+				wiped = wipe_tails(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1375,7 +1375,7 @@ int main (int argc, char *argv[])
 			}
 
 			if (opts.logfile) {
-				wiped = wipe_logfile (vol, byte, act);
+				wiped = wipe_logfile(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1383,7 +1383,7 @@ int main (int argc, char *argv[])
 			}
 
 			if (opts.mft) {
-				wiped = wipe_mft (vol, byte, act);
+				wiped = wipe_mft(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1391,7 +1391,7 @@ int main (int argc, char *argv[])
 			}
 
 			if (opts.pagefile) {
-				wiped = wipe_pagefile (vol, byte, act);
+				wiped = wipe_pagefile(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1399,7 +1399,7 @@ int main (int argc, char *argv[])
 			}
 
 			if (opts.unused) {
-				wiped = wipe_unused (vol, byte, act);
+				wiped = wipe_unused(vol, byte, act);
 				if (wiped < 0)
 					goto umount;
 				else
@@ -1410,13 +1410,13 @@ int main (int argc, char *argv[])
 				break;
 		}
 
-		printf ("%lld bytes were wiped\n", (long long)total);
+		printf("%lld bytes were wiped\n", (long long)total);
 	}
 	result = 0;
 umount:
-	ntfs_umount (vol, FALSE);
+	ntfs_umount(vol, FALSE);
 free:
 	if (opts.bytes)
-		free (opts.bytes);
+		free(opts.bytes);
 	return result;
 }

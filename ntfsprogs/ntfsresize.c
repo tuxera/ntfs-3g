@@ -301,7 +301,7 @@ __attribute__((noreturn))
 static void usage(void)
 {
 
-	printf ("\nUsage: %s [OPTIONS] DEVICE\n"
+	printf("\nUsage: %s [OPTIONS] DEVICE\n"
 		"    Resize an NTFS volume non-destructively, safely move any data if needed.\n"
 		"\n"
 		"    -i, --info             Estimate the smallest shrunken size possible\n"
@@ -321,8 +321,8 @@ static void usage(void)
 		"    The options -i and -s are mutually exclusive. If both options are\n"
 		"    omitted then the NTFS volume will be enlarged to the DEVICE size.\n"
 		"\n", EXEC_NAME);
-	printf ("%s%s", ntfs_bugs, ntfs_home);
-	printf ("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
+	printf("%s%s", ntfs_bugs, ntfs_home);
+	printf("Ntfsresize FAQ: http://linux-ntfs.sourceforge.net/info/ntfsresize.html\n");
 	exit(1);
 }
 
@@ -356,13 +356,13 @@ static void proceed_question(void)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
-	printf ("\nResize an NTFS Volume, without data loss.\n\n");
-	printf ("Copyright (c) 2002-2005  Szabolcs Szakacsits\n");
-	printf ("Copyright (c) 2002-2004  Anton Altaparmakov\n");
-	printf ("Copyright (c) 2002-2003  Richard Russon\n");
-	printf ("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("\nResize an NTFS Volume, without data loss.\n\n");
+	printf("Copyright (c) 2002-2005  Szabolcs Szakacsits\n");
+	printf("Copyright (c) 2002-2004  Anton Altaparmakov\n");
+	printf("Copyright (c) 2002-2003  Richard Russon\n");
+	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -454,7 +454,7 @@ static int parse_options(int argc, char **argv)
 	memset(&opt, 0, sizeof(opt));
 	opt.show_progress = 1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!err && !opt.volume)

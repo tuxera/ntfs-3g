@@ -413,7 +413,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 				   "detected in $LogFile restart page.");
 			err = EINVAL;
 			goto err_out;
-	       }
+		}
 	}
 	/*
 	 * If the restart page is modified by chkdsk or there are no active

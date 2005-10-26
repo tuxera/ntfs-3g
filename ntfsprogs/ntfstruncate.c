@@ -171,8 +171,8 @@ static void license(void)
 /**
  * usage - print a list of the parameters to the program
  */
-__attribute__ ((noreturn))
-static void usage (void)
+__attribute__((noreturn))
+static void usage(void)
 {
 	copyright();
 	fprintf(stderr, "Usage: %s [options] device inode [attr-type "

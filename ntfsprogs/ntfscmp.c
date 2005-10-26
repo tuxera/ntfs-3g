@@ -153,7 +153,7 @@ __attribute__((noreturn))
 static void usage(void)
 {
 
-	printf ("\nUsage: %s [OPTIONS] DEVICE1 DEVICE2\n"
+	printf("\nUsage: %s [OPTIONS] DEVICE1 DEVICE2\n"
 		"    Compare two NTFS volumes and tell the differences.\n"
 		"\n"
 		"    -P, --no-progress-bar  Don't show progress bar\n"
@@ -163,7 +163,7 @@ static void usage(void)
 		"    -d, --debug            Show debug information\n"
 #endif
 		"\n", EXEC_NAME);
-	printf ("%s%s", ntfs_bugs, ntfs_home);
+	printf("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
@@ -186,7 +186,7 @@ static void parse_options(int argc, char **argv)
 	memset(&opt, 0, sizeof(opt));
 	opt.show_progress = 1;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opt.vol1) {

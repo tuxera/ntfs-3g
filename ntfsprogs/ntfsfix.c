@@ -136,7 +136,7 @@ static void parse_options(int argc, char **argv)
 
 	memset(&opt, 0, sizeof(opt));
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opt.volume)
@@ -307,7 +307,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 	unsigned char *m, *m2;
 	int i, ret = -1; /* failure */
 	BOOL done;
-	
+
 	puts("\nProcessing $MFT and $MFTMirr... ");
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
@@ -426,7 +426,7 @@ static int fix_mount(void)
 	int ret = -1; /* failure */
 	ntfs_volume *vol;
 	struct ntfs_device *dev;
-	
+
 	printf("Attempting to correct errors... ");
 
 	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);

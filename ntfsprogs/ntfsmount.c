@@ -80,7 +80,7 @@ typedef enum {
 	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
 #if 0
 	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
-#endif	
+#endif
 	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
 } ntfs_fuse_streams_interface;
 
@@ -670,7 +670,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 
 	if (strchr(old_path, ':') &&	/* n/a for named data streams. */
 			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
-		return -EINVAL; 
+		return -EINVAL;
 	if (strchr(new_path, ':') &&	/* n/a for named data streams. */
 			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL;

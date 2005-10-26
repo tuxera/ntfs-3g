@@ -69,10 +69,10 @@ static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
 volatile sig_atomic_t caught_terminate = 0;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
-static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
+static GEN_PRINTF(Printf,  stderr, NULL,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -81,12 +81,12 @@ static GEN_PRINTF (Printf,  stderr, NULL,   FALSE)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
 	Printf("\n%s v%s (libntfs %s) - Overwrite files on NTFS volume.\n\n",
 		EXEC_NAME, VERSION, ntfs_libntfs_version());
-	Printf ("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
-	Printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	Printf("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
+	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -96,9 +96,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	Printf ("\nUsage: %s [options] device src_file dest_file\n\n"
+	Printf("\nUsage: %s [options] device src_file dest_file\n\n"
 		"    -a  --attribute num   Write to this attribute\n"
 		"    -i  --inode           Treat dest_file as inode number\n"
 		"    -f  --force           Use less caution\n"
@@ -109,7 +109,7 @@ static void usage (void)
 		"    -V  --version         Version information\n"
 		"    -v  --verbose         More output\n\n",
 		EXEC_NAME);
-	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	Printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -121,7 +121,7 @@ static void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char **argv)
+static int parse_options(int argc, char **argv)
 {
 	static const char *sopt = "-a:ifh?N:nqVv";
 	static const struct option lopt[] = {
@@ -263,7 +263,7 @@ static void signal_handler(int arg __attribute__((unused)))
  * Return:  0  Success, the program worked
  *	    1  Error, something went wrong
  */
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	FILE *in;
 	ntfs_volume *vol;
@@ -308,7 +308,7 @@ int main (int argc, char *argv[])
 
 	{
 		struct stat fst;
-		if (stat (opts.src_file, &fst) == -1) {
+		if (stat(opts.src_file, &fst) == -1) {
 			perror("ERROR: Couldn't stat source file");
 			goto umount;
 		}

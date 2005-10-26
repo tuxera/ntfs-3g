@@ -98,7 +98,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 			guid->data4[2], guid->data4[3], guid->data4[4],
 			guid->data4[5], guid->data4[6], guid->data4[7]);
 	if (res == 36)
-	       return _guid_str;
+		return _guid_str;
 	if (!guid_str)
 		free(_guid_str);
 	errno = EINVAL;

@@ -60,9 +60,9 @@ static struct options {
 	int	 noaction;	/* Do not write to disk */
 } opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -71,16 +71,16 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
-	printf ("\n%s v%s (libntfs %s) - Display, or set, the label for an "
+	printf("\n%s v%s (libntfs %s) - Display, or set, the label for an "
 			"NTFS Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf ("Copyright (c)\n");
-	printf ("    2002      Matthew J. Fanto\n");
-	printf ("    2002-2005 Anton Altaparmakov\n");
-	printf ("    2002-2003 Richard Russon\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("Copyright (c)\n");
+	printf("    2002      Matthew J. Fanto\n");
+	printf("    2002-2005 Anton Altaparmakov\n");
+	printf("    2002-2003 Richard Russon\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -90,9 +90,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	printf ("\nUsage: %s [options] device [label]\n"
+	printf("\nUsage: %s [options] device [label]\n"
 	       "    -n    --no-action    Do not write to disk\n"
 	       "    -f    --force        Use less caution\n"
 	       "    -q    --quiet        Less output\n"
@@ -100,7 +100,7 @@ static void usage (void)
 	       "    -V    --version      Display version information\n"
 	       "    -h    --help         Display this help\n\n",
 	       EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -112,7 +112,7 @@ static void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char *argv[])
+static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-fh?nqvV";
 	static const struct option lopt[] = {
@@ -132,7 +132,7 @@ static int parse_options (int argc, char *argv[])
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!err && !opts.device)
@@ -162,7 +162,7 @@ static int parse_options (int argc, char *argv[])
 			ver++;
 			break;
 		default:
-			Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
 			err++;
 			break;
 		}
@@ -173,12 +173,12 @@ static int parse_options (int argc, char *argv[])
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify a device.\n");
+				Eprintf("You must specify a device.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at "
+			Eprintf("You may not use --quiet and --verbose at "
 					"the same time.\n");
 			err++;
 		}
@@ -201,13 +201,13 @@ static int parse_options (int argc, char *argv[])
  *
  * Print the label of the device @dev to stdout.
  */
-static int print_label (ntfs_volume *vol, unsigned long mnt_flags)
+static int print_label(ntfs_volume *vol, unsigned long mnt_flags)
 {
 	int result = 0;
 	//XXX significant?
 	if ((mnt_flags & (NTFS_MF_MOUNTED | NTFS_MF_READONLY)) ==
 			NTFS_MF_MOUNTED) {
-		Eprintf ("%s is mounted read-write, results may be "
+		Eprintf("%s is mounted read-write, results may be "
 			"unreliable.\n", opts.device);
 		result = 1;
 	}
@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 	int result = 0;
 	ntfs_volume *vol;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv))
 		return 1;
 
 	utils_set_locale();
@@ -380,17 +380,17 @@ int main(int argc, char **argv)
 	if (!opts.label)
 		opts.noaction++;
 
-	vol = utils_mount_volume (opts.device, opts.noaction ? MS_RDONLY : 0,
+	vol = utils_mount_volume(opts.device, opts.noaction ? MS_RDONLY : 0,
 			opts.force);
 	if (!vol)
 		return 1;
 
 	if (opts.label)
-		result = change_label (vol, mnt_flags, opts.label, opts.force);
+		result = change_label(vol, mnt_flags, opts.label, opts.force);
 	else
-		result = print_label (vol, mnt_flags);
+		result = print_label(vol, mnt_flags);
 
-	ntfs_umount (vol, FALSE);
+	ntfs_umount(vol, FALSE);
 	return result;
 }
 

@@ -92,9 +92,9 @@ static struct options {
 	u8	 padding[4];	/* Unused: padding to 64 bit. */
 } opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * version - Print version information about the program
@@ -103,18 +103,18 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
-	printf ("\n%s v%s (libntfs %s) - Display information about an NTFS "
+	printf("\n%s v%s (libntfs %s) - Display information about an NTFS "
 			"Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf ("Copyright (c)\n");
-	printf ("    2002-2004 Matthew J. Fanto\n");
-	printf ("    2002-2005 Anton Altaparmakov\n");
-	printf ("    2002-2003 Richard Russon\n");
-	printf ("    2003      Leonard Norrgård\n");
-	printf ("    2004-2005 Yura Pakhuchiy\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("Copyright (c)\n");
+	printf("    2002-2004 Matthew J. Fanto\n");
+	printf("    2002-2005 Anton Altaparmakov\n");
+	printf("    2002-2003 Richard Russon\n");
+	printf("    2003      Leonard Norrgård\n");
+	printf("    2004-2005 Yura Pakhuchiy\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -124,9 +124,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	printf ("\nUsage: %s [options] -d dev\n"
+	printf("\nUsage: %s [options] -d dev\n"
 		"    -d dev  --device dev The ntfs volume to display information about\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"    -F file --file file  Display information about this file (absolute path)\n"
@@ -139,7 +139,7 @@ static void usage (void)
 		"    -V      --version    Display version information\n"
 		"    -h      --help       Display this help\n\n",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -151,7 +151,7 @@ static void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char *argv[])
+static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-:fhi:F:mqtTvVd:";
 	static const struct option lopt[] = {
@@ -178,7 +178,7 @@ static int parse_options (int argc, char *argv[])
 	opts.inode = -1;
 	opts.filename = NULL;
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		ntfs_log_trace("optind=%d; c='%c' optarg=\"%s\".\n", optind, c,
 				optarg);
 		switch (c) {
@@ -190,7 +190,7 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'i':
 			if ((opts.inode != -1) ||
-			    (!utils_parse_size (optarg, &opts.inode, FALSE))) {
+			    (!utils_parse_size(optarg, &opts.inode, FALSE))) {
 				err++;
 			}
 			break;
@@ -217,7 +217,7 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'T':
 			/* 'T' is deprecated, notify */
-			Eprintf ("Option 'T' is deprecated, it was replaced by 't'.\n");
+			Eprintf("Option 'T' is deprecated, it was replaced by 't'.\n");
 			err++;
 			break;
 		case 'v':
@@ -257,24 +257,24 @@ static int parse_options (int argc, char *argv[])
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify exactly one device.\n");
+				Eprintf("You must specify exactly one device.\n");
 			err++;
 		}
 
 		if ((opts.inode == -1) && (opts.filename == NULL) && !opts.mft) {
 			if (argc > 1)
-				Eprintf ("You must specify an inode to learn about.\n");
+				Eprintf("You must specify an inode to learn about.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+			Eprintf("You may not use --quiet and --verbose at the same time.\n");
 			err++;
 		}
 
 		if ((opts.inode != -1) && (opts.filename != NULL)) {
 			if (argc > 1)
-				Eprintf ("You may not specify --inode and --file together.\n");
+				Eprintf("You may not specify --inode and --file together.\n");
 			err++;
 		}
 
@@ -1078,13 +1078,13 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 			runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
 			if (rl) {
 				runlist *rlc = rl;
-				printf ("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
+				printf("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 				while (rlc->length) {
-					printf ("\t\t\t%lld\t\t%lld\t\t%lld\n",
+					printf("\t\t\t%lld\t\t%lld\t\t%lld\n",
 							rlc->vcn, rlc->lcn, rlc->length);
 					rlc++;
 				}
-				free (rl);
+				free(rl);
 			} else {
 				Eprintf("ntfsinfo error: could not decompress runlist\n");
 				return;
@@ -1872,12 +1872,12 @@ int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv))
 		return 1;
 
 	utils_set_locale();
 
-	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
+	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
 	if (!vol)
 		return 1;
 
@@ -1913,7 +1913,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	ntfs_umount (vol, FALSE);
+	ntfs_umount(vol, FALSE);
 	return 0;
 }
 

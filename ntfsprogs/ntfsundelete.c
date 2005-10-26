@@ -99,9 +99,9 @@ static short	avoid_duplicate_printing;	/* Flag  No duplicate printing of file in
 static range	*ranges;			/* Array containing all Inode-Rages for undelete */
 static long	nr_entries;			/* Number of range entries */
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * parse_inode_arg - parses the inode expression
@@ -110,7 +110,7 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return: Number of correct inode specifications or -1 for error
  */
-static int parse_inode_arg (void)
+static int parse_inode_arg(void)
 {
 	int p;
 	u32 imax;
@@ -129,28 +129,28 @@ static int parse_inode_arg (void)
 		return (0);	/* bailout if no optarg */
 
 	/* init variables */
-	p = strlen (optarg);
+	p = strlen(optarg);
 	imax = p;
 	opt_arg_ptr = optarg;
 	opt_arg_end1 = optarg;
 	opt_arg_end2 = &(optarg[p]);
 
 	/* alloc mem for range table */
-	ranges = (range *) malloc ((p + 1) * sizeof (range));
+	ranges = (range *) malloc((p + 1) * sizeof(range));
 	if (ranges == NULL) {
-		printf ("ERROR: Couldn't alloc mem for parsing inodes!\n");
+		printf("ERROR: Couldn't alloc mem for parsing inodes!\n");
 		return (-1);
 	}
 
 	/* loop */
 	while ((opt_arg_end1 != opt_arg_end2) && (p > 0)) {
 		/* Try to get inode */
-		inode = strtoul (opt_arg_ptr, &opt_arg_end1, 0);
+		inode = strtoul(opt_arg_ptr, &opt_arg_end1, 0);
 		p--;
 
 		/* invalid char at begin */
 		if ((opt_arg_ptr == opt_arg_end1) || (opt_arg_ptr == opt_arg_end2)) {
-			printf ("ERROR: Invalid Number: %s\n", opt_arg_ptr);
+			printf("ERROR: Invalid Number: %s\n", opt_arg_ptr);
 			return (-1);
 		}
 
@@ -160,15 +160,15 @@ static int parse_inode_arg (void)
 			opt_arg_temp = opt_arg_end1;
 			opt_arg_end1 = & (opt_arg_temp[1]);
 			if (opt_arg_temp >= opt_arg_end2) {
-				printf ("ERROR: Missing range end!\n");
+				printf("ERROR: Missing range end!\n");
 				return (-1);
 			}
 			range_begin = inode;
 
 			/* get count */
-			range_end = strtoul (opt_arg_end1, &opt_arg_temp, 0);
+			range_end = strtoul(opt_arg_end1, &opt_arg_temp, 0);
 			if (opt_arg_temp == opt_arg_end1) {
-				printf ("ERROR: Invalid Number: %s\n", opt_arg_temp);
+				printf("ERROR: Invalid Number: %s\n", opt_arg_temp);
 				return (-1);
 			}
 
@@ -198,7 +198,7 @@ static int parse_inode_arg (void)
 			/* Next inode */
 			opt_arg_ptr = & (opt_arg_end1[1]);
 			if (opt_arg_ptr >= opt_arg_end2) {
-				printf ("ERROR: Missing new value at end of input!\n");
+				printf("ERROR: Missing new value at end of input!\n");
 				return (-1);
 			}
 			continue;
@@ -218,14 +218,14 @@ static int parse_inode_arg (void)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
 	printf("\n%s v%s (libntfs %s) - Recover deleted files from an NTFS "
 			"Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf ("Copyright (c) 2002-2005 Richard Russon\n"
+	printf("Copyright (c) 2002-2005 Richard Russon\n"
 		"Copyright (c) 2004-2005 Holger Ohmacht\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -235,9 +235,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	printf ("\nUsage: %s [options] device\n"
+	printf("\nUsage: %s [options] device\n"
 		"    -s          --scan             Scan for files (default)\n"
 		"    -p num      --percentage num   Minimum percentage recoverable\n"
 		"    -m pattern  --match pattern    Only work on files with matching names\n"
@@ -262,7 +262,7 @@ static void usage (void)
 		"    -V          --version          Display version information\n"
 		"    -h          --help             Display this help\n\n",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -286,7 +286,7 @@ static void usage (void)
  * Return:  1, Success, the string was transformed
  *	    0, An error occurred
  */
-static int transform (const char *pattern, char **regex)
+static int transform(const char *pattern, char **regex)
 {
 	char *result;
 	int length, i, j;
@@ -294,9 +294,9 @@ static int transform (const char *pattern, char **regex)
 	if (!pattern || !regex)
 		return 0;
 
-	length = strlen (pattern);
+	length = strlen(pattern);
 	if (length < 1) {
-		Eprintf ("Pattern to transform is empty\n");
+		Eprintf("Pattern to transform is empty\n");
 		return 0;
 	}
 
@@ -305,9 +305,9 @@ static int transform (const char *pattern, char **regex)
 			length++;
 	}
 
-	result = malloc (length + 3);
+	result = malloc(length + 3);
 	if (!result) {
-		Eprintf ("Couldn't allocate memory in transform()\n");
+		Eprintf("Couldn't allocate memory in transform()\n");
 		return 0;
 	}
 
@@ -362,7 +362,7 @@ static int transform (const char *pattern, char **regex)
  * Return:  1  Success
  *	    0  Error, the string was malformed
  */
-static int parse_time (const char *value, time_t *since)
+static int parse_time(const char *value, time_t *since)
 {
 	long long result;
 	time_t now;
@@ -373,19 +373,19 @@ static int parse_time (const char *value, time_t *since)
 
 	ntfs_log_trace("Parsing time '%s' ago.\n", value);
 
-	result = strtoll (value, &suffix, 10);
+	result = strtoll(value, &suffix, 10);
 	if (result < 0 || errno == ERANGE) {
-		Eprintf ("Invalid time '%s'.\n", value);
+		Eprintf("Invalid time '%s'.\n", value);
 		return 0;
 	}
 
 	if (!suffix) {
-		Eprintf ("Internal error, strtoll didn't return a suffix.\n");
+		Eprintf("Internal error, strtoll didn't return a suffix.\n");
 		return 0;
 	}
 
-	if (strlen (suffix) > 1) {
-		Eprintf ("Invalid time suffix '%s'.  Use Y, M, W, D or H.\n", suffix);
+	if (strlen(suffix) > 1) {
+		Eprintf("Invalid time suffix '%s'.  Use Y, M, W, D or H.\n", suffix);
 		return 0;
 	}
 
@@ -399,11 +399,11 @@ static int parse_time (const char *value, time_t *since)
 		    break;
 
 		default:
-			Eprintf ("Invalid time suffix '%s'.  Use Y, M, W, D or H.\n", suffix);
+			Eprintf("Invalid time suffix '%s'.  Use Y, M, W, D or H.\n", suffix);
 			return 0;
 	}
 
-	now = time (NULL);
+	now = time(NULL);
 
 	ntfs_log_debug("Time now = %lld, Time then = %lld.\n", (long long) now,
 			(long long) result);
@@ -420,7 +420,7 @@ static int parse_time (const char *value, time_t *since)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char *argv[])
+static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-b:Cc:d:fhi?m:o:OPp:sS:t:Tu::qvV";
 	static const struct option lopt[] = {
@@ -433,7 +433,7 @@ static int parse_options (int argc, char *argv[])
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "match",	 required_argument,	NULL, 'm' },
 		{ "output",	 required_argument,	NULL, 'o' },
-		{ "optimistic",  no_argument,           NULL, 'O' },
+		{ "optimistic",  no_argument,		NULL, 'O' },
 		{ "percentage",  required_argument,	NULL, 'p' },
 		{ "scan",	 no_argument,		NULL, 's' },
 		{ "size",	 required_argument,	NULL, 'S' },
@@ -459,7 +459,7 @@ static int parse_options (int argc, char *argv[])
 	opts.uinode   = -1;
 	opts.percent  = -1;
 	opts.fillbyte = -1;
-        while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
@@ -472,7 +472,7 @@ static int parse_options (int argc, char *argv[])
 		case 'b':
 			if (opts.fillbyte == (char)-1) {
 				end = NULL;
-				opts.fillbyte = strtol (optarg, &end, 0);
+				opts.fillbyte = strtol(optarg, &end, 0);
 				if (end && *end)
 					err++;
 			} else {
@@ -484,7 +484,7 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'c':
 			if (opts.mode == MODE_NONE) {
-				if (!utils_parse_range (optarg,
+				if (!utils_parse_range(optarg,
 				    &opts.mft_begin, &opts.mft_end, TRUE))
 					err++;
 				opts.mode = MODE_COPY;
@@ -507,7 +507,7 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'm':
 			if (!opts.match) {
-				if (!transform (optarg, &opts.match)) {
+				if (!transform(optarg, &opts.match)) {
 					err++;
 				} else {
 					/* set regex-flag on true ;) */
@@ -525,10 +525,10 @@ static int parse_options (int argc, char *argv[])
 			}
 			break;
 		case 'O':
-		        if (!opts.optimistic) {
+			if (!opts.optimistic) {
 				opts.optimistic++;
 			} else {
-			        err++;
+				err++;
 			}
 			break;
 		case 'P':
@@ -541,7 +541,7 @@ static int parse_options (int argc, char *argv[])
 		case 'p':
 			if (opts.percent == -1) {
 				end = NULL;
-				opts.percent = strtol (optarg, &end, 0);
+				opts.percent = strtol(optarg, &end, 0);
 				if (end && ((*end != '%') && (*end != 0)))
 					err++;
 			} else {
@@ -559,14 +559,14 @@ static int parse_options (int argc, char *argv[])
 			break;
 		case 'S':
 			if ((opts.size_begin > 0) || (opts.size_end > 0) ||
-			    !utils_parse_range (optarg, &opts.size_begin,
+			    !utils_parse_range(optarg, &opts.size_begin,
 			     &opts.size_end, TRUE)) {
 			    err++;
 			}
 			break;
 		case 't':
 			if (opts.since == 0) {
-				if (!parse_time (optarg, &opts.since))
+				if (!parse_time(optarg, &opts.since))
 					err++;
 			} else {
 			    err++;
@@ -600,9 +600,9 @@ static int parse_options (int argc, char *argv[])
 			     (optopt == 'o') || (optopt == 'p') ||
 			     (optopt == 'S') || (optopt == 't') ||
 			     (optopt == 'u')) && (!optarg)) {
-				Eprintf ("Option '%s' requires an argument.\n", argv[optind-1]);
+				Eprintf("Option '%s' requires an argument.\n", argv[optind-1]);
 			} else {
-				Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+				Eprintf("Unknown option '%s'.\n", argv[optind-1]);
 			}
 			err++;
 			break;
@@ -614,7 +614,7 @@ static int parse_options (int argc, char *argv[])
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf ("You must specify exactly one device.\n");
+				Eprintf("You must specify exactly one device.\n");
 			err++;
 		}
 
@@ -626,19 +626,19 @@ static int parse_options (int argc, char *argv[])
 		case MODE_SCAN:
 			if (opts.output || opts.dest || opts.truncate ||
 					(opts.fillbyte != (char)-1)) {
-				Eprintf ("Scan can only be used with --percent, "
+				Eprintf("Scan can only be used with --percent, "
 					"--match, --ignore-case, --size and --time.\n");
 				err++;
 			}
 			if (opts.match_case && !opts.match) {
-				Eprintf ("The --case option doesn't make sense without the --match option\n");
+				Eprintf("The --case option doesn't make sense without the --match option\n");
 				err++;
 			}
 			break;
 
 		case MODE_UNDELETE:
 			/*if ((opts.percent != -1) || (opts.size_begin > 0) || (opts.size_end > 0)) {
-				Eprintf ("Undelete can only be used with "
+				Eprintf("Undelete can only be used with "
 					"--output, --destination, --byte and --truncate.\n");
 				err++;
 			}*/
@@ -649,32 +649,32 @@ static int parse_options (int argc, char *argv[])
 			    opts.match || opts.match_case ||
 			    (opts.size_begin > 0) ||
 			    (opts.size_end > 0)) {
-				Eprintf ("Copy can only be used with --output and --destination.\n");
+				Eprintf("Copy can only be used with --output and --destination.\n");
 				err++;
 			}
 			break;
 		default:
-			Eprintf ("You can only select one of Scan, Undelete or Copy.\n");
+			Eprintf("You can only select one of Scan, Undelete or Copy.\n");
 			err++;
 		}
 
 		if ((opts.percent < -1) || (opts.percent > 100)) {
-			Eprintf ("Percentage value must be in the range 0 - 100.\n");
+			Eprintf("Percentage value must be in the range 0 - 100.\n");
 			err++;
 		}
 
 		if (opts.quiet) {
 			if (opts.verbose) {
-				Eprintf ("You may not use --quiet and --verbose at the same time.\n");
+				Eprintf("You may not use --quiet and --verbose at the same time.\n");
 				err++;
 			} else if (opts.mode == MODE_SCAN) {
-				Eprintf ("You may not use --quiet when scanning a volume.\n");
+				Eprintf("You may not use --quiet when scanning a volume.\n");
 				err++;
 			}
 		}
 
 		if (opts.parent && !opts.verbose) {
-			Eprintf ("To use --parent, you must also use --verbose.\n");
+			Eprintf("To use --parent, you must also use --verbose.\n");
 			err++;
 		}
 	}
@@ -700,41 +700,41 @@ static int parse_options (int argc, char *argv[])
  *
  * Return:  none
  */
-static void free_file (struct ufile *file)
+static void free_file(struct ufile *file)
 {
 	struct list_head *item, *tmp;
 
 	if (!file)
 		return;
 
-	list_for_each_safe (item, tmp, &file->name) { /* List of filenames */
-		struct filename *f = list_entry (item, struct filename, list);
+	list_for_each_safe(item, tmp, &file->name) { /* List of filenames */
+		struct filename *f = list_entry(item, struct filename, list);
 		ntfs_log_debug("freeing filename '%s'", f->name ? f->name :
 				NONE);
 		if (f->name)
-			free (f->name);
+			free(f->name);
 		if (f->parent_name) {
 			ntfs_log_debug(" and parent filename '%s'",
 					f->parent_name);
-			free (f->parent_name);
+			free(f->parent_name);
 		}
 		ntfs_log_debug(".\n");
-		free (f);
+		free(f);
 	}
 
-	list_for_each_safe (item, tmp, &file->data) { /* List of data streams */
-		struct data *d = list_entry (item, struct data, list);
+	list_for_each_safe(item, tmp, &file->data) { /* List of data streams */
+		struct data *d = list_entry(item, struct data, list);
 		ntfs_log_debug("Freeing data stream '%s'.\n", d->name ?
 				d->name : UNNAMED);
 		if (d->name)
-			free (d->name);
+			free(d->name);
 		if (d->runlist)
-			free (d->runlist);
-		free (d);
+			free(d->runlist);
+		free(d);
 	}
 
-	free (file->mft);
-	free (file);
+	free(file->mft);
+	free(file);
 }
 
 /**
@@ -765,7 +765,7 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec)
 
 	ctx = ntfs_attr_get_search_ctx(NULL, rec);
 	if (!ctx) {
-		Eprintf ("ERROR: Couldn't create a search context.\n");
+		Eprintf("ERROR: Couldn't create a search context.\n");
 		return NULL;
 	}
 
@@ -806,7 +806,7 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec)
  * get_parent_name - Find the name of a file's parent.
  * @name:	the filename whose parent's name to find
  */
-static void get_parent_name (struct filename* name, ntfs_volume* vol)
+static void get_parent_name(struct filename* name, ntfs_volume* vol)
 {
 	ntfs_attr* mft_data;
 	MFT_RECORD* rec;
@@ -818,18 +818,18 @@ static void get_parent_name (struct filename* name, ntfs_volume* vol)
 
 	rec = calloc(1, vol->mft_record_size);
 	if (!rec) {
-		Eprintf ("ERROR: Couldn't allocate memory in get_parent_name()\n");
+		Eprintf("ERROR: Couldn't allocate memory in get_parent_name()\n");
 		return;
 	}
 
 	mft_data = ntfs_attr_open(vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft_data) {
-		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+		Eprintf("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror(errno));
 	} else {
 		inode_num = MREF(name->parent_mref);
 
 		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num, vol->mft_record_size, rec) < 1) {
-			Eprintf ("ERROR: Couldn't read MFT Record %lld.\n", inode_num);
+			Eprintf("ERROR: Couldn't read MFT Record %lld.\n", inode_num);
 		} else if ((filename_attr = verify_parent(name, rec))) {
 			if (ntfs_ucstombs(filename_attr->file_name,
 					filename_attr->file_name_length,
@@ -872,7 +872,7 @@ static void get_parent_name (struct filename* name, ntfs_volume* vol)
  * Return:  n  The number of $FILENAME attributes found
  *	   -1  Error
  */
-static int get_filenames (struct ufile *file, ntfs_volume* vol)
+static int get_filenames(struct ufile *file, ntfs_volume* vol)
 {
 	ATTR_RECORD *rec;
 	FILE_NAME_ATTR *attr;
@@ -884,17 +884,17 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 	if (!file)
 		return -1;
 
-	ctx = ntfs_attr_get_search_ctx (NULL, file->mft);
+	ctx = ntfs_attr_get_search_ctx(NULL, file->mft);
 	if (!ctx)
 		return -1;
 
-	while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+	while ((rec = find_attribute(AT_FILE_NAME, ctx))) {
 		/* We know this will always be resident. */
-		attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+		attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
 
-		name = calloc (1, sizeof (*name));
+		name = calloc(1, sizeof(*name));
 		if (!name) {
-			Eprintf ("ERROR: Couldn't allocate memory in get_filenames().\n");
+			Eprintf("ERROR: Couldn't allocate memory in get_filenames().\n");
 			count = -1;
 			break;
 		}
@@ -902,16 +902,16 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 		name->uname      = attr->file_name;
 		name->uname_len  = attr->file_name_length;
 		name->name_space = attr->file_name_type;
-		name->size_alloc = sle64_to_cpu (attr->allocated_size);
-		name->size_data  = sle64_to_cpu (attr->data_size);
+		name->size_alloc = sle64_to_cpu(attr->allocated_size);
+		name->size_data  = sle64_to_cpu(attr->data_size);
 		name->flags      = attr->file_attributes;
 
-		name->date_c     = ntfs2utc (attr->creation_time);
-		name->date_a     = ntfs2utc (attr->last_data_change_time);
-		name->date_m     = ntfs2utc (attr->last_mft_change_time);
-		name->date_r     = ntfs2utc (attr->last_access_time);
+		name->date_c     = ntfs2utc(attr->creation_time);
+		name->date_a     = ntfs2utc(attr->last_data_change_time);
+		name->date_m     = ntfs2utc(attr->last_mft_change_time);
+		name->date_r     = ntfs2utc(attr->last_access_time);
 
-		if (ntfs_ucstombs (name->uname, name->uname_len, &name->name,
+		if (ntfs_ucstombs(name->uname, name->uname_len, &name->name,
 				0) < 0) {
 			ntfs_log_debug("ERROR: Couldn't translate filename to "
 					"current locale.\n");
@@ -930,10 +930,10 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
 			space = name->name_space;
 		}
 
-		file->max_size = max (file->max_size, name->size_alloc);
-		file->max_size = max (file->max_size, name->size_data);
+		file->max_size = max(file->max_size, name->size_alloc);
+		file->max_size = max(file->max_size, name->size_data);
 
-		list_add_tail (&name->list, &file->name);
+		list_add_tail(&name->list, &file->name);
 		count++;
 	}
 
@@ -957,7 +957,7 @@ static int get_filenames (struct ufile *file, ntfs_volume* vol)
  * Return:  n  The number of $FILENAME attributes found
  *	   -1  Error
  */
-static int get_data (struct ufile *file, ntfs_volume *vol)
+static int get_data(struct ufile *file, ntfs_volume *vol)
 {
 	ATTR_RECORD *rec;
 	ntfs_attr_search_ctx *ctx;
@@ -967,14 +967,14 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 	if (!file)
 		return -1;
 
-	ctx = ntfs_attr_get_search_ctx (NULL, file->mft);
+	ctx = ntfs_attr_get_search_ctx(NULL, file->mft);
 	if (!ctx)
 		return -1;
 
-	while ((rec = find_attribute (AT_DATA, ctx))) {
-		data = calloc (1, sizeof (*data));
+	while ((rec = find_attribute(AT_DATA, ctx))) {
+		data = calloc(1, sizeof(*data));
 		if (!data) {
-			Eprintf ("ERROR: Couldn't allocate memory in get_data().\n");
+			Eprintf("ERROR: Couldn't allocate memory in get_data().\n");
 			count = -1;
 			break;
 		}
@@ -984,23 +984,23 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 		data->encrypted  = rec->flags & ATTR_IS_ENCRYPTED;
 
 		if (rec->name_length) {
-			data->uname     = (ntfschar *) ((char *) rec + le16_to_cpu (rec->name_offset));
+			data->uname     = (ntfschar *) ((char *) rec + le16_to_cpu(rec->name_offset));
 			data->uname_len = rec->name_length;
 
-			if (ntfs_ucstombs (data->uname, data->uname_len, &data->name,
+			if (ntfs_ucstombs(data->uname, data->uname_len, &data->name,
 					0) < 0) {
-				Eprintf ("ERROR: Cannot translate name into current locale.\n");
+				Eprintf("ERROR: Cannot translate name into current locale.\n");
 			}
 		}
 
 		if (data->resident) {
-			data->size_data  = le32_to_cpu (rec->value_length);
-			data->data	 = ((char*) (rec)) + le16_to_cpu (rec->value_offset);
+			data->size_data  = le32_to_cpu(rec->value_length);
+			data->data	 = ((char*) (rec)) + le16_to_cpu(rec->value_offset);
 		} else {
-			data->size_alloc = sle64_to_cpu (rec->allocated_size);
-			data->size_data  = sle64_to_cpu (rec->data_size);
-			data->size_init  = sle64_to_cpu (rec->initialized_size);
-			data->size_vcn   = sle64_to_cpu (rec->highest_vcn) + 1;
+			data->size_alloc = sle64_to_cpu(rec->allocated_size);
+			data->size_data  = sle64_to_cpu(rec->data_size);
+			data->size_init  = sle64_to_cpu(rec->initialized_size);
+			data->size_vcn   = sle64_to_cpu(rec->highest_vcn) + 1;
 		}
 
 		data->runlist = ntfs_mapping_pairs_decompress(vol, rec, NULL);
@@ -1008,10 +1008,10 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
 			ntfs_log_debug("Couldn't decompress the data runs.\n");
 		}
 
-		file->max_size = max (file->max_size, data->size_data);
-		file->max_size = max (file->max_size, data->size_init);
+		file->max_size = max(file->max_size, data->size_data);
+		file->max_size = max(file->max_size, data->size_init);
 
-		list_add_tail (&data->list, &file->data);
+		list_add_tail(&data->list, &file->data);
 		count++;
 	}
 
@@ -1031,7 +1031,7 @@ static int get_data (struct ufile *file, ntfs_volume *vol)
  * Return:  Pointer  A ufile object containing the results
  *	    NULL     Error
  */
-static struct ufile * read_record (ntfs_volume *vol, long long record)
+static struct ufile * read_record(ntfs_volume *vol, long long record)
 {
 	ATTR_RECORD *attr10, *attr20, *attr90;
 	struct ufile *file;
@@ -1040,51 +1040,51 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 	if (!vol)
 		return NULL;
 
-	file = calloc (1, sizeof (*file));
+	file = calloc(1, sizeof(*file));
 	if (!file) {
-		Eprintf ("ERROR: Couldn't allocate memory in read_record()\n");
+		Eprintf("ERROR: Couldn't allocate memory in read_record()\n");
 		return NULL;
 	}
 
-	INIT_LIST_HEAD (&file->name);
-	INIT_LIST_HEAD (&file->data);
+	INIT_LIST_HEAD(&file->name);
+	INIT_LIST_HEAD(&file->data);
 	file->inode = record;
 
-	file->mft = malloc (vol->mft_record_size);
+	file->mft = malloc(vol->mft_record_size);
 	if (!file->mft) {
-		Eprintf ("ERROR: Couldn't allocate memory in read_record()\n");
-		free_file (file);
+		Eprintf("ERROR: Couldn't allocate memory in read_record()\n");
+		free_file(file);
 		return NULL;
 	}
 
-	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
+	mft = ntfs_attr_open(vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft) {
-		Eprintf ("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror (errno));
-		free_file (file);
+		Eprintf("ERROR: Couldn't open $MFT/$DATA: %s\n", strerror(errno));
+		free_file(file);
 		return NULL;
 	}
 
-	if (ntfs_attr_mst_pread (mft, vol->mft_record_size * record, 1, vol->mft_record_size, file->mft) < 1) {
-		Eprintf ("ERROR: Couldn't read MFT Record %lld.\n", record);
-		ntfs_attr_close (mft);
-		free_file (file);
+	if (ntfs_attr_mst_pread(mft, vol->mft_record_size * record, 1, vol->mft_record_size, file->mft) < 1) {
+		Eprintf("ERROR: Couldn't read MFT Record %lld.\n", record);
+		ntfs_attr_close(mft);
+		free_file(file);
 		return NULL;
 	}
 
-	ntfs_attr_close (mft);
+	ntfs_attr_close(mft);
 	mft = NULL;
 
-	attr10 = find_first_attribute (AT_STANDARD_INFORMATION,	file->mft);
-	attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,	file->mft);
-	attr90 = find_first_attribute (AT_INDEX_ROOT,		file->mft);
+	attr10 = find_first_attribute(AT_STANDARD_INFORMATION,	file->mft);
+	attr20 = find_first_attribute(AT_ATTRIBUTE_LIST,	file->mft);
+	attr90 = find_first_attribute(AT_INDEX_ROOT,		file->mft);
 
 	ntfs_log_debug("Attributes present: %s %s %s.\n", attr10?"0x10":"",
 			attr20?"0x20":"", attr90?"0x90":"");
 
 	if (attr10) {
 		STANDARD_INFORMATION *si;
-		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu (attr10->value_offset));
-		file->date = ntfs2utc (si->last_data_change_time);
+		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu(attr10->value_offset));
+		file->date = ntfs2utc(si->last_data_change_time);
 	}
 
 	if (attr20 || !attr10)
@@ -1092,11 +1092,11 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
 	if (attr90)
 		file->directory = 1;
 
-	if (get_filenames (file, vol) < 0) {
-		Eprintf ("ERROR: Couldn't get filenames.\n");
+	if (get_filenames(file, vol) < 0) {
+		Eprintf("ERROR: Couldn't get filenames.\n");
 	}
-	if (get_data (file, vol) < 0) {
-		Eprintf ("ERROR: Couldn't get data streams.\n");
+	if (get_data(file, vol) < 0) {
+		Eprintf("ERROR: Couldn't get data streams.\n");
 	}
 
 	return file;
@@ -1125,7 +1125,7 @@ static struct ufile * read_record (ntfs_volume *vol, long long record)
  * Return:  n  The percentage of the file that _could_ be recovered
  *	   -1  Error
  */
-static int calc_percentage (struct ufile *file, ntfs_volume *vol)
+static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 {
 	runlist_element *rl = NULL;
 	struct list_head *pos;
@@ -1143,28 +1143,28 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		return 0;
 	}
 
-	if (list_empty (&file->data)) {
-		Vprintf ("File has no data streams.\n");
+	if (list_empty(&file->data)) {
+		Vprintf("File has no data streams.\n");
 		return 0;
 	}
 
-	list_for_each (pos, &file->data) {
-		data  = list_entry (pos, struct data, list);
+	list_for_each(pos, &file->data) {
+		data  = list_entry(pos, struct data, list);
 		clusters_inuse = 0;
 		clusters_free  = 0;
 
 		if (data->encrypted) {
-			Vprintf ("File is encrypted, recovery is impossible.\n");
+			Vprintf("File is encrypted, recovery is impossible.\n");
 			continue;
 		}
 
 		if (data->compressed) {
-			Vprintf ("File is compressed, recovery not yet implemented.\n");
+			Vprintf("File is compressed, recovery not yet implemented.\n");
 			continue;
 		}
 
 		if (data->resident) {
-			Vprintf ("File is resident, therefore recoverable.\n");
+			Vprintf("File is resident, therefore recoverable.\n");
 			percent = 100;
 			data->percent = 100;
 			continue;
@@ -1172,17 +1172,17 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 
 		rl = data->runlist;
 		if (!rl) {
-			Vprintf ("File has no runlist, hence no data.\n");
+			Vprintf("File has no runlist, hence no data.\n");
 			continue;
 		}
 
 		if (rl[0].length <= 0) {
-			Vprintf ("File has an empty runlist, hence no data.\n");
+			Vprintf("File has an empty runlist, hence no data.\n");
 			continue;
 		}
 
 		if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
-			Vprintf ("Missing segment at beginning, %lld "
+			Vprintf("Missing segment at beginning, %lld "
 					"clusters\n", (long long)rl[0].length);
 			clusters_inuse += rl[0].length;
 			rl++;
@@ -1190,7 +1190,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 
 		for (i = 0; rl[i].length > 0; i++) {
 			if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
-				Vprintf ("Missing segment at end, %lld "
+				Vprintf("Missing segment at end, %lld "
 						"clusters\n",
 						(long long)rl[i].length);
 				clusters_inuse += rl[i].length;
@@ -1206,7 +1206,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 			end   = rl[i].lcn + rl[i].length;
 
 			for (j = start; j < end; j++) {
-				if (utils_cluster_in_use (vol, j))
+				if (utils_cluster_in_use(vol, j))
 					clusters_inuse++;
 				else
 					clusters_free++;
@@ -1214,17 +1214,17 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
 		}
 
 		if ((clusters_inuse + clusters_free) == 0) {
-			Eprintf ("ERROR: Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
+			Eprintf("ERROR: Unexpected error whilst calculating percentage for inode %lld\n", file->inode);
 			continue;
 		}
 
 		data->percent = (clusters_free * 100) /
 				(clusters_inuse + clusters_free);
 
-		percent = max (percent, data->percent);
+		percent = max(percent, data->percent);
 	}
 
-	Vprintf ("File is %d%% recoverable\n", percent);
+	Vprintf("File is %d%% recoverable\n", percent);
 	return percent;
 }
 
@@ -1243,7 +1243,7 @@ static int calc_percentage (struct ufile *file, ntfs_volume *vol)
  *
  * Return:  none
  */
-static void dump_record (struct ufile *file)
+static void dump_record(struct ufile *file)
 {
 	char buffer[20];
 	const char *name;
@@ -1253,88 +1253,88 @@ static void dump_record (struct ufile *file)
 	if (!file)
 		return;
 
-	Qprintf ("MFT Record %lld\n", file->inode);
-	Qprintf ("Type: %s\n", (file->directory) ? "Directory" : "File");
-	strftime (buffer, sizeof (buffer), "%F %R", localtime (&file->date));
-	Qprintf ("Date: %s\n", buffer);
+	Qprintf("MFT Record %lld\n", file->inode);
+	Qprintf("Type: %s\n", (file->directory) ? "Directory" : "File");
+	strftime(buffer, sizeof(buffer), "%F %R", localtime(&file->date));
+	Qprintf("Date: %s\n", buffer);
 
 	if (file->attr_list)
-		Qprintf ("Metadata may span more than one MFT record\n");
+		Qprintf("Metadata may span more than one MFT record\n");
 
-	list_for_each (item, &file->name) {
-		struct filename *f = list_entry (item, struct filename, list);
+	list_for_each(item, &file->name) {
+		struct filename *f = list_entry(item, struct filename, list);
 
 		if (f->name)
 			name = f->name;
 		else
 			name = NONE;
 
-		Qprintf ("Filename: (%d) %s\n", f->name_space, f->name);
-		Qprintf ("File Flags: ");
-		if (f->flags & FILE_ATTR_SYSTEM)	Qprintf ("System ");
-		if (f->flags & FILE_ATTR_DIRECTORY)	Qprintf ("Directory ");
-		if (f->flags & FILE_ATTR_SPARSE_FILE)	Qprintf ("Sparse ");
-		if (f->flags & FILE_ATTR_REPARSE_POINT)	Qprintf ("Reparse ");
-		if (f->flags & FILE_ATTR_COMPRESSED)	Qprintf ("Compressed ");
-		if (f->flags & FILE_ATTR_ENCRYPTED)	Qprintf ("Encrypted ");
+		Qprintf("Filename: (%d) %s\n", f->name_space, f->name);
+		Qprintf("File Flags: ");
+		if (f->flags & FILE_ATTR_SYSTEM)	Qprintf("System ");
+		if (f->flags & FILE_ATTR_DIRECTORY)	Qprintf("Directory ");
+		if (f->flags & FILE_ATTR_SPARSE_FILE)	Qprintf("Sparse ");
+		if (f->flags & FILE_ATTR_REPARSE_POINT)	Qprintf("Reparse ");
+		if (f->flags & FILE_ATTR_COMPRESSED)	Qprintf("Compressed ");
+		if (f->flags & FILE_ATTR_ENCRYPTED)	Qprintf("Encrypted ");
 		if (!(f->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_DIRECTORY |
 		    FILE_ATTR_SPARSE_FILE | FILE_ATTR_REPARSE_POINT |
 		    FILE_ATTR_COMPRESSED | FILE_ATTR_ENCRYPTED))) {
-			Qprintf ("%s", NONE);
+			Qprintf("%s", NONE);
 		}
 
-		Qprintf ("\n");
+		Qprintf("\n");
 
 		if (opts.parent) {
-			Qprintf ("Parent: %s\n", f->parent_name ? f->parent_name : "<non-determined>");
+			Qprintf("Parent: %s\n", f->parent_name ? f->parent_name : "<non-determined>");
 		}
 
-		Qprintf ("Size alloc: %lld\n", f->size_alloc);
-		Qprintf ("Size data: %lld\n", f->size_data);
+		Qprintf("Size alloc: %lld\n", f->size_alloc);
+		Qprintf("Size data: %lld\n", f->size_data);
 
-		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_c));
-		Qprintf ("Date C: %s\n", buffer);
-		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_a));
-		Qprintf ("Date A: %s\n", buffer);
-		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_m));
-		Qprintf ("Date M: %s\n", buffer);
-		strftime (buffer, sizeof (buffer), "%F %R", localtime (&f->date_r));
-		Qprintf ("Date R: %s\n", buffer);
+		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_c));
+		Qprintf("Date C: %s\n", buffer);
+		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_a));
+		Qprintf("Date A: %s\n", buffer);
+		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_m));
+		Qprintf("Date M: %s\n", buffer);
+		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_r));
+		Qprintf("Date R: %s\n", buffer);
 	}
 
-	Qprintf ("Data Streams:\n");
-	list_for_each (item, &file->data) {
-		struct data *d = list_entry (item, struct data, list);
-		Qprintf ("Name: %s\n", (d->name) ? d->name : UNNAMED);
-		Qprintf ("Flags: ");
-		if (d->resident)   Qprintf ("Resident\n");
-		if (d->compressed) Qprintf ("Compressed\n");
-		if (d->encrypted)  Qprintf ("Encrypted\n");
+	Qprintf("Data Streams:\n");
+	list_for_each(item, &file->data) {
+		struct data *d = list_entry(item, struct data, list);
+		Qprintf("Name: %s\n", (d->name) ? d->name : UNNAMED);
+		Qprintf("Flags: ");
+		if (d->resident)   Qprintf("Resident\n");
+		if (d->compressed) Qprintf("Compressed\n");
+		if (d->encrypted)  Qprintf("Encrypted\n");
 		if (!d->resident && !d->compressed && !d->encrypted)
-			Qprintf ("None\n");
+			Qprintf("None\n");
 		else
-			Qprintf ("\n");
+			Qprintf("\n");
 
-		Qprintf ("Size alloc: %lld\n", d->size_alloc);
-		Qprintf ("Size data: %lld\n", d->size_data);
-		Qprintf ("Size init: %lld\n", d->size_init);
-		Qprintf ("Size vcn: %lld\n", d->size_vcn);
+		Qprintf("Size alloc: %lld\n", d->size_alloc);
+		Qprintf("Size data: %lld\n", d->size_data);
+		Qprintf("Size init: %lld\n", d->size_init);
+		Qprintf("Size vcn: %lld\n", d->size_vcn);
 
-		Qprintf ("Data runs:\n");
+		Qprintf("Data runs:\n");
 		if ((!d->runlist) || (d->runlist[0].length <= 0)) {
-			Qprintf ("    None\n");
+			Qprintf("    None\n");
 		} else {
 			for (i = 0; d->runlist[i].length > 0; i++) {
-				Qprintf ("    %lld @ %lld\n",
+				Qprintf("    %lld @ %lld\n",
 						(long long)d->runlist[i].length,
 						(long long)d->runlist[i].lcn);
 			}
 		}
 
-		Qprintf ("Amount potentially recoverable %d%%\n", d->percent);
+		Qprintf("Amount potentially recoverable %d%%\n", d->percent);
 	}
 
-	Qprintf ("________________________________________\n\n");
+	Qprintf("________________________________________\n\n");
 }
 
 /**
@@ -1360,7 +1360,7 @@ static void dump_record (struct ufile *file)
  *
  * Return:  none
  */
-static void list_record (struct ufile *file)
+static void list_record(struct ufile *file)
 {
 	char buffer[20];
 	struct list_head *item;
@@ -1370,7 +1370,7 @@ static void list_record (struct ufile *file)
 
 	char flagd = '.', flagr = '.', flagc = '.', flagx = '.';
 
-	strftime (buffer, sizeof (buffer), "%F", localtime (&file->date));
+	strftime(buffer, sizeof(buffer), "%F", localtime(&file->date));
 
 	if (file->attr_list)
 		flagx = '!';
@@ -1380,8 +1380,8 @@ static void list_record (struct ufile *file)
 	else
 		flagd = 'F';
 
-	list_for_each (item, &file->data) {
-		struct data *d = list_entry (item, struct data, list);
+	list_for_each(item, &file->data) {
+		struct data *d = list_entry(item, struct data, list);
 
 		if (!d->name) {
 			if (d->resident)   flagr = 'R';
@@ -1389,11 +1389,11 @@ static void list_record (struct ufile *file)
 			if (d->compressed) flagc = 'C';	/* These two are mutually exclusive */
 			if (d->encrypted)  flagc = 'E';
 
-			percent = max (percent, d->percent);
+			percent = max(percent, d->percent);
 		}
 
-		size = max (size, d->size_data);
-		size = max (size, d->size_init);
+		size = max(size, d->size_data);
+		size = max(size, d->size_init);
 	}
 
 	if (file->pref_name)
@@ -1401,7 +1401,7 @@ static void list_record (struct ufile *file)
 	else
 		name = NONE;
 
-	Qprintf ("%-8lld %c%c%c%c   %3d%%  %s %9lld  %s\n",
+	Qprintf("%-8lld %c%c%c%c   %3d%%  %s %9lld  %s\n",
 		file->inode, flagd, flagr, flagc, flagx,
 		percent, buffer, size, name);
 
@@ -1418,7 +1418,7 @@ static void list_record (struct ufile *file)
  * Return:  1  There is a matching filename.
  *	    0  There is no match.
  */
-static int name_match (regex_t *re, struct ufile *file)
+static int name_match(regex_t *re, struct ufile *file)
 {
 	struct list_head *item;
 	int result;
@@ -1426,14 +1426,14 @@ static int name_match (regex_t *re, struct ufile *file)
 	if (!re || !file)
 		return 0;
 
-	list_for_each (item, &file->name) {
-		struct filename *f = list_entry (item, struct filename, list);
+	list_for_each(item, &file->name) {
+		struct filename *f = list_entry(item, struct filename, list);
 
 		if (!f->name)
 			continue;
-		result = regexec (re, f->name, 0, NULL, 0);
+		result = regexec(re, f->name, 0, NULL, 0);
 		if (result < 0) {
-			Eprintf ("Couldn't compare filename with regex: %s\n", strerror (errno));
+			Eprintf("Couldn't compare filename with regex: %s\n", strerror(errno));
 			return 0;
 		} else if (result == REG_NOERROR) {
 			ntfs_log_debug("Found a matching filename.\n");
@@ -1456,7 +1456,7 @@ static int name_match (regex_t *re, struct ufile *file)
  * Return:  -1  Error, something went wrong
  *	     0  Success, all the data was written
  */
-static unsigned int write_data (int fd, const char *buffer,
+static unsigned int write_data(int fd, const char *buffer,
 	unsigned int bufsize)
 {
 	ssize_t result1, result2;
@@ -1466,7 +1466,7 @@ static unsigned int write_data (int fd, const char *buffer,
 		return -1;
 	}
 
-	result1 = write (fd, buffer, bufsize);
+	result1 = write(fd, buffer, bufsize);
 	if ((result1 == (ssize_t) bufsize) || (result1 < 0))
 		return result1;
 
@@ -1474,7 +1474,7 @@ static unsigned int write_data (int fd, const char *buffer,
 	buffer  += result1;
 	bufsize -= result1;
 
-	result2 = write (fd, buffer, bufsize);
+	result2 = write(fd, buffer, bufsize);
 	if (result2 < 0)
 		return result1;
 
@@ -1504,7 +1504,7 @@ static unsigned int write_data (int fd, const char *buffer,
  *
  * Return:  n  Length of the allocated name
  */
-static int create_pathname (const char *dir, const char *name,
+static int create_pathname(const char *dir, const char *name,
 	const char *stream, char *buffer, int bufsize)
 {
 	if (!name)
@@ -1512,16 +1512,16 @@ static int create_pathname (const char *dir, const char *name,
 
 	if (dir)
 		if (stream)
-			snprintf (buffer, bufsize, "%s/%s:%s", dir, name, stream);
+			snprintf(buffer, bufsize, "%s/%s:%s", dir, name, stream);
 		else
-			snprintf (buffer, bufsize, "%s/%s", dir, name);
+			snprintf(buffer, bufsize, "%s/%s", dir, name);
 	else
 		if (stream)
-			snprintf (buffer, bufsize, "%s:%s", name, stream);
+			snprintf(buffer, bufsize, "%s:%s", name, stream);
 		else
-			snprintf (buffer, bufsize, "%s", name);
+			snprintf(buffer, bufsize, "%s", name);
 
-	return strlen (buffer);
+	return strlen(buffer);
 }
 
 /**
@@ -1535,18 +1535,18 @@ static int create_pathname (const char *dir, const char *name,
  * Return:  -1  Error, failed to create the file
  *	     n  Success, this is the file descriptor
  */
-static int open_file (const char *pathname)
+static int open_file(const char *pathname)
 {
 	int flags;
 
-	Vprintf ("Creating file: %s\n", pathname);
+	Vprintf("Creating file: %s\n", pathname);
 
 	if (opts.force)
 		flags = O_RDWR | O_CREAT | O_TRUNC;
 	else
 		flags = O_RDWR | O_CREAT | O_EXCL;
 
-	return open (pathname, flags, S_IRUSR | S_IWUSR);
+	return open(pathname, flags, S_IRUSR | S_IWUSR);
 }
 
 /**
@@ -1559,7 +1559,7 @@ static int open_file (const char *pathname)
  * Return:  1  Success, set the file's date and time
  *	    0  Error, failed to change the file's date and time
  */
-static int set_date (const char *pathname, time_t date)
+static int set_date(const char *pathname, time_t date)
 {
 	struct utimbuf ut;
 
@@ -1568,8 +1568,8 @@ static int set_date (const char *pathname, time_t date)
 
 	ut.actime  = date;
 	ut.modtime = date;
-	if (utime (pathname, &ut)) {
-		Eprintf ("ERROR: Couldn't set the file's date and time\n");
+	if (utime(pathname, &ut)) {
+		Eprintf("ERROR: Couldn't set the file's date and time\n");
 		return 0;
 	}
 	return 1;
@@ -1597,7 +1597,7 @@ static int set_date (const char *pathname, time_t date)
  * Return:  0  Error, something went wrong
  *	    1  Success, the data was recovered
  */
-static int undelete_file (ntfs_volume *vol, long long inode)
+static int undelete_file(ntfs_volume *vol, long long inode)
 {
 	char pathname[256];
 	char *buffer = NULL;
@@ -1617,101 +1617,101 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 		return 0;
 
 	/* try to get record */
-	file = read_record (vol, inode);
+	file = read_record(vol, inode);
 	if (!file || !file->mft) {
-		Eprintf ("Can't read info from mft record %lld.\n", inode);
+		Eprintf("Can't read info from mft record %lld.\n", inode);
 		return 0;
 	}
 
 	/* if flag was not set, print file informations */
 	if (avoid_duplicate_printing == 0) {
 		if (opts.verbose) {
-			dump_record (file);
+			dump_record(file);
 		} else {
-			list_record (file);
-			//Qprintf ("\n");
+			list_record(file);
+			//Qprintf("\n");
 		}
 	}
 
 	bufsize = vol->cluster_size;
-	buffer = malloc (bufsize);
+	buffer = malloc(bufsize);
 	if (!buffer)
 		goto free;
 
 	if (file->mft->flags & MFT_RECORD_IN_USE) {		/* These two statement blocks were         */
-		Eprintf ("Record is in use by the mft\n");	/* relocated from below because            */
+		Eprintf("Record is in use by the mft\n");	/* relocated from below because            */
 		if (!opts.force) {				/* calc_percentage() must be called        */
 			free(buffer);
-			free_file (file);			/* before dump_record() or list_record().  */
+			free_file(file);			/* before dump_record() or list_record().  */
 			return 0;				/* Otherwise, when undeleting, a file      */
 		}						/* will always be listed as 0% recoverable */
-		Vprintf ("Forced to continue.\n");		/* even if successfully undeleted.   +mabs */
+		Vprintf("Forced to continue.\n");		/* even if successfully undeleted.   +mabs */
 	}
 
-	if (calc_percentage (file, vol) == 0) {
-		Qprintf ("File has no recoverable data.\n");
+	if (calc_percentage(file, vol) == 0) {
+		Qprintf("File has no recoverable data.\n");
 		goto free;
 	}
 
-	if (list_empty (&file->data)) {
-		Qprintf ("File has no data.  There is nothing to recover.\n");
+	if (list_empty(&file->data)) {
+		Qprintf("File has no data.  There is nothing to recover.\n");
 		goto free;
 	}
 
-	list_for_each (item, &file->data) {
-		struct data *d = list_entry (item, struct data, list);
+	list_for_each(item, &file->data) {
+		struct data *d = list_entry(item, struct data, list);
 
 		if (opts.output)
 				name = opts.output;
 		else
 				name = file->pref_name;
 
-		create_pathname (opts.dest, name, d->name, pathname, sizeof (pathname));
+		create_pathname(opts.dest, name, d->name, pathname, sizeof(pathname));
 		if (d->resident) {
-			fd = open_file (pathname);
+			fd = open_file(pathname);
 			if (fd < 0) {
-				Eprintf ("Couldn't create file: %s\n", strerror (errno));
+				Eprintf("Couldn't create file: %s\n", strerror(errno));
 				goto free;
 			}
 
-			Vprintf ("File has resident data.\n");
-			if (write_data (fd, d->data, d->size_data) < d->size_data) {
-				Eprintf ("Write failed: %s\n", strerror (errno));
-				close (fd);
+			Vprintf("File has resident data.\n");
+			if (write_data(fd, d->data, d->size_data) < d->size_data) {
+				Eprintf("Write failed: %s\n", strerror(errno));
+				close(fd);
 				goto free;
 			}
 
-			if (close (fd) < 0) {
-				Eprintf ("Close failed: %s\n", strerror (errno));
+			if (close(fd) < 0) {
+				Eprintf("Close failed: %s\n", strerror(errno));
 			}
 			fd = -1;
 		} else {
 			rl = d->runlist;
 			if (!rl) {
-				Vprintf ("File has no runlist, hence no data.\n");
+				Vprintf("File has no runlist, hence no data.\n");
 				continue;
 			}
 
 			if (rl[0].length <= 0) {
-				Vprintf ("File has an empty runlist, hence no data.\n");
+				Vprintf("File has an empty runlist, hence no data.\n");
 				continue;
 			}
 
-			fd = open_file (pathname);
+			fd = open_file(pathname);
 			if (fd < 0) {
-				Eprintf ("Couldn't create output file: %s\n", strerror (errno));
+				Eprintf("Couldn't create output file: %s\n", strerror(errno));
 				goto free;
 			}
 
 			if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
-				Vprintf ("Missing segment at beginning, %lld "
+				Vprintf("Missing segment at beginning, %lld "
 						"clusters.\n",
 						(long long)rl[0].length);
-				memset (buffer, opts.fillbyte, bufsize);
+				memset(buffer, opts.fillbyte, bufsize);
 				for (k = 0; k < rl[0].length * vol->cluster_size; k += bufsize) {
-					if (write_data (fd, buffer, bufsize) < bufsize) {
-						Eprintf ("Write failed: %s\n", strerror (errno));
-						close (fd);
+					if (write_data(fd, buffer, bufsize) < bufsize) {
+						Eprintf("Write failed: %s\n", strerror(errno));
+						close(fd);
 						goto free;
 					}
 				}
@@ -1721,14 +1721,14 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 			for (i = 0; rl[i].length > 0; i++) {
 
 				if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
-					Vprintf ("Missing segment at end, "
+					Vprintf("Missing segment at end, "
 							"%lld clusters.\n",
 							(long long)rl[i].length);
-					memset (buffer, opts.fillbyte, bufsize);
+					memset(buffer, opts.fillbyte, bufsize);
 					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
-						if (write_data (fd, buffer, bufsize) < bufsize) {
-							Eprintf ("Write failed: %s\n", strerror (errno));
-							close (fd);
+						if (write_data(fd, buffer, bufsize) < bufsize) {
+							Eprintf("Write failed: %s\n", strerror(errno));
+							close(fd);
 							goto free;
 						}
 						cluster_count++;
@@ -1737,12 +1737,12 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 				}
 
 				if (rl[i].lcn == LCN_HOLE) {
-					Vprintf ("File has a sparse section.\n");
-					memset (buffer, 0, bufsize);
+					Vprintf("File has a sparse section.\n");
+					memset(buffer, 0, bufsize);
 					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
-						if (write_data (fd, buffer, bufsize) < bufsize) {
-							Eprintf ("Write failed: %s\n", strerror (errno));
-							close (fd);
+						if (write_data(fd, buffer, bufsize) < bufsize) {
+							Eprintf("Write failed: %s\n", strerror(errno));
+							close(fd);
 							goto free;
 						}
 					}
@@ -1753,42 +1753,44 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 				end   = rl[i].lcn + rl[i].length;
 
 				for (j = start; j < end; j++) {
-					if (utils_cluster_in_use (vol, j) && !opts.optimistic) {
-						memset (buffer, opts.fillbyte, bufsize);
-						if (write_data (fd, buffer, bufsize) < bufsize) {
-							Eprintf ("Write failed: %s\n", strerror (errno));
-							close (fd);
+					if (utils_cluster_in_use(vol, j) && !opts.optimistic) {
+						memset(buffer, opts.fillbyte, bufsize);
+						if (write_data(fd, buffer, bufsize) < bufsize) {
+							Eprintf("Write failed: %s\n", strerror(errno));
+							close(fd);
 							goto free;
 						}
 					} else {
 						if (ntfs_cluster_read(vol, j, 1, buffer) < 1) {
-							Eprintf ("Read failed: %s\n", strerror (errno));
-							close (fd);
+							Eprintf("Read failed: %s\n", strerror(errno));
+							close(fd);
 							goto free;
 						}
-						if (write_data (fd, buffer, bufsize) < bufsize) {
-							Eprintf ("Write failed: %s\n", strerror (errno));
-							close (fd);
+						if (write_data(fd, buffer, bufsize) < bufsize) {
+							Eprintf("Write failed: %s\n", strerror(errno));
+							close(fd);
 							goto free;
 						}
 						cluster_count++;
 					}
 				}
 			}
-			Qprintf ("\n");
+			Qprintf("\n");
 
-	/* The following block of code implements the --truncate option.        */
-	/* Its semantics are as follows:                                        */
-	/* IF opts.truncate is set AND data stream currently being recovered is */
-	/* non-resident AND data stream has no holes (100% recoverability) AND  */
-	/* 0 <= (data->size_alloc - data->size_data) <= vol->cluster_size AND   */
-	/* cluster_count * vol->cluster_size == data->size_alloc THEN file      */
-	/* currently being written is truncated to data->size_data bytes before */
-	/* it's closed.                                                         */
-	/* This multiple checks try to ensure that only files with consistent   */
-	/* values of size/occupied clusters are eligible for truncation. Note   */
-	/* that resident streams need not be truncated, since the original code */
-	/* already recovers their exact length.                           +mabs */
+			/*
+			 * The following block of code implements the --truncate option.
+			 * Its semantics are as follows:
+			 * IF opts.truncate is set AND data stream currently being recovered is
+			 * non-resident AND data stream has no holes (100% recoverability) AND
+			 * 0 <= (data->size_alloc - data->size_data) <= vol->cluster_size AND
+			 * cluster_count * vol->cluster_size == data->size_alloc THEN file
+			 * currently being written is truncated to data->size_data bytes before
+			 * it's closed.
+			 * This multiple checks try to ensure that only files with consistent
+			 * values of size/occupied clusters are eligible for truncation. Note
+			 * that resident streams need not be truncated, since the original code
+			 * already recovers their exact length.                           +mabs
+			 */
 
 			if (opts.truncate) {
 				if (d->percent == 100 && d->size_alloc >= d->size_data &&
@@ -1800,23 +1802,23 @@ static int undelete_file (ntfs_volume *vol, long long inode)
 					"inconsistent $MFT record.\n");
 			}
 
-			if (close (fd) < 0) {
-				Eprintf ("Close failed: %s\n", strerror (errno));
+			if (close(fd) < 0) {
+				Eprintf("Close failed: %s\n", strerror(errno));
 			}
 			fd = -1;
 
 		}
-		set_date (pathname, file->date);
+		set_date(pathname, file->date);
 		if (d->name)
-			Qprintf ("Undeleted '%s:%s' successfully.\n", file->pref_name, d->name);
+			Qprintf("Undeleted '%s:%s' successfully.\n", file->pref_name, d->name);
 		else
-			Qprintf ("Undeleted '%s' successfully.\n", file->pref_name);
+			Qprintf("Undeleted '%s' successfully.\n", file->pref_name);
 	}
 	result = 1;
 free:
 	if (buffer)
-		free (buffer);
-	free_file (file);
+		free(buffer);
+	free_file(file);
 	return result;
 }
 
@@ -1832,7 +1834,7 @@ free:
  * Return:  -1  Error, something went wrong
  *	     n  Success, the number of recoverable files
  */
-static int scan_disk (ntfs_volume *vol)
+static int scan_disk(ntfs_volume *vol)
 {
 	s64 nr_mft_records;
 	const int BUFSIZE = 8192;
@@ -1849,16 +1851,16 @@ static int scan_disk (ntfs_volume *vol)
 	if (!vol)
 		return -1;
 
-	attr = ntfs_attr_open (vol->mft_ni, AT_BITMAP, AT_UNNAMED, 0);
+	attr = ntfs_attr_open(vol->mft_ni, AT_BITMAP, AT_UNNAMED, 0);
 	if (!attr) {
-		Eprintf ("ERROR: Couldn't open $MFT/$BITMAP: %s\n", strerror (errno));
+		Eprintf("ERROR: Couldn't open $MFT/$BITMAP: %s\n", strerror(errno));
 		return -1;
 	}
 	bmpsize = attr->initialized_size;
 
-	buffer = malloc (BUFSIZE);
+	buffer = malloc(BUFSIZE);
 	if (!buffer) {
-		Eprintf ("ERROR: Couldn't allocate memory in scan_disk()\n");
+		Eprintf("ERROR: Couldn't allocate memory in scan_disk()\n");
 		results = -1;
 		goto out;
 	}
@@ -1868,8 +1870,8 @@ static int scan_disk (ntfs_volume *vol)
 
 		if (!opts.match_case)
 			flags |= REG_ICASE;
-		if (regcomp (&re, opts.match, flags)) {
-			Eprintf ("ERROR: Couldn't create a regex.\n");
+		if (regcomp(&re, opts.match, flags)) {
+			Eprintf("ERROR: Couldn't create a regex.\n");
 			goto out;
 		}
 	}
@@ -1877,11 +1879,11 @@ static int scan_disk (ntfs_volume *vol)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
-	Qprintf ("Inode    Flags  %%age  Date           Size  Filename\n");
-	Qprintf ("---------------------------------------------------------------\n");
+	Qprintf("Inode    Flags  %%age  Date           Size  Filename\n");
+	Qprintf("---------------------------------------------------------------\n");
 	for (i = 0; i < bmpsize; i += BUFSIZE) {
-		long long read_count = min ((bmpsize - i), BUFSIZE);
-		size = ntfs_attr_pread (attr, i, read_count, buffer);
+		long long read_count = min((bmpsize - i), BUFSIZE);
+		size = ntfs_attr_pread(attr, i, read_count, buffer);
 		if (size < 0)
 			break;
 
@@ -1892,36 +1894,36 @@ static int scan_disk (ntfs_volume *vol)
 					goto done;
 				if (b & 1)
 					continue;
-				file = read_record (vol, (i+j)*8+k);
+				file = read_record(vol, (i+j)*8+k);
 				if (!file) {
-					Eprintf ("Couldn't read MFT Record %d.\n", (i+j)*8+k);
+					Eprintf("Couldn't read MFT Record %d.\n", (i+j)*8+k);
 					continue;
 				}
 
 				if ((opts.since > 0) && (file->date <= opts.since))
 					goto skip;
-				if (opts.match && !name_match (&re, file))
+				if (opts.match && !name_match(&re, file))
 					goto skip;
 				if (opts.size_begin && (opts.size_begin > file->max_size))
 					goto skip;
 				if (opts.size_end && (opts.size_end < file->max_size))
 					goto skip;
 
-				percent = calc_percentage (file, vol);
+				percent = calc_percentage(file, vol);
 				if ((opts.percent == -1) || (percent >= opts.percent)) {
 					if (opts.verbose)
-						dump_record (file);
+						dump_record(file);
 					else
-						list_record (file);
+						list_record(file);
 
 					/* Was -u specified with no inode
 					   so undelete file by regex */
 					if (opts.mode == MODE_UNDELETE) {
-						if  (!undelete_file (vol, file->inode))
-							Vprintf ("ERROR: Failed to undelete "
-							          "inode %lli\n!",
-							          file->inode);
-						printf ("\n");
+						if  (!undelete_file(vol, file->inode))
+							Vprintf("ERROR: Failed to undelete "
+								  "inode %lli\n!",
+								  file->inode);
+						printf("\n");
 					}
 				}
 				if (((opts.percent == -1) && (percent > 0)) ||
@@ -1929,18 +1931,18 @@ static int scan_disk (ntfs_volume *vol)
 					results++;
 				}
 skip:
-				free_file (file);
+				free_file(file);
 			}
 		}
 	}
 done:
-	Qprintf ("\nFiles with potentially recoverable content: %d\n", results);
+	Qprintf("\nFiles with potentially recoverable content: %d\n", results);
 out:
 	if (opts.match)
-		regfree (&re);
-	free (buffer);
+		regfree(&re);
+	free(buffer);
 	if (attr)
-		ntfs_attr_close (attr);
+		ntfs_attr_close(attr);
 	return results;
 }
 
@@ -1955,7 +1957,7 @@ out:
  * Return:  0  Success, all the records were written
  *	    1  Error, something went wrong
  */
-static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
+static int copy_mft(ntfs_volume *vol, long long mft_begin, long long mft_end)
 {
 	s64 nr_mft_records;
 	char pathname[256];
@@ -1970,19 +1972,19 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 		return 1;
 
 	if (mft_end < mft_begin) {
-		Eprintf ("Range to copy is backwards.\n");
+		Eprintf("Range to copy is backwards.\n");
 		return 1;
 	}
 
-	buffer = malloc (vol->mft_record_size);
+	buffer = malloc(vol->mft_record_size);
 	if (!buffer) {
-		Eprintf ("Couldn't allocate memory in copy_mft()\n");
+		Eprintf("Couldn't allocate memory in copy_mft()\n");
 		return 1;
 	}
 
-	mft = ntfs_attr_open (vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
+	mft = ntfs_attr_open(vol->mft_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!mft) {
-		Eprintf ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+		Eprintf("Couldn't open $MFT/$DATA: %s\n", strerror(errno));
 		goto free;
 	}
 
@@ -1993,17 +1995,17 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 				name);
 	}
 
-	create_pathname (opts.dest, name, NULL, pathname, sizeof (pathname));
-	fd = open_file (pathname);
+	create_pathname(opts.dest, name, NULL, pathname, sizeof(pathname));
+	fd = open_file(pathname);
 	if (fd < 0) {
-		Eprintf ("Couldn't open output file '%s': %s\n", name, strerror (errno));
+		Eprintf("Couldn't open output file '%s': %s\n", name, strerror(errno));
 		goto attr;
 	}
 
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
-	mft_end = min (mft_end, nr_mft_records - 1);
+	mft_end = min(mft_end, nr_mft_records - 1);
 
 	ntfs_log_debug("MFT records:\n");
 	ntfs_log_debug("\tTotal: %8lld\n", nr_mft_records);
@@ -2011,25 +2013,25 @@ static int copy_mft (ntfs_volume *vol, long long mft_begin, long long mft_end)
 	ntfs_log_debug("\tEnd:   %8lld\n", mft_end);
 
 	for (i = mft_begin; i <= mft_end; i++) {
-		if (ntfs_attr_pread (mft, vol->mft_record_size * i, vol->mft_record_size, buffer) < vol->mft_record_size) {
-			Eprintf ("Couldn't read MFT Record %lld: %s.\n", i, strerror (errno));
+		if (ntfs_attr_pread(mft, vol->mft_record_size * i, vol->mft_record_size, buffer) < vol->mft_record_size) {
+			Eprintf("Couldn't read MFT Record %lld: %s.\n", i, strerror(errno));
 			goto close;
 		}
 
-		if (write_data (fd, buffer, vol->mft_record_size) < vol->mft_record_size) {
-			Eprintf ("Write failed: %s\n", strerror (errno));
+		if (write_data(fd, buffer, vol->mft_record_size) < vol->mft_record_size) {
+			Eprintf("Write failed: %s\n", strerror(errno));
 			goto close;
 		}
 	}
 
-	Vprintf ("Read %lld MFT Records\n", mft_end - mft_begin + 1);
+	Vprintf("Read %lld MFT Records\n", mft_end - mft_begin + 1);
 	result = 0;
 close:
-	close (fd);
+	close(fd);
 attr:
-	ntfs_attr_close (mft);
+	ntfs_attr_close(mft);
 free:
-	free (buffer);
+	free(buffer);
 	return result;
 }
 
@@ -2037,7 +2039,7 @@ free:
  * handle_undelete
  * Handles the undelete
  */
-static int handle_undelete (ntfs_volume *vol)
+static int handle_undelete(ntfs_volume *vol)
 {
 	int result = 1;
 	int i;
@@ -2046,25 +2048,25 @@ static int handle_undelete (ntfs_volume *vol)
 	/* Check whether (an) inode(s) was specified or at least a regex! */
 	if (nr_entries == 0) {
 		if (with_regex == 0) {
-			printf ("ERROR: NO inode(s) AND NO match-regex specified!\n");
+			printf("ERROR: NO inode(s) AND NO match-regex specified!\n");
 		} else {
 			avoid_duplicate_printing= 1;
-			result = !scan_disk (vol);
+			result = !scan_disk(vol);
 			if (result)
-				Vprintf ("ERROR: Failed to scan device '%s'.\n", opts.device);
+				Vprintf("ERROR: Failed to scan device '%s'.\n", opts.device);
 		}
 	} else {
 		/* Normal undelete by specifying inode(s) */
-		Qprintf ("Inode    Flags  %%age  Date            Size  Filename\n");
-		Qprintf ("---------------------------------------------------------------\n");
+		Qprintf("Inode    Flags  %%age  Date            Size  Filename\n");
+		Qprintf("---------------------------------------------------------------\n");
 
 		/* loop all given inodes */
 		for (i = 0; i < nr_entries; i++) {
 			for (inode = ranges[i].begin; inode <= ranges[i].end; inode ++) {
 				/* Now undelete file */
-				result = !undelete_file (vol, inode);
+				result = !undelete_file(vol, inode);
 				if (result)
-					Vprintf ("ERROR: Failed to undelete "
+					Vprintf("ERROR: Failed to undelete "
 						"inode %lli\n!",
 						inode);
 			}
@@ -2081,7 +2083,7 @@ static int handle_undelete (ntfs_volume *vol)
  * Return:  0  Success, the program worked
  *	    1  Error, something went wrong
  */
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	int result = 1;
@@ -2089,12 +2091,12 @@ int main (int argc, char *argv[])
 	with_regex = 0;
 	avoid_duplicate_printing = 0;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv))
 		goto free;
 
 	utils_set_locale();
 
-	vol = utils_mount_volume (opts.device, MS_RDONLY, opts.force);
+	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
 	if (!vol)
 		return 1;
 
@@ -2102,21 +2104,21 @@ int main (int argc, char *argv[])
 	switch (opts.mode) {
 	/* Scanning */
 	case MODE_SCAN:
-		result = !scan_disk (vol);
+		result = !scan_disk(vol);
 		if (result)
-			Vprintf ("ERROR: Failed to scan device '%s'.\n", opts.device);
+			Vprintf("ERROR: Failed to scan device '%s'.\n", opts.device);
 		break;
 
 	/* Undelete-handling */
 	case MODE_UNDELETE:
-		result= handle_undelete (vol);
+		result= handle_undelete(vol);
 		break;
 
 	/* Handling of copy mft */
 	case MODE_COPY:
-		result = !copy_mft (vol, opts.mft_begin, opts.mft_end);
+		result = !copy_mft(vol, opts.mft_begin, opts.mft_end);
 		if (result)
-			Vprintf ("ERROR: Failed to read MFT blocks %lld-%lld.\n",
+			Vprintf("ERROR: Failed to read MFT blocks %lld-%lld.\n",
 				opts.mft_begin,
 				min((vol->mft_na->initialized_size >>
 				vol->mft_record_size_bits) , opts.mft_end));
@@ -2125,10 +2127,10 @@ int main (int argc, char *argv[])
 		; /* Cannot happen */
 	}
 
-	ntfs_umount (vol, FALSE);
+	ntfs_umount(vol, FALSE);
 free:
 	if (opts.match)
-		free (opts.match);
+		free(opts.match);
 
 	return result;
 }

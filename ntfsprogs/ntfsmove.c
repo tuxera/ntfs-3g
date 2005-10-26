@@ -50,9 +50,9 @@
 static const char *EXEC_NAME = "ntfsmove";
 static struct options opts;
 
-GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF (Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
+GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
+GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 #if 0
 #define RED	"\e[31m"
@@ -68,13 +68,13 @@ GEN_PRINTF (Qprintf, stdout, &opts.quiet,   FALSE)
  *
  * Return:  none
  */
-static void version (void)
+static void version(void)
 {
-	printf ("\n%s v%s (libntfs %s) - Move files and directories on an "
+	printf("\n%s v%s (libntfs %s) - Move files and directories on an "
 			"NTFS volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf ("Copyright (c) 2003 Richard Russon\n");
-	printf ("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	printf("Copyright (c) 2003 Richard Russon\n");
+	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -84,9 +84,9 @@ static void version (void)
  *
  * Return:  none
  */
-static void usage (void)
+static void usage(void)
 {
-	printf ("\nUsage: %s [options] device file\n"
+	printf("\nUsage: %s [options] device file\n"
 		"\n"
 		"    -S      --start        Move to the start of the volume\n"
 		"    -B      --best         Move to the best place on the volume\n"
@@ -101,7 +101,7 @@ static void usage (void)
 		"    -V      --version      Version information\n"
 		"    -v      --verbose      More output\n\n",
 		EXEC_NAME);
-	printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -113,7 +113,7 @@ static void usage (void)
  * Return:  1 Success
  *	    0 Error, one or more problems
  */
-static int parse_options (int argc, char **argv)
+static int parse_options(int argc, char **argv)
 {
 	static const char *sopt = "-BC:DEfh?nqSVv";
 	static const struct option lopt[] = {
@@ -139,7 +139,7 @@ static int parse_options (int argc, char **argv)
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
-	while ((c = getopt_long (argc, argv, sopt, lopt, NULL)) != -1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
@@ -160,7 +160,7 @@ static int parse_options (int argc, char **argv)
 			break;
 		case 'C':
 			if (opts.location == 0) {
-				opts.location = strtoll (optarg, &end, 0);
+				opts.location = strtoll(optarg, &end, 0);
 				if (end && *end)
 					err++;
 			} else {
@@ -202,7 +202,7 @@ static int parse_options (int argc, char **argv)
 			opts.verbose++;
 			break;
 		default:
-			Eprintf ("Unknown option '%s'.\n", argv[optind-1]);
+			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
 			err++;
 			break;
 		}
@@ -214,7 +214,7 @@ static int parse_options (int argc, char **argv)
 		if ((opts.device == NULL) ||
 		    (opts.file   == NULL)) {
 			if (argc > 1)
-				Eprintf ("You must specify one device and one file.\n");
+				Eprintf("You must specify one device and one file.\n");
 			err++;
 		}
 
@@ -225,7 +225,7 @@ static int parse_options (int argc, char **argv)
 		}
 
 		if (opts.location == -1) {
-			Eprintf ("You may only specify one location option: "
+			Eprintf("You may only specify one location option: "
 				"--start, --best, --end or --cluster\n");
 			err++;
 		} else if (opts.location == 0) {
@@ -246,7 +246,7 @@ static int parse_options (int argc, char **argv)
 /**
  * ntfs_debug_runlist_dump2 - Dump a runlist.
  */
-static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
+static int ntfs_debug_runlist_dump2(const runlist *rl, int abbr, char *prefix)
 {
 	//int abbr = 3;	/* abbreviate long lists */
 	int len = 0;
@@ -274,7 +274,7 @@ static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 		if (abbr)
 			if (len > 20) {
 				if ((i == abbr) && (len > (abbr*2)))
-					printf ("%s     ...      ...      ...\n", prefix);
+					printf("%s     ...      ...      ...\n", prefix);
 				if ((i > (abbr-1)) && (i < (len - (abbr-1))))
 					continue;
 			}
@@ -295,9 +295,9 @@ static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 			printf("%s%8lld %8lld %8lld\n", prefix,
 				rl->vcn, rl->lcn, rl->length);
 	}
-	printf ("%s                  --------\n", prefix);
-	printf ("%s                  %8lld\n", prefix, total);
-	printf ("\n");
+	printf("%s                  --------\n", prefix);
+	printf("%s                  %8lld\n", prefix, total);
+	printf("\n");
 	return res;
 }
 
@@ -306,7 +306,7 @@ static int ntfs_debug_runlist_dump2 (const runlist *rl, int abbr, char *prefix)
 /**
  * resize_nonres_attr
  */
-static int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
+static int resize_nonres_attr(MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size)
 {
 	int this_attr;
 	int next_attr;
@@ -323,15 +323,15 @@ static int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size
 	ptr = (u8*) m;
 
 	/*
-	printf ("old_size  = %d\n", old_size);
-	printf ("new_size  = %d\n", new_size);
-	printf ("file_size = %d\n", file_size);
-	printf ("this_attr = %d\n", this_attr);
-	printf ("next_attr = %d\n", next_attr);
-	printf ("tail_size = %d\n", tail_size);
+	printf("old_size  = %d\n", old_size);
+	printf("new_size  = %d\n", new_size);
+	printf("file_size = %d\n", file_size);
+	printf("this_attr = %d\n", this_attr);
+	printf("next_attr = %d\n", next_attr);
+	printf("tail_size = %d\n", tail_size);
 	*/
 
-	memmove (ptr + this_attr + new_size, ptr + next_attr, tail_size);
+	memmove(ptr + this_attr + new_size, ptr + next_attr, tail_size);
 
 	a->length = new_size;
 	m->bytes_in_use += new_size - old_size;
@@ -342,7 +342,7 @@ static int resize_nonres_attr (MFT_RECORD *m, ATTR_RECORD *a, const u32 new_size
 /**
  * calc_attr_length
  */
-static int calc_attr_length (ATTR_RECORD *rec, int runlength)
+static int calc_attr_length(ATTR_RECORD *rec, int runlength)
 {
 	int size;
 
@@ -361,15 +361,15 @@ static int calc_attr_length (ATTR_RECORD *rec, int runlength)
 /**
  * dump_runs
  */
-static void dump_runs (u8 *buffer, int len)
+static void dump_runs(u8 *buffer, int len)
 {
 	int i;
-	printf ("RUN: \e[01;31m");
+	printf("RUN: \e[01;31m");
 
 	for (i = 0; i < len; i++) {
-		printf (" %02x", buffer[i]);
+		printf(" %02x", buffer[i]);
 	}
-	printf ("\e[0m\n");
+	printf("\e[0m\n");
 }
 
 #endif /* if 0 */
@@ -377,7 +377,7 @@ static void dump_runs (u8 *buffer, int len)
 /**
  * find_unused
  */
-static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc
+static runlist * find_unused(ntfs_volume *vol, s64 size, u64 loc
 	__attribute__((unused)), int flags __attribute__((unused)))
 {
 	const int bufsize = 8192;
@@ -390,34 +390,34 @@ static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc
 	int bit = 0;
 	runlist *res = NULL;
 
-	//printf ("find_unused\n");
-	buffer = malloc (bufsize);
+	//printf("find_unused\n");
+	buffer = malloc(bufsize);
 	if (!buffer) {
-		printf ("!buffer\n");
+		printf("!buffer\n");
 		return NULL;
 	}
 
-	//printf ("looking for space for %lld clusters\n", size);
+	//printf("looking for space for %lld clusters\n", size);
 
 	clus = vol->lcnbmp_na->allocated_size / bufsize;
-	//printf ("clus = %d\n", clus);
+	//printf("clus = %d\n", clus);
 
 	for (i = 0; i < clus; i++) {
 		int bytes_read, j;
 
-		bytes_read = ntfs_attr_pread (vol->lcnbmp_na, i*bufsize,
+		bytes_read = ntfs_attr_pread(vol->lcnbmp_na, i*bufsize,
 				bufsize, buffer);
 		if (bytes_read != bufsize) {
-			printf ("!read\n");
+			printf("!read\n");
 			return NULL;
 		}
 		for (j = 0; j < bufsize*8; j++) {
-			bit = !!test_bit (j & 7, buffer[j>>3]);
+			bit = !!test_bit(j & 7, buffer[j>>3]);
 			if (curr == bit) {
 				count++;
 				if ((!bit) && (count >= size)) {
-					//res = calloc (2, sizeof (*res));
-					res = calloc (1, 4096);
+					//res = calloc(2, sizeof(*res));
+					res = calloc(1, 4096);
 					if (res) {
 						res[0].vcn    = 0;
 						res[0].lcn    = start;
@@ -427,7 +427,7 @@ static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc
 					goto done;
 				}
 			} else {
-				//printf ("%d * %d\n", curr, count);
+				//printf("%d * %d\n", curr, count);
 				curr = bit;
 				count = 1;
 				start = i*bufsize*8 + j;
@@ -435,18 +435,18 @@ static runlist * find_unused (ntfs_volume *vol, s64 size, u64 loc
 		}
 	}
 done:
-	//printf ("%d * %d\n", curr, count);
+	//printf("%d * %d\n", curr, count);
 
-	free (buffer);
+	free(buffer);
 
 	if (res) {
 		for (i = 0; i < size; i++) {
-			if (utils_cluster_in_use (vol, res->lcn + i)) {
-				printf ("ERROR cluster %lld in use\n", res->lcn + i);
+			if (utils_cluster_in_use(vol, res->lcn + i)) {
+				printf("ERROR cluster %lld in use\n", res->lcn + i);
 			}
 		}
 	} else {
-		printf ("failed\n");
+		printf("failed\n");
 	}
 
 	return res;
@@ -460,7 +460,7 @@ done:
  *   Any fragmented MFT records
  *   The boot file 'ntldr'
  */
-static int dont_move (ntfs_inode *ino)
+static int dont_move(ntfs_inode *ino)
 {
 	static const ntfschar ntldr[6] = {
 		const_cpu_to_le16('n'), const_cpu_to_le16('t'), const_cpu_to_le16('l'),
@@ -470,27 +470,27 @@ static int dont_move (ntfs_inode *ino)
 	ATTR_RECORD *rec;
 	FILE_NAME_ATTR *name;
 
-	if (utils_is_metadata (ino)) {
-		Eprintf ("metadata\n");
+	if (utils_is_metadata(ino)) {
+		Eprintf("metadata\n");
 		return 1;
 	}
 
-	rec = find_first_attribute (AT_ATTRIBUTE_LIST, ino->mrec);
+	rec = find_first_attribute(AT_ATTRIBUTE_LIST, ino->mrec);
 	if (rec) {
-		Eprintf ("attribute list\n");
+		Eprintf("attribute list\n");
 		return 1;
 	}
 
-	rec = find_first_attribute (AT_FILE_NAME, ino->mrec);
+	rec = find_first_attribute(AT_FILE_NAME, ino->mrec);
 	if (!rec) {
-		Eprintf ("extend inode\n");
+		Eprintf("extend inode\n");
 		return 1;
 	}
 
 	name = (FILE_NAME_ATTR*) ((u8*)rec + rec->value_offset);
-	if (ntfs_names_are_equal (ntldr, 5, name->file_name, name->file_name_length,
+	if (ntfs_names_are_equal(ntldr, 5, name->file_name, name->file_name_length,
 		IGNORE_CASE, ino->vol->upcase, ino->vol->upcase_len)) {
-		Eprintf ("ntldr\n");
+		Eprintf("ntldr\n");
 		return 1;
 	}
 
@@ -501,16 +501,16 @@ static int dont_move (ntfs_inode *ino)
 /**
  * bitmap_alloc
  */
-static int bitmap_alloc (ntfs_volume *vol, runlist_element *rl)
+static int bitmap_alloc(ntfs_volume *vol, runlist_element *rl)
 {
 	int res;
 
 	if (!rl)
 		return -1;
 
-	res = ntfs_bitmap_set_run (vol->lcnbmp_na, rl->lcn, rl->length);
+	res = ntfs_bitmap_set_run(vol->lcnbmp_na, rl->lcn, rl->length);
 	if (res < 0) {
-		Eprintf ("bitmap alloc returns %d\n", res);
+		Eprintf("bitmap alloc returns %d\n", res);
 	}
 
 	return res;
@@ -519,16 +519,16 @@ static int bitmap_alloc (ntfs_volume *vol, runlist_element *rl)
 /**
  * bitmap_free
  */
-static int bitmap_free (ntfs_volume *vol, runlist_element *rl)
+static int bitmap_free(ntfs_volume *vol, runlist_element *rl)
 {
 	int res;
 
 	if (!rl)
 		return -1;
 
-	res = ntfs_bitmap_clear_run (vol->lcnbmp_na, rl->lcn, rl->length);
+	res = ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn, rl->length);
 	if (res < 0) {
-		Eprintf ("bitmap free returns %d\n", res);
+		Eprintf("bitmap free returns %d\n", res);
 	}
 
 	return res;
@@ -537,7 +537,7 @@ static int bitmap_free (ntfs_volume *vol, runlist_element *rl)
 /**
  * data_copy
  */
-static int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *to)
+static int data_copy(ntfs_volume *vol, runlist_element *from, runlist_element *to)
 {
 	int i;
 	u8 *buffer;
@@ -548,32 +548,32 @@ static int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *
 	if ((from->length != to->length) || (from->lcn < 0) || (to->lcn < 0))
 		return -1;
 
-	//printf ("data_copy: from 0x%llx to 0x%llx\n", from->lcn, to->lcn);
-	buffer = malloc (vol->cluster_size);
+	//printf("data_copy: from 0x%llx to 0x%llx\n", from->lcn, to->lcn);
+	buffer = malloc(vol->cluster_size);
 	if (!buffer) {
-		printf ("!buffer\n");
+		printf("!buffer\n");
 		return -1;
 	}
 
 	for (i = 0; i < from->length; i++) {
-		//printf ("read  cluster at %8lld\n", from->lcn+i);
-		res = ntfs_pread (vol->dev, (from->lcn+i) * vol->cluster_size, vol->cluster_size, buffer);
+		//printf("read  cluster at %8lld\n", from->lcn+i);
+		res = ntfs_pread(vol->dev, (from->lcn+i) * vol->cluster_size, vol->cluster_size, buffer);
 		if (res != vol->cluster_size) {
-			Eprintf ("!read\n");
+			Eprintf("!read\n");
 			res = -1;
 			break;
 		}
 
-		//printf ("write cluster to %8lld\n", to->lcn+i);
-		res = ntfs_pwrite (vol->dev, (to->lcn+i) * vol->cluster_size, vol->cluster_size, buffer);
+		//printf("write cluster to %8lld\n", to->lcn+i);
+		res = ntfs_pwrite(vol->dev, (to->lcn+i) * vol->cluster_size, vol->cluster_size, buffer);
 		if (res != vol->cluster_size) {
-			Eprintf ("!write %lld\n", res);
+			Eprintf("!write %lld\n", res);
 			res = -1;
 			break;
 		}
 	}
 
-	free (buffer);
+	free(buffer);
 	return res;
 }
 
@@ -588,7 +588,7 @@ static int data_copy (ntfs_volume *vol, runlist_element *from, runlist_element *
  * copy data
  * deallocate old space
  */
-static s64 move_runlist (ntfs_volume *vol, runlist_element *from,
+static s64 move_runlist(ntfs_volume *vol, runlist_element *from,
 	runlist_element *to)
 {
 	int i;
@@ -596,41 +596,41 @@ static s64 move_runlist (ntfs_volume *vol, runlist_element *from,
 	if (!vol || !from || !to)
 		return -1;
 	if (from->length != to->length) {
-		Eprintf ("diffsizes\n");
+		Eprintf("diffsizes\n");
 		return -1;
 	}
 
 	if ((from->lcn < 0) || (to->lcn < 0)) {
-		Eprintf ("invalid runs\n");
+		Eprintf("invalid runs\n");
 		return -1;
 	}
 
 	for (i = 0; i < from->length; i++) {
-		if (!utils_cluster_in_use (vol, from->lcn+i)) {
-			Eprintf ("from not in use\n");
+		if (!utils_cluster_in_use(vol, from->lcn+i)) {
+			Eprintf("from not in use\n");
 			return -1;
 		}
 	}
 
 	for (i = 0; i < to->length; i++) {
-		if (utils_cluster_in_use (vol, to->lcn+i)) {
-			Eprintf ("to is in use\n");
+		if (utils_cluster_in_use(vol, to->lcn+i)) {
+			Eprintf("to is in use\n");
 			return -1;
 		}
 	}
 
-	if (bitmap_alloc (vol, to) < 0) {
-		Eprintf ("cannot bitmap_alloc\n");
+	if (bitmap_alloc(vol, to) < 0) {
+		Eprintf("cannot bitmap_alloc\n");
 		return -1;
 	}
 
-	if (data_copy (vol, from, to) < 0) {
-		Eprintf ("cannot data_copy\n");
+	if (data_copy(vol, from, to) < 0) {
+		Eprintf("cannot data_copy\n");
 		return -1;
 	}
 
-	if (bitmap_free (vol, from) < 0) {
-		Eprintf ("cannot bitmap_free\n");
+	if (bitmap_free(vol, from) < 0) {
+		Eprintf("cannot bitmap_free\n");
 		return -1;
 	}
 
@@ -654,7 +654,7 @@ static s64 move_runlist (ntfs_volume *vol, runlist_element *from,
 //      requires a mrec arg, not an ino (ino->mrec will do for now)
 // check size of new runlist before allocating / moving
 // replace one datarun with another (by hand)
-static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
+static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	runlist_element *run, u64 loc, int flags)
 {
 	runlist *from;
@@ -665,27 +665,27 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	s64 res = -1;
 
 	// find empty space
-	to = find_unused (vol, run->length, loc, flags);
+	to = find_unused(vol, run->length, loc, flags);
 	if (!to) {
-		Eprintf ("!to\n");
+		Eprintf("!to\n");
 		return -1;
 	}
 
 	to->vcn = run->vcn;
 
 	// copy original runlist
-	from = ntfs_mapping_pairs_decompress (vol, rec, NULL);
+	from = ntfs_mapping_pairs_decompress(vol, rec, NULL);
 	if (!from) {
-		printf ("!from\n");
+		printf("!from\n");
 		return -1;
 	}
 
-	printf ("move %lld,%lld,%lld to %lld,%lld,%lld\n", run->vcn, run->lcn, run->length, to->vcn, to->lcn, to->length);
+	printf("move %lld,%lld,%lld to %lld,%lld,%lld\n", run->vcn, run->lcn, run->length, to->vcn, to->lcn, to->length);
 
 	need_from = ntfs_get_size_for_mapping_pairs(vol, from, 0);
-	printf ("orig data run = %d bytes\n", need_from);
+	printf("orig data run = %d bytes\n", need_from);
 
-	//ntfs_debug_runlist_dump2 (from, 5, "\t");
+	//ntfs_debug_runlist_dump2(from, 5, "\t");
 
 	for (i = 0; to[i].length > 0; i++) {
 		if (from[i].vcn == run->vcn) {
@@ -694,47 +694,47 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 		}
 	}
 
-	//ntfs_debug_runlist_dump2 (from, 5, "\t");
+	//ntfs_debug_runlist_dump2(from, 5, "\t");
 
 	need_to = ntfs_get_size_for_mapping_pairs(vol, from, 0);
-	printf ("new  data run = %d bytes\n", need_to);
+	printf("new  data run = %d bytes\n", need_to);
 
-	need_from = calc_attr_length (rec, need_from);
-	need_to   = calc_attr_length (rec, need_to);
+	need_from = calc_attr_length(rec, need_from);
+	need_to   = calc_attr_length(rec, need_to);
 
-	//printf (RED "Before %d, after %d\n" NORM, need_from, need_to);
-	printf ("Before %d, after %d\n", need_from, need_to);
+	//printf(RED "Before %d, after %d\n" NORM, need_from, need_to);
+	printf("Before %d, after %d\n", need_from, need_to);
 
 	if (need_from != need_to) {
-		if (resize_nonres_attr (ino->mrec, rec, need_to) < 0) {
-			printf ("!resize\n");
+		if (resize_nonres_attr(ino->mrec, rec, need_to) < 0) {
+			printf("!resize\n");
 			return -1;
 		}
 	}
 
-	res = move_runlist (vol, run, to);
+	res = move_runlist(vol, run, to);
 	if (res < 0) {
-		Eprintf ("!move_runlist\n");
+		Eprintf("!move_runlist\n");
 		return -1;
 	}
 
 	// wipe orig runs
-	memset (((u8*)rec) +rec->mapping_pairs_offset, 0, need_to - rec->mapping_pairs_offset);
+	memset(((u8*)rec) +rec->mapping_pairs_offset, 0, need_to - rec->mapping_pairs_offset);
 
 	// update data runs
 	ntfs_mapping_pairs_build(vol, ((u8*)rec) + rec->mapping_pairs_offset,
 			need_to, from, 0, NULL);
 
 	// commit
-	ntfs_inode_mark_dirty (ino);
+	ntfs_inode_mark_dirty(ino);
 
-	if (ntfs_inode_sync (ino) < 0) {
-		printf ("!sync\n");
+	if (ntfs_inode_sync(ino) < 0) {
+		printf("!sync\n");
 		return -1;
 	}
 
-	free (from);
-	free (to);
+	free(from);
+	free(to);
 	return res;
 }
 
@@ -744,7 +744,7 @@ static s64 move_datarun (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
  * = 0  Nothing to do
  * < 0  Error
  */
-static s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
+static s64 move_attribute(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	u64 loc, int flags)
 {
 	int i;
@@ -756,24 +756,24 @@ static s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	// find that space and pass the location to our children.
 	// Anything else we pass directly to move_datarun.
 
-	runs = ntfs_mapping_pairs_decompress (vol, rec, NULL);
+	runs = ntfs_mapping_pairs_decompress(vol, rec, NULL);
 	if (!runs) {
-		Eprintf ("!runs\n");
+		Eprintf("!runs\n");
 		return -1;
 	}
 
-	//ntfs_debug_runlist_dump2 (runs, 5, "\t");
+	//ntfs_debug_runlist_dump2(runs, 5, "\t");
 
-	//printf ("             VCN     LCN     Length\n");
+	//printf("             VCN     LCN     Length\n");
 	for (i = 0; runs[i].length > 0; i++) {
 		if (runs[i].lcn == LCN_RL_NOT_MAPPED) {
 			continue;
 		}
 
-		res = move_datarun (vol, ino, rec, runs+i, loc, flags);
-		//printf ("        %8lld %8lld %8lld\n", runs[i].vcn, runs[i].lcn, runs[i].length);
+		res = move_datarun(vol, ino, rec, runs+i, loc, flags);
+		//printf("        %8lld %8lld %8lld\n", runs[i].vcn, runs[i].lcn, runs[i].length);
 		if (res < 0) {
-			Eprintf ("!move_datarun\n");
+			Eprintf("!move_datarun\n");
 			count = res;
 			break;
 		}
@@ -789,7 +789,7 @@ static s64 move_attribute (ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
  * = 0  Nothing to do
  * < 0  Error
  */
-static s64 move_file (ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
+static s64 move_file(ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
 {
 	char *buffer;
 	ntfs_attr_search_ctx *ctx;
@@ -797,47 +797,47 @@ static s64 move_file (ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
 	s64 res;
 	s64 count = 0;
 
-	buffer = malloc (MAX_PATH);
+	buffer = malloc(MAX_PATH);
 	if (!buffer) {
-		Eprintf ("Out of memory\n");
+		Eprintf("Out of memory\n");
 		return -1;
 	}
 
-	utils_inode_get_name (ino, buffer, MAX_PATH);
+	utils_inode_get_name(ino, buffer, MAX_PATH);
 
-	if (dont_move (ino)) {
-		Eprintf ("can't move\n");
+	if (dont_move(ino)) {
+		Eprintf("can't move\n");
 		return -1;
 	}
 
-	printf ("Moving %s\n", buffer);
+	printf("Moving %s\n", buffer);
 
 	// NTFS_MOVE_LOC_BEST : assess how much space all the attributes will need,
 	// find that space and pass the location to our children.
 	// Anything else we pass directly to move_attribute.
 
-	ctx = ntfs_attr_get_search_ctx (ino, NULL);
+	ctx = ntfs_attr_get_search_ctx(ino, NULL);
 
-	while ((rec = find_attribute (AT_UNUSED, ctx))) {
-		utils_attr_get_name (vol, rec, buffer, MAX_PATH);
-		printf ("\tAttribute 0x%02x %s is ", rec->type, buffer);
+	while ((rec = find_attribute(AT_UNUSED, ctx))) {
+		utils_attr_get_name(vol, rec, buffer, MAX_PATH);
+		printf("\tAttribute 0x%02x %s is ", rec->type, buffer);
 
 		if (rec->non_resident) {
-			printf ("non-resident.   Moving it.\n");
+			printf("non-resident.   Moving it.\n");
 
-			res = move_attribute (vol, ino, rec, loc, flags);
+			res = move_attribute(vol, ino, rec, loc, flags);
 			if (res < 0) {
 				count = res;
 				break;
 			}
 			count += res;
 		} else {
-			printf ("resident.\n\t\tSkipping it.\n");
+			printf("resident.\n\t\tSkipping it.\n");
 		}
 	}
 
-	ntfs_attr_put_search_ctx (ctx);
-	free (buffer);
+	ntfs_attr_put_search_ctx(ctx);
+	free(buffer);
 	return count;
 }
 
@@ -850,7 +850,7 @@ static s64 move_file (ntfs_volume *vol, ntfs_inode *ino, u64 loc, int flags)
  * Return:  0  Success, the program worked
  *	    1  Error, something went wrong
  */
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	ntfs_volume *vol;
 	ntfs_inode *inode;
@@ -858,7 +858,7 @@ int main (int argc, char *argv[])
 	int result = 1;
 	s64 count;
 
-	if (!parse_options (argc, argv))
+	if (!parse_options(argc, argv))
 		return 1;
 
 	utils_set_locale();
@@ -866,35 +866,35 @@ int main (int argc, char *argv[])
 	if (opts.noaction)
 		flags |= MS_RDONLY;
 
-	vol = utils_mount_volume (opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags, opts.force);
 	if (!vol) {
-		printf ("!vol\n");
+		printf("!vol\n");
 		return 1;
 	}
 
 	inode = ntfs_pathname_to_inode(vol, NULL, opts.file);
 	if (!inode) {
-		printf ("!inode\n");
+		printf("!inode\n");
 		return 1;
 	}
 
-	count = move_file (vol, inode, opts.location, 0);
+	count = move_file(vol, inode, opts.location, 0);
 	if ((count > 0) && (!opts.nodirty)) {
-		if (ntfs_volume_write_flags (vol, vol->flags | VOLUME_IS_DIRTY) <
+		if (ntfs_volume_write_flags(vol, vol->flags | VOLUME_IS_DIRTY) <
 				0) {
-			Eprintf ("Couldn't mark volume dirty\n");
+			Eprintf("Couldn't mark volume dirty\n");
 		}
-		printf ("Relocated %lld bytes\n", count);
+		printf("Relocated %lld bytes\n", count);
 	}
 	if (count >= 0)
 		result = 0;
 
 	if (result)
-		printf ("failed\n");
+		printf("failed\n");
 	else
-		printf ("success\n");
+		printf("success\n");
 
-	ntfs_inode_close (inode);
-	ntfs_umount (vol, FALSE);
+	ntfs_inode_close(inode);
+	ntfs_umount(vol, FALSE);
 	return result;
 }

@@ -1842,7 +1842,7 @@ find_attr_list_attr:
 
 			/* Got it. Done. */
 			if (!rc)
-			       return 0;
+				return 0;
 
 			/* Error! If other than not found return it. */
 			if (errno != ENOENT)

@@ -275,7 +275,7 @@ static int parse_options(int argc, char *argv[])
 
 	/* defaults to -a if -s is not specified */
 	if (!opts.system)
-	        opts.all++;
+		opts.all++;
 
 	if (help || ver)
 		opts.quiet = 0;
@@ -484,12 +484,12 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 
 	struct dir *dir = NULL;
 
-	filename = calloc (1, MAX_PATH);
+	filename = calloc(1, MAX_PATH);
 	if (!filename)
 		return -1;
 
-	if (ntfs_ucstombs (name, name_len, &filename, MAX_PATH) < 0) {
-		Eprintf ("Cannot represent filename in current locale.\n");
+	if (ntfs_ucstombs(name, name_len, &filename, MAX_PATH) < 0) {
+		Eprintf("Cannot represent filename in current locale.\n");
 		goto free;
 	}
 
@@ -606,7 +606,7 @@ release:
 	}
 
 free:
-	free (filename);
+	free(filename);
 	return result;
 }
 
@@ -641,7 +641,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	ni = ntfs_pathname_to_inode (vol, NULL, opts.path);
+	ni = ntfs_pathname_to_inode(vol, NULL, opts.path);
 	if (!ni) {
 		// FIXME: Print error... (AIA)
 		ntfs_umount(vol, FALSE);
@@ -674,9 +674,9 @@ int main(int argc, char **argv)
 		if (!ctx)
 			return -1;
 
-		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+		while ((rec = find_attribute(AT_FILE_NAME, ctx))) {
 			/* We know this will always be resident. */
-			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
 
 			if (attr->file_name_type < space) {
 				name     = attr->file_name;

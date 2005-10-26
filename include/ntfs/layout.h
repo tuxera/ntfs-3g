@@ -248,8 +248,8 @@ typedef enum {
 typedef enum {
 	MFT_RECORD_IN_USE	= const_cpu_to_le16(0x0001),
 	MFT_RECORD_IS_DIRECTORY	= const_cpu_to_le16(0x0002),
-	MFT_RECORD_IS_4         = const_cpu_to_le16(0x0004),
-        MFT_RECORD_IS_8         = const_cpu_to_le16(0x0008),
+	MFT_RECORD_IS_4		= const_cpu_to_le16(0x0004),
+	MFT_RECORD_IS_8		= const_cpu_to_le16(0x0008),
 	MFT_REC_SPACE_FILLER	= 0xffff	/* Just to make flags 16-bit. */
 } __attribute__((__packed__)) MFT_RECORD_FLAGS;
 
@@ -1833,18 +1833,18 @@ typedef struct {
 	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
 	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
 	u64 reserved_II;   /* Padding - always unicode "II" */
-} __attribute__ ((__packed__)) SDH_INDEX_DATA;
+} __attribute__((__packed__)) SDH_INDEX_DATA;
 
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
 	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
 	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
-} __attribute__ ((__packed__)) SII_INDEX_DATA;
+} __attribute__((__packed__)) SII_INDEX_DATA;
 
 typedef struct {
 	u64 owner_id;
-} __attribute__ ((__packed__)) QUOTA_O_INDEX_DATA;
+} __attribute__((__packed__)) QUOTA_O_INDEX_DATA;
 
 /*
  * The $SDS data stream contains the security descriptors, aligned on 16-byte
@@ -2461,7 +2461,7 @@ typedef struct {
 					2 = Unexpected type.
 					3 = Certificate thumbprint.
 					other = Unknown type. */
-        union {
+	union {
 		/* CryptoAPI container. */
 		struct {
 /* 12*/			u32 container_name_offset;	/* Offset in bytes to

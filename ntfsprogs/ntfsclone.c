@@ -154,7 +154,7 @@ struct {
 	s64 device_size;
 	s64 nr_clusters;
 	s64 inuse;
-} __attribute__ ((__packed__)) image_hdr;
+} __attribute__((__packed__)) image_hdr;
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -499,7 +499,7 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
 
 	if (read_all(fd, buff, NTFS_SECTOR_SIZE) == -1) {
 		Printf("WARNING: Can't read sector at %llu, lost data.\n",
-		       (unsigned long long)pos);
+			(unsigned long long)pos);
 		memset(buff, '?', NTFS_SECTOR_SIZE);
 		memmove(buff, badsector_magic, sizeof(badsector_magic));
 	}
@@ -991,9 +991,9 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			continue;
 		}
 
-	        deleted_inode = !(ni->mrec->flags & MFT_RECORD_IN_USE);
+		deleted_inode = !(ni->mrec->flags & MFT_RECORD_IN_USE);
 
-	        if (deleted_inode) {
+		if (deleted_inode) {
 
 			ni->mft_no = MREF(mref);
 			if (wipe) {
@@ -1007,7 +1007,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 		free(ni->mrec);
 		free(ni);
 
-	        if (deleted_inode)
+		if (deleted_inode)
 			continue;
 
 		if ((ni = ntfs_inode_open(volume, mref)) == NULL) {
@@ -1468,10 +1468,10 @@ int main(int argc, char **argv)
 	ntfs_size += 512; /* add backup boot sector */
 
 	if (opt.std_out) {
-	       if ((fd_out = fileno(stdout)) == -1)
-		       perr_exit("fileno for stdout failed");
+		if ((fd_out = fileno(stdout)) == -1)
+			perr_exit("fileno for stdout failed");
 	} else {
-	        /* device_size_get() might need to read() */
+		/* device_size_get() might need to read() */
 		int flags = O_RDWR;
 
 		if (!opt.blkdev_out) {

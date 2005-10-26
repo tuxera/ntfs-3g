@@ -2046,7 +2046,7 @@ ascend:
 	//ntfs_log_debug("\tnode has %d children\n", suc->child_count);
 
 	// initialise new node
-	// XXX ntfs_dt_initialise (new, vcn);
+	// XXX ntfs_dt_initialise(new, vcn);
 
 	goto done;
 
