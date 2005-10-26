@@ -46,13 +46,14 @@ extern const char *ntfs_gpl;
 #if !defined(REG_NOERROR) || (REG_NOERROR != 0)
 #	define REG_NOERROR 0
 #endif
+
 #define	DEC_PRINTF(NAME)							\
-	int NAME (const char *format, ...)					\
-	__attribute__ ((format (printf, 1, 2)));
+	int NAME(const char *format, ...)					\
+	__attribute__((format(printf, 1, 2)));
 
 #define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
-	__attribute__ ((format (printf, 1, 2)))					\
-	int NAME (const char *format, ...)					\
+	__attribute__((format(printf, 1, 2)))					\
+	int NAME(const char *format, ...)					\
 	{									\
 		int ret, olderr = errno, *control = (CONTROL);			\
 		va_list args;							\
@@ -63,9 +64,9 @@ extern const char *ntfs_gpl;
 		   ((*control && !(TRIGGER)) || (!*control && (TRIGGER))))	\
 			return -1;						\
 										\
-		va_start (args, format);					\
-		ret = vfprintf ((STREAM), format, args);			\
-		va_end (args);							\
+		va_start(args, format);						\
+		ret = vfprintf((STREAM), format, args);				\
+		va_end(args);							\
 		errno = olderr;							\
 		return ret;							\
 	}
@@ -73,32 +74,32 @@ extern const char *ntfs_gpl;
 
 /* utils.c's utilities require the following functions implemented.
  * Example of implementation is:
- *	GEN_PRINTF (Eprintf, stderr, NULL,          FALSE)
- *	GEN_PRINTF (Vprintf, stderr, &opts.verbose, TRUE)
- *	GEN_PRINTF (Qprintf, stderr, &opts.quiet,   FALSE)
+ *	GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
+ *	GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
+ *	GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
  */
 extern DEC_PRINTF(Eprintf)
 extern DEC_PRINTF(Vprintf)
 extern DEC_PRINTF(Qprintf)
 
-int utils_set_locale (void);
-int utils_parse_size (const char *value, s64 *size, BOOL scale);
-int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale);
-int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize);
-int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize);
-int utils_cluster_in_use (ntfs_volume *vol, long long lcn);
-int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref);
-int utils_is_metadata (ntfs_inode *inode);
-void utils_dump_mem (void *buf, int start, int length, int ascii);
+int utils_set_locale(void);
+int utils_parse_size(const char *value, s64 *size, BOOL scale);
+int utils_parse_range(const char *string, s64 *start, s64 *finish, BOOL scale);
+int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize);
+int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize);
+int utils_cluster_in_use(ntfs_volume *vol, long long lcn);
+int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref);
+int utils_is_metadata(ntfs_inode *inode);
+void utils_dump_mem(void *buf, int start, int length, int ascii);
 
 #ifndef _NTFS_RICH_H_
-ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
-ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft);
+ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
+ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
 #endif
 
-#if !(defined (_NTFS_VOLUME_H) && defined (NTFS_RICH))
-int utils_valid_device (const char *name, int force);
-ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force);
+#if !(defined(_NTFS_VOLUME_H) && defined(NTFS_RICH))
+int utils_valid_device(const char *name, int force);
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force);
 #endif
 
 /**
@@ -126,9 +127,9 @@ struct mft_search_ctx {
 	u64 mft_num;
 };
 
-struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol);
-void mft_put_search_ctx (struct mft_search_ctx *ctx);
-int mft_next_record (struct mft_search_ctx *ctx);
+struct mft_search_ctx * mft_get_search_ctx(ntfs_volume *vol);
+void mft_put_search_ctx(struct mft_search_ctx *ctx);
+int mft_next_record(struct mft_search_ctx *ctx);
 
 // Flags for dump mem
 #define DM_DEFAULTS	0

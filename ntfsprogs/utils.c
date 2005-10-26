@@ -23,7 +23,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -62,7 +64,6 @@
 #include <ctype.h>
 #endif
 
-#include "config.h"
 #include "utils.h"
 #include "types.h"
 #include "volume.h"
@@ -83,17 +84,16 @@ const char *ntfs_gpl = "This program is free software, released under the GNU "
 /**
  * utils_set_locale
  */
-int utils_set_locale (void)
+int utils_set_locale(void)
 {
 	const char *locale;
 
-	locale = setlocale (LC_ALL, "");
+	locale = setlocale(LC_ALL, "");
 	if (!locale) {
-		locale = setlocale (LC_ALL, NULL);
-		ntfs_log_error ("Failed to set locale, using default '%s'.\n", locale);
+		locale = setlocale(LC_ALL, NULL);
+		ntfs_log_error("Failed to set locale, using default '%s'.\n", locale);
 		return 1;
 	} else {
-		ntfs_log_verbose ("Using locale '%s'.\n", locale);
 		return 0;
 	}
 }
@@ -110,7 +110,7 @@ int utils_set_locale (void)
  * Return:  1  Success, we can continue
  *	    0  Error, we cannot use this device
  */
-int utils_valid_device (const char *name, int force)
+int utils_valid_device(const char *name, int force)
 {
 	unsigned long mnt_flags = 0;
 	struct stat st;
@@ -124,39 +124,39 @@ int utils_valid_device (const char *name, int force)
 		return 0;
 	}
 
-	if (stat (name, &st) == -1) {
+	if (stat(name, &st) == -1) {
 		if (errno == ENOENT) {
-			ntfs_log_error ("The device %s doesn't exist\n", name);
+			ntfs_log_error("The device %s doesn't exist\n", name);
 		} else {
-			ntfs_log_error ("Error getting information about %s: %s\n", name, strerror (errno));
+			ntfs_log_perror("Error getting information about %s", name);
 		}
 		return 0;
 	}
 
-	if (!S_ISBLK (st.st_mode)) {
-		ntfs_log_verbose ("%s is not a block device.\n", name);
+	if (!S_ISBLK(st.st_mode)) {
+		ntfs_log_warning("%s is not a block device.\n", name);
 		if (!force) {
-			ntfs_log_error ("Use the force option to work with files.\n");
+			ntfs_log_error("Use the force option to work with files.\n");
 			return 0;
 		}
-		ntfs_log_verbose ("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	/* Make sure the file system is not mounted. */
-	if (ntfs_check_if_mounted (name, &mnt_flags)) {
-		ntfs_log_verbose ("Failed to determine whether %s is mounted: %s\n", name, strerror (errno));
+	if (ntfs_check_if_mounted(name, &mnt_flags)) {
+		ntfs_log_perror("Failed to determine whether %s is mounted", name);
 		if (!force) {
-			ntfs_log_error ("Use the force option to ignore this error.\n");
+			ntfs_log_error("Use the force option to ignore this error.\n");
 			return 0;
 		}
-		ntfs_log_verbose ("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		ntfs_log_verbose ("The device %s, is mounted.\n", name);
+		ntfs_log_warning("The device %s, is mounted.\n", name);
 		if (!force) {
-			ntfs_log_error ("Use the force option to work a mounted filesystem.\n");
+			ntfs_log_error("Use the force option to work a mounted filesystem.\n");
 			return 0;
 		}
-		ntfs_log_verbose ("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	return 1;
@@ -165,7 +165,7 @@ int utils_valid_device (const char *name, int force)
 /**
  * utils_mount_volume
  */
-ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL force)
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force)
 {
 	ntfs_volume *vol;
 
@@ -174,16 +174,15 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 		return NULL;
 	}
 
-	if (!utils_valid_device (device, force))
+	if (!utils_valid_device(device, force))
 		return NULL;
 
-	vol = ntfs_mount (device, flags);
+	vol = ntfs_mount(device, flags);
 	if (!vol) {
 		int err;
 
 		err = errno;
-		ntfs_log_error("Couldn't mount device '%s': %s\n", device,
-				strerror(err));
+		ntfs_log_perror("Couldn't mount device '%s'", device);
 		if (err == EPERM)
 			ntfs_log_error("Windows was hibernated.  Try to mount volume "
 					"in windows, shut down and try "
@@ -196,13 +195,13 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		ntfs_log_quiet ("Volume is dirty.\n");
+		ntfs_log_warning("Volume is dirty.\n");
 		if (!force) {
-			ntfs_log_error ("Run chkdsk and try again, or use the --force option.\n");
-			ntfs_umount (vol, FALSE);
+			ntfs_log_error("Run chkdsk and try again, or use the --force option.\n");
+			ntfs_umount(vol, FALSE);
 			return NULL;
 		}
-		ntfs_log_quiet ("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	return vol;
@@ -232,7 +231,7 @@ ntfs_volume * utils_mount_volume (const char *device, unsigned long flags, BOOL 
  * Return:  1  Success
  *	    0  Error, the string was malformed
  */
-int utils_parse_size (const char *value, s64 *size, BOOL scale)
+int utils_parse_size(const char *value, s64 *size, BOOL scale)
 {
 	long long result;
 	char *suffix = NULL;
@@ -242,16 +241,16 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 		return 0;
 	}
 
-	ntfs_log_debug ("Parsing size '%s'.\n", value);
+	ntfs_log_debug("Parsing size '%s'.\n", value);
 
-	result = strtoll (value, &suffix, 10);
+	result = strtoll(value, &suffix, 10);
 	if (result < 0 || errno == ERANGE) {
-		ntfs_log_error ("Invalid size '%s'.\n", value);
+		ntfs_log_error("Invalid size '%s'.\n", value);
 		return 0;
 	}
 
 	if (!suffix) {
-		ntfs_log_error ("Internal error, strtoll didn't return a suffix.\n");
+		ntfs_log_error("Internal error, strtoll didn't return a suffix.\n");
 		return 0;
 	}
 
@@ -264,17 +263,17 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
 			case '-': case 0:
 				break;
 			default:
-				ntfs_log_error ("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
+				ntfs_log_error("Invalid size suffix '%s'.  Use T, G, M, or K.\n", suffix);
 				return 0;
 		}
 	} else {
 		if ((suffix[0] != '-') && (suffix[0] != 0)) {
-			ntfs_log_error ("Invalid number '%.*s'.\n", (int)(suffix - value + 1), value);
+			ntfs_log_error("Invalid number '%.*s'.\n", (int)(suffix - value + 1), value);
 			return 0;
 		}
 	}
 
-	ntfs_log_debug ("Parsed size = %lld.\n", result);
+	ntfs_log_debug("Parsed size = %lld.\n", result);
 	*size = result;
 	return 1;
 }
@@ -292,7 +291,7 @@ int utils_parse_size (const char *value, s64 *size, BOOL scale)
  * Return:  1  Success, a valid string was found
  *	    0  Error, the string was not a valid range
  */
-int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
+int utils_parse_range(const char *string, s64 *start, s64 *finish, BOOL scale)
 {
 	s64 a, b;
 	char *middle;
@@ -302,28 +301,28 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
 		return 0;
 	}
 
-	middle = strchr (string, '-');
+	middle = strchr(string, '-');
 	if (string == middle) {
-		ntfs_log_debug ("Range has no beginning, defaulting to 0.\n");
+		ntfs_log_debug("Range has no beginning, defaulting to 0.\n");
 		a = 0;
 	} else {
-		if (!utils_parse_size (string, &a, scale))
+		if (!utils_parse_size(string, &a, scale))
 			return 0;
 	}
 
 	if (middle) {
 		if (middle[1] == 0) {
 			b = LONG_MAX;		// XXX ULLONG_MAX
-			ntfs_log_debug ("Range has no end, defaulting to %lld.\n", b);
+			ntfs_log_debug("Range has no end, defaulting to %lld.\n", b);
 		} else {
-			if (!utils_parse_size (middle+1, &b, scale))
+			if (!utils_parse_size(middle+1, &b, scale))
 				return 0;
 		}
 	} else {
 		b = a;
 	}
 
-	ntfs_log_debug ("Range '%s' = %lld - %lld\n", string, a, b);
+	ntfs_log_debug("Range '%s' = %lld - %lld\n", string, a, b);
 
 	*start  = a;
 	*finish = b;
@@ -345,7 +344,7 @@ int utils_parse_range (const char *string, s64 *start, s64 *finish, BOOL scale)
  * Return:  Pointer  Success, an attribute was found
  *	    NULL     Error, no matching attributes were found
  */
-ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
+ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 {
 	if (!ctx) {
 		errno = EINVAL;
@@ -353,11 +352,11 @@ ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 	}
 
 	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
-		ntfs_log_debug ("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
+		ntfs_log_debug("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
 		return NULL;	/* None / no more of that type */
 	}
 
-	ntfs_log_debug ("find_attribute found an attribute of type: 0x%02x.\n", type);
+	ntfs_log_debug("find_attribute found an attribute of type: 0x%02x.\n", type);
 	return ctx->attr;
 }
 
@@ -375,7 +374,7 @@ ATTR_RECORD * find_attribute (const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
  * Return:  Pointer  Success, an attribute was found
  *	    NULL     Error, no matching attributes were found
  */
-ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
+ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
 {
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *rec;
@@ -385,18 +384,18 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
 		return NULL;
 	}
 
-	ctx = ntfs_attr_get_search_ctx (NULL, mft);
+	ctx = ntfs_attr_get_search_ctx(NULL, mft);
 	if (!ctx) {
-		ntfs_log_error ("Couldn't create a search context.\n");
+		ntfs_log_error("Couldn't create a search context.\n");
 		return NULL;
 	}
 
-	rec = find_attribute (type, ctx);
-	ntfs_attr_put_search_ctx (ctx);
+	rec = find_attribute(type, ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	if (rec)
-		ntfs_log_debug ("find_first_attribute: found attr of type 0x%02x.\n", type);
+		ntfs_log_debug("find_first_attribute: found attr of type 0x%02x.\n", type);
 	else
-		ntfs_log_debug ("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
+		ntfs_log_debug("find_first_attribute: didn't find attr of type 0x%02x.\n", type);
 	return rec;
 }
 
@@ -411,7 +410,7 @@ ATTR_RECORD * find_first_attribute (const ATTR_TYPES type, MFT_RECORD *mft)
  * if parent is 5 (/) stop
  * get inode of parent
  */
-int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
+int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 {
 	// XXX option: names = posix/win32 or dos
 	// flags: path, filename, or both
@@ -433,65 +432,65 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 	vol = inode->vol;
 
-	//ntfs_log_debug ("sizeof (char*) = %d, sizeof (names) = %d\n", sizeof (char*), sizeof (names));
-	memset (names, 0, sizeof (names));
+	//ntfs_log_debug("sizeof(char*) = %d, sizeof(names) = %d\n", sizeof(char*), sizeof(names));
+	memset(names, 0, sizeof(names));
 
 	for (i = 0; i < max_path; i++) {
 
-		ctx = ntfs_attr_get_search_ctx (inode, NULL);
+		ctx = ntfs_attr_get_search_ctx(inode, NULL);
 		if (!ctx) {
-			ntfs_log_error ("Couldn't create a search context.\n");
+			ntfs_log_error("Couldn't create a search context.\n");
 			return 0;
 		}
 
-		//ntfs_log_debug ("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
+		//ntfs_log_debug("i = %d, inode = %p (%lld)\n", i, inode, inode->mft_no);
 
 		name_space = 4;
-		while ((rec = find_attribute (AT_FILE_NAME, ctx))) {
+		while ((rec = find_attribute(AT_FILE_NAME, ctx))) {
 			/* We know this will always be resident. */
-			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+			attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
 
 			if (attr->file_name_type > name_space) { //XXX find the ...
 				continue;
 			}
 
 			name_space = attr->file_name_type;
-			parent     = le64_to_cpu (attr->parent_directory);
+			parent     = le64_to_cpu(attr->parent_directory);
 
 			if (names[i]) {
-				free (names[i]);
+				free(names[i]);
 				names[i] = NULL;
 			}
 
-			if (ntfs_ucstombs (attr->file_name, attr->file_name_length,
+			if (ntfs_ucstombs(attr->file_name, attr->file_name_length,
 			    &names[i], 0) < 0) {
 				char *temp;
-				ntfs_log_error ("Couldn't translate filename to current locale.\n");
-				temp = malloc (30);
+				ntfs_log_error("Couldn't translate filename to current locale.\n");
+				temp = malloc(30);
 				if (!temp)
 					return 0;
-				snprintf (temp, 30, "<MFT%llu>", (unsigned
+				snprintf(temp, 30, "<MFT%llu>", (unsigned
 						long long)inode->mft_no);
 				names[i] = temp;
 			}
 
-			//ntfs_log_debug ("names[%d] %s\n", i, names[i]);
-			//ntfs_log_debug ("parent = %lld\n", MREF (parent));
+			//ntfs_log_debug("names[%d] %s\n", i, names[i]);
+			//ntfs_log_debug("parent = %lld\n", MREF(parent));
 		}
 
 		ntfs_attr_put_search_ctx(ctx);
 
 		if (i > 0)			/* Don't close the original inode */
-			ntfs_inode_close (inode);
+			ntfs_inode_close(inode);
 
-		if (MREF (parent) == FILE_root) {	/* The root directory, stop. */
-			//ntfs_log_debug ("inode 5\n");
+		if (MREF(parent) == FILE_root) {	/* The root directory, stop. */
+			//ntfs_log_debug("inode 5\n");
 			break;
 		}
 
-		inode = ntfs_inode_open (vol, parent);
+		inode = ntfs_inode_open(vol, parent);
 		if (!inode) {
-			ntfs_log_error ("Couldn't open inode %llu.\n",
+			ntfs_log_error("Couldn't open inode %llu.\n",
 					(unsigned long long)MREF(parent));
 			break;
 		}
@@ -499,7 +498,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 	if (i >= max_path) {
 		/* If we get into an infinite loop, we'll end up here. */
-		ntfs_log_error ("The directory structure is too deep (over %d) nested directories.\n", max_path);
+		ntfs_log_error("The directory structure is too deep (over %d) nested directories.\n", max_path);
 		return 0;
 	}
 
@@ -508,9 +507,9 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 		if (!names[i])
 			continue;
 
-		len = snprintf (buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[i]);
+		len = snprintf(buffer + offset, bufsize - offset, "%c%s", PATH_SEP, names[i]);
 		if (len >= (bufsize - offset)) {
-			ntfs_log_error ("Pathname was truncated.\n");
+			ntfs_log_error("Pathname was truncated.\n");
 			break;
 		}
 
@@ -519,9 +518,9 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 
 	/* Free all the allocated memory */
 	for (i = 0; i < max_path; i++)
-		free (names[i]);
+		free(names[i]);
 
-	ntfs_log_debug ("Pathname: %s\n", buffer);
+	ntfs_log_debug("Pathname: %s\n", buffer);
 
 	return 0;
 }
@@ -529,7 +528,7 @@ int utils_inode_get_name (ntfs_inode *inode, char *buffer, int bufsize)
 /**
  * utils_attr_get_name
  */
-int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize)
+int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int bufsize)
 {
 	int len, namelen;
 	char *name;
@@ -541,23 +540,23 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 		return 0;
 	}
 
-	attrdef = ntfs_attr_find_in_attrdef (vol, attr->type);
+	attrdef = ntfs_attr_find_in_attrdef(vol, attr->type);
 	if (attrdef) {
 		name    = NULL;
-		namelen = ntfs_ucsnlen (attrdef->name, sizeof (attrdef->name));
-		if (ntfs_ucstombs (attrdef->name, namelen, &name, 0) < 0) {
-			ntfs_log_error ("Couldn't translate attribute type to current locale.\n");
+		namelen = ntfs_ucsnlen(attrdef->name, sizeof(attrdef->name));
+		if (ntfs_ucstombs(attrdef->name, namelen, &name, 0) < 0) {
+			ntfs_log_error("Couldn't translate attribute type to current locale.\n");
 			// <UNKNOWN>?
 			return 0;
 		}
-		len = snprintf (buffer, bufsize, "%s", name);
+		len = snprintf(buffer, bufsize, "%s", name);
 	} else {
-		ntfs_log_error ("Unknown attribute type 0x%02x\n", attr->type);
-		len = snprintf (buffer, bufsize, "<UNKNOWN>");
+		ntfs_log_error("Unknown attribute type 0x%02x\n", attr->type);
+		len = snprintf(buffer, bufsize, "<UNKNOWN>");
 	}
 
 	if (len >= bufsize) {
-		ntfs_log_error ("Attribute type was truncated.\n");
+		ntfs_log_error("Attribute type was truncated.\n");
 		return 0;
 	}
 
@@ -570,19 +569,19 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
 
 	name    = NULL;
 	namelen = attr->name_length;
-	if (ntfs_ucstombs ((ntfschar *)((char *)attr + attr->name_offset),
+	if (ntfs_ucstombs((ntfschar *)((char *)attr + attr->name_offset),
 	    namelen, &name, 0) < 0) {
-		ntfs_log_error ("Couldn't translate attribute name to current locale.\n");
+		ntfs_log_error("Couldn't translate attribute name to current locale.\n");
 		// <UNKNOWN>?
-		len = snprintf (buffer, bufsize, "<UNKNOWN>");
+		len = snprintf(buffer, bufsize, "<UNKNOWN>");
 		return 0;
 	}
 
-	len = snprintf (buffer, bufsize, "(%s)", name);
-	free (name);
+	len = snprintf(buffer, bufsize, "(%s)", name);
+	free(name);
 
 	if (len >= bufsize) {
-		ntfs_log_error ("Attribute name was truncated.\n");
+		ntfs_log_error("Attribute name was truncated.\n");
 		return 0;
 	}
 
@@ -606,10 +605,10 @@ int utils_attr_get_name (ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int 
  *	    0  Cluster is free space
  *	   -1  Error occurred
  */
-int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
+int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 {
 	static unsigned char buffer[512];
-	static long long bmplcn = -sizeof (buffer) - 1;	/* Which bit of $Bitmap is in the buffer */
+	static long long bmplcn = -sizeof(buffer) - 1;	/* Which bit of $Bitmap is in the buffer */
 
 	int byte, bit;
 	ntfs_attr *attr;
@@ -620,31 +619,31 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
 	}
 
 	/* Does lcn lie in the section of $Bitmap we already have cached? */
-	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof (buffer) << 3)))) {
-		ntfs_log_debug ("Bit lies outside cache.\n");
-		attr = ntfs_attr_open (vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
+	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof(buffer) << 3)))) {
+		ntfs_log_debug("Bit lies outside cache.\n");
+		attr = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 		if (!attr) {
-			ntfs_log_error ("Couldn't open $Bitmap: %s\n", strerror (errno));
+			ntfs_log_perror("Couldn't open $Bitmap");
 			return -1;
 		}
 
 		/* Mark the buffer as in use, in case the read is shorter. */
-		memset (buffer, 0xFF, sizeof (buffer));
-		bmplcn = lcn & (~((sizeof (buffer) << 3) - 1));
+		memset(buffer, 0xFF, sizeof(buffer));
+		bmplcn = lcn & (~((sizeof(buffer) << 3) - 1));
 
-		if (ntfs_attr_pread (attr, (bmplcn>>3), sizeof (buffer), buffer) < 0) {
-			ntfs_log_error ("Couldn't read $Bitmap: %s\n", strerror (errno));
-			ntfs_attr_close (attr);
+		if (ntfs_attr_pread(attr, (bmplcn>>3), sizeof(buffer), buffer) < 0) {
+			ntfs_log_perror("Couldn't read $Bitmap");
+			ntfs_attr_close(attr);
 			return -1;
 		}
 
-		ntfs_log_debug ("Reloaded bitmap buffer.\n");
-		ntfs_attr_close (attr);
+		ntfs_log_debug("Reloaded bitmap buffer.\n");
+		ntfs_attr_close(attr);
 	}
 
 	bit  = 1 << (lcn & 7);
-	byte = (lcn >> 3) & (sizeof (buffer) - 1);
-	ntfs_log_debug ("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n", lcn, bmplcn, byte, bit, buffer[byte] & bit);
+	byte = (lcn >> 3) & (sizeof(buffer) - 1);
+	ntfs_log_debug("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n", lcn, bmplcn, byte, bit, buffer[byte] & bit);
 
 	return (buffer[byte] & bit);
 }
@@ -666,10 +665,10 @@ int utils_cluster_in_use (ntfs_volume *vol, long long lcn)
  *	    0  MFT Record is unused
  *	   -1  Error occurred
  */
-int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
+int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref)
 {
 	static u8 buffer[512];
-	static s64 bmpmref = -sizeof (buffer) - 1; /* Which bit of $BITMAP is in the buffer */
+	static s64 bmpmref = -sizeof(buffer) - 1; /* Which bit of $BITMAP is in the buffer */
 
 	int byte, bit;
 
@@ -678,26 +677,27 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 		return -1;
 	}
 
+	ntfs_log_trace("entering\n");
 	/* Does mref lie in the section of $Bitmap we already have cached? */
 	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
-			(sizeof (buffer) << 3)))) {
-		ntfs_log_debug ("Bit lies outside cache.\n");
+			(sizeof(buffer) << 3)))) {
+		ntfs_log_debug("Bit lies outside cache.\n");
 
 		/* Mark the buffer as not in use, in case the read is shorter. */
-		memset (buffer, 0, sizeof (buffer));
-		bmpmref = mref & (~((sizeof (buffer) << 3) - 1));
+		memset(buffer, 0, sizeof(buffer));
+		bmpmref = mref & (~((sizeof(buffer) << 3) - 1));
 
-		if (ntfs_attr_pread (vol->mftbmp_na, (bmpmref>>3), sizeof (buffer), buffer) < 0) {
-			ntfs_log_error ("Couldn't read $MFT/$BITMAP: %s\n", strerror (errno));
+		if (ntfs_attr_pread(vol->mftbmp_na, (bmpmref>>3), sizeof(buffer), buffer) < 0) {
+			ntfs_log_perror("Couldn't read $MFT/$BITMAP");
 			return -1;
 		}
 
-		ntfs_log_debug ("Reloaded bitmap buffer.\n");
+		ntfs_log_debug("Reloaded bitmap buffer.\n");
 	}
 
 	bit  = 1 << (mref & 7);
-	byte = (mref >> 3) & (sizeof (buffer) - 1);
-	ntfs_log_debug ("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n", mref, bmpmref, byte, bit, buffer[byte] & bit);
+	byte = (mref >> 3) & (sizeof(buffer) - 1);
+	ntfs_log_debug("cluster = %lld, bmpmref = %lld, byte = %d, bit = %d, in use %d\n", mref, bmpmref, byte, bit, buffer[byte] & bit);
 
 	return (buffer[byte] & bit);
 }
@@ -705,7 +705,7 @@ int utils_mftrec_in_use (ntfs_volume *vol, MFT_REF mref)
 /**
  * __metadata
  */
-static int __metadata (ntfs_volume *vol, u64 num)
+static int __metadata(ntfs_volume *vol, u64 num)
 {
 	if (num <= FILE_UpCase)
 		return 1;
@@ -729,7 +729,7 @@ static int __metadata (ntfs_volume *vol, u64 num)
  *	    0  inode is not a metadata file
  *	   -1  Error occurred
  */
-int utils_is_metadata (ntfs_inode *inode)
+int utils_is_metadata(ntfs_inode *inode)
 {
 	ntfs_volume *vol;
 	ATTR_RECORD *rec;
@@ -747,26 +747,26 @@ int utils_is_metadata (ntfs_inode *inode)
 		return -1;
 
 	num = inode->mft_no;
-	if (__metadata (vol, num) == 1)
+	if (__metadata(vol, num) == 1)
 		return 1;
 
 	file = inode->mrec;
 	if (file && (file->base_mft_record != 0)) {
-		num = MREF (file->base_mft_record);
-		if (__metadata (vol, num) == 1)
+		num = MREF(file->base_mft_record);
+		if (__metadata(vol, num) == 1)
 			return 1;
 	}
 	file = inode->mrec;
 
-	rec = find_first_attribute (AT_FILE_NAME, inode->mrec);
+	rec = find_first_attribute(AT_FILE_NAME, inode->mrec);
 	if (!rec)
 		return -1;
 
 	/* We know this will always be resident. */
-	attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu (rec->value_offset));
+	attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
 
-	num = MREF (attr->parent_directory);
-	if ((num != FILE_root) && (__metadata (vol, num) == 1))
+	num = MREF(attr->parent_directory);
+	if ((num != FILE_root) && (__metadata(vol, num) == 1))
 		return 1;
 
 	return 0;
@@ -786,7 +786,7 @@ int utils_is_metadata (ntfs_inode *inode)
  * Examples are: DM_INDENT (indent the output by one tab); DM_RED (colour the
  * output); DM_NO_ASCII (only print the hex values).
  */
-void utils_dump_mem (void *buf, int start, int length, int flags)
+void utils_dump_mem(void *buf, int start, int length, int flags)
 {
 	int off, i, s, e, col;
 	u8 *mem = buf;
@@ -803,11 +803,11 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 		if (flags & DM_BLUE)
 			col += 4;
 		if (flags & DM_INDENT)
-			ntfs_log_debug ("\t");
+			ntfs_log_debug("\t");
 		if (flags & DM_BOLD)
-			ntfs_log_debug ("\e[01m");
+			ntfs_log_debug("\e[01m");
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			ntfs_log_debug ("\e[%dm", col);
+			ntfs_log_debug("\e[%dm", col);
 		if (off == s)
 			ntfs_log_debug("%6.6x ", start);
 		else
@@ -815,26 +815,26 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 
 		for (i = 0; i < 16; i++) {
 			if ((i == 8) && (!(flags & DM_NO_DIVIDER)))
-				ntfs_log_debug (" -");
+				ntfs_log_debug(" -");
 			if (((off+i) >= start) && ((off+i) < (start+length)))
-				ntfs_log_debug (" %02X", mem[off+i]);
+				ntfs_log_debug(" %02X", mem[off+i]);
 			else
-				ntfs_log_debug ("   ");
+				ntfs_log_debug("   ");
 		}
 		if (!(flags & DM_NO_ASCII)) {
-			ntfs_log_debug ("  ");
+			ntfs_log_debug("  ");
 			for (i = 0; i < 16; i++) {
 				if (((off+i) < start) || ((off+i) >= (start+length)))
-					ntfs_log_debug (" ");
-				else if (isprint (mem[off + i]))
-					ntfs_log_debug ("%c", mem[off + i]);
+					ntfs_log_debug(" ");
+				else if (isprint(mem[off + i]))
+					ntfs_log_debug("%c", mem[off + i]);
 				else
-					ntfs_log_debug (".");
+					ntfs_log_debug(".");
 			}
 		}
 		if (flags & (DM_RED | DM_BLUE | DM_GREEN | DM_BOLD))
-			ntfs_log_debug ("\e[0m");
-		ntfs_log_debug ("\n");
+			ntfs_log_debug("\e[0m");
+		ntfs_log_debug("\n");
 	}
 }
 
@@ -842,7 +842,7 @@ void utils_dump_mem (void *buf, int start, int length, int flags)
 /**
  * mft_get_search_ctx
  */
-struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol)
+struct mft_search_ctx * mft_get_search_ctx(ntfs_volume *vol)
 {
 	struct mft_search_ctx *ctx;
 
@@ -851,7 +851,7 @@ struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol)
 		return NULL;
 	}
 
-	ctx = calloc (1, sizeof *ctx);
+	ctx = calloc(1, sizeof *ctx);
 
 	ctx->mft_num = -1;
 	ctx->vol = vol;
@@ -862,19 +862,19 @@ struct mft_search_ctx * mft_get_search_ctx (ntfs_volume *vol)
 /**
  * mft_put_search_ctx
  */
-void mft_put_search_ctx (struct mft_search_ctx *ctx)
+void mft_put_search_ctx(struct mft_search_ctx *ctx)
 {
 	if (!ctx)
 		return;
 	if (ctx->inode)
-		ntfs_inode_close (ctx->inode);
-	free (ctx);
+		ntfs_inode_close(ctx->inode);
+	free(ctx);
 }
 
 /**
  * mft_next_record
  */
-int mft_next_record (struct mft_search_ctx *ctx)
+int mft_next_record(struct mft_search_ctx *ctx)
 {
 	s64 nr_mft_records;
 	ATTR_RECORD *attr10 = NULL;
@@ -888,7 +888,7 @@ int mft_next_record (struct mft_search_ctx *ctx)
 	}
 
 	if (ctx->inode) {
-		ntfs_inode_close (ctx->inode);
+		ntfs_inode_close(ctx->inode);
 		ctx->inode = NULL;
 	}
 
@@ -899,9 +899,9 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		int in_use;
 
 		ctx->flags_match = 0;
-		in_use = utils_mftrec_in_use (ctx->vol, (MFT_REF) ctx->mft_num);
+		in_use = utils_mftrec_in_use(ctx->vol, (MFT_REF) ctx->mft_num);
 		if (in_use == -1) {
-			ntfs_log_error ("Error reading inode %llu.  Aborting.\n",
+			ntfs_log_error("Error reading inode %llu.  Aborting.\n",
 					(unsigned long long)ctx->mft_num);
 			return -1;
 		}
@@ -909,16 +909,16 @@ int mft_next_record (struct mft_search_ctx *ctx)
 		if (in_use) {
 			ctx->flags_match |= FEMR_IN_USE;
 
-			ctx->inode = ntfs_inode_open (ctx->vol, (MFT_REF) ctx->mft_num);
+			ctx->inode = ntfs_inode_open(ctx->vol, (MFT_REF) ctx->mft_num);
 			if (ctx->inode == NULL) {
-				ntfs_log_error ("Error reading inode %llu.\n", (unsigned
+				ntfs_log_error("Error reading inode %llu.\n", (unsigned
 						long long) ctx->mft_num);
 				continue;
 			}
 
-			attr10 = find_first_attribute (AT_STANDARD_INFORMATION, ctx->inode->mrec);
-			attr20 = find_first_attribute (AT_ATTRIBUTE_LIST,       ctx->inode->mrec);
-			attr80 = find_first_attribute (AT_DATA, ctx->inode->mrec);
+			attr10 = find_first_attribute(AT_STANDARD_INFORMATION, ctx->inode->mrec);
+			attr20 = find_first_attribute(AT_ATTRIBUTE_LIST,       ctx->inode->mrec);
+			attr80 = find_first_attribute(AT_DATA, ctx->inode->mrec);
 
 			if (attr10)
 				ctx->flags_match |= FEMR_BASE_RECORD;
@@ -932,24 +932,24 @@ int mft_next_record (struct mft_search_ctx *ctx)
 				ctx->flags_match |= FEMR_FILE;
 
 			if (ctx->flags_search & FEMR_DIR) {
-				attr_ctx = ntfs_attr_get_search_ctx (ctx->inode, NULL);
+				attr_ctx = ntfs_attr_get_search_ctx(ctx->inode, NULL);
 				if (attr_ctx) {
-					if (ntfs_attr_lookup (AT_INDEX_ROOT, NTFS_INDEX_I30, 4, 0, 0, NULL, 0, attr_ctx) == 0)
+					if (ntfs_attr_lookup(AT_INDEX_ROOT, NTFS_INDEX_I30, 4, 0, 0, NULL, 0, attr_ctx) == 0)
 						ctx->flags_match |= FEMR_DIR;
 
-					ntfs_attr_put_search_ctx (attr_ctx);
+					ntfs_attr_put_search_ctx(attr_ctx);
 				} else {
-					ntfs_log_error ("Couldn't create a search context.\n");
+					ntfs_log_error("Couldn't create a search context.\n");
 					return -1;
 				}
 			}
 
-			switch (utils_is_metadata (ctx->inode)) {
+			switch (utils_is_metadata(ctx->inode)) {
 				case 1: ctx->flags_match |= FEMR_METADATA;     break;
 				case 0: ctx->flags_match |= FEMR_NOT_METADATA; break;
 				default:
 					ctx->flags_match |= FEMR_NOT_METADATA; break;
-					//ntfs_log_error ("Error reading inode %lld.\n", ctx->mft_num);
+					//ntfs_log_error("Error reading inode %lld.\n", ctx->mft_num);
 					//return -1;
 			}
 
@@ -958,33 +958,32 @@ int mft_next_record (struct mft_search_ctx *ctx)
 
 			ctx->flags_match |= FEMR_NOT_IN_USE;
 
-			ctx->inode = calloc (1, sizeof (*ctx->inode));
+			ctx->inode = calloc(1, sizeof(*ctx->inode));
 			if (!ctx->inode) {
-				ntfs_log_error ("Out of memory.  Aborting.\n");
+				ntfs_log_error("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
 			ctx->inode->mft_no = ctx->mft_num;
 			ctx->inode->vol    = ctx->vol;
-			ctx->inode->mrec   = malloc (ctx->vol->mft_record_size);
+			ctx->inode->mrec   = malloc(ctx->vol->mft_record_size);
 			if (!ctx->inode->mrec) {
-				free (ctx->inode); // == ntfs_inode_close
-				ntfs_log_error ("Out of memory.  Aborting.\n");
+				free(ctx->inode); // == ntfs_inode_close
+				ntfs_log_error("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
-			mft = ntfs_attr_open (ctx->vol->mft_ni, AT_DATA,
+			mft = ntfs_attr_open(ctx->vol->mft_ni, AT_DATA,
 					AT_UNNAMED, 0);
 			if (!mft) {
-				ntfs_log_error ("Couldn't open $MFT/$DATA: %s\n", strerror (errno));
+				ntfs_log_perror("Couldn't open $MFT/$DATA");
 				// free / close
 				return -1;
 			}
 
-			if (ntfs_attr_pread (mft, ctx->vol->mft_record_size * ctx->mft_num, ctx->vol->mft_record_size, ctx->inode->mrec) < ctx->vol->mft_record_size) {
-				ntfs_log_error ("Couldn't read MFT Record %llu: %s.\n",
-						(unsigned long long)
-						ctx->mft_num, strerror (errno));
+			if (ntfs_attr_pread(mft, ctx->vol->mft_record_size * ctx->mft_num, ctx->vol->mft_record_size, ctx->inode->mrec) < ctx->vol->mft_record_size) {
+				ntfs_log_perror("Couldn't read MFT Record %llu",
+					(unsigned long long) ctx->mft_num);
 				// free / close
 				ntfs_attr_close(mft);
 				return -1;
@@ -997,8 +996,8 @@ int mft_next_record (struct mft_search_ctx *ctx)
 			break;
 		}
 
-		if (ntfs_inode_close (ctx->inode)) {
-			ntfs_log_error ("Error closing inode %llu.\n",
+		if (ntfs_inode_close(ctx->inode)) {
+			ntfs_log_error("Error closing inode %llu.\n",
 					(unsigned long long)ctx->mft_num);
 			return -errno;
 		}
