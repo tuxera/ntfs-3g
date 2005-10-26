@@ -234,7 +234,7 @@ static int parse_options (int argc, char *argv[])
 				help++;
 				continue;
 			}
-			if (ntfs_logging_parse_option(argv[optind-1]))
+			if (ntfs_log_parse_option(argv[optind-1]))
 				continue;
 			ntfs_log_error("Unknown option '%s'.\n",
 					argv[optind-1]);
