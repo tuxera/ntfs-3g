@@ -42,6 +42,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  Sprintf(). Forward callers to ntfs_log_*().  (Yuval)
 	- Add some debugging to ntfsdecrypt.c to allow printing of the private
 	  key after it is decrypted (this is ifdeffed out by default).  (Anton)
+	- fflush() ntfs_log_ streams.  (Christophe)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

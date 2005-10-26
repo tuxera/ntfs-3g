@@ -369,6 +369,7 @@ int ntfs_logging_handler_printf(const char *function, const char *file,
 			ret += fprintf(stream, " : %s\n", strerror(olderr));
 	}
 
+	fflush(stream);
 	errno = olderr;
 	return ret;
 }
@@ -447,6 +448,7 @@ int ntfs_logging_handler_colour(const char *function, const char *file,
 	if (suffix)
 		ret += fprintf(stream, suffix);
 
+	fflush(stream);
 	errno = olderr;
 	return ret;
 }
