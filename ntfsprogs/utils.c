@@ -186,20 +186,21 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 		err = errno;
 		ntfs_log_perror("Couldn't mount device '%s'", device);
 		if (err == EPERM)
-			ntfs_log_error("Windows was hibernated.  Try to mount volume "
-					"in windows, shut down and try "
+			ntfs_log_error("Windows was hibernated.  Try to mount "
+					"volume in windows, shut down and try "
 					"again.\n");
 		if (err == EOPNOTSUPP)
-			ntfs_log_error("Windows did not shut down properly.  Try to "
-					"mount volume in windows, shut down "
-					"and try again.\n");
+			ntfs_log_error("Windows did not shut down properly.  "
+					"Try to mount volume in windows, "
+					"shut down and try again.\n");
 		return NULL;
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
 		ntfs_log_warning("Volume is dirty.\n");
 		if (!force) {
-			ntfs_log_error("Run chkdsk and try again, or use the --force option.\n");
+			ntfs_log_error("Run chkdsk and try again, or use the "
+					"force option.\n");
 			ntfs_umount(vol, FALSE);
 			return NULL;
 		}

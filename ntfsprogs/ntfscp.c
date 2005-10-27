@@ -4,7 +4,7 @@
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
  *
- * This utility will overwrite files on ntfs volume
+ * This utility will overwrite files on NTFS volume.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

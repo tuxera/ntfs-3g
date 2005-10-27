@@ -636,8 +636,9 @@ int ntfs_index_rm(ntfs_index_context *ictx)
 		if (ntfs_attr_truncate(na, new_index_length + offsetof(
 				INDEX_ROOT, index))) {
 			err = errno;
-			ntfs_log_error("Failed to truncate INDEX_ROOT attribute. "
-					" Leaving inconsist metadata.");
+			ntfs_log_error("Failed to truncate INDEX_ROOT "
+					"attribute.  Leaving inconsist "
+					"metadata.");
 			goto err_out;
 		}
 		ntfs_attr_close(na);

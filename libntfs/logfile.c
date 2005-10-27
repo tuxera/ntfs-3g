@@ -606,13 +606,13 @@ is_empty:
 		 */
 		if (rstr2_lsn > rstr1_lsn) {
 			ntfs_log_debug("Using second restart page as it is more "
-					"recent.");
+					"recent.\n");
 			free(rstr1_ph);
 			rstr1_ph = rstr2_ph;
 			/* rstr1_lsn = rstr2_lsn; */
 		} else {
 			ntfs_log_debug("Using first restart page as it is more "
-					"recent.");
+					"recent.\n");
 			free(rstr2_ph);
 		}
 		rstr2_ph = NULL;
@@ -721,7 +721,8 @@ int ntfs_empty_logfile(ntfs_attr *na)
 	/* Get length of $LogFile contents. */
 	len = na->data_size;
 	if (!len) {
-		ntfs_log_debug("$LogFile has zero length, no disk write needed.\n");
+		ntfs_log_debug("$LogFile has zero length, no disk write "
+				"needed.\n");
 		return 0;
 	}
 
@@ -734,8 +735,8 @@ int ntfs_empty_logfile(ntfs_attr *na)
 
 	if (count == -1 || pos != len) {
 		err = errno;
-		ntfs_log_debug("Amount of $LogFile data read does not correspond to "
-				"expected length!");
+		ntfs_log_debug("Amount of $LogFile data read does not "
+				"correspond to expected length!\n");
 		if (count != -1)
 			err = EIO;
 		goto io_error_exit;
@@ -752,7 +753,8 @@ int ntfs_empty_logfile(ntfs_attr *na)
 
 		if ((count = ntfs_attr_pwrite(na, pos, count, buf)) <= 0) {
 			err = errno;
-			ntfs_log_debug("Failed to set the $LogFile attribute value.\n");
+			ntfs_log_debug("Failed to set the $LogFile attribute "
+					"value.\n");
 			if (count != -1)
 				err = EIO;
 			goto io_error_exit;
