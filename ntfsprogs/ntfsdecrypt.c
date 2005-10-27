@@ -1143,14 +1143,11 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	}
 	/* Apply the IV. */
 	if (fek->alg_id == CALG_AES_256) {
-		((u64*)data)[0] ^= const_cpu_to_le64(0x5816657be9161312ULL +
-				offset);
-		((u64*)data)[1] ^= const_cpu_to_le64(0x1989adbe44918961ULL +
-				offset);
+		((u64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
+		((u64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((u64*)data)[0] ^= const_cpu_to_le64(0x169119629891ad13ULL +
-				offset);
+		((u64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
 	}
 	return 512;
 }
