@@ -74,18 +74,35 @@
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
 
+/*
+ * List of crypto algorithms used by EFS (32-bit values).
+ *
+ * To choose which one is used in Windows, create or set the REG_DWORD registry
+ * key HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\EFS\
+ * AlgorithmID to the value of your chosen crypto algorithm, e.g. to use DesX,
+ * set AlgorithmID to 0x6604.
+ *
+ * Note that the Windows versions I have tried so far (all are high crypto
+ * enabled) ignore the AlgorithmID value if it is not one of CALG_3DES,
+ * CALG_DESX, or CALG_AES_256, i.e. you cannot select CALG_DES at all using
+ * this registry key.  It would be interesting to check out encryption on one
+ * of the "crippled" crypto Windows versions...
+ */
+typedef enum {
+	CALG_DES	= const_cpu_to_le32(0x6601),
+	/* If not one of the below three, fall back to standard Des. */
+	CALG_3DES	= const_cpu_to_le32(0x6603),
+	CALG_DESX	= const_cpu_to_le32(0x6604),
+	CALG_AES_256	= const_cpu_to_le32(0x6610),
+} NTFS_CRYPTO_ALGORITHMS;
+
+/* Decrypted, in-memory file encryption key. */
 typedef struct {
-	u8 *key_data;
-	u32 alg_id;
 	gcry_cipher_hd_t gcry_cipher_hd;
+	u32 alg_id;
+	u8 *key_data;
 	gcry_cipher_hd_t *des_gcry_cipher_hd_ptr;
 } ntfs_fek;
-
-#define CALG_DES (0x6601)
-/* If not one of the below three, fall back to standard Des. */
-#define CALG_3DES (0x6603)
-#define CALG_DESX (0x6604)
-#define CALG_AES_256 (0x6610)
 
 /* DESX-MS128 implementation for libgcrypt. */
 static gcry_module_t ntfs_desx_module;
@@ -921,7 +938,8 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 	gcry_error_t err;
 
 	// TODO: Sanity checking of sizes and offsets.
-	key_size = *(u32*)fek_buf;
+	key_size = le32_to_cpup(fek_buf);
+	//fprintf(stderr, "key_size 0x%x\n", key_size);
 	fek = malloc(((((sizeof(*fek) + 7) & ~7) + key_size + 7) & ~7) +
 			sizeof(gcry_cipher_hd_t));
 	if (!fek) {
@@ -929,6 +947,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		return NULL;
 	}
 	fek->alg_id = *(u32*)(fek_buf + 8);
+	//fprintf(stderr, "alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
 	fek->key_data = (u8*)fek + ((sizeof(*fek) + 7) & ~7);
 	memcpy(fek->key_data, fek_buf + 16, key_size);
 	fek->des_gcry_cipher_hd_ptr = NULL;
@@ -966,10 +985,15 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 	default:
 		wanted_key_size = 8;
 		gcry_algo = GCRY_CIPHER_DES;
-		fprintf(stderr, "DES is not supported at present.  Please "
-				"email linux-ntfs-dev@lists.sourceforge.net "
-				"and say that you saw this message.  We will "
-				"then implement support for DES.\n");
+		if (fek->alg_id == CALG_DES)
+			fprintf(stderr, "DES is not supported at present");
+		else
+			fprintf(stderr, "Unknown crypto algorithm 0x%x",
+					le32_to_cpu(fek->alg_id));
+		fprintf(stderr, ".  Please email linux-ntfs-dev@lists."
+				"sourceforge.net and say that you saw this "
+				"message.  We will then try to implement "
+				"support for this algorithm.\n");
 		err = EOPNOTSUPP;
 		goto out;
 	}
@@ -1119,11 +1143,14 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	}
 	/* Apply the IV. */
 	if (fek->alg_id == CALG_AES_256) {
-		((u64*)data)[0] ^= 0x5816657be9161312ULL + offset;
-		((u64*)data)[1] ^= 0x1989adbe44918961ULL + offset;
+		((u64*)data)[0] ^= const_cpu_to_le64(0x5816657be9161312ULL +
+				offset);
+		((u64*)data)[1] ^= const_cpu_to_le64(0x1989adbe44918961ULL +
+				offset);
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((u64*)data)[0] ^= 0x169119629891ad13ULL + offset;
+		((u64*)data)[0] ^= const_cpu_to_le64(0x169119629891ad13ULL +
+				offset);
 	}
 	return 512;
 }
