@@ -1536,9 +1536,12 @@ int main(int argc, char *argv[])
 	}
 	free(parsed_options);
 #ifndef DEBUG
-	fh = fuse_new(ffd, NULL, &ntfs_fuse_oper, sizeof(ntfs_fuse_oper));
+	fh = fuse_new(ffd, (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS) ?
+			NULL : "use_ino", &ntfs_fuse_oper,
+			sizeof(ntfs_fuse_oper));
 #else
-	fh = fuse_new(ffd, "debug", &ntfs_fuse_oper,
+	fh = fuse_new(ffd, (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS) ?
+			"debug" : "debug,use_ino" , &ntfs_fuse_oper,
 			sizeof(ntfs_fuse_oper));
 #endif
 	if (!fh) {
