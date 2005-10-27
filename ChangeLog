@@ -44,7 +44,10 @@ xx/xx/2005 - 1.12.2-WIP
 	  key after it is decrypted (this is ifdeffed out by default).  (Anton)
 	- fflush() ntfs_log_ streams.  (Christophe)
 	- Working with regular files needs no longer the --force option,
-	  except for mkntfs. (Szaka)
+	  except for mkntfs.  (Szaka)
+	- Fix ntfs_non_resident_attr_expand bug, that occured if we enlarge
+	  sparse or compressed file, but do not need to allocate new clusters to
+	  perfrom this.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
