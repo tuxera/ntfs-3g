@@ -133,10 +133,12 @@ int utils_valid_device(const char *name, int force)
 		return 0;
 	}
 
-	if (!S_ISBLK(st.st_mode)) {
-		ntfs_log_warning("%s is not a block device.\n", name);
+	if (!S_ISBLK(st.st_mode) && !S_ISREG(st.st_mode)) {
+		ntfs_log_warning("%s is not a block device, "
+				 "nor regular file.\n", name);
 		if (!force) {
-			ntfs_log_error("Use the force option to work with files.\n");
+			ntfs_log_error("Use the force option to work with other"
+				       " file types, for your own risk!\n");
 			return 0;
 		}
 		ntfs_log_warning("Forced to continue.\n");

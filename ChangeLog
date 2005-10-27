@@ -43,6 +43,8 @@ xx/xx/2005 - 1.12.2-WIP
 	- Add some debugging to ntfsdecrypt.c to allow printing of the private
 	  key after it is decrypted (this is ifdeffed out by default).  (Anton)
 	- fflush() ntfs_log_ streams.  (Christophe)
+	- Working with regular files needs no longer the --force option,
+	  except for mkntfs. (Szaka)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
