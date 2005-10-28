@@ -35,8 +35,8 @@ xx/xx/2005 - 1.12.2-WIP
 	- mkntfs: optionally create NTFS version 3.0 (W2K) or 3.1 (XP, W2K3, 
 	  Vista).  (Implementation by Erik Sornes, adaption by Szaka)
 	- ntfsmount: Add 'streams_interface=' option to select named data
-	  streams access interface. Currently supported interfaces are 'none'
-	  and 'windows'.  (Yura)
+	  streams access interface. Currently supported interfaces are 'none',
+	  'windows' and 'xattr'.  (Yura)
 	- ntfscat can display named attributes, streams too.  (Szaka)
 	- Remove Dputs(), Dprintf(), Dperror(), ntfs_debug(), ntfs_error() and
 	  Sprintf(). Forward callers to ntfs_log_*().  (Yuval)

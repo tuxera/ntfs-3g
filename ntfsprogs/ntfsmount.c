@@ -78,9 +78,7 @@ typedef struct {
 
 typedef enum {
 	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
-#if 0
 	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
-#endif
 	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
 } ntfs_fuse_streams_interface;
 
@@ -864,7 +862,73 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 
 #ifdef HAVE_SETXATTR
 
-static int ntfs_fuse_getxattr(const char *path, const char *name,
+static const char nf_ns_xattr_preffix[] = "user.";
+static const int nf_ns_xattr_preffix_len = 5;
+
+static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
+{
+	ntfs_attr_search_ctx *actx = NULL;
+	ntfs_volume *vol;
+	ntfs_inode *ni;
+	char *to = list;
+	int ret = 0;
+
+	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+		return -EOPNOTSUPP;
+	vol = ctx->vol;
+	if (!vol)
+		return -ENODEV;
+	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	if (!ni)
+		return -errno;
+	actx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!actx) {
+		ret = -errno;
+		ntfs_inode_close(ni);
+		goto exit;
+	}
+	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
+				0, NULL, 0, actx)) {
+		char *tmp_name = NULL;
+		int tmp_name_len;
+
+		if (!actx->attr->name_length)
+			continue;
+		tmp_name_len = ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
+				le16_to_cpu(actx->attr->name_offset)),
+				actx->attr->name_length, &tmp_name, 0);
+		if (tmp_name_len < 0) {
+			ret = -errno;
+			goto exit;
+		}
+		ret += tmp_name_len + nf_ns_xattr_preffix_len + 1;
+		if (size) {
+			if ((size_t)ret <= size) {
+				strcpy(to, nf_ns_xattr_preffix);
+				to += nf_ns_xattr_preffix_len;
+				strncpy(to, tmp_name, tmp_name_len);
+				to += tmp_name_len;
+				*to = 0;
+				to++;
+			} else {
+				free(tmp_name);
+				ret = -ERANGE;
+				goto exit;
+			}
+		}
+		free(tmp_name);
+	}
+	if (errno != ENOENT)
+		ret = -errno;
+exit:
+	if (actx)
+		ntfs_attr_put_search_ctx(actx);
+	ntfs_inode_close(ni);
+	fprintf(stderr, "return %d\n", ret);
+	return ret;
+}
+
+static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 				char *value, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
@@ -904,14 +968,20 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		if (ret)
 			ret++; /* For space delimiter. */
 		ret += tmp_name_len;
-		if ((size_t)ret <= size) {
-			/* Don't add space to the beginning of line. */
-			if (to != value) {
-				*to = ' ';
-				to++;
+		if (size) {
+			if ((size_t)ret <= size) {
+				/* Don't add space to the beginning of line. */
+				if (to != value) {
+					*to = ' ';
+					to++;
+				}
+				strncpy(to, tmp_name, tmp_name_len);
+				to += tmp_name_len;
+			} else {
+				free(tmp_name);
+				ret = -ERANGE;
+				goto exit;
 			}
-			strncpy(to, tmp_name, tmp_name_len);
-			to += tmp_name_len;
 		}
 		free(tmp_name);
 	}
@@ -924,79 +994,21 @@ exit:
 	return ret;
 }
 
-#if 0
-/* If this will be enabled, need to fix bug before.  (bug description below) */
-
-static const char nf_ns_streams[] = "user.stream.";
-static const int nf_ns_streams_len = 12;
-
-static const char nf_ns_eas[] = "user.ea.";
-static const int nf_ns_eas_len = 8;
-
-static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
-{
-	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_volume *vol;
-	ntfs_inode *ni;
-	char *to = list;
-	int ret = 0;
-
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni)
-		return -errno;
-	actx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!actx) {
-		ret = -errno;
-		ntfs_inode_close(ni);
-		goto exit;
-	}
-	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
-				0, NULL, 0, actx)) {
-		if (!actx->attr->name_length)
-			continue;
-		ret += actx->attr->name_length + nf_ns_streams_len + 1;
-		if (size && (size_t)ret <= size) {
-			strcpy(to, nf_ns_streams);
-			to += nf_ns_streams_len;
-			/*
-			 * BUG: destination buffer length can be bigger than
-			 * actx->attr->name_length + 1.  (eg. internatinal
-			 * characters in utf8)
-			 */
-			if (ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
-					le16_to_cpu(actx->attr->name_offset)),
-					actx->attr->name_length, &to,
-					actx->attr->name_length + 1) < 0) {
-				ret = -errno;
-				goto exit;
-			}
-			to += actx->attr->name_length + 1;
-		}
-	}
-	if (errno != ENOENT)
-		ret = -errno;
-exit:
-	if (actx)
-		ntfs_attr_put_search_ctx(actx);
-	ntfs_inode_close(ni);
-	fprintf(stderr, "return %d\n", ret);
-	return ret;
-}
-
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int res;
 	ntfschar *lename = NULL;
+	int res, lename_len;
 
-	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == (size_t)nf_ns_streams_len)
+	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return ntfs_fuse_getxattr_windows(path, name, value, size);
+	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+		return -EOPNOTSUPP;
+	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
+			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
@@ -1004,12 +1016,12 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename,
-			strlen(name) - nf_ns_streams_len);
+	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 	if (!na) {
 		res = -ENODATA;
 		goto exit;
@@ -1038,11 +1050,13 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int res;
 	ntfschar *lename = NULL;
+	int res, lename_len;
 
-	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == (size_t)nf_ns_streams_len)
+	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+		return -EOPNOTSUPP;
+	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
+			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -EACCES;
 	vol = ctx->vol;
 	if (!vol)
@@ -1050,12 +1064,12 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename,
-			strlen(name) - nf_ns_streams_len);
+	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 	if (na && flags == XATTR_CREATE) {
 		res = -EEXIST;
 		goto exit;
@@ -1065,8 +1079,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -ENODATA;
 			goto exit;
 		}
-		na = ntfs_attr_add(ni, AT_DATA, lename, strlen(name) -
-				nf_ns_streams_len, 0);
+		if (ntfs_attr_add(ni, AT_DATA, lename, lename_len, NULL, 0)) {
+			res = -errno;
+			goto exit;
+		}
+		na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 		if (!na) {
 			res = -errno;
 			goto exit;
@@ -1091,11 +1108,14 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int res = 0;
 	ntfschar *lename = NULL;
+	int res = 0, lename_len;
 
-	if (strncmp(name, nf_ns_streams, nf_ns_streams_len) ||
-			strlen(name) == (size_t)nf_ns_streams_len)
+
+	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+		return -EOPNOTSUPP;
+	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
+			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
 	vol = ctx->vol;
 	if (!vol)
@@ -1103,12 +1123,12 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (ntfs_mbstoucs(name + nf_ns_streams_len, &lename, 0) == -1) {
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename,
-			strlen(name) - nf_ns_streams_len);
+	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 	if (!na) {
 		res = -ENODATA;
 		goto exit;
@@ -1125,8 +1145,6 @@ exit:
 		perror("Failed to close inode");
 	return res;
 }
-
-#endif /* 0 */
 
 #endif /* HAVE_SETXATTR */
 
@@ -1148,11 +1166,9 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.utime		= ntfs_fuse_utime,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
-#if 0
 	.setxattr	= ntfs_fuse_setxattr,
 	.removexattr	= ntfs_fuse_removexattr,
 	.listxattr	= ntfs_fuse_listxattr,
-#endif /* 0 */
 #endif /* HAVE_SETXATTR */
 };
 
@@ -1325,10 +1341,8 @@ static char *parse_mount_options(const char *org_options)
 			}
 			if (!strcmp(val, "none"))
 				ctx->streams = NF_STREAMS_INTERFACE_NONE;
-#if 0
 			else if (!strcmp(val, "xattr"))
 				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
-#endif
 			else if (!strcmp(val, "windows"))
 				ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
 			else {
