@@ -666,6 +666,7 @@ err_out:
  */
 void ntfs_ie_free(INDEX_ENTRY *ie)
 {
+	ntfs_log_trace ("ie %p, inode %lld\n", ie, MREF(ie->indexed_file));
 	free(ie);
 }
 
@@ -677,6 +678,7 @@ INDEX_ENTRY * ntfs_ie_create(void)
 	int length;
 	INDEX_ENTRY *ie;
 
+	ntfs_log_trace ("\n");
 	length = 16;
 	ie = calloc(1, length);
 	if (!ie)
@@ -700,6 +702,7 @@ VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie)
 	if (!(ie->flags & INDEX_ENTRY_NODE))
 		return -1;
 
+	ntfs_log_trace ("\n");
 	return *((VCN*) ((u8*) ie + ie->length - 8));
 }
 
@@ -713,6 +716,7 @@ INDEX_ENTRY * ntfs_ie_copy(INDEX_ENTRY *ie)
 	if (!ie)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	copy = malloc(ie->length);
 	if (!copy)
 		return NULL;
@@ -729,6 +733,7 @@ INDEX_ENTRY * ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn)
 	if (!ie)
 		return 0;
 
+	ntfs_log_trace ("\n");
 	if (!(ie->flags & INDEX_ENTRY_NODE)) {
 		ie->length += 8;
 		ie = realloc(ie, ie->length);
@@ -752,6 +757,7 @@ INDEX_ENTRY * ntfs_ie_remove_vcn(INDEX_ENTRY *ie)
 	if (!(ie->flags & INDEX_ENTRY_NODE))
 		return ie;
 
+	ntfs_log_trace ("\n");
 	ie->length -= 8;
 	ie->flags &= ~INDEX_ENTRY_NODE;
 	ie = realloc(ie, ie->length);
@@ -771,6 +777,7 @@ INDEX_ENTRY * ntfs_ie_set_name(INDEX_ENTRY *ie, ntfschar *name, int namelen, FIL
 	if (!ie || !name)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	/*
 	 * INDEX_ENTRY
 	 *	MFT_REF indexed_file;
@@ -857,6 +864,7 @@ INDEX_ENTRY * ntfs_ie_remove_name(INDEX_ENTRY *ie)
 	if (ie->key_length == 0)
 		return ie;
 
+	ntfs_log_trace ("\n");
 	if (ie->flags & INDEX_ENTRY_NODE)
 		vcn = ntfs_ie_get_vcn(ie);
 

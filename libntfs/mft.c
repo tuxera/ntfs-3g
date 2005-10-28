@@ -1556,6 +1556,7 @@ sync_rollback:
 #include "tree.h"
 #include "index.h"
 #include "rich.h"
+#include "utils.h"
 
 /**
  * ntfs_mft_remove_attr
@@ -1570,6 +1571,7 @@ int ntfs_mft_remove_attr(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES typ
 	if (!inode)
 		return 1;
 
+	ntfs_log_trace ("\n");
 	attr20 = find_first_attribute(AT_ATTRIBUTE_LIST, inode->mrec);
 	if (attr20)
 		return 1;
@@ -1633,6 +1635,7 @@ ATTR_RECORD * ntfs_mft_add_attr(ntfs_inode *inode, ATTR_TYPES type, u8 *data, in
 	if (!data)
 		return NULL;
 
+	ntfs_log_trace ("inode %p, mft %lld, attr 0x%02x, len %d\n", inode, inode->mft_no, type, data_len);
 	attr_size = ATTR_SIZE(data_len);
 
 	mrec = inode->mrec;
@@ -1703,6 +1706,7 @@ int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name,
 	MFT_RECORD *mrec = NULL;
 	int res = -1;
 
+	ntfs_log_trace ("\n");
 	// XXX only works when attr is in base inode
 
 	if ((!inode) || (!inode->mrec))
@@ -1711,6 +1715,8 @@ int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name,
 		return -1;
 
 	mrec = inode->mrec;
+	ntfs_log_debug("inode = %lld\n", MREF(inode->mft_no));
+	//utils_dump_mem(mrec, 0, 1024, DM_DEFAULTS);
 
 	mft_size  = mrec->bytes_allocated;
 	mft_usage = mrec->bytes_in_use;
@@ -1721,10 +1727,12 @@ int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name,
 	//ntfs_log_debug("mft_free  = %d\n", mft_free);
 	//ntfs_log_debug("\n");
 
-	ctx = ntfs_attr_get_search_ctx(NULL, mrec);
+	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 	if (!ctx)
 		goto done;
 
+	ntfs_name_print(name, name_len);
+	ntfs_log_debug(" type = 0x%02x\n", type);
 	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE, 0, NULL, 0, ctx) != 0)
 		goto done;
 
@@ -1738,8 +1746,8 @@ int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name,
 	attr_orig = arec->value_length;
 	attr_new  = data_len;
 
-	//ntfs_log_debug("attr orig = %d\n", attr_orig);
-	//ntfs_log_debug("attr new  = %d\n", attr_new);
+	ntfs_log_debug("attr orig = %d\n", attr_orig);
+	ntfs_log_debug("attr new  = %d\n", attr_new);
 	//ntfs_log_debug("\n");
 
 	if ((attr_new - attr_orig + mft_usage) > mft_size) {
@@ -1789,6 +1797,7 @@ int ntfs_mft_free_space(struct ntfs_dir *dir)
 	if ((!dir) || (!dir->inode))
 		return -1;
 
+	ntfs_log_trace ("\n");
 	mft = (MFT_RECORD*) dir->inode->mrec;
 
 	res = mft->bytes_allocated - mft->bytes_in_use;
@@ -1816,8 +1825,9 @@ int ntfs_mft_add_index(struct ntfs_dir *dir)
 	if (dir->index_size < 512)
 		return 1;
 
+	ntfs_log_trace ("\n");
 	vol = dir->vol;
-	ntfs_log_debug("add two attrs to " YELLOW); ntfs_name_print(dir->name, dir->name_len); ntfs_log_debug(END "\n");
+	ntfs_log_debug("add two attrs to "); ntfs_name_print(dir->name, dir->name_len); ntfs_log_debug("\n");
 	ntfs_log_debug("index size = %d\n", dir->index_size);
 
 	buffer = malloc(dir->index_size);

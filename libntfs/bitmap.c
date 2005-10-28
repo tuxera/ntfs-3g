@@ -237,6 +237,8 @@ int ntfs_bmp_rollback(struct ntfs_bmp *bmp)
 	if ((!bmp) || (bmp->count == 0))
 		return 0;
 
+	ntfs_log_trace ("bmp %p, records %d, attr %lld/%02X\n", bmp, bmp->count, MREF(bmp->attr->ni->mft_no), bmp->attr->type);
+
 	for (i = 0; i < bmp->count; i++)
 		free(bmp->data[i]);
 
@@ -256,15 +258,14 @@ int ntfs_bmp_commit(struct ntfs_bmp *bmp)
 {
 	int i;
 	u32 cs;
-#ifdef RM_WRITE
 	u32 ws; // write size
-#endif
 
 	if (!bmp)
 		return 0;
 	if (bmp->count == 0)
 		return 0;
 
+	ntfs_log_trace ("bmp %p, records %d, attr %lld/%02X\n", bmp, bmp->count, MREF(bmp->attr->ni->mft_no), bmp->attr->type);
 #if 0
 	ntfs_log_debug("attr = 0x%02X\n", bmp->attr->type);
 	ntfs_log_debug("resident = %d\n", !NAttrNonResident(bmp->attr));
@@ -280,22 +281,18 @@ int ntfs_bmp_commit(struct ntfs_bmp *bmp)
 
 		// non-resident
 		for (i = 0; i < bmp->count; i++) {
-#ifdef RM_WRITE
 			if (((bmp->data_vcn[i]+1) * cs) < bmp->attr->data_size)
 				ws = cs;
 			else
 				ws = bmp->attr->data_size & (cs - 1);
 			//ntfs_log_debug("writing %d bytes\n", ws);
 			ntfs_attr_pwrite(bmp->attr, bmp->data_vcn[i] * cs, ws, bmp->data[i]); // XXX retval
-#endif
-			ntfs_log_debug(RED "\tntfs_attr_pwrite(vcn %lld)\n" END, bmp->data_vcn[i]);
+			ntfs_log_warning("\tntfs_attr_pwrite(vcn %lld)\n", bmp->data_vcn[i]);
 		}
 	} else {
 		// resident
-#ifdef RM_WRITE
 		ntfs_attr_pwrite(bmp->attr, bmp->data_vcn[0], bmp->attr->data_size, bmp->data[0]); // XXX retval
-#endif
-		ntfs_log_debug(RED "\tntfs_attr_pwrite resident (%lld)\n" END, bmp->attr->data_size);
+		ntfs_log_warning("\tntfs_attr_pwrite resident (%lld)\n", bmp->attr->data_size);
 	}
 
 	ntfs_bmp_rollback(bmp);
@@ -311,8 +308,9 @@ void ntfs_bmp_free(struct ntfs_bmp *bmp)
 	if (!bmp)
 		return;
 
-	ntfs_bmp_rollback(bmp);
+	ntfs_log_trace ("bmp %p, records %d, attr %lld/%02X\n", bmp, bmp->count, MREF(bmp->attr->ni->mft_no), bmp->attr->type);
 
+	ntfs_bmp_rollback(bmp);
 	ntfs_attr_close(bmp->attr);
 
 	free(bmp);
@@ -329,6 +327,7 @@ struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *
 	if (!inode)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	attr = ntfs_attr_open(inode, type, name, name_len);
 	if (!attr)
 		return NULL;
@@ -339,6 +338,7 @@ struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *
 		return NULL;
 	}
 
+	ntfs_log_critical("bmp = %p, attr = %p, inode = %p, attr->ni->mft_no = %lld\n", bmp, attr, inode, MREF(attr->ni->mft_no));
 	bmp->vol       = inode->vol;
 	bmp->attr      = attr;
 	bmp->data      = NULL;
@@ -360,6 +360,7 @@ int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data)
 	if (!bmp || !data)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	old = ROUND_UP(bmp->count, 16);
 	bmp->count++;
 	new = ROUND_UP(bmp->count, 16);
@@ -397,6 +398,7 @@ u8 * ntfs_bmp_get_data(struct ntfs_bmp *bmp, VCN vcn)
 	if (!bmp)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	cs = bmp->vol->cluster_size;
 	cb = bmp->vol->cluster_size_bits;
 
@@ -447,6 +449,7 @@ int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 	if (!bmp)
 		return -1;
 
+	ntfs_log_trace ("vcn %lld, length %lld, value %d\n", vcn, length, value);
 	if (value)
 		value = 0xFF;
 
@@ -504,13 +507,13 @@ int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 	}
 
 #if 1
-	ntfs_log_debug(GREEN "Modified: inode %lld, ", bmp->attr->ni->mft_no);
+	ntfs_log_debug("Modified: inode %lld, ", bmp->attr->ni->mft_no);
 	switch (bmp->attr->type) {
 		case AT_BITMAP: ntfs_log_debug("$BITMAP");	break;
 		case AT_DATA:   ntfs_log_debug("$DATA");	break;
 		default:				break;
 	}
-	ntfs_log_debug(" vcn %lld-%lld\n" END, vcn>>12, (vcn+length-1)>>12);
+	ntfs_log_debug(" vcn %lld-%lld\n", vcn>>12, (vcn+length-1)>>12);
 #endif
 	return 1;
 }
@@ -531,6 +534,7 @@ s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp)
 	if (!bmp)
 		return -2;
 
+	ntfs_log_trace ("\n");
 	// find byte size of bmp
 	// find cluster size of bmp
 
@@ -586,6 +590,7 @@ int ntfs_bmp_find_space(struct ntfs_bmp *bmp, LCN start, long size)
 	if (!bmp)
 		return 0;
 
+	ntfs_log_trace ("\n");
 	start = 0;
 	size = 0;
 

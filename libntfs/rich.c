@@ -28,6 +28,9 @@
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+#ifdef HAVE_ERRNO_H
+#include <errno.h>
+#endif
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
@@ -58,6 +61,7 @@ ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
 		return NULL;
 	}
 
+	ntfs_log_trace ("\n");
 	if (ntfs_attr_lookup(type, NULL, 0, 0, 0, NULL, 0, ctx) != 0) {
 		ntfs_log_debug("find_attribute didn't find an attribute of type: 0x%02x.\n", type);
 		return NULL;	/* None / no more of that type */
@@ -91,6 +95,7 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
 		return NULL;
 	}
 
+	ntfs_log_trace ("\n");
 	ctx = ntfs_attr_get_search_ctx(NULL, mft);
 	if (!ctx) {
 		//XXX ntfs_log_error("Couldn't create a search context.\n");
@@ -115,10 +120,10 @@ void ntfs_name_print(ntfschar *name, int name_len)
 
 	if (name_len) {
 		ntfs_ucstombs(name, name_len, &buffer, 0);
-		ntfs_log_info("%s", buffer);
+		ntfs_log_debug("%s", buffer);
 		free(buffer);
 	} else {
-		ntfs_log_info("!");
+		ntfs_log_debug("!");
 	}
 }
 
@@ -141,6 +146,7 @@ int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECO
 	if (!attr->non_resident)
 		return 0;
 
+	ntfs_log_trace ("\n");
 	na = ntfs_attr_open(inode, attr->type, NULL, 0);
 	if (!na)
 		return 1;
@@ -150,7 +156,7 @@ int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECO
 	size = na->allocated_size >> inode->vol->cluster_size_bits;
 	for (count = 0; count < size; count += rl->length, rl++) {
 		if (ntfs_bmp_set_range(bmp, rl->lcn, rl->length, 0) < 0) {
-			ntfs_log_info(RED "set range : %lld - %lld FAILED\n" END, rl->lcn, rl->lcn+rl->length-1);
+			ntfs_log_warning("set range : %lld - %lld FAILED\n", rl->lcn, rl->lcn+rl->length-1);
 		}
 	}
 	ntfs_attr_close(na);
@@ -170,6 +176,7 @@ int utils_free_non_residents2(ntfs_inode *inode, struct ntfs_bmp *bmp)
 	if (!bmp)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	ctx = ntfs_attr_get_search_ctx(NULL, inode->mrec);
 	if (!ctx) {
 		ntfs_log_info("can't create a search context\n");

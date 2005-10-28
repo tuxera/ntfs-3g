@@ -54,13 +54,6 @@ GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
 GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
 GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
-#if 0
-#define RED	"\e[31m"
-#define YELLOW	"\e[33m"
-#define GREEN	"\e[01;32m"
-#define NORM	"\e[0m"
-#endif
-
 /**
  * version - Print version information about the program
  *
@@ -702,7 +695,6 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	need_from = calc_attr_length(rec, need_from);
 	need_to   = calc_attr_length(rec, need_to);
 
-	//printf(RED "Before %d, after %d\n" NORM, need_from, need_to);
 	printf("Before %d, after %d\n", need_from, need_to);
 
 	if (need_from != need_to) {

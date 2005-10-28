@@ -601,12 +601,12 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		ss++;
 	if (marker && (drl[dins].vcn + drl[dins].length > srl[send - 1].vcn))
 		finish = FALSE;
-#ifdef DEBUG
+
 	ntfs_log_debug("dfinal = %i, dend = %i\n", dfinal, dend);
 	ntfs_log_debug("sstart = %i, sfinal = %i, send = %i\n", sstart, sfinal, send);
 	ntfs_log_debug("start = %i, finish = %i\n", start, finish);
 	ntfs_log_debug("ds = %i, ss = %i, dins = %i\n", ds, ss, dins);
-#endif
+
 	if (start) {
 		if (finish)
 			drl = ntfs_rl_replace(drl, ds, srl + sstart, ss, dins);

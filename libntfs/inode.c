@@ -1061,6 +1061,8 @@ put_err_out:
 
 #ifdef NTFS_RICH
 
+#include "rich.h"
+
 /**
  * ntfs_inode_close2
  */
@@ -1069,7 +1071,7 @@ int ntfs_inode_close2(ntfs_inode *ni)
 	if (!ni)
 		return 0;
 
-	//ntfs_log_debug(BOLD YELLOW "inode close %lld (%d)\n" END, ni->mft_no, ni->ref_count);
+	ntfs_log_trace ("inode %p, mft %lld, refcount %d\n", ni, MREF(ni->mft_no), ni->ref_count);
 
 	ni->ref_count--;
 	if (ni->ref_count > 0)
@@ -1095,10 +1097,12 @@ ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 	if (!vol)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	switch (mref) {
 		case FILE_Bitmap:  ino = vol->lcnbmp_ni;  break;
 		case FILE_MFT:     ino = vol->mft_ni;     break;
 		case FILE_MFTMirr: ino = vol->mftmirr_ni; break;
+		case FILE_Volume:  ino = vol->vol_ni;     break;
 		case FILE_root:
 			dir = vol->private_data;
 			if (dir)
@@ -1107,7 +1111,7 @@ ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 	}
 
 	if (ino) {
-		//ntfs_log_debug(BOLD YELLOW "inode reuse %lld\n" END, mref);
+		ntfs_log_debug("inode reuse %lld\n", mref);
 		ino->ref_count++;
 		return ino;
 	}
@@ -1127,7 +1131,7 @@ ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 	ino->private_data = NULL;
 	ino->ref_count = 1;
 
-	//ntfs_log_debug(BOLD YELLOW "inode open %lld\n" END, mref);
+	ntfs_log_debug("inode open %lld, 0x%llx\n", MREF(mref), mref);
 	return ino;
 }
 
@@ -1142,6 +1146,7 @@ ntfs_inode * ntfs_inode_open3(ntfs_volume *vol, const MFT_REF mref)
 	if (!vol)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	ino = calloc(1, sizeof(*ino));
 	if (!ino)
 		return NULL;

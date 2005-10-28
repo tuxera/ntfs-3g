@@ -1537,6 +1537,7 @@ err_out:
 #ifdef NTFS_RICH
 
 #include "tree.h"
+#include "rich.h"
 
 /**
  * utils_valid_device - Perform some safety checks on the device before we start
@@ -1562,45 +1563,43 @@ int utils_valid_device(const char *name, int force)
 		errno = EINVAL;
 		return 0;
 	}
+	ntfs_log_trace ("\n");
 
 	if (stat(name, &st) == -1) {
 		if (errno == ENOENT) {
 			ntfs_log_error("The device %s doesn't exist\n", name);
 		} else {
-			ntfs_log_perror("Error getting information about %s",
-					name);
+			ntfs_log_perror("Error getting information about %s", name);
 		}
 		return 0;
 	}
 
-	if (!S_ISBLK(st.st_mode)) {
-		ntfs_log_verbose("%s is not a block device.\n", name);
+	if (!S_ISBLK(st.st_mode) && !S_ISREG(st.st_mode)) {
+		ntfs_log_warning("%s is not a block device, "
+				 "nor regular file.\n", name);
 		if (!force) {
-			ntfs_log_error("Use the force option to work with "
-					"files.\n");
+			ntfs_log_error("Use the force option to work with other"
+				       " file types, for your own risk!\n");
 			return 0;
 		}
-		ntfs_log_verbose("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(name, &mnt_flags)) {
-		ntfs_log_perror("Failed to determine whether %s is mounted",
-				name);
+		ntfs_log_perror("Failed to determine whether %s is mounted", name);
 		if (!force) {
-			ntfs_log_error("Use the force option to ignore this "
-					"error.\n");
+			ntfs_log_error("Use the force option to ignore this error.\n");
 			return 0;
 		}
-		ntfs_log_verbose("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		ntfs_log_verbose("The device %s, is mounted.\n", name);
+		ntfs_log_warning("The device %s, is mounted.\n", name);
 		if (!force) {
-			ntfs_log_error("Use the force option to work a mounted "
-					"filesystem.\n");
+			ntfs_log_error("Use the force option to work a mounted filesystem.\n");
 			return 0;
 		}
-		ntfs_log_verbose("Forced to continue.\n");
+		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	return 1;
@@ -1617,6 +1616,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 		errno = EINVAL;
 		return NULL;
 	}
+	ntfs_log_trace ("\n");
 
 	if (!utils_valid_device(device, force))
 		return NULL;
@@ -1627,20 +1627,22 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 
 		err = errno;
 		ntfs_log_perror("Couldn't mount device '%s'", device);
-		if (err == EOPNOTSUPP)
-			ntfs_log_error("Windows was either hibernated or did not "
-					"shut down properly.  Try to mount "
+		if (err == EPERM)
+			ntfs_log_error("Windows was hibernated.  Try to mount "
 					"volume in windows, shut down and try "
 					"again.\n");
+		if (err == EOPNOTSUPP)
+			ntfs_log_error("Windows did not shut down properly.  "
+					"Try to mount volume in windows, "
+					"shut down and try again.\n");
 		return NULL;
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		ntfs_log_quiet("Volume is dirty.\n");
-		return NULL;
+		ntfs_log_warning("Volume is dirty.\n");
 		if (!force) {
 			ntfs_log_error("Run chkdsk and try again, or use the "
-					"--force option.\n");
+					"force option.\n");
 			ntfs_umount(vol, FALSE);
 			return NULL;
 		}
@@ -1658,6 +1660,7 @@ int ntfs_volume_commit(ntfs_volume *vol)
 	if (!vol)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	ntfs_log_debug("commit volume\n");
 	if (ntfs_bmp_commit(vol->private_bmp1) < 0)
 		return -1;
@@ -1678,6 +1681,7 @@ int ntfs_volume_rollback(ntfs_volume *vol)
 {
 	if (!vol)
 		return -1;
+	ntfs_log_trace ("\n");
 
 	if (ntfs_bmp_rollback(vol->private_bmp1) < 0)
 		return -1;
@@ -1701,6 +1705,7 @@ int ntfs_volume_umount2(ntfs_volume *vol, const BOOL force)
 
 	if (!vol)
 		return 0;
+	ntfs_log_trace ("\n");
 
 	ntfs_volume_rollback(vol);
 
@@ -1768,6 +1773,7 @@ ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL f
 	struct ntfs_dt *found;
 	int num;
 
+	ntfs_log_trace ("\n");
 	vol = utils_mount_volume(device, flags, force);
 	if (!vol)
 		return NULL;
@@ -1793,7 +1799,7 @@ ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL f
 
 	//$Bitmap
 	num = -1;
-	found = ntfs_dt_find2(root, bmp, sizeof(bmp) - 1, &num);
+	found = ntfs_dt_find2(root, bmp, (sizeof(bmp)/sizeof(ntfschar)) - 1, &num);
 	if ((!found) || (num < 0)) {
 		ntfs_log_debug("can't find $Bitmap\n");
 		ntfs_volume_umount2(vol, FALSE);
@@ -1806,7 +1812,7 @@ ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL f
 
 	//$MFT
 	num = -1;
-	found = ntfs_dt_find2(root, mft, sizeof(mft) - 1, &num);
+	found = ntfs_dt_find2(root, mft, (sizeof(mft)/sizeof(ntfschar)) - 1, &num);
 	if ((!found) || (num < 0)) {
 		ntfs_log_debug("can't find $MFT\n");
 		ntfs_volume_umount2(vol, FALSE);
@@ -1819,7 +1825,7 @@ ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL f
 
 	//$MFTMirr
 	num = -1;
-	found = ntfs_dt_find2(root, mftmirr, sizeof(mftmirr) - 1, &num);
+	found = ntfs_dt_find2(root, mftmirr, (sizeof(mftmirr)/sizeof(ntfschar)) - 1, &num);
 	if ((!found) || (num < 0)) {
 		ntfs_log_debug("can't find $MFTMirr\n");
 		ntfs_volume_umount2(vol, FALSE);
@@ -1832,7 +1838,7 @@ ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL f
 
 	// root directory
 	num = -1;
-	found = ntfs_dt_find2(root, dot, 1, &num);
+	found = ntfs_dt_find2(root, dot, (sizeof(dot)/sizeof(ntfschar)) - 1, &num);
 	if ((!found) || (num < 0)) {
 		ntfs_log_debug("can't find the root directory\n");
 		ntfs_volume_umount2(vol, FALSE);

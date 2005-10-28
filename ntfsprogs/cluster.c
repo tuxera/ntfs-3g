@@ -36,13 +36,6 @@
 #include "cluster.h"
 #include "utils.h"
 
-#if 0
-#define RED	"\e[31m"
-#define YELLOW	"\e[33m"
-#define GREEN	"\e[01;32m"
-#define NORM	"\e[0m"
-#endif
-
 /**
  * cluster_find
  */
@@ -80,7 +73,6 @@ int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void 
 	m_ctx->flags_search = FEMR_IN_USE | FEMR_BASE_RECORD;
 
 	while (mft_next_record(m_ctx) == 0) {
-		//Qprintf(RED "Inode: %llu\n" NORM, (unsigned long long)
 		Qprintf("Inode: %llu\n", (unsigned long long)
 				m_ctx->inode->mft_no);
 

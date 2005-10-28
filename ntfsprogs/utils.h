@@ -37,15 +37,10 @@
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
 #endif
-//#include <regex.h>
 
 extern const char *ntfs_bugs;
 extern const char *ntfs_home;
 extern const char *ntfs_gpl;
-
-#if !defined(REG_NOERROR) || (REG_NOERROR != 0)
-#	define REG_NOERROR 0
-#endif
 
 #define	DEC_PRINTF(NAME)							\
 	int NAME(const char *format, ...)					\

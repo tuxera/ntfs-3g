@@ -61,12 +61,16 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
-#include <regex.h>
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
 #endif
 #ifdef HAVE_UTIME_H
 #include <utime.h>
+#endif
+#include <regex.h>
+
+#if !defined(REG_NOERROR) || (REG_NOERROR != 0)
+#define REG_NOERROR 0
 #endif
 
 #include "ntfsundelete.h"

@@ -26,16 +26,6 @@
 #include "attrib.h"
 #include "bitmap.h"
 
-// XXX Temporarily copied from utils.h
-#define RED	"\e[31m"
-#define GREEN	"\e[32m"
-#define YELLOW	"\e[33m"
-#define BLUE	"\e[34m"
-#define MAGENTA	"\e[35m"
-#define CYAN	"\e[36m"
-#define BOLD	"\e[01m"
-#define END	"\e[0m"
-
 #define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
 #define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
 #define ATTR_SIZE(s) ROUND_UP(s,8)

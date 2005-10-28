@@ -40,6 +40,7 @@
 #include "inode.h"
 #include "logging.h"
 #include "rich.h"
+#include "utils.h"
 
 /**
  * ntfs_dt_free
@@ -50,6 +51,8 @@ void ntfs_dt_free(struct ntfs_dt *dt)
 
 	if (!dt)
 		return;
+
+	ntfs_log_trace ("dt %p, children %d, dir %lld\n", dt, dt->child_count, MREF(dt->dir->mft_num));
 
 	for (i = 0; i < dt->child_count; i++) {
 		ntfs_dt_free(dt->sub_nodes[i]);
@@ -74,6 +77,8 @@ int ntfs_dt_rollback(struct ntfs_dt *dt)
 		return 0;
 	if (dt->child_count == 0)	// No children or nothing mapped
 		return 0;
+
+	ntfs_log_trace ("dt %p, children %d, dir %lld\n", dt, dt->child_count, MREF(dt->dir->mft_num));
 
 	if (dt->changed) {
 		// We can't trust anything below us in the tree
@@ -122,6 +127,8 @@ int ntfs_dt_commit(struct ntfs_dt *dt)
 	if (!dt)
 		return 0;
 
+	ntfs_log_trace ("dt %p, children %d, dir %lld\n", dt, dt->child_count, MREF(dt->dir->mft_num));
+
 	dir = dt->dir;
 	if (!dir)
 		return -1;
@@ -134,31 +141,27 @@ int ntfs_dt_commit(struct ntfs_dt *dt)
 			attr = dt->dir->ialloc;
 			size = dt->dir->index_size;
 			//utils_dump_mem(dt->data, 0, size, DM_DEFAULTS);
-#ifdef RM_WRITE
 			ntfs_attr_mst_pwrite(attr, dt->vcn * vol->cluster_size, 1, size, dt->data); // XXX retval
-#endif
 		} else {
 			ntfs_log_debug("commit dt (root)\n");
 			attr = dt->dir->iroot;
 			size = dt->data_len;
 			//utils_dump_mem(dt->data, 0, size, DM_DEFAULTS);
-#ifdef RM_WRITE
 			ntfs_attr_pwrite(attr, 0, size, dt->data); // XXX retval
-#endif
 		}
 
-		ntfs_log_debug(RED "\tntfs_attr_pwrite(vcn %lld)\n" END, dt->vcn);
+		ntfs_log_warning("\tntfs_attr_pwrite(vcn %lld)\n", dt->vcn);
 
 		dt->changed = FALSE;
+	} else {
+		//ntfs_log_debug("\tdt is clean\n");
 	}
 
 	for (i = 0; i < dt->child_count; i++) {
 		if ((dt->inodes[i]) && (NInoDirty(dt->inodes[i]))) {
 			//utils_dump_mem(dt->inodes[i]->mrec, 0, vol->mft_record_size, DM_DEFAULTS);
-#ifdef RM_WRITE
 			ntfs_inode_sync(dt->inodes[i]);
-#endif
-			ntfs_log_debug(RED "\tntfs_inode_sync %llu\n" END, dt->inodes[i]->mft_no);
+			ntfs_log_warning("\tntfs_inode_sync %llu\n", dt->inodes[i]->mft_no);
 		}
 
 		if (ntfs_dt_commit(dt->sub_nodes[i]) < 0)
@@ -181,6 +184,7 @@ BOOL ntfs_dt_create_children2(struct ntfs_dt *dt, int count)
 	if (old == new)
 		return TRUE;
 
+	ntfs_log_trace ("\n");
 	dt->children  = realloc(dt->children,  new * sizeof(*dt->children));
 	dt->sub_nodes = realloc(dt->sub_nodes, new * sizeof(*dt->sub_nodes));
 	dt->inodes    = realloc(dt->inodes,    new * sizeof(*dt->inodes));
@@ -213,6 +217,7 @@ BOOL ntfs_dt_resize_children3(struct ntfs_dt *dt, int new)
 	if (old == new)
 		return TRUE;
 
+	ntfs_log_trace ("dt %p, mft %lld, old %d, new %d\n", dt, MREF(dt->dir->mft_num), old, new);
 	dt->child_count = new;
 
 	old *= sizeof(*dt->children);
@@ -252,8 +257,11 @@ int ntfs_dt_root_count(struct ntfs_dt *dt)
 	if (!dt)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	buffer = dt->data;
 	size   = dt->data_len;
+
+	//utils_dump_mem(buffer, 0, size, DM_DEFAULTS);
 
 	root = (INDEX_ROOT*) buffer;
 	if (root->type != AT_FILE_NAME)
@@ -311,6 +319,7 @@ int ntfs_dt_alloc_count(struct ntfs_dt *dt)
 	if (!dt)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	buffer = dt->data;
 	size   = dt->data_len;
 
@@ -365,6 +374,7 @@ int ntfs_dt_initialise2(ntfs_volume *vol, struct ntfs_dt *dt)
 	if (!dt)
 		return 1;
 
+	ntfs_log_trace ("\n");
 	memset(dt->data, 0, dt->data_len);
 
 	alloc = (INDEX_ALLOCATION*) dt->data;
@@ -409,6 +419,7 @@ struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 	if (!dt)
 		return NULL;
 
+	ntfs_log_trace ("\n");
 	dt->dir		= dir;
 	dt->parent	= parent;
 	dt->child_count	= 0;
@@ -488,7 +499,7 @@ struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 		}
 #endif
 	}
-	//ntfs_log_debug("index_header (%d,%d)\n", dt->header.index_length, dt->header.allocated_size);
+	//ntfs_log_debug("index_header (%d,%d)\n", dt->header->index_length, dt->header->allocated_size);
 
 	return dt;
 }
@@ -510,6 +521,7 @@ MFT_REF ntfs_dt_find(struct ntfs_dt *dt, ntfschar *name, int name_len)
 	if (!dt || !name)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	/*
 	 * State            Children  Action
 	 * -------------------------------------------
@@ -583,6 +595,11 @@ struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len,
 
 	if (!dt || !name)
 		return NULL;
+	ntfs_log_trace ("dt %p, mft %llu, name %p%d\n", dt, MREF(dt->dir->mft_num), name, name_len);
+
+	//ntfs_log_debug("searching for: "); ntfs_name_print(name, name_len); ntfs_log_debug("\n");
+
+	//utils_dump_mem(dt->data, 0, 256, DM_DEFAULTS);
 
 	// XXX default index_num to -1
 
@@ -605,6 +622,8 @@ struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len,
 			r = -1;
 		} else {
 			//ntfs_log_debug("\t"); ntfs_name_print(ie->key.file_name.file_name, ie->key.file_name.file_name_length); ntfs_log_debug("\n");
+			//utils_dump_mem(name, 0, name_len * 2, DM_DEFAULTS);
+			//utils_dump_mem(ie->key.file_name.file_name, 0, ie->key.file_name.file_name_length * 2, DM_DEFAULTS);
 			r = ntfs_names_collate(name, name_len,
 						ie->key.file_name.file_name,
 						ie->key.file_name.file_name_length,
@@ -632,7 +651,7 @@ struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len,
 			}
 			res = ntfs_dt_find2(dt->sub_nodes[i], name, name_len, index_num);
 		} else {
-			ntfs_log_debug("error collating name\n");
+			//ntfs_log_debug("error collating name\n");
 		}
 		break;
 	}
@@ -654,6 +673,7 @@ struct ntfs_dt * ntfs_dt_find3(struct ntfs_dt *dt, ntfschar *name, int name_len,
 
 	if (!dt || !name)
 		return NULL;
+	ntfs_log_trace ("\n");
 
 	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
@@ -716,6 +736,7 @@ struct ntfs_dt * ntfs_dt_find4(struct ntfs_dt *dt, ntfschar *name, int name_len,
 
 	if (!dt || !name)
 		return NULL;
+	ntfs_log_trace ("\n");
 
 	//ntfs_log_debug("child_count = %d\n", dt->child_count);
 	for (i = 0; i < dt->child_count; i++) {
@@ -780,6 +801,7 @@ void ntfs_dt_find_all(struct ntfs_dt *dt)
 
 	if (!dt)
 		return;
+	ntfs_log_trace ("\n");
 
 	for (i = 0; i < dt->child_count; i++) {
 		ie = dt->children[i];
@@ -804,6 +826,7 @@ int ntfs_dt_find_parent(struct ntfs_dt *dt)
 
 	if (!dt)
 		return -1;
+	ntfs_log_trace ("\n");
 
 	parent = dt->parent;
 	if (!parent)
@@ -823,6 +846,7 @@ BOOL ntfs_dt_isroot(struct ntfs_dt *dt)
 {
 	if (!dt)
 		return FALSE;
+	ntfs_log_trace ("\n");
 	return (dt->parent == NULL);
 }
 
@@ -837,6 +861,7 @@ int ntfs_dt_root_freespace(struct ntfs_dt *dt)
 
 	if (!dt)
 		return -1;
+	ntfs_log_trace ("\n");
 
 	recsize = dt->dir->inode->vol->mft_record_size;
 
@@ -857,6 +882,7 @@ int ntfs_dt_alloc_freespace(struct ntfs_dt *dt)
 
 	if (!dt)
 		return -1;
+	ntfs_log_trace ("\n");
 
 	recsize = dt->dir->index_size;
 
@@ -880,6 +906,7 @@ int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int co
 	int len;
 	int insert;
 	//FILE_NAME_ATTR *file;
+	ntfs_log_trace ("\n");
 
 	//XXX check len > 0
 
@@ -889,8 +916,8 @@ int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int co
 	if ((start < 0) || ((start+count) >= old->child_count))
 		return -1;
 
-	ntfs_log_debug("\n");
-	ntfs_log_debug(BOLD YELLOW "Transferring children\n" END);
+	//ntfs_log_debug("\n");
+	ntfs_log_debug("Transferring children\n");
 
 	need = 0;
 	for (i = start; i < (start+count+1); i++) {
@@ -1009,8 +1036,8 @@ int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int co
 	old->changed = TRUE;
 	new->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
 
 	return 0;
 }
@@ -1034,6 +1061,7 @@ int ntfs_dt_alloc_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 		return 1;
 	if (!first)
 		return 1;
+	ntfs_log_trace ("\n");
 
 	need = 0;
 	ie = first;
@@ -1098,6 +1126,7 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2(struct ntfs_dt *dt, int before, int count, i
 		return NULL;
 	if (bytes < 1)
 		return NULL;
+	ntfs_log_trace ("\n");
 
 	// check alloc has enough space
 	space = ntfs_dt_alloc_freespace(dt);
@@ -1153,6 +1182,7 @@ int ntfs_dt_root_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 		return 1;
 	if (!first)
 		return 1;
+	ntfs_log_trace ("\n");
 
 	return count;
 }
@@ -1167,6 +1197,7 @@ int ntfs_dt_alloc_remove2(struct ntfs_dt *dt, int start, int count)
 
 	if (!dt)
 		return 1;
+	ntfs_log_trace ("\n");
 
 	size = 0;
 	for (i = start; i < (start+count); i++) {
@@ -1190,6 +1221,7 @@ int ntfs_dt_root_remove2(struct ntfs_dt *dt, int start, int count)
 		return -1;
 	if ((count < 1) || ((start + count - 1) >= dt->child_count))
 		return -1;
+	ntfs_log_trace ("\n");
 
 	ntfs_log_debug("s c/t %d %d/%d\n", start, count, dt->child_count);
 
@@ -1240,9 +1272,10 @@ int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 
 	if ((start + count) >= old->child_count)
 		return -1;
+	ntfs_log_trace ("\n");
 
-	ntfs_log_debug("\n");
-	ntfs_log_debug(BOLD YELLOW "Transferring children\n" END);
+	//ntfs_log_debug("\n");
+	ntfs_log_debug("Transferring children\n");
 
 	need = 0;
 	for (i = start; i < (start+count); i++) {
@@ -1371,8 +1404,8 @@ int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 	old->changed = TRUE;
 	new->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", old->dir->inode->mft_no, old->vcn, old->vcn + (old->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", new->dir->inode->mft_no, new->vcn, new->vcn + (new->dir->index_size>>9) - 1);
 
 	return 0;
 }
@@ -1390,6 +1423,7 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 
 	if (!del || !del_ie || !suc_ie)
 		return FALSE;
+	ntfs_log_trace ("\n");
 
 	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 	//ntfs_log_debug("\n");
@@ -1430,7 +1464,7 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 	//utils_dump_mem(attr, 0, del->data_len, DM_DEFAULTS);
 
 	//ntfs_log_debug("\n");
-	//ntfs_log_debug(BOLD YELLOW "Adjust children\n" END);
+	//ntfs_log_debug("Adjust children\n");
 	//for (i = 0; i < del->child_count; i++)
 	//	ntfs_log_debug("\tChild %d %p %d\n", i, del->children[i], del->children[i]->flags);
 	//ntfs_log_debug("\n");
@@ -1452,7 +1486,7 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 
 	del->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ROOT\n", del->dir->inode->mft_no);
 	return TRUE;
 }
 
@@ -1468,6 +1502,7 @@ BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie
 
 	if (!del || !del_ie || !suc_ie)
 		return FALSE;
+	ntfs_log_trace ("\n");
 
 	//utils_dump_mem(del->data, 0, del->data_len, DM_DEFAULTS);
 
@@ -1514,7 +1549,7 @@ BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie
 
 	del->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
 	return TRUE;
 }
 
@@ -1534,6 +1569,7 @@ BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 
 	if (!del)
 		return FALSE;
+	ntfs_log_trace ("\n");
 
 	//utils_dump_mem(del->data, 0, del->header->index_length+16, DM_RED);
 	//ntfs_log_debug("\n");
@@ -1635,7 +1671,7 @@ BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 
 	del->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, del->dir->inode->mft_no);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ROOT\n", del->dir->inode->mft_no);
 	return TRUE;
 }
 
@@ -1653,6 +1689,7 @@ BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 
 	if (!del)
 		return FALSE;
+	ntfs_log_trace ("\n");
 
 #if 0
 	off = (u8*)del->children[0] - del->data;
@@ -1751,7 +1788,7 @@ BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 
 	del->changed = TRUE;
 
-	ntfs_log_debug(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
+	ntfs_log_debug("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", del->dir->inode->mft_no, del->vcn, del->vcn + (del->dir->index_size>>9) - 1);
 
 	if (del->child_count < 2) {
 		ntfs_log_debug("indx is empty\n");
@@ -1776,6 +1813,7 @@ int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 
 	if (!parent || !ie)
 		return 0;
+	ntfs_log_trace ("\n");
 
 	block = (INDEX_BLOCK*) parent->data;
 
@@ -1864,12 +1902,13 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 	int len;
 
 	if (!parent || !ie)
-		return 0;
+		return -1;
+	ntfs_log_trace ("\n");
 
 	root = (INDEX_ROOT*) parent->data;
 
 	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
-	ntfs_log_debug("\n");
+	//ntfs_log_debug("\n");
 
 	need  = ie->length;
 	space = ntfs_mft_free_space(parent->dir);
@@ -1877,7 +1916,7 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 	ntfs_log_debug("need %d, have %d\n", need, space);
 	if (need > space) {
 		ntfs_log_debug("no room");
-		return 0;
+		return -1;
 	}
 
 	attr = malloc(parent->data_len + need);
@@ -1904,14 +1943,17 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 	parent->data = attr;
 	parent->data_len += need;
 
+	ntfs_log_debug("parent data len = %d\n", parent->data_len);
+
 	root = (INDEX_ROOT*) parent->data;
 	root->index.index_length   = parent->data_len - 16;
 	root->index.allocated_size = parent->data_len - 16;
 
 	//utils_dump_mem(parent->data, 0, parent->data_len, DM_DEFAULTS);
-	ntfs_log_debug("\n");
+	//ntfs_log_debug("\n");
 
 	ntfs_mft_resize_resident(parent->dir->inode, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, parent->data, parent->data_len);
+	parent->changed = TRUE;
 
 	//realloc children, sub_nodes
 	ntfs_dt_create_children2(parent, parent->child_count + 1);
@@ -1965,9 +2007,9 @@ int ntfs_dt_add2(INDEX_ENTRY *ie, struct ntfs_dt *suc, int suc_num, struct ntfs_
 
 	if (!ie || !suc)
 		return -1;
+	ntfs_log_trace ("\n");
 
-	ntfs_log_debug("\n");
-	ntfs_log_debug(BOLD YELLOW "Add key to leaf\n" END);
+	ntfs_log_debug("Add key to leaf\n");
 
 	//utils_dump_mem(suc->data, 0, suc->data_len, DM_DEFAULTS);
 
@@ -1998,11 +2040,17 @@ ascend:
 	ntfs_log_debug("\tspace %d\n", space);
 
 	if (space >= need) {
+		//ntfs_log_critical("index = %d\n", suc_num);
+		//ntfs_log_debug("prev inode = %p\n", suc->inodes[suc_num-1]);
+		//ntfs_log_debug("curr inode = %p\n", suc->inodes[suc_num]);
+		ntfs_log_debug("count = %d\n", suc->child_count);
 		if (ntfs_dt_isroot(suc))
 			ntfs_dt_root_add(suc, suc_num, ie, chl);
 		else
 			ntfs_dt_alloc_add(suc, suc_num, ie, chl);
-		goto done;
+		ntfs_log_debug("count = %d\n", suc->child_count);
+		//goto done;
+		return suc_num;	//XXX this is probably off-by-one
 	}
 
 	/*
@@ -2112,8 +2160,8 @@ ascend:
 	suc = suc->parent;
 	suc_num = 0;
 
-	ntfs_log_debug("\n");
-	ntfs_log_debug(BOLD YELLOW "Ascend\n" END);
+	//ntfs_log_debug("\n");
+	ntfs_log_debug("Ascend\n");
 	goto ascend;
 done:
 	return 0;

@@ -1513,15 +1513,9 @@ err_out:
 
 #ifdef NTFS_RICH
 
-#include <stdlib.h>
-
 #include "layout.h"
-#include "volume.h"
-#include "inode.h"
-#include "dir.h"
 #include "tree.h"
 #include "bitmap.h"
-#include "index.h"
 #include "rich.h"
 
 /**
@@ -1533,6 +1527,9 @@ int ntfs_dir_rollback(struct ntfs_dir *dir)
 
 	if (!dir)
 		return -1;
+
+	ntfs_log_trace ("dir %p, inode %lld, children %d\n", dir,
+		dir ? MREF(dir->mft_num) : 0, dir ? dir->child_count : 0);
 
 	if (ntfs_dt_rollback(dir->index) < 0)
 		return -1;
@@ -1562,6 +1559,9 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 	if (!vol || !dir)
 		return -1;
 
+	ntfs_log_trace ("dir %p, inode %lld, children %d\n", dir,
+		dir ? MREF(dir->mft_num) : 0, dir ? dir->child_count : 0);
+
 	if ((dir->ialloc == NULL) || (dir->bitmap == NULL))
 		return 0;
 
@@ -1581,7 +1581,7 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 		return 0;
 	}
 
-	ntfs_log_debug(BOLD YELLOW "Truncation needed\n" END);
+	ntfs_log_debug("Truncation needed\n");
 
 #if 0
 	ntfs_log_debug("\tlast bit = %lld\n", last_bit);
@@ -1598,13 +1598,13 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 
 		ie = ntfs_ie_copy(dir->index->children[0]);
 		if (!ie) {
-			ntfs_log_debug(RED "IE copy failed\n" END);
+			ntfs_log_warning("IE copy failed\n");
 			return -1;
 		}
 
 		ie = ntfs_ie_remove_vcn(ie);
 		if (!ie) {
-			ntfs_log_debug(RED "IE remove vcn failed\n" END);
+			ntfs_log_warning("IE remove vcn failed\n");
 			return -1;
 		}
 
@@ -1639,7 +1639,7 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 		//remove 0xB0 attribute
 		ntfs_mft_remove_attr(vol->private_bmp2, dir->inode, AT_BITMAP);
 	} else {
-		ntfs_log_debug(RED "Cannot shrink directory\n" END);
+		ntfs_log_warning("Cannot shrink directory\n");
 		//ntfs_dir_shrink_alloc
 		//ntfs_dir_shrink_bitmap
 		//make bitmap resident?
@@ -1702,12 +1702,12 @@ int ntfs_dir_commit(struct ntfs_dir *dir)
 	if (!dir)
 		return 0;
 
-	ntfs_log_debug("commit dir inode %llu\n", dir->inode->mft_no);
+	ntfs_log_trace ("dir %p, inode %lld, children %d\n", dir,
+		dir ? MREF(dir->mft_num) : 0, dir ? dir->child_count : 0);
+
 	if (NInoDirty(dir->inode)) {
-#ifdef RM_WRITE
 		ntfs_inode_sync(dir->inode);
-#endif
-		ntfs_log_debug(RED "\tntfs_inode_sync %llu\n" END, dir->inode->mft_no);
+		ntfs_log_warning("\tntfs_inode_sync %llu\n", dir->inode->mft_no);
 	}
 
 	if (ntfs_dt_commit(dir->index) < 0)
@@ -1734,6 +1734,9 @@ void ntfs_dir_free(struct ntfs_dir *dir)
 
 	if (!dir)
 		return;
+
+	ntfs_log_trace ("dir %p, inode %lld, children %d\n", dir,
+		dir ? MREF(dir->mft_num) : 0, dir ? dir->child_count : 0);
 
 	ntfs_dir_rollback(dir);
 
@@ -1775,7 +1778,8 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 	if (!vol)
 		return NULL;
 
-	//ntfs_log_debug("ntfs_dir_create %lld\n", MREF(mft_num));
+	ntfs_log_trace ("inode %lld\n", MREF(mft_num));
+
 	inode = ntfs_inode_open2(vol, mft_num);
 	if (!inode)
 		return NULL;
@@ -1811,6 +1815,7 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 		rec = find_first_attribute(AT_INDEX_ROOT, inode->mrec);
 		ir  = (INDEX_ROOT*) ((u8*)rec + rec->value_offset);
 		dir->index_size = ir->index_block_size;
+		ntfs_log_debug("dir size = %d\n", dir->index_size);
 	} else {
 		// XXX !iroot?
 		dir->index_size = 0;
@@ -1835,6 +1840,11 @@ void ntfs_dir_add(struct ntfs_dir *parent, struct ntfs_dir *child)
 	if (!parent || !child)
 		return;
 
+	ntfs_log_trace ("parent %p, inode %lld, children %d\n", parent,
+		parent ? MREF(parent->mft_num) : 0, parent ? parent->child_count : 0);
+	ntfs_log_trace ("child %p, inode %lld, children %d\n", child,
+		child ? MREF(child->mft_num) : 0, child ? child->child_count : 0);
+
 	parent->child_count++;
 	//ntfs_log_debug("child count = %d\n", parent->child_count);
 	parent->children = realloc(parent->children, parent->child_count * sizeof(struct ntfs_dir*));
@@ -1857,6 +1867,9 @@ struct ntfs_dir * ntfs_dir_find2(struct ntfs_dir *dir, ntfschar *name, int name_
 
 	if (!dir || !name)
 		return NULL;
+
+	ntfs_log_trace ("dir %p, inode %lld, children %d\n", dir,
+		dir ? MREF(dir->mft_num) : 0, dir ? dir->child_count : 0);
 
 	if (!dir->index) {	// XXX when will this happen?
 		ntfs_log_debug("ntfs_dir_find2 - directory has no index\n");
