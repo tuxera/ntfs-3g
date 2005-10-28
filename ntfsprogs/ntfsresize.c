@@ -2043,11 +2043,11 @@ static int check_bad_sectors(ntfs_volume *vol)
 
 	if (NInoAttrList(ctx->ntfs_ino))
 		err_exit("Hopelessly many bad sectors! Please report to "
-			 "linux-ntfs@lists.sf.net\n");
+			 "linux-ntfs-dev@lists.sf.net\n");
 
 	if (!ctx->attr->non_resident)
 		err_exit("Resident attribute in $BadClust! Please report to "
-			 "linux-ntfs@lists.sf.net\n");
+			 "linux-ntfs-dev@lists.sf.net\n");
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
 		perr_exit("Decompressing $BadClust:$Bad mapping pairs failed");
