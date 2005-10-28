@@ -78,7 +78,7 @@ display as being 0% recoverable.
 To recover a file
 .B ntfsundelete
 has to read the file's metadata.  Unfortunately, this isn't always intact.
-When a file is deleted, the metadata can be left in an inconsistant state. e.g.
+When a file is deleted, the metadata can be left in an inconsistent state. e.g.
 the file size may be zero; the dates of the file may be set to the time it was
 deleted, or random.
 .br
@@ -116,7 +116,7 @@ filled with this byte.  The default is zeros.
 .B \-\-case
 When scanning an NTFS volume, any filename matching (using the
 .B \-\-match
-option) is case\-insensitive.  This option makes the maching case\-sensitive.
+option) is case\-insensitive.  This option makes the matching case\-sensitive.
 .TP
 .BI "\-c " range
 .br
