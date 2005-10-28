@@ -206,7 +206,7 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'q':
 			opts.quiet++;
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET);
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 't':
 			opts.notime++;
