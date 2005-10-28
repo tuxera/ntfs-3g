@@ -50,11 +50,6 @@
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
 
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
-static GEN_PRINTF(Printf,  stderr, NULL,   FALSE)
-
 /**
  * version - Print version information about the program
  *
@@ -64,11 +59,11 @@ static GEN_PRINTF(Printf,  stderr, NULL,   FALSE)
  */
 static void version(void)
 {
-	Printf("\n%s v%s (libntfs %s) - Concatenate files and print on the "
+	ntfs_log_info("\n%s v%s (libntfs %s) - Concatenate files and print on the "
 			"standard output.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	Printf("Copyright (c) 2003 Richard Russon\n");
-	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("Copyright (c) 2003 Richard Russon\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -80,7 +75,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	Printf("\nUsage: %s [options] device [file]\n\n"
+	ntfs_log_info("\nUsage: %s [options] device [file]\n\n"
 		"    -a, --attribute type       Display this attribute type\n"
 		"    -n, --attribute-name name  Display this attribute name\n"
 		"    -i, --inode num            Display this inode\n\n"
@@ -91,7 +86,7 @@ static void usage(void)
 		"    -v  --verbose              More output\n\n",
 		//"    -r  --raw     Display the compressed or encrypted file",
 		EXEC_NAME);
-	Printf("%s%s\n", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -176,6 +171,7 @@ static int parse_options(int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 	ATTR_TYPES attr = AT_UNUSED;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
@@ -193,18 +189,18 @@ static int parse_options(int argc, char **argv)
 			} else if (!opts.file) {
 				opts.file = argv[optind-1];
 			} else {
-				Eprintf("You must specify exactly one file.\n");
+				ntfs_log_error("You must specify exactly one file.\n");
 				err++;
 			}
 			break;
 		case 'a':
 			if (opts.attr != (ATTR_TYPES)-1) {
-				Eprintf("You must specify exactly one attribute.\n");
+				ntfs_log_error("You must specify exactly one attribute.\n");
 			} else if (parse_attribute(optarg, &attr) > 0) {
 				opts.attr = attr;
 				break;
 			} else {
-				Eprintf("Couldn't parse attribute.\n");
+				ntfs_log_error("Couldn't parse attribute.\n");
 			}
 			err++;
 			break;
@@ -213,15 +209,20 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'h':
 		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
 			help++;
 			break;
 		case 'i':
 			if (opts.inode != -1)
-				Eprintf("You must specify exactly one inode.\n");
+				ntfs_log_error("You must specify exactly one inode.\n");
 			else if (utils_parse_size(optarg, &opts.inode, FALSE))
 				break;
 			else
-				Eprintf("Couldn't parse inode number.\n");
+				ntfs_log_error("Couldn't parse inode number.\n");
 			err++;
 			break;
 
@@ -229,46 +230,54 @@ static int parse_options(int argc, char **argv)
 			opts.attr_name_len = ntfs_mbstoucs(optarg,
 							   &opts.attr_name, 0);
 			if (opts.attr_name_len < 0) {
-				Eprintf("Invalid attribute name '%s': %s\n",
-					optarg, strerror(errno));
+				ntfs_log_perror("Invalid attribute name '%s'", optarg);
 				usage();
 			}
 
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'V':
 			ver++;
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
 			err++;
 			break;
 		}
 	}
 
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
+
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
-			Eprintf("You must specify a device.\n");
+			ntfs_log_error("You must specify a device.\n");
 			err++;
 
 		} else if (opts.file == NULL && opts.inode == -1) {
-			Eprintf("You must specify a file or inode "
+			ntfs_log_error("You must specify a file or inode "
 				 "with the -i option.\n");
 			err++;
 
 		} else if (opts.file != NULL && opts.inode != -1) {
-			Eprintf("You can't specify both a file and inode.\n");
+			ntfs_log_error("You can't specify both a file and inode.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the "
+			ntfs_log_error("You may not use --quiet and --verbose at the "
 					"same time.\n");
 			err++;
 		}
@@ -324,7 +333,7 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 
 	attr = ntfs_attr_open(inode, type, name, namelen);
 	if (!attr) {
-		Eprintf("Cannot find attribute type 0x%lx.\n", (long) type);
+		ntfs_log_error("Cannot find attribute type 0x%lx.\n", (long) type);
 		free(buffer);
 		return 1;
 	}
@@ -345,9 +354,9 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 		} else {
 			bytes_read = ntfs_attr_pread(attr, offset, bufsize, buffer);
 		}
-		//fprintf(stderr, "read %lld bytes\n", bytes_read);
+		//ntfs_log_info("read %lld bytes\n", bytes_read);
 		if (bytes_read == -1) {
-			perror("ERROR: Couldn't read file");
+			ntfs_log_perror("ERROR: Couldn't read file");
 			break;
 		}
 		if (!bytes_read)
@@ -355,7 +364,7 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 
 		written = fwrite(buffer, 1, bytes_read, stdout);
 		if (written != bytes_read) {
-			perror("ERROR: Couldn't output all data!");
+			ntfs_log_perror("ERROR: Couldn't output all data!");
 			break;
 		}
 		offset += bytes_read;
@@ -381,6 +390,8 @@ int main(int argc, char *argv[])
 	ATTR_TYPES attr;
 	int result = 1;
 
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
+
 	if (!parse_options(argc, argv))
 		return 1;
 
@@ -388,7 +399,7 @@ int main(int argc, char *argv[])
 
 	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
-		perror("ERROR: couldn't mount volume");
+		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
@@ -398,7 +409,7 @@ int main(int argc, char *argv[])
 		inode = ntfs_pathname_to_inode(vol, NULL, opts.file);
 
 	if (!inode) {
-		perror("ERROR: Couldn't open inode");
+		ntfs_log_perror("ERROR: Couldn't open inode");
 		return 1;
 	}
 
