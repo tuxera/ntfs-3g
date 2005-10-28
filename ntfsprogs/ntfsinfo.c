@@ -61,7 +61,6 @@
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #endif
-
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
@@ -92,10 +91,6 @@ static struct options {
 	u8	 padding[4];	/* Unused: padding to 64 bit. */
 } opts;
 
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
-
 /**
  * version - Print version information about the program
  *
@@ -111,7 +106,7 @@ static void version(void)
 	printf("Copyright (c)\n");
 	printf("    2002-2004 Matthew J. Fanto\n");
 	printf("    2002-2005 Anton Altaparmakov\n");
-	printf("    2002-2003 Richard Russon\n");
+	printf("    2002-2005 Richard Russon\n");
 	printf("    2003      Leonard Norrgård\n");
 	printf("    2004-2005 Yura Pakhuchiy\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
@@ -172,6 +167,7 @@ static int parse_options(int argc, char *argv[])
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -196,7 +192,8 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'F':
 			if (opts.filename == NULL) {
-				/* The inode can not be resolved here, store the filename */
+				/* The inode can not be resolved here,
+				   store the filename */
 				opts.filename = argv[optind-1];
 			} else {
 				/* "-F" can't appear more than once */
@@ -211,17 +208,20 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 't':
 			opts.notime++;
 			break;
 		case 'T':
 			/* 'T' is deprecated, notify */
-			Eprintf("Option 'T' is deprecated, it was replaced by 't'.\n");
+			ntfs_log_error("Option 'T' is deprecated, it was "
+				"replaced by 't'.\n");
 			err++;
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			ver++;
@@ -252,29 +252,40 @@ static int parse_options(int argc, char *argv[])
 		}
 	}
 
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
+
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf("You must specify exactly one device.\n");
+				ntfs_log_error("You must specify exactly one "
+					"device.\n");
 			err++;
 		}
 
 		if ((opts.inode == -1) && (opts.filename == NULL) && !opts.mft) {
 			if (argc > 1)
-				Eprintf("You must specify an inode to learn about.\n");
+				ntfs_log_error("You must specify an inode to "
+					"learn about.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the same time.\n");
+			ntfs_log_error("You may not use --quiet and --verbose "
+				"at the same time.\n");
 			err++;
 		}
 
 		if ((opts.inode != -1) && (opts.filename != NULL)) {
 			if (argc > 1)
-				Eprintf("You may not specify --inode and --file together.\n");
+				ntfs_log_error("You may not specify --inode "
+					"and --file together.\n");
 			err++;
 		}
 
@@ -488,6 +499,9 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 	printf("\n");
 }
 
+/**
+ * ntfs_dump_namespace
+ */
 static void ntfs_dump_namespace(u8 file_name_type)
 {
 	const char *mbs_file_type;
@@ -594,8 +608,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 			free(stream_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse stream name");
 		}
 	} else {
 		printf("\tList name:\t\t unnamed\n");
@@ -700,8 +713,7 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 			free(mbs_file_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse file name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse file name");
 		}
 		/* any way, error or not, print the length */
 		printf("\tFile Name Length:\t %d\n", file_name_attr->file_name_length);
@@ -796,7 +808,7 @@ static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 			printf("\tDomain ID:\t\t missing\n");
 	} else
 		printf("\t$OBJECT_ID not present. Only NTFS versions > 3.0\n"
-				"\thave $OBJECT_ID. Your version of NTFS is %d.\n",
+			"\thave $OBJECT_ID. Your version of NTFS is %d.\n",
 				vol->major_ver);
 }
 
@@ -840,8 +852,9 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 			break;
 		}
 
-		printf("%sACE:\t\t type:%s  flags:0x%x  access:0x%x\n",prefix,ace_type,
-			(unsigned int)le16_to_cpu(ace->flags),(unsigned int)le32_to_cpu(ace->mask));
+		printf("%sACE:\t\t type:%s  flags:0x%x  access:0x%x\n",prefix,
+			ace_type, (unsigned int)le16_to_cpu(ace->flags),
+			(unsigned int)le32_to_cpu(ace->mask));
 		/* get a SID string */
 		sid = ntfs_sid_to_mbs(&ace->sid, NULL, 0);
 		printf("%s\t\t SID: %s\n",prefix,sid);
@@ -882,7 +895,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 			bytes_read = ntfs_rl_pread(vol, rl, 0,
 						data_size, sec_desc_attr);
 			if (bytes_read != data_size) {
-				Eprintf("ntfsinfo error: could not "
+				ntfs_log_error("ntfsinfo error: could not "
 						"read security descriptor\n");
 				free(rl);
 				free(sec_desc_attr);
@@ -890,7 +903,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 			}
 			free(rl);
 		} else {
-			Eprintf("ntfsinfo error: could not "
+			ntfs_log_error("ntfsinfo error: could not "
 						"decompress runlist\n");
 			return;
 		}
@@ -971,8 +984,7 @@ static void ntfs_dump_attr_volume_name(ATTR_RECORD *attr)
 			free(mbs_vol_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr,"ntfsinfo error: could not parse volume name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse volume name");
 		}
 	} else {
 		printf("\tVolume Name:\t\t unnamed\n");
@@ -1042,8 +1054,7 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 			free(stream_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse stream name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse stream name");
 		}
 	} else {
 		printf("\tStream name:\t\t unnamed\n");
@@ -1081,12 +1092,13 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 				printf("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 				while (rlc->length) {
 					printf("\t\t\t%lld\t\t%lld\t\t%lld\n",
-							rlc->vcn, rlc->lcn, rlc->length);
+						rlc->vcn, rlc->lcn, rlc->length);
 					rlc++;
 				}
 				free(rl);
 			} else {
-				Eprintf("ntfsinfo error: could not decompress runlist\n");
+				ntfs_log_error("ntfsinfo error: could not "
+					"decompress runlist\n");
 				return;
 			}
 		}
@@ -1119,23 +1131,24 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 			numb_entries++;
 			continue;
 		}
-		Vprintf("\n");
-		Vprintf("\t\tEntry length:\t\t %u\n",
+		ntfs_log_verbose("\n");
+		ntfs_log_verbose("\t\tEntry length:\t\t %u\n",
 				le16_to_cpu(entry->length));
-		Vprintf("\t\tKey length:\t\t %u\n",
+		ntfs_log_verbose("\t\tKey length:\t\t %u\n",
 				le16_to_cpu(entry->key_length));
-		Vprintf("\t\tFlags:\t\t\t 0x%02x\n", le16_to_cpu(entry->flags));
+		ntfs_log_verbose("\t\tFlags:\t\t\t 0x%02x\n",
+			le16_to_cpu(entry->flags));
 
 		if (entry->flags & INDEX_ENTRY_NODE)
-			Vprintf("\t\tSubnode VCN:\t\t %lld\n", le64_to_cpu(
-					*((u8*)entry + le16_to_cpu(
-					entry->length) - sizeof(VCN))));
+			ntfs_log_verbose("\t\tSubnode VCN:\t\t %lld\n",
+				le64_to_cpu(*((u8*)entry +
+				le16_to_cpu(entry->length) - sizeof(VCN))));
 		if (entry->flags & INDEX_ENTRY_END)
 			break;
 
 		switch (type) {
 			case(AT_FILE_NAME):
-				Vprintf("\t\tFILE record number:\t %llu\n",
+				ntfs_log_verbose("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
 				if (opts.verbose) {
 					printf("\t");
@@ -1148,24 +1161,24 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 				ntfs_ucstombs(entry->key.file_name.file_name,
 					entry->key.file_name.file_name_length,
 					&name, 0);
-				Vprintf("\t\tName:\t\t\t %s\n", name);
+				ntfs_log_verbose("\t\tName:\t\t\t %s\n", name);
 				free(name);
 				name = NULL;
-				Vprintf("\t\tParent directory:\t %lld\n",
+				ntfs_log_verbose("\t\tParent directory:\t %lld\n",
 					 MREF_LE(entry->
 					 key.file_name.parent_directory));
-				Vprintf("\t\tData size:\t\t %lld\n",
+				ntfs_log_verbose("\t\tData size:\t\t %lld\n",
 					sle64_to_cpu(
 					entry->key.file_name.data_size));
-				Vprintf("\t\tAllocated size:\t\t %lld\n",
+				ntfs_log_verbose("\t\tAllocated size:\t\t %lld\n",
 					sle64_to_cpu(
 					entry->key.file_name.allocated_size));
 				break;
 			default:
 				// TODO: determine more attribute types
-				Vprintf("\t\tData offset:\t\t %u\n",
+				ntfs_log_verbose("\t\tData offset:\t\t %u\n",
 					le16_to_cpu(entry->data_offset));
-				Vprintf("\t\tData length:\t\t %u\n",
+				ntfs_log_verbose("\t\tData length:\t\t %u\n",
 					le16_to_cpu(entry->data_length));
 				break;
 		}
@@ -1173,7 +1186,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 						le16_to_cpu(entry->length));
 		numb_entries++;
 	}
-	Vprintf("\tEnd of index block reached\n");
+	ntfs_log_verbose("\tEnd of index block reached\n");
 	return numb_entries;
 }
 
@@ -1202,8 +1215,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 			free(index_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse index name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse index name");
 		}
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
@@ -1218,8 +1230,8 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 		if (index_root->type != AT_FILE_NAME) {
 			/* weird, this should be illgeal */
 			printf("0x%0X\n", type);
-			fprintf(stderr, "ntfsinfo error: Unknown Indexed Attr Type: 0x%0X\n",
-				type);
+			ntfs_log_error("ntfsinfo error: Unknown Indexed Attr "
+				"Type: 0x%0X\n", type);
 		} else {
 			printf("file names\n");
 		}
@@ -1251,7 +1263,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
-	Vprintf("\tDumping index block:");
+	ntfs_log_verbose("\tDumping index block:");
 	printf("\tIndex entries total:\t %d\n",
 			ntfs_dump_index_entries(entry, index_root->type));
 }
@@ -1372,7 +1384,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
-			Vprintf("\tDumping index block "
+			ntfs_log_verbose("\tDumping index block "
 					"(VCN %lld, used %u/%u):", le64_to_cpu(
 					tmp_alloc->index_block_vcn),
 					(unsigned int)le32_to_cpu(tmp_alloc->
@@ -1419,8 +1431,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			 * An error occurred, errno holds the reason -
 			 * notify the user
 			 */
-			fprintf(stderr, "ntfsinfo error: could not parse "
-					"index name: %s\n", strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse index name");
 		}
 	} else {
 		printf("\tIndex name:\t\t unnamed\n");
@@ -1436,7 +1447,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 		printf("\tUsed data size:\t\t %llu\n",
 			(unsigned long long)le64_to_cpu(attr->data_size));
 	} else {
-		Eprintf("Invalid $INDEX_ALLOCATION attribute. Should be be"
+		ntfs_log_error("Invalid $INDEX_ALLOCATION attribute. Should be"
 						    " non-resident\n");
 	}
 
@@ -1462,8 +1473,7 @@ static void ntfs_dump_attr_bitmap(ATTR_RECORD *attr)
 			free(bitmap_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse bitmap name: %s\n",
-				strerror(errno));
+			ntfs_log_perror("ntfsinfo error: could not parse bitmap name");
 		}
 	} else {
 		printf("\tBitmap name:\t\t unnamed\n");
@@ -1661,8 +1671,8 @@ static void ntfs_hex_dump(void *buf,unsigned int length)
 static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 {
 	printf("Dumping unknown attribute type 0x%X.\n"
-			"--Please report this to linux-ntfs-dev@lists.sourceforge.net--\n",
-			(unsigned int)le32_to_cpu(attr->type));
+		"--Please report this to linux-ntfs-dev@lists.sourceforge.net--\n",
+		(unsigned int)le32_to_cpu(attr->type));
 
 	printf("\tResident size:\t\t %u\n",(unsigned int)le32_to_cpu(attr->length));
 
@@ -1682,9 +1692,11 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 			printf("\tAttribute name:\t '%s'\n",attr_name);
 			free(attr_name);
 		} else {
-			/* an error occurred, errno holds the reason - notify the user */
-			fprintf(stderr, "ntfsinfo error: could not parse attribute name: %s\n",
-				strerror(errno));
+			/* an error occurred, errno holds the reason
+			 * notify the user
+			 */
+			ntfs_log_perror("ntfsinfo error: could not parse "
+				"attribute name");
 		}
 	} else {
 		printf("\tAttribute name:\t unnamed\n");
@@ -1705,8 +1717,9 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 		printf("\tInitialized data size:\t %llu\n",
 			(unsigned long long)le64_to_cpu(attr->initialized_size));
 
-		/* if the attribute resident part is large enough, it may contain
-			the compressed size */
+		/* if the attribute resident part is large enough, it may
+		 * contain the compressed size
+		 */
 		if ((le32_to_cpu(attr->length)>=72) &&
 			((attr->name_offset==0) || (le16_to_cpu(attr->name_offset)>=72))) {
 			printf("\tCompressed size:\t %llu\n",
@@ -1722,7 +1735,8 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 		/* hex dump */
 		printf("\tDumping some of the attribute data:\n");
 		ntfs_hex_dump((u8*)attr + le16_to_cpu(attr->value_offset),
-			(le16_to_cpu(attr->value_length)>128)?128:le16_to_cpu(attr->value_length));
+			(le16_to_cpu(attr->value_length)>128)?128
+			:le16_to_cpu(attr->value_length));
 	}
 }
 
@@ -1787,7 +1801,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 		switch (ctx->attr->type) {
 		case AT_UNUSED:
 			/* That's an internal type, isn't it? */
-			printf("Weird: AT_UNUSED type was returned, please report this.\n");
+			printf("Weird: AT_UNUSED type was returned, please "
+				"report this.\n");
 			break;
 		case AT_STANDARD_INFORMATION:
 			ntfs_dump_attr_standard_information(ctx->attr);
@@ -1838,7 +1853,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_logged_utility_stream(ctx->attr);
 			break;
 		case AT_END:
-			printf("Weird: AT_END type was returned, please report this.\n");
+			printf("Weird: AT_END type was returned, please report "
+				"this.\n");
 			break;
 		default:
 			ntfs_dump_attr_unknown(ctx->attr);
@@ -1847,8 +1863,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 
 	/* if we exited the loop before we're done - notify the user */
 	if (errno != ENOENT) {
-		fprintf(stderr, "ntfsinfo error: stopped before finished "
-			"enumerating attributes: %s\n", strerror(errno));
+		ntfs_log_perror("ntfsinfo error: stopped before finished "
+			"enumerating attributes");
 	} else {
 		printf("End of inode reached\n");
 	}
@@ -1871,6 +1887,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	if (!parse_options(argc, argv))
 		return 1;
@@ -1906,10 +1924,11 @@ int main(int argc, char **argv)
 		} else {
 			/* can't open inode */
 			/*
-			 * note: when the specified inode does not exist, either EIO or
-			 *  or ESPIPE is returned, we should notify better in those cases
+			 * note: when the specified inode does not exist, either
+			 * EIO or or ESPIPE is returned, we should notify better
+			 * in those cases
 			 */
-			fprintf(stderr, "Error loading node: %s\n", strerror(errno));
+			ntfs_log_perror("Error loading node");
 		}
 	}
 
