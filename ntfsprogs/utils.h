@@ -136,27 +136,4 @@ int mft_next_record(struct mft_search_ctx *ctx);
 #define DM_BLUE		(1 << 5)
 #define DM_BOLD		(1 << 6)
 
-#ifdef NTFS_RICH
-
-#include "layout.h"
-#include "volume.h"
-#include "inode.h"
-#include "bitmap.h"
-#include "dir.h"
-
-#define RED	"\e[31m"
-#define GREEN	"\e[32m"
-#define YELLOW	"\e[33m"
-#define BLUE	"\e[34m"
-#define MAGENTA	"\e[35m"
-#define CYAN	"\e[36m"
-#define BOLD	"\e[01m"
-#define END	"\e[0m"
-
-#define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
-#define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
-#define ATTR_SIZE(s) ROUND_UP(s,8)
-
-#endif /* NTFS_RICH */
-
 #endif /* _NTFS_UTILS_H_ */
