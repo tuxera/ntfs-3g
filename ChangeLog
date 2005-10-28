@@ -45,7 +45,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- fflush() ntfs_log_ streams.  (Christophe)
 	- Working with regular files no longer needs the --force option, except
 	  for mkntfs.  (Szaka)
-	- Fix ntfs_non_resident_attr_expand() bug, that occured if we enlarge
+	- Fix ntfs_non_resident_attr_expand() bug, that occurred if we enlarge
 	  sparse or compressed file, but do not need to allocate new clusters
 	  to perfrom this.  (Yura)
 	- Fix ntfsdecrypt endianness bugs thus it now works on OSX running on

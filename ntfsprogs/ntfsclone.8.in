@@ -37,7 +37,7 @@ filled with zeros (cloning to standard output).
 .B ntfsclone
 can be useful to make backups, an exact snapshot of an NTFS filesystem
 and restore it later on, or for developers to test NTFS read/write
-functionality, troubleshot/investigate users' issues using the clone
+functionality, troubleshoot/investigate users' issues using the clone
 without the risk of destroying the original filesystem.
 
 The clone, if not using the special image format, is an exact copy of the original
@@ -85,7 +85,7 @@ with the options
 .B \-S 
 (handle sparse files "efficiently") and
 .B \-j 
-(filter the archive through bzip2). Altough
+(filter the archive through bzip2). Although
 .BR tar
 still reads and analyses the entire file, it doesn't pass on the
 large data blocks having only zeros to filters and it also avoids

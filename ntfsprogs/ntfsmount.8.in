@@ -130,7 +130,7 @@ limited anyway to 32 pages (which is 128kbyte on i386).
 
 .TP
 .B force
-Force mount even if errors occured. Use this option only if you know what
+Force mount even if errors occurred. Use this option only if you know what
 are you doing and don't cry about data loss.
 
 .TP
@@ -168,7 +168,7 @@ NTFS FUSE module don't prevent you from accessing to named data streams so you
 can use your preferred utils to access them. You can even delete them using
 .B rm.
 You can list all named data streams by getting "ntfs.streams.list" extended
-attribute. NOTE: The last feauture is unique for NTFS FUSE module and maybe
+attribute. NOTE: The last feature is unique for NTFS FUSE module and maybe
 will be never supported by kernel driver.
 
 .SH EXAMPLES
@@ -232,13 +232,17 @@ No bugs are known at present. If you find any bugs, please send an email to
 .nh
 <linux-ntfs-dev@lists.sourceforge.net>.
 .hy
+
 .SH AUTHOR
 .B ntfsmount
 was written by Yura Pakhuchiy. This manual page use information from Documentation/filesystems/ntfs.txt from linux kernel source, and from README from FUSE.
+
 .SH DEDICATION
 With love to Marina Sapego.
+
 .SH THANKS
-Many thanks to Miklos Szeredi for advices and answers about FUSE.
+Many thanks to Miklos Szeredi for advice and answers about FUSE.
+
 .SH AVAILABILITY
 .B ntfsmount
 is part of the ntfsprogs package and is available from
@@ -246,6 +250,7 @@ is part of the ntfsprogs package and is available from
 .nh
 http://linux\-ntfs.sourceforge.net/downloads.html.
 .hy
+
 .SH SEE ALSO
 .BR "ntfsprogs" (8), " attr" (5), " getfattr" (1)
 
