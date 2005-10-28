@@ -1556,7 +1556,6 @@ sync_rollback:
 #include "tree.h"
 #include "index.h"
 #include "rich.h"
-#include "utils.h"
 
 /**
  * ntfs_mft_remove_attr

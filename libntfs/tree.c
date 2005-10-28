@@ -40,7 +40,6 @@
 #include "inode.h"
 #include "logging.h"
 #include "rich.h"
-#include "utils.h"
 
 /**
  * ntfs_dt_free
