@@ -51,16 +51,11 @@
 #include "tree.h"
 #include "index.h"
 #include "inode.h"
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfsrm";
 static struct options opts;
 static const char *space_line = "                                                                                ";
-
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
-
-#define RM_WRITE 0
 
 /**
  * version - Print version information about the program
@@ -181,7 +176,7 @@ static int parse_options(int argc, char **argv)
 			opts.verbose++;
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
 			err++;
 			break;
 		}
@@ -193,12 +188,12 @@ static int parse_options(int argc, char **argv)
 		if ((opts.device == NULL) ||
 		    (opts.file   == NULL)) {
 			if (argc > 1)
-				Eprintf("You must specify one device and one file.\n");
+				ntfs_log_error("You must specify one device and one file.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the "
+			ntfs_log_error("You may not use --quiet and --verbose at the "
 					"same time.\n");
 			err++;
 		}
@@ -263,6 +258,7 @@ static int utils_array_insert(void *ptr, int asize, int before, int count)
 	if (!ptr)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	src = (u8*) ptr + (before * esize);
 	dst = src + (count * esize);
 	len = (asize - before) * esize;
@@ -290,6 +286,7 @@ static int utils_array_remove(void *ptr, int asize, int first, int count)
 	if (!ptr)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	dst = (u8*) ptr + (first * esize);
 	src = dst + (count * esize);
 	len = (asize - first) * esize;
@@ -326,6 +323,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 		return FALSE;
 	}
 
+	ntfs_log_trace("\n");
 	memset(found, 0, sizeof(*found));
 
 	if (parent) {
@@ -333,7 +331,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 	} else {
 		dir = (struct ntfs_dir *) vol->private_data;
 		if (!dir) {
-			Eprintf("Couldn't open the inode of the root directory.\n");
+			ntfs_log_error("Couldn't open the inode of the root directory.\n");
 			goto close;
 		}
 	}
@@ -341,7 +339,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 	unicode = malloc(MAX_PATH * sizeof(ntfschar));
 	ascii   = strdup(pathname);		// Work with a r/w copy
 	if (!unicode || !ascii) {
-		Eprintf("Out of memory.\n");
+		ntfs_log_error("Out of memory.\n");
 		goto close;
 	}
 
@@ -357,7 +355,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 
 		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
 		if (len < 0) {
-			Eprintf("Couldn't convert name to Unicode: %s.\n", p);
+			ntfs_log_error("Couldn't convert name to Unicode: %s.\n", p);
 			goto close;
 		}
 
@@ -365,12 +363,14 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 		//printf("dir: index = %p, children = %p, inode = %p, iroot = %p, ialloc = %p, count = %d\n", dir->index, dir->children, dir->inode, dir->iroot, dir->ialloc, dir->child_count);
 		//if (dir->parent)
 		if (q) {
+			ntfs_log_trace("q\n");
 			child = ntfs_dir_find2(dir, unicode, len);
 			if (!child) {
 				printf("can't find %s in %s\n", p, pathname);
 				goto close;
 			}
 		} else {
+			ntfs_log_trace("!q dir->index = %p, %d\n", dir->index, dir->index->data_len);
 			//printf("file: %s\n", p);
 
 			dt = ntfs_dt_find2(dir->index, unicode, len, &dt_num);
@@ -378,6 +378,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 				printf("can't find %s in %s (2)\n", p, pathname);
 				goto close;
 			}
+			ntfs_log_debug("dt = %p, data_len = %d, parent = %p\n", dt, dt->data_len, dt->parent);
 
 			//printf("dt's flags = 0x%08x\n", dt->children[dt_num]->key.file_name.file_attributes);
 			if (dt->children[dt_num]->key.file_name.file_attributes == FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
@@ -437,6 +438,7 @@ static s64 ntfs_mft_find_free_entry(ntfs_volume *vol)
 	if (!vol)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	recs = vol->mft_na->initialized_size >> vol->mft_record_size_bits;
 	//printf("mft contains %lld records\n", recs);
 	for (i = 24; i < recs; i++) {
@@ -456,6 +458,7 @@ static int ntfs_mft_set_inuse6(ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inu
 	if (!inode)
 		return -1;
 
+	ntfs_log_trace("\n");
 	if (ntfs_bmp_set_range(bmp, (VCN) MREF(inode->mft_no), 1, inuse) < 0)
 		return -1;
 
@@ -472,7 +475,7 @@ static int ntfs_mft_set_inuse6(ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inu
 
 	NInoSetDirty(inode);
 
-	printf(GREEN "Modified: inode %lld MFT_RECORD header\n" END, inode->mft_no);
+	printf("Modified: inode %lld MFT_RECORD header\n", inode->mft_no);
 	return 0;
 }
 
@@ -505,6 +508,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		return 1;
 	}
 
+	ntfs_log_trace ("\n");
 	find_dir = del->dir;
 
 	uname    = del->children[del_num]->key.file_name.file_name;
@@ -532,7 +536,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	*/
 
 	if (del->header->flags & INDEX_NODE) {
-		printf(BOLD YELLOW "Replace key with its successor:\n" END);
+		printf("Replace key with its successor:\n");
 
 		vcn = ntfs_ie_get_vcn(del_ie);
 		//printf("vcn = %lld\n", vcn);
@@ -578,7 +582,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	 */
 
 	printf("\n");
-	printf(BOLD YELLOW "Delete key:\n" END);
+	printf("Delete key:\n");
 
 	file = &del->children[del_num]->key.file_name; printf("\tdel name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
 
@@ -604,7 +608,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	// find the key nearest the root which has no descendants
 	printf("\n");
-	printf(BOLD YELLOW "Find childless parent:\n" END);
+	printf("Find childless parent:\n");
 #if 0
 	for (par = del->parent, old = par; par; old = par, par = par->parent) {
 		if (par->child_count > 1)
@@ -650,7 +654,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	// find if parent has left siblings
 	if (par->children[par_num]->flags & INDEX_ENTRY_END) {
-		printf(BOLD YELLOW "Swap the children of the parent and its left sibling\n" END);
+		printf("Swap the children of the parent and its left sibling\n");
 
 		par_ie = par->children[par_num];
 		vcn = ntfs_ie_get_vcn(par_ie);
@@ -678,9 +682,9 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		par_num--;
 
 		if (ntfs_dt_isroot(par))
-			printf(GREEN "Modified: inode %lld, $INDEX_ROOT\n" END, par->dir->inode->mft_no);
+			printf("Modified: inode %lld, $INDEX_ROOT\n", par->dir->inode->mft_no);
 		else
-			printf(GREEN "Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n" END, par->dir->inode->mft_no, par->vcn, par->vcn + (par->dir->index_size>>9) - 1);
+			printf("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", par->dir->inode->mft_no, par->vcn, par->vcn + (par->dir->index_size>>9) - 1);
 	}
 
 	//ntfs_dt_print(top, 0);
@@ -690,7 +694,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	// unhook and hold onto the ded dt's
 	printf("\n");
-	printf(BOLD YELLOW "Remove parent\n" END);
+	printf("Remove parent\n");
 
 	file = &par->children[par_num]->key.file_name; printf("\tpar name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
 
@@ -735,7 +739,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	//ntfs_dt_print(top, 0);
 	printf("\n");
-	printf(BOLD YELLOW "Add childless parent\n" END);
+	printf("Add childless parent\n");
 
 	file = &add_ie->key.file_name; printf("\tadd name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
 	suc     = NULL;
@@ -789,6 +793,7 @@ static int ntfs_file_remove2(ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 	if (!vol || !dt)
 		return -1;
 
+	ntfs_log_trace ("\n");
 	ie  = dt->children[dt_num];
 	ino = dt->inodes[dt_num];
 	dir = dt->dir;
@@ -832,12 +837,13 @@ static int ntfs_file_add2(ntfs_volume *vol, char *filename)
 	s64 now = 0;
 	struct ntfs_dir *dir;
 	struct ntfs_dt *dt;
-	//int dt_index = 0;
+	int dt_index = 0;
 	int data_len = 0;
 	ATTR_RECORD *attr;
 	struct ntfs_dt *suc = NULL;
 	int suc_num = 0;
 
+	ntfs_log_trace("\n");
 	new_num = ntfs_mft_find_free_entry(vol);
 	if (new_num == (MFT_REF) -1)
 		return 1;
@@ -948,19 +954,21 @@ static int ntfs_file_add2(ntfs_volume *vol, char *filename)
 	dir = dt->dir->children[0];
 	dt = dir->index;
 
+	ntfs_log_debug("searching for "); ntfs_name_print(uname, uname_len); ntfs_log_debug("\n");
+	// find3 doesn't map new dts.  don't I _want_ to map them?
 	suc = ntfs_dt_find3(dt, uname, uname_len, &suc_num);
 
-	ntfs_dt_add2(ie, suc, suc_num, NULL);
+	ntfs_log_debug("dt = %p, data_len = %d, parent = %p\n", dt, dt->data_len, dt->parent);
 
-	/*
-	dt_index = ntfs_dt_root_add(dt, ie);
+	//dt_index = ntfs_dt_root_add(dt, ie);
+	dt_index = ntfs_dt_add2(ie, suc, suc_num, NULL);
 	if (dt_index >= 0) {
 		dt->inodes[dt_index] = ino;
 		ino->ref_count++;
 	}
-	*/
 
 close:
+	ntfs_log_debug("working inode refcount = %d\n", ino->ref_count);
 	free(buffer);
 	ntfs_inode_close2(ino);
 	ntfs_ie_free(ie);
@@ -968,6 +976,7 @@ close:
 	ntfs_inode_close2(find.inode);
 	return 0;
 }
+
 
 /**
  * main - Begin here
@@ -985,6 +994,11 @@ int main(int argc, char *argv[])
 	int result = 1;
 	struct ntfs_find find;
 
+	ntfs_log_set_handler (ntfs_log_handler_stdout);
+	ntfs_log_set_levels (NTFS_LOG_LEVEL_TRACE);
+	ntfs_log_set_flags (NTFS_LOG_FLAG_COLOUR);
+
+	ntfs_log_trace ("\n");
 	if (!parse_options(argc, argv))
 		goto done;
 
@@ -1000,6 +1014,8 @@ int main(int argc, char *argv[])
 	if (opts.noaction)
 		flags |= MS_RDONLY;
 
+	//ntfs_log_set_levels (NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE);
+	//ntfs_log_set_levels (NTFS_LOG_LEVEL_DEBUG);
 	vol = ntfs_volume_mount2(opts.device, flags, opts.force);
 	if (!vol) {
 		printf("!vol\n");
@@ -1026,12 +1042,14 @@ done:
 	if (0) ntfs_inode_close2(inode);
 	if (1) ntfs_volume_umount2(vol, FALSE);
 
+	//ntfs_log_clear_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE);
 	if (0) utils_pathname_to_inode2(NULL, NULL, NULL, NULL);
 	if (0) ntfs_ie_remove_name(NULL);
 	if (0) ntfs_dt_transfer2(NULL, NULL, 0, 0);
 	if (0) utils_array_remove(NULL, 0, 0, 0);
 	if (0) utils_array_insert(NULL, 0, 0, 0);
 
+	ntfs_log_trace("result = %d\n", result);
 	return result;
 }
 
