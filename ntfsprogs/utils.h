@@ -101,14 +101,14 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
  * defines...
  * if *not in use* then the other flags are ignored?
  */
-#define FEMR_IN_USE		1 << 0
-#define FEMR_NOT_IN_USE		1 << 1
-#define FEMR_FILE		1 << 2		// $DATA
-#define FEMR_DIR		1 << 3		// $INDEX_ROOT, "$I30"
-#define FEMR_METADATA		1 << 4
-#define FEMR_NOT_METADATA	1 << 5
-#define FEMR_BASE_RECORD	1 << 6
-#define FEMR_NOT_BASE_RECORD	1 << 7
+#define FEMR_IN_USE		(1 << 0)
+#define FEMR_NOT_IN_USE		(1 << 1)
+#define FEMR_FILE		(1 << 2)		// $DATA
+#define FEMR_DIR		(1 << 3)		// $INDEX_ROOT, "$I30"
+#define FEMR_METADATA		(1 << 4)
+#define FEMR_NOT_METADATA	(1 << 5)
+#define FEMR_BASE_RECORD	(1 << 6)
+#define FEMR_NOT_BASE_RECORD	(1 << 7)
 #define FEMR_ALL_RECORDS	0xFF
 
 /**
