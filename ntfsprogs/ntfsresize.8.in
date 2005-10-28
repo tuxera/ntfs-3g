@@ -20,7 +20,7 @@ The
 program safely resizes Windows XP, Windows Server 2003, Windows 2000, Windows 
 NT4 and Longhorn NTFS filesystems without data loss. All NTFS versions are
 supported, used by 32-bit and 64-bit Windows.
-.B Defragmentation is NOT required prior resizing 
+.B Defragmentation is NOT required prior to resizing 
 because the program can relocate any data if needed, without risking data 
 integrity.
 .PP
@@ -210,7 +210,7 @@ may also appear. Just acknowledge it and reboot again.
 .PP
 The disk geometry handling semantic (HDIO_GETGEO ioctl) has changed 
 in an incompatible way in Linux 2.6 kernels and this triggered multitudinous 
-partition table corruptions resulting unbootable Windows systems, even if
+partition table corruptions resulting in unbootable Windows systems, even if
 NTFS was consistent, if 
 .BR parted (8)
 was involved in some way. This problem was often attributed to ntfsresize 
