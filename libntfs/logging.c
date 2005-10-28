@@ -570,7 +570,7 @@ BOOL ntfs_log_parse_option(const char *option)
 		ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 		return TRUE;
 	} else if (strcmp(option, "--log-quiet") == 0) {
-		ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET);
+		ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 		return TRUE;
 	} else if (strcmp(option, "--log-trace") == 0) {
 		ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
