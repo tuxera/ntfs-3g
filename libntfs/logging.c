@@ -45,11 +45,31 @@
 #define PATH_SEP '/'
 #endif
 
+/* Colour prefixes and a suffix */
+static const char *col_green  = "\e[32m";
+static const char *col_cyan   = "\e[36m";
+static const char *col_yellow = "\e[01;33m";
+static const char *col_red    = "\e[01;31m";
+static const char *col_redinv = "\e[01;07;31m";
+static const char *col_end    = "\e[0m";
+
 /**
- * struct ntfs_logging
- * This global struct controls all the logging within the library and tools.
+ * struct ntfs_logging - Control info for the logging system
+ * @levels:	Bitfield of logging levels
+ * @flags:	Flags which affect the output style
+ * @handler:	Function to perform the actual logging
  */
-struct ntfs_logging ntfs_log = {
+struct ntfs_logging {
+	u32 levels;
+	u32 flags;
+	ntfs_log_handler *handler;
+};
+
+/**
+ * ntfs_log
+ * This struct controls all the logging within the library and tools.
+ */
+static struct ntfs_logging ntfs_log = {
 #ifdef DEBUG
 	NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
 #endif
@@ -57,8 +77,13 @@ struct ntfs_logging ntfs_log = {
 	NTFS_LOG_LEVEL_ERROR | NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
 	NTFS_LOG_LEVEL_REASON,
 	NTFS_LOG_FLAG_ONLYNAME,
-	ntfs_log_handler_printf
+#ifdef DEBUG
+	ntfs_log_handler_outerr
+#else
+	ntfs_log_handler_null
+#endif
 };
+
 
 /**
  * ntfs_log_get_levels - Get a list of the current logging levels
@@ -255,7 +280,7 @@ void ntfs_log_set_handler(ntfs_log_handler *handler)
 	if (handler)
 		ntfs_log.handler = handler;
 	else
-		ntfs_log.handler = ntfs_log_handler_printf;
+		ntfs_log.handler = ntfs_log_handler_null;
 }
 
 /**
@@ -294,8 +319,9 @@ int ntfs_log_redirect(const char *function, const char *file,
 	return ret;
 }
 
+
 /**
- * ntfs_log_handler_printf - Basic logging handler
+ * ntfs_log_handler_fprintf - Basic logging handler
  * @function:	Function in which the log line occurred
  * @file:	File in which the log line occurred
  * @line:	Line number on which the log line occurred
@@ -305,15 +331,17 @@ int ntfs_log_redirect(const char *function, const char *file,
  * @args:	Arguments to be formatted
  *
  * A simple logging handler.  This is where the log line is finally displayed.
+ * It is more likely that you will want to set the handler to either
+ * ntfs_log_handler_outerr or ntfs_log_handler_stderr.
  *
  * Note: For this handler, @data is a pointer to a FILE output stream.
- *       If @data is NULL, the function ntfs_log_get_stream will be called
+ *       If @data is NULL, nothing will be displayed.
  *
  * Returns:  -1  Error occurred
  *            0  Message wasn't logged
  *          num  Number of output characters
  */
-int ntfs_log_handler_printf(const char *function, const char *file,
+int ntfs_log_handler_fprintf(const char *function, const char *file,
 	int line, u32 level, void *data, const char *format, va_list args)
 {
 	const int reason_size = 128;
@@ -321,6 +349,12 @@ int ntfs_log_handler_printf(const char *function, const char *file,
 	int ret = 0;
 	int olderr = errno;
 	FILE *stream;
+	const char *col_prefix = NULL;
+	const char *col_suffix = NULL;
+
+	if (!data)		/* Interpret data as a FILE stream. */
+		return 0;	/* If it's NULL, we can't do anything. */
+	stream = (FILE*)data;
 
 	if (level == NTFS_LOG_LEVEL_REASON) {
 		if (!reason)
@@ -337,10 +371,35 @@ int ntfs_log_handler_printf(const char *function, const char *file,
 		}
 	}
 
-	if (data)
-		stream = (FILE*) data;
-	else
-		stream = ntfs_log_get_stream(level);
+	if (ntfs_log.flags & NTFS_LOG_FLAG_COLOUR) {
+		/* Pick a colour determined by the log level */
+		switch (level) {
+			case NTFS_LOG_LEVEL_DEBUG:
+				col_prefix = col_green;
+				col_suffix = col_end;
+				break;
+			case NTFS_LOG_LEVEL_TRACE:
+				col_prefix = col_cyan;
+				col_suffix = col_end;
+				break;
+			case NTFS_LOG_LEVEL_WARNING:
+				col_prefix = col_yellow;
+				col_suffix = col_end;
+				break;
+			case NTFS_LOG_LEVEL_ERROR:
+			case NTFS_LOG_LEVEL_PERROR:
+				col_prefix = col_red;
+				col_suffix = col_end;
+				break;
+			case NTFS_LOG_LEVEL_CRITICAL:
+				col_prefix = col_redinv;
+				col_suffix = col_end;
+				break;
+		}
+	}
+
+	if (col_prefix)
+		ret += fprintf(stream, col_prefix);
 
 	if ((ntfs_log.flags & NTFS_LOG_FLAG_ONLYNAME) &&
 	    (strchr(file, PATH_SEP)))		/* Abbreviate the filename */
@@ -368,13 +427,17 @@ int ntfs_log_handler_printf(const char *function, const char *file,
 			ret += fprintf(stream, " : %s\n", strerror(olderr));
 	}
 
+	if (col_suffix)
+		ret += fprintf(stream, col_suffix);
+
+
 	fflush(stream);
 	errno = olderr;
 	return ret;
 }
 
 /**
- * ntfs_log_handler_colour - Colour-highlighting logging handler
+ * ntfs_log_handler_null - Null logging handler (no output)
  * @function:	Function in which the log line occurred
  * @file:	File in which the log line occurred
  * @line:	Line number on which the log line occurred
@@ -383,73 +446,107 @@ int ntfs_log_handler_printf(const char *function, const char *file,
  * @format:	printf-style formatting string
  * @args:	Arguments to be formatted
  *
- * This is a simple logging filter that prefixes/suffixes some logs.
- *	Warnings:	 yellow
- *	Errors:		 red
- *	Critical errors: red (inverse video)
+ * This handler produces no output.  It provides a way to temporarily disable
+ * logging, without having to change the levels and flags.
  *
- * Note: This function calls ntfs_log_handler_printf to do the main work.
+ * Returns:  0  Message wasn't logged
+ */
+int ntfs_log_handler_null(const char *function __attribute__((unused)), const char *file __attribute__((unused)),
+	int line __attribute__((unused)), u32 level __attribute__((unused)), void *data __attribute__((unused)),
+	const char *format __attribute__((unused)), va_list args __attribute__((unused)))
+{
+	return 0;
+}
+
+/**
+ * ntfs_log_handler_stdout - All logs go to stdout
+ * @function:	Function in which the log line occurred
+ * @file:	File in which the log line occurred
+ * @line:	Line number on which the log line occurred
+ * @level:	Level at which the line is logged
+ * @data:	User specified data, possibly specific to a handler
+ * @format:	printf-style formatting string
+ * @args:	Arguments to be formatted
+ *
+ * Display a log message to stdout.
  *
  * Note: For this handler, @data is a pointer to a FILE output stream.
- *       If @data is NULL, the function ntfs_log_get_stream will be called
+ *       If @data is NULL, then stdout will be used.
+ *
+ * Note: This function calls ntfs_log_handler_fprintf to do the main work.
  *
  * Returns:  -1  Error occurred
  *            0  Message wasn't logged
  *          num  Number of output characters
  */
-int ntfs_log_handler_colour(const char *function, const char *file,
+int ntfs_log_handler_stdout(const char *function, const char *file,
 	int line, u32 level, void *data, const char *format, va_list args)
 {
-	int ret = 0;
-	int olderr = errno;
-	const char *prefix = NULL;
-	const char *suffix = NULL;
-	const char *end = "\e[0m";
-	FILE *stream = NULL;
+	if (!data)
+		data = stdout;
 
-	if (level != NTFS_LOG_LEVEL_REASON) {	/* Reasons get passed through */
-		if (data)
-			stream = (FILE*) data;
-		else
-			stream = ntfs_log_get_stream(level);
+	return ntfs_log_handler_fprintf(function, file, line, level, data, format, args);
+}
 
-		switch (level) {
-			case NTFS_LOG_LEVEL_DEBUG:
-				prefix = "\e[32m";	/* Green */
-				suffix = end;
-				break;
-			case NTFS_LOG_LEVEL_TRACE:
-				prefix = "\e[36m";	/* Cyan */
-				suffix = end;
-				break;
-			case NTFS_LOG_LEVEL_WARNING:
-				prefix = "\e[01;33m";	/* Yellow */
-				suffix = end;
-				break;
-			case NTFS_LOG_LEVEL_ERROR:
-			case NTFS_LOG_LEVEL_PERROR:
-				prefix = "\e[01;31m";	/* Red */
-				suffix = end;
-				break;
-			case NTFS_LOG_LEVEL_CRITICAL:
-				prefix = "\e[01;07;31m"; /* Red, inverse */
-				suffix = end;
-				break;
-		}
-	}
+/**
+ * ntfs_log_handler_outerr - Logs go to stdout/stderr depending on level
+ * @function:	Function in which the log line occurred
+ * @file:	File in which the log line occurred
+ * @line:	Line number on which the log line occurred
+ * @level:	Level at which the line is logged
+ * @data:	User specified data, possibly specific to a handler
+ * @format:	printf-style formatting string
+ * @args:	Arguments to be formatted
+ *
+ * Display a log message.  The output stream will be determined by the log
+ * level.
+ *
+ * Note: For this handler, @data is a pointer to a FILE output stream.
+ *       If @data is NULL, the function ntfs_log_get_stream will be called
+ *
+ * Note: This function calls ntfs_log_handler_fprintf to do the main work.
+ *
+ * Returns:  -1  Error occurred
+ *            0  Message wasn't logged
+ *          num  Number of output characters
+ */
+int ntfs_log_handler_outerr(const char *function, const char *file,
+	int line, u32 level, void *data, const char *format, va_list args)
+{
+	if (!data)
+		data = ntfs_log_get_stream(level);
 
-	if (prefix)
-		ret += fprintf(stream, prefix);
+	return ntfs_log_handler_fprintf(function, file, line, level, data, format, args);
+}
 
-	errno = olderr;
-	ret += ntfs_log_handler_printf(function, file, line, level, stream, format, args);
+/**
+ * ntfs_log_handler_stderr - All logs go to stderr
+ * @function:	Function in which the log line occurred
+ * @file:	File in which the log line occurred
+ * @line:	Line number on which the log line occurred
+ * @level:	Level at which the line is logged
+ * @data:	User specified data, possibly specific to a handler
+ * @format:	printf-style formatting string
+ * @args:	Arguments to be formatted
+ *
+ * Display a log message to stderr.
+ *
+ * Note: For this handler, @data is a pointer to a FILE output stream.
+ *       If @data is NULL, then stdout will be used.
+ *
+ * Note: This function calls ntfs_log_handler_fprintf to do the main work.
+ *
+ * Returns:  -1  Error occurred
+ *            0  Message wasn't logged
+ *          num  Number of output characters
+ */
+int ntfs_log_handler_stderr(const char *function, const char *file,
+	int line, u32 level, void *data, const char *format, va_list args)
+{
+	if (!data)
+		data = stderr;
 
-	if (suffix)
-		ret += fprintf(stream, suffix);
-
-	fflush(stream);
-	errno = olderr;
-	return ret;
+	return ntfs_log_handler_fprintf(function, file, line, level, data, format, args);
 }
 
 
@@ -482,7 +579,7 @@ BOOL ntfs_log_parse_option(const char *option)
 		return TRUE;
 	} else if ((strcmp(option, "--log-colour") == 0) ||
 		   (strcmp(option, "--log-color") == 0)) {
-		ntfs_log_set_handler(ntfs_log_handler_colour);
+		ntfs_log_set_flags(NTFS_LOG_FLAG_COLOUR);
 		return TRUE;
 	}
 

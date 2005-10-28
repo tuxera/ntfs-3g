@@ -32,26 +32,19 @@
 
 #include "types.h"
 
-
 /* Function prototype for the logging handlers */
 typedef int (ntfs_log_handler)(const char *function, const char *file, int line,
 	u32 level, void *data, const char *format, va_list args);
 
-/**
- * struct ntfs_logging - Control info for the logging system
- * @levels:	Bitfield of logging levels
- * @flags:	Flags to affect the output style
- * @handler:	Function to perform the actual logging
- */
-struct ntfs_logging {
-	u32 levels;
-	u32 flags;
-	ntfs_log_handler *handler;
-};
-
-extern struct ntfs_logging ntfs_log;
-
+/* Set the logging handler from one of the functions, below. */
 void ntfs_log_set_handler(ntfs_log_handler *handler);
+
+/* Logging handlers */
+ntfs_log_handler ntfs_log_handler_fprintf __attribute__((format(printf, 6, 0)));
+ntfs_log_handler ntfs_log_handler_null    __attribute__((format(printf, 6, 0)));
+ntfs_log_handler ntfs_log_handler_stdout  __attribute__((format(printf, 6, 0)));
+ntfs_log_handler ntfs_log_handler_outerr  __attribute__((format(printf, 6, 0)));
+ntfs_log_handler ntfs_log_handler_stderr  __attribute__((format(printf, 6, 0)));
 
 /* Enable/disable certain log levels */
 u32 ntfs_log_set_levels(u32 levels);
@@ -63,15 +56,12 @@ u32 ntfs_log_set_flags(u32 flags);
 u32 ntfs_log_clear_flags(u32 flags);
 u32 ntfs_log_get_flags(void);
 
+/* Turn command-line options into logging flags */
 BOOL ntfs_log_parse_option(const char *option);
 
 int ntfs_log_redirect(const char *function, const char *file, int line,
 	u32 level, void *data, const char *format, ...)
 	__attribute__((format(printf, 6, 7)));
-
-/* Logging handlers */
-ntfs_log_handler ntfs_log_handler_printf __attribute__((format(printf, 6, 0)));
-ntfs_log_handler ntfs_log_handler_colour __attribute__((format(printf, 6, 0)));
 
 /* Logging levels - Determine what gets logged */
 #define NTFS_LOG_LEVEL_DEBUG	(1 <<  0) /* x = 42 */
@@ -92,6 +82,7 @@ ntfs_log_handler ntfs_log_handler_colour __attribute__((format(printf, 6, 0)));
 #define NTFS_LOG_FLAG_LINE	(1 << 2) /* Show the line number of the message */
 #define NTFS_LOG_FLAG_FUNCTION	(1 << 3) /* Show the function name containing the message */
 #define NTFS_LOG_FLAG_ONLYNAME	(1 << 4) /* Only display the filename, not the pathname */
+#define NTFS_LOG_FLAG_COLOUR	(1 << 5) /* Colour highlight some messages */
 
 /* Macros to simplify logging.  One for each level defined above.
  * Note, if NTFS_DISABLE_DEBUG_LOGGING is defined, then ntfs_log_debug/trace have no effect.
@@ -106,6 +97,9 @@ ntfs_log_handler ntfs_log_handler_colour __attribute__((format(printf, 6, 0)));
 #define ntfs_log_warning(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_WARNING,NULL,FORMAT,##ARGS)
 #define ntfs_log_reason(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_REASON,NULL,FORMAT,##ARGS)
 
+/* By default debug and trace messages are compiled into the program,
+ * but not displayed.
+ */
 #ifdef NTFS_DISABLE_DEBUG_LOGGING
 #define ntfs_log_debug(FORMAT, ARGS...)do {} while (0)
 #define ntfs_log_trace(FORMAT, ARGS...)do {} while (0)
