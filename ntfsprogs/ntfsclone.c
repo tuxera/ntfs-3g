@@ -1128,6 +1128,8 @@ static void check_if_mounted(const char *device, unsigned long new_mntflag)
 }
 
 /**
+ * mount_volume -
+ *
  * First perform some checks to determine if the volume is already mounted, or
  * is dirty (Windows wasn't shutdown properly).  If everything is OK, then mount
  * the volume (load the metadata into memory).

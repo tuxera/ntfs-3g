@@ -552,8 +552,9 @@ static __inline__ long long mkntfs_write(struct ntfs_device *dev,
 }
 
 /**
- * Write to disk the clusters contained in the runlist @rl taking the data
- * from @val. Take @val_len bytes from @val and pad the rest with zeroes.
+ * ntfs_rlwrite - Write to disk the clusters contained in the runlist @rl
+ * taking the data from @val.  Take @val_len bytes from @val and pad the
+ * rest with zeroes.
  *
  * If the @rl specifies a completely sparse file, @val is allowed to be NULL.
  *
@@ -1147,6 +1148,8 @@ static void deallocate_scattered_clusters(const runlist *rl)
 
 /**
  * allocate_scattered_clusters
+ * @clusters: Amount of clusters to allocate.
+ *
  * Allocate @clusters and create a runlist of the allocated clusters.
  *
  * Return the allocated runlist. Caller has to free the runlist when finished
@@ -1696,6 +1699,7 @@ err_out:
 
 /**
  * insert_non_resident_attr_in_mft_record
+ *
  * Return 0 on success and -errno on error.
  */
 static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
@@ -1886,6 +1890,7 @@ err_out:
 
 /**
  * insert_resident_attr_in_mft_record
+ *
  * Return 0 on success and -errno on error.
  */
 static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
@@ -1994,6 +1999,7 @@ err_out:
 
 /**
  * add_attr_std_info
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
@@ -2034,6 +2040,7 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
 
 /**
  * add_attr_file_name
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
@@ -2114,6 +2121,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 
 /**
  * add_attr_object_id
+ *
  * add an object_id attribute to the mft record @m
  * return 0 on success or -errno on error
  */
@@ -2141,6 +2149,7 @@ static int add_attr_object_id(MFT_RECORD *m, OBJECT_ID_ATTR *objid_attr,
 
 /**
  * add_attr_sd
+ *
  * Create the security descriptor attribute adding the security descriptor @sd
  * of length @sd_len to the mft record @m.
  *
@@ -2167,6 +2176,7 @@ static int add_attr_sd(MFT_RECORD *m, const u8 *sd, const s64 sd_len)
 
 /**
  * add_attr_data
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
@@ -2202,6 +2212,7 @@ static int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 
 /**
  * add_attr_data_positioned
+ *
  * Create a non-resident data attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
@@ -2225,6 +2236,7 @@ static int add_attr_data_positioned(MFT_RECORD *m, const char *name,
 
 /**
  * add_attr_vol_name
+ *
  * Create volume name attribute specifying the volume name @vol_name as a null
  * terminated char string of length @vol_name_len (number of characters not
  * including the terminating null), which is converted internally to a little
@@ -2267,6 +2279,7 @@ static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 
 /**
  * add_attr_vol_info
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
@@ -2288,6 +2301,7 @@ static int add_attr_vol_info(MFT_RECORD *m, const VOLUME_FLAGS flags,
 
 /**
  * add_attr_index_root
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_index_root(MFT_RECORD *m, const char *name,
@@ -2368,6 +2382,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 
 /**
  * add_attr_index_alloc
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_index_alloc(MFT_RECORD *m, const char *name,
@@ -2386,6 +2401,7 @@ static int add_attr_index_alloc(MFT_RECORD *m, const char *name,
 
 /**
  * add_attr_bitmap
+ *
  * Return 0 on success or -errno on error.
  */
 static int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
@@ -2410,6 +2426,7 @@ static int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 
 /**
  * add_attr_bitmap_positioned
+ *
  * Create a non-resident bitmap attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
@@ -2432,6 +2449,7 @@ static int add_attr_bitmap_positioned(MFT_RECORD *m, const char *name,
 
 /**
  * upgrade_to_large_index
+ *
  * Create bitmap and index allocation attributes, modify index root
  * attribute accordingly and move all of the index entries from the index root
  * into the index allocation.
@@ -2593,6 +2611,7 @@ err_out:
 
 /**
  * make_room_for_index_entry_in_index_block
+ *
  * Create space of @size bytes at position @pos inside the index block @idx.
  *
  * Return 0 on success or -errno on error.
@@ -2643,12 +2662,11 @@ static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *idx,
 }
 
 /*
- * ntfs_index_keys_compare(char *key1, char *key2,
- * COLLATION_RULES *collation_rule)
+ * ntfs_index_keys_compare
+ *
  * not alle types of COLLATION_RULES supported yet...
  * added as needed.. (remove this comment when all is added)
  */
-
 static int ntfs_index_keys_compare(char *key1, char *key2,
 				   int key1_length,int key2_length,
 				   COLLATION_RULES collation_rule) {
@@ -2722,10 +2740,10 @@ static int ntfs_index_keys_compare(char *key1, char *key2,
 
 /**
  * insert_index_entry_in_res_dir_index
+ *
  * i.e. insert an index_entry in some named index_root
  * simplified search method, works for mkntfs
  */
-
 static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 		u32 idx_size, MFT_RECORD *m, ntfschar *name, u32 name_size,
 		 ATTR_TYPES type)
@@ -2841,9 +2859,9 @@ err_out:
 
 /**
  * intialize_secure
+ *
  * initializes $Secure's $SDH and $SII indexes from $SDS datastream
  */
-
 static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m) {
 
 	int err, sdh_size, sii_size;
@@ -2918,10 +2936,10 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m) {
 }
 
 /*
- * initialize_quota(MFT_RECORD *m)
+ * initialize_quota
+ *
  * initialize $Quota with the default quota index-entries.
  */
-
 static int initialize_quota(MFT_RECORD *m) {
 
 	int o_size, q1_size, q2_size, err;
@@ -3031,11 +3049,11 @@ static int initialize_quota(MFT_RECORD *m) {
 }
 
 /*
- * initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref)
+ * initialize_objid
+ *
  * initialize $ObjId with the default index-entries.
  * It is one entry which belongs to $Volume. (W2k3)
  */
-
 static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref) {
 
 	int o_size, err;
@@ -3072,6 +3090,7 @@ static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref) {
 
 /**
  * insert_file_link_in_dir_index
+ *
  * Insert the fully completed FILE_NAME_ATTR @file_name which is inside
  * the file with mft reference @file_ref into the index (allocation) block
  * @idx (which belongs to @file_ref's parent directory).
@@ -3200,6 +3219,7 @@ do_next:
 
 /**
  * create_hardlink_res
+ *
  * Create a file_name_attribute in the mft record @m_file which points to the
  * parent directory with mft reference @ref_parent.
  *
@@ -3210,7 +3230,6 @@ do_next:
  *
  * Return 0 on success or -errno on error.
  */
-
 static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 		MFT_RECORD *m_file, const MFT_REF ref_file,
 		const s64 allocated_size, const s64 data_size,
@@ -3311,6 +3330,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 
 /**
  * create_hardlink
+ *
  * Create a file_name_attribute in the mft record @m_file which points to the
  * parent directory with mft reference @ref_parent.
  *
@@ -4112,10 +4132,10 @@ static void mkntfs_fill_device_with_zeroes(void)
 
 /**
  * mkntfs_sync_index_record
+ *
  * (ERSO) made a function out of this, but the reason for doing that
  * disapeared during coding....
  */
-
 static void mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 		ntfschar* name, u32 name_len)
 {

@@ -609,8 +609,8 @@ static inline void ntfs_buffer_reverse(u8 *buf, unsigned buf_size)
 
 #ifndef HAVE_STRNLEN
 /**             
- *  * strnlen - strnlen is a gnu extension so emulate it if not present
- *   */     
+ * strnlen - strnlen is a gnu extension so emulate it if not present
+ */     
 static size_t strnlen(const char *s, size_t maxlen)
 {       
 	const char *p, *end;

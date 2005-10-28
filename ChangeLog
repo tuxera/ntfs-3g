@@ -50,6 +50,8 @@ xx/xx/2005 - 1.12.2-WIP
 	  to perfrom this.  (Yura)
 	- Fix ntfsdecrypt endianness bugs thus it now works on OSX running on
 	  a dual G5!  (Anton)
+	- Match function parameters names between .h and .c files.  (Yuval)
+	- Fix comment formats.  (Yuval)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

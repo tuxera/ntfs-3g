@@ -657,19 +657,19 @@ static HANDLE ntfs_device_win32_open_volume_for_partition(unsigned int drive_id,
 }
 
 /**
- * ntfs_device_win32_find_partition - locates partition details by id
- * @handle		HANDLE to the PhysicalDrive
- * @partition_id	the partition number to locate
- * @part_offset		pointer to where to put the offset to the partition
- * @part_length		pointer to where to put the length of the partition
- * @hidden_sectors	pointer to where to put the hidden sectors
+ * ntfs_device_win32_find_partition - locates partition details by id.
+ * @handle:		HANDLE to the PhysicalDrive
+ * @partition_id:	the partition number to locate
+ * @part_offset:	pointer to where to put the offset to the partition
+ * @part_length:	pointer to where to put the length of the partition
+ * @hidden_sectors:	pointer to where to put the hidden sectors
  *
  * This function requires an open PhysicalDrive handle and a partition_id.
  * If a partition with the required id is found on the supplied device,
  * the partition attributes are returned back.
  *
- * Return TRUE  if found, and sets the output parameters.
- *        FALSE if not and errno is set to the error code.
+ * Returns: TRUE  if found, and sets the output parameters.
+ *          FALSE if not and errno is set to the error code.
  */
 static BOOL ntfs_device_win32_find_partition(HANDLE handle, DWORD partition_id,
 		s64 *part_offset, s64 *part_length, int *hidden_sectors)

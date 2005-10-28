@@ -472,6 +472,7 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 
 /**
  * list_dir_entry
+ *
  * FIXME: Should we print errors as we go along? (AIA)
  */
 static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,

@@ -75,10 +75,10 @@
 
 /**
  * ntfs_device_alloc - allocate an ntfs device structure and pre-initialize it
- * name:	name of the device (must be present)
- * state:	initial device state (usually zero)
- * dops:	ntfs device operations to use with the device (must be present)
- * priv_data:	pointer to private data (optional)
+ * @name:	name of the device (must be present)
+ * @state:	initial device state (usually zero)
+ * @dops:	ntfs device operations to use with the device (must be present)
+ * @priv_data:	pointer to private data (optional)
  *
  * Allocate an ntfs device structure and pre-initialize it with the user-
  * specified device operations @dops, device state @state, device name @name,

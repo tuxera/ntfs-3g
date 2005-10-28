@@ -2041,6 +2041,7 @@ free:
 
 /**
  * handle_undelete
+ *
  * Handles the undelete
  */
 static int handle_undelete(ntfs_volume *vol)

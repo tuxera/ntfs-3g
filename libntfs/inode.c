@@ -732,7 +732,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 /**
  * ntfs_inode_add_attrlist - add attribute list to inode and fill it
- * @ni - opened ntfs inode to which add attribute list
+ * @ni: opened ntfs inode to which add attribute list
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  * The following error codes are defined:

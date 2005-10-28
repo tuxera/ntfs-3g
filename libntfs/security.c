@@ -251,9 +251,12 @@ err_out:
 }
 
 /**
- * GUID generate_guid(GUID *guid)
- * generatates a random current guid
+ * generate_guid - generatates a random current guid.
+ * @guid:	a pointer to a GUID struct to hold the generated guid.
+ *
  * perhaps not a very good random number generator though...
+ *
+ * Returns: The same pointer it was given as a parameter (guid).
  */
 GUID *generate_guid(GUID *guid) {
 

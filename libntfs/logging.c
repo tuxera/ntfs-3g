@@ -272,8 +272,6 @@ static const char * ntfs_log_get_prefix(u32 level)
  *
  * This alternate handler will be called for all future logging requests.
  * If no @handler is specified, logging will revert to the default handler.
- *
- * Returns: void
  */
 void ntfs_log_set_handler(ntfs_log_handler *handler)
 {
