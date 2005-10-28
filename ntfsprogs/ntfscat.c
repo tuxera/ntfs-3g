@@ -80,7 +80,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	Printf ("\nUsage: %s [options] device [file]\n\n"
+	Printf("\nUsage: %s [options] device [file]\n\n"
 		"    -a, --attribute type       Display this attribute type\n"
 		"    -n, --attribute-name name  Display this attribute name\n"
 		"    -i, --inode num            Display this inode\n\n"
@@ -91,7 +91,7 @@ static void usage(void)
 		"    -v  --verbose              More output\n\n",
 		//"    -r  --raw     Display the compressed or encrypted file",
 		EXEC_NAME);
-	Printf ("%s%s\n", ntfs_bugs, ntfs_home);
+	Printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
