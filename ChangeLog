@@ -47,7 +47,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  for mkntfs.  (Szaka)
 	- Fix ntfs_non_resident_attr_expand() bug, that occurred if we enlarge
 	  sparse or compressed file, but do not need to allocate new clusters
-	  to perfrom this.  (Yura)
+	  to perform this.  (Yura)
 	- Fix ntfsdecrypt endianness bugs thus it now works on OSX running on
 	  a dual G5!  (Anton)
 	- Match function parameters names between .h and .c files.  (Yuval)
