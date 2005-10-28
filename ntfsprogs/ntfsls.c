@@ -156,10 +156,9 @@ static void version(void)
  */
 static void usage(void)
 {
-	printf("\nUsage: %s [options] -d /dev/hda1\n"
+	printf("\nUsage: %s [options] device\n"
 		"\n"
 		"    -a         --all            Display all files\n"
-		"    -d DEVICE  --device DEVICE  NTFS volume\n"
 		"    -F         --classify       Display classification\n"
 		"    -f         --force          Use less caution\n"
 		"    -h   -?    --help           Display this help\n"
@@ -191,10 +190,9 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-ad:Ffh?ilp:qRsVvx";
+	static const char *sopt = "-aFfh?ilp:qRsVvx";
 	static const struct option lopt[] = {
 		{ "all",	 no_argument,		NULL, 'a' },
-		{ "device",      required_argument,	NULL, 'd' },
 		{ "classify",	 no_argument,		NULL, 'F' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
@@ -223,8 +221,11 @@ static int parse_options(int argc, char *argv[])
 
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
 		switch (c) {
-		case 'd':
-			opts.device = optarg;
+		case 1:
+			if (!opts.device)
+				opts.device = optarg;
+			else
+				err++;
 			break;
 		case 'p':
 			opts.path = optarg;

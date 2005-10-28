@@ -121,8 +121,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	printf("\nUsage: %s [options] -d dev\n"
-		"    -d dev  --device dev The ntfs volume to display information about\n"
+	printf("\nUsage: %s [options] device\n"
 		"    -i num  --inode num  Display information about this inode\n"
 		"    -F file --file file  Display information about this file (absolute path)\n"
 		"    -m      --mft        Dump information about the volume\n"
@@ -148,9 +147,8 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-:fhi:F:mqtTvVd:";
+	static const char *sopt = "-:fhi:F:mqtTvV";
 	static const struct option lopt[] = {
-		{ "device",	 required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "inode",	 required_argument,	NULL, 'i' },
@@ -178,9 +176,9 @@ static int parse_options(int argc, char *argv[])
 		ntfs_log_trace("optind=%d; c='%c' optarg=\"%s\".\n", optind, c,
 				optarg);
 		switch (c) {
-		case 'd':
+		case 1:
 			if (!opts.device)
-				opts.device = argv[optind-1];
+				opts.device = optarg;
 			else
 				err++;
 			break;

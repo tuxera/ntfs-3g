@@ -52,6 +52,9 @@ xx/xx/2005 - 1.12.2-WIP
 	  a dual G5!  (Anton)
 	- Match function parameters names between .h and .c files.  (Yuval)
 	- Fix comment formats.  (Yuval)
+	- ntfsinfo and ntfsls follow the convention how other utilities read
+	  the device argument: no -d or --device option is needed.  (Szaka)
+	  
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

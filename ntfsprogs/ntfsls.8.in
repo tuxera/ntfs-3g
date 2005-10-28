@@ -2,7 +2,7 @@
 .\" Copyright (c) 2003 Anton Altaparmakov. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSLS 8 "August 2003" "ntfsprogs version @VERSION@"
+.TH NTFSLS 8 "October 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsls \- list directory contents on an NTFS filesystem
 .SH SYNOPSIS
@@ -70,9 +70,6 @@ ntfsls \- list directory contents on an NTFS filesystem
 |
 .B \-\-dos
 ]
-.B \-d
-|
-.B \-\-device
 .I DEVICE
 .SH DESCRIPTION
 .B ntfsls
@@ -81,7 +78,8 @@ is used to list information about the files specified by the
 option (the root directory by default).
 .I DEVICE
 is the special file corresponding to the device (e.g
-.IR /dev/hdXX ).
+.IR /dev/hdXX ) 
+or an NTFS image file.
 .SH OPTIONS
 .TP
 .B \-a, \-\-all
@@ -129,15 +127,6 @@ Display more debug/warning/error messages.
 .B \-x, \-\-dos
 Display short file names, i.e. files in the DOS namespace, instead of long
 file names, i.e. files in the WIN32 namespace.
-.TP
-.BI "\-d, \-\-device" " DEVICE"
-The special file corresponding to the device that contains the NTFS partition
-to read.  If you want to use an image of an NTFS partition stored on a normal
-file, you will also need to specify the
-.B \-f
-or
-.B \-\-force
-options.
 .SH BUGS
 We are not aware of any bugs.  If you find a bug, please report it to
 <linux-ntfs-dev@lists.sourceforge.net>.  Thank you.

@@ -7,10 +7,10 @@
 ntfsinfo \- dump a file's attributes
 .SH SYNOPSIS
 .B ntfsinfo
-.I -d device
 .I -i inode-number
 .I -F path-filename
 .I -m
+.I device
 .SH DESCRIPTION
 .B ntfsinfo
 will dump the attributes of inode
