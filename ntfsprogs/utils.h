@@ -85,7 +85,7 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 int utils_cluster_in_use(ntfs_volume *vol, long long lcn);
 int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata(ntfs_inode *inode);
-void utils_dump_mem(void *buf, int start, int length, int ascii);
+void utils_dump_mem(void *buf, int start, int length, int flags);
 
 #ifndef _NTFS_RICH_H_
 ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);

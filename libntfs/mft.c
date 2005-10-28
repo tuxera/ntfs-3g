@@ -273,7 +273,7 @@ read_failed:
  * ntfs_mft_record_layout - layout an mft record into a memory buffer
  * @vol:	volume to which the mft record will belong
  * @mref:	mft reference specifying the mft record number
- * @m:		destination buffer of size >= @vol->mft_record_size bytes
+ * @mrec:	destination buffer of size >= @vol->mft_record_size bytes
  *
  * Layout an empty, unused mft record with the mft reference @mref into the
  * buffer @m.  The volume @vol is needed because the mft record structure was
@@ -283,17 +283,17 @@ read_failed:
  * On success return 0 and on error return -1 with errno set to the error code.
  */
 int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
-		MFT_RECORD *m)
+		MFT_RECORD *mrec)
 {
 	ATTR_RECORD *a;
 
-	if (!vol || !m) {
+	if (!vol || !mrec) {
 		errno = EINVAL;
 		return -1;
 	}
 	/* Aligned to 2-byte boundary. */
 	if (vol->major_ver < 3 || (vol->major_ver == 3 && !vol->minor_ver))
-		m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD_OLD) + 1) & ~1);
+		mrec->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD_OLD) + 1) & ~1);
 	else {
 		/* Abort if mref is > 32 bits. */
 		if (MREF(mref) & 0x0000ffff00000000ull) {
@@ -301,20 +301,20 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 			errno = ERANGE;
 			return -1;
 		}
-		m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
+		mrec->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
 		/*
 		 * Set the NTFS 3.1+ specific fields while we know that the
 		 * volume version is 3.1+.
 		 */
-		m->reserved = cpu_to_le16(0);
-		m->mft_record_number = cpu_to_le32(MREF(mref));
+		mrec->reserved = cpu_to_le16(0);
+		mrec->mft_record_number = cpu_to_le32(MREF(mref));
 	}
-	m->magic = magic_FILE;
+	mrec->magic = magic_FILE;
 	if (vol->mft_record_size >= NTFS_BLOCK_SIZE)
-		m->usa_count = cpu_to_le16(vol->mft_record_size /
+		mrec->usa_count = cpu_to_le16(vol->mft_record_size /
 				NTFS_BLOCK_SIZE + 1);
 	else {
-		m->usa_count = cpu_to_le16(1);
+		mrec->usa_count = cpu_to_le16(1);
 		ntfs_log_debug("Sector size is bigger than MFT record size.  "
 				"Setting usa_count to 1.  If Windows\n");
 		ntfs_log_debug("chkdsk reports this as corruption, please email "
@@ -324,28 +324,28 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 		ntfs_log_debug("Thank you.\n");
 	}
 	/* Set the update sequence number to 1. */
-	*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = cpu_to_le16(1);
-	m->lsn = cpu_to_le64(0ull);
-	m->sequence_number = cpu_to_le16(1);
-	m->link_count = cpu_to_le16(0);
+	*(u16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = cpu_to_le16(1);
+	mrec->lsn = cpu_to_le64(0ull);
+	mrec->sequence_number = cpu_to_le16(1);
+	mrec->link_count = cpu_to_le16(0);
 	/* Aligned to 8-byte boundary. */
-	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
-			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
-	m->flags = cpu_to_le16(0);
+	mrec->attrs_offset = cpu_to_le16((le16_to_cpu(mrec->usa_ofs) +
+			(le16_to_cpu(mrec->usa_count) << 1) + 7) & ~7);
+	mrec->flags = cpu_to_le16(0);
 	/*
 	 * Using attrs_offset plus eight bytes (for the termination attribute),
 	 * aligned to 8-byte boundary.
 	 */
-	m->bytes_in_use = cpu_to_le32((le16_to_cpu(m->attrs_offset) + 8 + 7) &
-			~7);
-	m->bytes_allocated = cpu_to_le32(vol->mft_record_size);
-	m->base_mft_record = cpu_to_le64((MFT_REF)0);
-	m->next_attr_instance = cpu_to_le16(0);
-	a = (ATTR_RECORD*)((u8*)m + le16_to_cpu(m->attrs_offset));
+	mrec->bytes_in_use = cpu_to_le32((le16_to_cpu(mrec->attrs_offset) + 8 +
+			7) & ~7);
+	mrec->bytes_allocated = cpu_to_le32(vol->mft_record_size);
+	mrec->base_mft_record = cpu_to_le64((MFT_REF)0);
+	mrec->next_attr_instance = cpu_to_le16(0);
+	a = (ATTR_RECORD*)((u8*)mrec + le16_to_cpu(mrec->attrs_offset));
 	a->type = AT_END;
 	a->length = cpu_to_le32(0);
 	/* Finally, clear the unused part of the mft record. */
-	memset((u8*)a + 8, 0, vol->mft_record_size - ((u8*)a + 8 - (u8*)m));
+	memset((u8*)a + 8, 0, vol->mft_record_size - ((u8*)a + 8 - (u8*)mrec));
 	return 0;
 }
 

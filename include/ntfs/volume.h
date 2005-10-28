@@ -205,7 +205,7 @@ extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 extern int ntfs_version_is_supported(ntfs_volume *vol);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
 
-extern int ntfs_volume_write_flags(ntfs_volume *v, const u16 flags);
+extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
 
 #ifdef NTFS_RICH
 

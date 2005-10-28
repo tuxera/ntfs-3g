@@ -40,7 +40,8 @@
  * --enable-debug).
  */
 extern BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, BOOL silent);
-extern int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b);
+extern int ntfs_boot_sector_parse(ntfs_volume *vol,
+		const NTFS_BOOT_SECTOR *bs);
 
 #endif /* defined _NTFS_BOOTSECT_H */
 

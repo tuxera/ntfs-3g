@@ -1358,7 +1358,7 @@ err_out:
  * @pos:	byte position in the attribute to begin reading from
  * @bk_cnt:	number of mst protected blocks to read
  * @bk_size:	size of each mst protected block in bytes
- * @b:		output data buffer
+ * @dst:	output data buffer
  *
  * This function will read @bk_cnt blocks of size @bk_size bytes each starting
  * at offset @pos from the ntfs attribute @na into the data buffer @b.
@@ -1382,7 +1382,7 @@ err_out:
  * errors can be repaired.
  */
 s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
-		const u32 bk_size, void *b)
+		const u32 bk_size, void *dst)
 {
 	s64 br;
 	u8 *end;
@@ -1394,12 +1394,13 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 		errno = EINVAL;
 		return -1;
 	}
-	br = ntfs_attr_pread(na, pos, bk_cnt * bk_size, b);
+	br = ntfs_attr_pread(na, pos, bk_cnt * bk_size, dst);
 	if (br <= 0)
 		return br;
 	br /= bk_size;
-	for (end = (u8*)b + br * bk_size; (u8*)b < end; b = (u8*)b + bk_size)
-		ntfs_mst_post_read_fixup((NTFS_RECORD*)b, bk_size);
+	for (end = (u8*)dst + br * bk_size; (u8*)dst < end; dst = (u8*)dst +
+			bk_size)
+		ntfs_mst_post_read_fixup((NTFS_RECORD*)dst, bk_size);
 	/* Finally, return the number of blocks read. */
 	return br;
 }
@@ -1410,7 +1411,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
  * @pos:	position in the attribute to write to
  * @bk_cnt:	number of mst protected blocks to write
  * @bk_size:	size of each mst protected block in bytes
- * @b:		data buffer to write to disk
+ * @src:	data buffer to write to disk
  *
  * This function will write @bk_cnt blocks of size @bk_size bytes each from
  * data buffer @b to multi sector transfer (mst) protected ntfs attribute @na
@@ -1435,7 +1436,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
  * achieved.
  */
 s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
-		const u32 bk_size, void *b)
+		const u32 bk_size, void *src)
 {
 	s64 written, i;
 
@@ -1453,7 +1454,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 		int err;
 
 		err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)
-				((u8*)b + i * bk_size), bk_size);
+				((u8*)src + i * bk_size), bk_size);
 		if (err < 0) {
 			/* Abort write at this position. */
 			if (!i)
@@ -1463,10 +1464,11 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 		}
 	}
 	/* Write the prepared data. */
-	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, b);
+	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, src);
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < bk_cnt; ++i)
-		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)b + i * bk_size));
+		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)src + i *
+				bk_size));
 	if (written <= 0)
 		return written;
 	/* Finally, return the number of complete blocks written. */
