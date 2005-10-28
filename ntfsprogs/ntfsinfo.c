@@ -633,17 +633,17 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 
 	l = ntfs_get_attribute_value_length(attr);
 	if (!l) {
-		perror("ntfs_get_attribute_value_length failed");
+		ntfs_log_perror("ntfs_get_attribute_value_length failed");
 		return;
 	}
 	value = malloc(l);
 	if (!value) {
-		perror("malloc failed");
+		ntfs_log_perror("malloc failed");
 		return;
 	}
 	l = ntfs_get_attribute_value(vol, attr, value);
 	if (!l) {
-		perror("ntfs_get_attribute_value failed");
+		ntfs_log_perror("ntfs_get_attribute_value failed");
 		free(value);
 		return;
 	}
@@ -675,7 +675,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 				printf("%s\n", name);
 				free(name);
 			} else
-				perror("ntfs_ucstombs failed");
+				ntfs_log_perror("ntfs_ucstombs failed");
 		} else
 			printf("unnamed\n");
 	}
@@ -886,7 +886,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 			data_size = sle64_to_cpu(attr->data_size);
 			sec_desc_attr = malloc(data_size);
 			if (!sec_desc_attr) {
-				perror("malloc failed");
+				ntfs_log_perror("malloc failed");
 				free(rl);
 				return;
 			}
@@ -1281,7 +1281,7 @@ static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 	if (attr->name_length) {
 		name = malloc(attr->name_length * sizeof(ntfschar));
 		if (!name) {
-			perror("malloc failed");
+			ntfs_log_perror("malloc failed");
 			return -1;
 		}
 		memcpy(name, (u8 *)attr + attr->name_offset,
@@ -1289,13 +1289,13 @@ static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 	}
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
-		perror("ntfs_get_search_ctx failed");
+		ntfs_log_perror("ntfs_get_search_ctx failed");
 		free(name);
 		return -1;
 	}
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0,
 							0, NULL, 0, ctx)) {
-		perror("ntfs_attr_lookup failed");
+		ntfs_log_perror("ntfs_attr_lookup failed");
 		ntfs_attr_put_search_ctx(ctx);
 		free(name);
 		return -1;
@@ -1334,16 +1334,16 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	name = (ntfschar*)((u8*)attr + attr->name_offset);
 	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
 	if (!na) {
-		perror("ntfs_attr_open failed");
+		ntfs_log_perror("ntfs_attr_open failed");
 		return;
 	}
 	bitmap = malloc(na->data_size);
 	if (!bitmap) {
-		perror("malloc failed");
+		ntfs_log_perror("malloc failed");
 		return;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, bitmap) != na->data_size) {
-		perror("ntfs_attr_pread failed");
+		ntfs_log_perror("ntfs_attr_pread failed");
 		free(bitmap);
 		return;
 	}
@@ -1352,19 +1352,19 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, attr->name_length);
 	if (!na) {
-		perror("ntfs_attr_open failed");
+		ntfs_log_perror("ntfs_attr_open failed");
 		free(bitmap);
 		return;
 	}
 	allocation = malloc(na->data_size);
 	if (!allocation) {
-		perror("malloc failed");
+		ntfs_log_perror("malloc failed");
 		free(bitmap);
 		return;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, allocation)
 							 != na->data_size) {
-		perror("ntfs_attr_pread failed");
+		ntfs_log_perror("ntfs_attr_pread failed");
 		free(allocation);
 		free(bitmap);
 		return;
@@ -1377,7 +1377,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
 						indx_record_size)) {
-				perror("Damaged INDX record");
+				ntfs_log_perror("Damaged INDX record");
 				goto free;
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
@@ -1552,13 +1552,13 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 
 			buf = malloc(data_size);
 			if (!buf) {
-				perror("malloc failed");
+				ntfs_log_perror("malloc failed");
 				free(rl);
 				return;
 			}
 			bytes_read = ntfs_rl_pread(vol, rl, 0, data_size, buf);
 			if (bytes_read != data_size) {
-				perror("ntfs_rl_pread failed");
+				ntfs_log_perror("ntfs_rl_pread failed");
 				free(buf);
 				free(rl);
 				return;
@@ -1566,7 +1566,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			free(rl);
 			ea = (EA_ATTR*)buf;
 		} else {
-			perror("ntfs_mapping_pairs_decompress failed");
+			ntfs_log_perror("ntfs_mapping_pairs_decompress failed");
 			return;
 		}
 	} else {
