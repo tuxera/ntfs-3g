@@ -52,6 +52,7 @@
 #include "list.h"
 #include "ntfstime.h"
 #include "version.h"
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfsls";
 
@@ -123,9 +124,10 @@ typedef struct {
 	ntfs_volume *vol;
 } ntfsls_dirent;
 
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
+static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
+			  const int name_len, const int name_type,
+			  const s64 pos, const MFT_REF mref,
+			  const unsigned dt_type);
 
 /**
  * version - Print version information about the program
@@ -212,6 +214,7 @@ static int parse_options(int argc, char *argv[])
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -235,13 +238,20 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'h':
 		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
 			help++;
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			ver++;
@@ -268,11 +278,18 @@ static int parse_options(int argc, char *argv[])
 			opts.recursive++;
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind - 1]);
 			err++;
 			break;
 		}
 	}
+
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
 
 	/* defaults to -a if -s is not specified */
 	if (!opts.system)
@@ -283,13 +300,13 @@ static int parse_options(int argc, char *argv[])
 	else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf("You must specify exactly one "
+				ntfs_log_error("You must specify exactly one "
 						"device.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the "
+			ntfs_log_error("You may not use --quiet and --verbose at the "
 					"same time.\n");
 			err++;
 		}
@@ -302,11 +319,6 @@ static int parse_options(int argc, char *argv[])
 
 	return (!err && !help && !ver);
 }
-
-static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
-			  const int name_len, const int name_type,
-			  const s64 pos, const MFT_REF mref,
-			  const unsigned dt_type);
 
 /**
  * free_dir - free one dir
@@ -422,7 +434,7 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 							    subdir->name);
 
 				if (!subdir->ni) {
-					Eprintf
+					ntfs_log_error
 					    ("ntfsls::readdir_recursive(): cannot get inode from pathname.\n");
 					result = -1;
 					break;
@@ -491,7 +503,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		return -1;
 
 	if (ntfs_ucstombs(name, name_len, &filename, MAX_PATH) < 0) {
-		Eprintf("Cannot represent filename in current locale.\n");
+		ntfs_log_error("Cannot represent filename in current locale.\n");
 		goto free;
 	}
 
@@ -516,7 +528,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		dir = (struct dir *)calloc(1, sizeof(struct dir));
 
 		if (!dir) {
-			Eprintf("Failed to allocate for subdir.\n");
+			ntfs_log_error("Failed to allocate for subdir.\n");
 			result = -1;
 			goto free;
 		}
@@ -629,6 +641,8 @@ int main(int argc, char **argv)
 	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfsls_dirent dirent;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	if (!parse_options(argc, argv)) {
 		// FIXME: Print error... (AIA)

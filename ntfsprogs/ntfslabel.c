@@ -48,6 +48,7 @@
 #include "mft.h"
 #include "utils.h"
 #include "version.h"
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfslabel";
 
@@ -60,10 +61,6 @@ static struct options {
 	int	 noaction;	/* Do not write to disk */
 } opts;
 
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
-
 /**
  * version - Print version information about the program
  *
@@ -73,14 +70,14 @@ GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
  */
 static void version(void)
 {
-	printf("\n%s v%s (libntfs %s) - Display, or set, the label for an "
+	ntfs_log_info("\n%s v%s (libntfs %s) - Display, or set, the label for an "
 			"NTFS Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	printf("Copyright (c)\n");
-	printf("    2002      Matthew J. Fanto\n");
-	printf("    2002-2005 Anton Altaparmakov\n");
-	printf("    2002-2003 Richard Russon\n");
-	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("Copyright (c)\n");
+	ntfs_log_info("    2002      Matthew J. Fanto\n");
+	ntfs_log_info("    2002-2005 Anton Altaparmakov\n");
+	ntfs_log_info("    2002-2003 Richard Russon\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -92,7 +89,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	printf("\nUsage: %s [options] device [label]\n"
+	ntfs_log_info("\nUsage: %s [options] device [label]\n"
 	       "    -n    --no-action    Do not write to disk\n"
 	       "    -f    --force        Use less caution\n"
 	       "    -q    --quiet        Less output\n"
@@ -100,7 +97,7 @@ static void usage(void)
 	       "    -V    --version      Display version information\n"
 	       "    -h    --help         Display this help\n\n",
 	       EXEC_NAME);
-	printf("%s%s\n", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -129,6 +126,7 @@ static int parse_options(int argc, char *argv[])
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -147,6 +145,11 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'h':
 		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
 			help++;
 			break;
 		case 'n':
@@ -154,31 +157,40 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			ver++;
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
 			err++;
 			break;
 		}
 	}
+
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
 
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
 		if (opts.device == NULL) {
 			if (argc > 1)
-				Eprintf("You must specify a device.\n");
+				ntfs_log_error("You must specify a device.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at "
+			ntfs_log_error("You may not use --quiet and --verbose at "
 					"the same time.\n");
 			err++;
 		}
@@ -199,7 +211,7 @@ static int parse_options(int argc, char *argv[])
  * @mnt_flags:	mount flags of the device or 0 if not mounted
  * @mnt_point:	mount point of the device or NULL
  *
- * Print the label of the device @dev to stdout.
+ * Print the label of the device @dev.
  */
 static int print_label(ntfs_volume *vol, unsigned long mnt_flags)
 {
@@ -207,12 +219,12 @@ static int print_label(ntfs_volume *vol, unsigned long mnt_flags)
 	//XXX significant?
 	if ((mnt_flags & (NTFS_MF_MOUNTED | NTFS_MF_READONLY)) ==
 			NTFS_MF_MOUNTED) {
-		Eprintf("%s is mounted read-write, results may be "
+		ntfs_log_error("%s is mounted read-write, results may be "
 			"unreliable.\n", opts.device);
 		result = 1;
 	}
 
-	printf("%s\n", vol->vol_name);
+	ntfs_log_info("%s\n", vol->vol_name);
 	return result;
 }
 
@@ -274,7 +286,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		if (!(mnt_flags & NTFS_MF_ISROOT) ||
 				!(mnt_flags & NTFS_MF_READONLY)) {
 			if (!force) {
-				fprintf(stderr, "Refusing to change label on "
+				ntfs_log_error("Refusing to change label on "
 						"read-%s mounted device %s.\n",
 						mnt_flags & NTFS_MF_READONLY ?
 						"only" : "write", opts.device);
@@ -284,13 +296,13 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	}
 	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
 	if (!ctx) {
-		perror("Failed to get attribute search context");
+		ntfs_log_perror("Failed to get attribute search context");
 		goto err_out;
 	}
 	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT) {
-			perror("Lookup of $VOLUME_NAME attribute failed");
+			ntfs_log_perror("Lookup of $VOLUME_NAME attribute failed");
 			goto err_out;
 		}
 		/* The volume name attribute does not exist.  Need to add it. */
@@ -298,19 +310,19 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	} else {
 		a = ctx->attr;
 		if (a->non_resident) {
-			fprintf(stderr, "Error: Attribute $VOLUME_NAME must be "
+			ntfs_log_error("Error: Attribute $VOLUME_NAME must be "
 					"resident.\n");
 			goto err_out;
 		}
 	}
 	label_len = ntfs_mbstoucs(label, &new_label, 0);
 	if (label_len == -1) {
-		perror("Unable to convert label string to Unicode");
+		ntfs_log_perror("Unable to convert label string to Unicode");
 		goto err_out;
 	}
 	label_len *= sizeof(ntfschar);
 	if (label_len > 0x100) {
-		fprintf(stderr, "New label is too long. Maximum %u characters "
+		ntfs_log_error("New label is too long. Maximum %u characters "
 				"allowed. Truncating excess characters.\n",
 				(unsigned)(0x100 / sizeof(ntfschar)));
 		label_len = 0x100;
@@ -318,7 +330,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	}
 	if (a) {
 		if (resize_resident_attribute_value(ctx->mrec, a, label_len)) {
-			perror("Error resizing resident attribute");
+			ntfs_log_perror("Error resizing resident attribute");
 			goto err_out;
 		}
 	} else {
@@ -327,7 +339,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		u32 biu = le32_to_cpu(ctx->mrec->bytes_in_use);
 		if (biu + asize > le32_to_cpu(ctx->mrec->bytes_allocated)) {
 			errno = ENOSPC;
-			perror("Error adding resident attribute");
+			ntfs_log_perror("Error adding resident attribute");
 			goto err_out;
 		}
 		a = ctx->attr;
@@ -349,7 +361,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	}
 	memcpy((u8*)a + le16_to_cpu(a->value_offset), new_label, label_len);
 	if (!opts.noaction && ntfs_inode_sync(vol->vol_ni)) {
-		perror("Error writing MFT Record to disk");
+		ntfs_log_perror("Error writing MFT Record to disk");
 		goto err_out;
 	}
 	result = 0;
@@ -371,6 +383,8 @@ int main(int argc, char **argv)
 	unsigned long mnt_flags = 0;
 	int result = 0;
 	ntfs_volume *vol;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	if (!parse_options(argc, argv))
 		return 1;
