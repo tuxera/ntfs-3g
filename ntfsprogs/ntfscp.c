@@ -51,6 +51,7 @@
 #include "dir.h"
 #include "debug.h"
 #include "version.h"
+#include "logging.h"
 
 struct options {
 	char		*device;	/* Device/File to work with */
@@ -69,11 +70,6 @@ static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
 volatile sig_atomic_t caught_terminate = 0;
 
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
-static GEN_PRINTF(Printf,  stderr, NULL,   FALSE)
-
 /**
  * version - Print version information about the program
  *
@@ -83,10 +79,10 @@ static GEN_PRINTF(Printf,  stderr, NULL,   FALSE)
  */
 static void version(void)
 {
-	Printf("\n%s v%s (libntfs %s) - Overwrite files on NTFS volume.\n\n",
+	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS volume.\n\n",
 		EXEC_NAME, VERSION, ntfs_libntfs_version());
-	Printf("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
-	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -98,7 +94,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	Printf("\nUsage: %s [options] device src_file dest_file\n\n"
+	ntfs_log_info("\nUsage: %s [options] device src_file dest_file\n\n"
 		"    -a  --attribute num   Write to this attribute\n"
 		"    -i  --inode           Treat dest_file as inode number\n"
 		"    -f  --force           Use less caution\n"
@@ -109,7 +105,7 @@ static void usage(void)
 		"    -V  --version         Version information\n"
 		"    -v  --verbose         More output\n\n",
 		EXEC_NAME);
-	Printf("%s%s\n", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -142,6 +138,7 @@ static int parse_options(int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 	s64 attr;
 
 	opts.device = NULL;
@@ -163,20 +160,20 @@ static int parse_options(int argc, char **argv)
 			} else if (!opts.dest_file) {
 				opts.dest_file = argv[optind - 1];
 			} else {
-				Eprintf("You must specify exactly 2 files.\n");
+				ntfs_log_error("You must specify exactly 2 files.\n");
 				err++;
 			}
 			break;
 		case 'a':
 			if (opts.attribute != AT_DATA) {
-				Eprintf("You can specify only 1 attribute.\n");
+				ntfs_log_error("You can specify only 1 attribute.\n");
 				err++;
 				break;
 			}
 
 			attr = strtol(optarg, &s, 0);
 			if (*s) {
-				Eprintf("Couldn't parse attribute.\n");
+				ntfs_log_error("Couldn't parse attribute.\n");
 				err++;
 			} else
 				opts.attribute = (ATTR_TYPES)attr;
@@ -189,11 +186,16 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'h':
 		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
 			help++;
 			break;
 		case 'N':
 			if (opts.attr_name) {
-				Eprintf("You can specify only one attribute "
+				ntfs_log_error("You can specify only one attribute "
 						"name.\n");
 				err++;
 			} else
@@ -204,36 +206,45 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'V':
 			ver++;
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n", argv[optind - 1]);
 			err++;
 			break;
 		}
 	}
 
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
+
 	if (help || ver) {
 		opts.quiet = 0;
 	} else {
 		if (!opts.device) {
-			Eprintf("You must specify a device.\n");
+			ntfs_log_error("You must specify a device.\n");
 			err++;
 		} else if (!opts.src_file) {
-			Eprintf("You must specify a source file.\n");
+			ntfs_log_error("You must specify a source file.\n");
 			err++;
 		} else if (!opts.dest_file) {
-			Eprintf("You must specify a destination file.\n");
+			ntfs_log_error("You must specify a destination file.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the "
+			ntfs_log_error("You may not use --quiet and --verbose at the "
 					"same time.\n");
 			err++;
 		}
@@ -278,6 +289,8 @@ int main(int argc, char *argv[])
 	ntfschar *attr_name;
 	int attr_name_len = 0;
 
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
+
 	if (!parse_options(argc, argv))
 		return 1;
 
@@ -285,12 +298,12 @@ int main(int argc, char *argv[])
 
 	/* Set SIGINT handler. */
 	if (signal(SIGINT, signal_handler) == SIG_ERR) {
-		perror("Failed to set SIGINT handler");
+		ntfs_log_perror("Failed to set SIGINT handler");
 		return 1;
 	}
 	/* Set SIGTERM handler. */
 	if (signal(SIGTERM, signal_handler) == SIG_ERR) {
-		perror("Failed to set SIGTERM handler");
+		ntfs_log_perror("Failed to set SIGTERM handler");
 		return 1;
 	}
 
@@ -299,7 +312,7 @@ int main(int argc, char *argv[])
 
 	vol = utils_mount_volume(opts.device, flags, opts.force);
 	if (!vol) {
-		perror("ERROR: couldn't mount volume");
+		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
@@ -309,16 +322,16 @@ int main(int argc, char *argv[])
 	{
 		struct stat fst;
 		if (stat(opts.src_file, &fst) == -1) {
-			perror("ERROR: Couldn't stat source file");
+			ntfs_log_perror("ERROR: Couldn't stat source file");
 			goto umount;
 		}
 		new_size = fst.st_size;
 	}
-	Vprintf("New file size: %lld\n", new_size);
+	ntfs_log_verbose("New file size: %lld\n", new_size);
 
 	in = fopen(opts.src_file, "r");
 	if (!in) {
-		perror("ERROR: Couldn't open source file");
+		ntfs_log_perror("ERROR: Couldn't open source file");
 		goto umount;
 	}
 
@@ -328,14 +341,14 @@ int main(int argc, char *argv[])
 
 		inode_num = strtoll(opts.dest_file, &s, 0);
 		if (*s) {
-			Eprintf("ERROR: Couldn't parse inode number.\n");
+			ntfs_log_error("ERROR: Couldn't parse inode number.\n");
 			goto close_src;
 		}
 		out = ntfs_inode_open(vol, inode_num);
 	} else
 		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
 	if (!out) {
-		perror("ERROR: Couldn't open destination file");
+		ntfs_log_perror("ERROR: Couldn't open destination file");
 		goto close_src;
 	}
 	if ((le16_to_cpu(out->mrec->flags) & MFT_RECORD_IS_DIRECTORY) &&
@@ -360,7 +373,7 @@ int main(int argc, char *argv[])
 		new_dest_file = malloc(strlen(opts.dest_file) +
 				strlen(filename) + 2);
 		if (!new_dest_file) {
-			perror("ERROR: malloc() failed");
+			ntfs_log_perror("ERROR: malloc() failed");
 			goto close_dst;
 		}
 		strcpy(new_dest_file, opts.dest_file);
@@ -370,7 +383,7 @@ int main(int argc, char *argv[])
 		out = ntfs_pathname_to_inode(vol, NULL, new_dest_file);
 		free(new_dest_file);
 		if (!out) {
-			perror("ERROR: Failed to open destination file");
+			ntfs_log_perror("ERROR: Failed to open destination file");
 			goto close_src;
 		}
 	}
@@ -379,7 +392,7 @@ int main(int argc, char *argv[])
 		attr_name = NULL;
 		attr_name_len = ntfs_mbstoucs(opts.attr_name, &attr_name, 0);
 		if (attr_name_len == -1) {
-			perror("ERROR: Failed to parse attribute name");
+			ntfs_log_perror("ERROR: Failed to parse attribute name");
 			goto close_dst;
 		}
 	} else
@@ -387,59 +400,59 @@ int main(int argc, char *argv[])
 	na = ntfs_attr_open(out, opts.attribute, attr_name, attr_name_len);
 	if (!na) {
 		if (errno != ENOENT) {
-			perror("ERROR: Couldn't open attribute");
+			ntfs_log_perror("ERROR: Couldn't open attribute");
 			goto close_dst;
 		}
 		/* Requested attribute isn't present, add it. */
 		if (ntfs_attr_add(out, opts.attribute, attr_name,
 				attr_name_len, NULL, 0)) {
-			perror("ERROR: Couldn't add attribute");
+			ntfs_log_perror("ERROR: Couldn't add attribute");
 			goto close_dst;
 		}
 		na = ntfs_attr_open(out, opts.attribute, attr_name,
 				attr_name_len);
 		if (!na) {
-			perror("ERROR: Couldn't open just added attribute");
+			ntfs_log_perror("ERROR: Couldn't open just added attribute");
 			goto close_dst;
 		}
 	}
 	if (attr_name != AT_UNNAMED)
 		free(attr_name);
 
-	Vprintf("Old file size: %lld\n", na->data_size);
+	ntfs_log_verbose("Old file size: %lld\n", na->data_size);
 	if (na->data_size != new_size) {
 		if (ntfs_attr_truncate(na, new_size)) {
-			perror("ERROR: Couldn't resize attribute");
+			ntfs_log_perror("ERROR: Couldn't resize attribute");
 			goto close_attr;
 		}
 	}
 
 	buf = malloc(NTFS_BUF_SIZE);
 	if (!buf) {
-		perror("ERROR: malloc failed");
+		ntfs_log_perror("ERROR: malloc failed");
 		goto close_attr;
 	}
 
-	Vprintf("Starting write.\n");
+	ntfs_log_verbose("Starting write.\n");
 	offset = 0;
 	while (!feof(in)) {
 		if (caught_terminate) {
-			printf("SIGTERM or SIGINT received. Aborting write.\n");
+			ntfs_log_error("SIGTERM or SIGINT received. Aborting write.\n");
 			break;
 		}
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
 		if (!br) {
-			if (!feof(in)) perror("ERROR: fread failed");
+			if (!feof(in)) ntfs_log_perror("ERROR: fread failed");
 			break;
 		}
 		bw = ntfs_attr_pwrite(na, offset, br, buf);
 		if (bw != br) {
-			perror("ERROR: ntfs_attr_pwrite failed");
+			ntfs_log_perror("ERROR: ntfs_attr_pwrite failed");
 			break;
 		}
 		offset += bw;
 	}
-	Vprintf("Syncing.\n");
+	ntfs_log_verbose("Syncing.\n");
 	result = 0;
 	free(buf);
 close_attr:
@@ -447,16 +460,17 @@ close_attr:
 close_dst:
 	while (ntfs_inode_close(out)) {
 		if (errno != EBUSY) {
-			Eprintf("Sync failed. Run chkdsk.\n");
+			ntfs_log_error("Sync failed. Run chkdsk.\n");
 			break;
 		}
-		Eprintf("Device busy. Will retry sync after 3 seconds.\n");
+		ntfs_log_error("Device busy. Will retry sync after 3 seconds.\n");
 		sleep(3);
 	}
 close_src:
 	fclose(in);
 umount:
 	ntfs_umount(vol, FALSE);
-	Vprintf("Done.\n");
+	ntfs_log_verbose("Done.\n");
 	return result;
 }
+
