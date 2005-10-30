@@ -59,7 +59,12 @@
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
 /**
- * ntfs_get_attribute_value_length
+ * ntfs_get_attribute_value_length -
+ * @a:
+ *
+ * Description...
+ *
+ * Returns:
  */
 s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 {
@@ -77,7 +82,14 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 }
 
 /**
- * ntfs_get_attribute_value
+ * ntfs_get_attribute_value -
+ * @vol:	
+ * @a:	
+ * @b:	
+ *
+ * Description...
+ *
+ * Returns:
  */
 s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 		const ATTR_RECORD *a, u8 *b)
@@ -245,8 +257,6 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 /* Already cleaned up code below, but still look for FIXME:... */
 
 /**
- * Internal:
- *
  * __ntfs_attr_init - primary initialization of an ntfs attribute structure
  * @na:		ntfs attribute to initialize
  * @ni:		ntfs inode with which to initialize the ntfs attribute
@@ -1476,8 +1486,6 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 }
 
 /**
- * Internal:
- *
  * ntfs_attr_find - find (next) attribute in mft record
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
@@ -1680,8 +1688,6 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 }
 
 /**
- * Internal:
- *
  * ntfs_external_attr_find - find an attribute in the attribute list of an inode
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
@@ -2189,8 +2195,6 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 }
 
 /**
- * Internal:
- *
  * ntfs_attr_init_search_ctx - initialize an attribute search context
  * @ctx:	attribute search context to initialize
  * @ni:		ntfs inode with which to initialize the search context

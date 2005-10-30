@@ -47,9 +47,15 @@
 #include "logging.h"
 
 /**
- * Internal:
- *
  * ntfs_rl_mm - runlist memmove
+ * @base:
+ * @dst:
+ * @src:
+ * @size:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static __inline__ void ntfs_rl_mm(runlist_element *base, int dst, int src,
 		int size)
@@ -59,9 +65,16 @@ static __inline__ void ntfs_rl_mm(runlist_element *base, int dst, int src,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_mc - runlist memory copy
+ * @dstbase:
+ * @dst:
+ * @srcbase:
+ * @src:
+ * @size:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static __inline__ void ntfs_rl_mc(runlist_element *dstbase, int dst,
 		runlist_element *srcbase, int src, int size)
@@ -71,8 +84,6 @@ static __inline__ void ntfs_rl_mc(runlist_element *dstbase, int dst,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_realloc - Reallocate memory for runlists
  * @rl:		original runlist
  * @old_size:	number of runlist elements in the original runlist @rl
@@ -99,8 +110,6 @@ static __inline__ runlist_element *ntfs_rl_realloc(runlist_element *rl,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_are_mergeable - test if two runlists can be joined together
  * @dst:	original runlist
  * @src:	new runlist to test for mergeability with @dst
@@ -138,8 +147,6 @@ static __inline__ BOOL ntfs_rl_are_mergeable(runlist_element *dst,
 }
 
 /**
- * Internal:
- *
  * __ntfs_rl_merge - merge two runlists without testing if they can be merged
  * @dst:	original, destination runlist
  * @src:	new runlist to merge with @dst
@@ -155,8 +162,6 @@ static __inline__ void __ntfs_rl_merge(runlist_element *dst,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_append - append a runlist after a given element
  * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
@@ -224,8 +229,6 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_insert - insert a runlist into another
  * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
@@ -323,8 +326,6 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_replace - overwrite a runlist element with another runlist
  * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
@@ -407,8 +408,6 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 }
 
 /**
- * Internal:
- *
  * ntfs_rl_split - insert a runlist into the centre of a hole
  * @dst:	original runlist to be worked on
  * @dsize:	number of elements in @dst (including end marker)
@@ -1719,7 +1718,12 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 }
 */
 /**
- * test_rl_dump_runlist
+ * test_rl_dump_runlist -
+ * @rl:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_dump_runlist(const runlist_element *rl)
 {
@@ -1766,7 +1770,13 @@ static void test_rl_dump_runlist(const runlist_element *rl)
 }
 
 /**
- * test_rl_runlists_merge
+ * test_rl_runlists_merge -
+ * @drl:
+ * @srl:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static runlist_element * test_rl_runlists_merge(runlist_element *drl, runlist_element *srl)
 {
@@ -1786,7 +1796,14 @@ static runlist_element * test_rl_runlists_merge(runlist_element *drl, runlist_el
 }
 
 /**
- * test_rl_read_buffer
+ * test_rl_read_buffer -
+ * @file:
+ * @buf:
+ * @bufsize:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int test_rl_read_buffer(const char *file, u8 *buf, int bufsize)
 {
@@ -1808,7 +1825,15 @@ static int test_rl_read_buffer(const char *file, u8 *buf, int bufsize)
 }
 
 /**
- * test_rl_pure_src
+ * test_rl_pure_src -
+ * @contig:
+ * @multi:
+ * @vcn:
+ * @len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static runlist_element * test_rl_pure_src(BOOL contig, BOOL multi, int vcn, int len)
 {
@@ -1835,7 +1860,18 @@ static runlist_element * test_rl_pure_src(BOOL contig, BOOL multi, int vcn, int 
 }
 
 /**
- * test_rl_pure_test
+ * test_rl_pure_test -
+ * @test:
+ * @contig:
+ * @multi:
+ * @vcn:
+ * @len:
+ * @file:
+ * @size:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_pure_test(int test, BOOL contig, BOOL multi, int vcn, int len, runlist_element *file, int size)
 {
@@ -1855,7 +1891,13 @@ static void test_rl_pure_test(int test, BOOL contig, BOOL multi, int vcn, int le
 }
 
 /**
- * test_rl_pure
+ * test_rl_pure -
+ * @contig:
+ * @multi:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_pure(char *contig, char *multi)
 {
@@ -1949,7 +1991,11 @@ static void test_rl_pure(char *contig, char *multi)
 }
 
 /**
- * test_rl_zero
+ * test_rl_zero -
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_zero(void)
 {
@@ -1971,7 +2017,15 @@ static void test_rl_zero(void)
 }
 
 /**
- * test_rl_frag_combine
+ * test_rl_frag_combine -
+ * @vol:
+ * @attr1:
+ * @attr2:
+ * @attr3:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_frag_combine(ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECORD *attr2, ATTR_RECORD *attr3)
 {
@@ -1999,7 +2053,12 @@ static void test_rl_frag_combine(ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECO
 }
 
 /**
- * test_rl_frag
+ * test_rl_frag -
+ * @test:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void test_rl_frag(char *test)
 {
@@ -2039,7 +2098,13 @@ out:
 }
 
 /**
- * test_rl_main
+ * test_rl_main -
+ * @argc:
+ * @argv:[]
+ *
+ * Description...
+ *
+ * Returns:
  */
 int test_rl_main(int argc, char *argv[])
 {

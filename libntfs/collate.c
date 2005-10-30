@@ -34,7 +34,16 @@
 #include "logging.h"
 
 /**
- * ntfs_collate_binary
+ * ntfs_collate_binary -
+ * @vol: unused
+ * @data1:
+ * @data1_len:
+ * @data2:
+ * @data2_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
@@ -55,7 +64,16 @@ static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 }
 
 /**
- * ntfs_collate_ntofs_ulong
+ * ntfs_collate_ntofs_ulong -
+ * @vol: unused
+ * @data1:
+ * @data1_len:
+ * @data2:
+ * @data2_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 		const void *data1, const int data1_len,
@@ -84,7 +102,16 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 }
 
 /**
- * ntfs_collate_file_name
+ * ntfs_collate_file_name -
+ * @vol:
+ * @data1:
+ * @data1_len: unused
+ * @data2:
+ * @data2_len: unused
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_collate_file_name(ntfs_volume *vol,
 		const void *data1, const int data1_len __attribute__((unused)),

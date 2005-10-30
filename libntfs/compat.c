@@ -28,8 +28,17 @@
 
 #include "compat.h"
 
-// TODO: Add check for FFS in the configure script... (AIA)
+/* TODO: Add check for FFS in the configure script... (AIA) */
+
 #ifndef HAVE_FFS
+/**
+ * ffs -
+ * @x:
+ *
+ * Description...
+ *
+ * Returns:
+ */
 int ffs(int x)
 {
 	int r = 1;

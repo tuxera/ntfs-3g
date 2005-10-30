@@ -67,7 +67,13 @@
 #define DEV_FD(dev)	(*(int *)dev->d_private)
 
 /**
- * ntfs_device_unix_io_open
+ * ntfs_device_unix_io_open -
+ * @dev:
+ * @flags:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 {
@@ -116,7 +122,12 @@ err_out:
 }
 
 /**
- * ntfs_device_unix_io_close
+ * ntfs_device_unix_io_close -
+ * @dev:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 {
@@ -146,7 +157,14 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 }
 
 /**
- * ntfs_device_unix_io_seek
+ * ntfs_device_unix_io_seek -
+ * @dev:
+ * @offset:
+ * @whence:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 		int whence)
@@ -155,7 +173,14 @@ static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 }
 
 /**
- * ntfs_device_unix_io_read
+ * ntfs_device_unix_io_read -
+ * @dev:
+ * @buf:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
 		s64 count)
@@ -164,7 +189,14 @@ static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
 }
 
 /**
- * ntfs_device_unix_io_write
+ * ntfs_device_unix_io_write -
+ * @dev:
+ * @buf:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 		s64 count)
@@ -178,7 +210,15 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 }
 
 /**
- * ntfs_device_unix_io_pread
+ * ntfs_device_unix_io_pread -
+ * @dev:
+ * @buf:
+ * @count:
+ * @offset:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
@@ -187,7 +227,15 @@ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 }
 
 /**
- * ntfs_device_unix_io_pwrite
+ * ntfs_device_unix_io_pwrite -
+ * @dev:
+ * @buf:
+ * @count:
+ * @offset:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 		s64 count, s64 offset)
@@ -201,7 +249,12 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 }
 
 /**
- * ntfs_device_unix_io_sync
+ * ntfs_device_unix_io_sync -
+ * @dev:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 {
@@ -215,7 +268,13 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 }
 
 /**
- * ntfs_device_unix_io_stat
+ * ntfs_device_unix_io_stat -
+ * @dev:
+ * @buf:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 {
@@ -223,7 +282,14 @@ static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 }
 
 /**
- * ntfs_device_unix_io_ioctl
+ * ntfs_device_unix_io_ioctl -
+ * @dev:
+ * @request:
+ * @argp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static int ntfs_device_unix_io_ioctl(struct ntfs_device *dev, int request,
 		void *argp)

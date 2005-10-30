@@ -258,7 +258,8 @@ err_out:
  *
  * Returns: The same pointer it was given as a parameter (guid).
  */
-GUID *generate_guid(GUID *guid) {
+GUID *generate_guid(GUID *guid)
+{
 
 	int i;
 	static u8 array[16];

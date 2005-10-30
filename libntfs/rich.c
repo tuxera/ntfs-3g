@@ -112,7 +112,13 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
 }
 
 /**
- * ntfs_name_print
+ * ntfs_name_print -
+ * @name:
+ * @name_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_name_print(ntfschar *name, int name_len)
 {
@@ -128,7 +134,14 @@ void ntfs_name_print(ntfschar *name, int name_len)
 }
 
 /**
- * utils_free_non_residents3
+ * utils_free_non_residents3 -
+ * @bmp:
+ * @inode:
+ * @attr:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECORD *attr)
 {
@@ -165,7 +178,13 @@ int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECO
 }
 
 /**
- * utils_free_non_residents2
+ * utils_free_non_residents2 -
+ * @inode:
+ * @bmp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int utils_free_non_residents2(ntfs_inode *inode, struct ntfs_bmp *bmp)
 {

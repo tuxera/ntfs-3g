@@ -123,7 +123,7 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
  */
 int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
-		const int err_val __attribute__((__unused__)),
+		const int err_val __attribute__((unused)),
 		const IGNORE_CASE_BOOL ic, const ntfschar *upcase,
 		const u32 upcase_len)
 {
@@ -307,7 +307,15 @@ ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
 }
 
 /**
- * ntfs_name_upcase
+ * ntfs_name_upcase -
+ * @name:
+ * @name_len:
+ * @upcase:
+ * @upcase_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 		const u32 upcase_len)
@@ -321,7 +329,14 @@ void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 }
 
 /**
- * ntfs_file_value_upcase
+ * ntfs_file_value_upcase -
+ * @file_name_attr:
+ * @upcase:
+ * @upcase_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 		const ntfschar *upcase, const u32 upcase_len)
@@ -331,7 +346,17 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 }
 
 /**
- * ntfs_file_values_compare
+ * ntfs_file_values_compare -
+ * @file_name_attr1:
+ * @file_name_attr2:
+ * @err_val:
+ * @ic:
+ * @upcase:
+ * @upcase_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
 		const FILE_NAME_ATTR *file_name_attr2,

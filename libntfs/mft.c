@@ -391,6 +391,14 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 static const char *es = "  Leaving inconsistent metadata.  Run chkdsk.";
 #endif
 
+/**
+ * ntfs_ffz -
+ * @word:
+ *
+ * Description...
+ *
+ * Returns:
+ */
 static inline unsigned int ntfs_ffz(unsigned int word)
 {
 	return ffs(~word) - 1;
@@ -1558,7 +1566,14 @@ sync_rollback:
 #include "rich.h"
 
 /**
- * ntfs_mft_remove_attr
+ * ntfs_mft_remove_attr -
+ * @bmp:
+ * @inode:
+ * @type:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_mft_remove_attr(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES type)
 {
@@ -1617,7 +1632,15 @@ int ntfs_mft_remove_attr(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES typ
 }
 
 /**
- * ntfs_mft_add_attr
+ * ntfs_mft_add_attr -
+ * @inode:
+ * @type:
+ * @data:
+ * @data_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 ATTR_RECORD * ntfs_mft_add_attr(ntfs_inode *inode, ATTR_TYPES type, u8 *data, int data_len)
 {
@@ -1687,7 +1710,17 @@ ATTR_RECORD * ntfs_mft_add_attr(ntfs_inode *inode, ATTR_TYPES type, u8 *data, in
 }
 
 /**
- * ntfs_mft_resize_resident
+ * ntfs_mft_resize_resident -
+ * @inode:
+ * @type:
+ * @name:
+ * @name_len:
+ * @data:
+ * @data_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len, u8 *data, int data_len)
 {
@@ -1786,7 +1819,12 @@ done:
 }
 
 /**
- * ntfs_mft_free_space
+ * ntfs_mft_free_space -
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_mft_free_space(struct ntfs_dir *dir)
 {
@@ -1805,7 +1843,12 @@ int ntfs_mft_free_space(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_mft_add_index
+ * ntfs_mft_add_index -
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_mft_add_index(struct ntfs_dir *dir)
 {

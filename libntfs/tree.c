@@ -42,7 +42,12 @@
 #include "rich.h"
 
 /**
- * ntfs_dt_free
+ * ntfs_dt_free -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_dt_free(struct ntfs_dt *dt)
 {
@@ -66,7 +71,12 @@ void ntfs_dt_free(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_rollback
+ * ntfs_dt_rollback -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_rollback(struct ntfs_dt *dt)
 {
@@ -113,7 +123,12 @@ int ntfs_dt_rollback(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_commit
+ * ntfs_dt_commit -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_commit(struct ntfs_dt *dt)
 {
@@ -171,7 +186,13 @@ int ntfs_dt_commit(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_create_children2
+ * ntfs_dt_create_children2 -
+ * @dt:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_create_children2(struct ntfs_dt *dt, int count)
 {
@@ -199,7 +220,13 @@ BOOL ntfs_dt_create_children2(struct ntfs_dt *dt, int count)
 }
 
 /**
- * ntfs_dt_resize_children3
+ * ntfs_dt_resize_children3 -
+ * @dt:
+ * @new:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_resize_children3(struct ntfs_dt *dt, int new)
 {
@@ -239,7 +266,12 @@ BOOL ntfs_dt_resize_children3(struct ntfs_dt *dt, int new)
 }
 
 /**
- * ntfs_dt_root_count
+ * ntfs_dt_root_count -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_count(struct ntfs_dt *dt)
 {
@@ -302,7 +334,12 @@ int ntfs_dt_root_count(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_alloc_count
+ * ntfs_dt_alloc_count -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_alloc_count(struct ntfs_dt *dt)
 {
@@ -361,7 +398,13 @@ int ntfs_dt_alloc_count(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_initialise2
+ * ntfs_dt_initialise2 -
+ * @vol:
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_initialise2(ntfs_volume *vol, struct ntfs_dt *dt)
 {
@@ -404,7 +447,14 @@ int ntfs_dt_initialise2(ntfs_volume *vol, struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_create
+ * ntfs_dt_create -
+ * @dir:
+ * @parent:
+ * @vcn:
+ *
+ * Description...
+ *
+ * Returns:
  */
 struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VCN vcn)
 {
@@ -504,7 +554,11 @@ struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 }
 
 /**
- * ntfs_dt_find
+ * ntfs_dt_find -
+ * @dt:
+ * @name:
+ * @name_len:
+ *
  * find dt by name, return MFT_REF
  * maps dt's as necessary
  */
@@ -580,7 +634,12 @@ MFT_REF ntfs_dt_find(struct ntfs_dt *dt, ntfschar *name, int name_len)
 }
 
 /**
- * ntfs_dt_find2
+ * ntfs_dt_find2 -
+ * @dt:
+ * @name:
+ * @name_len:
+ * @index_num:
+ *
  * find dt by name, returns dt and index
  * maps dt's as necessary
  */
@@ -659,7 +718,12 @@ struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find3
+ * ntfs_dt_find3 -
+ * @dt:
+ * @name:
+ * @name_len:
+ * @index_num:
+ *
  * find dt by name, returns dt and index
  * does not map new dt's
  */
@@ -720,7 +784,12 @@ struct ntfs_dt * ntfs_dt_find3(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find4
+ * ntfs_dt_find4 -
+ * @dt:
+ * @name:
+ * @name_len:
+ * @index_num:
+ *
  * find successor to specified name, returns dt and index
  * maps dt's as necessary
  */
@@ -789,7 +858,9 @@ struct ntfs_dt * ntfs_dt_find4(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find_all
+ * ntfs_dt_find_all -
+ * @dt:
+ *
  * maps all dt's into memory
  */
 void ntfs_dt_find_all(struct ntfs_dt *dt)
@@ -816,7 +887,12 @@ void ntfs_dt_find_all(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_find_parent
+ * ntfs_dt_find_parent -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_find_parent(struct ntfs_dt *dt)
 {
@@ -839,7 +915,12 @@ int ntfs_dt_find_parent(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_isroot
+ * ntfs_dt_isroot -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_isroot(struct ntfs_dt *dt)
 {
@@ -850,7 +931,12 @@ BOOL ntfs_dt_isroot(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_root_freespace
+ * ntfs_dt_root_freespace -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_freespace(struct ntfs_dt *dt)
 {
@@ -871,7 +957,12 @@ int ntfs_dt_root_freespace(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_alloc_freespace
+ * ntfs_dt_alloc_freespace -
+ * @dt:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_alloc_freespace(struct ntfs_dt *dt)
 {
@@ -892,7 +983,15 @@ int ntfs_dt_alloc_freespace(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_transfer
+ * ntfs_dt_transfer -
+ * @old:
+ * @new:
+ * @start:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
 {
@@ -1042,7 +1141,14 @@ int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int co
 }
 
 /**
- * ntfs_dt_alloc_insert
+ * ntfs_dt_alloc_insert -
+ * @dt:
+ * @first:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_alloc_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 {
@@ -1106,7 +1212,15 @@ int ntfs_dt_alloc_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 }
 
 /**
- * ntfs_dt_alloc_insert2
+ * ntfs_dt_alloc_insert2 -
+ * @dt:
+ * @before:
+ * @count:
+ * @bytes:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_dt_alloc_insert2(struct ntfs_dt *dt, int before, int count, int bytes)
 {
@@ -1173,7 +1287,14 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2(struct ntfs_dt *dt, int before, int count, i
 }
 
 /**
- * ntfs_dt_root_insert
+ * ntfs_dt_root_insert -
+ * @dt:
+ * @first:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 {
@@ -1187,7 +1308,14 @@ int ntfs_dt_root_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 }
 
 /**
- * ntfs_dt_alloc_remove2
+ * ntfs_dt_alloc_remove2 -
+ * @dt:
+ * @start:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_alloc_remove2(struct ntfs_dt *dt, int start, int count)
 {
@@ -1207,7 +1335,14 @@ int ntfs_dt_alloc_remove2(struct ntfs_dt *dt, int start, int count)
 }
 
 /**
- * ntfs_dt_root_remove2
+ * ntfs_dt_root_remove2 -
+ * @dt:
+ * @start:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_remove2(struct ntfs_dt *dt, int start, int count)
 {
@@ -1249,7 +1384,15 @@ int ntfs_dt_root_remove2(struct ntfs_dt *dt, int start, int count)
 }
 
 /**
- * ntfs_dt_transfer2
+ * ntfs_dt_transfer2 -
+ * @old:
+ * @new:
+ * @start:
+ * @count:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int count)
 {
@@ -1410,7 +1553,15 @@ int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 }
 
 /**
- * ntfs_dt_root_replace
+ * ntfs_dt_root_replace -
+ * @del:
+ * @del_num:
+ * @del_ie:
+ * @suc_ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
 {
@@ -1490,7 +1641,15 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 }
 
 /**
- * ntfs_dt_alloc_replace
+ * ntfs_dt_alloc_replace -
+ * @del:
+ * @del_num:
+ * @del_ie:
+ * @suc_ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, INDEX_ENTRY *suc_ie)
 {
@@ -1553,7 +1712,13 @@ BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie
 }
 
 /**
- * ntfs_dt_root_remove
+ * ntfs_dt_root_remove -
+ * @del:
+ * @del_num:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 {
@@ -1675,7 +1840,13 @@ BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 }
 
 /**
- * ntfs_dt_alloc_remove
+ * ntfs_dt_alloc_remove -
+ * @del:
+ * @del_num:
+ *
+ * Description...
+ *
+ * Returns:
  */
 BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 {
@@ -1798,7 +1969,15 @@ BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 }
 
 /**
- * ntfs_dt_alloc_add
+ * ntfs_dt_alloc_add -
+ * @parent:
+ * @index_num:
+ * @ie:
+ * @child:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
 {
@@ -1887,7 +2066,15 @@ int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 }
 
 /**
- * ntfs_dt_root_add
+ * ntfs_dt_root_add -
+ * @parent:
+ * @index_num:
+ * @ie:
+ * @child:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, struct ntfs_dt *child)
 {
@@ -1990,7 +2177,15 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 }
 
 /**
- * ntfs_dt_add2
+ * ntfs_dt_add2 -
+ * @ie:
+ * @suc:
+ * @suc_num:
+ * @ded:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dt_add2(INDEX_ENTRY *ie, struct ntfs_dt *suc, int suc_num, struct ntfs_dt *ded)
 {

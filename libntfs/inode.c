@@ -50,9 +50,12 @@
 #include "logging.h"
 
 /**
- * Internal:
+ * __ntfs_inode_allocate -
+ * @vol:
  *
- * __ntfs_inode_allocate - desc
+ * Description...
+ *
+ * Returns:
  */
 static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 {
@@ -65,9 +68,12 @@ static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 }
 
 /**
- * Internal:
+ * ntfs_inode_allocate -
+ * @vol:
  *
- * ntfs_inode_allocate - desc
+ * Description...
+ *
+ * Returns:
  */
 ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
 {
@@ -75,9 +81,12 @@ ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
 }
 
 /**
- * Internal:
+ * __ntfs_inode_release -
+ * @ni:
  *
- * __ntfs_inode_release - desc
+ * Description...
+ *
+ * Returns:
  */
 static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
 {
@@ -1064,7 +1073,12 @@ put_err_out:
 #include "rich.h"
 
 /**
- * ntfs_inode_close2
+ * ntfs_inode_close2 -
+ * @ni:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_inode_close2(ntfs_inode *ni)
 {
@@ -1087,7 +1101,13 @@ int ntfs_inode_close2(ntfs_inode *ni)
 }
 
 /**
- * ntfs_inode_open2
+ * ntfs_inode_open2 -
+ * @vol:
+ * @mref:
+ *
+ * Description...
+ *
+ * Returns:
  */
 ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 {
@@ -1136,8 +1156,13 @@ ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 }
 
 /**
- * ntfs_inode_open3
- * open a deleted inode
+ * ntfs_inode_open3 -
+ * @vol:
+ * @mref:
+ *
+ * Description...
+ *
+ * Returns:
  */
 ntfs_inode * ntfs_inode_open3(ntfs_volume *vol, const MFT_REF mref)
 {

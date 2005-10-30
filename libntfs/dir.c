@@ -603,8 +603,6 @@ typedef enum {
 } INDEX_TYPE;
 
 /**
- * Internal:
- *
  * ntfs_filldir - ntfs specific filldir method
  * @dir_ni:	ntfs inode of current directory
  * @pos:	current position in directory
@@ -646,8 +644,6 @@ static inline int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 }
 
 /**
- * Internal:
- *
  * ntfs_mft_get_parent_ref - find mft reference of parent directory of an inode
  * @ni:		ntfs inode whose parent directory to find
  *
@@ -1519,7 +1515,12 @@ err_out:
 #include "rich.h"
 
 /**
- * ntfs_dir_rollback
+ * ntfs_dir_rollback -
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dir_rollback(struct ntfs_dir *dir)
 {
@@ -1546,7 +1547,13 @@ int ntfs_dir_rollback(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_truncate
+ * ntfs_dir_truncate -
+ * @vol:
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 {
@@ -1693,7 +1700,12 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_commit
+ * ntfs_dir_commit -
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_dir_commit(struct ntfs_dir *dir)
 {
@@ -1725,7 +1737,12 @@ int ntfs_dir_commit(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_free
+ * ntfs_dir_free -
+ * @dir:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_dir_free(struct ntfs_dir *dir)
 {
@@ -1765,7 +1782,13 @@ void ntfs_dir_free(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_create
+ * ntfs_dir_create -
+ * @vol:
+ * @mft_num:
+ *
+ * Description...
+ *
+ * Returns:
  */
 struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 {
@@ -1833,7 +1856,13 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 }
 
 /**
- * ntfs_dir_add
+ * ntfs_dir_add -
+ * @parent:
+ * @child:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_dir_add(struct ntfs_dir *parent, struct ntfs_dir *child)
 {
@@ -1854,7 +1883,14 @@ void ntfs_dir_add(struct ntfs_dir *parent, struct ntfs_dir *child)
 }
 
 /**
- * ntfs_dir_find2
+ * ntfs_dir_find2 -
+ * @dir:
+ * @name:
+ * @name_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 struct ntfs_dir * ntfs_dir_find2(struct ntfs_dir *dir, ntfschar *name, int name_len)
 {

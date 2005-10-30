@@ -228,7 +228,12 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 #include "rich.h"
 
 /**
- * ntfs_bmp_rollback
+ * ntfs_bmp_rollback -
+ * @bmp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_bmp_rollback(struct ntfs_bmp *bmp)
 {
@@ -252,7 +257,12 @@ int ntfs_bmp_rollback(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_commit
+ * ntfs_bmp_commit -
+ * @bmp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_bmp_commit(struct ntfs_bmp *bmp)
 {
@@ -301,7 +311,12 @@ int ntfs_bmp_commit(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_free
+ * ntfs_bmp_free -
+ * @bmp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_bmp_free(struct ntfs_bmp *bmp)
 {
@@ -317,7 +332,15 @@ void ntfs_bmp_free(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_create
+ * ntfs_bmp_create -
+ * @inode:
+ * @type:
+ * @name:
+ * @name_len:
+ *
+ * Description...
+ *
+ * Returns:
  */
 struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len)
 {
@@ -349,7 +372,14 @@ struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *
 }
 
 /**
- * ntfs_bmp_add_data
+ * ntfs_bmp_add_data -
+ * @bmp:
+ * @vcn:
+ * @data:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data)
 {
@@ -386,7 +416,13 @@ int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data)
 }
 
 /**
- * ntfs_bmp_get_data
+ * ntfs_bmp_get_data -
+ * @bmp:
+ * @vcn:
+ *
+ * Description...
+ *
+ * Returns:
  */
 u8 * ntfs_bmp_get_data(struct ntfs_bmp *bmp, VCN vcn)
 {
@@ -430,7 +466,15 @@ u8 * ntfs_bmp_get_data(struct ntfs_bmp *bmp, VCN vcn)
 }
 
 /**
- * ntfs_bmp_set_range
+ * ntfs_bmp_set_range -
+ * @bmp:
+ * @vcn:
+ * @length:
+ * @value:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 {
@@ -519,7 +563,12 @@ int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 }
 
 /**
- * ntfs_bmp_find_last_set
+ * ntfs_bmp_find_last_set -
+ * @bmp:
+ *
+ * Description...
+ *
+ * Returns:
  */
 s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp)
 {
@@ -583,7 +632,14 @@ s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_find_space
+ * ntfs_bmp_find_space -
+ * @bmp:
+ * @start:
+ * @size:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_bmp_find_space(struct ntfs_bmp *bmp, LCN start, long size)
 {

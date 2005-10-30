@@ -68,6 +68,10 @@
 
 /**
  * ntfs_volume_alloc -
+ *
+ * Description...
+ *
+ * Returns:
  */
 ntfs_volume *ntfs_volume_alloc(void)
 {
@@ -91,9 +95,12 @@ ntfs_volume *ntfs_volume_alloc(void)
 }
 
 /**
- * Internal:
- *
  * __ntfs_volume_release -
+ * @v:
+ *
+ * Description...
+ *
+ * Returns:
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
@@ -134,8 +141,6 @@ static void __ntfs_volume_release(ntfs_volume *v)
 }
 
 /**
- * Internal:
- *
  * ntfs_mft_load - load the $MFT and setup the ntfs volume with it
  * @vol:	ntfs volume whose $MFT to load
  *
@@ -329,8 +334,6 @@ error_exit:
 }
 
 /**
- * Internal:
- *
  * ntfs_mftmirr_load - load the $MFTMirr and setup the ntfs volume with it
  * @vol:	ntfs volume whose $MFTMirr to load
  *
@@ -1266,8 +1269,6 @@ int ntfs_umount(ntfs_volume *vol,
 
 #ifndef HAVE_REALPATH
 /**
- * Internal:
- *
  * realpath - If there is no realpath on the system
  */
 static char *realpath(const char *path, char *resolved_path)
@@ -1277,9 +1278,8 @@ static char *realpath(const char *path, char *resolved_path)
 	return resolved_path;
 }
 #endif
+
 /**
- * Internal:
- *
  * ntfs_mntent_check - desc
  *
  * If you are wanting to use this, you actually wanted to use
@@ -1606,7 +1606,14 @@ int utils_valid_device(const char *name, int force)
 }
 
 /**
- * utils_mount_volume
+ * utils_mount_volume -
+ * @device:
+ * @flags:
+ * @force:
+ *
+ * Description...
+ *
+ * Returns:
  */
 ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force)
 {
@@ -1653,7 +1660,12 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 }
 
 /**
- * ntfs_volume_commit
+ * ntfs_volume_commit -
+ * @vol:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_volume_commit(ntfs_volume *vol)
 {
@@ -1675,7 +1687,12 @@ int ntfs_volume_commit(ntfs_volume *vol)
 }
 
 /**
- * ntfs_volume_rollback
+ * ntfs_volume_rollback -
+ * @vol:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_volume_rollback(ntfs_volume *vol)
 {
@@ -1696,7 +1713,13 @@ int ntfs_volume_rollback(ntfs_volume *vol)
 }
 
 /**
- * ntfs_volume_umount2
+ * ntfs_volume_umount2 -
+ * @vol:
+ * @force:
+ *
+ * Description...
+ *
+ * Returns:
  */
 int ntfs_volume_umount2(ntfs_volume *vol, const BOOL force)
 {
@@ -1725,7 +1748,14 @@ int ntfs_volume_umount2(ntfs_volume *vol, const BOOL force)
 }
 
 /**
- * ntfs_volume_mount2
+ * ntfs_volume_mount2 -
+ * @device:
+ * @flags:
+ * @force:
+ *
+ * Description...
+ *
+ * Returns:
  */
 ntfs_volume * ntfs_volume_mount2(const char *device, unsigned long flags, BOOL force)
 {

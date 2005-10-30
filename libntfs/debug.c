@@ -35,6 +35,11 @@
 #ifndef NTFS_DISABLE_DEBUG_LOGGING
 /**
  * ntfs_debug_runlist_dump - Dump a runlist.
+ * @rl:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_debug_runlist_dump(const runlist_element *rl)
 {

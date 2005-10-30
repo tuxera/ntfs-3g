@@ -662,7 +662,12 @@ err_out:
 #include "rich.h"
 
 /**
- * ntfs_ie_free
+ * ntfs_ie_free -
+ * @ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 void ntfs_ie_free(INDEX_ENTRY *ie)
 {
@@ -671,7 +676,11 @@ void ntfs_ie_free(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_create
+ * ntfs_ie_create -
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_create(void)
 {
@@ -693,7 +702,12 @@ INDEX_ENTRY * ntfs_ie_create(void)
 }
 
 /**
- * ntfs_ie_get_vcn
+ * ntfs_ie_get_vcn -
+ * @ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie)
 {
@@ -707,7 +721,12 @@ VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_copy
+ * ntfs_ie_copy -
+ * @ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_copy(INDEX_ENTRY *ie)
 {
@@ -726,7 +745,13 @@ INDEX_ENTRY * ntfs_ie_copy(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_set_vcn
+ * ntfs_ie_set_vcn -
+ * @ie:
+ * @vcn:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn)
 {
@@ -748,7 +773,12 @@ INDEX_ENTRY * ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn)
 }
 
 /**
- * ntfs_ie_remove_vcn
+ * ntfs_ie_remove_vcn -
+ * @ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_remove_vcn(INDEX_ENTRY *ie)
 {
@@ -765,7 +795,15 @@ INDEX_ENTRY * ntfs_ie_remove_vcn(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_set_name
+ * ntfs_ie_set_name -
+ * @ie:
+ * @name:
+ * @namelen:
+ * @nametype:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_set_name(INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype)
 {
@@ -853,7 +891,12 @@ INDEX_ENTRY * ntfs_ie_set_name(INDEX_ENTRY *ie, ntfschar *name, int namelen, FIL
 }
 
 /**
- * ntfs_ie_remove_name
+ * ntfs_ie_remove_name -
+ * @ie:
+ *
+ * Description...
+ *
+ * Returns:
  */
 INDEX_ENTRY * ntfs_ie_remove_name(INDEX_ENTRY *ie)
 {
