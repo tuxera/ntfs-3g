@@ -1096,7 +1096,7 @@ typedef struct {
  * twelve hexadecimal digits. GUIDs are Microsoft's implementation of the
  * distributed computing environment (DCE) universally unique identifier (UUID).
  * Example of a GUID:
- *	1F010768-5A73-BC91-0010-A52216A7
+ *	1F010768-5A73-BC91-0010-A52216A7227B
  */
 typedef struct {
 	u32 data1;	/* The first eight hexadecimal digits of the GUID. */
