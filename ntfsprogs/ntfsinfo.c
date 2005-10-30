@@ -1122,6 +1122,58 @@ typedef enum {
 	INDEX_ATTR_QUOTA_Q,
 } INDEX_ATTR_TYPE;
 
+static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
+{
+	unsigned i;
+	char printable_GUID[37];
+	
+	switch (type) {
+	case INDEX_ATTR_SECURE_SII:
+		ntfs_log_verbose("\t\tKey security id:\t %u\n",
+				 le32_to_cpu(entry->key.sii.security_id));
+		break;
+	case INDEX_ATTR_SECURE_SDH:
+		ntfs_log_verbose("\t\tKey hash:\t\t 0x%04x\n",
+				 le32_to_cpu(entry->key.sdh.hash));
+		ntfs_log_verbose("\t\tKey security id:\t %u\n",
+				 le32_to_cpu(entry->key.sdh.security_id));
+		break;
+	case INDEX_ATTR_OBJID_O:
+		ntfs_guid_to_mbs(&entry->key.object_id, printable_GUID);
+		ntfs_log_verbose("\t\tKey GUID:\t\t %s\n", printable_GUID);
+		break;
+	case INDEX_ATTR_REPARSE_R:
+		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%04x\n",
+				 le32_to_cpu(entry->key.reparse.reparse_tag));
+		ntfs_log_verbose("\t\tKey file id:\t\t %llu\n",
+				 le64_to_cpu(entry->key.reparse.file_id));
+		break;
+	case INDEX_ATTR_QUOTA_O:
+		ntfs_log_verbose("\t\tKey revision:\t\t %u\n", 
+				 entry->key.sid.revision);
+		ntfs_log_verbose("\t\tKey sub authority count: %u\n", 
+				 entry->key.sid.sub_authority_count);
+		ntfs_log_verbose("\t\tKey ident. auth. high:   %u\n",
+				 le16_to_cpu(entry->key.sid.
+					     identifier_authority.high_part));
+		ntfs_log_verbose("\t\tKey ident. auth. low:    %u\n",
+				 le32_to_cpu(entry->key.sid.
+					     identifier_authority.low_part));
+		for (i = 0; i < entry->key.sid.sub_authority_count; i++)
+			ntfs_log_verbose("\t\tKey sub authority:\t %u\n",
+				le32_to_cpu(entry->key.sid.sub_authority));
+		break;
+	case INDEX_ATTR_QUOTA_Q:
+		ntfs_log_verbose("\t\tKey owner id:\t\t %u\n",
+				 le32_to_cpu(entry->key.owner_id));
+		break;
+	default:
+		ntfs_log_verbose("\t\tKey is UNKNOWN: \t 0x%04x\n",
+				 le32_to_cpu(type));
+		break;
+	}
+}
+
 /**
  * ntfs_dump_index_entries()
  *
@@ -1185,11 +1237,12 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 					entry->key.file_name.allocated_size));
 				break;
 			default:
-				// TODO: determine more attribute types
 				ntfs_log_verbose("\t\tData offset:\t\t %u\n",
 					le16_to_cpu(entry->data_offset));
 				ntfs_log_verbose("\t\tData length:\t\t %u\n",
 					le16_to_cpu(entry->data_length));
+				ntfs_dump_index_key(entry, type);
+				// TODO: dump index attribute data too
 				break;
 		}
 		entry = (INDEX_ENTRY *)((u8 *)entry +

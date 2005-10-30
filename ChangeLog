@@ -55,6 +55,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfsinfo and ntfsls follow the convention how other utilities read
 	  the device argument: no -d or --device option is needed.  (Szaka)
 	- ntfsinfo: figure out and dump index attribute types.  (Szaka)
+	- ntfsinfo: dump index attribute keys.  (Szaka)
 	  
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
