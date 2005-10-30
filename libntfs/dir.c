@@ -64,6 +64,8 @@ ntfschar NTFS_INDEX_O[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('O'),
 		const_cpu_to_le16('\0') };
 ntfschar NTFS_INDEX_Q[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('Q'),
 		const_cpu_to_le16('\0') };
+ntfschar NTFS_INDEX_R[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('R'),
+		const_cpu_to_le16('\0') };
 
 /**
  * ntfs_inode_lookup_by_name - find an inode in a directory given its name

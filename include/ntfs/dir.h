@@ -32,7 +32,7 @@
 #define MAX_PATH 1024
 #endif
 
-/* The little endian Unicode strings $I30, $SII, $SDH, $O, $Q
+/* The little endian Unicode strings $I30, $SII, $SDH, $O, $Q, $R
  * as a global constant.
  */
 extern ntfschar NTFS_INDEX_I30[5];
@@ -40,6 +40,7 @@ extern ntfschar NTFS_INDEX_SII[5];
 extern ntfschar NTFS_INDEX_SDH[5];
 extern ntfschar NTFS_INDEX_O[3];
 extern ntfschar NTFS_INDEX_Q[3];
+extern ntfschar NTFS_INDEX_R[3];
 
 extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		const ntfschar *uname, const int uname_len);

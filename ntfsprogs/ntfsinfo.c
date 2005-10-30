@@ -6,6 +6,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
+ * Copyright (c) 2003-2005 Szabolcs Szakacsits
  *
  * This utility will dump a file's attributes.
  *
@@ -1110,12 +1111,23 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 	}
 }
 
+typedef enum {
+	INDEX_ATTR_UNKNOWN,
+	INDEX_ATTR_DIRECTORY_I30,
+	INDEX_ATTR_SECURE_SII,
+	INDEX_ATTR_SECURE_SDH,
+	INDEX_ATTR_OBJID_O,
+	INDEX_ATTR_REPARSE_R,
+	INDEX_ATTR_QUOTA_O,
+	INDEX_ATTR_QUOTA_Q,
+} INDEX_ATTR_TYPE;
+
 /**
  * ntfs_dump_index_entries()
  *
  * dump sequence of index_entries and return number of entries dumped.
  */
-static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
+static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
 	int numb_entries = 1;
 	char *name = NULL;
@@ -1145,12 +1157,12 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 			break;
 
 		switch (type) {
-			case(AT_FILE_NAME):
+			case(INDEX_ATTR_DIRECTORY_I30):
 				ntfs_log_verbose("\t\tFILE record number:\t %llu\n",
 						MREF_LE(entry->indexed_file));
 				if (opts.verbose) {
 					printf("\t");
-					ntfs_dump_flags(type, entry->key.
+					ntfs_dump_flags(AT_FILE_NAME, entry->key.
 						file_name.file_attributes);
 					printf("\t");
 					ntfs_dump_namespace(entry->key.
@@ -1188,14 +1200,85 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, ATTR_TYPES type)
 	return numb_entries;
 }
 
+#define	COMPARE_INDEX_NAMES(attr, name)					       \
+	ntfs_names_are_equal((name), sizeof(name) / 2 - 1,		       \
+		(ntfschar*)((char*)(attr) + le16_to_cpu((attr)->name_offset)), \
+		(attr)->name_length, 0, NULL, 0)
+
+static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot);
+
+static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
+					   INDEX_ROOT *index_root)
+{
+	char file_name[64];
+
+	if (!attr->name_length)
+		return INDEX_ATTR_UNKNOWN;
+	
+	if (index_root->type) {
+		if (index_root->type == AT_FILE_NAME)
+			return INDEX_ATTR_DIRECTORY_I30;
+		else
+			/* weird, this should be illegal */
+			ntfs_log_error("Unknown index attribute type: 0x%0X\n",
+				       index_root->type);
+		return INDEX_ATTR_UNKNOWN;
+	}
+	
+	if (utils_is_metadata(ni) <= 0)
+		return INDEX_ATTR_UNKNOWN;
+	if (utils_inode_get_name(ni, file_name, sizeof(file_name)) <= 0)
+		return INDEX_ATTR_UNKNOWN;
+	
+	if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_SDH))
+		return INDEX_ATTR_SECURE_SDH;
+	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_SII))
+		return INDEX_ATTR_SECURE_SII;
+	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_SII))
+		return INDEX_ATTR_SECURE_SII;
+	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_Q))
+		return INDEX_ATTR_QUOTA_Q;
+	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_R))
+		return INDEX_ATTR_REPARSE_R;
+	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_O)) {
+		if (!strcmp(file_name, "/$Extend/$Quota"))
+			return INDEX_ATTR_QUOTA_O;
+		else
+			return INDEX_ATTR_OBJID_O;
+	}
+	
+	return INDEX_ATTR_UNKNOWN;
+}
+
+static void ntfs_dump_index_attr_type(INDEX_ATTR_TYPE type)
+{
+	if (type == INDEX_ATTR_DIRECTORY_I30)
+		printf("DIRECTORY_I30");
+	else if (type == INDEX_ATTR_SECURE_SDH)
+		printf("SECURE_SDH");
+	else if (type == INDEX_ATTR_SECURE_SII)
+		printf("SECURE_SII");
+	else if (type == INDEX_ATTR_OBJID_O)
+		printf("OBJID_O");
+	else if (type == INDEX_ATTR_QUOTA_O)
+		printf("QUOTA_O");
+	else if (type == INDEX_ATTR_QUOTA_Q)
+		printf("QUOTA_Q");
+	else if (type == INDEX_ATTR_REPARSE_R)
+		printf("REPARSE_R");
+	else
+		printf("UNKNOWN");
+	printf("\n");
+}
+
 /**
  * ntfs_dump_attr_index_root()
  *
  * dump the index_root attribute
  */
-static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
+static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 {
-	unsigned int type;
+	INDEX_ATTR_TYPE type;
 	INDEX_ROOT *index_root = NULL;
 	INDEX_ENTRY *entry;
 
@@ -1222,22 +1305,10 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(attr->instance));
 
 	/* attr_type dumping */
+	type = get_index_attr_type(ni, attr, index_root);
 	printf("\tIndexed Attr Type:\t ");
-	type = le32_to_cpu(index_root->type);
-	if (type) {
-		if (index_root->type != AT_FILE_NAME) {
-			/* weird, this should be illgeal */
-			printf("0x%0X\n", type);
-			ntfs_log_error("ntfsinfo error: Unknown Indexed Attr "
-				"Type: 0x%0X\n", type);
-		} else {
-			printf("file names\n");
-		}
-	} else {
-		/* fixme: add some more index types */
-		printf("unknown\n");
-	}
-
+	ntfs_dump_index_attr_type(type);
+	
 	/* collation rule dumping */
 	printf("\tCollation Rule:\t\t %u\n",
 		(unsigned int)le32_to_cpu(index_root->collation_rule));
@@ -1263,16 +1334,15 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr)
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
 	ntfs_log_verbose("\tDumping index block:");
 	printf("\tIndex entries total:\t %d\n",
-			ntfs_dump_index_entries(entry, index_root->type));
+			ntfs_dump_index_entries(entry, type));
 }
 
 /**
- * ntfs_dump_attr_index_allocation()
+ * get_index_root()
  *
- * determine size and type of INDX record
+ * determine size, type and the collation rule of INDX record
  */
-static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
-						ATTR_TYPES *type, u32 *size)
+static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfschar *name = 0;
@@ -1303,8 +1373,7 @@ static int get_type_and_size_of_indx(ntfs_inode *ni, ATTR_RECORD *attr,
 
 	root = (INDEX_ROOT*)((u8*)ctx->attr +
 				le16_to_cpu(ctx->attr->value_offset));
-	*size = le32_to_cpu(root->index_block_size);
-	*type = root->type;
+	*iroot = *root;
 	ntfs_attr_put_search_ctx(ctx);
 	free(name);
 	return 0;
@@ -1319,8 +1388,8 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	INDEX_ALLOCATION *allocation, *tmp_alloc;
 	INDEX_ENTRY *entry;
-	ATTR_TYPES type;
-	u32 indx_record_size;
+	INDEX_ROOT index_root;
+	INDEX_ATTR_TYPE type;
 	int total_entries = 0;
 	int total_indx_blocks = 0;
 	ntfs_attr *na;
@@ -1328,8 +1397,10 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	int bit;
 	ntfschar *name;
 
-	if (get_type_and_size_of_indx(ni, attr, &type, &indx_record_size))
+	if (get_index_root(ni, attr, &index_root))
 		return;
+	
+	type = get_index_attr_type(ni, attr, &index_root);
 
 	name = (ntfschar*)((u8*)attr + attr->name_offset);
 	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
@@ -1376,7 +1447,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	while ((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
 		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
-						indx_record_size)) {
+						index_root.index_block_size)) {
 				ntfs_log_perror("Damaged INDX record");
 				goto free;
 			}
@@ -1392,8 +1463,8 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			total_entries += ntfs_dump_index_entries(entry, type);
 			total_indx_blocks++;
 		}
-		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc +
-							indx_record_size);
+		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
+						 index_root.index_block_size);
 		bit++;
 		if (bit > 7) {
 			bit = 0;
@@ -1827,7 +1898,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_data(ctx->attr, inode->vol);
 			break;
 		case AT_INDEX_ROOT:
-			ntfs_dump_attr_index_root(ctx->attr);
+			ntfs_dump_attr_index_root(ctx->attr, inode);
 			break;
 		case AT_INDEX_ALLOCATION:
 			ntfs_dump_attr_index_allocation(ctx->attr, inode);
