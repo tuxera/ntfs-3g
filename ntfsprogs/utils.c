@@ -525,7 +525,7 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 
 	ntfs_log_debug("Pathname: %s\n", buffer);
 
-	return 0;
+	return 1;
 }
 
 /**
