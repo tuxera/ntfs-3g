@@ -48,7 +48,7 @@
 #include "logging.h"
 
 /**
- * ntfs_compression_constants - enum of constants used in the compression code
+ * enum ntfs_compression_constants - constants used in the compression code
  */
 typedef enum {
 	/* Token types and access mask. */
