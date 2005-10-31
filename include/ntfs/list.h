@@ -22,7 +22,8 @@
 #ifndef _NTFS_LIST_H
 #define _NTFS_LIST_H
 
-/*
+/**
+ * struct list_head -
  * Simple doubly linked list implementation. - Copied from Linux kernel
  * 2.4.2-ac18 into Linux-NTFS (with minor modifications). - AIA
  *
@@ -32,7 +33,6 @@
  * generate better code by using them directly rather than
  * using the generic single-entry routines.
  */
-
 struct list_head {
 	struct list_head *next, *prev;
 };
@@ -46,7 +46,12 @@ struct list_head {
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 } while (0)
 
-/*
+/**
+ * __list_add -
+ * @new:
+ * @prev:
+ * @next:
+ *
  * Insert a new entry between two known consecutive entries.
  *
  * This is only for internal list manipulation where we know the prev/next
@@ -87,7 +92,11 @@ static __inline__ void list_add_tail(struct list_head *new, struct list_head *he
 	__list_add(new, head->prev, head);
 }
 
-/*
+/**
+ * __list_del -
+ * @prev:
+ * @next:
+ *
  * Delete a list entry by making the prev/next entries point to each other.
  *
  * This is only for internal list manipulation where we know the prev/next

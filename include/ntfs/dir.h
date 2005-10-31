@@ -84,7 +84,7 @@ extern int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 #ifdef NTFS_RICH
 
 /**
- * struct ntfs_dir
+ * struct ntfs_dir -
  */
 struct ntfs_dir {
 	ntfs_volume	  *vol;

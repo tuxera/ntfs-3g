@@ -138,7 +138,7 @@ static __inline__ int ntfs_bitmap_clear_bit(ntfs_attr *na, s64 bit)
 #include "inode.h"
 
 /**
- * struct ntfs_bmp
+ * struct ntfs_bmp -
  * a cache for either dir/$BITMAP, $MFT/$BITMAP or $Bitmap/$DATA
  */
 struct ntfs_bmp {

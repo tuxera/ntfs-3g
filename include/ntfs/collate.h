@@ -29,6 +29,14 @@
 
 #define NTFS_COLLATION_ERROR -2
 
+/**
+ * ntfs_is_collation_rule_supported -
+ * @cr:
+ *
+ * Description...
+ *
+ * Returns:
+ */
 static inline BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
 {
 	int i;

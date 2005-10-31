@@ -56,7 +56,8 @@
 #define DefaultLogPageSize	4096
 #define MinLogRecordPages	48
 
-/*
+/**
+ * struct RESTART_PAGE_HEADER -
  * Log file restart page header (begins the restart area).
  */
 typedef struct {
@@ -113,7 +114,8 @@ enum {
 
 typedef le16 RESTART_AREA_FLAGS;
 
-/*
+/**
+ * struct RESTART_AREA -
  * Log file restart area record.  The offset of this record is found by adding
  * the offset of the RESTART_PAGE_HEADER to the restart_area_offset value found
  * in it.  See notes at restart_area_offset above.
@@ -252,7 +254,8 @@ typedef struct {
 /* sizeof() = 48 (0x30) bytes */
 } __attribute__((__packed__)) RESTART_AREA;
 
-/*
+/**
+ * struct LOG_CLIENT_RECORD -
  * Log client record.  The offset of this record is found by adding the offset
  * of the RESTART_AREA to the client_array_offset value found in it.
  */
@@ -291,7 +294,8 @@ typedef struct {
 /* sizeof() = 160 (0xa0) bytes */
 } __attribute__((__packed__)) LOG_CLIENT_RECORD;
 
-/*
+/**
+ * struct RECORD_PAGE_HEADER -
  * Log page record page header. Each log page begins with this header and is
  * followed by several LOG_RECORD structures, starting at offset 0x40 (the
  * size of this structure and the following update sequence array and then
@@ -322,7 +326,8 @@ typedef struct {
 	} __attribute__((__packed__)) header;
 } __attribute__((__packed__)) RECORD_PAGE_HEADER;
 
-/*
+/**
+ * enum LOG_RECORD_FLAGS -
  * Possible 16-bit flags for log records.  (Or is it log record pages?)
  */
 typedef enum {
@@ -332,7 +337,8 @@ typedef enum {
 		   gcc knows to make the flags 16-bit. */
 } __attribute__((__packed__)) LOG_RECORD_FLAGS;
 
-/*
+/**
+ * struct LOG_CLIENT_ID -
  * The log client id structure identifying a log client.
  */
 typedef struct {
@@ -340,7 +346,8 @@ typedef struct {
 	u16 client_index;
 } __attribute__((__packed__)) LOG_CLIENT_ID;
 
-/*
+/**
+ * struct LOG_RECORD -
  * Log record header.  Each log record seems to have a constant size of 0x70
  * bytes.
  */

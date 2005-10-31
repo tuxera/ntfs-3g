@@ -2100,7 +2100,7 @@ out:
 /**
  * test_rl_main -
  * @argc:
- * @argv:[]
+ * @argv:
  *
  * Description...
  *

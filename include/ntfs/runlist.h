@@ -32,7 +32,8 @@ typedef runlist_element runlist;
 #include "attrib.h"
 #include "volume.h"
 
-/*
+/**
+ * struct _runlist_element -
  * runlist_element - in memory vcn to lcn mapping array element
  * @vcn:	starting vcn of the current array element
  * @lcn:	starting lcn of the current array element

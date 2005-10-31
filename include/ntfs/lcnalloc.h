@@ -28,6 +28,9 @@
 #include "runlist.h"
 #include "volume.h"
 
+/**
+ * enum NTFS_CLUSTER_ALLOCATION_ZONES -
+ */
 typedef enum {
 	FIRST_ZONE	= 0,	/* For sanity checking. */
 	MFT_ZONE	= 0,	/* Allocate from $MFT zone. */

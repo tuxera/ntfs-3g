@@ -28,7 +28,7 @@
 struct ntfs_dir;
 
 /**
- * struct ntfs_dt
+ * struct ntfs_dt -
  */
 struct ntfs_dt {
 	struct ntfs_dir	 *dir;

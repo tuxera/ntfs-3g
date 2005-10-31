@@ -43,6 +43,9 @@
 
 /* Both under Cygwin and DJGPP we do not have MS_RDONLY, so we define it. */
 #if !defined(MS_RDONLY)
+/**
+ * enum MS_MOUNT -
+ */
 typedef enum {
 	MS_RDONLY = 1,
 } MS_MOUNT;
@@ -57,7 +60,8 @@ typedef struct _ntfs_volume ntfs_volume;
 #include "inode.h"
 #include "attrib.h"
 
-/*
+/**
+ * enum ntfs_mount_flags -
  * Flags returned by the ntfs_check_if_mounted() function.
  */
 typedef enum {
@@ -68,7 +72,8 @@ typedef enum {
 
 extern int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags);
 
-/*
+/**
+ * enum ntfs_volume_state_bits -
  * Defined bits for the state field in the ntfs_volume structure.
  */
 typedef enum {
@@ -108,7 +113,8 @@ typedef enum {
 
 #define NTFS_BUF_SIZE 8192
 
-/*
+/**
+ * struct _ntfs_volume -
  * ntfs_volume - structure describing an open volume in memory
  */
 struct _ntfs_volume {

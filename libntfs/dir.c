@@ -592,6 +592,7 @@ static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
 				   const_cpu_to_le16('\0') };
 
 /*
+ * union index_union -
  * More helpers for ntfs_readdir().
  */
 typedef union {
@@ -599,6 +600,10 @@ typedef union {
 	INDEX_ALLOCATION *ia;
 } index_union __attribute__((__transparent_union__));
 
+/**
+ * enum INDEX_TYPE -
+ * More helpers for ntfs_readdir().
+ */
 typedef enum {
 	INDEX_TYPE_ROOT,	/* index root */
 	INDEX_TYPE_ALLOCATION,	/* index allocation */

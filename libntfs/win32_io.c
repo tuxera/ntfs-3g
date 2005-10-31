@@ -78,6 +78,9 @@ static LPFN_SETFILEPOINTEREX fnSetFilePointerEx = NULL;
 #define FNPOSTFIX "A"
 #endif
 
+/**
+ * struct win32_fd -
+ */
 typedef struct {
 	HANDLE handle;
 	s64 pos;		/* Logical current position on the volume. */

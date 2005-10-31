@@ -33,7 +33,7 @@ extern char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str);
 
 /**
  * ntfs_sid_is_valid - determine if a SID is valid
- * @sid:	[IN]  SID for which to determine if it is valid
+ * @sid:	SID for which to determine if it is valid
  *
  * Determine if the SID pointed to by @sid is valid.
  *

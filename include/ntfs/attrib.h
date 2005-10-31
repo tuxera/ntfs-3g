@@ -38,7 +38,7 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 extern ntfschar AT_UNNAMED[];
 
 /**
- * ntfs_lcn_special_values - special return values for ntfs_*_vcn_to_lcn()
+ * enum ntfs_lcn_special_values - special return values for ntfs_*_vcn_to_lcn()
  *
  * Special return values for ntfs_rl_vcn_to_lcn() and ntfs_attr_vcn_to_lcn().
  *
@@ -53,7 +53,7 @@ typedef enum {
 } ntfs_lcn_special_values;
 
 /**
- * ntfs_attr_search_ctx - search context used in attribute search functions
+ * struct ntfs_attr_search_ctx - search context used in attribute search functions
  * @mrec:	buffer containing mft record to search
  * @attr:	attribute record in @mrec where to begin/continue search
  * @is_first:	if true lookup_attr() begins search with @attr, else after @attr
@@ -126,7 +126,7 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
 }
 
 /**
- * ntfs_attr - ntfs in memory non-resident attribute structure
+ * struct ntfs_attr - ntfs in memory non-resident attribute structure
  * @rl:			if not NULL, the decompressed runlist
  * @ni:			base ntfs inode to which this attribute belongs
  * @type:		attribute type
@@ -184,7 +184,7 @@ struct _ntfs_attr {
 };
 
 /**
- * ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
+ * enum ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
  */
 typedef enum {
 	NA_Initialized,		/* 1: structure is initialized. */

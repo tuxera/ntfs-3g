@@ -81,7 +81,8 @@ typedef sle64 leLSN;
  * As long as this file will be included after <windows.h> were fine.
  */
 #ifndef _WINDEF_H
-/*
+/**
+ * enum BOOL -
  * These are just to make the code more readable...
  */
 typedef enum {
@@ -94,6 +95,9 @@ typedef enum {
 } BOOL;
 #endif /* defined _WINDEF_H */
 
+/**
+ * enum IGNORE_CASE_BOOL -
+ */
 typedef enum {
 	CASE_SENSITIVE = 0,
 	IGNORE_CASE = 1,

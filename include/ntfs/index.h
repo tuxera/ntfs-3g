@@ -31,7 +31,7 @@
 #include "mft.h"
 
 /**
- * ntfs_index_context -
+ * struct ntfs_index_context -
  * @ni:		inode containing the @entry described by this context
  * @name:	name of the index described by this context
  * @name_len:	length of the index name

@@ -37,6 +37,9 @@
 
 #ifndef HDIO_GETGEO
 #	define HDIO_GETGEO	0x10000301
+/**
+ * struct hd_geometry -
+ */
 struct hd_geometry {
 	unsigned char heads;
 	unsigned char sectors;
