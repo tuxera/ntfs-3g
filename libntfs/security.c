@@ -252,26 +252,21 @@ err_out:
 
 /**
  * ntfs_generate_guid - generatates a random current guid.
- * @guid:	a pointer to a GUID struct to hold the generated guid.
+ * @guid:	[OUT]   pointer to a GUID struct to hold the generated guid.
  *
  * perhaps not a very good random number generator though...
- *
- * Returns: The same pointer it was given as a parameter (guid).
  */
-GUID *ntfs_generate_guid(GUID *guid)
+void ntfs_generate_guid(GUID *guid)
 {
-
 	int i;
-	static u8 array[16];
+	u8 *p = (u8 *)guid;
 
-	for (i = 0; i < 16; i++) {
-		array[i] = (u8)(random() & 0xFF);
+	for (i = 0; i < sizeof(GUID); i++) {
+		p[i] = (u8)(random() & 0xFF);
 		if (i == 7)
-			array[7] = (array[7] & 0x0F) | 0x40;
+			p[7] = (p[7] & 0x0F) | 0x40;
 		if (i == 8)
-			array[8] = (array[8] & 0x3F) | 0x80;
+			p[8] = (p[8] & 0x3F) | 0x80;
 	}
-	memcpy(guid, array, sizeof(guid));
-	return guid;
 }
 
