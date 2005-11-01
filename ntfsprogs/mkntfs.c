@@ -2993,7 +2993,7 @@ static int initialize_quota(MFT_RECORD *m) {
 	idx_entry_q1->key_length = cpu_to_le16(0x04);
 	idx_entry_q1->flags = cpu_to_le16(0x00);
 	idx_entry_q1->reserved = cpu_to_le16(0x00);
-	idx_entry_q1->key.owner_id = cpu_to_le16(0x01);
+	idx_entry_q1->key.owner_id = cpu_to_le32(0x01);
 	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
 			 + idx_entry_q1->data_offset);
 	idx_entry_q1_data->version = cpu_to_le32(0x02);
