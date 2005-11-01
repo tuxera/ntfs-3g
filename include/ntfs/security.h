@@ -50,6 +50,6 @@ static __inline__ BOOL ntfs_sid_is_valid(const SID *sid)
 extern int ntfs_sid_to_mbs_size(const SID *sid);
 extern char *ntfs_sid_to_mbs(const SID *sid, char *sid_str,
 		size_t sid_str_size);
-extern GUID *generate_guid(GUID *guid);
+extern GUID *ntfs_generate_guid(GUID *guid);
 
 #endif /* defined _NTFS_SECURITY_H */

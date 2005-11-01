@@ -4202,7 +4202,7 @@ static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
 	}
 	if (!err && vol->major_ver>=3) {
 		volume_obj_id=(OBJECT_ID_ATTR*)calloc(1,0x10);
-		volume_obj_id->object_id = *generate_guid(&volume_obj_id->object_id);
+		volume_obj_id->object_id = *ntfs_generate_guid(&volume_obj_id->object_id);
 		err = add_attr_object_id(m, volume_obj_id, 0x10);
 	}
 	if (!err)

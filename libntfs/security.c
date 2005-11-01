@@ -251,14 +251,14 @@ err_out:
 }
 
 /**
- * generate_guid - generatates a random current guid.
+ * ntfs_generate_guid - generatates a random current guid.
  * @guid:	a pointer to a GUID struct to hold the generated guid.
  *
  * perhaps not a very good random number generator though...
  *
  * Returns: The same pointer it was given as a parameter (guid).
  */
-GUID *generate_guid(GUID *guid)
+GUID *ntfs_generate_guid(GUID *guid)
 {
 
 	int i;
