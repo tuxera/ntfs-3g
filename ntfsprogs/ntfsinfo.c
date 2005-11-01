@@ -1153,15 +1153,15 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				 entry->key.sid.revision);
 		ntfs_log_verbose("\t\tKey sub authority count: %u\n", 
 				 entry->key.sid.sub_authority_count);
-		ntfs_log_verbose("\t\tKey ident. auth. high:   %u\n",
+		ntfs_log_verbose("\t\tKey ident. auth. high:   0x%04x\n",
 				 le16_to_cpu(entry->key.sid.
 					     identifier_authority.high_part));
-		ntfs_log_verbose("\t\tKey ident. auth. low:    %u\n",
+		ntfs_log_verbose("\t\tKey ident. auth. low:    0x%08x\n",
 				 le32_to_cpu(entry->key.sid.
 					     identifier_authority.low_part));
 		for (i = 0; i < entry->key.sid.sub_authority_count; i++)
-			ntfs_log_verbose("\t\tKey sub authority:\t %u\n",
-				le32_to_cpu(entry->key.sid.sub_authority));
+			ntfs_log_verbose("\t\tKey sub authority:\t 0x%08x\n",
+				le32_to_cpu(entry->key.sid.sub_authority[i]));
 		break;
 	case INDEX_ATTR_QUOTA_Q:
 		ntfs_log_verbose("\t\tKey owner id:\t\t %u\n",
