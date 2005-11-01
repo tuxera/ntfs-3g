@@ -2767,7 +2767,7 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, name_size, 0, 0,
+	if (mkntfs_attr_lookup(AT_INDEX_ROOT, name, name_size, 0, 0,
 		NULL, 0, ctx)) {
 		err = EEXIST;
 		goto err_out;
