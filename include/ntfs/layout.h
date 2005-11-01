@@ -1882,7 +1882,7 @@ typedef struct {
 	u32 security_id;   /* The security_id assigned to the descriptor. */
 	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
 	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
-	u64 reserved_II;   /* Padding - always unicode "II" */
+	u32 reserved_II;   /* Padding - always unicode "II" */
 } __attribute__((__packed__)) SDH_INDEX_DATA;
 
 /**

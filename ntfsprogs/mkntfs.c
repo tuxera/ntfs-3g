@@ -2871,8 +2871,10 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m) {
 	SII_INDEX_DATA *sii_data;
 
 	sds_header = (SECURITY_DESCRIPTOR_HEADER*)sds;
-	sdh_size = cpu_to_le32(0x30);
-	sii_size = cpu_to_le32(0x28);
+	sdh_size  = sizeof(INDEX_ENTRY_HEADER);
+	sdh_size += sizeof(SDH_INDEX_KEY) + sizeof(SDH_INDEX_DATA);
+	sii_size  = sizeof(INDEX_ENTRY_HEADER);
+	sii_size += sizeof(SII_INDEX_KEY) + sizeof(SII_INDEX_DATA);
 	idx_entry_sdh = (INDEX_ENTRY*)calloc(1, sizeof(INDEX_ENTRY));
 	idx_entry_sii = (INDEX_ENTRY*)calloc(1, sizeof(INDEX_ENTRY));
 	err = 0;
@@ -2896,7 +2898,7 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m) {
 		sdh_data->offset_in_sds = sds_header->offset;
 
 		sdh_data->size_in_sds = sds_header->length;
-		sdh_data->reserved_II =  cpu_to_le64(0x00490049);
+		sdh_data->reserved_II =  cpu_to_le32(0x00490049);
 
 		//SII index entry
 		idx_entry_sii->data_offset = cpu_to_le16(0x14);
