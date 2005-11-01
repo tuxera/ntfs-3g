@@ -1880,9 +1880,9 @@ typedef struct {
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
-	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
-	u32 reserved_II;   /* Padding - always unicode "II" */
+	u64 offset_in_sds; /* Offset of the descriptor in $SDS data stream. */
+	u32 size_in_sds;   /* Size of the descriptor in $SDS data stream. */
+	u32 reserved_II;   /* Padding - always unicode "II". */
 } __attribute__((__packed__)) SDH_INDEX_DATA;
 
 /**
@@ -1891,8 +1891,8 @@ typedef struct {
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset_in_sds; /* Offset of the descriptor in SDS data stream */
-	u32 size_in_sds;   /* Size of the descriptor in SDS data stream */
+	u64 offset_in_sds; /* Offset of the descriptor in $SDS data stream. */
+	u32 size_in_sds;   /* Size of the descriptor in $SDS data stream. */
 } __attribute__((__packed__)) SII_INDEX_DATA;
 
 /**
@@ -2309,7 +2309,6 @@ typedef struct {
 					   control entry in the data part of
 					   the index. */
 	} __attribute__((__packed__)) key;
-
 	/* The (optional) index data is inserted here when creating. */
 	// VCN vcn;	/* If INDEX_ENTRY_NODE bit in flags is set, the last
 	//		   eight bytes of this index entry contain the virtual
