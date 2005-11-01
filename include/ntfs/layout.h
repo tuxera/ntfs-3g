@@ -1899,7 +1899,7 @@ typedef struct {
  * struct QUOTA_O_INDEX_DATA -
  */
 typedef struct {
-	u64 owner_id;
+	u32 owner_id;
 } __attribute__((__packed__)) QUOTA_O_INDEX_DATA;
 
 /**
