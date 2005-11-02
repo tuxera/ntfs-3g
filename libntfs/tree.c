@@ -42,7 +42,7 @@
 #include "rich.h"
 
 /**
- * ntfs_dt_free -
+ * ntfs_dt_free - Destroy a directory-tree object
  * @dt:
  *
  * Description...
@@ -71,7 +71,7 @@ void ntfs_dt_free(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_rollback -
+ * ntfs_dt_rollback - Discard the in-memory directory-tree changes
  * @dt:
  *
  * Description...
@@ -123,7 +123,7 @@ int ntfs_dt_rollback(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_commit -
+ * ntfs_dt_commit - Write to disk the in-memory directory-tree changes
  * @dt:
  *
  * Description...
@@ -186,7 +186,7 @@ int ntfs_dt_commit(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_create_children2 -
+ * ntfs_dt_create_children2 - Allocate space for the directory-tree's children
  * @dt:
  * @count:
  *
@@ -220,7 +220,7 @@ BOOL ntfs_dt_create_children2(struct ntfs_dt *dt, int count)
 }
 
 /**
- * ntfs_dt_resize_children3 -
+ * ntfs_dt_resize_children3 - Resize a directory-tree's children arrays
  * @dt:
  * @new:
  *
@@ -266,7 +266,7 @@ BOOL ntfs_dt_resize_children3(struct ntfs_dt *dt, int new)
 }
 
 /**
- * ntfs_dt_root_count -
+ * ntfs_dt_root_count - Count the index entries in an index root
  * @dt:
  *
  * Description...
@@ -334,7 +334,7 @@ int ntfs_dt_root_count(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_alloc_count -
+ * ntfs_dt_alloc_count - Count the index entries in an index allocation
  * @dt:
  *
  * Description...
@@ -398,7 +398,7 @@ int ntfs_dt_alloc_count(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_initialise2 -
+ * ntfs_dt_initialise2 - Setup a directory-tree object
  * @vol:
  * @dt:
  *
@@ -447,7 +447,7 @@ int ntfs_dt_initialise2(ntfs_volume *vol, struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_create -
+ * ntfs_dt_create - Create a representation of a directory index
  * @dir:
  * @parent:
  * @vcn:
@@ -554,7 +554,7 @@ struct ntfs_dt * ntfs_dt_create(struct ntfs_dir *dir, struct ntfs_dt *parent, VC
 }
 
 /**
- * ntfs_dt_find -
+ * ntfs_dt_find - Find an index entry by name
  * @dt:
  * @name:
  * @name_len:
@@ -634,7 +634,7 @@ MFT_REF ntfs_dt_find(struct ntfs_dt *dt, ntfschar *name, int name_len)
 }
 
 /**
- * ntfs_dt_find2 -
+ * ntfs_dt_find2 - Find an index entry by name
  * @dt:
  * @name:
  * @name_len:
@@ -718,7 +718,7 @@ struct ntfs_dt * ntfs_dt_find2(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find3 -
+ * ntfs_dt_find3 - Find an index entry by name
  * @dt:
  * @name:
  * @name_len:
@@ -784,7 +784,7 @@ struct ntfs_dt * ntfs_dt_find3(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find4 -
+ * ntfs_dt_find4 - Find an index entry by name
  * @dt:
  * @name:
  * @name_len:
@@ -858,7 +858,7 @@ struct ntfs_dt * ntfs_dt_find4(struct ntfs_dt *dt, ntfschar *name, int name_len,
 }
 
 /**
- * ntfs_dt_find_all -
+ * ntfs_dt_find_all - Recurse the directory-tree, mapping all elements
  * @dt:
  *
  * maps all dt's into memory
@@ -887,7 +887,7 @@ void ntfs_dt_find_all(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_find_parent -
+ * ntfs_dt_find_parent - Find the index of ourself in the parent's array
  * @dt:
  *
  * Description...
@@ -915,7 +915,7 @@ int ntfs_dt_find_parent(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_isroot -
+ * ntfs_dt_isroot - Does this directory-tree represent an index root
  * @dt:
  *
  * Description...
@@ -931,7 +931,7 @@ BOOL ntfs_dt_isroot(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_root_freespace -
+ * ntfs_dt_root_freespace - Give the free space (bytes) in an index root
  * @dt:
  *
  * Description...
@@ -957,7 +957,7 @@ int ntfs_dt_root_freespace(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_alloc_freespace -
+ * ntfs_dt_alloc_freespace - Give the free space (bytes) in an index allocation
  * @dt:
  *
  * Description...
@@ -983,7 +983,7 @@ int ntfs_dt_alloc_freespace(struct ntfs_dt *dt)
 }
 
 /**
- * ntfs_dt_transfer -
+ * ntfs_dt_transfer - Transfer several index entries between directory-trees
  * @old:
  * @new:
  * @start:
@@ -1141,7 +1141,7 @@ int ntfs_dt_transfer(struct ntfs_dt *old, struct ntfs_dt *new, int start, int co
 }
 
 /**
- * ntfs_dt_alloc_insert -
+ * ntfs_dt_alloc_insert - Insert an index entry into an index allocation
  * @dt:
  * @first:
  * @count:
@@ -1212,7 +1212,7 @@ int ntfs_dt_alloc_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 }
 
 /**
- * ntfs_dt_alloc_insert2 -
+ * ntfs_dt_alloc_insert2 - Insert an index entry into an index allocation
  * @dt:
  * @before:
  * @count:
@@ -1287,7 +1287,7 @@ INDEX_ENTRY * ntfs_dt_alloc_insert2(struct ntfs_dt *dt, int before, int count, i
 }
 
 /**
- * ntfs_dt_root_insert -
+ * ntfs_dt_root_insert - Insert an index entry into an index root
  * @dt:
  * @first:
  * @count:
@@ -1308,7 +1308,7 @@ int ntfs_dt_root_insert(struct ntfs_dt *dt, INDEX_ENTRY *first, int count)
 }
 
 /**
- * ntfs_dt_alloc_remove2 -
+ * ntfs_dt_alloc_remove2 - Remove an index entry from an index allocation
  * @dt:
  * @start:
  * @count:
@@ -1335,7 +1335,7 @@ int ntfs_dt_alloc_remove2(struct ntfs_dt *dt, int start, int count)
 }
 
 /**
- * ntfs_dt_root_remove2 -
+ * ntfs_dt_root_remove2 - Remove an index entry from an index root
  * @dt:
  * @start:
  * @count:
@@ -1384,7 +1384,7 @@ int ntfs_dt_root_remove2(struct ntfs_dt *dt, int start, int count)
 }
 
 /**
- * ntfs_dt_transfer2 -
+ * ntfs_dt_transfer2 - Transfer several index entries between directory-trees
  * @old:
  * @new:
  * @start:
@@ -1553,7 +1553,7 @@ int ntfs_dt_transfer2(struct ntfs_dt *old, struct ntfs_dt *new, int start, int c
 }
 
 /**
- * ntfs_dt_root_replace -
+ * ntfs_dt_root_replace - Replace an index entry in an index root
  * @del:
  * @del_num:
  * @del_ie:
@@ -1641,7 +1641,7 @@ int ntfs_dt_root_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie, 
 }
 
 /**
- * ntfs_dt_alloc_replace -
+ * ntfs_dt_alloc_replace - Replace an index entry in an index allocation
  * @del:
  * @del_num:
  * @del_ie:
@@ -1712,7 +1712,7 @@ BOOL ntfs_dt_alloc_replace(struct ntfs_dt *del, int del_num, INDEX_ENTRY *del_ie
 }
 
 /**
- * ntfs_dt_root_remove -
+ * ntfs_dt_root_remove - Remove an index entry from an index root
  * @del:
  * @del_num:
  *
@@ -1840,7 +1840,7 @@ BOOL ntfs_dt_root_remove(struct ntfs_dt *del, int del_num)
 }
 
 /**
- * ntfs_dt_alloc_remove -
+ * ntfs_dt_alloc_remove - Remove an index entry from an index allocation
  * @del:
  * @del_num:
  *
@@ -1969,7 +1969,7 @@ BOOL ntfs_dt_alloc_remove(struct ntfs_dt *del, int del_num)
 }
 
 /**
- * ntfs_dt_alloc_add -
+ * ntfs_dt_alloc_add - Add an index entry to an index allocation
  * @parent:
  * @index_num:
  * @ie:
@@ -2066,7 +2066,7 @@ int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 }
 
 /**
- * ntfs_dt_root_add -
+ * ntfs_dt_root_add - Add an index entry to an index root
  * @parent:
  * @index_num:
  * @ie:
@@ -2177,7 +2177,7 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 }
 
 /**
- * ntfs_dt_add2 -
+ * ntfs_dt_add2 - Add an index entry to a directory-tree
  * @ie:
  * @suc:
  * @suc_num:

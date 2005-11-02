@@ -662,7 +662,7 @@ err_out:
 #include "rich.h"
 
 /**
- * ntfs_ie_free -
+ * ntfs_ie_free - Destroy an index entry object
  * @ie:
  *
  * Description...
@@ -676,7 +676,7 @@ void ntfs_ie_free(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_create -
+ * ntfs_ie_create - Create a representation of an directory index entry
  *
  * Description...
  *
@@ -702,7 +702,7 @@ INDEX_ENTRY * ntfs_ie_create(void)
 }
 
 /**
- * ntfs_ie_get_vcn -
+ * ntfs_ie_get_vcn - Get the VCN associated with an index entry
  * @ie:
  *
  * Description...
@@ -721,7 +721,7 @@ VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_copy -
+ * ntfs_ie_copy - Create a copy of an index entry
  * @ie:
  *
  * Description...
@@ -745,7 +745,7 @@ INDEX_ENTRY * ntfs_ie_copy(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_set_vcn -
+ * ntfs_ie_set_vcn - Set VCN associated with an index entry
  * @ie:
  * @vcn:
  *
@@ -773,7 +773,7 @@ INDEX_ENTRY * ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn)
 }
 
 /**
- * ntfs_ie_remove_vcn -
+ * ntfs_ie_remove_vcn - Remove the VCN associated with an index entry
  * @ie:
  *
  * Description...
@@ -795,7 +795,7 @@ INDEX_ENTRY * ntfs_ie_remove_vcn(INDEX_ENTRY *ie)
 }
 
 /**
- * ntfs_ie_set_name -
+ * ntfs_ie_set_name - Associate a name with an index entry
  * @ie:
  * @name:
  * @namelen:
@@ -891,7 +891,7 @@ INDEX_ENTRY * ntfs_ie_set_name(INDEX_ENTRY *ie, ntfschar *name, int namelen, FIL
 }
 
 /**
- * ntfs_ie_remove_name -
+ * ntfs_ie_remove_name - Remove the name from an index-entry
  * @ie:
  *
  * Description...

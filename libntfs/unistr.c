@@ -307,7 +307,7 @@ ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
 }
 
 /**
- * ntfs_name_upcase -
+ * ntfs_name_upcase - Map an Unicode name to its uppercase equivalent
  * @name:
  * @name_len:
  * @upcase:
@@ -329,7 +329,7 @@ void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 }
 
 /**
- * ntfs_file_value_upcase -
+ * ntfs_file_value_upcase - Convert a filename to upper case
  * @file_name_attr:
  * @upcase:
  * @upcase_len:
@@ -346,7 +346,7 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 }
 
 /**
- * ntfs_file_values_compare -
+ * ntfs_file_values_compare - Which of two filenames should be listed first
  * @file_name_attr1:
  * @file_name_attr2:
  * @err_val:

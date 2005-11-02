@@ -1358,7 +1358,7 @@ search:
 	/*
 	 * If hard link count is not equal to zero then we are done. In other
 	 * case there are no reference to this inode left, so we should free all
-	 * non-resident atributes and mark inode as not in use.
+	 * non-resident attributes and mark inode as not in use.
 	 */
 	if (ni->mrec->link_count)
 		goto out;
@@ -1372,13 +1372,13 @@ search:
 			if (!rl) {
 				err = errno;
 				ntfs_log_error("Failed to decompress runlist.  "
-						"Leaving inconsist metadata.");
+						"Leaving inconsistent metadata.");
 				continue;
 			}
 			if (ntfs_cluster_free_from_rl(ni->vol, rl)) {
 				err = errno;
 				ntfs_log_error("Failed to free clusters.  "
-						"Leaving inconsist metadata.");
+						"Leaving inconsistent metadata.");
 				continue;
 			}
 			free(rl);
@@ -1522,7 +1522,7 @@ err_out:
 #include "rich.h"
 
 /**
- * ntfs_dir_rollback -
+ * ntfs_dir_rollback - Discard the in-memory directory changes
  * @dir:
  *
  * Description...
@@ -1554,7 +1554,7 @@ int ntfs_dir_rollback(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_truncate -
+ * ntfs_dir_truncate - Shrink an index allocation
  * @vol:
  * @dir:
  *
@@ -1707,7 +1707,7 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_commit -
+ * ntfs_dir_commit - Write to disk the in-memory directory changes
  * @dir:
  *
  * Description...
@@ -1744,7 +1744,7 @@ int ntfs_dir_commit(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_free -
+ * ntfs_dir_free - Destroy a directory object
  * @dir:
  *
  * Description...
@@ -1789,7 +1789,7 @@ void ntfs_dir_free(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_dir_create -
+ * ntfs_dir_create - Create a representation of a directory
  * @vol:
  * @mft_num:
  *
@@ -1863,7 +1863,7 @@ struct ntfs_dir * ntfs_dir_create(ntfs_volume *vol, MFT_REF mft_num)
 }
 
 /**
- * ntfs_dir_add -
+ * ntfs_dir_add - Add a directory to another as a child
  * @parent:
  * @child:
  *
@@ -1890,7 +1890,7 @@ void ntfs_dir_add(struct ntfs_dir *parent, struct ntfs_dir *child)
 }
 
 /**
- * ntfs_dir_find2 -
+ * ntfs_dir_find2 - Find a directory by name
  * @dir:
  * @name:
  * @name_len:

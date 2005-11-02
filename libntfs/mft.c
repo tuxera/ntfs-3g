@@ -392,7 +392,7 @@ static const char *es = "  Leaving inconsistent metadata.  Run chkdsk.";
 #endif
 
 /**
- * ntfs_ffz -
+ * ntfs_ffz - Find the first unset (zero) bit in a word
  * @word:
  *
  * Description...
@@ -1566,7 +1566,7 @@ sync_rollback:
 #include "rich.h"
 
 /**
- * ntfs_mft_remove_attr -
+ * ntfs_mft_remove_attr - Remove an attribute from an MFT record
  * @bmp:
  * @inode:
  * @type:
@@ -1632,7 +1632,7 @@ int ntfs_mft_remove_attr(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES typ
 }
 
 /**
- * ntfs_mft_add_attr -
+ * ntfs_mft_add_attr - Add an attribute to an MFT record
  * @inode:
  * @type:
  * @data:
@@ -1710,7 +1710,7 @@ ATTR_RECORD * ntfs_mft_add_attr(ntfs_inode *inode, ATTR_TYPES type, u8 *data, in
 }
 
 /**
- * ntfs_mft_resize_resident -
+ * ntfs_mft_resize_resident - Resize a resident attribute in an MFT record
  * @inode:
  * @type:
  * @name:
@@ -1819,7 +1819,7 @@ done:
 }
 
 /**
- * ntfs_mft_free_space -
+ * ntfs_mft_free_space - Calculate the free space (bytes) in an MFT record
  * @dir:
  *
  * Description...
@@ -1843,7 +1843,7 @@ int ntfs_mft_free_space(struct ntfs_dir *dir)
 }
 
 /**
- * ntfs_mft_add_index -
+ * ntfs_mft_add_index - Add an index (directory) to an MFT record
  * @dir:
  *
  * Description...

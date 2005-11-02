@@ -32,7 +32,7 @@
 
 #ifndef HAVE_FFS
 /**
- * ffs -
+ * ffs - Find the first set bit in an int
  * @x:
  *
  * Description...

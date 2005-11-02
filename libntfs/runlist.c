@@ -1718,7 +1718,7 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 }
 */
 /**
- * test_rl_dump_runlist -
+ * test_rl_dump_runlist - Runlist test: Display the contents of a runlist
  * @rl:
  *
  * Description...
@@ -1770,7 +1770,7 @@ static void test_rl_dump_runlist(const runlist_element *rl)
 }
 
 /**
- * test_rl_runlists_merge -
+ * test_rl_runlists_merge - Runlist test: Merge two runlists
  * @drl:
  * @srl:
  *
@@ -1796,7 +1796,7 @@ static runlist_element * test_rl_runlists_merge(runlist_element *drl, runlist_el
 }
 
 /**
- * test_rl_read_buffer -
+ * test_rl_read_buffer - Runlist test: Read a file containing a runlist
  * @file:
  * @buf:
  * @bufsize:
@@ -1825,7 +1825,7 @@ static int test_rl_read_buffer(const char *file, u8 *buf, int bufsize)
 }
 
 /**
- * test_rl_pure_src -
+ * test_rl_pure_src - Runlist test: Complicate the simple tests a little
  * @contig:
  * @multi:
  * @vcn:
@@ -1860,7 +1860,7 @@ static runlist_element * test_rl_pure_src(BOOL contig, BOOL multi, int vcn, int 
 }
 
 /**
- * test_rl_pure_test -
+ * test_rl_pure_test - Runlist test: Perform tests using simple runlists
  * @test:
  * @contig:
  * @multi:
@@ -1891,7 +1891,7 @@ static void test_rl_pure_test(int test, BOOL contig, BOOL multi, int vcn, int le
 }
 
 /**
- * test_rl_pure -
+ * test_rl_pure - Runlist test: Create tests using simple runlists
  * @contig:
  * @multi:
  *
@@ -1991,7 +1991,7 @@ static void test_rl_pure(char *contig, char *multi)
 }
 
 /**
- * test_rl_zero -
+ * test_rl_zero - Runlist test: Merge a zero-length runlist
  *
  * Description...
  *
@@ -2017,7 +2017,7 @@ static void test_rl_zero(void)
 }
 
 /**
- * test_rl_frag_combine -
+ * test_rl_frag_combine - Runlist test: Perform tests using fragmented files
  * @vol:
  * @attr1:
  * @attr2:
@@ -2053,7 +2053,7 @@ static void test_rl_frag_combine(ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECO
 }
 
 /**
- * test_rl_frag -
+ * test_rl_frag - Runlist test: Create tests using very fragmented files
  * @test:
  *
  * Description...
@@ -2098,7 +2098,7 @@ out:
 }
 
 /**
- * test_rl_main -
+ * test_rl_main - Runlist test: Program start (main)
  * @argc:
  * @argv:
  *

@@ -112,7 +112,7 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
 }
 
 /**
- * ntfs_name_print -
+ * ntfs_name_print - Send a Unicode name to the debug log
  * @name:
  * @name_len:
  *
@@ -134,7 +134,7 @@ void ntfs_name_print(ntfschar *name, int name_len)
 }
 
 /**
- * utils_free_non_residents3 -
+ * utils_free_non_residents3 - Free all the non-resident attributes of an inode
  * @bmp:
  * @inode:
  * @attr:
@@ -178,7 +178,7 @@ int utils_free_non_residents3(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_RECO
 }
 
 /**
- * utils_free_non_residents2 -
+ * utils_free_non_residents2 - Find all the non-resident attributes of an inode
  * @inode:
  * @bmp:
  *

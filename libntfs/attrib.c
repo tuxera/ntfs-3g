@@ -59,7 +59,7 @@
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
 /**
- * ntfs_get_attribute_value_length -
+ * ntfs_get_attribute_value_length - Find the length of an attribute
  * @a:
  *
  * Description...
@@ -82,7 +82,7 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 }
 
 /**
- * ntfs_get_attribute_value -
+ * ntfs_get_attribute_value - Get a copy of an attribute
  * @vol:	
  * @a:	
  * @b:	
@@ -2967,7 +2967,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		/* @val is mandatory. */
 		if (!val) {
 			ntfs_log_trace("val is mandatory for always resident "
-					"atributes.\n");
+					"attributes.\n");
 			errno = EINVAL;
 			return -1;
 		}

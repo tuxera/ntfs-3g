@@ -50,7 +50,7 @@
 #include "logging.h"
 
 /**
- * __ntfs_inode_allocate -
+ * __ntfs_inode_allocate - Create and initialise an NTFS inode object
  * @vol:
  *
  * Description...
@@ -68,7 +68,7 @@ static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 }
 
 /**
- * ntfs_inode_allocate -
+ * ntfs_inode_allocate - Create an NTFS inode object
  * @vol:
  *
  * Description...
@@ -81,7 +81,7 @@ ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
 }
 
 /**
- * __ntfs_inode_release -
+ * __ntfs_inode_release - Destroy an NTFS inode object
  * @ni:
  *
  * Description...
@@ -1073,7 +1073,7 @@ put_err_out:
 #include "rich.h"
 
 /**
- * ntfs_inode_close2 -
+ * ntfs_inode_close2 - Close an inode, freeing any resources
  * @ni:
  *
  * Description...
@@ -1101,7 +1101,7 @@ int ntfs_inode_close2(ntfs_inode *ni)
 }
 
 /**
- * ntfs_inode_open2 -
+ * ntfs_inode_open2 - Open an inode and initialise it
  * @vol:
  * @mref:
  *
@@ -1156,7 +1156,7 @@ ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref)
 }
 
 /**
- * ntfs_inode_open3 -
+ * ntfs_inode_open3 - Open an inode and initialise it
  * @vol:
  * @mref:
  *

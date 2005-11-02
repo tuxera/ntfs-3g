@@ -34,7 +34,7 @@
 #include "logging.h"
 
 /**
- * ntfs_collate_binary -
+ * ntfs_collate_binary - Which of two binary objects should be listed first
  * @vol: unused
  * @data1:
  * @data1_len:
@@ -64,7 +64,7 @@ static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 }
 
 /**
- * ntfs_collate_ntofs_ulong -
+ * ntfs_collate_ntofs_ulong - Which of two long ints should be listed first
  * @vol: unused
  * @data1:
  * @data1_len:
@@ -102,7 +102,7 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 }
 
 /**
- * ntfs_collate_file_name -
+ * ntfs_collate_file_name - Which of two filenames should be listed first
  * @vol:
  * @data1:
  * @data1_len: unused

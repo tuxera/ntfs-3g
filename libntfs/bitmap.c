@@ -228,7 +228,7 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 #include "rich.h"
 
 /**
- * ntfs_bmp_rollback -
+ * ntfs_bmp_rollback - Discard the in-memory bitmap changes
  * @bmp:
  *
  * Description...
@@ -257,7 +257,7 @@ int ntfs_bmp_rollback(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_commit -
+ * ntfs_bmp_commit - Write the cached bitmap data to disk
  * @bmp:
  *
  * Description...
@@ -311,7 +311,7 @@ int ntfs_bmp_commit(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_free -
+ * ntfs_bmp_free - Destroy a bitmap object
  * @bmp:
  *
  * Description...
@@ -332,7 +332,7 @@ void ntfs_bmp_free(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_create -
+ * ntfs_bmp_create - Create a representation of a bitmap
  * @inode:
  * @type:
  * @name:
@@ -372,7 +372,7 @@ struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *
 }
 
 /**
- * ntfs_bmp_add_data -
+ * ntfs_bmp_add_data - Add a bitmap block to the current cache
  * @bmp:
  * @vcn:
  * @data:
@@ -416,7 +416,7 @@ int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data)
 }
 
 /**
- * ntfs_bmp_get_data -
+ * ntfs_bmp_get_data - Ask for a bitmap block from the cache
  * @bmp:
  * @vcn:
  *
@@ -466,7 +466,7 @@ u8 * ntfs_bmp_get_data(struct ntfs_bmp *bmp, VCN vcn)
 }
 
 /**
- * ntfs_bmp_set_range -
+ * ntfs_bmp_set_range - Set a range of bits in the bitmap
  * @bmp:
  * @vcn:
  * @length:
@@ -563,7 +563,7 @@ int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 }
 
 /**
- * ntfs_bmp_find_last_set -
+ * ntfs_bmp_find_last_set - Find the last set bit in the bitmap
  * @bmp:
  *
  * Description...
@@ -632,7 +632,7 @@ s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp)
 }
 
 /**
- * ntfs_bmp_find_space -
+ * ntfs_bmp_find_space - Find an unused block of bits in a bitmap
  * @bmp:
  * @start:
  * @size:

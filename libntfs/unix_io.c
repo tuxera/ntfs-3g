@@ -67,7 +67,7 @@
 #define DEV_FD(dev)	(*(int *)dev->d_private)
 
 /**
- * ntfs_device_unix_io_open -
+ * ntfs_device_unix_io_open - Open a device and lock it exclusively
  * @dev:
  * @flags:
  *
@@ -122,7 +122,7 @@ err_out:
 }
 
 /**
- * ntfs_device_unix_io_close -
+ * ntfs_device_unix_io_close - Close the device, releasing the lock
  * @dev:
  *
  * Description...
@@ -157,7 +157,7 @@ static int ntfs_device_unix_io_close(struct ntfs_device *dev)
 }
 
 /**
- * ntfs_device_unix_io_seek -
+ * ntfs_device_unix_io_seek - Seek to a place on the device
  * @dev:
  * @offset:
  * @whence:
@@ -173,7 +173,7 @@ static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
 }
 
 /**
- * ntfs_device_unix_io_read -
+ * ntfs_device_unix_io_read - Read from the device, from the current location
  * @dev:
  * @buf:
  * @count:
@@ -189,7 +189,7 @@ static s64 ntfs_device_unix_io_read(struct ntfs_device *dev, void *buf,
 }
 
 /**
- * ntfs_device_unix_io_write -
+ * ntfs_device_unix_io_write - Write to the device, at the current location
  * @dev:
  * @buf:
  * @count:
@@ -210,7 +210,7 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 }
 
 /**
- * ntfs_device_unix_io_pread -
+ * ntfs_device_unix_io_pread - Perform a positioned read from the device
  * @dev:
  * @buf:
  * @count:
@@ -227,7 +227,7 @@ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 }
 
 /**
- * ntfs_device_unix_io_pwrite -
+ * ntfs_device_unix_io_pwrite - Perform a positioned write to the device
  * @dev:
  * @buf:
  * @count:
@@ -249,7 +249,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 }
 
 /**
- * ntfs_device_unix_io_sync -
+ * ntfs_device_unix_io_sync - Flush any buffered changes to the device
  * @dev:
  *
  * Description...
@@ -268,7 +268,7 @@ static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 }
 
 /**
- * ntfs_device_unix_io_stat -
+ * ntfs_device_unix_io_stat - Get information about the device
  * @dev:
  * @buf:
  *
@@ -282,7 +282,7 @@ static int ntfs_device_unix_io_stat(struct ntfs_device *dev, struct stat *buf)
 }
 
 /**
- * ntfs_device_unix_io_ioctl -
+ * ntfs_device_unix_io_ioctl - Perform an ioctl on the device
  * @dev:
  * @request:
  * @argp:

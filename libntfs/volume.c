@@ -67,7 +67,7 @@
 #endif
 
 /**
- * ntfs_volume_alloc -
+ * ntfs_volume_alloc - Create an NTFS volume object and initialise it
  *
  * Description...
  *
@@ -95,7 +95,7 @@ ntfs_volume *ntfs_volume_alloc(void)
 }
 
 /**
- * __ntfs_volume_release -
+ * __ntfs_volume_release - Destroy an NTFS volume object
  * @v:
  *
  * Description...
@@ -1606,7 +1606,7 @@ int utils_valid_device(const char *name, int force)
 }
 
 /**
- * utils_mount_volume -
+ * utils_mount_volume - Mount an NTFS volume
  * @device:
  * @flags:
  * @force:
@@ -1660,7 +1660,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 }
 
 /**
- * ntfs_volume_commit -
+ * ntfs_volume_commit - Write to disk the in-memory volume changes
  * @vol:
  *
  * Description...
@@ -1687,7 +1687,7 @@ int ntfs_volume_commit(ntfs_volume *vol)
 }
 
 /**
- * ntfs_volume_rollback -
+ * ntfs_volume_rollback - Discard the in-memory volume changes
  * @vol:
  *
  * Description...
@@ -1713,7 +1713,7 @@ int ntfs_volume_rollback(ntfs_volume *vol)
 }
 
 /**
- * ntfs_volume_umount2 -
+ * ntfs_volume_umount2 - Unmount an NTFS volume, using the new directory support
  * @vol:
  * @force:
  *
@@ -1748,7 +1748,7 @@ int ntfs_volume_umount2(ntfs_volume *vol, const BOOL force)
 }
 
 /**
- * ntfs_volume_mount2 -
+ * ntfs_volume_mount2 - Mount an NTFS volume, using the new directory support
  * @device:
  * @flags:
  * @force:
