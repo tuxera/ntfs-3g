@@ -3812,9 +3812,9 @@ static void mkntfs_initialize_bitmaps(void)
 	for (i = opts.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
 		ntfs_bit_set(lcn_bitmap, (u64)i, 1);
 	/*
-	 * Determine mft_size: (16 (1.2) or 28 (3.0+) mft records)
+	 * Determine mft_size: (16 (1.2) or 27 (3.0+) mft records)
 	 */
-	opts.mft_size = ((16 + 12 * (vol->major_ver >= 3)) * 
+	opts.mft_size = ((16 + 11 * (vol->major_ver >= 3)) * 
 			 vol->mft_record_size);
 	mkDprintf("MFT size = %i (0x%x) bytes\n", opts.mft_size, opts.mft_size);
 	/* Determine mft bitmap size and allocate it. */
@@ -4289,7 +4289,7 @@ static void mkntfs_create_root_structures(void)
 	 * sequence numbers of each system file to equal the mft record number
 	 * of that file (only for $MFT is the sequence number 1 rather than 0).
 	 */
-	for (i = 0; i < 16 + 12 * (vol->major_ver >= 3); i++) {
+	for (i = 0; i < 16 + 11 * (vol->major_ver >= 3); i++) {
 		if (ntfs_mft_record_layout(vol, 0, m = (MFT_RECORD *)(buf +
 				i * vol->mft_record_size)))
 			err_exit("Error:  Failed to layout mft record.\n");
@@ -4306,7 +4306,7 @@ static void mkntfs_create_root_structures(void)
 	 * Create the 16 system files, adding the system information attribute
 	 * to each as well as marking them in use in the mft bitmap.
 	 */
-	for (i = 0; i < 16 + 12 * (vol->major_ver >= 3); i++) {
+	for (i = 0; i < 16 + 11 * (vol->major_ver >= 3); i++) {
 		u32 file_attrs;
 
 		m = (MFT_RECORD*)(buf + i * vol->mft_record_size);
@@ -4347,9 +4347,6 @@ static void mkntfs_create_root_structures(void)
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
 			}
-			else if (i == 27)
-				add_attr_std_info(m, file_attrs,
-					cpu_to_le32(0x0102));
 			else add_attr_std_info(m, file_attrs,
 				cpu_to_le32(0x00));
 		}
@@ -4855,28 +4852,6 @@ static void mkntfs_create_root_structures(void)
 		if (err < 0)
 			err_exit("Couldn't create $Reparse: %s\n",
 				strerror(-err));
-		Vprintf("Creating System Volume Information (mft record 27)\n");
-		m = (MFT_RECORD*)(buf + 27 * vol->mft_record_size);
-		m->flags |= MFT_RECORD_IS_DIRECTORY;
-		if (!err)
-			err = create_hardlink(index_block, root_ref, m,
-				MK_LE_MREF(27, 27), 0LL, 0LL,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-				 FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT, 0, 0,
-				"SYSTEM~1", FILE_NAME_DOS);
-
-		if (!err)
-			err = create_hardlink(index_block, root_ref, m,
-				MK_LE_MREF(27, 27), 0LL, 0LL,
-				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-				FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT, 0, 0,
-				"System Volume Information", FILE_NAME_WIN32);
-		if (!err)
-			err = add_attr_index_root(m, "$I30", 4, 0, AT_FILE_NAME,
-				COLLATION_FILE_NAME, opts.index_block_size);
-		if (err < 0)
-			err_exit("Couldn't create  'System Volume Information'"
-				": %s\n", strerror(-err));
 	}
 }
 
