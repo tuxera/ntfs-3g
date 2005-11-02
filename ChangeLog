@@ -56,6 +56,8 @@ xx/xx/2005 - 1.12.2-WIP
 	  the device argument: no -d or --device option is needed.  (Szaka)
 	- ntfsinfo: figure out and dump index attribute types.  (Szaka)
 	- ntfsinfo: dump index attribute keys.  (Szaka)
+	- mkntfs: don't fill the last $MFT cluster with empty MFT records. 
+	  This is needed to conform to Windows' format behavior.  (Szaka)
 	  
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.

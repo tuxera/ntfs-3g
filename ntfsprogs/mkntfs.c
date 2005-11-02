@@ -3812,13 +3812,10 @@ static void mkntfs_initialize_bitmaps(void)
 	for (i = opts.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
 		ntfs_bit_set(lcn_bitmap, (u64)i, 1);
 	/*
-	 * Determine mft_size: (16 (1.2) or 28 (3.0+) mft records) or
-	 * 1 cluster, which ever is bigger, rounded to multiples of cluster
-	 * size
+	 * Determine mft_size: (16 (1.2) or 28 (3.0+) mft records)
 	 */
-	opts.mft_size = ((16 + 12 * (vol->major_ver >= 3)) *
-		vol->mft_record_size + vol->cluster_size - 1)
-		& ~(vol->cluster_size - 1);
+	opts.mft_size = ((16 + 12 * (vol->major_ver >= 3)) * 
+			 vol->mft_record_size);
 	mkDprintf("MFT size = %i (0x%x) bytes\n", opts.mft_size, opts.mft_size);
 	/* Determine mft bitmap size and allocate it. */
 	mft_bitmap_size = opts.mft_size / vol->mft_record_size;
@@ -3903,8 +3900,8 @@ static void mkntfs_initialize_rl_mft(void)
 				strerror(errno));
 	rl_mft[0].vcn = 0LL;
 	rl_mft[0].lcn = opts.mft_lcn;
-	/* We already rounded mft size up to a cluster. */
-	j = opts.mft_size / vol->cluster_size;
+	/* rounded up division by cluster size */
+	j = (opts.mft_size + vol->cluster_size - 1 ) / vol->cluster_size;
 	rl_mft[1].vcn = rl_mft[0].length = j;
 	rl_mft[1].lcn = -1LL;
 	rl_mft[1].length = 0LL;
@@ -4278,7 +4275,6 @@ static void mkntfs_create_root_structures(void)
 	MFT_RECORD *m;
 	MFT_REF root_ref, extend_ref;
 	int i, j, err;
-	unsigned mft_total_cluster_size;
 	u8 *sd;
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
@@ -4305,32 +4301,6 @@ static void mkntfs_create_root_structures(void)
 
 		if ( i > 0 ) m->sequence_number = cpu_to_le16(i);
 		if ( i == 0) m->sequence_number = cpu_to_le16(1);
-	}
-	/*
-	 * If a cluster contains more than the 16 (ntfs 1.2) or
-	 * 28 (ntfs 3.0+) system files, fill the rest
-	 * with empty, formatted records.
-	 */
-	mft_total_cluster_size = vol->cluster_size *
-		(((16 + 12 * (vol->major_ver >= 3) -1)
-		* vol->mft_record_size) / vol->cluster_size + 1);
-	if (mft_total_cluster_size > (16 + 12 * (vol->major_ver >= 3))*
-			vol->mft_record_size) {
-		for (i = 16 + 12 * (vol->major_ver >= 3);
-			i * vol->mft_record_size < mft_total_cluster_size; i++)
-				 {
-			if (ntfs_mft_record_layout(vol, 0, m =
-				(MFT_RECORD *)(buf + i * vol->mft_record_size)))
-				err_exit("Error:  Failed to layout mft"
-					" record.\n");
-#if 0
-		if (!opts.quiet && opts.verbose > 1)
-			dump_mft_record((MFT_RECORD*)buf +
-				i * vol->mft_record_size);
-#endif
-		m->flags = cpu_to_le16(0);
-		m->sequence_number = cpu_to_le16(i);
-		}
 	}
 	/*
 	 * Create the 16 system files, adding the system information attribute
