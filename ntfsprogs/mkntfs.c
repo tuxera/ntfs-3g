@@ -4794,34 +4794,14 @@ static void mkntfs_create_root_structures(void)
 	if (vol->major_ver >= 3) {
 		extend_flags = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
 			FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
-		Vprintf("Creating $ObjId (mft record 24)\n");
+		Vprintf("Creating $Quota (mft record 24)\n");
 		m = (MFT_RECORD*)(buf + 24 * vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
 		m->flags |= MFT_RECORD_IS_8;
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(buf +
-					11 * vol->mft_record_size), extend_ref,
-					m, MK_LE_MREF(24, 24), 0LL, 0LL,
-					extend_flags, 0, 0, "$ObjId",
-					FILE_NAME_WIN32_AND_DOS);
-
-		// FIXME: This should be IGNORE_CASE
-		if (!err)
-			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
-				COLLATION_NTOFS_ULONGS, opts.index_block_size);
-		if (!err)
-			err = initialize_objid(m, volume_obj_id->object_id,
-				 MK_LE_MREF(FILE_Volume, FILE_Volume));
-		if (err < 0)
-			err_exit("Couldn't create $ObjId: %s\n", strerror(-err));
-		Vprintf("Creating $Quota (mft record 25)\n");
-		m = (MFT_RECORD*)(buf + 25 * vol->mft_record_size);
-		m->flags |= MFT_RECORD_IS_4;
-		m->flags |= MFT_RECORD_IS_8;
-		if (!err)
-			err = create_hardlink_res((MFT_RECORD*)(buf +
 				11 * vol->mft_record_size), extend_ref, m,
-				MK_LE_MREF(25, 25), 0LL, 0LL, extend_flags
+				MK_LE_MREF(24, 24), 0LL, 0LL, extend_flags
 				, 0, 0, "$Quota", FILE_NAME_WIN32_AND_DOS);
 		// FIXME: This should be IGNORE_CASE
 		if (!err)
@@ -4835,6 +4815,26 @@ static void mkntfs_create_root_structures(void)
 			err = initialize_quota(m);
 		if (err < 0)
 			err_exit("Couldn't create $Quota: %s\n", strerror(-err));
+		Vprintf("Creating $ObjId (mft record 25)\n");
+		m = (MFT_RECORD*)(buf + 25 * vol->mft_record_size);
+		m->flags |= MFT_RECORD_IS_4;
+		m->flags |= MFT_RECORD_IS_8;
+		if (!err)
+			err = create_hardlink_res((MFT_RECORD*)(buf +
+					11 * vol->mft_record_size), extend_ref,
+					m, MK_LE_MREF(25, 25), 0LL, 0LL,
+					extend_flags, 0, 0, "$ObjId",
+					FILE_NAME_WIN32_AND_DOS);
+
+		// FIXME: This should be IGNORE_CASE
+		if (!err)
+			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
+				COLLATION_NTOFS_ULONGS, opts.index_block_size);
+		if (!err)
+			err = initialize_objid(m, volume_obj_id->object_id,
+				 MK_LE_MREF(FILE_Volume, FILE_Volume));
+		if (err < 0)
+			err_exit("Couldn't create $ObjId: %s\n", strerror(-err));
 		Vprintf("Creating $Reparse (mft record 26)\n");
 		m = (MFT_RECORD*)(buf + 26 * vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
