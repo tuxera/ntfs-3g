@@ -1216,7 +1216,7 @@ err_out:
 	ntfs_log_trace("Failed.\n");
 	if (ntfs_mft_record_free(ni->vol, ni))
 		ntfs_log_error("Failed to free MFT record.  "
-				"Leaving inconsist metadata. Run chkdsk.");
+				"Leaving inconsistent metadata. Run chkdsk.");
 	free(fn);
 	free(si);
 	errno = err;
@@ -1386,20 +1386,20 @@ search:
 	}
 	if (errno != ENOENT) {
 		err = errno;
-		ntfs_log_error("Atribute enumeration failed.  "
-				"Probably leaving inconsist metadata.");
+		ntfs_log_error("Attribute enumeration failed.  "
+				"Probably leaving inconsistent metadata.");
 	}
 	/* All extents should be attached after attribute walk. */
 	while (ni->nr_extents)
 		if (ntfs_mft_record_free(ni->vol, *(ni->extent_nis))) {
 			err = errno;
 			ntfs_log_error("Failed to free extent MFT record.  "
-					"Leaving inconsist metadata.");
+					"Leaving inconsistent metadata.");
 		}
 	if (ntfs_mft_record_free(ni->vol, ni)) {
 		err = errno;
 		ntfs_log_error("Failed to free base MFT record.  "
-				"Leaving inconsist metadata.");
+				"Leaving inconsistent metadata.");
 	}
 	ni = NULL;
 out:
@@ -1505,7 +1505,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	ntfs_log_trace("Done.\n");
 	return 0;
 rollback_failed:
-	ntfs_log_error("Rollback failed. Leaving inconsist metadata.");
+	ntfs_log_error("Rollback failed. Leaving inconsistent metadata.");
 err_out:
 	ntfs_log_error("Failed.\n");
 	free(fn);

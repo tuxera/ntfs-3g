@@ -2130,7 +2130,7 @@ not_found:
  * If @type is AT_END, seek to the end of the base mft record ignoring the
  * attribute list completely and return -1 with errno set to ENOENT.  AT_END is
  * not a valid attribute, its length is zero for example, thus it is safer to
- * return error instead of success in this case.  It should never ne needed to
+ * return error instead of success in this case.  It should never be needed to
  * do this, but we implement the functionality because it allows for simpler
  * code inside ntfs_external_attr_find().
  *
@@ -3000,7 +3000,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		/* Attribute can't be resident. */
 		is_resident = FALSE;
 	}
-	/* Calculate atribute record size. */
+	/* Calculate attribute record size. */
 	if (is_resident)
 		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
 				((name_len * sizeof(ntfschar) + 7) & ~7) +

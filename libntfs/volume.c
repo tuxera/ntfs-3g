@@ -626,8 +626,8 @@ exit:
  * ntfs_hiberfile_open - Find and open '/hiberfil.sys'
  * @vol:    An ntfs volume obtained from ntfs_mount
  *
- * Return:  inode  Success, hibefil.sys is valid
- *	    NULL   hibefil.sys doesn't exist or some other error occurred
+ * Return:  inode  Success, hiberfil.sys is valid
+ *	    NULL   hiberfil.sys doesn't exist or some other error occurred
  */
 static ntfs_inode *ntfs_hiberfile_open(ntfs_volume *vol)
 {

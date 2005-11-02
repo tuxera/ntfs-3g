@@ -156,7 +156,7 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
  * @data2_len:	length in bytes of @data2
  *
  * Collate the two data items @data1 and @data2 using the collation rule @cr
- * and return -1, 0, ir 1 if @data1 is found, respectively, to collate before,
+ * and return -1, 0, or 1 if @data1 is found, respectively, to collate before,
  * to match, or to collate after @data2.
  *
  * For speed we use the collation rule @cr as an index into two tables of

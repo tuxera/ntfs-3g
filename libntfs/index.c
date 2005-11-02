@@ -109,7 +109,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
  * ntfs_index_ctx_reinit - reinitialize an index context
  * @ictx:	index context to reinitialize
  *
- * Reintialize the index context @ictx so it can be used for ntfs_index_lookup.
+ * Reinitialize the index context @ictx so it can be used for ntfs_index_lookup.
  */
 void ntfs_index_ctx_reinit(ntfs_index_context *ictx)
 {
@@ -630,14 +630,14 @@ int ntfs_index_rm(ntfs_index_context *ictx)
 		if (!na) {
 			err = errno;
 			ntfs_log_error("Failed to open INDEX_ROOT attribute.  "
-					"Leaving inconsist metadata.");
+					"Leaving inconsistent metadata.");
 			goto err_out;
 		}
 		if (ntfs_attr_truncate(na, new_index_length + offsetof(
 				INDEX_ROOT, index))) {
 			err = errno;
 			ntfs_log_error("Failed to truncate INDEX_ROOT "
-					"attribute.  Leaving inconsist "
+					"attribute.  Leaving inconsistent "
 					"metadata.");
 			goto err_out;
 		}
