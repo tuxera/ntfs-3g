@@ -33,6 +33,7 @@
 
 /**
  * enum ntfs_device_state_bits -
+ *
  * Defined bits for the state field in the ntfs_device structure.
  */
 typedef enum {
@@ -59,6 +60,7 @@ typedef enum {
 
 /**
  * struct ntfs_device -
+ *
  * The ntfs device structure defining all operations needed to access the low
  * level device underlying the ntfs volume.
  */
@@ -74,6 +76,7 @@ struct stat;
 
 /**
  * struct ntfs_device_operations -
+ *
  * The ntfs device operations defining all operations that can be performed on
  * the low level device described by an ntfs device structure.
  */

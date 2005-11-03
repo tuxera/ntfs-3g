@@ -44,8 +44,7 @@
  */
 
 /**
- * struct BIOS_PARAMETER_BLOCK -
- * BIOS parameter block (bpb) structure.
+ * struct BIOS_PARAMETER_BLOCK - BIOS parameter block (bpb) structure.
  */
 typedef struct {
 	u16 bytes_per_sector;		/* Size of a sector in bytes. */
@@ -66,8 +65,7 @@ typedef struct {
 } __attribute__((__packed__)) BIOS_PARAMETER_BLOCK;
 
 /**
- * struct NTFS_BOOT_SECTOR -
- * NTFS boot sector structure.
+ * struct NTFS_BOOT_SECTOR - NTFS boot sector structure.
  */
 typedef struct {
 	u8  jump[3];			/* Irrelevant (jump to boot up code).*/
@@ -101,6 +99,7 @@ typedef struct {
 
 /**
  * enum NTFS_RECORD_TYPES -
+ *
  * Magic identifiers present at the beginning of all ntfs record containing
  * records (like mft records for example).
  */
@@ -170,6 +169,7 @@ typedef enum {
 
 /**
  * struct NTFS_RECORD -
+ *
  * The Update Sequence Array (usa) is an array of the u16 values which belong
  * to the end of each sector protected by the update sequence record in which
  * this array is contained. Note that the first entry is the Update Sequence
@@ -197,12 +197,12 @@ typedef struct {
 } __attribute__((__packed__)) NTFS_RECORD;
 
 /**
- * enum NTFS_SYSTEM_FILES -
- * System files mft record numbers. All these files are always marked as used
- * in the bitmap attribute of the mft; presumably in order to avoid accidental
- * allocation for random other mft records. Also, the sequence number for each
- * of the system files is always equal to their mft record number and it is
- * never modified.
+ * enum NTFS_SYSTEM_FILES - System files mft record numbers.
+ *
+ * All these files are always marked as used in the bitmap attribute of the
+ * mft; presumably in order to avoid accidental allocation for random other
+ * mft records. Also, the sequence number for each of the system files is
+ * always equal to their mft record number and it is never modified.
  */
 typedef enum {
 	FILE_MFT	= 0,	/* Master file table (mft). Data attribute
@@ -245,6 +245,7 @@ typedef enum {
 
 /**
  * enum MFT_RECORD_FLAGS -
+ *
  * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
  * _4 and _8 are needed by $Extend sub-files (don't know what to
@@ -322,7 +323,8 @@ typedef u64 MFT_REF;
 #define MREF_ERR(x)	((int)((s64)(x)))
 
 /**
- * struct MFT_RECORD -
+ * struct MFT_RECORD - An MFT record layout (NTFS 3.1+)
+ *
  * The mft record header present at the beginning of every record in the mft.
  * This is followed by a sequence of variable length attribute records which
  * is terminated by an attribute of type AT_END which is a truncated attribute
@@ -399,7 +401,8 @@ typedef struct {
 } __attribute__((__packed__)) MFT_RECORD;
 
 /**
- * struct MFT_RECORD_OLD -
+ * struct MFT_RECORD_OLD - An MFT record layout (NTFS <=3.0)
+ *
  * This is the version without the NTFS 3.1+ specific fields.
  */
 typedef struct {
@@ -469,13 +472,15 @@ typedef struct {
 } __attribute__((__packed__)) MFT_RECORD_OLD;
 
 /**
- * enum ATTR_TYPES -
- * System defined attributes (32-bit). Each attribute type has a corresponding
- * attribute name (Unicode string of maximum 64 character length) as described
- * by the attribute definitions present in the data attribute of the $AttrDef
- * system file. On NTFS 3.0 volumes the names are just as the types are named
- * in the below enum exchanging AT_ for the dollar sign ($). If that isn't a
- * revealing choice of symbol... (-;
+ * enum ATTR_TYPES - System defined attributes (32-bit).
+ *
+ * Each attribute type has a corresponding attribute name (Unicode string of
+ * maximum 64 character length) as described by the attribute definitions
+ * present in the data attribute of the $AttrDef system file.
+ * 
+ * On NTFS 3.0 volumes the names are just as the types are named in the below
+ * enum exchanging AT_ for the dollar sign ($). If that isn't a revealing
+ * choice of symbol... (-;
  */
 typedef enum {
 	AT_UNUSED			= const_cpu_to_le32(         0),
@@ -500,8 +505,8 @@ typedef enum {
 } ATTR_TYPES;
 
 /**
- * enum COLLATION_RULES -
- * The collation rules for sorting views/indexes/etc (32-bit).
+ * enum COLLATION_RULES - The collation rules for sorting views/indexes/etc
+ * (32-bit).
  *
  * COLLATION_UNICODE_STRING - Collate Unicode strings by comparing their binary
  *	Unicode values, except that when a character can be uppercased, the
@@ -556,6 +561,7 @@ typedef enum {
 
 /**
  * enum ATTR_DEF_FLAGS -
+ *
  * The flags (32-bit) describing attribute properties in the attribute
  * definition structure.  FIXME: This information is based on Regis's
  * information and, according to him, it is not certain and probably
@@ -592,6 +598,7 @@ typedef enum {
 
 /**
  * struct ATTR_DEF -
+ *
  * The data attribute of FILE_AttrDef contains a sequence of attribute
  * definitions for the NTFS volume. With this, it is supposed to be safe for an
  * older NTFS driver to mount a volume containing a newer NTFS version without
@@ -615,8 +622,7 @@ typedef struct {
 } __attribute__((__packed__)) ATTR_DEF;
 
 /**
- * enum ATTR_FLAGS -
- * Attribute flags (16-bit).
+ * enum ATTR_FLAGS - Attribute flags (16-bit).
  */
 typedef enum {
 	ATTR_IS_COMPRESSED	= const_cpu_to_le16(0x0001),
@@ -695,8 +701,7 @@ typedef enum {
  */
 
 /**
- * enum RESIDENT_ATTR_FLAGS -
- * Flags of resident attributes (8-bit).
+ * enum RESIDENT_ATTR_FLAGS - Flags of resident attributes (8-bit).
  */
 typedef enum {
 	RESIDENT_ATTR_IS_INDEXED = 0x01, /* Attribute is referenced in an index
@@ -705,8 +710,9 @@ typedef enum {
 } __attribute__((__packed__)) RESIDENT_ATTR_FLAGS;
 
 /**
- * struct ATTR_RECORD -
- * Attribute record header. Always aligned to 8-byte boundary.
+ * struct ATTR_RECORD - Attribute record header.
+ *
+ * Always aligned to 8-byte boundary.
  */
 typedef struct {
 /*Ofs*/
@@ -813,8 +819,7 @@ typedef struct {
 typedef ATTR_RECORD ATTR_REC;
 
 /**
- * enum FILE_ATTR_FLAGS -
- * File attribute flags (32-bit).
+ * enum FILE_ATTR_FLAGS - File attribute flags (32-bit).
  */
 typedef enum {
 	/*
@@ -875,8 +880,7 @@ typedef enum {
  */
 
 /**
- * struct STANDARD_INFORMATION -
- * Attribute: Standard information (0x10).
+ * struct STANDARD_INFORMATION - Attribute: Standard information (0x10).
  *
  * NOTE: Always resident.
  * NOTE: Present in all base file records on a volume.
@@ -968,8 +972,7 @@ typedef struct {
 } __attribute__((__packed__)) STANDARD_INFORMATION;
 
 /**
- * struct ATTR_LIST_ENTRY -
- * Attribute: Attribute list (0x20).
+ * struct ATTR_LIST_ENTRY - Attribute: Attribute list (0x20).
  *
  * - Can be either resident or non-resident.
  * - Value consists of a sequence of variable length, 8-byte aligned,
@@ -1035,8 +1038,8 @@ typedef struct {
 #define NTFS_MAX_NAME_LEN	255
 
 /**
- * enum FILE_NAME_TYPE_FLAGS -
- * Possible namespaces for filenames in ntfs (8-bit).
+ * enum FILE_NAME_TYPE_FLAGS - Possible namespaces for filenames in ntfs.
+ * (8-bit).
  */
 typedef enum {
 	FILE_NAME_POSIX			= 0x00,
@@ -1062,8 +1065,7 @@ typedef enum {
 } __attribute__((__packed__)) FILE_NAME_TYPE_FLAGS;
 
 /**
- * struct FILE_NAME_ATTR -
- * Attribute: Filename (0x30).
+ * struct FILE_NAME_ATTR - Attribute: Filename (0x30).
  *
  * NOTE: Always resident.
  * NOTE: All fields, except the parent_directory, are only updated when the
@@ -1111,12 +1113,14 @@ typedef struct {
 } __attribute__((__packed__)) FILE_NAME_ATTR;
 
 /**
- * struct GUID -
- * GUID structures store globally unique identifiers (GUID). A GUID is a
- * 128-bit value consisting of one group of eight hexadecimal digits, followed
- * by three groups of four hexadecimal digits each, followed by one group of
- * twelve hexadecimal digits. GUIDs are Microsoft's implementation of the
- * distributed computing environment (DCE) universally unique identifier (UUID).
+ * struct GUID - GUID structures store globally unique identifiers (GUID).
+ *
+ * A GUID is a 128-bit value consisting of one group of eight hexadecimal
+ * digits, followed by three groups of four hexadecimal digits each, followed
+ * by one group of twelve hexadecimal digits. GUIDs are Microsoft's
+ * implementation of the distributed computing environment (DCE) universally
+ * unique identifier (UUID).
+ *
  * Example of a GUID:
  *	1F010768-5A73-BC91-0010-A52216A7227B
  */
@@ -1130,11 +1134,12 @@ typedef struct {
 } __attribute__((__packed__)) GUID;
 
 /**
- * struct OBJ_ID_INDEX_DATA -
- * FILE_Extend/$ObjId contains an index named $O. This index contains all
- * object_ids present on the volume as the index keys and the corresponding
- * mft_record numbers as the index entry data parts. The data part (defined
- * below) also contains three other object_ids:
+ * struct OBJ_ID_INDEX_DATA - FILE_Extend/$ObjId contains an index named $O.
+ *
+ * This index contains all object_ids present on the volume as the index keys
+ * and the corresponding mft_record numbers as the index entry data parts.
+ *
+ * The data part (defined below) also contains three other object_ids:
  *	birth_volume_id - object_id of FILE_Volume on which the file was first
  *			  created. Optional (i.e. can be zero).
  *	birth_object_id - object_id of file when it was first created. Usually
@@ -1155,8 +1160,7 @@ typedef struct {
 } __attribute__((__packed__)) OBJ_ID_INDEX_DATA;
 
 /**
- * struct OBJECT_ID_ATTR -
- * Attribute: Object id (NTFS 3.0+) (0x40).
+ * struct OBJECT_ID_ATTR - Attribute: Object id (NTFS 3.0+) (0x40).
  *
  * NOTE: Always resident.
  */
@@ -1185,6 +1189,7 @@ typedef struct {
 #if 0
 /**
  * enum IDENTIFIER_AUTHORITIES -
+ *
  * The pre-defined IDENTIFIER_AUTHORITIES used as SID_IDENTIFIER_AUTHORITY in
  * the SID structure (see below).
  */
@@ -1200,6 +1205,7 @@ typedef enum {					/* SID string prefix. */
 
 /**
  * enum RELATIVE_IDENTIFIERS -
+ *
  * These relative identifiers (RIDs) are used with the above identifier
  * authorities to make up universal well-known SIDs.
  *
@@ -1331,6 +1337,7 @@ typedef union {
 
 /**
  * struct SID -
+ *
  * The SID structure is a variable-length structure used to uniquely identify
  * users or groups. SID stands for security identifier.
  *
@@ -1364,8 +1371,7 @@ typedef struct {
 } __attribute__((__packed__)) SID;
 
 /**
- * enum SID_CONSTANTS -
- * Current constants for SIDs.
+ * enum SID_CONSTANTS - Current constants for SIDs.
  */
 typedef enum {
 	SID_REVISION			=  1,	/* Current revision level. */
@@ -1375,8 +1381,7 @@ typedef enum {
 } SID_CONSTANTS;
 
 /**
- * enum ACE_TYPES -
- * The predefined ACE types (8-bit, see below).
+ * enum ACE_TYPES - The predefined ACE types (8-bit, see below).
  */
 typedef enum {
 	ACCESS_MIN_MS_ACE_TYPE		= 0,
@@ -1404,8 +1409,7 @@ typedef enum {
 } __attribute__((__packed__)) ACE_TYPES;
 
 /**
- * enum ACE_FLAGS -
- * The ACE flags (8-bit) for audit and inheritance (see below).
+ * enum ACE_FLAGS - The ACE flags (8-bit) for audit and inheritance.
  *
  * SUCCESSFUL_ACCESS_ACE_FLAG is only used with system audit and alarm ACE
  * types to indicate that a message is generated (in Windows!) for successful
@@ -1430,6 +1434,7 @@ typedef enum {
 
 /**
  * struct ACE_HEADER -
+ *
  * An ACE is an access-control entry in an access-control list (ACL).
  * An ACE defines access to an object for a specific user or group or defines
  * the types of access that generate system-administration messages or alarms
@@ -1447,8 +1452,9 @@ typedef struct {
 } __attribute__((__packed__)) ACE_HEADER;
 
 /**
- * enum ACCESS_MASK -
- * The access mask (32-bit). Defines the access rights.
+ * enum ACCESS_MASK - The access mask (32-bit).
+ *
+ * Defines the access rights.
  */
 typedef enum {
 	/*
@@ -1582,6 +1588,7 @@ typedef enum {
 
 /**
  * struct GENERIC_MAPPING -
+ *
  * The generic mapping array. Used to denote the mapping of each generic
  * access right to a specific access mask.
  *
@@ -1600,6 +1607,7 @@ typedef struct {
 
 /**
  * struct ACCESS_DENIED_ACE -
+ *
  * ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE
  */
 typedef struct {
@@ -1614,8 +1622,7 @@ typedef struct {
 			       SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE;
 
 /**
- * enum OBJECT_ACE_FLAGS -
- * The object ACE flags (32-bit).
+ * enum OBJECT_ACE_FLAGS - The object ACE flags (32-bit).
  */
 typedef enum {
 	ACE_OBJECT_TYPE_PRESENT			= const_cpu_to_le32(1),
@@ -1642,8 +1649,8 @@ typedef struct {
 			       SYSTEM_ALARM_OBJECT_ACE;
 
 /**
- * struct ACL -
- * An ACL is an access-control list (ACL).
+ * struct ACL - An ACL is an access-control list (ACL).
+ *
  * An ACL starts with an ACL header structure, which specifies the size of
  * the ACL and the number of ACEs it contains. The ACL header is followed by
  * zero or more access control entries (ACEs). The ACL as well as each ACE
@@ -1660,8 +1667,7 @@ typedef struct {
 } __attribute__((__packed__)) ACL;
 
 /**
- * enum ACL_CONSTANTS -
- * Current constants for ACLs.
+ * enum ACL_CONSTANTS - Current constants for ACLs.
  */
 typedef enum {
 	/* Current revision. */
@@ -1679,6 +1685,7 @@ typedef enum {
 
 /**
  * enum SECURITY_DESCRIPTOR_CONTROL -
+ *
  * The security descriptor control flags (16-bit).
  *
  * SE_OWNER_DEFAULTED - This boolean flag, when set, indicates that the
@@ -1744,6 +1751,7 @@ typedef enum {
 
 /**
  * struct SECURITY_DESCRIPTOR_RELATIVE -
+ *
  * Self-relative security descriptor. Contains the owner and group SIDs as well
  * as the sacl and dacl ACLs inside the security descriptor itself.
  */
@@ -1770,12 +1778,14 @@ typedef struct {
 } __attribute__((__packed__)) SECURITY_DESCRIPTOR_RELATIVE;
 
 /**
- * struct SECURITY_DESCRIPTOR -
- * Absolute security descriptor. Does not contain the owner and group SIDs, nor
- * the sacl and dacl ACLs inside the security descriptor. Instead, it contains
- * pointers to these structures in memory. Obviously, absolute security
- * descriptors are only useful for in memory representations of security
- * descriptors. On disk, a self-relative security descriptor is used.
+ * struct SECURITY_DESCRIPTOR - Absolute security descriptor.
+ *
+ * Does not contain the owner and group SIDs, nor the sacl and dacl ACLs inside
+ * the security descriptor. Instead, it contains pointers to these structures
+ * in memory. Obviously, absolute security descriptors are only useful for in
+ * memory representations of security descriptors.
+ *
+ * On disk, a self-relative security descriptor is used.
  */
 typedef struct {
 	u8 revision;	/* Revision level of the security descriptor. */
@@ -1800,6 +1810,7 @@ typedef struct {
 
 /**
  * enum SECURITY_DESCRIPTOR_CONSTANTS -
+ *
  * Current constants for security descriptors.
  */
 typedef enum {
@@ -1813,8 +1824,9 @@ typedef enum {
 } SECURITY_DESCRIPTOR_CONSTANTS;
 
 /*
- * Attribute: Security descriptor (0x50). A standard self-relative security
- * descriptor.
+ * Attribute: Security descriptor (0x50).
+ *
+ * A standard self-relative security descriptor.
  *
  * NOTE: Can be resident or non-resident.
  * NOTE: Not used in NTFS 3.0+, as security descriptors are stored centrally
@@ -1864,6 +1876,7 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
 
 /**
  * struct SECURITY_DESCRIPTOR_HEADER -
+ *
  * This header precedes each security descriptor in the $SDS data stream.
  * This is also the index entry data part of both the $SII and $SDH indexes.
  */
@@ -1904,6 +1917,7 @@ typedef struct {
 
 /**
  * struct SDS_ENTRY -
+ *
  * The $SDS data stream contains the security descriptors, aligned on 16-byte
  * boundaries, sorted by security_id in a B+ tree. Security descriptors cannot
  * cross 256kib boundaries (this restriction is imposed by the Windows cache
@@ -1926,19 +1940,19 @@ typedef struct {
 } __attribute__((__packed__)) SDS_ENTRY;
 
 /**
- * struct SII_INDEX_KEY -
- * The index entry key used in the $SII index. The collation type is
- * COLLATION_NTOFS_ULONG.
+ * struct SII_INDEX_KEY - The index entry key used in the $SII index.
+ *
+ * The collation type is COLLATION_NTOFS_ULONG.
  */
 typedef struct {
 	u32 security_id;   /* The security_id assigned to the descriptor. */
 } __attribute__((__packed__)) SII_INDEX_KEY;
 
 /**
- * struct SDH_INDEX_KEY -
- * The index entry key used in the $SDH index. The keys are sorted first by
- * hash and then by security_id. The collation rule is
- * COLLATION_NTOFS_SECURITY_HASH.
+ * struct SDH_INDEX_KEY - The index entry key used in the $SDH index.
+ *
+ * The keys are sorted first by hash and then by security_id.
+ * The collation rule is COLLATION_NTOFS_SECURITY_HASH.
  */
 typedef struct {
 	u32 hash;	   /* Hash of the security descriptor. */
@@ -1946,8 +1960,7 @@ typedef struct {
 } __attribute__((__packed__)) SDH_INDEX_KEY;
 
 /**
- * struct VOLUME_NAME -
- * Attribute: Volume name (0x60).
+ * struct VOLUME_NAME - Attribute: Volume name (0x60).
  *
  * NOTE: Always resident.
  * NOTE: Present only in FILE_Volume.
@@ -1957,8 +1970,7 @@ typedef struct {
 } __attribute__((__packed__)) VOLUME_NAME;
 
 /**
- * enum VOLUME_FLAGS -
- * Possible flags for the volume (16-bit).
+ * enum VOLUME_FLAGS - Possible flags for the volume (16-bit).
  */
 typedef enum {
 	VOLUME_IS_DIRTY			= const_cpu_to_le16(0x0001),
@@ -1972,8 +1984,7 @@ typedef enum {
 } __attribute__((__packed__)) VOLUME_FLAGS;
 
 /**
- * struct VOLUME_INFORMATION -
- * Attribute: Volume information (0x70).
+ * struct VOLUME_INFORMATION - Attribute: Volume information (0x70).
  *
  * NOTE: Always resident.
  * NOTE: Present only in FILE_Volume.
@@ -1988,8 +1999,7 @@ typedef struct {
 } __attribute__((__packed__)) VOLUME_INFORMATION;
 
 /**
- * struct DATA_ATTR -
- * Attribute: Data attribute (0x80).
+ * struct DATA_ATTR - Attribute: Data attribute (0x80).
  *
  * NOTE: Can be resident or non-resident.
  *
@@ -2000,8 +2010,7 @@ typedef struct {
 } __attribute__((__packed__)) DATA_ATTR;
 
 /**
- * enum INDEX_HEADER_FLAGS -
- * Index header flags (8-bit).
+ * enum INDEX_HEADER_FLAGS - Index header flags (8-bit).
  */
 typedef enum {
 	/* When index header is in an index root attribute: */
@@ -2024,6 +2033,7 @@ typedef enum {
 
 /**
  * struct INDEX_HEADER -
+ *
  * This is the header for indexes, describing the INDEX_ENTRY records, which
  * follow the INDEX_HEADER. Together the index header and the index entries
  * make up a complete index.
@@ -2052,8 +2062,7 @@ typedef struct {
 } __attribute__((__packed__)) INDEX_HEADER;
 
 /**
- * struct INDEX_ROOT -
- * Attribute: Index root (0x90).
+ * struct INDEX_ROOT - Attribute: Index root (0x90).
  *
  * NOTE: Always resident.
  *
@@ -2095,8 +2104,7 @@ typedef struct {
 } __attribute__((__packed__)) INDEX_ROOT;
 
 /**
- * struct INDEX_BLOCK -
- * Attribute: Index allocation (0xa0).
+ * struct INDEX_BLOCK - Attribute: Index allocation (0xa0).
  *
  * NOTE: Always non-resident (doesn't make sense to be resident anyway!).
  *
@@ -2130,6 +2138,7 @@ typedef INDEX_BLOCK INDEX_ALLOCATION;
 
 /**
  * struct REPARSE_INDEX_KEY -
+ *
  * The system file FILE_Extend/$Reparse contains an index named $R listing
  * all reparse points on the volume. The index entry keys are as defined
  * below. Note, that there is no index data associated with the index entries.
@@ -2145,8 +2154,7 @@ typedef struct {
 } __attribute__((__packed__)) REPARSE_INDEX_KEY;
 
 /**
- * enum QUOTA_FLAGS -
- * Quota flags (32-bit).
+ * enum QUOTA_FLAGS - Quota flags (32-bit).
  */
 typedef enum {
 	/* The user quota flags. Names explain meaning. */
@@ -2171,6 +2179,7 @@ typedef enum {
 
 /**
  * struct QUOTA_CONTROL_ENTRY -
+ *
  * The system file FILE_Extend/$Quota contains two indexes $O and $Q. Quotas
  * are on a per volume and per user basis.
  *
@@ -2205,8 +2214,7 @@ typedef struct {
 } __attribute__((__packed__)) QUOTA_CONTROL_ENTRY;
 
 /**
- * enum PREDEFINED_OWNER_IDS -
- * Predefined owner_id values (32-bit).
+ * enum PREDEFINED_OWNER_IDS - Predefined owner_id values (32-bit).
  */
 typedef enum {
 	QUOTA_INVALID_ID	= const_cpu_to_le32(0x00000000),
@@ -2215,8 +2223,7 @@ typedef enum {
 } PREDEFINED_OWNER_IDS;
 
 /**
- * enum INDEX_ENTRY_FLAGS -
- * Index entry flags (16-bit).
+ * enum INDEX_ENTRY_FLAGS - Index entry flags (16-bit).
  */
 typedef enum {
 	INDEX_ENTRY_NODE = const_cpu_to_le16(1), /* This entry contains a
@@ -2231,8 +2238,7 @@ typedef enum {
 } __attribute__((__packed__)) INDEX_ENTRY_FLAGS;
 
 /**
- * struct INDEX_ENTRY_HEADER -
- * This the index entry header (see below).
+ * struct INDEX_ENTRY_HEADER - This the index entry header (see below).
  */
 typedef struct {
 /*  0*/	union {		/* Only valid when INDEX_ENTRY_END is not set. */
@@ -2259,10 +2265,11 @@ typedef struct {
 } __attribute__((__packed__)) INDEX_ENTRY_HEADER;
 
 /**
- * struct INDEX_ENTRY -
- * This is an index entry. A sequence of such entries follows each INDEX_HEADER
- * structure. Together they make up a complete index. The index follows either
- * an index root attribute or an index allocation attribute.
+ * struct INDEX_ENTRY - This is an index entry.
+ *
+ * A sequence of such entries follows each INDEX_HEADER structure. Together
+ * they make up a complete index. The index follows either an index root
+ * attribute or an index allocation attribute.
  *
  * NOTE: Before NTFS 3.0 only filename attributes were indexed.
  */
@@ -2325,8 +2332,7 @@ typedef struct {
 } __attribute__((__packed__)) INDEX_ENTRY;
 
 /**
- * struct BITMAP_ATTR -
- * Attribute: Bitmap (0xb0).
+ * struct BITMAP_ATTR - Attribute: Bitmap (0xb0).
  *
  * Contains an array of bits (aka a bitfield).
  *
@@ -2341,6 +2347,7 @@ typedef struct {
 
 /**
  * enum PREDEFINED_REPARSE_TAGS -
+ *
  * The reparse point tag defines the type of the reparse point. It also
  * includes several flags, which further describe the reparse point.
  *
@@ -2382,8 +2389,7 @@ typedef enum {
 } PREDEFINED_REPARSE_TAGS;
 
 /**
- * struct REPARSE_POINT -
- * Attribute: Reparse point (0xc0).
+ * struct REPARSE_POINT - Attribute: Reparse point (0xc0).
  *
  * NOTE: Can be resident or non-resident.
  */
@@ -2395,8 +2401,7 @@ typedef struct {
 } __attribute__((__packed__)) REPARSE_POINT;
 
 /**
- * struct EA_INFORMATION -
- * Attribute: Extended attribute (EA) information (0xd0).
+ * struct EA_INFORMATION - Attribute: Extended attribute information (0xd0).
  *
  * NOTE: Always resident.
  */
@@ -2413,8 +2418,7 @@ typedef struct {
 } __attribute__((__packed__)) EA_INFORMATION;
 
 /**
- * enum EA_FLAGS -
- * Extended attribute flags (8-bit).
+ * enum EA_FLAGS - Extended attribute flags (8-bit).
  */
 typedef enum {
 	NEED_EA	= 0x80,		/* Indicate that the file to which the EA
@@ -2424,8 +2428,7 @@ typedef enum {
 } __attribute__((__packed__)) EA_FLAGS;
 
 /**
- * struct EA_ATTR -
- * Attribute: Extended attribute (EA) (0xe0).
+ * struct EA_ATTR - Attribute: Extended attribute (EA) (0xe0).
  *
  * Like the attribute list and the index buffer list, the EA attribute value is
  * a sequence of EA_ATTR variable length records.
@@ -2445,8 +2448,7 @@ typedef struct {
 } __attribute__((__packed__)) EA_ATTR;
 
 /**
- * struct PROPERTY_SET -
- * Attribute: Property set (0xf0).
+ * struct PROPERTY_SET - Attribute: Property set (0xf0).
  *
  * Intended to support Native Structure Storage (NSS) - a feature removed from
  * NTFS 3.0 during beta testing.
@@ -2456,8 +2458,7 @@ typedef struct {
 } __attribute__((__packed__)) PROPERTY_SET;
 
 /**
- * struct LOGGED_UTILITY_STREAM -
- * Attribute: Logged utility stream (0x100).
+ * struct LOGGED_UTILITY_STREAM - Attribute: Logged utility stream (0x100).
  *
  * NOTE: Can be resident or non-resident.
  *
@@ -2499,8 +2500,9 @@ typedef struct {
  */
 
 /**
- * struct EFS_ATTR_HEADER -
- * The header of the 0x100 attribute named "$EFS".
+ * struct EFS_ATTR_HEADER - "$EFS" header.
+ *
+ * The header of the Logged utility stream (0x100) attribute named "$EFS".
  */
 typedef struct {
 /*  0*/	u32 length;		/* Length of EFS attribute in bytes. */

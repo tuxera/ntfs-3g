@@ -82,8 +82,7 @@ typedef sle64 leLSN;
  */
 #ifndef _WINDEF_H
 /**
- * enum BOOL -
- * These are just to make the code more readable...
+ * enum BOOL - These are just to make the code more readable...
  */
 typedef enum {
 	FALSE = 0,

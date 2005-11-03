@@ -23,9 +23,10 @@
 #define _NTFS_LIST_H
 
 /**
- * struct list_head -
- * Simple doubly linked list implementation. - Copied from Linux kernel
- * 2.4.2-ac18 into Linux-NTFS (with minor modifications). - AIA
+ * struct list_head - Simple doubly linked list implementation.
+ * 
+ * Copied from Linux kernel 2.4.2-ac18 into Linux-NTFS (with minor
+ * modifications). - AIA
  *
  * Some of the internal functions ("__xxx") are useful when
  * manipulating whole lists rather than single entries, as
@@ -47,12 +48,10 @@ struct list_head {
 } while (0)
 
 /**
- * __list_add -
+ * __list_add - Insert a new entry between two known consecutive entries.
  * @new:
  * @prev:
  * @next:
- *
- * Insert a new entry between two known consecutive entries.
  *
  * This is only for internal list manipulation where we know the prev/next
  * entries already!

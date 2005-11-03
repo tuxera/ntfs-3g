@@ -34,6 +34,7 @@ typedef struct _ntfs_inode ntfs_inode;
 
 /**
  * enum ntfs_inode_state_bits -
+ *
  * Defined bits for the state field in the ntfs_inode structure.
  * (f) = files only, (d) = directories only
  */
@@ -110,9 +111,10 @@ typedef enum {
 				test_and_clear_nino_flag(ni, FileNameDirty)
 
 /**
- * struct _ntfs_inode -
- * The NTFS in-memory inode structure. It is just used as an extension to the
- * fields already provided in the VFS inode.
+ * struct _ntfs_inode - The NTFS in-memory inode structure.
+ *
+ * It is just used as an extension to the fields already provided in the VFS
+ * inode.
  */
 struct _ntfs_inode {
 	u64 mft_no;		/* Inode / mft record number. */
