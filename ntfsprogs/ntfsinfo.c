@@ -1124,7 +1124,7 @@ typedef enum {
 
 static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
-	unsigned i;
+	char *sid;
 	char printable_GUID[37];
 	
 	switch (type) {
@@ -1149,19 +1149,9 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				 le64_to_cpu(entry->key.reparse.file_id));
 		break;
 	case INDEX_ATTR_QUOTA_O:
-		ntfs_log_verbose("\t\tKey revision:\t\t %u\n", 
-				 entry->key.sid.revision);
-		ntfs_log_verbose("\t\tKey sub authority count: %u\n", 
-				 entry->key.sid.sub_authority_count);
-		ntfs_log_verbose("\t\tKey ident. auth. high:   0x%04x\n",
-				 le16_to_cpu(entry->key.sid.
-					     identifier_authority.high_part));
-		ntfs_log_verbose("\t\tKey ident. auth. low:    0x%08x\n",
-				 le32_to_cpu(entry->key.sid.
-					     identifier_authority.low_part));
-		for (i = 0; i < entry->key.sid.sub_authority_count; i++)
-			ntfs_log_verbose("\t\tKey sub authority:\t 0x%08x\n",
-				le32_to_cpu(entry->key.sid.sub_authority[i]));
+		sid = ntfs_sid_to_mbs(&entry->key.sid, NULL, 0);
+		ntfs_log_verbose("\t\tKey SID:\t\t %s\n", sid);
+		free(sid);
 		break;
 	case INDEX_ATTR_QUOTA_Q:
 		ntfs_log_verbose("\t\tKey owner id:\t\t %u\n",
