@@ -4318,6 +4318,7 @@ static void mkntfs_create_root_structures(void)
 		}
 		file_attrs = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM;
 		if (i == FILE_root) {
+			file_attrs |= FILE_ATTR_ARCHIVE;
 			if (opts.disable_indexing)
 				file_attrs |= FILE_ATTR_NOT_CONTENT_INDEXED;
 			if (opts.enable_compression)
@@ -4335,7 +4336,7 @@ static void mkntfs_create_root_structures(void)
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0100));
 			else if (i == 9) {
-				file_attrs |= FILE_ATTR_NOT_CONTENT_INDEXED;
+				file_attrs |= FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
 			}
@@ -4343,6 +4344,7 @@ static void mkntfs_create_root_structures(void)
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
 			else if (i ==24 || i == 25 || i == 26) {
+				file_attrs |= FILE_ATTR_ARCHIVE;
 				file_attrs |= FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
@@ -4793,7 +4795,7 @@ static void mkntfs_create_root_structures(void)
 	// starting vith file 24 (ignoring file 16-23)
 	if (vol->major_ver >= 3) {
 		extend_flags = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-			FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+			FILE_ATTR_ARCHIVE | FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
 		Vprintf("Creating $Quota (mft record 24)\n");
 		m = (MFT_RECORD*)(buf + 24 * vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
