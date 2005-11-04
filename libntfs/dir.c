@@ -1241,6 +1241,7 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	ntfs_index_context *ictx = NULL;
 	FILE_NAME_ATTR *fn = NULL;
 	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
+	BOOL case_sensitive_match = TRUE;
 	int err = 0;
 
 	ntfs_log_trace("Entering.\n");
@@ -1305,8 +1306,9 @@ search:
 				ntfs_names_are_equal(fn->file_name,
 				fn->file_name_length, name,
 				name_len, (fn->file_name_type ==
-				FILE_NAME_POSIX) ? CASE_SENSITIVE : IGNORE_CASE,
-				ni->vol->upcase, ni->vol->upcase_len)) {
+				FILE_NAME_POSIX || case_sensitive_match) ?
+				CASE_SENSITIVE : IGNORE_CASE, ni->vol->upcase,
+				ni->vol->upcase_len)) {
 			if (fn->file_name_type == FILE_NAME_WIN32) {
 				looking_for_dos_name = TRUE;
 				ntfs_attr_reinit_search_ctx(actx);
@@ -1317,8 +1319,18 @@ search:
 			break;
 		}
 	}
-	if (errno)
+	if (errno) {
+		/*
+		 * If case sensitive search failed, then try once again
+		 * ignoring case.
+		 */
+		if (errno == ENOENT && case_sensitive_match) {
+			case_sensitive_match = FALSE;
+			ntfs_attr_reinit_search_ctx(actx);
+			goto search;
+		}
 		goto err_out;
+	}
 	/* Search for such FILE_NAME in index. */
 	ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 	if (!ictx)
