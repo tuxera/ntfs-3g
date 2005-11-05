@@ -258,7 +258,7 @@ err_out:
  */
 void ntfs_generate_guid(GUID *guid)
 {
-	int i;
+	unsigned int i;
 	u8 *p = (u8 *)guid;
 
 	for (i = 0; i < sizeof(GUID); i++) {
