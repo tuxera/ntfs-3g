@@ -2608,4 +2608,27 @@ typedef struct {
 
 typedef EFS_DF_CERTIFICATE_THUMBPRINT_HEADER EFS_DF_CERT_THUMBPRINT_HEADER;
 
+typedef enum {
+	INTX_SYMBOLIC_LINK =
+		const_cpu_to_le64(0x014B4E4C78746E49ULL), /* "IntxLNK\1" */
+	INTX_CHARACTER_DEVICE =
+		const_cpu_to_le64(0x0052484378746E49ULL), /* "IntxCHR\0" */
+	INTX_BLOCK_DEVICE =
+		const_cpu_to_le64(0x004B4C4278746E49ULL), /* "IntxBLK\0" */
+} INTX_FILE_TYPES;
+
+typedef struct {
+	INTX_FILE_TYPES magic;		/* Intx file magic. */
+	union {
+		/* For character and block devices. */
+		struct {
+			u64 major;		/* Major device number. */
+			u64 minor;		/* Minor device number. */
+			void *device_end[0];	/* Marker for offsetof(). */
+		} __attribute__((__packed__));
+		/* For symbolic links. */
+		ntfschar target[0];
+	} __attribute__((__packed__));
+} __attribute__((__packed__)) INTX_FILE;
+
 #endif /* defined _NTFS_LAYOUT_H */

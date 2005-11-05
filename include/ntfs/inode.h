@@ -122,6 +122,8 @@ struct _ntfs_inode {
 	ntfs_volume *vol;	/* Pointer to the ntfs volume of this inode. */
 	unsigned long state;	/* NTFS specific flags describing this inode.
 				   See ntfs_inode_state_bits above. */
+	FILE_ATTR_FLAGS flags;	/* Flags describing the file.
+				   (Copy from STANDARD_INFORMATION) */
 	/*
 	 * Attribute list support (for use by the attribute lookup functions).
 	 * Setup during ntfs_open_inode() for all inodes with attribute lists.

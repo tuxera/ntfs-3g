@@ -166,6 +166,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		NInoSetEncrypted(ni);
 	if (std_info->file_attributes & FILE_ATTR_SPARSE_FILE)
 		NInoSetSparse(ni);
+	ni->flags = std_info->file_attributes;
 	ni->creation_time = ntfs2utc(std_info->creation_time);
 	ni->last_data_change_time = ntfs2utc(std_info->last_data_change_time);
 	ni->last_mft_change_time = ntfs2utc(std_info->last_mft_change_time);

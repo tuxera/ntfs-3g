@@ -292,47 +292,171 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	if (stream_name_len < 0)
 		return stream_name_len;
 	memset(stbuf, 0, sizeof(struct stat));
-	if ((ni = ntfs_pathname_to_inode(vol, NULL, path))) {
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY &&
-				!stream_name_len) {
-			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
-			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
-			if (na) {
-				stbuf->st_size = na->data_size;
-				stbuf->st_blocks = na->allocated_size >>
-					vol->sector_size_bits;
-				ntfs_attr_close(na);
-			} else {
-				stbuf->st_size = 0;
-				stbuf->st_blocks = 0;
-			}
-			stbuf->st_nlink = 1; /* Needed for correct find work. */
-		} else {
-			stbuf->st_mode = S_IFREG | (0777 & ~ctx->fmask);
-			na = ntfs_attr_open(ni, AT_DATA, stream_name,
-					stream_name_len);
-			if (na) {
-				stbuf->st_size = na->data_size;
-				stbuf->st_blocks = na->allocated_size >>
-					vol->sector_size_bits;
-				ntfs_attr_close(na);
-			} else {
-				stbuf->st_size = 0;
-				stbuf->st_blocks = 0;
-				if (stream_name_len)
-					res = -ENOENT;
-			}
-			stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
-		}
-		stbuf->st_uid = ctx->uid;
-		stbuf->st_gid = ctx->gid;
-		stbuf->st_ino = ni->mft_no;
-		stbuf->st_atime = ni->last_access_time;
-		stbuf->st_ctime = ni->last_mft_change_time;
-		stbuf->st_mtime = ni->last_data_change_time;
-		ntfs_inode_close(ni);
-	} else
+	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	if (!ni) {
 		res = -ENOENT;
+		goto exit;
+	}
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
+		/* Directory. */
+		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
+		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
+		if (na) {
+			stbuf->st_size = na->data_size;
+			stbuf->st_blocks = na->allocated_size >>
+				vol->sector_size_bits;
+			ntfs_attr_close(na);
+		} else {
+			stbuf->st_size = 0;
+			stbuf->st_blocks = 0;
+		}
+		stbuf->st_nlink = 1; /* Needed for correct find work. */
+	} else {
+		/* Regular or INTX file. */
+		stbuf->st_mode = S_IFREG;
+		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+		if (na) {
+			/* Check whether it's special INTX file. */
+			if ((ni->flags & FILE_ATTR_SYSTEM) && na->data_size <=
+					sizeof(INTX_FILE_TYPES) + sizeof(
+					ntfschar) * MAX_PATH && na->data_size >
+					sizeof(INTX_FILE_TYPES) &&
+					!stream_name_len) {
+				INTX_FILE *intx_file;
+
+				intx_file = malloc(na->data_size);
+				if (!intx_file) {
+					res = -errno;
+					ntfs_attr_close(na);
+					goto exit;
+				}
+				if (ntfs_attr_pread(na, 0, na->data_size,
+						intx_file) != na->data_size) {
+					res = -errno;
+					free(intx_file);
+					ntfs_attr_close(na);
+					goto exit;
+				}
+				if (intx_file->magic == INTX_BLOCK_DEVICE &&
+						na->data_size == offsetof(
+						INTX_FILE, device_end)) {
+					stbuf->st_mode = S_IFBLK;
+					stbuf->st_rdev = makedev(le64_to_cpu(
+							intx_file->major),
+							le64_to_cpu(
+							intx_file->minor));
+				}
+				if (intx_file->magic == INTX_CHARACTER_DEVICE &&
+						na->data_size == offsetof(
+						INTX_FILE, device_end)) {
+					stbuf->st_mode = S_IFCHR;
+					stbuf->st_rdev = makedev(le64_to_cpu(
+							intx_file->major),
+							le64_to_cpu(
+							intx_file->minor));
+				}
+				if (intx_file->magic == INTX_SYMBOLIC_LINK)
+					stbuf->st_mode = S_IFLNK;
+				free(intx_file);
+			}
+			stbuf->st_size = na->data_size;
+			stbuf->st_blocks = na->allocated_size >>
+				vol->sector_size_bits;
+			ntfs_attr_close(na);
+		} else {
+			stbuf->st_size = 0;
+			stbuf->st_blocks = 0;
+			if (stream_name_len)
+				res = -ENOENT;
+		}
+		stbuf->st_mode |= (0777 & ~ctx->fmask);
+		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+	}
+	stbuf->st_uid = ctx->uid;
+	stbuf->st_gid = ctx->gid;
+	stbuf->st_ino = ni->mft_no;
+	stbuf->st_atime = ni->last_access_time;
+	stbuf->st_ctime = ni->last_mft_change_time;
+	stbuf->st_mtime = ni->last_data_change_time;
+exit:
+	if (ni)
+		ntfs_inode_close(ni);
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
+}
+
+static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
+{
+	char *path;
+	ntfschar *stream_name;
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na = NULL;
+	INTX_FILE *intx_file = NULL;
+	int stream_name_len, res = 0;
+
+	/* Get inode. */
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	if (stream_name_len > 0) {
+		res = -EINVAL;
+		goto exit;
+	}
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	/* Sanity checks. */
+	if (!(ni->flags & FILE_ATTR_SYSTEM)) {
+		res = -EINVAL;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	if (na->data_size <= sizeof(INTX_FILE_TYPES)) {
+		res = -EINVAL;
+		goto exit;
+	}
+	if (na->data_size > sizeof(INTX_FILE_TYPES) +
+			sizeof(ntfschar) * MAX_PATH) {
+		res = -ENAMETOOLONG;
+		goto exit;
+	}
+	/* Receive file content. */
+	intx_file = malloc(na->data_size);
+	if (!intx_file) {
+		res = -errno;
+		goto exit;
+	}
+	if (ntfs_attr_pread(na, 0, na->data_size, intx_file) != na->data_size) {
+		res = -errno;
+		goto exit;
+	}
+	/* Sanity check. */
+	if (intx_file->magic != INTX_SYMBOLIC_LINK) {
+		res = -EINVAL;
+		goto exit;
+	}
+	/* Convert link from unicode to local encoding. */
+	if (ntfs_ucstombs(intx_file->target, (na->data_size -
+			offsetof(INTX_FILE, target)) / sizeof(ntfschar),
+			&buf, buf_size) < 0) {
+		res = -errno;
+		goto exit;
+	}
+exit:
+	if (intx_file)
+		free(intx_file);
+	if (na)
+		ntfs_attr_close(na);
+	if (ni)
+		ntfs_inode_close(ni);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1150,6 +1274,7 @@ exit:
 
 static struct fuse_operations ntfs_fuse_oper = {
 	.getattr	= ntfs_fuse_getattr,
+	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
 	.open		= ntfs_fuse_open,
 	.read		= ntfs_fuse_read,
@@ -1518,6 +1643,7 @@ int main(int argc, char *argv[])
 	int ffd;
 
 	utils_set_locale();
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
