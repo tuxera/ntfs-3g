@@ -96,8 +96,7 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute
 	/* Check sectors per cluster value is valid. */
 	ntfs_log_debug("Checking sectors per cluster... ");
 	switch (b->bpb.sectors_per_cluster) {
-	case 1: case 2: case 4: case 8: case 16:
-	case 32: case 64: case 128:
+	case 1: case 2: case 4: case 8: case 16: case 32: case 64: case 128:
 		break;
 	default:
 		goto not_ntfs;

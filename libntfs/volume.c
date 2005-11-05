@@ -75,23 +75,7 @@
  */
 ntfs_volume *ntfs_volume_alloc(void)
 {
-	ntfs_volume *vol;
-
-	vol = (ntfs_volume*)calloc(1, sizeof(ntfs_volume));
-	if (vol) {
-		vol->dev = NULL;
-		vol->vol_name = NULL;
-		vol->lcnbmp_ni = NULL;
-		vol->lcnbmp_na = NULL;
-		vol->mft_ni = NULL;
-		vol->mft_na = NULL;
-		vol->mftbmp_na = NULL;
-		vol->mftmirr_ni = NULL;
-		vol->mftmirr_na = NULL;
-		vol->upcase = NULL;
-		vol->attrdef = NULL;
-	}
-	return vol;
+	return calloc(1, sizeof(ntfs_volume));
 }
 
 /**
