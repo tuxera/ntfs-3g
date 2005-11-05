@@ -190,8 +190,8 @@ char *dev_name;
 struct mkntfs_options {
 	long long part_start_sect;	/* -p, start sector of partition on
 					   parent device */
-	long long nr_sectors;		/* size of device in sectors */
-	long long nr_clusters;		/* Note: Win2k treats clusters as
+	long long num_sectors;		/* size of device in sectors */
+	long long num_clusters;		/* Note: Win2k treats clusters as
 					   32-bit entities! */
 	long long volume_size;		/* in bytes, or suffixed
 					   with k for kB, m or M for MB, or
@@ -207,7 +207,7 @@ struct mkntfs_options {
 					   1. */
 	long long mft_zone_end;		/* Determined from volume_size and
 					   mft_zone_multiplier, in clusters. */
-	long long nr_bad_blocks;	/* Number of bad clusters. */
+	long long num_bad_blocks;	/* Number of bad clusters. */
 	long long *bad_blocks;		/* Array of bad clusters. */
 	char *bad_blocks_filename;	/* filename, file to read list of
 					   bad clusters from. */
@@ -455,7 +455,7 @@ static void parse_options(int argc, char *argv[])
 		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
 			err_exit("Invalid number of sectors: %s\n",
 					argv[optind - 1]);
-		opts.nr_sectors = u;
+		opts.num_sectors = u;
 	}
 	if (optind < argc)
 		usage();
@@ -480,15 +480,15 @@ static void append_to_bad_blocks(unsigned long long block)
 {
 	long long *new_buf;
 
-	if (!(opts.nr_bad_blocks & 15)) {
-		new_buf = realloc(opts.bad_blocks, (opts.nr_bad_blocks + 16) *
+	if (!(opts.num_bad_blocks & 15)) {
+		new_buf = realloc(opts.bad_blocks, (opts.num_bad_blocks + 16) *
 							sizeof(long long));
 		if (!new_buf)
 			err_exit("Reallocating memory for bad blocks list "
-				 "failed: %s\n", strerror(errno));
+				"failed: %s\n", strerror(errno));
 		opts.bad_blocks = new_buf;
 	}
-	opts.bad_blocks[opts.nr_bad_blocks++] = block;
+	opts.bad_blocks[opts.num_bad_blocks++] = block;
 }
 
 /**
@@ -508,8 +508,7 @@ static long long mkntfs_write(struct ntfs_device *dev,
 		bytes_written = dev->d_ops->write(dev, b, count);
 		if (bytes_written == -1LL) {
 			retry = errno;
-			ntfs_log_error("Error writing to %s: %s\n", vol->dev->d_name,
-					strerror(errno));
+			ntfs_log_perror("Error writing to %s", vol->dev->d_name);
 			errno = retry;
 			return bytes_written;
 		} else if (!bytes_written) {
@@ -582,9 +581,8 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 					length);
 			if (bytes_written == -1LL) {
 				retry = errno;
-				ntfs_log_error("Error writing to %s: %s\n",
-						vol->dev->d_name,
-						strerror(errno));
+				ntfs_log_perror("Error writing to %s",
+					vol->dev->d_name);
 				errno = retry;
 				return bytes_written;
 			}
@@ -952,7 +950,6 @@ static void dump_attr_record(ATTR_RECORD *a)
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
 					sizeof(s));
-
 		}
 		printf("Name = %s\n", s);
 	}
@@ -1079,7 +1076,7 @@ static int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
 	 * appropriate codes exist for simplicity of parsing the return value.
 	 */
 	if (size != ((size + 7) & ~7)) {
-		ntfs_log_error("make_room_for_attribute() received non 8-byte aligned"
+		ntfs_log_error("make_room_for_attribute() received non 8-byte aligned "
 				"size.\n");
 		return -EINVAL;
 	}
@@ -1149,7 +1146,7 @@ static runlist *allocate_scattered_clusters(s64 clusters)
 	s64 prev_run_len = 0LL;
 	char bit;
 
-	end = opts.nr_clusters;
+	end = opts.num_clusters;
 	/* Loop until all clusters are allocated. */
 	while (clusters) {
 		/* Loop in current zone until we run out of free clusters. */
@@ -1328,8 +1325,8 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				return -1;
 			}
 		} else if (name && !ntfs_names_are_equal(name, name_len,
-			    (ntfschar*)((char*)a + le16_to_cpu(a->name_offset)),
-			    a->name_length, ic, upcase, upcase_len)) {
+				(ntfschar*)((char*)a + le16_to_cpu(a->name_offset)),
+				a->name_length, ic, upcase, upcase_len)) {
 			int rc;
 
 			rc = ntfs_names_collate(name, name_len,
@@ -1457,7 +1454,6 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
  * other @ctx fields, base_ntfs_ino, base_mrec, and base_attr are set to NULL.
  * The only exception to this is when @type is AT_END, in which case
  * @ctx->al_entry is set to NULL also (see above).
- *
  *
  * The following error codes are defined:
  *	ENOENT	Attribute not found, not an error as such.
@@ -1656,8 +1652,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		a->compression_unit = 0;
 		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, &inited_size);
 		if (bw != val_len)
-			ntfs_log_error("Error writing non-resident attribute value."
-				"\n");
+			ntfs_log_error("Error writing non-resident attribute value.\n");
 		err = ntfs_mapping_pairs_build(vol, (u8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl, 0, NULL);
 	}
@@ -1752,8 +1747,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 				vol->cluster_size - 1) / vol->cluster_size);
 		if (!rl) {
 			err = -errno;
-			ntfs_log_error("Failed to allocate scattered clusters: %s\n",
-					strerror(-err));
+			ntfs_log_perror("Failed to allocate scattered clusters");
 			goto err_out;
 		}
 	} else {
@@ -1850,8 +1844,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		a->compression_unit = 0;
 		bw = ntfs_rlwrite(vol->dev, rl, val, val_len, NULL);
 		if (bw != val_len)
-			ntfs_log_error("Error writing non-resident attribute value."
-				"\n");
+			ntfs_log_error("Error writing non-resident attribute value.\n");
 		err = ntfs_mapping_pairs_build(vol, (u8*)a + hdr_size +
 				((name_len + 7) & ~7), mpa_size, rl, 0, NULL);
 	}
@@ -1991,7 +1984,7 @@ err_out:
  * Return 0 on success or -errno on error.
  */
 static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
-		 u32 security_id)
+		u32 security_id)
 {
 	STANDARD_INFORMATION si;
 	int err, sd_size;
@@ -2115,7 +2108,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
  * return 0 on success or -errno on error
  */
 static int add_attr_object_id(MFT_RECORD *m, OBJECT_ID_ATTR *objid_attr,
-	 int objid_attr_len)
+		int objid_attr_len)
 {
 	int err;
 
@@ -2128,7 +2121,7 @@ static int add_attr_object_id(MFT_RECORD *m, OBJECT_ID_ATTR *objid_attr,
 	else
 		err = insert_resident_attr_in_mft_record(m,
 				AT_OBJECT_ID, NULL, 0, 0, 0, 0,
-				 (u8*)objid_attr, objid_attr_len);
+				(u8*)objid_attr, objid_attr_len);
 	if (err < 0)
 		ntfs_log_error("add_attr_volume_id failed: %s\n", strerror(-err));
 	return err;
@@ -2305,7 +2298,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 	r = malloc(val_len);
 	if (!r)
 		return -errno;
-	r->type = indexed_attr_type == AT_FILE_NAME ? AT_FILE_NAME : 0;
+	r->type = (indexed_attr_type == AT_FILE_NAME) ? AT_FILE_NAME : 0;
 	if (indexed_attr_type == AT_FILE_NAME &&
 			collation_rule != COLLATION_FILE_NAME) {
 		free(r);
@@ -2324,7 +2317,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 		}
 		r->clusters_per_index_block = index_block_size /
 				vol->cluster_size;
-	} else /* if (vol->cluster_size > index_block_size) */ {
+	} else { /* if (vol->cluster_size > index_block_size) */
 		if (index_block_size & (index_block_size - 1)) {
 			ntfs_log_error("add_attr_index_root: index block size is not "
 					"a power of 2.\n");
@@ -2333,7 +2326,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 		}
 		if (index_block_size < (u32)opts.sector_size) {
 			 ntfs_log_error("add_attr_index_root: index block size is "
-					 "smaller than the sector size.\n");
+					"smaller than the sector size.\n");
 			 free(r);
 			 return -EINVAL;
 		}
@@ -2685,12 +2678,11 @@ static int ntfs_index_keys_compare(char *key1, char *key2,
 	if (collation_rule == COLLATION_NTOFS_ULONGS) {
 		/* i.e $OBJID-$O */
 		while ((j < min(key1_length, key2_length)) && (i == 0)) {
-			if (bswap_32(*(u32*)(key1 + j)) <
-				bswap_32(*(u32*)(key1 + j))) i = -1;
-			if (bswap_32(*(u32*)(key1 + j)) >
-				bswap_32(*(u32*)(key1 + j))) i = +1;
-			if (bswap_32(*(u32*)(key1 + j)) ==
-				 bswap_32(*(u32*)(key1 + j))) {
+			if (bswap_32(*(u32*)(key1 + j)) < bswap_32(*(u32*)(key1 + j)))
+				i = -1;
+			if (bswap_32(*(u32*)(key1 + j)) > bswap_32(*(u32*)(key1 + j)))
+				i = +1;
+			if (bswap_32(*(u32*)(key1 + j)) == bswap_32(*(u32*)(key1 + j))) {
 				i = 0;
 				j += 4;
 			}
@@ -2704,18 +2696,17 @@ static int ntfs_index_keys_compare(char *key1, char *key2,
 	}
 	if (collation_rule == COLLATION_NTOFS_SECURITY_HASH) {
 		/* i.e. $SDH */
-		if (((SDH_INDEX_KEY*)key1)->hash <
-			 ((SDH_INDEX_KEY*)key2)->hash) i = -1;
-		if (((SDH_INDEX_KEY*)key1)->hash >
-			 ((SDH_INDEX_KEY*)key2)->hash) i = +1;
-		if (((SDH_INDEX_KEY*)key1)->hash ==
-			 ((SDH_INDEX_KEY*)key2)->hash) {
-			if (((SDH_INDEX_KEY*)key1)->security_id <
-				 ((SDH_INDEX_KEY*)key2)->security_id) i = -1;
-			if (((SDH_INDEX_KEY*)key1)->security_id >
-				 ((SDH_INDEX_KEY*)key2)->security_id) i = +1;
-			if (((SDH_INDEX_KEY*)key1)->security_id ==
-				 ((SDH_INDEX_KEY*)key2)->security_id) i = 0;
+		if (((SDH_INDEX_KEY*)key1)->hash < ((SDH_INDEX_KEY*)key2)->hash)
+			i = -1;
+		if (((SDH_INDEX_KEY*)key1)->hash > ((SDH_INDEX_KEY*)key2)->hash)
+			i = +1;
+		if (((SDH_INDEX_KEY*)key1)->hash == ((SDH_INDEX_KEY*)key2)->hash) {
+			if (((SDH_INDEX_KEY*)key1)->security_id < ((SDH_INDEX_KEY*)key2)->security_id)
+				i = -1;
+			if (((SDH_INDEX_KEY*)key1)->security_id > ((SDH_INDEX_KEY*)key2)->security_id)
+				i = +1;
+			if (((SDH_INDEX_KEY*)key1)->security_id == ((SDH_INDEX_KEY*)key2)->security_id)
+				i = 0;
 		}
 		return i;
 	}
@@ -2741,7 +2732,7 @@ static int ntfs_index_keys_compare(char *key1, char *key2,
  */
 static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 		u32 idx_size, MFT_RECORD *m, ntfschar *name, u32 name_size,
-		 ATTR_TYPES type)
+		ATTR_TYPES type)
 {
 	ntfs_attr_search_ctx *ctx;
 	INDEX_HEADER *idx_header;
@@ -2776,7 +2767,7 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 	idx_entry = (INDEX_ENTRY*)((char*)idx_header +
 		le16_to_cpu((idx_header)->entries_offset));
 	idx_end = (INDEX_ENTRY*)((char*)idx_entry +
-		 le32_to_cpu(idx_header->index_length));
+		le32_to_cpu(idx_header->index_length));
 	/*
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
@@ -2798,15 +2789,15 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 			/* If file names are not equal, continue search. */
 			if (i)
 				goto do_next;
-			if (((FILE_NAME_ATTR*)&idx->key.file_name)->\
+			if (((FILE_NAME_ATTR*)&idx->key.file_name)->
 				file_name_type != FILE_NAME_POSIX ||
 				idx_entry->key.file_name.file_name_type
 				!= FILE_NAME_POSIX)
 					return -EEXIST;
 
-			 i = ntfs_file_values_compare((FILE_NAME_ATTR*)&idx->
+			i = ntfs_file_values_compare((FILE_NAME_ATTR*)&idx->
 				key.file_name,
-			 (FILE_NAME_ATTR*)&idx_entry->key.file_name, 1,
+				(FILE_NAME_ATTR*)&idx_entry->key.file_name, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 			if (i == -1)
 				break;
@@ -2825,9 +2816,8 @@ do_next:
 			i = ntfs_index_keys_compare((char*)idx_entry + 0x10,
 				(char*)idx + 0x10,
 				idx_entry->key_length, idx->key_length, collation_rule);
-			if (!i) {
+			if (!i)
 				return -EEXIST;
-			}
 			if (i == 1)
 				break;
 			idx_entry = (INDEX_ENTRY*)((char*)idx_entry +
@@ -2913,17 +2903,15 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		sii_data->offset_in_sds = sds_header->offset;
 		sii_data->size_in_sds = sds_header->length;
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sdh,
-			sdh_size, m,
-			NTFS_INDEX_SDH, 4, AT_UNUSED)))
+			sdh_size, m, NTFS_INDEX_SDH, 4, AT_UNUSED)))
 			break;
 
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sii,
-			sii_size, m,
-			NTFS_INDEX_SII, 4, AT_UNUSED)))
+			sii_size, m, NTFS_INDEX_SII, 4, AT_UNUSED)))
 			break;
 		sds_header = (SECURITY_DESCRIPTOR_HEADER*)((char*)sds_header +
 				(cpu_to_le32(sds_header->length + 0x0F) &
-					 ~cpu_to_le32(0x0F)));
+					~cpu_to_le32(0x0F)));
 		if (!sds_header->length)
 			break;
 	}
@@ -2968,11 +2956,11 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_o->key.sid.identifier_authority.low_part =
 		cpu_to_le32(0x05000000);
 	idx_entry_o->key.sid.sub_authority[0] =
-		 cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	idx_entry_o->key.sid.sub_authority[1] =
 		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 	idx_entry_o_data = (QUOTA_O_INDEX_DATA*)((char*)idx_entry_o
-			 + idx_entry_o->data_offset);
+			+ idx_entry_o->data_offset);
 	idx_entry_o_data->owner_id  = QUOTA_FIRST_USER_ID;
 		/* 20 00 00 00 padding after here on ntfs 3.1 ?? */
 
@@ -2983,7 +2971,7 @@ static int initialize_quota(MFT_RECORD *m)
 	if (err)
 		return err;
 
-	/* q index entry nr. 1 */
+	/* q index entry num 1 */
 	idx_entry_q1->data_offset = cpu_to_le16(0x14);
 	idx_entry_q1->data_length = cpu_to_le16(0x30);
 	idx_entry_q1->reservedV = cpu_to_le32(0x00);
@@ -2993,7 +2981,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q1->reserved = cpu_to_le16(0x00);
 	idx_entry_q1->key.owner_id = cpu_to_le32(0x01);
 	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
-			 + idx_entry_q1->data_offset);
+			+ idx_entry_q1->data_offset);
 	idx_entry_q1_data->version = cpu_to_le32(0x02);
 	idx_entry_q1_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	if (vol->minor_ver == 0)
@@ -3011,7 +2999,7 @@ static int initialize_quota(MFT_RECORD *m)
 	if (err)
 		return err;
 
-	/* q index entry nr. 2 */
+	/* q index entry num 2 */
 	idx_entry_q2->data_offset = cpu_to_le16(0x14);
 	idx_entry_q2->data_length = cpu_to_le16(0x40);
 	idx_entry_q2->reservedV = cpu_to_le32(0x00);
@@ -3021,7 +3009,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2->reserved = cpu_to_le16(0x00);
 	idx_entry_q2->key.owner_id = QUOTA_FIRST_USER_ID;
 	idx_entry_q2_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q2
-			 + idx_entry_q2->data_offset);
+			+ idx_entry_q2->data_offset);
 	idx_entry_q2_data->version = cpu_to_le32(0x02);
 	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	idx_entry_q2_data->bytes_used = cpu_to_le64(0x00);
@@ -3036,7 +3024,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2_data->sid.identifier_authority.low_part =
 		cpu_to_le32(0x05000000);
 	idx_entry_q2_data->sid.sub_authority[0] =
-		 cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	idx_entry_q2_data->sid.sub_authority[1] =
 		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 
@@ -3074,7 +3062,7 @@ static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref)
 	idx_entry_o->reserved = cpu_to_le16(0x00);
 	idx_entry_o->key.object_id = guid;
 	idx_entry_o_data = (OBJ_ID_INDEX_DATA*)((char*)idx_entry_o
-			 + idx_entry_o->data_offset);
+			+ idx_entry_o->data_offset);
 	idx_entry_o_data->mft_reference = mref;
 	idx_entry_o_data->birth_volume_id = *zero_guid;
 	idx_entry_o_data->birth_object_id = *zero_guid;
@@ -3118,14 +3106,13 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 	 * reach the last entry.
 	 */
 	while ((char*)ie < index_end && !(ie->flags & INDEX_ENTRY_END)) {
-/*
+#if 0
 #ifdef DEBUG
 		ntfs_log_debug("file_name_attr1->file_name_length = %i\n",
 				file_name->file_name_length);
 		if (file_name->file_name_length) {
 			char *__buf;
-			__buf = calloc(1, file_name->file_name_length +
-					1);
+			__buf = calloc(1, file_name->file_name_length + 1);
 			if (!__buf)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
@@ -3141,8 +3128,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 				ie->key.file_name.file_name_length);
 		if (ie->key.file_name.file_name_length) {
 			char *__buf;
-			__buf = calloc(1,
-					ie->key.file_name.file_name_length + 1);
+			__buf = calloc(1, ie->key.file_name.file_name_length + 1);
 			if (!__buf)
 				err_exit("Failed to allocate internal buffer: "
 						"%s\n", strerror(errno));
@@ -3155,7 +3141,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 			free(__buf);
 		}
 #endif
-*/
+#endif
 		i = ntfs_file_values_compare(file_name,
 				(FILE_NAME_ATTR*)&ie->key.file_name, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
@@ -3192,8 +3178,7 @@ do_next:
 #ifdef DEBUG
 		/* Next entry. */
 		if (!ie->length) {
-			ntfs_log_debug("BUG: ie->length is zero, breaking out of "
-					"loop.\n");
+			ntfs_log_debug("BUG: ie->length is zero, breaking out of loop.\n");
 			break;
 		}
 #endif
@@ -3312,8 +3297,8 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	idx_entry_new->length = idx_size + 0x10;
 	idx_entry_new->key_length = fn_size;
 	memcpy((char*)idx_entry_new+0x10, (char*)fn, fn_size);
-	i = insert_index_entry_in_res_dir_index(idx_entry_new, idx_size + 0x10
-		 , m_parent, NTFS_INDEX_I30, 4, AT_FILE_NAME);
+	i = insert_index_entry_in_res_dir_index(idx_entry_new, idx_size + 0x10,
+		m_parent, NTFS_INDEX_I30, 4, AT_FILE_NAME);
 	if (i < 0) {
 		ntfs_log_error("create_hardlink failed inserting index entry: %s\n",
 				strerror(-i));
@@ -3518,22 +3503,22 @@ static void mkntfs_open_partition(void)
 		ntfs_log_error("%s is not a block device.\n", vol->dev->d_name);
 		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
-		if (!opts.nr_sectors) {
+		if (!opts.num_sectors) {
 			if (!sbuf.st_size && !sbuf.st_blocks)
 				err_exit("You must specify the number of "
 						"sectors.\n");
 			if (opts.sector_size) {
 				if (sbuf.st_size)
-					opts.nr_sectors = sbuf.st_size /
+					opts.num_sectors = sbuf.st_size /
 							opts.sector_size;
 				else
-					opts.nr_sectors = ((s64)sbuf.st_blocks
+					opts.num_sectors = ((s64)sbuf.st_blocks
 							<< 9) /	opts.sector_size;
 			} else {
 				if (sbuf.st_size)
-					opts.nr_sectors = sbuf.st_size / 512;
+					opts.num_sectors = sbuf.st_size / 512;
 				else
-					opts.nr_sectors = sbuf.st_blocks;
+					opts.num_sectors = sbuf.st_blocks;
 				opts.sector_size = 512;
 			}
 		}
@@ -3578,9 +3563,9 @@ static void mkntfs_override_phys_params(void)
 		int _sect_size = 0;
 
 		if (vol->dev->d_ops->ioctl(vol->dev, BLKSSZGET, &_sect_size)
-				>= 0)
+				>= 0) {
 			opts.sector_size = _sect_size;
-		else
+		} else
 #endif
 		{
 			ntfs_log_error("No sector size specified for %s and it could "
@@ -3598,16 +3583,16 @@ static void mkntfs_override_phys_params(void)
 			 "less than or equal 4096 bytes.\n");
 	ntfs_log_debug("sector size = %i bytes\n", opts.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
-	if (!opts.nr_sectors) {
-		opts.nr_sectors = ntfs_device_size_get(vol->dev,
+	if (!opts.num_sectors) {
+		opts.num_sectors = ntfs_device_size_get(vol->dev,
 				opts.sector_size);
-		if (opts.nr_sectors <= 0)
+		if (opts.num_sectors <= 0)
 			err_exit("ntfs_device_size_get(%s) failed. Please "
 					"specify it manually.\n",
 					vol->dev->d_name);
 	}
-	ntfs_log_debug("number of sectors = %lld (0x%llx)\n", opts.nr_sectors,
-			opts.nr_sectors);
+	ntfs_log_debug("number of sectors = %lld (0x%llx)\n", opts.num_sectors,
+			opts.num_sectors);
 	/*
 	 * Reserve the last sector for the backup boot sector unless the
 	 * sector size is less than 512 bytes in which case reserve 512 bytes
@@ -3616,7 +3601,7 @@ static void mkntfs_override_phys_params(void)
 	i = 1;
 	if (opts.sector_size < 512)
 		i = 512 / opts.sector_size;
-	opts.nr_sectors -= i;
+	opts.num_sectors -= i;
 	/* If user didn't specify the partition start sector, determine it. */
 	if (opts.part_start_sect < 0) {
 		opts.part_start_sect = ntfs_device_partition_start_sector_get(
@@ -3694,7 +3679,7 @@ static void mkntfs_override_phys_params(void)
 	}
 	/* If user didn't specify the volume size, determine it now. */
 	if (!opts.volume_size)
-		opts.volume_size = opts.nr_sectors * opts.sector_size;
+		opts.volume_size = opts.num_sectors * opts.sector_size;
 	else if (opts.volume_size & (opts.sector_size - 1))
 		err_exit("volume_size is not a multiple of sector_size.\n");
 	/* Validate volume size. */
@@ -3758,23 +3743,23 @@ static void mkntfs_override_phys_params(void)
 				"by Windows.\n");
 	}
 	/* If user didn't specify the number of clusters, determine it now. */
-	if (!opts.nr_clusters)
-		opts.nr_clusters = opts.volume_size / vol->cluster_size;
+	if (!opts.num_clusters)
+		opts.num_clusters = opts.volume_size / vol->cluster_size;
 	/*
-	 * Check the cluster_size and nr_sectors for consistency with
-	 * sector_size and nr_sectors. And check both of these for consistency
+	 * Check the cluster_size and num_sectors for consistency with
+	 * sector_size and num_sectors. And check both of these for consistency
 	 * with volume_size.
 	 */
-	if (opts.nr_clusters != (opts.nr_sectors * opts.sector_size) /
+	if (opts.num_clusters != (opts.num_sectors * opts.sector_size) /
 			vol->cluster_size ||
-	    opts.volume_size / opts.sector_size != opts.nr_sectors ||
-	    opts.volume_size / vol->cluster_size != opts.nr_clusters)
+	    opts.volume_size / opts.sector_size != opts.num_sectors ||
+	    opts.volume_size / vol->cluster_size != opts.num_clusters)
 		err_exit("Illegal combination of volume/cluster/sector size "
-			 "and/or cluster/sector number.\n");
-	ntfs_log_debug("number of clusters = %llu (0x%llx)\n", opts.nr_clusters,
-			opts.nr_clusters);
+			"and/or cluster/sector number.\n");
+	ntfs_log_debug("number of clusters = %llu (0x%llx)\n", opts.num_clusters,
+			opts.num_clusters);
 	/* Number of clusters must fit within 32 bits (Win2k limitation). */
-	if (opts.nr_clusters >> 32) {
+	if (opts.num_clusters >> 32) {
 		if (vol->cluster_size >= 65536)
 			err_exit("Device is too large to hold an NTFS volume "
 					"(maximum size is 256TiB).\n");
@@ -3796,7 +3781,7 @@ static void mkntfs_initialize_bitmaps(void)
 	int i, j;
 
 	/* Determine lcn bitmap byte size and allocate it. */
-	lcn_bitmap_byte_size = (opts.nr_clusters + 7) >> 3;
+	lcn_bitmap_byte_size = (opts.num_clusters + 7) >> 3;
 	/* Needs to be multiple of 8 bytes. */
 	lcn_bitmap_byte_size = (lcn_bitmap_byte_size + 7) & ~7;
 	i = (lcn_bitmap_byte_size + vol->cluster_size - 1) &
@@ -3811,7 +3796,7 @@ static void mkntfs_initialize_bitmaps(void)
 	 * $Bitmap can overlap the end of the volume. Any bits in this region
 	 * must be set. This region also encompasses the backup boot sector.
 	 */
-	for (i = opts.nr_clusters; i < lcn_bitmap_byte_size << 3; i++)
+	for (i = opts.num_clusters; i < lcn_bitmap_byte_size << 3; i++)
 		ntfs_bit_set(lcn_bitmap, (u64)i, 1);
 	/*
 	 * Determine mft_size: (16 (1.2) or 27 (3.0+) mft records)
@@ -3873,7 +3858,7 @@ static void mkntfs_initialize_rl_mft(void)
 	}
 	ntfs_log_debug("$MFT logical cluster number = 0x%llx\n", opts.mft_lcn);
 	/* Determine MFT zone size. */
-	opts.mft_zone_end = opts.nr_clusters;
+	opts.mft_zone_end = opts.num_clusters;
 	switch (opts.mft_zone_multiplier) {  /* % of volume size in clusters */
 	case 4:
 		opts.mft_zone_end = opts.mft_zone_end >> 1;	/* 50%   */
@@ -3911,7 +3896,7 @@ static void mkntfs_initialize_rl_mft(void)
 	for (i = 0; i < j; i++)
 		ntfs_bit_set(lcn_bitmap, opts.mft_lcn + i, 1);
 	/* Determine mftmirr_lcn (middle of volume). */
-	opts.mftmirr_lcn = (opts.nr_sectors * opts.sector_size >> 1)
+	opts.mftmirr_lcn = (opts.num_sectors * opts.sector_size >> 1)
 			/ vol->cluster_size;
 	ntfs_log_debug("$MFTMirr logical cluster number = 0x%llx\n",
 			opts.mftmirr_lcn);
@@ -3973,7 +3958,7 @@ static void mkntfs_initialize_rl_logfile(void)
 		opts.logfile_size = (opts.volume_size / 100) &
 				~(vol->cluster_size - 1);
 	j = opts.logfile_size / vol->cluster_size;
-	while (rl_logfile[0].lcn + j >= opts.nr_clusters) {
+	while (rl_logfile[0].lcn + j >= opts.num_clusters) {
 		/*
 		 * $Logfile would overflow volume. Need to make it smaller than
 		 * the standard size. It's ok as we are creating a non-standard
@@ -4048,7 +4033,7 @@ static void mkntfs_initialize_rl_bad(void)
 	 * $BadClus named stream $Bad contains the whole volume as a single
 	 * sparse runlist entry.
 	 */
-	rl_bad[1].vcn = rl_bad[0].length = opts.nr_clusters;
+	rl_bad[1].vcn = rl_bad[0].length = opts.num_clusters;
 	rl_bad[1].lcn = -1LL;
 	rl_bad[1].length = 0LL;
 
@@ -4069,12 +4054,12 @@ static void mkntfs_fill_device_with_zeroes(void)
 	int i;
 	ssize_t bw;
 	unsigned long long position, mid_clust;
-	float progress_inc = (float)opts.nr_clusters / 100;
+	float progress_inc = (float)opts.num_clusters / 100;
 
 	ntfs_log_quiet("Initialising device with zeroes:   0%%");
 	fflush(stdout);
 	mid_clust = (opts.volume_size >> 1) / vol->cluster_size;
-	for (position = 0; position < (unsigned long long)opts.nr_clusters;
+	for (position = 0; position < (unsigned long long)opts.num_clusters;
 			position++) {
 		if (!(position % (int)(progress_inc+1))) {
 			ntfs_log_quiet("\b\b\b\b%3.0f%%", position /
@@ -4239,7 +4224,7 @@ static int create_backup_boot_sector(u8 *buff)
 	size = 512;
 	if (size < opts.sector_size)
 		size = opts.sector_size;
-	if (vol->dev->d_ops->seek(vol->dev, (opts.nr_sectors + 1) *
+	if (vol->dev->d_ops->seek(vol->dev, (opts.num_sectors + 1) *
 			opts.sector_size - size, SEEK_SET) == (off_t)-1)
 		goto bb_err;
 	if (size > 8192)
@@ -4331,7 +4316,7 @@ static void mkntfs_create_root_structures(void)
 
 		if (vol->major_ver < 3) {
 			add_attr_std_info(m, file_attrs,
-				cpu_to_le32(0)); /* dump_mft_record(m); */
+				cpu_to_le32(0));
 		} else {
 			/* setting specific security_id flag and */
 			/* filepermissions for ntfs 3.x */
@@ -4512,9 +4497,8 @@ static void mkntfs_create_root_structures(void)
 	/* windows 2003 will regard the volume as corrupt (ERSO) */
 	if (!err)
 		err = insert_non_resident_attr_in_mft_record(m,
-		AT_DATA,  NULL, 0,
-		0, 0,
-		lcn_bitmap, lcn_bitmap_byte_size);
+			AT_DATA,  NULL, 0, 0, 0,
+			lcn_bitmap, lcn_bitmap_byte_size);
 
 
 	if (!err)
@@ -4539,7 +4523,7 @@ static void mkntfs_create_root_structures(void)
 				strerror(errno));
 	memcpy(buf2, boot_array, sizeof(boot_array));
 	/*
-	 * Create the boot sector into buf2. Note, that buf2 already is zeroed
+	 * Create the boot sector in buf2. Note, that buf2 already is zeroed
 	 * in the boot sector section and that it has the NTFS OEM id/magic
 	 * already inserted, so no need to worry about these things.
 	 */
@@ -4560,7 +4544,7 @@ static void mkntfs_create_root_structures(void)
 	 * If there are problems go back to bs->unused[0-3] and set them. See
 	 * ../include/layout.h for details.
 	 */
-	bs->number_of_sectors = cpu_to_sle64(opts.nr_sectors);
+	bs->number_of_sectors = cpu_to_sle64(opts.num_sectors);
 	bs->mft_lcn = cpu_to_sle64(opts.mft_lcn);
 	bs->mftmirr_lcn = cpu_to_sle64(opts.mftmirr_lcn);
 	if (vol->mft_record_size >= vol->cluster_size) {
@@ -4635,7 +4619,7 @@ static void mkntfs_create_root_structures(void)
 	/* FIXME: This should be IGNORE_CASE */
 	/* Create a sparse named stream of size equal to the volume size. */
 	err = add_attr_data_positioned(m, "$Bad", 4, 0, 0, rl_bad, NULL,
-			opts.nr_clusters * vol->cluster_size);
+			opts.num_clusters * vol->cluster_size);
 	if (!err) {
 		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
 	}
@@ -4662,9 +4646,8 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = create_hardlink(index_block, root_ref, m,
 					MK_LE_MREF(9, 9), 0LL, 0LL,
-					FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0
-					, 0, "$Quota",
-					 FILE_NAME_WIN32_AND_DOS);
+					FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0,
+					0, "$Quota", FILE_NAME_WIN32_AND_DOS);
 		if (!err) {
 			init_system_file_sd(FILE_Secure, &sd, &i);
 			err = add_attr_sd(m, sd, i);
@@ -4687,14 +4670,12 @@ static void mkntfs_create_root_structures(void)
 			if (vol->minor_ver == 0) {
 				buf_sds_first_size = 0x1E0;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = calloc(1,
-					 buf_sds_first_size);
+				buf_sds_init = calloc(1, buf_sds_first_size);
 				init_secure_30(buf_sds_init);
 			} else {
 				buf_sds_first_size = 0x240;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = calloc(1,
-					 buf_sds_first_size);
+				buf_sds_init = calloc(1, buf_sds_first_size);
 				init_secure_31(buf_sds_init);
 			}
 			buf_sds = calloc(1,buf_sds_size);
@@ -4718,11 +4699,10 @@ static void mkntfs_create_root_structures(void)
 			err = add_attr_index_root(m, "$SII", 4, 0, AT_UNUSED,
 				COLLATION_NTOFS_ULONG, opts.index_block_size);
 		if (!err)
-			err =initialize_secure(buf_sds_init, buf_sds_first_size
-				 , m);
+			err =initialize_secure(buf_sds_init, buf_sds_first_size, m);
 		if (err < 0)
 			err_exit("Couldn't create $Secure: %s\n",
-				 strerror(-err));
+				strerror(-err));
 	}
 	/* dump_mft_record(m); */
 	ntfs_log_verbose("Creating $UpCase (mft record 0xa)\n");
@@ -4779,7 +4759,7 @@ static void mkntfs_create_root_structures(void)
 				COLLATION_FILE_NAME, opts.index_block_size);
 		if (err < 0)
 			err_exit("Couldn't create $Extend: %s\n",
-				 strerror(-err));
+				strerror(-err));
 	}
 	/* NTFS 1.2 reserved system files (mft records 0xc-0xf) */
 	for (i = 0xc; i < 0x10; i++) {
@@ -4807,8 +4787,8 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(buf +
 				11 * vol->mft_record_size), extend_ref, m,
-				MK_LE_MREF(24, 24), 0LL, 0LL, extend_flags
-				, 0, 0, "$Quota", FILE_NAME_WIN32_AND_DOS);
+				MK_LE_MREF(24, 24), 0LL, 0LL, extend_flags,
+				0, 0, "$Quota", FILE_NAME_WIN32_AND_DOS);
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
 			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
@@ -4838,7 +4818,7 @@ static void mkntfs_create_root_structures(void)
 				COLLATION_NTOFS_ULONGS, opts.index_block_size);
 		if (!err)
 			err = initialize_objid(m, volume_obj_id->object_id,
-				 MK_LE_MREF(FILE_Volume, FILE_Volume));
+				MK_LE_MREF(FILE_Volume, FILE_Volume));
 		if (err < 0)
 			err_exit("Couldn't create $ObjId: %s\n", strerror(-err));
 		ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
@@ -4928,17 +4908,20 @@ int main(int argc, char **argv)
 		mkntfs_fill_device_with_zeroes();
 	/* Create NTFS volume structures. */
 	mkntfs_create_root_structures();
-	/* - Do not step onto bad blocks!!! */
-	/* - If any bad blocks were specified or found, modify $BadClus, allocating the */
-	/*   bad clusters in $Bitmap. */
-	/* - C&w bootsector backup bootsector (backup in last sector of the */
-	/*   partition). */
-	/* - If NTFS 3.0+, c&w $Secure file and $Extend directory with the */
-	/*   corresponding special files in it, i.e. $ObjId, $Quota, $Reparse, and */
-	/*   $UsnJrnl. And others? Or not all necessary? */
-	/* - RE: Populate $root with the system files (and $Extend directory if */
-	/*   applicable). Possibly should move this as far to the top as possible and */
-	/*   update during each subsequent c&w of each system file. */
+
+	/*
+	 * - Do not step onto bad blocks!!!
+	 * - If any bad blocks were specified or found, modify $BadClus, allocating the
+	 *   bad clusters in $Bitmap.
+	 * - C&w bootsector backup bootsector (backup in last sector of the
+	 *   partition).
+	 * - If NTFS 3.0+, c&w $Secure file and $Extend directory with the
+	 *   corresponding special files in it, i.e. $ObjId, $Quota, $Reparse, and
+	 *   $UsnJrnl. And others? Or not all necessary?
+	 * - RE: Populate $root with the system files (and $Extend directory if
+	 *   applicable). Possibly should move this as far to the top as possible and
+	 *   update during each subsequent c&w of each system file.
+	 */
 	ntfs_log_verbose("Syncing root directory index record.\n");
 	mkntfs_sync_index_record(index_block, (MFT_RECORD*)(buf +
 		5 * vol->mft_record_size), NTFS_INDEX_I30, 4);
