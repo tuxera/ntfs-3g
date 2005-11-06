@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2003-2004 Lode Leroy
  * Copyright (c) 2003-2005 Anton Altaparmakov
+ * Copyright (c) 2004-2005 Yuval Fledel
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
