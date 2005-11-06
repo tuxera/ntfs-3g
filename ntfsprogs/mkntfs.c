@@ -354,13 +354,13 @@ static void mkntfs_init_options(struct mkntfs_options *opts2)	// XXX rename arg
 	memset(opts2, 0, sizeof(*opts2));
 
 	/* Mark all the numeric options as "unset". */
+	opts2->cluster_size		= -1;
 	opts2->heads			= -1;
+	opts2->mft_zone_multiplier	= -1;
+	opts2->num_sectors		= -1;
 	opts2->part_start_sect		= -1;
 	opts2->sector_size		= -1;
 	opts2->sectors_per_track	= -1;
-	opts2->mft_zone_multiplier	= -1;
-	opts2->num_sectors		= -1;
-	opts2->cluster_size		= -1;
 }
 
 /**
@@ -512,8 +512,15 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		default:
 			if (ntfs_log_parse_option (argv[optind-1]))
 				break;
-			if (optopt != '?')
+			if (((optopt == 'c') || (optopt == 'H') ||
+			     (optopt == 'L') || (optopt == 'p') ||
+			     (optopt == 's') || (optopt == 'S') ||
+			     (optopt == 'w') || (optopt == 'z')) &&
+			     (!optarg)) {
+				ntfs_log_error("Option '%s' requires an argument.\n", argv[optind-1]);
+			} else if (optopt != '?') {
 				ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
+			}
 			err++;
 			break;
 		}
@@ -2626,6 +2633,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		err = -EINVAL;
 		goto err_out;
 	}
+	ntfs_attr_put_search_ctx(ctx);
 	r = (INDEX_ROOT*)((char*)a + le16_to_cpu(a->value_offset));
 	re_end = (char*)r + le32_to_cpu(a->value_length);
 	re_start = (char*)&r->index + le32_to_cpu(r->index.entries_offset);
@@ -2722,8 +2730,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	*idx = ia_val;
 	return 0;
 err_out:
-	if (ctx)
-		ntfs_attr_put_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	free(ia_val);
 	return err;
 }
@@ -3551,53 +3558,45 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 }
 
 /**
- * init_options
- */
-static void init_options(void)
-{
-	memset(&opts, 0, sizeof(opts));
-	opts.sectors_per_track = -1;
-	opts.heads = -1;
-	opts.part_start_sect = -1;
-	g_index_block_size = 4096;
-	g_attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
-	g_attr_defs_len = sizeof(attrdef_ntfs12_array);
-	/* ntfs_log_debug("Attr_defs table length = %u\n", g_attr_defs_len); */
-}
-
-/**
  * mkntfs_exit
  */
 static void mkntfs_exit(void)
 {
-	free(g_index_block);
-	free(g_buf_sds_init);
-	free(g_buf_sds);
-	free(g_buf);
-	free(g_buf2);
-	free(g_lcn_bitmap);
-	free(g_mft_bitmap);
-	free(g_rl_mft);
-	free(g_rl_mft_bmp);
-	free(g_rl_mftmirr);
-	free(g_rl_logfile);
-	free(g_rl_boot);
-	free(g_rl_bad);
-	free(g_rl_index);
-	free(g_bad_blocks);
-	if ((g_attr_defs != (const ATTR_DEF*)attrdef_ntfs12_array) &&
-	    (g_attr_defs != (const ATTR_DEF*)attrdef_ntfs3x_array))
-		free(g_attr_defs);
-	if (!g_vol)
-		return;
-	free(g_vol->upcase);
-	if (g_vol->dev) {
-		if (NDevOpen(g_vol->dev) && g_vol->dev->d_ops->close(g_vol->dev))
-			ntfs_log_error("Warning: Could not close %s: %s\n",
-					g_vol->dev->d_name, strerror(errno));
-		ntfs_device_free(g_vol->dev);
+	/* Close the volume */
+	if (g_vol) {
+		if (g_vol->dev) {
+			if (NDevOpen(g_vol->dev) && g_vol->dev->d_ops->close(g_vol->dev))
+				ntfs_log_perror("Warning: Could not close %s", g_vol->dev->d_name);
+			ntfs_device_free(g_vol->dev);
+		}
+		free(g_vol->upcase);
+		free(g_vol);
+		g_vol = NULL;
 	}
-	free(g_vol);
+
+	/* Free any memory we've used */
+	free(g_bad_blocks);	g_bad_blocks	= NULL;
+	free(g_buf);		g_buf		= NULL;
+	free(g_buf2);		g_buf2		= NULL;
+	free(g_buf_sds);	g_buf_sds	= NULL;
+	free(g_buf_sds_init);	g_buf_sds_init	= NULL;
+	free(g_index_block);	g_index_block	= NULL;
+	free(g_lcn_bitmap);	g_lcn_bitmap	= NULL;
+	free(g_mft_bitmap);	g_mft_bitmap	= NULL;
+	free(g_rl_bad);		g_rl_bad	= NULL;
+	free(g_rl_boot);	g_rl_boot	= NULL;
+	free(g_rl_index);	g_rl_index	= NULL;
+	free(g_rl_logfile);	g_rl_logfile	= NULL;
+	free(g_rl_mft);		g_rl_mft	= NULL;
+	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
+	free(g_rl_mftmirr);	g_rl_mftmirr	= NULL;
+
+	/* Only free the attribute definitions, if we originally allocated them. */
+	if ((g_attr_defs != (const ATTR_DEF*)attrdef_ntfs12_array) &&
+	    (g_attr_defs != (const ATTR_DEF*)attrdef_ntfs3x_array)) {
+		free(g_attr_defs);
+		g_attr_defs = NULL;
+	}
 }
 
 /**
@@ -3605,8 +3604,12 @@ static void mkntfs_exit(void)
  *
  * Note: Might not return.
  */
-static void mkntfs_open_partition(void)
+static int mkntfs_open_partition(void)
 {
+	/* This function uses:
+	 *     g_vol
+	 */
+	int result = 1;
 	int i;
 	struct stat sbuf;
 	unsigned long mnt_flags;
@@ -3615,9 +3618,12 @@ static void mkntfs_open_partition(void)
 	 * Allocate and initialize an ntfs device structure and attach it to
 	 * the volume.
 	 */
-	if (!(g_vol->dev = ntfs_device_alloc(opts.dev_name, 0,
-			&ntfs_device_default_io_ops, NULL)))
-		err_exit("Could not allocate memory for internal buffer.\n");
+	g_vol->dev = ntfs_device_alloc(opts.dev_name, 0, &ntfs_device_default_io_ops, NULL);
+	if (!g_vol->dev) {
+		ntfs_log_perror("Could not create device");
+		goto done;
+	}
+
 	/* Open the device for reading or reading and writing. */
 	if (opts.no_action) {
 		ntfs_log_quiet("Running in READ-ONLY mode!\n");
@@ -3627,31 +3633,33 @@ static void mkntfs_open_partition(void)
 	}
 	if (g_vol->dev->d_ops->open(g_vol->dev, i)) {
 		if (errno == ENOENT)
-			err_exit("The device doesn't exist; did you specify "
-					"it correctly?\n");
-		err_exit("Could not open %s: %s\n", g_vol->dev->d_name,
-				strerror(errno));
+			ntfs_log_error("The device doesn't exist; did you specify it correctly?\n");
+		else
+			ntfs_log_perror("Could not open %s", g_vol->dev->d_name);
+		goto done;
 	}
 	/* Verify we are dealing with a block device. */
 	if (g_vol->dev->d_ops->stat(g_vol->dev, &sbuf)) {
-		err_exit("Error getting information about %s: %s\n",
-				g_vol->dev->d_name, strerror(errno));
+		ntfs_log_perror("Error getting information about %s", g_vol->dev->d_name);
+		goto done;
 	}
+
 	if (!S_ISBLK(sbuf.st_mode)) {
 		ntfs_log_error("%s is not a block device.\n", g_vol->dev->d_name);
-		if (!opts.force)
-			err_exit("Refusing to make a filesystem here!\n");
-		if (opts.num_sectors < 0) {
-			if (!sbuf.st_size && !sbuf.st_blocks)
-				err_exit("You must specify the number of "
-						"sectors.\n");
+		if (!opts.force) {
+			ntfs_log_error("Refusing to make a filesystem here!\n");
+			goto done;
+		}
+		if (!opts.num_sectors) {
+			if (!sbuf.st_size && !sbuf.st_blocks) {
+				ntfs_log_error("You must specify the number of sectors.\n");
+				goto done;
+			}
 			if (opts.sector_size) {
 				if (sbuf.st_size)
-					opts.num_sectors = sbuf.st_size /
-							opts.sector_size;
+					opts.num_sectors = sbuf.st_size / opts.sector_size;
 				else
-					opts.num_sectors = ((s64)sbuf.st_blocks
-							<< 9) /	opts.sector_size;
+					opts.num_sectors = ((s64)sbuf.st_blocks << 9) / opts.sector_size;
 			} else {
 				if (sbuf.st_size)
 					opts.num_sectors = sbuf.st_size / 512;
@@ -3662,28 +3670,29 @@ static void mkntfs_open_partition(void)
 		}
 		ntfs_log_warning("mkntfs forced anyway.\n");
 #ifdef HAVE_LINUX_MAJOR_H
-	} else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
-			MINOR(sbuf.st_rdev) % 64 == 0) ||
-			(SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) &&
-			MINOR(sbuf.st_rdev) % 16 == 0)) {
-		ntfs_log_error("%s is entire device, not just one partition.\n",
-				g_vol->dev->d_name);
-		if (!opts.force)
-			err_exit("Refusing to make a filesystem here!\n");
+	} else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 64 == 0) || (SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 16 == 0)) {
+		ntfs_log_error("%s is entire device, not just one partition.\n", g_vol->dev->d_name);
+		if (!opts.force) {
+			ntfs_log_error("Refusing to make a filesystem here!\n");
+			goto done;
+		}
 		ntfs_log_warning("mkntfs forced anyway.\n");
 #endif
 	}
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(g_vol->dev->d_name, &mnt_flags)) {
-		ntfs_log_error("Failed to determine whether %s is mounted: %s\n",
-				g_vol->dev->d_name, strerror(errno));
+		ntfs_log_perror("Failed to determine whether %s is mounted", g_vol->dev->d_name);
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
 		ntfs_log_error("%s is mounted.\n", g_vol->dev->d_name);
-		if (!opts.force)
-			err_exit("Refusing to make a filesystem here!\n");
-		ntfs_log_warning("mkntfs forced anyway. Hope /etc/mtab is "
-				"incorrect.\n");
+		if (!opts.force) {
+			ntfs_log_error("Refusing to make a filesystem here!\n");
+			goto done;
+		}
+		ntfs_log_warning("mkntfs forced anyway. Hope /etc/mtab is incorrect.\n");
 	}
+	result = 0;
+done:
+	return result;
 }
 
 /**
@@ -3693,6 +3702,11 @@ static void mkntfs_open_partition(void)
  */
 static void mkntfs_override_phys_params(void)
 {
+	/* This function uses:
+	 *     g_num_clusters
+	 *     g_vol
+	 *     g_volume_size
+	 */ 
 	int i;
 
 	/* If user didn't specify the sector size, determine it now. */
@@ -3700,10 +3714,10 @@ static void mkntfs_override_phys_params(void)
 #ifdef BLKSSZGET
 		int sect_size = 0;
 
-		if (g_vol->dev->d_ops->ioctl(g_vol->dev, BLKSSZGET, &sect_size)
-				>= 0) {
+		if (g_vol->dev->d_ops->ioctl(g_vol->dev, BLKSSZGET, &sect_size) >= 0) {
 			opts.sector_size = sect_size;
 		} else
+		/* XXX UGLY */
 #endif
 		{
 			ntfs_log_error("No sector size specified for %s and it could "
@@ -3794,6 +3808,7 @@ static void mkntfs_override_phys_params(void)
 	}
 	/* If user didn't specify the number of heads, determine it now. */
 	if (opts.heads < 0) {
+		//XXX this will break if sizeof(int) != sizeof(long) -- signextend
 		opts.heads = ntfs_device_heads_get(g_vol->dev);
 		if (opts.heads < 0) {
 			ntfs_log_error("No number of heads specified for %s and it "
@@ -3916,6 +3931,17 @@ static void mkntfs_override_phys_params(void)
  */
 static void mkntfs_initialize_bitmaps(void)
 {
+	/* This function uses:
+	 *     g_lcn_bitmap
+	 *     g_lcn_bitmap_byte_size
+	 *     g_mft_bitmap
+	 *     g_mft_bitmap_byte_size
+	 *     g_mft_bitmap_size
+	 *     g_mft_size
+	 *     g_num_clusters
+	 *     g_rl_mft_bmp
+	 *     g_vol
+	 */
 	int i, j;
 
 	/* Determine lcn bitmap byte size and allocate it. */
@@ -3981,6 +4007,19 @@ static void mkntfs_initialize_bitmaps(void)
  */
 static void mkntfs_initialize_rl_mft(void)
 {
+	/* This function uses:
+	 *     g_lcn_bitmap
+	 *     g_logfile_lcn
+	 *     g_mft_lcn
+	 *     g_mftmirr_lcn
+	 *     g_mft_size
+	 *     g_mft_zone_end
+	 *     g_num_clusters
+	 *     g_rl_mft
+	 *     g_rl_mft_bmp
+	 *     g_rl_mftmirr
+	 *     g_vol
+	 */
 	int i, j;
 
 	/* If user didn't specify the mft lcn, determine it now. */
@@ -4071,6 +4110,15 @@ static void mkntfs_initialize_rl_mft(void)
  */
 static void mkntfs_initialize_rl_logfile(void)
 {
+	/* This function uses:
+	 *     g_lcn_bitmap
+	 *     g_logfile_lcn
+	 *     g_logfile_size
+	 *     g_num_clusters
+	 *     g_rl_logfile
+	 *     g_vol
+	 *     g_volume_size
+	 */
 	int i, j;
 
 	/* Create runlist for log file. */
@@ -4132,6 +4180,11 @@ static void mkntfs_initialize_rl_logfile(void)
  */
 static void mkntfs_initialize_rl_boot(void)
 {
+	/* This function uses:
+	 *     g_lcn_bitmap
+	 *     g_rl_boot
+	 *     g_vol
+	 */
 	int i, j;
 	/* Create runlist for $Boot. */
 	g_rl_boot = malloc(2 * sizeof(runlist));
@@ -4160,6 +4213,10 @@ static void mkntfs_initialize_rl_boot(void)
  */
 static void mkntfs_initialize_rl_bad(void)
 {
+	/* This function uses:
+	 *     g_num_clusters
+	 *     g_rl_bad
+	 */
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */
 	g_rl_bad = malloc(2 * sizeof(runlist));
 	if (!g_rl_bad)
@@ -4185,6 +4242,12 @@ static void mkntfs_initialize_rl_bad(void)
  */
 static void mkntfs_fill_device_with_zeroes(void)
 {
+	/* This function uses:
+	 *     g_buf
+	 *     g_num_clusters
+	 *     g_vol
+	 *     g_volume_size
+	 */
 	/*
 	 * If not quick format, fill the device with 0s.
 	 * FIXME: Except bad blocks! (AIA)
@@ -4263,6 +4326,10 @@ static void mkntfs_fill_device_with_zeroes(void)
 static void mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 		ntfschar* name, u32 name_len)
 {
+	/* This function uses:
+	 *     g_rl_index
+	 *     g_vol
+	 */
 	int i, err;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -4395,6 +4462,34 @@ bb_err:
  */
 static void mkntfs_create_root_structures(void)
 {
+	/* This function uses:
+	 *     g_attr_defs
+	 *     g_attr_defs_len
+	 *     g_buf
+	 *     g_buf_sds
+	 *     g_buf_sds_first_size
+	 *     g_buf_sds_init
+	 *     g_buf_sds_size
+	 *     g_index_block
+	 *     g_index_block_size
+	 *     g_lcn_bitmap
+	 *     g_lcn_bitmap_byte_size
+	 *     g_logfile_size
+	 *     g_mft_bitmap
+	 *     g_mft_bitmap_byte_size
+	 *     g_mft_lcn
+	 *     g_mftmirr_lcn
+	 *     g_mft_size
+	 *     g_num_clusters
+	 *     g_rl_bad
+	 *     g_rl_boot
+	 *     g_rl_logfile
+	 *     g_rl_mft
+	 *     g_rl_mft_bmp
+	 *     g_rl_mftmirr
+	 *     g_vol
+	 *     g_volume_obj_id
+	 */
 	NTFS_BOOT_SECTOR *bs;
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
@@ -4973,64 +5068,76 @@ static void mkntfs_create_root_structures(void)
 	}
 }
 
+
 /**
- * main
+ * mkntfs_redirect
  */
-int main(int argc, char **argv)
+static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 {
-	ntfs_attr_search_ctx *ctx;
+	int result = 1;
+	ntfs_attr_search_ctx *ctx = NULL;
 	long long lw, pos;
 	ATTR_RECORD *a;
 	MFT_RECORD *m;
 	int i, err;
 
-	ntfs_log_set_handler(ntfs_log_handler_outerr);
+	if (!opts2) {
+		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
+		goto done;
+	}
 
-	/* Setup the correct locale for string output and conversion. */
-	utils_set_locale();
-	/* Initialize the random number generator with the current time. */
-	srandom(mkntfs_time());
-	/* Allocate and initialize ntfs_volume structure g_vol. */
-	g_vol = ntfs_volume_alloc();
-	if (!g_vol)
-		err_exit("Could not allocate memory for internal buffer.\n");
 	/* Register our exit function which will cleanup everything. */
 	err = atexit(&mkntfs_exit);
 	if (err == -1) {
-		ntfs_log_error("Could not set up exit() function because atexit() "
-				"failed. Aborting...\n");
-		mkntfs_exit();
-		exit(1);
+		ntfs_log_error("Could not set up exit() function because atexit() failed. Aborting...\n");
+		goto done;
 	}
-	g_vol->major_ver = 1;
-	g_vol->minor_ver = 2;
-	g_vol->mft_record_size = 1024;
-	g_vol->mft_record_size_bits = 10;
-	/* Length is in unicode characters. */
-	g_vol->upcase_len = 65536;
-	g_vol->upcase = malloc(g_vol->upcase_len * sizeof(ntfschar));
-	if (!g_vol->upcase)
-		err_exit("Could not allocate memory for internal buffer.\n");
-	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
-	/* Initialize opts to zero / required values. */
-	init_options();
-	mkntfs_init_options(&opts);
-	/* Parse command line options. */
-	if (!mkntfs_parse_options(argc, argv, &opts))
-		exit(1);
-	mkntfs_validate_options(&opts);
-	
+
+	/* Initialize the random number generator with the current time. */
+	srandom(mkntfs_time());
+
+	/* Allocate and initialize ntfs_volume structure g_vol. */
+	g_vol = ntfs_volume_alloc();
+	if (!g_vol) {
+		ntfs_log_perror("Could not create volume");
+		goto done;
+	}
+
 	/* transfer some options to the volume */
-	g_vol->vol_name  = opts.label;	// XXX when this be strdup, either free it, or call ntfs_umount
+	g_vol->vol_name  = opts.label;	// XXX when this is strdup, either free it, or call ntfs_umount
 	if (opts.ver_major && opts.ver_minor) {
 		g_vol->major_ver = opts.ver_major;
 		g_vol->minor_ver = opts.ver_minor;
+	} else {
+		g_vol->major_ver = 1;
+		g_vol->minor_ver = 2;
 	}
 	if (opts.cluster_size >= 0)
 		g_vol->cluster_size = opts.cluster_size;
 
-	/* Open the partition. */
-	mkntfs_open_partition();
+	g_vol->mft_record_size = 1024;
+	g_vol->mft_record_size_bits = 10;
+
+	/* Length is in unicode characters. */
+	g_vol->upcase_len = 65536;
+	g_vol->upcase = malloc(g_vol->upcase_len * sizeof(ntfschar));
+	if (!g_vol->upcase) {
+		ntfs_log_perror("Could not create upcase structure");
+		goto done;
+	}
+	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
+
+	/* Initialize opts to zero / required values. */
+	g_index_block_size = 4096;
+	g_attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
+	g_attr_defs_len = sizeof(attrdef_ntfs12_array);
+	/* ntfs_log_debug("Attr_defs table length = %u\n", g_attr_defs_len); */
+
+	if (mkntfs_open_partition())		/* Open the partition. */
+		goto done;
+
+	//--------------------------------------------------------------------------------
+
 	/* Decide on the sectors/tracks/heads/size, etc. */
 	mkntfs_override_phys_params();
 	/* Initialize $Bitmap and $MFT/$BITMAP related stuff. */
@@ -5041,11 +5148,14 @@ int main(int argc, char **argv)
 	mkntfs_initialize_rl_logfile();
 	/* Initialize $Boot. */
 	mkntfs_initialize_rl_boot();
+
 	/* Allocate a buffer large enough to hold the mft. */
 	g_buf = calloc(1, g_mft_size);
-	if (!g_buf)
-		err_exit("Failed to allocate internal buffer: %s\n",
-				strerror(errno));
+	if (!g_buf) {
+		ntfs_log_perror("Could not create work space");
+		goto done;
+	}
+
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */
 	mkntfs_initialize_rl_bad();
 	/* If not quick format, fill the device with 0s. */
@@ -5068,37 +5178,42 @@ int main(int argc, char **argv)
 	 *   update during each subsequent c&w of each system file.
 	 */
 	ntfs_log_verbose("Syncing root directory index record.\n");
-	mkntfs_sync_index_record(g_index_block, (MFT_RECORD*)(g_buf +
-		5 * g_vol->mft_record_size), NTFS_INDEX_I30, 4);
+	mkntfs_sync_index_record(g_index_block, (MFT_RECORD*)(g_buf + 5 * g_vol->mft_record_size), NTFS_INDEX_I30, 4);
 
 	ntfs_log_verbose("Syncing $Bitmap.\n");
 	m = (MFT_RECORD*)(g_buf + 6 * g_vol->mft_record_size);
+
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
-	if (!ctx)
-		err_exit("Failed to allocate attribute search context: %s\n",
-				strerror(errno));
-	if (mkntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
-		ntfs_attr_put_search_ctx(ctx);
-		err_exit("BUG: $DATA attribute not found.\n");
+	if (!ctx) {
+		ntfs_log_perror("Could not create an attribute search context");
+		goto done;
 	}
+
+	if (mkntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+		ntfs_log_error("BUG: $DATA attribute not found.\n");
+		goto done;
+	}
+
 	a = ctx->attr;
 	if (a->non_resident) {
 		runlist *rl = ntfs_mapping_pairs_decompress(g_vol, a, NULL);
-		ntfs_attr_put_search_ctx(ctx);
-		if (!rl)
-			err_exit("ntfs_mapping_pairs_decompress() failed\n");
-		lw = ntfs_rlwrite(g_vol->dev, rl, g_lcn_bitmap,
-				g_lcn_bitmap_byte_size, NULL);
+		if (!rl) {
+			ntfs_log_error("ntfs_mapping_pairs_decompress() failed\n");
+			goto done;
+		}
+		lw = ntfs_rlwrite(g_vol->dev, rl, g_lcn_bitmap, g_lcn_bitmap_byte_size, NULL);
 		err = errno;
 		free(rl);
-		if (lw != g_lcn_bitmap_byte_size)
-			err_exit("%s\n", lw == -1 ? strerror(err) :
-					"unknown error");
+		if (lw != g_lcn_bitmap_byte_size) {
+			ntfs_log_error("%s\n", lw == -1 ? strerror(err) : "unknown error");
+			goto done;
+		}
 	} else {
-		memcpy((char*)a + le16_to_cpu(a->value_offset), g_lcn_bitmap,
-				le32_to_cpu(a->value_length));
-		ntfs_attr_put_search_ctx(ctx);
+		memcpy((char*)a + le16_to_cpu(a->value_offset), g_lcn_bitmap, le32_to_cpu(a->value_length));
 	}
+
+	//--------------------------------------------------------------------------------
+
 	/*
 	 * No need to sync $MFT/$BITMAP as that has never been modified since
 	 * its creation.
@@ -5108,19 +5223,17 @@ int main(int argc, char **argv)
 	lw = 1;
 	for (i = 0; i < g_mft_size / (s32)g_vol->mft_record_size; i++) {
 		if (!opts.no_action)
-			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1,
-					g_vol->mft_record_size,
-					g_buf + i * g_vol->mft_record_size);
-		if (lw != 1)
-			err_exit("%s\n", lw == -1 ? strerror(errno) :
-						"unknown error");
+			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1, g_vol->mft_record_size, g_buf + i * g_vol->mft_record_size);
+		if (lw != 1) {
+			ntfs_log_error("%s\n", lw == -1 ? strerror(errno) : "unknown error");
+			goto done;
+		}
 		pos += g_vol->mft_record_size;
 	}
 	ntfs_log_verbose("Updating $MFTMirr.\n");
 	pos = g_mftmirr_lcn * g_vol->cluster_size;
 	lw = 1;
-	for (i = 0; i < g_rl_mftmirr[0].length * g_vol->cluster_size /
-			g_vol->mft_record_size; i++) {
+	for (i = 0; i < g_rl_mftmirr[0].length * g_vol->cluster_size / g_vol->mft_record_size; i++) {
 		u16 usn, *usnp;
 		m = (MFT_RECORD*)(g_buf + i * g_vol->mft_record_size);
 		/*
@@ -5135,22 +5248,51 @@ int main(int argc, char **argv)
 			usn = 0xfffe;
 		*usnp = cpu_to_le16(usn);
 		if (!opts.no_action)
-			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1,
-					g_vol->mft_record_size,
-					g_buf + i * g_vol->mft_record_size);
-		if (lw != 1)
-			err_exit("%s\n", lw == -1 ? strerror(errno) :
-					"unknown error");
+			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1, g_vol->mft_record_size, g_buf + i * g_vol->mft_record_size);
+		if (lw != 1) {
+			ntfs_log_error("%s\n", lw == -1 ? strerror(errno) : "unknown error");
+			goto done;
+		}
 		pos += g_vol->mft_record_size;
 	}
 	ntfs_log_verbose("Syncing device.\n");
-	if (g_vol->dev->d_ops->sync(g_vol->dev))
-		err_exit("Syncing device. FAILED: %s", strerror(errno));
+	if (g_vol->dev->d_ops->sync(g_vol->dev)) {
+		ntfs_log_error("Syncing device. FAILED");
+		goto done;
+	}
 	ntfs_log_quiet("mkntfs completed successfully. Have a nice day.\n");
-	/*
-	 * Device is unlocked and closed by the registered exit function
-	 * mkntfs_exit().
-	 */
-	return 0;
+	result = 0;
+done:
+	ntfs_attr_put_search_ctx(ctx);
+	mkntfs_exit();	/* Device is unlocked and closed here */
+	return result;
+}
+
+
+/**
+ * main - Begin here
+ *
+ * Start from here.
+ *
+ * Return:  0  Success, the program worked
+ *	    1  Error, something went wrong
+ */
+int main(int argc, char *argv[])
+{
+	int result = 1;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
+	utils_set_locale();
+
+	mkntfs_init_options(&opts);			/* Set up the options */
+
+	if (!mkntfs_parse_options(argc, argv, &opts))	/* Read the command line options */
+		goto done;
+	if (!mkntfs_validate_options(&opts))		/* Validate those options */
+		goto done;
+
+	result = mkntfs_redirect(&opts);
+done:
+	return result;
 }
 
