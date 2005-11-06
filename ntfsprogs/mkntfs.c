@@ -216,21 +216,370 @@ struct mkntfs_options {
 	BOOL disable_indexing;		/* -I, disables indexing of file contents on the volume by default. */
 	BOOL no_action;			/* -n, do not write to device, only display what would be done. */
 	long long part_start_sect;	/* -p, start sector of partition on parent device */
-	int quiet;			/* -q, quiet execution. */
+	BOOL quiet;			/* -q, quiet execution. */
 	long sector_size;		/* -s, in bytes, power of 2, default is 512 bytes. */
 	long sectors_per_track;		/* -S, number of sectors per track on device */
 	BOOL use_epoch_time;		/* -T, fake the time to be 00:00:00 UTC, Jan 1, 1970. */
-	long verbose;			/* -v, verbose execution */
+	BOOL verbose;			/* -v, verbose execution */
 	long mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 1. */
 	long long num_sectors;		/* size of device in sectors */
-
-	/* As yet unreferenced */
 	long cluster_size;		/* -c, format with this cluster-size */
 	u8 ver_major;			/* -w, ntfs version to create */
 	u8 ver_minor;
 	char *label;			/* -L, volume label */
 	BOOL debug;			/* --debug, lots of extra logging */
 } opts;
+
+
+/**
+ * mkntfs_license
+ */
+static void mkntfs_license(void)
+{
+	ntfs_log_info("%s", ntfs_gpl);
+}
+
+/**
+ * mkntfs_usage
+ */
+static void mkntfs_usage(void)
+{
+	ntfs_log_info("\nUsage: %s [options] device [number-of-sectors]\n"
+		"\n"
+		"Basic options:\n"
+		"    -f, --fast                      Perform a quick format\n"
+		"    -Q, --quick                     Perform a quick format\n"
+		"    -L, --label string              Set the volume label\n"
+		"    -C, --enable-compression        Enable compression on the volume\n"
+		"    -c, --cluster-size BYTES        Specify the cluster size for the volume\n"
+		"    -I, --no-indexing               Disable indexing on the volume\n"
+		"    -n, --no-action                 Do not write to disk\n"
+		"\n"
+		"Advanced options:\n"
+		"    -s, --sector-size BYTES         Specify the sector size for the device\n"
+		"    -p, --partition-start SECTOR    Specify the partition start sector\n"
+		"    -H, --heads NUM                 Specify the number of heads\n"
+		"    -S, --sectors-per-track NUM     Specify the number of sectors per track\n"
+		"    -z, --mft-zone-multiplier NUM   Set the MFT zone multiplier\n"
+		"    -T, --zero-time                 Fake the time to be 00:00 UTC, Jan 1, 1970\n"
+		"    -w, --ntfs-version STRING       NTFS version information\n"
+		"    -F, --force                     Force execution despite errors\n"
+		"\n"
+		"Output options:\n"
+		"    -q, --quiet                     Quiet execution\n"
+		"    -v, --verbose                   Verbose execution\n"
+		"        --debug                     Very verbose execution\n"
+		"\n"
+		"Help options:\n"
+		"    -V, --version                   Display version\n"
+		"    -l, --license                   Display licensing information\n"
+		"    -h, --help                      Display this help\n"
+		"\n", basename(EXEC_NAME));
+}
+
+/**
+ * mkntfs_version
+ */
+static void mkntfs_version(void)
+{
+	ntfs_log_info("\n%s v%s (libntfs %s)\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
+	ntfs_log_info("Create an NTFS volume on a user specified (block) device.\n\n");
+	ntfs_log_info("Copyright (c) 2000-2005 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");
+	ntfs_log_info("Copyright (c) 2002-2005 Szabolcs Szakacsits\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+
+/**
+ * mkntfs_parse_long
+ */
+static BOOL mkntfs_parse_long(const char *string, const char *name, long *num)
+{
+	char *end = NULL;
+	long tmp;
+
+	if (!string || !name || !num)
+		return FALSE;
+
+	if (*num >= 0) {
+		ntfs_log_error("You may only specify the %s once.\n", name);
+		return FALSE;
+	}
+
+	tmp = strtol(string, &end, 0);
+	if (end && *end) {
+		ntfs_log_error("Cannot understand the %s '%s'.\n", name, string);
+		return FALSE;
+	} else {
+		*num = tmp;
+		return TRUE;
+	}
+}
+
+/**
+ * mkntfs_parse_llong
+ */
+static BOOL mkntfs_parse_llong(const char *string, const char *name, long long *num)
+{
+	char *end = NULL;
+	long long tmp;
+
+	if (!string || !name || !num)
+		return FALSE;
+
+	if (*num >= 0) {
+		ntfs_log_error("You may only specify the %s once.\n", name);
+		return FALSE;
+	}
+
+	tmp = strtoll(string, &end, 0);
+	if (end && *end) {
+		ntfs_log_error("Cannot understand the %s '%s'.\n", name, string);
+		return FALSE;
+	} else {
+		*num = tmp;
+		return TRUE;
+	}
+}
+
+/**
+ * mkntfs_init_options
+ */
+static void mkntfs_init_options(struct mkntfs_options *opts2)	// XXX rename arg
+{
+	if (!opts2)
+		return;
+
+	memset(opts2, 0, sizeof(*opts2));
+
+	/* Mark all the numeric options as "unset". */
+	opts2->heads			= -1;
+	opts2->part_start_sect		= -1;
+	opts2->sector_size		= -1;
+	opts2->sectors_per_track	= -1;
+	opts2->mft_zone_multiplier	= -1;
+	opts2->num_sectors		= -1;
+	opts2->cluster_size		= -1;
+}
+
+/**
+ * mkntfs_parse_options
+ */
+static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
+{
+	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TvVw:z:";
+	static const struct option lopt[] = {
+		{ "cluster-size",	required_argument,	NULL, 'c' },
+		{ "debug",		no_argument,		NULL, 'Z' },
+		{ "enable-compression",	no_argument,		NULL, 'C' },
+		{ "fast",		no_argument,		NULL, 'f' },
+		{ "force",		no_argument,		NULL, 'F' },
+		{ "heads",		required_argument,	NULL, 'H' },
+		{ "help",		no_argument,		NULL, 'h' },
+		{ "label",		required_argument,	NULL, 'L' },
+		{ "license",		no_argument,		NULL, 'l' },
+		{ "mft-zone-multiplier",required_argument,	NULL, 'z' },
+		{ "no-action",		no_argument,		NULL, 'n' },
+		{ "no-indexing",	no_argument,		NULL, 'I' },
+		{ "ntfs-version",	required_argument,	NULL, 'w' },
+		{ "partition-start",	required_argument,	NULL, 'p' },
+		{ "quick",		no_argument,		NULL, 'Q' },
+		{ "quiet",		no_argument,		NULL, 'q' },
+		{ "sector-size",	required_argument,	NULL, 's' },
+		{ "sectors-per-track",	required_argument,	NULL, 'S' },
+		{ "verbose",		no_argument,		NULL, 'v' },
+		{ "version",		no_argument,		NULL, 'V' },
+		{ "zero-time",		no_argument,		NULL, 'T' },
+		{ NULL, 0, NULL, 0 }
+	};
+
+	char c = -1;
+	int lic = 0;
+	int err = 0;
+	int ver = 0;
+	int levels = 0;
+
+	if (!argv || !opts2) {
+		ntfs_log_error("Internal error: invalid parameters to mkntfs_options.\n");
+		return FALSE;
+	}
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
+		switch (c) {
+		case 1:		/* A device, or a number of sectors */
+			if (!opts2->dev_name)
+				opts2->dev_name = argv[optind-1];
+			else if (!mkntfs_parse_llong(optarg, "number of sectors", &opts2->num_sectors))
+				err++;
+			break;
+		case 'C':
+			opts2->enable_compression = TRUE;
+			break;
+		case 'c':
+			if (!mkntfs_parse_long(optarg, "cluster size", &opts2->cluster_size))
+				err++;
+			break;
+		case 'F':
+			opts2->force = TRUE;
+			break;
+		case 'f':	/* fast */
+		case 'Q':	/* quick */
+			opts2->quick_format = TRUE;
+			break;
+		case 'H':
+			if (!mkntfs_parse_long(optarg, "heads", &opts2->heads))
+				err++;
+			break;
+		case 'h':
+			err++;	/* display help */
+			break;
+		case 'I':
+			opts2->disable_indexing = TRUE;
+			break;
+		case 'L':
+			if (!opts2->label) {
+				opts2->label = argv[optind-1];
+			} else {
+				ntfs_log_error("You may only specify the label once.\n");
+				err++;
+			}
+			break;
+		case 'l':
+			lic++;	/* display the license */
+			break;
+		case 'n':
+			opts2->no_action = TRUE;
+			break;
+		case 'p':
+			if (!mkntfs_parse_llong(optarg, "partition start", &opts2->part_start_sect))
+				err++;
+			break;
+		case 'q':
+			opts2->quiet = TRUE;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
+			break;
+		case 's':
+			if (!mkntfs_parse_long(optarg, "sector size", &opts2->sector_size))
+				err++;
+			break;
+		case 'S':
+			if (!mkntfs_parse_long(optarg, "sectors per track", &opts2->sectors_per_track))
+				err++;
+			break;
+		case 'T':
+			opts2->use_epoch_time = TRUE;
+			break;
+		case 'v':
+			opts2->verbose = TRUE;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
+			break;
+		case 'V':
+			ver++;	/* display version info */
+			break;
+		case 'w':	/* ntfs-version */
+			if ((opts2->ver_major == 0) && (opts2->ver_minor == 0)) {
+				if (strcmp(optarg , "1.2") == 0) {
+					opts2->ver_major = 1;
+					opts2->ver_minor = 2;
+				} else if (strcmp(optarg , "3.0") == 0) {
+					opts2->ver_major = 3;
+					opts2->ver_minor = 0;
+				} else if (strcmp(optarg , "3.1") == 0) {
+					opts2->ver_major = 3;
+					opts2->ver_minor = 1;
+				} else {
+					ntfs_log_error("NTFS version '%s' is not supported.\n", optarg);
+					err++;
+				}
+			} else {
+				ntfs_log_error("You may only specify the NTFS version once.\n");
+				err++;
+			}
+			break;
+		case 'Z':	/* debug - turn on everything */
+			opts2->debug = TRUE;
+			opts2->verbose = TRUE;
+			opts2->quiet = FALSE;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE | NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_QUIET);
+			break;
+		case 'z':
+			if (!mkntfs_parse_long(optarg, "mft zone multiplier", &opts2->mft_zone_multiplier))
+				err++;
+			break;
+		default:
+			if (ntfs_log_parse_option (argv[optind-1]))
+				break;
+			if (optopt != '?')
+				ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
+			err++;
+			break;
+		}
+	}
+
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts2->verbose = TRUE;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts2->quiet = TRUE;
+
+	if (!err && !ver && !lic) {
+		if (opts2->dev_name == NULL) {
+			if (argc > 1)
+				ntfs_log_error("You must specify a device.\n");
+			err++;
+		}
+
+		if (opts2->quiet && opts2->verbose) {
+			ntfs_log_error("You may not use --quiet and --verbose "
+				"at the same time.\n");
+			err++;
+		}
+	}
+
+	if (ver)
+		mkntfs_version();
+	if (lic)
+		mkntfs_license();
+	if (err)
+		mkntfs_usage();
+
+	return (!err && !ver && !lic);
+}
+
+/**
+ * mkntfs_validate_options
+ */
+static BOOL mkntfs_validate_options(struct mkntfs_options *opts2 __attribute__((unused))) // XXX rename arg
+{
+#if 0
+	printf ("dev_name            = %s\n", opts2->dev_name);
+	printf ("label               = %s\n", opts2->label);
+	printf ("quick_format        = %d\n", opts2->quick_format);
+	printf ("disable_indexing    = %d\n", opts2->disable_indexing);
+	printf ("verbose             = %ld\n", opts2->verbose);
+	printf ("ver_major           = %d\n", opts2->ver_major);
+	printf ("ver_minor           = %d\n", opts2->ver_minor);
+	printf ("enable_compression  = %d\n", opts2->enable_compression);
+	printf ("heads               = %ld\n", opts2->heads);
+	printf ("cluster_size        = %ld\n", opts2->cluster_size);
+	printf ("mft_zone_multiplier = %ld\n", opts2->mft_zone_multiplier);
+	printf ("sectors_per_track   = %ld\n", opts2->sectors_per_track);
+	printf ("use_epoch_time      = %d\n", opts2->use_epoch_time);
+	printf ("num_sectors         = %lld\n", opts2->num_sectors);
+	printf ("sector_size         = %ld\n", opts2->sector_size);
+	printf ("part_start_sect     = %lld\n", opts2->part_start_sect);
+	printf ("quiet               = %d\n", opts2->quiet);
+	printf ("no_action           = %d\n", opts2->no_action);
+	printf ("force               = %d\n", opts2->force);
+	printf ("debug               = %d\n", opts2->debug);
+#endif
+
+	return TRUE;
+}
 
 
 /**
@@ -248,211 +597,6 @@ static void err_exit(const char *fmt, ...)
 	va_end(ap);
 	fprintf(stderr, "Aborting...\n");
 	exit(1);
-}
-
-/**
- * copyright - print copyright statements
- */
-static void copyright(void)
-{
-	fprintf(stderr, "Copyright (c) 2000-2005 Anton Altaparmakov\n"
-			"Copyright (c) 2001-2005 Richard Russon\n"
-			"Copyright (c) 2002-2005 Szabolcs Szakacsits\n"
-			"Create an NTFS volume on a user specified (block) "
-			"device.\n");
-}
-
-/**
- * license - print license statement
- */
-static void license(void)
-{
-	fprintf(stderr, "%s", ntfs_gpl);
-}
-
-/**
- * usage - print a list of the parameters to the program
- */
-__attribute__((noreturn))
-static void usage(void)
-{
-	copyright();
-	fprintf(stderr,	"Usage: %s [options] device "
-			"[number-of-sectors]\n"
-			"    -s sector-size           Specify the sector size "
-			"for the device\n"
-			"    -p part-start-sect       Specify the partition "
-			"start sector\n"
-			"    -H heads                 Specify the number of "
-			"heads\n"
-			"    -S sectors-per-track     Specify the number of "
-			"sectors per track\n"
-			"    -c cluster-size          Specify the cluster "
-			"size for the volume\n"
-			"    -L volume-label          Set the volume label\n"
-			"    -z mft-zone-multiplier   Set the MFT zone "
-			"multiplier\n"
-			"    -f                       Perform a quick format\n"
-			"    -Q                       Perform a quick format\n"
-			"    -C                       Enable compression on "
-			"the volume\n"
-			"    -I                       Disable indexing on the "
-			"volume\n"
-			"    -n                       Do not write to disk\n"
-			"    -F                       Force execution despite "
-			"errors\n"
-			"    -T                       Fake the time to be "
-			"00:00:00 UTC, Jan 1, 1970\n"
-			"    -q                       Quiet execution\n"
-			"    -v                       Verbose execution\n"
-			"    -vv                      Very verbose execution\n"
-			"    -V                       Display version \n"
-			"    -w                       NTFS version "
-			"information\n"
-			"    -l                       Display licensing "
-			"information\n"
-			"    -h                       Display this help\n",
-			EXEC_NAME);
-	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
-	exit(1);
-}
-
-/**
- * parse_options
- */
-static void parse_options(int argc, char *argv[])
-{
-	int c;
-	long l;
-	unsigned long u;
-	char *s;
-
-	/* Need to have: mft record size, index record size, mft size, */
-	/*		 logfile size, list of bad blocks, check for bad blocks, ... */
-	if (argc && *argv)
-		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
-	while ((c = getopt(argc, argv, "c:fH:h?np:qS:s:vz:CFTIL:QVlw:")) != EOF)
-		switch (c) {
-		case 'n':
-			opts.no_action = 1;
-			break;
-		case 'c':
-			l = strtol(optarg, &s, 0);
-			if (l <= 0 || l > INT_MAX || *s)
-				err_exit("Invalid cluster size.\n");
-			g_vol->cluster_size = l;
-			break;
-		case 'f':
-		case 'Q':
-			opts.quick_format = 1;
-			break;
-		case 'p':
-			u = strtoul(optarg, &s, 0);
-			if ((u >= ULONG_MAX && errno == ERANGE) || *s)
-				err_exit("Invalid partition start sector.\n");
-			opts.part_start_sect = u;
-			break;
-		case 'H':
-			l = strtol(optarg, &s, 0);
-			if (l <= 0 || l > INT_MAX || *s)
-				err_exit("Invalid number of heads.\n");
-			opts.heads = l;
-			break;
-		case 'S':
-			l = strtol(optarg, &s, 0);
-			if (l <= 0 || l > INT_MAX || *s)
-				err_exit("Invalid number of sectors per "
-						"track.\n");
-			opts.sectors_per_track = l;
-			break;
-		case 'q':
-			opts.quiet = 1;
-			break;
-		case 's':
-			l = strtol(optarg, &s, 0);
-			if (l <= 0 || l > INT_MAX || *s)
-				err_exit("Invalid sector size.\n");
-			opts.sector_size = l;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
-		case 'w':
-			if (!strcmp(optarg , "1.2")) {
-				g_vol->major_ver = 1;
-				g_vol->minor_ver = 2;
-				g_attr_defs =
-					(ATTR_DEF*)&attrdef_ntfs12_array;
-				g_attr_defs_len =
-					sizeof(attrdef_ntfs12_array);
-				break;
-			}
-			if (!strcmp(optarg , "3.0")) {
-				g_vol->major_ver = 3;
-				g_vol->minor_ver = 0;
-				g_attr_defs =
-					(ATTR_DEF*)&attrdef_ntfs3x_array;
-				g_attr_defs_len =
-					sizeof(attrdef_ntfs3x_array);
-				break;
-			}
-			if (!strcmp(optarg , "3.1")) {
-				g_vol->major_ver = 3;
-				g_vol->minor_ver = 1;
-				g_attr_defs =
-					(ATTR_DEF*)&attrdef_ntfs3x_array;
-				g_attr_defs_len =
-					 sizeof(attrdef_ntfs3x_array);
-				break;
-			}
-			err_exit("Ntfs version not supported.\n");
-		case 'z':
-			l = strtol(optarg, &s, 0);
-			if (l < 1 || l > 4 || *s)
-				err_exit("Invalid MFT zone multiplier.\n");
-			opts.mft_zone_multiplier = l;
-			break;
-		case 'C':
-			opts.enable_compression = 1;
-			break;
-		case 'F':
-			opts.force = 1;
-			break;
-		case 'T':
-			opts.use_epoch_time = 1;
-			break;
-		case 'I':
-			opts.disable_indexing = 1;
-			break;
-		case 'L':
-			g_vol->vol_name = optarg;
-			break;
-		case 'V':
-			/* Version number already printed, so just exit. */
-			exit(0);
-		case 'l':
-			copyright();
-			license();
-			exit(0);
-		case 'h':
-		case '?':
-		default:
-			usage();
-		}
-	if (optind == argc)
-		usage();
-	opts.dev_name = argv[optind++];
-	if (optind < argc) {
-		u = strtoul(argv[optind++], &s, 0);
-		if (*s || !u || (u >= ULONG_MAX && errno == ERANGE))
-			err_exit("Invalid number of sectors: %s\n",
-					argv[optind - 1]);
-		opts.num_sectors = u;
-	}
-	if (optind < argc)
-		usage();
 }
 
 /**
@@ -3442,7 +3586,7 @@ static void mkntfs_exit(void)
 	free(g_rl_index);
 	free(g_bad_blocks);
 	if ((g_attr_defs != (const ATTR_DEF*)attrdef_ntfs12_array) &&
-		(g_attr_defs != (const ATTR_DEF*)attrdef_ntfs3x_array))
+	    (g_attr_defs != (const ATTR_DEF*)attrdef_ntfs3x_array))
 		free(g_attr_defs);
 	if (!g_vol)
 		return;
@@ -3497,7 +3641,7 @@ static void mkntfs_open_partition(void)
 		ntfs_log_error("%s is not a block device.\n", g_vol->dev->d_name);
 		if (!opts.force)
 			err_exit("Refusing to make a filesystem here!\n");
-		if (!opts.num_sectors) {
+		if (opts.num_sectors < 0) {
 			if (!sbuf.st_size && !sbuf.st_blocks)
 				err_exit("You must specify the number of "
 						"sectors.\n");
@@ -3552,13 +3696,13 @@ static void mkntfs_override_phys_params(void)
 	int i;
 
 	/* If user didn't specify the sector size, determine it now. */
-	if (!opts.sector_size) {
+	if (opts.sector_size < 0) {
 #ifdef BLKSSZGET
-		int _sect_size = 0;
+		int sect_size = 0;
 
-		if (g_vol->dev->d_ops->ioctl(g_vol->dev, BLKSSZGET, &_sect_size)
+		if (g_vol->dev->d_ops->ioctl(g_vol->dev, BLKSSZGET, &sect_size)
 				>= 0) {
-			opts.sector_size = _sect_size;
+			opts.sector_size = sect_size;
 		} else
 #endif
 		{
@@ -3577,7 +3721,7 @@ static void mkntfs_override_phys_params(void)
 			 "less than or equal 4096 bytes.\n");
 	ntfs_log_debug("sector size = %ld bytes\n", opts.sector_size);
 	/* If user didn't specify the number of sectors, determine it now. */
-	if (!opts.num_sectors) {
+	if (opts.num_sectors < 0) {
 		opts.num_sectors = ntfs_device_size_get(g_vol->dev,
 				opts.sector_size);
 		if (opts.num_sectors <= 0)
@@ -3858,7 +4002,7 @@ static void mkntfs_initialize_rl_mft(void)
 		g_mft_zone_end = g_mft_zone_end >> 1;	/* 50%   */
 		break;
 	case 3:
-		g_mft_zone_end = g_mft_zone_end * 3 >> 3;	/* 37.5% */
+		g_mft_zone_end = g_mft_zone_end * 3 >> 3;/* 37.5% */
 		break;
 	case 2:
 		g_mft_zone_end = g_mft_zone_end >> 2;	/* 25%   */
@@ -4274,12 +4418,6 @@ static void mkntfs_create_root_structures(void)
 		if (ntfs_mft_record_layout(g_vol, 0, m = (MFT_RECORD *)(g_buf +
 				i * g_vol->mft_record_size)))
 			err_exit("Error:  Failed to layout mft record.\n");
-#if 0
-		if (!opts.quiet && opts.verbose > 1)
-			dump_mft_record((MFT_RECORD*)g_buf +
-				i * g_vol->mft_record_size);
-#endif
-
 		if (i > 0)
 			m->sequence_number = cpu_to_le16(i);
 		if (i == 0)
@@ -4313,7 +4451,7 @@ static void mkntfs_create_root_structures(void)
 				cpu_to_le32(0));
 		} else {
 			/* setting specific security_id flag and */
-			/* filepermissions for ntfs 3.x */
+			/* file permissions for ntfs 3.x */
 			if (i == 0 || i == 1 || i == 2 || i == 6 || i == 8 ||
 					i == 10) {
 				add_attr_std_info(m, file_attrs,
@@ -4578,7 +4716,7 @@ static void mkntfs_create_root_structures(void)
 	 */
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
-	if (!ntfs_boot_sector_is_ntfs(bs, opts.verbose > 0 ? 0 : 1))
+	if (!ntfs_boot_sector_is_ntfs(bs, !opts.debug))
 		err_exit("FATAL: Generated boot sector is invalid!\n");
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_boot, g_buf2, 8192);
 	if (!err)
@@ -4876,8 +5014,21 @@ int main(int argc, char **argv)
 	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
 	/* Initialize opts to zero / required values. */
 	init_options();
+	mkntfs_init_options(&opts);
 	/* Parse command line options. */
-	parse_options(argc, argv);
+	if (!mkntfs_parse_options(argc, argv, &opts))
+		exit(1);
+	mkntfs_validate_options(&opts);
+	
+	/* transfer some options to the volume */
+	g_vol->vol_name  = opts.label;	// XXX when this be strdup, either free it, or call ntfs_umount
+	if (opts.ver_major && opts.ver_minor) {
+		g_vol->major_ver = opts.ver_major;
+		g_vol->minor_ver = opts.ver_minor;
+	}
+	if (opts.cluster_size >= 0)
+		g_vol->cluster_size = opts.cluster_size;
+
 	/* Open the partition. */
 	mkntfs_open_partition();
 	/* Decide on the sectors/tracks/heads/size, etc. */
