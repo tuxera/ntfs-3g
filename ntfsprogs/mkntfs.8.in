@@ -1,5 +1,6 @@
 .\" -*- nroff -*-
 .\" Copyright (c) 2001,2002 Anton Altaparmakov. All Rights Reserved.
+.\" Copyright (c) 2005 Richard Russon. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\" Adapted from e2fsprogs-1.19/misc/mke2fs.8.in by Theodore Ts'o.
 .\"
@@ -9,70 +10,84 @@ mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 .SH SYNOPSIS
 .B mkntfs
 [
-.B \-s
-.I sector-size
+.I options
 ]
+.B device
 [
-.B \-p
-.I part-start-sect
+.I number-of-sectors
 ]
+.P
+.B mkntfs
 [
-.B \-H
-.I heads
-]
-[
-.B \-S
-.I sectors-per-track
+.B \-C
 ]
 [
 .B \-c
 .I cluster-size
 ]
 [
+.B \-F
+]
+[
+.B \-f
+]
+[
+.B \-H
+.I heads
+]
+[
+.B \-h
+]
+[
+.B \-I
+]
+[
 .B \-L
 .I volume-label
+]
+[
+.B \-l
+]
+[
+.B \-n
+]
+[
+.B \-p
+.I part-start-sect
+]
+[
+.B \-Q
+]
+[
+.B \-q
+]
+[
+.B \-S
+.I sectors-per-track
+]
+[
+.B \-s
+.I sector-size
+]
+[
+.B \-T
+]
+[
+.B \-V
+]
+[
+.B \-v
+]
+[
+.B \-w
+.I ntfs-version
 ]
 [
 .B \-z
 .I mft-zone-multiplier
 ]
 [
-.B \-f
-|
-.B \-Q
-]
-[
-.B -n
-]
-[
-.B \-q
-]
-[
-.B \-v
-]
-[
-.B \-vv
-]
-[
-.B \-C
-]
-[
-.B \-F
-]
-[
-.B \-T
-]
-[
-.B \-I
-]
-[
-.B \-V
-]
-[
-.B \-l
-]
-[
-.B \-h
+.B \-\-debug
 ]
 .I device
 [
@@ -90,45 +105,62 @@ is the number of blocks on the device.  If omitted,
 .B mkntfs
 automagically figures the file system size.
 .SH OPTIONS
-.TP
-.BI \-s " sector-size"
-Specify the size of sectors in bytes. Valid sector size values are 256, 512,
-1024, 2048 and 4096 bytes per sector. If omitted,
+Below is a summary of all the options that
 .B mkntfs
-attempts to determine the
-.I sector-size
-automatically and if that fails a default of 512 bytes per sector is used.
+accepts.  Nearly all options have two equivalent names.  The short name is preceded by
+.BR \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.BR \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI \-p " part-start-sect"
-Specify the partition start sector. The maximum is 4294967295 (2^32-1). If
-omitted,
-.B mkntfs
-attempts to determine
-.I part-start-sect
-automatically and if that fails a default of 0 is used. Note that
-.I part-start-sect
-is required for Windows to be able to boot from the created volume.
+
+.BR
+.SS Basic options
+.BR
+
+.B \-f
+.br
+.ns
 .TP
-.BI \-H " heads"
-Specify the number of heads. The maximum is 65535 (0xffff). If omitted,
-.B mkntfs
-attempts to determine the number of
-.I heads
-automatically and if that fails a default of 0 is used. Note that
-.I heads
-is required for Windows to be able to boot from the created volume.
+.B \-\-fast
+.br
+.ns
 .TP
-.BI \-S " sectors-per-track"
-Specify the number of sectors per track. The maximum is 65535 (0xffff). If
-omitted,
-.B mkntfs
-attempts to determine the number of
-.I sectors-per-track
-automatically and if that fails a default of 0 is used. Note that
-.I sectors-per-track
-is required for Windows to be able to boot from the created volume.
+.B \-Q
+.br
+.ns
 .TP
-.BI \-c " cluster-size"
+.B \-\-quick
+Perform quick (fast) format. This will skip both zeroing of the volume and bad sector
+checking.
+.TP
+
+.BI \-L " STRING"
+.br
+.ns
+.TP
+.BI \-\-label " STRING"
+Set the volume label for the filesystem.
+.TP
+
+.B \-C
+.br
+.ns
+.TP
+.B \-\-enable-compression
+Enable compression on the volume.
+.TP
+
+.BI \-c " BYTES"
+.br
+.ns
+.TP
+.BI \-\-cluster-size " BYTES"
 Specify the size of clusters in bytes. Valid cluster size values are powers of
 two, with at least 256, and at most 65536 bytes per cluster. If omitted,
 .B mkntfs
@@ -144,17 +176,101 @@ Volume	size	Default cluster size
 1GB	- 2GB	2048 bytes
 2GB	+	4096 bytes
 .TE
-
 Note that the default cluster size is set to be at least equal to the sector
 size as a cluster cannot be smaller than a sector. Also, note that values
 greater than 4096 have the side effect that compression is disabled on the
 volume (due to limitations in the NTFS compression algorithm currently in use
 by Windows).
 .TP
-.BI \-L " volume-label"
-Set the volume label for the filesystem.
+
+.B \-I
+.br
+.ns
 .TP
-.BI \-z " mft-zone-multiplier"
+.B \-\-disable-indexing
+Disable content indexing on the volume. (This is only meaningful on
+Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
+not implement content indexing at all.)
+.TP
+
+.B \-n
+.br
+.ns
+.TP
+.B \-\-no-action
+Causes
+.B mkntfs
+to not actually create a filesystem, but display what it would do if it were
+to create a filesystem. All steps of the format are carried out except the
+actual writing to the device.
+.TP
+
+.BR
+.SS Advanced options
+.BR
+
+.BI \-s " BYTES"
+.br
+.ns
+.TP
+.BI \-\-sector-size " BYTES"
+Specify the size of sectors in bytes. Valid sector size values are 256, 512,
+1024, 2048 and 4096 bytes per sector. If omitted,
+.B mkntfs
+attempts to determine the
+.I sector-size
+automatically and if that fails a default of 512 bytes per sector is used.
+.TP
+
+.BI \-p " SECTOR"
+.br
+.ns
+.TP
+.BI \-\-partition-start " SECTOR
+Specify the partition start sector. The maximum is 4294967295 (2^32-1). If
+omitted,
+.B mkntfs
+attempts to determine
+.I part-start-sect
+automatically and if that fails a default of 0 is used. Note that
+.I part-start-sect
+is required for Windows to be able to boot from the created volume.
+.TP
+
+.BI \-H " NUM"
+.br
+.ns
+.TP
+.BI \-\-heads " NUM"
+Specify the number of heads. The maximum is 65535 (0xffff). If omitted,
+.B mkntfs
+attempts to determine the number of
+.I heads
+automatically and if that fails a default of 0 is used. Note that
+.I heads
+is required for Windows to be able to boot from the created volume.
+.TP
+
+.BI \-S " NUM"
+.br
+.ns
+.TP
+.BI \-\-sectors-per-track " NUM"
+Specify the number of sectors per track. The maximum is 65535 (0xffff). If
+omitted,
+.B mkntfs
+attempts to determine the number of
+.I sectors-per-track
+automatically and if that fails a default of 0 is used. Note that
+.I sectors-per-track
+is required for Windows to be able to boot from the created volume.
+.TP
+
+.BI \-z " NUM"
+.br
+.ns
+.TP
+.BI \-\-mft-zone-multiplier " NUM"
 Set the MFT zone multiplier, which determines the size of the MFT zone to use
 on the volume. The MFT zone is the area at the beginning of the volume reserved
 for the master file table (MFT), which stores the on disk inodes (MFT records).
@@ -176,69 +292,101 @@ multiplier	(% of volume size)
 4	50.0%
 .TE
 .TP
-.B \-f
-Same as
-.BR \-Q .
+
+.B \-T
+.br
+.ns
 .TP
-.B \-Q
-Perform quick format. This will skip both zeroing of the volume and bad sector
-checking.
+.B \-\-zero-time
+Fake the time to be 00:00:00 UTC, Jan 1, 1970 instead of the current system
+time.  This is only really useful for debugging purposes.
 .TP
-.B \-n
-Causes
-.B mkntfs
-to not actually create a filesystem, but display what it would do if it were
-to create a filesystem. All steps of the format are carried out except the
-actual writing to the device.
+
+.B \-w STRING
+.br
+.ns
 .TP
-.B \-q
-Quiet execution; only errors are written to stderr, no output to stdout
-occurs at all. Useful if
-.B mkntfs
-is run in a script.
+.B \-\-ntfs-version STRING
+Select the version of NTFS you wish to use.  This can be one of "1.2", "3.0", or "3.1".
 .TP
-.B \-v
-Verbose execution.
-.TP
-.B \-vv
-Really verbose execution; includes the verbose output from the
-.B \-v
-option as well as additional output useful for debugging
-.B mkntfs.
-.TP
-.B \-C
-Enable compression on the volume.
-.TP
+
 .B \-F
+.br
+.ns
+.TP
+.B \-\-force
 Force
 .B mkntfs
 to run, even if the specified
 .I device
 is not a block special device, or appears to be mounted.
 .TP
-.B \-T
-Fake the time to be 00:00:00 UTC, Jan 1, 1970 instead of the current system
-time.  This is only really useful for debugging purposes.
+
+.BR
+.SS Output options
+.BR
+
+.B \-q
+.br
+.ns
 .TP
-.B \-I
-Disable content indexing on the volume. (This is only meaningful on
-Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
-not implement content indexing at all.)
+.B \-\-quiet
+Quiet execution; only errors are written to stderr, no output to stdout
+occurs at all. Useful if
+.B mkntfs
+is run in a script.
 .TP
+
+.B \-v
+.br
+.ns
+.TP
+.B \-\-verbose
+Verbose execution.
+.TP
+
+.B \-\-debug
+Really verbose execution; includes the verbose output from the
+.B \-v
+option as well as additional output useful for debugging
+.B mkntfs.
+.TP
+
+.BR
+.SS Help options
+.BR
+
 .B \-V
+.br
+.ns
+.TP
+.B \-\-version
 Print the version number of
 .B mkntfs
 and exit.
 .TP
+
 .B \-l
+.br
+.ns
+.TP
+.B \-\-license
 Print the licensing information of
 .B mkntfs
 and exit.
 .TP
+
 .B \-h
+.br
+.ns
+.TP
+.B \-\-help
 Print the usage information of 
 .B mkntfs
 and exit.
+.TP
+.BR
+
 .SH BUGS
 .B mkntfs
 writes the backup boot sector to the last sector of the block
@@ -275,4 +423,3 @@ and rpm) and pre-compiled binary (i386 rpm and deb) form.
 .SH SEE ALSO
 .BR badblocks (8),
 .BR ntfsprogs (8)
-
