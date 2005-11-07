@@ -858,8 +858,8 @@ typedef enum {
 	   are valid for setting. */
 
 	/*
-	 * These flags are only present in the FILE_NAME attribute (in the
-	 * field file_attributes).
+	 * FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT is only present in the
+	 * FILE_NAME attribute (in the field file_attributes).
 	 */
 	FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT	= const_cpu_to_le32(0x10000000),
 	/* This is a copy of the corresponding bit from the mft record, telling
