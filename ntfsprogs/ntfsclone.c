@@ -34,7 +34,10 @@
 #include <sys/ioctl.h>
 #endif
 #ifdef HAVE_SYS_VFS_H
-#	include <sys/vfs.h>
+#include <sys/vfs.h>
+#endif
+#ifdef HAVE_SYS_STATVFS_H
+#include <sys/statvfs.h>
 #endif
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -1444,6 +1447,28 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 		perr_exit("ntfs_inode_close failed for $BadClus");
 }
 
+static void check_dest_free_space(u64 src_bytes)
+{
+	u64 dest_bytes;
+	struct statvfs stvfs;
+
+	if (opt.save_image || opt.metadata_only || opt.blkdev_out || opt.std_out)
+		return;
+
+	if (fstatvfs(fd_out, &stvfs) == -1) {
+		Printf("WARNING: Unknown free space on the destination: %s\n",
+		       strerror(errno));
+		return;
+	}
+
+	dest_bytes = stvfs.f_bsize * stvfs.f_bfree;
+
+	if (dest_bytes < src_bytes)
+		err_exit("Destination has no enough free space: %llu MB < %llu"
+			 " MB\n", rounded_up_division(dest_bytes, NTFS_MBYTE),
+			 rounded_up_division(src_bytes,  NTFS_MBYTE));
+}
+
 int main(int argc, char **argv)
 {
 	ntfs_walk_clusters_ctx image;
@@ -1503,6 +1528,8 @@ int main(int argc, char **argv)
 	walk_clusters(vol, &backup_clusters);
 	compare_bitmaps(&lcn_bitmap);
 	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
+
+	check_dest_free_space(vol->cluster_size * image.inuse);
 
 	ignore_bad_clusters(&image);
 

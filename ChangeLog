@@ -67,6 +67,8 @@ xx/xx/2005 - 1.12.2-WIP
 	  block devices, FIFOs and sockets) to layout.h. Teech ntfsmount to
 	  handle them.  (Yura)
 	- Fix allocated data size for resident attributes.  (Yura)
+	- ntfsclone: check available free space on the destination before
+	  starting to clone or restore.  (Szaka)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
