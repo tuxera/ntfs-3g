@@ -489,10 +489,10 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 			printf(" FILE_NAME_INDEX");
 			flags &= ~FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
 		}
-		if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
-			printf(" VIEW_INDEX");
-			flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
-		}
+	}
+	if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
+		printf(" VIEW_INDEX");
+		flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
 	}
 	if (flags)
 		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
