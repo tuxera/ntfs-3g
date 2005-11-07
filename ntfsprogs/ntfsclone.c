@@ -95,7 +95,7 @@ struct {
 	int overwrite;
 	int std_out;
 	int blkdev_out;		/* output file is block device */
-	int metadata_only;
+	int metadata;		/* metadata only cloning */
 	int ignore_fs_check;
 	int rescue;
 	int save_image;
@@ -304,7 +304,7 @@ static void parse_options(int argc, char **argv)
 		case '?':
 			usage();
 		case 'm':
-			opt.metadata_only++;
+			opt.metadata++;
 			break;
 		case 'O':
 			opt.overwrite++;
@@ -344,18 +344,18 @@ static void parse_options(int argc, char **argv)
 		usage();
 	}
 
-	if (opt.metadata_only && opt.save_image)
+	if (opt.metadata && opt.save_image)
 		err_exit("Saving only metadata to an image is not "
 			 "supported!\n");
 
-	if (opt.metadata_only && opt.restore_image)
+	if (opt.metadata && opt.restore_image)
 		err_exit("Restoring only metadata from an image is not "
 			 "supported!\n");
 
-	if (opt.metadata_only && opt.std_out)
+	if (opt.metadata && opt.std_out)
 		err_exit("Cloning only metadata to stdout isn't supported!\n");
 
-	if (opt.ignore_fs_check && !opt.metadata_only)
+	if (opt.ignore_fs_check && !opt.metadata)
 		err_exit("Filesystem check can be ignored only for metadata "
 			 "cloning!\n");
 
@@ -377,7 +377,7 @@ static void parse_options(int argc, char **argv)
 
 			if (S_ISBLK(st.st_mode)) {
 				opt.blkdev_out = 1;
-				if (opt.metadata_only)
+				if (opt.metadata)
 					err_exit("Cloning only metadata to a "
 					     "block device isn't supported!\n");
 			}
@@ -589,7 +589,7 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 {
 	s64 i, len; /* number of clusters to copy */
 
-	if (opt.std_out || !opt.metadata_only)
+	if (opt.std_out || !opt.metadata)
 		return;
 
 	if (!(len = is_critical_metadata(image, rl)))
@@ -822,7 +822,7 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 		walk->image->inuse += lcn_length;
 	}
-	if (!wipe && !opt.std_out && opt.metadata_only &&
+	if (!wipe && !opt.std_out && opt.metadata &&
 	    walk->image->ni->mft_no == FILE_LogFile &&
 	    walk->image->ctx->attr->type == AT_DATA)
 		clone_logfile_parts(walk->image, rl);
@@ -1452,7 +1452,7 @@ static void check_dest_free_space(u64 src_bytes)
 	u64 dest_bytes;
 	struct statvfs stvfs;
 
-	if (opt.save_image || opt.metadata_only || opt.blkdev_out || opt.std_out)
+	if (opt.save_image || opt.metadata || opt.blkdev_out || opt.std_out)
 		return;
 
 	if (fstatvfs(fd_out, &stvfs) == -1) {
@@ -1538,7 +1538,7 @@ int main(int argc, char **argv)
 
 	/* FIXME: save backup boot sector */
 
-	if (opt.std_out || !opt.metadata_only) {
+	if (opt.std_out || !opt.metadata) {
 		s64 nr_clusters_to_save = image.inuse;
 		if (opt.std_out && !opt.save_image)
 			nr_clusters_to_save = vol->nr_clusters;
