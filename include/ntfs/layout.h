@@ -852,9 +852,10 @@ typedef enum {
 	   is used to obtain all flags that are valid for reading. */
 	FILE_ATTR_VALID_SET_FLAGS	= const_cpu_to_le32(0x000031a7),
 	/* FILE_ATTR_VALID_SET_FLAGS masks out the old DOS VolId, the
-	   F_A_DEVICE, F_A_DIRECTORY, F_A_SPARSE_FILE, F_A_REPARSE_POINT,
-	   F_A_COMPRESSED and F_A_ENCRYPTED and preserves the rest. This mask
-	   is used to to obtain all flags that are valid for setting. */
+	   FILE_ATTR_DEVICE, FILE_ATTR_DIRECTORY, FILE_ATTR_SPARSE_FILE,
+	   FILE_ATTR_REPARSE_POINT, FILE_ATRE_COMPRESSED and FILE_ATTR_ENCRYPTED
+	   and preserves the rest. This mask is used to to obtain all flags that
+	   are valid for setting. */
 
 	/*
 	 * These flags are only present in the FILE_NAME attribute (in the

@@ -45,9 +45,6 @@ typedef enum {
 	NI_AttrList,		/* 1: Mft record contains an attribute list. */
 	NI_AttrListDirty,	/* 1: Attribute list needs to be written to the
 				      mft record and then to disk. */
-	NI_Compressed,		/* 1: Inode is compressed. */
-	NI_Encrypted,		/* 1: Inode is encrypted. */
-	NI_Sparse,		/* 1: Inode is sparse. */
 	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
 				      in the index. */
 } ntfs_inode_state_bits;
@@ -86,18 +83,6 @@ typedef enum {
 #define NInoAttrListClearDirty(ni)		   clear_nino_al_flag(ni, Dirty)
 #define NInoAttrListTestAndSetDirty(ni)	    test_and_set_nino_al_flag(ni, Dirty)
 #define NInoAttrListTestAndClearDirty(ni) test_and_clear_nino_al_flag(ni, Dirty)
-
-#define NInoCompressed(ni)		 test_nino_flag(ni, Compressed)
-#define NInoSetCompressed(ni)		  set_nino_flag(ni, Compressed)
-#define NInoClearCompressed(ni)		clear_nino_flag(ni, Compressed)
-
-#define NInoEncrypted(ni)		 test_nino_flag(ni, Encrypted)
-#define NInoSetEncrypted(ni)		  set_nino_flag(ni, Encrypted)
-#define NInoClearEncrypted(ni)		clear_nino_flag(ni, Encrypted)
-
-#define NInoSparse(ni)			 test_nino_flag(ni, Sparse)
-#define NInoSetSparse(ni)		  set_nino_flag(ni, Sparse)
-#define NInoClearSparse(ni)		clear_nino_flag(ni, Sparse)
 
 #define NInoFileNameDirty(ni)			\
 					  test_nino_flag(ni, FileNameDirty)
@@ -148,7 +133,7 @@ struct _ntfs_inode {
 	void *private_data;	/* ntfs_dt containing this inode */
 	int ref_count;
 
-	/* Below 2 fields needed to update indexes. They valid if != -1. */
+	/* Below fields are valid only for base inode. */
 	s64 data_size;
 	s64 allocated_size;
 

@@ -312,13 +312,40 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		}
 		stbuf->st_nlink = 1; /* Needed for correct find work. */
 	} else {
-		/* Regular or INTX file. */
+		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
-		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-		if (na) {
-			/* Check whether it's special INTX file. */
-			if ((ni->flags & FILE_ATTR_SYSTEM) && na->data_size <=
-					sizeof(INTX_FILE_TYPES) + sizeof(
+		stbuf->st_size = ni->data_size;
+		stbuf->st_blocks = ni->allocated_size >> vol->sector_size_bits;
+		stbuf->st_mode |= (0777 & ~ctx->fmask);
+		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
+			na = ntfs_attr_open(ni, AT_DATA, stream_name,
+					stream_name_len);
+			if (!na) {
+				if (stream_name_len)
+					res = -ENOENT;
+				goto exit;
+			}
+			if (stream_name_len) {
+				stbuf->st_size = na->data_size;
+				stbuf->st_blocks = na->allocated_size >>
+					vol->sector_size_bits;
+			}
+			/* Check whether it's Interix fifo or socket. */
+			if (!(ni->flags & FILE_ATTR_HIDDEN) &&
+					!stream_name_len) {
+				/* FIFO. */
+				if (na->data_size == 0)
+					stbuf->st_mode = S_IFIFO;
+				/* Socket link. */
+				if (na->data_size == 1)
+					stbuf->st_mode = S_IFSOCK;
+			}
+			/*
+			 * Check wheter it's Interix symbolic link, block or
+			 * character device.
+			 */
+			if (na->data_size <= sizeof(INTX_FILE_TYPES) + sizeof(
 					ntfschar) * MAX_PATH && na->data_size >
 					sizeof(INTX_FILE_TYPES) &&
 					!stream_name_len) {
@@ -359,18 +386,8 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 					stbuf->st_mode = S_IFLNK;
 				free(intx_file);
 			}
-			stbuf->st_size = na->data_size;
-			stbuf->st_blocks = na->allocated_size >>
-				vol->sector_size_bits;
 			ntfs_attr_close(na);
-		} else {
-			stbuf->st_size = 0;
-			stbuf->st_blocks = 0;
-			if (stream_name_len)
-				res = -ENOENT;
 		}
-		stbuf->st_mode |= (0777 & ~ctx->fmask);
-		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 	}
 	stbuf->st_uid = ctx->uid;
 	stbuf->st_gid = ctx->gid;

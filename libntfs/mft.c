@@ -1459,7 +1459,8 @@ mft_rec_already_initialized:
 	/* Make sure the allocated inode is written out to disk later. */
 	ntfs_inode_mark_dirty(ni);
 	/* Initialize time, allocated and data size in ntfs_inode struct. */
-	ni->data_size = ni->allocated_size = -1;
+	ni->data_size = ni->allocated_size = 0;
+	ni->flags = 0;
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
 			ni->last_access_time = time(NULL);

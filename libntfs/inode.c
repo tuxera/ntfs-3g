@@ -145,8 +145,6 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto err_out;
 	}
 	ni->mft_no = MREF(mref);
-	ni->data_size = -1;
-	ni->allocated_size = -1;
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		goto err_out;
@@ -160,12 +158,6 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	}
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
-	if (std_info->file_attributes & FILE_ATTR_COMPRESSED)
-		NInoSetCompressed(ni);
-	if (std_info->file_attributes & FILE_ATTR_ENCRYPTED)
-		NInoSetEncrypted(ni);
-	if (std_info->file_attributes & FILE_ATTR_SPARSE_FILE)
-		NInoSetSparse(ni);
 	ni->flags = std_info->file_attributes;
 	ni->creation_time = ntfs2utc(std_info->creation_time);
 	ni->last_data_change_time = ntfs2utc(std_info->last_data_change_time);
@@ -176,9 +168,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 			ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
-		/* Attribute list attribute not present so we are done. */
-		ntfs_attr_put_search_ctx(ctx);
-		return ni;
+		/* Attribute list attribute does not present. */
+		goto get_size;
 	}
 	NInoSetAttrList(ni);
 	l = ntfs_get_attribute_value_length(ctx->attr);
@@ -198,6 +189,27 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (l != ni->attr_list_size) {
 		err = EIO;
 		goto put_err_out;
+	}
+get_size:
+	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
+		if (errno != ENOENT)
+			goto put_err_out;
+		/* Directory or special file. */
+		ni->data_size = ni->allocated_size = 0;
+	} else {
+		if (ctx->attr->non_resident) {
+			ni->data_size = sle64_to_cpu(ctx->attr->data_size);
+			if (ctx->attr->flags &
+					(ATTR_IS_COMPRESSED & ATTR_IS_SPARSE))
+				ni->allocated_size = sle64_to_cpu(
+						ctx->attr->compressed_size);
+			else
+				ni->allocated_size = sle64_to_cpu(
+						ctx->attr->allocated_size);
+		} else {
+			ni->data_size = le32_to_cpu(ctx->attr->value_length);
+			ni->allocated_size = (ni->data_size + 7) & ~7;
+		}
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	return ni;
@@ -475,18 +487,7 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	}
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
-	if (NInoCompressed(ni))
-		std_info->file_attributes |= FILE_ATTR_COMPRESSED;
-	else
-		std_info->file_attributes &= ~FILE_ATTR_COMPRESSED;
-	if (NInoEncrypted(ni))
-		std_info->file_attributes |= FILE_ATTR_ENCRYPTED;
-	else
-		std_info->file_attributes &= ~FILE_ATTR_ENCRYPTED;
-	if (NInoSparse(ni))
-		std_info->file_attributes |= FILE_ATTR_SPARSE_FILE;
-	else
-		std_info->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
+	std_info->file_attributes = ni->flags;
 	std_info->creation_time = utc2ntfs(ni->creation_time);
 	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
@@ -562,22 +563,11 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		}
 		/* Update flags and file size. */
 		fn = (FILE_NAME_ATTR *)ictx->data;
-		if (NInoCompressed(ni))
-			fn->file_attributes |= FILE_ATTR_COMPRESSED;
-		else
-			fn->file_attributes &= ~FILE_ATTR_COMPRESSED;
-		if (NInoEncrypted(ni))
-			fn->file_attributes |= FILE_ATTR_ENCRYPTED;
-		else
-			fn->file_attributes &= ~FILE_ATTR_ENCRYPTED;
-		if (NInoSparse(ni))
-			fn->file_attributes |= FILE_ATTR_SPARSE_FILE;
-		else
-			fn->file_attributes &= ~FILE_ATTR_SPARSE_FILE;
-		if (ni->allocated_size != -1)
-			fn->allocated_size = cpu_to_sle64(ni->allocated_size);
-		if (ni->data_size != -1)
-			fn->data_size = cpu_to_sle64(ni->data_size);
+		fn->file_attributes =
+				(fn->file_attributes & ~FILE_ATTR_VALID_FLAGS) |
+				(ni->flags & FILE_ATTR_VALID_FLAGS);
+		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
+		fn->data_size = cpu_to_sle64(ni->data_size);
 		fn->creation_time = utc2ntfs(ni->creation_time);
 		fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 		fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);

@@ -203,30 +203,30 @@ typedef enum {
 #define NAttrSetNonResident(na)		  set_nattr_flag(na, NonResident)
 #define NAttrClearNonResident(na)	clear_nattr_flag(na, NonResident)
 
-#define GenNAttrIno(flag)					\
-static inline int NAttr##flag(ntfs_attr *na)			\
+#define GenNAttrIno(func_name,flag)				\
+static inline int NAttr##func_name(ntfs_attr *na)		\
 {								\
 	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		return NIno##flag(na->ni);			\
+		return (na->ni->flags & FILE_ATTR_##flag);	\
 	return 0;						\
 }								\
-static inline void NAttrSet##flag(ntfs_attr *na)		\
+static inline void NAttrSet##func_name(ntfs_attr *na)		\
 {								\
 	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		NInoSet##flag(na->ni);				\
+		na->ni->flags |= FILE_ATTR_##flag;		\
 	else							\
 		ntfs_log_trace("BUG! Should be called only for "\
 			"unnamed data attribute.\n");		\
 }								\
-static inline void NAttrClear##flag(ntfs_attr *na)		\
+static inline void NAttrClear##func_name(ntfs_attr *na)		\
 {								\
 	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		NInoClear##flag(na->ni);			\
+		na->ni->flags &= ~FILE_ATTR_##flag;		\
 }
 
-GenNAttrIno(Compressed)
-GenNAttrIno(Encrypted)
-GenNAttrIno(Sparse)
+GenNAttrIno(Compressed, COMPRESSED)
+GenNAttrIno(Encrypted, ENCRYPTED)
+GenNAttrIno(Sparse, SPARSE_FILE)
 
 /*
  * Union of all known attribute values. For convenience. Used in the attr

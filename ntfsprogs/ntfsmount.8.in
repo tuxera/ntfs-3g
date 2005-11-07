@@ -22,9 +22,11 @@ is recommended, but not mandatory.
 .TP
 .B Fully implemented ntfsmount features are:
 
-* Read-only access to normal, sparse and compressed files.
+* Read-write access to normal and sparse files.
 
-* Overwrite normal and sparse files *with* changes to size.
+* Read-only access to compressed files.
+
+* Access to special Interix files (symlinks, devices, FIFOs).
 
 * List/Read/Write/Add/Remove named data streams.
 

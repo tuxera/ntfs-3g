@@ -409,9 +409,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		s64 l = le32_to_cpu(a->value_length);
 		ntfs_attr_init(na, FALSE, a->flags & ATTR_IS_COMPRESSED,
 				a->flags & ATTR_IS_ENCRYPTED,
-				a->flags & ATTR_IS_SPARSE, l, l, l,
-				cs ? sle64_to_cpu(a->compressed_size) : 0,
-				cs ? a->compression_unit : 0);
+				a->flags & ATTR_IS_SPARSE, (l + 7) & ~7, l, l,
+				cs ? (l + 7) & ~7 : 0, 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	return na;
@@ -3702,10 +3701,10 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		if (!ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 				newsize)) {
 			/* Update the ntfs attribute structure, too. */
-			na->allocated_size = na->data_size =
-					na->initialized_size = newsize;
+			na->data_size = na->initialized_size = newsize;
+			na->allocated_size = (newsize + 7) & ~7;
 			if (NAttrCompressed(na) || NAttrSparse(na))
-				na->compressed_size = newsize;
+				na->compressed_size = na->allocated_size;
 			goto resize_done;
 		}
 		/* Error! If not enough space, just continue. */
@@ -4027,8 +4026,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	NAttrClearCompressed(na);
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
-	na->allocated_size = na->initialized_size = na->compressed_size =
-			na->data_size;
+	na->initialized_size = na->data_size;
+	na->allocated_size = na->compressed_size = (na->data_size + 7) & ~7;
 	na->compression_block_size = 0;
 	na->compression_block_size_bits = na->compression_block_clusters = 0;
 	return 0;

@@ -58,6 +58,15 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfsinfo: dump index attribute keys.  (Szaka)
 	- mkntfs: don't fill the last $MFT cluster with empty MFT records. 
 	  This is needed to conform to Windows' format behavior.  (Szaka)
+	- Add @flags field to struct ntfs_inode. Remove NIno{Sparse,Compressed,
+	  Encrypted}, update all users to use @(ntfs_inode)->flags.  (Yura)
+	- Make @(ntfs_inode)->data_size and @(ntfs_inode)->allocated_size to
+	  always contain valid value.  (Yura)
+	- Always set correct file size and attributes in ntfs_link().  (Yura)
+	- Add info about Interix special files (symbolic links, character and
+	  block devices, FIFOs and sockets) to layout.h. Teech ntfsmount to
+	  handle them.  (Yura)
+	- Fix allocated data size for resident attributes.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
