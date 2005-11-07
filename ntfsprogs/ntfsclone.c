@@ -717,9 +717,6 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a = image->ctx->attr;
 
-	if (image->ni->mft_no <= LAST_METADATA_INODE)
-		return;
-
 	if (a->type == AT_FILE_NAME)
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a);
 
