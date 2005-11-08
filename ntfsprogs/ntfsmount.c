@@ -703,7 +703,7 @@ static int ntfs_fuse_chmod(const char *path,
 	return -EOPNOTSUPP;
 }
 
-static int ntfs_fuse_create(const char *org_path, dev_t type)
+static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev)
 {
 	char *name;
 	ntfschar *uname = NULL;
@@ -732,7 +732,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t type)
 		goto exit;
 	}
 	/* Create object specified in @type. */
-	ni = ntfs_create(dir_ni, uname, uname_len, type);
+	ni = ntfs_create(dir_ni, uname, uname_len, type, dev);
 	if (ni)
 		ntfs_inode_close(ni);
 	else
@@ -759,7 +759,7 @@ static int ntfs_fuse_create_stream(const char *path,
 			 * If such file does not exist, create it and try once
 			 * again to add stream to it.
 			 */
-			res = ntfs_fuse_create(path, S_IFREG);
+			res = ntfs_fuse_create(path, S_IFREG, 0);
 			if (!res)
 				return ntfs_fuse_create_stream(path,
 						stream_name, stream_name_len);
@@ -775,15 +775,15 @@ static int ntfs_fuse_create_stream(const char *path,
 	return res;
 }
 
-static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
-		dev_t dev __attribute__((unused)))
+static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
 	int res = 0;
 
-	if (mode && !(mode & (S_IFREG | S_IFIFO | S_IFSOCK)))
+	if (mode && !(mode &
+			(S_IFREG | S_IFIFO | S_IFSOCK | S_IFCHR | S_IFBLK)))
 		return -EOPNOTSUPP;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -793,7 +793,7 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT);
+		res = ntfs_fuse_create(path, mode & S_IFMT, dev);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
@@ -968,7 +968,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, S_IFDIR);
+	return ntfs_fuse_create(path, S_IFDIR, 0);
 }
 
 static int ntfs_fuse_rmdir(const char *path)

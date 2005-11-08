@@ -1077,19 +1077,25 @@ err_out:
  * @name:	unicode name of new object
  * @name_len:	length of the name in unicode characters
  * @type:	type of the object to create
+ * @dev:	major and minor device numbers (obtained from makedev())
  *
  * @type can be:
  *	S_IFREG		to create regular file
  *	S_IFDIR		to create directory
+ *	S_IFBLK		to create block device
+ *	S_IFCHR		to create character device
  *	S_IFIFO		to create FIFO
  *	S_IFSOCK	to create socket
  * other valuer are invalid.
+ *
+ * @dev is only used if @type is S_IFBLK or S_IFCHR, in other cases it's value
+ * is ignored.
  *
  * Return opened ntfs inode that describes created object on success or NULL
  * on error with errno set to the error code.
  */
 ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		dev_t type)
+		dev_t type, dev_t dev)
 {
 	ntfs_inode *ni;
 	FILE_NAME_ATTR *fn = NULL;
@@ -1100,7 +1106,8 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	/* Sanity checks. */
 	if (!dir_ni || !name || !name_len || (type != S_IFREG &&
 			type != S_IFDIR && type != S_IFIFO &&
-			type != S_IFSOCK)) {
+			type != S_IFSOCK && type != S_IFCHR &&
+			type != S_IFBLK)) {
 		ntfs_log_error("Invalid arguments.");
 		return NULL;
 	}
@@ -1125,7 +1132,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	si->last_access_time = utc2ntfs(ni->last_access_time);
-	if (type == S_IFSOCK || type == S_IFIFO) {
+	if (type != S_IFREG && type != S_IFDIR) {
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
@@ -1175,13 +1182,46 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 			goto err_out;
 		}
 	} else {
+		INTX_FILE *data;
+		int data_len;
+
+		switch (type) {
+			case S_IFBLK:
+			case S_IFCHR:
+				data_len = offsetof(INTX_FILE, device_end);
+				data = malloc(data_len);
+				if (!data) {
+					err = errno;
+					ntfs_log_error("Not enough memory for "
+							"content of DATA "
+							"attribute.\n");
+					goto err_out;
+				}
+				data->major = cpu_to_le64(major(dev));
+				data->minor = cpu_to_le64(minor(dev));
+				if (type == S_IFBLK)
+					data->magic = INTX_BLOCK_DEVICE;
+				if (type == S_IFCHR)
+					data->magic = INTX_CHARACTER_DEVICE;
+				break;
+			case S_IFSOCK:
+				data = NULL;
+				data_len = 1;
+				break;
+			default:
+				data = NULL;
+				data_len = 0;
+				break;
+		}
 		/* Add DATA attribute to inode. */
-		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL,
-				(type == S_IFSOCK) ? 1 : 0)) {
+		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, (u8*)data,
+				data_len)) {
 			err = errno;
 			ntfs_log_error("Failed to add DATA attribute.");
 			goto err_out;
 		}
+		if (data)
+			free(data);
 	}
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
@@ -1197,7 +1237,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	fn->file_name_type = FILE_NAME_POSIX;
 	if (type == S_IFDIR)
 		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
-	if (type == S_IFIFO || type == S_IFSOCK)
+	if (type != S_IFREG && type != S_IFDIR)
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	fn->creation_time = utc2ntfs(ni->creation_time);
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
