@@ -782,13 +782,10 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 	int stream_name_len;
 	int res = 0;
 
-	if (mode && !(mode &
-			(S_IFREG | S_IFIFO | S_IFSOCK | S_IFCHR | S_IFBLK)))
-		return -EOPNOTSUPP;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	if (stream_name_len && mode && !(mode & S_IFREG)) {
+	if (stream_name_len && !S_ISREG(mode)) {
 		res = -EINVAL;
 		goto exit;
 	}

@@ -71,7 +71,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  starting to clone or restore.  (Szaka)
 	- Change @type parameter for ntfs_create() to be dev_t rather than
 	  internal NTFS_DT_* constants.  (Yura)
-	- Teech ntfs_create() to create special Interix files (charcter and
+	- Teach ntfs_create() to create special Interix files (charcter and
 	  block devices, FIFOs and sockets). Add @dev parameter to ntfs_create()
 	  for this.  (Yura)
 

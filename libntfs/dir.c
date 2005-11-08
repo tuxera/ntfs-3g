@@ -1086,7 +1086,7 @@ err_out:
  *	S_IFCHR		to create character device
  *	S_IFIFO		to create FIFO
  *	S_IFSOCK	to create socket
- * other valuer are invalid.
+ * other values are invalid.
  *
  * @dev is only used if @type is S_IFBLK or S_IFCHR, in other cases it's value
  * is ignored.
@@ -1132,7 +1132,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	si->last_access_time = utc2ntfs(ni->last_access_time);
-	if (type != S_IFREG && type != S_IFDIR) {
+	if (!S_ISREG(type) && !S_ISDIR(type)) {
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
@@ -1143,7 +1143,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ntfs_log_error("Failed to add STANDARD_INFORMATION attribute.");
 		goto err_out;
 	}
-	if (type == S_IFDIR) {
+	if (S_ISDIR(type)) {
 		INDEX_ROOT *ir = NULL;
 		INDEX_ENTRY *ie;
 		int ir_len, index_len;
@@ -1208,7 +1208,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 				data = NULL;
 				data_len = 1;
 				break;
-			default:
+			default: /* FIFO or regular file. */
 				data = NULL;
 				data_len = 0;
 				break;
@@ -1235,9 +1235,9 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 			le16_to_cpu(dir_ni->mrec->sequence_number));
 	fn->file_name_length = name_len;
 	fn->file_name_type = FILE_NAME_POSIX;
-	if (type == S_IFDIR)
+	if (S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
-	if (type != S_IFREG && type != S_IFDIR)
+	if (!S_ISREG(type) && !S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	fn->creation_time = utc2ntfs(ni->creation_time);
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
@@ -1259,7 +1259,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	}
 	/* Set hard links count and directory flag. */
 	ni->mrec->link_count = cpu_to_le16(1);
-	if (type == S_IFDIR)
+	if (S_ISDIR(type))
 		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
 	ntfs_inode_mark_dirty(ni);
 	/* Done! */
