@@ -316,7 +316,6 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
 		stbuf->st_blocks = ni->allocated_size >> vol->sector_size_bits;
-		stbuf->st_mode |= (0777 & ~ctx->fmask);
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
@@ -388,6 +387,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			}
 			ntfs_attr_close(na);
 		}
+		stbuf->st_mode |= (0777 & ~ctx->fmask);
 	}
 	stbuf->st_uid = ctx->uid;
 	stbuf->st_gid = ctx->gid;
@@ -703,7 +703,7 @@ static int ntfs_fuse_chmod(const char *path,
 	return -EOPNOTSUPP;
 }
 
-static int ntfs_fuse_create(const char *org_path, const unsigned type)
+static int ntfs_fuse_create(const char *org_path, dev_t type)
 {
 	char *name;
 	ntfschar *uname = NULL;
@@ -759,7 +759,7 @@ static int ntfs_fuse_create_stream(const char *path,
 			 * If such file does not exist, create it and try once
 			 * again to add stream to it.
 			 */
-			res = ntfs_fuse_create(path, NTFS_DT_REG);
+			res = ntfs_fuse_create(path, S_IFREG);
 			if (!res)
 				return ntfs_fuse_create_stream(path,
 						stream_name, stream_name_len);
@@ -783,16 +783,21 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode,
 	int stream_name_len;
 	int res = 0;
 
-	if (mode && !(mode & S_IFREG))
+	if (mode && !(mode & (S_IFREG | S_IFIFO | S_IFSOCK)))
 		return -EOPNOTSUPP;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
+	if (stream_name_len && mode && !(mode & S_IFREG)) {
+		res = -EINVAL;
+		goto exit;
+	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, NTFS_DT_REG);
+		res = ntfs_fuse_create(path, mode & S_IFMT);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
+exit:
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -963,7 +968,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, NTFS_DT_DIR);
+	return ntfs_fuse_create(path, S_IFDIR);
 }
 
 static int ntfs_fuse_rmdir(const char *path)

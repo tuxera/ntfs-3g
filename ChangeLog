@@ -69,6 +69,8 @@ xx/xx/2005 - 1.12.2-WIP
 	- Fix allocated data size for resident attributes.  (Yura)
 	- ntfsclone: check available free space on the destination before
 	  starting to clone or restore.  (Szaka)
+	- Change @type parameter for ntfs_create() to be dev_t rather than
+	  internal NTFS_DT_* constants.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

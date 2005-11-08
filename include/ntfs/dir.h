@@ -49,7 +49,7 @@ extern ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname);
 
 extern ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		const unsigned type);
+		dev_t type);
 extern int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		u8 name_len);
 extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,

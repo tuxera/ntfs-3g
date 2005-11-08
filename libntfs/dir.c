@@ -34,6 +34,9 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 
 #include "types.h"
 #include "debug.h"
@@ -1069,20 +1072,24 @@ err_out:
 }
 
 /**
- * ntfs_create - create file or directory on ntfs volume
+ * ntfs_create - create object on ntfs volume
  * @dir_ni:	ntfs inode for directory in which create new object
  * @name:	unicode name of new object
  * @name_len:	length of the name in unicode characters
  * @type:	type of the object to create
  *
- * @type can be either NTFS_DT_REG to create regular file or NTFS_DT_DIR to
- * create directory, other valuer are invalid.
+ * @type can be:
+ *	S_IFREG		to create regular file
+ *	S_IFDIR		to create directory
+ *	S_IFIFO		to create FIFO
+ *	S_IFSOCK	to create socket
+ * other valuer are invalid.
  *
- * Return opened ntfs inode that describes created file on success or NULL
+ * Return opened ntfs inode that describes created object on success or NULL
  * on error with errno set to the error code.
  */
 ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		const unsigned type)
+		dev_t type)
 {
 	ntfs_inode *ni;
 	FILE_NAME_ATTR *fn = NULL;
@@ -1091,8 +1098,9 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 
 	ntfs_log_trace("Entering.\n");
 	/* Sanity checks. */
-	if (!dir_ni || !name || !name_len ||
-			(type != NTFS_DT_REG && type != NTFS_DT_DIR)) {
+	if (!dir_ni || !name || !name_len || (type != S_IFREG &&
+			type != S_IFDIR && type != S_IFIFO &&
+			type != S_IFSOCK)) {
 		ntfs_log_error("Invalid arguments.");
 		return NULL;
 	}
@@ -1117,6 +1125,10 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	si->last_access_time = utc2ntfs(ni->last_access_time);
+	if (type == S_IFSOCK || type == S_IFIFO) {
+		si->file_attributes = FILE_ATTR_SYSTEM;
+		ni->flags = FILE_ATTR_SYSTEM;
+	}
 	/* Add STANDARD_INFORMATION to inode. */
 	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
 			(u8*)si, si_len)) {
@@ -1124,7 +1136,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ntfs_log_error("Failed to add STANDARD_INFORMATION attribute.");
 		goto err_out;
 	}
-	if (type == NTFS_DT_DIR) {
+	if (type == S_IFDIR) {
 		INDEX_ROOT *ir = NULL;
 		INDEX_ENTRY *ie;
 		int ir_len, index_len;
@@ -1164,7 +1176,8 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		}
 	} else {
 		/* Add DATA attribute to inode. */
-		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0)) {
+		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL,
+				(type == S_IFSOCK) ? 1 : 0)) {
 			err = errno;
 			ntfs_log_error("Failed to add DATA attribute.");
 			goto err_out;
@@ -1182,8 +1195,10 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 			le16_to_cpu(dir_ni->mrec->sequence_number));
 	fn->file_name_length = name_len;
 	fn->file_name_type = FILE_NAME_POSIX;
-	if (type == NTFS_DT_DIR)
+	if (type == S_IFDIR)
 		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+	if (type == S_IFIFO || type == S_IFSOCK)
+		fn->file_attributes = FILE_ATTR_SYSTEM;
 	fn->creation_time = utc2ntfs(ni->creation_time);
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
@@ -1204,7 +1219,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 	}
 	/* Set hard links count and directory flag. */
 	ni->mrec->link_count = cpu_to_le16(1);
-	if (type == NTFS_DT_DIR)
+	if (type == S_IFDIR)
 		ni->mrec->flags |= MFT_RECORD_IS_DIRECTORY;
 	ntfs_inode_mark_dirty(ni);
 	/* Done! */
