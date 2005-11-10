@@ -494,7 +494,8 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 				MREF(mref), strerror(errno));
 		return 0;
 	}
-	if (MREF(mref) >= FILE_first_user || ctx->show_sys_files)
+	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
+			ctx->show_sys_files)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
 	free(filename);
 	return 0;
@@ -516,9 +517,6 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (!strcmp(path, "/"))
-		filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
