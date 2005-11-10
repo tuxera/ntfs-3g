@@ -239,29 +239,30 @@ static void version(void)
 static void usage(void)
 {
 	ntfs_log_info("\nUsage: %s [options] device\n"
-		"    -s          --scan             Scan for files (default)\n"
-		"    -p num      --percentage num   Minimum percentage recoverable\n"
-		"    -m pattern  --match pattern    Only work on files with matching names\n"
-		"    -C          --case             Case sensitive matching\n"
-		"    -S range    --size range       Match files of this size\n"
-		"    -t since    --time since       Last referenced since this time\n"
+		"    -s, --scan             Scan for files (default)\n"
+		"    -p, --percentage NUM   Minimum percentage recoverable\n"
+		"    -m, --match PATTERN    Only work on files with matching names\n"
+		"    -C, --case             Case sensitive matching\n"
+		"    -S, --size RANGE       Match files of this size\n"
+		"    -t, --time SINCE       Last referenced since this time\n"
 		"\n"
-		"    -i          --interactive      Interactive mode\n"
-		"    -u [nums]   --undelete [nums]  Undelete mode: if <nums> specified, so undelete these\n"
-		"    -o file     --output file      Save with this filename\n"
-		"    -O          --optimistic       Undelete in-use clusters as well\n"
-		"    -d dir      --destination dir  Destination directory\n"
-		"    -b num      --byte num         Fill missing parts with this byte\n"
-		"    -T          --truncate         Truncate 100%% recoverable file to exact size.\n"
-		"    -P          --parent           Show parent directory\n"
+		"    -u, --undelete         Undelete mode\n"
+		"    -i, --inodes RANGE     Recover these inodes\n"
+		//"    -I, --interactive      Interactive mode\n"
+		"    -o, --output FILE      Save with this filename\n"
+		"    -O, --optimistic       Undelete in-use clusters as well\n"
+		"    -d, --destination DIR  Destination directory\n"
+		"    -b, --byte NUM         Fill missing parts with this byte\n"
+		"    -T, --truncate         Truncate 100%% recoverable file to exact size.\n"
+		"    -P, --parent           Show parent directory\n"
 		"\n"
-		"    -c range    --copy range       Write a range of MFT records to a file\n"
+		"    -c, --copy RANGE       Write a range of MFT records to a file\n"
 		"\n"
-		"    -f          --force            Use less caution\n"
-		"    -q          --quiet            Less output\n"
-		"    -v          --verbose          More output\n"
-		"    -V          --version          Display version information\n"
-		"    -h          --help             Display this help\n\n",
+		"    -f, --force            Use less caution\n"
+		"    -q, --quiet            Less output\n"
+		"    -v, --verbose          More output\n"
+		"    -V, --version          Display version information\n"
+		"    -h, --help             Display this help\n\n",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -423,26 +424,27 @@ static int parse_time(const char *value, time_t *since)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-b:Cc:d:fhi?m:o:OPp:sS:t:Tu::qvV";
+	static const char *sopt = "-b:Cc:d:fh?i:m:o:OPp:sS:t:TuqvV";
 	static const struct option lopt[] = {
 		{ "byte",	 required_argument,	NULL, 'b' },
 		{ "case",	 no_argument,		NULL, 'C' },
 		{ "copy",	 required_argument,	NULL, 'c' },
 		{ "destination", required_argument,	NULL, 'd' },
 		{ "force",	 no_argument,		NULL, 'f' },
-		{ "interactive", no_argument,		NULL, 'i' },
 		{ "help",	 no_argument,		NULL, 'h' },
+		{ "inodes",	 required_argument,	NULL, 'i' },
+		//{ "interactive", no_argument,		NULL, 'I' },
 		{ "match",	 required_argument,	NULL, 'm' },
-		{ "output",	 required_argument,	NULL, 'o' },
 		{ "optimistic",  no_argument,		NULL, 'O' },
+		{ "output",	 required_argument,	NULL, 'o' },
+		{ "parent",	 no_argument,		NULL, 'P' },
 		{ "percentage",  required_argument,	NULL, 'p' },
+		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "scan",	 no_argument,		NULL, 's' },
 		{ "size",	 required_argument,	NULL, 'S' },
-		{ "parent",	 no_argument,		NULL, 'P' },
 		{ "time",	 required_argument,	NULL, 't' },
 		{ "truncate",	 no_argument,		NULL, 'T' },
-		{ "undelete",	 optional_argument,	NULL, 'u' },
-		{ "quiet",	 no_argument,		NULL, 'q' },
+		{ "undelete",	 no_argument,		NULL, 'u' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
@@ -505,12 +507,17 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'h':
 		case '?':
-			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
-				if (!ntfs_log_parse_option (argv[optind-1]))
-					err++;
+			if (ntfs_log_parse_option (argv[optind-1]))
 				break;
-			}
 			help++;
+			break;
+		case 'i':
+			end = NULL;
+			/* parse inodes */
+			if (parse_inode_arg() == -1)
+				err++;
+			if (end && *end)
+				err++;
 			break;
 		case 'm':
 			if (!opts.match) {
@@ -585,13 +592,7 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'u':
 			if (opts.mode == MODE_NONE) {
-				end = NULL;
 				opts.mode = MODE_UNDELETE;
-				/* parse inodes */
-				if (parse_inode_arg() == -1)
-					err++;
-				if (end && *end)
-					err++;
 			} else {
 				opts.mode = MODE_ERROR;
 			}
