@@ -178,7 +178,6 @@ int		   g_mft_bitmap_byte_size = 0;
 u8		  *g_mft_bitmap		  = NULL;
 int		   g_lcn_bitmap_byte_size = 0;
 u8		  *g_lcn_bitmap		  = NULL;
-OBJECT_ID_ATTR	  *g_volume_obj_id	  = NULL;
 runlist		  *g_rl_mft		  = NULL;
 runlist		  *g_rl_mft_bmp		  = NULL;
 runlist		  *g_rl_mftmirr		  = NULL;
@@ -2148,32 +2147,6 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 }
 
 /**
- * add_attr_object_id
- *
- * add an object_id attribute to the mft record @m
- * return 0 on success or -errno on error
- */
-static int add_attr_object_id(MFT_RECORD *m, OBJECT_ID_ATTR *objid_attr,
-		int objid_attr_len)
-{
-	int err;
-
-	/* Does it fit? NO: create non-resident. YES: create resident. */
-	if (le32_to_cpu(m->bytes_in_use) + 24 + objid_attr_len >
-						le32_to_cpu(m->bytes_allocated))
-		err = insert_non_resident_attr_in_mft_record(m,
-				AT_OBJECT_ID, NULL, 0, 0, 0, (u8*)objid_attr,
-				objid_attr_len);
-	else
-		err = insert_resident_attr_in_mft_record(m,
-				AT_OBJECT_ID, NULL, 0, 0, 0, 0,
-				(u8*)objid_attr, objid_attr_len);
-	if (err < 0)
-		ntfs_log_error("add_attr_volume_id failed: %s\n", strerror(-err));
-	return err;
-}
-
-/**
  * add_attr_sd
  *
  * Create the security descriptor attribute adding the security descriptor @sd
@@ -3070,45 +3043,6 @@ static int initialize_quota(MFT_RECORD *m)
 		q2_size, m,
 		NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q2);
-
-	return err;
-}
-
-/**
- * initialize_objid
- *
- * initialize $ObjId with the default index-entries.
- * It is one entry which belongs to $Volume. (W2k3)
- */
-static int initialize_objid(MFT_RECORD *m, GUID guid, const MFT_REF mref)
-{
-	int o_size, err;
-	INDEX_ENTRY *idx_entry_o;
-	OBJ_ID_INDEX_DATA *idx_entry_o_data;
-
-	err = 0;
-	o_size = cpu_to_le32(0x58);
-	idx_entry_o = calloc(1, o_size);
-
-	/* o index entry */
-	idx_entry_o->data_offset = cpu_to_le16(0x20);
-	idx_entry_o->data_length = cpu_to_le16(0x38);
-	idx_entry_o->reservedV = cpu_to_le32(0x00);
-	idx_entry_o->length = cpu_to_le16(0x58);
-	idx_entry_o->key_length = cpu_to_le16(0x10);
-	idx_entry_o->flags = cpu_to_le16(0x00);
-	idx_entry_o->reserved = cpu_to_le16(0x00);
-	idx_entry_o->key.object_id = guid;
-	idx_entry_o_data = (OBJ_ID_INDEX_DATA*)((char*)idx_entry_o
-			+ idx_entry_o->data_offset);
-	idx_entry_o_data->mft_reference = mref;
-	idx_entry_o_data->birth_volume_id = *zero_guid;
-	idx_entry_o_data->birth_object_id = *zero_guid;
-	idx_entry_o_data->domain_id = *zero_guid;
-	err = insert_index_entry_in_res_dir_index(idx_entry_o,
-		o_size, m,
-		NTFS_INDEX_O, 2, AT_UNUSED);
-	free(idx_entry_o);
 
 	return err;
 }
@@ -4270,11 +4204,6 @@ static void create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
 		init_system_file_sd(FILE_Volume, &sd, &i);
 		err = add_attr_sd(m, sd, i);
 	}
-	if (!err && g_vol->major_ver >= 3) {
-		g_volume_obj_id = calloc(1,0x10);
-		ntfs_generate_guid(&g_volume_obj_id->object_id);
-		err = add_attr_object_id(m, g_volume_obj_id, 0x10);
-	}
 	if (!err)
 		err = add_attr_data(m, NULL, 0, 0, 0, NULL, 0);
 	if (!err)
@@ -4919,9 +4848,6 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
 				COLLATION_NTOFS_ULONGS, g_vol->indx_record_size);
-		if (!err)
-			err = initialize_objid(m, g_volume_obj_id->object_id,
-				MK_LE_MREF(FILE_Volume, FILE_Volume));
 		if (err < 0)
 			err_exit("Couldn't create $ObjId: %s\n", strerror(-err));
 		ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
