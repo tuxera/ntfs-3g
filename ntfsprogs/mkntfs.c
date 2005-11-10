@@ -4932,8 +4932,13 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	g_vol->indx_record_size      = 4096;
 	g_vol->indx_record_size_bits = 12;
 
-	g_vol->attrdef = (ATTR_DEF*)&attrdef_ntfs12_array;
-	g_vol->attrdef_len = sizeof(attrdef_ntfs12_array);
+	if (g_vol->major_ver < 3) {
+		g_vol->attrdef = (ATTR_DEF*)&attrdef_ntfs12_array;
+		g_vol->attrdef_len = sizeof(attrdef_ntfs12_array);
+	} else {
+		g_vol->attrdef = (ATTR_DEF*)&attrdef_ntfs3x_array;
+		g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
+	}
 
 	if (mkntfs_open_partition())		/* Open the partition. */
 		goto done;
