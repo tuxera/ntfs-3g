@@ -1,4 +1,4 @@
-.\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
+.\" Copyright (c) 2002-2005 Richard Russon. All Rights Reserved.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
 .TH NTFSUNDELETE 8 "June 2002" "ntfsprogs version @VERSION@"
@@ -101,11 +101,11 @@ is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI "\-b " num
+.BI "\-b " NUM
 .br
 .ns
 .TP
-.BI "\-\-byte " num
+.BI "\-\-byte " NUM
 If any clusters of the file cannot be recovered, the missing parts will be
 filled with this byte.  The default is zeros.
 .TP
@@ -118,11 +118,11 @@ When scanning an NTFS volume, any filename matching (using the
 .B \-\-match
 option) is case\-insensitive.  This option makes the matching case\-sensitive.
 .TP
-.BI "\-c " range
+.BI "\-c " RANGE
 .br
 .ns
 .TP
-.BI "\-\-copy " range
+.BI "\-\-copy " RANGE
 This wizard's option will write a block of MFT FILE records to a file.  The
 default file is
 .I mft
@@ -133,11 +133,11 @@ and
 .B \-\-destination
 options.
 .TP
-.BI "\-d " dir
+.BI "\-d " DIR
 .br
 .ns
 .TP
-.BI "\-\-destination " dir
+.BI "\-\-destination " DIR
 This option controls where to put the output file of the
 .B \-\-undelete
 and
@@ -159,19 +159,21 @@ file.  Use this option with caution.
 .B \-\-help
 Show a list of options with a brief description of each one.
 .TP
-.B \-i
+.BI "\-i " RANGE
 .br
 .ns
 .TP
-.B \-\-interactive
-Switches the interactive mode, meaning that for  each undeleting of a file
-the user will be asked.
+.BI "\-\-inodes " RANGE
+Recover the files with these inode numbers.
+.I RANGE
+can be a single inode number, several numbers separated by commas "," or a
+range separated by a dash "-".
 .TP
-.BI "\-m " pattern
+.BI "\-m " PATTERN
 .br
 .ns
 .TP
-.BI "\-\-match " pattern
+.BI "\-\-match " PATTERN
 Filter the output by only looking for matching filenames.  The pattern can include the
 wildcards '?', match exactly one character or '*', match zero or more
 characters.  By default the matching is case\-insensitive.  To make the search
@@ -179,22 +181,22 @@ case sensitive, use the
 .B \-\-case
 option.
 .TP
-.BI "\-o " file
+.BI "\-o " FILE
 .br
 .ns
 .TP
-.BI "\-\-output " file
+.BI "\-\-output " FILE
 Use this option to set name of output file that
 .B \-\-undelete
 or
 .B \-\-copy
 will create.
 .TP
-.BI "\-p " num
+.BI "\-p " NUM
 .br
 .ns
 .TP
-.BI "\-\-percentage " num
+.BI "\-\-percentage " NUM
 Filter the output of the
 .B \-\-scan
 option, by only matching files with a certain amount of recoverable content.
@@ -248,11 +250,11 @@ The percentage field shows how much of the file can potentially be recovered.
 .sp
 .br
 .RE
-.BI "\-S " range
+.BI "\-S " RANGE
 .br
 .ns
 .TP
-.BI "\-\-size " range
+.BI "\-\-size " RANGE
 Filter the output of the
 .B \-\-scan
 option, by looking for a particular range of file sizes.  The range may be
@@ -260,11 +262,11 @@ specified as two numbers separated by a '\-'.  The sizes may be abbreviated
 using the suffixes k, m, g, t, for kilobytes, megabytes, gigabytes and terabytes
 respectively.
 .TP
-.BI "\-t " since
+.BI "\-t " SINCE
 .br
 .ns
 .TP
-.BI "\-\-time " since
+.BI "\-\-time " SINCE
 Filter the output of the
 .B \-\-scan
 option.  Only match files that have been altered since this time.  The time must
@@ -282,15 +284,18 @@ is confident about the size of a deleted file, then it will restore the file to
 exactly that size.  The default behaviour is to round up the size to the nearest
 cluster (which will be a multiple of 512 bytes).
 .TP
-.BI "\-u " [nums]
+.BI "\-u "
 .br
 .ns
 .TP
-.BI "\-\-undelete " [nums]
-where <nums> is optional. Recover the files either by matching the
-regular expression of option -m or by the given nums, which are the
-inode numbers. You can specify more than one inode by separating with
-"," or a range of inodes by using "-". This option can be combined with
+.BI "\-\-undelete "
+Select
+.B undelete
+mode.  You can specify the files to be recovered using by using
+.B --match
+or 
+.B --inodes
+options.  This option can be combined with
 .BR \-\-output ,
 .BR \-\-destination ,
 and
@@ -345,14 +350,14 @@ Look for deleted files altered in the last two days
 Undelete inodes 2, 5 and 100 to 131 of device /dev/sda1
 .RS
 .sp
-.B ntfsundelete /dev/sda1 -u 2,5,100-131
+.B ntfsundelete /dev/sda1 -u -i 2,5,100-131
 .sp
 .RE
 Undelete inode number 3689, call the file 'work.doc' and put it in the user's
 home directory.
 .RS
 .sp
-.B ntfsundelete /dev/hda1 \-u 3689 \-o work.doc \-d ~
+.B ntfsundelete /dev/hda1 \-u -i 3689 \-o work.doc \-d ~
 .sp
 .RE
 Save MFT Records 3689 to 3690 to a file 'debug'
