@@ -450,7 +450,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 				err++;
 			break;
 		case 'q':
-			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_VERBOSE);
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_PROGRESS);
 			break;
 		case 's':
 			if (!mkntfs_parse_long(optarg, "sector size", &opts2->sector_size))
@@ -464,7 +464,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 			opts2->use_epoch_time = TRUE;
 			break;
 		case 'v':
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_VERBOSE);
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_PROGRESS);
 			break;
 		case 'V':
 			ver++;	/* display version info */
@@ -4139,15 +4139,13 @@ static void mkntfs_fill_device_with_zeroes(void)
 	unsigned long long position, mid_clust;
 	float progress_inc = (float)g_vol->nr_clusters / 100;
 
-	ntfs_log_quiet("Initialising device with zeroes:   0%%");
-	fflush(stdout);
+	ntfs_log_progress("Initialising device with zeroes:   0%%");
 	mid_clust = (g_volume_size >> 1) / g_vol->cluster_size;
 	for (position = 0; position < (unsigned long long)g_vol->nr_clusters;
 			position++) {
 		if (!(position % (int)(progress_inc+1))) {
-			ntfs_log_quiet("\b\b\b\b%3.0f%%", position /
+			ntfs_log_progress("\b\b\b\b%3.0f%%", position /
 					progress_inc);
-			fflush(stdout);
 		}
 		bw = mkntfs_write(g_vol->dev, g_buf, g_vol->cluster_size);
 		if (bw != (ssize_t)g_vol->cluster_size) {
@@ -4176,7 +4174,7 @@ static void mkntfs_fill_device_with_zeroes(void)
 					g_vol->cluster_size, SEEK_SET);
 		}
 	}
-	ntfs_log_quiet("\b\b\b\b100%%");
+	ntfs_log_progress("\b\b\b\b100%%");
 	position = (g_volume_size & (g_vol->cluster_size - 1)) /
 			opts.sector_size;
 	for (i = 0; (unsigned long)i < position; i++) {
@@ -4196,7 +4194,7 @@ static void mkntfs_fill_device_with_zeroes(void)
 					opts.sector_size, SEEK_CUR);
 		}
 	}
-	ntfs_log_quiet(" - Done.\n");
+	ntfs_log_progress(" - Done.\n");
 }
 
 /**
