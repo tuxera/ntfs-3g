@@ -71,9 +71,11 @@ xx/xx/2005 - 1.12.2-WIP
 	  starting to clone or restore.  (Szaka)
 	- Change @type parameter for ntfs_create() to be dev_t rather than
 	  internal NTFS_DT_* constants.  (Yura)
-	- Teach ntfs_create() to create special Interix files (charcter and
-	  block devices, FIFOs and sockets). Add @dev parameter to ntfs_create()
-	  for this.  (Yura)
+	- New APIs (dir.[ch]):
+	    ntfs_create_device() for Interix block and character devices
+	    creation.
+	    ntfs_crate_symlink() for Interix symbolic links creation.  (Yura)
+	- Teach ntfs_create() to create Interix FIFOs and sockets.  (Yura)
 	- Fix the -u option in ntfsundelete.  Instead of a confusing optional
 	  parameter, there's a new option -i with a required parameter (Rich)
 

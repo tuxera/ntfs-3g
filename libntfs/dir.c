@@ -1072,18 +1072,23 @@ err_out:
 }
 
 /**
- * ntfs_create - create object on ntfs volume
+ * __ntfs_create - create object on ntfs volume
  * @dir_ni:	ntfs inode for directory in which create new object
  * @name:	unicode name of new object
  * @name_len:	length of the name in unicode characters
  * @type:	type of the object to create
  * @dev:	major and minor device numbers (obtained from makedev())
+ * @target:	target in unicode (only for symlinks)
+ * @target_len:	length of target in unicode charcters
+ *
+ * Internal, use ntfs_create{_device,_symlink} wrappers instead.
  *
  * @type can be:
  *	S_IFREG		to create regular file
  *	S_IFDIR		to create directory
  *	S_IFBLK		to create block device
  *	S_IFCHR		to create character device
+ *	S_IFLNK		to create symbolic link
  *	S_IFIFO		to create FIFO
  *	S_IFSOCK	to create socket
  * other values are invalid.
@@ -1094,8 +1099,9 @@ err_out:
  * Return opened ntfs inode that describes created object on success or NULL
  * on error with errno set to the error code.
  */
-ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		dev_t type, dev_t dev)
+static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
+		ntfschar *name, u8 name_len, dev_t type, dev_t dev,
+		ntfschar *target, u8 target_len)
 {
 	ntfs_inode *ni;
 	FILE_NAME_ATTR *fn = NULL;
@@ -1104,10 +1110,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 
 	ntfs_log_trace("Entering.\n");
 	/* Sanity checks. */
-	if (!dir_ni || !name || !name_len || (type != S_IFREG &&
-			type != S_IFDIR && type != S_IFIFO &&
-			type != S_IFSOCK && type != S_IFCHR &&
-			type != S_IFBLK)) {
+	if (!dir_ni || !name || !name_len) {
 		ntfs_log_error("Invalid arguments.");
 		return NULL;
 	}
@@ -1204,6 +1207,21 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 				if (type == S_IFCHR)
 					data->magic = INTX_CHARACTER_DEVICE;
 				break;
+			case S_IFLNK:
+				data_len = sizeof(INTX_FILE_TYPES) +
+						target_len * sizeof(ntfschar);
+				data = malloc(data_len);
+				if (!data) {
+					err = errno;
+					ntfs_log_error("Not enough memory for "
+							"content of DATA "
+							"attribute.\n");
+					goto err_out;
+				}
+				data->magic = INTX_SYMBOLIC_LINK;
+				memcpy(data->target, target,
+						target_len * sizeof(ntfschar));
+				break;
 			case S_IFSOCK:
 				data = NULL;
 				data_len = 1;
@@ -1276,6 +1294,42 @@ err_out:
 	free(si);
 	errno = err;
 	return NULL;
+}
+
+/**
+ * Some wrappers around __ntfs_create() ...
+ */
+
+ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
+		dev_t type)
+{
+	if (type != S_IFREG && type != S_IFDIR && type != S_IFIFO &&
+			type != S_IFSOCK) {
+		ntfs_log_error("Invalid arguments.");
+		return NULL;
+	}
+	return __ntfs_create(dir_ni, name, name_len, type, 0, NULL, 0);
+}
+
+ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
+		dev_t type, dev_t dev)
+{
+	if (type != S_IFCHR && type != S_IFBLK) {
+		ntfs_log_error("Invalid arguments.");
+		return NULL;
+	}
+	return __ntfs_create(dir_ni, name, name_len, type, dev, NULL, 0);
+}
+
+ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
+		ntfschar *target, u8 target_len)
+{
+	if (!target || !target_len) {
+		ntfs_log_error("Invalid arguments.");
+		return NULL;
+	}
+	return __ntfs_create(dir_ni, name, name_len, S_IFLNK, 0,
+			target, target_len);
 }
 
 /**

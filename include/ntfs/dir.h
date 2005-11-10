@@ -49,9 +49,15 @@ extern ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname);
 
 extern ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		dev_t type, dev_t dev);
+		dev_t type);
+extern ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni,
+		ntfschar *name, u8 name_len, dev_t type, dev_t dev);
+extern ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni,
+		ntfschar *name, u8 name_len, ntfschar *target, u8 target_len);
+
 extern int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		u8 name_len);
+
 extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		u8 name_len);
 

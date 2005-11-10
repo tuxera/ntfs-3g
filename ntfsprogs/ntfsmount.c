@@ -516,6 +516,9 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
+	if (!strcmp(path, "/"))
+		filler(buf, ".", NULL, 0);
+	filler(buf, "..", NULL, 0);
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
@@ -703,13 +706,14 @@ static int ntfs_fuse_chmod(const char *path,
 	return -EOPNOTSUPP;
 }
 
-static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev)
+static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
+		const char *target)
 {
 	char *name;
-	ntfschar *uname = NULL;
+	ntfschar *uname = NULL, *utarget = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *path;
-	int res = 0, uname_len;
+	int res = 0, uname_len, utarget_len;
 
 	path = strdup(org_path);
 	if (!path)
@@ -732,7 +736,25 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev)
 		goto exit;
 	}
 	/* Create object specified in @type. */
-	ni = ntfs_create(dir_ni, uname, uname_len, type, dev);
+	switch (type) {
+		case S_IFCHR:
+		case S_IFBLK:
+			ni = ntfs_create_device(dir_ni, uname, uname_len, type,
+					dev);
+			break;
+		case S_IFLNK:
+			utarget_len = ntfs_mbstoucs(target, &utarget, 0);
+			if (utarget_len < 0) {
+				res = -errno;
+				goto exit;
+			}
+			ni = ntfs_create_symlink(dir_ni, uname, uname_len,
+					utarget, utarget_len);
+			break;
+		default:
+			ni = ntfs_create(dir_ni, uname, uname_len, type);
+			break;
+	}
 	if (ni)
 		ntfs_inode_close(ni);
 	else
@@ -741,6 +763,8 @@ exit:
 	free(uname);
 	if (dir_ni)
 		ntfs_inode_close(dir_ni);
+	if (utarget)
+		free(utarget);
 	free(path);
 	return res;
 }
@@ -759,7 +783,7 @@ static int ntfs_fuse_create_stream(const char *path,
 			 * If such file does not exist, create it and try once
 			 * again to add stream to it.
 			 */
-			res = ntfs_fuse_create(path, S_IFREG, 0);
+			res = ntfs_fuse_create(path, S_IFREG, 0, NULL);
 			if (!res)
 				return ntfs_fuse_create_stream(path,
 						stream_name, stream_name_len);
@@ -790,7 +814,7 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT, dev);
+		res = ntfs_fuse_create(path, mode & S_IFMT, dev, NULL);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
@@ -799,6 +823,14 @@ exit:
 	if (stream_name_len)
 		free(stream_name);
 	return res;
+}
+
+static int ntfs_fuse_symlink(const char *to, const char *from)
+{
+	if (strchr(from, ':') &&	/* n/a for named data streams. */
+			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return -EINVAL;
+	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
 static int ntfs_fuse_link(const char *old_path, const char *new_path)
@@ -965,7 +997,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, S_IFDIR, 0);
+	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
@@ -1302,6 +1334,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.mknod		= ntfs_fuse_mknod,
+	.symlink	= ntfs_fuse_symlink,
 	.link		= ntfs_fuse_link,
 	.unlink		= ntfs_fuse_unlink,
 	.rename		= ntfs_fuse_rename,
