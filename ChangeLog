@@ -77,7 +77,10 @@ xx/xx/2005 - 1.12.2-WIP
 	    ntfs_crate_symlink() for Interix symbolic links creation.  (Yura)
 	- Teach ntfs_create() to create Interix FIFOs and sockets.  (Yura)
 	- Fix the -u option in ntfsundelete.  Instead of a confusing optional
-	  parameter, there's a new option -i with a required parameter (Rich)
+	  parameter, there's a new option -i with a required parameter.  (Rich)
+	- Make ntfsinfo report the MFT record flags properly, this includes
+	  the less encountered flags, and reporting the in_use flag instead of
+	  inverting it to unused.  (Yuval)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
