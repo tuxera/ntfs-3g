@@ -4358,7 +4358,7 @@ static void mkntfs_create_root_structures(void)
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0100));
 			} else if (i == 9) {
-				file_attrs |= FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+				file_attrs |= FILE_ATTR_VIEW_INDEX_PRESENT;
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
 			} else if (i == 11) {
@@ -4366,7 +4366,7 @@ static void mkntfs_create_root_structures(void)
 					cpu_to_le32(0x0101));
 			} else if (i == 24 || i == 25 || i == 26) {
 				file_attrs |= FILE_ATTR_ARCHIVE;
-				file_attrs |= FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+				file_attrs |= FILE_ATTR_VIEW_INDEX_PRESENT;
 				add_attr_std_info(m, file_attrs,
 					cpu_to_le32(0x0101));
 			} else {
@@ -4384,8 +4384,8 @@ static void mkntfs_create_root_structures(void)
 	m->link_count = cpu_to_le16(le16_to_cpu(m->link_count) + 1);
 	err = add_attr_file_name(m, root_ref, 0LL, 0LL,
 			FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-			FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT, 0, 0,
-			".", FILE_NAME_WIN32_AND_DOS);
+			FILE_ATTR_I30_INDEX_PRESENT, 0, 0, ".",
+			FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
 		if (g_vol->major_ver == 1) {
 			init_system_file_sd(FILE_root, &sd, &i);
@@ -4690,14 +4690,13 @@ static void mkntfs_create_root_structures(void)
 	} else {
 		ntfs_log_verbose("Creating $Secure (mft record 9)\n");
 		m = (MFT_RECORD*)(g_buf + 9 * g_vol->mft_record_size);
-		m->flags |= MFT_RECORD_IS_8;
+		m->flags |= MFT_RECORD_IS_VIEW_INDEX;
 		if (!err)
 			err = create_hardlink(g_index_block, root_ref, m,
 					MK_LE_MREF(9, 9), 0LL, 0LL,
 					FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-					FILE_ATTR_DUP_VIEW_INDEX_PRESENT
-					, 0, 0, "$Secure",
-					FILE_NAME_WIN32_AND_DOS);
+					FILE_ATTR_VIEW_INDEX_PRESENT, 0, 0,
+					"$Secure", FILE_NAME_WIN32_AND_DOS);
 		if (!err) {
 			if (g_vol->minor_ver == 0) {
 				g_buf_sds_first_size = 0x1E0;
@@ -4782,9 +4781,8 @@ static void mkntfs_create_root_structures(void)
 			err = create_hardlink(g_index_block, root_ref, m,
 					MK_LE_MREF(11, 11), 0LL, 0LL,
 					FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-					FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT,
-					0, 0, "$Extend",
-					FILE_NAME_WIN32_AND_DOS);
+					FILE_ATTR_I30_INDEX_PRESENT, 0, 0,
+					"$Extend", FILE_NAME_WIN32_AND_DOS);
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
 			err = add_attr_index_root(m, "$I30", 4, 0, AT_FILE_NAME,
@@ -4811,11 +4809,11 @@ static void mkntfs_create_root_structures(void)
 	/* starting vith file 24 (ignoring file 16-23) */
 	if (g_vol->major_ver >= 3) {
 		extend_flags = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
-			FILE_ATTR_ARCHIVE | FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+			FILE_ATTR_ARCHIVE | FILE_ATTR_VIEW_INDEX_PRESENT;
 		ntfs_log_verbose("Creating $Quota (mft record 24)\n");
 		m = (MFT_RECORD*)(g_buf + 24 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
-		m->flags |= MFT_RECORD_IS_8;
+		m->flags |= MFT_RECORD_IS_VIEW_INDEX;
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 				11 * g_vol->mft_record_size), extend_ref, m,
@@ -4836,7 +4834,7 @@ static void mkntfs_create_root_structures(void)
 		ntfs_log_verbose("Creating $ObjId (mft record 25)\n");
 		m = (MFT_RECORD*)(g_buf + 25 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
-		m->flags |= MFT_RECORD_IS_8;
+		m->flags |= MFT_RECORD_IS_VIEW_INDEX;
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 					11 * g_vol->mft_record_size), extend_ref,
@@ -4853,7 +4851,7 @@ static void mkntfs_create_root_structures(void)
 		ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
 		m = (MFT_RECORD*)(g_buf + 26 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
-		m->flags |= MFT_RECORD_IS_8;
+		m->flags |= MFT_RECORD_IS_VIEW_INDEX;
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 					11 * g_vol->mft_record_size),

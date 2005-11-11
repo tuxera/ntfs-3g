@@ -381,7 +381,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 			ntfs_log_debug("dt = %p, data_len = %d, parent = %p\n", dt, dt->data_len, dt->parent);
 
 			//printf("dt's flags = 0x%08x\n", dt->children[dt_num]->key.file_name.file_attributes);
-			if (dt->children[dt_num]->key.file_name.file_attributes == FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
+			if (dt->children[dt_num]->key.file_name.file_attributes == FILE_ATTR_I30_INDEX_PRESENT) {
 				//printf("DIR\n");
 				child = ntfs_dir_create(dir->vol, dt->children[dt_num]->indexed_file);
 				//printf("child = %p (%lld)\n", child, MREF(dt->children[dt_num]->indexed_file));

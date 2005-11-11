@@ -643,8 +643,7 @@ static inline int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 	/* Skip root directory self reference entry. */
 	if (MREF_LE(ie->indexed_file) == FILE_root)
 		return 0;
-	if (ie->key.file_name.file_attributes &
-			FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT)
+	if (ie->key.file_name.file_attributes & FILE_ATTR_I30_INDEX_PRESENT)
 		dt_type = NTFS_DT_DIR;
 	else
 		dt_type = NTFS_DT_REG;
@@ -1254,7 +1253,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	fn->file_name_length = name_len;
 	fn->file_name_type = FILE_NAME_POSIX;
 	if (S_ISDIR(type))
-		fn->file_attributes = FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+		fn->file_attributes = FILE_ATTR_I30_INDEX_PRESENT;
 	if (!S_ISREG(type) && !S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	fn->creation_time = utc2ntfs(ni->creation_time);
@@ -1576,7 +1575,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	fn->file_name_type = FILE_NAME_POSIX;
 	fn->file_attributes = ni->flags;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-		fn->file_attributes |= FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
 	fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 	fn->data_size = cpu_to_sle64(ni->data_size);
 	fn->creation_time = utc2ntfs(ni->creation_time);

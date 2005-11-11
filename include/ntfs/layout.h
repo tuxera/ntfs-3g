@@ -247,15 +247,22 @@ typedef enum {
  *
  * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
- * _4 and _8 are needed by $Extend sub-files (don't know what to
- * call them yet...)
+ * 
+ * MFT_RECORD_IS_4 exists on all $Extend sub-files.
+ * It seems that it marks it is a metadata file with MFT record >24, however,
+ * it is unknown if it is limited to metadata files only.
+ *
+ * MFT_RECORD_IS_VIEW_INDEX exists on every metafile with a non directory
+ * index, that means an INDEX_ROOT and an INDEX_ALLOCATION with a name other
+ * than "$I30". It is unknown if it is limited to metadata files only.
  */
 typedef enum {
-	MFT_RECORD_IN_USE	= const_cpu_to_le16(0x0001),
-	MFT_RECORD_IS_DIRECTORY	= const_cpu_to_le16(0x0002),
-	MFT_RECORD_IS_4		= const_cpu_to_le16(0x0004),
-	MFT_RECORD_IS_8		= const_cpu_to_le16(0x0008),
-	MFT_REC_SPACE_FILLER	= 0xffff	/* Just to make flags 16-bit. */
+	MFT_RECORD_IN_USE		= const_cpu_to_le16(0x0001),
+	MFT_RECORD_IS_DIRECTORY		= const_cpu_to_le16(0x0002),
+	MFT_RECORD_IS_4			= const_cpu_to_le16(0x0004),
+	MFT_RECORD_IS_VIEW_INDEX	= const_cpu_to_le16(0x0008),
+	MFT_REC_SPACE_FILLER		= 0xffff, /* Just to make flags
+						     16-bit. */
 } __attribute__((__packed__)) MFT_RECORD_FLAGS;
 
 /*
@@ -857,19 +864,30 @@ typedef enum {
 	   and preserves the rest. This mask is used to to obtain all flags that
 	   are valid for setting. */
 
-	/*
-	 * FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT is only present in the
-	 * FILE_NAME attribute (in the field file_attributes).
+	/**
+	 * FILE_ATTR_I30_INDEX_PRESENT - Is it a directory?
+	 *
+	 * This is a copy of the MFT_RECORD_IS_DIRECTORY bit from the mft
+	 * record, telling us whether this is a directory or not, i.e. whether
+	 * it has an index root attribute named "$I30" or not.
+	 * 
+	 * This flag is only present in the FILE_NAME attribute (in the 
+	 * file_attributes field).
 	 */
-	FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT	= const_cpu_to_le32(0x10000000),
-	/* This is a copy of the corresponding bit from the mft record, telling
-	   us whether this is a directory or not, i.e. whether it has an
-	   index root attribute or not. */
-	FILE_ATTR_DUP_VIEW_INDEX_PRESENT	= const_cpu_to_le32(0x20000000),
-	/* This is a copy of the corresponding bit from the mft record, telling
-	   us whether this file has a view index present (eg. object id index,
-	   quota index, one of the security indexes or the encrypting file
-	   system related indexes). */
+	FILE_ATTR_I30_INDEX_PRESENT	= const_cpu_to_le32(0x10000000),
+	
+	/**
+	 * FILE_ATTR_VIEW_INDEX_PRESENT - Does have a non-directory index?
+	 * 
+	 * This is a copy of the MFT_RECORD_IS_VIEW_INDEX bit from the mft
+	 * record, telling us whether this file has a view index present (eg.
+	 * object id index, quota index, one of the security indexes and the
+	 * reparse points index).
+	 *
+	 * This flag is only present in the $STANDARD_INFORMATION and
+	 * $FILE_NAME attributes.
+	 */
+	FILE_ATTR_VIEW_INDEX_PRESENT	= const_cpu_to_le32(0x20000000),
 } __attribute__((__packed__)) FILE_ATTR_FLAGS;
 
 /*

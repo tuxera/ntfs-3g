@@ -484,15 +484,17 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 		printf(" ENCRYPTED");
 		flags &= ~FILE_ATTR_ENCRYPTED;
 	}
+	/* We know that FILE_ATTR_I30_INDEX_PRESENT only exists on $FILE_NAME,
+	   and in case we are wrong, let it appear as UNKNOWN */
 	if (type == AT_FILE_NAME) {
-		if (flags & FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT) {
-			printf(" FILE_NAME_INDEX");
-			flags &= ~FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT;
+		if (flags & FILE_ATTR_I30_INDEX_PRESENT) {
+			printf(" I30_INDEX");
+			flags &= ~FILE_ATTR_I30_INDEX_PRESENT;
 		}
 	}
-	if (flags & FILE_ATTR_DUP_VIEW_INDEX_PRESENT) {
+	if (flags & FILE_ATTR_VIEW_INDEX_PRESENT) {
 		printf(" VIEW_INDEX");
-		flags &= ~FILE_ATTR_DUP_VIEW_INDEX_PRESENT;
+		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
 	}
 	if (flags)
 		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
