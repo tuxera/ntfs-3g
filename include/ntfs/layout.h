@@ -1911,20 +1911,15 @@ typedef struct {
 typedef struct {
 	u32 hash;          /* Hash of the security descriptor. */
 	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset_in_sds; /* Offset of the descriptor in $SDS data stream. */
-	u32 size_in_sds;   /* Size of the descriptor in $SDS data stream. */
+	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
+	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
 	u32 reserved_II;   /* Padding - always unicode "II". */
 } __attribute__((__packed__)) SDH_INDEX_DATA;
 
 /**
  * struct SII_INDEX_DATA -
  */
-typedef struct {
-	u32 hash;          /* Hash of the security descriptor. */
-	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset_in_sds; /* Offset of the descriptor in $SDS data stream. */
-	u32 size_in_sds;   /* Size of the descriptor in $SDS data stream. */
-} __attribute__((__packed__)) SII_INDEX_DATA;
+typedef SECURITY_DESCRIPTOR_HEADER SII_INDEX_DATA;
 
 /**
  * struct QUOTA_O_INDEX_DATA -

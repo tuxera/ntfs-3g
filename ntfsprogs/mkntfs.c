@@ -2893,9 +2893,9 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		sdh_data->hash = sds_header->hash;
 		sdh_data->security_id = sds_header->security_id;
 
-		sdh_data->offset_in_sds = sds_header->offset;
+		sdh_data->offset = sds_header->offset;
 
-		sdh_data->size_in_sds = sds_header->length;
+		sdh_data->length = sds_header->length;
 		sdh_data->reserved_II =  cpu_to_le32(0x00490049);
 
 		/* SII index entry */
@@ -2911,8 +2911,8 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 			idx_entry_sii->data_offset);
 		sii_data->hash = sds_header->hash;
 		sii_data->security_id = sds_header->security_id;
-		sii_data->offset_in_sds = sds_header->offset;
-		sii_data->size_in_sds = sds_header->length;
+		sii_data->offset = sds_header->offset;
+		sii_data->length = sds_header->length;
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sdh,
 			sdh_size, m, NTFS_INDEX_SDH, 4, AT_UNUSED)))
 			break;
