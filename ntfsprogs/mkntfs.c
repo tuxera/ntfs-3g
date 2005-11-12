@@ -5010,7 +5010,8 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 		err = errno;
 		free(rl);
 		if (lw != g_lcn_bitmap_byte_size) {
-			ntfs_log_error("%s\n", lw == -1 ? strerror(err) : "unknown error");
+			ntfs_log_error("ntfs_rlwrite: %s\n", lw == -1 ?
+				       strerror(err) : "unknown error");
 			goto done;
 		}
 	} else {
@@ -5030,7 +5031,8 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1, g_vol->mft_record_size, g_buf + i * g_vol->mft_record_size);
 		if (lw != 1) {
-			ntfs_log_error("%s\n", lw == -1 ? strerror(errno) : "unknown error");
+			ntfs_log_error("ntfs_mst_pwrite: %s\n", lw == -1 ?
+				       strerror(errno) : "unknown error");
 			goto done;
 		}
 		pos += g_vol->mft_record_size;
@@ -5055,7 +5057,8 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1, g_vol->mft_record_size, g_buf + i * g_vol->mft_record_size);
 		if (lw != 1) {
-			ntfs_log_error("%s\n", lw == -1 ? strerror(errno) : "unknown error");
+			ntfs_log_error("ntfs_mst_pwrite: %s\n", lw == -1 ?
+				       strerror(errno) : "unknown error");
 			goto done;
 		}
 		pos += g_vol->mft_record_size;
