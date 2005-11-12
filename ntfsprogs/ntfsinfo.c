@@ -497,7 +497,7 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
 	}
 	if (flags)
-		printf(" UNKNOWN: 0x%x", (unsigned int)le32_to_cpu(flags));
+		printf(" UNKNOWN: 0x%04x", (unsigned int)le32_to_cpu(flags));
 	printf("\n");
 }
 
@@ -1251,8 +1251,6 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		(ntfschar*)((char*)(attr) + le16_to_cpu((attr)->name_offset)), \
 		(attr)->name_length, 0, NULL, 0)
 
-static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot);
-
 static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 					   INDEX_ROOT *index_root)
 {
@@ -1289,7 +1287,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_O)) {
 		if (!strcmp(file_name, "/$Extend/$Quota"))
 			return INDEX_ATTR_QUOTA_O;
-		else
+		else if (!strcmp(file_name, "/$Extend/$ObjId"))
 			return INDEX_ATTR_OBJID_O;
 	}
 	
@@ -1893,7 +1891,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 			inode_flags &= ~MFT_RECORD_IS_VIEW_INDEX;
 		}
 		if (inode_flags)
-			printf("UNKNOWN:0x%04hx",inode_flags);
+			printf("UNKNOWN: 0x%04hx", inode_flags);
 	} else {
 		printf("none");
 	}
