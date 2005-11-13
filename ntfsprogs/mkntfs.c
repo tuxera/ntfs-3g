@@ -3783,10 +3783,13 @@ static void mkntfs_initialize_bitmaps(void)
 	for (i = g_vol->nr_clusters; i < (u64)g_lcn_bitmap_byte_size << 3; i++)
 		ntfs_bit_set(g_lcn_bitmap, i, 1);
 	/*
-	 * Determine mft_size: (16 (1.2) or 27 (3.0+) mft records)
+	 * Determine mft_size: (16 (1.2) or 27 (3.0+) mft records) or
+	 * one cluster, whichever is bigger.
 	 */
 	g_mft_size = ((16 + 11 * (g_vol->major_ver >= 3)) *
 			g_vol->mft_record_size);
+	if (g_mft_size < (s32)g_vol->cluster_size)
+		g_mft_size = g_vol->cluster_size;
 	ntfs_log_debug("MFT size = %i (0x%x) bytes\n", g_mft_size, g_mft_size);
 	/* Determine mft bitmap size and allocate it. */
 	g_mft_bitmap_size = g_mft_size / g_vol->mft_record_size;
@@ -4304,8 +4307,10 @@ static void mkntfs_create_root_structures(void)
 	u8 *sd;
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
+	int nr_sysfiles;
 
 	ntfs_log_quiet("Creating NTFS volume structures.\n");
+	nr_sysfiles = g_vol->major_ver < 3 ? 16 : 27;
 	/*
 	 * Setup an empty mft record.  Note, we can just give 0 as the mft
 	 * reference as we are creating an NTFS 1.2 volume for which the mft
@@ -4315,20 +4320,34 @@ static void mkntfs_create_root_structures(void)
 	 * sequence numbers of each system file to equal the mft record number
 	 * of that file (only for $MFT is the sequence number 1 rather than 0).
 	 */
-	for (i = 0; i < 16 + 11 * (g_vol->major_ver >= 3); i++) {
+	for (i = 0; i < nr_sysfiles; i++) {
 		if (ntfs_mft_record_layout(g_vol, 0, m = (MFT_RECORD *)(g_buf +
 				i * g_vol->mft_record_size)))
-			err_exit("Error:  Failed to layout mft record.\n");
+			err_exit("Failed to layout system mft records.\n");
 		if (i > 0)
 			m->sequence_number = cpu_to_le16(i);
 		if (i == 0)
 			m->sequence_number = cpu_to_le16(1);
 	}
 	/*
+	 * If only one cluster contains all system files then
+	 * fill the rest of it with empty, formatted records.
+	 */
+	if (nr_sysfiles * (s32)g_vol->mft_record_size < g_mft_size) {
+		for (i = nr_sysfiles; 
+		      i * (s32)g_vol->mft_record_size < g_mft_size; i++) {
+			m = (MFT_RECORD *)(g_buf + i * g_vol->mft_record_size);
+			if (ntfs_mft_record_layout(g_vol, 0, m))
+				err_exit("Failed to layout mft record.\n");
+			m->flags = cpu_to_le16(0);
+			m->sequence_number = cpu_to_le16(i);
+		}
+	}
+	/*
 	 * Create the 16 system files, adding the system information attribute
 	 * to each as well as marking them in use in the mft bitmap.
 	 */
-	for (i = 0; i < 16 + 11 * (g_vol->major_ver >= 3); i++) {
+	for (i = 0; i < nr_sysfiles; i++) {
 		u32 file_attrs;
 
 		m = (MFT_RECORD*)(g_buf + i * g_vol->mft_record_size);
@@ -4452,6 +4471,7 @@ static void mkntfs_create_root_structures(void)
 	if (err < 0)
 		err_exit("Couldn't create $MFT: %s\n", strerror(-err));
 	/* dump_mft_record(m); */
+
 	ntfs_log_verbose("Creating $MFTMirr (mft record 1)\n");
 	m = (MFT_RECORD*)(g_buf + 1 * g_vol->mft_record_size);
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_mftmirr, g_buf,
