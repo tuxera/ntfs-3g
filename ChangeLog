@@ -54,10 +54,10 @@ xx/xx/2005 - 1.12.2-WIP
 	- Fix comment formats.  (Yuval)
 	- ntfsinfo and ntfsls follow the convention how other utilities read
 	  the device argument: no -d or --device option is needed.  (Szaka)
-	- ntfsinfo: figure out and dump index attribute types.  (Szaka)
-	- ntfsinfo: dump index attribute keys.  (Szaka)
-	- mkntfs: don't fill the last $MFT cluster with empty MFT records. 
-	  This is needed to conform to Windows' format behavior.  (Szaka)
+	- ntfsinfo: dump index attribute types and keys. (Szaka)
+	- mkntfs: don't fill the last $MFT cluster with empty MFT records if 
+	  the cluster size <= 16 kB. This is needed to conform to Windows' 
+	  format behavior.  (Szaka)
 	- Add @flags field to struct ntfs_inode. Remove NIno{Sparse,Compressed,
 	  Encrypted}, update all users to use @(ntfs_inode)->flags.  (Yura)
 	- Make @(ntfs_inode)->data_size and @(ntfs_inode)->allocated_size to
@@ -68,7 +68,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  handle them.  (Yura)
 	- Fix allocated data size for resident attributes.  (Yura)
 	- ntfsclone: check available free space on the destination before
-	  starting to clone or restore.  (Szaka)
+	  starting to clone, image or restore.  (Szaka)
 	- Change @type parameter for ntfs_create() to be dev_t rather than
 	  internal NTFS_DT_* constants.  (Yura)
 	- New APIs (dir.[ch]):

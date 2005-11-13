@@ -1449,9 +1449,12 @@ static void check_dest_free_space(u64 src_bytes)
 	u64 dest_bytes;
 	struct statvfs stvfs;
 
-	if (opt.save_image || opt.metadata || opt.blkdev_out || opt.std_out)
+	if (opt.metadata || opt.blkdev_out || opt.std_out)
 		return;
-
+	/* 
+	 * TODO: save_image needs a bit more space than src_bytes
+	 * due to the free space encoding overhead.
+	 */
 	if (fstatvfs(fd_out, &stvfs) == -1) {
 		Printf("WARNING: Unknown free space on the destination: %s\n",
 		       strerror(errno));
