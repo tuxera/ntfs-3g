@@ -2878,6 +2878,8 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 	err = 0;
 
 	while ((char*)sds_header < (char*)sds + sds_size) {
+		if (!sds_header->length)
+			break;
 		/* SDH index entry */
 		idx_entry_sdh->data_offset = cpu_to_le16(0x18);
 		idx_entry_sdh->data_length = cpu_to_le16(0x14);
@@ -2923,8 +2925,6 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		sds_header = (SECURITY_DESCRIPTOR_HEADER*)((char*)sds_header +
 				(cpu_to_le32(sds_header->length + 0x0F) &
 					~cpu_to_le32(0x0F)));
-		if (!sds_header->length)
-			break;
 	}
 
 	free(idx_entry_sdh);
