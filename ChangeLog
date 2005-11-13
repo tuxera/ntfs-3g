@@ -81,6 +81,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- Make ntfsinfo report the MFT record flags properly, this includes
 	  the less encountered flags, and reporting the in_use flag instead of
 	  inverting it to unused.  (Yuval)
+	- mkntfs: fix segfault when volume had more than 2^31 clusters. (Szaka)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

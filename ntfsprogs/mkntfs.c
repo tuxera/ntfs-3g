@@ -3762,7 +3762,7 @@ static void mkntfs_initialize_bitmaps(void)
 	 *     g_rl_mft_bmp
 	 *     g_vol
 	 */
-	int i, j;
+	u64 i;
 
 	/* Determine lcn bitmap byte size and allocate it. */
 	g_lcn_bitmap_byte_size = (g_vol->nr_clusters + 7) >> 3;
@@ -3770,7 +3770,7 @@ static void mkntfs_initialize_bitmaps(void)
 	g_lcn_bitmap_byte_size = (g_lcn_bitmap_byte_size + 7) & ~7;
 	i = (g_lcn_bitmap_byte_size + g_vol->cluster_size - 1) &
 			~(g_vol->cluster_size - 1);
-	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %i\n",
+	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %llu\n",
 			g_lcn_bitmap_byte_size, i);
 	g_lcn_bitmap = calloc(1, g_lcn_bitmap_byte_size);
 	if (!g_lcn_bitmap)
@@ -3780,8 +3780,8 @@ static void mkntfs_initialize_bitmaps(void)
 	 * $Bitmap can overlap the end of the volume. Any bits in this region
 	 * must be set. This region also encompasses the backup boot sector.
 	 */
-	for (i = g_vol->nr_clusters; i < g_lcn_bitmap_byte_size << 3; i++)
-		ntfs_bit_set(g_lcn_bitmap, (u64)i, 1);
+	for (i = g_vol->nr_clusters; i < (u64)g_lcn_bitmap_byte_size << 3; i++)
+		ntfs_bit_set(g_lcn_bitmap, i, 1);
 	/*
 	 * Determine mft_size: (16 (1.2) or 27 (3.0+) mft records)
 	 */
@@ -3807,8 +3807,8 @@ static void mkntfs_initialize_bitmaps(void)
 				strerror(errno));
 	g_rl_mft_bmp[0].vcn = 0LL;
 	/* Mft bitmap is right after $Boot's data. */
-	j = (8192 + g_vol->cluster_size - 1) / g_vol->cluster_size;
-	g_rl_mft_bmp[0].lcn = j;
+	i = (8192 + g_vol->cluster_size - 1) / g_vol->cluster_size;
+	g_rl_mft_bmp[0].lcn = i;
 	/*
 	 * Size is always one cluster, even though valid data size and
 	 * initialized data size are only 8 bytes.
@@ -3817,7 +3817,7 @@ static void mkntfs_initialize_bitmaps(void)
 	g_rl_mft_bmp[1].lcn = -1LL;
 	g_rl_mft_bmp[1].length = 0LL;
 	/* Allocate cluster for mft bitmap. */
-	ntfs_bit_set(g_lcn_bitmap, (s64)j, 1);
+	ntfs_bit_set(g_lcn_bitmap, i, 1);
 }
 
 /**
