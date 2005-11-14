@@ -55,6 +55,7 @@
 #include "compress.h"
 #include "bitmap.h"
 #include "logging.h"
+#include "ntfstime.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -769,6 +770,12 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		errno = EACCES;
 		return -1;
 	}
+	/* Update access time if accessing unnamed data attribute. */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		na->ni->last_access_time = time(NULL);
+		NInoFileNameSetDirty(na->ni);
+		NInoSetDirty(na->ni);
+	}
 	if (!count)
 		return 0;
 	/* Truncate reads beyond end of attribute. */
@@ -950,6 +957,13 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		//		const s64 pos, s64 count, void *b);
 		errno = EOPNOTSUPP;
 		return -1;
+	}
+	/* Update time if writing to unnamed data attribute. */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		na->ni->last_data_change_time = time(NULL);
+		na->ni->last_mft_change_time = time(NULL);
+		NInoFileNameSetDirty(na->ni);
+		NInoSetDirty(na->ni);
 	}
 	if (!count)
 		return 0;
@@ -4915,9 +4929,10 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			ret = ntfs_non_resident_attr_shrink(na, newsize);
 	} else
 		ret = ntfs_resident_attr_resize(na, newsize);
-	/* Set FILE_NAME dirty flag, to update file length in the index. */
+	/* Set FILE_NAME dirty flag, to update length and time in the index. */
 	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-		NInoFileNameSetDirty(na->ni);
+		na->ni->last_data_change_time = time(NULL);
+		na->ni->last_mft_change_time = time(NULL);
 		na->ni->data_size = na->data_size;
 		/*
 		 * If attribute sparse or compressed then allocated size in
@@ -4928,6 +4943,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			na->ni->allocated_size = na->compressed_size;
 		else
 			na->ni->allocated_size = na->allocated_size;
+		NInoFileNameSetDirty(na->ni);
 	}
 	return ret;
 }
