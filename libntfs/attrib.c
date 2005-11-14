@@ -916,6 +916,7 @@ rl_err_out:
 s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 {
 	s64 written, to_write, ofs, total, old_initialized_size, old_data_size;
+	VCN update_from = -1;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
@@ -1202,6 +1203,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			}
 			na->rl = rl;
 			need_to.update_mapping_pairs = 1;
+			if (update_from == -1)
+				update_from = from_vcn;
 			rl = ntfs_attr_find_vcn(na, cur_vcn);
 			if (!rl) {
 				/*
@@ -1300,7 +1303,7 @@ done:
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
 	if (need_to.update_mapping_pairs)
-		ntfs_attr_update_mapping_pairs(na);
+		ntfs_attr_update_mapping_pairs(na, update_from);
 	/* Finally, return the number of bytes written. */
 	return total;
 rl_err_out:
@@ -1353,7 +1356,7 @@ err_out:
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
 	if (need_to.update_mapping_pairs)
-		ntfs_attr_update_mapping_pairs(na);
+		ntfs_attr_update_mapping_pairs(na, update_from);
 	/* Restore original data_size if needed. */
 	if (need_to.undo_data_size && ntfs_attr_truncate(na, old_data_size))
 		ntfs_log_trace("Failed to restore data_size.\n");
@@ -4037,6 +4040,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 /**
  * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
  * @na:		non-resident ntfs open attribute for which we need update
+ * @from_vcn:	update runlist starting this VCN
  *
  * Build mapping pairs from na->runlist and write them to the disk. Also, this
  * function updates sparse bit and allocates/frees space for compressed_size,
@@ -4047,7 +4051,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  *	ENOMEM - Not enough memory to complete operation.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-int ntfs_attr_update_mapping_pairs(ntfs_attr *na)
+int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *ni, *base_ni;
@@ -4090,9 +4094,35 @@ retry:
 	stop_vcn = 0;
 	finished_build = FALSE;
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+				CASE_SENSITIVE, from_vcn, NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
+		/*
+		 * If runlist is updating not from the beginning, then set
+		 * @stop_vcn properly, i.e. to the lowest vcn of record that
+		 * contain @from_vcn. Also we do not need @from_vcn anymore,
+		 * set it to 0 to make ntfs_attr_lookup enumerate attributes.
+		 */
+		if (from_vcn) {
+			LCN first_lcn;
+
+			stop_vcn = sle64_to_cpu(a->lowest_vcn);
+			from_vcn = 0;
+			/*
+			 * Check whether the first run we need to update is
+			 * the last run in runlist, if so, then deallocate
+			 * all attrubute extents starting this one.
+			 */
+			first_lcn = ntfs_rl_vcn_to_lcn(na->rl, stop_vcn);
+			if (first_lcn == LCN_EINVAL) {
+				ntfs_log_trace("BUG! Incorrect runlist.\n");
+				err = EIO;
+				goto put_err_out;
+			}
+			if (first_lcn == LCN_ENOENT ||
+					first_lcn == LCN_RL_NOT_MAPPED)
+				finished_build = TRUE;
+		}
 
 		/*
 		 * Check whether we finished mapping pairs build, if so mark
@@ -4319,10 +4349,11 @@ retry:
 			finished_build = TRUE;
 		if (!finished_build && errno != ENOSPC) {
 			err = errno;
-			ntfs_log_trace("BUG!  Mapping pairs build failed.  Please "
-					"run chkdsk and if that doesn't find "
-					"any errors please report you saw this "
-					"message to linux-ntfs-dev@lists.sf.net.\n");
+			ntfs_log_trace("BUG!  Mapping pairs build failed.  "
+					"Please run chkdsk and if that doesn't "
+					"find any errors please report you saw "
+					"this message to "
+					"linux-ntfs-dev@lists.sf.net.\n");
 			goto put_err_out;
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
@@ -4518,7 +4549,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		}
 
 		/* Write mapping pairs for new runlist. */
-		if (ntfs_attr_update_mapping_pairs(na)) {
+		if (ntfs_attr_update_mapping_pairs(na, first_free_vcn)) {
 			err = errno;
 			ntfs_log_trace("Eeek! Mapping pairs update failed. Leaving "
 					"inconstant metadata. Run chkdsk.\n");
@@ -4734,7 +4765,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		na->rl = rln;
 
 		/* Write mapping pairs for new runlist. */
-		if (ntfs_attr_update_mapping_pairs(na)) {
+		if (ntfs_attr_update_mapping_pairs(na, na->allocated_size >>
+				vol->cluster_size_bits)) {
 			err = errno;
 			ntfs_log_trace("Eeek! Mapping pairs update failed.\n");
 			goto rollback;
@@ -4818,7 +4850,8 @@ rollback:
 				"failed.\n");
 	} else {
 		/* Restore mapping pairs. */
-		if (ntfs_attr_update_mapping_pairs(na)) {
+		if (ntfs_attr_update_mapping_pairs(na, na->allocated_size >>
+					vol->cluster_size_bits)) {
 			ntfs_log_trace("Eeek! Couldn't restore old mapping pairs. "
 					"Rollback failed.\n");
 		}
