@@ -92,7 +92,7 @@ configuration option described in the previous section.
 
 .TP
 .B kernel_cache
-(NOTE: Work only with FUSE-2.3.0)
+(NOTE: Only for FUSE 2.3.0, with FUSE >= 2.4.0 on by default)
 This option disables flushing the cache of the file contents on
 every open().  This should only be enabled on filesystems, where the
 file data is never changed externally (not through the mounted FUSE

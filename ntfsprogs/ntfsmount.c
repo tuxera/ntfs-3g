@@ -96,6 +96,7 @@ typedef struct {
 	BOOL show_sys_files;
 	BOOL succeed_chmod;
 	BOOL force;
+	BOOL debug;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -116,10 +117,6 @@ static struct options {
 static const char *EXEC_NAME = "ntfsmount";
 static char def_opts[] = "default_permissions,allow_other,";
 static ntfs_fuse_context_t *ctx;
-
-GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
-GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
 
 static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 {
@@ -490,8 +487,8 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (name_type == FILE_NAME_DOS)
 		return 0;
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
-		Eprintf("Skipping unrepresentable file (inode %lld): %s\n",
-				MREF(mref), strerror(errno));
+		ntfs_log_error("Skipping unrepresentable file (inode %lld): "
+				"%s\n", MREF(mref), strerror(errno));
 		return 0;
 	}
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
@@ -586,8 +583,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
 		if (res < (s64)size)
-			Eprintf("ntfs_attr_pread returned less bytes than "
-					"requested.\n");
+			ntfs_log_error("ntfs_attr_pread returned less bytes "
+					"than requested.\n");
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
@@ -601,7 +598,7 @@ exit:
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -635,8 +632,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
 		if (res < (s64)size)
-			Eprintf("ntfs_attr_pwrite returned less bytes than "
-					"requested.\n");
+			ntfs_log_error("ntfs_attr_pwrite returned less bytes "
+					"than requested.\n");
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
@@ -651,7 +648,7 @@ exit:
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -687,7 +684,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	ntfs_attr_close(na);
 exit:
 	if (ni && ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -793,7 +790,7 @@ static int ntfs_fuse_create_stream(const char *path,
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return res;
 }
 
@@ -953,7 +950,7 @@ static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
 	}
 exit:
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return res;
 }
 
@@ -1029,7 +1026,7 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return 0;
 }
 
@@ -1097,7 +1094,7 @@ exit:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
 	ntfs_inode_close(ni);
-	fprintf(stderr, "return %d\n", ret);
+	ntfs_log_debug("return %d\n", ret);
 	return ret;
 }
 
@@ -1213,7 +1210,7 @@ exit:
 		ntfs_attr_close(na);
 	free(lename);
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return res;
 }
 
@@ -1272,7 +1269,7 @@ exit:
 		ntfs_attr_close(na);
 	free(lename);
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return res;
 }
 
@@ -1315,7 +1312,7 @@ exit:
 		ntfs_attr_close(na);
 	free(lename);
 	if (ntfs_inode_close(ni))
-		perror("Failed to close inode");
+		ntfs_log_perror("Failed to close inode");
 	return res;
 }
 
@@ -1351,7 +1348,7 @@ static int ntfs_fuse_init(void)
 {
 	ctx = malloc(sizeof(ntfs_fuse_context_t));
 	if (!ctx) {
-		perror("malloc failed");
+		ntfs_log_perror("malloc failed");
 		return -1;
 	}
 	*ctx = (ntfs_fuse_context_t) {
@@ -1371,7 +1368,7 @@ static int ntfs_fuse_mount(const char *device)
 
 	vol = utils_mount_volume(device, (ctx->ro) ? MS_RDONLY : 0, ctx->force);
 	if (!vol) {
-		Eprintf("Mount failed.\n");
+		ntfs_log_error("Mount failed.\n");
 		return -1;
 	}
 	ctx->vol = vol;
@@ -1381,9 +1378,9 @@ static int ntfs_fuse_mount(const char *device)
 static void ntfs_fuse_destroy(void)
 {
 	if (ctx->vol) {
-		printf("Unmounting: %s\n", ctx->vol->vol_name);
+		ntfs_log_debug("Unmounting: %s\n", ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
-			perror("Failed to unmount volume");
+			ntfs_log_perror("Failed to unmount volume");
 	}
 	free(ctx);
 }
@@ -1406,13 +1403,13 @@ static char *parse_mount_options(const char *org_options)
 	 */
 	ret = malloc(strlen(def_opts) + strlen(org_options) + 9 + PATH_MAX);
 	if (!ret) {
-		perror("malloc failed");
+		ntfs_log_perror("malloc failed");
 		return NULL;
 	}
 	*ret = 0;
 	options = strdup(org_options);
 	if (!options) {
-		perror("strdump failed");
+		ntfs_log_perror("strdump failed");
 		return NULL;
 	}
 	s = options;
@@ -1420,97 +1417,102 @@ static char *parse_mount_options(const char *org_options)
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "ro")) { /* Read-only mount. */
 			if (val) {
-				Eprintf("'ro' option should not have value.\n");
-				goto err_exit;
-			}
-			ctx->ro = TRUE;
-			strcat(ret, "ro,");
-#ifdef DEBUG
-		} else if (!strcmp(opt, "fake_rw")) {
-			if (val) {
-				Eprintf("'fake_rw' option should not have "
+				ntfs_log_error("'ro' option should not have "
 						"value.\n");
 				goto err_exit;
 			}
 			ctx->ro = TRUE;
-#endif
+			strcat(ret, "ro,");
+		} else if (!strcmp(opt, "fake_rw")) {
+			if (val) {
+				ntfs_log_error("'fake_rw' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->ro = TRUE;
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
 			/*
 			 * We need this to be able to check whether filesystem
 			 * mounted or not.
 			 */
-			Eprintf("'fsname' is unsupported option.\n");
+			ntfs_log_error("'fsname' is unsupported option.\n");
 			goto err_exit;
 		} else if (!strcmp(opt, "no_def_opts")) {
 			if (val) {
-				Eprintf("'no_def_opts' option should not have "
-						"value.\n");
+				ntfs_log_error("'no_def_opts' option should "
+						"not have value.\n");
 				goto err_exit;
 			}
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "umask")) {
 			if (!val) {
-				Eprintf("'umask' option should have value.\n");
+				ntfs_log_error("'umask' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 		} else if (!strcmp(opt, "fmask")) {
 			if (!val) {
-				Eprintf("'fmask' option should have value.\n");
+				ntfs_log_error("'fmask' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->fmask);
 		} else if (!strcmp(opt, "dmask")) {
 			if (!val) {
-				Eprintf("'dmask' option should have value.\n");
+				ntfs_log_error("'dmask' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->dmask);
 		} else if (!strcmp(opt, "uid")) {
 			if (!val) {
-				Eprintf("'uid' option should have value.\n");
+				ntfs_log_error("'uid' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->uid);
 		} else if (!strcmp(opt, "gid")) {
 			if (!val) {
-				Eprintf("'gid' option should have value.\n");
+				ntfs_log_error("'gid' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->gid);
 		} else if (!strcmp(opt, "show_sys_files")) {
 			if (val) {
-				Eprintf("'show_sys_files' option should not "
-						"have value.\n");
+				ntfs_log_error("'show_sys_files' option should "
+						"not have value.\n");
 				goto err_exit;
 			}
 			ctx->show_sys_files = TRUE;
 		} else if (!strcmp(opt, "succeed_chmod")) {
 			if (val) {
-				Eprintf("'succeed_chmod' option should not "
-						"have value.\n");
+				ntfs_log_error("'succeed_chmod' option should "
+						"not have value.\n");
 				goto err_exit;
 			}
 			ctx->succeed_chmod = TRUE;
 		} else if (!strcmp(opt, "force")) {
 			if (val) {
-				Eprintf("'force' option should not "
+				ntfs_log_error("'force' option should not "
 						"have value.\n");
 				goto err_exit;
 			}
 			ctx->force = TRUE;
 		} else if (!strcmp(opt, "locale")) {
 			if (!val) {
-				Eprintf("'locale' option should have value.\n");
+				ntfs_log_error("'locale' option should have "
+						"value.\n");
 				goto err_exit;
 			}
 			if (!setlocale(LC_ALL, val))
-				Eprintf("Failed to set locale to %s.  "
+				ntfs_log_error("Failed to set locale to %s.  "
 						"Continue anyway.\n", val);
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (!val) {
-				Eprintf("'streams_interface' option "
+				ntfs_log_error("'streams_interface' option "
 						"should have value.\n");
 				goto err_exit;
 			}
@@ -1521,12 +1523,26 @@ static char *parse_mount_options(const char *org_options)
 			else if (!strcmp(val, "windows"))
 				ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
 			else {
-				Eprintf("Invalid named data streams access "
-						"interface.\n");
+				ntfs_log_error("Invalid named data streams "
+						"access interface.\n");
 				goto err_exit;
 			}
 		} else if (!strcmp(opt, "noauto")) {
 			/* Don't pass noauto option to fuse. */
+		} else if (!strcmp(opt, "debug")) {
+			if (val) {
+				ntfs_log_error("'debug' option should not have "
+						"value.\n");
+				goto err_exit;
+			}
+			ctx->debug = TRUE;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
+		} else if (!strcmp(opt, "remount")) {
+			ntfs_log_error("Remounting is not supported at present."
+					" You have to umount volume and then "
+					"mount it once again.\n");
+			goto err_exit;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -1551,16 +1567,16 @@ err_exit:
 
 static void usage(void)
 {
-	Eprintf("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
+	ntfs_log_info("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
 			EXEC_NAME, VERSION, ntfs_libntfs_version());
-	Eprintf("Copyright (c) 2005 Yura Pakhuchiy\n\n");
-	Eprintf("usage:  %s device mount_point [-o options]\n\n",
+	ntfs_log_info("Copyright (c) 2005 Yura Pakhuchiy\n\n");
+	ntfs_log_info("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);
-	Eprintf("Possible options are:\n\tdefault_permissions\n\tallow_other\n"
-		"\tkernel_cache\n\tlarge_read\n\tdirect_io\n\tmax_read\n\t"
-		"force\n\tro\n\tno_def_opts\n\tumask\n\tfmask\n\tdmask\n\t"
-		"uid\n\tgid\n\tshow_sys_files\n\tsucceed_chmod\n\tlocale\n\n");
-	Eprintf("Default options are: \"%s\".\n", def_opts);
+	ntfs_log_info("ntfsmount options are:\n\tforce\n\tno_def_opts\n\tumask"
+		"\n\tfmask\n\tdmask\n\tuid\n\tgid\n\tshow_sys_files\n\t"
+		"succeed_chmod\n\tlocale\n\tstreams_interface\n"
+		"Also look into FUSE documentation about it options.\n\n");
+	ntfs_log_info("Default options are: \"%s\".\n", def_opts);
 }
 
 #ifndef HAVE_REALPATH
@@ -1608,7 +1624,7 @@ static int parse_options(int argc, char *argv[])
 			if (!opts.device) {
 				opts.device = malloc(PATH_MAX + 1);
 				if (!opts.device) {
-					perror("malloc");
+					ntfs_log_perror("malloc");
 					err++;
 					break;
 				}
@@ -1616,7 +1632,7 @@ static int parse_options(int argc, char *argv[])
 				if (argv[optind - 1][0] != '/') {
 					if (!realpath(argv[optind - 1],
 							opts.device)) {
-						perror("realpath");
+						ntfs_log_perror("realpath");
 						free(opts.device);
 						opts.device = NULL;
 						err++;
@@ -1627,8 +1643,8 @@ static int parse_options(int argc, char *argv[])
 			} else if (!opts.mnt_point)
 				opts.mnt_point = argv[optind - 1];
 			else {
-				Eprintf("You must specify exactly one device "
-						"and exactly one mount "
+				ntfs_log_error("You must specify exactly one "
+						"device and exactly one mount "
 						"point.\n");
 				err++;
 			}
@@ -1637,7 +1653,7 @@ static int parse_options(int argc, char *argv[])
 			if (!opts.options)
 				opts.options = argv[optind - 1];
 			else {
-				Eprintf("You must specify exactly one "
+				ntfs_log_error("You must specify exactly one "
 						"set of options.\n");
 				err++;
 			}
@@ -1653,7 +1669,8 @@ static int parse_options(int argc, char *argv[])
 			opts.verbose++;
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n",
+					argv[optind - 1]);
 			err++;
 			break;
 		}
@@ -1663,19 +1680,19 @@ static int parse_options(int argc, char *argv[])
 		opts.quiet = 0;
 	} else {
 		if (!opts.device) {
-			Eprintf("No mount point specified.\n");
+			ntfs_log_error("No mount point specified.\n");
 			err++;
 		}
 
 		if (!opts.mnt_point) {
 			if (argc > 1)
-				Eprintf("No mount point specified.\n");
+				ntfs_log_error("No mount point specified.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at "
-					"the same time.\n");
+			ntfs_log_error("You may not use --quiet and --verbose "
+					"at the same time.\n");
 			err++;
 		}
 	}
@@ -1720,32 +1737,36 @@ int main(int argc, char *argv[])
 	/* Create filesystem. */
 	ffd = fuse_mount(opts.mnt_point, parsed_options);
 	if (ffd == -1) {
-		Eprintf("fuse_mount failed.\n");
+		ntfs_log_error("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
 		return 5;
 	}
 	free(parsed_options);
-#ifndef DEBUG
-	fh = fuse_new(ffd, "use_ino", &ntfs_fuse_oper, sizeof(ntfs_fuse_oper));
+	if (!ctx->debug) {
+#if FUSE_MINOR_VERSION >= 4
+		fh = fuse_new(ffd, "use_ino,kernel_cache", &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper));
 #else
-	fh = fuse_new(ffd, "debug,use_ino" , &ntfs_fuse_oper,
-			sizeof(ntfs_fuse_oper));
+		fh = fuse_new(ffd, "use_ino", &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper));
 #endif
+	} else
+		fh = fuse_new(ffd, "debug,use_ino" , &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper));
+
 	if (!fh) {
-		Eprintf("fuse_new failed.\n");
+		ntfs_log_error("fuse_new failed.\n");
 		close(ffd);
 		fuse_unmount(opts.mnt_point);
 		ntfs_fuse_destroy();
 		return 6;
 	}
-#ifndef DEBUG
-	if (daemon(0, 0))
-		Eprintf("Failed to daemonize.\n");
-#endif
-	printf("Mounted: %s\n", ctx->vol->vol_name);
+	if (!ctx->debug && daemon(0, 0))
+		ntfs_log_error("Failed to daemonize.\n");
+	ntfs_log_info("Mounted: %s\n", ctx->vol->vol_name);
 	/* Main loop. */
 	if (fuse_loop(fh))
-		Eprintf("fuse_loop failed.\n");
+		ntfs_log_error("fuse_loop failed.\n");
 	/* Destroy. */
 	fuse_destroy(fh);
 	close(ffd);

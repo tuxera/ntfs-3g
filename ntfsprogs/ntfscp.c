@@ -79,8 +79,8 @@ volatile sig_atomic_t caught_terminate = 0;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS volume.\n\n",
-		EXEC_NAME, VERSION, ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS "
+		"volume.\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
 	ntfs_log_info("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
@@ -160,13 +160,15 @@ static int parse_options(int argc, char **argv)
 			} else if (!opts.dest_file) {
 				opts.dest_file = argv[optind - 1];
 			} else {
-				ntfs_log_error("You must specify exactly 2 files.\n");
+				ntfs_log_error("You must specify exactly two "
+						"files.\n");
 				err++;
 			}
 			break;
 		case 'a':
 			if (opts.attribute != AT_DATA) {
-				ntfs_log_error("You can specify only 1 attribute.\n");
+				ntfs_log_error("You can specify only one "
+						"attribute.\n");
 				err++;
 				break;
 			}
@@ -186,8 +188,8 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'h':
 		case '?':
-			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
-				if (!ntfs_log_parse_option (argv[optind-1]))
+			if (strncmp(argv[optind - 1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option(argv[optind - 1]))
 					err++;
 				break;
 			}
@@ -195,8 +197,8 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'N':
 			if (opts.attr_name) {
-				ntfs_log_error("You can specify only one attribute "
-						"name.\n");
+				ntfs_log_error("You can specify only one "
+						"attribute name.\n");
 				err++;
 			} else
 				opts.attr_name = argv[optind - 1];
@@ -216,7 +218,8 @@ static int parse_options(int argc, char **argv)
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		default:
-			ntfs_log_error("Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n",
+					argv[optind - 1]);
 			err++;
 			break;
 		}
@@ -239,13 +242,14 @@ static int parse_options(int argc, char **argv)
 			ntfs_log_error("You must specify a source file.\n");
 			err++;
 		} else if (!opts.dest_file) {
-			ntfs_log_error("You must specify a destination file.\n");
+			ntfs_log_error("You must specify a destination "
+					"file.\n");
 			err++;
 		}
 
 		if (opts.quiet && opts.verbose) {
-			ntfs_log_error("You may not use --quiet and --verbose at the "
-					"same time.\n");
+			ntfs_log_error("You may not use --quiet and --verbose "
+					"at the same time.\n");
 			err++;
 		}
 	}
@@ -383,7 +387,8 @@ int main(int argc, char *argv[])
 		out = ntfs_pathname_to_inode(vol, NULL, new_dest_file);
 		free(new_dest_file);
 		if (!out) {
-			ntfs_log_perror("ERROR: Failed to open destination file");
+			ntfs_log_perror("ERROR: Failed to open destination "
+					"file");
 			goto close_src;
 		}
 	}
@@ -392,7 +397,8 @@ int main(int argc, char *argv[])
 		attr_name = NULL;
 		attr_name_len = ntfs_mbstoucs(opts.attr_name, &attr_name, 0);
 		if (attr_name_len == -1) {
-			ntfs_log_perror("ERROR: Failed to parse attribute name");
+			ntfs_log_perror("ERROR: Failed to parse attribute "
+					"name");
 			goto close_dst;
 		}
 	} else
@@ -412,7 +418,8 @@ int main(int argc, char *argv[])
 		na = ntfs_attr_open(out, opts.attribute, attr_name,
 				attr_name_len);
 		if (!na) {
-			ntfs_log_perror("ERROR: Couldn't open just added attribute");
+			ntfs_log_perror("ERROR: Couldn't open just added "
+					"attribute");
 			goto close_dst;
 		}
 	}
@@ -437,7 +444,8 @@ int main(int argc, char *argv[])
 	offset = 0;
 	while (!feof(in)) {
 		if (caught_terminate) {
-			ntfs_log_error("SIGTERM or SIGINT received. Aborting write.\n");
+			ntfs_log_error("SIGTERM or SIGINT received.  "
+					"Aborting write.\n");
 			break;
 		}
 		br = fread(buf, 1, NTFS_BUF_SIZE, in);
@@ -463,7 +471,7 @@ close_dst:
 			ntfs_log_error("Sync failed. Run chkdsk.\n");
 			break;
 		}
-		ntfs_log_error("Device busy. Will retry sync after 3 seconds.\n");
+		ntfs_log_error("Device busy.  Will retry sync in 3 seconds.\n");
 		sleep(3);
 	}
 close_src:
@@ -473,4 +481,3 @@ umount:
 	ntfs_log_verbose("Done.\n");
 	return result;
 }
-
