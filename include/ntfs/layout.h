@@ -1922,13 +1922,6 @@ typedef struct {
 typedef SECURITY_DESCRIPTOR_HEADER SII_INDEX_DATA;
 
 /**
- * struct QUOTA_O_INDEX_DATA -
- */
-typedef struct {
-	u32 owner_id;
-} __attribute__((__packed__)) QUOTA_O_INDEX_DATA;
-
-/**
  * struct SDS_ENTRY -
  *
  * The $SDS data stream contains the security descriptors, aligned on 16-byte
@@ -2221,10 +2214,26 @@ typedef struct {
 	s64 threshold;		/* Soft quota (-1 if not limited). */
 	s64 limit;		/* Hard quota (-1 if not limited). */
 	s64 exceeded_time;	/* How long the soft quota has been exceeded. */
+/* The below field is NOT present for the quota defaults entry. */
 	SID sid;		/* The SID of the user/object associated with
-				   this quota entry. Equals zero for the quota
-				   defaults entry. */
+				   this quota entry. If this field is missing
+				   then the INDEX_ENTRY is padded with zeros
+				   to multiply of 8 which are not counted in
+				   the data_length field. If the sid is present
+				   then this structure is padded with zeros to
+				   multiply of 8 and the padding is counted in
+				   the INDEX_ENTRY's data_length. */
 } __attribute__((__packed__)) QUOTA_CONTROL_ENTRY;
+
+/**
+ * struct QUOTA_O_INDEX_DATA -
+ */
+typedef struct {
+	u32 owner_id;
+	u32 unknown;		/* Always 32. Seems to be padding and it's not
+				   counted in the INDEX_ENTRY's data_length.
+				   This field shouldn't be really here. */
+} __attribute__((__packed__)) QUOTA_O_INDEX_DATA;
 
 /**
  * enum PREDEFINED_OWNER_IDS - Predefined owner_id values (32-bit).
