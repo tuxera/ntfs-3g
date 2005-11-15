@@ -2973,7 +2973,8 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_o_data = (QUOTA_O_INDEX_DATA*)((char*)idx_entry_o
 			+ idx_entry_o->data_offset);
 	idx_entry_o_data->owner_id  = QUOTA_FIRST_USER_ID;
-		/* 20 00 00 00 padding after here on ntfs 3.1 ?? */
+	/* 20 00 00 00 padding after here on ntfs 3.1. 3.0 is unchecked. */
+	idx_entry_o_data->unknown = cpu_to_le32(32);
 
 	err = insert_index_entry_in_res_dir_index(idx_entry_o,
 		o_size, m,
