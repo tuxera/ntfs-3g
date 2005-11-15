@@ -167,13 +167,6 @@ const char *EXEC_NAME = "mkntfs";
  * Need these global so mkntfs_exit can access them.
  */
 u8		  *g_buf		  = NULL;
-u8		  *g_buf2		  = NULL;
-int		   g_buf2_size		  = 0;
-char		  *g_buf_sds		  = NULL;
-char		  *g_buf_sds_init	  = NULL;
-int		   g_buf_sds_size	  = 0;
-int		   g_buf_sds_first_size	  = 0;
-int		   g_mft_bitmap_size	  = 0;
 int		   g_mft_bitmap_byte_size = 0;
 u8		  *g_mft_bitmap		  = NULL;
 int		   g_lcn_bitmap_byte_size = 0;
@@ -184,11 +177,8 @@ runlist		  *g_rl_mftmirr		  = NULL;
 runlist		  *g_rl_logfile		  = NULL;
 runlist		  *g_rl_boot		  = NULL;
 runlist		  *g_rl_bad		  = NULL;
-runlist		  *g_rl_index		  = NULL;
 INDEX_ALLOCATION  *g_index_block	  = NULL;
 ntfs_volume	  *g_vol		  = NULL;
-
-/* globals demoted from mkntfs_options */
 long long	   g_volume_size	  = 0;		/* in bytes */
 int		   g_mft_size		  = 0;		/* The bigger of 16kB & one cluster */
 long long	   g_mft_lcn		  = 0;		/* lcn of $MFT, $DATA attribute */
@@ -1183,7 +1173,7 @@ static void deallocate_scattered_clusters(const runlist *rl)
  * TODO: We should be returning the size as well, but for mkntfs this is not
  * necessary.
  */
-static runlist *allocate_scattered_clusters(s64 clusters)
+static runlist * allocate_scattered_clusters(s64 clusters)
 {
 	runlist *rl = NULL, *rlt;
 	VCN vcn = 0LL;
@@ -3406,15 +3396,11 @@ static void mkntfs_exit(void)
 	/* Free any memory we've used */
 	free(g_bad_blocks);	g_bad_blocks	= NULL;
 	free(g_buf);		g_buf		= NULL;
-	free(g_buf2);		g_buf2		= NULL;
-	free(g_buf_sds);	g_buf_sds	= NULL;
-	free(g_buf_sds_init);	g_buf_sds_init	= NULL;
 	free(g_index_block);	g_index_block	= NULL;
 	free(g_lcn_bitmap);	g_lcn_bitmap	= NULL;
 	free(g_mft_bitmap);	g_mft_bitmap	= NULL;
 	free(g_rl_bad);		g_rl_bad	= NULL;
 	free(g_rl_boot);	g_rl_boot	= NULL;
-	free(g_rl_index);	g_rl_index	= NULL;
 	free(g_rl_logfile);	g_rl_logfile	= NULL;
 	free(g_rl_mft);		g_rl_mft	= NULL;
 	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
@@ -3758,12 +3744,12 @@ static void mkntfs_initialize_bitmaps(void)
 	 *     g_lcn_bitmap_byte_size
 	 *     g_mft_bitmap
 	 *     g_mft_bitmap_byte_size
-	 *     g_mft_bitmap_size
 	 *     g_mft_size
 	 *     g_rl_mft_bmp
 	 *     g_vol
 	 */
 	u64 i;
+	int mft_bitmap_size;
 
 	/* Determine lcn bitmap byte size and allocate it. */
 	g_lcn_bitmap_byte_size = (g_vol->nr_clusters + 7) >> 3;
@@ -3793,13 +3779,13 @@ static void mkntfs_initialize_bitmaps(void)
 		g_mft_size = g_vol->cluster_size;
 	ntfs_log_debug("MFT size = %i (0x%x) bytes\n", g_mft_size, g_mft_size);
 	/* Determine mft bitmap size and allocate it. */
-	g_mft_bitmap_size = g_mft_size / g_vol->mft_record_size;
+	mft_bitmap_size = g_mft_size / g_vol->mft_record_size;
 	/* Convert to bytes, at least one. */
-	g_mft_bitmap_byte_size = (g_mft_bitmap_size + 7) >> 3;
+	g_mft_bitmap_byte_size = (mft_bitmap_size + 7) >> 3;
 	/* Mft bitmap is allocated in multiples of 8 bytes. */
 	g_mft_bitmap_byte_size = (g_mft_bitmap_byte_size + 7) & ~7;
-	ntfs_log_debug("g_mft_bitmap_size = %i, g_mft_bitmap_byte_size = %i\n",
-			g_mft_bitmap_size, g_mft_bitmap_byte_size);
+	ntfs_log_debug("mft_bitmap_size = %i, g_mft_bitmap_byte_size = %i\n",
+			mft_bitmap_size, g_mft_bitmap_byte_size);
 	g_mft_bitmap = calloc(1, g_mft_bitmap_byte_size);
 	if (!g_mft_bitmap)
 		err_exit("Failed to allocate internal buffer: %s\n",
@@ -4139,19 +4125,20 @@ static void mkntfs_fill_device_with_zeroes(void)
  * mkntfs_sync_index_record
  *
  * (ERSO) made a function out of this, but the reason for doing that
- * disapeared during coding....
+ * disappeared during coding....
  */
 static void mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 		ntfschar* name, u32 name_len)
 {
 	/* This function uses:
-	 *     g_rl_index
 	 *     g_vol
 	 */
 	int i, err;
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
 	long long lw;
+	runlist	*rl_index = NULL;
+
 	i = 5 * sizeof(ntfschar);
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 
@@ -4165,24 +4152,28 @@ static void mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 		err_exit("BUG: $INDEX_ALLOCATION attribute not found.\n");
 	}
 	a = ctx->attr;
-	g_rl_index = ntfs_mapping_pairs_decompress(g_vol, a, NULL);
-	if (!g_rl_index) {
+	rl_index = ntfs_mapping_pairs_decompress(g_vol, a, NULL);
+	if (!rl_index) {
 		ntfs_attr_put_search_ctx(ctx);
 		err_exit("Failed to decompress runlist of $INDEX_ALLOCATION "
 				"attribute.\n");
 	}
 	if (sle64_to_cpu(a->initialized_size) < i) {
 		ntfs_attr_put_search_ctx(ctx);
+		free(rl_index);
 		err_exit("BUG: $INDEX_ALLOCATION attribute too short.\n");
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	i = sizeof(INDEX_BLOCK) - sizeof(INDEX_HEADER) +
 			le32_to_cpu(idx->index.allocated_size);
 	err = ntfs_mst_pre_write_fixup((NTFS_RECORD*)idx, i);
-	if (err)
+	if (err) {
+		free(rl_index);
 		err_exit("ntfs_mst_pre_write_fixup() failed while "
 			"syncing index block.\n");
-	lw = ntfs_rlwrite(g_vol->dev, g_rl_index, (u8*)idx, i, NULL);
+	}
+	lw = ntfs_rlwrite(g_vol->dev, rl_index, (u8*)idx, i, NULL);
+	free(rl_index);
 	if (lw != i)
 		err_exit("Error writing $INDEX_ALLOCATION.\n");
 	/* No more changes to @idx below here so no need for fixup: */
@@ -4278,10 +4269,6 @@ static void mkntfs_create_root_structures(void)
 {
 	/* This function uses:
 	 *     g_buf
-	 *     g_buf_sds
-	 *     g_buf_sds_first_size
-	 *     g_buf_sds_init
-	 *     g_buf_sds_size
 	 *     g_index_block
 	 *     g_lcn_bitmap
 	 *     g_lcn_bitmap_byte_size
@@ -4309,6 +4296,12 @@ static void mkntfs_create_root_structures(void)
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
 	int nr_sysfiles;
+	u8 *buf2 = NULL;
+	int buf2_size = 0;
+	int buf_sds_first_size = 0;
+	int buf_sds_size = 0;
+	char *buf_sds_init = NULL;
+	char *buf_sds = NULL;
 
 	ntfs_log_quiet("Creating NTFS volume structures.\n");
 	nr_sysfiles = g_vol->major_ver < 3 ? 16 : 27;
@@ -4493,15 +4486,15 @@ static void mkntfs_create_root_structures(void)
 	/* dump_mft_record(m); */
 	ntfs_log_verbose("Creating $LogFile (mft record 2)\n");
 	m = (MFT_RECORD*)(g_buf + 2 * g_vol->mft_record_size);
-	g_buf2 = malloc(g_logfile_size);
-	if (!g_buf2)
+	buf2 = malloc(g_logfile_size);
+	if (!buf2)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memset(g_buf2, -1, g_logfile_size);
-	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, g_buf2,
+	memset(buf2, -1, g_logfile_size);
+	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, buf2,
 			g_logfile_size);
-	free(g_buf2);
-	g_buf2 = NULL;
+	free(buf2);
+	buf2 = NULL;
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_LogFile, FILE_LogFile),
@@ -4519,25 +4512,25 @@ static void mkntfs_create_root_structures(void)
 	ntfs_log_verbose("Creating $AttrDef (mft record 4)\n");
 	m = (MFT_RECORD*)(g_buf + 4 * g_vol->mft_record_size);
 	if (g_vol->major_ver < 3)
-		g_buf2_size = 36000;
+		buf2_size = 36000;
 	else
-		g_buf2_size = g_vol->attrdef_len;
-	g_buf2 = calloc(1, g_buf2_size);
-	if (!g_buf2)
+		buf2_size = g_vol->attrdef_len;
+	buf2 = calloc(1, buf2_size);
+	if (!buf2)
 		err_exit("Failed to allocate internal buffer: %s\n",
 			strerror(errno));
-	memcpy(g_buf2, g_vol->attrdef, g_vol->attrdef_len);			// XXX why do we need a special buffer for this?
-	err = add_attr_data(m, NULL, 0, 0, 0, g_buf2, g_buf2_size);
-	free(g_buf2);
-	g_buf2 = NULL;
+	memcpy(buf2, g_vol->attrdef, g_vol->attrdef_len);			// XXX why do we need a special buffer for this?
+	err = add_attr_data(m, NULL, 0, 0, 0, buf2, buf2_size);
+	free(buf2);
+	buf2 = NULL;
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_AttrDef, FILE_AttrDef),
-				(g_buf2_size + g_vol->cluster_size - 1) &
-				~(g_vol->cluster_size - 1), g_buf2_size,
+				(buf2_size + g_vol->cluster_size - 1) &
+				~(g_vol->cluster_size - 1), buf2_size,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
 				"$AttrDef", FILE_NAME_WIN32_AND_DOS);
-	g_buf2_size = 0;
+	buf2_size = 0;
 	if (!err) {
 		init_system_file_sd(FILE_AttrDef, &sd, &i);
 		err = add_attr_sd(m, sd, i);
@@ -4571,17 +4564,17 @@ static void mkntfs_create_root_structures(void)
 	/* dump_mft_record(m); */
 	ntfs_log_verbose("Creating $Boot (mft record 7)\n");
 	m = (MFT_RECORD*)(g_buf + 7 * g_vol->mft_record_size);
-	g_buf2 = calloc(1, 8192);
-	if (!g_buf2)
+	buf2 = calloc(1, 8192);
+	if (!buf2)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memcpy(g_buf2, boot_array, sizeof(boot_array));
+	memcpy(buf2, boot_array, sizeof(boot_array));
 	/*
-	 * Create the boot sector in g_buf2. Note, that g_buf2 is already zeroed
+	 * Create the boot sector in buf2. Note, that buf2 is already zeroed
 	 * in the boot sector section and that it has the NTFS OEM id/magic
 	 * already inserted, so no need to worry about these things.
 	 */
-	bs = (NTFS_BOOT_SECTOR*)g_buf2;
+	bs = (NTFS_BOOT_SECTOR*)buf2;
 	bs->bpb.bytes_per_sector = cpu_to_le16(opts.sector_size);
 	bs->bpb.sectors_per_cluster = (u8)(g_vol->cluster_size /
 			opts.sector_size);
@@ -4607,10 +4600,12 @@ static void mkntfs_create_root_structures(void)
 	} else {
 		bs->clusters_per_mft_record = -(ffs(g_vol->mft_record_size) - 1);
 		if ((u32)(1 << -bs->clusters_per_mft_record) !=
-				g_vol->mft_record_size)
+				g_vol->mft_record_size) {
+			free(buf2);
 			err_exit("BUG: calculated clusters_per_mft_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_mft_record);
+		}
 	}
 	ntfs_log_debug("clusters per mft record = %i (0x%x)\n",
 			bs->clusters_per_mft_record,
@@ -4620,10 +4615,12 @@ static void mkntfs_create_root_structures(void)
 			g_vol->cluster_size;
 	} else {
 		bs->clusters_per_index_record = -g_vol->indx_record_size_bits;
-		if ((1 << -bs->clusters_per_index_record) != (s32)g_vol->indx_record_size)
+		if ((1 << -bs->clusters_per_index_record) != (s32)g_vol->indx_record_size) {
+			free(buf2);
 			err_exit("BUG: calculated clusters_per_index_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_index_record);
+		}
 	}
 	ntfs_log_debug("clusters per index block = %i (0x%x)\n",
 			bs->clusters_per_index_record,
@@ -4637,9 +4634,11 @@ static void mkntfs_create_root_structures(void)
 	 */
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
-	if (!ntfs_boot_sector_is_ntfs(bs, TRUE))
+	if (!ntfs_boot_sector_is_ntfs(bs, TRUE)) {
+		free(buf2);
 		err_exit("FATAL: Generated boot sector is invalid!\n");
-	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_boot, g_buf2, 8192);
+	}
+	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_boot, buf2, 8192);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_Boot, FILE_Boot),
@@ -4651,10 +4650,12 @@ static void mkntfs_create_root_structures(void)
 		init_system_file_sd(FILE_Boot, &sd, &i);
 		err = add_attr_sd(m, sd, i);
 	}
-	if (err < 0)
+	if (err < 0) {
+		free(buf2);
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
+	}
 
-	if (create_backup_boot_sector(g_buf2)) {
+	if (create_backup_boot_sector(buf2)) {
 		/*
 		 * Pre-2.6 kernels couldn't access the last sector
 		 * if it was odd hence we schedule chkdsk to create it.
@@ -4662,8 +4663,8 @@ static void mkntfs_create_root_structures(void)
 		volume_flags |= VOLUME_IS_DIRTY;
 	}
 
-	free(g_buf2);
-	g_buf2 = NULL;
+	free(buf2);
+	buf2 = NULL;
 
 	create_file_volume(m, root_ref, volume_flags);
 
@@ -4720,26 +4721,28 @@ static void mkntfs_create_root_structures(void)
 					"$Secure", FILE_NAME_WIN32_AND_DOS);
 		if (!err) {
 			if (g_vol->minor_ver == 0) {
-				g_buf_sds_first_size = 0x1E0;
-				g_buf_sds_size = 0x40000 + g_buf_sds_first_size;
-				g_buf_sds_init = calloc(1, g_buf_sds_first_size);
-				init_secure_30(g_buf_sds_init);
+				buf_sds_first_size = 0x1E0;
+				buf_sds_size = 0x40000 + buf_sds_first_size;
+				buf_sds_init = calloc(1, buf_sds_first_size);
+				init_secure_30(buf_sds_init);
 			} else {
-				g_buf_sds_first_size = 0x240;
-				g_buf_sds_size = 0x40000 + g_buf_sds_first_size;
-				g_buf_sds_init = calloc(1, g_buf_sds_first_size);
-				init_secure_31(g_buf_sds_init);
+				buf_sds_first_size = 0x240;
+				buf_sds_size = 0x40000 + buf_sds_first_size;
+				buf_sds_init = calloc(1, buf_sds_first_size);
+				init_secure_31(buf_sds_init);
 			}
-			g_buf_sds = calloc(1,g_buf_sds_size);
-			if (!g_buf_sds)
+			buf_sds = calloc(1,buf_sds_size);
+			if (!buf_sds) {
+				free(buf_sds_init);
 				err_exit("Failed to allocate internal buffer:"
 					" %s\n", strerror(errno));
-			memcpy((char*)g_buf_sds, (char*)g_buf_sds_init,
-				g_buf_sds_first_size);
-			memcpy((char*)g_buf_sds + 0x40000, (char*)g_buf_sds_init,
-				g_buf_sds_first_size);
-			err = add_attr_data(m, "$SDS", 4, 0, 0, (u8*)g_buf_sds,
-				g_buf_sds_size);
+			}
+			memcpy(buf_sds, buf_sds_init, buf_sds_first_size);
+			memcpy(buf_sds + 0x40000, buf_sds_init,
+				buf_sds_first_size);
+			err = add_attr_data(m, "$SDS", 4, 0, 0, (u8*)buf_sds,
+				buf_sds_size);
+			free(buf_sds);
 		}
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
@@ -4751,7 +4754,10 @@ static void mkntfs_create_root_structures(void)
 			err = add_attr_index_root(m, "$SII", 4, 0, AT_UNUSED,
 				COLLATION_NTOFS_ULONG, g_vol->indx_record_size);
 		if (!err)
-			err = initialize_secure(g_buf_sds_init, g_buf_sds_first_size, m);
+			err = initialize_secure(buf_sds_init, buf_sds_first_size, m);
+
+		free (buf_sds_init);
+		buf_sds_init = NULL;
 		if (err < 0)
 			err_exit("Couldn't create $Secure: %s\n",
 				strerror(-err));
