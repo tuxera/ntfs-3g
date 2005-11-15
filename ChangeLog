@@ -88,6 +88,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  stayed at approximately same level.  (Yura)
 	- Automatically update access and change time in ntfs_attr_p{read,write}
 	  and ntfs_attr_truncate.  (Yura)
+	- Add support of MS_NOATIME flag to ntfs_mount().  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

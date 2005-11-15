@@ -82,6 +82,7 @@ typedef enum {
 	NV_ReadOnly,		/* 1: Volume is read-only. */
 	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
 	NV_LogFileEmpty,	/* 1: $logFile journal is empty. */
+	NV_NoATime,		/* 1: Do not update access time. */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -100,11 +101,15 @@ typedef enum {
 #define NVolSetLogFileEmpty(nv)		  set_nvol_flag(nv, LogFileEmpty)
 #define NVolClearLogFileEmpty(nv)	clear_nvol_flag(nv, LogFileEmpty)
 
+#define NVolNoATime(nv)			 test_nvol_flag(nv, NoATime)
+#define NVolSetNoATime(nv)		  set_nvol_flag(nv, NoATime)
+#define NVolClearNoATime(nv)		clear_nvol_flag(nv, NoATime)
+
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.
  * NTFS version 2.x is used by Windows 2000 Beta
  * NTFS version 3.0 is used by Windows 2000.
- * NTFS version 3.1 is used by Windows XP, Windows Server 2003 and Longhorn.
+ * NTFS version 3.1 is used by Windows XP, 2003 and Vista.
  */
 
 #define NTFS_V1_1(major, minor) ((major) == 1 && (minor) == 1)
@@ -200,13 +205,13 @@ struct _ntfs_volume {
 extern ntfs_volume *ntfs_volume_alloc(void);
 
 extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
-		unsigned long rwflag);
+		unsigned long flags);
 
 extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
-		unsigned long rwflag);
+		unsigned long flags);
 extern int ntfs_device_umount(ntfs_volume *vol, const BOOL force);
 
-extern ntfs_volume *ntfs_mount(const char *name, unsigned long rwflag);
+extern ntfs_volume *ntfs_mount(const char *name, unsigned long flags);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);

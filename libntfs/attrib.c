@@ -770,8 +770,10 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		errno = EACCES;
 		return -1;
 	}
+	vol = na->ni->vol;
 	/* Update access time if accessing unnamed data attribute. */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+	if (!NVolReadOnly(vol) && !NVolNoATime(vol) && na->type == AT_DATA &&
+			na->name == AT_UNNAMED) {
 		na->ni->last_access_time = time(NULL);
 		NInoFileNameSetDirty(na->ni);
 		NInoSetDirty(na->ni);
@@ -784,7 +786,6 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 			return 0;
 		count = na->data_size - pos;
 	}
-	vol = na->ni->vol;
 	/* If it is a resident attribute, get the value from the mft record. */
 	if (!NAttrNonResident(na)) {
 		ntfs_attr_search_ctx *ctx;

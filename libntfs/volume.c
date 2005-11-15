@@ -384,7 +384,7 @@ error_exit:
 /**
  * ntfs_volume_startup - allocate and setup an ntfs volume
  * @dev:	device to open
- * @rwflag:	optional mount flags
+ * @flags:	optional mount flags
  *
  * Load, verify, and parse bootsector; load and setup $MFT and $MFTMirr. After
  * calling this function, the volume is setup sufficiently to call all read
@@ -393,7 +393,7 @@ error_exit:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
+ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 {
 	LCN mft_zone_size, mft_lcn;
 	s64 br;
@@ -429,8 +429,10 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long rwflag)
 	}
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
-	if ((rwflag & MS_RDONLY) == MS_RDONLY)
+	if (flags & MS_RDONLY)
 		NVolSetReadOnly(vol);
+	if (flags & MS_NOATIME)
+		NVolSetNoATime(vol);
 	ntfs_log_debug("Reading bootsector... ");
 	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
 		ntfs_log_debug(FAILED);
@@ -730,15 +732,16 @@ out:
 /**
  * ntfs_device_mount - open ntfs volume
  * @dev:	device to open
- * @rwflag:	optional mount flags
+ * @flags:	optional mount flags
  *
  * This function mounts an ntfs volume. @dev should describe the device which
  * to mount as the ntfs volume.
  *
- * @rwflags is an optional second parameter. The same flags are used as for
- * the mount system call (man 2 mount). Currently only the following flag
- * is implemented:
+ * @flags is an optional second parameter. The same flags are used as for
+ * the mount system call (man 2 mount). Currently only the following flags
+ * are implemented:
  *	MS_RDONLY	- mount volume read-only
+ *	MS_NOATIME	- do not update access time
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -749,7 +752,7 @@ out:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
+ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 {
 	s64 l;
 #ifndef NTFS_DISABLE_DEBUG_LOGGING
@@ -767,7 +770,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	int i, j, eo;
 	u32 u;
 
-	vol = ntfs_volume_startup(dev, rwflag);
+	vol = ntfs_volume_startup(dev, flags);
 	if (!vol) {
 		ntfs_log_perror("Failed to startup volume");
 		return NULL;
@@ -1101,7 +1104,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long rwflag)
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
 	 */
-	if (!(rwflag & MS_RDONLY)) {
+	if (!(flags & MS_RDONLY)) {
 		if (ntfs_volume_check_logfile(vol) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_hiberfile(vol) < 0)
@@ -1125,15 +1128,16 @@ error_exit:
 /**
  * ntfs_mount - open ntfs volume
  * @name:	name of device/file to open
- * @rwflag:	optional mount flags
+ * @flags:	optional mount flags
  *
  * This function mounts an ntfs volume. @name should contain the name of the
  * device/file to mount as the ntfs volume.
  *
- * @rwflags is an optional second parameter. The same flags are used as for
- * the mount system call (man 2 mount). Currently only the following flag
- * is implemented:
+ * @flags is an optional second parameter. The same flags are used as for
+ * the mount system call (man 2 mount). Currently only the following flags
+ * are implemented:
  *	MS_RDONLY	- mount volume read-only
+ *	MS_NOATIME	- do not update access time
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1148,7 +1152,7 @@ error_exit:
  * soon as the function returns.
  */
 ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
-		unsigned long rwflag __attribute__((unused)))
+		unsigned long flags __attribute__((unused)))
 {
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;
@@ -1159,7 +1163,7 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 	if (!dev)
 		return NULL;
 	/* Call ntfs_device_mount() to do the actual mount. */
-	vol = ntfs_device_mount(dev, rwflag);
+	vol = ntfs_device_mount(dev, flags);
 	if (!vol) {
 		int eo = errno;
 		ntfs_device_free(dev);
