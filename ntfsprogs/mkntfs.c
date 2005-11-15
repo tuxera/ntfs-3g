@@ -4932,7 +4932,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 
 	/* transfer some options to the volume */
 	g_vol->vol_name  = opts.label;	// XXX when this is strdup, either free it, or call ntfs_umount
-	if (opts.ver_major && opts.ver_minor) {
+	if (opts.ver_major) {
 		g_vol->major_ver = opts.ver_major;
 		g_vol->minor_ver = opts.ver_minor;
 	} else {
