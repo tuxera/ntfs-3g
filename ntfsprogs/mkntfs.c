@@ -3260,12 +3260,14 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 		ntfs_log_error("create_hardlink failed inserting index entry: %s\n",
 				strerror(-i));
 		/* FIXME: Remove the file name attribute from @m_file. */
+		free(idx_entry_new);
 		free(fn);
 		/* Undo link count increment. */
 		m_file->link_count = cpu_to_le16(
 				le16_to_cpu(m_file->link_count) - 1);
 		return i;
 	}
+	free(idx_entry_new);
 	free(fn);
 	return 0;
 }
@@ -3383,11 +3385,8 @@ static void mkntfs_exit(void)
 				ntfs_log_perror("Warning: Could not close %s", g_vol->dev->d_name);
 			ntfs_device_free(g_vol->dev);
 		}
-		/* Only free the attribute definitions, if we originally allocated them. */
-		if ((g_vol->attrdef != (const ATTR_DEF*)attrdef_ntfs12_array) &&
-		    (g_vol->attrdef != (const ATTR_DEF*)attrdef_ntfs3x_array)) {
-			free(g_vol->attrdef);
-		}
+		free(g_vol->vol_name);
+		free(g_vol->attrdef);
 		free(g_vol->upcase);
 		free(g_vol);
 		g_vol = NULL;
@@ -3514,7 +3513,7 @@ static void mkntfs_override_phys_params(void)
 	/* This function uses:
 	 *     g_vol
 	 *     g_volume_size
-	 */ 
+	 */
 	int i;
 
 	/* If user didn't specify the sector size, determine it now. */
@@ -4288,16 +4287,17 @@ static void mkntfs_create_root_structures(void)
 	 *     g_volume_obj_id
 	 */
 	NTFS_BOOT_SECTOR *bs;
-	ATTR_RECORD *a;
 	MFT_RECORD *m;
-	MFT_REF root_ref, extend_ref;
-	int i, j, err;
+	MFT_REF root_ref;
+	MFT_REF extend_ref;
+	int i;
+	int j;
+	int err;
 	u8 *sd;
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
 	int nr_sysfiles;
 	u8 *buf2 = NULL;
-	int buf2_size = 0;
 	int buf_sds_first_size = 0;
 	int buf_sds_size = 0;
 	char *buf_sds_init = NULL;
@@ -4328,7 +4328,7 @@ static void mkntfs_create_root_structures(void)
 	 * fill the rest of it with empty, formatted records.
 	 */
 	if (nr_sysfiles * (s32)g_vol->mft_record_size < g_mft_size) {
-		for (i = nr_sysfiles; 
+		for (i = nr_sysfiles;
 		      i * (s32)g_vol->mft_record_size < g_mft_size; i++) {
 			m = (MFT_RECORD *)(g_buf + i * g_vol->mft_record_size);
 			if (ntfs_mft_record_layout(g_vol, 0, m))
@@ -4422,6 +4422,7 @@ static void mkntfs_create_root_structures(void)
 		err = upgrade_to_large_index(m, "$I30", 4, 0, &g_index_block);
 	if (!err) {
 		ntfs_attr_search_ctx *ctx;
+		ATTR_RECORD *a;
 		ctx = ntfs_attr_get_search_ctx(NULL, m);
 		if (!ctx)
 			err_exit("Failed to allocate attribute search "
@@ -4511,26 +4512,15 @@ static void mkntfs_create_root_structures(void)
 
 	ntfs_log_verbose("Creating $AttrDef (mft record 4)\n");
 	m = (MFT_RECORD*)(g_buf + 4 * g_vol->mft_record_size);
-	if (g_vol->major_ver < 3)
-		buf2_size = 36000;
-	else
-		buf2_size = g_vol->attrdef_len;
-	buf2 = calloc(1, buf2_size);
-	if (!buf2)
-		err_exit("Failed to allocate internal buffer: %s\n",
-			strerror(errno));
-	memcpy(buf2, g_vol->attrdef, g_vol->attrdef_len);			// XXX why do we need a special buffer for this?
-	err = add_attr_data(m, NULL, 0, 0, 0, buf2, buf2_size);
-	free(buf2);
-	buf2 = NULL;
+
+	err = add_attr_data(m, NULL, 0, 0, 0, (u8*)g_vol->attrdef, g_vol->attrdef_len);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_AttrDef, FILE_AttrDef),
-				(buf2_size + g_vol->cluster_size - 1) &
-				~(g_vol->cluster_size - 1), buf2_size,
+				(g_vol->attrdef_len + g_vol->cluster_size - 1) &
+				~(g_vol->cluster_size - 1), g_vol->attrdef_len,
 				FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM, 0, 0,
 				"$AttrDef", FILE_NAME_WIN32_AND_DOS);
-	buf2_size = 0;
 	if (!err) {
 		init_system_file_sd(FILE_AttrDef, &sd, &i);
 		err = add_attr_sd(m, sd, i);
@@ -4931,7 +4921,14 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	}
 
 	/* transfer some options to the volume */
-	g_vol->vol_name  = opts.label;	// XXX when this is strdup, either free it, or call ntfs_umount
+	if (opts.label) {
+		g_vol->vol_name = strdup(opts.label);
+		if (!g_vol->vol_name) {
+			ntfs_log_perror("Could not copy volume name");
+			goto done;
+		}
+	}
+
 	if (opts.ver_major) {
 		g_vol->major_ver = opts.ver_major;
 		g_vol->minor_ver = opts.ver_minor;
@@ -4958,11 +4955,22 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	g_vol->indx_record_size_bits = 12;
 
 	if (g_vol->major_ver < 3) {
-		g_vol->attrdef = (ATTR_DEF*)&attrdef_ntfs12_array;
-		g_vol->attrdef_len = sizeof(attrdef_ntfs12_array);
+		g_vol->attrdef = calloc(1, 36000);
+		if (g_vol->attrdef) {
+			memcpy(g_vol->attrdef, attrdef_ntfs12_array, sizeof(attrdef_ntfs12_array));
+			g_vol->attrdef_len = 36000;
+		}
 	} else {
-		g_vol->attrdef = (ATTR_DEF*)&attrdef_ntfs3x_array;
-		g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
+		g_vol->attrdef = malloc(sizeof(attrdef_ntfs3x_array));
+		if (g_vol->attrdef) {
+			memcpy(g_vol->attrdef, attrdef_ntfs3x_array, sizeof(attrdef_ntfs3x_array));
+			g_vol->attrdef_len = sizeof(attrdef_ntfs3x_array);
+		}
+	}
+
+	if (!g_vol->attrdef) {
+		ntfs_log_perror("Could not create attrdef structure");
+		goto done;
 	}
 
 	if (mkntfs_open_partition())		/* Open the partition. */
