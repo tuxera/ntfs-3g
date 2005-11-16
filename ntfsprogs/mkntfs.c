@@ -577,6 +577,20 @@ static time_t mkntfs_time(void)
 }
 
 /**
+ * mkntfs_calloc
+ */
+static void *ntfs_calloc(size_t nmemb, size_t size)
+{
+	void *p;
+	
+	p = calloc(nmemb, size);
+	if (!p)
+		ntfs_log_perror("Failed to calloc() %lld bytes", 
+				(long long)nmemb * size);
+	return p;
+}
+
+/**
  * append_to_bad_blocks
  *
  * Note: Might not return.
@@ -2937,14 +2951,87 @@ static int initialize_quota(MFT_RECORD *m)
 	INDEX_ENTRY *idx_entry_o, *idx_entry_q1, *idx_entry_q2;
 	QUOTA_O_INDEX_DATA *idx_entry_o_data;
 	QUOTA_CONTROL_ENTRY *idx_entry_q1_data, *idx_entry_q2_data;
+	
 	err = 0;
-	o_size = cpu_to_le32(0x28);
+	
+	/* q index entry num 1 */
 	q1_size = cpu_to_le32(0x48);
-	q2_size = cpu_to_le32(0x58);
+	idx_entry_q1 = ntfs_calloc(1, q1_size);
+	if (!idx_entry_q1)
+		return errno;
+	
+	idx_entry_q1->data_offset = cpu_to_le16(0x14);
+	idx_entry_q1->data_length = cpu_to_le16(0x30);
+	idx_entry_q1->reservedV = cpu_to_le32(0x00);
+	idx_entry_q1->length = cpu_to_le16(0x48);
+	idx_entry_q1->key_length = cpu_to_le16(0x04);
+	idx_entry_q1->flags = cpu_to_le16(0x00);
+	idx_entry_q1->reserved = cpu_to_le16(0x00);
+	idx_entry_q1->key.owner_id = cpu_to_le32(0x01);
+	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
+			+ idx_entry_q1->data_offset);
+	idx_entry_q1_data->version = cpu_to_le32(0x02);
+	idx_entry_q1_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
+	if (g_vol->minor_ver == 0)
+		idx_entry_q1_data->flags |= QUOTA_FLAG_OUT_OF_DATE;
+	idx_entry_q1_data->bytes_used = cpu_to_le64(0x00);
+	idx_entry_q1_data->change_time = utc2ntfs(mkntfs_time());
+	idx_entry_q1_data->threshold = cpu_to_sle64(-0x01);
+	idx_entry_q1_data->limit = cpu_to_sle64(-0x01);
+	idx_entry_q1_data->exceeded_time = cpu_to_sle64(0x00);
 
-	idx_entry_o = calloc(1, o_size);
-	idx_entry_q1 = calloc(1, q1_size);
-	idx_entry_q2 = calloc(1, q2_size);
+	err = insert_index_entry_in_res_dir_index(idx_entry_q1,
+		q1_size, m,
+		NTFS_INDEX_Q, 2, AT_UNUSED);
+	free(idx_entry_q1);
+	if (err)
+		return err;
+
+	/* q index entry num 2 */
+	q2_size = cpu_to_le32(0x58);
+	idx_entry_q2 = ntfs_calloc(1, q2_size);
+	if (!idx_entry_q2)
+		return errno;
+	
+	idx_entry_q2->data_offset = cpu_to_le16(0x14);
+	idx_entry_q2->data_length = cpu_to_le16(0x40);
+	idx_entry_q2->reservedV = cpu_to_le32(0x00);
+	idx_entry_q2->length = cpu_to_le16(0x58);
+	idx_entry_q2->key_length = cpu_to_le16(0x04);
+	idx_entry_q2->flags = cpu_to_le16(0x00);
+	idx_entry_q2->reserved = cpu_to_le16(0x00);
+	idx_entry_q2->key.owner_id = QUOTA_FIRST_USER_ID;
+	idx_entry_q2_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q2
+			+ idx_entry_q2->data_offset);
+	idx_entry_q2_data->version = cpu_to_le32(0x02);
+	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
+	idx_entry_q2_data->bytes_used = cpu_to_le64(0x00);
+	idx_entry_q2_data->change_time = utc2ntfs(mkntfs_time());;
+	idx_entry_q2_data->threshold = cpu_to_sle64(-0x01);
+	idx_entry_q2_data->limit = cpu_to_sle64(-0x01);
+	idx_entry_q2_data->exceeded_time = cpu_to_sle64(0x00);
+	idx_entry_q2_data->sid.revision = 1;
+	idx_entry_q2_data->sid.sub_authority_count = 2;
+	idx_entry_q2_data->sid.identifier_authority.high_part =
+		cpu_to_le16(0x0000);
+	idx_entry_q2_data->sid.identifier_authority.low_part =
+		cpu_to_le32(0x05000000);
+	idx_entry_q2_data->sid.sub_authority[0] =
+		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	idx_entry_q2_data->sid.sub_authority[1] =
+		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+
+	err = insert_index_entry_in_res_dir_index(idx_entry_q2,
+		q2_size, m,
+		NTFS_INDEX_Q, 2, AT_UNUSED);
+	free(idx_entry_q2);
+	if (err)
+		return err;
+
+	o_size = cpu_to_le32(0x28);
+	idx_entry_o = ntfs_calloc(1, o_size);
+	if (!idx_entry_o)
+		return errno;
 
 	idx_entry_o->data_offset = cpu_to_le16(0x20);
 	idx_entry_o->data_length = cpu_to_le16(0x04);
@@ -2973,70 +3060,6 @@ static int initialize_quota(MFT_RECORD *m)
 		o_size, m,
 		NTFS_INDEX_O, 2, AT_UNUSED);
 	free(idx_entry_o);
-	if (err)
-		return err;
-
-	/* q index entry num 1 */
-	idx_entry_q1->data_offset = cpu_to_le16(0x14);
-	idx_entry_q1->data_length = cpu_to_le16(0x30);
-	idx_entry_q1->reservedV = cpu_to_le32(0x00);
-	idx_entry_q1->length = cpu_to_le16(0x48);
-	idx_entry_q1->key_length = cpu_to_le16(0x04);
-	idx_entry_q1->flags = cpu_to_le16(0x00);
-	idx_entry_q1->reserved = cpu_to_le16(0x00);
-	idx_entry_q1->key.owner_id = cpu_to_le32(0x01);
-	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
-			+ idx_entry_q1->data_offset);
-	idx_entry_q1_data->version = cpu_to_le32(0x02);
-	idx_entry_q1_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
-	if (g_vol->minor_ver == 0)
-		idx_entry_q1_data->flags |= QUOTA_FLAG_OUT_OF_DATE;
-	idx_entry_q1_data->bytes_used = cpu_to_le64(0x00);
-	idx_entry_q1_data->change_time = utc2ntfs(time(NULL));
-	idx_entry_q1_data->threshold = cpu_to_sle64(-0x01);
-	idx_entry_q1_data->limit = cpu_to_sle64(-0x01);
-	idx_entry_q1_data->exceeded_time = cpu_to_sle64(0x00);
-
-	err = insert_index_entry_in_res_dir_index(idx_entry_q1,
-		q1_size, m,
-		NTFS_INDEX_Q, 2, AT_UNUSED);
-	free(idx_entry_q1);
-	if (err)
-		return err;
-
-	/* q index entry num 2 */
-	idx_entry_q2->data_offset = cpu_to_le16(0x14);
-	idx_entry_q2->data_length = cpu_to_le16(0x40);
-	idx_entry_q2->reservedV = cpu_to_le32(0x00);
-	idx_entry_q2->length = cpu_to_le16(0x58);
-	idx_entry_q2->key_length = cpu_to_le16(0x04);
-	idx_entry_q2->flags = cpu_to_le16(0x00);
-	idx_entry_q2->reserved = cpu_to_le16(0x00);
-	idx_entry_q2->key.owner_id = QUOTA_FIRST_USER_ID;
-	idx_entry_q2_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q2
-			+ idx_entry_q2->data_offset);
-	idx_entry_q2_data->version = cpu_to_le32(0x02);
-	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
-	idx_entry_q2_data->bytes_used = cpu_to_le64(0x00);
-	idx_entry_q2_data->change_time = utc2ntfs(time(NULL));;
-	idx_entry_q2_data->threshold = cpu_to_sle64(-0x01);
-	idx_entry_q2_data->limit = cpu_to_sle64(-0x01);
-	idx_entry_q2_data->exceeded_time = cpu_to_sle64(0x00);
-	idx_entry_q2_data->sid.revision = 1;
-	idx_entry_q2_data->sid.sub_authority_count = 2;
-	idx_entry_q2_data->sid.identifier_authority.high_part =
-		cpu_to_le16(0x0000);
-	idx_entry_q2_data->sid.identifier_authority.low_part =
-		cpu_to_le32(0x05000000);
-	idx_entry_q2_data->sid.sub_authority[0] =
-		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	idx_entry_q2_data->sid.sub_authority[1] =
-		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
-
-	err = insert_index_entry_in_res_dir_index(idx_entry_q2,
-		q2_size, m,
-		NTFS_INDEX_Q, 2, AT_UNUSED);
-	free(idx_entry_q2);
 
 	return err;
 }
@@ -3191,9 +3214,8 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	if (!fn)
 		return -errno;
 	fn->parent_directory = ref_parent;
-	/* FIXME: Is this correct? Or do we have to copy the creation_time */
-	/* from the std info? */
-	fn->creation_time = utc2ntfs(time(NULL));
+	/* FIXME: copy the creation_time from the std info */
+	fn->creation_time = utc2ntfs(mkntfs_time());
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
