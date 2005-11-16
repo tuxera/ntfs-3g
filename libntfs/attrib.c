@@ -772,7 +772,8 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	}
 	vol = na->ni->vol;
 	/* Update access time if accessing unnamed data attribute. */
-	if (!NVolReadOnly(vol) && !NVolNoATime(vol) && na->type == AT_DATA &&
+	if (!NVolReadOnly(vol) && !NVolNoATime(vol) && na->ni->mft_no >=
+			FILE_first_user && na->type == AT_DATA &&
 			na->name == AT_UNNAMED) {
 		na->ni->last_access_time = time(NULL);
 		NInoFileNameSetDirty(na->ni);
@@ -960,7 +961,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		return -1;
 	}
 	/* Update time if writing to unnamed data attribute. */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+	if (na->ni->mft_no >= FILE_first_user && na->type == AT_DATA &&
+			na->name == AT_UNNAMED) {
 		na->ni->last_data_change_time = time(NULL);
 		na->ni->last_mft_change_time = time(NULL);
 		NInoFileNameSetDirty(na->ni);
