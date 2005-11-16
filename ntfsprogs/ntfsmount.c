@@ -97,6 +97,7 @@ typedef struct {
 	BOOL succeed_chmod;
 	BOOL force;
 	BOOL debug;
+	BOOL noatime;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -1367,7 +1368,7 @@ static int ntfs_fuse_mount(const char *device)
 	ntfs_volume *vol;
 
 	vol = utils_mount_volume(device, ((ctx->ro) ? MS_RDONLY : 0) |
-			MS_NOATIME, ctx->force);
+			((ctx->noatime) ? MS_NOATIME : 0), ctx->force);
 	if (!vol) {
 		ntfs_log_error("Mount failed.\n");
 		return -1;
@@ -1424,6 +1425,14 @@ static char *parse_mount_options(const char *org_options)
 			}
 			ctx->ro = TRUE;
 			strcat(ret, "ro,");
+		} else if (!strcmp(opt, "noatime")) {
+			if (val) {
+				ntfs_log_error("'noatime' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->noatime = TRUE;
+			strcat(ret, "noatime,"); /* Duplicate it for FUSE. */
 		} else if (!strcmp(opt, "fake_rw")) {
 			if (val) {
 				ntfs_log_error("'fake_rw' option should not "
