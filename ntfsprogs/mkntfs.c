@@ -4414,10 +4414,10 @@ static void mkntfs_create_root_structures(void)
 		if (g_vol->major_ver == 1) {
 			init_system_file_sd(FILE_root, &sd, &i);
 			err = add_attr_sd(m, sd, i);
-		} else if (NTFS_V3_0(g_vol->major_ver, g_vol->minor_ver) {
+		} else if (NTFS_V3_0(g_vol->major_ver, g_vol->minor_ver)) {
 			init_system_file_sd(FILE_root, &sd, &i);
 			err = add_attr_sd(m, sd, i);
-		} else if (NTFS_V3_1(g_vol->major_ver, g_vol->minor_ver) {
+		} else if (NTFS_V3_1(g_vol->major_ver, g_vol->minor_ver)) {
 			init_root_sd_31(&sd, &i);
 			err = add_attr_sd(m, sd, i);
 		} else {
