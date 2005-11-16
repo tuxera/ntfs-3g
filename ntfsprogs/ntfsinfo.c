@@ -497,7 +497,7 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 		flags &= ~FILE_ATTR_VIEW_INDEX_PRESENT;
 	}
 	if (flags)
-		printf(" UNKNOWN: 0x%04x", (unsigned int)le32_to_cpu(flags));
+		printf(" UNKNOWN: 0x%08x", (unsigned int)le32_to_cpu(flags));
 	printf("\n");
 }
 
@@ -1136,7 +1136,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				 le32_to_cpu(entry->key.sii.security_id));
 		break;
 	case INDEX_ATTR_SECURE_SDH:
-		ntfs_log_verbose("\t\tKey hash:\t\t 0x%04x\n",
+		ntfs_log_verbose("\t\tKey hash:\t\t 0x%08x\n",
 				 le32_to_cpu(entry->key.sdh.hash));
 		ntfs_log_verbose("\t\tKey security id:\t %u\n",
 				 le32_to_cpu(entry->key.sdh.security_id));
@@ -1146,7 +1146,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tKey GUID:\t\t %s\n", printable_GUID);
 		break;
 	case INDEX_ATTR_REPARSE_R:
-		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%04x\n",
+		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%08x\n",
 				 le32_to_cpu(entry->key.reparse.reparse_tag));
 		ntfs_log_verbose("\t\tKey file id:\t\t %llu\n",
 				 le64_to_cpu(entry->key.reparse.file_id));
@@ -1161,7 +1161,85 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				 le32_to_cpu(entry->key.owner_id));
 		break;
 	default:
-		ntfs_log_verbose("\t\tKey is UNKNOWN: \t 0x%04x\n",
+		ntfs_log_verbose("\t\tIndex attr type is UNKNOWN: \t 0x%08x\n",
+				 le32_to_cpu(type));
+		break;
+	}
+}
+
+typedef	union {		
+		SII_INDEX_DATA sii;		/* $SII index data in $Secure */
+		SDH_INDEX_DATA sdh;		/* $SDH index data in $Secure */
+		QUOTA_O_INDEX_DATA quota_o;	/* $O index data in $Quota    */
+		QUOTA_CONTROL_ENTRY quota_q;	/* $Q index data in $Quota    */
+} __attribute__((__packed__)) INDEX_ENTRY_DATA;
+
+static void ntfs_dump_index_data(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
+{
+	INDEX_ENTRY_DATA *data;
+	
+	data = (INDEX_ENTRY_DATA *)((u8 *)entry + entry->data_offset);
+	
+	switch (type) {
+	case INDEX_ATTR_SECURE_SII:
+		ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n",
+				 le32_to_cpu(data->sii.hash));
+		ntfs_log_verbose("\t\tSecurity id:\t\t %u\n",
+				 le32_to_cpu(data->sii.security_id));
+		ntfs_log_verbose("\t\tOffset in $SDS:\t\t %llu\n",
+				 le64_to_cpu(data->sii.offset));
+		ntfs_log_verbose("\t\tLength in $SDS:\t\t %u\n",
+				 le32_to_cpu(data->sii.length));
+		break;
+	case INDEX_ATTR_SECURE_SDH:
+		ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n",
+				 le32_to_cpu(data->sdh.hash));
+		ntfs_log_verbose("\t\tSecurity id:\t\t %u\n",
+				 le32_to_cpu(data->sdh.security_id));
+		ntfs_log_verbose("\t\tOffset in $SDS:\t\t %llu\n",
+				 le64_to_cpu(data->sdh.offset));
+		ntfs_log_verbose("\t\tLength in $SDS:\t\t %u\n",
+				 le32_to_cpu(data->sdh.length));
+		ntfs_log_verbose("\t\tUnknown (padding):\t 0x%08x\n",
+				 le32_to_cpu(data->sdh.reserved_II));
+		break;
+	case INDEX_ATTR_OBJID_O:
+		/* TODO */
+		break;
+	case INDEX_ATTR_REPARSE_R:
+		/* TODO */
+		break;
+	case INDEX_ATTR_QUOTA_O:
+		ntfs_log_verbose("\t\tOwner id:\t\t %u\n",
+				 le32_to_cpu(data->quota_o.owner_id));
+		ntfs_log_verbose("\t\tUnknown:\t\t %u\n",
+				 le32_to_cpu(data->quota_o.unknown));
+		break;
+	case INDEX_ATTR_QUOTA_Q:
+		ntfs_log_verbose("\t\tVersion:\t\t %u\n",
+				 le32_to_cpu(data->quota_q.version));
+		ntfs_log_verbose("\t\tQuota flags:\t\t 0x%08x\n",
+				 le32_to_cpu(data->quota_q.flags));
+		ntfs_log_verbose("\t\tBytes used:\t\t %llu\n",
+				 le64_to_cpu(data->quota_q.bytes_used));
+		ntfs_log_verbose("\t\tLast changed:\t\t %s",
+				 ntfsinfo_time_to_str(
+					 data->quota_q.change_time));
+		ntfs_log_verbose("\t\tThreshold:\t\t %lld\n",
+				 le64_to_cpu(data->quota_q.threshold));
+		ntfs_log_verbose("\t\tLimit:\t\t\t %lld\n",
+				 le64_to_cpu(data->quota_q.limit));
+		ntfs_log_verbose("\t\tExceeded time:\t\t %lld\n",
+				 le64_to_cpu(data->quota_q.exceeded_time));
+		if (entry->data_length > 48) {
+			char *sid;
+			sid = ntfs_sid_to_mbs(&data->quota_q.sid, NULL, 0);
+			ntfs_log_verbose("\t\tOwner SID:\t\t %s\n", sid);
+			free(sid);
+		}
+		break;
+	default:
+		ntfs_log_verbose("\t\tIndex attr type is UNKNOWN: \t 0x%08x\n",
 				 le32_to_cpu(type));
 		break;
 	}
@@ -1235,7 +1313,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				ntfs_log_verbose("\t\tData length:\t\t %u\n",
 					le16_to_cpu(entry->data_length));
 				ntfs_dump_index_key(entry, type);
-				// TODO: dump index attribute data too
+				ntfs_dump_index_data(entry, type);
 				break;
 		}
 		entry = (INDEX_ENTRY *)((u8 *)entry +
