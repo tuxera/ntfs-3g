@@ -1913,7 +1913,8 @@ typedef struct {
 	u32 security_id;   /* The security_id assigned to the descriptor. */
 	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
 	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
-	u32 reserved_II;   /* Padding - always unicode "II". */
+	u32 reserved_II;   /* Padding - always unicode "II" or zero. This field
+			      isn't counted in INDEX_ENTRY's data_length. */
 } __attribute__((__packed__)) SDH_INDEX_DATA;
 
 /**
