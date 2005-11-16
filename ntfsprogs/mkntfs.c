@@ -1208,15 +1208,18 @@ static runlist * allocate_scattered_clusters(s64 clusters)
 				vcn++;
 			} else {
 				rl[rlpos].vcn = vcn++;
-				rl[rlpos].lcn = prev_lcn = lcn;
-				rl[rlpos].length = prev_run_len = 1LL;
+				rl[rlpos].lcn = lcn;
+				prev_lcn = lcn;
+				rl[rlpos].length = 1LL;
+				prev_run_len = 1LL;
 				rlpos++;
 			}
 			/* Done? */
 			if (!--clusters) {
 				/* Add terminator element and return. */
 				rl[rlpos].vcn = vcn;
-				rl[rlpos].lcn = rl[rlpos].length = 0LL;
+				rl[rlpos].lcn = 0LL;
+				rl[rlpos].length = 0LL;
 				return rl;
 			}
 
@@ -2647,7 +2650,7 @@ static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *idx,
  * ntfs_index_keys_compare
  *
  * not all types of COLLATION_RULES supported yet...
- * added as needed.. (remove this comment when all is added)
+ * added as needed.. (remove this comment when all are added)
  */
 static int ntfs_index_keys_compare(char *key1, char *key2,
 				   int key1_length,int key2_length,
@@ -3478,7 +3481,8 @@ static int mkntfs_open_partition(void)
 		}
 		ntfs_log_warning("mkntfs forced anyway.\n");
 #ifdef HAVE_LINUX_MAJOR_H
-	} else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 64 == 0) || (SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 16 == 0)) {
+	} else if ((IDE_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 64 == 0) ||
+		  (SCSI_DISK_MAJOR(MAJOR(sbuf.st_rdev)) && MINOR(sbuf.st_rdev) % 16 == 0)) {
 		ntfs_log_error("%s is entire device, not just one partition.\n", g_vol->dev->d_name);
 		if (!opts.force) {
 			ntfs_log_error("Refusing to make a filesystem here!\n");
@@ -3802,7 +3806,8 @@ static void mkntfs_initialize_bitmaps(void)
 	 * Size is always one cluster, even though valid data size and
 	 * initialized data size are only 8 bytes.
 	 */
-	g_rl_mft_bmp[1].vcn = g_rl_mft_bmp[0].length = 1LL;
+	g_rl_mft_bmp[1].vcn = 1LL;
+	g_rl_mft_bmp[0].length = 1LL;
 	g_rl_mft_bmp[1].lcn = -1LL;
 	g_rl_mft_bmp[1].length = 0LL;
 	/* Allocate cluster for mft bitmap. */
@@ -3874,7 +3879,8 @@ static void mkntfs_initialize_rl_mft(void)
 	g_rl_mft[0].lcn = g_mft_lcn;
 	/* rounded up division by cluster size */
 	j = (g_mft_size + g_vol->cluster_size - 1) / g_vol->cluster_size;
-	g_rl_mft[1].vcn = g_rl_mft[0].length = j;
+	g_rl_mft[1].vcn = j;
+	g_rl_mft[0].length = j;
 	g_rl_mft[1].lcn = -1LL;
 	g_rl_mft[1].length = 0LL;
 	/* Allocate clusters for mft. */
@@ -3900,7 +3906,8 @@ static void mkntfs_initialize_rl_mft(void)
 	 * whichever is bigger).
 	 */
 	j = (4 * g_vol->mft_record_size + g_vol->cluster_size - 1) / g_vol->cluster_size;
-	g_rl_mftmirr[1].vcn = g_rl_mftmirr[0].length = j;
+	g_rl_mftmirr[1].vcn = j;
+	g_rl_mftmirr[0].length = j;
 	g_rl_mftmirr[1].lcn = -1LL;
 	g_rl_mftmirr[1].length = 0LL;
 	/* Allocate clusters for mft mirror. */
@@ -3972,7 +3979,8 @@ static void mkntfs_initialize_rl_logfile(void)
 		err_exit("$LogFile would be created with invalid size. This "
 				"is not allowed as it would cause Windows to "
 				"blue screen and during boot.\n");
-	g_rl_logfile[1].vcn = g_rl_logfile[0].length = j;
+	g_rl_logfile[1].vcn = j;
+	g_rl_logfile[0].length = j;
 	g_rl_logfile[1].lcn = -1LL;
 	g_rl_logfile[1].length = 0LL;
 	/* Allocate clusters for log file. */
@@ -4005,7 +4013,8 @@ static void mkntfs_initialize_rl_boot(void)
 	 * bigger.
 	 */
 	j = (8192 + g_vol->cluster_size - 1) / g_vol->cluster_size;
-	g_rl_boot[1].vcn = g_rl_boot[0].length = j;
+	g_rl_boot[1].vcn = j;
+	g_rl_boot[0].length = j;
 	g_rl_boot[1].lcn = -1LL;
 	g_rl_boot[1].length = 0LL;
 	/* Allocate clusters for $Boot. */
@@ -4034,7 +4043,8 @@ static void mkntfs_initialize_rl_bad(void)
 	 * $BadClus named stream $Bad contains the whole volume as a single
 	 * sparse runlist entry.
 	 */
-	g_rl_bad[1].vcn = g_rl_bad[0].length = g_vol->nr_clusters;
+	g_rl_bad[1].vcn = g_vol->nr_clusters;
+	g_rl_bad[0].length = g_vol->nr_clusters;
 	g_rl_bad[1].lcn = -1LL;
 	g_rl_bad[1].length = 0LL;
 
@@ -4259,6 +4269,7 @@ bb_err:
 	return -1;
 }
 
+
 /**
  * mkntfs_create_root_structures -
  *
@@ -4297,7 +4308,7 @@ static void mkntfs_create_root_structures(void)
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = 0;
 	int nr_sysfiles;
-	u8 *buf2 = NULL;
+	u8 *buf_log = NULL;
 	int buf_sds_first_size = 0;
 	int buf_sds_size = 0;
 	char *buf_sds_init = NULL;
@@ -4403,10 +4414,10 @@ static void mkntfs_create_root_structures(void)
 		if (g_vol->major_ver == 1) {
 			init_system_file_sd(FILE_root, &sd, &i);
 			err = add_attr_sd(m, sd, i);
-		} else if (g_vol->major_ver == 3 && g_vol->minor_ver == 0) {
+		} else if (NTFS_V3_0(g_vol->major_ver, g_vol->minor_ver) {
 			init_system_file_sd(FILE_root, &sd, &i);
 			err = add_attr_sd(m, sd, i);
-		} else if (g_vol->major_ver == 3 && g_vol->minor_ver == 1) {
+		} else if (NTFS_V3_1(g_vol->major_ver, g_vol->minor_ver) {
 			init_root_sd_31(&sd, &i);
 			err = add_attr_sd(m, sd, i);
 		} else {
@@ -4487,15 +4498,15 @@ static void mkntfs_create_root_structures(void)
 	/* dump_mft_record(m); */
 	ntfs_log_verbose("Creating $LogFile (mft record 2)\n");
 	m = (MFT_RECORD*)(g_buf + 2 * g_vol->mft_record_size);
-	buf2 = malloc(g_logfile_size);
-	if (!buf2)
+	buf_log = malloc(g_logfile_size);
+	if (!buf_log)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memset(buf2, -1, g_logfile_size);
-	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, buf2,
+	memset(buf_log, -1, g_logfile_size);
+	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, buf_log,
 			g_logfile_size);
-	free(buf2);
-	buf2 = NULL;
+	free(buf_log);
+	buf_log = NULL;
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_LogFile, FILE_LogFile),
@@ -4552,19 +4563,19 @@ static void mkntfs_create_root_structures(void)
 	if (err < 0)
 		err_exit("Couldn't create $Bitmap: %s\n", strerror(-err));
 	/* dump_mft_record(m); */
+
 	ntfs_log_verbose("Creating $Boot (mft record 7)\n");
 	m = (MFT_RECORD*)(g_buf + 7 * g_vol->mft_record_size);
-	buf2 = calloc(1, 8192);
-	if (!buf2)
+	bs = calloc(1, 8192);
+	if (!bs)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
-	memcpy(buf2, boot_array, sizeof(boot_array));
+	memcpy(bs, boot_array, sizeof(boot_array));
 	/*
-	 * Create the boot sector in buf2. Note, that buf2 is already zeroed
+	 * Create the boot sector in bs. Note, that bs is already zeroed
 	 * in the boot sector section and that it has the NTFS OEM id/magic
 	 * already inserted, so no need to worry about these things.
 	 */
-	bs = (NTFS_BOOT_SECTOR*)buf2;
 	bs->bpb.bytes_per_sector = cpu_to_le16(opts.sector_size);
 	bs->bpb.sectors_per_cluster = (u8)(g_vol->cluster_size /
 			opts.sector_size);
@@ -4591,7 +4602,7 @@ static void mkntfs_create_root_structures(void)
 		bs->clusters_per_mft_record = -(ffs(g_vol->mft_record_size) - 1);
 		if ((u32)(1 << -bs->clusters_per_mft_record) !=
 				g_vol->mft_record_size) {
-			free(buf2);
+			free(bs);
 			err_exit("BUG: calculated clusters_per_mft_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_mft_record);
@@ -4606,7 +4617,7 @@ static void mkntfs_create_root_structures(void)
 	} else {
 		bs->clusters_per_index_record = -g_vol->indx_record_size_bits;
 		if ((1 << -bs->clusters_per_index_record) != (s32)g_vol->indx_record_size) {
-			free(buf2);
+			free(bs);
 			err_exit("BUG: calculated clusters_per_index_record "
 					"is wrong (= 0x%x)\n",
 					bs->clusters_per_index_record);
@@ -4625,10 +4636,10 @@ static void mkntfs_create_root_structures(void)
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
 	if (!ntfs_boot_sector_is_ntfs(bs, TRUE)) {
-		free(buf2);
+		free(bs);
 		err_exit("FATAL: Generated boot sector is invalid!\n");
 	}
-	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_boot, buf2, 8192);
+	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_boot, (u8*)bs, 8192);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_Boot, FILE_Boot),
@@ -4641,11 +4652,11 @@ static void mkntfs_create_root_structures(void)
 		err = add_attr_sd(m, sd, i);
 	}
 	if (err < 0) {
-		free(buf2);
+		free(bs);
 		err_exit("Couldn't create $Boot: %s\n", strerror(-err));
 	}
 
-	if (create_backup_boot_sector(buf2)) {
+	if (create_backup_boot_sector((u8*)bs)) {
 		/*
 		 * Pre-2.6 kernels couldn't access the last sector
 		 * if it was odd hence we schedule chkdsk to create it.
@@ -4653,8 +4664,7 @@ static void mkntfs_create_root_structures(void)
 		volume_flags |= VOLUME_IS_DIRTY;
 	}
 
-	free(buf2);
-	buf2 = NULL;
+	free(bs);
 
 	create_file_volume(m, root_ref, volume_flags);
 
