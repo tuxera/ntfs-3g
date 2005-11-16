@@ -722,10 +722,9 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 	}
 	if (delta) {
 		int eo;
-		char *b = calloc(1, delta);
+		char *b = ntfs_calloc(1, delta);
 		if (!b)
-			err_exit("Error allocating internal buffer: "
-					"%s\n", strerror(errno));
+			exit(1);
 		bytes_written = mkntfs_write(dev, b, delta);
 		eo = errno;
 		free(b);
@@ -2518,7 +2517,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	err = add_attr_bitmap(m, name, name_len, ic, bmp, sizeof(bmp));
 	if (err)
 		goto err_out;
-	ia_val = calloc(1, index_block_size);
+	ia_val = ntfs_calloc(1, index_block_size);
 	if (!ia_val) {
 		err = -errno;
 		goto err_out;
@@ -2880,8 +2879,14 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 	sdh_size += sizeof(SDH_INDEX_KEY) + sizeof(SDH_INDEX_DATA);
 	sii_size  = sizeof(INDEX_ENTRY_HEADER);
 	sii_size += sizeof(SII_INDEX_KEY) + sizeof(SII_INDEX_DATA);
-	idx_entry_sdh = calloc(1, sizeof(INDEX_ENTRY));
-	idx_entry_sii = calloc(1, sizeof(INDEX_ENTRY));
+	idx_entry_sdh = ntfs_calloc(1, sizeof(INDEX_ENTRY));
+	if (!idx_entry_sdh)
+		return -errno;
+	idx_entry_sii = ntfs_calloc(1, sizeof(INDEX_ENTRY));
+	if (!idx_entry_sii) {
+		free(idx_entry_sdh);
+		return -errno;
+	}
 	err = 0;
 
 	while ((char*)sds_header < (char*)sds + sds_size) {
@@ -3274,7 +3279,9 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	/* Insert the index entry for file_name in @idx. */
 	/* remmet ut kun for debugging */
 	idx_size = (fn_size + 7)  & ~7;
-	idx_entry_new = calloc(1, idx_size + 0x10);
+	idx_entry_new = ntfs_calloc(1, idx_size + 0x10);
+	if (!idx_entry_new)
+		return -errno;
 	idx_entry_new->indexed_file = ref_file;
 	idx_entry_new->length = idx_size + 0x10;
 	idx_entry_new->key_length = fn_size;
@@ -3784,10 +3791,9 @@ static void mkntfs_initialize_bitmaps(void)
 			~(g_vol->cluster_size - 1);
 	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %llu\n",
 			g_lcn_bitmap_byte_size, i);
-	g_lcn_bitmap = calloc(1, g_lcn_bitmap_byte_size);
+	g_lcn_bitmap = ntfs_calloc(1, g_lcn_bitmap_byte_size);
 	if (!g_lcn_bitmap)
-		err_exit("Failed to allocate internal buffer: %s",
-				strerror(errno));
+		exit(1);
 	/*
 	 * $Bitmap can overlap the end of the volume. Any bits in this region
 	 * must be set. This region also encompasses the backup boot sector.
@@ -3811,10 +3817,9 @@ static void mkntfs_initialize_bitmaps(void)
 	g_mft_bitmap_byte_size = (g_mft_bitmap_byte_size + 7) & ~7;
 	ntfs_log_debug("mft_bitmap_size = %i, g_mft_bitmap_byte_size = %i\n",
 			mft_bitmap_size, g_mft_bitmap_byte_size);
-	g_mft_bitmap = calloc(1, g_mft_bitmap_byte_size);
+	g_mft_bitmap = ntfs_calloc(1, g_mft_bitmap_byte_size);
 	if (!g_mft_bitmap)
-		err_exit("Failed to allocate internal buffer: %s\n",
-				strerror(errno));
+		exit(1);
 	/* Create runlist for mft bitmap. */
 	g_rl_mft_bmp = malloc(2 * sizeof(runlist));
 	if (!g_rl_mft_bmp)
@@ -4588,10 +4593,9 @@ static void mkntfs_create_root_structures(void)
 
 	ntfs_log_verbose("Creating $Boot (mft record 7)\n");
 	m = (MFT_RECORD*)(g_buf + 7 * g_vol->mft_record_size);
-	bs = calloc(1, 8192);
+	bs = ntfs_calloc(1, 8192);
 	if (!bs)
-		err_exit("Failed to allocate internal buffer: %s\n",
-				strerror(errno));
+		exit(1);
 	memcpy(bs, boot_array, sizeof(boot_array));
 	/*
 	 * Create the boot sector in bs. Note, that bs is already zeroed
@@ -4745,19 +4749,22 @@ static void mkntfs_create_root_structures(void)
 			if (g_vol->minor_ver == 0) {
 				buf_sds_first_size = 0x1E0;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = calloc(1, buf_sds_first_size);
+				buf_sds_init = ntfs_calloc(1, buf_sds_first_size);
+				if (!buf_sds_init)
+					exit(1);
 				init_secure_30(buf_sds_init);
 			} else {
 				buf_sds_first_size = 0x240;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = calloc(1, buf_sds_first_size);
+				buf_sds_init = ntfs_calloc(1, buf_sds_first_size);
+				if (!buf_sds_init)
+					exit(1);
 				init_secure_31(buf_sds_init);
 			}
-			buf_sds = calloc(1,buf_sds_size);
+			buf_sds = ntfs_calloc(1,buf_sds_size);
 			if (!buf_sds) {
 				free(buf_sds_init);
-				err_exit("Failed to allocate internal buffer:"
-					" %s\n", strerror(errno));
+				exit(1);
 			}
 			memcpy(buf_sds, buf_sds_init, buf_sds_first_size);
 			memcpy(buf_sds + 0x40000, buf_sds_init,
@@ -4987,7 +4994,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	g_vol->indx_record_size_bits = 12;
 
 	if (g_vol->major_ver < 3) {
-		g_vol->attrdef = calloc(1, 36000);
+		g_vol->attrdef = ntfs_calloc(1, 36000);
 		if (g_vol->attrdef) {
 			memcpy(g_vol->attrdef, attrdef_ntfs12_array, sizeof(attrdef_ntfs12_array));
 			g_vol->attrdef_len = 36000;
@@ -5022,11 +5029,9 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	mkntfs_initialize_rl_boot();
 
 	/* Allocate a buffer large enough to hold the mft. */
-	g_buf = calloc(1, g_mft_size);
-	if (!g_buf) {
-		ntfs_log_perror("Could not create work space");
+	g_buf = ntfs_calloc(1, g_mft_size);
+	if (!g_buf)
 		goto done;
-	}
 
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */
 	mkntfs_initialize_rl_bad();
