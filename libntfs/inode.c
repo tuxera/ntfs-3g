@@ -1058,6 +1058,45 @@ put_err_out:
 	return -1;
 }
 
+/**
+ * ntfs_inode_update_atime - update access time for ntfs inode
+ * @ni:		ntfs inode for which update access time
+ *
+ * This function usually get called when user read not metadata from inode.
+ * Do not update time for system files.
+ */
+void ntfs_inode_update_atime(ntfs_inode *ni)
+{
+	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
+			FILE_first_user /*|| ni->mft_no == FILE_root*/)) {
+		ni->last_access_time = time(NULL);
+		NInoFileNameSetDirty(ni);
+		NInoSetDirty(ni);
+	}
+}
+
+/**
+ * ntfs_inode_update_time - update all times for ntfs inode
+ * @ni:		ntfs inode for which udpate times
+ *
+ * This function updates last access, mft and data change times. Usually
+ * get called when user write not metadata to inode. Do not update time for
+ * system files.
+ */
+void ntfs_inode_update_time(ntfs_inode *ni)
+{
+	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
+			FILE_first_user /*|| ni->mft_no == FILE_root*/)) {
+		time_t now;
+
+		now = time(NULL);
+		ni->last_access_time = now;
+		ni->last_data_change_time = now;
+		ni->last_mft_change_time = now;
+		NInoFileNameSetDirty(ni);
+		NInoSetDirty(ni);
+	}
+}
 
 #ifdef NTFS_RICH
 

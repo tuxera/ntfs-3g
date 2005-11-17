@@ -171,6 +171,9 @@ static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni)
 		NInoSetDirty(ni->base_ni);
 }
 
+extern void ntfs_inode_update_atime(ntfs_inode *ni);
+extern void ntfs_inode_update_time(ntfs_inode *ni);
+
 extern int ntfs_inode_sync(ntfs_inode *ni);
 
 extern int ntfs_inode_add_attrlist(ntfs_inode *ni);

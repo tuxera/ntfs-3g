@@ -55,7 +55,6 @@
 #include "compress.h"
 #include "bitmap.h"
 #include "logging.h"
-#include "ntfstime.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -771,14 +770,10 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		return -1;
 	}
 	vol = na->ni->vol;
-	/* Update access time if accessing unnamed data attribute. */
-	if (!NVolReadOnly(vol) && !NVolNoATime(vol) && na->ni->mft_no >=
-			FILE_first_user && na->type == AT_DATA &&
-			na->name == AT_UNNAMED) {
-		na->ni->last_access_time = time(NULL);
-		NInoFileNameSetDirty(na->ni);
-		NInoSetDirty(na->ni);
-	}
+	/* Update access time if needed. */
+	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
+			na->type == AT_INDEX_ALLOCATION)
+		ntfs_inode_update_atime(na->ni);
 	if (!count)
 		return 0;
 	/* Truncate reads beyond end of attribute. */
@@ -960,14 +955,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		errno = EOPNOTSUPP;
 		return -1;
 	}
-	/* Update time if writing to unnamed data attribute. */
-	if (na->ni->mft_no >= FILE_first_user && na->type == AT_DATA &&
-			na->name == AT_UNNAMED) {
-		na->ni->last_data_change_time = time(NULL);
-		na->ni->last_mft_change_time = time(NULL);
-		NInoFileNameSetDirty(na->ni);
-		NInoSetDirty(na->ni);
-	}
+	/* Update access and change times if needed. */
+	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
+			na->type == AT_INDEX_ALLOCATION)
+		ntfs_inode_update_time(na->ni);
 	if (!count)
 		return 0;
 	/* If the write reaches beyond the end, extend the attribute. */
@@ -4932,10 +4923,8 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			ret = ntfs_non_resident_attr_shrink(na, newsize);
 	} else
 		ret = ntfs_resident_attr_resize(na, newsize);
-	/* Set FILE_NAME dirty flag, to update length and time in the index. */
+	/* Set FILE_NAME dirty flag, to update file length in the index. */
 	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-		na->ni->last_data_change_time = time(NULL);
-		na->ni->last_mft_change_time = time(NULL);
 		na->ni->data_size = na->data_size;
 		/*
 		 * If attribute sparse or compressed then allocated size in
@@ -4948,5 +4937,9 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			na->ni->allocated_size = na->allocated_size;
 		NInoFileNameSetDirty(na->ni);
 	}
+	/* Update access and change times if needed. */
+	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
+			na->type == AT_INDEX_ALLOCATION)
+		ntfs_inode_update_time(na->ni);
 	return ret;
 }
