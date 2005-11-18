@@ -4873,7 +4873,7 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 				11 * g_vol->mft_record_size), extend_ref, m,
-				MK_LE_MREF(24, 24), 0LL, 0LL, extend_flags,
+				MK_LE_MREF(24, 1), 0LL, 0LL, extend_flags,
 				0, 0, "$Quota", FILE_NAME_WIN32_AND_DOS);
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
@@ -4894,7 +4894,7 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 					11 * g_vol->mft_record_size), extend_ref,
-					m, MK_LE_MREF(25, 25), 0LL, 0LL,
+					m, MK_LE_MREF(25, 1), 0LL, 0LL,
 					extend_flags, 0, 0, "$ObjId",
 					FILE_NAME_WIN32_AND_DOS);
 
@@ -4911,7 +4911,7 @@ static void mkntfs_create_root_structures(void)
 		if (!err)
 			err = create_hardlink_res((MFT_RECORD*)(g_buf +
 					11 * g_vol->mft_record_size),
-					extend_ref, m, MK_LE_MREF(26, 26),
+					extend_ref, m, MK_LE_MREF(26, 1),
 					0LL, 0LL, extend_flags, 0, 0,
 					"$Reparse", FILE_NAME_WIN32_AND_DOS);
 		/* FIXME: This should be IGNORE_CASE */
