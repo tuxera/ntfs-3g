@@ -574,7 +574,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		fn->last_access_time = utc2ntfs(ni->last_access_time);
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
-		ntfs_inode_close(index_ni);
+		if (ni != index_ni)
+			ntfs_inode_close(index_ni);
 	}
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {
@@ -1068,7 +1069,7 @@ put_err_out:
 void ntfs_inode_update_atime(ntfs_inode *ni)
 {
 	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
-			FILE_first_user /*|| ni->mft_no == FILE_root*/)) {
+			FILE_first_user || ni->mft_no == FILE_root)) {
 		ni->last_access_time = time(NULL);
 		NInoFileNameSetDirty(ni);
 		NInoSetDirty(ni);
@@ -1086,7 +1087,7 @@ void ntfs_inode_update_atime(ntfs_inode *ni)
 void ntfs_inode_update_time(ntfs_inode *ni)
 {
 	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
-			FILE_first_user /*|| ni->mft_no == FILE_root*/)) {
+			FILE_first_user || ni->mft_no == FILE_root)) {
 		time_t now;
 
 		now = time(NULL);
