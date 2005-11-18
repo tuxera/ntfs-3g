@@ -1077,7 +1077,7 @@ void ntfs_inode_update_atime(ntfs_inode *ni)
 
 /**
  * ntfs_inode_update_time - update all times for ntfs inode
- * @ni:		ntfs inode for which udpate times
+ * @ni:		ntfs inode for which update times
  *
  * This function updates last access, mft and data change times. Usually
  * get called when user write not metadata to inode. Do not update time for
