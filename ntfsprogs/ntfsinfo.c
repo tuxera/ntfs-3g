@@ -1167,7 +1167,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 	}
 }
 
-typedef	union {		
+typedef union {
 		SII_INDEX_DATA sii;		/* $SII index data in $Secure */
 		SDH_INDEX_DATA sdh;		/* $SDH index data in $Secure */
 		QUOTA_O_INDEX_DATA quota_o;	/* $O index data in $Quota    */
@@ -1280,41 +1280,50 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			break;
 
 		switch (type) {
-			case(INDEX_ATTR_DIRECTORY_I30):
-				ntfs_log_verbose("\t\tFILE record number:\t %llu\n",
-						MREF_LE(entry->indexed_file));
-				if (opts.verbose) {
-					printf("\t");
-					ntfs_dump_flags(AT_FILE_NAME, entry->key.
-						file_name.file_attributes);
-					printf("\t");
-					ntfs_dump_namespace(entry->key.
-						file_name.file_name_type);
-				}
-				ntfs_ucstombs(entry->key.file_name.file_name,
-					entry->key.file_name.file_name_length,
-					&name, 0);
-				ntfs_log_verbose("\t\tName:\t\t\t %s\n", name);
-				free(name);
-				name = NULL;
-				ntfs_log_verbose("\t\tParent directory:\t %lld\n",
-					 MREF_LE(entry->
-					 key.file_name.parent_directory));
-				ntfs_log_verbose("\t\tData size:\t\t %lld\n",
-					sle64_to_cpu(
-					entry->key.file_name.data_size));
-				ntfs_log_verbose("\t\tAllocated size:\t\t %lld\n",
-					sle64_to_cpu(
-					entry->key.file_name.allocated_size));
-				break;
-			default:
-				ntfs_log_verbose("\t\tData offset:\t\t %u\n",
-					le16_to_cpu(entry->data_offset));
-				ntfs_log_verbose("\t\tData length:\t\t %u\n",
-					le16_to_cpu(entry->data_length));
-				ntfs_dump_index_key(entry, type);
-				ntfs_dump_index_data(entry, type);
-				break;
+		case(INDEX_ATTR_DIRECTORY_I30):
+			ntfs_log_verbose("\t\tFILE record number:\t %llu\n",
+					MREF_LE(entry->indexed_file));
+			printf("\t");
+			ntfs_dump_flags(AT_FILE_NAME, entry->key.
+				file_name.file_attributes);
+			printf("\t");
+			ntfs_dump_namespace(entry->key.
+				file_name.file_name_type);
+			ntfs_ucstombs(entry->key.file_name.file_name,
+				entry->key.file_name.file_name_length,
+				&name, 0);
+			ntfs_log_verbose("\t\tName:\t\t\t %s\n", name);
+			free(name);
+			name = NULL;
+			ntfs_log_verbose("\t\tParent directory:\t %lld\n",
+				 MREF_LE(entry->
+				 key.file_name.parent_directory));
+			ntfs_log_verbose("\t\tCreation time:\t\t %s",
+				ntfsinfo_time_to_str(
+					entry->key.file_name.creation_time));
+			ntfs_log_verbose("\t\tData change time:\t %s",
+				ntfsinfo_time_to_str(
+					entry->key.file_name.last_data_change_time));
+			ntfs_log_verbose("\t\tMFT change time:\t %s",
+				ntfsinfo_time_to_str(
+					entry->key.file_name.last_mft_change_time));
+			ntfs_log_verbose("\t\tAccess time:\t\t %s",
+				ntfsinfo_time_to_str(
+					entry->key.file_name.last_access_time));
+			ntfs_log_verbose("\t\tData size:\t\t %lld\n",
+				sle64_to_cpu(entry->key.file_name.data_size));
+			ntfs_log_verbose("\t\tAllocated size:\t\t %lld\n",
+				sle64_to_cpu(
+				entry->key.file_name.allocated_size));
+			break;
+		default:
+			ntfs_log_verbose("\t\tData offset:\t\t %u\n",
+				le16_to_cpu(entry->data_offset));
+			ntfs_log_verbose("\t\tData length:\t\t %u\n",
+				le16_to_cpu(entry->data_length));
+			ntfs_dump_index_key(entry, type);
+			ntfs_dump_index_data(entry, type);
+			break;
 		}
 		entry = (INDEX_ENTRY *)((u8 *)entry +
 						le16_to_cpu(entry->length));
