@@ -66,6 +66,7 @@
 #include "mft.h"
 #include "bitmap.h"
 #include "inode.h"
+#include "dir.h"
 #include "runlist.h"
 #include "utils.h"
 #include "version.h"
@@ -699,10 +700,50 @@ static void restore_image(void)
 	}
 }
 
+static void wipe_index_root_timestamps(ATTR_RECORD *attr)
+{
+	INDEX_ENTRY *entry;
+	INDEX_ROOT *iroot;
+
+	iroot = (INDEX_ROOT *)((u8 *)attr + le16_to_cpu(attr->value_offset));
+	entry = (INDEX_ENTRY *)((u8 *)iroot +
+			le32_to_cpu(iroot->index.entries_offset) + 0x10);
+
+	while (!(entry->flags & INDEX_ENTRY_END)) {
+
+		if (iroot->type == AT_FILE_NAME) {
+
+			entry->key.file_name.creation_time = 0;
+			entry->key.file_name.last_access_time = 0;
+			entry->key.file_name.last_data_change_time = 0;
+			entry->key.file_name.last_mft_change_time = 0;
+
+		} else if (ntfs_names_are_equal(NTFS_INDEX_Q,
+				sizeof(NTFS_INDEX_Q) / 2 - 1,
+				(ntfschar *)((char *)attr +
+					    le16_to_cpu(attr->name_offset)),
+				attr->name_length, 0, NULL, 0)) {
+
+			QUOTA_CONTROL_ENTRY *quota_q;
+
+			quota_q = (QUOTA_CONTROL_ENTRY *)((u8 *)entry +
+							  entry->data_offset);
+			/*
+			 *  FIXME: no guarantee it's indeed /$Extend/$Quota:$Q
+			 *  till we only check for quota version 2 ...
+			 */
+			if (le32_to_cpu(quota_q->version) == 2)
+				quota_q->change_time = 0;
+		}
+
+		entry = (INDEX_ENTRY*)((u8*)entry + le16_to_cpu(entry->length));
+	}
+}
+
 #define WIPE_TIMESTAMPS(atype, attr)				\
 do {								\
 	atype *ats;						\
-	ats = (atype *)((char*)(attr) + (attr)->value_offset);	\
+	ats = (atype *)((char *)(attr) + (attr)->value_offset);	\
 								\
 	ats->creation_time = 0;					\
 	ats->last_data_change_time = 0;				\
@@ -722,6 +763,9 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 
 	else if (a->type == AT_STANDARD_INFORMATION)
 		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a);
+	
+	else if (a->type == AT_INDEX_ROOT)
+		wipe_index_root_timestamps(a);
 }
 
 static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
