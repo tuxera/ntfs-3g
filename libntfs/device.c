@@ -72,6 +72,9 @@
 #if defined(linux) && !defined(HDIO_GETGEO)
 #define HDIO_GETGEO	0x0301	/* Get device geometry. */
 #endif
+#if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
+#	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytes. */
+#endif
 
 /**
  * ntfs_device_alloc - allocate an ntfs device structure and pre-initialize it
@@ -638,3 +641,36 @@ int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
 #endif
 	return -1;
 }
+/**
+ * ntfs_device_sector_size_get - get sector size of a device
+ * @dev:	open device
+ *
+ * On success, return the sector size in bytes of the device @dev.
+ * On error return -1 with errno set to the error code.
+ *
+ * The following error codes are defined:
+ *	EINVAL		Input parameter error
+ *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
+ *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ */
+int ntfs_device_sector_size_get(struct ntfs_device *dev)
+{
+	if (!dev) {
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef BLKSSZGET
+	{
+		int sect_size = 0;
+
+		if (!dev->d_ops->ioctl(dev, BLKSSZGET, &sect_size)) {
+			ntfs_log_debug("BLKSSZGET sector size = %d bytes\n", sect_size);
+			return sect_size;
+		}
+	}
+#else
+	errno = EOPNOTSUPP;
+#endif
+	return -1;
+}
+

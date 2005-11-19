@@ -117,5 +117,6 @@ extern s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size);
 extern s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev);
 extern int ntfs_device_heads_get(struct ntfs_device *dev);
 extern int ntfs_device_sectors_per_track_get(struct ntfs_device *dev);
+extern int ntfs_device_sector_size_get(struct ntfs_device *dev);
 
 #endif /* defined _NTFS_DEVICE_H */
