@@ -72,9 +72,6 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_IOCTL_H
-#include <sys/ioctl.h>
-#endif
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
@@ -128,10 +125,6 @@
 #	endif
 #endif
 
-#if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
-#	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytes. */
-#endif
-
 #include "security.h"
 #include "types.h"
 #include "attrib.h"
@@ -179,7 +172,6 @@ runlist		  *g_rl_boot		  = NULL;
 runlist		  *g_rl_bad		  = NULL;
 INDEX_ALLOCATION  *g_index_block	  = NULL;
 ntfs_volume	  *g_vol		  = NULL;
-long long	   g_volume_size	  = 0;		/* in bytes */
 int		   g_mft_size		  = 0;		/* The bigger of 16kB & one cluster */
 long long	   g_mft_lcn		  = 0;		/* lcn of $MFT, $DATA attribute */
 long long	   g_mftmirr_lcn	  = 0;		/* lcn of $MFTMirr, $DATA */
@@ -3538,230 +3530,249 @@ done:
 
 /**
  * mkntfs_override_phys_params -
- *
- * Note: Might not return.
  */
-static void mkntfs_override_phys_params(void)
+static BOOL mkntfs_override_phys_params(ntfs_volume *vol)
 {
-	/* This function uses:
-	 *     g_vol
-	 *     g_volume_size
-	 */
 	int i;
+	s64 volume_size;
+	BOOL winboot = TRUE;
 
 	/* If user didn't specify the sector size, determine it now. */
 	if (opts.sector_size < 0) {
-#ifdef BLKSSZGET
-		int sect_size = 0;
-
-		if (g_vol->dev->d_ops->ioctl(g_vol->dev, BLKSSZGET, &sect_size) >= 0) {
-			opts.sector_size = sect_size;
-		} else
-		/* XXX UGLY */
-#endif
-		{
-			ntfs_log_error("No sector size specified for %s and it could "
-					"not be obtained automatically.\n"
-					"Assuming sector size is 512 bytes.\n",
-					g_vol->dev->d_name);
+		opts.sector_size = ntfs_device_sector_size_get(vol->dev);
+		if (opts.sector_size < 0) {
+			ntfs_log_warning("The sector size was not specified "
+				"for %s and it could not be obtained "
+				"automatically.  It has been set to 512 "
+				"bytes.\n", vol->dev->d_name);
 			opts.sector_size = 512;
 		}
 	}
+
 	/* Validate sector size. */
-	if ((opts.sector_size - 1) & opts.sector_size ||
-			opts.sector_size < 256 || opts.sector_size > 4096)
-		err_exit("sector_size is invalid. It must be a power "
-			 "of two, and it must be\n greater or equal 256 and "
-			 "less than or equal 4096 bytes.\n");
+	if ((opts.sector_size - 1) & opts.sector_size) {
+		ntfs_log_error("The sector size is invalid.  It must be a "
+			"power of two, e.g. 512, 1024.\n");
+		return FALSE;
+	}
+	if (opts.sector_size < 256 || opts.sector_size > 4096) {
+		ntfs_log_error("The sector size is invalid.  The minimum size "
+			"if 256 bytes and the maximum is 4096 bytes.\n");
+		return FALSE;
+	}
 	ntfs_log_debug("sector size = %ld bytes\n", opts.sector_size);
+
 	/* If user didn't specify the number of sectors, determine it now. */
 	if (opts.num_sectors < 0) {
-		opts.num_sectors = ntfs_device_size_get(g_vol->dev,
-				opts.sector_size);
-		if (opts.num_sectors <= 0)
-			err_exit("ntfs_device_size_get(%s) failed. Please "
-					"specify it manually.\n",
-					g_vol->dev->d_name);
+		opts.num_sectors = ntfs_device_size_get(vol->dev, opts.sector_size);
+		if (opts.num_sectors <= 0) {
+			ntfs_log_error("Couldn't determine the size of %s.  "
+				"Please specify the number of sectors "
+				"manually.\n", vol->dev->d_name);
+			return FALSE;
+		}
 	}
 	ntfs_log_debug("number of sectors = %lld (0x%llx)\n", opts.num_sectors,
-			opts.num_sectors);
+		opts.num_sectors);
+
 	/*
 	 * Reserve the last sector for the backup boot sector unless the
 	 * sector size is less than 512 bytes in which case reserve 512 bytes
-	 * worth of secstors.
+	 * worth of sectors.
 	 */
 	i = 1;
 	if (opts.sector_size < 512)
 		i = 512 / opts.sector_size;
 	opts.num_sectors -= i;
+
 	/* If user didn't specify the partition start sector, determine it. */
 	if (opts.part_start_sect < 0) {
-		opts.part_start_sect = ntfs_device_partition_start_sector_get(
-				g_vol->dev);
+		opts.part_start_sect = ntfs_device_partition_start_sector_get(vol->dev);
 		if (opts.part_start_sect < 0) {
-			ntfs_log_error("No partition start sector specified for %s "
-					"and it could not\nbe obtained "
-					"automatically.  Setting it to 0.\n"
-					"This will cause Windows not to be "
-					"able to boot from this volume.\n",
-					g_vol->dev->d_name);
+			ntfs_log_warning("The partition start sector was not "
+				"specified for %s and it could not be obtained "
+				"automatically.  It has been set to 0.\n",
+				vol->dev->d_name);
 			opts.part_start_sect = 0;
+			winboot = FALSE;
 		} else if (opts.part_start_sect >> 32) {
-			ntfs_log_error("No partition start sector specified for %s "
-					"and the automatically\ndetermined "
-					"value is too large.  Setting it to 0."
-					"  This will cause Windows not\nto be "
-					"able to boot from this volume.\n",
-					g_vol->dev->d_name);
+			ntfs_log_warning("The partition start sector specified "
+				"for %s and the automatically determined value "
+				"is too large.  It has been set to 0.\n",
+				vol->dev->d_name);
 			opts.part_start_sect = 0;
+			winboot = FALSE;
 		}
 	} else if (opts.part_start_sect >> 32) {
-		err_exit("Invalid partition start sector specified: %lli  "
-				"Maximum is 4294967295 (2^32-1).\n",
-				opts.part_start_sect);
+		ntfs_log_error("Invalid partition start sector.  Maximum is "
+			"4294967295 (2^32-1).\n");
+		return FALSE;
 	}
+
 	/* If user didn't specify the sectors per track, determine it now. */
 	if (opts.sectors_per_track < 0) {
-		opts.sectors_per_track =
-				ntfs_device_sectors_per_track_get(g_vol->dev);
+		opts.sectors_per_track = ntfs_device_sectors_per_track_get(vol->dev);
 		if (opts.sectors_per_track < 0) {
-			ntfs_log_error("No number of sectors per track specified for "
-					"%s and\nit could not be obtained "
-					"automatically.  Setting it to 0.  "
-					"This will cause\nWindows not to be "
-					"able to boot from this volume.\n",
-					g_vol->dev->d_name);
+			ntfs_log_warning("The number of sectors per track was "
+				"not specified for %s and it could not be "
+				"obtained automatically.  It has been set to "
+				"0.\n", vol->dev->d_name);
 			opts.sectors_per_track = 0;
-		} else if (opts.sectors_per_track > 0xffff) {
-			ntfs_log_error("No number of sectors per track specified for "
-					"%s and the automatically\ndetermined "
-					"value is too large.  Setting it to 0."
-					"  This will cause Windows not\nto be "
-					"able to boot from this volume.\n",
-					g_vol->dev->d_name);
+			winboot = FALSE;
+		} else if (opts.sectors_per_track > 65535) {
+			ntfs_log_warning("The number of sectors per track was "
+				"not specified for %s and the automatically "
+				"determined value is too large.  It has been "
+				"set to 0.\n", vol->dev->d_name);
 			opts.sectors_per_track = 0;
+			winboot = FALSE;
 		}
-	} else if (opts.sectors_per_track > 0xffff) {
-		err_exit("Invalid number of sectors per track specified: %ld  "
-				"Maximum is 65535 (0xffff).\n",
-				opts.sectors_per_track);
+	} else if (opts.sectors_per_track > 65535) {
+		ntfs_log_error("Invalid number of sectors per track.  Maximum "
+			"is 65535.\n");
+		return FALSE;
 	}
+
 	/* If user didn't specify the number of heads, determine it now. */
 	if (opts.heads < 0) {
-		//XXX this will break if sizeof(int) != sizeof(long) -- signextend
-		opts.heads = ntfs_device_heads_get(g_vol->dev);
+		opts.heads = ntfs_device_heads_get(vol->dev);
 		if (opts.heads < 0) {
-			ntfs_log_error("No number of heads specified for %s and it "
-					"could not\nbe obtained automatically."
-					"  Setting it to 0.  This will cause "
-					"Windows not to\nbe able to boot from "
-					"this volume.\n", g_vol->dev->d_name);
+			ntfs_log_warning("The number of heads was not "
+				"specified for %s and it could not be obtained "
+				"automatically.  It has been set to 0.\n",
+				vol->dev->d_name);
 			opts.heads = 0;
-		} else if (opts.heads > 0xffff) {
-			ntfs_log_error("No number of heads specified for %s and the "
-					"automatically\ndetermined value is "
-					"too large.  Setting it to 0.  This "
-					"will cause Windows not\nto be able "
-					"to boot from this volume.\n",
-					g_vol->dev->d_name);
+			winboot = FALSE;
+		} else if (opts.heads > 65535) {
+			ntfs_log_warning("The number of heads was not "
+				"specified for %s and the automatically "
+				"determined value is too large.  It has been "
+				"set to 0.\n", vol->dev->d_name);
 			opts.heads = 0;
+			winboot = FALSE;
 		}
-	} else if (opts.heads > 0xffff) {
-		err_exit("Invalid number of heads specified: %ld  Maximum is "
-				"65535 (0xffff).\n", opts.heads);
+	} else if (opts.heads > 65535) {
+		ntfs_log_error("Invalid number of heads.  Maximum is 65535.\n");
+		return FALSE;
 	}
-	/* If user didn't specify the volume size, determine it now. */
-	if (!g_volume_size)
-		g_volume_size = opts.num_sectors * opts.sector_size;
-	else if (g_volume_size & (opts.sector_size - 1))
-		err_exit("volume_size is not a multiple of sector_size.\n");
+
+	volume_size = opts.num_sectors * opts.sector_size;
+
 	/* Validate volume size. */
-	if (g_volume_size < 1 << 20 /* 1MiB */)
-		err_exit("Device is too small (%llikiB). Minimum NTFS volume "
-			 "size is 1MiB.\n", g_volume_size / 1024);
-	ntfs_log_debug("volume size = %llikiB\n", g_volume_size / 1024);
+	if (volume_size < (1 << 20)) {			/* 1MiB */
+		ntfs_log_error("Device is too small (%llikiB). Minimum NTFS "
+			"volume size is 1MiB.\n", volume_size / 1024);
+		return FALSE;
+	}
+	ntfs_log_debug("volume size = %llikiB\n", volume_size / 1024);
+
 	/* If user didn't specify the cluster size, determine it now. */
-	if (!g_vol->cluster_size) {
-		if (g_volume_size <= 512LL << 20)	/* <= 512MB */
-			g_vol->cluster_size = 512;
-		else if (g_volume_size <= 1LL << 30)	/* ]512MB-1GB] */
-			g_vol->cluster_size = 1024;
-		else if (g_volume_size <= 2LL << 30)	/* ]1GB-2GB] */
-			g_vol->cluster_size = 2048;
+	if (!vol->cluster_size) {
+		if (volume_size <= 512LL << 20)		/* <= 512MB */
+			vol->cluster_size = 512;
+		else if (volume_size <= 1LL << 30)	/* ]512MB-1GB] */
+			vol->cluster_size = 1024;
+		else if (volume_size <= 2LL << 30)	/* ]1GB-2GB] */
+			vol->cluster_size = 2048;
 		else
-			g_vol->cluster_size = 4096;
+			vol->cluster_size = 4096;
 		/* For small volumes on devices with large sector sizes. */
-		if (g_vol->cluster_size < (u32)opts.sector_size)
-			g_vol->cluster_size = opts.sector_size;
+		if (vol->cluster_size < (u32)opts.sector_size)
+			vol->cluster_size = opts.sector_size;
 		/*
 		 * For huge volumes, grow the cluster size until the number of
 		 * clusters fits into 32 bits or the cluster size exceeds the
 		 * maximum limit of 64kiB.
 		 */
-		while (g_volume_size >> (ffs(g_vol->cluster_size) - 1 + 32)) {
-			g_vol->cluster_size <<= 1;
-			if (g_vol->cluster_size > 65536)
-				err_exit("Device is too large to hold an NTFS "
-						"volume (maximum size is "
-						"256TiB).\n");
+		while (volume_size >> (ffs(vol->cluster_size) - 1 + 32)) {
+			vol->cluster_size <<= 1;
+			if (vol->cluster_size > 65535) {
+				ntfs_log_error("Device is too large to hold an "
+					"NTFS volume (maximum size is 256TiB).\n");
+				return FALSE;
+			}
 		}
+		ntfs_log_quiet("Cluster size has been automatically set to %d "
+			"bytes.\n", vol->cluster_size);
 	}
+
 	/* Validate cluster size. */
-	if (g_vol->cluster_size & (g_vol->cluster_size - 1) ||
-	    g_vol->cluster_size < (u32)opts.sector_size ||
-	    g_vol->cluster_size > 128 * (u32)opts.sector_size ||
-	    g_vol->cluster_size > 65536)
-		err_exit("Cluster_size is invalid. It must be a power of two, "
-			 "be at least\nthe same as sector_size, be maximum "
-			 "64kiB, and the sectors per cluster value has\n"
-			 "to fit inside eight bits. (We do not support larger "
-			 "cluster sizes yet.)\n");
-	g_vol->cluster_size_bits = ffs(g_vol->cluster_size) - 1;
-	ntfs_log_debug("cluster size = %u bytes\n", (unsigned int)g_vol->cluster_size);
-	if (g_vol->cluster_size > 4096) {
+	if (vol->cluster_size & (vol->cluster_size - 1)) {
+		ntfs_log_error("The cluster size is invalid.  It must be a "
+			"power of two, e.g. 1024, 4096.\n");
+		return FALSE;
+	}
+	if (vol->cluster_size < (u32)opts.sector_size) {
+		ntfs_log_error("The cluster size is invalid.  It must be equal "
+			"to, or larger than, the sector size.\n");
+		return FALSE;
+	}
+	if (vol->cluster_size > 128 * (u32)opts.sector_size) {
+		ntfs_log_error("The cluster size is invalid.  It cannot be "
+			"more that 128 times the size of the sector size.\n");
+		return FALSE;
+	}
+	if (vol->cluster_size > 65536) {
+		ntfs_log_error("The cluster size is invalid.  The maximum "
+			"cluster size is 65536 bytes (64kiB).\n");
+		return FALSE;
+	}
+
+	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
+	ntfs_log_debug("cluster size = %u bytes\n", (unsigned int)vol->cluster_size);
+	if (vol->cluster_size > 4096) {
 		if (opts.enable_compression) {
-			if (!opts.force)
-				err_exit("Cluster_size is above 4096 bytes "
-						"and compression is "
-						"requested.\nThis is not "
-						"possible due to limitations "
-						"in the compression algorithm "
-						"used by\nWindows.\n");
+			if (!opts.force) {
+				ntfs_log_error("Windows cannot use compression "
+					"when the cluster size is larger than "
+					"4096 bytes.\n");
+				return FALSE;
+			}
 			opts.enable_compression = 0;
 		}
-		ntfs_log_quiet("Warning: compression will be disabled on this volume "
-				"because it is not\nsupported when the cluster "
-				"size is above 4096 bytes. This is due to \n"
-				"limitations in the compression algorithm used "
-				"by Windows.\n");
+		ntfs_log_warning("Windows cannot use compression when the "
+			"cluster size is larger than 4096 bytes.  Compression "
+			"has been disabled for this volume.\n");
 	}
-	/* If user didn't specify the number of clusters, determine it now. */
-	if (!g_vol->nr_clusters)
-		g_vol->nr_clusters = g_volume_size / g_vol->cluster_size;
+
+	vol->nr_clusters = volume_size / vol->cluster_size;
+
 	/*
 	 * Check the cluster_size and num_sectors for consistency with
 	 * sector_size and num_sectors. And check both of these for consistency
 	 * with volume_size.
 	 */
-	if (g_vol->nr_clusters != (opts.num_sectors * opts.sector_size) /
-			g_vol->cluster_size ||
-	    g_volume_size / opts.sector_size != opts.num_sectors ||
-	    g_volume_size / g_vol->cluster_size != g_vol->nr_clusters)
-		err_exit("Illegal combination of volume/cluster/sector size "
-			"and/or cluster/sector number.\n");
-	ntfs_log_debug("number of clusters = %llu (0x%llx)\n", g_vol->nr_clusters,
-			g_vol->nr_clusters);
-	/* Number of clusters must fit within 32 bits (Win2k limitation). */
-	if (g_vol->nr_clusters >> 32) {
-		if (g_vol->cluster_size >= 65536)
-			err_exit("Device is too large to hold an NTFS volume "
-					"(maximum size is 256TiB).\n");
-		err_exit("Number of clusters exceeds 32 bits. Please try "
-				"again with a larger\ncluster size or leave "
-				"the cluster size unspecified and the "
-				"smallest possible\ncluster size for the size "
-				"of the device will be used.\n");
+	if ((vol->nr_clusters != ((opts.num_sectors * opts.sector_size) / vol->cluster_size) ||
+		(volume_size / opts.sector_size) != opts.num_sectors ||
+		(volume_size / vol->cluster_size) != vol->nr_clusters)) {
+		// XXX is this code reachable?
+		ntfs_log_error("Illegal combination of volume/cluster/sector size and/or cluster/sector number.\n");
+		return FALSE;
 	}
+	ntfs_log_debug("number of clusters = %llu (0x%llx)\n", vol->nr_clusters, vol->nr_clusters);
+
+	/* Number of clusters must fit within 32 bits (Win2k limitation). */
+	if (vol->nr_clusters >> 32) {
+		if (vol->cluster_size >= 65536) {
+			ntfs_log_error("Device is too large to hold an NTFS "
+				"volume (maximum size is 256TiB).\n");
+			return FALSE;
+		}
+		ntfs_log_error("Number of clusters exceeds 32 bits.  Please "
+			"try again with a larger\ncluster size or leave the "
+			"cluster size unspecified and the smallest possible "
+			"cluster size for the size of the device will be used.\n");
+		return FALSE;
+	}
+
+	if (!winboot) {
+		ntfs_log_warning("To boot from a device, Windows needs the "
+			"'partition start sector', the 'sectors per track' and "
+			"the 'number of heads' to be set.\n");
+		ntfs_log_warning("Windows will not be able to boot from this "
+			"device.\n");
+	}
+	return TRUE;
 }
 
 /**
@@ -3958,31 +3969,34 @@ static void mkntfs_initialize_rl_logfile(void)
 	 *     g_logfile_size
 	 *     g_rl_logfile
 	 *     g_vol
-	 *     g_volume_size
 	 */
 	int i, j;
+	u64 volume_size;
 
 	/* Create runlist for log file. */
 	g_rl_logfile = malloc(2 * sizeof(runlist));
 	if (!g_rl_logfile)
 		err_exit("Failed to allocate internal buffer: %s\n",
 				strerror(errno));
+
+	volume_size = g_vol->nr_clusters << g_vol->cluster_size_bits;
+
 	g_rl_logfile[0].vcn = 0LL;
 	g_rl_logfile[0].lcn = g_logfile_lcn;
 	/*
 	 * Determine logfile_size from volume_size (rounded up to a cluster),
 	 * making sure it does not overflow the end of the volume.
 	 */
-	if (g_volume_size < 2048LL * 1024)		/* < 2MiB	*/
+	if (volume_size < 2048LL * 1024)		/* < 2MiB	*/
 		g_logfile_size = 256LL * 1024;		/*   -> 256kiB	*/
-	else if (g_volume_size < 4000000LL)		/* < 4MB	*/
+	else if (volume_size < 4000000LL)		/* < 4MB	*/
 		g_logfile_size = 512LL * 1024;		/*   -> 512kiB	*/
-	else if (g_volume_size <= 200LL * 1024 * 1024)	/* < 200MiB	*/
+	else if (volume_size <= 200LL * 1024 * 1024)	/* < 200MiB	*/
 		g_logfile_size = 2048LL * 1024;		/*   -> 2MiB	*/
-	else if (g_volume_size >= 400LL << 20)		/* > 400MiB	*/
+	else if (volume_size >= 400LL << 20)		/* > 400MiB	*/
 		g_logfile_size = 4 << 20;		/*   -> 4MiB	*/
 	else
-		g_logfile_size = (g_volume_size / 100) &
+		g_logfile_size = (volume_size / 100) &
 				~(g_vol->cluster_size - 1);
 	j = g_logfile_size / g_vol->cluster_size;
 	while (g_rl_logfile[0].lcn + j >= g_vol->nr_clusters) {
@@ -4088,7 +4102,6 @@ static void mkntfs_fill_device_with_zeroes(void)
 	/* This function uses:
 	 *     g_buf
 	 *     g_vol
-	 *     g_volume_size
 	 */
 	/*
 	 * If not quick format, fill the device with 0s.
@@ -4098,9 +4111,12 @@ static void mkntfs_fill_device_with_zeroes(void)
 	ssize_t bw;
 	unsigned long long position, mid_clust;
 	float progress_inc = (float)g_vol->nr_clusters / 100;
+	u64 volume_size;
+
+	volume_size = g_vol->nr_clusters << g_vol->cluster_size_bits;
 
 	ntfs_log_progress("Initialising device with zeroes:   0%%");
-	mid_clust = (g_volume_size >> 1) / g_vol->cluster_size;
+	mid_clust = (volume_size >> 1) / g_vol->cluster_size;
 	for (position = 0; position < (unsigned long long)g_vol->nr_clusters;
 			position++) {
 		if (!(position % (int)(progress_inc+1))) {
@@ -4135,7 +4151,7 @@ static void mkntfs_fill_device_with_zeroes(void)
 		}
 	}
 	ntfs_log_progress("\b\b\b\b100%%");
-	position = (g_volume_size & (g_vol->cluster_size - 1)) /
+	position = (volume_size & (g_vol->cluster_size - 1)) /
 			opts.sector_size;
 	for (i = 0; (unsigned long)i < position; i++) {
 		bw = mkntfs_write(g_vol->dev, g_buf, opts.sector_size);
@@ -4296,7 +4312,6 @@ bb_err:
 	return -1;
 }
 
-
 /**
  * mkntfs_create_root_structures -
  *
@@ -4322,7 +4337,6 @@ static void mkntfs_create_root_structures(void)
 	 *     g_rl_mft_bmp
 	 *     g_rl_mftmirr
 	 *     g_vol
-	 *     g_volume_obj_id
 	 */
 	NTFS_BOOT_SECTOR *bs;
 	MFT_RECORD *m;
@@ -5018,7 +5032,9 @@ static int mkntfs_redirect(struct mkntfs_options *opts2) // XXX rename arg
 	//--------------------------------------------------------------------------------
 
 	/* Decide on the sectors/tracks/heads/size, etc. */
-	mkntfs_override_phys_params();
+	if (!mkntfs_override_phys_params(g_vol))
+		goto done;
+
 	/* Initialize $Bitmap and $MFT/$BITMAP related stuff. */
 	mkntfs_initialize_bitmaps();
 	/* Initialize MFT & set g_logfile_lcn. */
