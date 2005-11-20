@@ -228,9 +228,10 @@ GenNAttrIno(Compressed, COMPRESSED)
 GenNAttrIno(Encrypted, ENCRYPTED)
 GenNAttrIno(Sparse, SPARSE_FILE)
 
-/*
- * Union of all known attribute values. For convenience. Used in the attr
- * structure.
+/**
+ * union attr_val - Union of all known attribute values
+ *
+ * For convenience. Used in the attr structure.
  */
 typedef union {
 	u8 _default;	/* Unnamed u8 to serve as default when just using

@@ -1340,8 +1340,8 @@ typedef enum {					/* Identifier authority. */
  *	(Built-in domain)	S-1-5-0x20
  */
 
-/*
- * The SID_IDENTIFIER_AUTHORITY is a 48-bit value used in the SID structure.
+/**
+ * union SID_IDENTIFIER_AUTHORITY - A 48-bit value used in the SID structure
  *
  * NOTE: This is stored as a big endian number.
  */
