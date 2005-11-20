@@ -3539,7 +3539,7 @@ static BOOL mkntfs_override_phys_params(ntfs_volume *vol)
 	}
 	if (opts.sector_size < 256 || opts.sector_size > 4096) {
 		ntfs_log_error("The sector size is invalid.  The minimum size "
-			"if 256 bytes and the maximum is 4096 bytes.\n");
+			"is 256 bytes and the maximum is 4096 bytes.\n");
 		return FALSE;
 	}
 	ntfs_log_debug("sector size = %ld bytes\n", opts.sector_size);
