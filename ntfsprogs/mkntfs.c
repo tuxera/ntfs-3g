@@ -4376,10 +4376,10 @@ static BOOL mkntfs_create_root_structures(void)
 			ntfs_log_error("Failed to layout system mft records.\n");
 			return FALSE;
 		}
-		if (i > 0)
-			m->sequence_number = cpu_to_le16(i);
-		if (i == 0)
+		if (i == 0 || i > 23)
 			m->sequence_number = cpu_to_le16(1);
+		else
+			m->sequence_number = cpu_to_le16(i);
 	}
 	/*
 	 * If only one cluster contains all system files then
@@ -4946,6 +4946,7 @@ static BOOL mkntfs_create_root_structures(void)
 			ntfs_log_error("Couldn't create $Quota: %s\n", strerror(-err));
 			return FALSE;
 		}
+
 		ntfs_log_verbose("Creating $ObjId (mft record 25)\n");
 		m = (MFT_RECORD*)(g_buf + 25 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
@@ -4965,6 +4966,7 @@ static BOOL mkntfs_create_root_structures(void)
 			ntfs_log_error("Couldn't create $ObjId: %s\n", strerror(-err));
 			return FALSE;
 		}
+
 		ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
 		m = (MFT_RECORD*)(g_buf + 26 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
