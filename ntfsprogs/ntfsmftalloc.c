@@ -64,6 +64,7 @@
 #include "mft.h"
 #include "utils.h"
 #include "version.h"
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfsmftalloc";
 
@@ -89,42 +90,6 @@ static struct {
 } opts;
 
 /**
- * mkDprintf - debugging output (-vv); overridden by quiet (-q)
- */
-__attribute__((format(printf, 1, 2)))
-static void mkDprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opts.quiet && opts.verbose > 1) {
-		printf("DEBUG: ");
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/**
- * Eprintf - error output; ignores quiet (-q)
- */
-int Eprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	return 0;
-}
-
-/* Generate code for Vprintf() function: Verbose output (-v). */
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-
-/* Generate code for Qprintf() function: Quietable output (if not -q). */
-GEN_PRINTF(Qprintf, stdout, &opts.quiet, FALSE)
-
-/**
  * err_exit - error output and terminate; ignores quiet (-q)
  */
 __attribute__((noreturn))
@@ -146,7 +111,7 @@ static void err_exit(const char *fmt, ...)
  */
 static void copyright(void)
 {
-	fprintf(stderr, "Copyright (c) 2004-2005 Anton Altaparmakov\n"
+	ntfs_log_info("Copyright (c) 2004-2005 Anton Altaparmakov\n"
 			"Allocate and initialize a base or an extent mft "
 			"record.  If a base mft record\nis not specified, a "
 			"base mft record is allocated and initialized.  "
@@ -160,7 +125,7 @@ static void copyright(void)
  */
 static void license(void)
 {
-	fprintf(stderr, "%s", ntfs_gpl);
+	ntfs_log_info("%s", ntfs_gpl);
 }
 
 /**
@@ -170,7 +135,7 @@ __attribute__((noreturn))
 static void usage(void)
 {
 	copyright();
-	fprintf(stderr, "Usage: %s [options] device [base-mft-record]\n"
+	ntfs_log_info("Usage: %s [options] device [base-mft-record]\n"
 			"    -n    Do not write to disk\n"
 			"    -f    Force execution despite errors\n"
 			"    -q    Quiet execution\n"
@@ -179,7 +144,7 @@ static void usage(void)
 			"    -V    Display version information\n"
 			"    -l    Display licensing information\n"
 			"    -h    Display this help\n", EXEC_NAME);
-	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
@@ -194,9 +159,9 @@ static void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+	ntfs_log_info("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF)
+	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF) {
 		switch (c) {
 		case 'f':
 			opts.force = 1;
@@ -206,9 +171,11 @@ static void parse_options(int argc, char *argv[])
 			break;
 		case 'q':
 			opts.quiet = 1;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			/* Version number already printed, so just exit. */
@@ -222,11 +189,17 @@ static void parse_options(int argc, char *argv[])
 		default:
 			usage();
 		}
+	}
+
+	if (opts.verbose > 1)
+		ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
+			NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_QUIET);
+
 	if (optind == argc)
 		usage();
 	/* Get the device. */
 	dev_name = argv[optind++];
-	mkDprintf("device name = %s\n", dev_name);
+	ntfs_log_verbose("device name = %s\n", dev_name);
 	if (optind != argc) {
 		/* Get the base mft record number. */
 		ll = strtoll(argv[optind++], &s, 0);
@@ -234,7 +207,7 @@ static void parse_options(int argc, char *argv[])
 			err_exit("Invalid base mft record number: %s\n",
 					argv[optind - 1]);
 		base_mft_no = ll;
-		mkDprintf("base mft record number = 0x%llx\n", (long long)ll);
+		ntfs_log_verbose("base mft record number = 0x%llx\n", (long long)ll);
 	}
 	if (optind != argc)
 		usage();
@@ -249,46 +222,46 @@ static void dump_mft_record(MFT_RECORD *m)
 	unsigned int u;
 	MFT_REF r;
 
-	printf("-- Beginning dump of mft record. --\n");
+	ntfs_log_info("-- Beginning dump of mft record. --\n");
 	u = le32_to_cpu(m->magic);
-	printf("Mft record signature (magic) = %c%c%c%c\n", u & 0xff,
+	ntfs_log_info("Mft record signature (magic) = %c%c%c%c\n", u & 0xff,
 			u >> 8 & 0xff, u >> 16 & 0xff, u >> 24 & 0xff);
 	u = le16_to_cpu(m->usa_ofs);
-	printf("Update sequence array offset = %u (0x%x)\n", u, u);
-	printf("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
-	printf("$LogFile sequence number (lsn) = %llu\n",
+	ntfs_log_info("Update sequence array offset = %u (0x%x)\n", u, u);
+	ntfs_log_info("Update sequence array size = %u\n", le16_to_cpu(m->usa_count));
+	ntfs_log_info("$LogFile sequence number (lsn) = %llu\n",
 			(unsigned long long)le64_to_cpu(m->lsn));
-	printf("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
-	printf("Reference (hard link) count = %u\n",
+	ntfs_log_info("Sequence number = %u\n", le16_to_cpu(m->sequence_number));
+	ntfs_log_info("Reference (hard link) count = %u\n",
 						le16_to_cpu(m->link_count));
 	u = le16_to_cpu(m->attrs_offset);
-	printf("First attribute offset = %u (0x%x)\n", u, u);
-	printf("Flags = %u: ", le16_to_cpu(m->flags));
+	ntfs_log_info("First attribute offset = %u (0x%x)\n", u, u);
+	ntfs_log_info("Flags = %u: ", le16_to_cpu(m->flags));
 	if (m->flags & MFT_RECORD_IN_USE)
-		printf("MFT_RECORD_IN_USE");
+		ntfs_log_info("MFT_RECORD_IN_USE");
 	else
-		printf("MFT_RECORD_NOT_IN_USE");
+		ntfs_log_info("MFT_RECORD_NOT_IN_USE");
 	if (m->flags & MFT_RECORD_IS_DIRECTORY)
-		printf(" | MFT_RECORD_IS_DIRECTORY");
-	printf("\n");
+		ntfs_log_info(" | MFT_RECORD_IS_DIRECTORY");
+	ntfs_log_info("\n");
 	u = le32_to_cpu(m->bytes_in_use);
-	printf("Bytes in use = %u (0x%x)\n", u, u);
+	ntfs_log_info("Bytes in use = %u (0x%x)\n", u, u);
 	u = le32_to_cpu(m->bytes_allocated);
-	printf("Bytes allocated = %u (0x%x)\n", u, u);
+	ntfs_log_info("Bytes allocated = %u (0x%x)\n", u, u);
 	r = le64_to_cpu(m->base_mft_record);
-	printf("Base mft record reference:\n\tMft record number = %llu\n\t"
+	ntfs_log_info("Base mft record reference:\n\tMft record number = %llu\n\t"
 			"Sequence number = %u\n",
 			(unsigned long long)MREF(r), MSEQNO(r));
-	printf("Next attribute instance = %u\n",
+	ntfs_log_info("Next attribute instance = %u\n",
 			le16_to_cpu(m->next_attr_instance));
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
-	printf("-- Beginning dump of attributes within mft record. --\n");
+	ntfs_log_info("-- Beginning dump of attributes within mft record. --\n");
 	while ((char*)a < (char*)m + le32_to_cpu(m->bytes_in_use)) {
 		if (a->type == AT_END)
 			break;
 		a = (ATTR_RECORD*)((char*)a + le32_to_cpu(a->length));
 	};
-	printf("-- End of attributes. --\n");
+	ntfs_log_info("-- End of attributes. --\n");
 }
 
 /**
@@ -303,13 +276,12 @@ static void ntfsmftalloc_exit(void)
 		ni = base_ni;
 	/* Close the inode. */
 	if (ni && ntfs_inode_close(ni)) {
-		fprintf(stderr, "Warning: Failed to close inode 0x%llx: %s\n",
-				(long long)ni->mft_no, strerror(errno));
+		ntfs_log_perror("Warning: Failed to close inode 0x%llx",
+				(long long)ni->mft_no);
 	}
 	/* Unmount the volume. */
 	if (ntfs_umount(vol, 0) == -1)
-		fprintf(stderr, "Warning: Could not umount %s: %s\n", dev_name,
-				strerror(errno));
+		ntfs_log_perror("Warning: Could not umount %s", dev_name);
 }
 
 /**
@@ -320,6 +292,8 @@ int main(int argc, char **argv)
 	unsigned long mnt_flags, ul;
 	int err;
 
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
+
 	/* Initialize opts to zero / required values. */
 	memset(&opts, 0, sizeof(opts));
 	/* Parse command line options. */
@@ -327,18 +301,18 @@ int main(int argc, char **argv)
 	utils_set_locale();
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(dev_name, &mnt_flags))
-		Eprintf("Failed to determine whether %s is mounted: %s\n",
+		ntfs_log_error("Failed to determine whether %s is mounted: %s\n",
 				dev_name, strerror(errno));
 	else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Eprintf("%s is mounted.\n", dev_name);
+		ntfs_log_error("%s is mounted.\n", dev_name);
 		if (!opts.force)
 			err_exit("Refusing to run!\n");
-		fprintf(stderr, "ntfsmftalloc forced anyway. Hope /etc/mtab "
+		ntfs_log_error("ntfsmftalloc forced anyway. Hope /etc/mtab "
 				"is incorrect.\n");
 	}
 	/* Mount the device. */
 	if (opts.no_action) {
-		Qprintf("Running in READ-ONLY mode!\n");
+		ntfs_log_quiet("Running in READ-ONLY mode!\n");
 		ul = MS_RDONLY;
 	} else
 		ul = 0;
@@ -348,7 +322,7 @@ int main(int argc, char **argv)
 	/* Register our exit function which will unlock and close the device. */
 	err = atexit(&ntfsmftalloc_exit);
 	if (err == -1) {
-		Eprintf("Could not set up exit() function because atexit() "
+		ntfs_log_error("Could not set up exit() function because atexit() "
 				"failed: %s Aborting...\n", strerror(errno));
 		ntfsmftalloc_exit();
 		exit(1);
@@ -365,14 +339,14 @@ int main(int argc, char **argv)
 	if (!ni)
 		err_exit("Failed to allocate mft record: %s\n",
 				strerror(errno));
-	printf("Allocated %s mft record 0x%llx", base_ni ? "extent" : "base",
+	ntfs_log_info("Allocated %s mft record 0x%llx", base_ni ? "extent" : "base",
 			(long long)ni->mft_no);
 	if (base_ni)
-		printf(" with base mft record 0x%llx",
+		ntfs_log_info(" with base mft record 0x%llx",
 				(long long)base_mft_no);
-	printf(".\n");
+	ntfs_log_info(".\n");
 	if (!opts.quiet && opts.verbose > 1) {
-		mkDprintf("Dumping allocated mft record 0x%llx:\n",
+		ntfs_log_verbose("Dumping allocated mft record 0x%llx:\n",
 				(long long)ni->mft_no);
 		dump_mft_record(ni->mrec);
 	}
@@ -388,9 +362,8 @@ int main(int argc, char **argv)
 	/* Disable our ntfsmftalloc_exit() handler. */
 	success = TRUE;
 	if (err == -1)
-		fprintf(stderr, "Warning: Failed to umount %s: %s\n", dev_name,
-				strerror(errno));
+		ntfs_log_perror("Warning: Failed to umount %s", dev_name);
 	else
-		Qprintf("ntfsmftalloc completed successfully.\n");
+		ntfs_log_quiet("ntfsmftalloc completed successfully.\n");
 	return 0;
 }

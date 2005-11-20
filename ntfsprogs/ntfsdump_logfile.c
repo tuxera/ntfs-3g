@@ -70,6 +70,7 @@
 #include "mst.h"
 #include "utils.h"
 #include "version.h"
+#include "logging.h"
 
 typedef struct {
 	BOOL is_volume;
@@ -87,8 +88,6 @@ typedef struct {
 	};
 } logfile_file;
 
-GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
-
 /**
  * logfile_close
  */
@@ -98,15 +97,15 @@ static int logfile_close(logfile_file *logfile)
 		if (logfile->na)
 			ntfs_attr_close(logfile->na);
 		if (logfile->ni && ntfs_inode_close(logfile->ni))
-			Eprintf("Warning: Failed to close $LogFile (inode %i):"
-				" %s\n", FILE_LogFile, strerror(errno));
+			ntfs_log_perror("Warning: Failed to close $LogFile "
+					"(inode %i)", FILE_LogFile);
 		if (ntfs_umount(logfile->vol, 0))
-			Eprintf("Warning: Failed to umount %s: %s\n",
-				logfile->filename, strerror(errno));
+			ntfs_log_perror("Warning: Failed to umount %s",
+				logfile->filename);
 	} else {
 		if (close(logfile->fd))
-			Eprintf("Warning: Failed to close file %s: %s\n",
-				logfile->filename, strerror(errno));
+			ntfs_log_perror("Warning: Failed to close file %s",
+				logfile->filename);
 	}
 	return 0;
 }
@@ -130,17 +129,17 @@ static void device_err_exit(ntfs_volume *vol, ntfs_inode *ni,
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
-		Eprintf("Warning: Failed to close $LogFile (inode %i): %s\n",
-			FILE_LogFile, strerror(errno));
+		ntfs_log_perror("Warning: Failed to close $LogFile (inode %i)",
+			FILE_LogFile);
 	if (ntfs_umount(vol, 0))
-		Eprintf("Warning: Failed to umount: %s\n", strerror(errno));
+		ntfs_log_perror("Warning: Failed to umount");
 
 	fprintf(stderr, "ERROR: ");
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 
-	Eprintf("Aborting...\n");
+	ntfs_log_error("Aborting...\n");
 	exit(1);
 }
 
@@ -160,7 +159,7 @@ static void log_err_exit(u8 *buf, const char *fmt, ...)
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 
-	Eprintf("Aborting...\n");
+	ntfs_log_error("Aborting...\n");
 	exit(1);
 }
 
@@ -170,7 +169,7 @@ static void log_err_exit(u8 *buf, const char *fmt, ...)
 __attribute__((noreturn))
 static void usage(const char *exec_name)
 {
-	Eprintf("%s v%s (libntfs %s) - Interpret and display information "
+	ntfs_log_error("%s v%s (libntfs %s) - Interpret and display information "
 			"about the journal\n($LogFile) of an NTFS volume.\n"
 			"Copyright (c) 2000-2005 Anton Altaparmakov.\n"
 			"%s is free software, released under the GNU General "
@@ -202,7 +201,7 @@ static int logfile_open(BOOL is_volume, const char *filename,
 		if (!vol)
 			log_err_exit(NULL, "Failed to mount %s: %s\n",
 					filename, strerror(errno));
-		printf("Mounted NTFS volume %s (NTFS v%i.%i) on device %s.\n",
+		ntfs_log_info("Mounted NTFS volume %s (NTFS v%i.%i) on device %s.\n",
 				vol->vol_name ? vol->vol_name : "<NO_NAME>",
 				vol->major_ver, vol->minor_ver, filename);
 		if (ntfs_version_is_supported(vol))
@@ -265,13 +264,13 @@ static int logfile_pread(logfile_file *logfile, int ofs, int count, u8 *buf)
 		br = (int)ntfs_attr_pread(logfile->na, ofs, count, buf);
 	} else {
 		if (lseek(logfile->fd, ofs, SEEK_SET)==-1) {
-			Eprintf("Could not seek to offset %u\n", ofs);
+			ntfs_log_error("Could not seek to offset %u\n", ofs);
 			return 0;
 		}
 		br = read(logfile->fd, buf, count);
 	}
 	if (br != count) {
-		Eprintf("Only %d out of %d bytes read starting at %d\n",
+		ntfs_log_error("Only %d out of %d bytes read starting at %d\n",
 			br, count, ofs);
 	}
 	return br;
@@ -340,29 +339,35 @@ static void restart_header_sanity(RESTART_PAGE_HEADER *rstr, u8 *buf)
 				"yet.\n");
 }
 
+/**
+ * dump_restart_areas_header
+ */
 static void dump_restart_areas_header(RESTART_PAGE_HEADER *rstr)
 {
-	printf("\nRestart page header:\n");
-	printf("magic = %s\n", ntfs_is_rstr_record(rstr->magic) ? "RSTR" :
+	ntfs_log_info("\nRestart page header:\n");
+	ntfs_log_info("magic = %s\n", ntfs_is_rstr_record(rstr->magic) ? "RSTR" :
 			"CHKD");
-	printf("usa_ofs = %u (0x%x)\n", le16_to_cpu(rstr->usa_ofs),
+	ntfs_log_info("usa_ofs = %u (0x%x)\n", le16_to_cpu(rstr->usa_ofs),
 			le16_to_cpu(rstr->usa_ofs));
-	printf("usa_count = %u (0x%x)\n", le16_to_cpu(rstr->usa_count),
+	ntfs_log_info("usa_count = %u (0x%x)\n", le16_to_cpu(rstr->usa_count),
 			le16_to_cpu(rstr->usa_count));
-	printf("chkdsk_lsn = %lli (0x%llx)\n",
+	ntfs_log_info("chkdsk_lsn = %lli (0x%llx)\n",
 			(long long)sle64_to_cpu(rstr->chkdsk_lsn),
 			(unsigned long long)sle64_to_cpu(rstr->chkdsk_lsn));
-	printf("system_page_size = %u (0x%x)\n",
+	ntfs_log_info("system_page_size = %u (0x%x)\n",
 			(unsigned int)le32_to_cpu(rstr->system_page_size),
 			(unsigned int)le32_to_cpu(rstr->system_page_size));
-	printf("log_page_size = %u (0x%x)\n",
+	ntfs_log_info("log_page_size = %u (0x%x)\n",
 			(unsigned int)le32_to_cpu(rstr->log_page_size),
 			(unsigned int)le32_to_cpu(rstr->log_page_size));
-	printf("restart_offset = %u (0x%x)\n",
+	ntfs_log_info("restart_offset = %u (0x%x)\n",
 			le16_to_cpu(rstr->restart_area_offset),
 			le16_to_cpu(rstr->restart_area_offset));
 }
 
+/**
+ * dump_restart_areas_area
+ */
 static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 {
 	LOG_CLIENT_RECORD *lcr;
@@ -371,40 +376,40 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 
 	ra = (RESTART_AREA*)((u8*)rstr +
 			le16_to_cpu(rstr->restart_area_offset));
-	printf("current_lsn = %lli (0x%llx)\n",
+	ntfs_log_info("current_lsn = %lli (0x%llx)\n",
 			(long long)sle64_to_cpu(ra->current_lsn),
 			(unsigned long long)sle64_to_cpu(ra->current_lsn));
-	printf("log_clients = %u (0x%x)\n", le16_to_cpu(ra->log_clients),
+	ntfs_log_info("log_clients = %u (0x%x)\n", le16_to_cpu(ra->log_clients),
 			le16_to_cpu(ra->log_clients));
-	printf("client_free_list = %i (0x%x)\n",
+	ntfs_log_info("client_free_list = %i (0x%x)\n",
 			(s16)le16_to_cpu(ra->client_free_list),
 			le16_to_cpu(ra->client_free_list));
-	printf("client_in_use_list = %i (0x%x)\n",
+	ntfs_log_info("client_in_use_list = %i (0x%x)\n",
 			(s16)le16_to_cpu(ra->client_in_use_list),
 			le16_to_cpu(ra->client_in_use_list));
-	printf("flags = 0x%.4x\n", le16_to_cpu(ra->flags));
-	printf("seq_number_bits = %u (0x%x)\n",
+	ntfs_log_info("flags = 0x%.4x\n", le16_to_cpu(ra->flags));
+	ntfs_log_info("seq_number_bits = %u (0x%x)\n",
 			(unsigned int)le32_to_cpu(ra->seq_number_bits),
 			(unsigned int)le32_to_cpu(ra->seq_number_bits));
-	printf("restart_area_length = %u (0x%x)\n",
+	ntfs_log_info("restart_area_length = %u (0x%x)\n",
 			le16_to_cpu(ra->restart_area_length),
 			le16_to_cpu(ra->restart_area_length));
-	printf("client_array_offset = %u (0x%x)\n",
+	ntfs_log_info("client_array_offset = %u (0x%x)\n",
 			le16_to_cpu(ra->client_array_offset),
 			le16_to_cpu(ra->client_array_offset));
-	printf("file_size = %lli (0x%llx)\n",
+	ntfs_log_info("file_size = %lli (0x%llx)\n",
 			(long long)sle64_to_cpu(ra->file_size),
 			(unsigned long long)sle64_to_cpu(ra->file_size));
-	printf("last_lsn_data_length = %u (0x%x)\n",
+	ntfs_log_info("last_lsn_data_length = %u (0x%x)\n",
 			(unsigned int)le32_to_cpu(ra->last_lsn_data_length),
 			(unsigned int)le32_to_cpu(ra->last_lsn_data_length));
-	printf("log_record_header_length = %u (0x%x)\n",
+	ntfs_log_info("log_record_header_length = %u (0x%x)\n",
 			le16_to_cpu(ra->log_record_header_length),
 			le16_to_cpu(ra->log_record_header_length));
-	printf("log_page_data_offset = %u (0x%x)\n",
+	ntfs_log_info("log_page_data_offset = %u (0x%x)\n",
 			le16_to_cpu(ra->log_page_data_offset),
 			le16_to_cpu(ra->log_page_data_offset));
-	printf("restart_log_open_count = %u (0x%x)\n",
+	ntfs_log_info("restart_log_open_count = %u (0x%x)\n",
 			(unsigned)le32_to_cpu(ra->restart_log_open_count),
 			(unsigned)le32_to_cpu(ra->restart_log_open_count));
 	lcr = (LOG_CLIENT_RECORD*)((u8*)ra +
@@ -412,24 +417,24 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 	for (client = 0; client < le16_to_cpu(ra->log_clients); client++) {
 		char *client_name;
 
-		printf("\nLog client record number %i:\n", client + 1);
-		printf("oldest_lsn = %lli (0x%llx)\n",
+		ntfs_log_info("\nLog client record number %i:\n", client + 1);
+		ntfs_log_info("oldest_lsn = %lli (0x%llx)\n",
 				(long long)sle64_to_cpu(lcr->oldest_lsn),
 				(unsigned long long)
 				sle64_to_cpu(lcr->oldest_lsn));
-		printf("client_restart_lsn = %lli (0x%llx)\n", (long long)
+		ntfs_log_info("client_restart_lsn = %lli (0x%llx)\n", (long long)
 				sle64_to_cpu(lcr->client_restart_lsn),
 				(unsigned long long)
 				sle64_to_cpu(lcr->client_restart_lsn));
-		printf("prev_client = %i (0x%x)\n",
+		ntfs_log_info("prev_client = %i (0x%x)\n",
 				(s16)le16_to_cpu(lcr->prev_client),
 				le16_to_cpu(lcr->prev_client));
-		printf("next_client = %i (0x%x)\n",
+		ntfs_log_info("next_client = %i (0x%x)\n",
 				(s16)le16_to_cpu(lcr->next_client),
 				le16_to_cpu(lcr->next_client));
-		printf("seq_number = %u (0x%x)\n", le16_to_cpu(lcr->seq_number),
+		ntfs_log_info("seq_number = %u (0x%x)\n", le16_to_cpu(lcr->seq_number),
 				le16_to_cpu(lcr->seq_number));
-		printf("client_name_length = %u (0x%x)\n",
+		ntfs_log_info("client_name_length = %u (0x%x)\n",
 				(unsigned int)le32_to_cpu(lcr->client_name_length) / 2,
 				(unsigned int)le32_to_cpu(lcr->client_name_length) / 2);
 		if (le32_to_cpu(lcr->client_name_length)) {
@@ -437,12 +442,12 @@ static void dump_restart_areas_area(RESTART_PAGE_HEADER *rstr)
 			if (ntfs_ucstombs(lcr->client_name,
 					le32_to_cpu(lcr->client_name_length) /
 					2, &client_name, 0) < 0) {
-				perror("Failed to convert log client name");
+				ntfs_log_perror("Failed to convert log client name");
 				client_name = strdup("<conversion error>");
 			}
 		} else
 			client_name = strdup("<unnamed>");
-		printf("client_name = %s\n", client_name);
+		ntfs_log_info("client_name = %s\n", client_name);
 		free(client_name);
 		/*
 		 * Log client records are fixed size so we can simply use the
@@ -473,7 +478,7 @@ rstr_pass_loc:
 				"detected in restart page header.  Cannot "
 				"handle this yet.\n");
 	if (pass == 1)
-		printf("$LogFile version %i.%i.\n",
+		ntfs_log_info("$LogFile version %i.%i.\n",
 				sle16_to_cpu(rstr->major_ver),
 				sle16_to_cpu(rstr->minor_ver));
 	else /* if (pass == 2) */ {
@@ -511,10 +516,10 @@ rstr_pass_loc:
 					"yet.\n");
 	}
 	/* The restart page header is in rstr and it is mst deprotected. */
-	printf("\n%s restart page:\n", pass == 1 ? "1st" : "2nd");
+	ntfs_log_info("\n%s restart page:\n", pass == 1 ? "1st" : "2nd");
 	dump_restart_areas_header(rstr);
 
-	printf("\nRestart area:\n");
+	ntfs_log_info("\nRestart area:\n");
 	dump_restart_areas_area(rstr);
 
 skip_rstr_pass:
@@ -533,55 +538,55 @@ skip_rstr_pass:
 static void dump_log_record(LOG_RECORD *lr)
 {
 	unsigned int i;
-	printf("this lsn = 0x%llx\n",
+	ntfs_log_info("this lsn = 0x%llx\n",
 			(unsigned long long)le64_to_cpu(lr->this_lsn));
-	printf("client previous lsn = 0x%llx\n", (unsigned long long)
+	ntfs_log_info("client previous lsn = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(lr->client_previous_lsn));
-	printf("client undo next lsn = 0x%llx\n", (unsigned long long)
+	ntfs_log_info("client undo next lsn = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(lr->client_undo_next_lsn));
-	printf("client data length = 0x%x\n",
+	ntfs_log_info("client data length = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->client_data_length));
-	printf("client_id.seq_number = 0x%x\n",
+	ntfs_log_info("client_id.seq_number = 0x%x\n",
 			le16_to_cpu(lr->client_id.seq_number));
-	printf("client_id.client_index = 0x%x\n",
+	ntfs_log_info("client_id.client_index = 0x%x\n",
 			le16_to_cpu(lr->client_id.client_index));
-	printf("record type = 0x%x\n",
+	ntfs_log_info("record type = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->record_type));
-	printf("transaction_id = 0x%x\n",
+	ntfs_log_info("transaction_id = 0x%x\n",
 			(unsigned int)le32_to_cpu(lr->transaction_id));
-	printf("flags = 0x%x:", lr->flags);
+	ntfs_log_info("flags = 0x%x:", lr->flags);
 	if (!lr->flags)
-		printf(" NONE\n");
+		ntfs_log_info(" NONE\n");
 	else {
 		int _b = 0;
 
 		if (lr->flags & LOG_RECORD_MULTI_PAGE) {
-			printf(" LOG_RECORD_MULTI_PAGE");
+			ntfs_log_info(" LOG_RECORD_MULTI_PAGE");
 			_b = 1;
 		}
 		if (lr->flags & ~LOG_RECORD_MULTI_PAGE) {
 			if (_b)
-				printf(" |");
-			printf(" Unknown flags");
+				ntfs_log_info(" |");
+			ntfs_log_info(" Unknown flags");
 		}
-		printf("\n");
+		ntfs_log_info("\n");
 	}
-	printf("redo_operation = 0x%x\n", le16_to_cpu(lr->redo_operation));
-	printf("undo_operation = 0x%x\n", le16_to_cpu(lr->undo_operation));
-	printf("redo_offset = 0x%x\n", le16_to_cpu(lr->redo_offset));
-	printf("redo_length = 0x%x\n", le16_to_cpu(lr->redo_length));
-	printf("undo_offset = 0x%x\n", le16_to_cpu(lr->undo_offset));
-	printf("undo_length = 0x%x\n", le16_to_cpu(lr->undo_length));
-	printf("target_attribute = 0x%x\n", le16_to_cpu(lr->target_attribute));
-	printf("lcns_to_follow = 0x%x\n", le16_to_cpu(lr->lcns_to_follow));
-	printf("record_offset = 0x%x\n", le16_to_cpu(lr->record_offset));
-	printf("attribute_offset = 0x%x\n", le16_to_cpu(lr->attribute_offset));
-	printf("target_vcn = 0x%llx\n",
+	ntfs_log_info("redo_operation = 0x%x\n", le16_to_cpu(lr->redo_operation));
+	ntfs_log_info("undo_operation = 0x%x\n", le16_to_cpu(lr->undo_operation));
+	ntfs_log_info("redo_offset = 0x%x\n", le16_to_cpu(lr->redo_offset));
+	ntfs_log_info("redo_length = 0x%x\n", le16_to_cpu(lr->redo_length));
+	ntfs_log_info("undo_offset = 0x%x\n", le16_to_cpu(lr->undo_offset));
+	ntfs_log_info("undo_length = 0x%x\n", le16_to_cpu(lr->undo_length));
+	ntfs_log_info("target_attribute = 0x%x\n", le16_to_cpu(lr->target_attribute));
+	ntfs_log_info("lcns_to_follow = 0x%x\n", le16_to_cpu(lr->lcns_to_follow));
+	ntfs_log_info("record_offset = 0x%x\n", le16_to_cpu(lr->record_offset));
+	ntfs_log_info("attribute_offset = 0x%x\n", le16_to_cpu(lr->attribute_offset));
+	ntfs_log_info("target_vcn = 0x%llx\n",
 			(unsigned long long)sle64_to_cpu(lr->target_vcn));
 	if (le16_to_cpu(lr->lcns_to_follow) > 0)
-		printf("Array of lcns:\n");
+		ntfs_log_info("Array of lcns:\n");
 	for (i = 0; i < le16_to_cpu(lr->lcns_to_follow); i++)
-		printf("lcn_list[%u].lcn = 0x%llx\n", i, (unsigned long long)
+		ntfs_log_info("lcn_list[%u].lcn = 0x%llx\n", i, (unsigned long long)
 				sle64_to_cpu(lr->lcn_list[i].lcn));
 }
 
@@ -600,7 +605,7 @@ rcrd_pass_loc:
 	rcrd = (RECORD_PAGE_HEADER*)((u8*)rcrd + page_size);
 	if ((u8*)rcrd + page_size > buf + buf_size)
 		return;
-	printf("\nLog record page number %i", pass);
+	ntfs_log_info("\nLog record page number %i", pass);
 	if (!ntfs_is_rcrd_record(rcrd->magic) &&
 			!ntfs_is_chkd_record(rcrd->magic)) {
 		unsigned int i;
@@ -616,17 +621,17 @@ rcrd_pass_loc:
 	} else
 		puts(":");
 	/* Dump log record page */
-	printf("magic = %s\n", ntfs_is_rcrd_record(rcrd->magic) ? "RCRD" :
+	ntfs_log_info("magic = %s\n", ntfs_is_rcrd_record(rcrd->magic) ? "RCRD" :
 			"CHKD");
 // TODO: I am here... (AIA)
-	printf("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
+	ntfs_log_info("copy.last_lsn/file_offset = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->copy.last_lsn));
-	printf("flags = 0x%x\n", (unsigned int)le32_to_cpu(rcrd->flags));
-	printf("page count = %i\n", le16_to_cpu(rcrd->page_count));
-	printf("page position = %i\n", le16_to_cpu(rcrd->page_position));
-	printf("header.next_record_offset = 0x%llx\n", (unsigned long long)
+	ntfs_log_info("flags = 0x%x\n", (unsigned int)le32_to_cpu(rcrd->flags));
+	ntfs_log_info("page count = %i\n", le16_to_cpu(rcrd->page_count));
+	ntfs_log_info("page position = %i\n", le16_to_cpu(rcrd->page_position));
+	ntfs_log_info("header.next_record_offset = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->header.packed.next_record_offset));
-	printf("header.last_end_lsn = 0x%llx\n", (unsigned long long)
+	ntfs_log_info("header.last_end_lsn = 0x%llx\n", (unsigned long long)
 			le64_to_cpu(rcrd->header.packed.last_end_lsn));
 	/*
 	 * Where does the 0x40 come from? Is it just usa_offset +
@@ -635,7 +640,7 @@ rcrd_pass_loc:
 	lr = (LOG_RECORD*)((u8*)rcrd + 0x40);
 	client = 0;
 	do {
-		printf("\nLog record %i:\n", client);
+		ntfs_log_info("\nLog record %i:\n", client);
 		dump_log_record(lr);
 		client++;
 		lr = (LOG_RECORD*)((u8*)lr + 0x70);
@@ -658,7 +663,9 @@ int main(int argc, char **argv)
 	logfile_file logfile;
 	u8 *buf;
 
-	printf("\n");
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
+
+	ntfs_log_info("\n");
 	if (argc < 2 || argc > 3)
 		/* print usage and exit */
 		usage(argv[0]);
@@ -686,14 +693,13 @@ int main(int argc, char **argv)
 	if (logfile.data_size <= buf_size)
 		buf_size = logfile.data_size;
 	else
-		Eprintf("Warning: $LogFile is too big.  "
+		ntfs_log_error("Warning: $LogFile is too big.  "
 			"Only analysing the first 64MiB.\n");
 
 	/* For simplicity we read all of $LogFile/$DATA into memory. */
 	buf = malloc(buf_size);
 	if (!buf) {
-		Eprintf("Failed to allocate buffer for file data: %s\n",
-			strerror(errno));
+		ntfs_log_perror("Failed to allocate buffer for file data");
 		logfile_close(&logfile);
 		exit(1);
 	}
@@ -743,20 +749,20 @@ int main(int argc, char **argv)
 	 * Second, verify the restart area itself.
 	 */
 	// TODO: Implement this.
-	Eprintf("Warning:  Sanity checking of restart area not implemented "
+	ntfs_log_error("Warning:  Sanity checking of restart area not implemented "
 		"yet.\n");
 	/*
 	 * Third and last, verify the array of log client records.
 	 */
 	// TODO: Implement this.
-	Eprintf("Warning:  Sanity checking of array of log client records not "
+	ntfs_log_error("Warning:  Sanity checking of array of log client records not "
 		"implemented yet.\n");
 
 	/*
 	 * Dump the restart headers & areas.
 	 */
 	rcrd = (RECORD_PAGE_HEADER*)dump_restart_areas(rstr, buf, page_size);
-	printf("\n\nFinished with restart pages.  "
+	ntfs_log_info("\n\nFinished with restart pages.  "
 		"Beginning with log pages.\n");
 
 	/*

@@ -66,6 +66,7 @@
 #include "utils.h"
 #include "attrdef.h"
 #include "version.h"
+#include "logging.h"
 
 const char *EXEC_NAME = "ntfstruncate";
 
@@ -95,42 +96,6 @@ struct {
 	int force;		/* -f, force truncation. */
 				/* -V, print version and exit. */
 } opts;
-
-/**
- * mkDprintf - debugging output (-vv); overridden by quiet (-q)
- */
-__attribute__((format(printf, 1, 2)))
-static void mkDprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	if (!opts.quiet && opts.verbose > 1) {
-		printf("DEBUG: ");
-		va_start(ap, fmt);
-		vprintf(fmt, ap);
-		va_end(ap);
-	}
-}
-
-/**
- * Eprintf - error output; ignores quiet (-q)
- */
-int Eprintf(const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "ERROR: ");
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	return 0;
-}
-
-/* Generate code for Vprintf() function: Verbose output (-v). */
-GEN_PRINTF(Vprintf, stdout, &opts.verbose, TRUE)
-
-/* Generate code for Qprintf() function: Quietable output (if not -q). */
-GEN_PRINTF(Qprintf, stdout, &opts.quiet,   FALSE)
 
 /**
  * err_exit - error output and terminate; ignores quiet (-q)
@@ -216,9 +181,11 @@ static void parse_options(int argc, char *argv[])
 			break;
 		case 'q':
 			opts.quiet = 1;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			/* Version number already printed, so just exit. */
@@ -235,9 +202,13 @@ static void parse_options(int argc, char *argv[])
 	if (optind == argc)
 		usage();
 
+	if (opts.verbose > 1)
+		ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
+			NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_QUIET);
+
 	/* Get the device. */
 	dev_name = argv[optind++];
-	mkDprintf("device name = %s\n", dev_name);
+	ntfs_log_verbose("device name = %s\n", dev_name);
 
 	if (optind == argc)
 		usage();
@@ -247,7 +218,7 @@ static void parse_options(int argc, char *argv[])
 	if (*s || !ll || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid inode number: %s\n", argv[optind - 1]);
 	inode = ll;
-	mkDprintf("inode = %lli\n", (long long)inode);
+	ntfs_log_verbose("inode = %lli\n", (long long)inode);
 
 	if (optind == argc)
 		usage();
@@ -287,11 +258,11 @@ static void parse_options(int argc, char *argv[])
 			attr_name_len = 0;
 		}
 	}
-	mkDprintf("attribute type = 0x%x\n", (unsigned int)attr_type);
+	ntfs_log_verbose("attribute type = 0x%x\n", (unsigned int)attr_type);
 	if (attr_name == AT_UNNAMED)
-		mkDprintf("attribute name = \"\" (UNNAMED)\n");
+		ntfs_log_verbose("attribute name = \"\" (UNNAMED)\n");
 	else
-		mkDprintf("attribute name = \"%s\" (length %u Unicode "
+		ntfs_log_verbose("attribute name = \"%s\" (length %u Unicode "
 				"characters)\n", s2,
 				(unsigned int)attr_name_len);
 
@@ -300,7 +271,7 @@ static void parse_options(int argc, char *argv[])
 	if (*s2 || ll < 0 || (ll >= LLONG_MAX && errno == ERANGE))
 		err_exit("Invalid new length: %s\n", s);
 	new_len = ll;
-	mkDprintf("new length = %lli\n", new_len);
+	ntfs_log_verbose("new length = %lli\n", new_len);
 }
 
 /**
@@ -580,7 +551,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 //		printf("name = %c%c%c%c%c\n", *p, p[1], p[2], p[3], p[4]);
 //		}
 		if (ucstos(s, attr_defs[i].name, sizeof(s)) == -1) {
-			Eprintf("Could not convert Unicode string to single "
+			ntfs_log_error("Could not convert Unicode string to single "
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
 					sizeof(s));
@@ -600,7 +571,7 @@ static void dump_attr_record(MFT_RECORD *m, ATTR_RECORD *a)
 				cpu_to_le16(a->name_offset)),
 				min((int)sizeof(s),
 						a->name_length + 1)) == -1) {
-			Eprintf("Could not convert Unicode string to single "
+			ntfs_log_error("Could not convert Unicode string to single "
 				"byte string in current locale.\n");
 			strncpy(s, "Error converting Unicode string",
 					sizeof(s));
@@ -717,14 +688,13 @@ static void ntfstruncate_exit(void)
 		ntfs_attr_close(na);
 	/* Close the inode. */
 	if (ni && ntfs_inode_close(ni)) {
-		fprintf(stderr, "Warning: Failed to close inode %lli: %s\n",
-				(long long)inode, strerror(errno));
+		ntfs_log_perror("Warning: Failed to close inode %lli",
+				(long long)inode);
 	}
 	/* Unmount the volume. */
 	err = ntfs_umount(vol, 0);
 	if (err == -1)
-		fprintf(stderr, "Warning: Could not umount %s: %s\n", dev_name,
-				strerror(errno));
+		ntfs_log_perror("Warning: Could not umount %s", dev_name);
 	/* Free the attribute name if it exists. */
 	if (attr_name && attr_name != AT_UNNAMED)
 		free(attr_name);
@@ -737,6 +707,8 @@ int main(int argc, char **argv)
 {
 	unsigned long mnt_flags, ul;
 	int err;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	/* Initialize opts to zero / required values. */
 	memset(&opts, 0, sizeof(opts));
@@ -754,10 +726,10 @@ int main(int argc, char **argv)
 
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(dev_name, &mnt_flags))
-		Eprintf("Failed to determine whether %s is mounted: %s\n",
-				dev_name, strerror(errno));
+		ntfs_log_perror("Failed to determine whether %s is mounted",
+				dev_name);
 	else if (mnt_flags & NTFS_MF_MOUNTED) {
-		Eprintf("%s is mounted.\n", dev_name);
+		ntfs_log_error("%s is mounted.\n", dev_name);
 		if (!opts.force)
 			err_exit("Refusing to run!\n");
 		fprintf(stderr, "ntfstruncate forced anyway. Hope /etc/mtab "
@@ -766,7 +738,7 @@ int main(int argc, char **argv)
 
 	/* Mount the device. */
 	if (opts.no_action) {
-		Qprintf("Running in READ-ONLY mode!\n");
+		ntfs_log_quiet("Running in READ-ONLY mode!\n");
 		ul = MS_RDONLY;
 	} else
 		ul = 0;
@@ -777,7 +749,7 @@ int main(int argc, char **argv)
 	/* Register our exit function which will unlock and close the device. */
 	err = atexit(&ntfstruncate_exit);
 	if (err == -1) {
-		Eprintf("Could not set up exit() function because atexit() "
+		ntfs_log_error("Could not set up exit() function because atexit() "
 				"failed: %s Aborting...\n", strerror(errno));
 		ntfstruncate_exit();
 		exit(1);
@@ -796,7 +768,7 @@ int main(int argc, char **argv)
 				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
-		mkDprintf("Dumping mft record before calling "
+		ntfs_log_verbose("Dumping mft record before calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
 	}
@@ -808,7 +780,7 @@ int main(int argc, char **argv)
 				(unsigned int)attr_type, strerror(errno));
 
 	if (!opts.quiet && opts.verbose > 1) {
-		mkDprintf("Dumping mft record after calling "
+		ntfs_log_verbose("Dumping mft record after calling "
 				"ntfs_attr_truncate():\n");
 		dump_mft_record(ni->mrec);
 	}
@@ -826,8 +798,7 @@ int main(int argc, char **argv)
 	/* Unmount the volume. */
 	err = ntfs_umount(vol, 0);
 	if (err == -1)
-		fprintf(stderr, "Warning: Failed to umount %s: %s\n", dev_name,
-				strerror(errno));
+		ntfs_log_perror("Warning: Failed to umount %s", dev_name);
 
 	/* Free the attribute name if it exists. */
 	if (attr_name && attr_name != AT_UNNAMED)
@@ -836,7 +807,7 @@ int main(int argc, char **argv)
 	/* Finally, disable our ntfstruncate_exit() handler. */
 	success = TRUE;
 
-	Qprintf("ntfstruncate completed successfully. Have a nice day.\n");
+	ntfs_log_quiet("ntfstruncate completed successfully. Have a nice day.\n");
 	return 0;
 }
 

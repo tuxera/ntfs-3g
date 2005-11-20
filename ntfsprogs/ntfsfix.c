@@ -74,6 +74,7 @@
 #include "logfile.h"
 #include "utils.h"
 #include "version.h"
+#include "logging.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \
@@ -81,13 +82,9 @@ You need to run ./configure without the --disable-default-device-io-ops \
 switch if you want to be able to build the NTFS utilities."
 #endif
 
-GEN_PRINTF(Eprintf, stdout, NULL, FALSE)
-GEN_PRINTF(Vprintf, stdout, NULL, FALSE)
-GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
-
 static const char *EXEC_NAME = "ntfsfix";
-static const char *OK        = "OK";
-static const char *FAILED    = "FAILED";
+static const char *OK        = "OK\n";
+static const char *FAILED    = "FAILED\n";
 static BOOL vol_is_dirty     = FALSE;
 static BOOL journal_is_empty = FALSE;
 
@@ -95,10 +92,13 @@ struct {
 	char *volume;
 } opt;
 
+/**
+ * usage
+ */
 __attribute__((noreturn))
 static int usage(void)
 {
-	printf("%s v%s (libntfs %s)\n"
+	ntfs_log_info("%s v%s (libntfs %s)\n"
 		   "\n"
 		   "Usage: %s [options] device\n"
 		   "    Attempt to fix an NTFS partition.\n"
@@ -109,28 +109,34 @@ static int usage(void)
 		   "For example: %s /dev/hda6\n\n",
 		   EXEC_NAME, VERSION, ntfs_libntfs_version(), EXEC_NAME,
 		   EXEC_NAME);
-	printf("%s%s", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
+/**
+ * version
+ */
 __attribute__((noreturn))
 static void version(void)
 {
-	printf("%s v%s\n\n"
+	ntfs_log_info("%s v%s\n\n"
 		   "Attempt to fix an NTFS partition.\n\n"
 		   "Copyright (c) 2000-2003 Anton Altaparmakov.\n\n",
 		   EXEC_NAME, VERSION);
-	printf("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
+/**
+ * parse_options
+ */
 static void parse_options(int argc, char **argv)
 {
 	char c;
 	static const char *sopt = "-hV";
 	static const struct option lopt[] = {
-		{ "help",	    no_argument,		NULL, 'h' },
-		{ "version",	no_argument,		NULL, 'V' },
+		{ "help",	no_argument,	NULL, 'h' },
+		{ "version",	no_argument,	NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -142,7 +148,7 @@ static void parse_options(int argc, char **argv)
 			if (!opt.volume)
 				opt.volume = argv[optind - 1];
 			else {
-				printf("ERROR: Too many arguments.\n");
+				ntfs_log_info("ERROR: Too many arguments.\n");
 				usage();
 			}
 			break;
@@ -152,17 +158,20 @@ static void parse_options(int argc, char **argv)
 		case 'V':
 			version();
 		default:
-			printf("ERROR: Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_info("ERROR: Unknown option '%s'.\n", argv[optind - 1]);
 			usage();
 		}
 	}
 
 	if (opt.volume == NULL) {
-		printf("ERROR: You must specify a device.\n");
+		ntfs_log_info("ERROR: You must specify a device.\n");
 		usage();
 	}
 }
 
+/**
+ * OLD_ntfs_volume_set_flags
+ */
 static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 {
 	MFT_RECORD *m = NULL;
@@ -233,6 +242,9 @@ err_exit:
 	return ret;
 }
 
+/**
+ * set_dirty_flag
+ */
 static int set_dirty_flag(ntfs_volume *vol)
 {
 	u16 flags;
@@ -240,7 +252,7 @@ static int set_dirty_flag(ntfs_volume *vol)
 	if (vol_is_dirty == TRUE)
 		return 0;
 
-	printf("Setting required flags on partition... ");
+	ntfs_log_info("Setting required flags on partition... ");
 	/*
 	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
 	 * and fix it for us.
@@ -250,15 +262,18 @@ static int set_dirty_flag(ntfs_volume *vol)
 	if (vol->major_ver >= 2)
 		flags |= VOLUME_MOUNTED_ON_NT4;
 	if (OLD_ntfs_volume_set_flags(vol, flags)) {
-		puts(FAILED);
-		fprintf(stderr, "Error setting volume flags.\n");
+		ntfs_log_info(FAILED);
+		ntfs_log_error("Error setting volume flags.\n");
 		return -1;
 	}
-	puts(OK);
+	ntfs_log_info(OK);
 	vol_is_dirty = TRUE;
 	return 0;
 }
 
+/**
+ * set_dirty_flag_mount
+ */
 static int set_dirty_flag_mount(ntfs_volume *vol)
 {
 	u16 flags;
@@ -266,7 +281,7 @@ static int set_dirty_flag_mount(ntfs_volume *vol)
 	if (vol_is_dirty == TRUE)
 		return 0;
 
-	printf("Setting required flags on partition... ");
+	ntfs_log_info("Setting required flags on partition... ");
 	/*
 	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
 	 * and fix it for us.
@@ -276,31 +291,37 @@ static int set_dirty_flag_mount(ntfs_volume *vol)
 	if (vol->major_ver >= 2)
 		flags |= VOLUME_MOUNTED_ON_NT4;
 	if (ntfs_volume_write_flags(vol, flags)) {
-		puts(FAILED);
-		fprintf(stderr, "Error setting volume flags.\n");
+		ntfs_log_info(FAILED);
+		ntfs_log_error("Error setting volume flags.\n");
 		return -1;
 	}
-	puts(OK);
+	ntfs_log_info(OK);
 	vol_is_dirty = TRUE;
 	return 0;
 }
 
+/**
+ * empty_journal
+ */
 static int empty_journal(ntfs_volume *vol)
 {
 	if (journal_is_empty == TRUE)
 		return 0;
 
-	printf("Going to empty the journal ($LogFile)... ");
+	ntfs_log_info("Going to empty the journal ($LogFile)... ");
 	if (ntfs_logfile_reset(vol)) {
-		puts(FAILED);
-		perror("Failed to reset $LogFile");
+		ntfs_log_info(FAILED);
+		ntfs_log_perror("Failed to reset $LogFile");
 		return -1;
 	}
-	puts(OK);
+	ntfs_log_info(OK);
 	journal_is_empty = TRUE;
 	return 0;
 }
 
+/**
+ * fix_mftmirr
+ */
 static int fix_mftmirr(ntfs_volume *vol)
 {
 	s64 l, br;
@@ -308,44 +329,44 @@ static int fix_mftmirr(ntfs_volume *vol)
 	int i, ret = -1; /* failure */
 	BOOL done;
 
-	puts("\nProcessing $MFT and $MFTMirr... ");
+	ntfs_log_info("\nProcessing $MFT and $MFTMirr...\n");
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
 	m = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
 	if (!m) {
-		perror("Failed to allocate memory");
+		ntfs_log_perror("Failed to allocate memory");
 		return -1;
 	}
 	m2 = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
 	if (!m2) {
-		perror("Failed to allocate memory");
+		ntfs_log_perror("Failed to allocate memory");
 		free(m);
 		return -1;
 	}
 
-	printf("Reading $MFT... ");
+	ntfs_log_info("Reading $MFT... ");
 	l = ntfs_attr_mst_pread(vol->mft_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m);
 	if (l != vol->mftmirr_size) {
-		puts(FAILED);
+		ntfs_log_info(FAILED);
 		if (l != -1)
 			errno = EIO;
-		perror("Failed to read $MFT");
+		ntfs_log_perror("Failed to read $MFT");
 		goto error_exit;
 	}
-	puts(OK);
+	ntfs_log_info(OK);
 
-	printf("Reading $MFTMirr... ");
+	ntfs_log_info("Reading $MFTMirr... ");
 	l = ntfs_attr_mst_pread(vol->mftmirr_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m2);
 	if (l != vol->mftmirr_size) {
-		puts(FAILED);
+		ntfs_log_info(FAILED);
 		if (l != -1)
 			errno = EIO;
-		perror("Failed to read $MFTMirr");
+		ntfs_log_perror("Failed to read $MFTMirr");
 		goto error_exit;
 	}
-	puts(OK);
+	ntfs_log_info(OK);
 
 	/*
 	 * FIXME: Need to actually check the $MFTMirr for being real. Otherwise
@@ -359,7 +380,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 	 * MD disk and if yes then bomb out right at the start of the program?
 	 */
 
-	printf("Comparing $MFTMirr to $MFT... ");
+	ntfs_log_info("Comparing $MFTMirr to $MFT... ");
 	done = FALSE;
 	for (i = 0; i < vol->mftmirr_size; ++i) {
 		const char *ESTR[12] = { "$MFT", "$MFTMirr", "$LogFile",
@@ -375,22 +396,22 @@ static int fix_mftmirr(ntfs_volume *vol)
 			s = "mft record";
 
 		if (ntfs_is_baad_recordp(m + i * vol->mft_record_size)) {
-			puts("FAILED");
-			fprintf(stderr, "$MFT error: Incomplete multi sector "
+			ntfs_log_info("FAILED");
+			ntfs_log_error("$MFT error: Incomplete multi sector "
 					"transfer detected in %s.\nCannot "
 					"handle this yet. )-:\n", s);
 			goto error_exit;
 		}
 		if (!ntfs_is_mft_recordp(m + i * vol->mft_record_size)) {
-			puts("FAILED");
-			fprintf(stderr, "$MFT error: Invalid mft record for "
+			ntfs_log_info("FAILED");
+			ntfs_log_error("$MFT error: Invalid mft record for "
 					"%s.\nCannot handle this yet. )-:\n",
 					s);
 			goto error_exit;
 		}
 		if (ntfs_is_baad_recordp(m2 + i * vol->mft_record_size)) {
-			puts("FAILED");
-			fprintf(stderr, "$MFTMirr error: Incomplete multi "
+			ntfs_log_info("FAILED");
+			ntfs_log_error("$MFTMirr error: Incomplete multi "
 					"sector transfer detected in %s.\n", s);
 			goto error_exit;
 		}
@@ -400,20 +421,20 @@ static int fix_mftmirr(ntfs_volume *vol)
 				(u8*)m + i * vol->mft_record_size)))) {
 			if (!done) {
 				done = TRUE;
-				puts(FAILED);
-				printf("Correcting differences in $MFTMirr...");
+				ntfs_log_info(FAILED);
+				ntfs_log_info("Correcting differences in $MFTMirr...");
 			}
 			br = ntfs_mft_record_write(vol, i, (MFT_RECORD*)(m +
 					i * vol->mft_record_size));
 			if (br) {
-				puts(FAILED);
-				perror("Error correcting $MFTMirr");
+				ntfs_log_info(FAILED);
+				ntfs_log_perror("Error correcting $MFTMirr");
 				goto error_exit;
 			}
 		}
 	}
-	puts(OK);
-	printf("Processing of $MFT and $MFTMirr completed successfully.\n");
+	ntfs_log_info(OK);
+	ntfs_log_info("Processing of $MFT and $MFTMirr completed successfully.\n");
 	ret = 0;
 error_exit:
 	free(m);
@@ -421,26 +442,29 @@ error_exit:
 	return ret;
 }
 
+/**
+ * fix_mount
+ */
 static int fix_mount(void)
 {
 	int ret = -1; /* failure */
 	ntfs_volume *vol;
 	struct ntfs_device *dev;
 
-	printf("Attempting to correct errors... ");
+	ntfs_log_info("Attempting to correct errors... ");
 
 	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev) {
-		puts(FAILED);
-		perror("Failed to allocate device");
+		ntfs_log_info(FAILED);
+		ntfs_log_perror("Failed to allocate device");
 		return -1;
 	}
 
 	vol = ntfs_volume_startup(dev, 0);
 	if (!vol) {
-		puts(FAILED);
-		perror("Failed to startup volume");
-		fprintf(stderr, "Volume is corrupt. You should run chkdsk.\n");
+		ntfs_log_info(FAILED);
+		ntfs_log_perror("Failed to startup volume");
+		ntfs_log_error("Volume is corrupt. You should run chkdsk.\n");
 		ntfs_device_free(dev);
 		return -1;
 	}
@@ -473,41 +497,43 @@ int main(int argc, char **argv)
 	int ret = 1; /* failure */
 	BOOL force = FALSE;
 
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
+
 	parse_options(argc, argv);
 
 	if (!ntfs_check_if_mounted(opt.volume, &mnt_flags)) {
 		if ((mnt_flags & NTFS_MF_MOUNTED) &&
 				!(mnt_flags & NTFS_MF_READONLY) && !force) {
-			fprintf(stderr, "Refusing to operate on read-write "
+			ntfs_log_error("Refusing to operate on read-write "
 					"mounted device %s.\n", opt.volume);
 			exit(1);
 		}
 	} else
-		fprintf(stderr, "Failed to determine whether %s is mounted: "
-				"%s\n", opt.volume, strerror(errno));
+		ntfs_log_perror("Failed to determine whether %s is mounted",
+				opt.volume);
 	/* Attempt a full mount first. */
-	printf("Mounting volume... ");
+	ntfs_log_info("Mounting volume... ");
 	vol = ntfs_mount(opt.volume, 0);
 	if (vol) {
-		puts(OK);
-		printf("Processing of $MFT and $MFTMirr completed "
+		ntfs_log_info(OK);
+		ntfs_log_info("Processing of $MFT and $MFTMirr completed "
 				"successfully.\n");
 	} else {
-		puts(FAILED);
+		ntfs_log_info(FAILED);
 		if (fix_mount() < 0)
 			exit(1);
 		vol = ntfs_mount(opt.volume, 0);
 		if (!vol) {
-			perror("Remount failed");
+			ntfs_log_perror("Remount failed");
 			exit(1);
 		}
 	}
 
 	/* Check NTFS version is ok for us (in $Volume) */
-	printf("NTFS volume version is %i.%i.\n", vol->major_ver,
+	ntfs_log_info("NTFS volume version is %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
 	if (ntfs_version_is_supported(vol)) {
-		fprintf(stderr, "Error: Unknown NTFS version.\n");
+		ntfs_log_error("Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
 
@@ -527,7 +553,7 @@ int main(int argc, char **argv)
 	/* FIXME: Should we be marking the quota out of date, too? */
 
 	/* That's all for now! */
-	printf("NTFS partition %s was processed successfully.\n",
+	ntfs_log_info("NTFS partition %s was processed successfully.\n",
 			vol->dev->d_name);
 	/* Set return code to 0. */
 	ret = 0;

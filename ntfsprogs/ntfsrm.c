@@ -66,10 +66,10 @@ static const char *space_line = "                                               
  */
 static void version(void)
 {
-	printf("\n%s v%s (libntfs %s) - Delete files from an NTFS volume.\n\n",
+	ntfs_log_info("\n%s v%s (libntfs %s) - Delete files from an NTFS volume.\n\n",
 			EXEC_NAME, VERSION, ntfs_libntfs_version());
-	printf("Copyright (c) 2004 Richard Russon\n");
-	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("Copyright (c) 2004 Richard Russon\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -81,7 +81,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	printf("\nUsage: %s [options] device file\n"
+	ntfs_log_info("\nUsage: %s [options] device file\n"
 		"\n"
 		"    -r  --recursive    Delete files in subdirectories\n"
 		"    -i  --interactive  Ask before deleting files\n"
@@ -96,7 +96,7 @@ static void usage(void)
 		"    -V  --version      Version information\n"
 		"    -v  --verbose      More output\n\n",
 		EXEC_NAME);
-	printf("%s%s\n", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -130,6 +130,7 @@ static int parse_options(int argc, char **argv)
 	int err  = 0;
 	int ver  = 0;
 	int help = 0;
+	int levels = 0;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -154,6 +155,11 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'h':
 		case '?':
+			if (strncmp (argv[optind-1], "--log-", 6) == 0) {
+				if (!ntfs_log_parse_option (argv[optind-1]))
+					err++;
+				break;
+			}
 			help++;
 			break;
 		case 'i':
@@ -164,6 +170,7 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'R':
 		case 'r':
@@ -174,6 +181,7 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		default:
 			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
@@ -181,6 +189,13 @@ static int parse_options(int argc, char **argv)
 			break;
 		}
 	}
+
+	/* Make sure we're in sync with the log levels */
+	levels = ntfs_log_get_levels();
+	if (levels & NTFS_LOG_LEVEL_VERBOSE)
+		opts.verbose++;
+	if (!(levels & NTFS_LOG_LEVEL_QUIET))
+		opts.quiet++;
 
 	if (help || ver) {
 		opts.quiet = 0;
@@ -217,9 +232,9 @@ static void ntfs_dir_print(struct ntfs_dir *dir, int indent)
 	if (!dir)
 		return;
 
-	printf("%.*s%p ", indent, space_line, dir);
+	ntfs_log_info("%.*s%p ", indent, space_line, dir);
 	ntfs_name_print(dir->name, dir->name_len);
-	printf("\n");
+	ntfs_log_info("\n");
 
 	for (i = 0; i < dir->child_count; i++) {
 		ntfs_dir_print(dir->children[i], indent + 4);
@@ -237,7 +252,7 @@ static void ntfs_dt_print(struct ntfs_dt *dt, int indent)
 	if (!dt)
 		return;
 
-	printf("%.*s%p (%d)\n", indent, space_line, dt, dt->child_count);
+	ntfs_log_info("%.*s%p (%d)\n", indent, space_line, dt, dt->child_count);
 
 	for (i = 0; i < dt->child_count; i++) {
 		ntfs_dt_print(dt->sub_nodes[i], indent + 4);
@@ -359,32 +374,32 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 			goto close;
 		}
 
-		//printf("looking for %s in dir %lld\n", p, MREF(dir->mft_num));
-		//printf("dir: index = %p, children = %p, inode = %p, iroot = %p, ialloc = %p, count = %d\n", dir->index, dir->children, dir->inode, dir->iroot, dir->ialloc, dir->child_count);
+		//ntfs_log_info("looking for %s in dir %lld\n", p, MREF(dir->mft_num));
+		//ntfs_log_info("dir: index = %p, children = %p, inode = %p, iroot = %p, ialloc = %p, count = %d\n", dir->index, dir->children, dir->inode, dir->iroot, dir->ialloc, dir->child_count);
 		//if (dir->parent)
 		if (q) {
 			ntfs_log_trace("q\n");
 			child = ntfs_dir_find2(dir, unicode, len);
 			if (!child) {
-				printf("can't find %s in %s\n", p, pathname);
+				ntfs_log_info("can't find %s in %s\n", p, pathname);
 				goto close;
 			}
 		} else {
 			ntfs_log_trace("!q dir->index = %p, %d\n", dir->index, dir->index->data_len);
-			//printf("file: %s\n", p);
+			//ntfs_log_info("file: %s\n", p);
 
 			dt = ntfs_dt_find2(dir->index, unicode, len, &dt_num);
 			if (!dt) {
-				printf("can't find %s in %s (2)\n", p, pathname);
+				ntfs_log_info("can't find %s in %s (2)\n", p, pathname);
 				goto close;
 			}
 			ntfs_log_debug("dt = %p, data_len = %d, parent = %p\n", dt, dt->data_len, dt->parent);
 
-			//printf("dt's flags = 0x%08x\n", dt->children[dt_num]->key.file_name.file_attributes);
+			//ntfs_log_info("dt's flags = 0x%08x\n", dt->children[dt_num]->key.file_name.file_attributes);
 			if (dt->children[dt_num]->key.file_name.file_attributes == FILE_ATTR_I30_INDEX_PRESENT) {
-				//printf("DIR\n");
+				//ntfs_log_info("DIR\n");
 				child = ntfs_dir_create(dir->vol, dt->children[dt_num]->indexed_file);
-				//printf("child = %p (%lld)\n", child, MREF(dt->children[dt_num]->indexed_file));
+				//ntfs_log_info("child = %p (%lld)\n", child, MREF(dt->children[dt_num]->indexed_file));
 				if (child) {
 					child->index = ntfs_dt_create(child, NULL, -1);
 					ntfs_dir_add(dir, child);
@@ -395,14 +410,14 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 			if (dt->inodes[dt_num] == NULL) {
 				dt->inodes[dt_num] = ntfs_inode_open(dir->vol, dt->children[dt_num]->indexed_file);
 				if (!dt->inodes[dt_num]) {
-					printf("Can't open inode %lld\n", MREF(dt->children[dt_num]->indexed_file));
+					ntfs_log_info("Can't open inode %lld\n", MREF(dt->children[dt_num]->indexed_file));
 					goto close;
 				}
 				dt->inodes[dt_num]->ref_count = 2;
 				dt->inodes[dt_num]->private_data = dt;
 			}
 
-			//printf("dt = %p,%d\n", dt, dt_num);
+			//ntfs_log_info("dt = %p,%d\n", dt, dt_num);
 			break;
 		}
 
@@ -419,7 +434,7 @@ static BOOL utils_pathname_to_inode2(ntfs_volume *vol, struct ntfs_dir *parent, 
 	found->inode    = dt->inodes[dt_num];
 	found->mref     = found->inode->mft_no;
 	result = TRUE;
-	//printf("dir %p, dt %p, num %d, ino %p, %lld\n", dir, dt, dt_num, dt->inodes[dt_num], MREF(found->inode->mft_no));
+	//ntfs_log_info("dir %p, dt %p, num %d, ino %p, %lld\n", dir, dt, dt_num, dt->inodes[dt_num], MREF(found->inode->mft_no));
 close:
 	free(ascii);	// from strdup
 	free(unicode);
@@ -440,7 +455,7 @@ static s64 ntfs_mft_find_free_entry(ntfs_volume *vol)
 
 	ntfs_log_trace ("\n");
 	recs = vol->mft_na->initialized_size >> vol->mft_record_size_bits;
-	//printf("mft contains %lld records\n", recs);
+	//ntfs_log_info("mft contains %lld records\n", recs);
 	for (i = 24; i < recs; i++) {
 		if (utils_mftrec_in_use(vol, i) == 0)
 			return i;
@@ -475,7 +490,7 @@ static int ntfs_mft_set_inuse6(ntfs_inode *inode, struct ntfs_bmp *bmp, BOOL inu
 
 	NInoSetDirty(inode);
 
-	printf("Modified: inode %lld MFT_RECORD header\n", inode->mft_no);
+	ntfs_log_info("Modified: inode %lld MFT_RECORD header\n", inode->mft_no);
 	return 0;
 }
 
@@ -520,7 +535,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 
 	del_ie = del->children[del_num];
 	//utils_dump_mem(del_ie, 0, del_ie->length, DM_DEFAULTS);
-	//printf("\n");
+	//ntfs_log_info("\n");
 
 	/*
 	 * If the key is not in a leaf node, then replace it with its successor.
@@ -530,38 +545,38 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	/*
 	for (i = 0; i < top->child_count; i++) {
 		par_ie = top->children[i];
-		file = &par_ie->key.file_name; printf("\ttop node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		printf("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
+		file = &par_ie->key.file_name; ntfs_log_info("\ttop node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		ntfs_log_info("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
 	}
 	*/
 
 	if (del->header->flags & INDEX_NODE) {
-		printf("Replace key with its successor:\n");
+		ntfs_log_info("Replace key with its successor:\n");
 
 		vcn = ntfs_ie_get_vcn(del_ie);
-		//printf("vcn = %lld\n", vcn);
+		//ntfs_log_info("vcn = %lld\n", vcn);
 
 		suc = ntfs_dt_find4(find_dir->index, uname, name_len, &suc_num);
-		//printf("succ = %p, index = %d\n", suc, suc_num);
-		//printf("\n");
+		//ntfs_log_info("succ = %p, index = %d\n", suc, suc_num);
+		//ntfs_log_info("\n");
 
 		suc_ie = ntfs_ie_copy(suc->children[suc_num]);
 		//utils_dump_mem(suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
-		//printf("\n");
+		//ntfs_log_info("\n");
 
 		suc_ie = ntfs_ie_set_vcn(suc_ie, vcn);
 		//utils_dump_mem(suc_ie, 0, suc_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
-		//printf("\n");
+		//ntfs_log_info("\n");
 
-		file = &del_ie->key.file_name; printf("\trep name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		file = &suc_ie->key.file_name; printf("\tsuc name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+		file = &del_ie->key.file_name; ntfs_log_info("\trep name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		file = &suc_ie->key.file_name; ntfs_log_info("\tsuc name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 
 		//utils_dump_mem(del->data, 0, del->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
 		if (ntfs_dt_isroot(del))
 			res = ntfs_dt_root_replace(del, del_num, del_ie, suc_ie);
 		else
 			res = ntfs_dt_alloc_replace(del, del_num, del_ie, suc_ie);
-		//printf("\n");
+		//ntfs_log_info("\n");
 		//utils_dump_mem(del->data, 0, del->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
 
 		ntfs_ie_free(suc_ie);
@@ -581,10 +596,10 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	 * If this step creates an empty node, we have more to do.
 	 */
 
-	printf("\n");
-	printf("Delete key:\n");
+	ntfs_log_info("\n");
+	ntfs_log_info("Delete key:\n");
 
-	file = &del->children[del_num]->key.file_name; printf("\tdel name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+	file = &del->children[del_num]->key.file_name; ntfs_log_info("\tdel name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 
 	//utils_dump_mem(del->data, 0, del->header->index_length+24, DM_BLUE|DM_GREEN|DM_INDENT);
 	// XXX if del->child_count == 2, we could skip this step
@@ -593,7 +608,7 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		ntfs_dt_root_remove(del, del_num);
 	else
 		ntfs_dt_alloc_remove(del, del_num);
-	//printf("\n");
+	//ntfs_log_info("\n");
 	//utils_dump_mem(del->data, 0, del->header->index_length+24, DM_BLUE|DM_GREEN|DM_INDENT);
 
 	if (del->child_count > 1)	// XXX ntfs_dt_empty (dt),  ntfs_dt_full (dt, new)
@@ -607,8 +622,8 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	 */
 
 	// find the key nearest the root which has no descendants
-	printf("\n");
-	printf("Find childless parent:\n");
+	ntfs_log_info("\n");
+	ntfs_log_info("Find childless parent:\n");
 #if 0
 	for (par = del->parent, old = par; par; old = par, par = par->parent) {
 		if (par->child_count > 1)
@@ -617,20 +632,20 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	}
 #endif
 
-	printf("del = %p, parent = %p\n", del, del->parent);
+	ntfs_log_info("del = %p, parent = %p\n", del, del->parent);
 	par = del->parent;
 	par_num = ntfs_dt_find_parent(del);
 
 	//utils_dump_mem(par->data, 0, par->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
 
-	printf("par = %p, par->parent = %p, num = %d\n", par, par->parent, par_num);
+	ntfs_log_info("par = %p, par->parent = %p, num = %d\n", par, par->parent, par_num);
 	par_num = 0; // TEMP
 
 	if (par) {
 		file = &par->children[par_num]->key.file_name;
-		printf("\tpar name: ");
+		ntfs_log_info("\tpar name: ");
 		ntfs_name_print(file->file_name, file->file_name_length);
-		printf("\n");
+		ntfs_log_info("\n");
 	}
 
 	if (par == NULL) {
@@ -639,35 +654,35 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	}
 
 	//ntfs_dt_print(top, 0);
-	printf("\n");
+	ntfs_log_info("\n");
 
 	//utils_dump_mem(par->data, 0, par->data_len, DM_BLUE|DM_GREEN|DM_INDENT);
-	//printf("\n");
+	//ntfs_log_info("\n");
 
 	/*
 	for (i = 0; i < top->child_count; i++) {
 		par_ie = top->children[i];
-		file = &par_ie->key.file_name; printf("\ttop node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		printf("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
+		file = &par_ie->key.file_name; ntfs_log_info("\ttop node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		ntfs_log_info("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
 	}
 	*/
 
 	// find if parent has left siblings
 	if (par->children[par_num]->flags & INDEX_ENTRY_END) {
-		printf("Swap the children of the parent and its left sibling\n");
+		ntfs_log_info("Swap the children of the parent and its left sibling\n");
 
 		par_ie = par->children[par_num];
 		vcn = ntfs_ie_get_vcn(par_ie);
-		//printf("\toffset = %d\n", (u8*)par_ie - par->data); printf("\tflags = %d\n", par_ie->flags); printf("\tvcn = %lld\n", vcn); printf("\tlength = %d\n", par_ie->length);
+		//ntfs_log_info("\toffset = %d\n", (u8*)par_ie - par->data); ntfs_log_info("\tflags = %d\n", par_ie->flags); ntfs_log_info("\tvcn = %lld\n", vcn); ntfs_log_info("\tlength = %d\n", par_ie->length);
 		//utils_dump_mem(par_ie, 0, par_ie->length, DM_DEFAULTS);
-		//printf("\n");
+		//ntfs_log_info("\n");
 
-		//printf("\toffset = %d\n", (u8*)par_ie - par->data); printf("\tflags = %d\n", par_ie->flags); printf("\tvcn = %lld\n", vcn); printf("\tlength = %d\n", par_ie->length);
+		//ntfs_log_info("\toffset = %d\n", (u8*)par_ie - par->data); ntfs_log_info("\tflags = %d\n", par_ie->flags); ntfs_log_info("\tvcn = %lld\n", vcn); ntfs_log_info("\tlength = %d\n", par_ie->length);
 		//utils_dump_mem(par_ie, 0, par_ie->length, DM_DEFAULTS);
-		//printf("\n");
+		//ntfs_log_info("\n");
 
-		file = &par->children[par_num]  ->key.file_name; printf("\tpar name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		file = &par->children[par_num-1]->key.file_name; printf("\tsib name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+		file = &par->children[par_num]  ->key.file_name; ntfs_log_info("\tpar name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		file = &par->children[par_num-1]->key.file_name; ntfs_log_info("\tsib name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 
 		old                       = par->sub_nodes[par_num];
 		par->sub_nodes[par_num]   = par->sub_nodes[par_num-1];
@@ -682,28 +697,28 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 		par_num--;
 
 		if (ntfs_dt_isroot(par))
-			printf("Modified: inode %lld, $INDEX_ROOT\n", par->dir->inode->mft_no);
+			ntfs_log_info("Modified: inode %lld, $INDEX_ROOT\n", par->dir->inode->mft_no);
 		else
-			printf("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", par->dir->inode->mft_no, par->vcn, par->vcn + (par->dir->index_size>>9) - 1);
+			ntfs_log_info("Modified: inode %lld, $INDEX_ALLOCATION vcn %lld-%lld\n", par->dir->inode->mft_no, par->vcn, par->vcn + (par->dir->index_size>>9) - 1);
 	}
 
 	//ntfs_dt_print(top, 0);
 
-	//printf("\n");
+	//ntfs_log_info("\n");
 	//utils_dump_mem(par->data, 0, par->data_len, DM_DEFAULTS);
 
 	// unhook and hold onto the ded dt's
-	printf("\n");
-	printf("Remove parent\n");
+	ntfs_log_info("\n");
+	ntfs_log_info("Remove parent\n");
 
-	file = &par->children[par_num]->key.file_name; printf("\tpar name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+	file = &par->children[par_num]->key.file_name; ntfs_log_info("\tpar name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 
 	add_ie = ntfs_ie_copy(par->children[par_num]);
 	add_ie = ntfs_ie_remove_vcn(add_ie);
 	if (!add_ie)
 		goto done;
 
-	//printf("\n");
+	//ntfs_log_info("\n");
 	//utils_dump_mem(add_ie, 0, add_ie->length, DM_BLUE|DM_GREEN|DM_INDENT);
 
 	ded = par->sub_nodes[par_num];
@@ -713,44 +728,44 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 #if 0
 	for (i = 0; i < par->child_count; i++) {
 		par_ie = par->children[i];
-		file = &par_ie->key.file_name; printf("\tdel node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		printf("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
+		file = &par_ie->key.file_name; ntfs_log_info("\tdel node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		ntfs_log_info("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
 	}
 #endif
 
 #if 1
-	//printf("PAR: %p,%d\n", par, par_num);
+	//ntfs_log_info("PAR: %p,%d\n", par, par_num);
 	if (ntfs_dt_isroot(par))
 		ntfs_dt_root_remove(par, par_num);
 	else
 		ntfs_dt_alloc_remove(par, par_num);
 #endif
-	//printf("count = %d\n", par->child_count);
+	//ntfs_log_info("count = %d\n", par->child_count);
 	//utils_dump_mem(par->data, 0, par->data_len, DM_DEFAULTS);
-	//printf("0x%x\n", (u8*)par->children[0] - par->data);
+	//ntfs_log_info("0x%x\n", (u8*)par->children[0] - par->data);
 
 #if 0
 	for (i = 0; i < par->child_count; i++) {
 		par_ie = par->children[i];
-		file = &par_ie->key.file_name; printf("\tadd node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
-		printf("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
+		file = &par_ie->key.file_name; ntfs_log_info("\tadd node, key %d: ", i); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
+		ntfs_log_info("\tvcn = %lld\n", ntfs_ie_get_vcn(par_ie));
 	}
 #endif
 
 	//ntfs_dt_print(top, 0);
-	printf("\n");
-	printf("Add childless parent\n");
+	ntfs_log_info("\n");
+	ntfs_log_info("Add childless parent\n");
 
-	file = &add_ie->key.file_name; printf("\tadd name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+	file = &add_ie->key.file_name; ntfs_log_info("\tadd name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 	suc     = NULL;
 	suc_num = -1;
 	suc = ntfs_dt_find4(top, file->file_name, file->file_name_length, &suc_num);
-	//printf("SUC: %p, %d\n", suc, suc_num);
+	//ntfs_log_info("SUC: %p, %d\n", suc, suc_num);
 
 	if (!suc)
 		goto done;
 
-	file = &suc->children[suc_num]->key.file_name; printf("\tsuc name: "); ntfs_name_print(file->file_name, file->file_name_length); printf("\n");
+	file = &suc->children[suc_num]->key.file_name; ntfs_log_info("\tsuc name: "); ntfs_name_print(file->file_name, file->file_name_length); ntfs_log_info("\n");
 
 	// insert key into successor
 	// if any new nodes are needed, reuse the preserved nodes
@@ -766,14 +781,14 @@ static int ntfs_file_remove(ntfs_volume *vol, struct ntfs_dt *del, int del_num)
 	// XXX reduce size of alloc
 	// XXX if ded, don't write it back, just update bitmap
 
-	printf("empty\n");
+	ntfs_log_info("empty\n");
 	goto done;
 
 freedts:
-	printf("\twhole dir is empty\n");
+	ntfs_log_info("\twhole dir is empty\n");
 
 commit:
-	//printf("commit\n");
+	//ntfs_log_info("commit\n");
 
 done:
 	return 0;
@@ -813,8 +828,8 @@ static int ntfs_file_remove2(ntfs_volume *vol, struct ntfs_dt *dt, int dt_num)
 
 	if (0) ntfs_volume_rollback(vol);
 
-	if (0) printf("last mft = %lld\n", ntfs_bmp_find_last_set(bmp_mft));
-	if (0) printf("last vol = %lld\n", ntfs_bmp_find_last_set(bmp_vol));
+	if (0) ntfs_log_info("last mft = %lld\n", ntfs_bmp_find_last_set(bmp_mft));
+	if (0) ntfs_log_info("last vol = %lld\n", ntfs_bmp_find_last_set(bmp_vol));
 
 	return 0;
 }
@@ -855,9 +870,9 @@ static int ntfs_file_add2(ntfs_volume *vol, char *filename)
 		filename = ptr + 1;
 	}
 
-	printf("looking for %s\n", dirname);
+	ntfs_log_info("looking for %s\n", dirname);
 	if (utils_pathname_to_inode2(vol, NULL, dirname, &find) == FALSE) {
-		printf("!inode\n");
+		ntfs_log_info("!inode\n");
 		return 0;
 	}
 
@@ -868,10 +883,10 @@ static int ntfs_file_add2(ntfs_volume *vol, char *filename)
 	if (uname_len < 0)
 		goto close;
 
-	printf("new inode %lld\n", new_num);
+	ntfs_log_info("new inode %lld\n", new_num);
 	ino = ntfs_inode_open3(vol, new_num);
 	if (!ino) {
-		printf("!ino\n");
+		ntfs_log_info("!ino\n");
 		goto close;
 	}
 
@@ -936,7 +951,7 @@ static int ntfs_file_add2(ntfs_volume *vol, char *filename)
 	ie = ntfs_ie_create();
 	ie = ntfs_ie_set_name(ie, uname, uname_len, FILE_NAME_POSIX);
 	if (!ie) {
-		printf("!ie\n");
+		ntfs_log_info("!ie\n");
 		goto close;
 	}
 
@@ -1005,10 +1020,10 @@ int main(int argc, char *argv[])
 	utils_set_locale();
 
 #if 0
-	printf("sizeof(ntfs_bmp)   = %d\n", sizeof(struct ntfs_bmp));
-	printf("sizeof(ntfs_dt)    = %d\n", sizeof(struct ntfs_dt));
-	printf("sizeof(ntfs_dir)   = %d\n", sizeof(struct ntfs_dir));
-	printf("\n");
+	ntfs_log_info("sizeof(ntfs_bmp)   = %d\n", sizeof(struct ntfs_bmp));
+	ntfs_log_info("sizeof(ntfs_dt)    = %d\n", sizeof(struct ntfs_dt));
+	ntfs_log_info("sizeof(ntfs_dir)   = %d\n", sizeof(struct ntfs_dir));
+	ntfs_log_info("\n");
 #endif
 
 	if (opts.noaction)
@@ -1018,20 +1033,20 @@ int main(int argc, char *argv[])
 	//ntfs_log_set_levels (NTFS_LOG_LEVEL_DEBUG);
 	vol = ntfs_volume_mount2(opts.device, flags, opts.force);
 	if (!vol) {
-		printf("!vol\n");
+		ntfs_log_info("!vol\n");
 		goto done;
 	}
 
 #if 0
 	if (utils_pathname_to_inode2(vol, NULL, opts.file, &find) == FALSE) {
-		printf("!inode\n");
+		ntfs_log_info("!inode\n");
 		goto done;
 	}
 
 	inode = find.inode;
 #endif
 
-	//printf("inode = %lld\n", inode->mft_no);
+	//ntfs_log_info("inode = %lld\n", inode->mft_no);
 
 	if (0) result = ntfs_file_remove2(vol, find.dt, find.dt_index);
 	if (1) result = ntfs_file_add2(vol, opts.file);
