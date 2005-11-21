@@ -1587,6 +1587,7 @@ static void usage(void)
 		"succeed_chmod\n\tlocale\n\tstreams_interface\n"
 		"Also look into FUSE documentation about it options.\n\n");
 	ntfs_log_info("Default options are: \"%s\".\n", def_opts);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 #ifndef HAVE_REALPATH

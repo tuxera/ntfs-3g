@@ -1,16 +1,15 @@
-.\" Copyright (c) 2002 Richard Russon. All Rights Reserved.
-.\" Copyright (c) 2002-2003 Anton Altaparmakov. All Rights Reserved.
-.\" Copyright (c) 2005 Szabolcs Szakacsits. All Rights Reserved.
+.\" Copyright (c) 2002\-2005 Richard Russon.
+.\" Copyright (c) 2002\-2003 Anton Altaparmakov.
+.\" Copyright (c) 2005 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "June 2005" "ntfsprogs version @VERSION@"
+.TH NTFSPROGS 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsprogs \- several tools for doing neat things with NTFS partitions
 .SH OVERVIEW
 .B ntfsprogs
 is a suite of NTFS utilities based around a shared library.  The tools are
 available for free and come with full source code.
-
 .SH TOOLS
 .SS mkntfs
 .PP
@@ -20,7 +19,6 @@ available for free and come with full source code.
 .PP
 .BR ntfscat (8)
 : Dump a file's contents to the standard output.
-.PP
 .SS ntfsclone
 .PP
 .BR ntfsclone (8)
@@ -63,18 +61,25 @@ or directories within it.
 .PP
 .BR ntfsundelete (8)
 : Recover deleted files from an NTFS partition.
-
 .SH AUTHORS
 .PP
-The tools have been written by Anton Altaparmakov, Richard Russon, Matthew Fanto, Szabolcs Szakacsits, Lode Leroy, Yuval Fledel and Yura Pakhuchiy.
-
+The tools were written by Anton Altaparmakov, Carmelo Kintana, Cristian Klein,
+Erik Sornes, Giang Nguyen, Holger Ohmacht, Lode Leroy, Matthew J. Fanto, Per
+Olofsson, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy and Yuval Fledel.
 .SH AVAILABILITY
 The
 .B ntfsprogs
-can be downloaded from http://linux-ntfs.sourceforge.net/downloads.html
+can be downloaded from:
 .br
-These manual pages can be viewed online at http://linux-ntfs.sourceforge.net/man/ntfsprogs.html
-
+.nh
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+These manual pages can be viewed online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
+.hy
 .SH SEE ALSO
-.BR libntfs-gnomevfs (8)
+.BR libntfs\-gnomevfs (8)
 

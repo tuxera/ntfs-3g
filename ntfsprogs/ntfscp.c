@@ -95,15 +95,15 @@ static void version(void)
 static void usage(void)
 {
 	ntfs_log_info("\nUsage: %s [options] device src_file dest_file\n\n"
-		"    -a  --attribute num   Write to this attribute\n"
-		"    -i  --inode           Treat dest_file as inode number\n"
-		"    -f  --force           Use less caution\n"
-		"    -h  --help            Print this help\n"
-		"    -N  --attr-name name  Write to attribute with this name\n"
-		"    -n  --no-action       Do not write to disk\n"
-		"    -q  --quiet           Less output\n"
-		"    -V  --version         Version information\n"
-		"    -v  --verbose         More output\n\n",
+		"    -a, --attribute NUM   Write to this attribute\n"
+		"    -i, --inode           Treat dest_file as inode number\n"
+		"    -f, --force           Use less caution\n"
+		"    -h, --help            Print this help\n"
+		"    -N, --attr-name NAME  Write to attribute with this name\n"
+		"    -n, --no-action       Do not write to disk\n"
+		"    -q, --quiet           Less output\n"
+		"    -V, --version         Version information\n"
+		"    -v, --verbose         More output\n\n",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }

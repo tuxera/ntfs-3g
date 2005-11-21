@@ -1,15 +1,12 @@
-.\" Copyright (c) 2003 Richard Russon. All Rights Reserved.
+.\" Copyright (c) 2003\-2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLUSTER 8 "September 2003" "ntfsprogs version @VERSION@"
+.TH NTFSCLUSTER 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfscluster \- identify files in a specified region of an NTFS volume.
 .SH SYNOPSIS
 .B ntfscluster
-[
-.I options
-]
-.B device
+[\fIoptions\fR] \fIdevice\fR
 .SH DESCRIPTION
 .B ntfscluster
 has three modes of operation:
@@ -21,8 +18,8 @@ and
 .PP
 The default mode,
 .I info
-is currently not implemented.  It will display general information about the NTFS
-volume when it is working.
+is currently not implemented.  It will display general information about the
+NTFS volume when it is working.
 .SS Sector
 .PP
 The
@@ -39,72 +36,51 @@ mode of operation.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfscluster
-accepts.  All options have two equivalent names.  The short name is preceded by
-.BR \-
+accepts.  Nearly all options have two equivalent names.  The short name is
+preceded by
+.B \-
 and the long name is preceded by
 .BR \-\- .
 Any single letter options, that don't take an argument, can be combined into a
 single command, e.g.
-.BR \-fv
+.B \-fv
 is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI "\-c " range
-.br
-.ns
-.TP
-.BI "\-\-cluster " range
+\fB\-c\fR, \fB\-\-cluster\fR RANGE
 Any files whose data is in this range of clusters will be displayed.
 .TP
-.B \-f
-.br
-.ns
+\fB\-F\fR, \fB\-\-filename\fR NAME
+Show information about this file.
 .TP
-.B \-\-force
+\fB\-f\fR, \fB\-\-force\fR
 This will override some sensible defaults, such as not working with a mounted
 volume.  Use this option with caution.
 .TP
-.B \-\-help
+\fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .TP
-.B \-i
-.br
-.ns
+\fB\-I\fR, \fB\-\-inode\fR NUM
+Show information about this inode.
 .TP
-.B \-\-info
+\fB\-i\fR, \fB\-\-info\fR
 This option is not yet implemented.
 .TP
-.BI \-q
-.br
-.ns
-.TP
-.BI \-\-quiet
+\fB\-q\fR, \fB\-\-quiet\fR
 Reduce the amount of output to a minimum.  Naturally, it doesn't make sense to
 combine this option with
 .TP
-.B \-s
-.br
-.ns
-.TP
-.B \-\-sector
+\fB\-s\fR, \fB\-\-sector\fR RANGE
 Any files whose data is in this range of sectors will be displayed.
 .TP
-.B \-v
-.br
-.ns
-.TP
-.B \-\-verbose
+\fB\-v\fR, \fB\-\-verbose\fR
 Increase the amount of output that
 .B ntfscluster
 prints.
 .TP
-.B \-V
-.br
-.ns
-.TP
-.B \-\-version
-Show the version number, copyright and license
+\fB\-V\fR, \fB\-\-version\fR
+Show the version number, copyright and license for
 .BR ntfscluster .
 .SH EXAMPLES
 Get some information about the volume /dev/hda1.
@@ -116,27 +92,38 @@ Get some information about the volume /dev/hda1.
 Look for files in the first 500 clusters of /dev/hda1.
 .RS
 .sp
-.B ntfscluster -c 0-500 /dev/hda1
+.B ntfscluster \-c 0\-500 /dev/hda1
 .sp
+.RE
 .SH BUGS
 The
 .I info
-mode isn't implemented yet.  This program is quite limited, but it has no known
-bugs.  If you find one, please send an email to
-.nh
-<linux-ntfs-dev@lists.sourceforge.net>
-.hy
-.SH AUTHOR
+mode isn't implemented yet.
 .B ntfscluster
-was written by Richard Russon (FlatCap)
-.SH AVAILABILITY
-.B ntfscluster
-is part of the ntfsprogs package and is available from
+is quite limited, but it has no known bugs.  If you find a bug please send an
+email describing the problem to the development team:
 .br
 .nh
-http://linux\-ntfs.sourceforge.net/downloads.html
+linux\-ntfs\-dev@lists.sourceforge.net
+.hy
+.SH AUTHORS
+.B ntfscluster
+was written by Richard Russon, with contributions from Anton Altaparmakov.
+.SH AVAILABILITY
+.B ntfscluster
+is part of the
+.B ntfsprogs
+package and is available from:
+.br
+.nh
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+The manual pages are available online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
 .hy
 .SH SEE ALSO
 .BR ntfsinfo (8),
 .BR ntfsprogs (8)
-

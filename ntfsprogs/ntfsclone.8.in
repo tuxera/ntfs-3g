@@ -1,11 +1,9 @@
-.\" -*- nroff -*-
-.\" Copyright (c) 2003 Richard Russon
-.\" Copyright (c) 2003-2005 Szabolcs Szakacsits
-.\" Copyright (c) 2004 Per Olofsson
-.\" All Rights Reserved.
+.\" Copyright (c) 2003\-2005 Richard Russon.
+.\" Copyright (c) 2003\-2005 Szabolcs Szakacsits.
+.\" Copyright (c) 2004 Per Olofsson.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "Sep 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
@@ -13,11 +11,11 @@ ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 [\fIOPTIONS\fR]
 .I SOURCE
 .br
-.B ntfsclone \-\-save-image
+.B ntfsclone \-\-save\-image
 [\fIOPTIONS\fR]
 .I SOURCE
 .br
-.B ntfsclone \-\-restore-image
+.B ntfsclone \-\-restore\-image
 [\fIOPTIONS\fR]
 .I SOURCE
 .br
@@ -33,42 +31,40 @@ copies only the used data. Unused disk space becomes zero (cloning to
 sparse file), encoded with control codes (saving in special image format),
 left unchanged (cloning to a disk/partition) or 
 filled with zeros (cloning to standard output).
-
 .B ntfsclone
 can be useful to make backups, an exact snapshot of an NTFS filesystem
 and restore it later on, or for developers to test NTFS read/write
 functionality, troubleshoot/investigate users' issues using the clone
 without the risk of destroying the original filesystem.
-
-The clone, if not using the special image format, is an exact copy of the original
-NTFS filesystem from sector to sector thus it can be also mounted
+The clone, if not using the special image format, is an exact copy of the
+original NTFS filesystem from sector to sector thus it can be also mounted
 just like the original NTFS filesystem.
 For example if you clone to a file and the kernel has loopback device and
 NTFS support then the file can be mounted as
 .RS
 .sp
 .B   mount \-t ntfs \-o loop ntfsclone.img /mnt/ntfsclone
-.SH SPARSE FILES
-A file is sparse if it has unallocated blocks (holes). The reported size of such 
-files are always higher than the disk space consumed by them.
-The
-.BR du
+.sp
+.RE
+.SS Sparse Files
+A file is sparse if it has unallocated blocks (holes). The reported size of
+such files are always higher than the disk space consumed by them.  The
+.B du
 command can tell the real disk space used by a sparse file.
 The holes are always read as zeros. All major Linux filesystem like,
 ext2, ext3, reiserfs, Reiser4, JFS and XFS, supports
-sparse files but for example the ISO 9600 CD-ROM filesystem doesn't.
-.SH HANDLING LARGE SPARSE FILES
+sparse files but for example the ISO 9600 CD\-ROM filesystem doesn't.
+.SS Handling Large Sparse Files
 As of today Linux provides inadequate support for managing (tar, 
 cp, gzip, gunzip, bzip2, bunzip2, cat, etc) large sparse files. 
 The only main Linux filesystem
 having support for efficient sparse file handling is XFS by the 
 XFS_IOC_GETBMAPX 
-.BR ioctl\fR.
+.BR ioctl .
 However none of the common utilities supports it.
 This means when you tar, cp, gzip, bzip2, etc a large sparse file 
 they will always read the entire file, even if you use the "sparse support" 
 options. 
-
 .BR bzip2 
 compresses large sparse files much better than 
 .BR gzip 
@@ -76,8 +72,7 @@ but it does so
 also much slower. Moreover neither of them handles large sparse
 files efficiently during uncompression from disk space usage point 
 of view. 
-
-At present the most efficient way, both speed and space-wise, to
+At present the most efficient way, both speed and space\-wise, to
 compress and uncompress large sparse files by common tools 
 is using 
 .BR tar 
@@ -86,16 +81,16 @@ with the options
 (handle sparse files "efficiently") and
 .B \-j 
 (filter the archive through bzip2). Although
-.BR tar
+.B tar
 still reads and analyses the entire file, it doesn't pass on the
 large data blocks having only zeros to filters and it also avoids
 writing large amount of zeros to the disk needlessly. But since
-.BR tar
+.B tar
 can't create an archive from the standard input, you can't do this
-in-place by just reading 
-.BR ntfsclone
+in\-place by just reading 
+.B ntfsclone
 standard output.
-.SH THE SPECIAL IMAGE FORMAT
+.SS The Special Image Format
 It's also possible, actually it's recommended, to save an NTFS filesystem 
 to a special image format. 
 Instead of representing unallocated blocks as holes, they are
@@ -105,7 +100,6 @@ filesystem images over the network and similar, and can be used as a
 replacement for Ghost or Partition Image if it is combined with other
 tools. The downside is that you can't mount the image directly, you
 need to restore it first.
-
 To save an image using the special image format, use the
 .B \-s
 or the
@@ -118,21 +112,19 @@ option. Note that you can restore images from standard input by
 using '\-' as the 
 .I SOURCE
 file.
-.SH METADATA-ONLY CLONING
+.SS Metadata\-only Cloning
 One of the features of
-.BR ntfsclone
+.B ntfsclone
 is that, it can also save only the NTFS metadata using the option
 .B \-m
 or
 .B \-\-metadata
 and the clone still will be
-mountable. In this case all non-metadata file content will be lost and
+mountable. In this case all non\-metadata file content will be lost and
 reading them back will result always zeros.
-
-The metadata-only image can be compressed very
-well, usually to not more than 1-3 MB thus it's relatively easy to transfer
+The metadata\-only image can be compressed very
+well, usually to not more than 1\-3 MB thus it's relatively easy to transfer
 for investigation, troubleshooting.
-
 In this mode of ntfsclone,
 .B NONE 
 of the user's data is saved, including the resident user's data
@@ -140,47 +132,50 @@ embedded into metadata. All is filled with zeros.
 Moreover all the file timestamps, deleted and unused spaces inside
 the metadata are filled with zeros. Thus this mode is inappropriate
 for example for forensic analyses.
-
 Please note, filenames are not wiped out. They might contain
 sensitive information, so think twice before sending such an
 image to anybody.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfsclone
-accepts.  All options have two equivalent names.  The short name is preceded by
-.BR \-
+accepts.  Nearly all options have two equivalent names.  The short name is
+preceded by
+.B \-
 and the long name is preceded by
 .BR \-\- .
 Any single letter options, that don't take an argument, can be combined into a
 single command, e.g.
-.BR \-fm
+.B \-fv
 is equivalent to
-.BR "\-f \-m" .
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI "\-o, \-\-output " FILE
-Clone NTFS to the non-existent 
-.I FILE\fR. If 
+\fB\-o\fR, \fB\-\-output\fR FILE
+Clone NTFS to the non\-existent 
+.IR FILE .
+If 
 .I FILE 
-is '-' then clone to the 
+is '\-' then clone to the 
 standard output.
 .TP
-.BI "\-O, \-\-overwrite " FILE
+\fB\-O\fR, \fB\-\-overwrite\fR FILE
 Clone NTFS to 
-.I FILE\fR, overwriting if exists.
+.IR FILE ,
+overwriting if exists.
 .TP
-.B \-s, \-\-save\-image
+\fB\-s\fR, \fB\-\-save\-image\fR
 Save to the special image format. This is the most efficient way space and
-speed-wise if imaging is done to the standard output, e.g. for image 
+speed\-wise if imaging is done to the standard output, e.g. for image 
 compression, encryption or streaming through a network.
 .TP
-.B \-r, \-\-restore\-image
+\fB\-r\fR, \fB\-\-restore\-image\fR
 Restore from the special image format specified by
-.I SOURCE\fR.
+.I SOURCE .
 If the
 .I SOURCE
 is '\-' then the image is read from the standard input.
 .TP
-.B \-\-rescue
+\fB\-\-rescue\fR
 Ignore disk read errors so disks having bad sectors, e.g. dying disks, can be
 rescued the most efficiently way, with minimal stress on them. Ntfsclone works
 at the lowest, sector level in this mode too thus more data can be rescued. 
@@ -191,23 +186,23 @@ beginning of such sectors are marked by "BadSectoR\\0".
 Clone 
 .B ONLY METADATA
 (for NTFS experts). Moreover only cloning to a file is allowed.
-You can't metadata-only clone to a device, image or standard output.
+You can't metadata\-only clone to a device, image or standard output.
 .TP
-.B \-\-ignore\-fs\-check
+\fB\-\-ignore\-fs\-check\fR
 Ignore the result of the filesystem consistency check. This option is allowed
 to be used only with the 
-.BR --metadata 
+\fB\-m\fR, \fB\-\-metadata\fR
 option, for the safety of user's data. The clusters which cause the 
 inconsistency are saved too.
 .TP
-.B \-f, \-\-force
+\fB\-f\fR, \fB\-\-force\fR
 Forces ntfsclone to proceed if the filesystem is marked 
 "dirty" for consistency check.
 .TP
-.B \-h, \-\-help
+\fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .SH EXIT CODES
-The exit code is 0 on success, non-zero otherwise. 
+The exit code is 0 on success, non\-zero otherwise. 
 .SH EXAMPLES
 Save an NTFS to a file in the special image format
 .RS
@@ -218,13 +213,13 @@ Save an NTFS to a file in the special image format
 Restore an NTFS from a special image file to its original partition
 .RS
 .sp
-.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 backup.img 
+.B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 backup.img 
 .sp
 .RE
 Save an NTFS into a compressed image.
 .RS
 .sp
-.B ntfsclone \-\-save-image \-o \- /dev/hda1 | gzip \-c > backup.img.gz
+.B ntfsclone \-\-save\-image \-o \- /dev/hda1 | gzip \-c > backup.img.gz
 .sp
 .RE
 Restore an NTFS volume from a compressed image file
@@ -232,13 +227,13 @@ Restore an NTFS volume from a compressed image file
 .sp
 .B gunzip \-c backup.img.gz | \\\\
 .br
-.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
+.B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
 Backup an NTFS volume to a remote host, using ssh.
 .RS
 .sp
-.B ntfsclone \-\-save-image \-\-output \- /dev/hda1 | \\\\
+.B ntfsclone \-\-save\-image \-\-output \- /dev/hda1 | \\\\
 .br
 .B gzip \-c | ssh host 'cat > backup.img.gz'
 .sp
@@ -246,9 +241,9 @@ Backup an NTFS volume to a remote host, using ssh.
 Restore an NTFS volume from a remote host via ssh.
 .RS
 .sp
-.B ssh host 'cat backup.img.gz' | gunzip -c | \\\\
+.B ssh host 'cat backup.img.gz' | gunzip \-c | \\\\
 .br
-.B ntfsclone \-\-restore-image \-\-overwrite /dev/hda1 \-
+.B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
 Stream an image from a web server and restore it to a partition
@@ -259,10 +254,10 @@ Stream an image from a web server and restore it to a partition
 .B ntfsclone \-\-restore\-image \-\-overwrite /dev/hda1 \-
 .sp
 .RE
-Clone an NTFS volume to a non-existent file
+Clone an NTFS volume to a non\-existent file
 .RS
 .sp
-.B ntfsclone \-\-output ntfs-clone.img /dev/hda1
+.B ntfsclone \-\-output ntfs\-clone.img /dev/hda1
 .sp
 .RE
 Pack NTFS metadata for NTFS experts
@@ -271,30 +266,43 @@ Pack NTFS metadata for NTFS experts
 .B ntfsclone \-\-metadata \-\-output ntfsmeta.img /dev/hda1
 .br
 .B tar \-cjSf ntfsmeta.img.tar.bz2 ntfsmeta.img
-.SH KNOWN ISSUES
-This program has no known bugs. If you think you have found one then 
-please send an email to
+.sp
+.RE
+.SH BUGS
+There are no known problems with
+.BR ntfsclone .
+If you find a bug please send an email describing the problem to the
+development team:
+.br
 .nh
-<linux-ntfs-dev@lists.sourceforge.net>.
-
+linux\-ntfs\-dev@lists.sourceforge.net
+.hy
+.sp
 Sometimes it might appear ntfsclone froze if the clone is on ReiserFS 
-and even CTRL-C won't stop it. This is not a bug in ntfsclone, however
+and even CTRL\-C won't stop it. This is not a bug in ntfsclone, however
 it's due to ReiserFS being extremely inefficient creating large 
 sparse files and not handling signals during this operation. This
 ReiserFS problem was improved in kernel 2.4.22.
 XFS, JFS and ext3 don't have this problem.
 .hy
-.SH AUTHOR
+.SH AUTHORS
 .B ntfsclone
-was written by Szabolcs Szakacsits <szaka@sienet.hu>.
-
-Special image format support was added by Per Olofsson <pelle@dsv.su.se>.
+was written by Szabolcs Szakacsits and Anton Altaparmakov, with contributions
+from Per Olofsson.
 .SH AVAILABILITY
 .B ntfsclone
-is part of the ntfsprogs package and is available from
+is part of the
+.B ntfsprogs
+package and is available from:
 .br
 .nh
-http://linux\-ntfs.sourceforge.net/downloads.html
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+The manual pages are available online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
 .hy
 .SH SEE ALSO
 .BR ntfsresize (8)
@@ -302,4 +310,3 @@ http://linux\-ntfs.sourceforge.net/downloads.html
 .BR xfs_copy (8)
 .BR debugreiserfs (8)
 .BR e2image (8)
-

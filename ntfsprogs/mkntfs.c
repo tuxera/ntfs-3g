@@ -222,7 +222,7 @@ static void mkntfs_usage(void)
 		"Basic options:\n"
 		"    -f, --fast                      Perform a quick format\n"
 		"    -Q, --quick                     Perform a quick format\n"
-		"    -L, --label string              Set the volume label\n"
+		"    -L, --label STRING              Set the volume label\n"
 		"    -C, --enable-compression        Enable compression on the volume\n"
 		"    -c, --cluster-size BYTES        Specify the cluster size for the volume\n"
 		"    -I, --no-indexing               Disable indexing on the volume\n"
@@ -248,6 +248,7 @@ static void mkntfs_usage(void)
 		"    -l, --license                   Display licensing information\n"
 		"    -h, --help                      Display this help\n"
 		"\n", basename(EXEC_NAME));
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**

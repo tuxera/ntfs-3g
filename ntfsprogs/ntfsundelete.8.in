@@ -1,15 +1,12 @@
-.\" Copyright (c) 2002-2005 Richard Russon. All Rights Reserved.
+.\" Copyright (c) 2002\-2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSUNDELETE 8 "June 2002" "ntfsprogs version @VERSION@"
+.TH NTFSUNDELETE 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsundelete \- recover a deleted file from an NTFS volume.
 .SH SYNOPSIS
 .B ntfsundelete
-[
-.I options
-]
-.B device
+[\fIoptions\fR] \fIdevice\fR
 .SH DESCRIPTION
 .B ntfsundelete
 has three modes of operation:
@@ -27,8 +24,8 @@ will print a list giving the inode number, name and size.
 .PP
 The
 .I undelete
-mode takes the files either matching the regular expression (option -m)
-or  specified by the inode-expressions and recovers as much of the data
+mode takes the files either matching the regular expression (option \-m)
+or  specified by the inode\-expressions and recovers as much of the data
 as possible.   It saves the result to another location.  Partly for
 safety, but mostly because NTFS write support isn't finished.
 .SS Copy
@@ -90,39 +87,28 @@ correct last modified date, or something unexpected.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfsundelete
-accepts.  All options have two equivalent names.  The short name is preceded by
-.BR \-
+accepts.  Nearly all options have two equivalent names.  The short name is
+preceded by
+.B \-
 and the long name is preceded by
 .BR \-\- .
 Any single letter options, that don't take an argument, can be combined into a
 single command, e.g.
-.BR \-fv
+.B \-fv
 is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI "\-b " NUM
-.br
-.ns
-.TP
-.BI "\-\-byte " NUM
+\fB\-b\fR, \fB\-\-byte\fR NUM
 If any clusters of the file cannot be recovered, the missing parts will be
 filled with this byte.  The default is zeros.
 .TP
-.B \-C
-.br
-.ns
-.TP
-.B \-\-case
+\fB\-C\fR, \fB\-\-case\fR
 When scanning an NTFS volume, any filename matching (using the
 .B \-\-match
 option) is case\-insensitive.  This option makes the matching case\-sensitive.
 .TP
-.BI "\-c " RANGE
-.br
-.ns
-.TP
-.BI "\-\-copy " RANGE
+\fB\-c\fR, \fB\-\-copy\fR RANGE
 This wizard's option will write a block of MFT FILE records to a file.  The
 default file is
 .I mft
@@ -133,89 +119,59 @@ and
 .B \-\-destination
 options.
 .TP
-.BI "\-d " DIR
-.br
-.ns
-.TP
-.BI "\-\-destination " DIR
+\fB\-d\fR, \fB\-\-destination\fR DIR
 This option controls where to put the output file of the
 .B \-\-undelete
 and
 .B \-\-copy
 options.
 .TP
-.B \-f
-.br
-.ns
-.TP
-.B \-\-force
+\fB\-f\fR, \fB\-\-force\fR
 This will override some sensible defaults, such as not overwriting an existing
 file.  Use this option with caution.
 .TP
-.B \-h
-.br
-.ns
-.TP
-.B \-\-help
+\fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .TP
-.BI "\-i " RANGE
-.br
-.ns
-.TP
-.BI "\-\-inodes " RANGE
+\fB\-i\fR, \fB\-\-inodes\fR RANGE
 Recover the files with these inode numbers.
 .I RANGE
 can be a single inode number, several numbers separated by commas "," or a
-range separated by a dash "-".
+range separated by a dash "\-".
 .TP
-.BI "\-m " PATTERN
-.br
-.ns
-.TP
-.BI "\-\-match " PATTERN
-Filter the output by only looking for matching filenames.  The pattern can include the
-wildcards '?', match exactly one character or '*', match zero or more
-characters.  By default the matching is case\-insensitive.  To make the search
-case sensitive, use the
+\fB\-m\fR, \fB\-\-match\fR PATTERN
+Filter the output by only looking for matching filenames.  The pattern can
+include the wildcards '?', match exactly one character or '*', match zero or
+more characters.  By default the matching is case\-insensitive.  To make the
+search case sensitive, use the
 .B \-\-case
 option.
 .TP
-.BI "\-o " FILE
-.br
-.ns
+\fB\-O\fR, \fB\-\-optimistic\fR
+Recover parts of the file even if they are currently marked as in use.
 .TP
-.BI "\-\-output " FILE
+\fB\-o\fR, \fB\-\-output\fR FILE
 Use this option to set name of output file that
 .B \-\-undelete
 or
 .B \-\-copy
 will create.
 .TP
-.BI "\-p " NUM
-.br
-.ns
+\fB\-P\fR, \fB\-\-parent\fR
+Display the parent directory of a deleted file.
 .TP
-.BI "\-\-percentage " NUM
+\fB\-p\fR, \fB\-\-percentage\fR NUM
 Filter the output of the
 .B \-\-scan
 option, by only matching files with a certain amount of recoverable content.
 .B Please read the caveats section for more details.
 .TP
-.BI \-q
-.br
-.ns
-.TP
-.BI \-\-quiet
+\fB\-q\fR, \fB\-\-quiet\fR
 Reduce the amount of output to a minimum.  Naturally, it doesn't make sense to
 combine this option with
 .BR \-\-scan .
 .TP
-.B \-s
-.br
-.ns
-.TP
-.B \-\-scan
+\fB\-s\fR, \fB\-\-scan\fR
 Search through an NTFS volume and print a list of files that could be recovered.
 This is the default action of
 .BR ntfsundelete .
@@ -232,29 +188,23 @@ The output of scan will be:
 .sp
 .nf
 Inode  Flags  %age     Date      Size  Filename
- 6038  FN..    93%  2002-07-17  26629  thesis.doc
+ 6038  FN..    93%  2002\-07\-17  26629  thesis.doc
 .fi
 .TS
+box;
 lB lB
 l l.
 Flag	Description
 F/D	File/Directory
-N/R	(Non-)Resident data stream
+N/R	(Non\-)Resident data stream
 C/E	Compressed/Encrypted data stream
 !	Missing attributes
 .TE
-.RS
 .sp
-.br
+.sp
 The percentage field shows how much of the file can potentially be recovered.
-.sp
-.br
-.RE
-.BI "\-S " RANGE
-.br
-.ns
 .TP
-.BI "\-\-size " RANGE
+\fB\-S\fR, \fB\-\-size\fR RANGE
 Filter the output of the
 .B \-\-scan
 option, by looking for a particular range of file sizes.  The range may be
@@ -262,39 +212,27 @@ specified as two numbers separated by a '\-'.  The sizes may be abbreviated
 using the suffixes k, m, g, t, for kilobytes, megabytes, gigabytes and terabytes
 respectively.
 .TP
-.BI "\-t " SINCE
-.br
-.ns
-.TP
-.BI "\-\-time " SINCE
+\fB\-t\fR, \fB\-\-time\fR SINCE
 Filter the output of the
 .B \-\-scan
 option.  Only match files that have been altered since this time.  The time must
 be given as number using a suffix of d, w, m, y for days, weeks, months or years
 ago.
 .TP
-.BI \-T
-.br
-.ns
-.TP
-.BI \-\-truncate
+\fB\-T\fR, \fB\-\-truncate\fR
 If
-.BR ntfsundelete
+.B ntfsundelete
 is confident about the size of a deleted file, then it will restore the file to
 exactly that size.  The default behaviour is to round up the size to the nearest
 cluster (which will be a multiple of 512 bytes).
 .TP
-.BI "\-u "
-.br
-.ns
-.TP
-.BI "\-\-undelete "
+\fB\-u\fR, \fB\-\-undelete\fR
 Select
 .B undelete
 mode.  You can specify the files to be recovered using by using
-.B --match
+.B \-\-match
 or 
-.B --inodes
+.B \-\-inodes
 options.  This option can be combined with
 .BR \-\-output ,
 .BR \-\-destination ,
@@ -305,21 +243,13 @@ When the file is recovered it will be given its original name, unless the
 .B "\-\-output"
 option is used.
 .TP
-.B \-v
-.br
-.ns
-.TP
-.B \-\-verbose
+\fB\-v\fR, \fB\-\-verbose\fR
 Increase the amount of output that
 .B ntfsundelete
 prints.
 .TP
-.B \-V
-.br
-.ns
-.TP
-.B \-\-version
-Show the version number, copyright and license
+\fB\-V\fR, \fB\-\-version\fR
+Show the version number, copyright and license for
 .BR ntfsundelete .
 .SH EXAMPLES
 Look for deleted files on /dev/hda1.
@@ -331,7 +261,7 @@ Look for deleted files on /dev/hda1.
 Look for deleted documents on /dev/hda1.
 .RS
 .sp
-.B ntfsundelete /dev/hda1 -s \-m '*.doc'
+.B ntfsundelete /dev/hda1 \-s \-m '*.doc'
 .sp
 .RE
 Look for deleted files between 5000 and 6000000 bytes, with at least 90% of the
@@ -350,38 +280,50 @@ Look for deleted files altered in the last two days
 Undelete inodes 2, 5 and 100 to 131 of device /dev/sda1
 .RS
 .sp
-.B ntfsundelete /dev/sda1 -u -i 2,5,100-131
+.B ntfsundelete /dev/sda1 \-u \-i 2,5,100\-131
 .sp
 .RE
 Undelete inode number 3689, call the file 'work.doc' and put it in the user's
 home directory.
 .RS
 .sp
-.B ntfsundelete /dev/hda1 \-u -i 3689 \-o work.doc \-d ~
+.B ntfsundelete /dev/hda1 \-u \-i 3689 \-o work.doc \-d ~
 .sp
 .RE
 Save MFT Records 3689 to 3690 to a file 'debug'
 .RS
 .sp
 .B ntfsundelete /dev/hda1 \-c 3689\-3690 \-o debug
+.sp
 .RE
 .SH BUGS
-There are some small limitations to this program, but currently no known bugs.
-If you find one, please send an email to
+There are some small limitations to
+.BR ntfsundelete ,
+but currently no known bugs.  If you find a bug please send an email describing
+the problem to the development team:
+.br
 .nh
-<linux-ntfs-dev@lists.sourceforge.net>
+linux\-ntfs\-dev@lists.sourceforge.net
 .hy
 .SH AUTHORS
 .B ntfsundelete
-was written by Richard Russon (FlatCap) and Holger Ohmacht.
+was written by Richard Russon and Holger Ohmacht, with contributions from Anton
+Altaparmakov.
 .SH AVAILABILITY
 .B ntfsundelete
-is part of the ntfsprogs package and is available from
+is part of the
+.B ntfsprogs
+package and is available from:
 .br
 .nh
-http://linux\-ntfs.sourceforge.net/downloads.html
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+The manual pages are available online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
 .hy
 .SH SEE ALSO
 .BR ntfsinfo (8),
 .BR ntfsprogs (8)
-

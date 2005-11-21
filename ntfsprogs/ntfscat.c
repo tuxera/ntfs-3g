@@ -76,14 +76,14 @@ static void version(void)
 static void usage(void)
 {
 	ntfs_log_info("\nUsage: %s [options] device [file]\n\n"
-		"    -a, --attribute type       Display this attribute type\n"
-		"    -n, --attribute-name name  Display this attribute name\n"
-		"    -i, --inode num            Display this inode\n\n"
-		"    -f  --force                Use less caution\n"
-		"    -h  --help                 Print this help\n"
-		"    -q  --quiet                Less output\n"
-		"    -V  --version              Version information\n"
-		"    -v  --verbose              More output\n\n",
+		"    -a, --attribute TYPE       Display this attribute type\n"
+		"    -n, --attribute-name NAME  Display this attribute name\n"
+		"    -i, --inode NUM            Display this inode\n\n"
+		"    -f, --force                Use less caution\n"
+		"    -h, --help                 Print this help\n"
+		"    -q, --quiet                Less output\n"
+		"    -V, --version              Version information\n"
+		"    -v, --verbose              More output\n\n",
 		//"    -r  --raw     Display the compressed or encrypted file",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);

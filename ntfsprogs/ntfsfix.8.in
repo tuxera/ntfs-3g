@@ -1,44 +1,74 @@
-.\"                                      Hey, EMACS: -*- nroff -*-
-.\" First parameter, NAME, should be all caps
-.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
-.\" other parameters are allowed: see man(7), man(1)
-.TH NTFSFIX 8 "July 2005" "ntfsprogs version @VERSION@"
-.\" Please adjust this date whenever revising the manpage.
+.\" Copyright (c) 2004 Szabolcs Szakacsits.
+.\" Copyright (c) 2005 Richard Russon.
+.\" This file may be copied under the terms of the GNU Public License.
 .\"
-.\" Some roff macros, for reference:
-.\" .nh        disable hyphenation
-.\" .hy        enable hyphenation
-.\" .ad l      left justify
-.\" .ad b      justify to both left and right margins
-.\" .nf        disable filling
-.\" .fi        enable filling
-.\" .br        insert line break
-.\" .sp <n> insert n+1 empty lines
-.\" for manpage-specific macros, see man(7)
+.TH NTFSFIX 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsfix \- fix common errors and force Windows to check NTFS
 .SH SYNOPSIS
 .B ntfsfix
-.I device
+[\fIoptions\fR] \fIdevice\fR
 .SH DESCRIPTION
-\fBntfsfix\fP is a utility that fixes some common NTFS problems. 
-\fBntfsfix\fP is \fBNOT\fP a Linux
-version of chkdsk. It only repairs some fundamental NTFS inconsistencies,
-resets the NTFS journal file and schedules an NTFS consistency check for
-the first boot into Windows.
+.B ntfsfix
+is a utility that fixes some common NTFS problems. 
+.B ntfsfix
+is
+.B NOT
+a Linux version of chkdsk. It only repairs some fundamental NTFS
+inconsistencies, resets the NTFS journal file and schedules an NTFS consistency
+check for the first boot into Windows.
 .sp
 You may run 
 .B ntfsfix 
 on an NTFS volume if you think it's damaged and it can't be mounted.
-.SH AUTHOR
-The original ntfsfix manual page was written by David Martínez Moreno
-<ender@debian.org> and rewritten 
-by Szabolcs Szakacsits to reflect the current role of
+.SH OPTIONS
+Below is a summary of all the options that
+.B ntfsfix
+accepts.  Nearly all options have two equivalent names.  The short name is
+preceded by
+.B \-
+and the long name is preceded by
+.BR \-\- .
+Any single letter options, that don't take an argument, can be combined into a
+single command, e.g.
+.B \-fv
+is equivalent to
+.BR "\-f \-v" .
+Long named options can be abbreviated to any unique prefix of their name.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show a list of options with a brief description of each one.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Show the version number, copyright and license
+.SH BUGS
+There are no known problems with
+.BR ntfsfix .
+If you find a bug please send an email describing the problem to the
+development team:
+.br
+.nh
+linux\-ntfs\-dev@lists.sourceforge.net
+.hy
+.SH AUTHORS
+.B ntfsfix
+was written by Anton Altaparmakov.
 .B ntfsfix.
 .SH AVAILABILITY
 .B ntfsfix
-is part of the ntfsprogs package and is available from
-http://linux-ntfs.sourceforge.net/.
+is part of the
+.B ntfsprogs
+package and is available from:
+.br
+.nh
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+The manual pages are available online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
+.hy
 .SH SEE ALSO
 .BR mkntfs (8),
 .BR ntfsprogs (8)

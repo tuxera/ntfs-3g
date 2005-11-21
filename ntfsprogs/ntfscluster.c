@@ -80,19 +80,19 @@ static void version(void)
 static void usage(void)
 {
 	ntfs_log_info("\nUsage: %s [options] device\n"
-		"    -i        --info           Print information about the volume (default)\n"
+		"    -i, --info           Print information about the volume (default)\n"
 		"\n"
-		"    -c range  --cluster range  Look for objects in this range of clusters\n"
-		"    -s range  --sector range   Look for objects in this range of sectors\n"
-		"    -I num    --inode num      Show information about this inode\n"
-		"    -F name   --filename name  Show information about this file\n"
-	/*	"    -l        --last           Find the last file on the volume\n" */
+		"    -c, --cluster RANGE  Look for objects in this range of clusters\n"
+		"    -s, --sector RANGE   Look for objects in this range of sectors\n"
+		"    -I, --inode NUM      Show information about this inode\n"
+		"    -F, --filename NAME  Show information about this file\n"
+	/*	"    -l, --last           Find the last file on the volume\n" */
 		"\n"
-		"    -f        --force          Use less caution\n"
-		"    -q        --quiet          Less output\n"
-		"    -v        --verbose        More output\n"
-		"    -V        --version        Version information\n"
-		"    -h        --help           Print this help\n\n",
+		"    -f, --force          Use less caution\n"
+		"    -q, --quiet          Less output\n"
+		"    -v, --verbose        More output\n"
+		"    -V, --version        Version information\n"
+		"    -h, --help           Print this help\n\n",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }

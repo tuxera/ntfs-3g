@@ -1,12 +1,13 @@
-.\" -*- nroff -*-
-.\" Copyright (c) 2004-2005 Yura Pakhuchiy. All Rights Reserved.
+.\" Copyright (c) 2004\-2005 Yura Pakhuchiy.
+.\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCP 8 "October 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCP 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfscp \- overwrite file on an NTFS volume.
 .SH SYNOPSIS
-.BI "ntfscp [" options "] device source_file destination"
+.B ntfscp
+[\fIoptions\fR] \fIdevice source_file destination\fR
 .SH DESCRIPTION
 .B ntfscp
 will overwrite file on an NTFS volume. At present
@@ -19,89 +20,109 @@ is directory specified by name then
 .B source_file
 is copied into this directory, in case if
 .B destination
-is directory and specified by inode number then unnamed data attribute is created for this inode and
+is directory and specified by inode number then unnamed data attribute is
+created for this inode and
 .B source_file
-is copied into it (WARNING: it's unusual to have unnamed data streams in the directories, think twice before specifying directory by inode number). 
+is copied into it (WARNING: it's unusual to have unnamed data streams in the
+directories, think twice before specifying directory by inode number). 
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfscp
-accepts.  All options have two equivalent names.  The short name is preceded by
-.BR \-
+accepts.  Nearly all options have two equivalent names.  The short name is
+preceded by
+.B \-
 and the long name is preceded by
 .BR \-\- .
 Any single letter options, that don't take an argument, can be combined into a
 single command, e.g.
-.BR \-fv
+.B \-fv
 is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
-.BI "\-a, \-\-attribute " number
+\fB\-a\fR, \fB\-\-attribute\fR NUM
 Write to this attribute.
 .TP
-.B \-i, \-\-inode
+\fB\-i\fR, \fB\-\-inode\fR
 Treat
 .I destination
 as inode number.
 .TP
-.BI "\-N, \-\-attr-name " name
+\fB\-N\fR, \fB\-\-attr\-name\fR NAME
 Write to attribute with this name.
 .TP
-.B -n, --no-action
+\fB\-n\fR, \fB\-\-no\-action\fR
 Use this option to make a test run before doing the real copy operation.
-Volume will be opened read-only and no write will be done.
+Volume will be opened read\-only and no write will be done.
 .TP
-.B \-f, \-\-force
+\fB\-f\fR, \fB\-\-force\fR
 This will override some sensible defaults, such as not working with a mounted
 volume.  Use this option with caution.
 .TP
-.B \-h, \-\-help
+\fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .TP
-.B \-q, \-\-quiet
+\fB\-q\fR, \fB\-\-quiet\fR
 Suppress some debug/warning/error messages.
 .TP
-.B \-V, \-\-version
+\fB\-V\fR, \fB\-\-version\fR
 Show the version number, copyright and license
 .BR ntfscp .
 .TP
-.B \-v, \-\-verbose
+\fB\-v\fR, \fB\-\-verbose\fR
 Display more debug/warning/error messages.
 .SH DATA STREAMS
-All data on NTFS is stored in streams, which can have names. A file can have more than one data streams, but exactly one must have no name. The size of a file is the size of its unnamed data stream. Usually when you don't specify stream name you are access to unnamed data stream. If you want access to named data stream you need to add ":stream_name" to the filename. For example: by opening "some.mp3:artist" you will open stream "artist" in "some.mp3". But windows usually prevent you from accessing to named data streams, so you need to use some program like FAR or utils from cygwin to access named data streams.
+All data on NTFS is stored in streams, which can have names. A file can have
+more than one data streams, but exactly one must have no name. The size of a
+file is the size of its unnamed data stream. Usually when you don't specify
+stream name you are access to unnamed data stream. If you want access to named
+data stream you need to add ":stream_name" to the filename. For example: by
+opening "some.mp3:artist" you will open stream "artist" in "some.mp3". But
+windows usually prevent you from accessing to named data streams, so you need
+to use some program like FAR or utils from cygwin to access named data streams.
 .SH EXAMPLES
-Copy new_boot.ini from /home/user as boot.ini to the root of an /dev/hda1 NTFS volume:
+Copy new_boot.ini from /home/user as boot.ini to the root of an /dev/hda1 NTFS
+volume:
 .RS
 .sp
 .B ntfscp /dev/hda1 /home/user/new_boot.ini boot.ini
 .sp
 .RE
-Copy myfile to C:\\some\\path\\myfile:stream (assume that /dev/hda1 letter in windows is C):
+Copy myfile to C:\\some\\path\\myfile:stream (assume that /dev/hda1 letter in
+windows is C):
 .RS
 .sp
-.B ntfscp -N stream /dev/hda1 myfile /some/path
+.B ntfscp \-N stream /dev/hda1 myfile /some/path
+.sp
+.RE
 .SH BUGS
-No bugs are known at present. If you find any bugs, please send an email to
+There are no known problems with
+.BR ntfscp .
+If you find a bug please send an email describing the problem to the
+development team:
+.br
 .nh
-<linux-ntfs-dev@lists.sourceforge.net>.
+linux\-ntfs\-dev@lists.sourceforge.net
 .hy
-.SH AUTHOR
+.SH AUTHORS
 .B ntfscp
-was written by Yura Pakhuchiy.
-.B ntfscp
-and this manual page is based on
-.B ntfscat
-and its manual page by Richard Russon, so many thanks to him. Information about named data streams was partly taken from
-.B ntfsdoc.
+was written by Yura Pakhuchiy, with contributions from Anton Altaparmakov.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH AVAILABILITY
 .B ntfscp
-is part of the ntfsprogs package and is available from
+is part of the
+.B ntfsprogs
+package and is available from:
 .br
 .nh
-http://linux\-ntfs.sourceforge.net/downloads.html.
+http://www.linux\-ntfs.org/content/view/19/37
+.hy
+.sp
+The manual pages are available online at:
+.br
+.nh
+http://wiki.linux\-ntfs.org/doku.php?id=man
 .hy
 .SH SEE ALSO
 .BR ntfsprogs (8)
-

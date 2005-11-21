@@ -90,12 +90,12 @@ static void version(void)
 static void usage(void)
 {
 	ntfs_log_info("\nUsage: %s [options] device [label]\n"
-	       "    -n    --no-action    Do not write to disk\n"
-	       "    -f    --force        Use less caution\n"
-	       "    -q    --quiet        Less output\n"
-	       "    -v    --verbose      More output\n"
-	       "    -V    --version      Display version information\n"
-	       "    -h    --help         Display this help\n\n",
+	       "    -n, --no-action    Do not write to disk\n"
+	       "    -f, --force        Use less caution\n"
+	       "    -q, --quiet        Less output\n"
+	       "    -v, --verbose      More output\n"
+	       "    -V, --version      Display version information\n"
+	       "    -h, --help         Display this help\n\n",
 	       EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
