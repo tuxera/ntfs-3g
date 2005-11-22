@@ -6,7 +6,11 @@
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
-.BI "ntfsmount " device " " mount_point " [\-o " options "]"
+.B ntfsmount
+.I device mount_point
+[
+.B \-o options
+]
 .SH DESCRIPTION
 .B ntfsmount
 is a
@@ -134,14 +138,17 @@ are not set before partitions from /etc/fstab had been mounted.
 .B streams_interface=
 This option controls how the user can access named data streams.  It can be set
 to, one of
-.BR none ", " windows " or " xattr .
+.BR none ,
+.B windows
+or
+.BR xattr .
 If the option is set to
-.BR "none" ,
+.BR none ,
 the user will have no access to the named data streams.  If it's set to
-.BR "windows" ,
+.BR windows ,
 then the user can access them just like in Windows (eg. cat file:stream).
 If it's set to
-.BR "xattr" ,
+.BR xattr ,
 then the named data streams are mapped to xattrs and user can manipulate them
 using
 .B {get,set}fattr

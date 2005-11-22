@@ -8,7 +8,7 @@ mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 .SH SYNOPSIS
 .B mkntfs
 [\fIoptions\fR] \fIdevice \fR[\fInumber\-of\-sectors\fR]
-.P
+.PP
 .B mkntfs
 [
 .B \-C

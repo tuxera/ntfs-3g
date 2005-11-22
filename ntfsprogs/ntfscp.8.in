@@ -24,7 +24,7 @@ is directory and specified by inode number then unnamed data attribute is
 created for this inode and
 .B source_file
 is copied into it (WARNING: it's unusual to have unnamed data streams in the
-directories, think twice before specifying directory by inode number). 
+directories, think twice before specifying directory by inode number).
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfscp

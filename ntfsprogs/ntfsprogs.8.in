@@ -34,7 +34,7 @@ available for free and come with full source code.
 .SS ntfsfix
 .PP
 .BR ntfsfix (8)
-: Check and fix some common errors, clear the LogFile and make Windows 
+: Check and fix some common errors, clear the LogFile and make Windows
 perform a thorough check next time it boots.
 .SS ntfsinfo
 .PP

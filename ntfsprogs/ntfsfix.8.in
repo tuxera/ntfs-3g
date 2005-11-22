@@ -10,7 +10,7 @@ ntfsfix \- fix common errors and force Windows to check NTFS
 [\fIoptions\fR] \fIdevice\fR
 .SH DESCRIPTION
 .B ntfsfix
-is a utility that fixes some common NTFS problems. 
+is a utility that fixes some common NTFS problems.
 .B ntfsfix
 is
 .B NOT
@@ -18,8 +18,8 @@ a Linux version of chkdsk. It only repairs some fundamental NTFS
 inconsistencies, resets the NTFS journal file and schedules an NTFS consistency
 check for the first boot into Windows.
 .sp
-You may run 
-.B ntfsfix 
+You may run
+.B ntfsfix
 on an NTFS volume if you think it's damaged and it can't be mounted.
 .SH OPTIONS
 Below is a summary of all the options that

@@ -231,7 +231,7 @@ Select
 .B undelete
 mode.  You can specify the files to be recovered using by using
 .B \-\-match
-or 
+or
 .B \-\-inodes
 options.  This option can be combined with
 .BR \-\-output ,
@@ -240,7 +240,7 @@ and
 .BR \-\-byte .
 .sp
 When the file is recovered it will be given its original name, unless the
-.B "\-\-output"
+.B \-\-output
 option is used.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR

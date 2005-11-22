@@ -79,7 +79,7 @@ is used to list information about the files specified by the
 option (the root directory by default).
 .I DEVICE
 is the special file corresponding to the device (e.g
-.IR /dev/hdXX ) 
+.IR /dev/hdXX )
 or an NTFS image file.
 .SH OPTIONS
 Below is a summary of all the options that
@@ -108,7 +108,7 @@ Force execution.  For example necessary to run on an NTFS partition stored in
 a normal file.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Print the usage information of 
+Print the usage information of
 .B ntfsls
 and exit.
 .TP
@@ -133,7 +133,6 @@ Show the contents of all directories beneath the specified directory.
 Unless this options is specified, all files beginning with a dollar sign
 character will not be listed as these files are usually system files.
 .TP
-.B \-v, \-\-verbose
 \fB\-v\fR, \fB\-\-verbose\fR
 Display more debug/warning/error messages.
 .TP
