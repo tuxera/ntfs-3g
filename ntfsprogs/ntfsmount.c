@@ -1,8 +1,8 @@
 /**
  * ntfsmount - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2005 Yuval Fledel
  *
  * NTFS module for FUSE.
  *

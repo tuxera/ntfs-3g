@@ -154,24 +154,28 @@ using
 .B {get,set}fattr
 utilities.
 .SH DATA STREAMS
-All data on NTFS is stored in streams, which can have names.
-A file can have more than one data streams, but exactly one must have no name.
-The size of a file is the size of its unnamed data stream.
-Usually when you don't specify stream name you are access to the unnamed data
-stream.
-If you want access to named data stream you need to add ":stream_name" to the
-filename. For example: by opening "some.mp3:artist" you will open stream
-"artist" in "some.mp3".
-But windows usually prevent you from accessing to named data streams,
-so you need to use some program like FAR or utils from cygwin to access named
-data streams.
+All data on NTFS is stored in streams.  Every file has exactly one unnamed
+data stream and can have many named data streams.  The size of a file is the
+size of its unnamed data stream.  By default,
+.B ntfsmount
+will only read the unnamed data stream.
+.PP
+By using the options "streams_interface=windows", you will be able to read
+any named data streams, simply by specifying the stream's name after a colon.
+For example:
+.RS
 .sp
-NTFS FUSE module don't prevent you from accessing to named data streams so you
-can use your preferred utils to access them. You can even delete them using
-.B rm.
-You can list all named data streams by getting "ntfs.streams.list" extended
-attribute. NOTE: The last feature is unique for NTFS FUSE module and maybe
-will be never supported by kernel driver.
+cat some.mp3:artist
+.sp
+.RE
+Windows applications don't, consistently, allow you to read named data
+streams, so you are recommended to use tools like FAR, or utils from Cygwin.
+.PP
+Named data streams act like normals files, so you can read from them, write to
+them and even delete them (using rm).  You can list all the named data streams
+a file has by getting the "ntfs.streams.list" extended attribute.  NOTE: This
+list feature is unique to the NTFS FUSE module and may never be supported by the
+kernel driver.
 .SH EXAMPLES
 Mount /dev/hda1 to /mnt/ntfs\-fuse using ntfsmount:
 .RS
@@ -233,7 +237,7 @@ linux\-ntfs\-dev@lists.sourceforge.net
 .hy
 .SH AUTHORS
 .B ntfsmount
-was written by Yura Pakhuchiy, with contributions from Anton Altaparmakov.
+was written by Yura Pakhuchiy, with contributions from Yuval Fledel.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH THANKS
