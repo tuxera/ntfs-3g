@@ -41,13 +41,17 @@
 #include <mntent.h>
 #endif
 
-/* Both under Cygwin and DJGPP we do not have MS_RDONLY, so we define it. */
+/*
+ * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY and MS_NOATIME,
+ * so we define them ourselves.
+ */
 #if !defined(MS_RDONLY)
 /**
  * enum MS_MOUNT -
  */
 typedef enum {
 	MS_RDONLY = 1,
+	MS_NOATIME,
 } MS_MOUNT;
 #endif
 
