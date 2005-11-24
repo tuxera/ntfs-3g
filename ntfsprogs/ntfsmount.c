@@ -814,6 +814,8 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 exit:
 	free(path);
 	if (stream_name_len)
@@ -826,6 +828,8 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 	if (strchr(from, ':') &&	/* n/a for named data streams. */
 			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL;
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
@@ -869,6 +873,8 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 			res = -EIO;
 		goto exit;
 	}
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	/* Create hard link. */
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
@@ -969,6 +975,8 @@ static int ntfs_fuse_unlink(const char *org_path)
 		res = ntfs_fuse_rm(path);
 	else
 		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -993,6 +1001,8 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
 }
 
@@ -1000,6 +1010,8 @@ static int ntfs_fuse_rmdir(const char *path)
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	return ntfs_fuse_rm(path);
 }
 
@@ -1245,6 +1257,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		res = -EEXIST;
 		goto exit;
 	}
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
 			res = -ENODATA;
@@ -1304,6 +1318,8 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -ENODATA;
 		goto exit;
 	}
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 	if (ntfs_attr_rm(na))
 		res = -errno;
 	else
