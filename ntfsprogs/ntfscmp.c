@@ -63,10 +63,6 @@ struct progress_bar {
 #define PERR_PREFIX  ERR_PREFIX "(%d): "
 #define NERR_PREFIX  ERR_PREFIX ": "
 
-GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
-GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, NULL, FALSE)
-
 __attribute__((format(printf, 2, 3)))
 static void perr_printf(int newline, const char *fmt, ...)
 {
@@ -484,7 +480,7 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			print_na(na1);
 			printf("abrupt length:   %lld  !=  %lld ",
 			       na1->data_size, na2->data_size);
-			Vprintf("(count: %lld  !=  %lld)", count1, count2);
+			printf("(count: %lld  !=  %lld)", count1, count2);
 			puts("");
 			return;
 		}
@@ -510,7 +506,8 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 		if (memcmp(buf1, buf2, count1)) {
 			print_na(na1);
 			printf("content");
-			Vprintf(" (len = %lld)", count1);
+			if (opt.verbose)
+				printf(" (len = %lld)", count1);
 			printf(":   DIFFER\n");
 			return;
 		}
@@ -557,10 +554,13 @@ close_attribs:
 
 static void vprint_attribute(ATTR_TYPES atype, char  *name)
 {
-	Vprintf("0x%x", atype);
+	if (!opt.verbose)
+		return;
+
+	printf("0x%x", atype);
 	if (name)
-		Vprintf(":%s", name);
-	Vprintf(" ");
+		printf(":%s", name);
+	printf(" ");
 }
 
 static void print_attributes(ntfs_inode *ni,
@@ -569,10 +569,13 @@ static void print_attributes(ntfs_inode *ni,
 			     char  *name1,
 			     char  *name2)
 {
-	Vprintf("Walking inode %llu attributes: ", inumber(ni));
+	if (!opt.verbose)
+		return;
+
+	printf("Walking inode %llu attributes: ", inumber(ni));
 	vprint_attribute(atype1, name1);
 	vprint_attribute(atype2, name2);
-	Vprintf("\n");
+	printf("\n");
 }
 
 static int new_name(ntfs_attr_search_ctx *ctx, char *prev_name)
