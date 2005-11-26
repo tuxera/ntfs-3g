@@ -74,8 +74,8 @@
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
 
-/*
- * List of crypto algorithms used by EFS (32-bit values).
+/**
+ * enum NTFS_CRYPTO_ALGORITHMS - List of crypto algorithms used by EFS (32 bit)
  *
  * To choose which one is used in Windows, create or set the REG_DWORD registry
  * key HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\EFS\
@@ -96,7 +96,9 @@ typedef enum {
 	CALG_AES_256	= const_cpu_to_le32(0x6610),
 } NTFS_CRYPTO_ALGORITHMS;
 
-/* Decrypted, in-memory file encryption key. */
+/**
+ * struct ntfs_fek - Decrypted, in-memory file encryption key.
+ */
 typedef struct {
 	gcry_cipher_hd_t gcry_cipher_hd;
 	u32 alg_id;
@@ -127,11 +129,6 @@ struct options {
 static const char *EXEC_NAME = "ntfsdecrypt";
 static struct options opts;
 
-GEN_PRINTF(Eprintf, stderr, NULL, FALSE)
-GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
-GEN_PRINTF(Qprintf, stderr, &opts.quiet, FALSE)
-static GEN_PRINTF(Printf, stderr, NULL, FALSE)
-
 static ntfschar EFS[5] = {
 	const_cpu_to_le16('$'), const_cpu_to_le16('E'), const_cpu_to_le16('F'),
 	const_cpu_to_le16('S'), const_cpu_to_le16('\0')
@@ -146,12 +143,12 @@ static ntfschar EFS[5] = {
  */
 static void version(void)
 {
-	Printf("\n%s v%s (libntfs %s) - Decrypt files and print on the "
+	ntfs_log_info("\n%s v%s (libntfs %s) - Decrypt files and print on the "
 			"standard output.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
-	Printf("Copyright (c) 2005 Yuval Fledel\n");
-	Printf("Copyright (c) 2005 Anton Altaparmakov\n");
-	Printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+	ntfs_log_info("Copyright (c) 2005 Yuval Fledel\n");
+	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
+	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -163,7 +160,7 @@ static void version(void)
  */
 static void usage(void)
 {
-	Printf("\nUsage: %s [options] -k name.pfx device [file]\n\n"
+	ntfs_log_info("\nUsage: %s [options] -k name.pfx device [file]\n\n"
 	       "    -i, --inode num         Display this inode\n\n"
 	       "    -k  --keyfile name.pfx  Use file name as the user's private key file.\n"
 	       "    -f  --force             Use less caution\n"
@@ -172,7 +169,7 @@ static void usage(void)
 	       "    -V  --version           Version information\n"
 	       "    -v  --verbose           More output\n\n",
 	       EXEC_NAME);
-	Printf("%s%s\n", ntfs_bugs, ntfs_home);
+	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
 /**
@@ -215,7 +212,8 @@ static int parse_options(int argc, char **argv)
 			else if (!opts.file)
 				opts.file = argv[optind - 1];
 			else {
-				Eprintf("You must specify exactly one file.\n");
+				ntfs_log_error("You must specify exactly one "
+					"file.\n");
 				err++;
 			}
 			break;
@@ -230,32 +228,35 @@ static int parse_options(int argc, char **argv)
 			if (!opts.keyfile)
 				opts.keyfile = argv[optind - 1];
 			else {
-				Eprintf("You must specify exactly one "
+				ntfs_log_error("You must specify exactly one "
 						"key file.\n");
 				err++;
 			}
 			break;
 		case 'i':
 			if (opts.inode != -1)
-				Eprintf("You must specify exactly one "
+				ntfs_log_error("You must specify exactly one "
 						"inode.\n");
 			else if (utils_parse_size(optarg, &opts.inode, FALSE))
 				break;
 			else
-				Eprintf("Couldn't parse inode number.\n");
+				ntfs_log_error("Couldn't parse inode number.\n");
 			err++;
 			break;
 		case 'q':
 			opts.quiet++;
+			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
 			break;
 		case 'V':
 			ver++;
 			break;
 		case 'v':
 			opts.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		default:
-			Eprintf("Unknown option '%s'.\n", argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n",
+				argv[optind - 1]);
 			err++;
 			break;
 		}
@@ -263,24 +264,26 @@ static int parse_options(int argc, char **argv)
 
 	if (help || ver) {
 		opts.quiet = 0;
+		ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET);
 	} else {
 		if (!opts.keyfile) {
-			Eprintf("You must specify a key file.\n");
+			ntfs_log_error("You must specify a key file.\n");
 			err++;
 		} else if (opts.device == NULL) {
-			Eprintf("You must specify a device.\n");
+			ntfs_log_error("You must specify a device.\n");
 			err++;
 		} else if (opts.file == NULL && opts.inode == -1) {
-			Eprintf("You must specify a file or inode with the -i "
-					"option.\n");
+			ntfs_log_error("You must specify a file or inode with "
+				"the -i option.\n");
 			err++;
 		} else if (opts.file != NULL && opts.inode != -1) {
-			Eprintf("You can't specify both a file and inode.\n");
+			ntfs_log_error("You can't specify both a file and "
+				"inode.\n");
 			err++;
 		}
 		if (opts.quiet && opts.verbose) {
-			Eprintf("You may not use --quiet and --verbose at the "
-					"same time.\n");
+			ntfs_log_error("You may not use --quiet and --verbose "
+				"at the same time.\n");
 			err++;
 		}
 	}
@@ -293,6 +296,9 @@ static int parse_options(int argc, char **argv)
 	return (!err && !help && !ver);
 }
 
+/**
+ * ntfs_pkcs12_load_pfxfile
+ */
 static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 		unsigned *pfx_size)
 {
@@ -300,32 +306,33 @@ static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 	struct stat key_stat;
 
 	if (!keyfile || !pfx || !pfx_size) {
-		fprintf(stderr, "You have to specify the key file, a pointer "
+		ntfs_log_error("You have to specify the key file, a pointer "
 				"to hold the key file contents, and a pointer "
-				"to hold the size of the key file contents.");
+				"to hold the size of the key file contents.\n");
 		return -1;
 	}
 	f = open(keyfile, O_RDONLY);
 	if (f == -1) {
-		perror("Failed to open key file");
+		ntfs_log_perror("Failed to open key file");
 		return -1;
 	}
 	if (fstat(f, &key_stat) == -1) {
-		perror("Failed to stat key file");
+		ntfs_log_perror("Failed to stat key file");
 		goto file_out;
 	}
 	if (!S_ISREG(key_stat.st_mode)) {
-		fprintf(stderr, "Key file is not a regular file, cannot read "
-				"it.");
+		ntfs_log_error("Key file is not a regular file, cannot read "
+				"it.\n");
 		goto file_out;
 	}
 	if (!key_stat.st_size) {
-		fprintf(stderr, "Key file has zero size.");
+		ntfs_log_error("Key file has zero size.\n");
 		goto file_out;
 	}
 	*pfx = malloc(key_stat.st_size + 1);
 	if (!*pfx) {
-		perror("Failed to allocate buffer for key file contents");
+		ntfs_log_perror("Failed to allocate buffer for key file "
+			"contents");
 		goto file_out;
 	}
 	to_read = key_stat.st_size;
@@ -333,7 +340,7 @@ static int ntfs_pkcs12_load_pfxfile(const char *keyfile, u8 **pfx,
 	do {
 		br = read(f, *pfx + total, to_read);
 		if (br == -1) {
-			perror("Failed to read from key file");
+			ntfs_log_perror("Failed to read from key file");
 			goto free_out;
 		}
 		if (!br)
@@ -353,25 +360,31 @@ file_out:
 	return -1;
 }
 
+/**
+ * ntfs_crypto_init
+ */
 static int ntfs_crypto_init(void)
 {
 	int err;
 
 	/* Initialize gcrypt library.  Note: Must come before GNU TLS init. */
 	if (gcry_control(GCRYCTL_DISABLE_SECMEM, 0) != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to initialize the gcrypt library.\n");
+		ntfs_log_error("Failed to initialize the gcrypt library.\n");
 		return -1;
 	}
 	/* Initialize GNU TLS library.  Note: Must come after libgcrypt init. */
 	err = gnutls_global_init();
 	if (err < 0) {
-		fprintf(stderr, "Failed to initialize GNU TLS library: %s\n",
+		ntfs_log_error("Failed to initialize GNU TLS library: %s\n",
 				gnutls_strerror(err));
 		return -1;
 	}
 	return 0;
 }
 
+/**
+ * ntfs_crypto_deinit
+ */
 static void ntfs_crypto_deinit(void)
 {
 	gnutls_global_deinit();
@@ -382,6 +395,9 @@ static void ntfs_crypto_deinit(void)
 	}
 }
 
+/**
+ * ntfs_rsa_private_key_import_from_gnutls
+ */
 static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 		gnutls_x509_privkey_t priv_key)
 {
@@ -394,7 +410,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	/* Extract the RSA parameters from the GNU TLS private key. */
 	if (gnutls_x509_privkey_export_rsa_raw(priv_key, &rd[0], &rd[1],
 			&rd[2], &rd[3], &rd[4], &rd[5])) {
-		fprintf(stderr, "Failed to export rsa parameters.  (Is the "
+		ntfs_log_error("Failed to export rsa parameters.  (Is the "
 				"key an RSA private key?)\n");
 		return NULL;
 	}
@@ -402,7 +418,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	for (i = 0; i < 6; i++) {
 		if (gcry_mpi_scan(&rm[i], GCRYMPI_FMT_USG, rd[i].data,
 				rd[i].size, &tmp_size) != GPG_ERR_NO_ERROR) {
-			fprintf(stderr, "Failed to convert RSA parameter %i "
+			ntfs_log_error("Failed to convert RSA parameter %i "
 					"to mpi format (size %d)\n", i,
 					rd[i].size);
 			rsa_key = NULL;
@@ -422,7 +438,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 			"(private-key(rsa(n%m)(e%m)(d%m)(p%m)(q%m)(u%m)))",
 			rm[0], rm[1], rm[2], rm[4], rm[3], rm[5]) !=
 			GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to build RSA private key s-exp.\n");
+		ntfs_log_error("Failed to build RSA private key s-exp.\n");
 		rsa_key = NULL;
 	}
 	/* Release the no longer needed mpi values. */
@@ -431,6 +447,9 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 	return (ntfs_rsa_private_key)rsa_key;
 }
 
+/**
+ * ntfs_pkcs12_extract_rsa_key
+ */
 static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 		char *password)
 {
@@ -444,7 +463,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	/* Create a pkcs12 structure. */
 	err = gnutls_pkcs12_init(&pkcs12);
 	if (err) {
-		fprintf(stderr, "Failed to initialize PKCS#12 structure: %s\n",
+		ntfs_log_error("Failed to initialize PKCS#12 structure: %s\n",
 				gnutls_strerror(err));
 		return NULL;
 	}
@@ -453,7 +472,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	dpfx.size = pfx_size;
 	err = gnutls_pkcs12_import(pkcs12, &dpfx, GNUTLS_X509_FMT_DER, 0);
 	if (err) {
-		fprintf(stderr, "Failed to convert the PFX file from DER to "
+		ntfs_log_error("Failed to convert the PFX file from DER to "
 				"native PKCS#12 format: %s\n",
 				gnutls_strerror(err));
 		goto out;
@@ -473,14 +492,14 @@ retry_verify:
 			password = NULL;
 			goto retry_verify;
 		}
-		fprintf(stderr, "Failed to verify the MAC (%s).  Is the "
+		ntfs_log_error("Failed to verify the MAC (%s).  Is the "
 				"password correct?\n", gnutls_strerror(err));
 		goto out;
 	}
 	for (bag_index = 0; ; bag_index++) {
 		err = gnutls_pkcs12_bag_init(&bag);
 		if (err) {
-			fprintf(stderr, "Failed to initialize PKCS#12 Bag "
+			ntfs_log_error("Failed to initialize PKCS#12 Bag "
 					"structure: %s\n",
 					gnutls_strerror(err));
 			goto out;
@@ -489,7 +508,7 @@ retry_verify:
 		if (err) {
 			if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
 				break;
-			fprintf(stderr, "Failed to obtain Bag from PKCS#12 "
+			ntfs_log_error("Failed to obtain Bag from PKCS#12 "
 					"structure: %s\n",
 					gnutls_strerror(err));
 			goto bag_out;
@@ -497,13 +516,13 @@ retry_verify:
 check_again:
 		err = gnutls_pkcs12_bag_get_count(bag);
 		if (err < 0) {
-			fprintf(stderr, "Failed to obtain Bag count: %s\n",
+			ntfs_log_error("Failed to obtain Bag count: %s\n",
 					gnutls_strerror(err));
 			goto bag_out;
 		}
 		err = gnutls_pkcs12_bag_get_type(bag, 0);
 		if (err < 0) {
-			fprintf(stderr, "Failed to determine Bag type: %s\n",
+			ntfs_log_error("Failed to determine Bag type: %s\n",
 					gnutls_strerror(err));
 			goto bag_out;
 		}
@@ -514,13 +533,13 @@ check_again:
 		case GNUTLS_BAG_PKCS8_ENCRYPTED_KEY:
 			err = gnutls_pkcs12_bag_get_data(bag, 0, &dkey);
 			if (err < 0) {
-				fprintf(stderr, "Failed to obtain Bag data: "
+				ntfs_log_error("Failed to obtain Bag data: "
 						"%s\n", gnutls_strerror(err));
 				goto bag_out;
 			}
 			err = gnutls_x509_privkey_init(&pkey);
 			if (err) {
-				fprintf(stderr, "Failed to initialized "
+				ntfs_log_error("Failed to initialized "
 						"private key structure: %s\n",
 						gnutls_strerror(err));
 				goto bag_out;
@@ -529,7 +548,7 @@ check_again:
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
 					GNUTLS_X509_FMT_DER, password, flags);
 			if (err) {
-				fprintf(stderr, "Failed to convert private "
+				ntfs_log_error("Failed to convert private "
 						"key from DER to GNU TLS "
 						"format: %s\n",
 						gnutls_strerror(err));
@@ -549,12 +568,14 @@ check_again:
 			 */
 			char *buf = malloc(8192);
 			size_t bufsize = 8192;
-			err = gnutls_x509_privkey_export_pkcs8(pkey, GNUTLS_X509_FMT_PEM, "", GNUTLS_PKCS_PLAIN, buf, &bufsize);
+			err = gnutls_x509_privkey_export_pkcs8(pkey,
+				GNUTLS_X509_FMT_PEM, "", GNUTLS_PKCS_PLAIN, buf,
+				&bufsize);
 			if (err) {
-				fprintf(stderr, "eek1\n");
+				ntfs_log_error("eek1\n");
 				exit(1);
 			}
-			fprintf(stderr, "%s\n", buf);
+			ntfs_log_error("%s\n", buf);
 			free(buf);
 #endif
 			/* Convert the private key to our internal format. */
@@ -563,7 +584,7 @@ check_again:
 		case GNUTLS_BAG_ENCRYPTED:
 			err = gnutls_pkcs12_bag_decrypt(bag, password);
 			if (err) {
-				fprintf(stderr, "Failed to decrypt Bag: %s\n",
+				ntfs_log_error("Failed to decrypt Bag: %s\n",
 						gnutls_strerror(err));
 				goto bag_out;
 			}
@@ -583,6 +604,9 @@ out:
 	return rsa_key;
 }
 
+/**
+ * ntfs_rsa_private_key_release
+ */
 static void ntfs_rsa_private_key_release(ntfs_rsa_private_key rsa_key)
 {
 	gcry_sexp_release((gcry_sexp_t)rsa_key);
@@ -608,11 +632,11 @@ static inline void ntfs_buffer_reverse(u8 *buf, unsigned buf_size)
 }
 
 #ifndef HAVE_STRNLEN
-/**             
+/**
  * strnlen - strnlen is a gnu extension so emulate it if not present
- */     
+ */
 static size_t strnlen(const char *s, size_t maxlen)
-{       
+{
 	const char *p, *end;
 
 	/* Look for a '\0' character. */
@@ -640,7 +664,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	/* Convert the FEK to internal MPI format. */
 	err = gcry_mpi_scan(&fek_mpi, GCRYMPI_FMT_USG, fek, fek_size, NULL);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to convert file encryption key to "
+		ntfs_log_error("Failed to convert file encryption key to "
 				"internal MPI format: %s\n",
 				gcry_strerror(err));
 		return 0;
@@ -650,7 +674,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 			"(enc-val (flags) (rsa (a %m)))", fek_mpi);
 	gcry_mpi_release(fek_mpi);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to create internal S-expression of "
+		ntfs_log_error("Failed to create internal S-expression of "
 				"the file encryption key: %s\n",
 				gcry_strerror(err));
 		return 0;
@@ -659,7 +683,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	err = gcry_pk_decrypt(&fek_sexp2, fek_sexp, (gcry_sexp_t)rsa_key);
 	gcry_sexp_release(fek_sexp);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to decrypt the file encryption key: "
+		ntfs_log_error("Failed to decrypt the file encryption key: "
 				"%s\n", gcry_strerror(err));
 		return 0;
 	}
@@ -667,7 +691,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	fek_sexp = gcry_sexp_find_token(fek_sexp2, "value", 0);
 	gcry_sexp_release(fek_sexp2);
 	if (!fek_sexp) {
-		fprintf(stderr, "Failed to find the decrypted file encryption "
+		ntfs_log_error("Failed to find the decrypted file encryption "
 				"key in the internal S-expression.\n");
 		return 0;
 	}
@@ -675,7 +699,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	fek_mpi = gcry_sexp_nth_mpi(fek_sexp, 1, GCRYMPI_FMT_USG);
 	gcry_sexp_release(fek_sexp);
 	if (!fek_mpi) {
-		fprintf(stderr, "Failed to convert the decrypted file "
+		ntfs_log_error("Failed to convert the decrypted file "
 				"encryption key S-expression to internal MPI "
 				"format.\n");
 		return 0;
@@ -684,7 +708,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	err = gcry_mpi_print(GCRYMPI_FMT_USG, fek, fek_size, &size, fek_mpi);
 	gcry_mpi_release(fek_mpi);
 	if (err != GPG_ERR_NO_ERROR || !size) {
-		fprintf(stderr, "Failed to convert decrypted file encryption "
+		ntfs_log_error("Failed to convert decrypted file encryption "
 				"key from internal MPI format to binary data: "
 				"%s\n", gcry_strerror(err));
 		return 0;
@@ -695,7 +719,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 	 */
 	padding = strnlen((char *)fek, size) + 1;
 	if (padding > size) {
-		fprintf(stderr, "Failed to remove PKCS#1 padding from "
+		ntfs_log_error("Failed to remove PKCS#1 padding from "
 				"decrypted file encryption key.\n");
 		return 0;
 	}
@@ -723,7 +747,7 @@ static gcry_error_t ntfs_desx_key_expand(const u8 *src, u32 *des_key,
 
 	err = gcry_md_open(&hd1, GCRY_MD_MD5, 0);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to open MD5 digest.\n");
+		ntfs_log_error("Failed to open MD5 digest.\n");
 		return err;
 	}
 	/* Hash the on-disk key. */
@@ -731,7 +755,7 @@ static gcry_error_t ntfs_desx_key_expand(const u8 *src, u32 *des_key,
 	/* Copy the current hash for efficiency. */
 	err = gcry_md_copy(&hd2, hd1);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to copy MD5 digest object.\n");
+		ntfs_log_error("Failed to copy MD5 digest object.\n");
 		goto out;
 	}
 	/* Hash with the first salt and store the result. */
@@ -755,7 +779,7 @@ out:
  * @context:	pointer to a variable of type ntfs_desx_ctx
  * @key:	the 128 bit DES-X-MS128 key, concated with the DES handle
  * @keylen:	must always be 16
- * 
+ *
  * This is the libgcrypt set_key implementation for DES-X-MS128.
  */
 static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
@@ -766,27 +790,27 @@ static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
 	u8 des_key[8];
 
 	if (keylen != 16) {
-		fprintf(stderr, "Key length for desx must be 16.\n");
+		ntfs_log_error("Key length for desx must be 16.\n");
 		return GPG_ERR_INV_KEYLEN;
 	}
 	err = gcry_cipher_open(&ctx->gcry_cipher_hd, GCRY_CIPHER_DES,
 			GCRY_CIPHER_MODE_ECB, 0);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to open des cipher (error 0x%x).\n",
+		ntfs_log_error("Failed to open des cipher (error 0x%x).\n",
 				err);
 		return err;
 	}
 	err = ntfs_desx_key_expand(key, (u32*)des_key, &ctx->out_whitening,
 			&ctx->in_whitening);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to expand desx key (error 0x%x).\n",
+		ntfs_log_error("Failed to expand desx key (error 0x%x).\n",
 				err);
 		gcry_cipher_close(ctx->gcry_cipher_hd);
 		return err;
 	}
 	err = gcry_cipher_setkey(ctx->gcry_cipher_hd, des_key, sizeof(des_key));
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to set des key (error 0x%x).\n", err);
+		ntfs_log_error("Failed to set des key (error 0x%x).\n", err);
 		gcry_cipher_close(ctx->gcry_cipher_hd);
 		return err;
 	}
@@ -799,6 +823,9 @@ static gcry_err_code_t ntfs_desx_setkey(void *context, const u8 *key,
 	return GPG_ERR_NO_ERROR;
 }
 
+/**
+ * ntfs_desx_decrypt
+ */
 static void ntfs_desx_decrypt(void *context, u8 *outbuf, const u8 *inbuf)
 {
 	ntfs_desx_ctx *ctx = context;
@@ -806,12 +833,12 @@ static void ntfs_desx_decrypt(void *context, u8 *outbuf, const u8 *inbuf)
 
 	err = gcry_cipher_reset(ctx->gcry_cipher_hd);
 	if (err != GPG_ERR_NO_ERROR)
-		fprintf(stderr, "Failed to reset des cipher (error 0x%x).\n",
+		ntfs_log_error("Failed to reset des cipher (error 0x%x).\n",
 				err);
 	*(u64*)outbuf = *(const u64*)inbuf ^ ctx->out_whitening;
 	err = gcry_cipher_encrypt(ctx->gcry_cipher_hd, outbuf, 8, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR)
-		fprintf(stderr, "Des decryption failed (error 0x%x).\n", err);
+		ntfs_log_error("Des decryption failed (error 0x%x).\n", err);
 	*(u64*)outbuf ^= ctx->in_whitening;
 }
 
@@ -829,6 +856,9 @@ static gcry_cipher_spec_t ntfs_desx_cipher = {
 #ifdef DO_CRYPTO_TESTS
 
 /* Do not remove this test code from this file! AIA */
+/**
+ * ntfs_desx_key_expand_test
+ */
 static BOOL ntfs_desx_key_expand_test(void)
 {
 	const u8 known_desx_on_disk_key[16] = {
@@ -862,11 +892,14 @@ static BOOL ntfs_desx_key_expand_test(void)
 				*(u64*)known_out_whitening &&
 				test_in_whitening ==
 				*(u64*)known_in_whitening;
-	fprintf(stderr, "Testing whether ntfs_desx_key_expand() works: %s\n",
+	ntfs_log_error("Testing whether ntfs_desx_key_expand() works: %s\n",
 			res ? "SUCCESS" : "FAILED");
 	return res;
 }
 
+/**
+ * ntfs_des_test
+ */
 static BOOL ntfs_des_test(void)
 {
 	const u8 known_des_key[8] = {
@@ -886,14 +919,14 @@ static BOOL ntfs_des_test(void)
 	err = gcry_cipher_open(&gcry_cipher_hd, GCRY_CIPHER_DES,
 			GCRY_CIPHER_MODE_ECB, 0);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to open des cipher (error 0x%x).\n",
+		ntfs_log_error("Failed to open des cipher (error 0x%x).\n",
 				err);
 		return FALSE;
 	}
 	err = gcry_cipher_setkey(gcry_cipher_hd, known_des_key,
 			sizeof(known_des_key));
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to set des key (error 0x%x.\n", err);
+		ntfs_log_error("Failed to set des key (error 0x%x.\n", err);
 		gcry_cipher_close(gcry_cipher_hd);
 		return FALSE;
 	}
@@ -905,24 +938,30 @@ static BOOL ntfs_des_test(void)
 			sizeof(known_des_encrypted_data));
 	gcry_cipher_close(gcry_cipher_hd);
 	if (err) {
-		fprintf(stderr, "Failed to des decrypt test data (error "
+		ntfs_log_error("Failed to des decrypt test data (error "
 				"0x%x).\n", err);
 		return FALSE;
 	}
 	res = !memcmp(test_decrypted_data, known_decrypted_data,
 			sizeof(known_decrypted_data));
-	fprintf(stderr, "Testing whether des decryption works: %s\n",
+	ntfs_log_error("Testing whether des decryption works: %s\n",
 			res ? "SUCCESS" : "FAILED");
 	return res;
 }
 
 #else /* !defined(DO_CRYPTO_TESTS) */
 
+/**
+ * ntfs_desx_key_expand_test
+ */
 static inline BOOL ntfs_desx_key_expand_test(void)
 {
 	return TRUE;
 }
 
+/**
+ * ntfs_des_test
+ */
 static inline BOOL ntfs_des_test(void)
 {
 	return TRUE;
@@ -930,6 +969,9 @@ static inline BOOL ntfs_des_test(void)
 
 #endif /* !defined(DO_CRYPTO_TESTS) */
 
+/**
+ * ntfs_fek_import_from_raw
+ */
 static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		unsigned fek_size __attribute__((unused)))
 {
@@ -939,7 +981,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 
 	// TODO: Sanity checking of sizes and offsets.
 	key_size = le32_to_cpup(fek_buf);
-	//fprintf(stderr, "key_size 0x%x\n", key_size);
+	//ntfs_log_debug("key_size 0x%x\n", key_size);
 	fek = malloc(((((sizeof(*fek) + 7) & ~7) + key_size + 7) & ~7) +
 			sizeof(gcry_cipher_hd_t));
 	if (!fek) {
@@ -947,7 +989,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		return NULL;
 	}
 	fek->alg_id = *(u32*)(fek_buf + 8);
-	//fprintf(stderr, "alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
+	//ntfs_log_debug("alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
 	fek->key_data = (u8*)fek + ((sizeof(*fek) + 7) & ~7);
 	memcpy(fek->key_data, fek_buf + 16, key_size);
 	fek->des_gcry_cipher_hd_ptr = NULL;
@@ -964,7 +1006,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 					&ntfs_desx_algorithm_id,
 					&ntfs_desx_module);
 			if (err != GPG_ERR_NO_ERROR) {
-				fprintf(stderr, "Failed to register desx "
+				ntfs_log_error("Failed to register desx "
 						"cipher: %s\n",
 						gcry_strerror(err));
 				err = EINVAL;
@@ -986,11 +1028,11 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		wanted_key_size = 8;
 		gcry_algo = GCRY_CIPHER_DES;
 		if (fek->alg_id == CALG_DES)
-			fprintf(stderr, "DES is not supported at present");
+			ntfs_log_error("DES is not supported at present\n");
 		else
-			fprintf(stderr, "Unknown crypto algorithm 0x%x",
+			ntfs_log_error("Unknown crypto algorithm 0x%x\n",
 					le32_to_cpu(fek->alg_id));
-		fprintf(stderr, ".  Please email linux-ntfs-dev@lists."
+		ntfs_log_error(".  Please email linux-ntfs-dev@lists."
 				"sourceforge.net and say that you saw this "
 				"message.  We will then try to implement "
 				"support for this algorithm.\n");
@@ -998,7 +1040,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		goto out;
 	}
 	if (key_size != wanted_key_size) {
-		fprintf(stderr, "%s key of %u bytes but needed size is %u "
+		ntfs_log_error("%s key of %u bytes but needed size is %u "
 				"bytes, assuming corrupt key.  Aborting.\n",
 				gcry_cipher_algo_name(gcry_algo),
 				(unsigned)key_size, (unsigned)wanted_key_size);
@@ -1008,14 +1050,14 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 	err = gcry_cipher_open(&fek->gcry_cipher_hd, gcry_algo,
 			GCRY_CIPHER_MODE_CBC, 0);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "gcry_cipher_open() failed: %s\n",
+		ntfs_log_error("gcry_cipher_open() failed: %s\n",
 				gcry_strerror(err));
 		err = EINVAL;
 		goto out;
 	}
 	err = gcry_cipher_setkey(fek->gcry_cipher_hd, fek->key_data, key_size);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "gcry_cipher_setkey() failed: %s\n",
+		ntfs_log_error("gcry_cipher_setkey() failed: %s\n",
 				gcry_strerror(err));
 		gcry_cipher_close(fek->gcry_cipher_hd);
 		err = EINVAL;
@@ -1028,6 +1070,9 @@ out:
 	return NULL;
 }
 
+/**
+ * ntfs_fek_release
+ */
 static void ntfs_fek_release(ntfs_fek *fek)
 {
 	if (fek->des_gcry_cipher_hd_ptr)
@@ -1036,6 +1081,9 @@ static void ntfs_fek_release(ntfs_fek *fek)
 	free(fek);
 }
 
+/**
+ * ntfs_df_array_fek_get
+ */
 static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 		ntfs_rsa_private_key rsa_key)
 {
@@ -1064,10 +1112,10 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 			fek = ntfs_fek_import_from_raw(fek_buf, fek_size);
 			if (fek)
 				return fek;
-			fprintf(stderr, "Failed to convert the decrypted file "
+			ntfs_log_error("Failed to convert the decrypted file "
 					"encryption key to internal format.\n");
 		} else
-			fprintf(stderr, "Failed to decrypt the file "
+			ntfs_log_error("Failed to decrypt the file "
 					"encryption key.\n");
 		df_header = (EFS_DF_HEADER*)((u8*)df_header +
 				le32_to_cpu(df_header->df_length));
@@ -1089,17 +1137,17 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	/* Obtain the $EFS contents. */
 	na = ntfs_attr_open(inode, AT_LOGGED_UTILITY_STREAM, EFS, 4);
 	if (!na) {
-		perror("Failed to open $EFS attribute");
+		ntfs_log_perror("Failed to open $EFS attribute");
 		return NULL;
 	}
 	efs = malloc(na->data_size);
 	if (!efs) {
-		perror("Failed to allocate internal buffer");
+		ntfs_log_perror("Failed to allocate internal buffer");
 		ntfs_attr_close(na);
 		return NULL;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, efs) != na->data_size) {
-		perror("Failed to read $EFS attribute");
+		ntfs_log_perror("Failed to read $EFS attribute");
 		free(efs);
 		ntfs_attr_close(na);
 		return NULL;
@@ -1120,13 +1168,16 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	return fek;
 }
 
+/**
+ * ntfs_fek_decrypt_sector
+ */
 static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 {
 	gcry_error_t err;
 
 	err = gcry_cipher_reset(fek->gcry_cipher_hd);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Failed to reset cipher: %s\n",
+		ntfs_log_error("Failed to reset cipher: %s\n",
 				gcry_strerror(err));
 		return -1;
 	}
@@ -1138,7 +1189,7 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	 */
 	err = gcry_cipher_decrypt(fek->gcry_cipher_hd, data, 512, NULL, 0);
 	if (err != GPG_ERR_NO_ERROR) {
-		fprintf(stderr, "Decryption failed: %s\n", gcry_strerror(err));
+		ntfs_log_error("Decryption failed: %s\n", gcry_strerror(err));
 		return -1;
 	}
 	/* Apply the IV. */
@@ -1153,9 +1204,9 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 }
 
 /**
- * cat
+ * ntfs_cat_decrypt
+ * TODO:
  */
-// TODO:
 static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 {
 	int bufsize = 512;
@@ -1170,7 +1221,7 @@ static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 		return 1;
 	attr = ntfs_attr_open(inode, AT_DATA, NULL, 0);
 	if (!attr) {
-		Eprintf("Cannot cat a directory.\n");
+		ntfs_log_error("Cannot cat a directory.\n");
 		free(buffer);
 		return 1;
 	}
@@ -1188,23 +1239,24 @@ static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 	while (total > 0) {
 		bytes_read = ntfs_attr_pread(attr, offset, 512, buffer);
 		if (bytes_read == -1) {
-			perror("ERROR: Couldn't read file");
+			ntfs_log_perror("ERROR: Couldn't read file");
 			break;
 		}
 		if (!bytes_read)
 			break;
 		if ((i = ntfs_fek_decrypt_sector(fek, buffer, offset)) <
 				bytes_read) {
-			perror("ERROR: Couldn't decrypt all data!");
-			Eprintf("%u/%lld/%lld/%lld\n", i, (long long)bytes_read,
-					(long long)offset, (long long)total);
+			ntfs_log_perror("ERROR: Couldn't decrypt all data!");
+			ntfs_log_error("%u/%lld/%lld/%lld\n", i,
+				(long long)bytes_read, (long long)offset,
+				(long long)total);
 			break;
 		}
 		if (bytes_read > total)
 			bytes_read = total;
 		written = fwrite(buffer, 1, bytes_read, stdout);
 		if (written != bytes_read) {
-			perror("ERROR: Couldn't output all data!");
+			ntfs_log_perror("ERROR: Couldn't output all data!");
 			break;
 		}
 		offset += bytes_read;
@@ -1237,18 +1289,20 @@ int main(int argc, char *argv[])
 	unsigned pfx_size;
 	int res;
 
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
+
 	if (!parse_options(argc, argv))
 		return 1;
 	utils_set_locale();
 
 	/* Initialize crypto in ntfs. */
 	if (ntfs_crypto_init()) {
-		fprintf(stderr, "Failed to initialize crypto.  Aborting.\n");
+		ntfs_log_error("Failed to initialize crypto.  Aborting.\n");
 		return 1;
 	}
 	/* Load the PKCS#12 (.pfx) file containing the user's private key. */
 	if (ntfs_pkcs12_load_pfxfile(opts.keyfile, &pfx_buf, &pfx_size)) {
-		fprintf(stderr, "Failed to load key file.  Aborting.\n");
+		ntfs_log_error("Failed to load key file.  Aborting.\n");
 		ntfs_crypto_deinit();
 		return 1;
 	}
@@ -1256,7 +1310,7 @@ int main(int argc, char *argv[])
 	password = getpass("Enter the password with which the private key was "
 			"encrypted: ");
 	if (!password) {
-		perror("Failed to obtain user password");
+		ntfs_log_perror("Failed to obtain user password");
 		free(pfx_buf);
 		ntfs_crypto_deinit();
 		return 1;
@@ -1268,7 +1322,7 @@ int main(int argc, char *argv[])
 	/* No longer need the pfx file contents. */
 	free(pfx_buf);
 	if (!rsa_key) {
-		fprintf(stderr, "Failed to extract the private RSA key.  Did "
+		ntfs_log_error("Failed to extract the private RSA key.  Did "
 				"you perhaps mistype the password?\n");
 		ntfs_crypto_deinit();
 		return 1;
@@ -1276,7 +1330,7 @@ int main(int argc, char *argv[])
 	/* Mount the ntfs volume. */
 	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
 	if (!vol) {
-		fprintf(stderr, "Failed to mount ntfs volume.  Aborting.\n");
+		ntfs_log_error("Failed to mount ntfs volume.  Aborting.\n");
 		ntfs_rsa_private_key_release(rsa_key);
 		ntfs_crypto_deinit();
 		return 1;
@@ -1287,7 +1341,7 @@ int main(int argc, char *argv[])
 	else
 		inode = ntfs_pathname_to_inode(vol, NULL, opts.file);
 	if (!inode) {
-		fprintf(stderr, "Failed to open encrypted file.  Aborting.\n");
+		ntfs_log_error("Failed to open encrypted file.  Aborting.\n");
 		ntfs_umount(vol, FALSE);
 		ntfs_rsa_private_key_release(rsa_key);
 		ntfs_crypto_deinit();
@@ -1300,7 +1354,7 @@ int main(int argc, char *argv[])
 		res = ntfs_cat_decrypt(inode, fek);
 		ntfs_fek_release(fek);
 	} else {
-		fprintf(stderr, "Failed to obtain file encryption key.  "
+		ntfs_log_error("Failed to obtain file encryption key.  "
 				"Aborting.\n");
 		res = 1;
 	}
