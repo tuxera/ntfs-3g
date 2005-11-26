@@ -105,8 +105,8 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 	}
 	/* Complex attribute? */
 	if (a->flags) {
-		ntfs_log_debug("Encountered non-zero attribute flags.  Cannot handle "
-				"this yet.\n");
+		ntfs_log_error("Non-zero (%04x) attribute flags. Cannot handle "
+			       "this yet.\n", le16_to_cpu(a->flags));
 		errno = EOPNOTSUPP;
 		return 0;
 	}
