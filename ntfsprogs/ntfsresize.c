@@ -523,10 +523,8 @@ static int parse_options(int argc, char **argv)
 	/* Redirect stderr to stdout, note fflush()es are essential! */
 	fflush(stdout);
 	fflush(stderr);
-	if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1) {
-		perror("Failed to redirect stderr to stdout");
-		exit(1);
-	}
+	if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+		perr_exit("Failed to redirect stderr to stdout");
 	fflush(stdout);
 	fflush(stderr);
 
