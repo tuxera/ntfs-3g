@@ -42,41 +42,6 @@ extern const char *ntfs_bugs;
 extern const char *ntfs_home;
 extern const char *ntfs_gpl;
 
-#define	DEC_PRINTF(NAME)							\
-	int NAME(const char *format, ...)					\
-	__attribute__((format(printf, 1, 2)));
-
-#define	GEN_PRINTF(NAME, STREAM, CONTROL, TRIGGER)				\
-	__attribute__((format(printf, 1, 2)))					\
-	int NAME(const char *format, ...)					\
-	{									\
-		int ret, olderr = errno, *control = (CONTROL);			\
-		va_list args;							\
-										\
-		if (!(STREAM))							\
-			return -1;						\
-		if (control &&							\
-		   ((*control && !(TRIGGER)) || (!*control && (TRIGGER))))	\
-			return -1;						\
-										\
-		va_start(args, format);						\
-		ret = vfprintf((STREAM), format, args);				\
-		va_end(args);							\
-		errno = olderr;							\
-		return ret;							\
-	}
-
-
-/* utils.c's utilities require the following functions implemented.
- * Example of implementation is:
- *	GEN_PRINTF(Eprintf, stderr, NULL,          FALSE)
- *	GEN_PRINTF(Vprintf, stderr, &opts.verbose, TRUE)
- *	GEN_PRINTF(Qprintf, stderr, &opts.quiet,   FALSE)
- */
-extern DEC_PRINTF(Eprintf)
-extern DEC_PRINTF(Vprintf)
-extern DEC_PRINTF(Qprintf)
-
 int utils_set_locale(void);
 int utils_parse_size(const char *value, s64 *size, BOOL scale);
 int utils_parse_range(const char *string, s64 *start, s64 *finish, BOOL scale);
