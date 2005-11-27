@@ -206,10 +206,6 @@ s64 max_free_cluster_range = 0;
 
 #define NTFS_MAX_CLUSTER_SIZE	(65536)
 
-GEN_PRINTF(Eprintf, stderr, NULL,         FALSE)
-GEN_PRINTF(Vprintf, stdout, &opt.verbose, TRUE)
-GEN_PRINTF(Qprintf, stdout, NULL,         FALSE)
-
 static s64 rounded_up_division(s64 numer, s64 denom)
 {
 	return (numer + (denom - 1)) / denom;
@@ -492,15 +488,16 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'v':
 			opt.verbose++;
+			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
 			break;
 		case 'V':
 			ver++;
 			break;
 		default:
 			if (optopt == 's') {
-				Eprintf("Option '%s' requires an argument.\n", argv[optind-1]);
+				printf("Option '%s' requires an argument.\n", argv[optind-1]);
 			} else {
-				Eprintf("Unknown option '%s'.\n", argv[optind-1]);
+				printf("Unknown option '%s'.\n", argv[optind-1]);
 			}
 			err++;
 			break;
@@ -510,13 +507,13 @@ static int parse_options(int argc, char **argv)
 	if (!help && !ver) {
 		if (opt.volume == NULL) {
 			if (argc > 1)
-				Eprintf("You must specify exactly one device.\n");
+				printf("You must specify exactly one device.\n");
 			err++;
 		}
 		if (opt.info) {
 			opt.ro_flag = MS_RDONLY;
 			if (opt.bytes) {
-				Eprintf(NERR_PREFIX "Options --info and --size "
+				printf(NERR_PREFIX "Options --info and --size "
 					"can't be used together.\n");
 				usage();
 			}
@@ -605,9 +602,9 @@ static int rl_items(runlist *rl)
 
 static void dump_run(runlist_element *r)
 {
-	Vprintf(" %8lld  %8lld (0x%08llx)  %lld\n", (long long)r->vcn,
-			(long long)r->lcn, (long long)r->lcn,
-			(long long)r->length);
+	ntfs_log_verbose(" %8lld  %8lld (0x%08llx)  %lld\n", (long long)r->vcn,
+			 (long long)r->lcn, (long long)r->lcn,
+			 (long long)r->length);
 }
 
 static void dump_runlist(runlist *rl)
@@ -1150,7 +1147,7 @@ static void rl_fixup(runlist **rl)
 	if (tmp->lcn == LCN_RL_NOT_MAPPED) {
 		s64 unmapped_len = tmp->length;
 
-		Vprintf("Skip unmapped run at the beginning ...\n");
+		ntfs_log_verbose("Skip unmapped run at the beginning ...\n");
 
 		if (!tmp->length)
 			err_exit("Empty unmapped runlist! Please report!\n");
@@ -1161,7 +1158,7 @@ static void rl_fixup(runlist **rl)
 
 	for (tmp = *rl; tmp->length; tmp++) {
 		if (tmp->lcn == LCN_RL_NOT_MAPPED) {
-			Vprintf("Skip unmapped run at the end  ...\n");
+			ntfs_log_verbose("Skip unmapped run at the end  ...\n");
 
 			if (tmp[1].length)
 				err_exit("Unmapped runlist in the middle! "
@@ -1201,28 +1198,29 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		s64 remains_size;
 		char *next_attr;
 
-		Vprintf("Enlarging attribute header ...\n");
+		ntfs_log_verbose("Enlarging attribute header ...\n");
 
 		mp_size = (mp_size + 7) & ~7;
 
-		Vprintf("Old mp size      : %d\n", l);
-		Vprintf("New mp size      : %d\n", mp_size);
-		Vprintf("Bytes in use     : %u\n", (unsigned int)
-				le32_to_cpu(ctx->mrec->bytes_in_use));
+		ntfs_log_verbose("Old mp size      : %d\n", l);
+		ntfs_log_verbose("New mp size      : %d\n", mp_size);
+		ntfs_log_verbose("Bytes in use     : %u\n", (unsigned int)
+				 le32_to_cpu(ctx->mrec->bytes_in_use));
 
 		next_attr = (char *)a + le16_to_cpu(a->length);
 		l = mp_size - l;
 
-		Vprintf("Bytes in use new : %u\n", l + (unsigned int)
-				le32_to_cpu(ctx->mrec->bytes_in_use));
-		Vprintf("Bytes allocated  : %u\n", (unsigned int)
-				le32_to_cpu(ctx->mrec->bytes_allocated));
+		ntfs_log_verbose("Bytes in use new : %u\n", l + (unsigned int)
+				 le32_to_cpu(ctx->mrec->bytes_in_use));
+		ntfs_log_verbose("Bytes allocated  : %u\n", (unsigned int)
+				 le32_to_cpu(ctx->mrec->bytes_allocated));
 
 		remains_size = le32_to_cpu(ctx->mrec->bytes_in_use);
 		remains_size -= (next_attr - (char *)ctx->mrec);
 
-		Vprintf("increase         : %d\n", l);
-		Vprintf("shift            : %lld\n", (long long)remains_size);
+		ntfs_log_verbose("increase         : %d\n", l);
+		ntfs_log_verbose("shift            : %lld\n",
+				 (long long)remains_size);
 
 		if (le32_to_cpu(ctx->mrec->bytes_in_use) + l >
 				le32_to_cpu(ctx->mrec->bytes_allocated))
@@ -1322,8 +1320,8 @@ static int find_free_cluster(struct bitmap *bm,
 	}
 	if (rle->length < items && rle->length < max_free_cluster_range) {
 		max_free_cluster_range = rle->length;
-		Vprintf("Max free range: %7lld     \n",
-				(long long)max_free_cluster_range);
+		ntfs_log_verbose("Max free range: %7lld     \n",
+				 (long long)max_free_cluster_range);
 	}
 	pos = rle->lcn + items;
 	if (pos == nr_vol_clusters)
@@ -1370,7 +1368,7 @@ static runlist *alloc_cluster(struct bitmap *bm,
 	rl_set(rl + runs, vcn, -1LL, 0LL);
 
 	if (runs > 1) {
-		Vprintf("Multi-run allocation:    \n");
+		ntfs_log_verbose("Multi-run allocation:    \n");
 		dump_runlist(rl);
 	}
 	return rl;
@@ -1511,7 +1509,7 @@ static void rl_split_run(runlist **rl, int run, s64 pos)
 	rl_set(rle_new, rle->vcn, rle->lcn, len_head);
 	rl_set(rle_new + 1, rle->vcn + len_head, rle->lcn + len_head, len_tail);
 
-	Vprintf("Splitting run at cluster %lld:\n", (long long)pos);
+	ntfs_log_verbose("Splitting run at cluster %lld:\n", (long long)pos);
 	dump_run(rle); dump_run(rle_new); dump_run(rle_new + 1);
 
 	free(*rl);
@@ -1574,8 +1572,8 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 			  resize->mref, lcn_length);
 
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
-	Vprintf("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> 0x%08llx\n",
-			(unsigned long long)resize->mref,
+	ntfs_log_verbose("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> "
+			 "0x%08llx\n", (unsigned long long)resize->mref,
 			(unsigned int)le32_to_cpu(resize->ctx->attr->type),
 			(long long)lcn_length, (unsigned long long)lcn,
 			(unsigned long long)relocate_rl->lcn);
@@ -2037,7 +2035,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 	runlist *rl;
 	s64 i, badclusters = 0;
 
-	Vprintf("Checking for bad sectors ...\n");
+	ntfs_log_verbose("Checking for bad sectors ...\n");
 
 	lookup_data_attr(vol, FILE_BadClus, "$Bad", &ctx);
 
@@ -2058,7 +2056,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 			continue;
 
 		badclusters += rl[i].length;
-		Vprintf("Bad cluster: %8lld - %lld\n", rl[i].lcn,
+		ntfs_log_verbose("Bad cluster: %8lld - %lld\n", rl[i].lcn,
 			rl[i].lcn + rl[i].length - 1);
 	}
 
@@ -2394,6 +2392,8 @@ int main(int argc, char **argv)
 	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
 	ntfs_volume *vol;
+
+	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	printf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
