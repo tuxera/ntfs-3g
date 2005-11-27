@@ -51,7 +51,6 @@
 #include <limits.h>
 #endif
 #include <getopt.h>
-#include <time.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -66,6 +65,7 @@
 #include "index.h"
 #include "utils.h"
 #include "version.h"
+#include "ntfstime.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
