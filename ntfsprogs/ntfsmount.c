@@ -1599,8 +1599,8 @@ static void usage(void)
 	ntfs_log_info("ntfsmount options are:\n\tforce\n\tno_def_opts\n\tumask"
 		"\n\tfmask\n\tdmask\n\tuid\n\tgid\n\tshow_sys_files\n\t"
 		"succeed_chmod\n\tlocale\n\tstreams_interface\n"
-		"Also look into FUSE documentation about it options.\n\n");
-	ntfs_log_info("Default options are: \"%s\".\n", def_opts);
+		"Also look into FUSE documentation about it options.\n");
+	ntfs_log_info("Default options are: \"%s\".\n\n", def_opts);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
