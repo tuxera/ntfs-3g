@@ -176,10 +176,16 @@ struct {
 #define read_all(f, p, n)  io_all((f), (p), (n), 0)
 #define write_all(f, p, n) io_all((f), (p), (n), 1)
 
-GEN_PRINTF(Eprintf, stderr,  NULL,         FALSE)
-GEN_PRINTF(Vprintf, msg_out, &opt.verbose, TRUE)
-GEN_PRINTF(Qprintf, msg_out, &opt.quiet,   FALSE)
-static GEN_PRINTF(Printf,  msg_out, NULL,         FALSE)
+__attribute__((format(printf, 1, 2)))
+static void Printf(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(msg_out, fmt, ap);
+	va_end(ap);
+	fflush(msg_out);
+}
 
 __attribute__((format(printf, 1, 2)))
 static void perr_printf(const char *fmt, ...)
@@ -241,7 +247,7 @@ static int perr_exit(const char *fmt, ...)
 __attribute__((noreturn))
 static void usage(void)
 {
-	Eprintf("\nUsage: %s [OPTIONS] SOURCE\n"
+	fprintf(stderr, "\nUsage: %s [OPTIONS] SOURCE\n"
 		"    Efficiently clone NTFS to a sparse file, image, device or standard output.\n"
 		"\n"
 		"    -o, --output FILE      Clone NTFS to the non-existent FILE\n"
@@ -260,7 +266,7 @@ static void usage(void)
 		"    If FILE is '-' then send the image to the standard output. If SOURCE is '-'\n"
 		"    and --restore-image is used then read the image from the standard input.\n"
 		"\n", EXEC_NAME);
-	Eprintf("%s%s", ntfs_bugs, ntfs_home);
+	fprintf(stderr, "%s%s", ntfs_bugs, ntfs_home);
 	exit(1);
 }
 
@@ -1521,8 +1527,8 @@ int main(int argc, char **argv)
 	unsigned int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
-	Eprintf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
+		ntfs_libntfs_version());
 	msg_out = stderr;
 
 	parse_options(argc, argv);
