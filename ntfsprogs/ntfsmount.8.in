@@ -2,26 +2,16 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH NTFSMOUNT 8 "2005\-11\-27" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
 .B ntfsmount
 .I device mount_point
-[
-.B \-o options
-]
+[\fB\-o options\fR]
 .SH DESCRIPTION
-.B ntfsmount
-is a
-.B FUSE
-module that rely on
-.B libntfs.
-You need
-.B FUSE
-to compile it,
-.B xattr
-is recommended, but not mandatory.
+\fBntfsmount\fR is a \fBFUSE\fR module that rely on \fBlibntfs\fR. You need
+\fBFUSE\fR to compile it, \fBxattr\fR is recommended, but not mandatory.
 .TP
 .B Fully implemented ntfsmount features are:
 \(bu Read\-write access to normal and sparse files.
@@ -37,9 +27,7 @@ is recommended, but not mandatory.
 .br
 \(bu Hard link files.
 .SH OPTIONS
-Below is a summary of all the options that
-.B ntfsmount
-accepts.
+Below is a summary of all the options that \fBntfsmount\fR accepts.
 .TP
 .B uid=, gid=, umask=
 Provide default owner, group, and access mode mask.
@@ -137,28 +125,17 @@ are not set before partitions from /etc/fstab had been mounted.
 .TP
 .B streams_interface=
 This option controls how the user can access named data streams.  It can be set
-to, one of
-.BR none ,
-.B windows
-or
-.BR xattr .
-If the option is set to
-.BR none ,
-the user will have no access to the named data streams.  If it's set to
-.BR windows ,
-then the user can access them just like in Windows (eg. cat file:stream).
-If it's set to
-.BR xattr ,
-then the named data streams are mapped to xattrs and user can manipulate them
-using
-.B {get,set}fattr
+to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
+\fBnone\fR, the user will have no access to the named data streams.  If it's set
+to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
+file:stream). If it's set to \fBxattr\fR, then the named data streams are
+mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
 utilities.
 .SH DATA STREAMS
 All data on NTFS is stored in streams.  Every file has exactly one unnamed
 data stream and can have many named data streams.  The size of a file is the
-size of its unnamed data stream.  By default,
-.B ntfsmount
-will only read the unnamed data stream.
+size of its unnamed data stream.  By default, \fBntfsmount\fR will only read
+the unnamed data stream.
 .PP
 By using the options "streams_interface=windows", you will be able to read
 any named data streams, simply by specifying the stream's name after a colon.
