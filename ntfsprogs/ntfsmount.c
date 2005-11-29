@@ -71,6 +71,14 @@
 #define PATH_MAX 4096
 #endif
 
+#ifdef __FreeBSD__
+#undef  FUSE_USE_VERSION
+#define FUSE_USE_VERSION 25
+typedef struct statvfs nf_statfs;
+#else
+typedef struct statfs nf_statfs;
+#endif /* __FreeBSD__ */
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
@@ -183,7 +191,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 	return nr_free;
 }
 
-static __inline__ void ntfs_fuse_mark_free_space_outdate()
+static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
 {
 	/* Mark information about free MFT record and clusters outdate. */
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
@@ -207,7 +215,7 @@ static __inline__ void ntfs_fuse_mark_free_space_outdate()
  * Return 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-		struct statfs *sfs)
+		nf_statfs *sfs)
 {
 	long size;
 	ntfs_volume *vol;
@@ -215,8 +223,10 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	vol = ctx->vol;
 	if (!vol)
 		return -ENODEV;
+#ifndef __FreeBSD__
 	/* Type of filesystem. */
 	sfs->f_type = NTFS_SB_MAGIC;
+#endif
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
 	/*
@@ -239,7 +249,11 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		size = 0;
 	sfs->f_ffree = size;
 	/* Maximum length of filenames. */
+#ifndef __FreeBSD__
 	sfs->f_namelen = NTFS_MAX_NAME_LEN;
+#else
+	sfs->f_namemax = NTFS_MAX_NAME_LEN;
+#endif
 	return 0;
 }
 
