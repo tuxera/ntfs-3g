@@ -13,7 +13,7 @@ ntfsmount \- NTFS module for FUSE.
 \fBntfsmount\fR is a \fBFUSE\fR module that rely on \fBlibntfs\fR. You need
 \fBFUSE\fR to compile it, \fBxattr\fR is recommended, but not mandatory.
 .TP
-.B Fully implemented ntfsmount features are:
+.B Fully implemented ntfsmount features:
 \(bu Read\-write access to normal and sparse files.
 .br
 \(bu Read\-only access to compressed files.
@@ -21,6 +21,8 @@ ntfsmount \- NTFS module for FUSE.
 \(bu Access to special Interix files (symlinks, devices, FIFOs).
 .br
 \(bu List/Read/Write/Add/Remove named data streams.
+.br
+\(bu Supports Linux and FreeBSD.
 .TP
 .B Partly implemented features:
 \(bu Create/Delete/Move files and directories.
