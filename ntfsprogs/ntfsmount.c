@@ -24,6 +24,11 @@
 
 #include "config.h"
 
+#ifdef __FreeBSD__
+#undef  FUSE_USE_VERSION
+#define FUSE_USE_VERSION 25
+#endif /* __FreeBSD__ */
+
 #include <fuse.h>
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -72,8 +77,6 @@
 #endif
 
 #ifdef __FreeBSD__
-#undef  FUSE_USE_VERSION
-#define FUSE_USE_VERSION 25
 typedef struct statvfs nf_statfs;
 #else
 typedef struct statfs nf_statfs;
@@ -226,7 +229,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 #ifndef __FreeBSD__
 	/* Type of filesystem. */
 	sfs->f_type = NTFS_SB_MAGIC;
-#endif
+#endif /* __FreeBSD__ */
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
 	/*
@@ -253,7 +256,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	sfs->f_namelen = NTFS_MAX_NAME_LEN;
 #else
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
-#endif
+#endif /* __FreeBSD__ */
 	return 0;
 }
 
