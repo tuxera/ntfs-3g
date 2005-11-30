@@ -24,11 +24,6 @@
 
 #include "config.h"
 
-#ifdef __FreeBSD__
-#undef  FUSE_USE_VERSION
-#define FUSE_USE_VERSION 25
-#endif /* __FreeBSD__ */
-
 #include <fuse.h>
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
@@ -75,12 +70,6 @@
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
-
-#ifdef __FreeBSD__
-typedef struct statvfs nf_statfs;
-#else
-typedef struct statfs nf_statfs;
-#endif /* __FreeBSD__ */
 
 typedef struct {
 	fuse_fill_dir_t filler;
@@ -218,7 +207,7 @@ static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
  * Return 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-		nf_statfs *sfs)
+		struct statfs *sfs)
 {
 	long size;
 	ntfs_volume *vol;
@@ -226,10 +215,8 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	vol = ctx->vol;
 	if (!vol)
 		return -ENODEV;
-#ifndef __FreeBSD__
 	/* Type of filesystem. */
 	sfs->f_type = NTFS_SB_MAGIC;
-#endif /* __FreeBSD__ */
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
 	/*
