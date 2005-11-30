@@ -87,8 +87,8 @@ typedef struct {
 	int state;
 	long free_clusters;
 	long free_mft;
-	uid_t uid;
-	gid_t gid;
+	unsigned int uid;
+	unsigned int gid;
 	mode_t fmask;
 	mode_t dmask;
 	ntfs_fuse_streams_interface streams;
