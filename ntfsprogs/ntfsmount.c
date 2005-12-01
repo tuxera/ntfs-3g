@@ -1713,12 +1713,6 @@ static int parse_options(int argc, char *argv[])
 			err++;
 		}
 
-		if (!opts.mnt_point) {
-			if (argc > 1)
-				ntfs_log_error("No mount point specified.\n");
-			err++;
-		}
-
 		if (opts.quiet && opts.verbose) {
 			ntfs_log_error("You may not use --quiet and --verbose "
 					"at the same time.\n");
