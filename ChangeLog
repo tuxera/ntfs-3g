@@ -91,6 +91,7 @@ xx/xx/2005 - 1.12.2-WIP
 	- Add support of MS_NOATIME flag to ntfs_mount().  (Yura)
 	- ntfsclone: --metadata also wipes out the timestamps in the $I30 and
 	  in the /$Extend/$Quota:$Q index root attributes.  (Szaka)
+	- ntfsmount: Add FreeBSD support.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
