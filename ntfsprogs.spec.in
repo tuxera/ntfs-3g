@@ -17,7 +17,7 @@ Packager	: Anton Altaparmakov <aia21@cantab.net>
 License		: GPL
 Group		: System Environment/Base
 %description
-The Linux-NTFS project (http://linux-ntfs.sf.net/) aims to bring full support
+The Linux-NTFS project (http://www.linux-ntfs.org/) aims to bring full support
 for the NTFS filesystem to the Linux operating system.  The ntfsprogs package
 currently consists of a static library and utilities such as mkntfs, ntfscat,
 ntfsls, ntfsresize, and ntfsundelete (for a full list of included utilities

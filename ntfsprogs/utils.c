@@ -73,7 +73,7 @@
 #include "logging.h"
 
 const char *ntfs_bugs = "Developers' email address: linux-ntfs-dev@lists.sourceforge.net\n";
-const char *ntfs_home = "Linux NTFS homepage: http://linux-ntfs.sourceforge.net\n";
+const char *ntfs_home = "Linux NTFS homepage: http://www.linux-ntfs.org\n";
 const char *ntfs_gpl = "This program is free software, released under the GNU "
 	"General Public License\nand you are welcome to redistribute it under "
 	"certain conditions.  It comes with\nABSOLUTELY NO WARRANTY; for "

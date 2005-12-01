@@ -103,9 +103,9 @@ The
 .BR ntfsprogs
 package which contains the
 .BR libntfs-gnomevfs
-module can be downloaded from http://linux-ntfs.sourceforge.net/downloads.html
+module can be downloaded from http://www.linux-ntfs.org/content/view/19/37/
 .BR
-These manual pages can be viewed online at http://linux-ntfs.sourceforge.net/man/ntfsprogs.html
+These manual pages can be viewed online at http://man.linux-ntfs.org/ntfsprogs.8.html
 
 .SH SEE ALSO
 .BR ntfsprogs (8)
