@@ -1709,7 +1709,7 @@ static int parse_options(int argc, char *argv[])
 		opts.quiet = 0;
 	} else {
 		if (!opts.device) {
-			ntfs_log_error("No mount point specified.\n");
+			ntfs_log_error("No device specified.\n");
 			err++;
 		}
 
