@@ -89,8 +89,8 @@ typedef struct {
 	long free_mft;
 	unsigned int uid;
 	unsigned int gid;
-	mode_t fmask;
-	mode_t dmask;
+	unsigned int fmask;
+	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
 	BOOL ro;
 	BOOL show_sys_files;
