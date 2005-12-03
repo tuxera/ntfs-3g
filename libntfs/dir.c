@@ -1080,7 +1080,7 @@ err_out:
  * @target:	target in unicode (only for symlinks)
  * @target_len:	length of target in unicode charcters
  *
- * Internal, use ntfs_create{_device,_symlink} wrappers instead.
+ * Internal, use ntfs_create{,_device,_symlink} wrappers instead.
  *
  * @type can be:
  *	S_IFREG		to create regular file
@@ -1092,8 +1092,11 @@ err_out:
  *	S_IFSOCK	to create socket
  * other values are invalid.
  *
- * @dev is only used if @type is S_IFBLK or S_IFCHR, in other cases it's value
- * is ignored.
+ * @dev is used only if @type is S_IFBLK or S_IFCHR, in other cases its value
+ * ignored.
+ *
+ * @target and @target_len are used only if @type is S_IFLNK, in other cases
+ * their value ignored.
  *
  * Return opened ntfs inode that describes created object on success or NULL
  * on error with errno set to the error code.
@@ -1338,8 +1341,8 @@ ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
  * @name:	unicode name of the object to delete
  * @name_len:	length of the name in unicode characters
  *
- * @ni is always closed after using of this function (even if it failed),
- * user do not need to call ntfs_inode_close himself.
+ * @ni is always closed after the call to this function (even if it failed),
+ * user does not need to call ntfs_inode_close himself.
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
