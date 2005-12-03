@@ -1365,25 +1365,6 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		ni = ni->base_ni;
 	if (dir_ni->nr_extents == -1)
 		dir_ni = dir_ni->base_ni;
-	/* If deleting directory check it to be empty. */
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
-		ntfs_attr *na;
-
-		na = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
-		if (!na) {
-			ntfs_log_error("Corrupt directory or library bug.");
-			errno = EIO;
-			goto err_out;
-		}
-		if (na->data_size != sizeof(INDEX_ROOT) +
-				sizeof(INDEX_ENTRY_HEADER)) {
-			ntfs_attr_close(na);
-			ntfs_log_error("Directory is not empty.");
-			errno = ENOTEMPTY;
-			goto err_out;
-		}
-		ntfs_attr_close(na);
-	}
 	/*
 	 * Search for FILE_NAME attribute with such name. If it's in POSIX or
 	 * WIN32_AND_DOS namespace, then simply remove it from index and inode.
@@ -1442,6 +1423,34 @@ search:
 		}
 		goto err_out;
 	}
+	/* If deleting directory check it to be empty. */
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		ntfs_attr *na;
+
+		na = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
+		if (!na) {
+			ntfs_log_error("Corrupt directory or library bug.");
+			errno = EIO;
+			goto err_out;
+		}
+		/*
+		 * Do not allow non-empty directory deletion if hard links count
+		 * is 1 or 2 (in case if one of the names in DOS namespace and
+		 * another in WIN32 namespace).
+		 */
+		if ((na->data_size != sizeof(INDEX_ROOT) + sizeof(
+				INDEX_ENTRY_HEADER)) && (le16_to_cpu(
+				ni->mrec->link_count) == 1 ||
+				(le16_to_cpu(ni->mrec->link_count) == 2 &&
+				(fn->file_name_type == FILE_NAME_WIN32 ||
+				fn->file_name_type == FILE_NAME_DOS)))) {
+			ntfs_attr_close(na);
+			ntfs_log_error("Directory is not empty.");
+			errno = ENOTEMPTY;
+			goto err_out;
+		}
+		ntfs_attr_close(na);
+	}
 	/* Search for such FILE_NAME in index. */
 	ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 	if (!ictx)
@@ -1481,7 +1490,7 @@ search:
 	/*
 	 * If hard link count is not equal to zero then we are done. In other
 	 * case there are no reference to this inode left, so we should free all
-	 * non-resident attributes and mark inode as not in use.
+	 * non-resident attributes and mark all MFT record as not in use.
 	 */
 	if (ni->mrec->link_count)
 		goto out;
@@ -1550,6 +1559,12 @@ err_out:
  * @dir_ni:	ntfs inode for directory in which new link should be placed
  * @name:	unicode name of the new link
  * @name_len:	length of the name in unicode characters
+ *
+ * NOTE: At present we allow creating hardlinks to directories, we use them
+ * in a temporary state during rename. But it's defenitely bad idea to have
+ * hard links to directories as a result of operation.
+ * FIXME: Create internal  __ntfs_link that allows hard links to a directories
+ * and external ntfs_link that do not. Write ntfs_rename that uses __ntfs_link.
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
