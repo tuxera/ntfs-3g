@@ -1766,13 +1766,13 @@ int main(int argc, char *argv[])
 	}
 	free(parsed_options);
 	if (!ctx->debug) {
-#if FUSE_MINOR_VERSION >= 4
-		fh = fuse_new(ffd, "use_ino,kernel_cache", &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper));
-#else
-		fh = fuse_new(ffd, "use_ino", &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper));
-#endif
+		if (fuse_is_lib_option("kernel_cache"))
+			fh = fuse_new(ffd, "use_ino,kernel_cache",
+					&ntfs_fuse_oper,
+					sizeof(ntfs_fuse_oper));
+		else
+			fh = fuse_new(ffd, "use_ino", &ntfs_fuse_oper,
+					sizeof(ntfs_fuse_oper));
 	} else
 		fh = fuse_new(ffd, "debug,use_ino" , &ntfs_fuse_oper,
 				sizeof(ntfs_fuse_oper));
