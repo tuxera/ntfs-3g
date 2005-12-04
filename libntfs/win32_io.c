@@ -701,7 +701,7 @@ static BOOL ntfs_device_win32_find_partition(HANDLE handle, DWORD partition_id,
 		err = GetLastError();
 		free(drive_layout);
 		if (err != ERROR_INSUFFICIENT_BUFFER) {
-			ntfs_log_trace("GetDriveLayout failed.");
+			ntfs_log_trace("GetDriveLayout failed.\n");
 			errno = ntfs_w32error_to_errno(err);
 			return FALSE;
 		}

@@ -1204,7 +1204,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				if (ntfs_cluster_free_from_rl(vol, rlc)) {
 					ntfs_log_trace("Failed to free just "
 						"allocated clusters. Leaving "
-						"inconstant metadata. Run chkdsk");
+						"inconstant metadata. Run chkdsk\n");
 				}
 				errno = eo;
 				goto err_out;

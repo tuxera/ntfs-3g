@@ -59,7 +59,7 @@ static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
 		else
 			rc = 1;
 	}
-	ntfs_log_trace("Done, returning %i.", rc);
+	ntfs_log_trace("Done, returning %i.\n", rc);
 	return rc;
 }
 
@@ -84,7 +84,7 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
 
 	ntfs_log_trace("Entering.\n");
 	if (data1_len != data2_len || data1_len != 4) {
-		ntfs_log_error("data1_len or/and data2_len not equal to 4.");
+		ntfs_log_error("data1_len or/and data2_len not equal to 4.\n");
 		return NTFS_COLLATION_ERROR;
 	}
 	d1 = le32_to_cpup(data1);
@@ -172,7 +172,7 @@ int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
 
 	ntfs_log_trace("Entering.\n");
 	if (!vol || !data1 || !data2 || data1_len < 0 || data2_len < 0) {
-		ntfs_log_error("Invalid arguments passed.");
+		ntfs_log_error("Invalid arguments passed.\n");
 		return NTFS_COLLATION_ERROR;
 	}
 	/*

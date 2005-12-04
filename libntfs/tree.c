@@ -2000,7 +2000,7 @@ int ntfs_dt_alloc_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, st
 
 	ntfs_log_debug("need %d, have %d\n", need, space);
 	if (need > space) {
-		ntfs_log_debug("no room");
+		ntfs_log_debug("no room\n");
 		return 0;
 	}
 
@@ -2101,7 +2101,7 @@ int ntfs_dt_root_add(struct ntfs_dt *parent, int index_num, INDEX_ENTRY *ie, str
 
 	ntfs_log_debug("need %d, have %d\n", need, space);
 	if (need > space) {
-		ntfs_log_debug("no room");
+		ntfs_log_debug("no room\n");
 		return -1;
 	}
 

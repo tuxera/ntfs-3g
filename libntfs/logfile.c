@@ -70,7 +70,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 			logfile_system_page_size &
 			(logfile_system_page_size - 1) ||
 			logfile_log_page_size & (logfile_log_page_size - 1)) {
-		ntfs_log_error("$LogFile uses unsupported page size.");
+		ntfs_log_error("$LogFile uses unsupported page size.\n");
 		return FALSE;
 	}
 	/*
@@ -79,7 +79,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	 */
 	if (pos && pos != logfile_system_page_size) {
 		ntfs_log_error("Found restart area in incorrect "
-				"position in $LogFile.");
+				"position in $LogFile.\n");
 		return FALSE;
 	}
 	/* We only know how to handle version 1.1. */
@@ -87,7 +87,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 			sle16_to_cpu(rp->minor_ver) != 1) {
 		ntfs_log_error("$LogFile version %i.%i is not "
 				"supported.  (This driver supports version "
-				"1.1 only.)", (int)sle16_to_cpu(rp->major_ver),
+				"1.1 only.)\n", (int)sle16_to_cpu(rp->major_ver),
 				(int)sle16_to_cpu(rp->minor_ver));
 		return FALSE;
 	}
@@ -103,7 +103,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	usa_count = 1 + (logfile_system_page_size >> NTFS_BLOCK_SIZE_BITS);
 	if (usa_count != le16_to_cpu(rp->usa_count)) {
 		ntfs_log_error("$LogFile restart page specifies "
-				"inconsistent update sequence array count.");
+				"inconsistent update sequence array count.\n");
 		return FALSE;
 	}
 	/* Verify the position of the update sequence array. */
@@ -112,7 +112,7 @@ static BOOL ntfs_check_restart_page_header(RESTART_PAGE_HEADER *rp, s64 pos)
 	if (usa_ofs < sizeof(RESTART_PAGE_HEADER) ||
 			usa_end > NTFS_BLOCK_SIZE - sizeof(u16)) {
 		ntfs_log_error("$LogFile restart page specifies "
-				"inconsistent update sequence array offset.");
+				"inconsistent update sequence array offset.\n");
 		return FALSE;
 	}
 skip_usa_checks:
@@ -127,7 +127,7 @@ skip_usa_checks:
 			ra_ofs < sizeof(RESTART_PAGE_HEADER)) ||
 			ra_ofs > logfile_system_page_size) {
 		ntfs_log_error("$LogFile restart page specifies "
-				"inconsistent restart area offset.");
+				"inconsistent restart area offset.\n");
 		return FALSE;
 	}
 	/*
@@ -136,7 +136,7 @@ skip_usa_checks:
 	 */
 	if (!ntfs_is_chkd_record(rp->magic) && sle64_to_cpu(rp->chkdsk_lsn)) {
 		ntfs_log_error("$LogFile restart page is not modified "
-				"by chkdsk but a chkdsk LSN is specified.");
+				"by chkdsk but a chkdsk LSN is specified.\n");
 		return FALSE;
 	}
 	ntfs_log_trace("Done.\n");
@@ -174,7 +174,7 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	if (ra_ofs + offsetof(RESTART_AREA, file_size) >
 			NTFS_BLOCK_SIZE - sizeof(u16)) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent file offset.");
+				"inconsistent file offset.\n");
 		return FALSE;
 	}
 	/*
@@ -189,7 +189,7 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 			ra_ofs + ca_ofs > (u16)(NTFS_BLOCK_SIZE -
 			sizeof(u16))) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent client array offset.");
+				"inconsistent client array offset.\n");
 		return FALSE;
 	}
 	/*
@@ -206,7 +206,7 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 		ntfs_log_error("$LogFile restart area is out of bounds "
 				"of the system page size specified by the "
 				"restart page header and/or the specified "
-				"restart area length is inconsistent.");
+				"restart area length is inconsistent.\n");
 		return FALSE;
 	}
 	/*
@@ -221,7 +221,7 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 			le16_to_cpu(ra->client_in_use_list) >=
 			le16_to_cpu(ra->log_clients))) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"overflowing client free and/or in use lists.");
+				"overflowing client free and/or in use lists.\n");
 		return FALSE;
 	}
 	/*
@@ -236,21 +236,21 @@ static BOOL ntfs_check_restart_area(RESTART_PAGE_HEADER *rp)
 	}
 	if (le32_to_cpu(ra->seq_number_bits) != (u32)(67 - fs_bits)) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent sequence number bits.");
+				"inconsistent sequence number bits.\n");
 		return FALSE;
 	}
 	/* The log record header length must be a multiple of 8. */
 	if (((le16_to_cpu(ra->log_record_header_length) + 7) & ~7) !=
 			le16_to_cpu(ra->log_record_header_length)) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent log record header length.");
+				"inconsistent log record header length.\n");
 		return FALSE;
 	}
 	/* Ditto for the log page data offset. */
 	if (((le16_to_cpu(ra->log_page_data_offset) + 7) & ~7) !=
 			le16_to_cpu(ra->log_page_data_offset)) {
 		ntfs_log_error("$LogFile restart area specifies "
-				"inconsistent log page data offset.");
+				"inconsistent log page data offset.\n");
 		return FALSE;
 	}
 	ntfs_log_trace("Done.\n");
@@ -316,7 +316,7 @@ check_list:
 	ntfs_log_trace("Done.\n");
 	return TRUE;
 err_out:
-	ntfs_log_error("$LogFile log client array is corrupt.");
+	ntfs_log_error("$LogFile log client array is corrupt.\n");
 	return FALSE;
 }
 
@@ -374,7 +374,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 	trp = malloc(le32_to_cpu(rp->system_page_size));
 	if (!trp) {
 		ntfs_log_error("Failed to allocate memory for $LogFile "
-				"restart page buffer.");
+				"restart page buffer.\n");
 		return ENOMEM;
 	}
 	/*
@@ -389,7 +389,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 			le32_to_cpu(rp->system_page_size)) {
 		err = errno;
 		ntfs_log_error("Failed to read whole restart page into the "
-				"buffer.");
+				"buffer.\n");
 		if (err != ENOMEM)
 			err = EIO;
 		goto err_out;
@@ -410,7 +410,7 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 				le16_to_cpu(ra->restart_area_length) >
 				NTFS_BLOCK_SIZE - (int)sizeof(u16)) {
 			ntfs_log_error("Multi sector transfer error "
-				   "detected in $LogFile restart page.");
+				   "detected in $LogFile restart page.\n");
 			err = EINVAL;
 			goto err_out;
 		}
@@ -496,13 +496,13 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp)
 	 */
 	if (size < log_page_size * 2 || (size - log_page_size * 2) >>
 			log_page_bits < MinLogRecordPages) {
-		ntfs_log_error("$LogFile is too small.");
+		ntfs_log_error("$LogFile is too small.\n");
 		return FALSE;
 	}
 	/* Allocate memory for restart page. */
 	kaddr = malloc(NTFS_BLOCK_SIZE);
 	if (!kaddr) {
-		ntfs_log_error("Not enough memory.");
+		ntfs_log_error("Not enough memory.\n");
 		return FALSE;
 	}
 	/*
@@ -520,7 +520,7 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp)
 		if (ntfs_attr_pread(log_na, pos, NTFS_BLOCK_SIZE, kaddr) !=
 				NTFS_BLOCK_SIZE) {
 			ntfs_log_error("Failed to read first NTFS_BLOCK_SIZE "
-					"bytes of potential restart page.");
+					"bytes of potential restart page.\n");
 			goto err_out;
 		}
 
@@ -593,9 +593,9 @@ is_empty:
 	}
 	if (!rstr1_ph) {
 		if (rstr2_ph)
-			ntfs_log_error("BUG: rstr2_ph isn't NULL!");
+			ntfs_log_error("BUG: rstr2_ph isn't NULL!\n");
 		ntfs_log_error("Did not find any restart pages in "
-			   "$LogFile and it was not empty.");
+			   "$LogFile and it was not empty.\n");
 		return FALSE;
 	}
 	/* If both restart pages were found, use the more recent one. */
@@ -662,7 +662,7 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 		return TRUE;
 	}
 	if (!rp) {
-		ntfs_log_error("Restart page header is NULL.");
+		ntfs_log_error("Restart page header is NULL.\n");
 		return FALSE;
 	}
 	if (!ntfs_is_rstr_record(rp->magic) &&
@@ -670,7 +670,7 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 		ntfs_log_error("Restart page buffer is invalid.  This is "
 			   "probably a bug in that the $LogFile should "
 			   "have been consistency checked before calling "
-			   "this function.");
+			   "this function.\n");
 		return FALSE;
 	}
 

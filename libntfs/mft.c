@@ -481,7 +481,7 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 		ll = ntfs_attr_pread(mftbmp_na, ofs, size, buf);
 		if (ll < 0) {
 			ntfs_log_error("Failed to read mft bitmap "
-					"attribute, aborting.");
+					"attribute, aborting.\n");
 			free(buf);
 			return -1;
 		}
@@ -582,7 +582,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 			vol->cluster_size_bits);
 	if (!rl || !rl->length || rl->lcn < 0) {
 		ntfs_log_error("Failed to determine last allocated "
-				"cluster of mft bitmap attribute.");
+				"cluster of mft bitmap attribute.\n");
 		if (rl)
 			errno = EIO;
 		return -1;
@@ -595,7 +595,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	 */
 	ret = (int)ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
 	if (ret < 0) {
-		ntfs_log_error("Failed to read from lcn bitmap.");
+		ntfs_log_error("Failed to read from lcn bitmap.\n");
 		return -1;
 	}
 	ntfs_log_debug("Read %i byte%s.\n", ret, ret == 1 ? "" : "s");
@@ -606,7 +606,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		ret = (int)ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
 		if (ret < 1) {
 			ntfs_log_error("Failed to write to lcn "
-					"bitmap.");
+					"bitmap.\n");
 			if (!ret)
 				errno = EIO;
 			return -1;
@@ -621,17 +621,17 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		rl2 = ntfs_cluster_alloc(vol, rl[1].vcn, 1, lcn, DATA_ZONE);
 		if (!rl2) {
 			ntfs_log_error("Failed to allocate a cluster for "
-					"the mft bitmap.");
+					"the mft bitmap.\n");
 			return -1;
 		}
 		rl = ntfs_runlists_merge(mftbmp_na->rl, rl2);
 		if (!rl) {
 			ret = errno;
 			ntfs_log_error("Failed to merge runlists for mft "
-					"bitmap.");
+					"bitmap.\n");
 			if (ntfs_cluster_free_from_rl(vol, rl2))
 				ntfs_log_error("Failed to deallocate "
-						"cluster.%s", es);
+						"cluster.%s\n", es);
 			free(rl2);
 			errno = ret;
 			return -1;
@@ -649,13 +649,13 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	 */
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
 	if (!ctx) {
-		ntfs_log_error("Failed to get search context.");
+		ntfs_log_error("Failed to get search context.\n");
 		goto undo_alloc;
 	}
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
-				"mft bitmap attribute.");
+				"mft bitmap attribute.\n");
 		goto undo_alloc;
 	}
 	m = ctx->mrec;
@@ -664,7 +664,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	rl2 = ntfs_attr_find_vcn(mftbmp_na, ll);
 	if (!rl2 || !rl2->length) {
 		ntfs_log_error("Failed to determine previous last "
-				"allocated cluster of mft bitmap attribute.");
+				"allocated cluster of mft bitmap attribute.\n");
 		if (rl2)
 			errno = EIO;
 		goto undo_alloc;
@@ -673,7 +673,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll);
 	if (mp_size <= 0) {
 		ntfs_log_error("Get size for mapping pairs failed for "
-				"mft bitmap attribute extent.");
+				"mft bitmap attribute extent.\n");
 		goto undo_alloc;
 	}
 	/* Expand the attribute record if necessary. */
@@ -682,14 +682,14 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 			le16_to_cpu(a->mapping_pairs_offset))) {
 		if (errno != ENOSPC) {
 			ntfs_log_error("Failed to resize attribute "
-					"record for mft bitmap attribute.");
+					"record for mft bitmap attribute.\n");
 			goto undo_alloc;
 		}
 		// TODO: Deal with this by moving this extent to a new mft
 		// record or by starting a new extent in a new mft record.
 		ntfs_log_error("Not enough space in this mft record to "
 				"accommodate extended mft bitmap attribute "
-				"extent.  Cannot handle this yet.");
+				"extent.  Cannot handle this yet.\n");
 		errno = EOPNOTSUPP;
 		goto undo_alloc;
 	}
@@ -699,7 +699,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 			le16_to_cpu(a->mapping_pairs_offset), mp_size, rl2, ll,
 			NULL)) {
 		ntfs_log_error("Failed to build mapping pairs array for "
-				"mft bitmap attribute.");
+				"mft bitmap attribute.\n");
 		errno = EIO;
 		goto undo_alloc;
 	}
@@ -719,7 +719,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 				mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 			ntfs_log_error("Failed to find first attribute "
-					"extent of mft bitmap attribute.");
+					"extent of mft bitmap attribute.\n");
 			goto restore_undo_alloc;
 		}
 		a = ctx->attr;
@@ -736,7 +736,7 @@ restore_undo_alloc:
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
-				"mft bitmap attribute.%s", es);
+				"mft bitmap attribute.%s\n", es);
 		ntfs_attr_put_search_ctx(ctx);
 		mftbmp_na->allocated_size += vol->cluster_size;
 		/*
@@ -764,18 +764,17 @@ undo_alloc:
 	}
 	/* Deallocate the cluster. */
 	if (ntfs_bitmap_clear_bit(lcnbmp_na, lcn))
-		ntfs_log_error("Failed to free cluster.%s", es);
+		ntfs_log_error("Failed to free cluster.%s\n", es);
 	if (status.mp_rebuilt) {
 		if (ntfs_mapping_pairs_build(vol, (u8*)a +
 				le16_to_cpu(a->mapping_pairs_offset),
 				old_alen - le16_to_cpu(a->mapping_pairs_offset),
 				rl2, ll, NULL))
 			ntfs_log_error("Failed to restore mapping "
-					"pairs array.%s", es);
+					"pairs array.%s\n", es);
 		if (ntfs_attr_record_resize(m, a, old_alen))
 			ntfs_log_error("Failed to restore attribute "
-					"record.%s",
-					es);
+					"record.%s\n", es);
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	}
 	if (ctx)
@@ -807,13 +806,13 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	mftbmp_na = vol->mftbmp_na;
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
 	if (!ctx) {
-		ntfs_log_error("Failed to get search context.");
+		ntfs_log_error("Failed to get search context.\n");
 		return -1;
 	}
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "
-				"mft bitmap attribute.");
+				"mft bitmap attribute.\n");
 		err = errno;
 		goto put_err_out;
 	}
@@ -836,20 +835,20 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 		ntfs_log_debug("Wrote eight initialized bytes to mft bitmap.\n");
 		return 0;
 	}
-	ntfs_log_error("Failed to write to mft bitmap.");
+	ntfs_log_error("Failed to write to mft bitmap.\n");
 	err = errno;
 	if (ll >= 0)
 		err = EIO;
 	/* Try to recover from the error. */
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
 	if (!ctx) {
-		ntfs_log_error("Failed to get search context.%s", es);
+		ntfs_log_error("Failed to get search context.%s\n", es);
 		goto err_out;
 	}
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "
-				"mft bitmap attribute.%s", es);
+				"mft bitmap attribute.%s\n", es);
 put_err_out:
 		ntfs_attr_put_search_ctx(ctx);
 		goto err_out;
@@ -911,7 +910,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 			(mft_na->allocated_size - 1) >> vol->cluster_size_bits);
 	if (!rl || !rl->length || rl->lcn < 0) {
 		ntfs_log_error("Failed to determine last allocated "
-				"cluster of mft data attribute.");
+				"cluster of mft data attribute.\n");
 		if (rl)
 			errno = EIO;
 		return -1;
@@ -936,7 +935,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		if (errno != ENOSPC || nr == min_nr) {
 			ntfs_log_error("Failed to allocate the minimal "
 					"number of clusters (%lli) for the "
-					"mft data attribute.", (long long)nr);
+					"mft data attribute.\n", (long long)nr);
 			return -1;
 		}
 		/*
@@ -952,10 +951,10 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	if (!rl) {
 		err = errno;
 		ntfs_log_error("Failed to merge runlists for mft data "
-				"attribute.");
+				"attribute.\n");
 		if (ntfs_cluster_free_from_rl(vol, rl2))
 			ntfs_log_error("Failed to deallocate clusters "
-					"from the mft data attribute.%s", es);
+					"from the mft data attribute.%s\n", es);
 		free(rl2);
 		errno = err;
 		return -1;
@@ -968,13 +967,13 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	/* Update the attribute record as well. */
 	ctx = ntfs_attr_get_search_ctx(mft_na->ni, NULL);
 	if (!ctx) {
-		ntfs_log_error("Failed to get search context.");
+		ntfs_log_error("Failed to get search context.\n");
 		goto undo_alloc;
 	}
 	if (ntfs_attr_lookup(mft_na->type, mft_na->name, mft_na->name_len, 0,
 			rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
-				"mft data attribute.");
+				"mft data attribute.\n");
 		goto undo_alloc;
 	}
 	m = ctx->mrec;
@@ -983,7 +982,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	rl2 = ntfs_attr_find_vcn(mft_na, ll);
 	if (!rl2 || !rl2->length) {
 		ntfs_log_error("Failed to determine previous last "
-				"allocated cluster of mft data attribute.");
+				"allocated cluster of mft data attribute.\n");
 		if (rl2)
 			errno = EIO;
 		goto undo_alloc;
@@ -992,7 +991,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll);
 	if (mp_size <= 0) {
 		ntfs_log_error("Get size for mapping pairs failed for "
-				"mft data attribute extent.");
+				"mft data attribute extent.\n");
 		goto undo_alloc;
 	}
 	/* Expand the attribute record if necessary. */
@@ -1001,7 +1000,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 			mp_size + le16_to_cpu(a->mapping_pairs_offset))) {
 		if (errno != ENOSPC) {
 			ntfs_log_error("Failed to resize attribute "
-					"record for mft data attribute.");
+					"record for mft data attribute.\n");
 			goto undo_alloc;
 		}
 		// TODO: Deal with this by moving this extent to a new mft
@@ -1011,7 +1010,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		// question.
 		ntfs_log_error("Not enough space in this mft record to "
 				"accommodate extended mft data attribute "
-				"extent.  Cannot handle this yet.");
+				"extent.  Cannot handle this yet.\n");
 		errno = EOPNOTSUPP;
 		goto undo_alloc;
 	}
@@ -1023,7 +1022,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 			(u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp_size,
 			rl2, ll, NULL)) {
 		ntfs_log_error("Failed to build mapping pairs array of "
-				"mft data attribute.");
+				"mft data attribute.\n");
 		errno = EIO;
 		goto undo_alloc;
 	}
@@ -1045,7 +1044,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		if (ntfs_attr_lookup(mft_na->type, mft_na->name,
 				mft_na->name_len, 0, 0, NULL, 0, ctx)) {
 			ntfs_log_error("Failed to find first attribute "
-					"extent of mft data attribute.");
+					"extent of mft data attribute.\n");
 			goto restore_undo_alloc;
 		}
 		a = ctx->attr;
@@ -1062,7 +1061,7 @@ restore_undo_alloc:
 	if (ntfs_attr_lookup(mft_na->type, mft_na->name, mft_na->name_len, 0,
 			rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
-				"mft data attribute.%s", es);
+				"mft data attribute.%s\n", es);
 		ntfs_attr_put_search_ctx(ctx);
 		mft_na->allocated_size += nr << vol->cluster_size_bits;
 		/*
@@ -1080,20 +1079,20 @@ undo_alloc:
 	err = errno;
 	if (ntfs_cluster_free(vol, mft_na, old_last_vcn, -1) < 0)
 		ntfs_log_error("Failed to free clusters from mft data "
-				"attribute.%s", es);
+				"attribute.%s\n", es);
 	if (ntfs_rl_truncate(&mft_na->rl, old_last_vcn))
 		ntfs_log_error("Failed to truncate mft data attribute "
-				"runlist.%s", es);
+				"runlist.%s\n", es);
 	if (mp_rebuilt) {
 		if (ntfs_mapping_pairs_build(vol, (u8*)a +
 				le16_to_cpu(a->mapping_pairs_offset),
 				old_alen - le16_to_cpu(a->mapping_pairs_offset),
 				rl2, ll, NULL))
 			ntfs_log_error("Failed to restore mapping pairs "
-					"array.%s", es);
+					"array.%s\n", es);
 		if (ntfs_attr_record_resize(m, a, old_alen))
 			ntfs_log_error("Failed to restore attribute "
-					"record.%s", es);
+					"record.%s\n", es);
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	}
 	if (ctx)
@@ -1198,7 +1197,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 
 	if (base_ni)
 		ntfs_log_trace("Entering (allocating an extent mft record for "
-				"base mft record 0x%llx).",
+				"base mft record 0x%llx).\n",
 				(long long)base_ni->mft_no);
 	else
 		ntfs_log_trace("Entering (allocating a base mft record).\n");
@@ -1275,7 +1274,7 @@ found_free_rec:
 	/* @bit is the found free mft record, allocate it in the mft bitmap. */
 	ntfs_log_debug("At found_free_rec.\n");
 	if (ntfs_bitmap_set_bit(mftbmp_na, bit)) {
-		ntfs_log_error("Failed to allocate bit in mft bitmap.");
+		ntfs_log_error("Failed to allocate bit in mft bitmap.\n");
 		goto err_out;
 	}
 	ntfs_log_debug("Set bit 0x%llx in mft bitmap.\n", (long long)bit);
@@ -1325,20 +1324,20 @@ found_free_rec:
 		ntfs_log_debug("Initializing mft record 0x%llx.\n", (long long)ll2);
 		err = ntfs_mft_record_format(vol, ll2);
 		if (err) {
-			ntfs_log_error("Failed to format mft record.");
+			ntfs_log_error("Failed to format mft record.\n");
 			goto undo_data_init;
 		}
 	}
 	/* Update the mft data attribute record to reflect the new sizes. */
 	ctx = ntfs_attr_get_search_ctx(mft_na->ni, NULL);
 	if (!ctx) {
-		ntfs_log_error("Failed to get search context.");
+		ntfs_log_error("Failed to get search context.\n");
 		goto undo_data_init;
 	}
 	if (ntfs_attr_lookup(mft_na->type, mft_na->name, mft_na->name_len, 0,
 			0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "
-				"mft data attribute.");
+				"mft data attribute.\n");
 		ntfs_attr_put_search_ctx(ctx);
 		goto undo_data_init;
 	}
@@ -1370,12 +1369,12 @@ mft_rec_already_initialized:
 	m = (MFT_RECORD*)malloc(vol->mft_record_size);
 	if (!m) {
 		ntfs_log_error("Failed to allocate buffer for mft "
-				"record.");
+				"record.\n");
 		goto undo_mftbmp_alloc;
 	}
 	if (ntfs_mft_record_read(vol, bit, m)) {
 		err = errno;
-		ntfs_log_error("Failed to read mft record.");
+		ntfs_log_error("Failed to read mft record.\n");
 		free(m);
 		errno = err;
 		goto undo_mftbmp_alloc;
@@ -1385,7 +1384,7 @@ mft_rec_already_initialized:
 		ntfs_log_error("Mft record 0x%llx was marked unused in "
 				"mft bitmap but is marked used itself.  "
 				"Corrupt filesystem or library bug!  "
-				"Run chkdsk immediately!", (long long)bit);
+				"Run chkdsk immediately!\n", (long long)bit);
 		free(m);
 		errno = EIO;
 		goto undo_mftbmp_alloc;
@@ -1394,7 +1393,7 @@ mft_rec_already_initialized:
 	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
 	if (ntfs_mft_record_layout(vol, bit, m)) {
 		err = errno;
-		ntfs_log_error("Failed to re-format mft record.");
+		ntfs_log_error("Failed to re-format mft record.\n");
 		free(m);
 		errno = err;
 		goto undo_mftbmp_alloc;
@@ -1410,7 +1409,7 @@ mft_rec_already_initialized:
 	ni = ntfs_inode_allocate(vol);
 	if (!ni) {
 		err = errno;
-		ntfs_log_error("Failed to allocate buffer for inode.");
+		ntfs_log_error("Failed to allocate buffer for inode.\n");
 		free(m);
 		errno = err;
 		goto undo_mftbmp_alloc;
@@ -1441,7 +1440,7 @@ mft_rec_already_initialized:
 				err = errno;
 				ntfs_log_error("Failed to allocate "
 						"buffer for extent inodes "
-						"array.");
+						"array.\n");
 				free(m);
 				free(ni);
 				errno = err;
@@ -1477,7 +1476,7 @@ undo_data_init:
 undo_mftbmp_alloc:
 	err = errno;
 	if (ntfs_bitmap_clear_bit(mftbmp_na, bit))
-		ntfs_log_error("Failed to clear bit in mft bitmap.%s", es);
+		ntfs_log_error("Failed to clear bit in mft bitmap.%s\n", es);
 	errno = err;
 err_out:
 	if (!errno)

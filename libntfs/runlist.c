@@ -912,7 +912,7 @@ mpa_err:
 				rlpos++;
 			} else if (deltaxcn > max_cluster) {
 				ntfs_log_debug("Corrupt attribute. deltaxcn = "
-						"0x%llx, max_cluster = 0x%llx",
+						"0x%llx, max_cluster = 0x%llx\n",
 						(long long)deltaxcn,
 						(long long)max_cluster);
 				goto mpa_err;

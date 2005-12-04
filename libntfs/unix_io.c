@@ -104,7 +104,7 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
 		err = errno;
-		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s for %s",
+		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s for %s\n",
 				dev->d_name, NDevReadOnly(dev) ? "reading" : "writing");
 		if (close(DEV_FD(dev)))
 			ntfs_log_perror("ntfs_device_unix_io_open: Warning: Could not "

@@ -1113,13 +1113,13 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	ntfs_log_trace("Entering.\n");
 	/* Sanity checks. */
 	if (!dir_ni || !name || !name_len) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
-		ntfs_log_error("Failed to allocate new MFT record.");
+		ntfs_log_error("Failed to allocate new MFT record.\n");
 		return NULL;
 	}
 	/*
@@ -1130,7 +1130,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	si = calloc(1, si_len);
 	if (!si) {
 		err = errno;
-		ntfs_log_error("Not enough memory.");
+		ntfs_log_error("Not enough memory.\n");
 		goto err_out;
 	}
 	si->creation_time = utc2ntfs(ni->creation_time);
@@ -1145,7 +1145,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
 			(u8*)si, si_len)) {
 		err = errno;
-		ntfs_log_error("Failed to add STANDARD_INFORMATION attribute.");
+		ntfs_log_error("Failed to add STANDARD_INFORMATION attribute.\n");
 		goto err_out;
 	}
 	if (S_ISDIR(type)) {
@@ -1159,7 +1159,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		ir = calloc(1, ir_len);
 		if (!ir) {
 			err = errno;
-			ntfs_log_error("Not enough memory.");
+			ntfs_log_error("Not enough memory.\n");
 			goto err_out;
 		}
 		ir->type = AT_FILE_NAME;
@@ -1183,7 +1183,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		if (ntfs_attr_add(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, (u8*)ir, ir_len)) {
 			err = errno;
 			free(ir);
-			ntfs_log_error("Failed to add INDEX_ROOT attribute.");
+			ntfs_log_error("Failed to add INDEX_ROOT attribute.\n");
 			goto err_out;
 		}
 	} else {
@@ -1237,7 +1237,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, (u8*)data,
 				data_len)) {
 			err = errno;
-			ntfs_log_error("Failed to add DATA attribute.");
+			ntfs_log_error("Failed to add DATA attribute.\n");
 			goto err_out;
 		}
 		if (data)
@@ -1248,7 +1248,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	fn = calloc(1, fn_len);
 	if (!fn) {
 		err = errno;
-		ntfs_log_error("Not enough memory.");
+		ntfs_log_error("Not enough memory.\n");
 		goto err_out;
 	}
 	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
@@ -1267,14 +1267,14 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	/* Add FILE_NAME attribute to inode. */
 	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
 		err = errno;
-		ntfs_log_error("Failed to add FILE_NAME attribute.");
+		ntfs_log_error("Failed to add FILE_NAME attribute.\n");
 		goto err_out;
 	}
 	/* Add FILE_NAME attribute to index. */
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number)))) {
 		err = errno;
-		ntfs_log_error("Failed to add entry to the index.");
+		ntfs_log_error("Failed to add entry to the index.\n");
 		goto err_out;
 	}
 	/* Set hard links count and directory flag. */
@@ -1291,7 +1291,7 @@ err_out:
 	ntfs_log_trace("Failed.\n");
 	if (ntfs_mft_record_free(ni->vol, ni))
 		ntfs_log_error("Failed to free MFT record.  "
-				"Leaving inconsistent metadata. Run chkdsk.");
+				"Leaving inconsistent metadata. Run chkdsk.\n");
 	free(fn);
 	free(si);
 	errno = err;
@@ -1307,7 +1307,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 {
 	if (type != S_IFREG && type != S_IFDIR && type != S_IFIFO &&
 			type != S_IFSOCK) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
 	return __ntfs_create(dir_ni, name, name_len, type, 0, NULL, 0);
@@ -1317,7 +1317,7 @@ ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		dev_t type, dev_t dev)
 {
 	if (type != S_IFCHR && type != S_IFBLK) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
 	return __ntfs_create(dir_ni, name, name_len, type, dev, NULL, 0);
@@ -1327,7 +1327,7 @@ ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ntfschar *target, u8 target_len)
 {
 	if (!target || !target_len) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
 	return __ntfs_create(dir_ni, name, name_len, S_IFLNK, 0,
@@ -1357,7 +1357,7 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 
 	ntfs_log_trace("Entering.\n");
 	if (!ni || !dir_ni || !name || !name_len) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		errno = EINVAL;
 		goto err_out;
 	}
@@ -1429,7 +1429,7 @@ search:
 
 		na = ntfs_attr_open(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4);
 		if (!na) {
-			ntfs_log_error("Corrupt directory or library bug.");
+			ntfs_log_error("Corrupt directory or library bug.\n");
 			errno = EIO;
 			goto err_out;
 		}
@@ -1445,7 +1445,7 @@ search:
 				(fn->file_name_type == FILE_NAME_WIN32 ||
 				fn->file_name_type == FILE_NAME_DOS)))) {
 			ntfs_attr_close(na);
-			ntfs_log_error("Directory is not empty.");
+			ntfs_log_error("Directory is not empty.\n");
 			errno = ENOTEMPTY;
 			goto err_out;
 		}
@@ -1504,13 +1504,13 @@ search:
 			if (!rl) {
 				err = errno;
 				ntfs_log_error("Failed to decompress runlist.  "
-						"Leaving inconsistent metadata.");
+						"Leaving inconsistent metadata.\n");
 				continue;
 			}
 			if (ntfs_cluster_free_from_rl(ni->vol, rl)) {
 				err = errno;
 				ntfs_log_error("Failed to free clusters.  "
-						"Leaving inconsistent metadata.");
+						"Leaving inconsistent metadata.\n");
 				continue;
 			}
 			free(rl);
@@ -1519,19 +1519,19 @@ search:
 	if (errno != ENOENT) {
 		err = errno;
 		ntfs_log_error("Attribute enumeration failed.  "
-				"Probably leaving inconsistent metadata.");
+				"Probably leaving inconsistent metadata.\n");
 	}
 	/* All extents should be attached after attribute walk. */
 	while (ni->nr_extents)
 		if (ntfs_mft_record_free(ni->vol, *(ni->extent_nis))) {
 			err = errno;
 			ntfs_log_error("Failed to free extent MFT record.  "
-					"Leaving inconsistent metadata.");
+					"Leaving inconsistent metadata.\n");
 		}
 	if (ntfs_mft_record_free(ni->vol, ni)) {
 		err = errno;
 		ntfs_log_error("Failed to free base MFT record.  "
-				"Leaving inconsistent metadata.");
+				"Leaving inconsistent metadata.\n");
 	}
 	ni = NULL;
 out:
@@ -1576,7 +1576,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	ntfs_log_trace("Entering.\n");
 	if (!ni || !dir_ni || !name || !name_len) {
 		err = errno;
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		goto err_out;
 	}
 	/* Create FILE_NAME attribute. */
@@ -1584,7 +1584,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	fn = calloc(1, fn_len);
 	if (!fn) {
 		err = errno;
-		ntfs_log_error("Not enough memory.");
+		ntfs_log_error("Not enough memory.\n");
 		goto err_out;
 	}
 	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
@@ -1605,7 +1605,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number)))) {
 		err = errno;
-		ntfs_log_error("Failed to add entry to the index.");
+		ntfs_log_error("Failed to add entry to the index.\n");
 		goto err_out;
 	}
 	/* Add FILE_NAME attribute to inode. */
@@ -1613,7 +1613,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		ntfs_index_context *ictx;
 
 		err = errno;
-		ntfs_log_error("Failed to add FILE_NAME attribute.");
+		ntfs_log_error("Failed to add FILE_NAME attribute.\n");
 		/* Try to remove just added attribute from index. */
 		ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 		if (!ictx)
@@ -1637,7 +1637,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	ntfs_log_trace("Done.\n");
 	return 0;
 rollback_failed:
-	ntfs_log_error("Rollback failed. Leaving inconsistent metadata.");
+	ntfs_log_error("Rollback failed. Leaving inconsistent metadata.\n");
 err_out:
 	ntfs_log_error("Failed.\n");
 	free(fn);

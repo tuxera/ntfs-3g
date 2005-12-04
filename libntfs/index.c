@@ -95,7 +95,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 						1, ictx->block_size,
 						ictx->ia) != 1)
 					ntfs_log_error("Failed to write out "
-							"index block.");
+							"index block.\n");
 			}
 			/* Free resources. */
 			free(ictx->ia);
@@ -127,7 +127,7 @@ void ntfs_index_ctx_reinit(ntfs_index_context *ictx)
 						1, ictx->block_size,
 						ictx->ia) != 1)
 					ntfs_log_error("Failed to write out "
-							"index block.");
+							"index block.\n");
 			}
 			/* Free resources. */
 			free(ictx->ia);
@@ -206,7 +206,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	if (err) {
 		if (errno == ENOENT) {
 			ntfs_log_error("Index root attribute missing in inode "
-					"0x%llx.", ni->mft_no);
+					"0x%llx.\n", ni->mft_no);
 			err = EIO;
 		} else
 			err = errno;
@@ -222,7 +222,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	cr = ir->collation_rule;
 	if (!ntfs_is_collation_rule_supported(cr)) {
 		ntfs_log_error("Index uses unsupported collation rule 0x%x.  "
-				"Aborting lookup.", (unsigned)le32_to_cpu(cr));
+				"Aborting lookup.\n", (unsigned)le32_to_cpu(cr));
 		err = EOPNOTSUPP;
 		goto err_out;
 	}
@@ -272,7 +272,7 @@ done:
 				le16_to_cpu(ie->key_length));
 		if (rc == NTFS_COLLATION_ERROR) {
 			ntfs_log_error("Collation error. Probably filename "
-					"contain invalid characters.");
+					"contain invalid characters.\n");
 			err = ERANGE;
 			goto err_out;
 		}
@@ -312,14 +312,14 @@ done:
 	if (!na) {
 		ntfs_log_error("No index allocation attribute but index entry "
 				"requires one.  Inode 0x%llx is corrupt or "
-				"library bug.", ni->mft_no);
+				"library bug.\n", ni->mft_no);
 		goto err_out;
 	}
 	/* Allocate memory to store index block. */
 	ia = malloc(ictx->block_size);
 	if (!ia) {
 		ntfs_log_error("Not enough memory to allocate buffer for index"
-				" allocation.");
+				" allocation.\n");
 		err = ENOMEM;
 		goto err_out;
 	}
@@ -328,20 +328,20 @@ descend_into_child_node:
 	/* Read index allocation block. */
 	if (ntfs_attr_mst_pread(na, vcn << vol->cluster_size_bits, 1,
 				ictx->block_size, ia) != 1) {
-		ntfs_log_error("Failed to read index allocation.");
+		ntfs_log_error("Failed to read index allocation.\n");
 		goto err_out;
 	}
 	/* Catch multi sector transfer fixup errors. */
 	if (!ntfs_is_indx_record(ia->magic)) {
 		ntfs_log_error("Index record with vcn 0x%llx is corrupt.  "
-				"Corrupt inode 0x%llx.  Run chkdsk.",
+				"Corrupt inode 0x%llx.  Run chkdsk.\n",
 				(long long)vcn, ni->mft_no);
 		goto err_out;
 	}
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
 		ntfs_log_error("Actual VCN (0x%llx) of index buffer is "
 				"different from expected VCN (0x%llx).  Inode "
-				"0x%llx is corrupt or driver bug.",
+				"0x%llx is corrupt or driver bug.\n",
 				(unsigned long long)
 				sle64_to_cpu(ia->index_block_vcn),
 				(unsigned long long)vcn, ni->mft_no);
@@ -351,7 +351,7 @@ descend_into_child_node:
 		ntfs_log_error("Index buffer (VCN 0x%llx) of inode 0x%llx has "
 				"a size (%u) differing from the index "
 				"specified size (%u).  Inode is corrupt or "
-				"driver bug.", (unsigned long long)vcn,
+				"driver bug.\n", (unsigned long long)vcn,
 				ni->mft_no, (unsigned)
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				(unsigned)ictx->block_size);
@@ -360,7 +360,7 @@ descend_into_child_node:
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + ictx->block_size) {
 		ntfs_log_error("Size of index buffer (VCN 0x%llx) of inode "
-				"0x%llx exceeds maximum size.",
+				"0x%llx exceeds maximum size.\n",
 				(unsigned long long)vcn, ni->mft_no);
 		goto err_out;
 	}
@@ -378,7 +378,7 @@ descend_into_child_node:
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
 				(u8*)ie + le16_to_cpu(ie->length) > index_end) {
 			ntfs_log_error("Index entry out of bounds in inode "
-					"0x%llx.", ni->mft_no);
+					"0x%llx.\n", ni->mft_no);
 			goto err_out;
 		}
 		/*
@@ -406,7 +406,7 @@ ia_done:
 				le16_to_cpu(ie->key_length));
 		if (rc == NTFS_COLLATION_ERROR) {
 			ntfs_log_error("Collation error. Probably filename "
-					"contain invalid characters.");
+					"contain invalid characters.\n");
 			err = ERANGE;
 			goto err_out;
 		}
@@ -436,14 +436,14 @@ ia_done:
 	}
 	if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 		ntfs_log_error("Index entry with child node found in a leaf "
-				"node in inode 0x%llx.", ni->mft_no);
+				"node in inode 0x%llx.\n", ni->mft_no);
 		goto err_out;
 	}
 	/* Child node present, descend into it. */
 	vcn = sle64_to_cpup((sle64*)((u8*)ie + le16_to_cpu(ie->length) - 8));
 	if (vcn >= 0)
 		goto descend_into_child_node;
-	ntfs_log_error("Negative child node vcn in inode 0x%llx.", ni->mft_no);
+	ntfs_log_error("Negative child node vcn in inode 0x%llx.\n", ni->mft_no);
 err_out:
 	if (na)
 		ntfs_attr_close(na);
@@ -455,7 +455,7 @@ err_out:
 	errno = err;
 	return -1;
 idx_err_out:
-	ntfs_log_error("Corrupt index.  Aborting lookup.");
+	ntfs_log_error("Corrupt index.  Aborting lookup.\n");
 	goto err_out;
 }
 
@@ -479,7 +479,7 @@ int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
 
 	ntfs_log_trace("Entering.\n");
 	if (!ni || !fn) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -493,12 +493,12 @@ retry:
 	/* Find place where insert new entry. */
 	if (!ntfs_index_lookup(fn, fn_size, ictx)) {
 		err = EEXIST;
-		ntfs_log_error("Index already have such entry.");
+		ntfs_log_error("Index already have such entry.\n");
 		goto err_out;
 	}
 	if (errno != ENOENT) {
 		err = errno;
-		ntfs_log_error("Failed to find place where to insert new entry.");
+		ntfs_log_error("Failed to find place where to insert new entry.\n");
 		goto err_out;
 	}
 	/* Some setup. */
@@ -520,14 +520,14 @@ retry:
 					ictx->name_len);
 			if (!na) {
 				err = errno;
-				ntfs_log_error("Failed to open INDEX_ROOT.");
+				ntfs_log_error("Failed to open INDEX_ROOT.\n");
 				goto err_out;
 			}
 			if (ntfs_attr_truncate(na, allocated_size + offsetof(
 					INDEX_ROOT, index))) {
 				err = EOPNOTSUPP;
 				ntfs_attr_close(na);
-				ntfs_log_error("Failed to truncate INDEX_ROOT.");
+				ntfs_log_error("Failed to truncate INDEX_ROOT.\n");
 				goto err_out;
 			}
 			ntfs_attr_close(na);
@@ -590,7 +590,7 @@ int ntfs_index_rm(ntfs_index_context *ictx)
 	ntfs_log_trace("Entering.\n");
 	if (!ictx || (!ictx->ia && !ictx->ir) ||
 			ictx->entry->flags & INDEX_ENTRY_END) {
-		ntfs_log_error("Invalid arguments.");
+		ntfs_log_error("Invalid arguments.\n");
 		err = EINVAL;
 		goto err_out;
 	}
@@ -630,7 +630,7 @@ int ntfs_index_rm(ntfs_index_context *ictx)
 		if (!na) {
 			err = errno;
 			ntfs_log_error("Failed to open INDEX_ROOT attribute.  "
-					"Leaving inconsistent metadata.");
+					"Leaving inconsistent metadata.\n");
 			goto err_out;
 		}
 		if (ntfs_attr_truncate(na, new_index_length + offsetof(
@@ -638,7 +638,7 @@ int ntfs_index_rm(ntfs_index_context *ictx)
 			err = errno;
 			ntfs_log_error("Failed to truncate INDEX_ROOT "
 					"attribute.  Leaving inconsistent "
-					"metadata.");
+					"metadata.\n");
 			goto err_out;
 		}
 		ntfs_attr_close(na);
