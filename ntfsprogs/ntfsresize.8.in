@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSRESIZE 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "2005\-12\-08" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
@@ -122,9 +122,7 @@ smaller size than what you got by this option and depending on several
 factors it might be unable to shrink very close to this theoretical
 size. Although the integrity of your data should be never in risk,
 it's still strongly recommended to make a test run by using the
-.TP
-\fB\-n\fR, \fB\-\-no\-action\fR
-option before real resizing.
+\fB\-\-no\-action\fR option before real resizing.
 Practically the smallest shrunken size generally is
 at around "used space" + (20\-200 MB). Please also take into account
 that Windows might need about 50\-100 MB free space left to boot safely.
