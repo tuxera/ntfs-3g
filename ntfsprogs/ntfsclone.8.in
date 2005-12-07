@@ -3,7 +3,7 @@
 .\" Copyright (c) 2004 Per Olofsson.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "2005\-12\-08" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
@@ -31,11 +31,13 @@ copies only the used data. Unused disk space becomes zero (cloning to
 sparse file), encoded with control codes (saving in special image format),
 left unchanged (cloning to a disk/partition) or
 filled with zeros (cloning to standard output).
+
 .B ntfsclone
 can be useful to make backups, an exact snapshot of an NTFS filesystem
 and restore it later on, or for developers to test NTFS read/write
 functionality, troubleshoot/investigate users' issues using the clone
 without the risk of destroying the original filesystem.
+
 The clone, if not using the special image format, is an exact copy of the
 original NTFS filesystem from sector to sector thus it can be also mounted
 just like the original NTFS filesystem.
@@ -60,22 +62,24 @@ cp, gzip, gunzip, bzip2, bunzip2, cat, etc) large sparse files.
 The only main Linux filesystem
 having support for efficient sparse file handling is XFS by the
 XFS_IOC_GETBMAPX
-.BR ioctl .
+.BR ioctl (2) .
 However none of the common utilities supports it.
 This means when you tar, cp, gzip, bzip2, etc a large sparse file
 they will always read the entire file, even if you use the "sparse support"
 options.
-.B bzip2
+
+.BR bzip2 (1)
 compresses large sparse files much better than
-.B gzip
+.BR gzip (1)
 but it does so
 also much slower. Moreover neither of them handles large sparse
 files efficiently during uncompression from disk space usage point
 of view.
+
 At present the most efficient way, both speed and space\-wise, to
 compress and uncompress large sparse files by common tools
 is using
-.B tar
+.BR tar (1)
 with the options
 .B \-S
 (handle sparse files "efficiently") and
@@ -100,6 +104,7 @@ filesystem images over the network and similar, and can be used as a
 replacement for Ghost or Partition Image if it is combined with other
 tools. The downside is that you can't mount the image directly, you
 need to restore it first.
+
 To save an image using the special image format, use the
 .B \-s
 or the
@@ -122,9 +127,11 @@ or
 and the clone still will be
 mountable. In this case all non\-metadata file content will be lost and
 reading them back will result always zeros.
+
 The metadata\-only image can be compressed very
 well, usually to not more than 1\-3 MB thus it's relatively easy to transfer
 for investigation, troubleshooting.
+
 In this mode of ntfsclone,
 .B NONE
 of the user's data is saved, including the resident user's data
@@ -132,6 +139,7 @@ embedded into metadata. All is filled with zeros.
 Moreover all the file timestamps, deleted and unused spaces inside
 the metadata are filled with zeros. Thus this mode is inappropriate
 for example for forensic analyses.
+
 Please note, filenames are not wiped out. They might contain
 sensitive information, so think twice before sending such an
 image to anybody.
@@ -142,12 +150,12 @@ accepts.  Nearly all options have two equivalent names.  The short name is
 preceded by
 .B \-
 and the long name is preceded by
-.BR \-\- .
+.B \-\- .
 Any single letter options, that don't take an argument, can be combined into a
 single command, e.g.
 .B \-fv
 is equivalent to
-.BR "\-f \-v" .
+.B "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
 \fB\-o\fR, \fB\-\-output\fR FILE
@@ -268,7 +276,7 @@ Pack NTFS metadata for NTFS experts
 .B tar \-cjSf ntfsmeta.img.tar.bz2 ntfsmeta.img
 .sp
 .RE
-.SH BUGS
+.SH KNOWN ISSUES
 There are no known problems with
 .BR ntfsclone .
 If you find a bug please send an email describing the problem to the
@@ -287,8 +295,8 @@ XFS, JFS and ext3 don't have this problem.
 .hy
 .SH AUTHORS
 .B ntfsclone
-was written by Szabolcs Szakacsits and Anton Altaparmakov, with contributions
-from Per Olofsson.
+was written by Szabolcs Szakacsits with contributions from Per Olofsson 
+(special image format support) and Anton Altaparmakov.
 .SH AVAILABILITY
 .B ntfsclone
 is part of the
