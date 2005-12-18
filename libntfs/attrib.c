@@ -1220,9 +1220,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				 * @cur_vcn, because we missed it during
 				 * instantiating of the hole.
 				 */
-				ntfs_log_trace("BUG! Failed to find run after "
+				ntfs_log_error("BUG! Failed to find run after "
 						"instantiating. Please report "
-						"to the linux-ntfs-dev@lists.sf.net.\n");
+						"to the %s.\n", NTFS_DEV_LIST);
 				errno = EIO;
 				goto err_out;
 			}
@@ -1231,9 +1231,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				rl++;
 			/* Now LCN shoudn't be less than 0. */
 			if (rl->lcn < 0) {
-				ntfs_log_trace("BUG! LCN is lesser than 0. Please "
-						"report to the "
-						"linux-ntfs-dev@lists.sf.net.\n");
+				ntfs_log_error("BUG! LCN is lesser than 0. "
+						"Please report to the %s.\n",
+						NTFS_DEV_LIST);
 				errno = EIO;
 				goto err_out;
 			}
@@ -3969,9 +3969,9 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		 * Bug, because ntfs_attr_record_resize should not fail (we
 		 * already checked that attribute fits MFT record).
 		 */
-		ntfs_log_trace("BUG! Failed to resize attribute record. Please "
-				"report to the linux-ntfs-dev@lists.sf.net.  "
-				"Aborting...\n");
+		ntfs_log_error("BUG! Failed to resize attribute record. "
+				"Please report to the %s.  Aborting...\n",
+				NTFS_DEV_LIST);
 		errno = EIO;
 		return -1;
 	}
@@ -4327,11 +4327,12 @@ retry:
 			if (ntfs_attr_record_resize(m, a,
 					le16_to_cpu(a->mapping_pairs_offset) +
 					mp_size)) {
-				ntfs_log_trace("BUG! Ran out of space in mft record. "
-						"Please run chkdsk and if that "
-						"doesn't find any errors please "
-						"report you saw this message to "
-						"linux-ntfs-dev@lists.sf.net.\n");
+				ntfs_log_error("BUG! Ran out of space in mft "
+						"record. Please run chkdsk and "
+						"if that doesn't find any "
+						"errors please report you saw "
+						"this message to %s.\n",
+						NTFS_DEV_LIST);
 				err = EIO;
 				goto put_err_out;
 			}
@@ -4357,11 +4358,10 @@ retry:
 			finished_build = TRUE;
 		if (!finished_build && errno != ENOSPC) {
 			err = errno;
-			ntfs_log_trace("BUG!  Mapping pairs build failed.  "
+			ntfs_log_error("BUG!  Mapping pairs build failed.  "
 					"Please run chkdsk and if that doesn't "
 					"find any errors please report you saw "
-					"this message to "
-					"linux-ntfs-dev@lists.sf.net.\n");
+					"this message to %s.\n", NTFS_DEV_LIST);
 			goto put_err_out;
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
@@ -4452,10 +4452,10 @@ retry:
 			stop_vcn, &stop_vcn);
 		if (err < 0 && errno != ENOSPC) {
 			err = errno;
-			ntfs_log_trace("BUG!  Mapping pairs build failed.  Please "
-					"run chkdsk and if that doesn't find "
-					"any errors please report you saw this "
-					"message to linux-ntfs-dev@lists.sf.net.\n");
+			ntfs_log_error("BUG!  Mapping pairs build failed.  "
+					"Please run chkdsk and if that doesn't "
+					"find any errors please report you saw "
+					"this message to %s.\n", NTFS_DEV_LIST);
 			if (ntfs_mft_record_free(na->ni->vol, ni))
 				ntfs_log_trace("Couldn't free MFT record.\n");
 			goto put_err_out;

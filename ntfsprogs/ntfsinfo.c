@@ -1871,8 +1871,8 @@ static void ntfs_hex_dump(void *buf,unsigned int length)
 static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
 {
 	printf("Dumping unknown attribute type 0x%X.\n"
-		"--Please report this to linux-ntfs-dev@lists.sourceforge.net--\n",
-		(unsigned int)le32_to_cpu(attr->type));
+		"--Please report this to %s--\n",
+		(unsigned int)le32_to_cpu(attr->type), NTFS_DEV_LIST);
 
 	printf("\tResident size:\t\t %u\n",(unsigned int)le32_to_cpu(attr->length));
 

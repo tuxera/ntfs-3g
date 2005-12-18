@@ -193,12 +193,12 @@ found_it:
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			/* Only one case insensitive matching name allowed. */
 			if (mref) {
-				ntfs_log_debug("Found already cached mft reference "
-						"in phase 1. Please run "
-						"chkdsk and if that doesn't "
-						"find any errors please report "
-						"you saw this message to "
-						"linux-ntfs-dev@lists.sf.net.\n");
+				ntfs_log_error("Found already cached mft "
+						"reference in phase 1. Please "
+						"run chkdsk and if that doesn't"
+						" find any errors please report"
+						" you saw this message to %s\n",
+						NTFS_DEV_LIST);
 				goto put_err_out;
 			}
 			mref = le64_to_cpu(ie->indexed_file);
@@ -386,12 +386,12 @@ found_it2:
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			/* Only one case insensitive matching name allowed. */
 			if (mref) {
-				ntfs_log_debug("Found already cached mft reference "
-						"in phase 2. Please run "
-						"chkdsk and if that doesn't "
-						"find any errors please report "
-						"you saw this message to "
-						"linux-ntfs-dev@lists.sf.net.\n");
+				ntfs_log_error("Found already cached mft "
+						"reference in phase 2. Please "
+						"run chkdsk and if that doesn't"
+						" find any errors please report"
+						" you saw this message to %s\n",
+						NTFS_DEV_LIST);
 				goto close_err_out;
 			}
 			mref = le64_to_cpu(ie->indexed_file);

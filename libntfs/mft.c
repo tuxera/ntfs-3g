@@ -315,13 +315,12 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 				NTFS_BLOCK_SIZE + 1);
 	else {
 		mrec->usa_count = cpu_to_le16(1);
-		ntfs_log_debug("Sector size is bigger than MFT record size.  "
-				"Setting usa_count to 1.  If Windows\n");
-		ntfs_log_debug("chkdsk reports this as corruption, please email "
-				"linux-ntfs-dev@lists.sf.net\n");
-		ntfs_log_debug("stating that you saw this message and that the "
-				"file system created was corrupt.\n");
-		ntfs_log_debug("Thank you.\n");
+		ntfs_log_error("Sector size is bigger than MFT record size.  "
+				"Setting usa_count to 1.  If Windows chkdsk "
+				"reports this as corruption, please email %s "
+				"stating that you saw this message and that "
+				"the file system created was corrupt.  "
+				"Thank you.\n", NTFS_DEV_LIST);
 	}
 	/* Set the update sequence number to 1. */
 	*(u16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = cpu_to_le16(1);

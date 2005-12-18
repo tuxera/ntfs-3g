@@ -1032,10 +1032,9 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		else
 			ntfs_log_error("Unknown crypto algorithm 0x%x\n",
 					le32_to_cpu(fek->alg_id));
-		ntfs_log_error(".  Please email linux-ntfs-dev@lists."
-				"sourceforge.net and say that you saw this "
+		ntfs_log_error(".  Please email %s and say that you saw this "
 				"message.  We will then try to implement "
-				"support for this algorithm.\n");
+				"support for this algorithm.\n", NTFS_DEV_LIST);
 		err = EOPNOTSUPP;
 		goto out;
 	}

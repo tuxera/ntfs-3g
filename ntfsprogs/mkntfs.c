@@ -2478,11 +2478,12 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 				NTFS_BLOCK_SIZE + 1);
 	} else {
 		ia_val->usa_count = cpu_to_le16(1);
-		ntfs_log_quiet("Sector size is bigger than index block size. Setting "
-			"usa_count to 1. If Windows\nchkdsk reports this as "
-			"corruption, please email linux-ntfs-dev@lists.sf.net\n"
-			"stating that you saw this message and that the file "
-			"system created was corrupt.\nThank you.");
+		ntfs_log_error("Sector size is bigger than index block size. "
+				"Setting usa_count to 1. If Windows chkdsk "
+				"reports this as corruption, please email %s "
+				"stating that you saw this message and that "
+				"the filesystem created was corrupt.  "
+				"Thank you.", NTFS_DEV_LIST);
 	}
 	/* Set USN to 1. */
 	*(u16*)((char*)ia_val + le16_to_cpu(ia_val->usa_ofs)) =
