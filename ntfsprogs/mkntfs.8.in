@@ -44,6 +44,10 @@ mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 .B \-n
 ]
 [
+.B \-N
+.I ntfs\-version
+]
+[
 .B \-p
 .I part\-start\-sect
 ]
@@ -69,10 +73,6 @@ mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 ]
 [
 .B \-v
-]
-[
-.B \-w
-.I ntfs\-version
 ]
 [
 .B \-z
@@ -160,6 +160,10 @@ to create a filesystem. All steps of the format are carried out except the
 actual writing to the device.
 .SS Advanced options
 .TP
+\fB\-N\fR, \fB\-\-ntfs\-version\fR STRING
+Select the version of NTFS you wish to use.  This can be one of "1.2", "3.0",
+or "3.1".
+.TP
 \fB\-s\fR, \fB\-\-sector\-size\fR BYTES
 Specify the size of sectors in bytes. Valid sector size values are 256, 512,
 1024, 2048 and 4096 bytes per sector. If omitted,
@@ -224,10 +228,6 @@ multiplier	(% of volume size)
 \fB\-T\fR, \fB\-\-zero\-time\fR
 Fake the time to be 00:00:00 UTC, Jan 1, 1970 instead of the current system
 time.  This is only really useful for debugging purposes.
-.TP
-\fB\-w\fR, \fB\-\-ntfs\-version\fR STRING
-Select the version of NTFS you wish to use.  This can be one of "1.2", "3.0",
-or "3.1".
 .TP
 \fB\-F\fR, \fB\-\-force\fR
 Force

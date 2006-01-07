@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2001-2005 Richard Russon
- * Copyright (c) 2002-2005 Szabolcs Szakacsits
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
  *
  * This utility will create an NTFS 1.2, 3.0 or 3.1 volume on a user
@@ -198,7 +198,7 @@ struct mkntfs_options {
 	long mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 1. */
 	long long num_sectors;		/* size of device in sectors */
 	long cluster_size;		/* -c, format with this cluster-size */
-	u8 ver_major;			/* -w, ntfs version to create */
+	u8 ver_major;			/* -N, ntfs version to create */
 	u8 ver_minor;
 	char *label;			/* -L, volume label */
 } opts;
@@ -235,7 +235,7 @@ static void mkntfs_usage(void)
 		"    -S, --sectors-per-track NUM     Specify the number of sectors per track\n"
 		"    -z, --mft-zone-multiplier NUM   Set the MFT zone multiplier\n"
 		"    -T, --zero-time                 Fake the time to be 00:00 UTC, Jan 1, 1970\n"
-		"    -w, --ntfs-version STRING       NTFS version information\n"
+		"    -N, --ntfs-version VERSION      NTFS version: 3.1 or 1.2 (default)\n"
 		"    -F, --force                     Force execution despite errors\n"
 		"\n"
 		"Output options:\n"
@@ -260,7 +260,8 @@ static void mkntfs_version(void)
 	ntfs_log_info("Create an NTFS volume on a user specified (block) device.\n\n");
 	ntfs_log_info("Copyright (c) 2000-2005 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");
-	ntfs_log_info("Copyright (c) 2002-2005 Szabolcs Szakacsits\n");
+	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
+	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -342,7 +343,7 @@ static void mkntfs_init_options(struct mkntfs_options *opts2)
  */
 static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
 {
-	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TvVw:z:";
+	static const char *sopt = "-c:CfFhH:IlL:nN:p:qQs:S:TvVz:";
 	static const struct option lopt[] = {
 		{ "cluster-size",	required_argument,	NULL, 'c' },
 		{ "debug",		no_argument,		NULL, 'Z' },
@@ -356,7 +357,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		{ "mft-zone-multiplier",required_argument,	NULL, 'z' },
 		{ "no-action",		no_argument,		NULL, 'n' },
 		{ "no-indexing",	no_argument,		NULL, 'I' },
-		{ "ntfs-version",	required_argument,	NULL, 'w' },
+		{ "ntfs-version",	required_argument,	NULL, 'N' },
 		{ "partition-start",	required_argument,	NULL, 'p' },
 		{ "quick",		no_argument,		NULL, 'Q' },
 		{ "quiet",		no_argument,		NULL, 'q' },
@@ -426,6 +427,26 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		case 'n':
 			opts2->no_action = TRUE;
 			break;
+		case 'N':	/* ntfs-version */
+			if ((opts2->ver_major == 0) && (opts2->ver_minor == 0)) {
+				if (strcmp(optarg , "1.2") == 0) {
+					opts2->ver_major = 1;
+					opts2->ver_minor = 2;
+				} else if (strcmp(optarg , "3.0") == 0) {
+					opts2->ver_major = 3;
+					opts2->ver_minor = 0;
+				} else if (strcmp(optarg , "3.1") == 0) {
+					opts2->ver_major = 3;
+					opts2->ver_minor = 1;
+				} else {
+					ntfs_log_error("NTFS version '%s' is invalid.\n", optarg);
+					err++;
+				}
+			} else {
+				ntfs_log_error("You may only specify the NTFS version once.\n");
+				err++;
+			}
+			break;
 		case 'p':
 			if (!mkntfs_parse_llong(optarg, "partition start", &opts2->part_start_sect))
 				err++;
@@ -450,26 +471,6 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		case 'V':
 			ver++;	/* display version info */
 			break;
-		case 'w':	/* ntfs-version */
-			if ((opts2->ver_major == 0) && (opts2->ver_minor == 0)) {
-				if (strcmp(optarg , "1.2") == 0) {
-					opts2->ver_major = 1;
-					opts2->ver_minor = 2;
-				} else if (strcmp(optarg , "3.0") == 0) {
-					opts2->ver_major = 3;
-					opts2->ver_minor = 0;
-				} else if (strcmp(optarg , "3.1") == 0) {
-					opts2->ver_major = 3;
-					opts2->ver_minor = 1;
-				} else {
-					ntfs_log_error("NTFS version '%s' is not supported.\n", optarg);
-					err++;
-				}
-			} else {
-				ntfs_log_error("You may only specify the NTFS version once.\n");
-				err++;
-			}
-			break;
 		case 'Z':	/* debug - turn on everything */
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE | NTFS_LOG_LEVEL_VERBOSE | NTFS_LOG_LEVEL_QUIET);
 			break;
@@ -483,7 +484,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 			if (((optopt == 'c') || (optopt == 'H') ||
 			     (optopt == 'L') || (optopt == 'p') ||
 			     (optopt == 's') || (optopt == 'S') ||
-			     (optopt == 'w') || (optopt == 'z')) &&
+			     (optopt == 'N') || (optopt == 'z')) &&
 			     (!optarg)) {
 				ntfs_log_error("Option '%s' requires an argument.\n", argv[optind-1]);
 			} else if (optopt != '?') {
