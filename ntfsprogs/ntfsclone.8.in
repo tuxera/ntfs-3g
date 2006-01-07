@@ -1,9 +1,9 @@
 .\" Copyright (c) 2003\-2005 Richard Russon.
-.\" Copyright (c) 2003\-2005 Szabolcs Szakacsits.
+.\" Copyright (c) 2003\-2006 Szabolcs Szakacsits.
 .\" Copyright (c) 2004 Per Olofsson.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "December 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "January 2006" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
@@ -51,7 +51,7 @@ NTFS support then the file can be mounted as
 .SS Sparse Files
 A file is sparse if it has unallocated blocks (holes). The reported size of
 such files are always higher than the disk space consumed by them.  The
-.B du
+.BR du
 command can tell the real disk space used by a sparse file.
 The holes are always read as zeros. All major Linux filesystem like,
 ext2, ext3, reiserfs, Reiser4, JFS and XFS, supports
@@ -85,14 +85,14 @@ with the options
 (handle sparse files "efficiently") and
 .B \-j
 (filter the archive through bzip2). Although
-.B tar
+.BR tar
 still reads and analyses the entire file, it doesn't pass on the
 large data blocks having only zeros to filters and it also avoids
 writing large amount of zeros to the disk needlessly. But since
-.B tar
+.BR tar
 can't create an archive from the standard input, you can't do this
 in\-place by just reading
-.B ntfsclone
+.BR ntfsclone
 standard output.
 .SS The Special Image Format
 It's also possible, actually it's recommended, to save an NTFS filesystem
@@ -119,7 +119,7 @@ using '\-' as the
 file.
 .SS Metadata\-only Cloning
 One of the features of
-.B ntfsclone
+.BR ntfsclone
 is that, it can also save only the NTFS metadata using the option
 .B \-m
 or
@@ -178,8 +178,8 @@ compression, encryption or streaming through a network.
 .TP
 \fB\-r\fR, \fB\-\-restore\-image\fR
 Restore from the special image format specified by
-.I SOURCE .
-If the
+.I SOURCE
+argument. If the
 .I SOURCE
 is '\-' then the image is read from the standard input.
 .TP
@@ -279,8 +279,8 @@ Pack NTFS metadata for NTFS experts
 .SH KNOWN ISSUES
 There are no known problems with
 .BR ntfsclone .
-If you find a bug please send an email describing the problem to the
-development team:
+If you think you have found a problem then please send an email describing it
+to the development team:
 .br
 .nh
 linux\-ntfs\-dev@lists.sourceforge.net

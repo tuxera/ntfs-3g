@@ -1,8 +1,8 @@
-.\" Copyright (c) 2004 Szabolcs Szakacsits.
+.\" Copyright (c) 2005-2006 Szabolcs Szakacsits.
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSFIX 8 "November 2005" "ntfsprogs version @VERSION@"
+.TH NTFSFIX 8 "January 2006" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsfix \- fix common errors and force Windows to check NTFS
 .SH SYNOPSIS
@@ -20,7 +20,8 @@ check for the first boot into Windows.
 .sp
 You may run
 .B ntfsfix
-on an NTFS volume if you think it's damaged and it can't be mounted.
+on an NTFS volume if you think it was damaged by Windows or some other way 
+and it can't be mounted.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfsfix
@@ -52,8 +53,7 @@ linux\-ntfs\-dev@lists.sourceforge.net
 .hy
 .SH AUTHORS
 .B ntfsfix
-was written by Anton Altaparmakov.
-.B ntfsfix.
+was written by Anton Altaparmakov, with contributions from Szabolcs Szakacsits.
 .SH AVAILABILITY
 .B ntfsfix
 is part of the

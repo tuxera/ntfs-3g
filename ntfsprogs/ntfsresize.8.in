@@ -1,8 +1,8 @@
-.\" Copyright (c) 2002\-2005 Szabolcs Szakacsits.
+.\" Copyright (c) 2002\-2006 Szabolcs Szakacsits.
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSRESIZE 8 "December 2005" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "January 2006" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
@@ -43,6 +43,7 @@ parameter is given in kilo\-, mega\- or gigabytes respectively.
 .B Ntfsresize
 conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
+
 If both
 .B \-\-info
 and
@@ -96,6 +97,7 @@ starting sector and with the same partition type as before.
 Otherwise you won't be able to access your filesystem. Use the 'u'
 fdisk command to switch to the reliable sector unit from the
 default cylinder one.
+
 Also make sure you set the bootable flag for the partition if it
 existed before. Failing to do so you might not be able to boot your
 computer from the disk.
@@ -148,6 +150,7 @@ first.
 \fB\-f\fR, \fB\-\-force\fR
 Forces ntfsresize to proceed with the resize operation even if the filesystem
 is marked for consistency check.
+
 Please note, ntfsresize always marks the filesystem
 for consistency check before a real resize operation
 and it leaves that way for extra
@@ -167,6 +170,7 @@ Continue with the real resizing only if the test run passed.
 Support disks having hardware errors, bad sectors with those
 .B ntfsresize
 would refuse to work by default.
+
 Prior using this option, it's strongly recommended to make a backup by
 .BR ntfsclone (8)
 using the \-\-rescue option, then running 'chkdsk /f /r volume:' on Windows
@@ -174,6 +178,7 @@ from the command line. If the disk guarantee is still valid then replace it.
 It's defected. Please also note, that no software can repair these type of
 hardware errors. The most what they can do is to work around the permanent
 defects.
+
 This option doesn't have any effect if the disk is flawless.
 .TP
 \fB\-P\fR, \fB\-\-no\-progress\-bar\fR
@@ -191,7 +196,7 @@ and exit.
 Display help and exit.
 .SH EXIT CODES
 The exit code is 0 on success, non\-zero otherwise.
-.SH BUGS
+.SH KNOWN ISSUES
 No reliability problem is known. If you need
 help please try the Ntfsresize FAQ first (see below) and if you
 don't find your answer then send your question, comment or bug report to
