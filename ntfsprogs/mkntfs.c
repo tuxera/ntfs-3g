@@ -4710,7 +4710,7 @@ static BOOL mkntfs_create_root_structures(void)
 					return FALSE;
 				init_secure_30(buf_sds_init);
 			} else {
-				buf_sds_first_size = 0x240;
+				buf_sds_first_size = 0xFC;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
 				buf_sds_init = ntfs_calloc(1, buf_sds_first_size);
 				if (!buf_sds_init)
