@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSRESIZE 8 "2005\-12\-08" "ntfsprogs version @VERSION@"
+.TH NTFSRESIZE 8 "December 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS

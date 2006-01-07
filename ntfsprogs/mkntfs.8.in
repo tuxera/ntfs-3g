@@ -1,8 +1,9 @@
-.\" Copyright (c) 2001,2002 Anton Altaparmakov.
+.\" Copyright (c) 2001\-2002 Anton Altaparmakov.
 .\" Copyright (c) 2005 Richard Russon.
+.\" Copyright (c) 2005\-2006 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH MKNTFS 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH MKNTFS 8 "January 2006" "ntfsprogs version @VERSION@"
 .SH NAME
 mkntfs \- create an NTFS file system
 .SH SYNOPSIS

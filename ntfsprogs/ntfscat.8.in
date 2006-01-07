@@ -1,7 +1,7 @@
 .\" Copyright (c) 2003\-2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCAT 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH NTFSCAT 8 "November 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfscat \- print NTFS files and streams on the standard output
 .SH SYNOPSIS

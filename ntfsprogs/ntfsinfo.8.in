@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSINFO 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
+.TH NTFSINFO 8 "November 2005" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsinfo \- dump a file's attributes
 .SH SYNOPSIS
