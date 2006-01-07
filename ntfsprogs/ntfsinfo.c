@@ -817,15 +817,15 @@ static void ntfs_dump_attr_object_id(ATTR_RECORD *attr,ntfs_volume *vol)
 /**
  * ntfs_dump_acl
  *
- * given an acl, print it in a beautiful & lovley way.
+ * given an acl, print it in a beautiful & lovely way.
  */
-static void ntfs_dump_acl(const char *prefix,ACL *acl)
+static void ntfs_dump_acl(const char *prefix, ACL *acl)
 {
 	unsigned int i;
 	u16 ace_count;
 	ACCESS_ALLOWED_ACE *ace;
 
-	printf("%sRevision\t %u\n",prefix,acl->revision);
+	printf("%sRevision\t %u\n", prefix, acl->revision);
 
 	/* don't recalc le16_to_cpu every iteration (minor speedup on big-endians */
 	ace_count = le16_to_cpu(acl->ace_count);
@@ -834,7 +834,7 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 	ace = (ACCESS_ALLOWED_ACE *)((char *)acl + 8);
 
 	/* iterate through ACE's */
-	for (i=1;i<ace_count;i++) {
+	for (i = 1; i < ace_count; i++) {
 		const char *ace_type;
 		char *sid;
 
@@ -854,16 +854,64 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 			break;
 		}
 
-		printf("%sACE:\t\t type:%s  flags:0x%x  access:0x%x\n",prefix,
+		printf("%sACE:\t\t type:%s  flags:0x%x  access:0x%x\n", prefix,
 			ace_type, (unsigned int)le16_to_cpu(ace->flags),
 			(unsigned int)le32_to_cpu(ace->mask));
 		/* get a SID string */
 		sid = ntfs_sid_to_mbs(&ace->sid, NULL, 0);
-		printf("%s\t\t SID: %s\n",prefix,sid);
+		printf("%s\t\t SID: %s\n", prefix, sid);
 		free(sid);
 
 		/* proceed to next ACE */
 		ace = (ACCESS_ALLOWED_ACE *)(((char *)ace) + le32_to_cpu(ace->size));
+	}
+}
+
+
+static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
+					  const char *indent)
+{
+	char *sid;
+	
+	printf("%s\tRevision:\t\t %u\n", indent, sec_desc->revision);
+
+	/* TODO: parse the flags */
+	printf("%s\tFlags:\t\t\t 0x%0x\n", indent, sec_desc->control);
+
+	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
+		le32_to_cpu(sec_desc->owner)), NULL, 0);
+	printf("%s\tOwner SID:\t\t %s\n", indent, sid);
+	free(sid);
+
+	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
+		le32_to_cpu(sec_desc->group)), NULL, 0);
+	printf("%s\tGroup SID:\t\t %s\n", indent, sid);
+	free(sid);
+
+	printf("%s\tSystem ACL:\t\t ", indent);
+	if (sec_desc->control & SE_SACL_PRESENT) {
+		if (sec_desc->control & SE_SACL_DEFAULTED) {
+			printf("defaulted");
+		}
+		printf("\n");
+		ntfs_dump_acl(indent ? "\t\t\t" : "\t\t",
+			      (ACL *)((char *)sec_desc +
+				      le32_to_cpu(sec_desc->sacl)));
+	} else {
+		printf("missing\n");
+	}
+
+	printf("%s\tDiscretionary ACL:\t ", indent);
+	if (sec_desc->control & SE_DACL_PRESENT) {
+		if (sec_desc->control & SE_SACL_DEFAULTED) {
+			printf("defaulted");
+		}
+		printf("\n");
+		ntfs_dump_acl(indent ? "\t\t\t" : "\t\t",
+			      (ACL *)((char *)sec_desc +
+				      le32_to_cpu(sec_desc->dacl)));
+	} else {
+		printf("missing\n");
 	}
 }
 
@@ -875,7 +923,6 @@ static void ntfs_dump_acl(const char *prefix,ACL *acl)
 static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *vol)
 {
 	SECURITY_DESCRIPTOR_ATTR *sec_desc_attr;
-	char *sid;
 
 	printf("Dumping attribute $SECURITY_DESCRIPTOR (0x50)\n");
 
@@ -914,46 +961,10 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 				le16_to_cpu(attr->value_offset));
 	}
 
-	printf("\tRevision:\t\t %u\n",sec_desc_attr->revision);
-
-	/* TODO: parse the flags */
-	printf("\tFlags:\t\t\t 0x%0x\n",sec_desc_attr->control);
-
-	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc_attr +
-		le32_to_cpu(sec_desc_attr->owner)), NULL, 0);
-	printf("\tOwner SID:\t\t %s\n",sid);
-	free(sid);
-
-	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc_attr +
-		le32_to_cpu(sec_desc_attr->group)), NULL, 0);
-	printf("\tGroup SID:\t\t %s\n",sid);
-	free(sid);
-
-	printf("\tSystem ACL:\t\t ");
-	if (sec_desc_attr->control & SE_SACL_PRESENT) {
-		if (sec_desc_attr->control & SE_SACL_DEFAULTED) {
-			printf("defaulted");
-		}
-		printf("\n");
-		ntfs_dump_acl("\t\t",(ACL *)((char *)sec_desc_attr +
-			le32_to_cpu(sec_desc_attr->sacl)));
-	} else {
-		printf("missing\n");
-	}
-
-	printf("\tDiscretionary ACL:\t\t ");
-	if (sec_desc_attr->control & SE_DACL_PRESENT) {
-		if (sec_desc_attr->control & SE_SACL_DEFAULTED) {
-			printf("Defaulted");
-		}
-		printf("\n");
-		ntfs_dump_acl("\t\t",(ACL *)((char *)sec_desc_attr +
-			le32_to_cpu(sec_desc_attr->dacl)));
-	} else {
-		printf("missing\n");
-	}
-
-	if (attr->non_resident) free(sec_desc_attr);
+	ntfs_dump_security_descriptor(sec_desc_attr, "");
+	
+	if (attr->non_resident) 
+		free(sec_desc_attr);
 }
 
 /**
@@ -1037,13 +1048,86 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 			vol_information->flags & (0xFFFF - VOLUME_FLAGS_MASK));
 }
 
+static ntfschar NTFS_DATA_SDS[5] = { const_cpu_to_le16('$'),
+	const_cpu_to_le16('S'), const_cpu_to_le16('D'), 
+	const_cpu_to_le16('S'), const_cpu_to_le16('\0') };
+
+static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
+{
+	SECURITY_DESCRIPTOR_RELATIVE *sd;
+	
+	ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n", le32_to_cpu(sds->hash));
+	ntfs_log_verbose("\t\tSecurity id:\t\t %u\n",
+			 le32_to_cpu(sds->security_id));
+	ntfs_log_verbose("\t\tOffset:\t\t\t %llu\n", le64_to_cpu(sds->offset));
+	ntfs_log_verbose("\t\tLength:\t\t\t %u\n", le32_to_cpu(sds->length));
+	
+	sd = (SECURITY_DESCRIPTOR_RELATIVE *)((char *)sds +
+		sizeof(SECURITY_DESCRIPTOR_HEADER));
+	
+	ntfs_dump_security_descriptor(sd, "\t");
+}
+	
+static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
+{
+	SECURITY_DESCRIPTOR_HEADER *sds, *sd;
+	ntfs_attr *na;
+	ntfschar *name;
+	int name_len;
+	u64 inode;
+	
+	inode = ni->mft_no;
+	if (ni->nr_extents < 0)
+		inode = ni->base_ni->mft_no;
+	if (FILE_Secure != inode)
+		return;
+	
+	name_len = le16_to_cpu(attr->name_length);
+	if (!name_len)
+		return;
+	
+	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
+	if (!ntfs_names_are_equal(NTFS_DATA_SDS, sizeof(NTFS_DATA_SDS) / 2 - 1,
+				  name, name_len, 0, NULL, 0))
+		return;
+	
+	na = ntfs_attr_open(ni, AT_DATA, name, name_len);
+	if (!na) {
+		ntfs_log_perror("ntfs_attr_open failed");
+		return;
+	}
+	sds = malloc(na->data_size);
+	if (!sds) {
+		ntfs_log_perror("malloc failed");
+		return;
+	}
+	if (ntfs_attr_pread(na, 0, na->data_size, sds) != na->data_size) {
+		ntfs_log_perror("ntfs_attr_pread failed");
+		free(sds);
+		return;
+	}
+	ntfs_attr_close(na);
+	
+	sd = sds;
+	
+	while (sd->length && sd->length != 32 && sd->hash) {
+		ntfs_dump_sds_entry(sd);
+		sd = (SECURITY_DESCRIPTOR_HEADER *)((char *)sd +
+				(cpu_to_le32(sd->length + 0x0F) &
+				 ~cpu_to_le32(0x0F)));
+	}
+	
+	free(sds);
+}
 /**
  * ntfs_dump_data_attr()
  *
  * dump some info about the data attribute
  */
-static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
+static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_inode *ni)
 {
+	ntfs_volume *vol = ni->vol;
+	
 	printf("Dumping attribute $DATA (0x80) related info\n");
 
 	/* Dump stream name */
@@ -1112,6 +1196,9 @@ static void ntfs_dump_attr_data(ATTR_RECORD *attr, ntfs_volume *vol)
 		/* TODO: parse the flags */
 		printf("\tResidence Flags:\t 0x%02hhx\n", attr->resident_flags);
 	}
+	
+	if (opts.verbose)
+		ntfs_dump_sds(attr, ni);
 }
 
 typedef enum {
@@ -2036,7 +2123,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_volume_information(ctx->attr);
 			break;
 		case AT_DATA:
-			ntfs_dump_attr_data(ctx->attr, inode->vol);
+			ntfs_dump_attr_data(ctx->attr, inode);
 			break;
 		case AT_INDEX_ROOT:
 			ntfs_dump_attr_index_root(ctx->attr, inode);
