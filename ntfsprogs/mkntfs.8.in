@@ -4,7 +4,7 @@
 .\"
 .TH MKNTFS 8 "2005\-11\-21" "ntfsprogs version @VERSION@"
 .SH NAME
-mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
+mkntfs \- create an NTFS file system
 .SH SYNOPSIS
 .B mkntfs
 [\fIoptions\fR] \fIdevice \fR[\fInumber\-of\-sectors\fR]
@@ -87,8 +87,8 @@ mkntfs \- create an NTFS 1.2 (Windows NT/2000/XP) file system
 ]
 .SH DESCRIPTION
 .B mkntfs
-is used to create an NTFS 1.2 (Windows NT 4.0) file system on a device (usually
-a disk partition).
+is used to create an NTFS file system on a device (usually a disk partition)
+or file.
 .I device
 is the special file corresponding to the device (e.g
 .IR /dev/hdXX ).
@@ -147,10 +147,13 @@ greater than 4096 have the side effect that compression is disabled on the
 volume (due to limitations in the NTFS compression algorithm currently in use
 by Windows).
 .TP
-\fB\-I\fR, \fB\-\-no\-indexing\fR
-Disable content indexing on the volume. (This is only meaningful on
-Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
-not implement content indexing at all.)
+\fB\-N\fR, \fB\-\-ntfs\-version\fR STRING
+Select the version of NTFS you wish to create.  This can be "1.2" 
+(Windows NT 4.0) or "3.1" (Windows XP, Server 2003 and Vista). 
+Versions are upwards compatible and Windows 2000, which uses version "3.0",
+can read/write both.
+
+If this option is omitted then version "1.2" is used.
 .TP
 \fB\-n\fR, \fB\-\-no\-action\fR
 Causes
@@ -159,10 +162,6 @@ to not actually create a filesystem, but display what it would do if it were
 to create a filesystem. All steps of the format are carried out except the
 actual writing to the device.
 .SS Advanced options
-.TP
-\fB\-N\fR, \fB\-\-ntfs\-version\fR STRING
-Select the version of NTFS you wish to use.  This can be one of "1.2", "3.0",
-or "3.1".
 .TP
 \fB\-s\fR, \fB\-\-sector\-size\fR BYTES
 Specify the size of sectors in bytes. Valid sector size values are 256, 512,
@@ -228,6 +227,11 @@ multiplier	(% of volume size)
 \fB\-T\fR, \fB\-\-zero\-time\fR
 Fake the time to be 00:00:00 UTC, Jan 1, 1970 instead of the current system
 time.  This is only really useful for debugging purposes.
+.TP
+\fB\-I\fR, \fB\-\-no\-indexing\fR
+Disable content indexing on the volume. (This is only meaningful on
+Windows 2000 and later. Windows NT 4.0 and earlier ignore this as they do
+not implement content indexing at all.)
 .TP
 \fB\-F\fR, \fB\-\-force\fR
 Force

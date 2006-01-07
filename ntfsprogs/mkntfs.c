@@ -6,7 +6,7 @@
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
  *
- * This utility will create an NTFS 1.2, 3.0 or 3.1 volume on a user
+ * This utility will create an NTFS 1.2 or 3.1 volume on a user
  * specified (block) device.
  *
  * Some things (option handling and determination of mount status) have been
@@ -432,10 +432,12 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 				if (strcmp(optarg , "1.2") == 0) {
 					opts2->ver_major = 1;
 					opts2->ver_minor = 2;
+/*
+				FIXME: version 3.0 was not checked
 				} else if (strcmp(optarg , "3.0") == 0) {
 					opts2->ver_major = 3;
 					opts2->ver_minor = 0;
-				} else if (strcmp(optarg , "3.1") == 0) {
+*/				} else if (strcmp(optarg , "3.1") == 0) {
 					opts2->ver_major = 3;
 					opts2->ver_minor = 1;
 				} else {
