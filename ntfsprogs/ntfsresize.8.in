@@ -123,9 +123,11 @@ factors it might be unable to shrink very close to this theoretical
 size. Although the integrity of your data should be never in risk,
 it's still strongly recommended to make a test run by using the
 \fB\-\-no\-action\fR option before real resizing.
+
 Practically the smallest shrunken size generally is
 at around "used space" + (20\-200 MB). Please also take into account
 that Windows might need about 50\-100 MB free space left to boot safely.
+
 This option never causes any changes to the filesystem, the partition is
 opened read\-only.
 .TP
