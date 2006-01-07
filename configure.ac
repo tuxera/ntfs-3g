@@ -223,7 +223,13 @@ if test "$enable_fuse_module" != "no"; then
 				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.4.2 under FreeBSD, because earlier versions have problems with readdir.])
 			fi
 		]);;
-	*) AC_MSG_ERROR([ntfsmount can be built only under Linux and FreeBSD.]);;
+	*)
+		if test "$enable_fuse_module" = "yes"; then
+			AC_MSG_ERROR([ntfsmount can be built only under Linux and FreeBSD.])
+		else
+			AC_MSG_WARN([ntfsmount can be built only under Linux and FreeBSD.])
+		fi
+		;;
 	esac
 fi
 AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
