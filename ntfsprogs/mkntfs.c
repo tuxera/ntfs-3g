@@ -3921,11 +3921,30 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 		g_logfile_size = 512LL * 1024;		/*   -> 512kiB	*/
 	else if (volume_size <= 200LL * 1024 * 1024)	/* < 200MiB	*/
 		g_logfile_size = 2048LL * 1024;		/*   -> 2MiB	*/
-	else if (volume_size >= 400LL << 20)		/* > 400MiB	*/
-		g_logfile_size = 4 << 20;		/*   -> 4MiB	*/
-	else
-		g_logfile_size = (volume_size / 100) &
-				~(g_vol->cluster_size - 1);
+	else if (g_vol->major_ver < 3) {
+		if (volume_size >= 400LL << 20)		/* > 400MiB	*/
+			g_logfile_size = 4 << 20;	/*   -> 4MiB	*/
+		else
+			g_logfile_size = (volume_size / 100) &
+					~(g_vol->cluster_size - 1);
+	} else	{
+		/* 
+		 * FIXME: The $LogFile size is 64 MiB upwards from 12GiB but
+		 * the "200" divider below apparently approximates "100" or
+		 * some other walue as the volume size decreases. For example:
+		 *      Volume size   LogFile size    Ratio
+		 *	  8799808        46048       191.100
+		 *	  8603248        45072       190.877
+		 *	  7341704        38768       189.375
+		 *	  6144828        32784       187.433
+		 *	  4192932        23024       182.111
+		 */
+		if (volume_size >= 12LL << 30)		/* > 12GiB	*/
+			g_logfile_size = 64 << 20;	/*   -> 64MiB	*/
+		else
+			g_logfile_size = (volume_size / 200) &
+					~(g_vol->cluster_size - 1);
+	}
 	j = g_logfile_size / g_vol->cluster_size;
 	while (g_rl_logfile[0].lcn + j >= g_vol->nr_clusters) {
 		/*
