@@ -2,7 +2,7 @@
  * volume.h - Exports for NTFS volume handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -45,14 +45,19 @@
  * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY and MS_NOATIME,
  * so we define them ourselves.
  */
-#if !defined(MS_RDONLY)
-/**
- * enum MS_MOUNT -
+#ifndef MS_RDONLY
+#define MS_RDONLY 1
+#endif
+/*
+ * Solaris defines MS_RDONLY but not MS_NOATIME thus we need to carefully
+ * define MS_NOATIME.
  */
-typedef enum {
-	MS_RDONLY = 1,
-	MS_NOATIME,
-} MS_MOUNT;
+#ifndef MS_NOATIME
+#if (MS_RDONLY != 1)
+#	define MS_NOATIME 1
+#else
+#	define MS_NOATIME 2
+#endif
 #endif
 
 /* Forward declaration */
