@@ -2,7 +2,7 @@
  * dir.h - Exports for directory handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Anton Altaparmakov
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -73,11 +73,6 @@ extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 #define NTFS_DT_LNK		10
 #define NTFS_DT_SOCK		12
 #define NTFS_DT_WHT		14
-
-/* DJGPP do not know about this. */
-#ifndef S_IFREG
-
-#endif
 
 /*
  * This is the "ntfs_filldir" function type, used by ntfs_readdir() to let
