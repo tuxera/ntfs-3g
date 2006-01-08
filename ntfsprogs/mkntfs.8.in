@@ -314,7 +314,7 @@ http://www.linux\-ntfs.org/content/view/19/37
 The manual pages are available online at:
 .br
 .nh
-http://wiki.linux\-ntfs.org/doku.php?id=man
+http://man.linux-ntfs.org/ntfsprogs.8.html
 .hy
 .SH SEE ALSO
 .BR badblocks (8),
