@@ -3230,7 +3230,6 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 		return i;
 	}
 	/* Insert the index entry for file_name in @idx. */
-	/* remmet ut kun for debugging */
 	idx_size = (fn_size + 7)  & ~7;
 	idx_entry_new = ntfs_calloc(1, idx_size + 0x10);
 	if (!idx_entry_new)
@@ -3931,7 +3930,7 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 		/* 
 		 * FIXME: The $LogFile size is 64 MiB upwards from 12GiB but
 		 * the "200" divider below apparently approximates "100" or
-		 * some other walue as the volume size decreases. For example:
+		 * some other value as the volume size decreases. For example:
 		 *      Volume size   LogFile size    Ratio
 		 *	  8799808        46048       191.100
 		 *	  8603248        45072       190.877
@@ -4051,7 +4050,7 @@ static BOOL mkntfs_fill_device_with_zeroes(void)
 
 	volume_size = g_vol->nr_clusters << g_vol->cluster_size_bits;
 
-	ntfs_log_progress("Initialising device with zeroes:   0%%");
+	ntfs_log_progress("Initializing device with zeroes:   0%%");
 	mid_clust = (volume_size >> 1) / g_vol->cluster_size;
 	for (position = 0; position < (unsigned long long)g_vol->nr_clusters;
 			position++) {
@@ -4084,7 +4083,7 @@ static BOOL mkntfs_fill_device_with_zeroes(void)
 			if (!append_to_bad_blocks(position))
 				return FALSE;
 			ntfs_log_quiet("\nFound bad cluster (%lld). Adding to "
-				"list of bad blocks.\nInitialising "
+				"list of bad blocks.\nInitializing "
 				"device with zeroes: %3.0f%%", position,
 				position / progress_inc);
 			/* Seek to next cluster. */
@@ -4850,7 +4849,7 @@ static BOOL mkntfs_create_root_structures(void)
 		/* dump_mft_record(m); */
 	}
 	/* create systemfiles for ntfs volumes (3.1) */
-	/* starting vith file 24 (ignoring file 16-23) */
+	/* starting with file 24 (ignoring file 16-23) */
 	if (g_vol->major_ver >= 3) {
 		extend_flags = FILE_ATTR_HIDDEN | FILE_ATTR_SYSTEM |
 			FILE_ATTR_ARCHIVE | FILE_ATTR_VIEW_INDEX_PRESENT;
@@ -5018,7 +5017,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	if (!mkntfs_initialize_rl_mft())
 		goto done;
 
-	/* Initialise $LogFile. */
+	/* Initialize $LogFile. */
 	if (!mkntfs_initialize_rl_logfile())
 		goto done;
 
