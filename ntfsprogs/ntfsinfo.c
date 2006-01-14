@@ -4,7 +4,7 @@
  * Copyright (c) 2002-2004 Matthew J. Fanto
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
- * Copyright (c) 2003-2005 Szabolcs Szakacsits
+ * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Yuval Fledel
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
@@ -834,7 +834,7 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 	ace = (ACCESS_ALLOWED_ACE *)((char *)acl + 8);
 
 	/* iterate through ACE's */
-	for (i = 1; i < ace_count; i++) {
+	for (i = 1; i <= ace_count; i++) {
 		const char *ace_type;
 		char *sid;
 
