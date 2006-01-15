@@ -217,9 +217,8 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	ACCESS_ALLOWED_ACE *ace;
 	SID *sid;
 
-	static char sd_array[0x1200];
-	//char* sd_val = NULL;
-	*sd_val_len = 0x1200;
+	static char sd_array[0x1030];
+	*sd_val_len = 0x1030;
 	*sd_val = (u8*)&sd_array;
 
 	//security descriptor relative
