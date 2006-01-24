@@ -92,6 +92,7 @@ useful on 2.4.X kernels, as on 2.6 kernels requests size is
 automatically determined for optimum performance.
 .TP
 .B direct_io
+(NOTE: Only for FUSE 2.3.0)
 This option disables the use of page cache (file content cache) in
 the kernel for this filesystem.  This has several affects:
 - Each read() or write() system call will initiate one or more
