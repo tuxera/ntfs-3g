@@ -154,8 +154,8 @@ streams, so you are recommended to use tools like FAR, or utils from Cygwin.
 Named data streams act like normals files, so you can read from them, write to
 them and even delete them (using rm).  You can list all the named data streams
 a file has by getting the "ntfs.streams.list" extended attribute.  NOTE: This
-list feature is unique to the NTFS FUSE module and may never be supported by the
-kernel driver.
+list feature is unique to the \fBntfsmount\fR and may never be supported by the
+\fBkernel driver\fR.
 .SH EXAMPLES
 Mount /dev/hda1 to /mnt/ntfs\-fuse using ntfsmount:
 .RS
