@@ -38,6 +38,19 @@
 #include <sys/stat.h>
 #endif
 
+#ifdef HAVE_SYS_SYSMACROS_H
+#include <sys/sysmacros.h>
+#endif
+
+#ifdef DJGPP
+#ifndef S_IFLNK
+#define S_IFLNK 0xa000
+#endif
+#ifndef S_IFSOCK
+#define S_IFSOCK 0xc000
+#endif
+#endif
+
 #include "types.h"
 #include "debug.h"
 #include "attrib.h"
