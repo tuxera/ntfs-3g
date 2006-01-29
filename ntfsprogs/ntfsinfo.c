@@ -1110,7 +1110,15 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	
 	sd = sds;
 	
-	while (sd->length && sd->length != 32 && sd->hash) {
+	/*
+	 * FIXME: The right way is based on the indexes, so we couldn't
+	 * miss real entries. For now, dump until it makes sense.
+	 */
+	while (sd->length && sd->hash && 
+	       le64_to_cpu(sd->offset) < (u64)na->data_size &&
+	       le32_to_cpu(sd->length) < (u64)na->data_size &&
+	       le64_to_cpu(sd->offset) + 
+			le32_to_cpu(sd->length) < (u64)na->data_size) {
 		ntfs_dump_sds_entry(sd);
 		sd = (SECURITY_DESCRIPTOR_HEADER *)((char *)sd +
 				(cpu_to_le32(sd->length + 0x0F) &
