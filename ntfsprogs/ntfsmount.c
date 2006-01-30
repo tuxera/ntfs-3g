@@ -1,7 +1,7 @@
 /**
  * ntfsmount - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  *
  * NTFS module for FUSE.
@@ -94,7 +94,7 @@ typedef struct {
 	ntfs_fuse_streams_interface streams;
 	BOOL ro;
 	BOOL show_sys_files;
-	BOOL succeed_chmod;
+	BOOL silent;
 	BOOL force;
 	BOOL debug;
 	BOOL noatime;
@@ -707,7 +707,17 @@ static int ntfs_fuse_chmod(const char *path,
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return -EINVAL; /* n/a for named data streams. */
-	if (ctx->succeed_chmod)
+	if (ctx->silent)
+		return 0;
+	return -EOPNOTSUPP;
+}
+
+static int ntfs_fuse_chown(const char *path, uid_t uid __attribute__((unused)),
+		gid_t gid __attribute__((unused)))
+{
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return -EINVAL; /* n/a for named data streams. */
+	if (ctx->silent)
 		return 0;
 	return -EOPNOTSUPP;
 }
@@ -1347,6 +1357,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.truncate	= ntfs_fuse_truncate,
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
+	.chown		= ntfs_fuse_chown,
 	.mknod		= ntfs_fuse_mknod,
 	.symlink	= ntfs_fuse_symlink,
 	.link		= ntfs_fuse_link,
@@ -1515,13 +1526,13 @@ static char *parse_mount_options(const char *org_options)
 				goto err_exit;
 			}
 			ctx->show_sys_files = TRUE;
-		} else if (!strcmp(opt, "succeed_chmod")) {
+		} else if (!strcmp(opt, "silent")) {
 			if (val) {
-				ntfs_log_error("'succeed_chmod' option should "
+				ntfs_log_error("'silent' option should "
 						"not have value.\n");
 				goto err_exit;
 			}
-			ctx->succeed_chmod = TRUE;
+			ctx->silent = TRUE;
 		} else if (!strcmp(opt, "force")) {
 			if (val) {
 				ntfs_log_error("'force' option should not "
@@ -1597,13 +1608,14 @@ static void usage(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
 			EXEC_NAME, VERSION, ntfs_libntfs_version());
-	ntfs_log_info("Copyright (c) 2005 Yura Pakhuchiy\n\n");
+	ntfs_log_info("Copyright (c) 2005-2006 Yura Pakhuchiy\n\n");
 	ntfs_log_info("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);
 	ntfs_log_info("ntfsmount options are:\n\tforce\n\tno_def_opts\n\tumask"
 		"\n\tfmask\n\tdmask\n\tuid\n\tgid\n\tshow_sys_files\n\t"
-		"succeed_chmod\n\tlocale\n\tstreams_interface\n"
-		"Also look into FUSE documentation about it options.\n");
+		"silent\n\tlocale\n\tstreams_interface\n"
+		"Also look into FUSE documentation about it options "
+		"(NOTE: not all FUSE options are supported by ntfsmount).\n");
 	ntfs_log_info("Default options are: \"%s\".\n\n", def_opts);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }

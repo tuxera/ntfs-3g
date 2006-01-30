@@ -1,8 +1,8 @@
-.\" Copyright (c) 2005 Yura Pakhuchiy.
+.\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "November 2005" "ntfsprogs version @VERSION@"
+.TH NTFSMOUNT 8 "January 2006" "ntfsprogs version @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
@@ -119,8 +119,8 @@ Mount filesystem read\-only.
 By default ntfsmount acts as "default_permissions,allow_other" was passed to it,
 this option cancel this behaviour.
 .TP
-.B succeed_chmod
-Don't change any permissions and don't return error on chmod operation.
+.B silent
+Do nothing on chmod and chown operations, but do not return error.
 .TP
 .B locale=
 You can set locale with this option. It's useful if locale enviroment variables

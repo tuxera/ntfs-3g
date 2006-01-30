@@ -95,6 +95,8 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfsmount: Fix bug with moving non-empty directories.  (Yura)
 	- ntfsinfo: dump $Secure:$SDS in verbose mode.  (Szaka)
 	- ntfsinfo: fix off-by-one in ACL dumping, one ACE was missed.  (Szaka)
+	- ntfsmount: Rename "succeed_chmod" -> "silent". Do not return error
+	  on chown too.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
