@@ -2,7 +2,7 @@
  * dir.c - Directory handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
- * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -40,15 +40,6 @@
 
 #ifdef HAVE_SYS_SYSMACROS_H
 #include <sys/sysmacros.h>
-#endif
-
-#ifdef DJGPP
-#ifndef S_IFLNK
-#define S_IFLNK 0xa000
-#endif
-#ifndef S_IFSOCK
-#define S_IFSOCK 0xc000
-#endif
 #endif
 
 #include "types.h"

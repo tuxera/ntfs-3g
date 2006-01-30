@@ -2,7 +2,7 @@
  * dir.h - Exports for directory handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Anton Altaparmakov
- * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -32,7 +32,27 @@
 #define MAX_PATH 1024
 #endif
 
-/* The little endian Unicode strings $I30, $SII, $SDH, $O, $Q, $R
+/*
+ * We do not have these under DJGPP, so define our version that do not conflict
+ * with other S_IFs defined under DJGPP.
+ */
+#ifdef DJGPP
+#ifndef S_IFLNK
+#define S_IFLNK  0120000
+#endif
+#ifndef S_ISLNK
+#define S_ISLNK(m)  (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef S_IFSOCK
+#define S_IFSOCK 0140000
+#endif
+#ifndef S_ISSOCK
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#endif
+#endif
+
+/*
+ * The little endian Unicode strings $I30, $SII, $SDH, $O, $Q, $R
  * as a global constant.
  */
 extern ntfschar NTFS_INDEX_I30[5];
