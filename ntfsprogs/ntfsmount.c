@@ -232,8 +232,6 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	vol = ctx->vol;
 	if (!vol)
 		return -ENODEV;
-	/* Type of filesystem. */
-	sfs->f_type = NTFS_SB_MAGIC;
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
 #if FUSE_VERSION >= 25
@@ -1814,6 +1812,24 @@ int main(int argc, char *argv[])
 		return 5;
 	}
 	free(parsed_options);
+#if FUSE_VERSION >= 25
+	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
+	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
+	if (fuse_opt_add_arg(&margs, "") == -1 ||
+			fuse_opt_add_arg(&margs, "-o") == -1)
+		    fh = NULL;
+	if (!ctx->debug) {
+		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
+			fh = NULL;
+	} else {
+		if (fuse_opt_add_arg(&margs, "use_ino,debug") == -1)
+			fh = NULL;
+	}
+	if (fh)
+		fh = fuse_new(ffd, &margs , &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper));
+	fuse_opt_free_args(&margs);
+#else
 	if (!ctx->debug) {
 		if (fuse_is_lib_option("kernel_cache"))
 			fh = fuse_new(ffd, "use_ino,kernel_cache",
@@ -1825,7 +1841,7 @@ int main(int argc, char *argv[])
 	} else
 		fh = fuse_new(ffd, "debug,use_ino" , &ntfs_fuse_oper,
 				sizeof(ntfs_fuse_oper));
-
+#endif
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		close(ffd);
