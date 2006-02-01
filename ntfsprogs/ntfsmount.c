@@ -119,6 +119,25 @@ static const char *EXEC_NAME = "ntfsmount";
 static char def_opts[] = "default_permissions,allow_other,";
 static ntfs_fuse_context_t *ctx;
 
+static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
+{
+	/* Mark information about free MFT record and clusters outdate. */
+	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
+}
+
+/**
+ * ntfs_fuse_is_named_data_stream - check path to be to named data stream
+ * @path:	path to check
+ *
+ * Rerturn 1 if path is to named data stream or 0 otherwise.
+ */
+static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
+{
+	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+		return 1;
+	return 0;
+}
+
 static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 {
 	u8 *buf;
@@ -181,12 +200,6 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 	ctx->free_clusters = nr_free;
 	ctx->state &= ~(NF_FreeClustersOutdate);
 	return nr_free;
-}
-
-static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
-{
-	/* Mark information about free MFT record and clusters outdate. */
-	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 }
 
 /**
@@ -509,6 +522,13 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 				"%s\n", MREF(mref), strerror(errno));
 		return 0;
 	}
+	if (ntfs_fuse_is_named_data_stream(filename)) {
+		ntfs_log_error("Unable to access '%s' (inode %lld) with "
+				"current named streams access interface.\n",
+				filename, MREF(mref));
+		free(filename);
+		return 0;
+	}
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
@@ -712,7 +732,7 @@ exit:
 static int ntfs_fuse_chmod(const char *path,
 		mode_t mode __attribute__((unused)))
 {
-	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	if (ctx->silent)
 		return 0;
@@ -722,7 +742,7 @@ static int ntfs_fuse_chmod(const char *path,
 static int ntfs_fuse_chown(const char *path, uid_t uid __attribute__((unused)),
 		gid_t gid __attribute__((unused)))
 {
-	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	if (ctx->silent)
 		return 0;
@@ -851,9 +871,8 @@ exit:
 
 static int ntfs_fuse_symlink(const char *to, const char *from)
 {
-	if (strchr(from, ':') &&	/* n/a for named data streams. */
-			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
-		return -EINVAL;
+	if (ntfs_fuse_is_named_data_stream(from))
+		return -EINVAL; /* n/a for named data streams. */
 	ntfs_fuse_mark_free_space_outdate();
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
@@ -866,12 +885,10 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	char *path;
 	int res = 0, uname_len;
 
-	if (strchr(old_path, ':') &&	/* n/a for named data streams. */
-			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
-		return -EINVAL;
-	if (strchr(new_path, ':') &&	/* n/a for named data streams. */
-			ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
-		return -EINVAL;
+	if (ntfs_fuse_is_named_data_stream(old_path))
+		return -EINVAL; /* n/a for named data streams. */
+	if (ntfs_fuse_is_named_data_stream(new_path))
+		return -EINVAL; /* n/a for named data streams. */
 	path = strdup(new_path);
 	if (!path)
 		return -errno;
@@ -1022,7 +1039,7 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 static int ntfs_fuse_mkdir(const char *path,
 		mode_t mode __attribute__((unused)))
 {
-	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	ntfs_fuse_mark_free_space_outdate();
 	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
@@ -1030,7 +1047,7 @@ static int ntfs_fuse_mkdir(const char *path,
 
 static int ntfs_fuse_rmdir(const char *path)
 {
-	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	ntfs_fuse_mark_free_space_outdate();
 	return ntfs_fuse_rm(path);
@@ -1040,8 +1057,8 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
 
-	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
-		return 0; /* Unable to change time for named data streams. */
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
