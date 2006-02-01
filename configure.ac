@@ -215,12 +215,12 @@ if test "$enable_fuse_module" != "no"; then
 			fi
 		]);;
 	freebsd*)
-		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.4.2, [ compile_fuse_module=true ],
+		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.5.0, [ compile_fuse_module=true ],
 		[
 			if test "$enable_fuse_module" = "yes"; then
-				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.4.2 under FreeBSD, because earlier versions have problems with readdir.])
+				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
 			else
-				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.4.2 under FreeBSD, because earlier versions have problems with readdir.])
+				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
 			fi
 		]);;
 	*)

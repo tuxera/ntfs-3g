@@ -207,7 +207,11 @@ static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
  * Return 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
+#if FUSE_VERSION >= 25
+		struct statvfs *sfs)
+#else
 		struct statfs *sfs)
+#endif
 {
 	long size;
 	ntfs_volume *vol;
@@ -219,6 +223,9 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	sfs->f_type = NTFS_SB_MAGIC;
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
+#if FUSE_VERSION >= 25
+	sfs->f_frsize = vol->cluster_size;
+#endif
 	/*
 	 * Total data blocks in file system in units of f_bsize and since
 	 * inodes are also stored in data blocs ($MFT is a file) this is just
@@ -239,11 +246,11 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		size = 0;
 	sfs->f_ffree = size;
 	/* Maximum length of filenames. */
-#ifndef __FreeBSD__
-	sfs->f_namelen = NTFS_MAX_NAME_LEN;
-#else
+#if FUSE_VERSION >= 25
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
-#endif /* __FreeBSD__ */
+#else
+	sfs->f_namelen = NTFS_MAX_NAME_LEN;
+#endif
 	return 0;
 }
 
@@ -1741,8 +1748,11 @@ static int parse_options(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
+#if FUSE_VERSION >= 25
+	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
+#endif
 	struct fuse *fh;
-	int ffd;
+	int ffd = 0;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -1770,7 +1780,17 @@ int main(int argc, char *argv[])
 	}
 	free(opts.device);
 	/* Create filesystem. */
+#if FUSE_VERSION >= 25
+	if ((fuse_opt_add_arg(&margs, "") == -1 ||
+			fuse_opt_add_arg(&margs, "-o") == -1 ||
+			fuse_opt_add_arg(&margs, parsed_options) == -1))
+		ffd = -1;
+	if (ffd != -1)
+		ffd = fuse_mount(opts.mnt_point, &margs);
+	fuse_opt_free_args(&margs);
+#else
 	ffd = fuse_mount(opts.mnt_point, parsed_options);
+#endif
 	if (ffd == -1) {
 		ntfs_log_error("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
