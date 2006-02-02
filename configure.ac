@@ -2,7 +2,7 @@
 # configure.ac - Source file to generate "./configure" to prepare package for
 #		 compilation.
 #
-# Copyright (c) 2000-2005 Anton Altaparmakov
+# Copyright (c) 2000-2006 Anton Altaparmakov
 # Copyright (c) 2003 Jan Kratochvil
 #
 # This program/include file is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.12.2-WIP],[linux-ntfs-dev@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.13.0],[linux-ntfs-dev@lists.sourceforge.net])
 
 #
 # Before making a release, the LTVERSION string should be modified.
