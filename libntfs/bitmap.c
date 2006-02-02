@@ -162,7 +162,14 @@ static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 
 		/* Update counters. */
 		tmp = (bufsize - firstbyte - lastbyte) << 3;
-		firstbyte = 0;
+		if (firstbyte) {
+			firstbyte = 0;
+			/*
+			 * Re-set the partial first byte so a subsequent write
+			 * of the buffer does not have stale, incorrect bits.
+			 */
+			*buf = value ? 0xff : 0;
+		}
 		start_bit += tmp;
 		count -= tmp;
 		if (bufsize > (tmp = (count + 7) >> 3))

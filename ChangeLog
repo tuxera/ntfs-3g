@@ -1,11 +1,11 @@
-xx/xx/2005 - 1.12.2-WIP
+02/01/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
 	- Temporarily disable use of the legal ansi character checking in
 	  libntfs/unistr.c::ntfs_names_collate() pending a proper fix at some
 	  point.  (Anton)
 	- Rewrite gcc version detection logic using the -dumpversion option.
 	  Tested on various OS and architectures and gcc versions from 2.95 to
-	  4.0.1 with some weird ones like 3.5-blah thrown in, too.  (Anton)
+	  4.0.2 with some weird ones like 3.5-blah thrown in, too.  (Anton)
 	- Fix bogus le16_to_cpu() which should be le32_to_cpu() when accessing
 	  the attribute list entry attribute type in some places in
 	  libntfs/attrib.c.  (Anton)
@@ -64,7 +64,7 @@ xx/xx/2005 - 1.12.2-WIP
 	  always contain valid value.  (Yura)
 	- Always set correct file size and attributes in ntfs_link().  (Yura)
 	- Add info about Interix special files (symbolic links, character and
-	  block devices, FIFOs and sockets) to layout.h. Teech ntfsmount to
+	  block devices, FIFOs and sockets) to layout.h. Teach ntfsmount to
 	  handle them.  (Yura)
 	- Fix allocated data size for resident attributes.  (Yura)
 	- ntfsclone: check available free space on the destination before
@@ -97,6 +97,9 @@ xx/xx/2005 - 1.12.2-WIP
 	- ntfsinfo: fix off-by-one in ACL dumping, one ACE was missed.  (Szaka)
 	- ntfsmount: Rename "succeed_chmod" -> "silent". Do not return error
 	  on chown too.  (Yura)
+	- Fix stupid bug in libntfs/bitmap.c::ntfs_bitmap_set_bits_in_run()
+	  which caused bits to not be cleared or set if the first bit in the
+	  run was not a multiple of eight.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
