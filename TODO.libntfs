@@ -20,7 +20,13 @@
 - write ntfs_index_{rm_from,add_to,create,rm}()
 
 - detect presence of usnjrnl and if present and mounting rw, re-stamp it (see
-  current ntfs wip driver)
+  current ntfs driver for example in 2.6.15 kernel)
+
+- fix support for large sector sizes by changing the logical device block size
+  to the sector size in the ntfs volume (it ought to work without doing this as
+  we do byte-aligned i/o anyway) but it would be good to change in case a
+  previous mount left the block size to larger value and we expect 512 bytes as
+  that would be incredibly inefficient
 
 *******************
 * MEDIUM priority *

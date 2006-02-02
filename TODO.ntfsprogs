@@ -8,6 +8,13 @@ Thanks,
 * mkntfs *
 **********
 
+- Correct support for creating volumes with larger sector sizes (mft record
+  size, cluster size, and index block size must be >= sector size), so for 1k,
+  2k, and 4k sectors, we need to set the default mft record, cluster, and index
+  block size to be at least the sector size.
+- Correct the odd last partition sector not being accessible under 2.4 kernels
+  by setting the device block size to the sector size (default is 1k on 2.4
+  kernels and they can't cope with partial sectors).
 - Got a report that creating a floppy with mkntfs failed.  Difference between
   this floppy and the floppy created by the special tool found on the net was
   said to be that the bitmap is 256kib on the special floppy while mkntfs will

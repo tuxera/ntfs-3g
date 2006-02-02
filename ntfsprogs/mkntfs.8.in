@@ -1,4 +1,4 @@
-.\" Copyright (c) 2001\-2002 Anton Altaparmakov.
+.\" Copyright (c) 2001\-2006 Anton Altaparmakov.
 .\" Copyright (c) 2005 Richard Russon.
 .\" Copyright (c) 2005\-2006 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
@@ -154,7 +154,7 @@ Select the version of NTFS you wish to create.  This can be "1.2"
 Versions are upwards compatible and Windows 2000, which uses version "3.0",
 can read/write both.
 
-If this option is omitted then version "1.2" is used.
+If this option is omitted then version "3.1" is used.
 .TP
 \fB\-n\fR, \fB\-\-no\-action\fR
 Causes

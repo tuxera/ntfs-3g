@@ -1,7 +1,7 @@
 /**
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2001-2005 Richard Russon
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
@@ -235,7 +235,7 @@ static void mkntfs_usage(void)
 		"    -S, --sectors-per-track NUM     Specify the number of sectors per track\n"
 		"    -z, --mft-zone-multiplier NUM   Set the MFT zone multiplier\n"
 		"    -T, --zero-time                 Fake the time to be 00:00 UTC, Jan 1, 1970\n"
-		"    -N, --ntfs-version VERSION      NTFS version: 3.1 or 1.2 (default)\n"
+		"    -N, --ntfs-version VERSION      NTFS version: 3.1 (default) or 1.2 (old)\n"
 		"    -F, --force                     Force execution despite errors\n"
 		"\n"
 		"Output options:\n"
@@ -258,7 +258,7 @@ static void mkntfs_version(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s)\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
 	ntfs_log_info("Create an NTFS volume on a user specified (block) device.\n\n");
-	ntfs_log_info("Copyright (c) 2000-2005 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2000-2006 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");
 	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
 	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
@@ -4961,8 +4961,9 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		g_vol->major_ver = opts.ver_major;
 		g_vol->minor_ver = opts.ver_minor;
 	} else {
-		g_vol->major_ver = 1;
-		g_vol->minor_ver = 2;
+		/* Create NTFS 3.1 (Windows XP) volumes by default. */
+		g_vol->major_ver = 3;
+		g_vol->minor_ver = 1;
 	}
 	if (opts.cluster_size >= 0)
 		g_vol->cluster_size = opts.cluster_size;

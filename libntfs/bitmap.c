@@ -1,7 +1,7 @@
 /**
  * bitmap.c - Bitmap handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2002-2006 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
