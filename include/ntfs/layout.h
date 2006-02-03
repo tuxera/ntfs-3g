@@ -1986,6 +1986,7 @@ typedef enum {
 	VOLUME_MOUNTED_ON_NT4		= const_cpu_to_le16(0x0008),
 	VOLUME_DELETE_USN_UNDERWAY	= const_cpu_to_le16(0x0010),
 	VOLUME_REPAIR_OBJECT_ID		= const_cpu_to_le16(0x0020),
+	VOLUME_CHKDSK_UNDERWAY		= const_cpu_to_le16(0x4000),
 	VOLUME_MODIFIED_BY_CHKDSK	= const_cpu_to_le16(0x8000),
 	VOLUME_FLAGS_MASK		= const_cpu_to_le16(0x803f),
 } __attribute__((__packed__)) VOLUME_FLAGS;
