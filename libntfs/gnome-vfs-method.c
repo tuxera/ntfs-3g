@@ -3,7 +3,7 @@
  *			libntfs. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003 Jan Kratochvil <project-captive@jankratochvil.net>
- * Copyright (c) 2003-2005 Anton Altaparmakov
+ * Copyright (c) 2003-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -659,7 +659,7 @@ static GnomeVFSResult libntfs_gnomevfs_seek(GnomeVFSMethod *method,
 
 static GnomeVFSResult libntfs_gnomevfs_tell(GnomeVFSMethod *method,
 		GnomeVFSMethodHandle *method_handle,
-		GnomeVFSFileOffset *offset_return)
+		GnomeVFSFileSize *offset_return)
 {
 	GnomeVFSResult errvfsresult;
 	struct libntfs_file *libntfs_file;
@@ -676,7 +676,7 @@ static GnomeVFSResult libntfs_gnomevfs_tell(GnomeVFSMethod *method,
 		return errvfsresult;
 
 	*offset_return = libntfs_file->pos;
-	g_assert(*offset_return == libntfs_file->pos);
+	g_assert((s64)*offset_return == libntfs_file->pos);
 
 	return errvfsresult;
 }

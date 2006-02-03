@@ -1,7 +1,7 @@
 /*
  * device_io.h - Exports for default device io. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -36,7 +36,7 @@
 #else /* __CYGWIN32__ */
 
 #ifndef HDIO_GETGEO
-#	define HDIO_GETGEO	0x10000301
+#	define HDIO_GETGEO	0x301
 /**
  * struct hd_geometry -
  */
@@ -48,13 +48,16 @@ struct hd_geometry {
 };
 #endif
 #ifndef BLKGETSIZE
-#	define BLKGETSIZE	0x10001260
+#	define BLKGETSIZE	0x1260
 #endif
 #ifndef BLKSSZGET
-#	define BLKSSZGET	0x10001268
+#	define BLKSSZGET	0x1268
 #endif
 #ifndef BLKGETSIZE64
-#	define BLKGETSIZE64	0x10001272
+#	define BLKGETSIZE64	0x80041272
+#endif
+#ifndef BLKBSZSET
+#	define BLKBSZSET	0x40041271
 #endif
 
 /* On Cygwin; use Win32 low level device operations. */

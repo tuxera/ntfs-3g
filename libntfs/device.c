@@ -1,7 +1,7 @@
 /**
  * device.c - Low level device io functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Anton Altaparmakov
+ * Copyright (c) 2004-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -50,6 +50,9 @@
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
+#ifdef HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
 #ifdef HAVE_LINUX_FD_H
 #include <linux/fd.h>
 #endif
@@ -74,6 +77,9 @@
 #endif
 #if defined(linux) && defined(_IO) && !defined(BLKSSZGET)
 #	define BLKSSZGET _IO(0x12,104) /* Get device sector size in bytes. */
+#endif
+#if defined(linux) && defined(_IO) && !defined(BLKBSZSET)
+#	define BLKBSZSET _IOW(0x12,113,size_t) /* Set device block size in bytes. */
 #endif
 
 /**
@@ -641,6 +647,7 @@ int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
 #endif
 	return -1;
 }
+
 /**
  * ntfs_device_sector_size_get - get sector size of a device
  * @dev:	open device
@@ -650,8 +657,8 @@ int ntfs_device_sectors_per_track_get(struct ntfs_device *dev)
  *
  * The following error codes are defined:
  *	EINVAL		Input parameter error
- *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
- *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ *	EOPNOTSUPP	System does not support BLKSSZGET ioctl
+ *	ENOTTY		@dev is a file or a device not supporting BLKSSZGET
  */
 int ntfs_device_sector_size_get(struct ntfs_device *dev)
 {
@@ -666,6 +673,40 @@ int ntfs_device_sector_size_get(struct ntfs_device *dev)
 		if (!dev->d_ops->ioctl(dev, BLKSSZGET, &sect_size)) {
 			ntfs_log_debug("BLKSSZGET sector size = %d bytes\n", sect_size);
 			return sect_size;
+		}
+	}
+#else
+	errno = EOPNOTSUPP;
+#endif
+	return -1;
+}
+
+/**
+ * ntfs_device_block_size_set - set block size of a device
+ * @dev:	open device
+ * @block_size: block size to set @dev to
+ *
+ * On success, return 0.
+ * On error return -1 with errno set to the error code.
+ *
+ * The following error codes are defined:
+ *	EINVAL		Input parameter error
+ *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
+ *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ */
+int ntfs_device_block_size_set(struct ntfs_device *dev, int block_size)
+{
+	if (!dev) {
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef BLKBSZSET
+	{
+		size_t s_block_size = block_size;
+		if (!dev->d_ops->ioctl(dev, BLKBSZSET, &s_block_size)) {
+			ntfs_log_debug("Used BLKBSZSET to set block size to "
+					"%d bytes\n", block_size);
+			return 0;
 		}
 	}
 #else

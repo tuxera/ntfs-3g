@@ -1,7 +1,7 @@
 /**
  * unix_io.c - Unix style disk io functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2003 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -60,11 +60,12 @@
 #include "device.h"
 #include "logging.h"
 
-#if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
-#	define BLKGETSIZE _IO(0x12,96) /* Get device size in 512byte blocks. */
-#endif
-
 #define DEV_FD(dev)	(*(int *)dev->d_private)
+
+/* Define to nothing if not present on this system. */
+#ifndef O_EXCL
+#	define O_EXCL 0
+#endif
 
 /**
  * ntfs_device_unix_io_open - Open a device and lock it exclusively
@@ -86,8 +87,12 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	}
 	if (!(dev->d_private = malloc(sizeof(int))))
 		return -1;
-	/* Open the device/file obtaining the file descriptor. */
-	if ((*(int *)dev->d_private = open(dev->d_name, flags)) == -1) {
+	/*
+	 * Open the device/file obtaining the file descriptor for exclusive
+	 * access.
+	 */ 
+	*(int*)dev->d_private = open(dev->d_name, flags | O_EXCL);
+	if (*(int*)dev->d_private == -1) {
 		err = errno;
 		goto err_out;
 	}

@@ -4,7 +4,7 @@
  *		Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2004 Lode Leroy
- * Copyright (c) 2003-2005 Anton Altaparmakov
+ * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yuval Fledel
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1433,6 +1433,12 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 	case BLKSSZGET:
 		ntfs_log_debug("BLKSSZGET detected.\n");
 		return ntfs_win32_blksszget(dev, (int *)argp);
+#endif
+#ifdef BLKBSZSET
+	case BLKBSZSET:
+		ntfs_log_debug("BLKBSZSET detected.\n");
+		/* Nothing to do on Windows. */
+		return 0;
 #endif
 	default:
 		ntfs_log_debug("unimplemented ioctl %d.\n", request);

@@ -220,7 +220,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
  * Return 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 		struct statvfs *sfs)
 #else
 		struct statfs *sfs)
@@ -234,7 +234,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		return -ENODEV;
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	sfs->f_frsize = vol->cluster_size;
 #endif
 	/*
@@ -257,7 +257,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		size = 0;
 	sfs->f_ffree = size;
 	/* Maximum length of filenames. */
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
 #else
 	sfs->f_namelen = NTFS_MAX_NAME_LEN;
@@ -1763,7 +1763,7 @@ static int parse_options(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 #endif
 	struct fuse *fh;
@@ -1795,7 +1795,7 @@ int main(int argc, char *argv[])
 	}
 	free(opts.device);
 	/* Create filesystem. */
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	if ((fuse_opt_add_arg(&margs, "") == -1 ||
 			fuse_opt_add_arg(&margs, "-o") == -1 ||
 			fuse_opt_add_arg(&margs, parsed_options) == -1))
@@ -1812,7 +1812,7 @@ int main(int argc, char *argv[])
 		return 5;
 	}
 	free(parsed_options);
-#if FUSE_VERSION >= 25
+#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&margs, "") == -1 ||

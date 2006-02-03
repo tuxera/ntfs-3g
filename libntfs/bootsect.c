@@ -1,7 +1,7 @@
 /**
  * bootsect.c - Boot sector handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -270,4 +270,3 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 		vol->mftmirr_size = vol->cluster_size / vol->mft_record_size;
 	return 0;
 }
-

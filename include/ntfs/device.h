@@ -1,7 +1,7 @@
 /*
  * device.h - Exports for low level device io. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -118,5 +118,6 @@ extern s64 ntfs_device_partition_start_sector_get(struct ntfs_device *dev);
 extern int ntfs_device_heads_get(struct ntfs_device *dev);
 extern int ntfs_device_sectors_per_track_get(struct ntfs_device *dev);
 extern int ntfs_device_sector_size_get(struct ntfs_device *dev);
+extern int ntfs_device_block_size_set(struct ntfs_device *dev, int block_size);
 
 #endif /* defined _NTFS_DEVICE_H */

@@ -100,6 +100,20 @@
 	- Fix stupid bug in libntfs/bitmap.c::ntfs_bitmap_set_bits_in_run()
 	  which caused bits to not be cleared or set if the first bit in the
 	  run was not a multiple of eight.  (Anton)
+	- Change volume mounting (actually device opening) to happen with
+	  O_EXCL bit set so at least on Linux no one can change the device
+	  block size under our feet.  (Anton)
+	- Change volume mounting and mkntfs to set the device block size to the
+	  sector size using BLKBSZSET ioctl (Linux only).  This should be
+	  optimal for performance and should fixes the bug of not being able to
+	  create the backup boot sector if the number of sectors on the device
+	  is odd, the sector size is 512 bytes, and the kernel is 2.4.  (Anton)
+	- Enforce cluster size, mft record size, and index record size to be at
+	  least equal to the sector size and verify they are still valid and in
+	  particular display a warning message if the volume will not be
+	  mountable by the kernel driver (it requires mft record size and index
+	  record size to be below or equal to the system page size which we
+	  determine using sysconf()).  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

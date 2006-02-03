@@ -1,7 +1,7 @@
 /**
  * volume.c - NTFS volume handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2005 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
  *
@@ -467,7 +467,12 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	}
 	free(bs);
 	bs = NULL;
-
+	/* Now set the device block size to the sector size. */
+	if (ntfs_device_block_size_set(vol->dev, vol->sector_size))
+		ntfs_log_debug("Failed to set the device block size to the "
+				"sector size.  This may affect performance "
+				"but should be harmless otherwise.  Error: "
+				"%s\n", strerror(errno));
 	/*
 	 * We now initialize the cluster allocator.
 	 *

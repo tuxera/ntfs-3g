@@ -271,26 +271,6 @@ and exit.
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .SH BUGS
-.B mkntfs
-writes the backup boot sector to the last sector of the block
-.I device
-being formatted. However, current versions of the Linux kernel (all versions
-up to and including todays 2.4.18) either only report an even number of sectors
-when the sector size is below 1024 bytes, which is the case for most hard
-drives today (512 bytes sector size) or they return the correct number but
-accessing the last sector fails. Either way, this means that when a partition
-has an odd number of 512\-byte sectors, the last sector is either not reported
-to us at all or it is not writable by us and hence the created NTFS volume
-will either have the backup boot sector placed one sector ahead of where it
-should be or it cannot be written at all. For this reason,
-.B mkntfs
-marks the NTFS volume dirty, so that when you reboot into Windows, check disk
-runs automatically and creates a copy of the backup boot sector in the correct
-location. This also has the benefit of catching any bugs in
-.B mkntfs
-as check disk would find any corrupt structures and repair them, as well as
-report them.
-.sp
 If you find a bug please send an email describing the problem to the
 development team:
 .br
