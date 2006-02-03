@@ -3745,7 +3745,7 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 	 * "inode size" can be specified on other Linux/Unix file systems.
 	 */
 	vol->mft_record_size = 1024;
-	if (vol->mft_record_size < opts.sector_size)
+	if (vol->mft_record_size < (u32)opts.sector_size)
 		vol->mft_record_size = opts.sector_size;
 	if (vol->mft_record_size > (unsigned long)page_size)
 		ntfs_log_warning("Mft record size (%u bytes) exceeds system "
@@ -3763,7 +3763,7 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 	 * FIXME: Should we make the index record size to be user specifiable?
 	 */
 	vol->indx_record_size = 4096;
-	if (vol->indx_record_size < opts.sector_size)
+	if (vol->indx_record_size < (u32)opts.sector_size)
 		vol->indx_record_size = opts.sector_size;
 	if (vol->indx_record_size > (unsigned long)page_size)
 		ntfs_log_warning("Index record size (%u bytes) exceeds system "
