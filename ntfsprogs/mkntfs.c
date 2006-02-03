@@ -156,7 +156,7 @@ switch if you want to be able to build the NTFS utilities."
 /* Page size on ia32. Can change to 8192 on Alpha. */
 #define NTFS_PAGE_SIZE	4096
 
-static char *EXEC_NAME = "mkntfs";
+static char EXEC_NAME[] = "mkntfs";
 
 /**
  * global variables
