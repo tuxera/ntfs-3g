@@ -1036,6 +1036,8 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 		printf("DEL_USN ");
 	if (vol_information->flags & VOLUME_REPAIR_OBJECT_ID)
 		printf("REPAIR_OBJID ");
+	if (vol_information->flags & VOLUME_CHKDSK_UNDERWAY)
+		printf("CHKDSK_UNDERWAY ");
 	if (vol_information->flags & VOLUME_MODIFIED_BY_CHKDSK)
 		printf("MOD_BY_CHKDSK ");
 	if (vol_information->flags & VOLUME_FLAGS_MASK) {
