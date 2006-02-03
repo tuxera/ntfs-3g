@@ -715,6 +715,9 @@ int ntfs_device_block_size_set(struct ntfs_device *dev,
 			return 0;
 	}
 #else
+	/* If not a block device, pretend it was successful. */
+	if (!NDevBlock(dev))
+		return 0;
 	errno = EOPNOTSUPP;
 #endif
 	return -1;
