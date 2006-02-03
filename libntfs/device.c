@@ -671,7 +671,8 @@ int ntfs_device_sector_size_get(struct ntfs_device *dev)
 		int sect_size = 0;
 
 		if (!dev->d_ops->ioctl(dev, BLKSSZGET, &sect_size)) {
-			ntfs_log_debug("BLKSSZGET sector size = %d bytes\n", sect_size);
+			ntfs_log_debug("BLKSSZGET sector size = %d bytes\n",
+					sect_size);
 			return sect_size;
 		}
 	}
@@ -705,13 +706,15 @@ int ntfs_device_block_size_set(struct ntfs_device *dev, int block_size)
 		size_t s_block_size = block_size;
 		if (!dev->d_ops->ioctl(dev, BLKBSZSET, &s_block_size)) {
 			ntfs_log_debug("Used BLKBSZSET to set block size to "
-					"%d bytes\n", block_size);
+					"%d bytes.\n", block_size);
 			return 0;
 		}
+		/* If not a block device, pretend it was successful. */
+		if (!NDevBlock(dev))
+			return 0;
 	}
 #else
 	errno = EOPNOTSUPP;
 #endif
 	return -1;
 }
-

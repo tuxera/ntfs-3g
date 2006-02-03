@@ -40,6 +40,7 @@ typedef enum {
 	ND_Open,	/* 1: Device is open. */
 	ND_ReadOnly,	/* 1: Device is read-only. */
 	ND_Dirty,	/* 1: Device is dirty, needs sync. */
+	ND_Block,	/* 1: Device is a block device. */
 } ntfs_device_state_bits;
 
 #define  test_ndev_flag(nd, flag)	   test_bit(ND_##flag, (nd)->d_state)
@@ -57,6 +58,10 @@ typedef enum {
 #define NDevDirty(nd)		 test_ndev_flag(nd, Dirty)
 #define NDevSetDirty(nd)	  set_ndev_flag(nd, Dirty)
 #define NDevClearDirty(nd)	clear_ndev_flag(nd, Dirty)
+
+#define NDevBlock(nd)		 test_ndev_flag(nd, Block)
+#define NDevSetBlock(nd)	  set_ndev_flag(nd, Block)
+#define NDevClearBlock(nd)	clear_ndev_flag(nd, Block)
 
 /**
  * struct ntfs_device -

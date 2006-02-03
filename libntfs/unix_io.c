@@ -79,6 +79,7 @@
 static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 {
 	struct flock flk;
+	struct stat sbuf;
 	int err;
 
 	if (NDevOpen(dev)) {
@@ -116,6 +117,9 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 					"close %s", dev->d_name);
 		goto err_out;
 	}
+	/* Determine if device is a block device or not, ignoring errors. */
+	if (!fstat(DEV_FD(dev), &sbuf) && S_ISBLK(sbuf.st_mode))
+		NDevSetBlock(dev);
 	/* Set our open flag. */
 	NDevSetOpen(dev);
 	return 0;
@@ -317,4 +321,3 @@ struct ntfs_device_operations ntfs_device_unix_io_ops = {
 	.stat		= ntfs_device_unix_io_stat,
 	.ioctl		= ntfs_device_unix_io_ioctl,
 };
-
