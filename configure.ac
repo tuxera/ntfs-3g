@@ -326,13 +326,13 @@ AC_SUBST(AUTODIRS)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([ctype.h fcntl.h libintl.h limits.h locale.h mntent.h \
-	stddef.h stdint.h stdlib.h stdio.h stdarg.h string.h strings.h \
-	errno.h time.h unistd.h utime.h wchar.h getopt.h features.h endian.h \
-	byteswap.h sys/byteorder.h sys/endian.h sys/param.h sys/ioctl.h \
-	sys/mount.h sys/stat.h sys/types.h sys/vfs.h sys/statvfs.h sys/sysmacros.h \
-	linux/major.h linux/fd.h linux/hdreg.h machine/endian.h gcrypt.h \
-	windows.h gnutls/pkcs12.h])
+AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
+	mntent.h stddef.h stdint.h stdlib.h stdio.h stdarg.h string.h \
+	strings.h errno.h time.h unistd.h utime.h wchar.h getopt.h features.h \
+	endian.h byteswap.h sys/byteorder.h sys/endian.h sys/param.h \
+	sys/ioctl.h sys/mount.h sys/stat.h sys/types.h sys/vfs.h \
+	sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h linux/hdreg.h \
+	machine/endian.h gcrypt.h windows.h gnutls/pkcs12.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -356,9 +356,9 @@ AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit dup2 fdatasync getopt_long hasmntopt mbsinit memmove \
-	memset realpath regcomp setlocale setxattr strcasecmp strchr strdup \
-	strerror strnlen strtol strtoul sysconf utime])
+AC_CHECK_FUNCS([atexit basename dup2 fdatasync getopt_long hasmntopt mbsinit \
+	memmove memset realpath regcomp setlocale setxattr strcasecmp strchr \
+	strdup strerror strnlen strtol strtoul sysconf utime])
 
 # Makefiles to be created by configure.
 AC_CONFIG_FILES([

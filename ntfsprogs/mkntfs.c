@@ -78,6 +78,9 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
@@ -153,37 +156,37 @@ switch if you want to be able to build the NTFS utilities."
 /* Page size on ia32. Can change to 8192 on Alpha. */
 #define NTFS_PAGE_SIZE	4096
 
-const char *EXEC_NAME = "mkntfs";
+static char *EXEC_NAME = "mkntfs";
 
 /**
  * global variables
  */
-u8		  *g_buf		  = NULL;
-int		   g_mft_bitmap_byte_size = 0;
-u8		  *g_mft_bitmap		  = NULL;
-int		   g_lcn_bitmap_byte_size = 0;
-u8		  *g_lcn_bitmap		  = NULL;
-runlist		  *g_rl_mft		  = NULL;
-runlist		  *g_rl_mft_bmp		  = NULL;
-runlist		  *g_rl_mftmirr		  = NULL;
-runlist		  *g_rl_logfile		  = NULL;
-runlist		  *g_rl_boot		  = NULL;
-runlist		  *g_rl_bad		  = NULL;
-INDEX_ALLOCATION  *g_index_block	  = NULL;
-ntfs_volume	  *g_vol		  = NULL;
-int		   g_mft_size		  = 0;
-long long	   g_mft_lcn		  = 0;		/* lcn of $MFT, $DATA attribute */
-long long	   g_mftmirr_lcn	  = 0;		/* lcn of $MFTMirr, $DATA */
-long long	   g_logfile_lcn	  = 0;		/* lcn of $LogFile, $DATA */
-int		   g_logfile_size	  = 0;		/* in bytes, determined from volume_size */
-long long	   g_mft_zone_end	  = 0;		/* Determined from volume_size and mft_zone_multiplier, in clusters */
-long long	   g_num_bad_blocks	  = 0;		/* Number of bad clusters */
-long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+static u8		  *g_buf		  = NULL;
+static int		   g_mft_bitmap_byte_size = 0;
+static u8		  *g_mft_bitmap		  = NULL;
+static int		   g_lcn_bitmap_byte_size = 0;
+static u8		  *g_lcn_bitmap		  = NULL;
+static runlist		  *g_rl_mft		  = NULL;
+static runlist		  *g_rl_mft_bmp		  = NULL;
+static runlist		  *g_rl_mftmirr		  = NULL;
+static runlist		  *g_rl_logfile		  = NULL;
+static runlist		  *g_rl_boot		  = NULL;
+static runlist		  *g_rl_bad		  = NULL;
+static INDEX_ALLOCATION  *g_index_block	  = NULL;
+static ntfs_volume	  *g_vol		  = NULL;
+static int		   g_mft_size		  = 0;
+static long long	   g_mft_lcn		  = 0;		/* lcn of $MFT, $DATA attribute */
+static long long	   g_mftmirr_lcn	  = 0;		/* lcn of $MFTMirr, $DATA */
+static long long	   g_logfile_lcn	  = 0;		/* lcn of $LogFile, $DATA */
+static int		   g_logfile_size	  = 0;		/* in bytes, determined from volume_size */
+static long long	   g_mft_zone_end	  = 0;		/* Determined from volume_size and mft_zone_multiplier, in clusters */
+static long long	   g_num_bad_blocks	  = 0;		/* Number of bad clusters */
+static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
 
 /**
  * struct mkntfs_options
  */
-struct mkntfs_options {
+static struct mkntfs_options {
 	char *dev_name;			/* Name of the device, or file, to use */
 	BOOL enable_compression;	/* -C, enables compression of all files on the volume by default. */
 	BOOL quick_format;		/* -f or -Q, fast format, don't zero the volume first. */
