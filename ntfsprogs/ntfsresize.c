@@ -104,6 +104,10 @@ static const char *unclean_journal_msg =
 "using this software! Note, if you have run chkdsk previously then boot\n"
 "Windows again which will automatically initialize the journal correctly.\n";
 
+static const char *opened_volue_msg =
+"This software has detected that the NTFS volume is already opened by another\n"
+"software thus it refuses to progress to preserve data consistency.\n";
+
 static const char *bad_sectors_warning_msg =
 "****************************************************************************\n"
 "* WARNING: The disk has bad sector. This means physical damage on the disk *\n"
@@ -2260,6 +2264,8 @@ static ntfs_volume *mount_volume(void)
 			printf("%s", hibernated_volume_msg);
 		else if (err == EOPNOTSUPP)
 			printf("%s", unclean_journal_msg);
+		else if (err == EBUSY)
+			printf("%s", opened_volue_msg);
 		exit(1);
 	}
 
