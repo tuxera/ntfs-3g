@@ -279,8 +279,7 @@ linux\-ntfs\-dev@lists.sourceforge.net
 .hy
 .SH AUTHORS
 .B mkntfs
-was written by Anton Altaparmakov, Richard Russon and Szabolcs Szakacsits, with
-contributions from Erik Sornes.
+was written by Anton Altaparmakov, Richard Russon, Erik Sornes and Szabolcs Szakacsits.
 .SH AVAILABILITY
 .B mkntfs
 is part of the
