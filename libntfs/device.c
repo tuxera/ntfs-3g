@@ -692,8 +692,8 @@ int ntfs_device_sector_size_get(struct ntfs_device *dev)
  *
  * The following error codes are defined:
  *	EINVAL		Input parameter error
- *	EOPNOTSUPP	System does not support HDIO_GETGEO ioctl
- *	ENOTTY		@dev is a file or a device not supporting HDIO_GETGEO
+ *	EOPNOTSUPP	System does not support BLKBSZSET ioctl
+ *	ENOTTY		@dev is a file or a device not supporting BLKBSZSET
  */
 int ntfs_device_block_size_set(struct ntfs_device *dev,
 		int block_size __attribute__((unused)))
