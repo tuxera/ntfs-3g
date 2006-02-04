@@ -524,7 +524,7 @@ typedef enum {
  *	unistr.c::ntfs_collate_names() and unistr.c::legal_ansi_char_array[]
  *	for what I mean but COLLATION_UNICODE_STRING would not give any special
  *	treatment to any characters at all, but this is speculation.
- * COLLATION_NTOFS_ULONG - Sorting is done according to ascending u32	key
+ * COLLATION_NTOFS_ULONG - Sorting is done according to ascending u32 key
  *	values. E.g. used for $SII index in FILE_Secure, which sorts by
  *	security_id (u32).
  * COLLATION_NTOFS_SID - Sorting is done according to ascending SID values.

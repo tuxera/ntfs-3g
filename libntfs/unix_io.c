@@ -90,9 +90,11 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 		return -1;
 	/*
 	 * Open the device/file obtaining the file descriptor for exclusive
-	 * access.
+	 * access (but only if mounting r/w).
 	 */ 
-	*(int*)dev->d_private = open(dev->d_name, flags | O_EXCL);
+	if ((flags & O_RDWR) == O_RDWR)
+		flags |= O_EXCL;
+	*(int*)dev->d_private = open(dev->d_name, flags);
 	if (*(int*)dev->d_private == -1) {
 		err = errno;
 		goto err_out;
