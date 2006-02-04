@@ -791,6 +791,9 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		return;
 	case AT_INDEX_ROOT:
 		/* TODO */
+		printf("collation_rule %u\n", le32_to_cpu(((INDEX_ROOT*)val)->collation_rule));
+		printf("index.entries_offset %u\n", le32_to_cpu(((INDEX_ROOT*)val)->index.entries_offset));
+		printf("index.index_length %u\n", le32_to_cpu(((INDEX_ROOT*)val)->index.index_length));
 		printf("%s\n", todo);
 		return;
 	case AT_INDEX_ALLOCATION:
@@ -909,7 +912,7 @@ static void dump_attr_record(ATTR_RECORD *a)
 	printf("-- Beginning dump of attribute record. --\n");
 	if (a->type == AT_END) {
 		printf("Attribute type = 0x%x ($END)\n",
-				(unsigned int)le32_to_cpu(AT_END));
+				(unsigned int)const_le32_to_cpu(AT_END));
 		u = le32_to_cpu(a->length);
 		printf("Length of resident part = %u (0x%x)\n", u, u);
 		return;
@@ -1959,8 +1962,8 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->length = cpu_to_le32(asize);
 	a->non_resident = 0;
 	a->name_length = name_len;
-	a->name_offset = cpu_to_le16(24);
-	a->flags = cpu_to_le16(flags);
+	a->name_offset = const_cpu_to_le16(24);
+	a->flags = flags;
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
@@ -2305,24 +2308,24 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 				opts.sector_size;
 	}
 	memset(&r->reserved, 0, sizeof(r->reserved));
-	r->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
-	r->index.index_length = cpu_to_le32(sizeof(INDEX_HEADER) +
+	r->index.entries_offset = const_cpu_to_le32(sizeof(INDEX_HEADER));
+	r->index.index_length = const_cpu_to_le32(sizeof(INDEX_HEADER) +
 			sizeof(INDEX_ENTRY_HEADER));
 	r->index.allocated_size = r->index.index_length;
 	r->index.flags = SMALL_INDEX;
 	memset(&r->index.reserved, 0, sizeof(r->index.reserved));
-	e = (INDEX_ENTRY_HEADER*)((char*)&r->index +
+	e = (INDEX_ENTRY_HEADER*)((u8*)&r->index +
 			le32_to_cpu(r->index.entries_offset));
 	/*
 	 * No matter whether this is a file index or a view as this is a
 	 * termination entry, hence no key value / data is associated with it
 	 * at all. Thus, we just need the union to be all zero.
 	 */
-	e->indexed_file = cpu_to_le64(0LL);
-	e->length = cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
-	e->key_length = cpu_to_le16(0);
+	e->indexed_file = const_cpu_to_le64(0LL);
+	e->length = const_cpu_to_le16(sizeof(INDEX_ENTRY_HEADER));
+	e->key_length = const_cpu_to_le16(0);
 	e->flags = INDEX_ENTRY_END;
-	e->reserved = cpu_to_le16(0);
+	e->reserved = const_cpu_to_le16(0);
 	err = insert_resident_attr_in_mft_record(m, AT_INDEX_ROOT, name,
 				name_len, ic, 0, 0, (u8*)r, val_len);
 	free(r);
@@ -2620,80 +2623,72 @@ static int make_room_for_index_entry_in_index_block(INDEX_BLOCK *idx,
  * not all types of COLLATION_RULES supported yet...
  * added as needed.. (remove this comment when all are added)
  */
-static int ntfs_index_keys_compare(char *key1, char *key2,
-				   int key1_length,int key2_length,
-				   COLLATION_RULES collation_rule)
+static int ntfs_index_keys_compare(u8 *key1, u8 *key2, int key1_length,
+		int key2_length, COLLATION_RULES collation_rule)
 {
-	int i = 0;
-	int j = 0;
+	u32 u1, u2;
+	int i;
 
 	if (collation_rule == COLLATION_NTOFS_ULONG) {
 		/* i.e. $SII or $QUOTA-$Q */
-		while ((j < min(key1_length, key2_length)) && (i == 0)) {
-			if (*(u32*)(key1 + j) < *(u32*)(key2 + j))
-				i = -1;
-			if (*(u32*)(key1 + j) > *(u32*)(key2 + j))
-				i = +1;
-			if (*(u32*)(key1 + j) == *(u32*)(key2 + j)) {
-				i = 0;
-				j += 4;
-			}
-		}
-		if ((i == 0) && (key1_length > key2_length))
-			i = -1;
-		if ((i == 0) && (key1_length < key2_length))
-			i = +1;
-
-		return i;
+		u1 = le32_to_cpup(key1);
+		u2 = le32_to_cpup(key2);
+		if (u1 < u2)
+			return -1;
+		if (u1 > u2)
+			return 1;
+		/* u1 == u2 */
+		return 0;
 	}
-
 	if (collation_rule == COLLATION_NTOFS_ULONGS) {
 		/* i.e $OBJID-$O */
-		while ((j < min(key1_length, key2_length)) && (i == 0)) {
-			if (bswap_32(*(u32*)(key1 + j)) < bswap_32(*(u32*)(key1 + j)))
-				i = -1;
-			if (bswap_32(*(u32*)(key1 + j)) > bswap_32(*(u32*)(key1 + j)))
-				i = +1;
-			if (bswap_32(*(u32*)(key1 + j)) == bswap_32(*(u32*)(key1 + j))) {
-				i = 0;
-				j += 4;
-			}
+		i = 0;
+		while (i < min(key1_length, key2_length)) {
+			u1 = le32_to_cpup(key1 + i);
+			u2 = le32_to_cpup(key2 + i);
+			if (u1 < u2)
+				return -1;
+			if (u1 > u2)
+				return 1;
+			/* u1 == u2 */
+			i += sizeof(u32);
 		}
-		if ((i == 0) && (key1_length > key2_length))
-			i = -1;
-		if ((i == 0) && (key1_length < key2_length))
-			i = +1;
-
-		return i;
+		if (key1_length < key2_length)
+			return -1;
+		if (key1_length > key2_length)
+			return 1;
+		return 0;
 	}
 	if (collation_rule == COLLATION_NTOFS_SECURITY_HASH) {
 		/* i.e. $SDH */
-		if (((SDH_INDEX_KEY*)key1)->hash < ((SDH_INDEX_KEY*)key2)->hash)
-			i = -1;
-		if (((SDH_INDEX_KEY*)key1)->hash > ((SDH_INDEX_KEY*)key2)->hash)
-			i = +1;
-		if (((SDH_INDEX_KEY*)key1)->hash == ((SDH_INDEX_KEY*)key2)->hash) {
-			if (((SDH_INDEX_KEY*)key1)->security_id < ((SDH_INDEX_KEY*)key2)->security_id)
-				i = -1;
-			if (((SDH_INDEX_KEY*)key1)->security_id > ((SDH_INDEX_KEY*)key2)->security_id)
-				i = +1;
-			if (((SDH_INDEX_KEY*)key1)->security_id == ((SDH_INDEX_KEY*)key2)->security_id)
-				i = 0;
-		}
-		return i;
+		u1 = le32_to_cpu(((SDH_INDEX_KEY*)key1)->hash);
+		u2 = le32_to_cpu(((SDH_INDEX_KEY*)key2)->hash);
+		if (u1 < u2)
+			return -1;
+		if (u1 > u2)
+			return 1;
+		/* u1 == u2 */
+		u1 = le32_to_cpu(((SDH_INDEX_KEY*)key1)->security_id);
+		u2 = le32_to_cpu(((SDH_INDEX_KEY*)key2)->security_id);
+		if (u1 < u2)
+			return -1;
+		if (u1 > u2)
+			return 1;
+		return 0;
 	}
 	if (collation_rule == COLLATION_NTOFS_SID) {
 		/* i.e. $QUOTA-O */
 		i = memcmp(key1, key2, min(key1_length, key2_length));
-		if ((i == 0) && (key1_length > key2_length))
-			i = -1;
-		if ((i == 0) && (key1_length < key2_length))
-			i = +1;
-
+		if (!i) {
+			if (key1_length < key2_length)
+				return -1;
+			if (key1_length > key2_length)
+				return 1;
+		}
 		return i;
 	}
 	ntfs_log_critical("ntfs_index_keys_compare called without supported "
-		"collation rule.\n");
+			"collation rule.\n");
 	return 0;	/* Claim they're equal.  What else can we do? */
 }
 
@@ -2703,9 +2698,8 @@ static int ntfs_index_keys_compare(char *key1, char *key2,
  * i.e. insert an index_entry in some named index_root
  * simplified search method, works for mkntfs
  */
-static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
-		u32 idx_size, MFT_RECORD *m, ntfschar *name, u32 name_size,
-		ATTR_TYPES type)
+static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx, u32 idx_size,
+		MFT_RECORD *m, ntfschar *name, u32 name_size, ATTR_TYPES type)
 {
 	ntfs_attr_search_ctx *ctx;
 	INDEX_HEADER *idx_header;
@@ -2716,43 +2710,42 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 
 	err = 0;
 	/* does it fit ?*/
-	if (g_vol->mft_record_size > idx_size + m->bytes_allocated)
+	if (g_vol->mft_record_size > idx_size + le32_to_cpu(m->bytes_allocated))
 		return -ENOSPC;
-
 	/* find the INDEX_ROOT attribute:*/
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
-		if (!ctx) {
-		ntfs_log_error("Failed to allocate attribute search context.\n");
+	if (!ctx) {
+		ntfs_log_error("Failed to allocate attribute search "
+				"context.\n");
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (mkntfs_attr_lookup(AT_INDEX_ROOT, name, name_size, 0, 0,
-		NULL, 0, ctx)) {
-		err = EEXIST;
+	if (mkntfs_attr_lookup(AT_INDEX_ROOT, name, name_size, 0, 0, NULL, 0,
+			ctx)) {
+		err = -EEXIST;
 		goto err_out;
 	}
 	/* found attribute */
 	a = (ATTR_RECORD*)ctx->attr;
-	collation_rule = ((INDEX_ROOT*)((char*)a +
-		le16_to_cpu(a->value_offset)))->collation_rule;
-	idx_header = (INDEX_HEADER*)((char*)a + le16_to_cpu(a->value_offset)
-		+ le16_to_cpu(0x10));
-	idx_entry = (INDEX_ENTRY*)((char*)idx_header +
-		le16_to_cpu((idx_header)->entries_offset));
-	idx_end = (INDEX_ENTRY*)((char*)idx_entry +
-		le32_to_cpu(idx_header->index_length));
+	collation_rule = ((INDEX_ROOT*)((u8*)a +
+			le16_to_cpu(a->value_offset)))->collation_rule;
+	idx_header = (INDEX_HEADER*)((u8*)a + le16_to_cpu(a->value_offset)
+			+ 0x10);
+	idx_entry = (INDEX_ENTRY*)((u8*)idx_header +
+			le32_to_cpu(idx_header->entries_offset));
+	idx_end = (INDEX_ENTRY*)((u8*)idx_entry +
+			le32_to_cpu(idx_header->index_length));
 	/*
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-
 	if (type == AT_FILE_NAME) {
-		 while ((char*)idx_entry < (char*)idx_end &&
-				!(idx_entry->flags & INDEX_ENTRY_END)) {
-			i = ntfs_file_values_compare(
-				(FILE_NAME_ATTR*)&idx->key.file_name,
-				(FILE_NAME_ATTR*)&idx_entry->key.file_name, 1,
-				IGNORE_CASE, g_vol->upcase, g_vol->upcase_len);
+		 while (((u8*)idx_entry < (u8*)idx_end) &&
+				 !(idx_entry->flags & INDEX_ENTRY_END)) {
+			i = ntfs_file_values_compare(&idx->key.file_name,
+					&idx_entry->key.file_name, 1,
+					IGNORE_CASE, g_vol->upcase,
+					g_vol->upcase_len);
 			/*
 			 * If @file_name collates before ie->key.file_name,
 			 * there is no matching index entry.
@@ -2762,55 +2755,53 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx,
 			/* If file names are not equal, continue search. */
 			if (i)
 				goto do_next;
-			if (((FILE_NAME_ATTR*)&idx->key.file_name)->
-				file_name_type != FILE_NAME_POSIX ||
-				idx_entry->key.file_name.file_name_type
-				!= FILE_NAME_POSIX)
-					return -EEXIST;
-
-			i = ntfs_file_values_compare((FILE_NAME_ATTR*)&idx->
-				key.file_name,
-				(FILE_NAME_ATTR*)&idx_entry->key.file_name, 1,
-				CASE_SENSITIVE, g_vol->upcase, g_vol->upcase_len);
+			if (idx->key.file_name.file_name_type !=
+					FILE_NAME_POSIX ||
+					idx_entry->key.file_name.file_name_type
+					!= FILE_NAME_POSIX)
+				return -EEXIST;
+			i = ntfs_file_values_compare(&idx->key.file_name,
+					&idx_entry->key.file_name, 1,
+					CASE_SENSITIVE, g_vol->upcase,
+					g_vol->upcase_len);
+			if (!i)
+				return -EEXIST;
 			if (i == -1)
 				break;
-			/* Complete match. Bugger. Can't insert. */
-#if 0
-			if (!i)
-				return -EEXIST;
-#endif
 do_next:
-			idx_entry = (INDEX_ENTRY*)((char*)idx_entry +
-				le16_to_cpu(idx_entry->length));
+			idx_entry = (INDEX_ENTRY*)((u8*)idx_entry +
+					le16_to_cpu(idx_entry->length));
 		}
 	} else if (type == AT_UNUSED) {  /* case view */
-		while ((char*)idx_entry < (char*)idx_end && !(idx_entry->flags
-				& INDEX_ENTRY_END)) {
-			i = ntfs_index_keys_compare((char*)idx_entry + 0x10,
-				(char*)idx + 0x10,
-				idx_entry->key_length, idx->key_length, collation_rule);
+		while (((u8*)idx_entry < (u8*)idx_end) &&
+				!(idx_entry->flags & INDEX_ENTRY_END)) {
+			i = ntfs_index_keys_compare((u8*)idx + 0x10,
+					(u8*)idx_entry + 0x10,
+					le16_to_cpu(idx->key_length),
+					le16_to_cpu(idx_entry->key_length),
+					collation_rule);
 			if (!i)
 				return -EEXIST;
-			if (i == 1)
+			if (i == -1)
 				break;
-			idx_entry = (INDEX_ENTRY*)((char*)idx_entry +
-				le16_to_cpu(idx_entry->length));
+			idx_entry = (INDEX_ENTRY*)((u8*)idx_entry +
+					le16_to_cpu(idx_entry->length));
 		}
 	} else {
-		return EINVAL;
+		return -EINVAL;
 	}
-
-	memmove((char*)idx_entry + idx_size, (char*)idx_entry,
-		(char*)m + g_vol->mft_record_size -
-		((char*)idx_entry + idx_size));
-	memcpy((char*)idx_entry, (char*)idx, idx_size);
-	/* adjusting various offsets etc... */
-	m->bytes_in_use += idx_size;
-	a->length += idx_size;
-	a->value_length += idx_size;
-	((INDEX_HEADER*)idx_header)->index_length += idx_size;
-	((INDEX_HEADER*)idx_header)->allocated_size += idx_size;
-
+	memmove((u8*)idx_entry + idx_size, (u8*)idx_entry,
+			le32_to_cpu(m->bytes_in_use) -
+			((u8*)idx_entry - (u8*)m));
+	memcpy((u8*)idx_entry, (u8*)idx, idx_size);
+	/* Adjust various offsets, etc... */
+	m->bytes_in_use = cpu_to_le32(le32_to_cpu(m->bytes_in_use) + idx_size);
+	a->length = cpu_to_le32(le32_to_cpu(a->length) + idx_size);
+	a->value_length = cpu_to_le32(le32_to_cpu(a->value_length) + idx_size);
+	idx_header->index_length = cpu_to_le32(
+			le32_to_cpu(idx_header->index_length) + idx_size);
+	idx_header->allocated_size = cpu_to_le32(
+			le32_to_cpu(idx_header->allocated_size) + idx_size);
 err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
@@ -2849,55 +2840,49 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		if (!sds_header->length)
 			break;
 		/* SDH index entry */
-		idx_entry_sdh->data_offset = cpu_to_le16(0x18);
-		idx_entry_sdh->data_length = cpu_to_le16(0x14);
-		idx_entry_sdh->reservedV = cpu_to_le32(0x00);
-		idx_entry_sdh->length = cpu_to_le16(0x30);
-		idx_entry_sdh->key_length = cpu_to_le16(0x08);
-		idx_entry_sdh->flags = cpu_to_le16(0x00);
-		idx_entry_sdh->reserved = cpu_to_le16(0x00);
+		idx_entry_sdh->data_offset = const_cpu_to_le16(0x18);
+		idx_entry_sdh->data_length = const_cpu_to_le16(0x14);
+		idx_entry_sdh->reservedV = const_cpu_to_le32(0x00);
+		idx_entry_sdh->length = const_cpu_to_le16(0x30);
+		idx_entry_sdh->key_length = const_cpu_to_le16(0x08);
+		idx_entry_sdh->flags = const_cpu_to_le16(0x00);
+		idx_entry_sdh->reserved = const_cpu_to_le16(0x00);
 		idx_entry_sdh->key.sdh.hash = sds_header->hash;
 		idx_entry_sdh->key.sdh.security_id = sds_header->security_id;
-		sdh_data = (SDH_INDEX_DATA*)((char*)idx_entry_sdh +
-			idx_entry_sdh->data_offset);
+		sdh_data = (SDH_INDEX_DATA*)((u8*)idx_entry_sdh +
+				le16_to_cpu(idx_entry_sdh->data_offset));
 		sdh_data->hash = sds_header->hash;
 		sdh_data->security_id = sds_header->security_id;
-
 		sdh_data->offset = sds_header->offset;
-
 		sdh_data->length = sds_header->length;
-		sdh_data->reserved_II =  cpu_to_le32(0x00490049);
+		sdh_data->reserved_II = const_cpu_to_le32(0x00490049);
 
 		/* SII index entry */
-		idx_entry_sii->data_offset = cpu_to_le16(0x14);
-		idx_entry_sii->data_length = cpu_to_le16(0x14);
-		idx_entry_sii->reservedV = cpu_to_le32(0x00);
-		idx_entry_sii->length = cpu_to_le16(0x28);
-		idx_entry_sii->key_length = cpu_to_le16(0x04);
-		idx_entry_sii->flags = cpu_to_le16(0x00);
-		idx_entry_sii->reserved = cpu_to_le16(0x00);
+		idx_entry_sii->data_offset = const_cpu_to_le16(0x14);
+		idx_entry_sii->data_length = const_cpu_to_le16(0x14);
+		idx_entry_sii->reservedV = const_cpu_to_le32(0x00);
+		idx_entry_sii->length = const_cpu_to_le16(0x28);
+		idx_entry_sii->key_length = const_cpu_to_le16(0x04);
+		idx_entry_sii->flags = const_cpu_to_le16(0x00);
+		idx_entry_sii->reserved = const_cpu_to_le16(0x00);
 		idx_entry_sii->key.sii.security_id = sds_header->security_id;
-		sii_data = (SII_INDEX_DATA*)((char*)idx_entry_sii +
-			idx_entry_sii->data_offset);
+		sii_data = (SII_INDEX_DATA*)((u8*)idx_entry_sii +
+				le16_to_cpu(idx_entry_sii->data_offset));
 		sii_data->hash = sds_header->hash;
 		sii_data->security_id = sds_header->security_id;
 		sii_data->offset = sds_header->offset;
 		sii_data->length = sds_header->length;
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sdh,
-			sdh_size, m, NTFS_INDEX_SDH, 4, AT_UNUSED)))
+				sdh_size, m, NTFS_INDEX_SDH, 4, AT_UNUSED)))
 			break;
-
 		if ((err = insert_index_entry_in_res_dir_index(idx_entry_sii,
-			sii_size, m, NTFS_INDEX_SII, 4, AT_UNUSED)))
+				sii_size, m, NTFS_INDEX_SII, 4, AT_UNUSED)))
 			break;
-		sds_header = (SECURITY_DESCRIPTOR_HEADER*)((char*)sds_header +
-				(cpu_to_le32(sds_header->length + 0x0F) &
-					~cpu_to_le32(0x0F)));
+		sds_header = (SECURITY_DESCRIPTOR_HEADER*)((u8*)sds_header +
+				((le32_to_cpu(sds_header->length) + 15) & ~15));
 	}
-
 	free(idx_entry_sdh);
 	free(idx_entry_sii);
-
 	return err;
 }
 
@@ -2914,112 +2899,100 @@ static int initialize_quota(MFT_RECORD *m)
 	QUOTA_CONTROL_ENTRY *idx_entry_q1_data, *idx_entry_q2_data;
 	
 	err = 0;
-	
 	/* q index entry num 1 */
-	q1_size = cpu_to_le32(0x48);
+	q1_size = 0x48;
 	idx_entry_q1 = ntfs_calloc(1, q1_size);
 	if (!idx_entry_q1)
 		return errno;
-	
-	idx_entry_q1->data_offset = cpu_to_le16(0x14);
-	idx_entry_q1->data_length = cpu_to_le16(0x30);
-	idx_entry_q1->reservedV = cpu_to_le32(0x00);
-	idx_entry_q1->length = cpu_to_le16(0x48);
-	idx_entry_q1->key_length = cpu_to_le16(0x04);
-	idx_entry_q1->flags = cpu_to_le16(0x00);
-	idx_entry_q1->reserved = cpu_to_le16(0x00);
-	idx_entry_q1->key.owner_id = cpu_to_le32(0x01);
+	idx_entry_q1->data_offset = const_cpu_to_le16(0x14);
+	idx_entry_q1->data_length = const_cpu_to_le16(0x30);
+	idx_entry_q1->reservedV = const_cpu_to_le32(0x00);
+	idx_entry_q1->length = const_cpu_to_le16(0x48);
+	idx_entry_q1->key_length = const_cpu_to_le16(0x04);
+	idx_entry_q1->flags = const_cpu_to_le16(0x00);
+	idx_entry_q1->reserved = const_cpu_to_le16(0x00);
+	idx_entry_q1->key.owner_id = const_cpu_to_le32(0x01);
 	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
-			+ idx_entry_q1->data_offset);
-	idx_entry_q1_data->version = cpu_to_le32(0x02);
+			+ le16_to_cpu(idx_entry_q1->data_offset));
+	idx_entry_q1_data->version = const_cpu_to_le32(0x02);
 	idx_entry_q1_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	if (g_vol->minor_ver == 0)
 		idx_entry_q1_data->flags |= QUOTA_FLAG_OUT_OF_DATE;
-	idx_entry_q1_data->bytes_used = cpu_to_le64(0x00);
+	idx_entry_q1_data->bytes_used = const_cpu_to_le64(0x00);
 	idx_entry_q1_data->change_time = utc2ntfs(mkntfs_time());
-	idx_entry_q1_data->threshold = cpu_to_sle64(-0x01);
-	idx_entry_q1_data->limit = cpu_to_sle64(-0x01);
-	idx_entry_q1_data->exceeded_time = cpu_to_sle64(0x00);
-
-	err = insert_index_entry_in_res_dir_index(idx_entry_q1,
-		q1_size, m,
-		NTFS_INDEX_Q, 2, AT_UNUSED);
+	idx_entry_q1_data->threshold = const_cpu_to_le64((s64)-1);
+	idx_entry_q1_data->limit = const_cpu_to_le64((s64)-1);
+	idx_entry_q1_data->exceeded_time = const_cpu_to_le64(0x00);
+	err = insert_index_entry_in_res_dir_index(idx_entry_q1, q1_size, m,
+			NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q1);
 	if (err)
 		return err;
-
 	/* q index entry num 2 */
-	q2_size = cpu_to_le32(0x58);
+	q2_size = 0x58;
 	idx_entry_q2 = ntfs_calloc(1, q2_size);
 	if (!idx_entry_q2)
 		return errno;
-	
-	idx_entry_q2->data_offset = cpu_to_le16(0x14);
-	idx_entry_q2->data_length = cpu_to_le16(0x40);
-	idx_entry_q2->reservedV = cpu_to_le32(0x00);
-	idx_entry_q2->length = cpu_to_le16(0x58);
-	idx_entry_q2->key_length = cpu_to_le16(0x04);
-	idx_entry_q2->flags = cpu_to_le16(0x00);
-	idx_entry_q2->reserved = cpu_to_le16(0x00);
+	idx_entry_q2->data_offset = const_cpu_to_le16(0x14);
+	idx_entry_q2->data_length = const_cpu_to_le16(0x40);
+	idx_entry_q2->reservedV = const_cpu_to_le32(0x00);
+	idx_entry_q2->length = const_cpu_to_le16(0x58);
+	idx_entry_q2->key_length = const_cpu_to_le16(0x04);
+	idx_entry_q2->flags = const_cpu_to_le16(0x00);
+	idx_entry_q2->reserved = const_cpu_to_le16(0x00);
 	idx_entry_q2->key.owner_id = QUOTA_FIRST_USER_ID;
 	idx_entry_q2_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q2
-			+ idx_entry_q2->data_offset);
-	idx_entry_q2_data->version = cpu_to_le32(0x02);
+			+ le16_to_cpu(idx_entry_q2->data_offset));
+	idx_entry_q2_data->version = const_cpu_to_le32(0x02);
 	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
-	idx_entry_q2_data->bytes_used = cpu_to_le64(0x00);
+	idx_entry_q2_data->bytes_used = const_cpu_to_le64(0x00);
 	idx_entry_q2_data->change_time = utc2ntfs(mkntfs_time());;
-	idx_entry_q2_data->threshold = cpu_to_sle64(-0x01);
-	idx_entry_q2_data->limit = cpu_to_sle64(-0x01);
-	idx_entry_q2_data->exceeded_time = cpu_to_sle64(0x00);
+	idx_entry_q2_data->threshold = const_cpu_to_le64((s64)-1);
+	idx_entry_q2_data->limit = const_cpu_to_le64((s64)-1);
+	idx_entry_q2_data->exceeded_time = const_cpu_to_le64(0x00);
 	idx_entry_q2_data->sid.revision = 1;
 	idx_entry_q2_data->sid.sub_authority_count = 2;
 	idx_entry_q2_data->sid.identifier_authority.high_part =
-		cpu_to_le16(0x0000);
+			const_cpu_to_le16(0x0000);
 	idx_entry_q2_data->sid.identifier_authority.low_part =
-		cpu_to_le32(0x05000000);
+			const_cpu_to_le32(0x05000000);
 	idx_entry_q2_data->sid.sub_authority[0] =
-		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	idx_entry_q2_data->sid.sub_authority[1] =
-		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
-
-	err = insert_index_entry_in_res_dir_index(idx_entry_q2,
-		q2_size, m,
-		NTFS_INDEX_Q, 2, AT_UNUSED);
+			const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	err = insert_index_entry_in_res_dir_index(idx_entry_q2, q2_size, m,
+			NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q2);
 	if (err)
 		return err;
-
-	o_size = cpu_to_le32(0x28);
+	o_size = 0x28;
 	idx_entry_o = ntfs_calloc(1, o_size);
 	if (!idx_entry_o)
 		return errno;
-
-	idx_entry_o->data_offset = cpu_to_le16(0x20);
-	idx_entry_o->data_length = cpu_to_le16(0x04);
-	idx_entry_o->reservedV = cpu_to_le32(0x00);
-	idx_entry_o->length = cpu_to_le16(0x28);
-	idx_entry_o->key_length = cpu_to_le16(0x10);
-	idx_entry_o->flags = cpu_to_le16(0x00);
-	idx_entry_o->reserved = cpu_to_le16(0x00);
+	idx_entry_o->data_offset = const_cpu_to_le16(0x20);
+	idx_entry_o->data_length = const_cpu_to_le16(0x04);
+	idx_entry_o->reservedV = const_cpu_to_le32(0x00);
+	idx_entry_o->length = const_cpu_to_le16(0x28);
+	idx_entry_o->key_length = const_cpu_to_le16(0x10);
+	idx_entry_o->flags = const_cpu_to_le16(0x00);
+	idx_entry_o->reserved = const_cpu_to_le16(0x00);
 	idx_entry_o->key.sid.revision = 0x01;
 	idx_entry_o->key.sid.sub_authority_count = 0x02;
 	idx_entry_o->key.sid.identifier_authority.high_part =
-		cpu_to_le16(0x0000);
+			const_cpu_to_le16(0x0000);
 	idx_entry_o->key.sid.identifier_authority.low_part =
-		cpu_to_le32(0x05000000);
+			const_cpu_to_le32(0x05000000);
 	idx_entry_o->key.sid.sub_authority[0] =
-		cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	idx_entry_o->key.sid.sub_authority[1] =
-		cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+			const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 	idx_entry_o_data = (QUOTA_O_INDEX_DATA*)((char*)idx_entry_o
-			+ idx_entry_o->data_offset);
+			+ le16_to_cpu(idx_entry_o->data_offset));
 	idx_entry_o_data->owner_id  = QUOTA_FIRST_USER_ID;
 	/* 20 00 00 00 padding after here on ntfs 3.1. 3.0 is unchecked. */
-	idx_entry_o_data->unknown = cpu_to_le32(32);
-
-	err = insert_index_entry_in_res_dir_index(idx_entry_o,
-		o_size, m,
-		NTFS_INDEX_O, 2, AT_UNUSED);
+	idx_entry_o_data->unknown = const_cpu_to_le32(32);
+	err = insert_index_entry_in_res_dir_index(idx_entry_o, o_size, m,
+			NTFS_INDEX_O, 2, AT_UNUSED);
 	free(idx_entry_o);
 
 	return err;
@@ -3238,11 +3211,11 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	if (!idx_entry_new)
 		return -errno;
 	idx_entry_new->indexed_file = ref_file;
-	idx_entry_new->length = idx_size + 0x10;
-	idx_entry_new->key_length = fn_size;
-	memcpy((char*)idx_entry_new+0x10, (char*)fn, fn_size);
+	idx_entry_new->length = cpu_to_le16(idx_size + 0x10);
+	idx_entry_new->key_length = cpu_to_le16(fn_size);
+	memcpy((u8*)idx_entry_new + 0x10, (u8*)fn, fn_size);
 	i = insert_index_entry_in_res_dir_index(idx_entry_new, idx_size + 0x10,
-		m_parent, NTFS_INDEX_I30, 4, AT_FILE_NAME);
+			m_parent, NTFS_INDEX_I30, 4, AT_FILE_NAME);
 	if (i < 0) {
 		ntfs_log_error("create_hardlink failed inserting index entry: %s\n",
 				strerror(-i));
@@ -4754,7 +4727,6 @@ static BOOL mkntfs_create_root_structures(void)
 
 	/* dump_mft_record(m); */
 	/* create $Quota (1.2) or $Secure (3.0+) */
-
 	if (g_vol->major_ver < 3) {
 		ntfs_log_verbose("Creating $Quota (mft record 9)\n");
 		m = (MFT_RECORD*)(g_buf + 9 * g_vol->mft_record_size);
@@ -4799,22 +4771,22 @@ static BOOL mkntfs_create_root_structures(void)
 					return FALSE;
 				init_secure_31(buf_sds_init);
 			}
-			buf_sds = ntfs_calloc(1,buf_sds_size);
+			buf_sds = ntfs_calloc(1, buf_sds_size);
 			if (!buf_sds) {
 				free(buf_sds_init);
 				return FALSE;
 			}
 			memcpy(buf_sds, buf_sds_init, buf_sds_first_size);
 			memcpy(buf_sds + 0x40000, buf_sds_init,
-				buf_sds_first_size);
+					buf_sds_first_size);
 			err = add_attr_data(m, "$SDS", 4, 0, 0, (u8*)buf_sds,
-				buf_sds_size);
+					buf_sds_size);
 			free(buf_sds);
 		}
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
 			err = add_attr_index_root(m, "$SDH", 4, 0, AT_UNUSED,
-				COLLATION_NTOFS_SECURITY_HASH ,
+				COLLATION_NTOFS_SECURITY_HASH,
 				g_vol->indx_record_size);
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
@@ -4980,7 +4952,6 @@ static BOOL mkntfs_create_root_structures(void)
 	}
 	return TRUE;
 }
-
 
 /**
  * mkntfs_redirect
