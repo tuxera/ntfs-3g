@@ -2,9 +2,7 @@
  * upcase - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001 Richard Russon
- * Copyright (c) 2001-2004 Anton Altaparmakov
- *
- * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
+ * Copyright (c) 2001-2006 Anton Altaparmakov
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -28,6 +26,7 @@
 #include <string.h>
 #endif
 
+#include "endians.h"
 #include "types.h"
 #include "upcase.h"
 
@@ -74,8 +73,9 @@ void init_upcase_table(ntfschar *uc, u32 uc_len)
 	};
 	int i, r;
 
-	memset((char*)uc, 0, uc_len);
+	memset(uc, 0, uc_len);
 	uc_len >>= 1;
+	/* Generate the upcase table in cpu byte order. */
 	for (i = 0; (u32)i < uc_len; i++)
 		uc[i] = i;
 	for (r = 0; uc_run_table[r][0]; r++)
@@ -86,5 +86,7 @@ void init_upcase_table(ntfschar *uc, u32 uc_len)
 			uc[i + 1]--;
 	for (r = 0; uc_byte_table[r][0]; r++)
 		uc[uc_byte_table[r][0]] = uc_byte_table[r][1];
+	/* Convert the upcase table from cpu byte order to little endian. */
+	for (i = 0; (u32)i < uc_len; i++)
+		uc[i] = cpu_to_le16(uc[i]);
 }
-
