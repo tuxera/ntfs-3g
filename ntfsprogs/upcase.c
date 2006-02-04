@@ -75,18 +75,16 @@ void init_upcase_table(ntfschar *uc, u32 uc_len)
 
 	memset(uc, 0, uc_len);
 	uc_len >>= 1;
-	/* Generate the upcase table in cpu byte order. */
+	/* Generate the little endian Unicode upcase table used by ntfs. */
 	for (i = 0; (u32)i < uc_len; i++)
-		uc[i] = i;
+		uc[i] = cpu_to_le16(i);
 	for (r = 0; uc_run_table[r][0]; r++)
 		for (i = uc_run_table[r][0]; i < uc_run_table[r][1]; i++)
-			uc[i] += uc_run_table[r][2];
+			uc[i] = cpu_to_le16(le16_to_cpu(uc[i]) +
+					uc_run_table[r][2]);
 	for (r = 0; uc_dup_table[r][0]; r++)
 		for (i = uc_dup_table[r][0]; i < uc_dup_table[r][1]; i += 2)
-			uc[i + 1]--;
+			uc[i + 1] = cpu_to_le16(le16_to_cpu(uc[i + 1]) - 1);
 	for (r = 0; uc_byte_table[r][0]; r++)
-		uc[uc_byte_table[r][0]] = uc_byte_table[r][1];
-	/* Convert the upcase table from cpu byte order to little endian. */
-	for (i = 0; (u32)i < uc_len; i++)
-		uc[i] = cpu_to_le16(uc[i]);
+		uc[uc_byte_table[r][0]] = cpu_to_le16(uc_byte_table[r][1]);
 }
