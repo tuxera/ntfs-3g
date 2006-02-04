@@ -114,7 +114,7 @@
 	  mountable by the kernel driver (it requires mft record size and index
 	  record size to be below or equal to the system page size which we
 	  determine using sysconf()).  (Anton)
-	- Fix tons of bugs in mkntfs.  (Anton)
+	- Fix tons of big-endian bugs in mkntfs.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
