@@ -3794,8 +3794,6 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	else
 		g_mft_size = 16;
 	g_mft_size *= g_vol->mft_record_size;
-	g_mft_size = ((16 + 11 * (g_vol->major_ver >= 3)) *
-			g_vol->mft_record_size);
 	if (g_mft_size < (s32)g_vol->cluster_size)
 		g_mft_size = g_vol->cluster_size;
 	ntfs_log_debug("MFT size = %i (0x%x) bytes\n", g_mft_size, g_mft_size);
