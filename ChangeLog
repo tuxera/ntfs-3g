@@ -115,6 +115,7 @@
 	  record size to be below or equal to the system page size which we
 	  determine using sysconf()).  (Anton)
 	- Fix tons of big-endian bugs in mkntfs.  (Anton)
+	- ntfsresize, ntfsclone: always use MS_NOATIME.  (Szaka)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
