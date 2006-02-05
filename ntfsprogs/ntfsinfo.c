@@ -2046,14 +2046,20 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 
+	printf("Update Sequence Offset:\t %hu\n",
+		le16_to_cpu(inode->mrec->usa_ofs));
 	printf("Update Sequence Array Count:\t %hu\n",
 		le16_to_cpu(inode->mrec->usa_count));
-	printf("$LogFile seqNum for this Inode:\t 0x%llx\n",
+	printf("Update Sequence Number:\t %hu\n",
+		*(u16*)((u8*)inode->mrec + le16_to_cpu(inode->mrec->usa_ofs)));
+	printf("$LogFile Sequence Number:\t 0x%llx\n",
 		(signed long long int)sle64_to_cpu(inode->mrec->lsn));
-	printf("Number of times reused:\t\t %hu\n",
+	printf("MFT Record Sequence Number:\t %hu\n",
 		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
 	printf("Number of hard links:\t\t %hu\n",
 		le16_to_cpu(inode->mrec->link_count));
+	printf("First attribute offset:\t %hu\n",
+		le16_to_cpu(inode->mrec->attrs_offset));
 
 	printf("MFT record Flags:\t\t ");
 	if (inode_flags) {
@@ -2090,7 +2096,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 		printf("base MFT record:\t\t %llu\n",
 			MREF_LE(inode->mrec->base_mft_record));
 	}
-	printf("Next Attribute Instance Num\t %hu\n",
+	printf("Next Attribute Instance:\t %hu\n",
 		le16_to_cpu(inode->mrec->next_attr_instance));
 }
 
