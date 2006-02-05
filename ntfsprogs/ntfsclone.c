@@ -1006,6 +1006,19 @@ static void wipe_unused_mft(ntfs_inode *ni)
 	wiped_unused_mft += wipe_data((char *)m, sizeof(MFT_RECORD), unused);
 }
 
+static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
+{
+	u16 usn, *usnp;
+	
+	usnp = (u16 *)((char *)ni->mrec + le16_to_cpu(ni->mrec->usa_ofs));
+	usn = le16_to_cpup(usnp);
+	if (usn-- <= 1)
+		usn = 0xfffe;
+	*usnp = cpu_to_le16(usn);
+	
+	if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
+		perr_exit("ntfs_mft_record_write");
+}
 
 static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 {
@@ -1049,8 +1062,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			if (wipe) {
 				wipe_unused_mft(ni);
 				wipe_unused_mft_data(ni);
-				if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
-					perr_exit("ntfs_mft_record_write");
+				mft_record_write_with_same_usn(volume, ni);
 			}
 		}
 
@@ -1079,8 +1091,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 out:
 		if (wipe) {
 			wipe_unused_mft_data(ni);
-			if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
-				perr_exit("ntfs_mft_record_write");
+			mft_record_write_with_same_usn(volume, ni);
 		}
 
 		if (ntfs_inode_close(ni))
