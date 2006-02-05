@@ -88,6 +88,10 @@ static const char *bad_sectors_warning_msg =
 "* Use the --rescue option to efficiently save as much data as possible! *\n"
 "*************************************************************************\n";
 
+static const char *dirty_volume_msg =
+"Volume '%s' is scheduled for a check or it was shutdown \n"
+"uncleanly. Please boot Windows or use the --force option to progress.\n";
+
 struct {
 	int verbose;
 	int quiet;
@@ -1215,8 +1219,7 @@ static void mount_volume(unsigned long new_mntflag)
 
 	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
-			err_exit("Volume is dirty. Run chkdsk and "
-				 "please try again (or see -f option).\n");
+			err_exit(dirty_volume_msg, opt.volume);
 
 	if (NTFS_MAX_CLUSTER_SIZE < vol->cluster_size)
 		err_exit("Cluster size %u is too large!\n",
