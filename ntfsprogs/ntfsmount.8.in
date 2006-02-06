@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "January 2006" "ntfsprogs version @VERSION@"
+.TH NTFSMOUNT 8 "January 2006" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS

@@ -3,7 +3,7 @@
 .\" Copyright (c) 2004 Per Olofsson.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCLONE 8 "January 2006" "ntfsprogs version @VERSION@"
+.TH NTFSCLONE 8 "February 2006" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsclone \- Efficiently clone, image, restore or rescue an NTFS
 .SH SYNOPSIS
@@ -93,11 +93,10 @@ writing large amount of zeros to the disk needlessly. But since
 can't create an archive from the standard input, you can't do this
 in\-place by just reading
 .BR ntfsclone
-standard output. Even more sadly, using this \-S option results 
+standard output. Even more sadly, using the \-S option results 
 serious data loss since the end of 2004 and the GNU
 .BR tar
-maintainers don't care about releasing fixed versions until the
-present day.
+maintainers didn't release fixed versions until the present day.
 .SS The Special Image Format
 It's also possible, actually it's recommended, to save an NTFS filesystem
 to a special image format.

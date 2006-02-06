@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCP 8 "November 2005" "ntfsprogs version @VERSION@"
+.TH NTFSCP 8 "November 2005" "ntfsprogs @VERSION@"
 .SH NAME
 ntfscp \- overwrite file on an NTFS volume.
 .SH SYNOPSIS

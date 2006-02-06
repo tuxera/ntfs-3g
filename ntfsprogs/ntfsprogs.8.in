@@ -3,7 +3,7 @@
 .\" Copyright (c) 2005 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "November 2005" "ntfsprogs version @VERSION@"
+.TH NTFSPROGS 8 "November 2005" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsprogs \- several tools for doing neat things with NTFS partitions
 .SH OVERVIEW
