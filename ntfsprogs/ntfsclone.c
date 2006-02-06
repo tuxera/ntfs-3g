@@ -68,6 +68,7 @@
 #include "inode.h"
 #include "dir.h"
 #include "runlist.h"
+#include "ntfstime.h"
 #include "utils.h"
 #include "version.h"
 
@@ -710,7 +711,7 @@ static void restore_image(void)
 	}
 }
 
-static void wipe_index_root_timestamps(ATTR_RECORD *attr)
+static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 {
 	INDEX_ENTRY *entry;
 	INDEX_ROOT *iroot;
@@ -723,10 +724,10 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr)
 
 		if (iroot->type == AT_FILE_NAME) {
 
-			entry->key.file_name.creation_time = 0;
-			entry->key.file_name.last_access_time = 0;
-			entry->key.file_name.last_data_change_time = 0;
-			entry->key.file_name.last_mft_change_time = 0;
+			entry->key.file_name.creation_time = timestamp;
+			entry->key.file_name.last_access_time = timestamp;
+			entry->key.file_name.last_data_change_time = timestamp;
+			entry->key.file_name.last_mft_change_time = timestamp;
 
 		} else if (ntfs_names_are_equal(NTFS_INDEX_Q,
 				sizeof(NTFS_INDEX_Q) / 2 - 1,
@@ -743,22 +744,22 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr)
 			 *  till we only check for quota version 2 ...
 			 */
 			if (le32_to_cpu(quota_q->version) == 2)
-				quota_q->change_time = 0;
+				quota_q->change_time = timestamp;
 		}
 
 		entry = (INDEX_ENTRY*)((u8*)entry + le16_to_cpu(entry->length));
 	}
 }
 
-#define WIPE_TIMESTAMPS(atype, attr)				\
+#define WIPE_TIMESTAMPS(atype, attr, timestamp)			\
 do {								\
 	atype *ats;						\
 	ats = (atype *)((char *)(attr) + (attr)->value_offset);	\
 								\
-	ats->creation_time = 0;					\
-	ats->last_data_change_time = 0;				\
-	ats->last_mft_change_time= 0;				\
-	ats->last_access_time = 0;				\
+	ats->creation_time = (timestamp);	       		\
+	ats->last_data_change_time = (timestamp);		\
+	ats->last_mft_change_time= (timestamp);			\
+	ats->last_access_time = (timestamp);			\
 								\
 	wiped_timestamp_data += 32;				\
 								\
@@ -767,15 +768,16 @@ do {								\
 static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a = image->ctx->attr;
+	s64 timestamp = utc2ntfs(0);
 
 	if (a->type == AT_FILE_NAME)
-		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a);
+		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);
 
 	else if (a->type == AT_STANDARD_INFORMATION)
-		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a);
+		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a, timestamp);
 	
 	else if (a->type == AT_INDEX_ROOT)
-		wipe_index_root_timestamps(a);
+		wipe_index_root_timestamps(a, timestamp);
 }
 
 static void wipe_resident_data(ntfs_walk_clusters_ctx *image)
