@@ -729,6 +729,8 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 			entry->key.file_name.last_data_change_time = timestamp;
 			entry->key.file_name.last_mft_change_time = timestamp;
 
+			wiped_timestamp_data += 32;
+
 		} else if (ntfs_names_are_equal(NTFS_INDEX_Q,
 				sizeof(NTFS_INDEX_Q) / 2 - 1,
 				(ntfschar *)((char *)attr +
@@ -740,11 +742,14 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 			quota_q = (QUOTA_CONTROL_ENTRY *)((u8 *)entry +
 							  entry->data_offset);
 			/*
-			 *  FIXME: no guarantee it's indeed /$Extend/$Quota:$Q
-			 *  till we only check for quota version 2 ...
+			 *  FIXME: no guarantee it's indeed /$Extend/$Quota:$Q.
+			 *  For now, as a minimal safeguard, we check only for
+			 *  quota version 2 ...
 			 */
-			if (le32_to_cpu(quota_q->version) == 2)
+			if (le32_to_cpu(quota_q->version) == 2) {
 				quota_q->change_time = timestamp;
+				wiped_timestamp_data += 4;
+			}
 		}
 
 		entry = (INDEX_ENTRY*)((u8*)entry + le16_to_cpu(entry->length));
