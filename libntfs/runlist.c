@@ -347,6 +347,7 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
 static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
+	signed delta;
 	BOOL left  = FALSE;	/* Left end of @src needs merging */
 	BOOL right = FALSE;	/* Right end of @src needs merging */
 	int tail;		/* Start of tail of @dst */
@@ -366,11 +367,14 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
 		left = ntfs_rl_are_mergeable(dst + loc - 1, src);
 
 	/* Allocate some space. We'll need less if the left, right, or both
-	 * ends get merged.
+	 * ends get merged.  The -1 accounts for the run being replaced.
 	 */
-	dst = ntfs_rl_realloc(dst, dsize, dsize + ssize - left - right);
-	if (!dst)
-		return NULL;
+	delta = ssize - 1 - left - right;
+	if (delta > 0) {
+		dst = ntfs_rl_realloc(dst, dsize, dsize + delta);
+		if (!dst)
+			return NULL;
+	}
 	/*
 	 * We are guaranteed to succeed from here so can start modifying the
 	 * original runlists.
@@ -1733,20 +1737,20 @@ static void test_rl_dump_runlist(const runlist_element *rl)
 	const char *lcn_str[5] = { "HOLE", "NOTMAP", "ENOENT", "XXXX" };
 
 	if (!rl) {
-		ntfs_log_debug("    Run list not present.\n");
+		printf("    Run list not present.\n");
 		return;
 	}
 
 	if (abbr)
 		for (len = 0; rl[len].length; len++) ;
 
-	ntfs_log_debug("     VCN      LCN      len\n");
+	printf("     VCN      LCN      len\n");
 	for (i = 0; ; i++, rl++) {
 		LCN lcn = rl->lcn;
 
 		if ((abbr) && (len > 20)) {
 			if (i == 4)
-				ntfs_log_debug("     ...\n");
+				printf("     ...\n");
 			if ((i > 3) && (i < (len - 3)))
 				continue;
 		}
@@ -1756,17 +1760,17 @@ static void test_rl_dump_runlist(const runlist_element *rl)
 
 			if (ind > -LCN_ENOENT - 1)
 				ind = 3;
-			ntfs_log_debug("%8lld %8s %8lld\n",
+			printf("%8lld %8s %8lld\n",
 				rl->vcn, lcn_str[ind], rl->length);
 		} else
-			ntfs_log_debug("%8lld %8lld %8lld\n",
+			printf("%8lld %8lld %8lld\n",
 				rl->vcn, rl->lcn, rl->length);
 		if (!rl->length)
 			break;
 	}
 	if ((abbr) && (len > 20))
-		ntfs_log_debug("    (%d entries)\n", len+1);
-	ntfs_log_debug("\n");
+		printf("    (%d entries)\n", len+1);
+	printf("\n");
 }
 
 /**
@@ -1782,14 +1786,14 @@ static runlist_element * test_rl_runlists_merge(runlist_element *drl, runlist_el
 {
 	runlist_element *res = NULL;
 
-	ntfs_log_debug("dst:\n");
+	printf("dst:\n");
 	test_rl_dump_runlist(drl);
-	ntfs_log_debug("src:\n");
+	printf("src:\n");
 	test_rl_dump_runlist(srl);
 
 	res = ntfs_runlists_merge(drl, srl);
 
-	ntfs_log_debug("res:\n");
+	printf("res:\n");
 	test_rl_dump_runlist(res);
 
 	return res;
@@ -1811,12 +1815,12 @@ static int test_rl_read_buffer(const char *file, u8 *buf, int bufsize)
 
 	fptr = fopen(file, "r");
 	if (!fptr) {
-		ntfs_log_debug("open %s\n", file);
+		printf("open %s\n", file);
 		return 0;
 	}
 
 	if (fread(buf, bufsize, 1, fptr) == 99) {
-		ntfs_log_debug("read %s\n", file);
+		printf("read %s\n", file);
 		return 0;
 	}
 
@@ -1884,7 +1888,7 @@ static void test_rl_pure_test(int test, BOOL contig, BOOL multi, int vcn, int le
 
 	memcpy(dst, file, size);
 
-	ntfs_log_debug("Test %2d ----------\n", test);
+	printf("Test %2d ----------\n", test);
 	res = test_rl_runlists_merge(dst, src);
 
 	free(res);
@@ -1942,7 +1946,7 @@ static void test_rl_pure(char *contig, char *multi)
 	else if (strcmp(contig, "noncontig") == 0)
 		c = FALSE;
 	else {
-		ntfs_log_debug("rl pure [contig|noncontig] [single|multi]\n");
+		printf("rl pure [contig|noncontig] [single|multi]\n");
 		return;
 	}
 	if (strcmp(multi, "multi") == 0)
@@ -1950,7 +1954,7 @@ static void test_rl_pure(char *contig, char *multi)
 	else if (strcmp(multi, "single") == 0)
 		m = FALSE;
 	else {
-		ntfs_log_debug("rl pure [contig|noncontig] [single|multi]\n");
+		printf("rl pure [contig|noncontig] [single|multi]\n");
 		return;
 	}
 
@@ -2089,7 +2093,8 @@ static void test_rl_frag(char *test)
 	else if (strcmp(test, "231") == 0)  test_rl_frag_combine(&vol, attr2, attr3, attr1);
 	else if (strcmp(test, "312") == 0)  test_rl_frag_combine(&vol, attr3, attr1, attr2);
 	else if (strcmp(test, "321") == 0)  test_rl_frag_combine(&vol, attr3, attr2, attr1);
-	else ntfs_log_debug("Frag: No such test '%s'\n", test);
+	else
+		printf("Frag: No such test '%s'\n", test);
 
 out:
 	free(attr1);
@@ -2111,7 +2116,8 @@ int test_rl_main(int argc, char *argv[])
 	if      ((argc == 2) && (strcmp(argv[1], "zero") == 0)) test_rl_zero();
 	else if ((argc == 3) && (strcmp(argv[1], "frag") == 0)) test_rl_frag(argv[2]);
 	else if ((argc == 4) && (strcmp(argv[1], "pure") == 0)) test_rl_pure(argv[2], argv[3]);
-	else ntfs_log_debug("rl [zero|frag|pure] {args}\n");
+	else
+		printf("rl [zero|frag|pure] {args}\n");
 
 	return 0;
 }
