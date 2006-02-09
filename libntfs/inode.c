@@ -252,6 +252,8 @@ int ntfs_inode_close(ntfs_inode *ni)
 	if (!ni)
 		return 0;
 
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
@@ -473,6 +475,8 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	STANDARD_INFORMATION *std_info;
 	int err;
 
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
@@ -512,6 +516,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 	ntfs_inode *index_ni;
 	FILE_NAME_ATTR *fn;
 	int err = 0;
+
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {

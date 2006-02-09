@@ -629,6 +629,9 @@ LCN ntfs_attr_vcn_to_lcn(ntfs_attr *na, const VCN vcn)
 
 	if (!na || !NAttrNonResident(na) || vcn < 0)
 		return (LCN)LCN_EINVAL;
+
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
+			long)na->ni->mft_no, na->type);
 retry:
 	/* Convert vcn to lcn. If that fails map the runlist and retry once. */
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
@@ -678,6 +681,10 @@ runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn)
 		errno = EINVAL;
 		return NULL;
 	}
+	
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, vcn %llx\n",
+		       (unsigned long long)na->ni->mft_no, na->type,
+		       (long long)vcn);
 retry:
 	rl = na->rl;
 	if (!rl)
@@ -1573,6 +1580,8 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	ntfs_volume *vol;
 	ntfschar *upcase;
 	u32 upcase_len;
+	
+	ntfs_log_trace("Entering.\n");
 
 	if (ctx->ntfs_ino) {
 		vol = ctx->ntfs_ino->vol;
@@ -3250,6 +3259,8 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 new_size)
 {
+	ntfs_log_trace("Entering for new size %u.\n", (unsigned)new_size);
+
 	/*
 	 * Check that the attribute name hasn't been placed after the
 	 * attribute value. Chkdsk treat this as corruption.
@@ -3498,6 +3509,9 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	runlist *rl;
 	int mp_size, mp_ofs, name_ofs, arec_size, err;
 
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
+			long)na->ni->mft_no, na->type);
+
 	/* Some preliminary sanity checking. */
 	if (NAttrNonResident(na)) {
 		ntfs_log_trace("Eeek!  Trying to make non-resident attribute "
@@ -3679,6 +3693,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
 			long)na->ni->mft_no, na->type);
+
 	/* Get the attribute record that needs modification. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
@@ -3894,6 +3909,9 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	ATTR_REC *a = ctx->attr;
 	int name_ofs, val_ofs, err = EIO;
 	s64 arec_size, bytes_read;
+	
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
+			long)na->ni->mft_no, na->type);
 
 	/* Should be called for the first extent of the attribute. */
 	if (sle64_to_cpu(a->lowest_vcn)) {
@@ -4898,6 +4916,9 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		errno = EINVAL;
 		return -1;
 	}
+	
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
+			long)na->ni->mft_no, na->type);
 
 	if (na->data_size == newsize)
 		return 0;

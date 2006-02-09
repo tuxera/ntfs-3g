@@ -715,7 +715,13 @@ err_ret:
  */
 int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 {
+	ntfs_log_trace("Entering.\n");
+
 	for (; rl->length; rl++) {
+
+		ntfs_log_trace("Dealloc lcn 0x%llx, len 0x%llx.\n",
+			       (long long)rl->lcn, (long long)rl->length);
+
 		if (rl->lcn >= 0 && ntfs_bitmap_clear_run(vol->lcnbmp_na,
 				rl->lcn, rl->length)) {
 			int eo = errno;
@@ -754,7 +760,10 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		errno = EINVAL;
 		return -1;
 	}
-
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, count 0x%llx, "
+		       "vcn 0x%llx.\n", (unsigned long long)na->ni->mft_no,
+		       na->type, (long long)count, (long long)start_vcn);
+	
 	rl = ntfs_attr_find_vcn(na, start_vcn);
 	if (!rl) {
 		if (errno == ENOENT)
