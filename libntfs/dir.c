@@ -1110,6 +1110,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		ntfschar *target, u8 target_len)
 {
 	ntfs_inode *ni;
+	ntfs_attr *na;
+	int rollback_data = 0;
 	FILE_NAME_ATTR *fn = NULL;
 	STANDARD_INFORMATION *si = NULL;
 	int err, fn_len, si_len;
@@ -1244,8 +1246,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 			ntfs_log_error("Failed to add DATA attribute.\n");
 			goto err_out;
 		}
-		if (data)
-			free(data);
+		rollback_data = 1;
+		free(data);
 	}
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
@@ -1293,6 +1295,17 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	return ni;
 err_out:
 	ntfs_log_trace("Failed.\n");
+	if (rollback_data) {
+		na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+		if (!na)
+			ntfs_log_perror("Failed to open data attribute of "
+					" inode 0x%llx. Run chkdsk.\n",
+					(unsigned long long)ni->mft_no);
+		else if (ntfs_attr_rm(na))
+			ntfs_log_perror("Failed to remove data attribute of "
+					"inode 0x%llx. Run chkdsk.\n",
+					(unsigned long long)ni->mft_no);
+	}
 	if (ntfs_mft_record_free(ni->vol, ni))
 		ntfs_log_error("Failed to free MFT record.  "
 				"Leaving inconsistent metadata. Run chkdsk.\n");
