@@ -681,7 +681,7 @@ runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn)
 		errno = EINVAL;
 		return NULL;
 	}
-	
+
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, vcn %llx\n",
 		       (unsigned long long)na->ni->mft_no, na->type,
 		       (long long)vcn);
@@ -1580,7 +1580,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	ntfs_volume *vol;
 	ntfschar *upcase;
 	u32 upcase_len;
-	
+
 	ntfs_log_trace("Entering.\n");
 
 	if (ctx->ntfs_ino) {
@@ -3909,7 +3909,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	ATTR_REC *a = ctx->attr;
 	int name_ofs, val_ofs, err = EIO;
 	s64 arec_size, bytes_read;
-	
+
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
 			long)na->ni->mft_no, na->type);
 
@@ -4916,7 +4916,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
 			long)na->ni->mft_no, na->type);
 

@@ -226,7 +226,7 @@ int ntfs_bitmap_clear_run(ntfs_attr *na, s64 start_bit, s64 count)
 {
 	ntfs_log_trace("Dealloc from bit 0x%llx, count 0x%llx.\n",
 		       (long long)start_bit, (long long)count);
-	 
+
 	return ntfs_bitmap_set_bits_in_run(na, start_bit, count, 0);
 }
 

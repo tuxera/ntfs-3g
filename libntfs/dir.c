@@ -1110,7 +1110,6 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		ntfschar *target, u8 target_len)
 {
 	ntfs_inode *ni;
-	ntfs_attr *na;
 	int rollback_data = 0;
 	FILE_NAME_ATTR *fn = NULL;
 	STANDARD_INFORMATION *si = NULL;
@@ -1186,7 +1185,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		ie->key_length = 0;
 		ie->flags = INDEX_ENTRY_END;
 		/* Add INDEX_ROOT attribute to inode. */
-		if (ntfs_attr_add(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4, (u8*)ir, ir_len)) {
+		if (ntfs_attr_add(ni, AT_INDEX_ROOT, NTFS_INDEX_I30, 4,
+				(u8*)ir, ir_len)) {
 			err = errno;
 			free(ir);
 			ntfs_log_error("Failed to add INDEX_ROOT attribute.\n");
@@ -1296,6 +1296,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 err_out:
 	ntfs_log_trace("Failed.\n");
 	if (rollback_data) {
+		ntfs_attr *na;
+
 		na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 		if (!na)
 			ntfs_log_perror("Failed to open data attribute of "
