@@ -118,6 +118,13 @@ static const char *bad_sectors_warning_msg =
 "* NTFS safely by additionally using the --bad-sectors option of ntfsresize.*\n"
 "****************************************************************************\n";
 
+static const char *many_bad_sectors_msg =
+"***************************************************************************\n"
+"* WARNING: The disk has many bad sectors. This means physical damage      *\n"
+"* on the disk surface caused by deterioration, manufacturing faults or    *\n"
+"* other reason. We suggest to get a replacement disk as soon as possible. *\n"
+"***************************************************************************\n";
+
 struct {
 	int verbose;
 	int debug;
@@ -2034,6 +2041,7 @@ static void lookup_data_attr(ntfs_volume *vol,
 static int check_bad_sectors(ntfs_volume *vol)
 {
 	ntfs_attr_search_ctx *ctx;
+	ntfs_inode *base_ni;
 	runlist *rl;
 	s64 i, badclusters = 0;
 
@@ -2041,14 +2049,24 @@ static int check_bad_sectors(ntfs_volume *vol)
 
 	lookup_data_attr(vol, FILE_BadClus, "$Bad", &ctx);
 
-	if (NInoAttrList(ctx->ntfs_ino))
-		err_exit("Hopelessly many bad sectors! Please report to "
-			 "%s\n", NTFS_DEV_LIST);
+	base_ni = ctx->base_ntfs_ino;
+	if (!base_ni)
+		base_ni = ctx->ntfs_ino;
+
+	if (NInoAttrList(base_ni)) {
+		err_printf("Hopelessly many bad sectors has been detected!\n");
+		printf("%s", many_bad_sectors_msg);
+		exit(1);
+	}
 
 	if (!ctx->attr->non_resident)
 		err_exit("Resident attribute in $BadClust! Please report to "
 			 "%s\n", NTFS_DEV_LIST);
-
+	/* 
+	 * FIXME: The below would be partial for non-base records in the
+	 * not yet supported multi-record case. Alternatively use audited
+	 * ntfs_attr_truncate after an umount & mount.
+	 */
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, ctx->attr, NULL)))
 		perr_exit("Decompressing $BadClust:$Bad mapping pairs failed");
 
@@ -2058,8 +2076,9 @@ static int check_bad_sectors(ntfs_volume *vol)
 			continue;
 
 		badclusters += rl[i].length;
-		ntfs_log_verbose("Bad cluster: %8lld - %lld\n", rl[i].lcn,
-			rl[i].lcn + rl[i].length - 1);
+		ntfs_log_verbose("Bad cluster: %#8llx - %#llx    (%lld)\n",
+				 rl[i].lcn, rl[i].lcn + rl[i].length - 1,
+				 rl[i].length);
 	}
 
 	if (badclusters) {
