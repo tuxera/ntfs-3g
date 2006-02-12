@@ -91,9 +91,9 @@ static const char *invalid_ntfs_msg =
 "if the disk was incorrectly repartitioned (see the ntfsresize FAQ).\n";
 
 static const char *corrupt_volume_msg =
-"This software has detected that your NTFS is corrupted. Please run chkdsk /f\n"
-"on Windows then reboot it TWICE! Important, don't forget the /f parameter!\n"
-"Afterwards you can run ntfsresize. No modification was made to NTFS.\n";
+"NTFS is inconsistent. Run chkdsk /f on Windows then reboot it TWICE!\n"
+"The usage of the /f parameter is very IMPORTANT! No modification was\n"
+"and will be made to NTFS by this software until it gets repaired.\n";
 
 static const char *hibernated_volume_msg =
 "The NTFS partition is hibernated. Windows must be resumed and turned off\n"
@@ -974,9 +974,9 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 	}
 done:
 	if (mismatch) {
-		err_printf("Filesystem check failed! Totally %d cluster "
-			   "accounting mismatches.\n", mismatch);
-		printf("%s", corrupt_volume_msg);
+		printf("Filesystem check failed! Totally %d cluster "
+		       "accounting mismatches.\n", mismatch);
+		err_printf("%s", corrupt_volume_msg);
 		exit(1);
 	}
 }
