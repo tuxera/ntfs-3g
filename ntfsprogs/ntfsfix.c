@@ -1,14 +1,11 @@
 /**
- * NtfsFix - Part of the Linux-NTFS project.
+ * ntfsfix - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov.
+ * Copyright (c) 2002-2005 Szabolcs Szakacsits.
  *
- * This utility will attempt to fix a partition that has been damaged by the
- * current Linux-NTFS driver. It should be run after dismounting an NTFS
- * partition that has been mounted read-write under Linux and before rebooting
- * into Windows NT/2000. NtfsFix can be run even after Windows has had mounted
- * the partition, but it might be too late and irreversible damage to the data
- * might have been done already.
+ * This utility fixes some common NTFS problems, resets the NTFS journal file
+ * and schedules an NTFS consistency check for the first boot into Windows.
  *
  *	Anton Altaparmakov <aia21@cantab.net>
  *
