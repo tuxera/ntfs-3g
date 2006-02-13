@@ -40,6 +40,7 @@ typedef int (ntfs_log_handler)(const char *function, const char *file, int line,
 void ntfs_log_set_handler(ntfs_log_handler *handler);
 
 /* Logging handlers */
+ntfs_log_handler ntfs_log_handler_syslog  __attribute__((format(printf, 6, 0)));
 ntfs_log_handler ntfs_log_handler_fprintf __attribute__((format(printf, 6, 0)));
 ntfs_log_handler ntfs_log_handler_null    __attribute__((format(printf, 6, 0)));
 ntfs_log_handler ntfs_log_handler_stdout  __attribute__((format(printf, 6, 0)));

@@ -116,6 +116,8 @@
 	  determine using sysconf()).  (Anton)
 	- Fix tons of big-endian bugs in mkntfs.  (Anton)
 	- ntfsresize, ntfsclone: always use MS_NOATIME.  (Szaka)
+	- Implement simple syslog logging handler (need more work), teach
+	  ntfsmount to use it.  (Yura)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

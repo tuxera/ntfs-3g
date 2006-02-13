@@ -38,6 +38,7 @@
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+#include <syslog.h>
 
 #include "logging.h"
 
@@ -275,9 +276,11 @@ static const char * ntfs_log_get_prefix(u32 level)
  */
 void ntfs_log_set_handler(ntfs_log_handler *handler)
 {
-	if (handler)
+	if (handler) {
 		ntfs_log.handler = handler;
-	else
+		if (handler == ntfs_log_handler_syslog)
+			openlog("libntfs", LOG_PID, LOG_USER);
+	} else
 		ntfs_log.handler = ntfs_log_handler_null;
 }
 
@@ -317,6 +320,79 @@ int ntfs_log_redirect(const char *function, const char *file,
 	return ret;
 }
 
+
+/**
+ * ntfs_log_handler_syslog - syslog logging handler
+ * @function:	Function in which the log line occurred
+ * @file:	File in which the log line occurred
+ * @line:	Line number on which the log line occurred
+ * @level:	Level at which the line is logged
+ * @data:	User specified data, possibly specific to a handler
+ * @format:	printf-style formatting string
+ * @args:	Arguments to be formatted
+ *
+ * A simple syslog logging handler.  Ignores colors.
+ *
+ * Returns:  -1  Error occurred
+ *            0  Message wasn't logged
+ *          num  Number of output characters
+ */
+int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
+	const char *file, __attribute__((unused)) int line, u32 level,
+	void *data __attribute__((unused)), const char *format, va_list args)
+{
+	const int reason_size = 128;
+	static char *reason = NULL;
+	int ret = 0;
+	int olderr = errno;
+
+	if (level == NTFS_LOG_LEVEL_REASON) {
+		if (!reason)
+			reason = malloc(reason_size);
+		if (reason) {
+			memset(reason, 0, reason_size);
+			return vsnprintf(reason, reason_size, format, args);
+		} else {
+			/* Rather than call ourselves, just drop through */
+			level = NTFS_LOG_LEVEL_PERROR;
+			format = "Couldn't create reason";
+			args = NULL;
+			olderr = errno;
+		}
+	}
+
+	if ((ntfs_log.flags & NTFS_LOG_FLAG_ONLYNAME) &&
+	    (strchr(file, PATH_SEP)))		/* Abbreviate the filename */
+		file = strrchr(file, PATH_SEP) + 1;
+#if 0	/* FIXME: Implement this all. */
+	if (ntfs_log.flags & NTFS_LOG_FLAG_PREFIX)	/* Prefix the output */
+		ret += fprintf(stream, "%s", ntfs_log_get_prefix(level));
+
+	if (ntfs_log.flags & NTFS_LOG_FLAG_FILENAME)	/* Source filename */
+		ret += fprintf(stream, "%s ", file);
+
+	if (ntfs_log.flags & NTFS_LOG_FLAG_LINE)	/* Source line number */
+		ret += fprintf(stream, "(%d) ", line);
+
+	if ((ntfs_log.flags & NTFS_LOG_FLAG_FUNCTION) || /* Source function */
+	    (level & NTFS_LOG_LEVEL_TRACE))
+		ret += fprintf(stream, "%s(): ", function);
+
+	ret += vfprintf(stream, format, args);
+
+	if (level & NTFS_LOG_LEVEL_PERROR) {
+		if (reason)
+			ret += fprintf(stream, " : %s\n", reason);
+		else
+			ret += fprintf(stream, " : %s\n", strerror(olderr));
+	}
+#endif
+	vsyslog(LOG_NOTICE, format, args);
+	ret = 1; /* FIXME: caclulate how many bytes had been written. */
+
+	errno = olderr;
+	return ret;
+}
 
 /**
  * ntfs_log_handler_fprintf - Basic logging handler

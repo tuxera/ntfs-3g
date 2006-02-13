@@ -51,6 +51,7 @@
 #include <limits.h>
 #endif
 #include <getopt.h>
+#include <syslog.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -516,8 +517,8 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (name_type == FILE_NAME_DOS)
 		return 0;
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
-		ntfs_log_error("Skipping unrepresentable file (inode %lld): "
-				"%s\n", MREF(mref), strerror(errno));
+		ntfs_log_error("Skipping unrepresentable filename (inode %lld):"
+				" %s\n", MREF(mref), strerror(errno));
 		return 0;
 	}
 	if (ntfs_fuse_is_named_data_stream(filename)) {
@@ -1431,11 +1432,13 @@ static int ntfs_fuse_mount(const char *device)
 static void ntfs_fuse_destroy(void)
 {
 	if (ctx->vol) {
-		ntfs_log_debug("Unmounting: %s\n", ctx->vol->vol_name);
+		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
+				ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to unmount volume");
 	}
 	free(ctx);
+	free(opts.device);
 }
 
 static void signal_handler(int arg __attribute__((unused)))
@@ -1782,7 +1785,6 @@ int main(int argc, char *argv[])
 	parsed_options = parse_mount_options((opts.options) ?
 			opts.options : "");
 	if (!parsed_options) {
-		free(opts.device);
 		ntfs_fuse_destroy();
 		return 3;
 	}
@@ -1790,10 +1792,8 @@ int main(int argc, char *argv[])
 	/* Mount volume. */
 	if (ntfs_fuse_mount(opts.device)) {
 		ntfs_fuse_destroy();
-		free(opts.device);
 		return 4;
 	}
-	free(opts.device);
 	/* Create filesystem. */
 #if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	if ((fuse_opt_add_arg(&margs, "") == -1 ||
@@ -1849,12 +1849,23 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy();
 		return 6;
 	}
-	if (!ctx->debug && daemon(0, 0))
-		ntfs_log_error("Failed to daemonize.\n");
-	ntfs_log_info("Mounted: %s\n", ctx->vol->vol_name);
+	if (!ctx->debug) {
+		if (daemon(0, 0))
+			ntfs_log_error("Failed to daemonize.\n");
+		else {
+			ntfs_log_set_handler(ntfs_log_handler_syslog);
+			/* Override default libntfs ident. */
+			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
+		}
+	}
+	ntfs_log_info("Version %s (libntfs %s)\n", VERSION,
+			ntfs_libntfs_version());
+	ntfs_log_info("Mounted %s (%s, label \"%s\", volume version %d.%d)\n",
+			opts.device, (ctx->ro) ? "RO" : "RW",
+			ctx->vol->vol_name, ctx->vol->major_ver,
+			ctx->vol->minor_ver);
 	/* Main loop. */
-	if (fuse_loop(fh))
-		ntfs_log_error("fuse_loop failed.\n");
+	fuse_loop(fh);
 	/* Destroy. */
 	fuse_destroy(fh);
 	close(ffd);
