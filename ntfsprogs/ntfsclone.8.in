@@ -48,6 +48,26 @@ NTFS support then the file can be mounted as
 .B   mount \-t ntfs \-o loop ntfsclone.img /mnt/ntfsclone
 .sp
 .RE
+.SS Windows Cloning
+If you want to copy, move or restore a system or boot partition to another 
+computer, or to a different disk or partition (e.g. hda1\->hda2, hda1\->hdb1
+or to a different disk sector offset) then you will need to take extra care.
+
+Usually, Windows will not be able to boot, unless you copy, move or restore 
+NTFS to the same partition which starts at the same sector on the same type 
+of disk having the same BIOS legacy cylinder setting as the original 
+partition and disk had.
+
+The ntfsclone utility guarantees to make an exact copy of NTFS but it 
+won't deal with booting issues. This is by design: ntfsclone is a 
+filesystem, not system utility. Its aim is only NTFS cloning, not Windows 
+cloning. Hereby ntfsclone can be used as a very fast and reliable 
+build block for Windows clonning but itself it's not enough. You 
+can find useful tips following the related links on the below page
+.br
+.nh
+http://wiki.linux-ntfs.org/doku.php?id=ntfsclone
+.hy
 .SS Sparse Files
 A file is sparse if it has unallocated blocks (holes). The reported size of
 such files are always higher than the disk space consumed by them.  The
@@ -321,16 +341,22 @@ was written by Szabolcs Szakacsits with contributions from Per Olofsson
 .B ntfsclone
 is part of the
 .B ntfsprogs
-package and is available from:
+package and is available at:
 .br
 .nh
 http://www.linux\-ntfs.org/content/view/19/37
 .hy
 .sp
-The manual pages are available online at:
+The latest manual pages are available at:
 .br
 .nh
 http://man.linux-ntfs.org/
+.hy
+.sp
+Additional up-to-date information can be found furthermore at:
+.br
+.nh
+http://wiki.linux-ntfs.org/doku.php?id=ntfsclone
 .hy
 .SH SEE ALSO
 .BR ntfsresize (8)
