@@ -1,8 +1,8 @@
 /**
  * ntfscmp - compare two NTFS volumes.
  *
+ * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2005 Anton Altaparmakov
- * Copyright (c) 2005 Szabolcs Szakacsits
  *
  * This utility is part of the Linux-NTFS project.
  */
@@ -520,12 +520,37 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 	exit(1);
 }
 
+static int cmp_attribute_header(ATTR_RECORD *a1, ATTR_RECORD *a2)
+{
+	int header_size = offsetof(ATTR_RECORD, resident_end);
+
+	if (a1->non_resident != a2->non_resident)
+		return 1;
+
+	if (a1->non_resident) {
+
+		if (a1->compression_unit != a2->compression_unit)
+			return 1;
+
+		header_size = offsetof(ATTR_RECORD, non_resident_end);
+		if (a1->compression_unit)
+			header_size = offsetof(ATTR_RECORD, compressed_end);
+	} 
+
+	return memcmp(a1, a2, header_size);
+}
+
 static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 			  ntfs_attr_search_ctx *ctx2)
 {
 	ATTR_RECORD *a1 = ctx1->attr;
 	ATTR_RECORD *a2 = ctx2->attr;
 	ntfs_attr *na1, *na2;
+
+	if (cmp_attribute_header(a1, a2)) {
+		print_ctx(ctx1);
+		printf("header:    DIFFER\n");
+	}
 
 	na1 = ntfs_attr_open(base_inode(ctx1), a1->type, GET_ATTR_NAME(a1));
 	na2 = ntfs_attr_open(base_inode(ctx2), a2->type, GET_ATTR_NAME(a2));
