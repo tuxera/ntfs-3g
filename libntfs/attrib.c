@@ -4480,7 +4480,7 @@ retry:
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
 		ntfs_inode_mark_dirty(ni);
-		/* All mapping pairs are writed. */
+		/* All mapping pairs has been written. */
 		if (!err)
 			break;
 	}

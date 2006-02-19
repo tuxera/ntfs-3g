@@ -1119,12 +1119,16 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	/* Sanity checks. */
 	if (!dir_ni || !name || !name_len) {
 		ntfs_log_error("Invalid arguments.\n");
+		errno = EINVAL;
 		return NULL;
 	}
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
-		ntfs_log_error("Failed to allocate new MFT record.\n");
+		err = errno;
+		ntfs_log_error("Failed to allocate new MFT record: %s.\n",
+				strerror(err));
+		errno = err;
 		return NULL;
 	}
 	/*
@@ -1150,7 +1154,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
 			(u8*)si, si_len)) {
 		err = errno;
-		ntfs_log_error("Failed to add STANDARD_INFORMATION attribute.\n");
+		ntfs_log_error("Failed to add STANDARD_INFORMATION "
+				"attribute.\n");
 		goto err_out;
 	}
 	if (S_ISDIR(type)) {
@@ -1280,7 +1285,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number)))) {
 		err = errno;
-		ntfs_log_error("Failed to add entry to the index.\n");
+		ntfs_log_error("Failed to add entry to the index: %s.\n",
+				strerror(err));
 		goto err_out;
 	}
 	/* Set hard links count and directory flag. */
@@ -1506,6 +1512,7 @@ search:
 		ntfs_attr_reinit_search_ctx(actx);
 		goto search;
 	}
+	/* TODO: Update object id, quota and securiry indexes if required. */
 	/*
 	 * If hard link count is not equal to zero then we are done. In other
 	 * case there are no reference to this inode left, so we should free all

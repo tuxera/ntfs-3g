@@ -527,7 +527,8 @@ retry:
 					INDEX_ROOT, index))) {
 				err = EOPNOTSUPP;
 				ntfs_attr_close(na);
-				ntfs_log_error("Failed to truncate INDEX_ROOT.\n");
+				ntfs_log_debug("Failed to truncate "
+						"INDEX_ROOT.\n");
 				goto err_out;
 			}
 			ntfs_attr_close(na);
