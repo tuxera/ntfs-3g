@@ -4612,20 +4612,22 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	if ((na->allocated_size >> vol->cluster_size_bits) != first_free_vcn) {
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		a->allocated_size = cpu_to_sle64(na->allocated_size);
-	}
 
-	/* Update compressed_size if present. */
-	if (NAttrSparse(na) || NAttrCompressed(na)) {
-		s64 new_compr_size;
+		/* Update compressed_size if present. */
+		if (NAttrSparse(na) || NAttrCompressed(na)) {
+			s64 new_compr_size;
 
-		new_compr_size = ntfs_rl_get_compressed_size(vol, na->rl);
-		if (new_compr_size == -1) {
-			err = errno;
-			ntfs_log_trace("BUG! Leaving inconstant metadata.\n");
-			goto put_err_out;
+			new_compr_size = ntfs_rl_get_compressed_size(vol,
+					na->rl);
+			if (new_compr_size == -1) {
+				err = errno;
+				ntfs_log_trace("BUG! Leaving inconstant "
+						"metadata.\n");
+				goto put_err_out;
+			}
+			na->compressed_size = new_compr_size;
+			a->compressed_size = cpu_to_sle64(new_compr_size);
 		}
-		na->compressed_size = new_compr_size;
-		a->compressed_size = cpu_to_sle64(new_compr_size);
 	}
 
 	/* Update data and initialized size. */
