@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2006 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1166,6 +1166,25 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			ntfs_log_trace("Instantiate the hole with vcn 0x%llx.\n",
 					cur_vcn);
 			/*
+			 * Map whole runlist to be able update mapping pairs
+			 * later.
+			 */
+			if (ntfs_attr_map_whole_runlist(na))
+				goto err_out;
+			/*
+			 * Restore @rl, it probably get lost during runlist
+			 * mapping.
+			 */
+			rl = ntfs_attr_find_vcn(na, cur_vcn);
+			if (!rl) {
+				ntfs_log_error("BUG! Failed to find run after "
+						"mapping whole runlist. Please "
+						"report to the %s.\n",
+						NTFS_DEV_LIST);
+				errno = EIO;
+				goto err_out;
+			}
+			/*
 			 * Search backwards to find the best lcn to start
 			 * seek from.
 			 */
@@ -1327,8 +1346,10 @@ rl_err_out:
 		if (need_to.undo_initialized_size) {
 			if (pos + total > na->initialized_size)
 				goto done;
-			// TODO: Need to try to change initialized_size. If it
-			// succeeds goto done, otherwise goto err_out. (AIA)
+			/*
+			 * TODO: Need to try to change initialized_size. If it
+			 * succeeds goto done, otherwise goto err_out. (AIA)
+			 */
 			errno = EOPNOTSUPP;
 			goto err_out;
 		}
@@ -1360,11 +1381,14 @@ err_out:
 			}
 		}
 		if (err) {
-			ntfs_log_debug("Eeek! Failed to recover from error. Leaving "
-				"metadata in inconsistent state! Run chkdsk!\n");
-			// FIXME: At this stage could try to recover by filling
-			// old_initialized_size -> new_initialized_size with
-			// data or at least zeroes. (AIA)
+			/*
+			 * FIXME: At this stage could try to recover by filling
+			 * old_initialized_size -> new_initialized_size with
+			 * data or at least zeroes. (AIA)
+			 */
+			ntfs_log_error("Eeek! Failed to recover from error. "
+					"Leaving metadata in inconsistent "
+					"state! Run chkdsk!\n");
 		}
 	}
 	if (ctx)
