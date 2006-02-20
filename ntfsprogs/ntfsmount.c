@@ -99,6 +99,7 @@ typedef struct {
 	BOOL force;
 	BOOL debug;
 	BOOL noatime;
+	BOOL no_detach;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -1602,6 +1603,13 @@ static char *parse_mount_options(const char *org_options)
 			ctx->debug = TRUE;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
+		} else if (!strcmp(opt, "no_detach")) {
+			if (val) {
+				ntfs_log_error("'no_detach' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->no_detach = TRUE;
 		} else if (!strcmp(opt, "remount")) {
 			ntfs_log_error("Remounting is not supported at present."
 					" You have to umount volume and then "
@@ -1818,7 +1826,7 @@ int main(int argc, char *argv[])
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
 			fuse_opt_add_arg(&margs, "-o") == -1)
 		    fh = NULL;
-	if (!ctx->debug) {
+	if (!ctx->debug && !ctx->no_detach) {
 		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
 			fh = NULL;
 	} else {
@@ -1830,7 +1838,7 @@ int main(int argc, char *argv[])
 				sizeof(ntfs_fuse_oper));
 	fuse_opt_free_args(&margs);
 #else
-	if (!ctx->debug) {
+	if (!ctx->debug && !ctx->no_detach) {
 		if (fuse_is_lib_option("kernel_cache"))
 			fh = fuse_new(ffd, "use_ino,kernel_cache",
 					&ntfs_fuse_oper,
@@ -1849,7 +1857,7 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy();
 		return 6;
 	}
-	if (!ctx->debug) {
+	if (!ctx->debug && !ctx->no_detach) {
 		if (daemon(0, 0))
 			ntfs_log_error("Failed to daemonize.\n");
 		else {
