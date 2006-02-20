@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "January 2006" "ntfsprogs @VERSION@"
+.TH NTFSMOUNT 8 "February 2006" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsmount \- NTFS module for FUSE.
 .SH SYNOPSIS
@@ -134,6 +134,13 @@ to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
 file:stream). If it's set to \fBxattr\fR, then the named data streams are
 mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
 utilities.
+.TP
+.B debug
+Makes ntfsmount to not detach from terminal and print a lot of debug output from
+libntfs and FUSE.
+.TP
+.B no_detach
+Same as above but with less debug output.
 .SH DATA STREAMS
 All data on NTFS is stored in streams.  Every file has exactly one unnamed
 data stream and can have many named data streams.  The size of a file is the
