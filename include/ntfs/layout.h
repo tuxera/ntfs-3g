@@ -1106,9 +1106,15 @@ typedef struct {
 					   modified. */
 /* 20*/	s64 last_access_time;		/* Last time this mft record was
 					   accessed. */
-/* 28*/	s64 allocated_size;		/* Byte size of allocated space for the
-					   data attribute. NOTE: Is a multiple
-					   of the cluster size. */
+/* 28*/	s64 allocated_size;		/* Byte size of on-disk allocated space
+					   for the data attribute.  So for
+					   normal $DATA, this is the
+					   allocated_size from the unnamed
+					   $DATA attribute and for compressed
+					   and/or sparse $DATA, this is the
+					   compressed_size from the unnamed
+					   $DATA attribute.  NOTE: This is a
+					   multiple of the cluster size. */
 /* 30*/	s64 data_size;			/* Byte size of actual data in data
 					   attribute. */
 /* 38*/	FILE_ATTR_FLAGS file_attributes;	/* Flags describing the file. */
