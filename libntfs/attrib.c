@@ -3750,11 +3750,16 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		/* Perform the resize of the attribute record. */
 		if (!ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 				newsize)) {
-			/* Update the ntfs attribute structure, too. */
+			/* Update attribute size everywhere. */
 			na->data_size = na->initialized_size = newsize;
 			na->allocated_size = (newsize + 7) & ~7;
 			if (NAttrCompressed(na) || NAttrSparse(na))
 				na->compressed_size = na->allocated_size;
+			if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+				na->ni->data_size = na->data_size;
+				na->ni->allocated_size = na->allocated_size;
+				NInoFileNameSetDirty(na->ni);
+			}
 			goto resize_done;
 		}
 		/* Error! If not enough space, just continue. */
@@ -4318,8 +4323,8 @@ retry:
 						new_compr_size);
 			}
 			/*
-			 * Set FILE_NAME dirty flag, to update sparse bit in
-			 * the index. Update allocated size in the index.
+			 * Set FILE_NAME dirty flag, to update sparse bit and
+			 * allocated size in the index.
 			 */
 			if (na->type == AT_DATA && na->name == AT_UNNAMED) {
 				if (sparse)
@@ -4669,6 +4674,11 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		na->initialized_size = newsize;
 		ctx->attr->initialized_size = cpu_to_sle64(newsize);
 	}
+	/* Update data size in the index. */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		na->ni->data_size = na->data_size;
+		NInoFileNameSetDirty(na->ni);
+	}
 
 	/* If the attribute now has zero size, make it resident. */
 	if (!newsize) {
@@ -4864,6 +4874,11 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	/* Update data size. */
 	na->data_size = newsize;
 	ctx->attr->data_size = cpu_to_sle64(newsize);
+	/* Update data size in the index. */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		na->ni->data_size = na->data_size;
+		NInoFileNameSetDirty(na->ni);
+	}
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	/* Done! */
