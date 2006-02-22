@@ -115,6 +115,9 @@
 	- Implement simple syslog logging handler (need more work), teach
 	  ntfsmount to use it.  (Yura)
 	- Fix a lot of bugs in attribute resizing code.  (Yura)
+	- Deal with missing syslog function by making code conditional on
+	  presence of syslog.h header file (DOS/djgpp).  (Christophe)
+	- Avoid clash with existing constants (OSX).  (Christophe)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 

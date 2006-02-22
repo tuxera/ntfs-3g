@@ -85,12 +85,24 @@ typedef sle64 leLSN;
  * enum BOOL - These are just to make the code more readable...
  */
 typedef enum {
+#ifndef FALSE
 	FALSE = 0,
+#endif
+#ifndef NO
 	NO = 0,
+#endif
+#ifndef ZERO
 	ZERO = 0,
+#endif
+#ifndef TRUE
 	TRUE = 1,
+#endif
+#ifndef YES
 	YES = 1,
+#endif
+#ifndef ONE
 	ONE = 1,
+#endif
 } BOOL;
 #endif /* defined _WINDEF_H */
 

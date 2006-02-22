@@ -38,7 +38,9 @@
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+#ifdef HAVE_SYSLOG_H
 #include <syslog.h>
+#endif
 
 #include "logging.h"
 
@@ -278,8 +280,10 @@ void ntfs_log_set_handler(ntfs_log_handler *handler)
 {
 	if (handler) {
 		ntfs_log.handler = handler;
+#ifdef HAVE_SYSLOG_H
 		if (handler == ntfs_log_handler_syslog)
 			openlog("libntfs", LOG_PID, LOG_USER);
+#endif
 	} else
 		ntfs_log.handler = ntfs_log_handler_null;
 }
@@ -337,6 +341,8 @@ int ntfs_log_redirect(const char *function, const char *file,
  *            0  Message wasn't logged
  *          num  Number of output characters
  */
+
+#ifdef HAVE_SYSLOG_H
 int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	const char *file, __attribute__((unused)) int line, u32 level,
 	void *data __attribute__((unused)), const char *format, va_list args)
@@ -393,6 +399,7 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	errno = olderr;
 	return ret;
 }
+#endif
 
 /**
  * ntfs_log_handler_fprintf - Basic logging handler
