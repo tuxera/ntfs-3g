@@ -1314,6 +1314,17 @@ err_out:
 					"inode 0x%llx. Run chkdsk.\n",
 					(unsigned long long)ni->mft_no);
 	}
+	/*
+	 * Free extent MFT records (should not exist any with current
+	 * ntfs_create implementation, but for any case if something will be
+	 * changed in the future).
+	 */
+	while (ni->nr_extents)
+		if (ntfs_mft_record_free(ni->vol, *(ni->extent_nis))) {
+			err = errno;
+			ntfs_log_error("Failed to free extent MFT record.  "
+					"Leaving inconsistent metadata.\n");
+		}
 	if (ntfs_mft_record_free(ni->vol, ni))
 		ntfs_log_error("Failed to free MFT record.  "
 				"Leaving inconsistent metadata. Run chkdsk.\n");
