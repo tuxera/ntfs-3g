@@ -122,6 +122,7 @@
 	  copes with this and even chkdsk does not detect or fix this so we
 	  have to cope with it, too.  Thanks to a Pawel for reporting the
 	  problem.  (Anton)
+	- Fix compilation on FreeBSD.  (Christophe)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
