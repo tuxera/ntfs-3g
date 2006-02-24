@@ -104,7 +104,12 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 		return 0;
 	}
 	/* Complex attribute? */
-	if (a->flags) {
+	/*
+	 * Ignore the flags in case they are not zero for an attribute list
+	 * attribute.  Windows does not complain about invalid flags and chkdsk
+	 * does not detect or fix them so we need to cope with it, too.
+	 */
+	if (a->type != AT_ATTRIBUTE_LIST && a->flags) {
 		ntfs_log_error("Non-zero (%04x) attribute flags. Cannot handle "
 			       "this yet.\n", le16_to_cpu(a->flags));
 		errno = EOPNOTSUPP;
@@ -380,6 +385,13 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	}
 
 	a = ctx->attr;
+	/*
+	 * Wipe the flags in case they are not zero for an attribute list
+	 * attribute.  Windows does not complain about invalid flags and chkdsk
+	 * does not detect or fix them so we need to cope with it, too.
+	 */
+	if (type == AT_ATTRIBUTE_LIST)
+		a->flags = 0;
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 	if (!name) {
 		if (a->name_length) {

@@ -1,4 +1,4 @@
-02/01/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
+24/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
 	- Temporarily disable use of the legal ansi character checking in
 	  libntfs/unistr.c::ntfs_names_collate() pending a proper fix at some
@@ -118,6 +118,10 @@
 	- Deal with missing syslog function by making code conditional on
 	  presence of syslog.h header file (DOS/djgpp).  (Christophe)
 	- Avoid clash with existing constants (OSX).  (Christophe)
+	- Cope with attribute list attribute having invalid flags.  Windows
+	  copes with this and even chkdsk does not detect or fix this so we
+	  have to cope with it, too.  Thanks to a Pawel for reporting the
+	  problem.  (Anton)
 
 10/10/2005 - 1.12.1 - Minor fix to location of mount.ntfs-fuse and mkfs.ntfs.
 
