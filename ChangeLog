@@ -1,4 +1,4 @@
-24/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
+27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
 	- Temporarily disable use of the legal ansi character checking in
 	  libntfs/unistr.c::ntfs_names_collate() pending a proper fix at some
