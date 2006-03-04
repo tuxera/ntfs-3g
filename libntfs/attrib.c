@@ -1025,18 +1025,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		return count;
 	}
 	total = 0;
-	/* Find the runlist element containing the vcn. */
-	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
-	if (!rl) {
-		/*
-		 * If the vcn is not present it is an out of bounds write.
-		 * However, we already extended the size of the attribute,
-		 * so getting this here must be an error of some kind.
-		 */
-		if (errno == ENOENT)
-			errno = EIO;
-		goto err_out;
-	}
 	/* Handle writes beyond initialized_size. */
 	if (pos + count > na->initialized_size) {
 		if (ntfs_attr_map_whole_runlist(na))
@@ -1101,6 +1089,18 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		 * again.
 		 */
 		need_to.undo_initialized_size = 1;
+	}
+	/* Find the runlist element containing the vcn. */
+	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
+	if (!rl) {
+		/*
+		 * If the vcn is not present it is an out of bounds write.
+		 * However, we already extended the size of the attribute,
+		 * so getting this here must be an error of some kind.
+		 */
+		if (errno == ENOENT)
+			errno = EIO;
+		goto err_out;
 	}
 	/*
 	 * Scatter the data from the linear data buffer to the volume. Note, a
