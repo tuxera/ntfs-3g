@@ -1322,8 +1322,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		ntfs_log_trace("Writing 0x%llx bytes to vcn 0x%llx, lcn 0x%llx, ofs "
-				"0x%llx.\n", to_write, rl->vcn, rl->lcn, ofs);
+		ntfs_log_trace("Writing 0x%llx bytes to vcn 0x%llx, lcn 0x%llx,"
+				" ofs 0x%llx.\n", to_write, rl->vcn, rl->lcn,
+				ofs);
 		if (!NVolReadOnly(vol))
 			written = ntfs_pwrite(vol->dev, (rl->lcn <<
 					vol->cluster_size_bits) + ofs,
