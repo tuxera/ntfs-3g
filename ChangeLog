@@ -2,6 +2,7 @@ xx/xx/2006 - 1.13.1-WIP
 
 	- Fix bug in ntfs_attr_pwrite() when we sometimes lose current run in
 	  the runlist.  (Yura)
+	- Fix build with --disable-gnome-vfs --enable-fuse-module.  (Gentoo)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
