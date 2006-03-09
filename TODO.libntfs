@@ -13,11 +13,13 @@
 * HIGH priority *
 *****************
 
+- complete ntfs_index_{add_filename,rm}
+
+- move ntfsdecrypt to library.
+
 - complete the implementation of ntfs_attr_truncate() (for compressed files)
 
 - add write of compressed attributes
-
-- write ntfs_index_{rm_from,add_to,create,rm}()
 
 - detect presence of usnjrnl and if present and mounting rw, re-stamp it (see
   current ntfs driver for example in 2.6.15 kernel)
@@ -35,20 +37,14 @@
 - create API reference book template (cf. linux kernel)
 - enable automatic creation of API reference
 
-- write ntfs_file_name_{add,rm}_from_mft_record() or _from_ntfs_inode(?)
-
-- write ntfs_file_unlink()
-
-- write ntfs_file_create()
+- ntfs_index_add_filename to more generic ntfs_index_add
 
 - write API for conventional high level file access.
 
-- implement loads of utilities a-la ntcp, ntrm, ntcreat, etc...
+- implement loads of utilities a-la ntfsrm, ntfsmkdir, etc...
 
 - implement an ntfs shell where can use the above much faster with caching,
   probably extending the library in the process
-
-- implement {a,m,r}time updates in the library.
 
 ****************
 * LOW priority *
@@ -57,8 +53,6 @@
 - Do we attach attributes (ntfs_attr) to the corresponding ntfs_inode?  Now we
   just atach the inode to the attribute and expect the user to not shoot
   themselves in the foot.
-
-- add read/set of various file attributes/flags to library
 
 - add ACL read/write support to library
 

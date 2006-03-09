@@ -64,6 +64,7 @@ Thanks,
 **********
 
 - add ability to copy multiply files at once.
+- add ability to create new files.
 
 
 ***********
@@ -84,7 +85,14 @@ Thanks,
 * ntfslabel *
 *************
 
-- Support ioctls for ntfs tng driver 2.?.? for reading/changing the label.
+- Support ioctls for kernel driver and ntfsmount for reading/changing the label.
+
+
+*************
+* ntfsmount *
+*************
+
+- Cache opened inodes for faster access.
 
 
 **************
