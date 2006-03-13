@@ -42,9 +42,7 @@
  */
 int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void *data)
 {
-	u64 i;
 	int j;
-	int in_use = 0;
 	int result = -1;
 	struct mft_search_ctx *m_ctx = NULL;
 	ntfs_attr_search_ctx  *a_ctx = NULL;
@@ -53,22 +51,6 @@ int cluster_find(ntfs_volume *vol, LCN c_begin, LCN c_end, cluster_cb *cb, void 
 
 	if (!vol || !cb)
 		return -1;
-
-	// Quick check that at least one cluster is in use
-	for (i = c_begin; (LCN)i < c_end; i++) {
-		if (utils_cluster_in_use(vol, i) == 1) {
-			in_use = 1;
-			break;
-		}
-	}
-
-	if (!in_use) {
-		if (c_begin == c_end)
-			ntfs_log_verbose("cluster isn't in use\n");
-		else
-			ntfs_log_verbose("clusters aren't in use\n");
-		return 0;
-	}
 
 	m_ctx = mft_get_search_ctx(vol);
 	m_ctx->flags_search = FEMR_IN_USE | FEMR_BASE_RECORD;
