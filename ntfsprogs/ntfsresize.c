@@ -961,7 +961,7 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 					continue;
 				}
 
-				if (++mismatch > 10)
+				if (++mismatch > 10 && !opt.verbose)
 					continue;
 
 				printf("Cluster accounting failed at %lld "
