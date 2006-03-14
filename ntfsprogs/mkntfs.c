@@ -4617,10 +4617,8 @@ static BOOL mkntfs_create_root_structures(void)
 	bs->bpb.hidden_sectors = cpu_to_le32(opts.part_start_sect);
 	ntfs_log_debug("hidden sectors = %llu (0x%llx)\n", opts.part_start_sect,
 			opts.part_start_sect);
-	/*
-	 * If there are problems go back to bs->unused[0-3] and set them. See
-	 * ../include/layout.h for details.
-	 */
+	bs->physical_drive = 0x80;  	    /* boot from hard disk */
+	bs->extended_boot_signature = 0x80; /* everybody sets this, so we do */
 	bs->number_of_sectors = cpu_to_sle64(opts.num_sectors);
 	bs->mft_lcn = cpu_to_sle64(g_mft_lcn);
 	bs->mftmirr_lcn = cpu_to_sle64(g_mftmirr_lcn);

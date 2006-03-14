@@ -70,13 +70,10 @@ typedef struct {
 	u8  jump[3];			/* Irrelevant (jump to boot up code).*/
 	u64 oem_id;			/* Magic "NTFS    ". */
 /*0x0b*/BIOS_PARAMETER_BLOCK bpb;	/* See BIOS_PARAMETER_BLOCK. */
-	u8  unused[4];			/* zero, NTFS diskedit.exe states that
-					   this is actually:
-					    u8 physical_drive;		// 0x80
-					    u8 current_head;		// zero
-					    u8 extended_boot_signature; // 0x80
-					    u8 unused;			// zero
-					 */
+	u8 physical_drive;		/* 0x00 floppy, 0x80 hard disk */
+	u8 current_head;		/* zero */
+	u8 extended_boot_signature; 	/* 0x80 */
+	u8 reserved2;			/* zero */
 /*0x28*/s64 number_of_sectors;		/* Number of sectors in volume. Gives
 					   maximum volume size of 2^63 sectors.
 					   Assuming standard sector size of 512
