@@ -1070,12 +1070,41 @@ static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 	ntfs_dump_security_descriptor(sd, "\t");
 }
 	
+static void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type, 
+			       ntfschar *name, u32 name_len, s64 *data_size)
+{
+	ntfs_attr *na;
+	void *data;
+	s64 size;
+	
+	na = ntfs_attr_open(ni, type, name, name_len);
+	if (!na) {
+		ntfs_log_perror("ntfs_attr_open failed");
+		return NULL;
+	}
+	data = malloc(na->data_size);
+	if (!data) {
+		ntfs_log_perror("malloc failed");
+		return NULL;
+	}
+	size = ntfs_attr_pread(na, 0, na->data_size, data);
+	if (size != na->data_size) {
+		ntfs_log_perror("ntfs_attr_pread failed");
+		free(data);
+		return NULL;
+	}
+	ntfs_attr_close(na);
+	if (data_size)
+		*data_size = size;
+	return data;
+}
+
 static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	SECURITY_DESCRIPTOR_HEADER *sds, *sd;
-	ntfs_attr *na;
 	ntfschar *name;
 	int name_len;
+	s64 data_size;
 	u64 inode;
 	
 	inode = ni->mft_no;
@@ -1093,34 +1122,18 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 				  name, name_len, 0, NULL, 0))
 		return;
 	
-	na = ntfs_attr_open(ni, AT_DATA, name, name_len);
-	if (!na) {
-		ntfs_log_perror("ntfs_attr_open failed");
+	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
+	if (!sd)
 		return;
-	}
-	sds = malloc(na->data_size);
-	if (!sds) {
-		ntfs_log_perror("malloc failed");
-		return;
-	}
-	if (ntfs_attr_pread(na, 0, na->data_size, sds) != na->data_size) {
-		ntfs_log_perror("ntfs_attr_pread failed");
-		free(sds);
-		return;
-	}
-	ntfs_attr_close(na);
-	
-	sd = sds;
-	
 	/*
 	 * FIXME: The right way is based on the indexes, so we couldn't
 	 * miss real entries. For now, dump until it makes sense.
 	 */
 	while (sd->length && sd->hash && 
-	       le64_to_cpu(sd->offset) < (u64)na->data_size &&
-	       le32_to_cpu(sd->length) < (u64)na->data_size &&
+	       le64_to_cpu(sd->offset) < (u64)data_size &&
+	       le32_to_cpu(sd->length) < (u64)data_size &&
 	       le64_to_cpu(sd->offset) + 
-			le32_to_cpu(sd->length) < (u64)na->data_size) {
+			le32_to_cpu(sd->length) < (u64)data_size) {
 		ntfs_dump_sds_entry(sd);
 		sd = (SECURITY_DESCRIPTOR_HEADER *)((char *)sd +
 				(cpu_to_le32(sd->length + 0x0F) &
@@ -1620,60 +1633,34 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	INDEX_ATTR_TYPE type;
 	int total_entries = 0;
 	int total_indx_blocks = 0;
-	ntfs_attr *na;
 	u8 *bitmap, *byte;
 	int bit;
 	ntfschar *name;
+	u32 name_len;
+	s64 data_size;
 
 	if (get_index_root(ni, attr, &index_root))
 		return;
 	
 	type = get_index_attr_type(ni, attr, &index_root);
+	
+	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
+	name_len = le16_to_cpu(attr->name_length);
+	
+	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
+	if (!byte)
+		return;
 
-	name = (ntfschar*)((u8*)attr + attr->name_offset);
-	na = ntfs_attr_open(ni, AT_BITMAP, name, attr->name_length);
-	if (!na) {
-		ntfs_log_perror("ntfs_attr_open failed");
-		return;
-	}
-	bitmap = malloc(na->data_size);
-	if (!bitmap) {
-		ntfs_log_perror("malloc failed");
-		return;
-	}
-	if (ntfs_attr_pread(na, 0, na->data_size, bitmap) != na->data_size) {
-		ntfs_log_perror("ntfs_attr_pread failed");
+	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION, 
+						   name, name_len, &data_size);
+	if (!tmp_alloc) {
 		free(bitmap);
 		return;
 	}
-	ntfs_attr_close(na);
-	byte = bitmap;
-
-	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, attr->name_length);
-	if (!na) {
-		ntfs_log_perror("ntfs_attr_open failed");
-		free(bitmap);
-		return;
-	}
-	allocation = malloc(na->data_size);
-	if (!allocation) {
-		ntfs_log_perror("malloc failed");
-		free(bitmap);
-		return;
-	}
-	if (ntfs_attr_pread(na, 0, na->data_size, allocation)
-							 != na->data_size) {
-		ntfs_log_perror("ntfs_attr_pread failed");
-		free(allocation);
-		free(bitmap);
-		return;
-	}
-	ntfs_attr_close(na);
-	tmp_alloc = allocation;
 
 	bit = 0;
-	while ((u8 *)tmp_alloc < (u8 *)allocation + na->data_size) {
-		if (*byte & (1 << bit)) {
+	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
+		if (*byte & (1 << bit)) {					   
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
 						index_root.index_block_size)) {
 				ntfs_log_perror("Damaged INDX record");
