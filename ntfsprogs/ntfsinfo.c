@@ -1113,7 +1113,7 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	if (FILE_Secure != inode)
 		return;
 	
-	name_len = le16_to_cpu(attr->name_length);
+	name_len = attr->name_length;
 	if (!name_len)
 		return;
 	
@@ -1645,7 +1645,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	type = get_index_attr_type(ni, attr, &index_root);
 	
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
-	name_len = le16_to_cpu(attr->name_length);
+	name_len = attr->name_length;
 	
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte)
