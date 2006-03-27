@@ -1128,30 +1128,16 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 		ntfs_rsa_private_key rsa_key)
 {
-	ntfs_attr *na;
 	EFS_ATTR_HEADER *efs;
 	EFS_DF_ARRAY_HEADER *df_array;
 	ntfs_fek *fek = NULL;
 
 	/* Obtain the $EFS contents. */
-	na = ntfs_attr_open(inode, AT_LOGGED_UTILITY_STREAM, EFS, 4);
-	if (!na) {
-		ntfs_log_perror("Failed to open $EFS attribute");
-		return NULL;
-	}
-	efs = malloc(na->data_size);
+	efs = ntfs_attr_readall(inode, AT_LOGGED_UTILITY_STREAM, EFS, 4, NULL);
 	if (!efs) {
-		ntfs_log_perror("Failed to allocate internal buffer");
-		ntfs_attr_close(na);
-		return NULL;
-	}
-	if (ntfs_attr_pread(na, 0, na->data_size, efs) != na->data_size) {
 		ntfs_log_perror("Failed to read $EFS attribute");
-		free(efs);
-		ntfs_attr_close(na);
 		return NULL;
 	}
-	ntfs_attr_close(na);
 	/* Iterate through the DDFs & DRFs until we obtain a key. */
 	if (efs->offset_to_ddf_array) {
 		df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
