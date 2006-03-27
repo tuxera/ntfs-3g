@@ -22,6 +22,11 @@ xx/xx/2006 - 1.13.1-WIP
 	  numbers in hex (and octal if anyone is crazy enough to use that) in
 	  addition to decimal numbers on the command line options to most if
 	  not all utilities.  (Anton)
+	- Fix comparison of $MFT and $MFTMirr to not bail out when there are
+	  unused, invalid mft records which are the same in both $MFT and
+	  $MFTMirr.  Ported from kernel driver 2.1.27 release and aplied both
+	  to libntfs/volume.c mount related code and to ntfsprogs/ntfsfix.c's
+	  fixup code.  (Anton)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

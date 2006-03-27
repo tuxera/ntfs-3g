@@ -380,10 +380,12 @@ static int fix_mftmirr(ntfs_volume *vol)
 	ntfs_log_info("Comparing $MFTMirr to $MFT... ");
 	done = FALSE;
 	for (i = 0; i < vol->mftmirr_size; ++i) {
+		MFT_RECORD *mrec, *mrec2;
 		const char *ESTR[12] = { "$MFT", "$MFTMirr", "$LogFile",
 			"$Volume", "$AttrDef", "root directory", "$Bitmap",
 			"$Boot", "$BadClus", "$Secure", "$UpCase", "$Extend" };
 		const char *s;
+		BOOL use_mirr;
 
 		if (i < 12)
 			s = ESTR[i];
@@ -392,46 +394,68 @@ static int fix_mftmirr(ntfs_volume *vol)
 		else
 			s = "mft record";
 
-		if (ntfs_is_baad_recordp(m + i * vol->mft_record_size)) {
-			ntfs_log_info("FAILED");
-			ntfs_log_error("$MFT error: Incomplete multi sector "
-					"transfer detected in %s.\nCannot "
-					"handle this yet. )-:\n", s);
-			goto error_exit;
-		}
-		if (!ntfs_is_mft_recordp(m + i * vol->mft_record_size)) {
-			ntfs_log_info("FAILED");
-			ntfs_log_error("$MFT error: Invalid mft record for "
-					"%s.\nCannot handle this yet. )-:\n",
-					s);
-			goto error_exit;
-		}
-		if (ntfs_is_baad_recordp(m2 + i * vol->mft_record_size)) {
-			ntfs_log_info("FAILED");
-			ntfs_log_error("$MFTMirr error: Incomplete multi "
-					"sector transfer detected in %s.\n", s);
-			goto error_exit;
-		}
-		if (memcmp((u8*)m + i * vol->mft_record_size, (u8*)m2 +
-				i * vol->mft_record_size,
-				ntfs_mft_record_get_data_size((MFT_RECORD*)(
-				(u8*)m + i * vol->mft_record_size)))) {
-			if (!done) {
-				done = TRUE;
+		use_mirr = FALSE;
+		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
+		if (mrec->flags & MFT_RECORD_IN_USE) {
+			if (ntfs_is_baad_recordp(mrec)) {
 				ntfs_log_info(FAILED);
-				ntfs_log_info("Correcting differences in $MFTMirr...");
+				ntfs_log_error("$MFT error: Incomplete multi "
+						"sector transfer detected in "
+						"%s.\nCannot handle this yet. "
+						")-:\n", s);
+				goto error_exit;
 			}
-			br = ntfs_mft_record_write(vol, i, (MFT_RECORD*)(m +
-					i * vol->mft_record_size));
-			if (br) {
+			if (!ntfs_is_mft_recordp(mrec)) {
 				ntfs_log_info(FAILED);
-				ntfs_log_perror("Error correcting $MFTMirr");
+				ntfs_log_error("$MFT error: Invalid mft "
+						"record for %s.\nCannot "
+						"handle this yet. )-:\n", s);
 				goto error_exit;
 			}
 		}
+		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
+		if (mrec2->flags & MFT_RECORD_IN_USE) {
+			if (ntfs_is_baad_recordp(mrec2)) {
+				ntfs_log_info(FAILED);
+				ntfs_log_error("$MFTMirr error: Incomplete "
+						"multi sector transfer "
+						"detected in %s.\n", s);
+				goto error_exit;
+			}
+			if (!ntfs_is_mft_recordp(mrec2)) {
+				ntfs_log_info(FAILED);
+				ntfs_log_error("$MFTMirr error: Invalid mft "
+						"record for %s.\n", s);
+				goto error_exit;
+			}
+			/* $MFT is corrupt but $MFTMirr is ok, use $MFTMirr. */
+			if (!(mrec->flags & MFT_RECORD_IN_USE) &&
+					!ntfs_is_mft_recordp(mrec))
+				use_mirr = TRUE;
+		}
+		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
+			if (!done) {
+				done = TRUE;
+				ntfs_log_info(FAILED);
+			}
+			ntfs_log_info("Correcting differences in $MFT%s "
+					"record %d...", use_mirr ? "" : "Mirr",
+					i);
+			br = ntfs_mft_record_write(vol, i,
+					use_mirr ? mrec2 : mrec);
+			if (br) {
+				ntfs_log_info(FAILED);
+				ntfs_log_perror("Error correcting $MFT%s",
+						use_mirr ? "" : "Mirr");
+				goto error_exit;
+			}
+			ntfs_log_info(OK);
+		}
 	}
-	ntfs_log_info(OK);
-	ntfs_log_info("Processing of $MFT and $MFTMirr completed successfully.\n");
+	if (!done)
+		ntfs_log_info(OK);
+	ntfs_log_info("Processing of $MFT and $MFTMirr completed "
+			"successfully.\n");
 	ret = 0;
 error_exit:
 	free(m);

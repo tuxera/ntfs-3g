@@ -816,6 +816,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	}
 	ntfs_log_debug("Comparing $MFTMirr to $MFT... ");
 	for (i = 0; i < vol->mftmirr_size; ++i) {
+		MFT_RECORD *mrec, *mrec2;
 		const char *ESTR[12] = { "$MFT", "$MFTMirr", "$LogFile",
 			"$Volume", "$AttrDef", "root directory", "$Bitmap",
 			"$Boot", "$BadClus", "$Secure", "$UpCase", "$Extend" };
@@ -828,33 +829,39 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		else
 			s = "mft record";
 
-		if (ntfs_is_baad_recordp(m + i * vol->mft_record_size)) {
-			ntfs_log_debug("FAILED\n");
-			ntfs_log_debug("$MFT error: Incomplete multi sector transfer "
-					"detected in %s.\n", s);
-			goto io_error_exit;
+		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
+		if (mrec->flags & MFT_RECORD_IN_USE) {
+			if (ntfs_is_baad_recordp(mrec)) {
+				ntfs_log_debug("FAILED\n");
+				ntfs_log_debug("$MFT error: Incomplete multi "
+						"sector transfer detected in "
+						"%s.\n", s);
+				goto io_error_exit;
+			}
+			if (!ntfs_is_mft_recordp(mrec)) {
+				ntfs_log_debug("FAILED\n");
+				ntfs_log_debug("$MFT error: Invalid mft "
+						"record for %s.\n", s);
+				goto io_error_exit;
+			}
 		}
-		if (!ntfs_is_mft_recordp(m + i * vol->mft_record_size)) {
-			ntfs_log_debug("FAILED\n");
-			ntfs_log_debug("$MFT error: Invalid mft record for %s.\n", s);
-			goto io_error_exit;
+		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
+		if (mrec2->flags & MFT_RECORD_IN_USE) {
+			if (ntfs_is_baad_recordp(mrec2)) {
+				ntfs_log_debug("FAILED\n");
+				ntfs_log_debug("$MFTMirr error: Incomplete "
+						"multi sector transfer "
+						"detected in %s.\n", s);
+				goto io_error_exit;
+			}
+			if (!ntfs_is_mft_recordp(mrec2)) {
+				ntfs_log_debug("FAILED\n");
+				ntfs_log_debug("$MFTMirr error: Invalid mft "
+						"record for %s.\n", s);
+				goto io_error_exit;
+			}
 		}
-		if (ntfs_is_baad_recordp(m2 + i * vol->mft_record_size)) {
-			ntfs_log_debug("FAILED\n");
-			ntfs_log_debug("$MFTMirr error: Incomplete multi sector "
-					"transfer detected in %s.\n", s);
-			goto io_error_exit;
-		}
-		if (!ntfs_is_mft_recordp(m2 + i * vol->mft_record_size)) {
-			ntfs_log_debug("FAILED\n");
-			ntfs_log_debug("$MFTMirr error: Invalid mft record for "
-					"%s.\n", s);
-			goto io_error_exit;
-		}
-		if (memcmp((u8*)m + i * vol->mft_record_size, (u8*)m2 +
-				i * vol->mft_record_size,
-				ntfs_mft_record_get_data_size((MFT_RECORD*)(
-				(u8*)m + i * vol->mft_record_size)))) {
+		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
 			ntfs_log_debug(FAILED);
 			ntfs_log_debug("$MFTMirr does not match $MFT. Run "
 					"chkdsk.\n");
