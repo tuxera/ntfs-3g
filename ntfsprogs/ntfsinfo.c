@@ -1559,29 +1559,20 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot)
 {
 	ntfs_attr_search_ctx *ctx;
-	ntfschar *name = 0;
+	ntfschar *name;
 	INDEX_ROOT *root;
 
-	if (attr->name_length) {
-		name = malloc(attr->name_length * sizeof(ntfschar));
-		if (!name) {
-			ntfs_log_perror("malloc failed");
-			return -1;
-		}
-		memcpy(name, (u8 *)attr + attr->name_offset,
-				attr->name_length * sizeof(ntfschar));
-	}
+	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
+
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		ntfs_log_perror("ntfs_get_search_ctx failed");
-		free(name);
 		return -1;
 	}
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0,
 							0, NULL, 0, ctx)) {
 		ntfs_log_perror("ntfs_attr_lookup failed");
 		ntfs_attr_put_search_ctx(ctx);
-		free(name);
 		return -1;
 	}
 
@@ -1589,7 +1580,6 @@ static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot)
 				le16_to_cpu(ctx->attr->value_offset));
 	*iroot = *root;
 	ntfs_attr_put_search_ctx(ctx);
-	free(name);
 	return 0;
 }
 
