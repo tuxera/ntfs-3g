@@ -1556,31 +1556,37 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
  *
  * determine size, type and the collation rule of INDX record
  */
-static int get_index_root(ntfs_inode *ni, ATTR_RECORD *attr, INDEX_ROOT *iroot)
+static INDEX_ROOT *get_index_root(ntfs_inode *ni, ATTR_RECORD *attr)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfschar *name;
-	INDEX_ROOT *root;
+	INDEX_ROOT *root = NULL;
 
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		ntfs_log_perror("ntfs_get_search_ctx failed");
-		return -1;
+		return NULL;
 	}
-	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0,
-							0, NULL, 0, ctx)) {
+	
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0, 0, NULL,
+			     0, ctx)) {
 		ntfs_log_perror("ntfs_attr_lookup failed");
-		ntfs_attr_put_search_ctx(ctx);
-		return -1;
+		goto out;
 	}
-
-	root = (INDEX_ROOT*)((u8*)ctx->attr +
-				le16_to_cpu(ctx->attr->value_offset));
-	*iroot = *root;
+	
+	root = malloc(sizeof(INDEX_ROOT));
+	if (!root) {
+		ntfs_log_perror("malloc failed");
+		goto out;
+	}
+	
+	*root = *((INDEX_ROOT *)((u8 *)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset)));
+out:	
 	ntfs_attr_put_search_ctx(ctx);
-	return 0;
+	return root;
 }
 
 /**
@@ -1592,7 +1598,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	INDEX_ALLOCATION *allocation, *tmp_alloc;
 	INDEX_ENTRY *entry;
-	INDEX_ROOT index_root;
+	INDEX_ROOT *index_root;
 	INDEX_ATTR_TYPE type;
 	int total_entries = 0;
 	int total_indx_blocks = 0;
@@ -1602,10 +1608,13 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	u32 name_len;
 	s64 data_size;
 
-	if (get_index_root(ni, attr, &index_root))
+	index_root = get_index_root(ni, attr);
+	if (!index_root) {
+		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
 		return;
+	}
 	
-	type = get_index_attr_type(ni, attr, &index_root);
+	type = get_index_attr_type(ni, attr, index_root);
 	
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
@@ -1613,24 +1622,23 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
 		ntfs_log_perror("Failed to read $BITMAP attribute");
-		return;
+		goto out_index_root;
 	}
 
 	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION, 
 						   name, name_len, &data_size);
 	if (!tmp_alloc) {
 		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
-		free(bitmap);
-		return;
+		goto out_bitmap;
 	}
 
 	bit = 0;
 	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
 		if (*byte & (1 << bit)) {					   
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
-						index_root.index_block_size)) {
+						index_root->index_block_size)) {
 				ntfs_log_perror("Damaged INDX record");
-				goto free;
+				goto out_allocation;
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
@@ -1645,7 +1653,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			total_indx_blocks++;
 		}
 		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
-						 index_root.index_block_size);
+						 index_root->index_block_size);
 		bit++;
 		if (bit > 7) {
 			bit = 0;
@@ -1654,9 +1662,12 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	}
 	printf("\tIndex entries total:\t %d\n", total_entries);
 	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
-free:
+out_allocation:
 	free(allocation);
+out_bitmap:
 	free(bitmap);
+out_index_root:
+	free(index_root);
 }
 
 /**
