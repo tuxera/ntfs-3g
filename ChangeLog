@@ -27,6 +27,8 @@ xx/xx/2006 - 1.13.1-WIP
 	  $MFTMirr.  Ported from kernel driver 2.1.27 release and aplied both
 	  to libntfs/volume.c mount related code and to ntfsprogs/ntfsfix.c's
 	  fixup code.  (Anton)
+	- Change ntfsinfo to dump the key data as well as the keys themselves
+	  when dumping the $ObjId/$O index.  (Anton)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
