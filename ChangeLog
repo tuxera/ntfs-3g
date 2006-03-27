@@ -17,6 +17,11 @@ xx/xx/2006 - 1.13.1-WIP
 	  index allocation attributes as well. This further decreases the 
 	  compressed metadata image size by 10-25% and more importantly it
 	  eliminates non-interesting ntfscmp differences.  (Szaka)
+	- Change utils_parse_size() to use a base of 0 instead of 10 when
+	  calling strtoll().  This automagically allows specification of
+	  numbers in hex (and octal if anyone is crazy enough to use that) in
+	  addition to decimal numbers on the command line options to most if
+	  not all utilities.  (Anton)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

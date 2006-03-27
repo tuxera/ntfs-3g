@@ -211,6 +211,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 }
 
 #endif
+
 /**
  * utils_parse_size - Convert a string representing a size
  * @value:  String to be parsed
@@ -246,7 +247,7 @@ int utils_parse_size(const char *value, s64 *size, BOOL scale)
 
 	ntfs_log_debug("Parsing size '%s'.\n", value);
 
-	result = strtoll(value, &suffix, 10);
+	result = strtoll(value, &suffix, 0);
 	if (result < 0 || errno == ERANGE) {
 		ntfs_log_error("Invalid size '%s'.\n", value);
 		return 0;
