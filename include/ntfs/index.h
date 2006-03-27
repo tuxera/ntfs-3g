@@ -101,6 +101,8 @@ extern int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn,
 		MFT_REF mref);
 extern int ntfs_index_rm(ntfs_index_context *ictx);
 
+extern INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr);
+
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty
  * @ictx:	ntfs index context describing the index entry

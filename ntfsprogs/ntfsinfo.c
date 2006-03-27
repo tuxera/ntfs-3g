@@ -72,6 +72,7 @@
 #include "attrib.h"
 #include "layout.h"
 #include "inode.h"
+#include "index.h"
 #include "utils.h"
 #include "security.h"
 #include "mst.h"
@@ -1552,44 +1553,6 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 }
 
 /**
- * get_index_root()
- *
- * determine size, type and the collation rule of INDX record
- */
-static INDEX_ROOT *get_index_root(ntfs_inode *ni, ATTR_RECORD *attr)
-{
-	ntfs_attr_search_ctx *ctx;
-	ntfschar *name;
-	INDEX_ROOT *root = NULL;
-
-	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
-
-	ctx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!ctx) {
-		ntfs_log_perror("ntfs_get_search_ctx failed");
-		return NULL;
-	}
-	
-	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0, 0, NULL,
-			     0, ctx)) {
-		ntfs_log_perror("ntfs_attr_lookup failed");
-		goto out;
-	}
-	
-	root = malloc(sizeof(INDEX_ROOT));
-	if (!root) {
-		ntfs_log_perror("malloc failed");
-		goto out;
-	}
-	
-	*root = *((INDEX_ROOT *)((u8 *)ctx->attr +
-				le16_to_cpu(ctx->attr->value_offset)));
-out:	
-	ntfs_attr_put_search_ctx(ctx);
-	return root;
-}
-
-/**
  * ntfs_dump_attr_index_allocation()
  *
  * dump context of the index_allocation attribute
@@ -1608,7 +1571,7 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	u32 name_len;
 	s64 data_size;
 
-	index_root = get_index_root(ni, attr);
+	index_root = ntfs_index_root_get(ni, attr);
 	if (!index_root) {
 		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
 		return;

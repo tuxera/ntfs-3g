@@ -928,3 +928,49 @@ INDEX_ENTRY * ntfs_ie_remove_name(INDEX_ENTRY *ie)
 
 #endif /* NTFS_RICH */
 
+/**
+ * ntfs_index_root_get - read the index root of an attribute
+ * @ni:		open ntfs inode in which the ntfs attribute resides
+ * @attr:	attribute for which we want its index root 
+ *
+ * This function will read the related index root an ntfs attribute.
+ *
+ * On success a buffer is allocated with the content of the index root
+ * and which needs to be freed when it's not needed anymore.
+ *
+ * On error NULL is returned with errno set to the error code.
+ */
+INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr)
+{
+	ntfs_attr_search_ctx *ctx;
+	ntfschar *name;
+	INDEX_ROOT *root = NULL;
+
+	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
+
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx) {
+		ntfs_log_perror("ntfs_get_search_ctx failed");
+		return NULL;
+	}
+	
+	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, attr->name_length, 0, 0, NULL,
+			     0, ctx)) {
+		ntfs_log_perror("ntfs_attr_lookup failed");
+		goto out;
+	}
+	
+	root = malloc(sizeof(INDEX_ROOT));
+	if (!root) {
+		ntfs_log_perror("malloc failed");
+		goto out;
+	}
+	
+	*root = *((INDEX_ROOT *)((u8 *)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset)));
+out:	
+	ntfs_attr_put_search_ctx(ctx);
+	return root;
+}
+
+
