@@ -1074,7 +1074,7 @@ static void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 			       ntfschar *name, u32 name_len, s64 *data_size)
 {
 	ntfs_attr *na;
-	void *data;
+	void *data, *ret = NULL;
 	s64 size;
 	
 	na = ntfs_attr_open(ni, type, name, name_len);
@@ -1085,18 +1085,20 @@ static void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 	data = malloc(na->data_size);
 	if (!data) {
 		ntfs_log_perror("malloc failed");
-		return NULL;
+		goto out;
 	}
 	size = ntfs_attr_pread(na, 0, na->data_size, data);
 	if (size != na->data_size) {
 		ntfs_log_perror("ntfs_attr_pread failed");
 		free(data);
-		return NULL;
+		goto out;
 	}
-	ntfs_attr_close(na);
+	ret = data;
 	if (data_size)
 		*data_size = size;
-	return data;
+out:
+	ntfs_attr_close(na);
+	return ret;
 }
 
 static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
