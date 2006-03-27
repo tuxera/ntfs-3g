@@ -7,8 +7,10 @@ xx/xx/2006 - 1.13.1-WIP
 	  in $Bitmap (useful to find potentially corrupted files). (Szaka)
 	- mkntfs: set the physical drive and the extended boot signature to
 	  0x80 in the Extended BPB which are needed to boot from disk. (Szaka)
-	- ntfsinfo: fix two freed memory usage when dumping $SDS and index
+	- ntfsinfo: fix two freed memory usages when dumping $SDS and index
 	  allocation entries.  (Szaka)
+	- libntfs: add ntfs_attr_readall() which reads the entire data 
+	  from an ntfs attribute.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

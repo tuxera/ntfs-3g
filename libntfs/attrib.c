@@ -4992,3 +4992,54 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		ntfs_inode_update_time(na->ni);
 	return ret;
 }
+	
+/**
+ * ntfs_attr_readall - read the entire data from an ntfs attribute
+ * @ni:		open ntfs inode in which the ntfs attribute resides
+ * @type:	attribute type
+ * @name:	attribute name in little endian Unicode or AT_UNNAMED or NULL
+ * @name_len:	length of attribute @name in Unicode characters (if @name given)
+ * @data_size:	if non-NULL then store here the data size 
+ *
+ * This function will read the entire content of an ntfs attribute.
+ * If @name is AT_UNNAMED then look specifically for an unnamed attribute.
+ * If @name is NULL then the attribute could be either named or not. 
+ * In both those cases @name_len is not used at all.
+ *
+ * On success a buffer is allocated with the content of the attribute 
+ * and which needs to be freed when it's not needed anymore. If the
+ * @data_size parameter is non-NULL then the data size is set there.
+ *
+ * On error NULL is returned with errno set to the error code.
+ */
+void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
+			ntfschar *name, u32 name_len, s64 *data_size)
+{
+	ntfs_attr *na;
+	void *data, *ret = NULL;
+	s64 size;
+	
+	na = ntfs_attr_open(ni, type, name, name_len);
+	if (!na) {
+		ntfs_log_perror("ntfs_attr_open failed");
+		return NULL;
+	}
+	data = malloc(na->data_size);
+	if (!data) {
+		ntfs_log_perror("malloc failed");
+		goto out;
+	}
+	size = ntfs_attr_pread(na, 0, na->data_size, data);
+	if (size != na->data_size) {
+		ntfs_log_perror("ntfs_attr_pread failed");
+		free(data);
+		goto out;
+	}
+	ret = data;
+	if (data_size)
+		*data_size = size;
+out:
+	ntfs_attr_close(na);
+	return ret;
+}
+

@@ -1069,37 +1069,6 @@ static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 	
 	ntfs_dump_security_descriptor(sd, "\t");
 }
-	
-static void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type, 
-			       ntfschar *name, u32 name_len, s64 *data_size)
-{
-	ntfs_attr *na;
-	void *data, *ret = NULL;
-	s64 size;
-	
-	na = ntfs_attr_open(ni, type, name, name_len);
-	if (!na) {
-		ntfs_log_perror("ntfs_attr_open failed");
-		return NULL;
-	}
-	data = malloc(na->data_size);
-	if (!data) {
-		ntfs_log_perror("malloc failed");
-		goto out;
-	}
-	size = ntfs_attr_pread(na, 0, na->data_size, data);
-	if (size != na->data_size) {
-		ntfs_log_perror("ntfs_attr_pread failed");
-		free(data);
-		goto out;
-	}
-	ret = data;
-	if (data_size)
-		*data_size = size;
-out:
-	ntfs_attr_close(na);
-	return ret;
-}
 
 static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 {
@@ -1125,8 +1094,10 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 		return;
 	
 	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
-	if (!sd)
+	if (!sd) {
+		ntfs_log_perror("ntfs_attr_readall failed");
 		return;
+	}
 	/*
 	 * FIXME: The right way is based on the indexes, so we couldn't
 	 * miss real entries. For now, dump until it makes sense.
@@ -1650,12 +1621,15 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	name_len = attr->name_length;
 	
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
-	if (!byte)
+	if (!byte) {
+		ntfs_log_perror("ntfs_attr_readall failed");
 		return;
+	}
 
 	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION, 
 						   name, name_len, &data_size);
 	if (!tmp_alloc) {
+		ntfs_log_perror("ntfs_attr_readall failed");
 		free(bitmap);
 		return;
 	}

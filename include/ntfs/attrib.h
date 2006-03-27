@@ -270,6 +270,9 @@ extern s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count,
 extern s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count,
 		const void *b);
 
+extern void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
+			       ntfschar *name, u32 name_len, s64 *data_size);
+
 extern s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos,
 		const s64 bk_cnt, const u32 bk_size, void *dst);
 extern s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos,
