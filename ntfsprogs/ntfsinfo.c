@@ -1095,7 +1095,7 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	
 	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
 	if (!sd) {
-		ntfs_log_perror("ntfs_attr_readall failed");
+		ntfs_log_perror("Failed to read $SDS attribute");
 		return;
 	}
 	/*
@@ -1622,14 +1622,14 @@ static void ntfs_dump_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
-		ntfs_log_perror("ntfs_attr_readall failed");
+		ntfs_log_perror("Failed to read $BITMAP attribute");
 		return;
 	}
 
 	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION, 
 						   name, name_len, &data_size);
 	if (!tmp_alloc) {
-		ntfs_log_perror("ntfs_attr_readall failed");
+		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
 		free(bitmap);
 		return;
 	}
