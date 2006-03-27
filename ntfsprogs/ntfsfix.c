@@ -1,7 +1,7 @@
 /**
  * ntfsfix - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2005 Anton Altaparmakov.
+ * Copyright (c) 2000-2006 Anton Altaparmakov.
  * Copyright (c) 2002-2005 Szabolcs Szakacsits.
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file

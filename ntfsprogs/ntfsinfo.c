@@ -2,7 +2,7 @@
  * ntfsinfo - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Matthew J. Fanto
- * Copyright (c) 2002-2005 Anton Altaparmakov
+ * Copyright (c) 2002-2006 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Yuval Fledel
