@@ -1,7 +1,7 @@
 /**
  * ntfsclone - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003-2005 Szabolcs Szakacsits
+ * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Anton Altaparmakov
  * Special image format support copyright (c) 2004 Per Olofsson
  *
@@ -62,10 +62,12 @@
 #include "bootsect.h"
 #include "device.h"
 #include "attrib.h"
+#include "mst.h"
 #include "volume.h"
 #include "mft.h"
 #include "bitmap.h"
 #include "inode.h"
+#include "index.h"
 #include "dir.h"
 #include "runlist.h"
 #include "ntfstime.h"
@@ -711,6 +713,107 @@ static void restore_image(void)
 	}
 }
 
+static void wipe_index_entry_timestams(INDEX_ENTRY *e)
+{
+	s64 timestamp = utc2ntfs(0);
+
+	while (!(e->flags & INDEX_ENTRY_END)) {
+
+		e->key.file_name.creation_time = timestamp;
+		e->key.file_name.last_data_change_time = timestamp;
+		e->key.file_name.last_mft_change_time = timestamp;
+		e->key.file_name.last_access_time = timestamp;
+		
+		wiped_timestamp_data += 32;
+		
+		e = (INDEX_ENTRY *)((u8 *)e + le16_to_cpu(e->length));
+	}
+}
+
+static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
+{
+	INDEX_ALLOCATION *indexa, *tmp_indexa;
+	INDEX_ENTRY *entry;
+	INDEX_ROOT *indexr;
+	u8 *bitmap, *byte;
+	int bit;
+	ntfs_attr *na;
+	ntfschar *name;
+	u32 name_len;
+
+	indexr = ntfs_index_root_get(ni, attr);
+	if (!indexr) {
+		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
+		return;
+	}
+
+	if (indexr->type != AT_FILE_NAME)
+		goto out_indexr;
+
+	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
+	name_len = attr->name_length;
+	
+	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
+	if (!byte) {
+		ntfs_log_perror("Failed to read $BITMAP attribute");
+		goto out_indexr;
+	}
+
+	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, name_len);
+	if (!na) {
+		ntfs_log_perror("Failed to open $INDEX_ALLOCATION attribute");
+		goto out_bitmap;
+	}
+	tmp_indexa = indexa = malloc(na->data_size);
+	if (!tmp_indexa) {
+		ntfs_log_perror("malloc failed");
+		goto out_na;
+	}
+	if (ntfs_attr_pread(na, 0, na->data_size, indexa) != na->data_size) {
+		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
+		goto out_indexa;
+	}
+
+	bit = 0;
+	while ((u8 *)tmp_indexa < (u8 *)indexa + na->data_size) {
+		if (*byte & (1 << bit)) {					   
+			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)tmp_indexa,
+						indexr->index_block_size)) {
+				ntfs_log_perror("Damaged INDX record");
+				goto out_indexa;
+			}
+			entry = (INDEX_ENTRY *)((u8 *)tmp_indexa + le32_to_cpu(
+				tmp_indexa->index.entries_offset) + 0x18);
+
+			wipe_index_entry_timestams(entry);
+
+			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)tmp_indexa,
+						indexr->index_block_size)) {
+				ntfs_log_perror("INDX write fixup failed");
+				goto out_indexa;
+			}
+		}
+		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa + 
+						 indexr->index_block_size);
+		bit++;
+		if (bit > 7) {
+			bit = 0;
+			byte++;
+		}
+	}
+	
+	if (ntfs_rl_pwrite(vol, na->rl, 0, na->data_size, indexa) != na->data_size)
+		ntfs_log_perror("ntfs_rl_pwrite failed");
+out_indexa:
+	free(indexa);
+out_na:
+	ntfs_attr_close(na);
+out_bitmap:
+	free(bitmap);
+out_indexr:
+	free(indexr);
+}
+
 static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 {
 	INDEX_ENTRY *entry;
@@ -849,6 +952,9 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		}
 		return;
 	}
+
+	if (wipe && walk->image->ctx->attr->type == AT_INDEX_ALLOCATION)
+		wipe_index_allocation_timestamps(walk->image->ni, a);
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))
 		perr_exit("ntfs_decompress_mapping_pairs");

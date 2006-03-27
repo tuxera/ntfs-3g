@@ -13,6 +13,10 @@ xx/xx/2006 - 1.13.1-WIP
 	  from an ntfs attribute.  (Szaka)
 	- libntfs: add ntfs_index_root_get() which reads the index root of 
 	  an attribute.  (Szaka)
+	- ntfsclone: the --metadata option will wipe the timestamps in the
+	  index allocation attributes as well. This further decreases the 
+	  compressed metadata image size by 10-25% and more importantly it
+	  eliminates non-interesting ntfscmp differences.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
