@@ -1199,32 +1199,10 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tKey security id:\t %u\n",
 				 le32_to_cpu(entry->key.sdh.security_id));
 		break;
-	case INDEX_ATTR_OBJID_O: {
-		OBJ_ID_INDEX_DATA *object_id_data;
-
+	case INDEX_ATTR_OBJID_O:
 		ntfs_guid_to_mbs(&entry->key.object_id, printable_GUID);
 		ntfs_log_verbose("\t\tKey GUID:\t\t %s\n", printable_GUID);
 		ntfs_log_verbose("\t\tKey Data:\n");
-		object_id_data = (OBJ_ID_INDEX_DATA*)((u8*)entry +
-				le16_to_cpu(entry->data_offset));
-		ntfs_log_verbose("\t\tMFT Number:\t\t 0x%llx\n",
-				(unsigned long long)
-				MREF_LE(object_id_data->mft_reference));
-		ntfs_log_verbose("\t\tMFT Sequence Number:\t 0x%x\n",
-				(unsigned)
-				MSEQNO_LE(object_id_data->mft_reference));
-		ntfs_guid_to_mbs(&object_id_data->birth_volume_id,
-				printable_GUID);
-		ntfs_log_verbose("\t\tBirth volume id GUID:\t %s\n",
-				printable_GUID);
-		ntfs_guid_to_mbs(&object_id_data->birth_object_id,
-				printable_GUID);
-		ntfs_log_verbose("\t\tBirth object id GUID:\t %s\n",
-				printable_GUID);
-		ntfs_guid_to_mbs(&object_id_data->domain_id, printable_GUID);
-		ntfs_log_verbose("\t\tDomain id GUID:\t\t %s\n",
-				printable_GUID);
-		}
 		break;
 	case INDEX_ATTR_REPARSE_R:
 		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%08x\n",
@@ -1284,8 +1262,30 @@ static void ntfs_dump_index_data(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tUnknown (padding):\t 0x%08x\n",
 				 le32_to_cpu(data->sdh.reserved_II));
 		break;
-	case INDEX_ATTR_OBJID_O:
-		/* TODO */
+	case INDEX_ATTR_OBJID_O: {
+		OBJ_ID_INDEX_DATA *object_id_data;
+		char printable_GUID[37];
+
+		object_id_data = (OBJ_ID_INDEX_DATA*)((u8*)entry +
+				le16_to_cpu(entry->data_offset));
+		ntfs_log_verbose("\t\tMFT Number:\t\t 0x%llx\n",
+				(unsigned long long)
+				MREF_LE(object_id_data->mft_reference));
+		ntfs_log_verbose("\t\tMFT Sequence Number:\t 0x%x\n",
+				(unsigned)
+				MSEQNO_LE(object_id_data->mft_reference));
+		ntfs_guid_to_mbs(&object_id_data->birth_volume_id,
+				printable_GUID);
+		ntfs_log_verbose("\t\tBirth volume id GUID:\t %s\n",
+				printable_GUID);
+		ntfs_guid_to_mbs(&object_id_data->birth_object_id,
+				printable_GUID);
+		ntfs_log_verbose("\t\tBirth object id GUID:\t %s\n",
+				printable_GUID);
+		ntfs_guid_to_mbs(&object_id_data->domain_id, printable_GUID);
+		ntfs_log_verbose("\t\tDomain id GUID:\t\t %s\n",
+				printable_GUID);
+		}
 		break;
 	case INDEX_ATTR_REPARSE_R:
 		/* TODO */
