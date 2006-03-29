@@ -1202,7 +1202,6 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 	case INDEX_ATTR_OBJID_O:
 		ntfs_guid_to_mbs(&entry->key.object_id, printable_GUID);
 		ntfs_log_verbose("\t\tKey GUID:\t\t %s\n", printable_GUID);
-		ntfs_log_verbose("\t\tKey Data:\n");
 		break;
 	case INDEX_ATTR_REPARSE_R:
 		ntfs_log_verbose("\t\tKey reparse tag:\t 0x%08x\n",
@@ -1403,6 +1402,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			ntfs_log_verbose("\t\tData length:\t\t %u\n",
 				le16_to_cpu(entry->data_length));
 			ntfs_dump_index_key(entry, type);
+			ntfs_log_verbose("\t\tKey Data:\n");
 			ntfs_dump_index_data(entry, type);
 			break;
 		}
