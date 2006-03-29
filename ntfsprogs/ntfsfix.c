@@ -2,7 +2,7 @@
  * ntfsfix - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov.
- * Copyright (c) 2002-2005 Szabolcs Szakacsits.
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits.
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -118,7 +118,8 @@ static void version(void)
 {
 	ntfs_log_info("%s v%s\n\n"
 		   "Attempt to fix an NTFS partition.\n\n"
-		   "Copyright (c) 2000-2003 Anton Altaparmakov.\n\n",
+		   "Copyright (c) 2000-2006 Anton Altaparmakov.\n"
+		   "Copyright (c) 2002-2006 Szabolcs Szakacsits.\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);

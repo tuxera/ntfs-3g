@@ -108,9 +108,11 @@ static void version(void)
 			ntfs_libntfs_version());
 	printf("Copyright (c)\n");
 	printf("    2002-2004 Matthew J. Fanto\n");
-	printf("    2002-2005 Anton Altaparmakov\n");
+	printf("    2002-2006 Anton Altaparmakov\n");
 	printf("    2002-2005 Richard Russon\n");
+	printf("    2003-2006 Szabolcs Szakacsits\n");
 	printf("    2003      Leonard Norrgård\n");
+	printf("    2004-2005 Yuval Fledel\n");
 	printf("    2004-2005 Yura Pakhuchiy\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
