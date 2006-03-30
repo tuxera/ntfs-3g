@@ -1,7 +1,7 @@
 /**
  * ntfsresize - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2002-2005 Szabolcs Szakacsits
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  *
@@ -366,8 +366,8 @@ static void proceed_question(void)
 static void version(void)
 {
 	printf("\nResize an NTFS Volume, without data loss.\n\n");
-	printf("Copyright (c) 2002-2005  Szabolcs Szakacsits\n");
-	printf("Copyright (c) 2002-2004  Anton Altaparmakov\n");
+	printf("Copyright (c) 2002-2006  Szabolcs Szakacsits\n");
+	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
@@ -653,25 +653,19 @@ static int str2unicode(const char *aname, ntfschar **ustr, int *len)
 	return 0;
 }
 
-static int has_bad_sectors(ntfs_resize_t *resize, int is_inode)
+static int is_badclus_bad(u64 mft_no, ATTR_RECORD *a)
 {
 	int len, ret = 0;
 	ntfschar *ustr = NULL;
-	ATTR_RECORD *a = resize->ctx->attr;
 
-	if (is_inode) {
-		if (resize->ni->mft_no != FILE_BadClus)
-			return 0;
-	} else {
-		if (resize->mref != FILE_BadClus)
-			return 0;
-	}
+	if (mft_no != FILE_BadClus)
+	       	return 0;
 
 	if (str2unicode("$Bad", &ustr, &len) == -1)
 		return -1;
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
-			(ntfschar*)((u8*)a + le16_to_cpu(a->name_offset)),
+			(ntfschar *)((u8 *)a + le16_to_cpu(a->name_offset)),
 			a->name_length, 0, NULL, 0))
 		ret = 1;
 
@@ -695,7 +689,7 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 	flags = resize->ctx->attr->flags;
 	atype = resize->ctx->attr->type;
 
-	if ((ret = has_bad_sectors(resize, 1)) != 0) {
+	if ((ret = is_badclus_bad(inode, resize->ctx->attr)) != 0) {
 		if (ret == -1)
 			exit(1);
 		return;
@@ -1699,7 +1693,7 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 		if (handle_mftdata(resize, do_mftdata) == 0)
 			continue;
 
-		ret = has_bad_sectors(resize, 0);
+		ret = is_badclus_bad(resize->mref, resize->ctx->attr);
 		if (ret == -1)
 			exit(1);
 		else if (ret == 1)
