@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSINFO 8 "November 2005" "ntfsprogs @VERSION@"
+.TH NTFSINFO 8 "April 2006" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsinfo \- dump a file's attributes
 .SH SYNOPSIS
@@ -61,8 +61,7 @@ Increase the amount of output that
 prints.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
-Show the version number, copyright and license for
-.BR ntfsundelete .
+Show the version number, copyright and license.
 .SH BUGS
 There are no known problems with
 .BR ntfsinfo .
