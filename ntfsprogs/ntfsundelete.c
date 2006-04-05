@@ -450,7 +450,7 @@ static int parse_options(int argc, char *argv[])
 		{ NULL, 0, NULL, 0 }
 	};
 
-	char c = -1;
+	int c = -1;
 	char *end = NULL;
 	int err  = 0;
 	int ver  = 0;
@@ -463,7 +463,7 @@ static int parse_options(int argc, char *argv[])
 	opts.uinode   = -1;
 	opts.percent  = -1;
 	opts.fillbyte = -1;
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {

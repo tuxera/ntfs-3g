@@ -35,6 +35,7 @@ xx/xx/2006 - 1.13.1-WIP
 	- libntfs: add ntfs_str2ucs(), ntfs_freeucs(), ntfs_mft_usn_dec()
 	  and ntfs_inode_badclus_bad() functions, and convert all copy-pastes
 	  to use them.  (Szaka)
+	- Fix all incorrect getopt_long() return value usages.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

@@ -372,7 +372,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		{ NULL, 0, NULL, 0 }
 	};
 
-	char c = -1;
+	int c = -1;
 	int lic = 0;
 	int err = 0;
 	int ver = 0;
@@ -384,7 +384,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:		/* A device, or a number of sectors */
 			if (!opts2->dev_name)

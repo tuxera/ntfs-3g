@@ -209,7 +209,7 @@ static int parse_options(int argc, char *argv[])
 		{ NULL,		0,			NULL, 0   }
 	};
 
-	char c = -1;
+	int c = -1;
 	char *end;
 	int err  = 0;
 	int ver  = 0;

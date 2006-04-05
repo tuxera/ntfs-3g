@@ -1675,7 +1675,7 @@ static char *realpath(const char *path, char *resolved_path)
 static int parse_options(int argc, char *argv[])
 {
 	int err = 0, help = 0;
-	char c = -1;
+	int c = -1;
 
 	static const char *sopt = "-o:h?qv";
 	static const struct option lopt[] = {
@@ -1692,7 +1692,7 @@ static int parse_options(int argc, char *argv[])
 	opts.options = NULL;
 	opts.device = NULL;
 
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != (char)-1) {
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
