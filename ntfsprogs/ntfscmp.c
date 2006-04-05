@@ -522,20 +522,17 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 
 static int cmp_attribute_header(ATTR_RECORD *a1, ATTR_RECORD *a2)
 {
-	int header_size = offsetof(ATTR_RECORD, resident_end);
+	u32 header_size = offsetof(ATTR_RECORD, resident_end);
 
 	if (a1->non_resident != a2->non_resident)
 		return 1;
 
 	if (a1->non_resident) {
-
-		if (a1->compression_unit != a2->compression_unit)
-			return 1;
-
-		header_size = offsetof(ATTR_RECORD, non_resident_end);
-		if (a1->compression_unit)
-			header_size = offsetof(ATTR_RECORD, compressed_end);
-	} 
+		/*
+		 * FIXME: includes paddings which are not handled by ntfsinfo!
+		 */
+		header_size = a1->length;
+	}
 
 	return memcmp(a1, a2, header_size);
 }
