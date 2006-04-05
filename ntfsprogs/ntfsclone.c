@@ -787,6 +787,9 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 			wipe_index_entry_timestams(entry);
 
+			if (ntfs_mft_usn_dec((MFT_RECORD *)tmp_indexa))
+				perr_exit("ntfs_mft_usn_dec");
+
 			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)tmp_indexa,
 						indexr->index_block_size)) {
 				ntfs_log_perror("INDX write fixup failed");
