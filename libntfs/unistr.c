@@ -39,6 +39,7 @@
 #include <errno.h>
 #endif
 
+#include "attrib.h"
 #include "types.h"
 #include "unistr.h"
 #include "debug.h"
@@ -700,3 +701,55 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 	for (r = 0; uc_byte_table[r][0]; r++)
 		uc[uc_byte_table[r][0]] = uc_byte_table[r][1];
 }
+
+/**
+ * ntfs_str2ucs - convert a string to a valid NTFS file name
+ * @s:		input string
+ * @len:	length of output buffer in Unicode characters
+ *
+ * Convert the input @s string into the corresponding little endian,
+ * 2-byte Unicode string. The length of the converted string is less 
+ * or equal to the maximum length allowed by the NTFS format (255).
+ *
+ * If @s is NULL then return AT_UNNAMED.
+ *
+ * On success the function returns the Unicode string in an allocated 
+ * buffer and the caller is responsible to free it when it's not needed
+ * anymore.
+ *
+ * On error NULL is returned and errno is set to the error code.
+ */
+ntfschar *ntfs_str2ucs(const char *s, int *len)
+{
+	ntfschar *ucs = NULL;
+
+	if (s && ((*len = ntfs_mbstoucs(s, &ucs, 0)) == -1)) {
+		ntfs_log_perror("Couldn't convert '%s' to Unicode", s);
+		return NULL;
+	}
+	if (*len > 0xff) {
+		free(ucs);
+		errno = ENAMETOOLONG;
+		return NULL;
+	}
+	if (!ucs || !*len) {
+		ucs  = AT_UNNAMED;
+		*len = 0;
+	}
+	return ucs;
+}
+
+/**
+ * ntfs_ucsfree - free memory allocated by ntfs_str2ucs()
+ * @ucs		input string to be freed
+ *
+ * Free memory at @ucs and which was allocated by ntfs_str2ucs.
+ *
+ * Return value: none.
+ */
+void ntfs_ucsfree(ntfschar *ucs)
+{
+	if (ucs && (ucs != AT_UNNAMED))
+		free(ucs);
+}
+

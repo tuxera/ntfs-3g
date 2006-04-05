@@ -638,39 +638,25 @@ static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-static int str2unicode(const char *aname, ntfschar **ustr, int *len)
-{
-	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1)) {
-		perr_printf("Couldn't convert string to Unicode");
-		return -1;
-	}
-
-	if (!*ustr || !*len) {
-		*ustr = AT_UNNAMED;
-		*len = 0;
-	}
-
-	return 0;
-}
-
 static int is_badclus_bad(u64 mft_no, ATTR_RECORD *a)
 {
 	int len, ret = 0;
-	ntfschar *ustr = NULL;
+	ntfschar *ustr;
 
 	if (mft_no != FILE_BadClus)
 	       	return 0;
 
-	if (str2unicode("$Bad", &ustr, &len) == -1)
+	if ((ustr = ntfs_str2ucs("$Bad", &len)) == NULL) {
+		perr_printf("Couldn't convert '$Bad' to Unicode");
 		return -1;
+	}
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
 			(ntfschar *)((u8 *)a + le16_to_cpu(a->name_offset)),
 			a->name_length, 0, NULL, 0))
 		ret = 1;
 
-	if (ustr != AT_UNNAMED)
-		free(ustr);
+	ntfs_ucsfree(ustr);
 
 	return ret;
 }
@@ -2013,7 +1999,7 @@ static void lookup_data_attr(ntfs_volume *vol,
 			     ntfs_attr_search_ctx **ctx)
 {
 	ntfs_inode *ni;
-	ntfschar *ustr = NULL;
+	ntfschar *ustr;
 	int len = 0;
 
 	if (!(ni = ntfs_inode_open(vol, mref)))
@@ -2022,14 +2008,15 @@ static void lookup_data_attr(ntfs_volume *vol,
 	if (!(*ctx = attr_get_search_ctx(ni, NULL)))
 		exit(1);
 
-	if (str2unicode(aname, &ustr, &len) == -1)
+	if ((ustr = ntfs_str2ucs(aname, &len)) == NULL) {
+		perr_printf("Couldn't convert '%s' to Unicode", aname);
 		exit(1);
+	}
 
 	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
 		perr_exit("ntfs_lookup_attr");
 
-	if (ustr != AT_UNNAMED)
-		free(ustr);
+	ntfs_ucsfree(ustr);
 }
 
 static int check_bad_sectors(ntfs_volume *vol)

@@ -1539,21 +1539,6 @@ static ntfs_attr_search_ctx *attr_get_search_ctx(ntfs_inode *ni)
 	return ret;
 }
 
-static int str2unicode(const char *aname, ntfschar **ustr, int *len)
-{
-	if (aname && ((*len = ntfs_mbstoucs(aname, ustr, 0)) == -1)) {
-		perr_printf("Unable to convert '%s' to Unicode", aname);
-		return -1;
-	}
-
-	if (!*ustr || !*len) {
-		*ustr = AT_UNNAMED;
-		*len = 0;
-	}
-
-	return 0;
-}
-
 /**
  * lookup_data_attr
  *
@@ -1562,22 +1547,22 @@ static int str2unicode(const char *aname, ntfschar **ustr, int *len)
 static ntfs_attr_search_ctx *lookup_data_attr(ntfs_inode *ni, const char *aname)
 {
 	ntfs_attr_search_ctx *ctx;
-	ntfschar *ustr = NULL;
+	ntfschar *ustr;
 	int len = 0;
 
 	if ((ctx = attr_get_search_ctx(ni)) == NULL)
 		return NULL;
 
-	if (str2unicode(aname, &ustr, &len) == -1)
+	if ((ustr = ntfs_str2ucs(aname, &len)) == NULL) {
+		perr_printf("Couldn't convert '%s' to Unicode", aname);
 		goto error_out;
+	}
 
 	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, ctx)) {
 		perr_printf("ntfs_attr_lookup");
 		goto error_out;
 	}
-	if (ustr != AT_UNNAMED)
-		free(ustr);
-
+	ntfs_ucsfree(ustr);
 	return ctx;
 error_out:
 	ntfs_attr_put_search_ctx(ctx);

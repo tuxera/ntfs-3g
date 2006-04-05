@@ -1515,15 +1515,11 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		attr_lookup();
 	else
 	*/
-	if (name) {
-		uname_len = ntfs_mbstoucs(name, &uname, 0);
-		if (uname_len < 0)
-			return -errno;
-		if (uname_len > 0xff) {
-			free(uname);
-			return -ENAMETOOLONG;
-		}
-	}
+
+	uname = ntfs_str2ucs(name, &uname_len);
+	if (!uname)
+		return -errno;
+
 	/* Check if the attribute is already there. */
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
@@ -1674,7 +1670,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
-	free(uname);
+	ntfs_ucsfree(uname);
 	return err;
 }
 
@@ -1701,17 +1697,11 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		attr_lookup();
 	else
 	*/
-	if (name) {
-		uname_len = ntfs_mbstoucs(name, &uname, 0);
-		if (uname_len < 0)
-			return -errno;
-		if (uname_len > 0xff) {
-			free(uname);
-			return -ENAMETOOLONG;
-		}
-	} else {
-		uname = AT_UNNAMED;
-	}
+
+	uname = ntfs_str2ucs(name, &uname_len);
+	if (!uname)
+		return -errno;
+
 	/* Check if the attribute is already there. */
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
@@ -1866,8 +1856,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
-	if (uname && (uname != AT_UNNAMED))
-		free(uname);
+	ntfs_ucsfree(uname);
 	free(rl);
 	return err;
 }
@@ -1893,17 +1882,11 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 		mkntfs_attr_lookup();
 	else
 	*/
-	if (name) {
-		uname_len = ntfs_mbstoucs(name, &uname, 0);
-		if (uname_len < 0)
-			return -errno;
-		if (uname_len > 0xff) {
-			free(uname);
-			return -ENAMETOOLONG;
-		}
-	} else {
-		uname = AT_UNNAMED;
-	}
+
+	uname = ntfs_str2ucs(name, &uname_len);
+	if (!uname)
+		return -errno;
+
 	/* Check if the attribute is already there. */
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
@@ -1978,8 +1961,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
-	if (uname && (uname != AT_UNNAMED))
-		free(uname);
+	ntfs_ucsfree(uname);
 	return err;
 }
 
@@ -2426,33 +2408,26 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	char *re_start, *re_end;
 	int i, err, index_block_size;
 
-	if (name) {
-		uname_len = ntfs_mbstoucs(name, &uname, 0);
-		if (uname_len < 0)
-			return -errno;
-		if (uname_len > 0xff) {
-			free(uname);
-			return -ENAMETOOLONG;
-		}
-	} else {
-		uname = NULL;
-	}
+	uname = ntfs_str2ucs(name, &uname_len);
+	if (!uname)
+		return -errno;
+
 	/* Find the index root attribute. */
 	ctx = ntfs_attr_get_search_ctx(NULL, m);
 	if (!ctx) {
 		ntfs_log_error("Failed to allocate attribute search context.\n");
-		free(uname);
+		ntfs_ucsfree(uname);
 		return -ENOMEM;
 	}
 	if (ic == IGNORE_CASE) {
 		ntfs_log_error("FIXME: Hit unimplemented code path #4.\n");
 		err = -EOPNOTSUPP;
-		free(uname);
+		ntfs_ucsfree(uname);
 		goto err_out;
 	}
 	err = mkntfs_attr_lookup(AT_INDEX_ROOT, uname, uname_len, ic, 0, NULL, 0,
 			ctx);
-	free(uname);
+	ntfs_ucsfree(uname);
 	if (err) {
 		err = -ENOTDIR;
 		goto err_out;

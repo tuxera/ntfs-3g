@@ -696,8 +696,7 @@ static void ntfstruncate_exit(void)
 	if (err == -1)
 		ntfs_log_perror("Warning: Could not umount %s", dev_name);
 	/* Free the attribute name if it exists. */
-	if (attr_name && attr_name != AT_UNNAMED)
-		free(attr_name);
+	ntfs_ucsfree(attr_name);
 }
 
 /**
@@ -801,8 +800,7 @@ int main(int argc, char **argv)
 		ntfs_log_perror("Warning: Failed to umount %s", dev_name);
 
 	/* Free the attribute name if it exists. */
-	if (attr_name && attr_name != AT_UNNAMED)
-		free(attr_name);
+	ntfs_ucsfree(attr_name);
 
 	/* Finally, disable our ntfstruncate_exit() handler. */
 	success = TRUE;
