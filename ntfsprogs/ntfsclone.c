@@ -1125,13 +1125,8 @@ static void wipe_unused_mft(ntfs_inode *ni)
 
 static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 {
-	u16 usn, *usnp;
-	
-	usnp = (u16 *)((char *)ni->mrec + le16_to_cpu(ni->mrec->usa_ofs));
-	usn = le16_to_cpup(usnp);
-	if (usn-- <= 1)
-		usn = 0xfffe;
-	*usnp = cpu_to_le16(usn);
+	if (ntfs_mft_usn_dec(ni->mrec))
+		perr_exit("ntfs_mft_usn_dec");
 	
 	if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
 		perr_exit("ntfs_mft_record_write");

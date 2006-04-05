@@ -32,8 +32,8 @@ xx/xx/2006 - 1.13.1-WIP
 	- ntfsinfo: dump either a minimal (default) or the entire attribute
 	  header (--verbose) for all attributes types. Also removed a lot of
 	  redundant code and made some formatting corrections.  (Szaka)
-	- libntfs: add ntfs_str2ucs and ntfs_freeucs function, and convert 
-	  copy-pastes to use them.  (Szaka)
+	- libntfs: add ntfs_str2ucs(), ntfs_freeucs() and ntfs_mft_usn_dec()
+	  functions, and convert all copy-pastes to use them.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

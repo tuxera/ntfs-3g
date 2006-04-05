@@ -1935,3 +1935,26 @@ int ntfs_mft_add_index(struct ntfs_dir *dir)
 
 #endif /* NTFS_RICH */
 
+/**
+ * ntfs_mft_usn_dec - Decrement USN by one
+ * @mrec:	pointer to an mft record
+ *
+ * On success return 0 and on error return -1 with errno set.
+ */
+int ntfs_mft_usn_dec(MFT_RECORD *mrec)
+{
+	u16 usn, *usnp;
+
+	if (!mrec) {
+		errno = EINVAL;
+		return -1;
+	}
+	usnp = (u16 *)((char *)mrec + le16_to_cpu(mrec->usa_ofs));
+	usn = le16_to_cpup(usnp);
+	if (usn-- <= 1)
+		usn = 0xfffe;
+	*usnp = cpu_to_le16(usn);
+
+	return 0;
+}
+

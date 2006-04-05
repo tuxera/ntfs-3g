@@ -5101,7 +5101,6 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	pos = g_mftmirr_lcn * g_vol->cluster_size;
 	lw = 1;
 	for (i = 0; i < g_rl_mftmirr[0].length * g_vol->cluster_size / g_vol->mft_record_size; i++) {
-		u16 usn, *usnp;
 		m = (MFT_RECORD*)(g_buf + i * g_vol->mft_record_size);
 		/*
 		 * Decrement the usn by one, so it becomes the same as the one
@@ -5109,11 +5108,10 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		 * $MFTMirr to have the exact same byte by byte content as
 		 * $MFT, rather than just equivalent meaning content.
 		 */
-		usnp = (u16*)((char*)m + le16_to_cpu(m->usa_ofs));
-		usn = le16_to_cpup(usnp);
-		if (usn-- <= 1)
-			usn = 0xfffe;
-		*usnp = cpu_to_le16(usn);
+		if (ntfs_mft_usn_dec(m)) {
+			ntfs_log_error("ntfs_mft_usn_dec");
+			goto done;
+		}
 		if (!opts.no_action)
 			lw = ntfs_mst_pwrite(g_vol->dev, pos, 1, g_vol->mft_record_size, g_buf + i * g_vol->mft_record_size);
 		if (lw != 1) {
