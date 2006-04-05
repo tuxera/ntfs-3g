@@ -185,6 +185,8 @@ extern int ntfs_inode_add_attrlist(ntfs_inode *ni);
 
 extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
+extern int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *a);
+
 #ifdef NTFS_RICH
 
 int ntfs_inode_close2(ntfs_inode *ni);

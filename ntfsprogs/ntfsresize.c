@@ -638,29 +638,6 @@ static s64 nr_clusters_to_bitmap_byte_size(s64 nr_clusters)
 	return bm_bsize;
 }
 
-static int is_badclus_bad(u64 mft_no, ATTR_RECORD *a)
-{
-	int len, ret = 0;
-	ntfschar *ustr;
-
-	if (mft_no != FILE_BadClus)
-	       	return 0;
-
-	if ((ustr = ntfs_str2ucs("$Bad", &len)) == NULL) {
-		perr_printf("Couldn't convert '$Bad' to Unicode");
-		return -1;
-	}
-
-	if (ustr && ntfs_names_are_equal(ustr, len,
-			(ntfschar *)((u8 *)a + le16_to_cpu(a->name_offset)),
-			a->name_length, 0, NULL, 0))
-		ret = 1;
-
-	ntfs_ucsfree(ustr);
-
-	return ret;
-}
-
 static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 {
 	s64 inode, last_lcn;
@@ -675,9 +652,9 @@ static void collect_resize_constraints(ntfs_resize_t *resize, runlist *rl)
 	flags = resize->ctx->attr->flags;
 	atype = resize->ctx->attr->type;
 
-	if ((ret = is_badclus_bad(inode, resize->ctx->attr)) != 0) {
+	if ((ret = ntfs_inode_badclus_bad(inode, resize->ctx->attr)) != 0) {
 		if (ret == -1)
-			exit(1);
+			perr_exit("Bad sector list check failed");
 		return;
 	}
 
@@ -1679,9 +1656,9 @@ static void relocate_attributes(ntfs_resize_t *resize, int do_mftdata)
 		if (handle_mftdata(resize, do_mftdata) == 0)
 			continue;
 
-		ret = is_badclus_bad(resize->mref, resize->ctx->attr);
+		ret = ntfs_inode_badclus_bad(resize->mref, resize->ctx->attr);
 		if (ret == -1)
-			exit(1);
+			perr_exit("Bad sector list check failed");
 		else if (ret == 1)
 			continue;
 

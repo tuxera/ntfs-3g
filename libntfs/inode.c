@@ -1105,6 +1105,50 @@ void ntfs_inode_update_time(ntfs_inode *ni)
 	}
 }
 
+/**
+ * ntfs_inode_badclus_bad - check for $Badclus:$Bad data attribute
+ * @mft_no:		mft record number where @attr is present
+ * @attr:		attribute record used to check for the $Bad attribute
+ *
+ * Check if the mft record given by @mft_no and @attr contains the bad sector
+ * list. Please note that mft record numbers describing $Badclus extent inodes
+ * will not match the current $Badclus:$Bad check.
+ * 
+ * On success return 1 if the file is $Badclus:$Bad, otherwise return 0.
+ * On error return -1 with errno set to the error code.
+ */
+int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
+{
+	int len, ret = 0;
+	ntfschar *ustr;
+
+	if (!attr) {
+		ntfs_log_error("Invalid argument.\n");
+		errno = EINVAL;
+		return -1;
+	}
+	
+	if (mft_no != FILE_BadClus)
+	       	return 0;
+
+	if (attr->type != AT_DATA)
+	       	return 0;
+
+	if ((ustr = ntfs_str2ucs("$Bad", &len)) == NULL) {
+		ntfs_log_perror("Couldn't convert '$Bad' to Unicode");
+		return -1;
+	}
+
+	if (ustr && ntfs_names_are_equal(ustr, len,
+			(ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset)),
+			attr->name_length, 0, NULL, 0))
+		ret = 1;
+
+	ntfs_ucsfree(ustr);
+
+	return ret;
+}
+
 #ifdef NTFS_RICH
 
 #include "rich.h"
