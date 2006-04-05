@@ -52,7 +52,6 @@ Thanks,
 
 - more exact details about the differences 
 - unnamed resident attributes with same type are ignored
-- special $BadClus:$Bad handling, now $BadClus is skipped
 - new option: --metadata mode
 - code cleanup, remove many cross-util duplicates
 - write manual

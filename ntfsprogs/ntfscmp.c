@@ -567,6 +567,14 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 		goto close_attribs;
 	}
 
+	if (ntfs_inode_badclus_bad(inumber(ctx1->ntfs_ino), ctx1->attr) == 1) {
+		/*
+		 * If difference exists then it's already reported at the
+		 * attribute header since the mapping pairs must differ.
+		 */
+		return;
+	}
+
 	cmp_attribute_data(na1, na2);
 
 close_attribs:
@@ -774,10 +782,6 @@ static int cmp_inodes(ntfs_volume *vol1, ntfs_volume *vol2)
 	progress_update(&progress, 0);
 
 	for (inode = 0; inode < nr_mft_records; inode++) {
-
-		/* FIXME: needs special handling */
-		if (inode == 8)
-			continue;
 
 		ret1 = inode_open(vol1, (MFT_REF)inode, &ni1);
 		ret2 = inode_open(vol2, (MFT_REF)inode, &ni2);
