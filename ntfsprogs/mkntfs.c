@@ -4868,12 +4868,12 @@ static BOOL mkntfs_create_root_structures(void)
 				0, 0, "$Quota", FILE_NAME_WIN32_AND_DOS);
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
-			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
-				COLLATION_NTOFS_SID, g_vol->indx_record_size);
-		/* FIXME: This should be IGNORE_CASE */
-		if (!err)
 			err = add_attr_index_root(m, "$Q", 2, 0, AT_UNUSED,
 				COLLATION_NTOFS_ULONG, g_vol->indx_record_size);
+		/* FIXME: This should be IGNORE_CASE */
+		if (!err)
+			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
+				COLLATION_NTOFS_SID, g_vol->indx_record_size);
 		if (!err)
 			err = initialize_quota(m);
 		if (err < 0) {
