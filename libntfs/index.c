@@ -90,8 +90,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 			if (ictx->ia_dirty) {
 				if (ntfs_attr_mst_pwrite(ictx->ia_na,
 						ictx->ia_vcn <<
-						ictx->ni->vol->
-						cluster_size_bits,
+						ictx->vcn_size_bits,
 						1, ictx->block_size,
 						ictx->ia) != 1)
 					ntfs_log_error("Failed to write out "
@@ -122,8 +121,7 @@ void ntfs_index_ctx_reinit(ntfs_index_context *ictx)
 			if (ictx->ia_dirty) {
 				if (ntfs_attr_mst_pwrite(ictx->ia_na,
 						ictx->ia_vcn <<
-						ictx->ni->vol->
-						cluster_size_bits,
+						ictx->vcn_size_bits,
 						1, ictx->block_size,
 						ictx->ia) != 1)
 					ntfs_log_error("Failed to write out "
@@ -218,6 +216,14 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
 	/* Save index block size for future use. */
 	ictx->block_size = le32_to_cpu(ir->index_block_size);
+	/* Determine the size of a vcn in the directory index. */
+	if (vol->cluster_size <= ictx->block_size) {
+		ictx->vcn_size = vol->cluster_size;
+		ictx->vcn_size_bits = vol->cluster_size_bits;
+	} else {
+		ictx->vcn_size = vol->sector_size;
+		ictx->vcn_size_bits = vol->sector_size_bits;
+	}
 	/* Get collation rule type and validate it. */
 	cr = ir->collation_rule;
 	if (!ntfs_is_collation_rule_supported(cr)) {
@@ -326,7 +332,7 @@ done:
 descend_into_child_node:
 	ntfs_log_debug("Descend into node with VCN %lld.\n", vcn);
 	/* Read index allocation block. */
-	if (ntfs_attr_mst_pread(na, vcn << vol->cluster_size_bits, 1,
+	if (ntfs_attr_mst_pread(na, vcn << ictx->vcn_size_bits, 1,
 				ictx->block_size, ia) != 1) {
 		ntfs_log_error("Failed to read index allocation.\n");
 		goto err_out;

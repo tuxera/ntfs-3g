@@ -32,20 +32,22 @@
 
 /**
  * struct ntfs_index_context -
- * @ni:		inode containing the @entry described by this context
- * @name:	name of the index described by this context
- * @name_len:	length of the index name
- * @entry:	index entry (points into @ir or @ia)
- * @data:	index entry data (points into @entry)
- * @data_len:	length in bytes of @data
- * @is_in_root:	TRUE if @entry is in @ir and FALSE if it is in @ia
- * @ir:		index root if @is_in_root and NULL otherwise
- * @actx:	attribute search context if @is_in_root and NULL otherwise
- * @ia:		index block if @is_in_root is FALSE and NULL otherwise
- * @ia_na:	opened INDEX_ALLOCATION attribute
- * @ia_vcn:	VCN from which @ia where read from
- * @ia_dirty:	TRUE if index block was changed
- * @block_size:	index block size
+ * @ni:			inode containing the @entry described by this context
+ * @name:		name of the index described by this context
+ * @name_len:		length of the index name
+ * @entry:		index entry (points into @ir or @ia)
+ * @data:		index entry data (points into @entry)
+ * @data_len:		length in bytes of @data
+ * @is_in_root:		TRUE if @entry is in @ir or FALSE if it is in @ia
+ * @ir:			index root if @is_in_root or NULL otherwise
+ * @actx:		attribute search context if in root or NULL otherwise
+ * @ia:			index block if @is_in_root is FALSE or NULL otherwise
+ * @ia_na:		opened INDEX_ALLOCATION attribute
+ * @ia_vcn:		VCN from which @ia where read from
+ * @ia_dirty:		TRUE if index block was changed
+ * @block_size:		index block size
+ * @vcn_size:		VCN size for this index block
+ * @vcn_size_bits:	use instead of @vcn_size to speedup multiplication
  *
  * @ni is the inode this context belongs to.
  *
@@ -87,6 +89,8 @@ typedef struct {
 	VCN ia_vcn;
 	BOOL ia_dirty;
 	u32 block_size;
+	u32 vcn_size;
+	u8 vcn_size_bits;
 } ntfs_index_context;
 
 extern ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
