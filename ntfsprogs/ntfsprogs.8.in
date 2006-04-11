@@ -1,11 +1,11 @@
 .\" Copyright (c) 2002\-2005 Richard Russon.
 .\" Copyright (c) 2002\-2003 Anton Altaparmakov.
-.\" Copyright (c) 2005 Szabolcs Szakacsits.
+.\" Copyright (c) 2005\-2006 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "November 2005" "ntfsprogs @VERSION@"
+.TH NTFSPROGS 8 "April 2006" "ntfsprogs @VERSION@"
 .SH NAME
-ntfsprogs \- several tools for doing neat things with NTFS partitions
+ntfsprogs \- tools for doing neat things with NTFS
 .SH OVERVIEW
 .B ntfsprogs
 is a suite of NTFS utilities based around a shared library.  The tools are
@@ -13,42 +13,44 @@ available for free and come with full source code.
 .SH TOOLS
 .PP
 .BR mkntfs (8)
-\- Format a partition using NTFS.
+\- Create an NTFS filesystem.
 .PP
 .BR ntfscat (8)
-\- Dump a file's contents to the standard output.
+\- Dump a file's content to the standard output.
 .PP
 .BR ntfsclone (8)
-\- Efficiently clone, create, restore or rescue an image of an NTFS partition.
+\- Efficiently clone, backup, restore or rescue NTFS.
 .PP
 .BR ntfscluster (8)
-\- Locate the owner of any given sector or cluster on an NTFS partition.
+\- Locate the files which use the given sectors or clusters.
+.PP
+.BR ntfscmp (8)
+\- Compare two NTFS filesystems and tell the differences.
 .PP
 .BR ntfscp (8)
-\- Overwrite file on an NTFS partition.
+\- Overwrite a file on an NTFS.
 .PP
 .BR ntfsfix (8)
 \- Check and fix some common errors, clear the LogFile and make Windows
 perform a thorough check next time it boots.
 .PP
 .BR ntfsinfo (8)
-\- Show some information about an NTFS partition or one of the files
-or directories within it.
+\- Show information about NTFS or one of the files or directories within it.
 .PP
 .BR ntfslabel (8)
-\- Show, or set, an NTFS partition's volume label.
+\- Show, or set, an NTFS filesystem's volume label.
 .PP
 .BR ntfsls (8)
-\- List information about files in a directory residing on an NTFS partition.
+\- List information about files in a directory residing on an NTFS.
 .PP
 .BR ntfsmount (8)
-\- NTFS module for FUSE.
+\- Read-write NTFS userspace driver.
 .PP
 .BR ntfsresize (8)
-\- Resize an NTFS partition without losing data.
+\- Resize NTFS without losing data.
 .PP
 .BR ntfsundelete (8)
-\- Recover deleted files from an NTFS partition.
+\- Recover deleted files from NTFS.
 .SH AUTHORS
 .PP
 The tools were written by Anton Altaparmakov, Carmelo Kintana, Cristian Klein,
