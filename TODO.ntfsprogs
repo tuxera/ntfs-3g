@@ -50,12 +50,14 @@ Thanks,
 * ntfscmp *
 ***********
 
-- more exact details about the differences 
-- unnamed resident attributes with same type are ignored
+- compare mft record headers
+- exit status is 0 if inputs are the same, 1 if different, other if trouble
+- optionally ignore less interesting fields (e.g. attribute instance)
 - new option: --metadata mode
+- unnamed resident attributes with same type are ignored
 - code cleanup, remove many cross-util duplicates
-- write manual
-- performance: perhaps special handling for sparse, compressed, encrypted
+- handle deleted records
+- performance: special handling for sparse files
 
 
 **********
