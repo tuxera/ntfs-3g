@@ -11,11 +11,11 @@ endif
 # Workaround to make REALLYSTATIC work with automake 1.5.
 LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
-bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat
+bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsmftalloc ntfscmp
+			  ntfsmftalloc
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -95,6 +95,10 @@ ntfsmount_LDFLAGS	= $(AM_LFLAGS)
 ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=25
 endif
 
+ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
+ntfscmp_LDADD		= $(AM_LIBS)
+ntfscmp_LDFLAGS		= $(AM_LFLAGS)
+
 # We don't distribute these
 
 if ENABLE_RICH
@@ -106,10 +110,6 @@ endif
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)
 ntfstruncate_LDFLAGS	= $(AM_LFLAGS)
-
-ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
-ntfscmp_LDADD		= $(AM_LIBS)
-ntfscmp_LDFLAGS		= $(AM_LFLAGS)
 
 ntfsmftalloc_SOURCES	= ntfsmftalloc.c utils.c utils.h
 ntfsmftalloc_LDADD	= $(AM_LIBS)
