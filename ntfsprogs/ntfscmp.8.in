@@ -14,9 +14,9 @@ ntfscmp \- compare two NTFS filesystems and tell the differences
 The
 .B ntfscmp
 program makes a comparison between two NTFS filesystems from all aspects and 
-reports all varianses it finds.
+reports all variances it finds.
 The filesystems can be on block devices or images files. Ntfscmp can be used
-for volume verification however its primarily purpose was to be an efficient
+for volume verification however its primary purpose was to be an efficient
 development tool, used to quickly locate, identify and check the correctness
 of the metadata changes made to NTFS. 
 
