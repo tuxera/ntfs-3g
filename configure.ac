@@ -375,6 +375,7 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfscat.8
 	ntfsprogs/ntfsclone.8
 	ntfsprogs/ntfscluster.8
+	ntfsprogs/ntfscmp.8
 	ntfsprogs/ntfscp.8
 	ntfsprogs/ntfsfix.8
 	ntfsprogs/ntfsinfo.8

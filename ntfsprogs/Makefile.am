@@ -20,7 +20,7 @@ EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
 			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8 \
-			  ntfsmount.8
+			  ntfsmount.8 ntfscmp.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
