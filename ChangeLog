@@ -37,6 +37,9 @@ xx/xx/2006 - 1.13.1-WIP
 	  to use them.  (Szaka)
 	- Fix all incorrect getopt_long() return value usages.  (Szaka)
 	- Fix VCN size in the index.c.  (Anton, Yura)
+	- ntfscmp: support bad cluster list, compare full attribute headers
+	  for non-resident attributes, added manual, build and install by 
+	  default.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 
