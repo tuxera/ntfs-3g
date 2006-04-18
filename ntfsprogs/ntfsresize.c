@@ -1538,11 +1538,13 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 			  resize->mref, lcn_length);
 
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
-	ntfs_log_verbose("Relocate inode %7llu:0x%x:%08lld:0x%08llx --> "
-			 "0x%08llx\n", (unsigned long long)resize->mref,
-			(unsigned int)le32_to_cpu(resize->ctx->attr->type),
-			(long long)lcn_length, (unsigned long long)lcn,
-			(unsigned long long)relocate_rl->lcn);
+	ntfs_log_verbose("Relocate record %7llu:0x%x:%08lld:0x%08llx:0x%08llx "
+			 "--> 0x%08llx\n", (unsigned long long)resize->mref,
+			 (unsigned int)le32_to_cpu(resize->ctx->attr->type),
+			 (long long)lcn_length,
+			 (unsigned long long)(*rl + run)->vcn,
+			 (unsigned long long)lcn,
+			 (unsigned long long)relocate_rl->lcn);
 
 	relocate_clusters(resize, relocate_rl, lcn);
 	rl_insert_at_run(rl, run, relocate_rl);
@@ -1694,7 +1696,7 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 //		if (vol->dev->d_ops->sync(vol->dev) == -1)
 //			perr_exit("Failed to sync device");
 		if (write_mft_record(resize->vol, mref, resize->mrec))
-			perr_exit("Couldn't update inode %llu", mref);
+			perr_exit("Couldn't update record %llu", mref);
 	}
 }
 
