@@ -40,6 +40,8 @@ xx/xx/2006 - 1.13.1-WIP
 	- ntfscmp: support bad cluster list, compare full attribute headers
 	  for non-resident attributes, added manual, build and install by 
 	  default.  (Szaka)
+	- configure.ac: set PKG_CONFIG_PATH during build time so we should
+	  find .pc files in the most typical pkgconfig directories.  (Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

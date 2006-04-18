@@ -180,16 +180,16 @@ AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 PKG_PROG_PKG_CONFIG
 
+# Libraries often install their metadata .pc files in directories not searched
+# by pkg-config. Let's workaround this. 
+export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
+
 # Enable large file support.
 AC_SYS_LARGEFILE
 
 # Autodetect whether to build Gnome VFS or not.
 compile_gnome_vfs=false
 if test "$enable_gnome_vfs" != "no"; then
-	# Make compilation work on SuSE 9.0.
-	if test -d "/opt/gnome"; then
-		export PKG_CONFIG_PATH="/opt/gnome/lib/pkgconfig"
-	fi
 	PKG_CHECK_MODULES(LIBNTFS_GNOMEVFS, [glib-2.0 gthread-2.0 gnome-vfs-module-2.0],
 	[ compile_gnome_vfs=true ],
 	[
