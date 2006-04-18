@@ -1420,13 +1420,21 @@ static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
 
 		lseek_to_cluster(vol, src + i);
 
-		if (read_all(vol->dev, buff, vol->cluster_size) == -1)
-			perr_exit("read_all");
+		if (read_all(vol->dev, buff, vol->cluster_size) == -1) {
+			perr_printf("Failed to read from the disk");
+			if (errno == EIO)
+				printf("%s", bad_sectors_warning_msg);
+			exit(1);
+		}
 
 		lseek_to_cluster(vol, dest + i);
 
-		if (write_all(vol->dev, buff, vol->cluster_size) == -1)
-			perr_exit("write_all");
+		if (write_all(vol->dev, buff, vol->cluster_size) == -1) {
+			perr_printf("Failed to write to the disk");
+			if (errno == EIO)
+				printf("%s", bad_sectors_warning_msg);
+			exit(1);
+		}
 
 		resize->relocations++;
 		progress_update(&resize->progress, resize->relocations);
