@@ -2715,8 +2715,8 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx, u32 idx_size,
 	 * reach the last entry.
 	 */
 	if (type == AT_FILE_NAME) {
-		 while (((u8*)idx_entry < (u8*)idx_end) &&
-				 !(idx_entry->flags & INDEX_ENTRY_END)) {
+		while (((u8*)idx_entry < (u8*)idx_end) &&
+				!(idx_entry->flags & INDEX_ENTRY_END)) {
 			i = ntfs_file_values_compare(&idx->key.file_name,
 					&idx_entry->key.file_name, 1,
 					IGNORE_CASE, g_vol->upcase,

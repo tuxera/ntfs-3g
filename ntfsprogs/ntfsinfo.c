@@ -42,7 +42,6 @@
  *
  *	Still need to do:
  *	    $REPARSE_POINT/$SYMBOLIC_LINK
- *	    $PROPERTY_SET
  *	    $LOGGED_UTILITY_STREAM
  */
 
@@ -432,9 +431,9 @@ static void ntfs_dump_volume(ntfs_volume *vol)
  * @type:	dump flags for this attribute type
  * @flags:	flags for dumping
  */
-static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
+static void ntfs_dump_flags(char *indent, ATTR_TYPES type, u32 flags)
 {
-	printf("\tFile attributes:\t");
+	printf("%sFile attributes:\t", indent);
 	if (flags & FILE_ATTR_READONLY) {
 		printf(" READONLY");
 		flags &= ~FILE_ATTR_READONLY;
@@ -507,7 +506,7 @@ static void ntfs_dump_flags(ATTR_TYPES type, u32 flags)
 /**
  * ntfs_dump_namespace
  */
-static void ntfs_dump_namespace(u8 file_name_type)
+static void ntfs_dump_namespace(char *indent, u8 file_name_type)
 {
 	const char *mbs_file_type;
 
@@ -528,7 +527,7 @@ static void ntfs_dump_namespace(u8 file_name_type)
 	default:
 		mbs_file_type = "(unknown)";
 	}
-	printf("\tNamespace:\t\t %s\n", mbs_file_type);
+	printf("%sNamespace:\t\t %s\n", indent, mbs_file_type);
 }
 
 /* *************** functions for dumping attributes ******************** */
@@ -563,7 +562,7 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 		ntfs_time_str = ntfsinfo_time_to_str(standard_attr->last_access_time);
 		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
 	}
-	ntfs_dump_flags(attr->type, standard_attr->file_attributes);
+	ntfs_dump_flags("\t", attr->type, standard_attr->file_attributes);
 
 	printf("\tMax Number of Versions:\t %u \n",
 		(unsigned int)le32_to_cpu(standard_attr->maximum_versions));
@@ -577,10 +576,21 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 /*		printf("\t$STANDARD_INFORMATION fields owner_id, security_id, quota \n"
 			"\t & usn are missing. This volume has not been upgraded\n"); */
 	} else if (value_length == 72) {
+		printf("\tMaximum versions:\t %u \n", (unsigned int)
+				le32_to_cpu(standard_attr->maximum_versions));
+		printf("\tVersion number:\t\t %u \n", (unsigned int)
+				le32_to_cpu(standard_attr->version_number));
+		printf("\tClass ID:\t\t %u \n",
+			(unsigned int)le32_to_cpu(standard_attr->class_id));
 		printf("\tUser ID:\t\t %u \n",
 			(unsigned int)le32_to_cpu(standard_attr->owner_id));
 		printf("\tSecurity ID:\t\t %u \n",
 			(unsigned int)le32_to_cpu(standard_attr->security_id));
+		printf("\tQuota charged:\t\t %llu \n", (unsigned long long)
+				le64_to_cpu(standard_attr->quota_charged));
+		printf("\tUpdate Sequence Number:\t %llu \n",
+				(unsigned long long)
+				le64_to_cpu(standard_attr->usn));
 	} else {
 		printf("\tSize of STANDARD_INFORMATION is %u. It should be "
 			"either 72 or 48, something is wrong...\n",
@@ -653,18 +663,54 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 }
 
 /**
- * ntfs_dump_attr_file_name()
+ * ntfs_dump_filename()
  */
-static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
+static void ntfs_dump_filename(char *indent, FILE_NAME_ATTR *file_name_attr)
 {
-	FILE_NAME_ATTR *file_name_attr = NULL;
+	printf("%sParent directory:\t %lld\n", indent,
+		(long long)MREF_LE(file_name_attr->parent_directory));
+	/* time stuff */
+	if (!opts.notime) {
+		char *ntfs_time_str;
 
-	file_name_attr = (FILE_NAME_ATTR*)((char *)attr +
-		le16_to_cpu(attr->value_offset));
+		ntfs_time_str = ntfsinfo_time_to_str(
+				file_name_attr->creation_time);
+		printf("%sFile Creation Time:\t %s", indent, ntfs_time_str);
 
-	/* let's start with the obvious - file name */
+		ntfs_time_str = ntfsinfo_time_to_str(
+				file_name_attr->last_data_change_time);
+		printf("%sFile Altered Time:\t %s", indent, ntfs_time_str);
 
-	if (file_name_attr->file_name_length>0) {
+		ntfs_time_str = ntfsinfo_time_to_str(
+				file_name_attr->last_mft_change_time);
+		printf("%sMFT Changed Time:\t %s", indent, ntfs_time_str);
+
+		ntfs_time_str = ntfsinfo_time_to_str(
+				file_name_attr->last_access_time);
+		printf("%sLast Accessed Time:\t %s", indent, ntfs_time_str);
+	}
+	/* other basic stuff about the file */
+	printf("%sAllocated Size:\t\t %lld\n", indent, (long long)
+			sle64_to_cpu(file_name_attr->allocated_size));
+	printf("%sData Size:\t\t %lld\n", indent,
+			(long long)sle64_to_cpu(file_name_attr->data_size));
+	printf("%sFilename Length:\t %d\n", indent,
+			(unsigned)file_name_attr->file_name_length);
+	ntfs_dump_flags(indent, AT_FILE_NAME, file_name_attr->file_attributes);
+	if (file_name_attr->file_attributes & FILE_ATTR_REPARSE_POINT &&
+			file_name_attr->reserved)
+		printf("%sReparse point tag:\t 0x%x\n", indent, (unsigned)
+				le32_to_cpu(file_name_attr->reparse_point_tag));
+	else if (file_name_attr->reparse_point_tag) {
+		printf("%sEA Length:\t\t %d\n", indent, (unsigned)
+				le16_to_cpu(file_name_attr->packed_ea_size));
+		if (file_name_attr->reserved)
+			printf("%sReserved:\t\t %d\n", indent, (unsigned)
+					le16_to_cpu(file_name_attr->reserved));
+	}
+	/* The filename. */
+	ntfs_dump_namespace(indent, file_name_attr->file_name_type);
+	if (file_name_attr->file_name_length > 0) {
 		/* but first we need to convert the little endian unicode string
 		   into a printable format */
 		char *mbs_file_name = NULL;
@@ -674,47 +720,24 @@ static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
 			file_name_attr->file_name_length,&mbs_file_name,0);
 
 		if (mbs_file_name_size>0) {
-			printf("\tFile Name:\t\t '%s'\n", mbs_file_name);
+			printf("%sFilename:\t\t '%s'\n", indent, mbs_file_name);
 			free(mbs_file_name);
 		} else {
 			/* an error occurred, errno holds the reason - notify the user */
 			ntfs_log_perror("ntfsinfo error: could not parse file name");
 		}
-		/* any way, error or not, print the length */
-		printf("\tFile Name Length:\t %d\n", file_name_attr->file_name_length);
 	} else {
-		printf("\tFile Name:\t\t unnamed?!?\n");
+		printf("%sFile Name:\t\t unnamed?!?\n", indent);
 	}
+}
 
-	ntfs_dump_namespace(file_name_attr->file_name_type);
-
-	/* other basic stuff about the file */
-	printf("\tAllocated File Size:\t %lld\n",
-		(long long)sle64_to_cpu(file_name_attr->allocated_size));
-	printf("\tReal File Size:\t\t %lld\n",
-		(long long)sle64_to_cpu(file_name_attr->data_size));
-	printf("\tParent directory:\t %lld\n",
-		(long long)MREF_LE(file_name_attr->parent_directory));
-	ntfs_dump_flags(attr->type, file_name_attr->file_attributes);
-
-	/* time stuff stuff */
-	if (!opts.notime) {
-		char *ntfs_time_str;
-
-		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->creation_time);
-		printf("\tFile Creation Time:\t %s",ntfs_time_str);
-
-		ntfs_time_str = ntfsinfo_time_to_str(
-			file_name_attr->last_data_change_time);
-		printf("\tFile Altered Time:\t %s",ntfs_time_str);
-
-		ntfs_time_str = ntfsinfo_time_to_str(
-			file_name_attr->last_mft_change_time);
-		printf("\tMFT Changed Time:\t %s",ntfs_time_str);
-
-		ntfs_time_str = ntfsinfo_time_to_str(file_name_attr->last_access_time);
-		printf("\tLast Accessed Time:\t %s",ntfs_time_str);
-	}
+/**
+ * ntfs_dump_attr_file_name()
+ */
+static void ntfs_dump_attr_file_name(ATTR_RECORD *attr)
+{
+	ntfs_dump_filename("\t", (FILE_NAME_ATTR*)((u8*)attr +
+			le16_to_cpu(attr->value_offset)));
 }
 
 /**
@@ -1053,11 +1076,9 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	       le64_to_cpu(sd->offset) + 
 			le32_to_cpu(sd->length) < (u64)data_size) {
 		ntfs_dump_sds_entry(sd);
-		sd = (SECURITY_DESCRIPTOR_HEADER *)((char *)sd +
-				(cpu_to_le32(sd->length + 0x0F) &
-				 ~cpu_to_le32(0x0F)));
+		sd = (SECURITY_DESCRIPTOR_HEADER *)((char*)sd +
+				((le32_to_cpu(sd->length) + 15) & ~15));
 	}
-	
 	free(sds);
 }
 
@@ -1335,8 +1356,6 @@ static void ntfs_dump_index_data(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
 	int numb_entries = 1;
-	char *name = NULL;
-
 	while (1) {
 		if (!opts.verbose) {
 			if (entry->flags & INDEX_ENTRY_END)
@@ -1362,41 +1381,10 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			break;
 
 		switch (type) {
-		case(INDEX_ATTR_DIRECTORY_I30):
+		case INDEX_ATTR_DIRECTORY_I30:
 			ntfs_log_verbose("\t\tFILE record number:\t %llu\n",
 					MREF_LE(entry->indexed_file));
-			printf("\t");
-			ntfs_dump_flags(AT_FILE_NAME, entry->key.
-				file_name.file_attributes);
-			printf("\t");
-			ntfs_dump_namespace(entry->key.
-				file_name.file_name_type);
-			ntfs_ucstombs(entry->key.file_name.file_name,
-				entry->key.file_name.file_name_length,
-				&name, 0);
-			ntfs_log_verbose("\t\tName:\t\t\t %s\n", name);
-			free(name);
-			name = NULL;
-			ntfs_log_verbose("\t\tParent directory:\t %lld\n",
-				 MREF_LE(entry->
-				 key.file_name.parent_directory));
-			ntfs_log_verbose("\t\tCreation time:\t\t %s",
-				ntfsinfo_time_to_str(
-					entry->key.file_name.creation_time));
-			ntfs_log_verbose("\t\tData change time:\t %s",
-				ntfsinfo_time_to_str(
-					entry->key.file_name.last_data_change_time));
-			ntfs_log_verbose("\t\tMFT change time:\t %s",
-				ntfsinfo_time_to_str(
-					entry->key.file_name.last_mft_change_time));
-			ntfs_log_verbose("\t\tAccess time:\t\t %s",
-				ntfsinfo_time_to_str(
-					entry->key.file_name.last_access_time));
-			ntfs_log_verbose("\t\tData size:\t\t %lld\n",
-				sle64_to_cpu(entry->key.file_name.data_size));
-			ntfs_log_verbose("\t\tAllocated size:\t\t %lld\n",
-				sle64_to_cpu(
-				entry->key.file_name.allocated_size));
+			ntfs_dump_filename("\t\t", &entry->key.file_name);
 			break;
 		default:
 			ntfs_log_verbose("\t\tData offset:\t\t %u\n",
@@ -1705,12 +1693,19 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 			else
 				printf("Unknown (0x%02x)\n", ea->flags);
 		} else
-			printf("\n");
+			printf("NONE\n");
 		printf("\tName length:\t %d\n", ea->name_length);
 		printf("\tValue length:\t %d\n",
 				le16_to_cpu(ea->value_length));
 		printf("\tName:\t\t '%s'\n", ea->name);
-		printf("\tValue:\t\t '%s'\n", ea->value + ea->name_length + 1);
+		printf("\tValue:\t\t ");
+		if (ea->name_length == 11 &&
+				!strncmp((const char*)"SETFILEBITS",
+				(const char*)ea->name, 11))
+			printf("0%o\n", le32_to_cpu(*(le32*)(ea->value +
+					ea->name_length + 1)));
+		else
+			printf("'%s'\n", ea->value + ea->name_length + 1);
 		if (ea->next_entry_offset)
 			ea = (EA_ATTR*)((u8*)ea +
 					le32_to_cpu(ea->next_entry_offset));
