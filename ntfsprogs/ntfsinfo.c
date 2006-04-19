@@ -431,7 +431,7 @@ static void ntfs_dump_volume(ntfs_volume *vol)
  * @type:	dump flags for this attribute type
  * @flags:	flags for dumping
  */
-static void ntfs_dump_flags(char *indent, ATTR_TYPES type, u32 flags)
+static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, u32 flags)
 {
 	printf("%sFile attributes:\t", indent);
 	if (flags & FILE_ATTR_READONLY) {
@@ -506,7 +506,7 @@ static void ntfs_dump_flags(char *indent, ATTR_TYPES type, u32 flags)
 /**
  * ntfs_dump_namespace
  */
-static void ntfs_dump_namespace(char *indent, u8 file_name_type)
+static void ntfs_dump_namespace(const char *indent, u8 file_name_type)
 {
 	const char *mbs_file_type;
 
@@ -665,7 +665,8 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 /**
  * ntfs_dump_filename()
  */
-static void ntfs_dump_filename(char *indent, FILE_NAME_ATTR *file_name_attr)
+static void ntfs_dump_filename(const char *indent,
+		FILE_NAME_ATTR *file_name_attr)
 {
 	printf("%sParent directory:\t %lld\n", indent,
 		(long long)MREF_LE(file_name_attr->parent_directory));

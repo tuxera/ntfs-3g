@@ -108,7 +108,7 @@ typedef struct {
 
 /* DESX-MS128 implementation for libgcrypt. */
 static gcry_module_t ntfs_desx_module;
-static int ntfs_desx_algorithm_id = -1;
+static unsigned ntfs_desx_algorithm_id = -1;
 
 typedef struct {
 	u64 in_whitening, out_whitening;
