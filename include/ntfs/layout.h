@@ -2536,7 +2536,11 @@ typedef struct {
 	u32 state;		/* Always 0? */
 	u32 version;		/* Efs version.  Always 2? */
 	u32 crypto_api_version;	/* Always 0? */
-/* 16*/	u8 unknown4[16];	/* MD5 hash of decrypted FEK? */
+/* 16*/	u8 unknown4[16];	/* MD5 hash of decrypted FEK?  This field is
+				   created with a call to UuidCreate() so is
+				   unlikely to be an MD5 hash and is more
+				   likely to be GUID of this encrytped file
+				   or something like that. */
 /* 32*/	u8 unknown5[16];	/* MD5 hash of DDFs? */
 /* 48*/	u8 unknown6[16];	/* MD5 hash of DRFs? */
 /* 64*/	u32 offset_to_ddf_array;/* Offset in bytes to the array of data
