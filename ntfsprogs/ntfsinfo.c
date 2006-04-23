@@ -542,8 +542,6 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 	standard_attr = (STANDARD_INFORMATION*)((char *)attr +
 		le16_to_cpu(attr->value_offset));
 
-	/* let's start with mandatory? fields */
-
 	/* time conversion stuff */
 	if (!opts.notime) {
 		char *ntfs_time_str = NULL;
@@ -564,17 +562,9 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 	}
 	ntfs_dump_flags("\t", attr->type, standard_attr->file_attributes);
 
-	printf("\tMax Number of Versions:\t %u \n",
-		(unsigned int)le32_to_cpu(standard_attr->maximum_versions));
-	printf("\tVersion Number:\t\t %u \n",
-		(unsigned int)le32_to_cpu(standard_attr->version_number));
-	printf("\tClass ID:\t\t %u \n",
-		(unsigned int)le32_to_cpu(standard_attr->class_id));
-
 	value_length = le32_to_cpu(attr->value_length);
 	if (value_length == 48) {
-/*		printf("\t$STANDARD_INFORMATION fields owner_id, security_id, quota \n"
-			"\t & usn are missing. This volume has not been upgraded\n"); */
+		/* Only 12 reserved bytes here */
 	} else if (value_length == 72) {
 		printf("\tMaximum versions:\t %u \n", (unsigned int)
 				le32_to_cpu(standard_attr->maximum_versions));
