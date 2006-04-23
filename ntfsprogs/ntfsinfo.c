@@ -1366,7 +1366,6 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			numb_entries++;
 			continue;
 		}
-		ntfs_log_verbose("\n");
 		ntfs_log_verbose("\t\tEntry length:\t\t %u\n",
 				le16_to_cpu(entry->length));
 		ntfs_log_verbose("\t\tKey length:\t\t %u\n",
@@ -1400,6 +1399,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		entry = (INDEX_ENTRY *)((u8 *)entry +
 						le16_to_cpu(entry->length));
 		numb_entries++;
+		ntfs_log_verbose("\n");
 	}
 	ntfs_log_verbose("\tEnd of index block reached\n");
 	return numb_entries;
@@ -1515,9 +1515,21 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
-	ntfs_log_verbose("\tDumping index block:");
+	ntfs_log_verbose("\tDumping index block:\n");
 	printf("\tIndex entries total:\t %d\n",
 			ntfs_dump_index_entries(entry, type));
+}
+
+static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
+{
+	printf("%sUpd. Seq. Array Offset:\t %hu\n", indent, 
+	       le16_to_cpu(mrec->usa_ofs));
+	printf("%sUpd. Seq. Array Count: \t %hu\n", indent,
+	       le16_to_cpu(mrec->usa_count));
+	printf("%sUpd. Seq. Number:\t %hu\n", indent,
+	       *(u16 *)((u8 *)mrec + le16_to_cpu(mrec->usa_ofs)));
+	printf("%sLogFile Seq. Number:\t 0x%llx\n", indent,
+	       (long long int)sle64_to_cpu(mrec->lsn));
 }
 
 /**
@@ -1565,7 +1577,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	bit = 0;
 	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
-		if (*byte & (1 << bit)) {					   
+		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
 						index_root->index_block_size)) {
 				ntfs_log_perror("Damaged INDX record");
@@ -1573,13 +1585,18 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
-			ntfs_log_verbose("\tDumping index block "
-					"(VCN %lld, used %u/%u):", le64_to_cpu(
+			ntfs_log_verbose("\tDumping index block (VCN %lld, "
+					"used %u/%u):\n", le64_to_cpu(
 					tmp_alloc->index_block_vcn),
 					(unsigned int)le32_to_cpu(tmp_alloc->
 					index.index_length), (unsigned int)
 					le32_to_cpu(tmp_alloc->index.
 					allocated_size));
+			if (opts.verbose) {
+				ntfs_dump_usa_lsn("\t\t", 
+						  (MFT_RECORD *)tmp_alloc);
+				printf("\n");
+			}
 			total_entries += ntfs_dump_index_entries(entry, type);
 			total_indx_blocks++;
 		}
@@ -1803,22 +1820,15 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 
-	printf("Update Sequence Offset:\t\t %hu\n",
-		le16_to_cpu(inode->mrec->usa_ofs));
-	printf("Update Sequence Array Count:\t %hu\n",
-		le16_to_cpu(inode->mrec->usa_count));
-	printf("Update Sequence Number:\t\t %hu\n",
-		*(u16*)((u8*)inode->mrec + le16_to_cpu(inode->mrec->usa_ofs)));
-	printf("$LogFile Sequence Number:\t 0x%llx\n",
-		(signed long long int)sle64_to_cpu(inode->mrec->lsn));
-	printf("MFT Record Sequence Number:\t %hu\n",
+	ntfs_dump_usa_lsn("", inode->mrec);
+	printf("MFT Record Seq. Number:\t %hu\n",
 		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
-	printf("Number of hard links:\t\t %hu\n",
+	printf("Number of Hard Links:\t %hu\n",
 		le16_to_cpu(inode->mrec->link_count));
-	printf("First attribute offset:\t\t %hu\n",
+	printf("Attribute Offset:\t %hu\n",
 		le16_to_cpu(inode->mrec->attrs_offset));
 
-	printf("MFT record Flags:\t\t ");
+	printf("MFT Record Flags:\t ");
 	if (inode_flags) {
 		if (MFT_RECORD_IN_USE & inode_flags) {
 			printf("IN_USE ");
@@ -1844,16 +1854,16 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	}
 	printf("\n");
 
-	printf("Size - Used:\t\t\t %u bytes\n",
+	printf("Bytes Used:\t\t %u bytes\n",
 		(unsigned int)le32_to_cpu(inode->mrec->bytes_in_use));
-	printf("Size - Allocated:\t\t %u bytes\n",
+	printf("Bytes Allocated:\t %u bytes\n",
 		(unsigned int)le32_to_cpu(inode->mrec->bytes_allocated));
 
 	if (inode->mrec->base_mft_record) {
-		printf("base MFT record:\t\t %llu\n",
+		printf("Base MFT Record:\t %llu\n",
 			MREF_LE(inode->mrec->base_mft_record));
 	}
-	printf("Next Attribute Instance:\t %hu\n",
+	printf("Next Attribute Instance: %hu\n",
 		le16_to_cpu(inode->mrec->next_attr_instance));
 }
 
