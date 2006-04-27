@@ -1802,6 +1802,11 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy();
 		return 4;
 	}
+
+	/* Libfuse can't always find fusermount, so let's help it. */
+	if (setenv("PATH", ":/bin:/usr/bin:/usr/local/bin", 0) == -1)
+		ntfs_log_perror("WARNING: Failed to set $PATH\n");
+
 	/* Create filesystem. */
 #if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	if ((fuse_opt_add_arg(&margs, "") == -1 ||
