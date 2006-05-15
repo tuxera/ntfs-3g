@@ -121,9 +121,9 @@ static const char *EXEC_NAME = "ntfsmount";
 static char def_opts[] = "default_permissions,allow_other,";
 static ntfs_fuse_context_t *ctx;
 
-static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
+static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
-	/* Mark information about free MFT record and clusters outdate. */
+	/* Mark information about free MFT record and clusters outdated. */
 	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
 }
 
@@ -131,7 +131,7 @@ static __inline__ void ntfs_fuse_mark_free_space_outdate(void)
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
  * @path:	path to check
  *
- * Rerturn 1 if path is to named data stream or 0 otherwise.
+ * Returns 1 if path is to named data stream or 0 otherwise.
  */
 static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
 {
@@ -219,7 +219,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
  *
  * This code based on ntfs_statfs from ntfs kernel driver.
  *
- * Return 0 on success or -errno on error.
+ * Returns 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 #if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
@@ -358,7 +358,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				stbuf->st_blocks = na->allocated_size >>
 					vol->sector_size_bits;
 			}
-			/* Check whether it's Interix fifo or socket. */
+			/* Check whether it's Interix FIFO or socket. */
 			if (!(ni->flags & FILE_ATTR_HIDDEN) &&
 					!stream_name_len) {
 				/* FIFO. */
@@ -369,7 +369,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 					stbuf->st_mode = S_IFSOCK;
 			}
 			/*
-			 * Check wheter it's Interix symbolic link, block or
+			 * Check whether it's Interix symbolic link, block or
 			 * character device.
 			 */
 			if (na->data_size <= sizeof(INTX_FILE_TYPES) + sizeof(
@@ -682,7 +682,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	res = total;
 exit:
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
@@ -718,7 +718,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		goto exit;
 	}
 	res = ntfs_attr_truncate(na, size);
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
 exit:
 	if (ni && ntfs_inode_close(ni))
@@ -861,7 +861,7 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 exit:
 	free(path);
 	if (stream_name_len)
@@ -915,7 +915,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 			res = -EIO;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	/* Create hard link. */
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
@@ -1016,7 +1016,7 @@ static int ntfs_fuse_unlink(const char *org_path)
 		res = ntfs_fuse_rm(path);
 	else
 		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1041,7 +1041,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
 }
 
@@ -1049,7 +1049,7 @@ static int ntfs_fuse_rmdir(const char *path)
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_rm(path);
 }
 
@@ -1295,7 +1295,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		res = -EEXIST;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
 			res = -ENODATA;
@@ -1355,7 +1355,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -ENODATA;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	if (ntfs_attr_rm(na))
 		res = -errno;
 	else
@@ -1466,7 +1466,7 @@ static char *parse_mount_options(const char *org_options)
 	*ret = 0;
 	options = strdup(org_options);
 	if (!options) {
-		ntfs_log_perror("strdump failed");
+		ntfs_log_perror("strdup failed");
 		return NULL;
 	}
 	s = options;
@@ -1641,7 +1641,7 @@ static void usage(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
 			EXEC_NAME, VERSION, ntfs_libntfs_version());
-	ntfs_log_info("Copyright (c) 2005-2006 Yura Pakhuchiy\n\n");
+	ntfs_log_info("Copyright (C) 2005-2006 Yura Pakhuchiy\n\n");
 	ntfs_log_info("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);
 	ntfs_log_info("ntfsmount options are:\n\tforce\n\tno_def_opts\n\tumask"
@@ -1862,7 +1862,7 @@ int main(int argc, char *argv[])
 			ntfs_log_error("Failed to daemonize.\n");
 		else {
 			ntfs_log_set_handler(ntfs_log_handler_syslog);
-			/* Override default libntfs ident. */
+			/* Override default libntfs identify. */
 			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
 		}
 	}
