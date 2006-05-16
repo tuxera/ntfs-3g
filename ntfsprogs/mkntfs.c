@@ -3437,6 +3437,29 @@ done:
 }
 
 /**
+ * mkntfs_get_page_size - detect the system's memory page size.
+ */
+static long mkntfs_get_page_size()
+{
+	long page_size;
+#ifdef _SC_PAGESIZE
+	page_size = sysconf(_SC_PAGESIZE);
+	if (page_size < 0)
+#endif
+#ifdef _SC_PAGE_SIZE
+		page_size = sysconf(_SC_PAGE_SIZE);
+	if (page_size < 0)
+#endif
+	{
+		ntfs_log_warning("Failed to determine system page size.  "
+				"Assuming safe default of 4096 bytes.\n");
+		return 4096;
+	}
+	ntfs_log_debug("System page size is %li bytes.\n", page_size);
+	return page_size;
+}
+
+/**
  * mkntfs_override_vol_params -
  */
 static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
@@ -3678,16 +3701,7 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 				"of the device will be used.\n");
 		return FALSE;
 	}
-	page_size = sysconf(_SC_PAGESIZE);
-	if (page_size < 0)
-		page_size = sysconf(_SC_PAGE_SIZE);
-	if (page_size >= 0)
-		ntfs_log_debug("System page size is %li bytes.\n", page_size);
-	else {
-		ntfs_log_warning("Failed to determine system page size.  "
-				"Assuming safe default of 4096 bytes.\n");
-		page_size = 4096;
-	}
+	page_size = mkntfs_get_page_size();
 	/*
 	 * Set the mft record size.  By default this is 1024 but it has to be
 	 * at least as big as a sector and not bigger than a page on the system
