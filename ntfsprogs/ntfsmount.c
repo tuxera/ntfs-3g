@@ -873,7 +873,7 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 {
 	if (ntfs_fuse_is_named_data_stream(from))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdate();
+	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
