@@ -1364,8 +1364,8 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			le16_to_cpu(entry->flags));
 
 		if (entry->flags & INDEX_ENTRY_NODE)
-			ntfs_log_verbose("\t\tSubnode VCN:\t\t %lld\n",
-				le64_to_cpu(*((u8*)entry +
+			ntfs_log_verbose("\t\tSubnode VCN:\t\t 0x%llx\n",
+				sle64_to_cpu(*(VCN*)((u8*)entry +
 				le16_to_cpu(entry->length) - sizeof(VCN))));
 		if (entry->flags & INDEX_ENTRY_END)
 			break;
@@ -1575,13 +1575,14 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
-			ntfs_log_verbose("\tDumping index block (VCN %lld, "
-					"used %u/%u):\n", le64_to_cpu(
-					tmp_alloc->index_block_vcn),
+			ntfs_log_verbose("\tDumping index block (VCN 0x%llx, "
+					"used %u/%u, flags 0x%02x):\n",
+					le64_to_cpu(tmp_alloc->index_block_vcn),
 					(unsigned int)le32_to_cpu(tmp_alloc->
 					index.index_length), (unsigned int)
 					le32_to_cpu(tmp_alloc->index.
-					allocated_size));
+					allocated_size),
+					tmp_alloc->index.flags);
 			if (opts.verbose) {
 				ntfs_dump_usa_lsn("\t\t", 
 						  (MFT_RECORD *)tmp_alloc);
