@@ -1471,15 +1471,15 @@ search:
 		}
 		/*
 		 * Do not allow non-empty directory deletion if hard links count
-		 * is 1 or 2 (in case if one of the names in DOS namespace and
-		 * another in WIN32 namespace).
+		 * is 1 (always) or 2 (in case if filename in DOS namespace,
+		 * because we delete it first in filen which have both WIN32 and
+		 * DOS names).
 		 */
 		if ((na->data_size != sizeof(INDEX_ROOT) + sizeof(
 				INDEX_ENTRY_HEADER)) && (le16_to_cpu(
 				ni->mrec->link_count) == 1 ||
 				(le16_to_cpu(ni->mrec->link_count) == 2 &&
-				(fn->file_name_type == FILE_NAME_WIN32 ||
-				fn->file_name_type == FILE_NAME_DOS)))) {
+				fn->file_name_type == FILE_NAME_DOS))) {
 			ntfs_attr_close(na);
 			ntfs_log_error("Directory is not empty.\n");
 			errno = ENOTEMPTY;
