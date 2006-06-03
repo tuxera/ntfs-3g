@@ -1611,7 +1611,8 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	int fn_len, err;
 
 	ntfs_log_trace("Entering.\n");
-	if (!ni || !dir_ni || !name || !name_len) {
+	if (!ni || !dir_ni || !name || !name_len ||
+			ni->mft_no == dir_ni->mft_no) {
 		err = errno;
 		ntfs_log_error("Invalid arguments.\n");
 		goto err_out;
