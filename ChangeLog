@@ -50,6 +50,8 @@ xx/xx/2006 - 1.13.1-WIP
 	- configure.ac fix for Cygwin.  (Yuval)
 	- Fix bug with renaming directories with names in DOS and WIN32
 	  namespaces.  (Yura)
+	- ntfsclone: fix 64 bit destination size calculation on Mac OS X 
+	  (Mike Bombich, Anton, Szaka)
 
 27/02/2006 - 1.13.0 - Lots and lots and lots of fixes and enhancements.
 

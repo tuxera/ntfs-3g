@@ -1621,11 +1621,14 @@ static void check_dest_free_space(u64 src_bytes)
 		return;
 	}
 
-	dest_bytes = stvfs.f_bsize * stvfs.f_bfree;
-
+	dest_bytes = (u64)stvfs.f_frsize * stvfs.f_bfree;
+	if (!dest_bytes)
+		dest_bytes = (u64)stvfs.f_bsize * stvfs.f_bfree;
+	
 	if (dest_bytes < src_bytes)
-		err_exit("Destination has no enough free space: %llu MB < %llu"
-			 " MB\n", rounded_up_division(dest_bytes, NTFS_MBYTE),
+		err_exit("Destination doesn't have enough free space: "
+			 "%llu MB < %llu MB\n",
+			 rounded_up_division(dest_bytes, NTFS_MBYTE),
 			 rounded_up_division(src_bytes,  NTFS_MBYTE));
 }
 
