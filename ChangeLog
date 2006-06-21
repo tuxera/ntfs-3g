@@ -1,4 +1,4 @@
-xx/xx/2006 - 1.13.1-WIP
+21/06/2006 - 1.13.1 - Various fixes.
 
 	- Fix bug in ntfs_attr_pwrite() when we sometimes lose current run in
 	  the runlist.  (Yura)
