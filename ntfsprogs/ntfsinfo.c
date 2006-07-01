@@ -1016,7 +1016,8 @@ static ntfschar NTFS_DATA_SDS[5] = { const_cpu_to_le16('$'),
 static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 {
 	SECURITY_DESCRIPTOR_RELATIVE *sd;
-	
+
+	ntfs_log_verbose("\n");
 	ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n", le32_to_cpu(sds->hash));
 	ntfs_log_verbose("\t\tSecurity id:\t\t %u\n",
 			 le32_to_cpu(sds->security_id));
