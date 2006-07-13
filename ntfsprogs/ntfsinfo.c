@@ -849,15 +849,21 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	/* TODO: parse the flags */
 	printf("%s\tFlags:\t\t\t 0x%0x\n", indent, sec_desc->control);
 
-	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
-		le32_to_cpu(sec_desc->owner)), NULL, 0);
-	printf("%s\tOwner SID:\t\t %s\n", indent, sid);
-	free(sid);
+	if (sec_desc->owner) {
+		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
+			le32_to_cpu(sec_desc->owner)), NULL, 0);
+		printf("%s\tOwner SID:\t\t %s\n", indent, sid);
+		free(sid);
+	} else
+		printf("%s\tOwner SID:\t\t missing\n", indent);
 
-	sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
-		le32_to_cpu(sec_desc->group)), NULL, 0);
-	printf("%s\tGroup SID:\t\t %s\n", indent, sid);
-	free(sid);
+	if (sec_desc->group) {
+		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
+			le32_to_cpu(sec_desc->group)), NULL, 0);
+		printf("%s\tGroup SID:\t\t %s\n", indent, sid);
+		free(sid);
+	} else
+		printf("%s\tGroup SID:\t\t missing\n", indent);
 
 	printf("%s\tSystem ACL:\t\t ", indent);
 	if (sec_desc->control & SE_SACL_PRESENT) {
