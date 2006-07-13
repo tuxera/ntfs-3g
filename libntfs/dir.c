@@ -1082,7 +1082,7 @@ err_out:
  * @type:	type of the object to create
  * @dev:	major and minor device numbers (obtained from makedev())
  * @target:	target in unicode (only for symlinks)
- * @target_len:	length of target in unicode charcters
+ * @target_len:	length of target in unicode characters
  *
  * Internal, use ntfs_create{,_device,_symlink} wrappers instead.
  *
@@ -1110,10 +1110,14 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		ntfschar *target, u8 target_len)
 {
 	ntfs_inode *ni;
-	int rollback_data = 0;
+	int rollback_data = 0, rollback_sd = 0;
 	FILE_NAME_ATTR *fn = NULL;
 	STANDARD_INFORMATION *si = NULL;
-	int err, fn_len, si_len;
+	SECURITY_DESCRIPTOR_ATTR *sd = NULL;
+	ACL *acl;
+	ACCESS_ALLOWED_ACE *ace;
+	SID *sid;
+	int err, fn_len, si_len, sd_len;
 
 	ntfs_log_trace("Entering.\n");
 	/* Sanity checks. */
@@ -1158,6 +1162,60 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 				"attribute.\n");
 		goto err_out;
 	}
+	/* Create SECURITY_DESCRIPTOR attribute (everyone has full access). */
+	/*
+	 * Calculate security descriptor length. We have 2 sub-authorities in
+	 * owner and group SIDs, but structure SID contain only one, so add
+	 * 4 bytes to every SID.
+	 */
+	sd_len = sizeof(SECURITY_DESCRIPTOR_ATTR) + 2 * (sizeof(SID) + 4) +
+		sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE); 
+	sd = calloc(1, sd_len);
+	if (!sd) {
+		err = errno;
+		ntfs_log_error("Not enough memory.\n");
+		goto err_out;
+	}
+	sd->revision = 1;
+	sd->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
+	sid = (SID*)((u8*)sd + sizeof(SECURITY_DESCRIPTOR_ATTR));
+	sd->owner = cpu_to_le32((u8*)sid - (u8*)sd);
+	sid->revision = 1;
+	sid->sub_authority_count = 2;
+	sid->sub_authority[0] = cpu_to_le32(32);
+	sid->sub_authority[1] = cpu_to_le32(544);
+	sid->identifier_authority.value[5] = 5;
+	sid = (SID*)((u8*)sid + sizeof(SID) + 4); 
+	sd->group = cpu_to_le32((u8*)sid - (u8*)sd);
+	sid->revision = 1;
+	sid->sub_authority_count = 2;
+	sid->sub_authority[0] = cpu_to_le32(32);
+	sid->sub_authority[1] = cpu_to_le32(544);
+	sid->identifier_authority.value[5] = 5;
+	acl = (ACL*)((u8*)sid + sizeof(SID) + 4);
+	sd->dacl = cpu_to_le32((u8*)acl - (u8*)sd);
+	acl->revision = 2;
+	acl->size = cpu_to_le16(sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE));
+	acl->ace_count = cpu_to_le16(1);
+	ace = (ACCESS_ALLOWED_ACE*)((u8*)acl + sizeof(ACL));
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
+	ace->size = cpu_to_le16(sizeof(ACCESS_ALLOWED_ACE));
+	ace->mask = cpu_to_le32(0x1f01ff); /* FIXME */
+	ace->sid.revision = 1;
+	ace->sid.sub_authority_count = 1;
+	ace->sid.sub_authority[0] = 0;
+	ace->sid.identifier_authority.value[5] = 1;
+	/* Add SECURITY_DESCRIPTOR attribute to inode. */
+	if (ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0,
+			(u8*)sd, sd_len)) {
+		err = errno;
+		ntfs_log_error("Failed to add SECURITY_DESCRIPTOR "
+				"attribute.\n");
+		goto err_out;
+	}
+	rollback_sd = 1;
+	/* Add DATA/INDEX_ROOT attribute. */
 	if (S_ISDIR(type)) {
 		INDEX_ROOT *ir = NULL;
 		INDEX_ENTRY *ie;
@@ -1297,10 +1355,24 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	/* Done! */
 	free(fn);
 	free(si);
+	free(sd);
 	ntfs_log_trace("Done.\n");
 	return ni;
 err_out:
 	ntfs_log_trace("Failed.\n");
+	if (rollback_sd) {
+		ntfs_attr *na;
+
+		na = ntfs_attr_open(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0);
+		if (!na)
+			ntfs_log_perror("Failed to open SD (0x50) attribute of "
+					" inode 0x%llx. Run chkdsk.\n",
+					(unsigned long long)ni->mft_no);
+		else if (ntfs_attr_rm(na))
+			ntfs_log_perror("Failed to remove SD (0x50) attribute "
+					"of inode 0x%llx. Run chkdsk.\n",
+					(unsigned long long)ni->mft_no);
+	}
 	if (rollback_data) {
 		ntfs_attr *na;
 
@@ -1330,6 +1402,7 @@ err_out:
 				"Leaving inconsistent metadata. Run chkdsk.\n");
 	free(fn);
 	free(si);
+	free(sd);
 	errno = err;
 	return NULL;
 }

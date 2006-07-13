@@ -1,3 +1,8 @@
+xx/xx/xxxx - x.xx.x - 
+
+	- ntfsmount now creates files and directories with security descriptor
+	  that grant full access to everyone.  (Yura)
+
 21/06/2006 - 1.13.1 - Various fixes.
 
 	- Fix bug in ntfs_attr_pwrite() when we sometimes lose current run in
@@ -18,13 +23,13 @@
 	  compressed metadata image size by 10-25% and more importantly it
 	  eliminates non-interesting ntfscmp differences.  (Szaka)
 	- Change utils_parse_size() to use a base of 0 instead of 10 when
-	  calling strtoll().  This automagically allows specification of
+	  calling strtoll().  This automatically allows specification of
 	  numbers in hex (and octal if anyone is crazy enough to use that) in
 	  addition to decimal numbers on the command line options to most if
 	  not all utilities.  (Anton)
 	- Fix comparison of $MFT and $MFTMirr to not bail out when there are
 	  unused, invalid mft records which are the same in both $MFT and
-	  $MFTMirr.  Ported from kernel driver 2.1.27 release and aplied both
+	  $MFTMirr.  Ported from kernel driver 2.1.27 release and applied both
 	  to libntfs/volume.c mount related code and to ntfsprogs/ntfsfix.c's
 	  fixup code.  (Anton)
 	- Change ntfsinfo to dump the key data as well as the keys themselves
