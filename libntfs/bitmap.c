@@ -401,9 +401,9 @@ int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data)
 		return -1;
 
 	ntfs_log_trace ("\n");
-	old = ROUND_UP(bmp->count, 16);
+	old = ROUND_UP(bmp->count, 4);
 	bmp->count++;
-	new = ROUND_UP(bmp->count, 16);
+	new = ROUND_UP(bmp->count, 4);
 
 	if (old != new) {
 		bmp->data     = realloc(bmp->data,      new * sizeof(*bmp->data));
@@ -513,8 +513,8 @@ int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value)
 	vcn_finish = vcn + length - 1;
 
 	//ntfs_log_debug("vcn_start = %d, vcn_finish = %d\n", vcn_start, vcn_finish);
-	a = ROUND_DOWN(vcn_start,  csib);
-	b = ROUND_DOWN(vcn_finish, csib) + 1;
+	a = ROUND_DOWN(vcn_start,  bmp->vol->cluster_size_bits + 3);
+	b = ROUND_DOWN(vcn_finish, bmp->vol->cluster_size_bits + 3) + 1;
 
 	//ntfs_log_debug("a = %lld, b = %lld\n", a, b);
 
@@ -598,7 +598,7 @@ s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp)
 	// find cluster size of bmp
 
 	byte_count = bmp->attr->data_size;
-	clust_count = ROUND_UP(byte_count, bmp->vol->cluster_size) >> bmp->vol->cluster_size_bits;
+	clust_count = ROUND_UP(byte_count, bmp->vol->cluster_size_bits) >> bmp->vol->cluster_size_bits;
 
 	//ntfs_log_debug("bitmap = %lld bytes\n", byte_count);
 	//ntfs_log_debug("bitmap = %lld buffers\n", clust_count);

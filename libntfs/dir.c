@@ -1750,7 +1750,7 @@ int ntfs_dir_truncate(ntfs_volume *vol, struct ntfs_dir *dir)
 		return 0;
 
 #if 0
-	buf_count = ROUND_UP(dir->bitmap->attr->allocated_size, vol->cluster_size) >> vol->cluster_size_bits;
+	buf_count = ROUND_UP(dir->bitmap->attr->allocated_size, vol->cluster_size_bits) >> vol->cluster_size_bits;
 	ntfs_log_debug("alloc = %lld bytes\n", dir->ialloc->allocated_size);
 	ntfs_log_debug("alloc = %lld clusters\n", dir->ialloc->allocated_size >> vol->cluster_size_bits);
 	ntfs_log_debug("bitmap bytes 0 to %lld\n", ((dir->ialloc->allocated_size >> vol->cluster_size_bits)-1)>>3);

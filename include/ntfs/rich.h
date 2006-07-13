@@ -26,9 +26,7 @@
 #include "attrib.h"
 #include "bitmap.h"
 
-#define ROUND_UP(num,bound) (((num)+((bound)-1)) & ~((bound)-1))
-#define ROUND_DOWN(num,bound) ((num) & ~((bound)-1))
-#define ATTR_SIZE(s) ROUND_UP(s,8)
+#define ATTR_SIZE(s) ROUND_UP(s, 3)
 
 ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
