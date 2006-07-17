@@ -52,15 +52,11 @@ int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata(ntfs_inode *inode);
 void utils_dump_mem(void *buf, int start, int length, int flags);
 
-#ifndef _NTFS_RICH_H_
 ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
-#endif
 
-#if !(defined(_NTFS_VOLUME_H) && defined(NTFS_RICH))
 int utils_valid_device(const char *name, int force);
 ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force);
-#endif
 
 /**
  * defines...

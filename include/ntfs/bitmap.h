@@ -131,37 +131,4 @@ static __inline__ int ntfs_bitmap_clear_bit(ntfs_attr *na, s64 bit)
 	return ntfs_bitmap_clear_run(na, bit, 1);
 }
 
-
-#ifdef NTFS_RICH
-
-#include "layout.h"
-#include "inode.h"
-
-/**
- * struct ntfs_bmp -
- *
- * a cache for either dir/$BITMAP, $MFT/$BITMAP or $Bitmap/$DATA
- */
-struct ntfs_bmp {
-	ntfs_volume	 *vol;
-	ntfs_attr	 *attr;
-	int		  count;
-	u8		**data;
-	VCN		 *data_vcn;
-};
-
-
-int ntfs_bmp_rollback(struct ntfs_bmp *bmp);
-int ntfs_bmp_commit(struct ntfs_bmp *bmp);
-void ntfs_bmp_free(struct ntfs_bmp *bmp);
-struct ntfs_bmp * ntfs_bmp_create(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len);
-int ntfs_bmp_add_data(struct ntfs_bmp *bmp, VCN vcn, u8 *data);
-u8 * ntfs_bmp_get_data(struct ntfs_bmp *bmp, VCN vcn);
-int ntfs_bmp_set_range(struct ntfs_bmp *bmp, VCN vcn, s64 length, int value);
-s64 ntfs_bmp_find_last_set(struct ntfs_bmp *bmp);
-int ntfs_bmp_find_space(struct ntfs_bmp *bmp, LCN start, long size);
-
-#endif /* NTFS_RICH */
-
 #endif /* defined _NTFS_BITMAP_H */
-

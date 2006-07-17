@@ -113,18 +113,4 @@ extern int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni);
 
 extern int ntfs_mft_usn_dec(MFT_RECORD *mrec);
 
-#ifdef NTFS_RICH
-
-#include "bitmap.h"
-#include "dir.h"
-
-int ntfs_mft_remove_attr(struct ntfs_bmp *bmp, ntfs_inode *inode, ATTR_TYPES type);
-ATTR_RECORD * ntfs_mft_add_attr(ntfs_inode *inode, ATTR_TYPES type, u8 *data, int data_len);
-int ntfs_mft_resize_resident(ntfs_inode *inode, ATTR_TYPES type, ntfschar *name, int name_len, u8 *data, int data_len);
-int ntfs_mft_free_space(struct ntfs_dir *dir);
-int ntfs_mft_add_index(struct ntfs_dir *dir);
-
-#endif /* NTFS_RICH */
-
 #endif /* defined _NTFS_MFT_H */
-

@@ -129,21 +129,4 @@ static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 		ictx->ia_dirty = TRUE;
 }
 
-
-#ifdef NTFS_RICH
-
-#include "layout.h"
-
-void ntfs_ie_free(INDEX_ENTRY *ie);
-INDEX_ENTRY * ntfs_ie_create(void);
-VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie);
-INDEX_ENTRY * ntfs_ie_copy(INDEX_ENTRY *ie);
-INDEX_ENTRY * ntfs_ie_set_vcn(INDEX_ENTRY *ie, VCN vcn);
-INDEX_ENTRY * ntfs_ie_remove_vcn(INDEX_ENTRY *ie);
-INDEX_ENTRY * ntfs_ie_set_name(INDEX_ENTRY *ie, ntfschar *name, int namelen, FILE_NAME_TYPE_FLAGS nametype);
-INDEX_ENTRY * ntfs_ie_remove_name(INDEX_ENTRY *ie);
-
-#endif /* NTFS_RICH */
-
 #endif /* _NTFS_INDEX_H */
-

@@ -60,10 +60,6 @@ libntfs_la_SOURCES =	\
 	version.c	\
 	volume.c
 
-if ENABLE_RICH
-libntfs_la_SOURCES += rich.c tree.c
-endif
-
 if ENABLE_GNOME_VFS
 
 gnomevfsmoduleslibdir = $(libdir)/gnome-vfs-2.0/modules

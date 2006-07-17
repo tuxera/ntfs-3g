@@ -149,15 +149,6 @@ AC_ARG_ENABLE(debug-logging,
 	fi,
 )
 
-AC_ARG_ENABLE(rich,
-	AS_HELP_STRING(--enable-rich,enable Rich's "rm" test code), ,
-	enable_rich=no
-)
-AM_CONDITIONAL(ENABLE_RICH, test "$enable_rich" = yes)
-if test "$enable_rich" = "yes"; then
-	CFLAGS="$CFLAGS -DNTFS_RICH"
-fi
-
 # Use GNU extensions if available.
 AC_GNU_SOURCE
 

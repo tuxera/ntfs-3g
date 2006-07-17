@@ -187,12 +187,4 @@ extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
 extern int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *a);
 
-#ifdef NTFS_RICH
-
-int ntfs_inode_close2(ntfs_inode *ni);
-ntfs_inode * ntfs_inode_open2(ntfs_volume *vol, const MFT_REF mref);
-ntfs_inode * ntfs_inode_open3(ntfs_volume *vol, const MFT_REF mref);
-
-#endif /* NTFS_RICH */
-
 #endif /* defined _NTFS_INODE_H */

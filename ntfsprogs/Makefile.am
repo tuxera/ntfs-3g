@@ -37,10 +37,6 @@ if ENABLE_CRYPTO
 EXTRA_PROGRAMS		+= ntfsdecrypt
 endif
 
-if ENABLE_RICH
-EXTRA_PROGRAMS		+= ntfsrm
-endif
-
 # Set the include path.
 AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
 
@@ -100,12 +96,6 @@ ntfscmp_LDADD		= $(AM_LIBS)
 ntfscmp_LDFLAGS		= $(AM_LFLAGS)
 
 # We don't distribute these
-
-if ENABLE_RICH
-ntfsrm_SOURCES		= ntfsrm.c ntfsrm.h utils.c utils.h
-ntfsrm_LDADD		= $(AM_LIBS)
-ntfsrm_LDFLAGS		= $(AM_LFLAGS)
-endif
 
 ntfstruncate_SOURCES	= attrdef.c ntfstruncate.c utils.c utils.h
 ntfstruncate_LDADD	= $(AM_LIBS)
