@@ -1530,6 +1530,8 @@ search:
 			ntfs_attr_reinit_search_ctx(actx);
 			goto search;
 		}
+		ntfs_log_error("Failed to find requested filename in FILE_NAME "
+				"attributes that belong to this inode.\n");
 		goto err_out;
 	}
 	/* If deleting directory check it to be empty. */
