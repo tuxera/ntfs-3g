@@ -768,8 +768,6 @@ done:
 	ntfs_log_trace("Done.\n");
 	return 0;
 io_error_exit:
-	ntfs_attr_close(na);
-	ntfs_inode_close(na->ni);
 	errno = err;
 	return -1;
 }
