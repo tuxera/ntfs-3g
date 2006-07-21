@@ -1356,8 +1356,11 @@ found_free_rec:
 	if (mft_na->data_size > mft_na->allocated_size ||
 			mft_na->initialized_size > mft_na->data_size)
 		NTFS_BUG("mft_na sanity checks failed");
-	// BUG_ON(mft_na->initialized_size > mft_na->data_size);
-	// BUG_ON(mft_na->data_size > mft_na->allocated_size);
+	/* Sync MFT to disk now in order to minimize data-loss. */
+	if (ntfs_inode_sync(mft_na->ni)) {
+		ntfs_log_debug("mft sync after extension failed. rolling back.");
+		goto undo_data_init;
+	}
 mft_rec_already_initialized:
 	/*
 	 * We now have allocated and initialized the mft record.  Need to read
