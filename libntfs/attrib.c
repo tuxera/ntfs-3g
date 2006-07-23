@@ -2037,15 +2037,14 @@ is_enumeration:
 				ctx->ntfs_ino = ni;
 				ctx->mrec = ni->mrec;
 			}
-			ctx->attr = (ATTR_RECORD*)((char*)ctx->mrec +
-					le16_to_cpu(ctx->mrec->attrs_offset));
 		}
+		a = ctx->attr = (ATTR_RECORD*)((char*)ctx->mrec +
+				le16_to_cpu(ctx->mrec->attrs_offset));
 		/*
 		 * ctx->ntfs_ino, ctx->mrec, and ctx->attr now point to the
 		 * mft record containing the attribute represented by the
 		 * current al_entry.
-		 */
-		/*
+		 *
 		 * We could call into ntfs_attr_find() to find the right
 		 * attribute in this mft record but this would be less
 		 * efficient and not quite accurate as ntfs_attr_find() ignores
@@ -2054,9 +2053,7 @@ is_enumeration:
 		 * a proper match has been found in the attribute list entry
 		 * above, the comparison can now be optimized. So it is worth
 		 * re-implementing a simplified ntfs_attr_find() here.
-		 */
-		a = ctx->attr;
-		/*
+		 *
 		 * Use a manual loop so we can still use break and continue
 		 * with the same meanings as above.
 		 */
@@ -2065,7 +2062,7 @@ do_next_attr_loop:
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
 		if (a->type == AT_END)
-			continue;
+			break;
 		if (!a->length)
 			break;
 		if (al_entry->instance != a->instance)

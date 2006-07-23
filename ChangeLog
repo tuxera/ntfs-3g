@@ -2,6 +2,9 @@ xx/xx/xxxx - x.xx.x -
 
 	- ntfsmount now creates files and directories with security descriptor
 	  that grant full access to everyone.  (Yura)
+	- Fix long standing stupendously stupid bug in libntfs/attrib.c::
+	  ntfs_external_attr_find() and also port a bugfix from the advanced
+	  ntfs kernel driver to the same function.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
