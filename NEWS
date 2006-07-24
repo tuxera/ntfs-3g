@@ -1,6 +1,9 @@
 Current news
 ============
 
+Older news
+==========
+
 mkntfs now creates NTFS 3.1 (Windows XP) volumes by default.  The old NTFS 1.2
 format is now deprecated and whilst it can still be specified using a command
 line option, it will be removed in a future release.
@@ -8,14 +11,3 @@ line option, it will be removed in a future release.
 ntfsmount can create/delete/move files and directories!  It is not a full
 implementation, thus sometimes it will say 'Operation is not supported',
 nothing bad will happen to user data in this case.  (Yura Pakhuchiy)
-
-Older news
-==========
-
-Add new utility: ntfsmount.  It is a FUSE module that uses on libntfs.  So,
-you need FUSE 2.3 to compile it.  This module supports file overwrite including
-changing the file size and can read/write/add/remove named data streams via
-"file:stream" interface and list them via "ntfs.streams.list" extended
-attribute (this only if xattr support is enabled).  (Yura Pakhuchiy)
-
-Moved back from BitKeeper to CVS on SF.net.
