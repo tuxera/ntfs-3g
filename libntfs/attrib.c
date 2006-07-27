@@ -1,7 +1,7 @@
 /**
  * attrib.c - Attribute handling code. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2006 Yura Pakhuchiy
  *
@@ -2062,7 +2062,7 @@ do_next_attr_loop:
 				le32_to_cpu(ctx->mrec->bytes_allocated))
 			break;
 		if (a->type == AT_END)
-			break;
+			continue;
 		if (!a->length)
 			break;
 		if (al_entry->instance != a->instance)
