@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -1580,73 +1581,64 @@ err_out:
 int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 {
 	runlist *rl;
-	BOOL is_end;
+	BOOL is_end = FALSE;
 
 	if (!arl || !*arl) {
 		errno = EINVAL;
+		ntfs_log_perror("rl_truncate error: arl: %p *arl: %p", arl, *arl);
 		return -1;
 	}
+	
 	rl = *arl;
+	
 	if (start_vcn < rl->vcn) {
-		// FIXME: Eeek! BUG()
-		ntfs_log_trace("Eeek! start_vcn lies outside front of runlist!  "
-				"Aborting.\n");
-		errno = EIO;
+		errno = EINVAL;
+		ntfs_log_perror("Start_vcn lies outside front of runlist");
 		return -1;
 	}
+	
 	/* Find the starting vcn in the run list. */
 	while (rl->length) {
 		if (start_vcn < rl[1].vcn)
 			break;
 		rl++;
 	}
+	
 	if (!rl->length) {
-		// FIXME: Weird, probably a BUG()!
-		ntfs_log_trace("Weird!  Asking to truncate already truncated "
-				"runlist?!?  Abort.\n");
 		errno = EIO;
+		ntfs_log_trace("Truncating already truncated runlist?\n");
 		return -1;
 	}
-	if (start_vcn < rl->vcn) {
-		// FIXME: Eeek! BUG()
-		ntfs_log_trace("Eeek!  start_vcn < rl->vcn!  Aborting.\n");
-		errno = EIO;
-		return -1;
-	}
+	
+	/* Truncate the run. */
+	rl->length = start_vcn - rl->vcn;
+	
+	/*
+	 * If a run was partially truncated, make the following runlist
+	 * element a terminator instead of the truncated runlist
+	 * element itself.
+	 */
 	if (rl->length) {
-		is_end = FALSE;
-		/* Truncate the run. */
-		rl->length = start_vcn - rl->vcn;
-		/*
-		 * If a run was partially truncated, make the following runlist
-		 * element a terminator instead of the truncated runlist
-		 * element itself.
-		 */
-		if (rl->length) {
-			++rl;
-			if (!rl->length)
-				is_end = TRUE;
-			rl->vcn = start_vcn;
-			rl->length = 0;
-		}
-	} else
-		is_end = TRUE;
+		++rl;
+		if (!rl->length)
+			is_end = TRUE;
+		rl->vcn = start_vcn;
+		rl->length = 0;
+	}
 	rl->lcn = (LCN)LCN_ENOENT;
-	/* Reallocate memory if necessary. */
-	if (!is_end) {
+	/**
+	 * Reallocate memory if necessary.
+	 * FIXME: Below code is broken, because runlist allocations must be 
+	 * a multiply of 4096. The code caused crashes and corruptions.
+	 */
+/*	
+	 if (!is_end) {
 		size_t new_size = (rl - *arl + 1) * sizeof(runlist_element);
 		rl = realloc(*arl, new_size);
 		if (rl)
 			*arl = rl;
-		else if (!new_size)
-			*arl = NULL;
-		else {
-			// FIXME: Eeek!
-			ntfs_log_trace("Eeek!  Failed to reallocate runlist buffer!  "
-				"Continuing regardless and returning success.\n");
-		}
 	}
-	/* Done! */
+*/
 	return 0;
 }
 
