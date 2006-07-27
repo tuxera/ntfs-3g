@@ -2,8 +2,9 @@
  * volume.c - NTFS volume handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
- * Copyright (c) 2002-2005 Szabolcs Szakacsits
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -141,6 +142,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	MFT_RECORD *mb = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
 	ATTR_RECORD *a;
+	STANDARD_INFORMATION *std_info;
 	int eo;
 
 	/* Manually setup an ntfs_inode. */
@@ -214,6 +216,11 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		goto io_error_exit;
 	}
 mft_has_no_attr_list:
+	/* Receive attributes from STANDARD_INFORMATION. */
+	std_info = ntfs_attr_readall(vol->mft_ni, AT_STANDARD_INFORMATION, 
+				     AT_UNNAMED, 0, NULL);
+	vol->mft_ni->flags = std_info->file_attributes;
+
 	/* We now have a fully setup ntfs inode for $MFT in vol->mft_ni. */
 
 	/* Get an ntfs attribute for $MFT/$DATA and set it up, too. */
