@@ -1491,6 +1491,8 @@ search:
 		errno = 0;
 		fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
 				le16_to_cpu(actx->attr->value_offset));
+		ntfs_log_trace("Found filename with instance number %d.\n",
+				le16_to_cpu(actx->attr->instance));
 		if (looking_for_dos_name) {
 			if (fn->file_name_type == FILE_NAME_DOS)
 				break;
@@ -1513,6 +1515,8 @@ search:
 			if (fn->file_name_type == FILE_NAME_WIN32) {
 				looking_for_dos_name = TRUE;
 				ntfs_attr_reinit_search_ctx(actx);
+				ntfs_log_trace("Restart search. "
+						"Looking for DOS name.\n");
 				continue;
 			}
 			if (fn->file_name_type == FILE_NAME_DOS)
@@ -1528,6 +1532,7 @@ search:
 		if (errno == ENOENT && case_sensitive_match) {
 			case_sensitive_match = FALSE;
 			ntfs_attr_reinit_search_ctx(actx);
+			ntfs_log_trace("Restart search. Ignore case.");
 			goto search;
 		}
 		ntfs_log_error("Failed to find requested filename in FILE_NAME "
@@ -1562,6 +1567,7 @@ search:
 		}
 		ntfs_attr_close(na);
 	}
+	ntfs_log_trace("Found!\n");
 	/* Search for such FILE_NAME in index. */
 	ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 	if (!ictx)
@@ -1596,8 +1602,11 @@ search:
 		looking_for_dos_name = FALSE;
 		looking_for_win32_name = TRUE;
 		ntfs_attr_reinit_search_ctx(actx);
+		ntfs_log_trace("DOS name deleted. "
+				"Now search for WIN32 name.\n");
 		goto search;
-	}
+	} else
+		ntfs_log_trace("Deleted.\n");
 	/* TODO: Update object id, quota and securiry indexes if required. */
 	/*
 	 * If hard link count is not equal to zero then we are done. In other
@@ -1616,13 +1625,13 @@ search:
 			if (!rl) {
 				err = errno;
 				ntfs_log_error("Failed to decompress runlist.  "
-						"Leaving inconsistent metadata.\n");
+						"Leaving damaged metadata.\n");
 				continue;
 			}
 			if (ntfs_cluster_free_from_rl(ni->vol, rl)) {
 				err = errno;
 				ntfs_log_error("Failed to free clusters.  "
-						"Leaving inconsistent metadata.\n");
+						"Leaving damaged metadata.\n");
 				continue;
 			}
 			free(rl);
