@@ -530,20 +530,6 @@ static time_t mkntfs_time(void)
 }
 
 /**
- * mkntfs_calloc
- */
-static void *ntfs_calloc(size_t nmemb, size_t size)
-{
-	void *p;
-	
-	p = calloc(nmemb, size);
-	if (!p)
-		ntfs_log_perror("Failed to calloc() %lld bytes", 
-				(long long)nmemb * size);
-	return p;
-}
-
-/**
  * append_to_bad_blocks
  */
 static BOOL append_to_bad_blocks(unsigned long long block)
@@ -674,7 +660,7 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 	}
 	if (delta) {
 		int eo;
-		char *b = ntfs_calloc(1, delta);
+		char *b = ntfs_calloc(delta);
 		if (!b)
 			return -1;
 		bytes_written = mkntfs_write(dev, b, delta);
@@ -2449,7 +2435,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	err = add_attr_bitmap(m, name, name_len, ic, bmp, sizeof(bmp));
 	if (err)
 		goto err_out;
-	ia_val = ntfs_calloc(1, index_block_size);
+	ia_val = ntfs_calloc(index_block_size);
 	if (!ia_val) {
 		err = -errno;
 		goto err_out;
@@ -2801,10 +2787,10 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 	sdh_size += sizeof(SDH_INDEX_KEY) + sizeof(SDH_INDEX_DATA);
 	sii_size  = sizeof(INDEX_ENTRY_HEADER);
 	sii_size += sizeof(SII_INDEX_KEY) + sizeof(SII_INDEX_DATA);
-	idx_entry_sdh = ntfs_calloc(1, sizeof(INDEX_ENTRY));
+	idx_entry_sdh = ntfs_calloc(sizeof(INDEX_ENTRY));
 	if (!idx_entry_sdh)
 		return -errno;
-	idx_entry_sii = ntfs_calloc(1, sizeof(INDEX_ENTRY));
+	idx_entry_sii = ntfs_calloc(sizeof(INDEX_ENTRY));
 	if (!idx_entry_sii) {
 		free(idx_entry_sdh);
 		return -errno;
@@ -2876,7 +2862,7 @@ static int initialize_quota(MFT_RECORD *m)
 	err = 0;
 	/* q index entry num 1 */
 	q1_size = 0x48;
-	idx_entry_q1 = ntfs_calloc(1, q1_size);
+	idx_entry_q1 = ntfs_calloc(q1_size);
 	if (!idx_entry_q1)
 		return errno;
 	idx_entry_q1->data_offset = const_cpu_to_le16(0x14);
@@ -2905,7 +2891,7 @@ static int initialize_quota(MFT_RECORD *m)
 		return err;
 	/* q index entry num 2 */
 	q2_size = 0x58;
-	idx_entry_q2 = ntfs_calloc(1, q2_size);
+	idx_entry_q2 = ntfs_calloc(q2_size);
 	if (!idx_entry_q2)
 		return errno;
 	idx_entry_q2->data_offset = const_cpu_to_le16(0x14);
@@ -2941,7 +2927,7 @@ static int initialize_quota(MFT_RECORD *m)
 	if (err)
 		return err;
 	o_size = 0x28;
-	idx_entry_o = ntfs_calloc(1, o_size);
+	idx_entry_o = ntfs_calloc(o_size);
 	if (!idx_entry_o)
 		return errno;
 	idx_entry_o->data_offset = const_cpu_to_le16(0x20);
@@ -3182,7 +3168,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	}
 	/* Insert the index entry for file_name in @idx. */
 	idx_size = (fn_size + 7)  & ~7;
-	idx_entry_new = ntfs_calloc(1, idx_size + 0x10);
+	idx_entry_new = ntfs_calloc(idx_size + 0x10);
 	if (!idx_entry_new)
 		return -errno;
 	idx_entry_new->indexed_file = ref_file;
@@ -3765,7 +3751,7 @@ static BOOL mkntfs_initialize_bitmaps(void)
 			~(g_vol->cluster_size - 1);
 	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %llu\n",
 			g_lcn_bitmap_byte_size, i);
-	g_lcn_bitmap = ntfs_calloc(1, g_lcn_bitmap_byte_size);
+	g_lcn_bitmap = ntfs_calloc(g_lcn_bitmap_byte_size);
 	if (!g_lcn_bitmap)
 		return FALSE;
 	/*
@@ -3794,7 +3780,7 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	g_mft_bitmap_byte_size = (g_mft_bitmap_byte_size + 7) & ~7;
 	ntfs_log_debug("mft_bitmap_size = %i, g_mft_bitmap_byte_size = %i\n",
 			mft_bitmap_size, g_mft_bitmap_byte_size);
-	g_mft_bitmap = ntfs_calloc(1, g_mft_bitmap_byte_size);
+	g_mft_bitmap = ntfs_calloc(g_mft_bitmap_byte_size);
 	if (!g_mft_bitmap)
 		return FALSE;
 	/* Create runlist for mft bitmap. */
@@ -4585,7 +4571,7 @@ static BOOL mkntfs_create_root_structures(void)
 
 	ntfs_log_verbose("Creating $Boot (mft record 7)\n");
 	m = (MFT_RECORD*)(g_buf + 7 * g_vol->mft_record_size);
-	bs = ntfs_calloc(1, 8192);
+	bs = ntfs_calloc(8192);
 	if (!bs)
 		return FALSE;
 	memcpy(bs, boot_array, sizeof(boot_array));
@@ -4744,19 +4730,19 @@ static BOOL mkntfs_create_root_structures(void)
 			if (g_vol->minor_ver == 0) {
 				buf_sds_first_size = 0x1E0;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = ntfs_calloc(1, buf_sds_first_size);
+				buf_sds_init = ntfs_calloc(buf_sds_first_size);
 				if (!buf_sds_init)
 					return FALSE;
 				init_secure_30(buf_sds_init);
 			} else {
 				buf_sds_first_size = 0xFC;
 				buf_sds_size = 0x40000 + buf_sds_first_size;
-				buf_sds_init = ntfs_calloc(1, buf_sds_first_size);
+				buf_sds_init = ntfs_calloc(buf_sds_first_size);
 				if (!buf_sds_init)
 					return FALSE;
 				init_secure_31(buf_sds_init);
 			}
-			buf_sds = ntfs_calloc(1, buf_sds_size);
+			buf_sds = ntfs_calloc(buf_sds_size);
 			if (!buf_sds) {
 				free(buf_sds_init);
 				return FALSE;
@@ -4989,7 +4975,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	}
 	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
 	if (g_vol->major_ver < 3) {
-		g_vol->attrdef = ntfs_calloc(1, 36000);
+		g_vol->attrdef = ntfs_calloc(36000);
 		if (g_vol->attrdef) {
 			memcpy(g_vol->attrdef, attrdef_ntfs12_array,
 					sizeof(attrdef_ntfs12_array));
@@ -5029,7 +5015,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	if (!mkntfs_initialize_rl_boot())
 		goto done;
 	/* Allocate a buffer large enough to hold the mft. */
-	g_buf = ntfs_calloc(1, g_mft_size);
+	g_buf = ntfs_calloc(g_mft_size);
 	if (!g_buf)
 		goto done;
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */

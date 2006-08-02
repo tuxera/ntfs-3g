@@ -1,7 +1,9 @@
 /*
- * support.h - Useful definitions and macros. Part of the Linux-NTFS project.
+ * support.h - Various useful things. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c)      2006 Szabolcs Szakacsits
+ * Copyright (c)      2006 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -21,6 +23,10 @@
 
 #ifndef _NTFS_SUPPORT_H
 #define _NTFS_SUPPORT_H
+
+#include <stdlib.h>
+
+#include "logging.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -88,5 +94,29 @@
 	old_state;					\
 })
 
-#endif /* defined _NTFS_SUPPORT_H */
+/**
+ * ntfs_calloc, ntfs_malloc
+ * 
+ * Return a pointer to the allocated memory or NULL if the request fails.
+ */
+static inline void *ntfs_calloc(size_t size)
+{
+	void *p;
+	
+	p = calloc(1, size);
+	if (!p)
+		ntfs_log_perror("Failed to calloc %lld bytes", (long long)size);
+	return p;
+}
 
+static inline void *ntfs_malloc(size_t size)
+{
+	void *p;
+	
+	p = malloc(size);
+	if (!p)
+		ntfs_log_perror("Failed to malloc %lld bytes", (long long)size);
+	return p;
+}
+
+#endif /* defined _NTFS_SUPPORT_H */
