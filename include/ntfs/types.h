@@ -3,6 +3,7 @@
  *	     the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c)      2006 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -113,6 +114,12 @@ typedef enum {
 	CASE_SENSITIVE = 0,
 	IGNORE_CASE = 1,
 } IGNORE_CASE_BOOL;
+
+#define STATUS_OK				(0)
+#define STATUS_ERROR				(-1)
+#define STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT	(-2)
+#define STATUS_KEEP_SEARCHING			(-3)
+#define STATUS_NOT_FOUND			(-4)
 
 #endif /* defined _NTFS_TYPES_H */
 

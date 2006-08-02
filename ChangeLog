@@ -8,6 +8,8 @@ xx/xx/2006 - x.xx.x - .
 	  ntfs kernel driver to the same function.  (Anton)
 	- Add new API ntfs_attr_exist() that checks whether attribute with
 	  selected type and name already present in inode.  (Szaka)
+	- Extend ntfs_index_{add_filename,rm} to support almost all cases of
+	  index operations.  (Szaka, Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

@@ -1,9 +1,10 @@
 /*
  * index.h - Defines for NTFS index handling.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004 Anton Altaparmakov
- * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c)      2004 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
+ * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c)      2006 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -30,24 +31,32 @@
 #include "inode.h"
 #include "mft.h"
 
+#define  VCN_INDEX_ROOT_PARENT  ((VCN)-2)
+
+#define  MAX_PARENT_VCN		32
+
 /**
  * struct ntfs_index_context -
  * @ni:			inode containing the @entry described by this context
  * @name:		name of the index described by this context
  * @name_len:		length of the index name
- * @entry:		index entry (points into @ir or @ia)
+ * @entry:		index entry (points into @ir or @ib)
  * @data:		index entry data (points into @entry)
  * @data_len:		length in bytes of @data
- * @is_in_root:		TRUE if @entry is in @ir or FALSE if it is in @ia
+ * @cr:
+ * @is_in_root:		TRUE if @entry is in @ir or FALSE if it is in @ib
  * @ir:			index root if @is_in_root or NULL otherwise
  * @actx:		attribute search context if in root or NULL otherwise
- * @ia:			index block if @is_in_root is FALSE or NULL otherwise
  * @ia_na:		opened INDEX_ALLOCATION attribute
- * @ia_vcn:		VCN from which @ia where read from
- * @ia_dirty:		TRUE if index block was changed
+ * @ib:			index block if @is_in_root is FALSE or NULL otherwise
+ * @ib_vcn:		VCN from which @ib where read from
+ * @ib_dirty:		TRUE if index block was changed
+ * @parent_pos:		parent entries' positions in the index block
+ * @parent_vcn:		entry's parent nodes or VCN_INDEX_ROOT_PARENT for root
+ * @max_depth:		number of the parent nodes
+ * @pindex:		maximum it's the number of the parent nodes
  * @block_size:		index block size
- * @vcn_size:		VCN size for this index block
- * @vcn_size_bits:	use instead of @vcn_size to speedup multiplication
+ * @vcn_size_bits:	VCN size bits for this index block
  *
  * @ni is the inode this context belongs to.
  *
@@ -56,13 +65,13 @@
  * simply points into @entry.  This is probably what the user is interested in.
  *
  * If @is_in_root is TRUE, @entry is in the index root attribute @ir described
- * by the attribute search context @actx and inode @ni.  @ia, @ia_vcn and
- * @ia_dirty are undefined in this case.
+ * by the attribute search context @actx and inode @ni.  @ib, @ib_vcn and
+ * @ib_dirty are undefined in this case.
  *
- * If @is_in_root is FALSE, @entry is in the index allocation attribute and @ia
- * and @ia_vcn point to the index allocation block and VCN where it's placed,
+ * If @is_in_root is FALSE, @entry is in the index allocation attribute and @ib
+ * and @ib_vcn point to the index allocation block and VCN where it's placed,
  * respectively. @ir and @actx are NULL in this case. @ia_na is opened
- * INDEX_ALLOCATION attribute. @ia_dirty is TRUE if index block was changed and
+ * INDEX_ALLOCATION attribute. @ib_dirty is TRUE if index block was changed and
  * FALSE otherwise.
  *
  * To obtain a context call ntfs_index_ctx_get().
@@ -81,15 +90,19 @@ typedef struct {
 	INDEX_ENTRY *entry;
 	void *data;
 	u16 data_len;
+	COLLATION_RULES cr;
 	BOOL is_in_root;
 	INDEX_ROOT *ir;
 	ntfs_attr_search_ctx *actx;
-	INDEX_ALLOCATION *ia;
 	ntfs_attr *ia_na;
-	VCN ia_vcn;
-	BOOL ia_dirty;
+	INDEX_BLOCK *ib;
+	VCN ib_vcn;
+	BOOL ib_dirty;
+	int parent_pos[MAX_PARENT_VCN];
+	VCN parent_vcn[MAX_PARENT_VCN];
+	int max_depth;
+	int pindex;
 	u32 block_size;
-	u32 vcn_size;
 	u8 vcn_size_bits;
 } ntfs_index_context;
 
@@ -107,6 +120,12 @@ extern int ntfs_index_rm(ntfs_index_context *ictx);
 
 extern INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr);
 
+extern VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie);
+
+char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
+void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
+void ntfs_ih_filename_dump(INDEX_HEADER *ih);
+
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty
  * @ictx:	ntfs index context describing the index entry
@@ -118,7 +137,7 @@ extern INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr);
  * hence the index root attribute, will be written out to disk later.
  *
  * If the index entry is in an index block belonging to the index allocation
- * attribute, set ia_dirty to TRUE, thus index block will be updated during
+ * attribute, set ib_dirty to TRUE, thus index block will be updated during
  * ntfs_index_ctx_put.
  */
 static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
@@ -126,7 +145,7 @@ static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 	if (ictx->is_in_root)
 		ntfs_inode_mark_dirty(ictx->actx->ntfs_ino);
 	else
-		ictx->ia_dirty = TRUE;
+		ictx->ib_dirty = TRUE;
 }
 
 #endif /* _NTFS_INDEX_H */
