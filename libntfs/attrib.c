@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -5057,3 +5058,24 @@ out:
 	return ret;
 }
 
+/**
+ * ntfs_attr_exist - FIXME: description
+ */
+int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
+		u32 name_len)
+{
+	ntfs_attr_search_ctx *ctx;
+	int ret;
+	
+	ntfs_log_trace("Entering.\n");
+	
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx)
+		return 0;
+	
+	ret = ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE, 0, NULL, 0,
+			       ctx);
+
+	ntfs_attr_put_search_ctx(ctx);
+	return !ret;
+}
