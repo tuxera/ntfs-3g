@@ -3731,9 +3731,13 @@ cluster_free_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	ENOMEM - Not enough memory to complete operation.
- *	ERANGE - @newsize is not valid for the attribute type of @na.
- *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
+ *	ENOMEM		- Not enough memory to complete operation.
+ *	ERANGE		- @newsize is not valid for the attribute type of @na.
+ *	ENOSPC		- There is no enough space on the volume to allocate
+ *			  new clusters or in base mft to resize $ATTRIBUTE_LIST.
+ *	EOVERFLOW	- Resident attribute can not become non resident and
+ *			  already filled whole MFT record, but had not reached
+ *			  @newsize bytes length.
  */
 static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 {
@@ -3883,6 +3887,22 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		goto put_err_out;
 	}
 
+	/* 
+	 * Force index allocation creation instead of moving out index root
+	 * from the base MFT record.
+	 */
+	if (na->type == AT_INDEX_ROOT && na->data_size > sizeof(INDEX_ROOT) +
+			sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN)) {
+		INDEX_ROOT *ir;
+
+		ir = (INDEX_ROOT*)((u8*)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset));
+		if (!(ir->index.flags & LARGE_INDEX)) {
+			err = EOVERFLOW;
+			goto put_err_out;
+		}
+	}
+
 	/*
 	 * Check whether attribute is already single in the this MFT record.
 	 * 8 added for the attribute terminator.
@@ -3890,7 +3910,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) ==
 			le16_to_cpu(ctx->mrec->attrs_offset) +
 			le32_to_cpu(ctx->attr->length) + 8) {
-		err = ENOSPC;
+		err = EOVERFLOW;
 		goto put_err_out;
 	}
 
@@ -4960,8 +4980,15 @@ put_err_out:
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
- *	EINVAL	   - Invalid arguments were passed to the function.
- *	EOPNOTSUPP - The desired resize is not implemented yet.
+ *	EINVAL	   	- Invalid arguments were passed to the function.
+ *	EACCES		- Attribute is encrypted.
+ *	ERANGE		- @newsize is not valid for the attribute type of @na.
+ *	ENOSPC		- There is no enough space on the volume to allocate
+ *			  new clusters or in base mft to resize $ATTRIBUTE_LIST.
+ *	EOVERFLOW	- Resident attribute can not become non resident and
+ *			  already filled whole MFT record, but had not reached
+ *			  @newsize bytes length.
+ *	EOPNOTSUPP	- The desired resize is not implemented yet.
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
