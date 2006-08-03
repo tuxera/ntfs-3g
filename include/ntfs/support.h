@@ -24,10 +24,6 @@
 #ifndef _NTFS_SUPPORT_H
 #define _NTFS_SUPPORT_H
 
-#include <stdlib.h>
-
-#include "logging.h"
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -35,6 +31,12 @@
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
 #endif
+
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
+#include "logging.h"
 
 /*
  * Our mailing list. Use this define to prevent typos in email address.
