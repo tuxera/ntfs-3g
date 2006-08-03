@@ -4991,7 +4991,7 @@ put_err_out:
  *	EOPNOTSUPP	- The desired resize is not implemented yet.
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
-{
+{ 
 	int ret;
 
 	if (!na || newsize < 0 ||

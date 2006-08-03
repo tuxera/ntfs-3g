@@ -122,9 +122,9 @@ extern INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr);
 
 extern VCN ntfs_ie_get_vcn(INDEX_ENTRY *ie);
 
-char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
-void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
-void ntfs_ih_filename_dump(INDEX_HEADER *ih);
+extern char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
+extern void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
+extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty
