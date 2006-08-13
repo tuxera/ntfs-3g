@@ -9,7 +9,35 @@ xx/xx/2006 - x.xx.x - .
 	- Add new API ntfs_attr_exist() that checks whether attribute with
 	  selected type and name already present in inode.  (Szaka)
 	- Extend ntfs_index_{add_filename,rm} to support almost all cases of
-	  index operations.  (Szaka, Yura)
+	  index operations.  (Szaka)
+	- Support index operations when index root is in the base mft record.
+	  (Yura)
+	- calloc/malloc -> ntfs_{calloc,malloc} conversions.  (Szaka)
+	- ntfsclone: don't create image files with executable bit set.  (Szaka)
+	- ntfsclone: metadata cloning: write out extent records.  (Szaka) 
+	- ntfsclone: fix sometimes missing error messages and be more
+	  detailed.  (Szaka)
+	- ntfsclone: fix crash in wipe_index_allocation_timestamps(): don't 
+	  dump empty index allocation attribute.  (Szaka)
+	- ntfscmp: fine grained AT_INDEX_ALLOCATION comparison.  (Szaka)
+	- ntfsinfo: rename 'Flags:' fields to be unique.  (Szaka)
+	- ntfsinfo: add ntfs_dump_index_header(); dump full index attribute
+	  INDEX_HEADER.  (Szaka)
+	- ntfsinfo: add ntfs_dump_index_block() and use it.  (Szaka)
+	- ntfsinfo: fix output indenting.  (Szaka)
+	- ntfsinfo: make stdout line buffered.  (Szaka)
+	- ntfsinfo: fix segfaults when SDS has absolute security descriptor.  
+	  (Szaka)
+	- ntfsinfo: redirect stderr to /dev/null if --debug isn't used in
+	  debug mode.  (Szaka)
+	- ntfsinfo: fix segfaults on corrupt index blocks.  (Szaka)
+	- ntfsinfo: dump number of entries per block in index allocation 
+	  attributes.  (Szaka)
+	- ntfsinfo: dump ATTR_LIST_ENTRY padding in verbose mode. (Szaka)
+	- ntfsinfo: dump all VCN's in the same numeral system.  (Szaka)
+	- ntfsinfo: dump the FILE_ATTR_DIRECTORY flag.  (Szaka)
+	- ntfsinfo: dump padding between the Update Sequence Array and the
+	  first attribute in verbose mode.  (Szaka)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
