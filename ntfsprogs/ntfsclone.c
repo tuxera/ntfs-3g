@@ -629,7 +629,8 @@ static void clone_ntfs(u64 nr_clusters)
 	else
 		Printf("Cloning NTFS ...\n");
 
-	if ((buf = calloc(1, csize)) == NULL)
+	buf = ntfs_calloc(csize);
+	if (!buf)
 		perr_exit("clone_ntfs");
 
 	progress_init(&progress, p_counter, nr_clusters, 100);
@@ -765,11 +766,10 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		perr_printf("Failed to open $INDEX_ALLOCATION attribute");
 		goto out_bitmap;
 	}
-	tmp_indexa = indexa = malloc(na->data_size);
-	if (!tmp_indexa) {
-		perr_printf("malloc failed");
+	tmp_indexa = indexa = ntfs_malloc(na->data_size);
+	if (!tmp_indexa)
 		goto out_na;
-	}
+
 	if (ntfs_attr_pread(na, 0, na->data_size, indexa) != na->data_size) {
 		perr_printf("Failed to read $INDEX_ALLOCATION attribute");
 		goto out_indexa;
@@ -1158,7 +1158,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 
 		/* FIXME: Terrible kludge for libntfs not being able to return
 		   a deleted MFT record as inode */
-		ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
+		ni = ntfs_calloc(sizeof(ntfs_inode));
 		if (!ni)
 			perr_exit("walk_clusters");
 
@@ -1239,7 +1239,8 @@ static void setup_lcn_bitmap(void)
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = rounded_up_division(vol->nr_clusters, 8);
 
-	if (!(lcn_bitmap.bm = (unsigned char *)calloc(1, lcn_bitmap.size)))
+	lcn_bitmap.bm = ntfs_calloc(lcn_bitmap.size);
+	if (!lcn_bitmap.bm)
 		perr_exit("Failed to allocate internal buffer");
 
 	bitmap_file_data_fixup(vol->nr_clusters, &lcn_bitmap);
