@@ -1137,6 +1137,21 @@ static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 		perr_exit("ntfs_mft_record_write");
 }
 
+static void mft_inode_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
+{
+	s32 i;
+	
+	mft_record_write_with_same_usn(volume, ni);
+	
+	if (ni->nr_extents <= 0)
+		return;
+	
+	for (i = 0; i < ni->nr_extents; ++i) {
+		ntfs_inode *eni = ni->extent_nis[i];
+		mft_record_write_with_same_usn(volume, eni);
+	}
+}
+
 static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 {
 	s64 inode = 0;
@@ -1208,7 +1223,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 out:
 		if (wipe) {
 			wipe_unused_mft_data(ni);
-			mft_record_write_with_same_usn(volume, ni);
+			mft_inode_write_with_same_usn(volume, ni);
 		}
 
 		if (ntfs_inode_close(ni))
