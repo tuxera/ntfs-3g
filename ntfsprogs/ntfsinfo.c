@@ -1640,11 +1640,10 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			
 			entries = ntfs_dump_index_block(tmp_alloc, type,
 							ir->index_block_size);
-	       		if (entries == -1)
-				goto out_allocation;
-			
-			total_entries += entries;
-			total_indx_blocks++;
+	       		if (entries != -1) {
+				total_entries += entries;
+				total_indx_blocks++;
+			}
 		}
 		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
 						 ir->index_block_size);
@@ -1654,9 +1653,10 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			byte++;
 		}
 	}
+
 	printf("\tIndex entries total:\t %d\n", total_entries);
 	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
-out_allocation:
+	
 	free(allocation);
 out_bitmap:
 	free(bitmap);
