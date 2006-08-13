@@ -2424,7 +2424,6 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		err = -EINVAL;
 		goto err_out;
 	}
-	ntfs_attr_put_search_ctx(ctx);
 	r = (INDEX_ROOT*)((char*)a + le16_to_cpu(a->value_offset));
 	re_end = (char*)r + le32_to_cpu(a->value_length);
 	re_start = (char*)&r->index + le32_to_cpu(r->index.entries_offset);
@@ -2520,6 +2519,7 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		goto err_out;
 	}
 	*idx = ia_val;
+	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
