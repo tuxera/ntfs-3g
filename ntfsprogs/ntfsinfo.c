@@ -847,7 +847,7 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	printf("%s\tRevision:\t\t %u\n", indent, sec_desc->revision);
 
 	/* TODO: parse the flags */
-	printf("%s\tFlags:\t\t\t 0x%0x\n", indent, sec_desc->control);
+	printf("%s\tControl:\t\t 0x%0x\n", indent, sec_desc->control);
 
 	if (sec_desc->owner) {
 		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
@@ -988,7 +988,7 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 
 	printf("\tVolume Version:\t\t %d.%d\n", vol_information->major_ver,
 		vol_information->minor_ver);
-	printf("\tFlags:\t\t\t ");
+	printf("\tVolume Flags:\t\t ");
 	if (vol_information->flags & VOLUME_IS_DIRTY)
 		printf("DIRTY ");
 	if (vol_information->flags & VOLUME_RESIZE_LOG_FILE)
@@ -1129,7 +1129,7 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 	}
 
 	/* TODO: parse the flags */
-	printf("\tFlags:\t\t\t 0x%04hx\n",le16_to_cpu(a->flags));
+	printf("\tAttribute flags:\t 0x%04hx\n",le16_to_cpu(a->flags));
 	printf("\tAttribute instance:\t %u\n", le16_to_cpu(a->instance));
 
 	/* Resident attribute */
@@ -1367,7 +1367,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				le16_to_cpu(entry->length));
 		ntfs_log_verbose("\t\tKey length:\t\t %u\n",
 				le16_to_cpu(entry->key_length));
-		ntfs_log_verbose("\t\tFlags:\t\t\t 0x%02x\n",
+		ntfs_log_verbose("\t\tIndex entry flags:\t 0x%02x\n",
 			le16_to_cpu(entry->flags));
 
 		if (entry->flags & INDEX_ENTRY_NODE)
@@ -1508,7 +1508,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 		(unsigned int)le32_to_cpu(index_root->index.index_length));
 
 	/* the flags are 8bit long, no need for byte-order handling */
-	printf("\tFlags:\t\t\t 0x%02x\n",index_root->index.flags);
+	printf("\tIndex header flags:\t 0x%02x\n",index_root->index.flags);
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
@@ -1702,7 +1702,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		ea = (EA_ATTR*)((u8*)attr + le16_to_cpu(attr->value_offset));
 	}
 	while (1) {
-		printf("\n\tFlags:\t\t ");
+		printf("\n\tEA flags:\t\t ");
 		if (ea->flags) {
 			if (ea->flags == NEED_EA)
 				printf("NEED_EA\n");
