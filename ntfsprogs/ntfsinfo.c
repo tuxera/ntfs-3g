@@ -847,8 +847,20 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	printf("%s\tRevision:\t\t %u\n", indent, sec_desc->revision);
 
 	/* TODO: parse the flags */
-	printf("%s\tControl:\t\t 0x%0x\n", indent, sec_desc->control);
+	printf("%s\tControl:\t\t 0x%04x\n", indent, sec_desc->control);
 
+	if (~sec_desc->control & SE_SELF_RELATIVE) {
+		
+		SECURITY_DESCRIPTOR *sd = (SECURITY_DESCRIPTOR *)sec_desc;
+		
+		printf("%s\tOwner SID pointer:\t %p\n", indent, sd->owner);
+		printf("%s\tGroup SID pointer:\t %p\n", indent, sd->group);
+		printf("%s\tSACL pointer:\t\t %p\n", indent, sd->sacl);
+		printf("%s\tDACL pointer:\t\t %p\n", indent, sd->dacl);
+		
+		return;
+	}
+	
 	if (sec_desc->owner) {
 		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
 			le32_to_cpu(sec_desc->owner)), NULL, 0);
