@@ -146,6 +146,7 @@
 #include "attrdef.h"
 #include "version.h"
 #include "logging.h"
+#include "support.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #error "No default device io operations!  Cannot build mkntfs.  \
@@ -2028,7 +2029,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 			le16_to_cpu(ctx->attr->value_offset));
 	i = (strlen(file_name) + 1) * sizeof(ntfschar);
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
-	fn = malloc(fn_size);
+	fn = ntfs_malloc(fn_size);
 	if (!fn) {
 		ntfs_attr_put_search_ctx(ctx);
 		return -errno;
@@ -2237,7 +2238,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 	int err, val_len;
 
 	val_len = sizeof(INDEX_ROOT) + sizeof(INDEX_ENTRY_HEADER);
-	r = malloc(val_len);
+	r = ntfs_malloc(val_len);
 	if (!r)
 		return -errno;
 	r->type = (indexed_attr_type == AT_FILE_NAME) ? AT_FILE_NAME : 0;
@@ -3105,7 +3106,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	/* Create the file_name attribute. */
 	i = (strlen(file_name) + 1) * sizeof(ntfschar);
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
-	fn = malloc(fn_size);
+	fn = ntfs_malloc(fn_size);
 	if (!fn)
 		return -errno;
 	fn->parent_directory = ref_parent;
@@ -3220,7 +3221,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 	/* Create the file_name attribute. */
 	i = (strlen(file_name) + 1) * sizeof(ntfschar);
 	fn_size = sizeof(FILE_NAME_ATTR) + i;
-	fn = malloc(fn_size);
+	fn = ntfs_malloc(fn_size);
 	if (!fn)
 		return -errno;
 	fn->parent_directory = ref_parent;
@@ -3784,11 +3785,10 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	if (!g_mft_bitmap)
 		return FALSE;
 	/* Create runlist for mft bitmap. */
-	g_rl_mft_bmp = malloc(2 * sizeof(runlist));
-	if (!g_rl_mft_bmp) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_mft_bmp = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_mft_bmp)
 		return FALSE;
-	}
+	
 	g_rl_mft_bmp[0].vcn = 0LL;
 	/* Mft bitmap is right after $Boot's data. */
 	i = (8192 + g_vol->cluster_size - 1) / g_vol->cluster_size;
@@ -3850,11 +3850,10 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	 */
 	g_mft_zone_end += g_mft_lcn;
 	/* Create runlist for mft. */
-	g_rl_mft = malloc(2 * sizeof(runlist));
-	if (!g_rl_mft) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_mft = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_mft)
 		return FALSE;
-	}
+	
 	g_rl_mft[0].vcn = 0LL;
 	g_rl_mft[0].lcn = g_mft_lcn;
 	/* rounded up division by cluster size */
@@ -3872,11 +3871,10 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	ntfs_log_debug("$MFTMirr logical cluster number = 0x%llx\n",
 			g_mftmirr_lcn);
 	/* Create runlist for mft mirror. */
-	g_rl_mftmirr = malloc(2 * sizeof(runlist));
-	if (!g_rl_mftmirr) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_mftmirr = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_mftmirr)
 		return FALSE;
-	}
+	
 	g_rl_mftmirr[0].vcn = 0LL;
 	g_rl_mftmirr[0].lcn = g_mftmirr_lcn;
 	/*
@@ -3909,11 +3907,10 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 	u64 volume_size;
 
 	/* Create runlist for log file. */
-	g_rl_logfile = malloc(2 * sizeof(runlist));
-	if (!g_rl_logfile) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_logfile = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_logfile)
 		return FALSE;
-	}
+	
 
 	volume_size = g_vol->nr_clusters << g_vol->cluster_size_bits;
 
@@ -3994,11 +3991,10 @@ static BOOL mkntfs_initialize_rl_boot(void)
 {
 	int i, j;
 	/* Create runlist for $Boot. */
-	g_rl_boot = malloc(2 * sizeof(runlist));
-	if (!g_rl_boot) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_boot = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_boot)
 		return FALSE;
-	}
+	
 	g_rl_boot[0].vcn = 0LL;
 	g_rl_boot[0].lcn = 0LL;
 	/*
@@ -4022,11 +4018,10 @@ static BOOL mkntfs_initialize_rl_boot(void)
 static BOOL mkntfs_initialize_rl_bad(void)
 {
 	/* Create runlist for $BadClus, $DATA named stream $Bad. */
-	g_rl_bad = malloc(2 * sizeof(runlist));
-	if (!g_rl_bad) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	g_rl_bad = ntfs_malloc(2 * sizeof(runlist));
+	if (!g_rl_bad)
 		return FALSE;
-	}
+	
 	g_rl_bad[0].vcn = 0LL;
 	g_rl_bad[0].lcn = -1LL;
 	/*
@@ -4496,11 +4491,10 @@ static BOOL mkntfs_create_root_structures(void)
 	/* dump_mft_record(m); */
 	ntfs_log_verbose("Creating $LogFile (mft record 2)\n");
 	m = (MFT_RECORD*)(g_buf + 2 * g_vol->mft_record_size);
-	buf_log = malloc(g_logfile_size);
-	if (!buf_log) {
-		ntfs_log_perror("Failed to allocate internal buffer");
+	buf_log = ntfs_malloc(g_logfile_size);
+	if (!buf_log)
 		return FALSE;
-	}
+	
 	memset(buf_log, -1, g_logfile_size);
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, buf_log,
 			g_logfile_size);
@@ -4968,11 +4962,10 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		g_vol->cluster_size = opts.cluster_size;
 	/* Length is in unicode characters. */
 	g_vol->upcase_len = 65536;
-	g_vol->upcase = malloc(g_vol->upcase_len * sizeof(ntfschar));
-	if (!g_vol->upcase) {
-		ntfs_log_perror("Could not create upcase structure");
+	g_vol->upcase = ntfs_malloc(g_vol->upcase_len * sizeof(ntfschar));
+	if (!g_vol->upcase)
 		goto done;
-	}
+	
 	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
 	if (g_vol->major_ver < 3) {
 		g_vol->attrdef = ntfs_calloc(36000);
@@ -4982,7 +4975,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 			g_vol->attrdef_len = 36000;
 		}
 	} else {
-		g_vol->attrdef = malloc(sizeof(attrdef_ntfs3x_array));
+		g_vol->attrdef = ntfs_malloc(sizeof(attrdef_ntfs3x_array));
 		if (g_vol->attrdef) {
 			memcpy(g_vol->attrdef, attrdef_ntfs3x_array,
 					sizeof(attrdef_ntfs3x_array));
