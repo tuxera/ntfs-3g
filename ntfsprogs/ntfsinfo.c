@@ -1875,17 +1875,18 @@ static void ntfs_dump_attr_unknown(ATTR_RECORD *attr)
  */
 static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 {
-	u16 inode_flags = inode->mrec->flags;
+	MFT_RECORD *mrec = inode->mrec;
+	u16 inode_flags  = mrec->flags;
 
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 
-	ntfs_dump_usa_lsn("", inode->mrec);
+	ntfs_dump_usa_lsn("", mrec);
 	printf("MFT Record Seq. Numb.:\t %hu\n",
-		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
+		(short unsigned int)le16_to_cpu(mrec->sequence_number));
 	printf("Number of Hard Links:\t %hu\n",
-		le16_to_cpu(inode->mrec->link_count));
+		le16_to_cpu(mrec->link_count));
 	printf("Attribute Offset:\t %hu\n",
-		le16_to_cpu(inode->mrec->attrs_offset));
+		le16_to_cpu(mrec->attrs_offset));
 
 	printf("MFT Record Flags:\t ");
 	if (inode_flags) {
@@ -1914,16 +1915,16 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	printf("\n");
 
 	printf("Bytes Used:\t\t %u bytes\n",
-		(unsigned int)le32_to_cpu(inode->mrec->bytes_in_use));
+		(unsigned int)le32_to_cpu(mrec->bytes_in_use));
 	printf("Bytes Allocated:\t %u bytes\n",
-		(unsigned int)le32_to_cpu(inode->mrec->bytes_allocated));
+		(unsigned int)le32_to_cpu(mrec->bytes_allocated));
 
-	if (inode->mrec->base_mft_record) {
+	if (mrec->base_mft_record) {
 		printf("Base MFT Record:\t %llu\n",
-			MREF_LE(inode->mrec->base_mft_record));
+			MREF_LE(mrec->base_mft_record));
 	}
 	printf("Next Attribute Instance: %hu\n",
-		le16_to_cpu(inode->mrec->next_attr_instance));
+		le16_to_cpu(mrec->next_attr_instance));
 }
 
 /**
