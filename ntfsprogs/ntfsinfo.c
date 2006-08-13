@@ -1925,6 +1925,12 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	}
 	printf("Next Attribute Instance: %hu\n",
 		le16_to_cpu(mrec->next_attr_instance));
+	
+	printf("MFT Padding:\t");
+	ntfs_dump_bytes((u8 *)mrec, le16_to_cpu(mrec->usa_ofs) + 
+			2 * le16_to_cpu(mrec->usa_count),
+			le16_to_cpu(mrec->attrs_offset));
+	printf("\n");
 }
 
 /**
