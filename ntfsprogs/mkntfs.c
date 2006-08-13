@@ -3425,7 +3425,7 @@ done:
 /**
  * mkntfs_get_page_size - detect the system's memory page size.
  */
-static long mkntfs_get_page_size()
+static long mkntfs_get_page_size(void)
 {
 	long page_size;
 #ifdef _SC_PAGESIZE
