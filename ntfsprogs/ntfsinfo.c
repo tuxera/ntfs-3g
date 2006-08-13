@@ -1525,9 +1525,9 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 
 static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
 {
-	printf("%sUpd. Seq. Array Offset:\t %hu\n", indent, 
+	printf("%sUpd. Seq. Array Off.:\t %hu\n", indent, 
 	       le16_to_cpu(mrec->usa_ofs));
-	printf("%sUpd. Seq. Array Count: \t %hu\n", indent,
+	printf("%sUpd. Seq. Array Count:\t %hu\n", indent,
 	       le16_to_cpu(mrec->usa_count));
 	printf("%sUpd. Seq. Number:\t %hu\n", indent,
 	       *(u16 *)((u8 *)mrec + le16_to_cpu(mrec->usa_ofs)));
@@ -1839,7 +1839,7 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	printf("Dumping Inode #%llu\n",(long long)inode->mft_no);
 
 	ntfs_dump_usa_lsn("", inode->mrec);
-	printf("MFT Record Seq. Number:\t %hu\n",
+	printf("MFT Record Seq. Numb.:\t %hu\n",
 		(short unsigned int)le16_to_cpu(inode->mrec->sequence_number));
 	printf("Number of Hard Links:\t %hu\n",
 		le16_to_cpu(inode->mrec->link_count));
