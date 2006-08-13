@@ -1987,6 +1987,8 @@ int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
 
+	setlinebuf(stdout);
+	
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	if (!parse_options(argc, argv))
