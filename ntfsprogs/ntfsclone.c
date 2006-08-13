@@ -767,6 +767,10 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		perr_printf("Failed to open $INDEX_ALLOCATION attribute");
 		goto out_bitmap;
 	}
+
+	if (!na->data_size)
+		goto out_na;
+
 	tmp_indexa = indexa = ntfs_malloc(na->data_size);
 	if (!tmp_indexa)
 		goto out_na;
