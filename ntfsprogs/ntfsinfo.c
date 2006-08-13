@@ -1518,7 +1518,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
-	ntfs_log_verbose("\tDumping index block:\n");
+	ntfs_log_verbose("\tDumping index root:\n");
 	printf("\tIndex entries total:\t %d\n",
 			ntfs_dump_index_entries(entry, type));
 }
@@ -1535,6 +1535,34 @@ static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
 	       (long long int)sle64_to_cpu(mrec->lsn));
 }
 
+
+static s32 ntfs_dump_index_block(INDEX_BLOCK *ib, INDEX_ATTR_TYPE type,
+				 u32 ib_size)
+{
+	INDEX_ENTRY *entry;
+	
+	if (ntfs_mst_post_read_fixup((NTFS_RECORD *)ib, ib_size)) {
+		ntfs_log_perror("Damaged INDX record");
+		return -1;
+	}
+	ntfs_log_verbose("\tDumping index block:\n");
+	if (opts.verbose)
+		ntfs_dump_usa_lsn("\t\t", (MFT_RECORD *)ib);
+
+	ntfs_log_verbose("\t\tNode VCN:\t\t %lld\n",
+			 le64_to_cpu(ib->index_block_vcn));
+	
+	entry = (INDEX_ENTRY *)((u8 *)ib + 
+				le32_to_cpu(ib->index.entries_offset) + 0x18);
+	
+	if (opts.verbose) {
+		ntfs_dump_index_header("\t\t", &ib->index);
+		printf("\n");
+	}
+	
+	return ntfs_dump_index_entries(entry, type);
+}
+
 /**
  * ntfs_dump_attr_index_allocation()
  *
@@ -1543,8 +1571,7 @@ static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
 static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 {
 	INDEX_ALLOCATION *allocation, *tmp_alloc;
-	INDEX_ENTRY *entry;
-	INDEX_ROOT *index_root;
+	INDEX_ROOT *ir;
 	INDEX_ATTR_TYPE type;
 	int total_entries = 0;
 	int total_indx_blocks = 0;
@@ -1554,13 +1581,13 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	u32 name_len;
 	s64 data_size;
 
-	index_root = ntfs_index_root_get(ni, attr);
-	if (!index_root) {
+	ir = ntfs_index_root_get(ni, attr);
+	if (!ir) {
 		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
 		return;
 	}
 	
-	type = get_index_attr_type(ni, attr, index_root);
+	type = get_index_attr_type(ni, attr, ir);
 	
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
@@ -1581,26 +1608,18 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	bit = 0;
 	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
 		if (*byte & (1 << bit)) {
-			if (ntfs_mst_post_read_fixup((NTFS_RECORD *) tmp_alloc,
-						index_root->index_block_size)) {
-				ntfs_log_perror("Damaged INDX record");
+			int entries;
+			
+			entries = ntfs_dump_index_block(tmp_alloc, type,
+							ir->index_block_size);
+	       		if (entries == -1)
 				goto out_allocation;
-			}
-			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
-				tmp_alloc->index.entries_offset) + 0x18);
-			ntfs_log_verbose("\tDumping index block (VCN %lld):\n",
-				      le64_to_cpu(tmp_alloc->index_block_vcn));
-			if (opts.verbose) {
-				ntfs_dump_index_header("\t\t", &tmp_alloc->index);
-				ntfs_dump_usa_lsn("\t\t", 
-						  (MFT_RECORD *)tmp_alloc);
-				printf("\n");
-			}
-			total_entries += ntfs_dump_index_entries(entry, type);
+			
+			total_entries += entries;
 			total_indx_blocks++;
 		}
 		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
-						 index_root->index_block_size);
+						 ir->index_block_size);
 		bit++;
 		if (bit > 7) {
 			bit = 0;
@@ -1614,7 +1633,7 @@ out_allocation:
 out_bitmap:
 	free(bitmap);
 out_index_root:
-	free(index_root);
+	free(ir);
 }
 
 /**
