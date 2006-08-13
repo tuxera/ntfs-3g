@@ -85,12 +85,12 @@ static struct options {
 	const char *device;	/* Device/File to work with */
 	const char *filename;	/* Resolve this filename to mft number */
 	s64	 inode;		/* Info for this inode */
+	int	 debug;		/* Debug output */
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
 	int	 notime;	/* Don't report timestamps at all */
 	int	 mft;		/* Dump information about the volume as well */
-	u8	 padding[4];	/* Unused: padding to 64 bit. */
 } opts;
 
 /**
@@ -135,7 +135,11 @@ static void usage(void)
 		"    -q, --quiet      Less output\n"
 		"    -v, --verbose    More output\n"
 		"    -V, --version    Display version information\n"
-		"    -h, --help       Display this help\n\n",
+		"    -h, --help       Display this help\n"
+#ifdef DEBUG
+                "    -d, --debug            Show debug information\n"
+#endif
+	        "\n",
 		EXEC_NAME);
 	printf("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -151,8 +155,11 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-:fhi:F:mqtTvV";
+	static const char *sopt = "-:dfhi:F:mqtTvV";
 	static const struct option lopt[] = {
+#ifdef DEBUG
+                { "debug",      no_argument,            NULL, 'd' },
+#endif
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "inode",	 required_argument,	NULL, 'i' },
@@ -177,14 +184,15 @@ static int parse_options(int argc, char *argv[])
 	opts.filename = NULL;
 
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
-		ntfs_log_trace("optind=%d; c='%c' optarg=\"%s\".\n", optind, c,
-				optarg);
 		switch (c) {
 		case 1:
 			if (!opts.device)
 				opts.device = optarg;
 			else
 				err++;
+			break;
+		case 'd':
+			opts.debug++;
 			break;
 		case 'i':
 			if ((opts.inode != -1) ||
@@ -292,6 +300,14 @@ static int parse_options(int argc, char *argv[])
 		}
 
 	}
+
+#ifdef DEBUG
+	if (!opts.debug)
+		if (!freopen("/dev/null", "w", stderr)) {
+			ntfs_log_perror("Failed to freopen stderr to /dev/null");
+			exit(1);
+		}
+#endif
 
 	if (ver)
 		version();
@@ -1983,8 +1999,6 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 	/* close all data-structures we used */
 	ntfs_attr_put_search_ctx(ctx);
 	ntfs_inode_close(inode);
-
-	/* happily exit */
 }
 
 /**
@@ -2003,14 +2017,18 @@ int main(int argc, char **argv)
 	
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
-	if (!parse_options(argc, argv))
-		return 1;
+	if (!parse_options(argc, argv)) {
+		printf("Failed to parse command line options\n");
+		exit(1);
+	}
 
 	utils_set_locale();
 
 	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
-	if (!vol)
-		return 1;
+	if (!vol) {
+		printf("Failed to open '%s': %s\n", opts.device, strerror(errno));
+		exit(1);
+	}
 
 	/*
 	 * if opts.mft is not 0, then we will print out information about
