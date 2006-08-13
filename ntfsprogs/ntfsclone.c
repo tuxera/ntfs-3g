@@ -717,6 +717,7 @@ static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
 	s64 timestamp = utc2ntfs(0);
 
+	/* FIXME: can fall into infinite loop if corrupted */
 	while (!(e->flags & INDEX_ENTRY_END)) {
 
 		e->key.file_name.creation_time = timestamp;
@@ -743,7 +744,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	indexr = ntfs_index_root_get(ni, attr);
 	if (!indexr) {
-		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
+		perr_printf("Failed to read $INDEX_ROOT attribute");
 		return;
 	}
 
@@ -755,22 +756,22 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
-		ntfs_log_perror("Failed to read $BITMAP attribute");
+		perr_printf("Failed to read $BITMAP attribute");
 		goto out_indexr;
 	}
 
 	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, name_len);
 	if (!na) {
-		ntfs_log_perror("Failed to open $INDEX_ALLOCATION attribute");
+		perr_printf("Failed to open $INDEX_ALLOCATION attribute");
 		goto out_bitmap;
 	}
 	tmp_indexa = indexa = malloc(na->data_size);
 	if (!tmp_indexa) {
-		ntfs_log_perror("malloc failed");
+		perr_printf("malloc failed");
 		goto out_na;
 	}
 	if (ntfs_attr_pread(na, 0, na->data_size, indexa) != na->data_size) {
-		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
+		perr_printf("Failed to read $INDEX_ALLOCATION attribute");
 		goto out_indexa;
 	}
 
@@ -779,7 +780,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		if (*byte & (1 << bit)) {					   
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)tmp_indexa,
 						indexr->index_block_size)) {
-				ntfs_log_perror("Damaged INDX record");
+				perr_printf("Damaged INDX record");
 				goto out_indexa;
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_indexa + le32_to_cpu(
@@ -792,7 +793,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)tmp_indexa,
 						indexr->index_block_size)) {
-				ntfs_log_perror("INDX write fixup failed");
+				perr_printf("INDX write fixup failed");
 				goto out_indexa;
 			}
 		}
@@ -806,7 +807,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	}
 	
 	if (ntfs_rl_pwrite(vol, na->rl, 0, na->data_size, indexa) != na->data_size)
-		ntfs_log_perror("ntfs_rl_pwrite failed");
+		perr_printf("ntfs_rl_pwrite failed");
 out_indexa:
 	free(indexa);
 out_na:
