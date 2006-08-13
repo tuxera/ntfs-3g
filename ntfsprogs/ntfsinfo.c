@@ -78,6 +78,7 @@
 #include "dir.h"
 #include "ntfstime.h"
 #include "version.h"
+#include "support.h"
 
 static const char *EXEC_NAME = "ntfsinfo";
 
@@ -630,11 +631,10 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 		ntfs_log_perror("ntfs_get_attribute_value_length failed");
 		return;
 	}
-	value = malloc(l);
-	if (!value) {
-		ntfs_log_perror("malloc failed");
+	value = ntfs_malloc(l);
+	if (!value)
 		return;
-	}
+	
 	l = ntfs_get_attribute_value(vol, attr, value);
 	if (!l) {
 		ntfs_log_perror("ntfs_get_attribute_value failed");
@@ -949,9 +949,8 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 			s64 data_size, bytes_read;
 
 			data_size = sle64_to_cpu(attr->data_size);
-			sec_desc_attr = malloc(data_size);
+			sec_desc_attr = ntfs_malloc(data_size);
 			if (!sec_desc_attr) {
-				ntfs_log_perror("malloc failed");
 				free(rl);
 				return;
 			}
@@ -1737,9 +1736,8 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		if (rl) {
 			s64 bytes_read;
 
-			buf = malloc(data_size);
+			buf = ntfs_malloc(data_size);
 			if (!buf) {
-				ntfs_log_perror("malloc failed");
 				free(rl);
 				return;
 			}
