@@ -1203,8 +1203,9 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		a->length += l;
 	}
 
-	if (!(mp = calloc(1, mp_size)))
-		perr_exit("Couldn't get memory");
+	mp = ntfs_calloc(mp_size);
+	if (!mp)
+		perr_exit("ntfsc_calloc couldn't get memory");
 
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0, NULL))
 		perr_exit("ntfs_mapping_pairs_build");
@@ -1468,8 +1469,9 @@ static void rl_split_run(runlist **rl, int run, s64 pos)
 	size_head = run * sizeof(runlist_element);
 	size_tail = (items - run - 1) * sizeof(runlist_element);
 
-	if (!(rl_new = (runlist *)malloc(new_size)))
-		perr_exit("malloc");
+	rl_new = ntfs_malloc(new_size);
+	if (!rl_new)
+		perr_exit("ntfs_malloc");
 
 	rle_new = rl_new + run;
 	rle = *rl + run;
@@ -1719,9 +1721,9 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	progress_init(&resize->progress, 0, resize->relocations, resize->progress.flags);
 	resize->relocations = 0;
 
-	resize->mrec = (MFT_RECORD *)malloc(resize->vol->mft_record_size);
+	resize->mrec = ntfs_malloc(resize->vol->mft_record_size);
 	if (!resize->mrec)
-		perr_exit("malloc failed");
+		perr_exit("ntfs_malloc failed");
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
@@ -2119,7 +2121,8 @@ static int setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
 	/* Determine lcn bitmap byte size and allocate it. */
 	bm->size = rounded_up_division(nr_clusters, 8);
 
-	if (!(bm->bm = (unsigned char *)calloc(1, bm->size)))
+	bm->bm = ntfs_calloc(bm->size);
+	if (!bm->bm)
 		return -1;
 
 	bitmap_file_data_fixup(nr_clusters, bm);

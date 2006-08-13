@@ -421,7 +421,7 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 	FILE_NAME_ATTR *attr;
 	int name_space;
 	MFT_REF parent = FILE_root;
-	char *names[max_path + 1];// XXX malloc? and make max bigger?
+	char *names[max_path + 1];// XXX ntfs_malloc? and make max bigger?
 	int i, len, offset = 0;
 
 	if (!inode || !buffer) {
@@ -465,7 +465,7 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 			    &names[i], 0) < 0) {
 				char *temp;
 				ntfs_log_error("Couldn't translate filename to current locale.\n");
-				temp = malloc(30);
+				temp = ntfs_malloc(30);
 				if (!temp)
 					return 0;
 				snprintf(temp, 30, "<MFT%llu>", (unsigned
@@ -965,10 +965,9 @@ int mft_next_record(struct mft_search_ctx *ctx)
 
 			ctx->inode->mft_no = ctx->mft_num;
 			ctx->inode->vol    = ctx->vol;
-			ctx->inode->mrec   = malloc(ctx->vol->mft_record_size);
+			ctx->inode->mrec   = ntfs_malloc(ctx->vol->mft_record_size);
 			if (!ctx->inode->mrec) {
 				free(ctx->inode); // == ntfs_inode_close
-				ntfs_log_error("Out of memory.  Aborting.\n");
 				return -1;
 			}
 
