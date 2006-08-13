@@ -1671,7 +1671,7 @@ int main(int argc, char **argv)
 				flags |= O_EXCL;
 		}
 
-		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1)
+		if ((fd_out = open(opt.output, flags, S_IRUSR | S_IWUSR)) == -1)
 			perr_exit("Opening file '%s' failed", opt.output);
 
 		if (!opt.save_image)
