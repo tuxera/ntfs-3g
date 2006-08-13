@@ -463,6 +463,10 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, u32 flags)
 		printf(" SYSTEM");
 		flags &= ~FILE_ATTR_SYSTEM;
 	}
+	if (flags & FILE_ATTR_DIRECTORY) {
+		printf(" DIRECTORY");
+		flags &= ~FILE_ATTR_DIRECTORY;
+	}
 	if (flags & FILE_ATTR_ARCHIVE) {
 		printf(" ARCHIVE");
 		flags &= ~FILE_ATTR_ARCHIVE;
