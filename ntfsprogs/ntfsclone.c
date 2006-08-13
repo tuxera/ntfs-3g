@@ -745,7 +745,8 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	indexr = ntfs_index_root_get(ni, attr);
 	if (!indexr) {
-		perr_printf("Failed to read $INDEX_ROOT attribute");
+		perr_printf("Failed to read $INDEX_ROOT attribute of inode "
+			    "%lld", ni->mft_no);
 		return;
 	}
 
@@ -807,7 +808,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	}
 	
 	if (ntfs_rl_pwrite(vol, na->rl, 0, na->data_size, indexa) != na->data_size)
-		perr_printf("ntfs_rl_pwrite failed");
+		perr_printf("ntfs_rl_pwrite failed for inode %lld", ni->mft_no);
 out_indexa:
 	free(indexa);
 out_na:
