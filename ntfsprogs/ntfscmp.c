@@ -18,7 +18,9 @@
 #include <getopt.h>
 
 #include "utils.h"
+#include "mst.h"
 #include "version.h"
+#include "support.h"
 
 static const char *EXEC_NAME = "ntfscmp";
 
@@ -464,6 +466,118 @@ static void print_ctx(ntfs_attr_search_ctx *ctx)
 	free_name(&name);
 }
 
+static void print_differ(ntfs_attr *na)
+{
+	print_na(na);
+	printf("content:   DIFFER\n");
+}
+
+static int cmp_buffer(u8 *buf1, u8 *buf2, long long int size, ntfs_attr *na)
+{
+	if (memcmp(buf1, buf2, size)) {
+		print_differ(na);
+		return -1;
+	}
+	return 0;
+}
+
+struct cmp_ia {
+	INDEX_ALLOCATION *ia;
+	INDEX_ALLOCATION *tmp_ia;
+	u8 *bitmap;
+	u8 *byte;
+	s64 bm_size;
+};
+
+static int setup_cmp_ia(ntfs_attr *na, struct cmp_ia *cia)
+{
+	cia->bitmap = ntfs_attr_readall(na->ni, AT_BITMAP, na->name,
+					na->name_len, &cia->bm_size);
+	if (!cia->bitmap) {
+		perr_println("Failed to readall BITMAP");
+		return -1;
+	}
+	cia->byte = cia->bitmap; 
+
+	cia->tmp_ia = cia->ia = ntfs_malloc(na->data_size);
+	if (!cia->tmp_ia)
+		goto free_bm;
+
+	if (ntfs_attr_pread(na, 0, na->data_size, cia->ia) != na->data_size) {
+		perr_println("Failed to pread INDEX_ALLOCATION");
+		goto free_ia;
+	}
+	
+	return 0;
+free_ia:
+	free(cia->ia);
+free_bm:
+	free(cia->bitmap);
+	return -1;
+}
+
+static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
+{
+	struct cmp_ia cia1, cia2;
+	int bit, ret1, ret2;
+	u32 ib_size;
+	
+	if (setup_cmp_ia(na1, &cia1))
+		return;
+	if (setup_cmp_ia(na2, &cia2))
+		return;
+	/* 
+	 *  FIXME: ia can be the same even if the bitmap sizes are different.
+	 */
+	if (cia1.bm_size != cia1.bm_size)
+		goto out;
+	
+	if (cmp_buffer(cia1.bitmap, cia2.bitmap, cia1.bm_size, na1))
+		goto out;
+	
+	if (cmp_buffer((u8 *)cia1.ia, (u8 *)cia2.ia, 0x18, na1))
+		goto out;
+
+	ib_size = cia1.ia->index.allocated_size + 0x18;
+	
+	bit = 0;
+	while ((u8 *)cia1.tmp_ia < (u8 *)cia1.ia + na1->data_size) {
+		if (*cia1.byte & (1 << bit)) {					   
+			ret1 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia1.tmp_ia,
+							ib_size);
+			ret2 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia2.tmp_ia,
+							ib_size);
+			if (ret1 != ret2) {
+				print_differ(na1);
+				goto out;
+			}
+			
+			if (ret1 == -1)
+				continue;
+		
+			if (cmp_buffer(((u8 *)cia1.tmp_ia) + 0x18, 
+				       ((u8 *)cia2.tmp_ia) + 0x18,
+				       cia1.ia->index.index_length, na1))
+				goto out;
+		}
+		
+		cia1.tmp_ia = (INDEX_ALLOCATION *)((u8 *)cia1.tmp_ia + ib_size);
+		cia2.tmp_ia = (INDEX_ALLOCATION *)((u8 *)cia2.tmp_ia + ib_size);
+		
+		bit++;
+		if (bit > 7) {
+			bit = 0;
+			cia1.byte++;
+		}
+	}
+out:
+	free(cia1.ia);
+	free(cia2.ia);
+	free(cia1.bitmap);
+	free(cia2.bitmap);
+	return;
+}
+
 static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 {
 	s64 pos;
@@ -502,15 +616,9 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			printf("%lld  !=  %lld\n", pos + count1, na1->data_size);
 			exit(1);
 		}
-
-		if (memcmp(buf1, buf2, count1)) {
-			print_na(na1);
-			printf("content");
-			if (opt.verbose)
-				printf(" (len = %lld)", count1);
-			printf(":   DIFFER\n");
+		
+		if (cmp_buffer(buf1, buf2, count1, na1))
 			return;
-		}
 	}
 
 	err_printf("%s read overrun: ", __FUNCTION__);
@@ -575,7 +683,10 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 		return;
 	}
 
-	cmp_attribute_data(na1, na2);
+	if (na1->type == AT_INDEX_ALLOCATION)
+		cmp_index_allocation(na1, na2);
+	else
+		cmp_attribute_data(na1, na2);
 
 close_attribs:
 	ntfs_attr_close(na1);
