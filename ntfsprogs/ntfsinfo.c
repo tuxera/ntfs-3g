@@ -1413,8 +1413,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 
 		if (entry->flags & INDEX_ENTRY_NODE)
 			ntfs_log_verbose("\t\tSubnode VCN:\t\t 0x%llx\n",
-				sle64_to_cpu(*(VCN*)((u8*)entry +
-				le16_to_cpu(entry->length) - sizeof(VCN))));
+					 ntfs_ie_get_vcn(entry);
 		if (entry->flags & INDEX_ENTRY_END)
 			break;
 
