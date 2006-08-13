@@ -1471,6 +1471,19 @@ static void ntfs_dump_index_attr_type(INDEX_ATTR_TYPE type)
 	printf("\n");
 }
 
+static void ntfs_dump_index_header(const char *indent, INDEX_HEADER *idx)
+{
+	printf("%sEntries Offset:\t\t %u\n", indent,
+		(unsigned int)le32_to_cpu(idx->entries_offset));
+	printf("%sIndex Size:\t\t %u\n", indent,
+		(unsigned int)le32_to_cpu(idx->index_length));
+	printf("%sAllocated Size:\t\t %u\n", indent,
+		(unsigned int)le32_to_cpu(idx->allocated_size));
+	printf("%sIndex header flags:\t 0x%02x\n", indent, idx->flags);
+	
+	/* FIXME: there are 3 reserved bytes here */
+}
+
 /**
  * ntfs_dump_attr_index_root()
  *
@@ -1501,14 +1514,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 	printf("\tClusters Per Block:\t %u\n",
 		index_root->clusters_per_index_block);
 
-	/* index header starts here */
-	printf("\tAllocated Size:\t\t %u\n",
-		(unsigned int)le32_to_cpu(index_root->index.allocated_size));
-	printf("\tUsed Size:\t\t %u\n",
-		(unsigned int)le32_to_cpu(index_root->index.index_length));
-
-	/* the flags are 8bit long, no need for byte-order handling */
-	printf("\tIndex header flags:\t 0x%02x\n",index_root->index.flags);
+	ntfs_dump_index_header("\t", &index_root->index);
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
@@ -1582,15 +1588,10 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_alloc + le32_to_cpu(
 				tmp_alloc->index.entries_offset) + 0x18);
-			ntfs_log_verbose("\tDumping index block (VCN 0x%llx, "
-					"used %u/%u, flags 0x%02x):\n",
-					le64_to_cpu(tmp_alloc->index_block_vcn),
-					(unsigned int)le32_to_cpu(tmp_alloc->
-					index.index_length), (unsigned int)
-					le32_to_cpu(tmp_alloc->index.
-					allocated_size),
-					tmp_alloc->index.flags);
+			ntfs_log_verbose("\tDumping index block (VCN %lld):\n",
+				      le64_to_cpu(tmp_alloc->index_block_vcn));
 			if (opts.verbose) {
+				ntfs_dump_index_header("\t\t", &tmp_alloc->index);
 				ntfs_dump_usa_lsn("\t\t", 
 						  (MFT_RECORD *)tmp_alloc);
 				printf("\n");
