@@ -603,6 +603,15 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 			(unsigned int)value_length);
 	}
 }
+	
+static void ntfs_dump_bytes(u8 *buf, int start, int stop)
+{
+	int i;
+
+	for (i = start; i < stop; i++) {
+		printf("%02x ", buf[i]);
+	}
+}
 
 /**
  * ntfs_dump_attr_list()
@@ -663,6 +672,10 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 				ntfs_log_perror("ntfs_ucstombs failed");
 		} else
 			printf("unnamed\n");
+		printf("\t\tPadding:\t");
+		ntfs_dump_bytes((u8 *)entry, entry->name_offset + 
+				2 * entry->name_length, entry->length);
+		printf("\n");
 	}
 	free(value);
 	printf("\tEnd of attribute list reached.\n");
