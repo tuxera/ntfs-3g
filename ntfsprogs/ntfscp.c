@@ -1,7 +1,7 @@
 /**
  * ntfscp - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
  *
  * This utility will overwrite files on NTFS volume.
@@ -81,7 +81,7 @@ static void version(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS "
 		"volume.\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
-	ntfs_log_info("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2004-2006 Yura Pakhuchiy\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -355,37 +355,18 @@ int main(int argc, char *argv[])
 		ntfs_log_perror("ERROR: Couldn't open destination file");
 		goto close_src;
 	}
-	if ((le16_to_cpu(out->mrec->flags) & MFT_RECORD_IS_DIRECTORY) &&
-			!opts.inode){
-		/*
+	if ((out->mrec->flags & MFT_RECORD_IS_DIRECTORY) && !opts.inode) {
+		/* 
 		 * @out is directory and it was specified by pathname, add
-		 * filename to path and reopen inode.
+		 * filename to path and try once again.
 		 */
-		char *filename, *new_dest_file;
+		char *filename;
+		ntfs_inode *out_tmp;
 
-		/*
-		 * FIXME: There should exist more beautiful way to get filename.
-		 * Not sure that it will work in windows, but I don't think that
-		 * someone will use ntfscp under windows.
-		 */
-		filename = strrchr(opts.src_file, '/');
-		if (filename)
-			filename++;
-		else
-			filename = opts.src_file;
-		/* Add 2 bytes for '/' and null-terminator. */
-		new_dest_file = malloc(strlen(opts.dest_file) +
-				strlen(filename) + 2);
-		if (!new_dest_file) {
-			ntfs_log_perror("ERROR: malloc() failed");
-			goto close_dst;
-		}
-		strcpy(new_dest_file, opts.dest_file);
-		strcat(new_dest_file, "/");
-		strcat(new_dest_file, filename);
+		filename = basename(opts.src_file);
+		out_tmp = ntfs_pathname_to_inode(vol, out, filename);
 		ntfs_inode_close(out);
-		out = ntfs_pathname_to_inode(vol, NULL, new_dest_file);
-		free(new_dest_file);
+		out = out_tmp;
 		if (!out) {
 			ntfs_log_perror("ERROR: Failed to open destination "
 					"file");
