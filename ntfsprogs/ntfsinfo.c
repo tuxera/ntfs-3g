@@ -6,7 +6,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Yuval Fledel
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2006 Yura Pakhuchiy
  * Copyright (c)      2005 Cristian Klein
  *
  * This utility will dump a file's attributes.
@@ -113,7 +113,7 @@ static void version(void)
 	printf("    2003-2006 Szabolcs Szakacsits\n");
 	printf("    2003      Leonard Norrgård\n");
 	printf("    2004-2005 Yuval Fledel\n");
-	printf("    2004-2005 Yura Pakhuchiy\n");
+	printf("    2004-2006 Yura Pakhuchiy\n");
 	printf("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -678,7 +678,8 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 			printf("unnamed\n");
 		printf("\t\tPadding:\t");
 		ntfs_dump_bytes((u8 *)entry, entry->name_offset + 
-				2 * entry->name_length, entry->length);
+				sizeof(ntfschar) * entry->name_length,
+				le16_to_cpu(entry->length));
 		printf("\n");
 	}
 	free(value);
@@ -831,7 +832,10 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 
 	printf("%sRevision\t %u\n", prefix, acl->revision);
 
-	/* don't recalc le16_to_cpu every iteration (minor speedup on big-endians */
+	/* 
+	 * Do not recalculate le16_to_cpu every iteration (minor speedup on
+	 * big-endian machines.
+	 */
 	ace_count = le16_to_cpu(acl->ace_count);
 
 	/* initialize 'ace' to the first ace (if any) */
@@ -859,7 +863,7 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 		}
 
 		printf("%sACE:\t\t type:%s  flags:0x%x  access:0x%x\n", prefix,
-			ace_type, (unsigned int)le16_to_cpu(ace->flags),
+			ace_type, (unsigned int)ace->flags,
 			(unsigned int)le32_to_cpu(ace->mask));
 		/* get a SID string */
 		sid = ntfs_sid_to_mbs(&ace->sid, NULL, 0);
@@ -867,7 +871,8 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 		free(sid);
 
 		/* proceed to next ACE */
-		ace = (ACCESS_ALLOWED_ACE *)(((char *)ace) + le32_to_cpu(ace->size));
+		ace = (ACCESS_ALLOWED_ACE *)(((char *)ace) +
+				le32_to_cpu(ace->size));
 	}
 }
 
@@ -880,7 +885,8 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 	printf("%s\tRevision:\t\t %u\n", indent, sec_desc->revision);
 
 	/* TODO: parse the flags */
-	printf("%s\tControl:\t\t 0x%04x\n", indent, sec_desc->control);
+	printf("%s\tControl:\t\t 0x%04x\n", indent,
+			le16_to_cpu(sec_desc->control));
 
 	if (~sec_desc->control & SE_SELF_RELATIVE) {
 		
@@ -1153,12 +1159,13 @@ static const char *get_attribute_type_name(u32 type)
 static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 {
 	printf("Dumping attribute %s (%#02x)\n", 
-	       get_attribute_type_name(a->type), a->type);
+	       get_attribute_type_name(a->type), le32_to_cpu(a->type));
 
 	ntfs_log_verbose("\tAttribute length:\t %u\n", le32_to_cpu(a->length));
 	printf("\tResident: \t\t %s\n", a->non_resident ? "No" : "Yes");
 	ntfs_log_verbose("\tName length:\t\t %u\n", a->name_length);
-	ntfs_log_verbose("\tName offset:\t\t %u\n", le16_to_cpu(a->name_offset));
+	ntfs_log_verbose("\tName offset:\t\t %u\n",
+			le16_to_cpu(a->name_offset));
 
 	/* Dump the attribute (stream) name */
 	if (a->name_length) {
@@ -1573,7 +1580,7 @@ static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
 	printf("%sUpd. Seq. Array Count:\t %hu\n", indent,
 	       le16_to_cpu(mrec->usa_count));
 	printf("%sUpd. Seq. Number:\t %hu\n", indent,
-	       *(u16 *)((u8 *)mrec + le16_to_cpu(mrec->usa_ofs)));
+	       le16_to_cpup((u16 *)((u8 *)mrec + le16_to_cpu(mrec->usa_ofs))));
 	printf("%sLogFile Seq. Number:\t 0x%llx\n", indent,
 	       (long long int)sle64_to_cpu(mrec->lsn));
 }
@@ -1654,7 +1661,8 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			int entries;
 			
 			entries = ntfs_dump_index_block(tmp_alloc, type,
-							ir->index_block_size);
+							le32_to_cpu(
+							ir->index_block_size));
 	       		if (entries != -1) {
 				total_entries += entries;
 				total_indx_blocks++;
@@ -1662,7 +1670,8 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 			}
 		}
 		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
-						 ir->index_block_size);
+						le32_to_cpu(
+						ir->index_block_size));
 		bit++;
 		if (bit > 7) {
 			bit = 0;

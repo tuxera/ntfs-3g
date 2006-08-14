@@ -38,6 +38,7 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsinfo: dump the FILE_ATTR_DIRECTORY flag.  (Szaka)
 	- ntfsinfo: dump padding between the Update Sequence Array and the
 	  first attribute in verbose mode.  (Szaka)
+	- ntfsinfo: Fix endianness.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
