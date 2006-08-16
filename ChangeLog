@@ -39,6 +39,10 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsinfo: dump padding between the Update Sequence Array and the
 	  first attribute in verbose mode.  (Szaka)
 	- ntfsinfo: Fix endianness.  (Yura)
+	- ntfsinfo: Make more resilient to corrupt index entries in an index
+	  node.  (Anton)
+	- ntfsinfo: Print in both decimal and hexadecimal where it makes sense
+	  and is useful.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
