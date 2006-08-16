@@ -1443,6 +1443,10 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 			ntfs_dump_index_data(entry, type);
 			break;
 		}
+		if (!entry->length) {
+			ntfs_log_verbose("\tWARNING: Corrupt index entry, skipping this index block.\n");
+			break;
+		}
 		entry = (INDEX_ENTRY *)((u8 *)entry +
 						le16_to_cpu(entry->length));
 		numb_entries++;
