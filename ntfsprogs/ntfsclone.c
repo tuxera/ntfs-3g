@@ -611,10 +611,12 @@ static void lseek_to_cluster(s64 lcn)
 static void image_skip_clusters(s64 count)
 {
 	if (opt.save_image && count > 0) {
+		typeof(count) count_buf;
 		char buff[1 + sizeof(count)];
 
 		buff[0] = 0;
-		memcpy(buff + 1, &count, sizeof(count));
+		count_buf = cpu_to_sle64(count);
+		memcpy(buff + 1, &count_buf, sizeof(count_buf));
 
 		if (write_all(&fd_out, buff, sizeof(buff)) == -1)
 			perr_exit("write_all");
@@ -721,12 +723,13 @@ static void restore_image(void)
 		if (cmd == 0) {
 			if (read_all(&fd_in, &count, sizeof(count)) == -1)
 				perr_exit("read_all");
+			count = sle64_to_cpu(count);
 			if (opt.std_out)
 				write_empty_clusters(csize, count,
 						     &progress, &p_counter);
 			else {
-				if (lseek(fd_out, count * csize, SEEK_CUR)
-				    == (off_t)-1)
+				if (lseek(fd_out, count * csize, SEEK_CUR) ==
+						(off_t)-1)
 					perr_exit("restore_image: lseek");
 			}
 			pos += count;
@@ -809,7 +812,8 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	while ((u8 *)tmp_indexa < (u8 *)indexa + na->data_size) {
 		if (*byte & (1 << bit)) {					   
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)tmp_indexa,
-						indexr->index_block_size)) {
+					le32_to_cpu(
+					indexr->index_block_size))) {
 				perr_printf("Damaged INDX record");
 				goto out_indexa;
 			}
@@ -822,13 +826,14 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 				perr_exit("ntfs_mft_usn_dec");
 
 			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)tmp_indexa,
-						indexr->index_block_size)) {
+					le32_to_cpu(
+					indexr->index_block_size))) {
 				perr_printf("INDX write fixup failed");
 				goto out_indexa;
 			}
 		}
 		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa + 
-						 indexr->index_block_size);
+				le32_to_cpu(indexr->index_block_size));
 		bit++;
 		if (bit > 7) {
 			bit = 0;
@@ -877,7 +882,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 			QUOTA_CONTROL_ENTRY *quota_q;
 
 			quota_q = (QUOTA_CONTROL_ENTRY *)((u8 *)entry +
-							  entry->data_offset);
+					le16_to_cpu(entry->data_offset));
 			/*
 			 *  FIXME: no guarantee it's indeed /$Extend/$Quota:$Q.
 			 *  For now, as a minimal safeguard, we check only for
@@ -896,7 +901,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 #define WIPE_TIMESTAMPS(atype, attr, timestamp)			\
 do {								\
 	atype *ats;						\
-	ats = (atype *)((char *)(attr) + (attr)->value_offset);	\
+	ats = (atype *)((char *)(attr) + le16_to_cpu((attr)->value_offset)); \
 								\
 	ats->creation_time = (timestamp);	       		\
 	ats->last_data_change_time = (timestamp);		\
