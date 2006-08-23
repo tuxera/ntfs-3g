@@ -47,6 +47,7 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsclone: Redefine image format version number to be the image
 	  format version and not the NTFS version of the imaged volume which is
 	  totally useless.  (Anton)
+	- ntfsclone: Make ntfsclone image format extensible.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

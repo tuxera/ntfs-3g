@@ -166,6 +166,10 @@ unsigned int wiped_timestamp_data  = 0;
  * stupidly used the volume version as the image version...  )-:  I hope NTFS
  * never reaches version 10.0 and if it does one day I hope no-one is using
  * such an old ntfsclone by then...
+ *
+ * NOTE: Only bump the minor version if the image format and header are still
+ * backwards compatible.  Otherwise always bump the major version.  If in
+ * doubt, bump the major version.
  */
 #define NTFSCLONE_IMG_VER_MAJOR	10
 #define NTFSCLONE_IMG_VER_MINOR	0
@@ -179,7 +183,11 @@ struct {
 	s64 device_size;
 	s64 nr_clusters;
 	s64 inuse;
+	u32 offset_to_image_data;	/* From start of image_hdr. */
 } __attribute__((__packed__)) image_hdr;
+
+#define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
+		(offsetof(typeof(image_hdr), offset_to_image_data))
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -650,7 +658,8 @@ static void clone_ntfs(u64 nr_clusters)
 	progress_init(&progress, p_counter, nr_clusters, 100);
 
 	if (opt.save_image) {
-		if (write_all(&fd_out, &image_hdr, sizeof(image_hdr)) == -1)
+		if (write_all(&fd_out, &image_hdr,
+				image_hdr.offset_to_image_data) == -1)
 			perr_exit("write_all");
 	}
 
@@ -1296,14 +1305,15 @@ static void print_volume_size(const char *str, s64 bytes)
 }
 
 
-static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
+static void print_disk_usage(char *spacer, u32 cluster_size, s64 nr_clusters,
+		s64 inuse)
 {
 	s64 total, used;
 
 	total = nr_clusters * cluster_size;
 	used = inuse * cluster_size;
 
-	Printf("Space in use       : %lld MB (%.1f%%)   ",
+	Printf("Space in use       %s: %lld MB (%.1f%%)   ", spacer,
 			(long long)rounded_up_division(used, NTFS_MBYTE),
 			100.0 * ((float)used / total));
 
@@ -1312,18 +1322,21 @@ static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
 
 static void print_image_info(void)
 {
-	Printf("NTFS volume version: %d.%d\n",
+	Printf("Ntfsclone image version: %d.%d\n",
 			image_hdr.major_ver, image_hdr.minor_ver);
-	Printf("Cluster size       : %u bytes\n",
+	Printf("Cluster size           : %u bytes\n",
 			(unsigned)le32_to_cpu(image_hdr.cluster_size));
-	print_volume_size("Image volume size  ",
+	print_volume_size("Image volume size      ",
 			sle64_to_cpu(image_hdr.nr_clusters) *
 			le32_to_cpu(image_hdr.cluster_size));
-	Printf("Image device size  : %lld bytes\n",
+	Printf("Image device size      : %lld bytes\n",
 			sle64_to_cpu(image_hdr.device_size));
-	print_disk_usage(le32_to_cpu(image_hdr.cluster_size),
+	print_disk_usage("    ", le32_to_cpu(image_hdr.cluster_size),
 			sle64_to_cpu(image_hdr.nr_clusters),
 			sle64_to_cpu(image_hdr.inuse));
+	Printf("Offset to image data   : %u (0x%x) bytes\n",
+			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data),
+			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data));
 }
 
 static void check_if_mounted(const char *device, unsigned long new_mntflag)
@@ -1513,7 +1526,7 @@ static s64 open_image(void)
 		if ((fd_in = open(opt.volume, O_RDONLY)) == -1)
 			perr_exit("failed to open image");
 	}
-	if (read_all(&fd_in, &image_hdr, sizeof(image_hdr)) == -1)
+	if (read_all(&fd_in, &image_hdr, NTFSCLONE_IMG_HEADER_SIZE_OLD) == -1)
 		perr_exit("read_all");
 	if (memcmp(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE) != 0)
 		err_exit("Input file is not an image! (invalid magic)\n");
@@ -1529,6 +1542,41 @@ static s64 open_image(void)
 		image_hdr.device_size = cpu_to_sle64(image_hdr.device_size);
 		image_hdr.nr_clusters = cpu_to_sle64(image_hdr.nr_clusters);
 		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
+		image_hdr.offset_to_image_data =
+				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
+	} else {
+		typeof(image_hdr.offset_to_image_data) offset_to_image_data;
+		int delta;
+
+		if (image_hdr.major_ver > NTFSCLONE_IMG_VER_MAJOR)
+			err_exit("Do not know how to handle image format "
+					"version %d.%d.  Please obtain a "
+					"newer version of ntfsclone.\n",
+					image_hdr.major_ver,
+					image_hdr.minor_ver);
+		/* Read the image header data offset. */
+		if (read_all(&fd_in, &offset_to_image_data,
+				sizeof(offset_to_image_data)) == -1)
+			perr_exit("read_all");
+		image_hdr.offset_to_image_data =
+				le32_to_cpu(offset_to_image_data);
+		/*
+		 * Read any fields from the header that we have not read yet so
+		 * that the input stream is positioned correctly.  This means
+		 * we can support future minor versions that just extend the
+		 * header in a backwards compatible way.
+		 */
+		delta = offset_to_image_data - (NTFSCLONE_IMG_HEADER_SIZE_OLD +
+				sizeof(image_hdr.offset_to_image_data));
+		if (delta > 0) {
+			char *dummy_buf;
+
+			dummy_buf = malloc(delta);
+			if (!dummy_buf)
+				perr_exit("malloc dummy_buffer");
+			if (read_all(&fd_in, dummy_buf, delta) == -1)
+				perr_exit("read_all");
+		}
 	}
 	return sle64_to_cpu(image_hdr.device_size);
 }
@@ -1562,6 +1610,8 @@ static void initialise_image_hdr(s64 device_size, s64 inuse)
 	image_hdr.device_size = cpu_to_sle64(device_size);
 	image_hdr.nr_clusters = cpu_to_sle64(vol->nr_clusters);
 	image_hdr.inuse = cpu_to_sle64(inuse);
+	image_hdr.offset_to_image_data = cpu_to_le32((sizeof(image_hdr) + 7) &
+			~7);
 }
 
 static void check_output_device(s64 input_size)
@@ -1741,7 +1791,7 @@ int main(int argc, char **argv)
 
 	walk_clusters(vol, &backup_clusters);
 	compare_bitmaps(&lcn_bitmap);
-	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
+	print_disk_usage("", vol->cluster_size, vol->nr_clusters, image.inuse);
 
 	check_dest_free_space(vol->cluster_size * image.inuse);
 
