@@ -154,6 +154,8 @@ unsigned int wiped_unused_mft      = 0;
 unsigned int wiped_resident_data   = 0;
 unsigned int wiped_timestamp_data  = 0;
 
+static BOOL image_is_host_endian = FALSE;
+
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
 
@@ -723,7 +725,8 @@ static void restore_image(void)
 		if (cmd == 0) {
 			if (read_all(&fd_in, &count, sizeof(count)) == -1)
 				perr_exit("read_all");
-			count = sle64_to_cpu(count);
+			if (!image_is_host_endian)
+				count = sle64_to_cpu(count);
 			if (opt.std_out)
 				write_empty_clusters(csize, count,
 						     &progress, &p_counter);
@@ -1549,6 +1552,7 @@ static s64 open_image(void)
 		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
 		image_hdr.offset_to_image_data =
 				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
+		image_is_host_endian = TRUE;
 	} else {
 		typeof(image_hdr.offset_to_image_data) offset_to_image_data;
 		int delta;
