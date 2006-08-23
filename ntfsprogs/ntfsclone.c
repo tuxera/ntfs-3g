@@ -2,7 +2,7 @@
  * ntfsclone - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
- * Copyright (c) 2004-2005 Anton Altaparmakov
+ * Copyright (c) 2004-2006 Anton Altaparmakov
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -157,6 +157,20 @@ unsigned int wiped_timestamp_data  = 0;
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
 
+/* This is the first endianness safe format version. */
+#define NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE	10
+#define NTFSCLONE_IMG_VER_MINOR_ENDIANNESS_SAFE	0
+
+/*
+ * Set the version to 10.0 to avoid colisions with old ntfsclone which
+ * stupidly used the volume version as the image version...  )-:  I hope NTFS
+ * never reaches version 10.0 and if it does one day I hope no-one is using
+ * such an old ntfsclone by then...
+ */
+#define NTFSCLONE_IMG_VER_MAJOR	10
+#define NTFSCLONE_IMG_VER_MINOR	0
+
+/* All values are in little endian. */
 struct {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
@@ -527,7 +541,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 	/* vol is NULL if opt.restore_image is set */
-	u32 csize = image_hdr.cluster_size;
+	u32 csize = le32_to_cpu(image_hdr.cluster_size);
 	void *fd = (void *)&fd_in;
 	off_t rescue_pos;
 
@@ -679,7 +693,7 @@ static void write_empty_clusters(s32 csize, s64 count,
 static void restore_image(void)
 {
 	s64 pos = 0, count;
-	s32 csize = image_hdr.cluster_size;
+	s32 csize = le32_to_cpu(image_hdr.cluster_size);
 	char cmd;
 	u64 p_counter = 0;
 	struct progress_bar progress;
@@ -687,9 +701,11 @@ static void restore_image(void)
 	Printf("Restoring NTFS from image ...\n");
 
 	progress_init(&progress, p_counter, opt.std_out ?
-		      image_hdr.nr_clusters : image_hdr.inuse, 100);
+		      sle64_to_cpu(image_hdr.nr_clusters) :
+		      sle64_to_cpu(image_hdr.inuse),
+		      100);
 
-	while (pos < image_hdr.nr_clusters) {
+	while (pos < sle64_to_cpu(image_hdr.nr_clusters)) {
 		if (read_all(&fd_in, &cmd, sizeof(cmd)) == -1)
 			perr_exit("read_all");
 
@@ -1297,15 +1313,17 @@ static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
 static void print_image_info(void)
 {
 	Printf("NTFS volume version: %d.%d\n",
-	       image_hdr.major_ver, image_hdr.minor_ver);
+			image_hdr.major_ver, image_hdr.minor_ver);
 	Printf("Cluster size       : %u bytes\n",
-	       (unsigned int)image_hdr.cluster_size);
+			(unsigned)le32_to_cpu(image_hdr.cluster_size));
 	print_volume_size("Image volume size  ",
-			  image_hdr.nr_clusters * image_hdr.cluster_size);
-	Printf("Image device size  : %lld bytes\n", image_hdr.device_size);
-	print_disk_usage(image_hdr.cluster_size,
-			 image_hdr.nr_clusters,
-			 image_hdr.inuse);
+			sle64_to_cpu(image_hdr.nr_clusters) *
+			le32_to_cpu(image_hdr.cluster_size));
+	Printf("Image device size  : %lld bytes\n",
+			sle64_to_cpu(image_hdr.device_size));
+	print_disk_usage(le32_to_cpu(image_hdr.cluster_size),
+			sle64_to_cpu(image_hdr.nr_clusters),
+			sle64_to_cpu(image_hdr.inuse));
 }
 
 static void check_if_mounted(const char *device, unsigned long new_mntflag)
@@ -1495,14 +1513,24 @@ static s64 open_image(void)
 		if ((fd_in = open(opt.volume, O_RDONLY)) == -1)
 			perr_exit("failed to open image");
 	}
-
 	if (read_all(&fd_in, &image_hdr, sizeof(image_hdr)) == -1)
 		perr_exit("read_all");
-
 	if (memcmp(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE) != 0)
 		err_exit("Input file is not an image! (invalid magic)\n");
-
-	return image_hdr.device_size;
+	if (image_hdr.major_ver < NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE) {
+		Printf("Old image format detected.  Byteswapping on big "
+				"endian architectures.  If the image was "
+				"created on a little endian architecture it "
+				"will not work.  Use a more recent version "
+				"of ntfsclone to recreate the image.\n");
+		image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
+		image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
+		image_hdr.cluster_size = cpu_to_le32(image_hdr.cluster_size);
+		image_hdr.device_size = cpu_to_sle64(image_hdr.device_size);
+		image_hdr.nr_clusters = cpu_to_sle64(image_hdr.nr_clusters);
+		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
+	}
+	return sle64_to_cpu(image_hdr.device_size);
 }
 
 static s64 open_volume(void)
@@ -1528,12 +1556,12 @@ static s64 open_volume(void)
 static void initialise_image_hdr(s64 device_size, s64 inuse)
 {
 	memcpy(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE);
-	image_hdr.major_ver = vol->major_ver;
-	image_hdr.minor_ver = vol->minor_ver;
-	image_hdr.cluster_size = vol->cluster_size;
-	image_hdr.device_size = device_size;
-	image_hdr.nr_clusters = vol->nr_clusters;
-	image_hdr.inuse = inuse;
+	image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
+	image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
+	image_hdr.cluster_size = cpu_to_le32(vol->cluster_size);
+	image_hdr.device_size = cpu_to_sle64(device_size);
+	image_hdr.nr_clusters = cpu_to_sle64(vol->nr_clusters);
+	image_hdr.inuse = cpu_to_sle64(inuse);
 }
 
 static void check_output_device(s64 input_size)
@@ -1672,7 +1700,8 @@ int main(int argc, char **argv)
 
 	if (opt.restore_image) {
 		device_size = open_image();
-		ntfs_size = image_hdr.nr_clusters * image_hdr.cluster_size;
+		ntfs_size = sle64_to_cpu(image_hdr.nr_clusters) *
+				le32_to_cpu(image_hdr.cluster_size);
 	} else {
 		device_size = open_volume();
 		ntfs_size = vol->nr_clusters * vol->cluster_size;
