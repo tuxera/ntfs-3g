@@ -1261,6 +1261,8 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 static int ntfs_ib_split(ntfs_index_context *icx, INDEX_BLOCK *ib);
 
 /**
+ * ntfs_ib_insert - insert an index block to an index context.
+ *
  * On success return STATUS_OK or STATUS_KEEP_SEARCHING.
  * On error return STATUS_ERROR.
  */
@@ -1490,8 +1492,10 @@ out:
 }
 
 /**
- *  Used if an empty index block to be deleted has END entry as the parent
- *  in the INDEX_ROOT which is the only one there.
+ * ntfs_ir_leafify -
+ * 
+ * Used if an empty index block to be deleted has END entry as the parent
+ * in the INDEX_ROOT which is the only one there.
  */
 static void ntfs_ir_leafify(ntfs_index_context *icx, INDEX_HEADER *ih)
 {
@@ -1514,8 +1518,10 @@ static void ntfs_ir_leafify(ntfs_index_context *icx, INDEX_HEADER *ih)
 }
 
 /**
- *  Used if an empty index block to be deleted has END entry as the parent 
- *  in the INDEX_ROOT which is not the only one there.
+ * ntfs_ih_reparent_end -
+ *
+ * Used if an empty index block to be deleted has END entry as the parent 
+ * in the INDEX_ROOT which is not the only one there.
  */
 static int ntfs_ih_reparent_end(ntfs_index_context *icx, INDEX_HEADER *ih,
 				INDEX_BLOCK *ib)

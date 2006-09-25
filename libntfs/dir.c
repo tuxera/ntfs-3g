@@ -600,8 +600,7 @@ static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
 				   const_cpu_to_le16('\0') };
 
 /*
- * union index_union -
- * More helpers for ntfs_readdir().
+ * union index_union - Helper for ntfs_readdir().
  */
 typedef union {
 	INDEX_ROOT *ir;
@@ -609,8 +608,7 @@ typedef union {
 } index_union __attribute__((__transparent_union__));
 
 /**
- * enum INDEX_TYPE -
- * More helpers for ntfs_readdir().
+ * enum INDEX_TYPE - Helper for ntfs_readdir().
  */
 typedef enum {
 	INDEX_TYPE_ROOT,	/* index root */
@@ -1446,7 +1444,7 @@ ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 
 /**
  * ntfs_delete - delete file or directory from ntfs volume
- * @ni:		ntfs inode for object to delte
+ * @ni:		ntfs inode for object to delete
  * @dir_ni:	ntfs inode for directory in which delete object
  * @name:	unicode name of the object to delete
  * @name_len:	length of the name in unicode characters

@@ -69,8 +69,7 @@ struct ntfs_logging {
 };
 
 /**
- * ntfs_log
- * This struct controls all the logging within the library and tools.
+ * ntfs_log - This struct controls all the logging in the library and tools.
  */
 static struct ntfs_logging ntfs_log = {
 #ifdef DEBUG

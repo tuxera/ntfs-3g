@@ -741,7 +741,7 @@ ntfschar *ntfs_str2ucs(const char *s, int *len)
 
 /**
  * ntfs_ucsfree - free memory allocated by ntfs_str2ucs()
- * @ucs		input string to be freed
+ * @ucs:	input string to be freed
  *
  * Free memory at @ucs and which was allocated by ntfs_str2ucs.
  *

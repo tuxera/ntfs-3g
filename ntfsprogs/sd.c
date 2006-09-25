@@ -202,6 +202,7 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 
 /**
  * init_root_sd_31 (ERSO)
+ *
  * creates the security_descriptor for the root folder on ntfs 3.1.
  * It is very long; lots of ACE's at first, then large pieces of zeroes;
  * the owner user/group is near the end. On a partition created with

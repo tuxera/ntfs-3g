@@ -1189,8 +1189,10 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 }
 
 /**
- * ntfs_cat_decrypt
- * TODO:
+ * ntfs_cat_decrypt - Decrypt the contents of an encrypted file to stdout.
+ * @inode:	An encrypted file's inode structure, as obtained by
+ * 		ntfs_inode_open().
+ * @fek:	A file encryption key. As obtained by ntfs_inode_fek_get().
  */
 static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
 {

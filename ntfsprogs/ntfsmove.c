@@ -746,7 +746,8 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_attribute
+ * move_attribute -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error
@@ -791,7 +792,8 @@ static s64 move_attribute(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_file
+ * move_file -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error

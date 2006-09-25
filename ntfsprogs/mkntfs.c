@@ -585,9 +585,10 @@ static long long mkntfs_write(struct ntfs_device *dev,
 }
 
 /**
- * ntfs_rlwrite - Write to disk the clusters contained in the runlist @rl
- * taking the data from @val.  Take @val_len bytes from @val and pad the
- * rest with zeroes.
+ * ntfs_rlwrite - Write data to disk on clusters found in a runlist.
+ *
+ * Write to disk the clusters contained in the runlist @rl taking the data
+ * from @val.  Take @val_len bytes from @val and pad the rest with zeroes.
  *
  * If the @rl specifies a completely sparse file, @val is allowed to be NULL.
  *
@@ -1478,6 +1479,7 @@ static int mkntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 
 /**
  * insert_positioned_attr_in_mft_record
+ *
  * Create a non-resident attribute with a predefined on disk location
  * specified by the runlist @rl. The clusters specified by @rl are assumed to
  * be allocated already.
