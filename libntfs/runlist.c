@@ -1581,7 +1581,6 @@ err_out:
 int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 {
 	runlist *rl;
-	BOOL is_end = FALSE;
 
 	if (!arl || !*arl) {
 		errno = EINVAL;
@@ -1620,25 +1619,10 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	 */
 	if (rl->length) {
 		++rl;
-		if (!rl->length)
-			is_end = TRUE;
 		rl->vcn = start_vcn;
 		rl->length = 0;
 	}
 	rl->lcn = (LCN)LCN_ENOENT;
-	/**
-	 * Reallocate memory if necessary.
-	 * FIXME: Below code is broken, because runlist allocations must be 
-	 * a multiply of 4096. The code caused crashes and corruptions.
-	 */
-/*	
-	 if (!is_end) {
-		size_t new_size = (rl - *arl + 1) * sizeof(runlist_element);
-		rl = realloc(*arl, new_size);
-		if (rl)
-			*arl = rl;
-	}
-*/
 	return 0;
 }
 
