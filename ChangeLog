@@ -51,6 +51,7 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsclone: Fix endianness problems.  (Anton)
 	- Allow ntfscp to create the destination file if it does not already
 	  exists by calling ntfs_create().  (Hil)
+	- Fix GUID to string conversion.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
