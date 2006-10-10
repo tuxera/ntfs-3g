@@ -43,8 +43,7 @@
 /*
  * The zero GUID.
  */
-static const GUID __zero_guid = { const_cpu_to_le32(0), const_cpu_to_le16(0),
-		const_cpu_to_le16(0), { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static const GUID __zero_guid = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
 const GUID *const zero_guid = &__zero_guid;
 
 /**
@@ -90,13 +89,13 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 		if (!_guid_str)
 			return _guid_str;
 	}
-	res = snprintf(_guid_str, 37,
-			"%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-			(unsigned int)le32_to_cpu(guid->data1),
-			le16_to_cpu(guid->data2), le16_to_cpu(guid->data3),
-			guid->data4[0], guid->data4[1],
-			guid->data4[2], guid->data4[3], guid->data4[4],
-			guid->data4[5], guid->data4[6], guid->data4[7]);
+	res = snprintf(_guid_str, 37, "%02x%02x%02x%02x-%02x%02x-%02x%02x-"
+			"%02x%02x-%02x%02x%02x%02x%02x%02x", guid->raw[0],
+			guid->raw[1], guid->raw[2], guid->raw[3], guid->raw[4],
+			guid->raw[5], guid->raw[6], guid->raw[7], guid->raw[8],
+			guid->raw[9], guid->raw[10], guid->raw[11],
+			guid->raw[12], guid->raw[13], guid->raw[14],
+			guid->raw[15], guid->raw[16]);
 	if (res == 36)
 		return _guid_str;
 	if (!guid_str)

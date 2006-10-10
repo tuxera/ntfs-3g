@@ -1142,16 +1142,24 @@ typedef struct {
  * implementation of the distributed computing environment (DCE) universally
  * unique identifier (UUID).
  *
- * Example of a GUID:
+ * Example of a GUID in string format:
  *	1F010768-5A73-BC91-0010-A52216A7227B
+ * And the same in binary:
+ *	1F0107685A73BC910010A52216A7227B
  */
-typedef struct {
-	u32 data1;	/* The first eight hexadecimal digits of the GUID. */
-	u16 data2;	/* The first group of four hexadecimal digits. */
-	u16 data3;	/* The second group of four hexadecimal digits. */
-	u8 data4[8];	/* The first two bytes are the third group of four
-			   hexadecimal digits. The remaining six bytes are the
-			   final 12 hexadecimal digits. */
+typedef union {
+	struct {
+		u32 data1;	/* The first eight hexadecimal digits of the
+				   GUID. */
+		u16 data2;	/* The first group of four hexadecimal
+				   digits. */
+		u16 data3;	/* The second group of four hexadecimal
+				   digits. */
+		u8 data4[8];	/* The first two bytes are the third group of
+				   four hexadecimal digits.  The remaining six
+				   bytes are the final 12 hexadecimal digits. */
+	};
+	u8 raw[16];		/* Raw binary for ease of access. */
 } __attribute__((__packed__)) GUID;
 
 /**
