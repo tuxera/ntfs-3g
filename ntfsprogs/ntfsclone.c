@@ -116,7 +116,6 @@ struct {
 struct bitmap {
 	s64 size;
 	u8 *bm;
-	u8 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 struct progress_bar {

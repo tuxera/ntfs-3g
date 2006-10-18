@@ -57,7 +57,6 @@ struct progress_bar {
 	int resolution;
 	int flags;
 	float unit;
-	u8 padding[4];		/* Unused: padding to 64 bit. */
 };
 
 /* WARNING: don't modify the text, external tools grep for it */
