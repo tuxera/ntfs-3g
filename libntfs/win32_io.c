@@ -1113,11 +1113,13 @@ static int ntfs_device_win32_close(struct ntfs_device *dev)
 	}
 	rvl = CloseHandle(fd->handle);
 	free(fd);
+	fd = NULL;
 	if (!rvl) {
 		errno = ntfs_w32error_to_errno(GetLastError());
 		ntfs_log_trace("CloseHandle() failed.\n");
 		return -1;
 	}
+	NDevClearOpen(dev);
 	return 0;
 }
 
