@@ -801,11 +801,9 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 				 lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
-
 			u64 k = (u64)lcn + j;
 
 			if (k >= (u64)vol->nr_clusters) {
-
 				long long outsiders = lcn_length - j;
 
 				fsck->outsider += outsiders;
@@ -821,7 +819,7 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
 				if (++fsck->multi_ref <= 10 || opt.verbose)
 					printf("Cluster %lld is referenced "
-					       "multiply times!\n",
+					       "multiple times!\n",
 					       (long long)k);
 				continue;
 			}
