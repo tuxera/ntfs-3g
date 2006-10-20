@@ -1158,7 +1158,7 @@ typedef union {
 		u8 data4[8];	/* The first two bytes are the third group of
 				   four hexadecimal digits.  The remaining six
 				   bytes are the final 12 hexadecimal digits. */
-	};
+	} __attribute__((__packed__));
 	u8 raw[16];		/* Raw binary for ease of access. */
 } __attribute__((__packed__)) GUID;
 
