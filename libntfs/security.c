@@ -43,7 +43,7 @@
 /*
  * The zero GUID.
  */
-static const GUID __zero_guid = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
+static const GUID __zero_guid = { { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } } };
 const GUID *const zero_guid = &__zero_guid;
 
 /**
@@ -95,7 +95,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 			guid->raw[5], guid->raw[6], guid->raw[7], guid->raw[8],
 			guid->raw[9], guid->raw[10], guid->raw[11],
 			guid->raw[12], guid->raw[13], guid->raw[14],
-			guid->raw[15], guid->raw[16]);
+			guid->raw[15]);
 	if (res == 36)
 		return _guid_str;
 	if (!guid_str)
