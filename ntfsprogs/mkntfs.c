@@ -4245,6 +4245,8 @@ static int create_backup_boot_sector(u8 *buff)
 	size = 512;
 	if (size < opts.sector_size)
 		size = opts.sector_size;
+	if (size < opts.cluster_size)
+		size = opts.cluster_size;
 	if (g_vol->dev->d_ops->seek(g_vol->dev, (opts.num_sectors + 1) *
 			opts.sector_size - size, SEEK_SET) == (off_t)-1) {
 		ntfs_log_perror("Seek failed");
