@@ -3834,11 +3834,9 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		ntfs_attr_put_search_ctx(ctx);
 		if (ntfs_inode_free_space(na->ni, offsetof(ATTR_RECORD,
 				non_resident_end) + 8)) {
-			err = errno;
 			ntfs_log_trace("Couldn't free space in the MFT record "
 					"to make attribute list non "
 					"resident.\n");
-			errno = err;
 			return -1;
 		}
 		return ntfs_resident_attr_resize(na, newsize);
