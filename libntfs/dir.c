@@ -1128,10 +1128,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
-		err = errno;
 		ntfs_log_error("Failed to allocate new MFT record: %s.\n",
-				strerror(err));
-		errno = err;
+				strerror(errno));
 		return NULL;
 	}
 	/*

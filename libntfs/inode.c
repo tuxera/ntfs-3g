@@ -971,9 +971,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
-		err = errno;
 		ntfs_log_trace("Failed to get attribute search context.\n");
-		errno = err;
 		return -1;
 	}
 
