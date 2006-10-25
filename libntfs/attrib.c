@@ -1246,7 +1246,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				if (ntfs_cluster_free_from_rl(vol, rlc)) {
 					ntfs_log_trace("Failed to free just "
 						"allocated clusters. Leaving "
-						"inconstant metadata. "
+						"inconsistent metadata. "
 						"Run chkdsk\n");
 				}
 				errno = eo;
@@ -2809,11 +2809,10 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 					lowest_vcn, NULL, 0, ctx)) {
 		err = errno;
 		ntfs_log_trace("Attribute lookup failed. Probably leaving "
-				"inconstant metadata.\n");
+				"inconsistent metadata.\n");
 		ntfs_attr_put_search_ctx(ctx);
 		errno = err;
 		return -1;
-
 	}
 	offset = (u8*)ctx->attr - (u8*)ctx->mrec;
 	ntfs_attr_put_search_ctx(ctx);
@@ -2864,7 +2863,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 		if (NInoAttrList(base_ni) && type != AT_ATTRIBUTE_LIST)
 			if (ntfs_attrlist_entry_add(ni, ctx->attr))
 				ntfs_log_trace("Rollback failed. Leaving "
-						"inconstant metadata.\n");
+						"inconsistent metadata.\n");
 		err = EIO;
 		return -1;
 	}
@@ -3149,7 +3148,8 @@ add_attr_record:
 		ntfs_log_trace("Failed to initialize just added attribute.\n");
 		if (ntfs_attr_rm(na)) {
 			ntfs_log_trace("Failed to remove just added attribute. "
-					"Probably leaving damaged metadata.\n");
+					"Probably leaving inconsistent "
+					"metadata.\n");
 			ntfs_attr_close(na);
 		}
 		goto err_out;
@@ -3170,7 +3170,7 @@ free_err_out:
 			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni)) {
 			ntfs_log_trace("Failed to free MFT record. Leaving "
-					"inconstant metadata.\n");
+					"inconsistent metadata.\n");
 		}
 	}
 err_out:
@@ -3207,7 +3207,7 @@ int ntfs_attr_rm(ntfs_attr *na)
 			return -1;
 		if (ntfs_cluster_free(na->ni->vol, na, 0, -1) < 0) {
 			ntfs_log_trace("Failed to free cluster allocation. "
-					"Leaving inconstant metadata.\n");
+					"Leaving inconsistent metadata.\n");
 			ret = -1;
 		}
 	}
@@ -3220,14 +3220,14 @@ int ntfs_attr_rm(ntfs_attr *na)
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (ntfs_attr_record_rm(ctx)) {
 			ntfs_log_trace("Failed to remove attribute extent. "
-					"Leaving inconstant metadata.\n");
+					"Leaving inconsistent metadata.\n");
 			ret = -1;
 		}
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
 	if (errno != ENOENT) {
 		ntfs_log_trace("Attribute lookup failed. "
-				"Probably leaving inconstant metadata.\n");
+				"Probably leaving inconsistent metadata.\n");
 		ret = -1;
 	}
 
@@ -4067,7 +4067,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 		if (bytes_read >= 0)
 			errno = EIO;
 		ntfs_log_trace("Eeek! Failed to read attribute data. Leaving "
-				"inconstant metadata. Run chkdsk.  "
+				"inconsistent metadata. Run chkdsk.  "
 				"Aborting...\n");
 		return -1;
 	}
@@ -4327,8 +4327,9 @@ retry:
 						na->ni->vol, na->rl);
 				if (new_compr_size == -1) {
 					err = errno;
-					ntfs_log_trace("BUG! Leaving inconstant"
-							" metadata.\n");
+					ntfs_log_trace("BUG! Leaving "
+							"inconsistent "
+							"metadata.\n");
 					goto put_err_out;
 				}
 				na->compressed_size = new_compr_size;
@@ -4646,7 +4647,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		/* Write mapping pairs for new runlist. */
 		if (ntfs_attr_update_mapping_pairs(na, 0 /*first_free_vcn*/)) {
 			ntfs_log_trace("Eeek! Mapping pairs update failed. "
-					"Leaving inconstant metadata. "
+					"Leaving inconsistent metadata. "
 					"Run chkdsk.\n");
 			return -1;
 		}
@@ -4664,7 +4665,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		if (err == ENOENT)
 			err = EIO;
 		ntfs_log_trace("Eeek! Lookup of first attribute extent failed. "
-				"Leaving inconstant metadata.\n");
+				"Leaving inconsistent metadata.\n");
 		goto put_err_out;
 	}
 

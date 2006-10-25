@@ -53,7 +53,8 @@ xx/xx/2006 - x.xx.x - .
 	  exists by calling ntfs_create().  (Hil)
 	- Fix GUID to string conversion.  (Anton)
 	- Fix some byte-order conversion for u32 variables that used le16
-	  conversion macros. (zhanglinbao, Yuval)
+	  conversion macros.  (zhanglinbao, Yuval)
+	- Spelling mistake fixes in debug logging strings.  (Yuval)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

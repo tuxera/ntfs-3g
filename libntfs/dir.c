@@ -1622,13 +1622,15 @@ search:
 			if (!rl) {
 				err = errno;
 				ntfs_log_error("Failed to decompress runlist.  "
-						"Leaving damaged metadata.\n");
+						"Leaving inconsistent "
+						"metadata.\n");
 				continue;
 			}
 			if (ntfs_cluster_free_from_rl(ni->vol, rl)) {
 				err = errno;
 				ntfs_log_error("Failed to free clusters.  "
-						"Leaving damaged metadata.\n");
+						"Leaving inconsistent "
+						"metadata.\n");
 				continue;
 			}
 			free(rl);
