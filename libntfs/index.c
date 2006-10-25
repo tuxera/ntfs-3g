@@ -1145,7 +1145,7 @@ static int ntfs_ir_truncate(ntfs_index_context *icx, int data_size)
 		if (!icx->ir)
 			return STATUS_ERROR;
 	
-		icx->ir->index.allocated_size = cpu_to_le16(data_size);
+		icx->ir->index.allocated_size = cpu_to_le32(data_size);
 
 		ntfs_attr_put_search_ctx(ctx);
 	} else {
@@ -1246,7 +1246,7 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 	
 	ntfs_log_trace("Entering.\n");
 	
-	new_size = le16_to_cpu(icx->ir->index.index_length) + median->length;
+	new_size = le32_to_cpu(icx->ir->index.index_length) + median->length;
 	if (!(median->flags & INDEX_ENTRY_NODE))
 		new_size += sizeof(VCN);
 
@@ -1284,8 +1284,8 @@ static int ntfs_ib_insert(ntfs_index_context *icx, INDEX_ENTRY *ie, VCN new_vcn)
 	if (ntfs_ib_read(icx, old_vcn, ib))
 		goto err_out;
 
-	idx_size       = le16_to_cpu(ib->index.index_length);
-	allocated_size = le16_to_cpu(ib->index.allocated_size);
+	idx_size       = le32_to_cpu(ib->index.index_length);
+	allocated_size = le32_to_cpu(ib->index.allocated_size);
 	/* FIXME: sizeof(VCN) should be included only if ie has no VCN */
 	if (idx_size + ie->length + sizeof(VCN) > allocated_size) {
 		err = ntfs_ib_split(icx, ib);
@@ -1385,8 +1385,8 @@ static int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie)
 		else
 			ih = &icx->ib->index;
 		
-		allocated_size = le16_to_cpu(ih->allocated_size);
-		new_size = le16_to_cpu(ih->index_length) +
+		allocated_size = le32_to_cpu(ih->allocated_size);
+		new_size = le32_to_cpu(ih->index_length) +
 			le16_to_cpu(ie->length);
 	
 		if (new_size <= allocated_size)
