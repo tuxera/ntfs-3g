@@ -515,6 +515,8 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		return NULL;
 	}
 
+	ntfs_log_trace("Path: '%s'\n", pathname);
+
 	if (parent) {
 		ni = parent;
 	} else {
@@ -636,6 +638,8 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 	FILE_NAME_ATTR *fn = &ie->key.file_name;
 	unsigned dt_type;
 
+	ntfs_log_trace("Entering.\n");
+
 	/* Advance the position even if going to skip the entry. */
 	if (index_type == INDEX_TYPE_ALLOCATION)
 		*pos = (u8*)ie - (u8*)iu.ia + (sle64_to_cpu(
@@ -679,6 +683,8 @@ static MFT_REF ntfs_mft_get_parent_ref(ntfs_inode *ni)
 	ntfs_attr_search_ctx *ctx;
 	FILE_NAME_ATTR *fn;
 	int eo;
+
+	ntfs_log_trace("Entering.\n");
 
 	if (!ni) {
 		errno = EINVAL;
@@ -748,6 +754,8 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	int rc, ir_pos, bmp_buf_size, bmp_buf_pos, eo;
 	u32 index_block_size, index_vcn_size;
 	u8 index_block_size_bits, index_vcn_size_bits;
+
+	ntfs_log_trace("Entering.\n");
 
 	if (!dir_ni || !pos || !filldir) {
 		errno = EINVAL;
@@ -1119,6 +1127,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	int err, fn_len, si_len, sd_len;
 
 	ntfs_log_trace("Entering.\n");
+
 	/* Sanity checks. */
 	if (!dir_ni || !name || !name_len) {
 		ntfs_log_error("Invalid arguments.\n");
@@ -1462,6 +1471,7 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	int err = 0;
 
 	ntfs_log_trace("Entering.\n");
+
 	if (!ni || !dir_ni || !name || !name_len) {
 		ntfs_log_error("Invalid arguments.\n");
 		errno = EINVAL;
@@ -1694,6 +1704,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	int fn_len, err;
 
 	ntfs_log_trace("Entering.\n");
+
 	if (!ni || !dir_ni || !name || !name_len ||
 			ni->mft_no == dir_ni->mft_no) {
 		err = errno;

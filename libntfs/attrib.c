@@ -1625,7 +1625,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	ntfschar *upcase;
 	u32 upcase_len;
 
-	ntfs_log_trace("Entering.\n");
+	ntfs_log_trace("Entering for attribute type 0x%x.\n", type);
 
 	if (ctx->ntfs_ino) {
 		vol = ctx->ntfs_ino->vol;
@@ -2461,6 +2461,7 @@ int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 		return -1;
 	/* Check the flags and return the result. */
 	if (ad->flags & ATTR_DEF_RESIDENT) {
+		ntfs_log_trace("Attribute can't be non-resident\n");
 		errno = EPERM;
 		return -1;
 	}
@@ -2497,6 +2498,8 @@ int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPES type)
 	}
 	if (type != AT_INDEX_ALLOCATION)
 		return 0;
+
+	ntfs_log_trace("Attribute can't be resident\n");
 	errno = EPERM;
 	return -1;
 }
@@ -2543,6 +2546,7 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 	biu = le32_to_cpu(m->bytes_in_use);
 	/* Do we have enough space? */
 	if (biu + size > le32_to_cpu(m->bytes_allocated)) {
+		ntfs_log_trace("Not enough space in the MFT record\n");
 		errno = ENOSPC;
 		return -1;
 	}
@@ -2929,7 +2933,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 					ctx->attr, NULL);
 			if (!al_rl) {
 				ntfs_log_trace("Couldn't decompress attribute "
-						"list runlist. Return success "
+						"list runlist. Succeed "
 						"anyway.\n");
 				return 0;
 			}
@@ -2948,7 +2952,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			 * but without extents.
 			 */
 			ntfs_log_trace("Couldn't remove attribute list. "
-					"Return success anyway.\n");
+					"Succeed anyway.\n");
 			return 0;
 		}
 	}
@@ -3717,8 +3721,9 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	ntfs_inode *ni;
 	int err;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, new size %lld.\n",
+			(unsigned long long)na->ni->mft_no, na->type,
+			(long long)newsize);
 
 	/* Get the attribute record that needs modification. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
@@ -4012,6 +4017,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	/* Sanity check the size before we start modifying the attribute. */
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) - le32_to_cpu(a->length) +
 			arec_size > le32_to_cpu(ctx->mrec->bytes_allocated)) {
+		ntfs_log_trace("Not enough space to make attribute resident\n");
 		errno = ENOSPC;
 		return -1;
 	}
@@ -4588,8 +4594,9 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	s64 nr_freed_clusters;
 	int err;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, newsize %lld.\n",
+			(unsigned long long)na->ni->mft_no, na->type,
+			(long long)newsize);
 
 	vol = na->ni->vol;
 

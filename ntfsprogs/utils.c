@@ -668,15 +668,15 @@ int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref)
 {
 	static u8 buffer[512];
 	static s64 bmpmref = -sizeof(buffer) - 1; /* Which bit of $BITMAP is in the buffer */
-
 	int byte, bit;
+
+	ntfs_log_trace("Entering.\n");
 
 	if (!vol) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	ntfs_log_trace("entering\n");
 	/* Does mref lie in the section of $Bitmap we already have cached? */
 	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
 			(sizeof(buffer) << 3)))) {
