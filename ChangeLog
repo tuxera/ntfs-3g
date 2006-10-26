@@ -55,6 +55,7 @@ xx/xx/2006 - x.xx.x - .
 	- Fix some byte-order conversion for u32 variables that used le16
 	  conversion macros.  (zhanglinbao, Yuval)
 	- Spelling mistake fixes in debug logging strings.  (Yuval)
+	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

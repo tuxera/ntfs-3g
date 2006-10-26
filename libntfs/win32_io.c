@@ -222,7 +222,7 @@ static void ntfs_device_win32_init_imports(void)
  *
  * Supported flags are O_RDONLY, O_WRONLY and O_RDWR.
  */
-static __inline__ int ntfs_device_unix_status_flags_to_win32(int flags)
+static int ntfs_device_unix_status_flags_to_win32(int flags)
 {
 	int win_mode;
 
@@ -508,7 +508,7 @@ static int ntfs_device_win32_getgeo(HANDLE handle, win32_fd *fd)
  * Return 0 if o.k.
  *	 -1 if not, and errno set.
  */
-static __inline__ int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
+static int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
 		int flags)
 {
 	HANDLE handle;
@@ -538,7 +538,7 @@ static __inline__ int ntfs_device_win32_open_file(char *filename, win32_fd *fd,
  * return 0 if o.k.
  *        -1 if not, and errno set.
  */
-static __inline__ int ntfs_device_win32_open_drive(int drive_id, win32_fd *fd,
+static int ntfs_device_win32_open_drive(int drive_id, win32_fd *fd,
 		int flags)
 {
 	HANDLE handle;
@@ -1360,7 +1360,7 @@ static int ntfs_device_win32_stat(struct ntfs_device *dev, struct stat *buf)
  * Return 0 if o.k.
  *	 -1 if not, and errno set.  Note if error fd->handle is trashed.
  */
-static __inline__ int ntfs_win32_hdio_getgeo(struct ntfs_device *dev,
+static int ntfs_win32_hdio_getgeo(struct ntfs_device *dev,
 		struct hd_geometry *argp)
 {
 	win32_fd *fd = (win32_fd *)dev->d_private;
@@ -1382,7 +1382,7 @@ static __inline__ int ntfs_win32_hdio_getgeo(struct ntfs_device *dev,
  * Return 0 if o.k.
  *	 -1 if not, and errno set.  Note if error fd->handle is trashed.
  */
-static __inline__ int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
+static int ntfs_win32_blksszget(struct ntfs_device *dev,int *argp)
 {
 	win32_fd *fd = (win32_fd *)dev->d_private;
 	DWORD bytesReturned;

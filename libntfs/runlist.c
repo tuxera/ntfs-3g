@@ -100,7 +100,7 @@ static __inline__ void ntfs_rl_mc(runlist_element *dstbase, int dst,
  * On success, return a pointer to the newly allocated, or recycled, memory.
  * On error, return NULL with errno set to the error code.
  */
-static __inline__ runlist_element *ntfs_rl_realloc(runlist_element *rl,
+static runlist_element *ntfs_rl_realloc(runlist_element *rl,
 		int old_size, int new_size)
 {
 	old_size = (old_size * sizeof(runlist_element) + 0xfff) & ~0xfff;
@@ -121,7 +121,7 @@ static __inline__ runlist_element *ntfs_rl_realloc(runlist_element *rl,
  * Return: TRUE   Success, the runlists can be merged.
  *	   FALSE  Failure, the runlists cannot be merged.
  */
-static __inline__ BOOL ntfs_rl_are_mergeable(runlist_element *dst,
+static BOOL ntfs_rl_are_mergeable(runlist_element *dst,
 		runlist_element *src)
 {
 	if (!dst || !src) {
@@ -182,7 +182,7 @@ static __inline__ void __ntfs_rl_merge(runlist_element *dst,
  * On error, return NULL, with errno set to the error code. Both runlists are
  * left unmodified.
  */
-static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
+static runlist_element *ntfs_rl_append(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	BOOL right = FALSE;	/* Right end of @src needs merging */
@@ -249,7 +249,7 @@ static __inline__ runlist_element *ntfs_rl_append(runlist_element *dst,
  * On error, return NULL, with errno set to the error code. Both runlists are
  * left unmodified.
  */
-static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
+static runlist_element *ntfs_rl_insert(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	BOOL left = FALSE;	/* Left end of @src needs merging */
@@ -345,7 +345,7 @@ static __inline__ runlist_element *ntfs_rl_insert(runlist_element *dst,
  * On error, return NULL, with errno set to the error code. Both runlists are
  * left unmodified.
  */
-static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
+static runlist_element *ntfs_rl_replace(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	signed delta;
@@ -432,7 +432,7 @@ static __inline__ runlist_element *ntfs_rl_replace(runlist_element *dst,
  * On error, return NULL, with errno set to the error code. Both runlists are
  * left unmodified.
  */
-static __inline__ runlist_element *ntfs_rl_split(runlist_element *dst,
+static runlist_element *ntfs_rl_split(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	if (!dst || !src) {
@@ -1220,7 +1220,7 @@ rl_err_out:
  *
  * Return the number of bytes written. This function cannot fail.
  */
-__inline__ int ntfs_get_nr_significant_bytes(const s64 n)
+static int ntfs_get_nr_significant_bytes(const s64 n)
 {
 	s64 l = n;
 	int i;
@@ -1363,7 +1363,7 @@ err_out:
  * Return the number of bytes written on success. On error, i.e. the
  * destination buffer @dst is too small, return -1 with errno set ENOSPC.
  */
-__inline__ int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
+static int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
 		const s64 n)
 {
 	s64 l = n;

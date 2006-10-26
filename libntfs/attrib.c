@@ -274,7 +274,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
  *
  * Initialize the ntfs attribute @na with @ni, @type, @name, and @name_len.
  */
-static __inline__ void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
+static void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
 		const ATTR_TYPES type, ntfschar *name, const u32 name_len)
 {
 	na->rl = NULL;
@@ -2264,7 +2264,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
  *
  * Initialize the attribute search context @ctx with @ni and @mrec.
  */
-static __inline__ void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
+static void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
 		ntfs_inode *ni, MFT_RECORD *mrec)
 {
 	if (!mrec)

@@ -629,7 +629,7 @@ typedef enum {
  * Pass information specifying the current directory entry @ie to the @filldir
  * callback.
  */
-static inline int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
+static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 		const INDEX_TYPE index_type, index_union iu, INDEX_ENTRY *ie,
 		void *dirent, ntfs_filldir_t filldir)
 {

@@ -57,7 +57,7 @@
  *
  * Returns:
  */
-static __inline__ ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
+static ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 
@@ -88,7 +88,7 @@ ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
  *
  * Returns:
  */
-static __inline__ int __ntfs_inode_release(ntfs_inode *ni)
+static int __ntfs_inode_release(ntfs_inode *ni)
 {
 	if (NInoDirty(ni))
 		ntfs_log_debug("Eeek. Discarding dirty inode!\n");

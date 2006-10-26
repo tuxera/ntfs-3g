@@ -261,7 +261,7 @@ return_overflow:
  * code.  Might be a bit confusing to debug but there really should never be
  * errors coming from here.
  */
-static __inline__ BOOL ntfs_is_cb_compressed(ntfs_attr *na,
+static BOOL ntfs_is_cb_compressed(ntfs_attr *na,
 		runlist_element *rl, VCN cb_start_vcn, int cb_clusters)
 {
 	/*

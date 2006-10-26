@@ -55,7 +55,7 @@
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  */
-static __inline__ int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
+static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 		s64 count, int value)
 {
 	s64 bufsize, br;

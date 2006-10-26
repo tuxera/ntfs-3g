@@ -469,7 +469,7 @@ s64 ntfs_cluster_write(const ntfs_volume *vol, const s64 lcn,
  *
  * Return 0 if it is valid and -1 if it is not valid.
  */
-static inline int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
+static int ntfs_device_offset_valid(struct ntfs_device *dev, s64 ofs)
 {
 	char ch;
 
