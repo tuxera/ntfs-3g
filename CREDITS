@@ -6,34 +6,33 @@ The list is sorted alphabetically, so please keep it this way!
 Please contact <linux-ntfs-dev at lists.sf.net> if you believe someone is
 missing or if you prefer not to be listed.
 
+Alexei Alexandrov <alex_alexandrov at hotmail.com>
+Anton Altaparmakov <aia21 at cantab.net>
+Albert D. Cahalan <acahalan at cs.uml.edu>
+Russ Christensen <rchriste at cs.utah.edu>
+Pete Curran <curran at rpi.edu>
+Mario Emmenlauer <mario at emmenlauer.de>
+Andras Erdei <ccg at freemail.hu>
+Matthew J. Fanto <mattjf at uncompiled.com>
+Yuval Fledel <yuvalfl at gmail.com>
+Marcin Gibuła <m.gibula at conecto.pl>
+Christophe Grenier <grenier at cgsecurity.org>
+Ian Jackson <ian at davenant.greenend.org.uk>
+Carmelo Kintana <kintana at berkeley.edu>
+Jan Kratochvil <project-captive at jankratochvil.net>
+Lode Leroy <lode_leroy at hotmail.com>
+David Martínez Moreno <ender at debian.org>
+Giang Nguyen <cauthu at hotmail.com>
+Leonard Norrgård <vinsci at nic.funet.fi>
+Holger Ohmacht <holger.ohmacht at web.de>
+Per Olofsson <pelle at dsv.su.se>
+Yura Pakhuchiy <pakhuchiy at gmail.com>
+Yuri Per <yuri at acronis.com>
+Richard Russon <ntfs at flatcap.org>
+Erik S�rnes <erso1970 at yahoo.no>
+Szabolcs Szakacsits <szaka at sienet.hu>
+zhanglinbao <zhanglinbao2000 at 163.com>
 
-Alexei Alexandrov <alex_alexandrov@hotmail.com>
-Anton Altaparmakov <aia21@cantab.net>
-Albert D. Cahalan <acahalan@cs.uml.edu>
-Russ Christensen <rchriste@cs.utah.edu>
-Pete Curran <curran@rpi.edu>
-Mario Emmenlauer <mario@emmenlauer.de>
-Andras Erdei <ccg@freemail.hu>
-Matthew J. Fanto <mattjf@uncompiled.com>
-Yuval Fledel (no email address on request)
-Marcin Gibuła <m.gibula@conecto.pl>
-Christophe Grenier <grenier@cgsecurity.org>
-Ian Jackson <ian@davenant.greenend.org.uk>
-Carmelo Kintana <kintana@berkeley.edu>
-Jan Kratochvil <project-captive@jankratochvil.net>
-Lode Leroy <lode_leroy@hotmail.com>
-David Martínez Moreno <ender@debian.org>
-Giang Nguyen <cauthu@hotmail.com>
-Leonard Norrgård <vinsci@nic.funet.fi>
-Holger Ohmacht <holger.ohmacht@web.de>
-Per Olofsson <pelle@dsv.su.se>
-Yura Pakhuchiy <pakhuchiy@gmail.com>
-Yuri Per <yuri@acronis.com>
-Richard Russon <ntfs@flatcap.org>
-Erik S�rnes <erso1970@yahoo.no>
-Szabolcs Szakacsits <szaka@sienet.hu>
-
-Also, various code snippets and especially the autoconf/automake automated
-configuration, compilation and installation system have been ripped shamelessly
-from numerous different GNU and Gnome utilities and libraries so "Many thanks!"
+Configuration, compilation and installation system are originally based on
+numerous different GNU and Gnome utilities and libraries so "Many thanks!"
 to all the people who have participated in their creation!
