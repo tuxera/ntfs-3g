@@ -220,6 +220,7 @@ mft_has_no_attr_list:
 	std_info = ntfs_attr_readall(vol->mft_ni, AT_STANDARD_INFORMATION,
 				     AT_UNNAMED, 0, NULL);
 	vol->mft_ni->flags = std_info->file_attributes;
+	free(std_info);
 
 	/* We now have a fully setup ntfs inode for $MFT in vol->mft_ni. */
 

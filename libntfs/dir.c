@@ -1261,6 +1261,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 			ntfs_log_error("Failed to add INDEX_ROOT attribute.\n");
 			goto err_out;
 		}
+		free(ir);
 	} else {
 		INTX_FILE *data;
 		int data_len;
@@ -1312,6 +1313,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		if (ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, (u8*)data,
 				data_len)) {
 			err = errno;
+			free(data);
 			ntfs_log_error("Failed to add DATA attribute.\n");
 			goto err_out;
 		}

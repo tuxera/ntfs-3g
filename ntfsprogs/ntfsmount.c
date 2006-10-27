@@ -1800,6 +1800,7 @@ int main(int argc, char *argv[])
 	/* Mount volume. */
 	if (ntfs_fuse_mount(opts.device)) {
 		ntfs_fuse_destroy();
+		free(parsed_options);
 		return 4;
 	}
 	/* Create filesystem. */
@@ -1814,12 +1815,12 @@ int main(int argc, char *argv[])
 #else
 	ffd = fuse_mount(opts.mnt_point, parsed_options);
 #endif
+	free(parsed_options);
 	if (ffd == -1) {
 		ntfs_log_error("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
 		return 5;
 	}
-	free(parsed_options);
 #if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
