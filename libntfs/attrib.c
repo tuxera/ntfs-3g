@@ -1131,52 +1131,16 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			LCN lcn_seek_from = -1;
 			runlist *rlc;
 			VCN cur_vcn, from_vcn;
-			s64 t;
-			int cnt;
 
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
 				goto rl_err_out;
 			}
-			/*
-			 * It is a hole. Check if the data buffer is zero in
-			 * this region and if not instantiate the hole.
-			 */
+			
 			to_write = min(count, (rl->length <<
 					vol->cluster_size_bits) - ofs);
-			written = to_write / sizeof(unsigned long);
-			eo = 0;
-			for (t = 0; t < written; t++) {
-				if (((const unsigned long*)b)[t]) {
-					eo = 1;
-					break;
-				}
-			}
-			cnt = to_write & (sizeof(unsigned long) - 1);
-			if (cnt && !eo) {
-				int i;
-				const u8 *b2;
-
-				b2 = (const u8*)b + (to_write &
-						~(sizeof(unsigned long) - 1));
-				for (i = 0; i < cnt; i++) {
-					if (b2[i]) {
-						eo = 1;
-						break;
-					}
-				}
-			}
-			if (!eo) {
-				/*
-				 * The buffer region is zero, update progress
-				 * counters and proceed with next run.
-				 */
-				total += to_write;
-				count -= to_write;
-				b = (const u8*)b + to_write;
-				continue;
-			}
-			/* The buffer is non zero, instantiate the hole. */
+			
+			/* Instantiate the hole. */
 			cur_vcn = rl->vcn;
 			from_vcn = rl->vcn + (ofs >> vol->cluster_size_bits);
 			ntfs_log_trace("Instantiate hole with vcn 0x%llx.\n",
