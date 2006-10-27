@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run this to generate all the initial makefiles, etc.
+# Run this to generate configure, Makefile.in's, etc
 
 if test "$srcdir" == ""; then
 	srcdir=.
