@@ -1175,7 +1175,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	 * 4 bytes to every SID.
 	 */
 	sd_len = sizeof(SECURITY_DESCRIPTOR_ATTR) + 2 * (sizeof(SID) + 4) +
-		sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE); 
+		sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE);
 	sd = calloc(1, sd_len);
 	if (!sd) {
 		err = errno;
@@ -1191,7 +1191,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	sid->sub_authority[0] = cpu_to_le32(32);
 	sid->sub_authority[1] = cpu_to_le32(544);
 	sid->identifier_authority.value[5] = 5;
-	sid = (SID*)((u8*)sid + sizeof(SID) + 4); 
+	sid = (SID*)((u8*)sid + sizeof(SID) + 4);
 	sd->group = cpu_to_le32((u8*)sid - (u8*)sd);
 	sid->revision = 1;
 	sid->sub_authority_count = 2;

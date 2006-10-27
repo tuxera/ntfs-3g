@@ -496,7 +496,7 @@ static int setup_cmp_ia(ntfs_attr *na, struct cmp_ia *cia)
 		perr_println("Failed to readall BITMAP");
 		return -1;
 	}
-	cia->byte = cia->bitmap; 
+	cia->byte = cia->bitmap;
 
 	cia->tmp_ia = cia->ia = ntfs_malloc(na->data_size);
 	if (!cia->tmp_ia)
@@ -506,7 +506,7 @@ static int setup_cmp_ia(ntfs_attr *na, struct cmp_ia *cia)
 		perr_println("Failed to pread INDEX_ALLOCATION");
 		goto free_ia;
 	}
-	
+
 	return 0;
 free_ia:
 	free(cia->ia);
@@ -520,28 +520,28 @@ static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
 	struct cmp_ia cia1, cia2;
 	int bit, ret1, ret2;
 	u32 ib_size;
-	
+
 	if (setup_cmp_ia(na1, &cia1))
 		return;
 	if (setup_cmp_ia(na2, &cia2))
 		return;
-	/* 
+	/*
 	 *  FIXME: ia can be the same even if the bitmap sizes are different.
 	 */
 	if (cia1.bm_size != cia1.bm_size)
 		goto out;
-	
+
 	if (cmp_buffer(cia1.bitmap, cia2.bitmap, cia1.bm_size, na1))
 		goto out;
-	
+
 	if (cmp_buffer((u8 *)cia1.ia, (u8 *)cia2.ia, 0x18, na1))
 		goto out;
 
 	ib_size = cia1.ia->index.allocated_size + 0x18;
-	
+
 	bit = 0;
 	while ((u8 *)cia1.tmp_ia < (u8 *)cia1.ia + na1->data_size) {
-		if (*cia1.byte & (1 << bit)) {					   
+		if (*cia1.byte & (1 << bit)) {
 			ret1 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia1.tmp_ia,
 							ib_size);
 			ret2 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia2.tmp_ia,
@@ -550,19 +550,19 @@ static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
 				print_differ(na1);
 				goto out;
 			}
-			
+
 			if (ret1 == -1)
 				continue;
-		
-			if (cmp_buffer(((u8 *)cia1.tmp_ia) + 0x18, 
+
+			if (cmp_buffer(((u8 *)cia1.tmp_ia) + 0x18,
 				       ((u8 *)cia2.tmp_ia) + 0x18,
 				       cia1.ia->index.index_length, na1))
 				goto out;
 		}
-		
+
 		cia1.tmp_ia = (INDEX_ALLOCATION *)((u8 *)cia1.tmp_ia + ib_size);
 		cia2.tmp_ia = (INDEX_ALLOCATION *)((u8 *)cia2.tmp_ia + ib_size);
-		
+
 		bit++;
 		if (bit > 7) {
 			bit = 0;
@@ -615,7 +615,7 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 			printf("%lld  !=  %lld\n", pos + count1, na1->data_size);
 			exit(1);
 		}
-		
+
 		if (cmp_buffer(buf1, buf2, count1, na1))
 			return;
 	}

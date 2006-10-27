@@ -755,9 +755,9 @@ static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 		e->key.file_name.last_data_change_time = timestamp;
 		e->key.file_name.last_mft_change_time = timestamp;
 		e->key.file_name.last_access_time = timestamp;
-		
+
 		wiped_timestamp_data += 32;
-		
+
 		e = (INDEX_ENTRY *)((u8 *)e + le16_to_cpu(e->length));
 	}
 }
@@ -785,7 +785,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
-	
+
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
 		perr_printf("Failed to read $BITMAP attribute");
@@ -812,7 +812,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	bit = 0;
 	while ((u8 *)tmp_indexa < (u8 *)indexa + na->data_size) {
-		if (*byte & (1 << bit)) {					   
+		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)tmp_indexa,
 					le32_to_cpu(
 					indexr->index_block_size))) {
@@ -834,7 +834,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 				goto out_indexa;
 			}
 		}
-		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa + 
+		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa +
 				le32_to_cpu(indexr->index_block_size));
 		bit++;
 		if (bit > 7) {
@@ -842,7 +842,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 			byte++;
 		}
 	}
-	
+
 	if (ntfs_rl_pwrite(vol, na->rl, 0, na->data_size, indexa) != na->data_size)
 		perr_printf("ntfs_rl_pwrite failed for inode %lld", ni->mft_no);
 out_indexa:
@@ -924,7 +924,7 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 
 	else if (a->type == AT_STANDARD_INFORMATION)
 		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a, timestamp);
-	
+
 	else if (a->type == AT_INDEX_ROOT)
 		wipe_index_root_timestamps(a, timestamp);
 }
@@ -1168,7 +1168,7 @@ static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 {
 	if (ntfs_mft_usn_dec(ni->mrec))
 		perr_exit("ntfs_mft_usn_dec");
-	
+
 	if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
 		perr_exit("ntfs_mft_record_write");
 }
@@ -1176,12 +1176,12 @@ static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 static void mft_inode_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 {
 	s32 i;
-	
+
 	mft_record_write_with_same_usn(volume, ni);
-	
+
 	if (ni->nr_extents <= 0)
 		return;
-	
+
 	for (i = 0; i < ni->nr_extents; ++i) {
 		ntfs_inode *eni = ni->extent_nis[i];
 		mft_record_write_with_same_usn(volume, eni);
@@ -1719,7 +1719,7 @@ static void check_dest_free_space(u64 src_bytes)
 
 	if (opt.metadata || opt.blkdev_out || opt.std_out)
 		return;
-	/* 
+	/*
 	 * TODO: save_image needs a bit more space than src_bytes
 	 * due to the free space encoding overhead.
 	 */
@@ -1732,7 +1732,7 @@ static void check_dest_free_space(u64 src_bytes)
 	dest_bytes = (u64)stvfs.f_frsize * stvfs.f_bfree;
 	if (!dest_bytes)
 		dest_bytes = (u64)stvfs.f_bsize * stvfs.f_bfree;
-	
+
 	if (dest_bytes < src_bytes)
 		err_exit("Destination doesn't have enough free space: "
 			 "%llu MB < %llu MB\n",

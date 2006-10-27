@@ -2861,7 +2861,7 @@ static int initialize_quota(MFT_RECORD *m)
 	INDEX_ENTRY *idx_entry_o, *idx_entry_q1, *idx_entry_q2;
 	QUOTA_O_INDEX_DATA *idx_entry_o_data;
 	QUOTA_CONTROL_ENTRY *idx_entry_q1_data, *idx_entry_q2_data;
-	
+
 	err = 0;
 	/* q index entry num 1 */
 	q1_size = 0x48;
@@ -3790,7 +3790,7 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	g_rl_mft_bmp = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_mft_bmp)
 		return FALSE;
-	
+
 	g_rl_mft_bmp[0].vcn = 0LL;
 	/* Mft bitmap is right after $Boot's data. */
 	i = (8192 + g_vol->cluster_size - 1) / g_vol->cluster_size;
@@ -3855,7 +3855,7 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	g_rl_mft = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_mft)
 		return FALSE;
-	
+
 	g_rl_mft[0].vcn = 0LL;
 	g_rl_mft[0].lcn = g_mft_lcn;
 	/* rounded up division by cluster size */
@@ -3876,7 +3876,7 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	g_rl_mftmirr = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_mftmirr)
 		return FALSE;
-	
+
 	g_rl_mftmirr[0].vcn = 0LL;
 	g_rl_mftmirr[0].lcn = g_mftmirr_lcn;
 	/*
@@ -3912,7 +3912,7 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 	g_rl_logfile = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_logfile)
 		return FALSE;
-	
+
 
 	volume_size = g_vol->nr_clusters << g_vol->cluster_size_bits;
 
@@ -3935,7 +3935,7 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 			g_logfile_size = (volume_size / 100) &
 					~(g_vol->cluster_size - 1);
 	} else	{
-		/* 
+		/*
 		 * FIXME: The $LogFile size is 64 MiB upwards from 12GiB but
 		 * the "200" divider below apparently approximates "100" or
 		 * some other value as the volume size decreases. For example:
@@ -3996,7 +3996,7 @@ static BOOL mkntfs_initialize_rl_boot(void)
 	g_rl_boot = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_boot)
 		return FALSE;
-	
+
 	g_rl_boot[0].vcn = 0LL;
 	g_rl_boot[0].lcn = 0LL;
 	/*
@@ -4023,7 +4023,7 @@ static BOOL mkntfs_initialize_rl_bad(void)
 	g_rl_bad = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_bad)
 		return FALSE;
-	
+
 	g_rl_bad[0].vcn = 0LL;
 	g_rl_bad[0].lcn = -1LL;
 	/*
@@ -4498,7 +4498,7 @@ static BOOL mkntfs_create_root_structures(void)
 	buf_log = ntfs_malloc(g_logfile_size);
 	if (!buf_log)
 		return FALSE;
-	
+
 	memset(buf_log, -1, g_logfile_size);
 	err = add_attr_data_positioned(m, NULL, 0, 0, 0, g_rl_logfile, buf_log,
 			g_logfile_size);
@@ -4969,7 +4969,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	g_vol->upcase = ntfs_malloc(g_vol->upcase_len * sizeof(ntfschar));
 	if (!g_vol->upcase)
 		goto done;
-	
+
 	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
 	if (g_vol->major_ver < 3) {
 		g_vol->attrdef = ntfs_calloc(36000);

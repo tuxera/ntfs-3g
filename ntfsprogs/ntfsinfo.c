@@ -617,7 +617,7 @@ static void ntfs_dump_attr_standard_information(ATTR_RECORD *attr)
 				(unsigned)value_length);
 	}
 }
-	
+
 static void ntfs_dump_bytes(u8 *buf, int start, int stop)
 {
 	int i;
@@ -647,7 +647,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 	value = ntfs_malloc(l);
 	if (!value)
 		return;
-	
+
 	l = ntfs_get_attribute_value(vol, attr, value);
 	if (!l) {
 		ntfs_log_perror("ntfs_get_attribute_value failed");
@@ -698,7 +698,7 @@ static void ntfs_dump_attr_list(ATTR_RECORD *attr, ntfs_volume *vol)
 		} else
 			printf("unnamed\n");
 		printf("\t\tPadding:\t");
-		ntfs_dump_bytes((u8 *)entry, entry->name_offset + 
+		ntfs_dump_bytes((u8 *)entry, entry->name_offset +
 				sizeof(ntfschar) * entry->name_length,
 				le16_to_cpu(entry->length));
 		printf("\n");
@@ -864,7 +864,7 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 
 	printf("%sRevision\t %u\n", prefix, acl->revision);
 
-	/* 
+	/*
 	 * Do not recalculate le16_to_cpu every iteration (minor speedup on
 	 * big-endian machines.
 	 */
@@ -913,7 +913,7 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 					  const char *indent)
 {
 	char *sid;
-	
+
 	printf("%s\tRevision:\t\t %u\n", indent, sec_desc->revision);
 
 	/* TODO: parse the flags */
@@ -921,17 +921,16 @@ static void ntfs_dump_security_descriptor(SECURITY_DESCRIPTOR_ATTR *sec_desc,
 			le16_to_cpu(sec_desc->control));
 
 	if (~sec_desc->control & SE_SELF_RELATIVE) {
-		
 		SECURITY_DESCRIPTOR *sd = (SECURITY_DESCRIPTOR *)sec_desc;
-		
+
 		printf("%s\tOwner SID pointer:\t %p\n", indent, sd->owner);
 		printf("%s\tGroup SID pointer:\t %p\n", indent, sd->group);
 		printf("%s\tSACL pointer:\t\t %p\n", indent, sd->sacl);
 		printf("%s\tDACL pointer:\t\t %p\n", indent, sd->dacl);
-		
+
 		return;
 	}
-	
+
 	if (sec_desc->owner) {
 		sid = ntfs_sid_to_mbs((SID *)((char *)sec_desc +
 			le32_to_cpu(sec_desc->owner)), NULL, 0);
@@ -1017,8 +1016,8 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 	}
 
 	ntfs_dump_security_descriptor(sec_desc_attr, "");
-	
-	if (attr->non_resident) 
+
+	if (attr->non_resident)
 		free(sec_desc_attr);
 }
 
@@ -1099,7 +1098,7 @@ static void ntfs_dump_attr_volume_information(ATTR_RECORD *attr)
 }
 
 static ntfschar NTFS_DATA_SDS[5] = { const_cpu_to_le16('$'),
-	const_cpu_to_le16('S'), const_cpu_to_le16('D'), 
+	const_cpu_to_le16('S'), const_cpu_to_le16('D'),
 	const_cpu_to_le16('S'), const_cpu_to_le16('\0') };
 
 static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
@@ -1117,10 +1116,10 @@ static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 	ntfs_log_verbose("\t\tLength:\t\t\t %u (0x%x)\n",
 			(unsigned)le32_to_cpu(sds->length),
 			(unsigned)le32_to_cpu(sds->length));
-	
+
 	sd = (SECURITY_DESCRIPTOR_RELATIVE *)((char *)sds +
 		sizeof(SECURITY_DESCRIPTOR_HEADER));
-	
+
 	ntfs_dump_security_descriptor(sd, "\t");
 }
 
@@ -1131,22 +1130,22 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	int name_len;
 	s64 data_size;
 	u64 inode;
-	
+
 	inode = ni->mft_no;
 	if (ni->nr_extents < 0)
 		inode = ni->base_ni->mft_no;
 	if (FILE_Secure != inode)
 		return;
-	
+
 	name_len = attr->name_length;
 	if (!name_len)
 		return;
-	
+
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	if (!ntfs_names_are_equal(NTFS_DATA_SDS, sizeof(NTFS_DATA_SDS) / 2 - 1,
 				  name, name_len, 0, NULL, 0))
 		return;
-	
+
 	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
 	if (!sd) {
 		ntfs_log_perror("Failed to read $SDS attribute");
@@ -1156,10 +1155,10 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 	 * FIXME: The right way is based on the indexes, so we couldn't
 	 * miss real entries. For now, dump until it makes sense.
 	 */
-	while (sd->length && sd->hash && 
+	while (sd->length && sd->hash &&
 	       le64_to_cpu(sd->offset) < (u64)data_size &&
 	       le32_to_cpu(sd->length) < (u64)data_size &&
-	       le64_to_cpu(sd->offset) + 
+	       le64_to_cpu(sd->offset) +
 			le32_to_cpu(sd->length) < (u64)data_size) {
 		ntfs_dump_sds_entry(sd);
 		sd = (SECURITY_DESCRIPTOR_HEADER *)((char*)sd +
@@ -1193,10 +1192,10 @@ static const char *get_attribute_type_name(u32 type)
 
 	return "$UNKNOWN";
 }
-	
+
 static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 {
-	printf("Dumping attribute %s (0x%x)\n", 
+	printf("Dumping attribute %s (0x%x)\n",
 			get_attribute_type_name(a->type),
 			(unsigned)le32_to_cpu(a->type));
 
@@ -1274,7 +1273,7 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 				sle64_to_cpu(a->initialized_size));
 		if (a->compression_unit || a->flags & ATTR_IS_COMPRESSED ||
 				a->flags & ATTR_IS_SPARSE)
-			printf("\tCompressed size:\t %llu (0x%llx)\n", 
+			printf("\tCompressed size:\t %llu (0x%llx)\n",
 					(signed long long)
 					sle64_to_cpu(a->compressed_size),
 					(signed long long)
@@ -1324,7 +1323,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
 	char *sid;
 	char printable_GUID[37];
-	
+
 	switch (type) {
 	case INDEX_ATTR_SECURE_SII:
 		ntfs_log_verbose("\t\tKey security id:\t %u (0x%x)\n",
@@ -1382,9 +1381,9 @@ typedef union {
 static void ntfs_dump_index_data(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 {
 	INDEX_ENTRY_DATA *data;
-	
+
 	data = (INDEX_ENTRY_DATA *)((u8 *)entry + entry->data_offset);
-	
+
 	switch (type) {
 	case INDEX_ATTR_SECURE_SII:
 		ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n",
@@ -1580,7 +1579,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 
 	if (!attr->name_length)
 		return INDEX_ATTR_UNKNOWN;
-	
+
 	if (index_root->type) {
 		if (index_root->type == AT_FILE_NAME)
 			return INDEX_ATTR_DIRECTORY_I30;
@@ -1590,12 +1589,12 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 				       index_root->type);
 		return INDEX_ATTR_UNKNOWN;
 	}
-	
+
 	if (utils_is_metadata(ni) <= 0)
 		return INDEX_ATTR_UNKNOWN;
 	if (utils_inode_get_name(ni, file_name, sizeof(file_name)) <= 0)
 		return INDEX_ATTR_UNKNOWN;
-	
+
 	if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_SDH))
 		return INDEX_ATTR_SECURE_SDH;
 	else if (COMPARE_INDEX_NAMES(attr, NTFS_INDEX_SII))
@@ -1612,7 +1611,7 @@ static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 		else if (!strcmp(file_name, "/$Extend/$ObjId"))
 			return INDEX_ATTR_OBJID_O;
 	}
-	
+
 	return INDEX_ATTR_UNKNOWN;
 }
 
@@ -1649,7 +1648,7 @@ static void ntfs_dump_index_header(const char *indent, INDEX_HEADER *idx)
 			(unsigned)le32_to_cpu(idx->allocated_size),
 			(unsigned)le32_to_cpu(idx->allocated_size));
 	printf("%sIndex header flags:\t 0x%02x\n", indent, idx->flags);
-	
+
 	/* FIXME: there are 3 reserved bytes here */
 }
 
@@ -1670,7 +1669,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 	type = get_index_attr_type(ni, attr, index_root);
 	printf("\tIndexed Attr Type:\t ");
 	ntfs_dump_index_attr_type(type);
-	
+
 	/* collation rule dumping */
 	printf("\tCollation Rule:\t\t %u (0x%x)\n",
 			(unsigned)le32_to_cpu(index_root->collation_rule),
@@ -1717,7 +1716,7 @@ static s32 ntfs_dump_index_block(INDEX_BLOCK *ib, INDEX_ATTR_TYPE type,
 		u32 ib_size)
 {
 	INDEX_ENTRY *entry;
-	
+
 	if (ntfs_mst_post_read_fixup((NTFS_RECORD*)ib, ib_size)) {
 		ntfs_log_perror("Damaged INDX record");
 		return -1;
@@ -1729,15 +1728,15 @@ static s32 ntfs_dump_index_block(INDEX_BLOCK *ib, INDEX_ATTR_TYPE type,
 	ntfs_log_verbose("\t\tNode VCN:\t\t %lld (0x%llx)\n",
 			(unsigned long long)sle64_to_cpu(ib->index_block_vcn),
 			(unsigned long long)sle64_to_cpu(ib->index_block_vcn));
-	
-	entry = (INDEX_ENTRY*)((u8*)ib + 
+
+	entry = (INDEX_ENTRY*)((u8*)ib +
 				le32_to_cpu(ib->index.entries_offset) + 0x18);
-	
+
 	if (opts.verbose) {
 		ntfs_dump_index_header("\t\t", &ib->index);
 		printf("\n");
 	}
-	
+
 	return ntfs_dump_index_entries(entry, type);
 }
 
@@ -1764,19 +1763,19 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
 		return;
 	}
-	
+
 	type = get_index_attr_type(ni, attr, ir);
-	
+
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
-	
+
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
 		ntfs_log_perror("Failed to read $BITMAP attribute");
 		goto out_index_root;
 	}
 
-	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION, 
+	tmp_alloc = allocation = ntfs_attr_readall(ni, AT_INDEX_ALLOCATION,
 						   name, name_len, &data_size);
 	if (!tmp_alloc) {
 		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
@@ -1787,7 +1786,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	while ((u8 *)tmp_alloc < (u8 *)allocation + data_size) {
 		if (*byte & (1 << bit)) {
 			int entries;
-			
+
 			entries = ntfs_dump_index_block(tmp_alloc, type,
 							le32_to_cpu(
 							ir->index_block_size));
@@ -1797,7 +1796,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 				printf("\tIndex entries:\t\t %d\n", entries);
 			}
 		}
-		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc + 
+		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc +
 						le32_to_cpu(
 						ir->index_block_size));
 		bit++;
@@ -1809,7 +1808,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	printf("\tIndex entries total:\t %d\n", total_entries);
 	printf("\tINDX blocks total:\t %d\n", total_indx_blocks);
-	
+
 	free(allocation);
 out_bitmap:
 	free(bitmap);
@@ -2083,9 +2082,9 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
 	printf("Next Attribute Instance: %u (0x%x)\n",
 			(unsigned)le16_to_cpu(mrec->next_attr_instance),
 			(unsigned)le16_to_cpu(mrec->next_attr_instance));
-	
+
 	printf("MFT Padding:\t");
-	ntfs_dump_bytes((u8 *)mrec, le16_to_cpu(mrec->usa_ofs) + 
+	ntfs_dump_bytes((u8 *)mrec, le16_to_cpu(mrec->usa_ofs) +
 			2 * le16_to_cpu(mrec->usa_count),
 			le16_to_cpu(mrec->attrs_offset));
 	printf("\n");
@@ -2102,7 +2101,6 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 	   see ntfs_attr_lookup documentation for detailed explanation */
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
-		
 		if (ctx->attr->type == AT_END || ctx->attr->type == AT_UNUSED) {
 			printf("Weird: %s attribute type was found, please "
 					"report this.\n",
@@ -2110,9 +2108,9 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 					ctx->attr->type));
 			continue;
 		}
-		
+
 		ntfs_dump_attribute_header(ctx->attr, inode->vol);
-		
+
 		switch (ctx->attr->type) {
 		case AT_STANDARD_INFORMATION:
 			ntfs_dump_attr_standard_information(ctx->attr);
@@ -2194,7 +2192,7 @@ int main(int argc, char **argv)
 	ntfs_volume *vol;
 
 	setlinebuf(stdout);
-	
+
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
 	if (!parse_options(argc, argv)) {

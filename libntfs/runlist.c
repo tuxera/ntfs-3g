@@ -1586,31 +1586,31 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 		ntfs_log_perror("rl_truncate error: arl: %p *arl: %p", arl, *arl);
 		return -1;
 	}
-	
+
 	rl = *arl;
-	
+
 	if (start_vcn < rl->vcn) {
 		errno = EINVAL;
 		ntfs_log_perror("Start_vcn lies outside front of runlist");
 		return -1;
 	}
-	
+
 	/* Find the starting vcn in the run list. */
 	while (rl->length) {
 		if (start_vcn < rl[1].vcn)
 			break;
 		rl++;
 	}
-	
+
 	if (!rl->length) {
 		errno = EIO;
 		ntfs_log_trace("Truncating already truncated runlist?\n");
 		return -1;
 	}
-	
+
 	/* Truncate the run. */
 	rl->length = start_vcn - rl->vcn;
-	
+
 	/*
 	 * If a run was partially truncated, make the following runlist
 	 * element a terminator instead of the truncated runlist

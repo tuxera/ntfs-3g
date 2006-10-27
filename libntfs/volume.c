@@ -217,7 +217,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	}
 mft_has_no_attr_list:
 	/* Receive attributes from STANDARD_INFORMATION. */
-	std_info = ntfs_attr_readall(vol->mft_ni, AT_STANDARD_INFORMATION, 
+	std_info = ntfs_attr_readall(vol->mft_ni, AT_STANDARD_INFORMATION,
 				     AT_UNNAMED, 0, NULL);
 	vol->mft_ni->flags = std_info->file_attributes;
 
@@ -815,7 +815,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			ntfs_log_perror("Failed to read $MFTMirr");
 		else {
 			ntfs_log_debug("Failed to read $MFTMirr, unexpected "
-				       "length (%d != %lld).\n", 
+				       "length (%d != %lld).\n",
 				       vol->mftmirr_size, l);
 			errno = EIO;
 		}

@@ -708,12 +708,12 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
  * @len:	length of output buffer in Unicode characters
  *
  * Convert the input @s string into the corresponding little endian,
- * 2-byte Unicode string. The length of the converted string is less 
+ * 2-byte Unicode string. The length of the converted string is less
  * or equal to the maximum length allowed by the NTFS format (255).
  *
  * If @s is NULL then return AT_UNNAMED.
  *
- * On success the function returns the Unicode string in an allocated 
+ * On success the function returns the Unicode string in an allocated
  * buffer and the caller is responsible to free it when it's not needed
  * anymore.
  *

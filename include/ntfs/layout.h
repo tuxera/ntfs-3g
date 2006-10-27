@@ -244,7 +244,7 @@ typedef enum {
  *
  * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
- * 
+ *
  * MFT_RECORD_IS_4 exists on all $Extend sub-files.
  * It seems that it marks it is a metadata file with MFT record >24, however,
  * it is unknown if it is limited to metadata files only.
@@ -480,7 +480,7 @@ typedef struct {
  * Each attribute type has a corresponding attribute name (Unicode string of
  * maximum 64 character length) as described by the attribute definitions
  * present in the data attribute of the $AttrDef system file.
- * 
+ *
  * On NTFS 3.0 volumes the names are just as the types are named in the below
  * enum exchanging AT_ for the dollar sign ($). If that isn't a revealing
  * choice of symbol... (-;
@@ -867,15 +867,15 @@ typedef enum {
 	 * This is a copy of the MFT_RECORD_IS_DIRECTORY bit from the mft
 	 * record, telling us whether this is a directory or not, i.e. whether
 	 * it has an index root attribute named "$I30" or not.
-	 * 
-	 * This flag is only present in the FILE_NAME attribute (in the 
+	 *
+	 * This flag is only present in the FILE_NAME attribute (in the
 	 * file_attributes field).
 	 */
 	FILE_ATTR_I30_INDEX_PRESENT	= const_cpu_to_le32(0x10000000),
-	
+
 	/**
 	 * FILE_ATTR_VIEW_INDEX_PRESENT - Does have a non-directory index?
-	 * 
+	 *
 	 * This is a copy of the MFT_RECORD_IS_VIEW_INDEX bit from the mft
 	 * record, telling us whether this file has a view index present (eg.
 	 * object id index, quota index, one of the security indexes and the

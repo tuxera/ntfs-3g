@@ -1111,7 +1111,7 @@ void ntfs_inode_update_time(ntfs_inode *ni)
  * Check if the mft record given by @mft_no and @attr contains the bad sector
  * list. Please note that mft record numbers describing $Badclus extent inodes
  * will not match the current $Badclus:$Bad check.
- * 
+ *
  * On success return 1 if the file is $Badclus:$Bad, otherwise return 0.
  * On error return -1 with errno set to the error code.
  */
@@ -1125,7 +1125,7 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
 		errno = EINVAL;
 		return -1;
 	}
-	
+
 	if (mft_no != FILE_BadClus)
 	       	return 0;
 

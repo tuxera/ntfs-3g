@@ -2028,7 +2028,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 	if (!ctx->attr->non_resident)
 		err_exit("Resident attribute in $BadClust! Please report to "
 			 "%s\n", NTFS_DEV_LIST);
-	/* 
+	/*
 	 * FIXME: The below would be partial for non-base records in the
 	 * not yet supported multi-record case. Alternatively use audited
 	 * ntfs_attr_truncate after an umount & mount.
