@@ -1220,7 +1220,7 @@ rl_err_out:
  *
  * Return the number of bytes written. This function cannot fail.
  */
-static int ntfs_get_nr_significant_bytes(const s64 n)
+int ntfs_get_nr_significant_bytes(const s64 n)
 {
 	s64 l = n;
 	int i;
@@ -1363,8 +1363,7 @@ err_out:
  * Return the number of bytes written on success. On error, i.e. the
  * destination buffer @dst is too small, return -1 with errno set ENOSPC.
  */
-static int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
-		const s64 n)
+int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max, const s64 n)
 {
 	s64 l = n;
 	int i;
