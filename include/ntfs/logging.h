@@ -65,25 +65,25 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 	__attribute__((format(printf, 6, 7)));
 
 /* Logging levels - Determine what gets logged */
-#define NTFS_LOG_LEVEL_DEBUG	(1 <<  0) /* x = 42 */
-#define NTFS_LOG_LEVEL_TRACE	(1 <<  1) /* Entering function x() */
-#define NTFS_LOG_LEVEL_QUIET	(1 <<  2) /* Quietable output */
-#define NTFS_LOG_LEVEL_INFO	(1 <<  3) /* Volume needs defragmenting */
-#define NTFS_LOG_LEVEL_VERBOSE	(1 <<  4) /* Forced to continue */
-#define NTFS_LOG_LEVEL_PROGRESS	(1 <<  5) /* 54% complete */
-#define NTFS_LOG_LEVEL_WARNING	(1 <<  6) /* You should backup before starting */
-#define NTFS_LOG_LEVEL_ERROR	(1 <<  7) /* Operation failed, no damage done */
-#define NTFS_LOG_LEVEL_PERROR	(1 <<  8) /* Message : standard error description */
-#define NTFS_LOG_LEVEL_CRITICAL	(1 <<  9) /* Operation failed,damage may have occurred */
-#define NTFS_LOG_LEVEL_REASON	(1 << 10) /* Human readable reason for failure */
+#define NTFS_LOG_LEVEL_DEBUG	((u32)1 <<  0) /* x = 42 */
+#define NTFS_LOG_LEVEL_TRACE	((u32)1 <<  1) /* Entering function x() */
+#define NTFS_LOG_LEVEL_QUIET	((u32)1 <<  2) /* Quietable output */
+#define NTFS_LOG_LEVEL_INFO	((u32)1 <<  3) /* Volume needs defragmenting */
+#define NTFS_LOG_LEVEL_VERBOSE	((u32)1 <<  4) /* Forced to continue */
+#define NTFS_LOG_LEVEL_PROGRESS	((u32)1 <<  5) /* 54% complete */
+#define NTFS_LOG_LEVEL_WARNING	((u32)1 <<  6) /* You should backup before starting */
+#define NTFS_LOG_LEVEL_ERROR	((u32)1 <<  7) /* Operation failed, no damage done */
+#define NTFS_LOG_LEVEL_PERROR	((u32)1 <<  8) /* Message : standard error description */
+#define NTFS_LOG_LEVEL_CRITICAL	((u32)1 <<  9) /* Operation failed,damage may have occurred */
+#define NTFS_LOG_LEVEL_REASON	((u32)1 << 10) /* Human readable reason for failure */
 
 /* Logging style flags - Manage the style of the output */
-#define NTFS_LOG_FLAG_PREFIX	(1 << 0) /* Prefix messages with "ERROR: ", etc */
-#define NTFS_LOG_FLAG_FILENAME	(1 << 1) /* Show the file origin of the message */
-#define NTFS_LOG_FLAG_LINE	(1 << 2) /* Show the line number of the message */
-#define NTFS_LOG_FLAG_FUNCTION	(1 << 3) /* Show the function name containing the message */
-#define NTFS_LOG_FLAG_ONLYNAME	(1 << 4) /* Only display the filename, not the pathname */
-#define NTFS_LOG_FLAG_COLOUR	(1 << 5) /* Colour highlight some messages */
+#define NTFS_LOG_FLAG_PREFIX	((u32)1 << 0) /* Prefix messages with "ERROR: ", etc */
+#define NTFS_LOG_FLAG_FILENAME	((u32)1 << 1) /* Show the file origin of the message */
+#define NTFS_LOG_FLAG_LINE	((u32)1 << 2) /* Show the line number of the message */
+#define NTFS_LOG_FLAG_FUNCTION	((u32)1 << 3) /* Show the function name containing the message */
+#define NTFS_LOG_FLAG_ONLYNAME	((u32)1 << 4) /* Only display the filename, not the pathname */
+#define NTFS_LOG_FLAG_COLOUR	((u32)1 << 5) /* Colour highlight some messages */
 
 /* Macros to simplify logging.  One for each level defined above.
  * Note, if NTFS_DISABLE_DEBUG_LOGGING is defined, then ntfs_log_debug/trace have no effect.

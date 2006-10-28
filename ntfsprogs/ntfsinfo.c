@@ -1106,7 +1106,8 @@ static void ntfs_dump_sds_entry(SECURITY_DESCRIPTOR_HEADER *sds)
 	SECURITY_DESCRIPTOR_RELATIVE *sd;
 
 	ntfs_log_verbose("\n");
-	ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n", le32_to_cpu(sds->hash));
+	ntfs_log_verbose("\t\tHash:\t\t\t 0x%08x\n",
+			(unsigned)le32_to_cpu(sds->hash));
 	ntfs_log_verbose("\t\tSecurity id:\t\t %u (0x%x)\n",
 			(unsigned)le32_to_cpu(sds->security_id),
 			(unsigned)le32_to_cpu(sds->security_id));
@@ -1366,7 +1367,7 @@ static void ntfs_dump_index_key(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		break;
 	default:
 		ntfs_log_verbose("\t\tIndex attr type is UNKNOWN: \t 0x%08x\n",
-				le32_to_cpu(type));
+				(unsigned)le32_to_cpu(type));
 		break;
 	}
 }
@@ -1415,7 +1416,7 @@ static void ntfs_dump_index_data(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 				(unsigned)le32_to_cpu(data->sdh.length),
 				(unsigned)le32_to_cpu(data->sdh.length));
 		ntfs_log_verbose("\t\tUnknown (padding):\t 0x%08x\n",
-				 le32_to_cpu(data->sdh.reserved_II));
+				(unsigned)le32_to_cpu(data->sdh.reserved_II));
 		break;
 	case INDEX_ATTR_OBJID_O: {
 		OBJ_ID_INDEX_DATA *object_id_data;
@@ -1925,8 +1926,8 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		if (ea->name_length == 11 &&
 				!strncmp((const char*)"SETFILEBITS",
 				(const char*)ea->name, 11))
-			printf("0%o\n", le32_to_cpu(*(le32*)(ea->value +
-					ea->name_length + 1)));
+			printf("0%o\n", (unsigned)le32_to_cpu(*(le32*)
+					(ea->value + ea->name_length + 1)));
 		else
 			printf("'%s'\n", ea->value + ea->name_length + 1);
 		if (ea->next_entry_offset)

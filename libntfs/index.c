@@ -398,7 +398,8 @@ static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
 		ntfs_log_error("Corrupt index block : VCN (%lld) of inode %llu "
 			       "has a size (%u) differing from the index "
 			       "specified size (%u)\n", (long long)vcn,
-			       icx->ni->mft_no, ib_size, icx->block_size);
+			       icx->ni->mft_no, (unsigned)ib_size,
+			       (unsigned)icx->block_size);
 		return -1;
 	}
 	return 0;
@@ -656,8 +657,8 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	icx->block_size = le32_to_cpu(ir->index_block_size);
 	if (icx->block_size < NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
-		ntfs_log_perror("Index block size (%d) is smaller than the "
-				"sector size (%d)", icx->block_size,
+		ntfs_log_perror("Index block size (%u) is smaller than the "
+				"sector size (%d)", (unsigned)icx->block_size,
 				NTFS_BLOCK_SIZE);
 		return -1;
 	}

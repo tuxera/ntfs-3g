@@ -779,9 +779,12 @@ static void dump_resident_attr_val(ATTR_TYPES type, char *val, u32 val_len)
 		return;
 	case AT_INDEX_ROOT:
 		/* TODO */
-		printf("collation_rule %u\n", le32_to_cpu(((INDEX_ROOT*)val)->collation_rule));
-		printf("index.entries_offset %u\n", le32_to_cpu(((INDEX_ROOT*)val)->index.entries_offset));
-		printf("index.index_length %u\n", le32_to_cpu(((INDEX_ROOT*)val)->index.index_length));
+		printf("collation_rule %u\n", (unsigned)le32_to_cpu
+				(((INDEX_ROOT*)val)->collation_rule));
+		printf("index.entries_offset %u\n", (unsigned)le32_to_cpu
+				(((INDEX_ROOT*)val)->index.entries_offset));
+		printf("index.index_length %u\n", (unsigned)le32_to_cpu
+				(((INDEX_ROOT*)val)->index.index_length));
 		printf("%s\n", todo);
 		return;
 	case AT_INDEX_ALLOCATION:
@@ -3615,8 +3618,8 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 				return FALSE;
 			}
 		}
-		ntfs_log_quiet("Cluster size has been automatically set to %d "
-				"bytes.\n", vol->cluster_size);
+		ntfs_log_quiet("Cluster size has been automatically set to %u "
+				"bytes.\n", (unsigned)vol->cluster_size);
 	}
 	/* Validate cluster size. */
 	if (vol->cluster_size & (vol->cluster_size - 1)) {
@@ -3723,7 +3726,8 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 		ntfs_log_warning("Index record size (%u bytes) exceeds system "
 				"page size (%li bytes).  You will not be able "
 				"to mount this volume using the NTFS kernel "
-				"driver.\n", vol->indx_record_size, page_size);
+				"driver.\n", (unsigned)vol->indx_record_size,
+				page_size);
 	vol->indx_record_size_bits = ffs(vol->indx_record_size) - 1;
 	ntfs_log_debug("index record size = %u bytes\n",
 			(unsigned)vol->indx_record_size);
