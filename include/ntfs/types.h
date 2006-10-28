@@ -79,7 +79,7 @@ typedef sle64 leLSN;
 
 /*
  * Cygwin has a collision between our BOOL and <windef.h>'s
- * As long as this file will be included after <windows.h> were fine.
+ * As long as this file will be included after <windows.h> we're fine.
  */
 #ifndef _WINDEF_H
 /**
