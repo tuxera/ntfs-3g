@@ -216,6 +216,7 @@ do_next_tag:
 			goto return_overflow;
 		/* memmove() is safe with overlapping blocks. */
 		memmove(dest, dest_back_addr, length);
+		dest += length;
 		/* Advance source position and continue with the next token. */
 		cb += 2;
 	}
