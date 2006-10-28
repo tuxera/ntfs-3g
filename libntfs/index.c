@@ -218,9 +218,11 @@ static INDEX_ENTRY *ntfs_ie_get_last(INDEX_ENTRY *ie, char *ies_end)
 
 static INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
 {
+	INDEX_ENTRY *ie;
+
 	ntfs_log_trace("pos: %d\n", pos);
 
-	INDEX_ENTRY *ie = ntfs_ie_get_first(ih);
+	ie = ntfs_ie_get_first(ih);
 
 	while (pos-- > 0)
 		ie = ntfs_ie_get_next(ie);
@@ -229,10 +231,12 @@ static INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
 
 static INDEX_ENTRY *ntfs_ie_prev(INDEX_HEADER *ih, INDEX_ENTRY *ie)
 {
+	INDEX_ENTRY *ie_prev, *tmp;
+
 	ntfs_log_trace("Entering.\n");
 
-	INDEX_ENTRY *ie_prev = NULL;
-	INDEX_ENTRY *tmp     = ntfs_ie_get_first(ih);
+	ie_prev = NULL;
+	tmp     = ntfs_ie_get_first(ih);
 
 	while (tmp != ie) {
 		ie_prev = tmp;
