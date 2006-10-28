@@ -2352,18 +2352,18 @@ typedef struct {
 					   the index. */
 	} __attribute__((__packed__)) key;
 	/* The (optional) index data is inserted here when creating. */
-	// VCN vcn;	/* If INDEX_ENTRY_NODE bit in flags is set, the last
-	//		   eight bytes of this index entry contain the virtual
-	//		   cluster number of the index block that holds the
-	//		   entries immediately preceding the current entry (the
-	//		   vcn references the corresponding cluster in the data
-	//		   of the non-resident index allocation attribute). If
-	//		   the key_length is zero, then the vcn immediately
-	//		   follows the INDEX_ENTRY_HEADER. Regardless of
-	//		   key_length, the address of the 8-byte boundary
-	//		   aligned vcn of INDEX_ENTRY{_HEADER} *ie is given by
-	//		   (char*)ie + le16_to_cpu(ie->length) - sizeof(VCN),
-	//		   where sizeof(VCN) can be hardcoded as 8 if wanted. */
+	/* VCN vcn; */	/* If INDEX_ENTRY_NODE bit in flags is set, the last
+			   eight bytes of this index entry contain the virtual
+			   cluster number of the index block that holds the
+			   entries immediately preceding the current entry (the
+			   vcn references the corresponding cluster in the data
+			   of the non-resident index allocation attribute). If
+			   the key_length is zero, then the vcn immediately
+			   follows the INDEX_ENTRY_HEADER. Regardless of
+			   key_length, the address of the 8-byte boundary
+			   aligned vcn of INDEX_ENTRY{_HEADER} *ie is given by
+			   (char*)ie + le16_to_cpu(ie->length) - sizeof(VCN),
+			   where sizeof(VCN) can be hardcoded as 8 if wanted. */
 } __attribute__((__packed__)) INDEX_ENTRY;
 
 /**
