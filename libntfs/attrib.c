@@ -1352,7 +1352,7 @@ err_out:
 				err = 1;
 		} else
 			ntfs_attr_reinit_search_ctx(ctx);
-		if (!err) {
+		if (ctx) {
 			err = ntfs_attr_lookup(na->type, na->name,
 					na->name_len, 0, 0, NULL, 0, ctx);
 			if (!err) {
