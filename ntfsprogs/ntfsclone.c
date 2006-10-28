@@ -1312,8 +1312,8 @@ static void print_volume_size(const char *str, s64 bytes)
 }
 
 
-static void print_disk_usage(char *spacer, u32 cluster_size, s64 nr_clusters,
-		s64 inuse)
+static void print_disk_usage(const char *spacer, u32 cluster_size,
+		s64 nr_clusters, s64 inuse)
 {
 	s64 total, used;
 
