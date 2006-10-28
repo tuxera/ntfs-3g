@@ -78,8 +78,6 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a)
 		return sle64_to_cpu(a->data_size);
 	else
 		return (s64)le32_to_cpu(a->value_length);
-	errno = EINVAL;
-	return 0;
 }
 
 /**
@@ -254,6 +252,7 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 				errno = EIO;
 			}
 #undef ESTR
+			free(rl);
 			return 0;
 		}
 		total += r;
