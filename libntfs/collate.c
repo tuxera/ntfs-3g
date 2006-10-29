@@ -46,8 +46,8 @@
  * Returns:
  */
 static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
-		const void *data1, const int data1_len,
-		const void *data2, const int data2_len)
+		const void *data1, size_t data1_len,
+		const void *data2, size_t data2_len)
 {
 	int rc;
 
@@ -76,8 +76,8 @@ static int ntfs_collate_binary(ntfs_volume *vol __attribute__((unused)),
  * Returns:
  */
 static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
-		const void *data1, const int data1_len,
-		const void *data2, const int data2_len)
+		const void *data1, size_t data1_len,
+		const void *data2, size_t data2_len)
 {
 	int rc;
 	u32 d1, d2;
@@ -114,8 +114,8 @@ static int ntfs_collate_ntofs_ulong(ntfs_volume *vol __attribute__((unused)),
  * Returns:
  */
 static int ntfs_collate_file_name(ntfs_volume *vol,
-		const void *data1, const int data1_len __attribute__((unused)),
-		const void *data2, const int data2_len __attribute__((unused)))
+		const void *data1, size_t data1_len __attribute__((unused)),
+		const void *data2, size_t data2_len __attribute__((unused)))
 {
 	int rc;
 
@@ -130,8 +130,8 @@ static int ntfs_collate_file_name(ntfs_volume *vol,
 	return rc;
 }
 
-typedef int (*ntfs_collate_func_t)(ntfs_volume *, const void *, const int,
-		const void *, const int);
+typedef int (*ntfs_collate_func_t)(ntfs_volume *, const void *, size_t,
+		const void *, size_t);
 
 static ntfs_collate_func_t ntfs_do_collate0x0[3] = {
 	ntfs_collate_binary,
@@ -145,6 +145,31 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
 	NULL/*ntfs_collate_ntofs_security_hash*/,
 	NULL/*ntfs_collate_ntofs_ulongs*/,
 };
+
+/**
+ * ntfs_is_collation_rule_supported - Check if a collation rule is implemented.
+ * @cr: The to-be-checked collation rule
+ *
+ * Use this function to know if @cr is supported by libntfs.
+ *
+ * 7 collation rules are known to be supported by NTFS as defined
+ * in layout.h. However, libntfs only support 3 of them ATM.
+ *
+ * Return TRUE if @cr is supported. FALSE otherwise.
+ */
+BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
+{
+	return (cr == COLLATION_BINARY || cr == COLLATION_NTOFS_ULONG ||
+			cr == COLLATION_FILE_NAME);
+	/*
+	 * FIXME:  At the moment we only support COLLATION_BINARY,
+	 * COLLATION_NTOFS_ULONG and COLLATION_FILE_NAME.
+	 * The correct future implementation of this function should be:
+	 *
+	 * u32 i = le32_to_cpu(cr);
+	 * return ((i <= 0x02) || ((i >= 0x10) && (i <= 0x13)));
+	 */
+}
 
 /**
  * ntfs_collate - collate two data items using a specified collation rule
@@ -165,27 +190,20 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
  * Return NTFS_COLLATION_ERROR if error occurred.
  */
 int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
-		const void *data1, const int data1_len,
-		const void *data2, const int data2_len)
+		const void *data1, size_t data1_len,
+		const void *data2, size_t data2_len)
 {
-	int i;
+	u32 i;
 
 	ntfs_log_trace("Entering.\n");
-	if (!vol || !data1 || !data2 || data1_len < 0 || data2_len < 0) {
+	if (!vol || !data1 || !data2) {
 		ntfs_log_error("Invalid arguments passed.\n");
 		return NTFS_COLLATION_ERROR;
 	}
-	/*
-	 * FIXME:  At the moment we only support COLLATION_BINARY,
-	 * COLLATION_NTOFS_ULONG and COLLATION_FILE_NAME so we return error
-	 * for everything else.
-	 */
-	if (cr != COLLATION_BINARY && cr != COLLATION_NTOFS_ULONG &&
-			cr != COLLATION_FILE_NAME)
+
+	if (!ntfs_is_collation_rule_supported(cr))
 		goto err;
 	i = le32_to_cpu(cr);
-	if (i < 0)
-		goto err;
 	if (i <= 0x02)
 		return ntfs_do_collate0x0[i](vol, data1, data1_len,
 				data2, data2_len);

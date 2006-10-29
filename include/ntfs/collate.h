@@ -27,37 +27,12 @@
 #include "types.h"
 #include "volume.h"
 
-#define NTFS_COLLATION_ERROR -2
+#define NTFS_COLLATION_ERROR (-2)
 
-/**
- * ntfs_is_collation_rule_supported -
- * @cr:
- *
- * Description...
- *
- * Returns:
- */
-static inline BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
-{
-	int i;
-
-	/*
-	 * FIXME:  At the moment we only support COLLATION_BINARY,
-	 * COLLATION_NTOFS_ULONG and COLLATION_FILE_NAME so we return false
-	 * for everything else.
-	 */
-	if (cr != COLLATION_BINARY && cr != COLLATION_NTOFS_ULONG &&
-			cr != COLLATION_FILE_NAME)
-		return FALSE;
-	i = le32_to_cpu(cr);
-	if (((i >= 0) && (i <= 0x02)) ||
-			((i >= 0x10) && (i <= 0x13)))
-		return TRUE;
-	return FALSE;
-}
+extern BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr);
 
 extern int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
-		const void *data1, const int data1_len,
-		const void *data2, const int data2_len);
+		const void *data1, size_t data1_len,
+		const void *data2, size_t data2_len);
 
 #endif /* _NTFS_COLLATE_H */
