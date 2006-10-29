@@ -166,7 +166,7 @@ do_next_tag:
 	tag = *cb++;
 	/* Parse the eight tokens described by the tag. */
 	for (token = 0; token < 8; token++, tag >>= 1) {
-		u16 lg, pt, length;
+		u16 lg, pt, length, max_non_overlap;
 		register u16 i;
 		u8 *dest_back_addr;
 
@@ -214,9 +214,27 @@ do_next_tag:
 		/* Verify destination is in range. */
 		if (dest + length > dest_sb_end)
 			goto return_overflow;
-		/* memmove() is safe with overlapping blocks. */
-		memmove(dest, dest_back_addr, length);
-		dest += length;
+		/* The number of non-overlapping bytes. */
+		max_non_overlap = dest - dest_back_addr;
+		if (length <= max_non_overlap) {
+			/* The byte sequence doesn't overlap, just copy it. */
+			memcpy(dest, dest_back_addr, length);
+			/* Advance destination pointer. */
+			dest += length;
+		} else {
+			/*
+			 * The byte sequence does overlap, copy non-overlapping
+			 * part and then do a slow byte by byte copy for the
+			 * overlapping part. Also, advance the destination
+			 * pointer.
+			 */
+			memcpy(dest, dest_back_addr, max_non_overlap);
+			dest += max_non_overlap;
+			dest_back_addr += max_non_overlap;
+			length -= max_non_overlap;
+			while (length--)
+				*dest++ = *dest_back_addr++;
+		}
 		/* Advance source position and continue with the next token. */
 		cb += 2;
 	}

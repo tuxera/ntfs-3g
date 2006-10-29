@@ -57,8 +57,6 @@ xx/xx/2006 - x.xx.x - .
 	- Spelling mistake fixes.  (Yuval)
 	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
 	- Memory leak fixes.  (Yura, Yuval)
-	- Use memmove() in compress.c for moving overlapping blocks instead
-	  of copying bytes manually.  (Yuval)
 	- Change ntfs_collate()'s signature to take size_t's.  (Yuval)
 	- Move ntfs_is_collation_rule_supported() from collate.h to collate.c
 	  and rewrite it to be clearer.  (Yuval)
