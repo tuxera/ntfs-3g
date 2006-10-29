@@ -54,7 +54,7 @@ xx/xx/2006 - x.xx.x - .
 	- Fix GUID to string conversion.  (Anton)
 	- Fix some byte-order conversion for u32 variables that used le16
 	  conversion macros.  (zhanglinbao, Yuval)
-	- Spelling mistake fixes in debug logging strings.  (Yuval)
+	- Spelling mistake fixes.  (Yuval)
 	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
 	- Memory leak fixes.  (Yura, Yuval)
 	- Use memmove() in compress.c for moving overlapping blocks instead
@@ -62,6 +62,7 @@ xx/xx/2006 - x.xx.x - .
 	- Change ntfs_collate()'s signature to take size_t's.  (Yuval)
 	- Move ntfs_is_collation_rule_supported() from collate.h to collate.c
 	  and rewrite it to be clearer.  (Yuval)
+	- Move ntfs_index_entry_mark_dirty() to index.c.  (Szaka)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

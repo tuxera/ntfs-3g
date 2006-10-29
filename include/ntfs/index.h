@@ -126,26 +126,6 @@ extern char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
 extern void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
 extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
-/**
- * ntfs_index_entry_mark_dirty - mark an index entry dirty
- * @ictx:	ntfs index context describing the index entry
- *
- * Mark the index entry described by the index entry context @ictx dirty.
- *
- * If the index entry is in the index root attribute, simply mark the inode
- * containing the index root attribute dirty.  This ensures the mftrecord, and
- * hence the index root attribute, will be written out to disk later.
- *
- * If the index entry is in an index block belonging to the index allocation
- * attribute, set ib_dirty to TRUE, thus index block will be updated during
- * ntfs_index_ctx_put.
- */
-static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
-{
-	if (ictx->is_in_root)
-		ntfs_inode_mark_dirty(ictx->actx->ntfs_ino);
-	else
-		ictx->ib_dirty = TRUE;
-}
+extern void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx);
 
 #endif /* _NTFS_INDEX_H */

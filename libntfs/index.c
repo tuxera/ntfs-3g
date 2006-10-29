@@ -46,6 +46,28 @@
 #include "bitmap.h"
 #include "support.h"
 
+/**
+ * ntfs_index_entry_mark_dirty - mark an index entry dirty
+ * @ictx:	ntfs index context describing the index entry
+ *
+ * Mark the index entry described by the index entry context @ictx dirty.
+ *
+ * If the index entry is in the index root attribute, simply mark the inode
+ * containing the index root attribute dirty.  This ensures the mftrecord, and
+ * hence the index root attribute, will be written out to disk later.
+ *
+ * If the index entry is in an index block belonging to the index allocation
+ * attribute, set ib_dirty to TRUE, thus index block will be updated during
+ * ntfs_index_ctx_put.
+ */
+void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
+{
+	if (ictx->is_in_root)
+		ntfs_inode_mark_dirty(ictx->actx->ntfs_ino);
+	else
+		ictx->ib_dirty = TRUE;
+}
+
 static s64 ntfs_ib_vcn_to_pos(ntfs_index_context *icx, VCN vcn)
 {
 	return vcn << icx->vcn_size_bits;
