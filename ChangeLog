@@ -56,6 +56,12 @@ xx/xx/2006 - x.xx.x - .
 	  conversion macros.  (zhanglinbao, Yuval)
 	- Spelling mistake fixes in debug logging strings.  (Yuval)
 	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
+	- Memory leak fixes.  (Yura, Yuval)
+	- Use memmove() in compress.c for moving overlapping blocks instead
+	  of copying bytes manually.  (Yuval)
+	- Change ntfs_collate()'s signature to take size_t's.  (Yuval)
+	- Move ntfs_is_collation_rule_supported() from collate.h to collate.c
+	  and rewrite it to be clearer.  (Yuval)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
