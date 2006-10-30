@@ -385,11 +385,11 @@ static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 		size -= sizeof(VCN);
 
 	dup = ntfs_malloc(size);
-	if (dup)
+	if (dup) {
 		memcpy(dup, ie, size);
-
-	dup->flags &= ~INDEX_ENTRY_NODE;
-	dup->length = size;
+		dup->flags &= ~INDEX_ENTRY_NODE;
+		dup->length = size;
+	}
 	return dup;
 }
 
