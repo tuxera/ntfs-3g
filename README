@@ -1,0 +1,63 @@
+
+INTRODUCTION
+============
+
+The ntfs-3g driver is an open source, freely available read/write NTFS
+driver, which provides safe and fast handling of the Windows XP, Windows 
+Server 2003 and Windows 2000 filesystems. Almost the full POSIX filesystem 
+functionality is supported, the major exceptions are changing the file 
+ownerships and the access rights.
+
+The purpose of the project is to develop, continuously quality test and
+support a trustable, featureful and high performance solution for hardware
+platforms and operating systems whose users need to reliably interoperate
+with NTFS. Besides this practical goal, the project also aims to explore
+the limits of the hybrid, kernel/user space filesystem driver approach,
+performance, reliability and feature richness per invested effort wise.
+
+The driver currently is in BETA status, which means that we weren't
+reported and haven't found any data corruption or loss during ordinary
+driver use and in our extensive quality testing before release of the
+latest version of ntfs-3g, however we are aware of some usability issues
+and driver restrictions which are all documented and planned to be resolved
+in the future.
+
+You can find news, technical answers, problem submission instructions, 
+performance evaluation and other informations on the project web site: 
+
+			http://www.ntfs-3g.org
+
+
+QUICK INSTALLATION
+==================
+	
+Make sure you have the basic Linux development tools and the full FUSE 
+package (http://fuse.sourceforge.net) is already installed correctly on 
+the computer. Then type:  
+
+	./configure
+	make
+	make install      # or 'sudo make install' if you aren't root.
+
+
+USAGE
+=====
+
+If there was no error during installation then the NTFS volume can be
+read-write mounted for everybody the following way (unmount the volume if 
+it was already mounted, and replace /dev/hda1 and /mnt/windows, if needed):
+
+    ntfs-3g /dev/hda1 /mnt/windows
+
+You may also need to set the 'locale' option to make all files with national 
+characters visible. Replace the below hu_HU.utf8 with the appropriate setting. 
+
+    ntfs-3g /dev/hda1 /mnt/windows -o locale=hu_HU.utf8
+
+Please see the ntfs-3g manual page for more options and examples.
+
+You can also make NTFS to be mounted during boot by putting the below 
+line at the end of the /etc/fstab file:
+
+    /dev/hda1 /mnt/windows ntfs-3g defaults 0 0
+

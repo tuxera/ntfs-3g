@@ -1,0 +1,198 @@
+.\" Copyright (c) 2005-2006 Yura Pakhuchiy.
+.\" Copyright (c) 2005 Richard Russon.
+.\" Copyright (c) 2006 Szabolcs Szakacsits.
+.\" This file may be copied under the terms of the GNU Public License.
+.\"
+.TH NTFS-3G 8 "October 2006" "ntfs-3g @VERSION@"
+.SH NAME
+ntfs-3g \- Third Generation NTFS Driver
+.SH SYNOPSIS
+.B ntfs-3g
+.I device mount_point
+[\fB\-o options\fR]
+.SH DESCRIPTION
+\fBntfs-3g\fR is an NTFS driver, which can
+create, remove, rename files, directories, hard links, and
+streams; it can read and write files, including 
+streams and sparse files; it can handle special files like 
+symbolic links, devices, and FIFOs; moreover it can also read
+compressed files.
+.SH OPTIONS
+Below is a summary of the options that \fBntfs-3g\fR accepts.
+.TP
+.B uid=, gid=, umask=
+Provide default owner, group, and access mode mask.
+These options work as documented in mount(8).  By
+default, the files and directories are owned by the user who 
+mounted the volume but everybody has full read, write and
+executable access, moreover browse permission to any directory. 
+If you want to use the currently limited permission
+handling then use these options together with the 
+.B default_permissions,
+.B fmask
+and
+.B dmask
+options. The usage of the
+.B default_permissions
+option is a must in such cases.
+.TP
+.B default_permissions
+By default FUSE doesn't check file access permissions, the
+filesystem is free to implement its access policy or leave it to
+the underlying file access mechanism (e.g. in case of network
+filesystems).  This option enables permission checking, restricting
+accesses based on file modes.  This option is usually useful
+together with the 
+.B allow_other
+mount option.
+.TP
+.B fmask=, dmask=
+Instead of specifying umask which applies both to
+files and directories, fmask applies only to files and
+mask only to directories.
+.TP
+.B ro
+Mount filesystem read\-only.
+.TP
+.B locale=
+You can set locale with this option which is often required to make 
+visible files with national charaters. It's useful if locale 
+environment variables are not set before partitions had been mounted 
+from /etc/fstab.
+.TP
+.B force
+Force mount even if the volume is scheduled for consistency check.
+Use this option with caution and preferably with the
+.B ro
+option.
+.TP
+.B show_sys_files
+Show the system files in directory listings. 
+Otherwise the default behaviour is to hide the system files.
+Please note that even when this option is specified, "$MFT"
+may not be visible due to a glibc bug.
+Furthermore, irrespectively of show_sys_files, all
+files are accessible by name, for example you can always do
+"ls \-l '$UpCase'".
+.TP
+.B allow_other
+This option overrides the security measure restricting file access
+to the user mounting the filesystem.  This option is by default only
+allowed to root, but this restriction can be removed with a
+configuration option described in the previous section.
+.TP
+.B large_read
+Issue large read requests.  This can improve performance for some
+filesystems, but can also degrade performance.  This option is mostly
+useful on 2.4.X kernels, as on 2.6 kernels requests size is
+automatically determined for optimum performance.
+.TP
+.B max_read=
+With this option the maximum size of read operations can be set.
+The default is infinite.  Note that the size of read requests is
+limited anyway to 32 pages (which is 128kbyte on i386).
+.TP
+.B silent
+Do nothing on chmod and chown operations, but do not return error. 
+This option is on by default.
+.TP
+.B no_def_opts
+By default ntfs-3g acts as "silent,allow_other" was passed to it,
+this option cancel this behaviour.
+.TP
+.B streams_interface=
+This option controls how the user can access Alternate Data Streams (ADS)
+or in other words, named data streams. It can be set
+to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
+\fBnone\fR, the user will have no access to the named data streams.  If it's set
+to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
+file:stream). If it's set to \fBxattr\fR, then the named data streams are
+mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
+utilities. The default is \fBnone\fR.
+.TP
+.B debug
+Makes ntfs-3g to not detach from terminal and print a lot of debug output from
+libntfs-3g and FUSE.
+.TP
+.B no_detach
+Same as above but with less debug output.
+.SH ALTERNATE DATA STREAMS (ADS)
+All data on NTFS is stored in streams.  Every file has exactly one unnamed
+data stream and can have many named data streams.  The size of a file is the
+size of its unnamed data stream.  By default, \fBntfs-3g\fR will only read
+the unnamed data stream.
+.PP
+By using the options "streams_interface=windows", you will be able to read
+any named data streams, simply by specifying the stream's name after a colon.
+For example:
+.RS
+.sp
+cat some.mp3:artist
+.sp
+.RE
+Named data streams act like normals files, so you can read from them, write to
+them and even delete them (using rm).  You can list all the named data streams
+a file has by getting the "ntfs.streams.list" extended attribute.
+.SH EXAMPLES
+Mount /dev/hda1 to /mnt/windows:
+.RS
+.sp
+.B ntfs-3g /dev/hda1 /mnt/windows
+.sp
+.RE
+Read\-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 
+to be the owner of all files:
+.RS
+.sp
+.B ntfs-3g /dev/hda5 /home/user/mnt \-o ro,uid=1000
+.sp
+.RE
+/etc/fstab entry for the above:
+.RS
+.sp
+.B /dev/hda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
+.sp
+.RE
+Unmount /mnt/windows:
+.RS
+.sp
+.B umount /mnt/windows
+.sp
+.RE
+You can also unmount /mnt/windows with fusermount:
+.RS
+.sp
+.B fusermount \-u /mnt/windows
+.sp
+.RE
+.SH KNOWN ISSUES
+Please see 
+.RS
+.sp
+http://www.ntfs-3g.org/support.html
+.sp
+.RE
+for all known issues.
+If you would find a new one in the latest release of
+this software then please send an email describing it
+according to the above page. You can also contact the 
+development team on the ntfs\-3g\-devel@lists.sf.net email 
+address anytime.
+.SH AUTHORS
+.B ntfs-3g 
+was based on and a major improvement to ntfsmount and libntfs which were
+written by Yura Pakhuchiy and the Linux-NTFS team. The improvements were 
+made, the ntfs-3g project was initiated and currently led by long time 
+Linux-NTFS team developer Szabolcs Szakacsits (szaka@sienet.hu) to revive
+the stalled open source development and project management.
+
+.SH THANKS
+Several people made heroic efforts, often over five or more
+years which resulted the ntfs-3g driver. Most importantly they are 
+Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
+Yuval Fedel, and the author of the groundbreaking FUSE filesystem development 
+framework, Miklos Szeredi.
+.SH SEE ALSO
+.BR ntfsprogs (8),
+.BR attr (5),
+.BR getfattr (1)
