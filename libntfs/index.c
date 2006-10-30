@@ -789,7 +789,7 @@ done:
 	return 0;
 }
 
-static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, int ib_size,
+static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, u32 ib_size,
 				  INDEX_HEADER_FLAGS node_type)
 {
 	INDEX_BLOCK *ib;
@@ -985,8 +985,8 @@ static INDEX_BLOCK *ntfs_ir_to_ia(INDEX_ROOT *ir, VCN ib_vcn)
 
 	ntfs_log_trace("Entering.\n");
 
-	ib = ntfs_ib_alloc(ib_vcn, ir->index_block_size, LEAF_NODE);
-	if (!ib)
+	if (!(ib = ntfs_ib_alloc(ib_vcn, le32_to_cpu(ir->index_block_size),
+			LEAF_NODE)))
 		return NULL;
 
 	ies_start = (char *)ntfs_ie_get_first(&ir->index);
