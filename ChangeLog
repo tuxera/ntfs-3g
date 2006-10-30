@@ -192,7 +192,7 @@ xx/xx/2006 - x.xx.x - .
 	- New APIs (dir.[ch]):
 	    ntfs_create_device() for Interix block and character devices
 	    creation.
-	    ntfs_crate_symlink() for Interix symbolic links creation.  (Yura)
+	    ntfs_create_symlink() for Interix symbolic links creation.  (Yura)
 	- Teach ntfs_create() to create Interix FIFOs and sockets.  (Yura)
 	- Fix the -u option in ntfsundelete.  Instead of a confusing optional
 	  parameter, there's a new option -i with a required parameter.  (Rich)

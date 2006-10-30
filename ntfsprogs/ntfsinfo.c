@@ -904,7 +904,7 @@ static void ntfs_dump_acl(const char *prefix, ACL *acl)
 
 		/* proceed to next ACE */
 		ace = (ACCESS_ALLOWED_ACE *)(((char *)ace) +
-				le32_to_cpu(ace->size));
+				le16_to_cpu(ace->size));
 	}
 }
 
