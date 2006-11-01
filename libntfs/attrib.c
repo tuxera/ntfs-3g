@@ -921,6 +921,154 @@ rl_err_out:
 	return -1;
 }
 
+static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
+			runlist_element **rl, VCN *update_from)
+{
+	s64 to_write;
+	ntfs_volume *vol = na->ni->vol;
+	int eo, ret = -1;
+	runlist *rlc;
+	LCN lcn_seek_from = -1;
+	VCN cur_vcn, from_vcn;
+
+	to_write = min(count, ((*rl)->length << vol->cluster_size_bits) - *ofs);
+
+	/* Instantiate the hole. */
+	cur_vcn = (*rl)->vcn;
+	from_vcn = (*rl)->vcn + (*ofs >> vol->cluster_size_bits);
+	ntfs_log_trace("Instantiate the hole with vcn 0x%llx.\n", cur_vcn);
+	/*
+	 * Map whole runlist to be able update mapping pairs
+	 * later.
+	 */
+	if (ntfs_attr_map_whole_runlist(na))
+		goto err_out;
+	/*
+	 * Restore @*rl, it probably get lost during runlist
+	 * mapping.
+	 */
+	*rl = ntfs_attr_find_vcn(na, cur_vcn);
+	if (!*rl) {
+		ntfs_log_error("Failed to find run after mapping runlist. "
+				"Please report to %s.\n", NTFS_DEV_LIST);
+		errno = EIO;
+		goto err_out;
+	}
+	/*
+	 * Search backwards to find the best lcn to start
+	 * seek from.
+	 */
+	rlc = *rl;
+	while (rlc->vcn) {
+		rlc--;
+		if (rlc->lcn >= 0) {
+			lcn_seek_from = rlc->lcn + (from_vcn - rlc->vcn);
+			break;
+		}
+	}
+	if (lcn_seek_from == -1) {
+		/* Backwards search failed, search forwards. */
+		rlc = *rl;
+		while (rlc->length) {
+			rlc++;
+			if (rlc->lcn >= 0) {
+				lcn_seek_from = rlc->lcn -
+					(rlc->vcn - from_vcn);
+				break;
+			}
+		}
+	}
+	/* Allocate clusters to instantiate the hole. */
+	rlc = ntfs_cluster_alloc(vol, from_vcn,
+				((*ofs + to_write - 1) >>
+				vol->cluster_size_bits) + 1 +
+				(*rl)->vcn - from_vcn,
+				lcn_seek_from, DATA_ZONE);
+	if (!rlc) {
+		ntfs_log_perror("Hole filling cluster allocation failed");
+		goto err_out;
+	}
+	/* Merge runlists. */
+	*rl = ntfs_runlists_merge(na->rl, rlc);
+	if (!*rl) {
+		eo = errno;
+		ntfs_log_trace("Failed to merge runlists.\n");
+		if (ntfs_cluster_free_from_rl(vol, rlc)) {
+			ntfs_log_trace("Failed to free just "
+				"allocated clusters. Leaving "
+				"inconsistent metadata. "
+				"Run chkdsk\n");
+		}
+		errno = eo;
+		goto err_out;
+	}
+	na->rl = *rl;
+	if (*update_from == -1)
+		*update_from = from_vcn;
+	*rl = ntfs_attr_find_vcn(na, cur_vcn);
+	if (!*rl) {
+		/*
+		 * It's definitely a BUG, if we failed to find @cur_vcn, because
+		 * we missed it during instantiating of the hole.
+		 */
+		ntfs_log_error("BUG! Failed to find run after hole "
+				"instantiating. Please report to the %s.\n",
+				NTFS_DEV_LIST);
+		errno = EIO;
+		goto err_out;
+	}
+	/* If leaved part of the hole go to the next run. */
+	if ((*rl)->lcn < 0)
+		(*rl)++;
+	/* Now LCN shoudn't be less than 0. */
+	if ((*rl)->lcn < 0) {
+		ntfs_log_error("BUG! LCN is lesser than 0. "
+				"Please report to the %s.\n", NTFS_DEV_LIST);
+		errno = EIO;
+		goto err_out;
+	}
+	if (*ofs) {
+		/*
+		 * Need to clear region between start of
+		 * @cur_vcn cluster and @*ofs.
+		 */
+		char *buf;
+
+		buf = ntfs_malloc(*ofs);
+		if (!buf) {
+			errno = ENOMEM;
+			goto err_out;
+		}
+		memset(buf, 0, *ofs);
+		if (ntfs_rl_pwrite(vol, na->rl, cur_vcn <<
+					vol->cluster_size_bits, *ofs, buf) < 0) {
+			eo = errno;
+			ntfs_log_perror("Failed to zero area");
+			free(buf);
+			errno = eo;
+			goto err_out;
+		}
+		free(buf);
+	}
+	if ((*rl)->vcn < cur_vcn) {
+		/*
+		 * Clusters that replaced hole are merged with
+		 * previous run, so we need to update offset.
+		 */
+		*ofs += (cur_vcn - (*rl)->vcn) << vol->cluster_size_bits;
+	}
+	if ((*rl)->vcn > cur_vcn) {
+		/*
+		 * We left part of the hole, so we need to update the offset.
+		 */
+		*ofs -= ((*rl)->vcn - cur_vcn) << vol->cluster_size_bits;
+	}
+
+	ret = 0;
+err_out:
+	return ret;
+}
+
 /**
  * ntfs_attr_pwrite - positioned write to an ntfs attribute
  * @na:		ntfs attribute to write to
@@ -942,7 +1090,8 @@ rl_err_out:
  */
 s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 {
-	s64 written, to_write, ofs, total, old_initialized_size, old_data_size;
+	s64 written, to_write, ofs, old_initialized_size, old_data_size;
+	s64 total = 0;
 	VCN update_from = -1;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
@@ -951,8 +1100,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	struct {
 		unsigned int undo_initialized_size	: 1;
 		unsigned int undo_data_size		: 1;
-		unsigned int update_mapping_pairs	: 1;
-	} need_to = { 0, 0, 0 };
+	} need_to = { 0, 0 };
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
 			"0x%llx.\n", na->ni->mft_no, na->type, (long long)pos,
@@ -1028,7 +1176,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		ntfs_attr_put_search_ctx(ctx);
 		return count;
 	}
-	total = 0;
+
 	/* Handle writes beyond initialized_size. */
 	if (pos + count > na->initialized_size) {
 		if (ntfs_attr_map_whole_runlist(na))
@@ -1125,174 +1273,22 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			goto rl_err_out;
 		}
 		if (rl->lcn < (LCN)0) {
-			LCN lcn_seek_from = -1;
-			runlist *rlc;
-			VCN cur_vcn, from_vcn;
-
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
 				goto rl_err_out;
 			}
-			
-			to_write = min(count, (rl->length <<
-					vol->cluster_size_bits) - ofs);
-			
-			/* Instantiate the hole. */
-			cur_vcn = rl->vcn;
-			from_vcn = rl->vcn + (ofs >> vol->cluster_size_bits);
-			ntfs_log_trace("Instantiate hole with vcn 0x%llx.\n",
-					cur_vcn);
-			/*
-			 * Map whole runlist to be able update mapping pairs
-			 * later.
-			 */
-			if (ntfs_attr_map_whole_runlist(na))
-				goto err_out;
-			/*
-			 * Restore @rl, it probably get lost during runlist
-			 * mapping.
-			 */
-			rl = ntfs_attr_find_vcn(na, cur_vcn);
-			if (!rl) {
-				ntfs_log_error("BUG! Failed to find run after "
-						"mapping whole runlist. Please "
-						"report to the %s.\n",
-						NTFS_DEV_LIST);
-				errno = EIO;
-				goto err_out;
-			}
-			/*
-			 * Search backwards to find the best lcn to start
-			 * seek from.
-			 */
-			rlc = rl;
-			while (rlc->vcn) {
-				rlc--;
-				if (rlc->lcn >= 0) {
-					lcn_seek_from = rlc->lcn +
-							(from_vcn - rlc->vcn);
-					break;
-				}
-			}
-			if (lcn_seek_from == -1) {
-				/* Backwards search failed, search forwards. */
-				rlc = rl;
-				while (rlc->length) {
-					rlc++;
-					if (rlc->lcn >= 0) {
-						lcn_seek_from = rlc->lcn -
-							(rlc->vcn - from_vcn);
-						break;
-					}
-				}
-			}
-			/* Allocate clusters to instantiate the hole. */
-			rlc = ntfs_cluster_alloc(vol, from_vcn,
-						((ofs + to_write - 1) >>
-						vol->cluster_size_bits) + 1 +
-						rl->vcn - from_vcn,
-						lcn_seek_from, DATA_ZONE);
-			if (!rlc) {
-				eo = errno;
-				ntfs_log_trace("Failed to allocate clusters "
-						"for hole instantiating.\n");
-				errno = eo;
-				goto err_out;
-			}
-			/* Merge runlists. */
-			rl = ntfs_runlists_merge(na->rl, rlc);
-			if (!rl) {
-				eo = errno;
-				ntfs_log_trace("Failed to merge runlists.\n");
-				if (ntfs_cluster_free_from_rl(vol, rlc)) {
-					ntfs_log_trace("Failed to free just "
-						"allocated clusters. Leaving "
-						"inconsistent metadata. "
-						"Run chkdsk\n");
-				}
-				errno = eo;
-				goto err_out;
-			}
-			na->rl = rl;
-			need_to.update_mapping_pairs = 1;
-			if (update_from == -1)
-				update_from = from_vcn;
-			rl = ntfs_attr_find_vcn(na, cur_vcn);
-			if (!rl) {
-				/*
-				 * It's definitely a BUG, if we failed to find
-				 * @cur_vcn, because we missed it during
-				 * instantiating of the hole.
-				 */
-				ntfs_log_error("BUG! Failed to find run after "
-						"instantiating. Please report "
-						"to the %s.\n", NTFS_DEV_LIST);
-				errno = EIO;
-				goto err_out;
-			}
-			/* If leaved part of the hole go to the next run. */
-			if (rl->lcn < 0)
-				rl++;
-			/* Now LCN shoudn't be less than 0. */
-			if (rl->lcn < 0) {
-				ntfs_log_error("BUG! LCN is lesser than 0. "
-						"Please report to the %s.\n",
-						NTFS_DEV_LIST);
-				errno = EIO;
-				goto err_out;
-			}
-			if (ofs) {
-				/*
-				 * Need to clear region between start of
-				 * @cur_vcn cluster and @ofs.
-				 */
-				char *buf;
 
-				buf = malloc(ofs);
-				if (!buf) {
-					ntfs_log_trace("Not enough memory to "
-							"allocate %lld "
-							"bytes.\n", ofs);
-					errno = ENOMEM;
-					goto err_out;
-				}
-				memset(buf, 0, ofs);
-				if (ntfs_rl_pwrite(vol, na->rl, cur_vcn <<
-							vol->cluster_size_bits,
-							ofs, buf) < 0) {
-					eo = errno;
-					ntfs_log_trace("Failed to zero "
-							"area.\n");
-					free(buf);
-					errno = eo;
-					goto err_out;
-				}
-				free(buf);
-			}
-			if (rl->vcn < cur_vcn) {
-				/*
-				 * Clusters that replaced hole are merged with
-				 * previous run, so we need to update offset.
-				 */
-				ofs += (cur_vcn - rl->vcn) <<
-					vol->cluster_size_bits;
-			}
-			if (rl->vcn > cur_vcn) {
-				/*
-				 * We left part of the hole, so update we need
-				 * to update offset
-				 */
-				ofs -= (rl->vcn - cur_vcn) <<
-					vol->cluster_size_bits;
-			}
+			if (ntfs_attr_fill_hole(na, count, &ofs, &rl,
+					&update_from))
+				goto err_out;
 		}
+
 		/* It is a real lcn, write it to the volume. */
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		ntfs_log_trace("Writing 0x%llx bytes to vcn 0x%llx, lcn 0x%llx,"
-				" ofs 0x%llx.\n", to_write, rl->vcn, rl->lcn,
-				ofs);
+		ntfs_log_trace("Writing %lld bytes to vcn %lld, lcn %lld, ofs "
+				"%lld.\n", to_write, rl->vcn, rl->lcn, ofs);
 		if (!NVolReadOnly(vol))
 			written = ntfs_pwrite(vol->dev, (rl->lcn <<
 					vol->cluster_size_bits) + ofs,
@@ -1317,7 +1313,7 @@ done:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
-	if (need_to.update_mapping_pairs)
+	if (update_from != -1)
 		ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/);
 	/* Finally, return the number of bytes written. */
 	return total;
@@ -1375,7 +1371,7 @@ err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
-	if (need_to.update_mapping_pairs)
+	if (update_from != -1)
 		ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/);
 	/* Restore original data_size if needed. */
 	if (need_to.undo_data_size && ntfs_attr_truncate(na, old_data_size))

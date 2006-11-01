@@ -62,6 +62,7 @@ xx/xx/2006 - x.xx.x - .
 	- Move ntfs_index_entry_mark_dirty() to index.c.  (Szaka)
 	- Introduce misc.c. Move ntfs_[mc]alloc there.  (Szaka)
 	- Change malloc() calls to ntfs_malloc().  (Szaka)
+	- Factor ntfs_attr_fill_hole() out of ntfs_attr_pwrite().  (Szaka)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
