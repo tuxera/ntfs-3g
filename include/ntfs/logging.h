@@ -75,7 +75,6 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define NTFS_LOG_LEVEL_ERROR	((u32)1 <<  7) /* Operation failed, no damage done */
 #define NTFS_LOG_LEVEL_PERROR	((u32)1 <<  8) /* Message : standard error description */
 #define NTFS_LOG_LEVEL_CRITICAL	((u32)1 <<  9) /* Operation failed,damage may have occurred */
-#define NTFS_LOG_LEVEL_REASON	((u32)1 << 10) /* Human readable reason for failure */
 
 /* Logging style flags - Manage the style of the output */
 #define NTFS_LOG_FLAG_PREFIX	((u32)1 << 0) /* Prefix messages with "ERROR: ", etc */
@@ -96,7 +95,6 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define ntfs_log_quiet(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_QUIET,NULL,FORMAT,##ARGS)
 #define ntfs_log_verbose(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_VERBOSE,NULL,FORMAT,##ARGS)
 #define ntfs_log_warning(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_WARNING,NULL,FORMAT,##ARGS)
-#define ntfs_log_reason(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_REASON,NULL,FORMAT,##ARGS)
 
 /* By default debug and trace messages are compiled into the program,
  * but not displayed.
