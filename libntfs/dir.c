@@ -1594,7 +1594,7 @@ search:
 	/* Remove FILE_NAME from index. */
 	if (ntfs_index_rm(ictx))
 		goto err_out;
-	ictx = NULL;
+
 	/* Remove FILE_NAME from inode. */
 	if (ntfs_attr_record_rm(actx))
 		goto err_out;
