@@ -299,7 +299,7 @@ ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen)
 	u32 len;
 
 	len = ntfs_ucsnlen(s, maxlen);
-	dst = malloc((len + 1) * sizeof(ntfschar));
+	dst = ntfs_malloc((len + 1) * sizeof(ntfschar));
 	if (dst) {
 		memcpy(dst, s, len * sizeof(ntfschar));
 		dst[len] = cpu_to_le16(L'\0');
@@ -419,7 +419,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 	}
 	if (!mbs) {
 		mbs_len = (ins_len + 1) * MB_CUR_MAX;
-		mbs = (char*)malloc(mbs_len);
+		mbs = (char*)ntfs_malloc(mbs_len);
 		if (!mbs)
 			return -1;
 	}
@@ -436,7 +436,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 				errno = ENAMETOOLONG;
 				return -1;
 			}
-			tc = (char*)malloc((mbs_len + 64) & ~63);
+			tc = (char*)ntfs_malloc((mbs_len + 64) & ~63);
 			if (!tc)
 				goto err_out;
 			memcpy(tc, mbs, mbs_len);
@@ -562,7 +562,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 	ins_len++;
 	if (!ucs) {
 		ucs_len = ins_len;
-		ucs = (ntfschar*)malloc(ucs_len * sizeof(ntfschar));
+		ucs = (ntfschar*)ntfs_malloc(ucs_len * sizeof(ntfschar));
 		if (!ucs)
 			return -1;
 	}

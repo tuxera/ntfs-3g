@@ -56,6 +56,7 @@
 #include "compress.h"
 #include "bitmap.h"
 #include "logging.h"
+#include "support.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -175,11 +176,10 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 			 * going to overflow in the same fashion.
 			 * Temporary fix:  same as above.
 			 */
-			intbuf = malloc(rl[i].length << vol->cluster_size_bits);
+			intbuf = ntfs_malloc(rl[i].length <<
+					vol->cluster_size_bits);
 			if (!intbuf) {
 				int eo = errno;
-				ntfs_log_perror("Couldn't allocate memory for "
-						"internal buffer.");
 				free(rl);
 				errno = eo;
 				return 0;
@@ -1043,13 +1043,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		/* If write starts beyond initialized_size, zero the gap. */
 		if (pos > na->initialized_size) {
 			char *buf;
-			int err;
 
-			buf = malloc(NTFS_BUF_SIZE);
-			if (!buf) {
-				ntfs_log_trace("Not enough memory.\n");
+			buf = ntfs_malloc(NTFS_BUF_SIZE);
+			if (!buf)
 				goto err_out;
-			}
+
 			memset(buf, 0, NTFS_BUF_SIZE);
 			ofs = na->initialized_size;
 			while (ofs < pos) {
@@ -1057,7 +1055,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				written = ntfs_rl_pwrite(vol, na->rl, ofs,
 							to_write, buf);
 				if (written <= 0) {
-					err = errno;
+					int err = errno;
 					ntfs_log_trace("Failed to zero space "
 							"between initialized "
 							"size and @pos.\n");
@@ -2294,7 +2292,7 @@ ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 		errno = EINVAL;
 		return NULL;
 	}
-	ctx = malloc(sizeof(ntfs_attr_search_ctx));
+	ctx = ntfs_malloc(sizeof(ntfs_attr_search_ctx));
 	if (ctx)
 		ntfs_attr_init_search_ctx(ctx, ni, mrec);
 	return ctx;
@@ -4738,12 +4736,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * sparse runs instead of real allocation of clusters.
 		 */
 		if (na->type == AT_DATA && vol->major_ver >= 3) {
-			rl = malloc(0x1000);
-			if (!rl) {
-				ntfs_log_trace("Not enough memory.\n");
-				err = ENOMEM;
+			rl = ntfs_malloc(0x1000);
+			if (!rl)
 				return -1;
-			}
+
 			rl[0].vcn = (na->allocated_size >>
 					vol->cluster_size_bits);
 			rl[0].lcn = LCN_HOLE;
@@ -4983,11 +4979,10 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 		ntfs_log_perror("ntfs_attr_open failed");
 		return NULL;
 	}
-	data = malloc(na->data_size);
-	if (!data) {
-		ntfs_log_perror("malloc failed");
+	data = ntfs_malloc(na->data_size);
+	if (!data)
 		goto out;
-	}
+
 	size = ntfs_attr_pread(na, 0, na->data_size, data);
 	if (size != na->data_size) {
 		ntfs_log_perror("ntfs_attr_pread failed");

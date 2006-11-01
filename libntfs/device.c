@@ -111,7 +111,7 @@ struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
 		return NULL;
 	}
 
-	dev = (struct ntfs_device *)malloc(sizeof(struct ntfs_device));
+	dev = (struct ntfs_device *)ntfs_malloc(sizeof(struct ntfs_device));
 	if (dev) {
 		if (!(dev->d_name = strdup(name))) {
 			int eo = errno;

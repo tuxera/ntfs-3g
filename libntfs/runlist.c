@@ -766,7 +766,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 	/* Current position in runlist array. */
 	rlpos = 0;
 	/* Allocate first 4kiB block and set current runlist size to 4kiB. */
-	rl = malloc(rlsize = 0x1000);
+	rlsize = 0x1000;
+	rl = ntfs_malloc(rlsize);
 	if (!rl)
 		return NULL;
 	/* Insert unmapped starting element if necessary. */
@@ -1824,7 +1825,10 @@ static runlist_element * test_rl_pure_src(BOOL contig, BOOL multi, int vcn, int 
 	else
 		fudge = 999;
 
-	result = malloc(4096);
+	result = ntfs_malloc(4096);
+	if (!result)
+		return NULL;
+
 	if (multi) {
 		MKRL(result+0, vcn + (0*len/4), fudge + vcn + 1000 + (0*len/4), len / 4)
 		MKRL(result+1, vcn + (1*len/4), fudge + vcn + 1000 + (1*len/4), len / 4)
@@ -2042,9 +2046,9 @@ static void test_rl_frag_combine(ntfs_volume *vol, ATTR_RECORD *attr1, ATTR_RECO
 static void test_rl_frag(char *test)
 {
 	ntfs_volume vol;
-	ATTR_RECORD *attr1 = malloc(1024);
-	ATTR_RECORD *attr2 = malloc(1024);
-	ATTR_RECORD *attr3 = malloc(1024);
+	ATTR_RECORD *attr1 = ntfs_malloc(1024);
+	ATTR_RECORD *attr2 = ntfs_malloc(1024);
+	ATTR_RECORD *attr3 = ntfs_malloc(1024);
 
 	if (!attr1 || !attr2 || !attr3)
 		goto out;

@@ -180,7 +180,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto put_err_out;
 	}
 	ni->attr_list_size = l;
-	ni->attr_list = malloc(ni->attr_list_size);
+	ni->attr_list = ntfs_malloc(ni->attr_list_size);
 	if (!ni->attr_list)
 		goto put_err_out;
 	l = ntfs_get_attribute_value(vol, ctx->attr, ni->attr_list);
@@ -393,7 +393,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	if (!(base_ni->nr_extents & 3)) {
 		i = (base_ni->nr_extents + 4) * sizeof(ntfs_inode *);
 
-		extent_nis = (ntfs_inode**)malloc(i);
+		extent_nis = (ntfs_inode**)ntfs_malloc(i);
 		if (!extent_nis)
 			goto err_out;
 		if (base_ni->nr_extents) {

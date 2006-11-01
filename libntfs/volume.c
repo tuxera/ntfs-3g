@@ -147,7 +147,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 
 	/* Manually setup an ntfs_inode. */
 	vol->mft_ni = ntfs_inode_allocate(vol);
-	mb = (MFT_RECORD*)malloc(vol->mft_record_size);
+	mb = (MFT_RECORD*)ntfs_malloc(vol->mft_record_size);
 	if (!vol->mft_ni || !mb) {
 		ntfs_log_perror("Error allocating memory for $MFT");
 		goto error_exit;
@@ -198,12 +198,10 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		goto io_error_exit;
 	}
 	vol->mft_ni->attr_list_size = l;
-	vol->mft_ni->attr_list = malloc(l);
-	if (!vol->mft_ni->attr_list) {
-		ntfs_log_debug("Error: failed to allocate buffer for attribute "
-				"list.\n");
+	vol->mft_ni->attr_list = ntfs_malloc(l);
+	if (!vol->mft_ni->attr_list)
 		goto error_exit;
-	}
+
 	l = ntfs_get_attribute_value(vol, ctx->attr, vol->mft_ni->attr_list);
 	if (!l) {
 		ntfs_log_debug("Error: failed to get value of "
@@ -421,20 +419,20 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 		return NULL;
 	}
 
-	/* Allocate the boot sector structure. */
-	if (!(bs = (NTFS_BOOT_SECTOR *)malloc(sizeof(NTFS_BOOT_SECTOR))))
+	if (!(bs = (NTFS_BOOT_SECTOR *)ntfs_malloc(sizeof(NTFS_BOOT_SECTOR))))
 		return NULL;
+
 	/* Allocate the volume structure. */
 	vol = ntfs_volume_alloc();
 	if (!vol)
 		goto error_exit;
 	/* Create the default upcase table. */
 	vol->upcase_len = 65536;
-	vol->upcase = (ntfschar*)malloc(vol->upcase_len * sizeof(ntfschar));
-	if (!vol->upcase) {
-		ntfs_log_perror("Error allocating memory for upcase table.");
+	vol->upcase = (ntfschar*)ntfs_malloc(vol->upcase_len *
+			sizeof(ntfschar));
+	if (!vol->upcase)
 		goto error_exit;
-	}
+
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
 	if (flags & MS_RDONLY)
@@ -697,11 +695,9 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 		return -1;
 	}
 
-	buf = malloc(NTFS_HIBERFILE_HEADER_SIZE);
-	if (!buf) {
-		ntfs_log_perror("Error allocating memory for hiberfile.sys header");
+	buf = ntfs_malloc(NTFS_HIBERFILE_HEADER_SIZE);
+	if (!buf)
 		goto out;
-	}
 
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na) {
@@ -790,12 +786,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	}
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
-	m = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
-	m2 = (u8*)malloc(vol->mftmirr_size << vol->mft_record_size_bits);
-	if (!m || !m2) {
-		ntfs_log_perror("Failed to allocate memory");
+	m  = (u8*)ntfs_malloc(vol->mftmirr_size << vol->mft_record_size_bits);
+	m2 = (u8*)ntfs_malloc(vol->mftmirr_size << vol->mft_record_size_bits);
+	if (!m || !m2)
 		goto error_exit;
-	}
 
 	l = ntfs_attr_mst_pread(vol->mft_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m);
@@ -932,10 +926,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		vol->upcase_len = na->data_size >> 1;
 		/* Throw away default table. */
 		free(vol->upcase);
-		vol->upcase = (ntfschar*)malloc(na->data_size);
+		vol->upcase = (ntfschar*)ntfs_malloc(na->data_size);
 		if (!vol->upcase) {
 			ntfs_log_debug(FAILED);
-			ntfs_log_debug("Not enough memory to load $UpCase.\n");
 			goto error_exit;
 		}
 	}
@@ -1026,11 +1019,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		 * Treat this the same way as if the attribute was present but
 		 * had zero length.
 		 */
-		vol->vol_name = malloc(1);
+		vol->vol_name = ntfs_malloc(1);
 		if (!vol->vol_name) {
 			ntfs_log_debug(FAILED);
-			ntfs_log_debug("Error: Unable to allocate memory for volume "
-					"name!\n");
 			goto error_exit;
 		}
 		vol->vol_name[0] = '\0';
@@ -1057,11 +1048,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 					"to current locale");
 			ntfs_log_debug("Forcing name into ASCII by replacing "
 				"non-ASCII characters with underscores.\n");
-			vol->vol_name = malloc(u + 1);
+			vol->vol_name = ntfs_malloc(u + 1);
 			if (!vol->vol_name) {
 				ntfs_log_debug(FAILED);
-				ntfs_log_debug("Error: Unable to allocate memory for "
-						"volume name!\n");
 				goto error_exit;
 			}
 			for (j = 0; j < (s32)u; j++) {
@@ -1100,10 +1089,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	}
 	vol->attrdef_len = na->data_size;
-	vol->attrdef = (ATTR_DEF*)malloc(na->data_size);
+	vol->attrdef = (ATTR_DEF*)ntfs_malloc(na->data_size);
 	if (!vol->attrdef) {
 		ntfs_log_debug(FAILED);
-		ntfs_log_debug("Not enough memory to load $AttrDef.\n");
 		goto error_exit;
 	}
 	/* Read in the $DATA attribute value into the buffer. */
@@ -1303,10 +1291,10 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 	FILE *f;
 	int err = 0;
 
-	real_file = malloc(PATH_MAX + 1);
+	real_file = ntfs_malloc(PATH_MAX + 1);
 	if (!real_file)
 		return -1;
-	real_fsname = malloc(PATH_MAX + 1);
+	real_fsname = ntfs_malloc(PATH_MAX + 1);
 	if (!real_fsname) {
 		err = errno;
 		goto exit;

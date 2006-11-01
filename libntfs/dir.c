@@ -1270,12 +1270,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 			case S_IFBLK:
 			case S_IFCHR:
 				data_len = offsetof(INTX_FILE, device_end);
-				data = malloc(data_len);
+				data = ntfs_malloc(data_len);
 				if (!data) {
 					err = errno;
-					ntfs_log_error("Not enough memory for "
-							"content of DATA "
-							"attribute.\n");
 					goto err_out;
 				}
 				data->major = cpu_to_le64(major(dev));
@@ -1288,12 +1285,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 			case S_IFLNK:
 				data_len = sizeof(INTX_FILE_TYPES) +
 						target_len * sizeof(ntfschar);
-				data = malloc(data_len);
+				data = ntfs_malloc(data_len);
 				if (!data) {
 					err = errno;
-					ntfs_log_error("Not enough memory for "
-							"content of DATA "
-							"attribute.\n");
 					goto err_out;
 				}
 				data->magic = INTX_SYMBOLIC_LINK;
@@ -1322,10 +1316,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	}
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
-	fn = calloc(1, fn_len);
+	fn = ntfs_calloc(fn_len);
 	if (!fn) {
 		err = errno;
-		ntfs_log_error("Not enough memory.\n");
 		goto err_out;
 	}
 	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
@@ -1711,16 +1704,15 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 
 	if (!ni || !dir_ni || !name || !name_len ||
 			ni->mft_no == dir_ni->mft_no) {
-		err = errno;
-		ntfs_log_error("Invalid arguments.\n");
+		err = EINVAL;
+		ntfs_log_perror("ntfs_link wrong arguments");
 		goto err_out;
 	}
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
-	fn = calloc(1, fn_len);
+	fn = ntfs_calloc(fn_len);
 	if (!fn) {
 		err = errno;
-		ntfs_log_error("Not enough memory.\n");
 		goto err_out;
 	}
 	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,

@@ -375,12 +375,14 @@ s64 ntfs_compressed_attr_pread(ntfs_attr *na, s64 pos, s64 count, void *b)
 	cb_size = na->compression_block_size;
 	cb_size_mask = cb_size - 1UL;
 	cb_clusters = na->compression_block_clusters;
+
 	/* Need a temporary buffer for each loaded compression block. */
-	cb = malloc(cb_size);
+	cb = ntfs_malloc(cb_size);
 	if (!cb)
 		return -1;
+
 	/* Need a temporary buffer for each uncompressed block. */
-	dest = malloc(cb_size);
+	dest = ntfs_malloc(cb_size);
 	if (!dest) {
 		err = errno;
 		free(cb);

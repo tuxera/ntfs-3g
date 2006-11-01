@@ -61,6 +61,7 @@ xx/xx/2006 - x.xx.x - .
 	  and rewrite it to be clearer.  (Yuval)
 	- Move ntfs_index_entry_mark_dirty() to index.c.  (Szaka)
 	- Introduce misc.c. Move ntfs_[mc]alloc there.  (Szaka)
+	- Change malloc() calls to ntfs_malloc().  (Szaka)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

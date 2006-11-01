@@ -85,7 +85,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 	}
 	_guid_str = guid_str;
 	if (!_guid_str) {
-		_guid_str = malloc(37);
+		_guid_str = ntfs_malloc(37);
 		if (!_guid_str)
 			return _guid_str;
 	}
@@ -201,7 +201,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 		cnt = ntfs_sid_to_mbs_size(sid);
 		if (cnt < 0)
 			return NULL;
-		s = malloc(cnt);
+		s = ntfs_malloc(cnt);
 		if (!s)
 			return s;
 		sid_str = s;

@@ -67,6 +67,7 @@
 #include "utils.h"
 #include "version.h"
 #include "ntfstime.h"
+#include "misc.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -148,7 +149,7 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 
 	if (!(ctx->state & NF_FreeMFTOutdate))
 		return ctx->free_mft;
-	buf = malloc(vol->cluster_size);
+	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
 		return -ENOMEM;
 	while (1) {
@@ -180,7 +181,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 
 	if (!(ctx->state & NF_FreeClustersOutdate))
 		return ctx->free_clusters;
-	buf = malloc(vol->cluster_size);
+	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
 		return -ENOMEM;
 	while (1) {
@@ -378,7 +379,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 					!stream_name_len) {
 				INTX_FILE *intx_file;
 
-				intx_file = malloc(na->data_size);
+				intx_file = ntfs_malloc(na->data_size);
 				if (!intx_file) {
 					res = -errno;
 					ntfs_attr_close(na);
@@ -474,7 +475,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	/* Receive file content. */
-	intx_file = malloc(na->data_size);
+	intx_file = ntfs_malloc(na->data_size);
 	if (!intx_file) {
 		res = -errno;
 		goto exit;
@@ -1400,11 +1401,10 @@ static struct fuse_operations ntfs_fuse_oper = {
 
 static int ntfs_fuse_init(void)
 {
-	ctx = malloc(sizeof(ntfs_fuse_context_t));
-	if (!ctx) {
-		ntfs_log_perror("malloc failed");
+	ctx = ntfs_malloc(sizeof(ntfs_fuse_context_t));
+	if (!ctx)
 		return -1;
-	}
+
 	*ctx = (ntfs_fuse_context_t) {
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
 		.uid = geteuid(),
@@ -1458,11 +1458,11 @@ static char *parse_mount_options(const char *org_options)
 	 * +1		for null-terminator.
 	 * +PATH_MAX	for resolved by realpath() device name.
 	 */
-	ret = malloc(strlen(def_opts) + strlen(org_options) + 9 + PATH_MAX);
-	if (!ret) {
-		ntfs_log_perror("malloc failed");
+	ret = ntfs_malloc(strlen(def_opts) + strlen(org_options) + PATH_MAX +
+			9);
+	if (!ret)
 		return NULL;
-	}
+
 	*ret = 0;
 	options = strdup(org_options);
 	if (!options) {

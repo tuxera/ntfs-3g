@@ -96,4 +96,8 @@
 	old_state;					\
 })
 
+/* Memory allocation with logging. */
+extern void *ntfs_calloc(size_t size);
+extern void *ntfs_malloc(size_t size);
+
 #endif /* defined _NTFS_SUPPORT_H */

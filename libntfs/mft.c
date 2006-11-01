@@ -158,7 +158,7 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		cnt = vol->mftmirr_size - m;
 		if (cnt > count)
 			cnt = count;
-		bmirr = malloc(cnt * vol->mft_record_size);
+		bmirr = ntfs_malloc(cnt * vol->mft_record_size);
 		if (!bmirr)
 			return -1;
 		memcpy(bmirr, b, cnt * vol->mft_record_size);
@@ -240,7 +240,7 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	m = *mrec;
 	if (!m) {
-		m = (MFT_RECORD*)malloc(vol->mft_record_size);
+		m = (MFT_RECORD*)ntfs_malloc(vol->mft_record_size);
 		if (!m)
 			return -1;
 	}
@@ -367,7 +367,7 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 		errno = EINVAL;
 		return -1;
 	}
-	m = malloc(vol->mft_record_size);
+	m = ntfs_calloc(vol->mft_record_size);
 	if (!m)
 		return -1;
 	if (ntfs_mft_record_layout(vol, mref, m)) {
@@ -459,9 +459,10 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 		}
 	}
 	pass_start = data_pos;
-	buf = (u8*)malloc(PAGE_SIZE);
+	buf = (u8*)ntfs_malloc(PAGE_SIZE);
 	if (!buf)
 		return -1;
+
 	ntfs_log_debug("Starting bitmap search: pass %u, pass_start 0x%llx, "
 			"pass_end 0x%llx, data_pos 0x%llx.\n", pass,
 			(long long)pass_start, (long long)pass_end,
@@ -1368,12 +1369,10 @@ mft_rec_already_initialized:
 	 * is not zero as well as the update sequence number if it is not zero
 	 * or -1 (0xffff).
 	 */
-	m = (MFT_RECORD*)malloc(vol->mft_record_size);
-	if (!m) {
-		ntfs_log_error("Failed to allocate buffer for mft "
-				"record.\n");
+	m = (MFT_RECORD*)ntfs_malloc(vol->mft_record_size);
+	if (!m)
 		goto undo_mftbmp_alloc;
-	}
+
 	if (ntfs_mft_record_read(vol, bit, m)) {
 		err = errno;
 		ntfs_log_error("Failed to read mft record.\n");
@@ -1437,12 +1436,9 @@ mft_rec_already_initialized:
 			int i;
 
 			i = (base_ni->nr_extents + 4) * sizeof(ntfs_inode *);
-			extent_nis = (ntfs_inode**)malloc(i);
+			extent_nis = (ntfs_inode**)ntfs_malloc(i);
 			if (!extent_nis) {
 				err = errno;
-				ntfs_log_error("Failed to allocate "
-						"buffer for extent inodes "
-						"array.\n");
 				free(m);
 				free(ni);
 				errno = err;

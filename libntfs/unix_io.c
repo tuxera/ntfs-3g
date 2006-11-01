@@ -86,7 +86,7 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 		errno = EBUSY;
 		return -1;
 	}
-	if (!(dev->d_private = malloc(sizeof(int))))
+	if (!(dev->d_private = ntfs_malloc(sizeof(int))))
 		return -1;
 	/*
 	 * Open the device/file obtaining the file descriptor for exclusive

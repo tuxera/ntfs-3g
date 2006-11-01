@@ -371,12 +371,9 @@ static int ntfs_check_and_load_restart_page(ntfs_attr *log_na,
 	 * Allocate a buffer to store the whole restart page so we can multi
 	 * sector transfer deprotect it.
 	 */
-	trp = malloc(le32_to_cpu(rp->system_page_size));
-	if (!trp) {
-		ntfs_log_error("Failed to allocate memory for $LogFile "
-				"restart page buffer.\n");
+	trp = ntfs_malloc(le32_to_cpu(rp->system_page_size));
+	if (!trp)
 		return ENOMEM;
-	}
 	/*
 	 * Read the whole of the restart page into the buffer.  If it fits
 	 * completely inside @rp, just copy it from there.  Otherwise read it
@@ -500,11 +497,9 @@ BOOL ntfs_check_logfile(ntfs_attr *log_na, RESTART_PAGE_HEADER **rp)
 		return FALSE;
 	}
 	/* Allocate memory for restart page. */
-	kaddr = malloc(NTFS_BLOCK_SIZE);
-	if (!kaddr) {
-		ntfs_log_error("Not enough memory.\n");
+	kaddr = ntfs_malloc(NTFS_BLOCK_SIZE);
+	if (!kaddr)
 		return FALSE;
-	}
 	/*
 	 * Read through the file looking for a restart page.  Since the restart
 	 * page header is at the beginning of a page we only need to search at

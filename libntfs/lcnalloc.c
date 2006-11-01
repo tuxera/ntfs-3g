@@ -122,7 +122,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 
 	/* Return empty runlist if @count == 0 */
 	if (!count) {
-		rl = malloc(0x1000);
+		rl = ntfs_malloc(0x1000);
 		if (!rl)
 			return NULL;
 		rl[0].vcn = start_vcn;
@@ -132,7 +132,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	}
 
 	/* Allocate memory. */
-	buf = (u8*)malloc(8192);
+	buf = (u8*)ntfs_malloc(8192);
 	if (!buf)
 		return NULL;
 	/*

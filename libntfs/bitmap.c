@@ -78,10 +78,10 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 	if (bufsize > 8192)
 		bufsize = 8192;
 
-	/* Allocate memory. */
-	buf = (u8*)malloc(bufsize);
+	buf = (u8*)ntfs_malloc(bufsize);
 	if (!buf)
 		return -1;
+
 	/* Depending on @value, zero or set all bits in the allocated buffer. */
 	memset(buf, value ? 0xff : 0, bufsize);
 
