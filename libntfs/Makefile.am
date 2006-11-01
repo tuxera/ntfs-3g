@@ -52,6 +52,7 @@ libntfs_la_SOURCES =	\
 	lcnalloc.c	\
 	logfile.c	\
 	logging.c	\
+	misc.c		\
 	mft.c		\
 	mst.c		\
 	runlist.c	\
