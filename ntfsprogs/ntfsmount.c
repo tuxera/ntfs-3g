@@ -67,7 +67,7 @@
 #include "utils.h"
 #include "version.h"
 #include "ntfstime.h"
-#include "misc.h"
+#include "support.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096

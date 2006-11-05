@@ -1794,7 +1794,8 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 	       		if (entries != -1) {
 				total_entries += entries;
 				total_indx_blocks++;
-				printf("\tIndex entries:\t\t %d\n", entries);
+				ntfs_log_verbose("\tIndex entries:\t\t %d\n",
+						entries);
 			}
 		}
 		tmp_alloc = (INDEX_ALLOCATION *)((u8 *)tmp_alloc +
