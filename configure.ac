@@ -195,31 +195,13 @@ AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
 # Autodetect whether to build FUSE module or not.
 compile_fuse_module=false
 if test "$enable_fuse_module" != "no"; then
-	case "$target_os" in
-	linux*)
-		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.3.0, [ compile_fuse_module=true ],
-			if test "$enable_fuse_module" = "yes"; then
-				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.3.0.])
-			else
-				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.3.0.])
-			fi
-		);;
-	freebsd*)
-		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.5.0, [ compile_fuse_module=true ],
-			if test "$enable_fuse_module" = "yes"; then
-				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
-			else
-				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
-			fi
-		);;
-	*)
+	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
 		if test "$enable_fuse_module" = "yes"; then
-			AC_MSG_ERROR([ntfsmount can be built only under Linux and FreeBSD.])
+			AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.6.0.])
 		else
-			AC_MSG_WARN([ntfsmount can be built only under Linux and FreeBSD.])
+			AC_MSG_WARN([ntfsmount requires FUSE version >= 2.6.0.])
 		fi
-		;;
-	esac
+	)
 fi
 AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 

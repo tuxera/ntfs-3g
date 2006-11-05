@@ -223,11 +223,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
  * Returns 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 		struct statvfs *sfs)
-#else
-		struct statfs *sfs)
-#endif
 {
 	long size;
 	ntfs_volume *vol;
@@ -237,9 +233,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		return -ENODEV;
 	/* Optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	sfs->f_frsize = vol->cluster_size;
-#endif
 	/*
 	 * Total data blocks in file system in units of f_bsize and since
 	 * inodes are also stored in data blocs ($MFT is a file) this is just
@@ -260,11 +254,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		size = 0;
 	sfs->f_ffree = size;
 	/* Maximum length of filenames. */
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
-#else
-	sfs->f_namelen = NTFS_MAX_NAME_LEN;
-#endif
 	return 0;
 }
 
@@ -1774,9 +1764,7 @@ static int parse_options(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
-#endif
 	struct fuse *fh;
 	int ffd = 0;
 
@@ -1804,7 +1792,6 @@ int main(int argc, char *argv[])
 		return 4;
 	}
 	/* Create filesystem. */
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	if ((fuse_opt_add_arg(&margs, "") == -1 ||
 			fuse_opt_add_arg(&margs, "-o") == -1 ||
 			fuse_opt_add_arg(&margs, parsed_options) == -1))
@@ -1812,16 +1799,12 @@ int main(int argc, char *argv[])
 	if (ffd != -1)
 		ffd = fuse_mount(opts.mnt_point, &margs);
 	fuse_opt_free_args(&margs);
-#else
-	ffd = fuse_mount(opts.mnt_point, parsed_options);
-#endif
 	free(parsed_options);
 	if (ffd == -1) {
 		ntfs_log_error("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
 		return 5;
 	}
-#if defined(FUSE_VERSION) && (FUSE_VERSION >= 25)
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
@@ -1838,19 +1821,6 @@ int main(int argc, char *argv[])
 		fh = fuse_new(ffd, &margs , &ntfs_fuse_oper,
 				sizeof(ntfs_fuse_oper));
 	fuse_opt_free_args(&margs);
-#else
-	if (!ctx->debug && !ctx->no_detach) {
-		if (fuse_is_lib_option("kernel_cache"))
-			fh = fuse_new(ffd, "use_ino,kernel_cache",
-					&ntfs_fuse_oper,
-					sizeof(ntfs_fuse_oper));
-		else
-			fh = fuse_new(ffd, "use_ino", &ntfs_fuse_oper,
-					sizeof(ntfs_fuse_oper));
-	} else
-		fh = fuse_new(ffd, "debug,use_ino" , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper));
-#endif
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		close(ffd);

@@ -52,7 +52,7 @@ xx/xx/2006 - x.xx.x - .
 	- Allow ntfscp to create the destination file if it does not already
 	  exists by calling ntfs_create().  (Hil)
 	- Fix GUID to string conversion.  (Anton)
-	- Multiple big-endiness fixes.  (zhanglinbao, Yuval)
+	- Multiple big-endianness fixes.  (zhanglinbao, Yuval)
 	- Spelling mistake fixes.  (Yuval)
 	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
 	- Memory leak fixes.  (Yura, Yuval)
@@ -63,6 +63,8 @@ xx/xx/2006 - x.xx.x - .
 	- Introduce misc.c. Move ntfs_[mc]alloc there.  (Szaka)
 	- Change malloc() calls to ntfs_malloc().  (Szaka)
 	- Factor ntfs_attr_fill_hole() out of ntfs_attr_pwrite().  (Szaka)
+	- ntfsmount: require FUSE version >= 2.6.0 for build. Fixes fusermount
+	  lookup problem and allows to drop compatibility code.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
