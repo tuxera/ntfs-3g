@@ -1766,7 +1766,7 @@ int main(int argc, char *argv[])
 	char *parsed_options;
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
-	int ffd = 0;
+	struct fuse_chan *fch;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -1792,15 +1792,14 @@ int main(int argc, char *argv[])
 		return 4;
 	}
 	/* Create filesystem. */
-	if ((fuse_opt_add_arg(&margs, "") == -1 ||
+	fch = NULL; 
+	if (!(fuse_opt_add_arg(&margs, "") == -1 ||
 			fuse_opt_add_arg(&margs, "-o") == -1 ||
-			fuse_opt_add_arg(&margs, parsed_options) == -1))
-		ffd = -1;
-	if (ffd != -1)
-		ffd = fuse_mount(opts.mnt_point, &margs);
+			fuse_opt_add_arg(&margs, parsed_options)))
+		fch = fuse_mount(opts.mnt_point, &margs);
 	fuse_opt_free_args(&margs);
 	free(parsed_options);
-	if (ffd == -1) {
+	if (!fch) {
 		ntfs_log_error("fuse_mount failed.\n");
 		ntfs_fuse_destroy();
 		return 5;
@@ -1818,13 +1817,12 @@ int main(int argc, char *argv[])
 			fh = NULL;
 	}
 	if (fh)
-		fh = fuse_new(ffd, &margs , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper));
+		fh = fuse_new(fch, &margs , &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper), NULL);
 	fuse_opt_free_args(&margs);
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
-		close(ffd);
-		fuse_unmount(opts.mnt_point);
+		fuse_unmount(opts.mnt_point, fch);
 		ntfs_fuse_destroy();
 		return 6;
 	}
@@ -1846,9 +1844,8 @@ int main(int argc, char *argv[])
 	/* Main loop. */
 	fuse_loop(fh);
 	/* Destroy. */
+	fuse_unmount(opts.mnt_point, fch);
 	fuse_destroy(fh);
-	close(ffd);
-	fuse_unmount(opts.mnt_point);
 	ntfs_fuse_destroy();
 	return 0;
 }
