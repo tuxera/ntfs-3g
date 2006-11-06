@@ -1,5 +1,5 @@
 /**
- * mft.c - Miscellaneous functions. Part of the Linux-NTFS project.
+ * misc.c - Miscellaneous functions. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2006 Szabolcs Szakacsits
  *

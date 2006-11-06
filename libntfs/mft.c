@@ -386,9 +386,7 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 	return 0;
 }
 
-#ifndef NTFS_DISABLE_DEBUG_LOGGING
 static const char *es = "  Leaving inconsistent metadata.  Run chkdsk.";
-#endif
 
 /**
  * ntfs_ffz - Find the first unset (zero) bit in a word
