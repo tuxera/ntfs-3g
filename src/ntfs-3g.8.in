@@ -190,7 +190,7 @@ the stalled open source development and project management.
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
 Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
-Yuval Fedel, and the author of the groundbreaking FUSE filesystem development 
+Yuval Fledel, and the author of the groundbreaking FUSE filesystem development 
 framework, Miklos Szeredi.
 .SH SEE ALSO
 .BR ntfsprogs (8),
