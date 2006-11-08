@@ -330,7 +330,7 @@ extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
  *
  * FIXME: Describe possible errnos.
  */
-s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a);
+extern s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a);
 
 /**
  * get_attribute_value - return the attribute value of an attribute
@@ -346,14 +346,15 @@ s64 ntfs_get_attribute_value_length(const ATTR_RECORD *a);
  * then nothing was read due to a zero-length attribute value, otherwise
  * errno describes the error.
  */
-s64 ntfs_get_attribute_value(const ntfs_volume *vol, const ATTR_RECORD *a,
-		u8 *b);
+extern s64 ntfs_get_attribute_value(const ntfs_volume *vol, 
+				    const ATTR_RECORD *a, u8 *b);
 
-void ntfs_attr_name_free(char **name);
-char *ntfs_attr_name_get(const ntfschar *uname, const int uname_len);
-
-int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
-		    u32 name_len);
+extern void  ntfs_attr_name_free(char **name);
+extern char *ntfs_attr_name_get(const ntfschar *uname, const int uname_len);
+extern int   ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
+			     ntfschar *name, u32 name_len);
+extern int   ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
+			      ntfschar *name, u32 name_len);
 
 #endif /* defined _NTFS_ATTRIB_H */
 

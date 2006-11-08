@@ -1005,22 +1005,15 @@ static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
 		const int stream_name_len)
 {
 	ntfs_inode *ni;
-	ntfs_attr *na;
 	int res = 0;
 
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
-		goto exit;
-	}
-	if (ntfs_attr_rm(na))
-		res = -errno;
 	
-	ntfs_attr_close(na);
-exit:
+	if (ntfs_attr_remove(ni, AT_DATA, stream_name, stream_name_len))
+		res = -errno;
+
 	if (ntfs_inode_close(ni))
 		ntfs_log_perror("Failed to close inode");
 	return res;
@@ -1449,7 +1442,6 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni;
-	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
 	int res = 0, lename_len;
 
@@ -1470,15 +1462,11 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -errno;
 		goto exit;
 	}
-	na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
-	if (!na) {
-		res = -ENODATA;
-		goto exit;
-	}
-	if (ntfs_attr_rm(na))
+	if (ntfs_attr_remove(ni, AT_DATA, lename, lename_len)) {
+		if (errno == ENOENT)
+			errno = ENODATA;
 		res = -errno;
-
-	ntfs_attr_close(na);
+	}
 	
 	ntfs_fuse_mark_free_space_outdated();
 exit:

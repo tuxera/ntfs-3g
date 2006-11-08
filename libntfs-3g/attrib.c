@@ -4876,6 +4876,8 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 	void *data, *ret = NULL;
 	s64 size;
 	
+	ntfs_log_trace("Entering\n");
+	
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
 		ntfs_log_perror("ntfs_attr_open failed");
@@ -4919,5 +4921,35 @@ int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	ntfs_attr_put_search_ctx(ctx);
 	
 	return !ret;
+}
+
+int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name, 
+		     u32 name_len)
+{
+	ntfs_attr *na;
+	int ret;
+
+	ntfs_log_trace("Entering\n");
+	
+	if (!ni) {
+		ntfs_log_error("%s: NULL inode pointer", __FUNCTION__);
+		errno = EINVAL;
+		return -1;
+	}
+	
+	na = ntfs_attr_open(ni, type, name, name_len);
+	if (!na) {
+		ntfs_log_perror("Failed to open attribute 0x%02x of inode "
+				"0x%llx", type, (unsigned long long)ni->mft_no);
+		return -1;
+	}
+	
+	ret = ntfs_attr_rm(na);
+	if (ret)
+		ntfs_log_perror("Failed to remove attribute 0x%02x of inode "
+				"0x%llx", type, (unsigned long long)ni->mft_no);
+	ntfs_attr_close(na);
+	
+	return ret;
 }
 
