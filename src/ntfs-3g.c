@@ -1475,11 +1475,12 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -ENODATA;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	if (ntfs_attr_rm(na))
 		res = -errno;
 
 	ntfs_attr_close(na);
+	
+	ntfs_fuse_mark_free_space_outdated();
 exit:
 	free(lename);
 	if (ntfs_inode_close(ni))
