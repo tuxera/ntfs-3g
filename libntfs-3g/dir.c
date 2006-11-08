@@ -1230,10 +1230,13 @@ err_out:
 			ntfs_log_perror("Failed to open SD (0x50) attribute of "
 					" inode 0x%llx. Run chkdsk.\n",
 					(unsigned long long)ni->mft_no);
-		else if (ntfs_attr_rm(na))
-			ntfs_log_perror("Failed to remove SD (0x50) attribute "
-					"of inode 0x%llx. Run chkdsk.\n",
-					(unsigned long long)ni->mft_no);
+		else {
+			if (ntfs_attr_rm(na))
+				ntfs_log_perror("Failed to remove SD (0x50) "
+						"attribute of inode 0x%llx",
+						(unsigned long long)ni->mft_no);
+			ntfs_attr_close(na);
+		}
 	}
 	if (rollback_data) {
 		ntfs_attr *na;
@@ -1243,10 +1246,14 @@ err_out:
 			ntfs_log_perror("Failed to open data attribute of "
 					" inode 0x%llx. Run chkdsk.\n",
 					(unsigned long long)ni->mft_no);
-		else if (ntfs_attr_rm(na))
-			ntfs_log_perror("Failed to remove data attribute of "
-					"inode 0x%llx. Run chkdsk.\n",
-					(unsigned long long)ni->mft_no);
+		else {
+			if (ntfs_attr_rm(na))
+				ntfs_log_perror("Failed to remove data "
+						"attribute of inode 0x%llx",
+						(unsigned long long)ni->mft_no);
+			
+			ntfs_attr_close(na);
+		}
 	}
 	/*
 	 * Free extent MFT records (should not exist any with current

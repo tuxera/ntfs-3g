@@ -3080,15 +3080,13 @@ add_attr_record:
 			(val && (ntfs_attr_pwrite(na, 0, size, val) != size))) {
 		err = errno;
 		ntfs_log_trace("Failed to initialize just added attribute.\n");
-		if (ntfs_attr_rm(na)) {
+		if (ntfs_attr_rm(na))
 			ntfs_log_trace("Failed to remove just added attribute. "
 					"Probably leaving inconstant metadata.\n");
-			ntfs_attr_close(na);
-		}
+		ntfs_attr_close(na);
 		goto err_out;
 	}
 	ntfs_attr_close(na);
-	/* Done !*/
 	return 0;
 
 rm_attr_err_out:
@@ -3164,9 +3162,6 @@ int ntfs_attr_rm(ntfs_attr *na)
 		ret = -1;
 	}
 
-	/* Throw away now non-exist attribute. */
-	ntfs_attr_close(na);
-	/* Done. */
 	return ret;
 }
 
