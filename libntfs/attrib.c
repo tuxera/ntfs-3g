@@ -2946,7 +2946,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 {
 	u32 attr_rec_size;
 	int err, i, offset;
-	BOOL is_resident;
+	BOOL is_resident = TRUE;
+	BOOL always_non_resident = FALSE, always_resident = FALSE;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
 
@@ -2993,38 +2994,29 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 			errno = ERANGE;
 			return -1;
 		}
+		always_resident = TRUE;
 	}
 
-	/*
-	 * Determine resident or not will be new attribute. We add 8 to size in
-	 * non resident case for mapping pairs.
-	 */
-	if (!ntfs_attr_can_be_resident(ni->vol, type)) {
-		/* Attribute can be resident. */
-		is_resident = TRUE;
-		/* Check if it is better to make attribute non resident. */
-		if (!ntfs_attr_can_be_non_resident(ni->vol, type) &&
-				offsetof(ATTR_RECORD, resident_end) + size >=
-				offsetof(ATTR_RECORD, non_resident_end) + 8)
-			/* Make it non resident. */
-			is_resident = FALSE;
-	} else {
+	/* Check whether attribute can be resident. */
+	if (ntfs_attr_can_be_resident(ni->vol, type)) {
 		if (errno != EPERM) {
 			err = errno;
-			ntfs_log_trace("ntfs_attr_can_be_resident failed.\n");
+			ntfs_log_trace("ntfs_attr_can_be_resident() failed.\n");
 			goto err_out;
 		}
-		/* Attribute can't be resident. */
 		is_resident = FALSE;
+		always_non_resident = TRUE;
 	}
+
+retry:
 	/* Calculate attribute record size. */
 	if (is_resident)
 		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
-				((name_len * sizeof(ntfschar) + 7) & ~7) +
-				((size + 7) & ~7);
-	else
+				ROUND_UP(name_len * sizeof(ntfschar), 3) +
+				ROUND_UP(size, 3);
+	else /* We add 8 for space for mapping pairs. */
 		attr_rec_size = offsetof(ATTR_RECORD, non_resident_end) +
-				((name_len * sizeof(ntfschar) + 7) & ~7) + 8;
+				ROUND_UP(name_len * sizeof(ntfschar), 3) + 8;
 
 	/*
 	 * If we have enough free space for the new attribute in the base MFT
@@ -3050,6 +3042,20 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 			goto add_attr_record;
 	}
 
+	/* 
+	 * If failed to find space for resident attribute, then try to find
+	 * space for non resident one.
+	 */
+	if (is_resident && !always_resident) {
+		is_resident = FALSE;
+		goto retry;
+	}
+
+	/*
+	 * FIXME: Try to make other attributes non-resident here. Factor out
+	 * code from ntfs_resident_attr_resize.
+	 */
+
 	/* There is no extent that contain enough space for new attribute. */
 	if (!NInoAttrList(ni)) {
 		/* Add attribute list not present, add it and retry. */
@@ -3060,12 +3066,27 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		}
 		return ntfs_attr_add(ni, type, name, name_len, val, size);
 	}
-	/* Allocate new extent. */
+	/* Allocate new extent for attribute. */
 	attr_ni = ntfs_mft_record_alloc(ni->vol, ni);
 	if (!attr_ni) {
 		err = errno;
 		ntfs_log_trace("Failed to allocate extent record.\n");
 		goto err_out;
+	}
+
+	/*
+	 * Determine resident or not will be attribute using heuristics and
+	 * calculate attribute record size. FIXME: small code duplication here.
+	 */
+	if (always_resident || (!always_non_resident && size < 256)) {
+		is_resident = TRUE;
+		attr_rec_size = offsetof(ATTR_RECORD, resident_end) +
+				ROUND_UP(name_len * sizeof(ntfschar), 3) +
+				ROUND_UP(size, 3);
+	} else { /* We add 8 for space for mapping pairs. */
+		is_resident = FALSE;
+		attr_rec_size = offsetof(ATTR_RECORD, non_resident_end) +
+				ROUND_UP(name_len * sizeof(ntfschar), 3) + 8;
 	}
 
 add_attr_record:
@@ -3698,14 +3719,14 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	if (ntfs_attr_size_bounds_check(vol, na->type, newsize) < 0) {
 		err = errno;
 		if (err == ERANGE) {
-			ntfs_log_trace("Eeek!  Size bounds check failed.  "
+			ntfs_log_trace("Size bounds check failed.  "
 					"Aborting...\n");
 		} else if (err == ENOENT)
 			err = EIO;
 		goto put_err_out;
 	}
 	/*
-	 * If @newsize is bigger than the mft record we need to make the
+	 * If @newsize is bigger than the MFT record we need to make the
 	 * attribute non-resident if the attribute type supports it. If it is
 	 * smaller we can go ahead and attempt the resize.
 	 */
@@ -3715,7 +3736,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 				newsize)) {
 			/* Update attribute size everywhere. */
 			na->data_size = na->initialized_size = newsize;
-			na->allocated_size = (newsize + 7) & ~7;
+			na->allocated_size = ROUND_UP(newsize, 3);
 			if (NAttrCompressed(na) || NAttrSparse(na))
 				na->compressed_size = na->allocated_size;
 			if (na->type == AT_DATA && na->name == AT_UNNAMED) {
@@ -3728,12 +3749,12 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		/* Error! If not enough space, just continue. */
 		if (errno != ENOSPC) {
 			err = errno;
-			ntfs_log_trace("Eeek!  Failed to resize resident part "
+			ntfs_log_trace("Failed to resize resident part "
 					"of attribute.  Aborting...\n");
 			goto put_err_out;
 		}
 	}
-	/* There is not enough space in the mft record to perform the resize. */
+	/* There is not enough space in the MFT record to perform the resize. */
 
 	/* Make the attribute non-resident if possible. */
 	if (!ntfs_attr_make_non_resident(na, ctx)) {
@@ -3743,7 +3764,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		return ntfs_attr_truncate(na, newsize);
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
-		ntfs_log_trace("Eeek!  Failed to make attribute non-resident.  "
+		ntfs_log_trace("Failed to make attribute non-resident.  "
 				"Aborting...\n");
 		goto put_err_out;
 	}
@@ -3763,8 +3784,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		 * pairs will take 8 bytes.
 		 */
 		if (le32_to_cpu(a->length) <= offsetof(ATTR_RECORD,
-				compressed_size) + ((a->name_length *
-				sizeof(ntfschar) + 7) & ~7) + 8)
+				compressed_size) + ROUND_UP(a->name_length *
+				sizeof(ntfschar), 3) + 8)
 			continue;
 
 		tna = ntfs_attr_open(na->ni, a->type, (ntfschar*)((u8*)a +
@@ -3804,7 +3825,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	}
 
 	/*
-	 * Move the attribute to a new mft record, creating an attribute list
+	 * Move the attribute to a new MFT record, creating an attribute list
 	 * attribute or modifying it if it is already present.
 	 */
 
@@ -3855,7 +3876,7 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 			return -1;
 		return ntfs_resident_attr_resize(na, newsize);
 	}
-	/* Allocate new mft record. */
+	/* Allocate new MFT record. */
 	ni = ntfs_mft_record_alloc(vol, ni);
 	if (!ni) {
 		err = errno;

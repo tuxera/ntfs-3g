@@ -22,3 +22,4 @@ stamp-h.in
 ltconfig
 missing
 INSTALL
+cscope.out

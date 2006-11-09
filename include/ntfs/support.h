@@ -71,9 +71,9 @@
 /*
  * Round up and down @num to 2 in power of @order.
  */
-#define ROUND_UP(num,order)	(((num) + ((1 << order) - 1)) & \
-				~((1 << order) - 1))
-#define ROUND_DOWN(num,order)	((num) & ~((1 << order) - 1))
+#define ROUND_UP(num,order)	(((num) + ((1 << (order)) - 1)) & \
+				~((1 << (order)) - 1))
+#define ROUND_DOWN(num,order)	((num) & ~((1 << (order)) - 1))
 
 /*
  * Simple bit operation macros. NOTE: These are NOT atomic.

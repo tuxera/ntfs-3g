@@ -65,6 +65,7 @@ xx/xx/2006 - x.xx.x - .
 	- Factor ntfs_attr_fill_hole() out of ntfs_attr_pwrite().  (Szaka)
 	- ntfsmount: require FUSE version >= 2.6.0 for build. Fixes fusermount
 	  lookup problem and allows to drop compatibility code.  (Yura)
+	- Rewrite ntfs_attr_add() algorithm.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

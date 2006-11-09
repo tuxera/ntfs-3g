@@ -354,7 +354,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		errno = EINVAL;
 		return NULL;
 	}
-	ntfs_log_trace("Opening extent inode 0x%llx (base mft record 0x%llx).\n",
+	ntfs_log_trace("Opening extent inode 0x%llx "
+			"(base MFT record 0x%llx).\n",
 			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	/* Is the extent inode already open and attached to the base inode? */
@@ -370,8 +371,9 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 			seq_no = MSEQNO_LE(mref);
 			if (seq_no && seq_no != le16_to_cpu(
 					ni->mrec->sequence_number)) {
-				ntfs_log_debug("Found stale extent mft reference! "
-					"Corrupt file system. Run chkdsk.\n");
+				ntfs_log_debug("Found stale extent mft "
+						"reference! Corrupt file "
+						"system. Run chkdsk.\n");
 				errno = EIO;
 				return NULL;
 			}
@@ -440,7 +442,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 		return 0;
 
 	if (!ni->attr_list) {
-		ntfs_log_trace("Corrupt in-memory struct.\n");
+		ntfs_log_trace("Corrupted in-memory structure.\n");
 		errno = EINVAL;
 		return -1;
 	}
@@ -453,7 +455,8 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 				prev_attached != MREF_LE(ale->mft_reference)) {
 			if (!ntfs_extent_inode_open(ni,
 					MREF_LE(ale->mft_reference))) {
-				ntfs_log_trace("Couldn't attach extent inode.\n");
+				ntfs_log_trace("Couldn't attach extent "
+						"inode.\n");
 				return -1;
 			}
 			prev_attached = MREF_LE(ale->mft_reference);
