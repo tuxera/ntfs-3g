@@ -114,8 +114,7 @@ static void __ntfs_volume_release(ntfs_volume *v)
 	if (v->dev) {
 		struct ntfs_device *dev = v->dev;
 
-		if (NDevDirty(dev))
-			dev->d_ops->sync(dev);
+		dev->d_ops->sync(dev);
 		if (dev->d_ops->close(dev))
 			ntfs_log_perror("Failed to close the device");
 	}

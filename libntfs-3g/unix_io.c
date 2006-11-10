@@ -271,7 +271,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
  */
 static int ntfs_device_unix_io_sync(struct ntfs_device *dev)
 {
-	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
+	if (!NDevReadOnly(dev)) {
 		int res = fsync(DEV_FD(dev));
 		if (!res)
 			NDevClearDirty(dev);
