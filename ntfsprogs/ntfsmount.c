@@ -1399,8 +1399,8 @@ static int ntfs_fuse_init(void)
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
 		.uid = geteuid(),
 		.gid = getegid(),
-		.fmask = 0177,
-		.dmask = 0077,
+		.fmask = 0111,
+		.dmask = 0,
 		.streams = NF_STREAMS_INTERFACE_NONE,
 	};
 	return 0;
@@ -1837,8 +1837,8 @@ int main(int argc, char *argv[])
 	}
 	ntfs_log_info("Version %s (libntfs %s)\n", VERSION,
 			ntfs_libntfs_version());
-	ntfs_log_info("Mounted %s (%s, label \"%s\", volume version %d.%d)\n",
-			opts.device, (ctx->ro) ? "RO" : "RW",
+	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS version %d.%d)\n",
+			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
 	/* Main loop. */
