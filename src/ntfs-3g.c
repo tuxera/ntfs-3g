@@ -1928,7 +1928,7 @@ int main(int argc, char *argv[])
 	char *parsed_options;
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
-	int ffd = 0;
+	struct fuse_chan *fc;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -1966,14 +1966,14 @@ int main(int argc, char *argv[])
 		goto mount_failed;
 	}
 	
-	ffd = fuse_mount(opts.mnt_point, &margs);
-	if (ffd == -1) {
+	fc = fuse_mount(opts.mnt_point, &margs);
+	if (!fc) {
 		if (errno == ENOENT || errno == ENODEV) {
 			ntfs_log_error("Retrying mount ...\n");
 			load_fuse_module(1);
-			ffd = fuse_mount(opts.mnt_point, &margs);
+			fc = fuse_mount(opts.mnt_point, &margs);
 		}
-		if (ffd == -1) {
+		if (!fc) {
 mount_failed:			
 			ntfs_log_error("Failed to mount NTFS\n");
 			fuse_opt_free_args(&margs);
@@ -1998,13 +1998,12 @@ mount_failed:
 			fh = NULL;
 	}
 	if (fh)
-		fh = fuse_new(ffd, &margs , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper));
+		fh = fuse_new(fc, &margs , &ntfs_fuse_oper,
+				sizeof(ntfs_fuse_oper), NULL);
 	fuse_opt_free_args(&margs);
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
-		close(ffd);
-		fuse_unmount(opts.mnt_point);
+		fuse_unmount(opts.mnt_point, fc);
 		ntfs_fuse_destroy();
 		return 6;
 	}
@@ -2027,8 +2026,7 @@ mount_failed:
 	fuse_loop(fh);
 	
 	fuse_destroy(fh);
-	close(ffd);
-	fuse_unmount(opts.mnt_point);
+	fuse_unmount(opts.mnt_point, fc);
 	ntfs_fuse_destroy();
 	return 0;
 }

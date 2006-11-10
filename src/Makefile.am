@@ -25,7 +25,7 @@ AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs-3g $(all_includes)
 ntfs_3g_SOURCES	= ntfs-3g.c utils.c utils.h
 ntfs_3g_LDADD	= $(AM_LIBS) $(FUSE_MODULE_LIBS)
 ntfs_3g_LDFLAGS	= $(AM_LFLAGS)
-ntfs_3g_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=25
+ntfs_3g_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=26
 
 # Extra targets
 

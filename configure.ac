@@ -23,7 +23,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[0.20061031-BETA],[ntfs-3g-devel@lists.sf.net])
+AC_INIT([ntfs-3g],[0.20061110-BETA-CVS],[ntfs-3g-devel@lists.sf.net])
 
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
@@ -80,9 +80,9 @@ AC_SYS_LARGEFILE
 
 case "$target_os" in
 linux*)
-	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.5.0, [ compile_fuse_module=true ],
+	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
 	[
-		AC_MSG_ERROR([ntfs-3g requires FUSE >= 2.5.0. Please see http://fuse.sf.net/ or install __all__ the precompiled fuse packages.])
+		AC_MSG_ERROR([ntfs-3g requires FUSE >= 2.6.0. Please see http://fuse.sf.net/ or install __all__ FUSE packages (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev) or remove already installed __older__ FUSE.])
 	]);;
 *)
 		AC_MSG_ERROR([ntfs-3g can be built only under Linux.])
