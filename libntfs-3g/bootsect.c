@@ -156,7 +156,7 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute
 	return TRUE;
 not_ntfs:
 	ntfs_log_debug("FAILED\n");
-	ntfs_log_debug("Bootsector check failed.  Aborting...\n");
+	ntfs_log_error("Bootsector check failed.\n");
 	return FALSE;
 }
 
