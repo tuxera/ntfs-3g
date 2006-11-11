@@ -2025,8 +2025,8 @@ mount_failed:
 			ctx->vol->minor_ver);
 	fuse_loop(fh);
 	
-	fuse_destroy(fh);
 	fuse_unmount(opts.mnt_point, fc);
+	fuse_destroy(fh);
 	ntfs_fuse_destroy();
 	return 0;
 }
