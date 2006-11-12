@@ -41,25 +41,6 @@
 #include <mntent.h>
 #endif
 
-/*
- * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY and MS_NOATIME,
- * so we define them ourselves.
- */
-#ifndef MS_RDONLY
-#define MS_RDONLY 1
-#endif
-/*
- * Solaris defines MS_RDONLY but not MS_NOATIME thus we need to carefully
- * define MS_NOATIME.
- */
-#ifndef MS_NOATIME
-#if (MS_RDONLY != 1)
-#	define MS_NOATIME 1
-#else
-#	define MS_NOATIME 2
-#endif
-#endif
-
 /* Forward declaration */
 typedef struct _ntfs_volume ntfs_volume;
 
@@ -72,13 +53,24 @@ typedef struct _ntfs_volume ntfs_volume;
 /**
  * enum ntfs_mount_flags -
  *
+ * Flags for the ntfs_mount() function.
+ */
+typedef enum {
+	NTFS_MNT_RDONLY	 	= 1,
+	NTFS_MNT_NOATIME 	= 2,
+	NTFS_MNT_CASE_SENSITIVE	= 4,
+} ntfs_mount_flags;
+
+/**
+ * enum ntfs_mounted_flags -
+ *
  * Flags returned by the ntfs_check_if_mounted() function.
  */
 typedef enum {
 	NTFS_MF_MOUNTED		= 1,	/* Device is mounted. */
 	NTFS_MF_ISROOT		= 2,	/* Device is mounted as system root. */
 	NTFS_MF_READONLY	= 4,	/* Device is mounted read-only. */
-} ntfs_mount_flags;
+} ntfs_mounted_flags;
 
 extern int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags);
 
@@ -214,13 +206,13 @@ struct _ntfs_volume {
 extern ntfs_volume *ntfs_volume_alloc(void);
 
 extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
-		unsigned long flags);
+		ntfs_mount_flags flags);
 
 extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
-		unsigned long flags);
+		ntfs_mount_flags flags);
 extern int ntfs_device_umount(ntfs_volume *vol, const BOOL force);
 
-extern ntfs_volume *ntfs_mount(const char *name, unsigned long flags);
+extern ntfs_volume *ntfs_mount(const char *name, ntfs_mount_flags flags);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);

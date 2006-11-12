@@ -484,7 +484,7 @@ static int parse_options(int argc, char **argv)
 			opt.info++;
 			break;
 		case 'n':
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 			break;
 		case 'P':
 			opt.show_progress = 0;
@@ -520,7 +520,7 @@ static int parse_options(int argc, char **argv)
 			err++;
 		}
 		if (opt.info) {
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 			if (opt.bytes) {
 				printf(NERR_PREFIX "Options --info and --size "
 					"can't be used together.\n");
@@ -2237,7 +2237,7 @@ static ntfs_volume *mount_volume(void)
 				 "You must 'umount' it first.\n", opt.volume);
 	}
 
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | MS_NOATIME))) {
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_NOATIME))) {
 
 		int err = errno;
 

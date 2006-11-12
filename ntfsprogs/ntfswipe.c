@@ -1340,7 +1340,7 @@ int main(int argc, char *argv[])
 		print_summary();
 
 	if (opts.info || opts.noaction)
-		flags = MS_RDONLY;
+		flags = NTFS_MNT_RDONLY;
 
 	vol = utils_mount_volume(opts.device, flags, opts.force);
 	if (!vol)

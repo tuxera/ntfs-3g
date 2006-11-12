@@ -197,7 +197,7 @@ static int logfile_open(BOOL is_volume, const char *filename,
 		ntfs_inode *ni;
 		ntfs_attr *na;
 
-		vol = ntfs_mount(filename, MS_RDONLY);
+		vol = ntfs_mount(filename, NTFS_MNT_RDONLY);
 		if (!vol)
 			log_err_exit(NULL, "Failed to mount %s: %s\n",
 					filename, strerror(errno));

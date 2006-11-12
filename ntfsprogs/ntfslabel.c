@@ -394,8 +394,8 @@ int main(int argc, char **argv)
 	if (!opts.label)
 		opts.noaction++;
 
-	vol = utils_mount_volume(opts.device, opts.noaction ? MS_RDONLY : 0,
-			opts.force);
+	vol = utils_mount_volume(opts.device, opts.noaction ?
+			NTFS_MNT_RDONLY : 0, opts.force);
 	if (!vol)
 		return 1;
 

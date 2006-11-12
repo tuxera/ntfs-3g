@@ -117,7 +117,7 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		if (NDevDirty(dev))
 			dev->d_ops->sync(dev);
 		if (dev->d_ops->close(dev))
-			ntfs_log_perror("Eeek! Failed to close the device.  Error: ");
+			ntfs_log_perror("Failed to close the device.  Error: ");
 	}
 	free(v->vol_name);
 	free(v->upcase);
@@ -399,7 +399,8 @@ error_exit:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
+ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
+		ntfs_mount_flags flags)
 {
 	LCN mft_zone_size, mft_lcn;
 	s64 br;
@@ -435,10 +436,12 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
-	if (flags & MS_RDONLY)
+	if (flags & NTFS_MNT_RDONLY)
 		NVolSetReadOnly(vol);
-	if (flags & MS_NOATIME)
+	if (flags & NTFS_MNT_NOATIME)
 		NVolSetNoATime(vol);
+	if (flags & NTFS_MNT_CASE_SENSITIVE)
+		NVolSetCaseSensitive(vol);
 	ntfs_log_debug("Reading bootsector... ");
 	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
 		ntfs_log_debug(FAILED);
@@ -746,11 +749,13 @@ out:
  * This function mounts an ntfs volume. @dev should describe the device which
  * to mount as the ntfs volume.
  *
- * @flags is an optional second parameter. The same flags are used as for
- * the mount system call (man 2 mount). Currently only the following flags
+ * @flags is an optional second parameter. Some flags are similar to flags used
+ * as for the mount system call (man 2 mount). Currently the following flags
  * are implemented:
- *	MS_RDONLY	- mount volume read-only
- *	MS_NOATIME	- do not update access time
+ *	NTFS_MNT_RDONLY		- mount volume read-only
+ *	NTFS_MNT_NOATIME	- do not update access time
+ *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
+ *				  they are not in POSIX namespace
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -761,7 +766,7 @@ out:
  * Return the allocated volume structure on success and NULL on error with
  * errno set to the error code.
  */
-ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
+ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 {
 	s64 l;
 #ifndef NTFS_DISABLE_DEBUG_LOGGING
@@ -936,8 +941,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->upcase);
 	if (l != na->data_size) {
 		ntfs_log_debug(FAILED);
-		ntfs_log_debug("Amount of data read does not correspond to expected "
-				"length!\n");
+		ntfs_log_debug("Amount of data read does not correspond to "
+				"expected length!\n");
 		errno = EIO;
 		goto error_exit;
 	}
@@ -990,8 +995,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			le16_to_cpu(a->value_offset) + le32_to_cpu(
 			a->value_length) > le32_to_cpu(a->length)) {
 		ntfs_log_debug(FAILED);
-		ntfs_log_debug("Error: Attribute $VOLUME_INFORMATION in $Volume is "
-				"corrupt!\n");
+		ntfs_log_debug("Error: Attribute $VOLUME_INFORMATION in "
+				"$Volume is corrupt!\n");
 		errno = EIO;
 		goto error_exit;
 	}
@@ -1009,9 +1014,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			ctx)) {
 		if (errno != ENOENT) {
 			ntfs_log_debug(FAILED);
-			ntfs_log_debug("Error: Lookup of $VOLUME_NAME attribute in "
-					"$Volume failed.  This probably means "
-					"something is corrupt.  Run chkdsk.\n");
+			ntfs_log_debug("Error: Lookup of $VOLUME_NAME "
+					"attribute in $Volume failed.  "
+					"This probably means something is "
+					"corrupt.  Run chkdsk.\n");
 			goto error_exit;
 		}
 		/*
@@ -1044,8 +1050,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		 */
 		vol->vol_name = NULL;
 		if (ntfs_ucstombs(vname, u, &vol->vol_name, 0) == -1) {
-			ntfs_log_perror("Error: Volume name could not be converted "
-					"to current locale");
+			ntfs_log_perror("Error: Volume name could not be "
+					"converted to current locale");
 			ntfs_log_debug("Forcing name into ASCII by replacing "
 				"non-ASCII characters with underscores.\n");
 			vol->vol_name = ntfs_malloc(u + 1);
@@ -1083,8 +1089,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	/* Check we don't overflow 32-bits. */
 	if (na->data_size > 0xffffffffLL) {
 		ntfs_log_debug(FAILED);
-		ntfs_log_debug("Error: Attribute definition table is too big (max "
-				"32-bit allowed).\n");
+		ntfs_log_debug("Error: Attribute definition table is too big "
+				"(max 32-bit allowed).\n");
 		errno = EINVAL;
 		goto error_exit;
 	}
@@ -1098,8 +1104,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->attrdef);
 	if (l != na->data_size) {
 		ntfs_log_debug(FAILED);
-		ntfs_log_debug("Amount of data read does not correspond to expected "
-				"length!\n");
+		ntfs_log_debug("Amount of data read does not correspond to "
+				"expected length!\n");
 		errno = EIO;
 		goto error_exit;
 	}
@@ -1112,7 +1118,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
 	 */
-	if (!(flags & MS_RDONLY)) {
+	if (!(flags & NTFS_MNT_RDONLY)) {
 		if (ntfs_volume_check_logfile(vol) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_hiberfile(vol) < 0)
@@ -1141,11 +1147,13 @@ error_exit:
  * This function mounts an ntfs volume. @name should contain the name of the
  * device/file to mount as the ntfs volume.
  *
- * @flags is an optional second parameter. The same flags are used as for
- * the mount system call (man 2 mount). Currently only the following flags
+ * @flags is an optional second parameter. Some flags are similar to flags used
+ * as for the mount system call (man 2 mount). Currently the following flags
  * are implemented:
- *	MS_RDONLY	- mount volume read-only
- *	MS_NOATIME	- do not update access time
+ *	NTFS_MNT_RDONLY		- mount volume read-only
+ *	NTFS_MNT_NOATIME	- do not update access time
+ *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
+ *				  they are not in POSIX namespace
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1160,7 +1168,7 @@ error_exit:
  * soon as the function returns.
  */
 ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
-		unsigned long flags __attribute__((unused)))
+		ntfs_mount_flags flags __attribute__((unused)))
 {
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 	struct ntfs_device *dev;
@@ -1378,7 +1386,7 @@ int ntfs_check_if_mounted(const char *file __attribute__((unused)),
  * Version 1.1 and 1.2 are used by Windows NT3.x and NT4.
  * Version 2.x is used by Windows 2000 Betas.
  * Version 3.0 is used by Windows 2000.
- * Version 3.1 is used by Windows XP, Windows Server 2003 and Longhorn.
+ * Version 3.1 is used by Windows XP, Windows Server 2003 and Vista.
  *
  * Return 0 if NTFS version is supported otherwise -1 with errno set.
  *

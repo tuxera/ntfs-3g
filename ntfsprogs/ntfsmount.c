@@ -1410,8 +1410,9 @@ static int ntfs_fuse_mount(const char *device)
 {
 	ntfs_volume *vol;
 
-	vol = utils_mount_volume(device, ((ctx->ro) ? MS_RDONLY : 0) |
-			((ctx->noatime) ? MS_NOATIME : 0), ctx->force);
+	vol = utils_mount_volume(device, ((ctx->ro) ? NTFS_MNT_RDONLY : 0) |
+			((ctx->noatime) ? NTFS_MNT_NOATIME : 0) |
+			NTFS_MNT_CASE_SENSITIVE, ctx->force);
 	if (!vol) {
 		ntfs_log_error("Mount failed.\n");
 		return -1;

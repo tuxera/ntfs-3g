@@ -162,7 +162,8 @@ static GnomeVFSResult libntfs_gnomevfs_uri_parent_init(
 			return GNOME_VFS_ERROR_INVALID_URI;
 		}
 
-		if (!(volume = ntfs_mount(uri->parent->text, MS_RDONLY))) {
+		if (!(volume = ntfs_mount(uri->parent->text,
+				NTFS_MNT_RDONLY))) {
 			g_free(uri_parent_string);
 			return GNOME_VFS_ERROR_WRONG_FORMAT;
 		}

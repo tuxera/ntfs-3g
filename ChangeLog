@@ -64,7 +64,9 @@ xx/xx/2006 - x.xx.x - .
 	- Change malloc() calls to ntfs_malloc().  (Szaka)
 	- ntfsmount: require FUSE version >= 2.6.0 for build. Fixes fusermount
 	  lookup problem and allows to drop compatibility code.  (Yura)
-	- Rewrite ntfs_attr_add() algorithm.  (Yura)
+	- Rewrite ntfs_attr_add() algorithm to be faster and cleverer.  (Yura)
+	- Rename MS_{RDONLY,NOATIME} to NTFS_MNT_{RDONLY,NOATIME}. Introduce
+	  NTFS_MNT_CASE_SENSITIVE.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
