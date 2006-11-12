@@ -27,10 +27,10 @@
 
 #include <fuse.h>
 
-#if !defined(FUSE_VERSION) || (FUSE_VERSION < 25)
+#if !defined(FUSE_VERSION) || (FUSE_VERSION < 26)
 #error "***********************************************************"
 #error "*                                                         *"
-#error "*     Compilation requires at least FUSE version 2.5!     *"
+#error "*     Compilation requires at least FUSE version 2.6.0!   *"
 #error "*                                                         *"
 #error "***********************************************************"
 #endif
