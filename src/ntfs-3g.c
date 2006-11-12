@@ -1562,23 +1562,24 @@ static void signal_handler(int arg __attribute__((unused)))
 	fuse_exit((fuse_get_context())->fuse);
 }
 
-static char *parse_mount_options(const char *org_options)
+static char *parse_mount_options(const char *orig_opts)
 {
 	char *options, *s, *opt, *val, *ret;
 	BOOL no_def_opts = FALSE;
 
 	/*
-	 * +7		for "fsname=".
-	 * +1		for comma.
-	 * +1		for null-terminator.
-	 * +PATH_MAX	for resolved by realpath() device name.
+	 * +7		fsname=
+	 * +1		comma
+	 * +1		null-terminator
+	 * +21          ,blkdev,blksize=65536
+	 * +PATH_MAX	resolved realpath() device name
 	 */
-	ret = ntfs_malloc(strlen(def_opts) + strlen(org_options) + 9 + PATH_MAX);
+	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 64 + PATH_MAX);
 	if (!ret)
 		return NULL;
 	
 	*ret = 0;
-	options = strdup(org_options);
+	options = strdup(orig_opts);
 	if (!options) {
 		ntfs_log_perror("strdup failed");
 		return NULL;
@@ -1974,6 +1975,11 @@ int main(int argc, char *argv[])
 		return 4;
 	}
 
+	if (NDevBlock(ctx->vol->dev)) {
+		/* parsed_options already allocated enough space. */
+        	strcat(parsed_options, ",blkdev");
+	}
+	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");

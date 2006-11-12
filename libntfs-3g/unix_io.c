@@ -98,20 +98,20 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	if (!dev->d_private)
 		return -1;
 	/*
-	 * Open the device/file obtaining the file descriptor for exclusive
-	 * access (but only if mounting r/w).
+	 * Open file for exclusive access if mounting r/w.
+	 * Fuseblk takes care about block devices.
 	 */ 
-	if ((flags & O_RDWR) == O_RDWR)
+	if (!NDevBlock(dev) && (flags & O_RDWR) == O_RDWR)
 		flags |= O_EXCL;
 	*(int*)dev->d_private = open(dev->d_name, flags);
 	if (*(int*)dev->d_private == -1) {
 		err = errno;
 		goto err_out;
 	}
-	/* Setup our read-only flag. */
+	
 	if ((flags & O_RDWR) != O_RDWR)
 		NDevSetReadOnly(dev);
-	/* Acquire exclusive (mandatory) lock on the whole device. */
+	
 	memset(&flk, 0, sizeof(flk));
 	if (NDevReadOnly(dev))
 		flk.l_type = F_RDLCK;
@@ -121,14 +121,13 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
 		err = errno;
-		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s for %s\n",
-				dev->d_name, NDevReadOnly(dev) ? "reading" : "writing");
+		ntfs_log_perror("Failed to %s lock '%s'", NDevReadOnly(dev) ? 
+				"read" : "write", dev->d_name);
 		if (close(DEV_FD(dev)))
-			ntfs_log_perror("ntfs_device_unix_io_open: Warning: Could not "
-					"close %s", dev->d_name);
+			ntfs_log_perror("Failed to close '%s'", dev->d_name);
 		goto err_out;
 	}
-	/* Set our open flag. */
+	
 	NDevSetOpen(dev);
 	return 0;
 err_out:
