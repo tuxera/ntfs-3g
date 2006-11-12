@@ -87,6 +87,13 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 		errno = EBUSY;
 		return -1;
 	}
+	if (stat(dev->d_name, &sbuf)) {
+		ntfs_log_perror("Failed to access '%s'", dev->d_name);
+		return -1;
+	}
+	if (S_ISBLK(sbuf.st_mode))
+		NDevSetBlock(dev);
+	
 	dev->d_private = ntfs_malloc(sizeof(int));
 	if (!dev->d_private)
 		return -1;
@@ -121,9 +128,6 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 					"close %s", dev->d_name);
 		goto err_out;
 	}
-	/* Determine if device is a block device or not, ignoring errors. */
-	if (!fstat(DEV_FD(dev), &sbuf) && S_ISBLK(sbuf.st_mode))
-		NDevSetBlock(dev);
 	/* Set our open flag. */
 	NDevSetOpen(dev);
 	return 0;
