@@ -1923,6 +1923,27 @@ static void load_fuse_module(int force)
 		system(load_fuse_cmd);
 }
 
+static struct fuse_chan *try_fuse_mount(char *parsed_options)
+{
+	struct fuse_chan *fc = NULL;
+	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
+	
+	if ((fuse_opt_add_arg(&margs, "") == -1 ||
+	     fuse_opt_add_arg(&margs, "-o") == -1 ||
+	     fuse_opt_add_arg(&margs, parsed_options) == -1)) {
+		ntfs_log_error("Failed to set FUSE options.\n");
+		goto free_args;
+	}
+	
+	fc = fuse_mount(opts.mnt_point, &margs);
+	if (!fc)
+		ntfs_log_error("Failed to mount NTFS.\n");
+free_args:
+	fuse_opt_free_args(&margs);
+	return fc;
+		
+}
+		
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
@@ -1959,36 +1980,25 @@ int main(int argc, char *argv[])
 	
 	load_fuse_module(0);
 
-	if ((fuse_opt_add_arg(&margs, "") == -1 ||
-			fuse_opt_add_arg(&margs, "-o") == -1 ||
-			fuse_opt_add_arg(&margs, parsed_options) == -1)) {
-		ntfs_log_error("Failed to set FUSE options.\n");
-		goto mount_failed;
-	}
-	
-	fc = fuse_mount(opts.mnt_point, &margs);
+	fc = try_fuse_mount(parsed_options);
 	if (!fc) {
 		if (errno == ENOENT || errno == ENODEV) {
 			ntfs_log_error("Retrying mount ...\n");
 			load_fuse_module(1);
-			fc = fuse_mount(opts.mnt_point, &margs);
+			fc = try_fuse_mount(parsed_options);
 		}
 		if (!fc) {
-mount_failed:			
-			ntfs_log_error("Failed to mount NTFS\n");
-			fuse_opt_free_args(&margs);
 			free(parsed_options);
 			ntfs_fuse_destroy();
 			return 5;
-		} else
-			ntfs_log_info("Successful mount\n");
+		}
+		ntfs_log_info("Successful mount.\n");
 	}
-	fuse_opt_free_args(&margs);
 	free(parsed_options);
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
-			fuse_opt_add_arg(&margs, "-o") == -1)
+	    fuse_opt_add_arg(&margs, "-o") == -1)
 		    fh = NULL;
 	if (!ctx->debug && !ctx->no_detach) {
 		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
