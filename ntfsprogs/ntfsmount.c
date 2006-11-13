@@ -1697,7 +1697,10 @@ static int parse_options(int argc, char *argv[])
 				if (argv[optind - 1][0] != '/') {
 					if (!realpath(argv[optind - 1],
 							opts.device)) {
-						ntfs_log_perror("realpath");
+						ntfs_log_perror("Failed to "
+								"access %s",
+								argv[optind -
+								1]);
 						free(opts.device);
 						opts.device = NULL;
 						err++;

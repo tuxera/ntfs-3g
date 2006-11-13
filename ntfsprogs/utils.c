@@ -81,6 +81,41 @@ const char *ntfs_gpl = "This program is free software, released under the GNU "
 	"\"COPYING\" distributed with this program, or online at:\n"
 	"http://www.gnu.org/copyleft/gpl.html\n";
 
+static const char *invalid_ntfs_msg =
+"The device '%s' doesn't have a valid NTFS.\n"
+"Maybe you selected the wrong device? Or the whole disk instead of a\n"
+"partition (e.g. /dev/hda, not /dev/hda1)? Or the other way around?\n";
+
+static const char *corrupt_volume_msg =
+"NTFS is inconsistent. Run chkdsk /f on Windows then reboot it TWICE!\n"
+"The usage of the /f parameter is very IMPORTANT! No modification was\n"
+"made to NTFS by this software.\n";
+
+static const char *hibernated_volume_msg =
+"The NTFS partition is hibernated. Please resume Windows and turned it \n"
+"off properly, so mounting could be done safely.\n";
+
+static const char *unclean_journal_msg =
+"Mount is denied because the NTFS journal file is unclean. Choices are:\n"
+" A) Shutdown Windows properly.\n"
+" B) Click the 'Safely Remove Hardware' icon in the Windows taskbar\n"
+"    notification area before disconnecting the device.\n"
+" C) Use 'Eject' from Windows Explorer to safely remove the device.\n"
+" D) If you ran chkdsk previously then boot Windows again which will\n"
+"    automatically initialize the journal.\n"
+" E) Run 'ntfsfix' on Linux which will reset the NTFS journal.\n"
+"    Then submit force option (WARNING: This solution it not recommended).\n"
+" F) ntfsmount: Mount the volume read-only by using the 'ro' mount option.\n";
+
+static const char *opened_volume_msg =
+"Mount is denied because the NTFS volume is already exclusively opened.\n"
+"The volume may be already mounted, or another software may use it which\n"
+"could be identified for example by the help of the 'fuser' command.\n";
+
+static const char *dirty_volume_msg =
+"Volume is scheduled for check.\n"
+"Please boot into Windows TWICE, or use the 'force' option.\n";
+
 /**
  * utils_set_locale
  */
@@ -91,7 +126,8 @@ int utils_set_locale(void)
 	locale = setlocale(LC_ALL, "");
 	if (!locale) {
 		locale = setlocale(LC_ALL, NULL);
-		ntfs_log_error("Failed to set locale, using default '%s'.\n", locale);
+		ntfs_log_error("Failed to set locale, using default '%s'.\n",
+				locale);
 		return 1;
 	} else {
 		return 0;
@@ -99,7 +135,7 @@ int utils_set_locale(void)
 }
 
 /**
- * utils_valid_device - Perform some safety checks on the device, before we start
+ * utils_valid_device - Perform some safety checks on the device, before start
  * @name:   Full pathname of the device/file to work with
  * @force:  Continue regardless of problems
  *
@@ -115,7 +151,7 @@ int utils_valid_device(const char *name, int force)
 	struct stat st;
 
 #ifdef __CYGWIN32__
-	/* FIXME: This doesn't work for Cygwin, so just return success for now... */
+	/* FIXME: This doesn't work for Cygwin, so just return success. */
 	return 1;
 #endif
 	if (!name) {
@@ -124,37 +160,30 @@ int utils_valid_device(const char *name, int force)
 	}
 
 	if (stat(name, &st) == -1) {
-		if (errno == ENOENT) {
+		if (errno == ENOENT)
 			ntfs_log_error("The device %s doesn't exist\n", name);
-		} else {
-			ntfs_log_perror("Error getting information about %s", name);
-		}
+		else
+			ntfs_log_perror("Error getting information about %s",
+					name);
 		return 0;
-	}
-
-	if (!S_ISBLK(st.st_mode) && !S_ISREG(st.st_mode)) {
-		ntfs_log_warning("%s is not a block device, "
-				 "nor regular file.\n", name);
-		if (!force) {
-			ntfs_log_error("Use the force option to work with other"
-				       " file types, for your own risk!\n");
-			return 0;
-		}
-		ntfs_log_warning("Forced to continue.\n");
 	}
 
 	/* Make sure the file system is not mounted. */
 	if (ntfs_check_if_mounted(name, &mnt_flags)) {
-		ntfs_log_perror("Failed to determine whether %s is mounted", name);
+		ntfs_log_perror("Failed to determine whether %s is mounted",
+				name);
 		if (!force) {
-			ntfs_log_error("Use the force option to ignore this error.\n");
+			ntfs_log_error("Use the force option to ignore this "
+					"error.\n");
 			return 0;
 		}
 		ntfs_log_warning("Forced to continue.\n");
 	} else if (mnt_flags & NTFS_MF_MOUNTED) {
-		ntfs_log_warning("The device %s, is mounted.\n", name);
 		if (!force) {
-			ntfs_log_error("Use the force option to work a mounted filesystem.\n");
+			ntfs_log_error("%s", opened_volume_msg);
+			ntfs_log_error("You can use force option to avoid this "
+					"check, but this is not recommended\n"
+					"and may lead to data corruption.\n");
 			return 0;
 		}
 		ntfs_log_warning("Forced to continue.\n");
@@ -166,7 +195,8 @@ int utils_valid_device(const char *name, int force)
 /**
  * utils_mount_volume - Mount an NTFS volume
  */
-ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force)
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
+		BOOL force)
 {
 	ntfs_volume *vol;
 
@@ -180,32 +210,29 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL f
 
 	vol = ntfs_mount(device, flags);
 	if (!vol) {
-		int err;
-
-		err = errno;
-		ntfs_log_perror("Couldn't mount device '%s'", device);
-		if (err == EPERM)
-			ntfs_log_error("Windows was hibernated.  Try to mount "
-					"volume in windows, shut down and try "
-					"again.\n");
-		if (err == EOPNOTSUPP)
-			ntfs_log_error("Windows did not shut down properly.  "
-					"Try to mount volume in windows, "
-					"shut down and try again.\n");
+		ntfs_log_perror("Failed to mount '%s'", device);
+		if (errno == EINVAL)
+			ntfs_log_error(invalid_ntfs_msg, device);
+		else if (errno == EIO)
+			ntfs_log_error("%s", corrupt_volume_msg);
+		else if (errno == EPERM)
+			ntfs_log_error("%s", hibernated_volume_msg);
+		else if (errno == EOPNOTSUPP)
+			ntfs_log_error("%s", unclean_journal_msg);
+		else if (errno == EBUSY)
+			ntfs_log_error("%s", opened_volume_msg);
 		return NULL;
 	}
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		ntfs_log_warning("Volume is dirty.\n");
 		if (!force) {
-			ntfs_log_error("Run chkdsk and try again, or use the "
-					"force option.\n");
+			ntfs_log_error("%s", dirty_volume_msg);
 			ntfs_umount(vol, FALSE);
 			return NULL;
 		}
-		ntfs_log_warning("Forced to continue.\n");
+		ntfs_log_error("WARNING: Dirty volume mount was forced by the "
+				"'force' mount option.\n");
 	}
-
 	return vol;
 }
 
