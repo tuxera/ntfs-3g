@@ -1194,6 +1194,52 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	return 0;
 }
 
+static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	LCN lcn;
+	int ret, cl_per_bl = ctx->vol->cluster_size / blocksize;
+
+	if (blocksize > ctx->vol->cluster_size)
+		return -EINVAL;
+	
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL;
+	
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		ret = -errno;
+		goto close_inode;
+	}
+	
+	if (NAttrCompressed(na) || NAttrEncrypted(na) || !NAttrNonResident(na)){
+		ret = -EINVAL;
+		goto close_attr;
+	}
+	
+	if (ntfs_attr_map_whole_runlist(na)) {
+		ret = -errno;
+		goto close_attr;
+	}
+	
+	lcn = ntfs_rl_vcn_to_lcn(na->rl, *idx / cl_per_bl);
+	*idx = (lcn > 0) ? lcn * cl_per_bl + *idx % cl_per_bl : 0;
+	
+	ret = 0;
+	
+close_attr:
+	ntfs_attr_close(na);
+close_inode:
+	if (ntfs_inode_close(ni))
+		ntfs_log_perror("bmap: failed to close inode");
+	return ret;
+}
+
 #ifdef HAVE_SETXATTR
 
 static const char nf_ns_xattr_preffix[] = "user.";
@@ -1518,6 +1564,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
 	.utime		= ntfs_fuse_utime,
+	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
@@ -1945,6 +1992,29 @@ free_args:
 		
 }
 		
+static void set_fuseblk_options(char *parsed_options)
+{
+	char option[32];
+	long pagesize; 
+	u32 blksize = ctx->vol->cluster_size;
+	
+	if (!NDevBlock(ctx->vol->dev))
+		return;
+	
+	pagesize = sysconf(_SC_PAGESIZE);
+	if (pagesize < 1)
+		pagesize = 4096;
+	
+	if (blksize > pagesize)
+		blksize = pagesize;
+	
+	snprintf(option, sizeof(option), ",blksize=%u", blksize);
+	
+	/* parsed_options already allocated enough space. */
+	strcat(parsed_options, ",blkdev");
+	strcat(parsed_options, option);
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
@@ -1975,10 +2045,7 @@ int main(int argc, char *argv[])
 		return 4;
 	}
 
-	if (NDevBlock(ctx->vol->dev)) {
-		/* parsed_options already allocated enough space. */
-        	strcat(parsed_options, ",blkdev");
-	}
+	set_fuseblk_options(parsed_options);
 	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
