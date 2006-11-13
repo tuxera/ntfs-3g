@@ -143,11 +143,12 @@ AH_TEMPLATE([NTFS_DISABLE_DEBUG_LOGGING],
 	    [Define this if you want to compile out the debug log messages.
 	     This will reduce the size of the binaries.])
 AC_ARG_ENABLE(debug-logging,
-	AS_HELP_STRING(--disable-debug-logging,Remove debug logging from the code),
-	if test "$enable_debug_logging" == "no"; then
-		AC_DEFINE(NTFS_DISABLE_DEBUG_LOGGING)
-	fi,
+	AS_HELP_STRING(--enable-debug-logging,Add debug logging to the code),,
+	enable_debug_logging=no
 )
+if test "$enable_debug_logging" == "no"; then
+	AC_DEFINE(NTFS_DISABLE_DEBUG_LOGGING)
+fi
 
 # Use GNU extensions if available.
 AC_GNU_SOURCE
