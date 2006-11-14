@@ -1985,7 +1985,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	
 	fc = fuse_mount(opts.mnt_point, &margs);
 	if (!fc)
-		ntfs_log_error("Failed to mount NTFS.\n");
+		ntfs_log_error("Failed to create FUSE mount point.\n");
 free_args:
 	fuse_opt_free_args(&margs);
 	return fc;
@@ -2056,7 +2056,7 @@ int main(int argc, char *argv[])
 	fc = try_fuse_mount(parsed_options);
 	if (!fc) {
 		if (errno == ENOENT || errno == ENODEV) {
-			ntfs_log_error("Retrying mount ...\n");
+			ntfs_log_error("Retry to create FUSE mount point ...\n");
 			load_fuse_module(1);
 			fc = try_fuse_mount(parsed_options);
 		}
