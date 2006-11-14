@@ -346,8 +346,9 @@ int ntfs_log_redirect(const char *function, const char *file,
 
 #ifdef HAVE_SYSLOG_H
 int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
-	const char *file, __attribute__((unused)) int line, u32 level,
-	void *data __attribute__((unused)), const char *format, va_list args)
+	const char *file, __attribute__((unused)) int line, 
+	u32 level __attribute__((unused)), void *data __attribute__((unused)),
+	const char *format, va_list args)
 {
 	int ret = 0;
 	int olderr = errno;

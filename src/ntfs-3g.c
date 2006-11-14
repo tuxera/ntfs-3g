@@ -2005,7 +2005,7 @@ static void set_fuseblk_options(char *parsed_options)
 	if (pagesize < 1)
 		pagesize = 4096;
 	
-	if (blksize > pagesize)
+	if (blksize > (u32)pagesize)
 		blksize = pagesize;
 	
 	snprintf(option, sizeof(option), ",blksize=%u", blksize);
