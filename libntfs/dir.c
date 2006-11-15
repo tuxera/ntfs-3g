@@ -186,28 +186,17 @@ found_it:
 		}
 		/*
 		 * For a case insensitive mount, we also perform a case
-		 * insensitive comparison (provided the file name is not in the
-		 * POSIX namespace). If the comparison matches, we cache the
-		 * mft reference in mref.
+		 * insensitive comparison. If the comparison matches, we cache
+		 * the mft reference in mref. Use first case insensitive match
+		 * in case if no name matches case sensitive, but several names
+		 * matches case insensitive.
 		 */
-		if (!NVolCaseSensitive(vol) &&
-				ie->key.file_name.file_name_type &&
+		if (!mref && !NVolCaseSensitive(vol) &&
 				ntfs_names_are_equal(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
-				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
-			/* Only one case insensitive matching name allowed. */
-			if (mref) {
-				ntfs_log_error("Found already cached mft "
-						"reference in phase 1. Please "
-						"run chkdsk and if that doesn't"
-						" find any errors please report"
-						" you saw this message to %s\n",
-						NTFS_DEV_LIST);
-				goto put_err_out;
-			}
+				IGNORE_CASE, vol->upcase, vol->upcase_len))
 			mref = le64_to_cpu(ie->indexed_file);
-		}
 		/*
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
@@ -381,28 +370,17 @@ found_it2:
 		}
 		/*
 		 * For a case insensitive mount, we also perform a case
-		 * insensitive comparison (provided the file name is not in the
-		 * POSIX namespace). If the comparison matches, we cache the
-		 * mft reference in mref.
+		 * insensitive comparison. If the comparison matches, we cache
+		 * the mft reference in mref. Use first case insensitive match
+		 * in case if no name matches case sensitive, but several names
+		 * matches case insensitive.
 		 */
-		if (!NVolCaseSensitive(vol) &&
-				ie->key.file_name.file_name_type &&
+		if (!mref && !NVolCaseSensitive(vol) &&
 				ntfs_names_are_equal(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
-				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
-			/* Only one case insensitive matching name allowed. */
-			if (mref) {
-				ntfs_log_error("Found already cached mft "
-						"reference in phase 2. Please "
-						"run chkdsk and if that doesn't"
-						" find any errors please report"
-						" you saw this message to %s\n",
-						NTFS_DEV_LIST);
-				goto close_err_out;
-			}
+				IGNORE_CASE, vol->upcase, vol->upcase_len))
 			mref = le64_to_cpu(ie->indexed_file);
-		}
 		/*
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
@@ -1524,8 +1502,7 @@ search:
 		if (dir_ni->mft_no == MREF_LE(fn->parent_directory) &&
 				ntfs_names_are_equal(fn->file_name,
 				fn->file_name_length, name,
-				name_len, (fn->file_name_type ==
-				FILE_NAME_POSIX || case_sensitive_match) ?
+				name_len, case_sensitive_match ?
 				CASE_SENSITIVE : IGNORE_CASE, ni->vol->upcase,
 				ni->vol->upcase_len)) {
 			if (fn->file_name_type == FILE_NAME_WIN32) {

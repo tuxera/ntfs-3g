@@ -67,6 +67,8 @@ xx/xx/2006 - x.xx.x - .
 	- Rewrite ntfs_attr_add() algorithm to be faster and cleverer.  (Yura)
 	- Rename MS_{RDONLY,NOATIME} to NTFS_MNT_{RDONLY,NOATIME}. Introduce
 	  NTFS_MNT_CASE_SENSITIVE.  (Yura)
+	- Treat filenames in POSIX namespace as case insensitive in case of
+	  case insensitive mounts.  (Anton, Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
