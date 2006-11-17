@@ -727,7 +727,7 @@ ntfschar *ntfs_str2ucs(const char *s, int *len)
 		ntfs_log_perror("Couldn't convert '%s' to Unicode", s);
 		return NULL;
 	}
-	if (*len > 0xff) {
+	if (*len > NTFS_MAX_NAME_LEN) {
 		free(ucs);
 		errno = ENAMETOOLONG;
 		return NULL;

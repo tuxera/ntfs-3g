@@ -522,7 +522,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 
 	p = ascii;
 	/* Remove leading /'s. */
-	while (p && *p && *p == PATH_SEP)
+	while (p && *p == PATH_SEP)
 		p++;
 	while (p && *p) {
 		/* Find the end of the first token. */
