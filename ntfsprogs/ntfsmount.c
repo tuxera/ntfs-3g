@@ -1694,22 +1694,20 @@ static int parse_options(int argc, char *argv[])
 					break;
 				}
 				/* We don't want relative path in /etc/mtab. */
-				if (argv[optind - 1][0] != '/') {
-					if (!realpath(argv[optind - 1],
-							opts.device)) {
+				if (optarg[0] != '/') {
+					if (!realpath(optarg, opts.device)) {
 						ntfs_log_perror("Failed to "
 								"access %s",
-								argv[optind -
-								1]);
+								optarg);
 						free(opts.device);
 						opts.device = NULL;
 						err++;
 						break;
 					}
 				} else
-					strcpy(opts.device, argv[optind - 1]);
+					strcpy(opts.device, optarg);
 			} else if (!opts.mnt_point)
-				opts.mnt_point = argv[optind - 1];
+				opts.mnt_point = optarg;
 			else {
 				ntfs_log_error("You must specify exactly one "
 						"device and exactly one mount "
@@ -1719,7 +1717,7 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'o':
 			if (!opts.options)
-				opts.options = argv[optind - 1];
+				opts.options = optarg;
 			else {
 				ntfs_log_error("You must specify exactly one "
 						"set of options.\n");
@@ -1737,8 +1735,7 @@ static int parse_options(int argc, char *argv[])
 			opts.verbose++;
 			break;
 		default:
-			ntfs_log_error("Unknown option '%s'.\n",
-					argv[optind - 1]);
+			ntfs_log_error("Unknown option '%s'.\n", optarg);
 			err++;
 			break;
 		}
