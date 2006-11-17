@@ -151,13 +151,13 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 		return ctx->free_mft;
 	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
-		return -ENOMEM;
+		return -errno;
 	while (1) {
 		int i, j;
 
 		br = ntfs_attr_pread(vol->mftbmp_na, total,
 				vol->cluster_size, buf);
-		if (!br)
+		if (br <= 0)
 			break;
 		total += br;
 		for (i = 0; i < br; i++)
@@ -166,7 +166,7 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 					nr_free++;
 	}
 	free(buf);
-	if (!total)
+	if (!total || br < 0)
 		return -errno;
 	ctx->free_mft = nr_free;
 	ctx->state &= ~(NF_FreeMFTOutdate);
@@ -183,13 +183,13 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 		return ctx->free_clusters;
 	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
-		return -ENOMEM;
+		return -errno;
 	while (1) {
 		int i, j;
 
 		br = ntfs_attr_pread(vol->lcnbmp_na, total,
 				vol->cluster_size, buf);
-		if (!br)
+		if (br <= 0)
 			break;
 		total += br;
 		for (i = 0; i < br; i++)
@@ -198,7 +198,7 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 					nr_free++;
 	}
 	free(buf);
-	if (!total)
+	if (!total || br < 0)
 		return -errno;
 	ctx->free_clusters = nr_free;
 	ctx->state &= ~(NF_FreeClustersOutdate);
