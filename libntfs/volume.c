@@ -457,8 +457,8 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 		if (br != -1)
 			errno = EINVAL;
 		if (!br)
-			ntfs_log_debug("Error: partition is smaller than bootsector "
-					"size. Weird!\n");
+			ntfs_log_debug("Error: partition is smaller than "
+					"bootsector size. Weird!\n");
 		else
 			ntfs_log_perror("Error reading bootsector");
 		goto error_exit;
@@ -528,7 +528,8 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 				vol->cluster_size;
 	if (vol->mft_zone_start <= mft_lcn)
 		vol->mft_zone_start = 0;
-	ntfs_log_debug("mft_zone_start = 0x%llx\n", (long long)vol->mft_zone_start);
+	ntfs_log_debug("mft_zone_start = 0x%llx\n",
+			(long long)vol->mft_zone_start);
 
 	/*
 	 * Need to cap the mft zone on non-standard volumes so that it does

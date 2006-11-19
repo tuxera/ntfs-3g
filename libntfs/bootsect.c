@@ -56,7 +56,8 @@
  *
  * Return TRUE if @b contains a valid ntfs boot sector and FALSE if not.
  */
-BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute__((unused)))
+BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b,
+		const BOOL silent __attribute__((unused)))
 {
 	u32 i;
 
@@ -148,10 +149,10 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute
 	ntfs_log_debug("OK\n");
 
 	if (b->end_of_sector_marker != cpu_to_le16(0xaa55))
-		ntfs_log_debug("Warning: Bootsector has invalid end of sector marker.\n");
+		ntfs_log_debug("Warning: Bootsector has invalid end of sector "
+				"marker.\n");
 
 	ntfs_log_debug("Bootsector check completed successfully.\n");
-
 	return TRUE;
 not_ntfs:
 	ntfs_log_debug("FAILED\n");
@@ -187,7 +188,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	 * ntfs_boot_sector_is_ntfs but in this way we can just do this once.
 	 */
 	sectors_per_cluster = bs->bpb.sectors_per_cluster;
-	ntfs_log_debug("NumberOfSectors = %lli\n", sle64_to_cpu(bs->number_of_sectors));
+	ntfs_log_debug("NumberOfSectors = %lli\n",
+			sle64_to_cpu(bs->number_of_sectors));
 	ntfs_log_debug("SectorsPerCluster = 0x%x\n", sectors_per_cluster);
 	if (sectors_per_cluster & (sectors_per_cluster - 1)) {
 		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
@@ -244,7 +246,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 		return -1;
 	}
 	vol->mft_record_size_bits = ffs(vol->mft_record_size) - 1;
-	ntfs_log_debug("MftRecordSize = 0x%x\n", (unsigned)vol->mft_record_size);
+	ntfs_log_debug("MftRecordSize = 0x%x\n",
+			(unsigned)vol->mft_record_size);
 	ntfs_log_debug("MftRecordSizeBits = %u\n", vol->mft_record_size_bits);
 	/* Same as above for INDX record. */
 	c = bs->clusters_per_index_record;
@@ -254,7 +257,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	else
 		vol->indx_record_size = c << vol->cluster_size_bits;
 	vol->indx_record_size_bits = ffs(vol->indx_record_size) - 1;
-	ntfs_log_debug("INDXRecordSize = 0x%x\n", (unsigned)vol->indx_record_size);
+	ntfs_log_debug("INDXRecordSize = 0x%x\n",
+			(unsigned)vol->indx_record_size);
 	ntfs_log_debug("INDXRecordSizeBits = %u\n", vol->indx_record_size_bits);
 	/*
 	 * Work out the size of the MFT mirror in number of mft records. If the
