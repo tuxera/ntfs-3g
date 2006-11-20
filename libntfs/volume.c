@@ -117,7 +117,7 @@ static void __ntfs_volume_release(ntfs_volume *v)
 		if (NDevDirty(dev))
 			dev->d_ops->sync(dev);
 		if (dev->d_ops->close(dev))
-			ntfs_log_perror("Failed to close the device.  Error: ");
+			ntfs_log_perror("Failed to close the device");
 	}
 	free(v->vol_name);
 	free(v->upcase);
@@ -164,12 +164,12 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		goto error_exit;
 	}
 	if (ntfs_is_baad_record(mb->magic)) {
-		ntfs_log_debug("Error: Incomplete multi sector transfer detected in "
+		ntfs_log_error("Incomplete multi sector transfer detected in "
 				"$MFT.\n");
 		goto io_error_exit;
 	}
 	if (!ntfs_is_mft_record(mb->magic)) {
-		ntfs_log_debug("Error: $MFT has invalid magic.\n");
+		ntfs_log_error("$MFT has invalid magic.\n");
 		goto io_error_exit;
 	}
 	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, NULL);
@@ -179,14 +179,14 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	}
 	if (p2n(ctx->attr) < p2n(mb) ||
 			(char*)ctx->attr > (char*)mb + vol->mft_record_size) {
-		ntfs_log_debug("Error: $MFT is corrupt.\n");
+		ntfs_log_error("$MFT is corrupt.\n");
 		goto io_error_exit;
 	}
 	/* Find the $ATTRIBUTE_LIST attribute in $MFT if present. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT) {
-			ntfs_log_debug("Error: $MFT has corrupt attribute list.\n");
+			ntfs_log_error("$MFT has corrupt attribute list.\n");
 			goto io_error_exit;
 		}
 		goto mft_has_no_attr_list;
@@ -194,7 +194,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	NInoSetAttrList(vol->mft_ni);
 	l = ntfs_get_attribute_value_length(ctx->attr);
 	if (l <= 0 || l > 0x40000) {
-		ntfs_log_debug("Error: $MFT/$ATTRIBUTE_LIST has invalid length.\n");
+		ntfs_log_error("$MFT/$ATTRIBUTE_LIST has invalid length.\n");
 		goto io_error_exit;
 	}
 	vol->mft_ni->attr_list_size = l;
@@ -204,13 +204,13 @@ static int ntfs_mft_load(ntfs_volume *vol)
 
 	l = ntfs_get_attribute_value(vol, ctx->attr, vol->mft_ni->attr_list);
 	if (!l) {
-		ntfs_log_debug("Error: failed to get value of "
+		ntfs_log_error("Failed to get value of "
 				"$MFT/$ATTRIBUTE_LIST.\n");
 		goto io_error_exit;
 	}
 	if (l != vol->mft_ni->attr_list_size) {
-		ntfs_log_debug("Error: got unexpected amount of data when reading "
-				"$MFT/$ATTRIBUTE_LIST.\n");
+		ntfs_log_error("Got unexpected amount of data when "
+				"reading $MFT/$ATTRIBUTE_LIST.\n");
 		goto io_error_exit;
 	}
 mft_has_no_attr_list:
@@ -240,17 +240,18 @@ mft_has_no_attr_list:
 		a = ctx->attr;
 		/* $MFT must be non-resident. */
 		if (!a->non_resident) {
-			ntfs_log_debug("$MFT must be non-resident but a resident "
-					"extent was found. $MFT is corrupt. Run "
-					"chkdsk.\n");
+			ntfs_log_error("$MFT must be non-resident but a "
+					"resident extent was found. $MFT is "
+					"corrupt. Run chkdsk.\n");
 			goto io_error_exit;
 		}
 		/* $MFT must be uncompressed and unencrypted. */
 		if (a->flags & ATTR_COMPRESSION_MASK ||
 				a->flags & ATTR_IS_ENCRYPTED) {
-			ntfs_log_debug("$MFT must be uncompressed and unencrypted "
-					"but a compressed/encrypted extent was "
-					"found. $MFT is corrupt. Run chkdsk.\n");
+			ntfs_log_error("$MFT must be uncompressed and "
+					"unencrypted but a compressed/encrypted"
+					" extent was found. $MFT is corrupt. "
+					"Run chkdsk.\n");
 			goto io_error_exit;
 		}
 		/*
@@ -261,7 +262,8 @@ mft_has_no_attr_list:
 		 */
 		nrl = ntfs_mapping_pairs_decompress(vol, a, vol->mft_na->rl);
 		if (!nrl) {
-			ntfs_log_perror("ntfs_mapping_pairs_decompress() failed");
+			ntfs_log_perror("ntfs_mapping_pairs_decompress() "
+					"failed");
 			goto error_exit;
 		}
 		vol->mft_na->rl = nrl;
@@ -276,21 +278,22 @@ mft_has_no_attr_list:
 
 		/* Avoid endless loops due to corruption. */
 		if (next_vcn < sle64_to_cpu(a->lowest_vcn)) {
-			ntfs_log_debug("$MFT has corrupt attribute list attribute. "
-					"Run chkdsk.\n");
+			ntfs_log_error("$MFT has corrupt attribute list "
+					"attribute. Run chkdsk.\n");
 			goto io_error_exit;
 		}
 	}
 	if (!a) {
-		ntfs_log_debug("$MFT/$DATA attribute not found. $MFT is corrupt. Run "
-				"chkdsk.\n");
+		ntfs_log_error("$MFT/$DATA attribute not found. "
+				"$MFT is corrupt. Run chkdsk.\n");
 		goto io_error_exit;
 	}
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		ntfs_log_debug("Failed to load the complete runlist for $MFT/$DATA. "
-				"Bug or corrupt $MFT. Run chkdsk.\n");
-		ntfs_log_debug("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx\n",
-				(long long)highest_vcn, (long long)last_vcn - 1);
+		ntfs_log_error("Failed to load the complete runlist for "
+				"$MFT/$DATA. Bug or corrupt $MFT. "
+				"Run chkdsk.\n highest_vcn = 0x%llx, "
+				"last_vcn - 1 = 0x%llx\n", (long long)
+				highest_vcn, (long long)last_vcn - 1);
 		goto io_error_exit;
 	}
 	/* Done with the $Mft mft record. */
@@ -319,6 +322,7 @@ error_exit:
 		ntfs_inode_close(vol->mft_ni);
 		vol->mft_ni = NULL;
 	}
+	ntfs_log_error("Failed.\n");
 	errno = eo;
 	return -1;
 }
@@ -345,7 +349,8 @@ static int ntfs_mftmirr_load(ntfs_volume *vol)
 		return -1;
 	}
 	/* Get an ntfs attribute for $MFTMirr/$DATA, too. */
-	vol->mftmirr_na = ntfs_attr_open(vol->mftmirr_ni, AT_DATA, AT_UNNAMED, 0);
+	vol->mftmirr_na = ntfs_attr_open(vol->mftmirr_ni, AT_DATA,
+			AT_UNNAMED, 0);
 	if (!vol->mftmirr_na) {
 		ntfs_log_perror("Failed to open $MFTMirr/$DATA");
 		goto error_exit;
@@ -1501,14 +1506,14 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	}
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
-		ntfs_log_debug("Error: Attribute $VOLUME_INFORMATION was not found "
+		ntfs_log_error("Attribute $VOLUME_INFORMATION was not found "
 				"in $Volume!\n");
 		goto err_out;
 	}
 	a = ctx->attr;
 	/* Sanity check. */
 	if (a->non_resident) {
-		ntfs_log_debug("Error: Attribute $VOLUME_INFORMATION must be "
+		ntfs_log_error("Attribute $VOLUME_INFORMATION must be "
 				"resident (and it isn't)!\n");
 		errno = EIO;
 		goto err_out;
@@ -1520,7 +1525,7 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 			le32_to_cpu(ctx->mrec->bytes_in_use) ||
 			le16_to_cpu(a->value_offset) +
 			le32_to_cpu(a->value_length) > le32_to_cpu(a->length)) {
-		ntfs_log_debug("Error: Attribute $VOLUME_INFORMATION in $Volume is "
+		ntfs_log_error("Attribute $VOLUME_INFORMATION in $Volume is "
 				"corrupt!\n");
 		errno = EIO;
 		goto err_out;
@@ -1536,6 +1541,7 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	ret = 0; /* success */
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
+	ntfs_log_error("Failed.\n");
 	return ret;
 }
 
