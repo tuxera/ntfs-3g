@@ -976,7 +976,7 @@ out:
 	return vcn;
 }
 
-static INDEX_BLOCK *ntfs_ir_to_ia(INDEX_ROOT *ir, VCN ib_vcn)
+static INDEX_BLOCK *ntfs_ir_to_ib(INDEX_ROOT *ir, VCN ib_vcn)
 {
 	INDEX_BLOCK *ib;
 	INDEX_ENTRY *ie_last;
@@ -1003,25 +1003,41 @@ static INDEX_BLOCK *ntfs_ir_to_ia(INDEX_ROOT *ir, VCN ib_vcn)
 	ib->index.flags = ir->index.flags;
 	ib->index.index_length = cpu_to_le32(i +
 			le32_to_cpu(ib->index.entries_offset));
-	/*
-	 * Move the index root termination entry forward
-	 */
+	return ib;
+}
+
+static void ntfs_ir_nill(INDEX_ROOT *ir)
+{
+	INDEX_ENTRY *ie_last;
+	char *ies_start, *ies_end;
+
+	ntfs_log_trace("Entering\n");
+	/* TODO: This function could be much simpler. */
+	ies_start = (char *)ntfs_ie_get_first(&ir->index);
+	ies_end   = (char *)ntfs_ie_get_end(&ir->index);
+	ie_last   = ntfs_ie_get_last((INDEX_ENTRY *)ies_start, ies_end);
+	/* Move the index root termination entry forward. */
 	if ((char *)ie_last > ies_start) {
 		memmove(ies_start, (char *)ie_last, le16_to_cpu(
 					ie_last->length));
 		ie_last = (INDEX_ENTRY *)ies_start;
 	}
-	return ib;
 }
 
 static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
-			     INDEX_BLOCK *dst, INDEX_ENTRY *median, VCN new_vcn)
+			     INDEX_ENTRY *median, VCN new_vcn)
 {
 	u8 *ies_end;
 	INDEX_ENTRY *ie_head;		/* first entry after the median */
-	int tail_size;
+	int tail_size, ret;
+	INDEX_BLOCK *dst;
 
 	ntfs_log_trace("Entering.\n");
+
+	dst = ntfs_ib_alloc(new_vcn, icx->block_size, 
+			    src->index.flags & NODE_MASK);
+	if (!dst)
+		return STATUS_ERROR;
 
 	ie_head = ntfs_ie_get_next(median);
 
@@ -1032,10 +1048,10 @@ static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	dst->index.index_length = cpu_to_le32(tail_size +
 			le32_to_cpu(dst->index.entries_offset));
 
-	if (ntfs_ib_write(icx, new_vcn, dst))
-		return STATUS_ERROR;
+	ret = ntfs_ib_write(icx, new_vcn, dst);
 
-	return STATUS_OK;
+	free(dst);
+	return ret;
 }
 
 static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
@@ -1109,11 +1125,16 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 	if (new_ib_vcn == -1)
 		goto err_out;
 
-	ib = ntfs_ir_to_ia(ir, new_ib_vcn);
-	if (ib == NULL) {
-		ntfs_log_perror("Failed to create AT_INDEX_ALLOCATION");
-		goto err_out;
-	}
+	ib = ntfs_ir_to_ib(ir, new_ib_vcn);
+ 	if (ib == NULL) {
+		ntfs_log_perror("Failed to move index root to index block");
+		goto clear_bmp;
+ 	}
+ 
+	if (ntfs_ib_write(icx, new_ib_vcn, ib))
+		goto clear_bmp;
+
+	ntfs_ir_nill(ir);
 
 	ie = ntfs_ie_get_first(&ir->index);
 	ie->flags |= INDEX_ENTRY_NODE;
@@ -1132,14 +1153,14 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 		goto err_out;
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 
-	if (ntfs_ib_write(icx, new_ib_vcn, ib))
-		goto err_out;
-
 	ret = STATUS_OK;
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	free(ib);
 	return ret;
+clear_bmp:
+	ntfs_ibm_clear(icx, new_ib_vcn);
+	goto err_out;
 }
 
 /**
@@ -1341,10 +1362,9 @@ err_out:
  */
 static int ntfs_ib_split(ntfs_index_context *icx, INDEX_BLOCK *ib)
 {
-	INDEX_BLOCK *ib_new;
 	INDEX_ENTRY *median;
 	VCN new_vcn;
-	int ret, err = STATUS_ERROR;
+	int ret;
 
 	ntfs_log_trace("Entering.\n");
 
@@ -1355,6 +1375,11 @@ static int ntfs_ib_split(ntfs_index_context *icx, INDEX_BLOCK *ib)
 	new_vcn = ntfs_ibm_get_free(icx);
 	if (new_vcn == -1)
 		return STATUS_ERROR;
+
+	if (ntfs_ib_copy_tail(icx, ib, median, new_vcn)) {
+		ntfs_ibm_clear(icx, new_vcn);
+		return STATUS_ERROR;
+	}
 
 	if (ntfs_icx_parent_vcn(icx) == VCN_INDEX_ROOT_PARENT)
 		ret = ntfs_ir_insert_median(icx, median, new_vcn);
@@ -1368,21 +1393,8 @@ static int ntfs_ib_split(ntfs_index_context *icx, INDEX_BLOCK *ib)
 		return ret;
 	}
 
-	ib_new = ntfs_ib_alloc(new_vcn, icx->block_size,
-			       ib->index.flags & NODE_MASK);
-	if (!ib_new)
-		return STATUS_ERROR;
-
-	if (ntfs_ib_copy_tail(icx, ib, ib_new, median, new_vcn))
-		goto free_ib_new;
-
-	if (ntfs_ib_cut_tail(icx, ib, median))
-		goto free_ib_new;
-
-	err = STATUS_OK;
-free_ib_new:
-	free(ib_new);
-	return err;
+	ret = ntfs_ib_cut_tail(icx, ib, median);
+	return ret;
 }
 
 static int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie)
