@@ -340,8 +340,7 @@ error_exit:
  */
 static int ntfs_mftmirr_load(ntfs_volume *vol)
 {
-	int i;
-	runlist_element rl[2];
+	int err;
 
 	vol->mftmirr_ni = ntfs_inode_open(vol, FILE_MFTMirr);
 	if (!vol->mftmirr_ni) {
@@ -359,36 +358,27 @@ static int ntfs_mftmirr_load(ntfs_volume *vol)
 		ntfs_log_perror("Failed to map runlist of $MFTMirr/$DATA");
 		goto error_exit;
 	}
-	/* Construct the mft mirror runlist. */
-	rl[0].vcn = 0;
-	rl[0].lcn = vol->mftmirr_lcn;
-	rl[0].length = (vol->mftmirr_size * vol->mft_record_size +
-			vol->cluster_size - 1) / vol->cluster_size;
-	rl[1].vcn = rl[0].length;
-	rl[1].lcn = LCN_ENOENT;
-	rl[1].length = 0;
-	/* Compare the two runlists. They must be identical. */
-	i = 0;
-	do {
-		if (rl[i].vcn != vol->mftmirr_na->rl[i].vcn ||
-				rl[i].lcn != vol->mftmirr_na->rl[i].lcn ||
-				rl[i].length != vol->mftmirr_na->rl[i].length) {
-			ntfs_log_debug("Error: $MFTMirr location mismatch! Run "
-					"chkdsk.\n");
-			errno = EIO;
-			goto error_exit;
-		}
-	} while (rl[i++].length);
+	/* Check $MFTMirr runlist. */
+	if (vol->mftmirr_na->rl[0].lcn != vol->mftmirr_lcn ||
+			vol->mftmirr_na->rl[0].length < (vol->mftmirr_size *
+			vol->mft_record_size + vol->cluster_size - 1) /
+			vol->cluster_size) {
+		ntfs_log_error("$MFTMirr location mismatch or first 4 records "
+				"are fragmented. Run chkdsk.\n");
+		errno = EIO;
+		goto error_exit;
+
+	}
 	return 0;
 error_exit:
-	i = errno;
+	err = errno;
 	if (vol->mftmirr_na) {
 		ntfs_attr_close(vol->mftmirr_na);
 		vol->mftmirr_na = NULL;
 	}
 	ntfs_inode_close(vol->mftmirr_ni);
 	vol->mftmirr_ni = NULL;
-	errno = i;
+	errno = err;
 	return -1;
 }
 

@@ -169,7 +169,7 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 		if (bw != -1)
 			errno = EIO;
 		if (bw >= 0)
-			ntfs_log_debug("Error: partial write while writing $Mft "
+			ntfs_log_error("Partial write while writing $Mft "
 					"record(s)!\n");
 		else
 			ntfs_log_perror("Error writing $Mft record(s)");

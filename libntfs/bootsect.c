@@ -261,16 +261,9 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 			(unsigned)vol->indx_record_size);
 	ntfs_log_debug("INDXRecordSizeBits = %u\n", vol->indx_record_size_bits);
 	/*
-	 * Work out the size of the MFT mirror in number of mft records. If the
-	 * cluster size is less than or equal to the size taken by four mft
-	 * records, the mft mirror stores the first four mft records. If the
-	 * cluster size is bigger than the size taken by four mft records, the
-	 * mft mirror contains as many mft records as will fit into one
-	 * cluster.
+	 * Windows cares only about first 4 records in $MFTMirr and inores
+	 * everything beyend them.
 	 */
-	if (vol->cluster_size <= 4 * vol->mft_record_size)
-		vol->mftmirr_size = 4;
-	else
-		vol->mftmirr_size = vol->cluster_size / vol->mft_record_size;
+	vol->mftmirr_size = 4;
 	return 0;
 }

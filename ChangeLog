@@ -69,6 +69,9 @@ xx/xx/2006 - x.xx.x - .
 	  NTFS_MNT_CASE_SENSITIVE.  (Yura)
 	- Treat filenames in POSIX namespace as case insensitive in case of
 	  case insensitive mounts.  (Anton, Yura)
+	- Windows cares only about first 4 records in $MFTMirr and ignores
+	  everything beyond them. Update libntfs behaviour to be like in
+	  windows.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
