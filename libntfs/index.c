@@ -368,16 +368,16 @@ static INDEX_ENTRY *ntfs_ie_dup(INDEX_ENTRY *ie)
 
 	ntfs_log_trace("Entering.\n");
 
-	dup = ntfs_malloc(ie->length);
-	if (dup)
-		memcpy(dup, ie, ie->length);
+	dup = ntfs_malloc(le16_to_cpu(ie->length));
+ 	if (dup)
+		memcpy(dup, ie, le16_to_cpu(ie->length));
 	return dup;
 }
 
 static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 {
 	INDEX_ENTRY *dup;
-	int size = ie->length;
+	int size = le16_to_cpu(ie->length);
 
 	ntfs_log_trace("Entering.\n");
 
@@ -388,7 +388,7 @@ static INDEX_ENTRY *ntfs_ie_dup_novcn(INDEX_ENTRY *ie)
 	if (dup) {
 		memcpy(dup, ie, size);
 		dup->flags &= ~INDEX_ENTRY_NODE;
-		dup->length = size;
+		dup->length = cpu_to_le16(size);
 	}
 	return dup;
 }
@@ -795,7 +795,7 @@ static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, u32 ib_size,
 	INDEX_BLOCK *ib;
 	int ih_size = sizeof(INDEX_HEADER);
 
-	ntfs_log_trace("Entering ib_vcn = %lld ib_size = %d\n", ib_vcn,
+	ntfs_log_trace("Entering ib_vcn = %lld ib_size = %u\n", ib_vcn,
 			ib_size);
 
 	ib = ntfs_calloc(ib_size);
@@ -1069,10 +1069,11 @@ static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	if (ie_last->flags & INDEX_ENTRY_NODE)
 		ntfs_ie_set_vcn(ie_last, ntfs_ie_get_vcn(ie));
 
-	memcpy(ie, ie_last, ie_last->length);
-
-	src->index.index_length = cpu_to_le32(((char *)ie - ies_start) +
-		ie->length + le32_to_cpu(src->index.entries_offset));
+	memcpy(ie, ie_last, le16_to_cpu(ie_last->length));
+ 
+ 	src->index.index_length = cpu_to_le32(((char *)ie - ies_start) +
+			le16_to_cpu(ie->length) +
+			le32_to_cpu(src->index.entries_offset));
 
 	if (ntfs_ib_write(icx, icx->parent_vcn[icx->pindex + 1], src))
 		return STATUS_ERROR;
@@ -1237,8 +1238,8 @@ static int ntfs_ie_add_vcn(INDEX_ENTRY **ie)
 {
 	INDEX_ENTRY *p, *old = *ie;
 
-	old->length += sizeof(VCN);
-	p = realloc(old, old->length);
+	old->length = cpu_to_le16(le16_to_cpu(old->length) + sizeof(VCN));
+	p = realloc(old, le16_to_cpu(old->length));
 	if (!p)
 		return STATUS_ERROR;
 
@@ -1294,7 +1295,8 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 
 	ntfs_log_trace("Entering.\n");
 
-	new_size = le32_to_cpu(icx->ir->index.index_length) + median->length;
+	new_size = le32_to_cpu(icx->ir->index.index_length) +
+			le16_to_cpu(median->length);
 	if (!(median->flags & INDEX_ENTRY_NODE))
 		new_size += sizeof(VCN);
 
@@ -1335,7 +1337,7 @@ static int ntfs_ib_insert(ntfs_index_context *icx, INDEX_ENTRY *ie, VCN new_vcn)
 	idx_size       = le32_to_cpu(ib->index.index_length);
 	allocated_size = le32_to_cpu(ib->index.allocated_size);
 	/* FIXME: sizeof(VCN) should be included only if ie has no VCN */
-	if (idx_size + ie->length + sizeof(VCN) > allocated_size) {
+	if (idx_size + le16_to_cpu(ie->length) + sizeof(VCN) > allocated_size) {
 		err = ntfs_ib_split(icx, ib);
 		if (err == STATUS_OK)
 			err = STATUS_KEEP_SEARCHING;
@@ -1544,9 +1546,10 @@ static void ntfs_ir_leafify(ntfs_index_context *icx, INDEX_HEADER *ih)
 
 	ie = ntfs_ie_get_first(ih);
 	ie->flags &= ~INDEX_ENTRY_NODE;
-	ie->length -= sizeof(VCN);
-
-	ih->index_length -= sizeof(VCN);
+	ie->length = cpu_to_le16(le16_to_cpu(ie->length) - sizeof(VCN));
+ 
+	ih->index_length = cpu_to_le32(le32_to_cpu(ih->index_length) -
+			sizeof(VCN));
 	ih->flags &= ~LARGE_INDEX;
 
 	/* Not fatal error */
@@ -1691,7 +1694,7 @@ descend:
 	else
 		ih = &icx->ib->index;
 
-	delta = ie->length - icx->entry->length;
+	delta = le16_to_cpu(ie->length) - le16_to_cpu(icx->entry->length);
 	new_size = le32_to_cpu(ih->index_length) + delta;
 	if (delta > 0) {
 		if (icx->is_in_root) {
@@ -1701,11 +1704,9 @@ descend:
 						" during entry removal");
 				goto out2;
 			}
-
 			ih = &icx->ir->index;
 			entry = ntfs_ie_get_by_pos(ih, entry_pos);
-
-		} else if (new_size > ih->allocated_size) {
+		} else if (new_size > le32_to_cpu(ih->allocated_size)) {
 			errno = EOPNOTSUPP;
 			ntfs_log_perror("Denied to split INDEX_BLOCK during "
 					"entry removal");
