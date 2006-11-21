@@ -72,6 +72,7 @@ xx/xx/2006 - x.xx.x - .
 	- Windows cares only about first 4 records in $MFTMirr and ignores
 	  everything beyond them. Update libntfs behaviour to be like in
 	  windows.  (Yura)
+	- Fix free clusters and MFT records calculation.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

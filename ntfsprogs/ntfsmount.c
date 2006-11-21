@@ -141,10 +141,9 @@ static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
 	return 0;
 }
 
-static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
+static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, long nr_free)
 {
 	u8 *buf;
-	long nr_free = 0;
 	s64 br, total = 0;
 
 	if (!(ctx->state & NF_FreeMFTOutdate))
@@ -162,8 +161,8 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 		total += br;
 		for (i = 0; i < br; i++)
 			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
+				if ((buf[i] >> j) & 1)
+					nr_free--;
 	}
 	free(buf);
 	if (!total || br < 0)
@@ -176,7 +175,7 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol)
 static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 {
 	u8 *buf;
-	long nr_free = 0;
+	long nr_free = vol->nr_clusters;
 	s64 br, total = 0;
 
 	if (!(ctx->state & NF_FreeClustersOutdate))
@@ -194,8 +193,8 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 		total += br;
 		for (i = 0; i < br; i++)
 			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
+				if ((buf[i] >> j) & 1)
+					nr_free--;
 	}
 	free(buf);
 	if (!total || br < 0)
@@ -247,9 +246,10 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	/* Free blocks avail to non-superuser, same as above on NTFS. */
 	sfs->f_bavail = sfs->f_bfree = size;
 	/* Number of inodes in file system (at this point in time). */
-	sfs->f_files = vol->mft_na->data_size >> vol->mft_record_size_bits;
+	size = vol->mft_na->data_size >> vol->mft_record_size_bits;
+	sfs->f_files = size; 
 	/* Free inodes in fs (based on current total count). */
-	size = ntfs_fuse_get_nr_free_mft_records(vol);
+	size = ntfs_fuse_get_nr_free_mft_records(vol, size);
 	if (size < 0)
 		size = 0;
 	sfs->f_ffree = size;
