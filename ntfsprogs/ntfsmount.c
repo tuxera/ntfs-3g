@@ -1506,7 +1506,7 @@ static char *parse_mount_options(const char *org_options)
 						"value.\n");
 				goto err_exit;
 			}
-			sscanf(val, "%i", &ctx->fmask);
+			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 		} else if (!strcmp(opt, "fmask")) {
 			if (!val) {
@@ -1514,14 +1514,14 @@ static char *parse_mount_options(const char *org_options)
 						"value.\n");
 				goto err_exit;
 			}
-			sscanf(val, "%i", &ctx->fmask);
+			sscanf(val, "%o", &ctx->fmask);
 		} else if (!strcmp(opt, "dmask")) {
 			if (!val) {
 				ntfs_log_error("'dmask' option should have "
 						"value.\n");
 				goto err_exit;
 			}
-			sscanf(val, "%i", &ctx->dmask);
+			sscanf(val, "%o", &ctx->dmask);
 		} else if (!strcmp(opt, "uid")) {
 			if (!val) {
 				ntfs_log_error("'uid' option should have "
