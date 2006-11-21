@@ -354,19 +354,15 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (na) {
 			stbuf->st_size = na->data_size;
-			stbuf->st_blocks = na->allocated_size >>
-				vol->sector_size_bits;
+			stbuf->st_blocks = na->allocated_size >> 9;
 			ntfs_attr_close(na);
-		} else {
-			stbuf->st_size = 0;
-			stbuf->st_blocks = 0;
 		}
-		stbuf->st_nlink = 1; /* Needed for correct find work. */
+		stbuf->st_nlink = 1;	/* Make find(1) work */
 	} else {
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
-		stbuf->st_blocks = ni->allocated_size >> vol->sector_size_bits;
+		stbuf->st_blocks = ni->allocated_size >> 9;
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
@@ -378,8 +374,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			}
 			if (stream_name_len) {
 				stbuf->st_size = na->data_size;
-				stbuf->st_blocks = na->allocated_size >>
-					vol->sector_size_bits;
+				stbuf->st_blocks = na->allocated_size >> 9;
 			}
 			/* Check whether it's Interix FIFO or socket. */
 			if (!(ni->flags & FILE_ATTR_HIDDEN) &&
