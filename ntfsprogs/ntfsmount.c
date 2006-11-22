@@ -981,10 +981,8 @@ static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
 		res = -errno;
 		goto exit;
 	}
-	if (ntfs_attr_rm(na)) {
+	if (ntfs_attr_rm(na))
 		res = -errno;
-		ntfs_attr_close(na);
-	}
 exit:
 	if (ntfs_inode_close(ni))
 		ntfs_log_perror("Failed to close inode");
@@ -1322,7 +1320,6 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ntfschar *lename = NULL;
 	int res = 0, lename_len;
 
-
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
@@ -1347,8 +1344,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ntfs_fuse_mark_free_space_outdated();
 	if (ntfs_attr_rm(na))
 		res = -errno;
-	else
-		na = NULL;
+	na = NULL;
 exit:
 	if (na)
 		ntfs_attr_close(na);

@@ -3131,12 +3131,10 @@ add_attr_record:
 			(val && (ntfs_attr_pwrite(na, 0, size, val) != size))) {
 		err = errno;
 		ntfs_log_trace("Failed to initialize just added attribute.\n");
-		if (ntfs_attr_rm(na)) {
+		if (ntfs_attr_rm(na))
 			ntfs_log_trace("Failed to remove just added attribute. "
 					"Probably leaving inconsistent "
 					"metadata.\n");
-			ntfs_attr_close(na);
-		}
 		goto err_out;
 	}
 	ntfs_attr_close(na);
@@ -3168,7 +3166,8 @@ err_out:
  * @na:		opened ntfs attribute to delete
  *
  * Remove attribute and all it's extents from ntfs inode. If attribute was non
- * resident also free all clusters allocated by attribute.
+ * resident also free all clusters allocated by attribute. This function always 
+ * closes @na upon exit (both on success and failure).
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
@@ -3188,8 +3187,10 @@ int ntfs_attr_rm(ntfs_attr *na)
 
 	/* Free cluster allocation. */
 	if (NAttrNonResident(na)) {
-		if (ntfs_attr_map_whole_runlist(na))
+		if (ntfs_attr_map_whole_runlist(na)) {
+			ntfs_attr_close(na);
 			return -1;
+		}
 		if (ntfs_cluster_free(na->ni->vol, na, 0, -1) < 0) {
 			ntfs_log_trace("Failed to free cluster allocation. "
 					"Leaving inconsistent metadata.\n");
@@ -3199,8 +3200,10 @@ int ntfs_attr_rm(ntfs_attr *na)
 
 	/* Search for attribute extents and remove them all. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
-	if (!ctx)
+	if (!ctx) {
+		ntfs_attr_close(na);
 		return -1;
+	}
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (ntfs_attr_record_rm(ctx)) {
