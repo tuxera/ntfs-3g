@@ -1535,7 +1535,8 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	ret = 0; /* success */
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
-	ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
+	if (ret)
+		ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 	return ret;
 }
 
