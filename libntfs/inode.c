@@ -456,7 +456,9 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 			if (!ntfs_extent_inode_open(ni,
 					MREF_LE(ale->mft_reference))) {
 				ntfs_log_trace("Couldn't attach extent "
-						"inode.\n");
+						"inode (attr type 0x%x "
+						"references to it).\n",
+						le32_to_cpu(ale->type));
 				return -1;
 			}
 			prev_attached = MREF_LE(ale->mft_reference);
