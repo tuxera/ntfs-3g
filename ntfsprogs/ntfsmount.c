@@ -101,6 +101,7 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	BOOL leave_dirty;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -1359,6 +1360,10 @@ exit:
 static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
 {
 	if (ctx->vol) {
+		if (!ctx->leave_dirty && ntfs_volume_write_flags(ctx->vol,
+					ctx->vol->flags & ~VOLUME_IS_DIRTY))
+			ntfs_log_error("Failed to clear volume dirty flag. "
+					"OK, leave it, chkdsk will handle.\n");
 		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
 				ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
@@ -1426,9 +1431,19 @@ static int ntfs_fuse_mount(const char *device)
 		return -1;
 	}
 	ctx->vol = vol;
+	if (vol->flags & VOLUME_IS_DIRTY)
+		ctx->leave_dirty = TRUE;
+	else {
+		if (ntfs_volume_write_flags(vol, vol->flags |
+					VOLUME_IS_DIRTY)) {
+			ntfs_log_perror("Failed to set temporary dirty flag");
+			ntfs_umount(vol, FALSE);
+			ctx->vol = NULL;
+			return -1;
+		}
+	}
 	return 0;
 }
-
 
 static void signal_handler(int arg __attribute__((unused)))
 {

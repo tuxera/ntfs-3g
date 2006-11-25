@@ -114,7 +114,12 @@ static const char *opened_volume_msg =
 
 static const char *dirty_volume_msg =
 "Volume is scheduled for check.\n"
-"Please boot into Windows TWICE, or use the 'force' option.\n";
+"Please boot into Windows TWICE, or use the 'force' option.\n"
+"NOTE: If you had not scheduled check and last time accessed this volume\n"
+"using ntfsmount and shutdown system properly, then init scripts in your\n"
+"distribution are broken. Please report to your distribution developers\n"
+"(NOT to us!) that init scripts kill ntfsmount or mount.ntfs-fuse during\n"
+"shutdown instead of proper umount.\n";
 
 /**
  * utils_set_locale
