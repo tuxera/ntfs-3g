@@ -88,12 +88,6 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	}
 	if (!(dev->d_private = ntfs_malloc(sizeof(int))))
 		return -1;
-	/*
-	 * Open the device/file obtaining the file descriptor for exclusive
-	 * access (but only if mounting r/w).
-	 */
-	if ((flags & O_RDWR) == O_RDWR)
-		flags |= O_EXCL;
 	*(int*)dev->d_private = open(dev->d_name, flags);
 	if (*(int*)dev->d_private == -1) {
 		err = errno;
@@ -112,11 +106,12 @@ static int ntfs_device_unix_io_open(struct ntfs_device *dev, int flags)
 	flk.l_start = flk.l_len = 0LL;
 	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
 		err = errno;
-		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s for %s\n",
-				dev->d_name, NDevReadOnly(dev) ? "reading" : "writing");
+		ntfs_log_debug("ntfs_device_unix_io_open: Could not lock %s "
+				"for %s\n", dev->d_name, NDevReadOnly(dev) ?
+				"reading" : "writing");
 		if (close(DEV_FD(dev)))
-			ntfs_log_perror("ntfs_device_unix_io_open: Warning: Could not "
-					"close %s", dev->d_name);
+			ntfs_log_perror("ntfs_device_unix_io_open: Warning: "
+					"Could not close %s", dev->d_name);
 		goto err_out;
 	}
 	/* Determine if device is a block device or not, ignoring errors. */

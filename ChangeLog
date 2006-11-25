@@ -77,6 +77,9 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsmount: Umount volume in DESTROY. This is guarantees that all
 	  data would be synced before umount return for volumes mounted with
 	  blkdev option.  (Yura)
+	- Introduce MNT_NTFS_NOT_EXCLUSIVE mount option that tells libntfs do
+	  not open volume exclusively. Useful if libntfs user cares about this
+	  himself, eg. FUSE with blkdev option.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

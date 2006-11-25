@@ -438,7 +438,9 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 	if (flags & NTFS_MNT_CASE_SENSITIVE)
 		NVolSetCaseSensitive(vol);
 	ntfs_log_debug("Reading bootsector... ");
-	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
+	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY :
+				((flags & NTFS_MNT_NOT_EXCLUSIVE) ? O_RDWR :
+				(O_RDWR | O_EXCL)))) {
 		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Error opening partition device");
 		goto error_exit;
@@ -752,6 +754,7 @@ out:
  *	NTFS_MNT_NOATIME	- do not update access time
  *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
  *				  they are not in POSIX namespace
+ *	NTFS_MNT_NOT_EXCLUSIVE	- (unix only) do not open volume exclusively
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1150,6 +1153,7 @@ error_exit:
  *	NTFS_MNT_NOATIME	- do not update access time
  *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
  *				  they are not in POSIX namespace
+ *	NTFS_MNT_NOT_EXCLUSIVE	- (unix only) do not open volume exclusively
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes

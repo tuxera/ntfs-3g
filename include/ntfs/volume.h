@@ -59,6 +59,7 @@ typedef enum {
 	NTFS_MNT_RDONLY	 	= 1,
 	NTFS_MNT_NOATIME 	= 2,
 	NTFS_MNT_CASE_SENSITIVE	= 4,
+	NTFS_MNT_NOT_EXCLUSIVE	= 8,
 } ntfs_mount_flags;
 
 /**
