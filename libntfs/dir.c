@@ -1657,7 +1657,7 @@ out:
 	if (ni)
 		ntfs_inode_close(ni);
 	if (err) {
-		ntfs_log_error("Failed.\n");
+		ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 		errno = err;
 		return -1;
 	}
@@ -1755,7 +1755,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 rollback_failed:
 	ntfs_log_error("Rollback failed. Leaving inconsistent metadata.\n");
 err_out:
-	ntfs_log_error("Failed.\n");
+	ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 	free(fn);
 	errno = err;
 	return -1;

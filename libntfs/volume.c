@@ -322,7 +322,7 @@ error_exit:
 		ntfs_inode_close(vol->mft_ni);
 		vol->mft_ni = NULL;
 	}
-	ntfs_log_error("Failed.\n");
+	ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 	errno = eo;
 	return -1;
 }
@@ -1535,7 +1535,7 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	ret = 0; /* success */
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
-	ntfs_log_error("Failed.\n");
+	ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 	return ret;
 }
 
