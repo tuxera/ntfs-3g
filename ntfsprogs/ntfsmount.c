@@ -1356,6 +1356,18 @@ exit:
 
 #endif /* HAVE_SETXATTR */
 
+static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
+{
+	if (ctx->vol) {
+		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
+				ctx->vol->vol_name);
+		if (ntfs_umount(ctx->vol, FALSE))
+			ntfs_log_perror("Failed to unmount volume");
+	}
+	free(ctx);
+	free(opts.device);
+}
+
 static struct fuse_operations ntfs_fuse_oper = {
 	.getattr	= ntfs_fuse_getattr,
 	.readlink	= ntfs_fuse_readlink,
@@ -1375,6 +1387,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
 	.utime		= ntfs_fuse_utime,
+	.destroy	= ntfs_fuse_destroy,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
 	.setxattr	= ntfs_fuse_setxattr,
@@ -1415,17 +1428,6 @@ static int ntfs_fuse_mount(const char *device)
 	return 0;
 }
 
-static void ntfs_fuse_destroy(void)
-{
-	if (ctx->vol) {
-		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
-				ctx->vol->vol_name);
-		if (ntfs_umount(ctx->vol, FALSE))
-			ntfs_log_perror("Failed to unmount volume");
-	}
-	free(ctx);
-	free(opts.device);
-}
 
 static void signal_handler(int arg __attribute__((unused)))
 {
@@ -1776,13 +1778,13 @@ int main(int argc, char *argv[])
 	parsed_options = parse_mount_options((opts.options) ?
 			opts.options : "");
 	if (!parsed_options) {
-		ntfs_fuse_destroy();
+		ntfs_fuse_destroy(NULL);
 		return 3;
 	}
 
 	/* Mount volume. */
 	if (ntfs_fuse_mount(opts.device)) {
-		ntfs_fuse_destroy();
+		ntfs_fuse_destroy(NULL);
 		free(parsed_options);
 		return 4;
 	}
@@ -1796,7 +1798,7 @@ int main(int argc, char *argv[])
 	free(parsed_options);
 	if (!fch) {
 		ntfs_log_error("fuse_mount failed.\n");
-		ntfs_fuse_destroy();
+		ntfs_fuse_destroy(NULL);
 		return 5;
 	}
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
@@ -1818,7 +1820,7 @@ int main(int argc, char *argv[])
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		fuse_unmount(opts.mnt_point, fch);
-		ntfs_fuse_destroy();
+		ntfs_fuse_destroy(NULL);
 		return 6;
 	}
 	if (!ctx->debug && !ctx->no_detach) {
@@ -1841,6 +1843,5 @@ int main(int argc, char *argv[])
 	/* Destroy. */
 	fuse_unmount(opts.mnt_point, fch);
 	fuse_destroy(fh);
-	ntfs_fuse_destroy();
 	return 0;
 }
