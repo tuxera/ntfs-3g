@@ -96,7 +96,7 @@ static const char *hibernated_volume_msg =
 "off properly, so mounting could be done safely.\n";
 
 static const char *unclean_journal_msg =
-"Mount is denied because the NTFS journal file is unclean. Choices are:\n"
+"Access is denied because the NTFS journal file is unclean. Choices are:\n"
 " A) Shutdown Windows properly.\n"
 " B) Click the 'Safely Remove Hardware' icon in the Windows taskbar\n"
 "    notification area before disconnecting the device.\n"
@@ -108,7 +108,7 @@ static const char *unclean_journal_msg =
 " F) ntfsmount: Mount the volume read-only by using the 'ro' mount option.\n";
 
 static const char *opened_volume_msg =
-"Mount is denied because the NTFS volume is already exclusively opened.\n"
+"Access is denied because the NTFS volume is already exclusively opened.\n"
 "The volume may be already mounted, or another software may use it which\n"
 "could be identified for example by the help of the 'fuser' command.\n";
 
