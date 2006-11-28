@@ -1288,7 +1288,7 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 			// TODO: Switch this to properly aligned hex...
 			printf("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 			while (rlc->length) {
-				printf("\t\t\t%lld\t\t%lld\t\t%lld\n",
+				printf("\t\t\t0x%llx\t\t0x%llx\t\t0x%llx\n",
 					rlc->vcn, rlc->lcn, rlc->length);
 				rlc++;
 			}

@@ -60,6 +60,10 @@ typedef enum {
 	NTFS_MNT_NOATIME 	= 2,
 	NTFS_MNT_CASE_SENSITIVE	= 4,
 	NTFS_MNT_NOT_EXCLUSIVE	= 8,
+	NTFS_MNT_FORENSIC	= 16, /* Mount for forensic purposes, i.e. do
+					 not do any writing at all during the
+					 mount, i.e. no journal emptying, no
+					 dirty bit setting, etc. */
 } ntfs_mount_flags;
 
 /**
@@ -85,6 +89,10 @@ typedef enum {
 	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
 	NV_LogFileEmpty,	/* 1: $logFile journal is empty. */
 	NV_NoATime,		/* 1: Do not update access time. */
+	NV_WasDirty,		/* 1: Volume was marked dirty before we mounted
+				      it. */
+	NV_ForensicMount,	/* 1: Mount is forensic, i.e. no modifications
+				      are to be done by mount/umount. */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -106,6 +114,14 @@ typedef enum {
 #define NVolNoATime(nv)			 test_nvol_flag(nv, NoATime)
 #define NVolSetNoATime(nv)		  set_nvol_flag(nv, NoATime)
 #define NVolClearNoATime(nv)		clear_nvol_flag(nv, NoATime)
+
+#define NVolWasDirty(nv)		 test_nvol_flag(nv, WasDirty)
+#define NVolSetWasDirty(nv)		  set_nvol_flag(nv, WasDirty)
+#define NVolClearWasDirty(nv)		clear_nvol_flag(nv, WasDirty)
+
+#define NVolForensicMount(nv)		 test_nvol_flag(nv, ForensicMount)
+#define NVolSetForensicMount(nv)	  set_nvol_flag(nv, ForensicMount)
+#define NVolClearForensicMount(nv)	clear_nvol_flag(nv, ForensicMount)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.

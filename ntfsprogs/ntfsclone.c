@@ -1388,7 +1388,7 @@ static void mount_volume(unsigned long new_mntflag)
 		exit(1);
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (NVolWasDirty(vol))
 		if (opt.force-- <= 0)
 			err_exit(dirty_volume_msg, opt.volume);
 
@@ -1538,17 +1538,18 @@ static s64 open_image(void)
 	if (memcmp(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE) != 0)
 		err_exit("Input file is not an image! (invalid magic)\n");
 	if (image_hdr.major_ver < NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE) {
-		Printf("Old image format detected.  Byteswapping on big "
-				"endian architectures.  If the image was "
-				"created on a little endian architecture it "
-				"will not work.  Use a more recent version "
-				"of ntfsclone to recreate the image.\n");
 		image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
 		image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
+#if (__BYTE_ORDER == __BIG_ENDIAN)
+		Printf("Old image format detected.  If the image was created "
+				"on a little endian architecture it will not "
+				"work.  Use a more recent version of "
+				"ntfsclone to recreate the image.\n");
 		image_hdr.cluster_size = cpu_to_le32(image_hdr.cluster_size);
 		image_hdr.device_size = cpu_to_sle64(image_hdr.device_size);
 		image_hdr.nr_clusters = cpu_to_sle64(image_hdr.nr_clusters);
 		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
+#endif
 		image_hdr.offset_to_image_data =
 				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
 		image_is_host_endian = TRUE;
@@ -1764,6 +1765,7 @@ int main(int argc, char **argv)
 		device_size = open_volume();
 		ntfs_size = vol->nr_clusters * vol->cluster_size;
 	}
+	// FIXME: This needs to be the cluster size...
 	ntfs_size += 512; /* add backup boot sector */
 
 	if (opt.std_out) {

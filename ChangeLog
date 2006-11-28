@@ -80,6 +80,10 @@ xx/xx/2006 - x.xx.x - .
 	- Introduce MNT_NTFS_NOT_EXCLUSIVE mount option that tells libntfs do
 	  not open volume exclusively. Useful if libntfs user cares about this
 	  himself, eg. FUSE with blkdev option.  (Yura)
+	- Empty the journal at mount time.  (Anton)
+	- Set the volume dirty bit at mount time (if it is not set already and
+	  clear it again at umount time but only if it was not set to start
+	  with.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

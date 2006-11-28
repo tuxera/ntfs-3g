@@ -86,7 +86,8 @@ static void usage(void)
 		"    -q, --quiet                Less output\n"
 		"    -V, --version              Version information\n"
 		"    -v, --verbose              More output\n\n",
-		//"    -r  --raw     Display the compressed or encrypted file",
+// Does not work for compressed files at present so leave undocumented...
+//		"    -r  --raw                  Display the raw data (e.g. for compressed or encrypted file)",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -156,7 +157,7 @@ static int parse_attribute(const char *value, ATTR_TYPES *attr)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-a:fh?i:n:qVv";
+	static const char *sopt = "-a:fh?i:n:qVvr";
 	static const struct option lopt[] = {
 		{ "attribute",      required_argument,	NULL, 'a' },
 		{ "attribute-name", required_argument,	NULL, 'n' },
@@ -166,6 +167,7 @@ static int parse_options(int argc, char **argv)
 		{ "quiet",	    no_argument,	NULL, 'q' },
 		{ "version",	    no_argument,	NULL, 'V' },
 		{ "verbose",	    no_argument,	NULL, 'v' },
+		{ "raw",	    no_argument,	NULL, 'r' },
 		{ NULL,		    0,			NULL, 0   }
 	};
 
@@ -246,6 +248,9 @@ static int parse_options(int argc, char **argv)
 		case 'v':
 			opts.verbose++;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
+			break;
+		case 'r':
+			opts.raw = TRUE;
 			break;
 		default:
 			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
@@ -349,10 +354,11 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 
 	offset = 0;
 	for (;;) {
-		if (block_size > 0) {
+		if (!opts.raw && block_size > 0) {
 			// These types have fixup
 			bytes_read = ntfs_attr_mst_pread(attr, offset, 1, block_size, buffer);
-			bytes_read *= block_size;
+			if (bytes_read > 0)
+				bytes_read *= block_size;
 		} else {
 			bytes_read = ntfs_attr_pread(attr, offset, bufsize, buffer);
 		}

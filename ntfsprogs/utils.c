@@ -229,7 +229,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
 		return NULL;
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY) {
+	if (NVolWasDirty(vol)) {
 		if (!force) {
 			ntfs_log_error("%s", dirty_volume_msg);
 			ntfs_umount(vol, FALSE);

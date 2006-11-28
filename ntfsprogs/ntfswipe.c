@@ -1346,7 +1346,7 @@ int main(int argc, char *argv[])
 	if (!vol)
 		goto free;
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && (!opts.force))
+	if (NVolWasDirty(vol) && !opts.force)
 		goto umount;
 
 	if (opts.info) {

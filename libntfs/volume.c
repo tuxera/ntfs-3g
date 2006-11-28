@@ -89,6 +89,14 @@ ntfs_volume *ntfs_volume_alloc(void)
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
+	/*
+	 * Clear the dirty bit if it was not set before we mounted and this is
+	 * not a forensic mount.
+	 */
+	if (!NVolReadOnly(v) && !NVolWasDirty(v) && !NVolForensicMount(v)) {
+		v->flags &= ~VOLUME_IS_DIRTY;
+		(void)ntfs_volume_write_flags(v, v->flags);
+	}
 	if (v->lcnbmp_ni && NInoDirty(v->lcnbmp_ni))
 		ntfs_inode_sync(v->lcnbmp_ni);
 	if (v->vol_ni)
@@ -788,7 +796,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		ntfs_log_perror("Failed to startup volume");
 		return NULL;
 	}
-
+	/* Record whether this is a forensic mount. */
+	if (flags & NTFS_MNT_FORENSIC)
+		NVolSetForensicMount(vol);
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
 	m  = (u8*)ntfs_malloc(vol->mftmirr_size << vol->mft_record_size_bits);
 	m2 = (u8*)ntfs_malloc(vol->mftmirr_size << vol->mft_record_size_bits);
@@ -1002,9 +1012,14 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	/* Setup vol from the volume information attribute value. */
 	vol->major_ver = vinf->major_ver;
 	vol->minor_ver = vinf->minor_ver;
-	/* Do not use le16_to_cpu() macro here as our VOLUME_FLAGS are
-	   defined using cpu_to_le16() macro and hence are consistent. */
+	/*
+	 * Do not use le16_to_cpu() macro here as our VOLUME_FLAGS are defined
+	 * using cpu_to_le16() macro and hence are consistent.
+	 */
 	vol->flags = vinf->flags;
+	/* Record whether the volume was dirty or not. */
+	if (vol->flags & VOLUME_IS_DIRTY)
+		NVolSetWasDirty(vol);
 	/*
 	 * Reinitialize the search context for the $Volume/$VOLUME_NAME lookup.
 	 */
@@ -1116,12 +1131,26 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	/*
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
+	 *
+	 * If all is ok, reset the logfile and set the dirty bit on the volume.
+	 *
+	 * But do not do that if this is a FORENSIC mount.
 	 */
 	if (!(flags & NTFS_MNT_RDONLY)) {
 		if (ntfs_volume_check_logfile(vol) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_hiberfile(vol) < 0)
 			goto error_exit;
+		if (!NVolForensicMount(vol)) {
+			if (ntfs_logfile_reset(vol) < 0)
+				goto error_exit;
+			if (!NVolWasDirty(vol)) {
+				vol->flags |= VOLUME_IS_DIRTY;
+				if (ntfs_volume_write_flags(vol, vol->flags) <
+						0)
+					goto error_exit;
+			}
+		}
 	}
 
 	return vol;

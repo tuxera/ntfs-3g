@@ -2255,7 +2255,7 @@ static ntfs_volume *mount_volume(void)
 		exit(1);
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (NVolWasDirty(vol))
 		if (opt.force-- <= 0)
 			err_exit("Volume is scheduled for check.\nRun chkdsk /f"
 				 " and please try again, or see option -f.\n");
@@ -2279,32 +2279,16 @@ static ntfs_volume *mount_volume(void)
 /**
  * prepare_volume_fixup
  *
- * Set the volume's dirty flag and wipe the filesystem journal.  When Windows
- * boots it will automatically run chkdsk to check for any problems.  If the
- * read-only command line option was given, this function will do nothing.
+ * Make sure the volume's dirty flag does not get cleared at umount time.  When
+ * Windows boots it will automatically run chkdsk to check for any problems.
+ * If the read-only command line option was given, this function will do
+ * nothing.
  */
 static void prepare_volume_fixup(ntfs_volume *vol)
 {
-	u16 flags;
-
-	flags = vol->flags | VOLUME_IS_DIRTY;
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
-
 	printf("Schedule chkdsk for NTFS consistency check at Windows "
 		"boot time ...\n");
-
-	if (ntfs_volume_write_flags(vol, flags))
-		perr_exit("Failed to set $Volume dirty");
-
-	if (vol->dev->d_ops->sync(vol->dev) == -1)
-		perr_exit("Failed to sync device");
-
-	printf("Resetting $LogFile ... (this might take a while)\n");
-
-	if (ntfs_logfile_reset(vol))
-		perr_exit("Failed to reset $LogFile");
-
+	NVolSetWasDirty(vol);
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 }
@@ -2470,7 +2454,6 @@ int main(int argc, char **argv)
 		proceed_question();
 	}
 
-	/* FIXME: performance - relocate logfile here if it's needed */
 	prepare_volume_fixup(vol);
 
 	if (resize.relocations)
