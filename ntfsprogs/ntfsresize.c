@@ -215,6 +215,9 @@ s64 max_free_cluster_range = 0;
 
 #define NTFS_MAX_CLUSTER_SIZE	(65536)
 
+/* Global volume variable pointer for atexit() unmount purposes. */
+static ntfs_volume *g_vol;
+
 static s64 rounded_up_division(s64 numer, s64 denom)
 {
 	return (numer + (denom - 1)) / denom;
@@ -2291,6 +2294,11 @@ static void prepare_volume_fixup(ntfs_volume *vol)
 	NVolSetWasDirty(vol);
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
+	/*
+	 * We are starting to do irreversible volume changes now, thus we no
+	 * longer consider it safe to perform a unmount of the volume.
+	 */
+	g_vol = NULL;
 }
 
 
@@ -2358,8 +2366,6 @@ static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
 
 	compare_bitmaps(vol, &fsck->lcn_bitmap);
 }
-
-static ntfs_volume *g_vol;
 
 static void ntfsresize_atexit(void) {
 	if (g_vol && ntfs_umount(g_vol, 0) < 0)
