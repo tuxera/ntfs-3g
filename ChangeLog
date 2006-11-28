@@ -84,6 +84,12 @@ xx/xx/2006 - x.xx.x - .
 	- Set the volume dirty bit at mount time (if it is not set already and
 	  clear it again at umount time but only if it was not set to start
 	  with.  (Anton)
+	- Introduce NTFS_MNT_FORENSIC mount option for logfile dumping for
+	  example otherwise the logfile gets wiped out by the mount attempt if
+	  it is not read-only. (Anton)
+	- Fix ntfsresize to unmount the volume when finished/exiting so it does
+	  not leave the volume in an inconsistent state.  Somewhat crude
+	  solution using atexit() but it works...  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

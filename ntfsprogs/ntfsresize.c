@@ -2359,6 +2359,13 @@ static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
 	compare_bitmaps(vol, &fsck->lcn_bitmap);
 }
 
+static ntfs_volume *g_vol;
+
+static void ntfsresize_atexit(void) {
+	if (g_vol && ntfs_umount(g_vol, 0) < 0)
+		perror("Failed to unmount volume");
+}
+
 int main(int argc, char **argv)
 {
 	ntfsck_t fsck;
@@ -2377,8 +2384,12 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	if ((vol = mount_volume()) == NULL)
+	g_vol = NULL;
+	if (atexit(ntfsresize_atexit))
+		err_exit("Failed to register exit handler!");
+	if (!(vol = mount_volume()))
 		err_exit("Couldn't open volume '%s'!\n", opt.volume);
+	g_vol = vol;
 
 	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
 	device_size *= vol->sector_size;
