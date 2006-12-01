@@ -196,11 +196,11 @@ AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
 # Autodetect whether to build FUSE module or not.
 compile_fuse_module=false
 if test "$enable_fuse_module" != "no"; then
-	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
+	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.1, [ compile_fuse_module=true ],
 		if test "$enable_fuse_module" = "yes"; then
-			AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.6.0.])
+			AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.6.1.])
 		else
-			AC_MSG_WARN([ntfsmount requires FUSE version >= 2.6.0.])
+			AC_MSG_WARN([ntfsmount requires FUSE version >= 2.6.1.])
 		fi
 	)
 fi
