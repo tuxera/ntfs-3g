@@ -1717,6 +1717,7 @@ static void check_dest_free_space(u64 src_bytes)
 {
 	u64 dest_bytes;
 	struct statvfs stvfs;
+	struct stat stat;
 
 	if (opt.metadata || opt.blkdev_out || opt.std_out)
 		return;
@@ -1729,6 +1730,13 @@ static void check_dest_free_space(u64 src_bytes)
 		       strerror(errno));
 		return;
 	}
+	
+	/* If file is a FIFO then there is no point in checking the size. */
+	if (!fstat(fd_out, &stat)) {
+		if (S_ISFIFO(stat.st_mode))
+			return;
+	} else
+		Printf("WARNING: fstat failed: %s\n", strerror(errno));
 
 	dest_bytes = (u64)stvfs.f_frsize * stvfs.f_bfree;
 	if (!dest_bytes)

@@ -93,6 +93,8 @@ xx/xx/2006 - x.xx.x - .
 	- Raise FUSE dependence to 2.6.1 (the most stable and featured ATM),
 	  rename --enable-fuse-module to more clear --enable-ntfsmount and
 	  cleanup autotools scripts a bit.
+	- ntfsclone: don't check free space if output file is FIFO (Andree
+	  Leidenfrost)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
