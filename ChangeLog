@@ -90,6 +90,9 @@ xx/xx/2006 - x.xx.x - .
 	- Fix ntfsresize to unmount the volume when finished/exiting so it does
 	  not leave the volume in an inconsistent state.  Somewhat crude
 	  solution using atexit() but it works...  (Anton)
+	- Raise FUSE dependence to 2.6.1 (the most stable and featured ATM),
+	  rename --enable-fuse-module to more clear --enable-ntfsmount and
+	  cleanup autotools scripts a bit.
 
 21/06/2006 - 1.13.1 - Various fixes.
 

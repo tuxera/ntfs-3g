@@ -29,7 +29,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
 
-if ENABLE_FUSE_MODULE
+if ENABLE_FUSE
 bin_PROGRAMS		+= ntfsmount
 endif
 
@@ -84,11 +84,11 @@ ntfscp_SOURCES		= ntfscp.c utils.c utils.h
 ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
-if ENABLE_FUSE_MODULE
+if ENABLE_FUSE
 ntfsmount_SOURCES	= ntfsmount.c utils.c utils.h
-ntfsmount_LDADD		= $(AM_LIBS) $(FUSE_MODULE_LIBS)
+ntfsmount_LDADD		= $(AM_LIBS) $(FUSE_LIBS)
 ntfsmount_LDFLAGS	= $(AM_LFLAGS)
-ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=26
+ntfsmount_CFLAGS	= $(FUSE_CFLAGS) -DFUSE_USE_VERSION=26
 endif
 
 ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
@@ -140,21 +140,21 @@ extras:	libs $(EXTRA_PROGRAMS)
 install-exec-hook:
 	$(INSTALL) -d $(DESTDIR)/sbin
 	$(LN_S) -f $(sbindir)/mkntfs $(DESTDIR)/sbin/mkfs.ntfs
-if ENABLE_FUSE_MODULE
+if ENABLE_FUSE
 	$(LN_S) -f $(bindir)/ntfsmount $(DESTDIR)/sbin/mount.ntfs-fuse
 endif
 
 install-data-hook:
 	$(INSTALL) -d $(DESTDIR)$(man8dir)
 	$(LN_S) -f mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
-if ENABLE_FUSE_MODULE
+if ENABLE_FUSE
 	$(LN_S) -f ntfsmount.8 $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
 endif
 
 uninstall-local:
 	$(RM) -f $(DESTDIR)/sbin/mkfs.ntfs
 	$(RM) -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
-if ENABLE_FUSE_MODULE
+if ENABLE_FUSE
 	$(RM) -f $(DESTDIR)/sbin/mount.ntfs-fuse
 	$(RM) -f $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
 endif

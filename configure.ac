@@ -106,10 +106,10 @@ AC_ARG_ENABLE(gnome-vfs,
 	enable_gnome_vfs=auto
 )
 
-AC_ARG_ENABLE(fuse-module,
-	AS_HELP_STRING(--disable-fuse-module,omit FUSE 'libntfs' interface
+AC_ARG_ENABLE(ntfsmount,
+	AS_HELP_STRING(--disable-ntfsmount,omit userspace NTFS driver
 		       (default=detect)), ,
-	enable_fuse_module=auto
+	enable_ntfsmount=auto
 )
 
 AC_ARG_ENABLE(crypto,
@@ -194,17 +194,17 @@ fi
 AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
 
 # Autodetect whether to build FUSE module or not.
-compile_fuse_module=false
-if test "$enable_fuse_module" != "no"; then
-	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.1, [ compile_fuse_module=true ],
-		if test "$enable_fuse_module" = "yes"; then
+compile_ntfsmount=false
+if test "$enable_ntfsmount" != "no"; then
+	PKG_CHECK_MODULES(FUSE, fuse >= 2.6.1, [ compile_ntfsmount=true ],
+		if test "$enable_ntfsmount" = "yes"; then
 			AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.6.1.])
 		else
 			AC_MSG_WARN([ntfsmount requires FUSE version >= 2.6.1.])
 		fi
 	)
 fi
-AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
+AM_CONDITIONAL(ENABLE_FUSE, $compile_ntfsmount)
 
 # Autodetect whether we can build crypto stuff or not.
 compile_crypto=false
