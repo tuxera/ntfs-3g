@@ -215,9 +215,6 @@ s64 max_free_cluster_range = 0;
 
 #define NTFS_MAX_CLUSTER_SIZE	(65536)
 
-/* Global volume variable pointer for atexit() unmount purposes. */
-static ntfs_volume *g_vol;
-
 static s64 rounded_up_division(s64 numer, s64 denom)
 {
 	return (numer + (denom - 1)) / denom;
@@ -2239,9 +2236,13 @@ static ntfs_volume *mount_volume(void)
 			err_exit("Device '%s' is mounted. "
 				 "You must 'umount' it first.\n", opt.volume);
 	}
-
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_NOATIME))) {
-
+	/*
+	 * Pass NTFS_MNT_FORENSIC so that the mount process does not modify the
+	 * volume at all.  We will do the logfile emptying and dirty setting
+	 * later if needed.
+	 */
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_NOATIME |
+			NTFS_MNT_FORENSIC))) {
 		int err = errno;
 
 		perr_printf("Opening '%s' as NTFS failed", opt.volume);
@@ -2282,25 +2283,32 @@ static ntfs_volume *mount_volume(void)
 /**
  * prepare_volume_fixup
  *
- * Make sure the volume's dirty flag does not get cleared at umount time.  When
- * Windows boots it will automatically run chkdsk to check for any problems.
- * If the read-only command line option was given, this function will do
- * nothing.
+ * Set the volume's dirty flag and wipe the filesystem journal.  When Windows
+ * boots it will automatically run chkdsk to check for any problems.  If the
+ * read-only command line option was given, this function will do nothing.
  */
 static void prepare_volume_fixup(ntfs_volume *vol)
 {
-	printf("Schedule chkdsk for NTFS consistency check at Windows "
-		"boot time ...\n");
-	NVolSetWasDirty(vol);
-	if (vol->dev->d_ops->sync(vol->dev) == -1)
-		perr_exit("Failed to sync device");
-	/*
-	 * We are starting to do irreversible volume changes now, thus we no
-	 * longer consider it safe to perform a unmount of the volume.
-	 */
-	g_vol = NULL;
+	/* No need to schedule chkdsk if it is already scheduled. */
+	if (!NVolWasDirty(vol)) {
+		printf("Schedule chkdsk for NTFS consistency check at Windows "
+			"boot time ...\n");
+		vol->flags |= VOLUME_IS_DIRTY;
+		if (ntfs_volume_write_flags(vol, vol->flags))
+			perr_exit("Failed to set the volume dirty");
+		NVolSetWasDirty(vol);
+		if (vol->dev->d_ops->sync(vol->dev) == -1)
+			perr_exit("Failed to sync device");
+	}
+	/* No need to empty the journal if it is already empty. */
+	if (!NVolLogFileEmpty(vol)) {
+		printf("Resetting $LogFile ... (this might take a while)\n");
+		if (ntfs_logfile_reset(vol))
+			perr_exit("Failed to reset $LogFile");
+		if (vol->dev->d_ops->sync(vol->dev) == -1)
+			perr_exit("Failed to sync device");
+	}
 }
-
 
 static void set_disk_usage_constraint(ntfs_resize_t *resize)
 {
@@ -2367,11 +2375,6 @@ static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
 	compare_bitmaps(vol, &fsck->lcn_bitmap);
 }
 
-static void ntfsresize_atexit(void) {
-	if (g_vol && ntfs_umount(g_vol, 0) < 0)
-		perror("Failed to unmount volume");
-}
-
 int main(int argc, char **argv)
 {
 	ntfsck_t fsck;
@@ -2390,12 +2393,8 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	g_vol = NULL;
-	if (atexit(ntfsresize_atexit))
-		err_exit("Failed to register exit handler!");
 	if (!(vol = mount_volume()))
 		err_exit("Couldn't open volume '%s'!\n", opt.volume);
-	g_vol = vol;
 
 	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
 	device_size *= vol->sector_size;
@@ -2471,6 +2470,7 @@ int main(int argc, char **argv)
 		proceed_question();
 	}
 
+	/* FIXME: performance - relocate logfile here if it's needed */
 	prepare_volume_fixup(vol);
 
 	if (resize.relocations)
