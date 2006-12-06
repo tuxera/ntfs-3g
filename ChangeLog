@@ -10,8 +10,8 @@ xx/xx/2006 - x.xx.x - .
 	  selected type and name already present in inode.  (Szaka)
 	- Extend ntfs_index_{add_filename,rm} to support almost all cases of
 	  index operations.  (Szaka)
-	- Support index operations when index root is in the base mft record.
-	  (Yura)
+	- Support index operations when index root is in the base MFT
+	  record.  (Yura)
 	- calloc/malloc -> ntfs_{calloc,malloc} conversions.  (Szaka)
 	- ntfsclone: don't create image files with executable bit set.  (Szaka)
 	- ntfsclone: metadata cloning: write out extent records.  (Szaka) 
@@ -26,8 +26,8 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsinfo: add ntfs_dump_index_block() and use it.  (Szaka)
 	- ntfsinfo: fix output indenting.  (Szaka)
 	- ntfsinfo: make stdout line buffered.  (Szaka)
-	- ntfsinfo: fix segfaults when SDS has absolute security descriptor.  
-	  (Szaka)
+	- ntfsinfo: fix segfaults when SDS has absolute security
+	  descriptor.  (Szaka)
 	- ntfsinfo: redirect stderr to /dev/null if --debug isn't used in
 	  debug mode.  (Szaka)
 	- ntfsinfo: fix segfaults on corrupt index blocks.  (Szaka)
@@ -86,15 +86,18 @@ xx/xx/2006 - x.xx.x - .
 	  with.  (Anton)
 	- Introduce NTFS_MNT_FORENSIC mount option for logfile dumping for
 	  example otherwise the logfile gets wiped out by the mount attempt if
-	  it is not read-only. (Anton)
+	  it is not read-only.  (Anton)
 	- Fix ntfsresize to unmount the volume when finished/exiting so it does
 	  not leave the volume in an inconsistent state.  Somewhat crude
 	  solution using atexit() but it works...  (Anton)
 	- Raise FUSE dependence to 2.6.1 (the most stable and featured ATM),
 	  rename --enable-fuse-module to more clear --enable-ntfsmount and
-	  cleanup autotools scripts a bit.
-	- ntfsclone: don't check free space if output file is FIFO (Andree
+	  cleanup autotools scripts a bit.  (Yura)
+	- ntfsclone: don't check free space if output file is FIFO.  (Andree
 	  Leidenfrost)
+	- Turn ntfs_pathname_to_inode() into ntfs_pathname_to_inode_num() which
+	  returns ntfs inode number instead of opened inode itself.
+	  Reimplement ntfs_pathname_to_inode() as wrapper to new API.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

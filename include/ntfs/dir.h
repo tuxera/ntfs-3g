@@ -65,6 +65,8 @@ extern ntfschar NTFS_INDEX_R[3];
 extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		const ntfschar *uname, const int uname_len);
 
+extern u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
+		const char *pathname);
 extern ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname);
 

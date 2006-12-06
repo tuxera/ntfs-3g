@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  *
- * NTFS module for FUSE.
+ * Userspace NTFS driver.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

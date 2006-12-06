@@ -470,7 +470,8 @@ close_err_out:
 }
 
 /**
- * ntfs_pathname_to_inode - Find the inode which represents the given pathname
+ * ntfs_pathname_to_inode_num - find the inode number which represents the
+ * 				given pathname
  * @vol:       An ntfs volume obtained from ntfs_mount
  * @parent:    A directory inode to begin the search (may be NULL)
  * @pathname:  Pathname to be located
@@ -479,43 +480,35 @@ close_err_out:
  * splits the path and then descends the directory tree.  If @parent is NULL,
  * then the root directory '.' will be used as the base for the search.
  *
- * Return:  inode  Success, the pathname was valid
- *	    NULL   Error, the pathname was invalid, or some other error occurred
+ * Return:  -1    Error, the pathname was invalid, or some other error occurred
+ *          else  Success, the pathname was valid
  */
-ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
+u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname)
 {
-	u64 inum;
+	u64 inum, result = (u64)-1;
 	int len, err = 0;
 	char *p, *q;
-	ntfs_inode *ni;
-	ntfs_inode *result = NULL;
+	ntfs_inode *ni = NULL;
 	ntfschar *unicode = NULL;
 	char *ascii = NULL;
 
 	if (!vol || !pathname) {
-		errno = EINVAL;
-		return NULL;
+		err = EINVAL;
+		goto close;
 	}
 
 	ntfs_log_trace("Path: '%s'\n", pathname);
 
 	if (parent) {
 		ni = parent;
-	} else {
-		ni = ntfs_inode_open(vol, FILE_root);
-		if (!ni) {
-			ntfs_log_debug("Couldn't open the inode of the root "
-					"directory.\n");
-			err = EIO;
-			goto close;
-		}
-	}
+	} else
+		inum = FILE_root;
 
 	unicode = calloc(1, MAX_PATH);
 	ascii = strdup(pathname);
 	if (!unicode || !ascii) {
-		ntfs_log_debug("Out of memory.\n");
+		ntfs_log_error("Out of memory.\n");
 		err = ENOMEM;
 		goto close;
 	}
@@ -525,10 +518,20 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 	while (p && *p == PATH_SEP)
 		p++;
 	while (p && *p) {
+		if (!ni) {
+			ni = ntfs_inode_open(vol, inum);
+			if (!ni) {
+				ntfs_log_debug("Cannot open inode %llu.\n",
+						(unsigned long long)inum);
+				err = EIO;
+				goto close;
+			}
+		}
+
 		/* Find the end of the first token. */
 		q = strchr(p, PATH_SEP);
 		if (q != NULL) {
-			*q = '\0';
+			*q = 0;
 			q++;
 		}
 
@@ -547,26 +550,17 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			err = ENOENT;
 			goto close;
 		}
+		inum = MREF(inum);
 
 		if (ni != parent)
 			ntfs_inode_close(ni);
-
-		inum = MREF(inum);
-		ni = ntfs_inode_open(vol, inum);
-		if (!ni) {
-			ntfs_log_debug("Cannot open inode %llu: %s.\n",
-					(unsigned long long)inum, p);
-			err = EIO;
-			goto close;
-		}
+		ni = NULL;
 
 		p = q;
-		while (p && *p && *p == PATH_SEP)
+		while (p && *p == PATH_SEP)
 			p++;
 	}
-
-	result = ni;
-	ni = NULL;
+	result = inum;
 close:
 	if (ni && (ni != parent))
 		ntfs_inode_close(ni);
@@ -575,6 +569,30 @@ close:
 	if (err)
 		errno = err;
 	return result;
+}
+
+/**
+ * ntfs_pathname_to_inode - Find the inode which represents the given pathname
+ * @vol:       An ntfs volume obtained from ntfs_mount
+ * @parent:    A directory inode to begin the search (may be NULL)
+ * @pathname:  Pathname to be located
+ *
+ * Take an ASCII pathname and find the inode that represents it.  The function
+ * splits the path and then descends the directory tree.  If @parent is NULL,
+ * then the root directory '.' will be used as the base for the search.
+ *
+ * Return:  inode  Success, the pathname was valid
+ *	    NULL   Error, the pathname was invalid, or some other error occurred
+ */
+ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
+		const char *pathname)
+{
+	u64 inum;
+
+	inum = ntfs_pathname_to_inode_num(vol, parent, pathname);
+	if (inum == (u64)-1)
+		return NULL;
+	return ntfs_inode_open(vol, inum);
 }
 
 /*
