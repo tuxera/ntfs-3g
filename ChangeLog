@@ -98,6 +98,7 @@ xx/xx/2006 - x.xx.x - .
 	- Turn ntfs_pathname_to_inode() into ntfs_pathname_to_inode_num() which
 	  returns ntfs inode number instead of opened inode itself.
 	  Reimplement ntfs_pathname_to_inode() as wrapper to new API.  (Yura)
+	- ntfsmount: fix rename if destination already exists.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

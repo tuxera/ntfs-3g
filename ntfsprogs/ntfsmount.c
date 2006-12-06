@@ -1013,9 +1013,36 @@ static int ntfs_fuse_unlink(const char *org_path)
 static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 {
 	int ret;
+	u64 inum_new, inum_old;
 
+	/* Check whether destination already exists. */
+	if ((inum_new = ntfs_pathname_to_inode_num(ctx->vol, NULL, new_path)) !=
+			(u64)-1) {
+		if (errno != ENOENT)
+			return -errno;
+		/*
+		 * If source and destination belongs to the same inode, then
+		 * just unlink source if mount is case sensitive or return
+		 * -EINVAL if mount is case insensitive, because of a lot of
+		 * brain damaged cases here. Anyway coreutils is broken for
+		 * case sensitive filesystems.
+		 *
+		 * If source and destination belongs to different inodes, then
+		 * unlink current destination, so we can create link to source.
+		 */
+		inum_old = ntfs_pathname_to_inode_num(ctx->vol, NULL, old_path);
+		if (inum_old == inum_new) {
+			if (NVolCaseSensitive(ctx->vol))
+				goto unlink;
+			else
+				return -EINVAL;
+		} else
+			if ((ret = ntfs_fuse_unlink(new_path)))
+				return ret;
+	}
 	if ((ret = ntfs_fuse_link(old_path, new_path)))
 		return ret;
+unlink:
 	if ((ret = ntfs_fuse_unlink(old_path))) {
 		ntfs_fuse_unlink(new_path);
 		return ret;
