@@ -851,7 +851,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		}
 		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
 			ntfs_log_debug(FAILED);
-			ntfs_log_error("$MFTMirr does not match $MFT.\n");
+			ntfs_log_error("$MFTMirr does not match $MFT (record "
+				       "%d).\n", i);
 			goto io_error_exit;
 		}
 	}
