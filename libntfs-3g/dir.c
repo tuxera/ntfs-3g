@@ -1107,8 +1107,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 					ni->vol->indx_record_size >>
 					ni->vol->cluster_size_bits;
 		else
-			ir->clusters_per_index_block =
-					-ni->vol->indx_record_size_bits;
+			ir->clusters_per_index_block = 
+					ni->vol->indx_record_size >>
+					ni->vol->sector_size_bits;
 		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
 		ir->index.index_length = cpu_to_le32(index_len);
 		ir->index.allocated_size = cpu_to_le32(index_len);

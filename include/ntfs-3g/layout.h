@@ -2102,16 +2102,12 @@ typedef struct {
 /*  4*/	COLLATION_RULES collation_rule;	/* Collation rule used to sort the
 					   index entries. If type is $FILE_NAME,
 					   this must be COLLATION_FILE_NAME. */
-/*  8*/	u32 index_block_size;		/* Size of each index block in bytes (in
+/*  8*/	u32 index_block_size;		/* Size of index block in bytes (in
 					   the index allocation attribute). */
-/* 12*/	s8 clusters_per_index_block;	/* Cluster size of each index block (in
+/* 12*/	s8 clusters_per_index_block;	/* Size of index block in clusters (in
 					   the index allocation attribute), when
 					   an index block is >= than a cluster,
-					   otherwise this will be the -log of
-					   the size (like how the encoding of
-					   the mft record size and the index
-					   record size found in the boot sector
-					   work). Has to be a power of 2. */
+					   otherwise sectors per index block. */
 /* 13*/	u8 reserved[3];			/* Reserved/align to 8-byte boundary. */
 /* 16*/	INDEX_HEADER index;		/* Index header describing the
 					   following index entries. */
