@@ -89,6 +89,15 @@ linux*)
 	;;
 esac
 
+# Static linking failed because FUSE 2.6.[01] forgot to include -lrt. 
+# However FreeBSD doesn't have one. So, here we go with the code from FUSE. 
+libfuse_libs=
+LIBS=
+AC_SEARCH_LIBS(clock_gettime, [rt])
+libfuse_libs="$libfuse_libs $LIBS"
+LIBS=
+AC_SUBST(libfuse_libs)
+
 # add --with-extra-includes and --with-extra-libs switch to ./configure
 all_libraries="$all_libraries $USER_LDFLAGS"
 all_includes="$all_includes $USER_INCLUDES"
