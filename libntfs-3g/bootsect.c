@@ -2,7 +2,7 @@
  * bootsect.c - Boot sector handling code. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
- * Copyright (c) 2003-2004 Szabolcs Szakacsits
+ * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -57,11 +57,12 @@
  *
  * Return TRUE if @b contains a valid ntfs boot sector and FALSE if not.
  */
-BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute__((unused)))
+BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b)
 {
 	u32 i;
+	BOOL ret = FALSE;
 
-	ntfs_log_debug("\nBeginning bootsector check...\n");
+	ntfs_log_debug("Beginning bootsector check.\n");
 
 	/* Calculate the checksum. Note, this is just a simple addition of
 	   all u32 values in the bootsector starting at the beginning and
@@ -71,93 +72,102 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b, const BOOL silent __attribute
 		u32 *u = (u32 *)b;
 		u32 *bi = (u32 *)(&b->checksum);
 
-		ntfs_log_debug("Calculating bootsector checksum... ");
+		ntfs_log_debug("Calculating bootsector checksum.\n");
 
 		for (i = 0; u < bi; ++u)
 			i += le32_to_cpup(u);
 
-		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i)
+		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i) {
+			ntfs_log_error("Bootsector checksum failed.\n");
 			goto not_ntfs;
-		ntfs_log_debug("OK\n");
+		}
 	}
 
-	/* Check OEMidentifier is "NTFS    " */
-	ntfs_log_debug("Checking OEMid... ");
-	if (b->oem_id != cpu_to_le64(0x202020205346544eULL)) /* "NTFS    " */
+	ntfs_log_debug("Checking OEMid, NTFS signature.\n");
+	if (b->oem_id != cpu_to_le64(0x202020205346544eULL)) { /* "NTFS    " */
+		ntfs_log_error("NTFS signature is missing.\n");
 		goto not_ntfs;
-	ntfs_log_debug("OK\n");
+	}
 
-	/* Check bytes per sector value is between 256 and 4096. */
-	ntfs_log_debug("Checking bytes per sector... ");
-	if (le16_to_cpu(b->bpb.bytes_per_sector) <  0x100 ||
-	    le16_to_cpu(b->bpb.bytes_per_sector) > 0x1000)
+	ntfs_log_debug("Checking bytes per sector.\n");
+	if (le16_to_cpu(b->bpb.bytes_per_sector) <  256 ||
+	    le16_to_cpu(b->bpb.bytes_per_sector) > 4096) {
+		ntfs_log_error("Unexpected bytes per sector value (%d).\n", 
+			       le16_to_cpu(b->bpb.bytes_per_sector));
 		goto not_ntfs;
-	ntfs_log_debug("OK\n");
+	}
 
-	/* Check sectors per cluster value is valid. */
-	ntfs_log_debug("Checking sectors per cluster... ");
+	ntfs_log_debug("Checking sectors per cluster.\n");
 	switch (b->bpb.sectors_per_cluster) {
 	case 1: case 2: case 4: case 8: case 16: case 32: case 64: case 128:
 		break;
 	default:
+		ntfs_log_error("Unexpected sectors per cluster value (%d).\n",
+			       b->bpb.sectors_per_cluster);
 		goto not_ntfs;
 	}
-	ntfs_log_debug("OK\n");
 
-	/* Check the cluster size is not above 65536 bytes. */
-	ntfs_log_debug("Checking cluster size... ");
-	if ((u32)le16_to_cpu(b->bpb.bytes_per_sector) *
-	    b->bpb.sectors_per_cluster > 0x10000)
+	ntfs_log_debug("Checking cluster size.\n");
+	i = (u32)le16_to_cpu(b->bpb.bytes_per_sector) * 
+		b->bpb.sectors_per_cluster;
+	if (i > 65536) {
+		ntfs_log_error("Unexpected cluster size (%d).\n", i);
 		goto not_ntfs;
-	ntfs_log_debug("OK\n");
+	}
 
-	/* Check reserved/unused fields are really zero. */
-	ntfs_log_debug("Checking reserved fields are zero... ");
+	ntfs_log_debug("Checking reserved fields are zero.\n");
 	if (le16_to_cpu(b->bpb.reserved_sectors) ||
 	    le16_to_cpu(b->bpb.root_entries) ||
 	    le16_to_cpu(b->bpb.sectors) ||
 	    le16_to_cpu(b->bpb.sectors_per_fat) ||
 	    le32_to_cpu(b->bpb.large_sectors) ||
-	    b->bpb.fats)
+	    b->bpb.fats) {
+		ntfs_log_error("Reserved fields aren't zero "
+			       "(%d, %d, %d, %d, %d, %d).\n",
+			       le16_to_cpu(b->bpb.reserved_sectors),
+			       le16_to_cpu(b->bpb.root_entries),
+			       le16_to_cpu(b->bpb.sectors),
+			       le16_to_cpu(b->bpb.sectors_per_fat),
+			       le32_to_cpu(b->bpb.large_sectors),
+			       b->bpb.fats);
 		goto not_ntfs;
-	ntfs_log_debug("OK\n");
+	}
 
-	/* Check clusters per file mft record value is valid. */
-	ntfs_log_debug("Checking clusters per mft record... ");
+	ntfs_log_debug("Checking clusters per mft record.\n");
 	if ((u8)b->clusters_per_mft_record < 0xe1 ||
 	    (u8)b->clusters_per_mft_record > 0xf7) {
 		switch (b->clusters_per_mft_record) {
 		case 1: case 2: case 4: case 8: case 0x10: case 0x20: case 0x40:
 			break;
 		default:
+			ntfs_log_error("Unexpected clusters per mft record "
+				       "(%d).\n", b->clusters_per_mft_record);
 			goto not_ntfs;
 		}
 	}
-	ntfs_log_debug("OK\n");
 
-	/* Check clusters per index block value is valid. */
-	ntfs_log_debug("Checking clusters per index block... ");
+	ntfs_log_debug("Checking clusters per index block.\n");
 	if ((u8)b->clusters_per_index_record < 0xe1 ||
 	    (u8)b->clusters_per_index_record > 0xf7) {
 		switch (b->clusters_per_index_record) {
 		case 1: case 2: case 4: case 8: case 0x10: case 0x20: case 0x40:
 			break;
 		default:
+			ntfs_log_error("Unexpected clusters per index record "
+				       "(%d).\n", b->clusters_per_index_record);
 			goto not_ntfs;
 		}
 	}
-	ntfs_log_debug("OK\n");
 
 	if (b->end_of_sector_marker != cpu_to_le16(0xaa55))
-		ntfs_log_debug("Warning: Bootsector has invalid end of sector marker.\n");
+		ntfs_log_debug("Warning: Bootsector has invalid end of sector "
+			       "marker.\n");
 
 	ntfs_log_debug("Bootsector check completed successfully.\n");
 
-	return TRUE;
+	ret = TRUE;
 not_ntfs:
-	ntfs_log_debug("FAILED\n");
-	ntfs_log_error("Bootsector check failed.\n");
-	return FALSE;
+	return ret;
 }
 
 /**
@@ -172,8 +182,9 @@ not_ntfs:
  */
 int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 {
-	u8 sectors_per_cluster;
-	s8 c;
+	s64 sectors;
+	u8  sectors_per_cluster;
+	s8  c;
 
 	/* We return -1 with errno = EINVAL on error. */
 	errno = EINVAL;
@@ -188,34 +199,34 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	 * ntfs_boot_sector_is_ntfs but in this way we can just do this once.
 	 */
 	sectors_per_cluster = bs->bpb.sectors_per_cluster;
-	ntfs_log_debug("NumberOfSectors = %lli\n", sle64_to_cpu(bs->number_of_sectors));
 	ntfs_log_debug("SectorsPerCluster = 0x%x\n", sectors_per_cluster);
 	if (sectors_per_cluster & (sectors_per_cluster - 1)) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
-				"sectors_per_cluster is not a power of 2.\n",
-				vol->dev->d_name);
+		ntfs_log_error("sectors_per_cluster (%d) is not a power of 2."
+			       "\n", sectors_per_cluster);
 		return -1;
 	}
-	vol->nr_clusters = sle64_to_cpu(bs->number_of_sectors) >>
-			(ffs(sectors_per_cluster) - 1);
+	
+	sectors = sle64_to_cpu(bs->number_of_sectors);
+	ntfs_log_debug("NumberOfSectors = %lld\n", sectors);
+	
+	vol->nr_clusters =  sectors >> (ffs(sectors_per_cluster) - 1);
 
 	vol->mft_lcn = sle64_to_cpu(bs->mft_lcn);
 	vol->mftmirr_lcn = sle64_to_cpu(bs->mftmirr_lcn);
 	ntfs_log_debug("MFT LCN = 0x%llx\n", vol->mft_lcn);
 	ntfs_log_debug("MFTMirr LCN = 0x%llx\n", vol->mftmirr_lcn);
-	if (vol->mft_lcn > vol->nr_clusters ||
-			vol->mftmirr_lcn > vol->nr_clusters) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition!\n",
-				vol->dev->d_name);
-		ntfs_log_debug("($Mft LCN or $MftMirr LCN is greater than the "
-				"number of clusters!)\n");
+	if (vol->mft_lcn     > vol->nr_clusters ||
+	    vol->mftmirr_lcn > vol->nr_clusters) {
+		ntfs_log_error("$MFT LCN (%lld) or $MFTMirr LCN (%lld) is "
+			      "greater than the number of clusters (%lld).\n",
+			      vol->mft_lcn, vol->mftmirr_lcn, vol->nr_clusters);
 		return -1;
 	}
+	
 	vol->cluster_size = sectors_per_cluster * vol->sector_size;
 	if (vol->cluster_size & (vol->cluster_size - 1)) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
-				"cluster_size is not a power of 2.\n",
-				vol->dev->d_name);
+		ntfs_log_error("cluster_size (%d) is not a power of 2.\n",
+			       vol->cluster_size);
 		return -1;
 	}
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
@@ -239,9 +250,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	else
 		vol->mft_record_size = c << vol->cluster_size_bits;
 	if (vol->mft_record_size & (vol->mft_record_size - 1)) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
-				"mft_record_size is not a power of 2.\n",
-				vol->dev->d_name);
+		ntfs_log_error("mft_record_size (%d) is not a power of 2.\n",
+			       vol->mft_record_size);
 		return -1;
 	}
 	vol->mft_record_size_bits = ffs(vol->mft_record_size) - 1;
@@ -271,3 +281,4 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 		vol->mftmirr_size = vol->cluster_size / vol->mft_record_size;
 	return 0;
 }
+

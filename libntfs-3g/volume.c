@@ -391,9 +391,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 #ifdef DEBUG
 	const char *OK = "OK\n";
 	const char *FAILED = "FAILED\n";
-	BOOL debug = 1;
-#else
-	BOOL debug = 0;
 #endif
 
 	if (!dev || !dev->d_ops || !dev->d_name) {
@@ -443,16 +440,13 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	}
 	ntfs_log_debug(OK);
-	if (!ntfs_boot_sector_is_ntfs(bs, !debug)) {
-		ntfs_log_error("Device '%s' is not a valid NTFS partition!\n",
-				dev->d_name);
+	if (!ntfs_boot_sector_is_ntfs(bs)) {
 		errno = EINVAL;
 		goto error_exit;
 	}
-	if (ntfs_boot_sector_parse(vol, bs) < 0) {
-		ntfs_log_perror("Failed to parse ntfs bootsector");
+	if (ntfs_boot_sector_parse(vol, bs) < 0)
 		goto error_exit;
-	}
+	
 	free(bs);
 	bs = NULL;
 	/* Now set the device block size to the sector size. */
