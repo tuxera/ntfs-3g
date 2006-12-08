@@ -38,7 +38,7 @@ libs:
 install-exec-hook:
 	$(INSTALL) -d $(DESTDIR)/sbin
 	$(LN_S) -f $(bindir)/ntfs-3g $(DESTDIR)/sbin/mount.ntfs-3g
-	ldconfig
+	$(LDCONFIG)
 
 install-data-hook:
 	$(INSTALL) -d $(DESTDIR)$(man8dir)
