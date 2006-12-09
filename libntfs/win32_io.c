@@ -1449,26 +1449,12 @@ static int ntfs_device_win32_ioctl(struct ntfs_device *dev, int request,
 	}
 }
 
-static s64 ntfs_device_win32_pread(struct ntfs_device *dev, void *b,
-		s64 count, s64 offset)
-{
-	return ntfs_pread(dev, offset, count, b);
-}
-
-static s64 ntfs_device_win32_pwrite(struct ntfs_device *dev, const void *b,
-		s64 count, s64 offset)
-{
-	return ntfs_pwrite(dev, offset, count, b);
-}
-
 struct ntfs_device_operations ntfs_device_win32_io_ops = {
 	.open		= ntfs_device_win32_open,
 	.close		= ntfs_device_win32_close,
 	.seek		= ntfs_device_win32_seek,
 	.read		= ntfs_device_win32_read,
 	.write		= ntfs_device_win32_write,
-	.pread		= ntfs_device_win32_pread,
-	.pwrite		= ntfs_device_win32_pwrite,
 	.sync		= ntfs_device_win32_sync,
 	.stat		= ntfs_device_win32_stat,
 	.ioctl		= ntfs_device_win32_ioctl

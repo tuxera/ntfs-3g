@@ -153,6 +153,22 @@ int ntfs_device_free(struct ntfs_device *dev)
 }
 
 /**
+ * fake_pread - read operation disguised as pread
+ * @dev:	device to read from
+ * @b:		output data buffer
+ * @count:	number of bytes to read
+ * @pos:	position in device to read from
+ *
+ * Auxiliary function, used when we emulate pread by seek() + a sequence of
+ * read()s.
+ */
+static s64 fake_pread(struct ntfs_device *dev, void *b, s64 count,
+		s64 pos __attribute__((unused)))
+{
+	return dev->d_ops->read(dev, b, count);
+}
+
+/**
  * ntfs_pread - positioned read from disk
  * @dev:	device to read from
  * @pos:	position in device to read from
@@ -175,6 +191,7 @@ s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 {
 	s64 br, total;
 	struct ntfs_device_operations *dops;
+	s64 (*_pread)(struct ntfs_device *, void *, s64, s64);
 
 	ntfs_log_trace("Entering for pos 0x%llx, count 0x%llx.\n", pos, count);
 	if (!b || count < 0 || pos < 0) {
@@ -184,26 +201,55 @@ s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 	if (!count)
 		return 0;
 	dops = dev->d_ops;
-	/* Locate to position. */
-	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
-		ntfs_log_perror("ntfs_pread: device seek to 0x%llx returned error",
-				pos);
+	_pread = dops->pread;
+	if (!_pread)
+		_pread = fake_pread;
+seek:
+	/* Locate to position if pread is to be emulated by seek() + read(). */
+	if (_pread == fake_pread &&
+			dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
+		ntfs_log_perror("ntfs_pread: device seek to 0x%llx returned "
+				"error", pos);
 		return -1;
 	}
 	/* Read the data. */
 	for (total = 0; count; count -= br, total += br) {
-		br = dops->read(dev, (char*)b + total, count);
+		br = _pread(dev, (char*)b + total, count, pos + total);
 		/* If everything ok, continue. */
 		if (br > 0)
 			continue;
 		/* If EOF or error return number of bytes read. */
 		if (!br || total)
 			return total;
+		/*
+		 * If pread is not supported by the OS, fall back to emulating
+		 * it by seek() + read().
+		 */
+		if (errno == ENOSYS && _pread != fake_pread) {
+			_pread = fake_pread;
+			goto seek;
+		}
 		/* Nothing read and error, return error status. */
 		return br;
 	}
 	/* Finally, return the number of bytes read. */
 	return total;
+}
+
+/**
+ * fake_pwrite - write operation disguised as pwrite
+ * @dev:	device to write to
+ * @b:		input data buffer
+ * @count:	number of bytes to write
+ * @pos:	position in device to write to
+ *
+ * Auxiliary function, used when we emulate pwrite by seek() + a sequence of
+ * write()s.
+ */
+static s64 fake_pwrite(struct ntfs_device *dev, const void *b, s64 count,
+		s64 pos __attribute__((unused)))
+{
+	return dev->d_ops->write(dev, b, count);
 }
 
 /**
@@ -230,6 +276,7 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 {
 	s64 written, total;
 	struct ntfs_device_operations *dops;
+	s64 (*_pwrite)(struct ntfs_device *, const void *, s64, s64);
 
 	ntfs_log_trace("Entering for pos 0x%llx, count 0x%llx.\n", pos, count);
 	if (!b || count < 0 || pos < 0) {
@@ -243,8 +290,15 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		return -1;
 	}
 	dops = dev->d_ops;
-	/* Locate to position. */
-	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
+	_pwrite = dops->pwrite;
+	if (!_pwrite)
+		_pwrite = fake_pwrite;
+seek:
+	/*
+	 * Locate to position if pwrite is to be emulated by seek() + write().
+	 */
+	if (_pwrite == fake_pwrite &&
+			dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
 		ntfs_log_perror("ntfs_pwrite: seek to 0x%llx returned error",
 				pos);
 		return -1;
@@ -252,7 +306,8 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 	NDevSetDirty(dev);
 	/* Write the data. */
 	for (total = 0; count; count -= written, total += written) {
-		written = dops->write(dev, (const char*)b + total, count);
+		written = _pwrite(dev, (const char*)b + total, count,
+				pos + total);
 		/* If everything ok, continue. */
 		if (written > 0)
 			continue;
@@ -261,6 +316,14 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		 */
 		if (!written || total)
 			break;
+		/*
+		 * If pwrite is not supported by the OS, fall back to emulating
+		 * it by seek() + write().
+		 */
+		if (errno == ENOSYS && _pwrite != fake_pwrite) {
+			_pwrite = fake_pwrite;
+			goto seek;
+		}
 		/* Nothing written and error, return error status. */
 		return written;
 	}

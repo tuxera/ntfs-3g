@@ -99,6 +99,13 @@ xx/xx/2006 - x.xx.x - .
 	- ntfsmount: fix rename if destination already exists.  (Yura)
 	- ntfsfix: do not set VOLUME_MOUNTED_ON_NT4 flag as it causes Vista to
 	  not boot any more.
+	- Implement ntfs_pread() and ntfs_pwrite() in terms of device
+	  operations pread() and pwrite() respectively and fall back to using
+	  seek() + read()/write() if no pread()/pwrite() device operation is
+	  supplied or the OS does not support the pread()/pwrite() system call.
+	  Adapt unix_io pread()/pwrite() device operations to use pread()/
+	  pwrite() system call and adapt win32_io device operations to not
+	  supply pread()/pwrite().  (Csaba Henk, Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

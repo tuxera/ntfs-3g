@@ -486,25 +486,23 @@ close_err_out:
 u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname)
 {
-	u64 inum, result = (u64)-1;
+	u64 inum, result; 
 	int len, err = 0;
 	char *p, *q;
 	ntfs_inode *ni = NULL;
 	ntfschar *unicode = NULL;
 	char *ascii = NULL;
 
+	inum = result = (u64)-1;
 	if (!vol || !pathname) {
 		err = EINVAL;
 		goto close;
 	}
-
 	ntfs_log_trace("Path: '%s'\n", pathname);
-
 	if (parent) {
 		ni = parent;
 	} else
 		inum = FILE_root;
-
 	unicode = calloc(1, MAX_PATH);
 	ascii = strdup(pathname);
 	if (!unicode || !ascii) {
@@ -512,7 +510,6 @@ u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 		err = ENOMEM;
 		goto close;
 	}
-
 	p = ascii;
 	/* Remove leading /'s. */
 	while (p && *p == PATH_SEP)
@@ -527,14 +524,12 @@ u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 				goto close;
 			}
 		}
-
 		/* Find the end of the first token. */
 		q = strchr(p, PATH_SEP);
 		if (q != NULL) {
 			*q = 0;
 			q++;
 		}
-
 		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
 		if (len < 0) {
 			ntfs_log_debug("Couldn't convert name to Unicode: "
@@ -542,20 +537,17 @@ u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 			err = EILSEQ;
 			goto close;
 		}
-
 		inum = ntfs_inode_lookup_by_name(ni, unicode, len);
-		if (inum == (u64) -1) {
+		if (inum == (u64)-1) {
 			ntfs_log_debug("Couldn't find name '%s' in pathname "
 					"'%s'.\n", p, pathname);
 			err = ENOENT;
 			goto close;
 		}
 		inum = MREF(inum);
-
 		if (ni != parent)
 			ntfs_inode_close(ni);
 		ni = NULL;
-
 		p = q;
 		while (p && *p == PATH_SEP)
 			p++;
