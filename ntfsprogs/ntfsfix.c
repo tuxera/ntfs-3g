@@ -253,9 +253,6 @@ static int set_dirty_flag(ntfs_volume *vol)
 	 * and fix it for us.
 	 */
 	flags = vol->flags | VOLUME_IS_DIRTY;
-	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
 	if (OLD_ntfs_volume_set_flags(vol, flags)) {
 		ntfs_log_info(FAILED);
 		ntfs_log_error("Error setting volume flags.\n");

@@ -1989,6 +1989,9 @@ typedef struct {
 
 /**
  * enum VOLUME_FLAGS - Possible flags for the volume (16-bit).
+ *
+ * WARNING: Setting VOLUME_MOUNTED_ON_NT4 on a Volume causes Windows Vista to
+ * fail to boot (it hangs on a black screen).
  */
 typedef enum {
 	VOLUME_IS_DIRTY			= const_cpu_to_le16(0x0001),

@@ -86,10 +86,8 @@ xx/xx/2006 - x.xx.x - .
 	  with.  (Anton)
 	- Introduce NTFS_MNT_FORENSIC mount option for logfile dumping for
 	  example otherwise the logfile gets wiped out by the mount attempt if
-	  it is not read-only.  (Anton)
-	- Fix ntfsresize to unmount the volume when finished/exiting so it does
-	  not leave the volume in an inconsistent state.  Somewhat crude
-	  solution using atexit() but it works...  (Anton)
+	  it is not read-only.  Also use it for ntfsresize as it wishes to do
+	  its own logfile emptying and volume dirtying.  (Anton)
 	- Raise FUSE dependence to 2.6.1 (the most stable and featured ATM),
 	  rename --enable-fuse-module to more clear --enable-ntfsmount and
 	  cleanup autotools scripts a bit.  (Yura)
@@ -99,6 +97,8 @@ xx/xx/2006 - x.xx.x - .
 	  returns ntfs inode number instead of opened inode itself.
 	  Reimplement ntfs_pathname_to_inode() as wrapper to new API.  (Yura)
 	- ntfsmount: fix rename if destination already exists.  (Yura)
+	- ntfsfix: do not set VOLUME_MOUNTED_ON_NT4 flag as it causes Vista to
+	  not boot any more.
 
 21/06/2006 - 1.13.1 - Various fixes.
 
