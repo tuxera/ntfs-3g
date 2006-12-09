@@ -208,6 +208,19 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	
 	sectors = sle64_to_cpu(bs->number_of_sectors);
 	ntfs_log_debug("NumberOfSectors = %lld\n", sectors);
+	if (!sectors) {
+		ntfs_log_error("Volume size is set to zero.\n");
+		return -1;
+	}
+	if (vol->dev->d_ops->seek(vol->dev, 
+				  (sectors - 1) << vol->sector_size_bits,
+				  SEEK_SET) == -1) {
+		ntfs_log_perror("Failed to read last sector (%lld)", sectors);
+		ntfs_log_error("Perhaps the volume is a RAID/LDM but it wasn't "
+			       "setup yet, or the\nwrong device was used, "
+			       "or the partition table is incorrect.\n" );
+		return -1;
+	}
 	
 	vol->nr_clusters =  sectors >> (ffs(sectors_per_cluster) - 1);
 
