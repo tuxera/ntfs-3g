@@ -223,10 +223,12 @@ seek:
 			return total;
 		/*
 		 * If pread is not supported by the OS, fall back to emulating
-		 * it by seek() + read().
+		 * it by seek() + read() and set the device pread() pointer to
+		 * NULL so we automatically use seek() + read() from now on.
 		 */
 		if (errno == ENOSYS && _pread != fake_pread) {
 			_pread = fake_pread;
+			dops->pread = NULL;
 			goto seek;
 		}
 		/* Nothing read and error, return error status. */
@@ -318,10 +320,13 @@ seek:
 			break;
 		/*
 		 * If pwrite is not supported by the OS, fall back to emulating
-		 * it by seek() + write().
+		 * it by seek() + write() and set the device pwrite() pointer
+		 * to NULL so we automatically use seek() + write() from now
+		 * on.
 		 */
 		if (errno == ENOSYS && _pwrite != fake_pwrite) {
 			_pwrite = fake_pwrite;
+			dops->pwrite = NULL;
 			goto seek;
 		}
 		/* Nothing written and error, return error status. */
