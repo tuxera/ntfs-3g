@@ -259,8 +259,8 @@ static int set_dirty_flag(ntfs_volume *vol)
 		return -1;
 	}
 	vol->flags = flags;
-	ntfs_log_info(OK);
 	NVolSetWasDirty(vol);
+	ntfs_log_info(OK);
 	return 0;
 }
 

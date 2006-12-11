@@ -2289,25 +2289,19 @@ static ntfs_volume *mount_volume(void)
  */
 static void prepare_volume_fixup(ntfs_volume *vol)
 {
-	/* No need to schedule chkdsk if it is already scheduled. */
-	if (!NVolWasDirty(vol)) {
-		printf("Schedule chkdsk for NTFS consistency check at Windows "
-			"boot time ...\n");
-		vol->flags |= VOLUME_IS_DIRTY;
-		if (ntfs_volume_write_flags(vol, vol->flags))
-			perr_exit("Failed to set the volume dirty");
-		NVolSetWasDirty(vol);
-		if (vol->dev->d_ops->sync(vol->dev) == -1)
-			perr_exit("Failed to sync device");
-	}
-	/* No need to empty the journal if it is already empty. */
-	if (!NVolLogFileEmpty(vol)) {
-		printf("Resetting $LogFile ... (this might take a while)\n");
-		if (ntfs_logfile_reset(vol))
-			perr_exit("Failed to reset $LogFile");
-		if (vol->dev->d_ops->sync(vol->dev) == -1)
-			perr_exit("Failed to sync device");
-	}
+	printf("Schedule chkdsk for NTFS consistency check at Windows boot "
+			"time ...\n");
+	vol->flags |= VOLUME_IS_DIRTY;
+	if (ntfs_volume_write_flags(vol, vol->flags))
+		perr_exit("Failed to set the volume dirty");
+	NVolSetWasDirty(vol);
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
+		perr_exit("Failed to sync device");
+	printf("Resetting $LogFile ... (this might take a while)\n");
+	if (ntfs_logfile_reset(vol))
+		perr_exit("Failed to reset $LogFile");
+	if (vol->dev->d_ops->sync(vol->dev) == -1)
+		perr_exit("Failed to sync device");
 }
 
 static void set_disk_usage_constraint(ntfs_resize_t *resize)
