@@ -60,10 +60,7 @@ typedef enum {
 	NTFS_MNT_NOATIME 	= 2,
 	NTFS_MNT_CASE_SENSITIVE	= 4,
 	NTFS_MNT_NOT_EXCLUSIVE	= 8,
-	NTFS_MNT_FORENSIC	= 16, /* Mount for forensic purposes, i.e. do
-					 not do any writing at all during the
-					 mount, i.e. no journal emptying, no
-					 dirty bit setting, etc. */
+	NTFS_MNT_FORENSIC	= 16,
 } ntfs_mount_flags;
 
 /**

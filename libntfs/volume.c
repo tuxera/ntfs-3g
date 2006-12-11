@@ -763,6 +763,9 @@ out:
  *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
  *				  they are not in POSIX namespace
  *	NTFS_MNT_NOT_EXCLUSIVE	- (unix only) do not open volume exclusively
+ *	NTFS_MNT_FORENSIC	- mount for forensic purposes, i.e. do not do
+ *				  any writing at all during the mount, i.e. no
+ *				  journal emptying, no dirty bit setting, etc.
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1175,14 +1178,8 @@ error_exit:
  * This function mounts an ntfs volume. @name should contain the name of the
  * device/file to mount as the ntfs volume.
  *
- * @flags is an optional second parameter. Some flags are similar to flags used
- * as for the mount system call (man 2 mount). Currently the following flags
- * are implemented:
- *	NTFS_MNT_RDONLY		- mount volume read-only
- *	NTFS_MNT_NOATIME	- do not update access time
- *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
- *				  they are not in POSIX namespace
- *	NTFS_MNT_NOT_EXCLUSIVE	- (unix only) do not open volume exclusively
+ * @flags is an optional second parameter. See ntfs_device_mount comment for
+ * description.
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
