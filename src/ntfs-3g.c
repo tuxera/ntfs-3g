@@ -133,6 +133,11 @@ static char def_opts[] = "silent,allow_other,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 
+static const char *locale_msg =
+"WARNING: Couldn't set locale to '%s' thus some file names may not\n"
+"         be correct or visible. Please see the potential solution at\n"
+"         http://www.ntfs-3g.org/support.html#locale\n";
+
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
 	/* Mark information about free MFT record and clusters outdated. */
@@ -1738,9 +1743,7 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			if (!setlocale(LC_ALL, val))
-				ntfs_log_error("Couldn't set locale to %s thus "
-						"you may not see properly or "
-						"at all some files.\n", val);
+				ntfs_log_error(locale_msg, val);
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (!val) {
 				ntfs_log_error("'streams_interface' option "
