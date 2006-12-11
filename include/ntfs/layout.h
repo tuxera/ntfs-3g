@@ -2111,14 +2111,10 @@ typedef struct {
 					   this must be COLLATION_FILE_NAME. */
 	u32 index_block_size;		/* Size of each index block in bytes (in
 					   the index allocation attribute). */
-	s8 clusters_per_index_block;	/* Cluster size of each index block (in
+	u8 clusters_per_index_block;	/* Cluster size of each index block (in
 					   the index allocation attribute), when
 					   an index block is >= than a cluster,
-					   otherwise this will be the -log of
-					   the size (like how the encoding of
-					   the mft record size and the index
-					   record size found in the boot sector
-					   work). Has to be a power of 2. */
+					   otherwise sectors per index block. */
 	u8 reserved[3];			/* Reserved/align to 8-byte boundary. */
 	INDEX_HEADER index;		/* Index header describing the
 					   following index entries. */
