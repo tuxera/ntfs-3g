@@ -97,15 +97,15 @@ static const char *hibernated_volume_msg =
 "off properly, so mounting could be done safely.\n";
 
 static const char *unclean_journal_msg =
-"Mount is denied because the NTFS journal file is unclean. Choices are:\n"
-" A) Shutdown Windows properly.\n"
-" B) Click the 'Safely Remove Hardware' icon in the Windows taskbar\n"
-"    notification area before disconnecting the device.\n"
-" C) Use 'Eject' from Windows Explorer to safely remove the device.\n"
-" D) If you ran chkdsk previously then boot Windows again which will\n"
-"    automatically initialize the journal.\n"
-" E) Run 'ntfsfix' on Linux which will reset the NTFS journal.\n"
-" F) Mount the volume read-only by using the 'ro' mount option.\n";
+"Mount is denied because NTFS is unclean. Choose one of these actions:\n"
+"   Boot Windows and shutdown it cleanly, or if you have a removable\n"
+"   device then click the 'Safely Remove Hardware' icon in the Windows\n"
+"   taskbar notification area before disconnecting it.\n"
+"Or\n"
+"   Run 'ntfsfix' on Linux unless you have Vista, then mount NTFS with\n"
+"   the 'force' option read-write, or with the 'ro' option read-only.\n"
+"Or\n"
+"   Mount the NTFS volume with the 'ro' option in read-only mode.\n";
 
 static const char *opened_volume_msg =
 "Mount is denied because the NTFS volume is already exclusively opened.\n"
