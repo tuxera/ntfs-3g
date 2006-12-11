@@ -15,7 +15,7 @@ bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsmftalloc
+			  ntfsmftalloc ntfsck
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -83,6 +83,10 @@ ntfscat_LDFLAGS		= $(AM_LFLAGS)
 ntfscp_SOURCES		= ntfscp.c utils.c utils.h
 ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
+
+ntfsck_SOURCES		= ntfsck.c utils.c utils.h
+ntfsck_LDADD		= $(AM_LIBS)
+ntfsck_LDFLAGS		= $(AM_LFLAGS)
 
 if ENABLE_FUSE
 ntfsmount_SOURCES	= ntfsmount.c utils.c utils.h
