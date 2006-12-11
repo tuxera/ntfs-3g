@@ -1980,7 +1980,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	
 	fc = fuse_mount(opts.mnt_point, &margs);
 	if (!fc)
-		ntfs_log_error("Failed to create FUSE mount point.\n");
+		ntfs_log_perror("Failed to create FUSE mount point");
 free_args:
 	fuse_opt_free_args(&margs);
 	return fc;
