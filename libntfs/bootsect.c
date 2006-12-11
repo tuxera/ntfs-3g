@@ -83,7 +83,7 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b,
 
 	/* Check OEMidentifier is "NTFS    " */
 	ntfs_log_debug("Checking OEMid... ");
-	if (b->oem_id != cpu_to_le64(0x202020205346544eULL)) /* "NTFS    " */
+	if (b->oem_id != NTFS_SB_MAGIC) /* "NTFS    " */
 		goto not_ntfs;
 	ntfs_log_debug("OK\n");
 

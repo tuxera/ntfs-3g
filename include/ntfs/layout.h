@@ -27,9 +27,8 @@
 #include "endians.h"
 #include "support.h"
 
-/* The NTFS oem_id */
-#define magicNTFS	const_cpu_to_le64(0x202020205346544e)	/* "NTFS    " */
-#define NTFS_SB_MAGIC	0x5346544e				/* 'NTFS' */
+/* The NTFS oem_id "NTFS    " */
+#define NTFS_SB_MAGIC	const_cpu_to_le64(0x202020205346544eULL)
 
 /*
  * Location of bootsector on partition:
