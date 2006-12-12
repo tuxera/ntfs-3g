@@ -35,6 +35,10 @@
 #include <sys/types.h>
 #endif
 
+#ifdef __CHECKER__
+typedef int __attribute__((__mode__(__DI__))) int64_t;
+#endif
+
 typedef uint8_t  u8;			/* Unsigned types of an exact size */
 typedef uint16_t u16;
 typedef uint32_t u32;
