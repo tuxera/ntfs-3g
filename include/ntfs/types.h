@@ -45,17 +45,23 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
-typedef u16 le16;
-typedef u32 le32;
-typedef u64 le64;
+#ifdef __CHECKER__
+#define __bitwise __attribute__((bitwise))
+#else
+#define __bitwise
+#endif
+
+typedef u16 __bitwise le16;
+typedef u32 __bitwise le32;
+typedef u64 __bitwise le64;
 
 /*
  * Declare sle{16,32,64} to be unsigned because we do not want sign extension
  * on BE architectures.
  */
-typedef u16 sle16;
-typedef u32 sle32;
-typedef u64 sle64;
+typedef u16 __bitwise sle16;
+typedef u32 __bitwise sle32;
+typedef u64 __bitwise sle64;
 
 typedef u16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1

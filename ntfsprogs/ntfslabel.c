@@ -326,7 +326,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 				"allowed. Truncating excess characters.\n",
 				(unsigned)(0x100 / sizeof(ntfschar)));
 		label_len = 0x100;
-		new_label[label_len / sizeof(ntfschar)] = cpu_to_le16(L'\0');
+		new_label[label_len / sizeof(ntfschar)] = 0;
 	}
 	if (a) {
 		if (resize_resident_attribute_value(ctx->mrec, a, label_len)) {

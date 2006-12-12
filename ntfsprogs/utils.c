@@ -441,11 +441,12 @@ ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft)
  * if parent is 5 (/) stop
  * get inode of parent
  */
+#define max_path 20
 int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 {
 	// XXX option: names = posix/win32 or dos
 	// flags: path, filename, or both
-	const int max_path = 20;
+
 
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
@@ -555,6 +556,7 @@ int utils_inode_get_name(ntfs_inode *inode, char *buffer, int bufsize)
 
 	return 1;
 }
+#undef max_path
 
 /**
  * utils_attr_get_name

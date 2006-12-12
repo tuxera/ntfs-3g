@@ -594,29 +594,10 @@ static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
 				   const_cpu_to_le16('.'),
 				   const_cpu_to_le16('\0') };
 
-/*
- * union index_union - Helper for ntfs_readdir().
- */
-typedef union {
-	INDEX_ROOT *ir;
-	INDEX_ALLOCATION *ia;
-} index_union __attribute__((__transparent_union__));
-
-/**
- * enum INDEX_TYPE - Helper for ntfs_readdir().
- */
-typedef enum {
-	INDEX_TYPE_ROOT,	/* index root */
-	INDEX_TYPE_ALLOCATION,	/* index allocation */
-} INDEX_TYPE;
-
 /**
  * ntfs_filldir - ntfs specific filldir method
  * @dir_ni:	ntfs inode of current directory
  * @pos:	current position in directory
- * @ivcn_bits:	log(2) of index vcn size
- * @index_type:	specifies whether @iu is an index root or an index allocation
- * @iu:		index root or index block to which @ie belongs
  * @ie:		current index entry
  * @dirent:	context for filldir callback supplied by the caller
  * @filldir:	filldir callback supplied by the caller
@@ -624,8 +605,7 @@ typedef enum {
  * Pass information specifying the current directory entry @ie to the @filldir
  * callback.
  */
-static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
-		const INDEX_TYPE index_type, index_union iu, INDEX_ENTRY *ie,
+static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, INDEX_ENTRY *ie,
 		void *dirent, ntfs_filldir_t filldir)
 {
 	FILE_NAME_ATTR *fn = &ie->key.file_name;
@@ -633,13 +613,6 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 
 	ntfs_log_trace("Entering.\n");
 
-	/* Advance the position even if going to skip the entry. */
-	if (index_type == INDEX_TYPE_ALLOCATION)
-		*pos = (u8*)ie - (u8*)iu.ia + (sle64_to_cpu(
-				iu.ia->index_block_vcn) << ivcn_bits) +
-				dir_ni->vol->mft_record_size;
-	else /* if (index_type == INDEX_TYPE_ROOT) */
-		*pos = (u8*)ie - (u8*)iu.ir;
 	/* Skip root directory self reference entry. */
 	if (MREF_LE(ie->indexed_file) == FILE_root)
 		return 0;
@@ -770,9 +743,10 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	ia_na = ntfs_attr_open(dir_ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 	if (!ia_na) {
 		if (errno != ENOENT) {
-			ntfs_log_perror("Failed to open index allocation attribute. "
-				"Directory inode 0x%llx is corrupt or bug",
-				(unsigned long long)dir_ni->mft_no);
+			ntfs_log_perror("Failed to open index allocation "
+					"attribute. Directory inode 0x%llx is "
+					"corrupt or bug", (unsigned long long)
+					dir_ni->mft_no);
 			return -1;
 		}
 		i_size = 0;
@@ -877,12 +851,13 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* Skip index root entry if continuing previous readdir. */
 		if (ir_pos > (u8*)ie - (u8*)ir)
 			continue;
+		/* Advance the position even if going to skip the entry. */
+		*pos = (u8*)ie - (u8*)ir;
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
 		 */
-		rc = ntfs_filldir(dir_ni, pos, index_vcn_size_bits,
-				INDEX_TYPE_ROOT, ir, ie, dirent, filldir);
+		rc = ntfs_filldir(dir_ni, pos, ie, dirent, filldir);
 		if (rc) {
 			ntfs_attr_put_search_ctx(ctx);
 			ctx = NULL;
@@ -1035,12 +1010,15 @@ find_next_index_buffer:
 		/* Skip index entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)
 			continue;
+		/* Advance the position even if going to skip the entry. */
+		*pos = (u8*)ie - (u8*)ia + (sle64_to_cpu(
+				ia->index_block_vcn) << index_vcn_size_bits) +
+				dir_ni->vol->mft_record_size;
 		/*
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
 		 */
-		rc = ntfs_filldir(dir_ni, pos, index_vcn_size_bits,
-				INDEX_TYPE_ALLOCATION, ia, ie, dirent, filldir);
+		rc = ntfs_filldir(dir_ni, pos, ie, dirent, filldir);
 		if (rc)
 			goto done;
 	}
