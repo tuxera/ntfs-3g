@@ -72,7 +72,7 @@ struct options {
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
-volatile sig_atomic_t caught_terminate = 0;
+static volatile sig_atomic_t caught_terminate = 0;
 
 /**
  * version - Print version information about the program

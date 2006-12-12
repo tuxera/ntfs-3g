@@ -985,7 +985,7 @@ static void ntfs_dump_attr_security_descriptor(ATTR_RECORD *attr, ntfs_volume *v
 
 	if (attr->non_resident) {
 		/* FIXME: We don't handle fragmented mapping pairs case. */
-		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+		runlist *rl = ntfs_mapping_pairs_decompress(vol, attr, NULL);
 		if (rl) {
 			s64 data_size, bytes_read;
 
@@ -1282,7 +1282,7 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 	}
 
 	if (opts.verbose) {
-		runlist *rl = ntfs_mapping_pairs_decompress(vol, a, 0);
+		runlist *rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 		if (rl) {
 			runlist *rlc = rl;
 			// TODO: Switch this to properly aligned hex...
@@ -1878,7 +1878,7 @@ static void ntfs_dump_attr_ea(ATTR_RECORD *attr, ntfs_volume *vol)
 		if (!opts.verbose)
 			return;
 		/* FIXME: We don't handle fragmented mapping pairs case. */
-		rl = ntfs_mapping_pairs_decompress(vol, attr, 0);
+		rl = ntfs_mapping_pairs_decompress(vol, attr, NULL);
 		if (rl) {
 			s64 bytes_read;
 
