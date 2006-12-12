@@ -125,7 +125,7 @@ static const char *many_bad_sectors_msg =
 "* other reason. We suggest to get a replacement disk as soon as possible. *\n"
 "***************************************************************************\n";
 
-struct {
+static struct {
 	int verbose;
 	int debug;
 	int ro_flag;
@@ -200,7 +200,7 @@ typedef struct {
 
 /* FIXME: This, lcn_bitmap and pos from find_free_cluster() will make a cluster
    allocation related structure, attached to ntfs_resize_t */
-s64 max_free_cluster_range = 0;
+static s64 max_free_cluster_range = 0;
 
 #define NTFS_MBYTE (1000 * 1000)
 

@@ -1,3 +1,5 @@
+#include "boot.h"
+
 /**
  * boot_array - the first 3429 bytes of $Boot
  * The first 3429 bytes of $Boot. The rest is just zero. Total 8192 bytes.

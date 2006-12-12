@@ -95,7 +95,7 @@ static const char *dirty_volume_msg =
 "Volume '%s' is scheduled for a check or it was shutdown \n"
 "uncleanly. Please boot Windows or use the --force option to progress.\n";
 
-struct {
+static struct {
 	int verbose;
 	int quiet;
 	int debug;
@@ -139,19 +139,19 @@ struct ntfs_walk_cluster {
 };
 
 
-ntfs_volume *vol = NULL;
-struct bitmap lcn_bitmap;
+static ntfs_volume *vol = NULL;
+static struct bitmap lcn_bitmap;
 
-int fd_in;
-int fd_out;
-FILE *msg_out = NULL;
+static int fd_in;
+static int fd_out;
+static FILE *msg_out = NULL;
 
-int wipe = 0;
-unsigned int nr_used_mft_records   = 0;
-unsigned int wiped_unused_mft_data = 0;
-unsigned int wiped_unused_mft      = 0;
-unsigned int wiped_resident_data   = 0;
-unsigned int wiped_timestamp_data  = 0;
+static int wipe = 0;
+static unsigned int nr_used_mft_records   = 0;
+static unsigned int wiped_unused_mft_data = 0;
+static unsigned int wiped_unused_mft      = 0;
+static unsigned int wiped_resident_data   = 0;
+static unsigned int wiped_timestamp_data  = 0;
 
 static BOOL image_is_host_endian = FALSE;
 
@@ -176,7 +176,7 @@ static BOOL image_is_host_endian = FALSE;
 #define NTFSCLONE_IMG_VER_MINOR	0
 
 /* All values are in little endian. */
-struct {
+static struct {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
 	u8 minor_ver;
@@ -1406,7 +1406,7 @@ static void mount_volume(unsigned long new_mntflag)
 			  volume_size(vol, vol->nr_clusters));
 }
 
-struct ntfs_walk_cluster backup_clusters = { NULL, NULL };
+static struct ntfs_walk_cluster backup_clusters = { NULL, NULL };
 
 static int device_offset_valid(int fd, s64 ofs)
 {

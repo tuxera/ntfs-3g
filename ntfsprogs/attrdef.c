@@ -1,3 +1,5 @@
+#include "attrdef.h"
+
 /**
  * attrdef_ntfs12_array
  */

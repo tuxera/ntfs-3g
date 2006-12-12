@@ -39,7 +39,7 @@ static const char *hibernated_volume_msg =
 "turned off properly\n";
 
 
-struct {
+static struct {
 	int debug;
 	int show_progress;
 	int verbose;
@@ -309,7 +309,7 @@ static inline s64 get_nr_mft_records(ntfs_volume *vol)
 #define  NTFSCMP_EXTENSION_RECORD		4
 #define  NTFSCMP_INODE_CLOSE_ERROR		5
 
-const char *ntfscmp_errs[] = {
+static const char *ntfscmp_errs[] = {
 	"OK",
 	"INODE_OPEN_ERROR",
 	"INODE_OPEN_IO_ERROR",

@@ -83,7 +83,7 @@ static const char *EXEC_NAME = "ntfsfix";
 static const char *OK        = "OK\n";
 static const char *FAILED    = "FAILED\n";
 
-struct {
+static struct {
 	char *volume;
 } opt;
 
