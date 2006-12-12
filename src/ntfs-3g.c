@@ -138,6 +138,15 @@ static const char *locale_msg =
 "         be correct or visible. Please see the potential solution at\n"
 "         http://www.ntfs-3g.org/support.html#locale\n";
 
+static const char *fuse26_kmod_needed_msg =
+"ERROR: The FUSE kernel module 2.6.x is not available. Either remove the old\n"
+"       FUSE kernel module (use the command 'rmmod fuse') if you have the new\n"
+"       one, or compile the new module from the FUSE-2.6.x source package.\n"
+"       Please see the FUSE README file and the below web page for more help:\n"
+"\n"
+"                  http://www.ntfs-3g.org/support.html#fuse26\n"
+"\n";
+
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
 	/* Mark information about free MFT record and clusters outdated. */
@@ -2013,6 +2022,25 @@ static void set_fuseblk_options(char *parsed_options)
 	strcat(parsed_options, option);
 }
 
+static int has_fuseblk(void)
+{
+	char buf[256];
+	FILE *f = fopen("/proc/filesystems", "r");
+	if (!f) {
+		ntfs_log_perror("Failed to open /proc/filesystems");
+		return 1;
+	}
+	
+	while (fgets(buf, sizeof(buf), f))
+		if (strcmp(buf, "fuseblk\n") == 0) {
+			fclose(f);
+			return 1;
+		}
+	
+	fclose(f);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options;
@@ -2059,6 +2087,9 @@ int main(int argc, char *argv[])
 			fc = try_fuse_mount(parsed_options);
 		}
 		if (!fc) {
+			if (NDevBlock(ctx->vol->dev) && !has_fuseblk())
+				ntfs_log_error(fuse26_kmod_needed_msg);
+			
 			free(parsed_options);
 			ntfs_fuse_destroy();
 			return 5;
