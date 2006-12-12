@@ -239,7 +239,7 @@ static s64 ntfs_device_unix_io_write(struct ntfs_device *dev, const void *buf,
 static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
 		s64 count, s64 offset)
 {
-	return ntfs_pread(dev, offset, count, buf);
+	return pread(DEV_FD(dev), buf, count, offset);
 }
 
 /**
@@ -261,7 +261,7 @@ static s64 ntfs_device_unix_io_pwrite(struct ntfs_device *dev, const void *buf,
 		return -1;
 	}
 	NDevSetDirty(dev);
-	return ntfs_pwrite(dev, offset, count, buf);
+	return pwrite(DEV_FD(dev), buf, count, offset);
 }
 
 /**

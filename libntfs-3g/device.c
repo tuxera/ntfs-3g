@@ -179,22 +179,18 @@ s64 ntfs_pread(struct ntfs_device *dev, const s64 pos, s64 count, void *b)
 	struct ntfs_device_operations *dops;
 
 	ntfs_log_trace("Entering for pos 0x%llx, count 0x%llx.\n", pos, count);
+	
 	if (!b || count < 0 || pos < 0) {
 		errno = EINVAL;
 		return -1;
 	}
 	if (!count)
 		return 0;
+	
 	dops = dev->d_ops;
-	/* Locate to position. */
-	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
-		ntfs_log_perror("ntfs_pread: device seek to 0x%llx returned error",
-				pos);
-		return -1;
-	}
-	/* Read the data. */
+
 	for (total = 0; count; count -= br, total += br) {
-		br = dops->read(dev, (char*)b + total, count);
+		br = dops->pread(dev, (char*)b + total, count, pos + total);
 		/* If everything ok, continue. */
 		if (br > 0)
 			continue;
@@ -244,16 +240,13 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		errno = EROFS;
 		goto out;
 	}
+	
 	dops = dev->d_ops;
-	/* Locate to position. */
-	if (dops->seek(dev, pos, SEEK_SET) == (off_t)-1) {
-		ntfs_log_perror("ntfs_pwrite: seek to 0x%llx returned error",
-				pos);
-		goto out;
-	}
+
 	NDevSetDirty(dev);
 	for (total = 0; count; count -= written, total += written) {
-		written = dops->write(dev, (const char*)b + total, count);
+		written = dops->pwrite(dev, (const char*)b + total, count,
+				       pos + total);
 		/* If everything ok, continue. */
 		if (written > 0)
 			continue;
