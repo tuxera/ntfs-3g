@@ -1,13 +1,10 @@
 Current news
 ============
 
-Older news
-==========
+ntfsmount now has full basic read/write support.
 
-mkntfs now creates NTFS 3.1 (Windows XP) volumes by default.  The old NTFS 1.2
-format is now deprecated and whilst it can still be specified using a command
-line option, it will be removed in a future release.
+ntfsresize (and the entirety of ntfsprogs/libntfs in fact) now have full
+support for Windows Vista.
 
-ntfsmount can create/delete/move files and directories!  It is not a full
-implementation, thus sometimes it will say 'Operation is not supported',
-nothing bad will happen to user data in this case.  (Yura Pakhuchiy)
+mkntfs now creates a DCE compliant GUID for the volume and does a few other
+things to be more compliant with Windows Vista.

@@ -1,4 +1,4 @@
-xx/xx/2006 - x.xx.x - .
+xx/12/2006 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 
 	- ntfsmount now creates files and directories with security descriptor
 	  that grant full access to everyone.  (Yura)
@@ -112,6 +112,9 @@ xx/xx/2006 - x.xx.x - .
 	- mkntfs: Always set default cluster size to 4096 bytes regardless of
 	  volume size.  This is what Windows Vista does and it makes perfect
 	  sense from a performance point of view.  (Anton)
+	- mkntfs: As announced, remove the deprecated support for creation of
+	  NTFS 1.2/3.0 volumes.  We now create NTFS 3.1 volumes only.  (Anton)
+	- mkntfs: Remove lots of unused/unneeded debugging code.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

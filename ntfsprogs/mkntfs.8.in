@@ -45,10 +45,6 @@ mkntfs \- create an NTFS file system
 .B \-n
 ]
 [
-.B \-N
-.I ntfs\-version
-]
-[
 .B \-p
 .I part\-start\-sect
 ]
@@ -123,6 +119,14 @@ Set the volume label for the filesystem.
 \fB\-C\fR, \fB\-\-enable\-compression\fR
 Enable compression on the volume.
 .TP
+\fB\-n\fR, \fB\-\-no\-action\fR
+Causes
+.B mkntfs
+to not actually create a filesystem, but display what it would do if it were
+to create a filesystem. All steps of the format are carried out except the
+actual writing to the device.
+.SS Advanced options
+.TP
 \fB\-c\fR, \fB\-\-cluster\-size\fR BYTES
 Specify the size of clusters in bytes. Valid cluster size values are powers of
 two, with at least 256, and at most 65536 bytes per cluster. If omitted,
@@ -134,22 +138,6 @@ size as a cluster cannot be smaller than a sector. Also, note that values
 greater than 4096 have the side effect that compression is disabled on the
 volume (due to limitations in the NTFS compression algorithm currently in use
 by Windows).
-.TP
-\fB\-N\fR, \fB\-\-ntfs\-version\fR STRING
-Select the version of NTFS you wish to create.  This can be "1.2" 
-(Windows NT 4.0) or "3.1" (Windows XP, Server 2003, and Vista). 
-Versions are upwards compatible and Windows 2000, which uses version "3.0",
-can read/write both.
-
-If this option is omitted then version "3.1" is used.
-.TP
-\fB\-n\fR, \fB\-\-no\-action\fR
-Causes
-.B mkntfs
-to not actually create a filesystem, but display what it would do if it were
-to create a filesystem. All steps of the format are carried out except the
-actual writing to the device.
-.SS Advanced options
 .TP
 \fB\-s\fR, \fB\-\-sector\-size\fR BYTES
 Specify the size of sectors in bytes. Valid sector size values are 256, 512,
