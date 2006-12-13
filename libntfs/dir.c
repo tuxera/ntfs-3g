@@ -596,7 +596,6 @@ static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
 
 /**
  * ntfs_filldir - ntfs specific filldir method
- * @dir_ni:	ntfs inode of current directory
  * @pos:	current position in directory
  * @ie:		current index entry
  * @dirent:	context for filldir callback supplied by the caller
@@ -605,7 +604,7 @@ static const ntfschar dotdot[3] = { const_cpu_to_le16('.'),
  * Pass information specifying the current directory entry @ie to the @filldir
  * callback.
  */
-static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, INDEX_ENTRY *ie,
+static int ntfs_filldir(s64 *pos, INDEX_ENTRY *ie,
 		void *dirent, ntfs_filldir_t filldir)
 {
 	FILE_NAME_ATTR *fn = &ie->key.file_name;
@@ -857,7 +856,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
 		 */
-		rc = ntfs_filldir(dir_ni, pos, ie, dirent, filldir);
+		rc = ntfs_filldir(pos, ie, dirent, filldir);
 		if (rc) {
 			ntfs_attr_put_search_ctx(ctx);
 			ctx = NULL;
@@ -1018,7 +1017,7 @@ find_next_index_buffer:
 		 * Submit the directory entry to ntfs_filldir(), which will
 		 * invoke the filldir() callback as appropriate.
 		 */
-		rc = ntfs_filldir(dir_ni, pos, ie, dirent, filldir);
+		rc = ntfs_filldir(pos, ie, dirent, filldir);
 		if (rc)
 			goto done;
 	}

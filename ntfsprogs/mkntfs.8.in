@@ -127,20 +127,7 @@ Enable compression on the volume.
 Specify the size of clusters in bytes. Valid cluster size values are powers of
 two, with at least 256, and at most 65536 bytes per cluster. If omitted,
 .B mkntfs
-determines the
-.I cluster\-size
-from the volume size. The value is determined as follows:
-.TS
-box;
-lB lB lB
-l l r.
-Volume	size	Default cluster size
-0	\- 512MB	512 bytes
-512MB	\- 1GB	1024 bytes
-1GB	\- 2GB	2048 bytes
-2GB	+	4096 bytes
-.TE
-.sp
+uses 4096 bytes as the default cluster size.
 .sp
 Note that the default cluster size is set to be at least equal to the sector
 size as a cluster cannot be smaller than a sector. Also, note that values
@@ -150,7 +137,7 @@ by Windows).
 .TP
 \fB\-N\fR, \fB\-\-ntfs\-version\fR STRING
 Select the version of NTFS you wish to create.  This can be "1.2" 
-(Windows NT 4.0) or "3.1" (Windows XP, Server 2003 and Vista). 
+(Windows NT 4.0) or "3.1" (Windows XP, Server 2003, and Vista). 
 Versions are upwards compatible and Windows 2000, which uses version "3.0",
 can read/write both.
 

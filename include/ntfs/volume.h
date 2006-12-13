@@ -152,6 +152,8 @@ struct _ntfs_volume {
 	u8 major_ver;		/* Ntfs major version of volume. */
 	u8 minor_ver;		/* Ntfs minor version of volume. */
 	u16 flags;		/* Bit array of VOLUME_* flags. */
+	GUID guid;		/* The volume guid if present (otherwise it is
+				   a NULL guid). */
 
 	u16 sector_size;	/* Byte size of a sector. */
 	u8 sector_size_bits;	/* Log(2) of the byte size of a sector. */

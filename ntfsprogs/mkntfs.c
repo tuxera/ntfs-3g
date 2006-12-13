@@ -81,6 +81,10 @@
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
+#ifdef ENABLE_UUID
+#include <uuid/uuid.h>
+#endif
+
 
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
@@ -2083,6 +2087,34 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	return i;
 }
 
+#ifdef ENABLE_UUID
+
+/**
+ * add_attr_object_id -
+ *
+ * Note we insert only a basic object id which only has the GUID and none of
+ * the extended fields.  This is because we currently only use this function
+ * when creating the object id for the volume.
+ *
+ * Return 0 on success or -errno on error.
+ */
+static int add_attr_object_id(MFT_RECORD *m, const GUID *object_id)
+{
+	OBJECT_ID_ATTR oi;
+	int err;
+
+	oi = (OBJECT_ID_ATTR) {
+		.object_id = *object_id,
+	};
+	err = insert_resident_attr_in_mft_record(m, AT_OBJECT_ID, NULL,
+			0, 0, 0, 0, (u8*)&oi, sizeof(oi.object_id));
+	if (err < 0)
+		ntfs_log_error("add_attr_vol_info failed: %s\n", strerror(-err));
+	return err;
+}
+
+#endif
+
 /**
  * add_attr_sd
  *
@@ -2754,9 +2786,8 @@ do_next:
 			idx_entry = (INDEX_ENTRY*)((u8*)idx_entry +
 					le16_to_cpu(idx_entry->length));
 		}
-	} else {
+	} else
 		return -EINVAL;
-	}
 	memmove((u8*)idx_entry + idx_size, (u8*)idx_entry,
 			le32_to_cpu(m->bytes_in_use) -
 			((u8*)idx_entry - (u8*)m));
@@ -3300,6 +3331,56 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 	return 0;
 }
 
+#ifdef ENABLE_UUID
+
+/**
+ * index_obj_id_insert
+ *
+ * Insert an index entry with the key @guid and data pointing to the mft record
+ * @ref in the $O index root of the mft record @m (which must be the mft record
+ * for $ObjId).
+ *
+ * Return 0 on success or -errno on error.
+ */
+static int index_obj_id_insert(MFT_RECORD *m, const GUID *guid,
+		const MFT_REF ref)
+{
+	INDEX_ENTRY *idx_entry_new;
+	int data_ofs, idx_size, err;
+	OBJ_ID_INDEX_DATA *oi;
+
+	/*
+	 * Insert the index entry for the object id in the index.
+	 *
+	 * First determine the size of the index entry to be inserted.  This
+	 * consists of the index entry header, followed by the index key, i.e.
+	 * the GUID, followed by the index data, i.e. OBJ_ID_INDEX_DATA.
+	 */
+	data_ofs = (sizeof(INDEX_ENTRY_HEADER) + sizeof(GUID) + 7) & ~7;
+	idx_size = (data_ofs + sizeof(OBJ_ID_INDEX_DATA) + 7) & ~7;
+	idx_entry_new = ntfs_calloc(idx_size);
+	if (!idx_entry_new)
+		return -errno;
+	idx_entry_new->data_offset = cpu_to_le16(data_ofs);
+	idx_entry_new->data_length = cpu_to_le16(sizeof(OBJ_ID_INDEX_DATA));
+	idx_entry_new->length = cpu_to_le16(idx_size);
+	idx_entry_new->key_length = cpu_to_le16(sizeof(GUID));
+	idx_entry_new->key.object_id = *guid;
+	oi = (OBJ_ID_INDEX_DATA*)((u8*)idx_entry_new + data_ofs);
+	oi->mft_reference = ref;
+	err = insert_index_entry_in_res_dir_index(idx_entry_new, idx_size, m,
+			NTFS_INDEX_O, 2, AT_UNUSED);
+	free(idx_entry_new);
+	if (err < 0) {
+		ntfs_log_error("index_obj_id_insert failed inserting index "
+				"entry: %s\n", strerror(-err));
+		return err;
+	}
+	return 0;
+}
+
+#endif
+
 /**
  * mkntfs_cleanup
  */
@@ -3593,14 +3674,11 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 	ntfs_log_debug("volume size = %llikiB\n", volume_size / 1024);
 	/* If user didn't specify the cluster size, determine it now. */
 	if (!vol->cluster_size) {
-		if (volume_size <= 512LL << 20)		/* <= 512MB */
-			vol->cluster_size = 512;
-		else if (volume_size <= 1LL << 30)	/* ]512MB-1GB] */
-			vol->cluster_size = 1024;
-		else if (volume_size <= 2LL << 30)	/* ]1GB-2GB] */
-			vol->cluster_size = 2048;
-		else
-			vol->cluster_size = 4096;
+		/*
+		 * Windows Vista always uses 4096 bytes as the default cluster
+		 * size regardless of the volume size so we do it, too.
+		 */
+		vol->cluster_size = 4096;
 		/* For small volumes on devices with large sector sizes. */
 		if (vol->cluster_size < (u32)opts.sector_size)
 			vol->cluster_size = opts.sector_size;
@@ -4192,11 +4270,16 @@ static BOOL mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 	return TRUE;
 }
 
-
 /**
  * create_file_volume -
  */
-static BOOL create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
+static BOOL create_file_volume(MFT_RECORD *m, MFT_REF root_ref,
+		VOLUME_FLAGS fl
+		, const GUID *volume_guid
+#ifndef ENABLE_UUID
+		__attribute__((unused))
+#endif
+		)
 {
 	int i, err;
 	u8 *sd;
@@ -4216,14 +4299,21 @@ static BOOL create_file_volume(MFT_RECORD *m, MFT_REF root_ref, VOLUME_FLAGS fl)
 	if (!err)
 		err = add_attr_vol_name(m, g_vol->vol_name, g_vol->vol_name ?
 				strlen(g_vol->vol_name) : 0);
+#ifdef ENABLE_UUID
+	if (!err)
+		err = add_attr_object_id(m, volume_guid);
+#endif
 	if (!err) {
 		if (fl & VOLUME_IS_DIRTY)
-			ntfs_log_quiet("Setting the volume dirty so check disk runs "
-					"on next reboot into Windows.\n");
-		err = add_attr_vol_info(m, fl, g_vol->major_ver, g_vol->minor_ver);
+			ntfs_log_quiet("Setting the volume dirty so check "
+					"disk runs on next reboot into "
+					"Windows.\n");
+		err = add_attr_vol_info(m, fl, g_vol->major_ver,
+				g_vol->minor_ver);
 	}
 	if (err < 0) {
-		ntfs_log_error("Couldn't create $Volume: %s\n", strerror(-err));
+		ntfs_log_error("Couldn't create $Volume: %s\n",
+				strerror(-err));
 		return FALSE;
 	}
 	return TRUE;
@@ -4672,7 +4762,11 @@ static BOOL mkntfs_create_root_structures(void)
 		volume_flags |= VOLUME_IS_DIRTY;
 	}
 	free(bs);
-	if (!create_file_volume(m, root_ref, volume_flags))
+#ifdef ENABLE_UUID
+	/* Generate a GUID for the volume. */
+	uuid_generate((void*)&g_vol->guid);
+#endif
+	if (!create_file_volume(m, root_ref, volume_flags, &g_vol->guid))
 		return FALSE;
 	ntfs_log_verbose("Creating $BadClus (mft record 8)\n");
 	m = (MFT_RECORD*)(g_buf + 8 * g_vol->mft_record_size);
@@ -4768,7 +4862,7 @@ static BOOL mkntfs_create_root_structures(void)
 		if (!err)
 			err = initialize_secure(buf_sds_init, buf_sds_first_size, m);
 
-		free (buf_sds_init);
+		free(buf_sds_init);
 		buf_sds_init = NULL;
 		if (err < 0) {
 			ntfs_log_error("Couldn't create $Secure: %s\n",
@@ -4882,7 +4976,6 @@ static BOOL mkntfs_create_root_structures(void)
 			ntfs_log_error("Couldn't create $Quota: %s\n", strerror(-err));
 			return FALSE;
 		}
-
 		ntfs_log_verbose("Creating $ObjId (mft record 25)\n");
 		m = (MFT_RECORD*)(g_buf + 25 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;
@@ -4897,12 +4990,18 @@ static BOOL mkntfs_create_root_structures(void)
 		/* FIXME: This should be IGNORE_CASE */
 		if (!err)
 			err = add_attr_index_root(m, "$O", 2, 0, AT_UNUSED,
-				COLLATION_NTOFS_ULONGS, g_vol->indx_record_size);
+				COLLATION_NTOFS_ULONGS,
+				g_vol->indx_record_size);
+#ifdef ENABLE_UUID
+		if (!err)
+			err = index_obj_id_insert(m, &g_vol->guid,
+					MK_LE_MREF(FILE_Volume, FILE_Volume));
+#endif
 		if (err < 0) {
-			ntfs_log_error("Couldn't create $ObjId: %s\n", strerror(-err));
+			ntfs_log_error("Couldn't create $ObjId: %s\n",
+					strerror(-err));
 			return FALSE;
 		}
-
 		ntfs_log_verbose("Creating $Reparse (mft record 26)\n");
 		m = (MFT_RECORD*)(g_buf + 26 * g_vol->mft_record_size);
 		m->flags |= MFT_RECORD_IS_4;

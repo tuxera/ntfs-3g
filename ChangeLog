@@ -106,6 +106,12 @@ xx/xx/2006 - x.xx.x - .
 	  Adapt unix_io pread()/pwrite() device operations to use pread()/
 	  pwrite() system call and adapt win32_io device operations to not
 	  supply pread()/pwrite().  (Csaba Henk, Anton)
+	- mkntfs: Generate a random DCE compliant UUID for the created volume
+	  and include --with-uuid[=PFX] and --without-uuid options.  (Anton)
+	- configure.ac: Set language to C.  (Anton)
+	- mkntfs: Always set default cluster size to 4096 bytes regardless of
+	  volume size.  This is what Windows Vista does and it makes perfect
+	  sense from a performance point of view.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

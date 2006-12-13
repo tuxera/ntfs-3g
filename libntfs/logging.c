@@ -71,18 +71,20 @@ struct ntfs_logging {
 /**
  * ntfs_log - This struct controls all the logging in the library and tools.
  */
-static struct ntfs_logging ntfs_log = {
+static struct ntfs_logging ntfs_log = (struct ntfs_logging) {
+	.levels = NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET |
+			NTFS_LOG_LEVEL_WARNING | NTFS_LOG_LEVEL_ERROR |
+			NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
+			NTFS_LOG_LEVEL_PROGRESS |
 #ifdef DEBUG
-	NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
+			NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
 #endif
-	NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_WARNING |
-	NTFS_LOG_LEVEL_ERROR | NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
-	NTFS_LOG_LEVEL_PROGRESS,
-	NTFS_LOG_FLAG_ONLYNAME,
+			0,
+	.flags = NTFS_LOG_FLAG_ONLYNAME,
 #ifdef DEBUG
-	ntfs_log_handler_outerr
+	.handler = ntfs_log_handler_outerr,
 #else
-	ntfs_log_handler_null
+	.handler = ntfs_log_handler_null,
 #endif
 };
 
@@ -343,8 +345,10 @@ int ntfs_log_redirect(const char *function, const char *file,
 
 #ifdef HAVE_SYSLOG_H
 int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
-	const char *file, __attribute__((unused)) int line, u32 level,
-	void *data __attribute__((unused)), const char *format, va_list args)
+		const char *file, int line __attribute__((unused)),
+		u32 level __attribute__((unused)),
+		void *data __attribute__((unused)), const char *format,
+		va_list args)
 {
 	int ret = 0;
 	int olderr = errno;

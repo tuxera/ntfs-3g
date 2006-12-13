@@ -4,6 +4,7 @@ Makefile
 Makefile.in
 mkntfs
 ntfscat
+ntfsck
 ntfsclone
 ntfscluster
 ntfscmp

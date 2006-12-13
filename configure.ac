@@ -53,6 +53,7 @@ AC_INIT([ntfsprogs],[1.13.2-WIP],[linux-ntfs-dev@lists.sourceforge.net])
 LTVERSION_LIBNTFS="10:0:0"
 AC_SUBST(LTVERSION_LIBNTFS)
 
+AC_LANG([C])
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
 AC_CONFIG_SRCDIR([config.h.in])
@@ -241,6 +242,42 @@ all_includes="$all_includes $USER_INCLUDES"
 AC_SUBST(all_includes)
 AC_SUBST(all_libraries)
 
+# Specify support for generating DCE compliant UUIDs (aka GUIDs).  We check if
+# uuid/uuid.h header is present and the uuid library is present that goes with
+# it and then check if uuid_generate() is present and usable.
+#
+# DCE UUIDs are enabled by default and can be disabled with the --disable-uuid
+# option to the configure script.
+AC_ARG_WITH(uuid, [
+  --with-uuid@<:@=PFX@:>@       generate DCE compliant UUIDs, with optional prefix
+                          to uuid library and headers @<:@default=detect@:>@
+  --without-uuid          do not generate DCE compliant UUIDs],
+	if test "$with_uuid" = "yes"; then
+		extrapath=default
+	elif test "$with_uuid" = "no"; then
+		extrapath=
+	else
+		extrapath=$with_uuid
+	fi,
+	extrapath=default
+)
+if test "x$extrapath" != "x"; then
+	if test "x$extrapath" != "xdefault"; then
+		MKNTFS_CPPFLAGS="$MKNTFS_CPPFLAGS -I$extrapath/include"
+		MKNTFS_LIBS="$MKNTFS_LIBS -L$extrapath/lib"
+	fi
+	AC_CHECK_HEADER([uuid/uuid.h],
+		AC_CHECK_LIB([uuid], [uuid_generate],
+			AC_DEFINE([ENABLE_UUID], 1,
+			[Define this to 1 if you want to enable generation of
+			DCE compliant UUIDs.])
+			MKNTFS_LIBS="$MKNTFS_LIBS -luuid",
+			AC_MSG_WARN([Linux-NTFS DCE compliant UUID generation code requires the uuid library.]),
+		),
+		AC_MSG_WARN([Linux-NTFS DCE compliant UUID generation code requires the uuid library.]),
+	)
+fi
+
 # Get compiler name
 if test ! -z "$CC"; then
 	_cc="$CC"
@@ -291,6 +328,9 @@ AC_SUBST(LIBS)
 AC_SUBST(LIBNTFS_CFLAGS)
 AC_SUBST(LIBNTFS_GNOMEVFS_CFLAGS)
 AC_SUBST(LIBNTFS_GNOMEVFS_LIBS)
+
+AC_SUBST(MKNTFS_CPPFLAGS)
+AC_SUBST(MKNTFS_LIBS)
 
 AC_SUBST(AUTODIRS)
 
