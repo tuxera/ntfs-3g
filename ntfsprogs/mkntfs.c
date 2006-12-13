@@ -4299,10 +4299,6 @@ static BOOL create_file_volume(MFT_RECORD *m, MFT_REF root_ref,
 	if (!err)
 		err = add_attr_vol_name(m, g_vol->vol_name, g_vol->vol_name ?
 				strlen(g_vol->vol_name) : 0);
-#ifdef ENABLE_UUID
-	if (!err)
-		err = add_attr_object_id(m, volume_guid);
-#endif
 	if (!err) {
 		if (fl & VOLUME_IS_DIRTY)
 			ntfs_log_quiet("Setting the volume dirty so check "
@@ -4311,6 +4307,10 @@ static BOOL create_file_volume(MFT_RECORD *m, MFT_REF root_ref,
 		err = add_attr_vol_info(m, fl, g_vol->major_ver,
 				g_vol->minor_ver);
 	}
+#ifdef ENABLE_UUID
+	if (!err && g_vol->major_ver >= 3)
+		err = add_attr_object_id(m, volume_guid);
+#endif
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $Volume: %s\n",
 				strerror(-err));
