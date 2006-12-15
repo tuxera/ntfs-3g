@@ -1,7 +1,7 @@
 /*
  * device_io.c - Default device io operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Anton Altaparmakov
+ * Copyright (c) 2003-2006 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -23,16 +23,24 @@
 
 #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 
-#ifndef __CYGWIN32__
-
-/* Not on Cygwin; use standard Unix style low level device operations. */
-#include "unix_io.c"
-
-#else /* __CYGWIN32__ */
+#if defined(__CYGWIN32__)
 
 /* On Cygwin; use Win32 low level device operations. */
 #include "win32_io.c"
 
-#endif /* __CYGWIN32__ */
+#elif defined(__FreeBSD__)
+
+/* On FreeBSD; need to use sector aligned i/o. */
+#include "freebsd_io.c"
+
+#else
+
+/*
+ * Not on Cygwin or FreeBSD; use standard Unix style low level device
+ * operations.
+ */
+#include "unix_io.c"
+
+#endif
 
 #endif /* NO_NTFS_DEVICE_DEFAULT_IO_OPS */

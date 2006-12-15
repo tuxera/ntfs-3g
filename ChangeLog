@@ -115,6 +115,8 @@ xx/12/2006 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- mkntfs: As announced, remove the deprecated support for creation of
 	  NTFS 1.2/3.0 volumes.  We now create NTFS 3.1 volumes only.  (Anton)
 	- mkntfs: Remove lots of unused/unneeded debugging code.  (Anton)
+	- libntfs: Add support for FreeBSD 5.0+ sector aligned access
+	  requirements.  (Max Khon)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

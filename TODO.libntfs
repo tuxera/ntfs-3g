@@ -30,6 +30,9 @@
   previous mount left the block size to larger value and we expect 512 bytes as
   that would be incredibly inefficient
 
+- fix freebsd_io.c and win32_io.c to support device operations ->pread() and
+  ->pwrite() to improve their performance
+
 *******************
 * MEDIUM priority *
 *******************
