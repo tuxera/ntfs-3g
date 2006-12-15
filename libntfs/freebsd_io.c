@@ -1,12 +1,12 @@
 /**
- * freebsd_io.c - FreeBSD disk io functions.  Originated from the Linux-NTFS
- *		  project.
+ * freebsd_io.c - FreeBSD disk io functions. Part of the Linux-NTFS project.
  *
- * FreeBSD 5.0+ does not have character devices and requires 
- * read/writes from/to block devices to be sector aligned.
+ * FreeBSD 5.0+ does not have block devices and requires read/writes from/to
+ * character devices to be sector aligned.
  *
  * Copyright (c) 2006 Max Khon
  * Copyright (c) 2006 Anton Altaparmakov
+ * Copyright (c) 2006 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -177,15 +177,6 @@ static int ntfs_device_freebsd_io_open(struct ntfs_device *dev, int flags)
 	DEV_FD(dev)->block_size = 0;
 	DEV_FD(dev)->media_size = 0;
 
-	/*
-	 * Open file for exclusive access if mounting r/w.
-	 * Fuseblk takes care about block devices.
-	 * FIXME: This is totally wrong.  ntfsmount needs to just disabled the
-	 * O_EXCL otherwise all other utilities are not mounting O_EXCL when
-	 * they definitely should be doing it!
-	 */
-	if (!NDevBlock(dev) && (flags & O_RDWR) == O_RDWR)
-		flags |= O_EXCL;
 	DEV_FD(dev)->fd = open(dev->d_name, flags);
 	if (DEV_FD(dev)->fd == -1) {
 		err = errno;
