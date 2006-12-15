@@ -44,9 +44,9 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	sd->revision = 1;
 	sd->alignment = 0;
 	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
-	*sd_val_len = 0x68;
+	*sd_val_len = 0x64;
 	sd->owner = const_cpu_to_le32(0x48);
-	sd->group = const_cpu_to_le32(0x58);
+	sd->group = const_cpu_to_le32(0x54);
 	sd->sacl = const_cpu_to_le32(0);
 	sd->dacl = const_cpu_to_le32(0x14);
 	/*
@@ -68,13 +68,12 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	aa_ace->flags = 0;
 	aa_ace->size = const_cpu_to_le16(0x14);
 	switch (sys_file_no) {
-	case FILE_MFT:		case FILE_MFTMirr:	case FILE_LogFile:
-	case FILE_AttrDef:	case FILE_Bitmap:	case FILE_Boot:
-	case FILE_BadClus:	case FILE_UpCase:
+	case FILE_AttrDef:
+	case FILE_Boot:
 		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
 			FILE_READ_ATTRIBUTES | FILE_READ_EA | FILE_READ_DATA;
 		break;
-	case FILE_Volume:	case FILE_Secure:	case 0xb ... 0xffff:
+	default:
 		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_WRITE |
 			FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES |
 			FILE_WRITE_EA | FILE_READ_EA | FILE_APPEND_DATA |
@@ -103,17 +102,15 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	aa_ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	aa_ace->flags = 0;
 	aa_ace->size = const_cpu_to_le16(0x18);
+	/* Only $AttrDef and $Boot behave differently to everything else. */
 	switch (sys_file_no) {
-	case FILE_MFT:		case FILE_MFTMirr:
-	case FILE_LogFile:	case FILE_AttrDef:
-	case FILE_Bitmap:	case FILE_Boot:
-	case FILE_BadClus:	case FILE_UpCase:
+	case FILE_AttrDef:
+	case FILE_Boot:
 		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
 				FILE_READ_ATTRIBUTES | FILE_READ_EA |
 				FILE_READ_DATA;
 		break;
-	case FILE_Volume:	case FILE_Secure:
-	case 0xb ... 0xffff :
+	default:
 		aa_ace->mask = SYNCHRONIZE | STANDARD_RIGHTS_READ |
 				FILE_WRITE_ATTRIBUTES |
 				FILE_READ_ATTRIBUTES | FILE_WRITE_EA |
@@ -134,11 +131,13 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	aa_ace->sid.sub_authority[1] =
 			const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
-	/* Now at offset 0x48 into the security descriptor. */
-	/* As specified in the security descriptor, we now have the owner SID.*/
+	/*
+	 * Now at offset 0x48 into the security descriptor, as specified in the
+	 * security descriptor, we now have the owner SID.
+	 */
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->owner));
 	sid->revision = 1;
-	sid->sub_authority_count = 2;
+	sid->sub_authority_count = 1;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	sid->identifier_authority.value[0] = 0;
 	sid->identifier_authority.value[1] = 0;
@@ -146,12 +145,10 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	sid->identifier_authority.value[3] = 0;
 	sid->identifier_authority.value[4] = 0;
 	sid->identifier_authority.value[5] = 5;
-	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	sid->sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_LOCAL_SYSTEM_RID);
 	/*
-	 * Now at offset 0x40 or 0x58 (root directory and the other system
-	 * files, respectively) into the security descriptor, as specified in
-	 * the security descriptor, we have the group SID.
+	 * Now at offset 0x54 into the security descriptor, as specified in the
+	 * security descriptor, we have the group SID.
 	 */
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->group));
 	sid->revision = 1;
@@ -168,7 +165,7 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 }
 
 /**
- * init_root_sd_31 (ERSO)
+ * init_root_sd_31
  *
  * creates the security_descriptor for the root folder on ntfs 3.1.
  * It is very long; lots of ACE's at first, then large pieces of zeroes;
@@ -185,8 +182,8 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	ACCESS_ALLOWED_ACE *ace;
 	SID *sid;
 
-	static char sd_array[0x1030];
-	*sd_val_len = 0x1030;
+	static char sd_array[0x102c];
+	*sd_val_len = 0x102c;
 	*sd_val = (u8*)&sd_array;
 
 	//security descriptor relative
@@ -195,7 +192,7 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	sd->alignment = 0x00;
 	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
 	sd->owner = const_cpu_to_le32(0x1014);
-	sd->group = const_cpu_to_le32(0x1024);
+	sd->group = const_cpu_to_le32(0x1020);
 	sd->sacl = const_cpu_to_le32(0x00);
 	sd->dacl = const_cpu_to_le32(0x14);
 
@@ -349,7 +346,7 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	//owner sid
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->owner));
 	sid->revision = 0x01;
-	sid->sub_authority_count = 0x02;
+	sid->sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	sid->identifier_authority.value[0] = 0;
 	sid->identifier_authority.value[1] = 0;
@@ -357,8 +354,7 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	sid->identifier_authority.value[3] = 0;
 	sid->identifier_authority.value[4] = 0;
 	sid->identifier_authority.value[5] = 5;
-	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	sid->sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_LOCAL_SYSTEM_RID);
 
 	//group sid
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->group));

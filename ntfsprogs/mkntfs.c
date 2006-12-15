@@ -1548,7 +1548,10 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->length = cpu_to_le32(asize);
 	a->non_resident = 0;
 	a->name_length = name_len;
-	a->name_offset = const_cpu_to_le16(24);
+	if (type == AT_OBJECT_ID)
+		a->name_offset = const_cpu_to_le16(0);
+	else
+		a->name_offset = const_cpu_to_le16(24);
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
