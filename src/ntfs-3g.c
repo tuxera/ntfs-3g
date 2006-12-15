@@ -2032,7 +2032,7 @@ static int has_fuseblk(void)
 	}
 	
 	while (fgets(buf, sizeof(buf), f))
-		if (strcmp(buf, "fuseblk\n") == 0) {
+		if (strstr(buf, "fuseblk\n")) {
 			fclose(f);
 			return 1;
 		}
