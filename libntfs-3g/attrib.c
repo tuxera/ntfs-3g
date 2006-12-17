@@ -942,20 +942,17 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 
 	to_write = min(count, ((*rl)->length << vol->cluster_size_bits) - *ofs);
 	
-	/* Instantiate the hole. */
 	cur_vcn = (*rl)->vcn;
 	from_vcn = (*rl)->vcn + (*ofs >> vol->cluster_size_bits);
-	ntfs_log_trace("Instantiate the hole with vcn 0x%llx.\n", cur_vcn);
-	/*
-	 * Map whole runlist to be able update mapping pairs
-	 * later.
-	 */
+	
+	ntfs_log_trace("count: %lld, cur_vcn: %lld, from: %lld, to: %lld, ofs: "
+		       "%lld\n", count, cur_vcn, from_vcn, to_write, *ofs);
+	 
+	/* Map whole runlist to be able update mapping pairs later. */
 	if (ntfs_attr_map_whole_runlist(na))
 		goto err_out;
-	/*
-	 * Restore @*rl, it probably get lost during runlist
-	 * mapping.
-	 */
+	 
+	/* Restore @*rl, it probably get lost during runlist mapping. */
 	*rl = ntfs_attr_find_vcn(na, cur_vcn);
 	if (!*rl) {
 		ntfs_log_error("Failed to find run after mapping runlist. "
@@ -963,10 +960,8 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 		errno = EIO;
 		goto err_out;
 	}
-	/*
-	 * Search backwards to find the best lcn to start
-	 * seek from.
-	 */
+	
+	/* Search backwards to find the best lcn to start seek from. */
 	rlc = *rl;
 	while (rlc->vcn) {
 		rlc--;
@@ -986,7 +981,7 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 			}
 		}
 	}
-	/* Allocate clusters to instantiate the hole. */
+	
 	rlc = ntfs_cluster_alloc(vol, from_vcn,
 				((*ofs + to_write - 1) >> vol->cluster_size_bits)
 				 + 1 + (*rl)->vcn - from_vcn, 
@@ -995,7 +990,7 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 		ntfs_log_perror("Hole filling cluster allocation failed");
 		goto err_out;
 	}
-	/* Merge runlists. */
+	
 	*rl = ntfs_runlists_merge(na->rl, rlc);
 	if (!*rl) {
 		eo = errno;
@@ -1032,24 +1027,10 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 		goto err_out;
 	}
 	if (*ofs) {
-		/*
-		 * Need to clear region between start of
-		 * @cur_vcn cluster and @*ofs.
-		 */
-		char *buf;
-
-		buf = ntfs_malloc(*ofs);
-		if (!buf)
+		/* Clear non-sparse region from @cur_vcn to @*ofs. */
+		if (ntfs_attr_fill_zero(na, cur_vcn << vol->cluster_size_bits,
+					*ofs))
 			goto err_out;
-		
-		memset(buf, 0, *ofs);
-		if (ntfs_rl_pwrite(vol, na->rl, cur_vcn << vol->cluster_size_bits, 
-				   *ofs, buf) < 0) {
-			ntfs_log_perror("Failed to zero area");
-			free(buf);
-			goto err_out;
-		}
-		free(buf);
 	}
 	if ((*rl)->vcn < cur_vcn) {
 		/*
