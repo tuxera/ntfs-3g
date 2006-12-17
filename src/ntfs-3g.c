@@ -562,8 +562,11 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		return 0;
 	}
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
-			ctx->show_sys_files)
-		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
+			ctx->show_sys_files) {
+		struct stat st = { .st_ino = MREF(mref) };
+		
+		fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
+	}
 	free(filename);
 	return 0;
 }
