@@ -1106,7 +1106,8 @@ rl_err_out:
  *
  * This function will write @count bytes from data buffer @b to the volume @vol
  * scattering the data as specified by the runlist @rl. The write begins at
- * offset @pos into the runlist @rl.
+ * offset @pos into the runlist @rl. If a run is sparse then the related buffer
+ * data is ignored which means that the caller must ensure they are consistent.
  *
  * On success, return the number of successfully written bytes. If this number
  * is lower than @count this means that the write has been interrupted in
@@ -1141,38 +1142,13 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		if (!rl->length)
 			goto rl_err_out;
 		if (rl->lcn < (LCN)0) {
-			s64 t;
-			int cnt;
 
 			if (rl->lcn != (LCN)LCN_HOLE)
 				goto rl_err_out;
-			/*
-			 * It is a hole. Check if the buffer is zero in this
-			 * region and if not abort with error.
-			 */
+			
 			to_write = min(count, (rl->length <<
-					vol->cluster_size_bits) - ofs);
-			written = to_write / sizeof(unsigned long);
-			for (t = 0; t < written; t++) {
-				if (((unsigned long*)b)[t])
-					goto rl_err_out;
-			}
-			cnt = to_write & (sizeof(unsigned long) - 1);
-			if (cnt) {
-				int i;
-				u8 *b2;
-
-				b2 = (u8*)b + (to_write &
-						~(sizeof(unsigned long) - 1));
-				for (i = 0; i < cnt; i++) {
-					if (b2[i])
-						goto rl_err_out;
-				}
-			}
-			/*
-			 * The buffer region is zero, update progress counters
-			 * and proceed with next run.
-			 */
+					       vol->cluster_size_bits) - ofs);
+			
 			total += to_write;
 			count -= to_write;
 			b = (u8*)b + to_write;
