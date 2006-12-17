@@ -895,6 +895,41 @@ rl_err_out:
 	return -1;
 }
 
+static int ntfs_attr_fill_zero(ntfs_attr *na, s64 pos, s64 count)
+{
+	char *buf;
+	s64 written, size, end = pos + count;
+	int ret = -1;
+
+	ntfs_log_trace("pos %lld, count %lld\n", (long long)pos, 
+		       (long long)count);
+	
+	if (!na || pos < 0 || count < 0) {
+		errno = EINVAL;
+		goto err_out;
+	}
+	
+	buf = ntfs_calloc(NTFS_BUF_SIZE);
+	if (!buf)
+		goto err_out;
+	
+	while (pos < end) {
+		size = min(end - pos, NTFS_BUF_SIZE);
+		written = ntfs_rl_pwrite(na->ni->vol, na->rl, pos, size, buf);
+		if (written <= 0) {
+			ntfs_log_perror("Failed to zero space");
+			goto err_free;
+		}
+		pos += written;
+	}
+	
+	ret = 0;
+err_free:	
+	free(buf);
+err_out:
+	return ret;	
+}
+
 static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs, 
 			       runlist_element **rl, VCN *update_from)
 {
@@ -1153,31 +1188,13 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
 				0, NULL, 0, ctx))
 			goto err_out;
+		
 		/* If write starts beyond initialized_size, zero the gap. */
-		if (pos > na->initialized_size) {
-			char *buf;
-
-			buf = ntfs_malloc(NTFS_BUF_SIZE);
-			if (!buf)
+		if (pos > na->initialized_size)
+			if (ntfs_attr_fill_zero(na, na->initialized_size, 
+						pos - na->initialized_size))
 				goto err_out;
 			
-			memset(buf, 0, NTFS_BUF_SIZE);
-			ofs = na->initialized_size;
-			while (ofs < pos) {
-				to_write = min(pos - ofs, NTFS_BUF_SIZE);
-				written = ntfs_rl_pwrite(vol, na->rl, ofs,
-							to_write, buf);
-				if (written <= 0) {
-					ntfs_log_error("Failed to zero space "
-						       "between initialized "
-						       "size and @pos.\n");
-					free(buf);
-					goto err_out;
-				}
-				ofs += written;
-			}
-			free(buf);
-		}
 		ctx->attr->initialized_size = cpu_to_sle64(pos + count);
 		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
