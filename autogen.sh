@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/usr/bin/env bash
 # Run this to generate configure, Makefile.in's, etc
 
 if test "$srcdir" == ""; then
