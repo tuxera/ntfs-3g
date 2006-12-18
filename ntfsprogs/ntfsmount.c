@@ -165,8 +165,10 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, long nr_free)
 					nr_free--;
 	}
 	free(buf);
-	if (!total || br < 0)
+	if (!total || br < 0) {
+		ntfs_log_error("pread: %s\n", strerror(errno));
 		return -errno;
+	}
 	ctx->free_mft = nr_free;
 	ctx->state &= ~(NF_FreeMFTOutdate);
 	return nr_free;
@@ -197,8 +199,10 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 					nr_free--;
 	}
 	free(buf);
-	if (!total || br < 0)
+	if (!total || br < 0) {
+		ntfs_log_error("pread: %s\n", strerror(errno));
 		return -errno;
+	}
 	ctx->free_clusters = nr_free;
 	ctx->state &= ~(NF_FreeClustersOutdate);
 	return nr_free;
