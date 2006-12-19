@@ -3,7 +3,7 @@
 #include "sd.h"
 
 /**
- * init_system_file_sd
+ * init_system_file_sd -
  *
  * NTFS 3.1 - System files security decriptors
  * =====================================================
@@ -11,15 +11,8 @@
  * Create the security descriptor for system file number @sys_file_no and
  * return a pointer to the descriptor.
  *
- * $MFT, $MFTMirr, $LogFile, $AttrDef, $Bitmap, $Boot, $BadClus, and $UpCase
- * are the same.
- *
- * $Volume, $Quota, and system files 0xb-0xf are the same. They are almost the
- * same as the above, the only difference being that the two SIDs present in
- * the DACL grant GENERIC_WRITE and GENERIC_READ equivalent privileges while
- * the above only grant GENERIC_READ equivalent privileges.
- *
- * Root directory system file (".") is different altogether.
+ * Note the root directory system file (".") is very different and handled by a
+ * different function.
  *
  * The sd is returned in *@sd_val and has length *@sd_val_len.
  *
@@ -165,17 +158,14 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 }
 
 /**
- * init_root_sd_31
+ * init_root_sd -
  *
- * creates the security_descriptor for the root folder on ntfs 3.1.
- * It is very long; lots of ACE's at first, then large pieces of zeroes;
- * the owner user/group is near the end. On a partition created with
- * w2k3 the owner user/group at the end is surrounded by 'garbage', which I
- * yet do not understand. Here I have replaced the 'garbage' with
- * zeros, which seems to work. Chkdsk does not add the 'garbage', nor alter
- * this security descriptor in any way.
+ * Creates the security_descriptor for the root folder on ntfs 3.1 as created
+ * by Windows Vista (when the format is done from the disk management MMC
+ * snap-in, note this is different from the format done from the disk
+ * properties in Windows Explorer).
  */
-void init_root_sd_31(u8 **sd_val, int *sd_val_len)
+void init_root_sd(u8 **sd_val, int *sd_val_len)
 {
 	SECURITY_DESCRIPTOR_RELATIVE *sd;
 	ACL *acl;
@@ -188,34 +178,33 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 
 	//security descriptor relative
 	sd = (SECURITY_DESCRIPTOR_RELATIVE*)sd_array;
-	sd->revision = 0x01;
-	sd->alignment = 0x00;
+	sd->revision = SECURITY_DESCRIPTOR_REVISION;
+	sd->alignment = 0;
 	sd->control = SE_SELF_RELATIVE | SE_DACL_PRESENT;
 	sd->owner = const_cpu_to_le32(0x1014);
 	sd->group = const_cpu_to_le32(0x1020);
-	sd->sacl = const_cpu_to_le32(0x00);
-	sd->dacl = const_cpu_to_le32(0x14);
+	sd->sacl = 0;
+	sd->dacl = const_cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 
 	//acl
 	acl = (ACL*)((u8*)sd + sizeof(SECURITY_DESCRIPTOR_RELATIVE));
-	acl->revision = 0x02;
-	acl->alignment1 = 0x00;
+	acl->revision = ACL_REVISION;
+	acl->alignment1 = 0;
 	acl->size = const_cpu_to_le16(0x1000);
-	acl->ace_count = const_cpu_to_le16(0x07);
-	acl->alignment2 = const_cpu_to_le16(0x00);
+	acl->ace_count = const_cpu_to_le16(0x08);
+	acl->alignment2 = 0;
 
 	//ace1
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)acl + sizeof(ACL));
-	ace->type = 0x00;
-	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x18);
 	ace->mask = STANDARD_RIGHTS_ALL | FILE_WRITE_ATTRIBUTES |
 			 FILE_LIST_DIRECTORY | FILE_WRITE_DATA |
 			 FILE_ADD_SUBDIRECTORY | FILE_READ_EA | FILE_WRITE_EA |
 			 FILE_TRAVERSE | FILE_DELETE_CHILD |
 			 FILE_READ_ATTRIBUTES;
-
-	ace->sid.revision = 0x01;
+	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
@@ -230,15 +219,35 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 
 	//ace2
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
-	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
+			INHERIT_ONLY_ACE;
+	ace->size = const_cpu_to_le16(0x18);
+	ace->mask = GENERIC_ALL;
+	ace->sid.revision = SID_REVISION;
+	ace->sid.sub_authority_count = 0x02;
+	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
+	ace->sid.identifier_authority.value[0] = 0;
+	ace->sid.identifier_authority.value[1] = 0;
+	ace->sid.identifier_authority.value[2] = 0;
+	ace->sid.identifier_authority.value[3] = 0;
+	ace->sid.identifier_authority.value[4] = 0;
+	ace->sid.identifier_authority.value[5] = 5;
+	ace->sid.sub_authority[0] =
+			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+
+	//ace3
+	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x14);
 	ace->mask = STANDARD_RIGHTS_ALL | FILE_WRITE_ATTRIBUTES |
 			 FILE_LIST_DIRECTORY | FILE_WRITE_DATA |
 			 FILE_ADD_SUBDIRECTORY | FILE_READ_EA | FILE_WRITE_EA |
 			 FILE_TRAVERSE | FILE_DELETE_CHILD |
 			 FILE_READ_ATTRIBUTES;
-	ace->sid.revision = 0x01;
+	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
@@ -250,33 +259,15 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	ace->sid.sub_authority[0] =
 			const_cpu_to_le32(SECURITY_LOCAL_SYSTEM_RID);
 
-	//ace3
+	//ace4
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
 			INHERIT_ONLY_ACE;
 	ace->size = const_cpu_to_le16(0x14);
-	ace->mask = const_cpu_to_le32(0x10000000);
-	ace->sid.revision = 0x01;
+	ace->mask = GENERIC_ALL;
+	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x01;
-	/* SECURITY_CREATOR_SID_AUTHORITY (S-1-3) */
-	ace->sid.identifier_authority.value[0] = 0;
-	ace->sid.identifier_authority.value[1] = 0;
-	ace->sid.identifier_authority.value[2] = 0;
-	ace->sid.identifier_authority.value[3] = 0;
-	ace->sid.identifier_authority.value[4] = 0;
-	ace->sid.identifier_authority.value[5] = 3;
-	ace->sid.sub_authority[0] =
-			const_cpu_to_le32(SECURITY_CREATOR_OWNER_RID);
-
-	//ace4
-	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
-	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
-	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = const_cpu_to_le32(0x1200A9);
-	ace->sid.revision = 0x01;
-	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
 	ace->sid.identifier_authority.value[1] = 0;
@@ -285,17 +276,20 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
 	ace->sid.sub_authority[0] =
-			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
+			const_cpu_to_le32(SECURITY_LOCAL_SYSTEM_RID);
 
 	//ace5
 	ace = (ACCESS_ALLOWED_ACE*)((char*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
-	ace->flags = CONTAINER_INHERIT_ACE;
-	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = const_cpu_to_le32(0x04);
-	ace->sid.revision = 0x01;
-	ace->sid.sub_authority_count = 0x02;
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = 0;
+	ace->size = const_cpu_to_le16(0x14);
+	ace->mask = SYNCHRONIZE | READ_CONTROL | DELETE |
+			FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES |
+			FILE_TRAVERSE | FILE_WRITE_EA | FILE_READ_EA |
+			FILE_ADD_SUBDIRECTORY | FILE_ADD_FILE |
+			FILE_LIST_DIRECTORY;
+	ace->sid.revision = SID_REVISION;
+	ace->sid.sub_authority_count = 0x01;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
 	ace->sid.identifier_authority.value[1] = 0;
@@ -304,16 +298,36 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
 	ace->sid.sub_authority[0] =
-			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
+			const_cpu_to_le32(SECURITY_AUTHENTICATED_USER_RID);
 
 	//ace6
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
-	ace->flags = CONTAINER_INHERIT_ACE | INHERIT_ONLY_ACE;
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
+			INHERIT_ONLY_ACE;
+	ace->size = const_cpu_to_le16(0x14);
+	ace->mask = GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE | DELETE;
+	ace->sid.revision = SID_REVISION;
+	ace->sid.sub_authority_count = 0x01;
+	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
+	ace->sid.identifier_authority.value[0] = 0;
+	ace->sid.identifier_authority.value[1] = 0;
+	ace->sid.identifier_authority.value[2] = 0;
+	ace->sid.identifier_authority.value[3] = 0;
+	ace->sid.identifier_authority.value[4] = 0;
+	ace->sid.identifier_authority.value[5] = 5;
+	ace->sid.sub_authority[0] =
+			const_cpu_to_le32(SECURITY_AUTHENTICATED_USER_RID);
+
+	//ace7
+	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = const_cpu_to_le32(0x02);
-	ace->sid.revision = 0x01;
+	ace->mask = 9;
+	ace->mask = SYNCHRONIZE | READ_CONTROL | FILE_READ_ATTRIBUTES |
+			FILE_TRAVERSE | FILE_READ_EA | FILE_LIST_DIRECTORY;
+	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 0x02;
 	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
@@ -326,22 +340,25 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
 
-	//ace7
+	//ace8
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
-	ace->type = 0x00;
-	ace->flags = 0x00;
-	ace->size = const_cpu_to_le16(0x14);
-	ace->mask = const_cpu_to_le32(0x1200A9);
-	ace->sid.revision = 0x01;
-	ace->sid.sub_authority_count = 0x01;
-	/* SECURITY_WORLD_SID_AUTHORITY (S-1-1) */
+	ace->type = ACCESS_ALLOWED_ACE_TYPE;
+	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE |
+			INHERIT_ONLY_ACE;
+	ace->size = const_cpu_to_le16(0x18);
+	ace->mask = GENERIC_READ | GENERIC_EXECUTE;
+	ace->sid.revision = SID_REVISION;
+	ace->sid.sub_authority_count = 0x02;
+	/* SECURITY_NT_SID_AUTHORITY (S-1-5) */
 	ace->sid.identifier_authority.value[0] = 0;
 	ace->sid.identifier_authority.value[1] = 0;
 	ace->sid.identifier_authority.value[2] = 0;
 	ace->sid.identifier_authority.value[3] = 0;
 	ace->sid.identifier_authority.value[4] = 0;
-	ace->sid.identifier_authority.value[5] = 1;
-	ace->sid.sub_authority[0] = const_cpu_to_le32(SECURITY_WORLD_RID);
+	ace->sid.identifier_authority.value[5] = 5;
+	ace->sid.sub_authority[0] =
+			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
 
 	//owner sid
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->owner));
@@ -371,14 +388,14 @@ void init_root_sd_31(u8 **sd_val, int *sd_val_len)
 }
 
 /**
- * init_secure_31(char **r, int size);
+ * init_secure_sds -
  *
  * NTFS 3.1 - System files security decriptors
  * ===========================================
  * Create the security descriptor entries in $SDS data stream like they
  * are in a partition, newly formatted with windows 2003
  */
-void init_secure_31(char *sd_val)
+void init_secure_sds(char *sd_val)
 {
 	SECURITY_DESCRIPTOR_HEADER *sds;
 	SECURITY_DESCRIPTOR_RELATIVE *sd;

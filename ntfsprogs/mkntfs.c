@@ -145,12 +145,12 @@
 #include "utils.h"
 #include "ntfstime.h"
 #include "sd.h"
-#include "upcase.h"
 #include "boot.h"
 #include "attrdef.h"
 #include "version.h"
 #include "logging.h"
 #include "support.h"
+#include "unistr.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #error "No default device io operations!  Cannot build mkntfs.  \
@@ -4065,7 +4065,7 @@ static BOOL mkntfs_create_root_structures(void)
 			FILE_ATTR_I30_INDEX_PRESENT, 0, 0, ".",
 			FILE_NAME_WIN32_AND_DOS);
 	if (!err) {
-		init_root_sd_31(&sd, &i);
+		init_root_sd(&sd, &i);
 		err = add_attr_sd(m, sd, i);
 	}
 	/* FIXME: This should be IGNORE_CASE */
@@ -4349,7 +4349,7 @@ static BOOL mkntfs_create_root_structures(void)
 		buf_sds = ntfs_calloc(buf_sds_size);
 		if (!buf_sds)
 			return FALSE;
-		init_secure_31(buf_sds);
+		init_secure_sds(buf_sds);
 		memcpy(buf_sds + 0x40000, buf_sds, buf_sds_first_size);
 		err = add_attr_data(m, "$SDS", 4, 0, 0, (u8*)buf_sds,
 				buf_sds_size);
@@ -4541,8 +4541,8 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	g_vol->upcase = ntfs_malloc(g_vol->upcase_len * sizeof(ntfschar));
 	if (!g_vol->upcase)
 		goto done;
-
-	init_upcase_table(g_vol->upcase, g_vol->upcase_len * sizeof(ntfschar));
+	ntfs_upcase_table_build(g_vol->upcase,
+			g_vol->upcase_len * sizeof(ntfschar));
 	g_vol->attrdef = ntfs_malloc(sizeof(attrdef_ntfs3x_array));
 	if (!g_vol->attrdef) {
 		ntfs_log_perror("Could not create attrdef structure");

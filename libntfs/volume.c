@@ -436,7 +436,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 			sizeof(ntfschar));
 	if (!vol->upcase)
 		goto error_exit;
-
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
 	if (flags & NTFS_MNT_RDONLY)

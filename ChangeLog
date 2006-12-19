@@ -117,6 +117,14 @@ xx/12/2006 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- mkntfs: Remove lots of unused/unneeded debugging code.  (Anton)
 	- libntfs: Add support for FreeBSD 5.0+ sector aligned access
 	  requirements.  (Max Khon)
+	- mkntfs: Create more Vista like volumes.  We now match the security
+	  descriptor attributes (but not yet the security descriptors stored in
+	  $Secure).  (Anton)
+	- libntfs: Rewrite ntfs_upcase_table_build() to generate a Vista
+	  compatible upcase table ($UpCase).  (Anton)
+	- mkntfs: Remove own generation of upcase table, i.e. delete
+	  ntfsprogs/upcase.[ch] and use ntfs_upcase_table_build() supplied by
+	  libntfs.  (Anton)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
