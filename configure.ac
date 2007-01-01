@@ -85,6 +85,9 @@ linux*)
 	[
 		AC_MSG_ERROR([ntfs-3g requires FUSE >= 2.6.0. Please see http://fuse.sf.net/ or install __all__ FUSE packages (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev) or remove already installed __older__ FUSE.])
 	]);;
+freebsd*)
+	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
+	;;
 *)
 		AC_MSG_ERROR([ntfs-3g can be built only under Linux.])
 	;;
