@@ -47,6 +47,55 @@
 
 #define NTFS_LCNALLOC_BSIZE  512
 
+void ntfs_cluster_set_zone_pos(u8 zone, LCN zone_start, LCN zone_end, 
+			       LCN *zone_pos, LCN tc, LCN bmp_initial_pos)
+{
+	ntfs_log_trace("Before: zone %d = %lld\n", zone, (long long)*zone_pos);
+
+	if (tc >= zone_end) {
+		*zone_pos = zone_start;
+		// FIXME: seems to be bogus and only MFT zone used it
+		if (!zone_end)
+			*zone_pos = 0;
+	} else if ((bmp_initial_pos >= *zone_pos || tc > *zone_pos) && 
+		   tc >= zone_start)
+		*zone_pos = tc;
+
+	ntfs_log_trace("After: zone %d = %lld\n", zone, (long long)*zone_pos);
+}
+
+int ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc, 
+				 LCN bmp_initial_pos)
+{
+	ntfs_log_trace("tc = %lld, zone = %d\n", (long long)tc, zone);
+	
+	switch (zone) {
+	case 1:
+		ntfs_cluster_set_zone_pos(zone, vol->mft_lcn, 
+					  vol->mft_zone_end,
+					  &vol->mft_zone_pos, 
+					  tc, bmp_initial_pos);
+		break;
+	case 2:
+		ntfs_cluster_set_zone_pos(zone, vol->mft_zone_end, 
+					  vol->nr_clusters, 
+					  &vol->data1_zone_pos,
+					  tc, bmp_initial_pos);
+		break;
+	case 4:
+		ntfs_cluster_set_zone_pos(zone, 0, 
+					  vol->mft_zone_start, 
+					  &vol->data2_zone_pos, 
+					  tc, bmp_initial_pos);
+		break;
+	default:
+		ntfs_log_error("Invalid zone: %d\n", zone);
+		return -1;
+	}
+	
+	return 0;
+}
+
 /**
  * ntfs_cluster_alloc - allocate clusters on an ntfs volume
  * @vol:	mounted ntfs volume on which to allocate the clusters
@@ -337,66 +386,13 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			}
 			/* Done? */
 			if (!--clusters) {
-				LCN tc;
-				/*
-				 * Update the current zone position. Positions
-				 * of already scanned zones have been updated
-				 * during the respective zone switches.
-				 */
-				tc = lcn + bmp_pos + 1;
-				ntfs_log_trace("Done. Updating current zone "
-					"position, tc = 0x%llx, search_zone = %i.\n",
-					(long long)tc, search_zone);
-				switch (search_zone) {
-				case 1:
-					ntfs_log_trace("Before checks, vol->mft_zone_pos = 0x%llx.\n",
-							(long long) vol->mft_zone_pos);
-					if (tc >= vol->mft_zone_end) {
-						vol->mft_zone_pos =
-								vol->mft_lcn;
-						if (!vol->mft_zone_end)
-							vol->mft_zone_pos = 0;
-					} else if ((bmp_initial_pos >=
-							vol->mft_zone_pos ||
-							tc > vol->mft_zone_pos)
-							&& tc >= vol->mft_lcn)
-						vol->mft_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->mft_zone_pos = 0x%llx.\n",
-							(long long) vol->mft_zone_pos);
-					break;
-				case 2:
-					ntfs_log_trace("Before checks, vol->data1_zone_pos = 0x%llx.\n",
-							(long long) vol->data1_zone_pos);
-					if (tc >= vol->nr_clusters)
-						vol->data1_zone_pos =
-							     vol->mft_zone_end;
-					else if ((bmp_initial_pos >=
-						    vol->data1_zone_pos ||
-						    tc > vol->data1_zone_pos)
-						    && tc >= vol->mft_zone_end)
-						vol->data1_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->data1_zone_pos = 0x%llx.\n",
-							(long long) vol->data1_zone_pos);
-					break;
-				case 4:
-					ntfs_log_trace("Before checks, vol->data2_zone_pos = 0x%llx.\n",
-							(long long) vol->data2_zone_pos);
-					if (tc >= vol->mft_zone_start)
-						vol->data2_zone_pos = 0;
-					else if (bmp_initial_pos >=
-						      vol->data2_zone_pos ||
-						      tc > vol->data2_zone_pos)
-						vol->data2_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->data2_zone_pos = 0x%llx.\n",
-							(long long) vol->data2_zone_pos);
-					break;
-				default:
+				if (ntfs_cluster_update_zone_pos(vol,
+						search_zone, lcn + bmp_pos + 1,
+						bmp_initial_pos)) {
 					free(rl);
 					free(buf);
-					NTFS_BUG("switch (search_zone) 1");
 					return NULL;
 				}
-				ntfs_log_trace("Going to done_ret.\n");
 				goto done_ret;
 			}
 			lcn++;
@@ -470,31 +466,19 @@ done_zones_check:
 			ntfs_log_trace("Switching zone.\n");
 			/* Now switch to the next zone we haven't done yet. */
 			pass = 1;
+			if (rlpos) {
+				LCN tc;
+					
+				tc = rl[rlpos - 1].lcn + rl[rlpos - 1].length;
+				
+				if (ntfs_cluster_update_zone_pos(vol, 
+						search_zone, tc, bmp_initial_pos))
+					return NULL;
+			}
+			
 			switch (search_zone) {
 			case 1:
-				ntfs_log_trace("Switching from mft zone to data1 "
-						"zone.\n");
-				/* Update mft zone position. */
-				if (rlpos) {
-					LCN tc;
-					ntfs_log_trace("Before checks, vol->mft_zone_pos = 0x%llx.\n",
-							(long long) vol->mft_zone_pos);
-					tc = rl[rlpos - 1].lcn +
-							rl[rlpos - 1].length;
-					if (tc >= vol->mft_zone_end) {
-						vol->mft_zone_pos =
-								vol->mft_lcn;
-						if (!vol->mft_zone_end)
-							vol->mft_zone_pos = 0;
-					} else if ((bmp_initial_pos >=
-							vol->mft_zone_pos ||
-							tc > vol->mft_zone_pos)
-							&& tc >= vol->mft_lcn)
-						vol->mft_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->mft_zone_pos = 0x%llx.\n",
-							(long long) vol->mft_zone_pos);
-				}
-				/* Switch from mft zone to data1 zone. */
+				ntfs_log_trace("Zone switch: mft -> data1\n");
 switch_to_data1_zone:		search_zone = 2;
 				zone_start = bmp_initial_pos =
 						vol->data1_zone_pos;
@@ -508,27 +492,7 @@ switch_to_data1_zone:		search_zone = 2;
 				}
 				break;
 			case 2:
-				ntfs_log_trace("Switching from data1 zone to data2 "
-						"zone.\n");
-				/* Update data1 zone position. */
-				if (rlpos) {
-					LCN tc;
-					ntfs_log_trace("Before checks, vol->data1_zone_pos = 0x%llx.\n",
-							(long long) vol->data1_zone_pos);
-					tc = rl[rlpos - 1].lcn +
-							rl[rlpos - 1].length;
-					if (tc >= vol->nr_clusters)
-						vol->data1_zone_pos =
-							     vol->mft_zone_end;
-					else if ((bmp_initial_pos >=
-						    vol->data1_zone_pos ||
-						    tc > vol->data1_zone_pos)
-						    && tc >= vol->mft_zone_end)
-						vol->data1_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->data1_zone_pos = 0x%llx.\n",
-							(long long) vol->data1_zone_pos);
-				}
-				/* Switch from data1 zone to data2 zone. */
+				ntfs_log_trace("Zone switch: data1 -> data2\n");
 				search_zone = 4;
 				zone_start = bmp_initial_pos =
 						vol->data2_zone_pos;
@@ -542,25 +506,7 @@ switch_to_data1_zone:		search_zone = 2;
 				}
 				break;
 			case 4:
-				ntfs_log_debug("Switching from data2 zone to data1 "
-						"zone.\n");
-				/* Update data2 zone position. */
-				if (rlpos) {
-					LCN tc;
-					ntfs_log_trace("Before checks, vol->data2_zone_pos = 0x%llx.\n",
-							(long long) vol->data2_zone_pos);
-					tc = rl[rlpos - 1].lcn +
-							rl[rlpos - 1].length;
-					if (tc >= vol->mft_zone_start)
-						vol->data2_zone_pos = 0;
-					else if (bmp_initial_pos >=
-						      vol->data2_zone_pos ||
-						      tc > vol->data2_zone_pos)
-						vol->data2_zone_pos = tc;
-					ntfs_log_trace("After checks, vol->data2_zone_pos = 0x%llx.\n",
-							(long long) vol->data2_zone_pos);
-				}
-				/* Switch from data2 zone to data1 zone. */
+				ntfs_log_trace("Zone switch: data2 -> data1\n");
 				goto switch_to_data1_zone; /* See above. */
 			default:
 				NTFS_BUG("switch (search_zone) 3");
