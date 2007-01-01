@@ -977,6 +977,8 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 			rlc++;
 			if (rlc->lcn >= 0) {
 				lcn_seek_from = rlc->lcn - (rlc->vcn - from_vcn);
+				if (lcn_seek_from < -1)
+					lcn_seek_from = -1;
 				break;
 			}
 		}
