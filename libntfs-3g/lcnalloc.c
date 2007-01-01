@@ -45,6 +45,8 @@
 #include "logging.h"
 #include "misc.h"
 
+#define NTFS_LCNALLOC_BSIZE  512
+
 /**
  * ntfs_cluster_alloc - allocate clusters on an ntfs volume
  * @vol:	mounted ntfs volume on which to allocate the clusters
@@ -75,7 +77,7 @@
  *
  * This is not the prettiest function but the complexity stems from the need of
  * implementing the mft vs data zoned approach and from the fact that we have
- * access to the lcn bitmap in portions of up to 8192 bytes at a time, so we
+ * access to the lcn bitmap via up to NTFS_LCNALLOC_BSIZE bytes at a time, so we
  * need to cope with crossing over boundaries of two buffers. Further, the fact
  * that the allocator allows for caller supplied hints as to the location of
  * where allocation should begin and the fact that the allocator keeps track of
@@ -134,7 +136,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	}
 
 	/* Allocate memory. */
-	buf = ntfs_malloc(8192);
+	buf = ntfs_malloc(NTFS_LCNALLOC_BSIZE);
 	if (!buf)
 		return NULL;
 	/*
@@ -222,7 +224,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 		/* Loop until we run out of free clusters. */
 		last_read_pos = bmp_pos >> 3;
 		ntfs_log_trace("last_read_pos = 0x%llx.\n", (long long)last_read_pos);
-		br = ntfs_attr_pread(vol->lcnbmp_na, last_read_pos, 8192, buf);
+		br = ntfs_attr_pread(vol->lcnbmp_na, last_read_pos, NTFS_LCNALLOC_BSIZE, buf);
 		if (br <= 0) {
 			if (!br) {
 				/* Reached end of attribute. */
@@ -235,7 +237,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			goto err_ret;
 		}
 		/*
-		 * We might have read less than 8192 bytes if we are close to
+		 * We might have read less than NTFS_LCNALLOC_BSIZE bytes if we are close to
 		 * the end of the attribute.
 		 */
 		buf_size = (int)br << 3;
