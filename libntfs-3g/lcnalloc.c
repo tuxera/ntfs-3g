@@ -2,7 +2,7 @@
  * lcnalloc.c - Cluster (de)allocation code. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
- * Copyright (c) 2004-2006 Szabolcs Szakacsits
+ * Copyright (c) 2004-2007 Szabolcs Szakacsits
  * Copyright (c) 2004 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -46,6 +46,8 @@
 #include "misc.h"
 
 #define NTFS_LCNALLOC_BSIZE  512
+
+#define NTFS_LCNALLOC_SKIP  4096
 
 void ntfs_cluster_set_zone_pos(u8 zone, LCN zone_start, LCN zone_end, 
 			       LCN *zone_pos, LCN tc, LCN bmp_initial_pos)
@@ -162,6 +164,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	u8 *buf, *byte;
 	int err = 0, rlpos, rlsize, buf_size;
 	u8 pass, done_zones, search_zone, need_writeback, bit;
+	u8 first_try = 1;
 
 	ntfs_log_trace("Entering with count = 0x%llx, start_lcn = 0x%llx, "
 		       "zone = %s_ZONE.\n", (long long)count, (long long)
@@ -312,6 +315,10 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			if (*byte == 0xff) {
 				lcn = (lcn + 8) & ~7;
 				ntfs_log_trace("continuing while loop 1.\n");
+				if (first_try) {
+					first_try = 0;
+					lcn += NTFS_LCNALLOC_SKIP;
+				}
 				continue;
 			}
 			bit = 1 << (lcn & 7);
@@ -320,6 +327,10 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			if (*byte & bit) {
 				lcn++;
 				ntfs_log_trace("continuing while loop 2.\n");
+				if (first_try) {
+					first_try = 0;
+					lcn += NTFS_LCNALLOC_SKIP;
+				}
 				continue;
 			}
 			/* Reallocate memory if necessary. */
@@ -387,7 +398,8 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			/* Done? */
 			if (!--clusters) {
 				if (ntfs_cluster_update_zone_pos(vol,
-						search_zone, lcn + bmp_pos + 1,
+						search_zone, lcn + bmp_pos + 1 
+							+ NTFS_LCNALLOC_SKIP,
 						bmp_initial_pos)) {
 					free(rl);
 					free(buf);
@@ -469,7 +481,8 @@ done_zones_check:
 			if (rlpos) {
 				LCN tc;
 					
-				tc = rl[rlpos - 1].lcn + rl[rlpos - 1].length;
+				tc = rl[rlpos - 1].lcn + rl[rlpos - 1].length 
+					+ NTFS_LCNALLOC_SKIP;
 				
 				if (ntfs_cluster_update_zone_pos(vol, 
 						search_zone, tc, bmp_initial_pos))
