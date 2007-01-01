@@ -112,6 +112,11 @@ static const char *opened_volume_msg =
 "The volume may be already mounted, or another software may use it which\n"
 "could be identified for example by the help of the 'fuser' command.\n";
 
+static const char *fakeraid_msg =
+"You seem to have a SoftRAID/FakeRAID hardware and must use an activated,\n"
+"different device under /dev/mapper, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
+"to mount NTFS. Please see the 'dmraid' documentation for help.\n";
+
 /**
  * utils_set_locale
  */
@@ -149,6 +154,8 @@ ntfs_volume *utils_mount_volume(const char *volume, unsigned long flags,
 			ntfs_log_error("%s", unclean_journal_msg);
 		else if (errno == EBUSY)
 			ntfs_log_error("%s", opened_volume_msg);
+		else if (errno == ENODEV)
+			ntfs_log_error("%s", fakeraid_msg);
 		
 		return NULL;
 	}
