@@ -114,13 +114,15 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	int err = 0, rlpos, rlsize, buf_size;
 	u8 pass, done_zones, search_zone, need_writeback, bit;
 
-	ntfs_log_trace("Entering with count = 0x%llx, start_lcn = 0x%llx, zone = "
-			"%s_ZONE.\n", (long long)count, (long long)start_lcn,
-			zone == MFT_ZONE ? "MFT" : "DATA");
+	ntfs_log_trace("Entering with count = 0x%llx, start_lcn = 0x%llx, "
+		       "zone = %s_ZONE.\n", (long long)count, (long long)
+		       start_lcn, zone == MFT_ZONE ? "MFT" : "DATA");
 	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
 			(s8)zone < FIRST_ZONE || zone > LAST_ZONE) {
-		ntfs_log_trace("Invalid arguments!\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: vcn: %lld, count: %lld, lcn: %lld", 
+				__FUNCTION__, (long long)start_vcn, 
+				(long long)count, (long long)start_lcn);
 		return NULL;
 	}
 
@@ -233,7 +235,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 				goto zone_pass_done;
 			}
 			err = errno;
-			ntfs_log_trace("ntfs_attr_pread() failed. Aborting.\n");
+			ntfs_log_perror("ntfs_attr_pread() failed");
 			goto err_ret;
 		}
 		/*
@@ -281,8 +283,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 				trl = (runlist*)realloc(rl, rlsize);
 				if (!trl) {
 					err = ENOMEM;
-					ntfs_log_trace("Failed to allocate memory, "
-							"going to wb_err_ret.\n");
+					ntfs_log_perror("Failed to allocate memory");
 					goto wb_err_ret;
 				}
 				rl = trl;
@@ -416,8 +417,8 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 					err = errno;
 				else
 					err = EIO;
-				ntfs_log_trace("Bitmap writeback failed in read next "
-					"buffer code path with error code %i.\n", err);
+				ntfs_log_perror("Bitmap writeback failed in "
+						"read next buffer code path");
 				goto err_ret;
 			}
 		}
@@ -649,8 +650,7 @@ done_ret:
 				err = errno;
 			else
 				err = EIO;
-			ntfs_log_trace("Bitmap writeback failed in done code path "
-					"with error code %i.\n", err);
+			ntfs_log_perror("Bitmap writeback failed");
 			goto err_ret;
 		}
 	}
@@ -660,8 +660,7 @@ done_err_ret:
 	/* Done! */
 	if (!err)
 		return rl;
-	ntfs_log_trace("Failed to allocate clusters. Returning with error code "
-			"%i.\n", err);
+	ntfs_log_perror("Failed to allocate clusters");
 	errno = err;
 	return NULL;
 wb_err_ret:
