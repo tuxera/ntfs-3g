@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Run this to generate configure, Makefile.in's, etc
 
 (autoreconf --version) < /dev/null > /dev/null 2>&1 || {
