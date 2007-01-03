@@ -1,4 +1,4 @@
-xx/12/2006 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
+xx/01/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 
 	- ntfsmount now creates files and directories with security descriptor
 	  that grant full access to everyone.  (Yura)
@@ -125,6 +125,10 @@ xx/12/2006 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- mkntfs: Remove own generation of upcase table, i.e. delete
 	  ntfsprogs/upcase.[ch] and use ntfs_upcase_table_build() supplied by
 	  libntfs.  (Anton)
+	- Upgrade ntfsmount to new FUSE option parsing API.  (Yura)
+	- ntfsmount: Remove "show_sys_files" as potential harmful and
+	  introduce new "case_insensitive" option to support both case
+	  sensitive and insensitive mounts.  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

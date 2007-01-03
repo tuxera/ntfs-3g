@@ -1,10 +1,11 @@
 /**
  * ntfsmount - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2005-2006 Yura Pakhuchiy
- * Copyright (c) 2005 Yuval Fledel
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
+ * Copyright (c)      2005 Yuval Fledel
+ * Copyright (c)      2006 Szabolcs Szakacsits
  *
- * Userspace NTFS driver.
+ * Userspace read/write NTFS driver.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -86,6 +87,9 @@ typedef enum {
 
 typedef struct {
 	ntfs_volume *vol;
+	char *mnt_point;
+	char *device;
+	char *locale;
 	int state;
 	long free_clusters;
 	long free_mft;
@@ -95,12 +99,14 @@ typedef struct {
 	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
 	BOOL ro;
-	BOOL show_sys_files;
 	BOOL silent;
 	BOOL force;
 	BOOL debug;
-	BOOL noatime;
 	BOOL no_detach;
+	BOOL quiet;
+	BOOL verbose;
+	BOOL no_def_opts;
+	BOOL case_insensitive;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -110,18 +116,61 @@ typedef enum {
 						free MFT records is outdated. */
 } ntfs_fuse_state_bits;
 
-static struct options {
-	char	*mnt_point;	/* Mount point */
-	char	*options;	/* Mount options */
-	char	*device;	/* Device to mount */
-	int	 quiet;		/* Less output */
-	int	 verbose;	/* Extra output */
-} opts;
+#define NTFS_FUSE_OPT(t, p) { t, offsetof(ntfs_fuse_context_t, p), TRUE }
+#define NTFS_FUSE_OPT_NEG(t, p) { t, offsetof(ntfs_fuse_context_t, p), FALSE }
+#define NTFS_FUSE_OPT_VAL(t, p, v) { t, offsetof(ntfs_fuse_context_t, p), v }
+
+enum {
+	NF_KEY_HELP,
+	NF_KEY_UMASK,
+};
+
+static const struct fuse_opt ntfs_fuse_opts[] = {
+	NTFS_FUSE_OPT("-v", verbose),
+	NTFS_FUSE_OPT("--verbose", verbose),
+	NTFS_FUSE_OPT("-q", quiet),
+	NTFS_FUSE_OPT("--quiet", quiet),
+	NTFS_FUSE_OPT("force", force),
+	NTFS_FUSE_OPT("silent", silent),
+	NTFS_FUSE_OPT("ro", ro),
+	NTFS_FUSE_OPT("fake_rw", ro),
+	NTFS_FUSE_OPT("debug", debug),
+	NTFS_FUSE_OPT("no_detach", no_detach),
+	NTFS_FUSE_OPT("no_def_opts", no_def_opts),
+	NTFS_FUSE_OPT("case_insensitive", case_insensitive),
+	NTFS_FUSE_OPT("fmask=%o", fmask),
+	NTFS_FUSE_OPT("dmask=%o", dmask),
+	NTFS_FUSE_OPT("umask=%o", fmask),
+	NTFS_FUSE_OPT("uid=%d", uid),
+	NTFS_FUSE_OPT("gid=%d", gid),
+	NTFS_FUSE_OPT("locale=%s", locale),
+	NTFS_FUSE_OPT_NEG("nosilent", silent),
+	NTFS_FUSE_OPT_NEG("rw", ro),
+	NTFS_FUSE_OPT_VAL("streams_interface=none", streams,
+			NF_STREAMS_INTERFACE_NONE),
+	NTFS_FUSE_OPT_VAL("streams_interface=windows", streams,
+			NF_STREAMS_INTERFACE_WINDOWS),
+	NTFS_FUSE_OPT_VAL("streams_interface=xattr", streams,
+			NF_STREAMS_INTERFACE_XATTR),
+	FUSE_OPT_KEY("-h", NF_KEY_HELP),
+	FUSE_OPT_KEY("-?", NF_KEY_HELP),
+	FUSE_OPT_KEY("--help", NF_KEY_HELP),
+	FUSE_OPT_KEY("umask=", NF_KEY_UMASK),
+	FUSE_OPT_KEY("noauto", FUSE_OPT_KEY_DISCARD),
+	FUSE_OPT_KEY("fsname=", FUSE_OPT_KEY_DISCARD),
+	FUSE_OPT_KEY("ro", FUSE_OPT_KEY_KEEP),
+	FUSE_OPT_KEY("rw", FUSE_OPT_KEY_KEEP),
+	FUSE_OPT_END
+};
 
 static const char *EXEC_NAME = "ntfsmount";
-static char def_opts[] = "default_permissions,allow_other,";
+static char ntfs_fuse_default_options[] =
+		"default_permissions,allow_other,use_ino,kernel_cache";
 static ntfs_fuse_context_t *ctx;
 
+/**
+ * ntfs_fuse_mark_free_space_outdated - forces free space recalculation
+ */
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
 	/* Mark information about free MFT record and clusters outdated. */
@@ -522,8 +571,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		free(filename);
 		return 0;
 	}
-	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
-			ctx->show_sys_files)
+	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user)
 		fill_ctx->filler(fill_ctx->buf, filename, NULL, 0);
 	free(filename);
 	return 0;
@@ -1390,13 +1438,15 @@ exit:
 static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
 {
 	if (ctx->vol) {
-		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
+		ntfs_log_info("Unmounting %s (%s)\n", ctx->device,
 				ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to unmount volume");
 	}
+	free(ctx->device);
+	free(ctx->mnt_point);
+	free(ctx->locale);
 	free(ctx);
-	free(opts.device);
 }
 
 static struct fuse_operations ntfs_fuse_oper = {
@@ -1427,247 +1477,23 @@ static struct fuse_operations ntfs_fuse_oper = {
 #endif /* HAVE_SETXATTR */
 };
 
-static int ntfs_fuse_init(void)
-{
-	ctx = ntfs_malloc(sizeof(ntfs_fuse_context_t));
-	if (!ctx)
-		return -1;
-
-	*ctx = (ntfs_fuse_context_t) {
-		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
-		.uid = geteuid(),
-		.gid = getegid(),
-		.fmask = 0111,
-		.dmask = 0,
-		.streams = NF_STREAMS_INTERFACE_NONE,
-	};
-	return 0;
-}
-
-static int ntfs_fuse_mount(const char *device)
-{
-	ntfs_volume *vol;
-
-	vol = utils_mount_volume(device, ((ctx->ro) ? NTFS_MNT_RDONLY : 0) |
-			((ctx->noatime) ? NTFS_MNT_NOATIME : 0) |
-			NTFS_MNT_NOT_EXCLUSIVE /*| NTFS_MNT_CASE_SENSITIVE*/,
-			ctx->force);
-	if (!vol) {
-		ntfs_log_error("Mount failed.\n");
-		return -1;
-	}
-	ctx->vol = vol;
-	return 0;
-}
-
 static void signal_handler(int arg __attribute__((unused)))
 {
 	fuse_exit((fuse_get_context())->fuse);
 }
 
-static char *parse_mount_options(const char *org_options)
-{
-	char *options, *s, *opt, *val, *ret;
-	BOOL no_def_opts = FALSE;
-
-	/*
-	 * +7		for "fsname=".
-	 * +1		for comma.
-	 * +1		for null-terminator.
-	 * +PATH_MAX	for resolved by realpath() device name.
-	 */
-	ret = ntfs_malloc(strlen(def_opts) + strlen(org_options) + PATH_MAX +
-			9);
-	if (!ret)
-		return NULL;
-
-	*ret = 0;
-	options = strdup(org_options);
-	if (!options) {
-		ntfs_log_perror("strdup failed");
-		return NULL;
-	}
-	s = options;
-	while ((val = strsep(&s, ","))) {
-		opt = strsep(&val, "=");
-		if (!strcmp(opt, "ro")) { /* Read-only mount. */
-			if (val) {
-				ntfs_log_error("'ro' option should not have "
-						"value.\n");
-				goto err_exit;
-			}
-			ctx->ro = TRUE;
-			strcat(ret, "ro,");
-		} else if (!strcmp(opt, "noatime")) {
-			if (val) {
-				ntfs_log_error("'noatime' option should not "
-						"have value.\n");
-				goto err_exit;
-			}
-			ctx->noatime = TRUE;
-			strcat(ret, "noatime,"); /* Duplicate it for FUSE. */
-		} else if (!strcmp(opt, "fake_rw")) {
-			if (val) {
-				ntfs_log_error("'fake_rw' option should not "
-						"have value.\n");
-				goto err_exit;
-			}
-			ctx->ro = TRUE;
-		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
-			/*
-			 * We need this to be able to check whether filesystem
-			 * mounted or not.
-			 */
-			ntfs_log_error("'fsname' is unsupported option.\n");
-			goto err_exit;
-		} else if (!strcmp(opt, "no_def_opts")) {
-			if (val) {
-				ntfs_log_error("'no_def_opts' option should "
-						"not have value.\n");
-				goto err_exit;
-			}
-			no_def_opts = TRUE; /* Don't add default options. */
-		} else if (!strcmp(opt, "umask")) {
-			if (!val) {
-				ntfs_log_error("'umask' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			sscanf(val, "%o", &ctx->fmask);
-			ctx->dmask = ctx->fmask;
-		} else if (!strcmp(opt, "fmask")) {
-			if (!val) {
-				ntfs_log_error("'fmask' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			sscanf(val, "%o", &ctx->fmask);
-		} else if (!strcmp(opt, "dmask")) {
-			if (!val) {
-				ntfs_log_error("'dmask' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			sscanf(val, "%o", &ctx->dmask);
-		} else if (!strcmp(opt, "uid")) {
-			if (!val) {
-				ntfs_log_error("'uid' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			sscanf(val, "%i", &ctx->uid);
-		} else if (!strcmp(opt, "gid")) {
-			if (!val) {
-				ntfs_log_error("'gid' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			sscanf(val, "%i", &ctx->gid);
-		} else if (!strcmp(opt, "show_sys_files")) {
-			if (val) {
-				ntfs_log_error("'show_sys_files' option should "
-						"not have value.\n");
-				goto err_exit;
-			}
-			ctx->show_sys_files = TRUE;
-		} else if (!strcmp(opt, "silent")) {
-			if (val) {
-				ntfs_log_error("'silent' option should "
-						"not have value.\n");
-				goto err_exit;
-			}
-			ctx->silent = TRUE;
-		} else if (!strcmp(opt, "force")) {
-			if (val) {
-				ntfs_log_error("'force' option should not "
-						"have value.\n");
-				goto err_exit;
-			}
-			ctx->force = TRUE;
-		} else if (!strcmp(opt, "locale")) {
-			if (!val) {
-				ntfs_log_error("'locale' option should have "
-						"value.\n");
-				goto err_exit;
-			}
-			if (!setlocale(LC_ALL, val))
-				ntfs_log_error("Failed to set locale to %s.  "
-						"Continue anyway.\n", val);
-		} else if (!strcmp(opt, "streams_interface")) {
-			if (!val) {
-				ntfs_log_error("'streams_interface' option "
-						"should have value.\n");
-				goto err_exit;
-			}
-			if (!strcmp(val, "none"))
-				ctx->streams = NF_STREAMS_INTERFACE_NONE;
-			else if (!strcmp(val, "xattr"))
-				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
-			else if (!strcmp(val, "windows"))
-				ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
-			else {
-				ntfs_log_error("Invalid named data streams "
-						"access interface.\n");
-				goto err_exit;
-			}
-		} else if (!strcmp(opt, "noauto")) {
-			/* Don't pass noauto option to fuse. */
-		} else if (!strcmp(opt, "debug")) {
-			if (val) {
-				ntfs_log_error("'debug' option should not have "
-						"value.\n");
-				goto err_exit;
-			}
-			ctx->debug = TRUE;
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
-		} else if (!strcmp(opt, "no_detach")) {
-			if (val) {
-				ntfs_log_error("'no_detach' option should not "
-						"have value.\n");
-				goto err_exit;
-			}
-			ctx->no_detach = TRUE;
-		} else if (!strcmp(opt, "remount")) {
-			ntfs_log_error("Remounting is not supported at present."
-					" You have to umount volume and then "
-					"mount it once again.\n");
-			goto err_exit;
-		} else { /* Probably FUSE option. */
-			strcat(ret, opt);
-			if (val) {
-				strcat(ret, "=");
-				strcat(ret, val);
-			}
-			strcat(ret, ",");
-		}
-	}
-	if (!no_def_opts)
-		strcat(ret, def_opts);
-	strcat(ret, "fsname=");
-	strcat(ret, opts.device);
-exit:
-	free(options);
-	return ret;
-err_exit:
-	free(ret);
-	ret = NULL;
-	goto exit;
-}
-
 static void usage(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - NTFS module for FUSE.\n\n",
-			EXEC_NAME, VERSION, ntfs_libntfs_version());
-	ntfs_log_info("Copyright (C) 2005-2006 Yura Pakhuchiy\n\n");
+	ntfs_log_info("\n%s v%s (libntfs %s) - Userspace read/write NTFS "
+			"driver.\n\n", EXEC_NAME, VERSION,
+			ntfs_libntfs_version());
+	ntfs_log_info("Copyright (c) 2005-2007 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c)      2005 Yuval Fledel\n");
+	ntfs_log_info("Copyright (c)      2006 Szabolcs Szakacsits\n\n");
 	ntfs_log_info("usage:  %s device mount_point [-o options]\n\n",
 			EXEC_NAME);
-	ntfs_log_info("ntfsmount options are:\n\tforce\n\tno_def_opts\n\tumask"
-		"\n\tfmask\n\tdmask\n\tuid\n\tgid\n\tshow_sys_files\n\t"
-		"silent\n\tlocale\n\tstreams_interface\n"
-		"Also look into FUSE documentation about it options "
-		"(NOTE: not all FUSE options are supported by ntfsmount).\n");
-	ntfs_log_info("Default options are: \"%s\".\n\n", def_opts);
+	ntfs_log_info("Default options:\n\t%s\n\n",
+			ntfs_fuse_default_options);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
 
@@ -1681,178 +1507,178 @@ static char *realpath(const char *path, char *resolved_path)
 }
 #endif
 
-/**
- * parse_options - Read and validate the programs command line
- *
- * Read the command line, verify the syntax and parse the options.
- * This function is very long, but quite simple.
- *
- * Return:  1 Success
- *	    0 Error, one or more problems
- */
-static int parse_options(int argc, char *argv[])
+static int ntfs_fuse_init(void)
 {
-	int err = 0, help = 0;
-	int c = -1;
-
-	static const char *sopt = "-o:h?qv";
-	static const struct option lopt[] = {
-		{ "options",	 required_argument,	NULL, 'o' },
-		{ "help",	 no_argument,		NULL, 'h' },
-		{ "quiet",	 no_argument,		NULL, 'q' },
-		{ "verbose",	 no_argument,		NULL, 'v' },
-		{ NULL,		 0,			NULL,  0  }
-	};
-
-	opterr = 0; /* We'll handle the errors, thank you. */
-
-	opts.mnt_point = NULL;
-	opts.options = NULL;
-	opts.device = NULL;
-
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
-		switch (c) {
-		case 1:	/* A non-option argument */
-			if (!opts.device) {
-				opts.device = malloc(PATH_MAX + 1);
-				if (!opts.device) {
-					ntfs_log_perror("malloc");
-					err++;
-					break;
-				}
-				/* We don't want relative path in /etc/mtab. */
-				if (optarg[0] != '/') {
-					if (!realpath(optarg, opts.device)) {
-						ntfs_log_perror("Failed to "
-								"access %s",
-								optarg);
-						free(opts.device);
-						opts.device = NULL;
-						err++;
-						break;
-					}
-				} else
-					strcpy(opts.device, optarg);
-			} else if (!opts.mnt_point)
-				opts.mnt_point = optarg;
-			else {
-				ntfs_log_error("You must specify exactly one "
-						"device and exactly one mount "
-						"point.\n");
-				err++;
-			}
-			break;
-		case 'o':
-			if (!opts.options)
-				opts.options = optarg;
-			else {
-				ntfs_log_error("You must specify exactly one "
-						"set of options.\n");
-				err++;
-			}
-			break;
-		case 'h':
-		case '?':
-			help++;
-			break;
-		case 'q':
-			opts.quiet++;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
-		default:
-			ntfs_log_error("Unknown option '%s'.\n", optarg);
-			err++;
-			break;
-		}
-	}
-
-	if (help) {
-		opts.quiet = 0;
-	} else {
-		if (!opts.device) {
-			ntfs_log_error("No device specified.\n");
-			err++;
-		}
-
-		if (opts.quiet && opts.verbose) {
-			ntfs_log_error("You may not use --quiet and --verbose "
-					"at the same time.\n");
-			err++;
-		}
-	}
-
-	if (help || err)
-		usage();
-
-	return (!help && !err);
-}
-
-int main(int argc, char *argv[])
-{
-	char *parsed_options;
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
-	struct fuse *fh;
-	struct fuse_chan *fch;
-
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	if (!parse_options(argc, argv))
-		return 1;
+	ctx = ntfs_malloc(sizeof(ntfs_fuse_context_t));
+	if (!ctx)
+		return -1;
+
+	*ctx = (ntfs_fuse_context_t) {
+		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
+		.uid = geteuid(),
+		.gid = getegid(),
+		.fmask = 0111,
+		.dmask = 0,
+		.streams = NF_STREAMS_INTERFACE_NONE,
+		.silent = TRUE,
+	};
+	return 0;
+}
+
+static int ntfs_fuse_opt_proc(void *data __attribute__((unused)),
+		const char *arg, int key, struct fuse_args *outargs)
+{
+	switch (key) {
+	case NF_KEY_HELP:
+		return -1; /* Force usage show. */
+	case NF_KEY_UMASK:
+		ctx->dmask = ctx->fmask;
+		return 0;
+	case FUSE_OPT_KEY_NONOPT: /* All non-option arguments go here. */
+		if (!ctx->device) {
+			/* We don't want relative path in /etc/mtab. */
+			if (arg[0] != '/') {
+				ctx->device = ntfs_malloc(PATH_MAX + 1);
+				if (!ctx->device)
+					return -1;
+				if (!realpath(arg, ctx->device)) {
+					ntfs_log_perror("realpath(): %s", arg);
+					free(ctx->device);
+					ctx->device = NULL;
+					return -1;
+				}
+			} else {
+				ctx->device = strdup(arg);
+				if (!ctx->device) {
+					ntfs_log_perror("strdup()");
+					return -1;
+				}
+			}
+			return 0;
+		}
+		if (!ctx->mnt_point) {
+			ctx->mnt_point = strdup(arg);
+			if (!ctx->mnt_point) {
+				ntfs_log_perror("strdup()");
+				return -1;
+			}
+			return 0;
+		}
+		ntfs_log_error("You must specify exactly one device and "
+				"exactly one mount point.\n");
+		return -1;
+	default:
+		if (!strcmp(arg, "remount")) {
+			ntfs_log_error("Remounting is not supported yet. "
+					"You have to umount volume and then "
+					"mount it once again.\n");
+			return -1;
+		}
+		return 1; /* Just pass all unknown to us options to FUSE. */
+	}
+}
+
+static int parse_options(struct fuse_args *args)
+{
+	int ret;
+	char *fsname;
+
+	ret = fuse_opt_parse(args, ctx, ntfs_fuse_opts, ntfs_fuse_opt_proc);
+	if (!ctx->device) {
+		ntfs_log_error("No device specified.\n");
+		return -1;
+	}
+	if (ctx->quiet && ctx->verbose) {
+		ntfs_log_error("You may not use --quiet and --verbose at the "
+				"same time.\n");
+		return -1;
+	}
+	if (ctx->debug) {
+		ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
+		ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
+	}
+	if (ctx->locale && !setlocale(LC_ALL, ctx->locale))
+		ntfs_log_error("Failed to set locale to %s "
+				"(continue anyway).\n", ctx->locale);
+	fsname = ntfs_malloc(strlen(ctx->device) + 64);
+	if (!fsname)
+		return -1;
+	sprintf(fsname, "-ofsname=%s", ctx->device);
+	if (fuse_opt_add_arg(args, fsname) == -1) {
+		free(fsname);
+		return -1;
+	}
+	free(fsname);
+	if (!ctx->no_def_opts) {
+		if (fuse_opt_add_arg(args, "-o") == -1)
+			return -1;
+		if (fuse_opt_add_arg(args, ntfs_fuse_default_options) == -1)
+			return -1;
+	}
+	if (ctx->debug || ctx->no_detach) {
+		if (fuse_opt_add_arg(args, "-odebug") == -1)
+			return -1;
+	}
+	return ret;
+}
+
+static int ntfs_fuse_mount(void)
+{
+	ntfs_volume *vol;
+
+	vol = utils_mount_volume(ctx->device, NTFS_MNT_NOATIME |
+			((ctx->ro) ? NTFS_MNT_RDONLY : 0) |
+			((ctx->case_insensitive) ? 0 :
+			NTFS_MNT_CASE_SENSITIVE) |
+			NTFS_MNT_NOT_EXCLUSIVE /* FIXME */, ctx->force);
+	if (!vol) {
+		ntfs_log_error("Mount failed.\n");
+		return -1;
+	}
+	ctx->vol = vol;
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+	struct fuse *fh;
+	struct fuse_chan *fch;
 
 	ntfs_fuse_init();
-	/* Parse options. */
-	parsed_options = parse_mount_options((opts.options) ?
-			opts.options : "");
-	if (!parsed_options) {
+	if (parse_options(&args) == -1) {
+		usage();
+		fuse_opt_free_args(&args);
 		ntfs_fuse_destroy(NULL);
-		return 3;
+		return 1;
 	}
-
-	/* Mount volume. */
-	if (ntfs_fuse_mount(opts.device)) {
+	/* Mount volume (libntfs part). */
+	if (ntfs_fuse_mount()) {
+		fuse_opt_free_args(&args);
 		ntfs_fuse_destroy(NULL);
-		free(parsed_options);
-		return 4;
+		return 1;
 	}
-	/* Create filesystem. */
-	fch = NULL; 
-	if (!(fuse_opt_add_arg(&margs, "") == -1 ||
-			fuse_opt_add_arg(&margs, "-o") == -1 ||
-			fuse_opt_add_arg(&margs, parsed_options)))
-		fch = fuse_mount(opts.mnt_point, &margs);
-	fuse_opt_free_args(&margs);
-	free(parsed_options);
+	/* Create filesystem (FUSE part). */
+	fch = fuse_mount(ctx->mnt_point, &args);
 	if (!fch) {
 		ntfs_log_error("fuse_mount failed.\n");
+		fuse_opt_free_args(&args);
 		ntfs_fuse_destroy(NULL);
-		return 5;
+		return 1;
 	}
-	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
-	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
-	if (fuse_opt_add_arg(&margs, "") == -1 ||
-			fuse_opt_add_arg(&margs, "-o") == -1)
-		    fh = NULL;
-	if (!ctx->debug && !ctx->no_detach) {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
-			fh = NULL;
-	} else {
-		if (fuse_opt_add_arg(&margs, "use_ino,debug") == -1)
-			fh = NULL;
-	}
-	if (fh)
-		fh = fuse_new(fch, &margs , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper), NULL);
-	fuse_opt_free_args(&margs);
+	fh = fuse_new(fch, &args , &ntfs_fuse_oper, sizeof(ntfs_fuse_oper),
+			NULL);
+	fuse_opt_free_args(&args);
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
-		fuse_unmount(opts.mnt_point, fch);
+		fuse_unmount(ctx->mnt_point, fch);
 		ntfs_fuse_destroy(NULL);
-		return 6;
+		return 1;
 	}
 	if (!ctx->debug && !ctx->no_detach) {
 		if (daemon(0, 0))
@@ -1866,13 +1692,13 @@ int main(int argc, char *argv[])
 	ntfs_log_info("Version %s (libntfs %s)\n", VERSION,
 			ntfs_libntfs_version());
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS version %d.%d)\n",
-			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
+			ctx->device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
 	/* Main loop. */
 	fuse_loop(fh);
 	/* Destroy. */
-	fuse_unmount(opts.mnt_point, fch);
+	fuse_unmount(ctx->mnt_point, fch);
 	fuse_destroy(fh);
 	return 0;
 }
