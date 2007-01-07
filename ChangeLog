@@ -129,6 +129,7 @@ xx/01/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- ntfsmount: Remove "show_sys_files" as potential harmful and
 	  introduce new "case_insensitive" option to support both case
 	  sensitive and insensitive mounts.  (Yura)
+	- ntfsmount: st_block calculation was wrong for resident files.  (Yuval)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
