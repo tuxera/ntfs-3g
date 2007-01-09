@@ -259,7 +259,8 @@ descend_into_child_node:
 	if (br != 1) {
 		if (br != -1)
 			errno = EIO;
-		ntfs_log_perror("Failed to read vcn 0x%llx", vcn);
+		ntfs_log_perror("Failed to read vcn 0x%llx",
+			       	(unsigned long long)vcn);
 		goto close_err_out;
 	}
 
@@ -1047,10 +1048,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
-		err = errno;
-		ntfs_log_error("Could not allocate new MFT record: %s.\n",
-				strerror(err));
-		errno = err;
+		ntfs_log_perror("Could not allocate new MFT record");
 		return NULL;
 	}
 	/*

@@ -215,7 +215,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	if (vol->dev->d_ops->seek(vol->dev, 
 				  (sectors - 1) << vol->sector_size_bits,
 				  SEEK_SET) == -1) {
-		ntfs_log_perror("Failed to read last sector (%lld)", sectors);
+		ntfs_log_perror("Failed to read last sector (%lld)",
+			       	(long long)sectors);
 		ntfs_log_error("Perhaps the volume is a RAID/LDM but it wasn't "
 			       "setup yet, or the\nwrong device was used, "
 			       "or the partition table is incorrect.\n" );
@@ -232,7 +233,8 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	    vol->mftmirr_lcn > vol->nr_clusters) {
 		ntfs_log_error("$MFT LCN (%lld) or $MFTMirr LCN (%lld) is "
 			      "greater than the number of clusters (%lld).\n",
-			      vol->mft_lcn, vol->mftmirr_lcn, vol->nr_clusters);
+			      (long long)vol->mft_lcn, (long long)vol->mftmirr_lcn,
+			      (long long)vol->nr_clusters);
 		return -1;
 	}
 	

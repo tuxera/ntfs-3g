@@ -554,14 +554,14 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (name_type == FILE_NAME_DOS)
 		return 0;
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
-		ntfs_log_error("Skipping unrepresentable filename (inode %lld):"
-				" %s\n", MREF(mref), strerror(errno));
+		ntfs_log_perror("Skipping unrepresentable filename (inode %llu)",
+				(unsigned long long)MREF(mref));
 		return 0;
 	}
 	if (ntfs_fuse_is_named_data_stream(filename)) {
-		ntfs_log_error("Unable to access '%s' (inode %lld) with "
+		ntfs_log_error("Unable to access '%s' (inode %llu) with "
 				"current named streams access interface.\n",
-				filename, MREF(mref));
+				filename, (unsigned long long)MREF(mref));
 		free(filename);
 		return 0;
 	}
