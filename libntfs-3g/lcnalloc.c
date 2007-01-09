@@ -49,7 +49,7 @@
 
 #define NTFS_LCNALLOC_SKIP  4096
 
-void ntfs_cluster_set_zone_pos(u8 zone, LCN zone_start, LCN zone_end, 
+static void ntfs_cluster_set_zone_pos(u8 zone, LCN zone_start, LCN zone_end, 
 			       LCN *zone_pos, LCN tc, LCN bmp_initial_pos)
 {
 	ntfs_log_trace("Before: zone %d = %lld\n", zone, (long long)*zone_pos);
@@ -66,7 +66,7 @@ void ntfs_cluster_set_zone_pos(u8 zone, LCN zone_start, LCN zone_end,
 	ntfs_log_trace("After: zone %d = %lld\n", zone, (long long)*zone_pos);
 }
 
-int ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc, 
+static int ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc, 
 				 LCN bmp_initial_pos)
 {
 	ntfs_log_trace("tc = %lld, zone = %d\n", (long long)tc, zone);
