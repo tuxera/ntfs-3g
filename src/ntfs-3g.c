@@ -376,7 +376,11 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
-		stbuf->st_blocks = ni->allocated_size >> 9;
+		/* 
+		 * Temporary fix to make ActiveSync work via Samba 3.0.
+		 * See more on the ntfs-3g-devel list.
+		 */
+		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
 		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
