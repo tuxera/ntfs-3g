@@ -97,7 +97,7 @@ static const char *hibernated_volume_msg =
 "off properly, so mounting could be done safely.\n";
 
 static const char *unclean_journal_msg =
-"Mount is denied because NTFS is unclean. Choose one of these actions:\n"
+"Mount is denied because NTFS logfile is unclean. Choose one action:\n"
 "   Boot Windows and shutdown it cleanly, or if you have a removable\n"
 "   device then click the 'Safely Remove Hardware' icon in the Windows\n"
 "   taskbar notification area before disconnecting it.\n"
