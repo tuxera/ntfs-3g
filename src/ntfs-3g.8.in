@@ -1,9 +1,9 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
-.\" Copyright (c) 2006 Szabolcs Szakacsits.
+.\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "October 2006" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "January 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation NTFS Driver
 .SH SYNOPSIS
@@ -79,7 +79,7 @@ files are accessible by name, for example you can always do
 This option overrides the security measure restricting file access
 to the user mounting the filesystem.  This option is by default only
 allowed to root, but this restriction can be removed with a
-configuration option described in the previous section.
+FUSE configuration option.
 .TP
 .B large_read
 Issue large read requests.  This can improve performance for some
@@ -140,6 +140,12 @@ Mount /dev/hda1 to /mnt/windows:
 .B ntfs-3g /dev/hda1 /mnt/windows
 .sp
 .RE
+or
+.RS
+.sp
+.B mount -t ntfs-3g /dev/hda1 /mnt/windows
+.sp
+.RE
 Read\-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 
 to be the owner of all files:
 .RS
@@ -172,12 +178,12 @@ Please see
 http://www.ntfs-3g.org/support.html
 .sp
 .RE
-for all known issues.
+for common questions and known issues.
 If you would find a new one in the latest release of
-this software then please send an email describing it
-according to the above page. You can also contact the 
-development team on the ntfs\-3g\-devel@lists.sf.net email 
-address anytime.
+the software then please send an email describing it
+in detail. You can contact the 
+development team on the ntfs\-3g\-devel@lists.sf.net
+address.
 .SH AUTHORS
 .B ntfs-3g 
 was based on and a major improvement to ntfsmount and libntfs which were
