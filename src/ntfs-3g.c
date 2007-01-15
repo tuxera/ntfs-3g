@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
- * Copyright (c) 2006 Szabolcs Szakacsits
+ * Copyright (c) 2006-2007 Szabolcs Szakacsits
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -83,6 +83,13 @@
 #define PATH_MAX 4096
 #endif
 
+typedef enum {
+	FSTYPE_NONE,
+	FSTYPE_UNKNOWN,
+	FSTYPE_FUSE,
+	FSTYPE_FUSEBLK
+} fuse_fstype;
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
@@ -138,13 +145,14 @@ static const char *locale_msg =
 "         be correct or visible. Please see the potential solution at\n"
 "         http://www.ntfs-3g.org/support.html#locale\n";
 
-static const char *fuse26_kmod_needed_msg =
-"ERROR: The FUSE kernel module 2.6.x is not available. Either remove the old\n"
-"       FUSE kernel module (use the command 'rmmod fuse') if you have the new\n"
-"       one, or compile the new module from the FUSE-2.6.x source package.\n"
-"       Please see the FUSE README file and the below web page for more help:\n"
-"\n"
-"                  http://www.ntfs-3g.org/support.html#fuse26\n"
+static const char *fuse26_kmod_msg =
+"WARNING: Old FUSE kernel module detected. This means, some driver features\n"
+"         are not available (swap file on NTFS, boot from NTFS by LILO),\n"
+"         and unmount is not safe unless you make sure the ntfs-3g process\n"
+"         naturally terminates after calling 'umount'. The safe FUSE kernel\n"
+"         driver is included in the official Linux kernels since version\n"
+"         2.6.20-rc1, or in the FUSE 2.6 software package. Please see the\n"
+"         next page for more help: http://www.ntfs-3g.org/support.html#fuse26\n"
 "\n";
 
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
@@ -1607,17 +1615,19 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static int ntfs_fuse_mount(const char *device)
+static ntfs_volume *ntfs_open(const char *device, int blkdev)
 {
-	ntfs_volume *vol;
+	unsigned long flags = 0;
+	
+	if (!blkdev)
+		flags |= MS_EXCLUSIVE;
+	if (ctx->ro)
+		flags |= MS_RDONLY;
+	if (ctx->noatime)
+		flags |= MS_NOATIME;
 
-	vol = utils_mount_volume(device, ((ctx->ro) ? MS_RDONLY : 0) |
-			((ctx->noatime) ? MS_NOATIME : 0), ctx->force);
-	if (!vol)
-		return -1;
-
-	ctx->vol = vol;
-	return 0;
+	ctx->vol = utils_mount_volume(device, flags, ctx->force);
+	return ctx->vol;
 }
 
 static void signal_handler(int arg __attribute__((unused)))
@@ -1827,7 +1837,7 @@ static void usage(void)
 	ntfs_log_info("\n%s %s - Third Generation NTFS Driver\n\n",
 			EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (C) 2005-2006 Yura Pakhuchiy\n");
-	ntfs_log_info("Copyright (C) 2006 Szabolcs Szakacsits\n\n");
+	ntfs_log_info("Copyright (C) 2006-2007 Szabolcs Szakacsits\n\n");
 	ntfs_log_info("Usage:    %s device mount_point [-o options]\n\n", 
 		      EXEC_NAME);
 	ntfs_log_info("Options:  ro, force, default_permissions, umask, "
@@ -1955,34 +1965,67 @@ static int parse_options(int argc, char *argv[])
 	return (!help && !err);
 }
 
-static void load_fuse_module(int force)
+static fuse_fstype get_fuse_fstype(void)
+{
+	char buf[256];
+	fuse_fstype fstype = FSTYPE_NONE;
+	
+	FILE *f = fopen("/proc/filesystems", "r");
+	if (!f) {
+		ntfs_log_perror("Failed to open /proc/filesystems");
+		return FSTYPE_UNKNOWN;
+	}
+	
+	while (fgets(buf, sizeof(buf), f)) {
+		if (strstr(buf, "fuseblk\n")) {
+			fstype = FSTYPE_FUSEBLK;
+			break;
+		}
+		if (strstr(buf, "fuse\n"))
+			fstype = FSTYPE_FUSE;
+	}
+	
+	fclose(f);
+	return fstype;
+}
+
+static void create_dev_fuse(void)
 {
 	struct stat st;
-	int exist;
-	const char *load_fuse_cmd = "/sbin/modprobe fuse";
 	
-	exist = !stat("/dev/fuse", &st);
-	
-	if (!force && exist)
-		return;
-	
-	if (!exist) {
-		if (errno != ENOENT) {
-			ntfs_log_perror("Failed to stat /dev/fuse");
-			return;
-		}
-		
-		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229))) {
+	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
+		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229)))
 			ntfs_log_perror("Failed to create /dev/fuse");
-			return;
-		}
 	}
+}
+
+static fuse_fstype load_fuse_module(void)
+{
+	int i;
+	struct stat st;
+	const char *load_fuse_cmd = "/sbin/modprobe fuse";
+	struct timespec req = { 0, 100000000 };   /* 100 msec */
+	fuse_fstype fstype;
 	
 	if (stat("/sbin/modprobe", &st) == -1)
 		load_fuse_cmd = "modprobe fuse";
 	
 	if (getuid() == 0)
 		system(load_fuse_cmd);
+	
+	for (i = 0; i < 10; i++) {
+		/* 
+		 * We sleep first because despite the detection of the loaded
+		 * FUSE kernel module, ntfs_mount() can still fail if it's not 
+		 * fully functional/initialized. Note, of course this is still
+		 * unreliable but usually helps.
+		 */  
+		nanosleep(&req, NULL);
+		fstype = get_fuse_fstype();
+		if (fstype != FSTYPE_NONE)
+			break;
+	}
+	return fstype;
 }
 
 static struct fuse_chan *try_fuse_mount(char *parsed_options)
@@ -1990,6 +2033,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	struct fuse_chan *fc = NULL;
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	
+	/* The fuse_mount() options get modified, so we always rebuild it */
 	if ((fuse_opt_add_arg(&margs, "") == -1 ||
 	     fuse_opt_add_arg(&margs, "-o") == -1 ||
 	     fuse_opt_add_arg(&margs, parsed_options) == -1)) {
@@ -1999,7 +2043,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	
 	fc = fuse_mount(opts.mnt_point, &margs);
 	if (!fc)
-		ntfs_log_perror("Failed to create FUSE mount point");
+		ntfs_log_perror("FUSE mount point creation error");
 free_args:
 	fuse_opt_free_args(&margs);
 	return fc;
@@ -2008,12 +2052,9 @@ free_args:
 		
 static void set_fuseblk_options(char *parsed_options)
 {
-	char option[32];
+	char options[64];
 	long pagesize; 
 	u32 blksize = ctx->vol->cluster_size;
-	
-	if (!NDevBlock(ctx->vol->dev))
-		return;
 	
 	pagesize = sysconf(_SC_PAGESIZE);
 	if (pagesize < 1)
@@ -2022,30 +2063,9 @@ static void set_fuseblk_options(char *parsed_options)
 	if (blksize > (u32)pagesize)
 		blksize = pagesize;
 	
-	snprintf(option, sizeof(option), ",blksize=%u", blksize);
-	
 	/* parsed_options already allocated enough space. */
-	strcat(parsed_options, ",blkdev");
-	strcat(parsed_options, option);
-}
-
-static int has_fuseblk(void)
-{
-	char buf[256];
-	FILE *f = fopen("/proc/filesystems", "r");
-	if (!f) {
-		ntfs_log_perror("Failed to open /proc/filesystems");
-		return 1;
-	}
-	
-	while (fgets(buf, sizeof(buf), f))
-		if (strstr(buf, "fuseblk\n")) {
-			fclose(f);
-			return 1;
-		}
-	
-	fclose(f);
-	return 0;
+	snprintf(options, sizeof(options), ",blkdev,blksize=%u", blksize);
+	strcat(parsed_options, options);
 }
 
 int main(int argc, char *argv[])
@@ -2054,6 +2074,9 @@ int main(int argc, char *argv[])
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
 	struct fuse_chan *fc;
+	fuse_fstype fstype;
+	struct stat sbuf;
+	int use_blkdev = 0;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -2072,38 +2095,41 @@ int main(int argc, char *argv[])
 		return 3;
 	}
 
-	if (ntfs_fuse_mount(opts.device)) {
+	fstype = get_fuse_fstype();
+	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
+		fstype = load_fuse_module();
+	
+	create_dev_fuse();
+	
+	if (stat(opts.device, &sbuf)) {
+		ntfs_log_perror("Failed to access '%s'", opts.device);
+		ntfs_fuse_destroy();
+		return 7;
+	}
+	/* Always use fuseblk for block devices unless it's surely missing. */
+	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
+		use_blkdev = 1;
+
+	if (!ntfs_open(opts.device, use_blkdev)) {
 		free(parsed_options);
 		ntfs_fuse_destroy();
 		return 4;
 	}
-
-	set_fuseblk_options(parsed_options);
+	
+	if (use_blkdev)
+	    set_fuseblk_options(parsed_options);
 	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
 	
-	load_fuse_module(0);
-
 	fc = try_fuse_mount(parsed_options);
 	if (!fc) {
-		if (errno == ENOENT || errno == ENODEV) {
-			ntfs_log_error("Retry to create FUSE mount point ...\n");
-			load_fuse_module(1);
-			fc = try_fuse_mount(parsed_options);
-		}
-		if (!fc) {
-			if (NDevBlock(ctx->vol->dev) && !has_fuseblk())
-				ntfs_log_error(fuse26_kmod_needed_msg);
-			
-			free(parsed_options);
-			ntfs_fuse_destroy();
-			return 5;
-		}
-		ntfs_log_info("Successful mount.\n");
+		free(parsed_options);
+		ntfs_fuse_destroy();
+		return 5;
 	}
-	free(parsed_options);
+	
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
@@ -2123,9 +2149,14 @@ int main(int argc, char *argv[])
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		fuse_unmount(opts.mnt_point, fc);
+		free(parsed_options);
 		ntfs_fuse_destroy();
 		return 6;
 	}
+	
+	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
+		ntfs_log_info(fuse26_kmod_msg);
+	
 	if (!ctx->no_detach) {
 		if (daemon(0, ctx->debug))
 			ntfs_log_error("Failed to daemonize.\n");
@@ -2142,10 +2173,14 @@ int main(int argc, char *argv[])
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
+	ntfs_log_info("Options: %s\n", parsed_options);
+	
 	fuse_loop(fh);
 	
 	fuse_unmount(opts.mnt_point, fc);
 	fuse_destroy(fh);
+	
+	free(parsed_options);
 	ntfs_fuse_destroy();
 	return 0;
 }
