@@ -2016,7 +2016,7 @@ static fuse_fstype load_fuse_module(void)
 	for (i = 0; i < 10; i++) {
 		/* 
 		 * We sleep first because despite the detection of the loaded
-		 * FUSE kernel module, ntfs_mount() can still fail if it's not 
+		 * FUSE kernel module, fuse_mount() can still fail if it's not 
 		 * fully functional/initialized. Note, of course this is still
 		 * unreliable but usually helps.
 		 */  
@@ -2070,7 +2070,7 @@ static void set_fuseblk_options(char *parsed_options)
 
 int main(int argc, char *argv[])
 {
-	char *parsed_options;
+	char *parsed_options = NULL;
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
 	struct fuse_chan *fc;
@@ -2078,6 +2078,7 @@ int main(int argc, char *argv[])
 	struct stat sbuf;
 	int use_blkdev = 0;
 	int uid, euid, suid;
+	int err = 10;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -2091,23 +2092,17 @@ int main(int argc, char *argv[])
 		return 2;
 	
 	parsed_options = parse_mount_options(opts.options ? opts.options : "");
-	if (!parsed_options) {
-		ntfs_fuse_destroy();
-		return 3;
-	}
+	if (!parsed_options)
+		goto err_out;
 
 	if (getresuid(&uid, &euid, &suid)) {
 		ntfs_log_perror("Failed to get user ID's");
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 9;
+		goto err_out;
 	}
 	
 	if (setuid(euid)) {
 		ntfs_log_perror("Failed to set user ID to %d", euid);
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 8;
+		goto err_out;
 	}
 
 	fstype = get_fuse_fstype();
@@ -2118,19 +2113,14 @@ int main(int argc, char *argv[])
 	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 7;
+		goto err_out;
 	}
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		use_blkdev = 1;
 
-	if (!ntfs_open(opts.device, use_blkdev)) {
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 4;
-	}
+	if (!ntfs_open(opts.device, use_blkdev))
+		goto err_out;
 	
 	if (use_blkdev)
 	    set_fuseblk_options(parsed_options);
@@ -2140,11 +2130,8 @@ int main(int argc, char *argv[])
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
 	
 	fc = try_fuse_mount(parsed_options);
-	if (!fc) {
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 5;
-	}
+	if (!fc)
+		goto err_out;
 	
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
@@ -2164,16 +2151,13 @@ int main(int argc, char *argv[])
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		fuse_unmount(opts.mnt_point, fc);
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 6;
+		goto err_out;
 	}
 	
 	if (setuid(uid)) {
 		ntfs_log_perror("Failed to set user ID to %d", uid);
-		free(parsed_options);
-		ntfs_fuse_destroy();
-		return 8;
+		fuse_unmount(opts.mnt_point, fc);
+		goto err_out;
 	}
 
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
@@ -2202,8 +2186,9 @@ int main(int argc, char *argv[])
 	
 	fuse_unmount(opts.mnt_point, fc);
 	fuse_destroy(fh);
-	
+	err = 0;
+err_out:
 	free(parsed_options);
 	ntfs_fuse_destroy();
-	return 0;
+	return err;
 }
