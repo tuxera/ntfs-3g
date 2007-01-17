@@ -2132,7 +2132,6 @@ int main(int argc, char *argv[])
 	}
 	
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
-	margs = (struct fuse_args)FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
 	    fuse_opt_add_arg(&margs, "-o") == -1)
 		    fh = NULL;
