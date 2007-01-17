@@ -2103,6 +2103,7 @@ int main(int argc, char *argv[])
 	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
+		free(parsed_options);
 		ntfs_fuse_destroy();
 		return 7;
 	}
