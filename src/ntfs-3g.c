@@ -2077,6 +2077,7 @@ int main(int argc, char *argv[])
 	fuse_fstype fstype;
 	struct stat sbuf;
 	int use_blkdev = 0;
+	int uid, euid, suid;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
@@ -2093,6 +2094,20 @@ int main(int argc, char *argv[])
 	if (!parsed_options) {
 		ntfs_fuse_destroy();
 		return 3;
+	}
+
+	if (getresuid(&uid, &euid, &suid)) {
+		ntfs_log_perror("Failed to get user ID's");
+		free(parsed_options);
+		ntfs_fuse_destroy();
+		return 9;
+	}
+	
+	if (setuid(euid)) {
+		ntfs_log_perror("Failed to set user ID to %d", euid);
+		free(parsed_options);
+		ntfs_fuse_destroy();
+		return 8;
 	}
 
 	fstype = get_fuse_fstype();
@@ -2154,6 +2169,13 @@ int main(int argc, char *argv[])
 		return 6;
 	}
 	
+	if (setuid(uid)) {
+		ntfs_log_perror("Failed to set user ID to %d", uid);
+		free(parsed_options);
+		ntfs_fuse_destroy();
+		return 8;
+	}
+
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
 	
@@ -2168,6 +2190,7 @@ int main(int argc, char *argv[])
 #endif
 		}
 	}
+
 	ntfs_log_info("Version %s\n", VERSION);
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
