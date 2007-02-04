@@ -2077,7 +2077,7 @@ int main(int argc, char *argv[])
 	fuse_fstype fstype;
 	struct stat sbuf;
 	int use_blkdev = 0;
-	uid_t uid, euid, suid;
+	uid_t uid, euid;
 	int err = 10;
 
 	utils_set_locale();
@@ -2095,10 +2095,8 @@ int main(int argc, char *argv[])
 	if (!parsed_options)
 		goto err_out;
 
-	if (getresuid(&uid, &euid, &suid)) {
-		ntfs_log_perror("Failed to get user ID's");
-		goto err_out;
-	}
+	uid  = getuid();
+	euid = geteuid();
 	
 	if (setuid(euid)) {
 		ntfs_log_perror("Failed to set user ID to %d", euid);
