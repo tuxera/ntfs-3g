@@ -676,10 +676,9 @@ BOOL ntfs_is_logfile_clean(ntfs_attr *log_na, RESTART_PAGE_HEADER *rp)
 	 */
 	if (ra->client_in_use_list != LOGFILE_NO_CLIENT &&
 			!(ra->flags & RESTART_VOLUME_IS_CLEAN)) {
-		ntfs_log_error("$LogFile indicates unclean shutdown (%d, %d). "
-			       "Please report to %s!\n", 
+		ntfs_log_error("$LogFile indicates unclean shutdown (%d, %d)\n",
 			       le16_to_cpu(ra->client_in_use_list),
-			       le16_to_cpu(ra->flags), NTFS_DEV_LIST);
+			       le16_to_cpu(ra->flags));
 		return FALSE;
 	}
 	/* $LogFile indicates a clean shutdown. */
