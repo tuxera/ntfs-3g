@@ -2077,7 +2077,7 @@ int main(int argc, char *argv[])
 	fuse_fstype fstype;
 	struct stat sbuf;
 	int use_blkdev = 0;
-	int uid, euid, suid;
+	uid_t uid, euid, suid;
 	int err = 10;
 
 	utils_set_locale();
