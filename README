@@ -15,10 +15,10 @@ with NTFS. Besides this practical goal, the project also aims to explore
 the limits of the hybrid, kernel/user space filesystem driver approach,
 performance, reliability and feature richness per invested effort wise.
 
-The driver currently is in PREVIEW status, which means that we weren't
-reported and haven't found any data corruption or loss during ordinary
-driver use and in our extensive quality testing before release of the
-latest version of ntfs-3g, however we are aware of some usability issues
+The driver currently is in release candinate status, which means that we 
+weren't sreported and haven't found any data corruption or loss during 
+ordinary driver use and in our extensive quality testing before release of 
+the latest version of ntfs-3g, however we are aware of some usability issues
 and driver restrictions which are all documented and planned to be resolved
 in the future.
 
