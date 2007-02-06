@@ -3,16 +3,20 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "January 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "February 2007" "ntfs-3g @VERSION@"
 .SH NAME
-ntfs-3g \- Third Generation NTFS Driver
+ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
 .I device mount_point
 [\fB\-o options\fR]
+.br
+.B mount \-t ntfs-3g
+.I device mount_point
+[\fB\-o options\fR]
 .SH DESCRIPTION
 \fBntfs-3g\fR is an NTFS driver, which can
-create, remove, rename files, directories, hard links, and
+create, remove, rename, move files, directories, hard links, and
 streams; it can read and write files, including 
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
@@ -20,43 +24,41 @@ compressed files.
 .SH OPTIONS
 Below is a summary of the options that \fBntfs-3g\fR accepts.
 .TP
-.B uid=, gid=, umask=
-Provide default owner, group, and access mode mask.
-These options work as documented in mount(8).  By
-default, the files and directories are owned by the user who 
-mounted the volume but everybody has full read, write and
-executable access, moreover browse permission to any directory. 
-If you want to use the currently limited permission
-handling then use these options together with the 
-.B default_permissions,
+\fBuid=\fP\fIvalue\fP and \fBgid=\fP\fIvalue\fP
+Set the owner and the group of files.
+By default, files and directories are owned by the effective 
+user and group of the mounting process and everybody will
+have full read, write, execution and directory browsing permissions.
+If you want to use permissions handling then use these 
+options together with the 
+.B umask
+or
 .B fmask
 and
 .B dmask
-options. The usage of the
-.B default_permissions
-option is a must in such cases.
+options. 
 .TP
-.B default_permissions
-By default FUSE doesn't check file access permissions, the
-filesystem is free to implement its access policy or leave it to
-the underlying file access mechanism (e.g. in case of network
-filesystems).  This option enables permission checking, restricting
-accesses based on file modes.  This option is usually useful
-together with the 
-.B allow_other
-mount option.
+.BI umask= value
+Set the  bitmask of the file and directory permissions that are not
+present. The value is given in octal. The default value is 0 which
+means full access to everybody.
 .TP
-.B fmask=, dmask=
-Instead of specifying umask which applies both to
-files and directories, fmask applies only to files and
-mask only to directories.
+.BI fmask= value
+Set the  bitmask of the file permissions that are not present. 
+The value is given in octal. The default value is 0 which
+means full access to everybody.
+.TP
+.BI dmask= value
+Set the  bitmask of the directory permissions that are not
+present. The value is given in octal. The default value is 0 which
+means full access to everybody.
 .TP
 .B ro
 Mount filesystem read\-only.
 .TP
-.B locale=
+.BI locale= value
 You can set locale with this option which is often required to make 
-visible files with national charaters. It's useful if locale 
+visible files with national charaters. It's useful if the locale 
 environment variables are not set before partitions had been mounted 
 from /etc/fstab.
 .TP
@@ -77,9 +79,9 @@ files are accessible by name, for example you can always do
 .TP
 .B allow_other
 This option overrides the security measure restricting file access
-to the user mounting the filesystem.  This option is by default only
-allowed to root, but this restriction can be removed with a
-FUSE configuration option.
+to the user mounting the filesystem.  This option is only
+allowed to root, but this restriction can be overridden by the
+'user_allow_other' option in the /etc/fuse.conf file.
 .TP
 .B large_read
 Issue large read requests.  This can improve performance for some
@@ -87,7 +89,7 @@ filesystems, but can also degrade performance.  This option is mostly
 useful on 2.4.X kernels, as on 2.6 kernels requests size is
 automatically determined for optimum performance.
 .TP
-.B max_read=
+.BI max_read= value
 With this option the maximum size of read operations can be set.
 The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
@@ -100,7 +102,7 @@ This option is on by default.
 By default ntfs-3g acts as "silent,allow_other" was passed to it,
 this option cancel this behaviour.
 .TP
-.B streams_interface=
+.BI streams_interface= value
 This option controls how the user can access Alternate Data Streams (ADS)
 or in other words, named data streams. It can be set
 to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to

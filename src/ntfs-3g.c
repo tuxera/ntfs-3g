@@ -1640,12 +1640,14 @@ static char *parse_mount_options(const char *orig_opts)
 {
 	char *options, *s, *opt, *val, *ret;
 	BOOL no_def_opts = FALSE;
+	int default_permissions = 0;
 
 	/*
 	 * +7		fsname=
 	 * +1		comma
 	 * +1		null-terminator
 	 * +21          ,blkdev,blksize=65536
+	 * +20          ,default_permissions
 	 * +PATH_MAX	resolved realpath() device name
 	 */
 	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 64 + PATH_MAX);
@@ -1706,6 +1708,8 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			no_def_opts = TRUE; /* Don't add default options. */
+		} else if (!strcmp(opt, "default_permissions")) {
+			default_permissions = 1;
 		} else if (!strcmp(opt, "umask")) {
 			if (!val) {
 				ntfs_log_error("'umask' option should have "
@@ -1714,6 +1718,7 @@ static char *parse_mount_options(const char *orig_opts)
 			}
 			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
+		       	default_permissions = 1;
 		} else if (!strcmp(opt, "fmask")) {
 			if (!val) {
 				ntfs_log_error("'fmask' option should have "
@@ -1721,6 +1726,7 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%o", &ctx->fmask);
+		       	default_permissions = 1;
 		} else if (!strcmp(opt, "dmask")) {
 			if (!val) {
 				ntfs_log_error("'dmask' option should have "
@@ -1728,6 +1734,7 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%o", &ctx->dmask);
+		       	default_permissions = 1;
 		} else if (!strcmp(opt, "uid")) {
 			if (!val) {
 				ntfs_log_error("'uid' option should have "
@@ -1735,6 +1742,7 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->uid);
+		       	default_permissions = 1;
 		} else if (!strcmp(opt, "gid")) {
 			if (!val) {
 				ntfs_log_error("'gid' option should have "
@@ -1742,6 +1750,7 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%i", &ctx->gid);
+		       	default_permissions = 1;
 		} else if (!strcmp(opt, "show_sys_files")) {
 			if (val) {
 				ntfs_log_error("'show_sys_files' option should "
@@ -1822,6 +1831,8 @@ static char *parse_mount_options(const char *orig_opts)
 	}
 	if (!no_def_opts)
 		strcat(ret, def_opts);
+	if (default_permissions)
+		strcat(ret, "default_permissions,");
 	strcat(ret, "fsname=");
 	strcat(ret, opts.device);
 exit:
@@ -1841,10 +1852,9 @@ static void usage(void)
 	ntfs_log_info("Copyright (C) 2006-2007 Szabolcs Szakacsits\n\n");
 	ntfs_log_info("Usage:    %s device mount_point [-o options]\n\n", 
 		      EXEC_NAME);
-	ntfs_log_info("Options:  ro, force, default_permissions, umask, "
-		      "uid, gid, fmask, dmask, \n\t"
-		      "  locale, show_sys_files, no_def_opts, "
-		      "streams_interface.\n\t"
+	ntfs_log_info("Options:  ro, force, locale, uid, gid, umask, fmask, "
+		      "dmask, \n\t"
+		      "  show_sys_files, no_def_opts, streams_interface.\n\t"
 		      "  Please see the details in the manual.\n\n");
 	ntfs_log_info("%s\n", ntfs_home);
 }
