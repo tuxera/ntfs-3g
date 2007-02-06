@@ -23,7 +23,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[0.20070118-BETA],[ntfs-3g-devel@lists.sf.net])
+AC_INIT([ntfs-3g],[0.20070207-PREVIEW],[ntfs-3g-devel@lists.sf.net])
 
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
