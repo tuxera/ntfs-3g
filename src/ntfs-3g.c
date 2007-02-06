@@ -1820,6 +1820,9 @@ static char *parse_mount_options(const char *orig_opts)
 					" You have to umount volume and then "
 					"mount it once again.\n");
 			goto err_exit;
+		} else if (!strcmp(opt, "blksize")) {
+			ntfs_log_info("WARNING: blksize option is ignored "
+				      "because ntfs-3g must calculate it.\n");
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
