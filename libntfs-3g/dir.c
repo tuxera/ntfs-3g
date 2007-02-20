@@ -1529,7 +1529,7 @@ out:
 		ntfs_inode_close(ni);
 	if (err) {
 		errno = err;
-		ntfs_log_perror("Could not delete file");
+		ntfs_log_debug("Could not delete file: %s\n", strerror(errno));
 		return -1;
 	}
 	ntfs_log_trace("Done.\n");
