@@ -64,25 +64,6 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b)
 
 	ntfs_log_debug("Beginning bootsector check.\n");
 
-	/* Calculate the checksum. Note, this is just a simple addition of
-	   all u32 values in the bootsector starting at the beginning and
-	   finishing at the offset of the checksum itself (i.e. not including
-	   the checksum...). */
-	if ((void*)b < (void*)&b->checksum) {
-		u32 *u = (u32 *)b;
-		u32 *bi = (u32 *)(&b->checksum);
-
-		ntfs_log_debug("Calculating bootsector checksum.\n");
-
-		for (i = 0; u < bi; ++u)
-			i += le32_to_cpup(u);
-
-		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i) {
-			ntfs_log_error("Bootsector checksum failed.\n");
-			goto not_ntfs;
-		}
-	}
-
 	ntfs_log_debug("Checking OEMid, NTFS signature.\n");
 	if (b->oem_id != cpu_to_le64(0x202020205346544eULL)) { /* "NTFS    " */
 		ntfs_log_error("NTFS signature is missing.\n");
