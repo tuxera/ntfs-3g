@@ -15,17 +15,16 @@ with NTFS. Besides this practical goal, the project also aims to explore
 the limits of the hybrid, kernel/user space filesystem driver approach,
 performance, reliability and feature richness per invested effort wise.
 
-The driver currently is in release candinate status, which means that we 
-weren't sreported and haven't found any data corruption or loss during 
-ordinary driver use and in our extensive quality testing before release of 
-the latest version of ntfs-3g, however we are aware of some usability issues
-and driver restrictions which are all documented and planned to be resolved
-in the future.
+The driver is in STABLE status. The test methods, the test suites used and
+testimonials can be found on
 
-You can find news, technical answers, problem submission instructions, 
-performance evaluation and other informations on the project web site: 
+	http://www.ntfs-3g.org/quality.html
 
-			http://www.ntfs-3g.org
+News, support answers, problem submission instructions, support and discussion 
+forums, performance numbers and other information are available on the project 
+web site at
+
+	http://www.ntfs-3g.org
 
 
 QUICK INSTALLATION
@@ -47,19 +46,19 @@ If there was no error during installation then the NTFS volume can be
 read-write mounted for everybody the following way (unmount the volume if 
 it was already mounted, and replace /dev/hda1 and /mnt/windows, if needed):
 
-    mount -t ntfs-3g /dev/hda1 /mnt/windows
+	mount -t ntfs-3g /dev/hda1 /mnt/windows
 or
-    ntfs-3g /dev/hda1 /mnt/windows
+	ntfs-3g /dev/hda1 /mnt/windows
 
-You may also need to set the 'locale' option to make all files with national 
+You may also need to set the 'locale' option to make file names with national
 characters visible. Replace the below hu_HU.utf8 with the appropriate setting. 
 
-    mount -t ntfs-3g /dev/hda1 /mnt/windows -o locale=hu_HU.utf8
+	mount -t ntfs-3g /dev/hda1 /mnt/windows -o locale=hu_HU.utf8
 
 Please see the ntfs-3g manual page for more options and examples.
 
 You can also make NTFS to be mounted during boot by putting the below 
-line at the end of the /etc/fstab file:
+line at the __END__ of the /etc/fstab file:
 
-    /dev/hda1 /mnt/windows ntfs-3g defaults 0 0
+	/dev/hda1 /mnt/windows ntfs-3g defaults 0 0
 
