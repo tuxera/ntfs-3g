@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2000-2006 Anton Altaparmakov
 # Copyright (c) 2003 Jan Kratochvil
-# Copyright (c) 2005-2006 Szabolcs Szakacsits
+# Copyright (c) 2005-2007 Szabolcs Szakacsits
 #
 # This program/include file is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as published
@@ -23,7 +23,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[0.20070207-RC1],[ntfs-3g-devel@lists.sf.net])
+AC_INIT([ntfs-3g],[1.0],[ntfs-3g-devel@lists.sf.net])
 
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
