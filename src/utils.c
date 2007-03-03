@@ -154,7 +154,7 @@ ntfs_volume *utils_mount_volume(const char *volume, unsigned long flags,
 			ntfs_log_error("%s", unclean_journal_msg);
 		else if (errno == EBUSY)
 			ntfs_log_error("%s", opened_volume_msg);
-		else if (errno == ENODEV)
+		else if (errno == ENXIO)
 			ntfs_log_error("%s", fakeraid_msg);
 		
 		return NULL;
