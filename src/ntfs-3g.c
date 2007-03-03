@@ -1671,7 +1671,7 @@ static char *parse_mount_options(const char *orig_opts)
 	ctx->silent = TRUE;
 	
 	s = options;
-	while ((val = strsep(&s, ","))) {
+	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "ro")) { /* Read-only mount. */
 			if (val) {
