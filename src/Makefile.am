@@ -35,12 +35,16 @@ strip:	$(bin_PROGRAMS)
 libs:
 	(cd ../libntfs-3g && $(MAKE) libs) || exit 1;
 
+if RUN_LDCONFIG
 install-exec-hook:
+	$(LDCONFIG)
+endif
+
+install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/sbin
 	$(LN_S) -f $(bindir)/ntfs-3g $(DESTDIR)/sbin/mount.ntfs-3g
-	$(LDCONFIG)
 
-install-data-hook:
+install-data-local:
 	$(INSTALL) -d $(DESTDIR)$(man8dir)
 	$(LN_S) -f ntfs-3g.8 $(DESTDIR)$(man8dir)/mount.ntfs-3g.8
 

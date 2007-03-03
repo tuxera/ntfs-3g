@@ -59,6 +59,13 @@ AC_ARG_ENABLE(warnings,
 	enable_warnings=no
 )
 
+AC_ARG_ENABLE(ldconfig,
+	AS_HELP_STRING(--disable-ldconfig,do not update dynamic linker cache
+		       using ldconfig), ,
+	enable_ldconfig=yes
+)
+AM_CONDITIONAL(RUN_LDCONFIG, test "$enable_ldconfig" = yes)
+
 # Use GNU extensions if available.
 AC_GNU_SOURCE
 
@@ -67,7 +74,10 @@ AC_PROG_CC
 AC_PROG_GCC_TRADITIONAL
 AC_PROG_INSTALL
 AC_PATH_PROG(RM, rm, rm)
-AC_PATH_PROG(LDCONFIG, ldconfig, true, [/sbin /usr/sbin $PATH])
+# No need to check for ldconfig if --disable-ldconfig was given
+if test "$enable_ldconfig" = yes; then
+	AC_PATH_PROG(LDCONFIG, ldconfig, true, [/sbin /usr/sbin $PATH])
+fi
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
