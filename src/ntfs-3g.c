@@ -136,7 +136,7 @@ static struct options {
 } opts;
 
 static const char *EXEC_NAME = "ntfs-3g";
-static char def_opts[] = "silent,allow_other,";
+static char def_opts[] = "silent,allow_other,nonempty,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 
