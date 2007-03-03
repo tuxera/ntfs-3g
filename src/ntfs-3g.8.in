@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "February 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "March 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -21,22 +21,58 @@ streams; it can read and write files, including
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
 compressed files.
-.SH OPTIONS
-Below is a summary of the options that \fBntfs-3g\fR accepts.
-.TP
-\fBuid=\fP\fIvalue\fP and \fBgid=\fP\fIvalue\fP
-Set the owner and the group of files.
+.SS Access handling, security
 By default, files and directories are owned by the effective 
-user and group of the mounting process and everybody will
-have full read, write, execution and directory browsing permissions.
-If you want to use permissions handling then use these 
+user and group of the mounting process and everybody has
+full read, write, execution and directory browsing permissions.
+If you want to use permissions handling then use the
+.B uid
+and/or the
+.B gid 
 options together with the 
-.B umask
+.B umask,
 or
 .B fmask
 and
 .B dmask
-options. 
+options.
+.PP
+Windows users have full access to the files created on Linux.
+.PP
+If 
+.B ntfs-3g 
+is set setuid-root then non-root users will 
+be also able to mount block devices or via /etc/fstab if the 'user'
+or 'users' 
+.BR mount (8)
+option is specified. The
+.B ntfs-3g 
+process drops the 
+root priviledge after successful mount and runs unpriviledged 
+afterwards.
+.SS Alternate Data Streams (ADS)
+All data on NTFS is stored in streams.  Every file has exactly one unnamed
+data stream and can have many named data streams.  The size of a file is the
+size of its unnamed data stream.  By default, \fBntfs-3g\fR will only read
+the unnamed data stream.
+.PP
+By using the options "streams_interface=windows", you will be able to read
+any named data streams, simply by specifying the stream's name after a colon.
+For example:
+.RS
+.sp
+cat some.mp3:artist
+.sp
+.RE
+Named data streams act like normals files, so you can read from them, write to
+them and even delete them (using rm).  You can list all the named data streams
+a file has by getting the "ntfs.streams.list" extended attribute.
+.SH OPTIONS
+Below is a summary of the options that \fBntfs-3g\fR accepts.
+.TP
+\fBuid=\fP\fIvalue\fP and \fBgid=\fP\fIvalue\fP
+Set the owner and the group of files and directories. The values are numerical.
+The defaults are the uid and gid of the current process.
 .TP
 .BI umask= value
 Set the  bitmask of the file and directory permissions that are not
@@ -80,8 +116,8 @@ files are accessible by name, for example you can always do
 .B allow_other
 This option overrides the security measure restricting file access
 to the user mounting the filesystem.  This option is only
-allowed to root, but this restriction can be overridden by the
-'user_allow_other' option in the /etc/fuse.conf file.
+allowed to root, but this restriction can be overridden by 
+the 'user_allow_other' option in the /etc/fuse.conf file.
 .TP
 .B large_read
 Issue large read requests.  This can improve performance for some
@@ -118,23 +154,6 @@ libntfs-3g and FUSE.
 .TP
 .B no_detach
 Same as above but with less debug output.
-.SH ALTERNATE DATA STREAMS (ADS)
-All data on NTFS is stored in streams.  Every file has exactly one unnamed
-data stream and can have many named data streams.  The size of a file is the
-size of its unnamed data stream.  By default, \fBntfs-3g\fR will only read
-the unnamed data stream.
-.PP
-By using the options "streams_interface=windows", you will be able to read
-any named data streams, simply by specifying the stream's name after a colon.
-For example:
-.RS
-.sp
-cat some.mp3:artist
-.sp
-.RE
-Named data streams act like normals files, so you can read from them, write to
-them and even delete them (using rm).  You can list all the named data streams
-a file has by getting the "ntfs.streams.list" extended attribute.
 .SH EXAMPLES
 Mount /dev/hda1 to /mnt/windows:
 .RS
