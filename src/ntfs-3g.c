@@ -2057,7 +2057,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	
 	fc = fuse_mount(opts.mnt_point, &margs);
 	if (!fc)
-		ntfs_log_perror("FUSE mount point creation error");
+		ntfs_log_error("FUSE mount point creation failed\n");
 free_args:
 	fuse_opt_free_args(&margs);
 	return fc;
