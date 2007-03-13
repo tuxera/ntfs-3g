@@ -384,7 +384,7 @@ int main(int argc, char *argv[])
 	} else
 		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
 	if (!out) {
-		/* copy the file if the dest_file's parent dir can be opened */
+		/* Copy the file if the dest_file's parent dir can be opened. */
 		char *parent_dirname;
 		char *filename;
 		ntfs_inode *dir_ni;
@@ -401,7 +401,7 @@ int main(int argc, char *argv[])
 		}
 		dirname_last_whack = strrchr(parent_dirname, '/');
 		if (dirname_last_whack) {
-			dirname_last_whack[1] = '\0';
+			dirname_last_whack[1] = 0;
 			dir_ni = ntfs_pathname_to_inode(vol, NULL,
 					parent_dirname);
 		} else {
@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
 		if (dir_ni) {
 			if (!(dir_ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
 				/* Remove the last '/' for estetic reasons. */
-				dirname_last_whack[0] = '\0';
+				dirname_last_whack[0] = 0;
 				ntfs_log_error("The file '%s' already exists "
 						"and is not a directory. "
 						"Aborting.\n", parent_dirname);
@@ -440,14 +440,12 @@ int main(int argc, char *argv[])
 		}
 		free(parent_dirname);
 	}
-	/* the destination file is a path */
+	/* The destination is a directory. */
 	if ((out->mrec->flags & MFT_RECORD_IS_DIRECTORY) && !opts.inode) {
 		char *filename;
 		char *overwrite_filename;
 		int overwrite_filename_len;
-		/* inode to the file that is being created */
 		ntfs_inode *ni;
-		/* inode to the directory to create the file */
 		ntfs_inode *dir_ni;
 		int filename_len;
 		int dest_dirname_len;
@@ -456,7 +454,7 @@ int main(int argc, char *argv[])
 		dir_ni = out;
 		filename_len = strlen(filename);
 		dest_dirname_len = strlen(opts.dest_file);
-		overwrite_filename_len = filename_len+dest_dirname_len+2;
+		overwrite_filename_len = filename_len+dest_dirname_len + 2;
 		overwrite_filename = malloc(overwrite_filename_len);
 		if (!overwrite_filename) {
 			ntfs_log_perror("ERROR: Failed to allocate %i bytes "
@@ -466,8 +464,7 @@ int main(int argc, char *argv[])
 			goto close_src;
 		}
 		strcpy(overwrite_filename, opts.dest_file);
-		/* add '/' in the end of dest_dirname if there is not one there */
-		if (opts.dest_file[dest_dirname_len-1] != '/') {
+		if (opts.dest_file[dest_dirname_len - 1] != '/') {
 			strcat(overwrite_filename, "/");
 		}
 		strcat(overwrite_filename, filename);
@@ -480,8 +477,8 @@ int main(int argc, char *argv[])
 			ntfs_inode_close(out);
 			out = ni;
 		} else {
-			ntfs_log_verbose("Creating a new file '%s' under '%s'\n",
-					 filename, opts.dest_file);
+			ntfs_log_verbose("Creating a new file '%s' under "
+					"'%s'\n", filename, opts.dest_file);
 			ni = ntfs_new_file(dir_ni, filename);
 			ntfs_inode_close(dir_ni);
 			if (!ni) {
