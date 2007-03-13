@@ -953,9 +953,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		unsigned int update_mapping_pairs	: 1;
 	} need_to = { 0, 0, 0 };
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
-			"0x%llx.\n", na->ni->mft_no, na->type, (long long)pos,
-			(long long)count);
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, "
+			"count 0x%llx.\n", na->ni->mft_no, na->type,
+			(long long)pos, (long long)count);
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
 		return -1;
