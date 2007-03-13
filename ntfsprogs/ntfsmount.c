@@ -1120,7 +1120,7 @@ static int ntfs_fuse_rmdir(const char *path)
 	return ntfs_fuse_rm(path);
 }
 
-static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
+static int ntfs_fuse_utimens(const char *path, const struct timespec ts[2])
 {
 	ntfs_inode *ni;
 
@@ -1129,10 +1129,10 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	if (buf) {
-		ni->last_access_time = buf->actime;
-		ni->last_data_change_time = buf->modtime;
-		ni->last_mft_change_time = buf->modtime;
+	if (ts) {
+		ni->last_access_time = ts[0].tv_sec;
+		ni->last_data_change_time = ts[1].tv_sec;
+		ni->last_mft_change_time = ts[1].tv_sec;
 	} else {
 		time_t now;
 
@@ -1468,7 +1468,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.rename		= ntfs_fuse_rename,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
-	.utime		= ntfs_fuse_utime,
+	.utimens	= ntfs_fuse_utimens,
 	.destroy	= ntfs_fuse_destroy,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,

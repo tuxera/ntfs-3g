@@ -131,6 +131,7 @@ xx/01/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	  sensitive and insensitive mounts.  (Yura)
 	- ntfsmount: st_block calculation was wrong.  (Yuval)
 	- mkntfs: Use Vista $Boot rather than XP one.  (Anton)
+	- ntfsmount: use utimens() instead of deprecated utime().  (Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
