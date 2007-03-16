@@ -988,10 +988,8 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 				((*ofs + to_write - 1) >> vol->cluster_size_bits)
 				 + 1 + (*rl)->vcn - from_vcn, 
 				 lcn_seek_from, DATA_ZONE);
-	if (!rlc) {
-		ntfs_log_perror("Hole filling cluster allocation failed");
+	if (!rlc)
 		goto err_out;
-	}
 	
 	*rl = ntfs_runlists_merge(na->rl, rlc);
 	if (!*rl) {
