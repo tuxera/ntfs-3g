@@ -37,7 +37,8 @@ and
 .B dmask
 options.
 .PP
-Windows users have full access to the files created on Linux.
+Windows users have full access to the files created by 
+.B ntfs-3g.
 .PP
 If 
 .B ntfs-3g 
