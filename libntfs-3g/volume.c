@@ -457,32 +457,11 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 				"sector size.  This may affect performance "
 				"but should be harmless otherwise.  Error: "
 				"%s\n", strerror(errno));
-	/*
-	 * We now initialize the cluster allocator.
-	 *
-	 * FIXME: Move this to its own function? (AIA)
-	 */
+	
+	/* We now initialize the cluster allocator. */
 
-	// TODO: Make this tunable at mount time. (AIA)
-	vol->mft_zone_multiplier = 1;
-
-	/* Determine the size of the MFT zone. */
-	mft_zone_size = vol->nr_clusters;
-	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
-	case 4:
-		mft_zone_size >>= 1;			/* 50%   */
-		break;
-	case 3:
-		mft_zone_size = mft_zone_size * 3 >> 3;	/* 37.5% */
-		break;
-	case 2:
-		mft_zone_size >>= 2;			/* 25%   */
-		break;
-	/* case 1: */
-	default:
-		mft_zone_size >>= 3;			/* 12.5% */
-		break;
-	}
+	mft_zone_size = min(vol->nr_clusters >> 3,      /* 12.5% */
+			    200 * 1000 * 1024 >> vol->cluster_size_bits);
 
 	/* Setup the mft zone. */
 	vol->mft_zone_start = vol->mft_zone_pos = vol->mft_lcn;
