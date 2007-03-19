@@ -24,6 +24,17 @@ fi
   exit 1
 }
 
+UNAME=`which uname`
+if [ $? -eq 0 -a -n ${UNAME} -a -x ${UNAME} ]; then
+	OS=`${UNAME} -s`
+	if [ $? -eq 0 -a -n ${OS} -a "${OS}" == "Darwin" ]; then
+		echo ""
+		echo "Running on Mac OS X / Darwin.  Setting LIBTOOLIZE=glibtoolize..."
+		echo ""
+		export LIBTOOLIZE="glibtoolize"
+	fi
+fi
+
 echo Running autoreconf --verbose --install
 autoreconf --force --verbose --install
 

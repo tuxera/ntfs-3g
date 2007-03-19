@@ -1,7 +1,7 @@
 /**
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2006 Anton Altaparmakov
+ * Copyright (c) 2000-2007 Anton Altaparmakov
  * Copyright (c) 2001-2005 Richard Russon
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
@@ -27,21 +27,6 @@
  * along with this program (in the main directory of the Linux-NTFS source
  * in the file COPYING); if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-
-/*
- * WARNING: This program might not work on architectures which do not allow
- * unaligned access. For those, the program would need to start using
- * get/put_unaligned macros (#include <asm/unaligned.h>), but not doing it yet,
- * since NTFS really mostly applies to ia32 only, which does allow unaligned
- * accesses. We might not actually have a problem though, since the structs are
- * defined as being packed so that might be enough for gcc to insert the
- * correct code.
- *
- * If anyone using a non-little endian and/or an aligned access only CPU tries
- * this program please let me know whether it works or not!
- *
- *	Anton Altaparmakov <aia21@cantab.net>
  */
 
 #ifdef HAVE_CONFIG_H
@@ -263,7 +248,7 @@ static void mkntfs_version(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s)\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
 	ntfs_log_info("Create an NTFS volume on a user specified (block) device.\n\n");
-	ntfs_log_info("Copyright (c) 2000-2006 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2000-2007 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");
 	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
 	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");

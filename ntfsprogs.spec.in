@@ -41,7 +41,7 @@ allows GNOME VFS clients to seamlessly utilize the NTFS library (libntfs).
 Summary		: NTFS FUSE module (ntfsmount)
 Group		: System Environment/Base
 Requires	: ntfsprogs = %{ver}-%{rel}
-Requires	: fuse >= 2.3.0
+Requires	: fuse >= 2.6.1
 %description fuse
 This package contains the ntfsmount utility which is an NTFS filesystem in
 userspace (FUSE) module allowing users to mount an ntfs filesystem from

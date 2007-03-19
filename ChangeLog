@@ -1,4 +1,4 @@
-xx/01/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
+xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 
 	- ntfsmount now creates files and directories with security descriptor
 	  that grant full access to everyone.  (Yura)
