@@ -49,7 +49,7 @@ or 'users'
 option is specified. The
 .B ntfs-3g 
 process drops the 
-root priviledge after successful mount and runs unpriviledged 
+root privilege after successful mount and runs unprivileged 
 afterwards.
 .SS Alternate Data Streams (ADS)
 All data on NTFS is stored in streams.  Every file has exactly one unnamed
