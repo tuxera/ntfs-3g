@@ -1616,7 +1616,7 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static ntfs_volume *ntfs_open(const char *device, int blkdev)
+static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 {
 	unsigned long flags = 0;
 	
@@ -1627,7 +1627,7 @@ static ntfs_volume *ntfs_open(const char *device, int blkdev)
 	if (ctx->noatime)
 		flags |= MS_NOATIME;
 
-	ctx->vol = utils_mount_volume(device, flags, ctx->force);
+	ctx->vol = utils_mount_volume(device, mntpoint, flags, ctx->force);
 	return ctx->vol;
 }
 
@@ -2131,7 +2131,7 @@ int main(int argc, char *argv[])
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		use_blkdev = 1;
 
-	if (!ntfs_open(opts.device, use_blkdev))
+	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
 		goto err_out;
 	
 	if (use_blkdev)

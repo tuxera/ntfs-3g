@@ -117,6 +117,17 @@ static const char *fakeraid_msg =
 "different device under /dev/mapper, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
 "to mount NTFS. Please see the 'dmraid' documentation for help.\n";
 
+static const char *dirty_volume_msg =
+"Volume is scheduled for check. Please boot into Windows TWICE, or\n"
+"use the 'force' mount option. For example type on the command line:\n"
+"\n"
+"    mount -t ntfs-3g %s %s -o force\n"
+"\n"
+"Or add the option to the relevant row in the /etc/fstab file:\n"
+"\n"
+"    %s %s ntfs-3g defaults,force 0 0\n"
+"\n";
+
 /**
  * utils_set_locale
  */
@@ -134,8 +145,8 @@ int utils_set_locale(void)
 	}
 }
 
-ntfs_volume *utils_mount_volume(const char *volume, unsigned long flags,
-				BOOL force)
+ntfs_volume *utils_mount_volume(const char *volume, const char *mntpoint,
+				unsigned long flags, BOOL force)
 {
 	ntfs_volume *vol;
 
@@ -162,9 +173,8 @@ ntfs_volume *utils_mount_volume(const char *volume, unsigned long flags,
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
 		if (!force) {
-			ntfs_log_error("Volume is scheduled for check.\nPlease "
-				       "boot into Windows TWICE, or use the "
-				       "'force' mount option.\n");
+			ntfs_log_error(dirty_volume_msg, volume, mntpoint, 
+				       volume, mntpoint);
 			ntfs_umount(vol, FALSE);
 			
 			return NULL;
