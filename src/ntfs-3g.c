@@ -146,14 +146,14 @@ static const char *locale_msg =
 "         http://www.ntfs-3g.org/support.html#locale\n";
 
 static const char *fuse26_kmod_msg =
-"WARNING: Deficient FUSE kernel module detected. Some driver features are\n"
+"WARNING: Deficient Linux kernel detected. Some driver features are\n"
 "         not available (swap file on NTFS, boot from NTFS by LILO), and\n"
 "         unmount is not safe unless it's made sure the ntfs-3g process\n"
-"         naturally terminates after calling 'umount'. The safe FUSE kernel\n"
-"         driver is included in the official Linux kernels since version\n"
-"         2.6.20-rc1, or in the FUSE 2.6.0 or later software packages,\n"
-"         except the faulty FUSE version 2.6.2. Please see the next page\n"
-"         for more help: http://www.ntfs-3g.org/support.html#fuse26\n"
+"         naturally terminates after calling 'umount'. If you wish this\n"
+"         message to disappear then you should upgrade to at least kernel\n"
+"         version 2.6.20, or request help from your distribution to fix\n"
+"         the kernel problem. The below web page has more information:\n"
+"         http://www.ntfs-3g.org/support.html#fuse26\n"
 "\n";
 
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
