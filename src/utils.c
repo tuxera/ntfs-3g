@@ -102,8 +102,7 @@ static const char *unclean_journal_msg =
 "   device then click the 'Safely Remove Hardware' icon in the Windows\n"
 "   taskbar notification area before disconnecting it.\n"
 "Or\n"
-"   Run 'ntfsfix' on Linux unless you have Vista, then mount NTFS with\n"
-"   the 'force' option read-write, or with the 'ro' option read-only.\n"
+"   Run ntfsfix version 1.13.1 on Linux unless you have Vista.\n"
 "Or\n"
 "   Mount the NTFS volume with the 'ro' option in read-only mode.\n";
 
