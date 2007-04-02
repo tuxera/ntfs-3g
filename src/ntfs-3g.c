@@ -1607,8 +1607,8 @@ static int ntfs_fuse_init(void)
 	
 	*ctx = (ntfs_fuse_context_t) {
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
-		.uid = geteuid(),
-		.gid = getegid(),
+		.uid = getuid(),
+		.gid = getgid(),
 		.fmask = 0,
 		.dmask = 0,
 		.streams = NF_STREAMS_INTERFACE_NONE,
