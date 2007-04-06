@@ -2113,7 +2113,7 @@ int main(int argc, char *argv[])
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
 	struct fuse_chan *fc;
-	fuse_fstype fstype;
+	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
 	int use_blkdev = 0;
 	uid_t uid, euid;
@@ -2143,10 +2143,11 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
+#ifdef linux
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
-	
+#endif	
 	create_dev_fuse();
 	
 	if (stat(opts.device, &sbuf)) {
