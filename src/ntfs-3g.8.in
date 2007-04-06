@@ -187,12 +187,6 @@ Unmount /mnt/windows:
 .B umount /mnt/windows
 .sp
 .RE
-You can also unmount /mnt/windows with fusermount:
-.RS
-.sp
-.B fusermount \-u /mnt/windows
-.sp
-.RE
 .SH KNOWN ISSUES
 Please see 
 .RS
