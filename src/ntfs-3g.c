@@ -2133,7 +2133,6 @@ int main(int argc, char *argv[])
 	parsed_options = parse_mount_options(opts.options ? opts.options : "");
 	if (!parsed_options)
 		goto err_out;
-	free(opts.options);
 
 	uid  = getuid();
 	euid = geteuid();
@@ -2219,7 +2218,8 @@ int main(int argc, char *argv[])
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
-	ntfs_log_info("Options: %s\n", parsed_options);
+	ntfs_log_info("Cmdline options: %s\n", opts.options);
+	ntfs_log_info("Mount options: %s\n", parsed_options);
 	
 	fuse_loop(fh);
 	
@@ -2227,6 +2227,7 @@ int main(int argc, char *argv[])
 	fuse_destroy(fh);
 	err = 0;
 err_out:
+	free(opts.options);
 	free(parsed_options);
 	ntfs_fuse_destroy();
 	return err;
