@@ -28,6 +28,7 @@
 linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs-3g
 
 lib_LTLIBRARIES = libntfs-3g.la
+libntfs_3g_la_LDFLAGS = -version-number $(LIBNTFS_3G_VERSION)
 libntfs_3g_la_CFLAGS = $(LIBNTFS_3G_CFLAGS) 
 libntfs_3g_la_SOURCES =	\
 	attrib.c	\
