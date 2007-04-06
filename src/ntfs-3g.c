@@ -1872,6 +1872,32 @@ static char *realpath(const char *path, char *resolved_path)
 }
 #endif
 
+static int strappend(char **dest, const char *append)
+{
+	char *p;
+	size_t size;
+	
+	if (!dest)
+		return -1;
+	if (!append)
+		return 0;
+	
+	size = strlen(append) + 1;
+	if (*dest)
+		size += strlen(*dest);
+	
+	p = realloc(*dest, size);
+    	if (!p) {
+		ntfs_log_perror("Memory realloction failed");
+		return -1;
+	}
+	
+	strcat(p, append);
+	*dest = p;
+	
+	return 0;
+}
+
 /**
  * parse_options - Read and validate the programs command line
  *
@@ -1932,13 +1958,12 @@ static int parse_options(int argc, char *argv[])
 			}
 			break;
 		case 'o':
-			if (!opts.options)
-				opts.options = optarg;
-			else {
-				ntfs_log_error("You must specify exactly one "
-						"set of options.\n");
-				err++;
-			}
+			if (opts.options)
+				if (strappend(&opts.options, ","))
+					return 0;
+			if (strappend(&opts.options, optarg))
+				return 0;
+			printf("==> '%s'\n", opts.options);
 			break;
 		case 'h':
 		case '?':
@@ -2108,6 +2133,7 @@ int main(int argc, char *argv[])
 	parsed_options = parse_mount_options(opts.options ? opts.options : "");
 	if (!parsed_options)
 		goto err_out;
+	free(opts.options);
 
 	uid  = getuid();
 	euid = geteuid();
