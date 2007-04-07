@@ -131,8 +131,6 @@ static struct options {
 	char	*mnt_point;	/* Mount point */
 	char	*options;	/* Mount options */
 	char	*device;	/* Device to mount */
-	int	 quiet;		/* Less output */
-	int	 verbose;	/* Extra output */
 } opts;
 
 static const char *EXEC_NAME = "ntfs-3g";
@@ -143,7 +141,7 @@ static u32 ntfs_sequence;
 static const char *locale_msg =
 "WARNING: Couldn't set locale to '%s' thus some file names may not\n"
 "         be correct or visible. Please see the potential solution at\n"
-"         http://www.ntfs-3g.org/support.html#locale\n";
+"         http://ntfs-3g.org/support.html#locale\n";
 
 static const char *fuse26_kmod_msg =
 "WARNING: Deficient Linux kernel detected. Some driver features are\n"
@@ -153,8 +151,24 @@ static const char *fuse26_kmod_msg =
 "         message to disappear then you should upgrade to at least kernel\n"
 "         version 2.6.20, or request help from your distribution to fix\n"
 "         the kernel problem. The below web page has more information:\n"
-"         http://www.ntfs-3g.org/support.html#fuse26\n"
+"         http://ntfs-3g.org/support.html#fuse26\n"
 "\n";
+
+static const char *usage_msg = 
+"\n"
+"%s %s - Third Generation NTFS Driver\n"
+"\n"
+"Copyright (C) 2005-2006 Yura Pakhuchiy\n"
+"Copyright (C) 2006-2007 Szabolcs Szakacsits\n"
+"\n"
+"Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
+"\n"
+"Options:  ro, force, locale=, uid=, gid=, umask=, fmask=, dmask=,\n"
+"          streams_interface=. Please see details in the manual.\n"
+"\n"
+"Example:  ntfs-3g /dev/sda1 /mnt/win -o force,locale=en_EN.UTF-8\n"
+"\n"
+"%s";
 
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
@@ -1849,17 +1863,7 @@ err_exit:
 
 static void usage(void)
 {
-	ntfs_log_info("\n%s %s - Third Generation NTFS Driver\n\n",
-			EXEC_NAME, VERSION);
-	ntfs_log_info("Copyright (C) 2005-2006 Yura Pakhuchiy\n");
-	ntfs_log_info("Copyright (C) 2006-2007 Szabolcs Szakacsits\n\n");
-	ntfs_log_info("Usage:    %s device mount_point [-o options]\n\n", 
-		      EXEC_NAME);
-	ntfs_log_info("Options:  ro, force, locale, uid, gid, umask, fmask, "
-		      "dmask, \n\t"
-		      "  show_sys_files, no_def_opts, streams_interface.\n\t"
-		      "  Please see the details in the manual.\n\n");
-	ntfs_log_info("%s\n", ntfs_home);
+	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, EXEC_NAME, ntfs_home);
 }
 
 #ifndef HAVE_REALPATH
@@ -1900,108 +1904,79 @@ static int strappend(char **dest, const char *append)
 
 /**
  * parse_options - Read and validate the programs command line
- *
  * Read the command line, verify the syntax and parse the options.
- * This function is very long, but quite simple.
  *
- * Return:  1 Success
- *	    0 Error, one or more problems
+ * Return:   0 success, -1 error.
  */
 static int parse_options(int argc, char *argv[])
 {
-	int err = 0, help = 0;
-	int c = -1;
+	int c;
 
-	static const char *sopt = "-o:h?qv";
+	static const char *sopt = "-o:h";
 	static const struct option lopt[] = {
 		{ "options",	 required_argument,	NULL, 'o' },
 		{ "help",	 no_argument,		NULL, 'h' },
-		{ "quiet",	 no_argument,		NULL, 'q' },
-		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ NULL,		 0,			NULL,  0  }
 	};
 
 	opterr = 0; /* We'll handle the errors, thank you. */
-
-	opts.mnt_point = NULL;
-	opts.options = NULL;
-	opts.device = NULL;
 
 	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
 				opts.device = ntfs_malloc(PATH_MAX + 1);
-				if (!opts.device) {
-					err++;
-					break;
-				}
+				if (!opts.device)
+					return -1;
+				
 				/* We don't want relative path in /etc/mtab. */
 				if (optarg[0] != '/') {
 					if (!realpath(optarg, opts.device)) {
-						ntfs_log_perror("Cannot mount "
-								"'%s'", optarg);
+						ntfs_log_perror("%s: "
+							"Cannot mount '%s'", 
+							EXEC_NAME, optarg);
 						free(opts.device);
 						opts.device = NULL;
-						err++;
-						break;
+						return -1;
 					}
 				} else
 					strcpy(opts.device, optarg);
-			} else if (!opts.mnt_point)
+			} else if (!opts.mnt_point) {
 				opts.mnt_point = optarg;
-			else {
-				ntfs_log_error("You must specify exactly one "
+			} else {
+				ntfs_log_error("%s: You must specify exactly one "
 						"device and exactly one mount "
-						"point.\n");
-				err++;
+						"point.\n", EXEC_NAME);
+				return -1;
 			}
 			break;
 		case 'o':
 			if (opts.options)
 				if (strappend(&opts.options, ","))
-					return 0;
+					return -1;
 			if (strappend(&opts.options, optarg))
-				return 0;
-			printf("==> '%s'\n", opts.options);
+				return -1;
 			break;
 		case 'h':
-		case '?':
-			help++;
-			break;
-		case 'q':
-			opts.quiet++;
-			break;
-		case 'v':
-			opts.verbose++;
-			break;
+			usage();
+			exit(9);
 		default:
-			ntfs_log_error("Unknown option '%s'.\n",
-					argv[optind - 1]);
-			err++;
-			break;
+			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
+				       argv[optind - 1]);
+			return -1;
 		}
 	}
 
-	if (help) {
-		opts.quiet = 0;
-	} else {
-		if (!opts.device) {
-			ntfs_log_error("No device specified.\n");
-			err++;
-		}
-
-		if (opts.quiet && opts.verbose) {
-			ntfs_log_error("You may not use --quiet and --verbose "
-					"at the same time.\n");
-			err++;
-		}
+	if (!opts.device) {
+		ntfs_log_error("%s: No device is specified.\n", EXEC_NAME);
+		return -1;
+	}
+	if (!opts.mnt_point) {
+		ntfs_log_error("%s: No mountpoint is specified.\n", EXEC_NAME);
+		return -1;
 	}
 
-	if (help || err)
-		usage();
-
-	return (!help && !err);
+	return 0;
 }
 
 static fuse_fstype get_fuse_fstype(void)
@@ -2124,8 +2099,10 @@ int main(int argc, char *argv[])
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	if (!parse_options(argc, argv))
+	if (parse_options(argc, argv)) {
+		usage();
 		return 1;
+	}
 
 	if (ntfs_fuse_init())
 		return 2;
