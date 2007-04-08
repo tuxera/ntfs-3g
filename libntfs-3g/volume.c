@@ -552,22 +552,25 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 	RESTART_PAGE_HEADER *rp = NULL;
 	int err = 0;
 
-	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
+	ni = ntfs_inode_open(vol, FILE_LogFile);
+	if (!ni) {
 		ntfs_log_perror("Failed to open inode FILE_LogFile");
 		errno = EIO;
 		return -1;
 	}
-	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+	
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
 		ntfs_log_perror("Failed to open $FILE_LogFile/$DATA");
 		err = EIO;
-		goto exit;
+		goto out;
 	}
+	
 	if (!ntfs_check_logfile(na, &rp) || !ntfs_is_logfile_clean(na, rp))
 		err = EOPNOTSUPP;
 	free(rp);
-exit:
-	if (na)
-		ntfs_attr_close(na);
+	ntfs_attr_close(na);
+out:	
 	ntfs_inode_close(ni);
 	if (err) {
 		errno = err;
@@ -1075,10 +1078,15 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * We care only about read-write mounts.
 	 */
 	if (!(flags & MS_RDONLY)) {
-		if (ntfs_volume_check_logfile(vol) < 0)
-			goto error_exit;
 		if (ntfs_volume_check_hiberfile(vol) < 0)
 			goto error_exit;
+		if (ntfs_volume_check_logfile(vol) < 0) {
+			if (!(flags & MS_FORCE))
+				goto error_exit;
+			ntfs_log_info("WARNING: Forced mount, reset $LogFile.\n");
+			if (ntfs_logfile_reset(vol))
+				goto error_exit;
+		}
 	}
 
 	return vol;
@@ -1399,12 +1407,14 @@ int ntfs_logfile_reset(ntfs_volume *vol)
 		return -1;
 	}
 
-	if ((ni = ntfs_inode_open(vol, FILE_LogFile)) == NULL) {
-		ntfs_log_perror("Failed to open inode FILE_LogFile.");
+	ni = ntfs_inode_open(vol, FILE_LogFile);
+	if (!ni) {
+		ntfs_log_perror("Failed to open inode FILE_LogFile");
 		return -1;
 	}
 
-	if ((na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0)) == NULL) {
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
 		eo = errno;
 		ntfs_log_perror("Failed to open $FILE_LogFile/$DATA");
 		goto error_exit;
@@ -1412,10 +1422,10 @@ int ntfs_logfile_reset(ntfs_volume *vol)
 
 	if (ntfs_empty_logfile(na)) {
 		eo = errno;
-		ntfs_log_perror("Failed to empty $FILE_LogFile/$DATA");
 		ntfs_attr_close(na);
 		goto error_exit;
 	}
+	
 	ntfs_attr_close(na);
 	return ntfs_inode_close(ni);
 

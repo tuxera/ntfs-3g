@@ -100,10 +100,10 @@ environment variables are not set before partitions had been mounted
 from /etc/fstab.
 .TP
 .B force
-Force mount even if the volume is scheduled for consistency check.
-Use this option with caution and preferably with the
-.B ro
-option.
+Force mount even if the volume is scheduled for consistency check or
+the logfile is unclean. The logfile will be unconditionally cleared 
+in the latter case. Use this option with caution and for your own 
+responsibility.
 .TP
 .B show_sys_files
 Show the system files in directory listings. 

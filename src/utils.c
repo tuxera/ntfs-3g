@@ -97,14 +97,14 @@ static const char *hibernated_volume_msg =
 "properly, so mounting could be done safely.\n";
 
 static const char *unclean_journal_msg =
-"Mount is denied because NTFS logfile is unclean. Choose one action:\n"
-"   Boot Windows and shutdown it cleanly, or if you have a removable\n"
-"   device then click the 'Safely Remove Hardware' icon in the Windows\n"
-"   taskbar notification area before disconnecting it.\n"
-"Or\n"
-"   Run ntfsfix version 1.13.1 on Linux unless you have Vista.\n"
-"Or\n"
-"   Mount the NTFS volume with the 'ro' option in read-only mode.\n";
+"Mount is denied because NTFS is marked to be in use. Choose one action:\n"
+"\n"
+"Choice 1: If you have Windows then disconnect the external devices by\n"
+"          clicking on the 'Safely Remove Hardware' icon in the Windows\n"
+"          taskbar then shutdown Windows cleanly.\n"
+"\n"
+"Choice 2: If you don't have Windows then you can use the 'force' option for\n"
+"          your own responsibility. For example type on the command line:\n";
 
 static const char *opened_volume_msg =
 "Mount is denied because the NTFS volume is already exclusively opened.\n"
@@ -118,14 +118,15 @@ static const char *fakeraid_msg =
 
 static const char *dirty_volume_msg =
 "Volume is scheduled for check. Please boot into Windows TWICE, or\n"
-"use the 'force' mount option. For example type on the command line:\n"
+"use the 'force' mount option. For example type on the command line:\n";
+
+static const char *forced_mount_msg =
 "\n"
-"    mount -t ntfs-3g %s %s -o force\n"
+"            mount -t ntfs-3g %s %s -o force\n"
 "\n"
-"Or add the option to the relevant row in the /etc/fstab file:\n"
+"    Or add the option to the relevant row in the /etc/fstab file:\n"
 "\n"
-"    %s %s ntfs-3g defaults,force 0 0\n"
-"\n";
+"            %s %s ntfs-3g defaults,force 0 0\n";
 
 /**
  * utils_set_locale
@@ -160,9 +161,11 @@ ntfs_volume *utils_mount_volume(const char *volume, const char *mntpoint,
 			ntfs_log_error("%s", corrupt_volume_msg);
 		else if (errno == EPERM)
 			ntfs_log_error("%s", hibernated_volume_msg);
-		else if (errno == EOPNOTSUPP)
-			ntfs_log_error("%s", unclean_journal_msg);
-		else if (errno == EBUSY)
+		else if (errno == EOPNOTSUPP) {
+			ntfs_log_error(unclean_journal_msg);
+			ntfs_log_error(forced_mount_msg, volume, mntpoint,
+				       volume, mntpoint);
+		} else if (errno == EBUSY)
 			ntfs_log_error("%s", opened_volume_msg);
 		else if (errno == ENXIO)
 			ntfs_log_error("%s", fakeraid_msg);
@@ -172,14 +175,15 @@ ntfs_volume *utils_mount_volume(const char *volume, const char *mntpoint,
 
 	if (vol->flags & VOLUME_IS_DIRTY) {
 		if (!force) {
-			ntfs_log_error(dirty_volume_msg, volume, mntpoint, 
+			ntfs_log_error("%s", dirty_volume_msg);
+			ntfs_log_error(forced_mount_msg, volume, mntpoint, 
 				       volume, mntpoint);
 			ntfs_umount(vol, FALSE);
 			
 			return NULL;
 		} else
-			ntfs_log_error("WARNING: Dirty volume mount was forced "
-				       "by the 'force' mount option.\n");
+			ntfs_log_error("WARNING: Forced mount, unclean volume "
+				       "information is ignored.\n");
 	}
 	
 	return vol;

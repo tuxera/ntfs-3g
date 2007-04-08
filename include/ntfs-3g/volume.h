@@ -63,6 +63,10 @@
 
 #define MS_EXCLUSIVE 0x08000000
 
+#ifndef MS_FORCE
+#define MS_FORCE     0x10000000
+#endif
+
 /* Forward declaration */
 typedef struct _ntfs_volume ntfs_volume;
 

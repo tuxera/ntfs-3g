@@ -1640,6 +1640,8 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 		flags |= MS_RDONLY;
 	if (ctx->noatime)
 		flags |= MS_NOATIME;
+	if (ctx->force)
+		flags |= MS_FORCE;
 
 	ctx->vol = utils_mount_volume(device, mntpoint, flags, ctx->force);
 	return ctx->vol;
