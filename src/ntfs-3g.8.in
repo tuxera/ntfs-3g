@@ -3,17 +3,17 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "March 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "April 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
 .I device mount_point
-[\fB\-o options\fR]
+\fB[-o \fIoption\fP\fB[,...]]\fR
 .br
 .B mount \-t ntfs-3g
 .I device mount_point
-[\fB\-o options\fR]
+\fB[-o \fIoption\fP\fB[,...]]\fR
 .SH DESCRIPTION
 \fBntfs-3g\fR is an NTFS driver, which can
 create, remove, rename, move files, directories, hard links, and
@@ -120,12 +120,6 @@ to the user mounting the filesystem.  This option is only
 allowed to root, but this restriction can be overridden by 
 the 'user_allow_other' option in the /etc/fuse.conf file.
 .TP
-.B large_read
-Issue large read requests.  This can improve performance for some
-filesystems, but can also degrade performance.  This option is mostly
-useful on 2.4.X kernels, as on 2.6 kernels requests size is
-automatically determined for optimum performance.
-.TP
 .BI max_read= value
 With this option the maximum size of read operations can be set.
 The default is infinite.  Note that the size of read requests is
@@ -191,7 +185,7 @@ Unmount /mnt/windows:
 Please see 
 .RS
 .sp
-http://www.ntfs-3g.org/support.html
+http://ntfs-3g.org/support.html
 .sp
 .RE
 for common questions and known issues.
