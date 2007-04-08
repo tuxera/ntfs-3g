@@ -767,20 +767,11 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	l = ntfs_attr_mst_pread(vol->mftmirr_na, 0, vol->mftmirr_size,
 			vol->mft_record_size, m2);
 	if (l != vol->mftmirr_size) {
-		if (l == 4)
-			vol->mftmirr_size = 4;
-		else {
-			if (l == -1)
-				ntfs_log_perror("Failed to read $MFTMirr");
-			else {
-				ntfs_log_error("Failed to read $MFTMirr "
-					       "unexpected length (%d != %lld)."
-					       "\n", vol->mftmirr_size,
-					       (long long)l);
-				errno = EIO;
-			}
+		if (l == -1) {
+			ntfs_log_perror("Failed to read $MFTMirr");
 			goto error_exit;
 		}
+		vol->mftmirr_size = l;
 	}
 	ntfs_log_debug("Comparing $MFTMirr to $MFT... ");
 	for (i = 0; i < vol->mftmirr_size; ++i) {
