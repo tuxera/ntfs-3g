@@ -1045,6 +1045,12 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		errno = EINVAL;
 		return NULL;
 	}
+	
+	if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+		errno = EOPNOTSUPP;
+		return NULL;
+	}
+	
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
@@ -1567,6 +1573,12 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		ntfs_log_perror("ntfs_link wrong arguments");
 		goto err_out;
 	}
+	
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		err = EOPNOTSUPP;
+		goto err_out;
+	}
+	
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
 	fn = ntfs_calloc(fn_len);
