@@ -1898,7 +1898,10 @@ static int strappend(char **dest, const char *append)
 		return -1;
 	}
 	
-	strcat(p, append);
+	if (*dest)
+		strcat(p, append);
+	else
+		strcpy(p, append);
 	*dest = p;
 	
 	return 0;
