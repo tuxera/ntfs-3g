@@ -1917,10 +1917,11 @@ static int parse_options(int argc, char *argv[])
 {
 	int c;
 
-	static const char *sopt = "-o:h";
+	static const char *sopt = "-o:hv";
 	static const struct option lopt[] = {
 		{ "options",	 required_argument,	NULL, 'o' },
 		{ "help",	 no_argument,		NULL, 'h' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ NULL,		 0,			NULL,  0  }
 	};
 
@@ -1965,6 +1966,12 @@ static int parse_options(int argc, char *argv[])
 		case 'h':
 			usage();
 			exit(9);
+		case 'v':
+			/*
+			 * We must handle the 'verbose' option even if
+			 * we don't use it because mount(8) passes it.
+			 */
+			break;
 		default:
 			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
 				       argv[optind - 1]);
