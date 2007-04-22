@@ -1051,12 +1051,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		return NULL;
 	}
 	
-	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
-	if (!ni) {
-		ntfs_log_perror("Could not allocate new MFT record");
+	if (!ni)
 		return NULL;
-	}
 	/*
 	 * Create STANDARD_INFORMATION attribute. Write STANDARD_INFORMATION
 	 * version 1.2, windows will upgrade it to version 3 if needed.

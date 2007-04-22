@@ -1007,8 +1007,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		// this extent is not required to find the mft record in
 		// question.
 		errno = EOPNOTSUPP;
-		ntfs_log_perror("Not enough space to extended mft data "
-				"attribute.\n");
+		ntfs_log_perror("Not enough space to extended mft data");
 		goto undo_alloc;
 	}
 	mp_rebuilt = TRUE;
@@ -1373,18 +1372,15 @@ mft_rec_already_initialized:
 		goto undo_mftbmp_alloc;
 	
 	if (ntfs_mft_record_read(vol, bit, m)) {
-		err = errno;
-		ntfs_log_error("Failed to read mft record.\n");
+		ntfs_log_perror("Error reading mft %lld", (long long)bit);
 		free(m);
-		errno = err;
 		goto undo_mftbmp_alloc;
 	}
 	/* Sanity check that the mft record is really not in use. */
 	if (ntfs_is_file_record(m->magic) && (m->flags & MFT_RECORD_IN_USE)) {
-		ntfs_log_error("Mft record 0x%llx was marked unused in "
-				"mft bitmap but is marked used itself.  "
-				"Corrupt filesystem or library bug!  "
-				"Run chkdsk immediately!\n", (long long)bit);
+		ntfs_log_error("Mft %lld was marked unused in mft bitmap but "
+			       "is marked used itself. Corrupt filesystem, "
+			       "run chkdsk!\n", (long long)bit);
 		free(m);
 		errno = EIO;
 		goto undo_mftbmp_alloc;
@@ -1392,10 +1388,8 @@ mft_rec_already_initialized:
 	seq_no = m->sequence_number;
 	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
 	if (ntfs_mft_record_layout(vol, bit, m)) {
-		err = errno;
 		ntfs_log_error("Failed to re-format mft record.\n");
 		free(m);
-		errno = err;
 		goto undo_mftbmp_alloc;
 	}
 	if (le16_to_cpu(seq_no))
@@ -1408,10 +1402,8 @@ mft_rec_already_initialized:
 	/* Now need to open an ntfs inode for the mft record. */
 	ni = ntfs_inode_allocate(vol);
 	if (!ni) {
-		err = errno;
 		ntfs_log_error("Failed to allocate buffer for inode.\n");
 		free(m);
-		errno = err;
 		goto undo_mftbmp_alloc;
 	}
 	ni->mft_no = bit;
