@@ -683,8 +683,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
 		if (res < (s64)size)
-			ntfs_log_error("ntfs_attr_pread returned less bytes "
-					"than requested.\n");
+			ntfs_log_perror("ntfs_attr_pread partial write (%lld: "
+				"%lld <> %d)", (s64)offset, (s64)size, res);
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
