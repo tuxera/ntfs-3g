@@ -62,6 +62,7 @@
 #endif
 #include <getopt.h>
 #include <syslog.h>
+#include <sys/wait.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -1991,6 +1992,18 @@ static int parse_options(int argc, char *argv[])
 	return 0;
 }
 
+static void create_dev_fuse(void)
+{
+	struct stat st;
+	
+	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
+		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229)))
+			ntfs_log_perror("Failed to create /dev/fuse");
+	}
+}
+
+#ifdef linux
+
 static fuse_fstype get_fuse_fstype(void)
 {
 	char buf[256];
@@ -2015,29 +2028,23 @@ static fuse_fstype get_fuse_fstype(void)
 	return fstype;
 }
 
-static void create_dev_fuse(void)
-{
-	struct stat st;
-	
-	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
-		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229)))
-			ntfs_log_perror("Failed to create /dev/fuse");
-	}
-}
-
 static fuse_fstype load_fuse_module(void)
 {
 	int i;
 	struct stat st;
-	const char *load_fuse_cmd = "/sbin/modprobe fuse";
+	pid_t pid;
+	const char *cmd = "/sbin/modprobe";
 	struct timespec req = { 0, 100000000 };   /* 100 msec */
 	fuse_fstype fstype;
 	
-	if (stat("/sbin/modprobe", &st) == -1)
-		load_fuse_cmd = "modprobe fuse";
-	
-	if (getuid() == 0)
-		system(load_fuse_cmd);
+	if (!stat(cmd, &st) && !getuid()) {
+		pid = fork();
+		if (!pid) {
+			execl(cmd, cmd, "fuse", NULL);
+			_exit(1);
+		} else if (pid != -1)
+			waitpid(pid, NULL, 0);
+	}
 	
 	for (i = 0; i < 10; i++) {
 		/* 
@@ -2053,6 +2060,8 @@ static fuse_fstype load_fuse_module(void)
 	}
 	return fstype;
 }
+
+#endif
 
 static struct fuse_chan *try_fuse_mount(char *parsed_options)
 {
