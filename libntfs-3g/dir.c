@@ -1637,7 +1637,6 @@ rollback_failed:
 err_out:
 	free(fn);
 	errno = err;
-	ntfs_log_perror("Hard link failed");
 	return -1;
 }
 
