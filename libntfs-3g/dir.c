@@ -466,10 +466,13 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			q++;
 		}
 
-		len = ntfs_mbstoucs(p, &unicode, NTFS_MAX_NAME_LEN);
+		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
 		if (len < 0) {
 			ntfs_log_debug("Couldn't convert name to Unicode: %s.\n", p);
 			err = errno;
+			goto close;
+		} else if (len > NTFS_MAX_NAME_LEN) {
+			err = ENAMETOOLONG;
 			goto close;
 		}
 
