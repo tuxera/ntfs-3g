@@ -1311,6 +1311,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	
 	mft_na = vol->mft_na;
 	mftbmp_na = vol->mftbmp_na;
+retry:	
 	bit = ntfs_mft_bitmap_find_free_rec(vol, base_ni);
 	if (bit >= 0) {
 		ntfs_log_debug("Found free record (#1), bit 0x%llx.\n",
@@ -1405,12 +1406,10 @@ found_free_rec:
 	}
 	/* Sanity check that the mft record is really not in use. */
 	if (ntfs_is_file_record(m->magic) && (m->flags & MFT_RECORD_IN_USE)) {
-		ntfs_log_error("Mft %lld was marked unused in mft bitmap but "
-			       "is marked used itself. Corrupt filesystem, "
-			       "run chkdsk!\n", (long long)bit);
+		ntfs_log_error("Inode %lld is used but it wasn't marked in "
+			       "$MFT bitmap. Fixed.\n", (long long)bit);
 		free(m);
-		errno = EIO;
-		goto undo_mftbmp_alloc;
+		goto retry;
 	}
 	seq_no = m->sequence_number;
 	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
