@@ -116,7 +116,7 @@ static void __ntfs_inode_release(ntfs_inode *ni)
 		free(ni->attr_list);
 	free(ni->mrec);
 	free(ni);
-	return 0;
+	return;
 }
 
 /**
