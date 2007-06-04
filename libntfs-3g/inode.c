@@ -107,10 +107,11 @@ ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol)
  *
  * Returns:
  */
-static int __ntfs_inode_release(ntfs_inode *ni)
+static void __ntfs_inode_release(ntfs_inode *ni)
 {
 	if (NInoDirty(ni))
-		ntfs_log_debug("Eeek. Discarding dirty inode!\n");
+		ntfs_log_error("Releasing dirty inode %lld!\n", 
+			       (long long)ni->mft_no);
 	if (NInoAttrList(ni) && ni->attr_list)
 		free(ni->attr_list);
 	free(ni->mrec);
@@ -271,7 +272,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 	if (!ni)
 		return 0;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long)ni->mft_no);
 
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
@@ -330,11 +331,18 @@ int ntfs_inode_close(ntfs_inode *ni)
 			i = -1;
 			break;
 		}
+		
+		/* 
+		 *  We could successfully sync, so only log this error
+		 *  and try to sync other inode extents too.
+		 */
 		if (i != -1)
-			ntfs_log_debug("Extent inode was not attached to base inode! "
-					"Weird! Continuing regardless.\n");
+			ntfs_log_error("Extent inode %lld was not found\n",
+				       (long long)ni->mft_no);
 	}
-	return __ntfs_inode_release(ni);
+	
+	__ntfs_inode_release(ni);
+	return 0;
 }
 
 /**
@@ -425,9 +433,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	base_ni->extent_nis[base_ni->nr_extents++] = ni;
 	return ni;
 err_out:
-	i = errno;
 	__ntfs_inode_release(ni);
-	errno = i;
 	ntfs_log_perror("Failed to open extent inode");
 	return NULL;
 }
