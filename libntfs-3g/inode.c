@@ -542,12 +542,11 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 	FILE_NAME_ATTR *fn;
 	int err = 0;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		ntfs_log_trace("Failed to get attribute search context.\n");
 		goto err_out;
 	}
 	/* Walk through all FILE_NAME attributes and update them. */
@@ -556,27 +555,29 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				le16_to_cpu(ctx->attr->value_offset));
 		if (MREF_LE(fn->parent_directory) == ni->mft_no) {
 			/*
-			 * WARNING: We cheater here and obtain 2 attribute
+			 * WARNING: We cheat here and obtain 2 attribute
 			 * search contexts for one inode (first we obtained
 			 * above, second will be obtained inside
 			 * ntfs_index_lookup), it's acceptable for library,
-			 * but will lock kernel.
+			 * but will deadlock in the kernel.
 			 */
 			index_ni = ni;
 		} else
-			index_ni = ntfs_inode_open(ni->vol,
-				le64_to_cpu(fn->parent_directory));
+			index_ni = ntfs_inode_open(ni->vol, 
+					le64_to_cpu(fn->parent_directory));
 		if (!index_ni) {
 			if (!err)
 				err = errno;
-			ntfs_log_trace("Failed to open inode with index.\n");
+			ntfs_log_perror("Failed to open inode %lld with index",
+					le64_to_cpu(fn->parent_directory));
 			continue;
 		}
 		ictx = ntfs_index_ctx_get(index_ni, NTFS_INDEX_I30, 4);
 		if (!ictx) {
 			if (!err)
 				err = errno;
-			ntfs_log_trace("Failed to get index context.\n");
+			ntfs_log_perror("Failed to get index ctx, inode %lld",
+					(long long)index_ni->mft_no);
 			ntfs_inode_close(index_ni);
 			continue;
 		}
@@ -587,7 +588,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				else
 					err = errno;
 			}
-			ntfs_log_trace("Index lookup failed.\n");
+			ntfs_log_perror("Index lookup failed, inode %lld",
+					(long long)index_ni->mft_no);
 			ntfs_index_ctx_put(ictx);
 			ntfs_inode_close(index_ni);
 			continue;
@@ -605,13 +607,14 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		fn->last_access_time = utc2ntfs(ni->last_access_time);
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
-		if (ni != index_ni)
-			ntfs_inode_close(index_ni);
+		if ((ni != index_ni) && ntfs_inode_close(index_ni) && !err)
+			err = errno;
 	}
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
-		ntfs_log_trace("Attribute lookup failed.\n");
+		ntfs_log_perror("Attribute lookup failed, inode %lld",
+				(long long)ni->mft_no);
 		goto err_out;
 	}
 	ntfs_attr_put_search_ctx(ctx);
