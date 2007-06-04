@@ -646,10 +646,11 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 	if (!ni) {
 		errno = EINVAL;
+		ntfs_log_error("Failed to sync NULL inode\n");
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
@@ -659,7 +660,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			if (err != EIO)
 				err = EBUSY;
 		}
-		ntfs_log_trace("Failed to sync standard information.\n");
+		ntfs_log_perror("Failed to sync standard info (inode %lld)",
+				(long long)ni->mft_no);
 	}
 
 	/* Update FILE_NAME's in the index. */
@@ -671,7 +673,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			if (err != EIO)
 				err = EBUSY;
 		}
-		ntfs_log_trace("Failed to sync FILE_NAME attributes.\n");
+		ntfs_log_perror("Failed to sync FILE_NAME (inode %lld)",
+				(long long)ni->mft_no);
 		NInoFileNameSetDirty(ni);
 	}
 
@@ -686,33 +689,37 @@ int ntfs_inode_sync(ntfs_inode *ni)
 				err = errno;
 				if (err != EIO)
 					err = EBUSY;
-				ntfs_log_trace("Attribute list sync failed (open "
-						"failed).\n");
+				ntfs_log_perror("Attribute list sync failed "
+						"(open, inode %lld)",
+						(long long)ni->mft_no);
 			}
 			NInoAttrListSetDirty(ni);
-		} else {
-			if (na->data_size == ni->attr_list_size) {
-				if (ntfs_attr_pwrite(na, 0, ni->attr_list_size,
-							ni->attr_list) !=
-							ni->attr_list_size) {
-					if (!err || errno == EIO) {
-						err = errno;
-						if (err != EIO)
-							err = EBUSY;
-						ntfs_log_trace("Attribute list sync "
-							"failed (write failed).\n");
-					}
-					NInoAttrListSetDirty(ni);
+			goto sync_inode;
+		} 
+		
+		if (na->data_size == ni->attr_list_size) {
+			if (ntfs_attr_pwrite(na, 0, ni->attr_list_size,
+				        ni->attr_list) != ni->attr_list_size) {
+				if (!err || errno == EIO) {
+					err = errno;
+					if (err != EIO)
+						err = EBUSY;
+					ntfs_log_perror("Attribute list sync "
+						"failed (write, inode %lld)",
+						(long long)ni->mft_no);
 				}
-			} else {
-				err = EIO;
-				ntfs_log_trace("Attribute list sync failed (invalid size).\n");
 				NInoAttrListSetDirty(ni);
 			}
-			ntfs_attr_close(na);
+		} else {
+			err = EIO;
+			ntfs_log_error("Attribute list sync failed (bad size, "
+				       "inode %lld)\n", (long long)ni->mft_no);
+			NInoAttrListSetDirty(ni);
 		}
+		ntfs_attr_close(na);
 	}
-
+	
+sync_inode:
 	/* Write this inode out to the $MFT (and $MFTMirr if applicable). */
 	if (NInoTestAndClearDirty(ni)) {
 		if (ntfs_mft_record_write(ni->vol, ni->mft_no, ni->mrec)) {
@@ -722,7 +729,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 					err = EBUSY;
 			}
 			NInoSetDirty(ni);
-			ntfs_log_trace("Base MFT record sync failed.\n");
+			ntfs_log_perror("MFT record sync failed, inode %lld",
+					(long long)ni->mft_no);
 		}
 	}
 
@@ -734,18 +742,21 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			ntfs_inode *eni;
 
 			eni = ni->extent_nis[i];
-			if (NInoTestAndClearDirty(eni)) {
-				if (ntfs_mft_record_write(eni->vol, eni->mft_no,
-						eni->mrec)) {
-					if (!err || errno == EIO) {
-						err = errno;
-						if (err != EIO)
-							err = EBUSY;
-					}
-					NInoSetDirty(eni);
-					ntfs_log_trace("Extent MFT record sync "
-							"failed.\n");
+			if (!NInoTestAndClearDirty(eni))
+				continue;
+			
+			if (ntfs_mft_record_write(eni->vol, eni->mft_no, 
+						  eni->mrec)) {
+				if (!err || errno == EIO) {
+					err = errno;
+					if (err != EIO)
+						err = EBUSY;
 				}
+				NInoSetDirty(eni);
+				ntfs_log_perror("Extent MFT record sync failed,"
+						" inode %lld/%lld",
+						(long long)ni->mft_no,
+						(long long)eni->mft_no);
 			}
 		}
 	}
