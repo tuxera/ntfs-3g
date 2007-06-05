@@ -485,7 +485,10 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		}
 
 		if (ni != parent)
-			ntfs_inode_close(ni);
+			if (ntfs_inode_close(ni)) {
+				err = errno;
+				goto out;
+			}
 
 		inum = MREF(inum);
 		ni = ntfs_inode_open(vol, inum);
@@ -505,7 +508,9 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 	ni = NULL;
 close:
 	if (ni && (ni != parent))
-		ntfs_inode_close(ni);
+		if (ntfs_inode_close(ni) && !err)
+			err = errno;
+out:
 	free(ascii);
 	free(unicode);
 	if (err)
@@ -1531,8 +1536,8 @@ out:
 		ntfs_attr_put_search_ctx(actx);
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
-	if (ni)
-		ntfs_inode_close(ni);
+	if (ni && ntfs_inode_close(ni) && !err)
+		err = errno;
 	if (err) {
 		errno = err;
 		ntfs_log_debug("Could not delete file: %s\n", strerror(errno));
