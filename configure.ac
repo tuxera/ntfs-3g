@@ -92,7 +92,7 @@ export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/usr/lib/pkgconfig:/opt/gnome/lib/pkgc
 AC_SYS_LARGEFILE
 
 case "$target_os" in
-linux*)
+linux*|darwin*|netbsd*)
 	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
 	[
 		AC_MSG_ERROR([ntfs-3g requires FUSE >= 2.6.0. Please see http://fuse.sf.net/ or install __all__ FUSE packages (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev) or remove already installed __older__ FUSE.])
@@ -101,7 +101,7 @@ freebsd*)
 	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
 	;;
 *)
-		AC_MSG_ERROR([ntfs-3g can be built only under Linux.])
+	AC_MSG_ERROR([ntfs-3g can be built only under Linux, FreeBSD, Mac OS X, and NetBSD.])
 	;;
 esac
 
