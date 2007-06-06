@@ -2069,7 +2069,7 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	
 	/* The fuse_mount() options get modified, so we always rebuild it */
-	if ((fuse_opt_add_arg(&margs, "") == -1 ||
+	if ((fuse_opt_add_arg(&margs, EXEC_NAME) == -1 ||
 	     fuse_opt_add_arg(&margs, "-o") == -1 ||
 	     fuse_opt_add_arg(&margs, parsed_options) == -1)) {
 		ntfs_log_error("Failed to set FUSE options.\n");
