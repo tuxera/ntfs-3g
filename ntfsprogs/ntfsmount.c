@@ -759,7 +759,10 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		res = -errno;
 		goto exit;
 	}
-	res = ntfs_attr_truncate(na, size);
+	if (ntfs_attr_truncate(na, size))
+		res = -errno;
+	else
+		res = 0;
 	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
 exit:
