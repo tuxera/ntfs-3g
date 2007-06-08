@@ -459,7 +459,7 @@ void ntfs_attr_close(ntfs_attr *na)
  * @na:		ntfs attribute for which to map (part of) a runlist
  * @vcn:	map runlist part containing this vcn
  *
- * Map the part of a runlist containing the @vcn of an the ntfs attribute @na.
+ * Map the part of a runlist containing the @vcn of the ntfs attribute @na.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
@@ -467,7 +467,6 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 {
 	LCN lcn;
 	ntfs_attr_search_ctx *ctx;
-	int err;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, vcn 0x%llx.\n",
 		(unsigned long long)na->ni->mft_no, na->type, (long long)vcn);
@@ -490,14 +489,84 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 				na->rl);
 		if (rl) {
 			na->rl = rl;
-
 			ntfs_attr_put_search_ctx(ctx);
 			return 0;
 		}
 	}
-	err = errno;
 	ntfs_attr_put_search_ctx(ctx);
-	errno = err;
+	return -1;
+}
+
+/**
+ * ntfs_attr_map_runlist_range - map (a part of) a runlist of an ntfs attribute
+ * @na:		ntfs attribute for which to map (part of) a runlist
+ * @from_vcn:	map runlist part starting this vcn
+ * @to_vcn:	map runlist part ending this vcn
+ *
+ * Map the part of a runlist from containing the @from_vcn to containing the
+ * @to_vcn of an ntfs attribute @na. It is OK for @to_vcn to be beyond last run.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_attr_map_runlist_range(ntfs_attr *na, VCN from_vcn, VCN to_vcn)
+{
+	ntfs_attr_search_ctx *ctx = NULL;
+	runlist *rl;
+
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, "
+			"from_vcn 0x%llx, to_vcn 0x%llx.\n",
+		(unsigned long long)na->ni->mft_no, na->type,
+		(long long)from_vcn, (long long)to_vcn);
+
+	/* Map extent with @from_vcn. */
+	if (ntfs_attr_map_runlist(na, from_vcn))
+		goto err_out;
+
+	for (rl = na->rl; rl->vcn <= to_vcn;) {
+		/* Skip not interesting to us runs. */
+		if (rl->lcn >= 0 || rl->lcn == LCN_HOLE || (rl->vcn +
+					rl->length < from_vcn &&
+					rl->lcn == LCN_RL_NOT_MAPPED)) {
+			rl++;
+			continue;
+		}
+
+		/* We reached the end of runlist, just exit. */
+		if (rl->lcn == LCN_ENOENT)
+			break;
+
+		/* Check for errors. */
+		if (rl->lcn < 0 && rl->lcn != LCN_RL_NOT_MAPPED) {
+			errno = EIO;
+			goto err_out;
+		}
+
+		/* Runlist is not mapped here. */
+		if (!ctx) {
+			ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+			if (!ctx)
+				goto err_out;
+		}
+		/* Find the attribute in the mft record. */
+		if (ntfs_attr_lookup(na->type, na->name, na->name_len,
+					CASE_SENSITIVE, rl->vcn, NULL, 0,
+					ctx))
+			goto err_out;
+
+		/* Decode the runlist. */
+		rl = ntfs_mapping_pairs_decompress(na->ni->vol, ctx->attr,
+				na->rl);
+		if (!rl)
+			goto err_out;
+		na->rl = rl;
+	}
+
+	ntfs_attr_put_search_ctx(ctx);
+	ntfs_log_trace("Done.\n");
+	return 0;
+err_out:
+	ntfs_attr_put_search_ctx(ctx);
+	ntfs_log_trace("Failed.\n");
 	return -1;
 }
 
@@ -505,8 +574,8 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
  * ntfs_attr_map_whole_runlist - map the whole runlist of an ntfs attribute
  * @na:		ntfs attribute for which to map the runlist
  *
- * Map the whole runlist of an the ntfs attribute @na.  For an attribute made
- * up of only one attribute extent this is the same as calling
+ * Map the whole runlist of the ntfs attribute @na.  For an attribute made up
+ * of only one attribute extent this is the same as calling
  * ntfs_attr_map_runlist(na, 0) but for an attribute with multiple extents this
  * will map the runlist fragments from each of the extents thus giving access
  * to the entirety of the disk allocation of an attribute.
@@ -1030,7 +1099,13 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	total = 0;
 	/* Handle writes beyond initialized_size. */
 	if (pos + count > na->initialized_size) {
-		if (ntfs_attr_map_whole_runlist(na))
+		/*
+		 * Map runlist between initialized size and place we start
+		 * writing at.
+		 */
+		if (ntfs_attr_map_runlist_range(na, na->initialized_size >>
+					vol->cluster_size_bits,
+					pos >> vol->cluster_size_bits))
 			goto err_out;
 		/* Set initialized_size to @pos + @count. */
 		ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
@@ -2301,7 +2376,8 @@ ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
  * ntfs_attr_put_search_ctx - release an attribute search context
  * @ctx:	attribute search context to free
  *
- * Release the attribute search context @ctx.
+ * Release the attribute search context @ctx. This function does not change
+ * errno and doing nothing if NULL passed to it.
  */
 void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 {
