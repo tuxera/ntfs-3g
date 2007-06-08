@@ -1571,9 +1571,10 @@ static void ntfs_fuse_destroy(void)
 	
 	if (ctx->vol) {
 		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
-				ctx->vol->vol_name);
+			      ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
-			ntfs_log_perror("Failed to unmount volume");
+			ntfs_log_perror("Failed to cleanly unmount volume %s",
+					opts.device);
 	}
 	free(ctx);
 	ctx = NULL;
