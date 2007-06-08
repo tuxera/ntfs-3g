@@ -1258,19 +1258,19 @@ int ntfs_device_umount(ntfs_volume *vol,
  * function returns success. If it returns an error then nothing has been done
  * so it is safe to continue using @vol.
  */
-int ntfs_umount(ntfs_volume *vol,
-		const BOOL force __attribute__((unused)))
+int ntfs_umount(ntfs_volume *vol, const BOOL force __attribute__((unused)))
 {
 	struct ntfs_device *dev;
+	int ret;
 
 	if (!vol) {
 		errno = EINVAL;
 		return -1;
 	}
 	dev = vol->dev;
-	__ntfs_volume_release(vol);
+	ret = __ntfs_volume_release(vol);
 	ntfs_device_free(dev);
-	return 0;
+	return ret;
 }
 
 #ifdef HAVE_MNTENT_H
