@@ -436,7 +436,7 @@ static runlist_element *ntfs_rl_split(runlist_element *dst,
 		int dsize, runlist_element *src, int ssize, int loc)
 {
 	if (!dst || !src) {
-		ntfs_log_debug("Eeek. ntfs_rl_split() invoked with NULL pointer!\n");
+		ntfs_log_trace("Invoked with NULL pointer!\n");
 		errno = EINVAL;
 		return NULL;
 	}
@@ -1630,6 +1630,10 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
  * ntfs_rl_sparse - check whether runlist have sparse regions or not.
  * @rl:		runlist to check
  *
+ * This function just skips not mapped regions assuming they are not sparse,
+ * so you need to ensure that runlist is fully mapped if you want perform full
+ * check.
+ *
  * Return 1 if have, 0 if not, -1 on error with errno set to the error code.
  */
 int ntfs_rl_sparse(runlist *rl)
@@ -1642,15 +1646,18 @@ int ntfs_rl_sparse(runlist *rl)
 		return -1;
 	}
 
-	for (rlc = rl; rlc->length; rlc++)
+	for (rlc = rl; rlc->length; rlc++) {
 		if (rlc->lcn < 0) {
+			if (rlc->lcn == LCN_RL_NOT_MAPPED)
+				continue;
 			if (rlc->lcn != LCN_HOLE) {
-				ntfs_log_trace("Received unmapped runlist.\n");
-				errno = EINVAL;
+				ntfs_log_trace("Bad runlist.\n");
+				errno = EIO;
 				return -1;
 			}
 			return 1;
 		}
+	}
 	return 0;
 }
 

@@ -1392,7 +1392,7 @@ done:
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
 	if (need_to.update_mapping_pairs)
-		ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/);
+		ntfs_attr_update_mapping_pairs(na, update_from);
 	/* Finally, return the number of bytes written. */
 	return total;
 rl_err_out:
@@ -1450,7 +1450,7 @@ err_out:
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
 	if (need_to.update_mapping_pairs)
-		ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/);
+		ntfs_attr_update_mapping_pairs(na, update_from);
 	/* Restore original data_size if needed. */
 	if (need_to.undo_data_size && ntfs_attr_truncate(na, old_data_size))
 		ntfs_log_trace("Failed to restore data_size.\n");
@@ -4186,10 +4186,17 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
  * call to this function. Vice-versa @na->compressed_size will be calculated and
  * set to correct value during this function.
  *
- * FIXME: This function does not update sparse bit and compressed size correctly
- * if called with @from_vcn != 0.
+ * New runlist should be fully formed starting @from_vcn. Runs before @from_vcn
+ * can be mapped or not, but on-disk structures should not be modified before
+ * call to this function so they can be mapped if necessary.
+ *
+ * FIXME: Make it O(1) for sparse files too, not only for normal.
  *
  * FIXME: Rewrite without using NTFS_VCN_DELETE_MARK define.
+ *
+ * NOTE: Be careful in the future with updating bits on compressed files (at
+ * present assumed that on-disk flag is already set/cleared before call to
+ * this function).
  *
  * On success return 0 and on error return -1 with errno set to the error code.
  * The following error codes are defined:
@@ -4209,7 +4216,7 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn)
 	BOOL finished_build;
 
 retry:
-	if (!na || !na->rl || from_vcn) {
+	if (!na || !na->rl) {
 		ntfs_log_trace("Invalid parameters passed.\n");
 		errno = EINVAL;
 		return -1;
@@ -4221,8 +4228,9 @@ retry:
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, from vcn 0x%lld."
+			"\n", (unsigned long long)na->ni->mft_no, na->type,
+			from_vcn);
 
 	if (na->ni->nr_extents == -1)
 		base_ni = na->ni->base_ni;
@@ -4239,7 +4247,8 @@ retry:
 	stop_vcn = 0;
 	finished_build = FALSE;
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-				CASE_SENSITIVE, from_vcn, NULL, 0, ctx)) {
+				CASE_SENSITIVE, ctx->is_first ? 0 : from_vcn,
+				NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
 		/*
@@ -4248,7 +4257,7 @@ retry:
 		 * contain @from_vcn. Also we do not need @from_vcn anymore,
 		 * set it to 0 to make ntfs_attr_lookup enumerate attributes.
 		 */
-		if (from_vcn) {
+		if (from_vcn && a->lowest_vcn) {
 			LCN first_lcn;
 
 			stop_vcn = sle64_to_cpu(a->lowest_vcn);
@@ -4256,7 +4265,7 @@ retry:
 			/*
 			 * Check whether the first run we need to update is
 			 * the last run in runlist, if so, then deallocate
-			 * all attrubute extents starting this one.
+			 * all attribute extents starting this one.
 			 */
 			first_lcn = ntfs_rl_vcn_to_lcn(na->rl, stop_vcn);
 			if (first_lcn == LCN_EINVAL) {
@@ -4307,14 +4316,43 @@ retry:
 
 			/* Update allocated size. */
 			a->allocated_size = cpu_to_sle64(na->allocated_size);
-			/* Update sparse bit. */
+			/*
+			 * Check whether part of runlist we are updating is
+			 * sparse.
+			 */
 			sparse = ntfs_rl_sparse(na->rl);
 			if (sparse == -1) {
 				ntfs_log_trace("Bad runlist.\n");
-				err = EIO;
+				err = errno;
 				goto put_err_out;
 			}
-			/* Attribute become sparse. */
+			/*
+			 * If new part or on-disk attribute is not sparse, then
+			 * we should fully map runlist to make final decision.
+			 */
+			if (sparse || (a->flags & ATTR_IS_SPARSE)) {
+				if (from_vcn && ntfs_attr_map_runlist_range(na,
+						0, from_vcn - 1)) {
+					ntfs_log_trace("Failed to map runlist "
+							"before @from_vcn.\n");
+					err = errno;
+					goto put_err_out;
+				}
+				/*
+				 * Reconsider whether whole runlist is sparse
+				 * if new part is not.
+				 */
+				if (!sparse) {
+					sparse = ntfs_rl_sparse(na->rl);
+					if (sparse == -1) {
+						ntfs_log_trace("Bad "
+								"runlist.\n");
+						err = errno;
+						goto put_err_out;
+					}
+				}
+			}
+			/* Attribute becomes sparse/compressed. */
 			if (sparse && !(a->flags & (ATTR_IS_SPARSE |
 							ATTR_IS_COMPRESSED))) {
 				/*
@@ -4369,8 +4407,13 @@ retry:
 				a->mapping_pairs_offset =
 						cpu_to_le16(le16_to_cpu(
 						a->mapping_pairs_offset) + 8);
+				/*
+				 * We should update all mapping pairs, because
+				 * we shifted their starting position.
+				 */
+				from_vcn = 0;
 			}
-			/* Attribute no longer sparse. */
+			/* Attribute becomes normal. */
 			if (!sparse && (a->flags & ATTR_IS_SPARSE) &&
 					!(a->flags & ATTR_IS_COMPRESSED)) {
 				NAttrClearSparse(na);
@@ -4384,9 +4427,14 @@ retry:
 				a->mapping_pairs_offset =
 						cpu_to_le16(le16_to_cpu(
 						a->mapping_pairs_offset) - 8);
+				/*
+				 * We should update all mapping pairs, because
+				 * we shifted their starting position.
+				 */
+				from_vcn = 0;
 			}
 			/* Update compressed size if required. */
-			if (sparse) {
+			if (sparse || (a->flags & ATTR_IS_COMPRESSED)) {
 				s64 new_compr_size;
 
 				new_compr_size = ntfs_rl_get_compressed_size(
@@ -4415,7 +4463,21 @@ retry:
 							na->allocated_size;
 				NInoFileNameSetDirty(na->ni);
 			}
+
+			/*
+			 * We do want to do anything for the first extent in
+			 * case we are updating mapping pairs not from the
+			 * begging.
+			 */
+			if (!a->highest_vcn || from_vcn <=
+					sle64_to_cpu(a->highest_vcn) + 1)
+				from_vcn = 0;
+			else {
+				if (from_vcn)
+					continue;
+			}
 		}
+
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
 								stop_vcn);
@@ -4531,6 +4593,13 @@ retry:
 		ntfs_log_trace("Attribute lookup failed.\n");
 		goto put_err_out;
 	}
+	/* Sanity check. */
+	if (from_vcn) {
+		err = ENOMSG;
+		ntfs_log_error("Library BUG! @from_vcn is nonzero, please "
+				"report to %s.\n", NTFS_DEV_LIST);
+		goto put_err_out;
+	}
 
 	/* Deallocate not used attribute extents and return with success. */
 	if (finished_build) {
@@ -4557,6 +4626,7 @@ retry:
 		}
 		ntfs_log_trace("Deallocate done.\n");
 		ntfs_attr_put_search_ctx(ctx);
+		ntfs_log_trace("Done!");
 		return 0;
 	}
 	ntfs_attr_put_search_ctx(ctx);
@@ -4625,6 +4695,7 @@ retry:
 		if (!err)
 			break;
 	}
+	ntfs_log_trace("Done!\n");
 	return 0;
 put_err_out:
 	if (ctx)
@@ -4712,7 +4783,7 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		/* Write mapping pairs for new runlist. */
-		if (ntfs_attr_update_mapping_pairs(na, 0 /*first_free_vcn*/)) {
+		if (ntfs_attr_update_mapping_pairs(na, first_free_vcn)) {
 			ntfs_log_trace("Eeek! Mapping pairs update failed. "
 					"Leaving inconsistent metadata. "
 					"Run chkdsk.\n");
@@ -4788,7 +4859,6 @@ put_err_out:
 static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
 		BOOL sparse)
 {
-	LCN lcn_seek_from;
 	VCN first_free_vcn;
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx;
@@ -4826,9 +4896,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) < first_free_vcn) {
-		if (ntfs_attr_map_whole_runlist(na)) {
-			ntfs_log_trace("Eeek! ntfs_attr_map_whole_runlist "
-					"failed.\n");
+		/* Map required part of runlist. */
+		if (ntfs_attr_map_runlist(na, na->allocated_size >>
+					vol->cluster_size_bits)) {
+			ntfs_log_error("Failed to map runlist.\n");
 			return -1;
 		}
 
@@ -4857,6 +4928,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
 			 * attribute let the cluster allocator choose the
 			 * starting LCN.
 			 */
+			LCN lcn_seek_from;
+
 			lcn_seek_from = -1;
 			if (na->rl->length) {
 				/* Seek to the last run list element. */
@@ -4891,7 +4964,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
 		if (!rln) {
 			/* Failed, free just allocated clusters. */
 			err = errno;
-			ntfs_log_trace("Eeek! Run list merge failed.\n");
+			ntfs_log_trace("Run list merge failed.\n");
 			ntfs_cluster_free_from_rl(vol, rl);
 			free(rl);
 			errno = err;
@@ -4902,10 +4975,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		/* Write mapping pairs for new runlist. */
-		if (ntfs_attr_update_mapping_pairs(na, 0 /*na->allocated_size >>
-				vol->cluster_size_bits*/)) {
+		if (ntfs_attr_update_mapping_pairs(na, org_alloc_size >>
+				vol->cluster_size_bits)) {
 			err = errno;
-			ntfs_log_trace("Eeek! Mapping pairs update failed.\n");
+			ntfs_log_trace("Mapping pairs update failed.\n");
 			goto rollback;
 		}
 	}
@@ -4965,10 +5038,10 @@ rollback:
 		ntfs_log_trace("Couldn't truncate runlist. Rollback failed.\n");
 	} else {
 		/* Prepare to mapping pairs update. */
-		na->allocated_size = org_alloc_size << vol->cluster_size_bits;
+		na->allocated_size = org_alloc_size;
 		/* Restore mapping pairs. */
-		if (ntfs_attr_update_mapping_pairs(na, 0 /*na->allocated_size >>
-					vol->cluster_size_bits*/)) {
+		if (ntfs_attr_update_mapping_pairs(na, na->allocated_size >>
+					vol->cluster_size_bits)) {
 			ntfs_log_trace("Failed to restore old mapping pairs. "
 					"Rollback failed.\n");
 		}
@@ -5028,6 +5101,7 @@ int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse)
 	 */
 	if (NAttrEncrypted(na)) {
 		errno = EACCES;
+		ntfs_log_trace("Failed (encrypted).\n");
 		return -1;
 	}
 	/*
@@ -5035,6 +5109,7 @@ int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse)
 	 */
 	if (NAttrCompressed(na)) {
 		errno = EOPNOTSUPP;
+		ntfs_log_trace("Failed (compressed).\n");
 		return -1;
 	}
 	if (NAttrNonResident(na)) {
@@ -5049,6 +5124,10 @@ int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse)
 	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
 			na->type == AT_INDEX_ALLOCATION)
 		ntfs_inode_update_time(na->ni);
+	if (!ret)
+		ntfs_log_trace("Done!\n");
+	else
+		ntfs_log_trace("Failed.\n");
 	return ret;
 }
 
