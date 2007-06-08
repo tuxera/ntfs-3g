@@ -79,6 +79,35 @@ ntfs_volume *ntfs_volume_alloc(void)
 	return calloc(1, sizeof(ntfs_volume));
 }
 
+
+static void ntfs_attr_free(ntfs_attr **na)
+{
+	if (na && *na) {
+		ntfs_attr_close(*na);
+		*na = NULL;
+	} else
+		ntfs_log_error("Tried to free NULL attribute pointer (%p)\n", na);
+}
+
+static int ntfs_inode_free(ntfs_inode **ni)
+{
+	int ret = -1;
+
+	if (ni && *ni) {
+		ret = ntfs_inode_close(*ni);
+		*ni = NULL;
+	} else
+		ntfs_log_error("Tried to free NULL inode pointer (%p)\n", ni);
+	
+	return ret;
+}
+
+static void ntfs_error_set(int *err)
+{
+	if (!*err)
+		*err = errno;
+}
+
 /**
  * __ntfs_volume_release - Destroy an NTFS volume object
  * @v:
@@ -87,41 +116,51 @@ ntfs_volume *ntfs_volume_alloc(void)
  *
  * Returns:
  */
-static void __ntfs_volume_release(ntfs_volume *v)
+static int __ntfs_volume_release(ntfs_volume *v)
 {
+	int err = 0;
+
+	if (ntfs_inode_free(&v->vol_ni))
+		ntfs_error_set(&err);
+	/* 
+	 * FIXME: Inodes must be synced before closing
+	 * attributes, otherwise unmount could fail.
+	 */
 	if (v->lcnbmp_ni && NInoDirty(v->lcnbmp_ni))
 		ntfs_inode_sync(v->lcnbmp_ni);
-	if (v->vol_ni)
-		ntfs_inode_close(v->vol_ni);
-	if (v->lcnbmp_na)
-		ntfs_attr_close(v->lcnbmp_na);
-	if (v->lcnbmp_ni)
-		ntfs_inode_close(v->lcnbmp_ni);
+	ntfs_attr_free(&v->lcnbmp_na);
+	if (ntfs_inode_free(&v->lcnbmp_ni))
+		ntfs_error_set(&err);
+	
 	if (v->mft_ni && NInoDirty(v->mft_ni))
 		ntfs_inode_sync(v->mft_ni);
-	if (v->mftbmp_na)
-		ntfs_attr_close(v->mftbmp_na);
-	if (v->mft_na)
-		ntfs_attr_close(v->mft_na);
-	if (v->mft_ni)
-		ntfs_inode_close(v->mft_ni);
+	ntfs_attr_free(&v->mftbmp_na);
+	ntfs_attr_free(&v->mft_na);
+	if (ntfs_inode_free(&v->mft_ni))
+		ntfs_error_set(&err);
+	
 	if (v->mftmirr_ni && NInoDirty(v->mftmirr_ni))
 		ntfs_inode_sync(v->mftmirr_ni);
-	if (v->mftmirr_na)
-		ntfs_attr_close(v->mftmirr_na);
-	if (v->mftmirr_ni)
-		ntfs_inode_close(v->mftmirr_ni);
+	ntfs_attr_free(&v->mftmirr_na);
+	if (ntfs_inode_free(&v->mftmirr_ni))
+		ntfs_error_set(&err);
+	
 	if (v->dev) {
 		struct ntfs_device *dev = v->dev;
 
-		dev->d_ops->sync(dev);
+		if (dev->d_ops->sync(dev))
+			ntfs_error_set(&err);
 		if (dev->d_ops->close(dev))
-			ntfs_log_perror("Failed to close the device");
+			ntfs_error_set(&err);
 	}
+
 	free(v->vol_name);
 	free(v->upcase);
 	free(v->attrdef);
 	free(v);
+
+	errno = err;
+	return errno ? -1 : 0;
 }
 
 static void ntfs_attr_setup_flag(ntfs_inode *ni)
@@ -571,7 +610,8 @@ static int ntfs_volume_check_logfile(ntfs_volume *vol)
 	free(rp);
 	ntfs_attr_close(na);
 out:	
-	ntfs_inode_close(ni);
+	if (ntfs_inode_close(ni))
+		ntfs_error_set(&err);
 	if (err) {
 		errno = err;
 		return -1;
@@ -625,7 +665,10 @@ static ntfs_inode *ntfs_hiberfile_open(ntfs_volume *vol)
 		goto out;
 	}
 out:
-	ntfs_inode_close(ni_root);
+	if (ntfs_inode_close(ni_root)) {
+		ntfs_inode_close(ni_hibr);
+		ni_hibr = NULL;
+	}
 	free(unicode);
 	return ni_hibr;
 }
@@ -645,7 +688,7 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int i, bytes_read, ret = -1;
+	int i, bytes_read, err;
 	char *buf = NULL;
 
 	ni = ntfs_hiberfile_open(vol);
@@ -689,13 +732,16 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 		}
 	}
         /* All right, all header bytes are zero */
-	ret = 0;
+	errno = 0;
 out:
 	if (na)
 		ntfs_attr_close(na);
 	free(buf);
-	ntfs_inode_close(ni);
-	return ret;
+	err = errno;
+	if (ntfs_inode_close(ni))
+		ntfs_error_set(&err);
+	errno = err;
+	return errno ? -1 : 0;
 }
 
 /**
@@ -902,8 +948,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	/* Done with the $UpCase mft record. */
 	ntfs_log_debug(OK);
 	ntfs_attr_close(na);
-	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode, leaking memory");
+	if (ntfs_inode_close(ni)) {
+		ntfs_log_perror("Failed to close $UpCase");
+		goto error_exit;
+	}
 
 	/*
 	 * Now load $Volume and set the version information and flags in the
@@ -1062,8 +1110,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	/* Done with the $AttrDef mft record. */
 	ntfs_log_debug(OK);
 	ntfs_attr_close(na);
-	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode, leaking memory");
+	if (ntfs_inode_close(ni)) {
+		ntfs_log_perror("Failed to close $AttrDef");
+		goto error_exit;
+	}
 	/*
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
