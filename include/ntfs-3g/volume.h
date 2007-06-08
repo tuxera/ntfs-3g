@@ -225,7 +225,6 @@ extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 
 extern ntfs_volume *ntfs_device_mount(struct ntfs_device *dev,
 		unsigned long flags);
-extern int ntfs_device_umount(ntfs_volume *vol, const BOOL force);
 
 extern ntfs_volume *ntfs_mount(const char *name, unsigned long flags);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);

@@ -1201,42 +1201,6 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 }
 
 /**
- * ntfs_device_umount - close ntfs volume
- * @vol: address of ntfs_volume structure of volume to close
- * @force: if true force close the volume even if it is busy
- *
- * Deallocate all structures (including @vol itself) associated with the ntfs
- * volume @vol.
- *
- * Note it is up to the caller to destroy the device associated with the volume
- * being unmounted after this function returns.
- *
- * Return 0 on success. On error return -1 with errno set appropriately
- * (most likely to one of EAGAIN, EBUSY or EINVAL). The EAGAIN error means that
- * an operation is in progress and if you try the close later the operation
- * might be completed and the close succeed.
- *
- * If @force is true (i.e. not zero) this function will close the volume even
- * if this means that data might be lost.
- *
- * @vol must have previously been returned by a call to ntfs_device_mount().
- *
- * @vol itself is deallocated and should no longer be dereferenced after this
- * function returns success. If it returns an error then nothing has been done
- * so it is safe to continue using @vol.
- */
-int ntfs_device_umount(ntfs_volume *vol,
-		const BOOL force __attribute__((unused)))
-{
-	if (!vol) {
-		errno = EINVAL;
-		return -1;
-	}
-	__ntfs_volume_release(vol);
-	return 0;
-}
-
-/**
  * ntfs_umount - close ntfs volume
  * @vol: address of ntfs_volume structure of volume to close
  * @force: if true force close the volume even if it is busy
