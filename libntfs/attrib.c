@@ -986,7 +986,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	/* If the write reaches beyond the end, extend the attribute. */
 	old_data_size = na->data_size;
 	if (pos + count > na->data_size) {
-		if (ntfs_attr_truncate(na, pos + count)) {
+		if (__ntfs_attr_truncate(na, pos + count, FALSE)) {
 			eo = errno;
 			ntfs_log_trace("Attribute extend failed.\n");
 			errno = eo;
@@ -4698,6 +4698,7 @@ put_err_out:
  * ntfs_non_resident_attr_expand - expand a non-resident, open ntfs attribute
  * @na:		non-resident ntfs attribute to expand
  * @newsize:	new size (in bytes) to which to expand the attribute
+ * @sparse:	if TRUE then will create hole if possible
  *
  * Expand the size of a non-resident, open ntfs attribute @na to @newsize bytes,
  * by allocating new clusters.
@@ -4708,7 +4709,8 @@ put_err_out:
  *	ERANGE - @newsize is not valid for the attribute type of @na.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
+static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
+		BOOL sparse)
 {
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
@@ -4758,7 +4760,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
 		 * sparse runs instead of real allocation of clusters.
 		 */
-		if (na->type == AT_DATA && vol->major_ver >= 3) {
+		if (na->type == AT_DATA && vol->major_ver >= 3 && sparse) {
 			rl = ntfs_malloc(0x1000);
 			if (!rl)
 				return -1;
@@ -4903,10 +4905,12 @@ put_err_out:
 	return -1;
 }
 
+
 /**
- * ntfs_attr_truncate - resize an ntfs attribute
+ * __ntfs_attr_truncate - resize an ntfs attribute
  * @na:		open ntfs attribute to resize
  * @newsize:	new size (in bytes) to which to resize the attribute
+ * @sparse:	if TRUE then will create hole if possible
  *
  * Change the size of an open ntfs attribute @na to @newsize bytes. If the
  * attribute is made bigger and the attribute is resident the newly
@@ -4926,7 +4930,7 @@ put_err_out:
  *			  @newsize bytes length.
  *	EOPNOTSUPP	- The desired resize is not implemented yet.
  */
-int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
+int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse)
 {
 	int ret;
 
@@ -4959,7 +4963,8 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	}
 	if (NAttrNonResident(na)) {
 		if (newsize > na->data_size)
-			ret = ntfs_non_resident_attr_expand(na, newsize);
+			ret = ntfs_non_resident_attr_expand(na, newsize,
+					sparse);
 		else
 			ret = ntfs_non_resident_attr_shrink(na, newsize);
 	} else
@@ -4970,6 +4975,16 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		ntfs_inode_update_time(na->ni);
 	return ret;
 }
+
+
+/**
+ * Wrapper around __ntfs_attr_truncate that always tries to creates hole
+ */
+int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
+{
+	return __ntfs_attr_truncate(na, newsize, TRUE);
+}
+
 
 /**
  * ntfs_attr_readall - read the entire data from an ntfs attribute

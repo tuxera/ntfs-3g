@@ -315,6 +315,7 @@ extern int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra);
 
 extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn);
 
+extern int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse);
 extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
 
 extern int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,

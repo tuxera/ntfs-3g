@@ -1,7 +1,7 @@
 /**
  * ntfscp - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004-2006 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2006 Hil Liao
  *
@@ -85,7 +85,7 @@ static void version(void)
 {
 	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS "
 		"volume.\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
-	ntfs_log_info("Copyright (c) 2004-2006 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2004-2007 Yura Pakhuchiy\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -524,7 +524,7 @@ int main(int argc, char *argv[])
 
 	ntfs_log_verbose("Old file size: %lld\n", na->data_size);
 	if (na->data_size != new_size) {
-		if (ntfs_attr_truncate(na, new_size)) {
+		if (__ntfs_attr_truncate(na, new_size, FALSE)) {
 			ntfs_log_perror("ERROR: Couldn't resize attribute");
 			goto close_attr;
 		}
