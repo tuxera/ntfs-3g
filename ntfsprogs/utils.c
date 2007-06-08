@@ -4,6 +4,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  *
  * A set of shared functions for ntfs utilities
  *
@@ -578,7 +579,8 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 		name    = NULL;
 		namelen = ntfs_ucsnlen(attrdef->name, sizeof(attrdef->name));
 		if (ntfs_ucstombs(attrdef->name, namelen, &name, 0) < 0) {
-			ntfs_log_error("Couldn't translate attribute type to current locale.\n");
+			ntfs_log_error("Couldn't translate attribute type to "
+					"current locale.\n");
 			// <UNKNOWN>?
 			return 0;
 		}
@@ -602,9 +604,10 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 
 	name    = NULL;
 	namelen = attr->name_length;
-	if (ntfs_ucstombs((ntfschar *)((char *)attr + attr->name_offset),
-	    namelen, &name, 0) < 0) {
-		ntfs_log_error("Couldn't translate attribute name to current locale.\n");
+	if (ntfs_ucstombs((ntfschar *)((char *)attr + le16_to_cpu(
+			attr->name_offset)), namelen, &name, 0) < 0) {
+		ntfs_log_error("Couldn't translate attribute name to current "
+				"locale.\n");
 		// <UNKNOWN>?
 		len = snprintf(buffer, bufsize, "<UNKNOWN>");
 		return 0;
@@ -785,7 +788,7 @@ int utils_is_metadata(ntfs_inode *inode)
 
 	file = inode->mrec;
 	if (file && (file->base_mft_record != 0)) {
-		num = MREF(file->base_mft_record);
+		num = MREF_LE(file->base_mft_record);
 		if (__metadata(vol, num) == 1)
 			return 1;
 	}
@@ -796,9 +799,9 @@ int utils_is_metadata(ntfs_inode *inode)
 		return -1;
 
 	/* We know this will always be resident. */
-	attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
+	attr = (FILE_NAME_ATTR *)((char *)rec + le16_to_cpu(rec->value_offset));
 
-	num = MREF(attr->parent_directory);
+	num = MREF_LE(attr->parent_directory);
 	if ((num != FILE_root) && (__metadata(vol, num) == 1))
 		return 1;
 

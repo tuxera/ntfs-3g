@@ -2,7 +2,7 @@
  * volume.h - Exports for NTFS volume handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -151,7 +151,7 @@ struct _ntfs_volume {
 	ntfs_inode *vol_ni;	/* ntfs_inode structure for FILE_Volume. */
 	u8 major_ver;		/* Ntfs major version of volume. */
 	u8 minor_ver;		/* Ntfs minor version of volume. */
-	u16 flags;		/* Bit array of VOLUME_* flags. */
+	le16 flags;		/* Bit array of VOLUME_* flags. */
 	GUID guid;		/* The volume guid if present (otherwise it is
 				   a NULL guid). */
 
@@ -234,6 +234,6 @@ extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 extern int ntfs_version_is_supported(ntfs_volume *vol);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
 
-extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
+extern int ntfs_volume_write_flags(ntfs_volume *vol, const le16 flags);
 
 #endif /* defined _NTFS_VOLUME_H */

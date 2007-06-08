@@ -2,6 +2,7 @@
  * mst.c - Multi sector fixup handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -130,7 +131,7 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 {
 	u16 usa_ofs, usa_count, usn;
-	u16 *usa_pos, *data_pos;
+	le16 *usa_pos, *data_pos, usnle;
 
 	/* Sanity check + only fixup if it makes sense. */
 	if (!b || ntfs_is_baad_record(b->magic) ||
@@ -150,7 +151,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 		return -1;
 	}
 	/* Position of usn in update sequence array. */
-	usa_pos = (u16*)((u8*)b + usa_ofs);
+	usa_pos = (le16*)((u8*)b + usa_ofs);
 	/*
 	 * Cyclically increment the update sequence number
 	 * (skipping 0 and -1, i.e. 0xffff).
@@ -158,10 +159,10 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 	usn = le16_to_cpup(usa_pos) + 1;
 	if (usn == 0xffff || !usn)
 		usn = 1;
-	usn = cpu_to_le16(usn);
-	*usa_pos = usn;
+	usnle = cpu_to_le16(usn);
+	*usa_pos = usnle;
 	/* Position in data of first u16 that needs fixing up. */
-	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
+	data_pos = (le16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
 	/* Fixup all sectors. */
 	while (usa_count--) {
 		/*
@@ -170,7 +171,7 @@ int ntfs_mst_pre_write_fixup(NTFS_RECORD *b, const u32 size)
 		 */
 		*(++usa_pos) = *data_pos;
 		/* Apply fixup to data. */
-		*data_pos = usn;
+		*data_pos = usnle;
 		/* Increment position in data as well. */
 		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
 	}

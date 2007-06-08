@@ -2,7 +2,7 @@
  * dir.c - Directory handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or

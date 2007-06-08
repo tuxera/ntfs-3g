@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
- * Copyright (c) 2004-2006 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -393,7 +393,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	 */
 	if (type == AT_ATTRIBUTE_LIST)
 		a->flags = 0;
-	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+	cs = (a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE)) ? 1 : 0;
 	if (!name) {
 		if (a->name_length) {
 			name = ntfs_ucsndup((ntfschar*)((u8*)a + le16_to_cpu(
@@ -410,9 +410,9 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	}
 	__ntfs_attr_init(na, ni, type, name, name_len);
 	if (a->non_resident) {
-		ntfs_attr_init(na, TRUE, a->flags & ATTR_IS_COMPRESSED,
-				a->flags & ATTR_IS_ENCRYPTED,
-				a->flags & ATTR_IS_SPARSE,
+		ntfs_attr_init(na, TRUE, (a->flags & ATTR_IS_COMPRESSED)? 1 : 0,
+				(a->flags & ATTR_IS_ENCRYPTED) ? 1 : 0,
+				(a->flags & ATTR_IS_SPARSE) ? 1 : 0,
 				sle64_to_cpu(a->allocated_size),
 				sle64_to_cpu(a->data_size),
 				sle64_to_cpu(a->initialized_size),
@@ -420,10 +420,10 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				cs ? a->compression_unit : 0);
 	} else {
 		s64 l = le32_to_cpu(a->value_length);
-		ntfs_attr_init(na, FALSE, a->flags & ATTR_IS_COMPRESSED,
-				a->flags & ATTR_IS_ENCRYPTED,
-				a->flags & ATTR_IS_SPARSE, (l + 7) & ~7, l, l,
-				cs ? (l + 7) & ~7 : 0, 0);
+		ntfs_attr_init(na, FALSE, (a->flags & ATTR_IS_COMPRESSED) ? 1:0,
+				(a->flags & ATTR_IS_ENCRYPTED) ? 1 : 0,
+				(a->flags & ATTR_IS_SPARSE) ? 1 : 0,
+				(l + 7) & ~7, l, l, cs ? (l + 7) & ~7 : 0, 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	return na;
@@ -2622,7 +2622,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_inode *base_ni;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, flags 0x%x.\n",
-		(long long) ni->mft_no, (unsigned) type, (unsigned) flags);
+		(long long) ni->mft_no, le32_to_cpu(type), le16_to_cpu(flags));
 
 	if (!ni || (!name && name_len)) {
 		errno = EINVAL;
@@ -2746,9 +2746,9 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld, "
 			"dataruns_size %d, flags 0x%x.\n",
-			(long long) ni->mft_no, (unsigned) type,
+			(long long) ni->mft_no, le32_to_cpu(type),
 			(long long) lowest_vcn, dataruns_size,
-			(unsigned) flags);
+			le16_to_cpu(flags));
 
 	if (!ni || dataruns_size <= 0 || (!name && name_len)) {
 		errno = EINVAL;
@@ -3226,7 +3226,7 @@ rm_attr_err_out:
 free_err_out:
 	/* Free MFT record, if it isn't contain attributes. */
 	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
-			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
+			le16_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni)) {
 			ntfs_log_trace("Failed to free MFT record. Leaving "
 					"inconsistent metadata.\n");

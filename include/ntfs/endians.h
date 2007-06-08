@@ -3,6 +3,7 @@
  *	       Linux-NTFS project.
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c)      2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -110,39 +111,42 @@
 
 #if defined(__LITTLE_ENDIAN) && (__BYTE_ORDER == __LITTLE_ENDIAN)
 
-#define __le16_to_cpu(x) (x)
-#define __le32_to_cpu(x) (x)
-#define __le64_to_cpu(x) (x)
+#define __le16_to_cpu(x) ((__force u16)(x))
+#define __le32_to_cpu(x) ((__force u32)(x))
+#define __le64_to_cpu(x) ((__force u64)(x))
 
-#define __cpu_to_le16(x) (x)
-#define __cpu_to_le32(x) (x)
-#define __cpu_to_le64(x) (x)
+#define __cpu_to_le16(x) ((__force le16)(x))
+#define __cpu_to_le32(x) ((__force le32)(x))
+#define __cpu_to_le64(x) ((__force le64)(x))
 
-#define __constant_le16_to_cpu(x) (x)
-#define __constant_le32_to_cpu(x) (x)
-#define __constant_le64_to_cpu(x) (x)
+#define __constant_le16_to_cpu(x) ((__force u16)(x))
+#define __constant_le32_to_cpu(x) ((__force u32)(x))
+#define __constant_le64_to_cpu(x) ((__force u64)(x))
 
-#define __constant_cpu_to_le16(x) (x)
-#define __constant_cpu_to_le32(x) (x)
-#define __constant_cpu_to_le64(x) (x)
+#define __constant_cpu_to_le16(x) ((__force le16)(x))
+#define __constant_cpu_to_le32(x) ((__force le32)(x))
+#define __constant_cpu_to_le64(x) ((__force le64)(x))
 
 #elif defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
 
-#define __le16_to_cpu(x) bswap_16(x)
-#define __le32_to_cpu(x) bswap_32(x)
-#define __le64_to_cpu(x) bswap_64(x)
+#define __le16_to_cpu(x) bswap_16((__force u16)(x))
+#define __le32_to_cpu(x) bswap_32((__force u16)(x))
+#define __le64_to_cpu(x) bswap_64((__force u16)(x))
 
-#define __cpu_to_le16(x) bswap_16(x)
-#define __cpu_to_le32(x) bswap_32(x)
-#define __cpu_to_le64(x) bswap_64(x)
+#define __cpu_to_le16(x) (__force le16)bswap_16((__force u16)(x))
+#define __cpu_to_le32(x) (__force le32)bswap_32((__force u32)(x))
+#define __cpu_to_le64(x) (__force le64)bswap_64((__force u64)(x))
 
-#define __constant_le16_to_cpu(x) __ntfs_bswap_constant_16((u16)(x))
-#define __constant_le32_to_cpu(x) __ntfs_bswap_constant_32((u32)(x))
-#define __constant_le64_to_cpu(x) __ntfs_bswap_constant_64((u64)(x))
+#define __constant_le16_to_cpu(x) __ntfs_bswap_constant_16((__force u16)(x))
+#define __constant_le32_to_cpu(x) __ntfs_bswap_constant_32((__force u32)(x))
+#define __constant_le64_to_cpu(x) __ntfs_bswap_constant_64((__force u64)(x))
 
-#define __constant_cpu_to_le16(x) __ntfs_bswap_constant_16((u16)(x))
-#define __constant_cpu_to_le32(x) __ntfs_bswap_constant_32((u32)(x))
-#define __constant_cpu_to_le64(x) __ntfs_bswap_constant_64((u64)(x))
+#define __constant_cpu_to_le16(x) \
+	(__force le16)__ntfs_bswap_constant_16((__force u16)(x))
+#define __constant_cpu_to_le32(x) \
+	(__force le32)__ntfs_bswap_constant_32((__force u32)(x))
+#define __constant_cpu_to_le64(x) \
+	(__force le64)__ntfs_bswap_constant_64((__force u64)(x))
 
 #else
 
@@ -152,52 +156,83 @@
 
 /* Unsigned from LE to CPU conversion. */
 
-#define le16_to_cpu(x)		(u16)__le16_to_cpu((u16)(x))
-#define le32_to_cpu(x)		(u32)__le32_to_cpu((u32)(x))
-#define le64_to_cpu(x)		(u64)__le64_to_cpu((u64)(x))
+#define le16_to_cpu(x)		(u16)__le16_to_cpu((le16)(x))
+#define le32_to_cpu(x)		(u32)__le32_to_cpu((le32)(x))
+#define le64_to_cpu(x)		(u64)__le64_to_cpu((le64)(x))
 
-#define le16_to_cpup(x)		(u16)__le16_to_cpu(*(const u16*)(x))
-#define le32_to_cpup(x)		(u32)__le32_to_cpu(*(const u32*)(x))
-#define le64_to_cpup(x)		(u64)__le64_to_cpu(*(const u64*)(x))
+#define le16_to_cpup(x)		(u16)__le16_to_cpu(*(const le16*)(x))
+#define le32_to_cpup(x)		(u32)__le32_to_cpu(*(const le32*)(x))
+#define le64_to_cpup(x)		(u64)__le64_to_cpu(*(const le64*)(x))
 
 /* Signed from LE to CPU conversion. */
 
-#define sle16_to_cpu(x)		(s16)__le16_to_cpu((s16)(x))
-#define sle32_to_cpu(x)		(s32)__le32_to_cpu((s32)(x))
-#define sle64_to_cpu(x)		(s64)__le64_to_cpu((s64)(x))
+#define sle16_to_cpu(x)		(s16)__le16_to_cpu((sle16)(x))
+#define sle32_to_cpu(x)		(s32)__le32_to_cpu((sle32)(x))
+#define sle64_to_cpu(x)		(s64)__le64_to_cpu((sle64)(x))
 
-#define sle16_to_cpup(x)	(s16)__le16_to_cpu(*(s16*)(x))
-#define sle32_to_cpup(x)	(s32)__le32_to_cpu(*(s32*)(x))
-#define sle64_to_cpup(x)	(s64)__le64_to_cpu(*(s64*)(x))
+#define sle16_to_cpup(x)	(s16)__le16_to_cpu(*(const sle16*)(x))
+#define sle32_to_cpup(x)	(s32)__le32_to_cpu(*(const sle32*)(x))
+#define sle64_to_cpup(x)	(s64)__le64_to_cpu(*(const sle64*)(x))
 
 /* Unsigned from CPU to LE conversion. */
 
-#define cpu_to_le16(x)		(u16)__cpu_to_le16((u16)(x))
-#define cpu_to_le32(x)		(u32)__cpu_to_le32((u32)(x))
-#define cpu_to_le64(x)		(u64)__cpu_to_le64((u64)(x))
+#define cpu_to_le16(x)		(le16)__cpu_to_le16((u16)(x))
+#define cpu_to_le32(x)		(le32)__cpu_to_le32((u32)(x))
+#define cpu_to_le64(x)		(le64)__cpu_to_le64((u64)(x))
 
-#define cpu_to_le16p(x)		(u16)__cpu_to_le16(*(u16*)(x))
-#define cpu_to_le32p(x)		(u32)__cpu_to_le32(*(u32*)(x))
-#define cpu_to_le64p(x)		(u64)__cpu_to_le64(*(u64*)(x))
+#define cpu_to_le16p(x)		(le16)__cpu_to_le16(*(const u16*)(x))
+#define cpu_to_le32p(x)		(le32)__cpu_to_le32(*(const u32*)(x))
+#define cpu_to_le64p(x)		(le64)__cpu_to_le64(*(const u64*)(x))
 
 /* Signed from CPU to LE conversion. */
 
-#define cpu_to_sle16(x)		(s16)__cpu_to_le16((s16)(x))
-#define cpu_to_sle32(x)		(s32)__cpu_to_le32((s32)(x))
-#define cpu_to_sle64(x)		(s64)__cpu_to_le64((s64)(x))
+#define cpu_to_sle16(x)		(__force sle16)__cpu_to_le16((s16)(x))
+#define cpu_to_sle32(x)		(__force sle32)__cpu_to_le32((s32)(x))
+#define cpu_to_sle64(x)		(__force sle64)__cpu_to_le64((s64)(x))
 
-#define cpu_to_sle16p(x)	(s16)__cpu_to_le16(*(s16*)(x))
-#define cpu_to_sle32p(x)	(s32)__cpu_to_le32(*(s32*)(x))
-#define cpu_to_sle64p(x)	(s64)__cpu_to_le64(*(s64*)(x))
+#define cpu_to_sle16p(x)	(__force sle16)__cpu_to_le16(*(const s16*)(x))
+#define cpu_to_sle32p(x)	(__force sle32)__cpu_to_le32(*(const s32*)(x))
+#define cpu_to_sle64p(x)	(__force sle64)__cpu_to_le64(*(const s64*)(x))
 
 /* Constant endianness conversion defines. */
 
-#define const_le16_to_cpu(x)	__constant_le16_to_cpu(x)
-#define const_le32_to_cpu(x)	__constant_le32_to_cpu(x)
-#define const_le64_to_cpu(x)	__constant_le64_to_cpu(x)
+#define const_le16_to_cpu(x)	(u16)__constant_le16_to_cpu((le16)(x))
+#define const_le32_to_cpu(x)	(u32)__constant_le32_to_cpu((le32)(x))
+#define const_le64_to_cpu(x)	(u64)__constant_le64_to_cpu((le64)(x))
 
-#define const_cpu_to_le16(x)	__constant_cpu_to_le16(x)
-#define const_cpu_to_le32(x)	__constant_cpu_to_le32(x)
-#define const_cpu_to_le64(x)	__constant_cpu_to_le64(x)
+#define const_cpu_to_le16(x)	(le16)__constant_cpu_to_le16((u16)(x))
+#define const_cpu_to_le32(x)	(le32)__constant_cpu_to_le32((u32)(x))
+#define const_cpu_to_le64(x)	(le64)__constant_cpu_to_le64((u64)(x))
+
+#ifdef __CHECKER__
+static void ntfs_endian_self_test(void)
+{
+	/* Should not generate warnings. */
+	(le16)cpu_to_le16((u16)0);
+	(le32)cpu_to_le32((u32)0);
+	(le64)cpu_to_le64((u64)0);
+	(sle16)cpu_to_sle16((s16)0);
+	(sle32)cpu_to_sle32((s32)0);
+	(sle64)cpu_to_sle64((s64)0);
+	(u16)le16_to_cpu((__force le16)0);
+	(u32)le32_to_cpu((__force le32)0);
+	(u64)le64_to_cpu((__force le64)0);
+	(s16)sle16_to_cpu((__force sle16)0);
+	(s32)sle32_to_cpu((__force sle32)0);
+	(s64)sle64_to_cpu((__force sle64)0);
+	(le16)const_cpu_to_le16((u16)0);
+	(le32)const_cpu_to_le32((u32)0);
+	(le64)const_cpu_to_le64((u64)0);
+	(u16)const_le16_to_cpu((__force le16)0);
+	(u32)const_le32_to_cpu((__force le32)0);
+	(u64)const_le64_to_cpu((__force le64)0);
+
+	/*
+	 * TODO: Need some how to test that warnings are actually generated,
+	 * but without flooding output with them and vice-versa print warning
+	 * in case if some one warning is not triggered, but should. Any ideas?
+	 */
+}
+#endif
 
 #endif /* defined _NTFS_ENDIANS_H */

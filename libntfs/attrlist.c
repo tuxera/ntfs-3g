@@ -3,7 +3,7 @@
  *		project.
  *
  * Copyright (c) 2004-2005 Anton Altaparmakov
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -105,7 +105,7 @@ int ntfs_attrlist_need(ntfs_inode *ni)
 int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 {
 	ATTR_LIST_ENTRY *ale;
-	MFT_REF mref;
+	leMFT_REF mref;
 	ntfs_attr *na = NULL;
 	ntfs_attr_search_ctx *ctx;
 	u8 *new_al;
@@ -152,7 +152,7 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	if (!ntfs_attr_lookup(attr->type, (attr->name_length) ? (ntfschar*)
 			((u8*)attr + le16_to_cpu(attr->name_offset)) :
 			AT_UNNAMED, attr->name_length, CASE_SENSITIVE,
-			(attr->non_resident) ? le64_to_cpu(attr->lowest_vcn) :
+			(attr->non_resident) ? sle64_to_cpu(attr->lowest_vcn) :
 			0, (attr->non_resident) ? NULL : ((u8*)attr +
 			le16_to_cpu(attr->value_offset)), (attr->non_resident) ?
 			0 : le32_to_cpu(attr->value_length), ctx)) {
@@ -264,10 +264,10 @@ int ntfs_attrlist_entry_rm(ntfs_attr_search_ctx *ctx)
 		base_ni = ctx->ntfs_ino;
 	ale = ctx->al_entry;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld.\n",
-			(long long) ctx->ntfs_ino->mft_no,
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, lowest_vcn %lld."
+			"\n", (long long) ctx->ntfs_ino->mft_no,
 			(unsigned) le32_to_cpu(ctx->al_entry->type),
-			(long long) le64_to_cpu(ctx->al_entry->lowest_vcn));
+			(long long) sle64_to_cpu(ctx->al_entry->lowest_vcn));
 
 	if (!NInoAttrList(base_ni)) {
 		ntfs_log_trace("Attribute list isn't present.\n");

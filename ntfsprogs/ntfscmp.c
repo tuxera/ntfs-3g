@@ -1,10 +1,26 @@
 /**
- * ntfscmp - compare two NTFS volumes.
+ * ntfscmp - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
- * Copyright (c) 2005 Anton Altaparmakov
+ * Copyright (c) 2005      Anton Altaparmakov
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
- * This utility is part of the Linux-NTFS project.
+ * This utility compare two NTFS volumes.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program (in the main directory of the Linux-NTFS
+ * distribution in the file COPYING); if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "config.h"
@@ -386,7 +402,8 @@ static void print_attribute_name(char *name)
 }
 
 #define	GET_ATTR_NAME(a) \
-	((ntfschar *)(((u8 *)(a)) + ((a)->name_offset))), ((a)->name_length)
+	((ntfschar *)(((u8 *)(a)) + le16_to_cpu((a)->name_offset))), \
+	((a)->name_length)
 
 static void free_name(char **name)
 {
@@ -537,15 +554,15 @@ static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
 	if (cmp_buffer((u8 *)cia1.ia, (u8 *)cia2.ia, 0x18, na1))
 		goto out;
 
-	ib_size = cia1.ia->index.allocated_size + 0x18;
+	ib_size = le32_to_cpu(cia1.ia->index.allocated_size) + 0x18;
 
 	bit = 0;
 	while ((u8 *)cia1.tmp_ia < (u8 *)cia1.ia + na1->data_size) {
 		if (*cia1.byte & (1 << bit)) {
-			ret1 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia1.tmp_ia,
-							ib_size);
-			ret2 = ntfs_mst_post_read_fixup((NTFS_RECORD *)cia2.tmp_ia,
-							ib_size);
+			ret1 = ntfs_mst_post_read_fixup((NTFS_RECORD *)
+					cia1.tmp_ia, ib_size);
+			ret2 = ntfs_mst_post_read_fixup((NTFS_RECORD *)
+					cia2.tmp_ia, ib_size);
 			if (ret1 != ret2) {
 				print_differ(na1);
 				goto out;
@@ -555,8 +572,9 @@ static void cmp_index_allocation(ntfs_attr *na1, ntfs_attr *na2)
 				continue;
 
 			if (cmp_buffer(((u8 *)cia1.tmp_ia) + 0x18,
-				       ((u8 *)cia2.tmp_ia) + 0x18,
-				       cia1.ia->index.index_length, na1))
+					((u8 *)cia2.tmp_ia) + 0x18,
+					le32_to_cpu(cia1.ia->
+					index.index_length), na1))
 				goto out;
 		}
 
@@ -638,7 +656,7 @@ static int cmp_attribute_header(ATTR_RECORD *a1, ATTR_RECORD *a2)
 		/*
 		 * FIXME: includes paddings which are not handled by ntfsinfo!
 		 */
-		header_size = a1->length;
+		header_size = le32_to_cpu(a1->length);
 	}
 
 	return memcmp(a1, a2, header_size);
@@ -818,9 +836,11 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 
 		old_atype1 = atype1;
 		old_ret1 = ret1;
-		if (!ret1 && (atype1 <= atype2 || ret2))
+		if (!ret1 && (le32_to_cpu(atype1) <= le32_to_cpu(atype2) ||
+				ret2))
 			ret1 = next_attr(ctx1, &atype1, &name1, &errno1);
-		if (!ret2 && (old_atype1 >= atype2 || old_ret1))
+		if (!ret2 && (le32_to_cpu(old_atype1) >= le32_to_cpu(atype2) ||
+					old_ret1))
 			ret2 = next_attr(ctx2, &atype2, &name2, &errno2);
 
 		print_attributes(ni1, atype1, atype2, name1, name2);
@@ -834,14 +854,15 @@ static int cmp_attributes(ntfs_inode *ni1, ntfs_inode *ni2)
 			break;
 		}
 
-		if (ret2 || atype1 < atype2) {
+		if (ret2 || le32_to_cpu(atype1) < le32_to_cpu(atype2)) {
 			if (new_attribute(ctx1, prev_atype, prev_name)) {
 				print_ctx(ctx1);
 				printf("presence:   EXISTS   !=   MISSING\n");
-				set_prev(&prev_name, &prev_atype, name1, atype1);
+				set_prev(&prev_name, &prev_atype, name1,
+						atype1);
 			}
 
-		} else if (ret1 || atype1 > atype2) {
+		} else if (ret1 || le32_to_cpu(atype1) > le32_to_cpu(atype2)) {
 			if (new_attribute(ctx2, prev_atype, prev_name)) {
 				print_ctx(ctx2);
 				printf("presence:   MISSING  !=  EXISTS \n");

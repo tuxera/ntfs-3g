@@ -2,7 +2,7 @@
  * attrib.h - Exports for attribute handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -203,25 +203,25 @@ typedef enum {
 #define NAttrSetNonResident(na)		  set_nattr_flag(na, NonResident)
 #define NAttrClearNonResident(na)	clear_nattr_flag(na, NonResident)
 
-#define GenNAttrIno(func_name,flag)				\
-static inline int NAttr##func_name(ntfs_attr *na)		\
-{								\
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		return (na->ni->flags & FILE_ATTR_##flag);	\
-	return 0;						\
-}								\
-static inline void NAttrSet##func_name(ntfs_attr *na)		\
-{								\
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		na->ni->flags |= FILE_ATTR_##flag;		\
-	else							\
-		ntfs_log_trace("BUG! Should be called only for "\
-			"unnamed data attribute.\n");		\
-}								\
-static inline void NAttrClear##func_name(ntfs_attr *na)		\
-{								\
-	if (na->type == AT_DATA && na->name == AT_UNNAMED)	\
-		na->ni->flags &= ~FILE_ATTR_##flag;		\
+#define GenNAttrIno(func_name,flag)					\
+static inline int NAttr##func_name(ntfs_attr *na)			\
+{									\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)		\
+		return (na->ni->flags & FILE_ATTR_##flag) ? 1 : 0;	\
+	return 0;							\
+}									\
+static inline void NAttrSet##func_name(ntfs_attr *na)			\
+{									\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)		\
+		na->ni->flags |= FILE_ATTR_##flag;			\
+	else								\
+		ntfs_log_trace("BUG! Should be called only for "	\
+				"unnamed data attribute.\n");		\
+}									\
+static inline void NAttrClear##func_name(ntfs_attr *na)			\
+{									\
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)		\
+		na->ni->flags &= ~FILE_ATTR_##flag;			\
 }
 
 GenNAttrIno(Compressed, COMPRESSED)

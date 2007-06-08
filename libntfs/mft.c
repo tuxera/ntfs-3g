@@ -2,7 +2,7 @@
  * mft.c - Mft record handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c)      2005 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -323,7 +323,7 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 				"Thank you.\n", NTFS_DEV_LIST);
 	}
 	/* Set the update sequence number to 1. */
-	*(u16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = cpu_to_le16(1);
+	*(le16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = cpu_to_le16(1);
 	mrec->lsn = cpu_to_le64(0ull);
 	mrec->sequence_number = cpu_to_le16(1);
 	mrec->link_count = cpu_to_le16(0);
@@ -1191,7 +1191,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	ATTR_RECORD *a;
 	ntfs_inode *ni;
 	int err;
-	u16 seq_no, usn;
+	le16 seq_no, usn;
 
 	if (base_ni)
 		ntfs_log_trace("Entering (allocating an extent mft record for "
@@ -1389,7 +1389,7 @@ mft_rec_already_initialized:
 		goto undo_mftbmp_alloc;
 	}
 	seq_no = m->sequence_number;
-	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
+	usn = *(le16*)((u8*)m + le16_to_cpu(m->usa_ofs));
 	if (ntfs_mft_record_layout(vol, bit, m)) {
 		err = errno;
 		ntfs_log_error("Failed to re-format mft record.\n");
@@ -1397,11 +1397,10 @@ mft_rec_already_initialized:
 		errno = err;
 		goto undo_mftbmp_alloc;
 	}
-	if (le16_to_cpu(seq_no))
+	if (seq_no)
 		m->sequence_number = seq_no;
-	seq_no = le16_to_cpu(usn);
-	if (seq_no && seq_no != 0xffff)
-		*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
+	if (usn && le16_to_cpu(usn) != 0xffff)
+		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
 	m->flags |= MFT_RECORD_IN_USE;
 	/* Now need to open an ntfs inode for the mft record. */
@@ -1495,7 +1494,8 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 {
 	u64 mft_no;
 	int err;
-	u16 seq_no, old_seq_no;
+	u16 seq_no;
+	le16 old_seq_no;
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
@@ -1560,13 +1560,14 @@ sync_rollback:
  */
 int ntfs_mft_usn_dec(MFT_RECORD *mrec)
 {
-	u16 usn, *usnp;
+	u16 usn;
+	le16 *usnp;
 
 	if (!mrec) {
 		errno = EINVAL;
 		return -1;
 	}
-	usnp = (u16 *)((char *)mrec + le16_to_cpu(mrec->usa_ofs));
+	usnp = (le16 *)((char *)mrec + le16_to_cpu(mrec->usa_ofs));
 	usn = le16_to_cpup(usnp);
 	if (usn-- <= 1)
 		usn = 0xfffe;

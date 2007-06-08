@@ -2,7 +2,7 @@
  * inode.c - Inode handling code. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -343,7 +343,7 @@ int ntfs_inode_close(ntfs_inode *ni)
  * Note, extent inodes are never closed directly. They are automatically
  * disposed off by the closing of the base inode.
  */
-ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
+ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const leMFT_REF mref)
 {
 	u64 mft_no = MREF_LE(mref);
 	ntfs_inode *ni;
@@ -453,8 +453,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
 		if (ni->mft_no != MREF_LE(ale->mft_reference) &&
 				prev_attached != MREF_LE(ale->mft_reference)) {
-			if (!ntfs_extent_inode_open(ni,
-					MREF_LE(ale->mft_reference))) {
+			if (!ntfs_extent_inode_open(ni, ale->mft_reference)) {
 				ntfs_log_trace("Couldn't attach extent "
 						"inode (attr type 0x%x "
 						"references to it).\n",
@@ -1143,8 +1142,8 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
 	}
 
 	if (ustr && ntfs_names_are_equal(ustr, len,
-			(ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset)),
-			attr->name_length, 0, NULL, 0))
+			(ntfschar *)((u8 *)attr + le16_to_cpu(
+			attr->name_offset)), attr->name_length, 0, NULL, 0))
 		ret = 1;
 
 	ntfs_ucsfree(ustr);

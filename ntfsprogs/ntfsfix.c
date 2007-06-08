@@ -1,8 +1,9 @@
 /**
  * ntfsfix - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2006 Anton Altaparmakov.
- * Copyright (c) 2002-2006 Szabolcs Szakacsits.
+ * Copyright (c) 2000-2006 Anton Altaparmakov
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -116,8 +117,9 @@ static void version(void)
 {
 	ntfs_log_info("%s v%s\n\n"
 		   "Attempt to fix an NTFS partition.\n\n"
-		   "Copyright (c) 2000-2006 Anton Altaparmakov.\n"
-		   "Copyright (c) 2002-2006 Szabolcs Szakacsits.\n\n",
+		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
+		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
+		   "Copyright (c) 2007      Yura Pakhuchiy\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);
@@ -168,7 +170,7 @@ static void parse_options(int argc, char **argv)
 /**
  * OLD_ntfs_volume_set_flags
  */
-static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
+static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const le16 flags)
 {
 	MFT_RECORD *m = NULL;
 	ATTR_RECORD *a;
@@ -225,7 +227,7 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 		goto err_out;
 	}
 	/* Set the volume flags. */
-	vol->flags = c->flags = cpu_to_le16(flags);
+	vol->flags = c->flags = flags;
 	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
 		ntfs_log_perror("Error writing $Volume");
 		goto err_out;
@@ -243,7 +245,7 @@ err_exit:
  */
 static int set_dirty_flag(ntfs_volume *vol)
 {
-	u16 flags;
+	le16 flags;
 
 	if (NVolWasDirty(vol))
 		return 0;
@@ -362,7 +364,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 		use_mirr = FALSE;
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
 		if (mrec->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec)) {
+			if (ntfs_is_baad_record(mrec->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFT error: Incomplete multi "
 						"sector transfer detected in "
@@ -370,7 +372,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 						")-:\n", s);
 				goto error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec)) {
+			if (!ntfs_is_mft_record(mrec->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFT error: Invalid mft "
 						"record for %s.\nCannot "
@@ -380,14 +382,14 @@ static int fix_mftmirr(ntfs_volume *vol)
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
 		if (mrec2->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec2)) {
+			if (ntfs_is_baad_record(mrec2->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFTMirr error: Incomplete "
 						"multi sector transfer "
 						"detected in %s.\n", s);
 				goto error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec2)) {
+			if (!ntfs_is_mft_record(mrec2->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFTMirr error: Invalid mft "
 						"record for %s.\n", s);
@@ -395,7 +397,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 			}
 			/* $MFT is corrupt but $MFTMirr is ok, use $MFTMirr. */
 			if (!(mrec->flags & MFT_RECORD_IN_USE) &&
-					!ntfs_is_mft_recordp(mrec))
+					!ntfs_is_mft_record(mrec->magic))
 				use_mirr = TRUE;
 		}
 		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {

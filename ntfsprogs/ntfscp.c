@@ -182,7 +182,7 @@ static int parse_options(int argc, char **argv)
 				ntfs_log_error("Couldn't parse attribute.\n");
 				err++;
 			} else
-				opts.attribute = (ATTR_TYPES)attr;
+				opts.attribute = (ATTR_TYPES)cpu_to_le32(attr);
 			break;
 		case 'i':
 			opts.inode++;

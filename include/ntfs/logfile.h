@@ -2,6 +2,7 @@
  * logfile.h - Exports for $LogFile handling.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2000-2005 Anton Altaparmakov
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -110,7 +111,8 @@ typedef struct {
  */
 enum {
 	RESTART_VOLUME_IS_CLEAN	= const_cpu_to_le16(0x0002),
-	RESTART_SPACE_FILLER	= 0xffff, /* gcc: Force enum bit width to 16. */
+	RESTART_SPACE_FILLER	= const_cpu_to_le16(0xffff),
+				/* gcc: Force enum bit width to 16. */
 } __attribute__((__packed__));
 
 typedef le16 RESTART_AREA_FLAGS;

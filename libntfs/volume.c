@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -849,14 +849,14 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
 		if (mrec->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec)) {
+			if (ntfs_is_baad_record(mrec->magic)) {
 				ntfs_log_debug("FAILED\n");
 				ntfs_log_debug("$MFT error: Incomplete multi "
 						"sector transfer detected in "
 						"%s.\n", s);
 				goto io_error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec)) {
+			if (!ntfs_is_mft_record(mrec->magic)) {
 				ntfs_log_debug("FAILED\n");
 				ntfs_log_debug("$MFT error: Invalid mft "
 						"record for %s.\n", s);
@@ -865,14 +865,14 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
 		if (mrec2->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec2)) {
+			if (ntfs_is_baad_record(mrec2->magic)) {
 				ntfs_log_debug("FAILED\n");
 				ntfs_log_debug("$MFTMirr error: Incomplete "
 						"multi sector transfer "
 						"detected in %s.\n", s);
 				goto io_error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec2)) {
+			if (!ntfs_is_mft_record(mrec2->magic)) {
 				ntfs_log_debug("FAILED\n");
 				ntfs_log_debug("$MFTMirr error: Invalid mft "
 						"record for %s.\n", s);
@@ -1076,12 +1076,12 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 				goto error_exit;
 			}
 			for (j = 0; j < (s32)u; j++) {
-				ntfschar uc = le16_to_cpu(vname[j]);
+				u16 uc = le16_to_cpu(vname[j]);
 				if (uc > 0xff)
-					uc = (ntfschar)'_';
+					uc = (u16)'_';
 				vol->vol_name[j] = (char)uc;
 			}
-			vol->vol_name[u] = '\0';
+			vol->vol_name[u] = 0;
 		}
 	}
 	ntfs_log_debug(OK);
@@ -1506,7 +1506,7 @@ error_exit:
  *
  * Return 0 if successful and -1 if not with errno set to the error code.
  */
-int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
+int ntfs_volume_write_flags(ntfs_volume *vol, const le16 flags)
 {
 	ATTR_RECORD *a;
 	VOLUME_INFORMATION *c;

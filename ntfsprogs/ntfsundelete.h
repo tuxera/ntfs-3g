@@ -2,6 +2,7 @@
  * ntfsundelete - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2007 Yura Pakhuchiy
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -72,7 +73,7 @@ struct filename {
 	time_t		 date_r;	/*	read */
 	char		*name;		/* Filename in current locale */
 	FILE_NAME_TYPE_FLAGS name_space;
-	long long	 parent_mref;
+	leMFT_REF	 parent_mref;
 	char		*parent_name;
 };
 

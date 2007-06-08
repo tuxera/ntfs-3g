@@ -1,8 +1,8 @@
 /*
  * ntfstime.h - NTFS time related functions.  Part of the Linux-NTFS project.
  *
- * Copyright (c) 2005 Anton Altaparmakov
- * Copyright (c) 2005 Yura Pakhuchiy
+ * Copyright (c) 2005      Anton Altaparmakov
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -40,7 +40,7 @@
  *
  * Return:  n  A Unix time (number of seconds since 1970)
  */
-static __inline__ time_t ntfs2utc(s64 ntfs_time)
+static __inline__ time_t ntfs2utc(sle64 ntfs_time)
 {
 	return (sle64_to_cpu(ntfs_time) - (NTFS_TIME_OFFSET)) / 10000000;
 }
@@ -60,7 +60,7 @@ static __inline__ time_t ntfs2utc(s64 ntfs_time)
  *
  * Return:  n  An NTFS time (100ns units since Jan 1601)
  */
-static __inline__ s64 utc2ntfs(time_t utc_time)
+static __inline__ sle64 utc2ntfs(time_t utc_time)
 {
 	/* Convert to 100ns intervals and then add the NTFS time offset. */
 	return cpu_to_sle64((s64)utc_time * 10000000 + NTFS_TIME_OFFSET);

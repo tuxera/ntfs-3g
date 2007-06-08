@@ -2,7 +2,7 @@
  * inode.h - Defines for NTFS inode handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -155,7 +155,7 @@ extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
 extern int ntfs_inode_close(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
-		const MFT_REF mref);
+		const leMFT_REF mref);
 
 extern int ntfs_inode_attach_all_extents(ntfs_inode *ni);
 

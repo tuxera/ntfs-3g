@@ -3,7 +3,8 @@
  *
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2004-2005 Holger Ohmacht
- * Copyright (c) 2005 Anton Altaparmakov
+ * Copyright (c) 2005      Anton Altaparmakov
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -221,11 +222,13 @@ static int parse_inode_arg(void)
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Recover deleted files from an NTFS "
-			"Volume.\n\n", EXEC_NAME, VERSION,
+	ntfs_log_info("\n%s v%s (libntfs %s) - Recover deleted files from an "
+			"NTFS Volume.\n\n", EXEC_NAME, VERSION,
 			ntfs_libntfs_version());
 	ntfs_log_info("Copyright (c) 2002-2005 Richard Russon\n"
-		"Copyright (c) 2004-2005 Holger Ohmacht\n");
+			"Copyright (c) 2004-2005 Holger Ohmacht\n"
+			"Copyright (c) 2005      Anton Altaparmakov\n"
+			"Copyright (c) 2007      Yura Pakhuchiy\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -834,7 +837,8 @@ static void get_parent_name(struct filename* name, ntfs_volume* vol)
 
 	rec = calloc(1, vol->mft_record_size);
 	if (!rec) {
-		ntfs_log_error("ERROR: Couldn't allocate memory in get_parent_name()\n");
+		ntfs_log_error("ERROR: Couldn't allocate memory in "
+				"get_parent_name()\n");
 		return;
 	}
 
@@ -842,10 +846,12 @@ static void get_parent_name(struct filename* name, ntfs_volume* vol)
 	if (!mft_data) {
 		ntfs_log_perror("ERROR: Couldn't open $MFT/$DATA");
 	} else {
-		inode_num = MREF(name->parent_mref);
+		inode_num = MREF_LE(name->parent_mref);
 
-		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num, vol->mft_record_size, rec) < 1) {
-			ntfs_log_error("ERROR: Couldn't read MFT Record %lld.\n", inode_num);
+		if (ntfs_attr_pread(mft_data, vol->mft_record_size * inode_num,
+					vol->mft_record_size, rec) < 1) {
+			ntfs_log_error("ERROR: Couldn't read MFT Record %lld"
+					".\n", inode_num);
 		} else if ((filename_attr = verify_parent(name, rec))) {
 			if (ntfs_ucstombs(filename_attr->file_name,
 					filename_attr->file_name_length,
@@ -906,11 +912,13 @@ static int get_filenames(struct ufile *file, ntfs_volume* vol)
 
 	while ((rec = find_attribute(AT_FILE_NAME, ctx))) {
 		/* We know this will always be resident. */
-		attr = (FILE_NAME_ATTR *) ((char *) rec + le16_to_cpu(rec->value_offset));
+		attr = (FILE_NAME_ATTR *)((char *)rec +
+				le16_to_cpu(rec->value_offset));
 
 		name = calloc(1, sizeof(*name));
 		if (!name) {
-			ntfs_log_error("ERROR: Couldn't allocate memory in get_filenames().\n");
+			ntfs_log_error("ERROR: Couldn't allocate memory in "
+					"get_filenames().\n");
 			count = -1;
 			break;
 		}
@@ -990,28 +998,32 @@ static int get_data(struct ufile *file, ntfs_volume *vol)
 	while ((rec = find_attribute(AT_DATA, ctx))) {
 		data = calloc(1, sizeof(*data));
 		if (!data) {
-			ntfs_log_error("ERROR: Couldn't allocate memory in get_data().\n");
+			ntfs_log_error("ERROR: Couldn't allocate memory in "
+					"get_data().\n");
 			count = -1;
 			break;
 		}
 
 		data->resident   = !rec->non_resident;
-		data->compressed = rec->flags & ATTR_IS_COMPRESSED;
-		data->encrypted  = rec->flags & ATTR_IS_ENCRYPTED;
+		data->compressed = (rec->flags & ATTR_IS_COMPRESSED) ? 1 : 0;
+		data->encrypted  = (rec->flags & ATTR_IS_ENCRYPTED) ? 1 : 0;
 
 		if (rec->name_length) {
-			data->uname     = (ntfschar *) ((char *) rec + le16_to_cpu(rec->name_offset));
+			data->uname = (ntfschar *)((char *)rec +
+					le16_to_cpu(rec->name_offset));
 			data->uname_len = rec->name_length;
 
-			if (ntfs_ucstombs(data->uname, data->uname_len, &data->name,
-					0) < 0) {
-				ntfs_log_error("ERROR: Cannot translate name into current locale.\n");
+			if (ntfs_ucstombs(data->uname, data->uname_len,
+						&data->name, 0) < 0) {
+				ntfs_log_error("ERROR: Cannot translate name "
+						"into current locale.\n");
 			}
 		}
 
 		if (data->resident) {
-			data->size_data  = le32_to_cpu(rec->value_length);
-			data->data	 = ((char*) (rec)) + le16_to_cpu(rec->value_offset);
+			data->size_data = le32_to_cpu(rec->value_length);
+			data->data = (char*)rec +
+				le16_to_cpu(rec->value_offset);
 		} else {
 			data->size_alloc = sle64_to_cpu(rec->allocated_size);
 			data->size_data  = sle64_to_cpu(rec->data_size);
@@ -1169,17 +1181,20 @@ static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 		clusters_free  = 0;
 
 		if (data->encrypted) {
-			ntfs_log_verbose("File is encrypted, recovery is impossible.\n");
+			ntfs_log_verbose("File is encrypted, recovery is "
+					"impossible.\n");
 			continue;
 		}
 
 		if (data->compressed) {
-			ntfs_log_verbose("File is compressed, recovery not yet implemented.\n");
+			ntfs_log_verbose("File is compressed, recovery not yet "
+					"implemented.\n");
 			continue;
 		}
 
 		if (data->resident) {
-			ntfs_log_verbose("File is resident, therefore recoverable.\n");
+			ntfs_log_verbose("File is resident, therefore "
+					"recoverable.\n");
 			percent = 100;
 			data->percent = 100;
 			continue;
@@ -1187,16 +1202,18 @@ static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 
 		rl = data->runlist;
 		if (!rl) {
-			ntfs_log_verbose("File has no runlist, hence no data.\n");
+			ntfs_log_verbose("File has no runlist, hence no data."
+					"\n");
 			continue;
 		}
 
 		if (rl[0].length <= 0) {
-			ntfs_log_verbose("File has an empty runlist, hence no data.\n");
+			ntfs_log_verbose("File has an empty runlist, hence no "
+					"data.\n");
 			continue;
 		}
 
-		if (rl[0].lcn == LCN_RL_NOT_MAPPED) {	/* extended mft record */
+		if (rl[0].lcn == LCN_RL_NOT_MAPPED) { /* extended mft record */
 			ntfs_log_verbose("Missing segment at beginning, %lld "
 					"clusters\n", (long long)rl[0].length);
 			clusters_inuse += rl[0].length;
@@ -1288,12 +1305,18 @@ static void dump_record(struct ufile *file)
 
 		ntfs_log_quiet("Filename: (%d) %s\n", f->name_space, f->name);
 		ntfs_log_quiet("File Flags: ");
-		if (f->flags & FILE_ATTR_SYSTEM)	ntfs_log_quiet("System ");
-		if (f->flags & FILE_ATTR_DIRECTORY)	ntfs_log_quiet("Directory ");
-		if (f->flags & FILE_ATTR_SPARSE_FILE)	ntfs_log_quiet("Sparse ");
-		if (f->flags & FILE_ATTR_REPARSE_POINT)	ntfs_log_quiet("Reparse ");
-		if (f->flags & FILE_ATTR_COMPRESSED)	ntfs_log_quiet("Compressed ");
-		if (f->flags & FILE_ATTR_ENCRYPTED)	ntfs_log_quiet("Encrypted ");
+		if (f->flags & FILE_ATTR_SYSTEM)
+			ntfs_log_quiet("System ");
+		if (f->flags & FILE_ATTR_DIRECTORY)
+			ntfs_log_quiet("Directory ");
+		if (f->flags & FILE_ATTR_SPARSE_FILE)
+			ntfs_log_quiet("Sparse ");
+		if (f->flags & FILE_ATTR_REPARSE_POINT)
+			ntfs_log_quiet("Reparse ");
+		if (f->flags & FILE_ATTR_COMPRESSED)
+			ntfs_log_quiet("Compressed ");
+		if (f->flags & FILE_ATTR_ENCRYPTED)
+			ntfs_log_quiet("Encrypted ");
 		if (!(f->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_DIRECTORY |
 		    FILE_ATTR_SPARSE_FILE | FILE_ATTR_REPARSE_POINT |
 		    FILE_ATTR_COMPRESSED | FILE_ATTR_ENCRYPTED))) {
@@ -1310,13 +1333,17 @@ static void dump_record(struct ufile *file)
 		ntfs_log_quiet("Size alloc: %lld\n", f->size_alloc);
 		ntfs_log_quiet("Size data: %lld\n", f->size_data);
 
-		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_c));
+		strftime(buffer, sizeof(buffer), "%F %R",
+				localtime(&f->date_c));
 		ntfs_log_quiet("Date C: %s\n", buffer);
-		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_a));
+		strftime(buffer, sizeof(buffer), "%F %R",
+				localtime(&f->date_a));
 		ntfs_log_quiet("Date A: %s\n", buffer);
-		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_m));
+		strftime(buffer, sizeof(buffer), "%F %R",
+				localtime(&f->date_m));
 		ntfs_log_quiet("Date M: %s\n", buffer);
-		strftime(buffer, sizeof(buffer), "%F %R", localtime(&f->date_r));
+		strftime(buffer, sizeof(buffer), "%F %R",
+				localtime(&f->date_r));
 		ntfs_log_quiet("Date R: %s\n", buffer);
 	}
 
@@ -1349,7 +1376,8 @@ static void dump_record(struct ufile *file)
 			}
 		}
 
-		ntfs_log_quiet("Amount potentially recoverable %d%%\n", d->percent);
+		ntfs_log_quiet("Amount potentially recoverable %d%%\n",
+				d->percent);
 	}
 
 	ntfs_log_quiet("________________________________________\n\n");
@@ -1402,10 +1430,14 @@ static void list_record(struct ufile *file)
 		struct data *d = list_entry(item, struct data, list);
 
 		if (!d->name) {
-			if (d->resident)   flagr = 'R';
-			else		   flagr = 'N';
-			if (d->compressed) flagc = 'C';	/* These two are mutually exclusive */
-			if (d->encrypted)  flagc = 'E';
+			if (d->resident)
+				flagr = 'R';
+			else
+				flagr = 'N';
+			if (d->compressed)
+				flagc = 'C';
+			if (d->encrypted)
+				flagc = 'E';
 
 			percent = max(percent, d->percent);
 		}

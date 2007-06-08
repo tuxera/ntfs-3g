@@ -4,6 +4,7 @@
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -367,6 +368,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2006  Szabolcs Szakacsits\n");
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
+	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1169,7 +1171,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		ntfs_log_verbose("Bytes in use     : %u\n", (unsigned int)
 				 le32_to_cpu(ctx->mrec->bytes_in_use));
 
-		next_attr = (char *)a + le16_to_cpu(a->length);
+		next_attr = (char *)a + le32_to_cpu(a->length);
 		l = mp_size - l;
 
 		ntfs_log_verbose("Bytes in use new : %u\n", l + (unsigned int)
@@ -1196,7 +1198,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		memmove(next_attr + l, next_attr, remains_size);
 		ctx->mrec->bytes_in_use = cpu_to_le32(l +
 				le32_to_cpu(ctx->mrec->bytes_in_use));
-		a->length += l;
+		a->length = cpu_to_le32(le32_to_cpu(a->length) + l);
 	}
 
 	mp = ntfs_calloc(mp_size);
@@ -1609,8 +1611,8 @@ static int is_mftdata(ntfs_resize_t *resize)
 	if (resize->mref == 0)
 		return 1;
 
-	if (  MREF(resize->mrec->base_mft_record) == 0  &&
-	    MSEQNO(resize->mrec->base_mft_record) != 0)
+	if (MREF_LE(resize->mrec->base_mft_record) == 0 &&
+	    MSEQNO_LE(resize->mrec->base_mft_record) != 0)
 		return 1;
 
 	return 0;
@@ -1872,9 +1874,9 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 
 	rl_truncate(&rl_bad, nr_clusters);
 
-	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
-	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
-	a->data_size = cpu_to_le64(nr_clusters * vol->cluster_size);
+	a->highest_vcn = cpu_to_sle64(nr_clusters - 1LL);
+	a->allocated_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
+	a->data_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
 
 	replace_attribute_runlist(vol, resize->ctx, rl_bad);
 
@@ -1949,10 +1951,10 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 		realloc_bitmap_data_attr(resize, &rl, nr_bm_clusters);
 	}
 
-	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
-	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
-	a->data_size = cpu_to_le64(bm_bsize);
-	a->initialized_size = cpu_to_le64(bm_bsize);
+	a->highest_vcn = cpu_to_sle64(nr_bm_clusters - 1LL);
+	a->allocated_size = cpu_to_sle64(nr_bm_clusters * vol->cluster_size);
+	a->data_size = cpu_to_sle64(bm_bsize);
+	a->initialized_size = cpu_to_sle64(bm_bsize);
 
 	replace_attribute_runlist(vol, resize->ctx, rl);
 
@@ -2151,7 +2153,7 @@ static void update_bootsector(ntfs_resize_t *r)
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
 		copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
 			      r->mftmir_rl.length);
-		bs.mftmirr_lcn = cpu_to_le64(r->mftmir_rl.lcn);
+		bs.mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
 		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
 	}
 

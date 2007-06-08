@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
+ * Copyright (c)      2007 Yura Pakhuchiy
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -153,8 +154,6 @@ static unsigned int wiped_unused_mft      = 0;
 static unsigned int wiped_resident_data   = 0;
 static unsigned int wiped_timestamp_data  = 0;
 
-static BOOL image_is_host_endian = FALSE;
-
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
 
@@ -180,11 +179,11 @@ static struct {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
 	u8 minor_ver;
-	u32 cluster_size;
-	s64 device_size;
-	s64 nr_clusters;
-	s64 inuse;
-	u32 offset_to_image_data;	/* From start of image_hdr. */
+	le32 cluster_size;
+	sle64 device_size;
+	sle64 nr_clusters;
+	sle64 inuse;
+	le32 offset_to_image_data;	/* From start of image_hdr. */
 } __attribute__((__packed__)) image_hdr;
 
 #define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
@@ -612,7 +611,7 @@ static void lseek_to_cluster(s64 lcn)
 static void image_skip_clusters(s64 count)
 {
 	if (opt.save_image && count > 0) {
-		typeof(count) count_buf;
+		sle64 count_buf;
 		char buff[1 + sizeof(count)];
 
 		buff[0] = 0;
@@ -661,8 +660,8 @@ static void clone_ntfs(u64 nr_clusters)
 	progress_init(&progress, p_counter, nr_clusters, 100);
 
 	if (opt.save_image) {
-		if (write_all(&fd_out, &image_hdr,
-				image_hdr.offset_to_image_data) == -1)
+		if (write_all(&fd_out, &image_hdr, le32_to_cpu(
+				image_hdr.offset_to_image_data)) == -1)
 			perr_exit("write_all");
 	}
 
@@ -704,6 +703,7 @@ static void write_empty_clusters(s32 csize, s64 count,
 
 static void restore_image(void)
 {
+	sle64 countle;
 	s64 pos = 0, count;
 	s32 csize = le32_to_cpu(image_hdr.cluster_size);
 	char cmd;
@@ -722,10 +722,9 @@ static void restore_image(void)
 			perr_exit("read_all");
 
 		if (cmd == 0) {
-			if (read_all(&fd_in, &count, sizeof(count)) == -1)
+			if (read_all(&fd_in, &countle, sizeof(countle)) == -1)
 				perr_exit("read_all");
-			if (!image_is_host_endian)
-				count = sle64_to_cpu(count);
+			count = sle64_to_cpu(countle);
 			if (opt.std_out)
 				write_empty_clusters(csize, count,
 						     &progress, &p_counter);
@@ -746,7 +745,7 @@ static void restore_image(void)
 
 static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
-	s64 timestamp = utc2ntfs(0);
+	sle64 timestamp = utc2ntfs(0);
 
 	/* FIXME: can fall into infinite loop if corrupted */
 	while (!(e->flags & INDEX_ENTRY_END)) {
@@ -855,7 +854,7 @@ out_indexr:
 	free(indexr);
 }
 
-static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
+static void wipe_index_root_timestamps(ATTR_RECORD *attr, sle64 timestamp)
 {
 	INDEX_ENTRY *entry;
 	INDEX_ROOT *iroot;
@@ -917,7 +916,7 @@ do {								\
 static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	ATTR_RECORD *a = image->ctx->attr;
-	s64 timestamp = utc2ntfs(0);
+	sle64 timestamp = utc2ntfs(0);
 
 	if (a->type == AT_FILE_NAME)
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);
@@ -1552,9 +1551,8 @@ static s64 open_image(void)
 #endif
 		image_hdr.offset_to_image_data =
 				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
-		image_is_host_endian = TRUE;
 	} else {
-		typeof(image_hdr.offset_to_image_data) offset_to_image_data;
+		le32 offset_to_image_data;
 		int delta;
 
 		if (image_hdr.major_ver > NTFSCLONE_IMG_VER_MAJOR)
@@ -1567,16 +1565,16 @@ static s64 open_image(void)
 		if (read_all(&fd_in, &offset_to_image_data,
 				sizeof(offset_to_image_data)) == -1)
 			perr_exit("read_all");
-		image_hdr.offset_to_image_data =
-				le32_to_cpu(offset_to_image_data);
+		image_hdr.offset_to_image_data = offset_to_image_data;
 		/*
 		 * Read any fields from the header that we have not read yet so
 		 * that the input stream is positioned correctly.  This means
 		 * we can support future minor versions that just extend the
 		 * header in a backwards compatible way.
 		 */
-		delta = offset_to_image_data - (NTFSCLONE_IMG_HEADER_SIZE_OLD +
-				sizeof(image_hdr.offset_to_image_data));
+		delta = le32_to_cpu(offset_to_image_data) -
+			(NTFSCLONE_IMG_HEADER_SIZE_OLD +
+			sizeof(image_hdr.offset_to_image_data));
 		if (delta > 0) {
 			char *dummy_buf;
 

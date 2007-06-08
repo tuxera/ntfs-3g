@@ -4,7 +4,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
- * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published

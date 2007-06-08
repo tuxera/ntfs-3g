@@ -324,7 +324,6 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = 0;
 	ace->size = const_cpu_to_le16(0x18);
-	ace->mask = 9;
 	ace->mask = SYNCHRONIZE | READ_CONTROL | FILE_READ_ATTRIBUTES |
 			FILE_TRAVERSE | FILE_READ_EA | FILE_LIST_DIRECTORY;
 	ace->sid.revision = SID_REVISION;

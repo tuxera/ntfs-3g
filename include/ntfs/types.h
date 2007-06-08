@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c)      2006 Szabolcs Szakacsits
+ * Copyright (c)      2007 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -47,8 +48,10 @@ typedef int64_t s64;
 
 #ifdef __CHECKER__
 #define __bitwise __attribute__((bitwise))
+#define __force __attribute__((force))
 #else
 #define __bitwise
+#define __force
 #endif
 
 typedef u16 __bitwise le16;
@@ -63,7 +66,11 @@ typedef u16 __bitwise sle16;
 typedef u32 __bitwise sle32;
 typedef u64 __bitwise sle64;
 
-typedef u16 ntfschar;			/* 2-byte Unicode character type. */
+typedef u16 __bitwise be16;
+typedef u32 __bitwise be32;
+typedef u64 __bitwise be64;
+
+typedef le16 ntfschar;			/* 2-byte Unicode character type. */
 #define UCHAR_T_SIZE_BITS 1
 
 /*
