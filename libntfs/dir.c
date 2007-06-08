@@ -287,7 +287,8 @@ descend_into_child_node:
 	if (br != 1) {
 		if (br != -1)
 			errno = EIO;
-		ntfs_log_perror("Failed to read vcn 0x%llx", vcn);
+		ntfs_log_perror("Failed to read vcn 0x%llx",
+			       	(unsigned long long)vcn);
 		goto close_err_out;
 	}
 
