@@ -1192,6 +1192,26 @@ static const char *get_attribute_type_name(le32 type)
 	return "$UNKNOWN";
 }
 
+static const char * ntfs_dump_lcn(LCN lcn)
+{
+	switch (lcn) {
+		case LCN_HOLE:
+			return "<HOLE>\t";
+		case LCN_RL_NOT_MAPPED:
+			return "<RL_NOT_MAPPED>";
+		case LCN_ENOENT:
+			return "<ENOENT>\t";
+		case LCN_EINVAL:
+			return "<EINVAL>\t";
+		case LCN_EIO:
+			return "<EIO>\t";
+		default:
+			ntfs_log_error("Invalid LCN value %llx passed to "
+					"ntfs_dump_lcn().\n", lcn);
+			return "???\t";
+	}
+}
+
 static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 {
 	printf("Dumping attribute %s (0x%x)\n",
@@ -1280,14 +1300,24 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 	}
 
 	if (opts.verbose) {
-		runlist *rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
+		runlist *rl;
+
+		rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 		if (rl) {
 			runlist *rlc = rl;
+
 			// TODO: Switch this to properly aligned hex...
 			printf("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
 			while (rlc->length) {
-				printf("\t\t\t0x%llx\t\t0x%llx\t\t0x%llx\n",
-					rlc->vcn, rlc->lcn, rlc->length);
+				if (rlc->lcn >= 0)
+					printf("\t\t\t0x%llx\t\t0x%llx\t\t"
+							"0x%llx\n", rlc->vcn,
+							rlc->lcn, rlc->length);
+				else
+					printf("\t\t\t0x%llx\t\t%s\t"
+							"0x%llx\n", rlc->vcn,
+							ntfs_dump_lcn(rlc->lcn),
+							rlc->length);
 				rlc++;
 			}
 			free(rl);
