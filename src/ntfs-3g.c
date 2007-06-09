@@ -782,22 +782,21 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		return stream_name_len;
 	vol = ctx->vol;
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
-	if (!ni) {
-		res = -errno;
+	if (!ni)
 		goto exit;
-	}
+
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
+	if (!na)
 		goto exit;
-	}
-	res = ntfs_attr_truncate(na, size);
-	// FIXME: check the usage and the importance of the return value
-	if (res)
-		res = -1;
+
+	if (ntfs_attr_truncate(na, size))
+		goto exit;
+	
 	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
+	errno = 0;
 exit:
+	res = -errno;
 	if (ni && ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
