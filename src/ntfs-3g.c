@@ -366,6 +366,12 @@ static int ntfs_fuse_parse_path(const char *org_path, char **path,
 	return 0;
 }
 
+static void set_fuse_error(int *err)
+{
+	if (!*err)
+		*err = -errno;
+}
+
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
 	int res = 0;
@@ -484,8 +490,8 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	stbuf->st_ctime = ni->last_mft_change_time;
 	stbuf->st_mtime = ni->last_data_change_time;
 exit:
-	if (ni)
-		ntfs_inode_close(ni);
+	if (ni && ntfs_inode_close(ni))
+		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -560,8 +566,8 @@ exit:
 		free(intx_file);
 	if (na)
 		ntfs_attr_close(na);
-	if (ni)
-		ntfs_inode_close(ni);
+	if (ni && ntfs_inode_close(ni))
+		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -618,7 +624,8 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
-	ntfs_inode_close(ni);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&err);
 	return err;
 }
 
@@ -646,7 +653,8 @@ static int ntfs_fuse_open(const char *org_path,
 			ntfs_attr_close(na);
 		} else
 			res = -errno;
-		ntfs_inode_close(ni);
+		if (ntfs_inode_close(ni))
+			set_fuse_error(&res);
 	} else
 		res = -errno;
 	free(path);
@@ -699,7 +707,7 @@ exit:
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -751,7 +759,7 @@ exit:
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -791,7 +799,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	ntfs_attr_close(na);
 exit:
 	if (ni && ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -866,14 +874,15 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 			ni = ntfs_create(dir_ni, uname, uname_len, type);
 			break;
 	}
-	if (ni)
-		ntfs_inode_close(ni);
-	else
+	if (ni) {
+		if (ntfs_inode_close(ni))
+			set_fuse_error(&res);
+	} else
 		res = -errno;
 exit:
 	free(uname);
-	if (dir_ni)
-		ntfs_inode_close(dir_ni);
+	if (dir_ni && ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
 	if (utarget)
 		free(utarget);
 	free(path);
@@ -906,7 +915,7 @@ static int ntfs_fuse_create_stream(const char *path,
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	return res;
 }
 
@@ -986,11 +995,11 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
 exit:
-	if (ni)
-		ntfs_inode_close(ni);
+	if (ni && ntfs_inode_close(ni))
+		set_fuse_error(&res);
 	free(uname);
-	if (dir_ni)
-		ntfs_inode_close(dir_ni);
+	if (dir_ni && ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
 	free(path);
 	return res;
 }
@@ -1032,11 +1041,11 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 	ni = NULL;
 exit:
-	if (ni)
-		ntfs_inode_close(ni);
+	if (ni && ntfs_inode_close(ni))
+		set_fuse_error(&res);
 	free(uname);
-	if (dir_ni)
-		ntfs_inode_close(dir_ni);
+	if (dir_ni && ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
 	free(path);
 	return res;
 }
@@ -1055,7 +1064,7 @@ static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
 		res = -errno;
 
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	return res;
 }
 
@@ -1169,7 +1178,10 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 			goto out;
 		}
 		
-		ntfs_inode_close(ni);
+		if (ntfs_inode_close(ni)) {
+			set_fuse_error(&ret);
+			goto out;
+		}
 		
 		ret = ntfs_fuse_rename_existing_dest(old_path, new_path);
 		goto out;
@@ -1209,6 +1221,7 @@ static int ntfs_fuse_rmdir(const char *path)
 static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
+	int res = 0;
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
@@ -1230,8 +1243,8 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
-	return 0;
+		set_fuse_error(&res);
+	return res;
 }
 
 static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
@@ -1239,7 +1252,8 @@ static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 	ntfs_inode *ni;
 	ntfs_attr *na;
 	LCN lcn;
-	int ret, cl_per_bl = ctx->vol->cluster_size / blocksize;
+	int ret = 0; 
+	int cl_per_bl = ctx->vol->cluster_size / blocksize;
 
 	if (blocksize > ctx->vol->cluster_size)
 		return -EINVAL;
@@ -1270,13 +1284,11 @@ static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, *idx / cl_per_bl);
 	*idx = (lcn > 0) ? lcn * cl_per_bl + *idx % cl_per_bl : 0;
 	
-	ret = 0;
-	
 close_attr:
 	ntfs_attr_close(na);
 close_inode:
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("bmap: failed to close inode");
+		set_fuse_error(&ret);
 	return ret;
 }
 
@@ -1343,8 +1355,8 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 exit:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
-	ntfs_inode_close(ni);
-	ntfs_log_debug("return %d\n", ret);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&ret);
 	return ret;
 }
 
@@ -1410,7 +1422,8 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 exit:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
-	ntfs_inode_close(ni);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&ret);
 	return ret;
 }
 
@@ -1460,7 +1473,7 @@ exit:
 		ntfs_attr_close(na);
 	free(lename);
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	return res;
 }
 
@@ -1520,7 +1533,7 @@ exit:
 		ntfs_attr_close(na);
 	free(lename);
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	return res;
 }
 
@@ -1558,7 +1571,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 exit:
 	free(lename);
 	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+		set_fuse_error(&res);
 	return res;
 }
 
