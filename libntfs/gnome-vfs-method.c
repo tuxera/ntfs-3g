@@ -214,7 +214,7 @@ static GnomeVFSResult inode_open_by_pathname(ntfs_inode **inode_return,
 		     *pathname_next != G_DIR_SEPARATOR; pathname_next++) ;
 		if (*pathname_next) {
 			/* terminate current path element */
-			*pathname_next++ = '\0';
+			*pathname_next++ = 0;
 		}
 		while (*pathname_next == G_DIR_SEPARATOR)
 			pathname_next++;
@@ -224,7 +224,8 @@ static GnomeVFSResult inode_open_by_pathname(ntfs_inode **inode_return,
 		libntfs_newn(pathname_parse_ucs2,
 				strlen(pathname_parse_unescaped) + 1);
 		for (i = 0; pathname_parse_unescaped[i]; i++)
-			pathname_parse_ucs2[i] = pathname_parse_unescaped[i];
+			pathname_parse_ucs2[i] = cpu_to_le16(
+					pathname_parse_unescaped[i]);
 		pathname_parse_ucs2[i] = 0;
 		g_free(pathname_parse_unescaped);
 		G_LOCK(libntfs);
@@ -326,7 +327,8 @@ static gchar *libntfs_ntfscharo_utf8(const ntfschar *name, const int name_len)
 
 	gstring = g_string_sized_new(name_len);
 	for (i = 0; i < name_len; i++)
-		gstring = g_string_append_unichar(gstring, name[i]);
+		gstring = g_string_append_unichar(gstring,
+				le16_to_cpu(name[i]));
 	return g_string_free(gstring,	/* returns utf8-formatted string */
 			FALSE);	/* free_segment */
 }
@@ -347,8 +349,8 @@ static int libntfs_gnomevfs_read_directory_filldir(
 	g_return_val_if_fail(name_len >= 0, -1);
 	g_return_val_if_fail(pos >= 0, -1);
 
-	/* system directory; FIXME: What is its proper identification? */
-	if (name_len > 0 && name[0] == '$')
+	/* system directory */
+	if (MREF(mref) != FILE_root && MREF(mref) < FILE_first_user)
 		return 0;	/* continue traversal */
 
 	file_info = gnome_vfs_file_info_new();

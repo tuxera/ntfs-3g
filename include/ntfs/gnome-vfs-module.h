@@ -32,7 +32,7 @@ G_BEGIN_DECLS
 
 G_LOCK_EXTERN(libntfs);
 
-#define libntfs_newn(objp, n)	((objp) = g_new(typeof(*(objp)), (n)))
+#define libntfs_newn(objp, n)	((objp) = (typeof(objp))g_new(typeof(*(objp)), (n)))
 #define libntfs_new(objp)	(libntfs_newn((objp), 1))
 #define LIBNTFS_MEMZERO(objp)	(memset((objp), 0, sizeof(*(objp))))
 
