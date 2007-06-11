@@ -42,6 +42,16 @@ if test "x$prefix" = "xNONE"; then
 	ac_configure_args="$ac_configure_args --prefix $prefix"
 fi
 
+# Executables should be installed to the root filesystem, otherwise 
+# automounting NTFS volumes can fail during boot if the driver binaries 
+# (ntfs-3g, fuse) are on an unmounted partition.
+if test "x$exec_prefix" = "xNONE"; then
+       exec_prefix=/
+       ac_configure_args="$ac_configure_args --exec-prefix $exec_prefix"
+fi
+
+AC_MSG_NOTICE([Setting exec_prefix to $exec_prefix])
+
 # Command-line options.
 AC_ARG_ENABLE(debug,
 	AS_HELP_STRING(--enable-debug,enable additional debugging code and
