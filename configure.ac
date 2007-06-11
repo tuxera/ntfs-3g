@@ -96,7 +96,7 @@ AC_PROG_LIBTOOL
 
 # Libraries often install their metadata .pc files in directories not searched
 # by pkg-config. Let's workaround this. 
-export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
+export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/lib/pkgconfig:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
 
 # Enable large file support.
 AC_SYS_LARGEFILE
@@ -123,6 +123,8 @@ AC_SEARCH_LIBS(clock_gettime, [rt])
 libfuse_libs="$libfuse_libs $LIBS"
 LIBS=
 AC_SUBST(libfuse_libs)
+
+FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
 
 # add --with-extra-includes and --with-extra-libs switch to ./configure
 all_libraries="$all_libraries $USER_LDFLAGS"
@@ -203,3 +205,19 @@ AC_CONFIG_FILES([
 	src/ntfs-3g.8
 ])
 AC_OUTPUT
+
+if test "x$FUSE_LIB_PATH" != "x-L/lib"; then
+cat <<EOF
+**************************************************************************
+* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING *
+* FUSE is NOT installed on the root file system. This means that         *
+* automounting NTFS volumes during boot could fail. You can configure    *
+* FUSE during its installation the below way to prevent it.              *
+* 	./configure --exec-prefix=/                                      *
+* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING *
+**************************************************************************
+You can type now 'make' to build ntfs-3g.
+EOF
+
+fi
+
