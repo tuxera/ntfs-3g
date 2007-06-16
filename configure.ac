@@ -24,7 +24,7 @@
 
 AC_PREREQ(2.59)
 
-AC_INIT([ntfs-3g],[1.612-RC],[ntfs-3g-devel@lists.sf.net])
+AC_INIT([ntfs-3g],[1.616],[ntfs-3g-devel@lists.sf.net])
 LIBNTFS_3G_VERSION=4:0:0
 
 AC_CANONICAL_HOST([])
@@ -208,14 +208,14 @@ AC_OUTPUT
 
 if test "x$FUSE_LIB_PATH" != "x-L/lib"; then
 cat <<EOF
-**************************************************************************
-* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING *
-* FUSE is NOT installed on the root file system. This means that         *
-* automounting NTFS volumes during boot could fail. You can configure    *
-* FUSE during its installation the below way to prevent it.              *
-* 	./configure --exec-prefix=/                                      *
-* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING *
-**************************************************************************
+****************************************************************************
+* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
+* FUSE is NOT installed with root directory executable prefix. This means  *
+* that automounting NTFS volumes during boot could fail. You can configure *
+* FUSE to prevent this the below way during its installation:              *
+* 	./configure --exec-prefix=/                                        *
+* WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
+****************************************************************************
 You can type now 'make' to build ntfs-3g.
 EOF
 
