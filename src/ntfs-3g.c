@@ -2190,7 +2190,7 @@ int main(int argc, char *argv[])
 		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
 			fh = NULL;
 	} else {
-		if (fuse_opt_add_arg(&margs, "use_ino,debug") == -1)
+		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache,debug") == -1)
 			fh = NULL;
 	}
 	if (fh)
