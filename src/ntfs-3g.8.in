@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "April 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "June 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ create, remove, rename, move files, directories, hard links, and
 streams; it can read and write files, including 
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
-compressed files.
+transparently compressed files.
 .SS Access handling, security
 By default, files and directories are owned by the effective 
 user and group of the mounting process and everybody has
