@@ -87,9 +87,10 @@ static int ntfs_ib_write(ntfs_index_context *icx, VCN vcn, void *buf)
 	ret = ntfs_attr_mst_pwrite(icx->ia_na, ntfs_ib_vcn_to_pos(icx, vcn),
 				   1, icx->block_size, buf);
 	if (ret != 1) {
-		ntfs_log_perror("Failed to write index block %lld of inode "
-				"%llu", (long long)vcn,
-				(unsigned long long)icx->ni->mft_no);
+		if (errno != ENOSPC)
+			ntfs_log_perror("Failed to write index block %lld of "
+					"inode %llu", (long long)vcn,
+					(unsigned long long)icx->ni->mft_no);
 		return STATUS_ERROR;
 	}
 	
