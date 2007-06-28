@@ -752,8 +752,8 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	/* Find the index root attribute in the mft record. */
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, NTFS_INDEX_I30, 4, CASE_SENSITIVE, 0, NULL,
 			0, ctx)) {
-		ntfs_log_debug("Index root attribute missing in directory inode "
-				"0x%llx.\n", (unsigned long long)dir_ni->mft_no);
+		ntfs_log_perror("Index root attribute missing in directory inode "
+				"0x%llx", (unsigned long long)dir_ni->mft_no);
 		goto dir_err_out;
 	}
 	/* Get to the index root value. */
@@ -764,7 +764,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	index_block_size = le32_to_cpu(ir->index_block_size);
 	if (index_block_size < NTFS_BLOCK_SIZE ||
 			index_block_size & (index_block_size - 1)) {
-		ntfs_log_debug("Index block size %u is invalid.\n",
+		ntfs_log_error("Index block size %u is invalid.\n",
 				(unsigned)index_block_size);
 		goto dir_err_out;
 	}
@@ -850,7 +850,7 @@ skip_index_root:
 
 	bmp_pos = ia_pos >> index_block_size_bits;
 	if (bmp_pos >> 3 >= bmp_na->data_size) {
-		ntfs_log_debug("Current index position exceeds index bitmap "
+		ntfs_log_error("Current index position exceeds index bitmap "
 				"size.\n");
 		goto dir_err_out;
 	}
@@ -907,7 +907,7 @@ find_next_index_buffer:
 	ia_start = ia_pos & ~(s64)(index_block_size - 1);
 	if (sle64_to_cpu(ia->index_block_vcn) != ia_start >>
 			index_vcn_size_bits) {
-		ntfs_log_debug("Actual VCN (0x%llx) of index buffer is different "
+		ntfs_log_error("Actual VCN (0x%llx) of index buffer is different "
 				"from expected VCN (0x%llx) in inode 0x%llx.\n",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
 				(long long)ia_start >> index_vcn_size_bits,
@@ -915,7 +915,7 @@ find_next_index_buffer:
 		goto dir_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 != index_block_size) {
-		ntfs_log_debug("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
+		ntfs_log_error("Index buffer (VCN 0x%llx) of directory inode 0x%llx "
 				"has a size (%u) differing from the directory "
 				"specified size (%u).\n", (long long)ia_start >>
 				index_vcn_size_bits,
@@ -926,7 +926,7 @@ find_next_index_buffer:
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
 	if (index_end > (u8*)ia + index_block_size) {
-		ntfs_log_debug("Size of index buffer (VCN 0x%llx) of directory inode "
+		ntfs_log_error("Size of index buffer (VCN 0x%llx) of directory inode "
 				"0x%llx exceeds maximum size.\n",
 				(long long)ia_start >> index_vcn_size_bits,
 				(unsigned long long)dir_ni->mft_no);
@@ -948,7 +948,7 @@ find_next_index_buffer:
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
 				(u8*)ie + le16_to_cpu(ie->key_length) >
 				index_end) {
-			ntfs_log_debug("Index entry out of bounds in directory inode "
+			ntfs_log_error("Index entry out of bounds in directory inode "
 				"0x%llx.\n", (unsigned long long)dir_ni->mft_no);
 			goto dir_err_out;
 		}
