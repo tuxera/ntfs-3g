@@ -101,14 +101,14 @@ typedef enum {
  */
 typedef struct {
 	gcry_cipher_hd_t gcry_cipher_hd;
-	u32 alg_id;
+	le32 alg_id;
 	u8 *key_data;
 	gcry_cipher_hd_t *des_gcry_cipher_hd_ptr;
 } ntfs_fek;
 
 /* DESX-MS128 implementation for libgcrypt. */
 static gcry_module_t ntfs_desx_module;
-static unsigned ntfs_desx_algorithm_id = -1;
+static int ntfs_desx_algorithm_id = -1;
 
 typedef struct {
 	u64 in_whitening, out_whitening;
@@ -988,7 +988,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 		errno = ENOMEM;
 		return NULL;
 	}
-	fek->alg_id = *(u32*)(fek_buf + 8);
+	fek->alg_id = *(le32*)(fek_buf + 8);
 	//ntfs_log_debug("alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
 	fek->key_data = (u8*)fek + ((sizeof(*fek) + 7) & ~7);
 	memcpy(fek->key_data, fek_buf + 16, key_size);
@@ -1179,11 +1179,11 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 	}
 	/* Apply the IV. */
 	if (fek->alg_id == CALG_AES_256) {
-		((u64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
-		((u64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
+		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
+		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
 	} else {
 		/* All other algos (Des, 3Des, DesX) use the same IV. */
-		((u64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
+		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
 	}
 	return 512;
 }
