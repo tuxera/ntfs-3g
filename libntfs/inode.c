@@ -889,6 +889,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		goto remove_attrlist_record;;
 	}
 	/* Done! */
+	ntfs_attr_put_search_ctx(ctx);
 	ntfs_attr_close(na);
 	return 0;
 remove_attrlist_record:
