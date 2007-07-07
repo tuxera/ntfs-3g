@@ -1207,7 +1207,7 @@ static int ntfs_ir_truncate(ntfs_index_context *icx, int data_size)
 		ntfs_attr_put_search_ctx(ctx);
 	
 	} else if (errno != ENOSPC)
-		ntfs_log_trace("Failed to truncate INDEX_ROOT");
+		ntfs_log_perror("Failed to truncate INDEX_ROOT");
 	
 	ntfs_attr_close(na);
 	return ret;
