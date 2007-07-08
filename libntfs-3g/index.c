@@ -460,6 +460,17 @@ err_out:
 	return ir;
 }
 
+static INDEX_ROOT *ntfs_ir_lookup2(ntfs_inode *ni, ntfschar *name, u32 len)
+{
+	ntfs_attr_search_ctx *ctx;
+	INDEX_ROOT *ir;
+
+	ir = ntfs_ir_lookup(ni, name, len, &ctx);
+	if (ir)
+		ntfs_attr_put_search_ctx(ctx);
+	return ir;
+}
+
 /** 
  * Find a key in the index block.
  * 
@@ -1110,7 +1121,7 @@ static int ntfs_ia_add(ntfs_index_context *icx)
 
 static int ntfs_ir_reparent(ntfs_index_context *icx)
 {
-	ntfs_attr_search_ctx *ctx;
+	ntfs_attr_search_ctx *ctx = NULL;
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_BLOCK *ib = NULL;
@@ -1119,18 +1130,22 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 
 	ntfs_log_trace("Entering\n");
 	
-	ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len, &ctx);
+	ir = ntfs_ir_lookup2(icx->ni, icx->name, icx->name_len);
 	if (!ir)
-		return -1;
+		goto out;
 	
 	if ((ir->index.ih_flags & NODE_MASK) == SMALL_INDEX)
 		if (ntfs_ia_add(icx))
-			goto err_out;
+			goto out;
 	
 	new_ib_vcn = ntfs_ibm_get_free(icx);
 	if (new_ib_vcn == -1)
-		goto err_out;
+		goto out;
 		
+	ir = ntfs_ir_lookup2(icx->ni, icx->name, icx->name_len);
+	if (!ir)
+		goto clear_bmp;
+	
 	ib = ntfs_ir_to_ib(ir, new_ib_vcn);
 	if (ib == NULL) {
 		ntfs_log_perror("Failed to move index root to index block");
@@ -1138,6 +1153,10 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 	}
 		
 	if (ntfs_ib_write(icx, new_ib_vcn, ib))
+		goto clear_bmp;
+	
+	ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len, &ctx);
+	if (!ir)
 		goto clear_bmp;
 	
 	ntfs_ir_nill(ir);
@@ -1154,8 +1173,8 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 	if (ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 			sizeof(INDEX_ROOT) - sizeof(INDEX_HEADER) +
 			le32_to_cpu(ir->index.allocated_size)))
-		/* FIXME: revert bitmap, index root */
-		goto err_out;
+		/* FIXME: revert index root */
+		goto clear_bmp;
 	/*
 	 *  FIXME: do it earlier if we have enough space in IR (should always),
 	 *  so in error case we wouldn't lose the IB.
@@ -1166,6 +1185,7 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 err_out:
 	free(ib);
 	ntfs_attr_put_search_ctx(ctx);
+out:
 	return ret;
 clear_bmp:
 	ntfs_ibm_clear(icx, new_ib_vcn);
@@ -1196,16 +1216,12 @@ static int ntfs_ir_truncate(ntfs_index_context *icx, int data_size)
 	ret = ntfs_attr_truncate(na, data_size + offsetof(INDEX_ROOT, index));
 	if (ret == STATUS_OK) {
 		
-		ntfs_attr_search_ctx *ctx;
-		
-		icx->ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len, &ctx);
+		icx->ir = ntfs_ir_lookup2(icx->ni, icx->name, icx->name_len);
 		if (!icx->ir)
 			return STATUS_ERROR;
 	
 		icx->ir->index.allocated_size = cpu_to_le32(data_size);
 		
-		ntfs_attr_put_search_ctx(ctx);
-	
 	} else if (errno != ENOSPC)
 		ntfs_log_perror("Failed to truncate INDEX_ROOT");
 	
@@ -1305,6 +1321,10 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 	
 	ntfs_log_trace("Entering\n");
 	
+	icx->ir = ntfs_ir_lookup2(icx->ni, icx->name, icx->name_len);
+	if (!icx->ir)
+		return STATUS_ERROR;
+
 	new_size = le32_to_cpu(icx->ir->index.index_length) + 
 			le16_to_cpu(median->length);
 	if (!(median->ie_flags & INDEX_ENTRY_NODE))
@@ -1313,6 +1333,10 @@ static int ntfs_ir_insert_median(ntfs_index_context *icx, INDEX_ENTRY *median,
 	ret = ntfs_ir_make_space(icx, new_size);
 	if (ret != STATUS_OK)
 		return ret;
+	
+	icx->ir = ntfs_ir_lookup2(icx->ni, icx->name, icx->name_len);
+	if (!icx->ir)
+		return STATUS_ERROR;
 
 	return ntfs_ih_insert(&icx->ir->index, median, new_vcn, 
 			      ntfs_icx_parent_pos(icx));
