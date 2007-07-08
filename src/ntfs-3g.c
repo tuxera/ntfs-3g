@@ -994,11 +994,15 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
 exit:
+	/* 
+	 * Must close dir_ni first otherwise ntfs_inode_sync_file_name(ni)
+	 * may fail because ni may not be in parent's index on the disk yet.
+	 */
+	if (dir_ni && ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
 	if (ni && ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
-	if (dir_ni && ntfs_inode_close(dir_ni))
-		set_fuse_error(&res);
 	free(path);
 	return res;
 }
