@@ -742,7 +742,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < (s64)size && errno != ENOSPC)
+		if (res < (s64)size)
 			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
 				"%lld <> %d)", (s64)offset, (s64)size, res);
 		if (res <= 0) {

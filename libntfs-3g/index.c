@@ -87,10 +87,8 @@ static int ntfs_ib_write(ntfs_index_context *icx, VCN vcn, void *buf)
 	ret = ntfs_attr_mst_pwrite(icx->ia_na, ntfs_ib_vcn_to_pos(icx, vcn),
 				   1, icx->block_size, buf);
 	if (ret != 1) {
-		if (errno != ENOSPC)
-			ntfs_log_perror("Failed to write index block %lld of "
-					"inode %llu", (long long)vcn,
-					(unsigned long long)icx->ni->mft_no);
+		ntfs_log_perror("Failed to write index block %lld, inode %llu",
+			(long long)vcn, (unsigned long long)icx->ni->mft_no);
 		return STATUS_ERROR;
 	}
 	
@@ -1222,7 +1220,7 @@ static int ntfs_ir_truncate(ntfs_index_context *icx, int data_size)
 	
 		icx->ir->index.allocated_size = cpu_to_le32(data_size);
 		
-	} else if (errno != ENOSPC)
+	} else
 		ntfs_log_perror("Failed to truncate INDEX_ROOT");
 	
 	ntfs_attr_close(na);

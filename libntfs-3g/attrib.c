@@ -3489,9 +3489,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		rl = ntfs_cluster_alloc(vol, 0, new_allocated_size >>
 				vol->cluster_size_bits, -1, DATA_ZONE);
 		if (!rl) {
-			if (errno != ENOSPC)
-				ntfs_log_trace("Eeek!  Failed to allocate "
-					       "cluster(s).  Aborting...\n");
+			ntfs_log_perror("Failed to allocate clusters");
 			return -1;
 		}
 	} else
@@ -4247,15 +4245,12 @@ retry:
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_free_space(na->ni, mp_size -
 							cur_max_mp_size)) {
-					if (errno != ENOSPC)
-						return -1;
-					ntfs_log_error("Attribute list mapping "
-							"pairs size to big, "
+					ntfs_log_perror("Attribute list mapping"
+							" pairs size to big, "
 							"can't fit them in the "
 							"base MFT record. "
 							"Defragment volume and "
 							"try once again.\n");
-					errno = ENOSPC;
 					return -1;
 				}
 				goto retry;
