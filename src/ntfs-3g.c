@@ -1098,7 +1098,7 @@ static int ntfs_fuse_safe_rename(const char *old_path,
 {
 	int ret;
 
-	ntfs_log_trace("Entering");
+	ntfs_log_trace("Entering\n");
 	
 	ret = ntfs_fuse_link(new_path, tmp);
 	if (ret)
@@ -1138,7 +1138,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	char *tmp;
 	const char *ext = ".ntfs-3g-";
 
-	ntfs_log_trace("Entering");
+	ntfs_log_trace("Entering\n");
 	
 	len = strlen(new_path) + strlen(ext) + 10 + 1; /* wc(str(2^32)) + \0 */
 	tmp = ntfs_malloc(len);

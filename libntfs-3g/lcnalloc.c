@@ -85,7 +85,7 @@ static s64 max_empty_bit_range(unsigned char *buf, int size)
 	int max_range = 0;
 	s64 start_pos = -1;
 	
-	ntfs_log_trace("Entering");
+	ntfs_log_trace("Entering\n");
 	
 	for (i = 0; i < size; i++, buf++) {
 		
@@ -115,7 +115,7 @@ static int bitmap_writeback(ntfs_volume *vol, s64 pos, s64 size, void *b,
 {
 	s64 written;
 	
-	ntfs_log_trace("Entering");
+	ntfs_log_trace("Entering\n");
 	
 	if (!*writeback)
 		return 0;
