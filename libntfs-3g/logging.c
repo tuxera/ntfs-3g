@@ -365,7 +365,8 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	ret = vsnprintf(log, LOG_LINE_LEN, format, args);
 	if (ret < 0) {
 		vsyslog(LOG_NOTICE, format, args);
-		return 1;
+		ret = 1;
+		goto out;
 	}
 	
 	if ((LOG_LINE_LEN > ret + 3) && (level & NTFS_LOG_LEVEL_PERROR)) {
@@ -375,7 +376,7 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	}
 	
 	syslog(LOG_NOTICE, "%s", log);
-
+out:
 	errno = olderr;
 	return ret;
 }
