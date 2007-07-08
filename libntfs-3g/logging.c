@@ -358,6 +358,10 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	char log[LOG_LINE_LEN];
 	int ret, olderr = errno;
 
+#ifndef DEBUG
+	if ((level & NTFS_LOG_LEVEL_PERROR) && errno == ENOSPC)
+		return 1;
+#endif	
 	ret = vsnprintf(log, LOG_LINE_LEN, format, args);
 	if (ret < 0) {
 		vsyslog(LOG_NOTICE, format, args);
