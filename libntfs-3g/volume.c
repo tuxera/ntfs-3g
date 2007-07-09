@@ -85,8 +85,7 @@ static void ntfs_attr_free(ntfs_attr **na)
 	if (na && *na) {
 		ntfs_attr_close(*na);
 		*na = NULL;
-	} else
-		ntfs_log_error("Tried to free NULL attribute pointer (%p)\n", na);
+	}
 }
 
 static int ntfs_inode_free(ntfs_inode **ni)
@@ -96,8 +95,7 @@ static int ntfs_inode_free(ntfs_inode **ni)
 	if (ni && *ni) {
 		ret = ntfs_inode_close(*ni);
 		*ni = NULL;
-	} else
-		ntfs_log_error("Tried to free NULL inode pointer (%p)\n", ni);
+	} 
 	
 	return ret;
 }
