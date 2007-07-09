@@ -2009,6 +2009,8 @@ static int parse_options(int argc, char *argv[])
 	return 0;
 }
 
+#ifdef linux
+
 static void create_dev_fuse(void)
 {
 	struct stat st;
@@ -2018,8 +2020,6 @@ static void create_dev_fuse(void)
 			ntfs_log_perror("Failed to create /dev/fuse");
 	}
 }
-
-#ifdef linux
 
 static fuse_fstype get_fuse_fstype(void)
 {
@@ -2161,8 +2161,9 @@ int main(int argc, char *argv[])
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
-#endif	
+	
 	create_dev_fuse();
+#endif	
 	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
