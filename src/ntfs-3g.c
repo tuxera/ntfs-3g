@@ -144,17 +144,6 @@ static const char *locale_msg =
 "         be correct or visible. Please see the potential solution at\n"
 "         http://ntfs-3g.org/support.html#locale\n";
 
-static const char *fuse26_kmod_msg =
-"WARNING: Deficient Linux kernel detected. Some driver features are\n"
-"         not available (swap file on NTFS, boot from NTFS by LILO), and\n"
-"         unmount is not safe unless it's made sure the ntfs-3g process\n"
-"         naturally terminates after calling 'umount'. If you wish this\n"
-"         message to disappear then you should upgrade to at least kernel\n"
-"         version 2.6.20, or request help from your distribution to fix\n"
-"         the kernel problem. The below web page has more information:\n"
-"         http://ntfs-3g.org/support.html#fuse26\n"
-"\n";
-
 static const char *dev_fuse_msg =
 "HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
 "      kernel module as root (modprobe fuse) and make sure /dev/fuse exist.\n";
@@ -2015,6 +2004,17 @@ static int parse_options(int argc, char *argv[])
 
 #ifdef linux
 
+static const char *fuse26_kmod_msg =
+"WARNING: Deficient Linux kernel detected. Some driver features are\n"
+"         not available (swap file on NTFS, boot from NTFS by LILO), and\n"
+"         unmount is not safe unless it's made sure the ntfs-3g process\n"
+"         naturally terminates after calling 'umount'. If you wish this\n"
+"         message to disappear then you should upgrade to at least kernel\n"
+"         version 2.6.20, or request help from your distribution to fix\n"
+"         the kernel problem. The below web page has more information:\n"
+"         http://ntfs-3g.org/support.html#fuse26\n"
+"\n";
+
 static void create_dev_fuse(void)
 {
 	struct stat st;
@@ -2221,9 +2221,10 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
+#ifdef linux
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
-	
+#endif	
 	if (!ctx->no_detach) {
 		if (daemon(0, ctx->debug))
 			ntfs_log_error("Failed to daemonize.\n");
