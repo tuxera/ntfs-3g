@@ -155,6 +155,10 @@ static const char *fuse26_kmod_msg =
 "         http://ntfs-3g.org/support.html#fuse26\n"
 "\n";
 
+static const char *dev_fuse_msg =
+"HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
+"      kernel module as root (modprobe fuse) and make sure /dev/fuse exist.\n";
+
 static const char *usage_msg = 
 "\n"
 "%s %s - Third Generation NTFS Driver\n"
@@ -2016,8 +2020,11 @@ static void create_dev_fuse(void)
 	struct stat st;
 	
 	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
-		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229)))
+		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229))) {
 			ntfs_log_perror("Failed to create /dev/fuse");
+			if (errno == EPERM)
+				ntfs_log_error(dev_fuse_msg);
+		}
 	}
 }
 

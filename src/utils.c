@@ -52,9 +52,13 @@ static const char *invalid_ntfs_msg =
 "partition (e.g. /dev/hda, not /dev/hda1)? Or the other way around?\n";
 
 static const char *corrupt_volume_msg =
-"NTFS is inconsistent. Run chkdsk /f on Windows then reboot it TWICE!\n"
-"The usage of the /f parameter is very IMPORTANT! No modification was\n"
-"made to NTFS by this software.\n";
+"NTFS is either inconsistent, or you have hardware faults, or you have a\n"
+"SoftRAID/FakeRAID hardware. In the first case run chkdsk /f on Windows\n"
+"then reboot into Windows TWICE. The usage of the /f parameter is very\n"
+"important! If you have SoftRAID/FakeRAID then first you must activate\n"
+"it and mount a different device under the /dev/mapper/ directory, (e.g.\n"
+"/dev/mapper/nvidia_eahaabcc1). Please see the 'dmraid' documentation\n"
+"for the details.\n";
 
 static const char *hibernated_volume_msg =
 "The NTFS partition is hibernated. Please resume and shutdown Windows\n"
@@ -77,7 +81,7 @@ static const char *opened_volume_msg =
 
 static const char *fakeraid_msg =
 "You seem to have a SoftRAID/FakeRAID hardware and must use an activated,\n"
-"different device under /dev/mapper, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
+"different device under /dev/mapper/, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
 "to mount NTFS. Please see the 'dmraid' documentation for help.\n";
 
 static const char *dirty_volume_msg =
