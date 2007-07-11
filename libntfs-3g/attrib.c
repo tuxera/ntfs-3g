@@ -3983,6 +3983,125 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	return 0;
 }
 
+/*
+ * If we are in the first extent, then set/clean sparse bit,
+ * update allocated and compressed size.
+ */
+static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
+				 ntfs_attr_search_ctx *ctx)
+{
+	int sparse, ret = 0;
+	
+	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x\n", 
+		       (unsigned long long)na->ni->mft_no, na->type);
+	
+	if (a->lowest_vcn)
+		goto out;
+
+	a->allocated_size = cpu_to_sle64(na->allocated_size);
+
+	/* Update sparse bit. */
+	sparse = ntfs_rl_sparse(na->rl);
+	if (sparse == -1) {
+		errno = EIO;
+		goto error;
+	}
+
+	/* Attribute become sparse. */
+	if (sparse && !(a->flags & (ATTR_IS_SPARSE | ATTR_IS_COMPRESSED))) {
+		/*
+		 * Move attribute to another mft record, if attribute is too 
+		 * small to add compressed_size field to it and we have no 
+		 * free space in the current mft record.
+		 */
+		if ((le32_to_cpu(a->length) - 
+				le16_to_cpu(a->mapping_pairs_offset) == 8)
+		    && !(le32_to_cpu(m->bytes_allocated) - 
+				le32_to_cpu(m->bytes_in_use))) {
+
+			if (!NInoAttrList(na->ni)) {
+				ntfs_attr_put_search_ctx(ctx);
+				if (ntfs_inode_add_attrlist(na->ni))
+					goto leave;
+				goto retry;
+			}
+			if (ntfs_attr_record_move_away(ctx, 8)) {
+				ntfs_log_perror("Failed to move attribute");
+				goto error;
+			}
+			ntfs_attr_put_search_ctx(ctx);
+			goto retry;
+		}
+		if (!(le32_to_cpu(a->length) - le16_to_cpu(
+						a->mapping_pairs_offset))) {
+			errno = EIO;
+			ntfs_log_perror("Mapping pairs space is 0");
+			goto error;
+		}
+		
+		NAttrSetSparse(na);
+		a->flags |= ATTR_IS_SPARSE;
+		a->compression_unit = 4; /* Windows set it so, even if attribute
+					    is not actually compressed. */
+		
+		memmove((u8*)a + le16_to_cpu(a->name_offset) + 8,
+			(u8*)a + le16_to_cpu(a->name_offset),
+			a->name_length * sizeof(ntfschar));
+
+		a->name_offset = cpu_to_le16(le16_to_cpu(a->name_offset) + 8);
+		
+		a->mapping_pairs_offset =
+			cpu_to_le16(le16_to_cpu(a->mapping_pairs_offset) + 8);
+	}
+
+	/* Attribute no longer sparse. */
+	if (!sparse && (a->flags & ATTR_IS_SPARSE) && 
+	    !(a->flags & ATTR_IS_COMPRESSED)) {
+		
+		NAttrClearSparse(na);
+		a->flags &= ~ATTR_IS_SPARSE;
+		a->compression_unit = 0;
+		
+		memmove((u8*)a + le16_to_cpu(a->name_offset) - 8, 
+			(u8*)a + le16_to_cpu(a->name_offset),
+			a->name_length * sizeof(ntfschar));
+		
+		if (le16_to_cpu(a->name_offset) >= 8)
+			a->name_offset = cpu_to_le16(le16_to_cpu(a->name_offset) - 8);
+
+		a->mapping_pairs_offset = 
+			cpu_to_le16(le16_to_cpu(a->mapping_pairs_offset) - 8);
+	}
+
+	/* Update compressed size if required. */
+	if (sparse) {
+		s64 new_compr_size;
+
+		new_compr_size = ntfs_rl_get_compressed_size(na->ni->vol, na->rl);
+		if (new_compr_size == -1)
+			goto error;
+		
+		na->compressed_size = new_compr_size;
+		a->compressed_size = cpu_to_sle64(new_compr_size);
+	}
+	/*
+	 * Set FILE_NAME dirty flag, to update sparse bit and
+	 * allocated size in the index.
+	 */
+	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+		if (sparse)
+			na->ni->allocated_size = na->compressed_size;
+		else
+			na->ni->allocated_size = na->allocated_size;
+		NInoFileNameSetDirty(na->ni);
+	}
+out:
+	return ret;
+leave:	ret = -1; goto out;  /* return -1 */
+retry:	ret = -2; goto out;
+error:  ret = -3; goto out;
+}
+
 #define NTFS_VCN_DELETE_MARK -2
 /**
  * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
@@ -4095,124 +4214,13 @@ retry:
 			continue;
 		}
 
-		/*
-		 * If we in the first extent, then set/clean sparse bit,
-		 * update allocated and compressed size.
-		 */
-		if (!a->lowest_vcn) {
-			int sparse;
-
-			/* Update allocated size. */
-			a->allocated_size = cpu_to_sle64(na->allocated_size);
-			/* Update sparse bit. */
-			sparse = ntfs_rl_sparse(na->rl);
-			if (sparse == -1) {
-				ntfs_log_trace("Bad runlist.\n");
-				err = EIO;
-				goto put_err_out;
-			}
-			/* Attribute become sparse. */
-			if (sparse && !(a->flags & (ATTR_IS_SPARSE |
-							ATTR_IS_COMPRESSED))) {
-				/*
-				 * We need to move attribute to another mft
-				 * record, if attribute is to small to add
-				 * compressed_size field to it and we have no
-				 * free space in the current mft record.
-				 */
-				if ((le32_to_cpu(a->length) - le16_to_cpu(
-						a->mapping_pairs_offset)
-						== 8) && !(le32_to_cpu(
-						m->bytes_allocated) -
-						le32_to_cpu(m->bytes_in_use))) {
-					if (!NInoAttrList(na->ni)) {
-						ntfs_attr_put_search_ctx(ctx);
-						if (ntfs_inode_add_attrlist(
-									na->ni))
-							return -1;
-						goto retry;
-					}
-					if (ntfs_attr_record_move_away(ctx,
-								8)) {
-						ntfs_log_trace("Failed to move "
-							"attribute to another "
-							"extent. Aborting..\n");
-						err = errno;
-						goto put_err_out;
-					}
-					ntfs_attr_put_search_ctx(ctx);
-					goto retry;
-				}
-				if (!(le32_to_cpu(a->length) - le16_to_cpu(
-						a->mapping_pairs_offset))) {
-					ntfs_log_trace("Size of the space "
-							"allocated for mapping "
-							"pairs should not be 0."
-							"  Aborting ...\n");
-					err = EIO;
-					goto put_err_out;
-				}
-				NAttrSetSparse(na);
-				a->flags |= ATTR_IS_SPARSE;
-				a->compression_unit = 4; /* Windows set it so,
-							    even if attribute
-							    is not actually
-							    compressed. */
-				memmove((u8*)a + le16_to_cpu(a->name_offset) +
-					8, (u8*)a + le16_to_cpu(a->name_offset),
-					a->name_length * sizeof(ntfschar));
-				a->name_offset = cpu_to_le16(le16_to_cpu(
-							a->name_offset) + 8);
-				a->mapping_pairs_offset =
-						cpu_to_le16(le16_to_cpu(
-						a->mapping_pairs_offset) + 8);
-			}
-			/* Attribute no longer sparse. */
-			if (!sparse && (a->flags & ATTR_IS_SPARSE) &&
-					!(a->flags & ATTR_IS_COMPRESSED)) {
-				NAttrClearSparse(na);
-				a->flags &= ~ATTR_IS_SPARSE;
-				a->compression_unit = 0;
-				memmove((u8*)a + le16_to_cpu(a->name_offset) -
-					8, (u8*)a + le16_to_cpu(a->name_offset),
-					a->name_length * sizeof(ntfschar));
-				if (le16_to_cpu(a->name_offset) >= 8)
-					a->name_offset = cpu_to_le16(
-						le16_to_cpu(a->name_offset) - 8);
-				a->mapping_pairs_offset =
-						cpu_to_le16(le16_to_cpu(
-						a->mapping_pairs_offset) - 8);
-			}
-			/* Update compressed size if required. */
-			if (sparse) {
-				s64 new_compr_size;
-
-				new_compr_size = ntfs_rl_get_compressed_size(
-						na->ni->vol, na->rl);
-				if (new_compr_size == -1) {
-					err = errno;
-					ntfs_log_trace("BUG! Leaving inconstant"
-							" metadata.\n");
-					goto put_err_out;
-				}
-				na->compressed_size = new_compr_size;
-				a->compressed_size = cpu_to_sle64(
-						new_compr_size);
-			}
-			/*
-			 * Set FILE_NAME dirty flag, to update sparse bit and
-			 * allocated size in the index.
-			 */
-			if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-				if (sparse)
-					na->ni->allocated_size =
-							na->compressed_size;
-				else
-					na->ni->allocated_size =
-							na->allocated_size;
-				NInoFileNameSetDirty(na->ni);
-			}
+		err = ntfs_attr_update_meta(a, na, m, ctx);
+		switch (err) {
+			case -1: return -1;
+			case -2: goto retry;
+			case -3: goto put_err_out;
 		}
+
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
 								stop_vcn);
