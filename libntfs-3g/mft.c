@@ -936,7 +936,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		if (rl2)
 			break;
 		if (errno != ENOSPC || nr == min_nr) {
-			ntfs_log_error("Failed to allocate the minimal "
+			ntfs_log_perror("Failed to allocate the minimal "
 					"number of clusters (%lli) for the "
 					"mft data attribute.\n", (long long)nr);
 			return -1;
