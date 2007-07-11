@@ -1642,16 +1642,16 @@ int ntfs_rl_sparse(runlist *rl)
 	runlist *rlc;
 
 	if (!rl) {
-		ntfs_log_trace("Invalid argument passed.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: ", __FUNCTION__);
 		return -1;
 	}
 
 	for (rlc = rl; rlc->length; rlc++)
 		if (rlc->lcn < 0) {
 			if (rlc->lcn != LCN_HOLE) {
-				ntfs_log_trace("Received unmapped runlist.\n");
 				errno = EINVAL;
+				ntfs_log_perror("%s: bad runlist", __FUNCTION__);
 				return -1;
 			}
 			return 1;
@@ -1672,16 +1672,16 @@ s64 ntfs_rl_get_compressed_size(ntfs_volume *vol, runlist *rl)
 	s64 ret = 0;
 
 	if (!rl) {
-		ntfs_log_trace("Invalid argument passed.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: ", __FUNCTION__);
 		return -1;
 	}
 
 	for (rlc = rl; rlc->length; rlc++) {
 		if (rlc->lcn < 0) {
 			if (rlc->lcn != LCN_HOLE) {
-				ntfs_log_trace("Received unmapped runlist.\n");
 				errno = EINVAL;
+				ntfs_log_perror("%s: bad runlist", __FUNCTION__);
 				return -1;
 			}
 		} else
