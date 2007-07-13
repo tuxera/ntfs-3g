@@ -3373,14 +3373,15 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 	int i;
 
 	if (!ctx || !ctx->attr || !ctx->ntfs_ino || extra < 0) {
-		ntfs_log_trace("Invalid arguments passed.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: ctx=%p ctx->attr=%p extra=%d", __FUNCTION__,
+				ctx, ctx ? ctx->attr : NULL, extra);
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for attr 0x%x, inode 0x%llx.\n",
+	ntfs_log_trace("Entering for attr 0x%x, inode %llu\n",
 			(unsigned) le32_to_cpu(ctx->attr->type),
-			(long long) ctx->ntfs_ino->mft_no);
+			(unsigned long long)ctx->ntfs_ino->mft_no);
 
 	if (ctx->ntfs_ino->nr_extents == -1)
 		base_ni = ctx->base_ntfs_ino;
@@ -3388,14 +3389,15 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 		base_ni = ctx->ntfs_ino;
 
 	if (!NInoAttrList(base_ni)) {
-		ntfs_log_trace("Inode should contain attribute list to use this "
-				"function.\n");
 		errno = EINVAL;
+		ntfs_log_perror("Inode %llu has no attrlist", 
+				(unsigned long long)base_ni->mft_no);
 		return -1;
 	}
 
 	if (ntfs_inode_attach_all_extents(ctx->ntfs_ino)) {
-		ntfs_log_trace("Couldn't attach extent inode.\n");
+		ntfs_log_perror("Couldn't attach extents, inode=%llu", 
+				(unsigned long long)base_ni->mft_no);
 		return -1;
 	}
 
@@ -3427,11 +3429,11 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
 	 */
 	ni = ntfs_mft_record_alloc(base_ni->vol, base_ni);
 	if (!ni) {
-		ntfs_log_trace("Couldn't allocate new MFT record.\n");
+		ntfs_log_perror("Couldn't allocate MFT record");
 		return -1;
 	}
 	if (ntfs_attr_record_move_to(ctx, ni)) {
-		ntfs_log_trace("Couldn't move attribute to new MFT record.\n");
+		ntfs_log_perror("Couldn't move attribute to MFT record");
 		return -1;
 	}
 	return 0;
