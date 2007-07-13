@@ -3302,10 +3302,9 @@ int ntfs_attr_record_move_to(ntfs_attr_search_ctx *ctx, ntfs_inode *ni)
 	/* Find place in MFT record where attribute will be moved. */
 	a = ctx->attr;
 	nctx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!nctx) {
-		ntfs_log_trace("Couldn't obtain search context.\n");
+	if (!nctx)
 		return -1;
-	}
+
 	/*
 	 * Use ntfs_attr_find instead of ntfs_attr_lookup to find place for
 	 * attribute in @ni->mrec, not any extent inode in case if @ni is base
@@ -4160,10 +4159,8 @@ retry:
 		base_ni = na->ni;
 
 	ctx = ntfs_attr_get_search_ctx(base_ni, NULL);
-	if (!ctx) {
-		ntfs_log_trace("Couldn't get search context.\n");
+	if (!ctx)
 		return -1;
-	}
 
 	/* Fill attribute records with new mapping pairs. */
 	stop_vcn = 0;
@@ -4524,10 +4521,9 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 
 	/* Get the first attribute record. */
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_trace("Couldn't get attribute search context.\n");
+	if (!ctx)
 		return -1;
-	}
+
 	if (ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
 			0, NULL, 0, ctx)) {
 		err = errno;
@@ -4709,7 +4705,6 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx) {
 		err = errno;
-		ntfs_log_perror("Failed to get search context");
 		if (na->allocated_size == org_alloc_size) {
 			errno = err;
 			return -1;

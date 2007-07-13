@@ -814,7 +814,6 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx) {
 		err = errno;
-		ntfs_log_trace("Couldn't get search context.\n");
 		goto err_out;
 	}
 	/* Walk through all attributes. */
@@ -997,12 +996,8 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		return 0;
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!ctx) {
-		err = errno;
-		ntfs_log_trace("Failed to get attribute search context.\n");
-		errno = err;
+	if (!ctx)
 		return -1;
-	}
 
 	/*
 	 * Chkdsk complain if $STANDARD_INFORMATION is not in the base MFT

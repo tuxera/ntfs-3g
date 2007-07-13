@@ -219,10 +219,9 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		goto io_error_exit;
 	}
 	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, NULL);
-	if (!ctx) {
-		ntfs_log_perror("Failed to allocate attribute search context");
+	if (!ctx)
 		goto error_exit;
-	}
+
 	if (p2n(ctx->attr) < p2n(mb) ||
 			(char*)ctx->attr > (char*)mb + vol->mft_record_size) {
 		ntfs_log_error("$MFT is corrupt.\n");
@@ -964,11 +963,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	}
 	/* Get a search context for the $Volume/$VOLUME_INFORMATION lookup. */
 	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
-	if (!ctx) {
-		ntfs_log_debug(FAILED);
-		ntfs_log_perror("Failed to allocate attribute search context");
+	if (!ctx)
 		goto error_exit;
-	}
+
 	/* Find the $VOLUME_INFORMATION attribute. */
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
@@ -1461,10 +1458,9 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	}
 	/* Get a pointer to the volume information attribute. */
 	ctx = ntfs_attr_get_search_ctx(vol->vol_ni, NULL);
-	if (!ctx) {
-		ntfs_log_perror("Failed to allocate attribute search context");
+	if (!ctx)
 		return -1;
-	}
+
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
 		ntfs_log_error("Attribute $VOLUME_INFORMATION was not found "

@@ -656,10 +656,9 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	 * (non-terminator) runlist element of mft bitmap.
 	 */
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_error("Failed to get search context.\n");
+	if (!ctx)
 		goto undo_alloc;
-	}
+
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
@@ -808,10 +807,9 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 
 	mftbmp_na = vol->mftbmp_na;
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_error("Failed to get search context.\n");
+	if (!ctx)
 		return -1;
-	}
+
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "
@@ -844,10 +842,9 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 		err = EIO;
 	/* Try to recover from the error. */
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_error("Failed to get search context.%s\n", es);
+	if (!ctx)
 		goto err_out;
-	}
+
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "
@@ -969,10 +966,9 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		;
 	/* Update the attribute record as well. */
 	ctx = ntfs_attr_get_search_ctx(mft_na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_error("Failed to get search context.\n");
+	if (!ctx)
 		goto undo_alloc;
-	}
+
 	if (ntfs_attr_lookup(mft_na->type, mft_na->name, mft_na->name_len, 0,
 			rl[1].vcn, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find last attribute extent of "
@@ -1159,10 +1155,9 @@ static int ntfs_mft_record_init(ntfs_volume *vol, s64 size)
 	
 	/* Update the mft data attribute record to reflect the new sizes. */
 	ctx = ntfs_attr_get_search_ctx(mft_na->ni, NULL);
-	if (!ctx) {
-		ntfs_log_error("Failed to get search context.\n");
+	if (!ctx)
 		goto undo_data_init;
-	}
+
 	if (ntfs_attr_lookup(mft_na->type, mft_na->name, mft_na->name_len, 0,
 			0, NULL, 0, ctx)) {
 		ntfs_log_error("Failed to find first attribute extent of "

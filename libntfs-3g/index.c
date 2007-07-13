@@ -433,10 +433,8 @@ static INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
 	ntfs_log_trace("Entering\n");
 	
 	*ctx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!*ctx) {
-		ntfs_log_perror("Failed to get $INDEX_ROOT search context");
+	if (!*ctx)
 		return NULL;
-	}
 	
 	if (ntfs_attr_lookup(AT_INDEX_ROOT, name, name_len, CASE_SENSITIVE, 
 			     0, NULL, 0, *ctx)) {
