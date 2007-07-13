@@ -4136,22 +4136,21 @@ int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn)
 	VCN stop_vcn;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size, ret = -1;
 	BOOL finished_build;
-
 retry:
 	if (!na || !na->rl || from_vcn) {
-		ntfs_log_trace("Invalid parameters passed.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: na=%p", __FUNCTION__, na);
 		return -1;
 	}
+
+	ntfs_log_trace("Entering for inode %llu, attr 0x%x\n", 
+		       (unsigned long long)na->ni->mft_no, na->type);
 
 	if (!NAttrNonResident(na)) {
-		ntfs_log_trace("Attribute should be non resident.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: resident attribute", __FUNCTION__);
 		return -1;
 	}
-
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n", (unsigned long
-			long)na->ni->mft_no, na->type);
 
 	if (na->ni->nr_extents == -1)
 		base_ni = na->ni->base_ni;
@@ -4187,8 +4186,8 @@ retry:
 			 */
 			first_lcn = ntfs_rl_vcn_to_lcn(na->rl, stop_vcn);
 			if (first_lcn == LCN_EINVAL) {
-				ntfs_log_trace("BUG! Incorrect runlist.\n");
 				err = EIO;
+				ntfs_log_perror("Bad runlist");
 				goto put_err_out;
 			}
 			if (first_lcn == LCN_ENOENT ||
@@ -4223,7 +4222,7 @@ retry:
 								stop_vcn);
 		if (mp_size <= 0) {
 			err = errno;
-			ntfs_log_trace("Get size for mapping pairs failed.\n");
+			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
 			goto put_err_out;
 		}
 		/*
@@ -4250,12 +4249,9 @@ retry:
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_free_space(na->ni, mp_size -
 							cur_max_mp_size)) {
-					ntfs_log_perror("Attribute list mapping"
-							" pairs size to big, "
-							"can't fit them in the "
-							"base MFT record. "
-							"Defragment volume and "
-							"try once again.\n");
+					ntfs_log_perror("Attribute list is too "
+							"big. Defragment the "
+							"volume\n");
 					return -1;
 				}
 				goto retry;
@@ -4265,8 +4261,7 @@ retry:
 			if (!NInoAttrList(base_ni)) {
 				ntfs_attr_put_search_ctx(ctx);
 				if (ntfs_inode_add_attrlist(base_ni)) {
-					ntfs_log_trace("Couldn't add attribute "
-							"list.\n");
+					ntfs_log_perror("Can not add attrlist");
 					return -1;
 				}
 				goto retry;
@@ -4285,12 +4280,7 @@ retry:
 			if (ntfs_attr_record_resize(m, a,
 					le16_to_cpu(a->mapping_pairs_offset) +
 					mp_size)) {
-				ntfs_log_error("BUG! Ran out of space in mft "
-						"record. Please run chkdsk and "
-						"if that doesn't find any "
-						"errors please report you saw "
-						"this message to %s.\n",
-						NTFS_DEV_LIST);
+				ntfs_log_perror("Failed to resize attribute");
 				err = EIO;
 				goto put_err_out;
 			}
@@ -4316,10 +4306,7 @@ retry:
 			finished_build = TRUE;
 		if (!finished_build && errno != ENOSPC) {
 			err = errno;
-			ntfs_log_error("BUG!  Mapping pairs build failed.  "
-					"Please run chkdsk and if that doesn't "
-					"find any errors please report you saw "
-					"this message to %s.\n", NTFS_DEV_LIST);
+			ntfs_log_perror("Failed to build mapping pairs");
 			goto put_err_out;
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
@@ -4327,7 +4314,7 @@ retry:
 	/* Check whether error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
-		ntfs_log_trace("Attribute lookup failed.\n");
+		ntfs_log_perror("%s: Attribute lookup failed", __FUNCTION__);
 		goto put_err_out;
 	}
 
@@ -4343,15 +4330,14 @@ retry:
 			/* Remove unused attribute record. */
 			if (ntfs_attr_record_rm(ctx)) {
 				err = errno;
-				ntfs_log_trace("Couldn't remove unused "
-						"attribute record.\n");
+				ntfs_log_perror("Could not remove unused attr");
 				goto put_err_out;
 			}
 			ntfs_attr_reinit_search_ctx(ctx);
 		}
 		if (errno != ENOENT) {
 			err = errno;
-			ntfs_log_trace("Attribute lookup failed.\n");
+			ntfs_log_perror("%s: Attr lookup failed", __FUNCTION__);
 			goto put_err_out;
 		}
 		ntfs_log_trace("Deallocate done.\n");
@@ -4368,14 +4354,14 @@ retry:
 						na->rl, stop_vcn);
 		if (mp_size <= 0) {
 			err = errno;
-			ntfs_log_trace("Get size for mapping pairs failed.\n");
+			ntfs_log_perror("%s: get mp size failed", __FUNCTION__);
 			goto put_err_out;
 		}
 		/* Allocate new mft record. */
 		ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
 		if (!ni) {
 			err = errno;
-			ntfs_log_trace("Couldn't allocate new MFT record.\n");
+			ntfs_log_perror("Could not allocate new MFT record");
 			goto put_err_out;
 		}
 		m = ni->mrec;
@@ -4396,11 +4382,9 @@ retry:
 			 na->name, na->name_len, stop_vcn, mp_size, 0);
 		if (err == -1) {
 			err = errno;
-			ntfs_log_trace("Couldn't add attribute extent into the "
-					"MFT record.\n");
-			if (ntfs_mft_record_free(na->ni->vol, ni)) {
-				ntfs_log_trace("Couldn't free MFT record.\n");
-			}
+			ntfs_log_perror("Could not add attribute extent");
+			if (ntfs_mft_record_free(na->ni->vol, ni))
+				ntfs_log_perror("Could not free MFT record");
 			goto put_err_out;
 		}
 		a = (ATTR_RECORD*)((u8*)m + err);
@@ -4410,12 +4394,9 @@ retry:
 			stop_vcn, &stop_vcn);
 		if (err < 0 && errno != ENOSPC) {
 			err = errno;
-			ntfs_log_error("BUG!  Mapping pairs build failed.  "
-					"Please run chkdsk and if that doesn't "
-					"find any errors please report you saw "
-					"this message to %s.\n", NTFS_DEV_LIST);
+			ntfs_log_perror("Failed to build MP");
 			if (ntfs_mft_record_free(na->ni->vol, ni))
-				ntfs_log_trace("Couldn't free MFT record.\n");
+				ntfs_log_perror("Couldn't free MFT record");
 			goto put_err_out;
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
