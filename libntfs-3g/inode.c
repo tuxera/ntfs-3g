@@ -797,16 +797,16 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	ntfs_attr *na;
 
 	if (!ni) {
-		ntfs_log_trace("Invalid arguments.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+	ntfs_log_trace("inode %llu\n", (unsigned long long) ni->mft_no);
 
 	if (NInoAttrList(ni) || ni->nr_extents) {
-		ntfs_log_trace("Inode already has got attribute list.\n");
 		errno = EEXIST;
+		ntfs_log_perror("Inode already has attribute list");
 		return -1;
 	}
 
@@ -823,7 +823,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		
 		if (ctx->attr->type == AT_ATTRIBUTE_LIST) {
 			err = EIO;
-			ntfs_log_trace("Eeek! Attribute list already present.\n");
+			ntfs_log_perror("Attribute list already present");
 			goto put_err_out;
 		}
 		
@@ -863,7 +863,8 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {
 		err = errno;
-		ntfs_log_trace("Attribute lookup failed.\n");
+		ntfs_log_perror("%s: Attribute lookup failed, inode %lld",
+				__FUNCTION__, (long long)ni->mft_no);
 		goto put_err_out;
 	}
 
@@ -881,8 +882,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 				offsetof(ATTR_RECORD, resident_end))) {
 			/* Failed to free space. */
 			err = errno;
-			ntfs_log_trace("Failed to free space for "
-					"$ATTRIBUTE_LIST.\n");
+			ntfs_log_perror("Failed to free space for attrlist");
 			goto rollback;
 		}
 	}
@@ -891,7 +891,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	if (ntfs_resident_attr_record_add(ni,
 				AT_ATTRIBUTE_LIST, NULL, 0, NULL, 0, 0) < 0) {
 		err = errno;
-		ntfs_log_trace("Couldn't add $ATTRIBUTE_LIST to MFT record.\n");
+		ntfs_log_perror("Couldn't add $ATTRIBUTE_LIST to MFT");
 		goto rollback;
 	}
 
@@ -899,12 +899,12 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	na = ntfs_attr_open(ni, AT_ATTRIBUTE_LIST, AT_UNNAMED, 0);
 	if (!na) {
 		err = errno;
-		ntfs_log_trace("Failed to open just added $ATTRIBUTE_LIST.\n");
+		ntfs_log_perror("Failed to open just added $ATTRIBUTE_LIST");
 		goto remove_attrlist_record;
 	}
 	if (ntfs_attr_truncate(na, al_len)) {
 		err = errno;
-		ntfs_log_trace("Failed to resize just added $ATTRIBUTE_LIST.\n");
+		ntfs_log_perror("Failed to resize just added $ATTRIBUTE_LIST");
 		ntfs_attr_close(na);
 		goto remove_attrlist_record;;
 	}
@@ -922,11 +922,9 @@ remove_attrlist_record:
 	if (!ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0,
 				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (ntfs_attr_record_rm(ctx))
-			ntfs_log_trace("Rollback failed. Failed to remove attribute "
-					"list record.\n");
+			ntfs_log_perror("Rollback failed to remove attrlist");
 	} else
-		ntfs_log_trace("Rollback failed. Couldn't find attribute list "
-				"record.\n");
+		ntfs_log_perror("Rollback failed to find attrlist");
 	/* Setup back in-memory runlist. */
 	ni->attr_list = al;
 	ni->attr_list_size = al_len;
@@ -946,11 +944,10 @@ rollback:
 						sle64_to_cpu(ale->lowest_vcn),
 						NULL, 0, ctx)) {
 				if (ntfs_attr_record_move_to(ctx, ni))
-					ntfs_log_trace("Rollback failed. Couldn't "
-						"back attribute to base MFT record.\n");
+					ntfs_log_perror("Rollback failed to "
+							"move attribute");
 			} else
-				ntfs_log_trace("Rollback failed. ntfs_attr_lookup "
-						"failed.\n");
+				ntfs_log_perror("Rollback failed to find attr");
 			ntfs_attr_reinit_search_ctx(ctx);
 		}
 		ale = (ATTR_LIST_ENTRY*)((u8*)ale + le16_to_cpu(ale->length));
