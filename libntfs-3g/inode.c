@@ -978,13 +978,13 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	int freed, err;
 
 	if (!ni || size < 0) {
-		ntfs_log_trace("Invalid arguments.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: ni=%p size=%d", __FUNCTION__, ni, size);
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx, size %d.\n",
-			(long long) ni->mft_no, size);
+	ntfs_log_trace("Entering for inode %lld, size %d\n",
+		       (unsigned long long)ni->mft_no, size);
 
 	freed = (le32_to_cpu(ni->mrec->bytes_allocated) -
 				le32_to_cpu(ni->mrec->bytes_in_use));
@@ -1014,7 +1014,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				0, ctx)) {
 		if (errno != ENOENT) {
 			err = errno;
-			ntfs_log_trace("Attribute lookup failed.\n");
+			ntfs_log_perror("%s: attr lookup failed", __FUNCTION__);
 			goto put_err_out;
 		}
 		if (ctx->attr->type == AT_END) {
@@ -1035,7 +1035,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 						0, NULL, 0, ctx)) {
 				err = errno;
 				if (errno != ENOENT) {
-					ntfs_log_trace("Attribute lookup failed.\n");
+					ntfs_log_perror("Attr lookup failed");
 				} else
 					err = ENOSPC;
 				goto put_err_out;
@@ -1047,7 +1047,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		/* Move away attribute. */
 		if (ntfs_attr_record_move_away(ctx, 0)) {
 			err = errno;
-			ntfs_log_trace("Failed to move out attribute.\n");
+			ntfs_log_perror("Failed to move out attribute");
 			break;
 		}
 		freed += record_size;
@@ -1067,7 +1067,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				NULL, 0, ctx)) {
 			if (errno != ENOENT) {
 				err = errno;
-				ntfs_log_trace("Attribute lookup failed.\n");
+				ntfs_log_perror("Attr lookup #2 failed");
 				break;
 			}
 			if (ctx->attr->type == AT_END) {
