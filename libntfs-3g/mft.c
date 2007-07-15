@@ -1141,7 +1141,7 @@ static int ntfs_mft_record_init(ntfs_volume *vol, s64 size)
 			mft_na->data_size = mft_na->initialized_size;
 		ntfs_log_debug("Initializing mft record 0x%llx.\n", (long long)ll2);
 		if (ntfs_mft_record_format(vol, ll2) < 0) {
-			ntfs_log_error("Failed to format mft record.\n");
+			ntfs_log_perror("Failed to format mft record");
 			goto undo_data_init;
 		}
 	}
