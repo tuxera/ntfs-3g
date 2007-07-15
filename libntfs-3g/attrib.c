@@ -1276,7 +1276,13 @@ done:
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
 	if (update_from != -1)
-		ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/);
+		if (ntfs_attr_update_mapping_pairs(na, 0 /*update_from*/)) {
+			/*
+			 * FIXME: trying to recover by goto rl_err_out; 
+			 * could cause driver hang by infinite looping.
+			 */
+			return -1;
+		}
 out:	
 	return total;
 rl_err_out:
