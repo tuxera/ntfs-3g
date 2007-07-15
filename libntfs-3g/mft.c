@@ -371,29 +371,22 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 {
 	MFT_RECORD *m;
-	int err;
+	int ret = -1;
 
-	if (!vol || !vol->mft_na) {
-		errno = EINVAL;
-		return -1;
-	}
 	m = ntfs_calloc(vol->mft_record_size);
 	if (!m)
 		return -1;
-	if (ntfs_mft_record_layout(vol, mref, m)) {
-		err = errno;
-		free(m);
-		errno = err;
-		return -1;
-	}
-	if (ntfs_mft_record_write(vol, mref, m)) {
-		err = errno;
-		free(m);
-		errno = err;
-		return -1;
-	}
+	
+	if (ntfs_mft_record_layout(vol, mref, m))
+		goto free_m;
+	
+	if (ntfs_mft_record_write(vol, mref, m))
+		goto free_m;
+	
+	ret = 0;
+free_m:
 	free(m);
-	return 0;
+	return ret;
 }
 
 static const char *es = "  Leaving inconsistent metadata.  Run chkdsk.";
