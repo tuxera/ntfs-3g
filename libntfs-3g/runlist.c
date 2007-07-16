@@ -544,9 +544,8 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 
 	/* Can't have an entirely unmapped source runlist. */
 	if (!srl[si].length) {
-		ntfs_log_debug("Eeek! ntfs_runlists_merge() received entirely "
-				"unmapped source runlist.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: unmapped source runlist", __FUNCTION__);
 		return NULL;
 	}
 
@@ -567,8 +566,8 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	/* Sanity check for illegal overlaps. */
 	if ((drl[di].vcn == srl[si].vcn) && (drl[di].lcn >= 0) &&
 			(srl[si].lcn >= 0)) {
-		ntfs_log_debug("Run lists overlap. Cannot merge!\n");
 		errno = ERANGE;
+		ntfs_log_perror("Run lists overlap. Cannot merge");
 		return NULL;
 	}
 
