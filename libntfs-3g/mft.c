@@ -299,6 +299,7 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 
 	if (!vol || !mrec) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: mrec=%p", __FUNCTION__, mrec);
 		return -1;
 	}
 	/* Aligned to 2-byte boundary. */
@@ -307,8 +308,8 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 	else {
 		/* Abort if mref is > 32 bits. */
 		if (MREF(mref) & 0x0000ffff00000000ull) {
-			ntfs_log_debug("Mft reference exceeds 32 bits!\n");
 			errno = ERANGE;
+			ntfs_log_perror("Mft reference exceeds 32 bits");
 			return -1;
 		}
 		mrec->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
