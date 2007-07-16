@@ -2319,6 +2319,7 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 
 	if (!vol || !vol->attrdef || !type) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: type=%d", __FUNCTION__, type);
 		return NULL;
 	}
 	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
@@ -2332,8 +2333,8 @@ ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		/* We have gone too far already. No point in continuing. */
 		break;
 	}
-	/* Attribute not found?!? */
 	errno = ENOENT;
+	ntfs_log_perror("%s: type=%d", __FUNCTION__, type);
 	return NULL;
 }
 
