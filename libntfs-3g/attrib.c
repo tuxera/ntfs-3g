@@ -2945,8 +2945,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_attr *na;
 
 	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
-		ntfs_log_trace("Invalid arguments passed.\n");
 		errno = EINVAL;
+		ntfs_log_perror("%s: ni=%p  size=%lld", __FUNCTION__, ni, size);
 		return -1;
 	}
 
@@ -2958,12 +2958,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	/* Check the attribute type and the size. */
 	if (ntfs_attr_size_bounds_check(ni->vol, type, size)) {
-		if (errno == ERANGE) {
-			ntfs_log_trace("Size bounds check failed. Aborting...\n");
-		} else if (errno == ENOENT) {
-			ntfs_log_trace("Invalid attribute type. Aborting...\n");
+		if (errno == ENOENT)
 			errno = EIO;
-		}
 		return -1;
 	}
 
@@ -2971,19 +2967,19 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (ntfs_attr_can_be_non_resident(ni->vol, type)) {
 		if (errno != EPERM) {
 			err = errno;
-			ntfs_log_trace("ntfs_attr_can_be_non_resident failed.\n");
+			ntfs_log_perror("ntfs_attr_can_be_non_resident failed");
 			goto err_out;
 		}
 		/* @val is mandatory. */
 		if (!val) {
-			ntfs_log_trace("val is mandatory for always resident "
-					"attributes.\n");
 			errno = EINVAL;
+			ntfs_log_perror("val is mandatory for always resident "
+					"attributes");
 			return -1;
 		}
 		if (size > ni->vol->mft_record_size) {
-			ntfs_log_trace("Attribute is too big.\n");
 			errno = ERANGE;
+			ntfs_log_perror("Attribute is too big");
 			return -1;
 		}
 	}
@@ -2997,7 +2993,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	} else {
 		if (errno != EPERM) {
 			err = errno;
-			ntfs_log_trace("ntfs_attr_can_be_resident failed.\n");
+			ntfs_log_perror("ntfs_attr_can_be_resident failed");
 			goto err_out;
 		}
 		is_resident = FALSE;
@@ -3024,7 +3020,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	/* Try to add to extent inodes. */
 	if (ntfs_inode_attach_all_extents(ni)) {
 		err = errno;
-		ntfs_log_trace("Failed to attach all extents to inode.\n");
+		ntfs_log_perror("Failed to attach all extents to inode");
 		goto err_out;
 	}
 	for (i = 0; i < ni->nr_extents; i++) {
@@ -3040,7 +3036,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		/* Add attribute list not present, add it and retry. */
 		if (ntfs_inode_add_attrlist(ni)) {
 			err = errno;
-			ntfs_log_trace("Failed to add attribute list.\n");
+			ntfs_log_perror("Failed to add attribute list");
 			goto err_out;
 		}
 		return ntfs_attr_add(ni, type, name, name_len, val, size);
@@ -3049,7 +3045,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	attr_ni = ntfs_mft_record_alloc(ni->vol, ni);
 	if (!attr_ni) {
 		err = errno;
-		ntfs_log_trace("Failed to allocate extent record.\n");
+		ntfs_log_perror("Failed to allocate extent record");
 		goto err_out;
 	}
 
@@ -3060,7 +3056,7 @@ add_attr_record:
 				name_len, val, size, 0);
 		if (offset < 0) {
 			err = errno;
-			ntfs_log_trace("Failed to add resident attribute.\n");
+			ntfs_log_perror("Failed to add resident attribute");
 			goto free_err_out;
 		}
 		return 0;
@@ -3071,7 +3067,7 @@ add_attr_record:
 				name_len, 0, 8, 0);
 	if (offset < 0) {
 		err = errno;
-		ntfs_log_trace("Failed to add non resident attribute.\n");
+		ntfs_log_perror("Failed to add non resident attribute");
 		goto free_err_out;
 	}
 
@@ -3083,17 +3079,16 @@ add_attr_record:
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
 		err = errno;
-		ntfs_log_trace("Failed to open just added attribute.\n");
+		ntfs_log_perror("Failed to open just added attribute");
 		goto rm_attr_err_out;
 	}
 	/* Resize and set attribute value. */
 	if (ntfs_attr_truncate(na, size) ||
 			(val && (ntfs_attr_pwrite(na, 0, size, val) != size))) {
 		err = errno;
-		ntfs_log_trace("Failed to initialize just added attribute.\n");
+		ntfs_log_perror("Failed to initialize just added attribute");
 		if (ntfs_attr_rm(na))
-			ntfs_log_trace("Failed to remove just added attribute. "
-					"Probably leaving inconstant metadata.\n");
+			ntfs_log_perror("Failed to remove just added attribute");
 		ntfs_attr_close(na);
 		goto err_out;
 	}
@@ -3103,18 +3098,14 @@ add_attr_record:
 rm_attr_err_out:
 	/* Remove just added attribute. */
 	if (ntfs_attr_record_resize(attr_ni->mrec,
-			(ATTR_RECORD*)((u8*)attr_ni->mrec + offset), 0)) {
-		ntfs_log_trace("Failed to remove just added attribute.\n");
-	}
+			(ATTR_RECORD*)((u8*)attr_ni->mrec + offset), 0))
+		ntfs_log_perror("Failed to remove just added attribute #2");
 free_err_out:
 	/* Free MFT record, if it isn't contain attributes. */
 	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
-			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8) {
-		if (ntfs_mft_record_free(attr_ni->vol, attr_ni)) {
-			ntfs_log_trace("Failed to free MFT record. Leaving "
-					"inconstant metadata.\n");
-		}
-	}
+			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8)
+		if (ntfs_mft_record_free(attr_ni->vol, attr_ni))
+			ntfs_log_perror("Failed to free MFT record");
 err_out:
 	errno = err;
 	return -1;
