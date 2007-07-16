@@ -2356,31 +2356,36 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 		const s64 size)
 {
 	ATTR_DEF *ad;
+	s64 min_size, max_size;
 
 	if (size < 0) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: size=%lld", __FUNCTION__, size);
 		return -1;
 	}
 
 	/*
-	 * $ATTRIBUTE_LIST should be not greater than 0x40000, but this is not
-	 * listed in the AttrDef.
+	 * $ATTRIBUTE_LIST shouldn't be greater than 0x40000, otherwise 
+	 * Windows would crash. This is not listed in the AttrDef.
 	 */
 	if (type == AT_ATTRIBUTE_LIST && size > 0x40000) {
 		errno = ERANGE;
+		ntfs_log_perror("Too large attrlist (%lld)", size);
 		return -1;
 	}
 
 	ad = ntfs_attr_find_in_attrdef(vol, type);
 	if (!ad)
 		return -1;
-	/* We found the attribute. - Do the bounds check. */
-	if ((sle64_to_cpu(ad->min_size) && size <
-			sle64_to_cpu(ad->min_size)) ||
-			((sle64_to_cpu(ad->max_size) > 0) && size >
-			sle64_to_cpu(ad->max_size))) {
-		/* @size is out of range! */
+	
+	min_size = sle64_to_cpu(ad->min_size);
+	max_size = sle64_to_cpu(ad->max_size);
+	
+	if ((min_size && (size < min_size)) || 
+	    ((max_size > 0) && (size > max_size))) {
 		errno = ERANGE;
+		ntfs_log_perror("Attr type %d size check failed (min,size,max="
+			"%lld,%lld,%lld)", type, min_size, size, max_size);
 		return -1;
 	}
 	return 0;
@@ -2670,9 +2675,9 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	if (ntfs_attr_can_be_non_resident(ni->vol, type)) {
 		if (errno == EPERM)
-			ntfs_log_trace("Attribute can't be non resident.\n");
+			ntfs_log_perror("Attribute can't be non resident");
 		else
-			ntfs_log_trace("ntfs_attr_can_be_non_resident failed.\n");
+			ntfs_log_perror("ntfs_attr_can_be_non_resident failed");
 		return -1;
 	}
 
@@ -2688,10 +2693,11 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (!ntfs_attr_find(type, name, name_len, CASE_SENSITIVE, NULL, 0,
 			ctx)) {
 		err = EEXIST;
-		ntfs_log_trace("Attribute already present.\n");
+		ntfs_log_perror("Attribute 0x%x already present", type);
 		goto put_err_out;
 	}
 	if (errno != ENOENT) {
+		ntfs_log_perror("ntfs_attr_find failed");
 		err = EIO;
 		goto put_err_out;
 	}
@@ -2706,7 +2712,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 			sizeof(a->compressed_size) : 0);
 	if (ntfs_make_room_for_attr(ctx->mrec, (u8*) ctx->attr, length)) {
 		err = errno;
-		ntfs_log_trace("Failed to make room for attribute.\n");
+		ntfs_log_perror("Failed to make room for attribute");
 		goto put_err_out;
 	}
 
@@ -2744,9 +2750,8 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	if (type != AT_ATTRIBUTE_LIST && NInoAttrList(base_ni)) {
 		if (ntfs_attrlist_entry_add(ni, a)) {
 			err = errno;
+			ntfs_log_perror("Failed add attr entry to attrlist");
 			ntfs_attr_record_resize(m, a, 0);
-			ntfs_log_trace("Failed add attribute entry to "
-					"ATTRIBUTE_LIST.\n");
 			goto put_err_out;
 		}
 	}
@@ -2759,8 +2764,7 @@ int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_attr_reinit_search_ctx(ctx);
 	if (ntfs_attr_lookup(type, name, name_len, CASE_SENSITIVE,
 					lowest_vcn, NULL, 0, ctx)) {
-		ntfs_log_trace("Attribute lookup failed. Probably leaving inconstant "
-				"metadata.\n");
+		ntfs_log_perror("%s: attribute lookup failed", __FUNCTION__);
 		ntfs_attr_put_search_ctx(ctx);
 		return -1;
 
