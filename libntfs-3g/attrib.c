@@ -1092,6 +1092,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			(long long)count);
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		goto errno_set;
 	}
 	vol = na->ni->vol;
@@ -1135,13 +1136,16 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		if (!ctx)
 			goto err_out;
 		if (ntfs_attr_lookup(na->type, na->name, na->name_len, 0,
-				0, NULL, 0, ctx))
+				0, NULL, 0, ctx)) {
+			ntfs_log_perror("%s: lookup failed", __FUNCTION__);
 			goto err_out;
+		}
 		val = (char*)ctx->attr + le16_to_cpu(ctx->attr->value_offset);
 		if (val < (char*)ctx->attr || val +
 				le32_to_cpu(ctx->attr->value_length) >
 				(char*)ctx->mrec + vol->mft_record_size) {
 			errno = EIO;
+			ntfs_log_perror("%s: Sanity check failed", __FUNCTION__);
 			goto err_out;
 		}
 		memcpy(val + pos, b, count);
@@ -1154,6 +1158,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			 * it is unlikely to fail writing it, so is ok to just
 			 * return error here... (AIA)
 			 */
+			ntfs_log_perror("%s: failed to write mft record", __FUNCTION__);
 			goto err_out;
 		}
 		ntfs_attr_put_search_ctx(ctx);
@@ -1211,8 +1216,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		 * However, we already extended the size of the attribute,
 		 * so getting this here must be an error of some kind.
 		 */
-		if (errno == ENOENT)
+		if (errno == ENOENT) {
 			errno = EIO;
+			ntfs_log_perror("%s: Failed to find VCN #1", __FUNCTION__);
+		}
 		goto err_out;
 	}
 	/*
@@ -1225,8 +1232,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		if (rl->lcn == LCN_RL_NOT_MAPPED) {
 			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl) {
-				if (errno == ENOENT)
+				if (errno == ENOENT) {
 					errno = EIO;
+					ntfs_log_perror("%s: Failed to find VCN"
+							" #2", __FUNCTION__);
+				}
 				goto rl_err_out;
 			}
 			/* Needed for case when runs merged. */
@@ -1234,12 +1244,15 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		}
 		if (!rl->length) {
 			errno = EIO;
+			ntfs_log_perror("%s: Zero run length", __FUNCTION__);
 			goto rl_err_out;
 		}
 		if (rl->lcn < (LCN)0) {
 
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
+				ntfs_log_perror("%s: Unexpected LCN (%lld)", 
+						__FUNCTION__, rl->lcn);
 				goto rl_err_out;
 			}
 			
@@ -1390,6 +1403,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 			(long long)pos);
 	if (bk_cnt < 0 || bk_size % NTFS_BLOCK_SIZE) {
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		return -1;
 	}
 	br = ntfs_attr_pread(na, pos, bk_cnt * bk_size, dst);
@@ -1455,6 +1469,7 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 				((u8*)src + i * bk_size), bk_size);
 		if (err < 0) {
 			/* Abort write at this position. */
+			ntfs_log_perror("%s #1", __FUNCTION__);
 			if (!i)
 				return err;
 			bk_cnt = i;
@@ -1463,6 +1478,9 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	}
 	/* Write the prepared data. */
 	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, src);
+	if (written <= 0) {
+		ntfs_log_perror("%s: written=%lld", __FUNCTION__, written);
+	}
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < bk_cnt; ++i)
 		ntfs_mst_post_write_fixup((NTFS_RECORD*)((u8*)src + i *
@@ -4658,7 +4676,10 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					vol->cluster_size_bits), lcn_seek_from,
 					DATA_ZONE);
 			if (!rl) {
-				ntfs_log_perror("Cluster allocation failed");
+				ntfs_log_perror("Cluster allocation failed "
+						"(%lld)", first_free_vcn -
+						(na->allocated_size >>
+						 vol->cluster_size_bits));
 				return -1;
 			}
 		}
