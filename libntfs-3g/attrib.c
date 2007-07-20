@@ -751,13 +751,17 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	ntfs_volume *vol;
 	runlist_element *rl;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
-			"0x%llx.\n", (unsigned long long)na->ni->mft_no,
-			na->type, (long long)pos, (long long)count);
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: na=%p  b=%p  pos=%lld  count=%lld",
+				__FUNCTION__, na, b, pos, count);
 		return -1;
 	}
+	
+	ntfs_log_trace("Entering for inode %lld attr 0x%x pos %lld count "
+			"%lld\n", (unsigned long long)na->ni->mft_no,
+			na->type, (long long)pos, (long long)count);
+
 	/*
 	 * If this is a compressed attribute it needs special treatment, but
 	 * only if it is non-resident.
@@ -804,6 +808,7 @@ res_err_out:
 				le32_to_cpu(ctx->attr->value_length) >
 				(char*)ctx->mrec + vol->mft_record_size) {
 			errno = EIO;
+			ntfs_log_perror("%s: Sanity check failed", __FUNCTION__);
 			goto res_err_out;
 		}
 		memcpy(b, val + pos, count);
@@ -829,8 +834,10 @@ res_err_out:
 		 * However, we already truncated the read to the data_size,
 		 * so getting this here is an error.
 		 */
-		if (errno == ENOENT)
+		if (errno == ENOENT) {
 			errno = EIO;
+			ntfs_log_perror("%s: Failed to find VCN #1", __FUNCTION__);
+		}
 		return -1;
 	}
 	/*
@@ -843,18 +850,27 @@ res_err_out:
 		if (rl->lcn == LCN_RL_NOT_MAPPED) {
 			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl) {
-				if (errno == ENOENT)
+				if (errno == ENOENT) {
 					errno = EIO;
+					ntfs_log_perror("%s: Failed to find VCN #2",
+							__FUNCTION__);
+				}
 				goto rl_err_out;
 			}
 			/* Needed for case when runs merged. */
 			ofs = pos + total - (rl->vcn << vol->cluster_size_bits);
 		}
-		if (!rl->length)
+		if (!rl->length) {
+			errno = EIO;
+			ntfs_log_perror("%s: Zero run length", __FUNCTION__);
 			goto rl_err_out;
+		}
 		if (rl->lcn < (LCN)0) {
-			if (rl->lcn != (LCN)LCN_HOLE)
+			if (rl->lcn != (LCN)LCN_HOLE) {
+				ntfs_log_perror("%s: Bad run (%lld)", 
+						__FUNCTION__, rl->lcn);
 				goto rl_err_out;
+			}
 			/* It is a hole, just zero the matching @b range. */
 			to_read = min(count, (rl->length <<
 					vol->cluster_size_bits) - ofs);
@@ -887,6 +903,7 @@ retry:
 			return total;
 		if (!br)
 			errno = EIO;
+		ntfs_log_perror("%s: ntfs_pread failed", __FUNCTION__);
 		return -1;
 	}
 	/* Finally, return the number of bytes read. */
