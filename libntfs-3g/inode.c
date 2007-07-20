@@ -379,11 +379,14 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 
 	if (!base_ni) {
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		return NULL;
 	}
+	
 	ntfs_log_trace("Opening extent inode 0x%llx (base mft record 0x%llx).\n",
 			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
+	
 	/* Is the extent inode already open and attached to the base inode? */
 	if (base_ni->nr_extents > 0) {
 		extent_nis = base_ni->extent_nis;
@@ -397,12 +400,11 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 			seq_no = MSEQNO_LE(mref);
 			if (seq_no && seq_no != le16_to_cpu(
 					ni->mrec->sequence_number)) {
-				ntfs_log_debug("Found stale extent mft reference! "
-					"Corrupt file system. Run chkdsk.\n");
 				errno = EIO;
+				ntfs_log_perror("Found stale extent mft "
+					"reference mft=%lld", ni->mft_no);
 				return NULL;
 			}
-			/* We are done, return the extent inode. */
 			return ni;
 		}
 	}
@@ -411,8 +413,10 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	if (!ni)
 		return NULL;
 	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
-			NULL))
+			NULL)) {
+		ntfs_log_perror("ntfs_file_record_read failed #2");
 		goto err_out;
+	}
 	ni->mft_no = mft_no;
 	ni->nr_extents = -1;
 	ni->base_ni = base_ni;
@@ -434,7 +438,6 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	return ni;
 err_out:
 	__ntfs_inode_release(ni);
-	ntfs_log_perror("Failed to open extent inode");
 	return NULL;
 }
 
@@ -1014,7 +1017,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				0, ctx)) {
 		if (errno != ENOENT) {
 			err = errno;
-			ntfs_log_perror("%s: attr lookup failed", __FUNCTION__);
+			ntfs_log_perror("%s: attr lookup failed #2", __FUNCTION__);
 			goto put_err_out;
 		}
 		if (ctx->attr->type == AT_END) {
@@ -1035,7 +1038,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 						0, NULL, 0, ctx)) {
 				err = errno;
 				if (errno != ENOENT) {
-					ntfs_log_perror("Attr lookup failed");
+					ntfs_log_perror("Attr lookup failed #2");
 				} else
 					err = ENOSPC;
 				goto put_err_out;
@@ -1047,7 +1050,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		/* Move away attribute. */
 		if (ntfs_attr_record_move_away(ctx, 0)) {
 			err = errno;
-			ntfs_log_perror("Failed to move out attribute");
+			ntfs_log_perror("Failed to move out attribute #2");
 			break;
 		}
 		freed += record_size;
