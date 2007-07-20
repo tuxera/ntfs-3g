@@ -565,7 +565,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m = NULL; /* silence compiler warning */
 	ATTR_RECORD *a = NULL; /* silence compiler warning */
-	int ret, mp_size;
+	int err, mp_size;
 	u32 old_alen = 0; /* silence compiler warning */
 	u8 b, tb;
 	struct {
@@ -595,21 +595,21 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	 * hand as it may be in the MFT zone so the allocator would not give it
 	 * to us.
 	 */
-	ret = (int)ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
-	if (ret < 0) {
+	err = (int)ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
+	if (err < 0) {
 		ntfs_log_error("Failed to read from lcn bitmap.\n");
 		return -1;
 	}
-	ntfs_log_debug("Read %i byte%s.\n", ret, ret == 1 ? "" : "s");
+	ntfs_log_debug("Read %i byte%s.\n", err, err == 1 ? "" : "s");
 	tb = 1 << (lcn & 7ull);
-	if (ret == 1 && b != 0xff && !(b & tb)) {
+	if (err == 1 && b != 0xff && !(b & tb)) {
 		/* Next cluster is free, allocate it. */
 		b |= tb;
-		ret = (int)ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
-		if (ret < 1) {
+		err = (int)ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
+		if (err < 1) {
 			ntfs_log_error("Failed to write to lcn "
 					"bitmap.\n");
-			if (!ret)
+			if (!err)
 				errno = EIO;
 			return -1;
 		}
@@ -628,14 +628,14 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		}
 		rl = ntfs_runlists_merge(mftbmp_na->rl, rl2);
 		if (!rl) {
-			ret = errno;
+			err = errno;
 			ntfs_log_error("Failed to merge runlists for mft "
 					"bitmap.\n");
 			if (ntfs_cluster_free_from_rl(vol, rl2))
 				ntfs_log_error("Failed to deallocate "
 						"cluster.%s\n", es);
 			free(rl2);
-			errno = ret;
+			errno = err;
 			return -1;
 		}
 		mftbmp_na->rl = rl;
@@ -727,7 +727,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 restore_undo_alloc:
-	ret = errno;
+	err = errno;
 	ntfs_attr_reinit_search_ctx(ctx);
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, rl[1].vcn, NULL, 0, ctx)) {
@@ -739,15 +739,15 @@ restore_undo_alloc:
 		 * The only thing that is now wrong is ->allocated_size of the
 		 * base attribute extent which chkdsk should be able to fix.
 		 */
-		errno = ret;
+		errno = err;
 		return -1;
 	}
 	m = ctx->mrec;
 	a = ctx->attr;
 	a->highest_vcn = cpu_to_sle64(rl[1].vcn - 2);
-	errno = ret;
+	errno = err;
 undo_alloc:
-	ret = errno;
+	err = errno;
 	if (status.added_cluster) {
 		/* Truncate the last run in the runlist by one cluster. */
 		rl->length--;
@@ -775,7 +775,7 @@ undo_alloc:
 	}
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
-	errno = ret;
+	errno = err;
 	return -1;
 }
 
