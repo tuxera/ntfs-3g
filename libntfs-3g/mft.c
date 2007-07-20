@@ -567,12 +567,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	ATTR_RECORD *a = NULL; /* silence compiler warning */
 	int err, mp_size;
 	u32 old_alen = 0; /* silence compiler warning */
-	u8 b, tb;
-	struct {
-		u8 added_cluster:1;
-		u8 added_run:1;
-		u8 mp_rebuilt:1;
-	} status = { 0, 0, 0 };
+	BOOL mp_rebuilt = FALSE;
 
 	mftbmp_na = vol->mftbmp_na;
 	lcnbmp_na = vol->lcnbmp_na;
@@ -590,61 +585,30 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		return -1;
 	}
 	lcn = rl->lcn + rl->length;
-	/*
-	 * Attempt to get the cluster following the last allocated cluster by
-	 * hand as it may be in the MFT zone so the allocator would not give it
-	 * to us.
-	 */
-	err = (int)ntfs_attr_pread(lcnbmp_na, lcn >> 3, 1, &b);
-	if (err < 0) {
-		ntfs_log_error("Failed to read from lcn bitmap.\n");
+	
+	rl2 = ntfs_cluster_alloc(vol, rl[1].vcn, 1, lcn, DATA_ZONE);
+	if (!rl2) {
+		ntfs_log_error("Failed to allocate a cluster for "
+				"the mft bitmap.\n");
 		return -1;
 	}
-	ntfs_log_debug("Read %i byte%s.\n", err, err == 1 ? "" : "s");
-	tb = 1 << (lcn & 7ull);
-	if (err == 1 && b != 0xff && !(b & tb)) {
-		/* Next cluster is free, allocate it. */
-		b |= tb;
-		err = (int)ntfs_attr_pwrite(lcnbmp_na, lcn >> 3, 1, &b);
-		if (err < 1) {
-			ntfs_log_error("Failed to write to lcn "
-					"bitmap.\n");
-			if (!err)
-				errno = EIO;
-			return -1;
-		}
-		/* Update the mft bitmap runlist. */
-		rl->length++;
-		rl[1].vcn++;
-		status.added_cluster = 1;
-		ntfs_log_debug("Appending one cluster to mft bitmap.\n");
-	} else {
-		/* Allocate a cluster from the DATA_ZONE. */
-		rl2 = ntfs_cluster_alloc(vol, rl[1].vcn, 1, lcn, DATA_ZONE);
-		if (!rl2) {
-			ntfs_log_error("Failed to allocate a cluster for "
-					"the mft bitmap.\n");
-			return -1;
-		}
-		rl = ntfs_runlists_merge(mftbmp_na->rl, rl2);
-		if (!rl) {
-			err = errno;
-			ntfs_log_error("Failed to merge runlists for mft "
-					"bitmap.\n");
-			if (ntfs_cluster_free_from_rl(vol, rl2))
-				ntfs_log_error("Failed to deallocate "
-						"cluster.%s\n", es);
-			free(rl2);
-			errno = err;
-			return -1;
-		}
-		mftbmp_na->rl = rl;
-		status.added_run = 1;
-		ntfs_log_debug("Adding one run to mft bitmap.\n");
-		/* Find the last run in the new runlist. */
-		for (; rl[1].length; rl++)
-			;
+	rl = ntfs_runlists_merge(mftbmp_na->rl, rl2);
+	if (!rl) {
+		err = errno;
+		ntfs_log_error("Failed to merge runlists for mft "
+				"bitmap.\n");
+		if (ntfs_cluster_free_from_rl(vol, rl2))
+			ntfs_log_error("Failed to deallocate "
+					"cluster.%s\n", es);
+		free(rl2);
+		errno = err;
+		return -1;
 	}
+	mftbmp_na->rl = rl;
+	ntfs_log_debug("Adding one run to mft bitmap.\n");
+	/* Find the last run in the new runlist. */
+	for (; rl[1].length; rl++)
+		;
 	/*
 	 * Update the attribute record as well.  Note: @rl is the last
 	 * (non-terminator) runlist element of mft bitmap.
@@ -689,7 +653,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 		errno = EOPNOTSUPP;
 		goto undo_alloc;
 	}
-	status.mp_rebuilt = 1;
+	mp_rebuilt = TRUE;
 	/* Generate the mapping pairs array directly into the attr record. */
 	if (ntfs_mapping_pairs_build(vol, (u8*)a +
 			le16_to_cpu(a->mapping_pairs_offset), mp_size, rl2, ll,
@@ -748,20 +712,16 @@ restore_undo_alloc:
 	errno = err;
 undo_alloc:
 	err = errno;
-	if (status.added_cluster) {
-		/* Truncate the last run in the runlist by one cluster. */
-		rl->length--;
-		rl[1].vcn--;
-	} else if (status.added_run) {
-		lcn = rl->lcn;
-		/* Remove the last run from the runlist. */
-		rl->lcn = rl[1].lcn;
-		rl->length = 0;
-	}
+
+	/* Remove the last run from the runlist. */
+	lcn = rl->lcn;
+	rl->lcn = rl[1].lcn;
+	rl->length = 0;
+	
 	/* Deallocate the cluster. */
 	if (ntfs_bitmap_clear_bit(lcnbmp_na, lcn))
 		ntfs_log_error("Failed to free cluster.%s\n", es);
-	if (status.mp_rebuilt) {
+	if (mp_rebuilt) {
 		if (ntfs_mapping_pairs_build(vol, (u8*)a +
 				le16_to_cpu(a->mapping_pairs_offset),
 				old_alen - le16_to_cpu(a->mapping_pairs_offset),
