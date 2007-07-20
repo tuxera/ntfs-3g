@@ -81,9 +81,12 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 	s64 br;
 	VCN m;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
+	ntfs_log_trace("Entering for inode %lld\n", MREF(mref));
+	
 	if (!vol || !vol->mft_na || !b || count < 0) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: b=%p  count=%lld  mft=%lld", __FUNCTION__,
+				b, count, MREF(mref));
 		return -1;
 	}
 	m = MREF(mref);
@@ -246,6 +249,7 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 
 	if (!vol || !mrec) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: mrec=%p", __FUNCTION__, mrec);
 		return -1;
 	}
 	m = *mrec;
@@ -256,23 +260,28 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	if (ntfs_mft_record_read(vol, mref, m)) {
 		err = errno;
-		goto read_failed;
+		ntfs_log_perror("ntfs_mft_record_read failed");
+		goto err_out;
 	}
-	if (!ntfs_is_file_record(m->magic))
-		goto file_corrupt;
-	if (MSEQNO(mref) && MSEQNO(mref) != le16_to_cpu(m->sequence_number))
-		goto file_corrupt;
+	err = EIO;
+	if (!ntfs_is_file_record(m->magic)) {
+		ntfs_log_perror("Record %llu has no FILE magic", MREF(mref));
+		goto err_out;
+	}
+	if (MSEQNO(mref) && MSEQNO(mref) != le16_to_cpu(m->sequence_number)) {
+		ntfs_log_perror("Record %llu has wrong SeqNo", MREF(mref));
+		goto err_out;
+	}
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
-	if (p2n(a) < p2n(m) || (char*)a > (char*)m + vol->mft_record_size)
-		goto file_corrupt;
+	if (p2n(a) < p2n(m) || (char*)a > (char*)m + vol->mft_record_size) {
+		ntfs_log_perror("Record %llu is corrupt", MREF(mref));
+		goto err_out;
+	}
 	*mrec = m;
 	if (attr)
 		*attr = a;
 	return 0;
-file_corrupt:
-	ntfs_log_debug("ntfs_file_record_read(): file is corrupt.\n");
-	err = EIO;
-read_failed:
+err_out:
 	if (m != *mrec)
 		free(m);
 	errno = err;
