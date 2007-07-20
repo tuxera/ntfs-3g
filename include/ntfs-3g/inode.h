@@ -149,6 +149,8 @@ struct _ntfs_inode {
 	time_t last_access_time;
 };
 
+extern ntfs_inode *ntfs_inode_base(ntfs_inode *ni);
+
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
 
 extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);

@@ -51,6 +51,13 @@
 #include "logging.h"
 #include "misc.h"
 
+ntfs_inode *ntfs_inode_base(ntfs_inode *ni)
+{
+	if (ni->nr_extents == -1)
+		return ni->base_ni;
+	return ni;
+}
+
 /**
  * ntfs_inode_mark_dirty - set the inode (and its base inode if it exists) dirty
  * @ni:		ntfs inode to set dirty
