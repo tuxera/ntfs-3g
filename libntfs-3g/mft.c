@@ -491,7 +491,7 @@ static int ntfs_mft_bitmap_find_free_rec(ntfs_volume *vol, ntfs_inode *base_ni)
 			size = ll;
 		ll = ntfs_attr_pread(mftbmp_na, ofs, size, buf);
 		if (ll < 0) {
-			ntfs_log_error("Failed to read $MFT bitmap\n");
+			ntfs_log_perror("Failed to read $MFT bitmap");
 			free(buf);
 			return -1;
 		}
