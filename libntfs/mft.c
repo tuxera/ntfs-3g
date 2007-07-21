@@ -324,7 +324,7 @@ int ntfs_mft_record_layout(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	/* Set the update sequence number to 1. */
 	*(le16*)((u8*)mrec + le16_to_cpu(mrec->usa_ofs)) = cpu_to_le16(1);
-	mrec->lsn = cpu_to_le64(0ull);
+	mrec->lsn = 0;
 	mrec->sequence_number = cpu_to_le16(1);
 	mrec->link_count = cpu_to_le16(0);
 	/* Aligned to 8-byte boundary. */

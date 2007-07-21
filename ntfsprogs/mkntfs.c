@@ -1236,7 +1236,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
-	a->lowest_vcn = cpu_to_le64(0);
+	a->lowest_vcn = 0;
 	a->highest_vcn = cpu_to_sle64(highest_vcn - 1LL);
 	a->mapping_pairs_offset = cpu_to_le16(hdr_size + ((name_len + 7) & ~7));
 	memset(a->reserved1, 0, sizeof(a->reserved1));
@@ -1255,7 +1255,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		a->compression_unit = 4;
 		inited_size = val_len;
 		/* FIXME: Set the compressed size. */
-		a->compressed_size = cpu_to_le64(0);
+		a->compressed_size = 0;
 		/* FIXME: Write out the compressed data. */
 		/* FIXME: err = build_mapping_pairs_compressed(); */
 		err = -EOPNOTSUPP;
@@ -1421,7 +1421,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	a->instance = m->next_attr_instance;
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
-	a->lowest_vcn = cpu_to_le64(0);
+	a->lowest_vcn = 0;
 	for (i = 0; rl[i].length; i++)
 		;
 	a->highest_vcn = cpu_to_sle64(rl[i].vcn - 1);
@@ -1436,14 +1436,14 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		memcpy((char*)a + hdr_size, uname, name_len << 1);
 	if (flags & ATTR_COMPRESSION_MASK) {
 		if (flags & ATTR_COMPRESSION_MASK & ~ATTR_IS_COMPRESSED) {
-			ntfs_log_error("Unknown compression format. Reverting to "
-					"standard compression.\n");
+			ntfs_log_error("Unknown compression format. Reverting "
+					"to standard compression.\n");
 			a->flags &= ~ATTR_COMPRESSION_MASK;
 			a->flags |= ATTR_IS_COMPRESSED;
 		}
 		a->compression_unit = 4;
 		/* FIXME: Set the compressed size. */
-		a->compressed_size = cpu_to_le64(0);
+		a->compressed_size = 0;
 		/* FIXME: Write out the compressed data. */
 		/* FIXME: err = build_mapping_pairs_compressed(); */
 		err = -EOPNOTSUPP;
@@ -1451,7 +1451,8 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		a->compression_unit = 0;
 		bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len, NULL);
 		if (bw != val_len) {
-			ntfs_log_error("Error writing non-resident attribute value.\n");
+			ntfs_log_error("Error writing non-resident attribute "
+					"value.\n");
 			return -errno;
 		}
 		err = ntfs_mapping_pairs_build(g_vol, (u8*)a + hdr_size +
@@ -2111,8 +2112,8 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 	/* Set USN to 1. */
 	*(le16*)((char*)ia_val + le16_to_cpu(ia_val->usa_ofs)) =
 			cpu_to_le16(1);
-	ia_val->lsn = cpu_to_le64(0);
-	ia_val->index_block_vcn = cpu_to_le64(0);
+	ia_val->lsn = 0;
+	ia_val->index_block_vcn = 0;
 	ia_val->index.flags = LEAF_NODE;
 	/* Align to 8-byte boundary. */
 	ia_val->index.entries_offset = cpu_to_le32((sizeof(INDEX_HEADER) +
@@ -2533,7 +2534,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q1_data->change_time = utc2ntfs(mkntfs_time());
 	idx_entry_q1_data->threshold = cpu_to_sle64(-1);
 	idx_entry_q1_data->limit = cpu_to_sle64(-1);
-	idx_entry_q1_data->exceeded_time = const_cpu_to_le64(0x00);
+	idx_entry_q1_data->exceeded_time = 0;
 	err = insert_index_entry_in_res_dir_index(idx_entry_q1, q1_size, m,
 			NTFS_INDEX_Q, 2, AT_UNUSED);
 	free(idx_entry_q1);
@@ -2560,7 +2561,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2_data->change_time = utc2ntfs(mkntfs_time());;
 	idx_entry_q2_data->threshold = cpu_to_sle64(-1);
 	idx_entry_q2_data->limit = cpu_to_sle64(-1);
-	idx_entry_q2_data->exceeded_time = const_cpu_to_le64(0x00);
+	idx_entry_q2_data->exceeded_time = 0;
 	idx_entry_q2_data->sid.revision = 1;
 	idx_entry_q2_data->sid.sub_authority_count = 2;
 	for (i = 0; i < 5; i++)
