@@ -47,11 +47,15 @@ typedef int32_t s32;
 typedef int64_t s64;
 
 #ifdef __CHECKER__
-#define __bitwise __attribute__((bitwise))
-#define __force __attribute__((force))
+	#undef __bitwise
+	#undef __force
+	#define __bitwise __attribute__((bitwise))
+	#define __force __attribute__((force))
 #else
-#define __bitwise
-#define __force
+	#undef __bitwise
+	#undef __force
+	#define __bitwise
+	#define __force
 #endif
 
 typedef u16 __bitwise le16;
