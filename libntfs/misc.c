@@ -39,7 +39,7 @@
 void *ntfs_calloc(size_t size)
 {
 	void *p;
-	
+
 	p = calloc(1, size);
 	if (!p)
 		ntfs_log_perror("Failed to calloc %lld bytes", (long long)size);
@@ -55,7 +55,7 @@ void *ntfs_calloc(size_t size)
 void *ntfs_malloc(size_t size)
 {
 	void *p;
-	
+
 	p = malloc(size);
 	if (!p)
 		ntfs_log_perror("Failed to malloc %lld bytes", (long long)size);
