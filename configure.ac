@@ -210,10 +210,12 @@ if test "x$FUSE_LIB_PATH" != "x-L/lib"; then
 cat <<EOF
 ****************************************************************************
 * WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
-* FUSE is NOT installed with root directory executable prefix. This means  *
-* that automounting NTFS volumes during boot could fail. You can configure *
-* FUSE to prevent this the below way during its installation:              *
+* The FUSE user space binaries were NOT installed with root directory      *
+* executable prefix. This means that automounting NTFS volumes during boot *
+* could fail. This can be fixed the below way by reinstalling FUSE using   *
+* the right 'configure' option during FUSE compilation:                    *
 * 	./configure --exec-prefix=/                                        *
+* 	make && sudo make install                                          *
 * WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
 ****************************************************************************
 You can type now 'make' to build ntfs-3g.
