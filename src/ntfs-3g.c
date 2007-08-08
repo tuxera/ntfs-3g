@@ -573,14 +573,17 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		const unsigned dt_type __attribute__((unused)))
 {
 	char *filename = NULL;
+	int ret = 0;
 
 	if (name_type == FILE_NAME_DOS)
 		return 0;
+	
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
 		ntfs_log_perror("Skipping unrepresentable filename (inode %llu)",
 				(unsigned long long)MREF(mref));
 		return 0;
 	}
+	
 	if (ntfs_fuse_is_named_data_stream(filename)) {
 		ntfs_log_error("Unable to access '%s' (inode %llu) with "
 				"current named streams access interface.\n",
@@ -588,14 +591,16 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		free(filename);
 		return 0;
 	}
+	
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
 		struct stat st = { .st_ino = MREF(mref) };
 		
-		fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
+		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
+	
 	free(filename);
-	return 0;
+	return ret;
 }
 
 static int ntfs_fuse_readdir(const char *path, void *buf,
