@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "June 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "August 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ streams; it can read and write files, including
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
 transparently compressed files.
-.SS Access handling, security
+.SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process and everybody has
 full read, write, execution and directory browsing permissions.
@@ -51,8 +51,16 @@ option is specified. The
 process drops the 
 root privilege after successful mount and runs unprivileged 
 afterwards.
+.SS Windows Filename Compatibility
+NTFS supports several filename namespaces: DOS, Win32 and POSIX. While the
+\fBntfs-3g\fR driver handles all of them, it always creates new files in the 
+POSIX namespace for maximum portability and interoperability reasons. 
+This means that filenames are case sensitive and all characters are
+allowed except '/' and '\\0'. This is perfectly legal on Windows, though
+some application may get confused. If you find so then please report it
+to the developer of the relevant Windows software.
 .SS Alternate Data Streams (ADS)
-All data on NTFS is stored in streams.  Every file has exactly one unnamed
+NTFS stores all data in streams. Every file has exactly one unnamed
 data stream and can have many named data streams.  The size of a file is the
 size of its unnamed data stream.  By default, \fBntfs-3g\fR will only read
 the unnamed data stream.
