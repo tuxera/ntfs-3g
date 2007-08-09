@@ -1768,7 +1768,8 @@ static char *parse_mount_options(const char *orig_opts)
 			}
 			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
-		       	default_permissions = 1;
+			if (ctx->fmask)
+				default_permissions = 1;
 		} else if (!strcmp(opt, "fmask")) {
 			if (!val) {
 				ntfs_log_error("'fmask' option should have "
@@ -1776,7 +1777,8 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%o", &ctx->fmask);
-		       	default_permissions = 1;
+			if (ctx->fmask)
+				default_permissions = 1;
 		} else if (!strcmp(opt, "dmask")) {
 			if (!val) {
 				ntfs_log_error("'dmask' option should have "
@@ -1784,7 +1786,8 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			sscanf(val, "%o", &ctx->dmask);
-		       	default_permissions = 1;
+			if (ctx->dmask)
+				default_permissions = 1;
 		} else if (!strcmp(opt, "uid")) {
 			if (!val) {
 				ntfs_log_error("'uid' option should have "
