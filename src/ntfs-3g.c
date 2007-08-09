@@ -63,6 +63,7 @@
 #include <getopt.h>
 #include <syslog.h>
 #include <sys/wait.h>
+#include <pwd.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -1690,14 +1691,16 @@ static char *parse_mount_options(const char *orig_opts)
 	int default_permissions = 0;
 
 	/*
+	 * FIXME: This is not pretty ...
 	 * +7		fsname=
 	 * +1		comma
 	 * +1		null-terminator
 	 * +21          ,blkdev,blksize=65536
 	 * +20          ,default_permissions
+	 * +70          ,user=<max_64_chars>
 	 * +PATH_MAX	resolved realpath() device name
 	 */
-	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 64 + PATH_MAX);
+	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 256 + PATH_MAX);
 	if (!ret)
 		return NULL;
 	
@@ -2147,6 +2150,27 @@ static void set_fuseblk_options(char *parsed_options)
 	strcat(parsed_options, options);
 }
 
+static void set_user_mount_option(char *parsed_options, uid_t uid)
+{
+	struct passwd *pw;
+	char option[64];
+	
+	if (!uid)
+		return;
+	
+	errno = 0;
+	pw = getpwuid(uid);
+	if (!pw || !pw->pw_name) {
+		ntfs_log_perror("WARNING: could not get username for uid %lld, "
+				"unprivileged unmount may fail", (long long)uid);
+		return;
+	}
+	
+	/* parsed_options already allocated enough space. */
+	snprintf(option, sizeof(option), ",user=%s", pw->pw_name);
+	strcat(parsed_options, option);
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
@@ -2203,8 +2227,10 @@ int main(int argc, char *argv[])
 	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
 		goto err_out;
 	
-	if (use_blkdev)
+	if (use_blkdev) {
 	    set_fuseblk_options(parsed_options);
+	    set_user_mount_option(parsed_options, uid);
+	}
 	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
