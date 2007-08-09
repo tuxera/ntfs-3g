@@ -1121,7 +1121,7 @@ void ntfs_inode_update_atime(ntfs_inode *ni)
  */
 void ntfs_inode_update_time(ntfs_inode *ni)
 {
-	if (!NVolReadOnly(ni->vol) && 
+	if (!NVolReadOnly(ni->vol) && NInoMtimeUpdate(ni) &&
 	    (ni->mft_no >= FILE_first_user || ni->mft_no == FILE_root)) {
 		time_t now;
 

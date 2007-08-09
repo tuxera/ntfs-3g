@@ -48,6 +48,7 @@ typedef enum {
 				      mft record and then to disk. */
 	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
 				      in the index. */
+	NI_NoMtimeUpdate,	/* 1: Don't update modifiction time. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -95,6 +96,11 @@ typedef enum {
 				  test_and_set_nino_flag(ni, FileNameDirty)
 #define NInoFileNameTestAndClearDirty(ni)	\
 				test_and_clear_nino_flag(ni, FileNameDirty)
+
+#define NInoNoMtimeUpdate(ni)		 test_nino_flag(ni, NoMtimeUpdate)
+#define NInoSetNoMtimeUpdate(ni)	  set_nino_flag(ni, NoMtimeUpdate)
+#define NInoClearNoMtimeUpdate(ni)	clear_nino_flag(ni, NoMtimeUpdate)
+#define NInoMtimeUpdate(ni)		 (!NInoNoMtimeUpdate(ni))
 
 /**
  * struct _ntfs_inode - The NTFS in-memory inode structure.

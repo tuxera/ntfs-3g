@@ -951,7 +951,13 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
-static int ntfs_fuse_link(const char *old_path, const char *new_path)
+/**
+ * NOTE: About the role of mtime: during rename(3), which is currently 
+ * implemented by the help of link() operations, modification time mustn't
+ * be updated, so we NInoSetNoMtimeUpdate() such inodes after they are opened.
+ * This is not very nice itself but it may be eliminated, in time.
+ */
+static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 {
 	char *name;
 	ntfschar *uname = NULL;
@@ -972,6 +978,10 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 		res = -errno;
 		goto exit;
 	}
+	
+	if (!mtime)
+		NInoSetNoMtimeUpdate(ni);
+	
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
 	name++;
@@ -1003,6 +1013,11 @@ exit:
 	free(uname);
 	free(path);
 	return res;
+}
+
+static int ntfs_fuse_link(const char *old_path, const char *new_path)
+{
+	return ntfs_fuse_ln(old_path, new_path, 1);
 }
 
 static int ntfs_fuse_rm(const char *org_path)
@@ -1098,14 +1113,14 @@ static int ntfs_fuse_safe_rename(const char *old_path,
 
 	ntfs_log_trace("Entering\n");
 	
-	ret = ntfs_fuse_link(new_path, tmp);
+	ret = ntfs_fuse_ln(new_path, tmp, 0);
 	if (ret)
 		return ret;
 	
 	ret = ntfs_fuse_unlink(new_path);
 	if (!ret) {
 		
-		ret = ntfs_fuse_link(old_path, new_path);
+		ret = ntfs_fuse_ln(old_path, new_path, 0);
 		if (ret)
 			goto restore;
 		
@@ -1119,7 +1134,7 @@ static int ntfs_fuse_safe_rename(const char *old_path,
 	
 	goto cleanup;
 restore:
-	if (ntfs_fuse_link(tmp, new_path)) {
+	if (ntfs_fuse_ln(tmp, new_path, 0)) {
 err:
 		ntfs_log_perror("Rename failed. Existing file '%s' was renamed "
 				"to '%s'", new_path, tmp);
@@ -1188,7 +1203,7 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 		goto out;
 	}
 
-	ret = ntfs_fuse_link(old_path, new_path);
+	ret = ntfs_fuse_ln(old_path, new_path, 0);
 	if (ret)
 		goto out;
 	
