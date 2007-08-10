@@ -49,6 +49,7 @@ typedef enum {
 	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
 				      in the index. */
 	NI_NoMtimeUpdate,	/* 1: Don't update modifiction time. */
+	NI_NoParentMtimeUpdate,	/* 1: Don't update parent dir's mtime. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -101,6 +102,11 @@ typedef enum {
 #define NInoSetNoMtimeUpdate(ni)	  set_nino_flag(ni, NoMtimeUpdate)
 #define NInoClearNoMtimeUpdate(ni)	clear_nino_flag(ni, NoMtimeUpdate)
 #define NInoMtimeUpdate(ni)		 (!NInoNoMtimeUpdate(ni))
+
+#define NInoNoParentMtimeUpdate(ni)	  test_nino_flag(ni, NoMtimeUpdate)
+#define NInoSetNoParentMtimeUpdate(ni)	   set_nino_flag(ni, NoMtimeUpdate)
+#define NInoClearNoParentMtimeUpdate(ni) clear_nino_flag(ni, NoMtimeUpdate)
+#define NInoParentMtimeUpdate(ni)	  (!NInoNoParentMtimeUpdate(ni))
 
 /**
  * struct _ntfs_inode - The NTFS in-memory inode structure.

@@ -1245,6 +1245,9 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+	
+	NInoSetNoParentMtimeUpdate(ni);
+	
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;

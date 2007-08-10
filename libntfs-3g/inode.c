@@ -686,6 +686,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	/* Update FILE_NAME's in the index. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			NInoFileNameTestAndClearDirty(ni) &&
+			NInoParentMtimeUpdate(ni) &&
 			ntfs_inode_sync_file_name(ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
