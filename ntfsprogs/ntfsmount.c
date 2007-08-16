@@ -1506,7 +1506,7 @@ static void usage(void)
 static char *realpath(const char *path, char *resolved_path)
 {
 	strncpy(resolved_path, path, PATH_MAX);
-	resolved_path[PATH_MAX] = '\0';
+	resolved_path[PATH_MAX] = 0;
 	return resolved_path;
 }
 #endif
