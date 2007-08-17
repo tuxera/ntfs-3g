@@ -102,10 +102,11 @@ means full access to everybody.
 Mount filesystem read\-only.
 .TP
 .BI locale= value
-You can set locale with this option which is often required to make 
-visible files with national charaters. It's useful if the locale 
-environment variables are not set before partitions had been mounted 
-from /etc/fstab.
+This option can be useful if your language specific locale environment 
+variables are not set correctly or at all in your operating system.
+In such cases, the national characters can be made visible by using this 
+option. Please see more information about this topic at
+http://ntfs-3g.org/support.html#locale
 .TP
 .B force
 Force mount even if the volume is scheduled for consistency check or

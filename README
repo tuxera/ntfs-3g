@@ -50,10 +50,13 @@ it was already mounted, and replace /dev/hda1 and /mnt/windows, if needed):
 or
 	ntfs-3g /dev/hda1 /mnt/windows
 
-You may also need to set the 'locale' option to make file names with national
-characters visible. Replace the below hu_HU.utf8 with the appropriate setting. 
+If your Operating System vendor didn't setup your language specific settings 
+then you may also need to set the 'locale' mount option to make all filenames 
+with national characters visible. Replace the below en_US.UTF-8 with the 
+appropriate setting. You can find more information about his topic at
+http://ntfs-3g.org/support.html#locale
 
-	mount -t ntfs-3g /dev/hda1 /mnt/windows -o locale=hu_HU.utf8
+	mount -t ntfs-3g /dev/hda1 /mnt/windows -o locale=en_US.UTF-8
 
 Please see the ntfs-3g manual page for more options and examples.
 
