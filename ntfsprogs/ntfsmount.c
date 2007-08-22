@@ -620,7 +620,7 @@ static int ntfs_fuse_open(const char *org_path,
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
-			if (NAttrEncrypted(na))
+			if (NAttrEncrypted(na) && !na->crypto)
 				res = -EACCES;
 			ntfs_attr_close(na);
 		} else

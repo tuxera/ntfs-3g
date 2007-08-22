@@ -115,8 +115,8 @@ AC_ARG_ENABLE(ntfsmount,
 
 AC_ARG_ENABLE(crypto,
 	AS_HELP_STRING(--enable-crypto,enable crypto related code and utilities
-		       (default=no)), ,
-	enable_crypto=no
+		       (default=detect)), ,
+	enable_crypto=auto
 )
 
 AC_ARG_ENABLE(really-static,
@@ -137,7 +137,7 @@ AC_ARG_ENABLE(test,
 )
 AM_CONDITIONAL(ENABLE_TEST, test "$enable_test" = yes)
 if test "$enable_test" = "yes"; then
-	CFLAGS="$CFLAGS -DNTFS_TEST"
+	CFLAGS="${CFLAGS} -DNTFS_TEST"
 fi
 
 AH_TEMPLATE([NTFS_DISABLE_DEBUG_LOGGING],
@@ -212,7 +212,7 @@ AM_CONDITIONAL(ENABLE_FUSE, $compile_ntfsmount)
 compile_crypto=false
 if test "$enable_crypto" != "no"; then
 	have_libgcrypt=false
-	AM_PATH_LIBGCRYPT(1.2.0, [ have_libgcrypt=true ],
+	AM_PATH_LIBGCRYPT(1.2.2, [ have_libgcrypt=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gcrypt library.])
@@ -221,17 +221,29 @@ if test "$enable_crypto" != "no"; then
 		fi
 	])
 	have_libgnutls=false
-	AM_PATH_LIBGNUTLS(1.2.8, [ have_libgnutls=true ],
-	[
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 1.4.4, [ have_libgnutls=true ],
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gnutls library.])
 		else
 			AC_MSG_WARN([Linux-NTFS crypto code requires the gnutls library.])
 		fi
-	])
+	)
+	have_libconfig=false
+	PKG_CHECK_MODULES(libconfig, libconfig >= 1.0.1, [ have_libconfig=true ],
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([Linux-NTFS crypto code requires the libconfig.])
+		else
+			AC_MSG_WARN([Linux-NTFS crypto code requires the libconfig.])
+		fi
+	)
 	if test "$have_libgcrypt" = "true"; then
 		if test "$have_libgnutls" = "true"; then
-			compile_crypto=true
+			if test "$have_libconfig" = "true"; then
+				compile_crypto=true
+				AC_DEFINE([ENABLE_CRYPTO], 1,
+				[Define this to 1 if you want to enable support of
+				 encrypted files in libntfs and utilities.])
+			fi
 		fi
 	fi
 fi
@@ -345,7 +357,7 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	endian.h byteswap.h sys/byteorder.h sys/endian.h sys/param.h \
 	sys/ioctl.h sys/mount.h sys/stat.h sys/types.h sys/vfs.h \
 	sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h linux/hdreg.h \
-	machine/endian.h gcrypt.h windows.h gnutls/pkcs12.h syslog.h])
+	machine/endian.h windows.h syslog.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

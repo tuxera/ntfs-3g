@@ -32,9 +32,16 @@ LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs
 
 lib_LTLIBRARIES = libntfs.la
+
 libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS) -no-undefined
 libntfs_la_CFLAGS = $(LIBNTFS_CFLAGS) \
 	-DLTVERSION_LIBNTFS=\"$(LTVERSION_LIBNTFS)\"
+
+if ENABLE_CRYPTO
+libntfs_la_LDFLAGS += `libgnutls-config --libs` `pkg-config --libs libconfig`
+libntfs_la_CFLAGS += `libgnutls-config --cflags` `pkg-config --cflags libconfig`
+endif
+
 libntfs_la_SOURCES =	\
 	attrib.c	\
 	attrlist.c	\
@@ -43,6 +50,7 @@ libntfs_la_SOURCES =	\
 	collate.c	\
 	compat.c	\
 	compress.c	\
+	crypto.c	\
 	debug.c		\
 	device.c	\
 	device_io.c	\

@@ -34,6 +34,7 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 #include "volume.h"
 #include "debug.h"
 #include "logging.h"
+#include "crypto.h"
 
 extern ntfschar AT_UNNAMED[];
 
@@ -140,6 +141,7 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
  * @compression_block_size:		size of a compression block (cb)
  * @compression_block_size_bits:	log2 of the size of a cb
  * @compression_block_clusters:		number of clusters per cb
+ * @crypto:		(valid only for encrypted) see description below
  *
  * This structure exists purely to provide a mechanism of caching the runlist
  * of an attribute. If you want to operate on a particular attribute extent,
@@ -166,6 +168,17 @@ static __inline__ int ntfs_attrs_walk(ntfs_attr_search_ctx *ctx)
  *
  * @state contains NTFS attribute specific flags describing this attribute
  * structure. See ntfs_attr_state_bits above.
+ *
+ * @crypto points to private structure of crypto code. You should not access
+ * fields of this structure, but you can check whether it is NULL or not. If it
+ * is not NULL, then we successfully obtained FEK (File Encryption Key) and
+ * ntfs_attr_p{read,write} calls probably would succeed. If it is NULL, then we
+ * failed to obtain FEK (do not have corresponding PFX file, wrong password,
+ * etc..) or library was compiled without crypto support. Attribute size can be
+ * changed without knowledge of FEK, so you can use ntfs_attr_truncate in any
+ * case.
+ * NOTE: This field valid only if attribute encrypted (eg., NAttrEncrypted
+ * returns non-zero).
  */
 struct _ntfs_attr {
 	runlist_element *rl;
@@ -181,10 +194,12 @@ struct _ntfs_attr {
 	u32 compression_block_size;
 	u8 compression_block_size_bits;
 	u8 compression_block_clusters;
+	ntfs_crypto_attr *crypto;
 };
 
 /**
- * enum ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
+ * enum ntfs_attr_state_bits - bits for the state field in the ntfs_attr
+ * structure
  */
 typedef enum {
 	NA_Initialized,		/* 1: structure is initialized. */

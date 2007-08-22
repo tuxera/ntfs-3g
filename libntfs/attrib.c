@@ -57,6 +57,7 @@
 #include "bitmap.h"
 #include "logging.h"
 #include "support.h"
+#include "crypto.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
@@ -426,6 +427,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				(l + 7) & ~7, l, l, cs ? (l + 7) & ~7 : 0, 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
+	if (NAttrEncrypted(na))
+		ntfs_crypto_attr_open(na);
 	return na;
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
@@ -446,6 +449,8 @@ void ntfs_attr_close(ntfs_attr *na)
 {
 	if (!na)
 		return;
+	if (NAttrEncrypted(na))
+		ntfs_crypto_attr_close(na);
 	if (NAttrNonResident(na) && na->rl)
 		free(na->rl);
 	/* Don't release if using an internal constant. */
@@ -855,10 +860,9 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	 * Encrypted non-resident attributes are not supported.  We return
 	 * access denied, which is what Windows NT4 does, too.
 	 */
-	if (NAttrEncrypted(na) && NAttrNonResident(na)) {
-		errno = EACCES;
-		return -1;
-	}
+	if (NAttrEncrypted(na) && NAttrNonResident(na))
+		return ntfs_crypto_attr_pread(na, pos, count, b);
+
 	vol = na->ni->vol;
 	/* Update access time if needed. */
 	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||

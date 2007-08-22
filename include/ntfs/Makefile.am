@@ -8,6 +8,7 @@ linux_ntfsinclude_HEADERS = \
 	collate.h		\
 	compat.h		\
 	compress.h		\
+	crypto.h		\
 	debug.h			\
 	device.h		\
 	device_io.h		\
