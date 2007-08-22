@@ -32,7 +32,7 @@
 #include "debug.h"
 #include "logging.h"
 
-#ifndef NTFS_DISABLE_DEBUG_LOGGING
+#ifdef DEBUG
 /**
  * ntfs_debug_runlist_dump - Dump a runlist.
  * @rl:

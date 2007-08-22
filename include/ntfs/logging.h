@@ -85,7 +85,7 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define NTFS_LOG_FLAG_COLOUR	((u32)1 << 5) /* Colour highlight some messages */
 
 /* Macros to simplify logging.  One for each level defined above.
- * Note, if NTFS_DISABLE_DEBUG_LOGGING is defined, then ntfs_log_debug/trace have no effect.
+ * Note, if DEBUG is not defined, then ntfs_log_debug/trace have no effect.
  */
 #define ntfs_log_critical(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_CRITICAL,NULL,FORMAT,##ARGS)
 #define ntfs_log_error(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_ERROR,NULL,FORMAT,##ARGS)
@@ -96,16 +96,17 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define ntfs_log_verbose(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_VERBOSE,NULL,FORMAT,##ARGS)
 #define ntfs_log_warning(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_WARNING,NULL,FORMAT,##ARGS)
 
-/* By default debug and trace messages are compiled into the program,
+/*
+ * By default debug and trace messages are compiled into the program,
  * but not displayed.
  */
-#ifdef NTFS_DISABLE_DEBUG_LOGGING
+#ifndef DEBUG
 #define ntfs_log_debug(FORMAT, ARGS...)do {} while (0)
 #define ntfs_log_trace(FORMAT, ARGS...)do {} while (0)
-#else
+#else /* !DEBUG */
 #define ntfs_log_debug(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_DEBUG,NULL,FORMAT,##ARGS)
 #define ntfs_log_trace(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_TRACE,NULL,FORMAT,##ARGS)
-#endif /* NTFS_DISABLE_DEBUG_LOGGING */
+#endif /* DEBUG */
 
 #endif /* _LOGGING_H_ */
 

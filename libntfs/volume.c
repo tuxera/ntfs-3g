@@ -410,7 +410,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 	ntfs_volume *vol;
 	NTFS_BOOT_SECTOR *bs;
 	int eo;
-#ifndef NTFS_DISABLE_DEBUG_LOGGING
+#ifdef DEBUG
 	const char *OK = "OK\n";
 	const char *FAILED = "FAILED\n";
 	BOOL debug = 1;
@@ -778,7 +778,7 @@ out:
 ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 {
 	s64 l;
-#ifndef NTFS_DISABLE_DEBUG_LOGGING
+#ifdef DEBUG
 	const char *OK = "OK\n";
 	const char *FAILED = "FAILED\n";
 #endif

@@ -86,6 +86,11 @@ AC_ARG_ENABLE(debug,
 	enable_debug=no
 )
 
+AC_ARG_ENABLE(sparse,
+	AS_HELP_STRING(--enable-sparse,enable sparse code checking), ,
+	enable_sparse=no
+)
+
 # AH_TEMPLATE is needed here because we want to have a template in config.h
 # regardless of whether the option is given or not.
 AH_TEMPLATE([NO_NTFS_DEVICE_DEFAULT_IO_OPS],
@@ -138,17 +143,6 @@ AC_ARG_ENABLE(test,
 AM_CONDITIONAL(ENABLE_TEST, test "$enable_test" = yes)
 if test "$enable_test" = "yes"; then
 	CFLAGS="${CFLAGS} -DNTFS_TEST"
-fi
-
-AH_TEMPLATE([NTFS_DISABLE_DEBUG_LOGGING],
-	    [Define this if you want to compile out the debug log messages.
-	     This will reduce the size of the binaries.])
-AC_ARG_ENABLE(debug-logging,
-	AS_HELP_STRING(--enable-debug-logging,Add debug logging to the code),,
-	enable_debug_logging=no
-)
-if test "$enable_debug_logging" == "no"; then
-	AC_DEFINE(NTFS_DISABLE_DEBUG_LOGGING)
 fi
 
 # Use GNU extensions if available.
@@ -330,7 +324,13 @@ fi
 
 # Add debugging switches if --enable-debug was specified.
 if test "$enable_debug" = "yes"; then
-	CFLAGS="$CFLAGS -ggdb3 -DDEBUG"
+	CFLAGS="$CFLAGS -ggdb3 -DDEBUG -O0"
+fi
+
+# Set cgcc as compiler and add sparse flags if --enable-sparse was specified.
+if test "$enable_sparse" = "yes"; then
+	CC="cgcc"
+	CFLAGS="$CFLAGS -Wbitwise -Wno-transparent-union"
 fi
 
 AC_SUBST(CFLAGS)

@@ -30,7 +30,7 @@
 
 struct _runlist_element;
 
-#ifdef NTFS_DISABLE_DEBUG_LOGGING
+#ifndef DEBUG
 static __inline__ void ntfs_debug_runlist_dump(const struct _runlist_element *rl __attribute__((unused))) {}
 #else
 extern void ntfs_debug_runlist_dump(const struct _runlist_element *rl);
