@@ -134,7 +134,7 @@ typedef struct {
 	gcry_cipher_hd_t gcry_cipher_hd;
 } ntfs_desx_ctx;
 
-static ntfschar NTFS_EFS[5] = {
+ntfschar NTFS_EFS[5] = {
 	const_cpu_to_le16('$'), const_cpu_to_le16('E'), const_cpu_to_le16('F'),
 	const_cpu_to_le16('S'), const_cpu_to_le16(0)
 };

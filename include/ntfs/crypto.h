@@ -23,6 +23,8 @@
 #ifndef _NTFS_CRYPTO_H
 #define _NTFS_CRYPTO_H
 
+extern ntfschar NTFS_EFS[5];
+
 /*
  * This is our Big Secret (TM) structure, so do not allow anyone even read it
  * values. ;-) In fact, it is private because exist only in libntfs version
