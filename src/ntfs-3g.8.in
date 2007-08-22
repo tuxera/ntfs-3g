@@ -109,10 +109,9 @@ option. Please see more information about this topic at
 http://ntfs-3g.org/support.html#locale
 .TP
 .B force
-Force mount even if the volume is scheduled for consistency check or
-the logfile is unclean. The logfile will be unconditionally cleared 
-in the latter case. Use this option with caution and for your own 
-responsibility.
+Force the mounting even if the NTFS logfile is unclean. The logfile 
+will be unconditionally cleared. Use this option with caution and for 
+your own responsibility.
 .TP
 .B show_sys_files
 Show the system files in directory listings. 
