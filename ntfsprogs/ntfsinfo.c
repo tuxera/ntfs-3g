@@ -1980,13 +1980,26 @@ static void ntfs_dump_attr_property_set(ATTR_RECORD *attr __attribute__((unused)
 	/* TODO */
 }
 
+static void ntfs_hex_dump(void *buf,unsigned int length);
+
 /**
  * ntfs_dump_attr_logged_utility_stream()
  *
  * dump the property_set attribute
  */
-static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr __attribute__((unused)))
+static void ntfs_dump_attr_logged_utility_stream(ATTR_RECORD *attr,
+		ntfs_inode *ni)
 {
+	char *buf;
+	s64 size;
+
+	if (!opts.verbose)
+		return;
+	buf = ntfs_attr_readall(ni, AT_LOGGED_UTILITY_STREAM,
+			ntfs_attr_get_name(attr), attr->name_length, &size);
+	if (buf)
+		ntfs_hex_dump(buf, size);
+	free(buf);
 	/* TODO */
 }
 
@@ -2190,7 +2203,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			ntfs_dump_attr_property_set(ctx->attr);
 			break;
 		case AT_LOGGED_UTILITY_STREAM:
-			ntfs_dump_attr_logged_utility_stream(ctx->attr);
+			ntfs_dump_attr_logged_utility_stream(ctx->attr, inode);
 			break;
 		default:
 			ntfs_dump_attr_unknown(ctx->attr);
