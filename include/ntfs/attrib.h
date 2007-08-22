@@ -337,6 +337,11 @@ extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
 extern int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
 		ntfschar *name, u32 name_len);
 
+static __inline__ ntfschar *ntfs_attr_get_name(ATTR_RECORD *attr)
+{
+	return (ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset));
+}
+
 // FIXME / TODO: Above here the file is cleaned up. (AIA)
 /**
  * get_attribute_value_length - return the length of the value of an attribute

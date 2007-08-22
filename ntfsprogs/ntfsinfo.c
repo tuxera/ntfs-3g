@@ -349,22 +349,21 @@ static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
  *        null if cannot convert to multi-byte string. errno would contain the
  *             error id. no memory allocated in that case
  */
-static char *ntfs_attr_get_name(ATTR_RECORD *attr)
+static char *ntfs_attr_get_name_mbs(ATTR_RECORD *attr)
 {
 	ntfschar *ucs_attr_name;
 	char *mbs_attr_name = NULL;
 	int mbs_attr_name_size;
 
-	/* calculate name position */
-	ucs_attr_name = (ntfschar *)((char *)attr + le16_to_cpu(attr->name_offset));
-	/* convert unicode to printable format */
-	mbs_attr_name_size = ntfs_ucstombs(ucs_attr_name,attr->name_length,
-		&mbs_attr_name,0);
-	if (mbs_attr_name_size>0) {
+	/* Get name in unicode. */
+	ucs_attr_name = ntfs_attr_get_name(attr);
+	/* Convert unicode to printable format. */
+	mbs_attr_name_size = ntfs_ucstombs(ucs_attr_name, attr->name_length,
+			&mbs_attr_name, 0);
+	if (mbs_attr_name_size > 0)
 		return mbs_attr_name;
-	} else {
+	else
 		return NULL;
-	}
 }
 
 
@@ -1232,7 +1231,7 @@ static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
 	if (a->name_length) {
 		char *attribute_name = NULL;
 
-		attribute_name = ntfs_attr_get_name(a);
+		attribute_name = ntfs_attr_get_name_mbs(a);
 		if (attribute_name) {
 			printf("\tAttribute name:\t\t '%s'\n", attribute_name);
 			free(attribute_name);
