@@ -46,7 +46,7 @@ typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
 
-#ifdef __CHECKER__
+#if defined(__CHECKER__) && !defined(NTFS_DO_NOT_CHECK_ENDIANS)
 	#undef __bitwise
 	#undef __force
 	#define __bitwise __attribute__((bitwise))
