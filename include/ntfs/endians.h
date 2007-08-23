@@ -208,29 +208,39 @@
 static void ntfs_endian_self_test(void)
 {
 	/* Should not generate warnings. */
-	(le16)cpu_to_le16((u16)0);
-	(le32)cpu_to_le32((u32)0);
-	(le64)cpu_to_le64((u64)0);
-	(sle16)cpu_to_sle16((s16)0);
-	(sle32)cpu_to_sle32((s32)0);
-	(sle64)cpu_to_sle64((s64)0);
-	(u16)le16_to_cpu((__force le16)0);
-	(u32)le32_to_cpu((__force le32)0);
-	(u64)le64_to_cpu((__force le64)0);
-	(s16)sle16_to_cpu((__force sle16)0);
-	(s32)sle32_to_cpu((__force sle32)0);
-	(s64)sle64_to_cpu((__force sle64)0);
-	(le16)const_cpu_to_le16((u16)0);
-	(le32)const_cpu_to_le32((u32)0);
-	(le64)const_cpu_to_le64((u64)0);
-	(u16)const_le16_to_cpu((__force le16)0);
-	(u32)const_le32_to_cpu((__force le32)0);
-	(u64)const_le64_to_cpu((__force le64)0);
+	(le16)cpu_to_le16((u16)1);
+	(le32)cpu_to_le32((u32)1);
+	(le64)cpu_to_le64((u64)1);
+	(sle16)cpu_to_sle16((s16)1);
+	(sle32)cpu_to_sle32((s32)1);
+	(sle64)cpu_to_sle64((s64)1);
+	(u16)le16_to_cpu((__force le16)1);
+	(u32)le32_to_cpu((__force le32)1);
+	(u64)le64_to_cpu((__force le64)1);
+	(s16)sle16_to_cpu((__force sle16)1);
+	(s32)sle32_to_cpu((__force sle32)1);
+	(s64)sle64_to_cpu((__force sle64)1);
+	(le16)const_cpu_to_le16((u16)1);
+	(le32)const_cpu_to_le32((u32)1);
+	(le64)const_cpu_to_le64((u64)1);
+	(u16)const_le16_to_cpu((__force le16)1);
+	(u32)const_le32_to_cpu((__force le32)1);
+	(u64)const_le64_to_cpu((__force le64)1);
 
 	/*
 	 * TODO: Need some how to test that warnings are actually generated,
 	 * but without flooding output with them and vice-versa print warning
-	 * in case if some one warning is not triggered, but should. Any ideas?
+	 * in case if some one warning is not triggered, but should.  (Yura)
+	 *
+	 * I think it can only be done in  a ./configure like script / shell
+	 * script that will compile known good  and known bad code and pipe the
+	 * output from sparse to a file, then  grep the file for the wanted
+	 * warnings/lack thereof and then it would  say "Tests: PASS " or
+	 * "Tests: FAILED" or whatever.  And you can then  hook that into a
+	 * "make test" make target or similar so it is only  done when one
+	 * wants to do it...  (Anton)
+	 *
+	 * Also we can look on sparse self test script.  (Yura)
 	 */
 }
 #endif
