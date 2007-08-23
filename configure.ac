@@ -78,6 +78,16 @@ AC_ARG_ENABLE(ldconfig,
 )
 AM_CONDITIONAL(RUN_LDCONFIG, test "$enable_ldconfig" = yes)
 
+AC_ARG_ENABLE(library,
+	AS_HELP_STRING(--disable-library,do not install libntfs-3g but link
+		       it into ntfs-3g), ,
+	enable_library=yes
+)
+if test "$enable_library" != yes; then
+	enable_shared=no
+fi
+AM_CONDITIONAL(INSTALL_LIBRARY, test "$enable_library" = yes)
+
 # Use GNU extensions if available.
 AC_GNU_SOURCE
 

@@ -1,4 +1,5 @@
 
+if INSTALL_LIBRARY
 linux_ntfsincludedir = $(includedir)/ntfs-3g
 linux_ntfsinclude_HEADERS = \
 	attrib.h		\
@@ -30,5 +31,6 @@ linux_ntfsinclude_HEADERS = \
 	unistr.h		\
 	version.h		\
 	volume.h
+endif
 
 MAINTAINERCLEANFILES = Makefile.in
