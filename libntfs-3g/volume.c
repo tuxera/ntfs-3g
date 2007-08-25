@@ -76,7 +76,7 @@
  */
 ntfs_volume *ntfs_volume_alloc(void)
 {
-	return calloc(1, sizeof(ntfs_volume));
+	return ntfs_calloc(sizeof(ntfs_volume));
 }
 
 
@@ -433,6 +433,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 
 	if (!dev || !dev->d_ops || !dev->d_name) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: dev = %p", __FUNCTION__, dev);
 		return NULL;
 	}
 
@@ -444,6 +445,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	vol = ntfs_volume_alloc();
 	if (!vol)
 		goto error_exit;
+	
 	/* Create the default upcase table. */
 	vol->upcase_len = 65536;
 	vol->upcase = ntfs_malloc(vol->upcase_len * sizeof(ntfschar));
@@ -452,19 +454,20 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
+	
 	if (flags & MS_RDONLY)
 		NVolSetReadOnly(vol);
 	if (flags & MS_NOATIME)
 		NVolSetNoATime(vol);
-	ntfs_log_debug("Reading bootsector... ");
+	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
 	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Error opening partition device");
 		goto error_exit;
 	}
 	/* Attach the device to the volume. */
 	vol->dev = dev;
+	
 	/* Now read the bootsector. */
 	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
 	if (br != sizeof(NTFS_BOOT_SECTOR)) {
@@ -472,13 +475,11 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 		if (br != -1)
 			errno = EINVAL;
 		if (!br)
-			ntfs_log_error("Partition is smaller than bootsector "
-				       "size.\n");
+			ntfs_log_error("Failed to read bootsector (size=0)\n");
 		else
 			ntfs_log_perror("Error reading bootsector");
 		goto error_exit;
 	}
-	ntfs_log_debug(OK);
 	if (!ntfs_boot_sector_is_ntfs(bs)) {
 		errno = EINVAL;
 		goto error_exit;
@@ -550,22 +551,16 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	 */
 
 	/* Need to setup $MFT so we can use the library read functions. */
-	ntfs_log_debug("Loading $MFT... ");
 	if (ntfs_mft_load(vol) < 0) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to load $MFT");
 		goto error_exit;
 	}
-	ntfs_log_debug(OK);
 
 	/* Need to setup $MFTMirr so we can use the write functions, too. */
-	ntfs_log_debug("Loading $MFTMirr... ");
 	if (ntfs_mftmirr_load(vol) < 0) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to load $MFTMirr");
 		goto error_exit;
 	}
-	ntfs_log_debug(OK);
 	return vol;
 error_exit:
 	eo = errno;
@@ -784,10 +779,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	u32 u;
 
 	vol = ntfs_volume_startup(dev, flags);
-	if (!vol) {
-		ntfs_log_perror("Failed to startup volume");
+	if (!vol)
 		return NULL;
-	}
 
 	/* Load data from $MFT and $MFTMirr and compare the contents. */
 	m  = ntfs_malloc(vol->mftmirr_size << vol->mft_record_size_bits);
