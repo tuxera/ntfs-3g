@@ -457,7 +457,8 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	if (flags & MS_NOATIME)
 		NVolSetNoATime(vol);
 	ntfs_log_debug("Reading bootsector... ");
-	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
+	/* ...->open needs bracketing to compile with glibc 2.7 */
+	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
 		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Error opening partition device");
 		goto error_exit;
