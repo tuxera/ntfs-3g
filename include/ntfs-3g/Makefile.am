@@ -18,7 +18,6 @@ linux_ntfsinclude_HEADERS = \
 	inode.h			\
 	layout.h		\
 	lcnalloc.h		\
-	list.h			\
 	logfile.h		\
 	logging.h		\
 	mft.h			\
