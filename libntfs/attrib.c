@@ -1211,10 +1211,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				errno = EIO;
 				goto rl_err_out;
 			}
-			
+
 			to_write = min(count, (rl->length <<
 					vol->cluster_size_bits) - ofs);
-			
+
 			/* Instantiate the hole. */
 			cur_vcn = rl->vcn;
 			from_vcn = rl->vcn + (ofs >> vol->cluster_size_bits);
