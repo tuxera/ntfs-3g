@@ -1395,8 +1395,16 @@ done:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
-	if (need_to.update_mapping_pairs)
-		ntfs_attr_update_mapping_pairs(na, update_from);
+	if (need_to.update_mapping_pairs) {
+		if (ntfs_attr_update_mapping_pairs(na, update_from)) {
+			/* FIXME: We want rollback here. */
+			ntfs_log_perror("%s(): Failed to update mapping pairs. "
+					"Leaving inconsistent metadata. "
+					"Run chkdsk!", __FUNCTION__);
+			errno = EIO;
+			return -1;
+		}
+	}
 	/* Finally, return the number of bytes written. */
 	return total;
 rl_err_out:

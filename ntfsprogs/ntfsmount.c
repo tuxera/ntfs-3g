@@ -165,7 +165,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 
 static const char *EXEC_NAME = "ntfsmount";
 static char ntfs_fuse_default_options[] =
-		"default_permissions,allow_other,use_ino,kernel_cache";
+		"default_permissions,allow_other,use_ino,kernel_cache,nonempty";
 static ntfs_fuse_context_t *ctx;
 
 /**
@@ -711,7 +711,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < (s64)size)
+		if (res < (s64)size && errno != ENOSPC)
 			ntfs_log_error("ntfs_attr_pwrite returned less bytes "
 					"than requested.\n");
 		if (res <= 0) {

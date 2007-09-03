@@ -122,6 +122,11 @@ static const char *dirty_volume_msg =
 "(NOT to us!) that init scripts kill ntfsmount or mount.ntfs-fuse during\n"
 "shutdown instead of proper umount.\n";
 
+static const char *fakeraid_msg =
+"You seem to have a SoftRAID/FakeRAID hardware and must use an activated,\n"
+"different device under /dev/mapper, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
+"to mount NTFS. Please see the 'dmraid' documentation for help.\n";
+
 /**
  * utils_set_locale
  */
@@ -227,6 +232,8 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
 			ntfs_log_error("%s", unclean_journal_msg);
 		else if (errno == EBUSY)
 			ntfs_log_error("%s", opened_volume_msg);
+		else if (errno == ENXIO)
+			ntfs_log_error("%s", fakeraid_msg);
 		return NULL;
 	}
 
