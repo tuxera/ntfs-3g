@@ -1260,6 +1260,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 					if (rlc->lcn >= 0) {
 						lcn_seek_from = rlc->lcn -
 							(rlc->vcn - from_vcn);
+						if (lcn_seek_from < -1)
+							lcn_seek_from = -1;
 						break;
 					}
 				}
