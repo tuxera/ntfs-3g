@@ -76,16 +76,9 @@ static struct ntfs_logging ntfs_log = (struct ntfs_logging) {
 			NTFS_LOG_LEVEL_WARNING | NTFS_LOG_LEVEL_ERROR |
 			NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
 			NTFS_LOG_LEVEL_PROGRESS |
-#ifdef DEBUG
-			NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
-#endif
 			0,
 	.flags = NTFS_LOG_FLAG_ONLYNAME,
-#ifdef DEBUG
-	.handler = ntfs_log_handler_outerr,
-#else
 	.handler = ntfs_log_handler_null,
-#endif
 };
 
 
