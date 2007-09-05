@@ -1119,32 +1119,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				0, NULL, 0, ctx))
 			goto err_out;
 		/* If write starts beyond initialized_size, zero the gap. */
-		if (pos > na->initialized_size) {
-			char *buf;
+		if (pos > na->initialized_size && ntfs_rl_fill_zero(vol,
+				na->rl, na->initialized_size,
+				pos - na->initialized_size))
+			goto err_out;
 
-			buf = ntfs_malloc(NTFS_BUF_SIZE);
-			if (!buf)
-				goto err_out;
-
-			memset(buf, 0, NTFS_BUF_SIZE);
-			ofs = na->initialized_size;
-			while (ofs < pos) {
-				to_write = min(pos - ofs, NTFS_BUF_SIZE);
-				written = ntfs_rl_pwrite(vol, na->rl, ofs,
-							to_write, buf);
-				if (written <= 0) {
-					int err = errno;
-					ntfs_log_trace("Failed to zero space "
-							"between initialized "
-							"size and @pos.\n");
-					free(buf);
-					errno = err;
-					goto err_out;
-				}
-				ofs += written;
-			}
-			free(buf);
-		}
 		ctx->attr->initialized_size = cpu_to_sle64(pos + count);
 		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
@@ -1321,34 +1300,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				errno = EIO;
 				goto err_out;
 			}
-			if (ofs) {
-				/*
-				 * Need to clear region between start of
-				 * @cur_vcn cluster and @ofs.
-				 */
-				char *buf;
-
-				buf = malloc(ofs);
-				if (!buf) {
-					ntfs_log_trace("Not enough memory to "
-							"allocate %lld "
-							"bytes.\n", ofs);
-					errno = ENOMEM;
-					goto err_out;
-				}
-				memset(buf, 0, ofs);
-				if (ntfs_rl_pwrite(vol, na->rl, cur_vcn <<
-							vol->cluster_size_bits,
-							ofs, buf) < 0) {
-					eo = errno;
-					ntfs_log_trace("Failed to zero "
-							"area.\n");
-					free(buf);
-					errno = eo;
-					goto err_out;
-				}
-				free(buf);
-			}
 			if (rl->vcn < cur_vcn) {
 				/*
 				 * Clusters that replaced hole are merged with
@@ -1365,6 +1316,13 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				ofs -= (rl->vcn - cur_vcn) <<
 					vol->cluster_size_bits;
 			}
+			/*
+			 * Clear region between start of @rl->vcn cluster and
+			 * @ofs if necessary.
+			 */
+			if (ofs && ntfs_rl_fill_zero(vol, na->rl, rl->vcn <<
+					vol->cluster_size_bits, ofs))
+				goto err_out;
 		}
 		/* It is a real lcn, write it to the volume. */
 		to_write = min(count, (rl->length << vol->cluster_size_bits) -

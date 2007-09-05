@@ -56,6 +56,9 @@ extern s64 ntfs_rl_pread(const ntfs_volume *vol, const runlist_element *rl,
 extern s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 		const s64 pos, s64 count, void *b);
 
+extern int ntfs_rl_fill_zero(const ntfs_volume *vol, const runlist *rl,
+		s64 pos, const s64 count);
+
 extern runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		runlist_element *srl);
 

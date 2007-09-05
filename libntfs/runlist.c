@@ -1209,6 +1209,48 @@ rl_err_out:
 }
 
 /**
+ * ntfs_rl_fill_zero - fill given region with zeroes
+ * @vol:	ntfs volume to write to
+ * @rl:		runlist specifying where to write zeroes to
+ * @pos:	byte position within runlist @rl at which to begin the zeroing
+ * @count:	number of bytes to fill with zeros
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_rl_fill_zero(const ntfs_volume *vol, const runlist *rl, s64 pos,
+		const s64 count)
+{
+	char *buf;
+	s64 written, size, end = pos + count;
+	int ret = 0;
+
+	ntfs_log_trace("pos %lld, count %lld\n", (long long)pos,
+			(long long)count);
+
+	if (!vol || !rl || pos < 0 || count < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	buf = ntfs_calloc(NTFS_BUF_SIZE);
+	if (!buf)
+		return -1;
+
+	while (pos < end) {
+		size = min(end - pos, NTFS_BUF_SIZE);
+		written = ntfs_rl_pwrite(vol, rl, pos, size, buf);
+		if (written <= 0) {
+			ntfs_log_perror("Failed to zero space");
+			ret = -1;
+			break;
+		}
+		pos += written;
+	}
+	free(buf);
+	return ret;
+}
+
+/**
  * ntfs_get_nr_significant_bytes - get number of bytes needed to store a number
  * @n:		number for which to get the number of bytes for
  *
