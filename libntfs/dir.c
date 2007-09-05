@@ -1112,6 +1112,11 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 		errno = EINVAL;
 		return NULL;
 	}
+	/* FIXME: Reparse points requires special handling. */
+	if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
+		err = EOPNOTSUPP;
+		goto err_out;
+	}
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni) {
@@ -1222,7 +1227,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 					ni->vol->indx_record_size >>
 					ni->vol->cluster_size_bits;
 		else
-			ir->clusters_per_index_block = 
+			ir->clusters_per_index_block =
 					ni->vol->indx_record_size >>
 					ni->vol->sector_size_bits;
 		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
@@ -1683,6 +1688,11 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 			ni->mft_no == dir_ni->mft_no) {
 		err = EINVAL;
 		ntfs_log_error("Invalid arguments.");
+		goto err_out;
+	}
+	/* FIXME: Reparse points requires special handling. */
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		err = EOPNOTSUPP;
 		goto err_out;
 	}
 	/* Create FILE_NAME attribute. */
