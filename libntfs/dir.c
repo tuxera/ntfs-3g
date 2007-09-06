@@ -1114,8 +1114,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	}
 	/* FIXME: Reparse points requires special handling. */
 	if (dir_ni->flags & FILE_ATTR_REPARSE_POINT) {
-		err = EOPNOTSUPP;
-		goto err_out;
+		errno = EOPNOTSUPP;
+		return NULL;
 	}
 	/* Allocate MFT record for new file. */
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
