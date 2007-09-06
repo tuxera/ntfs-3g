@@ -1841,7 +1841,7 @@ int main(int argc, char **argv)
 	/* 'force' again mount for dirty volumes (e.g. after resize).
 	   FIXME: use mount flags to avoid potential side-effects in future */
 	opt.force++;
-	mount_volume(NTFS_MNT_NOATIME);
+	mount_volume(0);
 
 	free(lcn_bitmap.bm);
 	setup_lcn_bitmap();

@@ -2243,8 +2243,7 @@ static ntfs_volume *mount_volume(void)
 	 * volume at all.  We will do the logfile emptying and dirty setting
 	 * later if needed.
 	 */
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_NOATIME |
-			NTFS_MNT_FORENSIC))) {
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_FORENSIC))) {
 		int err = errno;
 
 		perr_printf("Opening '%s' as NTFS failed", opt.volume);

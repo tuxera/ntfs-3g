@@ -440,8 +440,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 			vol->upcase_len * sizeof(ntfschar));
 	if (flags & NTFS_MNT_RDONLY)
 		NVolSetReadOnly(vol);
-	if (flags & NTFS_MNT_NOATIME)
-		NVolSetNoATime(vol);
 	if (flags & NTFS_MNT_CASE_SENSITIVE)
 		NVolSetCaseSensitive(vol);
 	ntfs_log_debug("Reading bootsector... ");
@@ -758,7 +756,6 @@ out:
  * as for the mount system call (man 2 mount). Currently the following flags
  * are implemented:
  *	NTFS_MNT_RDONLY		- mount volume read-only
- *	NTFS_MNT_NOATIME	- do not update access time
  *	NTFS_MNT_CASE_SENSITIVE - treat filenames as case sensitive even if
  *				  they are not in POSIX namespace
  *	NTFS_MNT_NOT_EXCLUSIVE	- (unix only) do not open volume exclusively

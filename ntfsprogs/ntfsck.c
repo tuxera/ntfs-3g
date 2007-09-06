@@ -833,7 +833,7 @@ int main(int argc, char **argv)
 	// at this point we know that the volume is valid enough for mounting.
 
 	/* Call ntfs_device_mount() to do the actual mount. */
-	vol = ntfs_device_mount(dev, NTFS_MNT_NOATIME | NTFS_MNT_RDONLY);
+	vol = ntfs_device_mount(dev, NTFS_MNT_RDONLY);
 	if (!vol) {
 		ntfs_device_free(dev);
 		return 2;

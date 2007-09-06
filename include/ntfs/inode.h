@@ -130,7 +130,7 @@ struct _ntfs_inode {
 	};
 
 	/* Below fields are valid only for base inode. */
-	s64 data_size;		/* Data size stored in the filename index. */
+	s64 data_size;		/* Data size of unnamed DATA attribute. */
 	s64 allocated_size;	/* Allocated size stored in the filename
 				   index. (NOTE: Equal to allocated size of
 				   the unnamed data attribute for normal or
@@ -172,8 +172,14 @@ static __inline__ void ntfs_inode_mark_dirty(ntfs_inode *ni)
 		NInoSetDirty(ni->base_ni);
 }
 
-extern void ntfs_inode_update_atime(ntfs_inode *ni);
-extern void ntfs_inode_update_time(ntfs_inode *ni);
+typedef enum {
+	NTFS_UPDATE_ATIME = 1 << 0,
+	NTFS_UPDATE_MTIME = 1 << 1,
+	NTFS_UPDATE_CTIME = 1 << 2,
+} ntfs_time_update_flags;
+
+extern void ntfs_inode_update_times(ntfs_inode *ni,
+		ntfs_time_update_flags mask);
 
 extern int ntfs_inode_sync(ntfs_inode *ni);
 

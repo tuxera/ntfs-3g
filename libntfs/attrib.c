@@ -864,10 +864,6 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 		return ntfs_crypto_attr_pread(na, pos, count, b);
 
 	vol = na->ni->vol;
-	/* Update access time if needed. */
-	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
-			na->type == AT_INDEX_ALLOCATION)
-		ntfs_inode_update_atime(na->ni);
 	if (!count)
 		return 0;
 	/* Truncate reads beyond end of attribute. */
@@ -1050,10 +1046,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		errno = EOPNOTSUPP;
 		return -1;
 	}
-	/* Update access and change times if needed. */
-	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
-			na->type == AT_INDEX_ALLOCATION)
-		ntfs_inode_update_time(na->ni);
 	if (!count)
 		return 0;
 	/* If the write reaches beyond the end, extend the attribute. */
@@ -5092,10 +5084,6 @@ int __ntfs_attr_truncate(ntfs_attr *na, const s64 newsize, BOOL sparse)
 			ret = ntfs_non_resident_attr_shrink(na, newsize);
 	} else
 		ret = ntfs_resident_attr_resize(na, newsize);
-	/* Update access and change times if needed. */
-	if (na->type == AT_DATA || na->type == AT_INDEX_ROOT ||
-			na->type == AT_INDEX_ALLOCATION)
-		ntfs_inode_update_time(na->ni);
 	if (!ret)
 		ntfs_log_trace("Done!\n");
 	else

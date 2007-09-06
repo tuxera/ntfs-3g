@@ -107,6 +107,7 @@ typedef struct {
 	BOOL verbose;
 	BOOL no_def_opts;
 	BOOL case_insensitive;
+	BOOL noatime;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -138,6 +139,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	NTFS_FUSE_OPT("no_detach", no_detach),
 	NTFS_FUSE_OPT("no_def_opts", no_def_opts),
 	NTFS_FUSE_OPT("case_insensitive", case_insensitive),
+	NTFS_FUSE_OPT("noatime", noatime),
 	NTFS_FUSE_OPT("fmask=%o", fmask),
 	NTFS_FUSE_OPT("dmask=%o", dmask),
 	NTFS_FUSE_OPT("umask=%o", fmask),
@@ -160,6 +162,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	FUSE_OPT_KEY("fsname=", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("ro", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("rw", FUSE_OPT_KEY_KEEP),
+	FUSE_OPT_KEY("noatime", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_END
 };
 
@@ -188,6 +191,14 @@ static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return 1;
 	return 0;
+}
+
+static __inline__ void ntfs_fuse_update_times(ntfs_inode *ni,
+		ntfs_time_update_flags mask)
+{
+	if (ctx->noatime)
+		mask &= ~NTFS_UPDATE_ATIME;
+	ntfs_inode_update_times(ni, mask);
 }
 
 static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, long nr_free)
@@ -589,6 +600,7 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
 	ntfs_inode_close(ni);
 	return err;
 }
@@ -633,6 +645,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	ntfschar *stream_name;
 	int stream_name_len, res, total = 0;
 
+	if (!size)
+		return 0;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -662,6 +676,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		total += res;
 	}
 	res = total;
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -711,6 +726,9 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	res = total;
 exit:
 	ntfs_fuse_mark_free_space_outdated();
+	if (res > 0)
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_MTIME |
+				NTFS_UPDATE_CTIME);
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
@@ -738,6 +756,10 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		res = -errno;
 		goto exit;
 	}
+	if (ni->data_size == size) {
+		res = 0;
+		goto exit;
+	}
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na) {
 		res = -errno;
@@ -745,8 +767,11 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	}
 	if (ntfs_attr_truncate(na, size))
 		res = -errno;
-	else
+	else {
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_MTIME |
+				NTFS_UPDATE_CTIME);
 		res = 0;
+	}
 	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
 exit:
@@ -827,9 +852,11 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 			ni = ntfs_create(dir_ni, uname, uname_len, type);
 			break;
 	}
-	if (ni)
+	if (ni) {
 		ntfs_inode_close(ni);
-	else
+		ntfs_fuse_update_times(dir_ni,
+				NTFS_UPDATE_CTIME | NTFS_UPDATE_MTIME);
+	} else
 		res = -errno;
 exit:
 	free(uname);
@@ -948,6 +975,11 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	/* Create hard link. */
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
+	else {
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_CTIME |
+				NTFS_UPDATE_MTIME);
+	}
 exit:
 	if (ni)
 		ntfs_inode_close(ni);
@@ -993,9 +1025,14 @@ static int ntfs_fuse_rm(const char *org_path)
 		goto exit;
 	}
 	/* Delete object. */
-	if (ntfs_delete(ni, dir_ni, uname, uname_len))
+	if (ntfs_delete(&ni, dir_ni, uname, uname_len))
 		res = -errno;
-	ni = NULL;
+	else {
+		if (ni)
+			ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_CTIME |
+				NTFS_UPDATE_MTIME);
+	}
 exit:
 	if (ni)
 		ntfs_inode_close(ni);
@@ -1110,23 +1147,21 @@ static int ntfs_fuse_rmdir(const char *path)
 static int ntfs_fuse_utimens(const char *path, const struct timespec ts[2])
 {
 	ntfs_inode *ni;
+	time_t now;
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+	now = time(NULL);
+	ni->last_mft_change_time = now;
 	if (ts) {
 		ni->last_access_time = ts[0].tv_sec;
 		ni->last_data_change_time = ts[1].tv_sec;
-		ni->last_mft_change_time = ts[1].tv_sec;
 	} else {
-		time_t now;
-
-		now = time(NULL);
 		ni->last_access_time = now;
 		ni->last_data_change_time = now;
-		ni->last_mft_change_time = now;
 	}
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
@@ -1599,7 +1634,7 @@ static int ntfs_fuse_mount(void)
 {
 	ntfs_volume *vol;
 
-	vol = utils_mount_volume(ctx->device, NTFS_MNT_NOATIME |
+	vol = utils_mount_volume(ctx->device,
 			((ctx->ro) ? NTFS_MNT_RDONLY : 0) |
 			((ctx->case_insensitive) ? 0 :
 			NTFS_MNT_CASE_SENSITIVE) |

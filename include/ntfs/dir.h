@@ -77,7 +77,7 @@ extern ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni,
 extern ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni,
 		ntfschar *name, u8 name_len, ntfschar *target, u8 target_len);
 
-extern int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
+extern int ntfs_delete(ntfs_inode **pni, ntfs_inode *dir_ni, ntfschar *name,
 		u8 name_len);
 
 extern int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,

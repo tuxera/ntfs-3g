@@ -1069,43 +1069,34 @@ put_err_out:
 }
 
 /**
- * ntfs_inode_update_atime - update access time for ntfs inode
- * @ni:		ntfs inode for which update access time
+ * ntfs_inode_update_times - update selected time fields for ntfs inode
+ * @ni:		ntfs inode for which update time fields
+ * @mask:	select which time fields should be updated
  *
- * This function usually get called when user read not metadata from inode.
- * Do not update time for system files.
+ * This function updates time fields to current time. Fields to update are
+ * selected using @mask (see enum @ntfs_time_update_flags for posssible values).
  */
-void ntfs_inode_update_atime(ntfs_inode *ni)
+void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 {
-	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
-			FILE_first_user || ni->mft_no == FILE_root)) {
-		ni->last_access_time = time(NULL);
-		NInoFileNameSetDirty(ni);
-		NInoSetDirty(ni);
+	time_t now;
+
+	if (!ni) {
+		ntfs_log_error("%s(): Invalid arguments.\n", __FUNCTION__);
+		return;
 	}
-}
+	if ((ni->mft_no < FILE_first_user && ni->mft_no != FILE_root) ||
+			NVolReadOnly(ni->vol) || !mask)
+		return;
 
-/**
- * ntfs_inode_update_time - update all times for ntfs inode
- * @ni:		ntfs inode for which update times
- *
- * This function updates last access, mft and data change times. Usually
- * get called when user write not metadata to inode. Do not update time for
- * system files.
- */
-void ntfs_inode_update_time(ntfs_inode *ni)
-{
-	if (!NVolReadOnly(ni->vol) && !NVolNoATime(ni->vol) && (ni->mft_no >=
-			FILE_first_user || ni->mft_no == FILE_root)) {
-		time_t now;
-
-		now = time(NULL);
+	now = time(NULL);
+	if (mask & NTFS_UPDATE_ATIME)
 		ni->last_access_time = now;
+	if (mask & NTFS_UPDATE_MTIME)
 		ni->last_data_change_time = now;
+	if (mask & NTFS_UPDATE_CTIME)
 		ni->last_mft_change_time = now;
-		NInoFileNameSetDirty(ni);
-		NInoSetDirty(ni);
-	}
+	NInoFileNameSetDirty(ni);
+	NInoSetDirty(ni);
 }
 
 /**

@@ -57,10 +57,9 @@ typedef struct _ntfs_volume ntfs_volume;
  */
 typedef enum {
 	NTFS_MNT_RDONLY	 	= 1,
-	NTFS_MNT_NOATIME 	= 2,
+	NTFS_MNT_FORENSIC	= 2,
 	NTFS_MNT_CASE_SENSITIVE	= 4,
 	NTFS_MNT_NOT_EXCLUSIVE	= 8,
-	NTFS_MNT_FORENSIC	= 16,
 } ntfs_mount_flags;
 
 /**
@@ -107,10 +106,6 @@ typedef enum {
 #define NVolLogFileEmpty(nv)		 test_nvol_flag(nv, LogFileEmpty)
 #define NVolSetLogFileEmpty(nv)		  set_nvol_flag(nv, LogFileEmpty)
 #define NVolClearLogFileEmpty(nv)	clear_nvol_flag(nv, LogFileEmpty)
-
-#define NVolNoATime(nv)			 test_nvol_flag(nv, NoATime)
-#define NVolSetNoATime(nv)		  set_nvol_flag(nv, NoATime)
-#define NVolClearNoATime(nv)		clear_nvol_flag(nv, NoATime)
 
 #define NVolWasDirty(nv)		 test_nvol_flag(nv, WasDirty)
 #define NVolSetWasDirty(nv)		  set_nvol_flag(nv, WasDirty)

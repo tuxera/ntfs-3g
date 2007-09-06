@@ -487,7 +487,7 @@ close_err_out:
 u64 ntfs_pathname_to_inode_num(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname)
 {
-	u64 inum, result; 
+	u64 inum, result;
 	int len, err = 0;
 	char *p, *q;
 	ntfs_inode *ni = NULL;
@@ -1430,20 +1430,24 @@ ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 
 /**
  * ntfs_delete - delete file or directory from ntfs volume
- * @ni:		ntfs inode for object to delete
+ * @pni:	ntfs inode for object to delete
  * @dir_ni:	ntfs inode for directory in which delete object
  * @name:	unicode name of the object to delete
  * @name_len:	length of the name in unicode characters
  *
- * @ni is always closed after the call to this function (even if it failed),
- * user does not need to call ntfs_inode_close himself.
+ * @pni is pointer to pointer to ntfs_inode structure. Upon successful
+ * completion and if inode is really deleted (there are no more links left to
+ * it) this function will close @*pni and set it to NULL, in the other cases
+ * @*pni will stay opened.
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+int ntfs_delete(ntfs_inode **pni, ntfs_inode *dir_ni, ntfschar *name,
+		u8 name_len)
 {
 	ntfs_attr_search_ctx *actx = NULL;
 	ntfs_index_context *ictx = NULL;
+	ntfs_inode *ni;
 	FILE_NAME_ATTR *fn = NULL;
 	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
 	BOOL case_sensitive_match = TRUE;
@@ -1451,15 +1455,12 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 
 	ntfs_log_trace("Entering.\n");
 
-	if (!ni || !dir_ni || !name || !name_len) {
+	if (!pni || !(ni = *pni) || !dir_ni || !name || !name_len ||
+			ni->nr_extents == -1 || dir_ni->nr_extents == -1) {
 		ntfs_log_error("Invalid arguments.\n");
 		errno = EINVAL;
 		goto err_out;
 	}
-	if (ni->nr_extents == -1)
-		ni = ni->base_ni;
-	if (dir_ni->nr_extents == -1)
-		dir_ni = dir_ni->base_ni;
 	/*
 	 * Search for FILE_NAME attribute with such name. If it's in POSIX or
 	 * WIN32_AND_DOS namespace, then simply remove it from index and inode.
@@ -1642,14 +1643,12 @@ search:
 		ntfs_log_error("Failed to free base MFT record.  "
 				"Leaving inconsistent metadata.\n");
 	}
-	ni = NULL;
+	*pni = NULL;
 out:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
-	if (ni)
-		ntfs_inode_close(ni);
 	if (err) {
 		ntfs_log_error("%s(): Failed.\n", __FUNCTION__);
 		errno = err;
