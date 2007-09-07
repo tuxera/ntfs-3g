@@ -642,7 +642,10 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
  *
  * This function has a static buffer in which it caches a section of $Bitmap.
  * If the lcn, being tested, lies outside the range, the buffer will be
- * refreshed.
+ * refreshed. @bmplcn stores offset to the first bit (in bits) stored in the
+ * buffer.
+ *
+ * NOTE: Be very carefull with shifts by 3 everywhere in this function.
  *
  * Return:  1  Cluster is in use
  *	    0  Cluster is free space
@@ -651,8 +654,7 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 {
 	static unsigned char buffer[512];
-	static long long bmplcn = -sizeof(buffer) - 1;	/* Which bit of $Bitmap is in the buffer */
-
+	static long long bmplcn = -(sizeof(buffer) << 3);
 	int byte, bit;
 	ntfs_attr *attr;
 
@@ -674,7 +676,8 @@ int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 		memset(buffer, 0xFF, sizeof(buffer));
 		bmplcn = lcn & (~((sizeof(buffer) << 3) - 1));
 
-		if (ntfs_attr_pread(attr, (bmplcn>>3), sizeof(buffer), buffer) < 0) {
+		if (ntfs_attr_pread(attr, (bmplcn >> 3), sizeof(buffer),
+					buffer) < 0) {
 			ntfs_log_perror("Couldn't read $Bitmap");
 			ntfs_attr_close(attr);
 			return -1;
@@ -686,7 +689,9 @@ int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 
 	bit  = 1 << (lcn & 7);
 	byte = (lcn >> 3) & (sizeof(buffer) - 1);
-	ntfs_log_debug("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, in use %d\n", lcn, bmplcn, byte, bit, buffer[byte] & bit);
+	ntfs_log_debug("cluster = %lld, bmplcn = %lld, byte = %d, bit = %d, "
+			"in use %d\n", lcn, bmplcn, byte, bit, buffer[byte] &
+			bit);
 
 	return (buffer[byte] & bit);
 }
