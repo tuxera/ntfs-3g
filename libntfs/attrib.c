@@ -4386,7 +4386,16 @@ retry:
 				memmove((u8*)a + le16_to_cpu(a->name_offset) -
 					8, (u8*)a + le16_to_cpu(a->name_offset),
 					a->name_length * sizeof(ntfschar));
-				a->name_offset = cpu_to_le16(le16_to_cpu(
+				/*
+				 * Windows defragmentation tool do not update
+				 * name offset correctly for unnamed
+				 * attributes, but chkdsk do not like when it
+				 * negative, so do not change it at all if it
+				 * would become negative.
+				 */
+				if (le16_to_cpu(a->name_offset) >= 8)
+					a->name_offset = cpu_to_le16(
+							le16_to_cpu(
 							a->name_offset) - 8);
 				a->mapping_pairs_offset =
 						cpu_to_le16(le16_to_cpu(
