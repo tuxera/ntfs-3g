@@ -1281,11 +1281,37 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 retry:
 		ntfs_log_trace("Writing %lld bytes to vcn %lld, lcn %lld, ofs "
 			       "%lld.\n", to_write, rl->vcn, rl->lcn, ofs);
-		if (!NVolReadOnly(vol))
-			written = ntfs_pwrite(vol->dev, (rl->lcn <<
-					vol->cluster_size_bits) + ofs,
-					to_write, b);
-		else
+		if (!NVolReadOnly(vol)) {
+			
+			s64 pos = (rl->lcn << vol->cluster_size_bits) + ofs;
+			int bsize = vol->cluster_size;
+
+			/*
+			 * Write cluster size blocks if it's possible. This will 
+			 * cause the kernel not to seek and read disk blocks for
+			 * filling the end of the buffer which increases write
+			 * speed at least by 2-11 fold typically.
+			 */
+			if (!(ofs % bsize) && (to_write % bsize) && 
+			    ((ofs + to_write) == na->initialized_size)) {
+				
+				s64 rounded = (to_write + bsize - 1) & ~(bsize - 1);
+				char *cb = ntfs_malloc(rounded);
+				
+				if (!cb)
+					goto err_out;
+				
+				memcpy(cb, b, to_write);
+				memset(cb + to_write, 0, rounded - to_write);
+				
+				written = ntfs_pwrite(vol->dev, pos, rounded, cb); 
+				if (written == rounded)
+					written = to_write;
+				
+				free(cb);
+			} else
+				written = ntfs_pwrite(vol->dev, pos, to_write, b);
+		} else
 			written = to_write;
 		/* If everything ok, update progress counters and continue. */
 		if (written > 0) {
