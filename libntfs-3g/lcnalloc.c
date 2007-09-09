@@ -51,7 +51,7 @@
  * the update of the mapping pairs which converges to the cubic Faulhaber's
  * formula as the function of the number of extents (fragments, runs).
  */
-#define NTFS_LCNALLOC_BSIZE 1024
+#define NTFS_LCNALLOC_BSIZE 8192
 #define NTFS_LCNALLOC_SKIP  NTFS_LCNALLOC_BSIZE
 
 static void ntfs_cluster_set_zone_pos(LCN start, LCN end, LCN *pos, LCN tc)
