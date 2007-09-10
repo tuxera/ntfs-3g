@@ -319,6 +319,7 @@ int ntfs_log_redirect(const char *function, const char *file,
 }
 
 
+#ifdef HAVE_SYSLOG_H
 /**
  * ntfs_log_handler_syslog - syslog logging handler
  * @function:	Function in which the log line occurred
@@ -329,47 +330,56 @@ int ntfs_log_redirect(const char *function, const char *file,
  * @format:	printf-style formatting string
  * @args:	Arguments to be formatted
  *
- * A simple syslog logging handler.  Ignores colors.
+ * A syslog logging handler. Ignores colors and truncates output after 512
+ * bytes.
  *
  * Returns:  -1  Error occurred
  *            0  Message wasn't logged
  *          num  Number of output characters
  */
-
-#ifdef HAVE_SYSLOG_H
-int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
-		const char *file, int line __attribute__((unused)),
-		u32 level __attribute__((unused)),
-		void *data __attribute__((unused)), const char *format,
-		va_list args)
+int ntfs_log_handler_syslog(const char *function, const char *file, int line,
+		u32 level, void *data __attribute__((unused)),
+		const char *format, va_list args)
 {
-	int ret = 0;
-	int olderr = errno;
+	char buffer[512];
+	int ret = 0, olderr = errno;
 
 	if ((ntfs_log.flags & NTFS_LOG_FLAG_ONLYNAME) &&
 	    (strchr(file, PATH_SEP)))		/* Abbreviate the filename */
 		file = strrchr(file, PATH_SEP) + 1;
-#if 0	/* FIXME: Implement this all. */
-	if (ntfs_log.flags & NTFS_LOG_FLAG_PREFIX)	/* Prefix the output */
-		ret += fprintf(stream, "%s", ntfs_log_get_prefix(level));
 
-	if (ntfs_log.flags & NTFS_LOG_FLAG_FILENAME)	/* Source filename */
-		ret += fprintf(stream, "%s ", file);
+	/* Prefix the output */
+	if (ret < sizeof(buffer) && ntfs_log.flags & NTFS_LOG_FLAG_PREFIX)
+		ret += snprintf(buffer + ret, sizeof(buffer) - ret, "%s",
+				ntfs_log_get_prefix(level));
 
-	if (ntfs_log.flags & NTFS_LOG_FLAG_LINE)	/* Source line number */
-		ret += fprintf(stream, "(%d) ", line);
+	/* Source filename */
+	if (ret < sizeof(buffer) && ntfs_log.flags & NTFS_LOG_FLAG_FILENAME)
+		ret += snprintf(buffer + ret, sizeof(buffer) - ret, "%s ",
+				file);
 
-	if ((ntfs_log.flags & NTFS_LOG_FLAG_FUNCTION) || /* Source function */
-	    (level & NTFS_LOG_LEVEL_TRACE))
-		ret += fprintf(stream, "%s(): ", function);
+	/* Source line number */
+	if (ret < sizeof(buffer) && ntfs_log.flags & NTFS_LOG_FLAG_LINE)
+		ret += snprintf(buffer + ret, sizeof(buffer) - ret, "(%d) ",
+				line);
 
-	ret += vfprintf(stream, format, args);
+	/* Source function */
+	if (ret < sizeof(buffer) && ((ntfs_log.flags & NTFS_LOG_FLAG_FUNCTION)
+			|| (level & NTFS_LOG_LEVEL_TRACE)))
+		ret += snprintf(buffer + ret, sizeof(buffer) - ret, "%s(): ",
+				function);
 
-	if (level & NTFS_LOG_LEVEL_PERROR)
-		ret += fprintf(stream, ": %s\n", strerror(olderr));
-#endif
-	vsyslog(LOG_NOTICE, format, args);
-	ret = 1; /* FIXME: caclulate how many bytes had been written. */
+	/* Message itself */
+	if (ret < sizeof(buffer))
+		ret += vsnprintf(buffer + ret, sizeof(buffer) - ret, format,
+				args);
+
+	/* Append errno */
+	if (ret < sizeof(buffer) && level & NTFS_LOG_LEVEL_PERROR)
+		ret += snprintf(buffer + ret, sizeof(buffer) - ret, ": %s.\n",
+				strerror(olderr));
+
+	syslog(LOG_NOTICE, "%s", buffer);
 
 	errno = olderr;
 	return ret;
@@ -460,7 +470,7 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 	ret += vfprintf(stream, format, args);
 
 	if (level & NTFS_LOG_LEVEL_PERROR)
-		ret += fprintf(stream, ": %s\n", strerror(olderr));
+		ret += fprintf(stream, ": %s.\n", strerror(olderr));
 
 	if (col_suffix)
 		ret += fprintf(stream, col_suffix);

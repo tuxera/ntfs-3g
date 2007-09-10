@@ -1328,8 +1328,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,
 			le16_to_cpu(ni->mrec->sequence_number)))) {
 		err = errno;
-		ntfs_log_error("Failed to add entry to the index: %s.\n",
-				strerror(err));
+		ntfs_log_perror("Failed to add entry to the index");
 		goto err_out;
 	}
 	/* Set hard links count and directory flag. */
