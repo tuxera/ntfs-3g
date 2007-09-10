@@ -766,7 +766,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 				le16_to_cpu(dir_ni->mrec->sequence_number)),
 				NTFS_DT_DIR);
 		if (rc)
-			goto done;
+			goto err_out;
 		++*pos;
 	}
 	if (*pos == 1) {
@@ -781,7 +781,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		rc = filldir(dirent, dotdot, 2, FILE_NAME_POSIX, *pos,
 				parent_mref, NTFS_DT_DIR);
 		if (rc)
-			goto done;
+			goto err_out;
 		++*pos;
 	}
 
@@ -858,11 +858,8 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		 * invoke the filldir() callback as appropriate.
 		 */
 		rc = ntfs_filldir(pos, ie, dirent, filldir);
-		if (rc) {
-			ntfs_attr_put_search_ctx(ctx);
-			ctx = NULL;
-			goto done;
-		}
+		if (rc)
+			goto err_out;
 	}
 	ntfs_attr_put_search_ctx(ctx);
 	ctx = NULL;
@@ -1020,7 +1017,7 @@ find_next_index_buffer:
 		 */
 		rc = ntfs_filldir(pos, ie, dirent, filldir);
 		if (rc)
-			goto done;
+			goto err_out;
 	}
 	goto find_next_index_buffer;
 EOD:
@@ -1033,20 +1030,16 @@ done:
 		ntfs_attr_close(bmp_na);
 	if (ia_na)
 		ntfs_attr_close(ia_na);
-#ifdef DEBUG
-	if (!rc)
-		ntfs_log_debug("EOD, *pos 0x%llx, returning 0.\n",
-				(long long)*pos);
-	else
-		ntfs_log_debug("filldir returned %i, *pos 0x%llx, "
-				"returning 0.\n", rc, (long long)*pos);
-#endif
+	ntfs_log_debug("EOD, *pos 0x%llx, returning 0.\n", (long long)*pos);
 	return 0;
 dir_err_out:
 	errno = EIO;
 err_out:
 	eo = errno;
-	ntfs_log_trace("failed.\n");
+	if (rc)
+		ntfs_log_trace("filldir returned %i, *pos 0x%llx.", rc,
+				(long long)*pos);
+	ntfs_log_trace("Failed.\n");
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	free(ia);
