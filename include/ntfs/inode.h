@@ -41,7 +41,7 @@ typedef struct _ntfs_inode ntfs_inode;
 typedef enum {
 	NI_Dirty,		/* 1: Mft record needs to be written to disk. */
 
-	/* The NI_AttrList* tests only make sense for base inodes. */
+	/* Below fields only make sense for base inodes. */
 	NI_AttrList,		/* 1: Mft record contains an attribute list. */
 	NI_AttrListDirty,	/* 1: Attribute list needs to be written to the
 				      mft record and then to disk. */
@@ -130,6 +130,12 @@ struct _ntfs_inode {
 	};
 
 	/* Below fields are valid only for base inode. */
+
+	/*
+	 * This two fields are used to sync filename index and guaranteed to be
+	 * correct, however value in index itself maybe wrong (windows itself
+	 * do not update them properly).
+	 */
 	s64 data_size;		/* Data size of unnamed DATA attribute. */
 	s64 allocated_size;	/* Allocated size stored in the filename
 				   index. (NOTE: Equal to allocated size of
