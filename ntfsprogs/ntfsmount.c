@@ -51,8 +51,15 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
+#ifdef HAVE_PWD_H
+#include <pwd.h>
+#endif
+#ifdef HAVE_GETOPT_H
 #include <getopt.h>
+#endif
+#ifdef HAVE_SYSLOG_H
 #include <syslog.h>
+#endif
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -108,6 +115,7 @@ typedef struct {
 	BOOL no_def_opts;
 	BOOL case_insensitive;
 	BOOL noatime;
+	BOOL blkdev;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -148,6 +156,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	NTFS_FUSE_OPT("locale=%s", locale),
 	NTFS_FUSE_OPT_NEG("nosilent", silent),
 	NTFS_FUSE_OPT_NEG("rw", ro),
+	NTFS_FUSE_OPT_NEG("noblkdev", blkdev),
 	NTFS_FUSE_OPT_VAL("streams_interface=none", streams,
 			NF_STREAMS_INTERFACE_NONE),
 	NTFS_FUSE_OPT_VAL("streams_interface=windows", streams,
@@ -160,6 +169,8 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	FUSE_OPT_KEY("umask=", NF_KEY_UMASK),
 	FUSE_OPT_KEY("noauto", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("fsname=", FUSE_OPT_KEY_DISCARD),
+	FUSE_OPT_KEY("blkdev", FUSE_OPT_KEY_DISCARD),
+	FUSE_OPT_KEY("blksize=", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("ro", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("rw", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("noatime", FUSE_OPT_KEY_KEEP),
@@ -1527,12 +1538,13 @@ static int ntfs_fuse_init(void)
 
 	*ctx = (ntfs_fuse_context_t) {
 		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
-		.uid = geteuid(),
-		.gid = getegid(),
+		.uid = getuid(),
+		.gid = getgid(),
 		.fmask = 0111,
 		.dmask = 0,
 		.streams = NF_STREAMS_INTERFACE_NONE,
 		.silent = TRUE,
+		.blkdev = TRUE,
 	};
 	return 0;
 }
@@ -1590,10 +1602,39 @@ static int ntfs_fuse_opt_proc(void *data __attribute__((unused)),
 	}
 }
 
+static int ntfs_fuse_is_block_dev(void)
+{
+	struct stat st;
+
+	if (stat(ctx->device, &st)) {
+		ntfs_log_perror("Failed to stat %s", ctx->device);
+		return -1;
+	}
+
+	if (S_ISBLK(st.st_mode)) {
+		if (!ctx->blkdev) {
+			ntfs_log_warning("WARNING: %s is block device, but you "
+					"submitted 'noblkdev' option. This is "
+					"not recommended.\n", ctx->device);
+		}
+		if (geteuid()) {
+			ntfs_log_warning("WARNING: %s is block device, but you "
+					"are not root and %s is not set-uid-"
+					"root, so using 'blkdev' option is not "
+					"possible. This is not recommended.\n",
+					ctx->device, EXEC_NAME);
+			ctx->blkdev = FALSE;
+		}
+
+	} else
+		ctx->blkdev = FALSE;
+	return 0;
+}
+
 static int parse_options(struct fuse_args *args)
 {
 	int ret;
-	char *fsname;
+	char *buffer = NULL;
 
 	ret = fuse_opt_parse(args, ctx, ntfs_fuse_opts, ntfs_fuse_opt_proc);
 	if (!ctx->device) {
@@ -1612,15 +1653,38 @@ static int parse_options(struct fuse_args *args)
 	if (ctx->locale && !setlocale(LC_ALL, ctx->locale))
 		ntfs_log_error("Failed to set locale to %s "
 				"(continue anyway).\n", ctx->locale);
-	fsname = ntfs_malloc(strlen(ctx->device) + 64);
-	if (!fsname)
+	if (ntfs_fuse_is_block_dev())
 		return -1;
-	sprintf(fsname, "-ofsname=%s", ctx->device);
-	if (fuse_opt_add_arg(args, fsname) == -1) {
-		free(fsname);
+
+	/*
+	 * Now we will submit extra options to fuse. Allocate long enough
+	 * buffer for all dynamically generated options.
+	 */
+	buffer = ntfs_malloc(strlen(ctx->device) + 128);
+	if (!buffer)
+		return -1;
+	/* fsname */
+	sprintf(buffer, "-ofsname=%s", ctx->device);
+	if (fuse_opt_add_arg(args, buffer) == -1) {
+		free(buffer);
 		return -1;
 	}
-	free(fsname);
+	/* blkdev, user */
+	if (ctx->blkdev) {
+		struct passwd *pw;
+
+		pw = getpwuid(ctx->uid);
+		if (!pw || !pw->pw_name) {
+			free(buffer);
+			return -1;
+		}
+		sprintf(buffer, "-oblkdev,user=%s", pw->pw_name);
+		if (fuse_opt_add_arg(args, buffer) == -1) {
+			free(buffer);
+			return -1;
+		}
+	}
+	free(buffer);
 	if (!ctx->no_def_opts) {
 		if (fuse_opt_add_arg(args, "-o") == -1)
 			return -1;
@@ -1639,10 +1703,10 @@ static int ntfs_fuse_mount(void)
 	ntfs_volume *vol;
 
 	vol = utils_mount_volume(ctx->device,
-			((ctx->ro) ? NTFS_MNT_RDONLY : 0) |
-			((ctx->case_insensitive) ? 0 :
-			NTFS_MNT_CASE_SENSITIVE) |
-			NTFS_MNT_NOT_EXCLUSIVE /* FIXME */, ctx->force);
+			(ctx->case_insensitive ? 0 : NTFS_MNT_CASE_SENSITIVE) |
+			(ctx->blkdev ? NTFS_MNT_NOT_EXCLUSIVE : 0) |
+			(ctx->ro ? NTFS_MNT_RDONLY : 0),
+			ctx->force);
 	if (!vol) {
 		ntfs_log_error("Mount failed.\n");
 		return -1;
@@ -1670,6 +1734,13 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy(NULL);
 		return 1;
 	}
+	/* Gain root privileges if required. */
+	if (ctx->blkdev)
+		if (setuid(0)) {
+			ntfs_log_perror("setuid(0) failed");
+			fuse_opt_free_args(&args);
+			ntfs_fuse_destroy(NULL);
+		}
 	/* Create filesystem (FUSE part). */
 	fch = fuse_mount(ctx->mnt_point, &args);
 	if (!fch) {
@@ -1687,9 +1758,13 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy(NULL);
 		return 1;
 	}
+	/* Drop root privileges. */
+	if (setuid(ctx->uid) || seteuid(ctx->uid))
+		ntfs_log_warning("Failed to drop root privileges.\n");
+	/* Detach from terminal. */
 	if (!ctx->debug && !ctx->no_detach) {
 		if (daemon(0, 0))
-			ntfs_log_error("Failed to daemonize.\n");
+			ntfs_log_error("Failed to detach from terminal.\n");
 		else {
 			ntfs_log_set_handler(ntfs_log_handler_syslog);
 			/* Override default libntfs identify. */
