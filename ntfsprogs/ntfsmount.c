@@ -562,7 +562,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		const unsigned dt_type __attribute__((unused)))
 {
 	char *filename = NULL;
-	int ret;
+	int ret = 0;
 
 	if (name_type == FILE_NAME_DOS)
 		return 0;
