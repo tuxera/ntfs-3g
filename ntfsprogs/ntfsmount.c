@@ -1556,6 +1556,7 @@ static int ntfs_fuse_opt_proc(void *data __attribute__((unused)),
 {
 	switch (key) {
 	case NF_KEY_HELP:
+		usage();
 		return -1; /* Force usage show. */
 	case NF_KEY_UMASK:
 		ctx->dmask = ctx->fmask;
@@ -1635,12 +1636,14 @@ static int ntfs_fuse_is_block_dev(void)
 
 static int parse_options(struct fuse_args *args)
 {
-	int ret;
 	char *buffer = NULL;
 
-	ret = fuse_opt_parse(args, ctx, ntfs_fuse_opts, ntfs_fuse_opt_proc);
+	if (fuse_opt_parse(args, ctx, ntfs_fuse_opts, ntfs_fuse_opt_proc))
+		return -1;
+
 	if (!ctx->device) {
 		ntfs_log_error("No device specified.\n");
+		usage();
 		return -1;
 	}
 	if (ctx->quiet && ctx->verbose) {
@@ -1697,7 +1700,7 @@ static int parse_options(struct fuse_args *args)
 		if (fuse_opt_add_arg(args, "-odebug") == -1)
 			return -1;
 	}
-	return ret;
+	return 0;
 }
 
 static int ntfs_fuse_mount(void)
@@ -1724,8 +1727,7 @@ int main(int argc, char *argv[])
 	struct fuse_chan *fch;
 
 	ntfs_fuse_init();
-	if (parse_options(&args) == -1) {
-		usage();
+	if (parse_options(&args)) {
 		fuse_opt_free_args(&args);
 		ntfs_fuse_destroy(NULL);
 		return 1;
