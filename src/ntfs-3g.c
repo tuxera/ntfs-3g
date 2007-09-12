@@ -106,7 +106,6 @@ typedef enum {
 typedef struct {
 	ntfs_volume *vol;
 	int state;
-	long free_clusters;
 	long free_mft;
 	unsigned int uid;
 	unsigned int gid;
@@ -123,8 +122,6 @@ typedef struct {
 } ntfs_fuse_context_t;
 
 typedef enum {
-	NF_FreeClustersOutdate	= (1 << 0),  /* Information about amount of
-						free clusters is outdated. */
 	NF_FreeMFTOutdate	= (1 << 1),  /* Information about amount of
 						free MFT records is outdated. */
 } ntfs_fuse_state_bits;
@@ -167,8 +164,8 @@ static const char *usage_msg =
 
 static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
 {
-	/* Mark information about free MFT record and clusters outdated. */
-	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
+	/* Mark information about free MFT records outdated. */
+	ctx->state |= NF_FreeMFTOutdate;
 }
 
 /**
@@ -221,14 +218,12 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, s64 numof_inode)
 	return nr_free;
 }
 
-static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
+static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
 {
 	u8 *buf;
 	long nr_free = 0;
 	s64 br, total = 0;
 
-	if (!(ctx->state & NF_FreeClustersOutdate))
-		return ctx->free_clusters;
 	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
 		return -errno;
@@ -248,8 +243,6 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 	free(buf);
 	if (!total || br < 0)
 		return -errno;
-	ctx->free_clusters = nr_free;
-	ctx->state &= ~(NF_FreeClustersOutdate);
 	return nr_free;
 }
 
@@ -292,7 +285,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	sfs->f_blocks = vol->nr_clusters;
 	
 	/* Free data blocks in file system in units of f_bsize. */
-	size = ntfs_fuse_get_nr_free_clusters(vol);
+	size = vol->free_clusters;
 	if (size < 0)
 		size = 0;
 	
@@ -1655,7 +1648,7 @@ static int ntfs_fuse_init(void)
 		return -1;
 	
 	*ctx = (ntfs_fuse_context_t) {
-		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
+		.state = NF_FreeMFTOutdate,
 		.uid = getuid(),
 		.gid = getgid(),
 		.fmask = 0,
@@ -2232,6 +2225,12 @@ int main(int argc, char *argv[])
 
 	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
 		goto err_out;
+	
+	ctx->vol->free_clusters = ntfs_get_nr_free_clusters(ctx->vol);
+	if (ctx->vol->free_clusters < 0) {
+		ntfs_log_perror("Failed to read NTFS $Bitmap");
+		goto err_out;
+	}
 	
 	if (use_blkdev) {
 	    set_fuseblk_options(parsed_options);

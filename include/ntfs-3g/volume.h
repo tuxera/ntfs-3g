@@ -212,6 +212,9 @@ struct _ntfs_volume {
 	s32 attrdef_len;	/* Size of the attribute definition table in
 				   bytes. */
 
+	s64 free_clusters; 	/* Track the number of free clusters which
+				   greatly improves statfs() performance */
+
 	/* Temp: for directory handling */
 	void *private_data;	/* ntfs_dir for . */
 	void *private_bmp1;	/* ntfs_bmp for $MFT/$BITMAP */

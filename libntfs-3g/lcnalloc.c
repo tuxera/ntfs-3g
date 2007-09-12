@@ -305,6 +305,11 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			/* Allocate the bitmap bit. */
 			*byte |= bit;
 			writeback = 1;
+			if (vol->free_clusters <= 0) 
+				ntfs_log_error("Non-positive free clusters "
+					       "(%lld)!\n", vol->free_clusters);
+			else	
+				vol->free_clusters--; 
 			
 			/*
 			 * Coalesce with previous run if adjacent LCNs.
@@ -490,6 +495,9 @@ err_ret:
  */
 int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 {
+	s64 nr_freed = 0;
+	int ret = -1;
+
 	ntfs_log_trace("Entering.\n");
 
 	for (; rl->length; rl++) {
@@ -497,15 +505,26 @@ int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 		ntfs_log_trace("Dealloc lcn 0x%llx, len 0x%llx.\n",
 			       (long long)rl->lcn, (long long)rl->length);
 
-		if (rl->lcn >= 0 && ntfs_bitmap_clear_run(vol->lcnbmp_na,
-				rl->lcn, rl->length)) {
-			int eo = errno;
-			ntfs_log_trace("Eeek! Deallocation of clusters failed.\n");
-			errno = eo;
-			return -1;
+		if (rl->lcn >= 0) { 
+			if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn, 
+						  rl->length)) {
+				ntfs_log_perror("Cluster deallocation failed "
+					       "(%lld, %lld)", rl->lcn, 
+						rl->length);
+				goto out;
+			}
+			nr_freed += rl->length ; 
 		}
 	}
-	return 0;
+
+	ret = 0;
+out:
+	vol->free_clusters += nr_freed; 
+	if (vol->free_clusters > vol->nr_clusters)
+		ntfs_log_error("Too many free clusters (%lld > %lld)!",
+			       (long long)vol->free_clusters, 
+			       (long long)vol->nr_clusters);
+	return ret;
 }
 
 /**
@@ -527,7 +546,8 @@ int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 {
 	runlist *rl;
-	s64 nr_freed, delta, to_free;
+	s64 delta, to_free, nr_freed = 0;
+	int ret = -1;
 
 	if (!vol || !vol->lcnbmp_na || !na || start_vcn < 0 ||
 			(count < 0 && count != -1)) {
@@ -543,12 +563,13 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	if (!rl) {
 		if (errno == ENOENT)
 			return 0;
-		else
-			return -1;
+		return -1;
 	}
 
 	if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 		errno = EIO;
+		ntfs_log_perror("%s: Unexpected lcn (%lld)", __FUNCTION__, 
+				(long long)rl->lcn);
 		return -1;
 	}
 
@@ -563,14 +584,10 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 	if (rl->lcn != LCN_HOLE) {
 		/* Do the actual freeing of the clusters in this run. */
 		if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn + delta,
-				to_free))
+					  to_free))
 			return -1;
-		/* We have freed @to_free real clusters. */
 		nr_freed = to_free;
-	} else {
-		/* No real clusters were freed. */
-		nr_freed = 0;
-	}
+	} 
 
 	/* Go to the next run and adjust the number of clusters left to free. */
 	++rl;
@@ -586,11 +603,10 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		//	  list support! (AIA)
 		if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 			// FIXME: Eeek! We need rollback! (AIA)
-			ntfs_log_trace("Eeek! invalid lcn (= %lli).  Should attempt "
-					"to map runlist!  Leaving inconsistent "
-					"metadata!\n", (long long)rl->lcn);
 			errno = EIO;
-			return -1;
+			ntfs_log_perror("%s: Invalid lcn (%lli)", 
+					__FUNCTION__, (long long)rl->lcn);
+			goto out;
 		}
 
 		/* The number of clusters in this run that need freeing. */
@@ -599,18 +615,13 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 			to_free = count;
 
 		if (rl->lcn != LCN_HOLE) {
-			/* Do the actual freeing of the clusters in the run. */
 			if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn,
 					to_free)) {
-				int eo = errno;
-
 				// FIXME: Eeek! We need rollback! (AIA)
-				ntfs_log_trace("Eeek!  bitmap clear run failed.  "
-						"Leaving inconsistent metadata!\n");
-				errno = eo;
-				return -1;
+				ntfs_log_perror("%s: Clearing bitmap run failed",
+						__FUNCTION__);
+				goto out;
 			}
-			/* We have freed @to_free real clusters. */
 			nr_freed += to_free;
 		}
 
@@ -620,12 +631,18 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 
 	if (count != -1 && count != 0) {
 		// FIXME: Eeek! BUG()
-		ntfs_log_trace("Eeek!  count still not zero (= %lli).  Leaving "
-				"inconsistent metadata!\n", (long long)count);
 		errno = EIO;
-		return -1;
+		ntfs_log_perror("%s: count still not zero (%lld)", __FUNCTION__,
+			       (long long)count);
+		goto out;
 	}
 
-	/* Done. Return the number of actual clusters that were freed. */
-	return nr_freed;
+	ret = nr_freed;
+out:
+	vol->free_clusters += nr_freed ; 
+	if (vol->free_clusters > vol->nr_clusters)
+		ntfs_log_error("Too many free clusters (%lld > %lld)!",
+			       (long long)vol->free_clusters, 
+			       (long long)vol->nr_clusters);
+	return ret;
 }

@@ -568,7 +568,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 {
 	LCN lcn;
 	s64 ll = 0; /* silence compiler warning */
-	ntfs_attr *mftbmp_na, *lcnbmp_na;
+	ntfs_attr *mftbmp_na;
 	runlist_element *rl, *rl2 = NULL; /* silence compiler warning */
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m = NULL; /* silence compiler warning */
@@ -578,7 +578,6 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 	BOOL mp_rebuilt = FALSE;
 
 	mftbmp_na = vol->mftbmp_na;
-	lcnbmp_na = vol->lcnbmp_na;
 	/*
 	 * Determine the last lcn of the mft bitmap.  The allocated size of the
 	 * mft bitmap cannot be zero so we are ok to do this.
@@ -726,9 +725,11 @@ undo_alloc:
 	rl->lcn = rl[1].lcn;
 	rl->length = 0;
 	
-	/* Deallocate the cluster. */
-	if (ntfs_bitmap_clear_bit(lcnbmp_na, lcn))
+	/* FIXME: use an ntfs_cluster_free_* function */
+	if (ntfs_bitmap_clear_bit(vol->lcnbmp_na, lcn))
 		ntfs_log_error("Failed to free cluster.%s\n", es);
+	else
+		vol->free_clusters++;
 	if (mp_rebuilt) {
 		if (ntfs_mapping_pairs_build(vol, (u8*)a +
 				le16_to_cpu(a->mapping_pairs_offset),
