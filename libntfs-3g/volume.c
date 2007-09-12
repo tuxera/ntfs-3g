@@ -717,13 +717,6 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 		errno = EPERM;
 		goto out;
 	}
-	for (i = 0; i < NTFS_HIBERFILE_HEADER_SIZE; i++) {
-		if (buf[i]) {
-			ntfs_log_error("Windows is hibernated, won't mount.\n");
-			errno = EPERM;
-			goto out;
-		}
-	}
         /* All right, all header bytes are zero */
 	errno = 0;
 out:
