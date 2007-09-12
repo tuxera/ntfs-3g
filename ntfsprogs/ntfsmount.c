@@ -1734,13 +1734,22 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy(NULL);
 		return 1;
 	}
-	/* Gain root privileges if required. */
-	if (ctx->blkdev)
+	if (ctx->blkdev) {
+		/* Gain root privileges for blkdev mount. */
 		if (setuid(0)) {
 			ntfs_log_perror("setuid(0) failed");
 			fuse_opt_free_args(&args);
 			ntfs_fuse_destroy(NULL);
+			return 1;
 		}
+	} else {
+		/*
+		 * Drop effective uid if our binary is set-uid-root and we are
+		 * performing not blkdev mount.
+		 */
+		if (!geteuid() && seteuid(ctx->uid))
+			ntfs_log_perror("Failed to drop effective uid");
+	}
 	/* Create filesystem (FUSE part). */
 	fch = fuse_mount(ctx->mnt_point, &args);
 	if (!fch) {
@@ -1758,8 +1767,8 @@ int main(int argc, char *argv[])
 		ntfs_fuse_destroy(NULL);
 		return 1;
 	}
-	/* Drop root privileges. */
-	if (setuid(ctx->uid) || seteuid(ctx->uid))
+	/* Drop root privileges if we obtained them. */
+	if (ctx->blkdev && (setuid(ctx->uid) || seteuid(ctx->uid)))
 		ntfs_log_warning("Failed to drop root privileges.\n");
 	/* Detach from terminal. */
 	if (!ctx->debug && !ctx->no_detach) {
