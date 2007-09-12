@@ -157,6 +157,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	NTFS_FUSE_OPT_NEG("nosilent", silent),
 	NTFS_FUSE_OPT_NEG("rw", ro),
 	NTFS_FUSE_OPT_NEG("noblkdev", blkdev),
+	NTFS_FUSE_OPT_NEG("atime", noatime),
 	NTFS_FUSE_OPT_VAL("streams_interface=none", streams,
 			NF_STREAMS_INTERFACE_NONE),
 	NTFS_FUSE_OPT_VAL("streams_interface=windows", streams,
@@ -173,6 +174,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	FUSE_OPT_KEY("blksize=", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("ro", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("rw", FUSE_OPT_KEY_KEEP),
+	FUSE_OPT_KEY("atime", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("noatime", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_END
 };
