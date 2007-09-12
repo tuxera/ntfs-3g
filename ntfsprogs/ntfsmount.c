@@ -387,13 +387,19 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		res = -ENOENT;
 		goto exit;
 	}
+	stbuf->st_uid = ctx->uid;
+	stbuf->st_gid = ctx->gid;
+	stbuf->st_ino = ni->mft_no;
+	stbuf->st_atime = ni->last_access_time;
+	stbuf->st_ctime = ni->last_mft_change_time;
+	stbuf->st_mtime = ni->last_data_change_time;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
 		/* Directory. */
 		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
 		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (na) {
 			stbuf->st_size = na->data_size;
-			stbuf->st_blocks = (na->allocated_size + 511) >> 9;
+			stbuf->st_blocks = na->allocated_size >> 9;
 			ntfs_attr_close(na);
 		} else {
 			stbuf->st_size = 0;
@@ -401,27 +407,25 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		}
 		stbuf->st_nlink = 1; /* Needed for correct find work. */
 	} else {
-		/* Regular or Interix (INTX) file. */
+		/* Regular, data stream or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
-		stbuf->st_size = ni->data_size;
-		stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
 		stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
-		if (ni->flags & FILE_ATTR_SYSTEM || stream_name_len) {
-			na = ntfs_attr_open(ni, AT_DATA, stream_name,
-					stream_name_len);
-			if (!na) {
-				if (stream_name_len)
-					res = -ENOENT;
-				goto exit;
-			}
-			if (stream_name_len) {
-				stbuf->st_size = na->data_size;
-				stbuf->st_blocks =
-						(ni->allocated_size + 511) >> 9;
-			}
+		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+		if (!na) {
+			if (stream_name_len)
+				res = -ENOENT;
+			else
+				stbuf->st_size = stbuf->st_blocks = 0;
+			goto exit;
+		}
+		if (NAttrNonResident(na))
+			stbuf->st_blocks = na->allocated_size >> 9;
+		else
+			stbuf->st_blocks = 0;
+		stbuf->st_size = na->data_size;
+		if (ni->flags & FILE_ATTR_SYSTEM && !stream_name_len) {
 			/* Check whether it's Interix FIFO or socket. */
-			if (!(ni->flags & FILE_ATTR_HIDDEN) &&
-					!stream_name_len) {
+			if (!(ni->flags & FILE_ATTR_HIDDEN)) {
 				/* FIFO. */
 				if (na->data_size == 0)
 					stbuf->st_mode = S_IFIFO;
@@ -435,8 +439,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			 */
 			if (na->data_size <= sizeof(INTX_FILE_TYPES) + sizeof(
 					ntfschar) * MAX_PATH && na->data_size >
-					sizeof(INTX_FILE_TYPES) &&
-					!stream_name_len) {
+					sizeof(INTX_FILE_TYPES)) {
 				INTX_FILE *intx_file;
 
 				intx_file = ntfs_malloc(na->data_size);
@@ -474,16 +477,10 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 					stbuf->st_mode = S_IFLNK;
 				free(intx_file);
 			}
-			ntfs_attr_close(na);
 		}
+		ntfs_attr_close(na);
 		stbuf->st_mode |= (0777 & ~ctx->fmask);
 	}
-	stbuf->st_uid = ctx->uid;
-	stbuf->st_gid = ctx->gid;
-	stbuf->st_ino = ni->mft_no;
-	stbuf->st_atime = ni->last_access_time;
-	stbuf->st_ctime = ni->last_mft_change_time;
-	stbuf->st_mtime = ni->last_data_change_time;
 exit:
 	if (ni)
 		ntfs_inode_close(ni);

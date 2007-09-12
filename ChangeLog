@@ -73,7 +73,8 @@ xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	  everything beyond them. Update libntfs behaviour to be like in
 	  windows.  (Yura)
 	- ntfsmount: Fix free clusters and MFT records calculation.  (Yura)
-	- ntfsmount: Fix st_blocks calculation.  (Yuval, Yura)
+	- ntfsmount: Fix st_blocks calculation for resident files.  (Yuval,
+	  Yura)
 	- ntfsmount: Umount volume in DESTROY. This is guarantees that all
 	  data would be synced before umount return for volumes mounted with
 	  blkdev option.  (Yura)
