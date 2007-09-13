@@ -115,6 +115,7 @@ typedef struct {
 	BOOL no_def_opts;
 	BOOL case_insensitive;
 	BOOL noatime;
+	BOOL relatime;
 	BOOL blkdev;
 } ntfs_fuse_context_t;
 
@@ -148,6 +149,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	NTFS_FUSE_OPT("no_def_opts", no_def_opts),
 	NTFS_FUSE_OPT("case_insensitive", case_insensitive),
 	NTFS_FUSE_OPT("noatime", noatime),
+	NTFS_FUSE_OPT("relatime", relatime),
 	NTFS_FUSE_OPT("fmask=%o", fmask),
 	NTFS_FUSE_OPT("dmask=%o", dmask),
 	NTFS_FUSE_OPT("umask=%o", fmask),
@@ -158,6 +160,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	NTFS_FUSE_OPT_NEG("rw", ro),
 	NTFS_FUSE_OPT_NEG("noblkdev", blkdev),
 	NTFS_FUSE_OPT_NEG("atime", noatime),
+	NTFS_FUSE_OPT_NEG("norelatime", relatime),
 	NTFS_FUSE_OPT_VAL("streams_interface=none", streams,
 			NF_STREAMS_INTERFACE_NONE),
 	NTFS_FUSE_OPT_VAL("streams_interface=windows", streams,
@@ -211,6 +214,10 @@ static __inline__ void ntfs_fuse_update_times(ntfs_inode *ni,
 {
 	if (ctx->noatime)
 		mask &= ~NTFS_UPDATE_ATIME;
+	if (ctx->relatime && mask == NTFS_UPDATE_ATIME &&
+			ni->last_access_time >= ni->last_data_change_time &&
+			ni->last_access_time >= ni->last_mft_change_time)
+		return;
 	ntfs_inode_update_times(ni, mask);
 }
 
