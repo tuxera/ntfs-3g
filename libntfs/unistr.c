@@ -474,16 +474,13 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 	}
 #endif
 	/* Now write the NULL character. */
-	mbs[o] = '\0';
+	mbs[o] = 0;
 	if (*outs != mbs)
 		*outs = mbs;
 	return o;
 err_out:
-	if (mbs != *outs) {
-		int eo = errno;
+	if (mbs != *outs)
 		free(mbs);
-		errno = eo;
-	}
 	return -1;
 }
 
@@ -630,11 +627,8 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 		*outs = ucs;
 	return o;
 err_out:
-	if (ucs != *outs) {
-		int eo = errno;
+	if (ucs != *outs)
 		free(ucs);
-		errno = eo;
-	}
 	return -1;
 }
 
