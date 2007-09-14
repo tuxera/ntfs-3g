@@ -208,10 +208,8 @@ struct _ntfs_volume {
 	s32 attrdef_len;	/* Size of the attribute definition table in
 				   bytes. */
 
-	/* Temp: for directory handling */
-	void *private_data;	/* ntfs_dir for . */
-	void *private_bmp1;	/* ntfs_bmp for $MFT/$BITMAP */
-	void *private_bmp2;	/* ntfs_bmp for $Bitmap */
+	long nr_free_clusters;	/* This two are self explaining. */
+	long nr_free_mft_records;
 };
 
 extern ntfs_volume *ntfs_volume_alloc(void);

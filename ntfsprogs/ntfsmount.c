@@ -97,9 +97,6 @@ typedef struct {
 	char *mnt_point;
 	char *device;
 	char *locale;
-	int state;
-	long free_clusters;
-	long free_mft;
 	unsigned int uid;
 	unsigned int gid;
 	unsigned int fmask;
@@ -118,13 +115,6 @@ typedef struct {
 	BOOL relatime;
 	BOOL blkdev;
 } ntfs_fuse_context_t;
-
-typedef enum {
-	NF_FreeClustersOutdate	= (1 << 0),  /* Information about amount of
-						free clusters is outdated. */
-	NF_FreeMFTOutdate	= (1 << 1),  /* Information about amount of
-						free MFT records is outdated. */
-} ntfs_fuse_state_bits;
 
 #define NTFS_FUSE_OPT(t, p) { t, offsetof(ntfs_fuse_context_t, p), TRUE }
 #define NTFS_FUSE_OPT_NEG(t, p) { t, offsetof(ntfs_fuse_context_t, p), FALSE }
@@ -188,15 +178,6 @@ static char ntfs_fuse_default_options[] =
 static ntfs_fuse_context_t *ctx;
 
 /**
- * ntfs_fuse_mark_free_space_outdated - forces free space recalculation
- */
-static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
-{
-	/* Mark information about free MFT record and clusters outdated. */
-	ctx->state |= (NF_FreeClustersOutdate | NF_FreeMFTOutdate);
-}
-
-/**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
  * @path:	path to check
  *
@@ -221,73 +202,6 @@ static __inline__ void ntfs_fuse_update_times(ntfs_inode *ni,
 	ntfs_inode_update_times(ni, mask);
 }
 
-static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, long nr_free)
-{
-	u8 *buf;
-	s64 br, total = 0;
-
-	if (!(ctx->state & NF_FreeMFTOutdate))
-		return ctx->free_mft;
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->mftbmp_na, total,
-				vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if ((buf[i] >> j) & 1)
-					nr_free--;
-	}
-	free(buf);
-	if (!total || br < 0) {
-		ntfs_log_error("pread: %s\n", strerror(errno));
-		return -errno;
-	}
-	ctx->free_mft = nr_free;
-	ctx->state &= ~(NF_FreeMFTOutdate);
-	return nr_free;
-}
-
-static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
-{
-	u8 *buf;
-	long nr_free = vol->nr_clusters;
-	s64 br, total = 0;
-
-	if (!(ctx->state & NF_FreeClustersOutdate))
-		return ctx->free_clusters;
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->lcnbmp_na, total,
-				vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if ((buf[i] >> j) & 1)
-					nr_free--;
-	}
-	free(buf);
-	if (!total || br < 0) {
-		ntfs_log_error("pread: %s\n", strerror(errno));
-		return -errno;
-	}
-	ctx->free_clusters = nr_free;
-	ctx->state &= ~(NF_FreeClustersOutdate);
-	return nr_free;
-}
-
 /**
  * ntfs_fuse_statfs - return information about mounted NTFS volume
  * @path:	ignored (but fuse requires it)
@@ -308,8 +222,6 @@ static long ntfs_fuse_get_nr_free_clusters(ntfs_volume *vol)
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		struct statvfs *sfs)
 {
-	long size;
-
 	/* Optimal transfer block size. */
 	sfs->f_bsize = ctx->vol->cluster_size;
 	sfs->f_frsize = ctx->vol->cluster_size;
@@ -319,20 +231,16 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	 * the total clusters.
 	 */
 	sfs->f_blocks = ctx->vol->nr_clusters;
-	/* Free data blocks in file system in units of f_bsize. */
-	size = ntfs_fuse_get_nr_free_clusters(ctx->vol);
-	if (size < 0)
-		size = 0;
-	/* Free blocks avail to non-superuser, same as above on NTFS. */
-	sfs->f_bavail = sfs->f_bfree = size;
+	/*
+	 * Free data blocks and free data block available to non-superuser in
+	 * file system in units of f_bsize.
+	 */
+	sfs->f_bavail = sfs->f_bfree = ctx->vol->nr_free_clusters;
 	/* Number of inodes in file system (at this point in time). */
-	size = ctx->vol->mft_na->data_size >> ctx->vol->mft_record_size_bits;
-	sfs->f_files = size; 
+	sfs->f_files = ctx->vol->mft_na->data_size >>
+			ctx->vol->mft_record_size_bits;
 	/* Free inodes in fs (based on current total count). */
-	size = ntfs_fuse_get_nr_free_mft_records(ctx->vol, size);
-	if (size < 0)
-		size = 0;
-	sfs->f_ffree = size;
+	sfs->f_ffree = ctx->vol->nr_free_mft_records;
 	/* Maximum length of filenames. */
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
 	return 0;
@@ -746,7 +654,6 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	res = total;
 exit:
-	ntfs_fuse_mark_free_space_outdated();
 	if (res > 0)
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_MTIME |
 				NTFS_UPDATE_CTIME);
@@ -793,7 +700,6 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 				NTFS_UPDATE_CTIME);
 		res = 0;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
 exit:
 	if (ni && ntfs_inode_close(ni))
@@ -938,7 +844,6 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
-	ntfs_fuse_mark_free_space_outdated();
 exit:
 	free(path);
 	if (stream_name_len)
@@ -950,7 +855,6 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 {
 	if (ntfs_fuse_is_named_data_stream(from))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
@@ -992,7 +896,6 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 			res = -EIO;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	/* Create hard link. */
 	if (ntfs_link(ni, dir_ni, uname, uname_len))
 		res = -errno;
@@ -1101,7 +1004,6 @@ static int ntfs_fuse_unlink(const char *org_path)
 		res = ntfs_fuse_rm(path);
 	else
 		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-	ntfs_fuse_mark_free_space_outdated();
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1153,7 +1055,6 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
 }
 
@@ -1161,7 +1062,6 @@ static int ntfs_fuse_rmdir(const char *path)
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_rm(path);
 }
 
@@ -1389,7 +1289,6 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		res = -EEXIST;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
 			res = -ENODATA;
@@ -1444,7 +1343,6 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -ENODATA;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	if (ntfs_attr_rm(na))
 		res = -errno;
 	na = NULL;
@@ -1543,7 +1441,6 @@ static int ntfs_fuse_init(void)
 		return -1;
 
 	*ctx = (ntfs_fuse_context_t) {
-		.state = NF_FreeClustersOutdate | NF_FreeMFTOutdate,
 		.uid = getuid(),
 		.gid = getgid(),
 		.fmask = 0111,

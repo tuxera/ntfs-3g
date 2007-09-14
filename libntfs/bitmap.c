@@ -58,7 +58,8 @@
 static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 		s64 count, int value)
 {
-	s64 bufsize, br;
+	ntfs_volume *vol = na->ni->vol;
+	s64 bufsize, br, left = count;
 	u8 *buf, *lastbyte_buf;
 	int bit, firstbyte, lastbyte, lastbyte_pos, tmp, err;
 
@@ -95,7 +96,7 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 			return -1;
 		}
 		/* and set or clear the appropriate bits in it. */
-		while ((bit & 7) && count--) {
+		while ((bit & 7) && left--) {
 			if (value)
 				*buf |= 1 << bit++;
 			else
@@ -105,14 +106,14 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 		start_bit = (start_bit + 7) & ~7;
 	}
 
-	/* Loop until @count reaches zero. */
+	/* Loop until @left reaches zero. */
 	lastbyte = 0;
 	lastbyte_buf = NULL;
-	bit = count & 7;
+	bit = left & 7;
 	do {
 		/* If there is a last partial byte... */
-		if (count > 0 && bit) {
-			lastbyte_pos = ((count + 7) >> 3) + firstbyte;
+		if (left > 0 && bit) {
+			lastbyte_pos = ((left + 7) >> 3) + firstbyte;
 			if (!lastbyte_pos) {
 				// FIXME: Eeek! BUG!
 				ntfs_log_trace("lastbyte is zero. Leaving "
@@ -125,7 +126,7 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 				lastbyte_buf = buf + lastbyte_pos - 1;
 
 				/* read the byte in... */
-				br = ntfs_attr_pread(na, (start_bit + count) >>
+				br = ntfs_attr_pread(na, (start_bit + left) >>
 						3, 1, lastbyte_buf);
 				if (br != 1) {
 					// FIXME: Eeek! We need rollback! (AIA)
@@ -137,7 +138,7 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 					goto free_err_out;
 				}
 				/* and set/clear the appropriate bits in it. */
-				while (bit && count--) {
+				while (bit && left--) {
 					if (value)
 						*lastbyte_buf |= 1 << --bit;
 					else
@@ -172,19 +173,33 @@ static int ntfs_bitmap_set_bits_in_run(ntfs_attr *na, s64 start_bit,
 			*buf = value ? 0xff : 0;
 		}
 		start_bit += tmp;
-		count -= tmp;
-		if (bufsize > (tmp = (count + 7) >> 3))
+		left -= tmp;
+		if (bufsize > (tmp = (left + 7) >> 3))
 			bufsize = tmp;
 
-		if (lastbyte && count != 0) {
+		if (lastbyte && left != 0) {
 			// FIXME: Eeek! BUG!
 			ntfs_log_trace("Last buffer but count is not zero (= "
 					"%lli). Leaving inconsistent metadata."
-					"\n", (long long)count);
+					"\n", (long long)left);
 			err = EIO;
 			goto free_err_out;
 		}
-	} while (count > 0);
+	} while (left > 0);
+
+	/* Update free clusters and MFT records. */
+	if (na == vol->mftbmp_na) {
+		if (value)
+			vol->nr_free_mft_records -= count;
+		else
+			vol->nr_free_mft_records += count;
+	}
+	if (na == vol->lcnbmp_na) {
+		if (value)
+			vol->nr_free_clusters -= count;
+		else
+			vol->nr_free_clusters += count;
+	}
 
 	/* Done! */
 	free(buf);

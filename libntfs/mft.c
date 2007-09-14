@@ -609,6 +609,7 @@ static int ntfs_mft_bitmap_extend_allocation(ntfs_volume *vol)
 				errno = EIO;
 			return -1;
 		}
+		vol->nr_free_clusters--;
 		/* Update the mft bitmap runlist. */
 		rl->length++;
 		rl[1].vcn++;
@@ -833,6 +834,7 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 		ntfs_log_debug("Wrote eight initialized bytes to mft bitmap.\n");
 		return 0;
 	}
+	vol->nr_free_mft_records += 64; /* 8 bytes x 8 bits each. */
 	ntfs_log_error("Failed to write to mft bitmap.\n");
 	err = errno;
 	if (ll >= 0)

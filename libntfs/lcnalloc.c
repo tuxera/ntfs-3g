@@ -287,6 +287,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			}
 			/* Allocate the bitmap bit. */
 			*byte |= bit;
+			vol->nr_free_clusters--;
 			/* We need to write this bitmap buffer back to disk! */
 			need_writeback = 1;
 			ntfs_log_trace("*byte = 0x%x, need_writeback is set.\n",

@@ -745,6 +745,88 @@ out:
 }
 
 /**
+ * ntfs_volume_get_nr_free_mft_records - calculate number of free MFT records
+ * vol:		ntfs volume for which perform calculations.
+ *
+ * This function initializes @vol->nr_free_mft_records. @vol->mftbmp_na should
+ * be already opened upon call to this function.
+ *
+ * Return 0 on success. On error return -1 with errno set appropriately and
+ * @vol->nr_free_mft_records is not touched in this case.
+ */
+static int ntfs_volume_get_nr_free_mft_records(ntfs_volume *vol)
+{
+	long nr_free = vol->mft_na->data_size >> vol->mft_record_size_bits;
+	s64 br, total = 0;
+	u8 *buf;
+
+	buf = ntfs_malloc(vol->cluster_size);
+	if (!buf)
+		return -1;
+	while (1) {
+		int i, j;
+
+		br = ntfs_attr_pread(vol->mftbmp_na, total,
+				vol->cluster_size, buf);
+		if (br <= 0)
+			break;
+		total += br;
+		for (i = 0; i < br; i++)
+			for (j = 0; j < 8; j++)
+				if ((buf[i] >> j) & 1)
+					nr_free--;
+	}
+	free(buf);
+	if (!total || br < 0) {
+		ntfs_log_error("pread: %s\n", strerror(errno));
+		return -1;
+	}
+	vol->nr_free_mft_records = nr_free;
+	return 0;
+}
+
+/**
+ * ntfs_volume_get_nr_free_clusters - calculate number of free clusters
+ * vol:		ntfs volume for which perform calculations.
+ *
+ * This function initializes @vol->nr_free_clusters. @vol->lcnbmp_na should be
+ * already opened upon call to this function.
+ *
+ * Return 0 on success. On error return -1 with errno set appropriately and
+ * @vol->nr_free_clusters is not touched in this case.
+ */
+static long ntfs_volume_get_nr_free_clusters(ntfs_volume *vol)
+{
+	long nr_free = vol->nr_clusters;
+	s64 br, total = 0;
+	u8 *buf;
+
+	buf = ntfs_malloc(vol->cluster_size);
+	if (!buf)
+		return -1;
+	while (1) {
+		int i, j;
+
+		br = ntfs_attr_pread(vol->lcnbmp_na, total,
+				vol->cluster_size, buf);
+		if (br <= 0)
+			break;
+		total += br;
+		for (i = 0; i < br; i++)
+			for (j = 0; j < 8; j++)
+				if ((buf[i] >> j) & 1)
+					nr_free--;
+	}
+	free(buf);
+	if (!total || br < 0) {
+		ntfs_log_error("pread: %s\n", strerror(errno));
+		return -1;
+	}
+	vol->nr_free_clusters = nr_free;
+	return 0;
+}
+
+/**
  * ntfs_device_mount - open ntfs volume
  * @dev:	device to open
  * @flags:	optional mount flags
@@ -1127,6 +1209,15 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni))
 		ntfs_log_perror("Failed to close inode, leaking memory");
+	/* Initialize number of free clusters and MFT records. */
+	if (ntfs_volume_get_nr_free_mft_records(vol)) {
+		ntfs_log_perror("Failed to calculate number of free MFTs");
+		goto error_exit;
+	}
+	if (ntfs_volume_get_nr_free_clusters(vol)) {
+		ntfs_log_perror("Failed to calculate number of free clusters");
+		goto error_exit;
+	}
 	/*
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
