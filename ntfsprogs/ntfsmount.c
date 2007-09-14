@@ -1091,6 +1091,49 @@ static int ntfs_fuse_utimens(const char *path, const struct timespec ts[2])
 	return 0;
 }
 
+static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	LCN lcn;
+	int ret = 0, cl_per_bl = ctx->vol->cluster_size / blocksize;
+
+	if (blocksize > ctx->vol->cluster_size ||
+			ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL;
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		ret = -errno;
+		goto close_inode;
+	}
+
+	if (NAttrCompressed(na) || NAttrEncrypted(na) ||
+			!NAttrNonResident(na)) {
+		ret = -EINVAL;
+		goto close_attr;
+	}
+
+	lcn = ntfs_attr_vcn_to_lcn(na, *idx / cl_per_bl);
+	if (lcn < 0) {
+		if (lcn == LCN_HOLE)
+			ret = -EINVAL;
+		else
+			ret = -EIO;
+		goto close_attr;
+	}
+	*idx = lcn * cl_per_bl + *idx % cl_per_bl;
+close_attr:
+	ntfs_attr_close(na);
+close_inode:
+	if (ntfs_inode_close(ni))
+		ntfs_log_perror("bmap: failed to close inode");
+	return ret;
+}
+
 #ifdef HAVE_SETXATTR
 
 static const char nf_ns_xattr_preffix[] = "user.";
@@ -1390,6 +1433,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
 	.utimens	= ntfs_fuse_utimens,
+	.bmap		= ntfs_fuse_bmap,
 	.destroy	= ntfs_fuse_destroy,
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
@@ -1562,35 +1606,16 @@ static int parse_options(struct fuse_args *args)
 	if (ntfs_fuse_is_block_dev())
 		return -1;
 
-	/*
-	 * Now we will submit extra options to fuse. Allocate long enough
-	 * buffer for all dynamically generated options.
-	 */
 	buffer = ntfs_malloc(strlen(ctx->device) + 128);
 	if (!buffer)
 		return -1;
-	/* fsname */
 	sprintf(buffer, "-ofsname=%s", ctx->device);
 	if (fuse_opt_add_arg(args, buffer) == -1) {
 		free(buffer);
 		return -1;
 	}
-	/* blkdev, user */
-	if (ctx->blkdev) {
-		struct passwd *pw;
-
-		pw = getpwuid(ctx->uid);
-		if (!pw || !pw->pw_name) {
-			free(buffer);
-			return -1;
-		}
-		sprintf(buffer, "-oblkdev,user=%s", pw->pw_name);
-		if (fuse_opt_add_arg(args, buffer) == -1) {
-			free(buffer);
-			return -1;
-		}
-	}
 	free(buffer);
+
 	if (!ctx->no_def_opts) {
 		if (fuse_opt_add_arg(args, "-o") == -1)
 			return -1;
@@ -1601,6 +1626,28 @@ static int parse_options(struct fuse_args *args)
 		if (fuse_opt_add_arg(args, "-odebug") == -1)
 			return -1;
 	}
+	return 0;
+}
+
+static int ntfs_fuse_set_blkdev_options(struct fuse_args *args)
+{
+	int pagesize, blksize = ctx->vol->cluster_size;
+	struct passwd *pw;
+	char buffer[128];
+
+	pagesize = sysconf(_SC_PAGESIZE);
+	if (pagesize < 1)
+		pagesize = 4096;
+	if (blksize > pagesize)
+		blksize = pagesize;
+	pw = getpwuid(ctx->uid);
+	if (!pw || !pw->pw_name) {
+		ntfs_log_perror("getpwuid(%d) failed", ctx->uid);
+		return -1;
+	}
+	sprintf(buffer, "-oblkdev,blksize=%d,user=%s", blksize, pw->pw_name);
+	if (fuse_opt_add_arg(args, buffer) == -1)
+		return -1;
 	return 0;
 }
 
@@ -1643,6 +1690,12 @@ int main(int argc, char *argv[])
 		/* Gain root privileges for blkdev mount. */
 		if (setuid(0)) {
 			ntfs_log_perror("setuid(0) failed");
+			fuse_opt_free_args(&args);
+			ntfs_fuse_destroy(NULL);
+			return 1;
+		}
+		/* Set blkdev, blksize and user options. */
+		if (ntfs_fuse_set_blkdev_options(&args)) {
 			fuse_opt_free_args(&args);
 			ntfs_fuse_destroy(NULL);
 			return 1;
