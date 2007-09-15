@@ -60,6 +60,7 @@ typedef enum {
 	NTFS_MNT_FORENSIC	= 2,
 	NTFS_MNT_CASE_SENSITIVE	= 4,
 	NTFS_MNT_NOT_EXCLUSIVE	= 8,
+	NTFS_MNT_FORCE		= 16,
 } ntfs_mount_flags;
 
 /**

@@ -410,7 +410,8 @@ int main(int argc, char *argv[])
 
 	utils_set_locale();
 
-	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY, opts.force);
+	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
+			(opts.force ? NTFS_MNT_FORCE : 0));
 	if (!vol) {
 		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;

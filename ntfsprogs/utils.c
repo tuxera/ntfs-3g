@@ -206,8 +206,7 @@ int utils_valid_device(const char *name, int force)
 /**
  * utils_mount_volume - Mount an NTFS volume
  */
-ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
-		BOOL force)
+ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
 {
 	ntfs_volume *vol;
 
@@ -216,7 +215,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
 		return NULL;
 	}
 
-	if (!utils_valid_device(device, force))
+	if (!utils_valid_device(device, flags & NTFS_MNT_FORCE))
 		return NULL;
 
 	vol = ntfs_mount(device, flags);
@@ -238,7 +237,7 @@ ntfs_volume * utils_mount_volume(const char *device, unsigned long flags,
 	}
 
 	if (NVolWasDirty(vol)) {
-		if (!force) {
+		if (!(flags & NTFS_MNT_FORCE)) {
 			ntfs_log_error("%s", dirty_volume_msg);
 			ntfs_umount(vol, FALSE);
 			return NULL;

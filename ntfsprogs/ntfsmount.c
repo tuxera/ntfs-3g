@@ -1662,8 +1662,8 @@ static int ntfs_fuse_mount(void)
 	vol = utils_mount_volume(ctx->device,
 			(ctx->case_insensitive ? 0 : NTFS_MNT_CASE_SENSITIVE) |
 			(ctx->blkdev ? NTFS_MNT_NOT_EXCLUSIVE : 0) |
-			(ctx->ro ? NTFS_MNT_RDONLY : 0),
-			ctx->force);
+			(ctx->force ? NTFS_MNT_FORCE : 0) |
+			(ctx->ro ? NTFS_MNT_RDONLY : 0));
 	if (!vol) {
 		ntfs_log_error("Mount failed.\n");
 		return -1;

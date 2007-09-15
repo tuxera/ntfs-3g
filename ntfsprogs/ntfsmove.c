@@ -876,8 +876,10 @@ int main(int argc, char *argv[])
 
 	if (opts.noaction)
 		flags |= NTFS_MNT_RDONLY;
+	if (opts.force)
+		flags |= NTFS_MNT_FORCE;
 
-	vol = utils_mount_volume(opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags);
 	if (!vol) {
 		ntfs_log_info("!vol\n");
 		return 1;
