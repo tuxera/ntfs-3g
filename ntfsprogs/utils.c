@@ -104,8 +104,7 @@ static const char *unclean_journal_msg =
 " C) Use 'Eject' from Windows Explorer to safely remove the device.\n"
 " D) If you ran chkdsk previously then boot Windows again which will\n"
 "    automatically initialize the journal.\n"
-" E) Run 'ntfsfix' on Linux which will reset the NTFS journal.\n"
-"    Then submit force option (WARNING: This solution it not recommended).\n"
+" E) Submit 'force' option (WARNING: This solution it not recommended).\n"
 " F) ntfsmount: Mount the volume read-only by using the 'ro' mount option.\n";
 
 static const char *opened_volume_msg =

@@ -1219,14 +1219,20 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 	 * But do not do that if this is a FORENSIC mount.
 	 */
 	if (!(flags & NTFS_MNT_RDONLY)) {
-		if (ntfs_volume_check_logfile(vol) < 0)
-			goto error_exit;
 		if (ntfs_volume_check_hiberfile(vol) < 0)
 			goto error_exit;
+		if (ntfs_volume_check_logfile(vol) < 0) {
+			if (errno != EOPNOTSUPP || !(flags & NTFS_MNT_FORCE))
+				goto error_exit;
+			ntfs_log_warning("WARNING: $LogFile is not clean, "
+					"forced to continue.\n");
+			NVolSetWasDirty(vol); /* Leave volume dirty since we
+						 empted logfile. */
+		}
 		if (!NVolForensicMount(vol)) {
 			if (ntfs_logfile_reset(vol) < 0)
 				goto error_exit;
-			if (!NVolWasDirty(vol)) {
+			if (!(vol->flags & VOLUME_IS_DIRTY)) {
 				vol->flags |= VOLUME_IS_DIRTY;
 				if (ntfs_volume_write_flags(vol, vol->flags) <
 						0)
@@ -1234,7 +1240,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
 			}
 		}
 	}
-
 	return vol;
 io_error_exit:
 	errno = EIO;
