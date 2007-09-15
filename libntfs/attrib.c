@@ -1323,11 +1323,37 @@ retry:
 		ntfs_log_trace("Writing 0x%llx bytes to vcn 0x%llx, lcn 0x%llx,"
 				" ofs 0x%llx.\n", to_write, rl->vcn, rl->lcn,
 				ofs);
-		if (!NVolReadOnly(vol))
-			written = ntfs_pwrite(vol->dev, (rl->lcn <<
-					vol->cluster_size_bits) + ofs,
-					to_write, b);
-		else
+		if (!NVolReadOnly(vol)) {
+			s64 pos = (rl->lcn << vol->cluster_size_bits) + ofs;
+			int bsize = 4096; /* FIXME: Test whether we need
+					     PAGE_SIZE here. Eg., on IA64. */
+			/*
+			 * Write 4096 size blocks if it's possible. This will
+			 * cause the kernel not to seek and read disk blocks for
+			 * filling the end of the buffer which increases write
+			 * speed.
+			 */
+			if (vol->cluster_size >= bsize && !(ofs % bsize) &&
+					(to_write % bsize) && ofs + to_write ==
+					na->initialized_size) {
+				char *cb;
+				s64 rounded = (to_write + bsize - 1) &
+					~(bsize - 1);
+
+				cb = ntfs_malloc(rounded);
+				if (!cb)
+					goto err_out;
+				memcpy(cb, b, to_write);
+				memset(cb + to_write, 0, rounded - to_write);
+				written = ntfs_pwrite(vol->dev, pos, rounded,
+						cb);
+				if (written > to_write)
+					written = to_write;
+				free(cb);
+			} else
+				written = ntfs_pwrite(vol->dev, pos, to_write,
+						b);
+		} else
 			written = to_write;
 		/* If everything ok, update progress counters and continue. */
 		if (written > 0) {
