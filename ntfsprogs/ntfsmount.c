@@ -594,8 +594,10 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
 		if (res < (s64)size)
-			ntfs_log_error("ntfs_attr_pread returned less bytes "
-					"than requested.\n");
+			ntfs_log_error("ntfs_attr_pread returned %d bytes "
+					"instead of requested %lld bytes "
+					"(offset %lld).\n", res,
+					(long long)size, (long long)offset);
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
@@ -642,8 +644,10 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
 		if (res < (s64)size && errno != ENOSPC)
-			ntfs_log_error("ntfs_attr_pwrite returned less bytes "
-					"than requested.\n");
+			ntfs_log_error("ntfs_attr_pwrite returned %d bytes "
+					"instead of requested %lld bytes "
+					"(offset %lld).\n", res,
+					(long long)size, (long long)offset);
 		if (res <= 0) {
 			res = -errno;
 			goto exit;

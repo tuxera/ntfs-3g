@@ -1490,7 +1490,7 @@ int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
 {
 	INDEX_ENTRY *ie;
 	ntfs_index_context *icx;
-	int fn_size, ie_size, ret = -1;
+	int fn_size, ie_size, ret = -1, err;
 
 	ntfs_log_trace("Entering.\n");
 
@@ -1517,7 +1517,9 @@ int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn, MFT_REF mref)
 	if (!icx)
 		goto out;
 
+	err = errno;
 	ret = ntfs_ie_add(icx, ie);
+	errno = err;
 
 	ntfs_index_ctx_put(icx);
 out:
