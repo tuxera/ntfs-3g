@@ -910,6 +910,29 @@ static int ntfs_fuse_create_stream(const char *path,
 	return res;
 }
 
+static int ntfs_fuse_create_file(const char *org_path, mode_t mode, 
+			struct fuse_file_info *fi __attribute__((unused)))
+{
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+	int res;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	if (!stream_name_len)
+		res = ntfs_fuse_create(path, mode & S_IFMT, 0, NULL);
+	else
+		res = ntfs_fuse_create_stream(path, stream_name,
+				stream_name_len);
+	ntfs_fuse_mark_free_space_outdated();
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
+}
+
 static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 {
 	char *path = NULL;
@@ -1623,6 +1646,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
+	.create		= ntfs_fuse_create_file,
 	.mknod		= ntfs_fuse_mknod,
 	.symlink	= ntfs_fuse_symlink,
 	.link		= ntfs_fuse_link,
