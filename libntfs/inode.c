@@ -500,7 +500,6 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	std_info->last_access_time = utc2ntfs(ni->last_access_time);
-	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;
 }
@@ -636,17 +635,6 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
-	/* Update STANDARD_INFORMATION. */
-	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
-			ntfs_inode_sync_standard_information(ni)) {
-		if (!err || errno == EIO) {
-			err = errno;
-			if (err != EIO)
-				err = EBUSY;
-		}
-		ntfs_log_trace("Failed to sync standard information.\n");
-	}
-
 	/* Update FILE_NAME's in the index. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			NInoFileNameTestAndClearDirty(ni) &&
@@ -702,6 +690,19 @@ int ntfs_inode_sync(ntfs_inode *ni)
 
 	/* Write this inode out to the $MFT (and $MFTMirr if applicable). */
 	if (NInoTestAndClearDirty(ni)) {
+		/* Update STANDARD_INFORMATION. */
+		if ((ni->mrec->flags & MFT_RECORD_IN_USE) &&
+				ni->nr_extents != -1 &&
+				ntfs_inode_sync_standard_information(ni)) {
+			if (!err || errno == EIO) {
+				err = errno;
+				if (err != EIO)
+					err = EBUSY;
+			}
+			ntfs_log_trace("Failed to sync standard "
+					"information.\n");
+		}
+		/* Write MFT record. */
 		if (ntfs_mft_record_write(ni->vol, ni->mft_no, ni->mrec)) {
 			if (!err || errno == EIO) {
 				err = errno;
