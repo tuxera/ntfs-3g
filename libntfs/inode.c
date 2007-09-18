@@ -671,8 +671,8 @@ int ntfs_inode_sync(ntfs_inode *ni)
 				err = errno;
 				if (err != EIO)
 					err = EBUSY;
-				ntfs_log_trace("Attribute list sync failed (open "
-						"failed).\n");
+				ntfs_log_trace("Attribute list sync failed "
+						"(open failed).\n");
 			}
 			NInoAttrListSetDirty(ni);
 		} else {
@@ -684,14 +684,16 @@ int ntfs_inode_sync(ntfs_inode *ni)
 						err = errno;
 						if (err != EIO)
 							err = EBUSY;
-						ntfs_log_trace("Attribute list sync "
-							"failed (write failed).\n");
+						ntfs_log_trace("Attribute list "
+								"sync failed "
+								"(write).\n");
 					}
 					NInoAttrListSetDirty(ni);
 				}
 			} else {
 				err = EIO;
-				ntfs_log_trace("Attribute list sync failed (invalid size).\n");
+				ntfs_log_trace("Attribute list sync failed "
+						"(invalid size).\n");
 				NInoAttrListSetDirty(ni);
 			}
 			ntfs_attr_close(na);
