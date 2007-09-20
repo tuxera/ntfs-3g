@@ -1349,11 +1349,11 @@ int ntfs_crypto_attr_open(ntfs_attr *na)
 	ntfs_fek *fek;
 	int i;
 
+	na->crypto = NULL;
 	if (!na || !NAttrEncrypted(na)) {
 		errno = EINVAL;
 		return -1;
 	}
-
 	if (ntfs_crypto_init()) {
 		errno = EACCES;
 		return -1;
@@ -1370,7 +1370,6 @@ int ntfs_crypto_attr_open(ntfs_attr *na)
 		}
 	}
 
-	na->crypto = NULL;
 	errno = EACCES;
 	return -1;
 }
