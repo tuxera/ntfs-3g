@@ -44,6 +44,7 @@
 /* Forward declaration */
 typedef struct _ntfs_volume ntfs_volume;
 
+#include "list.h"
 #include "types.h"
 #include "support.h"
 #include "device.h"
@@ -131,6 +132,9 @@ typedef enum {
 
 #define NTFS_BUF_SIZE 8192
 
+#define NTFS_INODE_CACHE_SIZE 512 /* WARNING: This should be power of 2. */
+#define NTFS_INODE_CACHE_SIZE_BITS (NTFS_INODE_CACHE_SIZE - 1)
+
 /**
  * struct _ntfs_volume - structure describing an open volume in memory.
  */
@@ -211,6 +215,9 @@ struct _ntfs_volume {
 
 	long nr_free_clusters;	/* This two are self explaining. */
 	long nr_free_mft_records;
+
+	struct list_head inode_cache[NTFS_INODE_CACHE_SIZE]; /* List of opened
+								inodes. */
 };
 
 extern ntfs_volume *ntfs_volume_alloc(void);

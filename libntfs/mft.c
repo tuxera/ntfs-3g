@@ -1460,9 +1460,12 @@ mft_rec_already_initialized:
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
 			ni->last_access_time = time(NULL);
-	/* Update the default mft allocation position if it was used. */
-	if (!base_ni)
+	if (!base_ni) {
+		/* Update the default mft allocation position if it was used. */
 		vol->mft_data_pos = bit + 1;
+		/* Add inode to cache. */
+		__ntfs_inode_add_to_cache(ni);
+	}
 	/* Return the opened, allocated inode of the allocated mft record. */
 	ntfs_log_debug("Returning opened, allocated %sinode 0x%llx.\n",
 			base_ni ? "extent " : "", (long long)bit);

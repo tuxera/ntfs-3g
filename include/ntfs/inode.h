@@ -27,6 +27,7 @@
 /* Forward declaration */
 typedef struct _ntfs_inode ntfs_inode;
 
+#include "list.h"
 #include "types.h"
 #include "layout.h"
 #include "support.h"
@@ -132,7 +133,7 @@ struct _ntfs_inode {
 	/* Below fields are valid only for base inode. */
 
 	/*
-	 * This two fields are used to sync filename index and guaranteed to be
+	 * These two fields are used to sync filename index and guaranteed to be
 	 * correct, however value in index itself maybe wrong (windows itself
 	 * do not update them properly).
 	 */
@@ -144,11 +145,25 @@ struct _ntfs_inode {
 				   of the unnamed data attribute for sparse or
 				   compressed files.) */
 
+	/*
+	 * These four fields are copy of relevant fields from
+	 * STANDARD_INFORMATION attribute and used to sync it and FILE_NAME
+	 * attribute in the index.
+	 */
 	time_t creation_time;
 	time_t last_data_change_time;
 	time_t last_mft_change_time;
 	time_t last_access_time;
+
+	/* These 2 fields are used to keep track of opened inodes. */
+	struct list_head list_entry;	/* Keep pointers to the next/prev list
+					   entry. */
+	int nr_references;		/* How many times this inode was
+					   opened.  We really close inode only
+					   when this reaches zero. */
 };
+
+extern void __ntfs_inode_add_to_cache(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
 

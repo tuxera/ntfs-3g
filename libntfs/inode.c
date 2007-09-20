@@ -100,6 +100,16 @@ static int __ntfs_inode_release(ntfs_inode *ni)
 }
 
 /**
+ * __ntfs_inode_add_to_cache - do not use me! Only for internal library use.
+ */
+void __ntfs_inode_add_to_cache(ntfs_inode *ni)
+{
+	list_add_tail(&ni->list_entry, &ni->vol->inode_cache[
+			ni->mft_no & NTFS_INODE_CACHE_SIZE_BITS]);
+	ni->nr_references = 1;
+}
+
+/**
  * ntfs_inode_open - open an inode ready for access
  * @vol:	volume to get the inode from
  * @mref:	inode number / mft record number to open
@@ -129,12 +139,27 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_attr_search_ctx *ctx;
 	int err = 0;
 	STANDARD_INFORMATION *std_info;
+	struct list_head *pos;
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
 	if (!vol) {
 		errno = EINVAL;
 		return NULL;
 	}
+	/* Check cache, maybe this inode already opened? */
+	list_for_each(pos, &vol->inode_cache[MREF(mref) &
+			NTFS_INODE_CACHE_SIZE_BITS]) {
+		ntfs_inode *tmp_ni;
+
+		tmp_ni = list_entry(pos, ntfs_inode, list_entry);
+		if (tmp_ni->mft_no == MREF(mref)) {
+			ntfs_log_trace("Found this inode in cache, increment "
+					"reference count and return it.\n");
+			tmp_ni->nr_references++;
+			return tmp_ni;
+		}
+	}
+	/* Search failed. Properly open inode. */
 	ni = __ntfs_inode_allocate(vol);
 	if (!ni)
 		return NULL;
@@ -212,6 +237,7 @@ get_size:
 		}
 	}
 	ntfs_attr_put_search_ctx(ctx);
+	__ntfs_inode_add_to_cache(ni);
 	return ni;
 put_err_out:
 	if (!err)
@@ -254,6 +280,18 @@ int ntfs_inode_close(ntfs_inode *ni)
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
+	/* Decrement number of users. If there are left then just return. */
+	if (ni->nr_extents != -1) {
+		ni->nr_references--;
+		if (ni->nr_references) {
+			ntfs_log_trace("There are %d more references left to "
+					"this inode.\n",
+					ni->nr_references);
+			return 0;
+		} else
+			ntfs_log_trace("There are no more references left to "
+					"this inode.\n");
+	}
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
@@ -312,9 +350,12 @@ int ntfs_inode_close(ntfs_inode *ni)
 			break;
 		}
 		if (i != -1)
-			ntfs_log_debug("Extent inode was not attached to base inode! "
-					"Weird! Continuing regardless.\n");
+			ntfs_log_debug("Extent inode was not attached to base "
+					"inode! Continuing regardless.\n");
 	}
+	/* Remove inode from the list of opened inodes. */
+	if (ni->nr_extents != -1)
+		list_del(&ni->list_entry);
 	return __ntfs_inode_release(ni);
 }
 

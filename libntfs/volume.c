@@ -76,7 +76,15 @@
  */
 ntfs_volume *ntfs_volume_alloc(void)
 {
-	return calloc(1, sizeof(ntfs_volume));
+	ntfs_volume *vol;
+	int i;
+
+	vol = calloc(1, sizeof(ntfs_volume));
+	if (vol) {
+		for (i = 0; i < NTFS_INODE_CACHE_SIZE; i++)
+			INIT_LIST_HEAD(&vol->inode_cache[i]);
+	}
+	return vol;
 }
 
 /**
@@ -162,6 +170,7 @@ static int ntfs_mft_load(ntfs_volume *vol)
 	}
 	vol->mft_ni->mft_no = 0;
 	vol->mft_ni->mrec = mb;
+	__ntfs_inode_add_to_cache(vol->mft_ni);
 	/* Can't use any of the higher level functions yet! */
 	l = ntfs_mst_pread(vol->dev, vol->mft_lcn << vol->cluster_size_bits, 1,
 			vol->mft_record_size, mb);
