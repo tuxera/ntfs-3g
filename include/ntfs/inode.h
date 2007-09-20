@@ -161,6 +161,8 @@ struct _ntfs_inode {
 	int nr_references;		/* How many times this inode was
 					   opened.  We really close inode only
 					   when this reaches zero. */
+
+	struct list_head attr_cache;	/* List of opened attributes. */
 };
 
 extern void __ntfs_inode_add_to_cache(ntfs_inode *ni);

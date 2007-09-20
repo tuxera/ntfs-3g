@@ -62,8 +62,10 @@ static ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 	ntfs_inode *ni;
 
 	ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
-	if (ni)
+	if (ni) {
 		ni->vol = vol;
+		INIT_LIST_HEAD(&ni->attr_cache);
+	}
 	return ni;
 }
 
@@ -292,6 +294,11 @@ int ntfs_inode_close(ntfs_inode *ni)
 			ntfs_log_trace("There are no more references left to "
 					"this inode.\n");
 	}
+	/* Check whether all attributes of this inode are closed. */
+	if (!list_empty(&ni->attr_cache))
+		ntfs_log_error("%s(): Not all attributes are closed. "
+				"We definitely have memory leak. "
+				"Continue anyway.\n", __FUNCTION__);
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {

@@ -27,6 +27,7 @@
 typedef struct _ntfs_attr ntfs_attr;
 typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 
+#include "list.h"
 #include "types.h"
 #include "inode.h"
 #include "unistr.h"
@@ -195,6 +196,8 @@ struct _ntfs_attr {
 	u8 compression_block_size_bits;
 	u8 compression_block_clusters;
 	ntfs_crypto_attr *crypto;
+	struct list_head list_entry;
+	int nr_references;
 };
 
 /**

@@ -354,6 +354,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na;
 	ATTR_RECORD *a;
+	struct list_head *pos;
 	int err;
 	BOOL cs;
 
@@ -363,6 +364,21 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		errno = EINVAL;
 		return NULL;
 	}
+	/* Check cache, maybe this attribute already opened? */
+	list_for_each(pos, &ni->attr_cache) {
+		ntfs_attr *tmp_na;
+
+		tmp_na = list_entry(pos, ntfs_attr, list_entry);
+		if (tmp_na->type == type && tmp_na->name_len == name_len &&
+				!ntfs_ucsncmp(tmp_na->name, name, name_len)) {
+			ntfs_log_trace("Found this attribute in cache, "
+					"increment reference count and "
+					"return it.\n");
+			tmp_na->nr_references++;
+			return tmp_na;
+		}
+	}
+	/* Search failed. Properly open attrbute. */
 	na = calloc(sizeof(ntfs_attr), 1);
 	if (!na)
 		return NULL;
@@ -429,6 +445,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ntfs_attr_put_search_ctx(ctx);
 	if (NAttrEncrypted(na))
 		ntfs_crypto_attr_open(na);
+	list_add_tail(&na->list_entry, &ni->attr_cache);
+	na->nr_references = 1;
 	return na;
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
@@ -449,6 +467,14 @@ void ntfs_attr_close(ntfs_attr *na)
 {
 	if (!na)
 		return;
+	na->nr_references--;
+	if (na->nr_references) {
+		ntfs_log_trace("There are %d more references left to "
+				"this attribute.\n", na->nr_references);
+		return;
+	}
+	ntfs_log_trace("There are no more references left to this attribute\n");
+	list_del(&na->list_entry);
 	if (NAttrEncrypted(na))
 		ntfs_crypto_attr_close(na);
 	if (NAttrNonResident(na) && na->rl)
