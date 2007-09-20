@@ -534,11 +534,10 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	return err;
 }
 
-static int ntfs_fuse_open(const char *org_path,
-		struct fuse_file_info *fi __attribute__((unused)))
+static int ntfs_fuse_open(const char *org_path, struct fuse_file_info *fi)
 {
-	ntfs_inode *ni;
-	ntfs_attr *na;
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na = NULL;
 	int res = 0;
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -553,42 +552,53 @@ static int ntfs_fuse_open(const char *org_path,
 		if (na) {
 			if (NAttrEncrypted(na) && !na->crypto)
 				res = -EACCES;
-			ntfs_attr_close(na);
 		} else
 			res = -errno;
-		ntfs_inode_close(ni);
 	} else
 		res = -errno;
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
+	if (res) {
+		if (ni)
+			ntfs_inode_close(ni);
+		if (na)
+			ntfs_attr_close(na);
+	} else
+		fi->fh = (unsigned long)na;
 	return res;
 }
 
-static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
-		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
+static int ntfs_fuse_flush(const char *path __attribute__((unused)),
+		struct fuse_file_info *fi)
 {
-	ntfs_inode *ni = NULL;
-	ntfs_attr *na = NULL;
-	char *path = NULL;
-	ntfschar *stream_name;
-	int stream_name_len, res, total = 0;
+	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	ntfs_inode *ni = na->ni;
+
+	if (ntfs_inode_sync(ni))
+		return -errno;
+	return 0;
+}
+
+static int ntfs_fuse_release(const char *path __attribute__((unused)),
+		struct fuse_file_info *fi)
+{
+	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	ntfs_inode *ni = na->ni;
+
+	ntfs_attr_close(na);
+	ntfs_inode_close(ni);
+	return 0;
+}
+
+static int ntfs_fuse_read(const char *path, char *buf, size_t size,
+		off_t offset, struct fuse_file_info *fi)
+{
+	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	int res, total = 0;
 
 	if (!size)
 		return 0;
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!ni) {
-		res = -errno;
-		goto exit;
-	}
-	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
-		goto exit;
-	}
 	if (offset + size > na->data_size)
 		size = na->data_size - offset;
 	while (size) {
@@ -607,40 +617,17 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		total += res;
 	}
 	res = total;
-	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
+	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_ATIME);
 exit:
-	if (na)
-		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
-	free(path);
-	if (stream_name_len)
-		free(stream_name);
 	return res;
 }
 
-static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
-		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
+static int ntfs_fuse_write(const char *path, const char *buf, size_t size,
+		off_t offset, struct fuse_file_info *fi)
 {
-	ntfs_inode *ni = NULL;
-	ntfs_attr *na = NULL;
-	char *path = NULL;
-	ntfschar *stream_name;
-	int stream_name_len, res, total = 0;
+	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	int res, total = 0;
 
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-	if (!ni) {
-		res = -errno;
-		goto exit;
-	}
-	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
-		goto exit;
-	}
 	while (size) {
 		res = ntfs_attr_pwrite(na, offset, size, buf);
 		if (res < (s64)size && errno != ENOSPC)
@@ -659,15 +646,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	res = total;
 exit:
 	if (res > 0)
-		ntfs_fuse_update_times(ni, NTFS_UPDATE_MTIME |
+		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MTIME |
 				NTFS_UPDATE_CTIME);
-	if (na)
-		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
-	free(path);
-	if (stream_name_len)
-		free(stream_name);
 	return res;
 }
 
@@ -1423,6 +1403,8 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
 	.open		= ntfs_fuse_open,
+	.flush		= ntfs_fuse_flush,
+	.release	= ntfs_fuse_release,
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,
