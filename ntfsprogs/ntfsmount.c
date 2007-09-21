@@ -716,8 +716,8 @@ static int ntfs_fuse_chown(const char *path, uid_t uid __attribute__((unused)),
 	return -EOPNOTSUPP;
 }
 
-static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
-		const char *target)
+static int __ntfs_fuse_mknod(const char *org_path, dev_t type, dev_t dev,
+		const char *target, ntfs_inode **_ni)
 {
 	char *name;
 	ntfschar *uname = NULL, *utarget = NULL;
@@ -725,6 +725,8 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 	char *path;
 	int res = 0, uname_len, utarget_len;
 
+	if (_ni)
+		*_ni = NULL;
 	path = strdup(org_path);
 	if (!path)
 		return -errno;
@@ -766,7 +768,10 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 			break;
 	}
 	if (ni) {
-		ntfs_inode_close(ni);
+		if (_ni)
+			*_ni = ni;
+		else
+			ntfs_inode_close(ni);
 		ntfs_fuse_update_times(dir_ni,
 				NTFS_UPDATE_CTIME | NTFS_UPDATE_MTIME);
 	} else
@@ -781,43 +786,46 @@ exit:
 	return res;
 }
 
-static int ntfs_fuse_create_stream(const char *path,
-		ntfschar *stream_name, const int stream_name_len)
+static int ntfs_fuse_create_stream(const char *path, ntfschar *stream_name,
+		const int stream_name_len, ntfs_inode **_ni)
 {
 	ntfs_inode *ni;
 	int res = 0;
 
+	if (_ni)
+		*_ni = NULL;
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
-		if (res == -ENOENT) {
-			/*
-			 * If such file does not exist, create it and try once
-			 * again to add stream to it.
-			 */
-			res = ntfs_fuse_create(path, S_IFREG, 0, NULL);
-			if (!res)
-				return ntfs_fuse_create_stream(path,
-						stream_name, stream_name_len);
-			else
-				res = -errno;
-		}
-		return res;
+		if (res == -ENOENT)
+			res = __ntfs_fuse_mknod(path, S_IFREG, 0, NULL, &ni);
+		if (!res && !ni)
+			res = -EIO;
+		if (res)
+			return res;
 	}
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
-	if (ntfs_inode_close(ni))
-		ntfs_log_perror("Failed to close inode");
+	if (_ni)
+		*_ni = ni;
+	else {
+		if (ntfs_inode_close(ni))
+			ntfs_log_perror("Failed to close inode");
+	}
 	return res;
 }
 
-static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
+static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev,
+		ntfs_attr **na)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
 	int res = 0;
+	ntfs_inode *ni;
 
+	if (na)
+		*na = NULL;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -826,10 +834,22 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT, dev, NULL);
+		res = __ntfs_fuse_mknod(path, mode & S_IFMT, dev, NULL,
+				na ? &ni : NULL);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
-				stream_name_len);
+				stream_name_len, na ? &ni : NULL);
+	if (na && !res) {
+		if (ni) {
+			*na = ntfs_attr_open(ni, AT_DATA, stream_name,
+					stream_name_len);
+			if (!*na) {
+				ntfs_inode_close(ni);
+				res = -EIO;
+			}
+		} else
+			res = -EIO;
+	}
 exit:
 	free(path);
 	if (stream_name_len)
@@ -837,11 +857,27 @@ exit:
 	return res;
 }
 
+static int ntfs_fuse_mknod(const char *path, mode_t mode, dev_t dev)
+{
+	return ntfs_fuse_mknod_common(path, mode, dev, NULL);
+}
+
+static int ntfs_fuse_create(const char *path, mode_t mode,
+		struct fuse_file_info *fi)
+{
+	ntfs_attr *na;
+	int res;
+
+	res = ntfs_fuse_mknod_common(path, mode, 0, &na);
+	fi->fh = (uintptr_t)na;
+	return res;
+}
+
 static int ntfs_fuse_symlink(const char *to, const char *from)
 {
 	if (ntfs_fuse_is_named_data_stream(from))
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(from, S_IFLNK, 0, to);
+	return __ntfs_fuse_mknod(from, S_IFLNK, 0, to, NULL);
 }
 
 static int ntfs_fuse_link(const char *old_path, const char *new_path)
@@ -1041,7 +1077,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
+	return __ntfs_fuse_mknod(path, S_IFDIR, 0, NULL, NULL);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
@@ -1414,6 +1450,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
 	.mknod		= ntfs_fuse_mknod,
+	.create		= ntfs_fuse_create,
 	.symlink	= ntfs_fuse_symlink,
 	.link		= ntfs_fuse_link,
 	.unlink		= ntfs_fuse_unlink,
