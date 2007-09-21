@@ -408,6 +408,28 @@ exit:
 	return res;
 }
 
+static int ntfs_fuse_fgetattr(const char *path __attribute__((unused)),
+		struct stat *stbuf, struct fuse_file_info *fi)
+{
+	NTFS_FUSE_GET_NA(fi);
+	ntfs_inode *ni = na->ni;
+
+	stbuf->st_ino = ni->mft_no;
+	stbuf->st_mode = S_IFREG | (0777 & ~ctx->fmask);
+	stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+	stbuf->st_uid = ctx->uid;
+	stbuf->st_gid = ctx->gid;
+	stbuf->st_atime = ni->last_access_time;
+	stbuf->st_ctime = ni->last_mft_change_time;
+	stbuf->st_mtime = ni->last_data_change_time;
+	if (NAttrNonResident(na))
+		stbuf->st_blocks = na->allocated_size >> 9;
+	else
+		stbuf->st_blocks = 0;
+	stbuf->st_size = na->data_size;
+	return 0;
+}
+
 static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 {
 	char *path;
@@ -1451,6 +1473,7 @@ static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
 
 static struct fuse_operations ntfs_fuse_oper = {
 	.getattr	= ntfs_fuse_getattr,
+	.fgetattr	= ntfs_fuse_fgetattr,
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
 	.open		= ntfs_fuse_open,
