@@ -81,6 +81,9 @@
 #define PATH_MAX 4096
 #endif
 
+#define NTFS_FUSE_GET_NA(fi) \
+	ntfs_attr *na = (ntfs_attr *)(uintptr_t)(fi)->fh
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
@@ -565,17 +568,16 @@ static int ntfs_fuse_open(const char *org_path, struct fuse_file_info *fi)
 		if (na)
 			ntfs_attr_close(na);
 	} else
-		fi->fh = (unsigned long)na;
+		fi->fh = (uintptr_t)na;
 	return res;
 }
 
 static int ntfs_fuse_flush(const char *path __attribute__((unused)),
 		struct fuse_file_info *fi)
 {
-	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
-	ntfs_inode *ni = na->ni;
+	NTFS_FUSE_GET_NA(fi);
 
-	if (ntfs_inode_sync(ni))
+	if (ntfs_inode_sync(na->ni))
 		return -errno;
 	return 0;
 }
@@ -583,7 +585,7 @@ static int ntfs_fuse_flush(const char *path __attribute__((unused)),
 static int ntfs_fuse_release(const char *path __attribute__((unused)),
 		struct fuse_file_info *fi)
 {
-	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	NTFS_FUSE_GET_NA(fi);
 	ntfs_inode *ni = na->ni;
 
 	ntfs_attr_close(na);
@@ -594,7 +596,7 @@ static int ntfs_fuse_release(const char *path __attribute__((unused)),
 static int ntfs_fuse_read(const char *path, char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi)
 {
-	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	NTFS_FUSE_GET_NA(fi);
 	int res, total = 0;
 
 	if (!size)
@@ -625,7 +627,7 @@ exit:
 static int ntfs_fuse_write(const char *path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi)
 {
-	ntfs_attr *na = (ntfs_attr *)(unsigned long)fi->fh;
+	NTFS_FUSE_GET_NA(fi);
 	int res, total = 0;
 
 	while (size) {
