@@ -696,6 +696,19 @@ exit:
 	return res;
 }
 
+static int ntfs_fuse_ftruncate(const char *path __attribute__((unused)),
+		off_t size, struct fuse_file_info *fi)
+{
+	NTFS_FUSE_GET_NA(fi);
+
+	if (na->data_size == size)
+		return 0;
+	if (ntfs_attr_truncate(na, size))
+		return -errno;
+	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MTIME | NTFS_UPDATE_CTIME);
+	return 0;
+}
+
 static int ntfs_fuse_chmod(const char *path,
 		mode_t mode __attribute__((unused)))
 {
@@ -1446,6 +1459,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,
+	.ftruncate	= ntfs_fuse_ftruncate,
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
