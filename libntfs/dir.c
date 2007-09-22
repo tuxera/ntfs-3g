@@ -1453,6 +1453,12 @@ int ntfs_delete(ntfs_inode **pni, ntfs_inode *dir_ni, ntfschar *name,
 		errno = EINVAL;
 		goto err_out;
 	}
+	if (ni->nr_references > 1 && le16_to_cpu(ni->mrec->link_count) == 1) {
+		ntfs_log_error("Trying to deleting inode with left "
+				"references.\n");
+		errno = EINVAL;
+		goto err_out;
+	}
 	/*
 	 * Search for FILE_NAME attribute with such name. If it's in POSIX or
 	 * WIN32_AND_DOS namespace, then simply remove it from index and inode.
@@ -1545,6 +1551,14 @@ search:
 			goto err_out;
 		}
 		ntfs_attr_close(na);
+	}
+	/* One more sanity check. */
+	if (ni->nr_references > 1 && looking_for_dos_name &&
+			le16_to_cpu(ni->mrec->link_count) == 2) {
+		ntfs_log_error("Trying to deleting inode with left "
+				"references.\n");
+		errno = EINVAL;
+		goto err_out;
 	}
 	ntfs_log_trace("Found!\n");
 	/* Search for such FILE_NAME in index. */
