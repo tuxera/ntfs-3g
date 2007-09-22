@@ -65,7 +65,6 @@ Thanks,
 **********
 
 - add ability to copy multiply files at once.
-- add ability to create new files.
 
 
 ***********
@@ -93,7 +92,6 @@ Thanks,
 * ntfsmount *
 *************
 
-- Cache opened inodes for faster access.
 
 
 **************

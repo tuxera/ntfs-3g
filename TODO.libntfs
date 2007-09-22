@@ -1,10 +1,3 @@
-********************
-* libntfs-gnomevfs *
-********************
-
-- be generic filter: provide ntfs_device_operations from parent GnomeVFSHandle
-
-
 ***********
 * libntfs *
 ***********
@@ -13,13 +6,7 @@
 * HIGH priority *
 *****************
 
-- complete ntfs_index_{add_filename,rm}
-
-- move ntfsdecrypt to library.
-
-- complete the implementation of ntfs_attr_truncate() (for compressed files)
-
-- add write of compressed attributes
+- Make ntfs_attr_{truncate,pwrite} work for compressed/encrypted attributes
 
 - detect presence of usnjrnl and if present and mounting rw, re-stamp it (see
   current ntfs driver for example in 2.6.15 kernel)
@@ -53,10 +40,6 @@
 * LOW priority *
 ****************
 
-- Do we attach attributes (ntfs_attr) to the corresponding ntfs_inode?  Now we
-  just atach the inode to the attribute and expect the user to not shoot
-  themselves in the foot.
-
 - add ACL read/write support to library
 
 - add MS BackupAPI to library
@@ -66,3 +49,12 @@
 - add defrag API to library
 
 - write utilities for all of the above
+
+
+
+********************
+* libntfs-gnomevfs *
+********************
+
+- be generic filter: provide ntfs_device_operations from parent GnomeVFSHandle
+
