@@ -148,6 +148,7 @@ install-exec-hook:
 	$(LN_S) -f $(sbindir)/mkntfs $(DESTDIR)/sbin/mkfs.ntfs
 if ENABLE_FUSE
 	$(LN_S) -f $(bindir)/ntfsmount $(DESTDIR)/sbin/mount.ntfs-fuse
+	$(LN_S) -f $(bindir)/ntfsmount $(DESTDIR)/sbin/mount.fuse.ntfs
 endif
 
 install-data-hook:
@@ -155,6 +156,7 @@ install-data-hook:
 	$(LN_S) -f mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
 if ENABLE_FUSE
 	$(LN_S) -f ntfsmount.8 $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
+	$(LN_S) -f ntfsmount.8 $(DESTDIR)$(man8dir)/mount.fuse.ntfs.8
 endif
 
 uninstall-local:
@@ -162,5 +164,7 @@ uninstall-local:
 	$(RM) -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
 if ENABLE_FUSE
 	$(RM) -f $(DESTDIR)/sbin/mount.ntfs-fuse
+	$(RM) -f $(DESTDIR)/sbin/mount.fuse.ntfs
 	$(RM) -f $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
+	$(RM) -f $(DESTDIR)$(man8dir)/mount.fuse.ntfs.8
 endif
