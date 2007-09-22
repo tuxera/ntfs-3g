@@ -117,6 +117,9 @@ typedef struct {
 	BOOL noatime;
 	BOOL relatime;
 	BOOL blkdev;
+	char cached_path[PATH_MAX];
+	ntfs_inode *cached_ni;
+	ntfs_inode *root_ni;
 } ntfs_fuse_context_t;
 
 #define NTFS_FUSE_OPT(t, p) { t, offsetof(ntfs_fuse_context_t, p), TRUE }
@@ -287,6 +290,68 @@ static int ntfs_fuse_parse_path(const char *org_path, char **path,
 	return 0;
 }
 
+/**
+ * ntfs_fuse_cache_get_dir
+ *
+ * WARNING: Do not close inodes obtained with this function. They will be closed
+ * automatically upon to next call to this function with different path or in
+ * .destroy().
+ */
+static ntfs_inode *ntfs_fuse_cache_get_dir(const char *path)
+{
+	ntfs_inode *ni;
+
+	if (!*path)
+		path = "/";
+
+	if (ctx->cached_ni && !strcmp(ctx->cached_path, path)) {
+		ntfs_log_trace("Got '%s' from cache.\n", path);
+		return ctx->cached_ni;
+	}
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return NULL;
+	ntfs_inode_close(ctx->cached_ni);
+	ctx->cached_ni = ni;
+	strncpy(ctx->cached_path, path, sizeof(ctx->cached_path));
+	if (ctx->cached_path[sizeof(ctx->cached_path) - 1]) {
+		/* Path was truncated, invalidate it since we can not use it. */
+		ctx->cached_path[sizeof(ctx->cached_path) - 1] = 0;
+		*ctx->cached_path = 0;
+	}
+	ntfs_log_trace("Cached '%s'.\n", path);
+	return ni;
+}
+
+/**
+ * ntfs_fuse_cache_get_file
+ *
+ * WARNING: This function changes @path during execution, but restores it
+ * original value upon exit. Do *NOT* pass constant strings to this function!
+ *
+ * WARNING: You should close inode obtained with this function vice-versa to
+ * inodes obtained with ntfs_fuse_cache_get_dir().
+ */
+static ntfs_inode *ntfs_fuse_cache_get_file(char *path)
+{
+	ntfs_inode *dir_ni;
+	char *file;
+
+	file = strrchr(path, '/');
+	if (file == path)
+		return ntfs_pathname_to_inode(ctx->vol, NULL, file);
+	*file = 0;
+	dir_ni = ntfs_fuse_cache_get_dir(path);
+	*file = '/';
+	file++;
+
+	if (dir_ni)
+		return ntfs_pathname_to_inode(ctx->vol, dir_ni, file);
+	else
+		return NULL;
+}
+
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
 	int res = 0;
@@ -300,7 +365,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	if (stream_name_len < 0)
 		return stream_name_len;
 	memset(stbuf, 0, sizeof(struct stat));
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_file(path);
 	if (!ni) {
 		res = -ENOENT;
 		goto exit;
@@ -447,7 +512,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		res = -EINVAL;
 		goto exit;
 	}
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_file(path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -548,14 +613,13 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 
 	fill_ctx.filler = filler;
 	fill_ctx.buf = buf;
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_dir(path);
 	if (!ni)
 		return -errno;
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
 	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
-	ntfs_inode_close(ni);
 	return err;
 }
 
@@ -571,7 +635,7 @@ static int ntfs_fuse_open(const char *org_path, struct fuse_file_info *fi)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_file(path);
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
@@ -585,10 +649,8 @@ static int ntfs_fuse_open(const char *org_path, struct fuse_file_info *fi)
 	if (stream_name_len)
 		free(stream_name);
 	if (res) {
-		if (ni)
-			ntfs_inode_close(ni);
-		if (na)
-			ntfs_attr_close(na);
+		ntfs_inode_close(ni);
+		ntfs_attr_close(na);
 	} else
 		fi->fh = (uintptr_t)na;
 	return res;
@@ -687,7 +749,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_file(path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -767,6 +829,7 @@ static int __ntfs_fuse_mknod(const char *org_path, dev_t type, dev_t dev,
 		return -errno;
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
+	*name = 0;
 	name++;
 	uname_len = ntfs_mbstoucs(name, &uname, 0);
 	if (uname_len < 0) {
@@ -774,8 +837,7 @@ static int __ntfs_fuse_mknod(const char *org_path, dev_t type, dev_t dev,
 		goto exit;
 	}
 	/* Open parent directory. */
-	*name = 0;
-	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	dir_ni = ntfs_fuse_cache_get_dir(path);
 	if (!dir_ni) {
 		res = -errno;
 		if (res == -ENOENT)
@@ -813,8 +875,6 @@ static int __ntfs_fuse_mknod(const char *org_path, dev_t type, dev_t dev,
 		res = -errno;
 exit:
 	free(uname);
-	if (dir_ni)
-		ntfs_inode_close(dir_ni);
 	if (utarget)
 		free(utarget);
 	free(path);
@@ -983,13 +1043,14 @@ static int ntfs_fuse_rm(const char *org_path)
 	if (!path)
 		return -errno;
 	/* Open object for delete. */
-	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	ni = ntfs_fuse_cache_get_file(path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
 	}
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
+	*name = 0;
 	name++;
 	uname_len = ntfs_mbstoucs(name, &uname, 0);
 	if (uname_len < 0) {
@@ -997,8 +1058,7 @@ static int ntfs_fuse_rm(const char *org_path)
 		goto exit;
 	}
 	/* Open parent directory. */
-	*name = 0;
-	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	dir_ni = ntfs_fuse_cache_get_dir(path);
 	if (!dir_ni) {
 		res = -errno;
 		if (res == -ENOENT)
@@ -1015,11 +1075,8 @@ static int ntfs_fuse_rm(const char *org_path)
 				NTFS_UPDATE_MTIME);
 	}
 exit:
-	if (ni)
-		ntfs_inode_close(ni);
+	ntfs_inode_close(ni);
 	free(uname);
-	if (dir_ni)
-		ntfs_inode_close(dir_ni);
 	free(path);
 	return res;
 }
@@ -1460,6 +1517,8 @@ exit:
 static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
 {
 	if (ctx->vol) {
+		ntfs_inode_close(ctx->cached_ni);
+		ntfs_inode_close(ctx->root_ni);
 		ntfs_log_info("Unmounting %s (%s)\n", ctx->device,
 				ctx->vol->vol_name);
 		if (ntfs_umount(ctx->vol, FALSE))
@@ -1727,6 +1786,7 @@ static int ntfs_fuse_mount(void)
 		return -1;
 	}
 	ctx->vol = vol;
+	ctx->root_ni = ntfs_inode_open(vol, FILE_root);
 	return 0;
 }
 
