@@ -97,6 +97,30 @@ ntfs_volume *ntfs_volume_alloc(void)
  */
 static void __ntfs_volume_release(ntfs_volume *v)
 {
+	struct list_head *pos, *tmp;
+	int i;
+
+	/* Sync and print error about not detached inodes. */
+	for (i = 0; i < NTFS_INODE_CACHE_SIZE; i++)
+		list_for_each_safe(pos, tmp, &v->inode_cache[i]) {
+			ntfs_inode *ni =
+					list_entry(pos, ntfs_inode, list_entry);
+
+			switch (ni->mft_no) {
+				case FILE_Volume:
+				case FILE_Bitmap:
+				case FILE_MFT:
+				case FILE_MFTMirr:
+					if (ni->nr_references == 1)
+						continue;
+					break;
+			}
+
+			ntfs_log_error("%s(): Inode %llu still have %d "
+					"references.\n", __FUNCTION__,
+					ni->mft_no, ni->nr_references);
+			ntfs_inode_sync(ni);
+		}
 	/*
 	 * Clear the dirty bit if it was not set before we mounted and this is
 	 * not a forensic mount.
