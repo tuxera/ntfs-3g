@@ -649,8 +649,8 @@ static int ntfs_fuse_open(const char *org_path, struct fuse_file_info *fi)
 	if (stream_name_len)
 		free(stream_name);
 	if (res) {
-		ntfs_inode_close(ni);
 		ntfs_attr_close(na);
+		ntfs_inode_close(ni);
 	} else
 		fi->fh = (uintptr_t)na;
 	return res;
