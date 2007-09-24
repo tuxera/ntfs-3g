@@ -1524,10 +1524,20 @@ static void ntfs_fuse_destroy(void *priv __attribute__((unused)))
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to unmount volume");
 	}
+}
+
+static void ntfs_fuse_free_context(void)
+{
 	free(ctx->device);
 	free(ctx->mnt_point);
 	free(ctx->locale);
 	free(ctx);
+}
+
+static void ntfs_fuse_full_destroy(void)
+{
+	ntfs_fuse_destroy(NULL);
+	ntfs_fuse_free_context();
 }
 
 static struct fuse_operations ntfs_fuse_oper = {
@@ -1799,13 +1809,13 @@ int main(int argc, char *argv[])
 	ntfs_fuse_init();
 	if (parse_options(&args)) {
 		fuse_opt_free_args(&args);
-		ntfs_fuse_destroy(NULL);
+		ntfs_fuse_full_destroy();
 		return 1;
 	}
 	/* Mount volume (libntfs part). */
 	if (ntfs_fuse_mount()) {
 		fuse_opt_free_args(&args);
-		ntfs_fuse_destroy(NULL);
+		ntfs_fuse_full_destroy();
 		return 1;
 	}
 	if (ctx->blkdev) {
@@ -1813,13 +1823,13 @@ int main(int argc, char *argv[])
 		if (setuid(0)) {
 			ntfs_log_perror("setuid(0) failed");
 			fuse_opt_free_args(&args);
-			ntfs_fuse_destroy(NULL);
+			ntfs_fuse_full_destroy();
 			return 1;
 		}
 		/* Set blkdev, blksize and user options. */
 		if (ntfs_fuse_set_blkdev_options(&args)) {
 			fuse_opt_free_args(&args);
-			ntfs_fuse_destroy(NULL);
+			ntfs_fuse_full_destroy();
 			return 1;
 		}
 	} else {
@@ -1835,7 +1845,7 @@ int main(int argc, char *argv[])
 	if (!fch) {
 		ntfs_log_error("fuse_mount failed.\n");
 		fuse_opt_free_args(&args);
-		ntfs_fuse_destroy(NULL);
+		ntfs_fuse_full_destroy();
 		return 1;
 	}
 	fh = fuse_new(fch, &args , &ntfs_fuse_oper, sizeof(ntfs_fuse_oper),
@@ -1844,7 +1854,7 @@ int main(int argc, char *argv[])
 	if (!fh) {
 		ntfs_log_error("fuse_new failed.\n");
 		fuse_unmount(ctx->mnt_point, fch);
-		ntfs_fuse_destroy(NULL);
+		ntfs_fuse_full_destroy();
 		return 1;
 	}
 	/* Drop root privileges if we obtained them. */
@@ -1871,5 +1881,6 @@ int main(int argc, char *argv[])
 	/* Destroy. */
 	fuse_unmount(ctx->mnt_point, fch);
 	fuse_destroy(fh);
+	ntfs_fuse_free_context();
 	return 0;
 }
