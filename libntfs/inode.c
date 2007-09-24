@@ -831,6 +831,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	al_allocated = 0x40;
 	al_len = 0;
 	al = malloc(al_allocated);
+	NTFS_ON_DEBUG(memset(al, 0, 0x40)); /* Valgrind. */
 	ale = (ATTR_LIST_ENTRY *) al;
 	if (!al) {
 		ntfs_log_trace("Not enough memory.\n");
@@ -849,7 +850,7 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		if (ctx->attr->type == AT_ATTRIBUTE_LIST) {
 			err = EIO;
-			ntfs_log_trace("Eeek! Attribute list already present.\n");
+			ntfs_log_trace("Attribute list already present.\n");
 			goto put_err_out;
 		}
 		/* Calculate new length of attribute list. */
@@ -859,6 +860,8 @@ int ntfs_inode_add_attrlist(ntfs_inode *ni)
 		while (al_len > al_allocated) {
 			al_allocated += 0x40;
 			aln = realloc(al, al_allocated);
+			NTFS_ON_DEBUG(memset(aln + al_allocated - 0x40, 0,
+					0x40)); /* Valgrind. */
 			if (!aln) {
 				ntfs_log_trace("Not enough memory.\n");
 				err = ENOMEM;

@@ -185,8 +185,6 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 	entry_offset = ((u8 *)ale - ni->attr_list);
 	/* Set pointer to new entry. */
 	ale = (ATTR_LIST_ENTRY *)(new_al + entry_offset);
-	/* Zero it to fix valgrind warning. */
-	memset(ale, 0, entry_len);
 	/* Form new entry. */
 	ale->type = attr->type;
 	ale->length = cpu_to_le16(entry_len);
@@ -198,6 +196,8 @@ int ntfs_attrlist_entry_add(ntfs_inode *ni, ATTR_RECORD *attr)
 		ale->lowest_vcn = 0;
 	ale->mft_reference = mref;
 	ale->instance = attr->instance;
+	NTFS_ON_DEBUG(memset(ale->name, 0, ((u8*)((u8*)ale + entry_len)) -
+				((u8*)ale->name))); /* Shut up, valgrind. */
 	memcpy(ale->name, (u8 *)attr + le16_to_cpu(attr->name_offset),
 			attr->name_length * sizeof(ntfschar));
 
