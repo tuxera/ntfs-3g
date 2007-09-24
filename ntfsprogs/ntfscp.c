@@ -5,7 +5,7 @@
  * Copyright (c) 2005 Anton Altaparmakov
  * Copyright (c) 2006 Hil Liao
  *
- * This utility will overwrite files on NTFS volume.
+ * This utility will copy file to an NTFS volume.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -83,9 +83,11 @@ static volatile sig_atomic_t caught_terminate = 0;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Overwrite files on NTFS "
+	ntfs_log_info("\n%s v%s (libntfs %s) - Copy file to an NTFS "
 		"volume.\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
 	ntfs_log_info("Copyright (c) 2004-2007 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2006 Hil Liao\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
