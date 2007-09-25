@@ -1807,46 +1807,35 @@ int main(int argc, char *argv[])
 	struct fuse_chan *fch;
 
 	ntfs_fuse_init();
-	if (parse_options(&args)) {
-		fuse_opt_free_args(&args);
-		ntfs_fuse_full_destroy();
-		return 1;
+	if (parse_options(&args))
+		goto err_out;
+	/*
+	 * Drop effective uid to real uid because we do not want not previleged
+	 * user that runs set-uid-root binary to be able to mount devices
+	 * normally he do not have rights to.
+	 */
+	if (seteuid(ctx->uid)) {
+		ntfs_log_perror("seteuid(%d)", ctx->uid);
+		goto err_out;
 	}
 	/* Mount volume (libntfs part). */
-	if (ntfs_fuse_mount()) {
-		fuse_opt_free_args(&args);
-		ntfs_fuse_full_destroy();
-		return 1;
-	}
+	if (ntfs_fuse_mount())
+		goto err_out;
 	if (ctx->blkdev) {
 		/* Gain root privileges for blkdev mount. */
-		if (setuid(0)) {
-			ntfs_log_perror("setuid(0) failed");
-			fuse_opt_free_args(&args);
-			ntfs_fuse_full_destroy();
-			return 1;
+		if (seteuid(0) || setuid(0)) {
+			ntfs_log_perror("seteuid(0) or setuid(0) failed");
+			goto err_out;
 		}
 		/* Set blkdev, blksize and user options. */
-		if (ntfs_fuse_set_blkdev_options(&args)) {
-			fuse_opt_free_args(&args);
-			ntfs_fuse_full_destroy();
-			return 1;
-		}
-	} else {
-		/*
-		 * Drop effective uid if our binary is set-uid-root and we are
-		 * performing not blkdev mount.
-		 */
-		if (!geteuid() && seteuid(ctx->uid))
-			ntfs_log_perror("Failed to drop effective uid");
+		if (ntfs_fuse_set_blkdev_options(&args))
+			goto err_out;
 	}
 	/* Create filesystem (FUSE part). */
 	fch = fuse_mount(ctx->mnt_point, &args);
 	if (!fch) {
 		ntfs_log_error("fuse_mount failed.\n");
-		fuse_opt_free_args(&args);
-		ntfs_fuse_full_destroy();
-		return 1;
+		goto err_out;
 	}
 	fh = fuse_new(fch, &args , &ntfs_fuse_oper, sizeof(ntfs_fuse_oper),
 			NULL);
@@ -1858,7 +1847,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	/* Drop root privileges if we obtained them. */
-	if (ctx->blkdev && (setuid(ctx->uid) || seteuid(ctx->uid)))
+	if (ctx->blkdev && setuid(ctx->uid))
 		ntfs_log_warning("Failed to drop root privileges.\n");
 	/* Detach from terminal. */
 	if (!ctx->debug && !ctx->no_detach) {
@@ -1883,4 +1872,8 @@ int main(int argc, char *argv[])
 	fuse_destroy(fh);
 	ntfs_fuse_free_context();
 	return 0;
+err_out:
+	fuse_opt_free_args(&args);
+	ntfs_fuse_full_destroy();
+	return 1;
 }
