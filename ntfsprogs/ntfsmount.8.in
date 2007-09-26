@@ -1,139 +1,89 @@
-.\" Copyright (c) 2005-2006 Yura Pakhuchiy.
+.\" Copyright (c) 2005-2007 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
+.\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSMOUNT 8 "February 2006" "ntfsprogs @VERSION@"
+.TH NTFSMOUNT 8 "September 2007" "ntfsprogs @VERSION@"
 .SH NAME
-ntfsmount \- NTFS module for FUSE.
+ntfsmount \- Read/Write userspace NTFS driver.
 .SH SYNOPSIS
-.B ntfsmount
-.I device mount_point
-[\fB\-o options\fR]
-.SH DESCRIPTION
-\fBntfsmount\fR is a \fBFUSE\fR module that rely on \fBlibntfs\fR. You need
-\fBFUSE\fR to compile it, \fBxattr\fR is recommended, but not mandatory.
-.TP
-.B Fully implemented ntfsmount features:
-\(bu Read\-write access to normal and sparse files.
+\fBntfsmount\fR \fIdevice mount_point\fR [\fB\-o\fR \fIoptions\fR]
 .br
-\(bu Read\-only access to compressed files.
+\fBmount \-t fuse.ntfs\fR \fIdevice mount_point\fR [\fB\-o\fR \fIoptions\fR]
+.sp
+/etc/ftsab entry:
+.br
+\fIdevice mount_point\fR \fBfuse.ntfs\fR \fIoptions\fR \fB0 0\fR
+.SH DESCRIPTION
+\fBntfsmount\fR is a read/write userspace NTFS filesystem driver. Technically
+it connects \fBFUSE\fR with \fBlibntfs\fR.
+.TP
+\fBntfsmount\fR features:
+\(bu Create/Delete/Move files and directories.
+.br
+\(bu Hard link files.
+.br
+\(bu Read and write to normal and sparse files.
+.br
+\(bu Read compressed and encrypted files.
 .br
 \(bu Access to special Interix files (symlinks, devices, FIFOs).
 .br
 \(bu List/Read/Write/Add/Remove named data streams.
 .br
-\(bu Supports Linux and FreeBSD.
-.TP
-.B Partly implemented features:
-\(bu Create/Delete/Move files and directories.
-.br
-\(bu Hard link files.
+\(bu Supports Linux, FreeBSD, NetBSD and Mac OS X.
 .SH OPTIONS
-Below is a summary of all the options that \fBntfsmount\fR accepts.
+\fBntfsmount\fR supports most of options that \fBmount\fR and \fBFUSE\fR
+accepts (see "man 8 mount" and FUSE documentation for them). Additionally
+\fBntfsmount\fR have some unique to it options, below is a summary of them.
 .TP
-.B uid=, gid=, umask=
-Provide default owner, group, and access mode mask.
-These options work as documented in mount(8).  By
-default, the files/directories are owned by user that mounted volume and
-he/she has read and write permissions, as well as
-browse permission for directories.  No one else has any
-access permissions.  I.e. the mode on all files is by
-default rw\-\-\-\-\-\-\- and for directories rwx\-\-\-\-\-\-, a
-consequence of the default fmask=0177 and dmask=0077.
-Using a umask of zero will grant all permissions to
-everyone, i.e. all files and directories will have mode
-rwxrwxrwx.
+.B silent, nosilent
+\fBsilent\fR option makes ntfsmount to do not return "Operation is not
+supported" error on chmod and chown operations (this option is on by default).
+\fBnosilent\fR cancels this.
 .TP
-.B fmask=, dmask=
-Instead of specifying umask which applies both to
-files and directories, fmask applies only to files and
-mask only to directories.
+.BI locale= value
+You can set locale with this option. It's useful if locale environment variables
+are not set before partitions from /etc/fstab had been mounted. Try submitting this option if you are experience problems with displaying national characters in filenames.
 .TP
-.B show_sys_files
-If show_sys_files is specified, show the system files
-in directory listings.  Otherwise the default behaviour
-is to hide the system files.
-Note that even when show_sys_files is specified, "$MFT"
-may will not be visible due to bugs/mis\-features in glibc.
-Further, note that irrespective of show_sys_files, all
-files are accessible by name, i.e. you can always do
-"ls \-l '$UpCase'" for example to specifically show the
-system file containing the Unicode upcase table.
+\fBuid=\fIvalue\fR, \fBgid=\fIvalue\fR
+Set the owner and the group of files and directories. The values are numerical.
+The defaults are the uid and gid of the current process.
 .TP
-.B default_permissions
-By default FUSE doesn't check file access permissions, the
-filesystem is free to implement it's access policy or leave it to
-the underlying file access mechanism (e.g. in case of network
-filesystems).  This option enables permission checking, restricting
-access based on file mode.  This is option is usually useful
-together with the 'allow_other' mount option.
+\fBumask=\fIvalue\fR, \fBdmask=\fIvalue\fR, \fBfmask=\fIvalue\fR
+Set the bitmask of the file and directory permissions that are not present.
+The value is given in octal. Instead of specifying umask which applies both to
+files and directories, fmask applies only to files and dmask only to
+directories.
 .TP
-.B allow_other
-This option overrides the security measure restricting file access
-to the user mounting the filesystem.  This option is by default only
-allowed to root, but this restriction can be removed with a
-configuration option described in the previous section.
+.B case_insensitive
+Make \fBntfsmount\fR treat filenames in POSIX names as case insensitive.
+See \fBFILENAME NAMESPACES\fR section for details.
 .TP
-.B kernel_cache
-(NOTE: Only for FUSE 2.3.0, with FUSE >= 2.4.0 on by default)
-This option disables flushing the cache of the file contents on
-every open().  This should only be enabled on filesystems, where the
-file data is never changed externally (not through the mounted FUSE
-filesystem).  Thus it is not suitable for network filesystems and
-other "intermediate" filesystems.
-NOTE: if this option is not specified (and neither 'direct_io') data
-is still cached after the open(), so a read() system call will not
-always initiate a read operation.
+.B no_def_opts
+By default ntfsmount acts as some useful options were passed to it (you can get
+list of this options by running ntfsmount without any arguments). Submitting
+this option will cancel such behaviour.
 .TP
-.B large_read
-Issue large read requests.  This can improve performance for some
-filesystems, but can also degrade performance.  This option is only
-useful on 2.4.X kernels, as on 2.6 kernels requests size is
-automatically determined for optimum performance.
-.TP
-.B direct_io
-(NOTE: Only for FUSE 2.3.0)
-This option disables the use of page cache (file content cache) in
-the kernel for this filesystem.  This has several affects:
-- Each read() or write() system call will initiate one or more
-read or write operations, data will not be cached in the
-kernel.
-- The return value of the read() and write() system calls will
-correspond to the return values of the read and write
-operations.  This is useful for example if the file size is not
-known in advance (before reading it).
-.TP
-.B max_read=
-With this option the maximum size of read operations can be set.
-The default is infinite.  Note that the size of read requests is
-limited anyway to 32 pages (which is 128kbyte on i386).
+.B noblkdev
+By default ntfsmount tries to mount block devices with blkdev FUSE option if it
+have enough privileges. Submit this option if blkdev mount does not work for
+you for some reasons.
 .TP
 .B force
 Force mount even if errors occurred. Use this option only if you know what
 are you doing and don't cry about data loss.
 .TP
-.B ro
-Mount filesystem read\-only.
+.B relatime, norelatime
+Update inode access times relative to modify or change time.  Access
+time is only updated if the previous access time was earlier than the
+current modify or change time. (Similar to noatime, but doesn't break
+mutt or other applications that need to know if a file has been read
+since the last time it was modified.)
 .TP
-.B no_def_opts
-By default ntfsmount acts as "default_permissions,allow_other" was passed to it,
-this option cancel this behaviour.
-.TP
-.B silent
-Do nothing on chmod and chown operations, but do not return error.
-.TP
-.B locale=
-You can set locale with this option. It's useful if locale enviroment variables
-are not set before partitions from /etc/fstab had been mounted.
-.TP
-.B streams_interface=
+.BI streams_interface= value
 This option controls how the user can access named data streams.  It can be set
-to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
-\fBnone\fR, the user will have no access to the named data streams.  If it's set
-to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
-file:stream). If it's set to \fBxattr\fR, then the named data streams are
-mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
-utilities.
+to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. See \fBDATA STREAMS\fR section for details.
 .TP
 .B debug
 Makes ntfsmount to not detach from terminal and print a lot of debug output from
@@ -141,81 +91,79 @@ libntfs and FUSE.
 .TP
 .B no_detach
 Same as above but with less debug output.
+.SH FILENAME NAMESPACES
+There are exist several namespaces for filenames in NTFS: DOS, Win32 and POSIX.
+Names in DOS and Win32 namespaces are case insensitive, but names in POSIX
+namespace are case sensitive. By default windows creates filenames in DOS and
+Win32 namespaces (with exception for hard links), but ntfsmount always creates
+files in POSIX namespace. Note: you can create several files that differs only
+in case in one directory with ntfsmount, but windows applications may be
+confused by this.
 .SH DATA STREAMS
-All data on NTFS is stored in streams.  Every file has exactly one unnamed
-data stream and can have many named data streams.  The size of a file is the
-size of its unnamed data stream.  By default, \fBntfsmount\fR will only read
-the unnamed data stream.
+All data on NTFS is stored in streams.  Every file has exactly one unnamed data
+stream and can have many named data streams.  The size of a file is the size of
+its unnamed data stream.  Windows applications don't, consistently, allow you
+to read named data streams, so you are recommended to use tools like FAR, or
+utilities from Cygwin.
 .PP
-By using the options "streams_interface=windows", you will be able to read
+By default or if "streams_interface=none" option was passed, \fBntfsmount\fR will only read the unnamed data stream.
+.PP
+By using the option "streams_interface=windows", you will be able to read
 any named data streams, simply by specifying the stream's name after a colon.
-For example:
+Named data streams act like normals files, so you can read from them, write to
+them and even delete them (using rm). You can list all the named data streams
+a file has by getting the "ntfs.streams.list" extended attribute. Some examples:
 .RS
 .sp
 cat some.mp3:artist
+.br
+rm some.mp3:album
+.br
+echo Sympho Black Metal > some.mp3:genre
+.br
+getfattr \-n ntfs.streams.list some.mp3
 .sp
 .RE
-Windows applications don't, consistently, allow you to read named data
-streams, so you are recommended to use tools like FAR, or utils from Cygwin.
+If \fBstreams_interface\fR option is set to \fBxattr\fR, then the named data streams are mapped to xattrs and user can manipulate them using \fBgetfattr\fR and
+\fBsetfattr\fR utilities. Eg.:
+.RS
+.sp
+setfattr -n user.artist -v "Some Artist" some.mp3
+.br
+getfattr -d some.mp3
+.RE
+.SH ALLOWED CHARACTERS
+Win32 does not allow characters like '<', '>', '*', '?' and so on in the
+filenames, but NTFS supports any characters except '\\0' (NULL) and '/'.  You
+can create filenames with any allowed by NTFS characters using ntfsmount, but
+aware, you will not be able to access files with denied by Win32 characters from
+windows.
+.SH ACCESS HANDLING AND SECURITY
+By default, files and directories are owned by the user and group of the
+mounting process and everybody has full read, write, execution and directory
+browsing permissions.  If you want to use permissions handling then use the
+\fBuid\fR and/or the \fBgid\fR options together with the \fBumask\fR or
+\fBfmask\fR and \fBdmask\fR options.
 .PP
-Named data streams act like normals files, so you can read from them, write to
-them and even delete them (using rm).  You can list all the named data streams
-a file has by getting the "ntfs.streams.list" extended attribute.  NOTE: This
-list feature is unique to the \fBntfsmount\fR and may never be supported by the
-\fBkernel driver\fR.
+Windows users have full access to the files created by \fBntfsmount\fR.
 .SH EXAMPLES
-Mount /dev/hda1 to /mnt/ntfs\-fuse using ntfsmount:
+Mount /dev/hda1 to /mnt/ntfs using ntfsmount submiting locale option:
 .RS
 .sp
-.B ntfsmount /dev/hda1 /mnt/ntfs\-fuse
-.sp
-.RE
-Read\-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 to be
-owner of all files:
-.RS
-.sp
-.B ntfsmount /dev/hda5 /home/user/mnt \-o ro,uid=1000
+.B ntfsmount /dev/hda1 /mnt/ntfs -o locale=be_BY.UTF-8
 .sp
 .RE
 /etc/fstab entry for above:
 .RS
 .sp
-.B /dev/hda5 /home/user/mnt ntfs\-fuse ro,uid=1000 0 0
+.B /dev/hda1 /mnt/ntfs fuse.ntfs locale=be_BY.UTF-8 0 0
 .sp
 .RE
-Umount /mnt/ntfs\-fuse:
+Umount /mnt/ntfs:
 .RS
 .sp
-.B fusermount \-u /mnt/ntfs\-fuse
-.sp
-.RE
-Cat "artist" named data stream of "some.mp3":
-.RS
-.sp
-.B cat some.mp3:artist
-.sp
-.RE
-Write "Sympho Black Metal" to "genre" named data stream of "some.mp3":
-.RS
-.sp
-.B echo Sympho Black Metal > some.mp3:genre
-.sp
-.RE
-Remove "album" named data stream from "some.mp3":
-.RS
-.sp
-.B rm some.mp3:album
-.sp
-.RE
-List all named data streams for "some.mp3":
-.RS
-.sp
-.B getfattr \-n ntfs.streams.list some.mp3
-.sp
-.RE
+.B fusermount \-u /mnt/ntfs
 .SH BUGS
-There are no known problems with
-.BR ntfsmount .
 If you find a bug please send an email describing the problem to the
 development team:
 .br
@@ -223,17 +171,13 @@ development team:
 linux\-ntfs\-dev@lists.sourceforge.net
 .hy
 .SH AUTHORS
-.B ntfsmount
-was written by Yura Pakhuchiy, with contributions from Yuval Fledel.
+\fBntfsmount\fR was written by Yura Pakhuchiy, with contributions from Yuval Fledel and Szabolcs Szakacsits.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH THANKS
 Many thanks to Miklos Szeredi for advice and answers about FUSE.
 .SH AVAILABILITY
-.B ntfsmount
-is part of the
-.B ntfsprogs
-package and is available from:
+\fBntfsmount\fR is part of the \fBntfsprogs\fR package and is available from:
 .br
 .nh
 http://www.linux\-ntfs.org/content/view/19/37
@@ -244,7 +188,17 @@ The manual pages are available online at:
 .nh
 http://man.linux-ntfs.org/
 .hy
+.sp
+Additional up-to-date information can be found furthermore at:
+.br
+.nh
+http://wiki.linux-ntfs.org/doku.php?id=ntfsmount
+.hy
 .SH SEE ALSO
+Read \fBlibntfs\fR(8) for details how to access encrypted files and mount
+volumes with offset.
+.sp
+.BR libntfs (8),
 .BR ntfsprogs (8),
 .BR attr (5),
 .BR getfattr (1)
