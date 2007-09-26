@@ -195,8 +195,7 @@ Additional up-to-date information can be found furthermore at:
 http://wiki.linux-ntfs.org/doku.php?id=ntfsmount
 .hy
 .SH SEE ALSO
-Read \fBlibntfs\fR(8) for details how to access encrypted files and mount
-volumes with offset.
+Read \fBlibntfs\fR(8) for details how to access encrypted files.
 .sp
 .BR libntfs (8),
 .BR ntfsprogs (8),

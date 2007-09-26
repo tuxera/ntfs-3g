@@ -1,9 +1,10 @@
 .\" Copyright (c) 2002\-2005 Richard Russon.
 .\" Copyright (c) 2002\-2003 Anton Altaparmakov.
 .\" Copyright (c) 2005\-2006 Szabolcs Szakacsits.
+.\" Copyright (c) 2005\-2007 Yura Pakhuchiy.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSPROGS 8 "April 2006" "ntfsprogs @VERSION@"
+.TH NTFSPROGS 8 "September 2007" "ntfsprogs @VERSION@"
 .SH NAME
 ntfsprogs \- tools for doing neat things with NTFS
 .SH OVERVIEW
@@ -28,7 +29,7 @@ available for free and come with full source code.
 \- Compare two NTFS filesystems and tell the differences.
 .PP
 .BR ntfscp (8)
-\- Overwrite a file on an NTFS.
+\- Copy a file to an NTFS volume.
 .PP
 .BR ntfsfix (8)
 \- Check and fix some common errors, clear the LogFile and make Windows
@@ -71,5 +72,6 @@ These manual pages can be viewed online at:
 http://man.linux-ntfs.org/
 .hy
 .SH SEE ALSO
+.BR libntfs (8),
 .BR libntfs\-gnomevfs (8)
 
