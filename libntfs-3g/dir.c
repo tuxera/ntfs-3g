@@ -578,6 +578,8 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 		return 0;
 	if (ie->key.file_name.file_attributes & FILE_ATTR_I30_INDEX_PRESENT)
 		dt_type = NTFS_DT_DIR;
+	else if (fn->file_attributes & FILE_ATTR_SYSTEM)
+		dt_type = NTFS_DT_UNKNOWN;
 	else
 		dt_type = NTFS_DT_REG;
 	return filldir(dirent, fn->file_name, fn->file_name_length,
