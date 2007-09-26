@@ -214,6 +214,7 @@ struct _ntfs_volume {
 
 	s64 free_clusters; 	/* Track the number of free clusters which
 				   greatly improves statfs() performance */
+	s64 free_mft_records; 	/* Same for free mft records (see above) */
 
 	/* Temp: for directory handling */
 	void *private_data;	/* ntfs_dir for . */
