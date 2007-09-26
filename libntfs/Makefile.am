@@ -87,7 +87,8 @@ libntfs_gnomevfs_la_SOURCES =	\
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c
 
-man_MANS = libntfs-gnomevfs.8
+man_MANS = libntfs.8 \
+	libntfs-gnomevfs.8
 
 AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
 
