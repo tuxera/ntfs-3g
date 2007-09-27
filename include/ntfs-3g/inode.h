@@ -50,6 +50,7 @@ typedef enum {
 				      in the index. */
 	NI_NoMtimeUpdate,	/* 1: Don't update modifiction time. */
 	NI_NoParentMtimeUpdate,	/* 1: Don't update parent dir's mtime. */
+	NI_v3_Extensions,	/* 1: JPA v3.x extensions present. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -159,6 +160,12 @@ struct _ntfs_inode {
 	time_t last_data_change_time;
 	time_t last_mft_change_time;
 	time_t last_access_time;
+				/* NTFS 3.x extensions added by JPA */
+				/* only if NI_v3_Extensions is set in state */
+ 	le32 owner_id;
+	le32 security_id;
+	le32 quota_charged;
+	le32 usn;
 };
 
 extern ntfs_inode *ntfs_inode_base(ntfs_inode *ni);

@@ -190,6 +190,19 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ni->last_data_change_time = ntfs2utc(std_info->last_data_change_time);
 	ni->last_mft_change_time = ntfs2utc(std_info->last_mft_change_time);
 	ni->last_access_time = ntfs2utc(std_info->last_access_time);
+  		/* JPA insert v3 extensions if present */
+                /* length may be seen as 72 (v1.x) or 96 (v3.x) */
+        if (ctx->attr->length > sizeof(STANDARD_INFORMATION)) {
+  		set_nino_flag(ni, v3_Extensions);
+		ni->owner_id = std_info->owner_id;
+		ni->security_id = std_info->security_id;
+		ni->quota_charged = std_info->quota_charged;
+		ni->usn = std_info->usn;
+	} else {
+		clear_nino_flag(ni, v3_Extensions);
+		ni->owner_id = 0;
+		ni->security_id = 0;
+	}
 	/* Set attribute list information. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
@@ -531,6 +544,13 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	std_info->last_access_time = utc2ntfs(ni->last_access_time);
+		/* JPA update v3.x extensions */
+	if (test_nino_flag(ni, v3_Extensions)) {
+		std_info->owner_id = ni->owner_id;
+		std_info->security_id = ni->security_id;
+		std_info->quota_charged = ni->quota_charged;
+		std_info->usn = ni->usn;
+	}
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);
 	ntfs_attr_put_search_ctx(ctx);
 	return 0;

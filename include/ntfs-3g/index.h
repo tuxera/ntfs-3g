@@ -127,5 +127,7 @@ extern char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
 extern void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
 extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
+extern int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie);
+
 #endif /* _NTFS_INDEX_H */
 

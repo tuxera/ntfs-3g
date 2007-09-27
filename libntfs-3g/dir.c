@@ -1001,6 +1001,7 @@ err_out:
 /**
  * __ntfs_create - create object on ntfs volume
  * @dir_ni:	ntfs inode for directory in which create new object
+ * @securid:	id of inheritable security descriptor, 0 if none
  * @name:	unicode name of new object
  * @name_len:	length of the name in unicode characters
  * @type:	type of the object to create
@@ -1029,7 +1030,7 @@ err_out:
  * Return opened ntfs inode that describes created object on success or NULL
  * on error with errno set to the error code.
  */
-static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
+static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		ntfschar *name, u8 name_len, dev_t type, dev_t dev,
 		ntfschar *target, u8 target_len)
 {
@@ -1057,10 +1058,14 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	if (!ni)
 		return NULL;
 	/*
-	 * Create STANDARD_INFORMATION attribute. Write STANDARD_INFORMATION
-	 * version 1.2, windows will upgrade it to version 3 if needed.
+	 * Create STANDARD_INFORMATION attribute.
+	 * JPA Depending on available inherited security descriptor,
+	 * Write STANDARD_INFORMATION v1.2 (no inheritance) or v3
 	 */
-	si_len = offsetof(STANDARD_INFORMATION, v1_end);
+	if (securid)
+		si_len = sizeof(STANDARD_INFORMATION);
+	else
+		si_len = offsetof(STANDARD_INFORMATION, v1_end);
 	si = ntfs_calloc(si_len);
 	if (!si) {
 		err = errno;
@@ -1070,6 +1075,14 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	si->last_access_time = utc2ntfs(ni->last_access_time);
+	if (securid) {
+		set_nino_flag(ni, v3_Extensions);
+		si->owner_id = 0;
+		si->security_id = securid;
+		si->quota_charged = 0;
+		si->usn = 0;
+	} else
+		clear_nino_flag(ni, v3_Extensions);
 	if (!S_ISREG(type) && !S_ISDIR(type)) {
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
@@ -1082,10 +1095,12 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 				"attribute.\n");
 		goto err_out;
 	}
-	
-	if (ntfs_sd_add_everyone(ni)) {
-		err = errno;
-		goto err_out;
+
+	if (securid) {
+		if (ntfs_sd_add_everyone(ni)) {
+			err = errno;
+			goto err_out;
+		}
 	}
 	rollback_sd = 1;
 
@@ -1256,35 +1271,35 @@ err_out:
  * Some wrappers around __ntfs_create() ...
  */
 
-ntfs_inode *ntfs_create(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		dev_t type)
+ntfs_inode *ntfs_create(ntfs_inode *dir_ni, le32 securid, ntfschar *name,
+		u8 name_len, dev_t type)
 {
 	if (type != S_IFREG && type != S_IFDIR && type != S_IFIFO &&
 			type != S_IFSOCK) {
 		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
-	return __ntfs_create(dir_ni, name, name_len, type, 0, NULL, 0);
+	return __ntfs_create(dir_ni, securid, name, name_len, type, 0, NULL, 0);
 }
 
-ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		dev_t type, dev_t dev)
+ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, le32 securid,
+		ntfschar *name,	u8 name_len, dev_t type, dev_t dev)
 {
 	if (type != S_IFCHR && type != S_IFBLK) {
 		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
-	return __ntfs_create(dir_ni, name, name_len, type, dev, NULL, 0);
+	return __ntfs_create(dir_ni, securid, name, name_len, type, dev, NULL, 0);
 }
 
-ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
-		ntfschar *target, u8 target_len)
+ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, le32 securid,
+		ntfschar *name,	u8 name_len, ntfschar *target, u8 target_len)
 {
 	if (!target || !target_len) {
 		ntfs_log_error("Invalid arguments.\n");
 		return NULL;
 	}
-	return __ntfs_create(dir_ni, name, name_len, S_IFLNK, 0,
+	return __ntfs_create(dir_ni, securid, name, name_len, S_IFLNK, 0,
 			target, target_len);
 }
 

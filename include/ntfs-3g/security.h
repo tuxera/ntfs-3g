@@ -28,6 +28,50 @@
 #include "layout.h"
 #include "inode.h"
 
+/*
+ *          item in the mapping list
+ */
+
+struct MAPPING {
+	struct MAPPING *next;
+	int xid;		/* linux id : uid or gid */
+	SID *sid;		/* Windows id : usid or gsid */
+};
+
+/*
+ *           Security context, needed by most security functions
+ */
+
+struct SECURITY_ENTRY {
+	uid_t uid;
+	gid_t gid;
+	unsigned int mode:9;
+	unsigned int valid:1;
+} ;
+
+struct SECURITY_HEAD {
+	int first;
+	int last;
+			/* statistics */
+	unsigned long attempts;
+	unsigned long reads;
+	unsigned long writes;
+} ;
+
+struct SECURITY_CACHE {
+	struct SECURITY_HEAD head;
+	struct SECURITY_ENTRY cachetable[1];
+} ;
+
+struct SECURITY_CONTEXT {
+	ntfs_volume *vol;
+	struct MAPPING *usermapping;
+	struct MAPPING *groupmapping;
+	struct SECURITY_CACHE **pseccache;
+	uid_t uid; /* uid of user requesting (not the mounter) */
+	gid_t gid; /* gid of user requesting (not the mounter) */
+	} ;
+
 extern const GUID *const zero_guid;
 
 extern BOOL ntfs_guid_is_zero(const GUID *guid);
@@ -57,5 +101,22 @@ extern int ntfs_sd_add_everyone(ntfs_inode *ni);
 
 extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, 
 			       const u32 len);
+
+int ntfs_build_mapping(struct SECURITY_CONTEXT *scx);
+int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni, struct stat*);
+int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni, mode_t mode);
+BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
+		ntfs_inode *ni, int accesstype);
+BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
+		const char *path, int accesstype);
+
+int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
+int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni,
+		uid_t uid, gid_t gid, mode_t mode);
+
 
 #endif /* defined _NTFS_SECURITY_H */
