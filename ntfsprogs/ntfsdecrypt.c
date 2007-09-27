@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2005-2007 Anton Altaparmakov
+ * Copyright (c) 2007 Yura Pakhuchiy
  *
  * This utility will decrypt files and print the decrypted data on the standard
  * output.
@@ -644,15 +645,11 @@ check_again:
 				goto err;
 			}
 			purpose_oid[purpose_oid_size - 1] = '\0';
-			if (!strncmp(purpose_oid,
-					NTFS_EFS_CERT_PURPOSE_OID_DRF,
-					strlen(
-					NTFS_EFS_CERT_PURPOSE_OID_DRF)))
+			if (!strcmp(purpose_oid,
+					NTFS_EFS_CERT_PURPOSE_OID_DRF))
 				*df_type = DF_TYPE_DRF;
-			else if (!strncmp(purpose_oid,
-					NTFS_EFS_CERT_PURPOSE_OID_DDF,
-					strlen(
-					NTFS_EFS_CERT_PURPOSE_OID_DDF)))
+			else if (!strcmp(purpose_oid,
+					NTFS_EFS_CERT_PURPOSE_OID_DDF))
 				*df_type = DF_TYPE_DDF;
 			else {
 				ntfs_log_error("Certificate has unknown "
