@@ -4,6 +4,7 @@
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2007 Szabolcs Szakacsits
+ * Copyright (c) 2007 Jean-Pierre Andre
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -79,6 +80,7 @@
 #include "utils.h"
 #include "version.h"
 #include "ntfstime.h"
+#include "security.h"
 #include "misc.h"
 
 #ifndef PATH_MAX
@@ -119,6 +121,9 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	BOOL inherit;
+	struct SECURITY_CACHE *seccache;
+	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
 
 typedef enum {
@@ -218,6 +223,28 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, s64 numof_inode)
 	return nr_free;
 }
 
+/*
+ *      Fill a security context as needed by security fonctions
+ *      returns TRUE if Ok
+ *              FALSE if there is no user mapping. This is not an error
+ */
+
+static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
+{
+	struct fuse_context *fusecontext;
+
+	if (ctx->security.usermapping) {
+		scx->vol = ctx->vol;
+		scx->usermapping = ctx->security.usermapping;
+		scx->groupmapping = ctx->security.groupmapping;
+		scx->pseccache = &ctx->seccache;
+		fusecontext = fuse_get_context();
+		scx->uid = fusecontext->uid;
+		scx->gid = fusecontext->gid;
+	}
+return (ctx->security.usermapping != (struct MAPPING*)NULL);
+}
+
 static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
 {
 	u8 *buf;
@@ -312,6 +339,7 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	
 	/* Maximum length of filenames. */
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
+
 	return 0;
 }
 
@@ -368,6 +396,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	struct SECURITY_CONTEXT security;
 
 	vol = ctx->vol;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
@@ -381,6 +410,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
 		/* Directory. */
+
 		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
 		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (na) {
@@ -470,8 +500,13 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		}
 		stbuf->st_mode |= (0777 & ~ctx->fmask);
 	}
-	stbuf->st_uid = ctx->uid;
-	stbuf->st_gid = ctx->gid;
+	if (ntfs_fuse_fill_security_context(&security)) {
+		if (ntfs_get_owner_mode(&security,path,ni,stbuf) < 0)
+			set_fuse_error(&res);
+	} else {
+	        stbuf->st_uid = ctx->uid;
+        	stbuf->st_gid = ctx->gid;
+	}
 	stbuf->st_ino = ni->mft_no;
 	stbuf->st_atime = ni->last_access_time;
 	stbuf->st_ctime = ni->last_mft_change_time;
@@ -622,7 +657,7 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 }
 
 static int ntfs_fuse_open(const char *org_path,
-		struct fuse_file_info *fi __attribute__((unused)))
+		struct fuse_file_info *fi)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni;
@@ -631,6 +666,8 @@ static int ntfs_fuse_open(const char *org_path,
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	int accesstype;
+	struct SECURITY_CONTEXT security;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -640,8 +677,22 @@ static int ntfs_fuse_open(const char *org_path,
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
-			if (NAttrEncrypted(na))
-				res = -EACCES;
+			if (ntfs_fuse_fill_security_context(&security)) {
+				if (fi->flags & O_WRONLY)
+					accesstype = S_IWRITE;
+				else
+					if (fi->flags & O_RDWR)
+						 accesstype = S_IWRITE | S_IREAD;
+					else
+						accesstype = S_IREAD;
+				if (NAttrEncrypted(na)
+			     /* JPA check whether requested access is allowed */
+				  || !ntfs_allowed_access(&security,path,ni,accesstype))
+					res = -EACCES;
+			} else {
+				if (NAttrEncrypted(na))
+					res = -EACCES;
+			}
 			ntfs_attr_close(na);
 		} else
 			res = -errno;
@@ -685,7 +736,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = ntfs_attr_pread(na, offset, size, buf);
 		if (res < (s64)size)
 			ntfs_log_perror("ntfs_attr_pread partial write (%lld: "
-				"%lld <> %d)", (s64)offset, (s64)size, res);
+				"%lld <> %d)", (long long)offset,
+				(long long)size, res);
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
@@ -736,7 +788,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		res = ntfs_attr_pwrite(na, offset, size, buf);
 		if (res < (s64)size)
 			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
-				"%lld <> %d)", (s64)offset, (s64)size, res);
+				"%lld <> %d)", (long long)offset,
+				(long long)size, res);
 		if (res <= 0) {
 			res = -errno;
 			goto exit;
@@ -768,6 +821,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	struct SECURITY_CONTEXT security;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -781,7 +835,17 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	if (!na)
 		goto exit;
 
+	     /* JPA deny truncation if cannot write */
+	if (ntfs_fuse_fill_security_context(&security)
+	       && !ntfs_allowed_access(&security,org_path,ni,S_IWRITE)) {
+		errno = EACCES;
+		ntfs_attr_close(na);
+		goto exit;
+	}
+
+
 	if (ntfs_attr_truncate(na, size))
+	     /* JPA strange : no ntfs_attr_close(na) ? */
 		goto exit;
 	
 	ntfs_fuse_mark_free_space_outdated();
@@ -798,85 +862,218 @@ exit:
 }
 
 static int ntfs_fuse_chmod(const char *path,
-		mode_t mode __attribute__((unused)))
+		mode_t mode)
 {
+	int res = 0;
+	ntfs_inode *ni;
+	struct SECURITY_CONTEXT security;
+
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	if (ctx->silent)
-		return 0;
-	return -EOPNOTSUPP;
+
+	  /* JPA return unsupported if no user mapping has been defined */
+	if (!ntfs_fuse_fill_security_context(&security)) {
+		if (ctx->silent)
+			res = 0;
+		else
+			res = -EOPNOTSUPP;
+	} else {
+		   /* parent directory must be executable */
+		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!ni)
+				res = -errno;
+			else {
+				if (ntfs_set_mode(&security,path,ni,mode))
+					res = -errno;
+				ntfs_fuse_mark_free_space_outdated(); /* temp */
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		} else
+			res = -errno;
+	}
+	return res;
 }
 
 static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 {
+	ntfs_inode *ni;
+	int res;
+	struct SECURITY_CONTEXT security;
+
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	if (ctx->silent)
-		return 0;
-	if (uid == ctx->uid && gid == ctx->gid)
-		return 0;
-	return -EOPNOTSUPP;
+	if (!ntfs_fuse_fill_security_context(&security)) {
+		if (ctx->silent)
+			return 0;
+		if (uid == ctx->uid && gid == ctx->gid)
+			return 0;
+		return -EOPNOTSUPP;
+	} else {
+		   /* parent directory must be executable */
+		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!ni)
+				res = -errno;
+			else {
+				res = ntfs_set_owner(&security,
+					path,ni,uid,gid);
+				ntfs_fuse_mark_free_space_outdated(); /* temp */
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		} else
+			res = -errno;
+	}
+	return (res);
 }
 
-static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
+static int ntfs_fuse_access(const char *path, int type)
+{
+	int res = 0;
+	int mode;
+	ntfs_inode *ni;
+	struct SECURITY_CONTEXT security;
+
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+
+	  /* JPA return unsupported if no user mapping has been defined */
+	if (!ntfs_fuse_fill_security_context(&security)) {
+		if (ctx->silent)
+			res = 0;
+		else
+			res = -EOPNOTSUPP;
+	} else {
+		   /* parent directory must be readable */
+		   /* this is supposed to imply access to outer dirs */
+		if (ntfs_allowed_dir_access(&security,path,S_IREAD)) {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!type || !ni) {
+				res = -errno;
+			} else {
+				mode = 0;
+				if (type & X_OK) mode += S_IEXEC;
+				if (type & W_OK) mode += S_IWRITE;
+				if (type & R_OK) mode += S_IREAD;
+				if (ntfs_allowed_access(&security,path,ni,mode))
+					res = -errno;
+				if (ni && ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		} else
+			res = -errno;
+	}
+	return (res ? 0 : 1);
+}
+
+static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 		const char *target)
 {
 	char *name;
 	ntfschar *uname = NULL, *utarget = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
+	char *dir_path;
+	le32 securid;
 	char *path;
+	ntfschar *stream_name;
+	int stream_name_len;
+	dev_t type = typemode & ~0777;
+	mode_t perm;
+	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len, utarget_len;
 
-	path = strdup(org_path);
-	if (!path)
+	dir_path = strdup(org_path);
+	if (!dir_path)
 		return -errno;
 	/* Generate unicode filename. */
-	name = strrchr(path, '/');
+	name = strrchr(dir_path, '/');
 	name++;
 	uname_len = ntfs_mbstoucs(name, &uname, 0);
 	if (uname_len < 0) {
 		res = -errno;
 		goto exit;
 	}
+	stream_name_len = ntfs_fuse_parse_path(org_path,
+					 &path, &stream_name);
+	if (stream_name_len < 0) {
+		res = stream_name_len;
+		goto exit;
+	}
 	/* Open parent directory. */
 	*name = 0;
-	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, dir_path);
 	if (!dir_ni) {
+		free(path);
 		res = -errno;
 		goto exit;
 	}
-	/* Create object specified in @type. */
-	switch (type) {
-		case S_IFCHR:
-		case S_IFBLK:
-			ni = ntfs_create_device(dir_ni, uname, uname_len, type,
-					dev);
-			break;
-		case S_IFLNK:
-			utarget_len = ntfs_mbstoucs(target, &utarget, 0);
-			if (utarget_len < 0) {
-				res = -errno;
-				goto exit;
+		/* JPA make sure parent directory is writeable and executable */
+	if (!ntfs_fuse_fill_security_context(&security)
+	       || ntfs_allowed_access(&security,dir_path,
+				dir_ni,S_IWRITE + S_IEXEC)) {
+			/*
+			 * JPA if parent directory has an inheritable
+			 * security descriptor, make it available for
+			 * file creation. However this inheritance will
+			 * be lost when creation is applied if user
+			 * mapping has been defined
+			 */
+		if (test_nino_flag(dir_ni, v3_Extensions))
+			securid = dir_ni->security_id;
+		else
+			securid = cpu_to_le32(0);
+		/* Create object specified in @type. */
+		switch (type) {
+			case S_IFCHR:
+			case S_IFBLK:
+				ni = ntfs_create_device(dir_ni, securid,
+						uname, uname_len, type,	dev);
+				break;
+			case S_IFLNK:
+				utarget_len = ntfs_mbstoucs(target, &utarget, 0);
+				if (utarget_len < 0) {
+					res = -errno;
+					goto exit;
+				}
+				ni = ntfs_create_symlink(dir_ni, securid,
+						uname, uname_len,
+						utarget, utarget_len);
+				break;
+			default:
+				ni = ntfs_create(dir_ni, securid, uname,
+						uname_len, type);
+				break;
+		}
+		if (ni) {
+ /* ! JPA ! did not find where to get umask from ! */
+			if (S_ISDIR(type))
+				perm = typemode & ~ctx->dmask & 0777;
+			else
+				perm = typemode & ~ctx->fmask & 0777;
+			if (!ctx->inherit
+			   && ntfs_fuse_fill_security_context(&security)) {
+			   	if (ntfs_set_owner_mode(&security,path,ni,
+					security.uid,security.gid,perm) < 0)
+					set_fuse_error(&res);
+				ntfs_fuse_mark_free_space_outdated(); /* temp */
 			}
-			ni = ntfs_create_symlink(dir_ni, uname, uname_len,
-					utarget, utarget_len);
-			break;
-		default:
-			ni = ntfs_create(dir_ni, uname, uname_len, type);
-			break;
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
+
 	}
-	if (ni) {
-		if (ntfs_inode_close(ni))
-			set_fuse_error(&res);
-	} else
-		res = -errno;
+	free(path);
+
 exit:
 	free(uname);
 	if (dir_ni && ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
 	if (utarget)
 		free(utarget);
-	free(path);
+	free(dir_path);
 	return res;
 }
 
@@ -911,7 +1108,7 @@ static int ntfs_fuse_create_stream(const char *path,
 }
 
 static int ntfs_fuse_create_file(const char *org_path, mode_t mode, 
-			struct fuse_file_info *fi __attribute__((unused)))
+			struct fuse_file_info *fi)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -922,7 +1119,7 @@ static int ntfs_fuse_create_file(const char *org_path, mode_t mode,
 	if (stream_name_len < 0)
 		return stream_name_len;
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT, 0, NULL);
+		res = ntfs_fuse_create(path, mode, 0, NULL);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
@@ -948,7 +1145,7 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT, dev, NULL);
+		res = ntfs_fuse_create(path, mode & (S_IFMT | 0777), dev, NULL);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
@@ -980,6 +1177,7 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 	ntfschar *uname = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *path;
+	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len;
 
 	if (ntfs_fuse_is_named_data_stream(old_path))
@@ -995,7 +1193,7 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -errno;
 		goto exit;
 	}
-	
+
 	if (!mtime)
 		NInoSetNoMtimeUpdate(ni);
 	
@@ -1014,10 +1212,18 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -errno;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
-	/* Create hard link. */
-	if (ntfs_link(ni, dir_ni, uname, uname_len))
-		res = -errno;
+
+		/* JPA make sure the parent directory is writeable */
+	if (ntfs_fuse_fill_security_context(&security)
+	   && !ntfs_allowed_access(&security,path,dir_ni,S_IWRITE))
+		res = -EACCES;
+	else {
+
+		ntfs_fuse_mark_free_space_outdated();
+		/* Create hard link. */
+		if (ntfs_link(ni, dir_ni, uname, uname_len))
+			res = -errno;
+	}
 exit:
 	/* 
 	 * Must close dir_ni first otherwise ntfs_inode_sync_file_name(ni)
@@ -1106,16 +1312,22 @@ static int ntfs_fuse_unlink(const char *org_path)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	struct SECURITY_CONTEXT security;
 	int res = 0;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	if (!stream_name_len)
-		res = ntfs_fuse_rm(path);
-	else
-		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-	ntfs_fuse_mark_free_space_outdated();
+
+		   /* JPA deny unlinking if directory is not writable and executable */
+	if (!ntfs_fuse_fill_security_context(&security)
+	   || ntfs_allowed_dir_access(&security,path,S_IEXEC + S_IWRITE)) {
+		if (!stream_name_len)
+			res = ntfs_fuse_rm(path);
+		else
+			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
+		ntfs_fuse_mark_free_space_outdated();
+	}
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1167,6 +1379,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	int ret, len;
 	char *tmp;
 	const char *ext = ".ntfs-3g-";
+
 
 	ntfs_log_trace("Entering\n");
 	
@@ -1235,12 +1448,12 @@ out:
 }
 
 static int ntfs_fuse_mkdir(const char *path,
-		mode_t mode __attribute__((unused)))
+		mode_t mode)
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
 	ntfs_fuse_mark_free_space_outdated();
-	return ntfs_fuse_create(path, S_IFDIR, 0, NULL);
+	return ntfs_fuse_create(path, S_IFDIR | (mode & 0777), 0, NULL);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
@@ -1261,9 +1474,6 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	
-	NInoSetNoParentMtimeUpdate(ni);
-	
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;
@@ -1624,6 +1834,12 @@ static void ntfs_fuse_destroy(void)
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to cleanly unmount volume %s",
 					opts.device);
+		if (ctx->seccache)
+			ntfs_log_info("Cache attempts %lu reads %lu writes %lu\n",
+			      ctx->seccache->head.attempts,
+			      ctx->seccache->head.reads,
+			      ctx->seccache->head.writes);
+
 	}
 	free(ctx);
 	ctx = NULL;
@@ -1646,6 +1862,7 @@ static struct fuse_operations ntfs_fuse_oper = {
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
+	.access		= ntfs_fuse_access,
 	.create		= ntfs_fuse_create_file,
 	.mknod		= ntfs_fuse_mknod,
 	.symlink	= ntfs_fuse_symlink,
@@ -1896,6 +2113,12 @@ static char *parse_mount_options(const char *orig_opts)
 		} else if (!strcmp(opt, "blksize")) {
 			ntfs_log_info("WARNING: blksize option is ignored "
 				      "because ntfs-3g must calculate it.\n");
+		} else if (!strcmp(opt, "inherit")) {
+			/*
+			 * JPA do not overwrite inherited permissions
+			 * in create()
+			 */
+			ctx->inherit = TRUE;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -2255,7 +2478,7 @@ int main(int argc, char *argv[])
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}
-	
+
 	if (use_blkdev) {
 	    set_fuseblk_options(parsed_options);
 	    set_user_mount_option(parsed_options, uid);
@@ -2312,6 +2535,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	ctx->seccache = (struct SECURITY_CACHE*)NULL;
+
 	ntfs_log_info("Version %s\n", VERSION);
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
@@ -2319,7 +2544,13 @@ int main(int argc, char *argv[])
 			ctx->vol->minor_ver);
 	ntfs_log_info("Cmdline options: %s\n", opts.options);
 	ntfs_log_info("Mount options: %s\n", parsed_options);
-	
+	ctx->security.vol = ctx->vol;
+	ctx->security.uid = ctx->uid;
+	ctx->security.gid = ctx->gid;
+	if (!ntfs_build_mapping(&ctx->security)) /* JPA build user mapping (right place ?) */
+		ntfs_log_info("User mapping built\n");
+	else
+		ntfs_log_info("Failed to build user mapping\n");
 	fuse_loop(fh);
 	
 	fuse_unmount(opts.mnt_point, fc);
