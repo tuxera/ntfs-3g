@@ -62,6 +62,7 @@ typedef enum {
 	NTFS_MNT_CASE_SENSITIVE	= 4,
 	NTFS_MNT_NOT_EXCLUSIVE	= 8,
 	NTFS_MNT_FORCE		= 16,
+	NTFS_MNT_INTERIX	= 32,
 } ntfs_mount_flags;
 
 /**
@@ -91,6 +92,8 @@ typedef enum {
 				      it. */
 	NV_ForensicMount,	/* 1: Mount is forensic, i.e. no modifications
 				      are to be done by mount/umount. */
+	NV_Interix,		/* 1: Make libntfs recognize Interix special
+				      files. */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -116,6 +119,10 @@ typedef enum {
 #define NVolForensicMount(nv)		 test_nvol_flag(nv, ForensicMount)
 #define NVolSetForensicMount(nv)	  set_nvol_flag(nv, ForensicMount)
 #define NVolClearForensicMount(nv)	clear_nvol_flag(nv, ForensicMount)
+
+#define NVolInterix(nv)			 test_nvol_flag(nv, Interix)
+#define NVolSetInterix(nv)		  set_nvol_flag(nv, Interix)
+#define NVolClearInterix(nv)		clear_nvol_flag(nv, Interix)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.

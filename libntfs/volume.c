@@ -475,6 +475,8 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
 		NVolSetReadOnly(vol);
 	if (flags & NTFS_MNT_CASE_SENSITIVE)
 		NVolSetCaseSensitive(vol);
+	if (flags & NTFS_MNT_INTERIX)
+		NVolSetInterix(vol);
 	ntfs_log_debug("Reading bootsector... ");
 	if (dev->d_ops->open(dev, NVolReadOnly(vol) ? O_RDONLY :
 				((flags & NTFS_MNT_NOT_EXCLUSIVE) ? O_RDWR :
@@ -869,6 +871,7 @@ static long ntfs_volume_get_nr_free_clusters(ntfs_volume *vol)
  *	NTFS_MNT_FORENSIC	- mount for forensic purposes, i.e. do not do
  *				  any writing at all during the mount, i.e. no
  *				  journal emptying, no dirty bit setting, etc.
+ *	NTFS_MNT_INTERIX	- make libntfs recognize special Interix files
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
