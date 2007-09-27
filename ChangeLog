@@ -133,6 +133,15 @@ xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- ntfsmount: st_block calculation was wrong.  (Yuval)
 	- mkntfs: Use Vista $Boot rather than XP one.  (Anton)
 	- ntfsmount: use utimens() instead of deprecated utime().  (Yura)
+	- libntfs: Ignore bootsector checksum inconsistencies as too many 3rd
+	  party utilities update the boot sector without correcting the
+	  checksum.  Ported change from kernel driver.  (Anton)
+	- ntfsdecrypt: Major improvement!  We now validate the .pfx file to be
+	  the right type of RSA key and we also determine the thumbprint and
+	  compare the one in the keys to the one in the .pfx file thus we only
+	  try to decrypt the FEK once we have the correct key.  Several other
+	  bug fixes leading to crashes.  Also make compilation work on OS X
+	  when gnutls is otherwise not found.  (Anton, Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 

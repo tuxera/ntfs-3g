@@ -2,7 +2,7 @@
  * ntfsdecrypt - Decrypt ntfs encrypted files.  Part of the Linux-NTFS project.
  *
  * Copyright (c) 2005 Yuval Fledel
- * Copyright (c) 2005 Anton Altaparmakov
+ * Copyright (c) 2005-2007 Anton Altaparmakov
  *
  * This utility will decrypt files and print the decrypted data on the standard
  * output.
@@ -65,6 +65,19 @@
 #include "version.h"
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
+
+#define NTFS_SHA1_THUMBPRINT_SIZE 0x14
+
+#define NTFS_CRED_TYPE_CERT_THUMBPRINT const_cpu_to_le32(3)
+
+#define NTFS_EFS_CERT_PURPOSE_OID_DDF "1.3.6.1.4.1.311.10.3.4"
+#define NTFS_EFS_CERT_PURPOSE_OID_DRF "1.3.6.1.4.1.311.10.3.4.1"
+
+typedef enum {
+	DF_TYPE_UNKNOWN,
+	DF_TYPE_DDF,
+	DF_TYPE_DRF,
+} NTFS_DF_TYPES;
 
 /**
  * enum NTFS_CRYPTO_ALGORITHMS - List of crypto algorithms used by EFS (32 bit)
@@ -440,18 +453,33 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 }
 
 /**
+ * ntfs_rsa_private_key_release
+ */
+static void ntfs_rsa_private_key_release(ntfs_rsa_private_key rsa_key)
+{
+	gcry_sexp_release((gcry_sexp_t)rsa_key);
+}
+
+/**
  * ntfs_pkcs12_extract_rsa_key
  */
 static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
-		char *password)
+		char *password, char *thumbprint, int thumbprint_size,
+		NTFS_DF_TYPES *df_type)
 {
 	int err, bag_index, flags;
 	gnutls_datum_t dpfx, dkey;
-	gnutls_pkcs12_t pkcs12;
-	gnutls_pkcs12_bag_t bag;
-	gnutls_x509_privkey_t pkey;
+	gnutls_pkcs12_t pkcs12 = NULL;
+	gnutls_pkcs12_bag_t bag = NULL;
+	gnutls_x509_privkey_t pkey = NULL;
+	gnutls_x509_crt_t crt = NULL;
 	ntfs_rsa_private_key rsa_key = NULL;
+	char purpose_oid[100];
+	size_t purpose_oid_size = sizeof(purpose_oid);
+	size_t tp_size = thumbprint_size;
+	BOOL have_thumbprint = FALSE;
 
+	*df_type = DF_TYPE_UNKNOWN;
 	/* Create a pkcs12 structure. */
 	err = gnutls_pkcs12_init(&pkcs12);
 	if (err) {
@@ -467,7 +495,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 		ntfs_log_error("Failed to convert the PFX file from DER to "
 				"native PKCS#12 format: %s\n",
 				gnutls_strerror(err));
-		goto out;
+		goto err;
 	}
 	/*
 	 * Verify that the password is correct and that the key file has not
@@ -484,9 +512,9 @@ retry_verify:
 			password = NULL;
 			goto retry_verify;
 		}
-		ntfs_log_error("Failed to verify the MAC (%s).  Is the "
+		ntfs_log_error("Failed to verify the MAC: %s  Is the "
 				"password correct?\n", gnutls_strerror(err));
-		goto out;
+		goto err;
 	}
 	for (bag_index = 0; ; bag_index++) {
 		err = gnutls_pkcs12_bag_init(&bag);
@@ -494,29 +522,31 @@ retry_verify:
 			ntfs_log_error("Failed to initialize PKCS#12 Bag "
 					"structure: %s\n",
 					gnutls_strerror(err));
-			goto out;
+			goto err;
 		}
 		err = gnutls_pkcs12_get_bag(pkcs12, bag_index, bag);
 		if (err) {
-			if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+			if (err == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+				err = 0;
 				break;
+			}
 			ntfs_log_error("Failed to obtain Bag from PKCS#12 "
 					"structure: %s\n",
 					gnutls_strerror(err));
-			goto bag_out;
+			goto err;
 		}
 check_again:
 		err = gnutls_pkcs12_bag_get_count(bag);
 		if (err < 0) {
 			ntfs_log_error("Failed to obtain Bag count: %s\n",
 					gnutls_strerror(err));
-			goto bag_out;
+			goto err;
 		}
 		err = gnutls_pkcs12_bag_get_type(bag, 0);
 		if (err < 0) {
 			ntfs_log_error("Failed to determine Bag type: %s\n",
 					gnutls_strerror(err));
-			goto bag_out;
+			goto err;
 		}
 		flags = 0;
 		switch (err) {
@@ -527,14 +557,14 @@ check_again:
 			if (err < 0) {
 				ntfs_log_error("Failed to obtain Bag data: "
 						"%s\n", gnutls_strerror(err));
-				goto bag_out;
+				goto err;
 			}
 			err = gnutls_x509_privkey_init(&pkey);
 			if (err) {
 				ntfs_log_error("Failed to initialized "
 						"private key structure: %s\n",
 						gnutls_strerror(err));
-				goto bag_out;
+				goto err;
 			}
 			/* Decrypt the private key into GNU TLS format. */
 			err = gnutls_x509_privkey_import_pkcs8(pkey, &dkey,
@@ -544,7 +574,7 @@ check_again:
 						"key from DER to GNU TLS "
 						"format: %s\n",
 						gnutls_strerror(err));
-				goto key_out;
+				goto err;
 			}
 #if 0
 			/*
@@ -572,36 +602,108 @@ check_again:
 #endif
 			/* Convert the private key to our internal format. */
 			rsa_key = ntfs_rsa_private_key_import_from_gnutls(pkey);
-			goto key_out;
+			if (!rsa_key)
+				goto err;
+			break;
 		case GNUTLS_BAG_ENCRYPTED:
 			err = gnutls_pkcs12_bag_decrypt(bag, password);
 			if (err) {
 				ntfs_log_error("Failed to decrypt Bag: %s\n",
 						gnutls_strerror(err));
-				goto bag_out;
+				goto err;
 			}
 			goto check_again;
+		case GNUTLS_BAG_CERTIFICATE:
+			err = gnutls_pkcs12_bag_get_data(bag, 0, &dkey);
+			if (err < 0) {
+				ntfs_log_error("Failed to obtain Bag data: "
+						"%s\n", gnutls_strerror(err));
+				goto err;
+			}
+			err = gnutls_x509_crt_init(&crt);
+			if (err) {
+				ntfs_log_error("Failed to initialize "
+						"certificate structure: %s\n",
+						gnutls_strerror(err));
+				goto err;
+			}
+			err = gnutls_x509_crt_import(crt, &dkey,
+					GNUTLS_X509_FMT_DER);
+			if (err) {
+				ntfs_log_error("Failed to convert certificate "
+						"from DER to GNU TLS format: "
+						"%s\n", gnutls_strerror(err));
+				goto err;
+			}
+			err = gnutls_x509_crt_get_key_purpose_oid(crt, 0,
+					purpose_oid, &purpose_oid_size, NULL);
+			if (err) {
+				ntfs_log_error("Failed to get key purpose "
+						"OID: %s\n",
+						gnutls_strerror(err));
+				goto err;
+			}
+			purpose_oid[purpose_oid_size - 1] = '\0';
+			if (!strncmp(purpose_oid,
+					NTFS_EFS_CERT_PURPOSE_OID_DRF,
+					strlen(
+					NTFS_EFS_CERT_PURPOSE_OID_DRF)))
+				*df_type = DF_TYPE_DRF;
+			else if (!strncmp(purpose_oid,
+					NTFS_EFS_CERT_PURPOSE_OID_DDF,
+					strlen(
+					NTFS_EFS_CERT_PURPOSE_OID_DDF)))
+				*df_type = DF_TYPE_DDF;
+			else {
+				ntfs_log_error("Certificate has unknown "
+						"purpose OID %s.\n",
+						purpose_oid);
+				err = EINVAL;
+				goto err;
+			}
+			/* Return the thumbprint to the caller. */
+			err = gnutls_x509_crt_get_fingerprint(crt,
+					GNUTLS_DIG_SHA1, thumbprint, &tp_size);
+			if (err) {
+				ntfs_log_error("Failed to get thumbprint: "
+						"%s\n", gnutls_strerror(err));
+				goto err;
+			}
+			if (tp_size != NTFS_SHA1_THUMBPRINT_SIZE) {
+				ntfs_log_error("Invalid thumbprint size %zd.  "
+						"Should be %d.\n", tp_size,
+						thumbprint_size);
+				err = EINVAL;
+				goto err;
+			}
+			have_thumbprint = TRUE;
+			gnutls_x509_crt_deinit(crt);
+			crt = NULL;
+			break;
 		default:
 			/* We do not care about other types. */
 			break;
 		}
 		gnutls_pkcs12_bag_deinit(bag);
 	}
-key_out:
-	gnutls_x509_privkey_deinit(pkey);
-bag_out:
-	gnutls_pkcs12_bag_deinit(bag);
-out:
-	gnutls_pkcs12_deinit(pkcs12);
+err:
+	if (rsa_key && (err || *df_type == DF_TYPE_UNKNOWN ||
+			!have_thumbprint)) {
+		if (!err)
+			ntfs_log_error("Key type or thumbprint not found, "
+					"aborting.\n");
+		ntfs_rsa_private_key_release(rsa_key);
+		rsa_key = NULL;
+	}
+	if (crt)
+		gnutls_x509_crt_deinit(crt);
+	if (pkey)
+		gnutls_x509_privkey_deinit(pkey);
+	if (bag)
+		gnutls_pkcs12_bag_deinit(bag);
+	if (pkcs12)
+		gnutls_pkcs12_deinit(pkcs12);
 	return rsa_key;
-}
-
-/**
- * ntfs_rsa_private_key_release
- */
-static void ntfs_rsa_private_key_release(ntfs_rsa_private_key rsa_key)
-{
-	gcry_sexp_release((gcry_sexp_t)rsa_key);
 }
 
 /**
@@ -964,16 +1066,20 @@ static inline BOOL ntfs_des_test(void)
 /**
  * ntfs_fek_import_from_raw
  */
-static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
-		unsigned fek_size __attribute__((unused)))
+static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 {
 	ntfs_fek *fek;
 	u32 key_size, wanted_key_size, gcry_algo;
 	gcry_error_t err;
 
-	// TODO: Sanity checking of sizes and offsets.
 	key_size = le32_to_cpup(fek_buf);
-	//ntfs_log_debug("key_size 0x%x\n", key_size);
+	ntfs_log_debug("key_size 0x%x\n", key_size);
+	if (key_size + 16 > fek_size) {
+		ntfs_log_debug("Invalid FEK.  It was probably decrypted with "
+				"the incorrect RSA key.");
+		errno = EINVAL;
+		return NULL;
+	}
 	fek = malloc(((((sizeof(*fek) + 7) & ~7) + key_size + 7) & ~7) +
 			sizeof(gcry_cipher_hd_t));
 	if (!fek) {
@@ -1032,7 +1138,8 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
 	}
 	if (key_size != wanted_key_size) {
 		ntfs_log_error("%s key of %u bytes but needed size is %u "
-				"bytes, assuming corrupt key.  Aborting.\n",
+				"bytes, assuming corrupt or incorrect key.  "
+				"Aborting.\n",
 				gcry_cipher_algo_name(gcry_algo),
 				(unsigned)key_size, (unsigned)wanted_key_size);
 		err = EIO;
@@ -1076,7 +1183,8 @@ static void ntfs_fek_release(ntfs_fek *fek)
  * ntfs_df_array_fek_get
  */
 static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
-		ntfs_rsa_private_key rsa_key)
+		ntfs_rsa_private_key rsa_key, char *thumbprint,
+		int thumbprint_size)
 {
 	EFS_DF_HEADER *df_header;
 	EFS_DF_CREDENTIAL_HEADER *df_cred;
@@ -1086,14 +1194,41 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 	u32 df_count, fek_size;
 	unsigned i;
 
-	df_header = (EFS_DF_HEADER*)(df_array + 1);
 	df_count = le32_to_cpu(df_array->df_count);
-	for (i = 0; i < df_count; i++) {
+	if (!df_count)
+		ntfs_log_error("There are no elements in the DF array.\n");
+	df_header = (EFS_DF_HEADER*)(df_array + 1);
+	for (i = 0; i < df_count; i++, df_header = (EFS_DF_HEADER*)(
+			(u8*)df_header + le32_to_cpu(df_header->df_length))) {
 		df_cred = (EFS_DF_CREDENTIAL_HEADER*)((u8*)df_header +
 				le32_to_cpu(df_header->cred_header_offset));
+		if (df_cred->type != NTFS_CRED_TYPE_CERT_THUMBPRINT) {
+			ntfs_log_debug("Credential type is not certificate "
+					"thumbprint, skipping DF entry.\n");
+			continue;
+		}
 		df_cert = (EFS_DF_CERT_THUMBPRINT_HEADER*)((u8*)df_cred +
 				le32_to_cpu(
 				df_cred->cert_thumbprint_header_offset));
+		if (le32_to_cpu(df_cert->thumbprint_size) != thumbprint_size) {
+			ntfs_log_error("Thumbprint size %d is not valid "
+					"(should be %d), skipping this DF "
+					"entry.\n",
+					le32_to_cpu(df_cert->thumbprint_size),
+					thumbprint_size);
+			continue;
+		}
+		if (memcmp((u8*)df_cert +
+				le32_to_cpu(df_cert->thumbprint_offset),
+				thumbprint, thumbprint_size)) {
+			ntfs_log_debug("Thumbprints do not match, skipping "
+					"this DF entry.\n");
+			continue;
+		}
+		/*
+		 * The thumbprints match so this is probably the DF entry
+		 * matching the RSA key.  Try to decrypt the FEK with it.
+		 */
 		fek_size = le32_to_cpu(df_header->fek_size);
 		fek_buf = (u8*)df_header + le32_to_cpu(df_header->fek_offset);
 		/* Decrypt the FEK.  Note: This is done in place. */
@@ -1108,8 +1243,6 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 		} else
 			ntfs_log_error("Failed to decrypt the file "
 					"encryption key.\n");
-		df_header = (EFS_DF_HEADER*)((u8*)df_header +
-				le32_to_cpu(df_header->df_length));
 	}
 	return NULL;
 }
@@ -1118,10 +1251,11 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
  * ntfs_inode_fek_get -
  */
 static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
-		ntfs_rsa_private_key rsa_key)
+		ntfs_rsa_private_key rsa_key, char *thumbprint,
+		int thumbprint_size, NTFS_DF_TYPES df_type)
 {
 	EFS_ATTR_HEADER *efs;
-	EFS_DF_ARRAY_HEADER *df_array;
+	EFS_DF_ARRAY_HEADER *df_array = NULL;
 	ntfs_fek *fek = NULL;
 
 	/* Obtain the $EFS contents. */
@@ -1130,17 +1264,29 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 		ntfs_log_perror("Failed to read $EFS attribute");
 		return NULL;
 	}
-	/* Iterate through the DDFs & DRFs until we obtain a key. */
-	if (efs->offset_to_ddf_array) {
-		df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
-				le32_to_cpu(efs->offset_to_ddf_array));
-		fek = ntfs_df_array_fek_get(df_array, rsa_key);
-	}
-	if (!fek && efs->offset_to_drf_array) {
-		df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
-				le32_to_cpu(efs->offset_to_drf_array));
-		fek = ntfs_df_array_fek_get(df_array, rsa_key);
-	}
+	/*
+	 * Depending on whether the key is a normal key or a data recovery key,
+	 * iterate through the DDF or DRF array, respectively.
+	 */
+	if (df_type == DF_TYPE_DDF) {
+		if (efs->offset_to_ddf_array)
+			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
+					le32_to_cpu(efs->offset_to_ddf_array));
+		else
+			ntfs_log_error("There are no entries in the DDF "
+					"array.\n");
+	} else if (df_type == DF_TYPE_DRF) {
+		if (efs->offset_to_drf_array)
+			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
+					le32_to_cpu(efs->offset_to_drf_array));
+		else
+			ntfs_log_error("There are no entries in the DRF "
+					"array.\n");
+	} else
+		ntfs_log_error("Invalid DF type.\n");
+	if (df_array)
+		fek = ntfs_df_array_fek_get(df_array, rsa_key, thumbprint,
+				thumbprint_size);
 	free(efs);
 	return fek;
 }
@@ -1267,6 +1413,8 @@ int main(int argc, char *argv[])
 	ntfs_fek *fek;
 	unsigned pfx_size;
 	int res;
+	NTFS_DF_TYPES df_type;
+	char thumbprint[NTFS_SHA1_THUMBPRINT_SIZE];
 
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
@@ -1295,14 +1443,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	/* Obtain the user's private RSA key from the key file. */
-	rsa_key = ntfs_pkcs12_extract_rsa_key(pfx_buf, pfx_size, password);
+	rsa_key = ntfs_pkcs12_extract_rsa_key(pfx_buf, pfx_size, password,
+			thumbprint, sizeof(thumbprint), &df_type);
 	/* Destroy the password. */
 	memset(password, 0, strlen(password));
 	/* No longer need the pfx file contents. */
 	free(pfx_buf);
 	if (!rsa_key) {
-		ntfs_log_error("Failed to extract the private RSA key.  Did "
-				"you perhaps mistype the password?\n");
+		ntfs_log_error("Failed to extract the private RSA key.\n");
 		ntfs_crypto_deinit();
 		return 1;
 	}
@@ -1328,7 +1476,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	/* Obtain the file encryption key of the encrypted file. */
-	fek = ntfs_inode_fek_get(inode, rsa_key);
+	fek = ntfs_inode_fek_get(inode, rsa_key, thumbprint,
+			sizeof(thumbprint), df_type);
 	ntfs_rsa_private_key_release(rsa_key);
 	if (fek) {
 		res = ntfs_cat_decrypt(inode, fek);

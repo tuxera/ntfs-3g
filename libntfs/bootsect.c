@@ -63,22 +63,26 @@ BOOL ntfs_boot_sector_is_ntfs(NTFS_BOOT_SECTOR *b,
 
 	ntfs_log_debug("\nBeginning bootsector check...\n");
 
-	/* Calculate the checksum. Note, this is just a simple addition of
-	   all u32 values in the bootsector starting at the beginning and
-	   finishing at the offset of the checksum itself (i.e. not including
-	   the checksum...). */
-	if ((void*)b < (void*)&b->checksum) {
+	/*
+	 * Check that checksum == sum of u32 values from b to the checksum
+	 * field.  If checksum is zero, no checking is done.  We will work when
+	 * the checksum test fails, since some utilities update the boot sector
+	 * ignoring the checksum which leaves the checksum out-of-date.  We
+	 * report a warning if this is the case.
+	 */
+	if ((void*)b < (void*)&b->checksum && b->checksum) {
 		u32 *u = (u32 *)b;
 		u32 *bi = (u32 *)(&b->checksum);
 
 		ntfs_log_debug("Calculating bootsector checksum... ");
-
 		for (i = 0; u < bi; ++u)
 			i += le32_to_cpup(u);
-
-		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i)
-			goto not_ntfs;
-		ntfs_log_debug("OK\n");
+		if (le32_to_cpu(b->checksum) && le32_to_cpu(b->checksum) != i) {
+			ntfs_log_debug("FAILED\n");
+			ntfs_log_debug("The NTFS bootsector contains an "
+					"incorrect checksum.");
+		} else
+			ntfs_log_debug("OK\n");
 	}
 
 	/* Check OEMidentifier is "NTFS    " */
