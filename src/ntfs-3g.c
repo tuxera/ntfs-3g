@@ -568,7 +568,14 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
-		struct stat st = { .st_ino = MREF(mref) };
+		struct stat st = {};
+		 
+		st.st_ino = MREF(mref);
+
+		if (dt_type == NTFS_DT_REG)
+			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
+		else if (dt_type == NTFS_DT_DIR)
+			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask); 
 		
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
