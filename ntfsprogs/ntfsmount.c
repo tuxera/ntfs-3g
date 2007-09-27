@@ -594,8 +594,14 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		return 0;
 	}
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user) {
-		struct stat st = { .st_ino = MREF(mref) };
+		struct stat st = {
+			.st_ino = MREF(mref),
+		};
 
+		if (dt_type == NTFS_DT_REG)
+			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
+		if (dt_type == NTFS_DT_DIR)
+			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask);
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
 	free(filename);
@@ -1790,7 +1796,8 @@ static int ntfs_fuse_mount(void)
 			(ctx->case_insensitive ? 0 : NTFS_MNT_CASE_SENSITIVE) |
 			(ctx->blkdev ? NTFS_MNT_NOT_EXCLUSIVE : 0) |
 			(ctx->force ? NTFS_MNT_FORCE : 0) |
-			(ctx->ro ? NTFS_MNT_RDONLY : 0));
+			(ctx->ro ? NTFS_MNT_RDONLY : 0) |
+			NTFS_MNT_INTERIX);
 	if (!vol) {
 		ntfs_log_error("Mount failed.\n");
 		return -1;
