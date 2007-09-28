@@ -1096,7 +1096,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		goto err_out;
 	}
 
-	if (securid) {
+	if (!securid) {
 		if (ntfs_sd_add_everyone(ni)) {
 			err = errno;
 			goto err_out;
