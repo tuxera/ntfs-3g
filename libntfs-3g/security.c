@@ -1069,7 +1069,6 @@ static int merge_permissions(ntfs_inode *ni,
 			if (owner & FILE_GREAD)
 				perm |= S_IRUSR;
 		}
-//TRACE(fprintf(stderr,"owner allow 0x%x deny 0x%x perm 0%03o\n",owner,denyown,perm));
 	}
 	/* build group permission */
 	if (group) {
@@ -1094,7 +1093,6 @@ static int merge_permissions(ntfs_inode *ni,
 			if (group & FILE_GREAD)
 				perm |= S_IRGRP;
 		}
-//TRACE(fprintf(stderr,"group allow 0x%x deny 0x%x perm 0%03o\n",group,denygrp,perm));
 	}
 	/* build world permission */
 	if (world) {
@@ -1159,14 +1157,12 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 				allowown |= pace->mask;
 			else if (pace->type == ACCESS_DENIED_ACE_TYPE)
 				denyown |= pace->mask;
-//TRACE(fprintf(stderr,"owner allow 0x%x deny 0x%x\n",allowown,denyown));
 			} else
 			if (!memcmp(gsid, &pace->sid, gsidsz)) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowgrp |= pace->mask;
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
 					denygrp |= pace->mask;
-//TRACE(fprintf(stderr,"group allow 0x%x deny 0x%x\n",allowgrp,denygrp));
 			} else
 				if (is_world_sid((const SID*)&pace->sid)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
@@ -1174,7 +1170,6 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-//TRACE(fprintf(stderr,"world allow 0x%x deny 0x%x\n",allowall,denyall));
 				}
 			offace += le16_to_cpu(pace->size);
 		}
@@ -1222,13 +1217,11 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 		   && (pace->mask & FILE_WRITE_ATTRIBUTES)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
-//TRACE(fprintf(stderr,"owner allow 0x%x deny 0x%x\n",allowown,denyown));
 			} else
 			if (!memcmp(usid, &pace->sid, usidsz)
 			   && (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowgrp |= pace->mask;
-//TRACE(fprintf(stderr,"group allow 0x%x deny 0x%x\n",allowgrp,denygrp));
 			} else
 				if (is_world_sid((const SID*)&pace->sid)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
@@ -1236,7 +1229,6 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-//TRACE(fprintf(stderr,"world allow 0x%x deny 0x%x\n",allowall,denyall));
 				}
 			offace += le16_to_cpu(pace->size);
 		}
@@ -1274,7 +1266,6 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	acecnt = le16_to_cpu(pacl->ace_count);
-//TRACE(fprintf(ntfslog,"adminowns %d acecnt %d\n",adminowns,acecnt));
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
@@ -1285,7 +1276,6 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 			else
 				if (pace->type == ACCESS_DENIED_ACE_TYPE)
 					denyown |= pace->mask;
-//TRACE(fprintf(stderr,"owner allow 0x%x deny 0x%x\n",allowown,denyown));
 			} else
 			    if (!memcmp(gsid, &pace->sid, gsidsz)
 				&& (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
@@ -1294,14 +1284,12 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denygrp |= pace->mask;
-//TRACE(fprintf(stderr,"group allow 0x%x deny 0x%x\n",allowgrp,denygrp));
 				} else if (is_world_sid((const SID*)&pace->sid)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						allowall |= pace->mask;
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-//TRACE(fprintf(stderr,"world allow 0x%x deny 0x%x\n",allowall,denyall));
 				}
 			offace += le16_to_cpu(pace->size);
 		}
@@ -2285,7 +2273,7 @@ static int update_secur_descr(ntfs_volume *vol,
 				written = (int)ntfs_attr_pwrite(na, (s64) 0,
 					 (s64) newattrsz, newattr);
 				if (written != newattrsz) {
-					ntfs_log_error("File to update "
+					ntfs_log_error("Failed to update "
 						"a v1.x security descriptor\n");
 					errno = EIO;
 					res = -1;
@@ -2362,7 +2350,7 @@ static int update_secur_descr(ntfs_volume *vol,
  *          Set new permissions to a file
  *  Checks user mapping has been defined before request for setting
  *
- *  rejected is request is not originated by owner or root
+ *  rejected if request is not originated by owner or root
  *  returns 0 on success
  *         -1 on failure, with errno = EIO
  */
@@ -2800,8 +2788,8 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *            Read user mapping file and split into their attribute
- *            parameters are kept as text in a chained list until logins
+ *            Read user mapping file and split into their attribute.
+ *            Parameters are kept as text in a chained list until logins
  *            are converted to uid.
  *            Returns the head of list, if any
  *
@@ -2935,7 +2923,7 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 }
 
 /*
- *	Apply default mapping
+ *	Apply default single user mapping
  *	returns zero if successful
  */
 
@@ -2973,7 +2961,7 @@ int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx, const SID *usid)
 }
 
 /*
- *	Try and apply default mapping
+ *	Try and apply default single user mapping
  *	returns zero if successful
  */
 
@@ -3005,7 +2993,7 @@ int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 /*
  *	Build the user mapping
  *	- according to $Mapping file if present,
- *	- or try default mapping if possible
+ *	- or try default single user mapping if possible
  *
  *          The mapping is specific to a mounted device
  *       No locking done, mounting assumed non multithreaded
