@@ -1211,11 +1211,16 @@ static const char * ntfs_dump_lcn(LCN lcn)
 	}
 }
 
-static void ntfs_dump_attribute_header(ATTR_RECORD *a, ntfs_volume *vol)
+static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
+		ntfs_volume *vol)
 {
-	printf("Dumping attribute %s (0x%x)\n",
+	ATTR_RECORD *a = ctx->attr;
+
+	printf("Dumping attribute %s (0x%x) from mft record %lld (0x%llx)\n",
 			get_attribute_type_name(a->type),
-			(unsigned)le32_to_cpu(a->type));
+			(unsigned)le32_to_cpu(a->type),
+			(unsigned long long)ctx->ntfs_ino->mft_no,
+			(unsigned long long)ctx->ntfs_ino->mft_no);
 
 	ntfs_log_verbose("\tAttribute length:\t %u (0x%x)\n",
 			(unsigned)le32_to_cpu(a->length),
@@ -2153,7 +2158,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			continue;
 		}
 
-		ntfs_dump_attribute_header(ctx->attr, inode->vol);
+		ntfs_dump_attribute_header(ctx, inode->vol);
 
 		switch (ctx->attr->type) {
 		case AT_STANDARD_INFORMATION:
