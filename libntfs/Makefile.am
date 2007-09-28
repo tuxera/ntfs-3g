@@ -92,7 +92,7 @@ man_MANS = libntfs.8 \
 
 AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
+EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in config
 
 MAINTAINERCLEANFILES = Makefile.in
 
