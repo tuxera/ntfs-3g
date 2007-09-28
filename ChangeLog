@@ -1,4 +1,5 @@
-xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
+28/09/2007 - 2.0.0 - ntfsmount sports full read/write, libntfs can read
+		     encrypted files and ntfsresize supports Vista.
 
 	- ntfsmount now creates files and directories with security descriptor
 	  that grant full access to everyone.  (Yura)
@@ -14,10 +15,10 @@ xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	  record.  (Yura)
 	- calloc/malloc -> ntfs_{calloc,malloc} conversions.  (Szaka)
 	- ntfsclone: don't create image files with executable bit set.  (Szaka)
-	- ntfsclone: metadata cloning: write out extent records.  (Szaka) 
+	- ntfsclone: metadata cloning: write out extent records.  (Szaka)
 	- ntfsclone: fix sometimes missing error messages and be more
 	  detailed.  (Szaka)
-	- ntfsclone: fix crash in wipe_index_allocation_timestamps(): don't 
+	- ntfsclone: fix crash in wipe_index_allocation_timestamps(): don't
 	  dump empty index allocation attribute.  (Szaka)
 	- ntfscmp: fine grained AT_INDEX_ALLOCATION comparison.  (Szaka)
 	- ntfsinfo: rename 'Flags:' fields to be unique.  (Szaka)
@@ -31,7 +32,7 @@ xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	- ntfsinfo: redirect stderr to /dev/null if --debug isn't used in
 	  debug mode.  (Szaka)
 	- ntfsinfo: fix segfaults on corrupt index blocks.  (Szaka)
-	- ntfsinfo: dump number of entries per block in index allocation 
+	- ntfsinfo: dump number of entries per block in index allocation
 	  attributes.  (Szaka)
 	- ntfsinfo: dump ATTR_LIST_ENTRY padding in verbose mode. (Szaka)
 	- ntfsinfo: dump all VCN's in the same numeral system.  (Szaka)
@@ -142,6 +143,67 @@ xx/03/2007 - 2.0.0 - ntfsmount sports full r/w and ntfsresize supports Vista.
 	  try to decrypt the FEK once we have the correct key.  Several other
 	  bug fixes leading to crashes.  Also make compilation work on OS X
 	  when gnutls is otherwise not found.  (Anton, Yura)
+	- ntfsmount: fix errno in truncate() operation.  (Yura)
+	- Add new API: __ntfs_attr_truncate that allow user to select whether
+	  holes should be created or clusters allocated.  (Yura)
+	- Add new API: ntfs_attr_map_runlist_range to map part of runlist from
+	  selected VCN to selected VCN.  (Yura)
+	- Make ntfs_attr_update_mapping_pairs to be mostly O(1) for normal
+	  files.  (Yura)
+	- Introduce sparse bitwise annotations to automatically catch endian
+	  bugs. Adopt libntfs (and fix 2 bugs) and ntfsprogs (and fix lots of
+	  bugs).  (Yura)
+	- ntfsinfo: nicely dump special LCN values.  (Yura)
+	- Transparently integrate reading of encrypted files into library.
+	  This adds crypto.[ch], several exported functions that you are not
+	  interested to use and dependency on >=libconfig-1.0.1 to read list of
+	  PFX files with keys. See libntfs/config for example configuration
+	  file.  (Yura)
+	- Add new API ntfs_attr_get_name - returns pointer to unicode name of
+	  attribute.  (Yura)
+	- ntfsinfo: Dump raw content of LOGGED_UTILITY_STREAM in verbose
+	  mode.  (Yura)
+	- Export NTFS_EFS string.  (Yura)
+	- Merge --enable-debug and --enable-debug-logging.  (Yura)
+	- Add --enable-sparse configure option.  (Yura)
+	- Fix corner case in hole instantiating in ntfs_attr_pwrite().  (Szaka)
+	- Fix heavy memory usage during whole instantiating and add new API:
+	  ntfs_rl_fill_zero.  (Szaka, Yura)
+	- ntfs_delete() now takes pointer to pointer to ntfs_inode for file to
+	  delete and closes inode only in cases there are no more hard links
+	  left to file.  (Yura)
+	- Library no longer perform time updates, only provides API for
+	  performing time updates. Remove ntfs_inode_update_{a,}time() and
+	  introduce ntfs_inode_update_times(). Make ntfsmount update time
+	  according to SUS.  (Yura)
+	- Fix cache handling in utils_attr_get_name.  (Bogdan, Yura)
+	- ntfsmount: Submit inode number during readdir.  (Ted Anderson, Szaka)
+	- Fix syslog logging handler to respect all logging flags.  (Yura)
+	- ntfs_readdir, ntfs_fuse_filler: return with error if FUSE filler
+	  failed.  (Szaka, Yura)
+	- Fix rare directory corruption in index code.  (Szaka, Yura)
+	- ntfsmount: Mount block devices with blkdev mount option.  (Yura)
+	- ntfsmount: Add set-uid-root binary support.  (Yura)
+	- ntfsmount: Implement {no,}relatime (relative atime) options.  (Yura)
+	- Make libntfs keep track number of free clusters and MFT records.
+	  Thanks to David Fox and Szabolcs Szakacsits for idea.  (Yura)
+	- ntfsmount: Add bmap support.  (Szaka, Yura)
+	- Introduce NTFS_MNT_FORCE instead of third parameter (force) of
+	  utils_mount_volume.  (Yura)
+	- ntfs_attr_pwrite: Write 4096 bytes blocks when possible.  (David Fox,
+	  Szaka, Anton, Yura)
+	- Allow mounting volumes with non-clean logfile with force mount
+	  option. Thanks to Szaka for idea.  (Yura)
+	- libntfs: Attach opened inodes to volume.  (Yura)
+	- libntfs: Attach opened attributes to inode.  (Yura)
+	- ntfsmount: Save pointer to ntfs_attr in (fuse_file_info *)->fh and
+	  use it in ntfs_fuse_{read,write}.  (Yura)
+	- ntfsmount: Implement .create(), .ftruncate(), .fgetattr().  (Yura)
+	- libntfs: Sync and warn about not closed inodes in ntfs_umount.  (Yura)
+	- ntfsmount: Cache directory in which was performed last
+	  operation.  (Yura)
+	- Install mount.fuse.ntfs symbolic link.  (Yura)
+	- ntfsmount: Fill .st_mode in readdir().  (Szaka, Yura)
 
 21/06/2006 - 1.13.1 - Various fixes.
 
