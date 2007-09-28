@@ -39,7 +39,7 @@ struct MAPPING {
 };
 
 /*
- *           Security context, needed by most security functions
+ *	Entry in the security cache
  */
 
 struct SECURITY_ENTRY {
@@ -48,6 +48,10 @@ struct SECURITY_ENTRY {
 	unsigned int mode:9;
 	unsigned int valid:1;
 } ;
+
+/*
+ *	Header of the security cache
+ */
 
 struct SECURITY_HEAD {
 	int first;
@@ -58,10 +62,18 @@ struct SECURITY_HEAD {
 	unsigned long writes;
 } ;
 
+/*
+ *	The whole security cache
+ */
+
 struct SECURITY_CACHE {
 	struct SECURITY_HEAD head;
-	struct SECURITY_ENTRY cachetable[1];
+	struct SECURITY_ENTRY cachetable[1]; /* array of variable size */
 } ;
+
+/*
+ *	Security context, needed by most security functions
+ */
 
 struct SECURITY_CONTEXT {
 	ntfs_volume *vol;
