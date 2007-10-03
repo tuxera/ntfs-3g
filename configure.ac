@@ -24,8 +24,8 @@
 
 AC_PREREQ(2.59)
 
-AC_INIT([ntfs-3g],[1.913],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION=12:0:0
+AC_INIT([ntfs-3g],[1.1004],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION=13:0:0
 
 AC_CANONICAL_HOST([])
 AC_CANONICAL_TARGET([])
