@@ -51,7 +51,7 @@
  * the update of the mapping pairs which converges to the cubic Faulhaber's
  * formula as the function of the number of extents (fragments, runs).
  */
-#define NTFS_LCNALLOC_BSIZE 8192
+#define NTFS_LCNALLOC_BSIZE 4096
 #define NTFS_LCNALLOC_SKIP  NTFS_LCNALLOC_BSIZE
 
 static void ntfs_cluster_set_zone_pos(LCN start, LCN end, LCN *pos, LCN tc)
@@ -88,6 +88,11 @@ static s64 max_empty_bit_range(unsigned char *buf, int size)
 	ntfs_log_trace("Entering\n");
 	
 	for (i = 0; i < size; i++, buf++) {
+		
+		if (*buf == 0) {
+			run += 8;
+			continue;
+		}
 		
 		for (j = 0; j < 8; j++) {
 			
