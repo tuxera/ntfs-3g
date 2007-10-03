@@ -1098,7 +1098,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
-	int eo;
+	s64 eo, hole;
 	struct {
 		unsigned int undo_initialized_size	: 1;
 		unsigned int undo_data_size		: 1;
@@ -1245,7 +1245,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	 * length.
 	 */
 	ofs = pos - (rl->vcn << vol->cluster_size_bits);
-	for (; count; rl++, ofs = 0) {
+	for (hole = 0; count; rl++, ofs = 0, hole = 0) {
 		if (rl->lcn == LCN_RL_NOT_MAPPED) {
 			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl) {
@@ -1265,6 +1265,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			goto rl_err_out;
 		}
 		if (rl->lcn < (LCN)0) {
+			
+			hole = rl->vcn + rl->length;
 
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
@@ -1284,20 +1286,26 @@ retry:
 		if (!NVolReadOnly(vol)) {
 			
 			s64 pos = (rl->lcn << vol->cluster_size_bits) + ofs;
-			int bsize = vol->cluster_size;
+			u32 bsize = vol->cluster_size;
+			s64 wend = (rl->vcn << vol->cluster_size_bits) + ofs + to_write;
+			s64 rounded  = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
 
 			/*
-			 * Write cluster size blocks if it's possible. This will 
-			 * cause the kernel not to seek and read disk blocks for
-			 * filling the end of the buffer which increases write
-			 * speed at least by 2-11 fold typically.
+			 * Zero fill to cluster boundary if we're writing to an
+			 * ex-sparse cluster or we're at the end of the attribute.
+			 * This will cause the kernel not to seek and read disk 
+			 * blocks during write(2) to fill the end of the buffer 
+			 * which increases write speed by 2-10 fold typically.
 			 */
-			if (!(ofs % bsize) && (to_write % bsize) && 
-			    ((ofs + to_write) == na->initialized_size)) {
+			if ((rounded && (wend < (hole << vol->cluster_size_bits))) || 
+			    (((to_write % bsize) && 
+			      (ofs + to_write == na->initialized_size)))) {
 				
-				s64 rounded = (to_write + bsize - 1) & ~(bsize - 1);
-				char *cb = ntfs_malloc(rounded);
+				char *cb;
 				
+				rounded += to_write;
+				
+				cb = ntfs_malloc(rounded);
 				if (!cb)
 					goto err_out;
 				
