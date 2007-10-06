@@ -35,18 +35,30 @@
 struct MAPPING {
 	struct MAPPING *next;
 	int xid;		/* linux id : uid or gid */
-	SID *sid;		/* Windows id : usid or gsid */
+	const SID *sid;		/* Windows id : usid or gsid */
 };
 
 /*
- *	Entry in the security cache
+ *	Entry in the permissions cache
  */
 
-struct SECURITY_ENTRY {
+struct CACHED_PERMISSIONS {
 	uid_t uid;
 	gid_t gid;
 	unsigned int mode:9;
 	unsigned int valid:1;
+} ;
+
+/*
+ *	Entry in the securid cache
+ */
+
+struct CACHED_SECURID {
+	struct CACHED_SECURID *next;
+	uid_t uid;
+	gid_t gid;
+	unsigned int mode;
+	le32 securid;
 } ;
 
 /*
@@ -56,10 +68,16 @@ struct SECURITY_ENTRY {
 struct SECURITY_HEAD {
 	int first;
 	int last;
-			/* statistics */
-	unsigned long attempts;
-	unsigned long reads;
-	unsigned long writes;
+	struct CACHED_SECURID *most_recent_securid;
+			/* statistics for permissions */
+	unsigned long p_writes;
+	unsigned long p_reads;
+	unsigned long p_hits;
+			/* statistics for securids */
+	unsigned long s_writes;
+	unsigned long s_reads;
+	unsigned long s_hits;
+	unsigned long s_hops;
 } ;
 
 /*
@@ -68,7 +86,7 @@ struct SECURITY_HEAD {
 
 struct SECURITY_CACHE {
 	struct SECURITY_HEAD head;
-	struct SECURITY_ENTRY cachetable[1]; /* array of variable size */
+	struct CACHED_PERMISSIONS cachetable[1]; /* array of variable size */
 } ;
 
 /*
@@ -129,6 +147,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni,
 		uid_t uid, gid_t gid, mode_t mode);
+int ntfs_open_secure(ntfs_volume *vol);
+void ntfs_close_secure(ntfs_volume *vol);
 
 
 #endif /* defined _NTFS_SECURITY_H */
