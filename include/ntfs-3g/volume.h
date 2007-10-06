@@ -75,6 +75,7 @@ typedef struct _ntfs_volume ntfs_volume;
 #include "device.h"
 #include "inode.h"
 #include "attrib.h"
+#include "index.h"
 
 /**
  * enum ntfs_mount_flags -
@@ -194,6 +195,10 @@ struct _ntfs_volume {
 				   bit means that the mft record is in use and
 				   vice versa. */
 
+	ntfs_inode *secure_ni;	/* ntfs_inode structure for FILE $Secure */
+	ntfs_index_context *secure_xsii; /* index for using $Secure:$SII */
+	ntfs_index_context *secure_xsdh; /* index for using $Secure:$SDH */
+
 	int mftmirr_size;	/* Size of the FILE_MFTMirr in mft records. */
 	LCN mftmirr_lcn;	/* Logical cluster number of the data attribute
 				   for FILE_MFTMirr. */
@@ -214,6 +219,7 @@ struct _ntfs_volume {
 
 	s64 free_clusters; 	/* Track the number of free clusters which
 				   greatly improves statfs() performance */
+	s64 free_mft_records; 	/* Same for free mft records (see above) */
 
 	/* Temp: for directory handling */
 	void *private_data;	/* ntfs_dir for . */
