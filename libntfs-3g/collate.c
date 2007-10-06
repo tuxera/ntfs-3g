@@ -35,7 +35,7 @@
 
 BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
 {
-	int i;
+	/* int i; */
 
 	/*
 	 * FIXME:  At the moment we only support COLLATION_BINARY,
