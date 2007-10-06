@@ -240,7 +240,8 @@ static INDEX_ENTRY *ntfs_ie_get_last(INDEX_ENTRY *ie, char *ies_end)
 	return ie;
 }
 
-static INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
+/* static JPA removed for use in security.c */
+INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
 {
 	INDEX_ENTRY *ie;
 	
@@ -424,7 +425,8 @@ static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
 	return 0;
 }
 
-static INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
+/* static JPA removed for use in security.c */
+INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
 				  u32 name_len, ntfs_attr_search_ctx **ctx)
 {
 	ATTR_RECORD *a;
