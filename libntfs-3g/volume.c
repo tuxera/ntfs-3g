@@ -681,7 +681,7 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
-	int i, bytes_read, err;
+	int bytes_read, err;
 	char *buf = NULL;
 
 	ni = ntfs_hiberfile_open(vol);

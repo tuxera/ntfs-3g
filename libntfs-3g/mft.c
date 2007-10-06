@@ -797,6 +797,7 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	ll = ntfs_attr_pwrite(mftbmp_na, old_initialized_size, 8, &ll);
 	if (ll == 8) {
 		ntfs_log_debug("Wrote eight initialized bytes to mft bitmap.\n");
+		vol->free_mft_records += (8 * 8); 
 		return 0;
 	}
 	ntfs_log_error("Failed to write to mft bitmap.\n");
@@ -1440,6 +1441,7 @@ found_free_rec:
 	/* Return the opened, allocated inode of the allocated mft record. */
 	ntfs_log_debug("Returning opened, allocated %sinode 0x%llx.\n",
 			base_ni ? "extent " : "", (long long)bit);
+	vol->free_mft_records--; 
 	return ni;
 
 undo_mftbmp_alloc:
@@ -1508,8 +1510,10 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	}
 
 	/* Throw away the now freed inode. */
-	if (!ntfs_inode_close(ni))
+	if (!ntfs_inode_close(ni)) {
+		vol->free_mft_records++; 
 		return 0;
+	}
 	err = errno;
 
 	/* Rollback what we did... */
