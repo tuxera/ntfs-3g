@@ -22,6 +22,18 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
+ *	JPA configuration modes for this module
+ *	should be moved to some config file
+ */
+
+#define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
+#define BUFSZ 1024		/* buffer size to read mapping file */
+#define MAPPINGFILE "/$Extend/$UserMapping" /* name of mapping file */
+#define LINESZ 120              /* maximum useful size of a mapping line */
+#define CACHE_SECURID_SIZE 8    /* securid cache size >= 3 and not too big */
+#define CACHE_PERMISSIONS_SIZE 4000  /* think twice before increasing */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -47,30 +59,74 @@
 #include "attrib.h"
 #include "index.h"
 #include "dir.h"
-#include "security.h"
 #include "misc.h"
 #include "bitmap.h"
-
-/*
- *	JPA configuration modes for this module
- *	should move to some config file
- */
-
-#define FORCE_FORMAT_v1x 0 /* Insert security data as in NTFS v1.x */
-#define BUFSZ 1024		/* buffer size to read mapping file */
-#define MAPPINGFILE "/$Mapping" /* name of mapping file */
-#define LINESZ 120              /* maximum useful size of a mapping line */
+#include "security.h"
 
 /*
  *	JPA NTFS constants or structs
- *	should move to layout.h
+ *	should be moved to layout.h
  */
 
 #define ALIGN_SDS_BLOCK 0x40000 /* Alignment for a $SDS block */
 #define ALIGN_SDS_ENTRY 16 /* Alignment for a $SDS entry */
 #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
 
-struct SII {		/* this is an image of index (le) */
+/*
+ *		Matching of ntfs permissions to Linux permissions
+ *	these constants are adapted to endianness
+ *	when setting, set them all
+ *	when checking, check one is present
+ *		(checks needed)
+ */
+
+          /* flags which are set to mean exec, write or read */
+
+#define FILE_READ (FILE_READ_DATA | FILE_READ_EA)
+#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA)
+#define FILE_EXEC (FILE_EXECUTE)
+#define DIR_READ (FILE_LIST_DIRECTORY | FILE_READ_EA)
+#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY \
+                  | FILE_WRITE_EA | FILE_DELETE_CHILD)
+#define DIR_EXEC (FILE_TRAVERSE)
+
+          /* flags interpreted as meaning exec, write or read */
+
+#define FILE_GREAD (FILE_READ | GENERIC_READ)
+#define FILE_GWRITE (FILE_WRITE | GENERIC_WRITE)
+#define FILE_GEXEC (FILE_EXEC | GENERIC_EXECUTE)
+#define DIR_GREAD (DIR_READ | GENERIC_READ)
+#define DIR_GWRITE (DIR_WRITE | GENERIC_WRITE)
+#define DIR_GEXEC (DIR_EXEC | GENERIC_EXECUTE)
+
+          /* standard owner (and administrator) rights */
+
+#define OWNER_RIGHTS (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER | SYNCHRONIZE \
+                        | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES)
+
+          /* standard world rights */
+
+#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES);
+
+          /* inheritance flags for files and directories */
+
+#define FILE_INHERITANCE 0
+#define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
+
+/*
+ *	JPA The following must be in some library...
+ *	but did not found out where
+ */
+
+#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
+#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
+		| ((x & 0xff00) << 8) | ((x & 255) << 24))
+
+#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
+#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
+
+
+struct SII {		/* this is an image of an $SII index entry */
 	le16 offs;
 	le16 size;
 	le32 fill1;
@@ -80,7 +136,7 @@ struct SII {		/* this is an image of index (le) */
 	le16 fill2;
 	le32 keysecurid;
 
-	/* did not found official description for the following */
+	/* did not find official description for the following */
 	le32 hash;
 	le32 securid;
 	le32 dataoffsl;	/* documented as badly aligned */
@@ -88,7 +144,7 @@ struct SII {		/* this is an image of index (le) */
 	le32 datasize;
 } ;
 
-struct SDH {		/* this is an image of index (le) */
+struct SDH {		/* this is an image of an $SDH index entry */
 	le16 offs;
 	le16 size;
 	le32 fill1;
@@ -99,7 +155,7 @@ struct SDH {		/* this is an image of index (le) */
 	le32 keyhash;
 	le32 keysecurid;
 
-	/* did not found official description for the following */
+	/* did not find official description for the following */
 	le32 hash;
 	le32 securid;
 	le32 dataoffsl;
@@ -108,9 +164,27 @@ struct SDH {		/* this is an image of index (le) */
 	le32 fill3;
 	} ;
 
-static ntfschar sii_name[] = { '$', 'S', 'I', 'I', 0 };
-static ntfschar sdh_name[] = { '$', 'S', 'D', 'H', 0 };
-static ntfschar sds_name[] = { '$', 'S', 'D', 'S', 0 };
+/*
+ *		Struct to hold the input mapping file
+ *	(private to this module)
+ */
+
+struct MAPLIST {
+	struct MAPLIST *next;
+	char *uidstr;		/* uid text from the same record */
+	char *gidstr;		/* gid text from the same record */
+	char *sidstr;		/* sid text from the same record */
+	char maptext[LINESZ + 1];
+};
+
+/*
+ *	A few useful constants
+ */
+
+static ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
+static ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
+static ntfschar sds_stream[] = { '$', 'S', 'D', 'S', 0 };
+static const char mapping_name[] = MAPPINGFILE;
 
 /*
  * The zero GUID.
@@ -118,6 +192,46 @@ static ntfschar sds_name[] = { '$', 'S', 'D', 'S', 0 };
 static const GUID __zero_guid = { const_cpu_to_le32(0), const_cpu_to_le16(0),
 		const_cpu_to_le16(0), { 0, 0, 0, 0, 0, 0, 0, 0 } };
 const GUID *const zero_guid = &__zero_guid;
+
+/*
+ *		SID for world user
+ */
+
+static const char worldsidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 1,	/* base */
+		0, 0, 0, 0	/* 1st level */
+} ;
+
+static const SID *worldsid = (const SID*)worldsidbytes;
+
+/*
+ *		SID for administrator
+ */
+
+static const char adminsidbytes[] = {
+		1,		/* revision */
+		2,		/* auth count */
+		0, 0, 0, 0, 0, 5,	/* base */
+		32, 0, 0, 0,	/* 1st level */
+		32, 2, 0, 0	/* 2nd level */
+};
+
+static const SID *adminsid = (const SID*)adminsidbytes;
+
+/*
+ *		SID for system
+ */
+
+static const char systemsidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 5,	/* base */
+		18, 0, 0, 0 	/* 1st level */
+	};
+
+static const SID *systemsid = (const SID*)systemsidbytes;
 
 /**
  * ntfs_guid_is_zero - check if a GUID is zero
@@ -371,60 +485,7 @@ le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
 
 
 /*
- *         Matching of ntfs permissions to Linux permissions
- *            these constants are adapted to endianness
- *            when setting, set them all
- *            when checking, check one is present
- *               (checks needed)
- */
-          /* flags which are set to mean exec, write or read */
-#define FILE_READ (FILE_READ_DATA | FILE_READ_EA)
-#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA)
-#define FILE_EXEC (FILE_EXECUTE)
-#define DIR_READ (FILE_LIST_DIRECTORY | FILE_READ_EA)
-#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY \
-                  | FILE_WRITE_EA | FILE_DELETE_CHILD)
-#define DIR_EXEC (FILE_TRAVERSE)
-
-          /* flags interpreted as meaning exec, write or read */
-#define FILE_GREAD (FILE_READ | GENERIC_READ)
-#define FILE_GWRITE (FILE_WRITE | GENERIC_WRITE)
-#define FILE_GEXEC (FILE_EXEC | GENERIC_EXECUTE)
-#define DIR_GREAD (DIR_READ | GENERIC_READ)
-#define DIR_GWRITE (DIR_WRITE | GENERIC_WRITE)
-#define DIR_GEXEC (DIR_EXEC | GENERIC_EXECUTE)
-
-          /* standard owner (and administrator) rights */
-#define OWNER_RIGHTS (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER | SYNCHRONIZE \
-                        | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES)
-          /* standard world rights */
-#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES);
-          /* inheritance flags for files and directories */
-#define FILE_INHERITANCE 0
-#define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
-
-struct MAPLIST {
-	struct MAPLIST *next;
-	char *uidstr;		/* uid text from the same record */
-	char *gidstr;		/* gid text from the same record */
-	char *sidstr;		/* sid text from the same record */
-	char maptext[LINESZ + 1];
-};
-
-/*
- *        The following must be in some library...
- */
-
-unsigned int cpu_to_be32(unsigned int x)
-{
-	return (((x >> 24) & 255)
-		+ ((x >> 8) & 0xff00)
-		+ ((x & 0xff00) << 8)
-		+ ((x & 255) << 24));
-}
-
-/*
- *        The following must be in some library...
+ *		The following must be in some library...
  */
 
 unsigned long atoul(const char *p)
@@ -437,50 +498,166 @@ unsigned long atoul(const char *p)
 	return (v);
 }
 
+/*
+ *		Determine the size of a SID
+ */
+
 static int sid_size(const SID * sid)
 {
 	return (sid->sub_authority_count * 4 + 8);
 }
 
 /*
- *	Determine the size of a security attribute
- *	whatever the order of fields
- *      we however assume USID, GSID and DACL are present
+ *		Test whether two SID are equal
  */
 
-static int attr_size(const char *attr)
+static BOOL same_sid(const SID *first, const SID *second)
+{
+	int size;
+
+	size = sid_size(first);
+	return ((sid_size(second) == size)
+		&& !memcmp(first, second, size));
+}
+
+/*
+ *		Determine the size of a security attribute
+ *	whatever the order of fields
+ */
+
+static unsigned int attr_size(const char *attr)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *pnhead;
 	const ACL *pdacl;
+	const ACL *psacl;
 	const SID *psid;
-	int offdacl;
-	int offsid;
-	int endsid;
-	int attrsz;
+	unsigned int offdacl;
+	unsigned int offsacl;
+	unsigned int offowner;
+	unsigned int offgroup;
+	unsigned int endsid;
+	unsigned int attrsz;
 
+		/*
+		 * First check DACL, which is the last field in all descriptors
+		 * we build, and in most descriptors built by Windows
+		 */
 	pnhead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		/* find end of DACL */
 	offdacl = le32_to_cpu(pnhead->dacl);
 	pdacl = (const ACL*)&attr[offdacl];
 	attrsz = offdacl + le16_to_cpu(pdacl->size);
-		/* find end of USID */
-	offsid = le32_to_cpu(pnhead->owner);
-	psid = (const SID*)&attr[offsid];
-	endsid = offsid + sid_size(psid);
-	if (endsid > attrsz) attrsz = endsid;
-		/* find end of GSID */
-	offsid = le32_to_cpu(pnhead->group);
-	psid = (const SID*)&attr[offsid];
-	endsid = offsid + sid_size(psid);
-	if (endsid > attrsz) attrsz = endsid;
+
+	offowner = le32_to_cpu(pnhead->owner);
+	if (offowner >= attrsz) {
+			/* find end of USID */
+		psid = (const SID*)&attr[offowner];
+		endsid = offowner + sid_size(psid);
+		attrsz = endsid;
+	}
+	offgroup = le32_to_cpu(pnhead->group);
+	if (offgroup >= attrsz) {
+			/* find end of GSID */
+		psid = (const SID*)&attr[offgroup];
+		endsid = offgroup + sid_size(psid);
+		if (endsid > attrsz) attrsz = endsid;
+	}
+	offsacl = le32_to_cpu(pnhead->sacl);
+	if (offsacl >= attrsz) {
+			/* find end of DACL */
+		offsacl = le32_to_cpu(pnhead->sacl);
+		psacl = (const ACL*)&attr[offsacl];
+		attrsz = offsacl + le16_to_cpu(psacl->size);
+	}
 
 	return (attrsz);
 }
 
 /*
- *           Build an internal representation of a SID
- *         Returns a copy in allocated memory if it succeeds
- *         Currently it does only safety checks
+ *		Do sanity checks on a SID read from storage
+ *	(just check revision and number of authorities)
+ */
+
+BOOL valid_sid(const SID *sid)
+{
+	return ((sid->revision == SID_REVISION)
+		&& (sid->sub_authority_count >= 1)
+		&& (sid->sub_authority_count <= 8));
+}
+
+
+/*
+ *		Do sanity checks on security descriptors read from storage
+ *	basically, we make sure that every field holds within
+ *	allocated storage
+ *	Should not be called with a NULL argument
+ *	returns TRUE if considered safe
+ *		if not, error should be logged by caller
+ */
+
+BOOL valid_securattr(const char *securattr, int attrsz)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const ACL *pacl;
+	const ACCESS_ALLOWED_ACE *pace;
+	unsigned int offdacl;
+	unsigned int offace;
+	unsigned int acecnt;
+	unsigned int acesz;
+	unsigned int nace;
+	BOOL ok;
+
+	ok = TRUE;
+
+	/*
+	 * first check overall size if within allocation range
+	 * and a DACL is present
+	 * and owner and group SID are valid
+	 */
+
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
+	offdacl = le32_to_cpu(phead->dacl);
+	pacl = (ACL*)&securattr[offdacl];
+
+		/* size check occurs before the above pointers are used */
+
+	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+		&& (attr_size(securattr) <= attrsz)
+      		&& (phead->control & SE_DACL_PRESENT)
+		&& valid_sid((SID*)&securattr[le32_to_cpu(phead->owner)])
+		&& valid_sid((SID*)&securattr[le32_to_cpu(phead->group)])
+		&& (pacl->revision == ACL_REVISION)) {
+
+		/*
+		 * For each ACE, check it is within limits
+		 * and contains a valid SID
+		 */
+
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+		for (nace = 0; (nace < acecnt) && ok; nace++) {
+				/* be sure the beginning is within range */
+			if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
+				ok = FALSE;
+			else {
+				pace = (const ACCESS_ALLOWED_ACE*)
+					&securattr[offace];
+				acesz = le16_to_cpu(pace->size);
+				if (((offace + acesz) > attrsz)
+				   || !valid_sid(&pace->sid))
+					 ok = FALSE;
+				offace += acesz;
+			}
+		}
+	} else
+		ok = FALSE;
+	return (ok);
+}
+
+/*
+ *		Build an internal representation of a SID
+ *	Returns a copy in allocated memory if it succeeds
+ *	Currently it does only safety checks on input
  */
 
 static SID *encodesid(const char *sidstr)
@@ -498,10 +675,10 @@ static SID *encodesid(const char *sidstr)
 	sid = (SID*) NULL;
 	if (!strncmp(sidstr, "S-1-", 4)) {
 		bsid = &bigsid.sid;
-		bsid->revision = 1;
+		bsid->revision = SID_REVISION;
 		p = &sidstr[4];
 		auth = atoul(p);
-		bsid->identifier_authority.high_part = 0;
+		bsid->identifier_authority.high_part = cpu_to_be16(0);
 		bsid->identifier_authority.low_part = cpu_to_be32(auth);
 		cnt = 0;
 		p = strchr(p, '-');
@@ -513,7 +690,7 @@ static SID *encodesid(const char *sidstr)
 		}
 		bsid->sub_authority_count = cnt;
 		if (cnt > 0) {
-			sid = (SID*) malloc(4 * cnt + 8);
+			sid = (SID*) ntfs_malloc(4 * cnt + 8);
 			if (sid)
 				memcpy(sid, bsid, 4 * cnt + 8);
 		}
@@ -521,12 +698,10 @@ static SID *encodesid(const char *sidstr)
 	return (sid);
 }
 
-
-
 /*
- *          Internal read
- *     copied and pasted from ntfs_fuse_read() and made independent
- *     of fuse context
+ *		Internal read
+ *	copied and pasted from ntfs_fuse_read() and made independent
+ *	of fuse context
  */
 
 static int ntfs_local_read(ntfs_volume *vol, ntfs_inode *ni,
@@ -566,9 +741,9 @@ exit:
 
 
 /*
- *          Internal write
- *     copied and pasted from ntfs_fuse_write() and made independent
- *     of fuse context
+ *		Internal write
+ *	copied and pasted from ntfs_fuse_write() and made independent
+ *	of fuse context
  */
 
 static int ntfs_local_write(ntfs_volume *vol, ntfs_inode *ni,
@@ -599,84 +774,30 @@ static int ntfs_local_write(ntfs_volume *vol, ntfs_inode *ni,
 	}
 	res = total;
 exit:
-// !	ntfs_fuse_mark_free_space_outdated();
 	if (na)
 		ntfs_attr_close(na);
 	return res;
 }
 
-/*
- *                 Build a sid for world user
- *               (a constant in static data, do not free)
- */
-
-static const SID *worldsid(void)
-{
-	static char wsid[] = {
-		1,		/* revision */
-		1,		/* auth count */
-		0, 0, 0, 0, 0, 1,	/* base */
-		0, 0, 0, 0	/* 1st level */
-	};
-
-	return ((SID*) wsid);
-}
 
 /*
- *                 Build a sid for administrator
- *               (a constant in static data, do not free)
- */
-
-static const SID *adminsid(void)
-{
-	static char asid[] = {
-		1,		/* revision */
-		2,		/* auth count */
-		0, 0, 0, 0, 0, 5,	/* base */
-		32, 0, 0, 0,	/* 1st level */
-		32, 2, 0, 0	/* 2nd level */
-	};
-
-	return ((const SID*)asid);
-}
-
-/*
- *                 Build a sid for system
- *               (a constant in static data, do not free)
- */
-
-static const SID *systemsid(void)
-{
-	static char ssid[] = {
-		1,		/* revision */
-		1,		/* auth count */
-		0, 0, 0, 0, 0, 5,	/* base */
-		18, 0, 0, 0 	/* 1st level */
-	};
-
-	return ((const SID*)ssid);
-}
-
-/*
- *          Find Linux owner mapped to a usid
- *           Returns 0 (root) if not found
+ *		Find Linux owner mapped to a usid
+ *	Returns 0 (root) if not found
  */
 
 static int findowner(struct SECURITY_CONTEXT *scx, const SID * usid)
 {
 	struct MAPPING *p;
-	int usidsz;
 
-	usidsz = sid_size(usid);
 	p = scx->usermapping;
-	while (p && memcmp(usid, p->sid, usidsz))
+	while (p && !same_sid(usid, p->sid))
 		p = p->next;
 	return (p ? p->xid : 0);
 }
 
 /*
- *          Find Linux group mapped to a gsid
- *           Returns 0 (root) if not found
+ *		Find Linux group mapped to a gsid
+ *	Returns 0 (root) if not found
  */
 
 static int findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
@@ -686,14 +807,14 @@ static int findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
 
 	gsidsz = sid_size(gsid);
 	p = scx->groupmapping;
-	while (p && memcmp(gsid, p->sid, gsidsz))
+	while (p && !same_sid(gsid, p->sid))
 		p = p->next;
 	return (p ? p->xid : 0);
 }
 
 /*
- *          Find usid mapped to a Linux user
- *           Returns NULL if not found
+ *		Find usid mapped to a Linux user
+ *	Returns NULL if not found
  */
 
 static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
@@ -702,7 +823,7 @@ static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
 	const SID *sid;
 
 	if (!uid)
-		sid = adminsid();
+		sid = adminsid;
 	else {
 		p = scx->usermapping;
 		while (p && (p->xid != uid))
@@ -713,8 +834,8 @@ static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
 }
 
 /*
- *          Find Linux group mapped to a gsid
- *           Returns 0 (root) if not found
+ *		Find Linux group mapped to a gsid
+ *	Returns 0 (root) if not found
  */
 
 static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
@@ -723,7 +844,7 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
 	const SID *sid;
 
 	if (!gid)
-		sid = adminsid();
+		sid = adminsid;
 	else {
 		p = scx->groupmapping;
 		while (p && (p->xid != gid))
@@ -734,62 +855,247 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
 }
 
 /*
- *	Resize security cache in either direction
+ *	Cacheing is done two-way :
+ *	- from uid, gid and perm to securid (CACHED_SECURID)
+ *	- from a securid to uid, gid and perm (CACHED_PERMISSIONS)
+ *
+ *	CACHED_SECURID data is kept in a most-recent-first lists
+ *	which should not be too long to be efficient. Its optimal
+ *	size is depends on usage and is hard to determine.
+ *
+ *	CACHED_PERMISSIONS data is kept in an indexed array. Is
+ *	is optimal at the expense of storage. Use of a most-recent-first
+ *	list would save memory and provide similar performances for
+ *	standard usage, but not for file servers with too many file
+ *	owners
+ *
+ *	In both caches, data is never invalidated, however returned
+ *	entries may be overwritten at next update, so data has
+ *	to be copied elsewhere before another cache update is made.
+ *
+ *	Though the same data may be found in both list, they
+ *	must be kept separately : the interpretation of ACL
+ *	in both direction are approximations which could be non
+ *	reciprocal for some configuration of the user mapping data
+ */
+
+static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
+			u32 securindex)
+{
+	struct CACHED_SECURID *cachesecurid;
+	struct SECURITY_CACHE *cache;
+	int i;
+
+		/* create the securid cache first */
+	cachesecurid = (struct CACHED_SECURID*)
+		ntfs_malloc(CACHE_SECURID_SIZE*sizeof(struct CACHED_SECURID));
+	if (cachesecurid) {
+			/* chain the entries, and mark an invalid mode */
+		for (i=0; i<(CACHE_SECURID_SIZE - 1); i++) {
+			cachesecurid[i].next = &cachesecurid[i+1];
+			cachesecurid[i].mode = -1;
+		}
+			/* special for the last entry */
+		cachesecurid[CACHE_SECURID_SIZE - 1].next =
+			(struct CACHED_SECURID*)NULL;
+		cachesecurid[CACHE_SECURID_SIZE - 1].mode = -1;
+
+			/* create the first permissions cache entry */
+		cache = (struct SECURITY_CACHE*)
+			ntfs_malloc(sizeof(struct SECURITY_CACHE));
+		if (cache) {
+			cache->head.first = securindex;
+			cache->head.last = securindex;
+			cache->head.p_reads = 0;
+			cache->head.p_hits = 0;
+			cache->head.p_writes = 0;
+			cache->head.s_reads = 0;
+			cache->head.s_hits = 0;
+			cache->head.s_writes = 0;
+			cache->head.s_hops = 0;
+			*scx->pseccache = cache;
+			cache->head.most_recent_securid = cachesecurid;
+			cache->cachetable[0].valid = 0;
+		}
+	} else
+		cache = (struct SECURITY_CACHE*)NULL;
+	return (cache);
+}
+
+/*
+ *		Fetch a securid from cache
+ *	returns the cache entry, or NULL if not available
+ */
+
+static const struct CACHED_SECURID *fetch_securid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, gid_t gid, mode_t mode)
+{
+	struct SECURITY_CACHE *cache;
+	struct CACHED_SECURID *current;
+	struct CACHED_SECURID *previous;
+
+	cache = *scx->pseccache;
+	if (cache) {
+			/*
+			 * Search sequentially in LRU list
+			 */
+		current = cache->head.most_recent_securid;
+		previous = (struct CACHED_SECURID*)NULL;
+		while (current
+			&& ((current->uid != uid)
+			  || (current->gid != gid)
+			  || (current->mode != mode))) {
+			cache->head.s_hops++;
+			previous = current;
+			current = current->next;
+			}
+		if (current)
+			cache->head.s_hits++;
+		if (current && previous) {
+			/*
+			 * found and not at head of list, unlink from current
+			 * position and relink as head of list
+			 */
+			previous->next = current->next;
+			current->next = cache->head.most_recent_securid;
+			cache->head.most_recent_securid = current;
+		}
+	} else  /* cache not ready */
+		current = (struct CACHED_SECURID*)NULL;
+	cache->head.s_reads++;
+	return (current);
+}
+
+/*
+ *		Enter a securid into cache
+ *	returns the cache entry
+ */
+
+static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, gid_t gid,
+		mode_t mode, le32 securid)
+{
+	struct SECURITY_CACHE *cache;
+	struct CACHED_SECURID *current;
+	struct CACHED_SECURID *previous;
+	struct CACHED_SECURID *before;
+
+	mode &= 0777;
+	cache = *scx->pseccache;
+	if (cache || (cache = create_caches(scx, le32_to_cpu(securid)))) {
+
+			/*
+			 * Search sequentially in LRU list to locate the end,
+			 * and find out whether the entry is already in list
+			 * As we normally go to the end, no statitics is
+			 * kept.
+		 	 */
+		current = cache->head.most_recent_securid;
+		previous = (struct CACHED_SECURID*)NULL;
+		before = (struct CACHED_SECURID*)NULL;
+		while (current
+			&& ((current->uid != uid)
+			  || (current->gid != gid)
+			  || (current->mode != mode))) {
+			before = previous;
+			previous = current;
+			current = current->next;
+			}
+
+		if (!current) {
+			/*
+			 * Not in list, reuse the last entry,
+			 * and relink as head of list
+			 * Note : we assume at least three entries, so
+			 * before, previous and first are always different
+			 */
+			before->next = (struct CACHED_SECURID*)NULL;
+			previous->next = cache->head.most_recent_securid;
+			cache->head.most_recent_securid = previous;
+			current = previous;
+			current->uid = uid;
+			current->gid = gid;
+			current->mode = mode;
+			current->securid = securid;
+		}
+	} else		/* cache not available */
+		current = (struct CACHED_SECURID*)NULL;
+	cache->head.s_writes++;
+	return (current);
+}
+
+
+/*
+ *	Resize permission cache in either direction
  *	do not call unless resizing is needed
  *	
  *	returns pointer to required entry or NULL if not possible
  */
 
-
-static struct SECURITY_ENTRY *resize_cache(struct SECURITY_CONTEXT *scx,
-			 le32 securid)
+static struct CACHED_PERMISSIONS *resize_cache(
+			struct SECURITY_CONTEXT *scx,
+			u32 securindex)
 {
-	struct SECURITY_ENTRY *cacheentry;
+	struct CACHED_PERMISSIONS *cacheentry;
 	struct SECURITY_CACHE *oldcache;
 	struct SECURITY_CACHE *newcache;
 	int oldcnt;
 	int newcnt;
+	BOOL beyond;
 	int i;
 
-	cacheentry = (struct SECURITY_ENTRY*)NULL;
+	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	oldcache = *scx->pseccache;
-	if (oldcache->head.last < securid) {
+	beyond = oldcache->head.last < securindex;
+	if (beyond)
+		newcnt = securindex - oldcache->head.first + 1;
+	else
+		newcnt = oldcache->head.last - securindex + 1;
+	if (beyond && (newcnt <= CACHE_PERMISSIONS_SIZE)) {
 		/* expand cache beyond current end */
-		newcnt = securid - oldcache->head.first + 1;
+#if 1
 		newcache = (struct SECURITY_CACHE*)
 			realloc(oldcache,
-			    sizeof(struct SECURITY_HEAD)
-			      +  newcnt*sizeof(struct SECURITY_ENTRY));
+			    sizeof(struct SECURITY_CACHE)
+			      + (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
+#else
+		oldcnt = oldcache->head.last - oldcache->head.first + 1;
+		newcache = (struct SECURITY_CACHE*)
+			ntfs_malloc(
+			    sizeof(struct SECURITY_CACHE)
+			      + (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
+		memcpy(newcache,oldcache,
+			    sizeof(struct SECURITY_CACHE)
+			      + (oldcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
+		free(oldcache);
+#endif
 		if (newcache) {
-				/* mark new entries as not valid */
-			for (i=newcache->head.last+1; i<=securid; i++)
+			     /* mark new entries as not valid */
+			for (i=newcache->head.last+1; i<=securindex; i++)
 				newcache->cachetable[
 					i - newcache->head.first].valid = 0;
-			newcache->head.last = securid;
+			newcache->head.last = securindex;
 			*scx->pseccache = newcache;
 			cacheentry = &newcache->
-				cachetable[securid - newcache->head.first];
+				cachetable[securindex - newcache->head.first];
 		}
-	} else {
+	}
+	if (!beyond && (newcnt <= CACHE_PERMISSIONS_SIZE)) {
 		/* expand cache before current beginning */
-		newcnt = oldcache->head.last - securid + 1;
 		newcache = (struct SECURITY_CACHE*)
-			malloc(sizeof(struct SECURITY_HEAD)
-			    +  newcnt*sizeof(struct SECURITY_ENTRY));
+			ntfs_malloc(sizeof(struct SECURITY_CACHE)
+			    +  (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
 		if (newcache) {
-				/* mark new entries as not valid */
-			for (i=securid; i<oldcache->head.first; i++)
-				newcache->cachetable[i - securid].valid = 0;
-			newcache->head.first = securid;
-			newcache->head.last = oldcache->head.last;
-			newcache->head.attempts = oldcache->head.attempts;
-			newcache->head.reads = oldcache->head.reads;
-			newcache->head.writes = oldcache->head.writes;
+			     /* mark new entries as not valid */
+			for (i=securindex; i<oldcache->head.first; i++)
+				newcache->cachetable[i - securindex].valid = 0;
+			newcache->head = oldcache->head;
+			newcache->head.first = securindex;
 			oldcnt = oldcache->head.last - oldcache->head.first + 1;
 			memcpy(&newcache->cachetable[oldcache->head.first
 						 - newcache->head.first],
 				oldcache->cachetable,
-				oldcnt*sizeof(struct SECURITY_ENTRY));
+				oldcnt*sizeof(struct CACHED_PERMISSIONS));
 			*scx->pseccache = newcache;
 			free(oldcache);
 			cacheentry = &newcache->cachetable[0];
@@ -797,7 +1103,6 @@ static struct SECURITY_ENTRY *resize_cache(struct SECURITY_CONTEXT *scx,
 	}
 	return (cacheentry);
 }
-
 
 /*
  *	Enter uid, gid and mode into cache, if possible
@@ -807,11 +1112,12 @@ static struct SECURITY_ENTRY *resize_cache(struct SECURITY_CONTEXT *scx,
  *		security id associated)
  */
 
-static struct SECURITY_ENTRY *enter_cache(struct SECURITY_CONTEXT *scx,
+static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode)
 {
-	struct SECURITY_ENTRY *cacheentry;
+	struct CACHED_PERMISSIONS *cacheentry;
 	struct SECURITY_CACHE *pcache;
+	u32 securindex;
 
 	/* cacheing is only possible if a security_id has been defined */
 	if (test_nino_flag(ni, v3_Extensions)
@@ -820,48 +1126,42 @@ static struct SECURITY_ENTRY *enter_cache(struct SECURITY_CONTEXT *scx,
 		 *  Immediately test the most frequent situation
 		 *  where the entry exists
 		 */
+		securindex = le32_to_cpu(ni->security_id);
 		pcache = *scx->pseccache;
 		if (pcache
-		     && (pcache->head.first <= ni->security_id)
-		     && (pcache->head.last >= ni->security_id)) {
-			cacheentry = &pcache->cachetable[ni->security_id
+		     && (pcache->head.first <= securindex)
+		     && (pcache->head.last >= securindex)) {
+			cacheentry = &pcache->cachetable[securindex
 					 - pcache->head.first];
 			cacheentry->uid = uid;
 			cacheentry->gid = gid;
-			cacheentry->mode = mode;
+			cacheentry->mode = mode & 0777;
 			cacheentry->valid = 1;
-			pcache->head.writes++;
+			pcache->head.p_writes++;
 		} else {
 			if (!pcache) {
 				/* create the first cache entry */
-				pcache = (struct SECURITY_CACHE*)
-					malloc(sizeof(struct SECURITY_HEAD)
-					    +  sizeof(struct SECURITY_ENTRY));
-				pcache->head.first = ni->security_id;
-				pcache->head.last = ni->security_id;
-				pcache->head.attempts = 0;
-				pcache->head.reads = 0;
-				pcache->head.writes = 0;
-				*scx->pseccache = pcache;
+				pcache = create_caches(scx, securindex);
 				cacheentry = &pcache->cachetable[0];
 			} else {
-				cacheentry = resize_cache(scx, ni->security_id);
+				cacheentry = resize_cache(scx, securindex);
+				pcache = *scx->pseccache;
 			}
 			if (cacheentry) {
 				cacheentry->uid = uid;
 				cacheentry->gid = gid;
-				cacheentry->mode = mode;
+				cacheentry->mode = mode & 0777;
 				cacheentry->valid = 1;
-				pcache->head.writes++;
+				pcache->head.p_writes++;
 			}
 		}
 	} else
-		cacheentry = (struct SECURITY_ENTRY*)NULL;
+		cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	return (cacheentry);
 }
 
 /*
- *	Fetch a cache entry, if available
+ *	Fetch owner, group and permission of a file, if cached
  *
  *	Beware : do not use the returned entry after a cache update :
  *	the cache may be relocated making the returned entry meaningless
@@ -869,84 +1169,91 @@ static struct SECURITY_ENTRY *enter_cache(struct SECURITY_CONTEXT *scx,
  *	returns the cache entry, or NULL if not available
  */
 
-static struct SECURITY_ENTRY *fetch_cache(struct SECURITY_CONTEXT *scx,
+static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni)
 {
-	struct SECURITY_ENTRY *cacheentry;
+	struct CACHED_PERMISSIONS *cacheentry;
 	struct SECURITY_CACHE *pcache;
+	u32 securindex;
 
 	/* cacheing is only possible if a security_id has been defined */
-	cacheentry = (struct SECURITY_ENTRY*)NULL;
+	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	if (test_nino_flag(ni, v3_Extensions)
 	   && (ni->security_id)) {
+		securindex = le32_to_cpu(ni->security_id);
 		pcache = *scx->pseccache;
 		if (pcache
-		     && (pcache->head.first <= ni->security_id)
-		     && (pcache->head.last >= ni->security_id)) {
-			cacheentry = &pcache->cachetable[ni->security_id
+		     && (pcache->head.first <= securindex)
+		     && (pcache->head.last >= securindex)) {
+			cacheentry = &pcache->cachetable[securindex
 					 - pcache->head.first];
 			/* reject if entry is not valid */
 			if (!cacheentry->valid)
-				cacheentry = (struct SECURITY_ENTRY*)NULL;
+				cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 			else
-				pcache->head.reads++;
+				pcache->head.p_hits++;
 		if (pcache)
-			pcache->head.attempts++;
+			pcache->head.p_reads++;
 		}
 	}
 	return (cacheentry);
 }
 
-static char *indexsearch(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id)
+/*
+ *	Retrieve a security attribute from $Secure
+ */
+
+static char *retrievesecurityattr(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id)
 {
-	struct SII *psii;	/* this is an image of index (le) */
+	struct SII *psii;
 	union {
 		struct {
-			u32 dataoffsl;
-			u32 dataoffsh;
+			le32 dataoffsl;
+			le32 dataoffsh;
 		} parts;
-		u64 all;
+		le64 all;
 	} realign;
 	int found;
 	size_t size;
 	size_t rdsize;
 	s64 offs;
 	ntfs_inode *ni;
-	ntfs_index_context *xc;
+	ntfs_index_context *xsii;
 	char *securattr;
 
 	securattr = (char*)NULL;
-	ni = ntfs_pathname_to_inode(scx->vol, NULL, "$Secure");
-	if (ni) {
-		xc = ntfs_index_ctx_get(ni, sii_name, 4);
-		if (xc) {
-			found =
-			    !ntfs_index_lookup((char*)&id,
-					       sizeof(SII_INDEX_KEY), xc);
-			if (found) {
-				psii = (struct SII*)xc->entry;
-				size =
-				    (size_t) le32_to_cpu(psii->datasize) - 20;
-				/* work around bad alignment problem */
-				realign.parts.dataoffsh = psii->dataoffsh;
-				realign.parts.dataoffsl = psii->dataoffsl;
-				offs = le64_to_cpu(realign.all) + 20;
+	ni = scx->vol->secure_ni;
+	xsii = scx->vol->secure_xsii;
+	ntfs_index_ctx_reinit(xsii);
+	if (xsii) {
+		found =
+		    !ntfs_index_lookup((char*)&id,
+				       sizeof(SII_INDEX_KEY), xsii);
+		if (found) {
+			psii = (struct SII*)xsii->entry;
+			size =
+			    (size_t) le32_to_cpu(psii->datasize)
+				 - sizeof(SECURITY_DESCRIPTOR_HEADER);
+			/* work around bad alignment problem */
+			realign.parts.dataoffsh = psii->dataoffsh;
+			realign.parts.dataoffsl = psii->dataoffsl;
+			offs = le64_to_cpu(realign.all)
+				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
 
-				securattr = (char*)malloc(size);
-				if (securattr) {
-					rdsize = ntfs_local_read(
-						scx->vol,ni, "/$Secure",
-						sds_name,4,
-						securattr, size, offs);
-					if (rdsize != size) {
-						free(securattr);
-						securattr = (char*)NULL;
-					}
+			securattr = (char*)ntfs_malloc(size);
+			if (securattr) {
+				rdsize = ntfs_local_read(
+					scx->vol,ni, "/$Secure",
+					sds_stream, 4, securattr, size, offs);
+				if ((rdsize != size)
+					|| !valid_securattr(securattr,
+						rdsize)) {
+					/* error logged by caller */
+					free(securattr);
+					securattr = (char*)NULL;
 				}
 			}
-			ntfs_index_ctx_put(xc);
 		}
-		ntfs_inode_close(ni);
 	}
 	if (!securattr)
 		errno = EIO;
@@ -954,23 +1261,404 @@ static char *indexsearch(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id)
 }
 
 /*
- *            Get the security descriptor associated to a file
+ *		Build an ACL composed of several ACE's
+ *	(not expected to fail)
  *
- *    Either :
- *         - read the security descriptor attribute (v1.x format)
- *         - or find the descriptor in $Secure:$SDS (v3.x format)
+ *	Three schemes are defined :
  *
- *   The returned descriptor is dynamically allocated and has to be freed
+ *	1) if root is neither owner nor group up to 7 ACE's are set up :
+ *	- grants to owner (always present)
+ *	- denials to owner (preventing grants to world or group to apply)
+ *	- grants to group (unless groups has same rights as world)
+ *	- denials to group (preventing grants to world to apply) 
+ *	- grants to world (unless none)
+ *	- full privileges to administrator, always present
+ *	- full privileges to system, always present
+ *
+ *	2) if root is either owner or group, two problems arise :
+ *	- granting full rights to administrator (as needed to transpose
+ *	  to Windows rights bypassing granting to root) would imply
+ *	  Linux permissions to always be seen as rwx, no matter the chmod
+ *	- there is no different SID to separate an administrator owner
+ *	  from an administrator group. Hence Linux permissions for owner
+ *	  would always be similar to permissions to group.
+ *
+ *	as a work-around, up to 5 ACE's are set up if owner or group :
+ *	- grants to owner, always present at first position
+ *	- grants to group, always present
+ *	- grants to world, unless none
+ *	- full privileges to administrator, always present
+ *	- full privileges to system, always present
+ *
+ *	On Windows, these ACE's are processed normally, though they
+ *	are redundant (owner, group and administrator are the same,
+ *	as a consequence any denials would damage administrator rights)
+ *	but on Linux, privileges to administrator are ignored (they
+ *	are not needed as root has always full privileges), and
+ *	neither grants to group are applied to owner, nor grants to
+ *	world are applied to owner or group.
+ *
+ *	3) finally a similar situation arises when group is owner (they
+ *	 have the same SID), but is not root.
+ *	 In this situation up to 6 ACE's are set up :
+ *
+ *	- grants to owner (always present)
+ *	- denials to owner (preventing grants to world to apply)
+ *	- grants to group (unless groups has same rights as world)
+ *	- grants to world (unless none)
+ *	- full privileges to administrator, always present
+ *	- full privileges to system, always present
+ *
+ *	On Windows, these ACE's are processed normally, though they
+ *	are redundant (as owner and group are the same), but this has
+ *	no impact on administrator rights
+ */
+
+static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
+	       const SID * usid, const SID * gsid)
+{
+	ACL *pacl;
+	ACCESS_ALLOWED_ACE *pgace;
+	ACCESS_ALLOWED_ACE *pdace;
+	BOOL adminowns;
+	BOOL groupowns;
+	int pos;
+	int acecnt;
+	int usidsz;
+	int gsidsz;
+	int wsidsz;
+	int asidsz;
+	int ssidsz;
+	long grants;
+	long denials;
+
+	usidsz = sid_size(usid);
+	gsidsz = sid_size(gsid);
+	asidsz = sid_size(adminsid);
+	ssidsz = sid_size(systemsid);
+	adminowns = same_sid(usid, adminsid)
+	         || same_sid(gsid, adminsid);
+	groupowns = !adminowns && same_sid(usid, gsid);
+
+	/* ACL header */
+	pacl = (ACL*)&secattr[offs];
+	pacl->revision = ACL_REVISION;
+	pacl->alignment1 = 0;
+	pacl->size = cpu_to_le16(sizeof(ACL) + usidsz + 8);
+	pacl->ace_count = cpu_to_le16(1);
+	pacl->alignment2 = cpu_to_le16(0);
+	pos = sizeof(ACL);
+	acecnt = 0;
+
+	/* a grant ACE for owner */
+
+	pgace = (ACCESS_ALLOWED_ACE*) &secattr[offs + pos];
+	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	grants = OWNER_RIGHTS;
+	if (isdir) {
+		pgace->flags = DIR_INHERITANCE;
+		if (mode & S_IXUSR)
+			grants |= DIR_EXEC;
+		if (mode & S_IWUSR)
+			grants |= DIR_WRITE;
+		if (mode & S_IRUSR)
+			grants |= DIR_READ;
+	} else {
+		pgace->flags = FILE_INHERITANCE;
+		if (mode & S_IXUSR)
+			grants |= FILE_EXEC;
+		if (mode & S_IWUSR)
+			grants |= FILE_WRITE;
+		if (mode & S_IRUSR)
+			grants |= FILE_READ;
+	}
+	pgace->size = cpu_to_le16(usidsz + 8);
+	pgace->mask = cpu_to_le32(grants);
+	memcpy((char*)&pgace->sid, usid, usidsz);
+	pos += usidsz + 8;
+	acecnt++;
+
+	/* a possible ACE to deny owner what he/she would */
+	/* induely get from administrator, group or world */
+        /* unless owner is administrator or group */
+
+	denials = 0;
+	pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
+	if (!adminowns) {
+		if (!groupowns) {
+			if (isdir) {
+				pdace->flags = DIR_INHERITANCE;
+				if (mode & (S_IXGRP | S_IXOTH))
+					denials |= DIR_EXEC;
+				if (mode & (S_IWGRP | S_IWOTH))
+					denials |= DIR_WRITE;
+				if (mode & (S_IRGRP | S_IROTH))
+					denials |= DIR_READ;
+			} else {
+				pdace->flags = FILE_INHERITANCE;
+				if (mode & (S_IXGRP | S_IXOTH))
+					denials |= FILE_EXEC;
+				if (mode & (S_IWGRP | S_IWOTH))
+					denials |= FILE_WRITE;
+				if (mode & (S_IRGRP | S_IROTH))
+					denials |= FILE_READ;
+			}
+		} else {
+			if (isdir) {
+				pdace->flags = DIR_INHERITANCE;
+				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
+					denials |= DIR_EXEC;
+				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
+					denials |= DIR_WRITE;
+				if ((mode & S_IROTH) && !(mode & S_IRGRP))
+					denials |= DIR_READ;
+			} else {
+				pdace->flags = FILE_INHERITANCE;
+				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
+					denials |= FILE_EXEC;
+				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
+					denials |= FILE_WRITE;
+				if ((mode & S_IROTH) && !(mode & S_IRGRP))
+					denials |= FILE_READ;
+			}
+		}
+		denials &= ~grants;
+		if (denials) {
+			pdace->type = ACCESS_DENIED_ACE_TYPE;
+			pdace->size = cpu_to_le16(usidsz + 8);
+			pdace->mask = cpu_to_le32(denials);
+			memcpy((char*)&pdace->sid, usid, usidsz);
+			pos += usidsz + 8;
+			acecnt++;
+		}
+	}
+
+	/* a grant ACE for group */
+	/* unless group has the same rights as world */
+	/* but present if owner is administrator */
+
+	if (adminowns
+	    || (((mode >> 3) ^ mode) & 7)) {
+		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+		grants = WORLD_RIGHTS;
+		if (isdir) {
+			pgace->flags = DIR_INHERITANCE;
+			if (mode & S_IXGRP)
+				grants |= DIR_EXEC;
+			if (mode & S_IWGRP)
+				grants |= DIR_WRITE;
+			if (mode & S_IRGRP)
+				grants |= DIR_READ;
+		} else {
+			pgace->flags = FILE_INHERITANCE;
+			if (mode & S_IXGRP)
+				grants |= FILE_EXEC;
+			if (mode & S_IWGRP)
+				grants |= FILE_WRITE;
+			if (mode & S_IRGRP)
+				grants |= FILE_READ;
+		}
+		pgace->size = cpu_to_le16(gsidsz + 8);
+		pgace->mask = cpu_to_le32(grants);
+		memcpy((char*)&pgace->sid, gsid, gsidsz);
+		pos += gsidsz + 8;
+		acecnt++;
+
+		/* a possible ACE to deny group what it would get from world */
+		/* or administrator, unless owner is administrator or group */
+
+		denials = 0;
+		pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+		if (!adminowns && !groupowns) {
+			if (isdir) {
+				pdace->flags = DIR_INHERITANCE;
+				if (mode & S_IXOTH)
+					denials |= DIR_EXEC;
+				if (mode & S_IWOTH)
+					denials |= DIR_WRITE;
+				if (mode & S_IROTH)
+					denials |= DIR_READ;
+			} else {
+				pdace->flags = FILE_INHERITANCE;
+				if (mode & S_IXOTH)
+					denials |= FILE_EXEC;
+				if (mode & S_IWOTH)
+					denials |= FILE_WRITE;
+				if (mode & S_IROTH)
+					denials |= FILE_READ;
+			}
+			denials &= ~grants;
+			if (denials) {
+				pdace->type = ACCESS_DENIED_ACE_TYPE;
+				pdace->size = cpu_to_le16(gsidsz + 8);
+				pdace->mask = cpu_to_le32(denials);
+				memcpy((char*)&pdace->sid, gsid, gsidsz);
+				pos += gsidsz + 8;
+				acecnt++;
+			}
+		}
+	}
+
+	/* an ACE for world users */
+
+	wsidsz = sid_size(worldsid);
+	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	grants = WORLD_RIGHTS;
+	if (isdir) {
+		pgace->flags = DIR_INHERITANCE;
+		if (mode & S_IXOTH)
+			grants |= DIR_EXEC;
+		if (mode & S_IWOTH)
+			grants |= DIR_WRITE;
+		if (mode & S_IROTH)
+			grants |= DIR_READ;
+	} else {
+		pgace->flags = FILE_INHERITANCE;
+		if (mode & S_IXOTH)
+			grants |= FILE_EXEC;
+		if (mode & S_IWOTH)
+			grants |= FILE_WRITE;
+		if (mode & S_IROTH)
+			grants |= FILE_READ;
+	}
+	pgace->size = cpu_to_le16(wsidsz + 8);
+	pgace->mask = cpu_to_le32(grants);
+	memcpy((char*)&pgace->sid, worldsid, wsidsz);
+	pos += wsidsz + 8;
+	acecnt++;
+
+	/* an ACE for administrators */
+	/* always full access */
+
+	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	if (isdir)
+		pgace->flags = DIR_INHERITANCE;
+	else
+		pgace->flags = FILE_INHERITANCE;
+	pgace->size = cpu_to_le16(asidsz + 8);
+	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
+	pgace->mask = cpu_to_le32(grants);
+	memcpy((char*)&pgace->sid, adminsid, asidsz);
+	pos += asidsz + 8;
+	acecnt++;
+
+	/* an ACE for system (needed ?) */
+	/* always full access */
+
+	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	if (isdir)
+		pgace->flags = DIR_INHERITANCE;
+	else
+		pgace->flags = FILE_INHERITANCE;
+	pgace->size = cpu_to_le16(ssidsz + 8);
+	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
+	pgace->mask = cpu_to_le32(grants);
+	memcpy((char*)&pgace->sid, systemsid, ssidsz);
+	pos += ssidsz + 8;
+	acecnt++;
+
+	/* fix ACL header */
+	pacl->size = cpu_to_le16(pos);
+	pacl->ace_count = cpu_to_le16(acecnt);
+	return (pos);
+}
+
+/*
+ *		Build a full security descriptor
+ *	returns descriptor in allocated memory, must free() after use
  */
 
 static char *build_secur_descr(const char *path, mode_t mode,
-			int isdir, const SID * usid, const SID * gsid);
+			int isdir, const SID * usid, const SID * gsid)
+{
+	int newattrsz;
+	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
+	char *newattr;
+	int aclsz;
+	int usidsz;
+	int gsidsz;
+	int wsidsz;
+	int asidsz;
+	int ssidsz;
+
+	usidsz = sid_size(usid);
+	gsidsz = sid_size(gsid);
+	wsidsz = sid_size(worldsid);
+	asidsz = sid_size(adminsid);
+	ssidsz = sid_size(systemsid);
+
+	/* allocate enough space for the new security attribute */
+	newattrsz = sizeof(SECURITY_DESCRIPTOR_RELATIVE)	/* header */
+	    + usidsz + gsidsz	/* usid and gsid */
+	    + sizeof(ACL)	/* acl header */
+	    + 2*(8 + usidsz)	/* two possible ACE for user */
+	    + 2*(8 + gsidsz)	/* two possible ACE for group */
+	    + 8 + wsidsz	/* one ACE for world */
+	    + 8 + asidsz 	/* one ACE for admin */
+	    + 8 + ssidsz;	/* one ACE for system */
+	newattr = (char*)ntfs_malloc(newattrsz);
+	if (newattr) {
+		/* build the main header part */
+		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*) newattr;
+		pnhead->revision = 1;
+		pnhead->alignment = 0;
+		pnhead->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
+			/*
+			 * Windows prefers ACL first, do the same to
+			 * get the same hash value and avoid duplication
+			 */
+		/* build permissions */
+		aclsz = buildacls(newattr,
+			  sizeof(SECURITY_DESCRIPTOR_RELATIVE),
+			  mode, isdir, usid, gsid);
+		if ((aclsz + usidsz + gsidsz) <= newattrsz) {
+			/* append usid and gsid */
+			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
+				 + aclsz], usid, usidsz);
+			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
+				+ aclsz + usidsz], gsid, gsidsz);
+			/* positions of ACL, USID and GSID into header */
+			pnhead->owner =
+			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
+				 + aclsz);
+			pnhead->group =
+			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
+				 + aclsz + usidsz);
+			pnhead->sacl = cpu_to_le32(0);
+			pnhead->dacl =
+			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
+		} else {
+			/* hope error was detected before overflowing */
+			free(newattr);
+			newattr = (char*)NULL;
+			ntfs_log_error("Security descriptor is longer than expected\n");
+			errno = EIO;
+		}
+	} else
+		errno = ENOMEM;
+	return (newattr);
+}
+
+/*
+ *		Get the security descriptor associated to a file
+ *
+ *	Either :
+ *	   - read the security descriptor attribute (v1.x format)
+ *	   - or find the descriptor in $Secure:$SDS (v3.x format)
+ *
+ *	in both case, sanity checks are done on the attribute
+ *
+ *	The returned descriptor is dynamically allocated and has to be freed
+ */
 
 static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni)
 {
 	SII_INDEX_KEY securid;
-	const SID *asid;
 	char *securattr;
 	ntfschar nullchar = 0;
 	s64 readallsz;
@@ -984,12 +1672,21 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 	if (test_nino_flag(ni, v3_Extensions) && ni->security_id) {
 			/* get v3.x descriptor in $Secure */
 		securid.security_id = ni->security_id;
-		securattr = indexsearch(scx,securid);
+		securattr = retrievesecurityattr(scx,securid);
+		if (!securattr)
+			ntfs_log_error("Bad security descriptor for 0x%lx\n",
+					(long)le32_to_cpu(ni->security_id));
 	} else {
 			/* get v1.x security attribute */
 		readallsz = 0;
 		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
-				&nullchar, 0,&readallsz);
+				&nullchar, 0, &readallsz);
+		if (securattr && !valid_securattr(securattr, readallsz)) {
+			ntfs_log_error("Bad security descriptor for %s\n",
+				path);
+			free(securattr);
+			securattr = (char*)NULL;
+		}
 	}
 	if (!securattr) {
 			/*
@@ -1001,43 +1698,42 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 			 * be created by chown or chmod
 			 */
 		ntfs_log_error("No security descriptor found for %s\n",path);
-		asid = adminsid();
-		securattr = build_secur_descr(path, 0, 0, asid, asid);
+		securattr = build_secur_descr(path, 0, 0, adminsid, adminsid);
 	}
 	return (securattr);
 }
 
 /*
- *               test whether a SID means "world user"
+ *		Test whether a SID means "world user"
  */
 
 static int is_world_sid(const SID * usid)
 {
-	int any;
-
              /* check whether S-1-1-0 */
-        any = (usid->sub_authority_count == 1)
-            && (usid->identifier_authority.high_part == cpu_to_be32(0))
-            && (usid->identifier_authority.low_part == cpu_to_be32(1))
-            && (usid->sub_authority[0] == cpu_to_le32(0));
-	return (any);
+        return ((usid->sub_authority_count == 1)
+            && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+            && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
+            && (usid->sub_authority[0] == 0));
 }
 
 /*
- *               test whether a SID means "some user"
+ *		Test whether a SID means "some user"
+ *	Currently we only check for S-1-5-21... but we should
+ *	probably test for other configurations
  */
 
 static int is_user_sid(const SID * usid)
 {
-	int user;
-
-             /* check whether S-1-5-21... */
-        user = (usid->sub_authority_count == 5)
-            && (usid->identifier_authority.high_part == cpu_to_be32(0))
-            && (usid->identifier_authority.low_part == cpu_to_be32(5))
-            && (usid->sub_authority[0] == cpu_to_le32(21));
-	return (user);
+        return ((usid->sub_authority_count == 5)
+            && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+            && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+            && (usid->sub_authority[0] ==  cpu_to_le32(21)));
 }
+
+/*
+ *		Create a mode_t permission set
+ *	from owner, group and world grants as represented in ACEs
+ */
 
 static int merge_permissions(ntfs_inode *ni,
 		le32 owner, le32 group, le32 world)
@@ -1121,6 +1817,10 @@ static int merge_permissions(ntfs_inode *ni,
 	return (perm);
 }
 
+/*
+ *		Interpret an ACL and extract meaningful grants
+ *		(standard case : different owner, group and administrator)
+ */
 
 static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 			const char *securattr, ntfs_inode *ni)
@@ -1130,8 +1830,6 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 	const ACCESS_ALLOWED_ACE *pace;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
-	int usidsz;
-	int gsidsz;
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -1141,9 +1839,7 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-	usidsz = sid_size(usid);
 	gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
-	gsidsz = sid_size(gsid);
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -1152,13 +1848,13 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (!memcmp(usid, &pace->sid, usidsz)) {
+		if (same_sid(usid, &pace->sid)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			else if (pace->type == ACCESS_DENIED_ACE_TYPE)
 				denyown |= pace->mask;
 			} else
-			if (!memcmp(gsid, &pace->sid, gsidsz)) {
+			if (same_sid(gsid, &pace->sid)) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowgrp |= pace->mask;
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
@@ -1178,7 +1874,7 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 		 * unless denied personaly, and add to group rights
 		 * granted to world unless denied specifically
 		 */
-	allowown |= allowgrp | allowall;
+	allowown |= (allowgrp | allowall);
 	allowgrp |= allowall;
 	return (merge_permissions(ni,
 				allowown & ~denyown,
@@ -1186,6 +1882,11 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 				allowall & ~denyall));
 }
 
+/*
+ *		Interpret an ACL and extract meaningful grants
+ *		(special case : owner and group are the same,
+ *		and not administrator)
+ */
 
 static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 			const char *securattr, ntfs_inode *ni)
@@ -1194,7 +1895,6 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 	const ACL *pacl;
 	const ACCESS_ALLOWED_ACE *pace;
 	const SID *usid;	/* owner and group of file/directory */
-	int usidsz;
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -1204,7 +1904,6 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-	usidsz = sid_size(usid);
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -1213,12 +1912,12 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (!memcmp(usid, &pace->sid, usidsz)
+		if (same_sid(usid, &pace->sid)
 		   && (pace->mask & FILE_WRITE_ATTRIBUTES)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			} else
-			if (!memcmp(usid, &pace->sid, usidsz)
+			if (same_sid(usid, &pace->sid)
 			   && (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowgrp |= pace->mask;
@@ -1238,6 +1937,11 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 				allowall & ~denyall));
 }
 
+/*
+ *		Interpret an ACL and extract meaningful grants
+ *		(special case : owner or/and group is administrator)
+ */
+
 
 static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 			const char *securattr, ntfs_inode *ni)
@@ -1247,8 +1951,6 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 	const ACCESS_ALLOWED_ACE *pace;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
-	int usidsz;
-	int gsidsz;
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -1258,9 +1960,7 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-	usidsz = sid_size(usid);
 	gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
-	gsidsz = sid_size(gsid);
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -1269,7 +1969,7 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (!memcmp(usid, &pace->sid, usidsz)
+		if (same_sid(usid, &pace->sid)
 		   && (((pace->mask & FILE_WRITE_ATTRIBUTES) && !nace))) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
@@ -1277,7 +1977,7 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 				if (pace->type == ACCESS_DENIED_ACE_TYPE)
 					denyown |= pace->mask;
 			} else
-			    if (!memcmp(gsid, &pace->sid, gsidsz)
+			    if (same_sid(gsid, &pace->sid)
 				&& (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						allowgrp |= pace->mask;
@@ -1300,9 +2000,9 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *          Build unix-style (mode_t) permissions
- *     optionally filtered by the relation of user to file (owner, group or other)
- *     returns a negative result and sets errno if there is a problem
+ *		Build unix-style (mode_t) permissions from an ACL
+ *	returns the requested permissions
+ *	or a negative result (with errno set) if there is a problem
  */
 
 static int build_permissions(struct SECURITY_CONTEXT *scx,
@@ -1311,8 +2011,6 @@ static int build_permissions(struct SECURITY_CONTEXT *scx,
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
-	int usidsz;
-	int gsidsz;
 	int perm;
 	BOOL adminowns;
 	BOOL groupowns;
@@ -1320,12 +2018,10 @@ static int build_permissions(struct SECURITY_CONTEXT *scx,
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	if (phead->control & SE_DACL_PRESENT) {	/* no DACL, reject */
 		usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-		usidsz = sid_size(usid);
 		gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
-		gsidsz = sid_size(gsid);
-		adminowns = !memcmp(usid,adminsid(),usidsz)
-		         || !memcmp(gsid,adminsid(),gsidsz);
-		groupowns = !adminowns && !memcmp(gsid,usid,gsidsz);
+		adminowns = same_sid(usid,adminsid)
+		         || same_sid(gsid,adminsid);
+		groupowns = !adminowns && same_sid(gsid,usid);
 		if (adminowns)
 			perm = build_ownadmin_permissions(scx,securattr,
 					ni);
@@ -1344,9 +2040,9 @@ static int build_permissions(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *          Get permissions to access a file
- *        Takes into account the relation of user to file (owner, group, ...)
- *        Do no use as mode of the file
+ *		Get permissions to access a file
+ *	Takes into account the relation of user to file (owner, group, ...)
+ *	Do no use as mode of the file
  *
  *	returns -1 if there is a problem
  */
@@ -1355,7 +2051,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 		 const char *path, ntfs_inode * ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const struct SECURITY_ENTRY *cached;
+	const struct CACHED_PERMISSIONS *cached;
 	const char *securattr;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
@@ -1410,8 +2106,8 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *          Get owner, group and permissions in an stat structure
- *              returns permissions, or -1 if there is a problem
+ *		Get owner, group and permissions in an stat structure
+ *	returns permissions, or -1 if there is a problem
  */
 
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
@@ -1422,7 +2118,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 	const char *securattr;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
-	const struct SECURITY_ENTRY *cached;
+	const struct CACHED_PERMISSIONS *cached;
 	int perm;
 
 	if (!scx->usermapping)
@@ -1463,397 +2159,6 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *               Build an ACL composed of several ACE's
- *           (not expected to fail)
- *
- *	Three schemes are defined :
- *
- *	1) if root is neither owner nor group up to 7 ACE's are set up :
- *	- grants to owner (always present)
- *	- denials to owner (preventing grants to world or group to apply)
- *	- grants to group (unless groups has same rights as world)
- *	- denials to group (preventing grants to world to apply) 
- *	- grants to world (unless none)
- *	- full privileges to administrator, always present
- *	- full privileges to system, always present
- *
- *	2) if root is either owner or group, two problems arise :
- *	- granting full rights to administrator (as needed to transpose
- *	  to Windows rights bypassing granting to root) would imply
- *	  Linux permissions to always be seen as rwx, no matter the chmod
- *	- there is no different SID to separate an administrator owner
- *	  from an administrator group. Hence Linux permissions for owner
- *	  would always be similar to permissions to group.
- *
- *	as a work-around, up to 5 ACE's are set up if owner or group :
- *	- grants to owner, always present at first position
- *	- grants to group, always present
- *	- grants to world, unless none
- *	- full privileges to administrator, always present
- *	- full privileges to system, always present
- *
- *	On Windows, these ACE's are processed normally, though they
- *	are redundant (owner, group and administrator are the same,
- *	as a consequence any denials would damage administrator rights)
- *	but on Linux, privileges to administrator are ignored (they
- *	are not needed as root has always full privileges), and
- *	neither grants to group are applied to owner, nor grants to
- *	world are applied to owner or group.
- *
- *	3) finally a similar situation arises when group is owner (they
- *	 have the same SID), but is not root.
- *	 In this situation up to 6 ACE's are set up :
- *
- *	- grants to owner (always present)
- *	- denials to owner (preventing grants to world to apply)
- *	- grants to group (unless groups has same rights as world)
- *	- grants to world (unless none)
- *	- full privileges to administrator, always present
- *	- full privileges to system, always present
- *
- *	On Windows, these ACE's are processed normally, though they
- *	are redundant (as owner group are the same, but this has
- *	no impact on administrator rights)
- */
-
-static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
-	       const SID * usid, const SID * gsid)
-{
-	ACL *pacl;
-	ACCESS_ALLOWED_ACE *pgace;
-	ACCESS_ALLOWED_ACE *pdace;
-	const SID *wsid;
-	const SID *asid;
-	const SID *ssid;
-	BOOL adminowns;
-	BOOL groupowns;
-	int pos;
-	int acecnt;
-	int usidsz;
-	int gsidsz;
-	int wsidsz;
-	int asidsz;
-	int ssidsz;
-	long grants;
-	long denials;
-
-	usidsz = sid_size(usid);
-	gsidsz = sid_size(gsid);
-	asid = adminsid();
-	asidsz = sid_size(asid);
-	ssid = systemsid();
-	ssidsz = sid_size(ssid);
-	adminowns = !memcmp(usid, asid, usidsz)
-	         || !memcmp(gsid, asid, gsidsz);
-	groupowns = !adminowns && !memcmp(usid, gsid, usidsz);
-
-	/* ACL header */
-	pacl = (ACL*)&secattr[offs];
-	pacl->revision = ACL_REVISION;
-	pacl->alignment1 = 0;
-	pacl->size = sizeof(ACL) + usidsz + 8;
-	pacl->ace_count = cpu_to_le16(1);
-	pacl->alignment2 = 0;
-	pos = sizeof(ACL);
-	acecnt = 0;
-
-	/* a grant ACE for owner */
-
-	pgace = (ACCESS_ALLOWED_ACE*) &secattr[offs + pos];
-	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-	pgace->size = usidsz + 8;
-	grants = OWNER_RIGHTS;
-	if (isdir) {
-		pgace->flags = DIR_INHERITANCE;
-		if (mode & S_IXUSR)
-			grants |= DIR_EXEC;
-		if (mode & S_IWUSR)
-			grants |= DIR_WRITE;
-		if (mode & S_IRUSR)
-			grants |= DIR_READ;
-	} else {
-		pgace->flags = FILE_INHERITANCE;
-		if (mode & S_IXUSR)
-			grants |= FILE_EXEC;
-		if (mode & S_IWUSR)
-			grants |= FILE_WRITE;
-		if (mode & S_IRUSR)
-			grants |= FILE_READ;
-	}
-	pgace->mask = cpu_to_le32(grants);
-	memcpy((char*)&pgace->sid, usid, usidsz);
-	pos += pgace->size;
-	acecnt++;
-
-	/* a possible ACE to deny owner what he/she would */
-	/* induely get from administrator, group or world */
-        /* unless owner is administrator or group */
-
-	denials = 0;
-	pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
-	if (!adminowns) {
-		if (!groupowns) {
-			if (isdir) {
-				pdace->flags = DIR_INHERITANCE;
-				if (mode & (S_IXGRP | S_IXOTH))
-					denials |= DIR_EXEC;
-				if (mode & (S_IWGRP | S_IWOTH))
-					denials |= DIR_WRITE;
-				if (mode & (S_IRGRP | S_IROTH))
-					denials |= DIR_READ;
-			} else {
-				pdace->flags = FILE_INHERITANCE;
-				if (mode & (S_IXGRP | S_IXOTH))
-					denials |= FILE_EXEC;
-				if (mode & (S_IWGRP | S_IWOTH))
-					denials |= FILE_WRITE;
-				if (mode & (S_IRGRP | S_IROTH))
-					denials |= FILE_READ;
-			}
-		} else {
-			if (isdir) {
-				pdace->flags = DIR_INHERITANCE;
-				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
-					denials |= DIR_EXEC;
-				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
-					denials |= DIR_WRITE;
-				if ((mode & S_IROTH) && !(mode & S_IRGRP))
-					denials |= DIR_READ;
-			} else {
-				pdace->flags = FILE_INHERITANCE;
-				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
-					denials |= FILE_EXEC;
-				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
-					denials |= FILE_WRITE;
-				if ((mode & S_IROTH) && !(mode & S_IRGRP))
-					denials |= FILE_READ;
-			}
-		}
-		denials &= ~grants;
-		if (denials) {
-			pdace->type = ACCESS_DENIED_ACE_TYPE;
-			pdace->size = usidsz + 8;
-			pdace->mask = cpu_to_le32(denials);
-			memcpy((char*)&pdace->sid, usid, usidsz);
-			pos += pdace->size;
-			acecnt++;
-		}
-	}
-
-	/* a grant ACE for group */
-	/* unless group has the same rights as world */
-	/* but present if owner is administrator */
-
-	if (adminowns
-	    || (((mode >> 3) ^ mode) & 7)) {
-		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-		pgace->size = gsidsz + 8;
-		grants = WORLD_RIGHTS;
-		if (isdir) {
-			pgace->flags = DIR_INHERITANCE;
-			if (mode & S_IXGRP)
-				grants |= DIR_EXEC;
-			if (mode & S_IWGRP)
-				grants |= DIR_WRITE;
-			if (mode & S_IRGRP)
-				grants |= DIR_READ;
-		} else {
-			pgace->flags = FILE_INHERITANCE;
-			if (mode & S_IXGRP)
-				grants |= FILE_EXEC;
-			if (mode & S_IWGRP)
-				grants |= FILE_WRITE;
-			if (mode & S_IRGRP)
-				grants |= FILE_READ;
-		}
-		pgace->mask = cpu_to_le32(grants);
-		memcpy((char*)&pgace->sid, gsid, gsidsz);
-		pos += pgace->size;
-		acecnt++;
-
-		/* a possible ACE to deny group what it would get from world */
-		/* or administrator, unless owner is administrator or group */
-
-		denials = 0;
-		pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-		if (!adminowns && !groupowns) {
-			if (isdir) {
-				pdace->flags = DIR_INHERITANCE;
-				if (mode & S_IXOTH)
-					denials |= DIR_EXEC;
-				if (mode & S_IWOTH)
-					denials |= DIR_WRITE;
-				if (mode & S_IROTH)
-					denials |= DIR_READ;
-			} else {
-				pdace->flags = FILE_INHERITANCE;
-				if (mode & S_IXOTH)
-					denials |= FILE_EXEC;
-				if (mode & S_IWOTH)
-					denials |= FILE_WRITE;
-				if (mode & S_IROTH)
-					denials |= FILE_READ;
-			}
-			denials &= ~grants;
-			if (denials) {
-				pdace->type = ACCESS_DENIED_ACE_TYPE;
-				pdace->size = gsidsz + 8;
-				pdace->mask = cpu_to_le32(denials);
-				memcpy((char*)&pdace->sid, gsid, gsidsz);
-				pos += pdace->size;
-				acecnt++;
-			}
-		}
-	}
-
-	/* an ACE for world users */
-
-	wsid = worldsid();
-	wsidsz = sid_size(wsid);
-	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-	pgace->size = wsidsz + 8;
-	grants = WORLD_RIGHTS;
-	if (isdir) {
-		pgace->flags = DIR_INHERITANCE;
-		if (mode & S_IXOTH)
-			grants |= DIR_EXEC;
-		if (mode & S_IWOTH)
-			grants |= DIR_WRITE;
-		if (mode & S_IROTH)
-			grants |= DIR_READ;
-	} else {
-		pgace->flags = FILE_INHERITANCE;
-		if (mode & S_IXOTH)
-			grants |= FILE_EXEC;
-		if (mode & S_IWOTH)
-			grants |= FILE_WRITE;
-		if (mode & S_IROTH)
-			grants |= FILE_READ;
-	}
-	pgace->mask = cpu_to_le32(grants);
-	memcpy((char*)&pgace->sid, wsid, wsidsz);
-	pos += pgace->size;
-	acecnt++;
-
-	/* an ACE for administrators */
-	/* always full access */
-
-	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-	if (isdir)
-		pgace->flags = DIR_INHERITANCE;
-	else
-		pgace->flags = FILE_INHERITANCE;
-	pgace->size = asidsz + 8;
-	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
-	pgace->mask = cpu_to_le32(grants);
-	memcpy((char*)&pgace->sid, asid, asidsz);
-	pos += pgace->size;
-	acecnt++;
-
-	/* an ACE for system (needed ?) */
-	/* always full access */
-
-	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-	if (isdir)
-		pgace->flags = DIR_INHERITANCE;
-	else
-		pgace->flags = FILE_INHERITANCE;
-	pgace->size = ssidsz + 8;
-	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
-	pgace->mask = cpu_to_le32(grants);
-	memcpy((char*)&pgace->sid, ssid, ssidsz);
-	pos += pgace->size;
-	acecnt++;
-
-	/* fix ACL header */
-	pacl->size = cpu_to_le16(pos);
-	pacl->ace_count = cpu_to_le16(acecnt);
-	return (pos);
-}
-
-/*
- *                Build a full security descriptor
- *            (in allocated memory, must free() after use)
- */
-
-static char *build_secur_descr(const char *path, mode_t mode,
-			int isdir, const SID * usid, const SID * gsid)
-{
-	int newattrsz;
-	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
-	const SID *wsid;
-	char *newattr;
-	int aclsz;
-	int usidsz;
-	int gsidsz;
-	int wsidsz;
-	int asidsz;
-	int ssidsz;
-
-	wsid = worldsid();
-	usidsz = sid_size(usid);
-	gsidsz = sid_size(gsid);
-	wsidsz = sid_size(wsid);
-	asidsz = sid_size(adminsid());
-	ssidsz = sid_size(systemsid());
-
-	/* allocate enough space for the new security attribute */
-	newattrsz = sizeof(SECURITY_DESCRIPTOR_RELATIVE)	/* header */
-	    + usidsz + gsidsz	/* usid and gsid */
-	    + sizeof(ACL)	/* acl header */
-	    + 2*(8 + usidsz)	/* two possible ACE for user */
-	    + 2*(8 + gsidsz)	/* two possible ACE for group */
-	    + 8 + wsidsz	/* one ACE for world */
-	    + 8 + asidsz 	/* one ACE for admin */
-	    + 8 + ssidsz;	/* one ACE for system */
-	newattr = (char*)malloc(newattrsz);
-	if (newattr) {
-		/* build the main header part */
-		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*) newattr;
-		pnhead->revision = 1;
-		pnhead->alignment = 0;
-		pnhead->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
-			/*
-			 * Windows prefers ACL first, do the same to
-			 * get the same hash value and avoid duplication
-			 */
-		/* build permissions */
-		aclsz = buildacls(newattr,
-			  sizeof(SECURITY_DESCRIPTOR_RELATIVE),
-			  mode, isdir, usid, gsid);
-		if ((aclsz + usidsz + gsidsz) <= newattrsz) {
-			/* append usid and gsid */
-			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
-				 + aclsz], usid, usidsz);
-			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
-				+ aclsz + usidsz], gsid, gsidsz);
-			/* positions of ACL, USID and GSID into header */
-			pnhead->owner =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
-				 + aclsz);
-			pnhead->group =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
-				 + aclsz + usidsz);
-			pnhead->sacl = cpu_to_le32(0);
-			pnhead->dacl =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
-		} else {
-			/* hope error was detected before overflowing */
-			free(newattr);
-			newattr = (char*)NULL;
-			ntfs_log_error("Security descriptor is longer than expected\n");
-			errno = EIO;
-		}
-	} else
-		errno = ENOMEM;
-	return (newattr);
-}
-
-/*
  *	Get the first entry of current index block
  *	cut and pasted form ntfs_ie_get_first() in index.c
  */
@@ -1864,20 +2169,23 @@ static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
 }
 
 /*
- *	get next index entry in current block or next block
- *	(limited to SII and SDH)
+ *		Get next index entry in current block or next block
+ *	(currently limited to SII and SDH)
  *
  *	returns NULL at end of last block
  *
- * ! make sure getting next key value always returns an entry !
- * ! in the correct index level (a block with no child)       !
- *
- *	linking to next block should be improved and made generic
- *		(walk into tree instead of lookup)
+ *	Linking to next block should be improved and made generic
  *	then function should then be made public in index.c
+ *	currently walk up is generic but limited to a two-level tree
+ *	and walk down used a lookup and is not generic
  */
 
-static INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
+/* use of (normally static) functions from index.c */
+INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
+				  u32 name_len, ntfs_attr_search_ctx **ctx);
+INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos);
+
+INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
 			BOOL forsii)
 {
 	INDEX_ENTRY *next;
@@ -1885,45 +2193,103 @@ static INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
 	struct SDH *psdh;
 	SDH_INDEX_KEY sdhkey;
 	le32 siikey;
+	int flags;
 
-	if (!(ie->ie_flags & INDEX_ENTRY_END))
-		next = (INDEX_ENTRY*)((char*)ie + le16_to_cpu(ie->length));
-	else {
+			/* get down if have a subnode */
+
+	if (ie->ie_flags & INDEX_ENTRY_NODE) {
+		ntfs_index_ctx_reinit(xc);
 		if (forsii) {
 			psii = (struct SII*)ie;
 			siikey = cpu_to_le32(le32_to_cpu(psii->keysecurid) + 1);
-			ntfs_index_lookup((char*)&siikey,sizeof(SII_INDEX_KEY), xc);
+			ntfs_index_lookup((char*)&siikey,
+					sizeof(SII_INDEX_KEY), xc);
 		} else {
 			psdh = (struct SDH*)ie;
-			sdhkey.hash = cpu_to_le32(le32_to_cpu(psdh->keyhash) + 1);
-			if (sdhkey.hash)
-				sdhkey.security_id = psdh->keysecurid;
-			else
-				sdhkey.security_id =
-				 cpu_to_le32(le32_to_cpu(psdh->keysecurid) + 1);
-			ntfs_index_lookup((char*)&sdhkey,sizeof(SDH_INDEX_KEY), xc);
+			sdhkey.hash = psdh->keyhash;
+			sdhkey.security_id =
+				 cpu_to_le32(
+					le32_to_cpu(psdh->keysecurid) + 1);
+			ntfs_index_lookup((char*)&sdhkey,
+					sizeof(SDH_INDEX_KEY), xc);
 		}
-		/*
-		 *  ! lookup does not assume next key exists, but we !
-		 *  ! do assume we get to the start of correct block anyway !
-		 */
 		next = xc->entry;
-		/* for safety, return NULL at end of last block */
-		if ((ie->ie_flags & INDEX_ENTRY_END)
-		   && !(ie->ie_flags & INDEX_ENTRY_NODE))
-			next = (INDEX_ENTRY*)NULL;
+
+	} else {
+
+	next = (INDEX_ENTRY*)((char*)ie +
+				le16_to_cpu(ie->length));
+	flags = next->ie_flags;
+	if ((flags & INDEX_ENTRY_END) && (flags & INDEX_ENTRY_NODE)) {
+
+		/*
+		 * Move down in the tree if end of block and subnode present
+		 */
+
+		ntfs_index_ctx_reinit(xc);
+		if (forsii) {
+			psii = (struct SII*)ie;
+			siikey = cpu_to_le32(le32_to_cpu(psii->keysecurid) + 1);
+			ntfs_index_lookup((char*)&siikey,
+					sizeof(SII_INDEX_KEY), xc);
+		} else {
+			psdh = (struct SDH*)ie;
+			sdhkey.hash = psdh->keyhash;
+			sdhkey.security_id =
+				 cpu_to_le32(
+					le32_to_cpu(psdh->keysecurid) + 1);
+			ntfs_index_lookup((char*)&sdhkey,
+					sizeof(SDH_INDEX_KEY), xc);
+		}
+		next = xc->entry;
 	}
+		/*
+		 * If end of block and no subnode, move up in the tree
+		 * until current node is not the last child of parent
+		 */
+
+	if ((flags & INDEX_ENTRY_END) && !(flags & INDEX_ENTRY_NODE)) {
+		if (xc->pindex > 0) {
+			do {
+				xc->pindex--;
+				if (!xc->pindex) {
+					free(xc->ib);
+					xc->ib = (INDEX_BLOCK*)NULL;
+					xc->ir = ntfs_ir_lookup(xc->ni,
+						xc->name, xc->name_len,
+						&xc->actx);
+					xc->is_in_root = TRUE;
+					xc->entry = ntfs_ie_get_by_pos(
+						&xc->ir->index,
+						xc->parent_pos[xc->pindex]);
+				} else {
+/* ! TODO ! up into another non-root block */
+					xc->entry = (INDEX_ENTRY*)NULL;
+				}
+			} while (xc->entry && (xc->pindex > 0)
+				 && !(xc->entry->ie_flags & INDEX_ENTRY_END));
+		}
+			/* done if stuck at end of block */
+		if (xc->entry && (xc->entry->ie_flags & INDEX_ENTRY_END)) {
+			xc->entry = (INDEX_ENTRY*)NULL;
+		}
+		next = xc->entry;
+	}
+	}
+		/* return NULL if stuck at end of block */
+	if (next && (next->ie_flags & INDEX_ENTRY_END))
+		next = (INDEX_ENTRY*)NULL;
 	return (next);
 }
 
 
 /*
  *	Enter a new security descriptor to $Secure (data only)
- *      if has to be written twice with an offset of 256KB
+ *      it has to be written twice with an offset of 256KB
  *	Returns zero if sucessful
  */
 
-static int entersecurity_data(ntfs_volume *vol, ntfs_inode *ni,
+static int entersecurity_data(ntfs_volume *vol,
 			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
 			le32 hash, le32 keyid, off_t offs)
 {
@@ -1931,24 +2297,27 @@ static int entersecurity_data(ntfs_volume *vol, ntfs_inode *ni,
 	int written1;
 	int written2;
 	char *fullattr;
+	int fullsz;
 	SECURITY_DESCRIPTOR_HEADER *phsds;
 
 	res = -1;
-	fullattr = malloc(attrsz + 20);
+	fullsz = attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER);
+	fullattr = ntfs_malloc(fullsz);
 	if (fullattr) {
-		memcpy(&fullattr[20],attr,attrsz);
+		memcpy(&fullattr[sizeof(SECURITY_DESCRIPTOR_HEADER)],
+				attr,attrsz);
 		phsds = (SECURITY_DESCRIPTOR_HEADER*)fullattr;
 		phsds->hash = hash;
 		phsds->security_id = keyid;
 		phsds->offset = cpu_to_le64(offs);
-		phsds->length = cpu_to_le64(attrsz + 20);
-		written1 = ntfs_local_write(vol, ni, "$Secure",
-			sds_name, 4, fullattr, attrsz + 20,
+		phsds->length = cpu_to_le32(fullsz);
+		written1 = ntfs_local_write(vol, vol->secure_ni, "$Secure",
+			sds_stream, 4, fullattr, fullsz,
 			offs);
-		written2 = ntfs_local_write(vol, ni, "$Secure",
-			sds_name, 4, fullattr, attrsz + 20,
+		written2 = ntfs_local_write(vol, vol->secure_ni, "$Secure",
+			sds_stream, 4, fullattr, fullsz,
 			offs + ALIGN_SDS_BLOCK);
-		if ((written1 == (attrsz + 20))
+		if ((written1 == fullsz)
 		     && (written2 == written1))
 			res = 0;
 		else
@@ -1963,16 +2332,16 @@ static int entersecurity_data(ntfs_volume *vol, ntfs_inode *ni,
  *	Returns zero if sucessful
  */
 
-static int entersecurity_indexes(ntfs_inode *ni,
+static int entersecurity_indexes(ntfs_volume *vol,
 			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
 			le32 hash, le32 keyid, off_t offs)
 {
 	union {
 		struct {
-			u32 dataoffsl;
-			u32 dataoffsh;
+			le32 dataoffsl;
+			le32 dataoffsh;
 		} parts;
-		u64 all;
+		le64 all;
 	} realign;
 	int res;
 	ntfs_index_context *xsii;
@@ -1982,47 +2351,51 @@ static int entersecurity_indexes(ntfs_inode *ni,
 
 	res = -1;
 				/* enter a new $SII record */
-	xsii = ntfs_index_ctx_get(ni, sii_name, 4);
-	if (xsii) {
-		newsii.offs = 20;
-		newsii.size = sizeof(struct SII) - 20;
-		newsii.fill1 = 0;
-		newsii.indexsz = sizeof(struct SII);
-		newsii.indexksz = 4;
-		newsii.flags = 0;
-		newsii.fill2 = 0;
-		newsii.keysecurid = keyid;
-		newsii.hash = hash;
-		newsii.securid = keyid;
-		realign.all = cpu_to_le64(offs);
-		newsii.dataoffsh = realign.parts.dataoffsh;
-		newsii.dataoffsl = realign.parts.dataoffsl;
-		newsii.datasize = attrsz + 20;
-		if (!ntfs_ie_add(xsii,(INDEX_ENTRY*)&newsii)) {
-			xsdh = ntfs_index_ctx_get(ni, sdh_name, 4);
-			if (xsdh) {
-				/* enter a new $SDH record */
-				newsdh.offs = 24;
-				newsdh.size = 20;
-				newsdh.fill1 = 0;
-				newsdh.indexsz = sizeof(struct SDH);
-				newsdh.indexksz = 8;
-				newsdh.flags = 0;
-				newsdh.fill2 = 0;
-				newsdh.keyhash = hash;
-				newsdh.keysecurid = keyid;
-				newsdh.hash = hash;
-				newsdh.securid = keyid;
-				newsdh.dataoffsh = realign.parts.dataoffsh;
-				newsdh.dataoffsl = realign.parts.dataoffsl;
-				newsdh.datasize = attrsz + 20;
-				newsdh.fill3 = 0;
-				if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
-					res = 0;
-				ntfs_index_ctx_put(xsdh);
-			}
-		}
-		ntfs_index_ctx_put(xsii);
+
+	xsii = vol->secure_xsii;
+	ntfs_index_ctx_reinit(xsii);
+	newsii.offs = cpu_to_le16(20);
+	newsii.size = cpu_to_le16(sizeof(struct SII) - 20);
+	newsii.fill1 = cpu_to_le32(0);
+	newsii.indexsz = cpu_to_le16(sizeof(struct SII));
+	newsii.indexksz = cpu_to_le16(sizeof(SII_INDEX_KEY));
+	newsii.flags = cpu_to_le16(0);
+	newsii.fill2 = cpu_to_le16(0);
+	newsii.keysecurid = keyid;
+	newsii.hash = hash;
+	newsii.securid = keyid;
+	realign.all = cpu_to_le64(offs);
+	newsii.dataoffsh = realign.parts.dataoffsh;
+	newsii.dataoffsl = realign.parts.dataoffsl;
+	newsii.datasize = cpu_to_le32(attrsz
+			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
+	if (!ntfs_ie_add(xsii,(INDEX_ENTRY*)&newsii)) {
+
+		/* enter a new $SDH record */
+
+		xsdh = vol->secure_xsdh;
+		ntfs_index_ctx_reinit(xsdh);
+		newsdh.offs = cpu_to_le16(24);
+		newsdh.size = cpu_to_le16(
+			sizeof(SECURITY_DESCRIPTOR_HEADER));
+		newsdh.fill1 = cpu_to_le32(0);
+		newsdh.indexsz = cpu_to_le16(
+				sizeof(struct SDH));
+		newsdh.indexksz = cpu_to_le16(
+				sizeof(SDH_INDEX_KEY));
+		newsdh.flags = cpu_to_le16(0);
+		newsdh.fill2 = cpu_to_le16(0);
+		newsdh.keyhash = hash;
+		newsdh.keysecurid = keyid;
+		newsdh.hash = hash;
+		newsdh.securid = keyid;
+		newsdh.dataoffsh = realign.parts.dataoffsh;
+		newsdh.dataoffsl = realign.parts.dataoffsl;
+		newsdh.datasize = cpu_to_le32(attrsz
+			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
+		newsdh.fill3 = cpu_to_le32(0);
+		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
+			res = 0;
 	}
 	return (res);
 }
@@ -2035,19 +2408,18 @@ static int entersecurity_indexes(ntfs_inode *ni,
  *	needed while fuse is not multithreaded
  */
 
-static u32 entersecurityattr(ntfs_volume *vol,
-			ntfs_inode *ni,
+static le32 entersecurityattr(ntfs_volume *vol,
 			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
 			le32 hash)
 {
 	union {
 		struct {
-			u32 dataoffsl;
-			u32 dataoffsh;
+			le32 dataoffsl;
+			le32 dataoffsh;
 		} parts;
-		u64 all;
+		le64 all;
 	} realign;
-	u32 securid;
+	le32 securid;
 	le32 keyid;
 	off_t offs;
 	int size;
@@ -2062,85 +2434,85 @@ static u32 entersecurityattr(ntfs_volume *vol,
 	/* is always appended to and the id's are allocated */
 	/* in sequence */
 
-	securid = 0;
-	xsii = ntfs_index_ctx_get(ni, sii_name, 4);
-	if (xsii) {
-		offs = size = 0;
-		keyid = cpu_to_le32(-1);
-		ntfs_index_lookup((char*)&keyid,
-				       sizeof(SII_INDEX_KEY), xsii);
-		entry = xsii->entry;
-		psii = (struct SII*)xsii->entry;
-		if (psii) {
-			/*
-			 * Get last entry in block, but must get first one
-			 * one first, as we should already be beyond the
-			 * last one. For some reason the search for the last
-			 * entry sometimes does not return the last block...
-			 * we assume this can only happen in root block
-			 */
-			if (xsii->is_in_root)
-				entry = ntfs_ie_get_first(&xsii->ir->index);
-			else
-				entry = ntfs_ie_get_first(&xsii->ib->index);
-			/*
-			 * All index blocks should be at least half full
-			 * so there always is a last entry but one,
-			 * except when creating the first entry in index root
-			 */
-			keyid = 0;
-			while (!(entry->ie_flags & INDEX_ENTRY_END)) {
-				next = ntfs_index_next(entry,xsii,TRUE);
-				if (next->ie_flags & INDEX_ENTRY_END) {
-					psii = (struct SII*)entry;
-						/* save last key and */
-						/* available position */
-					keyid = psii->keysecurid;
-					securid = le32_to_cpu(keyid) + 1;
-					realign.parts.dataoffsh = psii->dataoffsh;
-					realign.parts.dataoffsl = psii->dataoffsl;
-					offs = le64_to_cpu(realign.all);
-					size = le32_to_cpu(psii->datasize);
-				}
-				entry = next;
+	securid = cpu_to_le32(0);
+	xsii = vol->secure_xsii;
+	ntfs_index_ctx_reinit(xsii);
+	offs = size = 0;
+	keyid = cpu_to_le32(-1);
+	ntfs_index_lookup((char*)&keyid,
+			       sizeof(SII_INDEX_KEY), xsii);
+	entry = xsii->entry;
+	psii = (struct SII*)xsii->entry;
+	if (psii) {
+		/*
+		 * Get last entry in block, but must get first one
+		 * one first, as we should already be beyond the
+		 * last one. For some reason the search for the last
+		 * entry sometimes does not return the last block...
+		 * we assume this can only happen in root block
+		 */
+		if (xsii->is_in_root)
+			entry = ntfs_ie_get_first
+				((INDEX_HEADER*)&xsii->ir->index);
+		else
+			entry = ntfs_ie_get_first
+				((INDEX_HEADER*)&xsii->ib->index);
+		/*
+		 * All index blocks should be at least half full
+		 * so there always is a last entry but one,
+		 * except when creating the first entry in index root.
+		 * A simplified version of next(), limited to
+		 * current index node, could be used
+		 */
+		keyid = cpu_to_le32(0);
+		while (entry) {
+			next = ntfs_index_next(entry,xsii,TRUE);
+			if (next) { 
+				psii = (struct SII*)next;
+					/* save last key and */
+					/* available position */
+				keyid = psii->keysecurid;
+				realign.parts.dataoffsh
+						 = psii->dataoffsh;
+				realign.parts.dataoffsl
+						 = psii->dataoffsl;
+				offs = le64_to_cpu(realign.all);
+				size = le32_to_cpu(psii->datasize);
 			}
+			entry = next;
 		}
-		if (!securid) {
-			/* assume we could have to insert the first entry */
-			/* (after upgrading from an old version ?) */
-			ntfs_log_error("Creating the first security_id\n");
-			securid = FIRST_SECURITY_ID;
-		}
-		if (securid) {
-			/*
-			 * The security attr has to be written twice 256KB
-			 * apart. This implies that offsets like
-			 * 0x40000*odd_integer must be left available for
-			 * the second copy. So align to next block when
-			 * the last byte overflows on a wrong block.
-			 */
-			offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
-			if ((offs + attrsz - 1) & ALIGN_SDS_BLOCK)
-				offs = ((offs + attrsz - 1)
-					 | (ALIGN_SDS_BLOCK - 1)) + 1;
-			/* now write the security attr to storage */
-			keyid = cpu_to_le32(securid);
-			if (entersecurity_data(vol,ni,attr,attrsz,
-					hash,keyid,offs)
-			    || entersecurity_indexes(ni,attr,attrsz,
-					hash,keyid,offs))
-				securid = 0;
-		} else {
-			ntfs_log_error("Could not find an available security_id\n");
-			errno = EIO;
-		}
-		ntfs_index_ctx_put(xsii);
 	}
+	if (!keyid) {
+		/* assume we could have to insert the first entry */
+		/* (after upgrading from an old version ?) */
+		ntfs_log_error("Creating the first security_id\n");
+		securid = cpu_to_le32(FIRST_SECURITY_ID);
+	} else
+		securid = cpu_to_le32(le32_to_cpu(keyid) + 1);
+	/*
+	 * The security attr has to be written twice 256KB
+	 * apart. This implies that offsets like
+	 * 0x40000*odd_integer must be left available for
+	 * the second copy. So align to next block when
+	 * the last byte overflows on a wrong block.
+	 */
+	offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
+	if ((offs + attrsz - 1) & ALIGN_SDS_BLOCK)
+		offs = ((offs + attrsz - 1)
+			 | (ALIGN_SDS_BLOCK - 1)) + 1;
+	/* now write the security attr to storage */
+	if (entersecurity_data(vol,attr,attrsz,
+			hash,securid,offs)
+	    || entersecurity_indexes(vol,attr,attrsz,
+			hash,securid,offs))
+		securid = cpu_to_le32(0);
+		/* inode now is dirty */
+	NInoSetDirty(vol->secure_ni);
 	return (securid);
 }
 
 /*
- *	Find a matching security descriptor in $Secure,
+ *		Find a matching security descriptor in $Secure,
  *	if none, allocate a new id and write the descriptor to storage
  *	Returns id of entry, or zero if there is a problem.
  *
@@ -2148,16 +2520,16 @@ static u32 entersecurityattr(ntfs_volume *vol,
  *	needed while fuse is not multithreaded
  */
 
-static u32 setsecurityattr(ntfs_volume *vol,
+static le32 setsecurityattr(ntfs_volume *vol,
 			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz)
 {
 	struct SDH *psdh;	/* this is an image of index (le) */
 	union {
 		struct {
-			u32 dataoffsl;
-			u32 dataoffsh;
+			le32 dataoffsl;
+			le32 dataoffsh;
 		} parts;
-		u64 all;
+		le64 all;
 	} realign;
 	BOOL found;
 	BOOL collision;
@@ -2165,85 +2537,82 @@ static u32 setsecurityattr(ntfs_volume *vol,
 	size_t rdsize;
 	s64 offs;
 	int res;
-	ntfs_inode *ni;
-	ntfs_index_context *xc;
+	ntfs_index_context *xsdh;
 	char *oldattr;
 	SDH_INDEX_KEY key;
 	INDEX_ENTRY *entry;
-	u32 securid;
+	le32 securid;
 	le32 hash;
 
 	hash = ntfs_security_hash(attr,attrsz);
 	oldattr = (char*)NULL;
-	securid = 0;
+	securid = cpu_to_le32(0);
 	res = 0;
-	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
-	if (ni) {
-		xc = ntfs_index_ctx_get(ni, sdh_name, 4);
-		if (xc) {
-			  /* find the nearest key */
-			key.hash = hash;
-			key.security_id = 0;
-			ntfs_index_lookup((char*)&key,
-					       sizeof(SDH_INDEX_KEY), xc);
-			entry = xc->entry;
-			found = FALSE;
-			do {
-				collision = FALSE;
-				psdh = (struct SDH*)entry;
-				size = (size_t) le32_to_cpu(psdh->datasize) - 20;
-				   /* if hash is not the same, the key is not present */
-				if (psdh && (size > 0)
-				   && (psdh->keyhash == hash)) {
-					   /* if hash is the same */
-					   /* check the whole record */
-					realign.parts.dataoffsh = psdh->dataoffsh;
-					realign.parts.dataoffsl = psdh->dataoffsl;
-					offs = le64_to_cpu(realign.all) + 20;
-					oldattr = (char*)malloc(size);
-					if (oldattr) {
-						rdsize = ntfs_local_read(
-							vol, ni, "/$Secure",
-							sds_name, 4,
-							oldattr, size, offs);
-						found = (rdsize == size)
-							&& !memcmp(oldattr,attr,size);
-						free(oldattr);
-						  /* if the records do not compare */
-						  /* (hash collision), try next one */
-						if (!found) {
-							entry = ntfs_index_next(
-								entry,xc,FALSE);
-							collision = TRUE;
-						}
-					} else
-						res = ENOMEM;
+	xsdh = vol->secure_xsdh;
+	ntfs_index_ctx_reinit(xsdh);
+		  /* find the nearest key */
+	key.hash = hash;
+	key.security_id = cpu_to_le32(0);
+	ntfs_index_lookup((char*)&key,
+			       sizeof(SDH_INDEX_KEY), xsdh);
+	entry = xsdh->entry;
+	found = FALSE;
+	do {
+		collision = FALSE;
+		psdh = (struct SDH*)entry;
+		size = (size_t) le32_to_cpu(psdh->datasize)
+				 - sizeof(SECURITY_DESCRIPTOR_HEADER);
+		   /* if hash is not the same, the key is not present */
+		if (psdh && (size > 0)
+		   && (psdh->keyhash == hash)) {
+			   /* if hash is the same */
+			   /* check the whole record */
+			realign.parts.dataoffsh = psdh->dataoffsh;
+			realign.parts.dataoffsl = psdh->dataoffsl;
+			offs = le64_to_cpu(realign.all)
+				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
+			oldattr = (char*)ntfs_malloc(size);
+			if (oldattr) {
+				rdsize = ntfs_local_read(vol,
+					vol->secure_ni, "/$Secure",
+					sds_stream, 4,
+					oldattr, size, offs);
+				found = (rdsize == size)
+					&& !memcmp(oldattr,attr,size);
+				free(oldattr);
+				  /* if the records do not compare */
+				  /* (hash collision), try next one */
+				if (!found) {
+					entry = ntfs_index_next(
+						entry,xsdh,FALSE);
+					collision = TRUE;
 				}
-			} while (collision && entry);
-			if (found)
-				securid = le32_to_cpu(psdh->keysecurid);
-			else {
-				if (res) {
-					errno = res;
-					securid = 0;
-				} else {
-                                 /* no matching key : have to build a new one */
-					securid = entersecurityattr(vol,ni,
-						attr,attrsz,hash);
-				}
-			}
-			ntfs_index_ctx_put(xc);
+			} else
+				res = ENOMEM;
 		}
-		ntfs_inode_close(ni);
+	} while (collision && entry);
+	if (found)
+		securid = psdh->keysecurid;
+	else {
+		if (res) {
+			errno = res;
+			securid = cpu_to_le32(0);
+		} else {
+			/* no matching key : have to build a new one */
+			securid = entersecurityattr(vol,
+				attr, attrsz, hash);
+		}
 	}
    return (securid);
 }
 
 
 /*
- *          Update a security descriptor
+ *		Update the security descriptor of a file
+ *	Either as an attribute (complying with pre v3.x NTFS version)
+ *	or, when possible, as an entry in $Secure (for NTFS v3.x)
  *
- *    returns 0 if success
+ *	returns 0 if success
  */
 
 static int update_secur_descr(ntfs_volume *vol,
@@ -2289,15 +2658,20 @@ static int update_secur_descr(ntfs_volume *vol,
 				&nullchar, 0);
 			if (na) {
 				clear_nino_flag(ni, v3_Extensions);
-			/* Truncating the record does not sweep extensions */
-			/* from copy in memory. Clear security_id for precaution */
-				ni->security_id = 0;
+			/*
+			 * Truncating the record does not sweep extensions
+			 * from copy in memory. Clear security_id to be safe
+			 */
+				ni->security_id = cpu_to_le32(0);
 				res = ntfs_attr_truncate(na, (s64)48);
 				ntfs_attr_close(na);
 				clear_nino_flag(ni, v3_Extensions);
 			}
 		} else {
-			/* insert the new security attribute if there were none */
+			/*
+			 * insert the new security attribute if there
+			 * were none
+			 */
 			res = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR,
 					    &nullchar, 0, (u8*)newattr,
 					    (s64) newattrsz);
@@ -2307,7 +2681,7 @@ static int update_secur_descr(ntfs_volume *vol,
 
 		/* update for NTFS format v3.x */
 
-		u32 securid;
+		le32 securid;
 
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
@@ -2319,16 +2693,17 @@ static int update_secur_descr(ntfs_volume *vol,
 				res = 0;
 				if (!test_nino_flag(ni, v3_Extensions)) {
 			/* expand standard information attribute to v3.x */
-					res = ntfs_attr_truncate(na, (s64)72);
-					ni->owner_id = 0;
-					ni->quota_charged = 0;
-					ni->usn = 0;
+					res = ntfs_attr_truncate(na,
+					 (s64)sizeof(STANDARD_INFORMATION));
+					ni->owner_id = cpu_to_le32(0);
+					ni->quota_charged = cpu_to_le32(0);
+					ni->usn = cpu_to_le32(0);
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
 						&nullchar, 0);
 				}
 				set_nino_flag(ni, v3_Extensions);
-				ni->security_id = cpu_to_le32(securid);
+				ni->security_id = securid;
 				ntfs_attr_close(na);
 			} else {
 				ntfs_log_error("Failed to update "
@@ -2343,43 +2718,112 @@ static int update_secur_descr(ntfs_volume *vol,
 
 	/* mark node as dirty */
 	NInoSetDirty(ni);
+	ntfs_inode_sync(ni); /* useful ? */
 	return (res);
 }
 
 /*
- *          Set new permissions to a file
- *  Checks user mapping has been defined before request for setting
+ *		Update ownership and mode of a file, reusing an existing
+ *	security descriptor when possible
+ *	
+ *	Returns zero if successful
+ */
+
+int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni,
+		uid_t uid, gid_t gid, mode_t mode)
+{
+	int res;
+	const struct CACHED_SECURID *cached;
+	const char *newattr;
+	const SID *usid;
+	const SID *gsid;
+	BOOL isdir;
+
+	res = 0;
+
+		/* check whether target securid is known in cache */
+
+	if (test_nino_flag(ni, v3_Extensions)) {
+		cached = fetch_securid(scx, uid, gid, mode & 0777);
+			/* quite simple, if we are lucky */
+		if (cached) {
+			ni->security_id = cached->securid;
+			if (mode & S_IWUSR)
+				ni->flags &= ~FILE_ATTR_READONLY;
+			else
+				ni->flags |= FILE_ATTR_READONLY;
+			NInoSetDirty(ni);
+		}
+	} else cached = (struct CACHED_SECURID*)NULL;
+
+	if (!cached) {
+		isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+			/*
+			 * Do not use usid and gsid from former attributes,
+			 * but recompute them to get repeatable results
+			 * which can be kept in cache.
+			 */
+		usid = find_usid(scx,uid);
+		gsid = find_gsid(scx,gid);
+		if (usid && gsid) {
+			newattr = build_secur_descr(path, mode,
+					 isdir, usid, gsid);
+			if (newattr) {
+				res = update_secur_descr(scx->vol, newattr, ni);
+				if (!res) {
+					/* update cache, for subsequent use */
+					if (test_nino_flag(ni, v3_Extensions))
+						enter_securid(scx, uid,
+							gid, mode,
+							ni->security_id);
+				}
+				free((void*)newattr);
+			} else {
+				/* could not build new security attribute */
+				errno = EIO;
+				res = -1;
+			}
+		} else {
+			/* could not map uid or gid */
+			errno = EIO;
+			res = -1;
+		}
+	}
+	return (res);
+}
+
+
+/*
+ *		Set new permissions to a file
+ *	Checks user mapping has been defined before request for setting
  *
- *  rejected if request is not originated by owner or root
- *  returns 0 on success
- *         -1 on failure, with errno = EIO
+ *	rejected if request is not originated by owner or root
+ *
+ *	returns 0 on success
+ *		-1 on failure, with errno = EIO
  */
 
 int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode * ni, mode_t mode)
+		const char *path, ntfs_inode *ni, mode_t mode)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const struct SECURITY_ENTRY *cached;
+	const struct CACHED_PERMISSIONS *cached;
 	const char *oldattr;
-	const char *newattr;
 	const SID *usid;
 	const SID *gsid;
 	uid_t uid;
 	uid_t fileuid;
 	uid_t filegid;
-	int isdir;
 	int res;
 
 	/* get the current owner, either from cache or from old attribute  */
 	res = 0;
 	usid = (const SID*)NULL;
-	oldattr = (char*)NULL;
-	cached = fetch_cache(scx,ni);
+	cached = fetch_cache(scx, ni);
 	if (cached) {
 		fileuid = cached->uid;
 		filegid = cached->gid;
-		usid = find_usid(scx,fileuid);
-		gsid = find_usid(scx,filegid);
 	} else {
 		oldattr = getsecurityattr(scx,path, ni);
 		if (oldattr) {
@@ -2388,37 +2832,20 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			gsid = (SID*)&oldattr[le32_to_cpu(phead->group)];
 			fileuid = findowner(scx,usid);
 			filegid = findowner(scx,gsid);
-		 /* do not free oldattr until usid and gsid are not needed */
-		}
+			free((void*)oldattr);
+		} else
+			res = -1;
 	}
-	if (usid) {
-		isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+
+	if (!res) {
 		uid = scx->uid;
 		if (!uid || (fileuid == uid)) {
-			newattr = build_secur_descr(path, mode, isdir,
-						     usid, gsid);
-			if (newattr) {
-				res = update_secur_descr(scx->vol, newattr, ni);
-				if (!res) {
-					enter_cache(scx, ni,
-						 fileuid, filegid, mode);
-					if (mode & S_IWUSR)
-						ni->flags &= ~FILE_ATTR_READONLY;
-					else
-						ni->flags |= FILE_ATTR_READONLY;
-				}
-				free((void*)newattr);
-			} else {
-				 /* could not build new security attribute */
-				errno = EIO;
-				res = -1;
-			}
+			ntfs_set_owner_mode(scx, path, ni,
+					fileuid, filegid, mode);
 		} else {
 			errno = EPERM;
 			res = -1;	/* neither owner nor root */
 		}
-		if (oldattr)
-			free((void*)oldattr);
 	} else {
 		res = -1;	/* could not get old security attribute */
 		errno = EIO;
@@ -2433,7 +2860,8 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 
 int ntfs_sd_add_everyone(ntfs_inode *ni)
 {
-	SECURITY_DESCRIPTOR_ATTR *sd;
+	/* JPA SECURITY_DESCRIPTOR_ATTR *sd; */
+	SECURITY_DESCRIPTOR_RELATIVE *sd;
 	ACL *acl;
 	ACCESS_ALLOWED_ACE *ace;
 	SID *sid;
@@ -2483,7 +2911,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	ace->mask = cpu_to_le32(0x1f01ff); /* FIXME */
 	ace->sid.revision = 1;
 	ace->sid.sub_authority_count = 1;
-	ace->sid.sub_authority[0] = 0;
+	ace->sid.sub_authority[0] = cpu_to_le32(0);
 	ace->sid.identifier_authority.value[5] = 1;
 
 	ret = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0, (u8*)sd,
@@ -2496,16 +2924,16 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 }
 
 /*
- *            Check whether user can access a file in a specific way
+ *		Check whether user can access a file in a specific way
  *
- *         Always returns true is user is root or if no user mapping
- *         has been defined
- *         Sets errno if there is a problem or if not allowed
+ *	Always returns true is user is root or if no user mapping
+ *	has been defined
+ *	Sets errno if there is a problem or if access is not allowed
  */
 
 BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni,
-		int accesstype) /* access type required (1..6) */
+		int accesstype) /* access type required (S_Ixxx values) */
 {
 	mode_t perm;
 	int allow;
@@ -2549,12 +2977,12 @@ BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *            Check whether user can access the parent directory
- *         of a file in a specific way
+ *		Check whether user can access the parent directory
+ *	of a file in a specific way
  *
- *         Always returns true is user is root or if no user mapping
- *         has been defined
- *         Sets errno if there is a problem or if not allowed
+ *	Always returns true is user is root or if no user mapping
+ *	has been defined
+ *	Sets errno if there is a problem or if not allowed
  */
 
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
@@ -2581,34 +3009,38 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	return (allow);		/* errno is set if not allowed */
 }
 
+/*
+ *		Define a new owner/group to a file
+ *
+ *	returns zero if successful
+ */
+
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const struct SECURITY_ENTRY *cached;
+	const struct CACHED_PERMISSIONS *cached;
 	const char *oldattr;
-	const char *newattr;
 	const SID *usid;
 	const SID *gsid;
 	uid_t fileuid;
 	uid_t filegid;
 	mode_t mode;
-	int isdir;
 	int res;
 
 	res = 0;
 	/* get the current owner and mode from cache or security attributes */
-	usid = (const SID*)NULL;
 	oldattr = (char*)NULL;
 	cached = fetch_cache(scx,ni);
 	if (cached) {
 		fileuid = cached->uid;
 		filegid = cached->gid;
 		mode = cached->mode;
-		usid = find_usid(scx,fileuid);
-		gsid = find_usid(scx,filegid);
 	} else {
-		oldattr = getsecurityattr(scx,path, ni);
+		fileuid = 0;
+		filegid = 0;
+		mode = 0;
+		oldattr = getsecurityattr(scx, path, ni);
 		if (oldattr) {
 			mode = build_permissions(scx, oldattr, ni);
 			if (mode >= 0) {
@@ -2617,12 +3049,13 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 				gsid = (SID*)&oldattr[le32_to_cpu(phead->group)];
 				fileuid = findowner(scx,usid);
 				filegid = findowner(scx,gsid);
-			}
-		 /* do not free oldattr until usid and gsid are not needed */
-		}
+			} else
+				res = -1;
+			free((void*)oldattr);
+		} else
+			res = -1;
 	}
-	if (usid) {
-		isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+	if (!res) {
 		/* check requested by owner or root */
 		/* for chgrp, group must match owner's */
 		if (!scx->uid
@@ -2631,40 +3064,16 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 			   || (filegid == scx->gid)))) {
 			/* replace by the new usid and gsid */
 			/* or reuse old gid and sid for cacheing */
-			if ((int)uid >= 0)
-				usid = find_usid(scx,uid);
-			else
+			if ((int)uid < 0)
 				uid = fileuid;
-			if ((int)gid >= 0)
-				gsid = find_gsid(scx,gid);
-			else
+			if ((int)gid < 0)
 				gid = filegid;
-			if (usid && gsid) {
-				newattr = build_secur_descr(path, mode,
-						 isdir, usid, gsid);
-				if (newattr) {
-					res =
-					    update_secur_descr(scx->vol,
-						 	newattr, ni);
-					if (!res) {
-						enter_cache(scx, ni,
-						 uid, gid, mode);
-					}
-					free((void*)newattr);
-				} else {
-					errno = EIO;
-					res = -1;	/* could not build new security attribute */
-				}
-			} else {
-				res = -1;	/* user mapping not defined */
-				errno = EOPNOTSUPP;
-			}
+			ntfs_set_owner_mode(scx, path, ni,
+					uid, gid, mode);
 		} else {
 			res = -1;	/* neither owner nor root */
 			errno = EPERM;
 		}
-		if (oldattr)
-			free((void*)oldattr);
 	} else {
 		res = -1;	/* could not get old security attribute */
 		errno = EIO;
@@ -2673,50 +3082,12 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 }
 
 
-int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
-	const char *path, ntfs_inode * ni,
-	 uid_t uid, gid_t gid, mode_t mode)
-{
-	const char *newattr;
-	const SID *usid;
-	const SID *gsid;
-	int isdir;
-	int res;
-
-	res = 0;
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
-	usid = find_usid(scx,uid);
-	gsid = find_gsid(scx,gid);
-	if (usid && gsid) {
-		newattr = build_secur_descr(path, mode,
-				 isdir, usid, gsid);
-		if (newattr) {
-			res = update_secur_descr(scx->vol, newattr, ni);
-			if (!res) {
-				enter_cache(scx, ni, uid, gid, mode);
-				if (mode & S_IWUSR)
-					ni->flags &= ~FILE_ATTR_READONLY;
-				else
-					ni->flags |= FILE_ATTR_READONLY;
-			}
-			free((void*)newattr);
-		} else {
-			errno = EIO;
-			res = -1;	/* could not build new security attribute */
-		}
-	} else {
-		res = -1;	/* user mapping not defined */
-		errno = EOPNOTSUPP;
-	}
-	return (res ? -1 : 0);
-}
-
 /*
- *              Get a single mapping item from buffer
+ *		Get a single mapping item from buffer
  *
- *              Always reads a full line, truncating long lines
- *               Refills buffer when exhausted
- *              Returns pointer to item, or NULL when no more
+ *	Always reads a full line, truncating long lines
+ *	Refills buffer when exhausted
+ *	Returns pointer to item, or NULL when there is no more
  */
 
 static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
@@ -2728,13 +3099,13 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 	char *p;
 	char *q;
 	int gotend;
-	ntfschar nullchar = 0;
+	static ntfschar nullchar = 0;
 	struct MAPLIST *item;
 
 	src = *psrc;
 	dst = 0;
 			/* allocate and get a full line */
-	item = (struct MAPLIST*)malloc(sizeof(struct MAPLIST));
+	item = (struct MAPLIST*)ntfs_malloc(sizeof(struct MAPLIST));
 	if (item) {
 		do {
 			gotend = 0;
@@ -2748,7 +3119,7 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 			if (buf[src] != '\n') {
 				*poffs += *psize;
 				*psize = ntfs_local_read(scx->vol,ni,
-					MAPPINGFILE, &nullchar, 0,
+					mapping_name, &nullchar, 0,
 					buf, (size_t)BUFSZ, *poffs);
 				src = 0;
 			} else {
@@ -2788,13 +3159,13 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 }
 
 /*
- *            Read user mapping file and split into their attribute.
- *            Parameters are kept as text in a chained list until logins
- *            are converted to uid.
- *            Returns the head of list, if any
+ *		Read user mapping file and split into their attribute.
+ *	Parameters are kept as text in a chained list until logins
+ *	are converted to uid.
+ *	Returns the head of list, if any
  *
- *        Basic IO routines are called since we are still mounting
- *        and we have not entered the fuse loop yet.
+ *	Basic IO routines are called since we are still mounting
+ *	and we have not entered the fuse loop yet.
  */
 
 static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
@@ -2803,18 +3174,18 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem;
 	struct MAPLIST *lastitem;
+	static ntfschar nullchar = 0;
 	ntfs_inode *ni;
 	int src;
-	ntfschar nullchar = 0;
 	off_t offs;
 	s64 size;
 
 	firstitem = (struct MAPLIST*)NULL;
 	lastitem = (struct MAPLIST*)NULL;
 	offs = 0;
-	ni = ntfs_pathname_to_inode(scx->vol, NULL, MAPPINGFILE);
+	ni = ntfs_pathname_to_inode(scx->vol, NULL, mapping_name);
 	if (ni) {
-		size = ntfs_local_read(scx->vol,ni,MAPPINGFILE,
+		size = ntfs_local_read(scx->vol,ni,mapping_name,
 					&nullchar, 0,
 					buf, (size_t)BUFSZ, offs);
 		if (size > 0) {
@@ -2838,8 +3209,10 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 }
 
 /*
- *           Build the user mapping list
- *           decimal uid are currently expected
+ *		Build the user mapping list
+ *	decimal uid are currently expected, however the input mapping
+ *	data have been kept in memory to facilitate the conversion of
+ *	logins while reading a file (such as /etc/passwd)
  */
 
 static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
@@ -2858,7 +3231,7 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 			if (sid) {
 				mapping =
 				    (struct MAPPING*)
-				    malloc(sizeof(struct MAPPING));
+				    ntfs_malloc(sizeof(struct MAPPING));
 				if (mapping) {
 					mapping->sid = sid;
 					mapping->xid = atoi(item->uidstr);
@@ -2876,8 +3249,11 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 }
 
 /*
- *           Build the group mapping list
- *           decimal gid are currently expected
+ *		Build the group mapping list
+ *	Decimal gid are currently expected, however the input mapping
+ *	data have been kept in memory to facilitate the conversion of
+ *	logins while reading a file (such as /etc/group)
+ *
  *	gid not associated to a uid are processed first in order
  *	to favour real groups
  */
@@ -2904,7 +3280,7 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 				sid = encodesid(item->sidstr);
 				if (sid) {
 					mapping = (struct MAPPING*)
-					    malloc(sizeof(struct MAPPING));
+					    ntfs_malloc(sizeof(struct MAPPING));
 					if (mapping) {
 						mapping->sid = sid;
 						mapping->xid = atoi(item->gidstr);
@@ -2923,7 +3299,7 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 }
 
 /*
- *	Apply default single user mapping
+ *		Apply default single user mapping
  *	returns zero if successful
  */
 
@@ -2937,12 +3313,12 @@ int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx, const SID *usid)
 
 	res = -1;
 	sidsz = sid_size(usid);
-	sid = (SID*)malloc(sidsz);
+	sid = (SID*)ntfs_malloc(sidsz);
 	if (sid) {
 		memcpy(sid,usid,sidsz);
-		usermapping = (struct MAPPING*)malloc(sizeof(struct MAPPING));
+		usermapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
 		if (usermapping) {
-			groupmapping = (struct MAPPING*)malloc(sizeof(struct MAPPING));
+			groupmapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
 			if (groupmapping) {
 				usermapping->sid = sid;
 				usermapping->xid = scx->uid;
@@ -2961,7 +3337,42 @@ int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx, const SID *usid)
 }
 
 /*
- *	Try and apply default single user mapping
+ *		Make sure there are no ambiguous mapping
+ *	Ambiguous mapping may lead to undesired configurations and
+ *	we had rather be safe until the consequences are understood
+ */
+
+BOOL check_mapping(const struct MAPPING *usermapping,
+		const struct MAPPING *groupmapping)
+{
+	const struct MAPPING *mapping1;
+	const struct MAPPING *mapping2;
+	BOOL ambiguous;
+
+	ambiguous = FALSE;
+	for (mapping1=usermapping; mapping1; mapping1=mapping1->next)
+		for (mapping2=mapping1->next; mapping2; mapping1=mapping2->next)
+			if (same_sid(mapping1->sid,mapping2->sid)) {
+				if (mapping1->xid != mapping2->xid)
+					ambiguous = TRUE;
+			} else {
+				if (mapping1->xid == mapping2->xid)
+					ambiguous = TRUE;
+			}
+	for (mapping1=groupmapping; mapping1; mapping1=mapping1->next)
+		for (mapping2=mapping1->next; mapping2; mapping1=mapping2->next)
+			if (same_sid(mapping1->sid,mapping2->sid)) {
+				if (mapping1->xid != mapping2->xid)
+					ambiguous = TRUE;
+			} else {
+				if (mapping1->xid == mapping2->xid)
+					ambiguous = TRUE;
+			}
+	return (ambiguous);
+}
+
+/*
+ *		Try and apply default single user mapping
  *	returns zero if successful
  */
 
@@ -2991,12 +3402,12 @@ int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 
 
 /*
- *	Build the user mapping
+ *		Build the user mapping
  *	- according to $Mapping file if present,
  *	- or try default single user mapping if possible
  *
- *          The mapping is specific to a mounted device
- *       No locking done, mounting assumed non multithreaded
+ *	The mapping is specific to a mounted device
+ *	No locking done, mounting assumed non multithreaded
  *
  *	returns zero if mapping is successful
  *	(failure should not be interpreted as an error)
@@ -3038,4 +3449,35 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 	return (!scx->usermapping);
 }
 
+/*
+ *	Open $Secure once for all
+ *	returns zero if succeeds
+ */
+
+
+int ntfs_open_secure(ntfs_volume *vol)
+{
+	ntfs_inode *ni;
+	int res;
+
+	res = -1;
+	vol->secure_ni = (ntfs_inode*)NULL;
+	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
+	if (ni) {
+		vol->secure_xsii = ntfs_index_ctx_get(ni, sii_stream, 4);
+		vol->secure_xsdh = ntfs_index_ctx_get(ni, sdh_stream, 4);
+		if (ni && vol->secure_xsii && vol->secure_xsdh) {
+			vol->secure_ni = ni;
+			res = 0;
+		}
+	}
+	return (res);
+}
+
+void ntfs_close_secure(ntfs_volume *vol)
+{
+	if (vol->secure_ni) {
+		ntfs_inode_close(vol->secure_ni);
+	}
+}
 
