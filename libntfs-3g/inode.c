@@ -544,8 +544,14 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	std_info->last_access_time = utc2ntfs(ni->last_access_time);
-		/* JPA update v3.x extensions */
-	if (test_nino_flag(ni, v3_Extensions)) {
+
+		/* JPA update v3.x extensions, ensuring consistency */
+
+	if (test_nino_flag(ni, v3_Extensions)
+	    && (ctx->attr->length <= sizeof(STANDARD_INFORMATION)))
+		ntfs_log_error("bad sync of standard information\n");
+
+	if (ctx->attr->length > sizeof(STANDARD_INFORMATION)) {
 		std_info->owner_id = ni->owner_id;
 		std_info->security_id = ni->security_id;
 		std_info->quota_charged = ni->quota_charged;
