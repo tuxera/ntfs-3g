@@ -107,8 +107,6 @@ typedef enum {
 
 typedef struct {
 	ntfs_volume *vol;
-	int state;
-	long free_mft;
 	unsigned int uid;
 	unsigned int gid;
 	unsigned int fmask;
@@ -125,11 +123,6 @@ typedef struct {
 	struct SECURITY_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
-
-typedef enum {
-	NF_FreeMFTOutdate	= (1 << 1),  /* Information about amount of
-						free MFT records is outdated. */
-} ntfs_fuse_state_bits;
 
 static struct options {
 	char	*mnt_point;	/* Mount point */
@@ -167,11 +160,6 @@ static const char *usage_msg =
 "\n"
 "%s";
 
-static __inline__ void ntfs_fuse_mark_free_space_outdated(void)
-{
-	/* Mark information about free MFT records outdated. */
-	ctx->state |= NF_FreeMFTOutdate;
-}
 
 /**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
@@ -186,14 +174,12 @@ static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
 	return 0;
 }
 
-static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, s64 numof_inode)
+static long ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 {
 	u8 *buf;
 	long nr_free = 0;
 	s64 br, total = 0;
 
-	if (!(ctx->state & NF_FreeMFTOutdate))
-		return ctx->free_mft;
 	buf = ntfs_malloc(vol->cluster_size);
 	if (!buf)
 		return -errno;
@@ -206,20 +192,15 @@ static long ntfs_fuse_get_nr_free_mft_records(ntfs_volume *vol, s64 numof_inode)
 			break;
 		total += br;
 		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++) {
-				
-				if (--numof_inode < 0)
-					break;
-				
+			for (j = 0; j < 8; j++)
 				if (!((buf[i] >> j) & 1))
 					nr_free++;
-			}
 	}
 	free(buf);
 	if (!total || br < 0)
 		return -errno;
-	ctx->free_mft = nr_free;
-	ctx->state &= ~(NF_FreeMFTOutdate);
+
+	nr_free += (vol->mftbmp_na->allocated_size - vol->mftbmp_na->data_size) << 3;
 	return nr_free;
 }
 
@@ -242,7 +223,7 @@ static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 		scx->uid = fusecontext->uid;
 		scx->gid = fusecontext->gid;
 	}
-return (ctx->security.usermapping != (struct MAPPING*)NULL);
+	return (ctx->security.usermapping != (struct MAPPING*)NULL);
 }
 
 static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
@@ -293,8 +274,8 @@ static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		struct statvfs *sfs)
 {
-	long size, delta_bits;
-	u64 allocated_inodes;
+	s64 size;
+	int delta_bits;
 	ntfs_volume *vol;
 
 	vol = ctx->vol;
@@ -327,11 +308,10 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 		size >>= -delta_bits;
 	
 	/* Number of inodes in file system (at this point in time). */
-	allocated_inodes = vol->mft_na->data_size >> vol->mft_record_size_bits;
-	sfs->f_files = allocated_inodes + size; 
+	sfs->f_files = (vol->mftbmp_na->allocated_size << 3) + size;
 	
 	/* Free inodes in fs (based on current total count). */
-	size = ntfs_fuse_get_nr_free_mft_records(vol, allocated_inodes) + size;
+	size += vol->free_mft_records;
 	if (size < 0)
 		size = 0;
 	sfs->f_ffree = size;
@@ -339,7 +319,6 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	
 	/* Maximum length of filenames. */
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
-
 	return 0;
 }
 
@@ -410,7 +389,6 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
 		/* Directory. */
-
 		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
 		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
 		if (na) {
@@ -623,7 +601,14 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
-		struct stat st = { .st_ino = MREF(mref) };
+		struct stat st = {};
+		 
+		st.st_ino = MREF(mref);
+
+		if (dt_type == NTFS_DT_REG)
+			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
+		else if (dt_type == NTFS_DT_DIR)
+			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask); 
 		
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
@@ -800,7 +785,6 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	res = total;
 exit:
-	ntfs_fuse_mark_free_space_outdated();
 	if (na)
 		ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
@@ -848,7 +832,6 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	     /* JPA strange : no ntfs_attr_close(na) ? */
 		goto exit;
 	
-	ntfs_fuse_mark_free_space_outdated();
 	ntfs_attr_close(na);
 	errno = 0;
 exit:
@@ -886,7 +869,6 @@ static int ntfs_fuse_chmod(const char *path,
 			else {
 				if (ntfs_set_mode(&security,path,ni,mode))
 					res = -errno;
-				ntfs_fuse_mark_free_space_outdated(); /* temp */
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
@@ -919,7 +901,6 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 			else {
 				res = ntfs_set_owner(&security,
 					path,ni,uid,gid);
-				ntfs_fuse_mark_free_space_outdated(); /* temp */
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
@@ -1057,7 +1038,6 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			   	if (ntfs_set_owner_mode(&security,path,ni,
 					security.uid,security.gid,perm) < 0)
 					set_fuse_error(&res);
-				ntfs_fuse_mark_free_space_outdated(); /* temp */
 			}
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
@@ -1123,7 +1103,6 @@ static int ntfs_fuse_create_file(const char *org_path, mode_t mode,
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
-	ntfs_fuse_mark_free_space_outdated();
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1149,7 +1128,6 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
-	ntfs_fuse_mark_free_space_outdated();
 exit:
 	free(path);
 	if (stream_name_len)
@@ -1161,7 +1139,6 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 {
 	if (ntfs_fuse_is_named_data_stream(from))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
@@ -1219,7 +1196,6 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -EACCES;
 	else {
 
-		ntfs_fuse_mark_free_space_outdated();
 		/* Create hard link. */
 		if (ntfs_link(ni, dir_ni, uname, uname_len))
 			res = -errno;
@@ -1318,7 +1294,6 @@ static int ntfs_fuse_unlink(const char *org_path)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-
 		   /* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
 	   || ntfs_allowed_dir_access(&security,path,S_IEXEC + S_IWRITE)) {
@@ -1326,7 +1301,6 @@ static int ntfs_fuse_unlink(const char *org_path)
 			res = ntfs_fuse_rm(path);
 		else
 			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-		ntfs_fuse_mark_free_space_outdated();
 	}
 	free(path);
 	if (stream_name_len)
@@ -1379,7 +1353,6 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	int ret, len;
 	char *tmp;
 	const char *ext = ".ntfs-3g-";
-
 
 	ntfs_log_trace("Entering\n");
 	
@@ -1452,7 +1425,6 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_create(path, S_IFDIR | (mode & 0777), 0, NULL);
 }
 
@@ -1460,7 +1432,6 @@ static int ntfs_fuse_rmdir(const char *path)
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ntfs_fuse_mark_free_space_outdated();
 	return ntfs_fuse_rm(path);
 }
 
@@ -1474,6 +1445,9 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+	
+	NInoSetNoParentMtimeUpdate(ni);
+	
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;
@@ -1753,7 +1727,6 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		res = -EEXIST;
 		goto exit;
 	}
-	ntfs_fuse_mark_free_space_outdated();
 	if (!na) {
 		if (flags == XATTR_REPLACE) {
 			res = -ENODATA;
@@ -1813,7 +1786,6 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = -errno;
 	}
 	
-	ntfs_fuse_mark_free_space_outdated();
 exit:
 	free(lename);
 	if (ntfs_inode_close(ni))
@@ -1831,15 +1803,35 @@ static void ntfs_fuse_destroy(void)
 	if (ctx->vol) {
 		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
 			      ctx->vol->vol_name);
+		ntfs_close_secure(ctx->vol);
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to cleanly unmount volume %s",
 					opts.device);
-		if (ctx->seccache)
-			ntfs_log_info("Cache attempts %lu reads %lu writes %lu\n",
-			      ctx->seccache->head.attempts,
-			      ctx->seccache->head.reads,
-			      ctx->seccache->head.writes);
-
+		if (ctx->seccache && ctx->seccache->head.p_reads) {
+			ntfs_log_info("Permissions cache : %lu writes "
+				"%lu reads %lu.%1lu%% hits\n",
+			      ctx->seccache->head.p_writes,
+			      ctx->seccache->head.p_reads,
+			      100 * ctx->seccache->head.p_hits
+			         / ctx->seccache->head.p_reads,
+			      1000 * ctx->seccache->head.p_hits
+			         / ctx->seccache->head.p_reads % 10);
+		}
+		if (ctx->seccache && ctx->seccache->head.s_reads) {
+			ntfs_log_info("Security id cache : %lu writes "
+				"%lu reads %lu.%1lu%% hits "
+				"%lu.%1lu mean hops\n",
+			      ctx->seccache->head.s_writes,
+			      ctx->seccache->head.s_reads,
+			      100 * ctx->seccache->head.s_hits
+			         / ctx->seccache->head.s_reads,
+			      1000 * ctx->seccache->head.s_hits
+			         / ctx->seccache->head.s_reads % 10,
+			      ctx->seccache->head.s_hops
+			         / ctx->seccache->head.s_reads,
+			      10 * ctx->seccache->head.s_hops
+			         / ctx->seccache->head.s_reads % 10);
+		}
 	}
 	free(ctx);
 	ctx = NULL;
@@ -1889,7 +1881,6 @@ static int ntfs_fuse_init(void)
 		return -1;
 	
 	*ctx = (ntfs_fuse_context_t) {
-		.state = NF_FreeMFTOutdate,
 		.uid = getuid(),
 		.gid = getgid(),
 		.fmask = 0,
@@ -2370,8 +2361,6 @@ static struct fuse_chan *try_fuse_mount(char *parsed_options)
 	}
 	
 	fc = fuse_mount(opts.mnt_point, &margs);
-	if (!fc)
-		ntfs_log_error("FUSE mount point creation failed\n");
 free_args:
 	fuse_opt_free_args(&margs);
 	return fc;
@@ -2479,6 +2468,12 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
+	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
+	if (ctx->vol->free_mft_records < 0) {
+		ntfs_log_perror("Failed to calculate free MFT records");
+		goto err_out;
+	}
+	
 	if (use_blkdev) {
 	    set_fuseblk_options(parsed_options);
 	    set_user_mount_option(parsed_options, uid);
@@ -2547,10 +2542,16 @@ int main(int argc, char *argv[])
 	ctx->security.vol = ctx->vol;
 	ctx->security.uid = ctx->uid;
 	ctx->security.gid = ctx->gid;
-	if (!ntfs_build_mapping(&ctx->security)) /* JPA build user mapping (right place ?) */
-		ntfs_log_info("User mapping built\n");
-	else
-		ntfs_log_info("Failed to build user mapping\n");
+		/* JPA open $Secure and build user mapping (right place ?) */
+	if (ntfs_open_secure(ctx->vol))
+		ntfs_log_info("Could not open file $Secure\n");
+	else {
+		if (!ntfs_build_mapping(&ctx->security))
+			ntfs_log_info("User mapping built\n");
+		else
+			ntfs_log_info("Failed to build user mapping\n");
+	}
+	
 	fuse_loop(fh);
 	
 	fuse_unmount(opts.mnt_point, fc);
