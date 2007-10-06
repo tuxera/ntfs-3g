@@ -578,6 +578,8 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 		return 0;
 	if (ie->key.file_name.file_attributes & FILE_ATTR_I30_INDEX_PRESENT)
 		dt_type = NTFS_DT_DIR;
+	else if (fn->file_attributes & FILE_ATTR_SYSTEM)
+		dt_type = NTFS_DT_UNKNOWN;
 	else
 		dt_type = NTFS_DT_REG;
 	return filldir(dirent, fn->file_name, fn->file_name_length,
@@ -1077,10 +1079,10 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	si->last_access_time = utc2ntfs(ni->last_access_time);
 	if (securid) {
 		set_nino_flag(ni, v3_Extensions);
-		si->owner_id = 0;
-		si->security_id = securid;
-		si->quota_charged = 0;
-		si->usn = 0;
+		ni->owner_id = si->owner_id = 0;
+		ni->security_id = si->security_id = securid;
+		ni->quota_charged = si->quota_charged = 0;
+		ni->usn = si->usn = 0;
 	} else
 		clear_nino_flag(ni, v3_Extensions);
 	if (!S_ISREG(type) && !S_ISDIR(type)) {
