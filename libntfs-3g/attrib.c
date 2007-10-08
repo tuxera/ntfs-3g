@@ -1285,10 +1285,10 @@ retry:
 			       "%lld.\n", to_write, rl->vcn, rl->lcn, ofs);
 		if (!NVolReadOnly(vol)) {
 			
-			s64 pos = (rl->lcn << vol->cluster_size_bits) + ofs;
-			u32 bsize = vol->cluster_size;
+			s64 wpos = (rl->lcn << vol->cluster_size_bits) + ofs;
 			s64 wend = (rl->vcn << vol->cluster_size_bits) + ofs + to_write;
-			s64 rounded  = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
+			u32 bsize = vol->cluster_size;
+			s64 rounded = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
 
 			/*
 			 * Zero fill to cluster boundary if we're writing to an
@@ -1312,13 +1312,13 @@ retry:
 				memcpy(cb, b, to_write);
 				memset(cb + to_write, 0, rounded - to_write);
 				
-				written = ntfs_pwrite(vol->dev, pos, rounded, cb); 
+				written = ntfs_pwrite(vol->dev, wpos, rounded, cb); 
 				if (written == rounded)
 					written = to_write;
 				
 				free(cb);
 			} else
-				written = ntfs_pwrite(vol->dev, pos, to_write, b);
+				written = ntfs_pwrite(vol->dev, wpos, to_write, b);
 		} else
 			written = to_write;
 		/* If everything ok, update progress counters and continue. */

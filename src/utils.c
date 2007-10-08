@@ -110,7 +110,7 @@ int utils_set_locale(void)
 }
 
 ntfs_volume *utils_mount_volume(const char *volume, const char *mntpoint,
-				unsigned long flags, BOOL force)
+				unsigned long flags)
 {
 	ntfs_volume *vol;
 

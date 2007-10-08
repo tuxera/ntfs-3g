@@ -601,10 +601,8 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
-		struct stat st = {};
+		struct stat st = { .st_ino = MREF(mref) };
 		 
-		st.st_ino = MREF(mref);
-
 		if (dt_type == NTFS_DT_REG)
 			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
 		else if (dt_type == NTFS_DT_DIR)
@@ -1903,7 +1901,7 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 	if (ctx->force)
 		flags |= MS_FORCE;
 
-	ctx->vol = utils_mount_volume(device, mntpoint, flags, ctx->force);
+	ctx->vol = utils_mount_volume(device, mntpoint, flags);
 	return ctx->vol;
 }
 
