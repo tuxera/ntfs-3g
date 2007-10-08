@@ -34,6 +34,6 @@ extern const char *ntfs_gpl;
 int utils_set_locale(void);
 
 ntfs_volume *utils_mount_volume(const char *device, const char *mntpoint,
-				unsigned long flags, BOOL force);
+				unsigned long flags);
 
 #endif /* _NTFS_UTILS_H_ */

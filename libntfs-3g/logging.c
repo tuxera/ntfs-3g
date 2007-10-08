@@ -67,7 +67,7 @@ static const char *col_end    = "\e[0m";
 struct ntfs_logging {
 	u32 levels;
 	u32 flags;
-	ntfs_log_handler *handler;
+	ntfs_log_handler *handler __attribute__((format(printf, 6, 0)));
 };
 
 /**
@@ -355,14 +355,14 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 			    void *data __attribute__((unused)), 
 			    const char *format, va_list args)
 {
-	char log[LOG_LINE_LEN];
+	char logbuf[LOG_LINE_LEN];
 	int ret, olderr = errno;
 
 #ifndef DEBUG
 	if ((level & NTFS_LOG_LEVEL_PERROR) && errno == ENOSPC)
 		return 1;
 #endif	
-	ret = vsnprintf(log, LOG_LINE_LEN, format, args);
+	ret = vsnprintf(logbuf, LOG_LINE_LEN, format, args);
 	if (ret < 0) {
 		vsyslog(LOG_NOTICE, format, args);
 		ret = 1;
@@ -370,12 +370,12 @@ int ntfs_log_handler_syslog(const char *function  __attribute__((unused)),
 	}
 	
 	if ((LOG_LINE_LEN > ret + 3) && (level & NTFS_LOG_LEVEL_PERROR)) {
-		strncat(log, ": ", LOG_LINE_LEN - ret - 1);
-		strncat(log, strerror(olderr), LOG_LINE_LEN - (ret + 3));
-		ret = strlen(log);
+		strncat(logbuf, ": ", LOG_LINE_LEN - ret - 1);
+		strncat(logbuf, strerror(olderr), LOG_LINE_LEN - (ret + 3));
+		ret = strlen(logbuf);
 	}
 	
-	syslog(LOG_NOTICE, "%s", log);
+	syslog(LOG_NOTICE, "%s", logbuf);
 out:
 	errno = olderr;
 	return ret;

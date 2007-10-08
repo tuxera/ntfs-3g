@@ -357,7 +357,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
  */
 le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
 {
-        const le32 *pos = (le32 *)sd;
+        const le32 *pos = (const le32 *)sd;
         const le32 *end = pos + (len >> 2);
         u32 hash = 0;
 
