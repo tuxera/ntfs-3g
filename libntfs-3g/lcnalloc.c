@@ -131,7 +131,8 @@ static int bitmap_writeback(ntfs_volume *vol, s64 pos, s64 size, void *b,
 	if (written != size) {
 		if (!written)
 			errno = EIO;
-		ntfs_log_perror("Bitmap write error (%lld, %lld)", pos, size);
+		ntfs_log_perror("Bitmap write error (%lld, %lld)",
+				(long long)pos, (long long)size);
 		return -1;
 	}
 
@@ -312,7 +313,8 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			writeback = 1;
 			if (vol->free_clusters <= 0) 
 				ntfs_log_error("Non-positive free clusters "
-					       "(%lld)!\n", vol->free_clusters);
+					       "(%lld)!\n",
+						(long long)vol->free_clusters);
 			else	
 				vol->free_clusters--; 
 			
@@ -514,8 +516,9 @@ int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 			if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn, 
 						  rl->length)) {
 				ntfs_log_perror("Cluster deallocation failed "
-					       "(%lld, %lld)", rl->lcn, 
-						rl->length);
+					       "(%lld, %lld)",
+						(long long)rl->lcn, 
+						(long long)rl->length);
 				goto out;
 			}
 			nr_freed += rl->length ; 
