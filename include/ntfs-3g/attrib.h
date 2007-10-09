@@ -37,6 +37,7 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 #include "logging.h"
 
 extern ntfschar AT_UNNAMED[];
+extern const ntfschar STREAM_SDS[];
 
 /**
  * enum ntfs_lcn_special_values - special return values for ntfs_*_vcn_to_lcn()
@@ -172,7 +173,7 @@ struct _ntfs_attr {
 	runlist_element *rl;
 	ntfs_inode *ni;
 	ATTR_TYPES type;
-	ntfschar *name;
+	const ntfschar *name;
 	u32 name_len;
 	unsigned long state;
 	s64 allocated_size;
@@ -261,9 +262,10 @@ extern void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
 		const s64 allocated_size, const s64 data_size,
 		const s64 initialized_size, const s64 compressed_size,
 		const u8 compression_unit);
-
+      /* warning : in the following "name" has to be freeable */
+      /* or one of constants AT_UNNAMED, NTFS_INDEX_I30 or STREAM_SDS */
 extern ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		ntfschar *name, u32 name_len);
+		const ntfschar *name, u32 name_len);
 extern void ntfs_attr_close(ntfs_attr *na);
 
 extern s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count,
@@ -272,7 +274,7 @@ extern s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count,
 		const void *b);
 
 extern void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
-			       ntfschar *name, u32 name_len, s64 *data_size);
+		const ntfschar *name, u32 name_len, s64 *data_size);
 
 extern s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos,
 		const s64 bk_cnt, const u32 bk_size, void *dst);
@@ -295,15 +297,15 @@ extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 extern int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size);
 
 extern int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, u8 *val, u32 size,
+		const ntfschar *name, u8 name_len, const u8 *val, u32 size,
 		ATTR_FLAGS flags);
 extern int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
-		ATTR_FLAGS flags);
+		const ntfschar *name, u8 name_len, VCN lowest_vcn,
+		int dataruns_size, ATTR_FLAGS flags);
 extern int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx);
 
 extern int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
-		ntfschar *name, u8 name_len, u8 *val, s64 size);
+		const ntfschar *name, u8 name_len, const u8 *val, s64 size);
 extern int ntfs_attr_rm(ntfs_attr *na);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
@@ -352,9 +354,9 @@ extern s64 ntfs_get_attribute_value(const ntfs_volume *vol,
 extern void  ntfs_attr_name_free(char **name);
 extern char *ntfs_attr_name_get(const ntfschar *uname, const int uname_len);
 extern int   ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
-			     ntfschar *name, u32 name_len);
+			     const ntfschar *name, u32 name_len);
 extern int   ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
-			      ntfschar *name, u32 name_len);
+			     const ntfschar *name, u32 name_len);
 
 #endif /* defined _NTFS_ATTRIB_H */
 

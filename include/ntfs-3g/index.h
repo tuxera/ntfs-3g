@@ -84,7 +84,7 @@
  */
 typedef struct {
 	ntfs_inode *ni;
-	ntfschar *name;
+	const ntfschar *name;
 	u32 name_len;
 	INDEX_ENTRY *entry;
 	void *data;
@@ -106,7 +106,7 @@ typedef struct {
 } ntfs_index_context;
 
 extern ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
-						ntfschar *name, u32 name_len);
+						const ntfschar *name, u32 name_len);
 extern void ntfs_index_ctx_put(ntfs_index_context *ictx);
 extern void ntfs_index_ctx_reinit(ntfs_index_context *ictx);
 
@@ -127,6 +127,10 @@ extern char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
 extern void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
 extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
+/* the following were added by JPA for temporary use in security.c */
+extern INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos);
+extern INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, const ntfschar *name,
+				  u32 name_len, ntfs_attr_search_ctx **ctx);
 extern int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie);
 
 #endif /* _NTFS_INDEX_H */
