@@ -35,7 +35,7 @@
 struct MAPPING {
 	struct MAPPING *next;
 	int xid;		/* linux id : uid or gid */
-	const SID *sid;		/* Windows id : usid or gsid */
+	SID *sid;		/* Windows id : usid or gsid */
 };
 
 /*

@@ -59,11 +59,11 @@
 #include "misc.h"
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
-const ntfschar STREAM_SDS[] = { const_cpu_to_le16('$'),
-                                const_cpu_to_le16('S'),
-                                const_cpu_to_le16('D'),
-                                const_cpu_to_le16('S'),
-                                const_cpu_to_le16('\0') };
+ntfschar STREAM_SDS[] = { const_cpu_to_le16('$'),
+			const_cpu_to_le16('S'),
+			const_cpu_to_le16('D'),
+			const_cpu_to_le16('S'),
+			const_cpu_to_le16('\0') };
 
 /**
  * ntfs_get_attribute_value_length - Find the length of an attribute
@@ -270,13 +270,11 @@ s64 ntfs_get_attribute_value(const ntfs_volume *vol,
  * Initialize the ntfs attribute @na with @ni, @type, @name, and @name_len.
  */
 static void __ntfs_attr_init(ntfs_attr *na, ntfs_inode *ni,
-		const ATTR_TYPES type, const ntfschar *name, const u32 name_len)
+		const ATTR_TYPES type, ntfschar *name, const u32 name_len)
 {
 	na->rl = NULL;
 	na->ni = ni;
 	na->type = type;
-		/* JPA should warn against feeing the name */
-		/* before closing the struct */
 	na->name = name;
 	if (name)
 		na->name_len = name_len;
@@ -347,7 +345,7 @@ void ntfs_attr_init(ntfs_attr *na, const BOOL non_resident,
  * both those cases @name_len is not used at all.
  */
 ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
-		const ntfschar *name, u32 name_len)
+		ntfschar *name, u32 name_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na;
@@ -447,8 +445,8 @@ void ntfs_attr_close(ntfs_attr *na)
 		free(na->rl);
 	/* Don't release if using an internal constant. */
 	if (na->name != AT_UNNAMED && na->name != NTFS_INDEX_I30
-	                           && na->name != STREAM_SDS)
-		ntfs_free(na->name);
+				&& na->name != STREAM_SDS)
+		free(na->name);
 	free(na);
 }
 
@@ -1297,9 +1295,9 @@ retry:
 		if (!NVolReadOnly(vol)) {
 			
 			s64 wpos = (rl->lcn << vol->cluster_size_bits) + ofs;
-			u32 bsize = vol->cluster_size;
 			s64 wend = (rl->vcn << vol->cluster_size_bits) + ofs + to_write;
-			s64 rounded  = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
+			u32 bsize = vol->cluster_size;
+			s64 rounded = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
 
 			/*
 			 * Zero fill to cluster boundary if we're writing to an
@@ -2614,8 +2612,8 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
  *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-			const ntfschar *name, u8 name_len, const u8 *val,
-			u32 size, ATTR_FLAGS flags)
+			ntfschar *name, u8 name_len, u8 *val, u32 size,
+			ATTR_FLAGS flags)
 {
 	ntfs_attr_search_ctx *ctx;
 	u32 length;
@@ -2737,8 +2735,8 @@ put_err_out:
  *	EIO	- I/O error occurred or damaged filesystem.
  */
 int ntfs_non_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
-		const ntfschar *name, u8 name_len, VCN lowest_vcn,
-		int dataruns_size, ATTR_FLAGS flags)
+		ntfschar *name, u8 name_len, VCN lowest_vcn, int dataruns_size,
+		ATTR_FLAGS flags)
 {
 	ntfs_attr_search_ctx *ctx;
 	u32 length;
@@ -3020,7 +3018,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
  * On success return 0. On error return -1 with errno set to the error code.
  */
 int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
-		const ntfschar *name, u8 name_len, const u8 *val, s64 size)
+		ntfschar *name, u8 name_len, u8 *val, s64 size)
 {
 	u32 attr_rec_size;
 	int err, i, offset;
@@ -4745,8 +4743,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				ntfs_log_perror("Cluster allocation failed "
 						"(%lld)",
 						(long long)first_free_vcn -
-						((long long)na->allocated_size >>
-						 vol->cluster_size_bits));
+						((long long)na->allocated_size
+						 >> vol->cluster_size_bits));
 				return -1;
 			}
 		}
@@ -4936,7 +4934,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
  * On error NULL is returned with errno set to the error code.
  */
 void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
-			const ntfschar *name, u32 name_len, s64 *data_size)
+			ntfschar *name, u32 name_len, s64 *data_size)
 {
 	ntfs_attr *na;
 	void *data, *ret = NULL;
@@ -4969,8 +4967,8 @@ out:
 
 
 
-int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
-			const ntfschar *name, u32 name_len)
+int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
+		    u32 name_len)
 {
 	ntfs_attr_search_ctx *ctx;
 	int ret;
@@ -4989,8 +4987,8 @@ int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
 	return !ret;
 }
 
-int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
-			const ntfschar *name, u32 name_len)
+int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name, 
+		     u32 name_len)
 {
 	ntfs_attr *na;
 	int ret;

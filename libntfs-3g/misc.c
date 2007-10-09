@@ -34,7 +34,3 @@ void *ntfs_malloc(size_t size)
 	return p;
 }
 
-void ntfs_free(const void *ptr) {
-	free((void*)ptr);
-}
-

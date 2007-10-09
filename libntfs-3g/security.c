@@ -181,8 +181,8 @@ struct MAPLIST {
  *	A few useful constants
  */
 
-static const ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
-static const ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
+static ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
+static ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
 static const char mapping_name[] = MAPPINGFILE;
 
 /*
@@ -285,7 +285,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 	if (res == 36)
 		return _guid_str;
 	if (!guid_str)
-		ntfs_free(_guid_str);
+		free(_guid_str);
 	errno = EINVAL;
 	return NULL;
 }
@@ -430,7 +430,7 @@ err_out:
 	else
 		i = errno;
 	if (!sid_str_size)
-		ntfs_free(sid_str);
+		free(sid_str);
 	errno = i;
 	return NULL;
 }
@@ -704,7 +704,7 @@ static SID *encodesid(const char *sidstr)
  */
 
 static int ntfs_local_read(ntfs_inode *ni,
-		const ntfschar *stream_name, int stream_name_len,
+		ntfschar *stream_name, int stream_name_len,
 		char *buf, size_t size, off_t offset)
 {
 	ntfs_attr *na = NULL;
@@ -746,7 +746,7 @@ exit:
  */
 
 static int ntfs_local_write(ntfs_inode *ni,
-		const ntfschar *stream_name, int stream_name_len,
+		ntfschar *stream_name, int stream_name_len,
 		char *buf, size_t size, off_t offset)
 {
 	ntfs_attr *na = NULL;
@@ -929,8 +929,8 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 
 static void free_caches(struct SECURITY_CONTEXT *scx)
 {
-	ntfs_free((*scx->pseccache)->head.first_securid);
-	ntfs_free(*scx->pseccache);
+	free((*scx->pseccache)->head.first_securid);
+	free(*scx->pseccache);
 }
 
 /*
@@ -1078,7 +1078,7 @@ static struct CACHED_PERMISSIONS *resize_cache(
 		memcpy(newcache,oldcache,
 			    sizeof(struct SECURITY_CACHE)
 			      + (oldcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-		ntfs_free(oldcache);
+		free(oldcache);
 #endif
 		if (newcache) {
 			     /* mark new entries as not valid */
@@ -1108,7 +1108,7 @@ static struct CACHED_PERMISSIONS *resize_cache(
 				oldcache->cachetable,
 				oldcnt*sizeof(struct CACHED_PERMISSIONS));
 			*scx->pseccache = newcache;
-			ntfs_free(oldcache);
+			free(oldcache);
 			cacheentry = &newcache->cachetable[0];
 		}
 	}
@@ -1260,7 +1260,7 @@ static char *retrievesecurityattr(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id
 					|| !valid_securattr(securattr,
 						rdsize)) {
 					/* error logged by caller */
-					ntfs_free(securattr);
+					free(securattr);
 					securattr = (char*)NULL;
 				}
 			}
@@ -1644,7 +1644,7 @@ static char *build_secur_descr(mode_t mode,
 			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		} else {
 			/* hope error was detected before overflowing */
-			ntfs_free(newattr);
+			free(newattr);
 			newattr = (char*)NULL;
 			ntfs_log_error("Security descriptor is longer than expected\n");
 			errno = EIO;
@@ -1694,7 +1694,7 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 		if (securattr && !valid_securattr(securattr, readallsz)) {
 			ntfs_log_error("Bad security descriptor for %s\n",
 				path);
-			ntfs_free(securattr);
+			free(securattr);
 			securattr = (char*)NULL;
 		}
 	}
@@ -2055,7 +2055,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
-	const char *securattr;
+	char *securattr;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
 	uid_t uid;
@@ -2090,7 +2090,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 					enter_cache(scx, ni, uid,
 							gid, perm);
 				}
-				ntfs_free(securattr);
+				free(securattr);
 			} else
 				perm = -1;
 				uid = gid = 0;
@@ -2118,7 +2118,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 		 struct stat *stbuf)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const char *securattr;
+	char *securattr;
 	const SID *usid;	/* owner of file/directory */
 	const SID *gsid;	/* group of file/directory */
 	const struct CACHED_PERMISSIONS *cached;
@@ -2154,7 +2154,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					enter_cache(scx, ni, stbuf->st_uid,
 						stbuf->st_gid, perm);
 				}
-				ntfs_free(securattr);
+				free(securattr);
 			}
 		}
 	}
@@ -2251,7 +2251,7 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
 			do {
 				xc->pindex--;
 				if (!xc->pindex) {
-					ntfs_free(xc->ib);
+					free(xc->ib);
 					xc->ib = (INDEX_BLOCK*)NULL;
 					xc->ir = ntfs_ir_lookup(xc->ni,
 						xc->name, xc->name_len,
@@ -2320,7 +2320,7 @@ static int entersecurity_data(ntfs_volume *vol,
 			res = 0;
 		else
 			errno = ENOMEM;
-		ntfs_free(fullattr);
+		free(fullattr);
 	}
 	return (res);
 }
@@ -2574,7 +2574,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 					oldattr, size, offs);
 				found = (rdsize == size)
 					&& !memcmp(oldattr,attr,size);
-				ntfs_free(oldattr);
+				free(oldattr);
 				  /* if the records do not compare */
 				  /* (hash collision), try next one */
 				if (!found) {
@@ -2611,7 +2611,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
  */
 
 static int update_secur_descr(ntfs_volume *vol,
-				const char *newattr, ntfs_inode *ni)
+				char *newattr, ntfs_inode *ni)
 {
 	int newattrsz;
 	int written;
@@ -2667,7 +2667,7 @@ static int update_secur_descr(ntfs_volume *vol,
 			 * were none
 			 */
 			res = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR,
-					    AT_UNNAMED, 0, (const u8*)newattr,
+					    AT_UNNAMED, 0, (u8*)newattr,
 					    (s64) newattrsz);
 		}
 #if !FORCE_FORMAT_v1x
@@ -2728,7 +2728,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 {
 	int res;
 	const struct CACHED_SECURID *cached;
-	const char *newattr;
+	char *newattr;
 	const SID *usid;
 	const SID *gsid;
 	BOOL isdir;
@@ -2771,7 +2771,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 							gid, mode,
 							ni->security_id);
 				}
-				ntfs_free(newattr);
+				free(newattr);
 			} else {
 				/* could not build new security attribute */
 				errno = EIO;
@@ -2802,7 +2802,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
-	const char *oldattr;
+	char *oldattr;
 	const SID *usid;
 	const SID *gsid;
 	uid_t uid;
@@ -2825,7 +2825,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
 			fileuid = findowner(scx,usid);
 			filegid = findowner(scx,gsid);
-			ntfs_free(oldattr);
+			free(oldattr);
 		} else
 			res = -1;
 	}
@@ -2912,7 +2912,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	if (ret)
 		ntfs_log_perror("Failed to add initial SECURITY_DESCRIPTOR\n");
 	
-	ntfs_free(sd);
+	free(sd);
 	return ret;
 }
 
@@ -2999,7 +2999,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 				 dir_ni, accesstype);
 			ntfs_inode_close(dir_ni);
 		}
-		ntfs_free(dirpath);
+		free(dirpath);
 	}
 	return (allow);		/* errno is set if not allowed */
 }
@@ -3015,7 +3015,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
-	const char *oldattr;
+	char *oldattr;
 	const SID *usid;
 	const SID *gsid;
 	uid_t fileuid;
@@ -3050,7 +3050,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 				filegid = findowner(scx,gsid);
 			} else
 				res = -1;
-			ntfs_free(oldattr);
+			free(oldattr);
 		} else
 			res = -1;
 	}
@@ -3143,11 +3143,11 @@ static struct MAPLIST *getmappingitem(
 			} else
 				p = (char*)NULL;	/* bad line, stop */
 			if (!p) {
-				ntfs_free(item);
+				free(item);
 				item = (struct MAPLIST*)NULL;
 			}
 		} else {
-			ntfs_free(item);	/* free unused item */
+			free(item);	/* free unused item */
 			item = (struct MAPLIST*)NULL;
 		}
 	}
@@ -3221,18 +3221,18 @@ static void free_mapping(struct SECURITY_CONTEXT *scx)
 		while (group && (group->sid != user->sid))
 			group = group->next;
 		if (!group)
-			ntfs_free(user->sid);
+			free(user->sid);
 			/* unchain item and free */
 		scx->usermapping = user->next;
-		ntfs_free(user);
+		free(user);
 	}
 		/* free group mappings */
 	while (scx->groupmapping) {
 		group = scx->groupmapping;
-		ntfs_free(group->sid);
+		free(group->sid);
 			/* unchain item and free */
 		scx->groupmapping = group->next;
-		ntfs_free(group);
+		free(group);
 	}
 }
 
@@ -3372,6 +3372,8 @@ static int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx,
  *	we had rather be safe until the consequences are understood
  */
 
+#if 0 /* not activated for now */
+
 static BOOL check_mapping(const struct MAPPING *usermapping,
 		const struct MAPPING *groupmapping)
 {
@@ -3401,6 +3403,8 @@ static BOOL check_mapping(const struct MAPPING *usermapping,
 	return (ambiguous);
 }
 
+#endif
+
 /*
  *		Try and apply default single user mapping
  *	returns zero if successful
@@ -3423,7 +3427,7 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 			usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
 			if (is_user_sid(usid))
 				res = ntfs_do_default_mapping(scx,usid);
-			ntfs_free(securattr);
+			free(securattr);
 		}
 		ntfs_inode_close(ni);
 	}
@@ -3466,7 +3470,7 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 		/* and rely on internal representation */
 		while (firstitem) {
 			item = firstitem->next;
-			ntfs_free(firstitem);
+			free(firstitem);
 			firstitem = item;
 		}
 	} else {
