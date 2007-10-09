@@ -145,15 +145,15 @@ static int ntfs_collate_ntofs_security_hash(ntfs_volume *vol __attribute__((unus
 {
 	int rc;
 	u32 d1, d2;
-	u32 *p1, *p2;
+	const u32 *p1, *p2;
 
 	ntfs_log_trace("Entering.\n");
 	if (data1_len != data2_len || data1_len != 8) {
 		ntfs_log_error("data1_len or/and data2_len not equal to 8.\n");
 		return NTFS_COLLATION_ERROR;
 	}
-	p1 = (u32*)data1;
-	p2 = (u32*)data2;
+	p1 = (const u32*)data1;
+	p2 = (const u32*)data2;
 	d1 = le32_to_cpup(p1);
 	d2 = le32_to_cpup(p2);
 	if (d1 < d2)
