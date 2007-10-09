@@ -2994,9 +2994,11 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		name = strrchr(dirpath, '/');
 		*++name = 0;
 		dir_ni = ntfs_pathname_to_inode(scx->vol, NULL, dirpath);
-		if (dir_ni)
+		if (dir_ni) {
 			allow = ntfs_allowed_access(scx,path,
 				 dir_ni, accesstype);
+			ntfs_inode_close(dir_ni);
+		}
 		ntfs_free(dirpath);
 	}
 	return (allow);		/* errno is set if not allowed */
