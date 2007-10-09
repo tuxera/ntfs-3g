@@ -81,6 +81,7 @@
 #include "version.h"
 #include "ntfstime.h"
 #include "security.h"
+#include "logging.h"
 #include "misc.h"
 
 #ifndef PATH_MAX
@@ -433,9 +434,10 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			 * Check whether it's Interix symbolic link, block or
 			 * character device.
 			 */
-			if (na->data_size <= sizeof(INTX_FILE_TYPES) + sizeof(
-					ntfschar) * MAX_PATH && na->data_size >
-					sizeof(INTX_FILE_TYPES) &&
+			if (((size_t)na->data_size <= sizeof(INTX_FILE_TYPES)
+					+ sizeof(ntfschar) * MAX_PATH)
+					&& ((size_t)na->data_size >
+						sizeof(INTX_FILE_TYPES)) &&
 					!stream_name_len) {
 				INTX_FILE *intx_file;
 
@@ -530,11 +532,11 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		res = -errno;
 		goto exit;
 	}
-	if (na->data_size <= sizeof(INTX_FILE_TYPES)) {
+	if ((size_t)na->data_size <= sizeof(INTX_FILE_TYPES)) {
 		res = -EINVAL;
 		goto exit;
 	}
-	if (na->data_size > sizeof(INTX_FILE_TYPES) +
+	if ((size_t)na->data_size > sizeof(INTX_FILE_TYPES) +
 			sizeof(ntfschar) * MAX_PATH) {
 		res = -ENAMETOOLONG;
 		goto exit;
@@ -602,7 +604,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
 		struct stat st = { .st_ino = MREF(mref) };
-		 
+
 		if (dt_type == NTFS_DT_REG)
 			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
 		else if (dt_type == NTFS_DT_DIR)
@@ -713,7 +715,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + size > na->data_size)
+	if (offset + size > (size_t)na->data_size)
 		size = na->data_size - offset;
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
@@ -1033,8 +1035,8 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				perm = typemode & ~ctx->fmask & 0777;
 			if (!ctx->inherit
 			   && ntfs_fuse_fill_security_context(&security)) {
-			   	if (ntfs_set_owner_mode(&security,path,ni,
-					security.uid,security.gid,perm) < 0)
+			   	if (ntfs_set_owner_mode(&security, ni,
+					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
 			}
 			if (ntfs_inode_close(ni))
@@ -1086,7 +1088,7 @@ static int ntfs_fuse_create_stream(const char *path,
 }
 
 static int ntfs_fuse_create_file(const char *org_path, mode_t mode, 
-			struct fuse_file_info *fi)
+			struct fuse_file_info *fi __attribute__((unused)))
 {
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -1678,7 +1680,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		goto exit;
 	}
 	if (size) {
-		if (size >= na->data_size) {
+		if (size >= (size_t)na->data_size) {
 			res = ntfs_attr_pread(na, 0, na->data_size, value);
 			if (res != na->data_size)
 				res = -errno;
@@ -1795,18 +1797,17 @@ exit:
 
 static void ntfs_fuse_destroy(void)
 {
+	struct SECURITY_CONTEXT security;
+
 	if (!ctx)
 		return;
 	
 	if (ctx->vol) {
 		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
 			      ctx->vol->vol_name);
-		ntfs_close_secure(ctx->vol);
-		if (ntfs_umount(ctx->vol, FALSE))
-			ntfs_log_perror("Failed to cleanly unmount volume %s",
-					opts.device);
-		if (ctx->seccache && ctx->seccache->head.p_reads) {
-			ntfs_log_info("Permissions cache : %lu writes "
+		if (ntfs_fuse_fill_security_context(&security)) {
+			if (ctx->seccache && ctx->seccache->head.p_reads) {
+				ntfs_log_info("Permissions cache : %lu writes "
 				"%lu reads %lu.%1lu%% hits\n",
 			      ctx->seccache->head.p_writes,
 			      ctx->seccache->head.p_reads,
@@ -1814,9 +1815,9 @@ static void ntfs_fuse_destroy(void)
 			         / ctx->seccache->head.p_reads,
 			      1000 * ctx->seccache->head.p_hits
 			         / ctx->seccache->head.p_reads % 10);
-		}
-		if (ctx->seccache && ctx->seccache->head.s_reads) {
-			ntfs_log_info("Security id cache : %lu writes "
+			}
+			if (ctx->seccache && ctx->seccache->head.s_reads) {
+				ntfs_log_info("Security id cache : %lu writes "
 				"%lu reads %lu.%1lu%% hits "
 				"%lu.%1lu mean hops\n",
 			      ctx->seccache->head.s_writes,
@@ -1829,7 +1830,11 @@ static void ntfs_fuse_destroy(void)
 			         / ctx->seccache->head.s_reads,
 			      10 * ctx->seccache->head.s_hops
 			         / ctx->seccache->head.s_reads % 10);
-		}
+			ntfs_close_secure(&security);
+		}		}
+		if (ntfs_umount(ctx->vol, FALSE))
+			ntfs_log_perror("Failed to cleanly unmount volume %s",
+					opts.device);
 	}
 	free(ctx);
 	ctx = NULL;
@@ -1901,7 +1906,7 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 	if (ctx->force)
 		flags |= MS_FORCE;
 
-	ctx->vol = utils_mount_volume(device, mntpoint, flags);
+	ctx->vol = utils_mount_volume(device, mntpoint, flags, ctx->force);
 	return ctx->vol;
 }
 
@@ -2417,7 +2422,7 @@ int main(int argc, char *argv[])
 	int err = 10;
 
 	utils_set_locale();
-	ntfs_log_set_handler(ntfs_log_handler_stderr);
+	ntfs_log_set_handler((ntfs_log_handler*)ntfs_log_handler_stderr);
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -2521,7 +2526,8 @@ int main(int argc, char *argv[])
 			ntfs_log_error("Failed to daemonize.\n");
 		else if (!ctx->debug) {
 #ifndef DEBUG
-			ntfs_log_set_handler(ntfs_log_handler_syslog);
+			ntfs_log_set_handler(
+				(ntfs_log_handler*)ntfs_log_handler_syslog);
 			/* Override default libntfs identify. */
 			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
 #endif
