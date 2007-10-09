@@ -1906,7 +1906,7 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 	if (ctx->force)
 		flags |= MS_FORCE;
 
-	ctx->vol = utils_mount_volume(device, mntpoint, flags, ctx->force);
+	ctx->vol = utils_mount_volume(device, mntpoint, flags);
 	return ctx->vol;
 }
 
