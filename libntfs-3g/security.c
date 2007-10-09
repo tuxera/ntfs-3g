@@ -181,9 +181,8 @@ struct MAPLIST {
  *	A few useful constants
  */
 
-static ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
-static ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
-static ntfschar sds_stream[] = { '$', 'S', 'D', 'S', 0 };
+static const ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
+static const ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
 static const char mapping_name[] = MAPPINGFILE;
 
 /*
@@ -286,7 +285,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 	if (res == 36)
 		return _guid_str;
 	if (!guid_str)
-		free(_guid_str);
+		ntfs_free(_guid_str);
 	errno = EINVAL;
 	return NULL;
 }
@@ -431,7 +430,7 @@ err_out:
 	else
 		i = errno;
 	if (!sid_str_size)
-		free(sid_str);
+		ntfs_free(sid_str);
 	errno = i;
 	return NULL;
 }
@@ -474,7 +473,7 @@ void ntfs_generate_guid(GUID *guid)
  */
 le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
 {
-        const le32 *pos = (const le32 *)sd;
+        const le32 *pos = (const le32*)sd;
         const le32 *end = pos + (len >> 2);
         u32 hash = 0;
 
@@ -488,7 +487,7 @@ le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
  *		The following must be in some library...
  */
 
-unsigned long atoul(const char *p)
+static unsigned long atoul(const char *p)
 {				/* must be somewhere ! */
 	unsigned long v;
 
@@ -578,7 +577,7 @@ static unsigned int attr_size(const char *attr)
  *	(just check revision and number of authorities)
  */
 
-BOOL valid_sid(const SID *sid)
+static BOOL valid_sid(const SID *sid)
 {
 	return ((sid->revision == SID_REVISION)
 		&& (sid->sub_authority_count >= 1)
@@ -595,7 +594,7 @@ BOOL valid_sid(const SID *sid)
  *		if not, error should be logged by caller
  */
 
-BOOL valid_securattr(const char *securattr, int attrsz)
+static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -617,15 +616,15 @@ BOOL valid_securattr(const char *securattr, int attrsz)
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (ACL*)&securattr[offdacl];
+	pacl = (const ACL*)&securattr[offdacl];
 
 		/* size check occurs before the above pointers are used */
 
 	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
 		&& (attr_size(securattr) <= attrsz)
       		&& (phead->control & SE_DACL_PRESENT)
-		&& valid_sid((SID*)&securattr[le32_to_cpu(phead->owner)])
-		&& valid_sid((SID*)&securattr[le32_to_cpu(phead->group)])
+		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
+		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
 		&& (pacl->revision == ACL_REVISION)) {
 
 		/*
@@ -704,8 +703,8 @@ static SID *encodesid(const char *sidstr)
  *	of fuse context
  */
 
-static int ntfs_local_read(ntfs_volume *vol, ntfs_inode *ni,
-		const char *path, ntfschar *stream_name, int stream_name_len,
+static int ntfs_local_read(ntfs_inode *ni,
+		const ntfschar *stream_name, int stream_name_len,
 		char *buf, size_t size, off_t offset)
 {
 	ntfs_attr *na = NULL;
@@ -716,7 +715,7 @@ static int ntfs_local_read(ntfs_volume *vol, ntfs_inode *ni,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + size > na->data_size)
+	if (offset + size > (size_t)na->data_size)
 		size = na->data_size - offset;
 	while (size) {
 		res = ntfs_attr_pread(na, offset, size, buf);
@@ -746,8 +745,8 @@ exit:
  *	of fuse context
  */
 
-static int ntfs_local_write(ntfs_volume *vol, ntfs_inode *ni,
-		const char *path, ntfschar *stream_name, int stream_name_len,
+static int ntfs_local_write(ntfs_inode *ni,
+		const ntfschar *stream_name, int stream_name_len,
 		char *buf, size_t size, off_t offset)
 {
 	ntfs_attr *na = NULL;
@@ -826,7 +825,7 @@ static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
 		sid = adminsid;
 	else {
 		p = scx->usermapping;
-		while (p && (p->xid != uid))
+		while (p && ((uid_t)p->xid != uid))
 			p = p->next;
 		sid = (p ? p->sid : (const SID*)NULL);
 	}
@@ -847,7 +846,7 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
 		sid = adminsid;
 	else {
 		p = scx->groupmapping;
-		while (p && (p->xid != gid))
+		while (p && ((gid_t)p->xid != gid))
 			p = p->next;
 		sid = (p ? p->sid : (const SID*)NULL);
 	}
@@ -914,12 +913,24 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 			cache->head.s_writes = 0;
 			cache->head.s_hops = 0;
 			*scx->pseccache = cache;
+			cache->head.first_securid = cachesecurid;
 			cache->head.most_recent_securid = cachesecurid;
 			cache->cachetable[0].valid = 0;
 		}
 	} else
 		cache = (struct SECURITY_CACHE*)NULL;
 	return (cache);
+}
+
+/*
+ *		Free memory used by caches
+ *	The only purpose is to facilitate the detection of memory leaks
+ */
+
+static void free_caches(struct SECURITY_CONTEXT *scx)
+{
+	ntfs_free((*scx->pseccache)->head.first_securid);
+	ntfs_free(*scx->pseccache);
 }
 
 /*
@@ -1042,7 +1053,7 @@ static struct CACHED_PERMISSIONS *resize_cache(
 	int oldcnt;
 	int newcnt;
 	BOOL beyond;
-	int i;
+	unsigned int i;
 
 	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	oldcache = *scx->pseccache;
@@ -1067,7 +1078,7 @@ static struct CACHED_PERMISSIONS *resize_cache(
 		memcpy(newcache,oldcache,
 			    sizeof(struct SECURITY_CACHE)
 			      + (oldcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-		free(oldcache);
+		ntfs_free(oldcache);
 #endif
 		if (newcache) {
 			     /* mark new entries as not valid */
@@ -1097,7 +1108,7 @@ static struct CACHED_PERMISSIONS *resize_cache(
 				oldcache->cachetable,
 				oldcnt*sizeof(struct CACHED_PERMISSIONS));
 			*scx->pseccache = newcache;
-			free(oldcache);
+			ntfs_free(oldcache);
 			cacheentry = &newcache->cachetable[0];
 		}
 	}
@@ -1243,13 +1254,13 @@ static char *retrievesecurityattr(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id
 			securattr = (char*)ntfs_malloc(size);
 			if (securattr) {
 				rdsize = ntfs_local_read(
-					scx->vol,ni, "/$Secure",
-					sds_stream, 4, securattr, size, offs);
+					ni, STREAM_SDS, 4,
+					securattr, size, offs);
 				if ((rdsize != size)
 					|| !valid_securattr(securattr,
 						rdsize)) {
 					/* error logged by caller */
-					free(securattr);
+					ntfs_free(securattr);
 					securattr = (char*)NULL;
 				}
 			}
@@ -1572,7 +1583,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
  *	returns descriptor in allocated memory, must free() after use
  */
 
-static char *build_secur_descr(const char *path, mode_t mode,
+static char *build_secur_descr(mode_t mode,
 			int isdir, const SID * usid, const SID * gsid)
 {
 	int newattrsz;
@@ -1633,7 +1644,7 @@ static char *build_secur_descr(const char *path, mode_t mode,
 			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		} else {
 			/* hope error was detected before overflowing */
-			free(newattr);
+			ntfs_free(newattr);
 			newattr = (char*)NULL;
 			ntfs_log_error("Security descriptor is longer than expected\n");
 			errno = EIO;
@@ -1660,7 +1671,6 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 {
 	SII_INDEX_KEY securid;
 	char *securattr;
-	ntfschar nullchar = 0;
 	s64 readallsz;
 
 		/*
@@ -1680,11 +1690,11 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 			/* get v1.x security attribute */
 		readallsz = 0;
 		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
-				&nullchar, 0, &readallsz);
+				AT_UNNAMED, 0, &readallsz);
 		if (securattr && !valid_securattr(securattr, readallsz)) {
 			ntfs_log_error("Bad security descriptor for %s\n",
 				path);
-			free(securattr);
+			ntfs_free(securattr);
 			securattr = (char*)NULL;
 		}
 	}
@@ -1698,7 +1708,7 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 			 * be created by chown or chmod
 			 */
 		ntfs_log_error("No security descriptor found for %s\n",path);
-		securattr = build_secur_descr(path, 0, 0, adminsid, adminsid);
+		securattr = build_secur_descr(0, 0, adminsid, adminsid);
 	}
 	return (securattr);
 }
@@ -1822,8 +1832,7 @@ static int merge_permissions(ntfs_inode *ni,
  *		(standard case : different owner, group and administrator)
  */
 
-static int build_std_permissions(struct SECURITY_CONTEXT *scx,
-			const char *securattr, ntfs_inode *ni)
+static int build_std_permissions(const char *securattr, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -1838,10 +1847,10 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-	gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
+	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
+	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (ACL*)&securattr[offdacl];
+	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	acecnt = le16_to_cpu(pacl->ace_count);
@@ -1888,8 +1897,7 @@ static int build_std_permissions(struct SECURITY_CONTEXT *scx,
  *		and not administrator)
  */
 
-static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
-			const char *securattr, ntfs_inode *ni)
+static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -1903,9 +1911,9 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
+	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
 	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (ACL*)&securattr[offdacl];
+	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	acecnt = le16_to_cpu(pacl->ace_count);
@@ -1943,8 +1951,7 @@ static int build_owngrp_permissions(struct SECURITY_CONTEXT *scx,
  */
 
 
-static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
-			const char *securattr, ntfs_inode *ni)
+static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -1959,10 +1966,10 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-	gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
+	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
+	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (ACL*)&securattr[offdacl];
+	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	acecnt = le16_to_cpu(pacl->ace_count);
@@ -2005,8 +2012,7 @@ static int build_ownadmin_permissions(struct SECURITY_CONTEXT *scx,
  *	or a negative result (with errno set) if there is a problem
  */
 
-static int build_permissions(struct SECURITY_CONTEXT *scx,
-		const char *securattr, ntfs_inode *ni)
+static int build_permissions(const char *securattr, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const SID *usid;	/* owner of file/directory */
@@ -2017,21 +2023,18 @@ static int build_permissions(struct SECURITY_CONTEXT *scx,
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	if (phead->control & SE_DACL_PRESENT) {	/* no DACL, reject */
-		usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
-		gsid = (SID*)&securattr[le32_to_cpu(phead->group)];
+		usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
+		gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 		adminowns = same_sid(usid,adminsid)
 		         || same_sid(gsid,adminsid);
 		groupowns = !adminowns && same_sid(gsid,usid);
 		if (adminowns)
-			perm = build_ownadmin_permissions(scx,securattr,
-					ni);
+			perm = build_ownadmin_permissions(securattr, ni);
 		else
 			if (groupowns)
-				perm = build_owngrp_permissions(scx,securattr,
-						ni);
+				perm = build_owngrp_permissions(securattr, ni);
 			else
-				perm = build_std_permissions(scx,securattr,
-						ni);
+				perm = build_std_permissions(securattr, ni);
 	} else {
 		perm = -1;
 		errno = EIO;
@@ -2072,22 +2075,22 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			perm = 0;	/* default to no permission */
 			securattr = getsecurityattr(scx,path, ni);
 			if (securattr) {
-				perm = build_permissions(scx,securattr, ni);
+				perm = build_permissions(securattr, ni);
 					/* fetch owner and group for cacheing */
 				if (perm >= 0) {
 					phead =
 					    (const SECURITY_DESCRIPTOR_RELATIVE*)
 					    	securattr;
-					usid = (SID*)&
+					usid = (const SID*)&
 					    securattr[le32_to_cpu(phead->owner)];
-					gsid = (SID*)&
+					gsid = (const SID*)&
 					    securattr[le32_to_cpu(phead->group)];
 					uid = findowner(scx,usid);
 					gid = findgroup(scx,gsid);
 					enter_cache(scx, ni, uid,
 							gid, perm);
 				}
-				free((void*)securattr);
+				ntfs_free(securattr);
 			} else
 				perm = -1;
 				uid = gid = 0;
@@ -2135,14 +2138,14 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			perm = -1;	/* default to error */
 			securattr = getsecurityattr(scx,path, ni);
 			if (securattr) {
-				perm = build_permissions(scx,securattr, ni);
+				perm = build_permissions(securattr, ni);
 				if (perm >= 0) {
 					phead =
 					    (const SECURITY_DESCRIPTOR_RELATIVE*)
 					    	securattr;
-					usid = (SID*)&
+					usid = (const SID*)&
 					    securattr[le32_to_cpu(phead->owner)];
-					gsid = (SID*)&
+					gsid = (const SID*)&
 					    securattr[le32_to_cpu(phead->group)];
 					stbuf->st_uid = findowner(scx,usid);
 					stbuf->st_gid = findgroup(scx,gsid);
@@ -2151,7 +2154,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					enter_cache(scx, ni, stbuf->st_uid,
 						stbuf->st_gid, perm);
 				}
-				free((void*)securattr);
+				ntfs_free(securattr);
 			}
 		}
 	}
@@ -2179,11 +2182,6 @@ static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
  *	currently walk up is generic but limited to a two-level tree
  *	and walk down used a lookup and is not generic
  */
-
-/* use of (normally static) functions from index.c */
-INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
-				  u32 name_len, ntfs_attr_search_ctx **ctx);
-INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos);
 
 INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
 			BOOL forsii)
@@ -2253,7 +2251,7 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
 			do {
 				xc->pindex--;
 				if (!xc->pindex) {
-					free(xc->ib);
+					ntfs_free(xc->ib);
 					xc->ib = (INDEX_BLOCK*)NULL;
 					xc->ir = ntfs_ir_lookup(xc->ni,
 						xc->name, xc->name_len,
@@ -2311,18 +2309,18 @@ static int entersecurity_data(ntfs_volume *vol,
 		phsds->security_id = keyid;
 		phsds->offset = cpu_to_le64(offs);
 		phsds->length = cpu_to_le32(fullsz);
-		written1 = ntfs_local_write(vol, vol->secure_ni, "$Secure",
-			sds_stream, 4, fullattr, fullsz,
+		written1 = ntfs_local_write(vol->secure_ni,
+			STREAM_SDS, 4, fullattr, fullsz,
 			offs);
-		written2 = ntfs_local_write(vol, vol->secure_ni, "$Secure",
-			sds_stream, 4, fullattr, fullsz,
+		written2 = ntfs_local_write(vol->secure_ni,
+			STREAM_SDS, 4, fullattr, fullsz,
 			offs + ALIGN_SDS_BLOCK);
 		if ((written1 == fullsz)
 		     && (written2 == written1))
 			res = 0;
 		else
 			errno = ENOMEM;
-		free(fullattr);
+		ntfs_free(fullattr);
 	}
 	return (res);
 }
@@ -2332,8 +2330,7 @@ static int entersecurity_data(ntfs_volume *vol,
  *	Returns zero if sucessful
  */
 
-static int entersecurity_indexes(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
+static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 			le32 hash, le32 keyid, off_t offs)
 {
 	union {
@@ -2501,10 +2498,8 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		offs = ((offs + attrsz - 1)
 			 | (ALIGN_SDS_BLOCK - 1)) + 1;
 	/* now write the security attr to storage */
-	if (entersecurity_data(vol,attr,attrsz,
-			hash,securid,offs)
-	    || entersecurity_indexes(vol,attr,attrsz,
-			hash,securid,offs))
+	if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
+	    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
 		securid = cpu_to_le32(0);
 		/* inode now is dirty */
 	NInoSetDirty(vol->secure_ni);
@@ -2573,13 +2568,13 @@ static le32 setsecurityattr(ntfs_volume *vol,
 				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
 			oldattr = (char*)ntfs_malloc(size);
 			if (oldattr) {
-				rdsize = ntfs_local_read(vol,
-					vol->secure_ni, "/$Secure",
-					sds_stream, 4,
+				rdsize = ntfs_local_read(
+					vol->secure_ni,
+					STREAM_SDS, 4,
 					oldattr, size, offs);
 				found = (rdsize == size)
 					&& !memcmp(oldattr,attr,size);
-				free(oldattr);
+				ntfs_free(oldattr);
 				  /* if the records do not compare */
 				  /* (hash collision), try next one */
 				if (!found) {
@@ -2622,7 +2617,6 @@ static int update_secur_descr(ntfs_volume *vol,
 	int written;
 	int res;
 	ntfs_attr *na;
-	ntfschar nullchar = 0;
 
 	newattrsz = attr_size(newattr);
 
@@ -2633,7 +2627,7 @@ static int update_secur_descr(ntfs_volume *vol,
 		/* update for NTFS format v1.x */
 
 		/* update the old security attribute */
-		na = ntfs_attr_open(ni, AT_SECURITY_DESCRIPTOR, &nullchar, 0);
+		na = ntfs_attr_open(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0);
 		if (na) {
 			/* resize attribute */
 			res = ntfs_attr_truncate(na, (s64) newattrsz);
@@ -2655,7 +2649,7 @@ static int update_secur_descr(ntfs_volume *vol,
 			/* this is needed when security data is wanted */
 			/* as v1.x though volume is formatted for v3.x */
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
-				&nullchar, 0);
+				AT_UNNAMED, 0);
 			if (na) {
 				clear_nino_flag(ni, v3_Extensions);
 			/*
@@ -2673,7 +2667,7 @@ static int update_secur_descr(ntfs_volume *vol,
 			 * were none
 			 */
 			res = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR,
-					    &nullchar, 0, (u8*)newattr,
+					    AT_UNNAMED, 0, (const u8*)newattr,
 					    (s64) newattrsz);
 		}
 #if !FORCE_FORMAT_v1x
@@ -2688,7 +2682,7 @@ static int update_secur_descr(ntfs_volume *vol,
 			(s64)newattrsz);
 		if (securid) {
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
-				&nullchar, 0);
+				AT_UNNAMED, 0);
 			if (na) {
 				res = 0;
 				if (!test_nino_flag(ni, v3_Extensions)) {
@@ -2700,7 +2694,7 @@ static int update_secur_descr(ntfs_volume *vol,
 					ni->usn = cpu_to_le32(0);
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
-						&nullchar, 0);
+						AT_UNNAMED, 0);
 				}
 				set_nino_flag(ni, v3_Extensions);
 				ni->security_id = securid;
@@ -2729,8 +2723,7 @@ static int update_secur_descr(ntfs_volume *vol,
  *	Returns zero if successful
  */
 
-int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni,
+int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		uid_t uid, gid_t gid, mode_t mode)
 {
 	int res;
@@ -2767,7 +2760,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		usid = find_usid(scx,uid);
 		gsid = find_gsid(scx,gid);
 		if (usid && gsid) {
-			newattr = build_secur_descr(path, mode,
+			newattr = build_secur_descr(mode,
 					 isdir, usid, gsid);
 			if (newattr) {
 				res = update_secur_descr(scx->vol, newattr, ni);
@@ -2778,7 +2771,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 							gid, mode,
 							ni->security_id);
 				}
-				free((void*)newattr);
+				ntfs_free(newattr);
 			} else {
 				/* could not build new security attribute */
 				errno = EIO;
@@ -2828,11 +2821,11 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 		oldattr = getsecurityattr(scx,path, ni);
 		if (oldattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
-			usid = (SID*)&oldattr[le32_to_cpu(phead->owner)];
-			gsid = (SID*)&oldattr[le32_to_cpu(phead->group)];
+			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
+			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
 			fileuid = findowner(scx,usid);
 			filegid = findowner(scx,gsid);
-			free((void*)oldattr);
+			ntfs_free(oldattr);
 		} else
 			res = -1;
 	}
@@ -2840,7 +2833,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 	if (!res) {
 		uid = scx->uid;
 		if (!uid || (fileuid == uid)) {
-			ntfs_set_owner_mode(scx, path, ni,
+			ntfs_set_owner_mode(scx, ni,
 					fileuid, filegid, mode);
 		} else {
 			errno = EPERM;
@@ -2919,7 +2912,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	if (ret)
 		ntfs_log_perror("Failed to add initial SECURITY_DESCRIPTOR\n");
 	
-	free(sd);
+	ntfs_free(sd);
 	return ret;
 }
 
@@ -3004,7 +2997,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		if (dir_ni)
 			allow = ntfs_allowed_access(scx,path,
 				 dir_ni, accesstype);
-		free(dirpath);
+		ntfs_free(dirpath);
 	}
 	return (allow);		/* errno is set if not allowed */
 }
@@ -3026,6 +3019,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 	uid_t fileuid;
 	uid_t filegid;
 	mode_t mode;
+	int perm;
 	int res;
 
 	res = 0;
@@ -3042,16 +3036,19 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		mode = 0;
 		oldattr = getsecurityattr(scx, path, ni);
 		if (oldattr) {
-			mode = build_permissions(scx, oldattr, ni);
-			if (mode >= 0) {
-				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
-				usid = (SID*)&oldattr[le32_to_cpu(phead->owner)];
-				gsid = (SID*)&oldattr[le32_to_cpu(phead->group)];
+			mode = perm = build_permissions(oldattr, ni);
+			if (perm >= 0) {
+				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+					oldattr;
+				usid = (const SID*)
+					&oldattr[le32_to_cpu(phead->owner)];
+				gsid = (const SID*)
+					&oldattr[le32_to_cpu(phead->group)];
 				fileuid = findowner(scx,usid);
 				filegid = findowner(scx,gsid);
 			} else
 				res = -1;
-			free((void*)oldattr);
+			ntfs_free(oldattr);
 		} else
 			res = -1;
 	}
@@ -3068,8 +3065,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 				uid = fileuid;
 			if ((int)gid < 0)
 				gid = filegid;
-			ntfs_set_owner_mode(scx, path, ni,
-					uid, gid, mode);
+			ntfs_set_owner_mode(scx, ni, uid, gid, mode);
 		} else {
 			res = -1;	/* neither owner nor root */
 			errno = EPERM;
@@ -3090,7 +3086,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
  *	Returns pointer to item, or NULL when there is no more
  */
 
-static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
+static struct MAPLIST *getmappingitem(
 		ntfs_inode *ni,	off_t *poffs, char *buf,
 		int *psrc, s64 *psize)
 {
@@ -3099,7 +3095,6 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 	char *p;
 	char *q;
 	int gotend;
-	static ntfschar nullchar = 0;
 	struct MAPLIST *item;
 
 	src = *psrc;
@@ -3118,8 +3113,8 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 			}
 			if (buf[src] != '\n') {
 				*poffs += *psize;
-				*psize = ntfs_local_read(scx->vol,ni,
-					mapping_name, &nullchar, 0,
+				*psize = ntfs_local_read(ni,
+					AT_UNNAMED, 0,
 					buf, (size_t)BUFSZ, *poffs);
 				src = 0;
 			} else {
@@ -3146,11 +3141,11 @@ static struct MAPLIST *getmappingitem(struct SECURITY_CONTEXT *scx,
 			} else
 				p = (char*)NULL;	/* bad line, stop */
 			if (!p) {
-				free(item);
+				ntfs_free(item);
 				item = (struct MAPLIST*)NULL;
 			}
 		} else {
-			free(item);	/* free unused item */
+			ntfs_free(item);	/* free unused item */
 			item = (struct MAPLIST*)NULL;
 		}
 	}
@@ -3174,7 +3169,6 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem;
 	struct MAPLIST *lastitem;
-	static ntfschar nullchar = 0;
 	ntfs_inode *ni;
 	int src;
 	off_t offs;
@@ -3185,13 +3179,12 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 	offs = 0;
 	ni = ntfs_pathname_to_inode(scx->vol, NULL, mapping_name);
 	if (ni) {
-		size = ntfs_local_read(scx->vol,ni,mapping_name,
-					&nullchar, 0,
+		size = ntfs_local_read(ni, AT_UNNAMED, 0,
 					buf, (size_t)BUFSZ, offs);
 		if (size > 0) {
 			src = 0;
 			do {
-				item = getmappingitem(scx,ni,&offs,
+				item = getmappingitem(ni,&offs,
 					buf,&src,&size);
 				if (item) {
 					item->next = (struct MAPLIST*)NULL;
@@ -3207,6 +3200,40 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 	}
 	return (firstitem);
 }
+
+/*
+ *		Free memory used to store the user mapping
+ *	The only purpose is to facilitate the detection of memory leaks
+ */
+
+static void free_mapping(struct SECURITY_CONTEXT *scx)
+{
+	struct MAPPING *user;
+	struct MAPPING *group;
+
+		/* free user mappings */
+	while (scx->usermapping) {
+		user = scx->usermapping;
+		/* do not free SIDs used for group mappings */
+		group = scx->groupmapping;
+		while (group && (group->sid != user->sid))
+			group = group->next;
+		if (!group)
+			ntfs_free(user->sid);
+			/* unchain item and free */
+		scx->usermapping = user->next;
+		ntfs_free(user);
+	}
+		/* free group mappings */
+	while (scx->groupmapping) {
+		group = scx->groupmapping;
+		ntfs_free(group->sid);
+			/* unchain item and free */
+		scx->groupmapping = group->next;
+		ntfs_free(group);
+	}
+}
+
 
 /*
  *		Build the user mapping list
@@ -3303,7 +3330,8 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
  *	returns zero if successful
  */
 
-int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx, const SID *usid)
+static int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx,
+			 const SID *usid)
 {
 	struct MAPPING *usermapping;
 	struct MAPPING *groupmapping;
@@ -3342,7 +3370,7 @@ int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx, const SID *usid)
  *	we had rather be safe until the consequences are understood
  */
 
-BOOL check_mapping(const struct MAPPING *usermapping,
+static BOOL check_mapping(const struct MAPPING *usermapping,
 		const struct MAPPING *groupmapping)
 {
 	const struct MAPPING *mapping1;
@@ -3376,7 +3404,7 @@ BOOL check_mapping(const struct MAPPING *usermapping,
  *	returns zero if successful
  */
 
-int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
+static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	ntfs_inode *ni;
@@ -3393,7 +3421,7 @@ int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 			usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
 			if (is_user_sid(usid))
 				res = ntfs_do_default_mapping(scx,usid);
-			free(securattr);
+			ntfs_free(securattr);
 		}
 		ntfs_inode_close(ni);
 	}
@@ -3436,7 +3464,7 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 		/* and rely on internal representation */
 		while (firstitem) {
 			item = firstitem->next;
-			free(firstitem);
+			ntfs_free(firstitem);
 			firstitem = item;
 		}
 	} else {
@@ -3474,10 +3502,23 @@ int ntfs_open_secure(ntfs_volume *vol)
 	return (res);
 }
 
-void ntfs_close_secure(ntfs_volume *vol)
+/*
+ *		Final cleaning
+ *	Allocated memory is freed to facilitate the detection of memory leaks
+ */
+
+void ntfs_close_secure(struct SECURITY_CONTEXT *scx)
 {
+	ntfs_volume *vol;
+
+	vol = scx->vol;
 	if (vol->secure_ni) {
+		ntfs_index_ctx_put(vol->secure_xsii);
+		ntfs_index_ctx_put(vol->secure_xsdh);
 		ntfs_inode_close(vol->secure_ni);
+		
 	}
+	free_mapping(scx);
+	free_caches(scx);
 }
 
