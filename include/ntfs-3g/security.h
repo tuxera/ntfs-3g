@@ -66,8 +66,9 @@ struct CACHED_SECURID {
  */
 
 struct SECURITY_HEAD {
-	int first;
-	int last;
+	unsigned int first;
+	unsigned int last;
+	struct CACHED_SECURID *first_securid;
 	struct CACHED_SECURID *most_recent_securid;
 			/* statistics for permissions */
 	unsigned long p_writes;
@@ -131,6 +132,9 @@ extern int ntfs_sd_add_everyone(ntfs_inode *ni);
 
 extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, 
 			       const u32 len);
+INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
+			BOOL forsii);
+
 
 int ntfs_build_mapping(struct SECURITY_CONTEXT *scx);
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
@@ -145,10 +149,10 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni,
+		ntfs_inode *ni,
 		uid_t uid, gid_t gid, mode_t mode);
 int ntfs_open_secure(ntfs_volume *vol);
-void ntfs_close_secure(ntfs_volume *vol);
+void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
 
 
 #endif /* defined _NTFS_SECURITY_H */
