@@ -115,7 +115,7 @@ static int ntfs_icx_ib_write(ntfs_index_context *icx)
  * Return NULL if allocation failed.
  */
 ntfs_index_context *ntfs_index_ctx_get(ntfs_inode *ni,
-				       ntfschar *name, u32 name_len)
+				       const ntfschar *name, u32 name_len)
 {
 	ntfs_index_context *icx;
 
@@ -426,7 +426,7 @@ static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
 }
 
 /* static JPA removed for use in security.c */
-INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
+INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, const ntfschar *name,
 				  u32 name_len, ntfs_attr_search_ctx **ctx)
 {
 	ATTR_RECORD *a;
@@ -458,7 +458,8 @@ err_out:
 	return ir;
 }
 
-static INDEX_ROOT *ntfs_ir_lookup2(ntfs_inode *ni, ntfschar *name, u32 len)
+static INDEX_ROOT *ntfs_ir_lookup2(ntfs_inode *ni, const ntfschar *name,
+		u32 len)
 {
 	ntfs_attr_search_ctx *ctx;
 	INDEX_ROOT *ir;
