@@ -754,7 +754,8 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: na=%p  b=%p  pos=%lld  count=%lld",
-				__FUNCTION__, na, b, pos, count);
+				__FUNCTION__, na, b, (long long)pos,
+				(long long)count);
 		return -1;
 	}
 	
@@ -868,7 +869,8 @@ res_err_out:
 		if (rl->lcn < (LCN)0) {
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				ntfs_log_perror("%s: Bad run (%lld)", 
-						__FUNCTION__, rl->lcn);
+						__FUNCTION__,
+						(long long)rl->lcn);
 				goto rl_err_out;
 			}
 			/* It is a hole, just zero the matching @b range. */
@@ -1271,7 +1273,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
 				ntfs_log_perror("%s: Unexpected LCN (%lld)", 
-						__FUNCTION__, rl->lcn);
+						__FUNCTION__,
+						(long long)rl->lcn);
 				goto rl_err_out;
 			}
 			
@@ -1530,7 +1533,8 @@ s64 ntfs_attr_mst_pwrite(ntfs_attr *na, const s64 pos, s64 bk_cnt,
 	/* Write the prepared data. */
 	written = ntfs_attr_pwrite(na, pos, bk_cnt * bk_size, src);
 	if (written <= 0) {
-		ntfs_log_perror("%s: written=%lld", __FUNCTION__, written);
+		ntfs_log_perror("%s: written=%lld", __FUNCTION__,
+				(long long)written);
 	}
 	/* Quickly deprotect the data again. */
 	for (i = 0; i < bk_cnt; ++i)
@@ -2430,7 +2434,8 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 
 	if (size < 0) {
 		errno = EINVAL;
-		ntfs_log_perror("%s: size=%lld", __FUNCTION__, size);
+		ntfs_log_perror("%s: size=%lld", __FUNCTION__,
+				(long long)size);
 		return -1;
 	}
 
@@ -2440,7 +2445,7 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	 */
 	if (type == AT_ATTRIBUTE_LIST && size > 0x40000) {
 		errno = ERANGE;
-		ntfs_log_perror("Too large attrlist (%lld)", size);
+		ntfs_log_perror("Too large attrlist (%lld)", (long long)size);
 		return -1;
 	}
 
@@ -2455,7 +2460,8 @@ int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPES type,
 	    ((max_size > 0) && (size > max_size))) {
 		errno = ERANGE;
 		ntfs_log_perror("Attr type %d size check failed (min,size,max="
-			"%lld,%lld,%lld)", type, min_size, size, max_size);
+			"%lld,%lld,%lld)", type, (long long)min_size,
+			(long long)size, (long long)max_size);
 		return -1;
 	}
 	return 0;
@@ -3016,7 +3022,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
 		errno = EINVAL;
-		ntfs_log_perror("%s: ni=%p  size=%lld", __FUNCTION__, ni, size);
+		ntfs_log_perror("%s: ni=%p  size=%lld", __FUNCTION__, ni,
+				(long long)size);
 		return -1;
 	}
 
@@ -4728,8 +4735,9 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 					DATA_ZONE);
 			if (!rl) {
 				ntfs_log_perror("Cluster allocation failed "
-						"(%lld)", first_free_vcn -
-						(na->allocated_size >>
+						"(%lld)",
+						(long long)first_free_vcn -
+						((long long)na->allocated_size >>
 						 vol->cluster_size_bits));
 				return -1;
 			}

@@ -409,7 +409,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 					ni->mrec->sequence_number)) {
 				errno = EIO;
 				ntfs_log_perror("Found stale extent mft "
-					"reference mft=%lld", ni->mft_no);
+					"reference mft=%lld",
+					(long long)ni->mft_no);
 				return NULL;
 			}
 			return ni;
@@ -579,7 +580,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			if (!err)
 				err = errno;
 			ntfs_log_perror("Failed to open inode %lld with index",
-					le64_to_cpu(fn->parent_directory));
+				(long long)le64_to_cpu(fn->parent_directory));
 			continue;
 		}
 		ictx = ntfs_index_ctx_get(index_ni, NTFS_INDEX_I30, 4);
