@@ -118,7 +118,7 @@ case "$target_os" in
 linux*|darwin*|netbsd*)
 	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
 	[
-		AC_MSG_ERROR([ntfs-3g requires FUSE >= 2.6.0. Please see http://fuse.sf.net/ or install __all__ FUSE packages (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev) or remove already installed __older__ FUSE.])
+	 AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either it's not fully installed (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev, etc packages) or files from an old version are still present. See FUSE at http://fuse.sf.net/])
 	]);;
 freebsd*)
 	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
