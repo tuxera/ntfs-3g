@@ -67,7 +67,7 @@ static const char *col_end    = "\e[0m";
 struct ntfs_logging {
 	u32 levels;
 	u32 flags;
-	ntfs_log_handler *handler __attribute__((format(printf, 6, 0)));
+	ntfs_log_handler *handler;
 };
 
 /**
