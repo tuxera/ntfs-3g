@@ -27,6 +27,7 @@
 #include "types.h"
 #include "layout.h"
 #include "inode.h"
+#include "dir.h"
 
 /*
  *          item in the mapping list
@@ -91,6 +92,14 @@ struct SECURITY_CACHE {
 } ;
 
 /*
+ *	Security flags values
+ */
+
+enum {
+	SECURITY_ADDSECURIDS	/* upgrade old security descriptors */
+} ;
+
+/*
  *	Security context, needed by most security functions
  */
 
@@ -132,9 +141,6 @@ extern int ntfs_sd_add_everyone(ntfs_inode *ni);
 
 extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, 
 			       const u32 len);
-INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
-			BOOL forsii);
-
 
 int ntfs_build_mapping(struct SECURITY_CONTEXT *scx);
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
@@ -153,6 +159,36 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		uid_t uid, gid_t gid, mode_t mode);
 int ntfs_open_secure(ntfs_volume *vol);
 void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
+
+/*
+ *		Security API for direct access to security descriptors
+ *	based on Win32 API
+ */
+
+#define MAGIC_API 10102007
+
+struct SECURITY_API {
+	u32 magic;
+	struct SECURITY_CONTEXT security;
+	struct SECURITY_CACHE *seccache;
+} ;
+
+enum {	OWNER_SECURITY_INFORMATION = 1,
+	GROUP_SECURITY_INFORMATION = 2,
+	DACL_SECURITY_INFORMATION = 4,
+	SACL_SECURITY_INFORMATION = 8
+} ;
+
+BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
+                const char *path, u32 selection,  
+                char *buf, u32 buflen, u32 *psize);
+BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
+		const char *path, u32 selection, const char *attr);
+BOOL ntfs_read_directory(struct SECURITY_API *scapi,
+		const char *path, ntfs_filldir_t callback, void *context);
+struct SECURITY_API *ntfs_initialize_file_security(const char *device,
+                                int flags);
+BOOL ntfs_leave_file_security(struct SECURITY_API *scx);
 
 
 #endif /* defined _NTFS_SECURITY_H */
