@@ -121,6 +121,7 @@ typedef struct {
 	BOOL noatime;
 	BOOL no_detach;
 	BOOL inherit;
+	BOOL addsecurids;
 	struct SECURITY_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
@@ -2113,6 +2114,12 @@ static char *parse_mount_options(const char *orig_opts)
 			 * in create()
 			 */
 			ctx->inherit = TRUE;
+		} else if (!strcmp(opt, "addsecurids")) {
+			/*
+			 * JPA create security ids for files being read
+			 * with an individual security attribute
+			 */
+			ctx->addsecurids = TRUE;
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -2489,7 +2496,7 @@ int main(int argc, char *argv[])
 	fc = try_fuse_mount(parsed_options);
 	if (!fc)
 		goto err_out;
-	
+
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
 	    fuse_opt_add_arg(&margs, "-o") == -1)
@@ -2546,6 +2553,9 @@ int main(int argc, char *argv[])
 	ctx->security.vol = ctx->vol;
 	ctx->security.uid = ctx->uid;
 	ctx->security.gid = ctx->gid;
+	ctx->vol->secure_flags = 0;
+	if (ctx->addsecurids && !ctx->ro)
+		ctx->vol->secure_flags = (1 << SECURITY_ADDSECURIDS);
 		/* JPA open $Secure and build user mapping (right place ?) */
 	if (ntfs_open_secure(ctx->vol))
 		ntfs_log_info("Could not open file $Secure\n");
