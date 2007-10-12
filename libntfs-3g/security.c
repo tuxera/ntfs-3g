@@ -2662,11 +2662,15 @@ static int update_secur_descr(ntfs_volume *vol,
  *	were created in previous versions, with a security attributes
  *	and no security id.
  *	
- *	It will create a duplicate (attribute and entry in $Secure)
- *	and allow for cacheing and inheritance.
- *	The attribute is kept for use by utilities which would not
- *	accept entries in $Secure
- *	At next update of permissions, the duplicate will be removed
+ *      It will allocate a security id and replace the individual
+ *	security attribute by a reference to the global one
+ *
+ *	Special files are not upgraded (currently / and files in
+ *	directories /$*)
+ *
+ *	Though most code is similar to update_secur_desc() it has
+ *	been kept apart to facilitate the further processing of
+ *	special cases or even to remove it if found dangerous.
  *
  *	returns 0 if success,
  *		1 if not upgradable. This is not an error.
@@ -3537,7 +3541,6 @@ void ntfs_close_secure(struct SECURITY_CONTEXT *scx)
 	}
 	free_mapping(scx);
 	free_caches(scx);
-showlist(99);
 }
 
 /*
