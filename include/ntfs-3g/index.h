@@ -113,6 +113,9 @@ extern void ntfs_index_ctx_reinit(ntfs_index_context *ictx);
 extern int ntfs_index_lookup(const void *key, const int key_len,
 		ntfs_index_context *ictx);
 
+extern INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie,
+		ntfs_index_context *ictx);
+
 extern int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn,
 		MFT_REF mref);
 extern int ntfs_index_rm(ntfs_index_context *ictx);
@@ -127,10 +130,7 @@ extern char *ntfs_ie_filename_get(INDEX_ENTRY *ie);
 extern void ntfs_ie_filename_dump(INDEX_ENTRY *ie);
 extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
-/* the following were added by JPA for temporary use in security.c */
-extern INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos);
-extern INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
-				  u32 name_len, ntfs_attr_search_ctx **ctx);
+/* the following was added by JPA for use in security.c */
 extern int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie);
 
 #endif /* _NTFS_INDEX_H */
