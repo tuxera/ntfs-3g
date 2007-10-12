@@ -240,8 +240,7 @@ static INDEX_ENTRY *ntfs_ie_get_last(INDEX_ENTRY *ie, char *ies_end)
 	return ie;
 }
 
-/* static JPA removed for use in security.c */
-INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
+static INDEX_ENTRY *ntfs_ie_get_by_pos(INDEX_HEADER *ih, int pos)
 {
 	INDEX_ENTRY *ie;
 	
@@ -425,8 +424,7 @@ static int ntfs_ia_check(ntfs_index_context *icx, INDEX_BLOCK *ib, VCN vcn)
 	return 0;
 }
 
-/* static JPA removed for use in security.c */
-INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
+static INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
 				  u32 name_len, ntfs_attr_search_ctx **ctx)
 {
 	ATTR_RECORD *a;
@@ -1866,6 +1864,159 @@ INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr)
 out:	
 	ntfs_attr_put_search_ctx(ctx);
 	return root;
+}
+
+
+/*
+ *		Walk down the index tree (leaf bound)
+ *	until there are no subnode in the first index entry
+ *	returns the entry at the bottom left in subnode
+ */
+
+static INDEX_ENTRY *ntfs_index_walk_down(INDEX_ENTRY *ie,
+			ntfs_index_context *ictx)
+{
+	INDEX_ENTRY *entry;
+	s64 vcn;
+
+	entry = ie;
+	do {
+		vcn = ntfs_ie_get_vcn(entry);
+		if (ictx->is_in_root) {
+
+			/* down from level zero */
+
+			free(ictx->ir);
+			ictx->ir = (INDEX_ROOT*)NULL;
+			ictx->ib = (INDEX_BLOCK*)ntfs_malloc(ictx->block_size);
+			ictx->pindex = 1;
+			ictx->is_in_root = FALSE;
+		} else {
+
+			/* down from non-zero level */
+			
+			ictx->pindex++;
+		}
+		ictx->parent_pos[ictx->pindex] = 0;
+		ictx->parent_vcn[ictx->pindex] = vcn;
+		if (!ntfs_ib_read(ictx,vcn,ictx->ib)) {
+			ictx->entry = ntfs_ie_get_first(&ictx->ib->index);
+			entry = ictx->entry;
+		} else
+			entry = (INDEX_ENTRY*)NULL;
+	} while (entry && (entry->ie_flags & INDEX_ENTRY_NODE));
+	return (entry);
+}
+
+/*
+ *		Walk up the index tree (root bound)
+ *	until there is a valid data entry in parent
+ *	returns the parent entry or NULL if no more parent
+ */
+
+static INDEX_ENTRY *ntfs_index_walk_up(INDEX_ENTRY *ie,
+			ntfs_index_context *ictx)
+{
+	INDEX_ENTRY *entry;
+	s64 vcn;
+
+	entry = ie;
+	if (ictx->pindex > 0) {
+		do {
+			ictx->pindex--;
+			if (!ictx->pindex) {
+
+					/* we have reached the root */
+
+				free(ictx->ib);
+				ictx->ib = (INDEX_BLOCK*)NULL;
+				ictx->is_in_root = TRUE;
+				/* a new search context is to be allocated */
+				if (ictx->actx)
+					free(ictx->actx);
+				ictx->ir = ntfs_ir_lookup(ictx->ni,
+					ictx->name, ictx->name_len,
+					&ictx->actx);
+				if (ictx->ir)
+					entry = ntfs_ie_get_by_pos(
+						&ictx->ir->index,
+						ictx->parent_pos[ictx->pindex]);
+				else
+					entry = (INDEX_ENTRY*)NULL;
+			} else {
+					/* up into non-root node */
+				vcn = ictx->parent_vcn[ictx->pindex];
+				if (!ntfs_ib_read(ictx,vcn,ictx->ib)) {
+					entry = ntfs_ie_get_by_pos(
+						&ictx->ib->index,
+						ictx->parent_pos[ictx->pindex]);
+				} else
+					entry = (INDEX_ENTRY*)NULL;
+			}
+		ictx->entry = entry;
+		} while (entry && (ictx->pindex > 0)
+			 && (entry->ie_flags & INDEX_ENTRY_END));
+	} else
+		entry = (INDEX_ENTRY*)NULL;
+	return (entry);
+}
+
+/*
+ *		Get next entry in an index according to collating sequence.
+ *	Must be initialized through a ntfs_index_lookup()
+ *
+ *	Returns next entry or NULL if none
+ *
+ *	Sample layout :
+ *
+ *                 +---+---+---+---+---+---+---+---+    n ptrs to subnodes
+ *                 |   |   | 10| 25| 33|   |   |   |    n-1 keys in between
+ *                 +---+---+---+---+---+---+---+---+    no key in last entry
+ *                              | A | A
+ *                              | | | +-------------------------------+
+ *   +--------------------------+ | +-----+                           |
+ *   |                            +--+    |                           |
+ *   V                               |    V                           |
+ * +---+---+---+---+---+---+---+---+ |  +---+---+---+---+---+---+---+---+
+ * | 11| 12| 13| 14| 15| 16| 17|   | |  | 26| 27| 28| 29| 30| 31| 32|   |
+ * +---+---+---+---+---+---+---+---+ |  +---+---+---+---+---+---+---+---+
+ *                               |   |
+ *       +-----------------------+   |
+ *       |                           |
+ *     +---+---+---+---+---+---+---+---+
+ *     | 18| 19| 20| 21| 22| 23| 24|   |
+ *     +---+---+---+---+---+---+---+---+
+ */
+
+INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
+{
+	INDEX_ENTRY *next;
+	int flags;
+
+                        /* get next entry in same node */
+                        /* there is always one after any entry with data */
+
+	next = (INDEX_ENTRY*)((char*)ie + le16_to_cpu(ie->length));
+	++ictx->parent_pos[ictx->pindex];
+	flags = next->ie_flags;
+
+			/* walk down if it has a subnode */
+
+	if (flags & INDEX_ENTRY_NODE) {
+		next = ntfs_index_walk_down(next,ictx);
+	} else {
+
+			/* walk up it has no subnode, nor data */
+
+		if (flags & INDEX_ENTRY_END) {
+			next = ntfs_index_walk_up(next, ictx);
+		}
+	}
+		/* return NULL if stuck at end of a block */
+
+	if (next && (next->ie_flags & INDEX_ENTRY_END))
+		next = (INDEX_ENTRY*)NULL;
+	return (next);
 }
 
 
