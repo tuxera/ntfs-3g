@@ -526,7 +526,7 @@ static BOOL same_sid(const SID *first, const SID *second)
 
 static unsigned int attr_size(const char *attr)
 {
-	const SECURITY_DESCRIPTOR_RELATIVE *pnhead;
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pdacl;
 	const ACL *psacl;
 	const SID *psid;
@@ -535,38 +535,41 @@ static unsigned int attr_size(const char *attr)
 	unsigned int offowner;
 	unsigned int offgroup;
 	unsigned int endsid;
+	unsigned int endsacl;
 	unsigned int attrsz;
 
 		/*
 		 * First check DACL, which is the last field in all descriptors
 		 * we build, and in most descriptors built by Windows
 		 */
-	pnhead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		/* find end of DACL */
-	offdacl = le32_to_cpu(pnhead->dacl);
+	offdacl = le32_to_cpu(phead->dacl);
 	pdacl = (const ACL*)&attr[offdacl];
 	attrsz = offdacl + le16_to_cpu(pdacl->size);
 
-	offowner = le32_to_cpu(pnhead->owner);
+	offowner = le32_to_cpu(phead->owner);
 	if (offowner >= attrsz) {
 			/* find end of USID */
 		psid = (const SID*)&attr[offowner];
 		endsid = offowner + sid_size(psid);
 		attrsz = endsid;
 	}
-	offgroup = le32_to_cpu(pnhead->group);
+	offgroup = le32_to_cpu(phead->group);
 	if (offgroup >= attrsz) {
 			/* find end of GSID */
 		psid = (const SID*)&attr[offgroup];
 		endsid = offgroup + sid_size(psid);
 		if (endsid > attrsz) attrsz = endsid;
 	}
-	offsacl = le32_to_cpu(pnhead->sacl);
+	offsacl = le32_to_cpu(phead->sacl);
 	if (offsacl >= attrsz) {
-			/* find end of DACL */
-		offsacl = le32_to_cpu(pnhead->sacl);
+			/* find end of SACL */
+		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
-		attrsz = offsacl + le16_to_cpu(psacl->size);
+		endsacl = offsacl + le16_to_cpu(psacl->size);
+		if (endsacl > attrsz)
+			attrsz = endsacl;
 	}
 
 	return (attrsz);
@@ -715,21 +718,24 @@ static int ntfs_local_read(ntfs_inode *ni,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + size > (size_t)na->data_size)
-		size = na->data_size - offset;
-	while (size) {
-		res = ntfs_attr_pread(na, offset, size, buf);
-		if (res < (s64)size)
-			ntfs_log_perror("ntfs_attr_pread partial write (%lld: "
-				"%lld <> %d)", (long long)offset,
-				 (long long)size, res);
-		if (res <= 0) {
-			res = -errno;
-			goto exit;
+	if ((size_t)offset < (size_t)na->data_size) {
+		if (offset + size > (size_t)na->data_size)
+			size = na->data_size - offset;
+		while (size) {
+			res = ntfs_attr_pread(na, offset, size, buf);
+			if ((off_t)res < (off_t)size)
+				ntfs_log_perror("ntfs_attr_pread partial read "
+					"(%lld : %lld <> %d)",
+					(long long)offset,
+					(long long)size, res);
+			if (res <= 0) {
+				res = -errno;
+				goto exit;
+			}
+			size -= res;
+			offset += res;
+			total += res;
 		}
-		size -= res;
-		offset += res;
-		total += res;
 	}
 	res = total;
 exit:
@@ -929,8 +935,10 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 
 static void free_caches(struct SECURITY_CONTEXT *scx)
 {
-	free((*scx->pseccache)->head.first_securid);
-	free(*scx->pseccache);
+	if (*scx->pseccache) {
+		free((*scx->pseccache)->head.first_securid);
+		free(*scx->pseccache);
+	}
 }
 
 /*
@@ -1661,7 +1669,8 @@ static char *build_secur_descr(mode_t mode,
  *	   - read the security descriptor attribute (v1.x format)
  *	   - or find the descriptor in $Secure:$SDS (v3.x format)
  *
- *	in both case, sanity checks are done on the attribute
+ *	in both case, sanity checks are done on the attribute and
+ *	the descriptor can be assumed safe
  *
  *	The returned descriptor is dynamically allocated and has to be freed
  */
@@ -2050,6 +2059,9 @@ static int build_permissions(const char *securattr, ntfs_inode *ni)
  *	returns -1 if there is a problem
  */
 
+static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
+				const char *attr, ntfs_inode *ni);
+
 static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 		 const char *path, ntfs_inode * ni)
 {
@@ -2073,11 +2085,26 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			gid = cached->gid;
 		} else {
 			perm = 0;	/* default to no permission */
-			securattr = getsecurityattr(scx,path, ni);
+			securattr = getsecurityattr(scx, path, ni);
 			if (securattr) {
 				perm = build_permissions(securattr, ni);
-					/* fetch owner and group for cacheing */
-				if (perm >= 0) {
+				/*
+				 *  Create a security id if there were none
+				 * and upgrade option is selected
+				 */
+				if (!test_nino_flag(ni, v3_Extensions)
+				   && (perm >= 0)
+				   && (scx->vol->flags
+				     & (1 << SECURITY_ADDSECURIDS))) {
+					upgrade_secur_desc(scx->vol, path,
+						securattr, ni);
+					/*
+					 * fetch owner and group for cacheing
+					 * if there is a securid
+					 */
+				}
+				if (test_nino_flag(ni, v3_Extensions)
+				    && (perm >= 0)) {
 					phead =
 					    (const SECURITY_DESCRIPTOR_RELATIVE*)
 					    	securattr;
@@ -2095,15 +2122,15 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				perm = -1;
 				uid = gid = 0;
 		}
-	}
-	if (perm >= 0) {
-		if (uid == scx->uid)
-			perm &= 0700;
-		else
-			if (gid == scx->gid)
-				perm &= 070;
+		if (perm >= 0) {
+			if (uid == scx->uid)
+				perm &= 0700;
 			else
-				perm &= 007;
+				if (gid == scx->gid)
+				perm &= 070;
+				else
+					perm &= 007;
+		}
 	}
 	return (perm);
 }
@@ -2136,10 +2163,23 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			stbuf->st_mode = (stbuf->st_mode & ~0777) + perm;
 		} else {
 			perm = -1;	/* default to error */
-			securattr = getsecurityattr(scx,path, ni);
+			securattr = getsecurityattr(scx, path, ni);
 			if (securattr) {
 				perm = build_permissions(securattr, ni);
+					/*
+					 * fetch owner and group for cacheing
+					 */
 				if (perm >= 0) {
+				/*
+				 *  Create a security id if there were none
+				 * and upgrade option is selected
+				 */
+					if (!test_nino_flag(ni, v3_Extensions)
+					   && (scx->vol->flags
+					     & (1 << SECURITY_ADDSECURIDS))) {
+						upgrade_secur_desc(scx->vol,
+							 path, securattr, ni);
+					}
 					phead =
 					    (const SECURITY_DESCRIPTOR_RELATIVE*)
 					    	securattr;
@@ -2171,119 +2211,13 @@ static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
 	return (INDEX_ENTRY*)((u8*)ih + le32_to_cpu(ih->entries_offset));
 }
 
-/*
- *		Get next index entry in current block or next block
- *	(currently limited to SII and SDH)
- *
- *	returns NULL at end of last block
- *
- *	Linking to next block should be improved and made generic
- *	then function should then be made public in index.c
- *	currently walk up is generic but limited to a two-level tree
- *	and walk down used a lookup and is not generic
- */
-
-INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *xc,
-			BOOL forsii)
-{
-	INDEX_ENTRY *next;
-	struct SII *psii;
-	struct SDH *psdh;
-	SDH_INDEX_KEY sdhkey;
-	le32 siikey;
-	int flags;
-
-			/* get down if have a subnode */
-
-	if (ie->ie_flags & INDEX_ENTRY_NODE) {
-		ntfs_index_ctx_reinit(xc);
-		if (forsii) {
-			psii = (struct SII*)ie;
-			siikey = cpu_to_le32(le32_to_cpu(psii->keysecurid) + 1);
-			ntfs_index_lookup((char*)&siikey,
-					sizeof(SII_INDEX_KEY), xc);
-		} else {
-			psdh = (struct SDH*)ie;
-			sdhkey.hash = psdh->keyhash;
-			sdhkey.security_id =
-				 cpu_to_le32(
-					le32_to_cpu(psdh->keysecurid) + 1);
-			ntfs_index_lookup((char*)&sdhkey,
-					sizeof(SDH_INDEX_KEY), xc);
-		}
-		next = xc->entry;
-
-	} else {
-
-	next = (INDEX_ENTRY*)((char*)ie +
-				le16_to_cpu(ie->length));
-	flags = next->ie_flags;
-	if ((flags & INDEX_ENTRY_END) && (flags & INDEX_ENTRY_NODE)) {
-
-		/*
-		 * Move down in the tree if end of block and subnode present
-		 */
-
-		ntfs_index_ctx_reinit(xc);
-		if (forsii) {
-			psii = (struct SII*)ie;
-			siikey = cpu_to_le32(le32_to_cpu(psii->keysecurid) + 1);
-			ntfs_index_lookup((char*)&siikey,
-					sizeof(SII_INDEX_KEY), xc);
-		} else {
-			psdh = (struct SDH*)ie;
-			sdhkey.hash = psdh->keyhash;
-			sdhkey.security_id =
-				 cpu_to_le32(
-					le32_to_cpu(psdh->keysecurid) + 1);
-			ntfs_index_lookup((char*)&sdhkey,
-					sizeof(SDH_INDEX_KEY), xc);
-		}
-		next = xc->entry;
-	}
-		/*
-		 * If end of block and no subnode, move up in the tree
-		 * until current node is not the last child of parent
-		 */
-
-	if ((flags & INDEX_ENTRY_END) && !(flags & INDEX_ENTRY_NODE)) {
-		if (xc->pindex > 0) {
-			do {
-				xc->pindex--;
-				if (!xc->pindex) {
-					free(xc->ib);
-					xc->ib = (INDEX_BLOCK*)NULL;
-					xc->ir = ntfs_ir_lookup(xc->ni,
-						xc->name, xc->name_len,
-						&xc->actx);
-					xc->is_in_root = TRUE;
-					xc->entry = ntfs_ie_get_by_pos(
-						&xc->ir->index,
-						xc->parent_pos[xc->pindex]);
-				} else {
-/* ! TODO ! up into another non-root block */
-					xc->entry = (INDEX_ENTRY*)NULL;
-				}
-			} while (xc->entry && (xc->pindex > 0)
-				 && !(xc->entry->ie_flags & INDEX_ENTRY_END));
-		}
-			/* done if stuck at end of block */
-		if (xc->entry && (xc->entry->ie_flags & INDEX_ENTRY_END)) {
-			xc->entry = (INDEX_ENTRY*)NULL;
-		}
-		next = xc->entry;
-	}
-	}
-		/* return NULL if stuck at end of block */
-	if (next && (next->ie_flags & INDEX_ENTRY_END))
-		next = (INDEX_ENTRY*)NULL;
-	return (next);
-}
-
 
 /*
- *	Enter a new security descriptor to $Secure (data only)
+ *	Enter a new security descriptor into $Secure (data only)
  *      it has to be written twice with an offset of 256KB
+ *
+ *	Should only be called by entersecurityattr() to ensure consistency
+ *
  *	Returns zero if sucessful
  */
 
@@ -2327,6 +2261,9 @@ static int entersecurity_data(ntfs_volume *vol,
 
 /*
  *	Enter a new security descriptor in $Secure (indexes only)
+ *
+ *	Should only be called by entersecurityattr() to ensure consistency
+ *
  *	Returns zero if sucessful
  */
 
@@ -2463,7 +2400,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 */
 		keyid = cpu_to_le32(0);
 		while (entry) {
-			next = ntfs_index_next(entry,xsii,TRUE);
+			next = ntfs_index_next(entry,xsii);
 			if (next) { 
 				psii = (struct SII*)next;
 					/* save last key and */
@@ -2501,8 +2438,11 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
 	    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
 		securid = cpu_to_le32(0);
-		/* inode now is dirty */
+		/* inode now is dirty, synchronize it all */
+	ntfs_index_ctx_reinit(vol->secure_xsii);
+	ntfs_index_ctx_reinit(vol->secure_xsdh);
 	NInoSetDirty(vol->secure_ni);
+	ntfs_inode_sync(vol->secure_ni);
 	return (securid);
 }
 
@@ -2579,7 +2519,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 				  /* (hash collision), try next one */
 				if (!found) {
 					entry = ntfs_index_next(
-						entry,xsdh,FALSE);
+						entry,xsdh);
 					collision = TRUE;
 				}
 			} else
@@ -2611,7 +2551,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
  */
 
 static int update_secur_descr(ntfs_volume *vol,
-				char *newattr, ntfs_inode *ni)
+				const char *newattr, ntfs_inode *ni)
 {
 	int newattrsz;
 	int written;
@@ -2695,7 +2635,7 @@ static int update_secur_descr(ntfs_volume *vol,
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
-				}
+			}
 				set_nino_flag(ni, v3_Extensions);
 				ni->security_id = securid;
 				ntfs_attr_close(na);
@@ -2715,6 +2655,77 @@ static int update_secur_descr(ntfs_volume *vol,
 	ntfs_inode_sync(ni); /* useful ? */
 	return (res);
 }
+
+/*
+ *		Upgrade the security descriptor of a file
+ *	This is intended to allow graceful upgrades for files which
+ *	were created in previous versions, with a security attributes
+ *	and no security id.
+ *	
+ *	It will create a duplicate (attribute and entry in $Secure)
+ *	and allow for cacheing and inheritance.
+ *	The attribute is kept for use by utilities which would not
+ *	accept entries in $Secure
+ *	At next update of permissions, the duplicate will be removed
+ *
+ *	returns 0 if success,
+ *		1 if not upgradable. This is not an error.
+ *		-1 if there is a problem
+ */
+
+static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
+				const char *attr, ntfs_inode *ni)
+{
+	int attrsz;
+	int res;
+	le32 securid;
+	ntfs_attr *na;
+
+		/*
+		 * upgrade requires NTFS format v3.x
+		 * also refuse upgrading for special files
+		 */
+
+	if ((vol->major_ver >= 3)
+		&& (path[0] == '/')
+		&& (path[1] != '$') && (path[1] != '\0')) {
+		attrsz = attr_size(attr);
+		securid = setsecurityattr(vol,
+			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
+			(s64)attrsz);
+		if (securid) {
+			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
+				AT_UNNAMED, 0);
+			if (na) {
+				res = 0;
+			/* expand standard information attribute to v3.x */
+				res = ntfs_attr_truncate(na,
+					 (s64)sizeof(STANDARD_INFORMATION));
+				ni->owner_id = cpu_to_le32(0);
+				ni->quota_charged = cpu_to_le32(0);
+				ni->usn = cpu_to_le32(0);
+				ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR,
+						AT_UNNAMED, 0);
+				set_nino_flag(ni, v3_Extensions);
+				ni->security_id = securid;
+				ntfs_attr_close(na);
+			} else {
+				ntfs_log_error("Failed to upgrade "
+					"standard informations\n");
+				errno = EIO;
+				res = -1;
+			}
+		} else
+			res = -1;
+	/* mark node as dirty */
+	NInoSetDirty(ni);
+	ntfs_inode_sync(ni); /* useful ? */
+	} else
+		res = 1;
+
+	return (res);
+}
+
 
 /*
  *		Update ownership and mode of a file, reusing an existing
@@ -3526,5 +3537,323 @@ void ntfs_close_secure(struct SECURITY_CONTEXT *scx)
 	}
 	free_mapping(scx);
 	free_caches(scx);
+showlist(99);
+}
+
+/*
+ *		API for direct access to security descriptors
+ *	based on Win32 API
+ */
+
+
+/*
+ *		Selective feeding of a security descriptor into user buffer
+ *
+ *	Returns TRUE if successful
+ */
+
+static BOOL feedsecurityattr(const char *attr, u32 selection,
+		char *buf, u32 buflen, u32 *psize)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
+	const ACL *pdacl;
+	const ACL *psacl;
+	const SID *pusid;
+	const SID *pgsid;
+	unsigned int offdacl;
+	unsigned int offsacl;
+	unsigned int offowner;
+	unsigned int offgroup;
+	unsigned int daclsz;
+	unsigned int saclsz;
+	unsigned int usidsz;
+	unsigned int gsidsz;
+	unsigned int size; /* size of requested attributes */
+	BOOL ok;
+	unsigned int pos;
+	unsigned int avail;
+
+		/*
+		 * First check DACL, which is the last field in all descriptors
+		 * we build, and in most descriptors built by Windows
+		 */
+
+	avail = 0;
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
+	size = 0;
+
+		/* locate DACL if requested and available */
+	if (selection & phead->control & DACL_SECURITY_INFORMATION) {
+		offdacl = le32_to_cpu(phead->dacl);
+		pdacl = (const ACL*)&attr[offdacl];
+		daclsz = le16_to_cpu(pdacl->size);
+		size = offdacl + daclsz;
+		avail |= DACL_SECURITY_INFORMATION;
+	} else
+		offdacl = daclsz = 0;
+
+		/* locate owner if requested and available */
+	offowner = le32_to_cpu(phead->owner);
+	if (offowner && (selection & OWNER_SECURITY_INFORMATION)) {
+			/* find end of USID */
+		pusid = (const SID*)&attr[offowner];
+		usidsz = sid_size(pusid);
+		if ((offowner + usidsz) > size)
+			size = offowner + usidsz;
+		avail |= OWNER_SECURITY_INFORMATION;
+	} else
+		offowner = usidsz = 0;
+
+		/* locate group if requested and available */
+	offgroup = le32_to_cpu(phead->group);
+	if (offgroup && (selection & GROUP_SECURITY_INFORMATION)) {
+			/* find end of GSID */
+		pgsid = (const SID*)&attr[offgroup];
+		gsidsz = sid_size(pgsid);
+		if ((offgroup + gsidsz) > size)
+			size = offgroup + gsidsz;
+		avail |= GROUP_SECURITY_INFORMATION;
+	} else
+		offgroup = gsidsz = 0;
+
+		/* locate SACL if requested and available */
+	if (selection & phead->control & SACL_SECURITY_INFORMATION) {
+			/* find end of SACL */
+		offsacl = le32_to_cpu(phead->sacl);
+		psacl = (const ACL*)&attr[offsacl];
+		saclsz = le16_to_cpu(psacl->size);
+		if ((offsacl + saclsz) > size)
+			size = offsacl + saclsz;
+		avail |= SACL_SECURITY_INFORMATION;
+	} else
+		offsacl = saclsz = 0;
+
+		/*
+		 * Check whether not requesting unavailable information
+		 * and having enough size in destination buffer
+		 */
+	if ((selection & ~avail)
+	   || (size > buflen)) {
+		errno = EINVAL;
+		ok = FALSE;
+	} else {
+		/* copy header and feed new flags */
+		memcpy(buf,attr,sizeof(SECURITY_DESCRIPTOR_RELATIVE));
+		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)buf;
+		pnhead->control = avail;
+		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
+
+		/* copy DACL if requested */
+		if (selection & DACL_SECURITY_INFORMATION) {
+			pnhead->dacl = pos;
+			memcpy(&buf[pos],&attr[offdacl],daclsz);
+			pos += daclsz;
+		} else
+			pnhead->dacl = 0;
+
+		/* copy SACL if requested */
+		if (selection & SACL_SECURITY_INFORMATION) {
+			pnhead->sacl = pos;
+			memcpy(&buf[pos],&attr[offsacl],saclsz);
+			pos += saclsz;
+		} else
+			pnhead->sacl = 0;
+
+		/* copy owner if requested */
+		if (selection & OWNER_SECURITY_INFORMATION) {
+			pnhead->owner = pos;
+			memcpy(&buf[pos],&attr[offowner],usidsz);
+			pos += usidsz;
+		} else
+			pnhead->owner = 0;
+
+		/* copy group if requested */
+		if (selection & GROUP_SECURITY_INFORMATION) {
+			pnhead->group = pos;
+			memcpy(&buf[pos],&attr[offgroup],gsidsz);
+			pos += gsidsz;
+		} else
+			pnhead->group = 0;
+		if (pos != size)
+			ntfs_log_error("Error in security descriptor size\n");
+		*psize = size;
+		ok = TRUE;
+	}
+
+	return (ok);
+}
+
+/*
+ *		Return the security descriptor of a file
+ *	This is intended to be similar to GetFileSecurity() from Win32
+ *	in order to facilitate the development of portable tools
+ *
+ *	returns NON zero if successful (following Win32 conventions)
+ *
+ *  BOOL WINAPI GetFileSecurity(
+ *    __in          LPCTSTR lpFileName,
+ *    __in          SECURITY_INFORMATION RequestedInformation,
+ *    __out_opt     PSECURITY_DESCRIPTOR pSecurityDescriptor,
+ *    __in          DWORD nLength,
+ *    __out         LPDWORD lpnLengthNeeded
+ *  );
+ *
+ */
+
+uid_t getuid(void);
+gid_t getgid(void);
+
+BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
+		const char *path, u32 selection,
+		char *buf, u32 buflen, u32 *psize)
+{
+	ntfs_inode *ni;
+	char *attr;
+	BOOL ok;
+
+	ok = FALSE; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
+		if (ni) {
+			attr = getsecurityattr(&scapi->security, path, ni);
+			if (attr) {
+				ok = feedsecurityattr(attr,selection,
+						buf,buflen,psize);
+				free(attr);
+			}
+			ntfs_inode_close(ni);
+		} else
+			errno = ENOENT;
+		if (!ok) *psize = 0;
+	} else
+		errno = EINVAL; /* do not clear *psize */
+	return (ok);
+}
+
+
+/*
+ *		Set the security descriptor of a file or directory
+ *	This is intended to be similar to SetFileSecurity() from Win32
+ *	in order to facilitate the development of portable tools
+ *
+ *	returns NON zero if successful (following Win32 conventions)
+ *
+ *  BOOL WINAPI SetFileSecurity(
+ *    __in          LPCTSTR lpFileName,
+ *    __in          SECURITY_INFORMATION SecurityInformation,
+ *    __in          PSECURITY_DESCRIPTOR pSecurityDescriptor
+ *  );
+ */
+
+BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
+		const char *path, u32 selection, const char *attr)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	ntfs_inode *ni;
+	int attrsz;
+	BOOL ok;
+
+	ok = FALSE; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API) && attr) {
+		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
+		attrsz = attr_size(attr);
+/* TODO should probably selectively merge into existing attr */
+/* for now we only enter new attributes */
+		if (valid_securattr(attr, attrsz)
+		   && (phead->control == selection)) {
+			ni = ntfs_pathname_to_inode(scapi->security.vol,
+				NULL, path);
+			if (ni) {
+				ok = !update_secur_descr(scapi->security.vol,
+					attr, ni);
+				ntfs_inode_close(ni);
+			}
+		}
+	}
+	return (ok);
+}
+
+
+BOOL ntfs_read_directory(struct SECURITY_API *scapi,
+		const char *path, ntfs_filldir_t callback, void *context)
+{
+	ntfs_inode *ni;
+	BOOL ok;
+	s64 pos;
+
+	ok = FALSE; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
+		if (ni) {
+			pos = 0;
+			ntfs_readdir(ni,&pos,context,callback);
+			ntfs_inode_close(ni);
+ok = TRUE; /* clarification needed */
+		} else
+			errno = ENOENT;
+	} else
+		errno = EINVAL; /* do not clear *psize */
+	return (ok);
+}
+
+/*
+ *		Initializations before calling ntfs_get_file_security()
+ *	ntfs_set_file_security() and ntfs_read_directory()
+ *
+ *	Returns an (obscured) struct SECURITY_API* needed for further calls
+ */
+
+struct SECURITY_API *ntfs_initialize_file_security(const char *device,
+				int flags)
+{
+	ntfs_volume *vol;
+	struct SECURITY_API *scapi;
+	struct SECURITY_CONTEXT *scx;
+
+	scapi = (struct SECURITY_API*)NULL;
+	vol = ntfs_mount(device, flags);
+	if (vol) {
+		scapi = (struct SECURITY_API*)
+			ntfs_malloc(sizeof(struct SECURITY_API));
+		if (scapi) {
+			scapi->magic = MAGIC_API;
+			scx = &scapi->security;
+			scx->vol = vol;
+			scx->uid = getuid();
+			scx->gid = getgid();
+			scx->pseccache = &scapi->seccache;
+			scx->vol->secure_flags = 0;
+			if (ntfs_build_mapping(scx)
+			    || ntfs_open_secure(vol)) {
+				free(scapi);
+				scapi = (struct SECURITY_API*)NULL;
+			}
+		} else
+			errno = ENOMEM;
+	}
+	return (scapi);
+}
+
+/*
+ *		Leaving after ntfs_initialize_file_security()
+ *
+ *	Returns FALSE if FAILED
+ */
+
+BOOL ntfs_leave_file_security(struct SECURITY_API *scapi)
+{
+	int ok;
+	ntfs_volume *vol;
+
+	ok = FALSE;
+	if (scapi && (scapi->magic == MAGIC_API) && scapi->security.vol) {
+		vol = scapi->security.vol;
+		ntfs_close_secure(&scapi->security);
+		free(scapi);
+ 		if (!ntfs_umount(vol, 0))
+			ok = TRUE;
+	}
+	return (ok);
 }
 
