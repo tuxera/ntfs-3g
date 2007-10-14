@@ -245,7 +245,7 @@ static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
  * Returns 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-		struct statvfs *sfs)
+			    struct statvfs *sfs)
 {
 	s64 size;
 	int delta_bits;
@@ -255,22 +255,23 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	if (!vol)
 		return -ENODEV;
 	
-	/* Optimal transfer block size. */
+	/* File system block size, used for optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
+	
+	/* Fundamental file system block size, used as the unit. */
 	sfs->f_frsize = vol->cluster_size;
+	
 	/*
-	 * Total data blocks in file system in units of f_bsize and since
-	 * inodes are also stored in data blocs ($MFT is a file) this is just
-	 * the total clusters.
+	 * Total number of blocks on file system in units of f_frsize.
+	 * Since inodes are also stored in blocks ($MFT is a file) hence
+	 * this is the number of clusters on the volume.
 	 */
 	sfs->f_blocks = vol->nr_clusters;
 	
-	/* Free data blocks in file system in units of f_bsize. */
+	/* Free blocks available for all and for non-privileged processes. */
 	size = vol->free_clusters;
 	if (size < 0)
 		size = 0;
-	
-	/* Free blocks avail to non-superuser, same as above on NTFS. */
 	sfs->f_bavail = sfs->f_bfree = size;
 	
 	/* Free inodes on the free space */
@@ -280,15 +281,14 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	else
 		size >>= -delta_bits;
 	
-	/* Number of inodes in file system (at this point in time). */
+	/* Number of inodes at this point in time. */
 	sfs->f_files = (vol->mftbmp_na->allocated_size << 3) + size;
 	
-	/* Free inodes in fs (based on current total count). */
+	/* Free inodes available for all and for non-privileged processes. */
 	size += vol->free_mft_records;
 	if (size < 0)
 		size = 0;
-	sfs->f_ffree = size;
-	sfs->f_favail = 0;
+	sfs->f_ffree = sfs->f_favail = size;
 	
 	/* Maximum length of filenames. */
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
