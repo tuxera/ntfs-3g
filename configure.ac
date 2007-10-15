@@ -219,7 +219,7 @@ AC_CONFIG_FILES([
 ])
 AC_OUTPUT
 
-if test "x$FUSE_LIB_PATH" != "x-L/lib"; then
+if test "x$FUSE_LIB_PATH" != "x-L/lib" -a "x$FUSE_LIB_PATH" != "x-L/lib64"; then
 cat <<EOF
 ****************************************************************************
 * WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
