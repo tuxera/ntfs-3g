@@ -1831,8 +1831,9 @@ static void ntfs_fuse_destroy(void)
 			         / ctx->seccache->head.s_reads,
 			      10 * ctx->seccache->head.s_hops
 			         / ctx->seccache->head.s_reads % 10);
+			}
 			ntfs_close_secure(&security);
-		}		}
+		}
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to cleanly unmount volume %s",
 					opts.device);
