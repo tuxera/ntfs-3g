@@ -29,7 +29,7 @@
 
 #define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
 #define BUFSZ 1024		/* buffer size to read mapping file */
-#define MAPPINGFILE "/$Extend/$UserMapping" /* name of mapping file */
+#define MAPPINGFILE "/NTFS-3G/UserMapping" /* name of mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_SECURID_SIZE 8    /* securid cache size >= 3 and not too big */
 #define CACHE_PERMISSIONS_SIZE 4000  /* think twice before increasing */
@@ -782,6 +782,558 @@ exit:
 	if (na)
 		ntfs_attr_close(na);
 	return res;
+}
+
+
+/*
+ *	Get the first entry of current index block
+ *	cut and pasted form ntfs_ie_get_first() in index.c
+ */
+
+static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
+{
+	return (INDEX_ENTRY*)((u8*)ih + le32_to_cpu(ih->entries_offset));
+}
+
+
+/*
+ *	Enter a new security descriptor into $Secure (data only)
+ *      it has to be written twice with an offset of 256KB
+ *
+ *	Should only be called by entersecurityattr() to ensure consistency
+ *
+ *	Returns zero if sucessful
+ */
+
+static int entersecurity_data(ntfs_volume *vol,
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
+			le32 hash, le32 keyid, off_t offs)
+{
+	int res;
+	int written1;
+	int written2;
+	char *fullattr;
+	int fullsz;
+	SECURITY_DESCRIPTOR_HEADER *phsds;
+
+	res = -1;
+	fullsz = attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER);
+	fullattr = ntfs_malloc(fullsz);
+	if (fullattr) {
+		memcpy(&fullattr[sizeof(SECURITY_DESCRIPTOR_HEADER)],
+				attr,attrsz);
+		phsds = (SECURITY_DESCRIPTOR_HEADER*)fullattr;
+		phsds->hash = hash;
+		phsds->security_id = keyid;
+		phsds->offset = cpu_to_le64(offs);
+		phsds->length = cpu_to_le32(fullsz);
+		written1 = ntfs_local_write(vol->secure_ni,
+			STREAM_SDS, 4, fullattr, fullsz,
+			offs);
+		written2 = ntfs_local_write(vol->secure_ni,
+			STREAM_SDS, 4, fullattr, fullsz,
+			offs + ALIGN_SDS_BLOCK);
+		if ((written1 == fullsz)
+		     && (written2 == written1))
+			res = 0;
+		else
+			errno = ENOMEM;
+		free(fullattr);
+	}
+	return (res);
+}
+
+/*
+ *	Enter a new security descriptor in $Secure (indexes only)
+ *
+ *	Should only be called by entersecurityattr() to ensure consistency
+ *
+ *	Returns zero if sucessful
+ */
+
+static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
+			le32 hash, le32 keyid, off_t offs)
+{
+	union {
+		struct {
+			le32 dataoffsl;
+			le32 dataoffsh;
+		} parts;
+		le64 all;
+	} realign;
+	int res;
+	ntfs_index_context *xsii;
+	ntfs_index_context *xsdh;
+	struct SII newsii;
+	struct SDH newsdh;
+
+	res = -1;
+				/* enter a new $SII record */
+
+	xsii = vol->secure_xsii;
+	ntfs_index_ctx_reinit(xsii);
+	newsii.offs = cpu_to_le16(20);
+	newsii.size = cpu_to_le16(sizeof(struct SII) - 20);
+	newsii.fill1 = cpu_to_le32(0);
+	newsii.indexsz = cpu_to_le16(sizeof(struct SII));
+	newsii.indexksz = cpu_to_le16(sizeof(SII_INDEX_KEY));
+	newsii.flags = cpu_to_le16(0);
+	newsii.fill2 = cpu_to_le16(0);
+	newsii.keysecurid = keyid;
+	newsii.hash = hash;
+	newsii.securid = keyid;
+	realign.all = cpu_to_le64(offs);
+	newsii.dataoffsh = realign.parts.dataoffsh;
+	newsii.dataoffsl = realign.parts.dataoffsl;
+	newsii.datasize = cpu_to_le32(attrsz
+			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
+	if (!ntfs_ie_add(xsii,(INDEX_ENTRY*)&newsii)) {
+
+		/* enter a new $SDH record */
+
+		xsdh = vol->secure_xsdh;
+		ntfs_index_ctx_reinit(xsdh);
+		newsdh.offs = cpu_to_le16(24);
+		newsdh.size = cpu_to_le16(
+			sizeof(SECURITY_DESCRIPTOR_HEADER));
+		newsdh.fill1 = cpu_to_le32(0);
+		newsdh.indexsz = cpu_to_le16(
+				sizeof(struct SDH));
+		newsdh.indexksz = cpu_to_le16(
+				sizeof(SDH_INDEX_KEY));
+		newsdh.flags = cpu_to_le16(0);
+		newsdh.fill2 = cpu_to_le16(0);
+		newsdh.keyhash = hash;
+		newsdh.keysecurid = keyid;
+		newsdh.hash = hash;
+		newsdh.securid = keyid;
+		newsdh.dataoffsh = realign.parts.dataoffsh;
+		newsdh.dataoffsl = realign.parts.dataoffsl;
+		newsdh.datasize = cpu_to_le32(attrsz
+			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
+		newsdh.fill3 = cpu_to_le32(0);
+		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
+			res = 0;
+	}
+	return (res);
+}
+
+/*
+ *	Enter a new security descriptor in $Secure (data and indexes)
+ *	Returns id of entry, or zero if there is a problem.
+ *
+ *	important : calls have to be serialized, however no locking is
+ *	needed while fuse is not multithreaded
+ */
+
+static le32 entersecurityattr(ntfs_volume *vol,
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
+			le32 hash)
+{
+	union {
+		struct {
+			le32 dataoffsl;
+			le32 dataoffsh;
+		} parts;
+		le64 all;
+	} realign;
+	le32 securid;
+	le32 keyid;
+	off_t offs;
+	int size;
+	struct SII *psii;
+	INDEX_ENTRY *entry;
+	INDEX_ENTRY *next;
+	ntfs_index_context *xsii;
+
+	/* find the first available securid beyond the last key */
+	/* in $Secure:$SII. This also determines the first */
+	/* available location in $Secure:$SDS, as this stream */
+	/* is always appended to and the id's are allocated */
+	/* in sequence */
+
+	securid = cpu_to_le32(0);
+	xsii = vol->secure_xsii;
+	ntfs_index_ctx_reinit(xsii);
+	offs = size = 0;
+	keyid = cpu_to_le32(-1);
+	ntfs_index_lookup((char*)&keyid,
+			       sizeof(SII_INDEX_KEY), xsii);
+	entry = xsii->entry;
+	psii = (struct SII*)xsii->entry;
+	if (psii) {
+		/*
+		 * Get last entry in block, but must get first one
+		 * one first, as we should already be beyond the
+		 * last one. For some reason the search for the last
+		 * entry sometimes does not return the last block...
+		 * we assume this can only happen in root block
+		 */
+		if (xsii->is_in_root)
+			entry = ntfs_ie_get_first
+				((INDEX_HEADER*)&xsii->ir->index);
+		else
+			entry = ntfs_ie_get_first
+				((INDEX_HEADER*)&xsii->ib->index);
+		/*
+		 * All index blocks should be at least half full
+		 * so there always is a last entry but one,
+		 * except when creating the first entry in index root.
+		 * A simplified version of next(), limited to
+		 * current index node, could be used
+		 */
+		keyid = cpu_to_le32(0);
+		while (entry) {
+			next = ntfs_index_next(entry,xsii);
+			if (next) { 
+				psii = (struct SII*)next;
+					/* save last key and */
+					/* available position */
+				keyid = psii->keysecurid;
+				realign.parts.dataoffsh
+						 = psii->dataoffsh;
+				realign.parts.dataoffsl
+						 = psii->dataoffsl;
+				offs = le64_to_cpu(realign.all);
+				size = le32_to_cpu(psii->datasize);
+			}
+			entry = next;
+		}
+	}
+	if (!keyid) {
+		/* assume we could have to insert the first entry */
+		/* (after upgrading from an old version ?) */
+		ntfs_log_error("Creating the first security_id\n");
+		securid = cpu_to_le32(FIRST_SECURITY_ID);
+	} else
+		securid = cpu_to_le32(le32_to_cpu(keyid) + 1);
+	/*
+	 * The security attr has to be written twice 256KB
+	 * apart. This implies that offsets like
+	 * 0x40000*odd_integer must be left available for
+	 * the second copy. So align to next block when
+	 * the last byte overflows on a wrong block.
+	 */
+	offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
+	if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
+	    & ALIGN_SDS_BLOCK)
+		offs = ((offs + attrsz
+			 + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
+			 | (ALIGN_SDS_BLOCK - 1)) + 1;
+		/*
+		 * now write the security attr to storage :
+		 * first data, then SII, then SDH
+		 * If failure occurs while writing SDS, data will never
+		 *    be accessed through indexes, and will be overwritten
+		 *    by the next allocated descriptor
+		 * If failure occurs while writing SII, the id has not
+		 *    recorded and will be reallocated later
+		 * If failure occurs while writing SDH, the space allocated
+		 *    in SDS or SII will not be reused, an inconsistency
+		 *    will persist with no significant consequence
+		 */
+	if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
+	    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
+		securid = cpu_to_le32(0);
+		/* inode now is dirty, synchronize it all */
+	ntfs_index_ctx_reinit(vol->secure_xsii);
+	ntfs_index_ctx_reinit(vol->secure_xsdh);
+	NInoSetDirty(vol->secure_ni);
+	ntfs_inode_sync(vol->secure_ni);
+	return (securid);
+}
+
+/*
+ *		Find a matching security descriptor in $Secure,
+ *	if none, allocate a new id and write the descriptor to storage
+ *	Returns id of entry, or zero if there is a problem.
+ *
+ *	important : calls have to be serialized, however no locking is
+ *	needed while fuse is not multithreaded
+ */
+
+static le32 setsecurityattr(ntfs_volume *vol,
+			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz)
+{
+	struct SDH *psdh;	/* this is an image of index (le) */
+	union {
+		struct {
+			le32 dataoffsl;
+			le32 dataoffsh;
+		} parts;
+		le64 all;
+	} realign;
+	BOOL found;
+	BOOL collision;
+	size_t size;
+	size_t rdsize;
+	s64 offs;
+	int res;
+	ntfs_index_context *xsdh;
+	char *oldattr;
+	SDH_INDEX_KEY key;
+	INDEX_ENTRY *entry;
+	le32 securid;
+	le32 hash;
+
+	hash = ntfs_security_hash(attr,attrsz);
+	oldattr = (char*)NULL;
+	securid = cpu_to_le32(0);
+	res = 0;
+	xsdh = vol->secure_xsdh;
+	ntfs_index_ctx_reinit(xsdh);
+		/*
+		 * find the nearest key as (hash,0)
+		 * (do not search for partial key : in case of collision,
+		 * it could return a key which is not the first one which
+		 * collides)
+		 */
+	key.hash = hash;
+	key.security_id = cpu_to_le32(0);
+	ntfs_index_lookup((char*)&key, sizeof(SDH_INDEX_KEY), xsdh);
+	entry = xsdh->entry;
+	found = FALSE;
+		/* lookup() may return a node with no data, if so get next */
+	if (entry->ie_flags & INDEX_ENTRY_END)
+		entry = ntfs_index_next(entry,xsdh);
+	do {
+		collision = FALSE;
+		psdh = (struct SDH*)entry;
+		if (psdh)
+			size = (size_t) le32_to_cpu(psdh->datasize)
+				 - sizeof(SECURITY_DESCRIPTOR_HEADER);
+		else size = 0;
+		   /* if hash is not the same, the key is not present */
+		if (psdh && (size > 0)
+		   && (psdh->keyhash == hash)) {
+			   /* if hash is the same */
+			   /* check the whole record */
+			realign.parts.dataoffsh = psdh->dataoffsh;
+			realign.parts.dataoffsl = psdh->dataoffsl;
+			offs = le64_to_cpu(realign.all)
+				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
+			oldattr = (char*)ntfs_malloc(size);
+			if (oldattr) {
+				rdsize = ntfs_local_read(
+					vol->secure_ni,
+					STREAM_SDS, 4,
+					oldattr, size, offs);
+				found = (rdsize == size)
+					&& !memcmp(oldattr,attr,size);
+				free(oldattr);
+				  /* if the records do not compare */
+				  /* (hash collision), try next one */
+				if (!found) {
+					entry = ntfs_index_next(
+						entry,xsdh);
+					collision = TRUE;
+				}
+			} else
+				res = ENOMEM;
+		}
+	} while (collision && entry);
+	if (found)
+		securid = psdh->keysecurid;
+	else {
+		if (res) {
+			errno = res;
+			securid = cpu_to_le32(0);
+		} else {
+			/* no matching key : have to build a new one */
+			securid = entersecurityattr(vol,
+				attr, attrsz, hash);
+		}
+	}
+   return (securid);
+}
+
+
+/*
+ *		Update the security descriptor of a file
+ *	Either as an attribute (complying with pre v3.x NTFS version)
+ *	or, when possible, as an entry in $Secure (for NTFS v3.x)
+ *
+ *	returns 0 if success
+ */
+
+static int update_secur_descr(ntfs_volume *vol,
+				char *newattr, ntfs_inode *ni)
+{
+	int newattrsz;
+	int written;
+	int res;
+	ntfs_attr *na;
+
+	newattrsz = attr_size(newattr);
+
+#if !FORCE_FORMAT_v1x
+	if (vol->major_ver < 3) {
+#endif
+
+		/* update for NTFS format v1.x */
+
+		/* update the old security attribute */
+		na = ntfs_attr_open(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0);
+		if (na) {
+			/* resize attribute */
+			res = ntfs_attr_truncate(na, (s64) newattrsz);
+			/* overwrite value */
+			if (!res) {
+				written = (int)ntfs_attr_pwrite(na, (s64) 0,
+					 (s64) newattrsz, newattr);
+				if (written != newattrsz) {
+					ntfs_log_error("Failed to update "
+						"a v1.x security descriptor\n");
+					errno = EIO;
+					res = -1;
+				}
+			}
+
+			ntfs_attr_close(na);
+			/* if old security attribute was found, also */
+			/* truncate standard information attribute to v1.x */
+			/* this is needed when security data is wanted */
+			/* as v1.x though volume is formatted for v3.x */
+			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
+				AT_UNNAMED, 0);
+			if (na) {
+				clear_nino_flag(ni, v3_Extensions);
+			/*
+			 * Truncating the record does not sweep extensions
+			 * from copy in memory. Clear security_id to be safe
+			 */
+				ni->security_id = cpu_to_le32(0);
+				res = ntfs_attr_truncate(na, (s64)48);
+				ntfs_attr_close(na);
+				clear_nino_flag(ni, v3_Extensions);
+			}
+		} else {
+			/*
+			 * insert the new security attribute if there
+			 * were none
+			 */
+			res = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR,
+					    AT_UNNAMED, 0, (u8*)newattr,
+					    (s64) newattrsz);
+		}
+#if !FORCE_FORMAT_v1x
+	} else {
+
+		/* update for NTFS format v3.x */
+
+		le32 securid;
+
+		securid = setsecurityattr(vol,
+			(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
+			(s64)newattrsz);
+		if (securid) {
+			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
+				AT_UNNAMED, 0);
+			if (na) {
+				res = 0;
+				if (!test_nino_flag(ni, v3_Extensions)) {
+			/* expand standard information attribute to v3.x */
+					res = ntfs_attr_truncate(na,
+					 (s64)sizeof(STANDARD_INFORMATION));
+					ni->owner_id = cpu_to_le32(0);
+					ni->quota_charged = cpu_to_le32(0);
+					ni->usn = cpu_to_le32(0);
+					ntfs_attr_remove(ni,
+						AT_SECURITY_DESCRIPTOR,
+						AT_UNNAMED, 0);
+			}
+				set_nino_flag(ni, v3_Extensions);
+				ni->security_id = securid;
+				ntfs_attr_close(na);
+			} else {
+				ntfs_log_error("Failed to update "
+					"standard informations\n");
+				errno = EIO;
+				res = -1;
+			}
+		} else
+			res = -1;
+	}
+#endif
+
+	/* mark node as dirty */
+	NInoSetDirty(ni);
+	ntfs_inode_sync(ni); /* useful ? */
+	return (res);
+}
+
+/*
+ *		Upgrade the security descriptor of a file
+ *	This is intended to allow graceful upgrades for files which
+ *	were created in previous versions, with a security attributes
+ *	and no security id.
+ *	
+ *      It will allocate a security id and replace the individual
+ *	security attribute by a reference to the global one
+ *
+ *	Special files are not upgraded (currently / and files in
+ *	directories /$*)
+ *
+ *	Though most code is similar to update_secur_desc() it has
+ *	been kept apart to facilitate the further processing of
+ *	special cases or even to remove it if found dangerous.
+ *
+ *	returns 0 if success,
+ *		1 if not upgradable. This is not an error.
+ *		-1 if there is a problem
+ */
+
+static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
+				const char *attr, ntfs_inode *ni)
+{
+	int attrsz;
+	int res;
+	le32 securid;
+	ntfs_attr *na;
+
+		/*
+		 * upgrade requires NTFS format v3.x
+		 * also refuse upgrading for special files
+		 */
+
+	if ((vol->major_ver >= 3)
+		&& (path[0] == '/')
+		&& (path[1] != '$') && (path[1] != '\0')) {
+		attrsz = attr_size(attr);
+		securid = setsecurityattr(vol,
+			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
+			(s64)attrsz);
+		if (securid) {
+			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
+				AT_UNNAMED, 0);
+			if (na) {
+				res = 0;
+			/* expand standard information attribute to v3.x */
+				res = ntfs_attr_truncate(na,
+					 (s64)sizeof(STANDARD_INFORMATION));
+				ni->owner_id = cpu_to_le32(0);
+				ni->quota_charged = cpu_to_le32(0);
+				ni->usn = cpu_to_le32(0);
+				ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR,
+						AT_UNNAMED, 0);
+				set_nino_flag(ni, v3_Extensions);
+				ni->security_id = securid;
+				ntfs_attr_close(na);
+			} else {
+				ntfs_log_error("Failed to upgrade "
+					"standard informations\n");
+				errno = EIO;
+				res = -1;
+			}
+		} else
+			res = -1;
+	/* mark node as dirty */
+	NInoSetDirty(ni);
+	ntfs_inode_sync(ni); /* useful ? */
+	} else
+		res = 1;
+
+	return (res);
 }
 
 
@@ -2059,9 +2611,6 @@ static int build_permissions(const char *securattr, ntfs_inode *ni)
  *	returns -1 if there is a problem
  */
 
-static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
-				const char *attr, ntfs_inode *ni);
-
 static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 		 const char *path, ntfs_inode * ni)
 {
@@ -2200,536 +2749,6 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 	}
 	return (perm);
 }
-
-/*
- *	Get the first entry of current index block
- *	cut and pasted form ntfs_ie_get_first() in index.c
- */
-
-static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
-{
-	return (INDEX_ENTRY*)((u8*)ih + le32_to_cpu(ih->entries_offset));
-}
-
-
-/*
- *	Enter a new security descriptor into $Secure (data only)
- *      it has to be written twice with an offset of 256KB
- *
- *	Should only be called by entersecurityattr() to ensure consistency
- *
- *	Returns zero if sucessful
- */
-
-static int entersecurity_data(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
-			le32 hash, le32 keyid, off_t offs)
-{
-	int res;
-	int written1;
-	int written2;
-	char *fullattr;
-	int fullsz;
-	SECURITY_DESCRIPTOR_HEADER *phsds;
-
-	res = -1;
-	fullsz = attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER);
-	fullattr = ntfs_malloc(fullsz);
-	if (fullattr) {
-		memcpy(&fullattr[sizeof(SECURITY_DESCRIPTOR_HEADER)],
-				attr,attrsz);
-		phsds = (SECURITY_DESCRIPTOR_HEADER*)fullattr;
-		phsds->hash = hash;
-		phsds->security_id = keyid;
-		phsds->offset = cpu_to_le64(offs);
-		phsds->length = cpu_to_le32(fullsz);
-		written1 = ntfs_local_write(vol->secure_ni,
-			STREAM_SDS, 4, fullattr, fullsz,
-			offs);
-		written2 = ntfs_local_write(vol->secure_ni,
-			STREAM_SDS, 4, fullattr, fullsz,
-			offs + ALIGN_SDS_BLOCK);
-		if ((written1 == fullsz)
-		     && (written2 == written1))
-			res = 0;
-		else
-			errno = ENOMEM;
-		free(fullattr);
-	}
-	return (res);
-}
-
-/*
- *	Enter a new security descriptor in $Secure (indexes only)
- *
- *	Should only be called by entersecurityattr() to ensure consistency
- *
- *	Returns zero if sucessful
- */
-
-static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
-			le32 hash, le32 keyid, off_t offs)
-{
-	union {
-		struct {
-			le32 dataoffsl;
-			le32 dataoffsh;
-		} parts;
-		le64 all;
-	} realign;
-	int res;
-	ntfs_index_context *xsii;
-	ntfs_index_context *xsdh;
-	struct SII newsii;
-	struct SDH newsdh;
-
-	res = -1;
-				/* enter a new $SII record */
-
-	xsii = vol->secure_xsii;
-	ntfs_index_ctx_reinit(xsii);
-	newsii.offs = cpu_to_le16(20);
-	newsii.size = cpu_to_le16(sizeof(struct SII) - 20);
-	newsii.fill1 = cpu_to_le32(0);
-	newsii.indexsz = cpu_to_le16(sizeof(struct SII));
-	newsii.indexksz = cpu_to_le16(sizeof(SII_INDEX_KEY));
-	newsii.flags = cpu_to_le16(0);
-	newsii.fill2 = cpu_to_le16(0);
-	newsii.keysecurid = keyid;
-	newsii.hash = hash;
-	newsii.securid = keyid;
-	realign.all = cpu_to_le64(offs);
-	newsii.dataoffsh = realign.parts.dataoffsh;
-	newsii.dataoffsl = realign.parts.dataoffsl;
-	newsii.datasize = cpu_to_le32(attrsz
-			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
-	if (!ntfs_ie_add(xsii,(INDEX_ENTRY*)&newsii)) {
-
-		/* enter a new $SDH record */
-
-		xsdh = vol->secure_xsdh;
-		ntfs_index_ctx_reinit(xsdh);
-		newsdh.offs = cpu_to_le16(24);
-		newsdh.size = cpu_to_le16(
-			sizeof(SECURITY_DESCRIPTOR_HEADER));
-		newsdh.fill1 = cpu_to_le32(0);
-		newsdh.indexsz = cpu_to_le16(
-				sizeof(struct SDH));
-		newsdh.indexksz = cpu_to_le16(
-				sizeof(SDH_INDEX_KEY));
-		newsdh.flags = cpu_to_le16(0);
-		newsdh.fill2 = cpu_to_le16(0);
-		newsdh.keyhash = hash;
-		newsdh.keysecurid = keyid;
-		newsdh.hash = hash;
-		newsdh.securid = keyid;
-		newsdh.dataoffsh = realign.parts.dataoffsh;
-		newsdh.dataoffsl = realign.parts.dataoffsl;
-		newsdh.datasize = cpu_to_le32(attrsz
-			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
-		newsdh.fill3 = cpu_to_le32(0);
-		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
-			res = 0;
-	}
-	return (res);
-}
-
-/*
- *	Enter a new security descriptor in $Secure (data and indexes)
- *	Returns id of entry, or zero if there is a problem.
- *
- *	important : calls have to be serialized, however no locking is
- *	needed while fuse is not multithreaded
- */
-
-static le32 entersecurityattr(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
-			le32 hash)
-{
-	union {
-		struct {
-			le32 dataoffsl;
-			le32 dataoffsh;
-		} parts;
-		le64 all;
-	} realign;
-	le32 securid;
-	le32 keyid;
-	off_t offs;
-	int size;
-	struct SII *psii;
-	INDEX_ENTRY *entry;
-	INDEX_ENTRY *next;
-	ntfs_index_context *xsii;
-
-	/* find the first available securid beyond the last key */
-	/* in $Secure:$SII. This also determines the first */
-	/* available location in $Secure:$SDS, as this stream */
-	/* is always appended to and the id's are allocated */
-	/* in sequence */
-
-	securid = cpu_to_le32(0);
-	xsii = vol->secure_xsii;
-	ntfs_index_ctx_reinit(xsii);
-	offs = size = 0;
-	keyid = cpu_to_le32(-1);
-	ntfs_index_lookup((char*)&keyid,
-			       sizeof(SII_INDEX_KEY), xsii);
-	entry = xsii->entry;
-	psii = (struct SII*)xsii->entry;
-	if (psii) {
-		/*
-		 * Get last entry in block, but must get first one
-		 * one first, as we should already be beyond the
-		 * last one. For some reason the search for the last
-		 * entry sometimes does not return the last block...
-		 * we assume this can only happen in root block
-		 */
-		if (xsii->is_in_root)
-			entry = ntfs_ie_get_first
-				((INDEX_HEADER*)&xsii->ir->index);
-		else
-			entry = ntfs_ie_get_first
-				((INDEX_HEADER*)&xsii->ib->index);
-		/*
-		 * All index blocks should be at least half full
-		 * so there always is a last entry but one,
-		 * except when creating the first entry in index root.
-		 * A simplified version of next(), limited to
-		 * current index node, could be used
-		 */
-		keyid = cpu_to_le32(0);
-		while (entry) {
-			next = ntfs_index_next(entry,xsii);
-			if (next) { 
-				psii = (struct SII*)next;
-					/* save last key and */
-					/* available position */
-				keyid = psii->keysecurid;
-				realign.parts.dataoffsh
-						 = psii->dataoffsh;
-				realign.parts.dataoffsl
-						 = psii->dataoffsl;
-				offs = le64_to_cpu(realign.all);
-				size = le32_to_cpu(psii->datasize);
-			}
-			entry = next;
-		}
-	}
-	if (!keyid) {
-		/* assume we could have to insert the first entry */
-		/* (after upgrading from an old version ?) */
-		ntfs_log_error("Creating the first security_id\n");
-		securid = cpu_to_le32(FIRST_SECURITY_ID);
-	} else
-		securid = cpu_to_le32(le32_to_cpu(keyid) + 1);
-	/*
-	 * The security attr has to be written twice 256KB
-	 * apart. This implies that offsets like
-	 * 0x40000*odd_integer must be left available for
-	 * the second copy. So align to next block when
-	 * the last byte overflows on a wrong block.
-	 */
-	offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
-	if ((offs + attrsz - 1) & ALIGN_SDS_BLOCK)
-		offs = ((offs + attrsz - 1)
-			 | (ALIGN_SDS_BLOCK - 1)) + 1;
-	/* now write the security attr to storage */
-	if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
-	    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
-		securid = cpu_to_le32(0);
-		/* inode now is dirty, synchronize it all */
-	ntfs_index_ctx_reinit(vol->secure_xsii);
-	ntfs_index_ctx_reinit(vol->secure_xsdh);
-	NInoSetDirty(vol->secure_ni);
-	ntfs_inode_sync(vol->secure_ni);
-	return (securid);
-}
-
-/*
- *		Find a matching security descriptor in $Secure,
- *	if none, allocate a new id and write the descriptor to storage
- *	Returns id of entry, or zero if there is a problem.
- *
- *	important : calls have to be serialized, however no locking is
- *	needed while fuse is not multithreaded
- */
-
-static le32 setsecurityattr(ntfs_volume *vol,
-			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz)
-{
-	struct SDH *psdh;	/* this is an image of index (le) */
-	union {
-		struct {
-			le32 dataoffsl;
-			le32 dataoffsh;
-		} parts;
-		le64 all;
-	} realign;
-	BOOL found;
-	BOOL collision;
-	size_t size;
-	size_t rdsize;
-	s64 offs;
-	int res;
-	ntfs_index_context *xsdh;
-	char *oldattr;
-	SDH_INDEX_KEY key;
-	INDEX_ENTRY *entry;
-	le32 securid;
-	le32 hash;
-
-	hash = ntfs_security_hash(attr,attrsz);
-	oldattr = (char*)NULL;
-	securid = cpu_to_le32(0);
-	res = 0;
-	xsdh = vol->secure_xsdh;
-	ntfs_index_ctx_reinit(xsdh);
-		  /* find the nearest key */
-	key.hash = hash;
-	key.security_id = cpu_to_le32(0);
-	ntfs_index_lookup((char*)&key,
-			       sizeof(SDH_INDEX_KEY), xsdh);
-	entry = xsdh->entry;
-	found = FALSE;
-	do {
-		collision = FALSE;
-		psdh = (struct SDH*)entry;
-		size = (size_t) le32_to_cpu(psdh->datasize)
-				 - sizeof(SECURITY_DESCRIPTOR_HEADER);
-		   /* if hash is not the same, the key is not present */
-		if (psdh && (size > 0)
-		   && (psdh->keyhash == hash)) {
-			   /* if hash is the same */
-			   /* check the whole record */
-			realign.parts.dataoffsh = psdh->dataoffsh;
-			realign.parts.dataoffsl = psdh->dataoffsl;
-			offs = le64_to_cpu(realign.all)
-				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
-			oldattr = (char*)ntfs_malloc(size);
-			if (oldattr) {
-				rdsize = ntfs_local_read(
-					vol->secure_ni,
-					STREAM_SDS, 4,
-					oldattr, size, offs);
-				found = (rdsize == size)
-					&& !memcmp(oldattr,attr,size);
-				free(oldattr);
-				  /* if the records do not compare */
-				  /* (hash collision), try next one */
-				if (!found) {
-					entry = ntfs_index_next(
-						entry,xsdh);
-					collision = TRUE;
-				}
-			} else
-				res = ENOMEM;
-		}
-	} while (collision && entry);
-	if (found)
-		securid = psdh->keysecurid;
-	else {
-		if (res) {
-			errno = res;
-			securid = cpu_to_le32(0);
-		} else {
-			/* no matching key : have to build a new one */
-			securid = entersecurityattr(vol,
-				attr, attrsz, hash);
-		}
-	}
-   return (securid);
-}
-
-
-/*
- *		Update the security descriptor of a file
- *	Either as an attribute (complying with pre v3.x NTFS version)
- *	or, when possible, as an entry in $Secure (for NTFS v3.x)
- *
- *	returns 0 if success
- */
-
-static int update_secur_descr(ntfs_volume *vol,
-				const char *newattr, ntfs_inode *ni)
-{
-	int newattrsz;
-	int written;
-	int res;
-	ntfs_attr *na;
-
-	newattrsz = attr_size(newattr);
-
-#if !FORCE_FORMAT_v1x
-	if (vol->major_ver < 3) {
-#endif
-
-		/* update for NTFS format v1.x */
-
-		/* update the old security attribute */
-		na = ntfs_attr_open(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0);
-		if (na) {
-			/* resize attribute */
-			res = ntfs_attr_truncate(na, (s64) newattrsz);
-			/* overwrite value */
-			if (!res) {
-				written = (int)ntfs_attr_pwrite(na, (s64) 0,
-					 (s64) newattrsz, newattr);
-				if (written != newattrsz) {
-					ntfs_log_error("Failed to update "
-						"a v1.x security descriptor\n");
-					errno = EIO;
-					res = -1;
-				}
-			}
-
-			ntfs_attr_close(na);
-			/* if old security attribute was found, also */
-			/* truncate standard information attribute to v1.x */
-			/* this is needed when security data is wanted */
-			/* as v1.x though volume is formatted for v3.x */
-			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
-				AT_UNNAMED, 0);
-			if (na) {
-				clear_nino_flag(ni, v3_Extensions);
-			/*
-			 * Truncating the record does not sweep extensions
-			 * from copy in memory. Clear security_id to be safe
-			 */
-				ni->security_id = cpu_to_le32(0);
-				res = ntfs_attr_truncate(na, (s64)48);
-				ntfs_attr_close(na);
-				clear_nino_flag(ni, v3_Extensions);
-			}
-		} else {
-			/*
-			 * insert the new security attribute if there
-			 * were none
-			 */
-			res = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR,
-					    AT_UNNAMED, 0, (u8*)newattr,
-					    (s64) newattrsz);
-		}
-#if !FORCE_FORMAT_v1x
-	} else {
-
-		/* update for NTFS format v3.x */
-
-		le32 securid;
-
-		securid = setsecurityattr(vol,
-			(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
-			(s64)newattrsz);
-		if (securid) {
-			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
-				AT_UNNAMED, 0);
-			if (na) {
-				res = 0;
-				if (!test_nino_flag(ni, v3_Extensions)) {
-			/* expand standard information attribute to v3.x */
-					res = ntfs_attr_truncate(na,
-					 (s64)sizeof(STANDARD_INFORMATION));
-					ni->owner_id = cpu_to_le32(0);
-					ni->quota_charged = cpu_to_le32(0);
-					ni->usn = cpu_to_le32(0);
-					ntfs_attr_remove(ni,
-						AT_SECURITY_DESCRIPTOR,
-						AT_UNNAMED, 0);
-			}
-				set_nino_flag(ni, v3_Extensions);
-				ni->security_id = securid;
-				ntfs_attr_close(na);
-			} else {
-				ntfs_log_error("Failed to update "
-					"standard informations\n");
-				errno = EIO;
-				res = -1;
-			}
-		} else
-			res = -1;
-	}
-#endif
-
-	/* mark node as dirty */
-	NInoSetDirty(ni);
-	ntfs_inode_sync(ni); /* useful ? */
-	return (res);
-}
-
-/*
- *		Upgrade the security descriptor of a file
- *	This is intended to allow graceful upgrades for files which
- *	were created in previous versions, with a security attributes
- *	and no security id.
- *	
- *      It will allocate a security id and replace the individual
- *	security attribute by a reference to the global one
- *
- *	Special files are not upgraded (currently / and files in
- *	directories /$*)
- *
- *	Though most code is similar to update_secur_desc() it has
- *	been kept apart to facilitate the further processing of
- *	special cases or even to remove it if found dangerous.
- *
- *	returns 0 if success,
- *		1 if not upgradable. This is not an error.
- *		-1 if there is a problem
- */
-
-static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
-				const char *attr, ntfs_inode *ni)
-{
-	int attrsz;
-	int res;
-	le32 securid;
-	ntfs_attr *na;
-
-		/*
-		 * upgrade requires NTFS format v3.x
-		 * also refuse upgrading for special files
-		 */
-
-	if ((vol->major_ver >= 3)
-		&& (path[0] == '/')
-		&& (path[1] != '$') && (path[1] != '\0')) {
-		attrsz = attr_size(attr);
-		securid = setsecurityattr(vol,
-			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
-			(s64)attrsz);
-		if (securid) {
-			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
-				AT_UNNAMED, 0);
-			if (na) {
-				res = 0;
-			/* expand standard information attribute to v3.x */
-				res = ntfs_attr_truncate(na,
-					 (s64)sizeof(STANDARD_INFORMATION));
-				ni->owner_id = cpu_to_le32(0);
-				ni->quota_charged = cpu_to_le32(0);
-				ni->usn = cpu_to_le32(0);
-				ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR,
-						AT_UNNAMED, 0);
-				set_nino_flag(ni, v3_Extensions);
-				ni->security_id = securid;
-				ntfs_attr_close(na);
-			} else {
-				ntfs_log_error("Failed to upgrade "
-					"standard informations\n");
-				errno = EIO;
-				res = -1;
-			}
-		} else
-			res = -1;
-	/* mark node as dirty */
-	NInoSetDirty(ni);
-	ntfs_inode_sync(ni); /* useful ? */
-	} else
-		res = 1;
-
-	return (res);
-}
-
 
 /*
  *		Update ownership and mode of a file, reusing an existing
@@ -3688,6 +3707,128 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 }
 
 /*
+ *		Merge a new security descriptor into the old one
+ *	and assign to designated file
+ *
+ *	Returns TRUE if successful
+ */
+
+static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
+		const char *newattr, u32 selection, ntfs_inode *ni)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *oldhead;
+	const SECURITY_DESCRIPTOR_RELATIVE *newhead;
+	SECURITY_DESCRIPTOR_RELATIVE *targhead;
+	const ACL *pdacl;
+	const ACL *psacl;
+	const SID *powner;
+	const SID *pgroup;
+	int offdacl;
+	int offsacl;
+	int offowner;
+	int offgroup;
+	unsigned int present;
+	unsigned int size;
+	char *target;
+	int pos;
+	int oldattrsz;
+	int newattrsz;
+	BOOL ok;
+
+	ok = FALSE; /* default return */
+	oldhead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
+	newhead = (const SECURITY_DESCRIPTOR_RELATIVE*)newattr;
+	oldattrsz = attr_size(oldattr);
+	newattrsz = attr_size(newattr);
+	target = (char*)malloc(oldattrsz + newattrsz);
+	if (target) {
+		targhead = (SECURITY_DESCRIPTOR_RELATIVE*)target;
+		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
+		present = oldhead->control;
+		if (oldhead->owner)
+			present |= OWNER_SECURITY_INFORMATION;
+		if (oldhead->group)
+			present |= GROUP_SECURITY_INFORMATION;
+			/*
+			 * copy new DACL if selected
+			 * or keep old DACL if any
+			 */
+		if ((selection | present) & DACL_SECURITY_INFORMATION) {
+			if (selection & DACL_SECURITY_INFORMATION) {
+				offdacl = le32_to_cpu(newhead->dacl);
+				pdacl = (const ACL*)&newattr[offdacl];
+			} else {
+				offdacl = le32_to_cpu(oldhead->dacl);
+				pdacl = (const ACL*)&oldattr[offdacl];
+			}
+			size = le16_to_cpu(pdacl->size);
+			memcpy(&target[pos], pdacl, size);
+			targhead->dacl = pos;
+			pos += size;
+		} else
+			targhead->dacl = 0;
+			/*
+			 * copy new SACL if selected
+			 * or keep old SACL if any
+			 */
+		if ((selection | present) & SACL_SECURITY_INFORMATION) {
+			if (selection & SACL_SECURITY_INFORMATION) {
+				offsacl = le32_to_cpu(newhead->sacl);
+				psacl = (const ACL*)&newattr[offsacl];
+			} else {
+				offsacl = le32_to_cpu(oldhead->sacl);
+				psacl = (const ACL*)&oldattr[offsacl];
+			}
+			size = le16_to_cpu(psacl->size);
+			memcpy(&target[pos], psacl, size);
+			targhead->sacl = pos;
+			pos += size;
+		} else
+			targhead->sacl = 0;
+			/*
+			 * copy new OWNER if selected
+			 * or keep old OWNER if any
+			 */
+		if ((selection | present) & OWNER_SECURITY_INFORMATION) {
+			if (selection & OWNER_SECURITY_INFORMATION) {
+				offowner = le32_to_cpu(newhead->owner);
+				powner = (const SID*)&newattr[offowner];
+			} else {
+				offowner = le32_to_cpu(oldhead->owner);
+				powner = (const SID*)&oldattr[offowner];
+			}
+			size = sid_size(powner);
+			memcpy(&target[pos], powner, size);
+			targhead->owner = pos;
+			pos += size;
+		} else
+			targhead->owner = 0;
+			/*
+			 * copy new GROUP if selected
+			 * or keep old GROUP if any
+			 */
+		if ((selection | present) & GROUP_SECURITY_INFORMATION) {
+			if (selection & GROUP_SECURITY_INFORMATION) {
+				offgroup = le32_to_cpu(newhead->group);
+				pgroup = (const SID*)&newattr[offgroup];
+			} else {
+				offgroup = le32_to_cpu(oldhead->group);
+				pgroup = (const SID*)&oldattr[offgroup];
+			}
+			size = sid_size(pgroup);
+			memcpy(&target[pos], pgroup, size);
+			targhead->group = pos;
+			pos += size;
+		} else
+			targhead->group = 0;
+		targhead->control = present | selection;
+		ok = !update_secur_descr(vol, target, ni);
+		free(target);
+	}
+	return (ok);
+}
+
+/*
  *		Return the security descriptor of a file
  *	This is intended to be similar to GetFileSecurity() from Win32
  *	in order to facilitate the development of portable tools
@@ -3755,21 +3896,34 @@ BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	ntfs_inode *ni;
 	int attrsz;
+	unsigned int provided;
+	char *oldattr;
 	BOOL ok;
 
 	ok = FALSE; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API) && attr) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		attrsz = attr_size(attr);
-/* TODO should probably selectively merge into existing attr */
-/* for now we only enter new attributes */
+		provided = phead->control;
+		if (phead->owner)
+			provided |= OWNER_SECURITY_INFORMATION;
+		if (phead->group)
+			provided |= GROUP_SECURITY_INFORMATION;
 		if (valid_securattr(attr, attrsz)
-		   && (phead->control == selection)) {
+			/* selected items must be provided */
+		   && (!(selection & ~provided))) {
 			ni = ntfs_pathname_to_inode(scapi->security.vol,
 				NULL, path);
 			if (ni) {
-				ok = !update_secur_descr(scapi->security.vol,
-					attr, ni);
+				oldattr = getsecurityattr(&scapi->security,
+						path, ni);
+				if (oldattr) {
+					ok = mergesecurityattr(
+						scapi->security.vol,
+						oldattr, attr,
+						selection, ni);
+					free(oldattr);
+				}
 				ntfs_inode_close(ni);
 			}
 		}
@@ -3786,13 +3940,16 @@ BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 	s64 pos;
 
 	ok = FALSE; /* default return */
-	if (scapi && (scapi->magic == MAGIC_API)) {
+	if (scapi && (scapi->magic == MAGIC_API) && callback) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			pos = 0;
-			ntfs_readdir(ni,&pos,context,callback);
-			ntfs_inode_close(ni);
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+				pos = 0;
+				ntfs_readdir(ni,&pos,context,callback);
+				ntfs_inode_close(ni);
 ok = TRUE; /* clarification needed */
+			} else
+				errno = ENOTDIR;
 		} else
 			errno = ENOENT;
 	} else
@@ -3803,6 +3960,8 @@ ok = TRUE; /* clarification needed */
 /*
  *		Initializations before calling ntfs_get_file_security()
  *	ntfs_set_file_security() and ntfs_read_directory()
+ *
+ *	Only allowed for root
  *
  *	Returns an (obscured) struct SECURITY_API* needed for further calls
  */
@@ -3815,26 +3974,29 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 	struct SECURITY_CONTEXT *scx;
 
 	scapi = (struct SECURITY_API*)NULL;
-	vol = ntfs_mount(device, flags);
-	if (vol) {
-		scapi = (struct SECURITY_API*)
-			ntfs_malloc(sizeof(struct SECURITY_API));
-		if (scapi) {
-			scapi->magic = MAGIC_API;
-			scx = &scapi->security;
-			scx->vol = vol;
-			scx->uid = getuid();
-			scx->gid = getgid();
-			scx->pseccache = &scapi->seccache;
-			scx->vol->secure_flags = 0;
-			if (ntfs_build_mapping(scx)
-			    || ntfs_open_secure(vol)) {
-				free(scapi);
-				scapi = (struct SECURITY_API*)NULL;
-			}
-		} else
-			errno = ENOMEM;
-	}
+	if (!getuid()) {
+		vol = ntfs_mount(device, flags);
+		if (vol) {
+			scapi = (struct SECURITY_API*)
+				ntfs_malloc(sizeof(struct SECURITY_API));
+			if (scapi) {
+				scapi->magic = MAGIC_API;
+				scx = &scapi->security;
+				scx->vol = vol;
+				scx->uid = getuid();
+				scx->gid = getgid();
+				scx->pseccache = &scapi->seccache;
+				scx->vol->secure_flags = 0;
+				if (ntfs_build_mapping(scx)
+				    || ntfs_open_secure(vol)) {
+					free(scapi);
+					scapi = (struct SECURITY_API*)NULL;
+				}
+			} else
+				errno = ENOMEM;
+		}
+	} else
+		errno = EPERM;
 	return (scapi);
 }
 
