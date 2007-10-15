@@ -1993,23 +1993,35 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
 	INDEX_ENTRY *next;
 	int flags;
 
-                        /* get next entry in same node */
-                        /* there is always one after any entry with data */
+			/*
+                         * lookup() may have returned an invalid node
+			 * when searching for a partial key
+			 * if this happens, walk up
+			 */
+ 
+	if (ie->ie_flags & INDEX_ENTRY_END)
+		next = ntfs_index_walk_up(ie, ictx);
+	else {
+			/*
+			 * get next entry in same node
+                         * there is always one after any entry with data
+			 */
 
-	next = (INDEX_ENTRY*)((char*)ie + le16_to_cpu(ie->length));
-	++ictx->parent_pos[ictx->pindex];
-	flags = next->ie_flags;
+		next = (INDEX_ENTRY*)((char*)ie + le16_to_cpu(ie->length));
+		++ictx->parent_pos[ictx->pindex];
+		flags = next->ie_flags;
 
 			/* walk down if it has a subnode */
 
-	if (flags & INDEX_ENTRY_NODE) {
-		next = ntfs_index_walk_down(next,ictx);
-	} else {
+		if (flags & INDEX_ENTRY_NODE) {
+			next = ntfs_index_walk_down(next,ictx);
+		} else {
 
-			/* walk up it has no subnode, nor data */
+				/* walk up it has no subnode, nor data */
 
-		if (flags & INDEX_ENTRY_END) {
-			next = ntfs_index_walk_up(next, ictx);
+			if (flags & INDEX_ENTRY_END) {
+				next = ntfs_index_walk_up(next, ictx);
+			}
 		}
 	}
 		/* return NULL if stuck at end of a block */
