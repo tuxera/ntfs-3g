@@ -837,9 +837,10 @@ static int entersecurity_data(ntfs_volume *vol,
 		     && (written2 == written1))
 			res = 0;
 		else
-			errno = ENOMEM;
+			errno = ENOSPC;
 		free(fullattr);
-	}
+	} else
+		errno = ENOMEM;
 	return (res);
 }
 
