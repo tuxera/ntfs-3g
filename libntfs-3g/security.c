@@ -911,7 +911,8 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 		newsdh.dataoffsl = realign.parts.dataoffsl;
 		newsdh.datasize = cpu_to_le32(attrsz
 			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
-		newsdh.fill3 = cpu_to_le32(0);
+                           /* special filler value... */
+		newsdh.fill3 = cpu_to_le32(0x00490049);
 		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
 			res = 0;
 	}
