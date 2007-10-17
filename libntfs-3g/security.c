@@ -70,6 +70,7 @@
 
 #define ALIGN_SDS_BLOCK 0x40000 /* Alignment for a $SDS block */
 #define ALIGN_SDS_ENTRY 16 /* Alignment for a $SDS entry */
+#define STUFFSZ 0x4000 /* unitary stuffing size for $SDS */
 #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
 
 /*
@@ -795,6 +796,55 @@ static INDEX_ENTRY *ntfs_ie_get_first(INDEX_HEADER *ih)
 	return (INDEX_ENTRY*)((u8*)ih + le32_to_cpu(ih->entries_offset));
 }
 
+/*
+ *		Stuff a 256KB block into $SDS before writing descriptors
+ *	into the block.
+ *
+ *	This prevents $SDS from being automatically declared as sparse
+ *	when the second copy of the first security descriptor is written
+ *	256KB further ahead.
+ *
+ *	Having $SDS declared as a sparse file is not wrong by itself
+ *	and chkdsk leaves it as a sparse file. It does however complain
+ *	and add a sparse flag (0x0200) into field file_attributes of
+ *	STANDARD_INFORMATION of $Secure. This probably means that a
+ *	sparse attribute (ATTR_IS_SPARSE) is only allowed in sparse
+ *	files (FILE_ATTR_SPARSE_FILE).
+ *
+ *	Windows normally does not convert to sparse attribute or sparse
+ *	file. Stuffing is just a way to get to the same result.
+ */
+
+static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
+{
+	int res;
+	int written;
+	unsigned long total;
+	char *stuff;
+
+	res = 0;
+	total = 0;
+	stuff = ntfs_malloc(STUFFSZ);
+	if (stuff) {
+		memset(stuff, 0, STUFFSZ);
+		do {
+			written = ntfs_local_write(vol->secure_ni,
+				STREAM_SDS, 4, stuff, STUFFSZ, offs);
+			if (written == STUFFSZ) {
+				total += STUFFSZ;
+				offs += STUFFSZ;
+			} else {
+				errno = ENOSPC;
+				res = -1;
+			}
+		} while (!res && (total < ALIGN_SDS_BLOCK));
+		free(stuff);
+	} else {
+		errno = ENOMEM;
+		res = -1;
+	}
+	return (res);
+}
 
 /*
  *	Enter a new security descriptor into $Secure (data only)
@@ -1018,10 +1068,12 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	 */
 	offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
 	if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
-	    & ALIGN_SDS_BLOCK)
+	    & ALIGN_SDS_BLOCK) {
 		offs = ((offs + attrsz
 			 + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
 			 | (ALIGN_SDS_BLOCK - 1)) + 1;
+		entersecurity_stuff(vol, offs);
+	}
 		/*
 		 * now write the security attr to storage :
 		 * first data, then SII, then SDH
