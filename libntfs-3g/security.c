@@ -997,6 +997,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	INDEX_ENTRY *entry;
 	INDEX_ENTRY *next;
 	ntfs_index_context *xsii;
+	ntfs_attr *na;
 
 	/* find the first available securid beyond the last key */
 	/* in $Secure:$SII. This also determines the first */
@@ -1053,10 +1054,24 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		}
 	}
 	if (!keyid) {
-		/* assume we could have to insert the first entry */
-		/* (after upgrading from an old version ?) */
-		ntfs_log_error("Creating the first security_id\n");
-		securid = cpu_to_le32(FIRST_SECURITY_ID);
+		/*
+		 * could not find any entry, before creating the first
+		 * entry, make a double check by making sure size of $SII
+		 * is less than needed for one entry
+		 */
+		securid = cpu_to_le32(0);
+		na = ntfs_attr_open(vol->secure_ni,AT_INDEX_ROOT,sii_stream,4);
+		if (na) {
+			if (na->data_size < sizeof(struct SII)) {
+				ntfs_log_error("Creating the first security_id\n");
+				securid = cpu_to_le32(FIRST_SECURITY_ID);
+			}
+			ntfs_attr_close(na);
+		}
+		if (!securid) {
+			ntfs_log_error("Error creating a security_id\n");
+			errno = EIO;
+		}
 	} else
 		securid = cpu_to_le32(le32_to_cpu(keyid) + 1);
 	/*
@@ -1066,14 +1081,17 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	 * the second copy. So align to next block when
 	 * the last byte overflows on a wrong block.
 	 */
-	offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
-	if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
-	    & ALIGN_SDS_BLOCK) {
-		offs = ((offs + attrsz
-			 + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
-			 | (ALIGN_SDS_BLOCK - 1)) + 1;
-		entersecurity_stuff(vol, offs);
-	}
+
+	if (securid) {
+		offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
+		if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
+	 	   & ALIGN_SDS_BLOCK) {
+			offs = ((offs + attrsz
+				 + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
+			 	| (ALIGN_SDS_BLOCK - 1)) + 1;
+		}
+		if (!(offs & (ALIGN_SDS_BLOCK - 1)))
+			entersecurity_stuff(vol, offs);
 		/*
 		 * now write the security attr to storage :
 		 * first data, then SII, then SDH
@@ -1086,9 +1104,10 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 *    in SDS or SII will not be reused, an inconsistency
 		 *    will persist with no significant consequence
 		 */
-	if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
-	    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
-		securid = cpu_to_le32(0);
+		if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
+		    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
+			securid = cpu_to_le32(0);
+	}
 		/* inode now is dirty, synchronize it all */
 	ntfs_index_ctx_reinit(vol->secure_xsii);
 	ntfs_index_ctx_reinit(vol->secure_xsdh);
