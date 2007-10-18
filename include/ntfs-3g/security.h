@@ -46,6 +46,8 @@ struct MAPPING {
 struct CACHED_PERMISSIONS {
 	uid_t uid;
 	gid_t gid;
+	le32 inh_fileid;
+	le32 inh_dirid;
 	unsigned int mode:9;
 	unsigned int valid:1;
 } ;
@@ -157,6 +159,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni,
 		uid_t uid, gid_t gid, mode_t mode);
+le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
+		const char *dir_path, ntfs_inode *dir_ni, BOOL fordir);
 int ntfs_open_secure(ntfs_volume *vol);
 void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
 

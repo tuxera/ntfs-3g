@@ -1761,6 +1761,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			cacheentry->uid = uid;
 			cacheentry->gid = gid;
 			cacheentry->mode = mode & 0777;
+			cacheentry->inh_fileid = cpu_to_le32(0);
+			cacheentry->inh_dirid = cpu_to_le32(0);
 			cacheentry->valid = 1;
 			pcache->head.p_writes++;
 		} else {
@@ -1776,6 +1778,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 				cacheentry->uid = uid;
 				cacheentry->gid = gid;
 				cacheentry->mode = mode & 0777;
+				cacheentry->inh_fileid = cpu_to_le32(0);
+				cacheentry->inh_dirid = cpu_to_le32(0);
 				cacheentry->valid = 1;
 				pcache->head.p_writes++;
 			}
@@ -1828,7 +1832,7 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
  *	Retrieve a security attribute from $Secure
  */
 
-static char *retrievesecurityattr(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id)
+static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 {
 	struct SII *psii;
 	union {
@@ -1847,8 +1851,8 @@ static char *retrievesecurityattr(struct SECURITY_CONTEXT *scx, SII_INDEX_KEY id
 	char *securattr;
 
 	securattr = (char*)NULL;
-	ni = scx->vol->secure_ni;
-	xsii = scx->vol->secure_xsii;
+	ni = vol->secure_ni;
+	xsii = vol->secure_xsii;
 	ntfs_index_ctx_reinit(xsii);
 	if (xsii) {
 		found =
@@ -2229,7 +2233,7 @@ static char *build_secur_descr(mode_t mode,
 	if (newattr) {
 		/* build the main header part */
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*) newattr;
-		pnhead->revision = 1;
+		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		pnhead->alignment = 0;
 		pnhead->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
 			/*
@@ -2281,7 +2285,7 @@ static char *build_secur_descr(mode_t mode,
  *	The returned descriptor is dynamically allocated and has to be freed
  */
 
-static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
+static char *getsecurityattr(ntfs_volume *vol,
 		const char *path, ntfs_inode *ni)
 {
 	SII_INDEX_KEY securid;
@@ -2297,7 +2301,7 @@ static char *getsecurityattr(struct SECURITY_CONTEXT *scx,
 	if (test_nino_flag(ni, v3_Extensions) && ni->security_id) {
 			/* get v3.x descriptor in $Secure */
 		securid.security_id = ni->security_id;
-		securattr = retrievesecurityattr(scx,securid);
+		securattr = retrievesecurityattr(vol,securid);
 		if (!securattr)
 			ntfs_log_error("Bad security descriptor for 0x%lx\n",
 					(long)le32_to_cpu(ni->security_id));
@@ -2688,7 +2692,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			gid = cached->gid;
 		} else {
 			perm = 0;	/* default to no permission */
-			securattr = getsecurityattr(scx, path, ni);
+			securattr = getsecurityattr(scx->vol, path, ni);
 			if (securattr) {
 				perm = build_permissions(securattr, ni);
 				/*
@@ -2766,7 +2770,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			stbuf->st_mode = (stbuf->st_mode & ~0777) + perm;
 		} else {
 			perm = -1;	/* default to error */
-			securattr = getsecurityattr(scx, path, ni);
+			securattr = getsecurityattr(scx->vol, path, ni);
 			if (securattr) {
 				perm = build_permissions(securattr, ni);
 					/*
@@ -2906,7 +2910,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 		fileuid = cached->uid;
 		filegid = cached->gid;
 	} else {
-		oldattr = getsecurityattr(scx,path, ni);
+		oldattr = getsecurityattr(scx->vol,path, ni);
 		if (oldattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
 			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
@@ -2960,11 +2964,11 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	if (!sd)
 		return -1;
 	
-	sd->revision = 1;
+	sd->revision = SECURITY_DESCRIPTOR_REVISION;
 	sd->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
 	
 	sid = (SID*)((u8*)sd + sizeof(SECURITY_DESCRIPTOR_ATTR));
-	sid->revision = 1;
+	sid->revision = SID_REVISION;
 	sid->sub_authority_count = 2;
 	sid->sub_authority[0] = cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	sid->sub_authority[1] = cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
@@ -2972,7 +2976,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	sd->owner = cpu_to_le32((u8*)sid - (u8*)sd);
 	
 	sid = (SID*)((u8*)sid + sizeof(SID) + 4); 
-	sid->revision = 1;
+	sid->revision = SID_REVISION;
 	sid->sub_authority_count = 2;
 	sid->sub_authority[0] = cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
 	sid->sub_authority[1] = cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
@@ -2980,7 +2984,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	sd->group = cpu_to_le32((u8*)sid - (u8*)sd);
 	
 	acl = (ACL*)((u8*)sid + sizeof(SID) + 4);
-	acl->revision = 2;
+	acl->revision = ACL_REVISION;
 	acl->size = cpu_to_le16(sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE));
 	acl->ace_count = cpu_to_le16(1);
 	sd->dacl = cpu_to_le32((u8*)acl - (u8*)sd);
@@ -2990,7 +2994,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
 	ace->size = cpu_to_le16(sizeof(ACCESS_ALLOWED_ACE));
 	ace->mask = cpu_to_le32(0x1f01ff); /* FIXME */
-	ace->sid.revision = 1;
+	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 1;
 	ace->sid.sub_authority[0] = cpu_to_le32(0);
 	ace->sid.identifier_authority.value[5] = 1;
@@ -3124,7 +3128,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		fileuid = 0;
 		filegid = 0;
 		mode = 0;
-		oldattr = getsecurityattr(scx, path, ni);
+		oldattr = getsecurityattr(scx->vol, path, ni);
 		if (oldattr) {
 			mode = perm = build_permissions(oldattr, ni);
 			if (perm >= 0) {
@@ -3165,6 +3169,232 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		errno = EIO;
 	}
 	return (res ? -1 : 0);
+}
+
+/*
+ *		Copy the inheritable parts of an ACL
+ *
+ *	Returns the size of the new ACL
+ *		or zero if nothing is inheritable
+ */
+
+static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
+{
+	int src;
+	int dst;
+	int oldcnt;
+	int newcnt;
+	unsigned int selection;
+	int nace;
+	int acesz;
+	const ACCESS_ALLOWED_ACE *poldace;
+	ACCESS_ALLOWED_ACE *pnewace;
+
+	/* ACL header */
+
+	newacl->revision = ACL_REVISION;
+	newacl->alignment1 = 0;
+	newacl->alignment2 = cpu_to_le16(0);
+	src = dst = sizeof(ACL);
+
+	selection = (fordir ? CONTAINER_INHERIT_ACE : OBJECT_INHERIT_ACE);
+	newcnt = 0;
+	oldcnt = le16_to_cpu(oldacl->ace_count);
+	for (nace = 0; nace < oldcnt; nace++) {
+		poldace = (const ACCESS_ALLOWED_ACE*)((char*)oldacl + src);
+		acesz = le16_to_cpu(poldace->size);
+		if (poldace->flags & selection) {
+			pnewace = (ACCESS_ALLOWED_ACE*)
+					((char*)newacl + dst);
+			memcpy(pnewace,poldace,acesz);
+				/* remove inheritance flags if not a directory */
+			if (!fordir)
+				pnewace->flags &= ~(OBJECT_INHERIT_ACE
+						| CONTAINER_INHERIT_ACE);
+			dst += acesz;
+			newcnt++;
+		}
+		src += acesz;
+	}
+		/*
+		 * Adjust header if something was inherited
+		 */
+	if (dst > sizeof(ACL)) {
+		newacl->ace_count = cpu_to_le16(newcnt);
+		newacl->size = cpu_to_le16(dst);
+	} else
+		dst = 0;
+	return (dst);
+}
+
+/*
+ *		Build a security id for descriptor inherited from
+ *	parent directory
+ */
+
+static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
+			const char *parentattr,
+			ntfs_inode *dir_ni, BOOL fordir)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *pphead;
+	const ACL *ppacl;
+	const SID *usid;
+	const SID *gsid;
+	int offpacl;
+	int offowner;
+	int offgroup;
+	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
+	ACL *pnacl;
+	int parentattrsz;
+	char *newattr;
+	int newattrsz;
+	int aclsz;
+	int usidsz;
+	int gsidsz;
+	int pos;
+	le32 securid;
+
+	parentattrsz = attr_size(parentattr);
+	if (scx->usermapping) {
+		usid = find_usid(scx, scx->uid);
+		gsid = find_gsid(scx, scx->gid);
+	} else
+		usid = gsid = (const SID*)NULL;
+		/*
+		 * new attribute is smaller than parent's
+		 * except for differences in SIDs
+		 */
+	newattrsz = parentattrsz;
+	if (usid) newattrsz += sid_size(usid);
+	if (gsid) newattrsz += sid_size(gsid);
+	newattr = (char*)malloc(parentattrsz);
+	if (newattr) {
+		pphead = (const SECURITY_DESCRIPTOR_RELATIVE*)parentattr;
+		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
+		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
+		pnhead->alignment = 0;
+		pnhead->control = SE_SELF_RELATIVE;
+		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
+			/*
+			 * locate and inherit DACL
+			 */
+		pnhead->dacl = cpu_to_le32(0);
+		if (pphead->control & SE_DACL_PRESENT) {
+			offpacl = le32_to_cpu(pphead->dacl);
+			ppacl = (const ACL*)&parentattr[offpacl];
+			pnacl = (ACL*)&newattr[pos];
+			aclsz = inherit_acl(ppacl, pnacl, fordir);
+			if (aclsz) {
+				pnhead->dacl = cpu_to_le32(pos);
+				pos += aclsz;
+				pnhead->control |= SE_DACL_PRESENT;
+			}
+		}
+			/*
+			 * locate and inherit SACL
+			 */
+		pnhead->sacl = cpu_to_le32(0);
+		if (pphead->control & SE_SACL_PRESENT) {
+			offpacl = le32_to_cpu(pphead->sacl);
+			ppacl = (const ACL*)&parentattr[offpacl];
+			pnacl = (ACL*)&newattr[pos];
+			aclsz = inherit_acl(ppacl, pnacl, fordir);
+			if (aclsz) {
+				pnhead->sacl = cpu_to_le32(pos);
+				pos += aclsz;
+				pnhead->control |= SE_SACL_PRESENT;
+			}
+		}
+			/*
+			 * inherit or redefine owner
+			 */
+		if (!usid) {
+			offowner = le32_to_cpu(pphead->owner);
+			usid = (const SID*)&parentattr[offowner];
+		}
+		usidsz = sid_size(usid);
+		memcpy(&newattr[pos],usid,usidsz);
+		pnhead->owner = cpu_to_le32(pos);
+		pos += usidsz;
+			/*
+			 * inherit or redefine group
+			 */
+		if (!gsid) {
+			offgroup = le32_to_cpu(pphead->group);
+			gsid = (const SID*)&parentattr[offgroup];
+		}
+		gsidsz = sid_size(gsid);
+		memcpy(&newattr[pos],gsid,gsidsz);
+		pnhead->group = cpu_to_le32(pos);
+		pos += usidsz;
+		securid = setsecurityattr(scx->vol,
+			(SECURITY_DESCRIPTOR_RELATIVE*)newattr, pos);
+	} else
+		securid = cpu_to_le32(0);
+	return (securid);
+}
+
+/*
+ *		Get an inherited security id
+ *
+ *	For Windows compatibility, the normal initial permission setting
+ *	may be inherited from the parent directory instead of being
+ *	defined by the creation arguments.
+ *
+ *	The following creates an inherited id for that purpose.
+ *
+ *	Note : the owner and group of parent directory are also
+ *	inherited (which is not the case on Windows) if no user mapping
+ *	is defined.
+ *
+ *	Returns the inherited id, or zero if not possible (eg on NTFS 1.x)
+ */
+
+le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
+			const char *dir_path, ntfs_inode *dir_ni, BOOL fordir)
+{
+	struct CACHED_PERMISSIONS *cached;
+	char *parentattr;
+	le32 securid;
+
+	securid = cpu_to_le32(0);
+	cached = (struct CACHED_PERMISSIONS*)NULL;
+		/*
+		 * Try to get inherited id from cache
+		 */
+	if (test_nino_flag(dir_ni, v3_Extensions)
+			&& dir_ni->security_id) {
+		cached = fetch_cache(scx, dir_ni);
+		if (cached)
+			securid = (fordir ? cached->inh_dirid
+					: cached->inh_fileid);
+	}
+		/*
+		 * Not cached or not available in cache, compute it all
+		 * Note : if parent directory has no id, it is not cacheable
+		 */
+	if (!securid) {
+		parentattr = getsecurityattr(scx->vol, dir_path, dir_ni);
+		if (parentattr) {
+			securid = build_inherited_id(scx,
+						parentattr,
+						dir_ni, fordir);
+			free(parentattr);
+			/*
+			 * Store the result into cache for further use
+			 */
+			if (securid) {
+				cached = fetch_cache(scx, dir_ni);
+				if (cached) {
+					if (fordir)
+						cached->inh_dirid = securid;
+					else
+						cached->inh_fileid = securid;
+				}
+			}
+		}
+	}
+	return (securid);
 }
 
 
@@ -3509,7 +3739,7 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 	res = -1;
 	ni = ntfs_pathname_to_inode(scx->vol, NULL, "/.");
 	if (ni) {
-		securattr = getsecurityattr(scx,"/.",ni);
+		securattr = getsecurityattr(scx->vol,"/.",ni);
 		if (securattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 			usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
@@ -3914,7 +4144,7 @@ BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			attr = getsecurityattr(&scapi->security, path, ni);
+			attr = getsecurityattr(scapi->security.vol, path, ni);
 			if (attr) {
 				ok = feedsecurityattr(attr,selection,
 						buf,buflen,psize);
@@ -3969,7 +4199,7 @@ BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
 			ni = ntfs_pathname_to_inode(scapi->security.vol,
 				NULL, path);
 			if (ni) {
-				oldattr = getsecurityattr(&scapi->security,
+				oldattr = getsecurityattr(scapi->security.vol,
 						path, ni);
 				if (oldattr) {
 					ok = mergesecurityattr(

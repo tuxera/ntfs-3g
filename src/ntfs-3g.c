@@ -207,24 +207,25 @@ static long ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 }
 
 /*
- *      Fill a security context as needed by security fonctions
- *      returns TRUE if Ok
- *              FALSE if there is no user mapping. This is not an error
+ *      Fill a security context as needed by security functions
+ *      returns TRUE if there is a user mapping,
+ *              FALSE if there is none
+ *			This is not an error and the context is filled anyway,
+ *			it is used for implicit Windows-like inheritance
  */
 
 static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 {
 	struct fuse_context *fusecontext;
 
-	if (ctx->security.usermapping) {
-		scx->vol = ctx->vol;
-		scx->usermapping = ctx->security.usermapping;
-		scx->groupmapping = ctx->security.groupmapping;
-		scx->pseccache = &ctx->seccache;
-		fusecontext = fuse_get_context();
-		scx->uid = fusecontext->uid;
-		scx->gid = fusecontext->gid;
-	}
+	scx->vol = ctx->vol;
+	scx->usermapping = ctx->security.usermapping;
+	scx->groupmapping = ctx->security.groupmapping;
+	scx->pseccache = &ctx->seccache;
+	fusecontext = fuse_get_context();
+	scx->uid = fusecontext->uid;
+	scx->gid = fusecontext->gid;
+
 	return (ctx->security.usermapping != (struct MAPPING*)NULL);
 }
 
@@ -380,6 +381,8 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	struct SECURITY_CONTEXT security;
 
 	vol = ctx->vol;
+if (!strcmp(org_path,"/dump"))
+dumpall(vol);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -1002,10 +1005,14 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			 * be lost when creation is applied if user
 			 * mapping has been defined
 			 */
-		if (test_nino_flag(dir_ni, v3_Extensions))
-			securid = dir_ni->security_id;
+		if (ctx->inherit || !ctx->security.usermapping)
+			securid = ntfs_inherited_id(&security, dir_path,
+					dir_ni, S_ISDIR(type));
 		else
-			securid = cpu_to_le32(0);
+			if (test_nino_flag(dir_ni, v3_Extensions))
+				securid = dir_ni->security_id;
+			else
+				securid = cpu_to_le32(0);
 		/* Create object specified in @type. */
 		switch (type) {
 			case S_IFCHR:
@@ -1832,8 +1839,8 @@ static void ntfs_fuse_destroy(void)
 			      10 * ctx->seccache->head.s_hops
 			         / ctx->seccache->head.s_reads % 10);
 			}
-			ntfs_close_secure(&security);
 		}
+		ntfs_close_secure(&security);
 		if (ntfs_umount(ctx->vol, FALSE))
 			ntfs_log_perror("Failed to cleanly unmount volume %s",
 					opts.device);
