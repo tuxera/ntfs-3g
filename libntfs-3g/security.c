@@ -3909,7 +3909,8 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 	size = 0;
 
 		/* locate DACL if requested and available */
-	if (selection & phead->control & DACL_SECURITY_INFORMATION) {
+	if (le16_to_cpu(phead->control)
+			 & (selection & DACL_SECURITY_INFORMATION)) {
 		offdacl = le32_to_cpu(phead->dacl);
 		pdacl = (const ACL*)&attr[offdacl];
 		daclsz = le16_to_cpu(pdacl->size);
@@ -3943,7 +3944,8 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offgroup = gsidsz = 0;
 
 		/* locate SACL if requested and available */
-	if (selection & phead->control & SACL_SECURITY_INFORMATION) {
+	if (le16_to_cpu(phead->control)
+		 & (selection & SACL_SECURITY_INFORMATION)) {
 			/* find end of SACL */
 		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
@@ -3966,40 +3968,40 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		/* copy header and feed new flags */
 		memcpy(buf,attr,sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)buf;
-		pnhead->control = avail;
+		pnhead->control = cpu_to_le16(avail);
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* copy DACL if requested */
 		if (selection & DACL_SECURITY_INFORMATION) {
-			pnhead->dacl = pos;
+			pnhead->dacl = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offdacl],daclsz);
 			pos += daclsz;
 		} else
-			pnhead->dacl = 0;
+			pnhead->dacl = cpu_to_le32(0);
 
 		/* copy SACL if requested */
 		if (selection & SACL_SECURITY_INFORMATION) {
-			pnhead->sacl = pos;
+			pnhead->sacl = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offsacl],saclsz);
 			pos += saclsz;
 		} else
-			pnhead->sacl = 0;
+			pnhead->sacl = cpu_to_le32(0);
 
 		/* copy owner if requested */
 		if (selection & OWNER_SECURITY_INFORMATION) {
-			pnhead->owner = pos;
+			pnhead->owner = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offowner],usidsz);
 			pos += usidsz;
 		} else
-			pnhead->owner = 0;
+			pnhead->owner = cpu_to_le32(0);
 
 		/* copy group if requested */
 		if (selection & GROUP_SECURITY_INFORMATION) {
-			pnhead->group = pos;
+			pnhead->group = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offgroup],gsidsz);
 			pos += gsidsz;
 		} else
-			pnhead->group = 0;
+			pnhead->group = cpu_to_le32(0);
 		if (pos != size)
 			ntfs_log_error("Error in security descriptor size\n");
 		*psize = size;
@@ -4047,7 +4049,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 	if (target) {
 		targhead = (SECURITY_DESCRIPTOR_RELATIVE*)target;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
-		present = oldhead->control;
+		present = le16_to_cpu(oldhead->control);
 		if (oldhead->owner)
 			present |= OWNER_SECURITY_INFORMATION;
 		if (oldhead->group)
@@ -4066,10 +4068,10 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			}
 			size = le16_to_cpu(pdacl->size);
 			memcpy(&target[pos], pdacl, size);
-			targhead->dacl = pos;
+			targhead->dacl = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->dacl = 0;
+			targhead->dacl = cpu_to_le32(0);
 			/*
 			 * copy new SACL if selected
 			 * or keep old SACL if any
@@ -4084,10 +4086,10 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			}
 			size = le16_to_cpu(psacl->size);
 			memcpy(&target[pos], psacl, size);
-			targhead->sacl = pos;
+			targhead->sacl = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->sacl = 0;
+			targhead->sacl = cpu_to_le32(0);
 			/*
 			 * copy new OWNER if selected
 			 * or keep old OWNER if any
@@ -4102,10 +4104,10 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			}
 			size = sid_size(powner);
 			memcpy(&target[pos], powner, size);
-			targhead->owner = pos;
+			targhead->owner = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->owner = 0;
+			targhead->owner = cpu_to_le32(0);
 			/*
 			 * copy new GROUP if selected
 			 * or keep old GROUP if any
@@ -4120,11 +4122,11 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			}
 			size = sid_size(pgroup);
 			memcpy(&target[pos], pgroup, size);
-			targhead->group = pos;
+			targhead->group = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->group = 0;
-		targhead->control = present | selection;
+			targhead->group = cpu_to_le32(0);
+		targhead->control = cpu_to_le16(present | selection);
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
 	}
@@ -4207,7 +4209,7 @@ BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && attr) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		attrsz = attr_size(attr);
-		provided = phead->control;
+		provided = le16_to_cpu(phead->control);
 		if (phead->owner)
 			provided |= OWNER_SECURITY_INFORMATION;
 		if (phead->group)

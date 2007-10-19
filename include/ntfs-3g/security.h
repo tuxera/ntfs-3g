@@ -177,6 +177,12 @@ struct SECURITY_API {
 	struct SECURITY_CACHE *seccache;
 } ;
 
+/*
+ *  The following constants are used in interfacing external programs.
+ *  They are not to be stored on disk and must be defined in their
+ *  native cpu representation.
+ *  When disk representation (le) is needed, use SE_DACL_PRESENT, etc.
+ */
 enum {	OWNER_SECURITY_INFORMATION = 1,
 	GROUP_SECURITY_INFORMATION = 2,
 	DACL_SECURITY_INFORMATION = 4,
@@ -193,6 +199,5 @@ BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
                                 int flags);
 BOOL ntfs_leave_file_security(struct SECURITY_API *scx);
-
 
 #endif /* defined _NTFS_SECURITY_H */
