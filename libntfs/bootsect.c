@@ -196,13 +196,18 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 			sle64_to_cpu(bs->number_of_sectors));
 	ntfs_log_debug("SectorsPerCluster = 0x%x\n", sectors_per_cluster);
 	if (sectors_per_cluster & (sectors_per_cluster - 1)) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
+		ntfs_log_error("Error: %s is not a valid NTFS partition! "
 				"sectors_per_cluster is not a power of 2.\n",
 				vol->dev->d_name);
 		return -1;
 	}
 	vol->nr_clusters = sle64_to_cpu(bs->number_of_sectors) >>
 			(ffs(sectors_per_cluster) - 1);
+	if (!vol->nr_clusters) {
+		ntfs_log_error("Error: %s is not a valid NTFS partition! "
+				"nr_clusters is 0.\n", vol->dev->d_name);
+		return -1;
+	}
 
 	vol->mft_lcn = sle64_to_cpu(bs->mft_lcn);
 	vol->mftmirr_lcn = sle64_to_cpu(bs->mftmirr_lcn);
@@ -210,15 +215,15 @@ int ntfs_boot_sector_parse(ntfs_volume *vol, const NTFS_BOOT_SECTOR *bs)
 	ntfs_log_debug("MFTMirr LCN = 0x%llx\n", vol->mftmirr_lcn);
 	if (vol->mft_lcn > vol->nr_clusters ||
 			vol->mftmirr_lcn > vol->nr_clusters) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition!\n",
+		ntfs_log_error("Error: %s is not a valid NTFS partition!\n",
 				vol->dev->d_name);
-		ntfs_log_debug("($Mft LCN or $MftMirr LCN is greater than the "
+		ntfs_log_error("($Mft LCN or $MftMirr LCN is greater than the "
 				"number of clusters!)\n");
 		return -1;
 	}
 	vol->cluster_size = sectors_per_cluster * vol->sector_size;
 	if (vol->cluster_size & (vol->cluster_size - 1)) {
-		ntfs_log_debug("Error: %s is not a valid NTFS partition! "
+		ntfs_log_error("Error: %s is not a valid NTFS partition! "
 				"cluster_size is not a power of 2.\n",
 				vol->dev->d_name);
 		return -1;
