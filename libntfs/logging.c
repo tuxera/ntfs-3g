@@ -75,8 +75,7 @@ static struct ntfs_logging ntfs_log = (struct ntfs_logging) {
 	.levels = NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET |
 			NTFS_LOG_LEVEL_WARNING | NTFS_LOG_LEVEL_ERROR |
 			NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
-			NTFS_LOG_LEVEL_PROGRESS |
-			0,
+			NTFS_LOG_LEVEL_PROGRESS,
 	.flags = NTFS_LOG_FLAG_ONLYNAME,
 	.handler = ntfs_log_handler_null,
 };
