@@ -196,7 +196,7 @@ static BOOL verify_boot_sector(struct ntfs_device *dev)
 
 	current_mft_record = 9;
 
-	if (dev->d_ops->pread(dev, buf, sizeof(buf), 0)!=sizeof(buf)) {
+	if (ntfs_pread(dev, 0, sizeof(buf), buf) != sizeof(buf)) {
 		check_failed("Failed to read boot sector.\n");
 		return 1;
 	}
@@ -258,7 +258,8 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 	if (!buf)
 		return NULL;
 
-	if (dev->d_ops->pread(dev, buf, size_of_file_record, offset_to_file_record)!=size_of_file_record) {
+	if (ntfs_pread(dev, offset_to_file_record, size_of_file_record, buf) !=
+			size_of_file_record) {
 		check_failed("Failed to read file record at offset %lld (0x%llx).\n", offset_to_file_record, offset_to_file_record);
 		return NULL;
 	}
