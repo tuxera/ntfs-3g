@@ -1,3 +1,12 @@
+xx/xx/2007 - 2.0.1
+
+	- Avoid endless loop when try to mount highly damaged volume with
+	  nubmer of sectors set to 0.  (Yura, reported by Erik Larsson)
+	- Raise FUSE dependency to 2.7.0 because we use user option in
+	  ntfsmount.  (Yura, reported by Andrey Rahmatullin)
+	- ntfsck: Use ntfs_pread instead ops->pread.  (Yura, reported by
+	  Christophe GRENIER)
+
 28/09/2007 - 2.0.0 - ntfsmount sports full read/write, libntfs can read
 		     encrypted files and ntfsresize supports Vista.
 
