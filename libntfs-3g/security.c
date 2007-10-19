@@ -83,31 +83,40 @@
 
           /* flags which are set to mean exec, write or read */
 
-#define FILE_READ (FILE_READ_DATA | FILE_READ_EA)
-#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA)
+#define FILE_READ FILE_READ_DATA
+#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA)
 #define FILE_EXEC (FILE_EXECUTE)
-#define DIR_READ (FILE_LIST_DIRECTORY | FILE_READ_EA)
-#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY \
-                  | FILE_WRITE_EA | FILE_DELETE_CHILD)
+#define DIR_READ FILE_LIST_DIRECTORY
+#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)
 #define DIR_EXEC (FILE_TRAVERSE)
 
-          /* flags interpreted as meaning exec, write or read */
+	  /* flags which must be different to mean sticky bit */
+#define FILE_STICKY (FILE_WRITE_DATA | FILE_APPEND_DATA)
+#define DIR_STICKY (FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)
+	  /* flags which must be different to mean setuid or setgid */
+#define FILE_SETUID (FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
+#define FILE_SETGID (FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
+
+          /* flags tested for meaning exec, write or read */
+	  /* tests for write allow for interpretation of a sticky bit */
 
 #define FILE_GREAD (FILE_READ | GENERIC_READ)
-#define FILE_GWRITE (FILE_WRITE | GENERIC_WRITE)
+#define FILE_GWRITE (FILE_WRITE_DATA | GENERIC_WRITE)
 #define FILE_GEXEC (FILE_EXEC | GENERIC_EXECUTE)
 #define DIR_GREAD (DIR_READ | GENERIC_READ)
-#define DIR_GWRITE (DIR_WRITE | GENERIC_WRITE)
+#define DIR_GWRITE (FILE_ADD_FILE | GENERIC_WRITE)
 #define DIR_GEXEC (DIR_EXEC | GENERIC_EXECUTE)
 
           /* standard owner (and administrator) rights */
 
-#define OWNER_RIGHTS (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER | SYNCHRONIZE \
-                        | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES)
+#define OWNER_RIGHTS (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER \
+			| SYNCHRONIZE \
+                        | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES \
+                        | FILE_READ_EA | FILE_WRITE_EA)
 
           /* standard world rights */
 
-#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES);
+#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA)
 
           /* inheritance flags for files and directories */
 
@@ -1626,7 +1635,7 @@ static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
 	struct CACHED_SECURID *previous;
 	struct CACHED_SECURID *before;
 
-	mode &= 0777;
+	mode &= 07777;
 	cache = *scx->pseccache;
 	if (cache || (cache = create_caches(scx, le32_to_cpu(securid)))) {
 
@@ -1781,7 +1790,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 					 - pcache->head.first];
 			cacheentry->uid = uid;
 			cacheentry->gid = gid;
-			cacheentry->mode = mode & 0777;
+			cacheentry->mode = mode & 07777;
 			cacheentry->inh_fileid = cpu_to_le32(0);
 			cacheentry->inh_dirid = cpu_to_le32(0);
 			cacheentry->valid = 1;
@@ -1798,7 +1807,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			if (cacheentry) {
 				cacheentry->uid = uid;
 				cacheentry->gid = gid;
-				cacheentry->mode = mode & 0777;
+				cacheentry->mode = mode & 07777;
 				cacheentry->inh_fileid = cpu_to_le32(0);
 				cacheentry->inh_dirid = cpu_to_le32(0);
 				cacheentry->valid = 1;
@@ -1962,6 +1971,15 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
  *	On Windows, these ACE's are processed normally, though they
  *	are redundant (as owner and group are the same), but this has
  *	no impact on administrator rights
+ *
+ *	Special cases :
+ *	- a directory with sticky bit is represented as a directory in
+ *	  which world can add directories and not delete or conversely
+ *	- a file with sticky bit is represented as a file which the
+ *	  owner can write to and not append or conversely
+ *	- a file with setuid or setgid is represented as a file with
+ *	  the right to write extended attributes different from the
+ *	  right to write standard attributes
  */
 
 static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
@@ -2021,6 +2039,10 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= FILE_WRITE;
 		if (mode & S_IRUSR)
 			grants |= FILE_READ;
+		if (mode & S_ISVTX)
+			grants ^= FILE_APPEND_DATA;
+ 		if (mode & S_ISUID)
+			grants ^= FILE_WRITE_EA;
 	}
 	pgace->size = cpu_to_le16(usidsz + 8);
 	pgace->mask = cpu_to_le32(grants);
@@ -2088,7 +2110,8 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	/* but present if owner is administrator */
 
 	if (adminowns
-	    || (((mode >> 3) ^ mode) & 7)) {
+	    || (((mode >> 3) ^ mode) & 7)
+	    || (mode & S_ISGID)) {
 		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 		grants = WORLD_RIGHTS;
@@ -2108,6 +2131,10 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				grants |= FILE_WRITE;
 			if (mode & S_IRGRP)
 				grants |= FILE_READ;
+			if (mode & S_ISVTX)
+				grants ^= FILE_APPEND_DATA;
+ 			if (mode & S_ISGID)
+				grants ^= FILE_WRITE_EA;
 		}
 		pgace->size = cpu_to_le16(gsidsz + 8);
 		pgace->mask = cpu_to_le32(grants);
@@ -2164,6 +2191,8 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= DIR_WRITE;
 		if (mode & S_IROTH)
 			grants |= DIR_READ;
+		if (mode & S_ISVTX)
+			grants ^= FILE_ADD_SUBDIRECTORY;
 	} else {
 		pgace->flags = FILE_INHERITANCE;
 		if (mode & S_IXOTH)
@@ -2414,6 +2443,14 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of readdata or generic read */
 			if (owner & FILE_GREAD)
 				perm |= S_IRUSR;
+			/* sticky if write different from append */
+			if (((owner & FILE_STICKY)
+			    && ((owner & FILE_STICKY) != FILE_STICKY)))
+				perm |= S_ISVTX;
+			/* setuid if write_ea different from write_attr */
+			if (((owner & FILE_SETUID)
+			    && ((owner & FILE_SETUID) != FILE_SETUID)))
+				perm |= S_ISUID;
 		}
 	}
 	/* build group permission */
@@ -2438,6 +2475,10 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of readdata */
 			if (group & FILE_GREAD)
 				perm |= S_IRGRP;
+			/* setgid if write_ea different from write_attr */
+			if (((group & FILE_SETGID)
+			    && ((group & FILE_SETGID) != FILE_SETGID)))
+				perm |= S_ISGID;
 		}
 	}
 	/* build world permission */
@@ -2452,6 +2493,10 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of list */
 			if (world & DIR_GREAD)
 				perm |= S_IROTH;
+			/* sticky if adddir different from delete_child */
+			if (((world & DIR_STICKY)
+			    && ((world & DIR_STICKY) != DIR_STICKY)))
+				perm |= S_ISVTX;
 		} else {
 			/* exec if execute */
 			if (world & FILE_GEXEC)
@@ -2703,7 +2748,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 	int perm;
 
 	if (!scx->usermapping || !scx->uid)
-		perm = 0777;
+		perm = 07777;
 	else {
 		/* check whether available in cache */
 		cached = fetch_cache(scx,ni);
@@ -2752,12 +2797,12 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 		}
 		if (perm >= 0) {
 			if (uid == scx->uid)
-				perm &= 0700;
+				perm &= 07700;
 			else
 				if (gid == scx->gid)
-				perm &= 070;
+				perm &= 07070;
 				else
-					perm &= 007;
+					perm &= 07007;
 		}
 	}
 	return (perm);
@@ -2780,7 +2825,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 	int perm;
 
 	if (!scx->usermapping)
-		perm = 0777;
+		perm = 07777;
 	else {
 			/* check whether available in cache */
 		cached = fetch_cache(scx,ni);
@@ -2788,7 +2833,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			perm = cached->mode;
 			stbuf->st_uid = cached->uid;
 			stbuf->st_gid = cached->gid;
-			stbuf->st_mode = (stbuf->st_mode & ~0777) + perm;
+			stbuf->st_mode = (stbuf->st_mode & ~07777) + perm;
 		} else {
 			perm = -1;	/* default to error */
 			securattr = getsecurityattr(scx->vol, path, ni);
@@ -2818,7 +2863,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					stbuf->st_uid = findowner(scx,usid);
 					stbuf->st_gid = findgroup(scx,gsid);
 					stbuf->st_mode =
-					    (stbuf->st_mode & ~0777) + perm;
+					    (stbuf->st_mode & ~07777) + perm;
 					enter_cache(scx, ni, stbuf->st_uid,
 						stbuf->st_gid, perm);
 				}
@@ -2851,7 +2896,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		/* check whether target securid is known in cache */
 
 	if (test_nino_flag(ni, v3_Extensions)) {
-		cached = fetch_securid(scx, uid, gid, mode & 0777);
+		cached = fetch_securid(scx, uid, gid, mode & 07777);
 			/* quite simple, if we are lucky */
 		if (cached) {
 			ni->security_id = cached->securid;
@@ -3032,12 +3077,13 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 /*
  *		Check whether user can access a file in a specific way
  *
- *	Always returns true is user is root or if no user mapping
- *	has been defined
- *	Sets errno if there is a problem or if access is not allowed
+ *	Returns 1 if user is root or if no user mapping has been defined
+ *		2 if sticky and accesstype is S_IWRITE + S_IEXEC + S_ISVTX
+ *		0 and sets errno if there is a problem or if access
+ *		  is not allowed
  */
 
-BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
+int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni,
 		int accesstype) /* access type required (S_Ixxx values) */
 {
@@ -3072,6 +3118,13 @@ BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 			allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
 			    && ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0);
 			break;
+		case S_IWRITE + S_IEXEC + S_ISVTX:
+			if (perm & S_ISVTX)
+				allow = 2;
+			else
+				allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
+				    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+			break;
 		default:	/* BUG ! */
 			allow = 0;
 			break;
@@ -3086,17 +3139,18 @@ BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
  *		Check whether user can access the parent directory
  *	of a file in a specific way
  *
- *	Always returns true is user is root or if no user mapping
- *	has been defined
+ *	Returns true if user is root or if no user mapping has been defined
+ *	
  *	Sets errno if there is a problem or if not allowed
  */
 
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype)
 {
-	BOOL allow;
+	int allow;
 	char *dirpath;
 	char *name;
+	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
 
 	allow = 0;
@@ -3108,9 +3162,23 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		*++name = 0;
 		dir_ni = ntfs_pathname_to_inode(scx->vol, NULL, dirpath);
 		if (dir_ni) {
-			allow = ntfs_allowed_access(scx,path,
+			allow = ntfs_allowed_access(scx,dirpath,
 				 dir_ni, accesstype);
 			ntfs_inode_close(dir_ni);
+				/*
+				 * for a sticky directory, have to retry
+				 * and check whether file itself is writeable
+				 */
+			if ((accesstype == (S_IWRITE + S_IEXEC + S_ISVTX))
+			   && (allow == 2)) {
+				ni = ntfs_pathname_to_inode(scx->vol, NULL,
+					 path);
+				if (ni) {
+					allow = ntfs_allowed_access(scx,path,
+						ni, S_IWRITE);
+				ntfs_inode_close(ni);
+				}
+			}
 		}
 		free(dirpath);
 	}

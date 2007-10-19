@@ -964,7 +964,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 	char *path;
 	ntfschar *stream_name;
 	int stream_name_len;
-	dev_t type = typemode & ~0777;
+	dev_t type = typemode & ~07777;
 	mode_t perm;
 	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len, utarget_len;
@@ -1132,7 +1132,7 @@ static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & (S_IFMT | 0777), dev, NULL);
+		res = ntfs_fuse_create(path, mode & (S_IFMT | 07777), dev, NULL);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
 				stream_name_len);
@@ -1304,12 +1304,14 @@ static int ntfs_fuse_unlink(const char *org_path)
 		return stream_name_len;
 		   /* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
-	   || ntfs_allowed_dir_access(&security,path,S_IEXEC + S_IWRITE)) {
+	   || ntfs_allowed_dir_access(&security, path,
+			S_IEXEC + S_IWRITE + S_ISVTX)) {
 		if (!stream_name_len)
 			res = ntfs_fuse_rm(path);
 		else
 			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-	}
+	} else
+		res = -errno;
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
@@ -1433,7 +1435,7 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, S_IFDIR | (mode & 0777), 0, NULL);
+	return ntfs_fuse_create(path, S_IFDIR | (mode & 07777), 0, NULL);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
@@ -2571,7 +2573,6 @@ int main(int argc, char *argv[])
 		ntfs_log_info("User mapping built\n");
 	else
 		ntfs_log_info("Failed to build user mapping\n");
-	}
 	
 	fuse_loop(fh);
 	

@@ -48,7 +48,7 @@ struct CACHED_PERMISSIONS {
 	gid_t gid;
 	le32 inh_fileid;
 	le32 inh_dirid;
-	unsigned int mode:9;
+	unsigned int mode:12;
 	unsigned int valid:1;
 } ;
 
@@ -149,7 +149,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, struct stat*);
 int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, mode_t mode);
-BOOL ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
+int ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
 		ntfs_inode *ni, int accesstype);
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype);
