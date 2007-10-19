@@ -1154,70 +1154,72 @@ static le32 setsecurityattr(ntfs_volume *vol,
 	securid = cpu_to_le32(0);
 	res = 0;
 	xsdh = vol->secure_xsdh;
-	ntfs_index_ctx_reinit(xsdh);
+	if (vol->secure_ni && xsdh) {
+		ntfs_index_ctx_reinit(xsdh);
 		/*
 		 * find the nearest key as (hash,0)
 		 * (do not search for partial key : in case of collision,
 		 * it could return a key which is not the first one which
 		 * collides)
 		 */
-	key.hash = hash;
-	key.security_id = cpu_to_le32(0);
-	ntfs_index_lookup((char*)&key, sizeof(SDH_INDEX_KEY), xsdh);
-	entry = xsdh->entry;
-	found = FALSE;
+		key.hash = hash;
+		key.security_id = cpu_to_le32(0);
+		ntfs_index_lookup((char*)&key, sizeof(SDH_INDEX_KEY), xsdh);
+		entry = xsdh->entry;
+		found = FALSE;
 		/* lookup() may return a node with no data, if so get next */
-	if (entry->ie_flags & INDEX_ENTRY_END)
-		entry = ntfs_index_next(entry,xsdh);
-	do {
-		collision = FALSE;
-		psdh = (struct SDH*)entry;
-		if (psdh)
-			size = (size_t) le32_to_cpu(psdh->datasize)
-				 - sizeof(SECURITY_DESCRIPTOR_HEADER);
-		else size = 0;
+		if (entry->ie_flags & INDEX_ENTRY_END)
+			entry = ntfs_index_next(entry,xsdh);
+		do {
+			collision = FALSE;
+			psdh = (struct SDH*)entry;
+			if (psdh)
+				size = (size_t) le32_to_cpu(psdh->datasize)
+					 - sizeof(SECURITY_DESCRIPTOR_HEADER);
+			else size = 0;
 		   /* if hash is not the same, the key is not present */
-		if (psdh && (size > 0)
-		   && (psdh->keyhash == hash)) {
-			   /* if hash is the same */
-			   /* check the whole record */
-			realign.parts.dataoffsh = psdh->dataoffsh;
-			realign.parts.dataoffsl = psdh->dataoffsl;
-			offs = le64_to_cpu(realign.all)
-				+ sizeof(SECURITY_DESCRIPTOR_HEADER);
-			oldattr = (char*)ntfs_malloc(size);
-			if (oldattr) {
-				rdsize = ntfs_local_read(
-					vol->secure_ni,
-					STREAM_SDS, 4,
-					oldattr, size, offs);
-				found = (rdsize == size)
-					&& !memcmp(oldattr,attr,size);
-				free(oldattr);
+			if (psdh && (size > 0)
+			   && (psdh->keyhash == hash)) {
+				   /* if hash is the same */
+				   /* check the whole record */
+				realign.parts.dataoffsh = psdh->dataoffsh;
+				realign.parts.dataoffsl = psdh->dataoffsl;
+				offs = le64_to_cpu(realign.all)
+					+ sizeof(SECURITY_DESCRIPTOR_HEADER);
+				oldattr = (char*)ntfs_malloc(size);
+				if (oldattr) {
+					rdsize = ntfs_local_read(
+						vol->secure_ni,
+						STREAM_SDS, 4,
+						oldattr, size, offs);
+					found = (rdsize == size)
+						&& !memcmp(oldattr,attr,size);
+					free(oldattr);
 				  /* if the records do not compare */
 				  /* (hash collision), try next one */
-				if (!found) {
-					entry = ntfs_index_next(
-						entry,xsdh);
-					collision = TRUE;
-				}
-			} else
-				res = ENOMEM;
-		}
-	} while (collision && entry);
-	if (found)
-		securid = psdh->keysecurid;
-	else {
-		if (res) {
-			errno = res;
-			securid = cpu_to_le32(0);
-		} else {
-			/* no matching key : have to build a new one */
-			securid = entersecurityattr(vol,
-				attr, attrsz, hash);
+					if (!found) {
+						entry = ntfs_index_next(
+							entry,xsdh);
+						collision = TRUE;
+					}
+				} else
+					res = ENOMEM;
+			}
+		} while (collision && entry);
+		if (found)
+			securid = psdh->keysecurid;
+		else {
+			if (res) {
+				errno = res;
+				securid = cpu_to_le32(0);
+			} else {
+				/* no matching key : have to build a new one */
+				securid = entersecurityattr(vol,
+					attr, attrsz, hash);
+			}
 		}
 	}
-   return (securid);
+	return (securid);
 }
 
 
@@ -1240,7 +1242,7 @@ static int update_secur_descr(ntfs_volume *vol,
 	newattrsz = attr_size(newattr);
 
 #if !FORCE_FORMAT_v1x
-	if (vol->major_ver < 3) {
+	if ((vol->major_ver < 3) || !vol->secure_ni) {
 #endif
 
 		/* update for NTFS format v1.x */
@@ -1872,8 +1874,8 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 	securattr = (char*)NULL;
 	ni = vol->secure_ni;
 	xsii = vol->secure_xsii;
-	ntfs_index_ctx_reinit(xsii);
-	if (xsii) {
+	if (ni && xsii) {
+		ntfs_index_ctx_reinit(xsii);
 		found =
 		    !ntfs_index_lookup((char*)&id,
 				       sizeof(SII_INDEX_KEY), xsii);
@@ -1904,7 +1906,7 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 		}
 	}
 	if (!securattr)
-		errno = EIO;
+		errno = EIO; /* $Secure not open */
 	return (securattr);
 }
 
@@ -3822,7 +3824,8 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 
 /*
  *	Open $Secure once for all
- *	returns zero if succeeds
+ *	returns zero if it succeeds
+ *		non-zero if it fails. This is not an error (on NTFS v1.x)
  */
 
 

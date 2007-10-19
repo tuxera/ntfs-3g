@@ -2567,11 +2567,10 @@ int main(int argc, char *argv[])
 		/* JPA open $Secure and build user mapping (right place ?) */
 	if (ntfs_open_secure(ctx->vol))
 		ntfs_log_info("Could not open file $Secure\n");
-	else {
-		if (!ntfs_build_mapping(&ctx->security))
-			ntfs_log_info("User mapping built\n");
-		else
-			ntfs_log_info("Failed to build user mapping\n");
+	if (!ntfs_build_mapping(&ctx->security))
+		ntfs_log_info("User mapping built\n");
+	else
+		ntfs_log_info("Failed to build user mapping\n");
 	}
 	
 	fuse_loop(fh);
