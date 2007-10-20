@@ -35,8 +35,6 @@
 
 BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
 {
-	/* int i; */
-
 	/*
 	 * FIXME:  At the moment we only support COLLATION_BINARY,
 	 * COLLATION_NTOFS_ULONG and COLLATION_FILE_NAME so we return false
@@ -47,14 +45,6 @@ BOOL ntfs_is_collation_rule_supported(COLLATION_RULES cr)
 			&& cr != COLLATION_FILE_NAME
 			&& cr != COLLATION_NTOFS_SECURITY_HASH)
 		return FALSE;
-/* JPA remove double checking
-	i = le32_to_cpu(cr);
-	if (((i >= 0) && (i <= 0x02)) ||
-			((i >= 0x10) && (i <= 0x13)))
-		return TRUE;
-	
-	return FALSE;
-*/
 	return TRUE;
 }
 
