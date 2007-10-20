@@ -31,8 +31,9 @@
 #define BUFSZ 1024		/* buffer size to read mapping file */
 #define MAPPINGFILE "/NTFS-3G/UserMapping" /* name of mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */
-#define CACHE_SECURID_SIZE 8    /* securid cache size >= 3 and not too big */
+#define CACHE_SECURID_SIZE 16    /* securid cache, size >= 3 and not too big */
 #define CACHE_PERMISSIONS_SIZE 4000  /* think twice before increasing */
+#define CACHE_LEGACY_SIZE 8    /* legacy cache size, zero or >= 3 and not too big */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -1500,7 +1501,7 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
  *	- from uid, gid and perm to securid (CACHED_SECURID)
  *	- from a securid to uid, gid and perm (CACHED_PERMISSIONS)
  *
- *	CACHED_SECURID data is kept in a most-recent-first lists
+ *	CACHED_SECURID data is kept in a most-recent-first list
  *	which should not be too long to be efficient. Its optimal
  *	size is depends on usage and is hard to determine.
  *
@@ -1510,9 +1511,17 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
  *	standard usage, but not for file servers with too many file
  *	owners
  *
- *	In both caches, data is never invalidated, however returned
- *	entries may be overwritten at next update, so data has
- *	to be copied elsewhere before another cache update is made.
+ *	CACHED_PERMISSIONS_LEGACY is a special case for CACHED_PERMISSIONS
+ *	for legacy directories which were not allocated a security_id
+ *	it is organized in a most-recent-first list.
+ *
+ *	In main caches, data is never invalidated, as the meaning of
+ *	a security_id only changes when user mapping is changed, which
+ *	current implies remounting. However returned entries may be
+ *	overwritten at next update, so data has to be copied elsewhere
+ *	before another cache update is made.
+ *	In legacy cache, data has to be invalidated when protection is
+ *	changed.
  *
  *	Though the same data may be found in both list, they
  *	must be kept separately : the interpretation of ACL
@@ -1525,8 +1534,12 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 {
 	struct CACHED_SECURID *cachesecurid;
 	struct SECURITY_CACHE *cache;
+#if CACHE_LEGACY_SIZE
+	struct CACHED_PERMISSIONS_LEGACY *cachelegacy;
+#endif
 	int i;
 
+	cache = (struct SECURITY_CACHE*)NULL;
 		/* create the securid cache first */
 	cachesecurid = (struct CACHED_SECURID*)
 		ntfs_malloc(CACHE_SECURID_SIZE*sizeof(struct CACHED_SECURID));
@@ -1540,27 +1553,48 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 		cachesecurid[CACHE_SECURID_SIZE - 1].next =
 			(struct CACHED_SECURID*)NULL;
 		cachesecurid[CACHE_SECURID_SIZE - 1].mode = -1;
-
-			/* create the first permissions cache entry */
-		cache = (struct SECURITY_CACHE*)
-			ntfs_malloc(sizeof(struct SECURITY_CACHE));
-		if (cache) {
-			cache->head.first = securindex;
-			cache->head.last = securindex;
-			cache->head.p_reads = 0;
-			cache->head.p_hits = 0;
-			cache->head.p_writes = 0;
-			cache->head.s_reads = 0;
-			cache->head.s_hits = 0;
-			cache->head.s_writes = 0;
-			cache->head.s_hops = 0;
-			*scx->pseccache = cache;
-			cache->head.first_securid = cachesecurid;
-			cache->head.most_recent_securid = cachesecurid;
-			cache->cachetable[0].valid = 0;
+#if CACHE_LEGACY_SIZE
+			/* create the legacy cache if needed */
+		cachelegacy = (struct CACHED_PERMISSIONS_LEGACY*)
+			ntfs_malloc(CACHE_LEGACY_SIZE*
+				sizeof(struct CACHED_PERMISSIONS_LEGACY));
+		if (cachelegacy) {
+			/* chain the entries, and mark an invalid entry */
+			for (i=0; i<(CACHE_LEGACY_SIZE - 1); i++) {
+				cachelegacy[i].next = &cachelegacy[i+1];
+				cachelegacy[i].permissions.valid = 0;
+			}
+				/* special for the last entry */
+			cachelegacy[CACHE_LEGACY_SIZE - 1].next =
+				(struct CACHED_PERMISSIONS_LEGACY*)NULL;
+			cachelegacy[CACHE_LEGACY_SIZE - 1].permissions.valid = 0;;
+#endif
+				/* create the first permissions cache entry */
+			cache = (struct SECURITY_CACHE*)
+				ntfs_malloc(sizeof(struct SECURITY_CACHE));
+			if (cache) {
+				cache->head.first = securindex;
+				cache->head.last = securindex;
+				cache->head.p_reads = 0;
+				cache->head.p_hits = 0;
+				cache->head.p_writes = 0;
+				cache->head.s_reads = 0;
+				cache->head.s_hits = 0;
+				cache->head.s_writes = 0;
+				cache->head.s_hops = 0;
+				*scx->pseccache = cache;
+				cache->head.first_securid = cachesecurid;
+				cache->head.most_recent_securid = cachesecurid;
+				cache->cachetable[0].valid = 0;
+#if CACHE_LEGACY_SIZE
+				cache->head.first_legacy = cachelegacy;
+				cache->head.most_recent_legacy = cachelegacy;
+#endif
+			}
+#if CACHE_LEGACY_SIZE
 		}
-	} else
-		cache = (struct SECURITY_CACHE*)NULL;
+#endif
+	}
 	return (cache);
 }
 
@@ -1573,6 +1607,9 @@ static void free_caches(struct SECURITY_CONTEXT *scx)
 {
 	if (*scx->pseccache) {
 		free((*scx->pseccache)->head.first_securid);
+#if CACHE_LEGACY_SIZE
+                free((*scx->pseccache)->head.first_legacy);
+#endif
 		free(*scx->pseccache);
 	}
 }
@@ -1615,9 +1652,9 @@ static const struct CACHED_SECURID *fetch_securid(struct SECURITY_CONTEXT *scx,
 			current->next = cache->head.most_recent_securid;
 			cache->head.most_recent_securid = current;
 		}
+		cache->head.s_reads++;
 	} else  /* cache not ready */
 		current = (struct CACHED_SECURID*)NULL;
-	cache->head.s_reads++;
 	return (current);
 }
 
@@ -1673,12 +1710,143 @@ static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
 			current->mode = mode;
 			current->securid = securid;
 		}
+		cache->head.s_writes++;
 	} else		/* cache not available */
 		current = (struct CACHED_SECURID*)NULL;
-	cache->head.s_writes++;
 	return (current);
 }
 
+
+#if CACHE_LEGACY_SIZE
+
+/*
+ *		Fetch a legacy directory from cache
+ *	returns the cache entry, or NULL if not available
+ */
+
+static struct CACHED_PERMISSIONS *fetch_legacy(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni)
+{
+	struct SECURITY_CACHE *cache;
+	struct CACHED_PERMISSIONS_LEGACY *current;
+	struct CACHED_PERMISSIONS_LEGACY *previous;
+	struct CACHED_PERMISSIONS *cacheentry;
+
+	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
+	cache = *scx->pseccache;
+	if (cache
+	    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+			/*
+			 * Search sequentially in LRU list
+			 */
+		current = cache->head.most_recent_legacy;
+		previous = (struct CACHED_PERMISSIONS_LEGACY*)NULL;
+		while (current
+			&& (!current->permissions.valid
+			   || (current->mft_no != ni->mft_no))) {
+			previous = current;
+			current = current->next;
+			}
+		if (current) {
+			cache->head.p_hits++;
+			cacheentry = &current->permissions;
+		}
+		if (current && previous) {
+			/*
+			 * found and not at head of list, unlink from current
+			 * position and relink as head of list
+			 */
+			previous->next = current->next;
+			current->next = cache->head.most_recent_legacy;
+			cache->head.most_recent_legacy = current;
+		}
+		cache->head.p_reads++;
+	}
+	return (cacheentry);
+}
+
+/*
+ *		Enter a legacy directory into cache
+ *	returns the cache entry
+ */
+
+static struct CACHED_PERMISSIONS *enter_legacy(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni, uid_t uid, gid_t gid,
+		mode_t mode)
+{
+	struct SECURITY_CACHE *cache;
+	struct CACHED_PERMISSIONS_LEGACY *current;
+	struct CACHED_PERMISSIONS_LEGACY *previous;
+	struct CACHED_PERMISSIONS_LEGACY *before;
+	struct CACHED_PERMISSIONS *cacheentry;
+
+	mode &= 07777;
+	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
+	cache = *scx->pseccache;
+	if ((cache || (cache = create_caches(scx, FIRST_SECURITY_ID)))
+	  && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+
+			/*
+			 * Search sequentially in LRU list to locate the end,
+			 * and find out whether the entry is already in list
+			 * As we normally go to the end, no statitics is
+			 * kept.
+		 	 */
+		current = cache->head.most_recent_legacy;
+		previous = (struct CACHED_PERMISSIONS_LEGACY*)NULL;
+		before = (struct CACHED_PERMISSIONS_LEGACY*)NULL;
+		while (current
+			&& (!current->permissions.valid
+			   || (current->mft_no != ni->mft_no))) {
+			before = previous;
+			previous = current;
+			current = current->next;
+			}
+
+		if (!current) {
+			/*
+			 * Not in list, reuse the last entry,
+			 * and relink as head of list
+			 * Note : we assume at least three entries, so
+			 * before, previous and first are always different
+			 */
+			before->next = (struct CACHED_PERMISSIONS_LEGACY*)NULL;
+			previous->next = cache->head.most_recent_legacy;
+			cache->head.most_recent_legacy = previous;
+			current = previous;
+			current->mft_no = ni->mft_no;
+			cacheentry = &current->permissions;
+			cacheentry->uid = uid;
+			cacheentry->gid = gid;
+			cacheentry->mode = mode;
+			cacheentry->inh_fileid = cpu_to_le32(0);
+			cacheentry->inh_dirid = cpu_to_le32(0);
+			cacheentry->valid = 1;
+		}
+		cache->head.p_writes++;
+	}
+	return (cacheentry);
+}
+
+/*
+ *		Invalidate a legacy directory entry in cache
+ *	This is needed after a change in directory protection, when
+ *	no security id has been assigned (only for NTFS 1.x)
+ *
+ *	returns the cache entry, or NULL if not available
+ */
+
+static struct CACHED_PERMISSIONS *invalidate_legacy(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni)
+{
+	struct CACHED_PERMISSIONS *cached;
+
+	cached = fetch_legacy(scx, ni);
+	if (cached) cached->valid = 0;
+	return (cached);
+}
+
+#endif
 
 /*
  *	Resize permission cache in either direction
@@ -1815,7 +1983,11 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			}
 		}
 	} else
+#if CACHE_LEGACY_SIZE
+		cacheentry =  enter_legacy(scx, ni, uid, gid, mode);
+#else
 		cacheentry = (struct CACHED_PERMISSIONS*)NULL;
+#endif
 	return (cacheentry);
 }
 
@@ -1855,6 +2027,10 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 			pcache->head.p_reads++;
 		}
 	}
+#if CACHE_LEGACY_SIZE
+	else
+		cacheentry = fetch_legacy(scx, ni);
+#endif
 	return (cacheentry);
 }
 
@@ -2928,6 +3104,9 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 						enter_securid(scx, uid,
 							gid, mode,
 							ni->security_id);
+					/* also invalidate legacy cache */
+					if (isdir && !ni->security_id)
+						invalidate_legacy(scx, ni);
 				}
 				free(newattr);
 			} else {
@@ -3359,7 +3538,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	newattrsz = parentattrsz;
 	if (usid) newattrsz += sid_size(usid);
 	if (gsid) newattrsz += sid_size(gsid);
-	newattr = (char*)malloc(parentattrsz);
+	newattr = (char*)ntfs_malloc(parentattrsz);
 	if (newattr) {
 		pphead = (const SECURITY_DESCRIPTOR_RELATIVE*)parentattr;
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
@@ -4119,7 +4298,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 	newhead = (const SECURITY_DESCRIPTOR_RELATIVE*)newattr;
 	oldattrsz = attr_size(oldattr);
 	newattrsz = attr_size(newattr);
-	target = (char*)malloc(oldattrsz + newattrsz);
+	target = (char*)ntfs_malloc(oldattrsz + newattrsz);
 	if (target) {
 		targhead = (SECURITY_DESCRIPTOR_RELATIVE*)target;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);

@@ -53,6 +53,16 @@ struct CACHED_PERMISSIONS {
 } ;
 
 /*
+ *	Entry in the permissions cache for directories with no security_id
+ */
+
+struct CACHED_PERMISSIONS_LEGACY {
+	struct CACHED_PERMISSIONS permissions;
+	struct CACHED_PERMISSIONS_LEGACY *next;
+	u64 mft_no;
+} ;
+
+/*
  *	Entry in the securid cache
  */
 
@@ -73,6 +83,8 @@ struct SECURITY_HEAD {
 	unsigned int last;
 	struct CACHED_SECURID *first_securid;
 	struct CACHED_SECURID *most_recent_securid;
+	struct CACHED_PERMISSIONS_LEGACY *first_legacy;
+	struct CACHED_PERMISSIONS_LEGACY *most_recent_legacy;
 			/* statistics for permissions */
 	unsigned long p_writes;
 	unsigned long p_reads;
