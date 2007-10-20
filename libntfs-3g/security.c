@@ -3248,6 +3248,9 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 				uid = fileuid;
 			if ((int)gid < 0)
 				gid = filegid;
+			/* clear setuid and setgid if owner has changed */
+			if (fileuid != uid)
+				mode &= 01777;
 			ntfs_set_owner_mode(scx, ni, uid, gid, mode);
 		} else {
 			res = -1;	/* neither owner nor root */
@@ -4340,17 +4343,21 @@ ok = TRUE; /* clarification needed */
  *	Only allowed for root
  *
  *	Returns an (obscured) struct SECURITY_API* needed for further calls
+ *		NULL if not root (EPERM) or device is mounted (EBUSY)
  */
 
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				int flags)
 {
 	ntfs_volume *vol;
+	unsigned long mntflag;
+	int mnt;
 	struct SECURITY_API *scapi;
 	struct SECURITY_CONTEXT *scx;
 
 	scapi = (struct SECURITY_API*)NULL;
-	if (!getuid()) {
+	mnt = ntfs_check_if_mounted(device, &mntflag);
+	if (!mnt && !(mntflag & NTFS_MF_MOUNTED) && !getuid()) {
 		vol = ntfs_mount(device, flags);
 		if (vol) {
 			scapi = (struct SECURITY_API*)
@@ -4372,7 +4379,10 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				errno = ENOMEM;
 		}
 	} else
-		errno = EPERM;
+		if (getuid())
+			errno = EPERM;
+		else
+			errno = EBUSY;
 	return (scapi);
 }
 
