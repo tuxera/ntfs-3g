@@ -381,8 +381,6 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	struct SECURITY_CONTEXT security;
 
 	vol = ctx->vol;
-if (!strcmp(org_path,"/dump"))
-dumpall(vol);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -935,22 +933,25 @@ static int ntfs_fuse_access(const char *path, int type)
 		   /* this is supposed to imply access to outer dirs */
 		if (ntfs_allowed_dir_access(&security,path,S_IREAD)) {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-			if (!type || !ni) {
+			if (!ni) {
 				res = -errno;
 			} else {
 				mode = 0;
-				if (type & X_OK) mode += S_IEXEC;
-				if (type & W_OK) mode += S_IWRITE;
-				if (type & R_OK) mode += S_IREAD;
-				if (ntfs_allowed_access(&security,path,ni,mode))
-					res = -errno;
-				if (ni && ntfs_inode_close(ni))
+				if (type & (X_OK | W_OK | R_OK)) {
+					if (type & X_OK) mode += S_IEXEC;
+					if (type & W_OK) mode += S_IWRITE;
+					if (type & R_OK) mode += S_IREAD;
+					if (!ntfs_allowed_access(&security,
+							path, ni, mode))
+						res = -errno;
+				}
+				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
 		} else
 			res = -errno;
 	}
-	return (res ? 0 : 1);
+	return (res);
 }
 
 static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
