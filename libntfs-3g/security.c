@@ -54,6 +54,8 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+#include <pwd.h>
+#include <grp.h>
 
 #include "types.h"
 #include "layout.h"
@@ -3845,9 +3847,7 @@ static void free_mapping(struct SECURITY_CONTEXT *scx)
 
 /*
  *		Build the user mapping list
- *	decimal uid are currently expected, however the input mapping
- *	data have been kept in memory to facilitate the conversion of
- *	logins while reading a file (such as /etc/passwd)
+ *	user identification may be given in symbolic or numeric format
  */
 
 static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
@@ -3856,12 +3856,23 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 	struct MAPPING *firstmapping;
 	struct MAPPING *lastmapping;
 	struct MAPPING *mapping;
+	struct passwd *pwd;
 	SID *sid;
+	int uid;
 
 	firstmapping = (struct MAPPING*)NULL;
 	lastmapping = (struct MAPPING*)NULL;
 	for (item = firstitem; item; item = item->next) {
-		if (item->uidstr[0]) {
+		if ((item->uidstr[0] >= '0') && (item->uidstr[0] <= '9'))
+			uid = atoi(item->uidstr);
+		else {
+			uid = 0;
+			if (item->uidstr[0]) {
+				pwd = getpwnam(item->uidstr);
+				if (pwd) uid = pwd->pw_uid;
+			}
+		}
+		if (uid) {
 			sid = encodesid(item->sidstr);
 			if (sid) {
 				mapping =
@@ -3869,7 +3880,7 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 				    ntfs_malloc(sizeof(struct MAPPING));
 				if (mapping) {
 					mapping->sid = sid;
-					mapping->xid = atoi(item->uidstr);
+					mapping->xid = uid;
 					mapping->next = (struct MAPPING*)NULL;
 					if (lastmapping)
 						lastmapping->next = mapping;
@@ -3885,9 +3896,7 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 
 /*
  *		Build the group mapping list
- *	Decimal gid are currently expected, however the input mapping
- *	data have been kept in memory to facilitate the conversion of
- *	logins while reading a file (such as /etc/group)
+ *	group identification may be given in symbolic or numeric format
  *
  *	gid not associated to a uid are processed first in order
  *	to favour real groups
@@ -3899,26 +3908,37 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 	struct MAPPING *firstmapping;
 	struct MAPPING *lastmapping;
 	struct MAPPING *mapping;
+	struct group *grp;
 	BOOL uidpresent;
 	BOOL ok;
 	int step;
 	SID *sid;
+	int gid;
 
 	firstmapping = (struct MAPPING*)NULL;
 	lastmapping = (struct MAPPING*)NULL;
 	for (step=1; step<=2; step++) {
 		for (item = firstitem; item; item = item->next) {
-			uidpresent = (item->uidstr[0] >= '1')
-                          && (item->uidstr[0] <= '9');
+			uidpresent = (item->uidstr[0] != '\0');
 			ok = (step == 1 ? !uidpresent : uidpresent);
-			if (item->gidstr[0] && ok) {
+			if ((item->gidstr[0] >= '0')
+			     && (item->gidstr[0] <= '9'))
+				gid = atoi(item->gidstr);
+			else {
+				gid = 0;
+				if (item->gidstr[0]) {
+					grp = getgrnam(item->gidstr);
+					if (grp) gid = grp->gr_gid;
+				}
+			}
+			if (gid && ok) {
 				sid = encodesid(item->sidstr);
 				if (sid) {
 					mapping = (struct MAPPING*)
 					    ntfs_malloc(sizeof(struct MAPPING));
 					if (mapping) {
 						mapping->sid = sid;
-						mapping->xid = atoi(item->gidstr);
+						mapping->xid = gid;
 						mapping->next = (struct MAPPING*)NULL;
 						if (lastmapping)
 							lastmapping->next = mapping;
