@@ -243,6 +243,20 @@ static const char systemsidbytes[] = {
 
 static const SID *systemsid = (const SID*)systemsidbytes;
 
+/*
+ *		SID for generic creator-owner
+ *		S-1-3-0
+ */
+
+static const char ownersidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 3,	/* base */
+		0, 0, 0, 0	/* 1st level */
+} ;
+
+static const SID *ownersid = (const SID*)ownersidbytes;
+
 /**
  * ntfs_guid_is_zero - check if a GUID is zero
  * @guid:	[IN] guid to check
@@ -2718,7 +2732,8 @@ static int build_std_permissions(const char *securattr, ntfs_inode *ni)
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (same_sid(usid, &pace->sid)) {
+		if (same_sid(usid, &pace->sid)
+		  || same_sid(ownersid, &pace->sid)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			else if (pace->type == ACCESS_DENIED_ACE_TYPE)
@@ -2781,8 +2796,9 @@ static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (same_sid(usid, &pace->sid)
-		   && (pace->mask & FILE_WRITE_ATTRIBUTES)) {
+		if ((same_sid(usid, &pace->sid)
+		   || same_sid(ownersid, &pace->sid))
+		    && (pace->mask & FILE_WRITE_ATTRIBUTES)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			} else
@@ -2837,8 +2853,9 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 	offace = offdacl + sizeof(ACL);
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (same_sid(usid, &pace->sid)
-		   && (((pace->mask & FILE_WRITE_ATTRIBUTES) && !nace))) {
+		if ((same_sid(usid, &pace->sid)
+		   || same_sid(ownersid, &pace->sid))
+		     && (((pace->mask & FILE_WRITE_ATTRIBUTES) && !nace))) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			else
