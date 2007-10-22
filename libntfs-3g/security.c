@@ -361,8 +361,10 @@ le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
         const le32 *end = pos + (len >> 2);
         u32 hash = 0;
 
-        while (pos < end)
-                hash = le32_to_cpup(pos++) + ntfs_rol32(hash, 3);
+        while (pos < end) {
+                hash = le32_to_cpup(pos) + ntfs_rol32(hash, 3);
+		pos++;
+	}
         return cpu_to_le32(hash);
 }
 
