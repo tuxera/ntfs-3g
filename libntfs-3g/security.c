@@ -3123,9 +3123,11 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 						enter_securid(scx, uid,
 							gid, mode,
 							ni->security_id);
+#if CACHE_LEGACY_SIZE
 					/* also invalidate legacy cache */
 					if (isdir && !ni->security_id)
 						invalidate_legacy(scx, ni);
+#endif
 				}
 				free(newattr);
 			} else {
@@ -3328,7 +3330,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 			break;
 		}
 		if (!allow)
-			errno = EPERM;
+			errno = EACCES;
 	}
 	return (allow);
 }
@@ -3434,12 +3436,10 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 			res = -1;
 	}
 	if (!res) {
-		/* check requested by owner or root */
+		/* check requested by root */
 		/* for chgrp, group must match owner's */
 		if (!scx->uid
-		   || ((fileuid == scx->uid)
-			&& (((int)gid < 0)
-			   || (filegid == scx->gid)))) {
+		   && (((int)gid < 0) || (filegid == scx->gid))) {
 			/* replace by the new usid and gsid */
 			/* or reuse old gid and sid for cacheing */
 			if ((int)uid < 0)

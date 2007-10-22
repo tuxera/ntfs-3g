@@ -381,6 +381,8 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	struct SECURITY_CONTEXT security;
 
 	vol = ctx->vol;
+if (!strcmp(org_path,"/dump"))
+dumpall(vol);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -896,13 +898,15 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 		return -EOPNOTSUPP;
 	} else {
 		   /* parent directory must be executable */
+		res = 0;
 		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni)
 				res = -errno;
 			else {
-				res = ntfs_set_owner(&security,
-					path,ni,uid,gid);
+				if (ntfs_set_owner(&security,
+						path,ni,uid,gid))
+					res = -errno;
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
@@ -1053,7 +1057,8 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 		} else
 			res = -errno;
 
-	}
+	} else
+		res = -errno;
 	free(path);
 
 exit:
@@ -1179,7 +1184,7 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -errno;
 		goto exit;
 	}
-
+	
 	if (!mtime)
 		NInoSetNoMtimeUpdate(ni);
 	
@@ -2507,7 +2512,7 @@ int main(int argc, char *argv[])
 	fc = try_fuse_mount(parsed_options);
 	if (!fc)
 		goto err_out;
-
+	
 	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
 	    fuse_opt_add_arg(&margs, "-o") == -1)
