@@ -4213,7 +4213,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 
 	avail = 0;
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
-	size = 0;
+	size = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* locate DACL if requested and available */
 	if (le16_to_cpu(phead->control)
@@ -4221,7 +4221,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offdacl = le32_to_cpu(phead->dacl);
 		pdacl = (const ACL*)&attr[offdacl];
 		daclsz = le16_to_cpu(pdacl->size);
-		size = offdacl + daclsz;
+		size += daclsz;
 		avail |= DACL_SECURITY_INFORMATION;
 	} else
 		offdacl = daclsz = 0;
@@ -4232,8 +4232,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			/* find end of USID */
 		pusid = (const SID*)&attr[offowner];
 		usidsz = sid_size(pusid);
-		if ((offowner + usidsz) > size)
-			size = offowner + usidsz;
+		size += usidsz;
 		avail |= OWNER_SECURITY_INFORMATION;
 	} else
 		offowner = usidsz = 0;
@@ -4244,8 +4243,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			/* find end of GSID */
 		pgsid = (const SID*)&attr[offgroup];
 		gsidsz = sid_size(pgsid);
-		if ((offgroup + gsidsz) > size)
-			size = offgroup + gsidsz;
+		size += gsidsz;
 		avail |= GROUP_SECURITY_INFORMATION;
 	} else
 		offgroup = gsidsz = 0;
@@ -4257,8 +4255,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
 		saclsz = le16_to_cpu(psacl->size);
-		if ((offsacl + saclsz) > size)
-			size = offsacl + saclsz;
+		size += saclsz;
 		avail |= SACL_SECURITY_INFORMATION;
 	} else
 		offsacl = saclsz = 0;
