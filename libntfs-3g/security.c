@@ -504,10 +504,8 @@ le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
         const le32 *end = pos + (len >> 2);
         u32 hash = 0;
 
-        while (pos < end) {
-                hash = le32_to_cpup(pos) + ntfs_rol32(hash, 3);
-		pos++;
-	}
+        while (pos < end)
+                hash = le32_to_cpup(pos++) + ntfs_rol32(hash, 3);
         return cpu_to_le32(hash);
 }
 
@@ -2578,15 +2576,25 @@ static char *getsecurityattr(ntfs_volume *vol,
 
 /*
  *		Test whether a SID means "world user"
+ *	Local users group also recognized as world
  */
 
 static int is_world_sid(const SID * usid)
 {
-             /* check whether S-1-1-0 */
-        return ((usid->sub_authority_count == 1)
-            && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-            && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
-            && (usid->sub_authority[0] == 0));
+	return (
+	     /* check whether S-1-1-0 : world */
+	       ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
+	    && (usid->sub_authority[0] == 0))
+
+	     /* check whether S-1-5-32-545 : local user */
+	  ||   ((usid->sub_authority_count == 2)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] == 32)
+	    && (usid->sub_authority[0] == 545))
+		);
 }
 
 /*
@@ -2597,10 +2605,10 @@ static int is_world_sid(const SID * usid)
 
 static int is_user_sid(const SID * usid)
 {
-        return ((usid->sub_authority_count == 5)
-            && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-            && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-            && (usid->sub_authority[0] ==  cpu_to_le32(21)));
+	return ((usid->sub_authority_count == 5)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
 }
 
 /*
