@@ -201,10 +201,10 @@ enum {	OWNER_SECURITY_INFORMATION = 1,
 	SACL_SECURITY_INFORMATION = 8
 } ;
 
-BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
+int ntfs_get_file_security(struct SECURITY_API *scapi,
                 const char *path, u32 selection,  
                 char *buf, u32 buflen, u32 *psize);
-BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
+int ntfs_set_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection, const char *attr);
 BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 		const char *path, ntfs_filldir_t callback, void *context);

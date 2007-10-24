@@ -3279,7 +3279,8 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 /*
  *		Check whether user can access a file in a specific way
  *
- *	Returns 1 if user is root or if no user mapping has been defined
+ *	Returns 1 if access is allowed, including user is root or no
+ *		  user mapping defined
  *		2 if sticky and accesstype is S_IWRITE + S_IEXEC + S_ISVTX
  *		0 and sets errno if there is a problem or if access
  *		  is not allowed
@@ -3292,8 +3293,13 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	mode_t perm;
 	int allow;
 
-	/* always allow for root (also root group ?) */
-	/* also always allow if no mapping has been defined */
+	/*
+	 * Always allow for root. From the user's point of view,
+	 * testing X_OK for a file with no x flag should return
+	 * not allowed, but this is checked somewhere else (fuse ?)
+	 * and we need not care about it.
+	 * Also always allow if no mapping has been defined
+	 */
 	if (!scx->usermapping || !scx->uid)
 		allow = 1;
 	else {
@@ -3341,7 +3347,8 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
  *		Check whether user can access the parent directory
  *	of a file in a specific way
  *
- *	Returns true if user is root or if no user mapping has been defined
+ *	Returns true if access is allowed, including user is root and
+ *		no user mapping defined
  *	
  *	Sets errno if there is a problem or if not allowed
  */
@@ -4251,9 +4258,12 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		/*
 		 * Check whether not requesting unavailable information
 		 * and having enough size in destination buffer
+		 * (required size is returned nevertheless so that
+		 * the request can be reissued with adequate size)
 		 */
 	if ((selection & ~avail)
 	   || (size > buflen)) {
+		*psize = size;
 		errno = EINVAL;
 		ok = FALSE;
 	} else {
@@ -4430,7 +4440,11 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
  *	This is intended to be similar to GetFileSecurity() from Win32
  *	in order to facilitate the development of portable tools
  *
- *	returns NON zero if successful (following Win32 conventions)
+ *	returns zero if unsuccessful (following Win32 conventions)
+ *		-1 if no securid
+ *		the securid if any
+ *
+ *  The Win32 API is :
  *
  *  BOOL WINAPI GetFileSecurity(
  *    __in          LPCTSTR lpFileName,
@@ -4445,31 +4459,37 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 uid_t getuid(void);
 gid_t getgid(void);
 
-BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
+int ntfs_get_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection,
 		char *buf, u32 buflen, u32 *psize)
 {
 	ntfs_inode *ni;
 	char *attr;
-	BOOL ok;
+	int res;
 
-	ok = FALSE; /* default return */
+	res = 0; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
 			attr = getsecurityattr(scapi->security.vol, path, ni);
 			if (attr) {
-				ok = feedsecurityattr(attr,selection,
-						buf,buflen,psize);
+				if (feedsecurityattr(attr,selection,
+						buf,buflen,psize)) {
+					if (test_nino_flag(ni, v3_Extensions))
+						res = le32_to_cpu(
+							ni->security_id);
+					else
+						res = -1;
+				}
 				free(attr);
 			}
 			ntfs_inode_close(ni);
 		} else
 			errno = ENOENT;
-		if (!ok) *psize = 0;
+		if (!res) *psize = 0;
 	} else
 		errno = EINVAL; /* do not clear *psize */
-	return (ok);
+	return (res);
 }
 
 
@@ -4478,7 +4498,11 @@ BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
  *	This is intended to be similar to SetFileSecurity() from Win32
  *	in order to facilitate the development of portable tools
  *
- *	returns NON zero if successful (following Win32 conventions)
+ *	returns zero if unsuccessful (following Win32 conventions)
+ *		-1 if no securid
+ *		the securid if any
+ *
+ *  The Win32 API is :
  *
  *  BOOL WINAPI SetFileSecurity(
  *    __in          LPCTSTR lpFileName,
@@ -4487,7 +4511,7 @@ BOOL ntfs_get_file_security(struct SECURITY_API *scapi,
  *  );
  */
 
-BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
+int ntfs_set_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection, const char *attr)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -4495,9 +4519,9 @@ BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
 	int attrsz;
 	unsigned int provided;
 	char *oldattr;
-	BOOL ok;
+	int res;
 
-	ok = FALSE; /* default return */
+	res = 0; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API) && attr) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		attrsz = attr_size(attr);
@@ -4515,17 +4539,24 @@ BOOL ntfs_set_file_security(struct SECURITY_API *scapi,
 				oldattr = getsecurityattr(scapi->security.vol,
 						path, ni);
 				if (oldattr) {
-					ok = mergesecurityattr(
+					if (mergesecurityattr(
 						scapi->security.vol,
 						oldattr, attr,
-						selection, ni);
+						selection, ni)) {
+						if (test_nino_flag(ni,
+							    v3_Extensions))
+							res = le32_to_cpu(
+							    ni->security_id);
+						else
+							res = -1;
+					}
 					free(oldattr);
 				}
 				ntfs_inode_close(ni);
 			}
 		}
 	}
-	return (ok);
+	return (res);
 }
 
 
