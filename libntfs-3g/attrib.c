@@ -60,6 +60,37 @@
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 
+static int NAttrFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		return (na->ni->flags & flag);
+	return 0;
+}
+
+static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		na->ni->flags |= flag;
+	else
+		ntfs_log_error("Denied setting flag %d for not unnamed data "
+			       "attribute\n", flag);
+}
+
+static void NAttrClearFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		na->ni->flags &= ~flag;
+}
+
+#define GenNAttrIno(func_name, flag)					\
+int NAttr##func_name(ntfs_attr *na) { return NAttrFlag   (na, flag); } 	\
+void NAttrSet##func_name(ntfs_attr *na)	 { NAttrSetFlag  (na, flag); }	\
+void NAttrClear##func_name(ntfs_attr *na){ NAttrClearFlag(na, flag); }
+
+GenNAttrIno(Compressed, FILE_ATTR_COMPRESSED)
+GenNAttrIno(Encrypted, 	FILE_ATTR_ENCRYPTED)
+GenNAttrIno(Sparse, 	FILE_ATTR_SPARSE_FILE)
+
 /**
  * ntfs_get_attribute_value_length - Find the length of an attribute
  * @a:

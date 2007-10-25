@@ -158,7 +158,7 @@ static const char *usage_msg =
  *
  * Returns 1 if path is to named data stream or 0 otherwise.
  */
-static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
+static int ntfs_fuse_is_named_data_stream(const char *path)
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return 1;
