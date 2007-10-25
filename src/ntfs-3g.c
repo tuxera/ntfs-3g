@@ -2024,7 +2024,7 @@ static int parse_options(int argc, char *argv[])
 	return 0;
 }
 
-#ifdef linux || __uClinux__
+#if defined(linux) || defined(__uClinux__)
 
 static const char *dev_fuse_msg =
 "HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
@@ -2231,7 +2231,7 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
-#ifdef linux || __uClinux__
+#if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
@@ -2302,7 +2302,7 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
-#ifdef linux || __uClinux__
+#if defined(linux) || defined(__uClinux__)
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
 #endif	
