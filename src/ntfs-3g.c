@@ -648,7 +648,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	ntfs_attr *na = NULL;
 	char *path = NULL;
 	ntfschar *stream_name;
-	int stream_name_len, res, total = 0;
+	int stream_name_len, res;
+	s64 total = 0;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -664,20 +665,26 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + size > na->data_size)
-		size = na->data_size - offset;
-	while (size) {
-		res = ntfs_attr_pread(na, offset, size, buf);
-		if (res < (s64)size)
-			ntfs_log_perror("ntfs_attr_pread partial write (%lld: "
-				"%lld <> %d)", (s64)offset, (s64)size, res);
-		if (res <= 0) {
-			res = -errno;
+	if (offset + size > na->data_size) {
+		if (na->data_size < offset) {
+			res = -EINVAL;
 			goto exit;
 		}
-		size -= res;
-		offset += res;
-		total += res;
+		size = na->data_size - offset;
+	}
+	while (size > 0) {
+		s64 ret = ntfs_attr_pread(na, offset, size, buf);
+		if (ret != (s64)size)
+			ntfs_log_perror("ntfs_attr_pread error reading '%s' at "
+				"offset %lld: %lld <> %lld", org_path, 
+				(long long)offset, (long long)size, (long long)ret);
+		if (ret <= 0 || ret > (s64)size) {
+			res = (ret <= 0) ? -errno : -EIO;
+			goto exit;
+		}
+		size -= ret;
+		offset += ret;
+		total += ret;
 	}
 	res = total;
 exit:
