@@ -2257,11 +2257,11 @@ int main(int argc, char *argv[])
 	if (fuse_opt_add_arg(&margs, "") == -1 ||
 	    fuse_opt_add_arg(&margs, "-o") == -1)
 		    fh = NULL;
-	if (!ctx->debug && !ctx->no_detach) {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
+	if (ctx->debug) {
+		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache,debug") == -1)
 			fh = NULL;
 	} else {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache,debug") == -1)
+		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
 			fh = NULL;
 	}
 	if (fh)
