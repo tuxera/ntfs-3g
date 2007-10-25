@@ -135,10 +135,6 @@ static const char *locale_msg =
 "         be correct or visible. Please see the potential solution at\n"
 "         http://ntfs-3g.org/support.html#locale\n";
 
-static const char *dev_fuse_msg =
-"HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
-"      kernel module as root (modprobe fuse) and make sure /dev/fuse exist.\n";
-
 static const char *usage_msg = 
 "\n"
 "%s %s - Third Generation NTFS Driver\n"
@@ -2030,6 +2026,12 @@ static int parse_options(int argc, char *argv[])
 
 #ifdef linux
 
+static const char *dev_fuse_msg =
+"HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
+"      kernel module as root ('modprobe fuse' or 'insmod <path_to>/fuse.ko'"
+"      or insmod <path_to>/fuse.o'). Make also sure that the fuse device"
+"      exists. It's usually either /dev/fuse or /dev/misc/fuse.";
+
 static const char *fuse26_kmod_msg =
 "WARNING: Deficient Linux kernel detected. Some driver features are\n"
 "         not available (swap file on NTFS, boot from NTFS by LILO), and\n"
@@ -2041,17 +2043,37 @@ static const char *fuse26_kmod_msg =
 "         http://ntfs-3g.org/support.html#fuse26\n"
 "\n";
 
-static void create_dev_fuse(void)
+static void mknod_dev_fuse(const char *dev)
 {
 	struct stat st;
 	
-	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
-		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229))) {
-			ntfs_log_perror("Failed to create /dev/fuse");
+	if (stat(dev, &st) && (errno == ENOENT)) {
+		mode_t mask = umask(0); 
+		if (mknod(dev, S_IFCHR | 0666, makedev(10, 229))) {
+			ntfs_log_perror("Failed to create '%s'", dev);
 			if (errno == EPERM)
 				ntfs_log_error(dev_fuse_msg);
 		}
+		umask(mask);
 	}
+}
+
+static void create_dev_fuse(void)
+{
+	mknod_dev_fuse("/dev/fuse");
+
+#ifdef __UCLIBC__
+	{
+		struct stat st;
+		/* The fuse device is under /dev/misc using devfs. */
+		if (stat("/dev/misc", &st) && (errno == ENOENT)) {
+			mode_t mask = umask(0); 
+			mkdir("/dev/misc", 0775);
+			umask(mask);
+		}
+		mknod_dev_fuse("/dev/misc/fuse");
+	}
+#endif
 }
 
 static fuse_fstype get_fuse_fstype(void)
