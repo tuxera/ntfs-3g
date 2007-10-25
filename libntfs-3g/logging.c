@@ -58,6 +58,13 @@ static const char *col_red    = "\e[01;31m";
 static const char *col_redinv = "\e[01;07;31m";
 static const char *col_end    = "\e[0m";
 
+/* gcc 3.3.3 crashes with internal compiler error. 4.x seems to be ok. */
+#if __GNUC__ <= 3
+# define  BROKEN_GCC_FORMAT_ATTRIBUTE
+#else
+# define  BROKEN_GCC_FORMAT_ATTRIBUTE __attribute__((format(printf, 6, 0)))
+#endif
+
 /**
  * struct ntfs_logging - Control info for the logging system
  * @levels:	Bitfield of logging levels
@@ -67,7 +74,7 @@ static const char *col_end    = "\e[0m";
 struct ntfs_logging {
 	u32 levels;
 	u32 flags;
-	ntfs_log_handler *handler;
+	ntfs_log_handler *handler BROKEN_GCC_FORMAT_ATTRIBUTE;
 };
 
 /**
