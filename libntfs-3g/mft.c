@@ -265,19 +265,20 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 	}
 	err = EIO;
 	if (!ntfs_is_file_record(m->magic)) {
-		ntfs_log_perror("Record %llu has no FILE magic",
-			(unsigned long long)MREF(mref));
+		ntfs_log_error("Record %llu has no FILE magic (0x%x)\n",
+			(unsigned long long)MREF(mref), *(le32 *)m);
 		goto err_out;
 	}
 	if (MSEQNO(mref) && MSEQNO(mref) != le16_to_cpu(m->sequence_number)) {
-		ntfs_log_perror("Record %llu has wrong SeqNo",
-				(unsigned long long)MREF(mref));
+		ntfs_log_error("Record %llu has wrong SeqNo (%d <> %d)\n",
+			       (unsigned long long)MREF(mref), MSEQNO(mref),
+			       le16_to_cpu(m->sequence_number));
 		goto err_out;
 	}
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	if (p2n(a) < p2n(m) || (char*)a > (char*)m + vol->mft_record_size) {
-		ntfs_log_perror("Record %llu is corrupt",
-				(unsigned long long)MREF(mref));
+		ntfs_log_error("Record %llu is corrupt\n",
+			       (unsigned long long)MREF(mref));
 		goto err_out;
 	}
 	*mrec = m;
