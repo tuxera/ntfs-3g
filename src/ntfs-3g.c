@@ -381,8 +381,6 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	struct SECURITY_CONTEXT security;
 
 	vol = ctx->vol;
-if (!strcmp(org_path,"/dump"))
-dumpall(vol);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
