@@ -487,8 +487,7 @@ int ntfs_inode_attach_all_extents(ntfs_inode *ni)
 	while ((u8*)ale < ni->attr_list + ni->attr_list_size) {
 		if (ni->mft_no != MREF_LE(ale->mft_reference) &&
 				prev_attached != MREF_LE(ale->mft_reference)) {
-			if (!ntfs_extent_inode_open(ni,
-					MREF_LE(ale->mft_reference))) {
+			if (!ntfs_extent_inode_open(ni, ale->mft_reference)) {
 				ntfs_log_trace("Couldn't attach extent inode.\n");
 				return -1;
 			}
