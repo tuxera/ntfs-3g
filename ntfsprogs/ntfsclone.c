@@ -420,9 +420,17 @@ static void parse_options(int argc, char **argv)
 
 			if (S_ISBLK(st.st_mode)) {
 				opt.blkdev_out = 1;
-				if (opt.metadata)
+				if (opt.metadata && !opt.force)
 					err_exit("Cloning only metadata to a "
-					     "block device isn't supported!\n");
+					     "block device does not usually "
+					     "make sense, aborting...\n"
+					     "If you were instructed to do "
+					     "this by a developer and/or are "
+					     "sure that this is what you want "
+					     "to do, run this utility again "
+					     "but this time add the force "
+					     "option, i.e. add '--force' to "
+					     "the command line arguments.");
 			}
 		}
 	}
