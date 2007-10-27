@@ -117,6 +117,7 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	struct fuse_chan *fc;
 } ntfs_fuse_context_t;
 
 static struct options {
@@ -1590,29 +1591,28 @@ exit:
 
 #endif /* HAVE_SETXATTR */
 
-static void ntfs_fuse_destroy(void)
+static void ntfs_close(void)
 {
 	if (!ctx)
 		return;
 	
-	if (ctx->vol) {
-		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
-			      ctx->vol->vol_name);
-		if (ntfs_umount(ctx->vol, FALSE))
-			ntfs_log_perror("Failed to cleanly unmount volume %s",
-					opts.device);
-	}
-	free(ctx);
-	ctx = NULL;
-	free(opts.device);
+	if (!ctx->vol)
+		return;
+	
+	ntfs_log_info("Unmounting %s (%s)\n", opts.device, ctx->vol->vol_name);
+	
+	if (ntfs_umount(ctx->vol, FALSE))
+		ntfs_log_perror("Failed to close volume %s", opts.device);
+	
+	ctx->vol = NULL;
 }
 
 static void ntfs_fuse_destroy2(void *unused __attribute__((unused)))
 {
-	ntfs_fuse_destroy();
+	ntfs_close();
 }
 
-static struct fuse_operations ntfs_fuse_oper = {
+static struct fuse_operations ntfs_3g_ops = {
 	.getattr	= ntfs_fuse_getattr,
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
@@ -2194,12 +2194,42 @@ static void set_user_mount_option(char *parsed_options, uid_t uid)
 	strcat(parsed_options, option);
 }
 
+static struct fuse *mount_fuse(char *parsed_options)
+{
+	struct fuse *fh = NULL;
+	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+	
+	/* Libfuse can't always find fusermount, so let's help it. */
+	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
+		ntfs_log_perror("WARNING: Failed to set $PATH\n");
+	
+	ctx->fc = try_fuse_mount(parsed_options);
+	if (!ctx->fc)
+		return NULL;
+	
+	if (fuse_opt_add_arg(&args, "") == -1)
+		goto err;
+	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache") == -1)
+		goto err;
+	if (ctx->debug)
+		if (fuse_opt_add_arg(&args, "-odebug") == -1)
+			goto err;
+	
+	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+	if (!fh)
+		goto err;
+out:
+	fuse_opt_free_args(&args);
+	return fh;
+err:	
+	fuse_unmount(opts.mnt_point, ctx->fc);
+	goto out;
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
-	struct fuse_chan *fc;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
 	int use_blkdev = 0;
@@ -2267,39 +2297,13 @@ int main(int argc, char *argv[])
 	    set_user_mount_option(parsed_options, uid);
 	}
 	
-	/* Libfuse can't always find fusermount, so let's help it. */
-	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
-		ntfs_log_perror("WARNING: Failed to set $PATH\n");
-	
-	fc = try_fuse_mount(parsed_options);
-	if (!fc)
+	fh = mount_fuse(parsed_options);
+	if (!fh)
 		goto err_out;
-	
-	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
-	if (fuse_opt_add_arg(&margs, "") == -1 ||
-	    fuse_opt_add_arg(&margs, "-o") == -1)
-		    fh = NULL;
-	if (ctx->debug) {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache,debug") == -1)
-			fh = NULL;
-	} else {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
-			fh = NULL;
-	}
-	if (fh)
-		fh = fuse_new(fc, &margs , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper), NULL);
-	fuse_opt_free_args(&margs);
-	if (!fh) {
-		ntfs_log_error("fuse_new failed.\n");
-		fuse_unmount(opts.mnt_point, fc);
-		goto err_out;
-	}
-	
+		
 	if (setuid(uid)) {
 		ntfs_log_perror("Failed to set user ID to %d", uid);
-		fuse_unmount(opts.mnt_point, fc);
-		goto err_out;
+		goto err_umount;
 	}
 
 #if defined(linux) || defined(__uClinux__)
@@ -2328,12 +2332,15 @@ int main(int argc, char *argv[])
 	
 	fuse_loop(fh);
 	
-	fuse_unmount(opts.mnt_point, fc);
-	fuse_destroy(fh);
 	err = 0;
+err_umount:
+	fuse_unmount(opts.mnt_point, ctx->fc);
+	fuse_destroy(fh);
 err_out:
-	free(opts.options);
+	ntfs_close();
+	free(ctx);
 	free(parsed_options);
-	ntfs_fuse_destroy();
+	free(opts.options);
+	free(opts.device);
 	return err;
 }
