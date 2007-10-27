@@ -117,6 +117,7 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	BOOL mounted;
 	struct fuse_chan *fc;
 } ntfs_fuse_context_t;
 
@@ -1599,7 +1600,9 @@ static void ntfs_close(void)
 	if (!ctx->vol)
 		return;
 	
-	ntfs_log_info("Unmounting %s (%s)\n", opts.device, ctx->vol->vol_name);
+	if (ctx->mounted)
+		ntfs_log_info("Unmounting %s (%s)\n", opts.device, 
+			      ctx->vol->vol_name);
 	
 	if (ntfs_umount(ctx->vol, FALSE))
 		ntfs_log_perror("Failed to close volume %s", opts.device);
@@ -1644,15 +1647,13 @@ static struct fuse_operations ntfs_3g_ops = {
 
 static int ntfs_fuse_init(void)
 {
-	ctx = ntfs_malloc(sizeof(ntfs_fuse_context_t));
+	ctx = ntfs_calloc(sizeof(ntfs_fuse_context_t));
 	if (!ctx)
 		return -1;
 	
 	*ctx = (ntfs_fuse_context_t) {
 		.uid = getuid(),
 		.gid = getgid(),
-		.fmask = 0,
-		.dmask = 0,
 		.streams = NF_STREAMS_INTERFACE_NONE,
 	};
 	return 0;
@@ -2218,6 +2219,8 @@ static struct fuse *mount_fuse(char *parsed_options)
 	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
 	if (!fh)
 		goto err;
+	
+	ctx->mounted = TRUE;
 out:
 	fuse_opt_free_args(&args);
 	return fh;
