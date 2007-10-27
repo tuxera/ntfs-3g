@@ -169,59 +169,11 @@ static int ntfs_fuse_is_named_data_stream(const char *path)
 
 static long ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 {
-	u8 *buf;
-	long nr_free = 0;
-	s64 br, total = 0;
+	ntfs_attr *na = vol->mftbmp_na;
+	long nr_free = ntfs_attr_get_free_bits(na);
 
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->mftbmp_na, total,
-				     vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
-	}
-	free(buf);
-	if (!total || br < 0)
-		return -errno;
-
-	nr_free += (vol->mftbmp_na->allocated_size - vol->mftbmp_na->data_size) << 3;
-	return nr_free;
-}
-
-static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
-{
-	u8 *buf;
-	long nr_free = 0;
-	s64 br, total = 0;
-
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->lcnbmp_na, total,
-				     vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
-	}
-	free(buf);
-	if (!total || br < 0)
-		return -errno;
+	if (nr_free >= 0)
+		nr_free += (na->allocated_size - na->data_size) << 3;
 	return nr_free;
 }
 
@@ -2283,7 +2235,7 @@ int main(int argc, char *argv[])
 	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
 		goto err_out;
 	
-	ctx->vol->free_clusters = ntfs_get_nr_free_clusters(ctx->vol);
+	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
 	if (ctx->vol->free_clusters < 0) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;

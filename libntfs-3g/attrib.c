@@ -5042,3 +5042,30 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	return ret;
 }
 
+long ntfs_attr_get_free_bits(ntfs_attr *na)
+{
+	u8 *buf;
+	long nr_free = 0;
+	s64 br, total = 0;
+
+	buf = ntfs_malloc(na->ni->vol->cluster_size);
+	if (!buf)
+		return -errno;
+	while (1) {
+		int i, j;
+
+		br = ntfs_attr_pread(na, total, na->ni->vol->cluster_size, buf);
+		if (br <= 0)
+			break;
+		total += br;
+		for (i = 0; i < br; i++)
+			for (j = 0; j < 8; j++)
+				if (!((buf[i] >> j) & 1))
+					nr_free++;
+	}
+	free(buf);
+	if (!total || br < 0)
+		return -errno;
+	return nr_free;
+}
+
