@@ -167,10 +167,10 @@ static int ntfs_fuse_is_named_data_stream(const char *path)
 	return 0;
 }
 
-static long ntfs_get_nr_free_mft_records(ntfs_volume *vol)
+static s64 ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 {
 	ntfs_attr *na = vol->mftbmp_na;
-	long nr_free = ntfs_attr_get_free_bits(na);
+	s64 nr_free = ntfs_attr_get_free_bits(na);
 
 	if (nr_free >= 0)
 		nr_free += (na->allocated_size - na->data_size) << 3;

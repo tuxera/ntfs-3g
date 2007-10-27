@@ -340,7 +340,7 @@ extern int   ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
 			     ntfschar *name, u32 name_len);
 extern int   ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
 			      ntfschar *name, u32 name_len);
-extern long  ntfs_attr_get_free_bits(ntfs_attr *na);
+extern s64   ntfs_attr_get_free_bits(ntfs_attr *na);
 
 #endif /* defined _NTFS_ATTRIB_H */
 
