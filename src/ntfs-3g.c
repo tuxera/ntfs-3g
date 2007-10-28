@@ -117,6 +117,7 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	BOOL blkdev;
 	BOOL mounted;
 	struct fuse_chan *fc;
 } ntfs_fuse_context_t;
@@ -1611,11 +1612,11 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
+static int ntfs_open(const char *device, char *mntpoint)
 {
 	unsigned long flags = 0;
 	
-	if (!blkdev)
+	if (!ctx->blkdev)
 		flags |= MS_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= MS_RDONLY;
@@ -1625,7 +1626,22 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 		flags |= MS_FORCE;
 
 	ctx->vol = utils_mount_volume(device, mntpoint, flags);
-	return ctx->vol;
+	if (!ctx->vol)
+		return -1;
+	
+	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
+	if (ctx->vol->free_clusters < 0) {
+		ntfs_log_perror("Failed to read NTFS $Bitmap");
+		return -1;
+	}
+
+	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
+	if (ctx->vol->free_mft_records < 0) {
+		ntfs_log_perror("Failed to calculate free MFT records");
+		return -1;
+	}
+	
+	return 0;
 }
 
 static void signal_handler(int arg __attribute__((unused)))
@@ -2187,7 +2203,6 @@ int main(int argc, char *argv[])
 	struct fuse *fh;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
-	int use_blkdev = 0;
 	uid_t uid, euid;
 	int err = 10;
 
@@ -2230,26 +2245,15 @@ int main(int argc, char *argv[])
 	}
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
-		use_blkdev = 1;
+		ctx->blkdev = TRUE;
 
-	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
+	if (ntfs_open(opts.device, opts.mnt_point))
 		goto err_out;
 	
-	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
-	if (ctx->vol->free_clusters < 0) {
-		ntfs_log_perror("Failed to read NTFS $Bitmap");
-		goto err_out;
-	}
-
-	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
-	if (ctx->vol->free_mft_records < 0) {
-		ntfs_log_perror("Failed to calculate free MFT records");
-		goto err_out;
-	}
-	
-	if (use_blkdev) {
-	    set_fuseblk_options(parsed_options);
-	    set_user_mount_option(parsed_options, uid);
+	if (ctx->blkdev) {
+		/* Must do after ntfs_open() to set the right blksize. */
+		set_fuseblk_options(parsed_options);
+		set_user_mount_option(parsed_options, uid);
 	}
 	
 	fh = mount_fuse(parsed_options);
