@@ -500,13 +500,15 @@ void ntfs_generate_guid(GUID *guid)
  */
 le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
 {
-        const le32 *pos = (const le32*)sd;
-        const le32 *end = pos + (len >> 2);
-        u32 hash = 0;
+	const le32 *pos = (const le32*)sd;
+	const le32 *end = pos + (len >> 2);
+	u32 hash = 0;
 
-        while (pos < end)
-                hash = le32_to_cpup(pos++) + ntfs_rol32(hash, 3);
-        return cpu_to_le32(hash);
+	while (pos < end) {
+		hash = le32_to_cpup(pos) + ntfs_rol32(hash, 3);
+		pos++;
+	}
+	return cpu_to_le32(hash);
 }
 
 
@@ -3487,8 +3489,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 
 static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
 {
-	int src;
-	int dst;
+	unsigned int src;
+	unsigned int dst;
 	int oldcnt;
 	int newcnt;
 	unsigned int selection;
@@ -3508,7 +3510,7 @@ static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
 	newcnt = 0;
 	oldcnt = le16_to_cpu(oldacl->ace_count);
 	for (nace = 0; nace < oldcnt; nace++) {
-		poldace = (const ACCESS_ALLOWED_ACE*)((char*)oldacl + src);
+		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
 		if (poldace->flags & selection) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
@@ -3540,8 +3542,7 @@ static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
  */
 
 static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
-			const char *parentattr,
-			ntfs_inode *dir_ni, BOOL fordir)
+			const char *parentattr, BOOL fordir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *pphead;
 	const ACL *ppacl;
@@ -3684,8 +3685,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		parentattr = getsecurityattr(scx->vol, dir_path, dir_ni);
 		if (parentattr) {
 			securid = build_inherited_id(scx,
-						parentattr,
-						dir_ni, fordir);
+						parentattr, fordir);
 			free(parentattr);
 			/*
 			 * Store the result into cache for further use
@@ -3865,6 +3865,10 @@ static void free_mapping(struct SECURITY_CONTEXT *scx)
 /*
  *		Build the user mapping list
  *	user identification may be given in symbolic or numeric format
+ *
+ *	! Note ! : does getpwnam() read /etc/passwd or some other file ?
+ *		if so there is a possible recursion into fuse if this
+ *		file is on NTFS, and fuse is not recursion safe.
  */
 
 static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
@@ -3917,6 +3921,10 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
  *
  *	gid not associated to a uid are processed first in order
  *	to favour real groups
+ *
+ *	! Note ! : does getgrnam() read /etc/group or some other file ?
+ *		if so there is a possible recursion into fuse if this
+ *		file is on NTFS, and fuse is not recursion safe.
  */
 
 static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)

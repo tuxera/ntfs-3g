@@ -65,6 +65,37 @@ ntfschar STREAM_SDS[] = { const_cpu_to_le16('$'),
 			const_cpu_to_le16('S'),
 			const_cpu_to_le16('\0') };
 
+static int NAttrFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		return (na->ni->flags & flag);
+	return 0;
+}
+
+static void NAttrSetFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		na->ni->flags |= flag;
+	else
+		ntfs_log_trace("Denied setting flag %d for not unnamed data "
+			       "attribute\n", flag);
+}
+
+static void NAttrClearFlag(ntfs_attr *na, FILE_ATTR_FLAGS flag)
+{
+	if (na->type == AT_DATA && na->name == AT_UNNAMED)
+		na->ni->flags &= ~flag;
+}
+
+#define GenNAttrIno(func_name, flag)					\
+int NAttr##func_name(ntfs_attr *na) { return NAttrFlag   (na, flag); } 	\
+void NAttrSet##func_name(ntfs_attr *na)	 { NAttrSetFlag  (na, flag); }	\
+void NAttrClear##func_name(ntfs_attr *na){ NAttrClearFlag(na, flag); }
+
+GenNAttrIno(Compressed, FILE_ATTR_COMPRESSED)
+GenNAttrIno(Encrypted, 	FILE_ATTR_ENCRYPTED)
+GenNAttrIno(Sparse, 	FILE_ATTR_SPARSE_FILE)
+
 /**
  * ntfs_get_attribute_value_length - Find the length of an attribute
  * @a:
@@ -4743,8 +4774,8 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 				ntfs_log_perror("Cluster allocation failed "
 						"(%lld)",
 						(long long)first_free_vcn -
-						((long long)na->allocated_size
-						 >> vol->cluster_size_bits));
+						((long long)na->allocated_size >>
+						 vol->cluster_size_bits));
 				return -1;
 			}
 		}
@@ -5015,5 +5046,32 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	ntfs_attr_close(na);
 	
 	return ret;
+}
+
+s64 ntfs_attr_get_free_bits(ntfs_attr *na)
+{
+	u8 *buf;
+	s64 nr_free = 0;
+	s64 br, total = 0;
+
+	buf = ntfs_malloc(na->ni->vol->cluster_size);
+	if (!buf)
+		return -1;
+	while (1) {
+		int i, j;
+
+		br = ntfs_attr_pread(na, total, na->ni->vol->cluster_size, buf);
+		if (br <= 0)
+			break;
+		total += br;
+		for (i = 0; i < br; i++)
+			for (j = 0; j < 8; j++)
+				if (!((buf[i] >> j) & 1))
+					nr_free++;
+	}
+	free(buf);
+	if (!total || br < 0)
+		return -1;
+	return nr_free;
 }
 

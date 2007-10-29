@@ -120,6 +120,9 @@ typedef struct {
 	BOOL debug;
 	BOOL noatime;
 	BOOL no_detach;
+	BOOL blkdev;
+	BOOL mounted;
+	struct fuse_chan *fc;
 	BOOL inherit;
 	BOOL addsecurids;
 	struct SECURITY_CACHE *seccache;
@@ -141,10 +144,6 @@ static const char *locale_msg =
 "WARNING: Couldn't set locale to '%s' thus some file names may not\n"
 "         be correct or visible. Please see the potential solution at\n"
 "         http://ntfs-3g.org/support.html#locale\n";
-
-static const char *dev_fuse_msg =
-"HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
-"      kernel module as root (modprobe fuse) and make sure /dev/fuse exist.\n";
 
 static const char *usage_msg = 
 "\n"
@@ -169,40 +168,20 @@ static const char *usage_msg =
  *
  * Returns 1 if path is to named data stream or 0 otherwise.
  */
-static __inline__ int ntfs_fuse_is_named_data_stream(const char *path)
+static int ntfs_fuse_is_named_data_stream(const char *path)
 {
 	if (strchr(path, ':') && ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return 1;
 	return 0;
 }
 
-static long ntfs_get_nr_free_mft_records(ntfs_volume *vol)
+static s64 ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 {
-	u8 *buf;
-	long nr_free = 0;
-	s64 br, total = 0;
+	ntfs_attr *na = vol->mftbmp_na;
+	s64 nr_free = ntfs_attr_get_free_bits(na);
 
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->mftbmp_na, total,
-				     vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
-	}
-	free(buf);
-	if (!total || br < 0)
-		return -errno;
-
-	nr_free += (vol->mftbmp_na->allocated_size - vol->mftbmp_na->data_size) << 3;
+	if (nr_free >= 0)
+		nr_free += (na->allocated_size - na->data_size) << 3;
 	return nr_free;
 }
 
@@ -229,34 +208,6 @@ static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 	return (ctx->security.usermapping != (struct MAPPING*)NULL);
 }
 
-static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
-{
-	u8 *buf;
-	long nr_free = 0;
-	s64 br, total = 0;
-
-	buf = ntfs_malloc(vol->cluster_size);
-	if (!buf)
-		return -errno;
-	while (1) {
-		int i, j;
-
-		br = ntfs_attr_pread(vol->lcnbmp_na, total,
-				     vol->cluster_size, buf);
-		if (br <= 0)
-			break;
-		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
-	}
-	free(buf);
-	if (!total || br < 0)
-		return -errno;
-	return nr_free;
-}
-
 /**
  * ntfs_fuse_statfs - return information about mounted NTFS volume
  * @path:	ignored (but fuse requires it)
@@ -275,7 +226,7 @@ static long ntfs_get_nr_free_clusters(ntfs_volume *vol)
  * Returns 0 on success or -errno on error.
  */
 static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
-		struct statvfs *sfs)
+			    struct statvfs *sfs)
 {
 	s64 size;
 	int delta_bits;
@@ -285,22 +236,23 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	if (!vol)
 		return -ENODEV;
 	
-	/* Optimal transfer block size. */
+	/* File system block size, used for optimal transfer block size. */
 	sfs->f_bsize = vol->cluster_size;
+	
+	/* Fundamental file system block size, used as the unit. */
 	sfs->f_frsize = vol->cluster_size;
+	
 	/*
-	 * Total data blocks in file system in units of f_bsize and since
-	 * inodes are also stored in data blocs ($MFT is a file) this is just
-	 * the total clusters.
+	 * Total number of blocks on file system in units of f_frsize.
+	 * Since inodes are also stored in blocks ($MFT is a file) hence
+	 * this is the number of clusters on the volume.
 	 */
 	sfs->f_blocks = vol->nr_clusters;
 	
-	/* Free data blocks in file system in units of f_bsize. */
+	/* Free blocks available for all and for non-privileged processes. */
 	size = vol->free_clusters;
 	if (size < 0)
 		size = 0;
-	
-	/* Free blocks avail to non-superuser, same as above on NTFS. */
 	sfs->f_bavail = sfs->f_bfree = size;
 	
 	/* Free inodes on the free space */
@@ -310,15 +262,14 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	else
 		size >>= -delta_bits;
 	
-	/* Number of inodes in file system (at this point in time). */
+	/* Number of inodes at this point in time. */
 	sfs->f_files = (vol->mftbmp_na->allocated_size << 3) + size;
 	
-	/* Free inodes in fs (based on current total count). */
+	/* Free inodes available for all and for non-privileged processes. */
 	size += vol->free_mft_records;
 	if (size < 0)
 		size = 0;
-	sfs->f_ffree = size;
-	sfs->f_favail = 0;
+	sfs->f_ffree = sfs->f_favail = size;
 	
 	/* Maximum length of filenames. */
 	sfs->f_namemax = NTFS_MAX_NAME_LEN;
@@ -606,7 +557,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
 			ctx->show_sys_files) {
 		struct stat st = { .st_ino = MREF(mref) };
-
+		 
 		if (dt_type == NTFS_DT_REG)
 			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
 		else if (dt_type == NTFS_DT_DIR)
@@ -701,7 +652,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	ntfs_attr *na = NULL;
 	char *path = NULL;
 	ntfschar *stream_name;
-	int stream_name_len, res, total = 0;
+	int stream_name_len, res;
+	s64 total = 0;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -717,21 +669,26 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + size > (size_t)na->data_size)
-		size = na->data_size - offset;
-	while (size) {
-		res = ntfs_attr_pread(na, offset, size, buf);
-		if (res < (s64)size)
-			ntfs_log_perror("ntfs_attr_pread partial write (%lld: "
-				"%lld <> %d)", (long long)offset,
-				(long long)size, res);
-		if (res <= 0) {
-			res = -errno;
+	if (offset + (off_t)size > na->data_size) {
+		if (na->data_size < offset) {
+			res = -EINVAL;
 			goto exit;
 		}
-		size -= res;
-		offset += res;
-		total += res;
+		size = na->data_size - offset;
+	}
+	while (size > 0) {
+		s64 ret = ntfs_attr_pread(na, offset, size, buf);
+		if (ret != (s64)size)
+			ntfs_log_perror("ntfs_attr_pread error reading '%s' at "
+				"offset %lld: %lld <> %lld", org_path, 
+				(long long)offset, (long long)size, (long long)ret);
+		if (ret <= 0 || ret > (s64)size) {
+			res = (ret <= 0) ? -errno : -EIO;
+			goto exit;
+		}
+		size -= ret;
+		offset += ret;
+		total += ret;
 	}
 	res = total;
 exit:
@@ -1809,15 +1766,18 @@ exit:
 
 #endif /* HAVE_SETXATTR */
 
-static void ntfs_fuse_destroy(void)
+static void ntfs_close(void)
 {
 	struct SECURITY_CONTEXT security;
 
 	if (!ctx)
 		return;
 	
-	if (ctx->vol) {
-		ntfs_log_info("Unmounting %s (%s)\n", opts.device,
+	if (!ctx->vol)
+		return;
+	
+	if (ctx->mounted) {
+		ntfs_log_info("Unmounting %s (%s)\n", opts.device, 
 			      ctx->vol->vol_name);
 		if (ntfs_fuse_fill_security_context(&security)) {
 			if (ctx->seccache && ctx->seccache->head.p_reads) {
@@ -1847,21 +1807,20 @@ static void ntfs_fuse_destroy(void)
 			}
 		}
 		ntfs_close_secure(&security);
-		if (ntfs_umount(ctx->vol, FALSE))
-			ntfs_log_perror("Failed to cleanly unmount volume %s",
-					opts.device);
 	}
-	free(ctx);
-	ctx = NULL;
-	free(opts.device);
+	
+	if (ntfs_umount(ctx->vol, FALSE))
+		ntfs_log_perror("Failed to close volume %s", opts.device);
+	
+	ctx->vol = NULL;
 }
 
 static void ntfs_fuse_destroy2(void *unused __attribute__((unused)))
 {
-	ntfs_fuse_destroy();
+	ntfs_close();
 }
 
-static struct fuse_operations ntfs_fuse_oper = {
+static struct fuse_operations ntfs_3g_ops = {
 	.getattr	= ntfs_fuse_getattr,
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
@@ -1894,25 +1853,23 @@ static struct fuse_operations ntfs_fuse_oper = {
 
 static int ntfs_fuse_init(void)
 {
-	ctx = ntfs_malloc(sizeof(ntfs_fuse_context_t));
+	ctx = ntfs_calloc(sizeof(ntfs_fuse_context_t));
 	if (!ctx)
 		return -1;
 	
 	*ctx = (ntfs_fuse_context_t) {
 		.uid = getuid(),
 		.gid = getgid(),
-		.fmask = 0,
-		.dmask = 0,
 		.streams = NF_STREAMS_INTERFACE_NONE,
 	};
 	return 0;
 }
 
-static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
+static int ntfs_open(const char *device, char *mntpoint)
 {
 	unsigned long flags = 0;
 	
-	if (!blkdev)
+	if (!ctx->blkdev)
 		flags |= MS_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= MS_RDONLY;
@@ -1922,7 +1879,22 @@ static ntfs_volume *ntfs_open(const char *device, char *mntpoint, int blkdev)
 		flags |= MS_FORCE;
 
 	ctx->vol = utils_mount_volume(device, mntpoint, flags);
-	return ctx->vol;
+	if (!ctx->vol)
+		return -1;
+	
+	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
+	if (ctx->vol->free_clusters < 0) {
+		ntfs_log_perror("Failed to read NTFS $Bitmap");
+		return -1;
+	}
+
+	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
+	if (ctx->vol->free_mft_records < 0) {
+		ntfs_log_perror("Failed to calculate free MFT records");
+		return -1;
+	}
+	
+	return 0;
 }
 
 static void signal_handler(int arg __attribute__((unused)))
@@ -2286,7 +2258,13 @@ static int parse_options(int argc, char *argv[])
 	return 0;
 }
 
-#ifdef linux
+#if defined(linux) || defined(__uClinux__)
+
+static const char *dev_fuse_msg =
+"HINT: You should be root, or make ntfs-3g setuid root, or load the FUSE\n"
+"      kernel module as root ('modprobe fuse' or 'insmod <path_to>/fuse.ko'"
+"      or insmod <path_to>/fuse.o'). Make also sure that the fuse device"
+"      exists. It's usually either /dev/fuse or /dev/misc/fuse.";
 
 static const char *fuse26_kmod_msg =
 "WARNING: Deficient Linux kernel detected. Some driver features are\n"
@@ -2299,17 +2277,37 @@ static const char *fuse26_kmod_msg =
 "         http://ntfs-3g.org/support.html#fuse26\n"
 "\n";
 
-static void create_dev_fuse(void)
+static void mknod_dev_fuse(const char *dev)
 {
 	struct stat st;
 	
-	if (stat("/dev/fuse", &st) && (errno == ENOENT)) {
-		if (mknod("/dev/fuse", S_IFCHR | 0666, makedev(10, 229))) {
-			ntfs_log_perror("Failed to create /dev/fuse");
+	if (stat(dev, &st) && (errno == ENOENT)) {
+		mode_t mask = umask(0); 
+		if (mknod(dev, S_IFCHR | 0666, makedev(10, 229))) {
+			ntfs_log_perror("Failed to create '%s'", dev);
 			if (errno == EPERM)
 				ntfs_log_error(dev_fuse_msg);
 		}
+		umask(mask);
 	}
+}
+
+static void create_dev_fuse(void)
+{
+	mknod_dev_fuse("/dev/fuse");
+
+#ifdef __UCLIBC__
+	{
+		struct stat st;
+		/* The fuse device is under /dev/misc using devfs. */
+		if (stat("/dev/misc", &st) && (errno == ENOENT)) {
+			mode_t mask = umask(0); 
+			mkdir("/dev/misc", 0775);
+			umask(mask);
+		}
+		mknod_dev_fuse("/dev/misc/fuse");
+	}
+#endif
 }
 
 static fuse_fstype get_fuse_fstype(void)
@@ -2430,15 +2428,46 @@ static void set_user_mount_option(char *parsed_options, uid_t uid)
 	strcat(parsed_options, option);
 }
 
+static struct fuse *mount_fuse(char *parsed_options)
+{
+	struct fuse *fh = NULL;
+	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+	
+	/* Libfuse can't always find fusermount, so let's help it. */
+	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
+		ntfs_log_perror("WARNING: Failed to set $PATH\n");
+	
+	ctx->fc = try_fuse_mount(parsed_options);
+	if (!ctx->fc)
+		return NULL;
+	
+	if (fuse_opt_add_arg(&args, "") == -1)
+		goto err;
+	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache") == -1)
+		goto err;
+	if (ctx->debug)
+		if (fuse_opt_add_arg(&args, "-odebug") == -1)
+			goto err;
+	
+	fh = fuse_new(ctx->fc, &args , &ntfs_3g_ops, sizeof(ntfs_3g_ops), NULL);
+	if (!fh)
+		goto err;
+	
+	ctx->mounted = TRUE;
+out:
+	fuse_opt_free_args(&args);
+	return fh;
+err:	
+	fuse_unmount(opts.mnt_point, ctx->fc);
+	goto out;
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
 	struct fuse *fh;
-	struct fuse_chan *fc;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
-	int use_blkdev = 0;
 	uid_t uid, euid;
 	int err = 10;
 
@@ -2467,7 +2496,7 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 
-#ifdef linux
+#if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
@@ -2481,64 +2510,27 @@ int main(int argc, char *argv[])
 	}
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
-		use_blkdev = 1;
+		ctx->blkdev = TRUE;
 
-	if (!ntfs_open(opts.device, opts.mnt_point, use_blkdev))
+	if (ntfs_open(opts.device, opts.mnt_point))
 		goto err_out;
 	
-	ctx->vol->free_clusters = ntfs_get_nr_free_clusters(ctx->vol);
-	if (ctx->vol->free_clusters < 0) {
-		ntfs_log_perror("Failed to read NTFS $Bitmap");
+	if (ctx->blkdev) {
+		/* Must do after ntfs_open() to set the right blksize. */
+		set_fuseblk_options(parsed_options);
+		set_user_mount_option(parsed_options, uid);
+	}
+	
+	fh = mount_fuse(parsed_options);
+	if (!fh)
 		goto err_out;
-	}
-
-	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
-	if (ctx->vol->free_mft_records < 0) {
-		ntfs_log_perror("Failed to calculate free MFT records");
-		goto err_out;
-	}
-	
-	if (use_blkdev) {
-	    set_fuseblk_options(parsed_options);
-	    set_user_mount_option(parsed_options, uid);
-	}
-	
-	/* Libfuse can't always find fusermount, so let's help it. */
-	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
-		ntfs_log_perror("WARNING: Failed to set $PATH\n");
-	
-	fc = try_fuse_mount(parsed_options);
-	if (!fc)
-		goto err_out;
-	
-	fh = (struct fuse *)1; /* Cast anything except NULL to handle errors. */
-	if (fuse_opt_add_arg(&margs, "") == -1 ||
-	    fuse_opt_add_arg(&margs, "-o") == -1)
-		    fh = NULL;
-	if (!ctx->debug && !ctx->no_detach) {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache") == -1)
-			fh = NULL;
-	} else {
-		if (fuse_opt_add_arg(&margs, "use_ino,kernel_cache,debug") == -1)
-			fh = NULL;
-	}
-	if (fh)
-		fh = fuse_new(fc, &margs , &ntfs_fuse_oper,
-				sizeof(ntfs_fuse_oper), NULL);
-	fuse_opt_free_args(&margs);
-	if (!fh) {
-		ntfs_log_error("fuse_new failed.\n");
-		fuse_unmount(opts.mnt_point, fc);
-		goto err_out;
-	}
-	
+		
 	if (setuid(uid)) {
 		ntfs_log_perror("Failed to set user ID to %d", uid);
-		fuse_unmount(opts.mnt_point, fc);
-		goto err_out;
+		goto err_umount;
 	}
 
-#ifdef linux
+#if defined(linux) || defined(__uClinux__)
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
 #endif	
@@ -2580,12 +2572,15 @@ int main(int argc, char *argv[])
 	
 	fuse_loop(fh);
 	
-	fuse_unmount(opts.mnt_point, fc);
-	fuse_destroy(fh);
 	err = 0;
+err_umount:
+	fuse_unmount(opts.mnt_point, ctx->fc);
+	fuse_destroy(fh);
 err_out:
-	free(opts.options);
+	ntfs_close();
+	free(ctx);
 	free(parsed_options);
-	ntfs_fuse_destroy();
+	free(opts.options);
+	free(opts.device);
 	return err;
 }

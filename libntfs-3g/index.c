@@ -1218,7 +1218,7 @@ static int ntfs_ir_truncate(ntfs_index_context *icx, int data_size)
 	
 		icx->ir->index.allocated_size = cpu_to_le32(data_size);
 		
-	} else
+	} else if (ret == STATUS_ERROR)
 		ntfs_log_perror("Failed to truncate INDEX_ROOT");
 	
 	ntfs_attr_close(na);
