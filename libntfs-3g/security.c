@@ -1090,7 +1090,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		securid = cpu_to_le32(0);
 		na = ntfs_attr_open(vol->secure_ni,AT_INDEX_ROOT,sii_stream,4);
 		if (na) {
-			if (na->data_size < sizeof(struct SII)) {
+			if ((size_t)na->data_size < sizeof(struct SII)) {
 				ntfs_log_error("Creating the first security_id\n");
 				securid = cpu_to_le32(FIRST_SECURITY_ID);
 			}
@@ -3456,9 +3456,11 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 	}
 	if (!res) {
 		/* check requested by root */
-		/* for chgrp, group must match owner's */
+		/* or chgrp requested by owner */
 		if (!scx->uid
-		   && (((int)gid < 0) || (filegid == scx->gid))) {
+		   || (((int)uid < 0)
+		      && (gid == scx->gid)
+		      && (fileuid == scx->uid))) {
 			/* replace by the new usid and gsid */
 			/* or reuse old gid and sid for cacheing */
 			if ((int)uid < 0)
