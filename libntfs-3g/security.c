@@ -1182,7 +1182,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 	securid = cpu_to_le32(0);
 	res = 0;
 	xsdh = vol->secure_xsdh;
-	if (vol->secure_ni && xsdh) {
+	if (vol->secure_ni && xsdh && !vol->secure_reentry++) {
 		ntfs_index_ctx_reinit(xsdh);
 		/*
 		 * find the nearest key as (hash,0)
@@ -1247,6 +1247,8 @@ static le32 setsecurityattr(ntfs_volume *vol,
 			}
 		}
 	}
+	if (--vol->secure_reentry)
+		ntfs_log_perror("Reentry error, check no multithreading\n");
 	return (securid);
 }
 
@@ -1565,12 +1567,12 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 			/* chain the entries, and mark an invalid mode */
 		for (i=0; i<(CACHE_SECURID_SIZE - 1); i++) {
 			cachesecurid[i].next = &cachesecurid[i+1];
-			cachesecurid[i].mode = -1;
+			cachesecurid[i].dmode = -1;
 		}
 			/* special for the last entry */
 		cachesecurid[CACHE_SECURID_SIZE - 1].next =
 			(struct CACHED_SECURID*)NULL;
-		cachesecurid[CACHE_SECURID_SIZE - 1].mode = -1;
+		cachesecurid[CACHE_SECURID_SIZE - 1].dmode = -1;
 #if CACHE_LEGACY_SIZE
 			/* create the legacy cache if needed */
 		cachelegacy = (struct CACHED_PERMISSIONS_LEGACY*)
@@ -1638,23 +1640,25 @@ static void free_caches(struct SECURITY_CONTEXT *scx)
  */
 
 static const struct CACHED_SECURID *fetch_securid(struct SECURITY_CONTEXT *scx,
-		uid_t uid, gid_t gid, mode_t mode)
+		uid_t uid, gid_t gid, mode_t mode, BOOL isdir)
 {
 	struct SECURITY_CACHE *cache;
 	struct CACHED_SECURID *current;
 	struct CACHED_SECURID *previous;
+	unsigned int dmode; /* mode and directory flag */
 
 	cache = *scx->pseccache;
 	if (cache) {
 			/*
 			 * Search sequentially in LRU list
 			 */
+		dmode = (isdir ? mode | 010000 : mode);
 		current = cache->head.most_recent_securid;
 		previous = (struct CACHED_SECURID*)NULL;
 		while (current
 			&& ((current->uid != uid)
 			  || (current->gid != gid)
-			  || (current->mode != mode))) {
+			  || (current->dmode != dmode))) {
 			cache->head.s_hops++;
 			previous = current;
 			current = current->next;
@@ -1682,15 +1686,17 @@ static const struct CACHED_SECURID *fetch_securid(struct SECURITY_CONTEXT *scx,
  */
 
 static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
-		uid_t uid, gid_t gid,
-		mode_t mode, le32 securid)
+		uid_t uid, gid_t gid, mode_t mode,
+		BOOL isdir, le32 securid)
 {
 	struct SECURITY_CACHE *cache;
 	struct CACHED_SECURID *current;
 	struct CACHED_SECURID *previous;
 	struct CACHED_SECURID *before;
+	unsigned int dmode;
 
-	mode &= 07777;
+	dmode = mode & 07777;
+	if (isdir) dmode |= 010000;
 	cache = *scx->pseccache;
 	if (cache || (cache = create_caches(scx, le32_to_cpu(securid)))) {
 
@@ -1706,7 +1712,7 @@ static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
 		while (current
 			&& ((current->uid != uid)
 			  || (current->gid != gid)
-			  || (current->mode != mode))) {
+			  || (current->dmode != dmode))) {
 			before = previous;
 			previous = current;
 			current = current->next;
@@ -1725,7 +1731,7 @@ static const struct CACHED_SECURID *enter_securid(struct SECURITY_CONTEXT *scx,
 			current = previous;
 			current->uid = uid;
 			current->gid = gid;
-			current->mode = mode;
+			current->dmode = dmode;
 			current->securid = securid;
 		}
 		cache->head.s_writes++;
@@ -3082,6 +3088,66 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 }
 
 /*
+ *		Allocate a security_id for a file being created
+ *	
+ *	Returns zero if not possible (NTFS v3.x required)
+ */
+
+le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, gid_t gid, mode_t mode, BOOL isdir)
+{
+	const struct CACHED_SECURID *cached;
+	char *newattr;
+	int newattrsz;
+	const SID *usid;
+	const SID *gsid;
+	le32 securid;
+
+	securid = cpu_to_le32(0);
+
+#if !FORCE_FORMAT_v1x
+		/* check whether target securid is known in cache */
+
+	cached = fetch_securid(scx, uid, gid, mode & 07777, isdir);
+		/* quite simple, if we are lucky */
+	if (cached)
+		securid = cached->securid;
+
+		/* not in cache : make sure we can create ids */
+
+	if (!cached && (scx->vol->major_ver >= 3)) {
+		usid = find_usid(scx,uid);
+		gsid = find_gsid(scx,gid);
+		if (usid && gsid) {
+			newattr = build_secur_descr(mode,
+					 isdir, usid, gsid);
+			if (newattr) {
+				newattrsz = attr_size(newattr);
+				securid = setsecurityattr(scx->vol,
+					(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
+					newattrsz);
+				if (securid) {
+					/* update cache, for subsequent use */
+					enter_securid(scx, uid,
+							gid, mode, isdir,
+							securid);
+				}
+				free(newattr);
+			} else {
+				/* could not build new security attribute */
+				errno = EIO;
+			}
+		} else {
+			/* could not map uid or gid */
+			errno = EIO;
+		}
+	}
+#endif
+	return (securid);
+}
+
+
+/*
  *		Update ownership and mode of a file, reusing an existing
  *	security descriptor when possible
  *	
@@ -3102,8 +3168,9 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 
 		/* check whether target securid is known in cache */
 
+	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
 	if (test_nino_flag(ni, v3_Extensions)) {
-		cached = fetch_securid(scx, uid, gid, mode & 07777);
+		cached = fetch_securid(scx, uid, gid, mode & 07777, isdir);
 			/* quite simple, if we are lucky */
 		if (cached) {
 			ni->security_id = cached->securid;
@@ -3116,7 +3183,6 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 	} else cached = (struct CACHED_SECURID*)NULL;
 
 	if (!cached) {
-		isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
 			/*
 			 * Do not use usid and gsid from former attributes,
 			 * but recompute them to get repeatable results
@@ -3133,7 +3199,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 					/* update cache, for subsequent use */
 					if (test_nino_flag(ni, v3_Extensions))
 						enter_securid(scx, uid,
-							gid, mode,
+							gid, mode, isdir,
 							ni->security_id);
 #if CACHE_LEGACY_SIZE
 					/* also invalidate legacy cache */
@@ -4152,6 +4218,7 @@ int ntfs_open_secure(ntfs_volume *vol)
 	vol->secure_ni = (ntfs_inode*)NULL;
 	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
 	if (ni) {
+		vol->secure_reentry = 0;
 		vol->secure_xsii = ntfs_index_ctx_get(ni, sii_stream, 4);
 		vol->secure_xsdh = ntfs_index_ctx_get(ni, sdh_stream, 4);
 		if (ni && vol->secure_xsii && vol->secure_xsdh) {

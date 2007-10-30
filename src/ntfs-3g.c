@@ -828,6 +828,13 @@ static int ntfs_fuse_chmod(const char *path,
 			else {
 				if (ntfs_set_mode(&security,path,ni,mode))
 					res = -errno;
+				else {
+					if (mode & S_IWUSR)
+						ni->flags &= ~FILE_ATTR_READONLY;
+					else
+						ni->flags |= FILE_ATTR_READONLY;
+				}
+				NInoSetDirty(ni);
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
@@ -958,21 +965,25 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 	if (!ntfs_fuse_fill_security_context(&security)
 	       || ntfs_allowed_access(&security,dir_path,
 				dir_ni,S_IWRITE + S_IEXEC)) {
+ /* ! JPA ! did not find where to get umask from ! */
+		if (S_ISDIR(type))
+			perm = typemode & ~ctx->dmask & 0777;
+		else
+			perm = typemode & ~ctx->fmask & 0777;
 			/*
-			 * JPA if parent directory has an inheritable
-			 * security descriptor, make it available for
-			 * file creation. However this inheritance will
-			 * be lost when creation is applied if user
-			 * mapping has been defined
+			 * JPA try to get a security id available for
+			 * file creation (from inheritance or argument).
+			 * This is not possible for NTFS 1.x, and we will
+			 * have to build a security attribute later.
 			 */
 		if (ctx->inherit || !ctx->security.usermapping)
 			securid = ntfs_inherited_id(&security, dir_path,
 					dir_ni, S_ISDIR(type));
-		else
-			if (test_nino_flag(dir_ni, v3_Extensions))
-				securid = dir_ni->security_id;
-			else
-				securid = cpu_to_le32(0);
+		else {
+			securid = ntfs_alloc_securid(&security,
+				security.uid, security.gid, perm,
+				S_ISDIR(type));
+		}
 		/* Create object specified in @type. */
 		switch (type) {
 			case S_IFCHR:
@@ -996,17 +1007,21 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				break;
 		}
 		if (ni) {
- /* ! JPA ! did not find where to get umask from ! */
-			if (S_ISDIR(type))
-				perm = typemode & ~ctx->dmask & 0777;
-			else
-				perm = typemode & ~ctx->fmask & 0777;
-			if (!ctx->inherit
-			   && ntfs_fuse_fill_security_context(&security)) {
+				/*
+				 * set the security attribute if a security id
+				 * could not be allocated (eg NTFS 1.x)
+				 */
+			if (!securid && ctx->security.usermapping) {
 			   	if (ntfs_set_owner_mode(&security, ni,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
 			}
+				/* Adjust read-only (for Windows) */
+			if (perm & S_IWUSR)
+				ni->flags &= ~FILE_ATTR_READONLY;
+			else
+				ni->flags |= FILE_ATTR_READONLY;
+			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		} else
