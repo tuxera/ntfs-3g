@@ -4443,6 +4443,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			pos += size;
 		} else
 			targhead->group = cpu_to_le32(0);
+		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
+		targhead->alignment = 0;
 		targhead->control = cpu_to_le16(present | selection);
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
