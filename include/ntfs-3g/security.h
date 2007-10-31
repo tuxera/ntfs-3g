@@ -70,7 +70,7 @@ struct CACHED_SECURID {
 	struct CACHED_SECURID *next;
 	uid_t uid;
 	gid_t gid;
-	unsigned int mode;
+	unsigned int dmode;
 	le32 securid;
 } ;
 
@@ -166,6 +166,8 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype);
 
+le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, gid_t gid, mode_t mode, BOOL isdir);
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
