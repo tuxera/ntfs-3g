@@ -2307,11 +2307,12 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 
 	/* a grant ACE for group */
 	/* unless group has the same rights as world */
-	/* but present if owner is administrator */
+	/* but present if group is owner or owner is administrator */
 
 	if (adminowns
+	    || groupowns
 	    || (((mode >> 3) ^ mode) & 7)
-	    || (mode & S_ISGID)) {
+	    || (mode & (S_ISGID | S_ISUID))) {
 		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 		grants = WORLD_RIGHTS;
