@@ -809,6 +809,7 @@ static int ntfs_fuse_chmod(const char *path,
 	int res = 0;
 	ntfs_inode *ni;
 	struct SECURITY_CONTEXT security;
+	time_t now;
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
@@ -833,6 +834,8 @@ static int ntfs_fuse_chmod(const char *path,
 						ni->flags &= ~FILE_ATTR_READONLY;
 					else
 						ni->flags |= FILE_ATTR_READONLY;
+					now = time(NULL);
+					ni->last_mft_change_time = now;
 				}
 				NInoSetDirty(ni);
 				if (ntfs_inode_close(ni))
