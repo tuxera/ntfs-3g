@@ -2241,9 +2241,9 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= FILE_READ;
 		if (mode & S_ISVTX)
 			grants ^= FILE_APPEND_DATA;
- 		if (mode & S_ISUID)
-			grants ^= FILE_WRITE_EA;
 	}
+	if (mode & S_ISUID)
+		grants ^= FILE_WRITE_EA;
 	pgace->size = cpu_to_le16(usidsz + 8);
 	pgace->mask = cpu_to_le32(grants);
 	memcpy((char*)&pgace->sid, usid, usidsz);
@@ -2334,9 +2334,9 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				grants |= FILE_READ;
 			if (mode & S_ISVTX)
 				grants ^= FILE_APPEND_DATA;
- 			if (mode & S_ISGID)
-				grants ^= FILE_WRITE_EA;
 		}
+		if (mode & S_ISGID)
+			grants ^= FILE_WRITE_EA;
 		pgace->size = cpu_to_le16(gsidsz + 8);
 		pgace->mask = cpu_to_le32(grants);
 		memcpy((char*)&pgace->sid, gsid, gsidsz);
@@ -2658,11 +2658,11 @@ static int merge_permissions(ntfs_inode *ni,
 			if (((owner & FILE_STICKY)
 			    && ((owner & FILE_STICKY) != FILE_STICKY)))
 				perm |= S_ISVTX;
-			/* setuid if write_ea different from write_attr */
-			if (((owner & FILE_SETUID)
-			    && ((owner & FILE_SETUID) != FILE_SETUID)))
-				perm |= S_ISUID;
 		}
+		/* setuid if write_ea different from write_attr */
+		if (((owner & FILE_SETUID)
+		    && ((owner & FILE_SETUID) != FILE_SETUID)))
+			perm |= S_ISUID;
 	}
 	/* build group permission */
 	if (group) {
@@ -2686,11 +2686,11 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of readdata */
 			if (group & FILE_GREAD)
 				perm |= S_IRGRP;
-			/* setgid if write_ea different from write_attr */
-			if (((group & FILE_SETGID)
-			    && ((group & FILE_SETGID) != FILE_SETGID)))
-				perm |= S_ISGID;
 		}
+		/* setgid if write_ea different from write_attr */
+		if (((group & FILE_SETGID)
+		    && ((group & FILE_SETGID) != FILE_SETGID)))
+			perm |= S_ISGID;
 	}
 	/* build world permission */
 	if (world) {
@@ -2780,8 +2780,8 @@ static int build_std_permissions(const char *securattr, ntfs_inode *ni)
 		 * unless denied personaly, and add to group rights
 		 * granted to world unless denied specifically
 		 */
-	allowown |= (allowgrp | allowall);
-	allowgrp |= allowall;
+	allowown |= (allowgrp | allowall) & ~FILE_SETUID;
+	allowgrp |= allowall & ~FILE_SETUID;
 	return (merge_permissions(ni,
 				allowown & ~denyown,
 				allowgrp & ~denygrp,
@@ -3535,7 +3535,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 			if ((int)gid < 0)
 				gid = filegid;
 			/* clear setuid and setgid if owner has changed */
-			if (fileuid != uid)
+                        /* unless request originated by root */
+			if (uid && (fileuid != uid))
 				mode &= 01777;
 			ntfs_set_owner_mode(scx, ni, uid, gid, mode);
 		} else {
