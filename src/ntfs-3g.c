@@ -851,6 +851,7 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 {
 	ntfs_inode *ni;
 	int res;
+	time_t now;
 	struct SECURITY_CONTEXT security;
 
 	if (ntfs_fuse_is_named_data_stream(path))
@@ -872,6 +873,13 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 				if (ntfs_set_owner(&security,
 						path,ni,uid,gid))
 					res = -errno;
+				else {
+					if (((int)uid != -1)
+					    || ((int)gid != -1)) {
+						now = time(NULL);
+						ni->last_mft_change_time = now;
+					}
+				}
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
