@@ -863,28 +863,29 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 			return 0;
 		return -EOPNOTSUPP;
 	} else {
-		   /* parent directory must be executable */
 		res = 0;
-		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
-			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-			if (!ni)
-				res = -errno;
-			else {
-				if (ntfs_set_owner(&security,
-						path,ni,uid,gid))
+		if (((int)uid != -1) || ((int)gid != -1)) {
+
+			   /* parent directory must be executable */
+		
+			if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+				if (!ni)
 					res = -errno;
 				else {
-					if (((int)uid != -1)
-					    || ((int)gid != -1)) {
+					if (ntfs_set_owner(&security,
+							path,ni,uid,gid))
+						res = -errno;
+					else {
 						now = time(NULL);
 						ni->last_mft_change_time = now;
 					}
+					if (ntfs_inode_close(ni))
+						set_fuse_error(&res);
 				}
-				if (ntfs_inode_close(ni))
-					set_fuse_error(&res);
-			}
-		} else
-			res = -errno;
+			} else
+				res = -errno;
+		}
 	}
 	return (res);
 }
