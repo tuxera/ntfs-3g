@@ -617,10 +617,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		goto exit;
 	}
 	if (offset + size > na->data_size) {
-		if (na->data_size < offset) {
-			res = -EINVAL;
-			goto exit;
-		}
+		if (na->data_size < offset)
+			goto ok;
 		size = na->data_size - offset;
 	}
 	while (size > 0) {
@@ -630,13 +628,14 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 				"offset %lld: %lld <> %lld", org_path, 
 				(long long)offset, (long long)size, (long long)ret);
 		if (ret <= 0 || ret > (s64)size) {
-			res = (ret <= 0) ? -errno : -EIO;
+			res = (ret < 0) ? -errno : -EIO;
 			goto exit;
 		}
 		size -= ret;
 		offset += ret;
 		total += ret;
 	}
+ok:
 	res = total;
 exit:
 	if (na)
