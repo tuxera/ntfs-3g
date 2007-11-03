@@ -58,8 +58,8 @@ static const char *col_red    = "\e[01;31m";
 static const char *col_redinv = "\e[01;07;31m";
 static const char *col_end    = "\e[0m";
 
-/* gcc 3.3.3 crashes with internal compiler error. 4.x seems to be ok. */
-#if __GNUC__ <= 3
+/* Some gcc 3.x, 4.[01].X crash with internal compiler error. */
+#if __GNUC__ <= 3 || (__GNUC__ == 4 && __GNUC_MINOR__ <= 1)
 # define  BROKEN_GCC_FORMAT_ATTRIBUTE
 #else
 # define  BROKEN_GCC_FORMAT_ATTRIBUTE __attribute__((format(printf, 6, 0)))
