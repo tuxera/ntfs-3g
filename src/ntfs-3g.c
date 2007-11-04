@@ -1372,7 +1372,7 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 			if ((size_t)ret <= size) {
 				/* Don't add space to the beginning of line. */
 				if (to != value) {
-					*to = ' ';
+					*to = '\0';
 					to++;
 				}
 				strncpy(to, tmp_name, tmp_name_len);
