@@ -875,7 +875,7 @@ static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
 }
 
 /*
- *	Enter a new security descriptor into $Secure (data only)
+ *		Enter a new security descriptor into $Secure (data only)
  *      it has to be written twice with an offset of 256KB
  *
  *	Should only be called by entersecurityattr() to ensure consistency
@@ -885,7 +885,7 @@ static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
 
 static int entersecurity_data(ntfs_volume *vol,
 			const SECURITY_DESCRIPTOR_RELATIVE *attr, s64 attrsz,
-			le32 hash, le32 keyid, off_t offs)
+			le32 hash, le32 keyid, off_t offs, int gap)
 {
 	int res;
 	int written1;
@@ -895,22 +895,31 @@ static int entersecurity_data(ntfs_volume *vol,
 	SECURITY_DESCRIPTOR_HEADER *phsds;
 
 	res = -1;
-	fullsz = attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER);
+	fullsz = attrsz + gap + sizeof(SECURITY_DESCRIPTOR_HEADER);
 	fullattr = ntfs_malloc(fullsz);
 	if (fullattr) {
-		memcpy(&fullattr[sizeof(SECURITY_DESCRIPTOR_HEADER)],
+			/*
+			 * Clear the gap from previous descriptor
+			 * this could be useful for appending the second
+			 * copy to the end of file. When creating a new
+			 * 256K block, the gap is cleared while writing
+			 * the first copy
+			 */
+		if (gap)
+			memset(fullattr,0,gap);
+		memcpy(&fullattr[gap + sizeof(SECURITY_DESCRIPTOR_HEADER)],
 				attr,attrsz);
-		phsds = (SECURITY_DESCRIPTOR_HEADER*)fullattr;
+		phsds = (SECURITY_DESCRIPTOR_HEADER*)&fullattr[gap];
 		phsds->hash = hash;
 		phsds->security_id = keyid;
 		phsds->offset = cpu_to_le64(offs);
-		phsds->length = cpu_to_le32(fullsz);
+		phsds->length = cpu_to_le32(fullsz - gap);
 		written1 = ntfs_local_write(vol->secure_ni,
 			STREAM_SDS, 4, fullattr, fullsz,
-			offs);
+			offs - gap);
 		written2 = ntfs_local_write(vol->secure_ni,
 			STREAM_SDS, 4, fullattr, fullsz,
-			offs + ALIGN_SDS_BLOCK);
+			offs - gap + ALIGN_SDS_BLOCK);
 		if ((written1 == fullsz)
 		     && (written2 == written1))
 			res = 0;
@@ -990,7 +999,8 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 		newsdh.dataoffsl = realign.parts.dataoffsl;
 		newsdh.datasize = cpu_to_le32(attrsz
 			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
-                           /* special filler value... */
+                           /* special filler value, Windows generally */
+                           /* fills with 0x00490049, sometimes with zero */
 		newsdh.fill3 = cpu_to_le32(0x00490049);
 		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
 			res = 0;
@@ -1020,6 +1030,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	le32 securid;
 	le32 keyid;
 	off_t offs;
+	int gap;
 	int size;
 	struct SII *psii;
 	INDEX_ENTRY *entry;
@@ -1111,7 +1122,8 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	 */
 
 	if (securid) {
-		offs += ((size - 1) | (ALIGN_SDS_ENTRY - 1)) + 1;
+		gap = (-size) & (ALIGN_SDS_ENTRY - 1);
+		offs += gap + size;
 		if ((offs + attrsz + sizeof(SECURITY_DESCRIPTOR_HEADER) - 1)
 	 	   & ALIGN_SDS_BLOCK) {
 			offs = ((offs + attrsz
@@ -1132,15 +1144,18 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 *    in SDS or SII will not be reused, an inconsistency
 		 *    will persist with no significant consequence
 		 */
-		if (entersecurity_data(vol, attr, attrsz, hash, securid, offs)
+		if (entersecurity_data(vol, attr, attrsz, hash, securid, offs, gap)
 		    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
 			securid = cpu_to_le32(0);
 	}
 		/* inode now is dirty, synchronize it all */
+	ntfs_index_entry_mark_dirty(vol->secure_xsii);
 	ntfs_index_ctx_reinit(vol->secure_xsii);
+	ntfs_index_entry_mark_dirty(vol->secure_xsdh);
 	ntfs_index_ctx_reinit(vol->secure_xsdh);
 	NInoSetDirty(vol->secure_ni);
-	ntfs_inode_sync(vol->secure_ni);
+	if (ntfs_inode_sync(vol->secure_ni))
+		ntfs_log_perror("Could not sync $Secure\n");
 	return (securid);
 }
 
