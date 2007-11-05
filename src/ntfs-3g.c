@@ -670,10 +670,8 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		goto exit;
 	}
 	if (offset + (off_t)size > na->data_size) {
-		if (na->data_size < offset) {
-			res = -EINVAL;
-			goto exit;
-		}
+		if (na->data_size < offset)
+			goto ok;
 		size = na->data_size - offset;
 	}
 	while (size > 0) {
@@ -683,13 +681,14 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 				"offset %lld: %lld <> %lld", org_path, 
 				(long long)offset, (long long)size, (long long)ret);
 		if (ret <= 0 || ret > (s64)size) {
-			res = (ret <= 0) ? -errno : -EIO;
+			res = (ret < 0) ? -errno : -EIO;
 			goto exit;
 		}
 		size -= ret;
 		offset += ret;
 		total += ret;
 	}
+ok:
 	res = total;
 exit:
 	if (na)
@@ -1436,6 +1435,7 @@ static int ntfs_fuse_rmdir(const char *path)
 static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
+	time_t now;
 	int res = 0;
 
 	if (ntfs_fuse_is_named_data_stream(path))
@@ -1446,17 +1446,15 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	
 	NInoSetNoParentMtimeUpdate(ni);
 	
+	now = time(NULL);
+	ni->last_mft_change_time = now;
+	
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;
-		ni->last_mft_change_time = buf->modtime;
 	} else {
-		time_t now;
-
-		now = time(NULL);
 		ni->last_access_time = now;
 		ni->last_data_change_time = now;
-		ni->last_mft_change_time = now;
 	}
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
@@ -1622,7 +1620,7 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 			if ((size_t)ret <= size) {
 				/* Don't add space to the beginning of line. */
 				if (to != value) {
-					*to = ' ';
+					*to = '\0';
 					to++;
 				}
 				strncpy(to, tmp_name, tmp_name_len);
