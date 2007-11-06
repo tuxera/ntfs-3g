@@ -607,6 +607,9 @@ static int ntfs_fuse_open(const char *org_path,
 	int accesstype;
 	struct SECURITY_CONTEXT security;
 
+		/* O_WRONLY and O_RDWR are incompatible */
+	if ((fi->flags & O_WRONLY) && (fi->flags & O_RDWR))
+		return (-EINVAL);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
@@ -615,6 +618,7 @@ static int ntfs_fuse_open(const char *org_path,
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
+
 			if (ntfs_fuse_fill_security_context(&security)) {
 				if (fi->flags & O_WRONLY)
 					accesstype = S_IWRITE;
@@ -624,6 +628,8 @@ static int ntfs_fuse_open(const char *org_path,
 					else
 						accesstype = S_IREAD;
 				if (NAttrEncrypted(na)
+			     /* JPA directory must be searchable */
+				  || !ntfs_allowed_dir_access(&security,path,S_IEXEC)
 			     /* JPA check whether requested access is allowed */
 				  || !ntfs_allowed_access(&security,path,ni,accesstype))
 					res = -EACCES;
@@ -1026,12 +1032,14 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			   	if (ntfs_set_owner_mode(&security, ni,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
+				else {
+					/* Adjust read-only (for Windows) */
+				if (perm & S_IWUSR)
+					ni->flags &= ~FILE_ATTR_READONLY;
+				else
+					ni->flags |= FILE_ATTR_READONLY;
+				}
 			}
-				/* Adjust read-only (for Windows) */
-			if (perm & S_IWUSR)
-				ni->flags &= ~FILE_ATTR_READONLY;
-			else
-				ni->flags |= FILE_ATTR_READONLY;
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
