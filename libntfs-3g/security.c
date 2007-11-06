@@ -3285,6 +3285,12 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 	if (!res) {
 		uid = scx->uid;
 		if (!uid || (fileuid == uid)) {
+				/*
+				 * clear setgid if file group does
+				 * not match process group
+				 */
+			if (uid && (filegid != scx->gid))
+				mode &= ~S_ISGID;
 			ntfs_set_owner_mode(scx, ni,
 					fileuid, filegid, mode);
 		} else {
