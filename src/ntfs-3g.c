@@ -607,9 +607,6 @@ static int ntfs_fuse_open(const char *org_path,
 	int accesstype;
 	struct SECURITY_CONTEXT security;
 
-		/* O_WRONLY and O_RDWR are incompatible */
-	if ((fi->flags & O_WRONLY) && (fi->flags & O_RDWR))
-		return (-EINVAL);
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
