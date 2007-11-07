@@ -1191,9 +1191,10 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		goto exit;
 	}
 
-		/* JPA make sure the parent directory is writeable */
+		/* JPA make sure the parent directories are writeable */
 	if (ntfs_fuse_fill_security_context(&security)
-	   && !ntfs_allowed_access(&security,path,dir_ni,S_IWRITE + S_IEXEC))
+	   && (!ntfs_allowed_dir_access(&security,old_path,S_IWRITE + S_IEXEC)
+	      || !ntfs_allowed_access(&security,path,dir_ni,S_IWRITE + S_IEXEC)))
 		res = -EACCES;
 	else {
 
