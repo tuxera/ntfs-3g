@@ -780,9 +780,10 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	if (!na)
 		goto exit;
 
-	     /* JPA deny truncation if cannot write */
+	     /* JPA deny truncation if cannot write to file or parent directory */
 	if (ntfs_fuse_fill_security_context(&security)
-	       && !ntfs_allowed_access(&security,org_path,ni,S_IWRITE)) {
+		&& (!ntfs_allowed_dir_access(&security, path, S_IWRITE + S_IEXEC)
+	          || !ntfs_allowed_access(&security, path, ni, S_IWRITE))) {
 		errno = EACCES;
 		ntfs_attr_close(na);
 		goto exit;
