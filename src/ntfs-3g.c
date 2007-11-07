@@ -1225,6 +1225,7 @@ static int ntfs_fuse_rm(const char *org_path)
 	ntfschar *uname = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *path;
+	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len;
 
 	path = strdup(org_path);
@@ -1251,9 +1252,15 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 		goto exit;
 	}
-	/* Delete object. */
-	if (ntfs_delete(ni, dir_ni, uname, uname_len))
-		res = -errno;
+		/* JPA deny unlinking if directory is not writable and executable */
+	if (!ntfs_fuse_fill_security_context(&security)
+           || ntfs_allowed_access(&security, path, dir_ni,
+                        S_IEXEC + S_IWRITE + S_ISVTX)) {
+		/* Delete object. */
+		if (ntfs_delete(ni, dir_ni, uname, uname_len))
+			res = -errno;
+	} else
+		res = -EACCES;
 	ni = NULL;
 exit:
 	if (ni && ntfs_inode_close(ni))
