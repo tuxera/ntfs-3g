@@ -2129,8 +2129,10 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 			}
 		}
 	}
-	if (!securattr)
-		errno = EIO; /* $Secure not open */
+	if (!securattr) {
+		ntfs_log_error("Failed to retrieve a security descriptor\n");
+		errno = EIO;
+	}
 	return (securattr);
 }
 
@@ -2950,6 +2952,7 @@ static int build_permissions(const char *securattr, ntfs_inode *ni)
 			else
 				perm = build_std_permissions(securattr, ni);
 	} else {
+		ntfs_log_error("Security descriptor has no DACL\n");
 		perm = -1;
 		errno = EIO;
 	}
@@ -3029,7 +3032,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				perm &= 07700;
 			else
 				if (gid == scx->gid)
-				perm &= 07070;
+					perm &= 07070;
 				else
 					perm &= 07007;
 		}
@@ -3150,11 +3153,14 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 				}
 				free(newattr);
 			} else {
-				/* could not build new security attribute */
-				errno = EIO;
+				/*
+				 * could not build new security attribute
+				 * errno set by build_secur_descr()
+				 */
 			}
 		} else {
 			/* could not map uid or gid */
+			ntfs_log_error("File is being created by an unmapped user\n");
 			errno = EIO;
 		}
 	}
@@ -3225,12 +3231,15 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 				}
 				free(newattr);
 			} else {
-				/* could not build new security attribute */
-				errno = EIO;
+				/*
+				 * could not build new security attribute
+				 * errno set by build_secur_descr()
+				 */
 				res = -1;
 			}
 		} else {
 			/* could not map uid or gid */
+			ntfs_log_error("File is made owned by an unmapped user\n");
 			errno = EIO;
 			res = -1;
 		}
@@ -3298,7 +3307,12 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			res = -1;	/* neither owner nor root */
 		}
 	} else {
-		res = -1;	/* could not get old security attribute */
+		/*
+		 * Should not happen : a default descriptor is generated
+		 * by getsecurityattr() when there are none
+		 */
+		ntfs_log_error("File has no security descriptor\n");
+		res = -1;
 		errno = EIO;
 	}
 	return (res ? -1 : 0);
@@ -3565,7 +3579,12 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 			errno = EPERM;
 		}
 	} else {
-		res = -1;	/* could not get old security attribute */
+		/*
+		 * Should not happen : a default descriptor is generated
+		 * by getsecurityattr() when there are none
+		 */
+		ntfs_log_error("File has no security descriptor\n");
+		res = -1;
 		errno = EIO;
 	}
 	return (res ? -1 : 0);
