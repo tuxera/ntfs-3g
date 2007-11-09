@@ -3137,31 +3137,29 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	if (!cached && (scx->vol->major_ver >= 3)) {
 		usid = find_usid(scx,uid);
 		gsid = find_gsid(scx,gid);
-		if (usid && gsid) {
-			newattr = build_secur_descr(mode,
-					 isdir, usid, gsid);
-			if (newattr) {
-				newattrsz = attr_size(newattr);
-				securid = setsecurityattr(scx->vol,
-					(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
-					newattrsz);
-				if (securid) {
-					/* update cache, for subsequent use */
-					enter_securid(scx, uid,
-							gid, mode, isdir,
-							securid);
-				}
-				free(newattr);
-			} else {
-				/*
-				 * could not build new security attribute
-				 * errno set by build_secur_descr()
-				 */
+		if (!usid || !gsid) {
+			ntfs_log_error("File created by an unmapped user/group %d/%d\n",
+					(int)uid, (int)gid);
+			usid = gsid = adminsid;
+		}
+		newattr = build_secur_descr(mode, isdir, usid, gsid);
+		if (newattr) {
+			newattrsz = attr_size(newattr);
+			securid = setsecurityattr(scx->vol,
+				(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
+				newattrsz);
+			if (securid) {
+				/* update cache, for subsequent use */
+				enter_securid(scx, uid,
+						gid, mode, isdir,
+						securid);
 			}
+			free(newattr);
 		} else {
-			/* could not map uid or gid */
-			ntfs_log_error("File is being created by an unmapped user\n");
-			errno = EIO;
+			/*
+			 * could not build new security attribute
+			 * errno set by build_secur_descr()
+			 */
 		}
 	}
 #endif
@@ -3212,35 +3210,33 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			 */
 		usid = find_usid(scx,uid);
 		gsid = find_gsid(scx,gid);
-		if (usid && gsid) {
-			newattr = build_secur_descr(mode,
+		if (!usid || !gsid) {
+			ntfs_log_error("File made owned by an unmapped user/group %d/%d\n",
+				uid, gid);
+			usid = gsid = adminsid;
+		}
+		newattr = build_secur_descr(mode,
 					 isdir, usid, gsid);
-			if (newattr) {
-				res = update_secur_descr(scx->vol, newattr, ni);
-				if (!res) {
-					/* update cache, for subsequent use */
-					if (test_nino_flag(ni, v3_Extensions))
-						enter_securid(scx, uid,
-							gid, mode, isdir,
-							ni->security_id);
+		if (newattr) {
+			res = update_secur_descr(scx->vol, newattr, ni);
+			if (!res) {
+				/* update cache, for subsequent use */
+				if (test_nino_flag(ni, v3_Extensions))
+					enter_securid(scx, uid,
+						gid, mode, isdir,
+						ni->security_id);
 #if CACHE_LEGACY_SIZE
-					/* also invalidate legacy cache */
-					if (isdir && !ni->security_id)
-						invalidate_legacy(scx, ni);
+				/* also invalidate legacy cache */
+				if (isdir && !ni->security_id)
+					invalidate_legacy(scx, ni);
 #endif
-				}
-				free(newattr);
-			} else {
-				/*
-				 * could not build new security attribute
-				 * errno set by build_secur_descr()
-				 */
-				res = -1;
 			}
+			free(newattr);
 		} else {
-			/* could not map uid or gid */
-			ntfs_log_error("File is made owned by an unmapped user\n");
-			errno = EIO;
+			/*
+			 * could not build new security attribute
+			 * errno set by build_secur_descr()
+			 */
 			res = -1;
 		}
 	}
