@@ -4354,8 +4354,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 	size = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* locate DACL if requested and available */
-	if (le16_to_cpu(phead->control)
-			 & (selection & DACL_SECURITY_INFORMATION)) {
+	if (phead->dacl && (selection & DACL_SECURITY_INFORMATION)) {
 		offdacl = le32_to_cpu(phead->dacl);
 		pdacl = (const ACL*)&attr[offdacl];
 		daclsz = le16_to_cpu(pdacl->size);
@@ -4387,8 +4386,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offgroup = gsidsz = 0;
 
 		/* locate SACL if requested and available */
-	if (le16_to_cpu(phead->control)
-		 & (selection & SACL_SECURITY_INFORMATION)) {
+	if (phead->dacl && (selection & SACL_SECURITY_INFORMATION)) {
 			/* find end of SACL */
 		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
@@ -4494,7 +4492,11 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 	if (target) {
 		targhead = (SECURITY_DESCRIPTOR_RELATIVE*)target;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
-		present = le16_to_cpu(oldhead->control);
+		present = 0;
+		if (oldhead->sacl)
+			present |= SACL_SECURITY_INFORMATION;
+		if (oldhead->dacl)
+			present |= DACL_SECURITY_INFORMATION;
 		if (oldhead->owner)
 			present |= OWNER_SECURITY_INFORMATION;
 		if (oldhead->group)
@@ -4573,7 +4575,9 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->group = cpu_to_le32(0);
 		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		targhead->alignment = 0;
-		targhead->control = cpu_to_le16(present | selection);
+		targhead->control = cpu_to_le16(
+			(present | selection)
+			& (SACL_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION));
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
 	}
@@ -4670,7 +4674,11 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && attr) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		attrsz = attr_size(attr);
-		provided = le16_to_cpu(phead->control);
+		provided = 0;
+		if (phead->sacl)
+			provided |= SACL_SECURITY_INFORMATION;
+		if (phead->dacl)
+			provided |= DACL_SECURITY_INFORMATION;
 		if (phead->owner)
 			provided |= OWNER_SECURITY_INFORMATION;
 		if (phead->group)
