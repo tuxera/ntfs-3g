@@ -570,12 +570,16 @@ static unsigned int attr_size(const char *attr)
 		/*
 		 * First check DACL, which is the last field in all descriptors
 		 * we build, and in most descriptors built by Windows
+		 * however missing for "DR Watson"
 		 */
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		/* find end of DACL */
 	offdacl = le32_to_cpu(phead->dacl);
-	pdacl = (const ACL*)&attr[offdacl];
-	attrsz = offdacl + le16_to_cpu(pdacl->size);
+	if (offdacl) {
+		pdacl = (const ACL*)&attr[offdacl];
+		attrsz = offdacl + le16_to_cpu(pdacl->size);
+	} else
+		attrsz = 0;
 
 	offowner = le32_to_cpu(phead->owner);
 	if (offowner >= attrsz) {
@@ -650,34 +654,49 @@ static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
 
-		/* size check occurs before the above pointers are used */
-
+		/*
+		 * size check occurs before the above pointers are used
+		 *
+		 * "DR Watson" standard directory on WinXP has an
+		 * old revision and no DACL though SE_DACL_PRESENT is set
+		 */
 	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
 		&& (attr_size(securattr) <= attrsz)
-      		&& (phead->control & SE_DACL_PRESENT)
+		&& phead->owner
+		&& phead->group
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
-		&& (pacl->revision == ACL_REVISION)) {
+			/*
+			 * for revision 2 we require SE_DACL_PRESENT to
+			 *    be consistent with offdacl,
+			 * for revision 1 we do not because of "DR Watson"
+			 */
+		&& (((pacl->revision == ACL_REVISION)
+		   && (phead->control & SE_DACL_PRESENT ? offdacl : !offdacl))
+		     || (pacl->revision == 1))) {
 
 		/*
 		 * For each ACE, check it is within limits
 		 * and contains a valid SID
+		 * "DR Watson" has no DACL
 		 */
 
-		acecnt = le16_to_cpu(pacl->ace_count);
-		offace = offdacl + sizeof(ACL);
-		for (nace = 0; (nace < acecnt) && ok; nace++) {
+		if (offdacl) {
+			acecnt = le16_to_cpu(pacl->ace_count);
+			offace = offdacl + sizeof(ACL);
+			for (nace = 0; (nace < acecnt) && ok; nace++) {
 				/* be sure the beginning is within range */
-			if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
-				ok = FALSE;
-			else {
-				pace = (const ACCESS_ALLOWED_ACE*)
-					&securattr[offace];
-				acesz = le16_to_cpu(pace->size);
-				if (((offace + acesz) > attrsz)
-				   || !valid_sid(&pace->sid))
-					 ok = FALSE;
-				offace += acesz;
+				if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
+					ok = FALSE;
+				else {
+					pace = (const ACCESS_ALLOWED_ACE*)
+						&securattr[offace];
+					acesz = le16_to_cpu(pace->size);
+					if (((offace + acesz) > attrsz)
+					   || !valid_sid(&pace->sid))
+						 ok = FALSE;
+					offace += acesz;
+				}
 			}
 		}
 	} else
@@ -2122,7 +2141,7 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 				if ((rdsize != size)
 					|| !valid_securattr(securattr,
 						rdsize)) {
-					/* error logged by caller */
+					/* error to be logged by caller */
 					free(securattr);
 					securattr = (char*)NULL;
 				}
@@ -2766,8 +2785,11 @@ static int build_std_permissions(const char *securattr, ntfs_inode *ni)
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
-	acecnt = le16_to_cpu(pacl->ace_count);
-	offace = offdacl + sizeof(ACL);
+	if (offdacl) {
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+	} else
+		acecnt = 0;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (same_sid(usid, &pace->sid)
@@ -2830,8 +2852,11 @@ static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
-	acecnt = le16_to_cpu(pacl->ace_count);
-	offace = offdacl + sizeof(ACL);
+	if (offdacl) {
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+	} else
+		acecnt = 0;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if ((same_sid(usid, &pace->sid)
@@ -2887,8 +2912,11 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
-	acecnt = le16_to_cpu(pacl->ace_count);
-	offace = offdacl + sizeof(ACL);
+	if (offdacl) {
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+	} else
+		acecnt = 0;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if ((same_sid(usid, &pace->sid)
@@ -2938,24 +2966,18 @@ static int build_permissions(const char *securattr, ntfs_inode *ni)
 	BOOL groupowns;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	if (phead->control & SE_DACL_PRESENT) {	/* no DACL, reject */
-		usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
-		gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
-		adminowns = same_sid(usid,adminsid)
-		         || same_sid(gsid,adminsid);
-		groupowns = !adminowns && same_sid(gsid,usid);
-		if (adminowns)
-			perm = build_ownadmin_permissions(securattr, ni);
+	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
+	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
+	adminowns = same_sid(usid,adminsid)
+	         || same_sid(gsid,adminsid);
+	groupowns = !adminowns && same_sid(gsid,usid);
+	if (adminowns)
+		perm = build_ownadmin_permissions(securattr, ni);
+	else
+		if (groupowns)
+			perm = build_owngrp_permissions(securattr, ni);
 		else
-			if (groupowns)
-				perm = build_owngrp_permissions(securattr, ni);
-			else
-				perm = build_std_permissions(securattr, ni);
-	} else {
-		ntfs_log_error("Security descriptor has no DACL\n");
-		perm = -1;
-		errno = EIO;
-	}
+			perm = build_std_permissions(securattr, ni);
 	return (perm);
 }
 
@@ -3691,9 +3713,10 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 			/*
 			 * locate and inherit DACL
+			 * do not test SE_DACL_PRESENT (wrong for "DR Watson")
 			 */
 		pnhead->dacl = cpu_to_le32(0);
-		if (pphead->control & SE_DACL_PRESENT) {
+		if (pphead->dacl) {
 			offpacl = le32_to_cpu(pphead->dacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
@@ -3708,7 +3731,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			 * locate and inherit SACL
 			 */
 		pnhead->sacl = cpu_to_le32(0);
-		if (pphead->control & SE_SACL_PRESENT) {
+		if (pphead->sacl) {
 			offpacl = le32_to_cpu(pphead->sacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
