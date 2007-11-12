@@ -760,7 +760,11 @@ out:
 	return res;
 }
 
-static int ntfs_fuse_truncate(const char *org_path, off_t size)
+/*
+ *	Common part for truncate() and ftruncate()
+ */
+
+static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
@@ -788,7 +792,8 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		 */
 	if (ntfs_fuse_fill_security_context(&security)
 		&& (!ntfs_allowed_dir_access(&security, path, S_IEXEC)
-	          || !ntfs_allowed_access(&security, path, ni, S_IWRITE))) {
+	          || (chkwrite
+		     && !ntfs_allowed_access(&security, path, ni, S_IWRITE)))) {
 		errno = EACCES;
 		ntfs_attr_close(na);
 		goto exit;
@@ -809,6 +814,21 @@ exit:
 	if (stream_name_len)
 		free(stream_name);
 	return res;
+}
+
+static int ntfs_fuse_truncate(const char *org_path, off_t size)
+{
+	return (ntfs_fuse_trunc(org_path, size, TRUE));
+}
+
+static int ntfs_fuse_ftruncate(const char *org_path, off_t size,
+			struct fuse_file_info *fi)
+{
+	/*
+	 * in ->ftruncate() the file handle is guaranteed
+	 * to have been opened for write.
+	 */
+	return (ntfs_fuse_trunc(org_path, size, FALSE));
 }
 
 static int ntfs_fuse_chmod(const char *path,
@@ -1876,6 +1896,7 @@ static struct fuse_operations ntfs_3g_ops = {
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,
+	.ftruncate	= ntfs_fuse_ftruncate,
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
