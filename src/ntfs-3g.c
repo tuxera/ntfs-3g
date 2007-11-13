@@ -798,10 +798,10 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na)
 		goto exit;
-		/*
-		 * JPA deny truncation if cannot write to file
-		 * or search in parent directory
-		 */
+	/*
+	 * JPA deny truncation if cannot write to file
+	 * or search in parent directory
+	 */
 	if (ntfs_fuse_fill_security_context(&security)
 		&& (!ntfs_allowed_dir_access(&security, path, S_IEXEC)
 	          || (chkwrite
@@ -810,7 +810,6 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 		ntfs_attr_close(na);
 		goto exit;
 	}
-
 
 	if (ntfs_attr_truncate(na, size))
 	     /* JPA strange : no ntfs_attr_close(na) ? */
@@ -831,7 +830,7 @@ exit:
 
 static int ntfs_fuse_truncate(const char *org_path, off_t size)
 {
-	return (ntfs_fuse_trunc(org_path, size, TRUE));
+	return ntfs_fuse_trunc(org_path, size, TRUE);
 }
 
 static int ntfs_fuse_ftruncate(const char *org_path, off_t size,
@@ -1074,7 +1073,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
-		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
+			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 		} else
 			res = -errno;
 
@@ -1222,15 +1221,13 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	      || !ntfs_allowed_access(&security,path,dir_ni,S_IWRITE + S_IEXEC)))
 		res = -EACCES;
 	else {
-
-
-	if (ntfs_link(ni, dir_ni, uname, uname_len)) {
-			res = -errno;
-		goto exit;
-	}
-
-	ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-	ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
+		if (ntfs_link(ni, dir_ni, uname, uname_len)) {
+				res = -errno;
+			goto exit;
+		}
+	
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 	}
 exit:
 	/* 
@@ -1283,16 +1280,16 @@ static int ntfs_fuse_rm(const char *org_path)
 	if (!ntfs_fuse_fill_security_context(&security)
            || ntfs_allowed_access(&security, path, dir_ni,
                         S_IEXEC + S_IWRITE + S_ISVTX)) {
-		/* Delete object. */
-	if (ntfs_delete(ni, dir_ni, uname, uname_len)) {
+		
+		if (ntfs_delete(ni, dir_ni, uname, uname_len))
 			res = -errno;
-	} else {
-		/* Inode ctime is updated in ntfs_delete() for hard links. */
-		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
-	}
-	/* ntfs_delete() always closes ni */
+		else {
+			/* Inode ctime is updated in ntfs_delete() for hard links. */
+			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
+		}
 	} else
 		res = -EACCES;
+	/* ntfs_delete() always closes ni */
 	ni = NULL;
 exit:
 	if (ni && ntfs_inode_close(ni))
