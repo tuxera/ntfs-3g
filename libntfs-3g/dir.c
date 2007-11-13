@@ -1500,8 +1500,10 @@ search:
 	 * case there are no reference to this inode left, so we should free all
 	 * non-resident attributes and mark all MFT record as not in use.
 	 */
-	if (ni->mrec->link_count)
+	if (ni->mrec->link_count) {
+		ntfs_inode_update_times(ni, NTFS_UPDATE_CTIME);
 		goto out;
+	}
 	ntfs_attr_reinit_search_ctx(actx);
 	while (!ntfs_attrs_walk(actx)) {
 		if (actx->attr->non_resident) {

@@ -175,6 +175,13 @@ static int ntfs_fuse_is_named_data_stream(const char *path)
 	return 0;
 }
 
+static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
+{
+	if (ctx->noatime)
+		mask &= ~NTFS_UPDATE_ATIME;
+	ntfs_inode_update_times(ni, mask);
+}
+
 static s64 ntfs_get_nr_free_mft_records(ntfs_volume *vol)
 {
 	ntfs_attr *na = vol->mftbmp_na;
@@ -592,6 +599,7 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
 			(ntfs_filldir_t)ntfs_fuse_filler))
 		err = -errno;
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_ATIME);
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&err);
 	return err;
@@ -653,7 +661,6 @@ static int ntfs_fuse_open(const char *org_path,
 static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	char *path = NULL;
@@ -661,11 +668,13 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	int stream_name_len, res;
 	s64 total = 0;
 
+	if (!size)
+		return 0;
+
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -695,6 +704,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		total += ret;
 	}
 ok:
+	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_ATIME);
 	res = total;
 exit:
 	if (na)
@@ -748,6 +758,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		total += res;
 	}
 	res = total;
+	if (res > 0)
+		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -804,6 +816,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	     /* JPA strange : no ntfs_attr_close(na) ? */
 		goto exit;
 	
+	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 	ntfs_attr_close(na);
 	errno = 0;
 exit:
@@ -837,7 +850,6 @@ static int ntfs_fuse_chmod(const char *path,
 	int res = 0;
 	ntfs_inode *ni;
 	struct SECURITY_CONTEXT security;
-	time_t now;
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
@@ -862,8 +874,7 @@ static int ntfs_fuse_chmod(const char *path,
 						ni->flags &= ~FILE_ATTR_READONLY;
 					else
 						ni->flags |= FILE_ATTR_READONLY;
-					now = time(NULL);
-					ni->last_mft_change_time = now;
+					ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 				}
 				NInoSetDirty(ni);
 				if (ntfs_inode_close(ni))
@@ -879,7 +890,6 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 {
 	ntfs_inode *ni;
 	int res;
-	time_t now;
 	struct SECURITY_CONTEXT security;
 
 	if (ntfs_fuse_is_named_data_stream(path))
@@ -904,10 +914,8 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 					if (ntfs_set_owner(&security,
 							path,ni,uid,gid))
 						res = -errno;
-					else {
-						now = time(NULL);
-						ni->last_mft_change_time = now;
-					}
+					else
+						ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 					if (ntfs_inode_close(ni))
 						set_fuse_error(&res);
 				}
@@ -1066,6 +1074,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
+		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 		} else
 			res = -errno;
 
@@ -1168,13 +1177,7 @@ static int ntfs_fuse_symlink(const char *to, const char *from)
 	return ntfs_fuse_create(from, S_IFLNK, 0, to);
 }
 
-/**
- * NOTE: About the role of mtime: during rename(3), which is currently 
- * implemented by the help of link() operations, modification time mustn't
- * be updated, so we NInoSetNoMtimeUpdate() such inodes after they are opened.
- * This is not very nice itself but it may be eliminated, in time.
- */
-static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
+static int ntfs_fuse_link(const char *old_path, const char *new_path)
 {
 	char *name;
 	ntfschar *uname = NULL;
@@ -1196,9 +1199,6 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -errno;
 		goto exit;
 	}
-	
-	if (!mtime)
-		NInoSetNoMtimeUpdate(ni);
 	
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
@@ -1223,9 +1223,14 @@ static int ntfs_fuse_ln(const char *old_path, const char *new_path, int mtime)
 		res = -EACCES;
 	else {
 
-		/* Create hard link. */
-		if (ntfs_link(ni, dir_ni, uname, uname_len))
+
+	if (ntfs_link(ni, dir_ni, uname, uname_len)) {
 			res = -errno;
+		goto exit;
+	}
+
+	ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+	ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 	}
 exit:
 	/* 
@@ -1239,11 +1244,6 @@ exit:
 	free(uname);
 	free(path);
 	return res;
-}
-
-static int ntfs_fuse_link(const char *old_path, const char *new_path)
-{
-	return ntfs_fuse_ln(old_path, new_path, 1);
 }
 
 static int ntfs_fuse_rm(const char *org_path)
@@ -1284,8 +1284,13 @@ static int ntfs_fuse_rm(const char *org_path)
            || ntfs_allowed_access(&security, path, dir_ni,
                         S_IEXEC + S_IWRITE + S_ISVTX)) {
 		/* Delete object. */
-		if (ntfs_delete(ni, dir_ni, uname, uname_len))
+	if (ntfs_delete(ni, dir_ni, uname, uname_len)) {
 			res = -errno;
+	} else {
+		/* Inode ctime is updated in ntfs_delete() for hard links. */
+		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
+	}
+	/* ntfs_delete() always closes ni */
 	} else
 		res = -EACCES;
 	ni = NULL;
@@ -1356,14 +1361,14 @@ static int ntfs_fuse_safe_rename(const char *old_path,
 
 	ntfs_log_trace("Entering\n");
 	
-	ret = ntfs_fuse_ln(new_path, tmp, 0);
+	ret = ntfs_fuse_link(new_path, tmp);
 	if (ret)
 		return ret;
 	
 	ret = ntfs_fuse_unlink(new_path);
 	if (!ret) {
 		
-		ret = ntfs_fuse_ln(old_path, new_path, 0);
+		ret = ntfs_fuse_link(old_path, new_path);
 		if (ret)
 			goto restore;
 		
@@ -1377,7 +1382,7 @@ static int ntfs_fuse_safe_rename(const char *old_path,
 	
 	goto cleanup;
 restore:
-	if (ntfs_fuse_ln(tmp, new_path, 0)) {
+	if (ntfs_fuse_link(tmp, new_path)) {
 err:
 		ntfs_log_perror("Rename failed. Existing file '%s' was renamed "
 				"to '%s'", new_path, tmp);
@@ -1446,7 +1451,7 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 		goto out;
 	}
 
-	ret = ntfs_fuse_ln(old_path, new_path, 0);
+	ret = ntfs_fuse_link(old_path, new_path);
 	if (ret)
 		goto out;
 	
@@ -1478,7 +1483,6 @@ static int ntfs_fuse_rmdir(const char *path)
 static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
-	time_t now;
 	int res = 0;
 
 	if (ntfs_fuse_is_named_data_stream(path))
@@ -1487,20 +1491,13 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	if (!ni)
 		return -errno;
 	
-	NInoSetNoParentMtimeUpdate(ni);
-	
-	now = time(NULL);
-	ni->last_mft_change_time = now;
-	
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;
-	} else {
-		ni->last_access_time = now;
-		ni->last_data_change_time = now;
-	}
-	NInoFileNameSetDirty(ni);
-	NInoSetDirty(ni);
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+	} else
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_AMCTIME);
+
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	return res;
