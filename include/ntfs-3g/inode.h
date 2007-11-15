@@ -48,8 +48,6 @@ typedef enum {
 				      mft record and then to disk. */
 	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
 				      in the index. */
-	NI_NoMtimeUpdate,	/* 1: Don't update modifiction time. */
-	NI_NoParentMtimeUpdate,	/* 1: Don't update parent dir's mtime. */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -97,16 +95,6 @@ typedef enum {
 				  test_and_set_nino_flag(ni, FileNameDirty)
 #define NInoFileNameTestAndClearDirty(ni)	\
 				test_and_clear_nino_flag(ni, FileNameDirty)
-
-#define NInoNoMtimeUpdate(ni)		 test_nino_flag(ni, NoMtimeUpdate)
-#define NInoSetNoMtimeUpdate(ni)	  set_nino_flag(ni, NoMtimeUpdate)
-#define NInoClearNoMtimeUpdate(ni)	clear_nino_flag(ni, NoMtimeUpdate)
-#define NInoMtimeUpdate(ni)		 (!NInoNoMtimeUpdate(ni))
-
-#define NInoNoParentMtimeUpdate(ni)	  test_nino_flag(ni, NoMtimeUpdate)
-#define NInoSetNoParentMtimeUpdate(ni)	   set_nino_flag(ni, NoMtimeUpdate)
-#define NInoClearNoParentMtimeUpdate(ni) clear_nino_flag(ni, NoMtimeUpdate)
-#define NInoParentMtimeUpdate(ni)	  (!NInoNoParentMtimeUpdate(ni))
 
 /**
  * struct _ntfs_inode - The NTFS in-memory inode structure.
@@ -161,6 +149,15 @@ struct _ntfs_inode {
 	time_t last_access_time;
 };
 
+typedef enum {
+	NTFS_UPDATE_ATIME = 1 << 0,
+	NTFS_UPDATE_MTIME = 1 << 1,
+	NTFS_UPDATE_CTIME = 1 << 2,
+} ntfs_time_update_flags;
+
+#define NTFS_UPDATE_MCTIME  (NTFS_UPDATE_MTIME | NTFS_UPDATE_CTIME)
+#define NTFS_UPDATE_AMCTIME (NTFS_UPDATE_ATIME | NTFS_UPDATE_MCTIME)
+
 extern ntfs_inode *ntfs_inode_base(ntfs_inode *ni);
 
 extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
@@ -176,8 +173,7 @@ extern int ntfs_inode_attach_all_extents(ntfs_inode *ni);
 
 extern void ntfs_inode_mark_dirty(ntfs_inode *ni);
 
-extern void ntfs_inode_update_atime(ntfs_inode *ni);
-extern void ntfs_inode_update_time(ntfs_inode *ni);
+extern void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask);
 
 extern int ntfs_inode_sync(ntfs_inode *ni);
 
