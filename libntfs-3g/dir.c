@@ -883,6 +883,7 @@ find_next_index_buffer:
 		if (bmp_buf_pos >> 3 < bmp_buf_size)
 			continue;
 		/* Read next chunk from the index bitmap. */
+		bmp_buf_pos = 0;
 		if ((bmp_pos >> 3) + bmp_buf_size > bmp_na->data_size)
 			bmp_buf_size = bmp_na->data_size - (bmp_pos >> 3);
 		br = ntfs_attr_pread(bmp_na, bmp_pos >> 3, bmp_buf_size, bmp);
