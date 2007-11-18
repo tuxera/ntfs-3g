@@ -1210,7 +1210,7 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 		ni->last_data_change_time = buf->modtime;
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	} else
-		ntfs_fuse_update_times(ni, NTFS_UPDATE_AMCTIME);
+		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
 
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -1620,8 +1620,6 @@ static int ntfs_open(const char *device, char *mntpoint)
 		flags |= MS_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= MS_RDONLY;
-	if (ctx->noatime)
-		flags |= MS_NOATIME;
 	if (ctx->force)
 		flags |= MS_FORCE;
 
@@ -1676,13 +1674,6 @@ static char *parse_mount_options(const char *orig_opts)
 		return NULL;
 	}
 	
-	/*
-	 * FIXME: Due to major performance hit and interference
-	 * issues, always use the 'noatime' options for now.
-	 */
-	ctx->noatime = TRUE;
-	strcat(ret, "noatime,");
-	
 	ctx->silent = TRUE;
 	
 	s = options;
@@ -1702,6 +1693,8 @@ static char *parse_mount_options(const char *orig_opts)
 						"have value.\n");
 				goto err_exit;
 			}
+			ctx->noatime = TRUE;
+			strcat(ret, "noatime,");
 		} else if (!strcmp(opt, "fake_rw")) {
 			if (val) {
 				ntfs_log_error("'fake_rw' option should not "

@@ -457,8 +457,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	
 	if (flags & MS_RDONLY)
 		NVolSetReadOnly(vol);
-	if (flags & MS_NOATIME)
-		NVolSetNoATime(vol);
 	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
 	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
@@ -739,10 +737,9 @@ out:
  * to mount as the ntfs volume.
  *
  * @flags is an optional second parameter. The same flags are used as for
- * the mount system call (man 2 mount). Currently only the following flags
- * are implemented:
+ * the mount system call (man 2 mount). Currently only the following flag
+ * is implemented:
  *	MS_RDONLY	- mount volume read-only
- *	MS_NOATIME	- do not update access time
  *
  * The function opens the device @dev and verifies that it contains a valid
  * bootsector. Then, it allocates an ntfs_volume structure and initializes
@@ -1136,9 +1133,8 @@ error_exit:
  *
  * @flags is an optional second parameter. The same flags are used as for
  * the mount system call (man 2 mount). Currently only the following flags
- * are implemented:
+ * is implemented:
  *	MS_RDONLY	- mount volume read-only
- *	MS_NOATIME	- do not update access time
  *
  * The function opens the device or file @name and verifies that it contains a
  * valid bootsector. Then, it allocates an ntfs_volume structure and initializes
