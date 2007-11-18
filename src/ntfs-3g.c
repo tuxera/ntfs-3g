@@ -415,7 +415,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	stbuf->st_ctime = ni->last_mft_change_time;
 	stbuf->st_mtime = ni->last_data_change_time;
 exit:
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -491,7 +491,7 @@ exit:
 		free(intx_file);
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -650,7 +650,7 @@ ok:
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -703,7 +703,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -742,7 +742,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 exit:
 	res = -errno;
 	ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -826,7 +826,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 		res = -errno;
 exit:
 	free(uname);
-	if (dir_ni && ntfs_inode_close(dir_ni))
+	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
 	if (utarget)
 		free(utarget);
@@ -969,9 +969,9 @@ exit:
 	 * Must close dir_ni first otherwise ntfs_inode_sync_file_name(ni)
 	 * may fail because ni may not be in parent's index on the disk yet.
 	 */
-	if (dir_ni && ntfs_inode_close(dir_ni))
+	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
 	free(path);
@@ -1020,10 +1020,10 @@ static int ntfs_fuse_rm(const char *org_path)
 	/* ntfs_delete() always closes ni */
 	ni = NULL;
 exit:
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
-	if (dir_ni && ntfs_inode_close(dir_ni))
+	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
 	free(path);
 	return res;
