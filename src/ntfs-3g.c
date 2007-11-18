@@ -716,7 +716,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
+	ntfs_attr *na = NULL;
 	int res;
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -738,10 +738,10 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 		goto exit;
 	
 	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
-	ntfs_attr_close(na);
 	errno = 0;
 exit:
 	res = -errno;
+	ntfs_attr_close(na);
 	if (ni && ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
