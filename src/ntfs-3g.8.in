@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "August 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "November 2007" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
