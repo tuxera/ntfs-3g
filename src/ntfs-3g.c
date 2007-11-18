@@ -92,6 +92,12 @@ typedef enum {
 	FSTYPE_FUSEBLK
 } fuse_fstype;
 
+typedef enum {
+	ATIME_ENABLED,
+	ATIME_DISABLED,
+	ATIME_RELATIVE
+} ntfs_atime_t;
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
@@ -110,12 +116,12 @@ typedef struct {
 	unsigned int fmask;
 	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
+	ntfs_atime_t atime;
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL silent;
 	BOOL force;
 	BOOL debug;
-	BOOL noatime;
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
@@ -170,8 +176,12 @@ static int ntfs_fuse_is_named_data_stream(const char *path)
 
 static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 {
-	if (ctx->noatime)
+	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
+	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
+			ni->last_access_time >= ni->last_data_change_time &&
+			ni->last_access_time >= ni->last_mft_change_time)
+		return;
 	ntfs_inode_update_times(ni, mask);
 }
 
@@ -1676,6 +1686,8 @@ static char *parse_mount_options(const char *orig_opts)
 	
 	ctx->silent = TRUE;
 	
+	ctx->atime = ATIME_RELATIVE;
+	
 	s = options;
 	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
@@ -1693,8 +1705,21 @@ static char *parse_mount_options(const char *orig_opts)
 						"have value.\n");
 				goto err_exit;
 			}
-			ctx->noatime = TRUE;
-			strcat(ret, "noatime,");
+			ctx->atime = ATIME_DISABLED;
+		} else if (!strcmp(opt, "atime")) {
+			if (val) {
+				ntfs_log_error("'atime' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->atime = ATIME_ENABLED;
+		} else if (!strcmp(opt, "relatime")) {
+			if (val) {
+				ntfs_log_error("'relatime' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->atime = ATIME_RELATIVE;
 		} else if (!strcmp(opt, "fake_rw")) {
 			if (val) {
 				ntfs_log_error("'fake_rw' option should not "
@@ -1847,6 +1872,14 @@ static char *parse_mount_options(const char *orig_opts)
 		strcat(ret, def_opts);
 	if (default_permissions)
 		strcat(ret, "default_permissions,");
+	
+	if (ctx->atime == ATIME_RELATIVE)
+		strcat(ret, "relatime,");
+	else if (ctx->atime == ATIME_ENABLED)
+		strcat(ret, "atime,");
+	else
+		strcat(ret, "noatime,");
+	
 	strcat(ret, "fsname=");
 	strcat(ret, opts.device);
 exit:

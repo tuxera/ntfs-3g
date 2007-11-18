@@ -99,7 +99,8 @@ present. The value is given in octal. The default value is 0 which
 means full access to everybody.
 .TP
 .B ro
-Mount filesystem read\-only.
+Mount filesystem read\-only. Useful if Windows is hibernated or the
+NTFS journal file is unclean.
 .TP
 .BI locale= value
 This option can be useful if your language specific locale environment 
@@ -112,6 +113,29 @@ http://ntfs-3g.org/support.html#locale
 Force the mounting even if the NTFS logfile is unclean. The logfile 
 will be unconditionally cleared. Use this option with caution and for 
 your own responsibility.
+.TP
+.B atime, noatime, relatime
+The 
+.B atime 
+option updates inode access time for each access.
+
+The 
+.B noatime 
+option disables inode access time updates which can speed up
+file operations and prevent sleeping (notebook) disks spinning 
+up too often thus saving energy and disk lifetime.
+
+The
+.B relatime 
+option is very similar to 
+.B noatime. 
+It  updates inode access times relative to modify or change time. 
+The access time is only updated if the previous access time was earlier 
+than the current modify or change time. Unlike
+.B noatime
+this option doesn't break applications that need to know 
+if a file has been read since the last time it was modified.
+This is the default behaviour.
 .TP
 .B show_sys_files
 Show the system files in directory listings. 
