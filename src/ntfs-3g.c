@@ -1276,27 +1276,23 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 		goto exit;
 	}
-		/* JPA deny unlinking if directory is not writable and executable */
+	/* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
-           || ntfs_allowed_access(&security, path, dir_ni,
-                        S_IEXEC + S_IWRITE + S_ISVTX)) {
+	    || ntfs_allowed_access(&security, path, dir_ni,
+				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 		
 		if (ntfs_delete(ni, dir_ni, uname, uname_len))
 			res = -errno;
-		else {
-			/* Inode ctime is updated in ntfs_delete() for hard links. */
-			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
-		}
+		/* ntfs_delete() always closes ni and dir_ni */
+		ni = dir_ni = NULL;
 	} else
 		res = -EACCES;
-	/* ntfs_delete() always closes ni */
-	ni = NULL;
 exit:
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
-	if (dir_ni && ntfs_inode_close(dir_ni))
-		set_fuse_error(&res);
 	free(path);
 	return res;
 }
