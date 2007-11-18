@@ -1488,7 +1488,7 @@ search:
 	 */
 	if (ni->mrec->link_count) {
 		ntfs_inode_update_times(ni, NTFS_UPDATE_CTIME);
-		goto out;
+		goto ok;
 	}
 	ntfs_attr_reinit_search_ctx(actx);
 	while (!ntfs_attrs_walk(actx)) {
@@ -1530,12 +1530,16 @@ search:
 				"Leaving inconsistent metadata.\n");
 	}
 	ni = NULL;
+ok:	
+	ntfs_inode_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 out:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
 	if (ictx)
 		ntfs_index_ctx_put(ictx);
-	if (ni && ntfs_inode_close(ni) && !err)
+	if (ntfs_inode_close(dir_ni) && !err)
+		err = errno;
+	if (ntfs_inode_close(ni) && !err)
 		err = errno;
 	if (err) {
 		errno = err;

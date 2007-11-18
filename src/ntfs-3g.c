@@ -1020,21 +1020,17 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 		goto exit;
 	}
-	/* Delete object. */
-	if (ntfs_delete(ni, dir_ni, uname, uname_len)) {
+	
+	if (ntfs_delete(ni, dir_ni, uname, uname_len))
 		res = -errno;
-	} else {
-		/* Inode ctime is updated in ntfs_delete() for hard links. */
-		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
-	}
-	/* ntfs_delete() always closes ni */
-	ni = NULL;
+	/* ntfs_delete() always closes ni and dir_ni */
+	ni = dir_ni = NULL;
 exit:
+	if (ntfs_inode_close(dir_ni))
+		set_fuse_error(&res);
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
-	if (ntfs_inode_close(dir_ni))
-		set_fuse_error(&res);
 	free(path);
 	return res;
 }
