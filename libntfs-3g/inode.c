@@ -588,7 +588,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				err = errno;
 			ntfs_log_perror("Failed to get index ctx, inode %lld",
 					(long long)index_ni->mft_no);
-			ntfs_inode_close(index_ni);
+			if (ni != index_ni && ntfs_inode_close(index_ni) && !err)
+				err = errno;
 			continue;
 		}
 		if (ntfs_index_lookup(fn, sizeof(FILE_NAME_ATTR), ictx)) {
@@ -601,7 +602,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			ntfs_log_perror("Index lookup failed, inode %lld",
 					(long long)index_ni->mft_no);
 			ntfs_index_ctx_put(ictx);
-			ntfs_inode_close(index_ni);
+			if (ni != index_ni && ntfs_inode_close(index_ni) && !err)
+				err = errno;
 			continue;
 		}
 		/* Update flags and file size. */
