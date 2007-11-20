@@ -2950,6 +2950,57 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 }
 
 /*
+ *		Special case for files owned by administrator with full
+ *	access granted to a mapped user : consider this user as the tenant
+ *	of the file.
+ *
+ *	This situation cannot be represented with Linux concepts and can
+ *	only be found for files or directories created by Windows.
+ *	Typical situation : directory "Documents and Settings/user" which
+ *	is on the path to user's files and must be given access to user
+ *	only.
+ *
+ *	Check file is owned by administrator and no user has rights before
+ *	calling.
+ *	Returns the uid of tenant or zero if none
+ */
+
+
+static uid_t find_tenant(struct SECURITY_CONTEXT *scx,
+			const char *securattr)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const ACL *pacl;
+	const ACCESS_ALLOWED_ACE *pace;
+	int offdacl;
+	int offace;
+	int acecnt;
+	int nace;
+	uid_t tid;
+	uid_t xid;
+
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
+	offdacl = le32_to_cpu(phead->dacl);
+	pacl = (const ACL*)&securattr[offdacl];
+	tid = 0;
+	if (offdacl) {
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+	} else
+		acecnt = 0;
+	for (nace = 0; nace < acecnt; nace++) {
+		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
+		if ((pace->type == ACCESS_ALLOWED_ACE_TYPE)
+		   && (pace->mask & DIR_WRITE)) {
+			xid = findowner(scx, &pace->sid);
+			if (xid) tid = xid;
+		}
+		offace += le16_to_cpu(pace->size);
+	}
+	return (tid);
+}
+
+/*
  *		Build unix-style (mode_t) permissions from an ACL
  *	returns the requested permissions
  *	or a negative result (with errno set) if there is a problem
@@ -3014,6 +3065,16 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			securattr = getsecurityattr(scx->vol, path, ni);
 			if (securattr) {
 				perm = build_permissions(securattr, ni);
+				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+				    	securattr;
+				usid = (const SID*)&
+					    securattr[le32_to_cpu(phead->owner)];
+				if (!perm && same_sid(usid, adminsid)) {
+					uid = find_tenant(scx, securattr);
+					if (uid)
+						perm = 0700;
+				} else
+					uid = findowner(scx,usid);
 				/*
 				 *  Create a security id if there were none
 				 * and upgrade option is selected
@@ -3031,14 +3092,8 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				}
 				if (test_nino_flag(ni, v3_Extensions)
 				    && (perm >= 0)) {
-					phead =
-					    (const SECURITY_DESCRIPTOR_RELATIVE*)
-					    	securattr;
-					usid = (const SID*)&
-					    securattr[le32_to_cpu(phead->owner)];
 					gsid = (const SID*)&
 					    securattr[le32_to_cpu(phead->group)];
-					uid = findowner(scx,usid);
 					gid = findgroup(scx,gsid);
 					enter_cache(scx, ni, uid,
 							gid, perm);
@@ -3113,7 +3168,14 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					    securattr[le32_to_cpu(phead->owner)];
 					gsid = (const SID*)&
 					    securattr[le32_to_cpu(phead->group)];
-					stbuf->st_uid = findowner(scx,usid);
+					if (!perm && same_sid(usid, adminsid)) {
+						stbuf->st_uid = 
+							find_tenant(scx,
+								securattr);
+						if (stbuf->st_uid)
+							perm = 0700;
+					} else
+						stbuf->st_uid = findowner(scx,usid);
 					stbuf->st_gid = findgroup(scx,gsid);
 					stbuf->st_mode =
 					    (stbuf->st_mode & ~07777) + perm;
