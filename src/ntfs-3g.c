@@ -817,7 +817,6 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	          || (chkwrite
 		     && !ntfs_allowed_access(&security, path, ni, S_IWRITE)))) {
 		errno = EACCES;
-		ntfs_attr_close(na);
 		goto exit;
 	}
 
