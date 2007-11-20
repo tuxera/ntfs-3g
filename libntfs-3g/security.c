@@ -662,18 +662,17 @@ static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 		 */
 	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
 		&& (attr_size(securattr) <= attrsz)
+		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
 		&& phead->owner
 		&& phead->group
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
 			/*
-			 * for revision 2 we require SE_DACL_PRESENT to
-			 *    be consistent with offdacl,
-			 * for revision 1 we do not because of "DR Watson"
+			 * we require SE_DACL_PRESENT to
+			 * be consistent with offdacl.
 			 */
-		&& (((pacl->revision == ACL_REVISION)
-		   && (phead->control & SE_DACL_PRESENT ? offdacl : !offdacl))
-		     || (pacl->revision == 1))) {
+		&& (pacl->revision == ACL_REVISION)
+		&& (phead->control & SE_DACL_PRESENT ? offdacl : !offdacl)) {
 
 		/*
 		 * For each ACE, check it is within limits
@@ -4575,9 +4574,10 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->group = cpu_to_le32(0);
 		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		targhead->alignment = 0;
-		targhead->control = cpu_to_le16(
-			(present | selection)
-			& (SACL_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION));
+		targhead->control = cpu_to_le16(SE_SELF_RELATIVE
+			| ((present | selection)
+			    & (SACL_SECURITY_INFORMATION
+				 | DACL_SECURITY_INFORMATION)));
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
 	}
