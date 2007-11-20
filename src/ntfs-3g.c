@@ -445,7 +445,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			set_fuse_error(&res);
 		else
 			if (S_ISLNK(stbuf->st_mode))
-				stbuf->st_mode |= (0777 & ~ctx->fmask);
+				stbuf->st_mode |= 0777;
 	} else {
 		stbuf->st_uid = ctx->uid;
        		stbuf->st_gid = ctx->gid;
