@@ -3277,10 +3277,6 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			/* quite simple, if we are lucky */
 		if (cached) {
 			ni->security_id = cached->securid;
-			if (mode & S_IWUSR)
-				ni->flags &= ~FILE_ATTR_READONLY;
-			else
-				ni->flags |= FILE_ATTR_READONLY;
 			NInoSetDirty(ni);
 		}
 	} else cached = (struct CACHED_SECURID*)NULL;

@@ -1067,16 +1067,17 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				 * set the security attribute if a security id
 				 * could not be allocated (eg NTFS 1.x)
 				 */
-			if (!securid && ctx->security.usermapping) {
-			   	if (ntfs_set_owner_mode(&security, ni,
+			if (ctx->security.usermapping) {
+			   	if (!securid
+				   && ntfs_set_owner_mode(&security, ni,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
 				else {
 					/* Adjust read-only (for Windows) */
-				if (perm & S_IWUSR)
-					ni->flags &= ~FILE_ATTR_READONLY;
-				else
-					ni->flags |= FILE_ATTR_READONLY;
+					if (perm & S_IWUSR)
+						ni->flags &= ~FILE_ATTR_READONLY;
+					else
+						ni->flags |= FILE_ATTR_READONLY;
 				}
 			}
 			NInoSetDirty(ni);
