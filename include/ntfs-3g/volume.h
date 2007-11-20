@@ -43,22 +43,11 @@
 #endif
 
 /*
- * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY and MS_NOATIME,
+ * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY,
  * so we define them ourselves.
  */
 #ifndef MS_RDONLY
 #define MS_RDONLY 1
-#endif
-/*
- * Solaris defines MS_RDONLY but not MS_NOATIME thus we need to carefully
- * define MS_NOATIME.
- */
-#ifndef MS_NOATIME
-#if (MS_RDONLY != 1)
-#	define MS_NOATIME 1
-#else
-#	define MS_NOATIME 2
-#endif
 #endif
 
 #define MS_EXCLUSIVE 0x08000000
@@ -99,7 +88,6 @@ typedef enum {
 	NV_ReadOnly,		/* 1: Volume is read-only. */
 	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
 	NV_LogFileEmpty,	/* 1: $logFile journal is empty. */
-	NV_NoATime,		/* 1: Do not update access time. */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -117,10 +105,6 @@ typedef enum {
 #define NVolLogFileEmpty(nv)		 test_nvol_flag(nv, LogFileEmpty)
 #define NVolSetLogFileEmpty(nv)		  set_nvol_flag(nv, LogFileEmpty)
 #define NVolClearLogFileEmpty(nv)	clear_nvol_flag(nv, LogFileEmpty)
-
-#define NVolNoATime(nv)			 test_nvol_flag(nv, NoATime)
-#define NVolSetNoATime(nv)		  set_nvol_flag(nv, NoATime)
-#define NVolClearNoATime(nv)		clear_nvol_flag(nv, NoATime)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.

@@ -95,6 +95,12 @@ typedef enum {
 	FSTYPE_FUSEBLK
 } fuse_fstype;
 
+typedef enum {
+	ATIME_ENABLED,
+	ATIME_DISABLED,
+	ATIME_RELATIVE
+} ntfs_atime_t;
+
 typedef struct {
 	fuse_fill_dir_t filler;
 	void *buf;
@@ -113,12 +119,12 @@ typedef struct {
 	unsigned int fmask;
 	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
+	ntfs_atime_t atime;
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL silent;
 	BOOL force;
 	BOOL debug;
-	BOOL noatime;
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
@@ -177,8 +183,12 @@ static int ntfs_fuse_is_named_data_stream(const char *path)
 
 static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 {
-	if (ctx->noatime)
+	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
+	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
+			ni->last_access_time >= ni->last_data_change_time &&
+			ni->last_access_time >= ni->last_mft_change_time)
+		return;
 	ntfs_inode_update_times(ni, mask);
 }
 
@@ -455,7 +465,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	stbuf->st_ctime = ni->last_mft_change_time;
 	stbuf->st_mtime = ni->last_data_change_time;
 exit:
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -531,7 +541,7 @@ exit:
 		free(intx_file);
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -709,7 +719,7 @@ ok:
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -763,7 +773,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 exit:
 	if (na)
 		ntfs_attr_close(na);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -780,7 +790,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 {
 	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
-	ntfs_attr *na;
+	ntfs_attr *na = NULL;
 	int res;
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -799,8 +809,8 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	if (!na)
 		goto exit;
 	/*
-	 * JPA deny truncation if cannot write to file
-	 * or search in parent directory
+	 * JPA deny truncation if cannot search in parent directory
+	 * or cannot write to file (already checked for ftruncate())
 	 */
 	if (ntfs_fuse_fill_security_context(&security)
 		&& (!ntfs_allowed_dir_access(&security, path, S_IEXEC)
@@ -812,15 +822,14 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	}
 
 	if (ntfs_attr_truncate(na, size))
-	     /* JPA strange : no ntfs_attr_close(na) ? */
 		goto exit;
 	
 	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
-	ntfs_attr_close(na);
 	errno = 0;
 exit:
 	res = -errno;
-	if (ni && ntfs_inode_close(ni))
+	ntfs_attr_close(na);
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
 	if (stream_name_len)
@@ -1083,7 +1092,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 
 exit:
 	free(uname);
-	if (dir_ni && ntfs_inode_close(dir_ni))
+	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
 	if (utarget)
 		free(utarget);
@@ -1234,9 +1243,9 @@ exit:
 	 * Must close dir_ni first otherwise ntfs_inode_sync_file_name(ni)
 	 * may fail because ni may not be in parent's index on the disk yet.
 	 */
-	if (dir_ni && ntfs_inode_close(dir_ni))
+	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
-	if (ni && ntfs_inode_close(ni))
+	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(uname);
 	free(path);
@@ -1489,7 +1498,7 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 		ni->last_data_change_time = buf->modtime;
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	} else
-		ntfs_fuse_update_times(ni, NTFS_UPDATE_AMCTIME);
+		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
 
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -1932,8 +1941,6 @@ static int ntfs_open(const char *device, char *mntpoint)
 		flags |= MS_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= MS_RDONLY;
-	if (ctx->noatime)
-		flags |= MS_NOATIME;
 	if (ctx->force)
 		flags |= MS_FORCE;
 
@@ -1988,15 +1995,10 @@ static char *parse_mount_options(const char *orig_opts)
 		return NULL;
 	}
 	
-	/*
-	 * FIXME: Due to major performance hit and interference
-	 * issues, always use the 'noatime' options for now.
-	 */
-	ctx->noatime = TRUE;
-	strcat(ret, "noatime,");
-	
 	ctx->silent = TRUE;
-	
+  	
+	ctx->atime = ATIME_RELATIVE;
+  	
 	s = options;
 	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
@@ -2014,6 +2016,21 @@ static char *parse_mount_options(const char *orig_opts)
 						"have value.\n");
 				goto err_exit;
 			}
+			ctx->atime = ATIME_DISABLED;
+		} else if (!strcmp(opt, "atime")) {
+			if (val) {
+				ntfs_log_error("'atime' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->atime = ATIME_ENABLED;
+		} else if (!strcmp(opt, "relatime")) {
+			if (val) {
+				ntfs_log_error("'relatime' option should not "
+						"have value.\n");
+				goto err_exit;
+			}
+			ctx->atime = ATIME_RELATIVE;
 		} else if (!strcmp(opt, "fake_rw")) {
 			if (val) {
 				ntfs_log_error("'fake_rw' option should not "
@@ -2178,6 +2195,14 @@ static char *parse_mount_options(const char *orig_opts)
 		strcat(ret, def_opts);
 	if (default_permissions)
 		strcat(ret, "default_permissions,");
+	
+	if (ctx->atime == ATIME_RELATIVE)
+		strcat(ret, "relatime,");
+	else if (ctx->atime == ATIME_ENABLED)
+		strcat(ret, "atime,");
+	else
+		strcat(ret, "noatime,");
+	
 	strcat(ret, "fsname=");
 	strcat(ret, opts.device);
 exit:
