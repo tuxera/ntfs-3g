@@ -4799,6 +4799,80 @@ ok = TRUE; /* clarification needed */
 }
 
 /*
+ *		read $SDS (for auditing security data)
+ */
+
+int ntfs_read_sds(struct SECURITY_API *scapi,
+		char *buf, u32 size, u32 offset)
+{
+	int got;
+
+	got = 0; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		got = ntfs_local_read(scapi->security.vol->secure_ni,
+			STREAM_SDS, 4, buf, size, offset);
+	} else
+		errno = EINVAL;
+	return (got);
+}
+
+/*
+ *		read $SII (for auditing security data)
+ */
+
+INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
+		INDEX_ENTRY *entry)
+{
+	le32 keyid;
+	ntfs_index_context *xsii;
+
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		xsii = scapi->security.vol->secure_xsii;
+		if (!entry) {
+			keyid = cpu_to_le32(0);
+			ntfs_index_lookup((char*)&keyid,
+				sizeof(SII_INDEX_KEY), xsii);
+			entry = xsii->entry;
+		} else
+			entry = ntfs_index_next(entry,xsii);
+		if (!entry)
+			errno = ENODATA;
+	} else {
+		entry = (INDEX_ENTRY*)NULL;
+		errno = EINVAL;
+	}
+	return (entry);
+}
+
+/*
+ *		read $SDH (for auditing security data)
+ */
+
+INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
+		INDEX_ENTRY *entry)
+{
+	le32 keyid;
+	ntfs_index_context *xsdh;
+
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		xsdh = scapi->security.vol->secure_xsdh;
+		if (!entry) {
+			keyid = cpu_to_le32(0);
+			ntfs_index_lookup((char*)&keyid,
+				sizeof(SDH_INDEX_KEY), xsdh);
+			entry = xsdh->entry;
+		} else
+			entry = ntfs_index_next(entry,xsdh);
+		if (!entry)
+			errno = ENODATA;
+	} else {
+		entry = (INDEX_ENTRY*)NULL;
+		errno = EINVAL;
+	}
+	return (entry);
+}
+
+/*
  *		Initializations before calling ntfs_get_file_security()
  *	ntfs_set_file_security() and ntfs_read_directory()
  *
