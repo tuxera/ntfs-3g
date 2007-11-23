@@ -668,11 +668,13 @@ static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
 			/*
-			 * we require SE_DACL_PRESENT to
-			 * be consistent with offdacl.
+			 * if there is an ACL, as indicated by offdacl,
+			 * require SE_DACL_PRESENT
+			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
 			 */
-		&& (pacl->revision == ACL_REVISION)
-		&& (phead->control & SE_DACL_PRESENT ? offdacl : !offdacl)) {
+		&& (!offdacl
+                    || ((pacl->revision == ACL_REVISION)
+		       && (phead->control & SE_DACL_PRESENT)))) {
 
 		/*
 		 * For each ACE, check it is within limits
