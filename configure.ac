@@ -116,9 +116,15 @@ AC_SYS_LARGEFILE
 
 case "$target_os" in
 linux*|darwin*|netbsd*)
-	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0, [ compile_fuse_module=true ],
+	if test -z "$PKG_CONFIG"; then
+		AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+	fi
+	if test "x$PKG_CONFIG" = "xno" ; then
+		AC_MSG_ERROR([pkg-config wasn't found! Please install from your vendor, or see http://pkg-config.freedesktop.org/wiki/])
+	fi
+	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0,,
 	[
-	 AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either it's not fully installed (e.g. fuse, fuse-utils, libfuse, libfuse2, libfuse-dev, etc packages) or files from an old version are still present. See FUSE at http://fuse.sf.net/])
+	 AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either older FUSE is still present, or FUSE is not fully installed (e.g. fuse, libfuse, libfuse2, libfuse-dev, etc packages). Source code: http://fuse.sf.net])
 	]);;
 freebsd*)
 	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
