@@ -4823,14 +4823,14 @@ int ntfs_read_sds(struct SECURITY_API *scapi,
 INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 		INDEX_ENTRY *entry)
 {
-	le32 keyid;
+	SII_INDEX_KEY key;
 	ntfs_index_context *xsii;
 
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		xsii = scapi->security.vol->secure_xsii;
 		if (!entry) {
-			keyid = cpu_to_le32(0);
-			ntfs_index_lookup((char*)&keyid,
+			key.security_id = cpu_to_le32(0);
+			ntfs_index_lookup((char*)&key,
 				sizeof(SII_INDEX_KEY), xsii);
 			entry = xsii->entry;
 		} else
@@ -4851,14 +4851,15 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 		INDEX_ENTRY *entry)
 {
-	le32 keyid;
+	SDH_INDEX_KEY key;
 	ntfs_index_context *xsdh;
 
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		xsdh = scapi->security.vol->secure_xsdh;
 		if (!entry) {
-			keyid = cpu_to_le32(0);
-			ntfs_index_lookup((char*)&keyid,
+			key.hash = cpu_to_le32(0);
+			key.security_id = cpu_to_le32(0);
+			ntfs_index_lookup((char*)&key,
 				sizeof(SDH_INDEX_KEY), xsdh);
 			entry = xsdh->entry;
 		} else

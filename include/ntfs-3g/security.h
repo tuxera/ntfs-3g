@@ -210,6 +210,12 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection, const char *attr);
 BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 		const char *path, ntfs_filldir_t callback, void *context);
+int ntfs_read_sds(struct SECURITY_API *scapi,
+		char *buf, u32 size, u32 offset);
+INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
+		INDEX_ENTRY *entry);
+INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
+		INDEX_ENTRY *entry);
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
                                 int flags);
 BOOL ntfs_leave_file_security(struct SECURITY_API *scx);
