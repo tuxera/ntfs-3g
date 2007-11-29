@@ -3825,6 +3825,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		pos += usidsz;
 		securid = setsecurityattr(scx->vol,
 			(SECURITY_DESCRIPTOR_RELATIVE*)newattr, pos);
+		free(newattr);
 	} else
 		securid = cpu_to_le32(0);
 	return (securid);
