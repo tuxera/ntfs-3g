@@ -86,11 +86,13 @@
 
           /* flags which are set to mean exec, write or read */
 
-#define FILE_READ FILE_READ_DATA
-#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA)
+#define FILE_READ (FILE_READ_DATA | SYNCHRONIZE)
+#define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA \
+		| READ_CONTROL | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
 #define FILE_EXEC (FILE_EXECUTE)
 #define DIR_READ FILE_LIST_DIRECTORY
-#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)
+#define DIR_WRITE (FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD \
+	 	| READ_CONTROL | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
 #define DIR_EXEC (FILE_TRAVERSE)
 
 	  /* flags which must be different to mean sticky bit */
@@ -103,12 +105,12 @@
           /* flags tested for meaning exec, write or read */
 	  /* tests for write allow for interpretation of a sticky bit */
 
-#define FILE_GREAD (FILE_READ | GENERIC_READ)
+#define FILE_GREAD (FILE_READ_DATA | GENERIC_READ)
 #define FILE_GWRITE (FILE_WRITE_DATA | GENERIC_WRITE)
-#define FILE_GEXEC (FILE_EXEC | GENERIC_EXECUTE)
-#define DIR_GREAD (DIR_READ | GENERIC_READ)
+#define FILE_GEXEC (FILE_EXECUTE | GENERIC_EXECUTE)
+#define DIR_GREAD (FILE_LIST_DIRECTORY | GENERIC_READ)
 #define DIR_GWRITE (FILE_ADD_FILE | GENERIC_WRITE)
-#define DIR_GEXEC (DIR_EXEC | GENERIC_EXECUTE)
+#define DIR_GEXEC (FILE_TRAVERSE | GENERIC_EXECUTE)
 
           /* standard owner (and administrator) rights */
 
@@ -119,7 +121,8 @@
 
           /* standard world rights */
 
-#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA)
+#define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA \
+			| SYNCHRONIZE)
 
           /* inheritance flags for files and directories */
 
@@ -2862,12 +2865,12 @@ static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if ((same_sid(usid, &pace->sid)
 		   || same_sid(ownersid, &pace->sid))
-		    && (pace->mask & FILE_WRITE_ATTRIBUTES)) {
+		    && (pace->mask & WRITE_OWNER)) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			} else
 			if (same_sid(usid, &pace->sid)
-			   && (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
+			   && (!(pace->mask & WRITE_OWNER))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowgrp |= pace->mask;
 			} else
@@ -2922,7 +2925,7 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if ((same_sid(usid, &pace->sid)
 		   || same_sid(ownersid, &pace->sid))
-		     && (((pace->mask & FILE_WRITE_ATTRIBUTES) && !nace))) {
+		     && (((pace->mask & WRITE_OWNER) && !nace))) {
 			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 				allowown |= pace->mask;
 			else
@@ -2930,7 +2933,7 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 					denyown |= pace->mask;
 			} else
 			    if (same_sid(gsid, &pace->sid)
-				&& (!(pace->mask & FILE_WRITE_ATTRIBUTES))) {
+				&& (!(pace->mask & WRITE_OWNER))) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						allowgrp |= pace->mask;
 					else
