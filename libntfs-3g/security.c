@@ -2638,8 +2638,8 @@ static int is_world_sid(const SID * usid)
 	  ||   ((usid->sub_authority_count == 2)
 	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-	    && (usid->sub_authority[0] == 32)
-	    && (usid->sub_authority[0] == 545))
+	    && (usid->sub_authority[0] == cpu_to_le32(32))
+	    && (usid->sub_authority[1] == cpu_to_le32(545)))
 		);
 }
 
