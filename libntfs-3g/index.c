@@ -1886,7 +1886,6 @@ static INDEX_ENTRY *ntfs_index_walk_down(INDEX_ENTRY *ie,
 
 			/* down from level zero */
 
-			free(ictx->ir);
 			ictx->ir = (INDEX_ROOT*)NULL;
 			ictx->ib = (INDEX_BLOCK*)ntfs_malloc(ictx->block_size);
 			ictx->pindex = 1;
@@ -1998,7 +1997,7 @@ INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie, ntfs_index_context *ictx)
 			 * when searching for a partial key
 			 * if this happens, walk up
 			 */
- 
+
 	if (ie->ie_flags & INDEX_ENTRY_END)
 		next = ntfs_index_walk_up(ie, ictx);
 	else {
