@@ -1335,20 +1335,20 @@ static int ntfs_fuse_unlink(const char *org_path)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
+	if (!stream_name_len)
+		res = ntfs_fuse_rm(path);
+	else {
 			/*
-			 * JPA deny unlinking if directory is not writable
-			 * and executable
-			 * sticky directory to be tested in ntfs_fuse_rm()
+			 * JPA deny unlinking stream if directory is not
+			 * writable and executable (debatable)
 			 */
-	if (!ntfs_fuse_fill_security_context(&security)
-	   || ntfs_allowed_dir_access(&security, path,
-			S_IEXEC + S_IWRITE)) {
-		if (!stream_name_len)
-			res = ntfs_fuse_rm(path);
-		else
+		if (!ntfs_fuse_fill_security_context(&security)
+		   || ntfs_allowed_dir_access(&security, path,
+				S_IEXEC + S_IWRITE))
 			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
-	} else
-		res = -errno;
+		else
+			res = -errno;
+	}
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
