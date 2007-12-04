@@ -668,6 +668,10 @@ static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
 		&& phead->owner
 		&& phead->group
+		&& !(phead->owner & cpu_to_le32(3))
+		&& !(phead->group & cpu_to_le32(3))
+		&& !(phead->dacl & cpu_to_le32(3))
+		&& !(phead->sacl & cpu_to_le32(3))
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
 		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
 			/*
