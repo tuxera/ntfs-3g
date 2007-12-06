@@ -18,5 +18,5 @@
   exit 1
 }
 
-echo Running autoreconf --verbose --install
-autoreconf --force --verbose --install 
+echo Running autoreconf --verbose --install --force
+autoreconf --verbose --install --force

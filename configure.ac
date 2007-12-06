@@ -3,8 +3,8 @@
 #		 compilation.
 #
 # Copyright (c) 2000-2006 Anton Altaparmakov
-# Copyright (c) 2003 Jan Kratochvil
 # Copyright (c) 2005-2007 Szabolcs Szakacsits
+# Copyright (C) 2007 Alon Bar-Lev
 #
 # This program/include file is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as published
@@ -20,112 +20,137 @@
 # along with this program (in the main directory of the NTFS-3G
 # distribution in the file COPYING); if not, write to the Free Software
 # Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-#
 
-AC_PREREQ(2.59)
+# Autoconf
+AC_PREREQ([2.59])
+AC_INIT([ntfs-3g],[1.1206-BETA],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION=18
+AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
-AC_INIT([ntfs-3g],[1.1120],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION=16:0:0
+# Environment
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
 
-AC_CANONICAL_HOST([])
-AC_CANONICAL_TARGET([])
-AC_CONFIG_SRCDIR([config.h.in])
-AC_CONFIG_HEADERS([config.h])
-AM_INIT_AUTOMAKE
+# Automake
+AM_INIT_AUTOMAKE([${PACKAGE_NAME}], [${PACKAGE_VERSION}])
+AM_CONFIG_HEADER([config.h])
 AM_MAINTAINER_MODE
-AM_ENABLE_SHARED
-AM_ENABLE_STATIC
 
-AC_PREFIX_DEFAULT(/usr/local)
-if test "x$prefix" = "xNONE"; then
-	prefix=$ac_default_prefix
-	ac_configure_args="$ac_configure_args --prefix $prefix"
-fi
-
-# Executables should be installed to the root filesystem, otherwise 
-# automounting NTFS volumes can fail during boot if the driver binaries 
-# (ntfs-3g, fuse) are on an unmounted partition.
-if test "x$exec_prefix" = "xNONE"; then
-       exec_prefix=/
-       ac_configure_args="$ac_configure_args --exec-prefix $exec_prefix"
-fi
-
-AC_MSG_NOTICE([Setting exec_prefix to $exec_prefix])
-
-# Command-line options.
-AC_ARG_ENABLE(debug,
-	AS_HELP_STRING(--enable-debug,enable additional debugging code and
-		       output), ,
-	enable_debug=no
+# Options
+AC_ARG_ENABLE(
+	[debug],
+	[AC_HELP_STRING([--enable-debug], [enable debugging code and output])],
+	,
+	[enable_debug="no"]
 )
 
-AC_ARG_ENABLE(really-static,
-	AS_HELP_STRING(--enable-really-static,create static binaries
-		       for the utilities), ,
-	enable_really_static=no
-)
-AM_CONDITIONAL(REALLYSTATIC, test "$enable_really_static" = yes)
-
-AC_ARG_ENABLE(warnings,
-	AS_HELP_STRING(--enable-warnings,enable additional compiler warnings), ,
-	enable_warnings=no
+AC_ARG_ENABLE(
+	[warnings],
+	[AC_HELP_STRING([--enable-warnings], [enable lots of compiler warnings])],
+	,
+	[enable_warnings="no"]
 )
 
-AC_ARG_ENABLE(ldconfig,
-	AS_HELP_STRING(--disable-ldconfig,do not update dynamic linker cache
-		       using ldconfig), ,
-	enable_ldconfig=yes
+AC_ARG_ENABLE(
+	[pedantic],
+	[AC_HELP_STRING([--enable-pedantic], [enable compile pedantic mode])],
+	,
+	[enable_pedantic="no"]
 )
 
-AC_ARG_ENABLE(library,
-	AS_HELP_STRING(--disable-library,do not install libntfs-3g but link
-		       it into ntfs-3g), ,
-	enable_library=yes
+AC_ARG_ENABLE(
+	[really-static],
+	[AC_HELP_STRING([--enable-really-static], [create fully static binaries])],
+	,
+	[enable_really_static="no"]
 )
-if test "$enable_library" != yes; then
-	enable_shared=no
-	enable_ldconfig=no
-fi
+AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
+
+AC_ARG_ENABLE(
+	[library],
+	[AC_HELP_STRING([--disable-library], [do not install libntfs-3g but link it into ntfs-3g])],
+	,
+	[enable_library="yes"]
+)
+test "${enable_really_static}" = "yes" && enable_library="no"
 AM_CONDITIONAL(INSTALL_LIBRARY, test "$enable_library" = yes)
 
+AC_ARG_ENABLE(
+	[ldconfig],
+	[AC_HELP_STRING([--disable-ldconfig], [do not update dynamic linker cache using ldconfig])],
+	,
+	[enable_ldconfig="yes"]
+)
+test "${enable_library}" = "no" && enable_ldconfig="no"
 # --disable-library will disable to run ldconfig since no point to do so.
 AM_CONDITIONAL(RUN_LDCONFIG, test "$enable_ldconfig" = yes)
 
-# Use GNU extensions if available.
-AC_GNU_SOURCE
+AC_ARG_ENABLE(
+	[ldscript],
+	[AC_HELP_STRING([--enable-ldscript], [use ldscript instead of .so symlink])],
+	,
+	[enable_ldscript="no"]
+)
 
-# Checks for programs.
+AC_ARG_ENABLE(
+	[mtab],
+	[AC_HELP_STRING([--disable-mtab], [disable and ignore usage of /etc/mtab])],
+	,
+	[enable_mtab="yes"]
+)
+
+AC_ARG_ENABLE(
+	[device-default-io-ops],
+	[AC_HELP_STRING([--disable-device-default-io-ops], [Install default IO ops])],
+	,
+	[enable_device_default_io_ops="yes"]
+)
+
+# Programs
+AC_GNU_SOURCE
 AC_PROG_CC
-AC_PROG_GCC_TRADITIONAL
-AC_PROG_INSTALL
-AC_PATH_PROG(RM, rm, rm)
+AC_PROG_LIBTOOL
+AC_PROG_LN_S
+AM_PROG_CC_C_O
 # No need to check for ldconfig if --disable-ldconfig was given
 if test "$enable_ldconfig" = yes; then
 	AC_PATH_PROG(LDCONFIG, ldconfig, true, [/sbin /usr/sbin $PATH])
 fi
-AC_PROG_LN_S
-AC_PROG_MAKE_SET
-AC_PROG_LIBTOOL
+AC_PATH_PROG([MV], [mv])
+AC_PATH_PROG([RM], [rm])
+AC_PATH_PROG([SED], [sed])
 
-# Libraries often install their metadata .pc files in directories not searched
-# by pkg-config. Let's workaround this. 
-export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/lib/pkgconfig:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
+# Environment
+AC_MSG_CHECKING([Windows OS])
+case "${target}" in
+*-mingw32*|*-winnt*|*-cygwin*)
+	AC_MSG_RESULT([yes])
+	WINDOWS="yes"
+	AC_DEFINE(
+		[WINDOWS],
+		[1],
+		[Define to 1 if this is a Windows OS]
+	)
+	;;
+*)
+	AC_MSG_RESULT([no])
+	WINDOWS="no"
+	;;
+esac
 
-# Enable large file support.
-AC_SYS_LARGEFILE
-
-case "$target_os" in
-linux*|darwin*|netbsd*)
-	if test -z "$PKG_CONFIG"; then
-		AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
-	fi
-	if test "x$PKG_CONFIG" = "xno" ; then
-		AC_MSG_ERROR([pkg-config wasn't found! Please install from your vendor, or see http://pkg-config.freedesktop.org/wiki/])
-	fi
-	PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.6.0,,
-	[
-	 AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either older FUSE is still present, or FUSE is not fully installed (e.g. fuse, libfuse, libfuse2, libfuse-dev, etc packages). Source code: http://fuse.sf.net])
-	]);;
+AC_MSG_CHECKING([fuse compatibility])
+case "${target_os}" in
+linux*)
+	AC_ARG_WITH(
+		[fuse],
+		[AC_HELP_STRING([--with-fuse=<internal|external>], [Select FUSE library: internal or external @<:@default=internal@:>@])],
+		,
+		[with_fuse="internal"]
+	)
+	;;
+darwin*|netbsd*)
+	with_fuse="external"
+	;;
 freebsd*)
 	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
 	;;
@@ -133,50 +158,55 @@ freebsd*)
 	AC_MSG_ERROR([ntfs-3g can be built only under Linux, FreeBSD, Mac OS X, and NetBSD.])
 	;;
 esac
+AC_MSG_RESULT([${with_fuse}])
 
-# Static linking failed because FUSE 2.6.[01] forgot to include -lrt. 
-# However FreeBSD doesn't have one. So, here we go with the code from FUSE. 
-libfuse_libs=
-LIBS=
-AC_SEARCH_LIBS(clock_gettime, [rt])
-libfuse_libs="$libfuse_libs $LIBS"
-LIBS=
-AC_SUBST(libfuse_libs)
-
-FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
-
-# add --with-extra-includes and --with-extra-libs switch to ./configure
-all_libraries="$all_libraries $USER_LDFLAGS"
-all_includes="$all_includes $USER_INCLUDES"
-AC_SUBST(all_includes)
-AC_SUBST(all_libraries)
-
-# Add our compiler switches not discarding 'CFLAGS' as they may have been
-# passed to us by rpmbuild(8).
-# We add -Wall to enable some compiler warnings.
-CFLAGS="$CFLAGS -Wall"
-
-# Add lots of extra warnings if --enable-warnings was specified.
-if test "$enable_warnings" = "yes"; then
-	CFLAGS="$CFLAGS -W -Wall -Waggregate-return -Wbad-function-cast -Wcast-align -Wcast-qual -Wdisabled-optimization -Wdiv-by-zero -Wfloat-equal -Winline -Wmissing-declarations -Wmissing-format-attribute -Wmissing-noreturn -Wmissing-prototypes -Wmultichar -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-compare -Wstrict-prototypes -Wundef -Wwrite-strings"
+if test "${enable_ldscript}" = "yes"; then
+	AC_MSG_CHECKING([Output format])
+	OUTPUT_FORMAT="$(${CC} ${CFLAGS} ${LDFLAGS} -Wl,--verbose 2>&1 | ${SED} -n 's/^OUTPUT_FORMAT("\([[^"]]*\)",.*/\1/p')"
+	if test -z "${OUTPUT_FORMAT}"; then
+		AC_MSG_RESULT([None])
+	else
+		AC_MSG_RESULT([${OUTPUT_FORMAT}])
+		OUTPUT_FORMAT="OUTPUT_FORMAT ( ${OUTPUT_FORMAT} )"
+	fi
 fi
 
-# Add debugging switches if --enable-debug was specified.
-if test "$enable_debug" = "yes"; then
-	CFLAGS="$CFLAGS -ggdb3 -DDEBUG"
+# Libraries
+if test "${with_fuse}" = "internal"; then
+	AC_CHECK_LIB(
+		[pthread],
+		[pthread_create],
+		[LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lpthread"],
+		[AC_MSG_ERROR([Cannot find pthread library])]
+	)
+	AC_CHECK_LIB(
+		[rt],
+		[clock_gettime],
+		[LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lrt"],
+		[AC_MSG_ERROR([Cannot find rt library])]
+	)
+	# required so that we re-compile anything
+	AC_DEFINE(
+		[FUSE_INTERNAL],
+		[1],
+		[Define to 1 if using internal fuse]
+	)
+else
+	PKG_PROG_PKG_CONFIG
+	test -z "${PKG_CONFIG}" && AC_MSG_ERROR([pkg-config wasn't found! Please install from your vendor, or see http://pkg-config.freedesktop.org/wiki/])
+	# Libraries often install their metadata .pc files in directories
+	# not searched by pkg-config. Let's workaround this. 
+	export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/lib/pkgconfig:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
+	PKG_CHECK_MODULES(
+		[FUSE_MODULE],
+		[fuse >= 2.6.0],
+		,
+		[
+			AC_MSG_ERROR([FUSE >= 2.6.0 was not found. Either older FUSE is still present, or FUSE is not fully installed (e.g. fuse, libfuse, libfuse2, libfuse-dev, etc packages). Source code: http://fuse.sf.net])
+		]
+	)
+	FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
 fi
-
-AC_SUBST(CFLAGS)
-AC_SUBST(CPPFLAGS)
-AC_SUBST(LDFLAGS)
-AC_SUBST(LIBS)
-
-AC_SUBST(LIBNTFS_3G_VERSION)
-AC_SUBST(LIBNTFS_3G_CFLAGS)
-
-AC_SUBST(AUTODIRS)
-
-# Checks for libraries.
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -190,17 +220,26 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
-AC_C_BIGENDIAN(,
-	[AC_DEFINE([WORDS_LITTLEENDIAN], 1,
-	[Define to 1 if your processor stores words with the least significant
-	byte first (like Intel and VAX, unlike Motorola and SPARC).])]
-	,)
+AC_C_BIGENDIAN(
+	,
+	[
+		AC_DEFINE(
+			[WORDS_LITTLEENDIAN],
+			[1],
+			[Define to 1 if your processor stores words with the least significant
+			byte first (like Intel and VAX, unlike Motorola and SPARC).]
+		)
+	]
+	,
+)
 AC_C_CONST
 AC_C_INLINE
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_STRUCT_ST_BLOCKS
 AC_CHECK_MEMBERS([struct stat.st_rdev])
+AC_CHECK_MEMBERS([struct stat.st_atim])
+AC_CHECK_MEMBERS([struct stat.st_atimespec])
 
 # Checks for library functions.
 AC_FUNC_GETMNTENT
@@ -210,23 +249,97 @@ AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_UTIME_NULL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit basename dup2 fdatasync getopt_long hasmntopt mbsinit \
+AC_CHECK_FUNCS([ \
+	atexit basename dup2 fdatasync getopt_long hasmntopt mbsinit \
 	memmove memset realpath regcomp setlocale setxattr strcasecmp strchr \
-	strdup strerror strnlen strtol strtoul sysconf utime])
+	strdup strerror strnlen strtol strtoul sysconf utime fork \
+])
+AC_SYS_LARGEFILE
 
-# Makefiles to be created by configure.
+# We add -Wall to enable some compiler warnings.
+CFLAGS="${CFLAGS} -Wall -fno-strict-aliasing"
+
+if test "${enable_pedantic}" = "yes"; then
+	enable_warnings="yes"
+	CFLAGS="${CFLAGS} -pedantic"
+fi
+
+if test "${enable_warnings}" = "yes"; then
+	CFLAGS="${CFLAGS} -W -Wall -Waggregate-return -Wbad-function-cast -Wcast-align -Wcast-qual -Wdisabled-optimization -Wdiv-by-zero -Wfloat-equal -Winline -Wmissing-declarations -Wmissing-format-attribute -Wmissing-noreturn -Wmissing-prototypes -Wmultichar -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-compare -Wstrict-prototypes -Wundef -Wwrite-strings"
+fi
+
+if test "${enable_debug}" = "yes"; then
+	CFLAGS="${CFLAGS} -ggdb3 -DDEBUG"
+	AC_DEFINE(
+		[ENABLE_DEBUG],
+		[1],
+		[Define to 1 if debug should be enabled]
+	)
+fi
+
+test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
+	[NO_NTFS_DEVICE_DEFAULT_IO_OPS],
+	[1],
+	[Don't use default IO ops]
+)
+
+if test "${enable_mtab}" = "no"; then
+	AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
+fi
+
+# Settings
+pkgconfigdir="\$(libdir)/pkgconfig"
+ntfs3gincludedir="\$(includedir)/ntfs-3g"
+# Executables should be installed to the root filesystem, otherwise 
+# automounting NTFS volumes can fail during boot if the driver binaries 
+# and their dependencies are on an unmounted partition. Use --exec-prefix
+# to override this.
+if test "x${exec_prefix}" = "xNONE"; then
+	rootbindir="/bin"
+	rootsbindir="/sbin"
+	rootlibdir="/lib${libdir##*/lib}"
+else
+	rootbindir="\$(bindir)"
+	rootsbindir="\$(sbindir)"
+	rootlibdir="\$(libdir)"
+fi
+AC_SUBST([pkgconfigdir])
+AC_SUBST([ntfs3gincludedir])
+AC_SUBST([rootbindir])
+AC_SUBST([rootsbindir])
+AC_SUBST([rootlibdir])
+AC_SUBST([LIBNTFS_3G_VERSION])
+AC_SUBST([LIBFUSE_LITE_LIBS])
+AC_SUBST([OUTPUT_FORMAT])
+AM_CONDITIONAL([FUSE_INTERNAL], [test "${with_fuse}" = "internal"])
+AM_CONDITIONAL([GENERATE_LDSCRIPT], [test "${enable_ldscript}" = "yes"])
+AM_CONDITIONAL([WINDOWS], [test "${WINDOWS}" = "yes"])
+AM_CONDITIONAL([NTFS_DEVICE_DEFAULT_IO_OPS], [test "${enable_device_default_io_ops}" = "yes"])
+
+# workaround for <autoconf-2.60
+if test -z "${docdir}"; then
+	docdir="\$(datarootdir)/doc/\$(PACKAGE_NAME)"
+	AC_SUBST([docdir])
+fi
+
+# generate files
 AC_CONFIG_FILES([
 	Makefile
 	include/Makefile
+	include/fuse-lite/Makefile
 	include/ntfs-3g/Makefile
+	libfuse-lite/Makefile
 	libntfs-3g/Makefile
+	libntfs-3g/libntfs-3g.pc
+	libntfs-3g/libntfs-3g.script.so
 	src/Makefile
 	src/ntfs-3g.8
 ])
 AC_OUTPUT
 
-if test "x$FUSE_LIB_PATH" != "x-L/lib" -a "x$FUSE_LIB_PATH" != "x-L/lib64"; then
-cat <<EOF
+if test "${with_fuse}" = "external"; then
+	if ! echo "x$FUSE_LIB_PATH" | grep -- "x-L/lib" > /dev/null; then
+		cat <<EOF
 ****************************************************************************
 * WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
 * The FUSE user space binaries were NOT installed with root directory      *
@@ -237,8 +350,9 @@ cat <<EOF
 * 	make && sudo make install                                          *
 * WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING   *
 ****************************************************************************
-You can type now 'make' to build ntfs-3g.
 EOF
-
+	fi
 fi
+
+echo "You can type now 'make' to build ntfs-3g."
 

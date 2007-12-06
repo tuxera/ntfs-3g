@@ -1,70 +1,75 @@
-#
-# Before making a release, the LTVERSION string should be modified.
-# The string is of the form CURRENT:REVISION:AGE.
-#
-# CURRENT (C)
-#	The most recent interface number that this library implements.
-#
-# REVISION (R)
-#	The implementation number that this library implements.
-#
-# AGE (A)
-#	The difference between the newest and oldest interfaces that this
-#	library implements. In other works, the library implements all the
-#	interface numbers in the range from number 'CURRENT - AGE' to
-#	'CURRENT'.
-#
-# This means that:
-#
-#   - If interfaces have been changed or added, but binary compatibility has
-#     been preserved, change to C+1:0:A+1
-#
-#   - If binary compatibility has been broken (eg removed or changed
-#     interfaces) change to C+1:0:0
-#
-#   - If the interface is the same as the previous version, change to C:R+1:A
-#
 
-linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs-3g
+MAINTAINERCLEANFILES = Makefile.in
 
 if INSTALL_LIBRARY
-lib_LTLIBRARIES = libntfs-3g.la
+rootlib_LTLIBRARIES=#Create directory
+lib_LTLIBRARIES    = libntfs-3g.la
+pkgconfig_DATA     = libntfs-3g.pc
 else
 noinst_LTLIBRARIES = libntfs-3g.la
 endif
 
-libntfs_3g_la_LDFLAGS = -version-number $(LIBNTFS_3G_VERSION)
-libntfs_3g_la_CFLAGS = $(LIBNTFS_3G_CFLAGS) 
+libntfs_3g_la_CFLAGS  = $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
+
+libntfs_3g_la_LDFLAGS = -version-info $(LIBNTFS_3G_VERSION) -no-undefined
+
+if FUSE_INTERNAL
+libntfs_3g_la_LIBADD  = $(top_srcdir)/libfuse-lite/libfuse-lite.la
+endif
+
 libntfs_3g_la_SOURCES =	\
-	attrib.c	\
-	attrlist.c	\
-	bitmap.c	\
-	bootsect.c	\
-	collate.c	\
-	compat.c	\
-	compress.c	\
-	debug.c		\
-	device.c	\
-	device_io.c	\
-	dir.c		\
-	index.c		\
-	inode.c		\
-	lcnalloc.c	\
-	logfile.c	\
-	logging.c	\
-	mft.c		\
-	misc.c		\
-	mst.c		\
-	runlist.c	\
-	security.c	\
-	unistr.c	\
-	version.c	\
+	attrib.c 	\
+	attrlist.c 	\
+	bitmap.c 	\
+	bootsect.c 	\
+	collate.c 	\
+	compat.c 	\
+	compress.c 	\
+	debug.c 	\
+	device.c 	\
+	dir.c 		\
+	index.c 	\
+	inode.c 	\
+	lcnalloc.c 	\
+	logfile.c 	\
+	logging.c 	\
+	mft.c 		\
+	misc.c 		\
+	mst.c 		\
+	runlist.c 	\
+	security.c 	\
+	unistr.c 	\
+	version.c 	\
 	volume.c
 
-AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
+if NTFS_DEVICE_DEFAULT_IO_OPS
+if WINDOWS
+libntfs_3g_la_SOURCES += win32_io.c
+else
+libntfs_3g_la_SOURCES += unix_io.c
+endif
+endif
 
-EXTRA_DIST = unix_io.c
+# We may need to move .so files to root
+# And create ldscript or symbolic link from /usr
+install-exec-hook: install-rootlibLTLIBRARIES
+if INSTALL_LIBRARY
+	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+		$(MV) -f "$(DESTDIR)/$(libdir)"/libntfs-3g.so* "$(DESTDIR)/$(rootlibdir)";  \
+	fi
+if GENERATE_LDSCRIPT
+	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+		$(install_sh_PROGRAM) "libntfs-3g.script.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+	fi
+else
+	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+		$(LN_S) "$(rootlibdir)/libntfs-3g.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
+	fi
+endif
+endif
 
-MAINTAINERCLEANFILES = Makefile.in
+uninstall-local:
+if INSTALL_LIBRARY
+	$(RM) -f "$(DESTDIR)/$(rootlibdir)"/libntfs-3g.so*
+endif
 
-libs:	$(lib_LTLIBRARIES)
