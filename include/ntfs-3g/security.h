@@ -37,6 +37,8 @@ struct MAPPING {
 	struct MAPPING *next;
 	int xid;		/* linux id : uid or gid */
 	SID *sid;		/* Windows id : usid or gsid */
+	int grcnt;		/* group count (for users only) */
+	gid_t *groups;		/* groups which the user is member of */
 };
 
 /*
