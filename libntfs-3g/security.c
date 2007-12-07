@@ -54,6 +54,7 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+#include <unistd.h>
 #include <pwd.h>
 #include <grp.h>
 
@@ -1556,6 +1557,39 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
 		sid = (p ? p->sid : (const SID*)NULL);
 	}
 	return (sid);
+}
+
+/*
+ *		Check whether current user is member of some group
+ *	Note : this only takes into account the groups defined in
+ *	/etc/group at initialization time.
+ *	It does not take into account the groups dynamically set by
+ *	setgroups() nor the changes in /etc/group since initialization
+ *
+ *	Should not be called for user root, however the group may be root
+ *
+ */
+
+static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
+{
+	BOOL ingroup;
+	int grcnt;
+	gid_t *groups;
+	struct MAPPING *user;
+
+	ingroup = FALSE;
+	if (uid) {
+		user = scx->usermapping;
+		while (user && ((uid_t)user->xid != uid))
+			user = user->next;
+		if (user) {
+			groups = user->groups;
+			grcnt = user->grcnt;
+			while ((--grcnt >= 0) && (groups[grcnt] != gid)) { }
+			ingroup = (grcnt >= 0);
+		}
+	}
+	return (ingroup);
 }
 
 /*
@@ -3116,7 +3150,8 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			if (uid == scx->uid)
 				perm &= 07700;
 			else
-				if (gid == scx->gid)
+				if ((gid == scx->gid)
+				   || groupmember(scx, scx->uid, gid))
 					perm &= 07070;
 				else
 					perm &= 07007;
@@ -3382,7 +3417,8 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 				 * clear setgid if file group does
 				 * not match process group
 				 */
-			if (uid && (filegid != scx->gid))
+			if (uid && (filegid != scx->gid)
+			    && !groupmember(scx, scx->uid, filegid))
 				mode &= ~S_ISGID;
 			ntfs_set_owner_mode(scx, ni,
 					fileuid, filegid, mode);
@@ -3642,10 +3678,10 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 	}
 	if (!res) {
 		/* check requested by root */
-		/* or chgrp requested by owner */
+		/* or chgrp requested by owner to an owned group */
 		if (!scx->uid
-		   || (((int)uid < 0)
-		      && (gid == scx->gid)
+		   || ((((int)uid < 0) || (uid == scx->uid))
+		      && ((gid == scx->gid) || groupmember(scx, scx->uid, gid))
 		      && (fileuid == scx->uid))) {
 			/* replace by the new usid and gsid */
 			/* or reuse old gid and sid for cacheing */
@@ -4043,6 +4079,9 @@ static void free_mapping(struct SECURITY_CONTEXT *scx)
 			group = group->next;
 		if (!group)
 			free(user->sid);
+			/* free group list if any */
+		if (user->grcnt)
+			free(user->groups);
 			/* unchain item and free */
 		scx->usermapping = user->next;
 		free(user);
@@ -4173,6 +4212,87 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 	}
 	return (firstmapping);
 }
+
+/*
+ *		Link a group to a member of group
+ *
+ *	Returns 0 if OK, -1 (and errno set) if error
+ */
+
+static int link_single_group(struct MAPPING *usermapping, struct passwd *user,
+			gid_t gid)
+{
+	struct group *group;
+	char **grmem;
+	int grcnt;
+	gid_t *groups;
+	int res;
+
+	res = 0;
+	group = getgrgid(gid);
+	if (group && group->gr_mem) {
+		grcnt = usermapping->grcnt;
+		groups = usermapping->groups;
+		grmem = group->gr_mem;
+		while (*grmem && strcmp(user->pw_name, *grmem))
+			grmem++;
+		if (*grmem) {
+			if (!grcnt)
+				groups = (gid_t*)malloc(sizeof(gid_t));
+			else
+				groups = (gid_t*)realloc(groups,
+					(grcnt+1)*sizeof(gid_t));
+			if (groups)
+				groups[grcnt++]	= gid;
+			else {
+				res = -1;
+				errno = ENOMEM;
+			}
+		}
+		usermapping->grcnt = grcnt;
+		usermapping->groups = groups;
+	}
+	return (res);
+}
+
+
+/*
+ *		Statically link group to users
+ *	This is based on groups defined in /etc/group and does not take
+ *	the groups dynamically set by setgroups() nor any changes in
+ *	/etc/group into account
+ *
+ *	Only mapped groups and root group are linked to mapped users
+ *
+ *	Returns 0 if OK, -1 (and errno set) if error
+ *
+ */
+
+static int link_group_members(struct SECURITY_CONTEXT *scx)
+{
+	struct MAPPING *usermapping;
+	struct MAPPING *groupmapping;
+	struct passwd *user;
+	int res;
+
+	res = 0;
+	for (usermapping=scx->usermapping; usermapping && !res;
+			usermapping=usermapping->next) {
+		usermapping->grcnt = 0;
+		usermapping->groups = (gid_t*)NULL;
+		user = getpwuid(usermapping->xid);
+		for (groupmapping=scx->groupmapping; groupmapping && !res;
+				groupmapping=groupmapping->next) {
+			if (link_single_group(usermapping, user,
+			    groupmapping->xid))
+				res = -1;
+			}
+		if (!res && link_single_group(usermapping, user, (gid_t)0))
+			res = -1;
+	}
+	return (res);
+}
+
 
 /*
  *		Apply default single user mapping
@@ -4327,7 +4447,7 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 				ntfs_log_info("Using default user mapping\n");
 		}
 	}
-	return (!scx->usermapping);
+	return (!scx->usermapping || link_group_members(scx));
 }
 
 /*
@@ -4672,9 +4792,6 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
  *  );
  *
  */
-
-uid_t getuid(void);
-gid_t getgid(void);
 
 int ntfs_get_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection,
