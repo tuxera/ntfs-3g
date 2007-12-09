@@ -4281,14 +4281,18 @@ static int link_group_members(struct SECURITY_CONTEXT *scx)
 		usermapping->grcnt = 0;
 		usermapping->groups = (gid_t*)NULL;
 		user = getpwuid(usermapping->xid);
-		for (groupmapping=scx->groupmapping; groupmapping && !res;
-				groupmapping=groupmapping->next) {
-			if (link_single_group(usermapping, user,
-			    groupmapping->xid))
+		if (user && user->pw_name) {
+			for (groupmapping=scx->groupmapping;
+					groupmapping && !res;
+					groupmapping=groupmapping->next) {
+				if (link_single_group(usermapping, user,
+				    groupmapping->xid))
+					res = -1;
+				}
+			if (!res && link_single_group(usermapping,
+					 user, (gid_t)0))
 				res = -1;
-			}
-		if (!res && link_single_group(usermapping, user, (gid_t)0))
-			res = -1;
+		}
 	}
 	return (res);
 }
