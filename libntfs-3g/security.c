@@ -3680,7 +3680,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		/* check requested by root */
 		/* or chgrp requested by owner to an owned group */
 		if (!scx->uid
-		   || ((((int)uid < 0) || (uid == scx->uid))
+		   || ((((int)uid < 0) || (uid == fileuid))
 		      && ((gid == scx->gid) || groupmember(scx, scx->uid, gid))
 		      && (fileuid == scx->uid))) {
 			/* replace by the new usid and gsid */
