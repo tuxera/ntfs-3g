@@ -1624,6 +1624,10 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
  *	must be kept separately : the interpretation of ACL
  *	in both direction are approximations which could be non
  *	reciprocal for some configuration of the user mapping data
+ *
+ *	During the process of recompiling ntfs-3g from a tgz archive,
+ *	security processing added 7.6% to the cpu time used by ntfs-3g
+ *	and 30% if the cache is disabled.
  */
 
 static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
@@ -3142,9 +3146,10 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 							gid, perm);
 				}
 				free(securattr);
-			} else
+			} else {
 				perm = -1;
 				uid = gid = 0;
+			}
 		}
 		if (perm >= 0) {
 			if (uid == scx->uid)
