@@ -81,7 +81,6 @@ struct CACHED_SECURID {
  */
 
 struct SECURITY_HEAD {
-	unsigned int first;
 	unsigned int last;
 	struct CACHED_SECURID *first_securid;
 	struct CACHED_SECURID *most_recent_securid;
@@ -104,7 +103,7 @@ struct SECURITY_HEAD {
 
 struct SECURITY_CACHE {
 	struct SECURITY_HEAD head;
-	struct CACHED_PERMISSIONS cachetable[1]; /* array of variable size */
+	struct CACHED_PERMISSIONS *cachetable[1]; /* array of variable size */
 } ;
 
 /*

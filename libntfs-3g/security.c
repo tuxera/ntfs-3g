@@ -32,7 +32,8 @@
 #define MAPPINGFILE "/NTFS-3G/UserMapping" /* name of mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_SECURID_SIZE 16    /* securid cache, size >= 3 and not too big */
-#define CACHE_PERMISSIONS_SIZE 4000  /* think twice before increasing */
+#define CACHE_PERMISSIONS_BITS 6  /* log2 of unitary allocation of permissions */
+#define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
 #define CACHE_LEGACY_SIZE 8    /* legacy cache size, zero or >= 3 and not too big */
 
 #ifdef HAVE_CONFIG_H
@@ -1601,7 +1602,7 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
  *	which should not be too long to be efficient. Its optimal
  *	size is depends on usage and is hard to determine.
  *
- *	CACHED_PERMISSIONS data is kept in an indexed array. Is
+ *	CACHED_PERMISSIONS data is kept in a two-level indexed array. It
  *	is optimal at the expense of storage. Use of a most-recent-first
  *	list would save memory and provide similar performances for
  *	standard usage, but not for file servers with too many file
@@ -1633,7 +1634,8 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 #if CACHE_LEGACY_SIZE
 	struct CACHED_PERMISSIONS_LEGACY *cachelegacy;
 #endif
-	int i;
+	unsigned int index1;
+	unsigned int i;
 
 	cache = (struct SECURITY_CACHE*)NULL;
 		/* create the securid cache first */
@@ -1665,12 +1667,13 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 				(struct CACHED_PERMISSIONS_LEGACY*)NULL;
 			cachelegacy[CACHE_LEGACY_SIZE - 1].permissions.valid = 0;;
 #endif
-				/* create the first permissions cache entry */
+				/* create the first permissions blocks */
+			index1 = securindex >> CACHE_PERMISSIONS_BITS;
 			cache = (struct SECURITY_CACHE*)
-				ntfs_malloc(sizeof(struct SECURITY_CACHE));
+				ntfs_malloc(sizeof(struct SECURITY_CACHE)
+				      + index1*sizeof(struct CACHED_PERMISSIONS*));
 			if (cache) {
-				cache->head.first = securindex;
-				cache->head.last = securindex;
+				cache->head.last = index1;
 				cache->head.p_reads = 0;
 				cache->head.p_hits = 0;
 				cache->head.p_writes = 0;
@@ -1681,7 +1684,9 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 				*scx->pseccache = cache;
 				cache->head.first_securid = cachesecurid;
 				cache->head.most_recent_securid = cachesecurid;
-				cache->cachetable[0].valid = 0;
+				for (i=0; i<=index1; i++)
+					cache->cachetable[i]
+					   = (struct CACHED_PERMISSIONS*)NULL;
 #if CACHE_LEGACY_SIZE
 				cache->head.first_legacy = cachelegacy;
 				cache->head.most_recent_legacy = cachelegacy;
@@ -1701,12 +1706,19 @@ static struct SECURITY_CACHE *create_caches(struct SECURITY_CONTEXT *scx,
 
 static void free_caches(struct SECURITY_CONTEXT *scx)
 {
-	if (*scx->pseccache) {
-		free((*scx->pseccache)->head.first_securid);
+	unsigned int index1;
+	struct SECURITY_CACHE *pseccache;
+
+	pseccache = *scx->pseccache;
+	if (pseccache) {
+		free(pseccache->head.first_securid);
 #if CACHE_LEGACY_SIZE
-                free((*scx->pseccache)->head.first_legacy);
+                free(pseccache->head.first_legacy);
 #endif
-		free(*scx->pseccache);
+		for (index1=0; index1<=pseccache->head.last; index1++)
+			if (pseccache->cachetable[index1])
+				free(pseccache->cachetable[index1]);
+		free(pseccache);
 	}
 }
 
@@ -1949,82 +1961,50 @@ static struct CACHED_PERMISSIONS *invalidate_legacy(struct SECURITY_CONTEXT *scx
 #endif
 
 /*
- *	Resize permission cache in either direction
+ *	Resize permission cache table
  *	do not call unless resizing is needed
  *	
- *	returns pointer to required entry or NULL if not possible
+ *	If allocation fails, the cache size is not updated
+ *	Lack of memory is not considered as an error, the cache is left
+ *	consistent and errno is not set.
  */
 
-static struct CACHED_PERMISSIONS *resize_cache(
-			struct SECURITY_CONTEXT *scx,
+static void resize_cache(struct SECURITY_CONTEXT *scx,
 			u32 securindex)
 {
-	struct CACHED_PERMISSIONS *cacheentry;
 	struct SECURITY_CACHE *oldcache;
 	struct SECURITY_CACHE *newcache;
-	int oldcnt;
 	int newcnt;
-	BOOL beyond;
+	int oldcnt;
+	unsigned int index1;
 	unsigned int i;
 
-	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	oldcache = *scx->pseccache;
-	beyond = oldcache->head.last < securindex;
-	if (beyond)
-		newcnt = securindex - oldcache->head.first + 1;
-	else
-		newcnt = oldcache->head.last - securindex + 1;
-	if (beyond && (newcnt <= CACHE_PERMISSIONS_SIZE)) {
-		/* expand cache beyond current end */
-#if 1
-		newcache = (struct SECURITY_CACHE*)
-			realloc(oldcache,
-			    sizeof(struct SECURITY_CACHE)
-			      + (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-#else
-		oldcnt = oldcache->head.last - oldcache->head.first + 1;
+	index1 = securindex >> CACHE_PERMISSIONS_BITS;
+	newcnt = index1 + 1;
+	if (newcnt <= ((CACHE_PERMISSIONS_SIZE
+			+ (1 << CACHE_PERMISSIONS_BITS)
+			- 1) >> CACHE_PERMISSIONS_BITS)) {
+		/* expand cache beyond current end, do not use realloc() */
+		/* to avoid losing data when there is no more memory */
+		oldcnt = oldcache->head.last + 1;
 		newcache = (struct SECURITY_CACHE*)
 			ntfs_malloc(
 			    sizeof(struct SECURITY_CACHE)
-			      + (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-		memcpy(newcache,oldcache,
+			      + (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS*));
+		if (newcache) {
+			memcpy(newcache,oldcache,
 			    sizeof(struct SECURITY_CACHE)
-			      + (oldcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-		free(oldcache);
-#endif
-		if (newcache) {
-			     /* mark new entries as not valid */
-			for (i=newcache->head.last+1; i<=securindex; i++)
-				newcache->cachetable[
-					i - newcache->head.first].valid = 0;
-			newcache->head.last = securindex;
-			*scx->pseccache = newcache;
-			cacheentry = &newcache->
-				cachetable[securindex - newcache->head.first];
-		}
-	}
-	if (!beyond && (newcnt <= CACHE_PERMISSIONS_SIZE)) {
-		/* expand cache before current beginning */
-		newcache = (struct SECURITY_CACHE*)
-			ntfs_malloc(sizeof(struct SECURITY_CACHE)
-			    +  (newcnt - 1)*sizeof(struct CACHED_PERMISSIONS));
-		if (newcache) {
-			     /* mark new entries as not valid */
-			for (i=securindex; i<oldcache->head.first; i++)
-				newcache->cachetable[i - securindex].valid = 0;
-			newcache->head = oldcache->head;
-			newcache->head.first = securindex;
-			oldcnt = oldcache->head.last - oldcache->head.first + 1;
-			memcpy(&newcache->cachetable[oldcache->head.first
-						 - newcache->head.first],
-				oldcache->cachetable,
-				oldcnt*sizeof(struct CACHED_PERMISSIONS));
-			*scx->pseccache = newcache;
+			      + (oldcnt - 1)*sizeof(struct CACHED_PERMISSIONS*));
 			free(oldcache);
-			cacheentry = &newcache->cachetable[0];
+			     /* mark new entries as not valid */
+			for (i=newcache->head.last+1; i<=index1; i++)
+				newcache->cachetable[i]
+					 = (struct CACHED_PERMISSIONS*)NULL;
+			newcache->head.last = index1;
+			*scx->pseccache = newcache;
 		}
 	}
-	return (cacheentry);
 }
 
 /*
@@ -2039,8 +2019,12 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode)
 {
 	struct CACHED_PERMISSIONS *cacheentry;
+	struct CACHED_PERMISSIONS *cacheblock;
 	struct SECURITY_CACHE *pcache;
 	u32 securindex;
+	unsigned int index1;
+	unsigned int index2;
+	int i;
 
 	/* cacheing is only possible if a security_id has been defined */
 	if (test_nino_flag(ni, v3_Extensions)
@@ -2050,12 +2034,13 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 		 *  where the entry exists
 		 */
 		securindex = le32_to_cpu(ni->security_id);
+		index1 = securindex >> CACHE_PERMISSIONS_BITS;
+		index2 = securindex & ((1 << CACHE_PERMISSIONS_BITS) - 1);
 		pcache = *scx->pseccache;
 		if (pcache
-		     && (pcache->head.first <= securindex)
-		     && (pcache->head.last >= securindex)) {
-			cacheentry = &pcache->cachetable[securindex
-					 - pcache->head.first];
+		     && (pcache->head.last >= index1)
+		     && pcache->cachetable[index1]) {
+			cacheentry = &pcache->cachetable[index1][index2];
 			cacheentry->uid = uid;
 			cacheentry->gid = gid;
 			cacheentry->mode = mode & 07777;
@@ -2065,22 +2050,34 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			pcache->head.p_writes++;
 		} else {
 			if (!pcache) {
-				/* create the first cache entry */
+				/* create the first cache block */
 				pcache = create_caches(scx, securindex);
-				cacheentry = &pcache->cachetable[0];
 			} else {
-				cacheentry = resize_cache(scx, securindex);
-				pcache = *scx->pseccache;
+				if (index1 > pcache->head.last) {
+					resize_cache(scx, securindex);
+					pcache = *scx->pseccache;
+				}
 			}
-			if (cacheentry) {
-				cacheentry->uid = uid;
-				cacheentry->gid = gid;
-				cacheentry->mode = mode & 07777;
-				cacheentry->inh_fileid = cpu_to_le32(0);
-				cacheentry->inh_dirid = cpu_to_le32(0);
-				cacheentry->valid = 1;
-				pcache->head.p_writes++;
-			}
+			/* allocate block, if cache table was allocated */
+			if (pcache && (index1 <= pcache->head.last)) {
+				cacheblock = (struct CACHED_PERMISSIONS*)
+					malloc(sizeof(struct CACHED_PERMISSIONS)
+						<< CACHE_PERMISSIONS_BITS);
+				pcache->cachetable[index1] = cacheblock;
+				for (i=0; i<(1 << CACHE_PERMISSIONS_BITS); i++)
+					cacheblock[i].valid = 0;
+				cacheentry = &cacheblock[index2];
+				if (cacheentry) {
+					cacheentry->uid = uid;
+					cacheentry->gid = gid;
+					cacheentry->mode = mode & 07777;
+					cacheentry->inh_fileid = cpu_to_le32(0);
+					cacheentry->inh_dirid = cpu_to_le32(0);
+					cacheentry->valid = 1;
+					pcache->head.p_writes++;
+				}
+			} else
+				cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 		}
 	} else
 #if CACHE_LEGACY_SIZE
@@ -2106,18 +2103,21 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 	struct CACHED_PERMISSIONS *cacheentry;
 	struct SECURITY_CACHE *pcache;
 	u32 securindex;
+	unsigned int index1;
+	unsigned int index2;
 
 	/* cacheing is only possible if a security_id has been defined */
 	cacheentry = (struct CACHED_PERMISSIONS*)NULL;
 	if (test_nino_flag(ni, v3_Extensions)
 	   && (ni->security_id)) {
 		securindex = le32_to_cpu(ni->security_id);
+		index1 = securindex >> CACHE_PERMISSIONS_BITS;
+		index2 = securindex & ((1 << CACHE_PERMISSIONS_BITS) - 1);
 		pcache = *scx->pseccache;
 		if (pcache
-		     && (pcache->head.first <= securindex)
-		     && (pcache->head.last >= securindex)) {
-			cacheentry = &pcache->cachetable[securindex
-					 - pcache->head.first];
+		     && (pcache->head.last >= index1)
+		     && pcache->cachetable[index1]) {
+			cacheentry = &pcache->cachetable[index1][index2];
 			/* reject if entry is not valid */
 			if (!cacheentry->valid)
 				cacheentry = (struct CACHED_PERMISSIONS*)NULL;
