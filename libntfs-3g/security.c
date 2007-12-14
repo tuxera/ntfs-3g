@@ -28,6 +28,7 @@
  */
 
 #define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
+#define OWNERFROMACL 1		/* Get the owner from ACL (not Windows owner) */
 #define BUFSZ 1024		/* buffer size to read mapping file */
 #define MAPPINGFILE "/NTFS-3G/UserMapping" /* name of mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */
@@ -2810,13 +2811,12 @@ static int merge_permissions(ntfs_inode *ni,
  *		(standard case : different owner, group and administrator)
  */
 
-static int build_std_permissions(const char *securattr, ntfs_inode *ni)
+static int build_std_permissions(const char *securattr,
+		const SID *usid, const SID *gsid, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
 	const ACCESS_ALLOWED_ACE *pace;
-	const SID *usid;	/* owner of file/directory */
-	const SID *gsid;	/* group of file/directory */
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -2825,8 +2825,6 @@ static int build_std_permissions(const char *securattr, ntfs_inode *ni)
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
-	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -2879,12 +2877,12 @@ static int build_std_permissions(const char *securattr, ntfs_inode *ni)
  *		and not administrator)
  */
 
-static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
+static int build_owngrp_permissions(const char *securattr,
+			const SID *usid, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
 	const ACCESS_ALLOWED_ACE *pace;
-	const SID *usid;	/* owner and group of file/directory */
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -2893,7 +2891,6 @@ static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -2937,13 +2934,12 @@ static int build_owngrp_permissions(const char *securattr, ntfs_inode *ni)
  */
 
 
-static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
+static int build_ownadmin_permissions(const char *securattr,
+			const SID *usid, const SID *gsid, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
 	const ACCESS_ALLOWED_ACE *pace;
-	const SID *usid;	/* owner of file/directory */
-	const SID *gsid;	/* group of file/directory */
 	int offdacl;
 	int offace;
 	int acecnt;
@@ -2952,8 +2948,6 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
-	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
 	allowown = allowgrp = allowall = cpu_to_le32(0);
@@ -2995,6 +2989,58 @@ static int build_ownadmin_permissions(const char *securattr, ntfs_inode *ni)
 				allowgrp & ~denygrp,
 				allowall & ~denyall));
 }
+
+#if OWNERFROMACL
+
+/*
+ *		Define the owner of a file as the first user allowed
+ *	to change the owner, instead of the user defined as owner.
+ *
+ *	This produces better approximations for files written by a
+ *	Windows user in an inheritable directory owned by another user,
+ *	as the access rights are inheritable but the ownership is not.
+ *
+ *	An important case is the directories "Documents and Settings/user"
+ *	which the users must have access to, though Windows considers them
+ *	as owned by administrator.
+ */
+
+static const SID *acl_owner(const char *securattr)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const SID *usid;
+	const ACL *pacl;
+	const ACCESS_ALLOWED_ACE *pace;
+	int offdacl;
+	int offace;
+	int acecnt;
+	int nace;
+	BOOL found;
+
+	found = FALSE;
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
+	offdacl = le32_to_cpu(phead->dacl);
+	if (offdacl) {
+		pacl = (const ACL*)&securattr[offdacl];
+		acecnt = le16_to_cpu(pacl->ace_count);
+		offace = offdacl + sizeof(ACL);
+		nace = 0;
+		do {
+			pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
+			if ((pace->mask & WRITE_OWNER)
+			   && (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+			   && is_user_sid(&pace->sid))
+				found = TRUE;
+		} while (!found && (++nace < acecnt));
+	}
+	if (found)
+		usid = &pace->sid;
+	else
+		usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
+	return (usid);
+}
+
+#else
 
 /*
  *		Special case for files owned by administrator with full
@@ -3047,34 +3093,33 @@ static uid_t find_tenant(struct SECURITY_CONTEXT *scx,
 	return (tid);
 }
 
+#endif
+
 /*
  *		Build unix-style (mode_t) permissions from an ACL
  *	returns the requested permissions
  *	or a negative result (with errno set) if there is a problem
  */
 
-static int build_permissions(const char *securattr, ntfs_inode *ni)
+static int build_permissions(const char *securattr,
+			const SID *usid, const SID *gsid, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const SID *usid;	/* owner of file/directory */
-	const SID *gsid;	/* group of file/directory */
 	int perm;
 	BOOL adminowns;
 	BOOL groupowns;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	usid = (const SID*)&securattr[le32_to_cpu(phead->owner)];
-	gsid = (const SID*)&securattr[le32_to_cpu(phead->group)];
 	adminowns = same_sid(usid,adminsid)
 	         || same_sid(gsid,adminsid);
 	groupowns = !adminowns && same_sid(gsid,usid);
 	if (adminowns)
-		perm = build_ownadmin_permissions(securattr, ni);
+		perm = build_ownadmin_permissions(securattr, usid, gsid, ni);
 	else
 		if (groupowns)
-			perm = build_owngrp_permissions(securattr, ni);
+			perm = build_owngrp_permissions(securattr, usid, ni);
 		else
-			perm = build_std_permissions(securattr, ni);
+			perm = build_std_permissions(securattr, usid, gsid, ni);
 	return (perm);
 }
 
@@ -3111,17 +3156,28 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			perm = 0;	/* default to no permission */
 			securattr = getsecurityattr(scx->vol, path, ni);
 			if (securattr) {
-				perm = build_permissions(securattr, ni);
 				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 				    	securattr;
+				gsid = (const SID*)&
+					   securattr[le32_to_cpu(phead->group)];
+				gid = findgroup(scx,gsid);
+#if OWNERFROMACL
+				usid = acl_owner(securattr);
+				perm = build_permissions(securattr,
+						 usid, gsid, ni);
+				uid = findowner(scx,usid);
+#else
 				usid = (const SID*)&
 					    securattr[le32_to_cpu(phead->owner)];
+				perm = build_permissions(securattr,
+						 usid, gsid, ni);
 				if (!perm && same_sid(usid, adminsid)) {
 					uid = find_tenant(scx, securattr);
 					if (uid)
 						perm = 0700;
 				} else
 					uid = findowner(scx,usid);
+#endif
 				/*
 				 *  Create a security id if there were none
 				 * and upgrade option is selected
@@ -3139,9 +3195,6 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				}
 				if (test_nino_flag(ni, v3_Extensions)
 				    && (perm >= 0)) {
-					gsid = (const SID*)&
-					    securattr[le32_to_cpu(phead->group)];
-					gid = findgroup(scx,gsid);
 					enter_cache(scx, ni, uid,
 							gid, perm);
 				}
@@ -3195,7 +3248,19 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			perm = -1;	/* default to error */
 			securattr = getsecurityattr(scx->vol, path, ni);
 			if (securattr) {
-				perm = build_permissions(securattr, ni);
+				phead =
+				    (const SECURITY_DESCRIPTOR_RELATIVE*)
+					    	securattr;
+				gsid = (const SID*)&
+					  securattr[le32_to_cpu(phead->group)];
+#if OWNERFROMACL
+				usid = acl_owner(securattr);
+#else
+				usid = (const SID*)&
+					  securattr[le32_to_cpu(phead->owner)];
+#endif
+				perm = build_permissions(securattr,
+					  usid, gsid, ni);
 					/*
 					 * fetch owner and group for cacheing
 					 */
@@ -3210,13 +3275,9 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 						upgrade_secur_desc(scx->vol,
 							 path, securattr, ni);
 					}
-					phead =
-					    (const SECURITY_DESCRIPTOR_RELATIVE*)
-					    	securattr;
-					usid = (const SID*)&
-					    securattr[le32_to_cpu(phead->owner)];
-					gsid = (const SID*)&
-					    securattr[le32_to_cpu(phead->group)];
+#if OWNERFROMACL
+					stbuf->st_uid = findowner(scx,usid);
+#else
 					if (!perm && same_sid(usid, adminsid)) {
 						stbuf->st_uid = 
 							find_tenant(scx,
@@ -3225,6 +3286,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 							perm = 0700;
 					} else
 						stbuf->st_uid = findowner(scx,usid);
+#endif
 					stbuf->st_gid = findgroup(scx,gsid);
 					stbuf->st_mode =
 					    (stbuf->st_mode & ~07777) + perm;
@@ -3665,14 +3727,19 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		mode = 0;
 		oldattr = getsecurityattr(scx->vol, path, ni);
 		if (oldattr) {
-			mode = perm = build_permissions(oldattr, ni);
+			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+				oldattr;
+			gsid = (const SID*)
+				&oldattr[le32_to_cpu(phead->group)];
+#if OWNERFROMACL
+			usid = acl_owner(oldattr);
+#else
+			usid = (const SID*)
+				&oldattr[le32_to_cpu(phead->owner)];
+#endif
+			mode = perm = build_permissions(oldattr,
+					 usid, gsid, ni);
 			if (perm >= 0) {
-				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
-					oldattr;
-				usid = (const SID*)
-					&oldattr[le32_to_cpu(phead->owner)];
-				gsid = (const SID*)
-					&oldattr[le32_to_cpu(phead->group)];
 				fileuid = findowner(scx,usid);
 				filegid = findowner(scx,gsid);
 			} else
@@ -4818,7 +4885,8 @@ int ntfs_get_file_security(struct SECURITY_API *scapi,
 			if (attr) {
 				if (feedsecurityattr(attr,selection,
 						buf,buflen,psize)) {
-					if (test_nino_flag(ni, v3_Extensions))
+					if (test_nino_flag(ni, v3_Extensions)
+					    && ni->security_id)
 						res = le32_to_cpu(
 							ni->security_id);
 					else
