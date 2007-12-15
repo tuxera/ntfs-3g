@@ -2215,8 +2215,6 @@ static struct fuse *mount_fuse(char *parsed_options)
 		fh = NULL;
 		goto err;
 	}
-
-	ctx->mounted = TRUE;
 out:
 	fuse_opt_free_args(&args);
 	return fh;
