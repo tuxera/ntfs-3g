@@ -1648,11 +1648,6 @@ static int ntfs_open(const char *device, char *mntpoint)
 	return 0;
 }
 
-static void signal_handler(int arg __attribute__((unused)))
-{
-	fuse_exit((fuse_get_context())->fuse);
-}
-
 static char *parse_mount_options(const char *orig_opts)
 {
 	char *options, *s, *opt, *val, *ret;
@@ -2210,6 +2205,12 @@ static struct fuse *mount_fuse(char *parsed_options)
 	if (!fh)
 		goto err;
 	
+	if (fuse_set_signal_handlers(fuse_get_session(fh))) {
+		fuse_destroy(fh);
+		fh = NULL;
+		goto err;
+	}
+
 	ctx->mounted = TRUE;
 out:
 	fuse_opt_free_args(&args);
@@ -2230,8 +2231,6 @@ int main(int argc, char *argv[])
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
 
 	if (parse_options(argc, argv)) {
 		usage();
