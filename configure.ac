@@ -192,8 +192,10 @@ if test "${with_fuse}" = "internal"; then
 		[Define to 1 if using internal fuse]
 	)
 else
-	PKG_PROG_PKG_CONFIG
-	test -z "${PKG_CONFIG}" && AC_MSG_ERROR([pkg-config wasn't found! Please install from your vendor, or see http://pkg-config.freedesktop.org/wiki/])
+	if test -z "$PKG_CONFIG"; then
+		AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+	fi
+	test "x${PKG_CONFIG}" = "xno" && AC_MSG_ERROR([pkg-config wasn't found! Please install from your vendor, or see http://pkg-config.freedesktop.org/wiki/])
 	# Libraries often install their metadata .pc files in directories
 	# not searched by pkg-config. Let's workaround this. 
 	export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:/lib/pkgconfig:/usr/lib/pkgconfig:/opt/gnome/lib/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig:$prefix/lib/pkgconfig:/opt/gnome/share/pkgconfig:/usr/local/share/pkgconfig
