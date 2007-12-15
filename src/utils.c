@@ -84,6 +84,10 @@ static const char *fakeraid_msg =
 "different device under /dev/mapper/, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
 "to mount NTFS. Please see the 'dmraid' documentation for help.\n";
 
+static const char *access_denied_msg =
+"Please check the volume and the NTFS-3G binary permissions, the mounting\n" 
+"user and group ID, and the mount options.\n";
+
 static const char *forced_mount_msg =
 "\n"
 "            mount -t ntfs-3g %s %s -o force\n"
@@ -109,34 +113,32 @@ int utils_set_locale(void)
 	return 0;
 }
 
-ntfs_volume *utils_mount_volume(const char *volume, const char *mntpoint,
-				unsigned long flags)
+void utils_mount_error(const char *volume, const char *mntpoint, int err)
 {
-	ntfs_volume *vol;
-
-	vol = ntfs_mount(volume, flags);
-	if (!vol) {
-		
-		ntfs_log_perror("Failed to mount '%s'", volume);
-		
-		if (errno == EINVAL)
+	switch (err) {
+		case NTFS_VOLUME_NOT_NTFS:
 			ntfs_log_error(invalid_ntfs_msg, volume);
-		else if (errno == EIO)
+			break;
+		case NTFS_VOLUME_CORRUPT:
 			ntfs_log_error("%s", corrupt_volume_msg);
-		else if (errno == EPERM)
+			break;
+		case NTFS_VOLUME_HIBERNATED:
 			ntfs_log_error("%s", hibernated_volume_msg);
-		else if (errno == EOPNOTSUPP) {
+			break;
+		case NTFS_VOLUME_UNCLEAN_UNMOUNT:
 			ntfs_log_error(unclean_journal_msg);
-			ntfs_log_error(forced_mount_msg, volume, mntpoint,
+			ntfs_log_error(forced_mount_msg, volume, mntpoint, 
 				       volume, mntpoint);
-		} else if (errno == EBUSY)
+			break;
+		case NTFS_VOLUME_LOCKED:
 			ntfs_log_error("%s", opened_volume_msg);
-		else if (errno == ENXIO)
+			break;
+		case NTFS_VOLUME_RAID:
 			ntfs_log_error("%s", fakeraid_msg);
-		
-		return NULL;
+			break;
+		case NTFS_VOLUME_NO_PRIVILEGE:
+			ntfs_log_error(access_denied_msg, volume);
+			break;
 	}
-
-	return vol;
 }
 

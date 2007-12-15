@@ -1629,23 +1629,28 @@ static int ntfs_open(const char *device, char *mntpoint)
 	if (ctx->force)
 		flags |= MS_FORCE;
 
-	ctx->vol = utils_mount_volume(device, mntpoint, flags);
-	if (!ctx->vol)
-		return -1;
+	ctx->vol = ntfs_mount(device, flags);
+	if (!ctx->vol) {
+		ntfs_log_perror("Failed to mount '%s'", device);
+		goto err_out;
+	}
 	
 	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
 	if (ctx->vol->free_clusters < 0) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
-		return -1;
+		goto err_out;
 	}
 
 	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
 	if (ctx->vol->free_mft_records < 0) {
 		ntfs_log_perror("Failed to calculate free MFT records");
-		return -1;
+		goto err_out;
 	}
+
+	errno = 0;
+err_out:
+	return ntfs_volume_error(errno);
 	
-	return 0;
 }
 
 static char *parse_mount_options(const char *orig_opts)
@@ -2227,28 +2232,31 @@ int main(int argc, char *argv[])
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
 	uid_t uid, euid;
-	int err = 10;
+	int err;
 
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
 		usage();
-		return 1;
+		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
 	if (ntfs_fuse_init())
-		return 2;
+		return NTFS_VOLUME_OUT_OF_MEMORY;
 	
 	parsed_options = parse_mount_options(opts.options ? opts.options : "");
-	if (!parsed_options)
+	if (!parsed_options) {
+		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
+	}
 
 	uid  = getuid();
 	euid = geteuid();
 	
 	if (setuid(euid)) {
 		ntfs_log_perror("Failed to set user ID to %d", euid);
+		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
 
@@ -2262,13 +2270,15 @@ int main(int argc, char *argv[])
 	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
+		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
 
-	if (ntfs_open(opts.device, opts.mnt_point))
+	err = ntfs_open(opts.device, opts.mnt_point);
+	if (err)
 		goto err_out;
 	
 	if (ctx->blkdev) {
@@ -2278,13 +2288,18 @@ int main(int argc, char *argv[])
 	}
 	
 	fh = mount_fuse(parsed_options);
-	if (!fh)
+	if (!fh) {
+		err = NTFS_VOLUME_FUSE_ERROR;
 		goto err_out;
+	}
 		
 	if (setuid(uid)) {
-		ntfs_log_perror("Failed to set user ID to %d", uid);
+		ntfs_log_perror("Failed to drop privilege (uid to %d)", uid);
+		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_umount;
 	}
+
+	ctx->mounted = TRUE;
 
 #if defined(linux) || defined(__uClinux__)
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
@@ -2317,6 +2332,7 @@ err_umount:
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
+	utils_mount_error(opts.device, opts.mnt_point, err);
 	ntfs_close();
 	free(ctx);
 	free(parsed_options);

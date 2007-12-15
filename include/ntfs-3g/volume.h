@@ -78,6 +78,21 @@ typedef enum {
 
 extern int ntfs_check_if_mounted(const char *file, unsigned long *mnt_flags);
 
+typedef enum {
+	NTFS_VOLUME_OK			= 0,
+	NTFS_VOLUME_SYNTAX_ERROR	= 11,
+	NTFS_VOLUME_NOT_NTFS		= 12,
+	NTFS_VOLUME_CORRUPT		= 13,
+	NTFS_VOLUME_HIBERNATED		= 14,
+	NTFS_VOLUME_UNCLEAN_UNMOUNT	= 15,
+	NTFS_VOLUME_LOCKED		= 16,
+	NTFS_VOLUME_RAID		= 17,
+	NTFS_VOLUME_UNKNOWN_REASON	= 18,
+	NTFS_VOLUME_NO_PRIVILEGE	= 19,
+	NTFS_VOLUME_OUT_OF_MEMORY	= 20,
+	NTFS_VOLUME_FUSE_ERROR		= 21
+} ntfs_volume_status;
+
 /**
  * enum ntfs_volume_state_bits -
  *
@@ -221,6 +236,8 @@ extern int ntfs_version_is_supported(ntfs_volume *vol);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
 
 extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
+
+extern int ntfs_volume_error(int err);
 
 #endif /* defined _NTFS_VOLUME_H */
 

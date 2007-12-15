@@ -1484,3 +1484,39 @@ err_out:
 	return ret;
 }
 
+int ntfs_volume_error(int err)
+{
+	int ret;
+
+	switch (err) {
+		case 0:
+			ret = NTFS_VOLUME_OK;
+			break;
+		case EINVAL:
+			ret = NTFS_VOLUME_NOT_NTFS;
+			break;
+		case EIO:
+			ret = NTFS_VOLUME_CORRUPT;
+			break;
+		case EPERM:
+			ret = NTFS_VOLUME_HIBERNATED;
+			break;
+		case EOPNOTSUPP:
+			ret = NTFS_VOLUME_UNCLEAN_UNMOUNT;
+			break;
+		case EBUSY:
+			ret = NTFS_VOLUME_LOCKED;
+			break;
+		case ENXIO:
+			ret = NTFS_VOLUME_RAID;
+			break;
+		case EACCES:
+			ret = NTFS_VOLUME_NO_PRIVILEGE;
+			break;
+		default:
+			ret = NTFS_VOLUME_UNKNOWN_REASON;
+			break;
+	}
+	return ret;
+}
+
