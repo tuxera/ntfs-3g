@@ -152,6 +152,7 @@ static int __ntfs_volume_release(ntfs_volume *v)
 			ntfs_error_set(&err);
 	}
 
+	ntfs_free_lru_caches(v);
 	free(v->vol_name);
 	free(v->upcase);
 	free(v->attrdef);
@@ -1166,6 +1167,7 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 		ntfs_device_free(dev);
 		errno = eo;
 	}
+	ntfs_create_lru_caches(vol);
 	return vol;
 #else
 	/*

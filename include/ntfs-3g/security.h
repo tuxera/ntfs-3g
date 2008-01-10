@@ -59,9 +59,10 @@ struct CACHED_PERMISSIONS {
  */
 
 struct CACHED_PERMISSIONS_LEGACY {
-	struct CACHED_PERMISSIONS permissions;
 	struct CACHED_PERMISSIONS_LEGACY *next;
+	char *unused;
 	u64 mft_no;
+	struct CACHED_PERMISSIONS perm;
 } ;
 
 /*
@@ -70,6 +71,7 @@ struct CACHED_PERMISSIONS_LEGACY {
 
 struct CACHED_SECURID {
 	struct CACHED_SECURID *next;
+	void *unused;
 	uid_t uid;
 	gid_t gid;
 	unsigned int dmode;
@@ -80,29 +82,20 @@ struct CACHED_SECURID {
  *	Header of the security cache
  */
 
-struct SECURITY_HEAD {
+struct CACHED_PERMISSIONS_HEADER {
 	unsigned int last;
-	struct CACHED_SECURID *first_securid;
-	struct CACHED_SECURID *most_recent_securid;
-	struct CACHED_PERMISSIONS_LEGACY *first_legacy;
-	struct CACHED_PERMISSIONS_LEGACY *most_recent_legacy;
 			/* statistics for permissions */
 	unsigned long p_writes;
 	unsigned long p_reads;
 	unsigned long p_hits;
-			/* statistics for securids */
-	unsigned long s_writes;
-	unsigned long s_reads;
-	unsigned long s_hits;
-	unsigned long s_hops;
 } ;
 
 /*
- *	The whole security cache
+ *	The whole permissions cache
  */
 
-struct SECURITY_CACHE {
-	struct SECURITY_HEAD head;
+struct PERMISSIONS_CACHE {
+	struct CACHED_PERMISSIONS_HEADER head;
 	struct CACHED_PERMISSIONS *cachetable[1]; /* array of variable size */
 } ;
 
@@ -122,7 +115,7 @@ struct SECURITY_CONTEXT {
 	ntfs_volume *vol;
 	struct MAPPING *usermapping;
 	struct MAPPING *groupmapping;
-	struct SECURITY_CACHE **pseccache;
+	struct PERMISSIONS_CACHE **pseccache;
 	uid_t uid; /* uid of user requesting (not the mounter) */
 	gid_t gid; /* gid of user requesting (not the mounter) */
 	} ;
@@ -189,7 +182,7 @@ void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
 struct SECURITY_API {
 	u32 magic;
 	struct SECURITY_CONTEXT security;
-	struct SECURITY_CACHE *seccache;
+	struct PERMISSIONS_CACHE *seccache;
 } ;
 
 /*

@@ -42,6 +42,10 @@
 #include <mntent.h>
 #endif
 
+#define CACHE_INODE_SIZE 32	/* inode cache, zero or >= 3 and not too big */
+#define CACHE_SECURID_SIZE 16    /* securid cache, zero or >= 3 and not too big */
+#define CACHE_LEGACY_SIZE 8    /* legacy cache size, zero or >= 3 and not too big */
+
 /*
  * Under Cygwin, DJGPP and FreeBSD we do not have MS_RDONLY,
  * so we define them ourselves.
@@ -206,6 +210,16 @@ struct _ntfs_volume {
 	s64 free_clusters; 	/* Track the number of free clusters which
 				   greatly improves statfs() performance */
 	s64 free_mft_records; 	/* Same for free mft records (see above) */
+
+#if CACHE_INODE_SIZE
+	struct CACHE_HEADER *inode_cache;
+#endif
+#if CACHE_SECURID_SIZE
+	struct CACHE_HEADER *securid_cache;
+#endif
+#if CACHE_LEGACY_SIZE
+	struct CACHE_HEADER *legacy_cache;
+#endif
 
 	/* Temp: for directory handling */
 	void *private_data;	/* ntfs_dir for . */

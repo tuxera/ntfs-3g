@@ -123,7 +123,10 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
  * @err_val if an invalid character is found in @name1 during the comparison.
  *
  * The following characters are considered invalid: '"', '*', '<', '>' and '?'.
+ *
+ * A few optimizations made by JPA
  */
+
 int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
 		const int err_val __attribute__((unused)),
@@ -139,21 +142,29 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		exit(1);
 	}
 #endif
-	for (cnt = 0; cnt < min(name1_len, name2_len); ++cnt) {
-		c1 = le16_to_cpu(*name1);
-		name1++;
-		c2 = le16_to_cpu(*name2);
-		name2++;
-		if (ic) {
-			if (c1 < upcase_len)
-				c1 = le16_to_cpu(upcase[c1]);
-			if (c2 < upcase_len)
-				c2 = le16_to_cpu(upcase[c2]);
-		}
-#if 0
-		if (c1 < 64 && legal_ansi_char_array[c1] & 8)
-			return err_val;
-#endif
+	cnt = min(name1_len, name2_len);
+		/* JPA average loop count is 8 */
+	if (cnt > 0) {
+		if (ic)
+				/* JPA this loop in 76% cases */
+			do {
+				c1 = le16_to_cpu(*name1);
+				name1++;
+				c2 = le16_to_cpu(*name2);
+				name2++;
+				if (c1 < upcase_len)
+					c1 = le16_to_cpu(upcase[c1]);
+				if (c2 < upcase_len)
+					c2 = le16_to_cpu(upcase[c2]);
+			} while ((c1 == c2) && --cnt);
+		else
+			do {
+				/* JPA this loop in 24% cases */
+				c1 = le16_to_cpu(*name1);
+				name1++;
+				c2 = le16_to_cpu(*name2);
+				name2++;
+			} while ((c1 == c2) && --cnt);
 		if (c1 < c2)
 			return -1;
 		if (c1 > c2)
@@ -163,12 +174,6 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		return -1;
 	if (name1_len == name2_len)
 		return 0;
-	/* name1_len > name2_len */
-#if 0
-	c1 = le16_to_cpu(*name1);
-	if (c1 < 64 && legal_ansi_char_array[c1] & 8)
-		return err_val;
-#endif
 	return 1;
 }
 

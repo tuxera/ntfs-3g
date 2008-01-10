@@ -131,7 +131,7 @@ typedef struct {
 	struct fuse_chan *fc;
 	BOOL inherit;
 	BOOL addsecurids;
-	struct SECURITY_CACHE *seccache;
+	struct PERMISSIONS_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
 
@@ -842,7 +842,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 }
 
 static int ntfs_fuse_ftruncate(const char *org_path, off_t size,
-			struct fuse_file_info *fi)
+			struct fuse_file_info *fi __attribute__((unused)))
 {
 	/*
 	 * in ->ftruncate() the file handle is guaranteed
@@ -1290,7 +1290,8 @@ static int ntfs_fuse_rm(const char *org_path)
 	    || ntfs_allowed_access(&security, path, dir_ni,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 		
-		if (ntfs_delete(ni, dir_ni, uname, uname_len))
+		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
+				 uname, uname_len))
 			res = -errno;
 		/* ntfs_delete() always closes ni and dir_ni */
 		ni = dir_ni = NULL;
@@ -1856,21 +1857,6 @@ static void ntfs_close(void)
 			         / ctx->seccache->head.p_reads,
 			      1000 * ctx->seccache->head.p_hits
 			         / ctx->seccache->head.p_reads % 10);
-			}
-			if (ctx->seccache && ctx->seccache->head.s_reads) {
-				ntfs_log_info("Security id cache : %lu writes "
-				"%lu reads %lu.%1lu%% hits "
-				"%lu.%1lu mean hops\n",
-			      ctx->seccache->head.s_writes,
-			      ctx->seccache->head.s_reads,
-			      100 * ctx->seccache->head.s_hits
-			         / ctx->seccache->head.s_reads,
-			      1000 * ctx->seccache->head.s_hits
-			         / ctx->seccache->head.s_reads % 10,
-			      ctx->seccache->head.s_hops
-			         / ctx->seccache->head.s_reads,
-			      10 * ctx->seccache->head.s_hops
-			         / ctx->seccache->head.s_reads % 10);
 			}
 		}
 		ntfs_close_secure(&security);
@@ -2529,6 +2515,15 @@ static struct fuse *mount_fuse(char *parsed_options)
 		goto err;
 	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache") == -1)
 		goto err;
+#if CACHE_INODE_SIZE
+		/*
+		 * JPA fuse attribute cacheing is not useful if we
+		 * cache inodes, and this avoids hard link problems
+		 */
+	if (fuse_opt_add_arg(&args,
+			"-oattr_timeout=0,ac_attr_timeout=0") == -1)
+		goto err;
+#endif
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;
@@ -2631,7 +2626,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	ctx->seccache = (struct SECURITY_CACHE*)NULL;
+	ctx->seccache = (struct PERMISSIONS_CACHE*)NULL;
 
 	ntfs_log_info("Version %s\n", VERSION);
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",

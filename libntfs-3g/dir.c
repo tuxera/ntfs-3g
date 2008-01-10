@@ -5,6 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2006 Szabolcs Szakacsits
  * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -76,6 +77,62 @@ ntfschar NTFS_INDEX_Q[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('Q'),
 		const_cpu_to_le16('\0') };
 ntfschar NTFS_INDEX_R[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('R'),
 		const_cpu_to_le16('\0') };
+
+#if CACHE_INODE_SIZE
+
+/*
+ *		Pathname comparing for entering/fetching from cache
+ */
+
+static int inode_cache_compare(const struct CACHED_GENERIC *cached,
+			const struct CACHED_GENERIC *wanted)
+{
+	return (strcmp(cached->pathname, wanted->pathname));
+}
+
+/*
+ *		Pathname comparing for invalidating entries in cache
+ *
+ *	A partial path is compared in order to invalidate all paths
+ *	related to a renamed directory
+ */
+
+static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
+			const struct CACHED_GENERIC *wanted)
+{
+	int len;
+
+	len = strlen(wanted->pathname);
+	return (strncmp(cached->pathname, wanted->pathname,len)
+			|| ((cached->pathname[len] != '\0')
+			   && (cached->pathname[len] != '/')));
+}
+
+/*
+ *		Normalize file paths for cacheing
+ *	Just remove leading and trailing '/', there should not be any
+ *	non-standard components (such as "/../" or "/./") because
+ *	paths have been rewritten by fuse.
+ *
+ *	Returns the first non-'/' char in the original path
+ */
+
+static char *path_normalize(char *path)
+{
+	int len;
+	char *p;
+
+		   /* remove leading and trailing '/' even for root */
+	len = strlen(path);
+	while ((len > 1) && (path[len - 1] == PATH_SEP))
+		path[--len] = '\0';
+	p = path;
+	while (*p == PATH_SEP)
+		p++;
+	return (p);
+	}
+
+#endif
 
 /**
  * ntfs_inode_lookup_by_name - find an inode in a directory given its name
@@ -426,6 +483,11 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 	ntfs_inode *result = NULL;
 	ntfschar *unicode = NULL;
 	char *ascii = NULL;
+#if CACHE_INODE_SIZE
+	struct CACHED_INODE item;
+	struct CACHED_INODE *cached;
+	char *fullname;
+#endif
 
 	if (!vol || !pathname) {
 		errno = EINVAL;
@@ -434,36 +496,68 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 	
 	ntfs_log_trace("path: '%s'\n", pathname);
 	
-	if (parent) {
-		ni = parent;
-	} else {
-		ni = ntfs_inode_open(vol, FILE_root);
-		if (!ni) {
-			ntfs_log_debug("Couldn't open the inode of the root "
-					"directory.\n");
-			err = EIO;
-			goto close;
-		}
-	}
-
 	unicode = ntfs_calloc(MAX_PATH);
 	ascii = strdup(pathname);
 	if (!unicode || !ascii) {
 		ntfs_log_debug("Out of memory.\n");
 		err = ENOMEM;
-		goto close;
+		goto out;
 	}
 
+#if CACHE_INODE_SIZE
+	fullname = path_normalize(ascii);
+	p = fullname;
+#else
 	p = ascii;
 	/* Remove leading /'s. */
 	while (p && *p && *p == PATH_SEP)
 		p++;
+#endif
+	if (parent) {
+		ni = parent;
+	} else {
+#if CACHE_INODE_SIZE
+			/*
+			 * fetch inode for full path from cache
+			 */
+		if (*fullname) {
+			item.pathname = fullname;
+			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
+				vol->inode_cache, GENERIC(&item),
+				inode_cache_compare);
+		} else
+			cached = (struct CACHED_INODE*)NULL;
+		if (cached) {
+			/*
+			 * return opened inode if found in cache
+			 */
+			inum = MREF(cached->inum);
+			ni = ntfs_inode_open(vol, inum);
+			if (!ni) {
+				ntfs_log_debug("Cannot open inode %llu: %s.\n",
+						(unsigned long long)inum, p);
+				err = EIO;
+			}
+			result = ni;
+			goto out;
+		}
+#endif
+		ni = ntfs_inode_open(vol, FILE_root);
+		if (!ni) {
+			ntfs_log_debug("Couldn't open the inode of the root "
+					"directory.\n");
+			err = EIO;
+			result = (ntfs_inode*)NULL;
+			goto out;
+		}
+	}
+
 	while (p && *p) {
 		/* Find the end of the first token. */
 		q = strchr(p, PATH_SEP);
 		if (q != NULL) {
 			*q = '\0';
-			q++;
+			/* q++; JPA */
 		}
 
 		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
@@ -475,8 +569,33 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			err = ENAMETOOLONG;
 			goto close;
 		}
-
+#if CACHE_INODE_SIZE
+			/*
+			 * fetch inode for partial path from cache
+			 * if not available, compute and store into cache
+			 */
+		if (parent)
+			inum = ntfs_inode_lookup_by_name(ni, unicode, len);
+		else {
+			item.pathname = fullname;
+			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
+					vol->inode_cache, GENERIC(&item),
+					inode_cache_compare);
+			if (cached) {
+				inum = cached->inum;
+			} else {
+				inum = ntfs_inode_lookup_by_name(ni, unicode, len);
+				if (inum != (u64) -1) {
+					item.inum = inum;
+					ntfs_enter_cache(vol->inode_cache,
+							GENERIC(&item),
+							inode_cache_compare);
+				}
+			}
+		}
+#else
 		inum = ntfs_inode_lookup_by_name(ni, unicode, len);
+#endif
 		if (inum == (u64) -1) {
 			ntfs_log_debug("Couldn't find name '%s' in pathname "
 					"'%s'.\n", p, pathname);
@@ -499,6 +618,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			goto close;
 		}
 
+		if (q) *q++ = PATH_SEP; /* JPA */
 		p = q;
 		while (p && *p && *p == PATH_SEP)
 			p++;
@@ -1369,7 +1489,8 @@ no_hardlink:
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+int ntfs_delete(ntfs_volume *vol, const char *pathname,
+		ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 {
 	ntfs_attr_search_ctx *actx = NULL;
 	ntfs_index_context *ictx = NULL;
@@ -1377,6 +1498,11 @@ int ntfs_delete(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
 	BOOL case_sensitive_match = TRUE;
 	int err = 0;
+#if CACHE_INODE_SIZE
+	char *ascii;
+	struct CACHED_INODE item;
+	int count;
+#endif
 
 	ntfs_log_trace("Entering.\n");
 	
@@ -1556,6 +1682,22 @@ out:
 		err = errno;
 	if (ntfs_inode_close(ni) && !err)
 		err = errno;
+#if CACHE_INODE_SIZE
+			/* invalide cache entry, even if there was an error */
+	ascii = strdup(pathname);
+	if (ascii) {
+		char *p;
+
+		item.pathname = path_normalize(ascii);
+		count = ntfs_invalidate_cache(vol->inode_cache, GENERIC(&item),
+				inode_cache_inv_compare);
+		p = ascii; /* do not clear ascii */
+		free(p);
+	}
+	if (!ascii || !count)
+		ntfs_log_error("Could not delete inode cache entry for %s\n",
+				pathname);
+#endif
 	if (err) {
 		errno = err;
 		ntfs_log_debug("Could not delete file: %s\n", strerror(errno));
