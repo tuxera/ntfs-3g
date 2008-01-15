@@ -4,6 +4,7 @@
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2004 Yura Pakhuchiy
  * Copyright (c) 2004-2007 Szabolcs Szakacsits
+ * Copyright (c) 2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -81,37 +82,74 @@ static void ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc)
 
 static s64 max_empty_bit_range(unsigned char *buf, int size)
 {
-	int i, j, run = 0;
-	int max_range = 0;
+	int max_range;
+	int i,j;
+	int run;
+	unsigned char uncounted;
 	s64 start_pos = -1;
-	
-	ntfs_log_trace("Entering\n");
-	
-	for (i = 0; i < size; i++, buf++) {
-		
-		if (*buf == 0) {
-			run += 8;
-			continue;
-		}
-		
-		for (j = 0; j < 8; j++) {
-			
-			int bit = *buf & (1 << j);
-		
-			if (bit) {
+
+	max_range = 0;
+	i = 0;
+		/*
+		 * count every bit until we reach a range of 8
+		 * (fast count if all bits set)
+		 */
+	run = 0;
+	while ((i < size) && (max_range < 8)) {
+		if (*buf == 255) {
+			if (run > max_range) {
+				max_range = run;
+				start_pos = i * 8 - run;
+			}
+			run = 0;
+		} else
+			for (j=0; j<8; j++)
+				if (*buf & (1 << j)) {
+					if (run > max_range) {
+						max_range = run;
+						start_pos = i * 8 + j - run;
+					}
+					run = 0;
+				} else
+					run++;
+		i++;
+		buf++;
+	}
+		/*
+		 * From now on, beginning and end are in different bytes
+		 * and we do not count bits unless we have enough
+		 * null bytes
+		 */
+	uncounted = 255;
+	while (i < size) {
+		if (*buf) {
+			if ((run + 14) > max_range) {
+				/* uncounted bits in first byte */
+				for (j=7; (j>=0) && !(uncounted & (1 << j)); j--)
+					run++;
+				/* uncounted bits in last byte */
+				for (j=0; (j<8) && !(*buf & (1 << j)); j++)
+					run++;
 				if (run > max_range) {
 					max_range = run;
 					start_pos = i * 8 + j - run;
 				}
-				run = 0;
-			} else 
-				run++;
-		}		
+			}
+			uncounted = *buf;
+			run = 0;
+		} else
+			run += 8;
+		buf++;
+		i++;
 	}
-	
-	if (run > max_range)
-		start_pos = i * 8 - run;
-	
+	if ((run + 7) > max_range) {
+		/* uncounted bits in first byte */
+		for (j=7; (j>=0) && !(uncounted & (1 << j)); j--)
+			run++;
+		if (run > max_range)
+			start_pos = i * 8 - run;
+	}
+
 	return start_pos;
 }
 
