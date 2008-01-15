@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2006 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2007 Szabolcs Szakacsits
- * Copyright (c) 2007 Jean-Pierre Andre
+ * Copyright (c) 2007-2008 Jean-Pierre Andre
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -131,6 +131,7 @@ typedef struct {
 	struct fuse_chan *fc;
 	BOOL inherit;
 	BOOL addsecurids;
+	char *usermap_path;
 	struct PERMISSIONS_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
@@ -2168,6 +2169,18 @@ static char *parse_mount_options(const char *orig_opts)
 			 * with an individual security attribute
 			 */
 			ctx->addsecurids = TRUE;
+		} else if (!strcmp(opt, "usermapping")) {
+			if (!val) {
+				ntfs_log_error("'usermapping' option should have "
+						"a value.\n");
+				goto err_exit;
+			}
+			ctx->usermap_path = strdup(val);
+			if (!ctx->usermap_path) {
+				ntfs_log_error("no more memory to store "
+					"'usermapping' option.\n");
+				goto err_exit;
+			}
 		} else { /* Probably FUSE option. */
 			strcat(ret, opt);
 			if (val) {
@@ -2644,10 +2657,12 @@ int main(int argc, char *argv[])
 		/* JPA open $Secure and build user mapping (right place ?) */
 	if (ntfs_open_secure(ctx->vol))
 		ntfs_log_info("Could not open file $Secure\n");
-	if (!ntfs_build_mapping(&ctx->security))
+	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
 		ntfs_log_info("User mapping built\n");
 	else
 		ntfs_log_info("Failed to build user mapping\n");
+	if (ctx->usermap_path)
+		free (ctx->usermap_path);
 	
 	fuse_loop(fh);
 	

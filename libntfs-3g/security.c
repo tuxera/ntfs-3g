@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007 Jean-Pierre Andre
+ * Copyright (c) 2007-2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -30,7 +30,7 @@
 #define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
 #define OWNERFROMACL 1		/* Get the owner from ACL (not Windows owner) */
 #define BUFSZ 1024		/* buffer size to read mapping file */
-#define MAPPINGFILE "/NTFS-3G/UserMapping" /* name of mapping file */
+#define MAPPINGFILE "NTFS-3G/UserMapping" /* default mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_PERMISSIONS_BITS 6  /* log2 of unitary allocation of permissions */
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
@@ -200,7 +200,6 @@ struct MAPLIST {
 
 static ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
 static ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
-static const char mapping_name[] = MAPPINGFILE;
 
 /*
  * The zero GUID.
@@ -3059,6 +3058,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 		uid_t uid, gid_t gid, mode_t mode, BOOL isdir)
 {
+#if !FORCE_FORMAT_v1x
 	const struct CACHED_SECURID *cached;
 	struct CACHED_SECURID wanted;
 	char *newattr;
@@ -3066,6 +3066,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	const SID *usid;
 	const SID *gsid;
 	le32 securid;
+#endif
 
 	securid = cpu_to_le32(0);
 
@@ -3794,7 +3795,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
  */
 
 static struct MAPLIST *getmappingitem(
-		ntfs_inode *ni,	off_t *poffs, char *buf,
+		ntfs_inode *ni,	int fd, off_t *poffs, char *buf,
 		int *psrc, s64 *psize)
 {
 	int src;
@@ -3820,9 +3821,12 @@ static struct MAPLIST *getmappingitem(
 			}
 			if (buf[src] != '\n') {
 				*poffs += *psize;
-				*psize = ntfs_local_read(ni,
-					AT_UNNAMED, 0,
-					buf, (size_t)BUFSZ, *poffs);
+				if (ni)
+					*psize = ntfs_local_read(ni,
+						AT_UNNAMED, 0,
+						buf, (size_t)BUFSZ, *poffs);
+				else
+					*psize = read(fd, buf, (size_t)BUFSZ);
 				src = 0;
 			} else {
 				gotend = 1;
@@ -3866,17 +3870,24 @@ static struct MAPLIST *getmappingitem(
  *	are converted to uid.
  *	Returns the head of list, if any
  *
- *	Basic IO routines are called since we are still mounting
- *	and we have not entered the fuse loop yet.
+ *	If an absolute path is provided, the mapping file is assumed
+ *	to be located in another mounted file system, and plain read()
+ *	are used to get its contents.
+ *	If a relative path is provided, the mapping file is assumed
+ *	to be located on the current file system, and internal IO
+ *	have to be used since we are still mounting and we have not
+ *	entered the fuse loop yet.
  */
 
-static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
+static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx,
+			const char *usermap_path)
 {
 	char buf[BUFSZ];
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem;
 	struct MAPLIST *lastitem;
 	ntfs_inode *ni;
+	int fd;
 	int src;
 	off_t offs;
 	s64 size;
@@ -3884,15 +3895,24 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 	firstitem = (struct MAPLIST*)NULL;
 	lastitem = (struct MAPLIST*)NULL;
 	offs = 0;
-	ni = ntfs_pathname_to_inode(scx->vol, NULL, mapping_name);
-	if (ni) {
-		size = ntfs_local_read(ni, AT_UNNAMED, 0,
+	ni = (ntfs_inode*)NULL;
+	fd = 0;
+	if (!usermap_path) usermap_path = MAPPINGFILE;
+	if (usermap_path[0] == '/')
+		fd = open(usermap_path,O_RDONLY);
+	else
+		ni = ntfs_pathname_to_inode(scx->vol, NULL, usermap_path);
+	if (ni || (fd > 0)) {
+		if (ni)
+			size = ntfs_local_read(ni, AT_UNNAMED, 0,
 					buf, (size_t)BUFSZ, offs);
+		else
+			size = read(fd, buf, (size_t)BUFSZ);
 		if (size > 0) {
 			src = 0;
 			do {
-				item = getmappingitem(ni,&offs,
-					buf,&src,&size);
+				item = getmappingitem(ni, fd, &offs,
+					buf, &src, &size);
 				if (item) {
 					item->next = (struct MAPLIST*)NULL;
 					if (lastitem)
@@ -3903,7 +3923,8 @@ static struct MAPLIST *readmapping(struct SECURITY_CONTEXT *scx)
 				}
 			} while (item);
 		}
-		ntfs_inode_close(ni);
+		if (ni) ntfs_inode_close(ni);
+		else close(fd);
 	}
 	return (firstitem);
 }
@@ -4256,7 +4277,7 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 
 /*
  *		Build the user mapping
- *	- according to $Mapping file if present,
+ *	- according to a mapping file if defined (or default present),
  *	- or try default single user mapping if possible
  *
  *	The mapping is specific to a mounted device
@@ -4266,7 +4287,7 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
  *	(failure should not be interpreted as an error)
  */
 
-int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
+int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 {
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem;
@@ -4276,7 +4297,7 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx)
 	/* be sure not to map anything until done */
 	scx->usermapping = (struct MAPPING*)NULL;
 	scx->groupmapping = (struct MAPPING*)NULL;
-	firstitem = readmapping(scx);
+	firstitem = readmapping(scx, usermap_path);
 	if (firstitem) {
 		usermapping = ntfs_do_user_mapping(firstitem);
 		groupmapping = ntfs_do_group_mapping(firstitem);
@@ -4885,7 +4906,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				scx->gid = getgid();
 				scx->pseccache = &scapi->seccache;
 				scx->vol->secure_flags = 0;
-				if (ntfs_build_mapping(scx)
+				if (ntfs_build_mapping(scx,(const char*)NULL)
 				    || ntfs_open_secure(vol)) {
 					free(scapi);
 					scapi = (struct SECURITY_API*)NULL;

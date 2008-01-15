@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2004      Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
+ * Copyright (c) 2007-2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -150,7 +151,7 @@ extern int ntfs_sd_add_everyone(ntfs_inode *ni);
 extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, 
 			       const u32 len);
 
-int ntfs_build_mapping(struct SECURITY_CONTEXT *scx);
+int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path);
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, struct stat*);
 int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
