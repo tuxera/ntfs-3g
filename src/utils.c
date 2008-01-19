@@ -85,8 +85,9 @@ static const char *fakeraid_msg =
 "to mount NTFS. Please see the 'dmraid' documentation for help.\n";
 
 static const char *access_denied_msg =
-"Please check the volume and the NTFS-3G binary permissions, the mounting\n" 
-"user and group ID, and the mount options.\n";
+"Please check the device and the ntfs-3g binary permissions, the mounting\n" 
+"user and group ID, and the mount options. You can find more explanation\n"
+"at http://ntfs-3g.org/support.html#useroption\n";
 
 static const char *forced_mount_msg =
 "\n"

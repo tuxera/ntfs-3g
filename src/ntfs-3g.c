@@ -2100,7 +2100,7 @@ static fuse_fstype load_fuse_module(void)
 	struct timespec req = { 0, 100000000 };   /* 100 msec */
 	fuse_fstype fstype;
 	
-	if (!stat(cmd, &st) && !getuid()) {
+	if (!stat(cmd, &st) && !geteuid()) {
 		pid = fork();
 		if (!pid) {
 			execl(cmd, cmd, "fuse", NULL);
@@ -2185,14 +2185,34 @@ static void set_user_mount_option(char *parsed_options, uid_t uid)
 	strcat(parsed_options, option);
 }
 
+static int set_uid(uid_t uid)
+{
+	if (setuid(uid)) {
+		ntfs_log_perror("Failed to set uid to %d", uid);
+		return NTFS_VOLUME_NO_PRIVILEGE;
+	}
+	return NTFS_VOLUME_OK;
+}
+
 static struct fuse *mount_fuse(char *parsed_options)
 {
+	uid_t uid, euid;
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
+	/* 
+	 * We must raise privilege if possible, otherwise the user[s] fstab 
+	 * option doesn't work because mount(8) always drops privilege what 
+	 * the blkdev option requires.
+	 */
+	uid  = getuid();
+	euid = geteuid();
+	
+	if (set_uid(euid))
+		return NULL;
 	
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
@@ -2210,14 +2230,23 @@ static struct fuse *mount_fuse(char *parsed_options)
 	if (!fh)
 		goto err;
 	
-	if (fuse_set_signal_handlers(fuse_get_session(fh))) {
-		fuse_destroy(fh);
-		fh = NULL;
-		goto err;
-	}
+	if (fuse_set_signal_handlers(fuse_get_session(fh)))
+		goto err_destory;
+	/* 
+	 * We can't drop privilege if internal FUSE is used because internal 
+	 * unmount needs it. Kernel 2.6.25 may include unprivileged full 
+	 * mount/unmount support.
+	 */
+#ifndef FUSE_INTERNAL
+	if (set_uid(uid))
+		goto err_destory;
+#endif	
 out:
 	fuse_opt_free_args(&args);
 	return fh;
+err_destory:
+	fuse_destroy(fh);
+	fh = NULL;
 err:	
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	goto out;
@@ -2229,7 +2258,6 @@ int main(int argc, char *argv[])
 	struct fuse *fh;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
-	uid_t uid, euid;
 	int err;
 
 	utils_set_locale();
@@ -2248,16 +2276,7 @@ int main(int argc, char *argv[])
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
 	}
-
-	uid  = getuid();
-	euid = geteuid();
 	
-	if (setuid(euid)) {
-		ntfs_log_perror("Failed to set user ID to %d", euid);
-		err = NTFS_VOLUME_NO_PRIVILEGE;
-		goto err_out;
-	}
-
 #if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
@@ -2282,7 +2301,7 @@ int main(int argc, char *argv[])
 	if (ctx->blkdev) {
 		/* Must do after ntfs_open() to set the right blksize. */
 		set_fuseblk_options(parsed_options);
-		set_user_mount_option(parsed_options, uid);
+		set_user_mount_option(parsed_options, getuid());
 	}
 	
 	fh = mount_fuse(parsed_options);
@@ -2290,13 +2309,7 @@ int main(int argc, char *argv[])
 		err = NTFS_VOLUME_FUSE_ERROR;
 		goto err_out;
 	}
-		
-	if (setuid(uid)) {
-		ntfs_log_perror("Failed to drop privilege (uid to %d)", uid);
-		err = NTFS_VOLUME_NO_PRIVILEGE;
-		goto err_umount;
-	}
-
+	
 	ctx->mounted = TRUE;
 
 #if defined(linux) || defined(__uClinux__)
@@ -2326,7 +2339,7 @@ int main(int argc, char *argv[])
 	fuse_loop(fh);
 	
 	err = 0;
-err_umount:
+
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:

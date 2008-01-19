@@ -23,13 +23,6 @@
 #include <sys/wait.h>
 #include <sys/mount.h>
 
-#define FUSERMOUNT_PROG         "fusermount"
-#define FUSE_COMMFD_ENV         "_FUSE_COMMFD"
-
-#ifndef HAVE_FORK
-#define fork() vfork()
-#endif
-
 #ifndef MS_DIRSYNC
 #define MS_DIRSYNC 128
 #endif
@@ -102,38 +95,6 @@ static const struct fuse_opt fuse_mount_opts[] = {
     FUSE_OPT_KEY("--version",           KEY_VERSION),
     FUSE_OPT_END
 };
-
-static void mount_help(void)
-{
-    fprintf(stderr,
-            "    -o allow_other         allow access to other users\n"
-            "    -o allow_root          allow access to root\n"
-            "    -o nonempty            allow mounts over non-empty file/dir\n"
-            "    -o default_permissions enable permission checking by kernel\n"
-            "    -o fsname=NAME         set filesystem name\n"
-            "    -o subtype=NAME        set filesystem type\n"
-            "    -o large_read          issue large read requests (2.4 only)\n"
-            "    -o max_read=N          set maximum size of read requests\n"
-            "\n"
-            );
-}
-
-static void exec_fusermount(const char *argv[])
-{
-    execv(FUSERMOUNT_DIR "/" FUSERMOUNT_PROG, (char **) argv);
-    execvp(FUSERMOUNT_PROG, (char **) argv);
-}
-
-static void mount_version(void)
-{
-    int pid = fork();
-    if (!pid) {
-        const char *argv[] = { FUSERMOUNT_PROG, "--version", NULL };
-        exec_fusermount(argv);
-        _exit(1);
-    } else if (pid != -1)
-        waitpid(pid, NULL, 0);
-}
 
 struct mount_flags {
     const char *opt;
@@ -208,66 +169,19 @@ static int fuse_mount_opt_proc(void *data, const char *arg, int key,
         return fuse_opt_add_opt(&mo->mtab_opts, arg);
 
     case KEY_HELP:
-        mount_help();
         mo->ishelp = 1;
         break;
 
     case KEY_VERSION:
-        mount_version();
         mo->ishelp = 1;
         break;
     }
     return 1;
 }
 
-/* return value:
- * >= 0  => fd
- * -1    => error
- */
-static int receive_fd(int fd)
-{
-    struct msghdr msg;
-    struct iovec iov;
-    char buf[1];
-    int rv;
-    size_t ccmsg[CMSG_SPACE(sizeof(int)) / sizeof(size_t)];
-    struct cmsghdr *cmsg;
-
-    iov.iov_base = buf;
-    iov.iov_len = 1;
-
-    msg.msg_name = 0;
-    msg.msg_namelen = 0;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    /* old BSD implementations should use msg_accrights instead of
-     * msg_control; the interface is different. */
-    msg.msg_control = ccmsg;
-    msg.msg_controllen = sizeof(ccmsg);
-
-    while(((rv = recvmsg(fd, &msg, 0)) == -1) && errno == EINTR);
-    if (rv == -1) {
-        perror("recvmsg");
-        return -1;
-    }
-    if(!rv) {
-        /* EOF */
-        return -1;
-    }
-
-    cmsg = CMSG_FIRSTHDR(&msg);
-    if (!cmsg->cmsg_type == SCM_RIGHTS) {
-        fprintf(stderr, "got control message of unknown type %d\n",
-                cmsg->cmsg_type);
-        return -1;
-    }
-    return *(int*)CMSG_DATA(cmsg);
-}
-
 void fuse_kern_unmount(const char *mountpoint, int fd)
 {
     int res;
-    int pid;
 
     if (!mountpoint)
         return;
@@ -294,81 +208,17 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
     if (res == 0)
         return;
 
-    pid = fork();
-    if(pid == -1)
-        return;
-
-    if(pid == 0) {
-        const char *argv[] =
-            { FUSERMOUNT_PROG, "-u", "-q", "-z", "--", mountpoint, NULL };
-
-        exec_fusermount(argv);
-        _exit(1);
-    }
-    waitpid(pid, NULL, 0);
+    fusermount(1, 0, 1, "", mountpoint);
 }
 
-static int fuse_mount_fusermount(const char *mountpoint, const char *opts,
-                                 int quiet)
+static int fuse_mount_fusermount(const char *mountpoint, const char *opts)
 {
-    int fds[2], pid;
-    int res;
-    int rv;
+	if (!mountpoint) {
+		fprintf(stderr, "fuse: missing mountpoint\n");
+		return -1;
+	}
 
-    if (!mountpoint) {
-        fprintf(stderr, "fuse: missing mountpoint\n");
-        return -1;
-    }
-
-    res = socketpair(PF_UNIX, SOCK_STREAM, 0, fds);
-    if(res == -1) {
-        perror("fuse: socketpair() failed");
-        return -1;
-    }
-
-    pid = fork();
-    if(pid == -1) {
-        perror("fuse: fork() failed");
-        close(fds[0]);
-        close(fds[1]);
-        return -1;
-    }
-
-    if(pid == 0) {
-        char env[10];
-        const char *argv[32];
-        int a = 0;
-
-        if (quiet) {
-            int fd = open("/dev/null", O_RDONLY);
-            dup2(fd, 1);
-            dup2(fd, 2);
-        }
-
-        argv[a++] = FUSERMOUNT_PROG;
-        if (opts) {
-            argv[a++] = "-o";
-            argv[a++] = opts;
-        }
-        argv[a++] = "--";
-        argv[a++] = mountpoint;
-        argv[a++] = NULL;
-
-        close(fds[1]);
-        fcntl(fds[0], F_SETFD, 0);
-        snprintf(env, sizeof(env), "%i", fds[0]);
-        setenv(FUSE_COMMFD_ENV, env, 1);
-        exec_fusermount(argv);
-        perror("fuse: failed to exec fusermount");
-        _exit(1);
-    }
-
-    close(fds[0]);
-    rv = receive_fd(fds[1]);
-    close(fds[1]);
-    waitpid(pid, NULL, 0); /* bury zombie */
-
-    return rv;
+	return fusermount(0, 0, 0, opts ? opts : "", mountpoint);
 }
 
 static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
@@ -550,12 +400,12 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
                 goto out;
             }
 
-            res = fuse_mount_fusermount(mountpoint, tmp_opts, 1);
+            res = fuse_mount_fusermount(mountpoint, tmp_opts);
             free(tmp_opts);
             if (res == -1)
-                res = fuse_mount_fusermount(mountpoint, mnt_opts, 0);
+                res = fuse_mount_fusermount(mountpoint, mnt_opts);
         } else {
-            res = fuse_mount_fusermount(mountpoint, mnt_opts, 0);
+            res = fuse_mount_fusermount(mountpoint, mnt_opts);
         }
     }
  out:

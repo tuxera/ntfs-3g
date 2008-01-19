@@ -26,6 +26,7 @@ libfuse_lite_la_SOURCES =	\
 	fuse_opt.c 		\
 	fuse_session.c 		\
 	fuse_signals.c 		\
+	fusermount.c		\
 	helper.c 		\
 	mount.c 		\
 	mount_util.c 		\
