@@ -1618,7 +1618,7 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static int ntfs_open(const char *device, char *mntpoint)
+static int ntfs_open(const char *device)
 {
 	unsigned long flags = 0;
 	
@@ -2294,7 +2294,7 @@ int main(int argc, char *argv[])
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
 
-	err = ntfs_open(opts.device, opts.mnt_point);
+	err = ntfs_open(opts.device);
 	if (err)
 		goto err_out;
 	
