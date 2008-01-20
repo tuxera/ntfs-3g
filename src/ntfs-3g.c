@@ -2252,6 +2252,29 @@ err:
 	goto out;
 }
 
+static void setup_logging(char *parsed_options)
+{
+	if (!ctx->no_detach) {
+		if (daemon(0, ctx->debug))
+			ntfs_log_error("Failed to daemonize.\n");
+		else if (!ctx->debug) {
+#ifndef DEBUG
+			ntfs_log_set_handler(ntfs_log_handler_syslog);
+			/* Override default libntfs identify. */
+			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
+#endif
+		}
+	}
+
+	ntfs_log_info("Version %s\n", VERSION);
+	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
+			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
+			ctx->vol->vol_name, ctx->vol->major_ver,
+			ctx->vol->minor_ver);
+	ntfs_log_info("Cmdline options: %s\n", opts.options);
+	ntfs_log_info("Mount options: %s\n", parsed_options);
+}
+
 int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
@@ -2316,25 +2339,7 @@ int main(int argc, char *argv[])
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
 #endif	
-	if (!ctx->no_detach) {
-		if (daemon(0, ctx->debug))
-			ntfs_log_error("Failed to daemonize.\n");
-		else if (!ctx->debug) {
-#ifndef DEBUG
-			ntfs_log_set_handler(ntfs_log_handler_syslog);
-			/* Override default libntfs identify. */
-			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
-#endif
-		}
-	}
-
-	ntfs_log_info("Version %s\n", VERSION);
-	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
-			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
-			ctx->vol->vol_name, ctx->vol->major_ver,
-			ctx->vol->minor_ver);
-	ntfs_log_info("Cmdline options: %s\n", opts.options);
-	ntfs_log_info("Mount options: %s\n", parsed_options);
+	setup_logging(parsed_options);
 	
 	fuse_loop(fh);
 	
