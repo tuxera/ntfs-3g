@@ -336,6 +336,7 @@ AC_CONFIG_FILES([
 	libntfs-3g/libntfs-3g.script.so
 	src/Makefile
 	src/ntfs-3g.8
+	src/ntfs-3g.probe.8
 ])
 AC_OUTPUT
 

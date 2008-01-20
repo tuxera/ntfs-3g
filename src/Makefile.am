@@ -12,7 +12,7 @@ endif
 bin_PROGRAMS	 = ntfs-3g.probe
 rootbin_PROGRAMS = ntfs-3g
 rootsbin_DATA 	 = #Create directory
-man_MANS	 = ntfs-3g.8
+man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8
 
 ntfs_3g_LDADD    = $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
