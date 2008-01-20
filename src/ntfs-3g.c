@@ -35,6 +35,12 @@
 #error "***********************************************************"
 #endif
 
+#ifdef FUSE_INTERNAL
+#define FUSE_TYPE	"integrated FUSE"
+#else
+#define FUSE_TYPE	"external FUSE"
+#endif
+
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -146,7 +152,7 @@ static const char *locale_msg =
 
 static const char *usage_msg = 
 "\n"
-"%s %s - Third Generation NTFS Driver\n"
+"%s %s %s %d - Third Generation NTFS Driver\n"
 "\n"
 "Copyright (C) 2005-2006 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2007 Szabolcs Szakacsits\n"
@@ -1889,7 +1895,8 @@ err_exit:
 
 static void usage(void)
 {
-	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, EXEC_NAME, ntfs_home);
+	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, FUSE_TYPE, fuse_version(),
+		      EXEC_NAME, ntfs_home);
 }
 
 #ifndef HAVE_REALPATH
@@ -2266,7 +2273,7 @@ static void setup_logging(char *parsed_options)
 		}
 	}
 
-	ntfs_log_info("Version %s\n", VERSION);
+	ntfs_log_info("Version %s %s %d\n", VERSION, FUSE_TYPE, fuse_version());
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
