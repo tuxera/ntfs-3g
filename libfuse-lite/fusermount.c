@@ -399,10 +399,6 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
             if (!get_string_opt(s, len, subtype_str, &subtype))
                 goto err;
         } else if (opt_eq(s, len, "blkdev")) {
-            if (getuid() != 0) {
-                fprintf(stderr, "%s: option blkdev is privileged\n", progname);
-                goto err;
-            }
             blkdev = 1;
         } else if (opt_eq(s, len, "nonempty")) {
             check_empty = 0;
