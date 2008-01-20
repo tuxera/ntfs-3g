@@ -500,9 +500,13 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
         int errno_save = errno;
         if (blkdev && errno == ENODEV && !fuse_mnt_check_fuseblk())
             fprintf(stderr, "%s: 'fuseblk' support missing\n", progname);
-        else
+	else {
             fprintf(stderr, "%s: mount failed: %s\n", progname, strerror(errno_save));
-        goto err;
+	    if (errno_save == EPERM)
+		    fprintf(stderr, "No privilege to mount. Please see "
+			    "http://ntfs-3g.org/support.html#useroption\n");
+	}
+	goto err;
     } else {
         *sourcep = source;
         *typep = type;
