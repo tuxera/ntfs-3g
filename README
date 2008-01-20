@@ -2,11 +2,11 @@
 INTRODUCTION
 ============
 
-The ntfs-3g driver is an open source, freely available read/write NTFS
-driver, which provides safe and fast handling of the Windows XP, Windows 
-Server 2003, Windows 2000 and Windows Vista filesystems. Almost the full 
-POSIX filesystem functionality is supported, the major exceptions are 
-changing the file ownerships and the access rights.
+The NTFS-3G driver is an open source, freely available read/write NTFS driver 
+for Linux, FreeBSD, Mac OS X, NetBSD, and Haiku. It provides safe and fast 
+handling of the Windows XP, Windows Server 2003, Windows 2000 and Windows 
+Vista file systems. Most POSIX file system operations are supported, and 
+full file ownership and permission support is also coming along fast.
 
 The purpose of the project is to develop, continuously quality test and
 support a trustable, featureful and high performance solution for hardware
@@ -29,14 +29,18 @@ web site at
 
 QUICK INSTALLATION
 ==================
-	
-Make sure you have the basic Linux development tools and the full FUSE 
-package (http://fuse.sourceforge.net) is already installed correctly on 
-the computer. Then type:  
+
+Linux: Make sure you have the basic development tools and the kernel includes 
+the FUSE kernel module. Then type:  
 
 	./configure
 	make
 	make install      # or 'sudo make install' if you aren't root.
+
+Please note that NTFS-3G doesn't require the FUSE user space package anymore.
+
+Non-Linux: Please see the NTFS-3G web page for OS specific installation and 
+source packages.
 
 
 USAGE
@@ -44,11 +48,11 @@ USAGE
 
 If there was no error during installation then the NTFS volume can be
 read-write mounted for everybody the following way (unmount the volume if 
-it was already mounted, and replace /dev/hda1 and /mnt/windows, if needed):
+it was already mounted, and replace /dev/sda1 and /mnt/windows, if needed):
 
-	mount -t ntfs-3g /dev/hda1 /mnt/windows
+	mount -t ntfs-3g /dev/sda1 /mnt/windows
 or
-	ntfs-3g /dev/hda1 /mnt/windows
+	ntfs-3g /dev/sda1 /mnt/windows
 
 If your Operating System vendor didn't setup your language specific settings 
 then you may also need to set the 'locale' mount option to make all filenames 
@@ -63,5 +67,5 @@ Please see the ntfs-3g manual page for more options and examples.
 You can also make NTFS to be mounted during boot by putting the below 
 line at the __END__ of the /etc/fstab file:
 
-	/dev/hda1 /mnt/windows ntfs-3g defaults 0 0
+	/dev/sda1 /mnt/windows ntfs-3g defaults 0 0
 
