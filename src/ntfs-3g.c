@@ -1,9 +1,9 @@
 /**
  * ntfs-3g - Third Generation NTFS Driver
  *
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
- * Copyright (c) 2006-2007 Szabolcs Szakacsits
+ * Copyright (c) 2006-2008 Szabolcs Szakacsits
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -154,18 +154,17 @@ static const char *usage_msg =
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
 "\n"
-"Copyright (C) 2005-2006 Yura Pakhuchiy\n"
-"Copyright (C) 2006-2007 Szabolcs Szakacsits\n"
+"Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
+"Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "\n"
 "Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
 "\n"
 "Options:  ro, force, locale=, uid=, gid=, umask=, fmask=, dmask=,\n"
 "          streams_interface=. Please see details in the manual.\n"
 "\n"
-"Example:  ntfs-3g /dev/sda1 /mnt/win -o force,locale=en_EN.UTF-8\n"
+"Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
 "\n"
 "%s";
-
 
 /**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
