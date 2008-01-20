@@ -1,18 +1,18 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
-.\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
+.\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "November 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "January 2008" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
-.I device mount_point
+.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
 .br
 .B mount \-t ntfs-3g
-.I device mount_point
+.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
 .SH DESCRIPTION
 \fBntfs-3g\fR is an NTFS driver, which can
@@ -21,6 +21,9 @@ streams; it can read and write files, including
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
 transparently compressed files.
+.PP
+The \fIvolume\fR to be mounted can be either a block device or 
+an image file.
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process and everybody has
@@ -43,14 +46,10 @@ Windows users have full access to the files created by
 If 
 .B ntfs-3g 
 is set setuid-root then non-root users will 
-be also able to mount block devices or via /etc/fstab if the 'user'
+be also able to mount volumes and via /etc/fstab if the 'user'
 or 'users' 
 .BR mount (8)
-option is specified. The
-.B ntfs-3g 
-process drops the 
-root privilege after successful mount and runs unprivileged 
-afterwards.
+option is specified. 
 .SS Windows Filename Compatibility
 NTFS supports several filename namespaces: DOS, Win32 and POSIX. While the
 \fBntfs-3g\fR driver handles all of them, it always creates new files in the 
@@ -182,29 +181,29 @@ libntfs-3g and FUSE.
 .B no_detach
 Same as above but with less debug output.
 .SH EXAMPLES
-Mount /dev/hda1 to /mnt/windows:
+Mount /dev/sda1 to /mnt/windows:
 .RS
 .sp
-.B ntfs-3g /dev/hda1 /mnt/windows
+.B ntfs-3g /dev/sda1 /mnt/windows
 .sp
 .RE
 or
 .RS
 .sp
-.B mount -t ntfs-3g /dev/hda1 /mnt/windows
+.B mount -t ntfs-3g /dev/sda1 /mnt/windows
 .sp
 .RE
-Read\-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 
+Read\-only mount /dev/sda5 to /home/user/mnt and make user with uid 1000 
 to be the owner of all files:
 .RS
 .sp
-.B ntfs-3g /dev/hda5 /home/user/mnt \-o ro,uid=1000
+.B ntfs-3g /dev/sda5 /home/user/mnt \-o ro,uid=1000
 .sp
 .RE
 /etc/fstab entry for the above:
 .RS
 .sp
-.B /dev/hda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
+.B /dev/sda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
 .sp
 .RE
 Unmount /mnt/windows:
@@ -213,6 +212,14 @@ Unmount /mnt/windows:
 .B umount /mnt/windows
 .sp
 .RE
+.SH EXIT CODES
+To facilitate the use of the
+.B ntfs-3g
+driver in scripts, an exit code is returned to give an indication of the 
+mountability status of a volume. Value 0 means success, and all other
+ones mean an error. The unique error codes are documented in the
+.BR ntfs-3g.probe (8)
+manual page.
 .SH KNOWN ISSUES
 Please see 
 .RS
@@ -231,9 +238,7 @@ address.
 was based on and a major improvement to ntfsmount and libntfs which were
 written by Yura Pakhuchiy and the Linux-NTFS team. The improvements were 
 made, the ntfs-3g project was initiated and currently led by long time 
-Linux-NTFS team developer Szabolcs Szakacsits (szaka@sienet.hu) to revive
-the stalled open source development and project management.
-
+Linux-NTFS team developer Szabolcs Szakacsits (szaka@ntfs-3g.org).
 .SH THANKS
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
@@ -241,6 +246,7 @@ Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
 Yuval Fledel, and the author of the groundbreaking FUSE filesystem development 
 framework, Miklos Szeredi.
 .SH SEE ALSO
+.BR ntfs-3g.probe (8),
 .BR ntfsprogs (8),
 .BR attr (5),
 .BR getfattr (1)
