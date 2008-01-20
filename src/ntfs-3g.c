@@ -2191,6 +2191,7 @@ static void set_user_mount_option(char *parsed_options, uid_t uid)
 	strcat(parsed_options, option);
 }
 
+#ifndef FUSE_INTERNAL
 static int set_uid(uid_t uid)
 {
 	if (setuid(uid)) {
@@ -2199,16 +2200,15 @@ static int set_uid(uid_t uid)
 	}
 	return NTFS_VOLUME_OK;
 }
+#endif	
 
 static struct fuse *mount_fuse(char *parsed_options)
 {
-	uid_t uid, euid;
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+#ifndef FUSE_INTERNAL
+	uid_t uid, euid;
 	
-	/* Libfuse can't always find fusermount, so let's help it. */
-	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
-		ntfs_log_perror("WARNING: Failed to set $PATH\n");
 	/* 
 	 * We must raise privilege if possible, otherwise the user[s] fstab 
 	 * option doesn't work because mount(8) always drops privilege what 
@@ -2219,6 +2219,10 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (set_uid(euid))
 		return NULL;
+#endif	
+	/* Libfuse can't always find fusermount, so let's help it. */
+	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
+		ntfs_log_perror("WARNING: Failed to set $PATH\n");
 	
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
