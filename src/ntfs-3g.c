@@ -1,9 +1,9 @@
 /**
  * ntfs-3g - Third Generation NTFS Driver
  *
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
- * Copyright (c) 2006-2007 Szabolcs Szakacsits
+ * Copyright (c) 2006-2008 Szabolcs Szakacsits
  * Copyright (c) 2007-2008 Jean-Pierre Andre
  *
  * This file is originated from the Linux-NTFS project.
@@ -34,6 +34,12 @@
 #error "*     Compilation requires at least FUSE version 2.6.0!   *"
 #error "*                                                         *"
 #error "***********************************************************"
+#endif
+
+#ifdef FUSE_INTERNAL
+#define FUSE_TYPE	"integrated FUSE"
+#else
+#define FUSE_TYPE	"external FUSE"
 #endif
 
 #ifdef HAVE_STDIO_H
@@ -154,20 +160,19 @@ static const char *locale_msg =
 
 static const char *usage_msg = 
 "\n"
-"%s %s - Third Generation NTFS Driver\n"
+"%s %s %s %d - Third Generation NTFS Driver\n"
 "\n"
-"Copyright (C) 2005-2006 Yura Pakhuchiy\n"
-"Copyright (C) 2006-2007 Szabolcs Szakacsits\n"
+"Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
+"Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "\n"
 "Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
 "\n"
 "Options:  ro, force, locale=, uid=, gid=, umask=, fmask=, dmask=,\n"
 "          streams_interface=. Please see details in the manual.\n"
 "\n"
-"Example:  ntfs-3g /dev/sda1 /mnt/win -o force,locale=en_EN.UTF-8\n"
+"Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
 "\n"
 "%s";
-
 
 /**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
@@ -1920,7 +1925,7 @@ static int ntfs_fuse_init(void)
 	return 0;
 }
 
-static int ntfs_open(const char *device, char *mntpoint)
+static int ntfs_open(const char *device)
 {
 	unsigned long flags = 0;
 	
@@ -1931,28 +1936,28 @@ static int ntfs_open(const char *device, char *mntpoint)
 	if (ctx->force)
 		flags |= MS_FORCE;
 
-	ctx->vol = utils_mount_volume(device, mntpoint, flags);
-	if (!ctx->vol)
-		return -1;
+	ctx->vol = ntfs_mount(device, flags);
+	if (!ctx->vol) {
+		ntfs_log_perror("Failed to mount '%s'", device);
+		goto err_out;
+	}
 	
 	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
 	if (ctx->vol->free_clusters < 0) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
-		return -1;
+		goto err_out;
 	}
 
 	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
 	if (ctx->vol->free_mft_records < 0) {
 		ntfs_log_perror("Failed to calculate free MFT records");
-		return -1;
+		goto err_out;
 	}
-	
-	return 0;
-}
 
-static void signal_handler(int arg __attribute__((unused)))
-{
-	fuse_exit((fuse_get_context())->fuse);
+	errno = 0;
+err_out:
+	return ntfs_volume_error(errno);
+	
 }
 
 static char *parse_mount_options(const char *orig_opts)
@@ -2215,7 +2220,8 @@ err_exit:
 
 static void usage(void)
 {
-	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, EXEC_NAME, ntfs_home);
+	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, FUSE_TYPE, fuse_version(),
+		      EXEC_NAME, ntfs_home);
 }
 
 #ifndef HAVE_REALPATH
@@ -2426,7 +2432,7 @@ static fuse_fstype load_fuse_module(void)
 	struct timespec req = { 0, 100000000 };   /* 100 msec */
 	fuse_fstype fstype;
 	
-	if (!stat(cmd, &st) && !getuid()) {
+	if (!stat(cmd, &st) && !geteuid()) {
 		pid = fork();
 		if (!pid) {
 			execl(cmd, cmd, "fuse", NULL);
@@ -2511,11 +2517,35 @@ static void set_user_mount_option(char *parsed_options, uid_t uid)
 	strcat(parsed_options, option);
 }
 
+#ifndef FUSE_INTERNAL
+static int set_uid(uid_t uid)
+{
+	if (setuid(uid)) {
+		ntfs_log_perror("Failed to set uid to %d", uid);
+		return NTFS_VOLUME_NO_PRIVILEGE;
+	}
+	return NTFS_VOLUME_OK;
+}
+#endif	
+
 static struct fuse *mount_fuse(char *parsed_options)
 {
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+#ifndef FUSE_INTERNAL
+	uid_t uid, euid;
 	
+	/* 
+	 * We must raise privilege if possible, otherwise the user[s] fstab 
+	 * option doesn't work because mount(8) always drops privilege what 
+	 * the blkdev option requires.
+	 */
+	uid  = getuid();
+	euid = geteuid();
+	
+	if (set_uid(euid))
+		return NULL;
+#endif	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
@@ -2545,13 +2575,51 @@ static struct fuse *mount_fuse(char *parsed_options)
 	if (!fh)
 		goto err;
 	
-	ctx->mounted = TRUE;
+	if (fuse_set_signal_handlers(fuse_get_session(fh)))
+		goto err_destory;
+	/* 
+	 * We can't drop privilege if internal FUSE is used because internal 
+	 * unmount needs it. Kernel 2.6.25 may include unprivileged full 
+	 * mount/unmount support.
+	 */
+#ifndef FUSE_INTERNAL
+	if (set_uid(uid))
+		goto err_destory;
+#endif	
 out:
 	fuse_opt_free_args(&args);
 	return fh;
+err_destory:
+	fuse_destroy(fh);
+	fh = NULL;
 err:	
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	goto out;
+}
+
+static void setup_logging(char *parsed_options)
+{
+	if (!ctx->no_detach) {
+		if (daemon(0, ctx->debug))
+			ntfs_log_error("Failed to daemonize.\n");
+		else if (!ctx->debug) {
+#ifndef DEBUG
+			ntfs_log_set_handler(ntfs_log_handler_syslog);
+			/* Override default libntfs identify. */
+			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
+#endif
+		}
+	}
+
+	ctx->seccache = (struct PERMISSIONS_CACHE*)NULL;
+
+	ntfs_log_info("Version %s %s %d\n", VERSION, FUSE_TYPE, fuse_version());
+	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
+			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
+			ctx->vol->vol_name, ctx->vol->major_ver,
+			ctx->vol->minor_ver);
+	ntfs_log_info("Cmdline options: %s\n", opts.options);
+	ntfs_log_info("Mount options: %s\n", parsed_options);
 }
 
 int main(int argc, char *argv[])
@@ -2560,34 +2628,25 @@ int main(int argc, char *argv[])
 	struct fuse *fh;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
-	uid_t uid, euid;
-	int err = 10;
+	int err;
 
 	utils_set_locale();
-	ntfs_log_set_handler((ntfs_log_handler*)ntfs_log_handler_stderr);
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
 		usage();
-		return 1;
+		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
 	if (ntfs_fuse_init())
-		return 2;
+		return NTFS_VOLUME_OUT_OF_MEMORY;
 	
 	parsed_options = parse_mount_options(opts.options ? opts.options : "");
-	if (!parsed_options)
-		goto err_out;
-
-	uid  = getuid();
-	euid = geteuid();
-	
-	if (setuid(euid)) {
-		ntfs_log_perror("Failed to set user ID to %d", euid);
+	if (!parsed_options) {
+		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
 	}
-
+	
 #if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
@@ -2598,56 +2657,37 @@ int main(int argc, char *argv[])
 	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
+		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
 
-	if (ntfs_open(opts.device, opts.mnt_point))
+	err = ntfs_open(opts.device);
+	if (err)
 		goto err_out;
 	
 	if (ctx->blkdev) {
 		/* Must do after ntfs_open() to set the right blksize. */
 		set_fuseblk_options(parsed_options);
-		set_user_mount_option(parsed_options, uid);
+		set_user_mount_option(parsed_options, getuid());
 	}
 	
 	fh = mount_fuse(parsed_options);
-	if (!fh)
+	if (!fh) {
+		err = NTFS_VOLUME_FUSE_ERROR;
 		goto err_out;
-		
-	if (setuid(uid)) {
-		ntfs_log_perror("Failed to set user ID to %d", uid);
-		goto err_umount;
 	}
+	
+	ctx->mounted = TRUE;
 
 #if defined(linux) || defined(__uClinux__)
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
 		ntfs_log_info(fuse26_kmod_msg);
 #endif	
-	if (!ctx->no_detach) {
-		if (daemon(0, ctx->debug))
-			ntfs_log_error("Failed to daemonize.\n");
-		else if (!ctx->debug) {
-#ifndef DEBUG
-			ntfs_log_set_handler(
-				(ntfs_log_handler*)ntfs_log_handler_syslog);
-			/* Override default libntfs identify. */
-			openlog(EXEC_NAME, LOG_PID, LOG_DAEMON);
-#endif
-		}
-	}
+	setup_logging(parsed_options);
 
-	ctx->seccache = (struct PERMISSIONS_CACHE*)NULL;
-
-	ntfs_log_info("Version %s\n", VERSION);
-	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
-			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
-			ctx->vol->vol_name, ctx->vol->major_ver,
-			ctx->vol->minor_ver);
-	ntfs_log_info("Cmdline options: %s\n", opts.options);
-	ntfs_log_info("Mount options: %s\n", parsed_options);
 	ctx->security.vol = ctx->vol;
 	ctx->security.uid = ctx->uid;
 	ctx->security.gid = ctx->gid;
@@ -2667,10 +2707,11 @@ int main(int argc, char *argv[])
 	fuse_loop(fh);
 	
 	err = 0;
-err_umount:
+
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
+	utils_mount_error(opts.device, opts.mnt_point, err);
 	ntfs_close();
 	free(ctx);
 	free(parsed_options);

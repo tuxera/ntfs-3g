@@ -86,16 +86,13 @@ typedef enum {
 #define NInoAttrListTestAndSetDirty(ni)	    test_and_set_nino_al_flag(ni, Dirty)
 #define NInoAttrListTestAndClearDirty(ni) test_and_clear_nino_al_flag(ni, Dirty)
 
-#define NInoFileNameDirty(ni)			\
-					  test_nino_flag(ni, FileNameDirty)
-#define NInoFileNameSetDirty(ni)		\
-					   set_nino_flag(ni, FileNameDirty)
-#define NInoFileNameClearDirty(ni)		\
-					 clear_nino_flag(ni, FileNameDirty)
+#define NInoFileNameDirty(ni)                 test_nino_flag(ni, FileNameDirty)
+#define NInoFileNameSetDirty(ni)               set_nino_flag(ni, FileNameDirty)
+#define NInoFileNameClearDirty(ni)           clear_nino_flag(ni, FileNameDirty)
 #define NInoFileNameTestAndSetDirty(ni)		\
-				  test_and_set_nino_flag(ni, FileNameDirty)
+				      test_and_set_nino_flag(ni, FileNameDirty)
 #define NInoFileNameTestAndClearDirty(ni)	\
-				test_and_clear_nino_flag(ni, FileNameDirty)
+				    test_and_clear_nino_flag(ni, FileNameDirty)
 
 /**
  * struct _ntfs_inode - The NTFS in-memory inode structure.
