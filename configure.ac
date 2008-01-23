@@ -107,6 +107,7 @@ AC_ARG_ENABLE(
 )
 
 # Programs
+# pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
 AC_PROG_CC
 AC_PROG_LIBTOOL
