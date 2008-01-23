@@ -303,7 +303,6 @@ extern int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn);
 
 extern int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize);
 
-// FIXME / TODO: Above here the file is cleaned up. (AIA)
 /**
  * get_attribute_value_length - return the length of the value of an attribute
  * @a:	pointer to a buffer containing the attribute record
