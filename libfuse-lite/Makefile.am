@@ -8,7 +8,6 @@ endif
 libfuse_lite_la_CFLAGS=			  \
 	$(AM_CFLAGS) 			  \
 	-I$(top_srcdir)/include/fuse-lite \
-	-D_REENTRANT 			  \
 	-D_FILE_OFFSET_BITS=64
 
 libfuse_lite_la_LIBADD  = $(LIBFUSE_LITE_LIBS)

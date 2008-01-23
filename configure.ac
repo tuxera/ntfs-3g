@@ -185,6 +185,11 @@ if test "${with_fuse}" = "internal"; then
 		[LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lrt"],
 		[AC_MSG_ERROR([Cannot find rt library])]
 	)
+	AC_DEFINE(
+		[_REENTRANT],
+		[1],
+		[Required define if using POSIX threads]
+	)
 	# required so that we re-compile anything
 	AC_DEFINE(
 		[FUSE_INTERNAL],
