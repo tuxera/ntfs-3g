@@ -2415,9 +2415,9 @@ static void fuse_lib_getlk(fuse_req_t req, fuse_ino_t ino,
 
 static void fuse_lib_setlk(fuse_req_t req, fuse_ino_t ino,
                            struct fuse_file_info *fi, struct flock *lock,
-                           int sleep)
+                           int should_sleep)
 {
-    int err = fuse_lock_common(req, ino, fi, lock, sleep ? F_SETLKW : F_SETLK);
+    int err = fuse_lock_common(req, ino, fi, lock, should_sleep ? F_SETLKW : F_SETLK);
     if (!err) {
         struct fuse *f = req_fuse(req);
         struct lock l;

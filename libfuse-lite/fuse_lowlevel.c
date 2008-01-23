@@ -841,7 +841,7 @@ static void do_getlk(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 }
 
 static void do_setlk_common(fuse_req_t req, fuse_ino_t nodeid,
-                            const void *inarg, int sleep)
+                            const void *inarg, int should_sleep)
 {
     struct fuse_lk_in *arg = (struct fuse_lk_in *) inarg;
     struct fuse_file_info fi;
@@ -853,7 +853,7 @@ static void do_setlk_common(fuse_req_t req, fuse_ino_t nodeid,
 
     convert_fuse_file_lock(&arg->lk, &flock);
     if (req->f->op.setlk)
-        req->f->op.setlk(req, nodeid, &fi, &flock, sleep);
+        req->f->op.setlk(req, nodeid, &fi, &flock, should_sleep);
     else
         fuse_reply_err(req, ENOSYS);
 }
