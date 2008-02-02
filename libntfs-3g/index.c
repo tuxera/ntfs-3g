@@ -1696,9 +1696,8 @@ descend:
 		goto descend;
 
 	if (ntfs_ih_zero_entry(&ib->index)) {
-		errno = EOPNOTSUPP;
-		ntfs_log_perror("Failed to find any entry in an index block. "
-				"Please run chkdsk.");
+		errno = EIO;
+		ntfs_log_perror("Empty index block");
 		goto out;
 	}
 
