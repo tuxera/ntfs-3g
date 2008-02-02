@@ -668,7 +668,6 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_BLOCK *ib = NULL;
-	ntfs_attr_search_ctx *actx;
 	int ret, err = 0;
 
 	ntfs_log_trace("Entering\n");
@@ -679,7 +678,7 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 		return -1;
 	}
 
-	ir = ntfs_ir_lookup(ni, icx->name, icx->name_len, &actx);
+	ir = ntfs_ir_lookup(ni, icx->name, icx->name_len, &icx->actx);
 	if (!ir) {
 		if (errno == ENOENT)
 			errno = EIO;
@@ -718,7 +717,6 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 		goto err_out;
 	}
 	
-	icx->actx = actx;
 	icx->ir = ir;
 	
 	if (ret != STATUS_KEEP_SEARCHING) {
@@ -782,8 +780,6 @@ err_out:
 	free(ib);
 	if (!err)
 		err = EIO;
-	if (actx)
-		ntfs_attr_put_search_ctx(actx);
 	errno = err;
 	return -1;
 done:
