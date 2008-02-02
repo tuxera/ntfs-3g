@@ -763,7 +763,7 @@ descend_into_child_node:
 		/* STATUS_OK or STATUS_NOT_FOUND */
 		icx->is_in_root = FALSE;
 		icx->ib = ib;
-		icx->parent_vcn[icx->pindex] = icx->ib_vcn = vcn;
+		icx->parent_vcn[icx->pindex] = vcn;
 		goto done;
 	}
 

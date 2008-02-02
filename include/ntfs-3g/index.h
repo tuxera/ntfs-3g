@@ -48,7 +48,6 @@
  * @actx:		attribute search context if in root or NULL otherwise
  * @ia:			index block if @is_in_root is FALSE or NULL otherwise
  * @ia_na:		opened INDEX_ALLOCATION attribute
- * @ib_vcn:		VCN from which @ia where read from
  * @parent_pos:		parent entries' positions in the index block
  * @parent_vcn:		entry's parent node or VCN_INDEX_ROOT_PARENT
  * @new_vcn:            new VCN if we need to create a new index block
@@ -64,11 +63,11 @@
  * simply points into @entry.  This is probably what the user is interested in.
  *
  * If @is_in_root is TRUE, @entry is in the index root attribute @ir described
- * by the attribute search context @actx and inode @ni.  @ia, @ib_vcn and
+ * by the attribute search context @actx and inode @ni.  @ia and
  * @ib_dirty are undefined in this case.
  *
  * If @is_in_root is FALSE, @entry is in the index allocation attribute and @ia
- * and @ib_vcn point to the index allocation block and VCN where it's placed,
+ * point to the index allocation block and VCN where it's placed,
  * respectively. @ir and @actx are NULL in this case. @ia_na is opened
  * INDEX_ALLOCATION attribute. @ib_dirty is TRUE if index block was changed and
  * FALSE otherwise.
@@ -96,7 +95,6 @@ typedef struct {
 	INDEX_BLOCK *ib;
 	ntfs_attr *ia_na;
 	int parent_pos[MAX_PARENT_VCN];  /* parent entries' positions */
-	VCN ib_vcn;
 	VCN parent_vcn[MAX_PARENT_VCN]; /* entry's parent nodes */
 	int pindex;	     /* maximum it's the number of the parent nodes  */
 	BOOL ib_dirty;
