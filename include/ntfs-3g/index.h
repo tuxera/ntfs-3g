@@ -115,7 +115,7 @@ extern int ntfs_index_lookup(const void *key, const int key_len,
 
 extern int ntfs_index_add_filename(ntfs_inode *ni, FILE_NAME_ATTR *fn,
 		MFT_REF mref);
-extern int ntfs_index_rm(ntfs_index_context *ictx);
+extern int ntfs_index_remove(ntfs_inode *ni, const void *key, const int keylen);
 
 extern INDEX_ROOT *ntfs_index_root_get(ntfs_inode *ni, ATTR_RECORD *attr);
 

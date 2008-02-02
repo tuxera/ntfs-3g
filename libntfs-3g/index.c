@@ -1828,6 +1828,33 @@ err_out:
 	return -1;
 }
 
+int ntfs_index_remove(ntfs_inode *ni, const void *key, const int keylen)
+{
+	int ret = -1;
+	ntfs_index_context *ctx;
+
+	ctx = ntfs_index_ctx_get(ni, NTFS_INDEX_I30, 4);
+	if (!ctx)
+		return -1;
+
+	if (ntfs_index_lookup(key, keylen, ctx))
+		goto err_out;
+
+	if (((FILE_NAME_ATTR *)ctx->data)->file_attributes &
+			FILE_ATTR_REPARSE_POINT) {
+		errno = EOPNOTSUPP;
+		goto err_out;
+	}
+	
+	if (ntfs_index_rm(ctx))
+		goto err_out;
+
+	ret = 0;
+err_out:
+	ntfs_index_ctx_put(ctx);
+	return ret;
+}
+
 /**
  * ntfs_index_root_get - read the index root of an attribute
  * @ni:		open ntfs inode in which the ntfs attribute resides
