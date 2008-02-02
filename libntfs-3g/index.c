@@ -78,14 +78,14 @@ static VCN ntfs_ib_pos_to_vcn(ntfs_index_context *icx, s64 pos)
 	return pos >> icx->vcn_size_bits;
 }
 
-static int ntfs_ib_write(ntfs_index_context *icx, VCN vcn, void *buf)
+static int ntfs_ib_write(ntfs_index_context *icx, INDEX_BLOCK *ib)
 {
-	s64 ret;
+	s64 ret, vcn = sle64_to_cpu(ib->index_block_vcn);
 	
 	ntfs_log_trace("vcn: %lld\n", vcn);
 	
 	ret = ntfs_attr_mst_pwrite(icx->ia_na, ntfs_ib_vcn_to_pos(icx, vcn),
-				   1, icx->block_size, buf);
+				   1, icx->block_size, ib);
 	if (ret != 1) {
 		ntfs_log_perror("Failed to write index block %lld, inode %llu",
 			(long long)vcn, (unsigned long long)icx->ni->mft_no);
@@ -97,7 +97,7 @@ static int ntfs_ib_write(ntfs_index_context *icx, VCN vcn, void *buf)
 
 static int ntfs_icx_ib_write(ntfs_index_context *icx)
 {
-		if (ntfs_ib_write(icx, icx->ib_vcn, icx->ib))
+		if (ntfs_ib_write(icx, icx->ib))
 			return STATUS_ERROR;
 		
 		icx->ib_dirty = FALSE;
@@ -155,7 +155,7 @@ static void ntfs_index_ctx_free(ntfs_index_context *icx)
 
 	if (icx->ib_dirty) {
 		/* FIXME: Error handling!!! */
-		ntfs_ib_write(icx, icx->ib_vcn, icx->ib);
+		ntfs_ib_write(icx, icx->ib);
 	}
 	
 	free(icx->ib);
@@ -1059,13 +1059,13 @@ static int ntfs_ib_copy_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	
 	dst->index.index_length = cpu_to_le32(tail_size + 
 					      le32_to_cpu(dst->index.entries_offset));
-	ret = ntfs_ib_write(icx, new_vcn, dst);
+	ret = ntfs_ib_write(icx, dst);
 
 	free(dst);
 	return ret;
 }
 
-static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
+static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *ib,
 			    INDEX_ENTRY *ie)
 {
 	char *ies_start, *ies_end;
@@ -1073,8 +1073,8 @@ static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	
 	ntfs_log_trace("Entering\n");
 	
-	ies_start = (char *)ntfs_ie_get_first(&src->index);
-	ies_end   = (char *)ntfs_ie_get_end(&src->index);
+	ies_start = (char *)ntfs_ie_get_first(&ib->index);
+	ies_end   = (char *)ntfs_ie_get_end(&ib->index);
 	
 	ie_last   = ntfs_ie_get_last((INDEX_ENTRY *)ies_start, ies_end);
 	if (ie_last->ie_flags & INDEX_ENTRY_NODE)
@@ -1082,10 +1082,10 @@ static int ntfs_ib_cut_tail(ntfs_index_context *icx, INDEX_BLOCK *src,
 	
 	memcpy(ie, ie_last, le16_to_cpu(ie_last->length));
 	
-	src->index.index_length = cpu_to_le32(((char *)ie - ies_start) + 
-		le16_to_cpu(ie->length) + le32_to_cpu(src->index.entries_offset));
+	ib->index.index_length = cpu_to_le32(((char *)ie - ies_start) + 
+		le16_to_cpu(ie->length) + le32_to_cpu(ib->index.entries_offset));
 	
-	if (ntfs_ib_write(icx, sle64_to_cpu(((INDEX_BLOCK *)src)->index_block_vcn), src))
+	if (ntfs_ib_write(icx, ib))
 		return STATUS_ERROR;
 	
 	return STATUS_OK;
@@ -1147,7 +1147,7 @@ static int ntfs_ir_reparent(ntfs_index_context *icx)
 		goto clear_bmp;
 	}
 		
-	if (ntfs_ib_write(icx, new_ib_vcn, ib))
+	if (ntfs_ib_write(icx, ib))
 		goto clear_bmp;
 	
 	ir = ntfs_ir_lookup(icx->ni, icx->name, icx->name_len, &ctx);
@@ -1374,7 +1374,7 @@ static int ntfs_ib_insert(ntfs_index_context *icx, INDEX_ENTRY *ie, VCN new_vcn)
 	if (ntfs_ih_insert(&ib->index, ie, new_vcn, ntfs_icx_parent_pos(icx)))
 		goto err_out;
 	
-	if (ntfs_ib_write(icx, old_vcn, ib))
+	if (ntfs_ib_write(icx, ib))
 		goto err_out;
 	
 	err = STATUS_OK;
@@ -1549,7 +1549,7 @@ static int ntfs_ih_takeout(ntfs_index_context *icx, INDEX_HEADER *ih,
 	if (ntfs_icx_parent_vcn(icx) == VCN_INDEX_ROOT_PARENT)
 		ntfs_inode_mark_dirty(icx->actx->ntfs_ino);
 	else
-		if (ntfs_ib_write(icx, ntfs_icx_parent_vcn(icx), ib))
+		if (ntfs_ib_write(icx, ib))
 			goto out;
 	
 	ntfs_index_ctx_reinit(icx);
@@ -1751,7 +1751,7 @@ descend:
 		if (ntfs_index_rm_leaf(icx))
 			goto out2;
 	} else 
-		if (ntfs_ib_write(icx, vcn, ib))
+		if (ntfs_ib_write(icx, ib))
 			goto out2;
 
 	ret = STATUS_OK;
