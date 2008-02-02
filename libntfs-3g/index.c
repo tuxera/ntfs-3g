@@ -451,8 +451,10 @@ static INDEX_ROOT *ntfs_ir_lookup(ntfs_inode *ni, ntfschar *name,
 	
 	ir = (INDEX_ROOT *)((char *)a + le16_to_cpu(a->value_offset));
 err_out:
-	if (!ir)
+	if (!ir) {
 		ntfs_attr_put_search_ctx(*ctx);
+		*ctx = NULL;
+	}
 	return ir;
 }
 
@@ -659,8 +661,7 @@ static int ntfs_icx_parent_dec(ntfs_index_context *icx)
  * the call to ntfs_index_ctx_put() to ensure that the changes are written
  * to disk.
  */
-int ntfs_index_lookup(const void *key, const int key_len,
-		ntfs_index_context *icx)
+int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *icx)
 {
 	VCN old_vcn, vcn;
 	ntfs_inode *ni = icx->ni;
