@@ -147,18 +147,14 @@ static void ntfs_index_ctx_free(ntfs_index_context *icx)
 	if (icx->actx)
 		ntfs_attr_put_search_ctx(icx->actx);
 
-	if (icx->is_in_root) {
-		if (icx->ia_na)
-			ntfs_attr_close(icx->ia_na);
-		return;
-	}
-
-	if (icx->ib_dirty) {
-		/* FIXME: Error handling!!! */
-		ntfs_ib_write(icx, icx->ib);
+	if (!icx->is_in_root) {
+		if (icx->ib_dirty) {
+			/* FIXME: Error handling!!! */
+			ntfs_ib_write(icx, icx->ib);
+		}
+		free(icx->ib);
 	}
 	
-	free(icx->ib);
 	ntfs_attr_close(icx->ia_na);
 }
 
@@ -775,8 +771,6 @@ descend_into_child_node:
 	
 	goto descend_into_child_node;
 err_out:
-	if (icx->ia_na)
-		ntfs_attr_close(icx->ia_na);
 	free(ib);
 	if (!err)
 		err = EIO;
