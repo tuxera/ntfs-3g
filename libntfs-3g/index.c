@@ -690,7 +690,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 		errno = EINVAL;
 		ntfs_log_perror("Index block size (%d) is smaller than the "
 				"sector size (%d)", icx->block_size, NTFS_BLOCK_SIZE);
-		return err_out;
+		goto err_out;
 	}
 
 	if (ni->vol->cluster_size <= icx->block_size)
