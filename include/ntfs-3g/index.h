@@ -98,7 +98,6 @@ typedef struct {
 	int parent_pos[MAX_PARENT_VCN];  /* parent entries' positions */
 	VCN ib_vcn;
 	VCN parent_vcn[MAX_PARENT_VCN]; /* entry's parent nodes */
-	int max_depth;	     /* number of the parent nodes 	*/
 	int pindex;	     /* maximum it's the number of the parent nodes  */
 	BOOL ib_dirty;
 	u32 block_size;

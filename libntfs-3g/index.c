@@ -789,7 +789,6 @@ done:
 	icx->entry = ie;
 	icx->data = (u8 *)ie + offsetof(INDEX_ENTRY, key);
 	icx->data_len = le16_to_cpu(ie->key_length);
-	icx->max_depth = icx->pindex;
 	ntfs_log_trace("Done.\n");
 	if (err) {
 		errno = err;
