@@ -2,7 +2,7 @@
  * volume.c - NTFS volume handling code. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
- * Copyright (c) 2002-2006 Szabolcs Szakacsits
+ * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -675,7 +675,7 @@ out:
  * Return:  0 if Windows isn't hibernated for sure
  *         -1 otherwise and errno is set to the appropriate value
  */
-static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
+int ntfs_volume_check_hiberfile(ntfs_volume *vol, int verbose)
 {
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
@@ -705,13 +705,15 @@ static int ntfs_volume_check_hiberfile(ntfs_volume *vol)
 		goto out;
 	}
 	if (bytes_read < NTFS_HIBERFILE_HEADER_SIZE) {
-		ntfs_log_error("Hibernated non-system partition, refused to "
-			       "mount.\n");
+		if (verbose)
+			ntfs_log_error("Hibernated non-system partition, "
+				       "refused to mount.\n");
 		errno = EPERM;
 		goto out;
 	}
 	if (memcmp(buf, "hibr", 4) == 0) {
-		ntfs_log_error("Windows is hibernated, refused to mount.\n");
+		if (verbose)
+			ntfs_log_error("Windows is hibernated, refused to mount.\n");
 		errno = EPERM;
 		goto out;
 	}
@@ -1098,7 +1100,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * We care only about read-write mounts.
 	 */
 	if (!(flags & MS_RDONLY)) {
-		if (ntfs_volume_check_hiberfile(vol) < 0)
+		if (!(flags & MS_IGNORE_HIBERFILE) && 
+		    ntfs_volume_check_hiberfile(vol, 1) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_logfile(vol) < 0) {
 			if (!(flags & MS_FORCE))

@@ -127,6 +127,7 @@ typedef struct {
 	BOOL show_sys_files;
 	BOOL silent;
 	BOOL force;
+	BOOL hiberfile;
 	BOOL debug;
 	BOOL no_detach;
 	BOOL blkdev;
@@ -159,8 +160,9 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
 "\n"
-"Options:  ro, force, locale=, uid=, gid=, umask=, fmask=, dmask=,\n"
-"          streams_interface=. Please see details in the manual.\n"
+"Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
+"          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
+"          Please see the details in the manual.\n"
 "\n"
 "Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
 "\n"
@@ -1633,6 +1635,8 @@ static int ntfs_open(const char *device)
 		flags |= MS_RDONLY;
 	if (ctx->force)
 		flags |= MS_FORCE;
+	if (ctx->hiberfile)
+		flags |= MS_IGNORE_HIBERFILE;
 
 	ctx->vol = ntfs_mount(device, flags);
 	if (!ctx->vol) {
@@ -1652,6 +1656,13 @@ static int ntfs_open(const char *device)
 		goto err_out;
 	}
 
+	if (ctx->hiberfile && ntfs_volume_check_hiberfile(ctx->vol, 0)) {
+		if (errno != EPERM)
+			goto err_out;
+		if (ntfs_fuse_rm("/hiberfil.sys"))
+			goto err_out;
+	}
+	
 	errno = 0;
 err_out:
 	return ntfs_volume_error(errno);
@@ -1809,6 +1820,13 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 			ctx->force = TRUE;
+		} else if (!strcmp(opt, "remove_hiberfile")) {
+			if (val) {
+				ntfs_log_error("'remove_hiberfile' option "
+					       "should not have value.\n");
+				goto err_exit;
+			}
+			ctx->hiberfile = TRUE;
 		} else if (!strcmp(opt, "locale")) {
 			if (!val) {
 				ntfs_log_error("'locale' option should have "
