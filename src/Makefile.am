@@ -39,12 +39,12 @@ endif
 
 install-exec-local:
 	$(INSTALL) -d "$(DESTDIR)$(rootsbindir)"
-	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)$(rootsbindir)/mount.ntfs-3g"
+	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
 
 install-data-local:
 	$(INSTALL) -d "$(DESTDIR)$(man8dir)"
 	$(LN_S) -f ntfs-3g.8 "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
 
 uninstall-local:
-	$(RM) -f "$(DESTDIR)$(rootsbindir)/mount.ntfs-3g"
+	$(RM) -f "$(DESTDIR)/sbin/mount.ntfs-3g"
 	$(RM) -f "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
