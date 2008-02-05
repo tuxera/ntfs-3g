@@ -40,7 +40,6 @@ static const struct fuse_opt fuse_helper_opts[] = {
     FUSE_HELPER_OPT("-f",          foreground),
     FUSE_HELPER_OPT("-s",          singlethread),
     FUSE_HELPER_OPT("fsname=",     nodefault_subtype),
-    FUSE_HELPER_OPT("subtype=",    nodefault_subtype),
 
     FUSE_OPT_KEY("-h",          KEY_HELP),
     FUSE_OPT_KEY("--help",      KEY_HELP),
@@ -50,7 +49,6 @@ static const struct fuse_opt fuse_helper_opts[] = {
     FUSE_OPT_KEY("-d",          FUSE_OPT_KEY_KEEP),
     FUSE_OPT_KEY("debug",       FUSE_OPT_KEY_KEEP),
     FUSE_OPT_KEY("fsname=",     FUSE_OPT_KEY_KEEP),
-    FUSE_OPT_KEY("subtype=",    FUSE_OPT_KEY_KEEP),
     FUSE_OPT_END
 };
 
@@ -118,27 +116,6 @@ static int fuse_helper_opt_proc(void *data, const char *arg, int key,
     }
 }
 
-static int add_default_subtype(const char *progname, struct fuse_args *args)
-{
-    int res;
-    char *subtype_opt;
-    const char *prog_basename = strrchr(progname, '/');
-    if (prog_basename == NULL)
-        prog_basename = progname;
-    else if (prog_basename[1] != '\0')
-        prog_basename++;
-
-    subtype_opt = (char *) malloc(strlen(prog_basename) + 64);
-    if (subtype_opt == NULL) {
-        fprintf(stderr, "fuse: memory allocation failed\n");
-        return -1;
-    }
-    sprintf(subtype_opt, "-osubtype=%s", prog_basename);
-    res = fuse_opt_add_arg(args, subtype_opt);
-    free(subtype_opt);
-    return res;
-}
-
 int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
                        int *multithreaded, int *foreground)
 {
@@ -150,11 +127,6 @@ int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
     if (res == -1)
         return -1;
 
-    if (!hopts.nodefault_subtype) {
-        res = add_default_subtype(args->argv[0], args);
-        if (res == -1)
-            goto err;
-    }
     if (mountpoint)
         *mountpoint = hopts.mountpoint;
     else
@@ -165,10 +137,6 @@ int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
     if (foreground)
         *foreground = hopts.foreground;
     return 0;
-
- err:
-    free(hopts.mountpoint);
-    return -1;
 }
 
 int fuse_daemonize(int foreground)

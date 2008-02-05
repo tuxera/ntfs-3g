@@ -375,7 +375,6 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
     const char *s;
     char *d;
     char *fsname = NULL;
-    char *subtype = NULL;
     char *source = NULL;
     char *type = NULL;
     int blkdev = 0;
@@ -389,13 +388,9 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
     for (s = opts, d = optbuf; *s;) {
         unsigned len;
         const char *fsname_str = "fsname=";
-        const char *subtype_str = "subtype=";
         for (len = 0; s[len] && s[len] != ','; len++);
         if (begins_with(s, fsname_str)) {
             if (!get_string_opt(s, len, fsname_str, &fsname))
-                goto err;
-        } else if (begins_with(s, subtype_str)) {
-            if (!get_string_opt(s, len, subtype_str, &subtype))
                 goto err;
         } else if (opt_eq(s, len, "blkdev")) {
             blkdev = 1;
@@ -448,38 +443,22 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
     sprintf(d, "fd=%i,rootmode=%o,user_id=%i,group_id=%i",
             fd, rootmode, getuid(), getgid());
 
-    source = malloc((fsname ? strlen(fsname) : 0) +
-                    (subtype ? strlen(subtype) : 0) + strlen(dev) + 32);
+    source = malloc((fsname ? strlen(fsname) : 0) + strlen(dev) + 32);
 
-    type = malloc((subtype ? strlen(subtype) : 0) + 32);
+    type = malloc(32);
     if (!type || !source) {
         fprintf(stderr, "%s: failed to allocate memory\n", progname);
         goto err;
     }
 
-    if (subtype)
-        sprintf(type, "%s.%s", blkdev ? "fuseblk" : "fuse", subtype);
-    else
-        strcpy(type, blkdev ? "fuseblk" : "fuse");
+    strcpy(type, blkdev ? "fuseblk" : "fuse");
 
     if (fsname)
         strcpy(source, fsname);
     else
-        strcpy(source, subtype ? subtype : dev);
+        strcpy(source, dev);
 
     res = mount(source, mnt, type, flags, optbuf);
-    if (res == -1 && errno == ENODEV && subtype) {
-        /* Probably missing subtype support */
-        strcpy(type, blkdev ? "fuseblk" : "fuse");
-        if (fsname) {
-            if (!blkdev)
-                sprintf(source, "%s#%s", subtype, fsname);
-        } else {
-            strcpy(source, type);
-        }
-
-        res = mount(source, mnt, type, flags, optbuf);
-    }
     if (res == -1 && errno == EINVAL) {
         /* It could be an old version not supporting group_id */
         sprintf(d, "fd=%i,rootmode=%o,user_id=%i", fd, rootmode, getuid());
@@ -507,7 +486,6 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 
  err:
     free(fsname);
-    free(subtype);
     free(source);
     free(type);
     free(mnt_opts);

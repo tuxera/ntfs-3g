@@ -46,8 +46,6 @@ struct mount_opts {
     int flags;
     int blkdev;
     char *fsname;
-    char *subtype;
-    char *subtype_opt;
     char *mtab_opts;
     char *fusermount_opts;
     char *kernel_opts;
@@ -60,12 +58,10 @@ static const struct fuse_opt fuse_mount_opts[] = {
     FUSE_MOUNT_OPT("allow_root",        allow_root),
     FUSE_MOUNT_OPT("blkdev",            blkdev),
     FUSE_MOUNT_OPT("fsname=%s",         fsname),
-    FUSE_MOUNT_OPT("subtype=%s",        subtype),
     FUSE_OPT_KEY("allow_other",         KEY_KERN_OPT),
     FUSE_OPT_KEY("allow_root",          KEY_ALLOW_ROOT),
     FUSE_OPT_KEY("blkdev",              KEY_FUSERMOUNT_OPT),
     FUSE_OPT_KEY("fsname=",             KEY_FUSERMOUNT_OPT),
-    FUSE_OPT_KEY("subtype=",            KEY_SUBTYPE_OPT),
     FUSE_OPT_KEY("large_read",          KEY_KERN_OPT),
     FUSE_OPT_KEY("blksize=",            KEY_KERN_OPT),
     FUSE_OPT_KEY("default_permissions", KEY_KERN_OPT),
@@ -158,9 +154,6 @@ static int fuse_mount_opt_proc(void *data, const char *arg, int key,
 
     case KEY_FUSERMOUNT_OPT:
         return fuse_opt_add_opt(&mo->fusermount_opts, arg);
-
-    case KEY_SUBTYPE_OPT:
-        return fuse_opt_add_opt(&mo->subtype_opt, arg);
 
     case KEY_MTAB_OPT:
         return fuse_opt_add_opt(&mo->mtab_opts, arg);
@@ -260,35 +253,18 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
         goto out_close;
 
     source = malloc((mo->fsname ? strlen(mo->fsname) : 0) +
-                    (mo->subtype ? strlen(mo->subtype) : 0) +
                     strlen(devname) + 32);
 
-    type = malloc((mo->subtype ? strlen(mo->subtype) : 0) + 32);
+    type = malloc(32);
     if (!type || !source) {
         fprintf(stderr, "fuse: failed to allocate memory\n");
         goto out_close;
     }
 
-    strcpy(type, mo->blkdev ? "fuseblk" : "fuse");
-    if (mo->subtype) {
-        strcat(type, ".");
-        strcat(type, mo->subtype);
-    }
-    strcpy(source,
-           mo->fsname ? mo->fsname : (mo->subtype ? mo->subtype : devname));
+    strcpy(type,   mo->blkdev ? "fuseblk" : "fuse");
+    strcpy(source, mo->fsname ? mo->fsname : devname);
 
     res = mount(source, mnt, type, mo->flags, mo->kernel_opts);
-    if (res == -1 && errno == ENODEV && mo->subtype) {
-        /* Probably missing subtype support */
-        strcpy(type, mo->blkdev ? "fuseblk" : "fuse");
-        if (mo->fsname) {
-            if (!mo->blkdev)
-                sprintf(source, "%s#%s", mo->subtype, mo->fsname);
-        } else {
-            strcpy(source, type);
-        }
-        res = mount(source, mnt, type, mo->flags, mo->kernel_opts);
-    }
     if (res == -1) {
         /*
          * Maybe kernel doesn't support unprivileged mounts, in this
@@ -381,30 +357,12 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
             fuse_opt_add_opt(&mnt_opts, mo.fusermount_opts) == -1)
             goto out;
 
-        if (mo.subtype) {
-            char *tmp_opts = NULL;
-
-            res = -1;
-            if (fuse_opt_add_opt(&tmp_opts, mnt_opts) == -1 ||
-                fuse_opt_add_opt(&tmp_opts, mo.subtype_opt) == -1) {
-                free(tmp_opts);
-                goto out;
-            }
-
-            res = fuse_mount_fusermount(mountpoint, tmp_opts);
-            free(tmp_opts);
-            if (res == -1)
-                res = fuse_mount_fusermount(mountpoint, mnt_opts);
-        } else {
-            res = fuse_mount_fusermount(mountpoint, mnt_opts);
-        }
+        res = fuse_mount_fusermount(mountpoint, mnt_opts);
     }
  out:
     free(mnt_opts);
     free(mo.fsname);
-    free(mo.subtype);
     free(mo.fusermount_opts);
-    free(mo.subtype_opt);
     free(mo.kernel_opts);
     free(mo.mtab_opts);
     return res;
