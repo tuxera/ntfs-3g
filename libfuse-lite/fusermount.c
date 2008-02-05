@@ -366,7 +366,7 @@ static int get_string_opt(const char *s, unsigned len, const char *opt,
 
 static int do_mount(const char *mnt, char **typep, mode_t rootmode,
                     int fd, const char *opts, const char *dev, char **sourcep,
-                    char **mnt_optsp, off_t rootsize)
+                    char **mnt_optsp)
 {
     int res;
     int flags = MS_NOSUID | MS_NODEV;
@@ -717,7 +717,7 @@ static int mount_fuse(const char *mnt, const char *opts)
         restore_privs();
         if (res != -1)
             res = do_mount(real_mnt, &type, stbuf.st_mode & S_IFMT, fd, opts,
-                           dev, &source, &mnt_opts, stbuf.st_size);
+                           dev, &source, &mnt_opts);
     } else
         restore_privs();
 
