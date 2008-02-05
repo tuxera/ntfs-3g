@@ -44,7 +44,6 @@ struct mount_opts {
     int allow_root;
     int ishelp;
     int flags;
-    int nonempty;
     int blkdev;
     char *fsname;
     char *subtype;
@@ -59,13 +58,11 @@ struct mount_opts {
 static const struct fuse_opt fuse_mount_opts[] = {
     FUSE_MOUNT_OPT("allow_other",       allow_other),
     FUSE_MOUNT_OPT("allow_root",        allow_root),
-    FUSE_MOUNT_OPT("nonempty",          nonempty),
     FUSE_MOUNT_OPT("blkdev",            blkdev),
     FUSE_MOUNT_OPT("fsname=%s",         fsname),
     FUSE_MOUNT_OPT("subtype=%s",        subtype),
     FUSE_OPT_KEY("allow_other",         KEY_KERN_OPT),
     FUSE_OPT_KEY("allow_root",          KEY_ALLOW_ROOT),
-    FUSE_OPT_KEY("nonempty",            KEY_FUSERMOUNT_OPT),
     FUSE_OPT_KEY("blkdev",              KEY_FUSERMOUNT_OPT),
     FUSE_OPT_KEY("fsname=",             KEY_FUSERMOUNT_OPT),
     FUSE_OPT_KEY("subtype=",            KEY_SUBTYPE_OPT),
@@ -242,12 +239,6 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
         fprintf(stderr ,"fuse: failed to access mountpoint %s: %s\n",
                 mnt, strerror(errno));
         return -1;
-    }
-
-    if (!mo->nonempty) {
-        res = fuse_mnt_check_empty("fuse", mnt, stbuf.st_mode, stbuf.st_size);
-        if (res == -1)
-            return -1;
     }
 
     fd = open(devname, O_RDWR);
