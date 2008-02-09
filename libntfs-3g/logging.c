@@ -291,7 +291,7 @@ void ntfs_log_set_handler(ntfs_log_handler *handler)
 		ntfs_log.handler = handler;
 #ifdef HAVE_SYSLOG_H
 		if (handler == ntfs_log_handler_syslog)
-			openlog("libntfs", LOG_PID, LOG_USER);
+			openlog("ntfs-3g", LOG_PID, LOG_USER);
 #endif
 	} else
 		ntfs_log.handler = ntfs_log_handler_null;
