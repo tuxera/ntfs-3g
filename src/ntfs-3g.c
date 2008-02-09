@@ -69,7 +69,6 @@
 #include <getopt.h>
 #include <syslog.h>
 #include <sys/wait.h>
-#include <pwd.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -1682,7 +1681,6 @@ static char *parse_mount_options(const char *orig_opts)
 	 * +1		null-terminator
 	 * +21          ,blkdev,blksize=65536
 	 * +20          ,default_permissions
-	 * +70          ,user=<max_64_chars>
 	 * +PATH_MAX	resolved realpath() device name
 	 */
 	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 256 + PATH_MAX);
@@ -2188,27 +2186,6 @@ static void set_fuseblk_options(char *parsed_options)
 	strcat(parsed_options, options);
 }
 
-static void set_user_mount_option(char *parsed_options, uid_t uid)
-{
-	struct passwd *pw;
-	char option[64];
-	
-	if (!uid)
-		return;
-	
-	errno = 0;
-	pw = getpwuid(uid);
-	if (!pw || !pw->pw_name) {
-		ntfs_log_perror("WARNING: could not get username for uid %lld, "
-				"unprivileged unmount may fail", (long long)uid);
-		return;
-	}
-	
-	/* parsed_options already allocated enough space. */
-	snprintf(option, sizeof(option), ",user=%s", pw->pw_name);
-	strcat(parsed_options, option);
-}
-
 #ifndef FUSE_INTERNAL
 static int set_uid(uid_t uid)
 {
@@ -2349,11 +2326,9 @@ int main(int argc, char *argv[])
 	if (err)
 		goto err_out;
 	
-	if (ctx->blkdev) {
-		/* Must do after ntfs_open() to set the right blksize. */
+	/* We must do this after ntfs_open() to be able to set the blksize */
+	if (ctx->blkdev)
 		set_fuseblk_options(parsed_options);
-		set_user_mount_option(parsed_options, getuid());
-	}
 	
 	fh = mount_fuse(parsed_options);
 	if (!fh) {
