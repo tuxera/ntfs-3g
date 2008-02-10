@@ -111,7 +111,8 @@ static int parse_options(int argc, char *argv[])
 				if (!opts.device)
 					return -1;
 				
-				strcpy(opts.device, optarg);
+				strncpy(opts.device, optarg, PATH_MAX);
+				opts.device[PATH_MAX] = 0;
 			} else {
 				ntfs_log_error("%s: You must specify exactly "
 					       "one device\n", EXEC_NAME);

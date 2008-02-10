@@ -1668,74 +1668,98 @@ err_out:
 	
 }
 
+#define STRAPPEND_MAX_INSIZE   8192
+#define strappend_is_large(x) ((x) > STRAPPEND_MAX_INSIZE)
+
+static int strappend(char **dest, const char *append)
+{
+	char *p;
+	size_t size_append, size_dest = 0;
+	
+	if (!dest)
+		return -1;
+	if (!append)
+		return 0;
+
+	size_append = strlen(append);
+	if (*dest)
+		size_dest = strlen(*dest);
+	
+	if (strappend_is_large(size_dest) || strappend_is_large(size_append)) {
+		errno = EOVERFLOW;
+		ntfs_log_perror("%s: Too large input buffer", EXEC_NAME);
+		return -1;
+	}
+	
+	p = realloc(*dest, size_dest + size_append + 1);
+    	if (!p) {
+		ntfs_log_perror("%s: Memory realloction failed", EXEC_NAME);
+		return -1;
+	}
+	
+	*dest = p;
+	strcpy(*dest + size_dest, append);
+	
+	return 0;
+}
+
+static int bogus_option_value(char *val, char *s)
+{
+	if (val) {
+		ntfs_log_error("'%s' option shouldn't have value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
+static int missing_option_value(char *val, char *s)
+{
+	if (!val) {
+		ntfs_log_error("'%s' option should have a value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
 static char *parse_mount_options(const char *orig_opts)
 {
-	char *options, *s, *opt, *val, *ret;
+	char *options, *s, *opt, *val, *ret = NULL;
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
 
-	/*
-	 * FIXME: This is not pretty ...
-	 * +7		fsname=
-	 * +1		comma
-	 * +1		null-terminator
-	 * +21          ,blkdev,blksize=65536
-	 * +20          ,default_permissions
-	 * +PATH_MAX	resolved realpath() device name
-	 */
-	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 256 + PATH_MAX);
-	if (!ret)
-		return NULL;
-	
-	*ret = 0;
-	options = strdup(orig_opts);
+	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
-		ntfs_log_perror("strdup failed");
+		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
 		return NULL;
 	}
 	
 	ctx->silent = TRUE;
-	
-	ctx->atime = ATIME_RELATIVE;
+	ctx->atime  = ATIME_RELATIVE;
 	
 	s = options;
 	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "ro")) { /* Read-only mount. */
-			if (val) {
-				ntfs_log_error("'ro' option should not have "
-						"value.\n");
+			if (bogus_option_value(val, "ro"))
 				goto err_exit;
-			}
 			ctx->ro = TRUE;
-			strcat(ret, "ro,");
-		} else if (!strcmp(opt, "noatime")) {
-			if (val) {
-				ntfs_log_error("'noatime' option should not "
-						"have value.\n");
+			if (strappend(&ret, "ro,"))
 				goto err_exit;
-			}
+		} else if (!strcmp(opt, "noatime")) {
+			if (bogus_option_value(val, "noatime"))
+				goto err_exit;
 			ctx->atime = ATIME_DISABLED;
 		} else if (!strcmp(opt, "atime")) {
-			if (val) {
-				ntfs_log_error("'atime' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "atime"))
 				goto err_exit;
-			}
 			ctx->atime = ATIME_ENABLED;
 		} else if (!strcmp(opt, "relatime")) {
-			if (val) {
-				ntfs_log_error("'relatime' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "relatime"))
 				goto err_exit;
-			}
 			ctx->atime = ATIME_RELATIVE;
 		} else if (!strcmp(opt, "fake_rw")) {
-			if (val) {
-				ntfs_log_error("'fake_rw' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "fake_rw"))
 				goto err_exit;
-			}
 			ctx->ro = TRUE;
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
 			/*
@@ -1745,100 +1769,64 @@ static char *parse_mount_options(const char *orig_opts)
 			ntfs_log_error("'fsname' is unsupported option.\n");
 			goto err_exit;
 		} else if (!strcmp(opt, "no_def_opts")) {
-			if (val) {
-				ntfs_log_error("'no_def_opts' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "no_def_opts"))
 				goto err_exit;
-			}
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "default_permissions")) {
 			default_permissions = 1;
 		} else if (!strcmp(opt, "umask")) {
-			if (!val) {
-				ntfs_log_error("'umask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "umask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 			if (ctx->fmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "fmask")) {
-			if (!val) {
-				ntfs_log_error("'fmask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "fmask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->fmask);
 			if (ctx->fmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "dmask")) {
-			if (!val) {
-				ntfs_log_error("'dmask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "dmask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->dmask);
 			if (ctx->dmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "uid")) {
-			if (!val) {
-				ntfs_log_error("'uid' option should have "
-						"value.\n");
+			if (missing_option_value(val, "uid"))
 				goto err_exit;
-			}
 			sscanf(val, "%i", &ctx->uid);
 		       	default_permissions = 1;
 		} else if (!strcmp(opt, "gid")) {
-			if (!val) {
-				ntfs_log_error("'gid' option should have "
-						"value.\n");
+			if (missing_option_value(val, "gid"))
 				goto err_exit;
-			}
 			sscanf(val, "%i", &ctx->gid);
 		       	default_permissions = 1;
 		} else if (!strcmp(opt, "show_sys_files")) {
-			if (val) {
-				ntfs_log_error("'show_sys_files' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
-			}
 			ctx->show_sys_files = TRUE;
 		} else if (!strcmp(opt, "silent")) {
-			if (val) {
-				ntfs_log_error("'silent' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "silent"))
 				goto err_exit;
-			}
 			ctx->silent = TRUE;
 		} else if (!strcmp(opt, "force")) {
-			if (val) {
-				ntfs_log_error("'force' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "force"))
 				goto err_exit;
-			}
 			ctx->force = TRUE;
 		} else if (!strcmp(opt, "remove_hiberfile")) {
-			if (val) {
-				ntfs_log_error("'remove_hiberfile' option "
-					       "should not have value.\n");
+			if (bogus_option_value(val, "remove_hiberfile"))
 				goto err_exit;
-			}
 			ctx->hiberfile = TRUE;
 		} else if (!strcmp(opt, "locale")) {
-			if (!val) {
-				ntfs_log_error("'locale' option should have "
-						"value.\n");
+			if (missing_option_value(val, "locale"))
 				goto err_exit;
-			}
 			if (!setlocale(LC_ALL, val))
 				ntfs_log_error(locale_msg, val);
 		} else if (!strcmp(opt, "streams_interface")) {
-			if (!val) {
-				ntfs_log_error("'streams_interface' option "
-						"should have value.\n");
+			if (missing_option_value(val, "streams_interface"))
 				goto err_exit;
-			}
 			if (!strcmp(val, "none"))
 				ctx->streams = NF_STREAMS_INTERFACE_NONE;
 			else if (!strcmp(val, "xattr"))
@@ -1853,20 +1841,14 @@ static char *parse_mount_options(const char *orig_opts)
 		} else if (!strcmp(opt, "noauto")) {
 			/* Don't pass noauto option to fuse. */
 		} else if (!strcmp(opt, "debug")) {
-			if (val) {
-				ntfs_log_error("'debug' option should not have "
-						"value.\n");
+			if (bogus_option_value(val, "debug"))
 				goto err_exit;
-			}
 			ctx->debug = TRUE;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
 		} else if (!strcmp(opt, "no_detach")) {
-			if (val) {
-				ntfs_log_error("'no_detach' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "no_detach"))
 				goto err_exit;
-			}
 			ctx->no_detach = TRUE;
 		} else if (!strcmp(opt, "remount")) {
 			ntfs_log_error("Remounting is not supported at present."
@@ -1877,28 +1859,35 @@ static char *parse_mount_options(const char *orig_opts)
 			ntfs_log_info("WARNING: blksize option is ignored "
 				      "because ntfs-3g must calculate it.\n");
 		} else { /* Probably FUSE option. */
-			strcat(ret, opt);
+			if (strappend(&ret, opt))
+				goto err_exit;
 			if (val) {
-				strcat(ret, "=");
-				strcat(ret, val);
+				if (strappend(&ret, "="))
+					goto err_exit;
+				if (strappend(&ret, val))
+					goto err_exit;
 			}
-			strcat(ret, ",");
+			if (strappend(&ret, ","))
+				goto err_exit;
 		}
 	}
-	if (!no_def_opts)
-		strcat(ret, def_opts);
-	if (default_permissions)
-		strcat(ret, "default_permissions,");
+	if (!no_def_opts && strappend(&ret, def_opts))
+		goto err_exit;
+	if (default_permissions && strappend(&ret, "default_permissions,"))
+		goto err_exit;
 	
+	s = "noatime,";
 	if (ctx->atime == ATIME_RELATIVE)
-		strcat(ret, "relatime,");
+		s = "relatime,";
 	else if (ctx->atime == ATIME_ENABLED)
-		strcat(ret, "atime,");
-	else
-		strcat(ret, "noatime,");
+		s = "atime,";
+	if (strappend(&ret, s))
+		goto err_exit;
 	
-	strcat(ret, "fsname=");
-	strcat(ret, opts.device);
+	if (strappend(&ret, "fsname="))
+		goto err_exit;
+	if (strappend(&ret, opts.device))
+		goto err_exit;
 exit:
 	free(options);
 	return ret;
@@ -1923,35 +1912,6 @@ static char *realpath(const char *path, char *resolved_path)
 	return resolved_path;
 }
 #endif
-
-static int strappend(char **dest, const char *append)
-{
-	char *p;
-	size_t size;
-	
-	if (!dest)
-		return -1;
-	if (!append)
-		return 0;
-	
-	size = strlen(append) + 1;
-	if (*dest)
-		size += strlen(*dest);
-	
-	p = realloc(*dest, size);
-    	if (!p) {
-		ntfs_log_perror("Memory realloction failed");
-		return -1;
-	}
-	
-	if (*dest)
-		strcat(p, append);
-	else
-		strcpy(p, append);
-	*dest = p;
-	
-	return 0;
-}
 
 /**
  * parse_options - Read and validate the programs command line
@@ -1981,18 +1941,14 @@ static int parse_options(int argc, char *argv[])
 				if (!opts.device)
 					return -1;
 				
-				/* We don't want relative path in /etc/mtab. */
-				if (optarg[0] != '/') {
-					if (!realpath(optarg, opts.device)) {
-						ntfs_log_perror("%s: "
-							"Cannot mount '%s'", 
-							EXEC_NAME, optarg);
-						free(opts.device);
-						opts.device = NULL;
-						return -1;
-					}
-				} else
-					strcpy(opts.device, optarg);
+				/* Canonicalize device name (mtab, etc) */
+				if (!realpath(optarg, opts.device)) {
+					ntfs_log_perror("%s: realpath failed "
+						"for '%s'", EXEC_NAME, optarg);
+					free(opts.device);
+					opts.device = NULL;
+					return -1;
+				}
 			} else if (!opts.mnt_point) {
 				opts.mnt_point = optarg;
 			} else {
@@ -2168,7 +2124,7 @@ free_args:
 		
 }
 		
-static void set_fuseblk_options(char *parsed_options)
+static int set_fuseblk_options(char **parsed_options)
 {
 	char options[64];
 	long pagesize; 
@@ -2181,9 +2137,10 @@ static void set_fuseblk_options(char *parsed_options)
 	if (blksize > (u32)pagesize)
 		blksize = pagesize;
 	
-	/* parsed_options already allocated enough space. */
 	snprintf(options, sizeof(options), ",blkdev,blksize=%u", blksize);
-	strcat(parsed_options, options);
+	if (strappend(parsed_options, options))
+		return -1;
+	return 0;
 }
 
 #ifndef FUSE_INTERNAL
@@ -2299,7 +2256,7 @@ int main(int argc, char *argv[])
 	if (ntfs_fuse_init())
 		return NTFS_VOLUME_OUT_OF_MEMORY;
 	
-	parsed_options = parse_mount_options(opts.options ? opts.options : "");
+	parsed_options = parse_mount_options(opts.options);
 	if (!parsed_options) {
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
@@ -2327,8 +2284,8 @@ int main(int argc, char *argv[])
 		goto err_out;
 	
 	/* We must do this after ntfs_open() to be able to set the blksize */
-	if (ctx->blkdev)
-		set_fuseblk_options(parsed_options);
+	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
+		goto err_out;
 	
 	fh = mount_fuse(parsed_options);
 	if (!fh) {
