@@ -1,7 +1,7 @@
 .\" Copyright (c) 2008 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G.PROBE 8 "January 2008" "ntfs-3g.probe @VERSION@"
+.TH NTFS-3G.PROBE 8 "February 2008" "ntfs-3g.probe @VERSION@"
 .SH NAME
 ntfs-3g.probe \- Probe an NTFS volume mountability
 .SH SYNOPSIS
@@ -43,9 +43,14 @@ The volume doesn't have a valid NTFS.
 Inconsistent NTFS, hardware or device driver fault, or unsetup 
 SoftRAID/FakeRAID hardware. 
 .IP 14
-The NTFS partition is hibernated.
+The NTFS partition is hibernated. Use the 'remove_hiberfile'
+.B ntfs-3g
+mount option to be able to read-write mount such volumes.
 .IP 15
-The volume was not cleanly unmounted. 
+The volume was not cleanly unmounted. The 'force'
+.B ntfs-3g
+mount option can overcome this scenario by resetting the NTFS
+journal file.
 .IP 16
 The volume is already exclusively opened and in use by a kernel
 driver or software.
