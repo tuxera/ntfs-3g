@@ -201,16 +201,6 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
     fusermount(1, 0, 1, "", mountpoint);
 }
 
-static int fuse_mount_fusermount(const char *mountpoint, const char *opts)
-{
-	if (!mountpoint) {
-		fprintf(stderr, "fuse: missing mountpoint\n");
-		return -1;
-	}
-
-	return fusermount(0, 0, 0, opts ? opts : "", mountpoint);
-}
-
 static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
                           const char *mnt_opts)
 {
@@ -357,7 +347,7 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
             fuse_opt_add_opt(&mnt_opts, mo.fusermount_opts) == -1)
             goto out;
 
-        res = fuse_mount_fusermount(mountpoint, mnt_opts);
+	res = fusermount(0, 0, 0, mnt_opts ? mnt_opts : "", mountpoint);
     }
  out:
     free(mnt_opts);
