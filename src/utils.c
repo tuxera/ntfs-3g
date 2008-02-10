@@ -100,7 +100,7 @@ static const char *forced_mount_msg =
 "\n"
 "    Or add the option to the relevant row in the /etc/fstab file:\n"
 "\n"
-"            %s %s ntfs-3g defaults,force 0 0\n";
+"            %s %s ntfs-3g force 0 0\n";
 
 /**
  * utils_set_locale
