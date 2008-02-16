@@ -1968,8 +1968,8 @@ static int parse_options(int argc, char *argv[])
 				
 				/* Canonicalize device name (mtab, etc) */
 				if (!realpath(optarg, opts.device)) {
-					ntfs_log_perror("%s: realpath failed "
-						"for '%s'", EXEC_NAME, optarg);
+					ntfs_log_perror("%s: Failed to access "
+					     "volume '%s'", EXEC_NAME, optarg);
 					free(opts.device);
 					opts.device = NULL;
 					return -1;
@@ -2250,7 +2250,8 @@ int main(int argc, char *argv[])
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
-		usage();
+		ntfs_log_error("Please type '%s --help' for more "
+			       "information.\n", argv[0]);
 		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
