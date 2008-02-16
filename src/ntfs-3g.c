@@ -167,6 +167,24 @@ static const char *usage_msg =
 "\n"
 "%s";
 
+#ifdef FUSE_INTERNAL
+int drop_privs(void);
+int restore_privs(void);
+#else
+/*
+ * setuid and setgid root ntfs-3g denies to start with external FUSE, 
+ * therefore the below functions are no-op in such case.
+ */
+static int drop_privs(void)    { return 0; }
+static int restore_privs(void) { return 0; }
+
+static const char *setuid_msg =
+"Mount is denied because setuid and setgid root ntfs-3g is insecure with an\n"
+"external FUSE library. Either remove the setuid/setgid bit from the binary\n"
+"or rebuild NTFS-3G with integrated FUSE support.\n";
+#endif	
+
+
 /**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
  * @path:	path to check
@@ -2143,35 +2161,11 @@ static int set_fuseblk_options(char **parsed_options)
 	return 0;
 }
 
-#ifndef FUSE_INTERNAL
-static int set_uid(uid_t uid)
-{
-	if (setuid(uid)) {
-		ntfs_log_perror("Failed to set uid to %d", uid);
-		return NTFS_VOLUME_NO_PRIVILEGE;
-	}
-	return NTFS_VOLUME_OK;
-}
-#endif	
-
 static struct fuse *mount_fuse(char *parsed_options)
 {
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-#ifndef FUSE_INTERNAL
-	uid_t uid, euid;
 	
-	/* 
-	 * We must raise privilege if possible, otherwise the user[s] fstab 
-	 * option doesn't work because mount(8) always drops privilege what 
-	 * the blkdev option requires.
-	 */
-	uid  = getuid();
-	euid = geteuid();
-	
-	if (set_uid(euid))
-		return NULL;
-#endif	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
@@ -2194,15 +2188,6 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_set_signal_handlers(fuse_get_session(fh)))
 		goto err_destory;
-	/* 
-	 * We can't drop privilege if internal FUSE is used because internal 
-	 * unmount needs it. Kernel 2.6.25 may include unprivileged full 
-	 * mount/unmount support.
-	 */
-#ifndef FUSE_INTERNAL
-	if (set_uid(uid))
-		goto err_destory;
-#endif	
 out:
 	fuse_opt_free_args(&args);
 	return fh;
@@ -2245,6 +2230,15 @@ int main(int argc, char *argv[])
 	struct stat sbuf;
 	int err;
 
+#ifndef FUSE_INTERNAL
+	if ((getuid() != geteuid()) || (getgid() != getegid())) {
+		fprintf(stderr, "%s", setuid_msg);
+		return NTFS_VOLUME_INSECURE;
+	}
+#endif
+	if (drop_privs())
+		return NTFS_VOLUME_NO_PRIVILEGE;
+	
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
@@ -2264,10 +2258,18 @@ int main(int argc, char *argv[])
 	
 #if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
+
+	err = NTFS_VOLUME_NO_PRIVILEGE;
+	if (restore_privs())
+		goto err_out;
+
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
 	
 	create_dev_fuse();
+
+	if (drop_privs())
+		goto err_out;
 #endif	
 	
 	if (stat(opts.device, &sbuf)) {

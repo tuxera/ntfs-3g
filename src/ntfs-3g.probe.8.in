@@ -64,6 +64,8 @@ Not enough privilege to mount.
 Out of memory.
 .IP 21
 Unclassified FUSE error.
+.IP 22
+Security hazard. Execution is denied because it would be exploitable.
 .SH KNOWN ISSUES
 Please see 
 .RS

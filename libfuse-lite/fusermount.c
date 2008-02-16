@@ -26,6 +26,7 @@
 #include <sys/fsuid.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
+#include <grp.h>
 
 #define FUSE_DEV_NEW "/dev/fuse"
 #define FUSE_CONF "/etc/fuse.conf"
@@ -50,23 +51,85 @@ static const char *get_user_name(void)
     }
 }
 
-static uid_t oldfsuid;
-static gid_t oldfsgid;
-
-static void drop_privs(void)
+int drop_privs(void)
 {
-    if (getuid() != 0) {
-        oldfsuid = setfsuid(getuid());
-        oldfsgid = setfsgid(getgid());
-    }
+	if (!geteuid()) {
+		if (setgroups(0, NULL) < 0) {
+			perror("priv drop: setgroups failed");
+			return -1;
+		}
+	}
+	
+	if (!getegid()) {
+
+		gid_t new_gid = getgid();
+
+		if (setresgid(-1, new_gid, getegid()) < 0) {
+			perror("priv drop: setresgid failed");
+			return -1;
+		}
+		if (getegid() != new_gid){
+			perror("dropping group privilege failed");
+			return -1;
+		}
+	}
+	
+	if (!geteuid()) {
+
+		uid_t new_uid = getuid();
+
+		if (setresuid(-1, new_uid, geteuid()) < 0) {
+			perror("priv drop: setresuid failed");
+			return -1;
+		}
+		if (geteuid() != new_uid){
+			perror("dropping user privilege failed");
+			return -1;
+		}
+	}
+	
+	return 0;
 }
 
-static void restore_privs(void)
+int restore_privs(void)
 {
-    if (getuid() != 0) {
-        setfsuid(oldfsuid);
-        setfsgid(oldfsgid);
-    }
+	if (geteuid()) {
+		
+		uid_t ruid, euid, suid;
+
+		if (getresuid(&ruid, &euid, &suid) < 0) {
+			perror("priv restore: getresuid failed");
+			return -1;
+		}
+		if (setresuid(-1, suid, -1) < 0) {
+			perror("priv restore: setresuid failed");
+			return -1;
+		}
+		if (geteuid() != suid) {
+			perror("restoring privilege failed");
+			return -1;
+		}
+	}
+
+	if (getegid()) {
+
+		gid_t rgid, egid, sgid;
+
+		if (getresgid(&rgid, &egid, &sgid) < 0) {
+			perror("priv restore: getresgid failed");
+			return -1;
+		}
+		if (setresgid(-1, sgid, -1) < 0) {
+			perror("priv restore: setresgid failed");
+			return -1;
+		}
+		if (getegid() != sgid){
+			perror("restoring group privilege failed");
+			return -1;
+		}
+	}
+	
+	return 0;
 }
 
 #ifndef IGNORE_MTAB
@@ -74,66 +137,6 @@ static int add_mount(const char *source, const char *mnt, const char *type,
                      const char *opts)
 {
     return fuse_mnt_add_mount(progname, source, mnt, type, opts);
-}
-
-static int unmount_fuse(const char *mnt, int quiet, int lazy)
-{
-    if (getuid() != 0) {
-        struct mntent *entp;
-        FILE *fp;
-        const char *user = NULL;
-        char uidstr[32];
-        unsigned uidlen = 0;
-        int found;
-        const char *mtab = _PATH_MOUNTED;
-
-        user = get_user_name();
-        if (user == NULL)
-            return -1;
-
-        fp = setmntent(mtab, "r");
-        if (fp == NULL) {
-            fprintf(stderr, "%s: failed to open %s: %s\n", progname, mtab,
-                    strerror(errno));
-            return -1;
-        }
-
-        uidlen = sprintf(uidstr, "%u", getuid());
-
-        found = 0;
-        while ((entp = getmntent(fp)) != NULL) {
-            if (!found && strcmp(entp->mnt_dir, mnt) == 0 &&
-                (strcmp(entp->mnt_type, "fuse") == 0 ||
-                 strcmp(entp->mnt_type, "fuseblk") == 0 ||
-                 strncmp(entp->mnt_type, "fuse.", 5) == 0 ||
-                 strncmp(entp->mnt_type, "fuseblk.", 8) == 0)) {
-                char *p = strstr(entp->mnt_opts, "user=");
-                if (p && (p == entp->mnt_opts || *(p-1) == ',') &&
-                    strcmp(p + 5, user) == 0) {
-                    found = 1;
-                    break;
-                }
-                /* /etc/mtab is a link pointing to /proc/mounts: */
-                else if ((p = strstr(entp->mnt_opts, "user_id=")) &&
-                         (p == entp->mnt_opts || *(p-1) == ',') &&
-                         strncmp(p + 8, uidstr, uidlen) == 0 &&
-                         (*(p+8+uidlen) == ',' || *(p+8+uidlen) == '\0')) {
-                    found = 1;
-                    break;
-                }
-            }
-        }
-        endmntent(fp);
-
-        if (!found) {
-            if (!quiet)
-                fprintf(stderr, "%s: entry for %s not found in %s\n", progname,
-                        mnt, mtab);
-            return -1;
-        }
-    }
-
-    return fuse_mnt_umount(progname, mnt, lazy);
 }
 
 static int count_fuse_fs(void)
@@ -171,11 +174,6 @@ static int add_mount(const char *source, const char *mnt, const char *type,
     (void) type;
     (void) opts;
     return 0;
-}
-
-static int unmount_fuse(const char *mnt, int quiet, int lazy)
-{
-    return fuse_mnt_umount(progname, mnt, lazy);
 }
 #endif /* IGNORE_MTAB */
 
@@ -458,12 +456,19 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
     else
         strcpy(source, dev);
 
+    if (restore_privs())
+	goto err;
+    
     res = mount(source, mnt, type, flags, optbuf);
     if (res == -1 && errno == EINVAL) {
         /* It could be an old version not supporting group_id */
         sprintf(d, "fd=%i,rootmode=%o,user_id=%i", fd, rootmode, getuid());
         res = mount(source, mnt, type, flags, optbuf);
     }
+    
+    if (drop_privs())
+	goto err;
+    
     if (res == -1) {
         int errno_save = errno;
         if (blkdev && errno == ENODEV && !fuse_mnt_check_fuseblk())
@@ -471,8 +476,9 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 	else {
             fprintf(stderr, "%s: mount failed: %s\n", progname, strerror(errno_save));
 	    if (errno_save == EPERM)
-		    fprintf(stderr, "No privilege to mount. Please see "
-			    "http://ntfs-3g.org/support.html#useroption\n");
+		    fprintf(stderr, "User doesn't have privilege to mount. "
+			    "For more information\nplease see: "
+			    "http://ntfs-3g.org/support.html#unprivileged\n");
 	}
 	goto err;
     } else {
@@ -629,24 +635,20 @@ static int mount_fuse(const char *mnt, const char *opts)
     if (fd == -1)
         return -1;
 
-    drop_privs();
     read_conf();
 
     if (getuid() != 0 && mount_max != -1) {
-        int mount_count = count_fuse_fs();
-        if (mount_count >= mount_max) {
+        if (count_fuse_fs() >= mount_max) {
             fprintf(stderr, "%s: too many FUSE filesystems mounted; "
 		    "mount_max=N can be set in /etc/fuse.conf\n", progname);
-            close(fd);
-            return -1;
+	    goto err;
         }
     }
 
     res = check_perm(&real_mnt, &stbuf, &currdir_fd, &mountpoint_fd);
-    restore_privs();
     if (res != -1)
-        res = do_mount(real_mnt, &type, stbuf.st_mode & S_IFMT, fd, opts, dev, 
-		       &source, &mnt_opts);
+         res = do_mount(real_mnt, &type, stbuf.st_mode & S_IFMT, fd, opts, dev,
+			&source, &mnt_opts);
 
     if (currdir_fd != -1) {
         fchdir(currdir_fd);
@@ -655,59 +657,69 @@ static int mount_fuse(const char *mnt, const char *opts)
     if (mountpoint_fd != -1)
         close(mountpoint_fd);
 
-    if (res == -1) {
-        close(fd);
-        return -1;
-    }
+    if (res == -1)
+	goto err;
 
+    if (restore_privs())
+	goto err;
+    
     if (geteuid() == 0) {
         res = add_mount(source, mnt, type, mnt_opts);
         if (res == -1) {
             umount2(mnt, 2); /* lazy umount */
-            close(fd);
-            return -1;
+	    drop_privs();
+	    goto err;
         }
     }
 
+    if (drop_privs())
+	goto err;
+out:    
     free(source);
     free(type);
     free(mnt_opts);
     free(dev);
 
     return fd;
+err:
+    close(fd);
+    fd = -1;
+    goto out;
 }
 
 int fusermount(int unmount, int quiet, int lazy, const char *opts,
 	       const char *origmnt)
 {
-    int res;
+    int res = -1;
     char *mnt;
     mode_t old_umask;
 
-    if (lazy && !unmount) {
-        fprintf(stderr, "%s: -z can only be used with -u\n", progname);
-	return -1;
-    }
-
-    drop_privs();
     mnt = fuse_mnt_resolve_path(progname, origmnt);
-    restore_privs();
     if (mnt == NULL)
 	return -1;
 
     old_umask = umask(033);
+    
     if (unmount) {
+	    
+	if (restore_privs())
+	    goto out;
+	
         if (geteuid() == 0)
-            res = unmount_fuse(mnt, quiet, lazy);
+            res = fuse_mnt_umount(progname, mnt, lazy);
         else {
             res = umount2(mnt, lazy ? 2 : 0);
             if (res == -1 && !quiet)
                 fprintf(stderr, "%s: failed to unmount %s: %s\n", progname,
                         mnt, strerror(errno));
         }
+	
+	if (drop_privs())
+	    res = -1;
+	
     } else
 	    res = mount_fuse(mnt, opts);
-    
+out:    
     umask(old_umask);
     return res;	    
 }

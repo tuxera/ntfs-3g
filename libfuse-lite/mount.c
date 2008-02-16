@@ -189,112 +189,7 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
     }
     close(fd);
 
-    if (geteuid() == 0) {
-        fuse_mnt_umount("fuse", mountpoint, 1);
-        return;
-    }
-
-    res = umount2(mountpoint, 2);
-    if (res == 0)
-        return;
-
     fusermount(1, 0, 1, "", mountpoint);
-}
-
-static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
-                          const char *mnt_opts)
-{
-    char tmp[128];
-    const char *devname = "/dev/fuse";
-    char *source = NULL;
-    char *type = NULL;
-    struct stat stbuf;
-    int fd;
-    int res;
-
-    if (!mnt) {
-        fprintf(stderr, "fuse: missing mountpoint\n");
-        return -1;
-    }
-
-    res = lstat(mnt, &stbuf);
-    if (res == -1) {
-        fprintf(stderr ,"fuse: failed to access mountpoint %s: %s\n",
-                mnt, strerror(errno));
-        return -1;
-    }
-
-    fd = open(devname, O_RDWR);
-    if (fd == -1) {
-        if (errno == ENODEV || errno == ENOENT)
-            fprintf(stderr,
-                    "fuse: device not found, try 'modprobe fuse' first\n");
-        else
-            fprintf(stderr, "fuse: failed to open %s: %s\n", devname,
-                    strerror(errno));
-        return -1;
-    }
-
-    snprintf(tmp, sizeof(tmp),  "fd=%i,rootmode=%o,user_id=%i,group_id=%i", fd,
-             stbuf.st_mode & S_IFMT, getuid(), getgid());
-
-    res = fuse_opt_add_opt(&mo->kernel_opts, tmp);
-    if (res == -1)
-        goto out_close;
-
-    source = malloc((mo->fsname ? strlen(mo->fsname) : 0) +
-                    strlen(devname) + 32);
-
-    type = malloc(32);
-    if (!type || !source) {
-        fprintf(stderr, "fuse: failed to allocate memory\n");
-        goto out_close;
-    }
-
-    strcpy(type,   mo->blkdev ? "fuseblk" : "fuse");
-    strcpy(source, mo->fsname ? mo->fsname : devname);
-
-    res = mount(source, mnt, type, mo->flags, mo->kernel_opts);
-    if (res == -1) {
-        /*
-         * Maybe kernel doesn't support unprivileged mounts, in this
-         * case try falling back to fusermount
-         */
-        if (errno == EPERM) {
-            res = -2;
-        } else {
-            int errno_save = errno;
-            if (mo->blkdev && errno == ENODEV && !fuse_mnt_check_fuseblk())
-                fprintf(stderr, "fuse: 'fuseblk' support missing\n");
-            else
-                fprintf(stderr, "fuse: mount failed: %s\n",
-                        strerror(errno_save));
-        }
-
-        goto out_close;
-    }
-
-    if (geteuid() == 0) {
-        char *newmnt = fuse_mnt_resolve_path("fuse", mnt);
-        res = -1;
-        if (!newmnt)
-            goto out_umount;
-
-        res = fuse_mnt_add_mount("fuse", source, newmnt, type, mnt_opts);
-        free(newmnt);
-        if (res == -1)
-            goto out_umount;
-    }
-
-    return fd;
-
- out_umount:
-    umount2(mnt, 2); /* lazy umount */
- out_close:
-    free(type);
-    free(source);
-    close(fd);
-    return res;
 }
 
 static int get_mnt_flag_opts(char **mnt_optsp, int flags)
@@ -340,16 +235,12 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
         goto out;
     if (mo.mtab_opts &&  fuse_opt_add_opt(&mnt_opts, mo.mtab_opts) == -1)
         goto out;
+    if (mo.fusermount_opts && fuse_opt_add_opt(&mnt_opts, mo.fusermount_opts) < 0)
+        goto out;
 
-    res = fuse_mount_sys(mountpoint, &mo, mnt_opts);
-    if (res == -2) {
-        if (mo.fusermount_opts && 
-            fuse_opt_add_opt(&mnt_opts, mo.fusermount_opts) == -1)
-            goto out;
-
-	res = fusermount(0, 0, 0, mnt_opts ? mnt_opts : "", mountpoint);
-    }
- out:
+    res = fusermount(0, 0, 0, mnt_opts ? mnt_opts : "", mountpoint);
+    
+out:
     free(mnt_opts);
     free(mo.fsname);
     free(mo.fusermount_opts);
