@@ -27,9 +27,7 @@
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
-#define FUSE_DEV_OLD "/proc/fs/fuse/dev"
 #define FUSE_DEV_NEW "/dev/fuse"
-#define FUSE_VERSION_FILE_OLD "/proc/fs/fuse/version"
 #define FUSE_CONF "/etc/fuse.conf"
 
 #ifndef MS_DIRSYNC
@@ -408,14 +406,16 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
                 if (res == 0 &&
                     sscanf(utsname.release, "%u.%u", &kmaj, &kmin) == 2 &&
                     (kmaj > 2 || (kmaj == 2 && kmin > 4))) {
-                    fprintf(stderr, "%s: note: 'large_read' mount option is deprecated for %i.%i kernels\n", progname, kmaj, kmin);
+                    fprintf(stderr, "%s: note: 'large_read' mount option is "
+			    "deprecated for %i.%i kernels\n", progname, kmaj, kmin);
                     skip_option = 1;
                 }
             }
             if (getuid() != 0 && !user_allow_other &&
                 (opt_eq(s, len, "allow_other") ||
                  opt_eq(s, len, "allow_root"))) {
-                fprintf(stderr, "%s: option %.*s only allowed if 'user_allow_other' is set in /etc/fuse.conf\n", progname, len, s);
+                fprintf(stderr, "%s: option %.*s only allowed if 'user_allow_other'"
+			" is set in /etc/fuse.conf\n", progname, len, s);
                 goto err;
             }
             if (!skip_option) {
@@ -491,36 +491,6 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
     free(mnt_opts);
     free(optbuf);
     return -1;
-}
-
-static int check_version(const char *dev)
-{
-    int res;
-    int majorver;
-    int minorver;
-    const char *version_file;
-    FILE *vf;
-
-    if (strcmp(dev, FUSE_DEV_OLD) != 0)
-        return 0;
-
-    version_file = FUSE_VERSION_FILE_OLD;
-    vf = fopen(version_file, "r");
-    if (vf == NULL) {
-        fprintf(stderr, "%s: kernel interface too old\n", progname);
-        return -1;
-    }
-    res = fscanf(vf, "%i.%i", &majorver, &minorver);
-    fclose(vf);
-    if (res != 2) {
-        fprintf(stderr, "%s: error reading %s\n", progname, version_file);
-        return -1;
-    }
-     if (majorver < 3) {
-        fprintf(stderr, "%s: kernel interface too old\n", progname);
-        return -1;
-    }
-    return 0;
 }
 
 static int check_perm(const char **mntp, struct stat *stbuf, int *currdir_fd,
@@ -607,7 +577,7 @@ static int check_perm(const char **mntp, struct stat *stbuf, int *currdir_fd,
     return 0;
 }
 
-static int try_open(const char *dev, char **devp, int silent)
+static int try_open(const char *dev, char **devp)
 {
     int fd = open(dev, O_RDWR);
     if (fd != -1) {
@@ -620,39 +590,22 @@ static int try_open(const char *dev, char **devp, int silent)
     } else if (errno == ENODEV ||
                errno == ENOENT) /* check for ENOENT too, for the udev case */
         return -2;
-    else if (!silent) {
+    else {
         fprintf(stderr, "%s: failed to open %s: %s\n", progname, dev,
                 strerror(errno));
     }
     return fd;
 }
 
-static int try_open_fuse_device(char **devp)
-{
-    int fd;
-    int err;
-
-    drop_privs();
-    fd = try_open(FUSE_DEV_NEW, devp, 0);
-    restore_privs();
-    if (fd >= 0)
-        return fd;
-
-    err = fd;
-    fd = try_open(FUSE_DEV_OLD, devp, 1);
-    if (fd >= 0)
-        return fd;
-
-    return err;
-}
-
 static int open_fuse_device(char **devp)
 {
-    int fd = try_open_fuse_device(devp);
+    int fd;
+
+    fd = try_open(FUSE_DEV_NEW, devp);
     if (fd >= -1)
         return fd;
 
-    fprintf(stderr, "%s: fuse device not found, try 'modprobe fuse' first\n",
+    fprintf(stderr, "%s: fuse device is missing, try 'modprobe fuse' as root\n",
             progname);
 
     return -1;
@@ -689,15 +642,11 @@ static int mount_fuse(const char *mnt, const char *opts)
         }
     }
 
-    res = check_version(dev);
-    if (res != -1) {
-        res = check_perm(&real_mnt, &stbuf, &currdir_fd, &mountpoint_fd);
-        restore_privs();
-        if (res != -1)
-            res = do_mount(real_mnt, &type, stbuf.st_mode & S_IFMT, fd, opts,
-                           dev, &source, &mnt_opts);
-    } else
-        restore_privs();
+    res = check_perm(&real_mnt, &stbuf, &currdir_fd, &mountpoint_fd);
+    restore_privs();
+    if (res != -1)
+        res = do_mount(real_mnt, &type, stbuf.st_mode & S_IFMT, fd, opts, dev, 
+		       &source, &mnt_opts);
 
     if (currdir_fd != -1) {
         fchdir(currdir_fd);
