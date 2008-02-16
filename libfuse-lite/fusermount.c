@@ -40,6 +40,9 @@ static const char *progname = "ntfs-3g-mount";
 static int user_allow_other = 0;
 static int mount_max = 1000;
 
+int drop_privs(void);
+int restore_privs(void);
+
 static const char *get_user_name(void)
 {
     struct passwd *pw = getpwuid(getuid());

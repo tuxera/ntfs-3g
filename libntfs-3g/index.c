@@ -1763,7 +1763,7 @@ out:
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-int ntfs_index_rm(ntfs_index_context *icx)
+static int ntfs_index_rm(ntfs_index_context *icx)
 {
 	INDEX_HEADER *ih;
 	int err, ret = STATUS_OK;

@@ -1728,7 +1728,7 @@ static int strappend(char **dest, const char *append)
 	return 0;
 }
 
-static int bogus_option_value(char *val, char *s)
+static int bogus_option_value(char *val, const char *s)
 {
 	if (val) {
 		ntfs_log_error("'%s' option shouldn't have value.\n", s);
@@ -1737,7 +1737,7 @@ static int bogus_option_value(char *val, char *s)
 	return 0;
 }
 
-static int missing_option_value(char *val, char *s)
+static int missing_option_value(char *val, const char *s)
 {
 	if (!val) {
 		ntfs_log_error("'%s' option should have a value.\n", s);
@@ -1901,12 +1901,11 @@ static char *parse_mount_options(const char *orig_opts)
 	if (default_permissions && strappend(&ret, "default_permissions,"))
 		goto err_exit;
 	
-	s = "noatime,";
-	if (ctx->atime == ATIME_RELATIVE)
-		s = "relatime,";
-	else if (ctx->atime == ATIME_ENABLED)
-		s = "atime,";
-	if (strappend(&ret, s))
+	if (ctx->atime == ATIME_RELATIVE && strappend(&ret, "relatime,"))
+		goto err_exit;
+	else if (ctx->atime == ATIME_ENABLED && strappend(&ret, "atime,"))
+		goto err_exit;
+	else if (strappend(&ret, "noatime,"))
 		goto err_exit;
 	
 	if (strappend(&ret, "fsname="))
