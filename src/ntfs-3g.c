@@ -179,9 +179,16 @@ static int drop_privs(void)    { return 0; }
 static int restore_privs(void) { return 0; }
 
 static const char *setuid_msg =
-"Mount is denied because setuid and setgid root ntfs-3g is insecure with an\n"
+"Mount is denied because setuid and setgid root ntfs-3g is insecure with the\n"
 "external FUSE library. Either remove the setuid/setgid bit from the binary\n"
-"or rebuild NTFS-3G with integrated FUSE support.\n";
+"or rebuild NTFS-3G with integrated FUSE support and make it setuid root.\n"
+"Please see more information at http://ntfs-3g.org/support.html#unprivileged\n";
+
+static const char *unpriv_fuseblk_msg =
+"Unprivileged user can not mount NTFS block devices using the external FUSE\n"
+"library. Either mount the volume as root, or rebuild NTFS-3G with integrated\n"
+"FUSE support and make it setuid root. Please see more information at\n"
+"http://ntfs-3g.org/support.html#unprivileged\n";
 #endif	
 
 
@@ -2247,8 +2254,10 @@ int main(int argc, char *argv[])
 		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
-	if (ntfs_fuse_init())
-		return NTFS_VOLUME_OUT_OF_MEMORY;
+	if (ntfs_fuse_init()) {
+		err = NTFS_VOLUME_OUT_OF_MEMORY;
+		goto err2;
+	}
 	
 	parsed_options = parse_mount_options(opts.options);
 	if (!parsed_options) {
@@ -2281,6 +2290,12 @@ int main(int argc, char *argv[])
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
 
+#ifndef FUSE_INTERNAL
+	if (getuid() && ctx->blkdev) {
+		ntfs_log_error("%s", unpriv_fuseblk_msg);
+		goto err2;
+	}
+#endif
 	err = ntfs_open(opts.device);
 	if (err)
 		goto err_out;
@@ -2311,6 +2326,7 @@ int main(int argc, char *argv[])
 	fuse_destroy(fh);
 err_out:
 	utils_mount_error(opts.device, opts.mnt_point, err);
+err2:
 	ntfs_close();
 	free(ctx);
 	free(parsed_options);
