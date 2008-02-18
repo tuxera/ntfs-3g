@@ -1493,7 +1493,6 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 		ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 {
 	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_index_context *ictx = NULL;
 	FILE_NAME_ATTR *fn = NULL;
 	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
 	BOOL case_sensitive_match = TRUE;
@@ -1593,19 +1592,7 @@ search:
 	if (ntfs_check_unlinkable_dir(ni, fn) < 0)
 		goto err_out;
 		
-	ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
-	if (!ictx)
-		goto err_out;
-	if (ntfs_index_lookup(fn, le32_to_cpu(actx->attr->value_length), ictx))
-		goto err_out;
-	
-	if (((FILE_NAME_ATTR*)ictx->data)->file_attributes &
-			FILE_ATTR_REPARSE_POINT) {
-		errno = EOPNOTSUPP;
-		goto err_out;
-	}
-	
-	if (ntfs_index_rm(ictx))
+	if (ntfs_index_remove(dir_ni, fn, le32_to_cpu(actx->attr->value_length)))
 		goto err_out;
 	
 	if (ntfs_attr_record_rm(actx))
@@ -1676,8 +1663,6 @@ ok:
 out:
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
-	if (ictx)
-		ntfs_index_ctx_put(ictx);
 	if (ntfs_inode_close(dir_ni) && !err)
 		err = errno;
 	if (ntfs_inode_close(ni) && !err)
@@ -1774,22 +1759,11 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	}
 	/* Add FILE_NAME attribute to inode. */
 	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
-		ntfs_index_context *ictx;
-
-		err = errno;
 		ntfs_log_error("Failed to add FILE_NAME attribute.\n");
+		err = errno;
 		/* Try to remove just added attribute from index. */
-		ictx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
-		if (!ictx)
+		if (ntfs_index_remove(dir_ni, fn, fn_len))
 			goto rollback_failed;
-		if (ntfs_index_lookup(fn, fn_len, ictx)) {
-			ntfs_index_ctx_put(ictx);
-			goto rollback_failed;
-		}
-		if (ntfs_index_rm(ictx)) {
-			ntfs_index_ctx_put(ictx);
-			goto rollback_failed;
-		}
 		goto err_out;
 	}
 	/* Increment hard links count. */

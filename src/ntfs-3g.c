@@ -70,7 +70,6 @@
 #include <getopt.h>
 #include <syslog.h>
 #include <sys/wait.h>
-#include <pwd.h>
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -130,6 +129,7 @@ typedef struct {
 	BOOL show_sys_files;
 	BOOL silent;
 	BOOL force;
+	BOOL hiberfile;
 	BOOL debug;
 	BOOL no_detach;
 	BOOL blkdev;
@@ -167,12 +167,38 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
 "\n"
-"Options:  ro, force, locale=, uid=, gid=, umask=, fmask=, dmask=,\n"
-"          streams_interface=. Please see details in the manual.\n"
+"Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
+"          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
+"          Please see the details in the manual.\n"
 "\n"
 "Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
 "\n"
 "%s";
+
+#ifdef FUSE_INTERNAL
+int drop_privs(void);
+int restore_privs(void);
+#else
+/*
+ * setuid and setgid root ntfs-3g denies to start with external FUSE, 
+ * therefore the below functions are no-op in such case.
+ */
+static int drop_privs(void)    { return 0; }
+static int restore_privs(void) { return 0; }
+
+static const char *setuid_msg =
+"Mount is denied because setuid and setgid root ntfs-3g is insecure with the\n"
+"external FUSE library. Either remove the setuid/setgid bit from the binary\n"
+"or rebuild NTFS-3G with integrated FUSE support and make it setuid root.\n"
+"Please see more information at http://ntfs-3g.org/support.html#unprivileged\n";
+
+static const char *unpriv_fuseblk_msg =
+"Unprivileged user can not mount NTFS block devices using the external FUSE\n"
+"library. Either mount the volume as root, or rebuild NTFS-3G with integrated\n"
+"FUSE support and make it setuid root. Please see more information at\n"
+"http://ntfs-3g.org/support.html#unprivileged\n";
+#endif	
+
 
 /**
  * ntfs_fuse_is_named_data_stream - check path to be to named data stream
@@ -1934,6 +1960,8 @@ static int ntfs_open(const char *device)
 		flags |= MS_RDONLY;
 	if (ctx->force)
 		flags |= MS_FORCE;
+	if (ctx->hiberfile)
+		flags |= MS_IGNORE_HIBERFILE;
 
 	ctx->vol = ntfs_mount(device, flags);
 	if (!ctx->vol) {
@@ -1953,81 +1981,111 @@ static int ntfs_open(const char *device)
 		goto err_out;
 	}
 
+	if (ctx->hiberfile && ntfs_volume_check_hiberfile(ctx->vol, 0)) {
+		if (errno != EPERM)
+			goto err_out;
+		if (ntfs_fuse_rm("/hiberfil.sys"))
+			goto err_out;
+	}
+	
 	errno = 0;
 err_out:
 	return ntfs_volume_error(errno);
 	
 }
 
+#define STRAPPEND_MAX_INSIZE   8192
+#define strappend_is_large(x) ((x) > STRAPPEND_MAX_INSIZE)
+
+static int strappend(char **dest, const char *append)
+{
+	char *p;
+	size_t size_append, size_dest = 0;
+	
+	if (!dest)
+		return -1;
+	if (!append)
+		return 0;
+
+	size_append = strlen(append);
+	if (*dest)
+		size_dest = strlen(*dest);
+	
+	if (strappend_is_large(size_dest) || strappend_is_large(size_append)) {
+		errno = EOVERFLOW;
+		ntfs_log_perror("%s: Too large input buffer", EXEC_NAME);
+		return -1;
+	}
+	
+	p = realloc(*dest, size_dest + size_append + 1);
+    	if (!p) {
+		ntfs_log_perror("%s: Memory realloction failed", EXEC_NAME);
+		return -1;
+	}
+	
+	*dest = p;
+	strcpy(*dest + size_dest, append);
+	
+	return 0;
+}
+
+static int bogus_option_value(char *val, const char *s)
+{
+	if (val) {
+		ntfs_log_error("'%s' option shouldn't have value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
+static int missing_option_value(char *val, const char *s)
+{
+	if (!val) {
+		ntfs_log_error("'%s' option should have a value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
 static char *parse_mount_options(const char *orig_opts)
 {
-	char *options, *s, *opt, *val, *ret;
+	char *options, *s, *opt, *val, *ret = NULL;
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
 
-	/*
-	 * FIXME: This is not pretty ...
-	 * +7		fsname=
-	 * +1		comma
-	 * +1		null-terminator
-	 * +21          ,blkdev,blksize=65536
-	 * +20          ,default_permissions
-	 * +70          ,user=<max_64_chars>
-	 * +PATH_MAX	resolved realpath() device name
-	 */
-	ret = ntfs_malloc(strlen(def_opts) + strlen(orig_opts) + 256 + PATH_MAX);
-	if (!ret)
-		return NULL;
-	
-	*ret = 0;
-	options = strdup(orig_opts);
+	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
-		ntfs_log_perror("strdup failed");
+		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
 		return NULL;
 	}
 	
 	ctx->silent = TRUE;
-  	
-	ctx->atime = ATIME_RELATIVE;
-  	
+	ctx->atime  = ATIME_RELATIVE;
+	
 	s = options;
 	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
 		if (!strcmp(opt, "ro")) { /* Read-only mount. */
-			if (val) {
-				ntfs_log_error("'ro' option should not have "
-						"value.\n");
+			if (bogus_option_value(val, "ro"))
 				goto err_exit;
-			}
 			ctx->ro = TRUE;
-			strcat(ret, "ro,");
-		} else if (!strcmp(opt, "noatime")) {
-			if (val) {
-				ntfs_log_error("'noatime' option should not "
-						"have value.\n");
+			if (strappend(&ret, "ro,"))
 				goto err_exit;
-			}
+		} else if (!strcmp(opt, "noatime")) {
+			if (bogus_option_value(val, "noatime"))
+				goto err_exit;
 			ctx->atime = ATIME_DISABLED;
 		} else if (!strcmp(opt, "atime")) {
-			if (val) {
-				ntfs_log_error("'atime' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "atime"))
 				goto err_exit;
-			}
 			ctx->atime = ATIME_ENABLED;
 		} else if (!strcmp(opt, "relatime")) {
-			if (val) {
-				ntfs_log_error("'relatime' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "relatime"))
 				goto err_exit;
-			}
 			ctx->atime = ATIME_RELATIVE;
 		} else if (!strcmp(opt, "fake_rw")) {
-			if (val) {
-				ntfs_log_error("'fake_rw' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "fake_rw"))
 				goto err_exit;
-			}
 			ctx->ro = TRUE;
 		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
 			/*
@@ -2037,93 +2095,64 @@ static char *parse_mount_options(const char *orig_opts)
 			ntfs_log_error("'fsname' is unsupported option.\n");
 			goto err_exit;
 		} else if (!strcmp(opt, "no_def_opts")) {
-			if (val) {
-				ntfs_log_error("'no_def_opts' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "no_def_opts"))
 				goto err_exit;
-			}
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "default_permissions")) {
 			default_permissions = 1;
 		} else if (!strcmp(opt, "umask")) {
-			if (!val) {
-				ntfs_log_error("'umask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "umask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
 			if (ctx->fmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "fmask")) {
-			if (!val) {
-				ntfs_log_error("'fmask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "fmask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->fmask);
 			if (ctx->fmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "dmask")) {
-			if (!val) {
-				ntfs_log_error("'dmask' option should have "
-						"value.\n");
+			if (missing_option_value(val, "dmask"))
 				goto err_exit;
-			}
 			sscanf(val, "%o", &ctx->dmask);
 			if (ctx->dmask)
 				default_permissions = 1;
 		} else if (!strcmp(opt, "uid")) {
-			if (!val) {
-				ntfs_log_error("'uid' option should have "
-						"value.\n");
+			if (missing_option_value(val, "uid"))
 				goto err_exit;
-			}
 			sscanf(val, "%i", &ctx->uid);
 		       	default_permissions = 1;
 		} else if (!strcmp(opt, "gid")) {
-			if (!val) {
-				ntfs_log_error("'gid' option should have "
-						"value.\n");
+			if (missing_option_value(val, "gid"))
 				goto err_exit;
-			}
 			sscanf(val, "%i", &ctx->gid);
 		       	default_permissions = 1;
 		} else if (!strcmp(opt, "show_sys_files")) {
-			if (val) {
-				ntfs_log_error("'show_sys_files' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
-			}
 			ctx->show_sys_files = TRUE;
 		} else if (!strcmp(opt, "silent")) {
-			if (val) {
-				ntfs_log_error("'silent' option should "
-						"not have value.\n");
+			if (bogus_option_value(val, "silent"))
 				goto err_exit;
-			}
 			ctx->silent = TRUE;
 		} else if (!strcmp(opt, "force")) {
-			if (val) {
-				ntfs_log_error("'force' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "force"))
 				goto err_exit;
-			}
 			ctx->force = TRUE;
-		} else if (!strcmp(opt, "locale")) {
-			if (!val) {
-				ntfs_log_error("'locale' option should have "
-						"value.\n");
+		} else if (!strcmp(opt, "remove_hiberfile")) {
+			if (bogus_option_value(val, "remove_hiberfile"))
 				goto err_exit;
-			}
+			ctx->hiberfile = TRUE;
+		} else if (!strcmp(opt, "locale")) {
+			if (missing_option_value(val, "locale"))
+				goto err_exit;
 			if (!setlocale(LC_ALL, val))
 				ntfs_log_error(locale_msg, val);
 		} else if (!strcmp(opt, "streams_interface")) {
-			if (!val) {
-				ntfs_log_error("'streams_interface' option "
-						"should have value.\n");
+			if (missing_option_value(val, "streams_interface"))
 				goto err_exit;
-			}
 			if (!strcmp(val, "none"))
 				ctx->streams = NF_STREAMS_INTERFACE_NONE;
 			else if (!strcmp(val, "xattr"))
@@ -2138,20 +2167,14 @@ static char *parse_mount_options(const char *orig_opts)
 		} else if (!strcmp(opt, "noauto")) {
 			/* Don't pass noauto option to fuse. */
 		} else if (!strcmp(opt, "debug")) {
-			if (val) {
-				ntfs_log_error("'debug' option should not have "
-						"value.\n");
+			if (bogus_option_value(val, "debug"))
 				goto err_exit;
-			}
 			ctx->debug = TRUE;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
 		} else if (!strcmp(opt, "no_detach")) {
-			if (val) {
-				ntfs_log_error("'no_detach' option should not "
-						"have value.\n");
+			if (bogus_option_value(val, "no_detach"))
 				goto err_exit;
-			}
 			ctx->no_detach = TRUE;
 		} else if (!strcmp(opt, "remount")) {
 			ntfs_log_error("Remounting is not supported at present."
@@ -2186,28 +2209,34 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 		} else { /* Probably FUSE option. */
-			strcat(ret, opt);
+			if (strappend(&ret, opt))
+				goto err_exit;
 			if (val) {
-				strcat(ret, "=");
-				strcat(ret, val);
+				if (strappend(&ret, "="))
+					goto err_exit;
+				if (strappend(&ret, val))
+					goto err_exit;
 			}
-			strcat(ret, ",");
+			if (strappend(&ret, ","))
+				goto err_exit;
 		}
 	}
-	if (!no_def_opts)
-		strcat(ret, def_opts);
-	if (default_permissions)
-		strcat(ret, "default_permissions,");
+	if (!no_def_opts && strappend(&ret, def_opts))
+		goto err_exit;
+	if (default_permissions && strappend(&ret, "default_permissions,"))
+		goto err_exit;
 	
-	if (ctx->atime == ATIME_RELATIVE)
-		strcat(ret, "relatime,");
-	else if (ctx->atime == ATIME_ENABLED)
-		strcat(ret, "atime,");
-	else
-		strcat(ret, "noatime,");
+	if (ctx->atime == ATIME_RELATIVE && strappend(&ret, "relatime,"))
+		goto err_exit;
+	else if (ctx->atime == ATIME_ENABLED && strappend(&ret, "atime,"))
+		goto err_exit;
+	else if (strappend(&ret, "noatime,"))
+		goto err_exit;
 	
-	strcat(ret, "fsname=");
-	strcat(ret, opts.device);
+	if (strappend(&ret, "fsname="))
+		goto err_exit;
+	if (strappend(&ret, opts.device))
+		goto err_exit;
 exit:
 	free(options);
 	return ret;
@@ -2232,35 +2261,6 @@ static char *realpath(const char *path, char *resolved_path)
 	return resolved_path;
 }
 #endif
-
-static int strappend(char **dest, const char *append)
-{
-	char *p;
-	size_t size;
-	
-	if (!dest)
-		return -1;
-	if (!append)
-		return 0;
-	
-	size = strlen(append) + 1;
-	if (*dest)
-		size += strlen(*dest);
-	
-	p = realloc(*dest, size);
-    	if (!p) {
-		ntfs_log_perror("Memory realloction failed");
-		return -1;
-	}
-	
-	if (*dest)
-		strcat(p, append);
-	else
-		strcpy(p, append);
-	*dest = p;
-	
-	return 0;
-}
 
 /**
  * parse_options - Read and validate the programs command line
@@ -2290,18 +2290,14 @@ static int parse_options(int argc, char *argv[])
 				if (!opts.device)
 					return -1;
 				
-				/* We don't want relative path in /etc/mtab. */
-				if (optarg[0] != '/') {
-					if (!realpath(optarg, opts.device)) {
-						ntfs_log_perror("%s: "
-							"Cannot mount '%s'", 
-							EXEC_NAME, optarg);
-						free(opts.device);
-						opts.device = NULL;
-						return -1;
-					}
-				} else
-					strcpy(opts.device, optarg);
+				/* Canonicalize device name (mtab, etc) */
+				if (!realpath(optarg, opts.device)) {
+					ntfs_log_perror("%s: Failed to access "
+					     "volume '%s'", EXEC_NAME, optarg);
+					free(opts.device);
+					opts.device = NULL;
+					return -1;
+				}
 			} else if (!opts.mnt_point) {
 				opts.mnt_point = optarg;
 			} else {
@@ -2477,7 +2473,7 @@ free_args:
 		
 }
 		
-static void set_fuseblk_options(char *parsed_options)
+static int set_fuseblk_options(char **parsed_options)
 {
 	char options[64];
 	long pagesize; 
@@ -2490,61 +2486,17 @@ static void set_fuseblk_options(char *parsed_options)
 	if (blksize > (u32)pagesize)
 		blksize = pagesize;
 	
-	/* parsed_options already allocated enough space. */
 	snprintf(options, sizeof(options), ",blkdev,blksize=%u", blksize);
-	strcat(parsed_options, options);
+	if (strappend(parsed_options, options))
+		return -1;
+	return 0;
 }
-
-static void set_user_mount_option(char *parsed_options, uid_t uid)
-{
-	struct passwd *pw;
-	char option[64];
-	
-	if (!uid)
-		return;
-	
-	errno = 0;
-	pw = getpwuid(uid);
-	if (!pw || !pw->pw_name) {
-		ntfs_log_perror("WARNING: could not get username for uid %lld, "
-				"unprivileged unmount may fail", (long long)uid);
-		return;
-	}
-	
-	/* parsed_options already allocated enough space. */
-	snprintf(option, sizeof(option), ",user=%s", pw->pw_name);
-	strcat(parsed_options, option);
-}
-
-#ifndef FUSE_INTERNAL
-static int set_uid(uid_t uid)
-{
-	if (setuid(uid)) {
-		ntfs_log_perror("Failed to set uid to %d", uid);
-		return NTFS_VOLUME_NO_PRIVILEGE;
-	}
-	return NTFS_VOLUME_OK;
-}
-#endif	
 
 static struct fuse *mount_fuse(char *parsed_options)
 {
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
-#ifndef FUSE_INTERNAL
-	uid_t uid, euid;
 	
-	/* 
-	 * We must raise privilege if possible, otherwise the user[s] fstab 
-	 * option doesn't work because mount(8) always drops privilege what 
-	 * the blkdev option requires.
-	 */
-	uid  = getuid();
-	euid = geteuid();
-	
-	if (set_uid(euid))
-		return NULL;
-#endif	
 	/* Libfuse can't always find fusermount, so let's help it. */
 	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
 		ntfs_log_perror("WARNING: Failed to set $PATH\n");
@@ -2576,15 +2528,6 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_set_signal_handlers(fuse_get_session(fh)))
 		goto err_destory;
-	/* 
-	 * We can't drop privilege if internal FUSE is used because internal 
-	 * unmount needs it. Kernel 2.6.25 may include unprivileged full 
-	 * mount/unmount support.
-	 */
-#ifndef FUSE_INTERNAL
-	if (set_uid(uid))
-		goto err_destory;
-#endif	
 out:
 	fuse_opt_free_args(&args);
 	return fh;
@@ -2629,18 +2572,30 @@ int main(int argc, char *argv[])
 	struct stat sbuf;
 	int err;
 
+#ifndef FUSE_INTERNAL
+	if ((getuid() != geteuid()) || (getgid() != getegid())) {
+		fprintf(stderr, "%s", setuid_msg);
+		return NTFS_VOLUME_INSECURE;
+	}
+#endif
+	if (drop_privs())
+		return NTFS_VOLUME_NO_PRIVILEGE;
+	
 	utils_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
-		usage();
+		ntfs_log_error("Please type '%s --help' for more "
+			       "information.\n", argv[0]);
 		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
-	if (ntfs_fuse_init())
-		return NTFS_VOLUME_OUT_OF_MEMORY;
+	if (ntfs_fuse_init()) {
+		err = NTFS_VOLUME_OUT_OF_MEMORY;
+		goto err2;
+	}
 	
-	parsed_options = parse_mount_options(opts.options ? opts.options : "");
+	parsed_options = parse_mount_options(opts.options);
 	if (!parsed_options) {
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
@@ -2648,10 +2603,18 @@ int main(int argc, char *argv[])
 	
 #if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
+
+	err = NTFS_VOLUME_NO_PRIVILEGE;
+	if (restore_privs())
+		goto err_out;
+
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
 	
 	create_dev_fuse();
+
+	if (drop_privs())
+		goto err_out;
 #endif	
 	
 	if (stat(opts.device, &sbuf)) {
@@ -2663,15 +2626,19 @@ int main(int argc, char *argv[])
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
 
+#ifndef FUSE_INTERNAL
+	if (getuid() && ctx->blkdev) {
+		ntfs_log_error("%s", unpriv_fuseblk_msg);
+		goto err2;
+	}
+#endif
 	err = ntfs_open(opts.device);
 	if (err)
 		goto err_out;
 	
-	if (ctx->blkdev) {
-		/* Must do after ntfs_open() to set the right blksize. */
-		set_fuseblk_options(parsed_options);
-		set_user_mount_option(parsed_options, getuid());
-	}
+	/* We must do this after ntfs_open() to be able to set the blksize */
+	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
+		goto err_out;
 	
 	fh = mount_fuse(parsed_options);
 	if (!fh) {
@@ -2711,6 +2678,7 @@ int main(int argc, char *argv[])
 	fuse_destroy(fh);
 err_out:
 	utils_mount_error(opts.device, opts.mnt_point, err);
+err2:
 	ntfs_close();
 	free(ctx);
 	free(parsed_options);

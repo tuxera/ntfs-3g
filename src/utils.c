@@ -4,7 +4,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2003-2006 Anton Altaparmakov
  * Copyright (c) 2003 Lode Leroy
- * Copyright (c) 2005-2007 Szabolcs Szakacsits
+ * Copyright (c) 2005-2008 Szabolcs Szakacsits
  *
  * A set of shared functions for ntfs utilities
  *
@@ -62,7 +62,12 @@ static const char *corrupt_volume_msg =
 
 static const char *hibernated_volume_msg =
 "The NTFS partition is hibernated. Please resume and shutdown Windows\n"
-"properly, so mounting could be done safely.\n";
+"properly, or mount the volume read-only with the 'ro' mount option, or\n"
+"mount the volume read-write with the 'remove_hiberfile' mount option.\n"
+"For example type on the command line:\n"
+"\n"
+"            mount -t ntfs-3g %s %s -o remove_hiberfile\n"
+"\n";
 
 static const char *unclean_journal_msg =
 "Mount is denied because NTFS is marked to be in use. Choose one action:\n"
@@ -85,9 +90,9 @@ static const char *fakeraid_msg =
 "to mount NTFS. Please see the 'dmraid' documentation for help.\n";
 
 static const char *access_denied_msg =
-"Please check the device and the ntfs-3g binary permissions, the mounting\n" 
-"user and group ID, and the mount options. You can find more explanation\n"
-"at http://ntfs-3g.org/support.html#useroption\n";
+"Please check the volume and the ntfs-3g binary permissions,\n"
+"and the mounting user ID. More explanation is provided at\n"
+"http://ntfs-3g.org/support.html#unprivileged\n";
 
 static const char *forced_mount_msg =
 "\n"
@@ -95,7 +100,7 @@ static const char *forced_mount_msg =
 "\n"
 "    Or add the option to the relevant row in the /etc/fstab file:\n"
 "\n"
-"            %s %s ntfs-3g defaults,force 0 0\n";
+"            %s %s ntfs-3g force 0 0\n";
 
 /**
  * utils_set_locale
@@ -124,7 +129,7 @@ void utils_mount_error(const char *volume, const char *mntpoint, int err)
 			ntfs_log_error("%s", corrupt_volume_msg);
 			break;
 		case NTFS_VOLUME_HIBERNATED:
-			ntfs_log_error("%s", hibernated_volume_msg);
+			ntfs_log_error(hibernated_volume_msg, volume, mntpoint);
 			break;
 		case NTFS_VOLUME_UNCLEAN_UNMOUNT:
 			ntfs_log_error(unclean_journal_msg);

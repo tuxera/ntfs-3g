@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2005-2006 Yura Pakhuchiy
- * Copyright (c) 2005-2006 Szabolcs Szakacsits
+ * Copyright (c) 2005-2008 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -60,6 +60,8 @@
 #define MS_FORCE     0x10000000
 #endif
 
+#define MS_IGNORE_HIBERFILE   0x20000000
+
 /* Forward declaration */
 typedef struct _ntfs_volume ntfs_volume;
 
@@ -95,7 +97,8 @@ typedef enum {
 	NTFS_VOLUME_UNKNOWN_REASON	= 18,
 	NTFS_VOLUME_NO_PRIVILEGE	= 19,
 	NTFS_VOLUME_OUT_OF_MEMORY	= 20,
-	NTFS_VOLUME_FUSE_ERROR		= 21
+	NTFS_VOLUME_FUSE_ERROR		= 21,
+	NTFS_VOLUME_INSECURE		= 22
 } ntfs_volume_status;
 
 /**
@@ -254,6 +257,7 @@ extern ntfs_volume *ntfs_mount(const char *name, unsigned long flags);
 extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
 
 extern int ntfs_version_is_supported(ntfs_volume *vol);
+extern int ntfs_volume_check_hiberfile(ntfs_volume *vol, int verbose);
 extern int ntfs_logfile_reset(ntfs_volume *vol);
 
 extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
