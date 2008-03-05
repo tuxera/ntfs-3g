@@ -3248,7 +3248,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
 			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
 			fileuid = findowner(scx,usid);
-			filegid = findowner(scx,gsid);
+			filegid = findgroup(scx,gsid);
 			free(oldattr);
 		} else
 			res = -1;
@@ -3518,7 +3518,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 					 usid, gsid, ni);
 			if (perm >= 0) {
 				fileuid = findowner(scx,usid);
-				filegid = findowner(scx,gsid);
+				filegid = findgroup(scx,gsid);
 			} else
 				res = -1;
 			free(oldattr);
