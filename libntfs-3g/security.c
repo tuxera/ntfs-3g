@@ -1038,6 +1038,7 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 /*
  *	Enter a new security descriptor in $Secure (data and indexes)
  *	Returns id of entry, or zero if there is a problem.
+ *	(should not be called for NTFS version < 3.0)
  *
  *	important : calls have to be serialized, however no locking is
  *	needed while fuse is not multithreaded
@@ -1059,6 +1060,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	off_t offs;
 	int gap;
 	int size;
+	BOOL found;
 	struct SII *psii;
 	INDEX_ENTRY *entry;
 	INDEX_ENTRY *next;
@@ -1076,10 +1078,15 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	ntfs_index_ctx_reinit(xsii);
 	offs = size = 0;
 	keyid = cpu_to_le32(-1);
-	ntfs_index_lookup((char*)&keyid,
+	found = !ntfs_index_lookup((char*)&keyid,
 			       sizeof(SII_INDEX_KEY), xsii);
-	entry = xsii->entry;
-	psii = (struct SII*)xsii->entry;
+	if (!found && (errno != ENOENT)) {
+		ntfs_log_perror("Inconsistency in index $SII");
+		psii = (struct SII*)NULL;
+	} else {
+		entry = xsii->entry;
+		psii = (struct SII*)xsii->entry;
+	}
 	if (psii) {
 		/*
 		 * Get last entry in block, but must get first one
@@ -1234,58 +1241,69 @@ static le32 setsecurityattr(ntfs_volume *vol,
 		 */
 		key.hash = hash;
 		key.security_id = cpu_to_le32(0);
-		ntfs_index_lookup((char*)&key, sizeof(SDH_INDEX_KEY), xsdh);
-		entry = xsdh->entry;
-		found = FALSE;
-		/* lookup() may return a node with no data, if so get next */
-		if (entry->ie_flags & INDEX_ENTRY_END)
-			entry = ntfs_index_next(entry,xsdh);
-		do {
-			collision = FALSE;
-			psdh = (struct SDH*)entry;
-			if (psdh)
-				size = (size_t) le32_to_cpu(psdh->datasize)
-					 - sizeof(SECURITY_DESCRIPTOR_HEADER);
-			else size = 0;
-		   /* if hash is not the same, the key is not present */
-			if (psdh && (size > 0)
-			   && (psdh->keyhash == hash)) {
-				   /* if hash is the same */
-				   /* check the whole record */
-				realign.parts.dataoffsh = psdh->dataoffsh;
-				realign.parts.dataoffsl = psdh->dataoffsl;
-				offs = le64_to_cpu(realign.all)
-					+ sizeof(SECURITY_DESCRIPTOR_HEADER);
-				oldattr = (char*)ntfs_malloc(size);
-				if (oldattr) {
-					rdsize = ntfs_local_read(
-						vol->secure_ni,
-						STREAM_SDS, 4,
-						oldattr, size, offs);
-					found = (rdsize == size)
-						&& !memcmp(oldattr,attr,size);
-					free(oldattr);
-				  /* if the records do not compare */
-				  /* (hash collision), try next one */
-					if (!found) {
-						entry = ntfs_index_next(
-							entry,xsdh);
-						collision = TRUE;
-					}
-				} else
-					res = ENOMEM;
-			}
-		} while (collision && entry);
-		if (found)
-			securid = psdh->keysecurid;
+		found = !ntfs_index_lookup((char*)&key,
+				 sizeof(SDH_INDEX_KEY), xsdh);
+		if (!found && (errno != ENOENT))
+			ntfs_log_perror("Inconsistency in index $SDH");
 		else {
-			if (res) {
-				errno = res;
-				securid = cpu_to_le32(0);
-			} else {
-				/* no matching key : have to build a new one */
-				securid = entersecurityattr(vol,
-					attr, attrsz, hash);
+			entry = xsdh->entry;
+			found = FALSE;
+			/*
+			 * lookup() may return a node with no data,
+			 * if so get next
+			 */
+			if (entry->ie_flags & INDEX_ENTRY_END)
+				entry = ntfs_index_next(entry,xsdh);
+			do {
+				collision = FALSE;
+				psdh = (struct SDH*)entry;
+				if (psdh)
+					size = (size_t) le32_to_cpu(psdh->datasize)
+						 - sizeof(SECURITY_DESCRIPTOR_HEADER);
+				else size = 0;
+			   /* if hash is not the same, the key is not present */
+				if (psdh && (size > 0)
+				   && (psdh->keyhash == hash)) {
+					   /* if hash is the same */
+					   /* check the whole record */
+					realign.parts.dataoffsh = psdh->dataoffsh;
+					realign.parts.dataoffsl = psdh->dataoffsl;
+					offs = le64_to_cpu(realign.all)
+						+ sizeof(SECURITY_DESCRIPTOR_HEADER);
+					oldattr = (char*)ntfs_malloc(size);
+					if (oldattr) {
+						rdsize = ntfs_local_read(
+							vol->secure_ni,
+							STREAM_SDS, 4,
+							oldattr, size, offs);
+						found = (rdsize == size)
+							&& !memcmp(oldattr,attr,size);
+						free(oldattr);
+					  /* if the records do not compare */
+					  /* (hash collision), try next one */
+						if (!found) {
+							entry = ntfs_index_next(
+								entry,xsdh);
+							collision = TRUE;
+						}
+					} else
+						res = ENOMEM;
+				}
+			} while (collision && entry);
+			if (found)
+				securid = psdh->keysecurid;
+			else {
+				if (res) {
+					errno = res;
+					securid = cpu_to_le32(0);
+				} else {
+					/*
+					 * no matching key :
+					 * have to build a new one
+					 */
+					securid = entersecurityattr(vol,
+						attr, attrsz, hash);
+				}
 			}
 		}
 	}
@@ -1942,7 +1960,9 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 					securattr = (char*)NULL;
 				}
 			}
-		}
+		} else
+			if (errno != ENOENT)
+				ntfs_log_perror("Inconsistency in index $SII");
 	}
 	if (!securattr) {
 		ntfs_log_error("Failed to retrieve a security descriptor\n");
@@ -2381,7 +2401,8 @@ static char *getsecurityattr(ntfs_volume *vol,
 		 * with a default security descriptor inserted in an
 		 * attribute
 		 */
-	if (test_nino_flag(ni, v3_Extensions) && ni->security_id) {
+	if (test_nino_flag(ni, v3_Extensions)
+			&& vol->secure_ni && ni->security_id) {
 			/* get v3.x descriptor in $Secure */
 		securid.security_id = ni->security_id;
 		securattr = retrievesecurityattr(vol,securid);
@@ -4337,14 +4358,21 @@ int ntfs_open_secure(ntfs_volume *vol)
 
 	res = -1;
 	vol->secure_ni = (ntfs_inode*)NULL;
-	ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
-	if (ni) {
-		vol->secure_reentry = 0;
-		vol->secure_xsii = ntfs_index_ctx_get(ni, sii_stream, 4);
-		vol->secure_xsdh = ntfs_index_ctx_get(ni, sdh_stream, 4);
-		if (ni && vol->secure_xsii && vol->secure_xsdh) {
-			vol->secure_ni = ni;
-			res = 0;
+	vol->secure_xsii = (ntfs_index_context*)NULL;
+	vol->secure_xsdh = (ntfs_index_context*)NULL;
+	if (vol->major_ver >= 3) {
+			/* make sure this is a genuine $Secure inode 9 */
+		ni = ntfs_pathname_to_inode(vol, NULL, "$Secure");
+		if (ni && (ni->mft_no == 9)) {
+			vol->secure_reentry = 0;
+			vol->secure_xsii = ntfs_index_ctx_get(ni,
+						sii_stream, 4);
+			vol->secure_xsdh = ntfs_index_ctx_get(ni,
+						sdh_stream, 4);
+			if (ni && vol->secure_xsii && vol->secure_xsdh) {
+				vol->secure_ni = ni;
+				res = 0;
+			}
 		}
 	}
 	return (res);
@@ -4799,6 +4827,8 @@ ok = TRUE; /* clarification needed */
 
 /*
  *		read $SDS (for auditing security data)
+ *
+ *	Returns the number or read bytes, or -1 if there is an error
  */
 
 int ntfs_read_sds(struct SECURITY_API *scapi,
@@ -4806,10 +4836,13 @@ int ntfs_read_sds(struct SECURITY_API *scapi,
 {
 	int got;
 
-	got = 0; /* default return */
+	got = -1; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API)) {
-		got = ntfs_local_read(scapi->security.vol->secure_ni,
-			STREAM_SDS, 4, buf, size, offset);
+		if (scapi->security.vol->secure_ni)
+			got = ntfs_local_read(scapi->security.vol->secure_ni,
+				STREAM_SDS, 4, buf, size, offset);
+		else
+			errno = EOPNOTSUPP;
 	} else
 		errno = EINVAL;
 	return (got);
@@ -4817,58 +4850,67 @@ int ntfs_read_sds(struct SECURITY_API *scapi,
 
 /*
  *		read $SII (for auditing security data)
+ *
+ *	Returns next entry, or NULL if there is an error
  */
 
 INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 		INDEX_ENTRY *entry)
 {
 	SII_INDEX_KEY key;
+	INDEX_ENTRY *ret;
 	ntfs_index_context *xsii;
 
+	ret = (INDEX_ENTRY*)NULL; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		xsii = scapi->security.vol->secure_xsii;
-		if (!entry) {
-			key.security_id = cpu_to_le32(0);
-			ntfs_index_lookup((char*)&key,
-				sizeof(SII_INDEX_KEY), xsii);
-			entry = xsii->entry;
+		if (xsii) {
+			if (!entry) {
+				key.security_id = cpu_to_le32(0);
+				if (!ntfs_index_lookup((char*)&key,
+						sizeof(SII_INDEX_KEY), xsii))
+					ret = xsii->entry;
+			} else
+				ret = ntfs_index_next(entry,xsii);
+			if (!ret)
+				errno = ENODATA;
 		} else
-			entry = ntfs_index_next(entry,xsii);
-		if (!entry)
-			errno = ENODATA;
-	} else {
-		entry = (INDEX_ENTRY*)NULL;
+			errno = EOPNOTSUPP;
+	} else
 		errno = EINVAL;
-	}
 	return (entry);
 }
 
 /*
  *		read $SDH (for auditing security data)
+ *
+ *	Returns next entry, or NULL if there is an error
  */
 
 INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 		INDEX_ENTRY *entry)
 {
 	SDH_INDEX_KEY key;
+	INDEX_ENTRY *ret;
 	ntfs_index_context *xsdh;
 
+	ret = (INDEX_ENTRY*)NULL; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		xsdh = scapi->security.vol->secure_xsdh;
-		if (!entry) {
-			key.hash = cpu_to_le32(0);
-			key.security_id = cpu_to_le32(0);
-			ntfs_index_lookup((char*)&key,
-				sizeof(SDH_INDEX_KEY), xsdh);
-			entry = xsdh->entry;
-		} else
-			entry = ntfs_index_next(entry,xsdh);
-		if (!entry)
-			errno = ENODATA;
-	} else {
-		entry = (INDEX_ENTRY*)NULL;
+		if (xsdh) {
+			if (!entry) {
+				key.hash = cpu_to_le32(0);
+				key.security_id = cpu_to_le32(0);
+				if (!ntfs_index_lookup((char*)&key,
+						sizeof(SDH_INDEX_KEY), xsdh))
+					ret = xsdh->entry;
+			} else
+				ret = ntfs_index_next(entry,xsdh);
+			if (!ret)
+				errno = ENODATA;
+		} else errno = ENOTSUP;
+	} else
 		errno = EINVAL;
-	}
 	return (entry);
 }
 
@@ -4906,11 +4948,9 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				scx->gid = getgid();
 				scx->pseccache = &scapi->seccache;
 				scx->vol->secure_flags = 0;
-				if (ntfs_build_mapping(scx,(const char*)NULL)
-				    || ntfs_open_secure(vol)) {
-					free(scapi);
-					scapi = (struct SECURITY_API*)NULL;
-				}
+					/* accept no mapping and no $Secure */
+				ntfs_build_mapping(scx,(const char*)NULL);
+				ntfs_open_secure(vol);
 			} else
 				errno = ENOMEM;
 		}

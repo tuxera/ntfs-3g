@@ -2660,8 +2660,9 @@ int main(int argc, char *argv[])
 	ctx->vol->secure_flags = 0;
 	if (ctx->addsecurids && !ctx->ro)
 		ctx->vol->secure_flags = (1 << SECURITY_ADDSECURIDS);
-		/* JPA open $Secure and build user mapping (right place ?) */
-	if (ntfs_open_secure(ctx->vol))
+		/* JPA open $Secure, (whatever NTFS version !) */
+		/* to initialize security data */
+	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
 		ntfs_log_info("Could not open file $Secure\n");
 	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
 		ntfs_log_info("User mapping built\n");

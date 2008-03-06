@@ -25,6 +25,34 @@
 #ifndef _NTFS_INDEX_H
 #define _NTFS_INDEX_H
 
+/* Convenience macros to test the versions of gcc.
+ *  Use them like this:
+ *  #if __GNUC_PREREQ (2,8)
+ *  ... code requiring gcc 2.8 or later ...
+ *  #endif
+ *  Note - they won't work for gcc1 or glibc1, since the _MINOR macros
+ *  were not defined then. 
+ */
+
+#ifndef __GNUC_PREREQ
+# if defined __GNUC__ && defined __GNUC_MINOR__
+#  define __GNUC_PREREQ(maj, min) \
+        ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
+# else
+#  define __GNUC_PREREQ(maj, min) 0
+# endif
+#endif
+
+/* allows us to warn about unused results of certain function calls */
+#ifndef __attribute_warn_unused_result__
+# if __GNUC_PREREQ (3,4)
+#  define __attribute_warn_unused_result__ \
+    __attribute__ ((__warn_unused_result__))
+# else
+#  define __attribute_warn_unused_result__ /* empty */
+# endif
+#endif
+
 #include "attrib.h"
 #include "types.h"
 #include "layout.h"
@@ -108,7 +136,7 @@ extern void ntfs_index_ctx_put(ntfs_index_context *ictx);
 extern void ntfs_index_ctx_reinit(ntfs_index_context *ictx);
 
 extern int ntfs_index_lookup(const void *key, const int key_len,
-		ntfs_index_context *ictx);
+		ntfs_index_context *ictx) __attribute_warn_unused_result__;
 
 extern INDEX_ENTRY *ntfs_index_next(INDEX_ENTRY *ie,
 		ntfs_index_context *ictx);
