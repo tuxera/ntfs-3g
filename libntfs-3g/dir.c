@@ -446,9 +446,8 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		}
 	}
 
-	unicode = ntfs_calloc(MAX_PATH);
 	ascii = strdup(pathname);
-	if (!unicode || !ascii) {
+	if (!ascii) {
 		ntfs_log_debug("Out of memory.\n");
 		err = ENOMEM;
 		goto close;
@@ -466,7 +465,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			q++;
 		}
 
-		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
+		len = ntfs_mbstoucs(p, &unicode, 0);
 		if (len < 0) {
 			ntfs_log_debug("Couldn't convert name to Unicode: %s.\n", p);
 			err = errno;
@@ -498,6 +497,9 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			err = EIO;
 			goto close;
 		}
+
+		free(unicode);
+		unicode = NULL;
 
 		p = q;
 		while (p && *p && *p == PATH_SEP)
