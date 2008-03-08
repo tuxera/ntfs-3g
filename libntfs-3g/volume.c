@@ -632,7 +632,7 @@ static ntfs_inode *ntfs_hiberfile_open(ntfs_volume *vol)
 		return NULL;
 	}
 
-	unicode_len = ntfs_mbstoucs(hiberfile, &unicode, 0);
+	unicode_len = ntfs_mbstoucs(hiberfile, &unicode);
 	if (unicode_len < 0) {
 		ntfs_log_perror("Couldn't convert 'hiberfil.sys' to Unicode");
 		goto out;

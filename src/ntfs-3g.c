@@ -321,7 +321,7 @@ static int ntfs_fuse_parse_path(const char *org_path, char **path,
 		*path = strsep(&stream_name_mbs, ":");
 		if (stream_name_mbs) {
 			*stream_name = NULL;
-			res = ntfs_mbstoucs(stream_name_mbs, stream_name, 0);
+			res = ntfs_mbstoucs(stream_name_mbs, stream_name);
 			if (res < 0)
 				return -errno;
 			return res;
@@ -827,7 +827,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
 	name++;
-	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	uname_len = ntfs_mbstoucs(name, &uname);
 	if (uname_len < 0) {
 		res = -errno;
 		goto exit;
@@ -847,7 +847,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t type, dev_t dev,
 					dev);
 			break;
 		case S_IFLNK:
-			utarget_len = ntfs_mbstoucs(target, &utarget, 0);
+			utarget_len = ntfs_mbstoucs(target, &utarget);
 			if (utarget_len < 0) {
 				res = -errno;
 				goto exit;
@@ -985,7 +985,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
 	name++;
-	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	uname_len = ntfs_mbstoucs(name, &uname);
 	if (uname_len < 0) {
 		res = -errno;
 		goto exit;
@@ -1039,7 +1039,7 @@ static int ntfs_fuse_rm(const char *org_path)
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
 	name++;
-	uname_len = ntfs_mbstoucs(name, &uname, 0);
+	uname_len = ntfs_mbstoucs(name, &uname);
 	if (uname_len < 0) {
 		res = -errno;
 		goto exit;
@@ -1456,7 +1456,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
@@ -1504,7 +1504,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
@@ -1562,7 +1562,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ni = ntfs_pathname_to_inode(vol, NULL, path);
 	if (!ni)
 		return -errno;
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename, 0);
+	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;

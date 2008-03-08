@@ -491,17 +491,16 @@ err_out:
  * ntfs_mbstoucs - convert a multibyte string to a little endian Unicode string
  * @ins:	input multibyte string buffer
  * @outs:	on return contains the (allocated) output Unicode string
- * @outs_len:	length of output buffer in Unicode characters
  *
  * Convert the input multibyte string @ins, from the current locale into the
  * corresponding little endian, 2-byte Unicode string.
  *
- * If *@outs is NULL, the function allocates the string and the caller is
- * responsible for calling free(*@outs); when finished with it.
+ * The function allocates the string and the caller is responsible for calling 
+ * free(*@outs); when finished with it.
  *
  * On success the function returns the number of Unicode characters written to
  * the output string *@outs (>= 0), not counting the terminating Unicode NULL
- * character. If the output string buffer was allocated, *@outs is set to it.
+ * character.
  *
  * On error, -1 is returned, and errno is set to the error code. The following
  * error codes can be expected:
@@ -511,7 +510,7 @@ err_out:
  *	ENAMETOOLONG	Destination buffer is too small for input string.
  *	ENOMEM		Not enough memory to allocate destination buffer.
  */
-int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
+int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 {
 	ntfschar *ucs;
 	const char *s;
@@ -525,12 +524,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 		errno = EINVAL;
 		return -1;
 	}
-	ucs = *outs;
-	ucs_len = outs_len;
-	if (ucs && !ucs_len) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
+	
 	/* Determine the size of the multi-byte string in bytes. */
 	ins_size = strlen(ins);
 	/* Determine the length of the multi-byte string. */
@@ -562,31 +556,21 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 	}
 	/* Add the NULL terminator. */
 	ins_len++;
-	if (!ucs) {
-		ucs_len = ins_len;
-		ucs = ntfs_malloc(ucs_len * sizeof(ntfschar));
-		if (!ucs)
-			return -1;
-	}
+	ucs_len = ins_len;
+	ucs = ntfs_malloc(ucs_len * sizeof(ntfschar));
+	if (!ucs)
+		return -1;
 #ifdef HAVE_MBSINIT
 	memset(&mbstate, 0, sizeof(mbstate));
 #else
 	mbtowc(NULL, NULL, 0);
 #endif
 	for (i = o = cnt = 0; i < ins_size; i += cnt, o++) {
-		/* Reallocate memory if necessary or abort. */
+		/* Reallocate memory if necessary. */
 		if (o >= ucs_len) {
 			ntfschar *tc;
-			if (ucs == *outs) {
-				errno = ENAMETOOLONG;
-				return -1;
-			}
-			/*
-			 * We will never get here but hey, it's only a bit of
-			 * extra code...
-			 */
 			ucs_len = (ucs_len * sizeof(ntfschar) + 64) & ~63;
-			tc = (ntfschar*)realloc(ucs, ucs_len);
+			tc = realloc(ucs, ucs_len);
 			if (!tc)
 				goto err_out;
 			ucs = tc;
@@ -626,15 +610,10 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs, int outs_len)
 #endif
 	/* Now write the NULL character. */
 	ucs[o] = cpu_to_le16(L'\0');
-	if (*outs != ucs)
-		*outs = ucs;
+	*outs = ucs;
 	return o;
 err_out:
-	if (ucs != *outs) {
-		int eo = errno;
-		free(ucs);
-		errno = eo;
-	}
+	free(ucs);
 	return -1;
 }
 
@@ -725,7 +704,7 @@ ntfschar *ntfs_str2ucs(const char *s, int *len)
 {
 	ntfschar *ucs = NULL;
 
-	if (s && ((*len = ntfs_mbstoucs(s, &ucs, 0)) == -1)) {
+	if (s && ((*len = ntfs_mbstoucs(s, &ucs)) == -1)) {
 		ntfs_log_perror("Couldn't convert '%s' to Unicode", s);
 		return NULL;
 	}
