@@ -588,7 +588,13 @@ static int check_perm(const char **mntp, struct stat *stbuf, int *currdir_fd,
 
 static int try_open(const char *dev, char **devp)
 {
-    int fd = open(dev, O_RDWR);
+    int fd;
+     
+    if (restore_privs())
+	return -1;
+    fd = open(dev, O_RDWR);
+    if (drop_privs())
+	return -1;
     if (fd != -1) {
         *devp = strdup(dev);
         if (*devp == NULL) {
