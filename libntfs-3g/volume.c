@@ -426,10 +426,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	ntfs_volume *vol;
 	NTFS_BOOT_SECTOR *bs;
 	int eo;
-#ifdef DEBUG
-	const char *OK = "OK\n";
-	const char *FAILED = "FAILED\n";
-#endif
 
 	if (!dev || !dev->d_ops || !dev->d_name) {
 		errno = EINVAL;
@@ -469,7 +465,6 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	/* Now read the bootsector. */
 	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
 	if (br != sizeof(NTFS_BOOT_SECTOR)) {
-		ntfs_log_debug(FAILED);
 		if (br != -1)
 			errno = EINVAL;
 		if (!br)
@@ -755,10 +750,6 @@ out:
 ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 {
 	s64 l;
-#ifdef DEBUG
-	const char *OK = "OK\n";
-	const char *FAILED = "FAILED\n";
-#endif	
 	ntfs_volume *vol;
 	u8 *m = NULL, *m2 = NULL;
 	ntfs_attr_search_ctx *ctx = NULL;
@@ -802,7 +793,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		}
 		vol->mftmirr_size = l;
 	}
-	ntfs_log_debug("Comparing $MFTMirr to $MFT... ");
+	ntfs_log_debug("Comparing $MFTMirr to $MFT...\n");
 	for (i = 0; i < vol->mftmirr_size; ++i) {
 		MFT_RECORD *mrec, *mrec2;
 		const char *ESTR[12] = { "$MFT", "$MFTMirr", "$LogFile",
@@ -820,14 +811,12 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
 		if (mrec->flags & MFT_RECORD_IN_USE) {
 			if (ntfs_is_baad_recordp(mrec)) {
-				ntfs_log_debug("FAILED\n");
 				ntfs_log_error("$MFT error: Incomplete multi "
 					       "sector transfer detected in "
 					       "'%s'.\n", s);
 				goto io_error_exit;
 			}
 			if (!ntfs_is_mft_recordp(mrec)) {
-				ntfs_log_debug("FAILED\n");
 				ntfs_log_error("$MFT error: Invalid mft "
 						"record for '%s'.\n", s);
 				goto io_error_exit;
@@ -836,62 +825,53 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
 		if (mrec2->flags & MFT_RECORD_IN_USE) {
 			if (ntfs_is_baad_recordp(mrec2)) {
-				ntfs_log_debug("FAILED\n");
 				ntfs_log_error("$MFTMirr error: Incomplete "
 						"multi sector transfer "
 						"detected in '%s'.\n", s);
 				goto io_error_exit;
 			}
 			if (!ntfs_is_mft_recordp(mrec2)) {
-				ntfs_log_debug("FAILED\n");
 				ntfs_log_error("$MFTMirr error: Invalid mft "
 						"record for '%s'.\n", s);
 				goto io_error_exit;
 			}
 		}
 		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
-			ntfs_log_debug(FAILED);
 			ntfs_log_error("$MFTMirr does not match $MFT (record "
 				       "%d).\n", i);
 			goto io_error_exit;
 		}
 	}
-	ntfs_log_debug(OK);
 
 	free(m2);
 	free(m);
 	m = m2 = NULL;
 
 	/* Now load the bitmap from $Bitmap. */
-	ntfs_log_debug("Loading $Bitmap... ");
+	ntfs_log_debug("Loading $Bitmap...\n");
 	vol->lcnbmp_ni = ntfs_inode_open(vol, FILE_Bitmap);
 	if (!vol->lcnbmp_ni) {
-		ntfs_log_debug(FAILED);
-		ntfs_log_perror("Failed to open inode");
+		ntfs_log_perror("Failed to open inode FILE_Bitmap");
 		goto error_exit;
 	}
 	/* Get an ntfs attribute for $Bitmap/$DATA. */
 	vol->lcnbmp_na = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!vol->lcnbmp_na) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
 	/* Done with the $Bitmap mft record. */
-	ntfs_log_debug(OK);
 
 	/* Now load the upcase table from $UpCase. */
-	ntfs_log_debug("Loading $UpCase... ");
+	ntfs_log_debug("Loading $UpCase...\n");
 	ni = ntfs_inode_open(vol, FILE_UpCase);
 	if (!ni) {
-		ntfs_log_debug(FAILED);
-		ntfs_log_perror("Failed to open inode");
+		ntfs_log_perror("Failed to open inode FILE_UpCase");
 		goto error_exit;
 	}
 	/* Get an ntfs attribute for $UpCase/$DATA. */
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
@@ -902,7 +882,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * characters.
 	 */
 	if (na->data_size & ~0x1ffffffffULL) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("Error: Upcase table is too big (max 32-bit "
 				"allowed).\n");
 		errno = EINVAL;
@@ -913,15 +892,12 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		/* Throw away default table. */
 		free(vol->upcase);
 		vol->upcase = ntfs_malloc(na->data_size);
-		if (!vol->upcase) {
-			ntfs_log_debug(FAILED);
+		if (!vol->upcase)
 			goto error_exit;
-		}
 	}
 	/* Read in the $DATA attribute value into the buffer. */
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->upcase);
 	if (l != na->data_size) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("Failed to read $UpCase, unexpected length "
 			       "(%lld != %lld).\n", (long long)l,
 			       (long long)na->data_size);
@@ -929,7 +905,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	}
 	/* Done with the $UpCase mft record. */
-	ntfs_log_debug(OK);
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni)) {
 		ntfs_log_perror("Failed to close $UpCase");
@@ -940,11 +915,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * Now load $Volume and set the version information and flags in the
 	 * vol structure accordingly.
 	 */
-	ntfs_log_debug("Loading $Volume... ");
+	ntfs_log_debug("Loading $Volume...\n");
 	vol->vol_ni = ntfs_inode_open(vol, FILE_Volume);
 	if (!vol->vol_ni) {
-		ntfs_log_debug(FAILED);
-		ntfs_log_perror("Failed to open inode");
+		ntfs_log_perror("Failed to open inode FILE_Volume");
 		goto error_exit;
 	}
 	/* Get a search context for the $Volume/$VOLUME_INFORMATION lookup. */
@@ -955,7 +929,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	/* Find the $VOLUME_INFORMATION attribute. */
 	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
 			0, ctx)) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("$VOLUME_INFORMATION attribute not found in "
 				"$Volume");
 		goto error_exit;
@@ -963,7 +936,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	a = ctx->attr;
 	/* Has to be resident. */
 	if (a->non_resident) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("Attribute $VOLUME_INFORMATION must be "
 			       "resident but it isn't.\n");
 		errno = EIO;
@@ -976,7 +948,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			le32_to_cpu(ctx->mrec->bytes_in_use) ||
 			le16_to_cpu(a->value_offset) + le32_to_cpu(
 			a->value_length) > le32_to_cpu(a->length)) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("$VOLUME_INFORMATION in $Volume is corrupt.\n");
 		errno = EIO;
 		goto error_exit;
@@ -994,7 +965,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT) {
-			ntfs_log_debug(FAILED);
 			ntfs_log_perror("Failed to lookup of $VOLUME_NAME in "
 					"$Volume failed");
 			goto error_exit;
@@ -1005,16 +975,13 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		 * had zero length.
 		 */
 		vol->vol_name = ntfs_malloc(1);
-		if (!vol->vol_name) {
-			ntfs_log_debug(FAILED);
+		if (!vol->vol_name)
 			goto error_exit;
-		}
 		vol->vol_name[0] = '\0';
 	} else {
 		a = ctx->attr;
 		/* Has to be resident. */
 		if (a->non_resident) {
-			ntfs_log_debug(FAILED);
 			ntfs_log_error("$VOLUME_NAME must be resident.\n");
 			errno = EIO;
 			goto error_exit;
@@ -1033,10 +1000,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			ntfs_log_debug("Forcing name into ASCII by replacing "
 				"non-ASCII characters with underscores.\n");
 			vol->vol_name = ntfs_malloc(u + 1);
-			if (!vol->vol_name) {
-				ntfs_log_debug(FAILED);
+			if (!vol->vol_name)
 				goto error_exit;
-			}
+			
 			for (j = 0; j < (s32)u; j++) {
 				ntfschar uc = le16_to_cpu(vname[j]);
 				if (uc > 0xff)
@@ -1046,27 +1012,23 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			vol->vol_name[u] = '\0';
 		}
 	}
-	ntfs_log_debug(OK);
 	ntfs_attr_put_search_ctx(ctx);
 	ctx = NULL;
 	/* Now load the attribute definitions from $AttrDef. */
-	ntfs_log_debug("Loading $AttrDef... ");
+	ntfs_log_debug("Loading $AttrDef...\n");
 	ni = ntfs_inode_open(vol, FILE_AttrDef);
 	if (!ni) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to open $AttrDef");
 		goto error_exit;
 	}
 	/* Get an ntfs attribute for $AttrDef/$DATA. */
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
 	/* Check we don't overflow 32-bits. */
 	if (na->data_size > 0xffffffffLL) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("Attribute definition table is too big (max "
 			       "32-bit allowed).\n");
 		errno = EINVAL;
@@ -1074,14 +1036,11 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	}
 	vol->attrdef_len = na->data_size;
 	vol->attrdef = ntfs_malloc(na->data_size);
-	if (!vol->attrdef) {
-		ntfs_log_debug(FAILED);
+	if (!vol->attrdef)
 		goto error_exit;
-	}
 	/* Read in the $DATA attribute value into the buffer. */
 	l = ntfs_attr_pread(na, 0, na->data_size, vol->attrdef);
 	if (l != na->data_size) {
-		ntfs_log_debug(FAILED);
 		ntfs_log_error("Failed to read $AttrDef, unexpected length "
 			       "(%lld != %lld).\n", (long long)l,
 			       (long long)na->data_size);
@@ -1089,7 +1048,6 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	}
 	/* Done with the $AttrDef mft record. */
-	ntfs_log_debug(OK);
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni)) {
 		ntfs_log_perror("Failed to close $AttrDef");
