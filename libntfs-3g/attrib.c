@@ -2726,6 +2726,10 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 			goto put_err_out;
 		}
 	}
+	if (type == AT_DATA && name == AT_UNNAMED) {
+		ni->data_size = size;
+		ni->allocated_size = (size + 7) & ~7;
+	}
 	ntfs_inode_mark_dirty(ni);
 	ntfs_attr_put_search_ctx(ctx);
 	return offset;

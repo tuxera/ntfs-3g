@@ -1203,6 +1203,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni,
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	fn->data_size = cpu_to_sle64(ni->data_size);
+	fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
 	/* Add FILE_NAME attribute to inode. */
 	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
