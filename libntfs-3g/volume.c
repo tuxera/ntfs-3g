@@ -456,7 +456,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
 	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
-		ntfs_log_perror("Error opening partition device");
+		ntfs_log_perror("Error opening '%s'", dev->d_name);
 		goto error_exit;
 	}
 	/* Attach the device to the volume. */
