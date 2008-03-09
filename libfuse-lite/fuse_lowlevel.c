@@ -1305,16 +1305,3 @@ struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
     return fuse_lowlevel_new_common(args, op, op_size, userdata);
 }
 
-
-struct fuse_ll_compat_conf {
-    unsigned max_read;
-    int set_max_read;
-};
-
-static const struct fuse_opt fuse_ll_opts_compat[] = {
-    { "max_read=", offsetof(struct fuse_ll_compat_conf, set_max_read), 1 },
-    { "max_read=%u", offsetof(struct fuse_ll_compat_conf, max_read), 0 },
-    FUSE_OPT_KEY("max_read=", FUSE_OPT_KEY_KEEP),
-    FUSE_OPT_END
-};
-
