@@ -3,8 +3,8 @@
 #		 compilation.
 #
 # Copyright (c) 2000-2006 Anton Altaparmakov
-# Copyright (c) 2005-2007 Szabolcs Szakacsits
-# Copyright (C) 2007 Alon Bar-Lev
+# Copyright (c) 2005-2008 Szabolcs Szakacsits
+# Copyright (C) 2007-2008 Alon Bar-Lev
 #
 # This program/include file is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as published
@@ -23,8 +23,8 @@
 
 # Autoconf
 AC_PREREQ([2.59])
-AC_INIT([ntfs-3g],[1.2216],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION=23
+AC_INIT([ntfs-3g],[1.2310],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION=24
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
