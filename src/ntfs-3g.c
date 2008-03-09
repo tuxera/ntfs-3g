@@ -2172,10 +2172,6 @@ static struct fuse *mount_fuse(char *parsed_options)
 	struct fuse *fh = NULL;
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	
-	/* Libfuse can't always find fusermount, so let's help it. */
-	if (setenv("PATH", ":/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin", 0))
-		ntfs_log_perror("WARNING: Failed to set $PATH\n");
-	
 	ctx->fc = try_fuse_mount(parsed_options);
 	if (!ctx->fc)
 		return NULL;
