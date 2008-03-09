@@ -276,7 +276,7 @@ static int find_mount_flag(const char *s, unsigned len, int *on, int *flag)
             *flag = mount_flags[i].flag;
             if (!mount_flags[i].safe && getuid() != 0) {
                 *flag = 0;
-                fprintf(stderr, "%s: unsafe option %s ignored\n",
+                fprintf(stderr, "%s: unsafe option '%s' ignored\n",
                         progname, opt);
             }
             return 1;

@@ -214,7 +214,8 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
     char *mnt_opts = NULL;
 
     memset(&mo, 0, sizeof(mo));
-    mo.flags = MS_NOSUID | MS_NODEV;
+    if (getuid())
+	    mo.flags = MS_NOSUID | MS_NODEV;
 
     if (args &&
         fuse_opt_parse(args, &mo, fuse_mount_opts, fuse_mount_opt_proc) == -1)
@@ -230,6 +231,10 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
 
     res = -1;
     if (get_mnt_flag_opts(&mnt_opts, mo.flags) == -1)
+        goto out;
+    if (!(mo.flags & MS_NODEV) && fuse_opt_add_opt(&mnt_opts, "dev") == -1)
+        goto out;
+    if (!(mo.flags & MS_NOSUID) && fuse_opt_add_opt(&mnt_opts, "suid") == -1)
         goto out;
     if (mo.kernel_opts && fuse_opt_add_opt(&mnt_opts, mo.kernel_opts) == -1)
         goto out;
