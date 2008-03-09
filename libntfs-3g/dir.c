@@ -1313,7 +1313,7 @@ int ntfs_check_empty_dir(ntfs_inode *ni)
 	/* Non-empty directory? */
 	if ((na->data_size != sizeof(INDEX_ROOT) + sizeof(INDEX_ENTRY_HEADER))){
 		/* Both ENOTEMPTY and EEXIST are ok. We use the more common. */
-		errno = EEXIST;
+		errno = ENOTEMPTY;
 		ntfs_log_debug("Directory is not empty\n");
 		ret = -1;
 	}
@@ -1328,7 +1328,7 @@ static int ntfs_check_unlinkable_dir(ntfs_inode *ni, FILE_NAME_ATTR *fn)
 	int ret;
 	
 	ret = ntfs_check_empty_dir(ni);
-	if (!ret || errno != EEXIST)
+	if (!ret || errno != ENOTEMPTY)
 		return ret;
 	/* 
 	 * Directory is non-empty, so we can unlink only if there is more than
@@ -1336,7 +1336,7 @@ static int ntfs_check_unlinkable_dir(ntfs_inode *ni, FILE_NAME_ATTR *fn)
 	 */
 	if ((link_count == 1) || 
 	    (link_count == 2 && fn->file_name_type == FILE_NAME_DOS)) {
-		errno = EEXIST;
+		errno = ENOTEMPTY;
 		ntfs_log_debug("Non-empty directory without hard links\n");
 		goto no_hardlink;
 	}
