@@ -113,21 +113,21 @@
 #define DIR_GWRITE (FILE_ADD_FILE | GENERIC_WRITE)
 #define DIR_GEXEC (FILE_TRAVERSE | GENERIC_EXECUTE)
 
-          /* standard owner (and administrator) rights */
+	/* standard owner (and administrator) rights */
 
 #define OWNER_RIGHTS (DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER \
 			| SYNCHRONIZE \
-                        | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES \
-                        | FILE_READ_EA | FILE_WRITE_EA)
+			| FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES \
+			| FILE_READ_EA | FILE_WRITE_EA)
 
-          /* standard world rights */
+	/* standard world rights */
 
 #define WORLD_RIGHTS (READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA \
 			| SYNCHRONIZE)
 
           /* inheritance flags for files and directories */
 
-#define FILE_INHERITANCE 0
+#define FILE_INHERITANCE NO_PROPAGATE_INHERIT_ACE
 #define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
 
 /*
@@ -209,7 +209,20 @@ static const GUID __zero_guid = { const_cpu_to_le32(0), const_cpu_to_le16(0),
 const GUID *const zero_guid = &__zero_guid;
 
 /*
- *		SID for world user
+ *		null SID (S-1-0-0)
+ */
+
+static const char nullsidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 0,	/* base */
+		0, 0, 0, 0 	/* 1st level */
+	};
+
+static const SID *nullsid = (const SID*)nullsidbytes;
+
+/*
+ *		SID for world  (S-1-1-0)
  */
 
 static const char worldsidbytes[] = {
@@ -2024,14 +2037,9 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
  *	are redundant (as owner and group are the same), but this has
  *	no impact on administrator rights
  *
- *	Special cases :
- *	- a directory with sticky bit is represented as a directory in
- *	  which world can add directories and not delete or conversely
- *	- a file with sticky bit is represented as a file which the
- *	  owner can write to and not append or conversely
- *	- a file with setuid or setgid is represented as a file with
- *	  the right to write extended attributes different from the
- *	  right to write standard attributes
+ *	Special flags (S_ISVTX, S_ISGID, S_ISUID) :
+ *	an extra null ACE is inserted to hold these flags, using
+ *	the same conventions as cygwin.
  */
 
 static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
@@ -2042,6 +2050,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	ACCESS_ALLOWED_ACE *pdace;
 	BOOL adminowns;
 	BOOL groupowns;
+	ACE_FLAGS gflags;
 	int pos;
 	int acecnt;
 	int usidsz;
@@ -2049,6 +2058,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	int wsidsz;
 	int asidsz;
 	int ssidsz;
+	int nsidsz;
 	long grants;
 	long denials;
 
@@ -2070,13 +2080,12 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	pos = sizeof(ACL);
 	acecnt = 0;
 
-	/* a grant ACE for owner */
+	/* compute a grant ACE for owner */
+	/* this ACE will be inserted after denial for owner */
 
-	pgace = (ACCESS_ALLOWED_ACE*) &secattr[offs + pos];
-	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 	grants = OWNER_RIGHTS;
 	if (isdir) {
-		pgace->flags = DIR_INHERITANCE;
+		gflags = DIR_INHERITANCE;
 		if (mode & S_IXUSR)
 			grants |= DIR_EXEC;
 		if (mode & S_IWUSR)
@@ -2084,23 +2093,14 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		if (mode & S_IRUSR)
 			grants |= DIR_READ;
 	} else {
-		pgace->flags = FILE_INHERITANCE;
+		gflags = FILE_INHERITANCE;
 		if (mode & S_IXUSR)
 			grants |= FILE_EXEC;
 		if (mode & S_IWUSR)
 			grants |= FILE_WRITE;
 		if (mode & S_IRUSR)
 			grants |= FILE_READ;
-		if (mode & S_ISVTX)
-			grants ^= FILE_APPEND_DATA;
 	}
-	if (mode & S_ISUID)
-		grants ^= FILE_WRITE_EA;
-	pgace->size = cpu_to_le16(usidsz + 8);
-	pgace->mask = cpu_to_le32(grants);
-	memcpy((char*)&pgace->sid, usid, usidsz);
-	pos += usidsz + 8;
-	acecnt++;
 
 	/* a possible ACE to deny owner what he/she would */
 	/* induely get from administrator, group or world */
@@ -2157,19 +2157,27 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		}
 	}
 
+		/* now insert grants to owner */
+	pgace = (ACCESS_ALLOWED_ACE*) &secattr[offs + pos];
+	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	pgace->size = cpu_to_le16(usidsz + 8);
+	pgace->flags = gflags;
+	pgace->mask = cpu_to_le32(grants);
+	memcpy((char*)&pgace->sid, usid, usidsz);
+	pos += usidsz + 8;
+	acecnt++;
+
 	/* a grant ACE for group */
 	/* unless group has the same rights as world */
 	/* but present if group is owner or owner is administrator */
+	/* this ACE will be inserted after denials for group */
 
 	if (adminowns
 	    || groupowns
-	    || (((mode >> 3) ^ mode) & 7)
-	    || (mode & (S_ISGID | S_ISUID))) {
-		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+	    || (((mode >> 3) ^ mode) & 7)) {
 		grants = WORLD_RIGHTS;
 		if (isdir) {
-			pgace->flags = DIR_INHERITANCE;
+			gflags = DIR_INHERITANCE;
 			if (mode & S_IXGRP)
 				grants |= DIR_EXEC;
 			if (mode & S_IWGRP)
@@ -2177,7 +2185,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			if (mode & S_IRGRP)
 				grants |= DIR_READ;
 		} else {
-			pgace->flags = FILE_INHERITANCE;
+			gflags = FILE_INHERITANCE;
 			if (mode & S_IXGRP)
 				grants |= FILE_EXEC;
 			if (mode & S_IWGRP)
@@ -2187,13 +2195,6 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			if (mode & S_ISVTX)
 				grants ^= FILE_APPEND_DATA;
 		}
-		if (mode & S_ISGID)
-			grants ^= FILE_WRITE_EA;
-		pgace->size = cpu_to_le16(gsidsz + 8);
-		pgace->mask = cpu_to_le32(grants);
-		memcpy((char*)&pgace->sid, gsid, gsidsz);
-		pos += gsidsz + 8;
-		acecnt++;
 
 		/* a possible ACE to deny group what it would get from world */
 		/* or administrator, unless owner is administrator or group */
@@ -2228,6 +2229,17 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				acecnt++;
 			}
 		}
+
+			/* now insert grants to group */
+		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+		pgace->flags = gflags;
+		pgace->size = cpu_to_le16(gsidsz + 8);
+		pgace->mask = cpu_to_le32(grants);
+		memcpy((char*)&pgace->sid, gsid, gsidsz);
+		pos += gsidsz + 8;
+		acecnt++;
+
 	}
 
 	/* an ACE for world users */
@@ -2244,8 +2256,6 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= DIR_WRITE;
 		if (mode & S_IROTH)
 			grants |= DIR_READ;
-		if (mode & S_ISVTX)
-			grants ^= FILE_ADD_SUBDIRECTORY;
 	} else {
 		pgace->flags = FILE_INHERITANCE;
 		if (mode & S_IXOTH)
@@ -2293,6 +2303,28 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	pos += ssidsz + 8;
 	acecnt++;
 
+	/* a null ACE to hold special flags */
+	/* using the same representation as cygwin */
+
+	if (mode & (S_ISVTX | S_ISGID | S_ISUID)) {
+		nsidsz = sid_size(nullsid);
+		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+		pgace->flags = NO_PROPAGATE_INHERIT_ACE;
+		pgace->size = cpu_to_le16(nsidsz + 8);
+		grants = 0;
+		if (mode & S_ISUID)
+			grants |= FILE_APPEND_DATA;
+		if (mode & S_ISGID)
+			grants |= FILE_WRITE_DATA;
+		if (mode & S_ISVTX)
+			grants |= FILE_READ_DATA;
+		pgace->mask = cpu_to_le32(grants);
+		memcpy((char*)&pgace->sid, nullsid, nsidsz);
+		pos += nsidsz + 8;
+		acecnt++;
+	}
+
 	/* fix ACL header */
 	pacl->size = cpu_to_le16(pos);
 	pacl->ace_count = cpu_to_le16(acecnt);
@@ -2332,6 +2364,8 @@ static char *build_secur_descr(mode_t mode,
 	    + 8 + wsidsz	/* one ACE for world */
 	    + 8 + asidsz 	/* one ACE for admin */
 	    + 8 + ssidsz;	/* one ACE for system */
+	if (mode & 07000)	/* a NULL ACE for special modes */
+		newattrsz += 8 + sid_size(nullsid);
 	newattr = (char*)ntfs_malloc(newattrsz);
 	if (newattr) {
 		/* build the main header part */
@@ -2479,7 +2513,7 @@ static int is_user_sid(const SID * usid)
  */
 
 static int merge_permissions(ntfs_inode *ni,
-		le32 owner, le32 group, le32 world)
+		le32 owner, le32 group, le32 world, le32 special)
 
 {
 	int perm;
@@ -2507,15 +2541,7 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of readdata or generic read */
 			if (owner & FILE_GREAD)
 				perm |= S_IRUSR;
-			/* sticky if write different from append */
-			if (((owner & FILE_STICKY)
-			    && ((owner & FILE_STICKY) != FILE_STICKY)))
-				perm |= S_ISVTX;
 		}
-		/* setuid if write_ea different from write_attr */
-		if (((owner & FILE_SETUID)
-		    && ((owner & FILE_SETUID) != FILE_SETUID)))
-			perm |= S_ISUID;
 	}
 	/* build group permission */
 	if (group) {
@@ -2540,10 +2566,6 @@ static int merge_permissions(ntfs_inode *ni,
 			if (group & FILE_GREAD)
 				perm |= S_IRGRP;
 		}
-		/* setgid if write_ea different from write_attr */
-		if (((group & FILE_SETGID)
-		    && ((group & FILE_SETGID) != FILE_SETGID)))
-			perm |= S_ISGID;
 	}
 	/* build world permission */
 	if (world) {
@@ -2557,10 +2579,6 @@ static int merge_permissions(ntfs_inode *ni,
 			/* read if any of list */
 			if (world & DIR_GREAD)
 				perm |= S_IROTH;
-			/* sticky if adddir different from delete_child */
-			if (((world & DIR_STICKY)
-			    && ((world & DIR_STICKY) != DIR_STICKY)))
-				perm |= S_ISVTX;
 		} else {
 			/* exec if execute */
 			if (world & FILE_GEXEC)
@@ -2572,6 +2590,15 @@ static int merge_permissions(ntfs_inode *ni,
 			if (world & FILE_GREAD)
 				perm |= S_IROTH;
 		}
+	}
+	/* build special permission flags */
+	if (special) {
+		if (special & FILE_APPEND_DATA)
+			perm |= S_ISUID;
+		if (special & FILE_WRITE_DATA)
+			perm |= S_ISGID;
+		if (special & FILE_READ_DATA)
+			perm |= S_ISVTX;
 	}
 	return (perm);
 }
@@ -2591,12 +2618,14 @@ static int build_std_permissions(const char *securattr,
 	int offace;
 	int acecnt;
 	int nace;
+	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
+	special = cpu_to_le32(0);
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	if (offdacl) {
@@ -2625,7 +2654,10 @@ static int build_std_permissions(const char *securattr,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-				}
+				} else
+				if ((same_sid((const SID*)&pace->sid,nullsid))
+				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+					special |= pace->mask;
 			offace += le16_to_cpu(pace->size);
 		}
 		/*
@@ -2633,12 +2665,13 @@ static int build_std_permissions(const char *securattr,
 		 * unless denied personaly, and add to group rights
 		 * granted to world unless denied specifically
 		 */
-	allowown |= (allowgrp | allowall) & ~FILE_SETUID;
-	allowgrp |= allowall & ~FILE_SETUID;
+	allowown |= (allowgrp | allowall);
+	allowgrp |= allowall;
 	return (merge_permissions(ni,
 				allowown & ~denyown,
 				allowgrp & ~denygrp,
-				allowall & ~denyall));
+				allowall & ~denyall,
+				special));
 }
 
 /*
@@ -2657,12 +2690,14 @@ static int build_owngrp_permissions(const char *securattr,
 	int offace;
 	int acecnt;
 	int nace;
+	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
+	special = cpu_to_le32(0);
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	if (offdacl) {
@@ -2689,13 +2724,17 @@ static int build_owngrp_permissions(const char *securattr,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-				}
+				} else
+				if ((same_sid((const SID*)&pace->sid,nullsid))
+				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+					special |= pace->mask;
 			offace += le16_to_cpu(pace->size);
 		}
 	return (merge_permissions(ni,
 				allowown & ~denyown,
 				allowgrp & ~denygrp,
-				allowall & ~denyall));
+				allowall & ~denyall,
+				special));
 }
 
 /*
@@ -2714,12 +2753,14 @@ static int build_ownadmin_permissions(const char *securattr,
 	int offace;
 	int acecnt;
 	int nace;
+	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
+	special = cpu_to_le32(0);
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
 	if (offdacl) {
@@ -2751,13 +2792,17 @@ static int build_ownadmin_permissions(const char *securattr,
 					else
 						if (pace->type == ACCESS_DENIED_ACE_TYPE)
 							denyall |= pace->mask;
-				}
+				} else
+				if ((same_sid((const SID*)&pace->sid,nullsid))
+				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+					special |= pace->mask;
 			offace += le16_to_cpu(pace->size);
 		}
 	return (merge_permissions(ni,
 				allowown & ~denyown,
 				allowgrp & ~denygrp,
-				allowall & ~denyall));
+				allowall & ~denyall,
+				special));
 }
 
 #if OWNERFROMACL
