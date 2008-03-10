@@ -496,9 +496,8 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 	
 	ntfs_log_trace("path: '%s'\n", pathname);
 	
-	unicode = ntfs_calloc(MAX_PATH);
 	ascii = strdup(pathname);
-	if (!unicode || !ascii) {
+	if (!ascii) {
 		ntfs_log_debug("Out of memory.\n");
 		err = ENOMEM;
 		goto out;
@@ -560,7 +559,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			/* q++; JPA */
 		}
 
-		len = ntfs_mbstoucs(p, &unicode, MAX_PATH);
+		len = ntfs_mbstoucs(p, &unicode);
 		if (len < 0) {
 			ntfs_log_debug("Couldn't convert name to Unicode: %s.\n", p);
 			err = errno;
@@ -617,6 +616,9 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			err = EIO;
 			goto close;
 		}
+	
+		free(unicode);
+		unicode = NULL;
 
 		if (q) *q++ = PATH_SEP; /* JPA */
 		p = q;
@@ -1338,6 +1340,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	fn->data_size = cpu_to_sle64(ni->data_size);
+	fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
 	/* Add FILE_NAME attribute to inode. */
 	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
@@ -1444,7 +1448,7 @@ int ntfs_check_empty_dir(ntfs_inode *ni)
 	/* Non-empty directory? */
 	if ((na->data_size != sizeof(INDEX_ROOT) + sizeof(INDEX_ENTRY_HEADER))){
 		/* Both ENOTEMPTY and EEXIST are ok. We use the more common. */
-		errno = EEXIST;
+		errno = ENOTEMPTY;
 		ntfs_log_debug("Directory is not empty\n");
 		ret = -1;
 	}
@@ -1459,7 +1463,7 @@ static int ntfs_check_unlinkable_dir(ntfs_inode *ni, FILE_NAME_ATTR *fn)
 	int ret;
 	
 	ret = ntfs_check_empty_dir(ni);
-	if (!ret || errno != EEXIST)
+	if (!ret || errno != ENOTEMPTY)
 		return ret;
 	/* 
 	 * Directory is non-empty, so we can unlink only if there is more than
@@ -1467,7 +1471,7 @@ static int ntfs_check_unlinkable_dir(ntfs_inode *ni, FILE_NAME_ATTR *fn)
 	 */
 	if ((link_count == 1) || 
 	    (link_count == 2 && fn->file_name_type == FILE_NAME_DOS)) {
-		errno = EEXIST;
+		errno = ENOTEMPTY;
 		ntfs_log_debug("Non-empty directory without hard links\n");
 		goto no_hardlink;
 	}
