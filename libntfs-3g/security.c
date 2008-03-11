@@ -2059,8 +2059,8 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	int asidsz;
 	int ssidsz;
 	int nsidsz;
-	long grants;
-	long denials;
+	le32 grants;
+	le32 denials;
 
 	usidsz = sid_size(usid);
 	gsidsz = sid_size(gsid);
@@ -2150,7 +2150,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		if (denials) {
 			pdace->type = ACCESS_DENIED_ACE_TYPE;
 			pdace->size = cpu_to_le16(usidsz + 8);
-			pdace->mask = cpu_to_le32(denials);
+			pdace->mask = denials;
 			memcpy((char*)&pdace->sid, usid, usidsz);
 			pos += usidsz + 8;
 			acecnt++;
@@ -2162,7 +2162,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 	pgace->size = cpu_to_le16(usidsz + 8);
 	pgace->flags = gflags;
-	pgace->mask = cpu_to_le32(grants);
+	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, usid, usidsz);
 	pos += usidsz + 8;
 	acecnt++;
@@ -2223,7 +2223,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			if (denials) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
-				pdace->mask = cpu_to_le32(denials);
+				pdace->mask = denials;
 				memcpy((char*)&pdace->sid, gsid, gsidsz);
 				pos += gsidsz + 8;
 				acecnt++;
@@ -2235,7 +2235,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 		pgace->flags = gflags;
 		pgace->size = cpu_to_le16(gsidsz + 8);
-		pgace->mask = cpu_to_le32(grants);
+		pgace->mask = grants;
 		memcpy((char*)&pgace->sid, gsid, gsidsz);
 		pos += gsidsz + 8;
 		acecnt++;
@@ -2266,7 +2266,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= FILE_READ;
 	}
 	pgace->size = cpu_to_le16(wsidsz + 8);
-	pgace->mask = cpu_to_le32(grants);
+	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, worldsid, wsidsz);
 	pos += wsidsz + 8;
 	acecnt++;
@@ -2282,7 +2282,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		pgace->flags = FILE_INHERITANCE;
 	pgace->size = cpu_to_le16(asidsz + 8);
 	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
-	pgace->mask = cpu_to_le32(grants);
+	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, adminsid, asidsz);
 	pos += asidsz + 8;
 	acecnt++;
@@ -2298,7 +2298,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		pgace->flags = FILE_INHERITANCE;
 	pgace->size = cpu_to_le16(ssidsz + 8);
 	grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
-	pgace->mask = cpu_to_le32(grants);
+	pgace->mask = grants;
 	memcpy((char*)&pgace->sid, systemsid, ssidsz);
 	pos += ssidsz + 8;
 	acecnt++;
@@ -2319,7 +2319,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			grants |= FILE_WRITE_DATA;
 		if (mode & S_ISVTX)
 			grants |= FILE_READ_DATA;
-		pgace->mask = cpu_to_le32(grants);
+		pgace->mask = grants;
 		memcpy((char*)&pgace->sid, nullsid, nsidsz);
 		pos += nsidsz + 8;
 		acecnt++;
