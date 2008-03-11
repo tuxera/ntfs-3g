@@ -34,6 +34,7 @@
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_PERMISSIONS_BITS 6  /* log2 of unitary allocation of permissions */
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
+#define DYNGROUPS 1             /* use dynamic groups */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -193,6 +194,12 @@ struct MAPLIST {
 	char *sidstr;		/* sid text from the same record */
 	char maptext[LINESZ + 1];
 };
+
+/*
+ *	A type large enough to hold any SID
+ */
+
+typedef char BIGSID[40];
 
 /*
  *	A few useful constants
@@ -735,17 +742,14 @@ static SID *encodesid(const char *sidstr)
 {
 	SID *sid;
 	int cnt;
-	union {
-		SID sid;
-		char bytes[8 * 4 + 8];	/* maximum size for 8 authorities */
-	} bigsid;
+	BIGSID bigsid;
 	SID *bsid;
 	long auth;
 	const char *p;
 
 	sid = (SID*) NULL;
 	if (!strncmp(sidstr, "S-1-", 4)) {
-		bsid = &bigsid.sid;
+		bsid = (SID*)&bigsid;
 		bsid->revision = SID_REVISION;
 		p = &sidstr[4];
 		auth = atoul(p);
@@ -760,7 +764,7 @@ static SID *encodesid(const char *sidstr)
 			cnt++;
 		}
 		bsid->sub_authority_count = cnt;
-		if (cnt > 0) {
+		if ((cnt > 0) && valid_sid(bsid)) {
 			sid = (SID*) ntfs_malloc(4 * cnt + 8);
 			if (sid)
 				memcpy(sid, bsid, 4 * cnt + 8);
@@ -1520,14 +1524,32 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
  *	Returns 0 (root) if not found
  */
 
-static int findowner(struct SECURITY_CONTEXT *scx, const SID * usid)
+static int findowner(struct SECURITY_CONTEXT *scx, const SID *usid)
 {
 	struct MAPPING *p;
+	BIGSID defsid;
+	SID *psid;
+	uid_t uid;
+	int cnt;
 
 	p = scx->usermapping;
-	while (p && !same_sid(usid, p->sid))
+	while (p && p->xid && !same_sid(usid, p->sid))
 		p = p->next;
-	return (p ? p->xid : 0);
+	if (p && !p->xid) {
+		/*
+		 * No explicit mapping found,
+		 * check whether default mapping applies
+		 */
+		memcpy(&defsid,p->sid,sid_size(p->sid));
+		psid = (SID*)&defsid;
+		cnt = psid->sub_authority_count;
+		psid->sub_authority[cnt-1] = usid->sub_authority[cnt-1];
+		if (same_sid(psid,usid))
+			uid = (usid->sub_authority[cnt-1]
+				- p->sid->sub_authority[cnt-1]) >> 1;
+		else uid = 0;
+	} else uid = (p ? p->xid : 0);
+	return (uid);
 }
 
 /*
@@ -1535,16 +1557,34 @@ static int findowner(struct SECURITY_CONTEXT *scx, const SID * usid)
  *	Returns 0 (root) if not found
  */
 
-static int findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
+static gid_t findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
 {
 	struct MAPPING *p;
 	int gsidsz;
+	BIGSID defsid;
+	SID *psid;
+	gid_t gid;
+	int cnt;
 
 	gsidsz = sid_size(gsid);
 	p = scx->groupmapping;
-	while (p && !same_sid(gsid, p->sid))
+	while (p && p->xid && !same_sid(gsid, p->sid))
 		p = p->next;
-	return (p ? p->xid : 0);
+	if (p && !p->xid) {
+		/*
+		 * No explicit mapping found,
+		 * check whether default mapping applies
+		 */
+		memcpy(&defsid,p->sid,sid_size(p->sid));
+		psid = (SID*)&defsid;
+		cnt = psid->sub_authority_count;
+		psid->sub_authority[cnt-1] = gsid->sub_authority[cnt-1];
+		if (same_sid(psid,gsid))
+			gid = (gsid->sub_authority[cnt-1]
+				- p->sid->sub_authority[cnt-1]) >> 1;
+		else gid = 0;
+	} else gid = (p ? p->xid : 0);
+	return (gid);
 }
 
 /*
@@ -1552,18 +1592,30 @@ static int findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
  *	Returns NULL if not found
  */
 
-static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
+static const SID *find_usid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, SID *defusid)
 {
 	struct MAPPING *p;
 	const SID *sid;
+	int cnt;
 
 	if (!uid)
 		sid = adminsid;
 	else {
 		p = scx->usermapping;
-		while (p && ((uid_t)p->xid != uid))
+		while (p && p->xid && ((uid_t)p->xid != uid))
 			p = p->next;
-		sid = (p ? p->sid : (const SID*)NULL);
+		if (p && !p->xid) {
+			/*
+			 * default has been reached :
+			 * build a specific SID according to pattern
+			 */
+			memcpy(defusid, p->sid, sid_size(p->sid));
+			cnt = defusid->sub_authority_count;
+			defusid->sub_authority[cnt-1] += 2*uid;
+			sid = defusid;
+		} else
+			sid = (p ? p->sid : (const SID*)NULL);
 	}
 	return (sid);
 }
@@ -1573,24 +1625,112 @@ static const SID *find_usid(struct SECURITY_CONTEXT *scx, uid_t uid)
  *	Returns 0 (root) if not found
  */
 
-static const SID *find_gsid(struct SECURITY_CONTEXT *scx, gid_t gid)
+static const SID *find_gsid(struct SECURITY_CONTEXT *scx,
+		gid_t gid, SID *defgsid)
 {
 	struct MAPPING *p;
 	const SID *sid;
+	int cnt;
 
 	if (!gid)
 		sid = adminsid;
 	else {
 		p = scx->groupmapping;
-		while (p && ((gid_t)p->xid != gid))
+		while (p && p->xid && ((gid_t)p->xid != gid))
 			p = p->next;
-		sid = (p ? p->sid : (const SID*)NULL);
+		if (p && !p->xid) {
+			/*
+			 * default has been reached :
+			 * build a specific SID according to pattern
+			 */
+			memcpy(defgsid, p->sid, sid_size(p->sid));
+			cnt = defgsid->sub_authority_count;
+			defgsid->sub_authority[cnt-1] += 2*gid + 1;
+			sid = defgsid;
+		} else
+			sid = (p ? p->sid : (const SID*)NULL);
 	}
 	return (sid);
 }
 
+#if DYNGROUPS
+
 /*
- *		Check whether current user is member of some group
+ *		Check whether current thread owner is member of file group
+ *
+ * The group list is available in
+ *
+ *   /proc/$PID/task/$TID/status
+ *
+ * and fuse supplies TID in get_fuse_context()->pid.  The only problem is
+ * finding out PID, for which I have no good solution, except to iterate
+ * through all processes.  This is rather slow, but may be speeded up
+ * with caching and heuristics (for single threaded programs PID = TID).
+ *
+ */
+
+static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
+{
+	char filename[64];
+	int fd;
+	BOOL found;
+	BOOL done;
+	BOOL ismember;
+	int wanted;
+	int pos;
+	int got;
+	char *start;
+	char *p;
+	gid_t grp;
+	pid_t tid;
+	char buf[BUFSZ+1];
+
+	ismember = FALSE; /* default return */
+	tid = scx->tid;
+	sprintf(filename,"/proc/%u/task/%u/status",tid,tid);
+	fd = open(filename,O_RDONLY);
+	if (fd >= 0) {
+			/* we expect a line such as "Groups: 601 603 605 607" */
+		wanted = BUFSZ;
+		pos = 0;
+		found = FALSE;
+		done = FALSE;
+		do {
+			got = read(fd, &buf[pos], wanted);
+			buf[pos + got] = 0;
+			start = strstr(buf,"\nGroups:");
+			found = start && (strchr(++start,'\n'));
+			if (!found && (got == wanted)) {
+				wanted = pos = BUFSZ/2;
+				memcpy(buf, &buf[BUFSZ/2], BUFSZ/2);
+			} else
+				done = TRUE;
+		} while (!done);
+		close(fd);
+			/* Groups record found, collect the gids */
+		if (found) {
+			p = &start[7];
+			done = FALSE;
+			do {
+				grp = 0;
+				while ((*p == ' ') || (*p == '\t')) p++;
+				if ((*p >= '0') && (*p <= '9')) {
+					while ((*p >= '0') && (*p <= '9'))
+						grp = grp*10 + (*p++) - '0';
+					ismember = (grp == gid);
+				} else
+					done = TRUE;
+			} while (!done && !ismember);
+		}
+	} else
+		ntfs_log_error("Could not open %s\n",filename);
+	return (ismember);
+}
+
+#else
+
+/*
+ *		Check whether current user is member of file group
  *	Note : this only takes into account the groups defined in
  *	/etc/group at initialization time.
  *	It does not take into account the groups dynamically set by
@@ -1621,6 +1761,8 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	}
 	return (ingroup);
 }
+
+#endif
 
 /*
  *	Cacheing is done two-way :
@@ -3131,6 +3273,8 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	int newattrsz;
 	const SID *usid;
 	const SID *gsid;
+	BIGSID defusid;
+	BIGSID defgsid;
 	le32 securid;
 #endif
 
@@ -3154,8 +3298,8 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 		/* not in cache : make sure we can create ids */
 
 	if (!cached && (scx->vol->major_ver >= 3)) {
-		usid = find_usid(scx,uid);
-		gsid = find_gsid(scx,gid);
+		usid = find_usid(scx,uid,(SID*)&defusid);
+		gsid = find_gsid(scx,gid,(SID*)&defgsid);
 		if (!usid || !gsid) {
 			ntfs_log_error("File created by an unmapped user/group %d/%d\n",
 					(int)uid, (int)gid);
@@ -3203,6 +3347,8 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 	char *newattr;
 	const SID *usid;
 	const SID *gsid;
+	BIGSID defusid;
+	BIGSID defgsid;
 	BOOL isdir;
 
 	res = 0;
@@ -3232,8 +3378,8 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			 * but recompute them to get repeatable results
 			 * which can be kept in cache.
 			 */
-		usid = find_usid(scx,uid);
-		gsid = find_gsid(scx,gid);
+		usid = find_usid(scx,uid,(SID*)&defusid);
+		gsid = find_gsid(scx,gid,(SID*)&defgsid);
 		if (!usid || !gsid) {
 			ntfs_log_error("File made owned by an unmapped user/group %d/%d\n",
 				uid, gid);
@@ -3693,6 +3839,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	const ACL *ppacl;
 	const SID *usid;
 	const SID *gsid;
+	BIGSID defusid;
+	BIGSID defgsid;
 	int offpacl;
 	int offowner;
 	int offgroup;
@@ -3709,8 +3857,8 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 
 	parentattrsz = attr_size(parentattr);
 	if (scx->usermapping) {
-		usid = find_usid(scx, scx->uid);
-		gsid = find_gsid(scx, scx->gid);
+		usid = find_usid(scx, scx->uid, (SID*)&defusid);
+		gsid = find_gsid(scx, scx->gid, (SID*)&defgsid);
 	} else
 		usid = gsid = (const SID*)NULL;
 		/*
@@ -4063,7 +4211,12 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 				if (pwd) uid = pwd->pw_uid;
 			}
 		}
-		if (uid) {
+			/*
+			 * Records with no uid and no gid are inserted
+			 * to build a default mapping
+			 */
+		if (uid
+		   || (!item->uidstr[0] && !item->gidstr[0])) {
 			sid = encodesid(item->sidstr);
 			if (sid) {
 				mapping =
@@ -4104,7 +4257,7 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 	struct MAPPING *lastmapping;
 	struct MAPPING *mapping;
 	struct group *grp;
-	BOOL uidpresent;
+	BOOL secondstep;
 	BOOL ok;
 	int step;
 	SID *sid;
@@ -4114,8 +4267,9 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 	lastmapping = (struct MAPPING*)NULL;
 	for (step=1; step<=2; step++) {
 		for (item = firstitem; item; item = item->next) {
-			uidpresent = (item->uidstr[0] != '\0');
-			ok = (step == 1 ? !uidpresent : uidpresent);
+			secondstep = (item->uidstr[0] != '\0')
+				|| !item->gidstr[0];
+			ok = (step == 1 ? !secondstep : secondstep);
 			if ((item->gidstr[0] >= '0')
 			     && (item->gidstr[0] <= '9'))
 				gid = atoi(item->gidstr);
@@ -4126,7 +4280,9 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 					if (grp) gid = grp->gr_gid;
 				}
 			}
-			if (gid && ok) {
+			if (ok
+			    && (gid
+				 || (!item->uidstr[0] && !item->gidstr[0]))) {
 				sid = encodesid(item->sidstr);
 				if (sid) {
 					mapping = (struct MAPPING*)

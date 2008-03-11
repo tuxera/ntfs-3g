@@ -119,6 +119,7 @@ struct SECURITY_CONTEXT {
 	struct PERMISSIONS_CACHE **pseccache;
 	uid_t uid; /* uid of user requesting (not the mounter) */
 	gid_t gid; /* gid of user requesting (not the mounter) */
+	pid_t tid; /* thread id of thread requesting */
 	} ;
 
 extern const GUID *const zero_guid;

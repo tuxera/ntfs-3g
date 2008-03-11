@@ -253,6 +253,7 @@ static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 	fusecontext = fuse_get_context();
 	scx->uid = fusecontext->uid;
 	scx->gid = fusecontext->gid;
+	scx->tid = fusecontext->pid;
 
 	return (ctx->security.usermapping != (struct MAPPING*)NULL);
 }
