@@ -5060,6 +5060,7 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 {
 	SII_INDEX_KEY key;
 	INDEX_ENTRY *ret;
+	BOOL found;
 	ntfs_index_context *xsii;
 
 	ret = (INDEX_ENTRY*)NULL; /* default return */
@@ -5068,8 +5069,10 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 		if (xsii) {
 			if (!entry) {
 				key.security_id = cpu_to_le32(0);
-				if (!ntfs_index_lookup((char*)&key,
-						sizeof(SII_INDEX_KEY), xsii))
+				found = !ntfs_index_lookup((char*)&key,
+						sizeof(SII_INDEX_KEY), xsii);
+				/* not supposed to find */
+				if (!found && (errno == ENOENT))
 					ret = xsii->entry;
 			} else
 				ret = ntfs_index_next(entry,xsii);
@@ -5079,7 +5082,7 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 			errno = EOPNOTSUPP;
 	} else
 		errno = EINVAL;
-	return (entry);
+	return (ret);
 }
 
 /*
@@ -5093,6 +5096,7 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 {
 	SDH_INDEX_KEY key;
 	INDEX_ENTRY *ret;
+	BOOL found;
 	ntfs_index_context *xsdh;
 
 	ret = (INDEX_ENTRY*)NULL; /* default return */
@@ -5102,8 +5106,10 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 			if (!entry) {
 				key.hash = cpu_to_le32(0);
 				key.security_id = cpu_to_le32(0);
-				if (!ntfs_index_lookup((char*)&key,
-						sizeof(SDH_INDEX_KEY), xsdh))
+				found = !ntfs_index_lookup((char*)&key,
+						sizeof(SDH_INDEX_KEY), xsdh);
+				/* not supposed to find */
+				if (!found && (errno == ENOENT))
 					ret = xsdh->entry;
 			} else
 				ret = ntfs_index_next(entry,xsdh);
@@ -5112,7 +5118,7 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 		} else errno = ENOTSUP;
 	} else
 		errno = EINVAL;
-	return (entry);
+	return (ret);
 }
 
 /*
