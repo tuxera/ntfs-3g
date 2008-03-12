@@ -34,7 +34,6 @@
 #define LINESZ 120              /* maximum useful size of a mapping line */
 #define CACHE_PERMISSIONS_BITS 6  /* log2 of unitary allocation of permissions */
 #define CACHE_PERMISSIONS_SIZE 262144 /* max cacheable permissions */
-#define DYNGROUPS 1             /* use dynamic groups */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -97,18 +96,11 @@
 	 	| READ_CONTROL | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
 #define DIR_EXEC (FILE_TRAVERSE)
 
-	  /* flags which must be different to mean sticky bit */
-#define FILE_STICKY (FILE_WRITE_DATA | FILE_APPEND_DATA)
-#define DIR_STICKY (FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)
-	  /* flags which must be different to mean setuid or setgid */
-#define FILE_SETUID (FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
-#define FILE_SETGID (FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
-
           /* flags tested for meaning exec, write or read */
 	  /* tests for write allow for interpretation of a sticky bit */
 
 #define FILE_GREAD (FILE_READ_DATA | GENERIC_READ)
-#define FILE_GWRITE (FILE_WRITE_DATA | GENERIC_WRITE)
+#define FILE_GWRITE (FILE_WRITE_DATA | FILE_APPEND_DATA | GENERIC_WRITE)
 #define FILE_GEXEC (FILE_EXECUTE | GENERIC_EXECUTE)
 #define DIR_GREAD (FILE_LIST_DIRECTORY | GENERIC_READ)
 #define DIR_GWRITE (FILE_ADD_FILE | GENERIC_WRITE)
@@ -572,6 +564,43 @@ static BOOL same_sid(const SID *first, const SID *second)
 }
 
 /*
+ *		Test whether a SID means "world user"
+ *	Local users group also recognized as world
+ */
+
+static int is_world_sid(const SID * usid)
+{
+	return (
+	     /* check whether S-1-1-0 : world */
+	       ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
+	    && (usid->sub_authority[0] == 0))
+
+	     /* check whether S-1-5-32-545 : local user */
+	  ||   ((usid->sub_authority_count == 2)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] == cpu_to_le32(32))
+	    && (usid->sub_authority[1] == cpu_to_le32(545)))
+		);
+}
+
+/*
+ *		Test whether a SID means "some user (or group)"
+ *	Currently we only check for S-1-5-21... but we should
+ *	probably test for other configurations
+ */
+
+static int is_user_sid(const SID * usid)
+{
+	return ((usid->sub_authority_count == 5)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
+}
+
+/*
  *		Determine the size of a security attribute
  *	whatever the order of fields
  */
@@ -641,6 +670,26 @@ static BOOL valid_sid(const SID *sid)
 	return ((sid->revision == SID_REVISION)
 		&& (sid->sub_authority_count >= 1)
 		&& (sid->sub_authority_count <= 8));
+}
+
+/*
+ *		Check whether a SID is acceptable for an implicit
+ *	mapping pattern.
+ *	It should have been already checked it is a valid user SID.
+ *
+ *	The last authority reference has to be >= 1000 (Windows usage)
+ *	and <= 0x7fffffff, so that 30 bits from a uid and 30 more bits
+ *      from a gid an be inserted with no overflow.
+ */
+
+static BOOL valid_pattern(const SID *sid)
+{
+	int cnt;
+	u32 auth;
+
+	cnt = sid->sub_authority_count;
+	auth = le32_to_cpu(sid->sub_authority[cnt-1]);
+	return ((auth >= 1000) && (auth <= 0x7fffffff));
 }
 
 
@@ -735,7 +784,7 @@ static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
 /*
  *		Build an internal representation of a SID
  *	Returns a copy in allocated memory if it succeeds
- *	Currently it does only safety checks on input
+ *	The SID is checked to be a valid user one.
  */
 
 static SID *encodesid(const char *sidstr)
@@ -764,7 +813,7 @@ static SID *encodesid(const char *sidstr)
 			cnt++;
 		}
 		bsid->sub_authority_count = cnt;
-		if ((cnt > 0) && valid_sid(bsid)) {
+		if ((cnt > 0) && valid_sid(bsid) && is_user_sid(bsid)) {
 			sid = (SID*) ntfs_malloc(4 * cnt + 8);
 			if (sid)
 				memcpy(sid, bsid, 4 * cnt + 8);
@@ -1518,6 +1567,51 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
 	return (res);
 }
 
+/*
+ *		Compute the uid or gid associated to a SID
+ *	through an implicit mapping
+ *
+ *	Returns 0 (root) if it does not match pattern
+ */
+
+static int findimplicit(const SID *xsid, const SID *pattern)
+{
+	BIGSID defsid;
+	SID *psid;
+	int xid; /* uid or gid */
+	int cnt;
+	int carry;
+
+	memcpy(&defsid,pattern,sid_size(pattern));
+	psid = (SID*)&defsid;
+	cnt = psid->sub_authority_count;
+	psid->sub_authority[cnt-1] = xsid->sub_authority[cnt-1];
+		/* direct check for basic situation */
+	if (same_sid(psid,xsid))
+		xid = ((le32_to_cpu(xsid->sub_authority[cnt-1])
+			- le32_to_cpu(pattern->sub_authority[cnt-1])) >> 1)
+			& 0x3fffffff;
+	else {
+		/*
+		 * check whether part of mapping had to be recorded
+		 * in a higher level authority
+		 */
+		carry = 1;
+		do {
+			psid->sub_authority[cnt-2]
+				= cpu_to_le32(le32_to_cpu(
+					psid->sub_authority[cnt-2]) + 1);
+		} while (!same_sid(psid,xsid) && (++carry < 4));
+		if (carry < 4)
+			xid = (((le32_to_cpu(xsid->sub_authority[cnt-1])
+				- le32_to_cpu(pattern->sub_authority[cnt-1])) >> 1)
+				& 0x3fffffff) | (carry << 30);
+		else
+			xid = 0;
+	}
+	return (xid);
+}
+
 
 /*
  *		Find Linux owner mapped to a usid
@@ -1527,28 +1621,18 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
 static int findowner(struct SECURITY_CONTEXT *scx, const SID *usid)
 {
 	struct MAPPING *p;
-	BIGSID defsid;
-	SID *psid;
 	uid_t uid;
-	int cnt;
 
 	p = scx->usermapping;
 	while (p && p->xid && !same_sid(usid, p->sid))
 		p = p->next;
-	if (p && !p->xid) {
+	if (p && !p->xid)
 		/*
-		 * No explicit mapping found,
-		 * check whether default mapping applies
+		 * No explicit mapping found, try implicit mapping
 		 */
-		memcpy(&defsid,p->sid,sid_size(p->sid));
-		psid = (SID*)&defsid;
-		cnt = psid->sub_authority_count;
-		psid->sub_authority[cnt-1] = usid->sub_authority[cnt-1];
-		if (same_sid(psid,usid))
-			uid = (usid->sub_authority[cnt-1]
-				- p->sid->sub_authority[cnt-1]) >> 1;
-		else uid = 0;
-	} else uid = (p ? p->xid : 0);
+		uid = findimplicit(usid,p->sid);
+	else
+		uid = (p ? p->xid : 0);
 	return (uid);
 }
 
@@ -1561,29 +1645,19 @@ static gid_t findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
 {
 	struct MAPPING *p;
 	int gsidsz;
-	BIGSID defsid;
-	SID *psid;
 	gid_t gid;
-	int cnt;
 
 	gsidsz = sid_size(gsid);
 	p = scx->groupmapping;
 	while (p && p->xid && !same_sid(gsid, p->sid))
 		p = p->next;
-	if (p && !p->xid) {
+	if (p && !p->xid)
 		/*
-		 * No explicit mapping found,
-		 * check whether default mapping applies
+		 * No explicit mapping found, try implicit mapping
 		 */
-		memcpy(&defsid,p->sid,sid_size(p->sid));
-		psid = (SID*)&defsid;
-		cnt = psid->sub_authority_count;
-		psid->sub_authority[cnt-1] = gsid->sub_authority[cnt-1];
-		if (same_sid(psid,gsid))
-			gid = (gsid->sub_authority[cnt-1]
-				- p->sid->sub_authority[cnt-1]) >> 1;
-		else gid = 0;
-	} else gid = (p ? p->xid : 0);
+		gid = findimplicit(gsid,p->sid);
+	else
+		gid = (p ? p->xid : 0);
 	return (gid);
 }
 
@@ -1607,12 +1681,22 @@ static const SID *find_usid(struct SECURITY_CONTEXT *scx,
 			p = p->next;
 		if (p && !p->xid) {
 			/*
-			 * default has been reached :
-			 * build a specific SID according to pattern
+			 * default pattern has been reached :
+			 * build an implicit SID according to pattern
+			 * (the pattern format was checked while reading
+			 * the mapping file)
 			 */
 			memcpy(defusid, p->sid, sid_size(p->sid));
 			cnt = defusid->sub_authority_count;
-			defusid->sub_authority[cnt-1] += 2*uid;
+			defusid->sub_authority[cnt-1]
+				= cpu_to_le32(
+					le32_to_cpu(defusid->sub_authority[cnt-1])
+					+ 2*(uid & 0x3fffffff));
+			if (uid & 0xc0000000)
+				defusid->sub_authority[cnt-2]
+					= cpu_to_le32(
+						le32_to_cpu(defusid->sub_authority[cnt-2])
+						+ ((uid >> 30) & 3));
 			sid = defusid;
 		} else
 			sid = (p ? p->sid : (const SID*)NULL);
@@ -1640,12 +1724,22 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx,
 			p = p->next;
 		if (p && !p->xid) {
 			/*
-			 * default has been reached :
-			 * build a specific SID according to pattern
+			 * default pattern has been reached :
+			 * build an implicit SID according to pattern
+			 * (the pattern format was checked while reading
+			 * the mapping file)
 			 */
 			memcpy(defgsid, p->sid, sid_size(p->sid));
 			cnt = defgsid->sub_authority_count;
-			defgsid->sub_authority[cnt-1] += 2*gid + 1;
+			defgsid->sub_authority[cnt-1]
+				= cpu_to_le32(
+					le32_to_cpu(defgsid->sub_authority[cnt-1])
+					+ 2*(gid & 0x3fffffff) + 1);
+			if (gid & 0xc0000000)
+				defgsid->sub_authority[cnt-2]
+					= cpu_to_le32(
+						le32_to_cpu(defgsid->sub_authority[cnt-2])
+						+ ((gid >> 30) & 3));
 			sid = defgsid;
 		} else
 			sid = (p ? p->sid : (const SID*)NULL);
@@ -1653,94 +1747,22 @@ static const SID *find_gsid(struct SECURITY_CONTEXT *scx,
 	return (sid);
 }
 
-#if DYNGROUPS
-
 /*
- *		Check whether current thread owner is member of file group
+ *		Optional simplified checking of group membership
  *
- * The group list is available in
- *
- *   /proc/$PID/task/$TID/status
- *
- * and fuse supplies TID in get_fuse_context()->pid.  The only problem is
- * finding out PID, for which I have no good solution, except to iterate
- * through all processes.  This is rather slow, but may be speeded up
- * with caching and heuristics (for single threaded programs PID = TID).
- *
- */
-
-static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
-{
-	char filename[64];
-	int fd;
-	BOOL found;
-	BOOL done;
-	BOOL ismember;
-	int wanted;
-	int pos;
-	int got;
-	char *start;
-	char *p;
-	gid_t grp;
-	pid_t tid;
-	char buf[BUFSZ+1];
-
-	ismember = FALSE; /* default return */
-	tid = scx->tid;
-	sprintf(filename,"/proc/%u/task/%u/status",tid,tid);
-	fd = open(filename,O_RDONLY);
-	if (fd >= 0) {
-			/* we expect a line such as "Groups: 601 603 605 607" */
-		wanted = BUFSZ;
-		pos = 0;
-		found = FALSE;
-		done = FALSE;
-		do {
-			got = read(fd, &buf[pos], wanted);
-			buf[pos + got] = 0;
-			start = strstr(buf,"\nGroups:");
-			found = start && (strchr(++start,'\n'));
-			if (!found && (got == wanted)) {
-				wanted = pos = BUFSZ/2;
-				memcpy(buf, &buf[BUFSZ/2], BUFSZ/2);
-			} else
-				done = TRUE;
-		} while (!done);
-		close(fd);
-			/* Groups record found, collect the gids */
-		if (found) {
-			p = &start[7];
-			done = FALSE;
-			do {
-				grp = 0;
-				while ((*p == ' ') || (*p == '\t')) p++;
-				if ((*p >= '0') && (*p <= '9')) {
-					while ((*p >= '0') && (*p <= '9'))
-						grp = grp*10 + (*p++) - '0';
-					ismember = (grp == gid);
-				} else
-					done = TRUE;
-			} while (!done && !ismember);
-		}
-	} else
-		ntfs_log_error("Could not open %s\n",filename);
-	return (ismember);
-}
-
-#else
-
-/*
- *		Check whether current user is member of file group
- *	Note : this only takes into account the groups defined in
+ *	This only takes into account the groups defined in
  *	/etc/group at initialization time.
  *	It does not take into account the groups dynamically set by
  *	setgroups() nor the changes in /etc/group since initialization
+ *
+ *	This optional method could be useful if standard checking
+ *	leads to a performance concern.
  *
  *	Should not be called for user root, however the group may be root
  *
  */
 
-static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
+static BOOL staticgroupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 {
 	BOOL ingroup;
 	int grcnt;
@@ -1762,7 +1784,91 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	return (ingroup);
 }
 
-#endif
+
+/*
+ *		Check whether current thread owner is member of file group
+ *
+ *	Should not be called for user root, however the group may be root
+ *
+ * As indicated by Miklos Szeredi :
+ *
+ * The group list is available in
+ *
+ *   /proc/$PID/task/$TID/status
+ *
+ * and fuse supplies TID in get_fuse_context()->pid.  The only problem is
+ * finding out PID, for which I have no good solution, except to iterate
+ * through all processes.  This is rather slow, but may be speeded up
+ * with caching and heuristics (for single threaded programs PID = TID).
+ *
+ * The following implementation gets the group list from
+ *   /proc/$TID/task/$TID/status which apparently exists and
+ * contains the same data.
+ */
+
+static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
+{
+	char filename[64];
+	int fd;
+	BOOL found;
+	BOOL done;
+	BOOL ismember;
+	int wanted;
+	int pos;
+	int got;
+	char *start;
+	char *p;
+	gid_t grp;
+	pid_t tid;
+	char buf[BUFSZ+1];
+
+	if (scx->vol->flags & (1 << SECURITY_STATICGRPS))
+		ismember = staticgroupmember(scx, uid, gid);
+	else {
+		ismember = FALSE; /* default return */
+		tid = scx->tid;
+		sprintf(filename,"/proc/%u/task/%u/status",tid,tid);
+		fd = open(filename,O_RDONLY);
+		if (fd >= 0) {
+				/* we expect a line such as "Groups: 601 603 605 607" */
+			wanted = BUFSZ;
+			pos = 0;
+			found = FALSE;
+			done = FALSE;
+			do {
+				got = read(fd, &buf[pos], wanted);
+				buf[pos + got] = 0;
+				start = strstr(buf,"\nGroups:");
+				found = start && (strchr(++start,'\n'));
+				if (!found && (got == wanted)) {
+					wanted = pos = BUFSZ/2;
+					memcpy(buf, &buf[BUFSZ/2], BUFSZ/2);
+				} else
+					done = TRUE;
+			} while (!done);
+			close(fd);
+				/* Groups record found, check the gids */
+			if (found) {
+				p = &start[7];
+				done = FALSE;
+				do {
+					grp = 0;
+					while ((*p == ' ') || (*p == '\t')) p++;
+					if ((*p >= '0') && (*p <= '9')) {
+						while ((*p >= '0') && (*p <= '9'))
+							grp = grp*10 + (*p++) - '0';
+						ismember = (grp == gid);
+					} else
+						done = TRUE;
+				} while (!done && !ismember);
+			} else
+				ntfs_log_error("No group record found in %s\n",filename);
+		} else
+			ntfs_log_error("Could not open %s\n",filename);
+	}
+	return (ismember);
+}
+
 
 /*
  *	Cacheing is done two-way :
@@ -2334,8 +2440,6 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				grants |= FILE_WRITE;
 			if (mode & S_IRGRP)
 				grants |= FILE_READ;
-			if (mode & S_ISVTX)
-				grants ^= FILE_APPEND_DATA;
 		}
 
 		/* a possible ACE to deny group what it would get from world */
@@ -2610,43 +2714,6 @@ static char *getsecurityattr(ntfs_volume *vol,
 		securattr = build_secur_descr(0, 0, adminsid, adminsid);
 	}
 	return (securattr);
-}
-
-/*
- *		Test whether a SID means "world user"
- *	Local users group also recognized as world
- */
-
-static int is_world_sid(const SID * usid)
-{
-	return (
-	     /* check whether S-1-1-0 : world */
-	       ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
-	    && (usid->sub_authority[0] == 0))
-
-	     /* check whether S-1-5-32-545 : local user */
-	  ||   ((usid->sub_authority_count == 2)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-	    && (usid->sub_authority[0] == cpu_to_le32(32))
-	    && (usid->sub_authority[1] == cpu_to_le32(545)))
-		);
-}
-
-/*
- *		Test whether a SID means "some user"
- *	Currently we only check for S-1-5-21... but we should
- *	probably test for other configurations
- */
-
-static int is_user_sid(const SID * usid)
-{
-	return ((usid->sub_authority_count == 5)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
 }
 
 /*
@@ -4213,11 +4280,17 @@ static struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 		}
 			/*
 			 * Records with no uid and no gid are inserted
-			 * to build a default mapping
+			 * to define the implicit mapping pattern
 			 */
 		if (uid
 		   || (!item->uidstr[0] && !item->gidstr[0])) {
 			sid = encodesid(item->sidstr);
+			if (sid && !item->uidstr[0] && !item->gidstr[0]
+			    && !valid_pattern(sid)) {
+				ntfs_log_error("Bad implicit SID pattern %s\n",
+					item->sidstr);
+				sid = (SID*)NULL;
+				}
 			if (sid) {
 				mapping =
 				    (struct MAPPING*)
@@ -4280,10 +4353,19 @@ static struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 					if (grp) gid = grp->gr_gid;
 				}
 			}
+			/*
+			 * Records with no uid and no gid are inserted in the
+			 * second step to define the implicit mapping pattern
+			 */
 			if (ok
 			    && (gid
 				 || (!item->uidstr[0] && !item->gidstr[0]))) {
 				sid = encodesid(item->sidstr);
+				if (sid && !item->uidstr[0] && !item->gidstr[0]
+				    && !valid_pattern(sid)) {
+					/* error already logged */
+					sid = (SID*)NULL;
+					}
 				if (sid) {
 					mapping = (struct MAPPING*)
 					    ntfs_malloc(sizeof(struct MAPPING));

@@ -105,7 +105,8 @@ struct PERMISSIONS_CACHE {
  */
 
 enum {
-	SECURITY_ADDSECURIDS	/* upgrade old security descriptors */
+	SECURITY_ADDSECURIDS,	/* upgrade old security descriptors */
+	SECURITY_STATICGRPS	/* use static groups for access control */
 } ;
 
 /*

@@ -137,6 +137,7 @@ typedef struct {
 	struct fuse_chan *fc;
 	BOOL inherit;
 	BOOL addsecurids;
+	BOOL staticgrps;
 	char *usermap_path;
 	struct PERMISSIONS_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
@@ -2197,6 +2198,12 @@ static char *parse_mount_options(const char *orig_opts)
 			 * with an individual security attribute
 			 */
 			ctx->addsecurids = TRUE;
+		} else if (!strcmp(opt, "staticgrps")) {
+			/*
+			 * JPA use static definition of groups
+			 * for file access control
+			 */
+			ctx->staticgrps = TRUE;
 		} else if (!strcmp(opt, "usermapping")) {
 			if (!val) {
 				ntfs_log_error("'usermapping' option should have "
@@ -2657,6 +2664,8 @@ int main(int argc, char *argv[])
 	ctx->vol->secure_flags = 0;
 	if (ctx->addsecurids && !ctx->ro)
 		ctx->vol->secure_flags = (1 << SECURITY_ADDSECURIDS);
+	if (ctx->staticgrps)
+		ctx->vol->secure_flags = (1 << SECURITY_STATICGRPS);
 		/* JPA open $Secure, (whatever NTFS version !) */
 		/* to initialize security data */
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
