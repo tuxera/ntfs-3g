@@ -1127,8 +1127,8 @@ ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
 		int eo = errno;
 		ntfs_device_free(dev);
 		errno = eo;
-	}
-	ntfs_create_lru_caches(vol);
+	} else
+		ntfs_create_lru_caches(vol);
 	return vol;
 #else
 	/*
