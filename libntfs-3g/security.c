@@ -1808,19 +1808,18 @@ static BOOL staticgroupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid
 
 static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 {
+	static char key[] = "\nGroups:";
+	char buf[BUFSZ+1];
 	char filename[64];
+	enum { INKEY, INSEP, INNUM, INEND } state;
 	int fd;
-	BOOL found;
-	BOOL done;
+	char c;
+	int matched;
 	BOOL ismember;
-	int wanted;
-	int pos;
 	int got;
-	char *start;
 	char *p;
 	gid_t grp;
 	pid_t tid;
-	char buf[BUFSZ+1];
 
 	if (scx->vol->flags & (1 << SECURITY_STATICGRPS))
 		ismember = staticgroupmember(scx, uid, gid);
@@ -1830,39 +1829,61 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 		sprintf(filename,"/proc/%u/task/%u/status",tid,tid);
 		fd = open(filename,O_RDONLY);
 		if (fd >= 0) {
-				/* we expect a line such as "Groups: 601 603 605 607" */
-			wanted = BUFSZ;
-			pos = 0;
-			found = FALSE;
-			done = FALSE;
+			got = read(fd, buf, BUFSZ);
+			buf[got] = 0;
+			state = INKEY;
+			matched = 0;
+			p = buf;
+			grp = 0;
+				/*
+				 *  A simple automaton to process lines like
+				 *  Groups: 14 500 513
+				 */
 			do {
-				got = read(fd, &buf[pos], wanted);
-				buf[pos + got] = 0;
-				start = strstr(buf,"\nGroups:");
-				found = start && (strchr(++start,'\n'));
-				if (!found && (got == wanted)) {
-					wanted = pos = BUFSZ/2;
-					memcpy(buf, &buf[BUFSZ/2], BUFSZ/2);
-				} else
-					done = TRUE;
-			} while (!done);
-			close(fd);
-				/* Groups record found, check the gids */
-			if (found) {
-				p = &start[7];
-				done = FALSE;
-				do {
-					grp = 0;
-					while ((*p == ' ') || (*p == '\t')) p++;
-					if ((*p >= '0') && (*p <= '9')) {
-						while ((*p >= '0') && (*p <= '9'))
-							grp = grp*10 + (*p++) - '0';
-						ismember = (grp == gid);
+				c = *p++;
+				if (!c) {
+					/* refill buffer */
+					got = read(fd, buf, BUFSZ);
+					buf[got] = 0;
+					p = buf;
+					c = *p++; /* 0 at end of file */
+				}
+				switch (state) {
+				case INKEY :
+					if (key[matched] == c) {
+						if (!key[++matched])
+							state = INSEP;
 					} else
-						done = TRUE;
-				} while (!done && !ismember);
-			} else
-				ntfs_log_error("No group record found in %s\n",filename);
+						if (key[0] == c)
+							matched = 1;
+						else
+							matched = 0;
+					break;
+				case INSEP :
+					if ((c >= '0') && (c <= '9')) {
+						grp = c - '0';
+						state = INNUM;
+					} else
+						if ((c != ' ') && (c != '\t'))
+							state = INEND;
+					break;
+				case INNUM :
+					if ((c >= '0') && (c <= '9'))
+						grp = grp*10 + c - '0';
+					else {
+						ismember = (grp == gid);
+						if ((c != ' ') && (c != '\t'))
+							state = INEND;
+						else
+							state = INSEP;
+					}
+				default :
+					break;
+				}
+			} while (!ismember && c && (state != INEND));
+		close(fd);
+		if (!c)
+			ntfs_log_error("No group record found in %s\n",filename);
 		} else
 			ntfs_log_error("Could not open %s\n",filename);
 	}
