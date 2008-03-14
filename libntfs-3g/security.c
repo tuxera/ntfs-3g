@@ -1821,7 +1821,7 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	gid_t grp;
 	pid_t tid;
 
-	if (scx->vol->flags & (1 << SECURITY_STATICGRPS))
+	if (scx->vol->secure_flags & (1 << SECURITY_STATICGRPS))
 		ismember = staticgroupmember(scx, uid, gid);
 	else {
 		ismember = FALSE; /* default return */
@@ -3229,7 +3229,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				 */
 				if (!test_nino_flag(ni, v3_Extensions)
 				   && (perm >= 0)
-				   && (scx->vol->flags
+				   && (scx->vol->secure_flags
 				     & (1 << SECURITY_ADDSECURIDS))) {
 					upgrade_secur_desc(scx->vol, path,
 						securattr, ni);
@@ -3315,7 +3315,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 				 * and upgrade option is selected
 				 */
 					if (!test_nino_flag(ni, v3_Extensions)
-					   && (scx->vol->flags
+					   && (scx->vol->secure_flags
 					     & (1 << SECURITY_ADDSECURIDS))) {
 						upgrade_secur_desc(scx->vol,
 							 path, securattr, ni);

@@ -2663,9 +2663,9 @@ int main(int argc, char *argv[])
 	ctx->security.gid = ctx->gid;
 	ctx->vol->secure_flags = 0;
 	if (ctx->addsecurids && !ctx->ro)
-		ctx->vol->secure_flags = (1 << SECURITY_ADDSECURIDS);
+		ctx->vol->secure_flags |= (1 << SECURITY_ADDSECURIDS);
 	if (ctx->staticgrps)
-		ctx->vol->secure_flags = (1 << SECURITY_STATICGRPS);
+		ctx->vol->secure_flags |= (1 << SECURITY_STATICGRPS);
 		/* JPA open $Secure, (whatever NTFS version !) */
 		/* to initialize security data */
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
