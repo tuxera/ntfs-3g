@@ -489,17 +489,16 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
         *typep = type;
         *mnt_optsp = mnt_opts;
     }
-    free(optbuf);
-
-    return res;
-
- err:
+out:    
     free(fsname);
+    free(optbuf);
+    return res;
+err:
     free(source);
     free(type);
     free(mnt_opts);
-    free(optbuf);
-    return -1;
+    res = -1;
+    goto out;
 }
 
 static int check_perm(const char **mntp, struct stat *stbuf, int *currdir_fd,
