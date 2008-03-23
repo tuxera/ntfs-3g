@@ -729,5 +729,6 @@ int fusermount(int unmount, int quiet, int lazy, const char *opts,
 	    res = mount_fuse(mnt, opts);
 out:    
     umask(old_umask);
+    free(mnt);
     return res;	    
 }
