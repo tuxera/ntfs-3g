@@ -5252,6 +5252,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				ntfs_malloc(sizeof(struct SECURITY_API));
 			if (scapi) {
 				scapi->magic = MAGIC_API;
+				scapi->seccache = (struct PERMISSIONS_CACHE*)NULL;
 				scx = &scapi->security;
 				scx->vol = vol;
 				scx->uid = getuid();
