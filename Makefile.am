@@ -1,17 +1,23 @@
 
-SUBDIRS = include libntfs-3g src
-
-EXTRA_DIST = AUTHORS CREDITS COPYING INSTALL NEWS README autogen.sh  
 AUTOMAKE_OPTIONS = gnu
 
-MAINTAINERCLEANFILES = configure Makefile.in aclocal.m4 compile depcomp \
-	install-sh ltmain.sh missing config.guess config.sub config.h.in INSTALL
+EXTRA_DIST = AUTHORS CREDITS COPYING NEWS autogen.sh  
 
-libtool: $(LIBTOOL_DEPS)
-	$(SHELL) ./config.status --recheck
+MAINTAINERCLEANFILES=\
+	configure \
+	Makefile.in \
+	aclocal.m4 \
+	compile \
+	depcomp \
+	install-sh \
+	ltmain.sh \
+	missing \
+	config.guess \
+	config.sub \
+	config.h.in \
+	config.h.in~ \
+	INSTALL
 
-strip:
-	(cd src && $(MAKE) strip) || exit 1;
+SUBDIRS= include libfuse-lite libntfs-3g src
 
-libs:
-	(cd libntfs-3g && $(MAKE) libs) || exit 1;
+doc_DATA = README
