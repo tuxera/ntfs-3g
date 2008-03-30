@@ -2178,7 +2178,7 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache") == -1)
+	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=0") == -1)
 		goto err;
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
