@@ -1288,7 +1288,8 @@ ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, ntfschar *name, u8 name_len,
 		ntfschar *target, u8 target_len)
 {
 	if (!target || !target_len) {
-		ntfs_log_error("Invalid arguments.\n");
+		ntfs_log_error("%s: Invalid argument (%p, %d)\n", __FUNCTION__,
+			       target, target_len);
 		return NULL;
 	}
 	return __ntfs_create(dir_ni, name, name_len, S_IFLNK, 0,
