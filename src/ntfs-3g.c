@@ -2238,7 +2238,7 @@ static char *parse_mount_options(const char *orig_opts)
 		goto err_exit;
 	else if (ctx->atime == ATIME_ENABLED && strappend(&ret, "atime,"))
 		goto err_exit;
-	else if (strappend(&ret, "noatime,"))
+	else if (ctx->atime == ATIME_DISABLED && strappend(&ret, "noatime,"))
 		goto err_exit;
 	
 	if (strappend(&ret, "fsname="))
