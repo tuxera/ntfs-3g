@@ -73,7 +73,7 @@ extern ntfs_inode *ntfs_create(ntfs_inode *dir_ni, le32 securid,
 extern ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, le32 securid,
 		ntfschar *name, u8 name_len, dev_t type, dev_t dev);
 extern ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, le32 securid,
-		ntfschar *name, u8 name_len, ntfschar *target, u8 target_len);
+		ntfschar *name, u8 name_len, ntfschar *target, int target_len);
 extern int ntfs_check_empty_dir(ntfs_inode *ni);
 extern int ntfs_delete(ntfs_volume *vol, const char *path,
 		ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,

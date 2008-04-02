@@ -1157,7 +1157,7 @@ err_out:
  */
 static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		ntfschar *name, u8 name_len, dev_t type, dev_t dev,
-		ntfschar *target, u8 target_len)
+		ntfschar *target, int target_len)
 {
 	ntfs_inode *ni;
 	int rollback_data = 0, rollback_sd = 0;
@@ -1420,7 +1420,7 @@ ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, le32 securid,
 }
 
 ntfs_inode *ntfs_create_symlink(ntfs_inode *dir_ni, le32 securid,
-		ntfschar *name,	u8 name_len, ntfschar *target, u8 target_len)
+		ntfschar *name,	u8 name_len, ntfschar *target, int target_len)
 {
 	if (!target || !target_len) {
 		ntfs_log_error("Invalid arguments.\n");
