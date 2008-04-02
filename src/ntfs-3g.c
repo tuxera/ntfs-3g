@@ -404,10 +404,11 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			 * Check whether it's Interix symbolic link, block or
 			 * character device.
 			 */
-			if (na->data_size <= sizeof(INTX_FILE_TYPES) + sizeof(
-					ntfschar) * MAX_PATH && na->data_size >
-					sizeof(INTX_FILE_TYPES) &&
-					!stream_name_len) {
+			if (na->data_size <= sizeof(INTX_FILE_TYPES) + 
+			    sizeof(ntfschar) * PATH_MAX && 
+			    na->data_size > sizeof(INTX_FILE_TYPES) && 
+			    !stream_name_len) {
+				
 				INTX_FILE *intx_file;
 
 				intx_file = ntfs_malloc(na->data_size);
@@ -501,7 +502,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	if (na->data_size > sizeof(INTX_FILE_TYPES) +
-			sizeof(ntfschar) * MAX_PATH) {
+			sizeof(ntfschar) * PATH_MAX) {
 		res = -ENAMETOOLONG;
 		goto exit;
 	}
