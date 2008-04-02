@@ -3047,6 +3047,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	u32 attr_rec_size;
 	int err, i, offset;
 	BOOL is_resident;
+	BOOL can_be_non_resident = FALSE;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
 
@@ -3089,7 +3090,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 			ntfs_log_perror("Attribute is too big");
 			return -1;
 		}
-	}
+	} else
+		can_be_non_resident = TRUE;
 
 	/*
 	 * Determine resident or not will be new attribute. We add 8 to size in
@@ -3162,6 +3164,8 @@ add_attr_record:
 		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
 				name_len, val, size, 0);
 		if (offset < 0) {
+			if (errno == ENOSPC && can_be_non_resident)
+				goto add_non_resident;
 			err = errno;
 			ntfs_log_perror("Failed to add resident attribute");
 			goto free_err_out;
@@ -3169,6 +3173,7 @@ add_attr_record:
 		return 0;
 	}
 
+add_non_resident:
 	/* Add non resident attribute. */
 	offset = ntfs_non_resident_attr_record_add(attr_ni, type, name,
 				name_len, 0, 8, 0);
