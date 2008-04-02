@@ -2585,9 +2585,9 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 	size = (size + 7) & ~7;
 
 	/* Rigorous consistency checks. */
-	if (!m || !pos || pos < (u8*)m || pos + size >
-			(u8*)m + le32_to_cpu(m->bytes_allocated)) {
+	if (!m || !pos || pos < (u8*)m) {
 		errno = EINVAL;
+		ntfs_log_perror("%s: pos=%p  m=%p", __FUNCTION__, pos, m);
 		return -1;
 	}
 	/* The -8 is for the attribute terminator. */
@@ -2601,7 +2601,8 @@ int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size)
 
 	biu = le32_to_cpu(m->bytes_in_use);
 	/* Do we have enough space? */
-	if (biu + size > le32_to_cpu(m->bytes_allocated)) {
+	if (biu + size > le32_to_cpu(m->bytes_allocated) ||
+	    pos + size > (u8*)m + le32_to_cpu(m->bytes_allocated)) {
 		errno = ENOSPC;
 		ntfs_log_trace("No enough space in the MFT record\n");
 		return -1;
