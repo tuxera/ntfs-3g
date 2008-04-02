@@ -439,7 +439,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			 * character device.
 			 */
 			if (((size_t)na->data_size <= sizeof(INTX_FILE_TYPES)
-					+ sizeof(ntfschar) * MAX_PATH)
+					+ sizeof(ntfschar) * PATH_MAX)
 					&& ((size_t)na->data_size >
 						sizeof(INTX_FILE_TYPES)) &&
 					!stream_name_len) {
@@ -544,7 +544,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 	if ((size_t)na->data_size > sizeof(INTX_FILE_TYPES) +
-			sizeof(ntfschar) * MAX_PATH) {
+			sizeof(ntfschar) * PATH_MAX) {
 		res = -ENAMETOOLONG;
 		goto exit;
 	}
