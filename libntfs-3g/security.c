@@ -3545,7 +3545,11 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 		oldattr = getsecurityattr(scx->vol,path, ni);
 		if (oldattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
+#if OWNERFROMACL
+			usid = acl_owner(oldattr);
+#else
 			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
+#endif
 			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
 			fileuid = findowner(scx,usid);
 			filegid = findgroup(scx,gsid);
