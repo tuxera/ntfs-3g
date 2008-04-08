@@ -2486,7 +2486,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 				if (mode & S_IROTH)
 					denials |= FILE_READ;
 			}
-			denials &= ~grants;
+			denials &= ~(grants | OWNER_RIGHTS);
 			if (denials) {
 				pdace->type = ACCESS_DENIED_ACE_TYPE;
 				pdace->size = cpu_to_le16(gsidsz + 8);
