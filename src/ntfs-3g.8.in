@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "February 2008" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "April 2008" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -46,10 +46,7 @@ Windows users have full access to the files created by
 If 
 .B ntfs-3g 
 is set setuid-root then non-root users will 
-be also able to mount volumes and via /etc/fstab if the 'user'
-or 'users' 
-.BR mount (8)
-option is specified. 
+be also able to mount volumes.
 .SS Windows Filename Compatibility
 NTFS supports several filename namespaces: DOS, Win32 and POSIX. While the
 \fBntfs-3g\fR driver handles all of them, it always creates new files in the 
@@ -153,12 +150,6 @@ Furthermore, irrespectively of show_sys_files, all
 files are accessible by name, for example you can always do
 "ls \-l '$UpCase'".
 .TP
-.B allow_other
-This option overrides the security measure restricting file access
-to the user mounting the filesystem.  This option is only
-allowed to root, but this restriction can be overridden by 
-the 'user_allow_other' option in the /etc/fuse.conf file.
-.TP
 .BI max_read= value
 With this option the maximum size of read operations can be set.
 The default is infinite.  Note that the size of read requests is
@@ -169,7 +160,7 @@ Do nothing on chmod and chown operations, but do not return error.
 This option is on by default.
 .TP
 .B no_def_opts
-By default ntfs-3g acts as "silent,allow_other" was passed to it,
+By default ntfs-3g acts as "silent" was passed to it,
 this option cancel this behaviour.
 .TP
 .BI streams_interface= value

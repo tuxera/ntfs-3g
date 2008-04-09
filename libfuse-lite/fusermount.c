@@ -37,7 +37,6 @@
 
 static const char *progname = "ntfs-3g-mount";
 
-static int user_allow_other = 0;
 static int mount_max = 1000;
 
 int drop_privs(void);
@@ -195,9 +194,7 @@ static void strip_line(char *line)
 static void parse_line(char *line, int linenum)
 {
     int tmp;
-    if (strcmp(line, "user_allow_other") == 0)
-        user_allow_other = 1;
-    else if (sscanf(line, "mount_max = %i", &tmp) == 1)
+    if (sscanf(line, "mount_max = %i", &tmp) == 1)
         mount_max = tmp;
     else if(line[0])
         fprintf(stderr, "%s: unknown parameter in %s at line %i: '%s'\n",
@@ -411,13 +408,6 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 			    "deprecated for %i.%i kernels\n", progname, kmaj, kmin);
                     skip_option = 1;
                 }
-            }
-            if (getuid() != 0 && !user_allow_other &&
-                (opt_eq(s, len, "allow_other") ||
-                 opt_eq(s, len, "allow_root"))) {
-                fprintf(stderr, "%s: option %.*s only allowed if 'user_allow_other'"
-			" is set in /etc/fuse.conf\n", progname, len, s);
-                goto err;
             }
             if (!skip_option) {
                 if (find_mount_flag(s, len, &on, &flag)) {
