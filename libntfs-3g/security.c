@@ -2497,16 +2497,18 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			}
 		}
 
-			/* now insert grants to group */
-		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-		pgace->flags = gflags;
-		pgace->size = cpu_to_le16(gsidsz + 8);
-		pgace->mask = grants;
-		memcpy((char*)&pgace->sid, gsid, gsidsz);
-		pos += gsidsz + 8;
-		acecnt++;
-
+		if (adminowns || ((mode >> 3) & ~mode & 7)) {
+				/* now insert grants to group */
+				/* if more rights than other */
+			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+			pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+			pgace->flags = gflags;
+			pgace->size = cpu_to_le16(gsidsz + 8);
+			pgace->mask = grants;
+			memcpy((char*)&pgace->sid, gsid, gsidsz);
+			pos += gsidsz + 8;
+			acecnt++;
+		}
 	}
 
 	/* an ACE for world users */
