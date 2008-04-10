@@ -583,8 +583,8 @@ static int mount_fuse(const char *mnt, const char *opts)
 
     if (getuid() != 0 && mount_max != -1) {
         if (count_fuse_fs() >= mount_max) {
-            fprintf(stderr, "%s: too many FUSE filesystems mounted; "
-		    "mount_max=N can be set in /etc/fuse.conf\n", progname);
+            fprintf(stderr, "%s: too many mounted FUSE filesystems (%d+)\n",
+		    progname, mount_max);
 	    goto err;
         }
     }
