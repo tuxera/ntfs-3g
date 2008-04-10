@@ -29,7 +29,6 @@
 #include <grp.h>
 
 #define FUSE_DEV_NEW "/dev/fuse"
-#define FUSE_CONF "/etc/fuse.conf"
 
 #ifndef MS_DIRSYNC
 #define MS_DIRSYNC 128
@@ -178,57 +177,6 @@ static int add_mount(const char *source, const char *mnt, const char *type,
     return 0;
 }
 #endif /* IGNORE_MTAB */
-
-static void strip_line(char *line)
-{
-    char *s = strchr(line, '#');
-    if (s != NULL)
-        s[0] = '\0';
-    for (s = line + strlen(line) - 1; s >= line && isspace((unsigned char) *s); s--);
-    s[1] = '\0';
-    for (s = line; isspace((unsigned char) *s); s++);
-    if (s != line)
-        memmove(line, s, strlen(s)+1);
-}
-
-static void parse_line(char *line, int linenum)
-{
-    int tmp;
-    if (sscanf(line, "mount_max = %i", &tmp) == 1)
-        mount_max = tmp;
-    else if(line[0])
-        fprintf(stderr, "%s: unknown parameter in %s at line %i: '%s'\n",
-                progname, FUSE_CONF, linenum, line);
-}
-
-static void read_conf(void)
-{
-    FILE *fp = fopen(FUSE_CONF, "r");
-    if (fp != NULL) {
-        int linenum = 1;
-        char line[256];
-        int isnewline = 1;
-        while (fgets(line, sizeof(line), fp) != NULL) {
-            if (isnewline) {
-                if (line[strlen(line)-1] == '\n') {
-                    strip_line(line);
-                    parse_line(line, linenum);
-                } else {
-                    fprintf(stderr, "%s: reading %s: line %i too long\n",
-                            progname, FUSE_CONF, linenum);
-                    isnewline = 0;
-                }
-            } else if(line[strlen(line)-1] == '\n')
-                isnewline = 1;
-            if (isnewline)
-                linenum ++;
-        }
-        fclose(fp);
-    } else if (errno != ENOENT) {
-        fprintf(stderr, "%s: failed to open %s: %s\n", progname, FUSE_CONF,
-                strerror(errno));
-    }
-}
 
 static int begins_with(const char *s, const char *beg)
 {
@@ -632,8 +580,6 @@ static int mount_fuse(const char *mnt, const char *opts)
     fd = open_fuse_device(&dev);
     if (fd == -1)
         return -1;
-
-    read_conf();
 
     if (getuid() != 0 && mount_max != -1) {
         if (count_fuse_fs() >= mount_max) {
