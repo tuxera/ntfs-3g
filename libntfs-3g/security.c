@@ -2497,7 +2497,9 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			}
 		}
 
-		if (adminowns || ((mode >> 3) & ~mode & 7)) {
+		if (adminowns
+		    || groupowns
+		    || ((mode >> 3) & ~mode & 7)) {
 				/* now insert grants to group */
 				/* if more rights than other */
 			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
@@ -2923,6 +2925,7 @@ static int build_owngrp_permissions(const char *securattr,
 	int acecnt;
 	int nace;
 	le32 special;
+	BOOL grppresent;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
 
@@ -2932,6 +2935,7 @@ static int build_owngrp_permissions(const char *securattr,
 	special = cpu_to_le32(0);
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
+	grppresent = FALSE;
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);
@@ -2947,8 +2951,10 @@ static int build_owngrp_permissions(const char *securattr,
 			} else
 			if (same_sid(usid, &pace->sid)
 			   && (!(pace->mask & WRITE_OWNER))) {
-				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 					allowgrp |= pace->mask;
+					grppresent = TRUE;
+				}
 			} else
 				if (is_world_sid((const SID*)&pace->sid)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
@@ -2962,6 +2968,8 @@ static int build_owngrp_permissions(const char *securattr,
 					special |= pace->mask;
 			offace += le16_to_cpu(pace->size);
 		}
+	if (!grppresent)
+		allowgrp = allowall;
 	return (merge_permissions(ni,
 				allowown & ~denyown,
 				allowgrp & ~denygrp,
