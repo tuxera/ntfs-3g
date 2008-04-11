@@ -54,13 +54,6 @@ static const char *get_user_name(void)
 
 int drop_privs(void)
 {
-	if (!geteuid()) {
-		if (setgroups(0, NULL) < 0) {
-			perror("priv drop: setgroups failed");
-			return -1;
-		}
-	}
-	
 	if (!getegid()) {
 
 		gid_t new_gid = getgid();
@@ -606,8 +599,14 @@ static int mount_fuse(const char *mnt, const char *opts)
 
     if (restore_privs())
 	goto err;
-    
+
     if (geteuid() == 0) {
+	
+	if (setgroups(0, NULL) == -1) {
+	    perror("priv drop: setgroups failed");
+	    goto err;
+	}
+	    
         res = add_mount(source, mnt, type, mnt_opts);
         if (res == -1) {
             umount2(mnt, 2); /* lazy umount */
