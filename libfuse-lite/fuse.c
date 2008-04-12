@@ -28,7 +28,6 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 
-#define FUSE_MAX_PATH 4096
 #define FUSE_DEFAULT_INTR_SIGNAL SIGUSR1
 
 #define FUSE_UNKNOWN_INO 0xffffffff
@@ -302,14 +301,28 @@ static struct node *find_node(struct fuse *f, fuse_ino_t parent,
     return node;
 }
 
-static char *add_name(char *buf, char *s, const char *name)
+static char *add_name(char **buf, unsigned *bufsize, char *s, const char *name)
 {
     size_t len = strlen(name);
-    s -= len;
-    if (s <= buf) {
-        fprintf(stderr, "fuse: path too long: ...%s\n", s + len);
-        return NULL;
+
+    if (s - len <= *buf) {
+	unsigned pathlen = *bufsize - (s - *buf);
+	unsigned newbufsize = *bufsize;
+	char *newbuf;
+
+	while (newbufsize < pathlen + len + 1)
+		newbufsize *= 2;
+
+	newbuf = realloc(*buf, newbufsize);
+	if (newbuf == NULL)
+		return NULL;
+
+	*buf = newbuf;
+	s = newbuf + newbufsize - pathlen;
+	memmove(s, newbuf + *bufsize - pathlen, pathlen);
+	*bufsize = newbufsize;
     }
+    s -= len;
     strncpy(s, name, len);
     s--;
     *s = '/';
@@ -319,16 +332,22 @@ static char *add_name(char *buf, char *s, const char *name)
 
 static char *get_path_name(struct fuse *f, fuse_ino_t nodeid, const char *name)
 {
-    char buf[FUSE_MAX_PATH];
-    char *s = buf + FUSE_MAX_PATH - 1;
+    unsigned bufsize = 256;
+    char *buf;
+    char *s;
     struct node *node;
 
+    buf = malloc(bufsize);
+    if (buf == NULL)
+            return NULL;
+
+    s = buf + bufsize - 1;
     *s = '\0';
 
     if (name != NULL) {
-        s = add_name(buf, s, name);
+        s = add_name(&buf, &bufsize, s, name);
         if (s == NULL)
-            return NULL;
+            goto out_free;
     }
 
     pthread_mutex_lock(&f->lock);
@@ -339,18 +358,24 @@ static char *get_path_name(struct fuse *f, fuse_ino_t nodeid, const char *name)
             break;
         }
 
-        s = add_name(buf, s, node->name);
+        s = add_name(&buf, &bufsize, s, node->name);
         if (s == NULL)
             break;
     }
     pthread_mutex_unlock(&f->lock);
 
     if (node == NULL || s == NULL)
-        return NULL;
-    else if (*s == '\0')
-        return strdup("/");
+        goto out_free;
+    
+    if (s[0])
+            memmove(buf, s, bufsize - (s - buf));
     else
-        return strdup(s);
+            strcpy(buf, "/");
+    return buf;
+    
+out_free:
+    free(buf);
+    return NULL;
 }
 
 static char *get_path(struct fuse *f, fuse_ino_t nodeid)
