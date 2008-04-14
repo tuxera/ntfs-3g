@@ -3578,7 +3578,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			if (uid && (filegid != scx->gid)
 			    && !groupmember(scx, scx->uid, filegid))
 				mode &= ~S_ISGID;
-			ntfs_set_owner_mode(scx, ni,
+			res = ntfs_set_owner_mode(scx, ni,
 					fileuid, filegid, mode);
 		} else {
 			errno = EPERM;
@@ -3856,7 +3856,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
                         /* unless request originated by root */
 			if (uid && (fileuid != uid))
 				mode &= 01777;
-			ntfs_set_owner_mode(scx, ni, uid, gid, mode);
+			res = ntfs_set_owner_mode(scx, ni, uid, gid, mode);
 		} else {
 			res = -1;	/* neither owner nor root */
 			errno = EPERM;
