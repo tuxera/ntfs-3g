@@ -438,11 +438,12 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			 * Check whether it's Interix symbolic link, block or
 			 * character device.
 			 */
-			if (((size_t)na->data_size <= sizeof(INTX_FILE_TYPES)
-					+ sizeof(ntfschar) * PATH_MAX)
-					&& ((size_t)na->data_size >
-						sizeof(INTX_FILE_TYPES)) &&
-					!stream_name_len) {
+			if ((size_t)na->data_size <= sizeof(INTX_FILE_TYPES)
+					+ sizeof(ntfschar) * PATH_MAX
+				&& (size_t)na->data_size >
+					sizeof(INTX_FILE_TYPES)
+				&& !stream_name_len) {
+				
 				INTX_FILE *intx_file;
 
 				intx_file = ntfs_malloc(na->data_size);
@@ -2511,17 +2512,8 @@ static struct fuse *mount_fuse(char *parsed_options)
 	
 	if (fuse_opt_add_arg(&args, "") == -1)
 		goto err;
-	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache") == -1)
+	if (fuse_opt_add_arg(&args, "-ouse_ino,kernel_cache,attr_timeout=0") == -1)
 		goto err;
-#if CACHE_INODE_SIZE
-		/*
-		 * JPA fuse attribute cacheing is not useful if we
-		 * cache inodes, and this avoids hard link problems
-		 */
-	if (fuse_opt_add_arg(&args,
-			"-oattr_timeout=0,ac_attr_timeout=0") == -1)
-		goto err;
-#endif
 	if (ctx->debug)
 		if (fuse_opt_add_arg(&args, "-odebug") == -1)
 			goto err;

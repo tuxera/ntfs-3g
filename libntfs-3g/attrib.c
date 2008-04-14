@@ -2653,8 +2653,6 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 
 	if (!ni || (!name && name_len)) {
 		errno = EINVAL;
-		ntfs_log_perror("%s: ni=%p, name=%p, len=%d", __FUNCTION__, ni,
-				name, name_len);
 		return -1;
 	}
 
