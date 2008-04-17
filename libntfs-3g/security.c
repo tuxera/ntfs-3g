@@ -3685,7 +3685,8 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni,
 		int accesstype) /* access type required (S_Ixxx values) */
 {
-	mode_t perm;
+	int perm;
+	int res;
 	int allow;
 
 	/*
@@ -3699,41 +3700,46 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		allow = 1;
 	else {
 		perm = ntfs_get_perm(scx, path, ni);
-		switch (accesstype) {
-		case S_IEXEC:
-			allow = (perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
-			break;
-		case S_IWRITE:
-			allow = (perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0;
-			break;
-		case S_IWRITE + S_IEXEC:
-			allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
-			    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
-			break;
-		case S_IREAD:
-			allow = (perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0;
-			break;
-		case S_IREAD + S_IEXEC:
-			allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
-			    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
-			break;
-		case S_IREAD + S_IWRITE:
-			allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
-			    && ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0);
-			break;
-		case S_IWRITE + S_IEXEC + S_ISVTX:
-			if (perm & S_ISVTX)
-				allow = 2;
-			else
+		if (perm >= 0) {
+			res = EACCES;
+			switch (accesstype) {
+			case S_IEXEC:
+				allow = (perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
+				break;
+			case S_IWRITE:
+				allow = (perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0;
+				break;
+			case S_IWRITE + S_IEXEC:
 				allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
 				    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
-			break;
-		default:	/* BUG ! */
+				break;
+			case S_IREAD:
+				allow = (perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0;
+				break;
+			case S_IREAD + S_IEXEC:
+				allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
+				    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+				break;
+			case S_IREAD + S_IWRITE:
+				allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
+				    && ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0);
+				break;
+			case S_IWRITE + S_IEXEC + S_ISVTX:
+				if (perm & S_ISVTX)
+					allow = 2;
+				else
+					allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
+					    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+				break;
+			default :
+				res = EINVAL;
+				allow = 0;
+				break;
+			}
+			if (!allow)
+				errno = res;
+		} else
 			allow = 0;
-			break;
-		}
-		if (!allow)
-			errno = EACCES;
 	}
 	return (allow);
 }
