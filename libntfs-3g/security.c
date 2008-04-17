@@ -274,6 +274,246 @@ static const char ownersidbytes[] = {
 
 static const SID *ownersid = (const SID*)ownersidbytes;
 
+/*
+ *		Determine the size of a SID
+ */
+
+static int sid_size(const SID * sid)
+{
+	return (sid->sub_authority_count * 4 + 8);
+}
+
+/*
+ *		Test whether two SID are equal
+ */
+
+static BOOL same_sid(const SID *first, const SID *second)
+{
+	int size;
+
+	size = sid_size(first);
+	return ((sid_size(second) == size)
+		&& !memcmp(first, second, size));
+}
+
+/*
+ *		Test whether a SID means "world user"
+ *	Local users group also recognized as world
+ */
+
+static int is_world_sid(const SID * usid)
+{
+	return (
+	     /* check whether S-1-1-0 : world */
+	       ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
+	    && (usid->sub_authority[0] == 0))
+
+	     /* check whether S-1-5-32-545 : local user */
+	  ||   ((usid->sub_authority_count == 2)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] == cpu_to_le32(32))
+	    && (usid->sub_authority[1] == cpu_to_le32(545)))
+		);
+}
+
+/*
+ *		Test whether a SID means "some user (or group)"
+ *	Currently we only check for S-1-5-21... but we should
+ *	probably test for other configurations
+ */
+
+static int is_user_sid(const SID * usid)
+{
+	return ((usid->sub_authority_count == 5)
+	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
+}
+
+/*
+ *		Determine the size of a security attribute
+ *	whatever the order of fields
+ */
+
+static unsigned int attr_size(const char *attr)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const ACL *pdacl;
+	const ACL *psacl;
+	const SID *psid;
+	unsigned int offdacl;
+	unsigned int offsacl;
+	unsigned int offowner;
+	unsigned int offgroup;
+	unsigned int endsid;
+	unsigned int endsacl;
+	unsigned int attrsz;
+
+		/*
+		 * First check DACL, which is the last field in all descriptors
+		 * we build, and in most descriptors built by Windows
+		 * however missing for "DR Watson"
+		 */
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
+		/* find end of DACL */
+	offdacl = le32_to_cpu(phead->dacl);
+	if (offdacl) {
+		pdacl = (const ACL*)&attr[offdacl];
+		attrsz = offdacl + le16_to_cpu(pdacl->size);
+	} else
+		attrsz = 0;
+
+	offowner = le32_to_cpu(phead->owner);
+	if (offowner >= attrsz) {
+			/* find end of USID */
+		psid = (const SID*)&attr[offowner];
+		endsid = offowner + sid_size(psid);
+		attrsz = endsid;
+	}
+	offgroup = le32_to_cpu(phead->group);
+	if (offgroup >= attrsz) {
+			/* find end of GSID */
+		psid = (const SID*)&attr[offgroup];
+		endsid = offgroup + sid_size(psid);
+		if (endsid > attrsz) attrsz = endsid;
+	}
+	offsacl = le32_to_cpu(phead->sacl);
+	if (offsacl >= attrsz) {
+			/* find end of SACL */
+		offsacl = le32_to_cpu(phead->sacl);
+		psacl = (const ACL*)&attr[offsacl];
+		endsacl = offsacl + le16_to_cpu(psacl->size);
+		if (endsacl > attrsz)
+			attrsz = endsacl;
+	}
+
+	return (attrsz);
+}
+
+/*
+ *		Do sanity checks on a SID read from storage
+ *	(just check revision and number of authorities)
+ */
+
+static BOOL valid_sid(const SID *sid)
+{
+	return ((sid->revision == SID_REVISION)
+		&& (sid->sub_authority_count >= 1)
+		&& (sid->sub_authority_count <= 8));
+}
+
+/*
+ *		Check whether a SID is acceptable for an implicit
+ *	mapping pattern.
+ *	It should have been already checked it is a valid user SID.
+ *
+ *	The last authority reference has to be >= 1000 (Windows usage)
+ *	and <= 0x7fffffff, so that 30 bits from a uid and 30 more bits
+ *      from a gid an be inserted with no overflow.
+ */
+
+static BOOL valid_pattern(const SID *sid)
+{
+	int cnt;
+	u32 auth;
+
+	cnt = sid->sub_authority_count;
+	auth = le32_to_cpu(sid->sub_authority[cnt-1]);
+	return ((auth >= 1000) && (auth <= 0x7fffffff));
+}
+
+
+/*
+ *		Do sanity checks on security descriptors read from storage
+ *	basically, we make sure that every field holds within
+ *	allocated storage
+ *	Should not be called with a NULL argument
+ *	returns TRUE if considered safe
+ *		if not, error should be logged by caller
+ */
+
+static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const ACL *pacl;
+	const ACCESS_ALLOWED_ACE *pace;
+	unsigned int offdacl;
+	unsigned int offace;
+	unsigned int acecnt;
+	unsigned int acesz;
+	unsigned int nace;
+	BOOL ok;
+
+	ok = TRUE;
+
+	/*
+	 * first check overall size if within allocation range
+	 * and a DACL is present
+	 * and owner and group SID are valid
+	 */
+
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
+	offdacl = le32_to_cpu(phead->dacl);
+	pacl = (const ACL*)&securattr[offdacl];
+
+		/*
+		 * size check occurs before the above pointers are used
+		 *
+		 * "DR Watson" standard directory on WinXP has an
+		 * old revision and no DACL though SE_DACL_PRESENT is set
+		 */
+	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+		&& (attr_size(securattr) <= attrsz)
+		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
+		&& phead->owner
+		&& phead->group
+		&& !(phead->owner & cpu_to_le32(3))
+		&& !(phead->group & cpu_to_le32(3))
+		&& !(phead->dacl & cpu_to_le32(3))
+		&& !(phead->sacl & cpu_to_le32(3))
+		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
+		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
+			/*
+			 * if there is an ACL, as indicated by offdacl,
+			 * require SE_DACL_PRESENT
+			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
+			 */
+		&& (!offdacl
+                    || ((pacl->revision == ACL_REVISION)
+		       && (phead->control & SE_DACL_PRESENT)))) {
+
+		/*
+		 * For each ACE, check it is within limits
+		 * and contains a valid SID
+		 * "DR Watson" has no DACL
+		 */
+
+		if (offdacl) {
+			acecnt = le16_to_cpu(pacl->ace_count);
+			offace = offdacl + sizeof(ACL);
+			for (nace = 0; (nace < acecnt) && ok; nace++) {
+				/* be sure the beginning is within range */
+				if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
+					ok = FALSE;
+				else {
+					pace = (const ACCESS_ALLOWED_ACE*)
+						&securattr[offace];
+					acesz = le16_to_cpu(pace->size);
+					if (((offace + acesz) > attrsz)
+					   || !valid_sid(&pace->sid))
+						 ok = FALSE;
+					offace += acesz;
+				}
+			}
+		}
+	} else
+		ok = FALSE;
+	return (ok);
+}
+
 /**
  * ntfs_guid_is_zero - check if a GUID is zero
  * @guid:	[IN] guid to check
@@ -539,246 +779,6 @@ static unsigned long atoul(const char *p)
 	while ((*p >= '0') && (*p <= '9'))
 		v = v * 10 + (*p++) - '0';
 	return (v);
-}
-
-/*
- *		Determine the size of a SID
- */
-
-static int sid_size(const SID * sid)
-{
-	return (sid->sub_authority_count * 4 + 8);
-}
-
-/*
- *		Test whether two SID are equal
- */
-
-static BOOL same_sid(const SID *first, const SID *second)
-{
-	int size;
-
-	size = sid_size(first);
-	return ((sid_size(second) == size)
-		&& !memcmp(first, second, size));
-}
-
-/*
- *		Test whether a SID means "world user"
- *	Local users group also recognized as world
- */
-
-static int is_world_sid(const SID * usid)
-{
-	return (
-	     /* check whether S-1-1-0 : world */
-	       ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
-	    && (usid->sub_authority[0] == 0))
-
-	     /* check whether S-1-5-32-545 : local user */
-	  ||   ((usid->sub_authority_count == 2)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-	    && (usid->sub_authority[0] == cpu_to_le32(32))
-	    && (usid->sub_authority[1] == cpu_to_le32(545)))
-		);
-}
-
-/*
- *		Test whether a SID means "some user (or group)"
- *	Currently we only check for S-1-5-21... but we should
- *	probably test for other configurations
- */
-
-static int is_user_sid(const SID * usid)
-{
-	return ((usid->sub_authority_count == 5)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
-	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
-	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
-}
-
-/*
- *		Determine the size of a security attribute
- *	whatever the order of fields
- */
-
-static unsigned int attr_size(const char *attr)
-{
-	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const ACL *pdacl;
-	const ACL *psacl;
-	const SID *psid;
-	unsigned int offdacl;
-	unsigned int offsacl;
-	unsigned int offowner;
-	unsigned int offgroup;
-	unsigned int endsid;
-	unsigned int endsacl;
-	unsigned int attrsz;
-
-		/*
-		 * First check DACL, which is the last field in all descriptors
-		 * we build, and in most descriptors built by Windows
-		 * however missing for "DR Watson"
-		 */
-	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
-		/* find end of DACL */
-	offdacl = le32_to_cpu(phead->dacl);
-	if (offdacl) {
-		pdacl = (const ACL*)&attr[offdacl];
-		attrsz = offdacl + le16_to_cpu(pdacl->size);
-	} else
-		attrsz = 0;
-
-	offowner = le32_to_cpu(phead->owner);
-	if (offowner >= attrsz) {
-			/* find end of USID */
-		psid = (const SID*)&attr[offowner];
-		endsid = offowner + sid_size(psid);
-		attrsz = endsid;
-	}
-	offgroup = le32_to_cpu(phead->group);
-	if (offgroup >= attrsz) {
-			/* find end of GSID */
-		psid = (const SID*)&attr[offgroup];
-		endsid = offgroup + sid_size(psid);
-		if (endsid > attrsz) attrsz = endsid;
-	}
-	offsacl = le32_to_cpu(phead->sacl);
-	if (offsacl >= attrsz) {
-			/* find end of SACL */
-		offsacl = le32_to_cpu(phead->sacl);
-		psacl = (const ACL*)&attr[offsacl];
-		endsacl = offsacl + le16_to_cpu(psacl->size);
-		if (endsacl > attrsz)
-			attrsz = endsacl;
-	}
-
-	return (attrsz);
-}
-
-/*
- *		Do sanity checks on a SID read from storage
- *	(just check revision and number of authorities)
- */
-
-static BOOL valid_sid(const SID *sid)
-{
-	return ((sid->revision == SID_REVISION)
-		&& (sid->sub_authority_count >= 1)
-		&& (sid->sub_authority_count <= 8));
-}
-
-/*
- *		Check whether a SID is acceptable for an implicit
- *	mapping pattern.
- *	It should have been already checked it is a valid user SID.
- *
- *	The last authority reference has to be >= 1000 (Windows usage)
- *	and <= 0x7fffffff, so that 30 bits from a uid and 30 more bits
- *      from a gid an be inserted with no overflow.
- */
-
-static BOOL valid_pattern(const SID *sid)
-{
-	int cnt;
-	u32 auth;
-
-	cnt = sid->sub_authority_count;
-	auth = le32_to_cpu(sid->sub_authority[cnt-1]);
-	return ((auth >= 1000) && (auth <= 0x7fffffff));
-}
-
-
-/*
- *		Do sanity checks on security descriptors read from storage
- *	basically, we make sure that every field holds within
- *	allocated storage
- *	Should not be called with a NULL argument
- *	returns TRUE if considered safe
- *		if not, error should be logged by caller
- */
-
-static BOOL valid_securattr(const char *securattr, unsigned int attrsz)
-{
-	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const ACL *pacl;
-	const ACCESS_ALLOWED_ACE *pace;
-	unsigned int offdacl;
-	unsigned int offace;
-	unsigned int acecnt;
-	unsigned int acesz;
-	unsigned int nace;
-	BOOL ok;
-
-	ok = TRUE;
-
-	/*
-	 * first check overall size if within allocation range
-	 * and a DACL is present
-	 * and owner and group SID are valid
-	 */
-
-	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
-	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (const ACL*)&securattr[offdacl];
-
-		/*
-		 * size check occurs before the above pointers are used
-		 *
-		 * "DR Watson" standard directory on WinXP has an
-		 * old revision and no DACL though SE_DACL_PRESENT is set
-		 */
-	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
-		&& (attr_size(securattr) <= attrsz)
-		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
-		&& phead->owner
-		&& phead->group
-		&& !(phead->owner & cpu_to_le32(3))
-		&& !(phead->group & cpu_to_le32(3))
-		&& !(phead->dacl & cpu_to_le32(3))
-		&& !(phead->sacl & cpu_to_le32(3))
-		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
-		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
-			/*
-			 * if there is an ACL, as indicated by offdacl,
-			 * require SE_DACL_PRESENT
-			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
-			 */
-		&& (!offdacl
-                    || ((pacl->revision == ACL_REVISION)
-		       && (phead->control & SE_DACL_PRESENT)))) {
-
-		/*
-		 * For each ACE, check it is within limits
-		 * and contains a valid SID
-		 * "DR Watson" has no DACL
-		 */
-
-		if (offdacl) {
-			acecnt = le16_to_cpu(pacl->ace_count);
-			offace = offdacl + sizeof(ACL);
-			for (nace = 0; (nace < acecnt) && ok; nace++) {
-				/* be sure the beginning is within range */
-				if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
-					ok = FALSE;
-				else {
-					pace = (const ACCESS_ALLOWED_ACE*)
-						&securattr[offace];
-					acesz = le16_to_cpu(pace->size);
-					if (((offace + acesz) > attrsz)
-					   || !valid_sid(&pace->sid))
-						 ok = FALSE;
-					offace += acesz;
-				}
-			}
-		}
-	} else
-		ok = FALSE;
-	return (ok);
 }
 
 /*
@@ -2683,67 +2683,6 @@ static char *build_secur_descr(mode_t mode,
 }
 
 /*
- *		Get the security descriptor associated to a file
- *
- *	Either :
- *	   - read the security descriptor attribute (v1.x format)
- *	   - or find the descriptor in $Secure:$SDS (v3.x format)
- *
- *	in both case, sanity checks are done on the attribute and
- *	the descriptor can be assumed safe
- *
- *	The returned descriptor is dynamically allocated and has to be freed
- */
-
-static char *getsecurityattr(ntfs_volume *vol,
-		const char *path, ntfs_inode *ni)
-{
-	SII_INDEX_KEY securid;
-	char *securattr;
-	s64 readallsz;
-
-		/*
-		 * Warning : in some situations, after fixing by chkdsk,
-		 * v3_Extensions are marked present (long standard informations)
-		 * with a default security descriptor inserted in an
-		 * attribute
-		 */
-	if (test_nino_flag(ni, v3_Extensions)
-			&& vol->secure_ni && ni->security_id) {
-			/* get v3.x descriptor in $Secure */
-		securid.security_id = ni->security_id;
-		securattr = retrievesecurityattr(vol,securid);
-		if (!securattr)
-			ntfs_log_error("Bad security descriptor for 0x%lx\n",
-					(long)le32_to_cpu(ni->security_id));
-	} else {
-			/* get v1.x security attribute */
-		readallsz = 0;
-		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
-				AT_UNNAMED, 0, &readallsz);
-		if (securattr && !valid_securattr(securattr, readallsz)) {
-			ntfs_log_error("Bad security descriptor for %s\n",
-				path);
-			free(securattr);
-			securattr = (char*)NULL;
-		}
-	}
-	if (!securattr) {
-			/*
-			 * in some situations, there is no security
-			 * descriptor, and chkdsk does not detect or fix
-			 * anything. This could be a normal situation.
-			 * When this happens, simulate a descriptor with
-			 * minimum rights, so that a real descriptor can
-			 * be created by chown or chmod
-			 */
-		ntfs_log_error("No security descriptor found for %s\n",path);
-		securattr = build_secur_descr(0, 0, adminsid, adminsid);
-	}
-	return (securattr);
-}
-
-/*
  *		Create a mode_t permission set
  *	from owner, group and world grants as represented in ACEs
  */
@@ -3178,6 +3117,67 @@ static int build_permissions(const char *securattr,
 		else
 			perm = build_std_permissions(securattr, usid, gsid, ni);
 	return (perm);
+}
+
+/*
+ *		Get the security descriptor associated to a file
+ *
+ *	Either :
+ *	   - read the security descriptor attribute (v1.x format)
+ *	   - or find the descriptor in $Secure:$SDS (v3.x format)
+ *
+ *	in both case, sanity checks are done on the attribute and
+ *	the descriptor can be assumed safe
+ *
+ *	The returned descriptor is dynamically allocated and has to be freed
+ */
+
+static char *getsecurityattr(ntfs_volume *vol,
+		const char *path, ntfs_inode *ni)
+{
+	SII_INDEX_KEY securid;
+	char *securattr;
+	s64 readallsz;
+
+		/*
+		 * Warning : in some situations, after fixing by chkdsk,
+		 * v3_Extensions are marked present (long standard informations)
+		 * with a default security descriptor inserted in an
+		 * attribute
+		 */
+	if (test_nino_flag(ni, v3_Extensions)
+			&& vol->secure_ni && ni->security_id) {
+			/* get v3.x descriptor in $Secure */
+		securid.security_id = ni->security_id;
+		securattr = retrievesecurityattr(vol,securid);
+		if (!securattr)
+			ntfs_log_error("Bad security descriptor for 0x%lx\n",
+					(long)le32_to_cpu(ni->security_id));
+	} else {
+			/* get v1.x security attribute */
+		readallsz = 0;
+		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
+				AT_UNNAMED, 0, &readallsz);
+		if (securattr && !valid_securattr(securattr, readallsz)) {
+			ntfs_log_error("Bad security descriptor for %s\n",
+				path);
+			free(securattr);
+			securattr = (char*)NULL;
+		}
+	}
+	if (!securattr) {
+			/*
+			 * in some situations, there is no security
+			 * descriptor, and chkdsk does not detect or fix
+			 * anything. This could be a normal situation.
+			 * When this happens, simulate a descriptor with
+			 * minimum rights, so that a real descriptor can
+			 * be created by chown or chmod
+			 */
+		ntfs_log_error("No security descriptor found for %s\n",path);
+		securattr = build_secur_descr(0, 0, adminsid, adminsid);
+	}
+	return (securattr);
 }
 
 /*
