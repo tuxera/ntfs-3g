@@ -34,7 +34,7 @@ struct CACHED_GENERIC {
 
 struct CACHED_INODE {
 	struct CACHED_INODE *next;
-	char *pathname;
+	const char *pathname;
 	u64 inum;
 } ;
 

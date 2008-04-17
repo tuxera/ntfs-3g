@@ -1043,7 +1043,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 		goto exit;
 	}
 	/* Open parent directory. */
-	*name = 0;
+	*--name = 0;
 	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, dir_path);
 	if (!dir_ni) {
 		free(path);
@@ -1251,7 +1251,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 		goto exit;
 	}
 	/* Open parent directory. */
-	*name = 0;
+	*--name = 0;
 	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!dir_ni) {
 		res = -errno;
@@ -1313,7 +1313,7 @@ static int ntfs_fuse_rm(const char *org_path)
 		goto exit;
 	}
 	/* Open parent directory. */
-	*name = 0;
+	*--name = 0;
 	dir_ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!dir_ni) {
 		res = -errno;

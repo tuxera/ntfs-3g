@@ -108,30 +108,6 @@ static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 			   && (cached->pathname[len] != '/')));
 }
 
-/*
- *		Normalize file paths for cacheing
- *	Just remove leading and trailing '/', there should not be any
- *	non-standard components (such as "/../" or "/./") because
- *	paths have been rewritten by fuse.
- *
- *	Returns the first non-'/' char in the original path
- */
-
-static char *path_normalize(char *path)
-{
-	int len;
-	char *p;
-
-		   /* remove leading and trailing '/' even for root */
-	len = strlen(path);
-	while ((len > 1) && (path[len - 1] == PATH_SEP))
-		path[--len] = '\0';
-	p = path;
-	while (*p == PATH_SEP)
-		p++;
-	return (p);
-	}
-
 #endif
 
 /**
@@ -503,14 +479,14 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		goto out;
 	}
 
-#if CACHE_INODE_SIZE
-	fullname = path_normalize(ascii);
-	p = fullname;
-#else
 	p = ascii;
 	/* Remove leading /'s. */
 	while (p && *p && *p == PATH_SEP)
 		p++;
+#if CACHE_INODE_SIZE
+	fullname = p;
+	if (p[0] && (p[strlen(p)-1] == PATH_SEP))
+		ntfs_log_error("Unnormalized path %s\n",ascii);
 #endif
 	if (parent) {
 		ni = parent;
@@ -1503,8 +1479,8 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 	BOOL case_sensitive_match = TRUE;
 	int err = 0;
 #if CACHE_INODE_SIZE
-	char *ascii;
 	struct CACHED_INODE item;
+	const char *p;
 	int count;
 #endif
 
@@ -1674,17 +1650,16 @@ out:
 		err = errno;
 #if CACHE_INODE_SIZE
 			/* invalide cache entry, even if there was an error */
-	ascii = strdup(pathname);
-	if (ascii) {
-		char *p;
-
-		item.pathname = path_normalize(ascii);
-		count = ntfs_invalidate_cache(vol->inode_cache, GENERIC(&item),
+	/* Remove leading /'s. */
+	p = pathname;
+	while (*p == PATH_SEP)
+		p++;
+	if (p[0] && (p[strlen(p)-1] == PATH_SEP))
+		ntfs_log_error("Unnormalized path %s\n",pathname);
+	item.pathname = p;
+	count = ntfs_invalidate_cache(vol->inode_cache, GENERIC(&item),
 				inode_cache_inv_compare);
-		p = ascii; /* do not clear ascii */
-		free(p);
-	}
-	if (!ascii || !count)
+	if (!count)
 		ntfs_log_error("Could not delete inode cache entry for %s\n",
 				pathname);
 #endif

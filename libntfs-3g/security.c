@@ -3758,7 +3758,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		/* the root of file system is seen as a parent of itself */
 		/* is that correct ? */
 		name = strrchr(dirpath, '/');
-		*++name = 0;
+		*name = 0;
 		dir_ni = ntfs_pathname_to_inode(scx->vol, NULL, dirpath);
 		if (dir_ni) {
 			allow = ntfs_allowed_access(scx,dirpath,
