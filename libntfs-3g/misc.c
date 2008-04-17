@@ -136,15 +136,14 @@ struct CACHED_GENERIC *ntfs_enter_cache(struct CACHE_HEADER *cache,
 			/*
 			 * Search sequentially in LRU list to locate the end,
 			 * and find out whether the entry is already in list
-			 * As we normally go to the end, no statitics is
+			 * As we normally go to the end, no statistics is
 			 * kept.
 		 	 */
 		current = cache->most_recent_entry;
 		previous = (struct CACHED_GENERIC*)NULL;
 		before = (struct CACHED_GENERIC*)NULL;
 		while (current
-			&& (!current->pathname
-			   || compare(current, item))) {
+		   && compare(current, item)) {
 			before = previous;
 			previous = current;
 			current = current->next;
@@ -162,35 +161,37 @@ struct CACHED_GENERIC *ntfs_enter_cache(struct CACHE_HEADER *cache,
 			if (cache->free_entry) {
 				current = cache->free_entry;
 				cache->free_entry = cache->free_entry->next;
-				if (item->pathname) {
-					current->pathname = ntfs_malloc(
-						strlen(item->pathname) + 1);
+				if (item->varsize) {
+					current->variable = ntfs_malloc(
+						item->varsize);
 				} else
-					current->pathname = (char*)NULL;
+					current->variable = (void*)NULL;
+				current->varsize = item->varsize;
 			} else {
 				before->next = (struct CACHED_GENERIC*)NULL;
 				current = previous;
-				if (item->pathname) {
-					if (current->pathname)
-						current->pathname = realloc(
-							current->pathname,
-							strlen(item->pathname) + 1);
+				if (item->varsize) {
+					if (current->varsize)
+						current->variable = realloc(
+							current->variable,
+							item->varsize);
 					else
-						current->pathname = ntfs_malloc(
-							strlen(item->pathname) + 1);
+						current->variable = ntfs_malloc(
+							item->varsize);
 				} else {
-					if (current->pathname)
-						free(current->pathname);
-					current->pathname = (char*)NULL;
+					if (current->varsize)
+						free(current->variable);
+					current->variable = (void*)NULL;
 				}
+				current->varsize = item->varsize;
 			}
 			current->next = cache->most_recent_entry;
 			cache->most_recent_entry = current;
 			memcpy(current->fixed, item->fixed, cache->fixed_size);
-			if (item->pathname) {
-				if (current->pathname) {
-					strcpy(current->pathname,
-						item->pathname);
+			if (item->varsize) {
+				if (current->variable) {
+					memcpy(current->variable,
+						item->variable, item->varsize);
 				} else {
 					/*
 					 * no more memory for variable part
@@ -202,8 +203,10 @@ struct CACHED_GENERIC *ntfs_enter_cache(struct CACHE_HEADER *cache,
 					cache->free_entry = current;
 					current = (struct CACHED_GENERIC*)NULL;
 				}
-			} else
-				current->pathname = (char*)NULL;
+			} else {
+				current->variable = (void*)NULL;
+				current->varsize = 0;
+			}
 		}
 		cache->writes++;
 	}
@@ -248,8 +251,9 @@ int ntfs_invalidate_cache(struct CACHE_HEADER *cache,
 					cache->most_recent_entry = current->next;
 				current->next = cache->free_entry;
 				cache->free_entry = current;
-				if (current->pathname)
-					free(current->pathname);
+				if (current->variable)
+					free(current->variable);
+				current->varsize = 0;
 				if (previous)
 					current = previous->next;
 				else
@@ -274,8 +278,8 @@ static void ntfs_free_cache(struct CACHE_HEADER *cache)
 
 	if (cache) {
 		for (entry=cache->most_recent_entry; entry; entry=entry->next)
-			if (entry->pathname)
-				free(entry->pathname);
+			if (entry->variable)
+				free(entry->variable);
 		free(cache);
 	}
 }
@@ -310,12 +314,14 @@ static struct CACHE_HEADER *ntfs_create_cache(const char *name,
 		for (i=0; i<(item_count - 1); i++) {
 			q = (struct CACHED_GENERIC*)((char*)p + full_item_size);
 			p->next = q;
-			p->pathname = (char*)NULL;
+			p->variable = (void*)NULL;
+			p->varsize = 0;
 			p = q;
 		}
 			/* special for the last entry */
 		p->next =  (struct CACHED_GENERIC*)NULL;
-		p->pathname = (char*)NULL;
+		p->variable = (void*)NULL;
+		p->varsize = 0;
 	}
 	return (cache);
 }

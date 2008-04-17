@@ -87,7 +87,8 @@ ntfschar NTFS_INDEX_R[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('R'),
 static int inode_cache_compare(const struct CACHED_GENERIC *cached,
 			const struct CACHED_GENERIC *wanted)
 {
-	return (strcmp(cached->pathname, wanted->pathname));
+	return (!cached->variable
+		    || strcmp(cached->variable, wanted->variable));
 }
 
 /*
@@ -102,10 +103,12 @@ static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 {
 	int len;
 
-	len = strlen(wanted->pathname);
-	return (strncmp(cached->pathname, wanted->pathname,len)
-			|| ((cached->pathname[len] != '\0')
-			   && (cached->pathname[len] != '/')));
+	len = strlen(wanted->variable);
+	return (!cached->variable
+			|| strncmp((const char*)cached->variable,
+				(const char*)wanted->variable,len)
+			|| ((((const char*)cached->variable)[len] != '\0')
+			   && (((const char*)cached->variable)[len] != '/')));
 }
 
 #endif
@@ -497,6 +500,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			 */
 		if (*fullname) {
 			item.pathname = fullname;
+			item.varsize = strlen(fullname) + 1;
 			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
 				vol->inode_cache, GENERIC(&item),
 				inode_cache_compare);
@@ -553,6 +557,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			inum = ntfs_inode_lookup_by_name(ni, unicode, len);
 		else {
 			item.pathname = fullname;
+			item.varsize = strlen(fullname) + 1;
 			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
 					vol->inode_cache, GENERIC(&item),
 					inode_cache_compare);

@@ -43,7 +43,8 @@ struct MAPPING {
 };
 
 /*
- *	Entry in the permissions cache
+ *		Entry in the permissions cache
+ *	Note : this cache is not organized as a generic cache
  */
 
 struct CACHED_PERMISSIONS {
@@ -61,7 +62,9 @@ struct CACHED_PERMISSIONS {
 
 struct CACHED_PERMISSIONS_LEGACY {
 	struct CACHED_PERMISSIONS_LEGACY *next;
-	char *unused;
+	void *variable;
+	size_t varsize;
+		/* above fields must match "struct CACHED_GENERIC" */
 	u64 mft_no;
 	struct CACHED_PERMISSIONS perm;
 } ;
@@ -72,7 +75,9 @@ struct CACHED_PERMISSIONS_LEGACY {
 
 struct CACHED_SECURID {
 	struct CACHED_SECURID *next;
-	void *unused;
+	void *variable;
+	size_t varsize;
+		/* above fields must match "struct CACHED_GENERIC" */
 	uid_t uid;
 	gid_t gid;
 	unsigned int dmode;
@@ -81,6 +86,7 @@ struct CACHED_SECURID {
 
 /*
  *	Header of the security cache
+ *	(has no cache structure by itself)
  */
 
 struct CACHED_PERMISSIONS_HEADER {
@@ -168,8 +174,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
-		ntfs_inode *ni,
-		uid_t uid, gid_t gid, mode_t mode);
+		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode);
 le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		const char *dir_path, ntfs_inode *dir_ni, BOOL fordir);
 int ntfs_open_secure(ntfs_volume *vol);

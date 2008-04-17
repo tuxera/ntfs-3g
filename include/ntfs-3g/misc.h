@@ -28,13 +28,16 @@
 
 struct CACHED_GENERIC {
 	struct CACHED_GENERIC *next;
-	char *pathname;
+	void *variable;
+	size_t varsize;
 	void *fixed[0];
 } ;
 
 struct CACHED_INODE {
 	struct CACHED_INODE *next;
 	const char *pathname;
+	size_t varsize;
+		/* above fields must match "struct CACHED_GENERIC" */
 	u64 inum;
 } ;
 

@@ -2119,7 +2119,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			wanted.perm.inh_fileid = cpu_to_le32(0);
 			wanted.perm.inh_dirid = cpu_to_le32(0);
 			wanted.mft_no = ni->mft_no;
-			wanted.unused = (char*)NULL;
+			wanted.variable = (void*)NULL;
+			wanted.varsize = 0;
 			legacy = (struct CACHED_PERMISSIONS_LEGACY*)ntfs_enter_cache(
 				scx->vol->legacy_cache, GENERIC(&wanted),
 				(cache_compare)leg_compare);
@@ -2177,7 +2178,8 @@ static struct CACHED_PERMISSIONS *fetch_cache(struct SECURITY_CONTEXT *scx,
 			struct CACHED_PERMISSIONS_LEGACY *legacy;
 
 			wanted.mft_no = ni->mft_no;
-			wanted.unused = (char*)NULL;
+			wanted.variable = (void*)NULL;
+			wanted.varsize = 0;
 			legacy = (struct CACHED_PERMISSIONS_LEGACY*)ntfs_fetch_cache(
 				scx->vol->legacy_cache, GENERIC(&wanted),
 				(cache_compare)leg_compare);
@@ -3385,7 +3387,8 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	wanted.gid = gid;
 	wanted.dmode = mode & 07777;
 	if (isdir) wanted.dmode |= 0x10000;
-	wanted.unused = (char*)NULL;
+	wanted.variable = (void*)NULL;
+	wanted.varsize = 0;
 	cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
 			scx->vol->securid_cache, GENERIC(&wanted),
 			(cache_compare)compare);
@@ -3459,7 +3462,8 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		wanted.gid = gid;
 		wanted.dmode = mode & 07777;
 		if (isdir) wanted.dmode |= 0x10000;
-		wanted.unused = (char*)NULL;
+		wanted.variable = (void*)NULL;
+		wanted.varsize = 0;
 		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
 				scx->vol->securid_cache, GENERIC(&wanted),
 				(cache_compare)compare);
@@ -3501,7 +3505,8 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 					struct CACHED_PERMISSIONS_LEGACY legacy;
 
 					legacy.mft_no = ni->mft_no;
-					legacy.unused = (char*)NULL;
+					legacy.variable = (void*)NULL;
+					legacy.varsize = 0;
 					ntfs_invalidate_cache(scx->vol->legacy_cache,
 						GENERIC(&legacy),
 						(cache_compare)leg_compare);
