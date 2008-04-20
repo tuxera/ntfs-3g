@@ -1,0 +1,3654 @@
+--- ntfsdev/ntfs-3g/src/ntfs-3g.c	2008-04-17 10:12:03.000000000 +0200
++++ ntfsacls/ntfs-3g/src/ntfs-3g.c	2008-04-20 12:26:51.000000000 +0200
+@@ -1069,9 +1069,15 @@
+ 			securid = ntfs_inherited_id(&security, dir_path,
+ 					dir_ni, S_ISDIR(type));
+ 		else {
++#if POSIXACLS
++			securid = ntfs_alloc_securid(&security,
++				security.uid, security.gid,
++				dir_path, dir_ni, perm, S_ISDIR(type));
++#else
+ 			securid = ntfs_alloc_securid(&security,
+ 				security.uid, security.gid, perm,
+ 				S_ISDIR(type));
++#endif
+ 		}
+ 		/* Create object specified in @type. */
+ 		switch (type) {
+@@ -1101,10 +1107,18 @@
+ 				 * could not be allocated (eg NTFS 1.x)
+ 				 */
+ 			if (ctx->security.usermapping) {
++#if POSIXACLS
++			   	if (!securid
++				   && ntfs_set_inherited_posix(&security, ni,
++					security.uid, security.gid,
++					dir_path, dir_ni, perm) < 0)
++					set_fuse_error(&res);
++#else
+ 			   	if (!securid
+ 				   && ntfs_set_owner_mode(&security, ni,
+ 					security.uid, security.gid, perm) < 0)
+ 					set_fuse_error(&res);
++#endif
+ 				else {
+ 					/* Adjust read-only (for Windows) */
+ 					if (perm & S_IWUSR)
+@@ -1729,6 +1743,38 @@
+ 	ntfschar *lename = NULL;
+ 	int res, lename_len;
+ 
++#if POSIXACLS
++	struct SECURITY_CONTEXT security;
++
++			/* hijack Posix ACL retrieval */
++	if ((size > 0)
++	    && (!strcmp(name,"system.posix_acl_access")
++		|| !strcmp(name,"system.posix_acl_default"))) {
++
++		if (ntfs_fuse_is_named_data_stream(path))
++			return -EINVAL; /* n/a for named data streams. */
++
++		  /* JPA return unsupported if no user mapping has been defined */
++		if (!ntfs_fuse_fill_security_context(&security)) {
++			if (ctx->silent)
++				res = 0;
++			else
++				res = -EOPNOTSUPP;
++
++		} else {
++			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
++			if (!ni)
++				res = -errno;
++			else {
++				res = ntfs_get_posix_acl(&security,path,
++					name,value,size,ni);
++				if (ntfs_inode_close(ni))
++					set_fuse_error(&res);
++			}
++		}
++		return (res);
++	}
++#endif
+ 	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
+ 		return ntfs_fuse_getxattr_windows(path, name, value, size);
+ 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+@@ -1779,6 +1825,37 @@
+ 	ntfschar *lename = NULL;
+ 	int res, lename_len;
+ 
++#if POSIXACLS
++	struct SECURITY_CONTEXT security;
++
++			/* hijack Posix ACL setting */
++	if (!strcmp(name,"system.posix_acl_access")
++	    || !strcmp(name,"system.posix_acl_default")) {
++
++		if (ntfs_fuse_is_named_data_stream(path))
++			return -EINVAL; /* n/a for named data streams. */
++
++		  /* JPA return unsupported if no user mapping has been defined */
++		if (!ntfs_fuse_fill_security_context(&security)) {
++			if (ctx->silent)
++				res = 0;
++			else
++				res = -EOPNOTSUPP;
++
++		} else {
++			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
++			if (!ni)
++				res = -errno;
++			else {
++				res = ntfs_set_posix_acl(&security,path,
++					name,value,size,ni);
++				if (ntfs_inode_close(ni))
++					set_fuse_error(&res);
++			}
++		}
++		return (res);
++	}
++#endif
+ 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+ 		return -EOPNOTSUPP;
+ 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
+@@ -1837,6 +1914,37 @@
+ 	int res = 0, lename_len;
+ 
+ 
++#if POSIXACLS
++	struct SECURITY_CONTEXT security;
++
++			/* hijack Posix ACL removal */
++	if (!strcmp(name,"system.posix_acl_access")
++	    || !strcmp(name,"system.posix_acl_default")) {
++
++		if (ntfs_fuse_is_named_data_stream(path))
++			return -EINVAL; /* n/a for named data streams. */
++
++		  /* JPA return unsupported if no user mapping has been defined */
++		if (!ntfs_fuse_fill_security_context(&security)) {
++			if (ctx->silent)
++				res = 0;
++			else
++				res = -EOPNOTSUPP;
++
++		} else {
++			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
++			if (!ni)
++				res = -errno;
++			else {
++				res = ntfs_remove_posix_acl(&security,path,
++					name,ni);
++				if (ntfs_inode_close(ni))
++					set_fuse_error(&res);
++			}
++		}
++		return (res);
++	}
++#endif
+ 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+ 		return -EOPNOTSUPP;
+ 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
+--- ntfsdev/ntfs-3g/include/ntfs-3g/security.h	2008-04-17 15:02:46.000000000 +0200
++++ ntfsacls/ntfs-3g/include/ntfs-3g/security.h	2008-04-20 11:37:48.000000000 +0200
+@@ -30,6 +30,8 @@
+ #include "inode.h"
+ #include "dir.h"
+ 
++#define POSIXACLS 1
++
+ /*
+  *          item in the mapping list
+  */
+@@ -52,6 +54,10 @@
+ 	gid_t gid;
+ 	le32 inh_fileid;
+ 	le32 inh_dirid;
++#if POSIXACLS
++	void *pxdesc;
++	unsigned int pxdescsize:16;
++#endif
+ 	unsigned int mode:12;
+ 	unsigned int valid:1;
+ } ;
+@@ -129,6 +135,65 @@
+ 	pid_t tid; /* thread id of thread requesting */
+ 	} ;
+ 
++#if POSIXACLS
++
++/*
++ *		       Posix ACL structures
++ */
++  
++struct POSIX_ACE {
++	u16 tag;
++	u16 perms;
++	s32 id;   
++} ;
++        
++struct POSIX_ACL {
++	u8 version;
++	u8 flags;
++	u16 filler;
++	struct POSIX_ACE ace[0];
++} ;
++
++struct POSIX_SECURITY {
++	mode_t mode;
++	int acccnt;
++	int defcnt;
++	int firstdef;
++	u16 tagsset;
++	struct POSIX_ACL acl;
++} ;
++        
++/*
++ *		Posix tags, cpu-endian 16 bits
++ */
++   
++enum {  
++	POSIX_ACL_USER_OBJ =	1,
++	POSIX_ACL_USER =	2,
++	POSIX_ACL_GROUP_OBJ =	4,
++	POSIX_ACL_GROUP =	8,
++	POSIX_ACL_MASK =	16,
++	POSIX_ACL_OTHER =	32,
++	POSIX_ACL_SPECIAL =	64  /* internal use only */
++} ;
++
++#define POSIX_ACL_EXTENSIONS (POSIX_ACL_USER | POSIX_ACL_GROUP | POSIX_ACL_MASK)
++        
++/*
++ *		Posix permissions, cpu-endian 16 bits
++ */
++   
++enum {  
++	POSIX_PERM_X =		1,
++	POSIX_PERM_W =		2,
++	POSIX_PERM_R =		4,
++	POSIX_PERM_DENIAL =	64 /* internal use only */
++} ;
++
++#define POSIX_VERSION 2
++
++#endif
++
+ extern const GUID *const zero_guid;
+ 
+ extern BOOL ntfs_guid_is_zero(const GUID *guid);
+@@ -169,17 +234,46 @@
+ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
+ 		const char *path, int accesstype);
+ 
++#if POSIXACLS
++le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
++		uid_t uid, gid_t gid, const char *dir_path,
++		ntfs_inode *dir_ni, mode_t mode, BOOL isdir);
++#else
+ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
+ 		uid_t uid, gid_t gid, mode_t mode, BOOL isdir);
++#endif
+ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
+ 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
++#if POSIXACLS
++int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
++		ntfs_inode *ni, uid_t uid, gid_t gid,
++		mode_t mode, struct POSIX_SECURITY *pxdesc);
++#else
+ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
+ 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode);
++#endif
+ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
+ 		const char *dir_path, ntfs_inode *dir_ni, BOOL fordir);
+ int ntfs_open_secure(ntfs_volume *vol);
+ void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
+ 
++#if POSIXACLS
++
++int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
++		ntfs_inode *ni, uid_t uid, gid_t gid,
++		const char *dir_path, ntfs_inode *dir_ni, mode_t mode);
++int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, char *value, size_t size,
++			ntfs_inode *ni);
++int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, const char *value, size_t size,
++			ntfs_inode *ni);
++int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, ntfs_inode *ni);
++
++#endif
++
++
+ /*
+  *		Security API for direct access to security descriptors
+  *	based on Win32 API
+--- ntfsdev/ntfs-3g/libntfs-3g/security.c	2008-04-20 11:31:59.000000000 +0200
++++ ntfsacls/ntfs-3g/libntfs-3g/security.c	2008-04-20 12:48:47.000000000 +0200
+@@ -77,12 +77,38 @@
+ #define STUFFSZ 0x4000 /* unitary stuffing size for $SDS */
+ #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
+ 
++#define FORCEMASK 0 /* temporary for debugging */
++
++/*
++ *	JPA The following must be in some library...
++ *	but did not found out where
++ */
++
++#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
++#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
++		| ((x & 0xff00) << 8) | ((x & 255) << 24))
++
++#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
++#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
++
++/*
++ *              Struct to hold the input mapping file
++ *      (private to this module)
++ */
++        
++struct MAPLIST {
++	struct MAPLIST *next;
++	char *uidstr;		/* uid text from the same record */
++	char *gidstr;		/* gid text from the same record */
++	char *sidstr;		/* sid text from the same record */
++	char maptext[LINESZ + 1];
++};
++
+ /*
+  *		Matching of ntfs permissions to Linux permissions
+  *	these constants are adapted to endianness
+  *	when setting, set them all
+  *	when checking, check one is present
+- *		(checks needed)
+  */
+ 
+           /* flags which are set to mean exec, write or read */
+@@ -123,18 +149,6 @@
+ #define FILE_INHERITANCE NO_PROPAGATE_INHERIT_ACE
+ #define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
+ 
+-/*
+- *	JPA The following must be in some library...
+- *	but did not found out where
+- */
+-
+-#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
+-#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
+-		| ((x & 0xff00) << 8) | ((x & 255) << 24))
+-
+-#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
+-#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
+-
+ 
+ struct SII {		/* this is an image of an $SII index entry */
+ 	le16 offs;
+@@ -175,19 +189,6 @@
+ 	} ;
+ 
+ /*
+- *		Struct to hold the input mapping file
+- *	(private to this module)
+- */
+-
+-struct MAPLIST {
+-	struct MAPLIST *next;
+-	char *uidstr;		/* uid text from the same record */
+-	char *gidstr;		/* gid text from the same record */
+-	char *sidstr;		/* sid text from the same record */
+-	char maptext[LINESZ + 1];
+-};
+-
+-/*
+  *	A type large enough to hold any SID
+  */
+ 
+@@ -278,7 +279,7 @@
+  *		SID for generic creator-group
+  *		S-1-3-1
+  */
+-	        
++
+ static const char groupsidbytes[] = {
+ 		1,		/* revision */
+ 		1,		/* auth count */
+@@ -320,13 +321,13 @@
+ 	return (
+ 	     /* check whether S-1-1-0 : world */
+ 	       ((usid->sub_authority_count == 1)
+-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
++	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
+ 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
+ 	    && (usid->sub_authority[0] == 0))
+ 
+ 	     /* check whether S-1-5-32-545 : local user */
+ 	  ||   ((usid->sub_authority_count == 2)
+-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
++	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
+ 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+ 	    && (usid->sub_authority[0] == cpu_to_le32(32))
+ 	    && (usid->sub_authority[1] == cpu_to_le32(545)))
+@@ -339,10 +340,10 @@
+  *	probably test for other configurations
+  */
+ 
+-static int is_user_sid(const SID * usid)
++static int is_user_sid(const SID *usid)
+ {
+ 	return ((usid->sub_authority_count == 5)
+-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
++	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
+ 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
+ 	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
+ }
+@@ -528,6 +529,672 @@
+ 	return (ok);
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Do sanity checks on a Posix descriptor
++ *	Should not be called with a NULL argument
++ *	returns TRUE if considered safe
++ *		if not, error should be logged by caller
++ */
++
++static BOOL valid_posix(const struct POSIX_SECURITY *pxdesc)
++{
++	const struct POSIX_ACL *pacl;
++	int i;
++	BOOL ok;
++	u16 tag;
++	u32 id;
++	int perms;
++	struct {
++		u16 previous;
++		u32 previousid;
++		u16 tagsset;
++		mode_t mode;
++		int owners;
++		int groups;
++		int others;
++	} checks[2], *pchk;
++
++	for (i=0; i<2; i++) {
++		checks[i].mode = 0;
++		checks[i].tagsset = 0;
++		checks[i].owners = 0;
++		checks[i].groups = 0;
++		checks[i].others = 0;
++		checks[i].previous = 0;
++		checks[i].previousid = 0;
++	}
++	ok = TRUE;
++	pacl = &pxdesc->acl;
++			/*
++			 * header (strict for now)
++			 */
++	if ((pacl->version != POSIX_VERSION)
++	    || (pacl->flags != 0)
++	    || (pacl->filler != 0))
++		ok = FALSE;
++			/*
++			 * Reject multiple owner, group or other
++			 * but do not require them to be present
++			 * Also check the ACEs are in correct order
++			 * which implies there is no duplicates
++			 */
++	for (i=0; i<pxdesc->acccnt + pxdesc->defcnt; i++) {
++		if (i >= pxdesc->firstdef)
++			pchk = &checks[1];
++		else
++			pchk = &checks[0];
++		perms = pacl->ace[i].perms;
++		tag = pacl->ace[i].tag;
++		pchk->tagsset |= tag;
++		id = pacl->ace[i].id;
++		if (perms & ~7) ok = FALSE;
++		if ((tag < pchk->previous)
++			|| ((tag == pchk->previous)
++			 && (id <= pchk->previousid)))
++				ok = FALSE;
++		pchk->previous = tag;
++		pchk->previousid = id;
++		switch (tag) {
++		case POSIX_ACL_USER_OBJ :
++			if (pchk->owners++)
++				ok = FALSE;
++			if (id != (u32)-1)
++				ok = FALSE;
++			pchk->mode |= perms << 6;
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++			if (pchk->groups++)
++				ok = FALSE;
++			if (id != (u32)-1)
++				ok = FALSE;
++			pchk->mode = (pchk->mode & 07707) | (perms << 3);
++			break;
++		case POSIX_ACL_OTHER :
++			if (pchk->others++)
++				ok = FALSE;
++			if (id != (u32)-1)
++				ok = FALSE;
++			pchk->mode |= perms;
++			break;
++		case POSIX_ACL_USER :
++		case POSIX_ACL_GROUP :
++				/* cannot accept root as designated user/grp */
++			if ((id == (u32)-1) || (id == (u32)0))
++				ok = FALSE;
++			break;
++		case POSIX_ACL_MASK :
++			if (id != (u32)-1)
++				ok = FALSE;
++			pchk->mode = (pchk->mode & 07707) | (perms << 3);
++			break;
++		default :
++			ok = FALSE;
++			break;
++		}
++	}
++	if ((pxdesc->acccnt > 0)
++	   && ((checks[0].owners != 1) || (checks[0].groups != 1) 
++		|| (checks[0].others != 1)))
++		ok = FALSE;
++		/* do not check owner, group or other are present in */
++		/* the default ACL, Windows does not necessarily set them */
++			/* descriptor */
++	if (pxdesc->defcnt && (pxdesc->acccnt > pxdesc->firstdef))
++		ok = FALSE;
++	if ((pxdesc->acccnt < 0) || (pxdesc->defcnt < 0))
++		ok = FALSE;
++			/* check mode, unless null or no tag set */
++	if (pxdesc->mode
++	    && checks[0].tagsset
++	    && (checks[0].mode != (pxdesc->mode & 0777)))
++		ok = FALSE;
++			/* check tagsset */
++	if (pxdesc->tagsset != checks[0].tagsset)
++		ok = FALSE;
++	return (ok);
++}
++
++static BOOL valid_posix_chk(const struct POSIX_SECURITY *pxdesc, const char *file, int line)
++{
++	BOOL ok;
++
++	ok = valid_posix(pxdesc);
++	if (!ok) {
++	}
++	return (ok);
++}
++
++#define valid_posix(p) valid_posix_chk((p),__FILE__,__LINE__)
++
++/*
++ *		Set standard header data into a Posix ACL
++ *	The mode argument should provide the 3 upper bits of target mode
++ */
++
++static mode_t posix_header(struct POSIX_SECURITY *pxdesc, mode_t basemode)
++{
++	mode_t mode;
++	u16 tagsset;
++	struct POSIX_ACE *pace;
++	int i;
++
++	mode = basemode & 07000;
++	tagsset = 0;
++	for (i=0; i<pxdesc->acccnt; i++) {
++		pace = &pxdesc->acl.ace[i];
++		tagsset |= pace->tag;
++		switch(pace->tag) {
++		case POSIX_ACL_USER_OBJ :
++			mode |= (pace->perms & 7) << 6;
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++		case POSIX_ACL_MASK :
++			mode = (mode & 07707) | ((pace->perms & 7) << 3);
++			break;
++		case POSIX_ACL_OTHER :
++			mode |= pace->perms & 7;
++			break;
++		default :
++			break;
++		}
++	}
++	pxdesc->tagsset = tagsset;
++	pxdesc->mode = mode;
++	pxdesc->acl.version = POSIX_VERSION;
++	pxdesc->acl.flags = 0;
++	pxdesc->acl.filler = 0;
++	return (mode);
++}
++
++/*
++ *		Sort ACEs in a Posix ACL
++ *	This is useful for always getting reusable converted ACLs,
++ *	it also helps in merging ACEs.
++ *	Repeated tag+id are allowed and not merged here.
++ *
++ *	Tags should be in ascending sequence and for a repeatable tag
++ *	ids should be in ascending sequence.
++ */
++
++static void sort_posix(struct POSIX_SECURITY *pxdesc)
++{
++	struct POSIX_ACL *pacl;
++	struct POSIX_ACE ace;
++	int i;
++	int offs;
++	BOOL done;
++	u16 tag;
++	u16 previous;
++	u32 id;
++	u32 previousid;
++
++
++			/*
++			 * Check sequencing of tag+id in access ACE's
++			 */
++	pacl = &pxdesc->acl;
++	do {
++		done = TRUE;
++		previous = pacl->ace[0].tag;
++		previousid = pacl->ace[0].id;
++		for (i=1; i<pxdesc->acccnt; i++) {
++			tag = pacl->ace[i].tag;
++			id = pacl->ace[i].id;
++
++			if ((tag < previous)
++			   || ((tag == previous) && (id < previousid))) {
++				done = FALSE;
++				memcpy(&ace,&pacl->ace[i-1],sizeof(struct POSIX_ACE));
++				memcpy(&pacl->ace[i-1],&pacl->ace[i],sizeof(struct POSIX_ACE));
++				memcpy(&pacl->ace[i],&ace,sizeof(struct POSIX_ACE));
++			} else {
++				previous = tag;
++				previousid = id;
++			}
++		}
++	} while (!done);
++				/*
++				 * Same for default ACEs
++				 */
++	do {
++		done = TRUE;
++		offs = pxdesc->firstdef;
++		previous = pacl->ace[offs].tag;
++		previousid = pacl->ace[offs].id;
++		for (i=offs+1; i<offs+pxdesc->defcnt; i++) {
++			tag = pacl->ace[i].tag;
++			id = pacl->ace[i].id;
++
++			if ((tag < previous)
++			   || ((tag == previous) && (id < previousid))) {
++				done = FALSE;
++				memcpy(&ace,&pacl->ace[i-1],sizeof(struct POSIX_ACE));
++				memcpy(&pacl->ace[i-1],&pacl->ace[i],sizeof(struct POSIX_ACE));
++				memcpy(&pacl->ace[i],&ace,sizeof(struct POSIX_ACE));
++			} else {
++				previous = tag;
++				previousid = id;
++			}
++		}
++	} while (!done);
++}
++
++/*
++ *		Merge a new mode into a Posix descriptor
++ *	The Posix descriptor is not reallocated, its size is unchanged
++ *
++ *	returns 0 if ok
++ */
++
++static int merge_mode_posix(struct POSIX_SECURITY *pxdesc, mode_t mode)
++{
++	int i;
++	BOOL maskfound;
++	struct POSIX_ACE *pace;
++	int todo;
++
++	maskfound = FALSE;
++	todo = POSIX_ACL_USER_OBJ | POSIX_ACL_GROUP_OBJ | POSIX_ACL_OTHER;
++	for (i=pxdesc->acccnt-1; i>=0; i--) {
++		pace = &pxdesc->acl.ace[i];
++		switch(pace->tag) {
++		case POSIX_ACL_USER_OBJ :
++			pace->perms = (mode >> 6) & 7;
++			todo &= ~POSIX_ACL_USER_OBJ;
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++			if (!maskfound)
++				pace->perms = (mode >> 3) & 7;
++			todo &= ~POSIX_ACL_GROUP_OBJ;
++			break;
++		case POSIX_ACL_MASK :
++			pace->perms = (mode >> 3) & 7;
++			maskfound = TRUE;
++			break;
++		case POSIX_ACL_OTHER :
++			pace->perms = mode & 7;
++			todo &= ~POSIX_ACL_OTHER;
++			break;
++		default :
++			break;
++		}
++	}
++	pxdesc->mode = mode;
++	return (todo ? -1 : 0);
++}
++
++/*
++ *		Merge new owner and group into a Posix descriptor
++ *	The Posix descriptor is reallocated, it has to be freed
++ *
++ *	returns NULL if there is a problem
++ */
++
++static struct POSIX_SECURITY *merge_owner_posix(const struct POSIX_SECURITY *pxdesc,
++		uid_t uid, gid_t gid, uid_t olduid, gid_t oldgid)
++{
++	struct POSIX_SECURITY *newpxdesc;
++	const struct POSIX_ACE *oldace;
++	struct POSIX_ACE *newace;
++	BOOL uidpresent;
++	BOOL gidpresent;
++	BOOL maskpresent;
++	mode_t ownerperms;
++	mode_t groupperms;
++	mode_t mode;
++	BOOL ignore;
++	u16 tagsset;
++	int count;
++	size_t size;
++	int i;
++	int k,l;
++
++	/*
++	 * Check whether the new owner and group were
++	 * already designated in the ACL, and there is a mask
++	 * Also get permissions of previous owner and group
++	 */
++	ownerperms = 0;
++	groupperms = 0;
++	uidpresent = FALSE;
++	gidpresent = FALSE;
++	maskpresent = FALSE;
++	for (i=0; i<pxdesc->acccnt; i++) {
++		oldace = &pxdesc->acl.ace[i];
++		switch (oldace->tag) {
++		case POSIX_ACL_USER_OBJ :
++			ownerperms = oldace->perms;
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++			groupperms = oldace->perms;
++			break;
++		case POSIX_ACL_USER :
++			if ((uid != (uid_t)-1)
++			   && ((uid_t)oldace->id == uid))
++				uidpresent = TRUE;
++			break;
++		case POSIX_ACL_GROUP :
++			if ((gid != (gid_t)-1)
++			   && ((gid_t)oldace->id == gid))
++				gidpresent = TRUE;
++			break;
++		case POSIX_ACL_MASK :
++			maskpresent = TRUE;
++		default :
++			break;
++		}
++	}
++	count = pxdesc->acccnt + pxdesc->defcnt;
++	if (!uidpresent)
++		count++;
++	if (!gidpresent)
++		count++;
++	if (!maskpresent)
++		count++;
++	size = sizeof(struct POSIX_SECURITY) + count*sizeof(struct POSIX_ACE);
++	newpxdesc = (struct POSIX_SECURITY*)malloc(size);
++	if (newpxdesc) {
++		k = 0;
++		mode = pxdesc->mode & 07000;
++		tagsset = 0;
++		if (!uidpresent) {
++			newace = newpxdesc->acl.ace;
++			newace->tag = POSIX_ACL_USER_OBJ;
++			newace->id = -1;
++			newace->perms = ownerperms;
++			mode |= (ownerperms << 6);
++			k++;
++		}
++		if (!gidpresent) {
++			newace = &newpxdesc->acl.ace[k];
++			newace->tag = POSIX_ACL_GROUP_OBJ;
++			newace->id = -1;
++			newace->perms = groupperms;
++			mode |= (groupperms << 3);
++			k++;
++		}
++		for (i=0; i<pxdesc->acccnt; i++) {
++			oldace = &pxdesc->acl.ace[i];
++			newace = &newpxdesc->acl.ace[k];
++			ignore = FALSE;
++			switch (oldace->tag) {
++			case POSIX_ACL_USER_OBJ :
++				if (olduid) {
++					newace->tag = POSIX_ACL_USER;
++					newace->id = olduid;
++				} else
++					ignore = TRUE;
++				break;
++			case POSIX_ACL_USER :
++				if ((uid_t)oldace->id == uid) {
++					newace->tag = POSIX_ACL_USER_OBJ;
++					newace->id = -1;
++					mode |= (oldace->perms << 6);
++				} else {
++					newace->tag = oldace->tag;
++					newace->id = oldace->id;
++				}
++				break;
++			case POSIX_ACL_GROUP_OBJ :
++				if (oldgid) {
++					newace->tag = POSIX_ACL_GROUP;
++					newace->id = oldgid;
++				} else
++					ignore = TRUE;
++				break;
++			case POSIX_ACL_GROUP :
++				if ((uid_t)oldace->id == gid) {
++					newace->tag = POSIX_ACL_GROUP_OBJ;
++					newace->id = -1;
++					mode |= (oldace->perms << 3);
++				} else {
++					newace->tag = oldace->tag;
++					newace->id = oldace->id;
++				}
++				break;
++			case POSIX_ACL_OTHER :
++				mode |= oldace->perms;
++				/* fall through */
++			default :
++				newace->tag = oldace->tag;
++				newace->id = oldace->id;
++			}
++			if (!ignore) {
++				newace->perms = oldace->perms;
++				tagsset |= newace->tag;
++				k++;
++			}
++		}
++			/*
++			 * If there were no mask, and we have created
++			 * a designated user or group, we need a mask
++			 * similar to group, so that the group righs
++			 * appear unchanged
++			 */
++		if (!maskpresent
++		    && (olduid || oldgid)) {
++			newace = &newpxdesc->acl.ace[k];
++			newace->tag = POSIX_ACL_MASK;
++			newace->perms = groupperms;
++			newace->id = -1;
++			tagsset |= POSIX_ACL_MASK;
++			k++;
++		}
++/* default ACE left unchanged */
++		l = 0;
++		for (i=0; i<pxdesc->defcnt; i++) {
++			oldace = &pxdesc->acl.ace[i + pxdesc->firstdef];
++			newace = &newpxdesc->acl.ace[l + k];
++			newace->tag = oldace->tag;
++			newace->id = oldace->id;
++			newace->perms = oldace->perms;
++			l++;
++		}
++			/* now set headers */
++		newpxdesc->acccnt = k;
++		newpxdesc->firstdef = k;
++		newpxdesc->defcnt = l;
++		newpxdesc->mode = mode;
++		newpxdesc->tagsset = tagsset;
++		newpxdesc->acl.version = POSIX_VERSION;
++		newpxdesc->acl.flags = 0;
++		newpxdesc->acl.filler = 0;
++			/* and finally sort */
++		sort_posix(newpxdesc);
++	} else
++		errno = ENOMEM;
++	return (newpxdesc);
++}
++
++#endif
++
++#if POSIXACLS
++
++/*
++ *		Replace an access or default Posix ACL
++ *	The resulting ACL is checked for validity
++ *
++ *	Returns a new ACL or NULL if there is a problem
++ */
++
++static struct POSIX_SECURITY *replace_acl(const struct POSIX_SECURITY *oldpxdesc,
++		const struct POSIX_ACL *newacl, int count, BOOL deflt)
++{
++	struct POSIX_SECURITY *newpxdesc;
++	size_t newsize;
++	int offset;
++	int oldoffset;
++	int i;
++
++	if (deflt)
++		newsize = sizeof(struct POSIX_SECURITY)
++			+ (oldpxdesc->acccnt + count)*sizeof(struct POSIX_ACE);
++	else
++		newsize = sizeof(struct POSIX_SECURITY)
++			+ (oldpxdesc->defcnt + count)*sizeof(struct POSIX_ACE);
++	newpxdesc = (struct POSIX_SECURITY*)malloc(newsize);
++	if (newpxdesc) {
++		if (deflt) {
++			offset = oldpxdesc->acccnt;
++			newpxdesc->acccnt = oldpxdesc->acccnt;
++			newpxdesc->defcnt = count;
++			newpxdesc->firstdef = offset;
++					/* copy access ACEs */
++			for (i=0; i<newpxdesc->acccnt; i++)
++				newpxdesc->acl.ace[i] = oldpxdesc->acl.ace[i];
++					/* copy default ACEs */
++			for (i=0; i<count; i++)
++				newpxdesc->acl.ace[i + offset] = newacl->ace[i];
++		} else {
++			offset = count;
++			newpxdesc->acccnt = count;
++			newpxdesc->defcnt = oldpxdesc->defcnt;
++			newpxdesc->firstdef = count;
++					/* copy access ACEs */
++			for (i=0; i<count; i++)
++				newpxdesc->acl.ace[i] = newacl->ace[i];
++					/* copy default ACEs */
++			oldoffset = oldpxdesc->firstdef;
++			for (i=0; i<newpxdesc->defcnt; i++)
++				newpxdesc->acl.ace[i + offset] = oldpxdesc->acl.ace[i + oldoffset];
++		}
++			/* assume special flags unchanged */
++		posix_header(newpxdesc, oldpxdesc->mode);
++		if (!valid_posix(newpxdesc)) {
++			free(newpxdesc);
++			newpxdesc = (struct POSIX_SECURITY*)NULL;
++			errno = EINVAL;
++		}
++	} else
++		errno = ENOMEM;
++	return (newpxdesc);
++}
++
++/*
++ *		Build an inherited Posix descriptor from parent
++ *	descriptor (if any) restricted to creation mode
++ *
++ *	Returns the inherited descriptor or NULL if there is a problem
++ */
++
++static struct POSIX_SECURITY *build_inherited_posix(
++		const struct POSIX_SECURITY *pxdesc, mode_t mode, BOOL isdir)
++{
++	struct POSIX_SECURITY *pydesc;
++	struct POSIX_ACE *pyace;
++	int count;
++	int defcnt;
++	int size;
++	int i;
++	s16 tagsset;
++
++	if (pxdesc && pxdesc->defcnt) {
++		if (isdir)
++			count = 2*pxdesc->defcnt + 3;
++		else
++			count = pxdesc->defcnt + 3;
++	} else
++		count = 3;
++	pydesc = (struct POSIX_SECURITY*)malloc(
++		sizeof(struct POSIX_SECURITY) + count*sizeof(struct POSIX_ACE));
++	if (pydesc) {
++			/*
++			 * Copy inherited tags and adapt perms
++			 */
++		tagsset = 0;
++		defcnt = (pxdesc ? pxdesc->defcnt : 0);
++		for (i=defcnt-1; i>=0; i--) {
++			pyace = &pydesc->acl.ace[i];
++			*pyace = pxdesc->acl.ace[pxdesc->firstdef + i];
++			switch (pyace->tag) {
++			case POSIX_ACL_USER_OBJ :
++				pyace->perms &= (mode >> 6) & 7;
++				break;
++			case POSIX_ACL_GROUP_OBJ :
++				if (!(tagsset & POSIX_ACL_MASK))
++					pyace->perms &= (mode >> 3) & 7;
++				break;
++			case POSIX_ACL_OTHER :
++				pyace->perms &= mode & 7;
++				break;
++			case POSIX_ACL_MASK :
++				pyace->perms &= (mode >> 3) & 7;
++				break;
++			default :
++				break;
++			}
++			tagsset |= pyace->tag;
++		}
++		pydesc->acccnt = defcnt;
++		/*
++		 * If some standard tags were missing, append them from mode
++		 * and sort the list
++		 */
++		if (~tagsset & (POSIX_ACL_USER_OBJ
++				 | POSIX_ACL_GROUP_OBJ | POSIX_ACL_OTHER)) {
++			i = defcnt;
++				/* owner was missing */
++			if (!(tagsset & POSIX_ACL_USER_OBJ)) {
++				pyace = &pydesc->acl.ace[i];
++				pyace->tag = POSIX_ACL_USER_OBJ;
++				pyace->id = -1;
++				pyace->perms = (mode >> 6) & 7;
++				tagsset |= POSIX_ACL_USER_OBJ;
++				i++;
++			}
++				/* owning group was missing */
++			if (!(tagsset & POSIX_ACL_GROUP_OBJ)) {
++				pyace = &pydesc->acl.ace[i];
++				pyace->tag = POSIX_ACL_GROUP_OBJ;
++				pyace->id = -1;
++				pyace->perms = (mode >> 3) & 7;
++				tagsset |= POSIX_ACL_GROUP_OBJ;
++				i++;
++			}
++				/* other was missing */
++			if (!(tagsset & POSIX_ACL_OTHER)) {
++				pyace = &pydesc->acl.ace[i];
++				pyace->tag = POSIX_ACL_OTHER;
++				pyace->id = -1;
++				pyace->perms = mode & 7;
++				tagsset |= POSIX_ACL_OTHER;
++				i++;
++			}
++			pydesc->acccnt = i;
++			pydesc->firstdef = i;
++			pydesc->defcnt = 0;
++			sort_posix(pydesc);
++		}
++
++		/*
++		 * append as a default ACL if a directory
++		 */
++		pydesc->firstdef = pydesc->acccnt;
++		if (defcnt && isdir) {
++			size = sizeof(struct POSIX_ACE)*defcnt;
++			memcpy(&pydesc->acl.ace[pydesc->firstdef],
++				 &pxdesc->acl.ace[pxdesc->firstdef],size);
++			pydesc->defcnt = defcnt;
++		} else {
++			pydesc->defcnt = 0;
++		}
++			/* assume special bits are not inherited */
++		posix_header(pydesc, mode & 07000);
++		if (!valid_posix(pydesc)) {
++			ntfs_log_error("Error building an inherited Posix desc\n");
++			errno = EIO;
++			free(pydesc);
++			pydesc = (struct POSIX_SECURITY*)NULL;
++		}
++	} else
++		errno = ENOMEM;
++	return (pydesc);
++}
++
++#endif
++
+ /**
+  * ntfs_guid_is_zero - check if a GUID is zero
+  * @guid:	[IN] guid to check
+@@ -1986,8 +2653,16 @@
+ 	pseccache = *scx->pseccache;
+ 	if (pseccache) {
+ 		for (index1=0; index1<=pseccache->head.last; index1++)
+-			if (pseccache->cachetable[index1])
++			if (pseccache->cachetable[index1]) {
++#if POSIXACLS
++				unsigned int index2;
++
++				for (index2=0; index2<(1<< CACHE_PERMISSIONS_BITS); index2++)
++					if (pseccache->cachetable[index1][index2].pxdesc)
++						free(pseccache->cachetable[index1][index2].pxdesc);
++#endif
+ 				free(pseccache->cachetable[index1]);
++			}
+ 		free(pseccache);
+ 	}
+ }
+@@ -1995,9 +2670,36 @@
+ static int compare(const struct CACHED_SECURID *cached,
+ 			const struct CACHED_SECURID *item)
+ {
+-	return (((cached->uid != item->uid)
++#if POSIXACLS
++	size_t csize;
++	size_t isize;
++
++		/* only compare data and sizes */
++	csize = (cached->variable ?
++		sizeof(struct POSIX_ACL)
++		+ (((struct POSIX_SECURITY*)cached->variable)->acccnt
++		   + ((struct POSIX_SECURITY*)cached->variable)->defcnt)
++			*sizeof(struct POSIX_ACE) :
++		0);
++	isize = (item->variable ?
++		sizeof(struct POSIX_ACL)
++		+ (((struct POSIX_SECURITY*)item->variable)->acccnt
++		   + ((struct POSIX_SECURITY*)item->variable)->defcnt)
++			*sizeof(struct POSIX_ACE) :
++		0);
++	return ((cached->uid != item->uid)
+ 		 || (cached->gid != item->gid)
+-		 || (cached->dmode != item->dmode)));
++		 || (cached->dmode != item->dmode)
++		 || (csize != isize)
++		 || (csize
++		    && isize
++		    && memcmp(&((struct POSIX_SECURITY*)cached->variable)->acl,
++		       &((struct POSIX_SECURITY*)item->variable)->acl, csize)));
++#else
++	return ((cached->uid != item->uid)
++		 || (cached->gid != item->gid)
++		 || (cached->dmode != item->dmode));
++#endif
+ }
+ 
+ static int leg_compare(const struct CACHED_PERMISSIONS_LEGACY *cached,
+@@ -2061,20 +2763,30 @@
+  *		security id associated)
+  */
+ 
++#if POSIXACLS
++static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
++		ntfs_inode *ni, uid_t uid, gid_t gid,
++		struct POSIX_SECURITY *pxdesc)
++#else
+ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
+ 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode)
++#endif
+ {
+ 	struct CACHED_PERMISSIONS *cacheentry;
+ 	struct CACHED_PERMISSIONS *cacheblock;
+ 	struct PERMISSIONS_CACHE *pcache;
+ 	u32 securindex;
++#if POSIXACLS
++	int pxsize;
++	struct POSIX_SECURITY *pxcached;
++#endif
+ 	unsigned int index1;
+ 	unsigned int index2;
+ 	int i;
+ 
+ 	/* cacheing is only possible if a security_id has been defined */
+ 	if (test_nino_flag(ni, v3_Extensions)
+-	   && (ni->security_id)) {
++	   && ni->security_id) {
+ 		/*
+ 		 *  Immediately test the most frequent situation
+ 		 *  where the entry exists
+@@ -2089,7 +2801,26 @@
+ 			cacheentry = &pcache->cachetable[index1][index2];
+ 			cacheentry->uid = uid;
+ 			cacheentry->gid = gid;
++#if POSIXACLS
++			if (cacheentry->pxdesc)
++				free(cacheentry->pxdesc);
++			if (pxdesc) {
++				pxsize = sizeof(struct POSIX_SECURITY)
++					+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++				pxcached = (struct POSIX_SECURITY*)malloc(pxsize);
++				if (pxcached) {
++					memcpy(pxcached, pxdesc, pxsize);
++					cacheentry->pxdesc = pxcached;
++				} else {
++					cacheentry->valid = 0;
++					cacheentry = (struct CACHED_PERMISSIONS*)NULL;
++				}
++				cacheentry->mode = pxdesc->mode & 07777;
++			} else
++				cacheentry->pxdesc = (struct POSIX_SECURITY*)NULL;
++#else
+ 			cacheentry->mode = mode & 07777;
++#endif
+ 			cacheentry->inh_fileid = cpu_to_le32(0);
+ 			cacheentry->inh_dirid = cpu_to_le32(0);
+ 			cacheentry->valid = 1;
+@@ -2116,7 +2847,26 @@
+ 				if (cacheentry) {
+ 					cacheentry->uid = uid;
+ 					cacheentry->gid = gid;
++#if POSIXACLS
++					if (cacheentry->pxdesc)
++						free(cacheentry->pxdesc);
++					if (pxdesc) {
++						pxsize = sizeof(struct POSIX_SECURITY)
++							+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++						pxcached = (struct POSIX_SECURITY*)malloc(pxsize);
++						if (pxcached) {
++							memcpy(pxcached, pxdesc, pxsize);
++							cacheentry->pxdesc = pxcached;
++						} else {
++							cacheentry->valid = 0;
++							cacheentry = (struct CACHED_PERMISSIONS*)NULL;
++						}
++						cacheentry->mode = pxdesc->mode & 07777;
++					} else
++						cacheentry->pxdesc = (struct POSIX_SECURITY*)NULL;
++#else
+ 					cacheentry->mode = mode & 07777;
++#endif
+ 					cacheentry->inh_fileid = cpu_to_le32(0);
+ 					cacheentry->inh_dirid = cpu_to_le32(0);
+ 					cacheentry->valid = 1;
+@@ -2134,16 +2884,27 @@
+ 
+ 			wanted.perm.uid = uid;
+ 			wanted.perm.gid = gid;
++#if POSIXACLS
++			wanted.perm.mode = pxdesc->mode & 07777;
++			wanted.perm.inh_fileid = cpu_to_le32(0);
++			wanted.perm.inh_dirid = cpu_to_le32(0);
++			wanted.mft_no = ni->mft_no;
++			wanted.variable = (void*)pxdesc;
++			wanted.varsize = sizeof(struct POSIX_SECURITY)
++					+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++#else
+ 			wanted.perm.mode = mode & 07777;
+ 			wanted.perm.inh_fileid = cpu_to_le32(0);
+ 			wanted.perm.inh_dirid = cpu_to_le32(0);
+ 			wanted.mft_no = ni->mft_no;
+ 			wanted.variable = (void*)NULL;
+ 			wanted.varsize = 0;
++#endif
+ 			legacy = (struct CACHED_PERMISSIONS_LEGACY*)ntfs_enter_cache(
+ 				scx->vol->legacy_cache, GENERIC(&wanted),
+ 				(cache_compare)leg_compare);
+-			if (legacy) cacheentry = &legacy->perm;
++			if (legacy)
++				cacheentry = &legacy->perm;
+ 		}
+ #endif
+ 	}
+@@ -2206,6 +2967,12 @@
+ 		}
+ 	}
+ #endif
++#if POSIXACLS
++	if (cacheentry && !cacheentry->pxdesc) {
++		ntfs_log_error("No Posix descriptor in cache\n");
++		cacheentry = (struct CACHED_PERMISSIONS*)NULL;
++	}
++#endif
+ 	return (cacheentry);
+ }
+ 
+@@ -2276,19 +3043,35 @@
+ 
+ /*
+  *		Build an ACL composed of several ACE's
+- *	(not expected to fail)
++ *	returns size of ACL or zero if failed
+  *
+  *	Three schemes are defined :
+  *
+  *	1) if root is neither owner nor group up to 7 ACE's are set up :
+- *	- grants to owner (always present)
+  *	- denials to owner (preventing grants to world or group to apply)
+- *	- grants to group (unless groups has same rights as world)
++ *	- grants to owner (always present)
++ *	- grants to group (unless group has no more than world rights)
+  *	- denials to group (preventing grants to world to apply) 
+  *	- grants to world (unless none)
+  *	- full privileges to administrator, always present
+  *	- full privileges to system, always present
+  *
++ *	The same scheme is applied for Posix ACLs, with the mask represented
++ *	as denials prepended to grants for designated users and groups
++ *
++ *	This is inspired by an Internet Draft from Marius Aamodt Eriksen
++ *	for mapping NFSv4 ACLs to Posix ACLs (draft-ietf-nfsv4-acl-mapping-00.txt)
++ *
++ *	Note that denials to group are located after grants to owner.
++ *	This only occurs in the unfrequent situation where world
++ *	has more rights than group and cannot be avoided if owner and other
++ *	have some common right which is denied to group (eg for mode 745
++ *	executing has to be denied to group, but not to owner or world).
++ *	This rare situation is processed by Windows correctly, but
++ *	Windows utilities may want to change the order, with a
++ *	consequence of applying the group denials to the Windows owner.
++ *	The interpretation on Linux is not affected by the order change.
++ *
+  *	2) if root is either owner or group, two problems arise :
+  *	- granting full rights to administrator (as needed to transpose
+  *	  to Windows rights bypassing granting to root) would imply
+@@ -2316,8 +3099,8 @@
+  *	 have the same SID), but is not root.
+  *	 In this situation up to 6 ACE's are set up :
+  *
+- *	- grants to owner (always present)
+  *	- denials to owner (preventing grants to world to apply)
++ *	- grants to owner (always present)
+  *	- grants to group (unless groups has same rights as world)
+  *	- grants to world (unless none)
+  *	- full privileges to administrator, always present
+@@ -2330,18 +3113,40 @@
+  *	Special flags (S_ISVTX, S_ISGID, S_ISUID) :
+  *	an extra null ACE is inserted to hold these flags, using
+  *	the same conventions as cygwin.
+- */
+-
+-static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
+-	       const SID * usid, const SID * gsid)
+-{
++ *
++ *	Limitations :
++ *	- root cannot be a designated user or group. Full rights
++ *	  are aways granted to root
++ */
++
++#if POSIXACLS
++
++static int buildacls_posix(struct SECURITY_CONTEXT *scx,
++		char *secattr, int offs, struct POSIX_SECURITY *pxdesc,
++		int isdir, const SID *usid, const SID *gsid)
++{
++	struct {
++		u16 grpperms;
++		u16 othperms;
++		u16 mask;
++	} aceset[2], *pset;
++	BOOL adminowns;
++	BOOL groupowns;
+ 	ACL *pacl;
+ 	ACCESS_ALLOWED_ACE *pgace;
+ 	ACCESS_ALLOWED_ACE *pdace;
+-	BOOL adminowns;
+-	BOOL groupowns;
+-	ACE_FLAGS gflags;
++	struct POSIX_ACE *pxace;
++	BOOL cantmap;
++	mode_t mode;
++	u16 tag;
++	u16 perms;
++	u16 mixperms;
++	ACE_FLAGS flags;
+ 	int pos;
++	int i;
++	BIGSID defsid;
++	const SID *sid;
++	int sidsz;
+ 	int acecnt;
+ 	int usidsz;
+ 	int gsidsz;
+@@ -2356,10 +3161,14 @@
+ 	gsidsz = sid_size(gsid);
+ 	asidsz = sid_size(adminsid);
+ 	ssidsz = sid_size(systemsid);
++	mode = pxdesc->mode;
++		/* adminowns and groupowns are used for both lists */
+ 	adminowns = same_sid(usid, adminsid)
+-	         || same_sid(gsid, adminsid);
++		 || same_sid(gsid, adminsid);
+ 	groupowns = !adminowns && same_sid(usid, gsid);
+ 
++	cantmap = FALSE;
++
+ 	/* ACL header */
+ 	pacl = (ACL*)&secattr[offs];
+ 	pacl->revision = ACL_REVISION;
+@@ -2370,10 +3179,524 @@
+ 	pos = sizeof(ACL);
+ 	acecnt = 0;
+ 
+-	/* compute a grant ACE for owner */
+-	/* this ACE will be inserted after denial for owner */
+-
+-	grants = OWNER_RIGHTS;
++		/*
++		 * Determine what is allowed to some group or world
++		 * to prevent designated users or other groups to get
++		 * rights from groups or world
++		 * Also get global mask
++		 */
++	aceset[0].grpperms = 0;
++	aceset[0].othperms = 0;
++	aceset[0].mask = (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
++	aceset[1].grpperms = 0;
++	aceset[1].othperms = 0;
++	aceset[1].mask = (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
++
++	for (i=pxdesc->acccnt+pxdesc->defcnt-1; i>=0; i--) {
++		if (i >= pxdesc->acccnt) {
++			pset = &aceset[1];
++			pxace = &pxdesc->acl.ace[i + pxdesc->firstdef - pxdesc->acccnt];
++		} else {
++			pset = &aceset[0];
++			pxace = &pxdesc->acl.ace[i];
++		}
++		switch (pxace->tag) {
++		case POSIX_ACL_USER :
++				/* do no want root as designated user */
++			if (!pxace->id)
++				adminowns = TRUE;
++			break;
++		case POSIX_ACL_GROUP :
++				/* do no want root as designated group */
++			if (!pxace->id)
++				adminowns = TRUE;
++			/* fall through */
++		case POSIX_ACL_GROUP_OBJ :
++			pset->grpperms |= pxace->perms;
++			break;
++		case POSIX_ACL_OTHER :
++			pset->othperms = pxace->perms;
++			break;
++		case POSIX_ACL_MASK :
++			pset->mask = pxace->perms;
++		default :
++			break;
++		}
++	}
++
++if (pxdesc->defcnt && (pxdesc->firstdef != pxdesc->acccnt)) {
++ntfs_log_error("** error : access and default not consecutive\n");
++return (0);
++}
++	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && !cantmap; i++) {
++		if (i >= pxdesc->acccnt) {
++			flags = INHERIT_ONLY_ACE
++				| OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
++			pset = &aceset[1];
++			pxace = &pxdesc->acl.ace[i + pxdesc->firstdef - pxdesc->acccnt];
++		} else {
++			flags = NO_PROPAGATE_INHERIT_ACE;
++			pset = &aceset[0];
++			pxace = &pxdesc->acl.ace[i];
++		}
++		tag = pxace->tag;
++		perms = pxace->perms;
++		switch (tag) {
++
++			/* compute a grant ACE for each owner or allowed user */
++
++		case POSIX_ACL_USER :
++		case POSIX_ACL_USER_OBJ :
++			if (tag == POSIX_ACL_USER_OBJ) {
++				sid = usid;
++				sidsz = usidsz;
++				grants = OWNER_RIGHTS;
++			} else {
++				sid = find_usid(scx, pxace->id, (SID*)&defsid);
++				if (sid) {
++					sidsz = sid_size(sid);
++					/*
++					 * Insert denial of complement of mask for
++					 * each designated user
++					 * WRITE_OWNER is inserted so that
++					 * the mask can be identified
++					 */
++					if (pset->mask != (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X)) {
++						denials = WRITE_OWNER;
++						pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
++						if (isdir) {
++							if (!(pset->mask & POSIX_PERM_X))
++								denials |= DIR_EXEC;
++							if (!(pset->mask & POSIX_PERM_W))
++								denials |= DIR_WRITE;
++							if (!(pset->mask & POSIX_PERM_R))
++								denials |= DIR_READ;
++						} else {
++							if (!(pset->mask & POSIX_PERM_X))
++								denials |= FILE_EXEC;
++							if (!(pset->mask & POSIX_PERM_W))
++								denials |= FILE_WRITE;
++							if (!(pset->mask & POSIX_PERM_R))
++								denials |= FILE_READ;
++						}
++						pdace->type = ACCESS_DENIED_ACE_TYPE;
++						pdace->flags = flags;
++						pdace->size = cpu_to_le16(sidsz + 8);
++						pdace->mask = denials;
++						memcpy((char*)&pdace->sid, sid, sidsz);
++						pos += sidsz + 8;
++						acecnt++;
++					}
++					grants = WORLD_RIGHTS;
++				} else
++					cantmap = TRUE;
++			}
++			if (!cantmap) {
++				if (isdir) {
++					if (perms & POSIX_PERM_X)
++						grants |= DIR_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= DIR_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= DIR_READ;
++				} else {
++					if (perms & POSIX_PERM_X)
++						grants |= FILE_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= FILE_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= FILE_READ;
++				}
++
++				/* a possible ACE to deny owner what he/she would */
++				/* induely get from administrator, group or world */
++				/* unless owner is administrator or group */
++
++				denials = 0;
++				pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
++				if (!adminowns) {
++					if (!groupowns) {
++						mixperms = pset->grpperms | pset->othperms;
++						if (isdir) {
++							if (mixperms & POSIX_PERM_X)
++								denials |= DIR_EXEC;
++							if (mixperms & POSIX_PERM_W)
++								denials |= DIR_WRITE;
++							if (mixperms & POSIX_PERM_R)
++								denials |= DIR_READ;
++						} else {
++							if (mixperms & POSIX_PERM_X)
++								denials |= FILE_EXEC;
++							if (mixperms & POSIX_PERM_W)
++								denials |= FILE_WRITE;
++							if (mixperms & POSIX_PERM_R)
++								denials |= FILE_READ;
++						}
++					} else {
++						mixperms = ~pset->grpperms & pset->othperms;
++						if (isdir) {
++							if (mixperms & POSIX_PERM_X)
++								denials |= DIR_EXEC;
++							if (mixperms & POSIX_PERM_W)
++								denials |= DIR_WRITE;
++							if (mixperms & POSIX_PERM_R)
++								denials |= DIR_READ;
++						} else {
++							if (mixperms & POSIX_PERM_X)
++								denials |= FILE_EXEC;
++							if (mixperms & POSIX_PERM_W)
++								denials |= FILE_WRITE;
++							if (mixperms & POSIX_PERM_R)
++								denials |= FILE_READ;
++						}
++					}
++					denials &= ~grants;
++					if (denials) {
++						pdace->type = ACCESS_DENIED_ACE_TYPE;
++						pdace->flags = flags;
++						pdace->size = cpu_to_le16(sidsz + 8);
++						pdace->mask = denials;
++						memcpy((char*)&pdace->sid, sid, sidsz);
++						pos += sidsz + 8;
++						acecnt++;
++					}
++				}
++			}
++			break;
++		default :
++			break;
++		}
++	}
++
++	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && !cantmap; i++) {
++		if (i >= pxdesc->acccnt) {
++			flags = INHERIT_ONLY_ACE
++				| OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
++			pset = &aceset[1];
++			pxace = &pxdesc->acl.ace[i + pxdesc->firstdef - pxdesc->acccnt];
++		} else {
++			flags = NO_PROPAGATE_INHERIT_ACE;
++			pset = &aceset[0];
++			pxace = &pxdesc->acl.ace[i];
++		}
++		tag = pxace->tag;
++		perms = pxace->perms;
++		switch (tag) {
++
++			/* compute a grant ACE for each owner or allowed user */
++
++		case POSIX_ACL_USER :
++		case POSIX_ACL_USER_OBJ :
++			if (tag == POSIX_ACL_USER_OBJ) {
++				sid = usid;
++				sidsz = usidsz;
++				grants = OWNER_RIGHTS;
++			} else {
++				sid = find_usid(scx, pxace->id, (SID*)&defsid);
++				if (sid)
++					sidsz = sid_size(sid);
++				else
++					cantmap = TRUE;
++				grants = WORLD_RIGHTS;
++			}
++			if (!cantmap) {
++				if (isdir) {
++					if (perms & POSIX_PERM_X)
++						grants |= DIR_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= DIR_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= DIR_READ;
++				} else {
++					if (perms & POSIX_PERM_X)
++						grants |= FILE_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= FILE_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= FILE_READ;
++				}
++				pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++				pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++				pgace->size = cpu_to_le16(sidsz + 8);
++				pgace->flags = flags;
++				pgace->mask = grants;
++				memcpy((char*)&pgace->sid, sid, sidsz);
++				pos += sidsz + 8;
++				acecnt++;
++			}
++			break;
++
++		case POSIX_ACL_GROUP :
++		case POSIX_ACL_GROUP_OBJ :
++
++			/* a grant ACE for group */
++			/* unless group-obj has the same rights as world */
++			/* but present if group is owner or owner is administrator */
++			/* this ACE will be inserted after denials for group */
++
++			if (tag == POSIX_ACL_GROUP_OBJ) {
++				sid = gsid;
++				sidsz = gsidsz;
++			} else {
++				sid = find_gsid(scx, pxace->id, (SID*)&defsid);
++				if (sid) {
++					sidsz = sid_size(sid);
++					/*
++					 * Insert denial of complement of mask for
++					 * each designated user
++					 * WRITE_OWNER is inserted so that
++					 * the mask can be identified
++					 */
++					if (pset->mask != (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X)) {
++						denials = WRITE_OWNER;
++						pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
++						if (isdir) {
++							if (!(pset->mask & POSIX_PERM_X))
++								denials |= DIR_EXEC;
++							if (!(pset->mask & POSIX_PERM_W))
++								denials |= DIR_WRITE;
++							if (!(pset->mask & POSIX_PERM_R))
++								denials |= DIR_READ;
++						} else {
++							if (!(pset->mask & POSIX_PERM_X))
++								denials |= FILE_EXEC;
++							if (!(pset->mask & POSIX_PERM_W))
++								denials |= FILE_WRITE;
++							if (!(pset->mask & POSIX_PERM_R))
++								denials |= FILE_READ;
++						}
++						pdace->type = ACCESS_DENIED_ACE_TYPE;
++						pdace->flags = flags;
++						pdace->size = cpu_to_le16(sidsz + 8);
++						pdace->mask = denials;
++						memcpy((char*)&pdace->sid, sid, sidsz);
++						pos += sidsz + 8;
++						acecnt++;
++					}
++				} else
++					cantmap = TRUE;
++			}
++			if (!cantmap
++			    && (adminowns
++				|| groupowns
++				|| (perms != pset->othperms)
++				|| (tag == POSIX_ACL_GROUP))) {
++				grants = WORLD_RIGHTS;
++				if (isdir) {
++					if (perms & POSIX_PERM_X)
++						grants |= DIR_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= DIR_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= DIR_READ;
++				} else {
++					if (perms & POSIX_PERM_X)
++						grants |= FILE_EXEC;
++					if (perms & POSIX_PERM_W)
++						grants |= FILE_WRITE;
++					if (perms & POSIX_PERM_R)
++						grants |= FILE_READ;
++				}
++
++				/* a possible ACE to deny group what it would get from world */
++				/* or administrator, unless owner is administrator or group */
++
++				denials = 0;
++				pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++				if (!adminowns && !groupowns) {
++					mixperms = pset->othperms;
++					if (isdir) {
++						if (mixperms & POSIX_PERM_X)
++							denials |= DIR_EXEC;
++						if (mixperms & POSIX_PERM_W)
++							denials |= DIR_WRITE;
++						if (mixperms & POSIX_PERM_R)
++							denials |= DIR_READ;
++					} else {
++						if (mixperms & POSIX_PERM_X)
++							denials |= FILE_EXEC;
++						if (mixperms & POSIX_PERM_W)
++							denials |= FILE_WRITE;
++						if (mixperms & POSIX_PERM_R)
++							denials |= FILE_READ;
++					}
++					denials &= ~(grants | OWNER_RIGHTS);
++					if (denials) {
++						pdace->type = ACCESS_DENIED_ACE_TYPE;
++						pdace->flags = flags;
++						pdace->size = cpu_to_le16(sidsz + 8);
++						pdace->mask = denials;
++						memcpy((char*)&pdace->sid, sid, sidsz);
++						pos += sidsz + 8;
++						acecnt++;
++					}
++				}
++
++					/* now insert grants to group if more than world */
++				if (adminowns
++					|| groupowns
++					|| (perms & ~pset->othperms)
++					|| (tag == POSIX_ACL_GROUP)) {
++					pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++					pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++					pgace->flags = flags;
++					pgace->size = cpu_to_le16(sidsz + 8);
++					pgace->mask = grants;
++#if FORCEMASK
++					if (opt_m)
++						pgace->mask = cpu_to_le32(forcemsk);
++#endif
++					memcpy((char*)&pgace->sid, sid, sidsz);
++					pos += sidsz + 8;
++					acecnt++;
++				}
++			}
++			break;
++
++		case POSIX_ACL_OTHER :
++
++			/* an ACE for world users */
++
++			wsidsz = sid_size(worldsid);
++			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++			grants = WORLD_RIGHTS;
++			if (isdir) {
++				if (perms & POSIX_PERM_X)
++					grants |= DIR_EXEC;
++				if (perms & POSIX_PERM_W)
++					grants |= DIR_WRITE;
++				if (perms & POSIX_PERM_R)
++					grants |= DIR_READ;
++			} else {
++				if (perms & POSIX_PERM_X)
++					grants |= FILE_EXEC;
++				if (perms & POSIX_PERM_W)
++					grants |= FILE_WRITE;
++				if (perms & POSIX_PERM_R)
++					grants |= FILE_READ;
++			}
++			pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++			pgace->flags = flags;
++			pgace->size = cpu_to_le16(wsidsz + 8);
++			pgace->mask = grants;
++#if FORCEMASK
++			if (opt_m)
++				pgace->mask = cpu_to_le32(forcemsk);
++#endif
++			memcpy((char*)&pgace->sid, worldsid, wsidsz);
++			pos += wsidsz + 8;
++			acecnt++;
++			break;
++		}
++	}
++
++	if (cantmap)
++		errno = EINVAL;
++	else {
++		/* an ACE for administrators */
++		/* always full access */
++
++		if (isdir)
++			flags = OBJECT_INHERIT_ACE
++				| CONTAINER_INHERIT_ACE;
++		else
++			flags = NO_PROPAGATE_INHERIT_ACE;
++		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++		pgace->flags = flags;
++		pgace->size = cpu_to_le16(asidsz + 8);
++		grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
++		pgace->mask = grants;
++		memcpy((char*)&pgace->sid, adminsid, asidsz);
++		pos += asidsz + 8;
++		acecnt++;
++
++		/* an ACE for system (needed ?) */
++		/* always full access */
++
++		pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++		pgace->flags = flags;
++		pgace->size = cpu_to_le16(ssidsz + 8);
++		grants = OWNER_RIGHTS | FILE_READ | FILE_WRITE | FILE_EXEC;
++		pgace->mask = grants;
++		memcpy((char*)&pgace->sid, systemsid, ssidsz);
++		pos += ssidsz + 8;
++		acecnt++;
++
++		/* a null ACE to hold special flags */
++		/* using the same representation as cygwin */
++
++		if (mode & (S_ISVTX | S_ISGID | S_ISUID)) {
++			nsidsz = sid_size(nullsid);
++			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
++			pgace->type = ACCESS_ALLOWED_ACE_TYPE;
++			pgace->flags = NO_PROPAGATE_INHERIT_ACE;
++			pgace->size = cpu_to_le16(nsidsz + 8);
++			grants = 0;
++			if (mode & S_ISUID)
++				grants |= FILE_APPEND_DATA;
++			if (mode & S_ISGID)
++				grants |= FILE_WRITE_DATA;
++			if (mode & S_ISVTX)
++				grants |= FILE_READ_DATA;
++			pgace->mask = grants;
++			memcpy((char*)&pgace->sid, nullsid, nsidsz);
++			pos += nsidsz + 8;
++			acecnt++;
++		}
++
++		/* fix ACL header */
++		pacl->size = cpu_to_le16(pos);
++		pacl->ace_count = cpu_to_le16(acecnt);
++	}
++	return (cantmap ? 0 : pos);
++}
++
++#endif
++
++static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
++	       const SID * usid, const SID * gsid)
++{
++	ACL *pacl;
++	ACCESS_ALLOWED_ACE *pgace;
++	ACCESS_ALLOWED_ACE *pdace;
++	BOOL adminowns;
++	BOOL groupowns;
++	ACE_FLAGS gflags;
++	int pos;
++	int acecnt;
++	int usidsz;
++	int gsidsz;
++	int wsidsz;
++	int asidsz;
++	int ssidsz;
++	int nsidsz;
++	le32 grants;
++	le32 denials;
++
++	usidsz = sid_size(usid);
++	gsidsz = sid_size(gsid);
++	asidsz = sid_size(adminsid);
++	ssidsz = sid_size(systemsid);
++	adminowns = same_sid(usid, adminsid)
++	         || same_sid(gsid, adminsid);
++	groupowns = !adminowns && same_sid(usid, gsid);
++
++	/* ACL header */
++	pacl = (ACL*)&secattr[offs];
++	pacl->revision = ACL_REVISION;
++	pacl->alignment1 = 0;
++	pacl->size = cpu_to_le16(sizeof(ACL) + usidsz + 8);
++	pacl->ace_count = cpu_to_le16(1);
++	pacl->alignment2 = cpu_to_le16(0);
++	pos = sizeof(ACL);
++	acecnt = 0;
++
++	/* compute a grant ACE for owner */
++	/* this ACE will be inserted after denial for owner */
++
++	grants = OWNER_RIGHTS;
+ 	if (isdir) {
+ 		gflags = DIR_INHERITANCE;
+ 		if (mode & S_IXUSR)
+@@ -2519,8 +3842,8 @@
+ 		}
+ 
+ 		if (adminowns
+-		    || groupowns
+-		    || ((mode >> 3) & ~mode & 7)) {
++		   || groupowns
++		   || ((mode >> 3) & ~mode & 7)) {
+ 				/* now insert grants to group */
+ 				/* if more rights than other */
+ 			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
+@@ -2623,6 +3946,106 @@
+ 	return (pos);
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Build a full security descriptor from a Posix ACL
++ *	returns descriptor in allocated memory, must free() after use
++ */
++
++static char *build_secur_descr_posix(struct SECURITY_CONTEXT *scx,
++			struct POSIX_SECURITY *pxdesc,
++			int isdir, const SID *usid, const SID *gsid)
++{
++	int newattrsz;
++	SECURITY_DESCRIPTOR_RELATIVE *pnhead;
++	char *newattr;
++	int aclsz;
++	int usidsz;
++	int gsidsz;
++	int wsidsz;
++	int asidsz;
++	int ssidsz;
++	int k;
++
++	usidsz = sid_size(usid);
++	gsidsz = sid_size(gsid);
++	wsidsz = sid_size(worldsid);
++	asidsz = sid_size(adminsid);
++	ssidsz = sid_size(systemsid);
++
++	/* allocate enough space for the new security attribute */
++	newattrsz = sizeof(SECURITY_DESCRIPTOR_RELATIVE)	/* header */
++	    + usidsz + gsidsz	/* usid and gsid */
++	    + sizeof(ACL)	/* acl header */
++	    + 2*(8 + usidsz)	/* two possible ACE for user */
++	    + 2*(8 + gsidsz)	/* two possible ACE for group */
++	    + 8 + wsidsz	/* one ACE for world */
++	    + 8 + asidsz	/* one ACE for admin */
++	    + 8 + ssidsz;	/* one ACE for system */
++	if (pxdesc->mode & 07000)	/* a NULL ACE for special modes */
++		newattrsz += 8 + sid_size(nullsid);
++				/* account for non-owning users and groups */
++	for (k=0; k<pxdesc->acccnt; k++) {
++		if ((pxdesc->acl.ace[k].tag == POSIX_ACL_USER)
++		    || (pxdesc->acl.ace[k].tag == POSIX_ACL_GROUP))
++			newattrsz += 3*40; /* fixme : maximum size */
++	}
++				/* account for default ACE's */
++	newattrsz += 2*40*pxdesc->defcnt;  /* fixme : maximum size */
++	newattr = (char*)ntfs_malloc(newattrsz);
++	if (newattr) {
++		/* build the main header part */
++		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
++		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
++		pnhead->alignment = 0;
++			/*
++			 * The flag SE_DACL_PROTECTED prevents the ACL
++			 * to be changed in an inheritance after creation
++			 */
++		pnhead->control = SE_DACL_PRESENT | SE_DACL_PROTECTED
++				    | SE_SELF_RELATIVE;
++			/*
++			 * Windows prefers ACL first, do the same to
++			 * get the same hash value and avoid duplication
++			 */
++		/* build permissions */
++		aclsz = buildacls_posix(scx,newattr,
++			  sizeof(SECURITY_DESCRIPTOR_RELATIVE),
++			  pxdesc, isdir, usid, gsid);
++		if (aclsz && ((aclsz + usidsz + gsidsz) <= newattrsz)) {
++			/* append usid and gsid */
++			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
++				 + aclsz], usid, usidsz);
++			memcpy(&newattr[sizeof(SECURITY_DESCRIPTOR_RELATIVE)
++				+ aclsz + usidsz], gsid, gsidsz);
++			/* positions of ACL, USID and GSID into header */
++			pnhead->owner =
++			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
++				 + aclsz);
++			pnhead->group =
++			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
++				 + aclsz + usidsz);
++			pnhead->sacl = cpu_to_le32(0);
++			pnhead->dacl =
++			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
++		} else {
++			/* ACL failure (errno set) or overflow */
++			free(newattr);
++			newattr = (char*)NULL;
++			if (aclsz) {
++				/* hope error was detected before overflowing */
++				ntfs_log_error("Security descriptor is longer than expected\n");
++				errno = EIO;
++			}
++		}
++	} else
++		errno = ENOMEM;
++	return (newattr);
++}
++
++#endif
++
+ /*
+  *		Build a full security descriptor
+  *	returns descriptor in allocated memory, must free() after use
+@@ -2802,6 +4225,142 @@
+ 	return (perm);
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Normalize a Posix ACL either from a sorted raw set of
++ *		access ACEs or default ACEs
++ *		(standard case : different owner, group and administrator)
++ */
++
++static int norm_std_permissions_posix(struct POSIX_SECURITY *posix_desc,
++		BOOL groupowns, int start, int count, int target)
++{
++	int j,k;
++	s32 id;
++	u16 tag;
++	u16 tagsset;
++	struct POSIX_ACE *pxace;
++	mode_t grantgrps;
++	mode_t grantwrld;
++	mode_t allow;
++	mode_t deny;
++	mode_t perms;
++	mode_t mode;
++
++	mode = 0;
++	tagsset = 0;
++		/*
++		 * Determine what is granted to some group or world
++		 */
++	pxace = posix_desc->acl.ace;
++	grantgrps = 0;
++	grantwrld = 0;
++	for (j=start; j<(start + count); j++) {
++		if (!(pxace[j].perms & POSIX_PERM_DENIAL)) {
++			switch (pxace[j].tag) {
++			case POSIX_ACL_GROUP_OBJ :
++			case POSIX_ACL_GROUP :
++				grantgrps |= pxace[j].perms;
++				break;
++			case POSIX_ACL_OTHER :
++				grantwrld = pxace[j].perms;
++				break;
++			default :
++				break;
++			}
++		}
++	}
++		/*
++		 * Collect groups of ACEs related to the same id
++		 * and determine what is granted and what is denied.
++		 * It is important the ACEs have been sorted
++		 */
++	j = start;
++	k = target;
++	while (j < (start + count)) {
++		tag = pxace[j].tag;
++		id = pxace[j].id;
++		if (pxace[j].perms & POSIX_PERM_DENIAL) {
++			deny = pxace[j].perms;
++			allow = 0;
++		} else {
++			deny = 0;
++			allow = pxace[j].perms;
++		}
++		j++;
++		while ((j < (start + count))
++		    && (pxace[j].tag == tag)
++		    && (pxace[j].id == id)) {
++			if (pxace[j].perms & POSIX_PERM_DENIAL)
++				deny |= pxace[j].perms;
++			else
++				allow |= pxace[j].perms;
++			j++;
++		}
++			/*
++			 * Build the permissions equivalent to grants and denials
++			 */
++		if (groupowns) {
++			if (tag == POSIX_ACL_MASK)
++				perms = ~deny;
++			else
++				perms = allow & ~deny;
++		} else
++			switch (tag) {
++			case POSIX_ACL_USER_OBJ :
++			case POSIX_ACL_USER :
++				perms = (allow | grantgrps | grantwrld) & ~deny;
++				break;
++			case POSIX_ACL_GROUP_OBJ :
++			case POSIX_ACL_GROUP :
++				perms = (allow | grantwrld) & ~deny;
++				break;
++			case POSIX_ACL_MASK :
++				perms = ~deny;
++				break;
++			default :
++				perms = allow & ~deny;
++				break;
++			}
++			/*
++			 * Store into a Posix ACE
++			 */
++		if (tag != POSIX_ACL_SPECIAL) {
++			pxace[k].tag = tag;
++			pxace[k].id = id;
++			pxace[k].perms = perms
++				 & (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
++			tagsset |= tag;
++			k++;
++		}
++		switch (tag) {
++		case POSIX_ACL_USER_OBJ :
++			mode |= ((perms & 7) << 6);
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++		case POSIX_ACL_MASK :
++			mode = (mode & 07707) | ((perms & 7) << 3);
++			break;
++		case POSIX_ACL_OTHER :
++			mode |= perms & 7;
++			break;
++		case POSIX_ACL_SPECIAL :
++			mode |= (perms & (S_ISVTX | S_ISUID | S_ISGID));
++			break;
++		default :
++			break;
++		}
++	}
++	if (!start) { /* not satisfactory */
++		posix_desc->mode = mode;
++		posix_desc->tagsset = tagsset;
++	}
++	return (k - target);
++}
++
++#endif
++
+ /*
+  *		Interpret an ACL and extract meaningful grants
+  *		(standard case : different owner, group and administrator)
+@@ -2942,6 +4501,108 @@
+ 				special));
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Normalize a Posix ACL either from a sorted raw set of
++ *		access ACEs or default ACEs
++ *		(special case : owner or/and group is administrator)
++ */
++
++static int norm_ownadmin_permissions_posix(struct POSIX_SECURITY *posix_desc,
++		int start, int count, int target)
++{
++	int j,k;
++	s32 id;
++	u16 tag;
++	u16 tagsset;
++	struct POSIX_ACE *pxace;
++	int acccnt;
++	mode_t allow;
++	mode_t deny;
++	mode_t perms;
++	mode_t mode;
++
++	mode = 0;
++	pxace = posix_desc->acl.ace;
++	acccnt = posix_desc->acccnt;
++	tagsset = 0;
++		/*
++		 * Collect groups of ACEs related to the same id
++		 * and determine what is granted (denials are ignored)
++		 * It is important the ACEs have been sorted
++		 */
++	j = start;
++	k = target;
++	deny = 0;
++	while (j < (start + count)) {
++		allow = 0;
++		tag = pxace[j].tag;
++		id = pxace[j].id;
++		if (tag == POSIX_ACL_MASK) {
++			deny = pxace[j].perms;
++			j++;
++			while ((j < (start + count))
++			    && (pxace[j].tag == POSIX_ACL_MASK))
++				j++;
++		} else {
++			if (pxace[j].perms & POSIX_PERM_DENIAL) {
++				j++;
++			} else {
++				allow = pxace[j].perms;
++				j++;
++				while ((j < (start + count))
++				    && (pxace[j].tag == tag)
++				    && (pxace[j].id == id)) {
++					if (!(pxace[j].perms & POSIX_PERM_DENIAL))
++						allow |= pxace[j].perms;
++					j++;
++				}
++			}
++		}
++
++			/*
++			 * Store the grants into a Posix ACE
++			 */
++		if (tag == POSIX_ACL_MASK)
++			perms = ~deny;
++		else
++			perms = allow;
++		if (tag != POSIX_ACL_SPECIAL) {
++			pxace[k].tag = tag;
++			pxace[k].id = id;
++			pxace[k].perms = perms
++				 & (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
++			tagsset |= tag;
++			k++;
++		}
++		switch (tag) {
++		case POSIX_ACL_USER_OBJ :
++			mode |= ((perms & 7) << 6);
++			break;
++		case POSIX_ACL_GROUP_OBJ :
++		case POSIX_ACL_MASK :
++			mode = (mode & 07707) | ((perms & 7) << 3);
++			break;
++		case POSIX_ACL_OTHER :
++			mode |= perms & 7;
++			break;
++		case POSIX_ACL_SPECIAL :
++			mode |= perms & (S_ISVTX | S_ISUID | S_ISGID);
++			break;
++		default :
++			break;
++		}
++	}
++	if (!start) { /* not satisfactory */
++		posix_desc->mode = mode;
++		posix_desc->tagsset = tagsset;
++	}
++	return (k - target);
++}
++
++#endif
++
+ /*
+  *		Interpret an ACL and extract meaningful grants
+  *		(special case : owner or/and group is administrator)
+@@ -3115,6 +4776,373 @@
+ 
+ #endif
+ 
++#if POSIXACLS
++
++/*
++ *		Build Posix permissions from an ACL
++ *	returns a pointer to the requested permissions
++ *	or a null pointer (with errno set) if there is a problem
++ */
++
++static struct POSIX_SECURITY *build_permissions_posix(struct SECURITY_CONTEXT *scx,
++			const char *securattr,
++			const SID *usid, const SID *gsid, ntfs_inode *ni)
++{
++	const SECURITY_DESCRIPTOR_RELATIVE *phead;
++	struct POSIX_SECURITY *pxdesc;
++	const ACL *pacl;
++	const ACCESS_ALLOWED_ACE *pace;
++	struct POSIX_ACE *pxace;
++	struct {
++		uid_t prevuid;
++		gid_t prevgid;
++		BOOL groupmask;
++		s16 tagsset;
++		mode_t permswrld;
++	} ctx[2], *pctx;
++	int offdacl;
++	int offace;
++	int alloccnt;
++	int acecnt;
++	uid_t uid;
++	gid_t gid;
++	int i,j;
++	int k,l;
++	BOOL ignore;
++	BOOL adminowns;
++	BOOL groupowns;
++	BOOL firstinh;
++
++	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
++	offdacl = le32_to_cpu(phead->dacl);
++	if (offdacl) {
++		pacl = (const ACL*)&securattr[offdacl];
++		acecnt = le16_to_cpu(pacl->ace_count);
++		offace = offdacl + sizeof(ACL);
++	} else {
++		acecnt = 0;
++		offace = 0;
++	}
++	adminowns = FALSE;
++	groupowns = same_sid(gsid,usid);
++	firstinh = FALSE;
++		/*
++		 * Build a raw posix security descriptor
++		 * by just translating permissions and ids
++		 * Add 2 to the count of ACE to be able to insert
++		 * a group ACE later in access and default ACLs
++		 * and add 2 more to be able to insert ACEs for owner and other
++		 */
++	alloccnt = acecnt + 4;
++	pxdesc = (struct POSIX_SECURITY*)malloc(
++				sizeof(struct POSIX_SECURITY)
++				+ alloccnt*sizeof(struct POSIX_ACE));
++	k = 0;
++	l = alloccnt;
++	for (i=0; i<2; i++) {
++		ctx[i].permswrld = 0;
++		ctx[i].prevuid = -1;
++		ctx[i].prevgid = -1;
++		ctx[i].groupmask = FALSE;
++		ctx[i].tagsset = 0;
++	}
++	for (j=0; j<acecnt; j++) {
++		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
++		if (pace->flags & INHERIT_ONLY_ACE) {
++			pxace = &pxdesc->acl.ace[l - 1];
++			pctx = &ctx[1];
++		} else {
++			pxace = &pxdesc->acl.ace[k];
++			pctx = &ctx[0];
++		}
++		ignore = FALSE;
++		if (same_sid(usid, &pace->sid)) {
++			pxace->id = -1;
++				/*
++				 * Owner has no write-owner right :
++				 * a group was defined same as owner
++				 * or admin was owner or group :
++				 * denials are meant to owner
++				 * and grants are meant to group
++				 */
++			if (!(pace->mask & WRITE_OWNER)
++			    && (pace->type == ACCESS_ALLOWED_ACE_TYPE)) {
++				if (same_sid(gsid,usid)) {
++					pxace->tag = POSIX_ACL_GROUP_OBJ;
++					pxace->id = -1;
++				} else {
++					if (same_sid(&pace->sid,usid))
++						groupowns = TRUE;
++					gid = findgroup(scx,&pace->sid);
++					if (gid) {
++						pxace->tag = POSIX_ACL_GROUP;
++						pxace->id = gid;
++						pctx->prevgid = gid;
++					} else
++						ignore = TRUE;
++				}
++			} else {
++					/* system ignored, and admin */
++					/* ignored at first position */
++				pxace->tag = POSIX_ACL_USER_OBJ;
++				if (pace->flags & INHERIT_ONLY_ACE) {
++					if ((firstinh && same_sid(&pace->sid,adminsid))
++					   || same_sid(&pace->sid,systemsid))
++						ignore = TRUE;
++					if (!firstinh) {
++						firstinh = TRUE;
++					}
++				} else {
++					if ((adminowns && same_sid(&pace->sid,adminsid))
++					   || same_sid(&pace->sid,systemsid))
++						ignore = TRUE;
++					if (same_sid(usid,adminsid))
++						adminowns = TRUE;
++				}
++			}
++		} else if (same_sid(gsid, &pace->sid)) {
++			pxace->id = -1;
++			pxace->tag = POSIX_ACL_GROUP_OBJ;
++			if (same_sid(gsid,adminsid)) {
++				adminowns = TRUE;
++				if (pace->mask & WRITE_OWNER)
++					ignore = TRUE;
++			}
++		} else if (is_world_sid((const SID*)&pace->sid)) {
++			pxace->id = -1;
++			pxace->tag = POSIX_ACL_OTHER;
++		} else if (same_sid((const SID*)&pace->sid,nullsid)) {
++			pxace->id = -1;
++			pxace->tag = POSIX_ACL_SPECIAL;
++		} else {
++			uid = findowner(scx,&pace->sid);
++			if (uid) {
++				if ((pace->type == ACCESS_DENIED_ACE_TYPE)
++				    && (pace->mask & WRITE_OWNER)
++				    && (pctx->prevuid != uid)) {
++					pxace->id = -1;
++					pxace->tag = POSIX_ACL_MASK;
++				} else {
++					pxace->id = uid;
++					pxace->tag = POSIX_ACL_USER;
++				}
++				pctx->prevuid = uid;
++			} else {
++				gid = findgroup(scx,&pace->sid);
++				if (gid) {
++					if ((pace->type == ACCESS_DENIED_ACE_TYPE)
++					    && (pace->mask & WRITE_OWNER)
++					    && (pctx->prevgid != gid)) {
++						pxace->tag = POSIX_ACL_MASK;
++						pctx->groupmask = TRUE;
++					} else {
++						pxace->tag = POSIX_ACL_GROUP;
++					}
++					pxace->id = gid;
++					pctx->prevgid = gid;
++				} else {
++					/*
++					 * do not grant rights to unknown
++					 * people and do not define root as a
++					 * designated user or group
++					 */
++					ignore = TRUE;
++				}
++			}
++		}
++		if (!ignore) {
++			pxace->perms = 0;
++				/* specific decoding for vtx/uid/gid */
++			if (pxace->tag == POSIX_ACL_SPECIAL) {
++				if (pace->mask & FILE_APPEND_DATA)
++					pxace->perms |= S_ISUID;
++				if (pace->mask & FILE_WRITE_DATA)
++					pxace->perms |= S_ISGID;
++				if (pace->mask & FILE_READ_DATA)
++					pxace->perms |= S_ISVTX;
++			} else
++				if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
++					if (pace->mask & DIR_GEXEC)
++						pxace->perms |= POSIX_PERM_X;
++					if (pace->mask & DIR_GWRITE)
++						pxace->perms |= POSIX_PERM_W;
++					if (pace->mask & DIR_GREAD)
++						pxace->perms |= POSIX_PERM_R;
++				} else {
++					if (pace->mask & FILE_GEXEC)
++						pxace->perms |= POSIX_PERM_X;
++					if (pace->mask & FILE_GWRITE)
++						pxace->perms |= POSIX_PERM_W;
++					if (pace->mask & FILE_GREAD)
++						pxace->perms |= POSIX_PERM_R;
++				}
++
++			if (pace->type != ACCESS_ALLOWED_ACE_TYPE)
++				pxace->perms |= POSIX_PERM_DENIAL;
++			else
++				if (pxace->tag == POSIX_ACL_OTHER)
++					pctx->permswrld = pxace->perms;
++			pctx->tagsset |= pxace->tag;
++			if (pace->flags & INHERIT_ONLY_ACE) {
++				l--;
++			} else {
++				k++;
++			}
++
++
++		}
++		offace += le16_to_cpu(pace->size);
++	}
++		/*
++		 * Create world perms if none (access ACE only)
++		 */
++	if (!(ctx[0].tagsset & POSIX_ACL_OTHER)) {
++		pxace = &pxdesc->acl.ace[k];
++		pxace->tag = POSIX_ACL_OTHER;
++		pxace->id = -1;
++		pxace->perms = 0;
++		ctx[0].tagsset |= POSIX_ACL_OTHER;
++		ctx[0].permswrld = 0;
++		k++;
++	}
++		/*
++		 * Duplicate world perms as owner perms if none (access ACE only)
++		 */
++	if (!(ctx[0].tagsset & POSIX_ACL_USER_OBJ)) {
++		pxace = &pxdesc->acl.ace[k];
++		pxace->tag = POSIX_ACL_USER_OBJ;
++		pxace->id = -1;
++		pxace->perms = ctx[0].permswrld;
++		ctx[0].tagsset |= POSIX_ACL_USER_OBJ;
++		k++;
++	}
++		/*
++		 * Duplicate world perms as group_obj perms if none
++		 */
++	if ((ctx[0].tagsset & POSIX_ACL_OTHER)
++	    && !(ctx[0].tagsset & POSIX_ACL_GROUP_OBJ)) {
++		pxace = &pxdesc->acl.ace[k];
++		pxace->tag = POSIX_ACL_GROUP_OBJ;
++		pxace->id = -1;
++		pxace->perms = ctx[0].permswrld;
++		ctx[0].tagsset |= POSIX_ACL_GROUP_OBJ;
++		k++;
++	}
++	if ((ctx[1].tagsset & POSIX_ACL_OTHER)
++	    && !(ctx[1].tagsset & POSIX_ACL_GROUP_OBJ)) {
++		pxace = &pxdesc->acl.ace[l - 1];
++		pxace->tag = POSIX_ACL_GROUP_OBJ;
++		pxace->id = -1;
++		pxace->perms = ctx[1].permswrld;
++		ctx[1].tagsset |= POSIX_ACL_GROUP_OBJ;
++		l--;
++	}
++		/*
++		 * Also duplicate world perms as group perms if they
++		 * were converted to mask and not followed by a group entry
++		 */
++	if (ctx[0].groupmask) {
++		for (i=k-2; i>=0; i--) {
++			if ((pxdesc->acl.ace[i].tag == POSIX_ACL_MASK)
++			   && (pxdesc->acl.ace[i].id != -1)
++			   && ((pxdesc->acl.ace[i+1].tag != POSIX_ACL_GROUP)
++			     || (pxdesc->acl.ace[i+1].id
++				!= pxdesc->acl.ace[i].id))) {
++				pxace = &pxdesc->acl.ace[k];
++				pxace->tag = POSIX_ACL_GROUP;
++				pxace->id = pxdesc->acl.ace[i].id;
++				pxace->perms = ctx[0].permswrld;
++				ctx[0].tagsset |= POSIX_ACL_GROUP;
++				k++;
++			}
++			if (pxdesc->acl.ace[i].tag == POSIX_ACL_MASK)
++				pxdesc->acl.ace[i].id = -1;
++		}
++	}
++	if (ctx[1].groupmask) {
++		for (i=l; i<(alloccnt-1); i++) {
++			if ((pxdesc->acl.ace[i].tag == POSIX_ACL_MASK)
++			   && (pxdesc->acl.ace[i].id != -1)
++			   && ((pxdesc->acl.ace[i+1].tag != POSIX_ACL_GROUP)
++			     || (pxdesc->acl.ace[i+1].id
++				!= pxdesc->acl.ace[i].id))) {
++				pxace = &pxdesc->acl.ace[l - 1];
++				pxace->tag = POSIX_ACL_GROUP;
++				pxace->id = pxdesc->acl.ace[i].id;
++				pxace->perms = ctx[1].permswrld;
++				ctx[1].tagsset |= POSIX_ACL_GROUP;
++				l--;
++			}
++			if (pxdesc->acl.ace[i].tag == POSIX_ACL_MASK)
++				pxdesc->acl.ace[i].id = -1;
++		}
++	}
++
++		/*
++		 * Insert default mask if none present and
++		 * there are designated users or groups
++		 * (the space for it has not beed used)
++		 */
++	if ((ctx[0].tagsset & (POSIX_ACL_USER | POSIX_ACL_GROUP))
++	    && !(ctx[0].tagsset & POSIX_ACL_MASK)) {
++		pxace = &pxdesc->acl.ace[k];
++		pxace->tag = POSIX_ACL_MASK;
++		pxace->id = -1;
++		pxace->perms = POSIX_PERM_DENIAL;
++		ctx[0].tagsset |= POSIX_ACL_MASK;
++		k++;
++	}
++	if ((ctx[1].tagsset & (POSIX_ACL_USER | POSIX_ACL_GROUP))
++	    && !(ctx[1].tagsset & POSIX_ACL_MASK)) {
++		pxace = &pxdesc->acl.ace[l - 1];
++		pxace->tag = POSIX_ACL_MASK;
++		pxace->id = -1;
++		pxace->perms = POSIX_PERM_DENIAL;
++		ctx[1].tagsset |= POSIX_ACL_MASK;
++		l--;
++	}
++	if (k > l) {
++		ntfs_log_error("Posix descriptor is longer than expected\n");
++		errno = EIO;
++		free(pxdesc);
++		pxdesc = (struct POSIX_SECURITY*)NULL;
++	} else {
++		pxdesc->acccnt = k;
++		pxdesc->defcnt = alloccnt - l;
++		pxdesc->firstdef = l;
++		pxdesc->tagsset = ctx[0].tagsset;
++		pxdesc->acl.version = POSIX_VERSION;
++		pxdesc->acl.flags = 0;
++		pxdesc->acl.filler = 0;
++		sort_posix(pxdesc);
++		if (adminowns) {
++			k = norm_ownadmin_permissions_posix(pxdesc,
++					0, pxdesc->acccnt, 0);
++			pxdesc->acccnt = k;
++			l = norm_ownadmin_permissions_posix(pxdesc,
++					pxdesc->firstdef, pxdesc->defcnt, k);
++			pxdesc->firstdef = k;
++			pxdesc->defcnt = l;
++		} else {
++			k = norm_std_permissions_posix(pxdesc,groupowns,
++					0, pxdesc->acccnt, 0);
++			pxdesc->acccnt = k;
++			l = norm_std_permissions_posix(pxdesc,groupowns,
++					pxdesc->firstdef, pxdesc->defcnt, k);
++			pxdesc->firstdef = k;
++			pxdesc->defcnt = l;
++		}
++	}
++	if (pxdesc && !valid_posix(pxdesc)) {
++		ntfs_log_error("Invalid Posix descriptor built\n");
++                errno = EIO;
++                free(pxdesc);
++                pxdesc = (struct POSIX_SECURITY*)NULL;
++	}
++	return (pxdesc);
++}
++
++#endif
+ /*
+  *		Build unix-style (mode_t) permissions from an ACL
+  *	returns the requested permissions
+@@ -3204,6 +5232,80 @@
+ 	return (securattr);
+ }
+ 
++#if POSIXACLS
++
++static int access_check_posix(struct SECURITY_CONTEXT *scx,
++			struct POSIX_SECURITY *pxdesc, mode_t request,
++			uid_t uid, gid_t gid)
++{
++	struct POSIX_ACE *pxace;
++	int userperms;
++	int groupperms;
++	int mask;
++	BOOL somegroup;
++	mode_t perms;
++	int i;
++
++	perms = pxdesc->mode;
++					/* owner */
++	if (uid == scx->uid)
++		perms &= 07700;
++	else {
++					/* analyze designated users and get mask */
++		userperms = -1;
++		groupperms = -1;
++		mask = 7;
++		for (i=pxdesc->acccnt-1; i>=0 ; i--) {
++			pxace = &pxdesc->acl.ace[i];
++			switch (pxace->tag) {
++			case POSIX_ACL_USER :
++				if ((uid_t)pxace->id == scx->uid)
++					userperms = pxace->perms;
++				break;
++			case POSIX_ACL_MASK :
++				mask = pxace->perms & 7;
++				break;
++			default :
++				break;
++			}
++		}
++					/* designated users */
++		if (userperms >= 0)
++			perms = (perms & 07000) + (userperms & mask);
++		else {
++					/* owning group */
++			if (!(~(perms >> 3) & request & mask)
++			    && ((gid == scx->gid)
++				|| groupmember(scx, scx->uid, gid)))
++				perms &= 07070;
++			else {
++					/* other groups */
++				groupperms = -1;
++				somegroup = FALSE;
++				for (i=pxdesc->acccnt-1; i>=0 ; i--) {
++					pxace = &pxdesc->acl.ace[i];
++					if ((pxace->tag == POSIX_ACL_GROUP)
++					    && groupmember(scx, uid, pxace->id)) {
++						if (!(~pxace->perms & request & mask))
++							groupperms = pxace->perms;
++						somegroup = TRUE;
++					}
++				}
++				if (groupperms >= 0)
++					perms = (perms & 07000) + (groupperms & mask);
++				else
++					if (somegroup)
++						perms = 0;
++					else
++						perms &= 07007;
++			}
++		}
++	}
++	return (perms);
++}
++
++#endif
++
+ /*
+  *		Get permissions to access a file
+  *	Takes into account the relation of user to file (owner, group, ...)
+@@ -3212,8 +5314,13 @@
+  *	returns -1 if there is a problem
+  */
+ 
++#if POSIXACLS
++static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
++		 const char *path, ntfs_inode * ni, mode_t request)
++#else
+ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
+ 		 const char *path, ntfs_inode * ni)
++#endif
+ {
+ 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+ 	const struct CACHED_PERMISSIONS *cached;
+@@ -3223,6 +5330,9 @@
+ 	uid_t uid;
+ 	gid_t gid;
+ 	int perm;
++#if POSIXACLS
++	struct POSIX_SECURITY *pxdesc;
++#endif
+ 
+ 	if (!scx->usermapping || !scx->uid)
+ 		perm = 07777;
+@@ -3230,9 +5340,15 @@
+ 		/* check whether available in cache */
+ 		cached = fetch_cache(scx,ni);
+ 		if (cached) {
++#if POSIXACLS
++			uid = cached->uid;
++			gid = cached->gid;
++			perm = access_check_posix(scx,cached->pxdesc,request,uid,gid);
++#else
+ 			perm = cached->mode;
+ 			uid = cached->uid;
+ 			gid = cached->gid;
++#endif
+ 		} else {
+ 			perm = 0;	/* default to no permission */
+ 			securattr = getsecurityattr(scx->vol, path, ni);
+@@ -3244,14 +5360,32 @@
+ 				gid = findgroup(scx,gsid);
+ #if OWNERFROMACL
+ 				usid = acl_owner(securattr);
++#if POSIXACLS
++				pxdesc = build_permissions_posix(scx,securattr,
++						 usid, gsid, ni);
++				if (pxdesc)
++					perm = pxdesc->mode & 07777;
++				else
++					perm = -1;
++#else
+ 				perm = build_permissions(securattr,
+ 						 usid, gsid, ni);
++#endif
+ 				uid = findowner(scx,usid);
+ #else
+ 				usid = (const SID*)&
+ 					    securattr[le32_to_cpu(phead->owner)];
++#if POSIXACLS
++				pxdesc = build_permissions_posix(scx,securattr,
++						 usid, gsid, ni);
++				if (pxdesc)
++					perm = pxdesc->mode & 07777;
++				else
++					perm = -1;
++#else
+ 				perm = build_permissions(securattr,
+ 						 usid, gsid, ni);
++#endif
+ 				if (!perm && same_sid(usid, adminsid)) {
+ 					uid = find_tenant(scx, securattr);
+ 					if (uid)
+@@ -3276,29 +5410,165 @@
+ 				}
+ 				if (test_nino_flag(ni, v3_Extensions)
+ 				    && (perm >= 0)) {
++#if POSIXACLS
++					enter_cache(scx, ni, uid,
++							gid, pxdesc);
++#else
+ 					enter_cache(scx, ni, uid,
+ 							gid, perm);
++#endif
++				}
++#if POSIXACLS
++				if (pxdesc) {
++					perm = access_check_posix(scx,pxdesc,request,uid,gid);
++					free(pxdesc);
++				}
++#endif
++				free(securattr);
++			} else {
++				perm = -1;
++				uid = gid = 0;
++			}
++		}
++#if POSIXACLS
++#else
++		if (perm >= 0) {
++			if (uid == scx->uid)
++				perm &= 07700;
++			else
++				if ((gid == scx->gid)
++				   || groupmember(scx, scx->uid, gid))
++					perm &= 07070;
++				else
++					perm &= 07007;
++		}
++#endif
++	}
++	return (perm);
++}
++
++#if POSIXACLS
++
++/*
++ *		Get a Posix ACL
++ *	returns size or -errno if there is a problem
++ */
++
++int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, char *value, size_t size,
++			ntfs_inode *ni)
++{
++	const SECURITY_DESCRIPTOR_RELATIVE *phead;
++	struct POSIX_SECURITY *pxdesc;
++	const struct CACHED_PERMISSIONS *cached;
++	char *securattr;
++	const SID *usid;	/* owner of file/directory */
++	const SID *gsid;	/* group of file/directory */
++	uid_t uid;
++	gid_t gid;
++	int perm;
++	size_t outsize;
++
++	outsize = 0;	/* default to error */
++	if (!scx->usermapping)
++		errno = ENOTSUP;
++	else {
++			/* check whether available in cache */
++		cached = fetch_cache(scx,ni);
++		if (cached)
++			pxdesc = cached->pxdesc;
++		else {
++			securattr = getsecurityattr(scx->vol, path, ni);
++			if (securattr) {
++				phead =
++				    (const SECURITY_DESCRIPTOR_RELATIVE*)
++			    			securattr;
++				gsid = (const SID*)&
++					  securattr[le32_to_cpu(phead->group)];
++#if OWNERFROMACL
++				usid = acl_owner(securattr);
++#else
++				usid = (const SID*)&
++					  securattr[le32_to_cpu(phead->owner)];
++#endif
++				pxdesc = build_permissions_posix(scx,securattr,
++					  usid, gsid, ni);
++
++					/*
++					 * fetch owner and group for cacheing
++					 */
++				if (pxdesc) {
++					perm = pxdesc->mode & 07777;
++				/*
++				 *  Create a security id if there were none
++				 * and upgrade option is selected
++				 */
++					if (!test_nino_flag(ni, v3_Extensions)
++					   && (scx->vol->secure_flags
++					     & (1 << SECURITY_ADDSECURIDS))) {
++						upgrade_secur_desc(scx->vol,
++							 path, securattr, ni);
++					}
++#if OWNERFROMACL
++					uid = findowner(scx,usid);
++#else
++					if (!perm && same_sid(usid, adminsid)) {
++						uid = find_tenant(scx,
++								securattr);
++						if (uid)
++							perm = 0700;
++					} else
++						uid = findowner(scx,usid);
++#endif
++					gid = findgroup(scx,gsid);
++					if (pxdesc->tagsset & POSIX_ACL_EXTENSIONS)
++					enter_cache(scx, ni, uid,
++							gid, pxdesc);
+ 				}
+ 				free(securattr);
++			} else
++				pxdesc = (struct POSIX_SECURITY*)NULL;
++		}
++
++		if (pxdesc) {
++			if (valid_posix(pxdesc)) {
++				if (!strcmp(name,"system.posix_acl_default")) {
++					outsize = sizeof(struct POSIX_ACL)
++						+ pxdesc->defcnt*sizeof(struct POSIX_ACE);
++					if (outsize <= size) {
++						memcpy(value,&pxdesc->acl,sizeof(struct POSIX_ACL));
++						memcpy(&value[sizeof(struct POSIX_ACL)],
++							&pxdesc->acl.ace[pxdesc->firstdef],
++							outsize-sizeof(struct POSIX_ACL));
++					} else {
++						outsize = 0;
++						errno = ENOSPC;
++					}
++				} else {
++					outsize = sizeof(struct POSIX_ACL)
++						+ pxdesc->acccnt*sizeof(struct POSIX_ACE);
++					if (outsize <= size)
++						memcpy(value,&pxdesc->acl,outsize);
++					else {
++						outsize = 0;
++						errno = ENOSPC;
++					}
++				}
+ 			} else {
+-				perm = -1;
+-				uid = gid = 0;
++				outsize = 0;
++				errno = EIO;
++				ntfs_log_error("Invalid Posix ACL built\n");
+ 			}
+-		}
+-		if (perm >= 0) {
+-			if (uid == scx->uid)
+-				perm &= 07700;
+-			else
+-				if ((gid == scx->gid)
+-				   || groupmember(scx, scx->uid, gid))
+-					perm &= 07070;
+-				else
+-					perm &= 07007;
+-		}
++			if (!cached)
++				free(pxdesc);
++		} else
++			outsize = 0;
+ 	}
+-	return (perm);
++	return (outsize ? (int)outsize : -errno);
+ }
+ 
++#endif
++
+ /*
+  *		Get owner, group and permissions in an stat structure
+  *	returns permissions, or -1 if there is a problem
+@@ -3314,6 +5584,9 @@
+ 	const SID *gsid;	/* group of file/directory */
+ 	const struct CACHED_PERMISSIONS *cached;
+ 	int perm;
++#if POSIXACLS
++	struct POSIX_SECURITY *pxdesc;
++#endif
+ 
+ 	if (!scx->usermapping)
+ 		perm = 07777;
+@@ -3340,8 +5613,17 @@
+ 				usid = (const SID*)&
+ 					  securattr[le32_to_cpu(phead->owner)];
+ #endif
++#if POSIXACLS
++				pxdesc = build_permissions_posix(scx, securattr,
++					  usid, gsid, ni);
++				if (pxdesc)
++					perm = pxdesc->mode & 07777;
++				else
++					perm = -1;
++#else
+ 				perm = build_permissions(securattr,
+ 					  usid, gsid, ni);
++#endif
+ 					/*
+ 					 * fetch owner and group for cacheing
+ 					 */
+@@ -3371,8 +5653,14 @@
+ 					stbuf->st_gid = findgroup(scx,gsid);
+ 					stbuf->st_mode =
+ 					    (stbuf->st_mode & ~07777) + perm;
++#if POSIXACLS
++					enter_cache(scx, ni, stbuf->st_uid,
++						stbuf->st_gid, pxdesc);
++					free(pxdesc);
++#else
+ 					enter_cache(scx, ni, stbuf->st_uid,
+ 						stbuf->st_gid, perm);
++#endif
+ 				}
+ 				free(securattr);
+ 			}
+@@ -3381,6 +5669,87 @@
+ 	return (perm);
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Get the base for a Posix inheritance and
++ *	build an inherited Posix descriptor
++ */
++
++static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
++			const char *dir_path, ntfs_inode *dir_ni,
++			mode_t mode, BOOL isdir)
++{
++	const struct CACHED_PERMISSIONS *cached;
++	const SECURITY_DESCRIPTOR_RELATIVE *phead;
++	struct POSIX_SECURITY *pxdesc;
++	struct POSIX_SECURITY *pydesc;
++	char *securattr;
++	const SID *usid;
++	const SID *gsid;
++	uid_t uid;
++	gid_t gid;
++
++	pydesc = (struct POSIX_SECURITY*)NULL;
++		/* check whether parent directory is available in cache */
++	cached = fetch_cache(scx,dir_ni);
++	if (cached) {
++		uid = cached->uid;
++		gid = cached->gid;
++		pxdesc = cached->pxdesc;
++		if (pxdesc) {
++			pydesc = build_inherited_posix(pxdesc,mode,isdir);
++		}
++	} else {
++		securattr = getsecurityattr(scx->vol, dir_path, dir_ni);
++		if (securattr) {
++			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
++			    	securattr;
++			gsid = (const SID*)&
++				   securattr[le32_to_cpu(phead->group)];
++			gid = findgroup(scx,gsid);
++#if OWNERFROMACL
++			usid = acl_owner(securattr);
++			pxdesc = build_permissions_posix(scx,securattr,
++						 usid, gsid, dir_ni);
++			uid = findowner(scx,usid);
++#else
++			usid = (const SID*)&
++				    securattr[le32_to_cpu(phead->owner)];
++			pxdesc = build_permissions_posix(scx,securattr,
++						 usid, gsid, dir_ni);
++			if (pxdesc && same_sid(usid, adminsid)) {
++				uid = find_tenant(scx, securattr);
++			} else
++				uid = findowner(scx,usid);
++#endif
++			if (pxdesc) {
++				/*
++				 *  Create a security id if there were none
++				 * and upgrade option is selected
++				 */
++				if (!test_nino_flag(dir_ni, v3_Extensions)
++				   && (scx->vol->secure_flags
++				     & (1 << SECURITY_ADDSECURIDS))) {
++					upgrade_secur_desc(scx->vol, dir_path,
++						securattr, dir_ni);
++					/*
++					 * fetch owner and group for cacheing
++					 * if there is a securid
++					 */
++				}
++				if (test_nino_flag(dir_ni, v3_Extensions)) {
++					enter_cache(scx, dir_ni, uid,
++							gid, pxdesc);
++				}
++				pydesc = build_inherited_posix(pxdesc, mode, isdir);
++				free(pxdesc);
++			}
++		}
++	}
++	return (pydesc);
++}
++
+ /*
+  *		Allocate a security_id for a file being created
+  *	
+@@ -3388,6 +5757,144 @@
+  */
+ 
+ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
++		uid_t uid, gid_t gid, const char *dir_path,
++		ntfs_inode *dir_ni, mode_t mode, BOOL isdir)
++{
++#if !FORCE_FORMAT_v1x
++	const struct CACHED_SECURID *cached;
++	struct CACHED_SECURID wanted;
++	struct POSIX_SECURITY *pxdesc;
++	char *newattr;
++	int newattrsz;
++	const SID *usid;
++	const SID *gsid;
++	BIGSID defusid;
++	BIGSID defgsid;
++	le32 securid;
++#endif
++
++	securid = cpu_to_le32(0);
++
++#if !FORCE_FORMAT_v1x
++
++	pxdesc = inherit_posix(scx, dir_path, dir_ni, mode, isdir);
++	if (pxdesc) {
++		/* check whether target securid is known in cache */
++
++		wanted.uid = uid;
++		wanted.gid = gid;
++		wanted.dmode = pxdesc->mode & mode & 07777;
++		if (isdir) wanted.dmode |= 0x10000;
++		wanted.variable = (void*)pxdesc;
++		wanted.varsize = sizeof(struct POSIX_SECURITY)
++				+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
++				scx->vol->securid_cache, GENERIC(&wanted),
++				(cache_compare)compare);
++			/* quite simple, if we are lucky */
++		if (cached)
++			securid = cached->securid;
++
++			/* not in cache : make sure we can create ids */
++
++		if (!cached && (scx->vol->major_ver >= 3)) {
++			usid = find_usid(scx,uid,(SID*)&defusid);
++			gsid = find_gsid(scx,gid,(SID*)&defgsid);
++			if (!usid || !gsid) {
++				ntfs_log_error("File created by an unmapped user/group %d/%d\n",
++						(int)uid, (int)gid);
++				usid = gsid = adminsid;
++			}
++			newattr = build_secur_descr_posix(scx, pxdesc,
++					isdir, usid, gsid);
++			if (newattr) {
++				newattrsz = attr_size(newattr);
++				securid = setsecurityattr(scx->vol,
++					(const SECURITY_DESCRIPTOR_RELATIVE*)newattr,
++					newattrsz);
++				if (securid) {
++					/* update cache, for subsequent use */
++					wanted.securid = securid;
++					ntfs_enter_cache(scx->vol->securid_cache,
++							GENERIC(&wanted),
++							(cache_compare)compare);
++				}
++				free(newattr);
++			} else {
++				/*
++				 * could not build new security attribute
++				 * errno set by build_secur_descr()
++				 */
++			}
++		}
++	free(pxdesc);
++	}
++#endif
++	return (securid);
++}
++
++/*
++ *		Apply Posix inheritance to a newly created file
++ *	(for NTFS 1.x only : no securid)
++ */
++
++int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
++		ntfs_inode *ni, uid_t uid, gid_t gid,
++		const char *dir_path, ntfs_inode *dir_ni, mode_t mode)
++{
++	struct POSIX_SECURITY *pxdesc;
++	char *newattr;
++	const SID *usid;
++	const SID *gsid;
++	BIGSID defusid;
++	BIGSID defgsid;
++	BOOL isdir;
++	int res;
++
++	res = -1;
++	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
++	pxdesc = inherit_posix(scx, dir_path, dir_ni, mode, isdir);
++	if (pxdesc) {
++		usid = find_usid(scx,uid,(SID*)&defusid);
++		gsid = find_gsid(scx,gid,(SID*)&defgsid);
++		if (!usid || !gsid) {
++			ntfs_log_error("File created by an unmapped user/group %d/%d\n",
++					(int)uid, (int)gid);
++			usid = gsid = adminsid;
++		}
++		newattr = build_secur_descr_posix(scx, pxdesc,
++					isdir, usid, gsid);
++		if (newattr) {
++			res = update_secur_descr(scx->vol, newattr, ni);
++#if CACHE_LEGACY_SIZE
++			/* also invalidate legacy cache */
++			if (isdir && !ni->security_id) {
++				struct CACHED_PERMISSIONS_LEGACY legacy;
++
++				legacy.mft_no = ni->mft_no;
++				legacy.variable = pxdesc;
++				legacy.varsize = sizeof(struct POSIX_SECURITY)
++					+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++				ntfs_invalidate_cache(scx->vol->legacy_cache,
++						GENERIC(&legacy),
++						(cache_compare)leg_compare);
++			}
++#endif
++			free(newattr);
++
++		} else {
++			/*
++			 * could not build new security attribute
++			 * errno set by build_secur_descr()
++			 */
++		}
++	}
++	return (res);
++}
++
++#else
++
++le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
+ 		uid_t uid, gid_t gid, mode_t mode, BOOL isdir)
+ {
+ #if !FORCE_FORMAT_v1x
+@@ -3455,6 +5962,7 @@
+ 	return (securid);
+ }
+ 
++#endif
+ 
+ /*
+  *		Update ownership and mode of a file, reusing an existing
+@@ -3463,8 +5971,14 @@
+  *	Returns zero if successful
+  */
+ 
++#if POSIXACLS
++int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
++		uid_t uid, gid_t gid, mode_t mode,
++		struct POSIX_SECURITY *pxdesc)
++#else
+ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+ 		uid_t uid, gid_t gid, mode_t mode)
++#endif
+ {
+ 	int res;
+ 	const struct CACHED_SECURID *cached;
+@@ -3486,8 +6000,17 @@
+ 		wanted.gid = gid;
+ 		wanted.dmode = mode & 07777;
+ 		if (isdir) wanted.dmode |= 0x10000;
++#if POSIXACLS
++		wanted.variable = (void*)pxdesc;
++		if (pxdesc)
++			wanted.varsize = sizeof(struct POSIX_SECURITY)
++				+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++		else
++			wanted.varsize = 0;
++#else
+ 		wanted.variable = (void*)NULL;
+ 		wanted.varsize = 0;
++#endif
+ 		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
+ 				scx->vol->securid_cache, GENERIC(&wanted),
+ 				(cache_compare)compare);
+@@ -3511,8 +6034,17 @@
+ 				uid, gid);
+ 			usid = gsid = adminsid;
+ 		}
++#if POSIXACLS
++		if (pxdesc)
++			newattr = build_secur_descr_posix(scx, pxdesc,
++					 isdir, usid, gsid);
++		else
++			newattr = build_secur_descr(mode,
++					 isdir, usid, gsid);
++#else
+ 		newattr = build_secur_descr(mode,
+ 					 isdir, usid, gsid);
++#endif
+ 		if (newattr) {
+ 			res = update_secur_descr(scx->vol, newattr, ni);
+ 			if (!res) {
+@@ -3529,8 +6061,13 @@
+ 					struct CACHED_PERMISSIONS_LEGACY legacy;
+ 
+ 					legacy.mft_no = ni->mft_no;
++#if POSIXACLS
++					legacy.variable = wanted.variable;
++					legacy.varsize = wanted.varsize;
++#else
+ 					legacy.variable = (void*)NULL;
+ 					legacy.varsize = 0;
++#endif
+ 					ntfs_invalidate_cache(scx->vol->legacy_cache,
+ 						GENERIC(&legacy),
+ 						(cache_compare)leg_compare);
+@@ -3549,6 +6086,115 @@
+ 	return (res);
+ }
+ 
++#if POSIXACLS
++
++/*
++ *		Set a new access or default Posix ACL to a file
++ *		(or remove ACL if no input data)
++ *	Validity of input data is checked after merging
++ *
++ *	Returns 0, or -1 if there is a problem
++ */
++
++int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, const char *value, size_t size,
++			ntfs_inode *ni)
++{
++	const SECURITY_DESCRIPTOR_RELATIVE *phead;
++	const struct CACHED_PERMISSIONS *cached;
++	char *oldattr;
++	uid_t processuid;
++	const SID *usid;
++	const SID *gsid;
++	uid_t uid;
++	uid_t gid;
++	int res;
++	mode_t mode;
++	BOOL isdir;
++	BOOL deflt;
++	int count;
++	struct POSIX_SECURITY *oldpxdesc;
++	struct POSIX_SECURITY *newpxdesc;
++
++	/* get the current pxsec, either from cache or from old attribute  */
++	res = -1;
++	deflt = !strcmp(name,"system.posix_acl_default");
++	if (size)
++		count = (size - sizeof(struct POSIX_ACL)) / sizeof(struct POSIX_ACE);
++	else
++		count = 0;
++	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
++	newpxdesc = (struct POSIX_SECURITY*)NULL;
++	if (!deflt || isdir) {
++		cached = fetch_cache(scx, ni);
++		if (cached) {
++			uid = cached->uid;
++			gid = cached->gid;
++			oldpxdesc = cached->pxdesc;
++			if (oldpxdesc) {
++				mode = oldpxdesc->mode;
++				newpxdesc = replace_acl(oldpxdesc,
++						(const struct POSIX_ACL*)value,count,deflt);
++				}
++		} else {
++			oldattr = getsecurityattr(scx->vol,path, ni);
++			if (oldattr) {
++				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
++#if OWNERFROMACL
++				usid = acl_owner(oldattr);
++#else
++				usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
++#endif
++				gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
++				uid = findowner(scx,usid);
++				gid = findgroup(scx,gsid);
++				oldpxdesc = build_permissions_posix(scx,
++					oldattr, usid, gsid, ni);
++				if (oldpxdesc) {
++					mode = oldpxdesc->mode;
++					newpxdesc = replace_acl(oldpxdesc,
++							(const struct POSIX_ACL*)value,count,deflt);
++					free(oldpxdesc);
++				}
++				free(oldattr);
++			}
++		}
++	} else
++		errno = EINVAL;
++
++	if (newpxdesc) {
++		processuid = scx->uid;
++		if (!processuid || (uid == processuid)) {
++				/*
++				 * clear setgid if file group does
++				 * not match process group
++				 */
++			if (processuid && (gid != scx->gid)
++			    && !groupmember(scx, scx->uid, gid)) {
++				newpxdesc->mode &= ~S_ISGID;
++			}
++			res = ntfs_set_owner_mode(scx, ni, uid, gid,
++				newpxdesc->mode, newpxdesc);
++		} else
++			errno = EPERM;
++		free(newpxdesc);
++	}
++	return (res ? -1 : 0);
++}
++
++/*
++ *		Remove a default Posix ACL from a file
++ */
++
++int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
++			const char *name, ntfs_inode *ni)
++{
++	return (ntfs_set_posix_acl(scx, path, name,
++			(const char*)NULL, 0, ni));
++}
++
++#endif
++
+ 
+ /*
+  *		Set new permissions to a file
+@@ -3568,18 +6214,40 @@
+ 	char *oldattr;
+ 	const SID *usid;
+ 	const SID *gsid;
++	uid_t processuid;
+ 	uid_t uid;
+-	uid_t fileuid;
+-	uid_t filegid;
++	uid_t gid;
+ 	int res;
++#if POSIXACLS
++	BOOL isdir;
++	int pxsize;
++	const struct POSIX_SECURITY *oldpxdesc;
++	struct POSIX_SECURITY *newpxdesc;
++#endif
+ 
+ 	/* get the current owner, either from cache or from old attribute  */
+ 	res = 0;
+-	usid = (const SID*)NULL;
++usid = (const SID*)NULL;
+ 	cached = fetch_cache(scx, ni);
+ 	if (cached) {
+-		fileuid = cached->uid;
+-		filegid = cached->gid;
++		uid = cached->uid;
++		gid = cached->gid;
++#if POSIXACLS
++		oldpxdesc = cached->pxdesc;
++		if (oldpxdesc) {
++				/* must copy before merging */
++			pxsize = sizeof(struct POSIX_SECURITY)
++				+ (oldpxdesc->acccnt + oldpxdesc->defcnt)*sizeof(struct POSIX_ACE);
++			newpxdesc = (struct POSIX_SECURITY*)malloc(pxsize);
++			if (newpxdesc) {
++				memcpy(newpxdesc, oldpxdesc, pxsize);
++				if (merge_mode_posix(newpxdesc, mode))
++					res = -1;
++			} else
++				res = -1;
++		} else
++			newpxdesc = (struct POSIX_SECURITY*)NULL;
++#endif
+ 	} else {
+ 		oldattr = getsecurityattr(scx->vol,path, ni);
+ 		if (oldattr) {
+@@ -3590,25 +6258,42 @@
+ 			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
+ #endif
+ 			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
+-			fileuid = findowner(scx,usid);
+-			filegid = findgroup(scx,gsid);
++			uid = findowner(scx,usid);
++			gid = findgroup(scx,gsid);
++#if POSIXACLS
++			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
++			newpxdesc = build_permissions_posix(scx,
++				oldattr, usid, gsid, ni);
++			if (!newpxdesc || merge_mode_posix(newpxdesc, mode))
++				res = -1;
++#endif
+ 			free(oldattr);
+ 		} else
+ 			res = -1;
+ 	}
+ 
+ 	if (!res) {
+-		uid = scx->uid;
+-		if (!uid || (fileuid == uid)) {
++		processuid = scx->uid;
++		if (!processuid || (uid == processuid)) {
+ 				/*
+ 				 * clear setgid if file group does
+ 				 * not match process group
+ 				 */
+-			if (uid && (filegid != scx->gid)
+-			    && !groupmember(scx, scx->uid, filegid))
++			if (processuid && (gid != scx->gid)
++			    && !groupmember(scx, scx->uid, gid))
+ 				mode &= ~S_ISGID;
+-			res = ntfs_set_owner_mode(scx, ni,
+-					fileuid, filegid, mode);
++#if POSIXACLS
++			if (newpxdesc) {
++				newpxdesc->mode = mode;
++				res = ntfs_set_owner_mode(scx, ni, uid, gid,
++					mode, newpxdesc);
++				free(newpxdesc);
++			} else
++				res = ntfs_set_owner_mode(scx, ni, uid, gid,
++					mode, newpxdesc);
++#else
++			res = ntfs_set_owner_mode(scx, ni, uid, gid, mode);
++#endif
+ 		} else {
+ 			errno = EPERM;
+ 			res = -1;	/* neither owner nor root */
+@@ -3723,7 +6408,11 @@
+ 	if (!scx->usermapping || !scx->uid)
+ 		allow = 1;
+ 	else {
+-		perm = ntfs_get_perm(scx, path, ni);
++#if POSIXACLS
++			perm = ntfs_get_perm(scx, path, ni, accesstype);
++#else
++			perm = ntfs_get_perm(scx, path, ni);
++#endif
+ 		if (perm >= 0) {
+ 			res = EACCES;
+ 			switch (accesstype) {
+@@ -3755,7 +6444,7 @@
+ 					allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
+ 					    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+ 				break;
+-			default :
++			default:
+ 				res = EINVAL;
+ 				allow = 0;
+ 				break;
+@@ -3838,6 +6527,10 @@
+ 	mode_t mode;
+ 	int perm;
+ 	int res;
++#if POSIXACLS
++	struct POSIX_SECURITY *oldpxdesc;
++	struct POSIX_SECURITY *newpxdesc;
++#endif
+ 
+ 	res = 0;
+ 	/* get the current owner and mode from cache or security attributes */
+@@ -3847,10 +6540,23 @@
+ 		fileuid = cached->uid;
+ 		filegid = cached->gid;
+ 		mode = cached->mode;
++#if POSIXACLS
++		oldpxdesc = cached->pxdesc;
++		if (oldpxdesc) {
++			newpxdesc = merge_owner_posix(oldpxdesc,
++				uid, gid, fileuid, filegid);
++			if (!newpxdesc)
++				res = -1;
++		} else
++			newpxdesc = (struct POSIX_SECURITY*)NULL;
++#endif
+ 	} else {
+ 		fileuid = 0;
+ 		filegid = 0;
+ 		mode = 0;
++#if POSIXACLS
++		newpxdesc = (struct POSIX_SECURITY*)NULL;
++#endif
+ 		oldattr = getsecurityattr(scx->vol, path, ni);
+ 		if (oldattr) {
+ 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+@@ -3863,6 +6569,21 @@
+ 			usid = (const SID*)
+ 				&oldattr[le32_to_cpu(phead->owner)];
+ #endif
++#if POSIXACLS
++			oldpxdesc = build_permissions_posix(scx, oldattr,
++					usid, gsid, ni);
++			if (oldpxdesc) {
++				fileuid = findowner(scx,usid);
++				filegid = findgroup(scx,gsid);
++				mode = perm = oldpxdesc->mode;
++				newpxdesc = merge_owner_posix(oldpxdesc,
++					uid, gid, fileuid, filegid);
++				free(oldpxdesc);
++				if (!newpxdesc)
++					res = -1;
++			} else
++				res = -1;
++#else
+ 			mode = perm = build_permissions(oldattr,
+ 					 usid, gsid, ni);
+ 			if (perm >= 0) {
+@@ -3870,6 +6591,7 @@
+ 				filegid = findgroup(scx,gsid);
+ 			} else
+ 				res = -1;
++#endif
+ 			free(oldattr);
+ 		} else
+ 			res = -1;
+@@ -3891,11 +6613,19 @@
+                         /* unless request originated by root */
+ 			if (uid && (fileuid != uid))
+ 				mode &= 01777;
++#if POSIXACLS
++			res = ntfs_set_owner_mode(scx, ni, uid, gid, 
++				mode, newpxdesc);
++#else
+ 			res = ntfs_set_owner_mode(scx, ni, uid, gid, mode);
++#endif
+ 		} else {
+ 			res = -1;	/* neither owner nor root */
+ 			errno = EPERM;
+ 		}
++#if POSIXACLS
++		free(newpxdesc);
++#endif
+ 	} else {
+ 		/*
+ 		 * Should not happen : a default descriptor is generated
