@@ -1588,41 +1588,46 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
  *	Returns 0 (root) if it does not match pattern
  */
 
-static int findimplicit(const SID *xsid, const SID *pattern)
+static int findimplicit(const SID *xsid, const SID *pattern, int parity)
 {
 	BIGSID defsid;
 	SID *psid;
 	int xid; /* uid or gid */
 	int cnt;
 	int carry;
+	u32 xlast;
+	u32 rlast;
 
 	memcpy(&defsid,pattern,sid_size(pattern));
 	psid = (SID*)&defsid;
 	cnt = psid->sub_authority_count;
 	psid->sub_authority[cnt-1] = xsid->sub_authority[cnt-1];
+	xlast = le32_to_cpu(xsid->sub_authority[cnt-1]);
+	rlast = le32_to_cpu(pattern->sub_authority[cnt-1]);
+
+	if ((xlast > rlast) && !((xlast ^ rlast ^ parity) & 1)) {
 		/* direct check for basic situation */
-	if (same_sid(psid,xsid))
-		xid = ((le32_to_cpu(xsid->sub_authority[cnt-1])
-			- le32_to_cpu(pattern->sub_authority[cnt-1])) >> 1)
-			& 0x3fffffff;
-	else {
-		/*
-		 * check whether part of mapping had to be recorded
-		 * in a higher level authority
-		 */
-		carry = 1;
-		do {
-			psid->sub_authority[cnt-2]
-				= cpu_to_le32(le32_to_cpu(
-					psid->sub_authority[cnt-2]) + 1);
-		} while (!same_sid(psid,xsid) && (++carry < 4));
-		if (carry < 4)
-			xid = (((le32_to_cpu(xsid->sub_authority[cnt-1])
-				- le32_to_cpu(pattern->sub_authority[cnt-1])) >> 1)
-				& 0x3fffffff) | (carry << 30);
-		else
-			xid = 0;
-	}
+		if (same_sid(psid,xsid))
+			xid = ((xlast - rlast) >> 1) & 0x3fffffff;
+		else {
+			/*
+			 * check whether part of mapping had to be recorded
+			 * in a higher level authority
+			 */
+			carry = 1;
+			do {
+				psid->sub_authority[cnt-2]
+					= cpu_to_le32(le32_to_cpu(
+						psid->sub_authority[cnt-2]) + 1);
+			} while (!same_sid(psid,xsid) && (++carry < 4));
+			if (carry < 4)
+				xid = (((xlast - rlast) >> 1) & 0x3fffffff)
+					| (carry << 30);
+			else
+				xid = 0;
+		}
+	} else
+		xid = 0;
 	return (xid);
 }
 
@@ -1644,7 +1649,7 @@ static int findowner(struct SECURITY_CONTEXT *scx, const SID *usid)
 		/*
 		 * No explicit mapping found, try implicit mapping
 		 */
-		uid = findimplicit(usid,p->sid);
+		uid = findimplicit(usid,p->sid,0);
 	else
 		uid = (p ? p->xid : 0);
 	return (uid);
@@ -1669,7 +1674,7 @@ static gid_t findgroup(struct SECURITY_CONTEXT *scx, const SID * gsid)
 		/*
 		 * No explicit mapping found, try implicit mapping
 		 */
-		gid = findimplicit(gsid,p->sid);
+		gid = findimplicit(gsid,p->sid,1);
 	else
 		gid = (p ? p->xid : 0);
 	return (gid);
