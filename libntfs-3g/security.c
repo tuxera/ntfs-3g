@@ -2354,6 +2354,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 
 	usidsz = sid_size(usid);
 	gsidsz = sid_size(gsid);
+	wsidsz = sid_size(worldsid);
 	asidsz = sid_size(adminsid);
 	ssidsz = sid_size(systemsid);
 	adminowns = same_sid(usid, adminsid)
@@ -2446,6 +2447,22 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 			acecnt++;
 		}
 	}
+		/*
+		 * for directories, a world execution denial
+		 * inherited to plain files
+		 */
+
+	if (isdir) {
+		pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
+			pdace->type = ACCESS_DENIED_ACE_TYPE;
+			pdace->flags = INHERIT_ONLY_ACE | OBJECT_INHERIT_ACE;
+			pdace->size = cpu_to_le16(wsidsz + 8);
+			pdace->mask = FILE_EXEC;
+			memcpy((char*)&pdace->sid, worldsid, wsidsz);
+			pos += wsidsz + 8;
+			acecnt++;
+	}
+
 
 		/* now insert grants to owner */
 	pgace = (ACCESS_ALLOWED_ACE*) &secattr[offs + pos];
@@ -2519,8 +2536,8 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		}
 
 		if (adminowns
-		    || groupowns
-		    || ((mode >> 3) & ~mode & 7)) {
+		   || groupowns
+		   || ((mode >> 3) & ~mode & 7)) {
 				/* now insert grants to group */
 				/* if more rights than other */
 			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
@@ -2536,7 +2553,6 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 
 	/* an ACE for world users */
 
-	wsidsz = sid_size(worldsid);
 	pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 	pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 	grants = WORLD_RIGHTS;
@@ -2656,6 +2672,8 @@ static char *build_secur_descr(mode_t mode,
 	    + 8 + wsidsz	/* one ACE for world */
 	    + 8 + asidsz 	/* one ACE for admin */
 	    + 8 + ssidsz;	/* one ACE for system */
+	if (isdir)			/* a world denial for directories */
+		newattrsz += 8 + wsidsz;
 	if (mode & 07000)	/* a NULL ACE for special modes */
 		newattrsz += 8 + sid_size(nullsid);
 	newattr = (char*)ntfs_malloc(newattrsz);
@@ -2834,29 +2852,31 @@ static int build_std_permissions(const char *securattr,
 		acecnt = 0;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if (same_sid(usid, &pace->sid)
-		  || same_sid(ownersid, &pace->sid)) {
-			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-				allowown |= pace->mask;
-			else if (pace->type == ACCESS_DENIED_ACE_TYPE)
-				denyown |= pace->mask;
-			} else
-			if (same_sid(gsid, &pace->sid)) {
+		if (!(pace->flags & INHERIT_ONLY_ACE)) {
+			if (same_sid(usid, &pace->sid)
+			  || same_sid(ownersid, &pace->sid)) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-					allowgrp |= pace->mask;
+					allowown |= pace->mask;
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
-					denygrp |= pace->mask;
-			} else
-				if (is_world_sid((const SID*)&pace->sid)) {
-					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-						allowall |= pace->mask;
-					else
-						if (pace->type == ACCESS_DENIED_ACE_TYPE)
-							denyall |= pace->mask;
+					denyown |= pace->mask;
 				} else
-				if ((same_sid((const SID*)&pace->sid,nullsid))
-				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-					special |= pace->mask;
+				if (same_sid(gsid, &pace->sid)) {
+					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+						allowgrp |= pace->mask;
+					else if (pace->type == ACCESS_DENIED_ACE_TYPE)
+						denygrp |= pace->mask;
+				} else
+					if (is_world_sid((const SID*)&pace->sid)) {
+						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+							allowall |= pace->mask;
+						else
+							if (pace->type == ACCESS_DENIED_ACE_TYPE)
+								denyall |= pace->mask;
+					} else
+					if ((same_sid((const SID*)&pace->sid,nullsid))
+					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+						special |= pace->mask;
+			}
 			offace += le16_to_cpu(pace->size);
 		}
 		/*
@@ -2867,8 +2887,8 @@ static int build_std_permissions(const char *securattr,
 	allowown |= (allowgrp | allowall);
 	allowgrp |= allowall;
 	return (merge_permissions(ni,
-				allowown & ~denyown,
-				allowgrp & ~denygrp,
+				allowown & ~(denyown | denyall),
+				allowgrp & ~(denygrp | denyall),
 				allowall & ~denyall,
 				special));
 }
@@ -2908,36 +2928,38 @@ static int build_owngrp_permissions(const char *securattr,
 		acecnt = 0;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if ((same_sid(usid, &pace->sid)
-		   || same_sid(ownersid, &pace->sid))
-		    && (pace->mask & WRITE_OWNER)) {
-			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-				allowown |= pace->mask;
-			} else
-			if (same_sid(usid, &pace->sid)
-			   && (!(pace->mask & WRITE_OWNER))) {
-				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
-					allowgrp |= pace->mask;
-					grppresent = TRUE;
-				}
-			} else
-				if (is_world_sid((const SID*)&pace->sid)) {
-					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-						allowall |= pace->mask;
-					else
-						if (pace->type == ACCESS_DENIED_ACE_TYPE)
-							denyall |= pace->mask;
+		if (!(pace->flags & INHERIT_ONLY_ACE)) {
+			if ((same_sid(usid, &pace->sid)
+			   || same_sid(ownersid, &pace->sid))
+			    && (pace->mask & WRITE_OWNER)) {
+				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+					allowown |= pace->mask;
 				} else
-				if ((same_sid((const SID*)&pace->sid,nullsid))
-				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-					special |= pace->mask;
+				if (same_sid(usid, &pace->sid)
+				   && (!(pace->mask & WRITE_OWNER))) {
+					if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
+						allowgrp |= pace->mask;
+						grppresent = TRUE;
+					}
+				} else
+					if (is_world_sid((const SID*)&pace->sid)) {
+						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+							allowall |= pace->mask;
+						else
+							if (pace->type == ACCESS_DENIED_ACE_TYPE)
+								denyall |= pace->mask;
+					} else
+					if ((same_sid((const SID*)&pace->sid,nullsid))
+					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+						special |= pace->mask;
+			}
 			offace += le16_to_cpu(pace->size);
 		}
 	if (!grppresent)
 		allowgrp = allowall;
 	return (merge_permissions(ni,
-				allowown & ~denyown,
-				allowgrp & ~denygrp,
+				allowown & ~(denyown | denyall),
+				allowgrp & ~(denygrp | denyall),
 				allowall & ~denyall,
 				special));
 }
@@ -2958,6 +2980,7 @@ static int build_ownadmin_permissions(const char *securattr,
 	int offace;
 	int acecnt;
 	int nace;
+	BOOL firstapply;
 	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
@@ -2973,39 +2996,43 @@ static int build_ownadmin_permissions(const char *securattr,
 		offace = offdacl + sizeof(ACL);
 	} else
 		acecnt = 0;
+	firstapply = TRUE;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
-		if ((same_sid(usid, &pace->sid)
-		   || same_sid(ownersid, &pace->sid))
-		     && (((pace->mask & WRITE_OWNER) && !nace))) {
-			if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-				allowown |= pace->mask;
-			else
-				if (pace->type == ACCESS_DENIED_ACE_TYPE)
-					denyown |= pace->mask;
-			} else
-			    if (same_sid(gsid, &pace->sid)
-				&& (!(pace->mask & WRITE_OWNER))) {
-					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-						allowgrp |= pace->mask;
-					else
-						if (pace->type == ACCESS_DENIED_ACE_TYPE)
-							denygrp |= pace->mask;
-				} else if (is_world_sid((const SID*)&pace->sid)) {
-					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
-						allowall |= pace->mask;
-					else
-						if (pace->type == ACCESS_DENIED_ACE_TYPE)
-							denyall |= pace->mask;
+		if (!(pace->flags & INHERIT_ONLY_ACE)) {
+			if ((same_sid(usid, &pace->sid)
+			   || same_sid(ownersid, &pace->sid))
+			     && (((pace->mask & WRITE_OWNER) && firstapply))) {
+				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+					allowown |= pace->mask;
+				else
+					if (pace->type == ACCESS_DENIED_ACE_TYPE)
+						denyown |= pace->mask;
 				} else
-				if ((same_sid((const SID*)&pace->sid,nullsid))
-				   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
-					special |= pace->mask;
+				    if (same_sid(gsid, &pace->sid)
+					&& (!(pace->mask & WRITE_OWNER))) {
+						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+							allowgrp |= pace->mask;
+						else
+							if (pace->type == ACCESS_DENIED_ACE_TYPE)
+								denygrp |= pace->mask;
+					} else if (is_world_sid((const SID*)&pace->sid)) {
+						if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+							allowall |= pace->mask;
+						else
+							if (pace->type == ACCESS_DENIED_ACE_TYPE)
+								denyall |= pace->mask;
+					} else
+					if ((same_sid((const SID*)&pace->sid,nullsid))
+					   && (pace->type == ACCESS_ALLOWED_ACE_TYPE))
+						special |= pace->mask;
+			firstapply = FALSE;
+			}
 			offace += le16_to_cpu(pace->size);
 		}
 	return (merge_permissions(ni,
-				allowown & ~denyown,
-				allowgrp & ~denygrp,
+				allowown & ~(denyown  | denyall),
+				allowgrp & ~(denygrp  | denyall),
 				allowall & ~denyall,
 				special));
 }
