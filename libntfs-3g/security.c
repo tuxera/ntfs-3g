@@ -275,6 +275,20 @@ static const char ownersidbytes[] = {
 static const SID *ownersid = (const SID*)ownersidbytes;
 
 /*
+ *		SID for generic creator-group
+ *		S-1-3-1
+ */
+	        
+static const char groupsidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 3,	/* base */
+		1, 0, 0, 0	/* 1st level */
+} ;
+
+static const SID *groupsid = (const SID*)groupsidbytes;
+
+/*
  *		Determine the size of a SID
  */
 
@@ -2645,7 +2659,12 @@ static char *build_secur_descr(mode_t mode,
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*) newattr;
 		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		pnhead->alignment = 0;
-		pnhead->control = SE_DACL_PRESENT | SE_SELF_RELATIVE;
+			/*
+			 * The flag SE_DACL_PROTECTED prevents the ACL
+			 * to be changed in an inheritance after creation
+			 */
+		pnhead->control = SE_DACL_PRESENT | SE_DACL_PROTECTED
+				    | SE_SELF_RELATIVE;
 			/*
 			 * Windows prefers ACL first, do the same to
 			 * get the same hash value and avoid duplication
@@ -3891,7 +3910,8 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
  *		or zero if nothing is inheritable
  */
 
-static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
+static int inherit_acl(const ACL *oldacl, ACL *newacl,
+			const SID *usid, const SID *gsid, BOOL fordir)
 {
 	unsigned int src;
 	unsigned int dst;
@@ -3900,8 +3920,13 @@ static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
 	unsigned int selection;
 	int nace;
 	int acesz;
+	int usidsz;
+	int gsidsz;
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
+
+	usidsz = sid_size(usid);
+	gsidsz = sid_size(gsid);
 
 	/* ACL header */
 
@@ -3920,10 +3945,23 @@ static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
+				/*
+				 * Replace generic creator-owner and
+				 * creator-group by owner and group
+				 */
+			if (same_sid(&pnewace->sid, ownersid)) {
+				memcpy(&pnewace->sid, usid, usidsz);
+				acesz = usidsz + 8;
+			}
+			if (same_sid(&pnewace->sid, groupsid)) {
+				memcpy(&pnewace->sid, gsid, gsidsz);
+				acesz = gsidsz + 8;
+			}
 				/* remove inheritance flags if not a directory */
 			if (!fordir)
 				pnewace->flags &= ~(OBJECT_INHERIT_ACE
-						| CONTAINER_INHERIT_ACE);
+						| CONTAINER_INHERIT_ACE
+						| INHERIT_ONLY_ACE);
 			dst += acesz;
 			newcnt++;
 		}
@@ -3941,8 +3979,8 @@ static int inherit_acl(const ACL *oldacl, ACL *newacl, BOOL fordir)
 }
 
 /*
- *		Build a security id for descriptor inherited from
- *	parent directory
+ *		Build a security id for a descriptor inherited from
+ *	parent directory the Windows way
  */
 
 static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
@@ -3969,21 +4007,37 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 	le32 securid;
 
 	parentattrsz = attr_size(parentattr);
+	pphead = (const SECURITY_DESCRIPTOR_RELATIVE*)parentattr;
 	if (scx->usermapping) {
 		usid = find_usid(scx, scx->uid, (SID*)&defusid);
 		gsid = find_gsid(scx, scx->gid, (SID*)&defgsid);
-	} else
-		usid = gsid = (const SID*)NULL;
+		if (!usid)
+			usid = adminsid;
+		if (!gsid)
+			gsid = adminsid;
+	} else {
+		/*
+		 * If there is no user mapping, we have to copy owner
+		 * and group from parent directory.
+		 * Windows never has to do that, because it can always
+		 * rely on a user mapping
+		 */
+		offowner = le32_to_cpu(pphead->owner);
+		usid = (const SID*)&parentattr[offowner];
+		offgroup = le32_to_cpu(pphead->group);
+		gsid = (const SID*)&parentattr[offgroup];
+	}
 		/*
 		 * new attribute is smaller than parent's
-		 * except for differences in SIDs
+		 * except for differences in SIDs which appear in
+		 * owner, group and possible grants and denials in
+		 * generic creator-owner and creator-group ACEs
 		 */
-	newattrsz = parentattrsz;
-	if (usid) newattrsz += sid_size(usid);
-	if (gsid) newattrsz += sid_size(gsid);
+	usidsz = sid_size(usid);
+	gsidsz = sid_size(gsid);
+	newattrsz = parentattrsz + 3*usidsz + 3*gsidsz;
 	newattr = (char*)ntfs_malloc(parentattrsz);
 	if (newattr) {
-		pphead = (const SECURITY_DESCRIPTOR_RELATIVE*)parentattr;
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
 		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		pnhead->alignment = 0;
@@ -3998,7 +4052,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			offpacl = le32_to_cpu(pphead->dacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
-			aclsz = inherit_acl(ppacl, pnacl, fordir);
+			aclsz = inherit_acl(ppacl, pnacl, usid, gsid, fordir);
 			if (aclsz) {
 				pnhead->dacl = cpu_to_le32(pos);
 				pos += aclsz;
@@ -4013,7 +4067,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			offpacl = le32_to_cpu(pphead->sacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
-			aclsz = inherit_acl(ppacl, pnacl, fordir);
+			aclsz = inherit_acl(ppacl, pnacl, usid, gsid, fordir);
 			if (aclsz) {
 				pnhead->sacl = cpu_to_le32(pos);
 				pos += aclsz;
@@ -4023,22 +4077,12 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			/*
 			 * inherit or redefine owner
 			 */
-		if (!usid) {
-			offowner = le32_to_cpu(pphead->owner);
-			usid = (const SID*)&parentattr[offowner];
-		}
-		usidsz = sid_size(usid);
 		memcpy(&newattr[pos],usid,usidsz);
 		pnhead->owner = cpu_to_le32(pos);
 		pos += usidsz;
 			/*
 			 * inherit or redefine group
 			 */
-		if (!gsid) {
-			offgroup = le32_to_cpu(pphead->group);
-			gsid = (const SID*)&parentattr[offgroup];
-		}
-		gsidsz = sid_size(gsid);
 		memcpy(&newattr[pos],gsid,gsidsz);
 		pnhead->group = cpu_to_le32(pos);
 		pos += usidsz;
