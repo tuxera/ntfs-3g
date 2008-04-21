@@ -78,11 +78,35 @@
 #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
 
 /*
+ *	JPA The following must be in some library...
+ *	but did not found out where
+ */
+
+#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
+#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
+		| ((x & 0xff00) << 8) | ((x & 255) << 24))
+
+#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
+#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
+
+/*
+ *		Struct to hold the input mapping file
+ *	(private to this module)
+ */
+
+struct MAPLIST {
+	struct MAPLIST *next;
+	char *uidstr;		/* uid text from the same record */
+	char *gidstr;		/* gid text from the same record */
+	char *sidstr;		/* sid text from the same record */
+	char maptext[LINESZ + 1];
+};
+
+/*
  *		Matching of ntfs permissions to Linux permissions
  *	these constants are adapted to endianness
  *	when setting, set them all
  *	when checking, check one is present
- *		(checks needed)
  */
 
           /* flags which are set to mean exec, write or read */
@@ -123,19 +147,6 @@
 #define FILE_INHERITANCE NO_PROPAGATE_INHERIT_ACE
 #define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
 
-/*
- *	JPA The following must be in some library...
- *	but did not found out where
- */
-
-#define endian_rev16(x) (((x >> 8) & 255) | ((x & 255) << 8))
-#define endian_rev32(x) (((x >> 24) & 255) | ((x >> 8) & 0xff00) \
-		| ((x & 0xff00) << 8) | ((x & 255) << 24))
-
-#define cpu_to_be16(x) endian_rev16(cpu_to_le16(x))
-#define cpu_to_be32(x) endian_rev32(cpu_to_le32(x))
-
-
 struct SII {		/* this is an image of an $SII index entry */
 	le16 offs;
 	le16 size;
@@ -173,19 +184,6 @@ struct SDH {		/* this is an image of an $SDH index entry */
 	le32 datasize;
 	le32 fill3;
 	} ;
-
-/*
- *		Struct to hold the input mapping file
- *	(private to this module)
- */
-
-struct MAPLIST {
-	struct MAPLIST *next;
-	char *uidstr;		/* uid text from the same record */
-	char *gidstr;		/* gid text from the same record */
-	char *sidstr;		/* sid text from the same record */
-	char maptext[LINESZ + 1];
-};
 
 /*
  *	A type large enough to hold any SID
@@ -278,7 +276,7 @@ static const SID *ownersid = (const SID*)ownersidbytes;
  *		SID for generic creator-group
  *		S-1-3-1
  */
-	        
+
 static const char groupsidbytes[] = {
 		1,		/* revision */
 		1,		/* auth count */
@@ -320,13 +318,13 @@ static int is_world_sid(const SID * usid)
 	return (
 	     /* check whether S-1-1-0 : world */
 	       ((usid->sub_authority_count == 1)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(1))
 	    && (usid->sub_authority[0] == 0))
 
 	     /* check whether S-1-5-32-545 : local user */
 	  ||   ((usid->sub_authority_count == 2)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
 	    && (usid->sub_authority[0] == cpu_to_le32(32))
 	    && (usid->sub_authority[1] == cpu_to_le32(545)))
@@ -339,10 +337,10 @@ static int is_world_sid(const SID * usid)
  *	probably test for other configurations
  */
 
-static int is_user_sid(const SID * usid)
+static int is_user_sid(const SID *usid)
 {
 	return ((usid->sub_authority_count == 5)
-	    && (usid->identifier_authority.high_part ==  cpu_to_be32(0))
+	    && (usid->identifier_authority.high_part ==  cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  cpu_to_be32(5))
 	    && (usid->sub_authority[0] ==  cpu_to_le32(21)));
 }
@@ -2074,7 +2072,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 
 	/* cacheing is only possible if a security_id has been defined */
 	if (test_nino_flag(ni, v3_Extensions)
-	   && (ni->security_id)) {
+	   && ni->security_id) {
 		/*
 		 *  Immediately test the most frequent situation
 		 *  where the entry exists
@@ -2143,7 +2141,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			legacy = (struct CACHED_PERMISSIONS_LEGACY*)ntfs_enter_cache(
 				scx->vol->legacy_cache, GENERIC(&wanted),
 				(cache_compare)leg_compare);
-			if (legacy) cacheentry = &legacy->perm;
+			if (legacy)
+				cacheentry = &legacy->perm;
 		}
 #endif
 	}
@@ -2276,15 +2275,15 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 
 /*
  *		Build an ACL composed of several ACE's
- *	(not expected to fail)
+ *	returns size of ACL or zero if failed
  *
  *	Three schemes are defined :
  *
  *	1) if root is neither owner nor group up to 7 ACE's are set up :
- *	- grants to owner (always present)
  *	- denials to owner (preventing grants to world or group to apply)
- *	- grants to group (unless groups has same rights as world)
+ *	- grants to owner (always present)
  *	- denials to group (preventing grants to world to apply) 
+ *	- grants to group (unless group has no more than world rights)
  *	- grants to world (unless none)
  *	- full privileges to administrator, always present
  *	- full privileges to system, always present
@@ -2316,8 +2315,8 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
  *	 have the same SID), but is not root.
  *	 In this situation up to 6 ACE's are set up :
  *
- *	- grants to owner (always present)
  *	- denials to owner (preventing grants to world to apply)
+ *	- grants to owner (always present)
  *	- grants to group (unless groups has same rights as world)
  *	- grants to world (unless none)
  *	- full privileges to administrator, always present
@@ -3595,18 +3594,17 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 	char *oldattr;
 	const SID *usid;
 	const SID *gsid;
+	uid_t processuid;
 	uid_t uid;
-	uid_t fileuid;
-	uid_t filegid;
+	uid_t gid;
 	int res;
 
 	/* get the current owner, either from cache or from old attribute  */
 	res = 0;
-	usid = (const SID*)NULL;
 	cached = fetch_cache(scx, ni);
 	if (cached) {
-		fileuid = cached->uid;
-		filegid = cached->gid;
+		uid = cached->uid;
+		gid = cached->gid;
 	} else {
 		oldattr = getsecurityattr(scx->vol,path, ni);
 		if (oldattr) {
@@ -3617,25 +3615,24 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
 #endif
 			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
-			fileuid = findowner(scx,usid);
-			filegid = findgroup(scx,gsid);
+			uid = findowner(scx,usid);
+			gid = findgroup(scx,gsid);
 			free(oldattr);
 		} else
 			res = -1;
 	}
 
 	if (!res) {
-		uid = scx->uid;
-		if (!uid || (fileuid == uid)) {
+		processuid = scx->uid;
+		if (!processuid || (uid == processuid)) {
 				/*
 				 * clear setgid if file group does
 				 * not match process group
 				 */
-			if (uid && (filegid != scx->gid)
-			    && !groupmember(scx, scx->uid, filegid))
+			if (processuid && (gid != scx->gid)
+			    && !groupmember(scx, scx->uid, gid))
 				mode &= ~S_ISGID;
-			res = ntfs_set_owner_mode(scx, ni,
-					fileuid, filegid, mode);
+			res = ntfs_set_owner_mode(scx, ni, uid, gid, mode);
 		} else {
 			errno = EPERM;
 			res = -1;	/* neither owner nor root */
