@@ -2834,6 +2834,7 @@ static int build_std_permissions(const char *securattr,
 	int offace;
 	int acecnt;
 	int nace;
+	BOOL noown;
 	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
@@ -2844,6 +2845,7 @@ static int build_std_permissions(const char *securattr,
 	special = cpu_to_le32(0);
 	allowown = allowgrp = allowall = cpu_to_le32(0);
 	denyown = denygrp = denyall = cpu_to_le32(0);
+	noown = TRUE;
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);
@@ -2854,6 +2856,7 @@ static int build_std_permissions(const char *securattr,
 		if (!(pace->flags & INHERIT_ONLY_ACE)) {
 			if (same_sid(usid, &pace->sid)
 			  || same_sid(ownersid, &pace->sid)) {
+				noown = FALSE;
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 					allowown |= pace->mask;
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
@@ -2878,6 +2881,14 @@ static int build_std_permissions(const char *securattr,
 			}
 			offace += le16_to_cpu(pace->size);
 		}
+		/*
+		 * No indication about owner's rights : grant basic rights
+		 * This happens for files created by Windows in directories
+		 * created by Linux and owned by root, because Windows
+		 * merges the admin ACEs
+		 */
+	if (noown)
+		allowown = (FILE_READ_DATA | FILE_WRITE_DATA | FILE_EXECUTE);
 		/*
 		 *  Add to owner rights granted to group or world
 		 * unless denied personaly, and add to group rights
