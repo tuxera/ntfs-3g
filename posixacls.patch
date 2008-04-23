@@ -286,7 +286,7 @@
   *		Security API for direct access to security descriptors
   *	based on Win32 API
 --- ntfsdev/ntfs-3g/libntfs-3g/security.c	2008-04-21 15:52:57.000000000 +0200
-+++ ntfsacls/ntfs-3g/libntfs-3g/security.c	2008-04-21 15:55:24.000000000 +0200
++++ ntfsacls/ntfs-3g/libntfs-3g/security.c	2008-04-23 10:15:26.000000000 +0200
 @@ -526,6 +526,673 @@
  	return (ok);
  }
@@ -1227,7 +1227,7 @@
  	/* ACL header */
  	pacl = (ACL*)&secattr[offs];
  	pacl->revision = ACL_REVISION;
-@@ -2370,65 +3178,591 @@
+@@ -2370,65 +3178,587 @@
  	pos = sizeof(ACL);
  	acecnt = 0;
  
@@ -1697,10 +1697,6 @@
 +			pgace->flags = flags;
 +			pgace->size = cpu_to_le16(wsidsz + 8);
 +			pgace->mask = grants;
-+#if FORCEMASK
-+			if (opt_m)
-+				pgace->mask = cpu_to_le32(forcemsk);
-+#endif
 +			memcpy((char*)&pgace->sid, worldsid, wsidsz);
 +			pos += wsidsz + 8;
 +			acecnt++;
@@ -1874,7 +1870,7 @@
  					denials |= FILE_EXEC;
  				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
  					denials |= FILE_WRITE;
-@@ -2638,6 +3972,108 @@
+@@ -2638,6 +3968,108 @@
  	return (pos);
  }
  
@@ -1983,7 +1979,7 @@
  /*
   *		Build a full security descriptor
   *	returns descriptor in allocated memory, must free() after use
-@@ -2816,9 +4252,154 @@
+@@ -2816,9 +4248,154 @@
  		if (special & FILE_READ_DATA)
  			perm |= S_ISVTX;
  	}
@@ -2139,7 +2135,7 @@
  /*
   *		Interpret an ACL and extract meaningful grants
   *		(standard case : different owner, group and administrator)
-@@ -2974,6 +4555,119 @@
+@@ -2974,6 +4551,119 @@
  				special));
  }
  
@@ -2259,7 +2255,7 @@
  /*
   *		Interpret an ACL and extract meaningful grants
   *		(special case : owner or/and group is administrator)
-@@ -3041,8 +4735,8 @@
+@@ -3041,8 +4731,8 @@
  			offace += le16_to_cpu(pace->size);
  		}
  	return (merge_permissions(ni,
@@ -2270,7 +2266,7 @@
  				allowall & ~denyall,
  				special));
  }
-@@ -3152,6 +4846,373 @@
+@@ -3152,6 +4842,374 @@
  
  #endif
  
@@ -2410,7 +2406,8 @@
 +		} else if (is_world_sid((const SID*)&pace->sid)) {
 +			pxace->id = -1;
 +			pxace->tag = POSIX_ACL_OTHER;
-+			if (pace->type == ACCESS_DENIED_ACE_TYPE)
++			if ((pace->type == ACCESS_DENIED_ACE_TYPE)
++			   && (pace->flags & INHERIT_ONLY_ACE))
 +				ignore = TRUE;
 +		} else if (same_sid((const SID*)&pace->sid,nullsid)) {
 +			pxace->id = -1;
@@ -2512,8 +2509,8 @@
 +		 * created by Linux and owned by root, because Windows
 +		 * merges the admin ACEs
 +		 */
-+//	for (i=0; i<2; i++)
-+	for (i=0; i<1; i++)
++	for (i=0; i<2; i++)
++//	for (i=0; i<1; i++)
 +		if (!(ctx[i].tagsset & POSIX_ACL_USER_OBJ)
 +		  && (ctx[i].tagsset & POSIX_ACL_OTHER)) {
 +			if (i)
@@ -2644,7 +2641,7 @@
  /*
   *		Build unix-style (mode_t) permissions from an ACL
   *	returns the requested permissions
-@@ -3241,6 +5302,80 @@
+@@ -3241,6 +5299,80 @@
  	return (securattr);
  }
  
@@ -2725,7 +2722,7 @@
  /*
   *		Get permissions to access a file
   *	Takes into account the relation of user to file (owner, group, ...)
-@@ -3249,8 +5384,13 @@
+@@ -3249,8 +5381,13 @@
   *	returns -1 if there is a problem
   */
  
@@ -2739,7 +2736,7 @@
  {
  	const SECURITY_DESCRIPTOR_RELATIVE *phead;
  	const struct CACHED_PERMISSIONS *cached;
-@@ -3260,6 +5400,9 @@
+@@ -3260,6 +5397,9 @@
  	uid_t uid;
  	gid_t gid;
  	int perm;
@@ -2749,7 +2746,7 @@
  
  	if (!scx->usermapping || !scx->uid)
  		perm = 07777;
-@@ -3267,9 +5410,15 @@
+@@ -3267,9 +5407,15 @@
  		/* check whether available in cache */
  		cached = fetch_cache(scx,ni);
  		if (cached) {
@@ -2765,7 +2762,7 @@
  		} else {
  			perm = 0;	/* default to no permission */
  			securattr = getsecurityattr(scx->vol, path, ni);
-@@ -3281,14 +5430,32 @@
+@@ -3281,14 +5427,32 @@
  				gid = findgroup(scx,gsid);
  #if OWNERFROMACL
  				usid = acl_owner(securattr);
@@ -2798,7 +2795,7 @@
  				if (!perm && same_sid(usid, adminsid)) {
  					uid = find_tenant(scx, securattr);
  					if (uid)
-@@ -3313,15 +5480,28 @@
+@@ -3313,15 +5477,28 @@
  				}
  				if (test_nino_flag(ni, v3_Extensions)
  				    && (perm >= 0)) {
@@ -2827,7 +2824,7 @@
  		if (perm >= 0) {
  			if (uid == scx->uid)
  				perm &= 07700;
-@@ -3332,10 +5512,133 @@
+@@ -3332,10 +5509,133 @@
  				else
  					perm &= 07007;
  		}
@@ -2962,7 +2959,7 @@
  /*
   *		Get owner, group and permissions in an stat structure
   *	returns permissions, or -1 if there is a problem
-@@ -3351,6 +5654,9 @@
+@@ -3351,6 +5651,9 @@
  	const SID *gsid;	/* group of file/directory */
  	const struct CACHED_PERMISSIONS *cached;
  	int perm;
@@ -2972,7 +2969,7 @@
  
  	if (!scx->usermapping)
  		perm = 07777;
-@@ -3377,8 +5683,17 @@
+@@ -3377,8 +5680,17 @@
  				usid = (const SID*)&
  					  securattr[le32_to_cpu(phead->owner)];
  #endif
@@ -2990,7 +2987,7 @@
  					/*
  					 * fetch owner and group for cacheing
  					 */
-@@ -3408,8 +5723,14 @@
+@@ -3408,8 +5720,14 @@
  					stbuf->st_gid = findgroup(scx,gsid);
  					stbuf->st_mode =
  					    (stbuf->st_mode & ~07777) + perm;
@@ -3005,7 +3002,7 @@
  				}
  				free(securattr);
  			}
-@@ -3418,6 +5739,87 @@
+@@ -3418,6 +5736,87 @@
  	return (perm);
  }
  
@@ -3093,7 +3090,7 @@
  /*
   *		Allocate a security_id for a file being created
   *	
-@@ -3425,6 +5827,144 @@
+@@ -3425,6 +5824,144 @@
   */
  
  le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
@@ -3238,7 +3235,7 @@
  		uid_t uid, gid_t gid, mode_t mode, BOOL isdir)
  {
  #if !FORCE_FORMAT_v1x
-@@ -3492,6 +6032,7 @@
+@@ -3492,6 +6029,7 @@
  	return (securid);
  }
  
@@ -3246,7 +3243,7 @@
  
  /*
   *		Update ownership and mode of a file, reusing an existing
-@@ -3500,8 +6041,14 @@
+@@ -3500,8 +6038,14 @@
   *	Returns zero if successful
   */
  
@@ -3261,7 +3258,7 @@
  {
  	int res;
  	const struct CACHED_SECURID *cached;
-@@ -3523,8 +6070,17 @@
+@@ -3523,8 +6067,17 @@
  		wanted.gid = gid;
  		wanted.dmode = mode & 07777;
  		if (isdir) wanted.dmode |= 0x10000;
@@ -3279,7 +3276,7 @@
  		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
  				scx->vol->securid_cache, GENERIC(&wanted),
  				(cache_compare)compare);
-@@ -3548,8 +6104,17 @@
+@@ -3548,8 +6101,17 @@
  				uid, gid);
  			usid = gsid = adminsid;
  		}
@@ -3297,7 +3294,7 @@
  		if (newattr) {
  			res = update_secur_descr(scx->vol, newattr, ni);
  			if (!res) {
-@@ -3566,8 +6131,13 @@
+@@ -3566,8 +6128,13 @@
  					struct CACHED_PERMISSIONS_LEGACY legacy;
  
  					legacy.mft_no = ni->mft_no;
@@ -3311,7 +3308,7 @@
  					ntfs_invalidate_cache(scx->vol->legacy_cache,
  						GENERIC(&legacy),
  						(cache_compare)leg_compare);
-@@ -3586,6 +6156,115 @@
+@@ -3586,6 +6153,115 @@
  	return (res);
  }
  
@@ -3427,7 +3424,7 @@
  
  /*
   *		Set new permissions to a file
-@@ -3609,6 +6288,12 @@
+@@ -3609,6 +6285,12 @@
  	uid_t uid;
  	uid_t gid;
  	int res;
@@ -3440,7 +3437,7 @@
  
  	/* get the current owner, either from cache or from old attribute  */
  	res = 0;
-@@ -3616,6 +6301,22 @@
+@@ -3616,6 +6298,22 @@
  	if (cached) {
  		uid = cached->uid;
  		gid = cached->gid;
@@ -3463,7 +3460,7 @@
  	} else {
  		oldattr = getsecurityattr(scx->vol,path, ni);
  		if (oldattr) {
-@@ -3628,6 +6329,13 @@
+@@ -3628,6 +6326,13 @@
  			gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
  			uid = findowner(scx,usid);
  			gid = findgroup(scx,gsid);
@@ -3477,7 +3474,7 @@
  			free(oldattr);
  		} else
  			res = -1;
-@@ -3643,7 +6351,18 @@
+@@ -3643,7 +6348,18 @@
  			if (processuid && (gid != scx->gid)
  			    && !groupmember(scx, scx->uid, gid))
  				mode &= ~S_ISGID;
@@ -3496,7 +3493,7 @@
  		} else {
  			errno = EPERM;
  			res = -1;	/* neither owner nor root */
-@@ -3758,7 +6477,11 @@
+@@ -3758,7 +6474,11 @@
  	if (!scx->usermapping || !scx->uid)
  		allow = 1;
  	else {
@@ -3509,7 +3506,7 @@
  		if (perm >= 0) {
  			res = EACCES;
  			switch (accesstype) {
-@@ -3873,6 +6596,10 @@
+@@ -3873,6 +6593,10 @@
  	mode_t mode;
  	int perm;
  	int res;
@@ -3520,7 +3517,7 @@
  
  	res = 0;
  	/* get the current owner and mode from cache or security attributes */
-@@ -3882,10 +6609,23 @@
+@@ -3882,10 +6606,23 @@
  		fileuid = cached->uid;
  		filegid = cached->gid;
  		mode = cached->mode;
@@ -3544,7 +3541,7 @@
  		oldattr = getsecurityattr(scx->vol, path, ni);
  		if (oldattr) {
  			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
-@@ -3898,6 +6638,21 @@
+@@ -3898,6 +6635,21 @@
  			usid = (const SID*)
  				&oldattr[le32_to_cpu(phead->owner)];
  #endif
@@ -3566,7 +3563,7 @@
  			mode = perm = build_permissions(oldattr,
  					 usid, gsid, ni);
  			if (perm >= 0) {
-@@ -3905,6 +6660,7 @@
+@@ -3905,6 +6657,7 @@
  				filegid = findgroup(scx,gsid);
  			} else
  				res = -1;
@@ -3574,7 +3571,7 @@
  			free(oldattr);
  		} else
  			res = -1;
-@@ -3926,11 +6682,19 @@
+@@ -3926,11 +6679,19 @@
                          /* unless request originated by root */
  			if (uid && (fileuid != uid))
  				mode &= 01777;
