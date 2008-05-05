@@ -55,7 +55,7 @@ journal file.
 The volume is already exclusively opened and in use by a kernel
 driver or software.
 .IP 17
-Unsetup SoftRAID/FakeRAID hardware.
+SoftRAID/FakeRAID hardware without setup, or missing, or powered down device.
 .IP 18
 Unknown reason.
 .IP 19

@@ -85,9 +85,10 @@ static const char *opened_volume_msg =
 "could be identified for example by the help of the 'fuser' command.\n";
 
 static const char *fakeraid_msg =
-"You seem to have a SoftRAID/FakeRAID hardware and must use an activated,\n"
-"different device under /dev/mapper/, (e.g. /dev/mapper/nvidia_eahaabcc1)\n"
-"to mount NTFS. Please see the 'dmraid' documentation for help.\n";
+"Either the device is missing or it's powered down, or you have\n"
+"SoftRAID hardware and must use an activated, different device under\n" 
+"/dev/mapper/, (e.g. /dev/mapper/nvidia_eahaabcc1) to mount NTFS.\n"
+"Please see the 'dmraid' documentation for help.\n";
 
 static const char *access_denied_msg =
 "Please check '%s' and the ntfs-3g binary permissions,\n"
