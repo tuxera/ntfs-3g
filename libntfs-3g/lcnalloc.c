@@ -316,7 +316,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 		bmp_pos &= ~7;
 		writeback = 0;
 		
-		while (1) {
+		while (lcn < buf_size) {
 			byte = buf + (lcn >> 3);
 			bit = 1 << (lcn & 7);
 			if (has_guess) {
