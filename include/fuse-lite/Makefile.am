@@ -1,5 +1,5 @@
 
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 noinst_HEADERS = 		\
 	fuse.h			\

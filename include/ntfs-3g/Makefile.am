@@ -1,5 +1,5 @@
 
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if INSTALL_LIBRARY
 ntfs3ginclude_HEADERS = \

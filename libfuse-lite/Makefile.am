@@ -1,5 +1,5 @@
 
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
  
 if FUSE_INTERNAL
 noinst_LTLIBRARIES = libfuse-lite.la
