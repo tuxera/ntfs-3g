@@ -1,5 +1,5 @@
 
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if INSTALL_LIBRARY
 rootlib_LTLIBRARIES=#Create directory
@@ -14,7 +14,7 @@ libntfs_3g_la_CFLAGS  = $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
 libntfs_3g_la_LDFLAGS = -version-info $(LIBNTFS_3G_VERSION) -no-undefined
 
 if FUSE_INTERNAL
-libntfs_3g_la_LIBADD  = $(top_srcdir)/libfuse-lite/libfuse-lite.la
+libntfs_3g_la_LIBADD  = $(top_builddir)/libfuse-lite/libfuse-lite.la
 endif
 
 libntfs_3g_la_SOURCES =	\

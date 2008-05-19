@@ -1,5 +1,5 @@
 
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if FUSE_INTERNAL
 FUSE_CFLAGS = -I$(top_srcdir)/include/fuse-lite
