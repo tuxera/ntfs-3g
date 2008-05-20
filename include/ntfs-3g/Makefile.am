@@ -1,8 +1,7 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-if INSTALL_LIBRARY
-ntfs3ginclude_HEADERS = \
+headers = \
 	attrib.h	\
 	attrlist.h	\
 	bitmap.h	\
@@ -32,5 +31,10 @@ ntfs3ginclude_HEADERS = \
 	unistr.h	\
 	version.h	\
 	volume.h
+
+if INSTALL_LIBRARY
+ntfs3ginclude_HEADERS = $(headers)
+else
+noinst_HEADERS = $(headers)
 endif
 
