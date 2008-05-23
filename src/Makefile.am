@@ -38,7 +38,7 @@ install-exec-hook:
 endif
 
 install-exec-local:
-	$(INSTALL) -d "$(DESTDIR)$(rootsbindir)"
+	$(INSTALL) -d "$(DESTDIR)/sbin"
 	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
 
 install-data-local:
