@@ -209,6 +209,40 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	return -1;
 }
 
+int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref, 
+			  MFT_RECORD *m)
+{			  
+	ATTR_RECORD *a;
+	int ret = -1;
+	
+	if (!ntfs_is_file_record(m->magic)) {
+		ntfs_log_error("Record %llu has no FILE magic (0x%x)\n",
+			       (unsigned long long)MREF(mref), *(le32 *)m);
+		goto err_out;
+	}
+	
+	if (le32_to_cpu(m->bytes_allocated) != vol->mft_record_size) {
+		ntfs_log_error("Record %llu has corrupt allocation size "
+			       "(%u <> %u)\n", (unsigned long long)MREF(mref),
+			       vol->mft_record_size,
+			       le32_to_cpu(m->bytes_allocated));
+		goto err_out;
+	}
+	
+	a = (ATTR_RECORD *)((char *)m + le16_to_cpu(m->attrs_offset));
+	if (p2n(a) < p2n(m) || (char *)a > (char *)m + vol->mft_record_size) {
+		ntfs_log_error("Record %llu is corrupt\n",
+			       (unsigned long long)MREF(mref));
+		goto err_out;
+	}
+	
+	ret = 0;
+err_out:
+	if (ret)
+		errno = EIO;
+	return ret;
+}
+
 /**
  * ntfs_file_record_read - read a FILE record from the mft from disk
  * @vol:	volume to read from
@@ -244,14 +278,13 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		MFT_RECORD **mrec, ATTR_RECORD **attr)
 {
 	MFT_RECORD *m;
-	ATTR_RECORD *a;
-	int err;
 
 	if (!vol || !mrec) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: mrec=%p", __FUNCTION__, mrec);
 		return -1;
 	}
+	
 	m = *mrec;
 	if (!m) {
 		m = ntfs_malloc(vol->mft_record_size);
@@ -259,36 +292,26 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 			return -1;
 	}
 	if (ntfs_mft_record_read(vol, mref, m)) {
-		err = errno;
 		ntfs_log_perror("ntfs_mft_record_read failed");
 		goto err_out;
 	}
-	err = EIO;
-	if (!ntfs_is_file_record(m->magic)) {
-		ntfs_log_error("Record %llu has no FILE magic (0x%x)\n",
-			(unsigned long long)MREF(mref), *(le32 *)m);
+	if (ntfs_mft_record_check(vol, mref, m))
 		goto err_out;
-	}
+	
 	if (MSEQNO(mref) && MSEQNO(mref) != le16_to_cpu(m->sequence_number)) {
 		ntfs_log_error("Record %llu has wrong SeqNo (%d <> %d)\n",
 			       (unsigned long long)MREF(mref), MSEQNO(mref),
 			       le16_to_cpu(m->sequence_number));
-		goto err_out;
-	}
-	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
-	if (p2n(a) < p2n(m) || (char*)a > (char*)m + vol->mft_record_size) {
-		ntfs_log_error("Record %llu is corrupt\n",
-			       (unsigned long long)MREF(mref));
+		errno = EIO;
 		goto err_out;
 	}
 	*mrec = m;
 	if (attr)
-		*attr = a;
+		*attr = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	return 0;
 err_out:
 	if (m != *mrec)
 		free(m);
-	errno = err;
 	return -1;
 }
 

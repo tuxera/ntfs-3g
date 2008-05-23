@@ -209,24 +209,14 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		ntfs_log_perror("Error reading $MFT");
 		goto error_exit;
 	}
-	if (ntfs_is_baad_record(mb->magic)) {
-		ntfs_log_error("Incomplete multi sector transfer detected in "
-				"$MFT.\n");
-		goto io_error_exit;
-	}
-	if (!ntfs_is_mft_record(mb->magic)) {
-		ntfs_log_error("$MFT has invalid magic.\n");
-		goto io_error_exit;
-	}
+	
+	if (ntfs_mft_record_check(vol, 0, mb))
+		goto error_exit;
+	
 	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, NULL);
 	if (!ctx)
 		goto error_exit;
 
-	if (p2n(ctx->attr) < p2n(mb) ||
-			(char*)ctx->attr > (char*)mb + vol->mft_record_size) {
-		ntfs_log_error("$MFT is corrupt.\n");
-		goto io_error_exit;
-	}
 	/* Find the $ATTRIBUTE_LIST attribute in $MFT if present. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
