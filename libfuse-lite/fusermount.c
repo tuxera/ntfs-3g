@@ -439,7 +439,7 @@ static int check_perm(const char **mntp, struct stat *stbuf, int *currdir_fd,
     const char *mnt = *mntp;
     const char *origmnt = mnt;
 
-    res = lstat(mnt, stbuf);
+    res = stat(mnt, stbuf);
     if (res == -1) {
         fprintf(stderr, "%s: failed to access mountpoint %s: %s\n",
                 progname, mnt, strerror(errno));
