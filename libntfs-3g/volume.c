@@ -844,13 +844,19 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		ntfs_log_perror("Failed to open inode FILE_Bitmap");
 		goto error_exit;
 	}
-	/* Get an ntfs attribute for $Bitmap/$DATA. */
+	
 	vol->lcnbmp_na = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!vol->lcnbmp_na) {
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Done with the $Bitmap mft record. */
+	
+	if (vol->lcnbmp_na->data_size > vol->lcnbmp_na->allocated_size) {
+		ntfs_log_error("Corrupt cluster map size (%lld > %lld)\n",
+				(long long)vol->lcnbmp_na->data_size, 
+				(long long)vol->lcnbmp_na->allocated_size);
+		goto io_error_exit;
+	}
 
 	/* Now load the upcase table from $UpCase. */
 	ntfs_log_debug("Loading $UpCase...\n");
