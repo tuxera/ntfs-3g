@@ -24,7 +24,7 @@
 # Autoconf
 AC_PREREQ([2.59])
 AC_INIT([ntfs-3g],[1.2506],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION=28
+LIBNTFS_3G_VERSION="28"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
@@ -64,7 +64,6 @@ AC_ARG_ENABLE(
 	,
 	[enable_really_static="no"]
 )
-AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 
 AC_ARG_ENABLE(
 	[library],
@@ -72,8 +71,6 @@ AC_ARG_ENABLE(
 	,
 	[enable_library="yes"]
 )
-test "${enable_really_static}" = "yes" && enable_library="no"
-AM_CONDITIONAL(INSTALL_LIBRARY, test "$enable_library" = yes)
 
 AC_ARG_ENABLE(
 	[ldconfig],
@@ -81,9 +78,6 @@ AC_ARG_ENABLE(
 	,
 	[enable_ldconfig="yes"]
 )
-test "${enable_library}" = "no" && enable_ldconfig="no"
-# --disable-library will disable to run ldconfig since no point to do so.
-AM_CONDITIONAL(RUN_LDCONFIG, test "$enable_ldconfig" = yes)
 
 AC_ARG_ENABLE(
 	[ldscript],
@@ -106,20 +100,19 @@ AC_ARG_ENABLE(
 	[enable_device_default_io_ops="yes"]
 )
 
-# Programs
 # pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
+
+# Programs
 AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_PROG_LN_S
 AM_PROG_CC_C_O
-# No need to check for ldconfig if --disable-ldconfig was given
-if test "$enable_ldconfig" = yes; then
-	AC_PATH_PROG(LDCONFIG, ldconfig, true, [/sbin /usr/sbin $PATH])
-fi
 AC_PATH_PROG([MV], [mv])
 AC_PATH_PROG([RM], [rm])
 AC_PATH_PROG([SED], [sed])
+AC_ARG_VAR([LDCONFIG], [ldconfig utility])
+AC_PATH_PROG([LDCONFIG], [ldconfig], [true], [/sbin /usr/sbin $PATH])
 
 # Environment
 AC_MSG_CHECKING([Windows OS])
@@ -291,9 +284,10 @@ test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
 	[Don't use default IO ops]
 )
 
-if test "${enable_mtab}" = "no"; then
-	AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
-fi
+test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
+
+test "${enable_really_static}" = "yes" && enable_library="no"
+test "${enable_library}" = "no" && enable_ldconfig="no"
 
 # Settings
 pkgconfigdir="\$(libdir)/pkgconfig"
@@ -323,6 +317,9 @@ AM_CONDITIONAL([FUSE_INTERNAL], [test "${with_fuse}" = "internal"])
 AM_CONDITIONAL([GENERATE_LDSCRIPT], [test "${enable_ldscript}" = "yes"])
 AM_CONDITIONAL([WINDOWS], [test "${WINDOWS}" = "yes"])
 AM_CONDITIONAL([NTFS_DEVICE_DEFAULT_IO_OPS], [test "${enable_device_default_io_ops}" = "yes"])
+AM_CONDITIONAL([RUN_LDCONFIG], [test "${enable_ldconfig}" = "yes"])
+AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
+AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then
