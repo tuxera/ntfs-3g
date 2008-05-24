@@ -41,8 +41,7 @@ install-exec-local:
 	$(INSTALL) -d "$(DESTDIR)/sbin"
 	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
 
-install-data-local:
-	$(INSTALL) -d "$(DESTDIR)$(man8dir)"
+install-data-local:	install-man8
 	$(LN_S) -f ntfs-3g.8 "$(DESTDIR)$(man8dir)/mount.ntfs-3g.8"
 
 uninstall-local:
