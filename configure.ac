@@ -73,6 +73,18 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[mount-helper],
+	[AC_HELP_STRING([--enable-mount-helper], [install mount helper @<:@default=enabled for linux@:>@])],
+	,
+	[
+		case "${target_os}" in
+			linux*) enable_mount_helper="yes" ;;
+			*) enable_mount_helper="no" ;;
+		esac
+	]
+)
+
+AC_ARG_ENABLE(
 	[ldconfig],
 	[AC_HELP_STRING([--disable-ldconfig], [do not update dynamic linker cache using ldconfig])],
 	,
@@ -95,9 +107,19 @@ AC_ARG_ENABLE(
 
 AC_ARG_ENABLE(
 	[device-default-io-ops],
-	[AC_HELP_STRING([--disable-device-default-io-ops], [Install default IO ops])],
+	[AC_HELP_STRING([--disable-device-default-io-ops], [install default IO ops])],
 	,
 	[enable_device_default_io_ops="yes"]
+)
+
+# Driver executables should be installed to the root filesystem, otherwise 
+# automounting NTFS volumes can fail during boot if the driver binaries 
+# and their dependencies are on an unmounted partition.
+AC_ARG_WITH(
+	[rootfs],
+	[AC_HELP_STRING([--with-rootfs=DIR], [rootfs location @<:@default=/@:>@])],
+	,
+	[with_rootfs="/"]
 )
 
 # pthread_rwlock_t requires _GNU_SOURCE
@@ -289,22 +311,17 @@ test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc
 test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"
 
-# Settings
+if test "x${DISTCHECK_HACK}" != "x"; then
+	with_rootfs=`echo "${prefix}" | sed "s#NONE#${ac_default_prefix}#"`
+	enable_mount_helper="no"
+	enable_ldconfig="no"
+fi
+
+rootbindir="${with_rootfs}/bin"
+rootsbindir="${with_rootfs}/sbin"
+rootlibdir="${with_rootfs}/lib${libdir##*/lib}"
 pkgconfigdir="\$(libdir)/pkgconfig"
 ntfs3gincludedir="\$(includedir)/ntfs-3g"
-# Executables should be installed to the root filesystem, otherwise 
-# automounting NTFS volumes can fail during boot if the driver binaries 
-# and their dependencies are on an unmounted partition. Use --exec-prefix
-# to override this.
-if test "x${exec_prefix}" = "xNONE"; then
-	rootbindir="/bin"
-	rootsbindir="/sbin"
-	rootlibdir="/lib${libdir##*/lib}"
-else
-	rootbindir="\$(bindir)"
-	rootsbindir="\$(sbindir)"
-	rootlibdir="\$(libdir)"
-fi
 AC_SUBST([pkgconfigdir])
 AC_SUBST([ntfs3gincludedir])
 AC_SUBST([rootbindir])
@@ -320,6 +337,7 @@ AM_CONDITIONAL([NTFS_DEVICE_DEFAULT_IO_OPS], [test "${enable_device_default_io_o
 AM_CONDITIONAL([RUN_LDCONFIG], [test "${enable_ldconfig}" = "yes"])
 AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
+AM_CONDITIONAL([ENABLE_MOUNT_HELPER], [test "${enable_mount_helper}" = "yes"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then
@@ -343,7 +361,7 @@ AC_CONFIG_FILES([
 ])
 AC_OUTPUT
 
-if test "${with_fuse}" = "external"; then
+if test "${with_fuse}" = "external" -a "${with_rootfs}" = "/"; then
 	if ! echo "x$FUSE_LIB_PATH" | grep -- "x-L/lib" > /dev/null; then
 		cat <<EOF
 ****************************************************************************
