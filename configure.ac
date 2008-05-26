@@ -344,6 +344,11 @@ if test -z "${docdir}"; then
 	docdir="\$(datarootdir)/doc/\$(PACKAGE_NAME)"
 	AC_SUBST([docdir])
 fi
+# workaround for <automake-1.10
+if test -z "${MKDIR_P}"; then
+	MKDIR_P="\$(mkdir_p)"
+	AC_SUBST([MKDIR_P])
+fi
 
 # generate files
 AC_CONFIG_FILES([

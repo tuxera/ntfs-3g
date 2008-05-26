@@ -39,7 +39,7 @@ endif
 
 if ENABLE_MOUNT_HELPER
 install-exec-local:	install-rootbinPROGRAMS
-	$(mkdir_p) "$(DESTDIR)/sbin"
+	$(MKDIR_P) "$(DESTDIR)/sbin"
 	$(LN_S) -f "$(rootbindir)/ntfs-3g" "$(DESTDIR)/sbin/mount.ntfs-3g"
 endif
 
