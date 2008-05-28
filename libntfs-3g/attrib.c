@@ -429,25 +429,25 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
 	
-	if ((!(a->flags & ATTR_IS_COMPRESSED) != !NAttrCompressed(na))  ||
-	    (!(a->flags & ATTR_IS_SPARSE)     != !NAttrSparse(na)) ||
-	    (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na))) {
+	if (na->type == AT_DATA && na->name == AT_UNNAMED &&
+	    ((!(a->flags & ATTR_IS_COMPRESSED) != !NAttrCompressed(na)) ||
+	     (!(a->flags & ATTR_IS_SPARSE)     != !NAttrSparse(na)) ||
+	     (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
 		errno = EIO;
-		ntfs_log_perror("Inode %lld attr 0x%x has corrupt flags "
-			       "(0x%x <> 0x%x)", (unsigned long long)ni->mft_no,
-			       type, a->flags, na->ni->flags);
+		ntfs_log_perror("Inode %lld has corrupt attribute flags "
+				"(0x%x <> 0x%x)",(unsigned long long)ni->mft_no,
+				a->flags, na->ni->flags);
 		goto put_err_out;
 	}
 
-	if ((NAttrCompressed(na) || NAttrSparse(na)) && !a->compression_unit) {
-		errno = EIO;
-		ntfs_log_perror("Compressed inode %lld attr 0x%x has no "
-			       "compression unit", 
-			       (unsigned long long)ni->mft_no, type);
-		goto put_err_out;
-	}
-	
 	if (a->non_resident) {
+		if ((a->flags & ATTR_IS_COMPRESSED) && !a->compression_unit) {
+			errno = EIO;
+			ntfs_log_perror("Compressed inode %lld attr 0x%x has "
+					"no compression unit",
+					(unsigned long long)ni->mft_no, type);
+			goto put_err_out;
+		}
 		ntfs_attr_init(na, TRUE, a->flags & ATTR_IS_COMPRESSED,
 				a->flags & ATTR_IS_ENCRYPTED,
 				a->flags & ATTR_IS_SPARSE,
