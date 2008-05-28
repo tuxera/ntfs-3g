@@ -112,16 +112,6 @@ AC_ARG_ENABLE(
 	[enable_device_default_io_ops="yes"]
 )
 
-# Driver executables should be installed to the root filesystem, otherwise 
-# automounting NTFS volumes can fail during boot if the driver binaries 
-# and their dependencies are on an unmounted partition.
-AC_ARG_WITH(
-	[rootfs],
-	[AC_HELP_STRING([--with-rootfs=DIR], [rootfs location @<:@default=/@:>@])],
-	,
-	[with_rootfs="/"]
-)
-
 # pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
 
@@ -312,16 +302,26 @@ test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"
 
 if test "x${DISTCHECK_HACK}" != "x"; then
-	with_rootfs=`echo "${prefix}" | sed "s#NONE#${ac_default_prefix}#"`
 	enable_mount_helper="no"
 	enable_ldconfig="no"
 fi
 
-rootbindir="${with_rootfs}/bin"
-rootsbindir="${with_rootfs}/sbin"
-rootlibdir="${with_rootfs}/lib${libdir##*/lib}"
+# Settings
 pkgconfigdir="\$(libdir)/pkgconfig"
 ntfs3gincludedir="\$(includedir)/ntfs-3g"
+# Executables should be installed to the root filesystem, otherwise 
+# automounting NTFS volumes can fail during boot if the driver binaries 
+# and their dependencies are on an unmounted partition. Use --exec-prefix
+# to override this.
+if test "x${exec_prefix}" = "xNONE"; then
+	rootbindir="/bin"
+	rootsbindir="/sbin"
+	rootlibdir="/lib${libdir##*/lib}"
+else
+	rootbindir="\$(bindir)"
+	rootsbindir="\$(sbindir)"
+	rootlibdir="\$(libdir)"
+fi
 AC_SUBST([pkgconfigdir])
 AC_SUBST([ntfs3gincludedir])
 AC_SUBST([rootbindir])
@@ -366,7 +366,7 @@ AC_CONFIG_FILES([
 ])
 AC_OUTPUT
 
-if test "${with_fuse}" = "external" -a "${with_rootfs}" = "/"; then
+if test "${with_fuse}" = "external"; then
 	if ! echo "x$FUSE_LIB_PATH" | grep -- "x-L/lib" > /dev/null; then
 		cat <<EOF
 ****************************************************************************
