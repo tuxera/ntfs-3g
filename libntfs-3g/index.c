@@ -220,7 +220,7 @@ static u8 *ntfs_ie_get_end(INDEX_HEADER *ih)
 
 static int ntfs_ie_end(INDEX_ENTRY *ie)
 {
-	return ie->ie_flags & INDEX_ENTRY_END;
+	return ie->ie_flags & INDEX_ENTRY_END || !ie->length;
 }
 
 /** 
@@ -301,11 +301,13 @@ static int ntfs_ih_numof_entries(INDEX_HEADER *ih)
 {
 	int n;
 	INDEX_ENTRY *ie;
+	u8 *end;
 	
 	ntfs_log_trace("Entering\n");
 	
+	end = ntfs_ie_get_end(ih);
 	ie = ntfs_ie_get_first(ih);
-	for (n = 0; !ntfs_ie_end(ie); n++)
+	for (n = 0; !ntfs_ie_end(ie) && (u8 *)ie < end; n++)
 		ie = ntfs_ie_get_next(ie);
 	return n;
 }
