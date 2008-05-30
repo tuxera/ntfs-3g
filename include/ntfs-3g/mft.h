@@ -52,6 +52,9 @@ static __inline__ int ntfs_mft_record_read(const ntfs_volume *vol,
 	return ntfs_mft_records_read(vol, mref, 1, b);
 }
 
+extern int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref, 
+		MFT_RECORD *m);
+
 extern int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		MFT_RECORD **mrec, ATTR_RECORD **attr);
 

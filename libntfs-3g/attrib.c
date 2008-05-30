@@ -381,10 +381,9 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na;
 	ATTR_RECORD *a;
-	int err;
 	BOOL cs;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n",
+	ntfs_log_trace("Entering for inode %lld, attr 0x%x.\n",
 		(unsigned long long)ni->mft_no, type);
 	if (!ni || !ni->vol || !ni->mrec) {
 		errno = EINVAL;
@@ -402,16 +401,29 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	}
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
-	if (!ctx) {
-		err = errno;
+	if (!ctx)
 		goto err_out;
-	}
-	if (ntfs_attr_lookup(type, name, name_len, 0, 0, NULL, 0, ctx)) {
-		err = errno;
+
+	if (ntfs_attr_lookup(type, name, name_len, 0, 0, NULL, 0, ctx))
 		goto put_err_out;
-	}
 
 	a = ctx->attr;
+	
+	if (!name) {
+		if (a->name_length) {
+			name = ntfs_ucsndup((ntfschar*)((u8*)a + le16_to_cpu(
+					a->name_offset)), a->name_length);
+			if (!name)
+				goto put_err_out;
+			name_len = a->name_length;
+		} else {
+			name = AT_UNNAMED;
+			name_len = 0;
+		}
+	}
+	
+	__ntfs_attr_init(na, ni, type, name, name_len);
+	
 	/*
 	 * Wipe the flags in case they are not zero for an attribute list
 	 * attribute.  Windows does not complain about invalid flags and chkdsk
@@ -419,23 +431,28 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	 */
 	if (type == AT_ATTRIBUTE_LIST)
 		a->flags = 0;
+	
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
-	if (!name) {
-		if (a->name_length) {
-			name = ntfs_ucsndup((ntfschar*)((u8*)a + le16_to_cpu(
-					a->name_offset)), a->name_length);
-			if (!name) {
-				err = errno;
-				goto put_err_out;
-			}
-			name_len = a->name_length;
-		} else {
-			name = AT_UNNAMED;
-			name_len = 0;
-		}
+	
+	if (na->type == AT_DATA && na->name == AT_UNNAMED &&
+	    ((!(a->flags & ATTR_IS_COMPRESSED) != !NAttrCompressed(na)) ||
+	     (!(a->flags & ATTR_IS_SPARSE)     != !NAttrSparse(na)) ||
+	     (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
+		errno = EIO;
+		ntfs_log_perror("Inode %lld has corrupt attribute flags "
+				"(0x%x <> 0x%x)",(unsigned long long)ni->mft_no,
+				a->flags, na->ni->flags);
+		goto put_err_out;
 	}
-	__ntfs_attr_init(na, ni, type, name, name_len);
+
 	if (a->non_resident) {
+		if ((a->flags & ATTR_IS_COMPRESSED) && !a->compression_unit) {
+			errno = EIO;
+			ntfs_log_perror("Compressed inode %lld attr 0x%x has "
+					"no compression unit",
+					(unsigned long long)ni->mft_no, type);
+			goto put_err_out;
+		}
 		ntfs_attr_init(na, TRUE, a->flags & ATTR_IS_COMPRESSED,
 				a->flags & ATTR_IS_ENCRYPTED,
 				a->flags & ATTR_IS_SPARSE,
@@ -457,7 +474,6 @@ put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	free(na);
-	errno = err;
 	return NULL;
 }
 
@@ -797,8 +813,8 @@ s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	}
 	
 	ntfs_log_trace("Entering for inode %lld attr 0x%x pos %lld count "
-			"%lld\n", (unsigned long long)na->ni->mft_no,
-			na->type, (long long)pos, (long long)count);
+			"%lld  flags: 0x%x\n", (unsigned long long)na->ni->mft_no,
+			na->type, (long long)pos, (long long)count, na->ni->flags);
 
 	/*
 	 * If this is a compressed attribute it needs special treatment, but

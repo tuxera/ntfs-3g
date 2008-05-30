@@ -210,24 +210,14 @@ static int ntfs_mft_load(ntfs_volume *vol)
 		ntfs_log_perror("Error reading $MFT");
 		goto error_exit;
 	}
-	if (ntfs_is_baad_record(mb->magic)) {
-		ntfs_log_error("Incomplete multi sector transfer detected in "
-				"$MFT.\n");
-		goto io_error_exit;
-	}
-	if (!ntfs_is_mft_record(mb->magic)) {
-		ntfs_log_error("$MFT has invalid magic.\n");
-		goto io_error_exit;
-	}
+	
+	if (ntfs_mft_record_check(vol, 0, mb))
+		goto error_exit;
+	
 	ctx = ntfs_attr_get_search_ctx(vol->mft_ni, NULL);
 	if (!ctx)
 		goto error_exit;
 
-	if (p2n(ctx->attr) < p2n(mb) ||
-			(char*)ctx->attr > (char*)mb + vol->mft_record_size) {
-		ntfs_log_error("$MFT is corrupt.\n");
-		goto io_error_exit;
-	}
 	/* Find the $ATTRIBUTE_LIST attribute in $MFT if present. */
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
@@ -855,13 +845,19 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		ntfs_log_perror("Failed to open inode FILE_Bitmap");
 		goto error_exit;
 	}
-	/* Get an ntfs attribute for $Bitmap/$DATA. */
+	
 	vol->lcnbmp_na = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 	if (!vol->lcnbmp_na) {
 		ntfs_log_perror("Failed to open ntfs attribute");
 		goto error_exit;
 	}
-	/* Done with the $Bitmap mft record. */
+	
+	if (vol->lcnbmp_na->data_size > vol->lcnbmp_na->allocated_size) {
+		ntfs_log_error("Corrupt cluster map size (%lld > %lld)\n",
+				(long long)vol->lcnbmp_na->data_size, 
+				(long long)vol->lcnbmp_na->allocated_size);
+		goto io_error_exit;
+	}
 
 	/* Now load the upcase table from $UpCase. */
 	ntfs_log_debug("Loading $UpCase...\n");
