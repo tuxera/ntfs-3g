@@ -3747,6 +3747,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	int perm;
 	int res;
 	int allow;
+	struct stat stbuf;
 
 	/*
 	 * Always allow for root. From the user's point of view,
@@ -3784,9 +3785,13 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 				    && ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0);
 				break;
 			case S_IWRITE + S_IEXEC + S_ISVTX:
-				if (perm & S_ISVTX)
-					allow = 2;
-				else
+				if (perm & S_ISVTX) {
+					if ((ntfs_get_owner_mode(scx,path,ni,&stbuf) >= 0)
+					    && (stbuf.st_uid == scx->uid))
+						allow = 1;
+					else
+						allow = 2;
+				} else
 					allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
 					    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
 				break;
@@ -3821,6 +3826,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	char *name;
 	ntfs_inode *ni;
 	ntfs_inode *dir_ni;
+	struct stat stbuf;
 
 	allow = 0;
 	dirpath = strdup(path);
@@ -3835,16 +3841,17 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 				 dir_ni, accesstype);
 			ntfs_inode_close(dir_ni);
 				/*
-				 * for a sticky directory, have to retry
-				 * and check whether file itself is writeable
+				 * for an not-owned sticky directory, have to
+				 * check whether file itself is owned
 				 */
 			if ((accesstype == (S_IWRITE + S_IEXEC + S_ISVTX))
 			   && (allow == 2)) {
 				ni = ntfs_pathname_to_inode(scx->vol, NULL,
 					 path);
+				allow = FALSE;
 				if (ni) {
-					allow = ntfs_allowed_access(scx,path,
-						ni, S_IWRITE);
+					allow = (ntfs_get_owner_mode(scx,path,ni,&stbuf) >= 0)
+						&& (stbuf.st_uid == scx->uid);
 				ntfs_inode_close(ni);
 				}
 			}

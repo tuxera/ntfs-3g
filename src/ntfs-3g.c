@@ -1321,7 +1321,7 @@ static int ntfs_fuse_rm(const char *org_path)
 	}
 	/* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
-	    || ntfs_allowed_access(&security, path, dir_ni,
+	    || ntfs_allowed_dir_access(&security, org_path,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 		
 		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
@@ -1379,7 +1379,7 @@ static int ntfs_fuse_unlink(const char *org_path)
 			 */
 		if (!ntfs_fuse_fill_security_context(&security)
 		   || ntfs_allowed_dir_access(&security, path,
-				S_IEXEC + S_IWRITE))
+				S_IEXEC + S_IWRITE + S_ISVTX))
 			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
 		else
 			res = -errno;
@@ -1425,7 +1425,15 @@ err:
 				"to '%s'", new_path, tmp);
 	} else {
 cleanup:
-		ntfs_fuse_unlink(tmp);
+		/*
+		 * Condition for this unlink has already been checked in
+		 * "ntfs_fuse_rename_existing_dest()", so it should never
+		 * fail (unless concurrent access to directories when fuse
+		 * is multithreaded)
+		 */
+		if (ntfs_fuse_unlink(tmp) < 0)
+			ntfs_log_perror("Rename failed. Existing file '%s' still present "
+				"as '%s'", new_path, tmp);
 	}
 	return 	ret;
 }
@@ -1434,6 +1442,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 {
 	int ret, len;
 	char *tmp;
+	struct SECURITY_CONTEXT security;
 	const char *ext = ".ntfs-3g-";
 
 	ntfs_log_trace("Entering\n");
@@ -1447,9 +1456,21 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 	if (ret != len - 1) {
 		ntfs_log_error("snprintf failed: %d != %d\n", ret, len - 1);
 		ret = -EOVERFLOW;
-	} else
-		ret = ntfs_fuse_safe_rename(old_path, new_path, tmp);
-	
+	} else {
+			/*
+			 * Make sure existing dest can be removed.
+			 * This is only needed if parent directory is
+			 * sticky, because in this situation condition
+			 * for unlinking is different from condition for
+			 * linking
+			 */
+		if (!ntfs_fuse_fill_security_context(&security)
+		  || ntfs_allowed_dir_access(&security, new_path,
+				S_IEXEC + S_IWRITE + S_ISVTX))
+			ret = ntfs_fuse_safe_rename(old_path, new_path, tmp);
+		else
+			ret = -EACCES;
+	}
 	free(tmp);
 	return 	ret;
 }
