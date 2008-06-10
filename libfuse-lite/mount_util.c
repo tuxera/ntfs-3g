@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
+#include <sys/param.h>
 
 static int mtab_needs_update(const char *mnt)
 {
