@@ -1484,7 +1484,7 @@ static int update_secur_descr(ntfs_volume *vol,
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
-			}
+				}
 				set_nino_flag(ni, v3_Extensions);
 				ni->security_id = securid;
 				ntfs_attr_close(na);
@@ -3518,13 +3518,13 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		/* check whether target securid is known in cache */
 
 	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+	wanted.uid = uid;
+	wanted.gid = gid;
+	wanted.dmode = mode & 07777;
+	if (isdir) wanted.dmode |= 0x10000;
+	wanted.variable = (void*)NULL;
+	wanted.varsize = 0;
 	if (test_nino_flag(ni, v3_Extensions)) {
-		wanted.uid = uid;
-		wanted.gid = gid;
-		wanted.dmode = mode & 07777;
-		if (isdir) wanted.dmode |= 0x10000;
-		wanted.variable = (void*)NULL;
-		wanted.varsize = 0;
 		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
 				scx->vol->securid_cache, GENERIC(&wanted),
 				(cache_compare)compare);

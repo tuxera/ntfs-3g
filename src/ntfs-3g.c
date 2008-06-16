@@ -1065,14 +1065,16 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			 * This is not possible for NTFS 1.x, and we will
 			 * have to build a security attribute later.
 			 */
-		if (ctx->inherit || !ctx->security.usermapping)
-			securid = ntfs_inherited_id(&security, dir_path,
+		if (!ctx->security.usermapping)
+			securid = 0;
+		else
+			if (ctx->inherit)
+				securid = ntfs_inherited_id(&security, dir_path,
 					dir_ni, S_ISDIR(type));
-		else {
-			securid = ntfs_alloc_securid(&security,
-				security.uid, security.gid, perm,
-				S_ISDIR(type));
-		}
+			else
+				securid = ntfs_alloc_securid(&security,
+					security.uid, security.gid, perm,
+					S_ISDIR(type));
 		/* Create object specified in @type. */
 		switch (type) {
 			case S_IFCHR:
