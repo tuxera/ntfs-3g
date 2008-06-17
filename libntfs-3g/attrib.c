@@ -3286,6 +3286,7 @@ int ntfs_attr_rm(ntfs_attr *na)
 		}
 		ntfs_attr_reinit_search_ctx(ctx);
 	}
+	ntfs_attr_put_search_ctx(ctx);
 	if (errno != ENOENT) {
 		ntfs_log_trace("Attribute lookup failed. Probably leaving inconstant "
 				"metadata.\n");
