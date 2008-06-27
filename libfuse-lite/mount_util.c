@@ -23,17 +23,35 @@
 
 static int mtab_needs_update(const char *mnt)
 {
-    struct stat stbuf;
+	int res;
+	struct stat stbuf;
 
-    /* If mtab is within new mount, don't touch it */
-    if (strncmp(mnt, _PATH_MOUNTED, strlen(mnt)) == 0 &&
-        _PATH_MOUNTED[strlen(mnt)] == '/')
-        return 0;
+	/* If mtab is within new mount, don't touch it */
+	if (strncmp(mnt, _PATH_MOUNTED, strlen(mnt)) == 0 &&
+	    _PATH_MOUNTED[strlen(mnt)] == '/')
+		return 0;
 
-    if (lstat(_PATH_MOUNTED, &stbuf) != -1 && S_ISLNK(stbuf.st_mode))
-        return 0;
+	/*
+	 * Skip mtab update if /etc/mtab:
+	 *
+	 *  - doesn't exist,
+	 *  - is a symlink,
+	 *  - is on a read-only filesystem.
+	 */
+	res = lstat(_PATH_MOUNTED, &stbuf);
+	if (res == -1) {
+		if (errno == ENOENT)
+			return 0;
+	} else {
+		if (S_ISLNK(stbuf.st_mode))
+			return 0;
 
-    return 1;
+		res = access(_PATH_MOUNTED, W_OK);
+		if (res == -1 && errno == EROFS)
+			return 0;
+	}
+
+	return 1;
 }
 
 int fuse_mnt_add_mount(const char *progname, const char *fsname,
