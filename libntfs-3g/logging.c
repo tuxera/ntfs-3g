@@ -2,7 +2,7 @@
  * logging.c - Centralised logging.  Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2005 Richard Russon
- * Copyright (c) 2005-2006 Szabolcs Szakacsits
+ * Copyright (c) 2005-2008 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
