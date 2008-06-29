@@ -195,16 +195,17 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	u8 has_guess, used_zone_pos;
 	int err = 0, rlpos, rlsize, buf_size;
 
-	ntfs_log_trace("Entering with count = 0x%llx, start_lcn = 0x%llx, "
+	ntfs_log_enter("Entering with count = 0x%llx, start_lcn = 0x%llx, "
 		       "zone = %s_ZONE.\n", (long long)count, (long long)
 		       start_lcn, zone == MFT_ZONE ? "MFT" : "DATA");
+	
 	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
 			(s8)zone < FIRST_ZONE || zone > LAST_ZONE) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: vcn: %lld, count: %lld, lcn: %lld", 
 				__FUNCTION__, (long long)start_vcn, 
 				(long long)count, (long long)start_lcn);
-		return NULL;
+		goto out;
 	}
 
 	/* Return empty runlist if @count == 0 */
@@ -215,12 +216,12 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			rl[0].lcn = LCN_RL_NOT_MAPPED;
 			rl[0].length = 0;
 		}
-		return rl;
+		goto out;
 	}
 
 	buf = ntfs_malloc(NTFS_LCNALLOC_BSIZE);
 	if (!buf)
-		return NULL;
+		goto out;
 	/*
 	 * If no @start_lcn was requested, use the current zone
 	 * position otherwise use the requested @start_lcn.
@@ -322,20 +323,30 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			 * Coalesce with previous run if adjacent LCNs.
 			 * Otherwise, append a new run.
 			 */
-			if (prev_lcn == lcn + bmp_pos - prev_run_len && rlpos)
+			if (prev_lcn == lcn + bmp_pos - prev_run_len && rlpos) {
+				ntfs_log_debug("Cluster coalesce: prev_lcn: "
+					       "%lld  lcn: %lld  bmp_pos: %lld  "
+					       "prev_run_len: %lld\n", prev_lcn,
+					       lcn, bmp_pos, prev_run_len);
 				rl[rlpos - 1].length = ++prev_run_len;
-			else {
+			} else {
 				if (rlpos)
 					rl[rlpos].vcn = rl[rlpos - 1].vcn +
 							prev_run_len;
-				else
+				else {
 					rl[rlpos].vcn = start_vcn;
+					ntfs_log_debug("Start_vcn: %lld\n", 
+						       start_vcn);
+				}
 				
 				rl[rlpos].lcn = prev_lcn = lcn + bmp_pos;
 				rl[rlpos].length = prev_run_len = 1;
 				rlpos++;
 			}
 			
+			ntfs_log_debug("RUN:   %-16lld %-16lld %-16lld\n", 
+				       rl[rlpos - 1].vcn, rl[rlpos - 1].lcn, 
+				       rl[rlpos - 1].length);
 			/* Done? */
 			if (!--clusters) {
 				if (used_zone_pos)
@@ -467,13 +478,15 @@ done_ret:
 		goto err_ret;
 	}
 done_err_ret:
-	ntfs_log_debug("At done_err_ret (follows done_ret).\n");
 	free(buf);
-	if (!err)
-		return rl;
-	ntfs_log_trace("Failed to allocate clusters (%d)", errno);
-	errno = err;
-	return NULL;
+	if (err) {
+		errno = err;
+		ntfs_log_perror("Failed to allocate clusters");
+		rl = NULL;
+	}
+out:	
+	ntfs_log_leave("\n");
+	return rl;
 
 wb_err_ret:
 	ntfs_log_trace("At wb_err_ret.\n");
@@ -486,6 +499,7 @@ err_ret:
 		rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
 		rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 		rl[rlpos].length = 0;
+		ntfs_debug_runlist_dump(rl);
 		ntfs_cluster_free_from_rl(vol, rl);
 		free(rl);
 		rl = NULL;
@@ -563,22 +577,23 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		errno = EINVAL;
 		return -1;
 	}
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, count 0x%llx, "
+	
+	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, count 0x%llx, "
 		       "vcn 0x%llx.\n", (unsigned long long)na->ni->mft_no,
 		       na->type, (long long)count, (long long)start_vcn);
 
 	rl = ntfs_attr_find_vcn(na, start_vcn);
 	if (!rl) {
 		if (errno == ENOENT)
-			return 0;
-		return -1;
+			ret = 0;
+		goto leave;
 	}
 
 	if (rl->lcn < 0 && rl->lcn != LCN_HOLE) {
 		errno = EIO;
 		ntfs_log_perror("%s: Unexpected lcn (%lld)", __FUNCTION__, 
 				(long long)rl->lcn);
-		return -1;
+		goto leave;
 	}
 
 	/* Find the starting cluster inside the run that needs freeing. */
@@ -593,7 +608,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 		/* Do the actual freeing of the clusters in this run. */
 		if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn + delta,
 					  to_free))
-			return -1;
+			goto leave;
 		nr_freed = to_free;
 	} 
 
@@ -652,5 +667,7 @@ out:
 		ntfs_log_error("Too many free clusters (%lld > %lld)!",
 			       (long long)vol->free_clusters, 
 			       (long long)vol->nr_clusters);
+leave:	
+	ntfs_log_leave("\n");
 	return ret;
 }

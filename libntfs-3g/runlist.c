@@ -463,39 +463,10 @@ static runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
 
 
 /**
- * ntfs_runlists_merge - merge two runlists into one
- * @drl:	original runlist to be worked on
- * @srl:	new runlist to be merged into @drl
- *
- * First we sanity check the two runlists @srl and @drl to make sure that they
- * are sensible and can be merged. The runlist @srl must be either after the
- * runlist @drl or completely within a hole (or unmapped region) in @drl.
- *
- * Merging of runlists is necessary in two cases:
- *   1. When attribute lists are used and a further extent is being mapped.
- *   2. When new clusters are allocated to fill a hole or extend a file.
- *
- * There are four possible ways @srl can be merged. It can:
- *	- be inserted at the beginning of a hole,
- *	- split the hole in two and be inserted between the two fragments,
- *	- be appended at the end of a hole, or it can
- *	- replace the whole hole.
- * It can also be appended to the end of the runlist, which is just a variant
- * of the insert case.
- *
- * On success, return a pointer to the new, combined, runlist. Note, both
- * runlists @drl and @srl are deallocated before returning so you cannot use
- * the pointers for anything any more. (Strictly speaking the returned runlist
- * may be the same as @dst but this is irrelevant.)
- *
- * On error, return NULL, with errno set to the error code. Both runlists are
- * left unmodified. The following error codes are defined:
- *	ENOMEM		Not enough memory to allocate runlist array.
- *	EINVAL		Invalid parameters were passed in.
- *	ERANGE		The runlists overlap and cannot be merged.
+ * ntfs_runlists_merge_i - see ntfs_runlists_merge
  */
-runlist_element *ntfs_runlists_merge(runlist_element *drl,
-		runlist_element *srl)
+static runlist_element *ntfs_runlists_merge_i(runlist_element *drl, 
+					      runlist_element *srl)
 {
 	int di, si;		/* Current index into @[ds]rl. */
 	int sstart;		/* First index with lcn > LCN_RL_NOT_MAPPED. */
@@ -699,6 +670,49 @@ critical_error:
 	ntfs_log_debug("Forcing segmentation fault!\n");
 	marker_vcn = ((runlist*)NULL)->lcn;
 	return drl;
+}
+
+/**
+ * ntfs_runlists_merge - merge two runlists into one
+ * @drl:	original runlist to be worked on
+ * @srl:	new runlist to be merged into @drl
+ *
+ * First we sanity check the two runlists @srl and @drl to make sure that they
+ * are sensible and can be merged. The runlist @srl must be either after the
+ * runlist @drl or completely within a hole (or unmapped region) in @drl.
+ *
+ * Merging of runlists is necessary in two cases:
+ *   1. When attribute lists are used and a further extent is being mapped.
+ *   2. When new clusters are allocated to fill a hole or extend a file.
+ *
+ * There are four possible ways @srl can be merged. It can:
+ *	- be inserted at the beginning of a hole,
+ *	- split the hole in two and be inserted between the two fragments,
+ *	- be appended at the end of a hole, or it can
+ *	- replace the whole hole.
+ * It can also be appended to the end of the runlist, which is just a variant
+ * of the insert case.
+ *
+ * On success, return a pointer to the new, combined, runlist. Note, both
+ * runlists @drl and @srl are deallocated before returning so you cannot use
+ * the pointers for anything any more. (Strictly speaking the returned runlist
+ * may be the same as @dst but this is irrelevant.)
+ *
+ * On error, return NULL, with errno set to the error code. Both runlists are
+ * left unmodified. The following error codes are defined:
+ *	ENOMEM		Not enough memory to allocate runlist array.
+ *	EINVAL		Invalid parameters were passed in.
+ *	ERANGE		The runlists overlap and cannot be merged.
+ */
+runlist_element *ntfs_runlists_merge(runlist_element *drl,
+		runlist_element *srl)
+{
+	runlist_element *rl; 
+	
+	ntfs_log_enter("Entering\n");
+	rl = ntfs_runlists_merge_i(drl, srl);
+	ntfs_log_leave("\n");
+	return rl;
 }
 
 /**

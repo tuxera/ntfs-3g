@@ -374,19 +374,20 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		ntfschar *name, u32 name_len)
 {
 	ntfs_attr_search_ctx *ctx;
-	ntfs_attr *na;
+	ntfs_attr *na = NULL;
 	ATTR_RECORD *a;
 	BOOL cs;
 
-	ntfs_log_trace("Entering for inode %lld, attr 0x%x.\n",
-		(unsigned long long)ni->mft_no, type);
+	ntfs_log_enter("Entering for inode %lld, attr 0x%x.\n",
+		       (unsigned long long)ni->mft_no, type);
+	
 	if (!ni || !ni->vol || !ni->mrec) {
 		errno = EINVAL;
-		return NULL;
+		goto out;
 	}
 	na = calloc(sizeof(ntfs_attr), 1);
 	if (!na)
-		return NULL;
+		goto out;
 	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {
 		name = ntfs_ucsndup(name, name_len);
 		if (!name)
@@ -462,12 +463,16 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 				cs ? (l + 7) & ~7 : 0, 0);
 	}
 	ntfs_attr_put_search_ctx(ctx);
+out:
+	ntfs_log_leave("\n");	
 	return na;
+
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	free(na);
-	return NULL;
+	na = NULL;
+	goto out;
 }
 
 /**
@@ -772,46 +777,16 @@ map_rl:
 }
 
 /**
- * ntfs_attr_pread - read from an attribute specified by an ntfs_attr structure
- * @na:		ntfs attribute to read from
- * @pos:	byte position in the attribute to begin reading from
- * @count:	number of bytes to read
- * @b:		output data buffer
- *
- * This function will read @count bytes starting at offset @pos from the ntfs
- * attribute @na into the data buffer @b.
- *
- * On success, return the number of successfully read bytes. If this number is
- * lower than @count this means that the read reached end of file or that an
- * error was encountered during the read so that the read is partial. 0 means
- * end of file or nothing was read (also return 0 when @count is 0).
- *
- * On error and nothing has been read, return -1 with errno set appropriately
- * to the return code of ntfs_pread(), or to EINVAL in case of invalid
- * arguments.
- */
-s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
+ * ntfs_attr_pread_i - see description at ntfs_attr_pread()
+ */ 
+static s64 ntfs_attr_pread_i(ntfs_attr *na, const s64 pos, s64 count, void *b)
 {
 	s64 br, to_read, ofs, total, total2;
 	ntfs_volume *vol;
 	runlist_element *rl;
 
-	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
-		errno = EINVAL;
-		ntfs_log_perror("%s: na=%p  b=%p  pos=%lld  count=%lld",
-				__FUNCTION__, na, b, (long long)pos,
-				(long long)count);
-		return -1;
-	}
+	/* Sanity checking arguments is done in ntfs_attr_pread(). */
 	
-	ntfs_log_trace("Entering for inode %lld attr 0x%x pos %lld count "
-			"%lld  flags: 0x%x\n", (unsigned long long)na->ni->mft_no,
-			na->type, (long long)pos, (long long)count, na->ni->flags);
-
-	/*
-	 * If this is a compressed attribute it needs special treatment, but
-	 * only if it is non-resident.
-	 */
 	if (NAttrCompressed(na) && NAttrNonResident(na))
 		return ntfs_compressed_attr_pread(na, pos, count, b);
 	/*
@@ -957,6 +932,47 @@ rl_err_out:
 		return total;
 	errno = EIO;
 	return -1;
+}
+
+/**
+ * ntfs_attr_pread - read from an attribute specified by an ntfs_attr structure
+ * @na:		ntfs attribute to read from
+ * @pos:	byte position in the attribute to begin reading from
+ * @count:	number of bytes to read
+ * @b:		output data buffer
+ *
+ * This function will read @count bytes starting at offset @pos from the ntfs
+ * attribute @na into the data buffer @b.
+ *
+ * On success, return the number of successfully read bytes. If this number is
+ * lower than @count this means that the read reached end of file or that an
+ * error was encountered during the read so that the read is partial. 0 means
+ * end of file or nothing was read (also return 0 when @count is 0).
+ *
+ * On error and nothing has been read, return -1 with errno set appropriately
+ * to the return code of ntfs_pread(), or to EINVAL in case of invalid
+ * arguments.
+ */
+s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
+{
+	int ret;
+	
+	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
+		errno = EINVAL;
+		ntfs_log_perror("%s: na=%p  b=%p  pos=%lld  count=%lld",
+				__FUNCTION__, na, b, (long long)pos,
+				(long long)count);
+		return -1;
+	}
+	
+	ntfs_log_enter("Entering for inode %lld attr 0x%x pos %lld count "
+		       "%lld\n", (unsigned long long)na->ni->mft_no,
+		       na->type, (long long)pos, (long long)count);
+
+	ret = ntfs_attr_pread_i(na, pos, count, b);
+	
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 static int ntfs_attr_fill_zero(ntfs_attr *na, s64 pos, s64 count)
@@ -1148,9 +1164,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		unsigned int undo_data_size		: 1;
 	} need_to = { 0, 0 };
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
+	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
 			"0x%llx.\n", na->ni->mft_no, na->type, (long long)pos,
 			(long long)count);
+	
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
 		ntfs_log_perror("%s", __FUNCTION__);
@@ -1387,9 +1404,11 @@ done:
 			 * FIXME: trying to recover by goto rl_err_out; 
 			 * could cause driver hang by infinite looping.
 			 */
-			return -1;
+			total = -1;
+			goto out;
 		}
 out:	
+	ntfs_log_leave("\n");
 	return total;
 rl_err_out:
 	eo = errno;
@@ -1900,7 +1919,7 @@ static int ntfs_external_attr_find(ATTR_TYPES type, const ntfschar *name,
 
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
-	ntfs_log_trace("Entering for inode 0x%llx, attribute type 0x%x.\n",
+	ntfs_log_trace("Entering for inode %lld, attribute type 0x%x.\n",
 			(unsigned long long)ni->mft_no, type);
 	if (!base_ni) {
 		/* First call happens with the base mft record. */
@@ -2299,22 +2318,29 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 {
 	ntfs_volume *vol;
 	ntfs_inode *base_ni;
+	int ret = -1;
 
+	ntfs_log_enter("Entering for attribute type 0x%x\n", type);
+	
 	if (!ctx || !ctx->mrec || !ctx->attr || (name && name != AT_UNNAMED &&
 			(!ctx->ntfs_ino || !(vol = ctx->ntfs_ino->vol) ||
 			!vol->upcase || !vol->upcase_len))) {
 		errno = EINVAL;
-		return -1;
+		goto out;
 	}
+	
 	if (ctx->base_ntfs_ino)
 		base_ni = ctx->base_ntfs_ino;
 	else
 		base_ni = ctx->ntfs_ino;
 	if (!base_ni || !NInoAttrList(base_ni) || type == AT_ATTRIBUTE_LIST)
-		return ntfs_attr_find(type, name, name_len, ic, val, val_len,
-				ctx);
-	return ntfs_external_attr_find(type, name, name_len, ic, lowest_vcn,
-			val, val_len, ctx);
+		ret = ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
+	else
+		ret = ntfs_external_attr_find(type, name, name_len, ic, 
+					      lowest_vcn, val, val_len, ctx);
+out:
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
@@ -3617,10 +3643,8 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		/* Start by allocating clusters to hold the attribute value. */
 		rl = ntfs_cluster_alloc(vol, 0, new_allocated_size >>
 				vol->cluster_size_bits, -1, DATA_ZONE);
-		if (!rl) {
-			ntfs_log_perror("Failed to allocate clusters");
+		if (!rl)
 			return -1;
-		}
 	} else
 		rl = NULL;
 	/*
@@ -4233,31 +4257,9 @@ error:  ret = -3; goto out;
 
 #define NTFS_VCN_DELETE_MARK -2
 /**
- * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
- * @na:		non-resident ntfs open attribute for which we need update
- * @from_vcn:	update runlist starting this VCN
- *
- * Build mapping pairs from @na->rl and write them to the disk. Also, this
- * function updates sparse bit, allocated and compressed size (allocates/frees
- * space for this field if required).
- *
- * @na->allocated_size should be set to correct value for the new runlist before
- * call to this function. Vice-versa @na->compressed_size will be calculated and
- * set to correct value during this function.
- *
- * FIXME: This function does not update sparse bit and compressed size correctly
- * if called with @from_vcn != 0.
- *
- * FIXME: Rewrite without using NTFS_VCN_DELETE_MARK define.
- *
- * On success return 0 and on error return -1 with errno set to the error code.
- * The following error codes are defined:
- *	EINVAL - Invalid arguments passed.
- *	ENOMEM - Not enough memory to complete operation.
- *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST
- *		 or there is no free MFT records left to allocate.
+ * ntfs_attr_update_mapping_pairs_i - see ntfs_attr_update_mapping_pairs
  */
-int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn)
+static int ntfs_attr_update_mapping_pairs_i(ntfs_attr *na, VCN from_vcn)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *ni, *base_ni;
@@ -4546,6 +4548,41 @@ put_err_out:
 	goto out;
 }
 #undef NTFS_VCN_DELETE_MARK
+
+/**
+ * ntfs_attr_update_mapping_pairs - update mapping pairs for ntfs attribute
+ * @na:		non-resident ntfs open attribute for which we need update
+ * @from_vcn:	update runlist starting this VCN
+ *
+ * Build mapping pairs from @na->rl and write them to the disk. Also, this
+ * function updates sparse bit, allocated and compressed size (allocates/frees
+ * space for this field if required).
+ *
+ * @na->allocated_size should be set to correct value for the new runlist before
+ * call to this function. Vice-versa @na->compressed_size will be calculated and
+ * set to correct value during this function.
+ *
+ * FIXME: This function does not update sparse bit and compressed size correctly
+ * if called with @from_vcn != 0.
+ *
+ * FIXME: Rewrite without using NTFS_VCN_DELETE_MARK define.
+ *
+ * On success return 0 and on error return -1 with errno set to the error code.
+ * The following error codes are defined:
+ *	EINVAL - Invalid arguments passed.
+ *	ENOMEM - Not enough memory to complete operation.
+ *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST
+ *		 or there is no free MFT records left to allocate.
+ */
+int ntfs_attr_update_mapping_pairs(ntfs_attr *na, VCN from_vcn)
+{
+	int ret; 
+	
+	ntfs_log_enter("Entering\n");
+	ret = ntfs_attr_update_mapping_pairs_i(na, from_vcn);
+	ntfs_log_leave("\n");
+	return ret;
+}
 
 /**
  * ntfs_non_resident_attr_shrink - shrink a non-resident, open ntfs attribute
@@ -4980,12 +5017,12 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 	void *data, *ret = NULL;
 	s64 size;
 	
-	ntfs_log_trace("Entering\n");
+	ntfs_log_enter("Entering\n");
 	
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
 		ntfs_log_perror("ntfs_attr_open failed");
-		return NULL;
+		goto err_exit;
 	}
 	data = ntfs_malloc(na->data_size);
 	if (!data)
@@ -5002,6 +5039,8 @@ void *ntfs_attr_readall(ntfs_inode *ni, const ATTR_TYPES type,
 		*data_size = size;
 out:
 	ntfs_attr_close(na);
+err_exit:
+	ntfs_log_leave("\n");
 	return ret;
 }
 

@@ -58,6 +58,10 @@ static const char *col_red    = "\e[01;31m";
 static const char *col_redinv = "\e[01;07;31m";
 static const char *col_end    = "\e[0m";
 
+#ifdef DEBUG
+static int tab;
+#endif
+
 /* Some gcc 3.x, 4.[01].X crash with internal compiler error. */
 #if __GNUC__ <= 3 || (__GNUC__ == 4 && __GNUC_MINOR__ <= 1)
 # define  BROKEN_GCC_FORMAT_ATTRIBUTE
@@ -83,7 +87,8 @@ struct ntfs_logging {
  */
 static struct ntfs_logging ntfs_log = {
 #ifdef DEBUG
-	NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE |
+	NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE | NTFS_LOG_LEVEL_ENTER |
+	NTFS_LOG_LEVEL_LEAVE |
 #endif
 	NTFS_LOG_LEVEL_INFO | NTFS_LOG_LEVEL_QUIET | NTFS_LOG_LEVEL_WARNING |
 	NTFS_LOG_LEVEL_ERROR | NTFS_LOG_LEVEL_PERROR | NTFS_LOG_LEVEL_CRITICAL |
@@ -214,6 +219,8 @@ static FILE * ntfs_log_get_stream(u32 level)
 
 		case NTFS_LOG_LEVEL_DEBUG:
 		case NTFS_LOG_LEVEL_TRACE:
+		case NTFS_LOG_LEVEL_ENTER:
+		case NTFS_LOG_LEVEL_LEAVE:
 		case NTFS_LOG_LEVEL_WARNING:
 		case NTFS_LOG_LEVEL_ERROR:
 		case NTFS_LOG_LEVEL_CRITICAL:
@@ -413,6 +420,9 @@ out:
 int ntfs_log_handler_fprintf(const char *function, const char *file,
 	int line, u32 level, void *data, const char *format, va_list args)
 {
+#ifdef DEBUG
+	int i;
+#endif
 	int ret = 0;
 	int olderr = errno;
 	FILE *stream;
@@ -423,6 +433,13 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 		return 0;	/* If it's NULL, we can't do anything. */
 	stream = (FILE*)data;
 
+#ifdef DEBUG
+	if (level == NTFS_LOG_LEVEL_LEAVE) {
+		if (tab)
+			tab--;
+		return 0;
+	}
+#endif	
 	if (ntfs_log.flags & NTFS_LOG_FLAG_COLOUR) {
 		/* Pick a colour determined by the log level */
 		switch (level) {
@@ -449,7 +466,11 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 				break;
 		}
 	}
-
+	
+#ifdef DEBUG
+	for (i = 0; i < tab; i++)
+		ret += fprintf(stream, " ");
+#endif	
 	if (col_prefix)
 		ret += fprintf(stream, col_prefix);
 
@@ -467,7 +488,7 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 		ret += fprintf(stream, "(%d) ", line);
 
 	if ((ntfs_log.flags & NTFS_LOG_FLAG_FUNCTION) || /* Source function */
-	    (level & NTFS_LOG_LEVEL_TRACE))
+	    (level & NTFS_LOG_LEVEL_TRACE) || (level & NTFS_LOG_LEVEL_ENTER))
 		ret += fprintf(stream, "%s(): ", function);
 
 	ret += vfprintf(stream, format, args);
@@ -478,7 +499,10 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 	if (col_suffix)
 		ret += fprintf(stream, col_suffix);
 
-
+#ifdef DEBUG
+	if (level == NTFS_LOG_LEVEL_ENTER)
+		tab++;
+#endif	
 	fflush(stream);
 	errno = olderr;
 	return ret;

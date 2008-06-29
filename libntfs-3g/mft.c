@@ -147,7 +147,6 @@ int ntfs_mft_records_write(const ntfs_volume *vol, const MFT_REF mref,
 	void *bmirr = NULL;
 	int cnt = 0, res = 0;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
 	if (!vol || !vol->mft_na || vol->mftmirr_size <= 0 || !b || count < 0) {
 		errno = EINVAL;
 		return -1;
@@ -410,9 +409,11 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 	MFT_RECORD *m;
 	int ret = -1;
 
+	ntfs_log_enter("Entering\n");
+	
 	m = ntfs_calloc(vol->mft_record_size);
 	if (!m)
-		return -1;
+		goto out;
 	
 	if (ntfs_mft_record_layout(vol, mref, m))
 		goto free_m;
@@ -423,6 +424,8 @@ int ntfs_mft_record_format(const ntfs_volume *vol, const MFT_REF mref)
 	ret = 0;
 free_m:
 	free(m);
+out:	
+	ntfs_log_leave("\n");
 	return ret;
 }
 
@@ -794,11 +797,14 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
 	int err;
+	int ret = -1;
 
+	ntfs_log_enter("Entering\n");
+	
 	mftbmp_na = vol->mftbmp_na;
 	ctx = ntfs_attr_get_search_ctx(mftbmp_na->ni, NULL);
 	if (!ctx)
-		return -1;
+		goto out;
 
 	if (ntfs_attr_lookup(mftbmp_na->type, mftbmp_na->name,
 			mftbmp_na->name_len, 0, 0, NULL, 0, ctx)) {
@@ -825,7 +831,8 @@ static int ntfs_mft_bitmap_extend_initialized(ntfs_volume *vol)
 	if (ll == 8) {
 		ntfs_log_debug("Wrote eight initialized bytes to mft bitmap.\n");
 		vol->free_mft_records += (8 * 8); 
-		return 0;
+		ret = 0;
+		goto out;
 	}
 	ntfs_log_error("Failed to write to mft bitmap.\n");
 	err = errno;
@@ -860,7 +867,9 @@ put_err_out:
 			(long long)mftbmp_na->initialized_size);
 err_out:
 	errno = err;
-	return -1;
+out:
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
