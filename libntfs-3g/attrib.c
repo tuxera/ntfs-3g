@@ -389,10 +389,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		return NULL;
 	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {
 		name = ntfs_ucsndup(name, name_len);
-		if (!name) {
-			free(na);
-			return NULL;
-		}
+		if (!name)
+			goto err_out;
 	}
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
