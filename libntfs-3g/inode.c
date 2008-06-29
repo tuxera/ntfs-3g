@@ -154,7 +154,6 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	s64 l;
 	ntfs_inode *ni;
 	ntfs_attr_search_ctx *ctx;
-	int err = 0;
 	STANDARD_INFORMATION *std_info;
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
@@ -168,7 +167,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
 		goto err_out;
 	if (!(ni->mrec->flags & MFT_RECORD_IN_USE)) {
-		err = ENOENT;
+		errno = ENOENT;
 		goto err_out;
 	}
 	ni->mft_no = MREF(mref);
@@ -178,7 +177,6 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	/* Receive some basic information about inode. */
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		err = errno;
 		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
 				"attribute.\n");
 		goto put_err_out;
@@ -203,7 +201,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (!l)
 		goto put_err_out;
 	if (l > 0x40000) {
-		err = EIO;
+		errno = EIO;
 		goto put_err_out;
 	}
 	ni->attr_list_size = l;
@@ -214,7 +212,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (!l)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {
-		err = EIO;
+		errno = EIO;
 		goto put_err_out;
 	}
 get_size:
@@ -241,14 +239,9 @@ get_size:
 	ntfs_attr_put_search_ctx(ctx);
 	return ni;
 put_err_out:
-	if (!err)
-		err = errno;
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
-	if (!err)
-		err = errno;
 	__ntfs_inode_release(ni);
-	errno = err;
 	return NULL;
 }
 
