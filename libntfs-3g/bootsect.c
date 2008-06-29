@@ -2,7 +2,7 @@
  * bootsect.c - Boot sector handling code. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
- * Copyright (c) 2003-2006 Szabolcs Szakacsits
+ * Copyright (c) 2003-2008 Szabolcs Szakacsits
  * Copyright (c)      2005 Yura Pakhuchiy
  *
  * This program/include file is free software; you can redistribute it and/or

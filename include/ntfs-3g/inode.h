@@ -1,10 +1,10 @@
 /*
  * inode.h - Defines for NTFS inode handling. Originated from the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2001-2004 Anton Altaparmakov
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
- * Copyright (c) 2006 Szabolcs Szakacsits
+ * Copyright (c) 2006-2008 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published

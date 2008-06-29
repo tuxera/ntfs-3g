@@ -3,8 +3,8 @@
  *
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
- * Copyright (c) 2004-2006 Szabolcs Szakacsits
- * Copyright (c) 2005-2006 Yura Pakhuchiy
+ * Copyright (c) 2004-2008 Szabolcs Szakacsits
+ * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or

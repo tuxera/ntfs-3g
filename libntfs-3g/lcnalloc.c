@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2004 Yura Pakhuchiy
- * Copyright (c) 2004-2007 Szabolcs Szakacsits
+ * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2008 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or

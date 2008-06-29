@@ -1,7 +1,8 @@
 /*
  * logging.h - Centralised logging. Originated from the Linux-NTFS project.
  *
- * Copyright (c) 2005 Richard Russon
+ * Copyright (c) 2005      Richard Russon
+ * Copyright (c) 2007-2008 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
