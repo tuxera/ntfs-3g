@@ -27,6 +27,7 @@
 #include "volume.h"
 #include "inode.h"
 #include "layout.h"
+#include "logging.h"
 
 extern int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 		const s64 count, MFT_RECORD *b);
