@@ -77,6 +77,8 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define NTFS_LOG_LEVEL_ERROR	(1 <<  7) /* Operation failed, no damage done */
 #define NTFS_LOG_LEVEL_PERROR	(1 <<  8) /* Message : standard error description */
 #define NTFS_LOG_LEVEL_CRITICAL	(1 <<  9) /* Operation failed,damage may have occurred */
+#define NTFS_LOG_LEVEL_ENTER	(1 << 10) /* Enter a function */
+#define NTFS_LOG_LEVEL_LEAVE	(1 << 11) /* Leave a function  */
 
 /* Logging style flags - Manage the style of the output */
 #define NTFS_LOG_FLAG_PREFIX	(1 << 0) /* Prefix messages with "ERROR: ", etc */
@@ -104,9 +106,13 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #ifdef DEBUG
 #define ntfs_log_debug(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_DEBUG,NULL,FORMAT,##ARGS)
 #define ntfs_log_trace(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_TRACE,NULL,FORMAT,##ARGS)
+#define ntfs_log_enter(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_ENTER,NULL,FORMAT,##ARGS)
+#define ntfs_log_leave(FORMAT, ARGS...) ntfs_log_redirect(__FUNCTION__,__FILE__,__LINE__,NTFS_LOG_LEVEL_LEAVE,NULL,FORMAT,##ARGS)
 #else
 #define ntfs_log_debug(FORMAT, ARGS...)do {} while (0)
 #define ntfs_log_trace(FORMAT, ARGS...)do {} while (0)
+#define ntfs_log_enter(FORMAT, ARGS...)do {} while (0)
+#define ntfs_log_leave(FORMAT, ARGS...)do {} while (0)
 #endif /* DEBUG */
 
 #endif /* _LOGGING_H_ */

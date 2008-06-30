@@ -152,23 +152,22 @@ static void __ntfs_inode_release(ntfs_inode *ni)
 ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 {
 	s64 l;
-	ntfs_inode *ni;
+	ntfs_inode *ni = NULL;
 	ntfs_attr_search_ctx *ctx;
-	int err = 0;
 	STANDARD_INFORMATION *std_info;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", MREF(mref));
+	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
 	if (!vol) {
 		errno = EINVAL;
-		return NULL;
+		goto out;
 	}
 	ni = __ntfs_inode_allocate(vol);
 	if (!ni)
-		return NULL;
+		goto out;
 	if (ntfs_file_record_read(vol, mref, &ni->mrec, NULL))
 		goto err_out;
 	if (!(ni->mrec->flags & MFT_RECORD_IN_USE)) {
-		err = ENOENT;
+		errno = ENOENT;
 		goto err_out;
 	}
 	ni->mft_no = MREF(mref);
@@ -178,7 +177,6 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	/* Receive some basic information about inode. */
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		err = errno;
 		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
 				"attribute.\n");
 		goto put_err_out;
@@ -216,7 +214,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (!l)
 		goto put_err_out;
 	if (l > 0x40000) {
-		err = EIO;
+		errno = EIO;
 		goto put_err_out;
 	}
 	ni->attr_list_size = l;
@@ -227,7 +225,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	if (!l)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {
-		err = EIO;
+		errno = EIO;
 		goto put_err_out;
 	}
 get_size:
@@ -252,17 +250,16 @@ get_size:
 		}
 	}
 	ntfs_attr_put_search_ctx(ctx);
+out:	
+	ntfs_log_leave("\n");
 	return ni;
+
 put_err_out:
-	if (!err)
-		err = errno;
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
-	if (!err)
-		err = errno;
 	__ntfs_inode_release(ni);
-	errno = err;
-	return NULL;
+	ni = NULL;
+	goto out;
 }
 
 /**
@@ -289,17 +286,19 @@ err_out:
  */
 int ntfs_inode_close(ntfs_inode *ni)
 {
+	int ret = -1;
+	
 	if (!ni)
 		return 0;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long)ni->mft_no);
+	ntfs_log_enter("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	/* If we have dirty metadata, write it out. */
 	if (NInoDirty(ni) || NInoAttrListDirty(ni)) {
 		if (ntfs_inode_sync(ni)) {
 			if (errno != EIO)
 				errno = EBUSY;
-			return -1;
+			goto err;
 		}
 	}
 	/* Is this a base inode with mapped extent inodes? */
@@ -308,7 +307,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 			if (ntfs_inode_close(ni->extent_nis[0])) {
 				if (errno != EIO)
 					errno = EBUSY;
-				return -1;
+				goto err;
 			}
 		}
 	} else if (ni->nr_extents == -1) {
@@ -362,7 +361,10 @@ int ntfs_inode_close(ntfs_inode *ni)
 	}
 	
 	__ntfs_inode_release(ni);
-	return 0;
+	ret = 0;
+err:
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
@@ -393,7 +395,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 {
 	u64 mft_no = MREF_LE(mref);
-	ntfs_inode *ni;
+	ntfs_inode *ni = NULL;
 	ntfs_inode **extent_nis;
 	int i;
 
@@ -403,7 +405,7 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		return NULL;
 	}
 	
-	ntfs_log_trace("Opening extent inode 0x%llx (base mft record 0x%llx).\n",
+	ntfs_log_enter("Opening extent inode %lld (base mft record %lld).\n",
 			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	
@@ -424,15 +426,15 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 				ntfs_log_perror("Found stale extent mft "
 					"reference mft=%lld",
 					(long long)ni->mft_no);
-				return NULL;
+				goto out;
 			}
-			return ni;
+			goto out;
 		}
 	}
 	/* Wasn't there, we need to load the extent inode. */
 	ni = __ntfs_inode_allocate(base_ni->vol);
 	if (!ni)
-		return NULL;
+		goto out;
 	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
 			NULL)) {
 		ntfs_log_perror("ntfs_file_record_read failed #2");
@@ -456,10 +458,13 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 		base_ni->extent_nis = extent_nis;
 	}
 	base_ni->extent_nis[base_ni->nr_extents++] = ni;
+out:
+	ntfs_log_leave("\n");
 	return ni;
 err_out:
 	__ntfs_inode_release(ni);
-	return NULL;
+	ni = NULL;
+	goto out;
 }
 
 /**
@@ -689,6 +694,7 @@ err_out:
  */
 int ntfs_inode_sync(ntfs_inode *ni)
 {
+	int ret = 0;
 	int err = 0;
 
 	if (!ni) {
@@ -697,7 +703,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
+	ntfs_log_enter("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	/* Update STANDARD_INFORMATION. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
@@ -808,10 +814,13 @@ sync_inode:
 		}
 	}
 
-	if (!err)
-		return 0;
-	errno = err;
-	return -1;
+	if (err) {
+		errno = err;
+		ret = -1;
+	}
+	
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
