@@ -2231,7 +2231,17 @@ int main(int argc, char *argv[])
 	struct fuse *fh;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
 	struct stat sbuf;
-	int err;
+	int err, fd;
+
+	/*
+	 * Make sure file descriptors 0, 1 and 2 are open, 
+	 * otherwise chaos would ensue.
+	 */
+	do {
+		fd = open("/dev/null", O_RDWR);
+		if (fd > 2)
+			close(fd);
+	} while (fd >= 0 && fd <= 2);
 
 #ifndef FUSE_INTERNAL
 	if ((getuid() != geteuid()) || (getgid() != getegid())) {
