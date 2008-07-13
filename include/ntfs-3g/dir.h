@@ -29,10 +29,6 @@
 
 #define PATH_SEP '/'
 
-#ifndef MAX_PATH
-#define MAX_PATH 1024
-#endif
-
 /*
  * We do not have these under DJGPP, so define our version that do not conflict
  * with other S_IFs defined under DJGPP.
