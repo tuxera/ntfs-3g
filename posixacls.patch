@@ -1,22 +1,22 @@
---- ntfsdev/ntfs-3g/src/ntfs-3g.c	2008-06-02 10:13:23.000000000 +0200
-+++ ntfsacls/ntfs-3g/src/ntfs-3g.c	2008-06-02 11:06:46.000000000 +0200
-@@ -1069,9 +1069,15 @@
- 			securid = ntfs_inherited_id(&security, dir_path,
+--- ntfsdev/ntfs-3g/src/ntfs-3g.c	2008-07-13 11:22:47.000000000 +0200
++++ ntfsacls/ntfs-3g/src/ntfs-3g.c	2008-07-13 11:33:14.000000000 +0200
+@@ -1072,9 +1072,15 @@
+ 				securid = ntfs_inherited_id(&security, dir_path,
  					dir_ni, S_ISDIR(type));
- 		else {
+ 			else
 +#if POSIXACLS
-+			securid = ntfs_alloc_securid(&security,
-+				security.uid, security.gid,
-+				dir_path, dir_ni, perm, S_ISDIR(type));
++				securid = ntfs_alloc_securid(&security,
++					security.uid, security.gid,
++					dir_path, dir_ni, perm, S_ISDIR(type));
 +#else
- 			securid = ntfs_alloc_securid(&security,
- 				security.uid, security.gid, perm,
- 				S_ISDIR(type));
+ 				securid = ntfs_alloc_securid(&security,
+ 					security.uid, security.gid, perm,
+ 					S_ISDIR(type));
 +#endif
- 		}
  		/* Create object specified in @type. */
  		switch (type) {
-@@ -1101,10 +1107,18 @@
+ 			case S_IFCHR:
+@@ -1103,10 +1109,18 @@
  				 * could not be allocated (eg NTFS 1.x)
  				 */
  			if (ctx->security.usermapping) {
@@ -35,7 +35,7 @@
  				else {
  					/* Adjust read-only (for Windows) */
  					if (perm & S_IWUSR)
-@@ -1750,6 +1764,38 @@
+@@ -1752,6 +1766,38 @@
  	ntfschar *lename = NULL;
  	int res, lename_len;
  
@@ -74,7 +74,7 @@
  	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
  		return ntfs_fuse_getxattr_windows(path, name, value, size);
  	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
-@@ -1800,6 +1846,37 @@
+@@ -1802,6 +1848,37 @@
  	ntfschar *lename = NULL;
  	int res, lename_len;
  
@@ -112,7 +112,7 @@
  	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
  		return -EOPNOTSUPP;
  	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
-@@ -1858,6 +1935,37 @@
+@@ -1860,6 +1937,37 @@
  	int res = 0, lename_len;
  
  
@@ -150,8 +150,8 @@
  	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
  		return -EOPNOTSUPP;
  	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
---- ntfsdev/ntfs-3g/include/ntfs-3g/security.h	2008-05-30 08:53:07.000000000 +0200
-+++ ntfsacls/ntfs-3g/include/ntfs-3g/security.h	2008-04-20 11:37:48.000000000 +0200
+--- ntfsdev/ntfs-3g/include/ntfs-3g/security.h	2008-07-13 09:11:26.000000000 +0200
++++ ntfsacls/ntfs-3g/include/ntfs-3g/security.h	2008-07-13 11:33:14.000000000 +0200
 @@ -30,6 +30,8 @@
  #include "inode.h"
  #include "dir.h"
@@ -285,8 +285,8 @@
  /*
   *		Security API for direct access to security descriptors
   *	based on Win32 API
---- ntfsdev/ntfs-3g/libntfs-3g/security.c	2008-06-02 10:19:12.000000000 +0200
-+++ ntfsacls/ntfs-3g/libntfs-3g/security.c	2008-06-02 10:26:10.000000000 +0200
+--- ntfsdev/ntfs-3g/libntfs-3g/security.c	2008-07-13 09:11:26.000000000 +0200
++++ ntfsacls/ntfs-3g/libntfs-3g/security.c	2008-07-13 12:44:56.000000000 +0200
 @@ -526,6 +526,673 @@
  	return (ok);
  }
@@ -961,6 +961,15 @@
  /**
   * ntfs_guid_is_zero - check if a GUID is zero
   * @guid:	[IN] guid to check
+@@ -1484,7 +2151,7 @@
+ 					ntfs_attr_remove(ni,
+ 						AT_SECURITY_DESCRIPTOR,
+ 						AT_UNNAMED, 0);
+-				}
++			}
+ 				set_nino_flag(ni, v3_Extensions);
+ 				ni->security_id = securid;
+ 				ntfs_attr_close(na);
 @@ -1984,8 +2651,16 @@
  	pseccache = *scx->pseccache;
  	if (pseccache) {
@@ -1227,7 +1236,7 @@
  	/* ACL header */
  	pacl = (ACL*)&secattr[offs];
  	pacl->revision = ACL_REVISION;
-@@ -2370,65 +3178,587 @@
+@@ -2370,62 +3178,584 @@
  	pos = sizeof(ACL);
  	acecnt = 0;
  
@@ -1356,9 +1365,7 @@
 +				sid = usid;
 +				sidsz = usidsz;
 +				grants = OWNER_RIGHTS;
- 			} else {
--				pdace->flags = FILE_INHERITANCE;
--				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
++			} else {
 +				sid = find_usid(scx, pxace->id, (SID*)&defsid);
 +				if (sid) {
 +					sidsz = sid_size(sid);
@@ -1864,12 +1871,9 @@
 +					denials |= DIR_WRITE;
 +				if ((mode & S_IROTH) && !(mode & S_IRGRP))
 +					denials |= DIR_READ;
-+			} else {
-+				pdace->flags = FILE_INHERITANCE;
-+				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
- 					denials |= FILE_EXEC;
- 				if ((mode & S_IWOTH) && !(mode & S_IWGRP))
- 					denials |= FILE_WRITE;
+ 			} else {
+ 				pdace->flags = FILE_INHERITANCE;
+ 				if ((mode & S_IXOTH) && !(mode & S_IXGRP))
 @@ -2638,6 +3968,108 @@
  	return (pos);
  }
@@ -1979,14 +1983,10 @@
  /*
   *		Build a full security descriptor
   *	returns descriptor in allocated memory, must free() after use
-@@ -2816,9 +4248,154 @@
- 		if (special & FILE_READ_DATA)
- 			perm |= S_ISVTX;
- 	}
--	return (perm);
-+	return (perm);
-+}
-+
+@@ -2819,6 +4251,151 @@
+ 	return (perm);
+ }
+ 
 +#if POSIXACLS
 +
 +/*
@@ -2128,8 +2128,8 @@
 +		posix_desc->tagsset = tagsset;
 +	}
 +	return (k - target);
- }
- 
++}
++
 +#endif
 +
  /*
@@ -2795,7 +2795,7 @@
  				if (!perm && same_sid(usid, adminsid)) {
  					uid = find_tenant(scx, securattr);
  					if (uid)
-@@ -3313,15 +5477,28 @@
+@@ -3313,29 +5477,165 @@
  				}
  				if (test_nino_flag(ni, v3_Extensions)
  				    && (perm >= 0)) {
@@ -2806,28 +2806,31 @@
  					enter_cache(scx, ni, uid,
  							gid, perm);
 +#endif
- 				}
++				}
 +#if POSIXACLS
 +				if (pxdesc) {
 +					perm = access_check_posix(scx,pxdesc,request,uid,gid);
 +					free(pxdesc);
 +				}
 +#endif
- 				free(securattr);
- 			} else {
- 				perm = -1;
- 				uid = gid = 0;
- 			}
- 		}
++				free(securattr);
++			} else {
++				perm = -1;
++				uid = gid = 0;
++			}
++		}
 +#if POSIXACLS
 +#else
- 		if (perm >= 0) {
- 			if (uid == scx->uid)
- 				perm &= 07700;
-@@ -3332,10 +5509,133 @@
- 				else
- 					perm &= 07007;
- 		}
++		if (perm >= 0) {
++			if (uid == scx->uid)
++				perm &= 07700;
++			else
++				if ((gid == scx->gid)
++				   || groupmember(scx, scx->uid, gid))
++					perm &= 07070;
++				else
++					perm &= 07007;
++		}
 +#endif
 +	}
 +	return (perm);
@@ -2910,8 +2913,8 @@
 +					if (pxdesc->tagsset & POSIX_ACL_EXTENSIONS)
 +					enter_cache(scx, ni, uid,
 +							gid, pxdesc);
-+				}
-+				free(securattr);
+ 				}
+ 				free(securattr);
 +			} else
 +				pxdesc = (struct POSIX_SECURITY*)NULL;
 +		}
@@ -2940,11 +2943,24 @@
 +						errno = ENOSPC;
 +					}
 +				}
-+			} else {
+ 			} else {
+-				perm = -1;
+-				uid = gid = 0;
 +				outsize = 0;
 +				errno = EIO;
 +				ntfs_log_error("Invalid Posix ACL built\n");
-+			}
+ 			}
+-		}
+-		if (perm >= 0) {
+-			if (uid == scx->uid)
+-				perm &= 07700;
+-			else
+-				if ((gid == scx->gid)
+-				   || groupmember(scx, scx->uid, gid))
+-					perm &= 07070;
+-				else
+-					perm &= 07007;
+-		}
 +			if (!cached)
 +				free(pxdesc);
 +		} else
@@ -3258,24 +3274,24 @@
  {
  	int res;
  	const struct CACHED_SECURID *cached;
-@@ -3523,8 +6067,17 @@
- 		wanted.gid = gid;
- 		wanted.dmode = mode & 07777;
- 		if (isdir) wanted.dmode |= 0x10000;
+@@ -3522,8 +6066,17 @@
+ 	wanted.gid = gid;
+ 	wanted.dmode = mode & 07777;
+ 	if (isdir) wanted.dmode |= 0x10000;
 +#if POSIXACLS
-+		wanted.variable = (void*)pxdesc;
-+		if (pxdesc)
-+			wanted.varsize = sizeof(struct POSIX_SECURITY)
-+				+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
-+		else
-+			wanted.varsize = 0;
++	wanted.variable = (void*)pxdesc;
++	if (pxdesc)
++		wanted.varsize = sizeof(struct POSIX_SECURITY)
++			+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
++	else
++		wanted.varsize = 0;
 +#else
- 		wanted.variable = (void*)NULL;
- 		wanted.varsize = 0;
+ 	wanted.variable = (void*)NULL;
+ 	wanted.varsize = 0;
 +#endif
+ 	if (test_nino_flag(ni, v3_Extensions)) {
  		cached = (const struct CACHED_SECURID*)ntfs_fetch_cache(
  				scx->vol->securid_cache, GENERIC(&wanted),
- 				(cache_compare)compare);
 @@ -3548,8 +6101,17 @@
  				uid, gid);
  			usid = gsid = adminsid;
@@ -3432,7 +3448,7 @@
 +	BOOL isdir;
 +	int pxsize;
 +	const struct POSIX_SECURITY *oldpxdesc;
-+	struct POSIX_SECURITY *newpxdesc;
++	struct POSIX_SECURITY *newpxdesc = (struct POSIX_SECURITY*)NULL;
 +#endif
  
  	/* get the current owner, either from cache or from old attribute  */
@@ -3474,7 +3490,7 @@
  			free(oldattr);
  		} else
  			res = -1;
-@@ -3643,7 +6348,18 @@
+@@ -3643,7 +6348,17 @@
  			if (processuid && (gid != scx->gid)
  			    && !groupmember(scx, scx->uid, gid))
  				mode &= ~S_ISGID;
@@ -3483,7 +3499,6 @@
 +				newpxdesc->mode = mode;
 +				res = ntfs_set_owner_mode(scx, ni, uid, gid,
 +					mode, newpxdesc);
-+				free(newpxdesc);
 +			} else
 +				res = ntfs_set_owner_mode(scx, ni, uid, gid,
 +					mode, newpxdesc);
@@ -3493,7 +3508,17 @@
  		} else {
  			errno = EPERM;
  			res = -1;	/* neither owner nor root */
-@@ -3759,7 +6475,11 @@
+@@ -3657,6 +6372,9 @@
+ 		res = -1;
+ 		errno = EIO;
+ 	}
++#if POSIXACLS
++	if (newpxdesc) free(newpxdesc);
++#endif
+ 	return (res ? -1 : 0);
+ }
+ 
+@@ -3759,7 +6477,11 @@
  	if (!scx->usermapping || !scx->uid)
  		allow = 1;
  	else {
@@ -3506,7 +3531,7 @@
  		if (perm >= 0) {
  			res = EACCES;
  			switch (accesstype) {
-@@ -3880,6 +6600,10 @@
+@@ -3880,6 +6602,10 @@
  	mode_t mode;
  	int perm;
  	int res;
@@ -3517,7 +3542,7 @@
  
  	res = 0;
  	/* get the current owner and mode from cache or security attributes */
-@@ -3889,10 +6613,23 @@
+@@ -3889,10 +6615,23 @@
  		fileuid = cached->uid;
  		filegid = cached->gid;
  		mode = cached->mode;
@@ -3541,7 +3566,7 @@
  		oldattr = getsecurityattr(scx->vol, path, ni);
  		if (oldattr) {
  			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
-@@ -3905,6 +6642,21 @@
+@@ -3905,6 +6644,21 @@
  			usid = (const SID*)
  				&oldattr[le32_to_cpu(phead->owner)];
  #endif
@@ -3563,7 +3588,7 @@
  			mode = perm = build_permissions(oldattr,
  					 usid, gsid, ni);
  			if (perm >= 0) {
-@@ -3912,6 +6664,7 @@
+@@ -3912,6 +6666,7 @@
  				filegid = findgroup(scx,gsid);
  			} else
  				res = -1;
@@ -3571,7 +3596,7 @@
  			free(oldattr);
  		} else
  			res = -1;
-@@ -3933,11 +6686,19 @@
+@@ -3933,11 +6688,19 @@
                          /* unless request originated by root */
  			if (uid && (fileuid != uid))
  				mode &= 01777;
