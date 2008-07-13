@@ -4347,7 +4347,7 @@ retry:
 		switch (err) {
 			case -1: return -1;
 			case -2: goto retry;
-			case -3: goto put_err_out;
+			case -3: err = errno; goto put_err_out;
 		}
 
 		/* Get the size for the rest of mapping pairs array. */
