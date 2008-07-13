@@ -1433,10 +1433,9 @@ int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
 	vol->flags = c->flags = flags & VOLUME_FLAGS_MASK;
 	/* Write them to disk. */
 	ntfs_inode_mark_dirty(vol->vol_ni);
-	if (ntfs_inode_sync(vol->vol_ni)) {
-		ntfs_log_perror("Error writing $Volume");
+	if (ntfs_inode_sync(vol->vol_ni))
 		goto err_out;
-	}
+
 	ret = 0; /* success */
 err_out:
 	ntfs_attr_put_search_ctx(ctx);
