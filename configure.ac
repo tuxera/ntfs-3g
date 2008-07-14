@@ -39,42 +39,42 @@ AM_MAINTAINER_MODE
 # Options
 AC_ARG_ENABLE(
 	[debug],
-	[AC_HELP_STRING([--enable-debug], [enable debugging code and output])],
+	[AS_HELP_STRING([--enable-debug],[enable debugging code and output])],
 	,
 	[enable_debug="no"]
 )
 
 AC_ARG_ENABLE(
 	[warnings],
-	[AC_HELP_STRING([--enable-warnings], [enable lots of compiler warnings])],
+	[AS_HELP_STRING([--enable-warnings],[enable lots of compiler warnings])],
 	,
 	[enable_warnings="no"]
 )
 
 AC_ARG_ENABLE(
 	[pedantic],
-	[AC_HELP_STRING([--enable-pedantic], [enable compile pedantic mode])],
+	[AS_HELP_STRING([--enable-pedantic],[enable compile pedantic mode])],
 	,
 	[enable_pedantic="no"]
 )
 
 AC_ARG_ENABLE(
 	[really-static],
-	[AC_HELP_STRING([--enable-really-static], [create fully static binaries])],
+	[AS_HELP_STRING([--enable-really-static],[create fully static binaries])],
 	,
 	[enable_really_static="no"]
 )
 
 AC_ARG_ENABLE(
 	[library],
-	[AC_HELP_STRING([--disable-library], [do not install libntfs-3g but link it into ntfs-3g])],
+	[AS_HELP_STRING([--disable-library],[do not install libntfs-3g but link it into ntfs-3g])],
 	,
 	[enable_library="yes"]
 )
 
 AC_ARG_ENABLE(
 	[mount-helper],
-	[AC_HELP_STRING([--enable-mount-helper], [install mount helper @<:@default=enabled for linux@:>@])],
+	[AS_HELP_STRING([--enable-mount-helper],[install mount helper @<:@default=enabled for linux@:>@])],
 	,
 	[
 		case "${target_os}" in
@@ -86,28 +86,28 @@ AC_ARG_ENABLE(
 
 AC_ARG_ENABLE(
 	[ldconfig],
-	[AC_HELP_STRING([--disable-ldconfig], [do not update dynamic linker cache using ldconfig])],
+	[AS_HELP_STRING([--disable-ldconfig],[do not update dynamic linker cache using ldconfig])],
 	,
 	[enable_ldconfig="yes"]
 )
 
 AC_ARG_ENABLE(
 	[ldscript],
-	[AC_HELP_STRING([--enable-ldscript], [use ldscript instead of .so symlink])],
+	[AS_HELP_STRING([--enable-ldscript],[use ldscript instead of .so symlink])],
 	,
 	[enable_ldscript="no"]
 )
 
 AC_ARG_ENABLE(
 	[mtab],
-	[AC_HELP_STRING([--disable-mtab], [disable and ignore usage of /etc/mtab])],
+	[AS_HELP_STRING([--disable-mtab],[disable and ignore usage of /etc/mtab])],
 	,
 	[enable_mtab="yes"]
 )
 
 AC_ARG_ENABLE(
 	[device-default-io-ops],
-	[AC_HELP_STRING([--disable-device-default-io-ops], [install default IO ops])],
+	[AS_HELP_STRING([--disable-device-default-io-ops],[install default IO ops])],
 	,
 	[enable_device_default_io_ops="yes"]
 )
@@ -149,7 +149,7 @@ case "${target_os}" in
 linux*)
 	AC_ARG_WITH(
 		[fuse],
-		[AC_HELP_STRING([--with-fuse=<internal|external>], [Select FUSE library: internal or external @<:@default=internal@:>@])],
+		[AS_HELP_STRING([--with-fuse=<internal|external>],[Select FUSE library: internal or external @<:@default=internal@:>@])],
 		,
 		[with_fuse="internal"]
 	)
