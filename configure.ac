@@ -22,7 +22,7 @@
 # Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # Autoconf
-AC_PREREQ([2.59])
+AC_PREREQ(2.59)
 AC_INIT([ntfs-3g],[1.2712],[ntfs-3g-devel@lists.sf.net])
 LIBNTFS_3G_VERSION="34"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
@@ -33,7 +33,7 @@ AC_CANONICAL_TARGET
 
 # Automake
 AM_INIT_AUTOMAKE([${PACKAGE_NAME}], [${PACKAGE_VERSION}])
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AM_MAINTAINER_MODE
 
 # Options
