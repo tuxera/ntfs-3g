@@ -2221,7 +2221,7 @@ static void setup_logging(char *parsed_options)
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
-	ntfs_log_info("Cmdline options: %s\n", opts.options);
+	ntfs_log_info("Cmdline options: %s\n", opts.options ? opts.options : "");
 	ntfs_log_info("Mount options: %s\n", parsed_options);
 }
 
