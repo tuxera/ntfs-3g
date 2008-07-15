@@ -79,7 +79,6 @@ ntfs_volume *ntfs_volume_alloc(void)
 	return ntfs_calloc(sizeof(ntfs_volume));
 }
 
-
 static void ntfs_attr_free(ntfs_attr **na)
 {
 	if (na && *na) {

@@ -185,7 +185,8 @@ struct _ntfs_attr {
 };
 
 /**
- * enum ntfs_attr_state_bits - bits for the state field in the ntfs_attr structure
+ * enum ntfs_attr_state_bits - bits for the state field in the ntfs_attr
+ * structure
  */
 typedef enum {
 	NA_Initialized,		/* 1: structure is initialized. */

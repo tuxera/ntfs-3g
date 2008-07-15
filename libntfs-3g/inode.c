@@ -262,6 +262,8 @@ err_out:
  * If it is an extent inode, we disconnect it from its base inode before we
  * destroy it.
  *
+ * It is OK to pass NULL to this function, it is just noop in this case.
+ *
  * Return 0 on success or -1 on error with errno set to the error code. On
  * error, @ni has not been freed. The user should attempt to handle the error
  * and call ntfs_inode_close() again. The following error codes are defined:

@@ -500,7 +500,7 @@ void ntfs_attr_close(ntfs_attr *na)
  * @na:		ntfs attribute for which to map (part of) a runlist
  * @vcn:	map runlist part containing this vcn
  *
- * Map the part of a runlist containing the @vcn of an the ntfs attribute @na.
+ * Map the part of a runlist containing the @vcn of the ntfs attribute @na.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
@@ -543,8 +543,8 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
  * ntfs_attr_map_whole_runlist - map the whole runlist of an ntfs attribute
  * @na:		ntfs attribute for which to map the runlist
  *
- * Map the whole runlist of an the ntfs attribute @na.  For an attribute made
- * up of only one attribute extent this is the same as calling
+ * Map the whole runlist of the ntfs attribute @na.  For an attribute made up
+ * of only one attribute extent this is the same as calling
  * ntfs_attr_map_runlist(na, 0) but for an attribute with multiple extents this
  * will map the runlist fragments from each of the extents thus giving access
  * to the entirety of the disk allocation of an attribute.
@@ -2992,7 +2992,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 		NInoAttrListClearDirty(base_ni);
 	}
 
-	/* Free MFT record, if it isn't contain attributes. */
+	/* Free MFT record, if it doesn't contain attributes. */
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) -
 			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(ni->vol, ni)) {
@@ -3254,7 +3254,7 @@ rm_attr_err_out:
 			(ATTR_RECORD*)((u8*)attr_ni->mrec + offset), 0))
 		ntfs_log_perror("Failed to remove just added attribute #2");
 free_err_out:
-	/* Free MFT record, if it isn't contain attributes. */
+	/* Free MFT record, if it doesn't contain attributes. */
 	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
 			le16_to_cpu(attr_ni->mrec->attrs_offset) == 8)
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni))
