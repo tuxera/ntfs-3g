@@ -67,13 +67,6 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
-	[library],
-	[AS_HELP_STRING([--disable-library],[do not install libntfs-3g but link it into ntfs-3g])],
-	,
-	[enable_library="yes"]
-)
-
-AC_ARG_ENABLE(
 	[mount-helper],
 	[AS_HELP_STRING([--enable-mount-helper],[install mount helper @<:@default=enabled for linux@:>@])],
 	,
@@ -86,6 +79,13 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[ldscript],
+	[AS_HELP_STRING([--enable-ldscript],[use ldscript instead of .so symlink])],
+	,
+	[enable_ldscript="no"]
+)
+
+AC_ARG_ENABLE(
 	[ldconfig],
 	[AS_HELP_STRING([--disable-ldconfig],[do not update dynamic linker cache using ldconfig])],
 	,
@@ -93,10 +93,10 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
-	[ldscript],
-	[AS_HELP_STRING([--enable-ldscript],[use ldscript instead of .so symlink])],
+	[library],
+	[AS_HELP_STRING([--disable-library],[do not install libntfs-3g but link it into ntfs-3g])],
 	,
-	[enable_ldscript="no"]
+	[enable_library="yes"]
 )
 
 AC_ARG_ENABLE(
