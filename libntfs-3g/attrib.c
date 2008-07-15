@@ -3256,7 +3256,7 @@ rm_attr_err_out:
 free_err_out:
 	/* Free MFT record, if it isn't contain attributes. */
 	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
-			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8)
+			le16_to_cpu(attr_ni->mrec->attrs_offset) == 8)
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni))
 			ntfs_log_perror("Failed to free MFT record");
 err_out:
