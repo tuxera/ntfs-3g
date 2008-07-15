@@ -4903,7 +4903,7 @@ rollback:
 		ntfs_log_perror("Couldn't truncate runlist. Rollback failed");
 	} else {
 		/* Prepare to mapping pairs update. */
-		na->allocated_size = org_alloc_size << vol->cluster_size_bits;
+		na->allocated_size = org_alloc_size;
 		/* Restore mapping pairs. */
 		if (ntfs_attr_update_mapping_pairs(na, 0 /*na->allocated_size >>
 					vol->cluster_size_bits*/)) {
