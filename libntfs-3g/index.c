@@ -1421,14 +1421,16 @@ static int ntfs_ib_split(ntfs_index_context *icx, INDEX_BLOCK *ib)
 
 static int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie)
 {
-	char *fn;
 	INDEX_HEADER *ih;
 	int allocated_size, new_size;
 	int ret = STATUS_ERROR;
 	
+#ifdef DEBUG
+	char *fn;
 	fn = ntfs_ie_filename_get(ie);
 	ntfs_log_trace("file: '%s'\n", fn);
 	ntfs_attr_name_free(&fn);
+#endif
 	
 	while (1) {
 				
