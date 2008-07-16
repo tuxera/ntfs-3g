@@ -16,10 +16,8 @@ libfuse_lite_la_SOURCES =	\
 	fuse_i.h 		\
 	fuse_kern_chan.c 	\
 	fuse_loop.c 		\
-	fuse_loop_mt.c 		\
 	fuse_lowlevel.c 	\
 	fuse_misc.h 		\
-	fuse_mt.c 		\
 	fuse_opt.c 		\
 	fuse_session.c 		\
 	fuse_signals.c 		\

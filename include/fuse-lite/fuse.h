@@ -426,36 +426,6 @@ struct fuse_context {
     void *private_data;
 };
 
-/**
- * Main function of FUSE.
- *
- * This is for the lazy.  This is all that has to be called from the
- * main() function.
- *
- * This function does the following:
- *   - parses command line options (-d -s and -h)
- *   - passes relevant mount options to the fuse_mount()
- *   - installs signal handlers for INT, HUP, TERM and PIPE
- *   - registers an exit handler to unmount the filesystem on program exit
- *   - creates a fuse handle
- *   - registers the operations
- *   - calls either the single-threaded or the multi-threaded event loop
- *
- * Note: this is currently implemented as a macro.
- *
- * @param argc the argument counter passed to the main() function
- * @param argv the argument vector passed to the main() function
- * @param op the file system operation
- * @param user_data user data supplied in the context during the init() method
- * @return 0 on success, nonzero on failure
- */
-/*
-int fuse_main(int argc, char *argv[], const struct fuse_operations *op,
-              void *user_data);
-*/
-#define fuse_main(argc, argv, op, user_data) \
-            fuse_main_real(argc, argv, op, sizeof(*(op)), user_data)
-
 /* ----------------------------------------------------------- *
  * More detailed API                                           *
  * ----------------------------------------------------------- */
@@ -505,21 +475,6 @@ int fuse_loop(struct fuse *f);
 void fuse_exit(struct fuse *f);
 
 /**
- * FUSE event loop with multiple threads
- *
- * Requests from the kernel are processed, and the appropriate
- * operations are called.  Request are processed in parallel by
- * distributing them between multiple threads.
- *
- * Calling this function requires the pthreads library to be linked to
- * the application.
- *
- * @param f the FUSE handle
- * @return 0 if no error occurred, -1 otherwise
- */
-int fuse_loop_mt(struct fuse *f);
-
-/**
  * Get the current context
  *
  * The context is only valid for the duration of a filesystem
@@ -536,14 +491,6 @@ struct fuse_context *fuse_get_context(void);
  * @return 1 if the request has been interrupted, 0 otherwise
  */
 int fuse_interrupted(void);
-
-/**
- * The real main function
- *
- * Do not call this directly, use fuse_main()
- */
-int fuse_main_real(int argc, char *argv[], const struct fuse_operations *op,
-                   size_t op_size, void *user_data);
 
 /*
  * Stacking API

@@ -19,15 +19,11 @@ struct fuse_cmd {
     struct fuse_chan *ch;
 };
 
-struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
-                             const struct fuse_operations *op,
-                             size_t op_size, void *user_data);
-
 struct fuse_chan *fuse_kern_chan_new(int fd);
 
-struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
-                                       const struct fuse_lowlevel_ops *op,
-                                       size_t op_size, void *userdata);
+struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
+				       const struct fuse_lowlevel_ops *op,
+				       size_t op_size, void *userdata);
 
 void fuse_kern_unmount(const char *mountpoint, int fd);
 int fuse_kern_mount(const char *mountpoint, struct fuse_args *args);

@@ -1244,13 +1244,8 @@ static void fuse_ll_destroy(void *data)
     free(f);
 }
 
-/*
- * always call fuse_lowlevel_new_common() internally, to work around a
- * misfeature in the FreeBSD runtime linker, which links the old
- * version of a symbol to internal references.
- */
-struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
-                                       const struct fuse_lowlevel_ops *op,
+struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
+				       const struct fuse_lowlevel_ops *op,
                                        size_t op_size, void *userdata)
 {
     struct fuse_ll *f;
@@ -1295,13 +1290,5 @@ struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
     free(f);
  out:
     return NULL;
-}
-
-
-struct fuse_session *fuse_lowlevel_new(struct fuse_args *args,
-                                       const struct fuse_lowlevel_ops *op,
-                                       size_t op_size, void *userdata)
-{
-    return fuse_lowlevel_new_common(args, op, op_size, userdata);
 }
 

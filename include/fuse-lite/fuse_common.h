@@ -134,38 +134,6 @@ struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args);
 void fuse_unmount(const char *mountpoint, struct fuse_chan *ch);
 
 /**
- * Parse common options
- *
- * The following options are parsed:
- *
- *   '-f'            foreground
- *   '-d' '-odebug'  foreground, but keep the debug option
- *   '-s'            single threaded
- *   '-h' '--help'   help
- *   '-ho'           help without header
- *   '-ofsname=..'   file system name, if not present, then set to the program
- *                   name
- *
- * All parameters may be NULL
- *
- * @param args argument vector
- * @param mountpoint the returned mountpoint, should be freed after use
- * @param multithreaded set to 1 unless the '-s' option is present
- * @param foreground set to 1 if one of the relevant options is present
- * @return 0 on success, -1 on failure
- */
-int fuse_parse_cmdline(struct fuse_args *args, char **mountpoint,
-                       int *multithreaded, int *foreground);
-
-/**
- * Go into the background
- *
- * @param foreground if true, stay in the foreground
- * @return 0 on success, -1 on failure
- */
-int fuse_daemonize(int foreground);
-
-/**
  * Get the version of the library
  *
  * @return the version

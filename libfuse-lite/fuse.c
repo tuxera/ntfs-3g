@@ -2677,9 +2677,9 @@ struct fuse_fs *fuse_fs_new(const struct fuse_operations *op, size_t op_size,
     return fs;
 }
 
-struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
-                             const struct fuse_operations *op,
-                             size_t op_size, void *user_data)
+struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
+		      const struct fuse_operations *op, size_t op_size,
+		      void *user_data)
 {
     struct fuse *f;
     struct node *root;
@@ -2726,7 +2726,7 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
     f->conf.readdir_ino = 1;
 #endif
 
-    f->se = fuse_lowlevel_new_common(args, &llop, sizeof(llop), f);
+    f->se = fuse_lowlevel_new(args, &llop, sizeof(llop), f);
     if (f->se == NULL) {
         goto out_free_fs;
     }
@@ -2801,13 +2801,6 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
     fuse_delete_context_key();
  out:
     return NULL;
-}
-
-struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
-                      const struct fuse_operations *op, size_t op_size,
-                      void *user_data)
-{
-    return fuse_new_common(ch, args, op, op_size, user_data);
 }
 
 void fuse_destroy(struct fuse *f)
