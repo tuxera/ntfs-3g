@@ -27,12 +27,19 @@
 #include "config.h"
 #endif
 
-#ifdef WINDOWS
-
 #ifndef HAVE_FFS
-#define HAVE_FFS
 extern int ffs(int i);
 #endif /* HAVE_FFS */
+
+#ifndef HAVE_DAEMON
+extern int daemon(int nochdir, int noclose);
+#endif /* HAVE_DAEMON */
+
+#ifndef HAVE_STRSEP
+extern char *strsep(char **stringp, const char *delim);
+#endif /* HAVE_STRSEP */
+
+#ifdef WINDOWS
 
 #define HAVE_STDIO_H		/* mimic config.h */
 #define HAVE_STDARG_H

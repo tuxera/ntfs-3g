@@ -74,6 +74,14 @@
 #include <sys/xattr.h>
 #endif
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+
+#include "compat.h"
 #include "attrib.h"
 #include "inode.h"
 #include "volume.h"
@@ -2287,15 +2295,17 @@ int main(int argc, char *argv[])
 	if (drop_privs())
 		goto err_out;
 #endif	
-	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
 		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
+
+#if !(defined(__sun) && defined (__SVR4))
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
+#endif
 
 #ifndef FUSE_INTERNAL
 	if (getuid() && ctx->blkdev) {
