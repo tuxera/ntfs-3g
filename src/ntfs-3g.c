@@ -735,17 +735,17 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		goto exit;
 	}
 	while (size) {
-		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < (s64)size)
+		s64 ret = ntfs_attr_pwrite(na, offset, size, buf);
+		if (0 <= ret && ret < (s64)size)
 			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
-				"%lld <> %d)", (long long)offset, (long long)size, res);
-		if (res <= 0) {
+				"%lld <> %d)", (long long)offset, (long long)size, ret);
+		if (ret <= 0) {
 			res = -errno;
 			goto exit;
 		}
-		size -= res;
-		offset += res;
-		total += res;
+		size   -= ret;
+		offset += ret;
+		total  += ret;
 	}
 	res = total;
 	if (res > 0)
