@@ -351,17 +351,15 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	int res = 0;
 	ntfs_inode *ni;
 	ntfs_attr *na;
-	ntfs_volume *vol;
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
 
-	vol = ctx->vol;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
 	memset(stbuf, 0, sizeof(struct stat));
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -595,15 +593,13 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 		struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_fuse_fill_context_t fill_ctx;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	s64 pos = 0;
 	int err = 0;
 
-	vol = ctx->vol;
 	fill_ctx.filler = filler;
 	fill_ctx.buf = buf;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
@@ -618,7 +614,6 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 static int ntfs_fuse_open(const char *org_path,
 		struct fuse_file_info *fi __attribute__((unused)))
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na;
 	int res = 0;
@@ -629,8 +624,7 @@ static int ntfs_fuse_open(const char *org_path,
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
@@ -711,7 +705,6 @@ exit:
 static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	char *path = NULL;
@@ -723,8 +716,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		res = stream_name_len;
 		goto out;
 	}
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -765,7 +757,6 @@ out:
 
 static int ntfs_fuse_truncate(const char *org_path, off_t size)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	int res;
@@ -776,8 +767,7 @@ static int ntfs_fuse_truncate(const char *org_path, off_t size)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		goto exit;
 
@@ -1306,17 +1296,13 @@ static const int nf_ns_xattr_preffix_len = 5;
 static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	char *to = list;
 	int ret = 0;
 
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
@@ -1370,17 +1356,13 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 				char *value, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	char *to = value;
 	int ret = 0;
 
 	if (strcmp(name, "ntfs.streams.list"))
 		return -EOPNOTSUPP;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
@@ -1436,7 +1418,6 @@ exit:
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
@@ -1449,10 +1430,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
@@ -1486,7 +1464,6 @@ exit:
 static int ntfs_fuse_setxattr(const char *path, const char *name,
 				const char *value, size_t size, int flags)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
@@ -1497,10 +1474,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -EACCES;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
@@ -1544,7 +1518,6 @@ exit:
 
 static int ntfs_fuse_removexattr(const char *path, const char *name)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfschar *lename = NULL;
 	int res = 0, lename_len;
@@ -1555,10 +1528,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
