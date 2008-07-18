@@ -1,15 +1,15 @@
 /*
-    FUSE: Filesystem in Userspace
-    Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+  FUSE: Filesystem in Userspace
+  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
-    This program can be distributed under the terms of the GNU LGPLv2.
-    See the file COPYING.LIB.
+  This program can be distributed under the terms of the GNU LGPLv2.
+  See the file COPYING.LIB.
 */
 
 /** @file */
 
 #if !defined(_FUSE_H_) && !defined(_FUSE_LOWLEVEL_H_)
-#error "Never include <fuse_common.h> directly; use <fuse.h> or <fuse_lowlevel.h instead."
+#error "Never include <fuse_common.h> directly; use <fuse.h> or <fuse_lowlevel.h> instead."
 #endif
 
 #ifndef _FUSE_COMMON_H_
@@ -37,38 +37,38 @@ extern "C" {
  * Changed in version 2.5
  */
 struct fuse_file_info {
-    /** Open flags.  Available in open() and release() */
-    int flags;
+	/** Open flags.	 Available in open() and release() */
+	int flags;
 
-    /** Old file handle, don't use */
-    unsigned long fh_old;
+	/** Old file handle, don't use */
+	unsigned long fh_old;
 
-    /** In case of a write operation indicates if this was caused by a
-        writepage */
-    int writepage;
+	/** In case of a write operation indicates if this was caused by a
+	    writepage */
+	int writepage;
 
-    /** Can be filled in by open, to use direct I/O on this file.
-        Introduced in version 2.4 */
-    unsigned int direct_io : 1;
+	/** Can be filled in by open, to use direct I/O on this file.
+	    Introduced in version 2.4 */
+	unsigned int direct_io : 1;
 
-    /** Can be filled in by open, to indicate, that cached file data
-        need not be invalidated.  Introduced in version 2.4 */
-    unsigned int keep_cache : 1;
+	/** Can be filled in by open, to indicate, that cached file data
+	    need not be invalidated.  Introduced in version 2.4 */
+	unsigned int keep_cache : 1;
 
-    /** Indicates a flush operation.  Set in flush operation, also
-        maybe set in highlevel lock operation and lowlevel release
-        operation.  Introduced in version 2.6 */
-    unsigned int flush : 1;
+	/** Indicates a flush operation.  Set in flush operation, also
+	    maybe set in highlevel lock operation and lowlevel release
+	    operation.	Introduced in version 2.6 */
+	unsigned int flush : 1;
 
-    /** Padding.  Do not use*/
-    unsigned int padding : 29;
+	/** Padding.  Do not use*/
+	unsigned int padding : 29;
 
-    /** File handle.  May be filled in by filesystem in open().
-        Available in all other file operations */
-    uint64_t fh;
+	/** File handle.  May be filled in by filesystem in open().
+	    Available in all other file operations */
+	uint64_t fh;
 
-    /** Lock owner id.  Available in locking operations and flush */
-    uint64_t lock_owner;
+	/** Lock owner id.  Available in locking operations and flush */
+	uint64_t lock_owner;
 };
 
 /**
@@ -79,36 +79,36 @@ struct fuse_file_info {
  * value must usually be smaller than the indicated value.
  */
 struct fuse_conn_info {
-    /**
-     * Major version of the protocol (read-only)
-     */
-    unsigned proto_major;
+	/**
+	 * Major version of the protocol (read-only)
+	 */
+	unsigned proto_major;
 
-    /**
-     * Minor version of the protocol (read-only)
-     */
-    unsigned proto_minor;
+	/**
+	 * Minor version of the protocol (read-only)
+	 */
+	unsigned proto_minor;
 
-    /**
-     * Is asynchronous read supported (read-write)
-     */
-    unsigned async_read;
+	/**
+	 * Is asynchronous read supported (read-write)
+	 */
+	unsigned async_read;
 
-    /**
-     * Maximum size of the write buffer
-     */
-    unsigned max_write;
+	/**
+	 * Maximum size of the write buffer
+	 */
+	unsigned max_write;
 
-    /**
-     * Maximum readahead
-     */
-    unsigned max_readahead;
+	/**
+	 * Maximum readahead
+	 */
+	unsigned max_readahead;
 
-    /**
-     * For future use.
-     */
-    unsigned reserved[27];
-};
+	/**
+	 * For future use.
+	 */
+	unsigned reserved[27];
+    };
 
 struct fuse_session;
 struct fuse_chan;
@@ -141,13 +141,13 @@ void fuse_unmount(const char *mountpoint, struct fuse_chan *ch);
 int fuse_version(void);
 
 /* ----------------------------------------------------------- *
- * Signal handling                                             *
+ * Signal handling					       *
  * ----------------------------------------------------------- */
 
 /**
  * Exit session on HUP, TERM and INT signals and ignore PIPE signal
  *
- * Stores session in a global variable.  May only be called once per
+ * Stores session in a global variable.	 May only be called once per
  * process until fuse_remove_signal_handlers() is called.
  *
  * @param se the session to exit
