@@ -914,29 +914,7 @@ static int ntfs_fuse_create_stream(const char *path,
 	return res;
 }
 
-static int ntfs_fuse_create_file(const char *org_path, mode_t mode, 
-			struct fuse_file_info *fi __attribute__((unused)))
-{
-	char *path = NULL;
-	ntfschar *stream_name;
-	int stream_name_len;
-	int res;
-
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & S_IFMT, 0, NULL);
-	else
-		res = ntfs_fuse_create_stream(path, stream_name,
-				stream_name_len);
-	free(path);
-	if (stream_name_len)
-		free(stream_name);
-	return res;
-}
-
-static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
+static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -960,6 +938,17 @@ exit:
 	if (stream_name_len)
 		free(stream_name);
 	return res;
+}
+
+static int ntfs_fuse_mknod(const char *path, mode_t mode, dev_t dev)
+{
+	return ntfs_fuse_mknod_common(path, mode, dev);
+}
+
+static int ntfs_fuse_create_file(const char *path, mode_t mode,
+			    struct fuse_file_info *fi __attribute__((unused)))
+{
+	return ntfs_fuse_mknod_common(path, mode, 0);
 }
 
 static int ntfs_fuse_symlink(const char *to, const char *from)
