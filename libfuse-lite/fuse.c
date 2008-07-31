@@ -51,7 +51,6 @@ struct fuse_config {
     int set_gid;
     int direct_io;
     int kernel_cache;
-    int auto_cache;
     int intr;
     int intr_signal;
     int help;
@@ -98,10 +97,6 @@ struct node {
     uint64_t nlookup;
     int open_count;
     int is_hidden;
-    struct timespec stat_updated;
-    struct timespec mtime;
-    off_t size;
-    int cache_valid;
     struct lock *locks;
 };
 
@@ -934,40 +929,6 @@ static int hide_node(struct fuse *f, const char *oldpath,
     return err;
 }
 
-static int mtime_eq(const struct stat *stbuf, const struct timespec *ts)
-{
-    return stbuf->st_mtime == ts->tv_sec && ST_MTIM_NSEC(stbuf) == ts->tv_nsec;
-}
-
-#ifndef CLOCK_MONOTONIC
-#define CLOCK_MONOTONIC CLOCK_REALTIME
-#endif
-
-static void curr_time(struct timespec *now)
-{
-    static clockid_t clockid = CLOCK_MONOTONIC;
-    int res = clock_gettime(clockid, now);
-    if (res == -1 && errno == EINVAL) {
-        clockid = CLOCK_REALTIME;
-        res = clock_gettime(clockid, now);
-    }
-    if (res == -1) {
-        perror("fuse: clock_gettime");
-        abort();
-    }
-}
-
-static void update_stat(struct node *node, const struct stat *stbuf)
-{
-    if (node->cache_valid && (!mtime_eq(stbuf, &node->mtime) ||
-                              stbuf->st_size != node->size))
-        node->cache_valid = 0;
-    node->mtime.tv_sec = stbuf->st_mtime;
-    node->mtime.tv_nsec = ST_MTIM_NSEC(stbuf);
-    node->size = stbuf->st_size;
-    curr_time(&node->stat_updated);
-}
-
 static int lookup_path(struct fuse *f, fuse_ino_t nodeid,
                        const char *name, const char *path,
                        struct fuse_entry_param *e, struct fuse_file_info *fi)
@@ -990,11 +951,6 @@ static int lookup_path(struct fuse *f, fuse_ino_t nodeid,
             e->generation = node->generation;
             e->entry_timeout = f->conf.entry_timeout;
             e->attr_timeout = f->conf.attr_timeout;
-            if (f->conf.auto_cache) {
-                pthread_mutex_lock(&f->lock);
-                update_stat(node, &e->attr);
-                pthread_mutex_unlock(&f->lock);
-            }
             set_stat(f, e->ino, &e->attr);
             if (f->conf.debug)
                 fprintf(stderr, "   NODEID: %lu\n", (unsigned long) e->ino);
@@ -1183,11 +1139,6 @@ static void fuse_lib_getattr(fuse_req_t req, fuse_ino_t ino,
     }
     pthread_rwlock_unlock(&f->tree_lock);
     if (!err) {
-        if (f->conf.auto_cache) {
-            pthread_mutex_lock(&f->lock);
-            update_stat(get_node(f, ino), &buf);
-            pthread_mutex_unlock(&f->lock);
-        }
         set_stat(f, ino, &buf);
         fuse_reply_attr(req, &buf, f->conf.attr_timeout);
     } else
@@ -1249,11 +1200,6 @@ static void fuse_lib_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
     }
     pthread_rwlock_unlock(&f->tree_lock);
     if (!err) {
-        if (f->conf.auto_cache) {
-            pthread_mutex_lock(&f->lock);
-            update_stat(get_node(f, ino), &buf);
-            pthread_mutex_unlock(&f->lock);
-        }
         set_stat(f, ino, &buf);
         fuse_reply_attr(req, &buf, f->conf.attr_timeout);
     } else
@@ -1598,43 +1544,6 @@ static void fuse_lib_create(fuse_req_t req, fuse_ino_t parent,
     pthread_rwlock_unlock(&f->tree_lock);
 }
 
-static double diff_timespec(const struct timespec *t1,
-                            const struct timespec *t2)
-{
-    return (t1->tv_sec - t2->tv_sec) + 
-        ((double) t1->tv_nsec - (double) t2->tv_nsec) / 1000000000.0;
-}
-
-static void open_auto_cache(struct fuse *f, fuse_ino_t ino, const char *path,
-                            struct fuse_file_info *fi)
-{
-    struct node *node;
-
-    pthread_mutex_lock(&f->lock);
-    node = get_node(f, ino);
-    if (node->cache_valid) {
-        struct timespec now;
-
-        curr_time(&now);
-        if (diff_timespec(&now, &node->stat_updated) > f->conf.ac_attr_timeout) {
-            struct stat stbuf;
-            int err;
-            pthread_mutex_unlock(&f->lock);
-            err = fuse_fs_fgetattr(f->fs, path, &stbuf, fi);
-            pthread_mutex_lock(&f->lock);
-            if (!err)
-                update_stat(node, &stbuf);
-            else
-                node->cache_valid = 0;
-        }
-    }
-    if (node->cache_valid)
-        fi->keep_cache = 1;
-
-    node->cache_valid = 1;
-    pthread_mutex_unlock(&f->lock);
-}
-
 static void fuse_lib_open(fuse_req_t req, fuse_ino_t ino,
                           struct fuse_file_info *fi)
 {
@@ -1654,9 +1563,6 @@ static void fuse_lib_open(fuse_req_t req, fuse_ino_t ino,
                 fi->direct_io = 1;
             if (f->conf.kernel_cache)
                 fi->keep_cache = 1;
-
-            if (f->conf.auto_cache)
-                open_auto_cache(f, ino, path, fi);
         }
         fuse_finish_interrupt(f, req, &d);
     }
@@ -2568,8 +2474,6 @@ static const struct fuse_opt fuse_lib_opts[] = {
     FUSE_LIB_OPT("readdir_ino",           readdir_ino, 1),
     FUSE_LIB_OPT("direct_io",             direct_io, 1),
     FUSE_LIB_OPT("kernel_cache",          kernel_cache, 1),
-    FUSE_LIB_OPT("auto_cache",            auto_cache, 1),
-    FUSE_LIB_OPT("noauto_cache",          auto_cache, 0),
     FUSE_LIB_OPT("umask=",                set_mode, 1),
     FUSE_LIB_OPT("umask=%o",              umask, 0),
     FUSE_LIB_OPT("uid=",                  set_uid, 1),
@@ -2594,7 +2498,6 @@ static void fuse_lib_help(void)
 "    -o readdir_ino         try to fill in d_ino in readdir\n"
 "    -o direct_io           use direct I/O\n"
 "    -o kernel_cache        cache files in kernel\n"
-"    -o [no]auto_cache      enable caching based on modification times\n"
 "    -o umask=M             set file permissions (octal)\n"
 "    -o uid=N               set file owner\n"
 "    -o gid=N               set file group\n"

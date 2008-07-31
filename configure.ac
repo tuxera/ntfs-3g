@@ -192,12 +192,6 @@ if test "${with_fuse}" = "internal"; then
 		[LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lpthread"],
 		[AC_MSG_ERROR([Cannot find pthread library])]
 	)
-	AC_CHECK_LIB(
-		[rt],
-		[clock_gettime],
-		[LIBFUSE_LITE_LIBS="${LIBFUSE_LITE_LIBS} -lrt"],
-		[AC_MSG_ERROR([Cannot find rt library])]
-	)
 	AC_DEFINE(
 		[_REENTRANT],
 		[1],
