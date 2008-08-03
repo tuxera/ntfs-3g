@@ -5220,6 +5220,77 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 }
 
 
+/*
+ *		Return the attributes of a file
+ *	This is intended to be similar to GetFileAttributes() from Win32
+ *	in order to facilitate the development of portable tools
+ *
+ *	returns -1 if unsuccessful (Win32 : INVALID_FILE_ATTRIBUTES)
+ *
+ *  The Win32 API is :
+ *
+ *  DWORD WINAPI GetFileAttributes(
+ *   __in  LPCTSTR lpFileName
+ *  );
+ */
+
+int ntfs_get_file_attributes(struct SECURITY_API *scapi, const char *path)
+{
+	ntfs_inode *ni;
+	s32 attrib;
+
+	attrib = -1; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API) && path) {
+		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
+		if (ni) {
+			attrib = ni->flags;
+			ntfs_inode_close(ni);
+		} else
+			errno = ENOENT;
+	} else
+		errno = EINVAL; /* do not clear *psize */
+	return (attrib);
+}
+
+
+/*
+ *		Set attributes to a file or directory
+ *	This is intended to be similar to SetFileAttributes() from Win32
+ *	in order to facilitate the development of portable tools
+ *
+ *	Only a few flags can be set (same list as Win32)
+ *
+ *	returns zero if unsuccessful (following Win32 conventions)
+ *		nonzero if successful
+ *
+ *  The Win32 API is :
+ *
+ *  BOOL WINAPI SetFileAttributes(
+ *    __in  LPCTSTR lpFileName,
+ *    __in  DWORD dwFileAttributes
+ *  );
+ */
+
+BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
+		const char *path, s32 attrib)
+{
+	ntfs_inode *ni;
+	int res;
+
+	res = 0; /* default return */
+	if (scapi && (scapi->magic == MAGIC_API) && path) {
+		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
+		if (ni) {
+			ni->flags = (ni->flags & ~0x31a7) | (attrib & 0x31a7);
+			NInoSetDirty(ni);
+			ntfs_inode_close(ni);
+		} else
+			errno = ENOENT;
+	}
+	return (res);
+}
+
+
 BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 		const char *path, ntfs_filldir_t callback, void *context)
 {
@@ -5338,6 +5409,110 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 	} else
 		errno = EINVAL;
 	return (ret);
+}
+
+/*
+ *		Get the mapped user SID
+ *	A buffer of 40 bytes has to be supplied
+ *
+ *	returns the size of the SID, or zero and errno set if not found
+ */
+
+int ntfs_get_usid(struct SECURITY_API *scapi, uid_t uid, char *buf)
+{
+	const SID *usid;
+	BIGSID defusid;
+	int size;
+
+	size = 0;
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		usid = find_usid(&scapi->security, uid, (SID*)&defusid);
+		if (usid) {
+			size = sid_size(usid);
+			memcpy(buf,usid,size);
+		} else
+			errno = ENODATA;
+	} else
+		errno = EINVAL;
+	return (size);
+}
+
+/*
+ *		Get the mapped group SID
+ *	A buffer of 40 bytes has to be supplied
+ *
+ *	returns the size of the SID, or zero and errno set if not found
+ */
+
+int ntfs_get_gsid(struct SECURITY_API *scapi, gid_t gid, char *buf)
+{
+	const SID *gsid;
+	BIGSID defgsid;
+	int size;
+
+	size = 0;
+	if (scapi && (scapi->magic == MAGIC_API)) {
+		gsid = find_gsid(&scapi->security, gid, (SID*)&defgsid);
+		if (gsid) {
+			size = sid_size(gsid);
+			memcpy(buf,gsid,size);
+		} else
+			errno = ENODATA;
+	} else
+		errno = EINVAL;
+	return (size);
+}
+
+/*
+ *		Get the user mapped to a SID
+ *
+ *	returns the uid, or -1 if not found
+ */
+
+int ntfs_get_user(struct SECURITY_API *scapi, const SID *usid)
+{
+	int uid;
+
+	uid = -1;
+	if (scapi && (scapi->magic == MAGIC_API) && valid_sid(usid)) {
+		if (same_sid(usid,adminsid))
+			uid = 0;
+		else {
+			uid = findowner(&scapi->security, usid);
+			if (!uid) {
+				uid = -1;
+				errno = ENODATA;
+			}
+		}
+	} else
+		errno = EINVAL;
+	return (uid);
+}
+
+/*
+ *		Get the group mapped to a SID
+ *
+ *	returns the uid, or -1 if not found
+ */
+
+int ntfs_get_group(struct SECURITY_API *scapi, const SID *gsid)
+{
+	int gid;
+
+	gid = -1;
+	if (scapi && (scapi->magic == MAGIC_API) && valid_sid(gsid)) {
+		if (same_sid(gsid,adminsid))
+			gid = 0;
+		else {
+			gid = findgroup(&scapi->security, gsid);
+			if (!gid) {
+				gid = -1;
+				errno = ENODATA;
+			}
+		}
+	} else
+		errno = EINVAL;
+	return (gid);
 }
 
 /*
