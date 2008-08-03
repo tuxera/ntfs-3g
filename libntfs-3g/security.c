@@ -4233,11 +4233,10 @@ static struct MAPLIST *getmappingitem(
 			while ((src < *psize)
 			       && (buf[src] != '\n')) {
 				if (dst < LINESZ)
-					item->maptext[dst] = buf[src];
-				dst++;
+					item->maptext[dst++] = buf[src];
 				src++;
 			}
-			if (buf[src] != '\n') {
+			if ((src >= *psize) && (buf[src] != '\n')) {
 				*poffs += *psize;
 				if (ni)
 					*psize = ntfs_local_read(ni,
