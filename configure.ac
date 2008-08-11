@@ -168,10 +168,18 @@ freebsd*)
 	AC_MSG_ERROR([Please see FreeBSD support at http://www.freshports.org/sysutils/fusefs-ntfs])
 	;;
 *)
-	AC_MSG_ERROR([ntfs-3g can be built only under Linux, FreeBSD, Mac OS X, and NetBSD.])
+	AC_MSG_ERROR([ntfs-3g can be built for Linux, FreeBSD, Mac OS X, NetBSD, and Solaris only.])
 	;;
 esac
 AC_MSG_RESULT([${with_fuse}])
+
+case "${target_os}" in
+solaris*)
+	if test "x$GCC" != "xyes" ; then
+		AC_MSG_ERROR([ntfs-3g can be built only with gcc on Solaris. Install it by 'pkg install gcc-dev' and retry.)])
+	fi
+	;;
+esac
 
 if test "${enable_ldscript}" = "yes"; then
 	AC_MSG_CHECKING([Output format])
