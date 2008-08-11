@@ -271,8 +271,10 @@ AC_CHECK_FUNCS([ \
 ])
 AC_SYS_LARGEFILE
 
-# We add -Wall to enable some compiler warnings.
-CFLAGS="${CFLAGS} -Wall"
+if test "$GCC" = "yes" ; then
+	# We add -Wall to enable some compiler warnings.
+	CFLAGS="${CFLAGS} -Wall"
+fi
 
 if test "${enable_pedantic}" = "yes"; then
 	enable_warnings="yes"
