@@ -4236,7 +4236,7 @@ static struct MAPLIST *getmappingitem(
 					item->maptext[dst++] = buf[src];
 				src++;
 			}
-			if ((src >= *psize) && (buf[src] != '\n')) {
+			if (src >= *psize) {
 				*poffs += *psize;
 				if (ni)
 					*psize = ntfs_local_read(ni,
