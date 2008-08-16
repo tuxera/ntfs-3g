@@ -210,6 +210,10 @@ int ntfs_get_file_security(struct SECURITY_API *scapi,
                 char *buf, u32 buflen, u32 *psize);
 int ntfs_set_file_security(struct SECURITY_API *scapi,
 		const char *path, u32 selection, const char *attr);
+int ntfs_get_file_attributes(struct SECURITY_API *scapi,
+		const char *path);
+BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
+		const char *path, s32 attrib);
 BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 		const char *path, ntfs_filldir_t callback, void *context);
 int ntfs_read_sds(struct SECURITY_API *scapi,
@@ -221,5 +225,10 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
                                 int flags);
 BOOL ntfs_leave_file_security(struct SECURITY_API *scx);
+
+int ntfs_get_usid(struct SECURITY_API *scapi, uid_t uid, char *buf);
+int ntfs_get_gsid(struct SECURITY_API *scapi, gid_t gid, char *buf);
+int ntfs_get_user(struct SECURITY_API *scapi, const SID *usid);
+int ntfs_get_group(struct SECURITY_API *scapi, const SID *gsid);
 
 #endif /* defined _NTFS_SECURITY_H */
