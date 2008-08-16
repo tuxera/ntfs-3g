@@ -506,7 +506,7 @@ void ntfs_attr_close(ntfs_attr *na)
  * @na:		ntfs attribute for which to map (part of) a runlist
  * @vcn:	map runlist part containing this vcn
  *
- * Map the part of a runlist containing the @vcn of an the ntfs attribute @na.
+ * Map the part of a runlist containing the @vcn of the ntfs attribute @na.
  *
  * Return 0 on success and -1 on error with errno set to the error code.
  */
@@ -549,8 +549,8 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
  * ntfs_attr_map_whole_runlist - map the whole runlist of an ntfs attribute
  * @na:		ntfs attribute for which to map the runlist
  *
- * Map the whole runlist of an the ntfs attribute @na.  For an attribute made
- * up of only one attribute extent this is the same as calling
+ * Map the whole runlist of the ntfs attribute @na.  For an attribute made up
+ * of only one attribute extent this is the same as calling
  * ntfs_attr_map_runlist(na, 0) but for an attribute with multiple extents this
  * will map the runlist fragments from each of the extents thus giving access
  * to the entirety of the disk allocation of an attribute.
@@ -2998,7 +2998,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 		NInoAttrListClearDirty(base_ni);
 	}
 
-	/* Free MFT record, if it isn't contain attributes. */
+	/* Free MFT record, if it doesn't contain attributes. */
 	if (le32_to_cpu(ctx->mrec->bytes_in_use) -
 			le16_to_cpu(ctx->mrec->attrs_offset) == 8) {
 		if (ntfs_mft_record_free(ni->vol, ni)) {
@@ -3260,9 +3260,9 @@ rm_attr_err_out:
 			(ATTR_RECORD*)((u8*)attr_ni->mrec + offset), 0))
 		ntfs_log_perror("Failed to remove just added attribute #2");
 free_err_out:
-	/* Free MFT record, if it isn't contain attributes. */
+	/* Free MFT record, if it doesn't contain attributes. */
 	if (le32_to_cpu(attr_ni->mrec->bytes_in_use) -
-			le32_to_cpu(attr_ni->mrec->attrs_offset) == 8)
+			le16_to_cpu(attr_ni->mrec->attrs_offset) == 8)
 		if (ntfs_mft_record_free(attr_ni->vol, attr_ni))
 			ntfs_log_perror("Failed to free MFT record");
 err_out:
@@ -4325,7 +4325,7 @@ retry:
 			 */
 			first_lcn = ntfs_rl_vcn_to_lcn(na->rl, stop_vcn);
 			if (first_lcn == LCN_EINVAL) {
-				err = EIO;
+				errno = EIO;
 				ntfs_log_perror("Bad runlist");
 				goto put_err_out;
 			}
@@ -4349,8 +4349,7 @@ retry:
 			continue;
 		}
 
-		err = ntfs_attr_update_meta(a, na, m, ctx);
-		switch (err) {
+		switch (ntfs_attr_update_meta(a, na, m, ctx)) {
 			case -1: return -1;
 			case -2: goto retry;
 			case -3: goto put_err_out;
@@ -4360,7 +4359,6 @@ retry:
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
 								stop_vcn);
 		if (mp_size <= 0) {
-			err = errno;
 			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
 			goto put_err_out;
 		}
@@ -4419,8 +4417,8 @@ retry:
 			if (ntfs_attr_record_resize(m, a,
 					le16_to_cpu(a->mapping_pairs_offset) +
 					mp_size)) {
+				errno = EIO;
 				ntfs_log_perror("Failed to resize attribute");
-				err = EIO;
 				goto put_err_out;
 			}
 		}
@@ -4444,7 +4442,6 @@ retry:
 				stop_vcn, &stop_vcn))
 			finished_build = TRUE;
 		if (!finished_build && errno != ENOSPC) {
-			err = errno;
 			ntfs_log_perror("Failed to build mapping pairs");
 			goto put_err_out;
 		}
@@ -4452,7 +4449,6 @@ retry:
 	}
 	/* Check whether error occurred. */
 	if (errno != ENOENT) {
-		err = errno;
 		ntfs_log_perror("%s: Attribute lookup failed", __FUNCTION__);
 		goto put_err_out;
 	}
@@ -4468,14 +4464,12 @@ retry:
 				continue;
 			/* Remove unused attribute record. */
 			if (ntfs_attr_record_rm(ctx)) {
-				err = errno;
 				ntfs_log_perror("Could not remove unused attr");
 				goto put_err_out;
 			}
 			ntfs_attr_reinit_search_ctx(ctx);
 		}
 		if (errno != ENOENT) {
-			err = errno;
 			ntfs_log_perror("%s: Attr lookup failed", __FUNCTION__);
 			goto put_err_out;
 		}
@@ -4492,14 +4486,12 @@ retry:
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol,
 						na->rl, stop_vcn);
 		if (mp_size <= 0) {
-			err = errno;
 			ntfs_log_perror("%s: get mp size failed", __FUNCTION__);
 			goto put_err_out;
 		}
 		/* Allocate new mft record. */
 		ni = ntfs_mft_record_alloc(na->ni->vol, base_ni);
 		if (!ni) {
-			err = errno;
 			ntfs_log_perror("Could not allocate new MFT record");
 			goto put_err_out;
 		}
@@ -4524,6 +4516,7 @@ retry:
 			ntfs_log_perror("Could not add attribute extent");
 			if (ntfs_mft_record_free(na->ni->vol, ni))
 				ntfs_log_perror("Could not free MFT record");
+			errno = err;
 			goto put_err_out;
 		}
 		a = (ATTR_RECORD*)((u8*)m + err);
@@ -4536,6 +4529,7 @@ retry:
 			ntfs_log_perror("Failed to build MP");
 			if (ntfs_mft_record_free(na->ni->vol, ni))
 				ntfs_log_perror("Couldn't free MFT record");
+			errno = err;
 			goto put_err_out;
 		}
 		a->highest_vcn = cpu_to_sle64(stop_vcn - 1);
@@ -4551,7 +4545,6 @@ out:
 put_err_out:
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
-	errno = err;
 	goto out;
 }
 #undef NTFS_VCN_DELETE_MARK
@@ -4916,7 +4909,7 @@ rollback:
 		ntfs_log_perror("Couldn't truncate runlist. Rollback failed");
 	} else {
 		/* Prepare to mapping pairs update. */
-		na->allocated_size = org_alloc_size << vol->cluster_size_bits;
+		na->allocated_size = org_alloc_size;
 		/* Restore mapping pairs. */
 		if (ntfs_attr_update_mapping_pairs(na, 0 /*na->allocated_size >>
 					vol->cluster_size_bits*/)) {

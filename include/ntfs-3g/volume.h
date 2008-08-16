@@ -239,10 +239,6 @@ struct _ntfs_volume {
 	struct CACHE_HEADER *legacy_cache;
 #endif
 
-	/* Temp: for directory handling */
-	void *private_data;	/* ntfs_dir for . */
-	void *private_bmp1;	/* ntfs_bmp for $MFT/$BITMAP */
-	void *private_bmp2;	/* ntfs_bmp for $Bitmap */
 };
 
 extern ntfs_volume *ntfs_volume_alloc(void);

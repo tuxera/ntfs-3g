@@ -128,12 +128,14 @@ struct _ntfs_inode {
 					   inode of the base mft record. */
 	};
 
-	/* Temp: for directory handling */
-	void *private_data;	/* ntfs_dt containing this inode */
-	int ref_count;
-
 	/* Below fields are valid only for base inode. */
-	s64 data_size;		/* Data size stored in the filename index. */
+
+	/*
+	 * These two fields are used to sync filename index and guaranteed to be
+	 * correct, however value in index itself maybe wrong (windows itself
+	 * do not update them properly).
+	 */
+	s64 data_size;		/* Data size of unnamed DATA attribute. */
 	s64 allocated_size;	/* Allocated size stored in the filename
 				   index. (NOTE: Equal to allocated size of
 				   the unnamed data attribute for normal or
@@ -141,6 +143,11 @@ struct _ntfs_inode {
 				   of the unnamed data attribute for sparse or
 				   compressed files.) */
 
+	/*
+	 * These four fields are copy of relevant fields from
+	 * STANDARD_INFORMATION attribute and used to sync it and FILE_NAME
+	 * attribute in the index.
+	 */
 	time_t creation_time;
 	time_t last_data_change_time;
 	time_t last_mft_change_time;

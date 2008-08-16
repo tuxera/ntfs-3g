@@ -75,6 +75,14 @@
 #include <sys/xattr.h>
 #endif
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+
+#include "compat.h"
 #include "attrib.h"
 #include "inode.h"
 #include "volume.h"
@@ -376,18 +384,16 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	int res = 0;
 	ntfs_inode *ni;
 	ntfs_attr *na;
-	ntfs_volume *vol;
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
 	struct SECURITY_CONTEXT security;
 
-	vol = ctx->vol;
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
 	memset(stbuf, 0, sizeof(struct stat));
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -630,15 +636,13 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 		struct fuse_file_info *fi __attribute__((unused)))
 {
 	ntfs_fuse_fill_context_t fill_ctx;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	s64 pos = 0;
 	int err = 0;
 
-	vol = ctx->vol;
 	fill_ctx.filler = filler;
 	fill_ctx.buf = buf;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	if (ntfs_readdir(ni, &pos, &fill_ctx,
@@ -653,7 +657,6 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 static int ntfs_fuse_open(const char *org_path,
 		struct fuse_file_info *fi)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na;
 	int res = 0;
@@ -666,8 +669,7 @@ static int ntfs_fuse_open(const char *org_path,
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
@@ -765,7 +767,6 @@ exit:
 static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		off_t offset, struct fuse_file_info *fi __attribute__((unused)))
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	char *path = NULL;
@@ -777,8 +778,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		res = stream_name_len;
 		goto out;
 	}
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni) {
 		res = -errno;
 		goto exit;
@@ -789,17 +789,18 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		goto exit;
 	}
 	while (size) {
-		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < (s64)size)
-			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
-				"%lld <> %d)", (long long)offset, (long long)size, res);
-		if (res <= 0) {
+		s64 ret = ntfs_attr_pwrite(na, offset, size, buf);
+		if (0 <= ret && ret < (s64)size)
+			ntfs_log_perror("ntfs_attr_pwrite partial write to '%s'"
+				" (%lld: %lld <> %lld)", path, (long long)offset,
+				(long long)size, ret);
+		if (ret <= 0) {
 			res = -errno;
 			goto exit;
 		}
-		size -= res;
-		offset += res;
-		total += res;
+		size   -= ret;
+		offset += ret;
+		total  += ret;
 	}
 	res = total;
 	if (res > 0)
@@ -822,7 +823,6 @@ out:
 
 static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	int res;
@@ -834,8 +834,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	vol = ctx->vol;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		goto exit;
 
@@ -1166,29 +1165,7 @@ static int ntfs_fuse_create_stream(const char *path,
 	return res;
 }
 
-static int ntfs_fuse_create_file(const char *org_path, mode_t mode, 
-			struct fuse_file_info *fi __attribute__((unused)))
-{
-	char *path = NULL;
-	ntfschar *stream_name;
-	int stream_name_len;
-	int res;
-
-	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
-	if (stream_name_len < 0)
-		return stream_name_len;
-	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode, 0, NULL);
-	else
-		res = ntfs_fuse_create_stream(path, stream_name,
-				stream_name_len);
-	free(path);
-	if (stream_name_len)
-		free(stream_name);
-	return res;
-}
-
-static int ntfs_fuse_mknod(const char *org_path, mode_t mode, dev_t dev)
+static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -1212,6 +1189,17 @@ exit:
 	if (stream_name_len)
 		free(stream_name);
 	return res;
+}
+
+static int ntfs_fuse_mknod(const char *path, mode_t mode, dev_t dev)
+{
+	return ntfs_fuse_mknod_common(path, mode, dev);
+}
+
+static int ntfs_fuse_create_file(const char *path, mode_t mode,
+			    struct fuse_file_info *fi __attribute__((unused)))
+{
+	return ntfs_fuse_mknod_common(path, mode, 0);
 }
 
 static int ntfs_fuse_symlink(const char *to, const char *from)
@@ -1616,17 +1604,13 @@ static const int nf_ns_xattr_preffix_len = 5;
 static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	char *to = list;
 	int ret = 0;
 
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
@@ -1680,17 +1664,13 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 				char *value, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	char *to = value;
 	int ret = 0;
 
 	if (strcmp(name, "ntfs.streams.list"))
 		return -EOPNOTSUPP;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
@@ -1746,7 +1726,6 @@ exit:
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
@@ -1759,10 +1738,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
@@ -1796,7 +1772,6 @@ exit:
 static int ntfs_fuse_setxattr(const char *path, const char *name,
 				const char *value, size_t size, int flags)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
@@ -1807,10 +1782,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -EACCES;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
@@ -1854,7 +1826,6 @@ exit:
 
 static int ntfs_fuse_removexattr(const char *path, const char *name)
 {
-	ntfs_volume *vol;
 	ntfs_inode *ni;
 	ntfschar *lename = NULL;
 	int res = 0, lename_len;
@@ -1865,10 +1836,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
-	vol = ctx->vol;
-	if (!vol)
-		return -ENODEV;
-	ni = ntfs_pathname_to_inode(vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
@@ -2579,7 +2547,7 @@ static void setup_logging(char *parsed_options)
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,
 			ctx->vol->minor_ver);
-	ntfs_log_info("Cmdline options: %s\n", opts.options);
+	ntfs_log_info("Cmdline options: %s\n", opts.options ? opts.options : "");
 	ntfs_log_info("Mount options: %s\n", parsed_options);
 }
 
@@ -2645,15 +2613,17 @@ int main(int argc, char *argv[])
 	if (drop_privs())
 		goto err_out;
 #endif	
-	
 	if (stat(opts.device, &sbuf)) {
 		ntfs_log_perror("Failed to access '%s'", opts.device);
 		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err_out;
 	}
+
+#if !(defined(__sun) && defined (__SVR4))
 	/* Always use fuseblk for block devices unless it's surely missing. */
 	if (S_ISBLK(sbuf.st_mode) && (fstype != FSTYPE_FUSE))
 		ctx->blkdev = TRUE;
+#endif
 
 #ifndef FUSE_INTERNAL
 	if (getuid() && ctx->blkdev) {
