@@ -171,7 +171,7 @@ char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str)
 	}
 	_guid_str = guid_str;
 	if (!_guid_str) {
-		_guid_str = ntfs_malloc(37);
+		_guid_str = (char*)ntfs_malloc(37);
 		if (!_guid_str)
 			return _guid_str;
 	}
@@ -287,7 +287,7 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 		cnt = ntfs_sid_to_mbs_size(sid);
 		if (cnt < 0)
 			return NULL;
-		s = ntfs_malloc(cnt);
+		s = (char*)ntfs_malloc(cnt);
 		if (!s)
 			return s;
 		sid_str = s;
@@ -507,7 +507,7 @@ static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
 
 	res = 0;
 	total = 0;
-	stuff = ntfs_malloc(STUFFSZ);
+	stuff = (char*)ntfs_malloc(STUFFSZ);
 	if (stuff) {
 		memset(stuff, 0, STUFFSZ);
 		do {
@@ -551,7 +551,7 @@ static int entersecurity_data(ntfs_volume *vol,
 
 	res = -1;
 	fullsz = attrsz + gap + sizeof(SECURITY_DESCRIPTOR_HEADER);
-	fullattr = ntfs_malloc(fullsz);
+	fullattr = (char*)ntfs_malloc(fullsz);
 	if (fullattr) {
 			/*
 			 * Clear the gap from previous descriptor
@@ -2860,7 +2860,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	 */
 	sd_len = sizeof(SECURITY_DESCRIPTOR_ATTR) + 2 * (sizeof(SID) + 4) +
 		sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE); 
-	sd = ntfs_calloc(sd_len);
+	sd = (SECURITY_DESCRIPTOR_RELATIVE*)ntfs_calloc(sd_len);
 	if (!sd)
 		return -1;
 	
@@ -3777,7 +3777,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		/* copy header and feed new flags */
 		memcpy(buf,attr,sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)buf;
-		pnhead->control = cpu_to_le16(avail);
+		pnhead->control = const_cpu_to_le16(avail);
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* copy DACL if requested */
