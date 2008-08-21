@@ -2260,20 +2260,23 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			sscanf(val, "%o", &ctx->fmask);
 			ctx->dmask = ctx->fmask;
-			if (ctx->fmask)
-				default_permissions = 1;
+#if !POSIXACLS
+			default_permissions = 1;
+#endif
 		} else if (!strcmp(opt, "fmask")) {
 			if (missing_option_value(val, "fmask"))
 				goto err_exit;
 			sscanf(val, "%o", &ctx->fmask);
-			if (ctx->fmask)
-				default_permissions = 1;
+#if !POSIXACLS
+			default_permissions = 1;
+#endif
 		} else if (!strcmp(opt, "dmask")) {
 			if (missing_option_value(val, "dmask"))
 				goto err_exit;
 			sscanf(val, "%o", &ctx->dmask);
-			if (ctx->dmask)
-				default_permissions = 1;
+#if !POSIXACLS
+			default_permissions = 1;
+#endif
 		} else if (!strcmp(opt, "uid")) {
 			if (missing_option_value(val, "uid"))
 				goto err_exit;
@@ -2822,14 +2825,29 @@ int main(int argc, char *argv[])
 		ctx->vol->secure_flags |= (1 << SECURITY_ADDSECURIDS);
 	if (ctx->staticgrps)
 		ctx->vol->secure_flags |= (1 << SECURITY_STATICGRPS);
+	if (strstr(parsed_options,"default_permissions"))
+		ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
 		/* JPA open $Secure, (whatever NTFS version !) */
 		/* to initialize security data */
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
 		ntfs_log_info("Could not open file $Secure\n");
-	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
-		ntfs_log_info("User mapping built\n");
-	else
-		ntfs_log_info("Failed to build user mapping\n");
+#if POSIXACLS
+	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
+		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+			ntfs_log_info("User mapping built, Posix ACLs not used\n");
+		else
+			ntfs_log_info("User mapping built, Posix ACLs in use\n");
+	} else
+		ntfs_log_error("Failed to build user mapping\n");
+#else
+	if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT)) {
+		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
+			ntfs_log_info("User mapping built\n");
+		else
+			ntfs_log_error("Failed to build user mapping\n");
+	} else
+		ntfs_log_info("No permission checks activated\n");
+#endif
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);
 	
