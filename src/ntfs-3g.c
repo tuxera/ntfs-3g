@@ -707,14 +707,16 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 static int ntfs_fuse_open(const char *org_path,
 		struct fuse_file_info *fi)
 {
-	ntfs_inode *ni;
-	ntfs_attr *na;
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na = NULL;
 	int res = 0;
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+#if POSIXACLS
 	int accesstype;
 	struct SECURITY_CONTEXT security;
+#endif
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -723,7 +725,7 @@ static int ntfs_fuse_open(const char *org_path,
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 		if (na) {
-
+#if POSIXACLS
 			if (ntfs_fuse_fill_security_context(&security)) {
 				if (fi->flags & O_WRONLY)
 					accesstype = S_IWRITE;
@@ -742,16 +744,22 @@ static int ntfs_fuse_open(const char *org_path,
 				if (NAttrEncrypted(na))
 					res = -EACCES;
 			}
-			ntfs_attr_close(na);
+#else
+			if (NAttrEncrypted(na))
+				res = -EACCES;
+#endif
 		} else
 			res = -errno;
-		if (ntfs_inode_close(ni))
-			set_fuse_error(&res);
 	} else
 		res = -errno;
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
+	if (res) {
+		ntfs_attr_close(na);
+		ntfs_inode_close(ni);
+	} else
+		fi->fh = (uintptr_t)na;
 	return res;
 }
 
@@ -879,7 +887,9 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+#if POSIXACLS
 	struct SECURITY_CONTEXT security;
+#endif
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -951,8 +961,10 @@ static int ntfs_fuse_chmod(const char *path,
 		else
 			res = -EOPNOTSUPP;
 	} else {
+#if POSIXACLS
 		   /* parent directory must be executable */
 		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+#endif
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni)
 				res = -errno;
@@ -970,8 +982,10 @@ static int ntfs_fuse_chmod(const char *path,
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			}
+#if POSIXACLS
 		} else
 			res = -errno;
+#endif
 	}
 	return res;
 }
@@ -993,10 +1007,11 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 	} else {
 		res = 0;
 		if (((int)uid != -1) || ((int)gid != -1)) {
-
+#if POSIXACLS
 			   /* parent directory must be executable */
 		
 			if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+#endif
 				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 				if (!ni)
 					res = -errno;
@@ -1009,12 +1024,16 @@ static int ntfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 					if (ntfs_inode_close(ni))
 						set_fuse_error(&res);
 				}
+#if POSIXACLS
 			} else
 				res = -errno;
+#endif
 		}
 	}
 	return (res);
 }
+
+#if POSIXACLS
 
 static int ntfs_fuse_access(const char *path, int type)
 {
@@ -1034,7 +1053,6 @@ static int ntfs_fuse_access(const char *path, int type)
 			res = -EOPNOTSUPP;
 	} else {
 		   /* parent directory must be readable */
-		   /* this is supposed to imply access to outer dirs */
 		if (ntfs_allowed_dir_access(&security,path,S_IREAD)) {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni) {
@@ -1057,6 +1075,8 @@ static int ntfs_fuse_access(const char *path, int type)
 	}
 	return (res);
 }
+
+#endif
 
 static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 		const char *target)
@@ -1099,10 +1119,12 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 		res = -errno;
 		goto exit;
 	}
+#if POSIXACLS
 		/* JPA make sure parent directory is writeable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
 	       || ntfs_allowed_access(&security,dir_path,
 				dir_ni,S_IWRITE + S_IEXEC)) {
+#endif
  /* ! JPA ! did not find where to get umask from ! */
 		if (S_ISDIR(type))
 			perm = typemode & ~ctx->dmask & 0777;
@@ -1184,9 +1206,10 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 		} else
 			res = -errno;
-
+#if POSIXACLS
 	} else
 		res = -errno;
+#endif
 	free(path);
 
 exit:
@@ -1279,8 +1302,10 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	ntfschar *uname = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *path;
-	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len;
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	if (ntfs_fuse_is_named_data_stream(old_path))
 		return -EINVAL; /* n/a for named data streams. */
@@ -1312,12 +1337,15 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 		goto exit;
 	}
 
+#if POSIXACLS
 		/* JPA make sure the parent directories are writeable */
 	if (ntfs_fuse_fill_security_context(&security)
 	   && (!ntfs_allowed_dir_access(&security,old_path,S_IWRITE + S_IEXEC)
 	      || !ntfs_allowed_access(&security,path,dir_ni,S_IWRITE + S_IEXEC)))
 		res = -EACCES;
-	else {
+	else
+#endif
+	{
 		if (ntfs_link(ni, dir_ni, uname, uname_len)) {
 				res = -errno;
 			goto exit;
@@ -1346,8 +1374,10 @@ static int ntfs_fuse_rm(const char *org_path)
 	ntfschar *uname = NULL;
 	ntfs_inode *dir_ni = NULL, *ni;
 	char *path;
-	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len;
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	path = strdup(org_path);
 	if (!path)
@@ -1373,18 +1403,22 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 		goto exit;
 	}
+	
+#if POSIXACLS
 	/* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
 	    || ntfs_allowed_dir_access(&security, org_path,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
-		
+#endif
 		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
 				 uname, uname_len))
 			res = -errno;
 		/* ntfs_delete() always closes ni and dir_ni */
 		ni = dir_ni = NULL;
+#if POSIXACLS
 	} else
 		res = -EACCES;
+#endif
 exit:
 	if (ntfs_inode_close(dir_ni))
 		set_fuse_error(&res);
@@ -1418,8 +1452,10 @@ static int ntfs_fuse_unlink(const char *org_path)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
-	struct SECURITY_CONTEXT security;
 	int res = 0;
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
@@ -1427,6 +1463,7 @@ static int ntfs_fuse_unlink(const char *org_path)
 	if (!stream_name_len)
 		res = ntfs_fuse_rm(path);
 	else {
+#if POSIXACLS
 			/*
 			 * JPA deny unlinking stream if directory is not
 			 * writable and executable (debatable)
@@ -1437,6 +1474,9 @@ static int ntfs_fuse_unlink(const char *org_path)
 			res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
 		else
 			res = -errno;
+#else
+		res = ntfs_fuse_rm_stream(path, stream_name, stream_name_len);
+#endif
 	}
 	free(path);
 	if (stream_name_len)
@@ -1496,8 +1536,10 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 {
 	int ret, len;
 	char *tmp;
-	struct SECURITY_CONTEXT security;
 	const char *ext = ".ntfs-3g-";
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	ntfs_log_trace("Entering\n");
 	
@@ -1511,6 +1553,7 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 		ntfs_log_error("snprintf failed: %d != %d\n", ret, len - 1);
 		ret = -EOVERFLOW;
 	} else {
+#if POSIXACLS
 			/*
 			 * Make sure existing dest can be removed.
 			 * This is only needed if parent directory is
@@ -1524,6 +1567,9 @@ static int ntfs_fuse_rename_existing_dest(const char *old_path, const char *new_
 			ret = ntfs_fuse_safe_rename(old_path, new_path, tmp);
 		else
 			ret = -EACCES;
+#else
+		ret = ntfs_fuse_safe_rename(old_path, new_path, tmp);
+#endif
 	}
 	free(tmp);
 	return 	ret;
