@@ -18,6 +18,7 @@ libntfs_3g_la_LIBADD  = $(top_builddir)/libfuse-lite/libfuse-lite.la
 endif
 
 libntfs_3g_la_SOURCES =	\
+	acls.c 	\
 	attrib.c 	\
 	attrlist.c 	\
 	bitmap.c 	\
@@ -54,15 +55,15 @@ endif
 # And create ldscript or symbolic link from /usr
 install-exec-hook: install-rootlibLTLIBRARIES
 if INSTALL_LIBRARY
-	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
 		$(MV) -f "$(DESTDIR)/$(libdir)"/libntfs-3g.so* "$(DESTDIR)/$(rootlibdir)";  \
 	fi
 if GENERATE_LDSCRIPT
-	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
 		$(install_sh_PROGRAM) "libntfs-3g.script.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
 	fi
 else
-	if [ "$(rootlibdir)" != "$(libdir)" ]; then \
+	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
 		$(LN_S) "$(rootlibdir)/libntfs-3g.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
 	fi
 endif

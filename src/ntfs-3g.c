@@ -256,15 +256,15 @@ static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 	struct fuse_context *fusecontext;
 
 	scx->vol = ctx->vol;
-	scx->usermapping = ctx->security.usermapping;
-	scx->groupmapping = ctx->security.groupmapping;
+	scx->mapping[MAPUSERS] = ctx->security.mapping[MAPUSERS];
+	scx->mapping[MAPGROUPS] = ctx->security.mapping[MAPGROUPS];
 	scx->pseccache = &ctx->seccache;
 	fusecontext = fuse_get_context();
 	scx->uid = fusecontext->uid;
 	scx->gid = fusecontext->gid;
 	scx->tid = fusecontext->pid;
 
-	return (ctx->security.usermapping != (struct MAPPING*)NULL);
+	return (ctx->security.mapping[MAPUSERS] != (struct MAPPING*)NULL);
 }
 
 /**
@@ -1064,7 +1064,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 			 * This is not possible for NTFS 1.x, and we will
 			 * have to build a security attribute later.
 			 */
-		if (!ctx->security.usermapping)
+		if (!ctx->security.mapping[MAPUSERS])
 			securid = 0;
 		else
 			if (ctx->inherit)
@@ -1107,7 +1107,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				 * set the security attribute if a security id
 				 * could not be allocated (eg NTFS 1.x)
 				 */
-			if (ctx->security.usermapping) {
+			if (ctx->security.mapping[MAPUSERS]) {
 #if POSIXACLS
 			   	if (!securid
 				   && ntfs_set_inherited_posix(&security, ni,

@@ -2,6 +2,7 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 headers = \
+	acls.h	\
 	attrib.h	\
 	attrlist.h	\
 	bitmap.h	\

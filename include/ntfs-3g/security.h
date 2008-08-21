@@ -55,7 +55,7 @@ struct CACHED_PERMISSIONS {
 	le32 inh_fileid;
 	le32 inh_dirid;
 #if POSIXACLS
-	void *pxdesc;
+	struct POSIX_SECURITY *pxdesc;
 	unsigned int pxdescsize:16;
 #endif
 	unsigned int mode:12;
@@ -125,10 +125,11 @@ enum {
  *	Security context, needed by most security functions
  */
 
+enum { MAPUSERS, MAPGROUPS, MAPCOUNT } ;
+
 struct SECURITY_CONTEXT {
 	ntfs_volume *vol;
-	struct MAPPING *usermapping;
-	struct MAPPING *groupmapping;
+	struct MAPPING *mapping[MAPCOUNT];
 	struct PERMISSIONS_CACHE **pseccache;
 	uid_t uid; /* uid of user requesting (not the mounter) */
 	gid_t gid; /* gid of user requesting (not the mounter) */
@@ -193,8 +194,6 @@ enum {
 #define POSIX_VERSION 2
 
 #endif
-
-extern const GUID *const zero_guid;
 
 extern BOOL ntfs_guid_is_zero(const GUID *guid);
 extern char *ntfs_guid_to_mbs(const GUID *guid, char *guid_str);
