@@ -567,12 +567,12 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
 		&& phead->owner
 		&& phead->group
-		&& !(phead->owner & cpu_to_le32(3))
-		&& !(phead->group & cpu_to_le32(3))
-		&& !(phead->dacl & cpu_to_le32(3))
-		&& !(phead->sacl & cpu_to_le32(3))
-		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
-		&& valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
+		&& !(phead->owner & const_cpu_to_le32(3))
+		&& !(phead->group & const_cpu_to_le32(3))
+		&& !(phead->dacl & const_cpu_to_le32(3))
+		&& !(phead->sacl & const_cpu_to_le32(3))
+		&& ntfs_valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
+		&& ntfs_valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
 			/*
 			 * if there is an ACL, as indicated by offdacl,
 			 * require SE_DACL_PRESENT
@@ -1428,8 +1428,8 @@ static int buildacls_posix(struct MAPPING *mapping[],
 	pacl->revision = ACL_REVISION;
 	pacl->alignment1 = 0;
 	pacl->size = cpu_to_le16(sizeof(ACL) + usidsz + 8);
-	pacl->ace_count = cpu_to_le16(1);
-	pacl->alignment2 = cpu_to_le16(0);
+	pacl->ace_count = const_cpu_to_le16(1);
+	pacl->alignment2 = const_cpu_to_le16(0);
 	pos = sizeof(ACL);
 	acecnt = 0;
 
@@ -1587,7 +1587,7 @@ return (0);
 				/* induely get from administrator, group or world */
 				/* unless owner is administrator or group */
 
-				denials = 0;
+				denials = const_cpu_to_le32(0);
 				pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
 				if (!adminowns) {
 					if (!groupowns) {
@@ -1797,7 +1797,7 @@ return (0);
 				/* a possible ACE to deny group what it would get from world */
 				/* or administrator, unless owner is administrator or group */
 
-				denials = 0;
+				denials = const_cpu_to_le32(0);
 				pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 				if (!adminowns && !groupowns) {
 					mixperms = pset->othperms;
@@ -1931,7 +1931,7 @@ return (0);
 			pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 			pgace->flags = NO_PROPAGATE_INHERIT_ACE;
 			pgace->size = cpu_to_le16(nsidsz + 8);
-			grants = 0;
+			grants = const_cpu_to_le32(0);
 			if (mode & S_ISUID)
 				grants |= FILE_APPEND_DATA;
 			if (mode & S_ISGID)
@@ -1987,8 +1987,8 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	pacl->revision = ACL_REVISION;
 	pacl->alignment1 = 0;
 	pacl->size = cpu_to_le16(sizeof(ACL) + usidsz + 8);
-	pacl->ace_count = cpu_to_le16(1);
-	pacl->alignment2 = cpu_to_le16(0);
+	pacl->ace_count = const_cpu_to_le16(1);
+	pacl->alignment2 = const_cpu_to_le16(0);
 	pos = sizeof(ACL);
 	acecnt = 0;
 
@@ -2018,7 +2018,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 	/* induely get from administrator, group or world */
         /* unless owner is administrator or group */
 
-	denials = 0;
+	denials = const_cpu_to_le32(0);
 	pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
 	if (!adminowns) {
 		if (!groupowns) {
@@ -2125,7 +2125,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		/* a possible ACE to deny group what it would get from world */
 		/* or administrator, unless owner is administrator or group */
 
-		denials = 0;
+		denials = const_cpu_to_le32(0);
 		pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 		if (!adminowns && !groupowns) {
 			if (isdir) {
@@ -2241,7 +2241,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
 		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
 		pgace->flags = NO_PROPAGATE_INHERIT_ACE;
 		pgace->size = cpu_to_le16(nsidsz + 8);
-		grants = 0;
+		grants = const_cpu_to_le32(0);
 		if (mode & S_ISUID)
 			grants |= FILE_APPEND_DATA;
 		if (mode & S_ISGID)
@@ -2343,9 +2343,9 @@ char *ntfs_build_descr_posix(struct MAPPING *mapping[],
 			pnhead->group =
 			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
 				 + aclsz + usidsz);
-			pnhead->sacl = cpu_to_le32(0);
+			pnhead->sacl = const_cpu_to_le32(0);
 			pnhead->dacl =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
+			    const_cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		} else {
 			/* ACL failure (errno set) or overflow */
 			free(newattr);
@@ -2434,9 +2434,9 @@ char *ntfs_build_descr(mode_t mode,
 			pnhead->group =
 			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE)
 				 + aclsz + usidsz);
-			pnhead->sacl = cpu_to_le32(0);
+			pnhead->sacl = const_cpu_to_le32(0);
 			pnhead->dacl =
-			    cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
+			    const_cpu_to_le32(sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		} else {
 			/* hope error was detected before overflowing */
 			free(newattr);
@@ -2713,9 +2713,9 @@ static int build_std_permissions(const char *securattr,
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
-	special = cpu_to_le32(0);
-	allowown = allowgrp = allowall = cpu_to_le32(0);
-	denyown = denygrp = denyall = cpu_to_le32(0);
+	special = const_cpu_to_le32(0);
+	allowown = allowgrp = allowall = const_cpu_to_le32(0);
+	denyown = denygrp = denyall = const_cpu_to_le32(0);
 	noown = TRUE;
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
@@ -2798,9 +2798,9 @@ static int build_owngrp_permissions(const char *securattr,
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
-	special = cpu_to_le32(0);
-	allowown = allowgrp = allowall = cpu_to_le32(0);
-	denyown = denygrp = denyall = cpu_to_le32(0);
+	special = const_cpu_to_le32(0);
+	allowown = allowgrp = allowall = const_cpu_to_le32(0);
+	denyown = denygrp = denyall = const_cpu_to_le32(0);
 	grppresent = FALSE;
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
@@ -2983,9 +2983,9 @@ static int build_ownadmin_permissions(const char *securattr,
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
 	pacl = (const ACL*)&securattr[offdacl];
-	special = cpu_to_le32(0);
-	allowown = allowgrp = allowall = cpu_to_le32(0);
-	denyown = denygrp = denyall = cpu_to_le32(0);
+	special = const_cpu_to_le32(0);
+	allowown = allowgrp = allowall = const_cpu_to_le32(0);
+	denyown = denygrp = denyall = const_cpu_to_le32(0);
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
 		offace = offdacl + sizeof(ACL);

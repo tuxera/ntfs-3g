@@ -107,8 +107,16 @@ struct SDH {		/* this is an image of an $SDH index entry */
  *	A few useful constants
  */
 
-static ntfschar sii_stream[] = { '$', 'S', 'I', 'I', 0 };
-static ntfschar sdh_stream[] = { '$', 'S', 'D', 'H', 0 };
+static ntfschar sii_stream[] = { const_cpu_to_le16('$'),
+				 const_cpu_to_le16('S'),
+				 const_cpu_to_le16('I'),   
+				 const_cpu_to_le16('I'),   
+				 const_cpu_to_le16(0) };
+static ntfschar sdh_stream[] = { const_cpu_to_le16('$'),
+				 const_cpu_to_le16('S'),
+				 const_cpu_to_le16('D'),
+				 const_cpu_to_le16('H'),
+				 const_cpu_to_le16(0) };
 
 /*
  *		null SID (S-1-0-0)
@@ -607,13 +615,13 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 
 	xsii = vol->secure_xsii;
 	ntfs_index_ctx_reinit(xsii);
-	newsii.offs = cpu_to_le16(20);
-	newsii.size = cpu_to_le16(sizeof(struct SII) - 20);
-	newsii.fill1 = cpu_to_le32(0);
-	newsii.indexsz = cpu_to_le16(sizeof(struct SII));
-	newsii.indexksz = cpu_to_le16(sizeof(SII_INDEX_KEY));
-	newsii.flags = cpu_to_le16(0);
-	newsii.fill2 = cpu_to_le16(0);
+	newsii.offs = const_cpu_to_le16(20);
+	newsii.size = const_cpu_to_le16(sizeof(struct SII) - 20);
+	newsii.fill1 = const_cpu_to_le32(0);
+	newsii.indexsz = const_cpu_to_le16(sizeof(struct SII));
+	newsii.indexksz = const_cpu_to_le16(sizeof(SII_INDEX_KEY));
+	newsii.flags = const_cpu_to_le16(0);
+	newsii.fill2 = const_cpu_to_le16(0);
 	newsii.keysecurid = keyid;
 	newsii.hash = hash;
 	newsii.securid = keyid;
@@ -628,16 +636,16 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 
 		xsdh = vol->secure_xsdh;
 		ntfs_index_ctx_reinit(xsdh);
-		newsdh.offs = cpu_to_le16(24);
-		newsdh.size = cpu_to_le16(
+		newsdh.offs = const_cpu_to_le16(24);
+		newsdh.size = const_cpu_to_le16(
 			sizeof(SECURITY_DESCRIPTOR_HEADER));
-		newsdh.fill1 = cpu_to_le32(0);
-		newsdh.indexsz = cpu_to_le16(
+		newsdh.fill1 = const_cpu_to_le32(0);
+		newsdh.indexsz = const_cpu_to_le16(
 				sizeof(struct SDH));
-		newsdh.indexksz = cpu_to_le16(
+		newsdh.indexksz = const_cpu_to_le16(
 				sizeof(SDH_INDEX_KEY));
-		newsdh.flags = cpu_to_le16(0);
-		newsdh.fill2 = cpu_to_le16(0);
+		newsdh.flags = const_cpu_to_le16(0);
+		newsdh.fill2 = const_cpu_to_le16(0);
 		newsdh.keyhash = hash;
 		newsdh.keysecurid = keyid;
 		newsdh.hash = hash;
@@ -648,7 +656,7 @@ static int entersecurity_indexes(ntfs_volume *vol, s64 attrsz,
 			 + sizeof(SECURITY_DESCRIPTOR_HEADER));
                            /* special filler value, Windows generally */
                            /* fills with 0x00490049, sometimes with zero */
-		newsdh.fill3 = cpu_to_le32(0x00490049);
+		newsdh.fill3 = const_cpu_to_le32(0x00490049);
 		if (!ntfs_ie_add(xsdh,(INDEX_ENTRY*)&newsdh))
 			res = 0;
 	}
@@ -693,11 +701,11 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	/* is always appended to and the id's are allocated */
 	/* in sequence */
 
-	securid = cpu_to_le32(0);
+	securid = const_cpu_to_le32(0);
 	xsii = vol->secure_xsii;
 	ntfs_index_ctx_reinit(xsii);
 	offs = size = 0;
-	keyid = cpu_to_le32(-1);
+	keyid = const_cpu_to_le32(-1);
 	found = !ntfs_index_lookup((char*)&keyid,
 			       sizeof(SII_INDEX_KEY), xsii);
 	if (!found && (errno != ENOENT)) {
@@ -728,7 +736,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 * A simplified version of next(), limited to
 		 * current index node, could be used
 		 */
-		keyid = cpu_to_le32(0);
+		keyid = const_cpu_to_le32(0);
 		while (entry) {
 			next = ntfs_index_next(entry,xsii);
 			if (next) { 
@@ -752,12 +760,12 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 * entry, make a double check by making sure size of $SII
 		 * is less than needed for one entry
 		 */
-		securid = cpu_to_le32(0);
+		securid = const_cpu_to_le32(0);
 		na = ntfs_attr_open(vol->secure_ni,AT_INDEX_ROOT,sii_stream,4);
 		if (na) {
 			if ((size_t)na->data_size < sizeof(struct SII)) {
 				ntfs_log_error("Creating the first security_id\n");
-				securid = cpu_to_le32(FIRST_SECURITY_ID);
+				securid = const_cpu_to_le32(FIRST_SECURITY_ID);
 			}
 			ntfs_attr_close(na);
 		}
@@ -800,7 +808,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 */
 		if (entersecurity_data(vol, attr, attrsz, hash, securid, offs, gap)
 		    || entersecurity_indexes(vol, attrsz, hash, securid, offs))
-			securid = cpu_to_le32(0);
+			securid = const_cpu_to_le32(0);
 	}
 		/* inode now is dirty, synchronize it all */
 	ntfs_index_entry_mark_dirty(vol->secure_xsii);
@@ -848,7 +856,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 
 	hash = ntfs_security_hash(attr,attrsz);
 	oldattr = (char*)NULL;
-	securid = cpu_to_le32(0);
+	securid = const_cpu_to_le32(0);
 	res = 0;
 	xsdh = vol->secure_xsdh;
 	if (vol->secure_ni && xsdh && !vol->secure_reentry++) {
@@ -860,7 +868,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 		 * collides)
 		 */
 		key.hash = hash;
-		key.security_id = cpu_to_le32(0);
+		key.security_id = const_cpu_to_le32(0);
 		found = !ntfs_index_lookup((char*)&key,
 				 sizeof(SDH_INDEX_KEY), xsdh);
 		if (!found && (errno != ENOENT))
@@ -915,7 +923,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 			else {
 				if (res) {
 					errno = res;
-					securid = cpu_to_le32(0);
+					securid = const_cpu_to_le32(0);
 				} else {
 					/*
 					 * no matching key :
@@ -987,7 +995,7 @@ static int update_secur_descr(ntfs_volume *vol,
 			 * Truncating the record does not sweep extensions
 			 * from copy in memory. Clear security_id to be safe
 			 */
-				ni->security_id = cpu_to_le32(0);
+				ni->security_id = const_cpu_to_le32(0);
 				res = ntfs_attr_truncate(na, (s64)48);
 				ntfs_attr_close(na);
 				clear_nino_flag(ni, v3_Extensions);
@@ -1020,9 +1028,9 @@ static int update_secur_descr(ntfs_volume *vol,
 			/* expand standard information attribute to v3.x */
 					res = ntfs_attr_truncate(na,
 					 (s64)sizeof(STANDARD_INFORMATION));
-					ni->owner_id = cpu_to_le32(0);
-					ni->quota_charged = cpu_to_le32(0);
-					ni->usn = cpu_to_le32(0);
+					ni->owner_id = const_cpu_to_le32(0);
+					ni->quota_charged = const_cpu_to_le32(0);
+					ni->usn = const_cpu_to_le32(0);
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
@@ -1096,9 +1104,9 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
 			/* expand standard information attribute to v3.x */
 				res = ntfs_attr_truncate(na,
 					 (s64)sizeof(STANDARD_INFORMATION));
-				ni->owner_id = cpu_to_le32(0);
-				ni->quota_charged = cpu_to_le32(0);
-				ni->usn = cpu_to_le32(0);
+				ni->owner_id = const_cpu_to_le32(0);
+				ni->quota_charged = const_cpu_to_le32(0);
+				ni->usn = const_cpu_to_le32(0);
 				ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
 				set_nino_flag(ni, v3_Extensions);
@@ -1509,8 +1517,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 #else
 			cacheentry->mode = mode & 07777;
 #endif
-			cacheentry->inh_fileid = cpu_to_le32(0);
-			cacheentry->inh_dirid = cpu_to_le32(0);
+			cacheentry->inh_fileid = const_cpu_to_le32(0);
+			cacheentry->inh_dirid = const_cpu_to_le32(0);
 			cacheentry->valid = 1;
 			pcache->head.p_writes++;
 		} else {
@@ -1555,8 +1563,8 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 #else
 					cacheentry->mode = mode & 07777;
 #endif
-					cacheentry->inh_fileid = cpu_to_le32(0);
-					cacheentry->inh_dirid = cpu_to_le32(0);
+					cacheentry->inh_fileid = const_cpu_to_le32(0);
+					cacheentry->inh_dirid = const_cpu_to_le32(0);
 					cacheentry->valid = 1;
 					pcache->head.p_writes++;
 				}
@@ -1574,16 +1582,16 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			wanted.perm.gid = gid;
 #if POSIXACLS
 			wanted.perm.mode = pxdesc->mode & 07777;
-			wanted.perm.inh_fileid = cpu_to_le32(0);
-			wanted.perm.inh_dirid = cpu_to_le32(0);
+			wanted.perm.inh_fileid = const_cpu_to_le32(0);
+			wanted.perm.inh_dirid = const_cpu_to_le32(0);
 			wanted.mft_no = ni->mft_no;
 			wanted.variable = (void*)pxdesc;
 			wanted.varsize = sizeof(struct POSIX_SECURITY)
 					+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
 #else
 			wanted.perm.mode = mode & 07777;
-			wanted.perm.inh_fileid = cpu_to_le32(0);
-			wanted.perm.inh_dirid = cpu_to_le32(0);
+			wanted.perm.inh_fileid = const_cpu_to_le32(0);
+			wanted.perm.inh_dirid = const_cpu_to_le32(0);
 			wanted.mft_no = ni->mft_no;
 			wanted.variable = (void*)NULL;
 			wanted.varsize = 0;
@@ -2292,7 +2300,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	le32 securid;
 #endif
 
-	securid = cpu_to_le32(0);
+	securid = const_cpu_to_le32(0);
 
 #if !FORCE_FORMAT_v1x
 
@@ -2428,7 +2436,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 	le32 securid;
 #endif
 
-	securid = cpu_to_le32(0);
+	securid = const_cpu_to_le32(0);
 
 #if !FORCE_FORMAT_v1x
 		/* check whether target securid is known in cache */
@@ -2862,33 +2870,33 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	sid = (SID*)((u8*)sd + sizeof(SECURITY_DESCRIPTOR_ATTR));
 	sid->revision = SID_REVISION;
 	sid->sub_authority_count = 2;
-	sid->sub_authority[0] = cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	sid->sub_authority[1] = cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	sid->sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 	sid->identifier_authority.value[5] = 5;
 	sd->owner = cpu_to_le32((u8*)sid - (u8*)sd);
 	
 	sid = (SID*)((u8*)sid + sizeof(SID) + 4); 
 	sid->revision = SID_REVISION;
 	sid->sub_authority_count = 2;
-	sid->sub_authority[0] = cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	sid->sub_authority[1] = cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	sid->sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 	sid->identifier_authority.value[5] = 5;
 	sd->group = cpu_to_le32((u8*)sid - (u8*)sd);
 	
 	acl = (ACL*)((u8*)sid + sizeof(SID) + 4);
 	acl->revision = ACL_REVISION;
-	acl->size = cpu_to_le16(sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE));
-	acl->ace_count = cpu_to_le16(1);
+	acl->size = const_cpu_to_le16(sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE));
+	acl->ace_count = const_cpu_to_le16(1);
 	sd->dacl = cpu_to_le32((u8*)acl - (u8*)sd);
 	
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)acl + sizeof(ACL));
 	ace->type = ACCESS_ALLOWED_ACE_TYPE;
 	ace->flags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
-	ace->size = cpu_to_le16(sizeof(ACCESS_ALLOWED_ACE));
-	ace->mask = cpu_to_le32(0x1f01ff); /* FIXME */
+	ace->size = const_cpu_to_le16(sizeof(ACCESS_ALLOWED_ACE));
+	ace->mask = const_cpu_to_le32(0x1f01ff); /* FIXME */
 	ace->sid.revision = SID_REVISION;
 	ace->sid.sub_authority_count = 1;
-	ace->sid.sub_authority[0] = cpu_to_le32(0);
+	ace->sid.sub_authority[0] = const_cpu_to_le32(0);
 	ace->sid.identifier_authority.value[5] = 1;
 
 	ret = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0, (u8*)sd,
@@ -3225,7 +3233,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			 * locate and inherit DACL
 			 * do not test SE_DACL_PRESENT (wrong for "DR Watson")
 			 */
-		pnhead->dacl = cpu_to_le32(0);
+		pnhead->dacl = const_cpu_to_le32(0);
 		if (pphead->dacl) {
 			offpacl = le32_to_cpu(pphead->dacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
@@ -3240,7 +3248,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			/*
 			 * locate and inherit SACL
 			 */
-		pnhead->sacl = cpu_to_le32(0);
+		pnhead->sacl = const_cpu_to_le32(0);
 		if (pphead->sacl) {
 			offpacl = le32_to_cpu(pphead->sacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
@@ -3268,7 +3276,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			(SECURITY_DESCRIPTOR_RELATIVE*)newattr, pos);
 		free(newattr);
 	} else
-		securid = cpu_to_le32(0);
+		securid = const_cpu_to_le32(0);
 	return (securid);
 }
 
@@ -3295,7 +3303,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 	char *parentattr;
 	le32 securid;
 
-	securid = cpu_to_le32(0);
+	securid = const_cpu_to_le32(0);
 	cached = (struct CACHED_PERMISSIONS*)NULL;
 		/*
 		 * Try to get inherited id from cache
@@ -3778,7 +3786,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			memcpy(&buf[pos],&attr[offdacl],daclsz);
 			pos += daclsz;
 		} else
-			pnhead->dacl = cpu_to_le32(0);
+			pnhead->dacl = const_cpu_to_le32(0);
 
 		/* copy SACL if requested */
 		if (selection & SACL_SECURITY_INFORMATION) {
@@ -3786,7 +3794,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			memcpy(&buf[pos],&attr[offsacl],saclsz);
 			pos += saclsz;
 		} else
-			pnhead->sacl = cpu_to_le32(0);
+			pnhead->sacl = const_cpu_to_le32(0);
 
 		/* copy owner if requested */
 		if (selection & OWNER_SECURITY_INFORMATION) {
@@ -3794,7 +3802,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			memcpy(&buf[pos],&attr[offowner],usidsz);
 			pos += usidsz;
 		} else
-			pnhead->owner = cpu_to_le32(0);
+			pnhead->owner = const_cpu_to_le32(0);
 
 		/* copy group if requested */
 		if (selection & GROUP_SECURITY_INFORMATION) {
@@ -3802,7 +3810,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 			memcpy(&buf[pos],&attr[offgroup],gsidsz);
 			pos += gsidsz;
 		} else
-			pnhead->group = cpu_to_le32(0);
+			pnhead->group = const_cpu_to_le32(0);
 		if (pos != size)
 			ntfs_log_error("Error in security descriptor size\n");
 		*psize = size;
@@ -3876,7 +3884,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->dacl = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->dacl = cpu_to_le32(0);
+			targhead->dacl = const_cpu_to_le32(0);
 			/*
 			 * copy new SACL if selected
 			 * or keep old SACL if any
@@ -3894,7 +3902,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->sacl = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->sacl = cpu_to_le32(0);
+			targhead->sacl = const_cpu_to_le32(0);
 			/*
 			 * copy new OWNER if selected
 			 * or keep old OWNER if any
@@ -3912,7 +3920,7 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->owner = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->owner = cpu_to_le32(0);
+			targhead->owner = const_cpu_to_le32(0);
 			/*
 			 * copy new GROUP if selected
 			 * or keep old GROUP if any
@@ -3930,13 +3938,13 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			targhead->group = cpu_to_le32(pos);
 			pos += size;
 		} else
-			targhead->group = cpu_to_le32(0);
+			targhead->group = const_cpu_to_le32(0);
 		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		targhead->alignment = 0;
-		targhead->control = cpu_to_le16(SE_SELF_RELATIVE
-			| ((present | selection)
+		targhead->control = SE_SELF_RELATIVE
+			| cpu_to_le16((present | selection)
 			    & (SACL_SECURITY_INFORMATION
-				 | DACL_SECURITY_INFORMATION)));
+				 | DACL_SECURITY_INFORMATION));
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
 	}
@@ -4093,7 +4101,11 @@ int ntfs_get_file_attributes(struct SECURITY_API *scapi, const char *path)
 	if (scapi && (scapi->magic == MAGIC_API) && path) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			attrib = ni->flags;
+			attrib = le32_to_cpu(ni->flags);
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				attrib |= 0x10;
+			else
+				attrib &= ~0x10;
 			ntfs_inode_close(ni);
 		} else
 			errno = ENOENT;
@@ -4131,7 +4143,8 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && path) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			ni->flags = (ni->flags & ~0x31a7) | (attrib & 0x31a7);
+			ni->flags = (ni->flags & ~const_cpu_to_le32(0x31a7))
+				 | cpu_to_le32(attrib & 0x31a7);
 			NInoSetDirty(ni);
 			ntfs_inode_close(ni);
 		} else
@@ -4208,7 +4221,7 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 		xsii = scapi->security.vol->secure_xsii;
 		if (xsii) {
 			if (!entry) {
-				key.security_id = cpu_to_le32(0);
+				key.security_id = const_cpu_to_le32(0);
 				found = !ntfs_index_lookup((char*)&key,
 						sizeof(SII_INDEX_KEY), xsii);
 				/* not supposed to find */
@@ -4244,8 +4257,8 @@ INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 		xsdh = scapi->security.vol->secure_xsdh;
 		if (xsdh) {
 			if (!entry) {
-				key.hash = cpu_to_le32(0);
-				key.security_id = cpu_to_le32(0);
+				key.hash = const_cpu_to_le32(0);
+				key.security_id = const_cpu_to_le32(0);
 				found = !ntfs_index_lookup((char*)&key,
 						sizeof(SDH_INDEX_KEY), xsdh);
 				/* not supposed to find */
