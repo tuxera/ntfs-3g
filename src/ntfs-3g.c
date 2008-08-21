@@ -387,6 +387,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	BOOL withusermapping;
 	struct SECURITY_CONTEXT security;
 
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
@@ -398,6 +399,17 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		res = -errno;
 		goto exit;
 	}
+	withusermapping = ntfs_fuse_fill_security_context(&security);
+#if POSIXACLS
+		/*
+		 * make sure the parent directory is searchable
+		 */
+	if (withusermapping
+	   && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		res = -EACCES;  
+		goto exit;
+	}
+#endif
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
 		/* Directory. */
 		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
@@ -491,7 +503,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		}
 		stbuf->st_mode |= (0777 & ~ctx->fmask);
 	}
-	if (ntfs_fuse_fill_security_context(&security)) {
+	if (withusermapping) {
 		if (ntfs_get_owner_mode(&security,path,ni,stbuf) < 0)
 			set_fuse_error(&res);
 		else
@@ -630,6 +642,44 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	free(filename);
 	return ret;
 }
+
+#if POSIXACLS
+
+static int ntfs_fuse_opendir(const char *path,
+		struct fuse_file_info *fi)
+{
+	int res = 0;
+	ntfs_inode *ni;
+	int accesstype;
+	struct SECURITY_CONTEXT security;
+
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (ni) {
+		if (ntfs_fuse_fill_security_context(&security)) {
+			if (fi->flags & O_WRONLY)
+				accesstype = S_IWRITE;
+			else
+				if (fi->flags & O_RDWR)
+					accesstype = S_IWRITE | S_IREAD;
+				else
+					accesstype = S_IREAD;
+		     /* JPA directory must be searchable */
+			if (!ntfs_allowed_dir_access(&security,path,S_IEXEC)
+		     /* JPA check whether requested access is allowed */
+			  || !ntfs_allowed_access(&security,path,ni,accesstype))
+				res = -EACCES;
+		}
+		if (ntfs_inode_close(ni))
+			set_fuse_error(&res);
+	} else
+		res = -errno;
+	return res;
+}
+
+#endif
 
 static int ntfs_fuse_readdir(const char *path, void *buf,
 		fuse_fill_dir_t filler, off_t offset __attribute__((unused)),
@@ -2018,7 +2068,6 @@ static struct fuse_operations ntfs_3g_ops = {
 	.statfs		= ntfs_fuse_statfs,
 	.chmod		= ntfs_fuse_chmod,
 	.chown		= ntfs_fuse_chown,
-	.access		= ntfs_fuse_access,
 	.create		= ntfs_fuse_create_file,
 	.mknod		= ntfs_fuse_mknod,
 	.symlink	= ntfs_fuse_symlink,
@@ -2030,6 +2079,10 @@ static struct fuse_operations ntfs_3g_ops = {
 	.utime		= ntfs_fuse_utime,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
+#if POSIXACLS
+	.access		= ntfs_fuse_access,
+	.opendir	= ntfs_fuse_opendir,
+#endif
 #ifdef HAVE_SETXATTR
 	.getxattr	= ntfs_fuse_getxattr,
 	.setxattr	= ntfs_fuse_setxattr,
