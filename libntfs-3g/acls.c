@@ -3080,6 +3080,7 @@ const SID *ntfs_acl_owner(const char *securattr)
 			   && (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 			   && ntfs_is_user_sid(&pace->sid))
 				found = TRUE;
+			offace += le16_to_cpu(pace->size);
 		} while (!found && (++nace < acecnt));
 	}
 	if (found)
