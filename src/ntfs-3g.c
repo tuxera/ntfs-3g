@@ -1071,9 +1071,15 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				securid = ntfs_inherited_id(&security, dir_path,
 					dir_ni, S_ISDIR(type));
 			else
+#if POSIXACLS
+				securid = ntfs_alloc_securid(&security,
+					security.uid, security.gid,
+					dir_path, dir_ni, perm, S_ISDIR(type));
+#else
 				securid = ntfs_alloc_securid(&security,
 					security.uid, security.gid, perm,
 					S_ISDIR(type));
+#endif
 		/* Create object specified in @type. */
 		switch (type) {
 			case S_IFCHR:
@@ -1102,10 +1108,18 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 				 * could not be allocated (eg NTFS 1.x)
 				 */
 			if (ctx->security.usermapping) {
+#if POSIXACLS
+			   	if (!securid
+				   && ntfs_set_inherited_posix(&security, ni,
+					security.uid, security.gid,
+					dir_path, dir_ni, perm) < 0)
+					set_fuse_error(&res);
+#else
 			   	if (!securid
 				   && ntfs_set_owner_mode(&security, ni,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
+#endif
 				else {
 					/* Adjust read-only (for Windows) */
 					if (perm & S_IWUSR)
@@ -1731,6 +1745,38 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 	int res, lename_len;
 
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+
+			/* hijack Posix ACL retrieval */
+	if ((size > 0)
+	    && (!strcmp(name,"system.posix_acl_access")
+		|| !strcmp(name,"system.posix_acl_default"))) {
+
+		if (ntfs_fuse_is_named_data_stream(path))
+			return -EINVAL; /* n/a for named data streams. */
+
+		  /* JPA return unsupported if no user mapping has been defined */
+		if (!ntfs_fuse_fill_security_context(&security)) {
+			if (ctx->silent)
+				res = 0;
+			else
+				res = -EOPNOTSUPP;
+
+		} else {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!ni)
+				res = -errno;
+			else {
+				res = ntfs_get_posix_acl(&security,path,
+					name,value,size,ni);
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		}
+		return (res);
+	}
+#endif
 	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return ntfs_fuse_getxattr_windows(path, name, value, size);
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
@@ -1777,6 +1823,37 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 	int res, lename_len;
 
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+
+			/* hijack Posix ACL setting */
+	if (!strcmp(name,"system.posix_acl_access")
+	    || !strcmp(name,"system.posix_acl_default")) {
+
+		if (ntfs_fuse_is_named_data_stream(path))
+			return -EINVAL; /* n/a for named data streams. */
+
+		  /* JPA return unsupported if no user mapping has been defined */
+		if (!ntfs_fuse_fill_security_context(&security)) {
+			if (ctx->silent)
+				res = 0;
+			else
+				res = -EOPNOTSUPP;
+
+		} else {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!ni)
+				res = -errno;
+			else {
+				res = ntfs_set_posix_acl(&security,path,
+					name,value,size,ni);
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		}
+		return (res);
+	}
+#endif
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
@@ -1831,6 +1908,37 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	int res = 0, lename_len;
 
 
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+
+			/* hijack Posix ACL removal */
+	if (!strcmp(name,"system.posix_acl_access")
+	    || !strcmp(name,"system.posix_acl_default")) {
+
+		if (ntfs_fuse_is_named_data_stream(path))
+			return -EINVAL; /* n/a for named data streams. */
+
+		  /* JPA return unsupported if no user mapping has been defined */
+		if (!ntfs_fuse_fill_security_context(&security)) {
+			if (ctx->silent)
+				res = 0;
+			else
+				res = -EOPNOTSUPP;
+
+		} else {
+			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			if (!ni)
+				res = -errno;
+			else {
+				res = ntfs_remove_posix_acl(&security,path,
+					name,ni);
+				if (ntfs_inode_close(ni))
+					set_fuse_error(&res);
+			}
+		}
+		return (res);
+	}
+#endif
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||

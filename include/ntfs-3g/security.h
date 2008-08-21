@@ -30,6 +30,8 @@
 #include "inode.h"
 #include "dir.h"
 
+#define POSIXACLS 1
+
 /*
  *          item in the mapping list
  */
@@ -52,6 +54,10 @@ struct CACHED_PERMISSIONS {
 	gid_t gid;
 	le32 inh_fileid;
 	le32 inh_dirid;
+#if POSIXACLS
+	void *pxdesc;
+	unsigned int pxdescsize:16;
+#endif
 	unsigned int mode:12;
 	unsigned int valid:1;
 } ;
@@ -129,6 +135,65 @@ struct SECURITY_CONTEXT {
 	pid_t tid; /* thread id of thread requesting */
 	} ;
 
+#if POSIXACLS
+
+/*
+ *		       Posix ACL structures
+ */
+  
+struct POSIX_ACE {
+	u16 tag;
+	u16 perms;
+	s32 id;   
+} ;
+        
+struct POSIX_ACL {
+	u8 version;
+	u8 flags;
+	u16 filler;
+	struct POSIX_ACE ace[0];
+} ;
+
+struct POSIX_SECURITY {
+	mode_t mode;
+	int acccnt;
+	int defcnt;
+	int firstdef;
+	u16 tagsset;
+	struct POSIX_ACL acl;
+} ;
+        
+/*
+ *		Posix tags, cpu-endian 16 bits
+ */
+   
+enum {  
+	POSIX_ACL_USER_OBJ =	1,
+	POSIX_ACL_USER =	2,
+	POSIX_ACL_GROUP_OBJ =	4,
+	POSIX_ACL_GROUP =	8,
+	POSIX_ACL_MASK =	16,
+	POSIX_ACL_OTHER =	32,
+	POSIX_ACL_SPECIAL =	64  /* internal use only */
+} ;
+
+#define POSIX_ACL_EXTENSIONS (POSIX_ACL_USER | POSIX_ACL_GROUP | POSIX_ACL_MASK)
+        
+/*
+ *		Posix permissions, cpu-endian 16 bits
+ */
+   
+enum {  
+	POSIX_PERM_X =		1,
+	POSIX_PERM_W =		2,
+	POSIX_PERM_R =		4,
+	POSIX_PERM_DENIAL =	64 /* internal use only */
+} ;
+
+#define POSIX_VERSION 2
+
+#endif
+
 extern const GUID *const zero_guid;
 
 extern BOOL ntfs_guid_is_zero(const GUID *guid);
@@ -169,16 +234,45 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype);
 
+#if POSIXACLS
+le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
+		uid_t uid, gid_t gid, const char *dir_path,
+		ntfs_inode *dir_ni, mode_t mode, BOOL isdir);
+#else
 le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 		uid_t uid, gid_t gid, mode_t mode, BOOL isdir);
+#endif
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
+#if POSIXACLS
+int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni, uid_t uid, gid_t gid,
+		mode_t mode, struct POSIX_SECURITY *pxdesc);
+#else
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode);
+#endif
 le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		const char *dir_path, ntfs_inode *dir_ni, BOOL fordir);
 int ntfs_open_secure(ntfs_volume *vol);
 void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
+
+#if POSIXACLS
+
+int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni, uid_t uid, gid_t gid,
+		const char *dir_path, ntfs_inode *dir_ni, mode_t mode);
+int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name, char *value, size_t size,
+			ntfs_inode *ni);
+int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name, const char *value, size_t size,
+			ntfs_inode *ni);
+int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name, ntfs_inode *ni);
+
+#endif
+
 
 /*
  *		Security API for direct access to security descriptors
