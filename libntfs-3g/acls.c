@@ -3123,6 +3123,7 @@ static int build_ownadmin_permissions(const char *securattr,
 	int acecnt;
 	int nace;
 	BOOL firstapply;
+	int isforeign;
 	le32 special;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
@@ -3139,6 +3140,7 @@ static int build_ownadmin_permissions(const char *securattr,
 	} else
 		acecnt = 0;
 	firstapply = TRUE;
+	isforeign = 3;
 	for (nace = 0; nace < acecnt; nace++) {
 		pace = (const ACCESS_ALLOWED_ACE*)&securattr[offace];
 		if (!(pace->flags & INHERIT_ONLY_ACE)) {
@@ -3147,7 +3149,8 @@ static int build_ownadmin_permissions(const char *securattr,
 			     && (((pace->mask & WRITE_OWNER) && firstapply))) {
 				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 					allowown |= pace->mask;
-				else
+					isforeign &= ~1;
+				} else
 					if (pace->type == ACCESS_DENIED_ACE_TYPE)
 						denyown |= pace->mask;
 				} else
@@ -3155,7 +3158,8 @@ static int build_ownadmin_permissions(const char *securattr,
 					&& (!(pace->mask & WRITE_OWNER))) {
 						if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 							allowgrp |= pace->mask;
-						else
+							isforeign &= ~2;
+						} else
 							if (pace->type == ACCESS_DENIED_ACE_TYPE)
 								denygrp |= pace->mask;
 					} else if (is_world_sid((const SID*)&pace->sid)) {
@@ -3172,6 +3176,10 @@ static int build_ownadmin_permissions(const char *securattr,
 			}
 			offace += le16_to_cpu(pace->size);
 		}
+	if (isforeign) {
+		allowown |= (allowgrp | allowall);
+		allowgrp |= allowall;
+	}
 	return (merge_permissions(ni,
 				allowown & ~(denyown | denyall),
 				allowgrp & ~(denygrp | denyall),
