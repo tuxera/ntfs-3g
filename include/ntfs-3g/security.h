@@ -127,6 +127,7 @@ struct PERMISSIONS_CACHE {
 
 enum {
 	SECURITY_DEFAULT,	/* rely on fuse for permissions checking */
+	SECURITY_RAW,		/* force same ownership/permissions on files */
 	SECURITY_ADDSECURIDS,	/* upgrade old security descriptors */
 	SECURITY_STATICGRPS	/* use static groups for access control */
 } ;

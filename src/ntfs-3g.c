@@ -144,8 +144,7 @@ typedef struct {
 	BOOL mounted;
 	struct fuse_chan *fc;
 	BOOL inherit;
-	BOOL addsecurids;
-	BOOL staticgrps;
+	unsigned int secure_flags;
 	char *usermap_path;
 	struct PERMISSIONS_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
@@ -2254,6 +2253,7 @@ static char *parse_mount_options(const char *orig_opts)
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
 
+	ctx->secure_flags = 0;
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
 		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
@@ -2328,11 +2328,13 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			sscanf(val, "%i", &ctx->uid);
 		       	default_permissions = 1;
+			ctx->secure_flags |= (1 << SECURITY_RAW);
 		} else if (!strcmp(opt, "gid")) {
 			if (missing_option_value(val, "gid"))
 				goto err_exit;
 			sscanf(val, "%i", &ctx->gid);
 		       	default_permissions = 1;
+			ctx->secure_flags |= (1 << SECURITY_RAW);
 		} else if (!strcmp(opt, "show_sys_files")) {
 			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
@@ -2399,13 +2401,13 @@ static char *parse_mount_options(const char *orig_opts)
 			 * JPA create security ids for files being read
 			 * with an individual security attribute
 			 */
-			ctx->addsecurids = TRUE;
+			ctx->secure_flags |= (1 << SECURITY_ADDSECURIDS);
 		} else if (!strcmp(opt, "staticgrps")) {
 			/*
 			 * JPA use static definition of groups
 			 * for file access control
 			 */
-			ctx->staticgrps = TRUE;
+			ctx->secure_flags |= (1 << SECURITY_STATICGRPS);
 		} else if (!strcmp(opt, "usermapping")) {
 			if (!val) {
 				ntfs_log_error("'usermapping' option should have "
@@ -2447,6 +2449,14 @@ static char *parse_mount_options(const char *orig_opts)
 		goto err_exit;
 	if (strappend(&ret, opts.device))
 		goto err_exit;
+	if (default_permissions)
+		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+#if !POSIXACLS
+	else
+		ctx->secure_flags |= (1 << SECURITY_RAW);
+#endif
+	if (ctx->ro)
+		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
 exit:
 	free(options);
 	return ret;
@@ -2866,34 +2876,44 @@ int main(int argc, char *argv[])
 	ctx->security.vol = ctx->vol;
 	ctx->security.uid = ctx->uid;
 	ctx->security.gid = ctx->gid;
-	ctx->vol->secure_flags = 0;
-	if (ctx->addsecurids && !ctx->ro)
-		ctx->vol->secure_flags |= (1 << SECURITY_ADDSECURIDS);
-	if (ctx->staticgrps)
-		ctx->vol->secure_flags |= (1 << SECURITY_STATICGRPS);
-	if (strstr(parsed_options,"default_permissions"))
-		ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-		/* JPA open $Secure, (whatever NTFS version !) */
-		/* to initialize security data */
-	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
-		ntfs_log_info("Could not open file $Secure\n");
+	ctx->vol->secure_flags = ctx->secure_flags;
+	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
+		/* same ownership/permissions for all files */
+		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
+		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
+		if (ctx->secure_flags & (1 << SECURITY_DEFAULT))
+			ntfs_log_info("Global ownership and permissions enforced\n");
+		else
+			ntfs_log_info("Ownership and permissions fully disabled\n");
+	} else {
+			/* JPA open $Secure, (whatever NTFS version !) */
+			/* to initialize security data */
+		if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
+			ntfs_log_info("Could not open file $Secure\n");
 #if POSIXACLS
-	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
-		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-			ntfs_log_info("User mapping built, Posix ACLs not used\n");
-		else
-			ntfs_log_info("User mapping built, Posix ACLs in use\n");
-	} else
-		ntfs_log_error("Failed to build user mapping\n");
+		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
+			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+				ntfs_log_info("User mapping built, Posix ACLs not used\n");
+			else
+				ntfs_log_info("User mapping built, Posix ACLs in use\n");
+		} else {
+			ntfs_log_error("Failed to build user mapping : unmounting\n");
+			err = NTFS_VOLUME_INSECURE;
+			goto err_map;
+		}
 #else
-	if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT)) {
-		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
-			ntfs_log_info("User mapping built\n");
-		else
-			ntfs_log_error("Failed to build user mapping\n");
-	} else
-		ntfs_log_info("No permission checks activated\n");
+		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT)) {
+			if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
+				ntfs_log_info("User mapping built\n");
+			else {
+				ntfs_log_error("Failed to build user mapping : unmounting\n");
+				err = NTFS_VOLUME_INSECURE;
+				goto err_map;
+			}
+		} else
+			ntfs_log_info("No permission checks activated\n");
 #endif
+	}
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);
 	
@@ -2901,6 +2921,7 @@ int main(int argc, char *argv[])
 	
 	err = 0;
 
+err_map:
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
