@@ -222,7 +222,7 @@ static int is_world_sid(const SID * usid)
 	       ((usid->sub_authority_count == 1)
 	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(1))
-	    && (usid->sub_authority[0] == 0))
+	    && (usid->sub_authority[0] == const_cpu_to_le32(0)))
 
 	     /* check whether S-1-5-32-545 : local user */
 	  ||   ((usid->sub_authority_count == 2)
@@ -333,9 +333,11 @@ BOOL ntfs_valid_pattern(const SID *sid)
 {
 	int cnt;
 	u32 auth;
+	le32 leauth;
 
 	cnt = sid->sub_authority_count;
-	auth = le32_to_cpu(sid->sub_authority[cnt-1]);
+	leauth = sid->sub_authority[cnt-1];
+	auth = le32_to_cpu(leauth);
 	return ((auth >= 1000) && (auth <= 0x7fffffff));
 }
 
@@ -346,13 +348,15 @@ BOOL ntfs_valid_pattern(const SID *sid)
  *	Returns 0 (root) if it does not match pattern
  */
 
-static int findimplicit(const SID *xsid, const SID *pattern, int parity)
+static u32 findimplicit(const SID *xsid, const SID *pattern, int parity)
 {
 	BIGSID defsid;
 	SID *psid;
-	int xid; /* uid or gid */
+	u32 xid; /* uid or gid */
 	int cnt;
-	int carry;
+	u32 carry;
+	le32 leauth;
+	u32 uauth;
 	u32 xlast;
 	u32 rlast;
 
@@ -360,8 +364,10 @@ static int findimplicit(const SID *xsid, const SID *pattern, int parity)
 	psid = (SID*)&defsid;
 	cnt = psid->sub_authority_count;
 	psid->sub_authority[cnt-1] = xsid->sub_authority[cnt-1];
-	xlast = le32_to_cpu(xsid->sub_authority[cnt-1]);
-	rlast = le32_to_cpu(pattern->sub_authority[cnt-1]);
+	leauth = xsid->sub_authority[cnt-1];
+	xlast = le32_to_cpu(leauth);
+	leauth = pattern->sub_authority[cnt-1];
+	rlast = le32_to_cpu(leauth);
 
 	if ((xlast > rlast) && !((xlast ^ rlast ^ parity) & 1)) {
 		/* direct check for basic situation */
@@ -374,9 +380,9 @@ static int findimplicit(const SID *xsid, const SID *pattern, int parity)
 			 */
 			carry = 1;
 			do {
-				psid->sub_authority[cnt-2]
-					= cpu_to_le32(le32_to_cpu(
-						psid->sub_authority[cnt-2]) + 1);
+				leauth = psid->sub_authority[cnt-2];
+				uauth = le32_to_cpu(leauth) + 1;
+				psid->sub_authority[cnt-2] = cpu_to_le32(uauth);
 			} while (!ntfs_same_sid(psid,xsid) && (++carry < 4));
 			if (carry < 4)
 				xid = (((xlast - rlast) >> 1) & 0x3fffffff)
@@ -399,6 +405,8 @@ const SID *ntfs_find_usid(struct MAPPING *usermapping,
 {
 	struct MAPPING *p;
 	const SID *sid;
+	le32 leauth;
+	u32 uauth;
 	int cnt;
 
 	if (!uid)
@@ -416,15 +424,14 @@ const SID *ntfs_find_usid(struct MAPPING *usermapping,
 			 */
 			memcpy(defusid, p->sid, ntfs_sid_size(p->sid));
 			cnt = defusid->sub_authority_count;
-			defusid->sub_authority[cnt-1]
-				= cpu_to_le32(
-					le32_to_cpu(defusid->sub_authority[cnt-1])
-					+ 2*(uid & 0x3fffffff));
-			if (uid & 0xc0000000)
-				defusid->sub_authority[cnt-2]
-					= cpu_to_le32(
-						le32_to_cpu(defusid->sub_authority[cnt-2])
-						+ ((uid >> 30) & 3));
+			leauth = defusid->sub_authority[cnt-1];
+			uauth = le32_to_cpu(leauth) + 2*(uid & 0x3fffffff);
+			defusid->sub_authority[cnt-1] = cpu_to_le32(uauth);
+			if (uid & 0xc0000000) {
+				leauth = defusid->sub_authority[cnt-2];
+				uauth = le32_to_cpu(leauth) + ((uid >> 30) & 3);
+				defusid->sub_authority[cnt-2] = cpu_to_le32(uauth);
+			}
 			sid = defusid;
 		} else
 			sid = (p ? p->sid : (const SID*)NULL);
@@ -442,6 +449,8 @@ const SID *ntfs_find_gsid(struct MAPPING *groupmapping,
 {
 	struct MAPPING *p;
 	const SID *sid;
+	le32 leauth;
+	u32 uauth;
 	int cnt;
 
 	if (!gid)
@@ -459,15 +468,14 @@ const SID *ntfs_find_gsid(struct MAPPING *groupmapping,
 			 */
 			memcpy(defgsid, p->sid, ntfs_sid_size(p->sid));
 			cnt = defgsid->sub_authority_count;
-			defgsid->sub_authority[cnt-1]
-				= cpu_to_le32(
-					le32_to_cpu(defgsid->sub_authority[cnt-1])
-					+ 2*(gid & 0x3fffffff) + 1);
-			if (gid & 0xc0000000)
-				defgsid->sub_authority[cnt-2]
-					= cpu_to_le32(
-						le32_to_cpu(defgsid->sub_authority[cnt-2])
-							+ ((gid >> 30) & 3));
+			leauth = defgsid->sub_authority[cnt-1];
+			uauth = le32_to_cpu(leauth) + 2*(gid & 0x3fffffff) + 1;
+			defgsid->sub_authority[cnt-1] = cpu_to_le32(uauth);
+			if (gid & 0xc0000000) {
+				leauth = defgsid->sub_authority[cnt-2];
+				uauth = le32_to_cpu(leauth) + ((gid >> 30) & 3);
+				defgsid->sub_authority[cnt-2] = cpu_to_le32(uauth);
+			}
 			sid = defgsid;
 		} else
 			sid = (p ? p->sid : (const SID*)NULL);
@@ -3628,7 +3636,7 @@ static SID *encodesid(const char *sidstr)
 	int cnt;
 	BIGSID bigsid;
 	SID *bsid;
-	long auth;
+	u32 auth;
 	const char *p;
 
 	sid = (SID*) NULL;
@@ -3643,7 +3651,8 @@ static SID *encodesid(const char *sidstr)
 		p = strchr(p, '-');
 		while (p && (cnt < 8)) {
 			p++;
-			bsid->sub_authority[cnt] = cpu_to_le32(atoul(p));
+			auth = atoul(p);
+			bsid->sub_authority[cnt] = cpu_to_le32(auth);
 			p = strchr(p, '-');
 			cnt++;
 		}
