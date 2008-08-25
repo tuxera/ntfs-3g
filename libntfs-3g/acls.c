@@ -1381,6 +1381,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		u16 grpperms;
 		u16 othperms;
 		u16 mask;
+		u16 nonstd;
 	} aceset[2], *pset;
 	BOOL adminowns;
 	BOOL groupowns;
@@ -1446,11 +1447,13 @@ static int buildacls_posix(struct MAPPING *mapping[],
 	aceset[0].grpperms = 0;
 	aceset[0].othperms = 0;
 	aceset[0].mask = (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
+	aceset[0].nonstd = 0;
 	aceset[1].selfuserperms = 0;
 	aceset[1].selfgrpperms = 0;
 	aceset[1].grpperms = 0;
 	aceset[1].othperms = 0;
 	aceset[1].mask = (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
+	aceset[1].nonstd = 0;
 
 	for (i=pxdesc->acccnt+pxdesc->defcnt-1; i>=0; i--) {
 		if (i >= pxdesc->acccnt) {
@@ -1462,6 +1465,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		}
 		switch (pxace->tag) {
 		case POSIX_ACL_USER :
+			pset->nonstd++;
 /* ! probably do no want root as designated user */
 			if (!pxace->id)
 				adminowns = TRUE;
@@ -1473,6 +1477,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 			}
 			break;
 		case POSIX_ACL_GROUP :
+			pset->nonstd++;
 /* ! probably do no want root as designated group */
 			if (!pxace->id)
 				adminowns = TRUE;
@@ -1490,6 +1495,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 			pset->othperms = pxace->perms;
 			break;
 		case POSIX_ACL_MASK :
+			pset->nonstd++;
 			pset->mask = pxace->perms;
 		default :
 			break;
@@ -1833,7 +1839,7 @@ return (0);
 					/* now insert grants to group if more than world */
 				if (adminowns
 					|| groupowns
-					|| avoidmask
+					|| (avoidmask && pset->nonstd)
 					|| (perms & ~pset->othperms)
 					|| (tag == POSIX_ACL_GROUP)) {
 					pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
