@@ -1850,14 +1850,15 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 
 		if (ntfs_fuse_is_named_data_stream(path))
 			return -EINVAL; /* n/a for named data streams. */
-
-		  /* JPA return unsupported if no user mapping has been defined */
-		if (!ntfs_fuse_fill_security_context(&security)) {
-			if (ctx->silent)
-				res = 0;
-			else
-				res = -EOPNOTSUPP;
-
+		/*
+		 * return unsupported if ACL were disabled
+		 * or no user mapping has been defined
+		 * However no error will be returned to getfacl
+		 */
+ 		if ((ctx->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
+		   || !ntfs_fuse_fill_security_context(&security)) {
+			res = -EOPNOTSUPP;
 		} else {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni)
@@ -1927,14 +1928,14 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 
 		if (ntfs_fuse_is_named_data_stream(path))
 			return -EINVAL; /* n/a for named data streams. */
-
-		  /* JPA return unsupported if no user mapping has been defined */
-		if (!ntfs_fuse_fill_security_context(&security)) {
-			if (ctx->silent)
-				res = 0;
-			else
-				res = -EOPNOTSUPP;
-
+		/*
+		 * return unsupported if ACL were disabled
+		 * or no user mapping has been defined
+		 */
+		if ((ctx->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
+		   || !ntfs_fuse_fill_security_context(&security)) {
+			res = -EOPNOTSUPP;
 		} else {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni)
@@ -2012,14 +2013,14 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 
 		if (ntfs_fuse_is_named_data_stream(path))
 			return -EINVAL; /* n/a for named data streams. */
-
-		  /* JPA return unsupported if no user mapping has been defined */
-		if (!ntfs_fuse_fill_security_context(&security)) {
-			if (ctx->silent)
-				res = 0;
-			else
-				res = -EOPNOTSUPP;
-
+		/*
+		 * return unsupported if ACL were disabled
+		 * or no user mapping has been defined.
+		 */
+		if ((ctx->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
+		   || !ntfs_fuse_fill_security_context(&security)) {
+			res = -EOPNOTSUPP;
 		} else {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni)
