@@ -271,6 +271,7 @@ int ntfs_sid_to_mbs_size(const SID *sid)
 char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 {
 	u64 u;
+	le32 leauth;
 	char *s;
 	int i, j, cnt;
 
@@ -316,8 +317,9 @@ char *ntfs_sid_to_mbs(const SID *sid, char *sid_str, size_t sid_str_size)
 	cnt -= i;
 	/* Finally, add the sub authorities. */
 	for (j = 0; j < sid->sub_authority_count; j++) {
+		leauth = sid->sub_authority[j];
 		i = snprintf(s, cnt, "-%u", (unsigned int)
-				le32_to_cpu(sid->sub_authority[j]));
+				le32_to_cpu(leauth));
 		if (i < 0 || i >= cnt)
 			goto err_out;
 		s += i;
@@ -685,6 +687,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	} realign;
 	le32 securid;
 	le32 keyid;
+	u32 newkey;
 	off_t offs;
 	int gap;
 	int size;
@@ -773,8 +776,10 @@ static le32 entersecurityattr(ntfs_volume *vol,
 			ntfs_log_error("Error creating a security_id\n");
 			errno = EIO;
 		}
-	} else
-		securid = cpu_to_le32(le32_to_cpu(keyid) + 1);
+	} else {
+		newkey = le32_to_cpu(keyid) + 1;
+		securid = cpu_to_le32(newkey);
+	}
 	/*
 	 * The security attr has to be written twice 256KB
 	 * apart. This implies that offsets like
@@ -1271,7 +1276,6 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	}
 	return (ismember);
 }
-
 
 /*
  *	Cacheing is done two-way :
@@ -2379,7 +2383,7 @@ int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 	int res;
 
 	res = -1;
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 	pxdesc = inherit_posix(scx, dir_path, dir_ni, mode, isdir);
 	if (pxdesc) {
 		usid = ntfs_find_usid(scx->mapping[MAPUSERS],uid,(SID*)&defusid);
@@ -2521,7 +2525,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 
 		/* check whether target securid is known in cache */
 
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 	wanted.uid = uid;
 	wanted.gid = gid;
 	wanted.dmode = mode & 07777;
@@ -2650,7 +2654,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 		count = (size - sizeof(struct POSIX_ACL)) / sizeof(struct POSIX_ACE);
 	else
 		count = 0;
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 	newpxdesc = (struct POSIX_SECURITY*)NULL;
 	if (!deflt || isdir) {
 		cached = fetch_cache(scx, ni);
@@ -2787,7 +2791,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
 			gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
 #if POSIXACLS
-			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 			newpxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,
 				oldattr, usid, gsid, ni);
 			if (!newpxdesc || ntfs_merge_mode_posix(newpxdesc, mode))
@@ -3777,7 +3781,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		/* copy header and feed new flags */
 		memcpy(buf,attr,sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)buf;
-		pnhead->control = const_cpu_to_le16(avail);
+		pnhead->control = cpu_to_le16(avail);
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
 		/* copy DACL if requested */
