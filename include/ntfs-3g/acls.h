@@ -68,7 +68,7 @@
 
           /* flags which are set to mean exec, write or read */
 
-#define FILE_READ (FILE_READ_DATA | SYNCHRONIZE)
+#define FILE_READ (FILE_READ_DATA)
 #define FILE_WRITE (FILE_WRITE_DATA | FILE_APPEND_DATA \
 		| READ_CONTROL | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA)
 #define FILE_EXEC (FILE_EXECUTE)
@@ -103,6 +103,15 @@
 
 #define FILE_INHERITANCE NO_PROPAGATE_INHERIT_ACE
 #define DIR_INHERITANCE (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
+
+/*
+ *		To identify NTFS ACL meaning Posix ACL granted to root
+ *	we use rights always granted to anybody, so they have no impact
+ *	either on Windows or on Linux.
+ */
+
+#define ROOT_OWNER_UNMARK SYNCHRONIZE	/* ACL granted to root as owner */
+#define ROOT_GROUP_UNMARK FILE_READ_EA	/* ACL granted to root as group */
 
 /*
  *		A type large enough to hold any SID
