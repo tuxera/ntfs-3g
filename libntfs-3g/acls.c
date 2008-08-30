@@ -1724,6 +1724,7 @@ return (0);
 					grants = WORLD_RIGHTS;
 				} else {
 					sid = adminsid;
+					sidsz = ntfs_sid_size(sid);
 					rootuser = TRUE;
 					grants = WORLD_RIGHTS & ~ROOT_OWNER_UNMARK;
 				}
@@ -1776,8 +1777,8 @@ return (0);
 					sid = adminsid;
 					rootgroup = TRUE;
 				}
-			sidsz = ntfs_sid_size(sid);
 			if (sid) {
+				sidsz = ntfs_sid_size(sid);
 				/*
 				 * Insert denial of complement of mask for
 				 * each group
