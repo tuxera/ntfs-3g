@@ -697,6 +697,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	INDEX_ENTRY *next;
 	ntfs_index_context *xsii;
 	ntfs_attr *na;
+	int olderrno;
 
 	/* find the first available securid beyond the last key */
 	/* in $Secure:$SII. This also determines the first */
@@ -709,12 +710,15 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	ntfs_index_ctx_reinit(xsii);
 	offs = size = 0;
 	keyid = const_cpu_to_le32(-1);
+	olderrno = errno;
 	found = !ntfs_index_lookup((char*)&keyid,
 			       sizeof(SII_INDEX_KEY), xsii);
 	if (!found && (errno != ENOENT)) {
 		ntfs_log_perror("Inconsistency in index $SII");
 		psii = (struct SII*)NULL;
 	} else {
+			/* restore errno to avoid misinterpretation */
+		errno = olderrno;
 		entry = xsii->entry;
 		psii = (struct SII*)xsii->entry;
 	}
@@ -858,6 +862,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 	INDEX_ENTRY *entry;
 	le32 securid;
 	le32 hash;
+	int olderrno;
 
 	hash = ntfs_security_hash(attr,attrsz);
 	oldattr = (char*)NULL;
@@ -874,11 +879,14 @@ static le32 setsecurityattr(ntfs_volume *vol,
 		 */
 		key.hash = hash;
 		key.security_id = const_cpu_to_le32(0);
+		olderrno = errno;
 		found = !ntfs_index_lookup((char*)&key,
 				 sizeof(SDH_INDEX_KEY), xsdh);
 		if (!found && (errno != ENOENT))
 			ntfs_log_perror("Inconsistency in index $SDH");
 		else {
+				/* restore errno to avoid misinterpretation */
+			errno = olderrno;
 			entry = xsdh->entry;
 			found = FALSE;
 			/*

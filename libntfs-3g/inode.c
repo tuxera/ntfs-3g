@@ -155,6 +155,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_inode *ni = NULL;
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
+	int olderrno;
 
 	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
 	if (!vol) {
@@ -202,11 +203,14 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		ni->security_id = 0;
 	}
 	/* Set attribute list information. */
+	olderrno = errno;
 	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
 			ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
 		/* Attribute list attribute does not present. */
+		/* restore previous errno to avoid misinterpretation */
+		errno = olderrno;
 		goto get_size;
 	}
 	NInoSetAttrList(ni);
@@ -229,10 +233,13 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto put_err_out;
 	}
 get_size:
+	olderrno = errno;
 	if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, 0, 0, NULL, 0, ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
 		/* Directory or special file. */
+		/* restore previous errno to avoid misinterpretation */
+		errno = olderrno;
 		ni->data_size = ni->allocated_size = 0;
 	} else {
 		if (ctx->attr->non_resident) {
