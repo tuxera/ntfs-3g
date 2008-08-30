@@ -3220,7 +3220,7 @@ static uid_t find_tenant(struct MAPPING *mapping[],
  *	be a a poor approximation of what was expected
  */
 
-struct POSIX_SECURITY *ntfs_ntfs_build_permissions_posix(struct MAPPING *mapping[],
+struct POSIX_SECURITY *ntfs_build_permissions_posix(struct MAPPING *mapping[],
 			const char *securattr,
 			const SID *usid, const SID *gsid, ntfs_inode *ni)
 {

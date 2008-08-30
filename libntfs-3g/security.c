@@ -1923,7 +1923,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
 #if OWNERFROMACL
 				usid = ntfs_acl_owner(securattr);
-				pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,securattr,
+				pxdesc = ntfs_build_permissions_posix(scx->mapping,securattr,
 						 usid, gsid, ni);
 				if (pxdesc)
 					perm = pxdesc->mode & 07777;
@@ -1933,7 +1933,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 #else
 				usid = (const SID*)&
 					    securattr[le32_to_cpu(phead->owner)];
-				pxdesc = ntfs_ntfs_build_permissions_posix(scx,securattr,
+				pxdesc = ntfs_build_permissions_posix(scx,securattr,
 						 usid, gsid, ni);
 				if (pxdesc)
 					perm = pxdesc->mode & 07777;
@@ -2022,7 +2022,7 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 				usid = (const SID*)&
 					  securattr[le32_to_cpu(phead->owner)];
 #endif
-				pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,securattr,
+				pxdesc = ntfs_build_permissions_posix(scx->mapping,securattr,
 					  usid, gsid, ni);
 
 					/*
@@ -2145,7 +2145,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					  securattr[le32_to_cpu(phead->owner)];
 #endif
 #if POSIXACLS
-				pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping, securattr,
+				pxdesc = ntfs_build_permissions_posix(scx->mapping, securattr,
 					  usid, gsid, ni);
 				if (pxdesc)
 					perm = pxdesc->mode & 07777;
@@ -2241,13 +2241,13 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 			gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
 #if OWNERFROMACL
 			usid = ntfs_acl_owner(securattr);
-			pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,securattr,
+			pxdesc = ntfs_build_permissions_posix(scx->mapping,securattr,
 						 usid, gsid, dir_ni);
 			uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
 #else
 			usid = (const SID*)&
 				    securattr[le32_to_cpu(phead->owner)];
-			pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,securattr,
+			pxdesc = ntfs_build_permissions_posix(scx->mapping,securattr,
 						 usid, gsid, dir_ni);
 			if (pxdesc && ntfs_same_sid(usid, adminsid)) {
 				uid = find_tenant(scx, securattr);
@@ -2679,7 +2679,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 				gsid = (const SID*)&oldattr[le32_to_cpu(phead->group)];
 				uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
 				gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
-				oldpxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,
+				oldpxdesc = ntfs_build_permissions_posix(scx->mapping,
 					oldattr, usid, gsid, ni);
 				if (oldpxdesc) {
 					mode = oldpxdesc->mode;
@@ -2792,7 +2792,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
 #if POSIXACLS
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
-			newpxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping,
+			newpxdesc = ntfs_build_permissions_posix(scx->mapping,
 				oldattr, usid, gsid, ni);
 			if (!newpxdesc || ntfs_merge_mode_posix(newpxdesc, mode))
 				res = -1;
@@ -3103,7 +3103,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 				&oldattr[le32_to_cpu(phead->owner)];
 #endif
 #if POSIXACLS
-			pxdesc = ntfs_ntfs_build_permissions_posix(scx->mapping, oldattr,
+			pxdesc = ntfs_build_permissions_posix(scx->mapping, oldattr,
 					usid, gsid, ni);
 			if (pxdesc) {
 				pxdescbuilt = TRUE;

@@ -171,7 +171,7 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 		const struct POSIX_SECURITY *pxdesc, mode_t mode, BOOL isdir);
 struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 		const struct POSIX_ACL *newacl, int count, BOOL deflt);
-struct POSIX_SECURITY *ntfs_ntfs_build_permissions_posix(struct MAPPING *mapping[],
+struct POSIX_SECURITY *ntfs_build_permissions_posix(struct MAPPING *mapping[],
 			const char *securattr,
 			const SID *usid, const SID *gsid, ntfs_inode *ni);
 struct POSIX_SECURITY *ntfs_merge_descr_posix(const struct POSIX_SECURITY *first,
