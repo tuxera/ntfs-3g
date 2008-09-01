@@ -2428,7 +2428,7 @@ static char *parse_mount_options(const char *orig_opts)
 		} else if (!strcmp(opt, "locale")) {
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
-			if (ntfs_set_char_encoding(LC_ALL, val))
+			if (ntfs_set_char_encoding(val))
 				ntfs_log_error(locale_msg, val);
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (missing_option_value(val, "streams_interface"))
