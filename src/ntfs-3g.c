@@ -1716,9 +1716,19 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 	ntfs_inode *ni;
 	char *to = list;
 	int ret = 0;
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
 		return -EOPNOTSUPP;
+#if POSIXACLS
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
@@ -1776,9 +1786,19 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 	ntfs_inode *ni;
 	char *to = value;
 	int ret = 0;
+#if POSIXACLS
+	struct SECURITY_CONTEXT security;
+#endif
 
 	if (strcmp(name, "ntfs.streams.list"))
 		return -EOPNOTSUPP;
+#if POSIXACLS
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
@@ -1955,9 +1975,23 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -EACCES;
+#if POSIXACLS
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+#if POSIXACLS
+	if (!ntfs_allowed_as_owner(&security,path,ni)) {
+		res = -errno;
+		ntfs_inode_close(ni);
+		return (res);
+	}
+#endif
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
 	if (lename_len == -1) {
 		res = -errno;
@@ -2043,6 +2077,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+#if POSIXACLS
+	if (!ntfs_allowed_as_owner(&security,path,ni)) {
+		res = -errno;
+		ntfs_inode_close(ni);
+		return (res);
+	}
+#endif
 	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
 	if (lename_len == -1) {
 		res = -errno;
@@ -2061,6 +2102,10 @@ exit:
 	return res;
 }
 
+#else
+#if POSIXACLS
+#error "Option inconsistency : POSIXACLS requires SETXATTR"
+#endif
 #endif /* HAVE_SETXATTR */
 
 static void ntfs_close(void)
