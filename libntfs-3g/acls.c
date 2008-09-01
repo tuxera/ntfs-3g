@@ -1389,7 +1389,8 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		u16 grpperms;
 		u16 othperms;
 		u16 mask;
-		u16 nonstd;
+		u16 designates;
+		u16 withmask;
 		u16 rootspecial;
 	} aceset[2], *pset;
 	BOOL adminowns;
@@ -1461,7 +1462,8 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		pset->grpperms = 0;
 		pset->othperms = 0;
 		pset->mask = (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X);
-		pset->nonstd = 0;
+		pset->designates = 0;
+		pset->withmask = 0;
 		pset->rootspecial = 0;
 	}
 
@@ -1475,7 +1477,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		}
 		switch (pxace->tag) {
 		case POSIX_ACL_USER :
-			pset->nonstd++;
+			pset->designates++;
 			if (pxace->id) {
 				sid = NTFS_FIND_USID(mapping[MAPUSERS],
 					pxace->id, (SID*)&defsid);
@@ -1486,7 +1488,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 				pset->rootspecial = TRUE;
 			break;
 		case POSIX_ACL_GROUP :
-			pset->nonstd++;
+			pset->designates++;
 			if (pxace->id) {
 				sid = NTFS_FIND_GSID(mapping[MAPUSERS],
 					pxace->id, (SID*)&defsid);
@@ -1503,7 +1505,7 @@ static int buildacls_posix(struct MAPPING *mapping[],
 			pset->othperms = pxace->perms;
 			break;
 		case POSIX_ACL_MASK :
-			pset->nonstd++;
+			pset->withmask++;
 			pset->mask = pxace->perms;
 		default :
 			break;
@@ -1522,13 +1524,19 @@ return (0);
 			pset = &aceset[1];
 			pxace = &pxdesc->acl.ace[i + pxdesc->firstdef - pxdesc->acccnt];
 		} else {
-			flags = NO_PROPAGATE_INHERIT_ACE;
+			if (pxdesc->defcnt)
+				flags = NO_PROPAGATE_INHERIT_ACE;
+			else
+				flags = (isdir ? DIR_INHERITANCE
+					   : FILE_INHERITANCE);
 			pset = &aceset[0];
 			pxace = &pxdesc->acl.ace[i];
 		}
 		tag = pxace->tag;
 		perms = pxace->perms;
-		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X));
+		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
+				&& ((pset->designates && pset->withmask)
+				   || (!pset->designates && !pset->withmask));
 		switch (tag) {
 
 			/* insert denial ACEs for each owner or allowed user */
@@ -1695,13 +1703,19 @@ return (0);
 			pset = &aceset[1];
 			pxace = &pxdesc->acl.ace[i + pxdesc->firstdef - pxdesc->acccnt];
 		} else {
-			flags = NO_PROPAGATE_INHERIT_ACE;
+			if (pxdesc->defcnt)
+				flags = NO_PROPAGATE_INHERIT_ACE;
+			else
+				flags = (isdir ? DIR_INHERITANCE
+					   : FILE_INHERITANCE);
 			pset = &aceset[0];
 			pxace = &pxdesc->acl.ace[i];
 		}
 		tag = pxace->tag;
 		perms = pxace->perms;
-		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X));
+		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
+				&& ((pset->designates && pset->withmask)
+				   || (!pset->designates && !pset->withmask));
 		switch (tag) {
 
 			/* compute a grant ACE for each owner or allowed user */
@@ -1884,7 +1898,7 @@ return (0);
 					/* now insert grants to group if more than world */
 				if (adminowns
 					|| groupowns
-					|| (avoidmask && pset->nonstd)
+					|| (avoidmask && (pset->designates || pset->withmask))
 					|| (perms & ~pset->othperms)
 					|| (pset->rootspecial
 					   && (tag == POSIX_ACL_GROUP_OBJ))
