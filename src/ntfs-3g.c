@@ -1710,6 +1710,49 @@ close_inode:
 static const char nf_ns_xattr_preffix[] = "user.";
 static const int nf_ns_xattr_preffix_len = 5;
 
+#if POSIXACLS
+
+static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
+static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
+
+/*
+ *		Check whether access to an ACL as an extended attribute
+ *	is allowed
+ *
+ *	Returns pointer to inode if allowed,
+ *		NULL and errno set if not allowed
+ */
+
+static ntfs_inode *ntfs_check_access_xattr(const char *path,
+			struct SECURITY_CONTEXT *security)
+{
+	ntfs_inode *ni;
+
+	ni = (ntfs_inode*)NULL;
+	if (ntfs_fuse_is_named_data_stream(path))
+		errno = EINVAL; /* n/a for named data streams. */
+	else {
+		/*
+		 * return unsupported if ACL were disabled
+		 * or no user mapping has been defined.
+		 * However no error will be returned to getfacl
+		 */
+		if ((ctx->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
+		   || !ntfs_fuse_fill_security_context(security)) {
+			errno = EOPNOTSUPP;
+		} else {
+			   /* parent directory must be executable */
+			if (ntfs_allowed_dir_access(security,path,S_IEXEC)) {
+				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			}
+		}
+	}
+	return (ni);
+}
+
+#endif
+
 static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
@@ -1863,33 +1906,24 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix ACL retrieval */
-	if ((size > 0)
-	    && (!strcmp(name,"system.posix_acl_access")
-		|| !strcmp(name,"system.posix_acl_default"))) {
+			/* hijack Posix/NTFS ACL retrieval */
+	if ((!strcmp(name,nf_ns_xattr_posix_access)
+		|| !strcmp(name,nf_ns_xattr_posix_default)) {
 
-		if (ntfs_fuse_is_named_data_stream(path))
-			return -EINVAL; /* n/a for named data streams. */
-		/*
-		 * return unsupported if ACL were disabled
-		 * or no user mapping has been defined
-		 * However no error will be returned to getfacl
-		 */
- 		if ((ctx->secure_flags
-			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
-		   || !ntfs_fuse_fill_security_context(&security)) {
-			res = -EOPNOTSUPP;
-		} else {
-			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-			if (!ni)
-				res = -errno;
-			else {
-				res = ntfs_get_posix_acl(&security,path,
-					name,value,size,ni);
-				if (ntfs_inode_close(ni))
-					set_fuse_error(&res);
-			}
-		}
+		ni = ntfs_check_access_xattr(path,&security);
+		if (ni) {
+				/*
+				 * the returned value is the needed
+				 * size. If it is too small, no copy
+				 * is done, and the caller has to
+				 * issue a new call with correct size.
+				 */
+			res = ntfs_get_posix_acl(&security,path,
+				name,value,size,ni);
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
 		return (res);
 	}
 #endif
@@ -1942,31 +1976,20 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix ACL setting */
-	if (!strcmp(name,"system.posix_acl_access")
-	    || !strcmp(name,"system.posix_acl_default")) {
+			/* hijack Posix/NTFS ACL setting */
+	if (!strcmp(name,nf_ns_xattr_posix_access)
+	    || !strcmp(name,nf_ns_xattr_posix_default)) {
 
-		if (ntfs_fuse_is_named_data_stream(path))
-			return -EINVAL; /* n/a for named data streams. */
-		/*
-		 * return unsupported if ACL were disabled
-		 * or no user mapping has been defined
-		 */
-		if ((ctx->secure_flags
-			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
-		   || !ntfs_fuse_fill_security_context(&security)) {
-			res = -EOPNOTSUPP;
-		} else {
-			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-			if (!ni)
+		ni = ntfs_check_access_xattr(path,&security);
+		if (ni) {
+			res = ntfs_set_posix_acl(&security,path,
+				name,value,size,ni);
+			if (res)
 				res = -errno;
-			else {
-				res = ntfs_set_posix_acl(&security,path,
-					name,value,size,ni);
-				if (ntfs_inode_close(ni))
-					set_fuse_error(&res);
-			}
-		}
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
 		return (res);
 	}
 #endif
@@ -2041,32 +2064,26 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix ACL removal */
-	if (!strcmp(name,"system.posix_acl_access")
-	    || !strcmp(name,"system.posix_acl_default")) {
-
-		if (ntfs_fuse_is_named_data_stream(path))
-			return -EINVAL; /* n/a for named data streams. */
-		/*
-		 * return unsupported if ACL were disabled
-		 * or no user mapping has been defined.
-		 */
-		if ((ctx->secure_flags
-			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_RAW)))
-		   || !ntfs_fuse_fill_security_context(&security)) {
-			res = -EOPNOTSUPP;
-		} else {
-			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-			if (!ni)
-				res = -errno;
-			else {
+			/* hijack Posix/NTFS ACL removal */
+	if (!strcmp(name,nf_ns_xattr_posix_access)
+	    || !strcmp(name,nf_ns_xattr_posix_default)
+	    || !strcmp(name,nf_ns_xattr_ntfs)) {
+			/*
+			 * Removal of NTFS ACL is never allowed
+			 */
+		if (!strcmp(name,nf_ns_xattr_ntfs))
+			res = -EPERM;
+		else {
+			ni = ntfs_check_access_xattr(path,&security);
+			if (ni) {
 				res = ntfs_remove_posix_acl(&security,path,
 					name,ni);
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
-			}
+			} else
+				res = -errno;
 		}
-		return (res);
+	return (res);
 	}
 #endif
 	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
