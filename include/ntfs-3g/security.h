@@ -239,6 +239,8 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, struct stat*);
 int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 		const char *path, ntfs_inode *ni, mode_t mode);
+BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
+                const char *path, ntfs_inode *ni);
 int ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
 		ntfs_inode *ni, int accesstype);
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
@@ -280,6 +282,12 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			ntfs_inode *ni);
 int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, ntfs_inode *ni);
+int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name, char *value, size_t size,
+			ntfs_inode *ni);
+int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name, const char *value, size_t size,
+			ntfs_inode *ni);
 
 #endif
 

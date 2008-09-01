@@ -1990,7 +1990,10 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 
 /*
  *		Get a Posix ACL
+ *
  *	returns size or -errno if there is a problem
+ *	if size was too small, no copy is done and errno is not set,
+ *	the caller is expected to issue a new call
  */
 
 int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
@@ -2072,26 +2075,35 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 		if (pxdesc) {
 			if (ntfs_valid_posix(pxdesc)) {
 				if (!strcmp(name,"system.posix_acl_default")) {
-					outsize = sizeof(struct POSIX_ACL)
-						+ pxdesc->defcnt*sizeof(struct POSIX_ACE);
-					if (outsize <= size) {
+					if (ni->mrec->flags
+						    & MFT_RECORD_IS_DIRECTORY)
+						outsize = sizeof(struct POSIX_ACL)
+							+ pxdesc->defcnt*sizeof(struct POSIX_ACE);
+					else {
+					/*
+					 * getting default ACL from plain file :
+					 * return EACCES if size > 0 as
+					 * indicated in the man, but return ok
+					 * if size == 0, so that ls does not
+					 * display an error
+					 */
+						if (size > 0) {
+							outsize = 0;
+							errno = EACCES;
+						} else
+							outsize = sizeof(struct POSIX_ACL);
+					}
+					if (outsize && (outsize <= size)) {
 						memcpy(value,&pxdesc->acl,sizeof(struct POSIX_ACL));
 						memcpy(&value[sizeof(struct POSIX_ACL)],
 							&pxdesc->acl.ace[pxdesc->firstdef],
 							outsize-sizeof(struct POSIX_ACL));
-					} else {
-						outsize = 0;
-						errno = ENOSPC;
 					}
 				} else {
 					outsize = sizeof(struct POSIX_ACL)
 						+ pxdesc->acccnt*sizeof(struct POSIX_ACE);
 					if (outsize <= size)
 						memcpy(value,&pxdesc->acl,outsize);
-					else {
-						outsize = 0;
-						errno = ENOSPC;
-					}
 				}
 			} else {
 				outsize = 0;
@@ -2102,6 +2114,33 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 				free(pxdesc);
 		} else
 			outsize = 0;
+	}
+	return (outsize ? (int)outsize : -errno);
+}
+
+/*
+ *		Get an NTFS ACL
+ *
+ *	Returns size or -errno if there is a problem
+ *	if size was too small, no copy is done and errno is not set,
+ *	the caller is expected to issue a new call
+ */
+
+int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
+			const char *name  __attribute__((unused)),
+			char *value, size_t size, ntfs_inode *ni)
+{
+	char *securattr;
+	size_t outsize;
+
+	outsize = 0;	/* default to no data and no error */
+	securattr = getsecurityattr(scx->vol, path, ni);
+	if (securattr) {
+		outsize = ntfs_attr_size(securattr);
+		if (outsize <= size) {
+			memcpy(value,securattr,outsize);
+		}
+		free(securattr);
 	}
 	return (outsize ? (int)outsize : -errno);
 }
@@ -2628,11 +2667,63 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 #if POSIXACLS
 
 /*
+ *		Check whether user has ownership rights on a file
+ *
+ *	Returns TRUE if allowed
+ *		if not, errno tells why
+ */
+
+BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni)
+{
+	const struct CACHED_PERMISSIONS *cached;
+	char *oldattr;
+	const SID *usid;
+	uid_t processuid;
+	uid_t uid;
+	BOOL gotowner;
+	int allowed;
+
+	gotowner = FALSE; /* default */
+	processuid = scx->uid;
+		/* get the owner, either from cache or from old attribute  */
+	cached = fetch_cache(scx, ni);
+	if (cached) {
+		uid = cached->uid;
+		gotowner = TRUE;
+	} else {
+		oldattr = getsecurityattr(scx->vol,path, ni);
+		if (oldattr) {
+#if OWNERFROMACL
+			usid = ntfs_acl_owner(oldattr);
+#else
+			const SECURITY_DESCRIPTOR_RELATIVE *phead;
+
+			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
+			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
+#endif
+			uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
+			gotowner = TRUE;
+			free(oldattr);
+		}
+	}
+	allowed = FALSE;
+	if (gotowner) {
+/* TODO : use CAP_FOWNER process capability */
+		if (!processuid || (processuid == uid))
+			allowed = TRUE;
+		else
+			errno = EPERM;
+	}
+	return (allowed);
+}
+
+/*
  *		Set a new access or default Posix ACL to a file
  *		(or remove ACL if no input data)
  *	Validity of input data is checked after merging
  *
- *	Returns 0, or -1 if there is a problem
+ *	Returns 0, or -1 if there is a problem which errno describes
  */
 
 int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
@@ -2664,7 +2755,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 		count = 0;
 	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 	newpxdesc = (struct POSIX_SECURITY*)NULL;
-	if (!deflt || isdir) {
+	if (!deflt || isdir || !size) {
 		cached = fetch_cache(scx, ni);
 		if (cached) {
 			uid = cached->uid;
@@ -2703,6 +2794,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 
 	if (newpxdesc) {
 		processuid = scx->uid;
+/* TODO : use CAP_FOWNER process capability */
 		if (!processuid || (uid == processuid)) {
 				/*
 				 * clear setgid if file group does
@@ -2730,6 +2822,65 @@ int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 {
 	return (ntfs_set_posix_acl(scx, path, name,
 			(const char*)NULL, 0, ni));
+}
+
+/*
+ *		Set a new NTFS ACL to a file
+ *
+ *	Returns 0, or -1 if there is a problem
+ */
+
+int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
+			const char *path  __attribute__((unused)),
+			const char *name  __attribute__((unused)),
+			const char *value, size_t size,	ntfs_inode *ni)
+{
+	char *attr;
+	int res;
+
+	res = -1;
+	if ((size > 0)
+	   && ntfs_valid_descr(value,size)
+	   && (ntfs_attr_size(value) == size)) {
+		if (ntfs_allowed_as_owner(scx,path,ni)) {
+				/* need copying in order to write */
+			attr = (char*)ntfs_malloc(size);
+			if (attr) {
+				memcpy(attr,value,size);
+				res = update_secur_descr(scx->vol, attr, ni);
+				/*
+				 * No need to invalidate standard caches :
+				 * the relation between a securid and
+				 * the associated protection is unchanged,
+				 * only the relation between a file and
+				 * its securid and protection is changed.
+				 */
+#if CACHE_LEGACY_SIZE
+				/*
+				 * we must however invalidate the legacy
+				 * cache, which is based on inode numbers.
+				 * For safety, invalidate even if updating
+				 * failed.
+				 */
+				if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				   && !ni->security_id) {
+					struct CACHED_PERMISSIONS_LEGACY legacy;
+
+					legacy.mft_no = ni->mft_no;
+					legacy.variable = (char*)NULL;
+					legacy.varsize = 0;
+					ntfs_invalidate_cache(scx->vol->legacy_cache,
+						GENERIC(&legacy),
+						(cache_compare)leg_compare);
+				}
+#endif
+				free(attr);
+			} else
+				errno = ENOMEM;
+		}
+	} else
+		errno = EINVAL;
+	return (res ? -1 : 0);
 }
 
 #endif
@@ -2812,6 +2963,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 
 	if (!res) {
 		processuid = scx->uid;
+/* TODO : use CAP_FOWNER process capability */
 		if (!processuid || (uid == processuid)) {
 				/*
 				 * clear setgid if file group does

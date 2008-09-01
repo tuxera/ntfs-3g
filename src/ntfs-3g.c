@@ -1714,6 +1714,7 @@ static const int nf_ns_xattr_preffix_len = 5;
 
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
+static const char nf_ns_xattr_ntfs[] = "system.ntfs_acl";
 
 /*
  *		Check whether access to an ACL as an extended attribute
@@ -1908,7 +1909,8 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 
 			/* hijack Posix/NTFS ACL retrieval */
 	if ((!strcmp(name,nf_ns_xattr_posix_access)
-		|| !strcmp(name,nf_ns_xattr_posix_default)) {
+		|| !strcmp(name,nf_ns_xattr_posix_default)
+		|| !strcmp(name,nf_ns_xattr_ntfs))) {
 
 		ni = ntfs_check_access_xattr(path,&security);
 		if (ni) {
@@ -1918,8 +1920,12 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 				 * is done, and the caller has to
 				 * issue a new call with correct size.
 				 */
-			res = ntfs_get_posix_acl(&security,path,
-				name,value,size,ni);
+			if (!strcmp(name,nf_ns_xattr_ntfs))
+				res = ntfs_get_ntfs_acl(&security,path,
+					name,value,size,ni);
+			else
+				res = ntfs_get_posix_acl(&security,path,
+					name,value,size,ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		} else
@@ -1978,12 +1984,17 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 
 			/* hijack Posix/NTFS ACL setting */
 	if (!strcmp(name,nf_ns_xattr_posix_access)
-	    || !strcmp(name,nf_ns_xattr_posix_default)) {
+	    || !strcmp(name,nf_ns_xattr_posix_default)
+	    || !strcmp(name,nf_ns_xattr_ntfs)) {
 
 		ni = ntfs_check_access_xattr(path,&security);
 		if (ni) {
-			res = ntfs_set_posix_acl(&security,path,
-				name,value,size,ni);
+			if (!strcmp(name,nf_ns_xattr_ntfs))
+				res = ntfs_set_ntfs_acl(&security,path,
+					name,value,size,ni);
+			else
+				res = ntfs_set_posix_acl(&security,path,
+					name,value,size,ni);
 			if (res)
 				res = -errno;
 			if (ntfs_inode_close(ni))
