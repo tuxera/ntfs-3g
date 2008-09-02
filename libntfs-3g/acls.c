@@ -1077,7 +1077,9 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 		sizeof(struct POSIX_SECURITY) + count*sizeof(struct POSIX_ACE));
 	if (pydesc) {
 			/*
-			 * Copy inherited tags and adapt perms
+			 * Copy inherited tags 
+			 * and, for a plain file, remove execution right
+			 * from owner, other and mask
 			 */
 		tagsset = 0;
 		defcnt = (pxdesc ? pxdesc->defcnt : 0);
@@ -1086,17 +1088,10 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 			*pyace = pxdesc->acl.ace[pxdesc->firstdef + i];
 			switch (pyace->tag) {
 			case POSIX_ACL_USER_OBJ :
-				pyace->perms &= (mode >> 6) & 7;
-				break;
-			case POSIX_ACL_GROUP_OBJ :
-				if (!(tagsset & POSIX_ACL_MASK))
-					pyace->perms &= (mode >> 3) & 7;
-				break;
 			case POSIX_ACL_OTHER :
-				pyace->perms &= mode & 7;
-				break;
 			case POSIX_ACL_MASK :
-				pyace->perms &= (mode >> 3) & 7;
+				if (!isdir)
+					pyace->perms &= 6;
 				break;
 			default :
 				break;
