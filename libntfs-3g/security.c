@@ -2323,6 +2323,7 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 				pydesc = ntfs_build_inherited_posix(pxdesc, mode, isdir);
 				free(pxdesc);
 			}
+			free(securattr);
 		}
 	}
 	return (pydesc);
