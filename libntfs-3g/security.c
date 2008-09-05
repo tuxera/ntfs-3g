@@ -1611,8 +1611,16 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			legacy = (struct CACHED_PERMISSIONS_LEGACY*)ntfs_enter_cache(
 				scx->vol->legacy_cache, GENERIC(&wanted),
 				(cache_compare)leg_compare);
-			if (legacy)
+			if (legacy) {
 				cacheentry = &legacy->perm;
+#if POSIXACLS
+				/*
+				 * give direct access to the cached pxdesc
+				 * in the permissions structure
+				 */
+				cacheentry->pxdesc = legacy->variable;
+#endif
+			}
 		}
 #endif
 	}
