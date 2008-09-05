@@ -818,19 +818,6 @@ BOOL ntfs_valid_posix(const struct POSIX_SECURITY *pxdesc)
 	return (ok);
 }
 
-static BOOL ntfs_valid_posix_chk(const struct POSIX_SECURITY *pxdesc, const char *file, int line)
-{
-	BOOL ok;
-
-	ok = ntfs_valid_posix(pxdesc);
-	if (!ok) {
-		ntfs_log_error("Bad Posix ACL in %s line %d\n",file,line);
-	}
-	return (ok);
-}
-
-#define ntfs_valid_posix(p) ntfs_valid_posix_chk((p),__FILE__,__LINE__)
-
 /*
  *		Set standard header data into a Posix ACL
  *	The mode argument should provide the 3 upper bits of target mode
@@ -1039,6 +1026,7 @@ struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 			/* assume special flags unchanged */
 		posix_header(newpxdesc, oldpxdesc->mode);
 		if (!ntfs_valid_posix(newpxdesc)) {
+			/* do not log, this is an application error */
 			free(newpxdesc);
 			newpxdesc = (struct POSIX_SECURITY*)NULL;
 			errno = EINVAL;
