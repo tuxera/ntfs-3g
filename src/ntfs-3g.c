@@ -747,18 +747,16 @@ static int ntfs_fuse_open(const char *org_path,
 			if (NAttrEncrypted(na))
 				res = -EACCES;
 #endif
+			ntfs_attr_close(na);
 		} else
 			res = -errno;
+		if (ntfs_inode_close(ni))
+			set_fuse_error(&res);
 	} else
 		res = -errno;
 	free(path);
 	if (stream_name_len)
 		free(stream_name);
-	if (res) {
-		ntfs_attr_close(na);
-		ntfs_inode_close(ni);
-	} else
-		fi->fh = (uintptr_t)na;
 	return res;
 }
 
