@@ -1363,11 +1363,15 @@ static void free_caches(struct SECURITY_CONTEXT *scx)
 		for (index1=0; index1<=pseccache->head.last; index1++)
 			if (pseccache->cachetable[index1]) {
 #if POSIXACLS
+				struct CACHED_PERMISSIONS *cacheentry;
 				unsigned int index2;
 
-				for (index2=0; index2<(1<< CACHE_PERMISSIONS_BITS); index2++)
-					if (pseccache->cachetable[index1][index2].pxdesc)
-						free(pseccache->cachetable[index1][index2].pxdesc);
+				for (index2=0; index2<(1<< CACHE_PERMISSIONS_BITS); index2++) {
+					cacheentry = &pseccache->cachetable[index1][index2];
+					if (cacheentry->valid
+					    && cacheentry->pxdesc)
+						free(cacheentry->pxdesc);
+					}
 #endif
 				free(pseccache->cachetable[index1]);
 			}
@@ -1510,7 +1514,7 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 			cacheentry->uid = uid;
 			cacheentry->gid = gid;
 #if POSIXACLS
-			if (cacheentry->pxdesc)
+			if (cacheentry->valid && cacheentry->pxdesc)
 				free(cacheentry->pxdesc);
 			if (pxdesc) {
 				pxsize = sizeof(struct POSIX_SECURITY)
@@ -1556,8 +1560,6 @@ static struct CACHED_PERMISSIONS *enter_cache(struct SECURITY_CONTEXT *scx,
 					cacheentry->uid = uid;
 					cacheentry->gid = gid;
 #if POSIXACLS
-					if (cacheentry->pxdesc)
-						free(cacheentry->pxdesc);
 					if (pxdesc) {
 						pxsize = sizeof(struct POSIX_SECURITY)
 							+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
