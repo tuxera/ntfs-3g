@@ -5112,10 +5112,23 @@ s64 ntfs_attr_get_free_bits(ntfs_attr *na)
 		if (br <= 0)
 			break;
 		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
+		for (i = 0; i < br; )
+			switch (buf[i]) {
+			case 0 :
+				do {
+					nr_free += 8;
+				} while ((++i < br) && (!buf[i]));
+			break;
+			case 255 :
+				do {
+				} while ((++i < br) && (buf[i] == 255));
+			break;
+			default :
+				for (j = 0; j < 8; j++)
+					if (!((buf[i] >> j) & 1))
+						nr_free++;
+				i++;
+			}
 	}
 	free(buf);
 	if (!total || br < 0)

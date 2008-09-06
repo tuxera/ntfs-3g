@@ -82,74 +82,56 @@ static void ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc)
 
 static s64 max_empty_bit_range(unsigned char *buf, int size)
 {
-	int max_range;
-	int i,j;
-	int run;
-	unsigned char uncounted;
+	int i, j, run = 0;
+	int max_range = 0;
 	s64 start_pos = -1;
-
-	max_range = 0;
+	
+	ntfs_log_trace("Entering\n");
+	
 	i = 0;
-		/*
-		 * count every bit until we reach a range of 8
-		 * (fast count if all bits set)
-		 */
-	run = 0;
-	while ((i < size) && (max_range < 8)) {
-		if (*buf == 255) {
+	while (i < size) {
+		switch (*buf) {
+		case 0 :
+			do {
+				buf++;
+				run += 8;
+				i++;
+			} while ((i < size) && !*buf);
+			break;
+		case 255 :
 			if (run > max_range) {
 				max_range = run;
-				start_pos = i * 8 - run;
+				start_pos = (s64)i * 8 - run;
 			}
 			run = 0;
-		} else
-			for (j=0; j<8; j++)
-				if (*buf & (1 << j)) {
+			do {
+				buf++;
+				i++;
+			} while ((i < size) && (*buf == 255));
+			break;
+		default :
+			for (j = 0; j < 8; j++) {
+			
+				int bit = *buf & (1 << j);
+		
+				if (bit) {
 					if (run > max_range) {
 						max_range = run;
-						start_pos = i * 8 + j - run;
+						start_pos = (s64)i * 8 + (j - run);
 					}
 					run = 0;
-				} else
+				} else 
 					run++;
-		i++;
-		buf++;
-	}
-		/*
-		 * From now on, beginning and end are in different bytes
-		 * and we do not count bits unless we have enough
-		 * null bytes
-		 */
-	uncounted = 255;
-	while (i < size) {
-		if (*buf) {
-			if ((run + 14) > max_range) {
-				/* uncounted bits in first byte */
-				for (j=7; (j>=0) && !(uncounted & (1 << j)); j--)
-					run++;
-				/* uncounted bits in last byte */
-				for (j=0; (j<8) && !(*buf & (1 << j)); j++)
-					run++;
-				if (run > max_range) {
-					max_range = run;
-					start_pos = i * 8 + j - run;
-				}
 			}
-			uncounted = *buf;
-			run = 0;
-		} else
-			run += 8;
-		buf++;
-		i++;
+			i++;
+			buf++;
+		
+		}
 	}
-	if ((run + 7) > max_range) {
-		/* uncounted bits in first byte */
-		for (j=7; (j>=0) && !(uncounted & (1 << j)); j--)
-			run++;
-		if (run > max_range)
-			start_pos = i * 8 - run;
-	}
-
+	
+	if (run > max_range)
+		start_pos = (s64)i * 8 - run;
+	
 	return start_pos;
 }
 
