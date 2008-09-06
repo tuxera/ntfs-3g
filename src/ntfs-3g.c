@@ -898,6 +898,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na)
 		goto exit;
+#if POSIXACLS
 	/*
 	 * JPA deny truncation if cannot search in parent directory
 	 * or cannot write to file (already checked for ftruncate())
@@ -909,6 +910,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
 		errno = EACCES;
 		goto exit;
 	}
+#endif
 
 	if (ntfs_attr_truncate(na, size))
 		goto exit;
@@ -1121,6 +1123,8 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 	if (!ntfs_fuse_fill_security_context(&security)
 	       || ntfs_allowed_access(&security,dir_path,
 				dir_ni,S_IWRITE + S_IEXEC)) {
+#else
+		ntfs_fuse_fill_security_context(&security);
 #endif
  /* ! JPA ! did not find where to get umask from ! */
 		if (S_ISDIR(type))
