@@ -2904,6 +2904,14 @@ int main(int argc, char *argv[])
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
 	
+	ctx->security.uid = 0;
+	ctx->security.gid = 0;
+	if ((opts.mnt_point[0] == '/')
+	   && !stat(opts.mnt_point,&sbuf)) {
+		/* collect owner of mount point, useful for default mapping */
+		ctx->security.uid = sbuf.st_uid;
+		ctx->security.gid = sbuf.st_gid;
+	}
 	create_dev_fuse();
 
 	if (drop_privs())
@@ -2950,10 +2958,10 @@ int main(int argc, char *argv[])
 	setup_logging(parsed_options);
 
 	ctx->security.vol = ctx->vol;
-	ctx->security.uid = ctx->uid;
-	ctx->security.gid = ctx->gid;
 	ctx->vol->secure_flags = ctx->secure_flags;
 	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
+		ctx->security.uid = ctx->uid;
+		ctx->security.gid = ctx->gid;
 		/* same ownership/permissions for all files */
 		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
 		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
