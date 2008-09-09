@@ -970,13 +970,8 @@ static int ntfs_fuse_chmod(const char *path,
 			else {
 				if (ntfs_set_mode(&security,path,ni,mode))
 					res = -errno;
-				else {
-					if (mode & S_IWUSR)
-						ni->flags &= ~FILE_ATTR_READONLY;
-					else
-						ni->flags |= FILE_ATTR_READONLY;
+				else
 					ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-				}
 				NInoSetDirty(ni);
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
@@ -1193,14 +1188,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
 #endif
-				else {
-					/* Adjust read-only (for Windows) */
-					if (perm & S_IWUSR)
-						ni->flags &= ~FILE_ATTR_READONLY;
-					else
-						ni->flags |= FILE_ATTR_READONLY;
-				}
-			}
+  			}
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);

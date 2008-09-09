@@ -2454,7 +2454,14 @@ int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 		newattr = ntfs_build_descr_posix(scx->mapping, pxdesc,
 					isdir, usid, gsid);
 		if (newattr) {
+				/* Adjust Windows read-only flag */
 			res = update_secur_descr(scx->vol, newattr, ni);
+			if (!res) {
+				if (mode & S_IWUSR)
+					ni->flags &= ~FILE_ATTR_READONLY;
+				else
+					ni->flags |= FILE_ATTR_READONLY;
+			}
 #if CACHE_LEGACY_SIZE
 			/* also invalidate legacy cache */
 			if (isdir && !ni->security_id) {
@@ -2637,6 +2644,11 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		if (newattr) {
 			res = update_secur_descr(scx->vol, newattr, ni);
 			if (!res) {
+				/* adjust Windows read-only flag */
+				if (mode & S_IWUSR)
+					ni->flags &= ~FILE_ATTR_READONLY;
+				else
+					ni->flags |= FILE_ATTR_READONLY;
 				/* update cache, for subsequent use */
 				if (test_nino_flag(ni, v3_Extensions)) {
 					wanted.securid = ni->security_id;
