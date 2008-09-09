@@ -398,10 +398,10 @@ static u32 findimplicit(const SID *xsid, const SID *pattern, int parity)
  *	Returns NULL if not found
  */
 
-const SID *ntfs_find_usid(struct MAPPING *usermapping,
+const SID *ntfs_find_usid(const struct MAPPING* usermapping,
 		uid_t uid, SID *defusid)
 {
-	struct MAPPING *p;
+	const struct MAPPING *p;
 	const SID *sid;
 	le32 leauth;
 	u32 uauth;
@@ -442,10 +442,10 @@ const SID *ntfs_find_usid(struct MAPPING *usermapping,
  *	Returns 0 (root) if not found
  */
 
-const SID *ntfs_find_gsid(struct MAPPING *groupmapping,
+const SID *ntfs_find_gsid(const struct MAPPING* groupmapping,
 		gid_t gid, SID *defgsid)
 {
-	struct MAPPING *p;
+	const struct MAPPING *p;
 	const SID *sid;
 	le32 leauth;
 	u32 uauth;
@@ -486,10 +486,10 @@ const SID *ntfs_find_gsid(struct MAPPING *groupmapping,
  *	Returns 0 (root) if not found
  */
 
-uid_t ntfs_find_user(struct MAPPING *usermapping, const SID *usid)
+uid_t ntfs_find_user(const struct MAPPING* usermapping, const SID *usid)
 {
 	uid_t uid;
-	struct MAPPING *p;
+	const struct MAPPING *p;
 
 	p = usermapping;
 	while (p && p->xid && !ntfs_same_sid(usid, p->sid))
@@ -509,10 +509,10 @@ uid_t ntfs_find_user(struct MAPPING *usermapping, const SID *usid)
  *	Returns 0 (root) if not found
  */
 
-gid_t ntfs_find_group(struct MAPPING *groupmapping, const SID * gsid)
+gid_t ntfs_find_group(const struct MAPPING* groupmapping, const SID * gsid)
 {
 	gid_t gid;
-	struct MAPPING *p;
+	const struct MAPPING *p;
 	int gsidsz;
 
 	gsidsz = ntfs_sid_size(gsid);
@@ -1789,8 +1789,8 @@ static BOOL build_group_denials_grant(ACL *pacl,
  *
  */
 
-static int buildacls_posix(struct MAPPING* mapping[],
-		char *secattr, int offs, struct POSIX_SECURITY *pxdesc,
+static int buildacls_posix(struct MAPPING* const mapping[],
+		char *secattr, int offs, const struct POSIX_SECURITY *pxdesc,
 		int isdir, const SID *usid, const SID *gsid)
 {
         struct BUILD_CONTEXT aceset[2], *pset;
@@ -2431,7 +2431,7 @@ static int buildacls(char *secattr, int offs, mode_t mode, int isdir,
  *	returns descriptor in allocated memory, must free() after use
  */
 
-char *ntfs_build_descr_posix(struct MAPPING *mapping[],
+char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
 			struct POSIX_SECURITY *pxdesc,
 			int isdir, const SID *usid, const SID *gsid)
 {
@@ -3289,7 +3289,7 @@ const SID *ntfs_acl_owner(const char *securattr)
  */
 
 
-static uid_t find_tenant(struct MAPPING *mapping[],
+static uid_t find_tenant(struct MAPPING *const mapping[],
 			const char *securattr)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -3338,7 +3338,8 @@ static uid_t find_tenant(struct MAPPING *mapping[],
  *	be a a poor approximation of what was expected
  */
 
-struct POSIX_SECURITY *ntfs_build_permissions_posix(struct MAPPING *mapping[],
+struct POSIX_SECURITY *ntfs_build_permissions_posix(
+			struct MAPPING *const mapping[],
 			const char *securattr,
 			const SID *usid, const SID *gsid, ntfs_inode *ni)
 {

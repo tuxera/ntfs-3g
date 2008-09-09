@@ -156,10 +156,12 @@ BOOL ntfs_is_user_sid(const SID *usid);
 int ntfs_sid_size(const SID * sid);
 unsigned int ntfs_attr_size(const char *attr);
 
-const SID *ntfs_find_usid(struct MAPPING *usermapping, uid_t uid, SID *pdefsid);
-const SID *ntfs_find_gsid(struct MAPPING *groupmapping, gid_t gid, SID *pdefsid);
-uid_t ntfs_find_user(struct MAPPING *usermapping, const SID *usid);
-gid_t ntfs_find_group(struct MAPPING *groupmapping, const SID * gsid);
+const SID *ntfs_find_usid(const struct MAPPING *usermapping,
+			uid_t uid, SID *pdefsid);
+const SID *ntfs_find_gsid(const struct MAPPING *groupmapping,
+			gid_t gid, SID *pdefsid);
+uid_t ntfs_find_user(const struct MAPPING *usermapping, const SID *usid);
+gid_t ntfs_find_group(const struct MAPPING *groupmapping, const SID * gsid);
 const SID *ntfs_acl_owner(const char *secattr);
 
 #if POSIXACLS
@@ -171,12 +173,13 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 		const struct POSIX_SECURITY *pxdesc, mode_t mode, BOOL isdir);
 struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 		const struct POSIX_ACL *newacl, int count, BOOL deflt);
-struct POSIX_SECURITY *ntfs_build_permissions_posix(struct MAPPING *mapping[],
+struct POSIX_SECURITY *ntfs_build_permissions_posix(
+			struct MAPPING* const mapping[],
 			const char *securattr,
 			const SID *usid, const SID *gsid, ntfs_inode *ni);
 struct POSIX_SECURITY *ntfs_merge_descr_posix(const struct POSIX_SECURITY *first,
 			const struct POSIX_SECURITY *second);
-char *ntfs_build_descr_posix(struct MAPPING *mapping[],
+char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
 			struct POSIX_SECURITY *pxdesc,
 			int isdir, const SID *usid, const SID *gsid);
 
