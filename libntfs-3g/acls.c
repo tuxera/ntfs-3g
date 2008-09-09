@@ -1275,7 +1275,434 @@ struct POSIX_SECURITY *ntfs_merge_descr_posix(const struct POSIX_SECURITY *first
 	return (pxdesc);
 }
 
-#endif /* POSIXACLS */
+struct BUILD_CONTEXT {
+	BOOL isdir;
+	BOOL adminowns;
+	BOOL groupowns;
+	u16 selfuserperms;
+	u16 selfgrpperms;
+	u16 grpperms;
+	u16 othperms;
+	u16 mask;
+	u16 designates;
+	u16 withmask;
+	u16 rootspecial;
+} ;
+
+
+
+static BOOL build_user_denials(ACL *pacl,
+		const SID *usid, struct MAPPING* const mapping[],
+		ACE_FLAGS flags, const struct POSIX_ACE *pxace,
+		struct BUILD_CONTEXT *pset)
+{
+	BIGSID defsid;
+	ACCESS_ALLOWED_ACE *pdace;
+	const SID *sid;
+	int sidsz;
+	int pos;
+	int acecnt;
+	le32 grants;
+	le32 denials;
+	u16 perms;
+	u16 mixperms;
+	u16 tag;
+	BOOL rejected;
+	BOOL rootuser;
+	BOOL avoidmask;
+
+	rejected = FALSE;
+	tag = pxace->tag;
+	perms = pxace->perms;
+	rootuser = FALSE;
+	pos = le16_to_cpu(pacl->size);
+	acecnt = le16_to_cpu(pacl->ace_count);
+	avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
+			&& ((pset->designates && pset->withmask)
+			   || (!pset->designates && !pset->withmask));
+	if (tag == POSIX_ACL_USER_OBJ) {
+		sid = usid;
+		sidsz = ntfs_sid_size(sid);
+		grants = OWNER_RIGHTS;
+	} else {
+		if (pxace->id) {
+			sid = NTFS_FIND_USID(mapping[MAPUSERS],
+				pxace->id, (SID*)&defsid);
+			grants = WORLD_RIGHTS;
+		} else {
+			sid = adminsid;
+			rootuser = TRUE;
+			grants = WORLD_RIGHTS & ~ROOT_OWNER_UNMARK;
+		}
+		if (sid) {
+			sidsz = ntfs_sid_size(sid);
+			/*
+			 * Insert denial of complement of mask for
+			 * each designated user (except root)
+			 * WRITE_OWNER is inserted so that
+			 * the mask can be identified
+			 */
+			if (!avoidmask && !rootuser) {
+				denials = WRITE_OWNER;
+				pdace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+				if (pset->isdir) {
+					if (!(pset->mask & POSIX_PERM_X))
+						denials |= DIR_EXEC;
+					if (!(pset->mask & POSIX_PERM_W))
+						denials |= DIR_WRITE;
+					if (!(pset->mask & POSIX_PERM_R))
+						denials |= DIR_READ;
+				} else {
+					if (!(pset->mask & POSIX_PERM_X))
+						denials |= FILE_EXEC;
+					if (!(pset->mask & POSIX_PERM_W))
+						denials |= FILE_WRITE;
+					if (!(pset->mask & POSIX_PERM_R))
+						denials |= FILE_READ;
+				}
+				if (rootuser)
+					grants &= ~ROOT_OWNER_UNMARK;
+				pdace->type = ACCESS_DENIED_ACE_TYPE;
+				pdace->flags = flags;
+				pdace->size = cpu_to_le16(sidsz + 8);
+				pdace->mask = denials;
+				memcpy((char*)&pdace->sid, sid, sidsz);
+				pos += sidsz + 8;
+				acecnt++;
+			}
+		} else
+			rejected = TRUE;
+	}
+	if (!rejected) {
+		if (pset->isdir) {
+			if (perms & POSIX_PERM_X)
+				grants |= DIR_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= DIR_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= DIR_READ;
+		} else {
+			if (perms & POSIX_PERM_X)
+				grants |= FILE_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= FILE_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= FILE_READ;
+		}
+
+		/* a possible ACE to deny owner what he/she would */
+		/* induely get from administrator, group or world */
+		/* unless owner is administrator or group */
+
+		denials = const_cpu_to_le32(0);
+		pdace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+		if (!pset->adminowns && !rootuser) {
+			if (!pset->groupowns) {
+				mixperms = pset->grpperms | pset->othperms;
+				if (tag == POSIX_ACL_USER_OBJ)
+					mixperms |= pset->selfuserperms;
+				if (pset->isdir) {
+					if (mixperms & POSIX_PERM_X)
+						denials |= DIR_EXEC;
+					if (mixperms & POSIX_PERM_W)
+						denials |= DIR_WRITE;
+					if (mixperms & POSIX_PERM_R)
+						denials |= DIR_READ;
+				} else {
+					if (mixperms & POSIX_PERM_X)
+						denials |= FILE_EXEC;
+					if (mixperms & POSIX_PERM_W)
+						denials |= FILE_WRITE;
+					if (mixperms & POSIX_PERM_R)
+						denials |= FILE_READ;
+				}
+			} else {
+				mixperms = ~pset->grpperms & pset->othperms;
+				if (tag == POSIX_ACL_USER_OBJ)
+					mixperms |= pset->selfuserperms;
+				if (pset->isdir) {
+					if (mixperms & POSIX_PERM_X)
+						denials |= DIR_EXEC;
+					if (mixperms & POSIX_PERM_W)
+						denials |= DIR_WRITE;
+					if (mixperms & POSIX_PERM_R)
+						denials |= DIR_READ;
+				} else {
+					if (mixperms & POSIX_PERM_X)
+						denials |= FILE_EXEC;
+					if (mixperms & POSIX_PERM_W)
+						denials |= FILE_WRITE;
+					if (mixperms & POSIX_PERM_R)
+						denials |= FILE_READ;
+				}
+			}
+			denials &= ~grants;
+			if (denials) {
+				pdace->type = ACCESS_DENIED_ACE_TYPE;
+				pdace->flags = flags;
+				pdace->size = cpu_to_le16(sidsz + 8);
+				pdace->mask = denials;
+				memcpy((char*)&pdace->sid, sid, sidsz);
+				pos += sidsz + 8;
+				acecnt++;
+			}
+		}
+	}
+	pacl->size = cpu_to_le16(pos);
+	pacl->ace_count = cpu_to_le16(acecnt);
+	return (!rejected);
+}
+
+static BOOL build_user_grants(ACL *pacl,
+		const SID *usid, struct MAPPING* const mapping[],
+		ACE_FLAGS flags, const struct POSIX_ACE *pxace,
+		struct BUILD_CONTEXT *pset)
+{
+	BIGSID defsid;
+	ACCESS_ALLOWED_ACE *pgace;
+	const SID *sid;
+	int sidsz;
+	int pos;
+	int acecnt;
+	le32 grants;
+	u16 perms;
+	u16 tag;
+	BOOL rejected;
+	BOOL rootuser;
+
+	rejected = FALSE;
+	tag = pxace->tag;
+	perms = pxace->perms;
+	rootuser = FALSE;
+	pos = le16_to_cpu(pacl->size);
+	acecnt = le16_to_cpu(pacl->ace_count);
+	if (tag == POSIX_ACL_USER_OBJ) {
+		sid = usid;
+		sidsz = ntfs_sid_size(sid);
+		grants = OWNER_RIGHTS;
+	} else {
+		if (pxace->id) {
+			sid = NTFS_FIND_USID(mapping[MAPUSERS],
+				pxace->id, (SID*)&defsid);
+			if (sid)
+				sidsz = ntfs_sid_size(sid);
+			else
+				rejected = TRUE;
+			grants = WORLD_RIGHTS;
+		} else {
+			sid = adminsid;
+			sidsz = ntfs_sid_size(sid);
+			rootuser = TRUE;
+			grants = WORLD_RIGHTS & ~ROOT_OWNER_UNMARK;
+		}
+	}
+	if (!rejected) {
+		if (pset->isdir) {
+			if (perms & POSIX_PERM_X)
+				grants |= DIR_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= DIR_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= DIR_READ;
+		} else {
+			if (perms & POSIX_PERM_X)
+				grants |= FILE_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= FILE_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= FILE_READ;
+		}
+		if (rootuser)
+			grants &= ~ROOT_OWNER_UNMARK;
+		pgace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+		pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+		pgace->size = cpu_to_le16(sidsz + 8);
+		pgace->flags = flags;
+		pgace->mask = grants;
+		memcpy((char*)&pgace->sid, sid, sidsz);
+		pos += sidsz + 8;
+		acecnt = le16_to_cpu(pacl->ace_count) + 1;
+		pacl->ace_count = cpu_to_le16(acecnt);
+		pacl->size = cpu_to_le16(pos);
+	}
+	return (!rejected);
+}
+
+
+			/* a grant ACE for group */
+			/* unless group-obj has the same rights as world */
+			/* but present if group is owner or owner is administrator */
+			/* this ACE will be inserted after denials for group */
+
+static BOOL build_group_denials_grant(ACL *pacl,
+		const SID *gsid, struct MAPPING* const mapping[],
+		ACE_FLAGS flags, const struct POSIX_ACE *pxace,
+		struct BUILD_CONTEXT *pset)
+{
+	BIGSID defsid;
+	ACCESS_ALLOWED_ACE *pdace;
+	ACCESS_ALLOWED_ACE *pgace;
+	const SID *sid;
+	int sidsz;
+	int pos;
+	int acecnt;
+	le32 grants;
+	le32 denials;
+	u16 perms;
+	u16 mixperms;
+	u16 tag;
+	BOOL avoidmask;
+	BOOL rootgroup;
+	BOOL rejected;
+
+	rejected = FALSE;
+	tag = pxace->tag;
+	perms = pxace->perms;
+	pos = le16_to_cpu(pacl->size);
+	acecnt = le16_to_cpu(pacl->ace_count);
+	rootgroup = FALSE;
+	avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
+			&& ((pset->designates && pset->withmask)
+			   || (!pset->designates && !pset->withmask));
+	if (tag == POSIX_ACL_GROUP_OBJ)
+		sid = gsid;
+	else
+		if (pxace->id)
+			sid = NTFS_FIND_GSID(mapping[MAPGROUPS],
+				pxace->id, (SID*)&defsid);
+		else {
+			sid = adminsid;
+			rootgroup = TRUE;
+		}
+	if (sid) {
+		sidsz = ntfs_sid_size(sid);
+		/*
+		 * Insert denial of complement of mask for
+		 * each group
+		 * WRITE_OWNER is inserted so that
+		 * the mask can be identified
+		 * Note : this mask may lead on Windows to
+		 * deny rights to administrators belonging
+		 * to some user group
+		 */
+		if ((!avoidmask && !rootgroup)
+		    || (pset->rootspecial
+			&& (tag == POSIX_ACL_GROUP_OBJ))) {
+			denials = WRITE_OWNER;
+			pdace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+			if (pset->isdir) {
+				if (!(pset->mask & POSIX_PERM_X))
+					denials |= DIR_EXEC;
+				if (!(pset->mask & POSIX_PERM_W))
+					denials |= DIR_WRITE;
+				if (!(pset->mask & POSIX_PERM_R))
+					denials |= DIR_READ;
+			} else {
+				if (!(pset->mask & POSIX_PERM_X))
+					denials |= FILE_EXEC;
+				if (!(pset->mask & POSIX_PERM_W))
+					denials |= FILE_WRITE;
+				if (!(pset->mask & POSIX_PERM_R))
+					denials |= FILE_READ;
+			}
+			pdace->type = ACCESS_DENIED_ACE_TYPE;
+			pdace->flags = flags;
+			pdace->size = cpu_to_le16(sidsz + 8);
+			pdace->mask = denials;
+			memcpy((char*)&pdace->sid, sid, sidsz);
+			pos += sidsz + 8;
+			acecnt++;
+		}
+	} else
+		rejected = TRUE;
+	if (!rejected
+	    && (pset->adminowns
+		|| pset->groupowns
+		|| avoidmask
+		|| rootgroup
+		|| (perms != pset->othperms))) {
+		grants = WORLD_RIGHTS;
+		if (rootgroup)
+			grants &= ~ROOT_GROUP_UNMARK;
+		if (pset->isdir) {
+			if (perms & POSIX_PERM_X)
+				grants |= DIR_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= DIR_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= DIR_READ;
+		} else {
+			if (perms & POSIX_PERM_X)
+				grants |= FILE_EXEC;
+			if (perms & POSIX_PERM_W)
+				grants |= FILE_WRITE;
+			if (perms & POSIX_PERM_R)
+				grants |= FILE_READ;
+		}
+
+		/* a possible ACE to deny group what it would get from world */
+		/* or administrator, unless owner is administrator or group */
+
+		denials = const_cpu_to_le32(0);
+		pdace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+		if (!pset->adminowns
+		    && !pset->groupowns
+		    && !rootgroup) {
+			mixperms = pset->othperms;
+			if (tag == POSIX_ACL_GROUP_OBJ)
+				mixperms |= pset->selfgrpperms;
+			if (pset->isdir) {
+				if (mixperms & POSIX_PERM_X)
+					denials |= DIR_EXEC;
+				if (mixperms & POSIX_PERM_W)
+					denials |= DIR_WRITE;
+				if (mixperms & POSIX_PERM_R)
+					denials |= DIR_READ;
+			} else {
+				if (mixperms & POSIX_PERM_X)
+					denials |= FILE_EXEC;
+				if (mixperms & POSIX_PERM_W)
+					denials |= FILE_WRITE;
+				if (mixperms & POSIX_PERM_R)
+					denials |= FILE_READ;
+			}
+			denials &= ~(grants | OWNER_RIGHTS);
+			if (denials) {
+				pdace->type = ACCESS_DENIED_ACE_TYPE;
+				pdace->flags = flags;
+				pdace->size = cpu_to_le16(sidsz + 8);
+				pdace->mask = denials;
+				memcpy((char*)&pdace->sid, sid, sidsz);
+				pos += sidsz + 8;
+				acecnt++;
+			}
+		}
+
+			/* now insert grants to group if more than world */
+		if (pset->adminowns
+			|| pset->groupowns
+			|| (avoidmask && (pset->designates || pset->withmask))
+			|| (perms & ~pset->othperms)
+			|| (pset->rootspecial
+			   && (tag == POSIX_ACL_GROUP_OBJ))
+			|| (tag == POSIX_ACL_GROUP)) {
+			if (rootgroup)
+				grants &= ~ROOT_GROUP_UNMARK;
+			pgace = (ACCESS_DENIED_ACE*)&((char*)pacl)[pos];
+			pgace->type = ACCESS_ALLOWED_ACE_TYPE;
+			pgace->flags = flags;
+			pgace->size = cpu_to_le16(sidsz + 8);
+			pgace->mask = grants;
+			memcpy((char*)&pgace->sid, sid, sidsz);
+			pos += sidsz + 8;
+			acecnt++;
+		}
+	}
+	pacl->size = cpu_to_le16(pos);
+	pacl->ace_count = cpu_to_le16(acecnt);
+	return (!rejected);
+}
+
 
 /*
  *		Build an ACL composed of several ACE's
@@ -1360,48 +1787,29 @@ struct POSIX_SECURITY *ntfs_merge_descr_posix(const struct POSIX_SECURITY *first
  *	an extra null ACE is inserted to hold these flags, using
  *	the same conventions as cygwin.
  *
- *	Limitations :
- *	- root cannot be a designated user or group. Full rights
- *	  are aways granted to root
  */
 
-#if POSIXACLS
-
-static int buildacls_posix(struct MAPPING *mapping[],
+static int buildacls_posix(struct MAPPING* mapping[],
 		char *secattr, int offs, struct POSIX_SECURITY *pxdesc,
 		int isdir, const SID *usid, const SID *gsid)
 {
-	struct {
-		u16 selfuserperms;
-		u16 selfgrpperms;
-		u16 grpperms;
-		u16 othperms;
-		u16 mask;
-		u16 designates;
-		u16 withmask;
-		u16 rootspecial;
-	} aceset[2], *pset;
+        struct BUILD_CONTEXT aceset[2], *pset;
 	BOOL adminowns;
 	BOOL groupowns;
-	BOOL avoidmask;
-	BOOL rootuser;
-	BOOL rootgroup;
 	ACL *pacl;
 	ACCESS_ALLOWED_ACE *pgace;
 	ACCESS_ALLOWED_ACE *pdace;
-	struct POSIX_ACE *pxace;
-	BOOL cantmap;
+	const struct POSIX_ACE *pxace;
+	BOOL ok;
 	mode_t mode;
 	u16 tag;
 	u16 perms;
-	u16 mixperms;
 	ACE_FLAGS flags;
 	int pos;
 	int i;
 	int k;
 	BIGSID defsid;
 	const SID *sid;
-	int sidsz;
 	int acecnt;
 	int usidsz;
 	int gsidsz;
@@ -1410,7 +1818,6 @@ static int buildacls_posix(struct MAPPING *mapping[],
 	int ssidsz;
 	int nsidsz;
 	le32 grants;
-	le32 denials;
 
 	usidsz = ntfs_sid_size(usid);
 	gsidsz = ntfs_sid_size(gsid);
@@ -1423,17 +1830,15 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		 || ntfs_same_sid(gsid, adminsid);
 	groupowns = !adminowns && ntfs_same_sid(usid, gsid);
 
-	cantmap = FALSE;
+	ok = TRUE;
 
 	/* ACL header */
 	pacl = (ACL*)&secattr[offs];
 	pacl->revision = ACL_REVISION;
 	pacl->alignment1 = 0;
 	pacl->size = cpu_to_le16(sizeof(ACL) + usidsz + 8);
-	pacl->ace_count = const_cpu_to_le16(1);
+	pacl->ace_count = const_cpu_to_le16(0);
 	pacl->alignment2 = const_cpu_to_le16(0);
-	pos = sizeof(ACL);
-	acecnt = 0;
 
 		/*
 		 * Determine what is allowed to some group or world
@@ -1453,6 +1858,9 @@ static int buildacls_posix(struct MAPPING *mapping[],
 		pset->designates = 0;
 		pset->withmask = 0;
 		pset->rootspecial = 0;
+		pset->adminowns = adminowns;
+		pset->groupowns = groupowns;
+		pset->isdir = isdir;
 	}
 
 	for (i=pxdesc->acccnt+pxdesc->defcnt-1; i>=0; i--) {
@@ -1504,8 +1912,14 @@ if (pxdesc->defcnt && (pxdesc->firstdef != pxdesc->acccnt)) {
 ntfs_log_error("** error : access and default not consecutive\n");
 return (0);
 }
+			/*
+			 * First insert all denials for owner and each
+			 * designated user (with mask if needed)
+			 */
 
-	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && !cantmap; i++) {
+	pacl->ace_count = const_cpu_to_le16(0);
+	pacl->size = const_cpu_to_le16(sizeof(ACL));
+	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && ok; i++) {
 		if (i >= pxdesc->acccnt) {
 			flags = INHERIT_ONLY_ACE
 				| OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
@@ -1522,144 +1936,15 @@ return (0);
 		}
 		tag = pxace->tag;
 		perms = pxace->perms;
-		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
-				&& ((pset->designates && pset->withmask)
-				   || (!pset->designates && !pset->withmask));
 		switch (tag) {
 
 			/* insert denial ACEs for each owner or allowed user */
 
 		case POSIX_ACL_USER :
 		case POSIX_ACL_USER_OBJ :
-			rootuser = FALSE;
-			if (tag == POSIX_ACL_USER_OBJ) {
-				sid = usid;
-				sidsz = usidsz;
-				grants = OWNER_RIGHTS;
-			} else {
-				if (pxace->id) {
-					sid = NTFS_FIND_USID(mapping[MAPUSERS],
-						pxace->id, (SID*)&defsid);
-					grants = WORLD_RIGHTS;
-				} else {
-					sid = adminsid;
-					rootuser = TRUE;
-					grants = WORLD_RIGHTS & ~ROOT_OWNER_UNMARK;
-				}
-				if (sid) {
-					sidsz = ntfs_sid_size(sid);
-					/*
-					 * Insert denial of complement of mask for
-					 * each designated user (except root)
-					 * WRITE_OWNER is inserted so that
-					 * the mask can be identified
-					 */
-					if (!avoidmask && !rootuser) {
-						denials = WRITE_OWNER;
-						pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
-						if (isdir) {
-							if (!(pset->mask & POSIX_PERM_X))
-								denials |= DIR_EXEC;
-							if (!(pset->mask & POSIX_PERM_W))
-								denials |= DIR_WRITE;
-							if (!(pset->mask & POSIX_PERM_R))
-								denials |= DIR_READ;
-						} else {
-							if (!(pset->mask & POSIX_PERM_X))
-								denials |= FILE_EXEC;
-							if (!(pset->mask & POSIX_PERM_W))
-								denials |= FILE_WRITE;
-							if (!(pset->mask & POSIX_PERM_R))
-								denials |= FILE_READ;
-						}
-						if (rootuser)
-							grants &= ~ROOT_OWNER_UNMARK;
-						pdace->type = ACCESS_DENIED_ACE_TYPE;
-						pdace->flags = flags;
-						pdace->size = cpu_to_le16(sidsz + 8);
-						pdace->mask = denials;
-						memcpy((char*)&pdace->sid, sid, sidsz);
-						pos += sidsz + 8;
-						acecnt++;
-					}
-				} else
-					cantmap = TRUE;
-			}
-			if (!cantmap) {
-				if (isdir) {
-					if (perms & POSIX_PERM_X)
-						grants |= DIR_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= DIR_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= DIR_READ;
-				} else {
-					if (perms & POSIX_PERM_X)
-						grants |= FILE_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= FILE_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= FILE_READ;
-				}
 
-				/* a possible ACE to deny owner what he/she would */
-				/* induely get from administrator, group or world */
-				/* unless owner is administrator or group */
-
-				denials = const_cpu_to_le32(0);
-				pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
-				if (!adminowns && !rootuser) {
-					if (!groupowns) {
-						mixperms = pset->grpperms | pset->othperms;
-						if (tag == POSIX_ACL_USER_OBJ)
-							mixperms |= pset->selfuserperms;
-						if (isdir) {
-							if (mixperms & POSIX_PERM_X)
-								denials |= DIR_EXEC;
-							if (mixperms & POSIX_PERM_W)
-								denials |= DIR_WRITE;
-							if (mixperms & POSIX_PERM_R)
-								denials |= DIR_READ;
-						} else {
-							if (mixperms & POSIX_PERM_X)
-								denials |= FILE_EXEC;
-							if (mixperms & POSIX_PERM_W)
-								denials |= FILE_WRITE;
-							if (mixperms & POSIX_PERM_R)
-								denials |= FILE_READ;
-						}
-					} else {
-						mixperms = ~pset->grpperms & pset->othperms;
-						if (tag == POSIX_ACL_USER_OBJ)
-							mixperms |= pset->selfuserperms;
-						if (isdir) {
-							if (mixperms & POSIX_PERM_X)
-								denials |= DIR_EXEC;
-							if (mixperms & POSIX_PERM_W)
-								denials |= DIR_WRITE;
-							if (mixperms & POSIX_PERM_R)
-								denials |= DIR_READ;
-						} else {
-							if (mixperms & POSIX_PERM_X)
-								denials |= FILE_EXEC;
-							if (mixperms & POSIX_PERM_W)
-								denials |= FILE_WRITE;
-							if (mixperms & POSIX_PERM_R)
-								denials |= FILE_READ;
-						}
-					}
-					denials &= ~grants;
-					if (denials) {
-						pdace->type = ACCESS_DENIED_ACE_TYPE;
-						pdace->flags = flags;
-						pdace->size = cpu_to_le16(sidsz + 8);
-						pdace->mask = denials;
-						memcpy((char*)&pdace->sid, sid, sidsz);
-						pos += sidsz + 8;
-						acecnt++;
-					}
-				}
-			}
+			ok = build_user_denials(pacl,
+				usid, mapping, flags, pxace, pset);
 			break;
 		default :
 			break;
@@ -1667,24 +1952,34 @@ return (0);
 	}
 
 		/*
-		 * for directories, a world execution denial
+		 * for directories, insert a world execution denial
 		 * inherited to plain files.
 		 * This is to prevent Windows from granting execution
 		 * of files through inheritance from parent directory
 		 */
 
-	if (isdir) {
+	if (isdir && ok) {
+		pos = le16_to_cpu(pacl->size);
 		pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
-			pdace->type = ACCESS_DENIED_ACE_TYPE;
-			pdace->flags = INHERIT_ONLY_ACE | OBJECT_INHERIT_ACE;
-			pdace->size = cpu_to_le16(wsidsz + 8);
-			pdace->mask = FILE_EXEC;
-			memcpy((char*)&pdace->sid, worldsid, wsidsz);
-			pos += wsidsz + 8;
-			acecnt++;
+		pdace->type = ACCESS_DENIED_ACE_TYPE;
+		pdace->flags = INHERIT_ONLY_ACE | OBJECT_INHERIT_ACE;
+		pdace->size = cpu_to_le16(wsidsz + 8);
+		pdace->mask = FILE_EXEC;
+		memcpy((char*)&pdace->sid, worldsid, wsidsz);
+		pos += wsidsz + 8;
+		acecnt = le16_to_cpu(pacl->ace_count) + 1;
+		pacl->ace_count = cpu_to_le16(acecnt);
+		pacl->size = cpu_to_le16(pos);
 	}
 
-	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && !cantmap; i++) {
+			/*
+			 * now insert (if needed)
+			 * - grants to owner and designated users
+			 * - mask and denials for all groups
+			 * - grants to other
+			 */
+
+	for (i=0; (i<(pxdesc->acccnt + pxdesc->defcnt)) && ok; i++) {
 		if (i >= pxdesc->acccnt) {
 			flags = INHERIT_ONLY_ACE
 				| OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
@@ -1701,214 +1996,30 @@ return (0);
 		}
 		tag = pxace->tag;
 		perms = pxace->perms;
-		avoidmask = (pset->mask == (POSIX_PERM_R | POSIX_PERM_W | POSIX_PERM_X))
-				&& ((pset->designates && pset->withmask)
-				   || (!pset->designates && !pset->withmask));
 		switch (tag) {
 
-			/* compute a grant ACE for each owner or allowed user */
+			/* ACE for each owner or allowed user */
 
 		case POSIX_ACL_USER :
 		case POSIX_ACL_USER_OBJ :
-			rootuser = FALSE;
-			if (tag == POSIX_ACL_USER_OBJ) {
-				sid = usid;
-				sidsz = usidsz;
-				grants = OWNER_RIGHTS;
-			} else {
-				if (pxace->id) {
-					sid = NTFS_FIND_USID(mapping[MAPUSERS],
-						pxace->id, (SID*)&defsid);
-					if (sid)
-						sidsz = ntfs_sid_size(sid);
-					else
-						cantmap = TRUE;
-					grants = WORLD_RIGHTS;
-				} else {
-					sid = adminsid;
-					sidsz = ntfs_sid_size(sid);
-					rootuser = TRUE;
-					grants = WORLD_RIGHTS & ~ROOT_OWNER_UNMARK;
-				}
-			}
-			if (!cantmap) {
-				if (isdir) {
-					if (perms & POSIX_PERM_X)
-						grants |= DIR_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= DIR_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= DIR_READ;
-				} else {
-					if (perms & POSIX_PERM_X)
-						grants |= FILE_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= FILE_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= FILE_READ;
-				}
-				if (rootuser)
-					grants &= ~ROOT_OWNER_UNMARK;
-				pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-				pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-				pgace->size = cpu_to_le16(sidsz + 8);
-				pgace->flags = flags;
-				pgace->mask = grants;
-				memcpy((char*)&pgace->sid, sid, sidsz);
-				pos += sidsz + 8;
-				acecnt++;
-			}
+			ok = build_user_grants(pacl,usid,
+					mapping,flags,pxace,pset);
 			break;
 
 		case POSIX_ACL_GROUP :
 		case POSIX_ACL_GROUP_OBJ :
 
-			/* a grant ACE for group */
-			/* unless group-obj has the same rights as world */
-			/* but present if group is owner or owner is administrator */
-			/* this ACE will be inserted after denials for group */
+			/* denials and grants for groups */
 
-			rootgroup = FALSE;
-			if (tag == POSIX_ACL_GROUP_OBJ)
-				sid = gsid;
-			else
-				if (pxace->id)
-					sid = NTFS_FIND_GSID(mapping[MAPGROUPS],
-						pxace->id, (SID*)&defsid);
-				else {
-					sid = adminsid;
-					rootgroup = TRUE;
-				}
-			if (sid) {
-				sidsz = ntfs_sid_size(sid);
-				/*
-				 * Insert denial of complement of mask for
-				 * each group
-				 * WRITE_OWNER is inserted so that
-				 * the mask can be identified
-				 * Note : this mask may lead on Windows to
-				 * deny rights to administrators belonging
-				 * to some user group
-				 */
-				if ((!avoidmask && !rootgroup)
-				    || (pset->rootspecial
-					&& (tag == POSIX_ACL_GROUP_OBJ))) {
-					denials = WRITE_OWNER;
-					pdace = (ACCESS_DENIED_ACE*) &secattr[offs + pos];
-					if (isdir) {
-						if (!(pset->mask & POSIX_PERM_X))
-							denials |= DIR_EXEC;
-						if (!(pset->mask & POSIX_PERM_W))
-							denials |= DIR_WRITE;
-						if (!(pset->mask & POSIX_PERM_R))
-							denials |= DIR_READ;
-					} else {
-						if (!(pset->mask & POSIX_PERM_X))
-							denials |= FILE_EXEC;
-						if (!(pset->mask & POSIX_PERM_W))
-							denials |= FILE_WRITE;
-						if (!(pset->mask & POSIX_PERM_R))
-							denials |= FILE_READ;
-					}
-					pdace->type = ACCESS_DENIED_ACE_TYPE;
-					pdace->flags = flags;
-					pdace->size = cpu_to_le16(sidsz + 8);
-					pdace->mask = denials;
-					memcpy((char*)&pdace->sid, sid, sidsz);
-					pos += sidsz + 8;
-					acecnt++;
-				}
-			} else
-				cantmap = TRUE;
-			if (!cantmap
-			    && (adminowns
-				|| groupowns
-				|| avoidmask
-				|| rootgroup
-				|| (perms != pset->othperms))) {
-				grants = WORLD_RIGHTS;
-				if (rootgroup)
-					grants &= ~ROOT_GROUP_UNMARK;
-				if (isdir) {
-					if (perms & POSIX_PERM_X)
-						grants |= DIR_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= DIR_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= DIR_READ;
-				} else {
-					if (perms & POSIX_PERM_X)
-						grants |= FILE_EXEC;
-					if (perms & POSIX_PERM_W)
-						grants |= FILE_WRITE;
-					if (perms & POSIX_PERM_R)
-						grants |= FILE_READ;
-				}
-
-				/* a possible ACE to deny group what it would get from world */
-				/* or administrator, unless owner is administrator or group */
-
-				denials = const_cpu_to_le32(0);
-				pdace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-				if (!adminowns
-				    && !groupowns
-				    && !rootgroup) {
-					mixperms = pset->othperms;
-					if (tag == POSIX_ACL_GROUP_OBJ)
-						mixperms |= pset->selfgrpperms;
-					if (isdir) {
-						if (mixperms & POSIX_PERM_X)
-							denials |= DIR_EXEC;
-						if (mixperms & POSIX_PERM_W)
-							denials |= DIR_WRITE;
-						if (mixperms & POSIX_PERM_R)
-							denials |= DIR_READ;
-					} else {
-						if (mixperms & POSIX_PERM_X)
-							denials |= FILE_EXEC;
-						if (mixperms & POSIX_PERM_W)
-							denials |= FILE_WRITE;
-						if (mixperms & POSIX_PERM_R)
-							denials |= FILE_READ;
-					}
-					denials &= ~(grants | OWNER_RIGHTS);
-					if (denials) {
-						pdace->type = ACCESS_DENIED_ACE_TYPE;
-						pdace->flags = flags;
-						pdace->size = cpu_to_le16(sidsz + 8);
-						pdace->mask = denials;
-						memcpy((char*)&pdace->sid, sid, sidsz);
-						pos += sidsz + 8;
-						acecnt++;
-					}
-				}
-
-					/* now insert grants to group if more than world */
-				if (adminowns
-					|| groupowns
-					|| (avoidmask && (pset->designates || pset->withmask))
-					|| (perms & ~pset->othperms)
-					|| (pset->rootspecial
-					   && (tag == POSIX_ACL_GROUP_OBJ))
-					|| (tag == POSIX_ACL_GROUP)) {
-					if (rootgroup)
-						grants &= ~ROOT_GROUP_UNMARK;
-					pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
-					pgace->type = ACCESS_ALLOWED_ACE_TYPE;
-					pgace->flags = flags;
-					pgace->size = cpu_to_le16(sidsz + 8);
-					pgace->mask = grants;
-					memcpy((char*)&pgace->sid, sid, sidsz);
-					pos += sidsz + 8;
-					acecnt++;
-				}
-			}
+			ok = build_group_denials_grant(pacl,gsid,
+					mapping,flags,pxace,pset);
 			break;
 
 		case POSIX_ACL_OTHER :
 
-			/* an ACE for other users */
+			/* grants for other users */
 
+			pos = le16_to_cpu(pacl->size);
 			pgace = (ACCESS_ALLOWED_ACE*)&secattr[offs + pos];
 			grants = WORLD_RIGHTS;
 			if (isdir) {
@@ -1932,17 +2043,21 @@ return (0);
 			pgace->mask = grants;
 			memcpy((char*)&pgace->sid, worldsid, wsidsz);
 			pos += wsidsz + 8;
-			acecnt++;
+			acecnt = le16_to_cpu(pacl->ace_count) + 1;
+			pacl->ace_count = cpu_to_le16(acecnt);
+			pacl->size = cpu_to_le16(pos);
 			break;
 		}
 	}
 
-	if (cantmap)
+	if (!ok)
 		errno = EINVAL;
 	else {
 		/* an ACE for administrators */
 		/* always full access */
 
+		pos = le16_to_cpu(pacl->size);
+		acecnt = le16_to_cpu(pacl->ace_count);
 		if (isdir)
 			flags = OBJECT_INHERIT_ACE
 				| CONTAINER_INHERIT_ACE;
@@ -1997,7 +2112,7 @@ return (0);
 		pacl->size = cpu_to_le16(pos);
 		pacl->ace_count = cpu_to_le16(acecnt);
 	}
-	return (cantmap ? 0 : pos);
+	return (ok ? pos : 0);
 }
 
 #endif /* POSIXACLS */
