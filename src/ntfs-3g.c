@@ -1909,7 +1909,11 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix/NTFS ACL retrieval */
+			/*
+			 * hijack Posix/NTFS ACL retrieval, whatever mode
+			 * was selected for xattr (from the user's point
+			 * of view, ACLs are not xattr)
+			 */
 	if ((!strcmp(name,nf_ns_xattr_posix_access)
 		|| !strcmp(name,nf_ns_xattr_posix_default)
 		|| !strcmp(name,nf_ns_xattr_ntfs))) {
@@ -1984,7 +1988,12 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix/NTFS ACL setting */
+			/*
+			 * hijack Posix/NTFS ACL retrieval, whatever mode
+			 * was selected for xattr (from the user's point
+			 * of view, ACLs are not xattr)
+			 * Note : updating an ACL does not set ctime
+			 */
 	if (!strcmp(name,nf_ns_xattr_posix_access)
 	    || !strcmp(name,nf_ns_xattr_posix_default)
 	    || !strcmp(name,nf_ns_xattr_ntfs)) {
@@ -2077,7 +2086,12 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 
-			/* hijack Posix/NTFS ACL removal */
+			/*
+			 * hijack Posix/NTFS ACL retrieval, whatever mode
+			 * was selected for xattr (from the user's point
+			 * of view, ACLs are not xattr)
+			 * Note : updating an ACL does not set ctime
+			 */
 	if (!strcmp(name,nf_ns_xattr_posix_access)
 	    || !strcmp(name,nf_ns_xattr_posix_default)
 	    || !strcmp(name,nf_ns_xattr_ntfs)) {
@@ -2089,8 +2103,9 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		else {
 			ni = ntfs_check_access_xattr(path,&security);
 			if (ni) {
-				res = ntfs_remove_posix_acl(&security,path,
-					name,ni);
+				if (ntfs_remove_posix_acl(&security,path,
+						name,ni))
+					res = -errno;
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			} else

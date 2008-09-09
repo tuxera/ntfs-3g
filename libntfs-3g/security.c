@@ -2826,6 +2826,8 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 
 /*
  *		Remove a default Posix ACL from a file
+ *
+ *	Returns 0, or -1 if there is a problem which errno describes
  */
 
 int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
