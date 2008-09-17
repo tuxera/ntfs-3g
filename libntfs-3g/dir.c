@@ -168,6 +168,9 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		 */
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
+		
+		if (!le16_to_cpu(ie->length))
+			goto put_err_out;
 		/*
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
@@ -317,6 +320,11 @@ descend_into_child_node:
 		 */
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
+		
+		if (!le16_to_cpu(ie->length)) {
+			errno = EIO;
+			goto close_err_out;
+		}
 		/*
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
@@ -808,6 +816,10 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		/* The last entry cannot contain a name. */
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
+		
+		if (!le16_to_cpu(ie->length))
+			goto dir_err_out;
+		
 		/* Skip index root entry if continuing previous readdir. */
 		if (ir_pos > (u8*)ie - (u8*)ir)
 			continue;
@@ -960,6 +972,10 @@ find_next_index_buffer:
 		/* The last entry cannot contain a name. */
 		if (ie->ie_flags & INDEX_ENTRY_END)
 			break;
+		
+		if (!le16_to_cpu(ie->length))
+			goto dir_err_out;
+		
 		/* Skip index entry if continuing previous readdir. */
 		if (ia_pos - ia_start > (u8*)ie - (u8*)ia)
 			continue;
