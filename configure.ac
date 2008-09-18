@@ -23,8 +23,8 @@
 
 # Autoconf
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[1.2812],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION="36"
+AC_INIT([ntfs-3g],[1.2918],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION="38"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
