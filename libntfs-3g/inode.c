@@ -1054,6 +1054,7 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		 * find next, because we don't need such.
 		 */
 		while (ctx->ntfs_ino->mft_no != ni->mft_no) {
+retry:			
 			if (ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE,
 						0, NULL, 0, ctx)) {
 				err = errno;
@@ -1064,6 +1065,10 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 				goto put_err_out;
 			}
 		}
+
+		if (ntfs_inode_base(ctx->ntfs_ino)->mft_no == FILE_MFT && 
+		    ctx->attr->type == AT_DATA)
+			goto retry;
 
 		record_size = le32_to_cpu(ctx->attr->length);
 
