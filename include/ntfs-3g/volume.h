@@ -230,7 +230,7 @@ struct _ntfs_volume {
 	s64 free_mft_records; 	/* Same for free mft records (see above) */
 
 #if CACHE_INODE_SIZE
-	struct CACHE_HEADER *inode_cache;
+	struct CACHE_HEADER *xinode_cache;
 #endif
 #if CACHE_SECURID_SIZE
 	struct CACHE_HEADER *securid_cache;

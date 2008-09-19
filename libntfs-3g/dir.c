@@ -502,7 +502,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			item.pathname = fullname;
 			item.varsize = strlen(fullname) + 1;
 			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
-				vol->inode_cache, GENERIC(&item),
+				vol->xinode_cache, GENERIC(&item),
 				inode_cache_compare);
 		} else
 			cached = (struct CACHED_INODE*)NULL;
@@ -559,7 +559,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			item.pathname = fullname;
 			item.varsize = strlen(fullname) + 1;
 			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
-					vol->inode_cache, GENERIC(&item),
+					vol->xinode_cache, GENERIC(&item),
 					inode_cache_compare);
 			if (cached) {
 				inum = cached->inum;
@@ -567,7 +567,7 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 				inum = ntfs_inode_lookup_by_name(ni, unicode, len);
 				if (inum != (u64) -1) {
 					item.inum = inum;
-					ntfs_enter_cache(vol->inode_cache,
+					ntfs_enter_cache(vol->xinode_cache,
 							GENERIC(&item),
 							inode_cache_compare);
 				}
@@ -1662,7 +1662,7 @@ out:
 	if (p[0] && (p[strlen(p)-1] == PATH_SEP))
 		ntfs_log_error("Unnormalized path %s\n",pathname);
 	item.pathname = p;
-	count = ntfs_invalidate_cache(vol->inode_cache, GENERIC(&item),
+	count = ntfs_invalidate_cache(vol->xinode_cache, GENERIC(&item),
 				inode_cache_inv_compare);
 	if (!count)
 		ntfs_log_error("Could not delete inode cache entry for %s\n",

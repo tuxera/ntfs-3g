@@ -337,7 +337,7 @@ void ntfs_create_lru_caches(ntfs_volume *vol)
 {
 #if CACHE_INODE_SIZE
 		 /* inode cache */
-	vol->inode_cache = ntfs_create_cache("inode",
+	vol->xinode_cache = ntfs_create_cache("inode",
 		sizeof(struct CACHED_INODE), CACHE_INODE_SIZE);
 #endif
 	vol->securid_cache = ntfs_create_cache("securid",
@@ -355,7 +355,7 @@ void ntfs_create_lru_caches(ntfs_volume *vol)
 void ntfs_free_lru_caches(ntfs_volume *vol)
 {
 #if CACHE_INODE_SIZE
-	ntfs_free_cache(vol->inode_cache);
+	ntfs_free_cache(vol->xinode_cache);
 #endif
 	ntfs_free_cache(vol->securid_cache);
 #if CACHE_LEGACY_SIZE
