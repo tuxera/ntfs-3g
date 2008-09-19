@@ -29,10 +29,6 @@
 
 #define PATH_SEP '/'
 
-#ifndef MAX_PATH
-#define MAX_PATH 1024
-#endif
-
 /*
  * We do not have these under DJGPP, so define our version that do not conflict
  * with other S_IFs defined under DJGPP.
@@ -68,7 +64,6 @@ extern u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 
 extern ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		const char *pathname);
-
 extern ntfs_inode *ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		ntfschar *name,	u8 name_len, dev_t type);
 extern ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, le32 securid,

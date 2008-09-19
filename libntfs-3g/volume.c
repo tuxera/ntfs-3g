@@ -79,7 +79,6 @@ ntfs_volume *ntfs_volume_alloc(void)
 	return ntfs_calloc(sizeof(ntfs_volume));
 }
 
-
 static void ntfs_attr_free(ntfs_attr **na)
 {
 	if (na && *na) {
@@ -481,9 +480,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 				"%s\n", strerror(errno));
 	
 	/* We now initialize the cluster allocator. */
-
-	mft_zone_size = min(vol->nr_clusters >> 3,      /* 12.5% */
-			    200 * 1000 * 1024 >> vol->cluster_size_bits);
+	mft_zone_size = vol->nr_clusters >> 3;      /* 12.5% */
 
 	/* Setup the mft zone. */
 	vol->mft_zone_start = vol->mft_zone_pos = vol->mft_lcn;

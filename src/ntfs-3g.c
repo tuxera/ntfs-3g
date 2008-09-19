@@ -706,8 +706,8 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 static int ntfs_fuse_open(const char *org_path,
 		struct fuse_file_info *fi)
 {
-	ntfs_inode *ni = NULL;
-	ntfs_attr *na = NULL;
+	ntfs_inode *ni;
+	ntfs_attr *na;
 	int res = 0;
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -1121,7 +1121,6 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 #else
 		ntfs_fuse_fill_security_context(&security);
 #endif
- /* ! JPA ! did not find where to get umask from ! */
 		if (S_ISDIR(type))
 			perm = typemode & ~ctx->dmask & 0777;
 		else
@@ -1188,7 +1187,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 					security.uid, security.gid, perm) < 0)
 					set_fuse_error(&res);
 #endif
-  			}
+			}
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
