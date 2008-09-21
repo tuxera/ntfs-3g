@@ -1153,7 +1153,7 @@ err_out:
  * on error with errno set to the error code.
  */
 static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
-		ntfschar *name, u8 name_len, dev_t type, dev_t dev,
+		ntfschar *name, u8 name_len, mode_t type, dev_t dev,
 		ntfschar *target, int target_len)
 {
 	ntfs_inode *ni;
@@ -1396,7 +1396,7 @@ err_out:
  */
 
 ntfs_inode *ntfs_create(ntfs_inode *dir_ni, le32 securid, ntfschar *name,
-		u8 name_len, dev_t type)
+		u8 name_len, mode_t type)
 {
 	if (type != S_IFREG && type != S_IFDIR && type != S_IFIFO &&
 			type != S_IFSOCK) {
@@ -1407,7 +1407,7 @@ ntfs_inode *ntfs_create(ntfs_inode *dir_ni, le32 securid, ntfschar *name,
 }
 
 ntfs_inode *ntfs_create_device(ntfs_inode *dir_ni, le32 securid,
-		ntfschar *name, u8 name_len, dev_t type, dev_t dev)
+		ntfschar *name, u8 name_len, mode_t type, dev_t dev)
 {
 	if (type != S_IFCHR && type != S_IFBLK) {
 		ntfs_log_error("Invalid arguments.\n");

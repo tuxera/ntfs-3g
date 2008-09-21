@@ -1072,7 +1072,7 @@ static int ntfs_fuse_access(const char *path, int type)
 
 #endif
 
-static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
+static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 		const char *target)
 {
 	char *name;
@@ -1083,7 +1083,7 @@ static int ntfs_fuse_create(const char *org_path, dev_t typemode, dev_t dev,
 	char *path;
 	ntfschar *stream_name;
 	int stream_name_len;
-	dev_t type = typemode & ~07777;
+	mode_t type = typemode & ~07777;
 	mode_t perm;
 	struct SECURITY_CONTEXT security;
 	int res = 0, uname_len, utarget_len;
