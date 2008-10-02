@@ -704,7 +704,11 @@ static int ntfs_fuse_readdir(const char *path, void *buf,
 }
 
 static int ntfs_fuse_open(const char *org_path,
+#if POSIXACLS
 		struct fuse_file_info *fi)
+#else
+		struct fuse_file_info *fi __attribute__((unused)))
+#endif
 {
 	ntfs_inode *ni;
 	ntfs_attr *na;
@@ -876,7 +880,12 @@ out:
  *	Common part for truncate() and ftruncate()
  */
 
-static int ntfs_fuse_trunc(const char *org_path, off_t size, BOOL chkwrite)
+static int ntfs_fuse_trunc(const char *org_path, off_t size,
+#if POSIXACLS
+			BOOL chkwrite)
+#else
+			BOOL chkwrite __attribute__((unused)))
+#endif
 {
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
