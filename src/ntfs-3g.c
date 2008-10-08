@@ -2588,10 +2588,6 @@ static char *parse_mount_options(const char *orig_opts)
 		goto err_exit;
 	if (default_permissions)
 		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
-#if !POSIXACLS
-	else
-		ctx->secure_flags |= (1 << SECURITY_RAW);
-#endif
 	if (ctx->ro)
 		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
 exit:
@@ -2913,6 +2909,8 @@ int main(int argc, char *argv[])
 	char *parsed_options = NULL;
 	struct fuse *fh;
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
+	const char *permissions_mode = (const char*)NULL;
+	const char *failed_secure = (const char*)NULL;
 	struct stat sbuf;
 	int err, fd;
 
@@ -3003,7 +3001,51 @@ int main(int argc, char *argv[])
 	/* We must do this after ntfs_open() to be able to set the blksize */
 	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
 		goto err_out;
-	
+
+	ctx->security.vol = ctx->vol;
+	ctx->vol->secure_flags = ctx->secure_flags;
+	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
+		ctx->security.uid = ctx->uid;
+		ctx->security.gid = ctx->gid;
+		/* same ownership/permissions for all files */
+		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
+		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
+		if (ctx->secure_flags & (1 << SECURITY_DEFAULT))
+			permissions_mode = "Global ownership and permissions enforced\n";
+		else
+			permissions_mode = "Ownership and permissions disabled\n";
+	} else {
+			/* JPA open $Secure, (whatever NTFS version !) */
+			/* to initialize security data */
+		if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
+			failed_secure = "Could not open file $Secure\n";
+		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
+#if POSIXACLS
+			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+				permissions_mode = "User mapping built, Posix ACLs not used\n";
+			else
+				permissions_mode = "User mapping built, Posix ACLs in use\n";
+#else
+			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+				permissions_mode = "User mapping built\n";
+			else {
+				/*
+				 * No explicit option (typically mount by hal)
+				 * enable checks if user mapping found
+				 */
+				ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
+				if (strappend(&parsed_options, ",default_permissions")) {
+					err = NTFS_VOLUME_SYNTAX_ERROR;
+					goto err_out;
+				}
+			}
+#endif
+		} else
+			permissions_mode = "No user mapping file : ownership and permissions disabled\n";
+	}
+	if (ctx->usermap_path)
+		free (ctx->usermap_path);
+
 	fh = mount_fuse(parsed_options);
 	if (!fh) {
 		err = NTFS_VOLUME_FUSE_ERROR;
@@ -3017,56 +3059,15 @@ int main(int argc, char *argv[])
 		ntfs_log_info(fuse26_kmod_msg);
 #endif	
 	setup_logging(parsed_options);
-
-	ctx->security.vol = ctx->vol;
-	ctx->vol->secure_flags = ctx->secure_flags;
-	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
-		ctx->security.uid = ctx->uid;
-		ctx->security.gid = ctx->gid;
-		/* same ownership/permissions for all files */
-		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
-		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
-		if (ctx->secure_flags & (1 << SECURITY_DEFAULT))
-			ntfs_log_info("Global ownership and permissions enforced\n");
-		else
-			ntfs_log_info("Ownership and permissions fully disabled\n");
-	} else {
-			/* JPA open $Secure, (whatever NTFS version !) */
-			/* to initialize security data */
-		if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
-			ntfs_log_info("Could not open file $Secure\n");
-#if POSIXACLS
-		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
-			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-				ntfs_log_info("User mapping built, Posix ACLs not used\n");
-			else
-				ntfs_log_info("User mapping built, Posix ACLs in use\n");
-		} else {
-			ntfs_log_error("Failed to build user mapping : unmounting\n");
-			err = NTFS_VOLUME_INSECURE;
-			goto err_map;
-		}
-#else
-		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT)) {
-			if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path))
-				ntfs_log_info("User mapping built\n");
-			else {
-				ntfs_log_error("Failed to build user mapping : unmounting\n");
-				err = NTFS_VOLUME_INSECURE;
-				goto err_map;
-			}
-		} else
-			ntfs_log_info("No permission checks activated\n");
-#endif
-	}
-	if (ctx->usermap_path)
-		free (ctx->usermap_path);
+	if (failed_secure)
+	        ntfs_log_info(failed_secure);
+	if (permissions_mode)
+	        ntfs_log_info(permissions_mode);
 	
 	fuse_loop(fh);
 	
 	err = 0;
 
-err_map:
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
