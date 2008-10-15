@@ -612,7 +612,7 @@ leave:
 	return ret;
 }
 
-int ntfs_mft_attr_extend(ntfs_volume *vol, ntfs_attr *na)
+static int ntfs_mft_attr_extend(ntfs_attr *na)
 {
 	int ret = STATUS_ERROR;
 	ntfs_log_enter("Entering\n");
@@ -1354,7 +1354,7 @@ undo_data_init:
 	goto out;
 }
 
-ntfs_inode *ntfs_mft_rec_alloc(ntfs_volume *vol)
+static ntfs_inode *ntfs_mft_rec_alloc(ntfs_volume *vol)
 {
 	s64 ll, bit;
 	ntfs_attr *mft_na, *mftbmp_na;
@@ -1498,7 +1498,6 @@ undo_mftbmp_alloc:
 err_out:
 	if (!errno)
 		errno = EIO;
-err_exit:
 	ni = NULL;
 	goto out;	
 }
