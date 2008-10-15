@@ -732,7 +732,7 @@ static int ntfs_mft_bitmap_extend_allocation_i(ntfs_volume *vol)
 	if (ntfs_attr_record_resize(m, a, mp_size +
 			le16_to_cpu(a->mapping_pairs_offset))) {
 		ntfs_log_info("extending $MFT bitmap\n");
-		ret = ntfs_mft_attr_extend(vol, vol->mftbmp_na);
+		ret = ntfs_mft_attr_extend(vol->mftbmp_na);
 		if (ret == STATUS_OK)
 			goto ok;
 		if (ret == STATUS_ERROR) {
@@ -1080,7 +1080,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 	old_alen = le32_to_cpu(a->length);
 	if (ntfs_attr_record_resize(m, a,
 			mp_size + le16_to_cpu(a->mapping_pairs_offset))) {
-		ret = ntfs_mft_attr_extend(vol, vol->mft_na);
+		ret = ntfs_mft_attr_extend(vol->mft_na);
 		if (ret == STATUS_OK)
 			goto ok;
 		if (ret == STATUS_ERROR) {
