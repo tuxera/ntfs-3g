@@ -39,7 +39,6 @@ libntfs_3g_la_SOURCES =	\
 	runlist.c 	\
 	security.c 	\
 	unistr.c 	\
-	version.c 	\
 	volume.c
 
 if NTFS_DEVICE_DEFAULT_IO_OPS

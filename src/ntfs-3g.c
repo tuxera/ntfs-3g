@@ -90,7 +90,6 @@
 #include "layout.h"
 #include "index.h"
 #include "utils.h"
-#include "version.h"
 #include "ntfstime.h"
 #include "misc.h"
 
