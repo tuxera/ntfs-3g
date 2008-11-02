@@ -94,6 +94,7 @@
 #include "version.h"
 #include "ntfstime.h"
 #include "security.h"
+#include "reparse.h"
 #include "logging.h"
 #include "misc.h"
 
@@ -172,6 +173,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
+"Copyright (C) 2007-2008 Jean-Pierre Andre\n"
 "\n"
 "Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
 "\n"
@@ -182,6 +184,8 @@ static const char *usage_msg =
 "Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
 "\n"
 "%s";
+
+static const char ntfs_bad_reparse[] = "unsupported reparse point";
 
 #ifdef FUSE_INTERNAL
 int drop_privs(void);
@@ -410,15 +414,43 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 #endif
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
-		/* Directory. */
-		stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
-		na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
-		if (na) {
-			stbuf->st_size = na->data_size;
-			stbuf->st_blocks = na->allocated_size >> 9;
-			ntfs_attr_close(na);
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+			char *target;
+			int attr_size;
+
+			errno = 0;
+			target = ntfs_junction_point(ctx->vol,org_path, ni,
+					&attr_size);
+				/*
+				 * If the reparse point is not a valid
+				 * directory junction, and there is no error
+				 * we still display as a symlink
+				 */
+			if (target || (errno == EOPNOTSUPP)) {
+					/* returning attribute size */
+				if (target)
+					stbuf->st_size = attr_size;
+				else
+					stbuf->st_size = sizeof(ntfs_bad_reparse);
+				stbuf->st_blocks = (ni->allocated_size + 511) >> 9;
+				stbuf->st_nlink = le16_to_cpu(ni->mrec->link_count);
+				stbuf->st_mode = S_IFLNK;
+				free(target);
+			} else {
+				res = -errno;
+				goto exit;
+			}
+		} else {
+			/* Directory. */
+			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
+			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
+			if (na) {
+				stbuf->st_size = na->data_size;
+				stbuf->st_blocks = na->allocated_size >> 9;
+				ntfs_attr_close(na);
+			}
+			stbuf->st_nlink = 1;	/* Make find(1) work */
 		}
-		stbuf->st_nlink = 1;	/* Make find(1) work */
 	} else {
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
@@ -549,7 +581,22 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 	}
 	/* Sanity checks. */
 	if (!(ni->flags & FILE_ATTR_SYSTEM)) {
-		res = -EINVAL;
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+			char *target;
+			int attr_size;
+
+			errno = 0;
+			target = ntfs_junction_point(ctx->vol,org_path, ni, &attr_size);
+			if (target) {
+				strncpy(buf,target,buf_size);
+				free(target);
+			} else
+				if (errno == EOPNOTSUPP)
+					strcpy(buf,ntfs_bad_reparse);
+				else
+					res = -errno;
+		} else
+			res = -EINVAL;
 		goto exit;
 	}
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
