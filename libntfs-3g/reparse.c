@@ -115,6 +115,7 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 	u64 mref;
 	le64 lemref;
 	int lkup;
+	int olderrno;
 	int i;
 	FILE_NAME_ATTR *found;
 	struct {
@@ -132,7 +133,10 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 			find.attr.file_name[i] = vol->upcase[uname[i]];
 		else
 			find.attr.file_name[i] = uname[i];
+	olderrno = errno;
 	lkup = ntfs_index_lookup(&find, uname_len, icx);
+	if (errno == ENOENT)
+		errno = olderrno;
 	found = (FILE_NAME_ATTR*)icx->data;
 		/*
 		 * We generally only get the first matching candidate,
@@ -397,6 +401,11 @@ char *ntfs_junction_point(ntfs_volume *vol, const char *org_path,
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 	if (reparse_attr && attr_size) {
+			/*
+			 * reparse_tag 0xa000000c has been found for
+			 * \Users\All Users
+			 * (not supported until properly understood)
+			 */
 		if (reparse_attr->reparse_tag == IO_REPARSE_TAG_MOUNT_POINT) {
 			path_data = (struct SYMLNK_REPARSE_DATA*)reparse_attr->reparse_data;
 			offs = le16_to_cpu(path_data->subst_name_offset);

@@ -579,24 +579,31 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		res = -errno;
 		goto exit;
 	}
+		/*
+		 * Directory and reparse point : analyze as a
+		 * junction point
+		 */
+	if ((ni->flags & FILE_ATTR_REPARSE_POINT)
+	   && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+		char *target;
+		int attr_size;
+
+		errno = 0;
+		res = 0;
+		target = ntfs_junction_point(ctx->vol,org_path, ni, &attr_size);
+		if (target) {
+			strncpy(buf,target,buf_size);
+			free(target);
+		} else
+			if (errno == EOPNOTSUPP)
+				strcpy(buf,ntfs_bad_reparse);
+			else
+				res = -errno;
+		goto exit;
+	}
 	/* Sanity checks. */
 	if (!(ni->flags & FILE_ATTR_SYSTEM)) {
-		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
-			char *target;
-			int attr_size;
-
-			errno = 0;
-			target = ntfs_junction_point(ctx->vol,org_path, ni, &attr_size);
-			if (target) {
-				strncpy(buf,target,buf_size);
-				free(target);
-			} else
-				if (errno == EOPNOTSUPP)
-					strcpy(buf,ntfs_bad_reparse);
-				else
-					res = -errno;
-		} else
-			res = -EINVAL;
+		res = -EINVAL;
 		goto exit;
 	}
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
