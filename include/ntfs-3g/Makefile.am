@@ -25,6 +25,7 @@ headers = \
 	misc.h		\
 	mst.h		\
 	ntfstime.h	\
+	reparse.h	\
 	runlist.h	\
 	security.h	\
 	support.h	\
