@@ -86,7 +86,6 @@ int ntfs_log_redirect(const char *function, const char *file, int line,
 #define NTFS_LOG_FLAG_LINE	(1 << 2) /* Show the line number of the message */
 #define NTFS_LOG_FLAG_FUNCTION	(1 << 3) /* Show the function name containing the message */
 #define NTFS_LOG_FLAG_ONLYNAME	(1 << 4) /* Only display the filename, not the pathname */
-#define NTFS_LOG_FLAG_COLOUR	(1 << 5) /* Colour highlight some messages */
 
 /* Macros to simplify logging.  One for each level defined above.
  * Note, ntfs_log_debug/trace have effect only if DEBUG is defined.
