@@ -133,7 +133,7 @@ void utils_mount_error(const char *volume, const char *mntpoint, int err)
 			ntfs_log_error(hibernated_volume_msg, volume, mntpoint);
 			break;
 		case NTFS_VOLUME_UNCLEAN_UNMOUNT:
-			ntfs_log_error(unclean_journal_msg);
+			ntfs_log_error("%s", unclean_journal_msg);
 			ntfs_log_error(forced_mount_msg, volume, mntpoint, 
 				       volume, mntpoint);
 			break;
