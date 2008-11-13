@@ -56,18 +56,27 @@
 #include "misc.h"
 #include "reparse.h"
 
-/* the definition in layout.h is wrong.
-   source : http://www.opensource.apple.com/darwinsource/WWDC2004/tcl-14/tcl/win/tclWinFile.c
+/* the definitions in layout.h are wrong, we use names defined in
+  http://msdn.microsoft.com/en-us/library/aa365740(VS.85).aspx
 */
 #undef IO_REPARSE_TAG_MOUNT_POINT
-#define IO_REPARSE_TAG_MOUNT_POINT 0xA0000003
+#define IO_REPARSE_TAG_MOUNT_POINT const_cpu_to_le32(0xA0000003)
+#define IO_REPARSE_TAG_SYMLINK const_cpu_to_le32(0xA000000C)
 
-
-struct SYMLNK_REPARSE_DATA {
+struct MOUNT_POINT_REPARSE_DATA {
 	u16	subst_name_offset;
 	u16	subst_name_length;
 	u16	print_name_offset;
 	u16	print_name_length;
+	char	path_buffer[0];      /* above data assume this is char array */
+} ;
+
+struct SYMLINK_REPARSE_DATA {		/* another format */
+	u16	subst_name_offset;
+	u16	subst_name_length;
+	u16	print_name_offset;
+	u16	print_name_length;
+	u32	unknown;
 	char	path_buffer[0];      /* above data assume this is char array */
 } ;
 
@@ -393,7 +402,8 @@ char *ntfs_junction_point(ntfs_volume *vol, const char *org_path,
 	unsigned int offs;
 	unsigned int lth;
 	REPARSE_POINT *reparse_attr;
-	struct SYMLNK_REPARSE_DATA *path_data;
+	struct MOUNT_POINT_REPARSE_DATA *mount_point_data;
+	struct SYMLINK_REPARSE_DATA *symlink_data;
 	BOOL bad;
 
 	target = (char*)NULL;
@@ -401,27 +411,41 @@ char *ntfs_junction_point(ntfs_volume *vol, const char *org_path,
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 	if (reparse_attr && attr_size) {
-			/*
-			 * reparse_tag 0xa000000c has been found for
-			 * \Users\All Users
-			 * (not supported until properly understood)
-			 */
-		if (reparse_attr->reparse_tag == IO_REPARSE_TAG_MOUNT_POINT) {
-			path_data = (struct SYMLNK_REPARSE_DATA*)reparse_attr->reparse_data;
-			offs = le16_to_cpu(path_data->subst_name_offset);
-			lth = le16_to_cpu(path_data->subst_name_length);
+		switch (reparse_attr->reparse_tag) {
+		case IO_REPARSE_TAG_MOUNT_POINT :
+			mount_point_data = (struct MOUNT_POINT_REPARSE_DATA*)reparse_attr->reparse_data;
+			offs = le16_to_cpu(mount_point_data->subst_name_offset);
+			lth = le16_to_cpu(mount_point_data->subst_name_length);
 				/* consistency checks */
 			if (((le16_to_cpu(reparse_attr->reparse_data_length)
 				 + 8) == attr_size)
 			    && ((int)((sizeof(REPARSE_POINT)
-				 + sizeof(struct SYMLNK_REPARSE_DATA)
+				 + sizeof(struct MOUNT_POINT_REPARSE_DATA)
 				 + offs + lth)) <= attr_size)) {
 				target = ntfs_get_junction(vol,
-					(ntfschar*)&path_data->path_buffer[offs],
+					(ntfschar*)&mount_point_data->path_buffer[offs],
 					lth/2, org_path);
 				if (target)
 					bad = FALSE;
 			}
+			break;
+		case IO_REPARSE_TAG_SYMLINK :
+			symlink_data = (struct SYMLINK_REPARSE_DATA*)reparse_attr->reparse_data;
+			offs = le16_to_cpu(symlink_data->subst_name_offset);
+			lth = le16_to_cpu(symlink_data->subst_name_length);
+				/* consistency checks */
+			if (((le16_to_cpu(reparse_attr->reparse_data_length)
+				 + 8) == attr_size)
+			    && ((int)((sizeof(REPARSE_POINT)
+				 + sizeof(struct SYMLINK_REPARSE_DATA)
+				 + offs + lth)) <= attr_size)) {
+				target = ntfs_get_junction(vol,
+					(ntfschar*)&symlink_data->path_buffer[offs],
+					lth/2, org_path);
+				if (target)
+					bad = FALSE;
+			}
+			break;
 		}
 		free(reparse_attr);
 	}
