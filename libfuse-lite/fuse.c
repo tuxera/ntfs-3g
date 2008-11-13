@@ -515,14 +515,14 @@ static void fuse_do_prepare_interrupt(fuse_req_t req, struct fuse_intr_data *d)
     fuse_req_interrupt_func(req, fuse_interrupt, d);
 }
 
-static inline void fuse_finish_interrupt(struct fuse *f, fuse_req_t req,
+static void fuse_finish_interrupt(struct fuse *f, fuse_req_t req,
                                          struct fuse_intr_data *d)
 {
     if (f->conf.intr)
         fuse_do_finish_interrupt(f, req, d);
 }
 
-static inline void fuse_prepare_interrupt(struct fuse *f, fuse_req_t req,
+static void fuse_prepare_interrupt(struct fuse *f, fuse_req_t req,
                                           struct fuse_intr_data *d)
 {
     if (f->conf.intr)
