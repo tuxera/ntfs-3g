@@ -45,6 +45,7 @@
 #include "dir.h"
 #include "logging.h"
 #include "bitmap.h"
+#include "reparse.h"
 #include "misc.h"
 
 /**
@@ -1813,12 +1814,13 @@ err_out:
 	goto out;
 }
 
-int ntfs_index_remove(ntfs_inode *ni, const void *key, const int keylen)
+int ntfs_index_remove(ntfs_inode *dir_ni, ntfs_inode *ni,
+		const void *key, const int keylen)
 {
 	int ret = STATUS_ERROR;
 	ntfs_index_context *icx;
 
-	icx = ntfs_index_ctx_get(ni, NTFS_INDEX_I30, 4);
+	icx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
 	if (!icx)
 		return -1;
 
@@ -1827,8 +1829,9 @@ int ntfs_index_remove(ntfs_inode *ni, const void *key, const int keylen)
 		if (ntfs_index_lookup(key, keylen, icx))
 			goto err_out;
 
-		if (((FILE_NAME_ATTR *)icx->data)->file_attributes &
-				FILE_ATTR_REPARSE_POINT) {
+		if ((((FILE_NAME_ATTR *)icx->data)->file_attributes &
+				FILE_ATTR_REPARSE_POINT)
+		   && !ntfs_possible_symlink(ni)) {
 			errno = EOPNOTSUPP;
 			goto err_out;
 		}

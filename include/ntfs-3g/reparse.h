@@ -24,7 +24,8 @@
 #ifndef REPARSE_H
 #define REPARSE_H
 
-char *ntfs_junction_point(ntfs_volume *vol, const char *org_path,
-                        ntfs_inode *ni, int *pattr_size);
+char *ntfs_make_symlink(const char *org_path,
+			ntfs_inode *ni, int *pattr_size);
+BOOL ntfs_possible_symlink(ntfs_inode *ni);
 
 #endif /* REPARSE_H */

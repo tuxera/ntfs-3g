@@ -57,6 +57,7 @@
 #include "logging.h"
 #include "misc.h"
 #include "security.h"
+#include "reparse.h"
 
 /*
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
@@ -1594,7 +1595,7 @@ search:
 	if (ntfs_check_unlinkable_dir(ni, fn) < 0)
 		goto err_out;
 		
-	if (ntfs_index_remove(dir_ni, fn, le32_to_cpu(actx->attr->value_length)))
+	if (ntfs_index_remove(dir_ni, ni, fn, le32_to_cpu(actx->attr->value_length)))
 		goto err_out;
 	
 	if (ntfs_attr_record_rm(actx))
@@ -1725,7 +1726,8 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		goto err_out;
 	}
 	
-	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+	if ((ni->flags & FILE_ATTR_REPARSE_POINT)
+	   && !ntfs_possible_symlink(ni)) {
 		err = EOPNOTSUPP;
 		goto err_out;
 	}
@@ -1763,7 +1765,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 		ntfs_log_error("Failed to add FILE_NAME attribute.\n");
 		err = errno;
 		/* Try to remove just added attribute from index. */
-		if (ntfs_index_remove(dir_ni, fn, fn_len))
+		if (ntfs_index_remove(dir_ni, ni, fn, fn_len))
 			goto rollback_failed;
 		goto err_out;
 	}

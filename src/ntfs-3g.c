@@ -413,14 +413,15 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		goto exit;
 	}
 #endif
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY && !stream_name_len) {
+	if (((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		|| (ni->flags & FILE_ATTR_REPARSE_POINT))
+	    && !stream_name_len) {
 		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
 			char *target;
 			int attr_size;
 
 			errno = 0;
-			target = ntfs_junction_point(ctx->vol,org_path, ni,
-					&attr_size);
+			target = ntfs_make_symlink(org_path, ni, &attr_size);
 				/*
 				 * If the reparse point is not a valid
 				 * directory junction, and there is no error
@@ -580,17 +581,15 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 		goto exit;
 	}
 		/*
-		 * Directory and reparse point : analyze as a
-		 * junction point
+		 * Reparse point : analyze as a junction point
 		 */
-	if ((ni->flags & FILE_ATTR_REPARSE_POINT)
-	   && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
 		char *target;
 		int attr_size;
 
 		errno = 0;
 		res = 0;
-		target = ntfs_junction_point(ctx->vol,org_path, ni, &attr_size);
+		target = ntfs_make_symlink(org_path, ni, &attr_size);
 		if (target) {
 			strncpy(buf,target,buf_size);
 			free(target);
