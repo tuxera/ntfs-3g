@@ -172,7 +172,8 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 		if (icx->data && icx->data_len) {
 			found = (FILE_NAME_ATTR*)icx->data;
 			if (lkup
-			   && !ntfs_names_collate(find.attr.file_name, find.attr.file_name_length,
+			   && !ntfs_names_collate(find.attr.file_name,
+				find.attr.file_name_length,
 				found->file_name, found->file_name_length,
 				1, IGNORE_CASE,
 				vol->upcase, vol->upcase_len))
@@ -341,11 +342,13 @@ static char *search_relative(ntfs_volume *vol, ntfschar *path, int count,
 			do {
 				len = 0;
 				while (((start + len) < unisz)
-				    && (unicode[start + len] != const_cpu_to_le16('/')))
-					len++;
+				    && (unicode[start + len]
+					!= const_cpu_to_le16('/')))
+						len++;
 				curni = (struct INODE_STACK*)NULL;
 				if ((start + len) < unisz) {
-					curni = stack_inode(topni, &unicode[start], len, FALSE);
+					curni = stack_inode(topni,
+						&unicode[start], len, FALSE);
 					if (curni)
 						topni = curni;
 				} else
@@ -353,23 +356,29 @@ static char *search_relative(ntfs_volume *vol, ntfschar *path, int count,
 				start += len + 1;
 			} while (curni
 			    && topni->ni
-			    && (topni->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			    && (topni->ni->mrec->flags
+				& MFT_RECORD_IS_DIRECTORY)
 			    && (start < unisz));
 			free(unicode);
-			if (curni && topni->ni && (topni->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
-				start = 0;
+			if (curni
+			    && topni->ni
+			    && (topni->ni->mrec->flags
+				& MFT_RECORD_IS_DIRECTORY)) {
+					start = 0;
 				do {
 					len = 0;
 					while (((start + len) < count)
-					    && (path[start + len] != const_cpu_to_le16('\\')))
-						len++;
+					    && (path[start + len]
+						!= const_cpu_to_le16('\\')))
+							len++;
 					curni = (struct INODE_STACK*)NULL;
-					if ((path[start] == const_cpu_to_le16('.'))
+					if ((path[start]
+						== const_cpu_to_le16('.'))
 					    && ((len == 1)
 						|| ((len == 2)
 						    && (path[start+1] 
 							== const_cpu_to_le16('.'))))) {
-						/* leave the .. or . in the path */
+					/* leave the .. or . in the path */
 						curni = topni;
 						if (len == 2) {
 							curni = pop_inode(topni);
@@ -377,23 +386,29 @@ static char *search_relative(ntfs_volume *vol, ntfschar *path, int count,
 								topni = curni;
 						}
 					} else {
-						curni = stack_inode(topni, &path[start], len, TRUE);
+						curni = stack_inode(topni,
+						    &path[start], len, TRUE);
 						if (curni)
 							topni = curni;
 					}
 					if (topni->ni) {
 						start += len;
 						if (start < count)
-							path[start++] = const_cpu_to_le16('/');
+							path[start++]
+							    = const_cpu_to_le16('/');
 					}
 				} while (curni
 				    && topni->ni
-				    && (topni->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				    && (topni->ni->mrec->flags
+					& MFT_RECORD_IS_DIRECTORY)
 				    && (start < count));
 				if (curni
 				    && topni->ni
-				    && (topni->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? isdir : !isdir)) {
-					if (ntfs_ucstombs(path, count, &target, 0) < 0) {
+				    && (topni->ni->mrec->flags
+					 & (MFT_RECORD_IS_DIRECTORY
+					     ? isdir : !isdir))) {
+					if (ntfs_ucstombs(path, count,
+					    &target, 0) < 0) {
 						if (target) {
 							free(target);
 							target = (char*)NULL;
@@ -521,7 +536,8 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 			for (p=path; *p; p++)
 				if (*p == '/')
 					level++;
-			fulltarget = (char*)ntfs_malloc(3*level + strlen(target) + 1);
+			fulltarget = (char*)ntfs_malloc(3*level
+					+ strlen(target) + 1);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
@@ -559,7 +575,8 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 			for (p=path; *p; p++)
 				if (*p == '/')
 					level++;
-			fulltarget = (char*)ntfs_malloc(3*level + sizeof(mappingdir) + count - 4);
+			fulltarget = (char*)ntfs_malloc(3*level
+					+ sizeof(mappingdir) + count - 4);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
@@ -635,15 +652,18 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 	    && !ntfs_drive_letter(vol, junction[0]))
 	    || (kind == ABS_PATH)) {
 		if (kind == ABS_PATH)
-			target = search_absolute(vol,&junction[1],count - 1, isdir);
+			target = search_absolute(vol, &junction[1],
+				count - 1, isdir);
 		else
-			target = search_absolute(vol,&junction[3],count - 3, isdir);
+			target = search_absolute(vol, &junction[3],
+				count - 3, isdir);
 		if (target) {
 			level = 0;
 			for (p=path; *p; p++)
 				if (*p == '/')
 					level++;
-			fulltarget = (char*)ntfs_malloc(3*level + strlen(target) + 1);
+			fulltarget = (char*)ntfs_malloc(3*level
+					+ strlen(target) + 1);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
@@ -678,7 +698,8 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 			for (p=path; *p; p++)
 				if (*p == '/')
 					level++;
-			fulltarget = (char*)ntfs_malloc(3*level + sizeof(mappingdir) + count - 4);
+			fulltarget = (char*)ntfs_malloc(3*level
+					+ sizeof(mappingdir) + count - 4);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
@@ -745,14 +766,16 @@ char *ntfs_make_symlink(const char *org_path,
 
 	target = (char*)NULL;
 	bad = TRUE;
-	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
+	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			 != const_cpu_to_le16(0);
 	vol = ni->vol;
 	reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
 			AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
 	if (reparse_attr && attr_size) {
 		switch (reparse_attr->reparse_tag) {
 		case IO_REPARSE_TAG_MOUNT_POINT :
-			mount_point_data = (struct MOUNT_POINT_REPARSE_DATA*)reparse_attr->reparse_data;
+			mount_point_data = (struct MOUNT_POINT_REPARSE_DATA*)
+						reparse_attr->reparse_data;
 			offs = le16_to_cpu(mount_point_data->subst_name_offset);
 			lth = le16_to_cpu(mount_point_data->subst_name_length);
 				/* consistency checks */
@@ -770,7 +793,8 @@ char *ntfs_make_symlink(const char *org_path,
 			}
 			break;
 		case IO_REPARSE_TAG_SYMLINK :
-			symlink_data = (struct SYMLINK_REPARSE_DATA*)reparse_attr->reparse_data;
+			symlink_data = (struct SYMLINK_REPARSE_DATA*)
+						reparse_attr->reparse_data;
 			offs = le16_to_cpu(symlink_data->subst_name_offset);
 			lth = le16_to_cpu(symlink_data->subst_name_length);
 			p = (ntfschar*)&symlink_data->path_buffer[offs];
@@ -800,8 +824,9 @@ char *ntfs_make_symlink(const char *org_path,
 				case FULL_TARGET :
 					if (!(symlink_data->flags
 					   & const_cpu_to_le32(1))) {
-						target = ntfs_get_fulllink(vol,p,
-							lth/2, org_path, isdir);
+						target = ntfs_get_fulllink(vol,
+							p, lth/2,
+							org_path, isdir);
 						if (target)
 							bad = FALSE;
 					}
@@ -809,8 +834,9 @@ char *ntfs_make_symlink(const char *org_path,
 				case ABS_TARGET :
 					if (symlink_data->flags
 					   & const_cpu_to_le32(1)) {
-						target = ntfs_get_abslink(vol,p,
-							lth/2, org_path, isdir);
+						target = ntfs_get_abslink(vol,
+							p, lth/2,
+							org_path, isdir);
 						if (target)
 							bad = FALSE;
 					}
@@ -818,8 +844,9 @@ char *ntfs_make_symlink(const char *org_path,
 				case REL_TARGET :
 					if (symlink_data->flags
 					   & const_cpu_to_le32(1)) {
-						target = ntfs_get_rellink(vol,p,
-							lth/2, org_path, isdir);
+						target = ntfs_get_rellink(vol,
+							p, lth/2,
+							org_path, isdir);
 						if (target)
 							bad = FALSE;
 					}
