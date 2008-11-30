@@ -2107,7 +2107,7 @@ is_enumeration:
 			if (MSEQNO_LE(al_entry->mft_reference) !=
 					le16_to_cpu(
 					ni->mrec->sequence_number)) {
-				ntfs_log_debug("Found stale mft reference in "
+				ntfs_log_error("Found stale mft reference in "
 						"attribute list!\n");
 				break;
 			}
@@ -2193,8 +2193,8 @@ do_next_attr:
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
 	}
-	ntfs_log_debug("Inode is corrupt.\n");
 	errno = EIO;
+	ntfs_log_perror("Inode is corrupt (%lld)", (unsigned long long)ni->mft_no);
 	return -1;
 not_found:
 	/*
