@@ -164,13 +164,13 @@ static const char *usage_msg =
 "Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "\n"
-"Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
+"Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
 "Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
 "          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual.\n"
 "\n"
-"Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
+"Examples: ntfs-3g -o force /dev/sda1 /mnt/windows\n"
 "\n"
 "%s";
 

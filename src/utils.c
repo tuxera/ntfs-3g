@@ -66,7 +66,7 @@ static const char *hibernated_volume_msg =
 "mount the volume read-write with the 'remove_hiberfile' mount option.\n"
 "For example type on the command line:\n"
 "\n"
-"            mount -t ntfs-3g %s %s -o remove_hiberfile\n"
+"            mount -t ntfs-3g -o remove_hiberfile %s %s\n"
 "\n";
 
 static const char *unclean_journal_msg =
@@ -97,7 +97,7 @@ static const char *access_denied_msg =
 
 static const char *forced_mount_msg =
 "\n"
-"            mount -t ntfs-3g %s %s -o force\n"
+"            mount -t ntfs-3g -o force %s %s\n"
 "\n"
 "    Or add the option to the relevant row in the /etc/fstab file:\n"
 "\n"
