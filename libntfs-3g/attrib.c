@@ -914,8 +914,9 @@ retry:
 			total += br;
 			count -= br;
 			b = (u8*)b + br;
-			continue;
 		}
+		if (br == to_read)
+			continue;
 		/* If the syscall was interrupted, try again. */
 		if (br == (s64)-1 && errno == EINTR)
 			goto retry;
