@@ -3064,23 +3064,23 @@ int main(int argc, char *argv[])
 		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
 		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
 		if (ctx->secure_flags & (1 << SECURITY_DEFAULT))
-			permissions_mode = "Global ownership and permissions enforced\n";
+			permissions_mode = "Global ownership and permissions enforced";
 		else
-			permissions_mode = "Ownership and permissions disabled\n";
+			permissions_mode = "Ownership and permissions disabled";
 	} else {
 			/* JPA open $Secure, (whatever NTFS version !) */
 			/* to initialize security data */
 		if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
-			failed_secure = "Could not open file $Secure\n";
+			failed_secure = "Could not open file $Secure";
 		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
 #if POSIXACLS
 			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-				permissions_mode = "User mapping built, Posix ACLs not used\n";
+				permissions_mode = "User mapping built, Posix ACLs not used";
 			else
-				permissions_mode = "User mapping built, Posix ACLs in use\n";
+				permissions_mode = "User mapping built, Posix ACLs in use";
 #else
 			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-				permissions_mode = "User mapping built\n";
+				permissions_mode = "User mapping built";
 			else {
 				/*
 				 * No explicit option (typically mount by hal)
@@ -3094,7 +3094,7 @@ int main(int argc, char *argv[])
 			}
 #endif
 		} else
-			permissions_mode = "No user mapping file : ownership and permissions disabled\n";
+			permissions_mode = "No user mapping file : ownership and permissions disabled";
 	}
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);
@@ -3113,9 +3113,9 @@ int main(int argc, char *argv[])
 #endif	
 	setup_logging(parsed_options);
 	if (failed_secure)
-	        ntfs_log_info(failed_secure);
+	        ntfs_log_info("%s\n",failed_secure);
 	if (permissions_mode)
-	        ntfs_log_info(permissions_mode);
+	        ntfs_log_info("%s\n",permissions_mode);
 	
 	fuse_loop(fh);
 	
