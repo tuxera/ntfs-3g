@@ -2128,6 +2128,8 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 	return (outsize ? (int)outsize : -errno);
 }
 
+#endif /* POSIXACLS */
+
 /*
  *		Get an NTFS ACL
  *
@@ -2154,8 +2156,6 @@ int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 	}
 	return (outsize ? (int)outsize : -errno);
 }
-
-#endif /* POSIXACLS */
 
 /*
  *		Get owner, group and permissions in an stat structure
@@ -2849,6 +2849,8 @@ int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			(const char*)NULL, 0, ni));
 }
 
+#endif
+
 /*
  *		Set a new NTFS ACL to a file
  *
@@ -2867,7 +2869,11 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
 	if ((size > 0)
 	   && ntfs_valid_descr(value,size)
 	   && (ntfs_attr_size(value) == size)) {
+#if POSIXACLS
 		if (ntfs_allowed_as_owner(scx,path,ni)) {
+#else
+			{ /* relying on fuse for access control */
+#endif
 				/* need copying in order to write */
 			attr = (char*)ntfs_malloc(size);
 			if (attr) {
@@ -2907,9 +2913,6 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
 		errno = EINVAL;
 	return (res ? -1 : 0);
 }
-
-#endif
-
 
 /*
  *		Set new permissions to a file

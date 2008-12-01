@@ -282,15 +282,14 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			ntfs_inode *ni);
 int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, ntfs_inode *ni);
+#endif
+
 int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, char *value, size_t size,
 			ntfs_inode *ni);
 int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, const char *value, size_t size,
 			ntfs_inode *ni);
-
-#endif
-
 
 /*
  *		Security API for direct access to security descriptors
