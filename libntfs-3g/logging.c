@@ -50,14 +50,6 @@
 #define PATH_SEP '/'
 #endif
 
-/* Colour prefixes and a suffix */
-static const char *col_green  = "\e[32m";
-static const char *col_cyan   = "\e[36m";
-static const char *col_yellow = "\e[01;33m";
-static const char *col_red    = "\e[01;31m";
-static const char *col_redinv = "\e[01;07;31m";
-static const char *col_end    = "\e[0m";
-
 #ifdef DEBUG
 static int tab;
 #endif
@@ -426,8 +418,6 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 	int ret = 0;
 	int olderr = errno;
 	FILE *stream;
-	const char *col_prefix = NULL;
-	const char *col_suffix = NULL;
 
 	if (!data)		/* Interpret data as a FILE stream. */
 		return 0;	/* If it's NULL, we can't do anything. */
@@ -439,41 +429,10 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 			tab--;
 		return 0;
 	}
-#endif	
-	if (ntfs_log.flags & NTFS_LOG_FLAG_COLOUR) {
-		/* Pick a colour determined by the log level */
-		switch (level) {
-			case NTFS_LOG_LEVEL_DEBUG:
-				col_prefix = col_green;
-				col_suffix = col_end;
-				break;
-			case NTFS_LOG_LEVEL_TRACE:
-				col_prefix = col_cyan;
-				col_suffix = col_end;
-				break;
-			case NTFS_LOG_LEVEL_WARNING:
-				col_prefix = col_yellow;
-				col_suffix = col_end;
-				break;
-			case NTFS_LOG_LEVEL_ERROR:
-			case NTFS_LOG_LEVEL_PERROR:
-				col_prefix = col_red;
-				col_suffix = col_end;
-				break;
-			case NTFS_LOG_LEVEL_CRITICAL:
-				col_prefix = col_redinv;
-				col_suffix = col_end;
-				break;
-		}
-	}
 	
-#ifdef DEBUG
 	for (i = 0; i < tab; i++)
 		ret += fprintf(stream, " ");
 #endif	
-	if (col_prefix)
-		ret += fprintf(stream, col_prefix);
-
 	if ((ntfs_log.flags & NTFS_LOG_FLAG_ONLYNAME) &&
 	    (strchr(file, PATH_SEP)))		/* Abbreviate the filename */
 		file = strrchr(file, PATH_SEP) + 1;
@@ -495,9 +454,6 @@ int ntfs_log_handler_fprintf(const char *function, const char *file,
 
 	if (level & NTFS_LOG_LEVEL_PERROR)
 		ret += fprintf(stream, ": %s\n", strerror(olderr));
-
-	if (col_suffix)
-		ret += fprintf(stream, col_suffix);
 
 #ifdef DEBUG
 	if (level == NTFS_LOG_LEVEL_ENTER)
@@ -648,10 +604,6 @@ BOOL ntfs_log_parse_option(const char *option)
 		return TRUE;
 	} else if (strcmp(option, "--log-trace") == 0) {
 		ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
-		return TRUE;
-	} else if ((strcmp(option, "--log-colour") == 0) ||
-		   (strcmp(option, "--log-color") == 0)) {
-		ntfs_log_set_flags(NTFS_LOG_FLAG_COLOUR);
 		return TRUE;
 	}
 

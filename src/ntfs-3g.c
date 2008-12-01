@@ -91,7 +91,6 @@
 #include "layout.h"
 #include "index.h"
 #include "utils.h"
-#include "version.h"
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
@@ -175,13 +174,13 @@ static const char *usage_msg =
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2007-2008 Jean-Pierre Andre\n"
 "\n"
-"Usage:    %s <device|image_file> <mount_point> [-o option[,...]]\n"
+"Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
 "Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
 "          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual.\n"
 "\n"
-"Example:  ntfs-3g /dev/sda1 /mnt/win -o force\n"
+"Examples: ntfs-3g -o force /dev/sda1 /mnt/windows\n"
 "\n"
 "%s";
 
@@ -2776,7 +2775,7 @@ static void mknod_dev_fuse(const char *dev)
 		if (mknod(dev, S_IFCHR | 0666, makedev(10, 229))) {
 			ntfs_log_perror("Failed to create '%s'", dev);
 			if (errno == EPERM)
-				ntfs_log_error(dev_fuse_msg);
+				ntfs_log_error("%s", dev_fuse_msg);
 		}
 		umask(mask);
 	}
@@ -3109,7 +3108,7 @@ int main(int argc, char *argv[])
 
 #if defined(linux) || defined(__uClinux__)
 	if (S_ISBLK(sbuf.st_mode) && (fstype == FSTYPE_FUSE))
-		ntfs_log_info(fuse26_kmod_msg);
+		ntfs_log_info("%s", fuse26_kmod_msg);
 #endif	
 	setup_logging(parsed_options);
 	if (failed_secure)
