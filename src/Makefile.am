@@ -23,14 +23,14 @@ ntfs_3g_CFLAGS   =			\
 	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
 	-I$(top_srcdir)/include/ntfs-3g
-ntfs_3g_SOURCES  = ntfs-3g.c utils.c utils.h
+ntfs_3g_SOURCES  = ntfs-3g.c
 
 ntfs_3g_probe_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 ntfs_3g_probe_LDFLAGS	= $(AM_LDFLAGS) -all-static
 endif
 ntfs_3g_probe_CFLAGS  	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
-ntfs_3g_probe_SOURCES 	= ntfs-3g.probe.c utils.c utils.h
+ntfs_3g_probe_SOURCES 	= ntfs-3g.probe.c
 
 if RUN_LDCONFIG
 install-exec-hook:

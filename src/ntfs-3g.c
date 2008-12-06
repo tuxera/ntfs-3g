@@ -89,7 +89,6 @@
 #include "unistr.h"
 #include "layout.h"
 #include "index.h"
-#include "utils.h"
 #include "ntfstime.h"
 #include "misc.h"
 
@@ -2219,7 +2218,7 @@ int main(int argc, char *argv[])
 	if (drop_privs())
 		return NTFS_VOLUME_NO_PRIVILEGE;
 	
-	utils_set_locale();
+	ntfs_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
@@ -2301,7 +2300,7 @@ int main(int argc, char *argv[])
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
-	utils_mount_error(opts.device, opts.mnt_point, err);
+	ntfs_mount_error(opts.device, opts.mnt_point, err);
 err2:
 	ntfs_close();
 	free(ctx);

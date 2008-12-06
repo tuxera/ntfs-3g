@@ -33,7 +33,6 @@
 #include <getopt.h>
 
 #include "volume.h"
-#include "utils.h"
 #include "misc.h"
 
 #ifndef PATH_MAX
