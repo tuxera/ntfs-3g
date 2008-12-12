@@ -260,7 +260,10 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	if (!vol)
 		return -ENODEV;
 	
-	/* File system block size, used for optimal transfer block size. */
+	/* 
+	 * File system block size. Used to calculate used/free space by df.
+	 * Incorrectly documented as "optimal transfer block size". 
+	 */
 	sfs->f_bsize = vol->cluster_size;
 	
 	/* Fundamental file system block size, used as the unit. */
