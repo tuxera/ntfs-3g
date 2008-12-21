@@ -3,6 +3,8 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
+ * Copyright (c) 2008      Jean-Pierre Andre
+ * Copyright (c) 2008      Bernhard Kaindl
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -39,6 +41,9 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#ifdef HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 #include "attrib.h"
 #include "types.h"
@@ -47,6 +52,8 @@
 #include "logging.h"
 #include "misc.h"
 
+#define NOREVBOM 0  /* JPA rejecting U+FFFE and U+FFFF, open to debate */
+
 /*
  * IMPORTANT
  * =========
@@ -54,6 +61,8 @@
  * All these routines assume that the Unicode characters are in little endian
  * encoding inside the strings!!!
  */
+
+static int use_utf8 = 1; /* use UTF-8 encoding for file names */
 
 /*
  * This is used by the name collation functions to quickly determine what
@@ -373,6 +382,282 @@ int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
 			err_val, ic, upcase, upcase_len);
 }
 
+/*
+   NTFS uses Unicode (UTF-16LE [NTFS-3G uses UCS-2LE, which is enough
+   for now]) for path names, but the Unicode code points need to be
+   converted before a path can be accessed under NTFS. For 7 bit ASCII/ANSI,
+   glibc does this even without a locale in a hard-coded fashion as that
+   appears to be is easy because the low 7-bit ASCII range appears to be
+   available in all charsets but it does not convert anything if
+   there was some error with the locale setup or none set up like
+   when mount is called during early boot where he (by policy) do
+   not use locales (and may be not available if /usr is not yet mounted),
+   so this patch fixes the resulting issues for systems which use
+   UTF-8 and for others, specifying the locale in fstab brings them
+   the encoding which they want.
+  
+   If no locale is defined or there was a problem with setting one
+   up and whenever nl_langinfo(CODESET) returns a sting starting with
+   "ANSI", use an internal UCS-2LE <-> UTF-8 codeset converter to fix
+   the bug where NTFS-3G does not show any path names which include
+   international characters!!! (and also fails on creating them) as result.
+  
+   Author: Bernhard Kaindl <bk@suse.de>
+   Jean-Pierre Andre made it compliant with RFC3629/RFC2781.
+*/
+ 
+/* 
+ * Return the amount of 8-bit elements in UTF-8 needed (without
+ * the terminating null) to store a given UTF-16LE string. 
+ */
+static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_len)
+{
+	int i;
+	int count = 0;
+	BOOL surrog;
+
+	surrog = FALSE;
+	for (i = 0; i < ins_len && ins[i]; i++) {
+		unsigned short c = le16_to_cpu(ins[i]);
+		if (surrog) {
+			if ((c >= 0xdc00) && (c < 0xe000)) {
+				surrog = FALSE;
+				count += 4;
+			} else goto fail;
+		} else
+			if (c < 0x80)
+				count++;
+			else if (c < 0x800)
+				count += 2;
+			else if (c < 0xd800)
+				count += 3;
+			else if (c < 0xdc00)
+				surrog = TRUE;
+#if NOREVBOM
+			else if ((c >= 0xe000) && (c < 0xfffe))
+#else
+			else if (c >= 0xe000)
+#endif
+				count += 3;
+			else goto fail;
+		if (count > outs_len)
+			goto fail;
+	}
+	if (surrog) goto fail;
+	return count;
+fail:
+	return -1;
+}
+
+/*
+ * ntfs_utf16_to_utf8 - convert a little endian UTF16LE string to an UTF-8 string
+ * @ins:	input utf16 string buffer
+ * @ins_len:	length of input string in utf16 characters
+ * @outs:	on return contains the (allocated) output multibyte string
+ * @outs_len:	length of output buffer in bytes
+ */
+static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
+			      char **outs, int outs_len)
+{
+	char *t;
+	int i, size;
+	ntfschar halfpair;
+
+	halfpair = 0;
+	if (!*outs)
+		outs_len = PATH_MAX;
+
+	size = utf16_to_utf8_size(ins, ins_len, outs_len);
+
+	if (size < 0) {
+		errno = ENAMETOOLONG;
+		goto fail;
+	}
+	if (!*outs)
+		*outs = ntfs_malloc((outs_len = size + 1));
+
+	t = *outs;
+
+	for (i = 0; i < ins_len && ins[i]; i++) {
+	    unsigned short c = le16_to_cpu(ins[i]);
+			/* size not double-checked */
+		if (halfpair) {
+			if ((c >= 0xdc00) && (c < 0xe000)) {
+				*t++ = 0xf0 + (((halfpair + 64) >> 8) & 7);
+				*t++ = 0x80 + (((halfpair + 64) >> 2) & 63);
+				*t++ = 0x80 + ((c >> 6) & 15) + ((halfpair & 3) << 4);
+				*t++ = 0x80 + (c & 63);
+				halfpair = 0;
+			} else goto fail;
+		} else if (c < 0x80) {
+			*t++ = c;
+	    	} else {
+			if (c < 0x800) {
+			   	*t++ = (0xc0 | ((c >> 6) & 0x3f));
+			        *t++ = 0x80 | (c & 0x3f);
+			} else if (c < 0xd800) {
+			   	*t++ = 0xe0 | (c >> 12);
+			   	*t++ = 0x80 | ((c >> 6) & 0x3f);
+		        	*t++ = 0x80 | (c & 0x3f);
+			} else if (c < 0xdc00)
+				halfpair = c;
+			else if (c >= 0xe000) {
+				*t++ = 0xe0 | (c >> 12);
+				*t++ = 0x80 | ((c >> 6) & 0x3f);
+			        *t++ = 0x80 | (c & 0x3f);
+			} else goto fail;
+	        }
+	}
+	*t = '\0';
+	return t - *outs;
+fail:
+	return -1;
+}
+
+/* 
+ * Return the amount of 16-bit elements in UTF-16LE needed 
+ * (without the terminating null) to store given UTF-8 string.
+ *
+ * Return -1 if it does not fit into PATH_MAX.
+ *
+ * Note: This does not check whether the input sequence is a valid utf8 string,
+ *	 and should be used only in context where such check is made!
+ */
+static int utf8_to_utf16_size(const char *s)
+{
+	unsigned int byte;
+	size_t count = 0;
+
+	while ((byte = *((const unsigned char *)s++))) {
+		if (++count >= PATH_MAX || byte >= 0xF5)
+			goto fail;
+		if (!*s) break;
+		if (byte >= 0xC0) s++;
+		if (!*s) break;
+		if (byte >= 0xE0) s++;
+		if (!*s) break;
+		if (byte >= 0xF0) {
+			s++;
+			if (++count >= PATH_MAX)
+				goto fail;
+		}
+	}
+	return count;
+fail:
+	return -1;
+}
+/* 
+ * This converts one UTF-8 sequence to cpu-endian Unicode value
+ * within range U+0 .. U+10ffff and excluding U+D800 .. U+DFFF
+ * Returns the number of used utf8 bytes or -1 if sequence is invalid.
+ */
+static int utf8_to_unicode(u32 *wc, const char *s)
+{
+    	unsigned int byte = *((const unsigned char *)s);
+
+					/* single byte */
+	if (byte == 0) {
+		*wc = (u32) 0;
+		return 0;
+	} else if (byte < 0x80) {
+		*wc = (u32) byte;
+		return 1;
+					/* double byte */
+	} else if (byte < 0xc2) {
+		goto fail;
+	} else if (byte < 0xE0) {
+		if (strlen(s) < 2)
+			goto fail;
+		if ((s[1] & 0xC0) == 0x80) {
+			*wc = ((u32)(byte & 0x1F) << 6)
+			    | ((u32)(s[1] & 0x3F));
+			return 2;
+		} else
+			goto fail;
+					/* three-byte */
+	} else if (byte < 0xF0) {
+		if (strlen(s) < 3)
+			goto fail;
+		if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
+			*wc = ((u32)(byte & 0x0F) << 12)
+			    | ((u32)(s[1] & 0x3F) << 6)
+			    | ((u32)(s[2] & 0x3F));
+			/* Check valid ranges */
+#if NOREVBOM
+			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFD)))
+				return 3;
+#else
+			if (((*wc >= 0x800) && (*wc <= 0xD7FF))
+			  || ((*wc >= 0xe000) && (*wc <= 0xFFFF)))
+				return 3;
+#endif
+		}
+		goto fail;
+					/* four-byte */
+	} else if (byte < 0xF5) {
+		if (strlen(s) < 4)
+			goto fail;
+		if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)
+		  && ((s[3] & 0xC0) == 0x80)) {
+			*wc = ((u32)(byte & 0x07) << 18)
+			    | ((u32)(s[1] & 0x3F) << 12)
+			    | ((u32)(s[2] & 0x3F) << 6)
+			    | ((u32)(s[3] & 0x3F));
+		/* Check valid ranges */
+		if ((*wc <= 0x10ffff) && (*wc >= 0x10000))
+			return 4;
+		}
+		goto fail;
+	}
+fail:
+	return -1;
+}
+
+/**
+ * ntfs_utf8_to_utf16 - convert a UTF-8 string to a UTF-16LE string
+ * @ins:	input multibyte string buffer
+ * @outs:	on return contains the (allocated) output utf16 string
+ * @outs_len:	length of output buffer in utf16 characters
+ */
+static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
+{
+	const char *t = ins;
+	u32 wc;
+	ntfschar *outpos;
+	int shorts = utf8_to_utf16_size(ins);
+
+	if (shorts < 0) {
+		errno = EILSEQ;
+		goto fail;
+	}
+	if (!*outs)
+		*outs = ntfs_malloc((shorts+1) * sizeof(ntfschar));
+
+	outpos = *outs;
+
+	while(1) {
+		int m  = utf8_to_unicode(&wc, t);
+		if (m < 0) {
+			errno = EILSEQ;
+			goto fail;
+		}
+		if (wc < 0x10000)
+			*outpos++ = cpu_to_le16(wc);
+		else {
+			wc -= 0x10000;
+			*outpos++ = cpu_to_le16((wc >> 10) + 0xd800);
+			*outpos++ = cpu_to_le16((wc & 0x3ff) + 0xdc00);
+		}
+		if (m == 0)
+			break;
+		t += m;
+	}
+    return --outpos - *outs;
+fail:
+    return -1;
+}
+
 /**
  * ntfs_ucstombs - convert a little endian Unicode string to a multibyte string
  * @ins:	input Unicode string buffer
@@ -419,6 +704,8 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		errno = ENAMETOOLONG;
 		return -1;
 	}
+	if (use_utf8)
+		return ntfs_utf16_to_utf8(ins, ins_len, outs, outs_len);
 	if (!mbs) {
 		mbs_len = (ins_len + 1) * MB_CUR_MAX;
 		mbs = ntfs_malloc(mbs_len);
@@ -525,6 +812,9 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 		return -1;
 	}
 	
+	if (use_utf8)
+		return ntfs_utf8_to_utf16(ins, outs);
+
 	/* Determine the size of the multi-byte string in bytes. */
 	ins_size = strlen(ins);
 	/* Determine the length of the multi-byte string. */
@@ -732,5 +1022,26 @@ void ntfs_ucsfree(ntfschar *ucs)
 {
 	if (ucs && (ucs != AT_UNNAMED))
 		free(ucs);
+}
+
+/*
+ * Define the character encoding to be used.
+ * Use UTF-8 unless specified otherwise.
+ */
+
+int ntfs_set_char_encoding(const char *locale)
+{
+	use_utf8 = 0;
+	if (!locale || strstr(locale,"utf8") || strstr(locale,"UTF8")
+	    || strstr(locale,"utf-8") || strstr(locale,"UTF-8"))
+		use_utf8 = 1;
+	else
+		if (setlocale(LC_ALL, locale))
+			use_utf8 = 0;
+		else {
+			ntfs_log_error("Invalid locale, encoding to UTF-8\n");
+			use_utf8 = 1;
+	 	}
+	return 0; /* always successful */
 }
 
