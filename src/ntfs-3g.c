@@ -151,11 +151,6 @@ static char def_opts[] = "silent,allow_other,nonempty,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 
-static const char *locale_msg =
-"WARNING: Couldn't set locale to '%s' thus some file names may not\n"
-"         be correct or visible. Please see the potential solution at\n"
-"         http://ntfs-3g.org/support.html#locale\n";
-
 static const char *usage_msg = 
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
@@ -165,8 +160,8 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
-"Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
-"          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
+"Options:  ro (read-only mount), force, remove_hiberfile, uid=,\n" 
+"          gid=, umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual.\n"
 "\n"
 "Examples: ntfs-3g -o force /dev/sda1 /mnt/windows\n"
@@ -1817,8 +1812,7 @@ static char *parse_mount_options(const char *orig_opts)
 		} else if (!strcmp(opt, "locale")) {
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
-			if (!setlocale(LC_ALL, val))
-				ntfs_log_error(locale_msg, val);
+			setlocale(LC_ALL, val);
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (missing_option_value(val, "streams_interface"))
 				goto err_exit;

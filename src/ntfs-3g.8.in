@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "April 2008" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "December 2008" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -99,11 +99,7 @@ Mount filesystem read\-only. Useful if Windows is hibernated or the
 NTFS journal file is unclean.
 .TP
 .BI locale= value
-This option can be useful if your language specific locale environment 
-variables are not set correctly or at all in your operating system.
-In such cases, the national characters can be made visible by using this 
-option. Please see more information about this topic at
-http://ntfs-3g.org/support.html#locale
+Prints informative and diagnostic messages in the set locale.
 .TP
 .B force
 Force the mounting even if the NTFS logfile is unclean. The logfile 
