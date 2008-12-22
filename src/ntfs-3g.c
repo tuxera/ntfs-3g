@@ -562,7 +562,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
 		ntfs_log_perror("Skipping unrepresentable filename (inode %llu)",
 				(unsigned long long)MREF(mref));
-		return 0;
+		return -1;
 	}
 	
 	if (ntfs_fuse_is_named_data_stream(filename)) {
