@@ -407,12 +407,14 @@ int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
 */
  
 /* 
- * Return the amount of 8-bit elements in UTF-8 needed (without
- * the terminating null) to store a given UTF-16LE string. 
+ * Return the amount of 8-bit elements in UTF-8 needed (without the terminating
+ * null) to store a given UTF-16LE string.
+ *
+ * Return -1 with errno set if string has invalid byte sequence or too long.
  */
 static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_len)
 {
-	int i;
+	int i, ret = -1;
 	int count = 0;
 	BOOL surrog;
 
@@ -423,7 +425,8 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 			if ((c >= 0xdc00) && (c < 0xe000)) {
 				surrog = FALSE;
 				count += 4;
-			} else goto fail;
+			} else 
+				goto fail;
 		} else
 			if (c < 0x80)
 				count++;
@@ -439,14 +442,22 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 			else if (c >= 0xe000)
 #endif
 				count += 3;
-			else goto fail;
-		if (count > outs_len)
-			goto fail;
+			else 
+				goto fail;
+		if (count > outs_len) {
+			errno = ENAMETOOLONG;
+			goto out;
+		}
 	}
-	if (surrog) goto fail;
-	return count;
+	if (surrog) 
+		goto fail;
+
+	ret = count;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = EILSEQ;
+	goto out;
 }
 
 /*
@@ -455,12 +466,14 @@ fail:
  * @ins_len:	length of input string in utf16 characters
  * @outs:	on return contains the (allocated) output multibyte string
  * @outs_len:	length of output buffer in bytes
+ *
+ * Return -1 with errno set if string has invalid byte sequence or too long.
  */
 static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 			      char **outs, int outs_len)
 {
 	char *t;
-	int i, size;
+	int i, size, ret = -1;
 	ntfschar halfpair;
 
 	halfpair = 0;
@@ -469,10 +482,9 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 
 	size = utf16_to_utf8_size(ins, ins_len, outs_len);
 
-	if (size < 0) {
-		errno = ENAMETOOLONG;
-		goto fail;
-	}
+	if (size < 0)
+		goto out;
+
 	if (!*outs)
 		*outs = ntfs_malloc((outs_len = size + 1));
 
@@ -488,7 +500,8 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0x80 + ((c >> 6) & 15) + ((halfpair & 3) << 4);
 				*t++ = 0x80 + (c & 63);
 				halfpair = 0;
-			} else goto fail;
+			} else 
+				goto fail;
 		} else if (c < 0x80) {
 			*t++ = c;
 	    	} else {
@@ -505,51 +518,70 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0xe0 | (c >> 12);
 				*t++ = 0x80 | ((c >> 6) & 0x3f);
 			        *t++ = 0x80 | (c & 0x3f);
-			} else goto fail;
+			} else 
+				goto fail;
 	        }
 	}
 	*t = '\0';
-	return t - *outs;
+	ret = t - *outs;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = EILSEQ;
+	goto out;
 }
 
 /* 
  * Return the amount of 16-bit elements in UTF-16LE needed 
  * (without the terminating null) to store given UTF-8 string.
  *
- * Return -1 if it does not fit into PATH_MAX.
+ * Return -1 with errno set if it's longer than PATH_MAX or string is invalid.
  *
  * Note: This does not check whether the input sequence is a valid utf8 string,
  *	 and should be used only in context where such check is made!
  */
 static int utf8_to_utf16_size(const char *s)
 {
+	int ret = -1;
 	unsigned int byte;
 	size_t count = 0;
 
 	while ((byte = *((const unsigned char *)s++))) {
-		if (++count >= PATH_MAX || byte >= 0xF5)
+		if (++count >= PATH_MAX) 
 			goto fail;
-		if (!*s) break;
-		if (byte >= 0xC0) s++;
-		if (!*s) break;
-		if (byte >= 0xE0) s++;
-		if (!*s) break;
+		if (byte >= 0xF5) {
+			errno = EILSEQ;
+			goto out;
+		}
+		if (!*s) 
+			break;
+		if (byte >= 0xC0) 
+			s++;
+		if (!*s) 
+			break;
+		if (byte >= 0xE0) 
+			s++;
+		if (!*s) 
+			break;
 		if (byte >= 0xF0) {
 			s++;
 			if (++count >= PATH_MAX)
 				goto fail;
 		}
 	}
-	return count;
+	ret = count;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = ENAMETOOLONG;
+	goto out;
 }
 /* 
  * This converts one UTF-8 sequence to cpu-endian Unicode value
  * within range U+0 .. U+10ffff and excluding U+D800 .. U+DFFF
- * Returns the number of used utf8 bytes or -1 if sequence is invalid.
+ *
+ * Return the number of used utf8 bytes or -1 with errno set 
+ * if sequence is invalid.
  */
 static int utf8_to_unicode(u32 *wc, const char *s)
 {
@@ -611,6 +643,7 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 		goto fail;
 	}
 fail:
+	errno = EILSEQ;
 	return -1;
 }
 
@@ -619,18 +652,20 @@ fail:
  * @ins:	input multibyte string buffer
  * @outs:	on return contains the (allocated) output utf16 string
  * @outs_len:	length of output buffer in utf16 characters
+ * 
+ * Return -1 with errno set.
  */
 static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 {
 	const char *t = ins;
 	u32 wc;
 	ntfschar *outpos;
-	int shorts = utf8_to_utf16_size(ins);
+	int shorts, ret = -1;
 
-	if (shorts < 0) {
-		errno = EILSEQ;
+	shorts = utf8_to_utf16_size(ins);
+	if (shorts < 0)
 		goto fail;
-	}
+
 	if (!*outs)
 		*outs = ntfs_malloc((shorts+1) * sizeof(ntfschar));
 
@@ -638,10 +673,8 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 
 	while(1) {
 		int m  = utf8_to_unicode(&wc, t);
-		if (m < 0) {
-			errno = EILSEQ;
+		if (m < 0)
 			goto fail;
-		}
 		if (wc < 0x10000)
 			*outpos++ = cpu_to_le16(wc);
 		else {
@@ -653,9 +686,10 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 			break;
 		t += m;
 	}
-    return --outpos - *outs;
+	
+	ret = --outpos - *outs;
 fail:
-    return -1;
+	return ret;
 }
 
 /**
