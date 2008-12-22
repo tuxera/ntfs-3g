@@ -485,8 +485,12 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 	if (size < 0)
 		goto out;
 
-	if (!*outs)
-		*outs = ntfs_malloc((outs_len = size + 1));
+	if (!*outs) {
+		outs_len = size + 1;
+		*outs = ntfs_malloc(outs_len);
+		if (!*outs)
+			goto out;
+	}
 
 	t = *outs;
 
@@ -666,8 +670,11 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 	if (shorts < 0)
 		goto fail;
 
-	if (!*outs)
-		*outs = ntfs_malloc((shorts+1) * sizeof(ntfschar));
+	if (!*outs) {
+		*outs = ntfs_malloc((shorts + 1) * sizeof(ntfschar));
+		if (!*outs)
+			goto fail;
+	}
 
 	outpos = *outs;
 
