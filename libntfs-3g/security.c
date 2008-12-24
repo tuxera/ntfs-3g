@@ -4306,8 +4306,10 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 				}
 				ntfs_inode_close(ni);
 			}
-		}
-	}
+		} else
+			errno = EINVAL;
+	} else
+		errno = EINVAL;
 	return (res);
 }
 
@@ -4402,10 +4404,11 @@ BOOL ntfs_read_directory(struct SECURITY_API *scapi,
 			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
 				pos = 0;
 				ntfs_readdir(ni,&pos,context,callback);
+				ok = !ntfs_inode_close(ni);
+			} else {
 				ntfs_inode_close(ni);
-ok = TRUE; /* clarification needed */
-			} else
 				errno = ENOTDIR;
+			}
 		} else
 			errno = ENOENT;
 	} else
