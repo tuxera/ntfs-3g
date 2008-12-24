@@ -941,22 +941,24 @@ void ntfs_sort_posix(struct POSIX_SECURITY *pxdesc)
 				 */
 	do {
 		done = TRUE;
-		offs = pxdesc->firstdef;
-		previous = pacl->ace[offs].tag;
-		previousid = pacl->ace[offs].id;
-		for (i=offs+1; i<offs+pxdesc->defcnt; i++) {
-			tag = pacl->ace[i].tag;
-			id = pacl->ace[i].id;
+		if ((pxdesc->defcnt) > 1) {
+			offs = pxdesc->firstdef;
+			previous = pacl->ace[offs].tag;
+			previousid = pacl->ace[offs].id;
+			for (i=offs+1; i<offs+pxdesc->defcnt; i++) {
+				tag = pacl->ace[i].tag;
+				id = pacl->ace[i].id;
 
-			if ((tag < previous)
-			   || ((tag == previous) && (id < previousid))) {
-				done = FALSE;
-				memcpy(&ace,&pacl->ace[i-1],sizeof(struct POSIX_ACE));
-				memcpy(&pacl->ace[i-1],&pacl->ace[i],sizeof(struct POSIX_ACE));
-				memcpy(&pacl->ace[i],&ace,sizeof(struct POSIX_ACE));
-			} else {
-				previous = tag;
-				previousid = id;
+				if ((tag < previous)
+				   || ((tag == previous) && (id < previousid))) {
+					done = FALSE;
+					memcpy(&ace,&pacl->ace[i-1],sizeof(struct POSIX_ACE));
+					memcpy(&pacl->ace[i-1],&pacl->ace[i],sizeof(struct POSIX_ACE));
+					memcpy(&pacl->ace[i],&ace,sizeof(struct POSIX_ACE));
+				} else {
+					previous = tag;
+					previousid = id;
+				}
 			}
 		}
 	} while (!done);
