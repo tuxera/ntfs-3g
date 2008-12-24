@@ -361,35 +361,37 @@ static u32 findimplicit(const SID *xsid, const SID *pattern, int parity)
 	memcpy(&defsid,pattern,ntfs_sid_size(pattern));
 	psid = (SID*)&defsid;
 	cnt = psid->sub_authority_count;
-	psid->sub_authority[cnt-1] = xsid->sub_authority[cnt-1];
-	leauth = xsid->sub_authority[cnt-1];
-	xlast = le32_to_cpu(leauth);
-	leauth = pattern->sub_authority[cnt-1];
-	rlast = le32_to_cpu(leauth);
+	xid = 0;
+	if (xsid->sub_authority_count == cnt) {
+		psid->sub_authority[cnt-1] = xsid->sub_authority[cnt-1];
+		leauth = xsid->sub_authority[cnt-1];
+		xlast = le32_to_cpu(leauth);
+		leauth = pattern->sub_authority[cnt-1];
+		rlast = le32_to_cpu(leauth);
 
-	if ((xlast > rlast) && !((xlast ^ rlast ^ parity) & 1)) {
-		/* direct check for basic situation */
-		if (ntfs_same_sid(psid,xsid))
-			xid = ((xlast - rlast) >> 1) & 0x3fffffff;
-		else {
-			/*
-			 * check whether part of mapping had to be recorded
-			 * in a higher level authority
-			 */
-			carry = 1;
-			do {
-				leauth = psid->sub_authority[cnt-2];
-				uauth = le32_to_cpu(leauth) + 1;
-				psid->sub_authority[cnt-2] = cpu_to_le32(uauth);
-			} while (!ntfs_same_sid(psid,xsid) && (++carry < 4));
-			if (carry < 4)
-				xid = (((xlast - rlast) >> 1) & 0x3fffffff)
-					| (carry << 30);
-			else
-				xid = 0;
+		if ((xlast > rlast) && !((xlast ^ rlast ^ parity) & 1)) {
+			/* direct check for basic situation */
+			if (ntfs_same_sid(psid,xsid))
+				xid = ((xlast - rlast) >> 1) & 0x3fffffff;
+			else {
+				/*
+				 * check whether part of mapping had to be
+				 * recorded in a higher level authority
+			 	 */
+				carry = 1;
+				do {
+					leauth = psid->sub_authority[cnt-2];
+					uauth = le32_to_cpu(leauth) + 1;
+					psid->sub_authority[cnt-2]
+						= cpu_to_le32(uauth);
+				} while (!ntfs_same_sid(psid,xsid)
+					 && (++carry < 4));
+				if (carry < 4)
+					xid = (((xlast - rlast) >> 1)
+						& 0x3fffffff) | (carry << 30);
+			}
 		}
-	} else
-		xid = 0;
+	}
 	return (xid);
 }
 
