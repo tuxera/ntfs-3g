@@ -530,6 +530,39 @@ gid_t ntfs_find_group(const struct MAPPING* groupmapping, const SID * gsid)
 }
 
 /*
+ *		Check the validity of the ACEs in a DACL or SACL
+ */
+
+static BOOL valid_acl(const ACL *pacl, unsigned int end)
+{
+	const ACCESS_ALLOWED_ACE *pace;
+	unsigned int offace;
+	unsigned int acecnt;
+	unsigned int acesz;
+	unsigned int nace;
+	BOOL ok;
+
+	ok = TRUE;
+	acecnt = le16_to_cpu(pacl->ace_count);
+	offace = sizeof(ACL);
+	for (nace = 0; (nace < acecnt) && ok; nace++) {
+		/* be sure the beginning is within range */
+		if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > end)
+			ok = FALSE;
+		else {
+			pace = (const ACCESS_ALLOWED_ACE*)
+				&((const char*)pacl)[offace];
+			acesz = le16_to_cpu(pace->size);
+			if (((offace + acesz) > end)
+			   || !ntfs_valid_sid(&pace->sid))
+				 ok = FALSE;
+			offace += acesz;
+		}
+	}
+	return (ok);
+}
+
+/*
  *		Do sanity checks on security descriptors read from storage
  *	basically, we make sure that every field holds within
  *	allocated storage
@@ -541,13 +574,12 @@ gid_t ntfs_find_group(const struct MAPPING* groupmapping, const SID * gsid)
 BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
-	const ACL *pacl;
-	const ACCESS_ALLOWED_ACE *pace;
+	const ACL *pdacl;
+	const ACL *psacl;
 	unsigned int offdacl;
-	unsigned int offace;
-	unsigned int acecnt;
-	unsigned int acesz;
-	unsigned int nace;
+	unsigned int offsacl;
+	unsigned int offowner;
+	unsigned int offgroup;
 	BOOL ok;
 
 	ok = TRUE;
@@ -560,7 +592,11 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
-	pacl = (const ACL*)&securattr[offdacl];
+	offsacl = le32_to_cpu(phead->sacl);
+	offowner = le32_to_cpu(phead->owner);
+	offgroup = le32_to_cpu(phead->group);
+	pdacl = (const ACL*)&securattr[offdacl];
+	psacl = (const ACL*)&securattr[offsacl];
 
 		/*
 		 * size check occurs before the above pointers are used
@@ -571,47 +607,40 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
 	if ((attrsz >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
 		&& (ntfs_attr_size(securattr) <= attrsz)
 		&& (phead->revision == SECURITY_DESCRIPTOR_REVISION)
-		&& phead->owner
-		&& phead->group
+		&& (offowner >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+		&& ((offowner + 2) < attrsz)
+		&& (offgroup >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+		&& ((offgroup + 2) < attrsz)
+		&& (!offdacl
+			|| ((offdacl >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+			    && (offdacl < attrsz)))
+		&& (!offsacl
+			|| ((offsacl >= sizeof(SECURITY_DESCRIPTOR_RELATIVE))
+			    && (offsacl < attrsz)))
 		&& !(phead->owner & const_cpu_to_le32(3))
 		&& !(phead->group & const_cpu_to_le32(3))
 		&& !(phead->dacl & const_cpu_to_le32(3))
 		&& !(phead->sacl & const_cpu_to_le32(3))
-		&& ntfs_valid_sid((const SID*)&securattr[le32_to_cpu(phead->owner)])
-		&& ntfs_valid_sid((const SID*)&securattr[le32_to_cpu(phead->group)])
+		&& ntfs_valid_sid((const SID*)&securattr[offowner])
+		&& ntfs_valid_sid((const SID*)&securattr[offgroup])
 			/*
 			 * if there is an ACL, as indicated by offdacl,
 			 * require SE_DACL_PRESENT
 			 * but "Dr Watson" has SE_DACL_PRESENT though no DACL
 			 */
 		&& (!offdacl
-                    || ((pacl->revision == ACL_REVISION)
-		       && (phead->control & SE_DACL_PRESENT)))) {
-
-		/*
-		 * For each ACE, check it is within limits
-		 * and contains a valid SID
-		 * "DR Watson" has no DACL
-		 */
-
-		if (offdacl) {
-			acecnt = le16_to_cpu(pacl->ace_count);
-			offace = offdacl + sizeof(ACL);
-			for (nace = 0; (nace < acecnt) && ok; nace++) {
-				/* be sure the beginning is within range */
-				if ((offace + sizeof(ACCESS_ALLOWED_ACE)) > attrsz)
-					ok = FALSE;
-				else {
-					pace = (const ACCESS_ALLOWED_ACE*)
-						&securattr[offace];
-					acesz = le16_to_cpu(pace->size);
-					if (((offace + acesz) > attrsz)
-					   || !ntfs_valid_sid(&pace->sid))
-						 ok = FALSE;
-					offace += acesz;
-				}
-			}
-		}
+                    || ((pdacl->revision == ACL_REVISION)
+		       && (phead->control & SE_DACL_PRESENT)))
+			/* same for SACL */
+		&& (!offsacl
+                    || ((psacl->revision == ACL_REVISION)
+		       && (phead->control & SE_SACL_PRESENT)))) {
+			/*
+			 *  Check the DACL and SACL if present
+			 */
+		if ((offdacl && !valid_acl(pdacl,attrsz - offdacl))
+		   || (offsacl && !valid_acl(psacl,attrsz - offsacl)))
+			ok = FALSE;
 	} else
 		ok = FALSE;
 	return (ok);
