@@ -3901,13 +3901,10 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 	BOOL ok;
 	unsigned int pos;
 	unsigned int avail;
-
-		/*
-		 * First check DACL, which is the last field in all descriptors
-		 * we build, and in most descriptors built by Windows
-		 */
+	le16 control;
 
 	avail = 0;
+	control = SE_SELF_RELATIVE;
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 	size = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
@@ -3944,7 +3941,7 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offgroup = gsidsz = 0;
 
 		/* locate SACL if requested and available */
-	if (phead->dacl && (selection & SACL_SECURITY_INFORMATION)) {
+	if (phead->sacl && (selection & SACL_SECURITY_INFORMATION)) {
 			/* find end of SACL */
 		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
@@ -3955,49 +3952,65 @@ static BOOL feedsecurityattr(const char *attr, u32 selection,
 		offsacl = saclsz = 0;
 
 		/*
-		 * Check whether not requesting unavailable information
-		 * and having enough size in destination buffer
+		 * Check having enough size in destination buffer
 		 * (required size is returned nevertheless so that
 		 * the request can be reissued with adequate size)
 		 */
-	if ((selection & ~avail)
-	   || (size > buflen)) {
+	if (size > buflen) {
 		*psize = size;
 		errno = EINVAL;
 		ok = FALSE;
 	} else {
-		/* copy header and feed new flags */
+		if (selection & OWNER_SECURITY_INFORMATION)
+			control |= phead->control & SE_OWNER_DEFAULTED;
+		if (selection & GROUP_SECURITY_INFORMATION)
+			control |= phead->control & SE_GROUP_DEFAULTED;
+		if (selection & DACL_SECURITY_INFORMATION)
+			control |= phead->control
+					& (SE_DACL_PRESENT
+					   | SE_DACL_DEFAULTED
+					   | SE_DACL_AUTO_INHERITED
+					   | SE_DACL_PROTECTED);
+		if (selection & SACL_SECURITY_INFORMATION)
+			control |= phead->control
+					& (SE_SACL_PRESENT
+					   | SE_SACL_DEFAULTED
+					   | SE_SACL_AUTO_INHERITED
+					   | SE_SACL_PROTECTED);
+		/*
+		 * copy header and feed new flags, even if no detailed data
+		 */
 		memcpy(buf,attr,sizeof(SECURITY_DESCRIPTOR_RELATIVE));
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)buf;
-		pnhead->control = cpu_to_le16(avail);
+		pnhead->control = control;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 
-		/* copy DACL if requested */
-		if (selection & DACL_SECURITY_INFORMATION) {
+		/* copy DACL if requested and available */
+		if (selection & avail & DACL_SECURITY_INFORMATION) {
 			pnhead->dacl = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offdacl],daclsz);
 			pos += daclsz;
 		} else
 			pnhead->dacl = const_cpu_to_le32(0);
 
-		/* copy SACL if requested */
-		if (selection & SACL_SECURITY_INFORMATION) {
+		/* copy SACL if requested and available */
+		if (selection & avail & SACL_SECURITY_INFORMATION) {
 			pnhead->sacl = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offsacl],saclsz);
 			pos += saclsz;
 		} else
 			pnhead->sacl = const_cpu_to_le32(0);
 
-		/* copy owner if requested */
-		if (selection & OWNER_SECURITY_INFORMATION) {
+		/* copy owner if requested and available */
+		if (selection & avail & OWNER_SECURITY_INFORMATION) {
 			pnhead->owner = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offowner],usidsz);
 			pos += usidsz;
 		} else
 			pnhead->owner = const_cpu_to_le32(0);
 
-		/* copy group if requested */
-		if (selection & GROUP_SECURITY_INFORMATION) {
+		/* copy group if requested and available */
+		if (selection & avail & GROUP_SECURITY_INFORMATION) {
 			pnhead->group = cpu_to_le32(pos);
 			memcpy(&buf[pos],&attr[offgroup],gsidsz);
 			pos += gsidsz;
@@ -4033,8 +4046,8 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 	int offsacl;
 	int offowner;
 	int offgroup;
-	unsigned int present;
 	unsigned int size;
+	le16 control;
 	char *target;
 	int pos;
 	int oldattrsz;
@@ -4050,20 +4063,13 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 	if (target) {
 		targhead = (SECURITY_DESCRIPTOR_RELATIVE*)target;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
-		present = 0;
-		if (oldhead->sacl)
-			present |= SACL_SECURITY_INFORMATION;
-		if (oldhead->dacl)
-			present |= DACL_SECURITY_INFORMATION;
-		if (oldhead->owner)
-			present |= OWNER_SECURITY_INFORMATION;
-		if (oldhead->group)
-			present |= GROUP_SECURITY_INFORMATION;
+		control = SE_SELF_RELATIVE;
 			/*
 			 * copy new DACL if selected
 			 * or keep old DACL if any
 			 */
-		if ((selection | present) & DACL_SECURITY_INFORMATION) {
+		if ((selection & DACL_SECURITY_INFORMATION) ?
+				newhead->dacl : oldhead->dacl) {
 			if (selection & DACL_SECURITY_INFORMATION) {
 				offdacl = le32_to_cpu(newhead->dacl);
 				pdacl = (const ACL*)&newattr[offdacl];
@@ -4077,11 +4083,25 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			pos += size;
 		} else
 			targhead->dacl = const_cpu_to_le32(0);
+		if (selection & DACL_SECURITY_INFORMATION) {
+			control |= newhead->control
+					& (SE_DACL_PRESENT
+					   | SE_DACL_DEFAULTED
+					   | SE_DACL_PROTECTED);
+			if (newhead->control & SE_DACL_AUTO_INHERIT_REQ)
+				control |= SE_DACL_AUTO_INHERITED;
+		} else
+			control |= oldhead->control
+					& (SE_DACL_PRESENT
+					   | SE_DACL_DEFAULTED
+					   | SE_DACL_AUTO_INHERITED
+					   | SE_DACL_PROTECTED);
 			/*
 			 * copy new SACL if selected
 			 * or keep old SACL if any
 			 */
-		if ((selection | present) & SACL_SECURITY_INFORMATION) {
+		if ((selection & SACL_SECURITY_INFORMATION) ?
+				newhead->sacl : oldhead->sacl) {
 			if (selection & SACL_SECURITY_INFORMATION) {
 				offsacl = le32_to_cpu(newhead->sacl);
 				psacl = (const ACL*)&newattr[offsacl];
@@ -4095,11 +4115,25 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			pos += size;
 		} else
 			targhead->sacl = const_cpu_to_le32(0);
+		if (selection & SACL_SECURITY_INFORMATION) {
+			control |= newhead->control
+					& (SE_SACL_PRESENT
+					   | SE_SACL_DEFAULTED
+					   | SE_SACL_PROTECTED);
+			if (newhead->control & SE_SACL_AUTO_INHERIT_REQ)
+				control |= SE_SACL_AUTO_INHERITED;
+		} else
+			control |= oldhead->control
+					& (SE_SACL_PRESENT
+					   | SE_SACL_DEFAULTED
+					   | SE_SACL_AUTO_INHERITED
+					   | SE_SACL_PROTECTED);
 			/*
 			 * copy new OWNER if selected
 			 * or keep old OWNER if any
 			 */
-		if ((selection | present) & OWNER_SECURITY_INFORMATION) {
+		if ((selection & OWNER_SECURITY_INFORMATION) ?
+				newhead->owner : oldhead->owner) {
 			if (selection & OWNER_SECURITY_INFORMATION) {
 				offowner = le32_to_cpu(newhead->owner);
 				powner = (const SID*)&newattr[offowner];
@@ -4113,17 +4147,26 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			pos += size;
 		} else
 			targhead->owner = const_cpu_to_le32(0);
+		if (selection & OWNER_SECURITY_INFORMATION)
+			control |= newhead->control & SE_OWNER_DEFAULTED;
+		else
+			control |= oldhead->control & SE_OWNER_DEFAULTED;
 			/*
 			 * copy new GROUP if selected
 			 * or keep old GROUP if any
 			 */
-		if ((selection | present) & GROUP_SECURITY_INFORMATION) {
+		if ((selection & GROUP_SECURITY_INFORMATION) ?
+				newhead->group : oldhead->group) {
 			if (selection & GROUP_SECURITY_INFORMATION) {
 				offgroup = le32_to_cpu(newhead->group);
 				pgroup = (const SID*)&newattr[offgroup];
+				control |= newhead->control
+						 & SE_GROUP_DEFAULTED;
 			} else {
 				offgroup = le32_to_cpu(oldhead->group);
 				pgroup = (const SID*)&oldattr[offgroup];
+				control |= oldhead->control
+						 & SE_GROUP_DEFAULTED;
 			}
 			size = ntfs_sid_size(pgroup);
 			memcpy(&target[pos], pgroup, size);
@@ -4131,12 +4174,13 @@ static BOOL mergesecurityattr(ntfs_volume *vol, const char *oldattr,
 			pos += size;
 		} else
 			targhead->group = const_cpu_to_le32(0);
+		if (selection & GROUP_SECURITY_INFORMATION)
+			control |= newhead->control & SE_GROUP_DEFAULTED;
+		else
+			control |= oldhead->control & SE_GROUP_DEFAULTED;
 		targhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		targhead->alignment = 0;
-		targhead->control = SE_SELF_RELATIVE
-			| cpu_to_le16((present | selection)
-			    & (SACL_SECURITY_INFORMATION
-				 | DACL_SECURITY_INFORMATION));
+		targhead->control = control;
 		ok = !update_secur_descr(vol, target, ni);
 		free(target);
 	}
@@ -4223,7 +4267,7 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	ntfs_inode *ni;
 	int attrsz;
-	unsigned int provided;
+	BOOL missing;
 	char *oldattr;
 	int res;
 
@@ -4231,18 +4275,16 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && attr) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		attrsz = ntfs_attr_size(attr);
-		provided = 0;
-		if (phead->sacl)
-			provided |= SACL_SECURITY_INFORMATION;
-		if (phead->dacl)
-			provided |= DACL_SECURITY_INFORMATION;
-		if (phead->owner)
-			provided |= OWNER_SECURITY_INFORMATION;
-		if (phead->group)
-			provided |= GROUP_SECURITY_INFORMATION;
-		if (ntfs_valid_descr(attr, attrsz)
-			/* selected items must be provided */
-		   && (!(selection & ~provided))) {
+		/* if selected, owner and group must be present or defaulted */
+		missing = ((selection & OWNER_SECURITY_INFORMATION)
+				&& !phead->owner
+				&& !(phead->control & SE_OWNER_DEFAULTED))
+			|| ((selection & GROUP_SECURITY_INFORMATION)
+				&& !phead->group
+				&& !(phead->control & SE_GROUP_DEFAULTED));
+		if (!missing
+		    && (phead->control & SE_SELF_RELATIVE)
+		    && ntfs_valid_descr(attr, attrsz)) {
 			ni = ntfs_pathname_to_inode(scapi->security.vol,
 				NULL, path);
 			if (ni) {
