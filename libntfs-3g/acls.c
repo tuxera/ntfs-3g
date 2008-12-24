@@ -261,30 +261,15 @@ unsigned int ntfs_attr_size(const char *attr)
 	unsigned int offowner;
 	unsigned int offgroup;
 	unsigned int endsid;
-	unsigned int endsacl;
+	unsigned int endacl;
 	unsigned int attrsz;
 
-		/*
-		 * First check DACL, which is the last field in all descriptors
-		 * we build, and in most descriptors built by Windows
-		 * however missing for "DR Watson"
-		 */
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
-		/* find end of DACL */
-	offdacl = le32_to_cpu(phead->dacl);
-	if (offdacl) {
-		pdacl = (const ACL*)&attr[offdacl];
-		attrsz = offdacl + le16_to_cpu(pdacl->size);
-	} else
-		attrsz = 0;
-
-	offowner = le32_to_cpu(phead->owner);
-	if (offowner >= attrsz) {
-			/* find end of USID */
-		psid = (const SID*)&attr[offowner];
-		endsid = offowner + ntfs_sid_size(psid);
-		attrsz = endsid;
-	}
+		/*
+		 * First check group, which is the last field in all descriptors
+		 * we build, and in most descriptors built by Windows
+		 */
+	attrsz = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 	offgroup = le32_to_cpu(phead->group);
 	if (offgroup >= attrsz) {
 			/* find end of GSID */
@@ -292,16 +277,31 @@ unsigned int ntfs_attr_size(const char *attr)
 		endsid = offgroup + ntfs_sid_size(psid);
 		if (endsid > attrsz) attrsz = endsid;
 	}
+	offowner = le32_to_cpu(phead->owner);
+	if (offowner >= attrsz) {
+			/* find end of USID */
+		psid = (const SID*)&attr[offowner];
+		endsid = offowner + ntfs_sid_size(psid);
+		attrsz = endsid;
+	}
 	offsacl = le32_to_cpu(phead->sacl);
 	if (offsacl >= attrsz) {
 			/* find end of SACL */
-		offsacl = le32_to_cpu(phead->sacl);
 		psacl = (const ACL*)&attr[offsacl];
-		endsacl = offsacl + le16_to_cpu(psacl->size);
-		if (endsacl > attrsz)
-			attrsz = endsacl;
+		endacl = offsacl + le16_to_cpu(psacl->size);
+		if (endacl > attrsz)
+			attrsz = endacl;
 	}
 
+
+		/* find end of DACL */
+	offdacl = le32_to_cpu(phead->dacl);
+	if (offdacl >= attrsz) {
+		pdacl = (const ACL*)&attr[offdacl];
+		endacl = offdacl + le16_to_cpu(pdacl->size);
+		if (endacl > attrsz)
+			attrsz = endacl;
+	}
 	return (attrsz);
 }
 
