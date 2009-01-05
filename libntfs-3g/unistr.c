@@ -388,40 +388,38 @@ int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
 }
 
 /*
-#
-# NTFS uses Unicode (UTF-16LE [NTFS-3G uses UCS-2LE, which is enough
-# for now]) for path names, but the Unicode code points need to be
-# converted before a path can be accessed under NTFS. For 7 bit ASCII/ANSI,
-# glibc does this even without a locale in a hard-coded fashion as that
-# appears to be is easy because the low 7-bit ASCII range appears to be
-# available # in all charsets but it does not convert anything if
-# there was some error with the locale setup or none set up like
-# when mount is called during early boot where he (by policy) do
-# not use locales (and may be not available if /usr is not yet mounted),
-# so this patch fixes the resulting issues for systems which use
-# UTF-8 and for others, specifying the locale in fstab brings them
-# the encoding which they want.
-#
-# If no locale is defined or there was a problem with setting one
-# up and whenever nl_langinfo(CODESET) returns a sting starting with
-# "ANSI", use an internal UCS-2LE <-> UTF-8 codeset converter to fix
-# the bug where NTFS-3G does not show any path names which include
-# international characters!!! (and also fails on creating them) as result.
-#
-# Author: Bernhard Kaindl <bk@suse.de>
-#
+   NTFS uses Unicode (UTF-16LE [NTFS-3G uses UCS-2LE, which is enough
+   for now]) for path names, but the Unicode code points need to be
+   converted before a path can be accessed under NTFS. For 7 bit ASCII/ANSI,
+   glibc does this even without a locale in a hard-coded fashion as that
+   appears to be is easy because the low 7-bit ASCII range appears to be
+   available in all charsets but it does not convert anything if
+   there was some error with the locale setup or none set up like
+   when mount is called during early boot where he (by policy) do
+   not use locales (and may be not available if /usr is not yet mounted),
+   so this patch fixes the resulting issues for systems which use
+   UTF-8 and for others, specifying the locale in fstab brings them
+   the encoding which they want.
+  
+   If no locale is defined or there was a problem with setting one
+   up and whenever nl_langinfo(CODESET) returns a sting starting with
+   "ANSI", use an internal UCS-2LE <-> UTF-8 codeset converter to fix
+   the bug where NTFS-3G does not show any path names which include
+   international characters!!! (and also fails on creating them) as result.
+  
+   Author: Bernhard Kaindl <bk@suse.de>
+   Jean-Pierre Andre made it compliant with RFC3629/RFC2781.
 */
  
- 
-/* Return the amount of 16-bit elements in UTF-16LE needed (without
- * the terminating null to store given UTF-8 string and -1 if it does
- * not fit into PATH_MAX
+/* 
+ * Return the amount of 8-bit elements in UTF-8 needed (without the terminating
+ * null) to store a given UTF-16LE string.
  *
- * JPA : made compliant with RFC3629 / RFC2781
+ * Return -1 with errno set if string has invalid byte sequence or too long.
  */
 static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_len)
 {
-	int i;
+	int i, ret = -1;
 	int count = 0;
 	BOOL surrog;
 
@@ -432,7 +430,8 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 			if ((c >= 0xdc00) && (c < 0xe000)) {
 				surrog = FALSE;
 				count += 4;
-			} else goto fail;
+			} else 
+				goto fail;
 		} else
 			if (c < 0x80)
 				count++;
@@ -448,14 +447,22 @@ static int utf16_to_utf8_size(const ntfschar *ins, const int ins_len, int outs_l
 			else if (c >= 0xe000)
 #endif
 				count += 3;
-			else goto fail;
-		if (count > outs_len)
-			goto fail;
+			else 
+				goto fail;
+		if (count > outs_len) {
+			errno = ENAMETOOLONG;
+			goto out;
+		}
 	}
-	if (surrog) goto fail;
-	return count;
+	if (surrog) 
+		goto fail;
+
+	ret = count;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = EILSEQ;
+	goto out;
 }
 
 /*
@@ -465,13 +472,13 @@ fail:
  * @outs:	on return contains the (allocated) output multibyte string
  * @outs_len:	length of output buffer in bytes
  *
- * JPA : made compliant with RFC3629 / RFC2781
+ * Return -1 with errno set if string has invalid byte sequence or too long.
  */
 static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
-		char **outs, int outs_len)
+			      char **outs, int outs_len)
 {
 	char *t;
-	int i, size;
+	int i, size, ret = -1;
 	ntfschar halfpair;
 
 	halfpair = 0;
@@ -480,12 +487,15 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 
 	size = utf16_to_utf8_size(ins, ins_len, outs_len);
 
-	if (size < 0) {
-		errno = ENAMETOOLONG;
-		goto fail;
+	if (size < 0)
+		goto out;
+
+	if (!*outs) {
+		outs_len = size + 1;
+		*outs = ntfs_malloc(outs_len);
+		if (!*outs)
+			goto out;
 	}
-	if (!*outs)
-		*outs = ntfs_malloc((outs_len = size + 1));
 
 	t = *outs;
 
@@ -499,7 +509,8 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0x80 + ((c >> 6) & 15) + ((halfpair & 3) << 4);
 				*t++ = 0x80 + (c & 63);
 				halfpair = 0;
-			} else goto fail;
+			} else 
+				goto fail;
 		} else if (c < 0x80) {
 			*t++ = c;
 	    	} else {
@@ -516,54 +527,70 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 				*t++ = 0xe0 | (c >> 12);
 				*t++ = 0x80 | ((c >> 6) & 0x3f);
 			        *t++ = 0x80 | (c & 0x3f);
-			} else goto fail;
+			} else 
+				goto fail;
 	        }
 	}
 	*t = '\0';
-	return t - *outs;
+	ret = t - *outs;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = EILSEQ;
+	goto out;
 }
 
- 
-/* Return the amount of 16-bit elements in UTF-16LE needed (without
- * the terminating null to store given UTF-8 string and -1 if it does
- * not fit into PATH_MAX
+/* 
+ * Return the amount of 16-bit elements in UTF-16LE needed 
+ * (without the terminating null) to store given UTF-8 string.
  *
- * Note : this does not check whether the input sequence is a valid utf8
- *	string, and should be used only in context where such check is made
+ * Return -1 with errno set if it's longer than PATH_MAX or string is invalid.
  *
- * JPA : made compliant with RFC3629 / RFC2781
- *
+ * Note: This does not check whether the input sequence is a valid utf8 string,
+ *	 and should be used only in context where such check is made!
  */
 static int utf8_to_utf16_size(const char *s)
 {
+	int ret = -1;
 	unsigned int byte;
 	size_t count = 0;
 
 	while ((byte = *((const unsigned char *)s++))) {
-		if (++count >= PATH_MAX || byte >= 0xF5)
+		if (++count >= PATH_MAX) 
 			goto fail;
-		if (!*s) break;
-		if (byte >= 0xC0) s++;
-		if (!*s) break;
-		if (byte >= 0xE0) s++;
-		if (!*s) break;
+		if (byte >= 0xF5) {
+			errno = EILSEQ;
+			goto out;
+		}
+		if (!*s) 
+			break;
+		if (byte >= 0xC0) 
+			s++;
+		if (!*s) 
+			break;
+		if (byte >= 0xE0) 
+			s++;
+		if (!*s) 
+			break;
 		if (byte >= 0xF0) {
 			s++;
 			if (++count >= PATH_MAX)
 				goto fail;
 		}
 	}
-	return count;
+	ret = count;
+out:
+	return ret;
 fail:
-	return -1;
+	errno = ENAMETOOLONG;
+	goto out;
 }
-/* This converts one UTF-8 sequence to cpu-endian Unicode value
- *  within range U+0 .. U+10ffff and excluding U+D800 .. U+DFFF
- *  Returns the number of used utf8 bytes or -1 if sequence is invalid
+/* 
+ * This converts one UTF-8 sequence to cpu-endian Unicode value
+ * within range U+0 .. U+10ffff and excluding U+D800 .. U+DFFF
  *
- * JPA : made compliant with RFC3629 / RFC2781
+ * Return the number of used utf8 bytes or -1 with errno set 
+ * if sequence is invalid.
  */
 static int utf8_to_unicode(u32 *wc, const char *s)
 {
@@ -625,6 +652,7 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 		goto fail;
 	}
 fail:
+	errno = EILSEQ;
 	return -1;
 }
 
@@ -633,31 +661,32 @@ fail:
  * @ins:	input multibyte string buffer
  * @outs:	on return contains the (allocated) output utf16 string
  * @outs_len:	length of output buffer in utf16 characters
- *
- * JPA : made compliant with RFC3629 / RFC2781
+ * 
+ * Return -1 with errno set.
  */
 static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 {
 	const char *t = ins;
 	u32 wc;
 	ntfschar *outpos;
-	int shorts = utf8_to_utf16_size(ins);
+	int shorts, ret = -1;
 
-	if (shorts < 0) {
-		errno = EILSEQ;
+	shorts = utf8_to_utf16_size(ins);
+	if (shorts < 0)
 		goto fail;
+
+	if (!*outs) {
+		*outs = ntfs_malloc((shorts + 1) * sizeof(ntfschar));
+		if (!*outs)
+			goto fail;
 	}
-	if (!*outs)
-		*outs = ntfs_malloc((shorts+1) * sizeof(ntfschar));
 
 	outpos = *outs;
 
 	while(1) {
 		int m  = utf8_to_unicode(&wc, t);
-		if (m < 0) {
-			errno = EILSEQ;
+		if (m < 0)
 			goto fail;
-		}
 		if (wc < 0x10000)
 			*outpos++ = cpu_to_le16(wc);
 		else {
@@ -669,9 +698,10 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 			break;
 		t += m;
 	}
-    return --outpos - *outs;
+	
+	ret = --outpos - *outs;
 fail:
-    return -1;
+	return ret;
 }
 
 /**
@@ -1041,9 +1071,8 @@ void ntfs_ucsfree(ntfschar *ucs)
 }
 
 /*
- *		Define the character encoding to be used
- *
- *	Using UTF-8 unless specified otherwise
+ * Define the character encoding to be used.
+ * Use UTF-8 unless specified otherwise.
  */
 
 int ntfs_set_char_encoding(const char *locale)
@@ -1059,6 +1088,6 @@ int ntfs_set_char_encoding(const char *locale)
 			ntfs_log_error("Invalid locale, encoding to UTF-8\n");
 			use_utf8 = 1;
 	 	}
-	return (0); /* always successful */
+	return 0; /* always successful */
 }
 

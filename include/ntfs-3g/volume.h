@@ -241,6 +241,8 @@ struct _ntfs_volume {
 
 };
 
+extern const char *ntfs_home;
+
 extern ntfs_volume *ntfs_volume_alloc(void);
 
 extern ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
@@ -259,6 +261,9 @@ extern int ntfs_logfile_reset(ntfs_volume *vol);
 extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
 
 extern int ntfs_volume_error(int err);
+extern void ntfs_mount_error(const char *vol, const char *mntpoint, int err);
+
+extern int ntfs_set_locale(void);
 
 #endif /* defined _NTFS_VOLUME_H */
 

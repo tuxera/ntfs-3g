@@ -23,8 +23,8 @@
 
 # Autoconf
 AC_PREREQ(2.59)
-AC_INIT([ntfs-3g],[1.2812],[ntfs-3g-devel@lists.sf.net])
-LIBNTFS_3G_VERSION="36"
+AC_INIT([ntfs-3g],[1.5222-RC],[ntfs-3g-devel@lists.sf.net])
+LIBNTFS_3G_VERSION="47"
 AC_CONFIG_SRCDIR([src/ntfs-3g.c])
 
 # Environment
@@ -107,10 +107,10 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
-	[posix-acl],
-	[AS_HELP_STRING([--disable-posix-acl],[disable POSIX ACL support])],
+	[posix-acls],
+	[AS_HELP_STRING([--enable-posix-acls],[enable POSIX ACL support])],
 	,
-	[enable_posix_acl="yes"]
+	[enable_posix_acls="no"]
 )
 
 AC_ARG_ENABLE(
@@ -316,7 +316,7 @@ test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
 )
 
 test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
-test "${enable_posix_acl}" = "yes" && AC_DEFINE([POSIXACLS], [1], [POSIX ACL support])
+test "${enable_posix_acls}" != "no" && AC_DEFINE([POSIXACLS], [1], [POSIX ACL support])
 
 test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"

@@ -90,7 +90,6 @@
 #include "unistr.h"
 #include "layout.h"
 #include "index.h"
-#include "utils.h"
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
@@ -161,11 +160,6 @@ static char def_opts[] = "silent,allow_other,nonempty,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 
-static const char *locale_msg =
-"WARNING: Couldn't set locale to '%s' thus some file names may not\n"
-"         be correct or visible. Please see the potential solution at\n"
-"         http://ntfs-3g.org/support.html#locale\n";
-
 static const char *usage_msg = 
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
@@ -176,8 +170,8 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
-"Options:  ro (read-only mount), force, remove_hiberfile, locale=,\n" 
-"          uid=, gid=, umask=, fmask=, dmask=, streams_interface=.\n"
+"Options:  ro (read-only mount), force, remove_hiberfile, uid=,\n" 
+"          gid=, umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual.\n"
 "\n"
 "Examples: ntfs-3g -o force /dev/sda1 /mnt/windows\n"
@@ -297,7 +291,10 @@ static int ntfs_fuse_statfs(const char *path __attribute__((unused)),
 	if (!vol)
 		return -ENODEV;
 	
-	/* File system block size, used for optimal transfer block size. */
+	/* 
+	 * File system block size. Used to calculate used/free space by df.
+	 * Incorrectly documented as "optimal transfer block size". 
+	 */
 	sfs->f_bsize = vol->cluster_size;
 	
 	/* Fundamental file system block size, used as the unit. */
@@ -667,7 +664,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
 		ntfs_log_perror("Skipping unrepresentable filename (inode %llu)",
 				(unsigned long long)MREF(mref));
-		return 0;
+		return -1;
 	}
 	
 	if (ntfs_fuse_is_named_data_stream(filename)) {
@@ -2541,10 +2538,10 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			ctx->hiberfile = TRUE;
 		} else if (!strcmp(opt, "locale")) {
+				/* option "locale" kept undocumented */
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
-			if (ntfs_set_char_encoding(val))
-				ntfs_log_error(locale_msg, val);
+			ntfs_set_char_encoding(val);
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (missing_option_value(val, "streams_interface"))
 				goto err_exit;
@@ -2985,7 +2982,7 @@ int main(int argc, char *argv[])
 	if (drop_privs())
 		return NTFS_VOLUME_NO_PRIVILEGE;
 	
-	utils_set_locale();
+	ntfs_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
@@ -3123,7 +3120,7 @@ int main(int argc, char *argv[])
 	fuse_unmount(opts.mnt_point, ctx->fc);
 	fuse_destroy(fh);
 err_out:
-	utils_mount_error(opts.device, opts.mnt_point, err);
+	ntfs_mount_error(opts.device, opts.mnt_point, err);
 err2:
 	ntfs_close();
 	free(ctx);
