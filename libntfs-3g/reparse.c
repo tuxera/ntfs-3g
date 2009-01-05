@@ -39,6 +39,10 @@
 #include <sys/stat.h>
 #endif
 
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
+
 #ifdef HAVE_SYS_SYSMACROS_H
 #include <sys/sysmacros.h>
 #endif
@@ -110,6 +114,23 @@ static const ntfschar vol_junction_head[] = {
 	const_cpu_to_le16('m'),
 	const_cpu_to_le16('e'),
 	const_cpu_to_le16('{'),
+} ;
+
+static ntfschar reparse_point_name[] = {
+	const_cpu_to_le16('$'),
+	const_cpu_to_le16('R'),
+	const_cpu_to_le16('E'),
+	const_cpu_to_le16('P'),
+	const_cpu_to_le16('A'),
+	const_cpu_to_le16('R'),
+	const_cpu_to_le16('S'),
+	const_cpu_to_le16('E'),
+	const_cpu_to_le16('_'),
+	const_cpu_to_le16('P'),
+	const_cpu_to_le16('O'),
+	const_cpu_to_le16('I'),
+	const_cpu_to_le16('N'),
+	const_cpu_to_le16('T'),
 } ;
 
 static const char mappingdir[] = ".NTFS-3G/";
@@ -891,3 +912,145 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 	}
 	return (possible);
 }
+
+/*
+ *		Get the ntfs reparse data into an extended attribute
+ *
+ *	Returns the reparse data size
+ *		and the buffer is updated if it is long enough
+ */
+
+int ntfs_get_ntfs_reparse_data(const char *path  __attribute__((unused)),
+			char *value, size_t size, ntfs_inode *ni)
+{
+	REPARSE_POINT *reparse_attr;
+	s64 attr_size;
+
+	attr_size = 0;	/* default to no data and no error */
+	if (ni) {
+		if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+			reparse_attr = (REPARSE_POINT*)ntfs_attr_readall(ni,
+				AT_REPARSE_POINT,(ntfschar*)NULL, 0, &attr_size);
+			if (reparse_attr) {
+				if (attr_size <= (s64)size) {
+					if (value)
+						memcpy(value,reparse_attr,
+							attr_size);
+					else
+						errno = EINVAL;
+				}
+				free(reparse_attr);
+			}
+		} else
+			errno = ENODATA;
+	}
+	return (attr_size ? (int)attr_size : -errno);
+}
+
+/*
+ *		Set the reparse data from an extended attribute
+ *
+ *	Warning : the new data is not checked
+ *
+ *	Returns 0, or -1 if there is a problem
+ */
+
+int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
+			const char *value, size_t size, int flags,
+			ntfs_inode *ni)
+{
+	int res;
+	int written;
+	ntfs_attr *na;
+
+	res = 0;
+	if (ni && (value || !size)) {
+		if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,(ntfschar*)NULL,0)) {
+			if (!(flags & XATTR_REPLACE)) {
+			/*
+			 * no reparse data attribute : add one,
+			 * apparently, this does not feed the new value in
+			 */
+				res = ntfs_attr_add(ni,AT_REPARSE_POINT,
+					reparse_point_name,14,(u8*)NULL,(s64)size);
+				if (!res)
+					ni->flags |= FILE_ATTR_REPARSE_POINT;
+				NInoSetDirty(ni);
+			} else {
+				errno = ENODATA;
+				res = -1;
+			}
+		} else {
+			if (flags & XATTR_CREATE) {
+				errno = EEXIST;
+				res = -1;
+			}
+		}
+		if (!res) {
+			/*
+			 * open and update the existing reparse data
+			 */
+			na = ntfs_attr_open(ni, AT_REPARSE_POINT,
+				reparse_point_name, 14);
+			if (na) {
+				/* resize attribute */
+				res = ntfs_attr_truncate(na, (s64)size);
+				/* overwrite value if any */
+				if (!res && value) {
+					written = (int)ntfs_attr_pwrite(na,
+						 (s64)0, (s64)size, value);
+					if (written != (s64)size) {
+						ntfs_log_error("Failed to update "
+							"reparse data\n");
+						errno = EIO;
+						res = -1;
+					}
+				}
+				ntfs_attr_close(na);
+				NInoSetDirty(ni);
+			} else
+				res = -1;
+		}
+	} else {
+		errno = EINVAL;
+		res = -1;
+	}
+	return (res ? -1 : 0);
+}
+
+/*
+ *		Remove the reparse data
+ *
+ *	Returns 0, or -1 if there is a problem
+ */
+
+int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
+				ntfs_inode *ni)
+{
+	int res;
+	ntfs_attr *na;
+
+	res = 0;
+	if (ni) {
+		/*
+		 * open and delete the reparse data
+		 */
+		na = ntfs_attr_open(ni, AT_REPARSE_POINT,
+			reparse_point_name, 14);
+		if (na) {
+			/* remove attribute */
+			res = ntfs_attr_rm(na);
+			if (!res)
+				ni->flags &= ~FILE_ATTR_REPARSE_POINT;
+		} else {
+			errno = ENODATA;
+			res = -1;
+		}
+		NInoSetDirty(ni);
+	} else {
+		errno = EINVAL;
+		res = -1;
+	}
+	return (res ? -1 : 0);
+}
+

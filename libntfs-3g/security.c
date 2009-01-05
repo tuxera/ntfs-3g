@@ -41,6 +41,10 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
+
 #include <unistd.h>
 #include <pwd.h>
 #include <grp.h>
@@ -2687,8 +2691,6 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 	return (res);
 }
 
-#if POSIXACLS
-
 /*
  *		Check whether user has ownership rights on a file
  *
@@ -2741,6 +2743,8 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
 	return (allowed);
 }
 
+#if POSIXACLS
+
 /*
  *		Set a new access or default Posix ACL to a file
  *		(or remove ACL if no input data)
@@ -2751,7 +2755,7 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
 
 int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, const char *value, size_t size,
-			ntfs_inode *ni)
+			int flags, ntfs_inode *ni)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -2765,6 +2769,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 	mode_t mode;
 	BOOL isdir;
 	BOOL deflt;
+	BOOL exist;
 	int count;
 	struct POSIX_SECURITY *oldpxdesc;
 	struct POSIX_SECURITY *newpxdesc;
@@ -2804,9 +2809,18 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 				oldpxdesc = ntfs_build_permissions_posix(scx->mapping,
 					oldattr, usid, gsid, ni);
 				if (oldpxdesc) {
-					mode = oldpxdesc->mode;
-					newpxdesc = ntfs_replace_acl(oldpxdesc,
+					if (deflt)
+						exist = oldpxdesc->defcnt > 0;
+					else
+						exist = oldpxdesc->acccnt > 3;
+					if ((exist && (flags & XATTR_CREATE))
+					  || (!exist && (flags & XATTR_REPLACE))) {
+						errno = (exist ? EEXIST : ENODATA);
+					} else {
+						mode = oldpxdesc->mode;
+						newpxdesc = ntfs_replace_acl(oldpxdesc,
 							(const struct POSIX_ACL*)value,count,deflt);
+					}
 					free(oldpxdesc);
 				}
 				free(oldattr);
@@ -2846,7 +2860,7 @@ int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, ntfs_inode *ni)
 {
 	return (ntfs_set_posix_acl(scx, path, name,
-			(const char*)NULL, 0, ni));
+			(const char*)NULL, 0, 0, ni));
 }
 
 #endif
@@ -2860,55 +2874,51 @@ int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
 			const char *path  __attribute__((unused)),
 			const char *name  __attribute__((unused)),
-			const char *value, size_t size,	ntfs_inode *ni)
+			const char *value, size_t size,	int flags,
+			ntfs_inode *ni)
 {
 	char *attr;
 	int res;
 
 	res = -1;
 	if ((size > 0)
+	   && !(flags & XATTR_CREATE)
 	   && ntfs_valid_descr(value,size)
 	   && (ntfs_attr_size(value) == size)) {
-#if POSIXACLS
-		if (ntfs_allowed_as_owner(scx,path,ni)) {
-#else
-			{ /* relying on fuse for access control */
-#endif
-				/* need copying in order to write */
-			attr = (char*)ntfs_malloc(size);
-			if (attr) {
-				memcpy(attr,value,size);
-				res = update_secur_descr(scx->vol, attr, ni);
-				/*
-				 * No need to invalidate standard caches :
-				 * the relation between a securid and
-				 * the associated protection is unchanged,
-				 * only the relation between a file and
-				 * its securid and protection is changed.
-				 */
+			/* need copying in order to write */
+		attr = (char*)ntfs_malloc(size);
+		if (attr) {
+			memcpy(attr,value,size);
+			res = update_secur_descr(scx->vol, attr, ni);
+			/*
+			 * No need to invalidate standard caches :
+			 * the relation between a securid and
+			 * the associated protection is unchanged,
+			 * only the relation between a file and
+			 * its securid and protection is changed.
+			 */
 #if CACHE_LEGACY_SIZE
-				/*
-				 * we must however invalidate the legacy
-				 * cache, which is based on inode numbers.
-				 * For safety, invalidate even if updating
-				 * failed.
-				 */
-				if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				   && !ni->security_id) {
-					struct CACHED_PERMISSIONS_LEGACY legacy;
+			/*
+			 * we must however invalidate the legacy
+			 * cache, which is based on inode numbers.
+			 * For safety, invalidate even if updating
+			 * failed.
+			 */
+			if ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			   && !ni->security_id) {
+				struct CACHED_PERMISSIONS_LEGACY legacy;
 
-					legacy.mft_no = ni->mft_no;
-					legacy.variable = (char*)NULL;
-					legacy.varsize = 0;
-					ntfs_invalidate_cache(scx->vol->legacy_cache,
-						GENERIC(&legacy),
-						(cache_compare)leg_compare);
-				}
+				legacy.mft_no = ni->mft_no;
+				legacy.variable = (char*)NULL;
+				legacy.varsize = 0;
+				ntfs_invalidate_cache(scx->vol->legacy_cache,
+					GENERIC(&legacy),
+					(cache_compare)leg_compare);
+			}
 #endif
-				free(attr);
-			} else
-				errno = ENOMEM;
-		}
+			free(attr);
+		} else
+			errno = ENOMEM;
 	} else
 		errno = EINVAL;
 	return (res ? -1 : 0);

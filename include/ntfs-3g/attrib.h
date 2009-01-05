@@ -345,5 +345,11 @@ extern int   ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
 			      ntfschar *name, u32 name_len);
 extern s64   ntfs_attr_get_free_bits(ntfs_attr *na);
 
+int ntfs_get_ntfs_attrib(const char *path,
+			char *value, size_t size, ntfs_inode *ni);
+int ntfs_set_ntfs_attrib(const char *path,
+			const char *value, size_t size,	int flags,
+			ntfs_inode *ni);
+
 #endif /* defined _NTFS_ATTRIB_H */
 

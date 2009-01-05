@@ -39,6 +39,9 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
 
 #include "compat.h"
 #include "attrib.h"
@@ -5137,3 +5140,61 @@ s64 ntfs_attr_get_free_bits(ntfs_attr *na)
 	return nr_free;
 }
 
+/*
+ *		Get the ntfs attribute into an extended attribute
+ *	The attribute is returned according to cpu endianness
+ */
+
+int ntfs_get_ntfs_attrib(const char *path  __attribute__((unused)),
+			char *value, size_t size, ntfs_inode *ni)
+{
+	u32 attrib;
+	size_t outsize;
+
+	outsize = 0;	/* default to no data and no error */
+	if (ni) {
+		attrib = le32_to_cpu(ni->flags);
+		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			attrib |= const_le32_to_cpu(FILE_ATTR_DIRECTORY);
+		else
+			attrib &= ~const_le32_to_cpu(FILE_ATTR_DIRECTORY);
+		outsize = sizeof(FILE_ATTR_FLAGS);
+		if (size >= outsize) {
+			if (value)
+				memcpy(value,&attrib,outsize);
+			else
+				errno = EINVAL;
+		}
+	}
+	return (outsize ? (int)outsize : -errno);
+}
+
+/*
+ *		Return the ntfs attribute into an extended attribute
+ *	The attribute is expected according to cpu endianness
+ *
+ *	Returns 0, or -1 if there is a problem
+ */
+
+int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
+			const char *value, size_t size,	int flags,
+			ntfs_inode *ni)
+{
+	u32 attrib;
+	int res;
+
+	res = -1;
+	if (ni && value && (size >= sizeof(FILE_ATTR_FLAGS))) {
+		if (!(flags & XATTR_CREATE)) {
+			/* copy to avoid alignment problems */
+			memcpy(&attrib,value,sizeof(FILE_ATTR_FLAGS));
+			ni->flags = (ni->flags & ~const_cpu_to_le32(0x31a7))
+				 | cpu_to_le32(attrib & 0x31a7);
+			NInoSetDirty(ni);
+			res = 0;
+		} else
+			errno = EEXIST;
+	} else
+		errno = EINVAL;
+	return (res ? -1 : 0);
+}

@@ -30,6 +30,10 @@
 #include "inode.h"
 #include "dir.h"
 
+#ifndef POSIXACLS
+#define POSIXACLS 0
+#endif
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define const_cpu_to_be16(x) ((((x) & 255L) << 8) + (((x) >> 8) & 255L))
 #define const_cpu_to_be32(x) ((((x) & 255L) << 24) + (((x) & 0xff00L) << 8) \
@@ -277,7 +281,7 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			ntfs_inode *ni);
 int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, const char *value, size_t size,
-			ntfs_inode *ni);
+			int flags, ntfs_inode *ni);
 int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, ntfs_inode *ni);
 #endif
@@ -287,7 +291,7 @@ int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			ntfs_inode *ni);
 int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, const char *value, size_t size,
-			ntfs_inode *ni);
+			int flags, ntfs_inode *ni);
 
 /*
  *		Security API for direct access to security descriptors

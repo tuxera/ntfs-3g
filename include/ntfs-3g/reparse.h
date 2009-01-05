@@ -28,4 +28,10 @@ char *ntfs_make_symlink(const char *org_path,
 			ntfs_inode *ni, int *pattr_size);
 BOOL ntfs_possible_symlink(ntfs_inode *ni);
 
+int ntfs_get_ntfs_reparse_data(const char *path,
+			char *value, size_t size, ntfs_inode *ni);
+int ntfs_set_ntfs_reparse_data(const char *path, const char *value,
+			size_t size, int flags, ntfs_inode *ni);
+int ntfs_remove_ntfs_reparse_data(const char *path, ntfs_inode *ni);
+
 #endif /* REPARSE_H */
