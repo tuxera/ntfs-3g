@@ -347,7 +347,6 @@ static void set_fuse_error(int *err)
 static void *ntfs_macfuse_init(struct fuse_conn_info *conn)
 {
     FUSE_ENABLE_XTIMES(conn);
-    /* FUSE_ENABLE_SETVOLNAME(conn); Later, when implemented */
     return NULL;
 }
 
