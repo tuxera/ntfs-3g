@@ -376,6 +376,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_attr *na = NULL;
+	ntfschar *newname = NULL;
 	ATTR_RECORD *a;
 	BOOL cs;
 
@@ -393,6 +394,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		name = ntfs_ucsndup(name, name_len);
 		if (!name)
 			goto err_out;
+		newname = name;
 	}
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
@@ -410,6 +412,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 					a->name_offset)), a->name_length);
 			if (!name)
 				goto put_err_out;
+			newname = name;
 			name_len = a->name_length;
 		} else {
 			name = AT_UNNAMED;
@@ -471,6 +474,7 @@ out:
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 err_out:
+	free(newname);
 	free(na);
 	na = NULL;
 	goto out;
