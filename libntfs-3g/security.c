@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -68,6 +68,15 @@
 #define ALIGN_SDS_ENTRY 16 /* Alignment for a $SDS entry */
 #define STUFFSZ 0x4000 /* unitary stuffing size for $SDS */
 #define FIRST_SECURITY_ID 0x100 /* Lowest security id */
+
+	/* Mask for attributes which can be forced */
+#define FILE_ATTR_SETTABLE ( FILE_ATTR_READONLY		\
+				| FILE_ATTR_HIDDEN	\
+				| FILE_ATTR_SYSTEM	\
+				| FILE_ATTR_ARCHIVE	\
+				| FILE_ATTR_TEMPORARY	\
+				| FILE_ATTR_OFFLINE	\
+				| FILE_ATTR_NOT_CONTENT_INDEXED )
 
 struct SII {		/* this is an image of an $SII index entry */
 	le16 offs;
@@ -3825,6 +3834,67 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 }
 
 /*
+ *		Get the ntfs attribute into an extended attribute
+ *	The attribute is returned according to cpu endianness
+ */
+
+int ntfs_get_ntfs_attrib(const char *path  __attribute__((unused)),
+			char *value, size_t size, ntfs_inode *ni)
+{
+	u32 attrib;
+	size_t outsize;
+
+	outsize = 0;	/* default to no data and no error */
+	if (ni) {
+		attrib = le32_to_cpu(ni->flags);
+		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			attrib |= const_le32_to_cpu(FILE_ATTR_DIRECTORY);
+		else
+			attrib &= ~const_le32_to_cpu(FILE_ATTR_DIRECTORY);
+		if (!attrib)
+			attrib |= const_le32_to_cpu(FILE_ATTR_NORMAL);
+		outsize = sizeof(FILE_ATTR_FLAGS);
+		if (size >= outsize) {
+			if (value)
+				memcpy(value,&attrib,outsize);
+			else
+				errno = EINVAL;
+		}
+	}
+	return (outsize ? (int)outsize : -errno);
+}
+
+/*
+ *		Return the ntfs attribute into an extended attribute
+ *	The attribute is expected according to cpu endianness
+ *
+ *	Returns 0, or -1 if there is a problem
+ */
+
+int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
+			const char *value, size_t size,	int flags,
+			ntfs_inode *ni)
+{
+	u32 attrib;
+	int res;
+
+	res = -1;
+	if (ni && value && (size >= sizeof(FILE_ATTR_FLAGS))) {
+		if (!(flags & XATTR_CREATE)) {
+			/* copy to avoid alignment problems */
+			memcpy(&attrib,value,sizeof(FILE_ATTR_FLAGS));
+			ni->flags = (ni->flags & ~FILE_ATTR_SETTABLE)
+				 | (cpu_to_le32(attrib) & FILE_ATTR_SETTABLE);
+			NInoSetDirty(ni);
+			res = 0;
+		} else
+			errno = EEXIST;
+	} else
+		errno = EINVAL;
+	return (res ? -1 : 0);
+}
+
+/*
  *	Open $Secure once for all
  *	returns zero if it succeeds
  *		non-zero if it fails. This is not an error (on NTFS v1.x)
@@ -4349,9 +4419,12 @@ int ntfs_get_file_attributes(struct SECURITY_API *scapi, const char *path)
 		if (ni) {
 			attrib = le32_to_cpu(ni->flags);
 			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				attrib |= 0x10;
+				attrib |= const_le32_to_cpu(FILE_ATTR_DIRECTORY);
 			else
-				attrib &= ~0x10;
+				attrib &= ~const_le32_to_cpu(FILE_ATTR_DIRECTORY);
+			if (!attrib)
+				attrib |= const_le32_to_cpu(FILE_ATTR_NORMAL);
+
 			ntfs_inode_close(ni);
 		} else
 			errno = ENOENT;
@@ -4389,8 +4462,8 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API) && path) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			ni->flags = (ni->flags & ~const_cpu_to_le32(0x31a7))
-				 | cpu_to_le32(attrib & 0x31a7);
+			ni->flags = (ni->flags & ~FILE_ATTR_SETTABLE)
+				 | (cpu_to_le32(attrib) & FILE_ATTR_SETTABLE);
 			NInoSetDirty(ni);
 			if (!ntfs_inode_close(ni))
 				res = -1;

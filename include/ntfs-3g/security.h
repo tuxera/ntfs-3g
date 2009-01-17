@@ -292,6 +292,11 @@ int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
 			const char *name, const char *value, size_t size,
 			int flags, ntfs_inode *ni);
+int ntfs_get_ntfs_attrib(const char *path,
+			char *value, size_t size, ntfs_inode *ni);
+int ntfs_set_ntfs_attrib(const char *path,
+			const char *value, size_t size,	int flags,
+			ntfs_inode *ni);
 
 /*
  *		Security API for direct access to security descriptors
