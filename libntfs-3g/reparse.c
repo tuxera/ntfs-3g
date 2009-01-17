@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2008 Jean-Pierre Andre
+ * Copyright (c) 2008-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1028,6 +1028,7 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 				ntfs_inode *ni)
 {
 	int res;
+	int olderrno;
 	ntfs_attr *na;
 
 	res = 0;
@@ -1042,6 +1043,11 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 			res = ntfs_attr_rm(na);
 			if (!res)
 				ni->flags &= ~FILE_ATTR_REPARSE_POINT;
+			olderrno = errno;
+			ntfs_attr_close(na);
+					/* avoid errno pollution */
+			if (errno == ENOENT)
+				errno = olderrno;
 		} else {
 			errno = ENODATA;
 			res = -1;
