@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2008 Szabolcs Szakacsits
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -2365,6 +2365,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
 		return -ENODATA;
+#if POSIXACLS
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
