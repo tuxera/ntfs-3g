@@ -1558,6 +1558,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
+	} else {
+		if (ntfs_attr_truncate(na, (s64)size)) {
+			res = -errno;
+			goto exit;
+		}
 	}
 	res = ntfs_attr_pwrite(na, 0, size, value);
 	if (res != (s64) size)
