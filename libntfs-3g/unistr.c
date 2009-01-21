@@ -2,8 +2,8 @@
  * unistr.c - Unicode string handling. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
- * Copyright (c) 2002-2008 Szabolcs Szakacsits
- * Copyright (c) 2008      Jean-Pierre Andre
+ * Copyright (c) 2002-2009 Szabolcs Szakacsits
+ * Copyright (c) 2008-2009 Jean-Pierre Andre
  * Copyright (c) 2008      Bernhard Kaindl
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -45,6 +45,7 @@
 #include <locale.h>
 #endif
 
+#include "compat.h"
 #include "attrib.h"
 #include "types.h"
 #include "unistr.h"
