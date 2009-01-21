@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2002 Richard Russon
  * Copyright (c) 2002-2004 Anton Altaparmakov
+ * Copyright (c) 2008-2009 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -25,6 +26,13 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
 #endif
 
 #ifndef HAVE_FFS

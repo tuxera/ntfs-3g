@@ -4,6 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -92,10 +93,6 @@
 #include "index.h"
 #include "ntfstime.h"
 #include "misc.h"
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 typedef enum {
 	FSTYPE_NONE,
