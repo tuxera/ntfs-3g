@@ -167,7 +167,7 @@ to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
 to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
 file:stream). If it's set to \fBxattr\fR, then the named data streams are
 mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
-utilities. The default is \fBnone\fR.
+utilities. The default is \fBxattr\fR.
 .TP
 .B debug
 Makes ntfs-3g to not detach from terminal and print a lot of debug output from

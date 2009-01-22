@@ -1678,7 +1678,11 @@ static int ntfs_fuse_init(void)
 	*ctx = (ntfs_fuse_context_t) {
 		.uid = getuid(),
 		.gid = getgid(),
-		.streams = NF_STREAMS_INTERFACE_NONE,
+#if defined(linux)			
+		.streams = NF_STREAMS_INTERFACE_XATTR,
+#else			
+       		.streams = NF_STREAMS_INTERFACE_NONE,
+#endif			
 	};
 	return 0;
 }
