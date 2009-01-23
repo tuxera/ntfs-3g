@@ -3,8 +3,9 @@
  *
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
- * Copyright (c) 2006-2008 Szabolcs Szakacsits
+ * Copyright (c) 2006-2009 Szabolcs Szakacsits
  * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
  *
@@ -95,10 +96,6 @@
 #include "reparse.h"
 #include "logging.h"
 #include "misc.h"
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 typedef enum {
 	FSTYPE_NONE,
@@ -378,6 +375,66 @@ static void set_fuse_error(int *err)
 	if (!*err)
 		*err = -errno;
 }
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+static void *ntfs_macfuse_init(struct fuse_conn_info *conn)
+{
+    FUSE_ENABLE_XTIMES(conn);
+    return NULL;
+}
+
+static int ntfs_macfuse_getxtimes(const char *org_path, 
+		struct timespec *bkuptime, struct timespec *crtime)
+{
+	int res = 0;
+	ntfs_inode *ni;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len;
+
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0)
+		return stream_name_len;
+	memset(bkuptime, 0, sizeof(struct timespec));
+	memset(crtime, 0, sizeof(struct timespec));
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	
+	/* We have no backup timestamp in NTFS. */
+	crtime->tv_sec = ni->creation_time;
+exit:
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+	return res;
+}
+
+int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
+{
+	ntfs_inode *ni;
+	int res = 0;
+
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+	
+	if (tv) {
+		ni->creation_time = tv->tv_sec;
+		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+	} 
+
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
@@ -2626,6 +2683,12 @@ static struct fuse_operations ntfs_3g_ops = {
 	.removexattr	= ntfs_fuse_removexattr,
 	.listxattr	= ntfs_fuse_listxattr,
 #endif /* HAVE_SETXATTR */
+#if defined(__APPLE__) || defined(__DARWIN__)
+	.init           = ntfs_macfuse_init,
+	/* MacFUSE extensions. */
+	.getxtimes      = ntfs_macfuse_getxtimes,
+	.setcrtime      = ntfs_macfuse_setcrtime,
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 };
 
 static int ntfs_fuse_init(void)

@@ -2,7 +2,7 @@
  * volume.c - NTFS volume handling code. Originated from the Linux-NTFS project.
  *
  * Copyright (c) 2000-2006 Anton Altaparmakov
- * Copyright (c) 2002-2008 Szabolcs Szakacsits
+ * Copyright (c) 2002-2009 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -53,6 +53,7 @@
 #include <locale.h>
 #endif
 
+#include "compat.h"
 #include "volume.h"
 #include "attrib.h"
 #include "mft.h"
@@ -65,10 +66,6 @@
 #include "dir.h"
 #include "logging.h"
 #include "misc.h"
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 const char *ntfs_home = 
 "Ntfs-3g news, support and information:  http://ntfs-3g.org\n";
