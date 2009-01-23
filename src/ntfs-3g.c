@@ -121,6 +121,7 @@ typedef struct {
 typedef enum {
 	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
 	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
+	NF_STREAMS_INTERFACE_OPENXATTR,	/* Same, not limited to "user." */
 	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
 } ntfs_fuse_streams_interface;
 
@@ -1754,14 +1755,38 @@ close_inode:
 
 #ifdef HAVE_SETXATTR
 
+/*
+ *                Name space identifications and prefixes
+ */
+
+enum { XATTRNS_NONE,
+	XATTRNS_USER,
+	XATTRNS_SYSTEM,
+	XATTRNS_SECURITY,
+	XATTRNS_TRUSTED,
+	XATTRNS_OPEN } ;
+
+static const char nf_ns_user_prefix[] = "user.";
+static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
+static const char nf_ns_system_prefix[] = "system.";
+static const int nf_ns_system_prefix_len = sizeof(nf_ns_system_prefix) - 1;
+static const char nf_ns_security_prefix[] = "security.";
+static const int nf_ns_security_prefix_len = sizeof(nf_ns_security_prefix) - 1;
+static const char nf_ns_trusted_prefix[] = "trusted.";
+static const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
+
+static const char xattr_ntfs_3g[] = "ntfs-3g.";
+
+/*
+ *		Identification of data mapped to the system name space
+ */
+
 enum { XATTR_UNMAPPED,
 	XATTR_NTFS_ACL,
 	XATTR_NTFS_ATTRIB,
 	XATTR_NTFS_REPARSE_DATA,
 	XATTR_POSIX_ACC, XATTR_POSIX_DEF } ;
 
-static const char nf_ns_xattr_preffix[] = "user.";
-static const int nf_ns_xattr_preffix_len = 5;
 static const char nf_ns_xattr_ntfs[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
@@ -1809,7 +1834,12 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 
 #endif
 
-static int mapped_xattr(const char *name)
+/*
+ *		Determine whether an extended attribute is in the system
+ *	name space and mapped to internal data
+ */
+
+static int mapped_xattr_system(const char *name)
 {
 	int num;
 
@@ -1835,6 +1865,83 @@ static int mapped_xattr(const char *name)
 	return (num);
 }
 
+/*
+ *		Determine the name space of an extended attribute
+ */
+
+static int xattr_namespace(const char *name)
+{
+	int namespace;
+
+	if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
+		namespace = XATTRNS_NONE;
+		if (!strncmp(name, nf_ns_user_prefix, 
+			nf_ns_user_prefix_len)
+		    && (strlen(name) != (size_t)nf_ns_user_prefix_len))
+			namespace = XATTRNS_USER;
+		else if (!strncmp(name, nf_ns_system_prefix, 
+			nf_ns_system_prefix_len)
+		    && (strlen(name) != (size_t)nf_ns_system_prefix_len))
+			namespace = XATTRNS_SYSTEM;
+		else if (!strncmp(name, nf_ns_security_prefix, 
+			nf_ns_security_prefix_len)
+		    && (strlen(name) != (size_t)nf_ns_security_prefix_len))
+			namespace = XATTRNS_SECURITY;
+		else if (!strncmp(name, nf_ns_trusted_prefix, 
+			nf_ns_trusted_prefix_len)
+		    && (strlen(name) != (size_t)nf_ns_trusted_prefix_len))
+			namespace = XATTRNS_TRUSTED;
+	} else
+		namespace = XATTRNS_OPEN;
+	return (namespace);
+}
+
+/*
+ *		Fix the prefix of an extended attribute
+ */
+
+static int fix_xattr_prefix(const char *name, int namespace, ntfschar **lename)
+{
+	int len;
+	char *prefixed;
+
+	*lename = (ntfschar*)NULL;
+	switch (namespace) {
+	case XATTRNS_USER :
+		/*
+		 * user name space : remove user prefix
+		 */
+		len = ntfs_mbstoucs(name + nf_ns_user_prefix_len, lename);
+		break;
+	case XATTRNS_SYSTEM :
+	case XATTRNS_SECURITY :
+	case XATTRNS_TRUSTED :
+		/*
+		 * security, trusted and unmapped system name spaces :
+		 * insert ntfs-3g prefix
+		 */
+		prefixed = ntfs_malloc(strlen(xattr_ntfs_3g)
+			 + strlen(name) + 1);
+		if (prefixed) {
+			strcpy(prefixed,xattr_ntfs_3g);
+			strcat(prefixed,name);
+			len = ntfs_mbstoucs(prefixed, lename);
+			free(prefixed);
+		} else
+			len = -1;
+		break;
+	case XATTRNS_OPEN :
+		/*
+		 * in open name space mode : do no fix prefix
+		 */
+		len = ntfs_mbstoucs(name, lename);
+		break;
+	default :
+		len = -1;
+	}
+	return (len);
+}
+
 static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 {
 	ntfs_attr_search_ctx *actx = NULL;
@@ -1845,7 +1952,8 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 	struct SECURITY_CONTEXT security;
 #endif
 
-	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	if ((ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	    && (ctx->streams != NF_STREAMS_INTERFACE_OPENXATTR))
 		return -EOPNOTSUPP;
 #if POSIXACLS
 		   /* parent directory must be executable */
@@ -1877,11 +1985,16 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 			ret = -errno;
 			goto exit;
 		}
-		ret += tmp_name_len + nf_ns_xattr_preffix_len + 1;
+		if (ctx->streams == NF_STREAMS_INTERFACE_XATTR)
+			ret += tmp_name_len + nf_ns_user_prefix_len + 1;
+		else
+			ret += tmp_name_len + 1;
 		if (size) {
 			if ((size_t)ret <= size) {
-				strcpy(to, nf_ns_xattr_preffix);
-				to += nf_ns_xattr_preffix_len;
+				if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
+					strcpy(to, nf_ns_user_prefix);
+					to += nf_ns_user_prefix_len;
+				}
 				strncpy(to, tmp_name, tmp_name_len);
 				to += tmp_name_len;
 				*to = 0;
@@ -1985,9 +2098,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 	int res, lename_len;
 	int attr;
+	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = mapped_xattr(name);
+	attr = mapped_xattr_system(name);
 	if (attr != XATTR_UNMAPPED) {
 #if POSIXACLS
 			/*
@@ -2059,7 +2173,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
 						value,size,ni);
-				break;
+					break;
 				default : /* not possible */
 					break;
 				}
@@ -2073,15 +2187,26 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	}
 	if (ctx->streams == NF_STREAMS_INTERFACE_WINDOWS)
 		return ntfs_fuse_getxattr_windows(path, name, value, size);
-	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	if (ctx->streams == NF_STREAMS_INTERFACE_NONE)
 		return -EOPNOTSUPP;
-	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
-			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
+	namespace = xattr_namespace(name);
+	if (namespace == XATTRNS_NONE)
 		return -ENODATA;
+#if POSIXACLS
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+		/* trusted only readable by root */
+	if ((namespace == XATTRNS_TRUSTED)
+	    && security.uid)
+		    return -EACCES;
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
+	lename_len = fix_xattr_prefix(name, namespace, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
@@ -2117,9 +2242,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ntfschar *lename = NULL;
 	int res, lename_len;
 	int attr;
+	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = mapped_xattr(name);
+	attr = mapped_xattr_system(name);
 	if (attr != XATTR_UNMAPPED) {
 #if POSIXACLS
 			/*
@@ -2205,29 +2331,37 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 #endif
 		return (res);
 	}
-	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	if ((ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	    && (ctx->streams != NF_STREAMS_INTERFACE_OPENXATTR))
 		return -EOPNOTSUPP;
-	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
-			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
-		return -EACCES;
+	namespace = xattr_namespace(name);
+	if (namespace == XATTRNS_NONE)
+		return -ENODATA;
 #if POSIXACLS
 		   /* parent directory must be executable */
 	if (ntfs_fuse_fill_security_context(&security)
 	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
 		return (-errno);
 	}
+		/* security and trusted only settable by root */
+	if (((namespace == XATTRNS_SECURITY)
+	   || (namespace == XATTRNS_TRUSTED))
+		&& security.uid)
+		    return -EACCES;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (!ntfs_allowed_as_owner(&security,path,ni)) {
+	if (((namespace == XATTRNS_SECURITY)
+	   || (namespace == XATTRNS_TRUSTED))
+		&& !ntfs_allowed_as_owner(&security,path,ni)) {
 		res = -errno;
 		ntfs_inode_close(ni);
 		return (res);
 	}
 #endif
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
+	lename_len = fix_xattr_prefix(name, namespace, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
@@ -2248,6 +2382,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		}
 		na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 		if (!na) {
+			res = -errno;
+			goto exit;
+		}
+	} else {
+		if (ntfs_attr_truncate(na, (s64)size)) {
 			res = -errno;
 			goto exit;
 		}
@@ -2272,9 +2411,10 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	ntfschar *lename = NULL;
 	int res = 0, lename_len;
 	int attr;
+	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = mapped_xattr(name);
+	attr = mapped_xattr_system(name);
 	if (attr != XATTR_UNMAPPED) {
 #if POSIXACLS
 
@@ -2360,10 +2500,11 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #endif
 		return (res);
 	}
-	if (ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	if ((ctx->streams != NF_STREAMS_INTERFACE_XATTR)
+	    && (ctx->streams != NF_STREAMS_INTERFACE_OPENXATTR))
 		return -EOPNOTSUPP;
-	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
-			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
+	namespace = xattr_namespace(name);
+	if (namespace == XATTRNS_NONE)
 		return -ENODATA;
 #if POSIXACLS
 		   /* parent directory must be executable */
@@ -2371,18 +2512,25 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
 		return (-errno);
 	}
+		/* security and trusted only settable by root */
+	if (((namespace == XATTRNS_SECURITY)
+	   || (namespace == XATTRNS_TRUSTED))
+		&& security.uid)
+		    return -EACCES;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (!ntfs_allowed_as_owner(&security,path,ni)) {
+	if (((namespace == XATTRNS_SECURITY)
+	   || (namespace == XATTRNS_TRUSTED))
+		&& !ntfs_allowed_as_owner(&security,path,ni)) {
 		res = -errno;
 		ntfs_inode_close(ni);
 		return (res);
 	}
 #endif
-	lename_len = ntfs_mbstoucs(name + nf_ns_xattr_preffix_len, &lename);
+	lename_len = fix_xattr_prefix(name, namespace, &lename);
 	if (lename_len == -1) {
 		res = -errno;
 		goto exit;
@@ -2696,7 +2844,6 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			ctx->hiberfile = TRUE;
 		} else if (!strcmp(opt, "locale")) {
-				/* option "locale" kept undocumented */
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
 			ntfs_set_char_encoding(val);
@@ -2707,6 +2854,8 @@ static char *parse_mount_options(const char *orig_opts)
 				ctx->streams = NF_STREAMS_INTERFACE_NONE;
 			else if (!strcmp(val, "xattr"))
 				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+			else if (!strcmp(val, "openxattr"))
+				ctx->streams = NF_STREAMS_INTERFACE_OPENXATTR;
 			else if (!strcmp(val, "windows"))
 				ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
 			else {
@@ -2714,6 +2863,8 @@ static char *parse_mount_options(const char *orig_opts)
 						"access interface.\n");
 				goto err_exit;
 			}
+		} else if (!strcmp(opt, "user_xattr")) {
+			ctx->streams = NF_STREAMS_INTERFACE_XATTR;
 		} else if (!strcmp(opt, "noauto")) {
 			/* Don't pass noauto option to fuse. */
 		} else if (!strcmp(opt, "debug")) {
