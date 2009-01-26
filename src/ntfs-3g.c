@@ -162,9 +162,10 @@ static const char *usage_msg =
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
 "\n"
-"Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
+"Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
-"Copyright (C) 2007-2008 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2009 Jean-Pierre Andre\n"
+"Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
@@ -2042,11 +2043,22 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 			ret = -errno;
 			goto exit;
 		}
-		if (ctx->streams == NF_STREAMS_INTERFACE_XATTR)
-			ret += tmp_name_len + nf_ns_user_prefix_len + 1;
-		else
+			/*
+			 * When using name spaces, do not return
+			 * security, trusted nor system attributes
+			 * (filtered elsewhere anyway)
+			 * otherwise insert "user." prefix
+			 */
+		if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
+			if ((strlen(tmp_name) > sizeof(xattr_ntfs_3g))
+			  && !strncmp(tmp_name,xattr_ntfs_3g,
+				sizeof(xattr_ntfs_3g)-1))
+				tmp_name_len = 0;
+			else
+				ret += tmp_name_len + nf_ns_user_prefix_len + 1;
+		} else
 			ret += tmp_name_len + 1;
-		if (size) {
+		if (size && tmp_name_len) {
 			if ((size_t)ret <= size) {
 				if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
 					strcpy(to, nf_ns_user_prefix);
