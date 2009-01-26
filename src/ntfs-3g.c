@@ -2258,7 +2258,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		/* trusted only readable by root */
 	if ((namespace == XATTRNS_TRUSTED)
 	    && security.uid)
-		    return -EACCES;
+		    return -EPERM;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
@@ -2410,10 +2410,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (((namespace == XATTRNS_SECURITY)
-	   || (namespace == XATTRNS_TRUSTED))
-		&& !ntfs_allowed_as_owner(&security,path,ni)) {
-		res = -errno;
+	if (security.uid
+	    && ((namespace == XATTRNS_SECURITY)
+		|| (namespace == XATTRNS_TRUSTED)
+		|| !ntfs_allowed_as_owner(&security,path,ni))) {
+		res = -EPERM;
 		ntfs_inode_close(ni);
 		return (res);
 	}
@@ -2579,10 +2580,11 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (((namespace == XATTRNS_SECURITY)
-	   || (namespace == XATTRNS_TRUSTED))
-		&& !ntfs_allowed_as_owner(&security,path,ni)) {
-		res = -errno;
+	if (security.uid
+	    && ((namespace == XATTRNS_SECURITY)
+		|| (namespace == XATTRNS_TRUSTED)
+		|| !ntfs_allowed_as_owner(&security,path,ni))) {
+		res = -EPERM;
 		ntfs_inode_close(ni);
 		return (res);
 	}
