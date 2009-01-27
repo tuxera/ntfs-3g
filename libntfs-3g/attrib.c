@@ -5087,8 +5087,11 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	
 	na = ntfs_attr_open(ni, type, name, name_len);
 	if (!na) {
-		ntfs_log_perror("Failed to open attribute 0x%02x of inode "
+			/* do not log removal of non-existent stream */
+		if (type != AT_DATA) {
+			ntfs_log_perror("Failed to open attribute 0x%02x of inode "
 				"0x%llx", type, (unsigned long long)ni->mft_no);
+		}
 		return -1;
 	}
 	
