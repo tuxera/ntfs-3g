@@ -1848,11 +1848,10 @@ enum { XATTR_UNMAPPED,
 static const char nf_ns_xattr_ntfs[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
-
-#if POSIXACLS
-
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
+
+#if POSIXACLS
 
 /*
  *		Check whether access to an ACL as an extended attribute
@@ -1911,14 +1910,12 @@ static int mapped_xattr_system(const char *name)
 			if (!strcmp(name,nf_ns_xattr_reparse))
 				num = XATTR_NTFS_REPARSE_DATA;
 			else
-#if POSIXACLS
 				if (!strcmp(name,nf_ns_xattr_posix_access))
 					num = XATTR_POSIX_ACC;
 				else
 					if (!strcmp(name,nf_ns_xattr_posix_default))
 						num = XATTR_POSIX_DEF;
 					else
-#endif
 						num = XATTR_UNMAPPED;
 	return (num);
 }
@@ -2243,7 +2240,13 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					res = ntfs_get_ntfs_reparse_data(path,
 						value,size,ni);
 					break;
-				default : /* not possible */
+				default :
+					/*
+					 * make sure applications do not see
+					 * Posix ACL not consistent with mode
+					 */
+					errno = EOPNOTSUPP;
+					res = -errno;
 					break;
 				}
 				if (ntfs_inode_close(ni))
@@ -2385,7 +2388,13 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 						res = ntfs_set_ntfs_reparse_data(path,
 							value,size,flags,ni);
 						break;
-					default : /* not possible */
+					default :
+						/*
+						 * make sure applications do not see
+						 * Posix ACL not consistent with mode
+						 */
+						errno = EOPNOTSUPP;
+						res = -errno;
 						break;
 					}
 					if (res)
@@ -2564,6 +2573,12 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 					res = -errno;
 				break;
 			default : /* not possible */
+				/*
+				 * make sure applications do not see
+				 * Posix ACL not consistent with mode
+				 */
+				errno = EOPNOTSUPP;
+				res = -errno;
 				break;
 			}
 		}
