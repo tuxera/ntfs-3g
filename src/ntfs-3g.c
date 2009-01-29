@@ -1527,7 +1527,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		return -EOPNOTSUPP;
 	if (strncmp(name, nf_ns_xattr_preffix, nf_ns_xattr_preffix_len) ||
 			strlen(name) == (size_t)nf_ns_xattr_preffix_len)
-		return -EACCES;
+		return -EOPNOTSUPP;
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
