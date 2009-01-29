@@ -1,9 +1,9 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
-.\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
+.\" Copyright (c) 2006-2009 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "December 2008" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "February 2009" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -238,7 +238,9 @@ Linux-NTFS team developer Szabolcs Szakacsits (szaka@ntfs-3g.org).
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
 Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
-Yuval Fledel, and the author of the groundbreaking FUSE filesystem development 
+Yuval Fledel, Jean-Pierre Andre, Alon Bar-Lev, Dominique L Bouix,
+Csaba Henk, Bernhard Kaindl, Erik Larsson, Alejandro Pulver, and 
+the author of the groundbreaking FUSE filesystem development 
 framework, Miklos Szeredi.
 .SH SEE ALSO
 .BR ntfs-3g.probe (8),
