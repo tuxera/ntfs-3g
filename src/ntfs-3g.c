@@ -2020,6 +2020,14 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+#if POSIXACLS
+		   /* file must be readable */
+	if (!ntfs_allowed_access(&security,path,ni,S_IREAD)) {
+		ret = -EACCES;
+		ntfs_inode_close(ni);
+		goto exit;
+	}
+#endif
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!actx) {
 		ret = -errno;
@@ -2106,10 +2114,15 @@ static int ntfs_fuse_getxattr_windows(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+#if POSIXACLS
+	if (!ntfs_allowed_access(&security,path,ni,S_IREAD)) {
+		ret = -errno;
+		goto exit;
+	}
+#endif
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!actx) {
 		ret = -errno;
-		ntfs_inode_close(ni);
 		goto exit;
 	}
 	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
@@ -2177,33 +2190,36 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 			 */
 		ni = ntfs_check_access_xattr(&security,path);
 		if (ni) {
+			if (ntfs_allowed_access(&security,path,ni,S_IREAD)) {
 				/*
 				 * the returned value is the needed
 				 * size. If it is too small, no copy
 				 * is done, and the caller has to
 				 * issue a new call with correct size.
 				 */
-			switch (attr) {
-			case XATTR_NTFS_ACL :
-				res = ntfs_get_ntfs_acl(&security,path,
-					name,value,size,ni);
-				break;
-			case XATTR_POSIX_ACC :
-			case XATTR_POSIX_DEF :
-				res = ntfs_get_posix_acl(&security,path,
-					name,value,size,ni);
-				break;
-			case XATTR_NTFS_ATTRIB :
-				res = ntfs_get_ntfs_attrib(path,
-					value,size,ni);
-				break;
-			case XATTR_NTFS_REPARSE_DATA :
-				res = ntfs_get_ntfs_reparse_data(path,
-					value,size,ni);
-				break;
-			default : /* not possible */
-				break;
-			}
+				switch (attr) {
+				case XATTR_NTFS_ACL :
+					res = ntfs_get_ntfs_acl(&security,path,
+						name,value,size,ni);
+					break;
+				case XATTR_POSIX_ACC :
+				case XATTR_POSIX_DEF :
+					res = ntfs_get_posix_acl(&security,path,
+						name,value,size,ni);
+					break;
+				case XATTR_NTFS_ATTRIB :
+					res = ntfs_get_ntfs_attrib(path,
+						value,size,ni);
+					break;
+				case XATTR_NTFS_REPARSE_DATA :
+					res = ntfs_get_ntfs_reparse_data(path,
+						value,size,ni);
+					break;
+				default : /* not possible */
+					break;
+				}
+			} else
+				res = -errno;
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		} else
@@ -2278,6 +2294,13 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
+#if POSIXACLS
+		   /* file must be readable */
+	if (!ntfs_allowed_access(&security, path, ni, S_IREAD)) {
+		res = -errno;
+		goto exit;
+	}
+#endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
 	if (lename_len == -1) {
 		res = -errno;
@@ -2431,13 +2454,26 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (security.uid
-	    && ((namespace == XATTRNS_SECURITY)
-		|| (namespace == XATTRNS_TRUSTED)
-		|| !ntfs_allowed_as_owner(&security,path,ni))) {
-		res = -EPERM;
-		ntfs_inode_close(ni);
-		return (res);
+	switch (namespace) {
+	case XATTRNS_SECURITY :
+	case XATTRNS_TRUSTED :
+		if (security.uid) {
+			res = -EPERM;
+			goto exit;
+		}
+		break;
+	case XATTRNS_SYSTEM :
+		if (!ntfs_allowed_as_owner(&security,path,ni)) {
+			res = -EACCES;
+			goto exit;
+		}
+		break;
+	default :
+		if (!ntfs_allowed_access(&security,path,ni,S_IWRITE)) {
+			res = -EACCES;
+			goto exit;
+		}
+		break;
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
@@ -2607,13 +2643,26 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	if (!ni)
 		return -errno;
 #if POSIXACLS
-	if (security.uid
-	    && ((namespace == XATTRNS_SECURITY)
-		|| (namespace == XATTRNS_TRUSTED)
-		|| !ntfs_allowed_as_owner(&security,path,ni))) {
-		res = -EPERM;
-		ntfs_inode_close(ni);
-		return (res);
+	switch (namespace) {
+	case XATTRNS_SECURITY :
+	case XATTRNS_TRUSTED :
+		if (security.uid) {
+			res = -EPERM;
+			goto exit;
+		}
+		break;
+	case XATTRNS_SYSTEM :
+		if (!ntfs_allowed_as_owner(&security,path,ni)) {
+			res = -EACCES;
+			goto exit;
+		}
+		break;
+	default :
+		if (!ntfs_allowed_access(&security,path,ni,S_IWRITE)) {
+			res = -EACCES;
+			goto exit;
+		}
+		break;
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
