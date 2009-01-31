@@ -343,11 +343,11 @@ static void set_fuse_error(int *err)
 #if defined(__APPLE__) || defined(__DARWIN__)
 static void *ntfs_macfuse_init(struct fuse_conn_info *conn)
 {
-    FUSE_ENABLE_XTIMES(conn);
-    return NULL;
+	FUSE_ENABLE_XTIMES(conn);
+	return NULL;
 }
 
-static int ntfs_macfuse_getxtimes(const char *org_path, 
+static int ntfs_macfuse_getxtimes(const char *org_path,
 		struct timespec *bkuptime, struct timespec *crtime)
 {
 	int res = 0;
@@ -392,8 +392,29 @@ int ntfs_macfuse_setcrtime(const char *path, const struct timespec *tv)
 	if (tv) {
 		ni->creation_time = tv->tv_sec;
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
-	} 
+	}
 
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
+{
+	ntfs_inode *ni;
+	int res = 0;
+	
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+	
+	/* 
+	 * Doing nothing while pretending to do something. NTFS has no backup
+	 * time. If this function is not implemented then some apps break. 
+	 */
+	
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	return res;
@@ -1662,10 +1683,11 @@ static struct fuse_operations ntfs_3g_ops = {
 	.listxattr	= ntfs_fuse_listxattr,
 #endif /* HAVE_SETXATTR */
 #if defined(__APPLE__) || defined(__DARWIN__)
-	.init           = ntfs_macfuse_init,
+	.init		= ntfs_macfuse_init,
 	/* MacFUSE extensions. */
-	.getxtimes      = ntfs_macfuse_getxtimes,
-	.setcrtime      = ntfs_macfuse_setcrtime,
+	.getxtimes	= ntfs_macfuse_getxtimes,
+	.setcrtime	= ntfs_macfuse_setcrtime,
+	.setbkuptime	= ntfs_macfuse_setbkuptime
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 };
 
