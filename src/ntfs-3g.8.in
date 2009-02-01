@@ -8,12 +8,12 @@
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
-.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
 .br
 .B mount \-t ntfs-3g
-.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
 .SH DESCRIPTION
 \fBntfs-3g\fR is an NTFS driver, which can
 create, remove, rename, move files, directories, hard links, and
@@ -42,6 +42,10 @@ options.
 .PP
 Windows users have full access to the files created by 
 .B ntfs-3g.
+.PP
+Full ownership and permission support, including Windows user mapping
+and POSIX file system compliance, is provided by the Advanced NTFS-3G 
+driver.
 .PP
 If 
 .B ntfs-3g 
@@ -103,9 +107,6 @@ means full access to everybody.
 Mount filesystem read\-only. Useful if Windows is hibernated or the
 NTFS journal file is unclean.
 .TP
-.BI locale= value
-Prints informative and diagnostic messages in the set locale.
-.TP
 .B force
 Force the mounting even if the NTFS logfile is unclean. The logfile 
 will be unconditionally cleared. Use this option with caution and for 
@@ -160,6 +161,9 @@ limited anyway to 32 pages (which is 128kbyte on i386).
 Do nothing on chmod and chown operations, but do not return error. 
 This option is on by default.
 .TP
+.BI locale= value
+Prints informative and diagnostic messages in the set locale.
+.TP
 .B no_def_opts
 By default ntfs-3g acts as "silent" was passed to it,
 this option cancel this behaviour.
@@ -181,7 +185,7 @@ libntfs-3g and FUSE.
 .B no_detach
 Same as above but with less debug output.
 .SH EXAMPLES
-Mount /dev/sda1 to /mnt/windows:
+Mount /dev/sda1 to /mnt/windows (make sure /mnt/windows exists):
 .RS
 .sp
 .B ntfs-3g /dev/sda1 /mnt/windows
@@ -197,7 +201,7 @@ Read\-only mount /dev/sda5 to /home/user/mnt and make user with uid 1000
 to be the owner of all files:
 .RS
 .sp
-.B ntfs-3g /dev/sda5 /home/user/mnt \-o ro,uid=1000
+.B ntfs-3g \-o ro,uid=1000 /dev/sda5 /home/user/mnt
 .sp
 .RE
 /etc/fstab entry for the above:
@@ -227,12 +231,8 @@ Please see
 http://ntfs-3g.org/support.html
 .sp
 .RE
-for common questions and known issues.
-If you would find a new one in the latest release of
-the software then please send an email describing it
-in detail. You can contact the 
-development team on the ntfs\-3g\-devel@lists.sf.net
-address.
+for common questions and known issues. You can contact the development 
+team on the ntfs\-3g\-devel@lists.sf.net address.
 .SH ACKNOWLEDGEMENT
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
@@ -245,4 +245,5 @@ framework, Miklos Szeredi.
 .BR ntfs-3g.probe (8),
 .BR ntfsprogs (8),
 .BR attr (5),
-.BR getfattr (1)
+.BR getfattr (1),
+.BR setfattr (1)
