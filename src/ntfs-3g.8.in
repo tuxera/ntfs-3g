@@ -233,13 +233,7 @@ the software then please send an email describing it
 in detail. You can contact the 
 development team on the ntfs\-3g\-devel@lists.sf.net
 address.
-.SH AUTHORS
-.B ntfs-3g 
-was based on and a major improvement to ntfsmount and libntfs which were
-written by Yura Pakhuchiy and the Linux-NTFS team. The improvements were 
-made, the ntfs-3g project was initiated and currently led by long time 
-Linux-NTFS team developer Szabolcs Szakacsits (szaka@ntfs-3g.org).
-.SH THANKS
+.SH ACKNOWLEDGEMENT
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
 Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
