@@ -73,7 +73,12 @@ Named data streams act like normals files, so you can read from them, write to
 them and even delete them (using rm).  You can list all the named data streams
 a file has by getting the "ntfs.streams.list" extended attribute.
 .SH OPTIONS
-Below is a summary of the options that \fBntfs-3g\fR accepts.
+Most of the generic mount options described in 
+. BR mount (8)
+are
+supported (ro, rw, suid, nosuid, dev, nodev, exec, noexec). 
+Below is a summary of the options that \fBntfs-3g\fR additionally 
+accepts.
 .TP
 \fBuid=\fP\fIvalue\fP and \fBgid=\fP\fIvalue\fP
 Set the owner and the group of files and directories. The values are numerical.
