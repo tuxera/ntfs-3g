@@ -721,7 +721,7 @@ static int ntfs_mft_bitmap_extend_allocation_i(ntfs_volume *vol)
 		goto undo_alloc;
 	}
 	/* Get the size for the new mapping pairs array for this extent. */
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll);
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll, INT_MAX);
 	if (mp_size <= 0) {
 		ntfs_log_error("Get size for mapping pairs failed for "
 				"mft bitmap attribute extent.\n");
@@ -1070,7 +1070,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 		goto undo_alloc;
 	}
 	/* Get the size for the new mapping pairs array for this extent. */
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll);
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl2, ll, INT_MAX);
 	if (mp_size <= 0) {
 		ntfs_log_error("Get size for mapping pairs failed for "
 				"mft data attribute extent.\n");

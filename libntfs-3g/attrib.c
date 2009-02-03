@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -3690,7 +3690,7 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 		}
 	}
 	/* Determine the size of the mapping pairs array. */
-	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0);
+	mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0, INT_MAX);
 	if (mp_size < 0) {
 		err = errno;
 		ntfs_log_debug("Eeek!  Failed to get size for mapping pairs array.  "
@@ -4278,6 +4278,7 @@ static int ntfs_attr_update_mapping_pairs_i(ntfs_attr *na, VCN from_vcn)
 	MFT_RECORD *m;
 	ATTR_RECORD *a;
 	VCN stop_vcn;
+	const runlist_element *stop_rl;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size, ret = -1;
 	BOOL finished_build;
 retry:
@@ -4307,6 +4308,7 @@ retry:
 
 	/* Fill attribute records with new mapping pairs. */
 	stop_vcn = 0;
+	stop_rl = na->rl;
 	finished_build = FALSE;
 	while (!ntfs_attr_lookup(na->type, na->name, na->name_len,
 				CASE_SENSITIVE, from_vcn, NULL, 0, ctx)) {
@@ -4360,13 +4362,6 @@ retry:
 			case -3: goto put_err_out;
 		}
 
-		/* Get the size for the rest of mapping pairs array. */
-		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
-								stop_vcn);
-		if (mp_size <= 0) {
-			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
-			goto put_err_out;
-		}
 		/*
 		 * Determine maximum possible length of mapping pairs,
 		 * if we shall *not* expand space for mapping pairs.
@@ -4380,6 +4375,17 @@ retry:
 		 */
 		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
+		/* Get the size for the rest of mapping pairs array. */
+/* old code equivalent
+		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
+						stop_vcn, INT_MAX);
+*/
+		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, stop_rl,
+						stop_vcn, exp_max_mp_size);
+		if (mp_size <= 0) {
+			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
+			goto put_err_out;
+		}
 		/* Test mapping pairs for fitting in the current mft record. */
 		if (mp_size > exp_max_mp_size) {
 			/*
@@ -4444,8 +4450,12 @@ retry:
 		 */
 		if (!ntfs_mapping_pairs_build(na->ni->vol, (u8*)a + le16_to_cpu(
 				a->mapping_pairs_offset), mp_size, na->rl,
-				stop_vcn, &stop_vcn))
+				stop_vcn, &stop_rl))
 			finished_build = TRUE;
+		if (stop_rl)
+			stop_vcn = stop_rl->vcn;
+		else
+			stop_vcn = 0;
 		if (!finished_build && errno != ENOSPC) {
 			ntfs_log_perror("Failed to build mapping pairs");
 			goto put_err_out;
@@ -4489,7 +4499,7 @@ retry:
 	while (1) {
 		/* Calculate size of rest mapping pairs. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol,
-						na->rl, stop_vcn);
+						na->rl, stop_vcn, INT_MAX);
 		if (mp_size <= 0) {
 			ntfs_log_perror("%s: get mp size failed", __FUNCTION__);
 			goto put_err_out;
@@ -4528,7 +4538,11 @@ retry:
 
 		err = ntfs_mapping_pairs_build(na->ni->vol, (u8*)a +
 			le16_to_cpu(a->mapping_pairs_offset), mp_size, na->rl,
-			stop_vcn, &stop_vcn);
+			stop_vcn, &stop_rl);
+		if (stop_rl)
+			stop_vcn = stop_rl->vcn;
+		else
+			stop_vcn = 0;
 		if (err < 0 && errno != ENOSPC) {
 			err = errno;
 			ntfs_log_perror("Failed to build MP");

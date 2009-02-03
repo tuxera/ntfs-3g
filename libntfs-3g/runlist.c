@@ -5,6 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004 Yura Pakhuchiy
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1219,19 +1220,18 @@ errno_set:
  */
 int ntfs_get_nr_significant_bytes(const s64 n)
 {
-	s64 l = n;
+	u64 l;
 	int i;
-	s8 j;
 
-	i = 0;
-	do {
-		l >>= 8;
-		i++;
-	} while (l != 0LL && l != -1LL);
-	j = (n >> 8 * (i - 1)) & 0xff;
-	/* If the sign bit is wrong, we need an extra byte. */
-	if ((n < 0LL && j >= 0) || (n > 0LL && j < 0))
-		i++;
+	l = (n < 0 ? ~n : n);
+	i = 1;
+	if (l >= 128) {
+		l >>= 7;
+		do {
+			i++;
+			l >>= 8;
+		} while (l);
+	}
 	return i;
 }
 
@@ -1256,7 +1256,7 @@ int ntfs_get_nr_significant_bytes(const s64 n)
  *	EIO	- The runlist is corrupt.
  */
 int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const runlist_element *rl, const VCN start_vcn)
+		const runlist_element *rl, const VCN start_vcn, int max_size)
 {
 	LCN prev_lcn;
 	int rls;
@@ -1315,7 +1315,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		rl++;
 	}
 	/* Do the full runs. */
-	for (; rl->length; rl++) {
+	for (; rl->length && (rls < max_size); rl++) {
 		if (rl->length < 0 || rl->lcn < LCN_HOLE)
 			goto err_out;
 		/* Header byte + length. */
@@ -1430,7 +1430,7 @@ err_out:
  */
 int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 		const int dst_len, const runlist_element *rl,
-		const VCN start_vcn, VCN *const stop_vcn)
+		const VCN start_vcn, runlist_element const **stop_rl)
 {
 	LCN prev_lcn;
 	u8 *dst_max, *dst_next;
@@ -1442,8 +1442,8 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 	if (!rl) {
 		if (start_vcn)
 			goto val_err;
-		if (stop_vcn)
-			*stop_vcn = 0;
+		if (stop_rl)
+			*stop_rl = rl;
 		if (dst_len < 1)
 			goto nospc_err;
 		goto ok;
@@ -1538,8 +1538,8 @@ int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 		dst += 1 + len_len + lcn_len;
 	}
 	/* Set stop vcn. */
-	if (stop_vcn)
-		*stop_vcn = rl->vcn;
+	if (stop_rl)
+		*stop_rl = rl;
 ok:	
 	/* Add terminator byte. */
 	*dst = 0;
@@ -1547,8 +1547,8 @@ out:
 	return ret;
 size_err:
 	/* Set stop vcn. */
-	if (stop_vcn)
-		*stop_vcn = rl->vcn;
+	if (stop_rl)
+		*stop_rl = rl;
 	/* Add terminator byte. */
 	*dst = 0;
 nospc_err:

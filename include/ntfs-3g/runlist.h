@@ -65,14 +65,14 @@ extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 extern int ntfs_get_nr_significant_bytes(const s64 n);
 
 extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
-		const runlist_element *rl, const VCN start_vcn);
+		const runlist_element *rl, const VCN start_vcn, int max_size);
 
 extern int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max,
 		const s64 n);
 
 extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, u8 *dst,
 		const int dst_len, const runlist_element *rl,
-		const VCN start_vcn, VCN *const stop_vcn);
+		const VCN start_vcn, runlist_element const **stop_rl);
 
 extern int ntfs_rl_truncate(runlist **arl, const VCN start_vcn);
 
