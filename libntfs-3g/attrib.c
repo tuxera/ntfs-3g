@@ -1980,6 +1980,7 @@ find_attr_list_attr:
 			/* Check for bogus calls. */
 			if (name || name_len || val || val_len || lowest_vcn) {
 				errno = EINVAL;
+				ntfs_log_perror("%s", __FUNCTION__);
 				return -1;
 			}
 
@@ -2010,9 +2011,9 @@ find_attr_list_attr:
 			if (errno != ENOENT)
 				return rc;
 
-			/* Not found?!? Absurd! Must be a bug... )-: */
-			ntfs_log_error("Extant attribute list wasn't found\n");
-			errno = EINVAL;
+			/* Not found?!? Absurd! */
+			errno = EIO;
+			ntfs_log_error("Attribute list wasn't found");
 			return -1;
 		}
 	}
