@@ -424,11 +424,8 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 	ni = __ntfs_inode_allocate(base_ni->vol);
 	if (!ni)
 		goto out;
-	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec,
-			NULL)) {
-		ntfs_log_perror("ntfs_file_record_read failed #2");
+	if (ntfs_file_record_read(base_ni->vol, le64_to_cpu(mref), &ni->mrec, NULL))
 		goto err_out;
-	}
 	ni->mft_no = mft_no;
 	ni->nr_extents = -1;
 	ni->base_ni = base_ni;
