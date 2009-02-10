@@ -2199,7 +2199,7 @@ do_next_attr:
 		ctx->attr = ctx->base_attr;
 	}
 	errno = EIO;
-	ntfs_log_perror("Inode is corrupt (%lld)", (unsigned long long)ni->mft_no);
+	ntfs_log_perror("Inode is corrupt (%lld)", (long long)base_ni->mft_no);
 	return -1;
 not_found:
 	/*
