@@ -1698,6 +1698,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	} else {
 		if (name && name != AT_UNNAMED) {
 			errno = EINVAL;
+			ntfs_log_perror("%s", __FUNCTION__);
 			return -1;
 		}
 		vol = NULL;
@@ -1809,8 +1810,9 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			}
 		}
 	}
-	ntfs_log_debug("ntfs_attr_find(): File is corrupt. Run chkdsk.\n");
 	errno = EIO;
+	ntfs_log_perror("%s: Corrupt inode (%lld)", __FUNCTION__, 
+			ctx->ntfs_ino ? (long long)ctx->ntfs_ino->mft_no : -1);
 	return -1;
 }
 
