@@ -2128,10 +2128,8 @@ is_enumeration:
 				/* We want an extent record. */
 				ni = ntfs_extent_inode_open(base_ni,
 						al_entry->mft_reference);
-				if (!ni) {
-					ntfs_log_perror("Failed to map extent inode");
+				if (!ni)
 					break;
-				}
 				ctx->ntfs_ino = ni;
 				ctx->mrec = ni->mrec;
 			}
