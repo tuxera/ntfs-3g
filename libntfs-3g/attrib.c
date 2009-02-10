@@ -2334,6 +2334,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 			(!ctx->ntfs_ino || !(vol = ctx->ntfs_ino->vol) ||
 			!vol->upcase || !vol->upcase_len))) {
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		goto out;
 	}
 	
