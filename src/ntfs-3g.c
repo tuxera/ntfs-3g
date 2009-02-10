@@ -129,7 +129,7 @@ typedef struct {
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL silent;
-	BOOL force;
+	BOOL recover;
 	BOOL hiberfile;
 	BOOL debug;
 	BOOL no_detach;
@@ -153,16 +153,18 @@ static const char *usage_msg =
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
 "\n"
-"Copyright (C) 2006-2008 Szabolcs Szakacsits\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
+"Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
+"Copyright (C) 2007-2009 Jean-Pierre Andre\n"
+"Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
-"Options:  ro (read-only mount), force, remove_hiberfile, uid=,\n" 
-"          gid=, umask=, fmask=, dmask=, streams_interface=.\n"
-"          Please see the details in the manual.\n"
+"Options:  ro (read-only mount), remove_hiberfile, uid=, gid=,\n" 
+"          umask=, fmask=, dmask=, streams_interface=.\n"
+"          Please see the details in the manual (type: man ntfs-3g).\n"
 "\n"
-"Examples: ntfs-3g -o force /dev/sda1 /mnt/windows\n"
+"Example: ntfs-3g /dev/sda1 /mnt/windows\n"
 "\n"
 "%s";
 
@@ -1698,9 +1700,12 @@ static int ntfs_fuse_init(void)
 		return -1;
 	
 	*ctx = (ntfs_fuse_context_t) {
-		.uid = getuid(),
-		.gid = getgid(),
+		.uid     = getuid(),
+		.gid     = getgid(),
 		.streams = NF_STREAMS_INTERFACE_NONE,
+		.atime   = ATIME_RELATIVE,
+		.silent  = TRUE,
+		.recover = TRUE
 	};
 	return 0;
 }
@@ -1713,8 +1718,8 @@ static int ntfs_open(const char *device)
 		flags |= MS_EXCLUSIVE;
 	if (ctx->ro)
 		flags |= MS_RDONLY;
-	if (ctx->force)
-		flags |= MS_FORCE;
+	if (ctx->recover)
+		flags |= MS_RECOVER;
 	if (ctx->hiberfile)
 		flags |= MS_IGNORE_HIBERFILE;
 
@@ -1814,9 +1819,6 @@ static char *parse_mount_options(const char *orig_opts)
 		return NULL;
 	}
 	
-	ctx->silent = TRUE;
-	ctx->atime  = ATIME_RELATIVE;
-	
 	s = options;
 	while (s && *s && (val = strsep(&s, ","))) {
 		opt = strsep(&val, "=");
@@ -1892,10 +1894,14 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;
 			ctx->silent = TRUE;
-		} else if (!strcmp(opt, "force")) {
-			if (bogus_option_value(val, "force"))
+		} else if (!strcmp(opt, "recover")) {
+			if (bogus_option_value(val, "recover"))
 				goto err_exit;
-			ctx->force = TRUE;
+			ctx->recover = TRUE;
+		} else if (!strcmp(opt, "norecover")) {
+			if (bogus_option_value(val, "norecover"))
+				goto err_exit;
+			ctx->recover = FALSE;
 		} else if (!strcmp(opt, "remove_hiberfile")) {
 			if (bogus_option_value(val, "remove_hiberfile"))
 				goto err_exit;

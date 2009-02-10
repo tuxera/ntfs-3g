@@ -104,13 +104,7 @@ present. The value is given in octal. The default value is 0 which
 means full access to everybody.
 .TP
 .B ro
-Mount filesystem read\-only. Useful if Windows is hibernated or the
-NTFS journal file is unclean.
-.TP
-.B force
-Force the mounting even if the NTFS logfile is unclean. The logfile 
-will be unconditionally cleared. Use this option with caution and for 
-your own responsibility.
+Mount filesystem read\-only. Useful if Windows is hibernated.
 .TP
 .B remove_hiberfile
 Unlike in case of read-only mount, the read-write mount is denied if 
@@ -119,6 +113,11 @@ shutdown it properly, or use this option which will remove the Windows
 hibernation file. Please note, this means that the saved Windows 
 session will be completely lost. Use this option for your own 
 responsibility.
+.TP
+.B recover, norecover
+Recover and repair a corrupted or inconsistent 
+NTFS volume if it's possible. The default behaviour is 
+.B recover.
 .TP
 .B atime, noatime, relatime
 The 
@@ -178,9 +177,15 @@ file:stream). If it's set to \fBxattr\fR, then the named data streams are
 mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
 utilities. The default is \fBnone\fR.
 .TP
+.B force
+This mount option is not used anymore. It was superseded by the
+.B recover
+and
+.B norecover
+options.
+.TP
 .B debug
-Makes ntfs-3g to not detach from terminal and print a lot of debug output from
-libntfs-3g and FUSE.
+Makes ntfs-3g to not detach from terminal and print a lot of driver debug output.
 .TP
 .B no_detach
 Same as above but with less debug output.
