@@ -387,7 +387,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		errno = EINVAL;
 		goto out;
 	}
-	na = calloc(sizeof(ntfs_attr), 1);
+	na = ntfs_calloc(sizeof(ntfs_attr));
 	if (!na)
 		goto out;
 	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {

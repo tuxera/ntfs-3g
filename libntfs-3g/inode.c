@@ -87,7 +87,7 @@ static ntfs_inode *__ntfs_inode_allocate(ntfs_volume *vol)
 {
 	ntfs_inode *ni;
 
-	ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
+	ni = (ntfs_inode*)ntfs_calloc(sizeof(ntfs_inode));
 	if (ni)
 		ni->vol = vol;
 	return ni;
