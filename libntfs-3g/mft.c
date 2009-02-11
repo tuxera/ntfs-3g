@@ -105,11 +105,9 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 	if (br != count) {
 		if (br != -1)
 			errno = EIO;
-		if (br >= 0)
-			ntfs_log_debug("Error: partition is smaller than it should "
-					"be!\n");
-		else
-			ntfs_log_perror("Error reading $Mft record(s)");
+		ntfs_log_perror("Failed to read of MFT, mft=%llu count=%lld "
+				"br=%lld", (long long)m, (long long)count,
+				(long long)br);
 		return -1;
 	}
 	return 0;
