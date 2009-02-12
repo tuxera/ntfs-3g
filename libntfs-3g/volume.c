@@ -94,14 +94,8 @@ static const char *hibernated_volume_msg =
 "\n";
 
 static const char *unclean_journal_msg =
-"Mount is denied because NTFS is marked to be in use. Choose one action:\n"
-"\n"
-"Choice 1: If you have Windows then disconnect the external devices by\n"
-"          clicking on the 'Safely Remove Hardware' icon in the Windows\n"
-"          taskbar then shutdown Windows cleanly.\n"
-"\n"
-"Choice 2: If you don't have Windows then you can use the 'force' option for\n"
-"          your own responsibility. For example type on the command line:\n";
+"Write access is denied because the disk wasn't safely powered\n"
+"off and the 'norecover' mount option was specified.\n";
 
 static const char *opened_volume_msg =
 "Mount is denied because the NTFS volume is already exclusively opened.\n"
@@ -118,14 +112,6 @@ static const char *access_denied_msg =
 "Please check '%s' and the ntfs-3g binary permissions,\n"
 "and the mounting user ID. More explanation is provided at\n"
 "http://ntfs-3g.org/support.html#unprivileged\n";
-
-static const char *forced_mount_msg =
-"\n"
-"            mount -t ntfs-3g -o force %s %s\n"
-"\n"
-"    Or add the option to the relevant row in the /etc/fstab file:\n"
-"\n"
-"            %s %s ntfs-3g force 0 0\n";
 
 /**
  * ntfs_volume_alloc - Create an NTFS volume object and initialise it
@@ -1116,9 +1102,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 		    ntfs_volume_check_hiberfile(vol, 1) < 0)
 			goto error_exit;
 		if (ntfs_volume_check_logfile(vol) < 0) {
-			if (!(flags & MS_FORCE))
+			if (!(flags & MS_RECOVER))
 				goto error_exit;
-			ntfs_log_info("WARNING: Forced mount, reset $LogFile.\n");
+			ntfs_log_info("The file system wasn't safely "
+				      "closed on Windows. Fixing.\n");
 			if (ntfs_logfile_reset(vol))
 				goto error_exit;
 		}
@@ -1550,8 +1537,6 @@ void ntfs_mount_error(const char *volume, const char *mntpoint, int err)
 			break;
 		case NTFS_VOLUME_UNCLEAN_UNMOUNT:
 			ntfs_log_error("%s", unclean_journal_msg);
-			ntfs_log_error(forced_mount_msg, volume, mntpoint, 
-				       volume, mntpoint);
 			break;
 		case NTFS_VOLUME_LOCKED:
 			ntfs_log_error("%s", opened_volume_msg);

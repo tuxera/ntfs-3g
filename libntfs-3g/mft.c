@@ -105,11 +105,9 @@ int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
 	if (br != count) {
 		if (br != -1)
 			errno = EIO;
-		if (br >= 0)
-			ntfs_log_debug("Error: partition is smaller than it should "
-					"be!\n");
-		else
-			ntfs_log_perror("Error reading $Mft record(s)");
+		ntfs_log_perror("Failed to read of MFT, mft=%llu count=%lld "
+				"br=%lld", (long long)m, (long long)count,
+				(long long)br);
 		return -1;
 	}
 	return 0;
@@ -290,10 +288,9 @@ int ntfs_file_record_read(const ntfs_volume *vol, const MFT_REF mref,
 		if (!m)
 			return -1;
 	}
-	if (ntfs_mft_record_read(vol, mref, m)) {
-		ntfs_log_perror("ntfs_mft_record_read failed");
+	if (ntfs_mft_record_read(vol, mref, m))
 		goto err_out;
-	}
+
 	if (ntfs_mft_record_check(vol, mref, m))
 		goto err_out;
 	
@@ -1404,7 +1401,6 @@ found_free_rec:
 		goto undo_mftbmp_alloc;
 	
 	if (ntfs_mft_record_read(vol, bit, m)) {
-		ntfs_log_perror("Error reading mft %lld #2", (long long)bit);
 		free(m);
 		goto undo_mftbmp_alloc;
 	}
@@ -1707,7 +1703,6 @@ found_free_rec:
 		goto undo_mftbmp_alloc;
 	
 	if (ntfs_mft_record_read(vol, bit, m)) {
-		ntfs_log_perror("Error reading mft %lld", (long long)bit);
 		free(m);
 		goto undo_mftbmp_alloc;
 	}

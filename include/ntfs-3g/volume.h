@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2005-2006 Yura Pakhuchiy
- * Copyright (c) 2005-2008 Szabolcs Szakacsits
+ * Copyright (c) 2005-2009 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -56,8 +56,8 @@
 
 #define MS_EXCLUSIVE 0x08000000
 
-#ifndef MS_FORCE
-#define MS_FORCE     0x10000000
+#ifndef MS_RECOVER
+#define MS_RECOVER   0x10000000
 #endif
 
 #define MS_IGNORE_HIBERFILE   0x20000000

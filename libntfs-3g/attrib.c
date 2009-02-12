@@ -392,7 +392,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		errno = EINVAL;
 		goto out;
 	}
-	na = calloc(sizeof(ntfs_attr), 1);
+	na = ntfs_calloc(sizeof(ntfs_attr));
 	if (!na)
 		goto out;
 	if (name && name != AT_UNNAMED && name != NTFS_INDEX_I30) {
@@ -1704,6 +1704,7 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 	} else {
 		if (name && name != AT_UNNAMED) {
 			errno = EINVAL;
+			ntfs_log_perror("%s", __FUNCTION__);
 			return -1;
 		}
 		vol = NULL;
@@ -1815,8 +1816,9 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			}
 		}
 	}
-	ntfs_log_debug("ntfs_attr_find(): File is corrupt. Run chkdsk.\n");
 	errno = EIO;
+	ntfs_log_perror("%s: Corrupt inode (%lld)", __FUNCTION__, 
+			ctx->ntfs_ino ? (long long)ctx->ntfs_ino->mft_no : -1);
 	return -1;
 }
 
@@ -1984,6 +1986,7 @@ find_attr_list_attr:
 			/* Check for bogus calls. */
 			if (name || name_len || val || val_len || lowest_vcn) {
 				errno = EINVAL;
+				ntfs_log_perror("%s", __FUNCTION__);
 				return -1;
 			}
 
@@ -2014,9 +2017,9 @@ find_attr_list_attr:
 			if (errno != ENOENT)
 				return rc;
 
-			/* Not found?!? Absurd! Must be a bug... )-: */
-			ntfs_log_error("Extant attribute list wasn't found\n");
-			errno = EINVAL;
+			/* Not found?!? Absurd! */
+			errno = EIO;
+			ntfs_log_error("Attribute list wasn't found");
 			return -1;
 		}
 	}
@@ -2131,10 +2134,8 @@ is_enumeration:
 				/* We want an extent record. */
 				ni = ntfs_extent_inode_open(base_ni,
 						al_entry->mft_reference);
-				if (!ni) {
-					ntfs_log_perror("Failed to map extent inode");
+				if (!ni)
 					break;
-				}
 				ctx->ntfs_ino = ni;
 				ctx->mrec = ni->mrec;
 			}
@@ -2204,7 +2205,7 @@ do_next_attr:
 		ctx->attr = ctx->base_attr;
 	}
 	errno = EIO;
-	ntfs_log_perror("Inode is corrupt (%lld)", (unsigned long long)ni->mft_no);
+	ntfs_log_perror("Inode is corrupt (%lld)", (long long)base_ni->mft_no);
 	return -1;
 not_found:
 	/*
@@ -2338,6 +2339,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 			(!ctx->ntfs_ino || !(vol = ctx->ntfs_ino->vol) ||
 			!vol->upcase || !vol->upcase_len))) {
 		errno = EINVAL;
+		ntfs_log_perror("%s", __FUNCTION__);
 		goto out;
 	}
 	
@@ -4281,6 +4283,7 @@ static int ntfs_attr_update_mapping_pairs_i(ntfs_attr *na, VCN from_vcn)
 	const runlist_element *stop_rl;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size, ret = -1;
 	BOOL finished_build;
+
 retry:
 	if (!na || !na->rl || from_vcn) {
 		errno = EINVAL;
@@ -4376,12 +4379,19 @@ retry:
 		exp_max_mp_size = le32_to_cpu(m->bytes_allocated) -
 				le32_to_cpu(m->bytes_in_use) + cur_max_mp_size;
 		/* Get the size for the rest of mapping pairs array. */
-/* old code equivalent
-		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
-						stop_vcn, INT_MAX);
-*/
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, stop_rl,
 						stop_vcn, exp_max_mp_size);
+{ /* temporary compare against old computation */
+int old;
+
+		old = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
+						stop_vcn, INT_MAX);
+		if (((mp_size <= exp_max_mp_size) || (old <= exp_max_mp_size))
+		  && (mp_size != old)) {
+			ntfs_log_error("Bad runlist size, old %d new %d\n",old,mp_size);
+			goto put_err_out;
+		}
+}
 		if (mp_size <= 0) {
 			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
 			goto put_err_out;
