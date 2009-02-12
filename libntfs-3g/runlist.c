@@ -1315,7 +1315,7 @@ int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
 		rl++;
 	}
 	/* Do the full runs. */
-	for (; rl->length && (rls < max_size); rl++) {
+	for (; rl->length && (rls <= max_size); rl++) {
 		if (rl->length < 0 || rl->lcn < LCN_HOLE)
 			goto err_out;
 		/* Header byte + length. */
