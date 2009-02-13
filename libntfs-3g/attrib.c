@@ -991,6 +991,9 @@ static int ntfs_attr_fill_zero(ntfs_attr *na, s64 pos, s64 count)
 {
 	char *buf;
 	s64 written, size, end = pos + count;
+	s64 ofsi;
+	const runlist_element *rli;
+	ntfs_volume *vol;
 	int ret = -1;
 
 	ntfs_log_trace("pos %lld, count %lld\n", (long long)pos, 
@@ -1005,9 +1008,17 @@ static int ntfs_attr_fill_zero(ntfs_attr *na, s64 pos, s64 count)
 	if (!buf)
 		goto err_out;
 	
+	rli = na->rl;
+	ofsi = 0;
+	vol = na->ni->vol;
 	while (pos < end) {
+		while (rli->length && (ofsi + (rli->length <<
+	                        vol->cluster_size_bits) <= pos)) {
+	                ofsi += (rli->length << vol->cluster_size_bits);
+			rli++;
+		}
 		size = min(end - pos, NTFS_BUF_SIZE);
-		written = ntfs_rl_pwrite(na->ni->vol, na->rl, pos, size, buf);
+		written = ntfs_rl_pwrite(vol, rli, ofsi, pos, size, buf);
 		if (written <= 0) {
 			ntfs_log_perror("Failed to zero space");
 			goto err_free;
@@ -4381,7 +4392,7 @@ retry:
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, stop_rl,
 						stop_vcn, exp_max_mp_size);
-{ /* temporary compare against old computation */
+{ /* temporary compare against old computation
 int old;
 
 		old = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
@@ -4391,7 +4402,7 @@ int old;
 			ntfs_log_error("Bad runlist size, old %d new %d\n",old,mp_size);
 			goto put_err_out;
 		}
-}
+*/}
 		if (mp_size <= 0) {
 			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
 			goto put_err_out;

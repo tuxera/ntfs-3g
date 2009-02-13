@@ -1114,8 +1114,9 @@ rl_err_out:
 /**
  * ntfs_rl_pwrite - scatter write to disk
  * @vol:	ntfs volume to write to
- * @rl:		runlist specifying where to write the data to
- * @pos:	byte position within runlist @rl at which to begin the write
+ * @rl:		runlist entry specifying where to write the data to
+ * @ofs:	offset in file for runlist element indicated in @rl
+ * @pos:	byte position from runlist beginning at which to begin the write
  * @count:	number of bytes to write
  * @b:		data buffer to write to disk
  *
@@ -1134,9 +1135,9 @@ rl_err_out:
  * of invalid arguments.
  */
 s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
-		const s64 pos, s64 count, void *b)
+		s64 ofs, const s64 pos, s64 count, void *b)
 {
-	s64 written, to_write, ofs, total = 0;
+	s64 written, to_write, total = 0;
 	int err = EIO;
 
 	if (!vol || !rl || pos < 0 || count < 0) {
@@ -1149,9 +1150,11 @@ s64 ntfs_rl_pwrite(const ntfs_volume *vol, const runlist_element *rl,
 	if (!count)
 		goto out;
 	/* Seek in @rl to the run containing @pos. */
-	for (ofs = 0; rl->length && (ofs + (rl->length <<
-			vol->cluster_size_bits) <= pos); rl++)
+	while (rl->length && (ofs + (rl->length <<
+			vol->cluster_size_bits) <= pos)) {
 		ofs += (rl->length << vol->cluster_size_bits);
+		rl++;
+	}
 	/* Offset in the run at which to begin writing. */
 	ofs = pos - ofs;
 	for (total = 0LL; count; rl++, ofs = 0) {
