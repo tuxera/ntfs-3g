@@ -1426,7 +1426,6 @@ rl_err_out:
 			 * TODO: Need to try to change initialized_size. If it
 			 * succeeds goto done, otherwise goto err_out. (AIA)
 			 */
-			errno = EOPNOTSUPP;
 			goto err_out;
 		}
 		goto done;
