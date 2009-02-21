@@ -189,24 +189,6 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
     return send_reply_iov(req, error, iov, count);
 }
 
-int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
-{
-    int res;
-    struct iovec *padded_iov;
-
-    padded_iov = malloc((count + 1) * sizeof(struct iovec));
-    if (padded_iov == NULL)
-        return fuse_reply_err(req, -ENOMEM);
-
-    memcpy(padded_iov + 1, iov, count * sizeof(struct iovec));
-    count++;
-
-    res = send_reply_iov(req, 0, padded_iov, count);
-    free(padded_iov);
-
-    return res;
-}
-
 size_t fuse_dirent_size(size_t namelen)
 {
     return FUSE_DIRENT_ALIGN(FUSE_NAME_OFFSET + namelen);
