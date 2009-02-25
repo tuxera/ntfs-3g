@@ -5096,28 +5096,61 @@ int ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,
 	return ret;
 }
 
+/* Below macros are 32-bit ready. */
+#define BCX(x) ((x) - (((x) >> 1) & 0x77777777) - \
+		      (((x) >> 2) & 0x33333333) - \
+		      (((x) >> 3) & 0x11111111))
+#define BITCOUNT(x) (((BCX(x) + (BCX(x) >> 4)) & 0x0F0F0F0F) % 255)
+
+static u8 *ntfs_init_lut256(void)
+{
+	int i;
+	u8 *lut;
+	
+	lut = ntfs_malloc(256);
+	if (lut)
+		for(i = 0; i < 256; i++)
+			*(lut + i) = 8 - BITCOUNT(i);
+	return lut;
+}
+
 s64 ntfs_attr_get_free_bits(ntfs_attr *na)
 {
-	u8 *buf;
+	u8 *buf, *lut;
+	s64 br      = 0;
+	s64 total   = 0;
 	s64 nr_free = 0;
-	s64 br, total = 0;
 
-	buf = ntfs_malloc(na->ni->vol->cluster_size);
-	if (!buf)
+	lut = ntfs_init_lut256();
+	if (!lut)
 		return -1;
-	while (1) {
-		int i, j;
+	
+	buf = ntfs_malloc(65536);
+	if (!buf)
+		goto out;
 
-		br = ntfs_attr_pread(na, total, na->ni->vol->cluster_size, buf);
+	while (1) {
+		u32 *p;
+		br = ntfs_attr_pread(na, total, 65536, buf);
 		if (br <= 0)
 			break;
 		total += br;
-		for (i = 0; i < br; i++)
-			for (j = 0; j < 8; j++)
-				if (!((buf[i] >> j) & 1))
-					nr_free++;
+		p = (u32 *)buf + br / 4 - 1;
+		for (; (u8 *)p >= buf; p--) {
+			nr_free += lut[ *p        & 255] + 
+			           lut[(*p >>  8) & 255] + 
+			           lut[(*p >> 16) & 255] + 
+			           lut[(*p >> 24)      ];
+		}
+		switch (br % 4) {
+			case 3:  nr_free += lut[*(buf + br - 3)];
+			case 2:  nr_free += lut[*(buf + br - 2)];
+			case 1:  nr_free += lut[*(buf + br - 1)];
+		}
 	}
 	free(buf);
+out:
+	free(lut);
 	if (!total || br < 0)
 		return -1;
 	return nr_free;
