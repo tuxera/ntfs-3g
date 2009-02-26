@@ -213,7 +213,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {
 		errno = EIO;
-		ntfs_log_perror("Unexpected attrlist size (%lld <> %lu)\n",
+		ntfs_log_perror("Unexpected attrlist size (%lld <> %u)\n",
 				(long long)l, ni->attr_list_size);
 		goto put_err_out;
 	}
@@ -988,8 +988,8 @@ err_out:
 }
 
 /**
- * ntfs_inode_free_space - free space in the MFT record of inode
- * @ni:		ntfs inode in which MFT record free space
+ * ntfs_inode_free_space - free space in the MFT record of an inode
+ * @ni:		ntfs inode in which MFT record needs more free space
  * @size:	amount of space needed to free
  *
  * Return 0 on success or -1 on error with errno set to the error code.
@@ -1019,18 +1019,8 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 		return -1;
 
 	/*
-	 * Chkdsk complain if $STANDARD_INFORMATION is not in the base MFT
-	 * record. FIXME: I'm not sure in this, need to recheck. For now simply
-	 * do not move $STANDARD_INFORMATION at all.
-	 *
-	 * Also we can't move $ATTRIBUTE_LIST from base MFT_RECORD, so position
-	 * search context on first attribute after $STANDARD_INFORMATION and
-	 * $ATTRIBUTE_LIST.
-	 *
-	 * Why we reposition instead of simply skip this attributes during
-	 * enumeration? Because in case we have got only in-memory attribute
-	 * list ntfs_attr_lookup will fail when it will try to find
-	 * $ATTRIBUTE_LIST.
+	 * $STANDARD_INFORMATION and $ATTRIBUTE_LIST must stay in the base MFT
+	 * record, so position search context on the first attribute after them.
 	 */
 	if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0, NULL,
 				0, ctx)) {
@@ -1047,7 +1037,6 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 
 	while (1) {
 		int record_size;
-
 		/*
 		 * Check whether attribute is from different MFT record. If so,
 		 * find next, because we don't need such.
@@ -1079,15 +1068,17 @@ retry:
 		}
 		freed += record_size;
 
-		/* Check whether we done. */
+		/* Check whether we are done. */
 		if (size <= freed) {
 			ntfs_attr_put_search_ctx(ctx);
 			return 0;
 		}
-
 		/*
-		 * Reposition to first attribute after $STANDARD_INFORMATION and
-		 * $ATTRIBUTE_LIST (see comments upwards).
+		 * Reposition to first attribute after $STANDARD_INFORMATION 
+		 * and $ATTRIBUTE_LIST instead of simply skipping this attribute 
+		 * because in the case when we have got only in-memory attribute 
+		 * list then ntfs_attr_lookup will fail when it tries to find 
+		 * $ATTRIBUTE_LIST.
 		 */
 		ntfs_attr_reinit_search_ctx(ctx);
 		if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0,
@@ -1106,7 +1097,7 @@ retry:
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	if (err == ENOSPC)
-		ntfs_log_trace("No attributes left that can be moved out.\n");
+		ntfs_log_trace("No attributes left that could be moved out.\n");
 	errno = err;
 	return -1;
 }
