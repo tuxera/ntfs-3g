@@ -177,8 +177,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	/* Receive some basic information about inode. */
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
 				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
-				"attribute.\n");
+		ntfs_log_perror("No STANDARD_INFORMATION in base record\n");
 		goto put_err_out;
 	}
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
@@ -202,6 +201,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto put_err_out;
 	if (l > 0x40000) {
 		errno = EIO;
+		ntfs_log_perror("Too large attrlist (%lld)\n", (long long)l);
 		goto put_err_out;
 	}
 	ni->attr_list_size = l;
@@ -213,6 +213,8 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		goto put_err_out;
 	if (l != ni->attr_list_size) {
 		errno = EIO;
+		ntfs_log_perror("Unexpected attrlist size (%lld <> %lu)\n",
+				(long long)l, ni->attr_list_size);
 		goto put_err_out;
 	}
 get_size:
