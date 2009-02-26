@@ -2351,6 +2351,36 @@ out:
 }
 
 /**
+ * ntfs_attr_position - find given or next attribute type in an ntfs inode
+ * @type:	attribute type to start lookup
+ * @ctx:	search context with mft record and attribute to search from
+ *
+ * Find an attribute type in an ntfs inode or the next attribute which is not
+ * the AT_END attribute. Please see more details at ntfs_attr_lookup.
+ *
+ * Return 0 if the search was successful and -1 if not, with errno set to the
+ * error code.
+ *
+ * The following error codes are defined:
+ *	EINVAL	Invalid arguments.
+ *	EIO	I/O error or corrupt data structures found.
+ *	ENOMEM	Not enough memory to allocate necessary buffers.
+ * 	ENOSPC  No attribute was found after 'type', only AT_END.
+ */
+int ntfs_attr_position(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx)
+{
+	if (ntfs_attr_lookup(type, NULL, 0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		if (errno != ENOENT)
+			return -1;
+		if (ctx->attr->type == AT_END) {
+			errno = ENOSPC;
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/**
  * ntfs_attr_init_search_ctx - initialize an attribute search context
  * @ctx:	attribute search context to initialize
  * @ni:		ntfs inode with which to initialize the search context

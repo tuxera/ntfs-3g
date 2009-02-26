@@ -1022,17 +1022,9 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	 * $STANDARD_INFORMATION and $ATTRIBUTE_LIST must stay in the base MFT
 	 * record, so position search context on the first attribute after them.
 	 */
-	if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0, NULL,
-				0, ctx)) {
-		if (errno != ENOENT) {
-			err = errno;
-			ntfs_log_perror("%s: attr lookup failed #2", __FUNCTION__);
-			goto put_err_out;
-		}
-		if (ctx->attr->type == AT_END) {
-			err = ENOSPC;
-			goto put_err_out;
-		}
+	if (ntfs_attr_position(AT_FILE_NAME, ctx)) {
+		err = errno;
+		goto put_err_out;
 	}
 
 	while (1) {
@@ -1081,17 +1073,9 @@ retry:
 		 * $ATTRIBUTE_LIST.
 		 */
 		ntfs_attr_reinit_search_ctx(ctx);
-		if (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0,
-				NULL, 0, ctx)) {
-			if (errno != ENOENT) {
-				err = errno;
-				ntfs_log_perror("Attr lookup #2 failed");
-				break;
-			}
-			if (ctx->attr->type == AT_END) {
-				err = ENOSPC;
-				break;
-			}
+		if (ntfs_attr_position(AT_FILE_NAME, ctx)) {
+			err = errno;
+			break;
 		}
 	}
 put_err_out:
