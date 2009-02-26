@@ -997,7 +997,7 @@ err_out:
 int ntfs_inode_free_space(ntfs_inode *ni, int size)
 {
 	ntfs_attr_search_ctx *ctx;
-	int freed, err;
+	int freed;
 
 	if (!ni || size < 0) {
 		errno = EINVAL;
@@ -1022,10 +1022,8 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 	 * $STANDARD_INFORMATION and $ATTRIBUTE_LIST must stay in the base MFT
 	 * record, so position search context on the first attribute after them.
 	 */
-	if (ntfs_attr_position(AT_FILE_NAME, ctx)) {
-		err = errno;
+	if (ntfs_attr_position(AT_FILE_NAME, ctx))
 		goto put_err_out;
-	}
 
 	while (1) {
 		int record_size;
@@ -1037,11 +1035,10 @@ int ntfs_inode_free_space(ntfs_inode *ni, int size)
 retry:			
 			if (ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE,
 						0, NULL, 0, ctx)) {
-				err = errno;
 				if (errno != ENOENT) {
 					ntfs_log_perror("Attr lookup failed #2");
 				} else
-					err = ENOSPC;
+					errno = ENOSPC;
 				goto put_err_out;
 			}
 		}
@@ -1052,9 +1049,7 @@ retry:
 
 		record_size = le32_to_cpu(ctx->attr->length);
 
-		/* Move away attribute. */
 		if (ntfs_attr_record_move_away(ctx, 0)) {
-			err = errno;
 			ntfs_log_perror("Failed to move out attribute #2");
 			break;
 		}
@@ -1073,16 +1068,13 @@ retry:
 		 * $ATTRIBUTE_LIST.
 		 */
 		ntfs_attr_reinit_search_ctx(ctx);
-		if (ntfs_attr_position(AT_FILE_NAME, ctx)) {
-			err = errno;
+		if (ntfs_attr_position(AT_FILE_NAME, ctx))
 			break;
-		}
 	}
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
-	if (err == ENOSPC)
+	if (errno == ENOSPC)
 		ntfs_log_trace("No attributes left that could be moved out.\n");
-	errno = err;
 	return -1;
 }
 
