@@ -3908,14 +3908,15 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 		ntfs_log_perror("%s: Attribute lookup failed 1", __FUNCTION__);
 		goto put_err_out;
 	}
-
-	/* We can't move out attribute list, thus move out others. */
-	if (na->type == AT_ATTRIBUTE_LIST) {
+	/* 
+	 * The standard information and attribute list attributes can't be
+	 * moved out from the base MFT record, so try to move out others. 
+	 */
+	if (na->type==AT_STANDARD_INFORMATION || na->type==AT_ATTRIBUTE_LIST) {
 		ntfs_attr_put_search_ctx(ctx);
 		if (ntfs_inode_free_space(na->ni, offsetof(ATTR_RECORD,
 				non_resident_end) + 8)) {
-			ntfs_log_perror("Couldn't free space in the MFT record to "
-					"make attribute list non resident");
+			ntfs_log_perror("Could not free space in MFT record");
 			return -1;
 		}
 		return ntfs_resident_attr_resize(na, newsize);
