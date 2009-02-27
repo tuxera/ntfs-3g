@@ -514,20 +514,17 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 {
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
-	int err;
 
-	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
+	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
 
 	ctx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!ctx)
 		return -1;
 	if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
-				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		err = errno;
-		ntfs_log_trace("Failed to receive STANDARD_INFORMATION "
-				"attribute.\n");
+			     0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		ntfs_log_perror("Failed to sync standard info (inode %lld)",
+				(long long)ni->mft_no);
 		ntfs_attr_put_search_ctx(ctx);
-		errno = err;
 		return -1;
 	}
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
@@ -688,8 +685,6 @@ int ntfs_inode_sync(ntfs_inode *ni)
 			if (err != EIO)
 				err = EBUSY;
 		}
-		ntfs_log_perror("Failed to sync standard info (inode %lld)",
-				(long long)ni->mft_no);
 	}
 
 	/* Update FILE_NAME's in the index. */
