@@ -3876,6 +3876,7 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 			ntfs_inode *ni)
 {
 	u32 attrib;
+	u32 settable;
 	int res;
 
 	res = -1;
@@ -3883,8 +3884,11 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 		if (!(flags & XATTR_CREATE)) {
 			/* copy to avoid alignment problems */
 			memcpy(&attrib,value,sizeof(FILE_ATTR_FLAGS));
-			ni->flags = (ni->flags & ~FILE_ATTR_SETTABLE)
-				 | (cpu_to_le32(attrib) & FILE_ATTR_SETTABLE);
+			settable = FILE_ATTR_SETTABLE;
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				settable |= FILE_ATTR_COMPRESSED;
+			ni->flags = (ni->flags & ~settable)
+				 | (cpu_to_le32(attrib) & settable);
 			NInoSetDirty(ni);
 			res = 0;
 		} else
@@ -4456,14 +4460,18 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 		const char *path, s32 attrib)
 {
 	ntfs_inode *ni;
+	le32 settable;
 	int res;
 
 	res = 0; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API) && path) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			ni->flags = (ni->flags & ~FILE_ATTR_SETTABLE)
-				 | (cpu_to_le32(attrib) & FILE_ATTR_SETTABLE);
+			settable = FILE_ATTR_SETTABLE;
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				settable |= FILE_ATTR_COMPRESSED;
+			ni->flags = (ni->flags & ~settable)
+				 | (cpu_to_le32(attrib) & settable);
 			NInoSetDirty(ni);
 			if (!ntfs_inode_close(ni))
 				res = -1;
