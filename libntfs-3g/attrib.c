@@ -2761,7 +2761,8 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	a->length = cpu_to_le32(length);
 	a->non_resident = 0;
 	a->name_length = name_len;
-	a->name_offset = cpu_to_le16(offsetof(ATTR_RECORD, resident_end));
+	a->name_offset = (name_len
+		? cpu_to_le16(offsetof(ATTR_RECORD, resident_end)) : 0);
 	a->flags = flags;
 	a->instance = m->next_attr_instance;
 	a->value_length = cpu_to_le32(size);
