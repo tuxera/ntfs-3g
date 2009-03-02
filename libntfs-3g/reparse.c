@@ -116,23 +116,6 @@ static const ntfschar vol_junction_head[] = {
 	const_cpu_to_le16('{'),
 } ;
 
-static ntfschar reparse_point_name[] = {
-	const_cpu_to_le16('$'),
-	const_cpu_to_le16('R'),
-	const_cpu_to_le16('E'),
-	const_cpu_to_le16('P'),
-	const_cpu_to_le16('A'),
-	const_cpu_to_le16('R'),
-	const_cpu_to_le16('S'),
-	const_cpu_to_le16('E'),
-	const_cpu_to_le16('_'),
-	const_cpu_to_le16('P'),
-	const_cpu_to_le16('O'),
-	const_cpu_to_le16('I'),
-	const_cpu_to_le16('N'),
-	const_cpu_to_le16('T'),
-} ;
-
 static const char mappingdir[] = ".NTFS-3G/";
 
 /*
@@ -965,14 +948,14 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
 
 	res = 0;
 	if (ni && (value || !size)) {
-		if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,(ntfschar*)NULL,0)) {
+		if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,AT_UNNAMED,0)) {
 			if (!(flags & XATTR_REPLACE)) {
 			/*
 			 * no reparse data attribute : add one,
 			 * apparently, this does not feed the new value in
 			 */
 				res = ntfs_attr_add(ni,AT_REPARSE_POINT,
-					reparse_point_name,14,(u8*)NULL,(s64)size);
+					AT_UNNAMED,0,(u8*)NULL,(s64)size);
 				if (!res)
 					ni->flags |= FILE_ATTR_REPARSE_POINT;
 				NInoSetDirty(ni);
@@ -991,7 +974,7 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
 			 * open and update the existing reparse data
 			 */
 			na = ntfs_attr_open(ni, AT_REPARSE_POINT,
-				reparse_point_name, 14);
+				AT_UNNAMED,0);
 			if (na) {
 				/* resize attribute */
 				res = ntfs_attr_truncate(na, (s64)size);
@@ -1037,7 +1020,7 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 		 * open and delete the reparse data
 		 */
 		na = ntfs_attr_open(ni, AT_REPARSE_POINT,
-			reparse_point_name, 14);
+			AT_UNNAMED,0);
 		if (na) {
 			/* remove attribute */
 			res = ntfs_attr_rm(na);
