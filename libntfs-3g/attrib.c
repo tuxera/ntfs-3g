@@ -4393,17 +4393,6 @@ retry:
 		/* Get the size for the rest of mapping pairs array. */
 		mp_size = ntfs_get_size_for_mapping_pairs(na->ni->vol, stop_rl,
 						stop_vcn, exp_max_mp_size);
-{ /* temporary compare against old computation
-int old;
-
-		old = ntfs_get_size_for_mapping_pairs(na->ni->vol, na->rl,
-						stop_vcn, INT_MAX);
-		if (((mp_size <= exp_max_mp_size) || (old <= exp_max_mp_size))
-		  && (mp_size != old)) {
-			ntfs_log_error("Bad runlist size, old %d new %d\n",old,mp_size);
-			goto put_err_out;
-		}
-*/}
 		if (mp_size <= 0) {
 			ntfs_log_perror("%s: get MP size failed", __FUNCTION__);
 			goto put_err_out;
