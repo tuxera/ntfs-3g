@@ -561,14 +561,14 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 	ntfs_attr_search_ctx *ctx;
 	ntfs_volume *vol = na->ni->vol;
 	ATTR_RECORD *a;
-	int err;
+	int ret = -1;
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x.\n",
-			(unsigned long long)na->ni->mft_no, na->type);
+	ntfs_log_enter("Entering for inode %llu, attr 0x%x.\n",
+		       (unsigned long long)na->ni->mft_no, na->type);
 
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
-		return -1;
+		goto out;
 
 	/* Map all attribute extents one by one. */
 	next_vcn = last_vcn = highest_vcn = 0;
@@ -639,17 +639,13 @@ int ntfs_attr_map_whole_runlist(ntfs_attr *na)
 				(long long)highest_vcn, (long long)last_vcn);
 		goto err_out;
 	}
-	err = errno;
+	if (errno == ENOENT)
+		ret = 0;
+err_out:	
 	ntfs_attr_put_search_ctx(ctx);
-	if (err == ENOENT)
-		return 0;
-out_now:
-	errno = err;
-	return -1;
-err_out:
-	err = errno;
-	ntfs_attr_put_search_ctx(ctx);
-	goto out_now;
+out:
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
