@@ -3810,7 +3810,7 @@ cluster_free_err_out:
  *	ERANGE - @newsize is not valid for the attribute type of @na.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
+static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_volume *vol;
@@ -4004,6 +4004,16 @@ resize_done:
 put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
+	return ret;
+}
+
+static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
+{
+	int ret; 
+	
+	ntfs_log_enter("Entering\n");
+	ret = ntfs_resident_attr_resize_i(na, newsize);
+	ntfs_log_leave("\n");
 	return ret;
 }
 
@@ -4977,7 +4987,7 @@ put_err_out:
  */
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
-	int ret;
+	int ret = STATUS_ERROR;
 
 	if (!na || newsize < 0 ||
 			(na->ni->mft_no == FILE_MFT && na->type == AT_DATA)) {
@@ -4986,12 +4996,13 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		return STATUS_ERROR;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, size %lld\n", 
+	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, size %lld\n",
 		       (unsigned long long)na->ni->mft_no, na->type, newsize);
 
 	if (na->data_size == newsize) {
 		ntfs_log_trace("Size is already ok\n");
-		return STATUS_OK;
+		ret = STATUS_OK;
+		goto out;
 	}
 	/*
 	 * Encrypted attributes are not supported. We return access denied,
@@ -5000,7 +5011,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	if (NAttrEncrypted(na)) {
 		errno = EACCES;
 		ntfs_log_perror("Failed to truncate encrypted attribute");
-		return STATUS_ERROR;
+		goto out;
 	}
 	/*
 	 * TODO: Implement making handling of compressed attributes.
@@ -5008,7 +5019,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	if (NAttrCompressed(na)) {
 		errno = EOPNOTSUPP;
 		ntfs_log_perror("Failed to truncate compressed attribute");
-		return STATUS_ERROR;
+		goto out;
 	}
 	if (NAttrNonResident(na)) {
 		if (newsize > na->data_size)
@@ -5017,8 +5028,8 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			ret = ntfs_non_resident_attr_shrink(na, newsize);
 	} else
 		ret = ntfs_resident_attr_resize(na, newsize);
-	
-	ntfs_log_trace("Return status %d\n", ret);
+out:	
+	ntfs_log_leave("Return status %d\n", ret);
 	return ret;
 }
 	
