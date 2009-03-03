@@ -3794,6 +3794,9 @@ cluster_free_err_out:
 	return -1;
 }
 
+
+static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize);
+
 /**
  * ntfs_resident_attr_resize - resize a resident, open ntfs attribute
  * @na:		resident ntfs attribute to resize
