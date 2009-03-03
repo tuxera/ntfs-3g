@@ -3,7 +3,7 @@
 .\" Copyright (c) 2006-2009 Szabolcs Szakacsits.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "February 2009" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "March 2009" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -236,8 +236,7 @@ Please see
 http://ntfs-3g.org/support.html
 .sp
 .RE
-for common questions and known issues. You can contact the development 
-team on the ntfs\-3g\-devel@lists.sf.net address.
+for common questions, known issues and support. 
 .SH ACKNOWLEDGEMENT
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
