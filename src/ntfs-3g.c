@@ -2320,8 +2320,7 @@ int main(int argc, char *argv[])
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
 	if (parse_options(argc, argv)) {
-		ntfs_log_error("Please type '%s --help' for more "
-			       "information.\n", argv[0]);
+		usage();
 		return NTFS_VOLUME_SYNTAX_ERROR;
 	}
 
