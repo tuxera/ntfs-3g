@@ -82,7 +82,7 @@ static int ntfs_ib_write(ntfs_index_context *icx, INDEX_BLOCK *ib)
 {
 	s64 ret, vcn = sle64_to_cpu(ib->index_block_vcn);
 	
-	ntfs_log_trace("vcn: %lld\n", vcn);
+	ntfs_log_trace("vcn: %lld\n", (long long)vcn);
 	
 	ret = ntfs_attr_mst_pwrite(icx->ia_na, ntfs_ib_vcn_to_pos(icx, vcn),
 				   1, icx->block_size, ib);
@@ -585,7 +585,7 @@ static int ntfs_ib_read(ntfs_index_context *icx, VCN vcn, INDEX_BLOCK *dst)
 {
 	s64 pos, ret;
 
-	ntfs_log_trace("vcn: %lld\n", vcn);
+	ntfs_log_trace("vcn: %lld\n", (long long)vcn);
 	
 	pos = ntfs_ib_vcn_to_pos(icx, vcn);
 
@@ -746,7 +746,7 @@ descend_into_child_node:
 	}
 	old_vcn = vcn;
 
-	ntfs_log_debug("Descend into node with VCN %lld.\n", vcn);
+	ntfs_log_debug("Descend into node with VCN %lld\n", (long long)vcn);
 	
 	if (ntfs_ib_read(icx, vcn, ib))
 		goto err_out;
@@ -797,7 +797,7 @@ static INDEX_BLOCK *ntfs_ib_alloc(VCN ib_vcn, u32 ib_size,
 	INDEX_BLOCK *ib;
 	int ih_size = sizeof(INDEX_HEADER);
 	
-	ntfs_log_trace("Entering ib_vcn = %lld ib_size = %u\n", ib_vcn, ib_size);
+	ntfs_log_trace("ib_vcn: %lld ib_size: %u\n", (long long)ib_vcn, ib_size);
 	
 	ib = ntfs_calloc(ib_size);
 	if (!ib)
@@ -893,7 +893,7 @@ static int ntfs_ibm_modify(ntfs_index_context *icx, VCN vcn, int set)
 	ntfs_attr *na;
 	int ret = STATUS_ERROR;
 
-	ntfs_log_trace("%s vcn: %lld\n", set ? "set" : "clear", vcn);
+	ntfs_log_trace("%s vcn: %lld\n", set ? "set" : "clear", (long long)vcn);
 	
 	na = ntfs_attr_open(icx->ni, AT_BITMAP,  icx->name, icx->name_len);
 	if (!na) {
@@ -970,7 +970,7 @@ static VCN ntfs_ibm_get_free(ntfs_index_context *icx)
 	
 	vcn = ntfs_ibm_pos_to_vcn(icx, size * 8);
 out:	
-	ntfs_log_trace("allocated vcn: %lld\n", vcn);
+	ntfs_log_trace("allocated vcn: %lld\n", (long long)vcn);
 
 	if (ntfs_ibm_set(icx, vcn))
 		vcn = (VCN)-1;

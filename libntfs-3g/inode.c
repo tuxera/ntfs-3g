@@ -156,7 +156,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
 
-	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
+	ntfs_log_enter("Entering for inode %lld\n", (long long)MREF(mref));
 	if (!vol) {
 		errno = EINVAL;
 		goto out;

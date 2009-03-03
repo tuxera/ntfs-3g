@@ -905,8 +905,9 @@ res_err_out:
 		to_read = min(count, (rl->length << vol->cluster_size_bits) -
 				ofs);
 retry:
-		ntfs_log_trace("Reading 0x%llx bytes from vcn 0x%llx, lcn 0x%llx, "
-				"ofs 0x%llx.\n", to_read, rl->vcn, rl->lcn, ofs);
+		ntfs_log_trace("Reading %lld bytes from vcn %lld, lcn %lld, ofs"
+				" %lld.\n", (long long)to_read, (long long)rl->vcn,
+			       (long long )rl->lcn, (long long)ofs);
 		br = ntfs_pread(vol->dev, (rl->lcn << vol->cluster_size_bits) +
 				ofs, to_read, b);
 		/* If everything ok, update progress counters and continue. */
@@ -1028,7 +1029,8 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 	from_vcn = (*rl)->vcn + (*ofs >> vol->cluster_size_bits);
 	
 	ntfs_log_trace("count: %lld, cur_vcn: %lld, from: %lld, to: %lld, ofs: "
-		       "%lld\n", count, cur_vcn, from_vcn, to_write, *ofs);
+		       "%lld\n", (long long)count, (long long)cur_vcn, 
+		       (long long)from_vcn, (long long)to_write, (long long)*ofs);
 	 
 	/* Map whole runlist to be able update mapping pairs later. */
 	if (ntfs_attr_map_whole_runlist(na))
@@ -1166,9 +1168,9 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		unsigned int undo_data_size		: 1;
 	} need_to = { 0, 0 };
 
-	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, pos 0x%llx, count "
-			"0x%llx.\n", na->ni->mft_no, na->type, (long long)pos,
-			(long long)count);
+	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
+		       "0x%llx.\n", (long long)na->ni->mft_no, na->type,
+		       (long long)pos, (long long)count);
 	
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
@@ -1343,7 +1345,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		to_write = min(count, (rl->length << vol->cluster_size_bits) - ofs);
 retry:
 		ntfs_log_trace("Writing %lld bytes to vcn %lld, lcn %lld, ofs "
-			       "%lld.\n", to_write, rl->vcn, rl->lcn, ofs);
+			       "%lld.\n", (long long)to_write, (long long)rl->vcn,
+			       (long long)rl->lcn, (long long)ofs);
 		if (!NVolReadOnly(vol)) {
 			
 			s64 wpos = (rl->lcn << vol->cluster_size_bits) + ofs;
@@ -3131,8 +3134,8 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 		return -1;
 	}
 
-	ntfs_log_trace("Entering for inode 0x%llx, attr %x, size %lld.\n",
-			(long long) ni->mft_no, type, size);
+	ntfs_log_trace("Entering for inode %lld, attr %x, size %lld.\n",
+			(long long)ni->mft_no, type, (long long)size);
 
 	if (ni->nr_extents == -1)
 		ni = ni->base_ni;
@@ -4382,8 +4385,8 @@ retry:
 		 */
 		if (finished_build) {
 			ntfs_log_trace("Mark attr 0x%x for delete in inode "
-					"0x%llx.\n", (unsigned)le32_to_cpu(
-					a->type), ctx->ntfs_ino->mft_no);
+				"%lld.\n", (unsigned)le32_to_cpu(a->type),
+				(long long)ctx->ntfs_ino->mft_no);
 			a->highest_vcn = cpu_to_sle64(NTFS_VCN_DELETE_MARK);
 			ntfs_inode_mark_dirty(ctx->ntfs_ino);
 			continue;
@@ -5006,8 +5009,9 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		return STATUS_ERROR;
 	}
 
-	ntfs_log_enter("Entering for inode 0x%llx, attr 0x%x, size %lld\n",
-		       (unsigned long long)na->ni->mft_no, na->type, newsize);
+	ntfs_log_enter("Entering for inode %lld, attr 0x%x, size %lld\n",
+		       (unsigned long long)na->ni->mft_no, na->type, 
+		       (long long)newsize);
 
 	if (na->data_size == newsize) {
 		ntfs_log_trace("Size is already ok\n");

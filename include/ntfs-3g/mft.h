@@ -52,7 +52,7 @@ static __inline__ int ntfs_mft_record_read(const ntfs_volume *vol,
 {
 	int ret; 
 	
-	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
+	ntfs_log_enter("Entering for inode %lld\n", (long long)MREF(mref));
 	ret = ntfs_mft_records_read(vol, mref, 1, b);
 	ntfs_log_leave("\n");
 	return ret;
@@ -87,7 +87,7 @@ static __inline__ int ntfs_mft_record_write(const ntfs_volume *vol,
 {
 	int ret; 
 	
-	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
+	ntfs_log_enter("Entering for inode %lld\n", (long long)MREF(mref));
 	ret = ntfs_mft_records_write(vol, mref, 1, b);
 	ntfs_log_leave("\n");
 	return ret;
