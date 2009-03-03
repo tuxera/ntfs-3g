@@ -4774,7 +4774,7 @@ put_err_out:
  *	ERANGE - @newsize is not valid for the attribute type of @na.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
+static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 {
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
@@ -4784,7 +4784,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
 	s64 org_alloc_size;
 	int err;
 
-	ntfs_log_trace("Inode 0x%llx, attr 0x%x, new size %lld old size %lld\n",
+	ntfs_log_trace("Inode %lld, attr 0x%x, new size %lld old size %lld\n",
 			(unsigned long long)na->ni->mft_no, na->type,
 			(long long)newsize, (long long)na->data_size);
 
@@ -4966,6 +4966,17 @@ put_err_out:
 	ntfs_attr_put_search_ctx(ctx);
 	errno = err;
 	return -1;
+}
+
+
+static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
+{
+	int ret; 
+	
+	ntfs_log_enter("Entering\n");
+	ret = ntfs_non_resident_attr_expand_i(na, newsize);
+	ntfs_log_leave("\n");
+	return ret;
 }
 
 /**
