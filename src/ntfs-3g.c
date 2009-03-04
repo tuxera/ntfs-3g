@@ -2012,11 +2012,12 @@ static int parse_options(int argc, char *argv[])
 {
 	int c;
 
-	static const char *sopt = "-o:hv";
+	static const char *sopt = "-o:hvV";
 	static const struct option lopt[] = {
 		{ "options",	 required_argument,	NULL, 'o' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "version",	 no_argument,		NULL, 'V' },
 		{ NULL,		 0,			NULL,  0  }
 	};
 
@@ -2063,6 +2064,10 @@ static int parse_options(int argc, char *argv[])
 			 * we don't use it because mount(8) passes it.
 			 */
 			break;
+		case 'V':
+			ntfs_log_info("%s %s %s %d\n", EXEC_NAME, VERSION, 
+				      FUSE_TYPE, fuse_version());
+			exit(0);
 		default:
 			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
 				       argv[optind - 1]);
