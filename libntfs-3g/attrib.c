@@ -1162,7 +1162,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
-	s64 eo, hole;
+	s64 eo, hole_end;
 	struct {
 		unsigned int undo_initialized_size	: 1;
 		unsigned int undo_data_size		: 1;
@@ -1307,7 +1307,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	 * length.
 	 */
 	ofs = pos - (rl->vcn << vol->cluster_size_bits);
-	for (hole = 0; count; rl++, ofs = 0, hole = 0) {
+	for (hole_end = 0; count; rl++, ofs = 0, hole_end = 0) {
 		if (rl->lcn == LCN_RL_NOT_MAPPED) {
 			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl) {
@@ -1328,7 +1328,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		}
 		if (rl->lcn < (LCN)0) {
 			
-			hole = rl->vcn + rl->length;
+			hole_end = rl->vcn + rl->length;
 
 			if (rl->lcn != (LCN)LCN_HOLE) {
 				errno = EIO;
@@ -1353,7 +1353,7 @@ retry:
 			s64 wend = (rl->vcn << vol->cluster_size_bits) + ofs + to_write;
 			u32 bsize = vol->cluster_size;
 			/* Byte size needed to zero fill a cluster */
-			s64 rounded = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
+			s64 rounding = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
 			/**
 			 * Zero fill to cluster boundary if we're writing at the
 			 * end of the attribute or into an ex-sparse cluster.
@@ -1361,22 +1361,22 @@ retry:
 			 * blocks during write(2) to fill the end of the buffer 
 			 * which increases write speed by 2-10 fold typically.
 			 */
-			if (rounded && ((wend == na->initialized_size) ||
-				(wend < (hole << vol->cluster_size_bits)))) {
+			if (rounding && ((wend == na->initialized_size) ||
+				(wend < (hole_end << vol->cluster_size_bits)))){
 				
 				char *cb;
 				
-				rounded += to_write;
+				rounding += to_write;
 				
-				cb = ntfs_malloc(rounded);
+				cb = ntfs_malloc(rounding);
 				if (!cb)
 					goto err_out;
 				
 				memcpy(cb, b, to_write);
-				memset(cb + to_write, 0, rounded - to_write);
+				memset(cb + to_write, 0, rounding - to_write);
 				
-				written = ntfs_pwrite(vol->dev, wpos, rounded, cb); 
-				if (written == rounded)
+				written = ntfs_pwrite(vol->dev, wpos, rounding, cb); 
+				if (written == rounding)
 					written = to_write;
 				
 				free(cb);
