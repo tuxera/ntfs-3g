@@ -1352,18 +1352,17 @@ retry:
 			s64 wpos = (rl->lcn << vol->cluster_size_bits) + ofs;
 			s64 wend = (rl->vcn << vol->cluster_size_bits) + ofs + to_write;
 			u32 bsize = vol->cluster_size;
+			/* Byte size needed to zero fill a cluster */
 			s64 rounded = ((wend + bsize - 1) & ~(s64)(bsize - 1)) - wend;
-
-			/*
-			 * Zero fill to cluster boundary if we're writing to an
-			 * ex-sparse cluster or we're at the end of the attribute.
+			/**
+			 * Zero fill to cluster boundary if we're writing at the
+			 * end of the attribute or into an ex-sparse cluster.
 			 * This will cause the kernel not to seek and read disk 
 			 * blocks during write(2) to fill the end of the buffer 
 			 * which increases write speed by 2-10 fold typically.
 			 */
-			if ((rounded && (wend < (hole << vol->cluster_size_bits))) || 
-			    (((to_write % bsize) && 
-			      (wend == na->initialized_size)))) {
+			if (rounded && ((wend == na->initialized_size) ||
+				(wend < (hole << vol->cluster_size_bits)))) {
 				
 				char *cb;
 				
