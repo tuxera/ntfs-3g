@@ -1363,7 +1363,7 @@ retry:
 			 */
 			if ((rounded && (wend < (hole << vol->cluster_size_bits))) || 
 			    (((to_write % bsize) && 
-			      (ofs + to_write == na->initialized_size)))) {
+			      (wend == na->initialized_size)))) {
 				
 				char *cb;
 				
