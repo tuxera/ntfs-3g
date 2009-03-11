@@ -3876,7 +3876,7 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 			ntfs_inode *ni)
 {
 	u32 attrib;
-	u32 settable;
+	le32 settable;
 	int res;
 
 	res = -1;
