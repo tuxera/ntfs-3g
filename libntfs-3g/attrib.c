@@ -958,7 +958,7 @@ rl_err_out:
  */
 s64 ntfs_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
 {
-	int ret;
+	s64 ret;
 	
 	if (!na || !na->ni || !na->ni->vol || !b || pos < 0 || count < 0) {
 		errno = EINVAL;
