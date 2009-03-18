@@ -1162,7 +1162,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	ntfs_volume *vol;
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
-	s64 eo, hole_end;
+	s64 hole_end;
+	int eo;
 	struct {
 		unsigned int undo_initialized_size	: 1;
 		unsigned int undo_data_size		: 1;
