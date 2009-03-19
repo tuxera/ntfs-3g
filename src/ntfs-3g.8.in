@@ -157,7 +157,15 @@ The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 .TP
 .B silent
-Do nothing on chmod and chown operations, but do not return error. 
+Do not return error for chown and chmod unless access right 
+handling is turned on by either of the
+.B uid,
+.B gid,
+.B umask,
+.B fmask,
+or
+.B dmask
+option. 
 This option is on by default.
 .TP
 .BI locale= value
