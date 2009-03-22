@@ -1228,12 +1228,16 @@ static int ntfs_ir_make_space(ntfs_index_context *icx, int data_size)
 	int ret;
 
 	ntfs_log_trace("Entering\n");
+
+	ret = ntfs_ir_truncate(icx, data_size);
+	if (ret == STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT) {
 	
-	ret = ntfs_ir_reparent(icx);
-	if (ret == STATUS_OK)
-		ret = STATUS_KEEP_SEARCHING;
-	else
-		ntfs_log_perror("Failed to nodify INDEX_ROOT");
+		ret = ntfs_ir_reparent(icx);
+		if (ret == STATUS_OK)
+			ret = STATUS_KEEP_SEARCHING;
+		else
+			ntfs_log_perror("Failed to nodify INDEX_ROOT");
+	}
 
 	return ret;
 }

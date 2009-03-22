@@ -3400,6 +3400,14 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 				       "(%u > %u)\n", new_muse, alloc_size);
 			return -1;
 		}
+
+		if (a->type == AT_INDEX_ROOT && new_size > attr_size &&
+		    new_muse + 120 > alloc_size) {
+			errno = ENOSPC;
+			ntfs_log_trace("Too big INDEX_ROOT (%u > %u)\n",
+					new_muse, alloc_size);
+			return -1;
+		}
 		
 		/* Move attributes following @a to their new location. */
 		memmove((u8 *)a + new_size, (u8 *)a + attr_size,
