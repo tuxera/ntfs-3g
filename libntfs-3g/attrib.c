@@ -3922,6 +3922,15 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 		ntfs_log_perror("%s: Attribute lookup failed 1", __FUNCTION__);
 		goto put_err_out;
 	}
+	
+	/* Prefer to add AT_INDEX_ALLOCATION instead of AT_ATTRIBUTE_LIST */
+	if (na->type == AT_INDEX_ROOT) {
+		err = ENOSPC;
+		ntfs_log_trace("INDEX_ROOT can not be enlarged\n");
+		ret = STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT;
+		goto put_err_out;
+	}
+	
 	/* 
 	 * The standard information and attribute list attributes can't be
 	 * moved out from the base MFT record, so try to move out others. 

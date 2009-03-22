@@ -1035,6 +1035,9 @@ retry:
 		    ctx->attr->type == AT_DATA)
 			goto retry;
 
+		if (ctx->attr->type == AT_INDEX_ROOT)
+			goto retry;
+
 		record_size = le32_to_cpu(ctx->attr->length);
 
 		if (ntfs_attr_record_move_away(ctx, 0)) {
