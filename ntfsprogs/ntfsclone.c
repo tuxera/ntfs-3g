@@ -529,6 +529,8 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 		if (i < 0) {
 			if (errno != EAGAIN && errno != EINTR)
 				return -1;
+		} else if (i == 0 && !do_write && opt.restore_image) {
+			return -1;
 		} else {
 			count -= i;
 			buf = i + (char *) buf;
