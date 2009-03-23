@@ -156,8 +156,8 @@ struct _ntfs_inode {
 				/* only if NI_v3_Extensions is set in state */
  	le32 owner_id;
 	le32 security_id;
-	le32 quota_charged;
-	le32 usn;
+	le64 quota_charged;
+	le64 usn;
 };
 
 typedef enum {

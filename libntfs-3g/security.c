@@ -1055,8 +1055,8 @@ static int update_secur_descr(ntfs_volume *vol,
 					res = ntfs_attr_truncate(na,
 					 (s64)sizeof(STANDARD_INFORMATION));
 					ni->owner_id = const_cpu_to_le32(0);
-					ni->quota_charged = const_cpu_to_le32(0);
-					ni->usn = const_cpu_to_le32(0);
+					ni->quota_charged = const_cpu_to_le64(0);
+					ni->usn = const_cpu_to_le64(0);
 					ntfs_attr_remove(ni,
 						AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
@@ -1131,8 +1131,8 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
 				res = ntfs_attr_truncate(na,
 					 (s64)sizeof(STANDARD_INFORMATION));
 				ni->owner_id = const_cpu_to_le32(0);
-				ni->quota_charged = const_cpu_to_le32(0);
-				ni->usn = const_cpu_to_le32(0);
+				ni->quota_charged = const_cpu_to_le64(0);
+				ni->usn = const_cpu_to_le64(0);
 				ntfs_attr_remove(ni, AT_SECURITY_DESCRIPTOR,
 						AT_UNNAMED, 0);
 				set_nino_flag(ni, v3_Extensions);

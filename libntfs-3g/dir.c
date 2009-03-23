@@ -1210,8 +1210,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		set_nino_flag(ni, v3_Extensions);
 		ni->owner_id = si->owner_id = 0;
 		ni->security_id = si->security_id = securid;
-		ni->quota_charged = si->quota_charged = 0;
-		ni->usn = si->usn = 0;
+		ni->quota_charged = si->quota_charged = const_cpu_to_le64(0);
+		ni->usn = si->usn = const_cpu_to_le64(0);
 	} else
 		clear_nino_flag(ni, v3_Extensions);
 	if (!S_ISREG(type) && !S_ISDIR(type)) {
