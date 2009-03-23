@@ -532,6 +532,8 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 {
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
+	u32 lth;
+	le32 lthle;
 	int err;
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
@@ -558,11 +560,13 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 
 		/* JPA update v3.x extensions, ensuring consistency */
 
+	lthle = ctx->attr->length;
+	lth = le32_to_cpu(lthle);
 	if (test_nino_flag(ni, v3_Extensions)
-	    && (ctx->attr->length <= sizeof(STANDARD_INFORMATION)))
+	    && (lth <= sizeof(STANDARD_INFORMATION)))
 		ntfs_log_error("bad sync of standard information\n");
 
-	if (ctx->attr->length > sizeof(STANDARD_INFORMATION)) {
+	if (lth > sizeof(STANDARD_INFORMATION)) {
 		std_info->owner_id = ni->owner_id;
 		std_info->security_id = ni->security_id;
 		std_info->quota_charged = ni->quota_charged;
