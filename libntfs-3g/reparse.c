@@ -409,8 +409,8 @@ static char *search_relative(ntfs_volume *vol, ntfschar *path, int count,
 				if (curni
 				    && topni->ni
 				    && (topni->ni->mrec->flags
-					 & (MFT_RECORD_IS_DIRECTORY
-					     ? isdir : !isdir))) {
+					 & MFT_RECORD_IS_DIRECTORY
+					     ? isdir : !isdir)) {
 					if (ntfs_ucstombs(path, count,
 					    &target, 0) < 0) {
 						if (target) {
