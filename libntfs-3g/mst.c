@@ -63,7 +63,9 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 			(u32)(usa_ofs + (usa_count * 2)) > size ||
 			(size >> NTFS_BLOCK_SIZE_BITS) != usa_count) {
 		errno = EINVAL;
-		ntfs_log_perror("%s", __FUNCTION__);
+		ntfs_log_perror("%s: magic: 0x%08x  size: %d  usa_ofs: %d  "
+				"usa_count: %d", __FUNCTION__, *(le32 *)b,
+				size, usa_ofs, usa_count);
 		return -1;
 	}
 	/* Position of usn in update sequence array. */
@@ -90,9 +92,12 @@ int ntfs_mst_post_read_fixup(NTFS_RECORD *b, const u32 size)
 			 * Set the magic to "BAAD" and return failure.
 			 * Note that magic_BAAD is already converted to le32.
 			 */
-			b->magic = magic_BAAD;
 			errno = EIO;
-			ntfs_log_perror("Incomplete multi-sector transfer");
+			ntfs_log_perror("Incomplete multi-sector transfer: "
+				"magic: 0x%08x  size: %d  usa_ofs: %d  usa_count:"
+				" %d  data: %d  usn: %d", *(le32 *)b, size,
+				usa_ofs, usa_count, *data_pos, usn);
+			b->magic = magic_BAAD;
 			return -1;
 		}
 		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
