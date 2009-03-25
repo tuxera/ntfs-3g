@@ -3402,11 +3402,11 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 		}
 
 		if (a->type == AT_INDEX_ROOT && new_size > attr_size &&
-		    new_muse + 120 > alloc_size) {
+		    new_muse + 120 > alloc_size && old_size + 120 <= alloc_size) {
 			errno = ENOSPC;
 			ntfs_log_trace("Too big INDEX_ROOT (%u > %u)\n",
 					new_muse, alloc_size);
-			return -1;
+			return STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT;
 		}
 		
 		/* Move attributes following @a to their new location. */
@@ -3440,12 +3440,14 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 int ntfs_resident_attr_value_resize(MFT_RECORD *m, ATTR_RECORD *a,
 		const u32 new_size)
 {
+	int ret;
+	
 	ntfs_log_trace("Entering for new size %u.\n", (unsigned)new_size);
 
 	/* Resize the resident part of the attribute record. */
-	if (ntfs_attr_record_resize(m, a, (le16_to_cpu(a->value_offset) +
-			new_size + 7) & ~7) < 0)
-		return -1;
+	if ((ret = ntfs_attr_record_resize(m, a, (le16_to_cpu(a->value_offset) +
+			new_size + 7) & ~7)) < 0)
+		return ret;
 	/*
 	 * If we made the attribute value bigger, clear the area between the
 	 * old size and @new_size.
@@ -3860,8 +3862,8 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 	 */
 	if (newsize < vol->mft_record_size) {
 		/* Perform the resize of the attribute record. */
-		if (!ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
-				newsize)) {
+		if (!(ret = ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
+				newsize))) {
 			/* Update attribute size everywhere. */
 			na->data_size = na->initialized_size = newsize;
 			na->allocated_size = (newsize + 7) & ~7;
@@ -3873,6 +3875,11 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 				NInoFileNameSetDirty(na->ni);
 			}
 			goto resize_done;
+		}
+		/* Prefer AT_INDEX_ALLOCATION instead of AT_ATTRIBUTE_LIST */
+		if (ret == STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT) {
+			err = errno;
+			goto put_err_out;
 		}
 	}
 	/* There is not enough space in the mft record to perform the resize. */
@@ -3928,14 +3935,6 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 	if (errno != ENOENT) {
 		err = errno;
 		ntfs_log_perror("%s: Attribute lookup failed 1", __FUNCTION__);
-		goto put_err_out;
-	}
-	
-	/* Prefer to add AT_INDEX_ALLOCATION instead of AT_ATTRIBUTE_LIST */
-	if (na->type == AT_INDEX_ROOT) {
-		err = ENOSPC;
-		ntfs_log_trace("INDEX_ROOT can not be enlarged\n");
-		ret = STATUS_RESIDENT_ATTRIBUTE_FILLED_MFT;
 		goto put_err_out;
 	}
 	
