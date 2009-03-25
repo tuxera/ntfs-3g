@@ -451,7 +451,7 @@ switch_to_data1_zone:		search_zone = 2;
 				search_zone = 1;
 				zone_start = vol->mft_zone_pos;
 				zone_end = vol->mft_zone_end;
-				if (!zone_start == vol->mft_zone_start)
+				if (zone_start == vol->mft_zone_start)
 					pass = 2;
 				break;
 			}
