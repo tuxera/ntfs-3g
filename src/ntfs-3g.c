@@ -636,7 +636,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		return 0;
 	
 	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
-		ntfs_log_perror("Skipping unrepresentable filename (inode %llu)",
+		ntfs_log_perror("Filename decoding failed (inode %llu)",
 				(unsigned long long)MREF(mref));
 		return -1;
 	}
