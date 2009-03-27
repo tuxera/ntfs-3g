@@ -155,6 +155,7 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ntfs_inode *ni = NULL;
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
+	le32 lthle;
 	int olderrno;
 
 	ntfs_log_enter("Entering for inode %lld\n", MREF(mref));
@@ -191,8 +192,9 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	ni->last_access_time = ntfs2utc(std_info->last_access_time);
   		/* JPA insert v3 extensions if present */
                 /* length may be seen as 72 (v1.x) or 96 (v3.x) */
-        if (ctx->attr->length > sizeof(STANDARD_INFORMATION)) {
-  		set_nino_flag(ni, v3_Extensions);
+	lthle = ctx->attr->length;
+	if (le32_to_cpu(lthle) > sizeof(STANDARD_INFORMATION)) {
+		set_nino_flag(ni, v3_Extensions);
 		ni->owner_id = std_info->owner_id;
 		ni->security_id = std_info->security_id;
 		ni->quota_charged = std_info->quota_charged;
