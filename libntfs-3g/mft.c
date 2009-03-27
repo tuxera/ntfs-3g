@@ -1025,7 +1025,7 @@ static int ntfs_mft_data_extend_allocation(ntfs_volume *vol)
 				"count %lli.\n", (long long)nr);
 	} while (1);
 	
-	ntfs_log_debug("Allocated %lli clusters.\n", nr);
+	ntfs_log_debug("Allocated %lld clusters.\n", (long long)nr);
 	
 	rl = ntfs_runlists_merge(mft_na->rl, rl2);
 	if (!rl) {

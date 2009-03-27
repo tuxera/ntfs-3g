@@ -57,7 +57,7 @@
 
 static void ntfs_cluster_set_zone_pos(LCN start, LCN end, LCN *pos, LCN tc)
 {
-	ntfs_log_trace("pos: %lld  tc: %lld\n", (long long)*pos, tc);
+	ntfs_log_trace("pos: %lld  tc: %lld\n", (long long)*pos, (long long)tc);
 
 	if (tc >= end)
 		*pos = start;
@@ -346,8 +346,10 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			if (prev_lcn == lcn + bmp_pos - prev_run_len && rlpos) {
 				ntfs_log_debug("Cluster coalesce: prev_lcn: "
 					       "%lld  lcn: %lld  bmp_pos: %lld  "
-					       "prev_run_len: %lld\n", prev_lcn,
-					       lcn, bmp_pos, prev_run_len);
+					       "prev_run_len: %lld\n", 
+					       (long long)prev_lcn, 
+					       (long long)lcn, (long long)bmp_pos, 
+					       (long long)prev_run_len);
 				rl[rlpos - 1].length = ++prev_run_len;
 			} else {
 				if (rlpos)
@@ -356,7 +358,7 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 				else {
 					rl[rlpos].vcn = start_vcn;
 					ntfs_log_debug("Start_vcn: %lld\n", 
-						       start_vcn);
+						       (long long)start_vcn);
 				}
 				
 				rl[rlpos].lcn = prev_lcn = lcn + bmp_pos;
@@ -365,8 +367,9 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			}
 			
 			ntfs_log_debug("RUN:   %-16lld %-16lld %-16lld\n", 
-				       rl[rlpos - 1].vcn, rl[rlpos - 1].lcn, 
-				       rl[rlpos - 1].length);
+				       (long long)rl[rlpos - 1].vcn, 
+				       (long long)rl[rlpos - 1].lcn, 
+				       (long long)rl[rlpos - 1].length);
 			/* Done? */
 			if (!--clusters) {
 				if (used_zone_pos)
@@ -468,7 +471,7 @@ switch_to_data1_zone:		search_zone = 2;
 				search_zone = 1;
 				zone_start = vol->mft_zone_pos;
 				zone_end = vol->mft_zone_end;
-				if (!zone_start == vol->mft_zone_start)
+				if (zone_start == vol->mft_zone_start)
 					pass = 2;
 				break;
 			}

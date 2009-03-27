@@ -557,8 +557,8 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 
 		len = ntfs_mbstoucs(p, &unicode);
 		if (len < 0) {
-			ntfs_log_perror("Couldn't convert filename to Unicode: "
-					"'%s'.\n", p);
+			ntfs_log_perror("Could not convert filename to Unicode:"
+					" '%s'", p);
 			err = errno;
 			goto close;
 		} else if (len > NTFS_MAX_NAME_LEN) {
@@ -916,7 +916,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	 * or signals an error (both covered by the rc test).
 	 */
 	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
-		ntfs_log_debug("In index root, offset 0x%x.\n", (u8*)ie - (u8*)ir);
+		ntfs_log_debug("In index root, offset %d.\n", (int)((u8*)ie - (u8*)ir));
 		/* Bounds checks. */
 		if ((u8*)ie < (u8*)ctx->mrec || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||
@@ -1565,8 +1565,9 @@ search:
 		/* Ignore hard links from other directories */
 		if (dir_ni->mft_no != MREF_LE(fn->parent_directory)) {
 			ntfs_log_debug("MFT record numbers don't match "
-				       "(%llu != %llu)\n", dir_ni->mft_no, 
-				       MREF_LE(fn->parent_directory));
+				       "(%llu != %llu)\n", 
+				       (long long unsigned)dir_ni->mft_no, 
+				       (long long unsigned)MREF_LE(fn->parent_directory));
 			continue;
 		}
 		     

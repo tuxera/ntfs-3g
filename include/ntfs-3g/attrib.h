@@ -93,6 +93,8 @@ extern int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx);
 
+extern int ntfs_attr_position(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
+
 extern ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
 		const ATTR_TYPES type);
 
