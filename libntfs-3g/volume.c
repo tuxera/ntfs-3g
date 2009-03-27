@@ -566,9 +566,9 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	 * respective zone.
 	 */
 	vol->data1_zone_pos = vol->mft_zone_end;
-	ntfs_log_debug("data1_zone_pos = 0x%llx\n", vol->data1_zone_pos);
+	ntfs_log_debug("data1_zone_pos = %lld\n", (long long)vol->data1_zone_pos);
 	vol->data2_zone_pos = 0;
-	ntfs_log_debug("data2_zone_pos = 0x%llx\n", vol->data2_zone_pos);
+	ntfs_log_debug("data2_zone_pos = %lld\n", (long long)vol->data2_zone_pos);
 
 	/* Set the mft data allocation position to mft record 24. */
 	vol->mft_data_pos = 24;
