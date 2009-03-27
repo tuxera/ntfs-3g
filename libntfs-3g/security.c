@@ -4733,7 +4733,8 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 		if (vol) {
 			scapi = (struct SECURITY_API*)
 				ntfs_malloc(sizeof(struct SECURITY_API));
-			if (scapi) {
+			if (!ntfs_volume_get_free_space(vol)
+			    && scapi) {
 				scapi->magic = MAGIC_API;
 				scapi->seccache = (struct PERMISSIONS_CACHE*)NULL;
 				scx = &scapi->security;
@@ -4745,8 +4746,14 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 					/* accept no mapping and no $Secure */
 				ntfs_build_mapping(scx,(const char*)NULL);
 				ntfs_open_secure(vol);
-			} else
-				errno = ENOMEM;
+			} else {
+				if (scapi)
+					free(scapi);
+				else
+					errno = ENOMEM;
+				mnt = ntfs_umount(vol,FALSE);
+				scapi = (struct SECURITY_API*)NULL;
+			}
 		}
 	} else
 		if (getuid())

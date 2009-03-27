@@ -1564,3 +1564,30 @@ int ntfs_set_locale(void)
 	return 0;
 }
 
+/*
+ *		Feed the counts of free clusters and free mft records
+ */
+
+int ntfs_volume_get_free_space(ntfs_volume *vol)
+{
+	ntfs_attr *na;
+	int ret;
+
+	ret = -1; /* default return */
+	vol->free_clusters = ntfs_attr_get_free_bits(vol->lcnbmp_na);
+	if (vol->free_clusters < 0) {
+		ntfs_log_perror("Failed to read NTFS $Bitmap");
+	} else {
+		na = vol->mftbmp_na;
+		vol->free_mft_records = ntfs_attr_get_free_bits(na);
+
+		if (vol->free_mft_records >= 0)
+			vol->free_mft_records += (na->allocated_size - na->data_size) << 3;
+
+		if (vol->free_mft_records < 0)
+			ntfs_log_perror("Failed to calculate free MFT records");
+		else
+			ret = 0;
+	}
+	return (ret);
+}

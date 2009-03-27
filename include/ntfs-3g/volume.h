@@ -263,6 +263,8 @@ extern int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags);
 extern int ntfs_volume_error(int err);
 extern void ntfs_mount_error(const char *vol, const char *mntpoint, int err);
 
+extern int ntfs_volume_get_free_space(ntfs_volume *vol);
+
 extern int ntfs_set_locale(void);
 
 #endif /* defined _NTFS_VOLUME_H */
