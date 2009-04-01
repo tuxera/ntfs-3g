@@ -58,7 +58,6 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
                        const char *mnt, const char *type, const char *opts)
 {
     int res;
-    int status;
 
     if (!mtab_needs_update(mnt))
         return 0;
@@ -66,7 +65,7 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
     res = fork();
     if (res == -1) {
         fprintf(stderr, "%s: fork: %s\n", progname, strerror(errno));
-        return -1;
+        return 0;
     }
     if (res == 0) {
         char templ[] = "/tmp/fusermountXXXXXX";
@@ -96,14 +95,6 @@ int fuse_mnt_add_mount(const char *progname, const char *fsname,
                 strerror(errno));
         exit(1);
     }
-    res = waitpid(res, &status, 0);
-    if (res == -1) {
-        fprintf(stderr, "%s: waitpid: %s\n", progname, strerror(errno));
-        return -1;
-    }
-    if (status != 0)
-        return -1;
-
     return 0;
 }
 
