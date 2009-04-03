@@ -49,6 +49,8 @@ struct _runlist_element {/* In memory vcn to lcn mapping structure element. */
 	s64 length;	/* Run length in clusters. */
 };
 
+extern runlist_element *ntfs_rl_extend(runlist_element *rl, int more_entries);
+
 extern LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 extern s64 ntfs_rl_pread(const ntfs_volume *vol, const runlist_element *rl,

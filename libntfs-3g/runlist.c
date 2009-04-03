@@ -111,6 +111,27 @@ static runlist_element *ntfs_rl_realloc(runlist_element *rl, int old_size,
 	return realloc(rl, new_size);
 }
 
+/*
+ *		Extend a runlist by some entry count
+ *	The runlist may have to be reallocated
+ *
+ *	Returns the reallocated runlist
+ *		or NULL if reallocation was not possible (with errno set)
+ */
+
+runlist_element *ntfs_rl_extend(runlist_element *rl, int more_entries)
+{
+	int last;
+
+	last = 0;
+	while (rl[last].length)
+		last++;
+	rl = ntfs_rl_realloc(rl,last+1,last+more_entries+1);
+	if (!rl)
+		errno = ENOMEM;
+	return (rl);
+}
+
 /**
  * ntfs_rl_are_mergeable - test if two runlists can be joined together
  * @dst:	original runlist

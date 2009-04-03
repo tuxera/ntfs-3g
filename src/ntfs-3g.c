@@ -880,6 +880,11 @@ static int ntfs_fuse_open(const char *org_path,
 			if (NAttrEncrypted(na))
 				res = -EACCES;
 #endif
+			/* mark a future need to compress the last chunk */
+			if ((res >= 0)
+			    && (na->data_flags & ATTR_COMPRESSION_MASK)
+			    && (fi->flags & (O_WRONLY | O_RDWR)))
+				fi->fh |= 1;
 			ntfs_attr_close(na);
 		} else
 			res = -errno;
@@ -978,10 +983,6 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	}
 	while (size) {
 		s64 ret = ntfs_attr_pwrite(na, offset, size, buf);
-		if (0 <= ret && ret < (s64)size)
-			ntfs_log_perror("ntfs_attr_pwrite partial write to '%s'"
-				" (%lld: %lld <> %lld)", path, (long long)offset,
-				(long long)size, (long long)ret);
 		if (ret <= 0) {
 			res = -errno;
 			goto exit;
@@ -993,6 +994,48 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 	res = total;
 	if (res > 0)
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
+exit:
+	if (na)
+		ntfs_attr_close(na);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	free(path);
+	if (stream_name_len)
+		free(stream_name);
+out:	
+	return res;
+}
+
+static int ntfs_fuse_release(const char *org_path,
+		struct fuse_file_info *fi)
+{
+	ntfs_inode *ni = NULL;
+	ntfs_attr *na = NULL;
+	char *path = NULL;
+	ntfschar *stream_name;
+	int stream_name_len, res;
+
+	/* Only for marked descriptors there is something to do */
+	if (!(fi->fh & 1)) {
+		res = 0;
+		goto out;
+	}
+	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
+	if (stream_name_len < 0) {
+		res = stream_name_len;
+		goto out;
+	}
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni) {
+		res = -errno;
+		goto exit;
+	}
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	res = ntfs_attr_pclose(na);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -1049,7 +1092,11 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 		goto exit;
 	}
 #endif
-
+		/* for compressed files, only deleting contents is implemented */
+	if (NAttrCompressed(na) && size) {
+		errno = EOPNOTSUPP;
+		goto exit;
+	}
 	if (ntfs_attr_truncate(na, size))
 		goto exit;
 	
@@ -1211,7 +1258,7 @@ static int ntfs_fuse_access(const char *path, int type)
 #endif
 
 static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
-		const char *target)
+		const char *target, struct fuse_file_info *fi)
 {
 	char *name;
 	ntfschar *uname = NULL, *utarget = NULL;
@@ -1326,6 +1373,10 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					set_fuse_error(&res);
 #endif
 			}
+				/* mark a need to compress the end of file */
+			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
+				fi->fh |= 1;
+			}
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
@@ -1349,7 +1400,8 @@ exit:
 }
 
 static int ntfs_fuse_create_stream(const char *path,
-		ntfschar *stream_name, const int stream_name_len)
+		ntfschar *stream_name, const int stream_name_len,
+		struct fuse_file_info *fi)
 {
 	ntfs_inode *ni;
 	int res = 0;
@@ -1361,11 +1413,13 @@ static int ntfs_fuse_create_stream(const char *path,
 			/*
 			 * If such file does not exist, create it and try once
 			 * again to add stream to it.
+			 * Note : no fuse_file_info for creation of main file
 			 */
-			res = ntfs_fuse_create(path, S_IFREG, 0, NULL);
+			res = ntfs_fuse_create(path, S_IFREG, 0, NULL,
+					(struct fuse_file_info*)NULL);
 			if (!res)
 				return ntfs_fuse_create_stream(path,
-						stream_name, stream_name_len);
+						stream_name, stream_name_len,fi);
 			else
 				res = -errno;
 		}
@@ -1373,12 +1427,16 @@ static int ntfs_fuse_create_stream(const char *path,
 	}
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
+	if ((res >= 0) && (ni->flags & FILE_ATTR_COMPRESSED)
+	    && (fi->flags & (O_WRONLY | O_RDWR)))
+		fi->fh |= 1;
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	return res;
 }
 
-static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev)
+static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev,
+				struct fuse_file_info *fi)
 {
 	char *path = NULL;
 	ntfschar *stream_name;
@@ -1393,10 +1451,11 @@ static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev)
 		goto exit;
 	}
 	if (!stream_name_len)
-		res = ntfs_fuse_create(path, mode & (S_IFMT | 07777), dev, NULL);
+		res = ntfs_fuse_create(path, mode & (S_IFMT | 07777), dev, 
+					NULL,fi);
 	else
 		res = ntfs_fuse_create_stream(path, stream_name,
-				stream_name_len);
+				stream_name_len,fi);
 exit:
 	free(path);
 	if (stream_name_len)
@@ -1406,20 +1465,22 @@ exit:
 
 static int ntfs_fuse_mknod(const char *path, mode_t mode, dev_t dev)
 {
-	return ntfs_fuse_mknod_common(path, mode, dev);
+	return ntfs_fuse_mknod_common(path, mode, dev,
+			(struct fuse_file_info*)NULL);
 }
 
 static int ntfs_fuse_create_file(const char *path, mode_t mode,
-			    struct fuse_file_info *fi __attribute__((unused)))
+			    struct fuse_file_info *fi)
 {
-	return ntfs_fuse_mknod_common(path, mode, 0);
+	return ntfs_fuse_mknod_common(path, mode, 0, fi);
 }
 
 static int ntfs_fuse_symlink(const char *to, const char *from)
 {
 	if (ntfs_fuse_is_named_data_stream(from))
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(from, S_IFLNK, 0, to);
+	return ntfs_fuse_create(from, S_IFLNK, 0, to,
+			(struct fuse_file_info*)NULL);
 }
 
 static int ntfs_fuse_link(const char *old_path, const char *new_path)
@@ -1754,7 +1815,8 @@ static int ntfs_fuse_mkdir(const char *path,
 {
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	return ntfs_fuse_create(path, S_IFDIR | (mode & 07777), 0, NULL);
+	return ntfs_fuse_create(path, S_IFDIR | (mode & 07777), 0, NULL,
+			(struct fuse_file_info*)NULL);
 }
 
 static int ntfs_fuse_rmdir(const char *path)
@@ -2357,6 +2419,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
 	int res, lename_len;
+	size_t part, total;
 	int attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
@@ -2522,15 +2585,25 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			goto exit;
 		}
 	} else {
-		if (ntfs_attr_truncate(na, (s64)size)) {
+			/* currently compressed streams can only be wiped out */
+		if (ntfs_attr_truncate(na, (s64)0 /* size */)) {
 			res = -errno;
 			goto exit;
 		}
 	}
-	res = ntfs_attr_pwrite(na, 0, size, value);
-	if (res != (s64) size)
+	total = 0;
+	if (size) {
+		do {
+			part = ntfs_attr_pwrite(na, total, size - total,
+					 &value[total]);
+			if (part > 0)
+				total += part;
+		} while ((part > 0) && (total < size));
+	if (total != size)
 		res = -errno;
 	else
+		res = ntfs_attr_pclose(na);
+	} else
 		res = 0;
 exit:
 	if (na)
@@ -2754,6 +2827,7 @@ static struct fuse_operations ntfs_3g_ops = {
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
 	.open		= ntfs_fuse_open,
+	.release	= ntfs_fuse_release,
 	.read		= ntfs_fuse_read,
 	.write		= ntfs_fuse_write,
 	.truncate	= ntfs_fuse_truncate,

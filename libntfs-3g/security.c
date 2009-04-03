@@ -3877,6 +3877,7 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 {
 	u32 attrib;
 	le32 settable;
+	ATTR_FLAGS dirflags;
 	int res;
 
 	res = -1;
@@ -3885,12 +3886,31 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 			/* copy to avoid alignment problems */
 			memcpy(&attrib,value,sizeof(FILE_ATTR_FLAGS));
 			settable = FILE_ATTR_SETTABLE;
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				settable |= FILE_ATTR_COMPRESSED;
-			ni->flags = (ni->flags & ~settable)
-				 | (cpu_to_le32(attrib) & settable);
-			NInoSetDirty(ni);
 			res = 0;
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+				/*
+				 * Accept changing compression for a directory
+				 * and set index root accordingly
+				 */
+				settable |= FILE_ATTR_COMPRESSED;
+				if ((ni->flags ^ cpu_to_le32(attrib))
+				             & FILE_ATTR_COMPRESSED) {
+					if (ni->flags & FILE_ATTR_COMPRESSED)
+						dirflags = const_cpu_to_le16(0);
+					else
+						dirflags = ATTR_IS_COMPRESSED;
+					res = ntfs_attr_set_flags(ni,
+						AT_INDEX_ROOT,
+					        NTFS_INDEX_I30, 4,
+						dirflags,
+						ATTR_COMPRESSION_MASK);
+				}
+			}
+			if (!res) {
+				ni->flags = (ni->flags & ~settable)
+					 | (cpu_to_le32(attrib) & settable);
+				NInoSetDirty(ni);
+			}
 		} else
 			errno = EEXIST;
 	} else
@@ -4461,6 +4481,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 {
 	ntfs_inode *ni;
 	le32 settable;
+	ATTR_FLAGS dirflags;
 	int res;
 
 	res = 0; /* default return */
@@ -4468,11 +4489,30 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
 			settable = FILE_ATTR_SETTABLE;
-			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+				/*
+				 * Accept changing compression for a directory
+				 * and set index root accordingly
+				 */
 				settable |= FILE_ATTR_COMPRESSED;
-			ni->flags = (ni->flags & ~settable)
-				 | (cpu_to_le32(attrib) & settable);
-			NInoSetDirty(ni);
+				if ((ni->flags ^ cpu_to_le32(attrib))
+				             & FILE_ATTR_COMPRESSED) {
+					if (ni->flags & FILE_ATTR_COMPRESSED)
+						dirflags = const_cpu_to_le16(0);
+					else
+						dirflags = ATTR_IS_COMPRESSED;
+					res = ntfs_attr_set_flags(ni,
+						AT_INDEX_ROOT,
+					        NTFS_INDEX_I30, 4,
+						dirflags,
+						ATTR_COMPRESSION_MASK);
+				}
+			}
+			if (!res) {
+				ni->flags = (ni->flags & ~settable)
+					 | (cpu_to_le32(attrib) & settable);
+				NInoSetDirty(ni);
+			}
 			if (!ntfs_inode_close(ni))
 				res = -1;
 		} else

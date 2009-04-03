@@ -1218,6 +1218,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
+	if ((dir_ni->flags & FILE_ATTR_COMPRESSED)
+	   && (S_ISREG(type) || S_ISDIR(type)))
+		ni->flags |= FILE_ATTR_COMPRESSED;
 	/* Add STANDARD_INFORMATION to inode. */
 	if (ntfs_attr_add(ni, AT_STANDARD_INFORMATION, AT_UNNAMED, 0,
 			(u8*)si, si_len)) {
