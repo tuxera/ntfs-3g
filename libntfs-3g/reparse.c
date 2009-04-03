@@ -953,12 +953,20 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
 			/*
 			 * no reparse data attribute : add one,
 			 * apparently, this does not feed the new value in
+			 * Note : NTFS version must be >= 3
 			 */
-				res = ntfs_attr_add(ni,AT_REPARSE_POINT,
-					AT_UNNAMED,0,(u8*)NULL,(s64)size);
-				if (!res)
-					ni->flags |= FILE_ATTR_REPARSE_POINT;
-				NInoSetDirty(ni);
+				if (ni->vol->major_ver >= 3) {
+					res = ntfs_attr_add(ni,AT_REPARSE_POINT,
+						AT_UNNAMED,0,(u8*)NULL,
+						(s64)size);
+					if (!res)
+						ni->flags
+						    |= FILE_ATTR_REPARSE_POINT;
+					NInoSetDirty(ni);
+				} else {
+					errno = EOPNOTSUPP;
+					res = -1;
+				}
 			} else {
 				errno = ENODATA;
 				res = -1;
