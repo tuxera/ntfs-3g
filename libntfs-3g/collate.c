@@ -152,8 +152,10 @@ static int ntfs_collate_ntofs_security_hash(ntfs_volume *vol __attribute__((unus
 		if (d1 > d2)
 			rc = 1;
 		else {
-			d1 = le32_to_cpup(++p1);
-			d2 = le32_to_cpup(++p2);
+			p1++;
+			p2++;
+			d1 = le32_to_cpup(p1);
+			d2 = le32_to_cpup(p2);
 			if (d1 < d2)
 				rc = -1;
 			else {
