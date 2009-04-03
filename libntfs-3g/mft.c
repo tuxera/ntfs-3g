@@ -1459,7 +1459,7 @@ found_free_rec:
 			free(ni);
 			goto undo_mftbmp_alloc;
 		}
-		if (base_ni->extent_nis) {
+		if (base_ni->nr_extents) {
 			memcpy(extent_nis, base_ni->extent_nis,
 					i - 4 * sizeof(ntfs_inode *));
 			free(base_ni->extent_nis);
@@ -1761,7 +1761,7 @@ found_free_rec:
 				free(ni);
 				goto undo_mftbmp_alloc;
 			}
-			if (base_ni->extent_nis) {
+			if (base_ni->nr_extents) {
 				memcpy(extent_nis, base_ni->extent_nis,
 						i - 4 * sizeof(ntfs_inode *));
 				free(base_ni->extent_nis);

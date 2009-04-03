@@ -1407,8 +1407,9 @@ retry:
 			total += written;
 			count -= written;
 			b = (const u8*)b + written;
-			continue;
 		}
+		if (written == to_write)
+			continue;
 		/* If the syscall was interrupted, try again. */
 		if (written == (s64)-1 && errno == EINTR)
 			goto retry;
