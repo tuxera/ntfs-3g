@@ -21,6 +21,17 @@
  * along with this program (in the main directory of the NTFS-3G
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * A part of the compression algorithm is based on lzhuf.c whose header
+ * describes the roles of the original authors (with no apparent copyright
+ * notice, and according to http://home.earthlink.net/~neilbawd/pall.html
+ * this was put into public domain in 1988 by Haruhiko OKUMURA).
+ *
+ * LZHUF.C English version 1.0
+ * Based on Japanese version 29-NOV-1988   
+ * LZSS coded by Haruhiko OKUMURA
+ * Adaptive Huffman Coding coded by Haruyasu YOSHIZAKI
+ * Edited and translated to English by Kenji RIKITAKE
  */
 
 #ifdef HAVE_CONFIG_H
