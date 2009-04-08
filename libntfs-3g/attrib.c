@@ -3482,6 +3482,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	BOOL can_be_non_resident = FALSE;
 	ntfs_inode *attr_ni;
 	ntfs_attr *na;
+	ATTR_FLAGS data_flags;
 
 	if (!ni || size < 0 || type == AT_ATTRIBUTE_LIST) {
 		errno = EINVAL;
@@ -3591,15 +3592,13 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 	}
 
 add_attr_record:
+	if ((ni->flags & FILE_ATTR_COMPRESSED)
+	    && ((type == AT_DATA)
+	       || ((type == AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
+		data_flags = ATTR_IS_COMPRESSED;
+	else
+		data_flags = const_cpu_to_le16(0);
 	if (is_resident) {
-		ATTR_FLAGS data_flags;
-
-		if ((ni->flags & FILE_ATTR_COMPRESSED)
-		    && ((type == AT_DATA)
-		       || ((type == AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
-			data_flags = ATTR_IS_COMPRESSED;
-		else
-			data_flags = const_cpu_to_le16(0);
 		/* Add resident attribute. */
 		offset = ntfs_resident_attr_record_add(attr_ni, type, name,
 				name_len, val, size, data_flags);
@@ -3616,7 +3615,7 @@ add_attr_record:
 add_non_resident:
 	/* Add non resident attribute. */
 	offset = ntfs_non_resident_attr_record_add(attr_ni, type, name,
-				name_len, 0, 8, const_cpu_to_le16(0));
+				name_len, 0, 8, data_flags);
 	if (offset < 0) {
 		err = errno;
 		ntfs_log_perror("Failed to add non resident attribute");
@@ -4996,7 +4995,8 @@ retry:
 			mp_size = cur_max_mp_size;
 		/* Add attribute extent to new record. */
 		err = ntfs_non_resident_attr_record_add(ni, na->type,
-			 na->name, na->name_len, stop_vcn, mp_size, 0);
+			na->name, na->name_len, stop_vcn, mp_size,
+			na->data_flags);
 		if (err == -1) {
 			err = errno;
 			ntfs_log_perror("Could not add attribute extent");
