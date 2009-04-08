@@ -102,7 +102,6 @@ static void ntfs_init_compress_tree(struct COMPRESS_CONTEXT *pctx)
 static void ntfs_new_node (struct COMPRESS_CONTEXT *pctx,
 		unsigned int r)
 {
-	unsigned int i;
 	unsigned int pp;
 	BOOL less;
 	BOOL done;
@@ -137,6 +136,7 @@ static void ntfs_new_node (struct COMPRESS_CONTEXT *pctx,
 			}
 		}
 		if (!done) {
+			register unsigned int i;
 			register const unsigned char *p1,*p2;
 
 			i = 1;
@@ -151,12 +151,13 @@ static void ntfs_new_node (struct COMPRESS_CONTEXT *pctx,
 					pctx->match_position = 
 						r - pp + 2*NTFS_SB_SIZE - 1;
 					if ((pctx->match_length = i) > mxl) {
+						i = pctx->rson[pp];
+						pctx->rson[r] = i;
+						i = pctx->lson[pp];
+						pctx->lson[r] = i;
+						pctx->dad[i] = r;
 						i = pctx->dad[pp];
 						pctx->dad[r] = i;
-						pctx->lson[r] = pctx->lson[pp];
-						pctx->rson[r] = pctx->rson[pp];
-						pctx->dad[pctx->lson[pp]] = r;
-						pctx->dad[pctx->rson[pp]] = r;
 						if (pctx->rson[i] == pp)
 							pctx->rson[i] = r;
 						else
