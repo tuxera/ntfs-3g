@@ -1345,6 +1345,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		fn->file_attributes = FILE_ATTR_I30_INDEX_PRESENT;
 	if (!S_ISREG(type) && !S_ISDIR(type))
 		fn->file_attributes = FILE_ATTR_SYSTEM;
+	else
+		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
 	fn->creation_time = utc2ntfs(ni->creation_time);
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
