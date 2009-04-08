@@ -1873,7 +1873,8 @@ static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 		goto close_inode;
 	}
 	
-	if (NAttrCompressed(na) || NAttrEncrypted(na) || !NAttrNonResident(na)){
+	if ((na->data_flags & (ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED))
+			 || !NAttrNonResident(na)) {
 		ret = -EINVAL;
 		goto close_attr;
 	}
