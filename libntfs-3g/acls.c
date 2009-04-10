@@ -2651,7 +2651,7 @@ char *ntfs_build_descr(mode_t mode,
  *	from owner, group and world grants as represented in ACEs
  */
 
-static int merge_permissions(ntfs_inode *ni,
+static int merge_permissions(BOOL isdir,
 		le32 owner, le32 group, le32 world, le32 special)
 
 {
@@ -2660,7 +2660,7 @@ static int merge_permissions(ntfs_inode *ni,
 	perm = 0;
 	/* build owner permission */
 	if (owner) {
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (isdir) {
 			/* exec if any of list, traverse */
 			if (owner & DIR_GEXEC)
 				perm |= S_IXUSR;
@@ -2684,7 +2684,7 @@ static int merge_permissions(ntfs_inode *ni,
 	}
 	/* build group permission */
 	if (group) {
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (isdir) {
 			/* exec if any of list, traverse */
 			if (group & DIR_GEXEC)
 				perm |= S_IXGRP;
@@ -2708,7 +2708,7 @@ static int merge_permissions(ntfs_inode *ni,
 	}
 	/* build world permission */
 	if (world) {
-		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (isdir) {
 			/* exec if any of list, traverse */
 			if (world & DIR_GEXEC)
 				perm |= S_IXOTH;
@@ -2907,7 +2907,7 @@ static int norm_std_permissions_posix(struct POSIX_SECURITY *posix_desc,
  */
 
 static int build_std_permissions(const char *securattr,
-		const SID *usid, const SID *gsid, ntfs_inode *ni)
+		const SID *usid, const SID *gsid, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -2978,7 +2978,7 @@ static int build_std_permissions(const char *securattr,
 		 */
 	allowown |= (allowgrp | allowall);
 	allowgrp |= allowall;
-	return (merge_permissions(ni,
+	return (merge_permissions(isdir,
 				allowown & ~(denyown | denyall),
 				allowgrp & ~(denygrp | denyall),
 				allowall & ~denyall,
@@ -2992,7 +2992,7 @@ static int build_std_permissions(const char *securattr,
  */
 
 static int build_owngrp_permissions(const char *securattr,
-			const SID *usid, ntfs_inode *ni)
+			const SID *usid, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -3049,7 +3049,7 @@ static int build_owngrp_permissions(const char *securattr,
 		}
 	if (!grppresent)
 		allowgrp = allowall;
-	return (merge_permissions(ni,
+	return (merge_permissions(isdir,
 				allowown & ~(denyown | denyall),
 				allowgrp & ~(denygrp | denyall),
 				allowall & ~denyall,
@@ -3176,7 +3176,7 @@ static int norm_ownadmin_permissions_posix(struct POSIX_SECURITY *posix_desc,
 
 
 static int build_ownadmin_permissions(const char *securattr,
-			const SID *usid, const SID *gsid, ntfs_inode *ni)
+			const SID *usid, const SID *gsid, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const ACL *pacl;
@@ -3245,7 +3245,7 @@ static int build_ownadmin_permissions(const char *securattr,
 		allowown |= (allowgrp | allowall);
 		allowgrp |= allowall;
 	}
-	return (merge_permissions(ni,
+	return (merge_permissions(isdir,
 				allowown & ~(denyown | denyall),
 				allowgrp & ~(denygrp | denyall),
 				allowall & ~denyall,
@@ -3374,7 +3374,7 @@ static uid_t find_tenant(struct MAPPING *const mapping[],
 struct POSIX_SECURITY *ntfs_build_permissions_posix(
 			struct MAPPING *const mapping[],
 			const char *securattr,
-			const SID *usid, const SID *gsid, ntfs_inode *ni)
+			const SID *usid, const SID *gsid, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	struct POSIX_SECURITY *pxdesc;
@@ -3615,7 +3615,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				if (pace->mask & FILE_READ_DATA)
 					pxace->perms |= S_ISVTX;
 			} else
-				if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+				if (isdir) {
 					if (pace->mask & DIR_GEXEC)
 						pxace->perms |= POSIX_PERM_X;
 					if (pace->mask & DIR_GWRITE)
@@ -3799,7 +3799,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
  */
 
 int ntfs_build_permissions(const char *securattr,
-			const SID *usid, const SID *gsid, ntfs_inode *ni)
+			const SID *usid, const SID *gsid, BOOL isdir)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	int perm;
@@ -3811,12 +3811,12 @@ int ntfs_build_permissions(const char *securattr,
 	         || ntfs_same_sid(gsid,adminsid);
 	groupowns = !adminowns && ntfs_same_sid(gsid,usid);
 	if (adminowns)
-		perm = build_ownadmin_permissions(securattr, usid, gsid, ni);
+		perm = build_ownadmin_permissions(securattr, usid, gsid, isdir);
 	else
 		if (groupowns)
-			perm = build_owngrp_permissions(securattr, usid, ni);
+			perm = build_owngrp_permissions(securattr, usid, isdir);
 		else
-			perm = build_std_permissions(securattr, usid, gsid, ni);
+			perm = build_std_permissions(securattr, usid, gsid, isdir);
 	return (perm);
 }
 

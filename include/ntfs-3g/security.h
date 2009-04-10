@@ -303,7 +303,7 @@ int ntfs_set_ntfs_attrib(const char *path,
  *	based on Win32 API
  */
 
-#define MAGIC_API 10102007
+#define MAGIC_API 0x09042009
 
 struct SECURITY_API {
 	u32 magic;

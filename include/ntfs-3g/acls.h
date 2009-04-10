@@ -176,7 +176,7 @@ struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 struct POSIX_SECURITY *ntfs_build_permissions_posix(
 			struct MAPPING* const mapping[],
 			const char *securattr,
-			const SID *usid, const SID *gsid, ntfs_inode *ni);
+			const SID *usid, const SID *gsid, BOOL isdir);
 struct POSIX_SECURITY *ntfs_merge_descr_posix(const struct POSIX_SECURITY *first,
 			const struct POSIX_SECURITY *second);
 char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
@@ -188,7 +188,7 @@ char *ntfs_build_descr_posix(struct MAPPING* const mapping[],
 int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			const SID *usid, const SID *gsid, BOOL fordir);
 int ntfs_build_permissions(const char *securattr,
-			const SID *usid, const SID *gsid, ntfs_inode *ni);
+			const SID *usid, const SID *gsid, BOOL isdir);
 char *ntfs_build_descr(mode_t mode,
 			int isdir, const SID * usid, const SID * gsid);
 struct MAPLIST *ntfs_read_mapping(FILEREADER reader, void *fileid);
