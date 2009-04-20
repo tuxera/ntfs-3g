@@ -1003,21 +1003,26 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 	{0}
 	};
 	int i, r;
+	int k, off;
 
 	memset((char*)uc, 0, uc_len);
 	uc_len >>= 1;
 	if (uc_len > 65536)
 		uc_len = 65536;
 	for (i = 0; (u32)i < uc_len; i++)
-		uc[i] = i;
-	for (r = 0; uc_run_table[r][0]; r++)
+		uc[i] = cpu_to_le16(i);
+	for (r = 0; uc_run_table[r][0]; r++) {
+		off = uc_run_table[r][2];
 		for (i = uc_run_table[r][0]; i < uc_run_table[r][1]; i++)
-			uc[i] += uc_run_table[r][2];
+			uc[i] = cpu_to_le16(i + off);
+	}
 	for (r = 0; uc_dup_table[r][0]; r++)
 		for (i = uc_dup_table[r][0]; i < uc_dup_table[r][1]; i += 2)
-			uc[i + 1]--;
-	for (r = 0; uc_byte_table[r][0]; r++)
-		uc[uc_byte_table[r][0]] = uc_byte_table[r][1];
+			uc[i + 1] = cpu_to_le16(i);
+	for (r = 0; uc_byte_table[r][0]; r++) {
+		k = uc_byte_table[r][1];
+		uc[uc_byte_table[r][0]] = cpu_to_le16(k);
+	}
 }
 
 /**
