@@ -1359,7 +1359,7 @@ static ntfs_inode *ntfs_mft_rec_alloc(ntfs_volume *vol)
 	ntfs_inode *ni = NULL;
 	ntfs_inode *base_ni;
 	int err;
-	u16 seq_no, usn;
+	le16 seq_no, usn;
 
 	ntfs_log_enter("Entering\n");
 
@@ -1413,17 +1413,17 @@ found_free_rec:
 	}
 
 	seq_no = m->sequence_number;
-	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
+	usn = *(le16*)((u8*)m + le16_to_cpu(m->usa_ofs));
 	if (ntfs_mft_record_layout(vol, bit, m)) {
 		ntfs_log_error("Failed to re-format mft record.\n");
 		free(m);
 		goto undo_mftbmp_alloc;
 	}
-	if (le16_to_cpu(seq_no))
+	if (seq_no)
 		m->sequence_number = seq_no;
-	seq_no = le16_to_cpu(usn);
-	if (seq_no && seq_no != 0xffff)
-		*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
+	seq_no = usn;
+	if (seq_no && seq_no != const_cpu_to_le16(0xffff))
+		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
 	m->flags |= MFT_RECORD_IN_USE;
 	/* Now need to open an ntfs inode for the mft record. */
@@ -1588,7 +1588,7 @@ ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, ntfs_inode *base_ni)
 	MFT_RECORD *m;
 	ntfs_inode *ni = NULL;
 	int err;
-	u16 seq_no, usn;
+	le16 seq_no, usn;
 
 	if (base_ni)
 		ntfs_log_enter("Entering (allocating an extent mft record for "
@@ -1714,17 +1714,17 @@ found_free_rec:
 		goto retry;
 	}
 	seq_no = m->sequence_number;
-	usn = *(u16*)((u8*)m + le16_to_cpu(m->usa_ofs));
+	usn = *(le16*)((u8*)m + le16_to_cpu(m->usa_ofs));
 	if (ntfs_mft_record_layout(vol, bit, m)) {
 		ntfs_log_error("Failed to re-format mft record.\n");
 		free(m);
 		goto undo_mftbmp_alloc;
 	}
-	if (le16_to_cpu(seq_no))
+	if (seq_no)
 		m->sequence_number = seq_no;
-	seq_no = le16_to_cpu(usn);
-	if (seq_no && seq_no != 0xffff)
-		*(u16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
+	seq_no = usn;
+	if (seq_no && seq_no != const_cpu_to_le16(0xffff))
+		*(le16*)((u8*)m + le16_to_cpu(m->usa_ofs)) = usn;
 	/* Set the mft record itself in use. */
 	m->flags |= MFT_RECORD_IN_USE;
 	/* Now need to open an ntfs inode for the mft record. */
@@ -1816,7 +1816,8 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 {
 	u64 mft_no;
 	int err;
-	u16 seq_no, old_seq_no;
+	u16 seq_no;
+	le16 old_seq_no;
 
 	ntfs_log_trace("Entering for inode 0x%llx.\n", (long long) ni->mft_no);
 
@@ -1883,13 +1884,14 @@ sync_rollback:
  */
 int ntfs_mft_usn_dec(MFT_RECORD *mrec)
 {
-	u16 usn, *usnp;
+	u16 usn;
+	le16 *usnp;
 
 	if (!mrec) {
 		errno = EINVAL;
 		return -1;
 	}
-	usnp = (u16 *)((char *)mrec + le16_to_cpu(mrec->usa_ofs));
+	usnp = (le16*)((char*)mrec + le16_to_cpu(mrec->usa_ofs));
 	usn = le16_to_cpup(usnp);
 	if (usn-- <= 1)
 		usn = 0xfffe;
