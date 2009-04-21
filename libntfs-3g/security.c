@@ -1855,10 +1855,36 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 	int i;
 
 	perms = pxdesc->mode;
-					/* owner */
-	if (uid == scx->uid)
-		perms &= 07700;
-	else {
+					/* owner and root access */
+	if (!scx->uid || (uid == scx->uid)) {
+		if (!scx->uid) {
+					/* root access if owner or other execution */
+			if (perms & 0101)
+				perms = 07777;
+			else {
+					/* root access if some group execution */
+				groupperms = 0;
+				mask = 7;
+				for (i=pxdesc->acccnt-1; i>=0 ; i--) {
+					pxace = &pxdesc->acl.ace[i];
+					switch (pxace->tag) {
+					case POSIX_ACL_USER_OBJ :
+					case POSIX_ACL_GROUP_OBJ :
+					case POSIX_ACL_GROUP :
+						groupperms |= pxace->perms;
+						break;
+					case POSIX_ACL_MASK :
+						mask = pxace->perms & 7;
+						break;
+					default :
+						break;
+					}
+				}
+				perms = (groupperms & mask & 1) | 6;
+			}
+		} else
+			perms &= 07700;
+	} else {
 					/* analyze designated users and get mask */
 		userperms = -1;
 		groupperms = -1;
@@ -1935,7 +1961,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 	BOOL isdir;
 	struct POSIX_SECURITY *pxdesc;
 
-	if (!scx->mapping[MAPUSERS] || !scx->uid)
+	if (!scx->mapping[MAPUSERS])
 		perm = 07777;
 	else {
 		/* check whether available in cache */
@@ -3151,13 +3177,14 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 
 	if (scx->vol->secure_flags & (1 << SECURITY_DEFAULT)) return (1);
 	/*
-	 * Always allow for root. From the user's point of view,
-	 * testing X_OK for a file with no x flag should return
-	 * not allowed, but this is checked somewhere else (fuse ?)
-	 * and we need not care about it.
+	 * Always allow for root unless execution is requested.
+	 * (was checked by fuse until kernel 2.6.29)
 	 * Also always allow if no mapping has been defined
 	 */
-	if (!scx->mapping[MAPUSERS] || !scx->uid)
+	if (!scx->mapping[MAPUSERS]
+	    || (!scx->uid
+		&& (!(accesstype & S_IEXEC)
+		    || (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))))
 		allow = 1;
 	else {
 		perm = ntfs_get_perm(scx, path, ni, accesstype);
