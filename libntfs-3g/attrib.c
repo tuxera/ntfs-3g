@@ -4100,6 +4100,12 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 	 */
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
+	if ((a->flags & ATTR_COMPRESSION_MASK) == ATTR_IS_COMPRESSED) {
+			/* set compression writing parameters */
+		na->compression_block_size
+			= 1 << (STANDARD_COMPRESSION_UNIT + vol->cluster_size_bits);
+		na->compression_block_clusters = 1 << STANDARD_COMPRESSION_UNIT;
+	}
 
 	if (rl) {
 		/* Now copy the attribute value to the allocated cluster(s). */
@@ -4173,9 +4179,6 @@ static int ntfs_attr_make_non_resident(ntfs_attr *na,
 			/* support only ATTR_IS_COMPRESSED compression mode */
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;
 		a->compressed_size = const_cpu_to_le64(0);
-		na->compression_block_size
-			= 1 << (a->compression_unit + vol->cluster_size_bits);
-		na->compression_block_clusters = 1 << STANDARD_COMPRESSION_UNIT;
 	} else {
 		a->compression_unit = 0;
 		a->flags &= ~ATTR_COMPRESSION_MASK;
