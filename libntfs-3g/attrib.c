@@ -1502,7 +1502,8 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				goto err_out;
 		}
 		if (compressed) {
-			while (ofs >= (rl->length << vol->cluster_size_bits)) {
+			while (rl->length
+			    && (ofs >= (rl->length << vol->cluster_size_bits))) {
 				ofs -= rl->length << vol->cluster_size_bits;
 				rl++;
 			}
@@ -1778,7 +1779,8 @@ int ntfs_attr_pclose(ntfs_attr *na)
 		if (ntfs_attr_fill_hole(na, (s64)0, &ofs, &rl, &update_from))
 			goto err_out;
 	}
-	while (ofs >= (rl->length << vol->cluster_size_bits)) {
+	while (rl->length
+	    && (ofs >= (rl->length << vol->cluster_size_bits))) {
 		ofs -= rl->length << vol->cluster_size_bits;
 		rl++;
 	}
