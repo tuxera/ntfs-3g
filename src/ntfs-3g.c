@@ -982,7 +982,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		goto exit;
 	}
 	while (size) {
-		s64 ret = ntfs_attr_pwrite(na, offset, size, buf);
+		s64 ret = ntfs_attr_pwrite(na, offset, size, &buf[total]);
 		if (ret <= 0) {
 			res = -errno;
 			goto exit;
