@@ -1013,6 +1013,8 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 			uc[i + 1]--;
 	for (r = 0; uc_byte_table[r][0]; r++)
 		uc[uc_byte_table[r][0]] = uc_byte_table[r][1];
+	for (i = 0; (u32)i < uc_len; i++)
+		uc[i] = cpu_to_le16(uc[i]);
 }
 
 /**
