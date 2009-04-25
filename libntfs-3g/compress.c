@@ -1119,8 +1119,8 @@ static int ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
 		if (!written)
 			compress = FALSE;
 		if ((written > 0)
-		   && ntfs_compress_free(na,rl,written,
-				na->compression_block_size))
+		   && ntfs_compress_free(na,rl,offs + written,
+				offs + na->compression_block_size))
 			written = -1;
 	}
 	if (!compress) {
