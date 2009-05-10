@@ -171,6 +171,7 @@ static const struct fuse_opt ntfs_fuse_opts[] = {
 	FUSE_OPT_KEY("fsname=", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("blkdev", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("blksize=", FUSE_OPT_KEY_DISCARD),
+	FUSE_OPT_KEY("uhelper=", FUSE_OPT_KEY_DISCARD),
 	FUSE_OPT_KEY("ro", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("rw", FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("atime", FUSE_OPT_KEY_KEEP),
