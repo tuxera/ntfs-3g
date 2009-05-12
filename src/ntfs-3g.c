@@ -83,6 +83,10 @@
 #include <sys/mkdev.h>
 #endif
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+#include <sys/dirent.h>
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+
 #include "compat.h"
 #include "attrib.h"
 #include "inode.h"
@@ -631,11 +635,12 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 {
 	char *filename = NULL;
 	int ret = 0;
+	int filenamelen = -1;
 
 	if (name_type == FILE_NAME_DOS)
 		return 0;
 	
-	if (ntfs_ucstombs(name, name_len, &filename, 0) < 0) {
+	if ((filenamelen = ntfs_ucstombs(name, name_len, &filename, 0)) < 0) {
 		ntfs_log_perror("Filename decoding failed (inode %llu)",
 				(unsigned long long)MREF(mref));
 		return -1;
@@ -658,6 +663,20 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 		else if (dt_type == NTFS_DT_DIR)
 			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask); 
 		
+#if defined(__APPLE__) || defined(__DARWIN__)
+		/* 
+		 * Returning file names larger than MAXNAMLEN (255) bytes
+		 * causes Darwin/Mac OS X to bug out and skip the entry. 
+		 */
+		if (filenamelen > MAXNAMLEN) {
+			ntfs_log_debug("Truncating %d byte filename to "
+				       "%d bytes.\n", filenamelen, MAXNAMLEN);
+			ntfs_log_debug("  before: '%s'\n", filename);
+			memset(filename + MAXNAMLEN, 0, filenamelen - MAXNAMLEN);
+			ntfs_log_debug("   after: '%s'\n", filename);
+		}
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+	
 		ret = fill_ctx->filler(fill_ctx->buf, filename, &st, 0);
 	}
 	
