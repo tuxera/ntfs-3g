@@ -614,13 +614,12 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	if (withusermapping) {
 		if (ntfs_get_owner_mode(&security,path,ni,stbuf) < 0)
 			set_fuse_error(&res);
-		else
-			if (S_ISLNK(stbuf->st_mode))
-				stbuf->st_mode |= 0777;
 	} else {
 		stbuf->st_uid = ctx->uid;
        		stbuf->st_gid = ctx->gid;
 	}
+	if (S_ISLNK(stbuf->st_mode))
+		stbuf->st_mode |= 0777;
 	stbuf->st_ino = ni->mft_no;
 	stbuf->st_atime = ni->last_access_time;
 	stbuf->st_ctime = ni->last_mft_change_time;
