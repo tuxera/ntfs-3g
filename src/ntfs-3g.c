@@ -2536,7 +2536,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (((namespace == XATTRNS_SECURITY)
 	   || (namespace == XATTRNS_TRUSTED))
 		&& security.uid)
-		    return -EACCES;
+		    return -EPERM;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
