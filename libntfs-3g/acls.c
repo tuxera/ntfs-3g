@@ -2944,7 +2944,8 @@ static int build_std_permissions(const char *securattr,
 				else if (pace->type == ACCESS_DENIED_ACE_TYPE)
 					denyown |= pace->mask;
 				} else
-				if (ntfs_same_sid(gsid, &pace->sid)) {
+				if (ntfs_same_sid(gsid, &pace->sid)
+				    && !(pace->mask & WRITE_OWNER)) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
 						allowgrp |= pace->mask;
 					else if (pace->type == ACCESS_DENIED_ACE_TYPE)
@@ -3403,6 +3404,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 	BOOL adminowns;
 	BOOL groupowns;
 	BOOL firstinh;
+	BOOL genericinh;
 
 	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 	offdacl = le32_to_cpu(phead->dacl);
@@ -3417,15 +3419,16 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 	adminowns = FALSE;
 	groupowns = ntfs_same_sid(gsid,usid);
 	firstinh = FALSE;
+	genericinh = FALSE;
 		/*
 		 * Build a raw posix security descriptor
 		 * by just translating permissions and ids
 		 * Add 2 to the count of ACE to be able to insert
 		 * a group ACE later in access and default ACLs
 		 * and add 2 more to be able to insert ACEs for owner
-		 * and 1 more for other
+		 * and 2 more for other
 		 */
-	alloccnt = acecnt + 5;
+	alloccnt = acecnt + 6;
 	pxdesc = (struct POSIX_SECURITY*)malloc(
 				sizeof(struct POSIX_SECURITY)
 				+ alloccnt*sizeof(struct POSIX_ACE));
@@ -3460,6 +3463,9 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 		   && ntfs_same_sid(&pace->sid, adminsid)) {
 			pxace->tag = (pace->mask & ROOT_OWNER_UNMARK ? POSIX_ACL_GROUP : POSIX_ACL_USER);
 			pxace->id = 0;
+			if ((pace->mask & (GENERIC_ALL | WRITE_OWNER))
+			   && (pace->flags & INHERIT_ONLY_ACE))
+				ignore = genericinh = TRUE;
 		} else
 		if (ntfs_same_sid(usid, &pace->sid)) {
 			pxace->id = -1;
@@ -3470,7 +3476,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				 * denials are meant to owner
 				 * and grants are meant to group
 				 */
-			if (!(pace->mask & WRITE_OWNER)
+			if (!(pace->mask & (WRITE_OWNER | GENERIC_ALL))
 			    && (pace->type == ACCESS_ALLOWED_ACE_TYPE)) {
 				if (ntfs_same_sid(gsid,usid)) {
 					pxace->tag = POSIX_ACL_GROUP_OBJ;
@@ -3553,10 +3559,14 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 						pctx->gotgroup = TRUE;
 				}
 
-				if (ntfs_same_sid(gsid,adminsid)) {
-					adminowns = TRUE;
-					if (pace->mask & WRITE_OWNER)
+				if (ntfs_same_sid(gsid,adminsid)
+				    || ntfs_same_sid(gsid,systemsid)) {
+					if (pace->mask & (WRITE_OWNER | GENERIC_ALL))
 						ignore = TRUE;
+					if (ntfs_same_sid(gsid,adminsid))
+						adminowns = TRUE;
+					else
+						genericinh = ignore;
 				}
 			}
 		} else if (is_world_sid((const SID*)&pace->sid)) {
@@ -3622,6 +3632,11 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 						pxace->perms |= POSIX_PERM_W;
 					if (pace->mask & DIR_GREAD)
 						pxace->perms |= POSIX_PERM_R;
+					if ((pace->mask & GENERIC_ALL)
+					   && (pace->flags & INHERIT_ONLY_ACE))
+						pxace->perms |= POSIX_PERM_X
+								| POSIX_PERM_W
+								| POSIX_PERM_R;
 				} else {
 					if (pace->mask & FILE_GEXEC)
 						pxace->perms |= POSIX_PERM_X;
@@ -3646,17 +3661,21 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 		offace += le16_to_cpu(pace->size);
 	}
 		/*
-		 * Create world perms if none (access ACE only)
+		 * Create world perms if none (both lists)
 		 */
-	if (!(ctx[0].tagsset & POSIX_ACL_OTHER)) {
-		pxace = &pxdesc->acl.ace[k];
-		pxace->tag = POSIX_ACL_OTHER;
-		pxace->id = -1;
-		pxace->perms = 0;
-		ctx[0].tagsset |= POSIX_ACL_OTHER;
-		ctx[0].permswrld = 0;
-		k++;
-	}
+	for (i=0; i<2; i++)
+		if ((genericinh || !i)
+		    && !(ctx[i].tagsset & POSIX_ACL_OTHER)) {
+			if (i)
+				pxace = &pxdesc->acl.ace[--l];
+			else
+				pxace = &pxdesc->acl.ace[k++];
+			pxace->tag = POSIX_ACL_OTHER;
+			pxace->id = -1;
+			pxace->perms = 0;
+			ctx[i].tagsset |= POSIX_ACL_OTHER;
+			ctx[i].permswrld = 0;
+		}
 		/*
 		 * Set basic owner perms if none (both lists)
 		 * This happens for files created by Windows in directories
