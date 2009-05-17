@@ -3467,12 +3467,16 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * new attribute is smaller than parent's
 		 * except for differences in SIDs which appear in
 		 * owner, group and possible grants and denials in
-		 * generic creator-owner and creator-group ACEs
+		 * generic creator-owner and creator-group ACEs.
+		 * For directories, an ACE may be duplicated for
+		 * access and inheritance, so we double the count.
 		 */
 	usidsz = ntfs_sid_size(usid);
 	gsidsz = ntfs_sid_size(gsid);
 	newattrsz = parentattrsz + 3*usidsz + 3*gsidsz;
-	newattr = (char*)ntfs_malloc(parentattrsz);
+	if (fordir)
+		newattrsz *= 2;
+	newattr = (char*)ntfs_malloc(newattrsz);
 	if (newattr) {
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
 		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;

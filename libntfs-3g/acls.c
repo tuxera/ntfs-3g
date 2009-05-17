@@ -686,6 +686,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	for (nace = 0; nace < oldcnt; nace++) {
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
+			/* inheritance for access */
 		if (poldace->flags & selection) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
@@ -702,11 +703,50 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				memcpy(&pnewace->sid, gsid, gsidsz);
 				acesz = gsidsz + 8;
 			}
-				/* remove inheritance flags if not a directory */
-			if (!fordir)
-				pnewace->flags &= ~(OBJECT_INHERIT_ACE
+			if (pnewace->mask & GENERIC_ALL) {
+				pnewace->mask &= ~GENERIC_ALL;
+				if (fordir)
+					pnewace->mask |= OWNER_RIGHTS
+							| DIR_READ
+							| DIR_WRITE
+							| DIR_EXEC;
+				else
+			/*
+			 * The last flag is not defined for a file,
+			 * however Windows sets it, so do the same
+			 */
+					pnewace->mask |= OWNER_RIGHTS
+							| FILE_READ
+							| FILE_WRITE
+							| FILE_EXEC
+							| cpu_to_le32(0x40);
+			}
+				/* remove inheritance flags */
+			pnewace->flags &= ~(OBJECT_INHERIT_ACE
 						| CONTAINER_INHERIT_ACE
 						| INHERIT_ONLY_ACE);
+			dst += acesz;
+			newcnt++;
+		}
+			/* inheritance for further inheritance */
+		if (fordir
+		   && (poldace->flags
+			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE))) {
+			pnewace = (ACCESS_ALLOWED_ACE*)
+					((char*)newacl + dst);
+			memcpy(pnewace,poldace,acesz);
+				/*
+				 * Replace generic creator-owner and
+				 * creator-group by owner and group
+				 */
+			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
+				memcpy(&pnewace->sid, usid, usidsz);
+				acesz = usidsz + 8;
+			}
+			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
+				memcpy(&pnewace->sid, gsid, gsidsz);
+				acesz = gsidsz + 8;
+			}
 			dst += acesz;
 			newcnt++;
 		}
