@@ -58,6 +58,7 @@
 #include "bitmap.h"
 #include "logging.h"
 #include "misc.h"
+#include "efs.h"
 
 #define STANDARD_COMPRESSION_UNIT 4
 
@@ -446,7 +447,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * directory (for unnamed data streams) or on current
 		 * inode (for named data streams). The compression mark
 		 * may change any time, the compression state can only
-		 * change when stream is void.
+		 * change when stream is wiped out.
 		 */
 		a->flags &= ~ATTR_COMPRESSION_MASK;
 		if (na->ni->flags & FILE_ATTR_COMPRESSED)
@@ -806,9 +807,10 @@ map_rl:
  */ 
 static s64 ntfs_attr_pread_i(ntfs_attr *na, const s64 pos, s64 count, void *b)
 {
-	s64 br, to_read, ofs, total, total2;
+	s64 br, to_read, ofs, total, total2, max_read, max_init;
 	ntfs_volume *vol;
 	runlist_element *rl;
+	u16 efs_padding_length;
 
 	/* Sanity checking arguments is done in ntfs_attr_pread(). */
 	
@@ -825,20 +827,37 @@ static s64 ntfs_attr_pread_i(ntfs_attr *na, const s64 pos, s64 count, void *b)
 	/*
 	 * Encrypted non-resident attributes are not supported.  We return
 	 * access denied, which is what Windows NT4 does, too.
+	 * However, allow if mounted with efs_raw option
 	 */
-	if (NAttrEncrypted(na) && NAttrNonResident(na)) {
+	vol = na->ni->vol;
+	if (!vol->efs_raw && NAttrEncrypted(na) && NAttrNonResident(na)) {
 		errno = EACCES;
 		return -1;
 	}
-	vol = na->ni->vol;
 	
 	if (!count)
 		return 0;
-	/* Truncate reads beyond end of attribute. */
-	if (pos + count > na->data_size) {
-		if (pos >= na->data_size)
+		/*
+		 * Truncate reads beyond end of attribute,
+		 * but round to next 512 byte boundary for encrypted
+		 * attributes with efs_raw mount option
+		 */
+	max_read = na->data_size;
+	max_init = na->initialized_size;
+	if (na->ni->vol->efs_raw
+	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && NAttrNonResident(na)) {
+		if (na->data_size != na->initialized_size) {
+			ntfs_log_error("uninitialized encrypted file not supported\n");
+			errno = EINVAL;
+			return -1;
+		}	
+		max_init = max_read = ((na->data_size + 511) & ~511) + 2;
+	}
+	if (pos + count > max_read) {
+		if (pos >= max_read)
 			return 0;
-		count = na->data_size - pos;
+		count = max_read - pos;
 	}
 	/* If it is a resident attribute, get the value from the mft record. */
 	if (!NAttrNonResident(na)) {
@@ -868,15 +887,42 @@ res_err_out:
 	}
 	total = total2 = 0;
 	/* Zero out reads beyond initialized size. */
-	if (pos + count > na->initialized_size) {
-		if (pos >= na->initialized_size) {
+	if (pos + count > max_init) {
+		if (pos >= max_init) {
 			memset(b, 0, count);
 			return count;
 		}
-		total2 = pos + count - na->initialized_size;
+		total2 = pos + count - max_init;
 		count -= total2;
 		memset((u8*)b + count, 0, total2);
 	}
+		/*
+		 * for encrypted non-resident attributes with efs_raw set 
+		 * the last two bytes aren't read from disk but contain
+		 * the number of padding bytes so original size can be 
+		 * restored
+		 */
+	if (na->ni->vol->efs_raw && 
+			(na->data_flags & ATTR_IS_ENCRYPTED) && 
+			((pos + count) > max_init-2)) {
+		efs_padding_length = 511 - ((na->data_size - 1) & 511);
+		if (pos+count == max_init) {
+			if (count == 1) {
+				*((u8*)b+count-1) = (u8)(efs_padding_length >> 8);
+				count--;
+				total2++;
+			} else {
+				*(u16*)((u8*)b+count-2) = cpu_to_le16(efs_padding_length);
+				count -= 2;
+				total2 +=2;
+			}
+		} else {
+			*((u8*)b+count-1) = (u8)(efs_padding_length & 0xff);
+			count--;
+			total2++;
+		}
+	}
+	
 	/* Find the runlist element containing the vcn. */
 	rl = ntfs_attr_find_vcn(na, pos >> vol->cluster_size_bits);
 	if (!rl) {
@@ -1255,10 +1301,12 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
 			 != const_cpu_to_le16(0);
 	/*
-	 * Encrypted non-resident attributes are not supported.  We return
+	 * Encrypted attributes are only supported in raw mode.  We return
 	 * access denied, which is what Windows NT4 does, too.
+	 * Moreover a file cannot be both encrypted and compressed.
 	 */
-	if (NAttrEncrypted(na) && NAttrNonResident(na)) {
+	if ((na->data_flags & ATTR_IS_ENCRYPTED)
+	   && (compressed || !vol->efs_raw)) {
 		errno = EACCES;
 		goto errno_set;
 	}
@@ -3074,7 +3122,7 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 	ntfs_inode *base_ni;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr 0x%x, flags 0x%x.\n",
-		(long long) ni->mft_no, (unsigned) type, (unsigned) flags);
+		(long long) ni->mft_no, (unsigned) type, (unsigned) data_flags);
 
 	if (!ni || (!name && name_len)) {
 		errno = EINVAL;
@@ -4051,7 +4099,7 @@ int ntfs_attr_record_move_away(ntfs_attr_search_ctx *ctx, int extra)
  *	    We expect the caller to do this as this is a fairly low level
  *	    function and it is likely there will be further changes made.
  */
-static int ntfs_attr_make_non_resident(ntfs_attr *na,
+int ntfs_attr_make_non_resident(ntfs_attr *na,
 		ntfs_attr_search_ctx *ctx)
 {
 	s64 new_allocated_size, bw;
@@ -4504,8 +4552,8 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	if (ntfs_attr_can_be_resident(vol, na->type))
 		return -1;
 
-	if (NAttrEncrypted(na)) {
-		ntfs_log_trace("Making encrypted files resident is not "
+	if (na->data_flags & ATTR_IS_ENCRYPTED) {
+		ntfs_log_trace("Making encrypted streams resident is not "
 				"implemented yet.\n");
 		errno = EOPNOTSUPP;
 		return -1;
@@ -5476,9 +5524,9 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	 * Encrypted attributes are not supported. We return access denied,
 	 * which is what Windows NT4 does, too.
 	 */
-	if (NAttrEncrypted(na)) {
+	if (na->data_flags & ATTR_IS_ENCRYPTED) {
 		errno = EACCES;
-		ntfs_log_perror("Failed to truncate encrypted attribute");
+		ntfs_log_info("Failed to truncate encrypted attribute");
 		goto out;
 	}
 	/*

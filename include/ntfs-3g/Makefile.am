@@ -14,6 +14,7 @@ headers = \
 	device.h	\
 	device_io.h	\
 	dir.h		\
+	efs.h		\
 	endians.h	\
 	index.h		\
 	inode.h		\

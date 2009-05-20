@@ -285,7 +285,8 @@ extern int ntfs_attr_can_be_non_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
 extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
-
+int ntfs_attr_make_non_resident(ntfs_attr *na,
+		ntfs_attr_search_ctx *ctx);
 extern int ntfs_make_room_for_attr(MFT_RECORD *m, u8 *pos, u32 size);
 
 extern int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,

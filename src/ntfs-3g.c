@@ -94,6 +94,7 @@
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
+#include "efs.h"
 #include "logging.h"
 #include "misc.h"
 
@@ -122,6 +123,11 @@ typedef enum {
 	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
 } ntfs_fuse_streams_interface;
 
+enum {
+	CLOSE_COMPRESSED = 1,
+	CLOSE_ENCRYPTED = 2
+};
+
 typedef struct {
 	ntfs_volume *vol;
 	unsigned int uid;
@@ -139,6 +145,7 @@ typedef struct {
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
+	BOOL efs_raw;
 	struct fuse_chan *fc;
 	BOOL inherit;
 	unsigned int secure_flags;
@@ -532,6 +539,14 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
+		/*
+		 * return data size rounded to next 512 byte boundary for
+		 * encrypted files to include padding required for decryption
+		 * also include 2 bytes for padding info
+		*/
+		if (ctx->efs_raw && ni->flags & FILE_ATTR_ENCRYPTED)
+			stbuf->st_size = ((ni->data_size + 511) & ~511) + 2;
+
 		/* 
 		 * Temporary fix to make ActiveSync work via Samba 3.0.
 		 * See more on the ntfs-3g-devel list.
@@ -560,6 +575,12 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 				if (na->data_size == 1)
 					stbuf->st_mode = S_IFSOCK;
 			}
+			/* encrypted named stream */
+			/* round size up to next 512 byte boundary */
+			if (ctx->efs_raw && stream_name_len && 
+			    (na->data_flags & ATTR_IS_ENCRYPTED) &&
+			    NAttrNonResident(na)) 
+				stbuf->st_size = ((na->data_size+511) & ~511)+2;
 			/*
 			 * Check whether it's Interix symbolic link, block or
 			 * character device.
@@ -793,9 +814,9 @@ static int ntfs_fuse_opendir(const char *path,
 					accesstype = S_IWRITE | S_IREAD;
 				else
 					accesstype = S_IREAD;
-		     /* JPA directory must be searchable */
+				/* directory must be searchable */
 			if (!ntfs_allowed_dir_access(&security,path,S_IEXEC)
-		     /* JPA check whether requested access is allowed */
+				/* check whether requested access is allowed */
 			  || !ntfs_allowed_access(&security,path,ni,accesstype))
 				res = -EACCES;
 		}
@@ -865,25 +886,26 @@ static int ntfs_fuse_open(const char *org_path,
 						 accesstype = S_IWRITE | S_IREAD;
 					else
 						accesstype = S_IREAD;
-				if (NAttrEncrypted(na)
 			     /* JPA directory must be searchable */
-				  || !ntfs_allowed_dir_access(&security,path,S_IEXEC)
+				if (!ntfs_allowed_dir_access(&security,
+				    path,S_IEXEC)
 			     /* JPA check whether requested access is allowed */
-				  || !ntfs_allowed_access(&security,path,ni,accesstype))
-					res = -EACCES;
-			} else {
-				if (NAttrEncrypted(na))
+				  || !ntfs_allowed_access(&security,
+				    path,ni,accesstype))
 					res = -EACCES;
 			}
-#else
-			if (NAttrEncrypted(na))
-				res = -EACCES;
 #endif
-			/* mark a future need to compress the last chunk */
 			if ((res >= 0)
-			    && (na->data_flags & ATTR_COMPRESSION_MASK)
-			    && (fi->flags & (O_WRONLY | O_RDWR)))
-				fi->fh |= 1;
+			    && (fi->flags & (O_WRONLY | O_RDWR))) {
+			/* mark a future need to compress the last chunk */
+				if (na->data_flags & ATTR_COMPRESSION_MASK)
+					fi->fh |= CLOSE_COMPRESSED;
+			/* mark a future need to fixup encrypted inode */
+				if (ctx->efs_raw
+				    && !(na->data_flags & ATTR_IS_ENCRYPTED)
+				    && (ni->flags & FILE_ATTR_ENCRYPTED))
+					fi->fh |= CLOSE_ENCRYPTED;
+			}
 			ntfs_attr_close(na);
 		} else
 			res = -errno;
@@ -906,6 +928,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	ntfschar *stream_name;
 	int stream_name_len, res;
 	s64 total = 0;
+	s64 max_read;
 
 	if (!size)
 		return 0;
@@ -923,10 +946,16 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	if (offset + (off_t)size > na->data_size) {
-		if (na->data_size < offset)
+	/* limit reads at next 512 byte boundary for encrypted attributes */
+	max_read = na->data_size;
+	if (ctx->efs_raw && (na->data_flags & ATTR_IS_ENCRYPTED) && 
+            NAttrNonResident(na)) {
+		max_read = ((na->data_size+511) & ~511) + 2;
+	}
+	if (offset + (off_t)size > max_read) {
+		if (max_read < offset)
 			goto ok;
-		size = na->data_size - offset;
+		size = max_read - offset;
 	}
 	while (size > 0) {
 		s64 ret = ntfs_attr_pread(na, offset, size, buf);
@@ -1015,7 +1044,7 @@ static int ntfs_fuse_release(const char *org_path,
 	int stream_name_len, res;
 
 	/* Only for marked descriptors there is something to do */
-	if (!(fi->fh & 1)) {
+	if (!(fi->fh & (CLOSE_COMPRESSED | CLOSE_ENCRYPTED))) {
 		res = 0;
 		goto out;
 	}
@@ -1034,7 +1063,11 @@ static int ntfs_fuse_release(const char *org_path,
 		res = -errno;
 		goto exit;
 	}
-	res = ntfs_attr_pclose(na);
+	res = 0;
+	if (fi->fh & CLOSE_COMPRESSED)
+		res = ntfs_attr_pclose(na);
+	if (fi->fh & CLOSE_ENCRYPTED)
+		res = ntfs_efs_fixup_attribute(NULL, na);
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -1372,10 +1405,15 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					set_fuse_error(&res);
 #endif
 			}
-				/* mark a need to compress the end of file */
+			/* mark a need to compress the end of file */
 			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
-				fi->fh |= 1;
+				fi->fh |= CLOSE_COMPRESSED;
 			}
+			/* mark a future need to fixup encrypted inode */
+			if (fi
+			    && ctx->efs_raw
+			    && (ni->flags & FILE_ATTR_ENCRYPTED))
+				fi->fh |= CLOSE_ENCRYPTED;
 			NInoSetDirty(ni);
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
@@ -1426,9 +1464,18 @@ static int ntfs_fuse_create_stream(const char *path,
 	}
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
-	if ((res >= 0) && (ni->flags & FILE_ATTR_COMPRESSED)
-	    && (fi->flags & (O_WRONLY | O_RDWR)))
-		fi->fh |= 1;
+
+	if ((res >= 0)
+	    && (fi->flags & (O_WRONLY | O_RDWR))) {
+		/* mark a future need to compress the last block */
+		if (ni->flags & FILE_ATTR_COMPRESSED)
+			fi->fh |= CLOSE_COMPRESSED;
+		/* mark a future need to fixup encrypted inode */
+		if (ctx->efs_raw
+		    && (ni->flags & FILE_ATTR_ENCRYPTED))
+			fi->fh |= CLOSE_ENCRYPTED;
+	}
+
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	return res;
@@ -1925,11 +1972,14 @@ static const char xattr_ntfs_3g[] = "ntfs-3g.";
 enum { XATTR_UNMAPPED,
 	XATTR_NTFS_ACL,
 	XATTR_NTFS_ATTRIB,
+	XATTR_NTFS_EFSINFO,
 	XATTR_NTFS_REPARSE_DATA,
-	XATTR_POSIX_ACC, XATTR_POSIX_DEF } ;
+	XATTR_POSIX_ACC, 
+	XATTR_POSIX_DEF } ;
 
 static const char nf_ns_xattr_ntfs[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
+static const char nf_ns_xattr_efsinfo[] = "user.ntfs.efsinfo";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
@@ -2003,7 +2053,12 @@ static int mapped_xattr_system(const char *name)
 					if (!strcmp(name,nf_ns_xattr_posix_default))
 						num = XATTR_POSIX_DEF;
 					else
-						num = XATTR_UNMAPPED;
+						if (ctx->efs_raw
+						    && !strcmp(name,
+							  nf_ns_xattr_efsinfo))
+							num = XATTR_NTFS_EFSINFO;
+						else
+							num = XATTR_UNMAPPED;
 	return (num);
 }
 
@@ -2093,10 +2148,6 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 #endif
-
-	if ((ctx->streams != NF_STREAMS_INTERFACE_XATTR)
-	    && (ctx->streams != NF_STREAMS_INTERFACE_OPENXATTR))
-		return -EOPNOTSUPP;
 #if POSIXACLS
 		   /* parent directory must be executable */
 	if (ntfs_fuse_fill_security_context(&security)
@@ -2121,53 +2172,71 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 		ntfs_inode_close(ni);
 		goto exit;
 	}
-	while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
-				0, NULL, 0, actx)) {
-		char *tmp_name = NULL;
-		int tmp_name_len;
 
-		if (!actx->attr->name_length)
-			continue;
-		tmp_name_len = ntfs_ucstombs((ntfschar *)((u8*)actx->attr +
-				le16_to_cpu(actx->attr->name_offset)),
+	if ((ctx->streams == NF_STREAMS_INTERFACE_XATTR)
+	    || (ctx->streams == NF_STREAMS_INTERFACE_OPENXATTR)) {
+		while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE,
+					0, NULL, 0, actx)) {
+			char *tmp_name = NULL;
+			int tmp_name_len;
+
+			if (!actx->attr->name_length)
+				continue;
+			tmp_name_len = ntfs_ucstombs(
+				(ntfschar *)((u8*)actx->attr +
+					le16_to_cpu(actx->attr->name_offset)),
 				actx->attr->name_length, &tmp_name, 0);
-		if (tmp_name_len < 0) {
-			ret = -errno;
-			goto exit;
-		}
-			/*
-			 * When using name spaces, do not return
-			 * security, trusted nor system attributes
-			 * (filtered elsewhere anyway)
-			 * otherwise insert "user." prefix
-			 */
-		if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
-			if ((strlen(tmp_name) > sizeof(xattr_ntfs_3g))
-			  && !strncmp(tmp_name,xattr_ntfs_3g,
-				sizeof(xattr_ntfs_3g)-1))
-				tmp_name_len = 0;
-			else
-				ret += tmp_name_len + nf_ns_user_prefix_len + 1;
-		} else
-			ret += tmp_name_len + 1;
-		if (size && tmp_name_len) {
-			if ((size_t)ret <= size) {
-				if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
-					strcpy(to, nf_ns_user_prefix);
-					to += nf_ns_user_prefix_len;
-				}
-				strncpy(to, tmp_name, tmp_name_len);
-				to += tmp_name_len;
-				*to = 0;
-				to++;
-			} else {
-				free(tmp_name);
-				ret = -ERANGE;
+			if (tmp_name_len < 0) {
+				ret = -errno;
 				goto exit;
 			}
+				/*
+				 * When using name spaces, do not return
+				 * security, trusted nor system attributes
+				 * (filtered elsewhere anyway)
+				 * otherwise insert "user." prefix
+				 */
+			if (ctx->streams == NF_STREAMS_INTERFACE_XATTR) {
+				if ((strlen(tmp_name) > sizeof(xattr_ntfs_3g))
+				  && !strncmp(tmp_name,xattr_ntfs_3g,
+					sizeof(xattr_ntfs_3g)-1))
+					tmp_name_len = 0;
+				else
+					ret += tmp_name_len
+						 + nf_ns_user_prefix_len + 1;
+			} else
+				ret += tmp_name_len + 1;
+			if (size && tmp_name_len) {
+				if ((size_t)ret <= size) {
+					if (ctx->streams
+					    == NF_STREAMS_INTERFACE_XATTR) {
+						strcpy(to, nf_ns_user_prefix);
+						to += nf_ns_user_prefix_len;
+					}
+					strncpy(to, tmp_name, tmp_name_len);
+					to += tmp_name_len;
+					*to = 0;
+					to++;
+				} else {
+					free(tmp_name);
+					ret = -ERANGE;
+					goto exit;
+				}
+			}
+			free(tmp_name);
 		}
-		free(tmp_name);
 	}
+
+		/* List efs info xattr for encrypted files */
+	if (ctx->efs_raw && (ni->flags & FILE_ATTR_ENCRYPTED)) {
+		ret += sizeof(nf_ns_xattr_efsinfo);
+		if ((size_t)ret <= size) {
+			memcpy(to, nf_ns_xattr_efsinfo,
+				sizeof(nf_ns_xattr_efsinfo));
+			to += sizeof(nf_ns_xattr_efsinfo);
+		}
+	}
+
 	if (errno != ENOENT)
 		ret = -errno;
 exit:
@@ -2263,6 +2332,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
 	int res, lename_len;
+	s64 rsize;
 	int attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
@@ -2298,6 +2368,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					res = ntfs_get_ntfs_attrib(path,
 						value,size,ni);
 					break;
+				case XATTR_NTFS_EFSINFO :
+					res = ntfs_get_efs_info(path,
+						value,size,ni);
+					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
 						value,size,ni);
@@ -2305,8 +2379,9 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 				default : /* not possible */
 					break;
 				}
-			} else
+			} else {
 				res = -errno;
+                        }
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		} else
@@ -2337,6 +2412,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					break;
 				case XATTR_NTFS_ATTRIB :
 					res = ntfs_get_ntfs_attrib(path,
+						value,size,ni);
+					break;
+				case XATTR_NTFS_EFSINFO :
+					res = ntfs_get_efs_info(path,
 						value,size,ni);
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
@@ -2398,15 +2477,20 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		res = -ENODATA;
 		goto exit;
 	}
+	rsize = na->data_size;
+	if (ctx->efs_raw && 
+	    (na->data_flags & ATTR_IS_ENCRYPTED) &&
+	    NAttrNonResident(na))
+		rsize = ((na->data_size + 511) & ~511)+2;
 	if (size) {
-		if (size >= (size_t)na->data_size) {
-			res = ntfs_attr_pread(na, 0, na->data_size, value);
-			if (res != na->data_size)
+		if (size >= (size_t)rsize) {
+			res = ntfs_attr_pread(na, 0, rsize, value);
+			if (res != rsize)
 				res = -errno;
 		} else
 			res = -ERANGE;
 	} else
-		res = na->data_size;
+		res = rsize;
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -2454,6 +2538,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					res = ntfs_set_ntfs_attrib(path,
 						value,size,flags,ni);
 					break;
+				case XATTR_NTFS_EFSINFO :
+					res = ntfs_set_efs_info(path,
+						value,size,flags,ni);
+					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_set_ntfs_reparse_data(path,
 						value,size,flags,ni);
@@ -2493,6 +2581,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 						break;
 					case XATTR_NTFS_ATTRIB :
 						res = ntfs_set_ntfs_attrib(path,
+							value,size,flags,ni);
+						break;
+					case XATTR_NTFS_EFSINFO :
+						res = ntfs_set_efs_info(path,
 							value,size,flags,ni);
 						break;
 					case XATTR_NTFS_REPARSE_DATA :
@@ -2603,10 +2695,14 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			if (part > 0)
 				total += part;
 		} while ((part > 0) && (total < size));
-	if (total != size)
-		res = -errno;
-	else
-		res = ntfs_attr_pclose(na);
+		if (total != size)
+			res = -errno;
+		else
+			if (!(res = ntfs_attr_pclose(na)))
+				if (ctx->efs_raw 
+				   && (ni->flags & FILE_ATTR_ENCRYPTED))
+					res = ntfs_efs_fixup_attribute(NULL,
+						na);
 	} else
 		res = 0;
 exit:
@@ -2644,6 +2740,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			 */
 		case XATTR_NTFS_ACL :
 		case XATTR_NTFS_ATTRIB :
+		case XATTR_NTFS_EFSINFO :
 			res = -EPERM;
 			break;
 		case XATTR_POSIX_ACC :
@@ -2688,6 +2785,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 				 */
 			case XATTR_NTFS_ACL :
 			case XATTR_NTFS_ATTRIB :
+			case XATTR_NTFS_EFSINFO :
 				res = -EPERM;
 				break;
 			case XATTR_NTFS_REPARSE_DATA :
@@ -2994,6 +3092,7 @@ static char *parse_mount_options(const char *orig_opts)
 	int default_permissions = 0;
 
 	ctx->secure_flags = 0;
+	ctx->efs_raw = FALSE;
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
 		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
@@ -3164,6 +3263,10 @@ static char *parse_mount_options(const char *orig_opts)
 					"'usermapping' option.\n");
 				goto err_exit;
 			}
+		} else if (!strcmp(opt, "efs_raw")) {
+			if (bogus_option_value(val, "efs_raw"))
+				goto err_exit;
+			ctx->efs_raw = TRUE;
 		} else { /* Probably FUSE option. */
 			if (strappend(&ret, opt))
 				goto err_exit;
@@ -3615,6 +3718,7 @@ int main(int argc, char *argv[])
 
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
+	ctx->vol->efs_raw = ctx->efs_raw;
 	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
 		ctx->security.uid = ctx->uid;
 		ctx->security.gid = ctx->gid;

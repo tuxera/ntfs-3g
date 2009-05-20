@@ -228,6 +228,8 @@ struct _ntfs_volume {
 	s64 free_clusters; 	/* Track the number of free clusters which
 				   greatly improves statfs() performance */
 	s64 free_mft_records; 	/* Same for free mft records (see above) */
+	BOOL efs_raw;		/* volume is mounted for raw access to
+				   efs-encrypted files */
 
 #if CACHE_INODE_SIZE
 	struct CACHE_HEADER *xinode_cache;

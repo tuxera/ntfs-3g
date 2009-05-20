@@ -29,6 +29,7 @@ libntfs_3g_la_SOURCES =	\
 	debug.c 	\
 	device.c 	\
 	dir.c 		\
+	efs.c 		\
 	index.c 	\
 	inode.c 	\
 	lcnalloc.c 	\
@@ -37,7 +38,7 @@ libntfs_3g_la_SOURCES =	\
 	mft.c 		\
 	misc.c 		\
 	mst.c 		\
-	reparse.c	\
+	reparse.c 	\
 	runlist.c 	\
 	security.c 	\
 	unistr.c 	\
