@@ -65,5 +65,45 @@ extern ntfschar *ntfs_str2ucs(const char *s, int *len);
 
 extern void ntfs_ucsfree(ntfschar *ucs);
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+/**
+ * Mac OS X only.
+ *
+ * Sets file name Unicode normalization form conversion on or off.
+ *   normalize=0 : Off
+ *   normalize=1 : On
+ * If set to on, all filenames returned by ntfs-3g will be converted to the NFD
+ * normalization form, while all filenames recieved by ntfs-3g will be converted to the NFC
+ * normalization form. Since Windows and most other OS:es use the NFC form while Mac OS X
+ * mostly uses NFD, this conversion increases compatibility between Mac applications and
+ * NTFS-3G.
+ * 
+ * @param normalize decides whether or not the string functions will do automatic filename
+ *        normalization when converting to and from UTF-8. 0 means normalization is disabled,
+ *        1 means it is enabled.
+ * @return -1 if the argument was invalid or an error occurred, 0 if all went well.
+ */
+extern int ntfs_macosx_normalize_filenames(int normalize);
+
+/**
+ * Mac OS X only.
+ * 
+ * Normalizes the input string "utf8_string" to one of the normalization forms NFD or NFC.
+ * The parameter "composed" decides whether output should be in composed, NFC, form
+ * (composed == 1) or decomposed, NFD, form (composed == 0).
+ * Input is assumed to be properly UTF-8 encoded and null-terminated. Output will be a newly
+ * ntfs_calloc'ed string encoded in UTF-8. It is the callers responsibility to free(...) the
+ * allocated string when it's no longer needed.
+ *
+ * @param utf8_string the input string, which may be in any normalization form.
+ * @param target a pointer where the resulting string will be stored.
+ * @param composed decides which composition form to normalize the input string to. 0 means
+ *        composed form (NFC), 1 means decomposed form (NFD).
+ * @return -1 if the normalization failed for some reason, otherwise the length of the
+ *         normalized string stored in target.
+ */
+extern int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target, int composed);
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+
 #endif /* defined _NTFS_UNISTR_H */
 

@@ -113,6 +113,18 @@ AC_ARG_ENABLE(
 	[enable_device_default_io_ops="yes"]
 )
 
+AC_ARG_ENABLE(
+	[nfconv],
+	[AS_HELP_STRING([--disable-nfconv],[disable the 'nfconv' patch, which adds support for Unicode normalization form conversion when built on Mac OS X @<:@default=enabled for Mac OS X@:>@])],
+	[enable_nfconv="no"],
+	[
+		case "${target_os}" in
+			darwin*) enable_nfconv="yes" ;;
+			*) enable_nfconv="no" ;;
+		esac
+	]
+)
+
 # pthread_rwlock_t requires _GNU_SOURCE
 AC_GNU_SOURCE
 
@@ -262,6 +274,26 @@ AC_STRUCT_ST_BLOCKS
 AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_CHECK_MEMBERS([struct stat.st_atim])
 AC_CHECK_MEMBERS([struct stat.st_atimespec])
+
+# For the 'nfconv' patch (Mac OS X only):
+case "${target_os}" in
+darwin*)
+	if test "${enable_nfconv}" = "yes"; then
+		AC_CHECK_HEADER(
+			[CoreFoundation/CoreFoundation.h],
+			[
+				LDFLAGS="${LDFLAGS} -framework CoreFoundation"
+				AC_DEFINE(
+					[ENABLE_NFCONV],
+					[1],
+					[Define to 1 if the nfconv patch should be enabled]
+				)
+			],
+			AC_MSG_ERROR([[Cannot find CoreFoundation required for 'nfconv' functionality Mac OS X. You may use the --disable-nfconv 'configure' option to avoid this error.]])
+		)
+	fi
+	;;
+esac
 
 # Checks for library functions.
 AC_FUNC_GETMNTENT

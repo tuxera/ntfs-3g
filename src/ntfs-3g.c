@@ -1933,6 +1933,24 @@ static char *parse_mount_options(const char *orig_opts)
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
 			setlocale(LC_ALL, val);
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+		} else if (!strcmp(opt, "nfconv")) {
+			if (bogus_option_value(val, "nfconv"))
+				goto err_exit;
+			if (ntfs_macosx_normalize_filenames(1)) {
+				ntfs_log_error("ntfs_macosx_normalize_filenames(1) failed!\n");
+				goto err_exit;
+			}
+		} else if (!strcmp(opt, "nonfconv")) {
+			if (bogus_option_value(val, "nonfconv"))
+				goto err_exit;
+			if (ntfs_macosx_normalize_filenames(0)) {
+				ntfs_log_error("ntfs_macosx_normalize_filenames(0) failed!\n");
+				goto err_exit;
+			}
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 		} else if (!strcmp(opt, "streams_interface")) {
 			if (missing_option_value(val, "streams_interface"))
 				goto err_exit;
