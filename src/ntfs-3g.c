@@ -168,6 +168,17 @@ static u32 ntfs_sequence;
 static const char *usage_msg = 
 "\n"
 "%s %s %s %d - Third Generation NTFS Driver\n"
+"\t\t"
+#ifdef HAVE_SETXATTR
+"XATTRS are on, "
+#else
+"XATTRS are off, "
+#endif
+#if POSIXACLS
+"POSIX ACLS are on\n"
+#else
+"POSIX ACLS are off\n"
+#endif
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
