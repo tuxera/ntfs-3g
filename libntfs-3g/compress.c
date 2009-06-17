@@ -164,6 +164,7 @@ static void ntfs_new_node (struct COMPRESS_CONTEXT *pctx,
 					if ((pctx->match_length = i) > mxl) {
 						i = pctx->rson[pp];
 						pctx->rson[r] = i;
+						pctx->dad[i] = r;
 						i = pctx->lson[pp];
 						pctx->lson[r] = i;
 						pctx->dad[i] = r;
