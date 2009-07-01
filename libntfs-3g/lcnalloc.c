@@ -4,7 +4,7 @@
  * Copyright (c) 2002-2004 Anton Altaparmakov
  * Copyright (c) 2004 Yura Pakhuchiy
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
- * Copyright (c) 2008 Jean-Pierre Andre
+ * Copyright (c) 2008-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -55,6 +55,12 @@
 #define NTFS_LCNALLOC_BSIZE 4096
 #define NTFS_LCNALLOC_SKIP  NTFS_LCNALLOC_BSIZE
 
+enum {
+	ZONE_MFT = 1,
+	ZONE_DATA1 = 2,
+	ZONE_DATA2 = 4
+} ;
+
 static void ntfs_cluster_set_zone_pos(LCN start, LCN end, LCN *pos, LCN tc)
 {
 	ntfs_log_trace("pos: %lld  tc: %lld\n", (long long)*pos, (long long)tc);
@@ -69,17 +75,44 @@ static void ntfs_cluster_update_zone_pos(ntfs_volume *vol, u8 zone, LCN tc)
 {
 	ntfs_log_trace("tc = %lld, zone = %d\n", (long long)tc, zone);
 	
-	if (zone == 1)
+	if (zone == ZONE_MFT)
 		ntfs_cluster_set_zone_pos(vol->mft_lcn, vol->mft_zone_end,
 					  &vol->mft_zone_pos, tc);
-	else if (zone == 2)
+	else if (zone == ZONE_DATA1)
 		ntfs_cluster_set_zone_pos(vol->mft_zone_end, vol->nr_clusters,
 					  &vol->data1_zone_pos, tc);
-	else /* zone == 4 */
+	else /* zone == ZONE_DATA2 */
 		ntfs_cluster_set_zone_pos(0, vol->mft_zone_start, 
 					  &vol->data2_zone_pos, tc);
 }
 
+/*
+ *		Unmark full zones when a cluster has been freed in a full zone
+ *
+ *	Next allocation will reuse the freed cluster
+ */
+
+static void update_full_status(ntfs_volume *vol, LCN lcn)
+{
+	if (lcn >= vol->mft_zone_end) {
+		if (vol->full_zones & ZONE_DATA1) {
+			ntfs_cluster_update_zone_pos(vol, ZONE_DATA1, lcn);
+			vol->full_zones &= ~ZONE_DATA1;
+		}
+	} else
+		if (lcn < vol->mft_zone_start) {
+			if (vol->full_zones & ZONE_DATA2) {
+				ntfs_cluster_update_zone_pos(vol, ZONE_DATA2, lcn);
+				vol->full_zones &= ~ZONE_DATA2;
+			}
+		} else {
+			if (vol->full_zones & ZONE_MFT) {
+				ntfs_cluster_update_zone_pos(vol, ZONE_MFT, lcn);
+				vol->full_zones &= ~ZONE_MFT;
+			}
+		}
+}
+ 
 static s64 max_empty_bit_range(unsigned char *buf, int size)
 {
 	int i, j, run = 0;
@@ -265,13 +298,13 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 		
 	if (zone_start < vol->mft_zone_start) {
 		zone_end = vol->mft_zone_start;
-		search_zone = 4;
+		search_zone = ZONE_DATA2;
 	} else if (zone_start < vol->mft_zone_end) {
 		zone_end = vol->mft_zone_end;
-		search_zone = 1;
+		search_zone = ZONE_MFT;
 	} else {
 		zone_end = vol->nr_clusters;
-		search_zone = 2;
+		search_zone = ZONE_DATA1;
 	}
 	
 	bmp_pos = zone_start;
@@ -280,6 +313,9 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 	clusters = count;
 	rlpos = rlsize = 0;
 	while (1) {
+			/* check whether we have exhausted the current zone */
+		if (search_zone & vol->full_zones)
+			goto zone_pass_done;
 		last_read_pos = bmp_pos >> 3;
 		br = ntfs_attr_pread(vol->lcnbmp_na, last_read_pos, 
 				     NTFS_LCNALLOC_BSIZE, buf);
@@ -391,9 +427,9 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 			
 			used_zone_pos = 1;
 			
-			if (search_zone == 1)
+			if (search_zone == ZONE_MFT)
 				zone_start = vol->mft_zone_pos;
-			else if (search_zone == 2)
+			else if (search_zone == ZONE_DATA1)
 				zone_start = vol->data1_zone_pos;
 			else
 				zone_start = vol->data2_zone_pos;
@@ -411,13 +447,12 @@ runlist *ntfs_cluster_alloc(ntfs_volume *vol, VCN start_vcn, s64 count,
 zone_pass_done:
 		ntfs_log_trace("Finished current zone pass(%i).\n", pass);
 		if (pass == 1) {
-			
 			pass = 2;
 			zone_end = zone_start;
 			
-			if (search_zone == 1)
+			if (search_zone == ZONE_MFT)
 				zone_start = vol->mft_zone_start;
-			else if (search_zone == 2)
+			else if (search_zone == ZONE_DATA1)
 				zone_start = vol->mft_zone_end;
 			else
 				zone_start = 0;
@@ -433,7 +468,8 @@ zone_pass_done:
 		/* pass == 2 */
 done_zones_check:
 		done_zones |= search_zone;
-		if (done_zones < 7) {
+		vol->full_zones |= search_zone;
+		if (done_zones < (ZONE_MFT + ZONE_DATA1 + ZONE_DATA2)) {
 			ntfs_log_trace("Switching zone.\n");
 			pass = 1;
 			if (rlpos) {
@@ -446,29 +482,29 @@ done_zones_check:
 			}
 			
 			switch (search_zone) {
-			case 1:
+			case ZONE_MFT:
 				ntfs_log_trace("Zone switch: mft -> data1\n");
-switch_to_data1_zone:		search_zone = 2;
+switch_to_data1_zone:		search_zone = ZONE_DATA1;
 				zone_start = vol->data1_zone_pos;
 				zone_end = vol->nr_clusters;
 				if (zone_start == vol->mft_zone_end)
 					pass = 2;
 				break;
-			case 2:
+			case ZONE_DATA1:
 				ntfs_log_trace("Zone switch: data1 -> data2\n");
-				search_zone = 4;
+				search_zone = ZONE_DATA2;
 				zone_start = vol->data2_zone_pos;
 				zone_end = vol->mft_zone_start;
 				if (!zone_start)
 					pass = 2;
 				break;
-			case 4:
-				if (!(done_zones & 2)) {
+			case ZONE_DATA2:
+				if (!(done_zones & ZONE_DATA1)) {
 					ntfs_log_trace("data2 -> data1\n");
 					goto switch_to_data1_zone;
 				}
 				ntfs_log_trace("Zone switch: data2 -> mft\n");
-				search_zone = 1;
+				search_zone = ZONE_MFT;
 				zone_start = vol->mft_zone_pos;
 				zone_end = vol->mft_zone_end;
 				if (zone_start == vol->mft_zone_start)
@@ -550,6 +586,7 @@ int ntfs_cluster_free_from_rl(ntfs_volume *vol, runlist *rl)
 			       (long long)rl->lcn, (long long)rl->length);
 
 		if (rl->lcn >= 0) { 
+			update_full_status(vol,rl->lcn);
 			if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn, 
 						  rl->length)) {
 				ntfs_log_perror("Cluster deallocation failed "
@@ -629,6 +666,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 
 	if (rl->lcn != LCN_HOLE) {
 		/* Do the actual freeing of the clusters in this run. */
+		update_full_status(vol,rl->lcn + delta);
 		if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn + delta,
 					  to_free))
 			goto leave;
@@ -661,6 +699,7 @@ int ntfs_cluster_free(ntfs_volume *vol, ntfs_attr *na, VCN start_vcn, s64 count)
 			to_free = count;
 
 		if (rl->lcn != LCN_HOLE) {
+			update_full_status(vol,rl->lcn);
 			if (ntfs_bitmap_clear_run(vol->lcnbmp_na, rl->lcn,
 					to_free)) {
 				// FIXME: Eeek! We need rollback! (AIA)

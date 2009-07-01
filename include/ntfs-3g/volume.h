@@ -172,6 +172,7 @@ struct _ntfs_volume {
 
 	/* Variables used by the cluster and mft allocators. */
 	u8 mft_zone_multiplier;	/* Initial mft zone multiplier. */
+	u8 full_zones;		/* cluster zones which are full */
 	s64 mft_data_pos;	/* Mft record number at which to allocate the
 				   next mft record. */
 	LCN mft_zone_start;	/* First cluster of the mft zone. */

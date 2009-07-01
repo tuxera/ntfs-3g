@@ -526,6 +526,7 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 				"%s\n", strerror(errno));
 	
 	/* We now initialize the cluster allocator. */
+	vol->full_zones = 0;
 	mft_zone_size = vol->nr_clusters >> 3;      /* 12.5% */
 
 	/* Setup the mft zone. */
