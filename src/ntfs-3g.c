@@ -98,6 +98,8 @@
 #include "logging.h"
 #include "misc.h"
 
+#define set_archive(ni) (ni)->flags |= FILE_ATTR_ARCHIVE
+
 typedef enum {
 	FSTYPE_NONE,
 	FSTYPE_UNKNOWN,
@@ -1036,6 +1038,8 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 exit:
 	if (na)
 		ntfs_attr_close(na);
+	if (total)
+		set_archive(ni);
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	free(path);
@@ -1108,6 +1112,7 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 	char *path = NULL;
 	ntfschar *stream_name;
 	int stream_name_len;
+	s64 oldsize;
 #if POSIXACLS
 	struct SECURITY_CONTEXT security;
 #endif
@@ -1140,8 +1145,11 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 		errno = EOPNOTSUPP;
 		goto exit;
 	}
+	oldsize = na->data_size;
 	if (ntfs_attr_truncate(na, size))
 		goto exit;
+	if (oldsize != size)
+		set_archive(ni);
 	
 	ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 	errno = 0;
@@ -1416,6 +1424,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					set_fuse_error(&res);
 #endif
 			}
+			set_archive(ni);
 			/* mark a need to compress the end of file */
 			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
 				fi->fh |= CLOSE_COMPRESSED;
@@ -1478,6 +1487,7 @@ static int ntfs_fuse_create_stream(const char *path,
 
 	if ((res >= 0)
 	    && (fi->flags & (O_WRONLY | O_RDWR))) {
+		set_archive(ni);
 		/* mark a future need to compress the last block */
 		if (ni->flags & FILE_ATTR_COMPRESSED)
 			fi->fh |= CLOSE_COMPRESSED;
@@ -2686,6 +2696,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
+		set_archive(ni);
 		na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 		if (!na) {
 			res = -errno;
@@ -2714,6 +2725,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 				   && (ni->flags & FILE_ATTR_ENCRYPTED))
 					res = ntfs_efs_fixup_attribute(NULL,
 						na);
+		if (total)
+			set_archive(ni);
 	} else
 		res = 0;
 exit:
@@ -2882,7 +2895,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			errno = ENODATA;
 		res = -errno;
 	}
-	
+	set_archive(ni);
 exit:
 	free(lename);
 	if (ntfs_inode_close(ni))
