@@ -134,8 +134,8 @@ int ntfs_set_efs_info(const char *path	__attribute__((unused)),
 
 	res = 0;
 	if (ni && value && size) {
-		if (ni->flags && (FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
-			if (ni->flags && FILE_ATTR_ENCRYPTED) {
+		if (ni->flags & (FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
+			if (ni->flags & FILE_ATTR_ENCRYPTED) {
 				ntfs_log_info("File %s already encrypted",path);
 				errno = EEXIST;
 			} else {
