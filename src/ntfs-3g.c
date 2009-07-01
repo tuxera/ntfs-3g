@@ -1995,17 +1995,33 @@ enum { XATTR_UNMAPPED,
 	XATTR_NTFS_ATTRIB,
 	XATTR_NTFS_EFSINFO,
 	XATTR_NTFS_REPARSE_DATA,
+	XATTR_NTFS_DOS_NAME,
 	XATTR_POSIX_ACC, 
 	XATTR_POSIX_DEF } ;
 
-static const char nf_ns_xattr_ntfs[] = "system.ntfs_acl";
+static const char nf_ns_xattr_ntfs_acl[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_efsinfo[] = "user.ntfs.efsinfo";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
+static const char nf_ns_xattr_dos_name[] = "system.ntfs_dos_name";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
 
-#if POSIXACLS
+struct XATTRNAME {
+	int xattr;
+	const char *name;
+} ;
+
+static struct XATTRNAME nf_ns_xattr_names[] = {
+	{ XATTR_NTFS_ACL, nf_ns_xattr_ntfs_acl },
+	{ XATTR_NTFS_ATTRIB, nf_ns_xattr_attrib },
+	{ XATTR_NTFS_EFSINFO, nf_ns_xattr_efsinfo },
+	{ XATTR_NTFS_REPARSE_DATA, nf_ns_xattr_reparse },
+	{ XATTR_NTFS_DOS_NAME, nf_ns_xattr_dos_name },
+	{ XATTR_POSIX_ACC, nf_ns_xattr_posix_access },
+	{ XATTR_POSIX_DEF, nf_ns_xattr_posix_default },
+	{ XATTR_UNMAPPED, (char*)NULL } /* terminator */
+};
 
 /*
  *		Check whether access to internal data as an extended
@@ -2016,10 +2032,11 @@ static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
  */
 
 static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
-			const char *path, int attr)
+			const char *path, int attr, BOOL setting)
 {
 	ntfs_inode *ni;
 	BOOL foracl;
+	mode_t acctype;
 
 	ni = (ntfs_inode*)NULL;
 	if (ntfs_fuse_is_named_data_stream(path))
@@ -2038,16 +2055,21 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 		    && foracl) {
 			errno = EOPNOTSUPP;
 		} else {
-			   /* parent directory must be executable */
-			if (ntfs_allowed_dir_access(security,path,S_IEXEC)) {
+				/*
+				 * parent directory must be executable, and
+				 * for setting a DOS name it must be writeable
+				 */
+			if (setting && (attr == XATTR_NTFS_DOS_NAME))
+				acctype = S_IEXEC | S_IWRITE;
+			else
+				acctype = S_IEXEC;
+			if (ntfs_allowed_dir_access(security,path,acctype)) {
 				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			}
 		}
 	}
 	return (ni);
 }
-
-#endif
 
 /*
  *		Determine whether an extended attribute is in the system
@@ -2056,31 +2078,12 @@ static ntfs_inode *ntfs_check_access_xattr(struct SECURITY_CONTEXT *security,
 
 static int mapped_xattr_system(const char *name)
 {
-	int num;
+	struct XATTRNAME *p;
 
-
-	if (!strcmp(name,nf_ns_xattr_ntfs))
-		num = XATTR_NTFS_ACL;
-	else
-		if (!strcmp(name,nf_ns_xattr_attrib))
-			num = XATTR_NTFS_ATTRIB;
-		else
-			if (!strcmp(name,nf_ns_xattr_reparse))
-				num = XATTR_NTFS_REPARSE_DATA;
-			else
-				if (!strcmp(name,nf_ns_xattr_posix_access))
-					num = XATTR_POSIX_ACC;
-				else
-					if (!strcmp(name,nf_ns_xattr_posix_default))
-						num = XATTR_POSIX_DEF;
-					else
-						if (ctx->efs_raw
-						    && !strcmp(name,
-							  nf_ns_xattr_efsinfo))
-							num = XATTR_NTFS_EFSINFO;
-						else
-							num = XATTR_UNMAPPED;
-	return (num);
+	p = nf_ns_xattr_names;
+	while (p->name && strcmp(p->name,name))
+		p++;
+	return (p->xattr);
 }
 
 /*
@@ -2362,11 +2365,11 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 	if (attr != XATTR_UNMAPPED) {
 #if POSIXACLS
 			/*
-			 * hijack Posix/NTFS ACL retrieval, whatever mode
-			 * was selected for xattr (from the user's point
-			 * of view, ACLs are not xattr)
+			 * hijack internal data and ACL retrieval, whatever
+			 * mode was selected for xattr (from the user's
+			 * point of view, ACLs are not xattr)
 			 */
-		ni = ntfs_check_access_xattr(&security,path,attr);
+		ni = ntfs_check_access_xattr(&security,path,attr,FALSE);
 		if (ni) {
 			if (ntfs_allowed_access(&security,path,ni,S_IREAD)) {
 				/*
@@ -2395,6 +2398,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
+						value,size,ni);
+					break;
+				case XATTR_NTFS_DOS_NAME:
+					res = ntfs_get_ntfs_dos_name(path,
 						value,size,ni);
 					break;
 				default : /* not possible */
@@ -2441,6 +2448,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
+						value,size,ni);
+					break;
+				case XATTR_NTFS_DOS_NAME:
+					res = ntfs_get_ntfs_dos_name(path,
 						value,size,ni);
 					break;
 				default :
@@ -2537,12 +2548,12 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	if (attr != XATTR_UNMAPPED) {
 #if POSIXACLS
 			/*
-			 * hijack Posix/NTFS ACL retrieval, whatever mode
-			 * was selected for xattr (from the user's point
-			 * of view, ACLs are not xattr)
+			 * hijack internal data and ACL setting, whatever
+			 * mode was selected for xattr (from the user's
+			 * point of view, ACLs are not xattr)
 			 * Note : updating an ACL does not set ctime
 			 */
-		ni = ntfs_check_access_xattr(&security,path,attr);
+		ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
 		if (ni) {
 			if (ntfs_allowed_as_owner(&security,path,ni)) {
 				switch (attr) {
@@ -2567,6 +2578,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					res = ntfs_set_ntfs_reparse_data(path,
 						value,size,flags,ni);
 					break;
+				case XATTR_NTFS_DOS_NAME:
+					/* warning : this closes the inode */
+					res = ntfs_set_ntfs_dos_name(path,
+						value,size,flags,ni);
+					break;
 				default : /* not possible */
 					break;
 				}
@@ -2574,7 +2590,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					res = -errno;
 			} else
 				res = -errno;
-			if (ntfs_inode_close(ni))
+			if ((attr != XATTR_NTFS_DOS_NAME)
+			   && ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		} else
 			res = -errno;
@@ -2587,7 +2604,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		if (ntfs_fuse_is_named_data_stream(path))
 			res = -EINVAL; /* n/a for named data streams. */
 		else {
-			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+			/* creation of a new name is not controlled by fuse */
+			if (attr == XATTR_NTFS_DOS_NAME)
+				ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
+			else
+				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (ni) {
 					/*
 					 * user mapping is not mandatory
@@ -2612,6 +2633,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 						res = ntfs_set_ntfs_reparse_data(path,
 							value,size,flags,ni);
 						break;
+					case XATTR_NTFS_DOS_NAME:
+					/* warning : this closes the inode */
+						res = ntfs_set_ntfs_dos_name(path,
+							value,size,flags,ni);
+						break;
 					default :
 						/*
 						 * make sure applications do not see
@@ -2625,7 +2651,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 						res = -errno;
 				} else
 					res = -errno;
-				if (ntfs_inode_close(ni))
+				if ((attr != XATTR_NTFS_DOS_NAME)
+				    && ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			} else
 				res = -errno;
@@ -2752,9 +2779,9 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 #if POSIXACLS
 
 			/*
-			 * hijack Posix/NTFS ACL retrieval, whatever mode
-			 * was selected for xattr (from the user's point
-			 * of view, ACLs are not xattr)
+			 * hijack internal data and ACL removal, whatever
+			 * mode was selected for xattr (from the user's
+			 * point of view, ACLs are not xattr)
 			 * Note : updating an ACL does not set ctime
 			 */
 		res = 0;
@@ -2769,7 +2796,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			break;
 		case XATTR_POSIX_ACC :
 		case XATTR_POSIX_DEF :
-			ni = ntfs_check_access_xattr(&security,path,attr);
+			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
 			if (ni) {
 				if (!ntfs_allowed_as_owner(&security,path,ni)
 				   || ntfs_remove_posix_acl(&security,path,
@@ -2781,7 +2808,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 				res = -errno;
 			break;
 		case XATTR_NTFS_REPARSE_DATA :
-			ni = ntfs_check_access_xattr(&security,path,attr);
+			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
 			if (ni) {
 				if (!ntfs_allowed_as_owner(&security,path,ni)
 				    || ntfs_remove_ntfs_reparse_data(path,ni))
@@ -2791,7 +2818,11 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			} else
 				res = -errno;
 			break;
-		default : /* not possible */
+		case XATTR_NTFS_DOS_NAME:
+		default :
+			errno = EOPNOTSUPP;
+			res = -errno;
+			break;
 			break;
 		}
 #else
@@ -2828,7 +2859,8 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 				} else
 					res = -errno;
 				break;
-			default : /* not possible */
+			case XATTR_NTFS_DOS_NAME:
+			default :
 				/*
 				 * make sure applications do not see
 				 * Posix ACL not consistent with mode

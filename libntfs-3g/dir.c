@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2005-2007 Yura Pakhuchiy
- * Copyright (c) 2008 Jean-Pierre Andre
+ * Copyright (c) 2008-2009 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -59,6 +59,10 @@
 #include "security.h"
 #include "reparse.h"
 
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
+
 /*
  * The little endian Unicode strings "$I30", "$SII", "$SDH", "$O"
  *  and "$Q" as global constants.
@@ -97,6 +101,8 @@ static int inode_cache_compare(const struct CACHED_GENERIC *cached,
  *
  *	A partial path is compared in order to invalidate all paths
  *	related to a renamed directory
+ *	inode numbers are also checked, as deleting a long name may
+ *	imply deleting a short name and conversely
  */
 
 static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
@@ -106,10 +112,12 @@ static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 
 	len = strlen(wanted->variable);
 	return (!cached->variable
-			|| strncmp((const char*)cached->variable,
+		|| ((((const struct CACHED_INODE*)wanted)->inum
+		         != MREF(((const struct CACHED_INODE*)cached)->inum))
+		   && (strncmp((const char*)cached->variable,
 				(const char*)wanted->variable,len)
 			|| ((((const char*)cached->variable)[len] != '\0')
-			   && (((const char*)cached->variable)[len] != '/')));
+			   && (((const char*)cached->variable)[len] != '/')))));
 }
 
 #endif
@@ -1516,6 +1524,7 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 #if CACHE_INODE_SIZE
 	struct CACHED_INODE item;
 	const char *p;
+	u64 inum = (u64)-1;
 	int count;
 #endif
 
@@ -1631,6 +1640,9 @@ search:
 	 * case there are no reference to this inode left, so we should free all
 	 * non-resident attributes and mark all MFT record as not in use.
 	 */
+#if CACHE_INODE_SIZE
+	inum = ni->mft_no;
+#endif
 	if (ni->mrec->link_count) {
 		ntfs_inode_update_times(ni, NTFS_UPDATE_CTIME);
 		goto ok;
@@ -1685,19 +1697,22 @@ out:
 	if (ntfs_inode_close(ni) && !err)
 		err = errno;
 #if CACHE_INODE_SIZE
+	if (pathname) {
 			/* invalide cache entry, even if there was an error */
-	/* Remove leading /'s. */
-	p = pathname;
-	while (*p == PATH_SEP)
-		p++;
-	if (p[0] && (p[strlen(p)-1] == PATH_SEP))
-		ntfs_log_error("Unnormalized path %s\n",pathname);
-	item.pathname = p;
-	count = ntfs_invalidate_cache(vol->xinode_cache, GENERIC(&item),
-				inode_cache_inv_compare);
-	if (!count)
-		ntfs_log_error("Could not delete inode cache entry for %s\n",
+		/* Remove leading /'s. */
+		p = pathname;
+		while (*p == PATH_SEP)
+			p++;
+		if (p[0] && (p[strlen(p)-1] == PATH_SEP))
+			ntfs_log_error("Unnormalized path %s\n",pathname);
+		item.pathname = p;
+		item.inum = inum;
+		count = ntfs_invalidate_cache(vol->xinode_cache, GENERIC(&item),
+					inode_cache_inv_compare);
+		if (!count)
+			ntfs_log_error("Could not delete inode cache entry for %s\n",
 				pathname);
+	}
 #endif
 	if (err) {
 		errno = err;
@@ -1726,7 +1741,8 @@ err_out:
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
+			 u8 name_len, FILE_NAME_TYPE_FLAGS nametype)
 {
 	FILE_NAME_ATTR *fn = NULL;
 	int fn_len, err;
@@ -1756,7 +1772,7 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	fn->parent_directory = MK_LE_MREF(dir_ni->mft_no,
 			le16_to_cpu(dir_ni->mrec->sequence_number));
 	fn->file_name_length = name_len;
-	fn->file_name_type = FILE_NAME_POSIX;
+	fn->file_name_type = nametype;
 	fn->file_attributes = ni->flags;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
@@ -1799,3 +1815,284 @@ err_out:
 	return -1;
 }
 
+int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
+{
+	return (ntfs_link_i(ni, dir_ni, name, name_len, FILE_NAME_POSIX));
+}
+
+#ifdef HAVE_SETXATTR
+
+#define MAX_DOS_NAME_LENGTH	 12
+
+/*
+ *		Get a DOS name for a file in designated directory
+ *
+ *	Returns size if found
+ *		0 if not found
+ *		-1 if there was an error (described by errno)
+ */
+
+static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
+{
+	size_t outsize = 0;
+	FILE_NAME_ATTR *fn;
+	ntfs_attr_search_ctx *ctx;
+
+		/* find the name in the attributes */
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (!ctx)
+		return -1;
+
+	while (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
+		/* We know this will always be resident. */
+		fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset));
+
+		if ((fn->file_name_type & FILE_NAME_DOS)
+		    && (MREF_LE(fn->parent_directory) == dnum)) {
+				/*
+				 * Found a DOS or WIN32+DOS name for the entry
+				 * copy name, after truncation for safety
+				 */
+			outsize = fn->file_name_length;
+/* TODO : reject if name is too long ? */
+			if (outsize > MAX_DOS_NAME_LENGTH)
+				outsize = MAX_DOS_NAME_LENGTH;
+			memcpy(dosname,fn->file_name,outsize*sizeof(ntfschar));
+			ntfs_name_upcase(dosname, outsize,
+					ni->vol->upcase, ni->vol->upcase_len);
+		}
+	}
+	ntfs_attr_put_search_ctx(ctx);
+	return (outsize);
+}
+
+
+/*
+ *		Get the ntfs DOS name into an extended attribute
+ */
+
+int ntfs_get_ntfs_dos_name(const char *path,
+			char *value, size_t size, ntfs_inode *ni)
+{
+	int outsize = 0;
+	char *outname = (char*)NULL;
+	ntfs_inode *dir_ni = NULL;
+	u64 dnum;
+	char *dirname;
+	const char *rdirname;
+	char *p;
+	int doslen;
+	ntfschar dosname[MAX_DOS_NAME_LENGTH];
+
+			/* get the parent directory */
+	dirname = strdup(path);
+	if (dirname) {
+		p = strrchr(dirname,'/');
+		if (p) {
+			*p++ = 0;
+			rdirname = (dirname[0] ? dirname : "/");
+			dir_ni = ntfs_pathname_to_inode(ni->vol, NULL, rdirname);
+			dnum = dir_ni->mft_no;
+			free(dirname);
+		}
+	}
+	if (dir_ni) {
+		doslen = get_dos_name(ni, dnum, dosname);
+		if (doslen > 0) {
+				/*
+				 * Found a DOS name for the entry,
+				 * encode it into the buffer if there is
+				 * enough space
+				 */
+			if (ntfs_ucstombs(dosname, doslen, &outname, size) < 0) {
+				ntfs_log_error("Cannot represent dosname in current locale.\n");
+				outsize = -errno;
+			} else {
+				outsize = strlen(outname);
+				if (value && (outsize <= (int)size))
+					memcpy(value, outname, outsize);
+				else
+					if (size && (outsize > (int)size))
+						outsize = -ERANGE;
+				free(outname);
+			}
+		} else
+			if (doslen < 0)
+				outsize = -errno;
+		ntfs_inode_close(dir_ni);
+	} else
+		outsize = -errno;
+	return (outsize);
+}
+
+/*
+ *		Set a DOS name to a file and adjust name spaces
+ *
+ *	This done in three (or four) steps :
+ *
+ * - insert the short name (as a DOS name or Posix name if collapsible)
+ * - delete the old long name or existing short name
+ * - insert the new long name (as a Win32 or DOS+Win32 name)
+ * - delete the short name if collapsible
+ *
+ * Deleting the old long name will not delete the file
+ * provided the old name was in the Posix name space,
+ * because the alternate name has been set before.
+ *
+ * Likewise, deleting the existing short name implies
+ * deleting the long name, but not the file itself
+ * because the alternate name has been set before.
+ *
+ * Note : currently the short name and the long name must be different
+ */
+
+static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
+			const char *fullpath,
+			ntfschar *shortname, int shortlen,
+			ntfschar *longname, int longlen,
+			ntfschar *deletename, int deletelen)
+{
+	unsigned int linkcount;
+	ntfs_volume *vol;
+	BOOL collapsible;
+	BOOL deleted;
+	u64 dnum;
+	u64 fnum;
+	int res;
+
+	res = -1;
+	vol = ni->vol;
+	dnum = dir_ni->mft_no;
+	fnum = ni->mft_no;
+				/* save initial link count */
+	linkcount = le16_to_cpu(ni->mrec->link_count);
+
+		/* check whether the same name may be used as DOS and WIN32 */
+	collapsible = ntfs_collapsible_chars(ni->vol, shortname, shortlen,
+						longname, longlen);
+	if (!ntfs_link_i(ni, dir_ni, shortname, shortlen,
+		(collapsible ? FILE_NAME_POSIX : FILE_NAME_DOS))
+		/* make sure a new link was recorded */
+	    && (le16_to_cpu(ni->mrec->link_count) > linkcount)
+		/* delete the existing long name or short name */
+	    && !ntfs_delete(vol, fullpath, ni, dir_ni, deletename, deletelen)) {
+		/* delete closes the inodes, so have to open again */
+		dir_ni = ntfs_inode_open(vol, dnum);
+		deleted = FALSE;
+		if (dir_ni) {
+			ni = ntfs_inode_open(vol, fnum);
+			if (ni) {
+				if (collapsible) {
+					if (!ntfs_link_i(ni, dir_ni, longname,
+						    longlen, FILE_NAME_WIN32_AND_DOS)) {
+						if (!ntfs_delete(vol, (const char*)NULL, ni,
+							dir_ni, shortname, shortlen))
+							res = 0;
+						deleted = TRUE;
+					}
+				} else
+					if (!ntfs_link_i(ni, dir_ni, longname,
+						    longlen, FILE_NAME_WIN32))
+						res = 0;
+				if (!deleted)
+					ntfs_inode_close(ni);
+			}
+		if (!deleted)
+			ntfs_inode_close(dir_ni);
+		}
+	}
+	return (res);
+}
+
+
+/*
+ *		Set the ntfs DOS name into an extended attribute
+ *  The DOS name will be added as another file name attribute
+ *  using the existing file name information from the original
+ *  name or overwriting the DOS Name if one exists.
+ */
+
+int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
+			int flags, ntfs_inode *ni)
+{
+	int res = 0;
+	int longlen = 0;
+	int shortlen = 0;
+	char newname[MAX_DOS_NAME_LENGTH + 1];
+	ntfschar oldname[MAX_DOS_NAME_LENGTH];
+	int oldsize;
+	ntfs_volume *vol;
+	u64 fnum;
+	u64 dnum;
+	ntfschar *shortname = NULL;
+	ntfschar *longname = NULL;
+	ntfs_inode *dir_ni = NULL;
+	char *dirname = (char*)NULL;
+	const char *rdirname;
+	char *p;
+
+	vol = ni->vol;
+	fnum = ni->mft_no;
+		/* convert the string to the NTFS wide chars */
+	if (size > MAX_DOS_NAME_LENGTH)
+		size = MAX_DOS_NAME_LENGTH;
+	strncpy(newname, value, size);
+	newname[size] = 0;
+	shortlen = ntfs_mbstoucs(newname, &shortname);
+			/* make sure the short name has valid chars */
+	if ((shortlen < 0) || ntfs_forbidden_chars(shortname,shortlen)) {
+		res = -errno;
+		return res;
+	}
+			/* get the parent directory */
+	dirname = strdup(path);
+	if (dirname) {
+		p = strrchr(dirname,'/');
+		if (p) {
+			*p++ = 0;
+			longlen = ntfs_mbstoucs(p, &longname);
+				/* make sure the long name had valid chars */
+			if (!ntfs_forbidden_chars(longname,longlen)) {
+				rdirname = (dirname[0] ? dirname : "/");
+				dir_ni = ntfs_pathname_to_inode(vol, NULL, rdirname);
+				dnum = dir_ni->mft_no;
+			}
+		}
+	}
+	if (dir_ni) {
+		oldsize = get_dos_name(ni, dnum, oldname);
+		if (oldsize >= 0) {
+			if (oldsize > 0) {
+				if (flags & XATTR_CREATE) {
+					res = -1;
+					errno = EEXIST;
+				} else
+					res = set_dos_name(ni, dir_ni, path,
+						shortname, shortlen,
+						longname, longlen,
+						oldname, oldsize);
+			} else {
+				if (flags & XATTR_REPLACE) {
+					res = -1;
+					errno = ENODATA;
+				} else
+					res = set_dos_name(ni, dir_ni, path,
+						shortname, shortlen,
+						longname, longlen,
+						longname, longlen);
+			}
+		} else
+			res = -1;
+	} else {
+		res = -1;
+		errno = EINVAL;
+	}
+	free(dirname);
+	free(longname);
+	free(shortname);
+	return (res ? -1 : 0);
+}
+
+#endif

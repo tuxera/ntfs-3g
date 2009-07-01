@@ -2173,6 +2173,110 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 	return (outsize ? (int)outsize : -errno);
 }
 
+#else /* POSIXACLS */
+
+
+/*
+ *		Get permissions to access a file
+ *	Takes into account the relation of user to file (owner, group, ...)
+ *	Do no use as mode of the file
+ *
+ *	returns -1 if there is a problem
+ *
+ *	This is only used for checking creation of DOS file names
+ */
+
+static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
+		const char *path, ntfs_inode *ni,
+		mode_t request __attribute__((unused)))
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const struct CACHED_PERMISSIONS *cached;
+	char *securattr;
+	const SID *usid;	/* owner of file/directory */
+	const SID *gsid;	/* group of file/directory */
+	BOOL isdir;
+	uid_t uid;
+	gid_t gid;
+	int perm;
+
+	if (!scx->mapping[MAPUSERS] || !scx->uid)
+		perm = 07777;
+	else {
+		/* check whether available in cache */
+		cached = fetch_cache(scx,ni);
+		if (cached) {
+			perm = cached->mode;
+			uid = cached->uid;
+			gid = cached->gid;
+		} else {
+			perm = 0;	/* default to no permission */
+			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				!= const_cpu_to_le16(0);
+			securattr = getsecurityattr(scx->vol, path, ni);
+			if (securattr) {
+				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+				    	securattr;
+				gsid = (const SID*)&
+					   securattr[le32_to_cpu(phead->group)];
+				gid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
+#if OWNERFROMACL
+				usid = ntfs_acl_owner(securattr);
+				perm = ntfs_build_permissions(securattr,
+						 usid, gsid, isdir);
+				uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
+#else
+				usid = (const SID*)&
+					    securattr[le32_to_cpu(phead->owner)];
+				perm = ntfs_build_permissions(securattr,
+						 usid, gsid, isdir);
+				if (!perm && ntfs_same_sid(usid, adminsid)) {
+					uid = find_tenant(scx, securattr);
+					if (uid)
+						perm = 0700;
+				} else
+					uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
+#endif
+				/*
+				 *  Create a security id if there were none
+				 * and upgrade option is selected
+				 */
+				if (!test_nino_flag(ni, v3_Extensions)
+				   && (perm >= 0)
+				   && (scx->vol->secure_flags
+				     & (1 << SECURITY_ADDSECURIDS))) {
+					upgrade_secur_desc(scx->vol, path,
+						securattr, ni);
+					/*
+					 * fetch owner and group for cacheing
+					 * if there is a securid
+					 */
+				}
+				if (test_nino_flag(ni, v3_Extensions)
+				    && (perm >= 0)) {
+					enter_cache(scx, ni, uid,
+							gid, perm);
+				}
+				free(securattr);
+			} else {
+				perm = -1;
+				uid = gid = 0;
+			}
+		}
+		if (perm >= 0) {
+			if (uid == scx->uid)
+				perm &= 07700;
+			else
+				if ((gid == scx->gid)
+				   || groupmember(scx, scx->uid, gid))
+					perm &= 07070;
+				else
+					perm &= 07007;
+		}
+	}
+	return (perm);
+}
+
 #endif /* POSIXACLS */
 
 /*
@@ -3154,8 +3258,6 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	return ret;
 }
 
-#if POSIXACLS
-
 /*
  *		Check whether user can access a file in a specific way
  *
@@ -3164,6 +3266,8 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
  *		2 if sticky and accesstype is S_IWRITE + S_IEXEC + S_ISVTX
  *		0 and sets errno if there is a problem or if access
  *		  is not allowed
+ *
+ *	This is used for Posix ACL and checking creation of DOS file names
  */
 
 int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
@@ -3175,7 +3279,10 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	int allow;
 	struct stat stbuf;
 
+#if POSIXACLS
+		/* shortcut, use only if Posix ACLs in use */
 	if (scx->vol->secure_flags & (1 << SECURITY_DEFAULT)) return (1);
+#endif
 	/*
 	 * Always allow for root unless execution is requested.
 	 * (was checked by fuse until kernel 2.6.29)
@@ -3244,6 +3351,8 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
  *		no user mapping defined
  *	
  *	Sets errno if there is a problem or if not allowed
+ *
+ *	This is used for Posix ACL and checking creation of DOS file names
  */
 
 BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
@@ -3256,7 +3365,10 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	ntfs_inode *dir_ni;
 	struct stat stbuf;
 
+#if POSIXACLS
+		/* shortcut, use only if Posix ACLs in use */
 	if (scx->vol->secure_flags & (1 << SECURITY_DEFAULT)) return (TRUE);
+#endif
 	allow = 0;
 	dirpath = strdup(path);
 	if (dirpath) {
@@ -3289,8 +3401,6 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	}
 	return (allow);		/* errno is set if not allowed */
 }
-
-#endif
 
 /*
  *		Define a new owner/group to a file

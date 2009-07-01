@@ -1077,6 +1077,68 @@ void ntfs_ucsfree(ntfschar *ucs)
 }
 
 /*
+ *		Check whether a name contains no chars forbidden
+ *	for DOS or Win32 use
+ *
+ *	If there is a bad char, errno is set to EINVAL
+ */
+
+BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
+{
+	BOOL forbidden = FALSE;
+	int ch;
+	int i;
+	u32 mainset =     (1L << ('\"' - 0x20))
+			| (1L << ('*' - 0x20))
+			| (1L << ('/' - 0x20))
+			| (1L << (':' - 0x20))
+			| (1L << ('<' - 0x20))
+			| (1L << ('>' - 0x20))
+			| (1L << ('?' - 0x20));
+
+	for (i=0; i<len; i++) {
+		ch = le16_to_cpu(name[i]);
+		if ((ch <= 0x20)
+		    || ((ch < 0x40)
+			&& ((1L << (ch - 0x20)) & mainset))
+		    || (ch == '\\')
+		    || (ch == '|'))
+			forbidden = TRUE;
+	}
+	if (forbidden)
+		errno = EINVAL;
+	return (forbidden);
+}
+
+/*
+ *		Check whether the same name can be used as a DOS and
+ *	a Win32 name
+ *
+ *	The names must be the same, or the short name the uppercase
+ *	variant of the long name
+ */
+
+BOOL ntfs_collapsible_chars(ntfs_volume *vol,
+			const ntfschar *shortname, int shortlen,
+			const ntfschar *longname, int longlen)
+{
+	BOOL collapsible;
+	unsigned int ch;
+	int i;
+
+	collapsible = shortlen == longlen;
+	if (collapsible)
+		for (i=0; i<shortlen; i++) {
+			ch = le16_to_cpu(longname[i]);
+			if ((ch >= vol->upcase_len)
+		   	 || ((shortname[i] != longname[i])
+				&& (shortname[i] != vol->upcase[ch])))
+					collapsible = FALSE;
+	}
+	return (collapsible);
+}
+
+/*
  * Define the character encoding to be used.
  * Use UTF-8 unless specified otherwise.
  */
