@@ -2924,8 +2924,8 @@ static void ntfs_close(void)
 			      ctx->vol->vol_name);
 		if (ntfs_fuse_fill_security_context(&security)) {
 			if (ctx->seccache && ctx->seccache->head.p_reads) {
-				ntfs_log_info("Permissions cache : %lu writes "
-				"%lu reads %lu.%1lu%% hits\n",
+				ntfs_log_info("Permissions cache : %lu writes, "
+				"%lu reads, %lu.%1lu%% hits\n",
 			      ctx->seccache->head.p_writes,
 			      ctx->seccache->head.p_reads,
 			      100 * ctx->seccache->head.p_hits
@@ -3114,6 +3114,7 @@ static char *parse_mount_options(const char *orig_opts)
 	char *options, *s, *opt, *val, *ret = NULL;
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
+	int want_permissions = 0;
 
 	ctx->secure_flags = 0;
 	ctx->efs_raw = FALSE;
@@ -3173,28 +3174,22 @@ static char *parse_mount_options(const char *orig_opts)
 			if (missing_option_value(val, "fmask"))
 				goto err_exit;
 			sscanf(val, "%o", &ctx->fmask);
-#if !POSIXACLS
-			default_permissions = 1;
-#endif
+		       	want_permissions = 1;
 		} else if (!strcmp(opt, "dmask")) {
 			if (missing_option_value(val, "dmask"))
 				goto err_exit;
 			sscanf(val, "%o", &ctx->dmask);
-#if !POSIXACLS
-			default_permissions = 1;
-#endif
+		       	want_permissions = 1;
 		} else if (!strcmp(opt, "uid")) {
 			if (missing_option_value(val, "uid"))
 				goto err_exit;
 			sscanf(val, "%i", &ctx->uid);
-		       	default_permissions = 1;
-			ctx->secure_flags |= (1 << SECURITY_RAW);
+		       	want_permissions = 1;
 		} else if (!strcmp(opt, "gid")) {
 			if (missing_option_value(val, "gid"))
 				goto err_exit;
 			sscanf(val, "%i", &ctx->gid);
-		       	default_permissions = 1;
-			ctx->secure_flags |= (1 << SECURITY_RAW);
+			want_permissions = 1;
 		} else if (!strcmp(opt, "show_sys_files")) {
 			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
@@ -3322,6 +3317,8 @@ static char *parse_mount_options(const char *orig_opts)
 		goto err_exit;
 	if (default_permissions)
 		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+	if (want_permissions)
+		ctx->secure_flags |= (1 << SECURITY_WANTED);
 	if (ctx->ro)
 		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
 exit:
@@ -3743,44 +3740,45 @@ int main(int argc, char *argv[])
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
 	ctx->vol->efs_raw = ctx->efs_raw;
-	if (ctx->secure_flags & (1 << SECURITY_RAW)) {
+		/* JPA open $Secure, (whatever NTFS version !) */
+		/* to initialize security data */
+	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
+		failed_secure = "Could not open file $Secure";
+	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
+#if POSIXACLS
+		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+			permissions_mode = "User mapping built, Posix ACLs not used";
+		else
+			permissions_mode = "User mapping built, Posix ACLs in use";
+#else
+		if (!(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))) {
+			/*
+			 * No explicit option but user mapping found
+			 * force default security
+			 */
+			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
+			if (strappend(&parsed_options, ",default_permissions")) {
+				err = NTFS_VOLUME_SYNTAX_ERROR;
+				goto err_out;
+			}
+		}
+		permissions_mode = "User mapping built";
+#endif
+	} else {
 		ctx->security.uid = ctx->uid;
 		ctx->security.gid = ctx->gid;
 		/* same ownership/permissions for all files */
 		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
 		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
-		if (ctx->secure_flags & (1 << SECURITY_DEFAULT))
+		if (ctx->secure_flags & (1 << SECURITY_WANTED))
+			ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+		if (ctx->secure_flags & (1 << SECURITY_DEFAULT)) {
+			ctx->secure_flags |= (1 << SECURITY_RAW);
 			permissions_mode = "Global ownership and permissions enforced";
-		else
+		} else {
+			ctx->secure_flags &= ~(1 << SECURITY_RAW);
 			permissions_mode = "Ownership and permissions disabled";
-	} else {
-			/* JPA open $Secure, (whatever NTFS version !) */
-			/* to initialize security data */
-		if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
-			failed_secure = "Could not open file $Secure";
-		if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
-#if POSIXACLS
-			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-				permissions_mode = "User mapping built, Posix ACLs not used";
-			else
-				permissions_mode = "User mapping built, Posix ACLs in use";
-#else
-			if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
-				permissions_mode = "User mapping built";
-			else {
-				/*
-				 * No explicit option (typically mount by hal)
-				 * enable checks if user mapping found
-				 */
-				ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-				if (strappend(&parsed_options, ",default_permissions")) {
-					err = NTFS_VOLUME_SYNTAX_ERROR;
-					goto err_out;
-				}
-			}
-#endif
-		} else
-			permissions_mode = "No user mapping file : ownership and permissions disabled";
+		}
 	}
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);

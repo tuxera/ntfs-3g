@@ -131,7 +131,8 @@ enum {
 	SECURITY_DEFAULT,	/* rely on fuse for permissions checking */
 	SECURITY_RAW,		/* force same ownership/permissions on files */
 	SECURITY_ADDSECURIDS,	/* upgrade old security descriptors */
-	SECURITY_STATICGRPS	/* use static groups for access control */
+	SECURITY_STATICGRPS,	/* use static groups for access control */
+	SECURITY_WANTED		/* a security related option was present */
 } ;
 
 /*
