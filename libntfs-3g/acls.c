@@ -1120,7 +1120,8 @@ struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
  */
 
 struct POSIX_SECURITY *ntfs_build_inherited_posix(
-		const struct POSIX_SECURITY *pxdesc, mode_t mode, BOOL isdir)
+		const struct POSIX_SECURITY *pxdesc, mode_t mode,
+		mode_t mask, BOOL isdir)
 {
 	struct POSIX_SECURITY *pydesc;
 	struct POSIX_ACE *pyace;
@@ -1142,6 +1143,8 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 	if (pydesc) {
 			/*
 			 * Copy inherited tags and adapt perms
+			 * Use requested mode, ignoring umask
+			 * (not possible with older versions of fuse)
 			 */
 		tagsset = 0;
 		defcnt = (pxdesc ? pxdesc->defcnt : 0);
@@ -1171,6 +1174,7 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 		/*
 		 * If some standard tags were missing, append them from mode
 		 * and sort the list
+		 * Here we have to use the umask'ed mode
 		 */
 		if (~tagsset & (POSIX_ACL_USER_OBJ
 				 | POSIX_ACL_GROUP_OBJ | POSIX_ACL_OTHER)) {
@@ -1180,7 +1184,7 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 				pyace = &pydesc->acl.ace[i];
 				pyace->tag = POSIX_ACL_USER_OBJ;
 				pyace->id = -1;
-				pyace->perms = (mode >> 6) & 7;
+				pyace->perms = ((mode & ~mask) >> 6) & 7;
 				tagsset |= POSIX_ACL_USER_OBJ;
 				i++;
 			}
@@ -1189,7 +1193,7 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 				pyace = &pydesc->acl.ace[i];
 				pyace->tag = POSIX_ACL_GROUP_OBJ;
 				pyace->id = -1;
-				pyace->perms = (mode >> 3) & 7;
+				pyace->perms = ((mode & ~mask) >> 3) & 7;
 				tagsset |= POSIX_ACL_GROUP_OBJ;
 				i++;
 			}
@@ -1198,7 +1202,7 @@ struct POSIX_SECURITY *ntfs_build_inherited_posix(
 				pyace = &pydesc->acl.ace[i];
 				pyace->tag = POSIX_ACL_OTHER;
 				pyace->id = -1;
-				pyace->perms = mode & 7;
+				pyace->perms = mode & ~mask & 7;
 				tagsset |= POSIX_ACL_OTHER;
 				i++;
 			}

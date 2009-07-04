@@ -148,6 +148,7 @@ struct SECURITY_CONTEXT {
 	uid_t uid; /* uid of user requesting (not the mounter) */
 	gid_t gid; /* gid of user requesting (not the mounter) */
 	pid_t tid; /* thread id of thread requesting */
+	mode_t umask; /* umask of requesting thread */
 	} ;
 
 #if POSIXACLS

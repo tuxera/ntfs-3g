@@ -278,6 +278,13 @@ static BOOL ntfs_fuse_fill_security_context(struct SECURITY_CONTEXT *scx)
 	scx->uid = fusecontext->uid;
 	scx->gid = fusecontext->gid;
 	scx->tid = fusecontext->pid;
+#ifdef FUSE_CAP_DONT_MASK
+		/* the umask can be processed by the file system */
+	scx->umask = fusecontext->umask;
+#else
+		/* the umask if forced by fuse on creation */
+	scx->umask = 0;
+#endif
 
 	return (ctx->security.mapping[MAPUSERS] != (struct MAPPING*)NULL);
 }
@@ -476,6 +483,15 @@ int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 		set_fuse_error(&res);
 	return res;
 }
+#else /* defined(__APPLE__) || defined(__DARWIN__) */
+#ifdef FUSE_CAP_DONT_MASK
+static void *ntfs_init(struct fuse_conn_info *conn)
+{
+		/* request umask not to be enforced by fuse */
+	conn->want |= FUSE_CAP_DONT_MASK;
+	return NULL;
+}
+#endif
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
@@ -1350,7 +1366,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 		goto exit;
 	}
 #if POSIXACLS
-		/* JPA make sure parent directory is writeable and executable */
+		/* make sure parent directory is writeable and executable */
 	if (!ntfs_fuse_fill_security_context(&security)
 	       || ntfs_allowed_access(&security,dir_path,
 				dir_ni,S_IWRITE + S_IEXEC)) {
@@ -1362,7 +1378,7 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 		else
 			perm = typemode & ~ctx->fmask & 0777;
 			/*
-			 * JPA try to get a security id available for
+			 * Try to get a security id available for
 			 * file creation (from inheritance or argument).
 			 * This is not possible for NTFS 1.x, and we will
 			 * have to build a security attribute later.
@@ -1380,8 +1396,8 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 					dir_path, dir_ni, perm, S_ISDIR(type));
 #else
 				securid = ntfs_alloc_securid(&security,
-					security.uid, security.gid, perm,
-					S_ISDIR(type));
+					security.uid, security.gid,
+					perm & ~security.umask, S_ISDIR(type));
 #endif
 		/* Create object specified in @type. */
 		switch (type) {
@@ -1420,7 +1436,8 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 #else
 			   	if (!securid
 				   && ntfs_set_owner_mode(&security, ni,
-					security.uid, security.gid, perm) < 0)
+					security.uid, security.gid, 
+					perm & ~security.umask) < 0)
 					set_fuse_error(&res);
 #endif
 			}
@@ -3020,6 +3037,10 @@ static struct fuse_operations ntfs_3g_ops = {
 	.getxtimes	= ntfs_macfuse_getxtimes,
 	.setcrtime	= ntfs_macfuse_setcrtime,
 	.setbkuptime	= ntfs_macfuse_setbkuptime
+#else /* defined(__APPLE__) || defined(__DARWIN__) */
+#ifdef FUSE_CAP_DONT_MASK
+	.init		= ntfs_init
+#endif
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 };
 

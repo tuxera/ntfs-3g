@@ -170,7 +170,8 @@ BOOL ntfs_valid_posix(const struct POSIX_SECURITY *pxdesc);
 void ntfs_sort_posix(struct POSIX_SECURITY *pxdesc);
 int ntfs_merge_mode_posix(struct POSIX_SECURITY *pxdesc, mode_t mode);
 struct POSIX_SECURITY *ntfs_build_inherited_posix(
-		const struct POSIX_SECURITY *pxdesc, mode_t mode, BOOL isdir);
+		const struct POSIX_SECURITY *pxdesc, mode_t mode,
+		mode_t umask, BOOL isdir);
 struct POSIX_SECURITY *ntfs_replace_acl(const struct POSIX_SECURITY *oldpxdesc,
 		const struct POSIX_ACL *newacl, int count, BOOL deflt);
 struct POSIX_SECURITY *ntfs_build_permissions_posix(

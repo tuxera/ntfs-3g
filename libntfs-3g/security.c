@@ -2438,7 +2438,8 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 		gid = cached->gid;
 		pxdesc = cached->pxdesc;
 		if (pxdesc) {
-			pydesc = ntfs_build_inherited_posix(pxdesc,mode,isdir);
+			pydesc = ntfs_build_inherited_posix(pxdesc,mode,
+					scx->umask,isdir);
 		}
 	} else {
 		securattr = getsecurityattr(scx->vol, dir_path, dir_ni);
@@ -2482,7 +2483,8 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 					enter_cache(scx, dir_ni, uid,
 							gid, pxdesc);
 				}
-				pydesc = ntfs_build_inherited_posix(pxdesc, mode, isdir);
+				pydesc = ntfs_build_inherited_posix(pxdesc,
+					mode, scx->umask, isdir);
 				free(pxdesc);
 			}
 			free(securattr);
