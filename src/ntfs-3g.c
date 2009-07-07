@@ -1622,6 +1622,7 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 			goto exit;
 		}
 	
+		set_archive(ni);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 		ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 	}
@@ -1681,6 +1682,7 @@ static int ntfs_fuse_rm(const char *org_path)
 	    || ntfs_allowed_dir_access(&security, org_path,
 				   S_IEXEC + S_IWRITE + S_ISVTX)) {
 #endif
+		set_archive(ni); /* even if deletion fails ! */
 		if (ntfs_delete(ctx->vol, org_path, ni, dir_ni,
 				 uname, uname_len))
 			res = -errno;
@@ -1712,6 +1714,8 @@ static int ntfs_fuse_rm_stream(const char *path, ntfschar *stream_name,
 	
 	if (ntfs_attr_remove(ni, AT_DATA, stream_name, stream_name_len))
 		res = -errno;
+	else
+		set_archive(ni);
 
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
