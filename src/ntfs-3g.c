@@ -2014,6 +2014,7 @@ enum { XATTR_UNMAPPED,
 	XATTR_NTFS_EFSINFO,
 	XATTR_NTFS_REPARSE_DATA,
 	XATTR_NTFS_DOS_NAME,
+	XATTR_NTFS_TIMES,
 	XATTR_POSIX_ACC, 
 	XATTR_POSIX_DEF } ;
 
@@ -2022,6 +2023,7 @@ static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_efsinfo[] = "user.ntfs.efsinfo";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
 static const char nf_ns_xattr_dos_name[] = "system.ntfs_dos_name";
+static const char nf_ns_xattr_times[] = "system.ntfs_times";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
 
@@ -2036,6 +2038,7 @@ static struct XATTRNAME nf_ns_xattr_names[] = {
 	{ XATTR_NTFS_EFSINFO, nf_ns_xattr_efsinfo },
 	{ XATTR_NTFS_REPARSE_DATA, nf_ns_xattr_reparse },
 	{ XATTR_NTFS_DOS_NAME, nf_ns_xattr_dos_name },
+	{ XATTR_NTFS_TIMES, nf_ns_xattr_times },
 	{ XATTR_POSIX_ACC, nf_ns_xattr_posix_access },
 	{ XATTR_POSIX_DEF, nf_ns_xattr_posix_default },
 	{ XATTR_UNMAPPED, (char*)NULL } /* terminator */
@@ -2422,6 +2425,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					res = ntfs_get_ntfs_dos_name(path,
 						value,size,ni);
 					break;
+				case XATTR_NTFS_TIMES:
+					res = ntfs_inode_get_times(path,
+						value,size,ni);
+					break;
 				default : /* not possible */
 					break;
 				}
@@ -2470,6 +2477,10 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 					break;
 				case XATTR_NTFS_DOS_NAME:
 					res = ntfs_get_ntfs_dos_name(path,
+						value,size,ni);
+					break;
+				case XATTR_NTFS_TIMES:
+					res = ntfs_inode_get_times(path,
 						value,size,ni);
 					break;
 				default :
@@ -2601,6 +2612,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					res = ntfs_set_ntfs_dos_name(path,
 						value,size,flags,ni);
 					break;
+				case XATTR_NTFS_TIMES:
+					res = ntfs_inode_set_times(path,
+						value,size,flags,ni);
+					break;
 				default : /* not possible */
 					break;
 				}
@@ -2654,6 +2669,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					case XATTR_NTFS_DOS_NAME:
 					/* warning : this closes the inode */
 						res = ntfs_set_ntfs_dos_name(path,
+							value,size,flags,ni);
+						break;
+					case XATTR_NTFS_TIMES:
+						res = ntfs_inode_set_times(path,
 							value,size,flags,ni);
 						break;
 					default :
@@ -2805,11 +2824,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		res = 0;
 		switch (attr) {
 			/*
-			 * Removal of NTFS ACL or ATTRIB is never allowed
+			 * Removal of NTFS ACL, ATTRIB, EFSINFO or TIMES
+			 * is never allowed
 			 */
 		case XATTR_NTFS_ACL :
 		case XATTR_NTFS_ATTRIB :
 		case XATTR_NTFS_EFSINFO :
+		case XATTR_NTFS_TIMES :
 			res = -EPERM;
 			break;
 		case XATTR_POSIX_ACC :
@@ -2854,11 +2875,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		else {
 			switch (attr) {
 				/*
-				 * Removal of NTFS ACL or ATTRIB is never allowed
+				 * Removal of NTFS ACL, ATTRIB, EFSINFO or TIMES
+				 * is never allowed
 				 */
 			case XATTR_NTFS_ACL :
 			case XATTR_NTFS_ATTRIB :
 			case XATTR_NTFS_EFSINFO :
+			case XATTR_NTFS_TIMES :
 				res = -EPERM;
 				break;
 			case XATTR_NTFS_REPARSE_DATA :

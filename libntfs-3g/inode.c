@@ -35,6 +35,9 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
 
 #include "compat.h"
 #include "types.h"
@@ -554,10 +557,12 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
 	std_info->file_attributes = ni->flags;
-	std_info->creation_time = utc2ntfs(ni->creation_time);
-	std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-	std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-	std_info->last_access_time = utc2ntfs(ni->last_access_time);
+	if (test_nino_flag(ni, TimesDirty)) {
+		std_info->creation_time = utc2ntfs(ni->creation_time);
+		std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+		std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+		std_info->last_access_time = utc2ntfs(ni->last_access_time);
+	}
 
 		/* JPA update v3.x extensions, ensuring consistency */
 
@@ -655,10 +660,12 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				(ni->flags & FILE_ATTR_VALID_FLAGS);
 		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 		fn->data_size = cpu_to_sle64(ni->data_size);
-		fn->creation_time = utc2ntfs(ni->creation_time);
-		fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-		fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-		fn->last_access_time = utc2ntfs(ni->last_access_time);
+		if (test_nino_flag(ni, TimesDirty)) {
+			fn->creation_time = utc2ntfs(ni->creation_time);
+			fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+			fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+			fn->last_access_time = utc2ntfs(ni->last_access_time);
+		}
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
 		if ((ni != index_ni) && ntfs_inode_close(index_ni) && !err)
@@ -1137,6 +1144,7 @@ void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (mask & NTFS_UPDATE_CTIME)
 		ni->last_mft_change_time = now;
 	
+	set_nino_flag(ni, TimesDirty);
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
 }
@@ -1183,4 +1191,152 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
 	ntfs_ucsfree(ustr);
 
 	return ret;
+}
+
+/*
+ *		Get high precision NTFS times
+ *
+ *	They are returned in following order : create, update, access, change
+ *	provided they fit in requested size.
+ *
+ *	Returns the modified size if successfull (or 32 if buffer size is null)
+ *		-errno if failed
+ */
+
+int ntfs_inode_get_times(const char *path __attribute__((unused)),
+			char *value, size_t size, ntfs_inode *ni)
+{
+	ntfs_attr_search_ctx *ctx;
+	STANDARD_INFORMATION *std_info;
+	u64 *times;
+	int ret;
+
+	ret = 0;
+	ctx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (ctx) {
+		if (ntfs_attr_lookup(AT_STANDARD_INFORMATION, AT_UNNAMED,
+				     0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			ntfs_log_perror("Failed to get standard info (inode %lld)",
+					(long long)ni->mft_no);
+		} else {
+			std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
+			if (value && (size >= 8)) {
+				times = (u64*)value;
+				times[0] = le64_to_cpu(std_info->creation_time);
+				ret = 8;
+				if (size >= 16) {
+					times[1] = le64_to_cpu(std_info->last_data_change_time);
+					ret = 16;
+				}
+				if (size >= 24) {
+					times[2] = le64_to_cpu(std_info->last_access_time);
+					ret = 24;
+				}
+				if (size >= 32) {
+					times[3] = le64_to_cpu(std_info->last_mft_change_time);
+					ret = 32;
+				}
+			} else
+				if (!size)
+					ret = 32;
+				else
+					ret = -ERANGE;
+			}
+		ntfs_attr_put_search_ctx(ctx);
+	}		
+	return (ret ? ret : -errno);
+}
+
+/*
+ *		Set high precision NTFS times
+ *
+ *	They are expected in this order : create, update, access
+ *	provided they are present in input. The change time is set to
+ *	current time.
+ *
+ *	The times are inserted directly in the standard_information and
+ *	file names attributes to avoid manipulating low precision times
+ *
+ *	Returns 0 if success
+ *		-1 if there were an error (described by errno)
+ */
+
+int ntfs_inode_set_times(const char *path __attribute__((unused)),
+			const char *value, size_t size,
+			int flags, ntfs_inode *ni)
+{
+	ntfs_attr_search_ctx *ctx;
+	STANDARD_INFORMATION *std_info;
+	FILE_NAME_ATTR *fn;
+	const u64 *times;
+	le64 now;
+	int cnt;
+	int ret;
+
+	ret = -1;
+	if ((size >= 8) && !(flags & XATTR_CREATE)) {
+		times = (const u64*)value;
+		now = utc2ntfs(time((time_t*)NULL));
+			/* update the standard information attribute */
+		ctx = ntfs_attr_get_search_ctx(ni, NULL);
+		if (ctx) {
+			if (ntfs_attr_lookup(AT_STANDARD_INFORMATION,
+					AT_UNNAMED, 0, CASE_SENSITIVE,
+					0, NULL, 0, ctx)) {
+				ntfs_log_perror("Failed to get standard info (inode %lld)",
+						(long long)ni->mft_no);
+			} else {
+				std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
+				/*
+				 * Do not mark times dirty to avoid
+				 * overwriting them when the inode is closed.
+				 */
+				std_info->creation_time = cpu_to_le64(times[0]);
+				if (size >= 16)
+					std_info->last_data_change_time = cpu_to_le64(times[1]);
+				if (size >= 24)
+					std_info->last_access_time = cpu_to_le64(times[2]);
+				std_info->last_mft_change_time = now;
+				ntfs_inode_mark_dirty(ctx->ntfs_ino);
+
+				/* update the file names attributes */
+				ntfs_attr_reinit_search_ctx(ctx);
+				cnt = 0;
+				while (!ntfs_attr_lookup(AT_FILE_NAME,
+						AT_UNNAMED, 0, CASE_SENSITIVE,
+						0, NULL, 0, ctx)) {
+					fn = (FILE_NAME_ATTR*)((u8 *)ctx->attr +
+						le16_to_cpu(ctx->attr->value_offset));
+				/*
+				 * Do not mark times dirty to avoid
+				 * overwriting them when the inode is closed.
+				 */
+					fn->creation_time
+						= cpu_to_le64(times[0]);
+					if (size >= 16)
+						fn->last_data_change_time
+							= cpu_to_le64(times[1]);
+					if (size >= 24)
+						fn->last_access_time
+							= cpu_to_le64(times[2]);
+					fn->last_mft_change_time = now;
+					cnt++;
+				}
+				if (cnt)
+					ret = 0;
+				else {
+					ntfs_log_perror("Failed to get file names (inode %lld)",
+						(long long)ni->mft_no);
+				}
+			}
+			ntfs_attr_put_search_ctx(ctx);
+		}		
+	} else
+		if (size < 8)
+			errno = ERANGE;
+		else
+			errno = EEXIST;
+	return (ret);
 }
