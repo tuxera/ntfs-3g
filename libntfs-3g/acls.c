@@ -72,6 +72,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <errno.h>
 
