@@ -2414,8 +2414,11 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 						value,size,ni);
 					break;
 				case XATTR_NTFS_EFSINFO :
-					res = ntfs_get_efs_info(path,
-						value,size,ni);
+					if (ctx->efs_raw)
+						res = ntfs_get_efs_info(path,
+							value,size,ni);
+					else
+						res = -EPERM;
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
@@ -2468,8 +2471,11 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 						value,size,ni);
 					break;
 				case XATTR_NTFS_EFSINFO :
-					res = ntfs_get_efs_info(path,
-						value,size,ni);
+					if (ctx->efs_raw)
+						res = ntfs_get_efs_info(path,
+							value,size,ni);
+					else
+						res = -EPERM;
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_get_ntfs_reparse_data(path,
@@ -2600,8 +2606,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 						value,size,flags,ni);
 					break;
 				case XATTR_NTFS_EFSINFO :
-					res = ntfs_set_efs_info(path,
-						value,size,flags,ni);
+					if (ctx->efs_raw)
+						res = ntfs_set_efs_info(path,
+							value,size,flags,ni);
+					else
+						res = -EPERM;
 					break;
 				case XATTR_NTFS_REPARSE_DATA :
 					res = ntfs_set_ntfs_reparse_data(path,
@@ -2659,8 +2668,11 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 							value,size,flags,ni);
 						break;
 					case XATTR_NTFS_EFSINFO :
-						res = ntfs_set_efs_info(path,
-							value,size,flags,ni);
+						if (ctx->efs_raw)
+							res = ntfs_set_efs_info(path,
+								value,size,flags,ni);
+						else
+							res = -EPERM;
 						break;
 					case XATTR_NTFS_REPARSE_DATA :
 						res = ntfs_set_ntfs_reparse_data(path,
