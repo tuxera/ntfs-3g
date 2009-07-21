@@ -333,7 +333,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
 	ret = ntfs_attr_add(ni, AT_SECURITY_DESCRIPTOR, AT_UNNAMED, 0, (u8 *)sd,
 			    sd_len);
 	if (ret)
-		ntfs_log_perror("Failed to add SECURITY_DESCRIPTOR\n");
+		ntfs_log_perror("Failed to add SECURITY_DESCRIPTOR");
 	
 	free(sd);
 	return ret;
