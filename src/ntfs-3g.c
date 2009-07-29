@@ -417,10 +417,31 @@ int ntfs_macfuse_setbkuptime(const char *path, const struct timespec *tv)
 		return -errno;
 	
 	/* 
-	 * Doing nothing while pretending to do something. NTFS has no backup
-	 * time. If this function is not implemented then some apps break. 
+	 * Only pretending to set backup time successfully to please the APIs of
+	 * Mac OS X. In reality, NTFS has no backup time.
 	 */
 	
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
+{
+	ntfs_inode *ni;
+	int res = 0;
+
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+
+	if (tv) {
+		ni->last_mft_change_time = tv->tv_sec;
+		ntfs_fuse_update_times(ni, 0);
+	}
+
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
 	return res;
@@ -1708,7 +1729,8 @@ static struct fuse_operations ntfs_3g_ops = {
 	/* MacFUSE extensions. */
 	.getxtimes	= ntfs_macfuse_getxtimes,
 	.setcrtime	= ntfs_macfuse_setcrtime,
-	.setbkuptime	= ntfs_macfuse_setbkuptime
+	.setbkuptime	= ntfs_macfuse_setbkuptime,
+	.setchgtime	= ntfs_macfuse_setchgtime,
 #endif /* defined(__APPLE__) || defined(__DARWIN__) */
 };
 
