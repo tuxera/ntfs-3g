@@ -1021,7 +1021,9 @@ static struct fuse *req_fuse_prepare(fuse_req_t req)
     c->ctx.uid = ctx->uid;
     c->ctx.gid = ctx->gid;
     c->ctx.pid = ctx->pid;
+#ifdef POSIXACLS
     c->ctx.umask = ctx->umask;
+#endif
     return c->ctx.fuse;
 }
 

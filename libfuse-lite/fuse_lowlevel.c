@@ -78,7 +78,9 @@ static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
     attr->atimensec = ST_ATIM_NSEC(stbuf);
     attr->mtimensec = ST_MTIM_NSEC(stbuf);
     attr->ctimensec = ST_CTIM_NSEC(stbuf);
-attr->filling = 0; /* JPA trying to be safe */
+#ifdef POSIXACLS
+    attr->filling = 0; /* JPA trying to be safe */
+#endif
 }
 
 static void convert_attr(const struct fuse_setattr_in *attr, struct stat *stbuf)
@@ -512,9 +514,11 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     const struct fuse_mknod_in *arg = (const struct fuse_mknod_in *) inarg;
     const char *name = PARAM(arg);
 
+#ifdef POSIXACLS
     if (req->f->conn.proto_minor >= 12)
 	req->ctx.umask = arg->umask;
     else
+#endif
 	name = (const char *) inarg + FUSE_COMPAT_MKNOD_IN_SIZE;
 
     if (req->f->op.mknod)
@@ -527,8 +531,10 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 {
     const struct fuse_mkdir_in *arg = (const struct fuse_mkdir_in *) inarg;
 
+#ifdef POSIXACLS
     if (req->f->conn.proto_minor >= 12)
 	req->ctx.umask = arg->umask;
+#endif
 
     if (req->f->op.mkdir)
         req->f->op.mkdir(req, nodeid, PARAM(arg), arg->mode);
@@ -600,9 +606,11 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
         memset(&fi, 0, sizeof(fi));
         fi.flags = arg->flags;
 
+#ifdef POSIXACLS
 	if (req->f->conn.proto_minor >= 12)
 		req->ctx.umask = arg->umask;
 	else
+#endif
 		name = (const char *) inarg + sizeof(struct fuse_open_in);
 
 	req->f->op.create(req, nodeid, name, arg->mode, &fi);
@@ -999,8 +1007,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
             f->conn.async_read = arg->flags & FUSE_ASYNC_READ;
         if (arg->max_readahead < f->conn.max_readahead)
             f->conn.max_readahead = arg->max_readahead;
+#ifdef POSIXACLS
 	if (arg->flags & FUSE_DONT_MASK)
 	    f->conn.capable |= FUSE_CAP_DONT_MASK;
+#endif
     } else {
         f->conn.async_read = 0;
         f->conn.max_readahead = 0;
@@ -1027,8 +1037,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
         outarg.flags |= FUSE_ASYNC_READ;
     if (f->op.getlk && f->op.setlk)
         outarg.flags |= FUSE_POSIX_LOCKS;
+#ifdef POSIXACLS
     if (f->conn.want & FUSE_CAP_DONT_MASK)
 	outarg.flags |= FUSE_DONT_MASK;
+#endif
     outarg.max_readahead = f->conn.max_readahead;
     outarg.max_write = f->conn.max_write;
 
