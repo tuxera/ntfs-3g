@@ -839,11 +839,12 @@ do_next_cb:
  *	Returns the amount of data read
  */
 
-static int read_clusters(ntfs_volume *vol, const runlist_element *rl,
-			s64 offs, int to_read, char *inbuf)
+static u32 read_clusters(ntfs_volume *vol, const runlist_element *rl,
+			s64 offs, u32 to_read, char *inbuf)
 {
-	int count;
-	int got, xgot;
+	u32 count;
+	int xgot;
+	u32 got;
 	s64 xpos;
 	BOOL first;
 	char *xinbuf;
@@ -863,14 +864,14 @@ static int read_clusters(ntfs_volume *vol, const runlist_element *rl,
 		if ((to_read - got) < count)
 			count = to_read - got;
 		xgot = ntfs_pread(vol->dev, xpos, count, xinbuf);
-		if (xgot == count) {
+		if (xgot == (int)count) {
 			got += count;
 			xpos += count;
 			xinbuf += count;
 			xrl++;
 		}
 		first = FALSE;
-	} while ((xgot == count) && (got < to_read));
+	} while ((xgot == (int)count) && (got < to_read));
 	return (got);
 }
 
@@ -920,8 +921,9 @@ static int write_clusters(ntfs_volume *vol, const runlist_element *rl,
  *		Compress and write a set of blocks
  *
  *	returns the size actually written (rounded to a full cluster)
- *		or 0 if could not compress (nothing is written)
- *		or -1 if there were an irrecoverable error (errno set)
+ *		or 0 if all zeroes (nothing is written)
+ *		or -1 if could not compress (nothing is written)
+ *		or -2 if there were an irrecoverable error (errno set)
  */
 
 static int ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
@@ -929,6 +931,7 @@ static int ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
 {
 	ntfs_volume *vol;
 	char *outbuf;
+	char *pbuf;
 	unsigned int compsz;
 	int written;
 	int rounded;
@@ -937,9 +940,16 @@ static int ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
 	unsigned int sz;
 	unsigned int bsz;
 	BOOL fail;
+	BOOL allzeroes;
+		/* a single compressed zero */
+	static char onezero[] = { 0x01, 0xb0, 0x00, 0x00 } ;
+		/* a couple of compressed zeroes */
+	static char twozeroes[] = { 0x02, 0xb0, 0x00, 0x00, 0x00 } ;
+		/* more compressed zeroes, to be followed by some count */
+	static char morezeroes[] = { 0x03, 0xb0, 0x02, 0x00 } ;
 
 	vol = na->ni->vol;
-	written = 0; /* default return */
+	written = -1; /* default return */
 	clsz = 1 << vol->cluster_size_bits;
 		/* may need 2 extra bytes per block and 2 more bytes */
 	outbuf = (char*)ntfs_malloc(na->compression_block_size
@@ -948,21 +958,43 @@ static int ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
 	if (outbuf) {
 		fail = FALSE;
 		compsz = 0;
+		allzeroes = TRUE;
 		for (p=0; (p<insz) && !fail; p+=NTFS_SB_SIZE) {
 			if ((p + NTFS_SB_SIZE) < insz)
 				bsz = NTFS_SB_SIZE;
 			else
 				bsz = insz - p;
-			sz = ntfs_compress_block(&inbuf[p],bsz,
-					&outbuf[compsz]);
+			pbuf = &outbuf[compsz];
+			sz = ntfs_compress_block(&inbuf[p],bsz,pbuf);
 			/* fail if all the clusters (or more) are needed */
 			if (!sz || ((compsz + sz + clsz + 2)
 					 > na->compression_block_size))
 				fail = TRUE;
-			else
-				compsz += sz;
+			else {
+				if (allzeroes) {
+				/* check whether this is all zeroes */
+					switch (sz) {
+					case 4 :
+						allzeroes = !memcmp(
+							pbuf,onezero,4);
+						break;
+					case 5 :
+						allzeroes = !memcmp(
+							pbuf,twozeroes,5);
+						break;
+					case 6 :
+						allzeroes = !memcmp(
+							pbuf,morezeroes,4);
+						break;
+					default :
+						allzeroes = FALSE;
+						break;
+					}
+				}
+			compsz += sz;
+			}
 		}
-		if (!fail) {
+		if (!fail && !allzeroes) {
 			/* add a couple of null bytes, space has been checked */
 			outbuf[compsz++] = 0;
 			outbuf[compsz++] = 0;
@@ -973,9 +1005,11 @@ static int ntfs_comp_set(ntfs_attr *na, runlist_element *rl,
 // previously written text has been spoilt, should return a specific error
 				ntfs_log_error("error writing compressed data\n");
 				errno = EIO;
-				written = -1;
+				written = -2;
 			}
-		}
+		} else
+			if (!fail)
+				written = 0;
 		free(outbuf);
 	}
 	return (written);
@@ -1001,6 +1035,8 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 	s64 freelcn;
 	s64 freevcn;
 	int freelength;
+	BOOL mergeholes;
+	BOOL beginhole;
 	ntfs_volume *vol;
 	runlist_element *freerl;
 
@@ -1024,11 +1060,21 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 		freevcn = rl->vcn + usedcnt;
 		freelength = rl->length - usedcnt;
 			/* new count of allocated clusters */
-		rl->length = usedcnt;
-		freerl = ++rl;
+		rl->length = usedcnt; /* warning : can be zero */
 		if (!((freevcn + freecnt)
 			    & (na->compression_block_clusters - 1))) {
-			if (freelength > 0) {
+			beginhole = !usedcnt && !rl->vcn;
+			mergeholes = !usedcnt
+					&& rl[0].vcn
+					&& (rl[-1].lcn == LCN_HOLE);
+			if (mergeholes) {
+				freerl = rl;
+				freerl->length = freecnt;
+			} else
+				freerl = ++rl;
+			if ((freelength > 0)
+			    && !mergeholes
+			    && (usedcnt || beginhole)) {
 				/*
 				 * move the unused part to the end. Doing so,
 				 * the vcn will be out of order. This does
@@ -1050,10 +1096,18 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 				/* free the hole */
 			res = ntfs_cluster_free_from_rl(vol,freerl);
 			if (!res) {
-					/* mark hole as free */
-				freerl->lcn = LCN_HOLE;
-				freerl->vcn = freevcn;
-				freerl->length = freecnt;
+				if (mergeholes) {
+						/* merge with adjacent hole */
+					freerl--;
+					freerl->length += freecnt;
+				} else {
+					if (beginhole)
+						freerl--;
+						/* mark hole as free */
+					freerl->lcn = LCN_HOLE;
+					freerl->vcn = freevcn;
+					freerl->length = freecnt;
+				}
 					/* and set up the new end */
 				freerl[1].lcn = LCN_ENOENT;
 				freerl[1].vcn = freevcn + freecnt;
@@ -1076,26 +1130,34 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
  */
 
 static int ntfs_read_append(ntfs_attr *na, const runlist_element *rl,
-			s64 offs, int compsz, int pos,
+			s64 offs, u32 compsz, int pos,
 			char *outbuf, s64 to_write, const void *b)
 {
 	int fail = 1;
 	char *compbuf;
-	int decompsz;
-	int got;
+	u32 decompsz;
+	u32 got;
 
-	compbuf = (char*)ntfs_malloc(compsz);
-	if (compbuf) {
+	if (compsz == na->compression_block_size) {
+			/* if the full block was requested, it was a hole */
+		memset(outbuf,0,compsz);
+		memcpy(&outbuf[pos],b,to_write);
+		fail = 0;
+	} else {
+		compbuf = (char*)ntfs_malloc(compsz);
+		if (compbuf) {
 			/* must align to full block for decompression */
-		decompsz = ((pos - 1) | (NTFS_SB_SIZE - 1)) + 1;
-		got = read_clusters(na->ni->vol, rl, offs, compsz, compbuf);
-		if ((got == compsz)
-		    && !ntfs_decompress((u8*)outbuf,decompsz,
-				(u8*)compbuf,compsz)) {
-			memcpy(&outbuf[pos],b,to_write);
-			fail = 0;
+			decompsz = ((pos - 1) | (NTFS_SB_SIZE - 1)) + 1;
+			got = read_clusters(na->ni->vol, rl, offs,
+					compsz, compbuf);
+			if ((got == compsz)
+			    && !ntfs_decompress((u8*)outbuf,decompsz,
+					(u8*)compbuf,compsz)) {
+				memcpy(&outbuf[pos],b,to_write);
+				fail = 0;
+			}
+			free(compbuf);
 		}
-		free(compbuf);
 	}
 	return (fail);
 }
@@ -1117,9 +1179,9 @@ static int ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
 
 	if (compress) {
 		written = ntfs_comp_set(na, rl, offs, count, outbuf);
-		if (!written)
+		if (written == -1)
 			compress = FALSE;
-		if ((written > 0)
+		if ((written >= 0)
 		   && ntfs_compress_free(na,rl,offs + written,
 				offs + na->compression_block_size))
 			written = -1;
@@ -1160,7 +1222,7 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 	s64 got;
 	s64 start_vcn;
 	s64 nextblock;
-	int compsz;
+	u32 compsz;
 	char *inbuf;
 	char *outbuf;
 	BOOL fail;
@@ -1259,7 +1321,7 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 				 * if compression was not successful,
 				 * only write the part which was requested
 				 */
-					if ((written > 0)
+					if ((written >= 0)
 						/* free the unused clusters */
 				  	  && !ntfs_compress_free(na,brl,
 						    written + roffs,
@@ -1348,7 +1410,7 @@ int ntfs_compressed_close(ntfs_attr *na, runlist_element *wrl, s64 offs)
 				if (got == to_read) {
 					written = ntfs_comp_set(na, brl, roffs,
 							to_read, inbuf);
-					if ((written > 0)
+					if ((written >= 0)
 					/* free the unused clusters */
 					    && !ntfs_compress_free(na,brl,
 							written + roffs,
@@ -1356,7 +1418,7 @@ int ntfs_compressed_close(ntfs_attr *na, runlist_element *wrl, s64 offs)
 						done = TRUE;
 					} else
 				/* if compression failed, leave uncompressed */
-						if (!written)
+						if (written == -1)
 							done = TRUE;
 				}
 			} else

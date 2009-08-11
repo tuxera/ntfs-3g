@@ -1156,14 +1156,26 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 		goto exit;
 	}
 #endif
-		/* for compressed files, only deleting contents is implemented */
-	if (NAttrCompressed(na) && size) {
+		/*
+		 * for compressed files, only deleting contents and expanding
+		 * are implemented. Expanding is done by inserting a final
+		 * zero, which is optimized as creating a hole when possible. 
+		 */
+	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	    && size
+	    && (size < na->initialized_size)) {
 		errno = EOPNOTSUPP;
 		goto exit;
 	}
 	oldsize = na->data_size;
-	if (ntfs_attr_truncate(na, size))
-		goto exit;
+	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	    && (size > na->initialized_size)) {
+		char zero = 0;
+		if (ntfs_attr_pwrite(na, size - 1, 1, &zero) <= 0)
+			goto exit;
+	} else
+		if (ntfs_attr_truncate(na, size))
+			goto exit;
 	if (oldsize != size)
 		set_archive(ni);
 	

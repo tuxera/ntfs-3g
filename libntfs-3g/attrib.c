@@ -1249,6 +1249,8 @@ err_out:
 	return ret;
 }
 
+static int stuff_hole(ntfs_attr *na, const s64 pos);
+
 /**
  * ntfs_attr_pwrite - positioned write to an ntfs attribute
  * @na:		ntfs attribute to write to
@@ -1310,6 +1312,15 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		errno = EACCES;
 		goto errno_set;
 	}
+		/*
+		 * Fill the gap, when writing beyond the end of a compressed
+		 * file. This will make recursive calls
+		 */
+	if (compressed
+	    && (na->type == AT_DATA)
+	    && (pos > na->initialized_size)
+	    && stuff_hole(na,pos))
+		goto errno_set;
 	/* If this is a compressed attribute it needs special treatment. */
 	wasnonresident = NAttrNonResident(na) != 0;
 	makingnonresident = wasnonresident /* yes : already changed */
@@ -1407,10 +1418,12 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			goto err_out;
 		/*
 		 * For a compressed attribute, we must be sure there is an
-		 * available entry, so reserve it before it gets too late.
+		 * available entry, and, when reopening a compressed file,
+		 * we may need to split a hole. So reserve the entries
+		 * before it gets too late.
 		 */
 		if (compressed) {
-			na->rl = ntfs_rl_extend(na->rl,1);
+			na->rl = ntfs_rl_extend(na->rl,2);
 			if (!na->rl)
 				goto err_out;
 		}
@@ -1487,29 +1500,45 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		 */
 	compressed_part = 0;
 	if (compressed) {
- 		if ((rl->lcn >= 0) && (rl[1].lcn == (LCN)LCN_HOLE)) {
-			s64 xofs;
-
-			if (wasnonresident)
-				compressed_part = na->compression_block_clusters
-					   - rl[1].length;
-			rl++;
-			xofs = 0;
-			if (ntfs_attr_fill_hole(na,
-				    rl->length << vol->cluster_size_bits,
-				    &xofs, &rl, &update_from))
-                      		goto err_out;
-			 /* the fist allocated cluster was not merged */
-			if (!xofs)
-				rl--;
-		} else
-			if ((rl->lcn == (LCN)LCN_HOLE)
-			    && wasnonresident
-			    && (rl->length < na->compression_block_clusters))
+		if ((rl->lcn == (LCN)LCN_HOLE)
+		    && wasnonresident) {
+			if (rl->length < na->compression_block_clusters)
 				compressed_part
-                                	 = na->compression_block_clusters
-                                           - rl->length;
+					= na->compression_block_clusters
+					   - rl->length;
+			else {
+				compressed_part
+					= na->compression_block_clusters;
+				if (rl->length > na->compression_block_clusters) {
+					rl[2].lcn = rl[1].lcn;
+					rl[2].vcn = rl[1].vcn;
+					rl[2].length = rl[1].length;
+					rl[1].vcn -= compressed_part;
+					rl[1].lcn = LCN_HOLE;
+					rl[1].length = compressed_part;
+					rl[0].length -= compressed_part;
+					ofs -= rl->length << vol->cluster_size_bits;
+					rl++;
+				}
+			}
 				/* normal hole filling will do later */
+		} else
+			if ((rl->lcn >= 0) && (rl[1].lcn == (LCN)LCN_HOLE)) {
+				s64 xofs;
+
+				if (wasnonresident)
+					compressed_part = na->compression_block_clusters
+						   - rl[1].length;
+				rl++;
+				xofs = 0;
+				if (ntfs_attr_fill_hole(na,
+					    rl->length << vol->cluster_size_bits,
+					    &xofs, &rl, &update_from))
+                      			goto err_out;
+				 /* the fist allocated cluster was not merged */
+				if (!xofs)
+					rl--;
+			}
 	}
 	/*
 	 * Scatter the data from the linear data buffer to the volume. Note, a
@@ -1785,11 +1814,15 @@ int ntfs_attr_pclose(ntfs_attr *na)
 		compressed_part
 			 = na->compression_block_clusters - rl[1].length;
 	else
-		if ((rl->lcn == (LCN)LCN_HOLE)
-		    && (rl->length < na->compression_block_clusters))
-			compressed_part
-                                 = na->compression_block_clusters
-                                           - rl->length;
+		if (rl->lcn == (LCN)LCN_HOLE) {
+			if (rl->length < na->compression_block_clusters)
+				compressed_part
+        	                        = na->compression_block_clusters
+                	                           - rl->length;
+			else
+				compressed_part
+					= na->compression_block_clusters;
+		}
 		/* done, if the last block set was compressed */
 	if (compressed_part)
 		goto out;
@@ -5552,13 +5585,14 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		 * allocated, and we do not known the size of compression
 		 * block until the attribute has been made non-resident.
 		 * Moreover we can only process a single compression
-		 * block at a time, so we silently do not allocate more.
+		 * block at a time (from where we are about to write),
+		 * so we silently do not allocate more.
 		 *
 		 * Note : do not request truncate on compressed files
 		 * unless being able to face the consequences !
 		 */
 		if (compressed && newsize)
-			fullsize = (na->data_size
+			fullsize = (na->initialized_size
 				 | (na->compression_block_size - 1)) + 1;
 		else
 			fullsize = newsize;
@@ -5573,6 +5607,93 @@ out:
 	return ret;
 }
 	
+/*
+ *		Stuff a hole in a compressed file
+ *
+ *	An unallocated hole must be aligned on compression block size.
+ *	If needed current block and target block are stuffed with zeroes.
+ *
+ *	Returns 0 if succeeded,
+ *		-1 if it failed (as explained in errno)
+ */
+
+static int stuff_hole(ntfs_attr *na, const s64 pos)
+{
+	s64 size;
+	s64 begin_size;
+	s64 end_size;
+	char *buf;
+	int ret;
+
+	ret = 0;
+		/*
+		 * If the attribute is resident, the compression block size
+		 * is not defined yet and we can make no decision.
+		 * So we first try resizing to the target and if the
+		 * attribute is still resident, we're done
+		 */
+	if (!NAttrNonResident(na)) {
+		ret = ntfs_resident_attr_resize(na, pos);
+		if (!ret && !NAttrNonResident(na))
+			na->initialized_size = na->data_size = pos;
+	}
+	if (!ret && NAttrNonResident(na)) {
+			/* does the hole span over several compression block ? */
+		if ((pos ^ na->initialized_size)
+				& ~(na->compression_block_size - 1)) {
+			begin_size = ((na->initialized_size - 1)
+					| (na->compression_block_size - 1))
+					+ 1 - na->initialized_size;
+			end_size = pos & (na->compression_block_size - 1);
+			size = (begin_size > end_size ? begin_size : end_size);
+		} else {
+			/* short stuffing in a single compression block */
+			begin_size = size = pos - na->initialized_size;
+			end_size = 0;
+		}
+		if (size)
+			buf = (char*)ntfs_malloc(size);
+		else
+			buf = (char*)NULL;
+		if (buf || !size) {
+			memset(buf,0,size);
+				/* stuff into current block */
+			if (begin_size
+			    && (ntfs_attr_pwrite(na,
+				na->initialized_size, begin_size, buf)
+				   != begin_size))
+				ret = -1;
+				/* create an unstuffed hole */
+			if (!ret
+			    && ((na->initialized_size + end_size) < pos)
+			    && ntfs_non_resident_attr_expand(na,
+					pos - end_size))
+				ret = -1;
+			else 
+				na->initialized_size
+				    = na->data_size = pos - end_size;
+				/* stuff into the target block */
+			if (!ret && end_size
+			    && (ntfs_attr_pwrite(na, 
+				na->initialized_size, end_size, buf)
+				    != end_size))
+				ret = -1;
+			if (buf)
+				free(buf);
+		} else
+			ret = -1;
+	}
+		/* make absolutely sure we have reached the target */
+	if (!ret && (na->initialized_size != pos)) {
+		ntfs_log_error("Failed to stuff a compressed file"
+			"target %lld reached %lld\n",
+			(long long)pos, (long long)na->initialized_size);
+		errno = EIO;
+		ret = -1;
+	}
+	return (ret);
+}
+
 /**
  * ntfs_attr_readall - read the entire data from an ntfs attribute
  * @ni:		open ntfs inode in which the ntfs attribute resides
