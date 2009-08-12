@@ -1085,7 +1085,7 @@ void ntfs_ucsfree(ntfschar *ucs)
 
 BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 {
-	BOOL forbidden = FALSE;
+	BOOL forbidden;
 	int ch;
 	int i;
 	u32 mainset =     (1L << ('\"' - 0x20))
@@ -1096,9 +1096,12 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('>' - 0x20))
 			| (1L << ('?' - 0x20));
 
+	forbidden = (len == 0)
+			|| (le16_to_cpu(name[0]) == ' ')
+			|| (le16_to_cpu(name[len-1]) == ' ');
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
-		if ((ch <= 0x20)
+		if ((ch < 0x20)
 		    || ((ch < 0x40)
 			&& ((1L << (ch - 0x20)) & mainset))
 		    || (ch == '\\')
