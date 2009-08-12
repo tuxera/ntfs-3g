@@ -1918,9 +1918,11 @@ int ntfs_get_ntfs_dos_name(const char *path,
 						outsize = -ERANGE;
 				free(outname);
 			}
-		} else
-			if (doslen < 0)
-				outsize = -errno;
+		} else {
+			if (doslen == 0)
+				errno = ENODATA;
+			outsize = -errno;
+		}
 		ntfs_inode_close(dir_ni);
 	} else
 		outsize = -errno;
