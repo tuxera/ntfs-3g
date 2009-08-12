@@ -1947,6 +1947,10 @@ int ntfs_get_ntfs_dos_name(const char *path,
  * deleting the long name, but not the file itself
  * because the alternate name has been set before.
  *
+ * The inodes of file and parent directory are always closed
+ *
+ * Returns 0 if successful
+ *	   -1 if failed
  * Note : currently the short name and the long name must be different
  */
 
@@ -2014,6 +2018,8 @@ static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
  *  The DOS name will be added as another file name attribute
  *  using the existing file name information from the original
  *  name or overwriting the DOS Name if one exists.
+ *
+ *  	The inode of the file is always closed
  */
 
 int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
@@ -2028,6 +2034,7 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 	ntfs_volume *vol;
 	u64 fnum;
 	u64 dnum;
+	BOOL closed = FALSE;
 	ntfschar *shortname = NULL;
 	ntfschar *longname = NULL;
 	ntfs_inode *dir_ni = NULL;
@@ -2045,6 +2052,7 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 	shortlen = ntfs_mbstoucs(newname, &shortname);
 			/* make sure the short name has valid chars */
 	if ((shortlen < 0) || ntfs_forbidden_chars(shortname,shortlen)) {
+		ntfs_inode_close(ni);
 		res = -errno;
 		return res;
 	}
@@ -2070,23 +2078,29 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 				if (flags & XATTR_CREATE) {
 					res = -1;
 					errno = EEXIST;
-				} else
+				} else {
 					res = set_dos_name(ni, dir_ni, path,
 						shortname, shortlen,
 						longname, longlen,
 						oldname, oldsize);
+					closed = TRUE;
+				}
 			} else {
 				if (flags & XATTR_REPLACE) {
 					res = -1;
 					errno = ENODATA;
-				} else
+				} else {
 					res = set_dos_name(ni, dir_ni, path,
 						shortname, shortlen,
 						longname, longlen,
 						longname, longlen);
+					closed = TRUE;
+				}
 			}
 		} else
 			res = -1;
+		if (!closed)
+			ntfs_inode_close(dir_ni);
 	} else {
 		res = -1;
 		errno = EINVAL;
@@ -2094,6 +2108,8 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 	free(dirname);
 	free(longname);
 	free(shortname);
+	if (!closed)
+		ntfs_inode_close(ni);
 	return (res ? -1 : 0);
 }
 
