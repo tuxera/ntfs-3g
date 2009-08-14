@@ -2195,4 +2195,93 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 	return (res ? -1 : 0);
 }
 
+/*
+ *		Delete the ntfs DOS name
+ */
+
+int ntfs_remove_ntfs_dos_name(const char *path, ntfs_inode *ni)
+{
+	int res;
+	int oldnametype;
+	int longlen = 0;
+	int shortlen;
+	u64 dnum;
+	ntfs_volume *vol;
+	BOOL deleted = FALSE;
+	ntfschar shortname[MAX_DOS_NAME_LENGTH];
+	ntfschar *longname = NULL;
+	ntfs_inode *dir_ni = NULL;
+	char *dirname = (char*)NULL;
+	const char *rdirname;
+	char *p;
+
+	res = -1;
+	vol = ni->vol;
+			/* get the parent directory */
+	dirname = strdup(path);
+	if (dirname) {
+		p = strrchr(dirname,'/');
+		if (p) {
+			*p++ = 0;
+			longlen = ntfs_mbstoucs(p, &longname);
+			rdirname = (dirname[0] ? dirname : "/");
+			dir_ni = ntfs_pathname_to_inode(vol, NULL, rdirname);
+			}
+		}
+	if (dir_ni) {
+		dnum = dir_ni->mft_no;
+		shortlen = get_dos_name(ni, dnum, shortname);
+		if (shortlen >= 0) {
+				/* migrate the long name as Posix */
+			oldnametype = set_namespace(ni,dir_ni,longname,longlen,
+					FILE_NAME_POSIX);
+			switch (oldnametype) {
+			case FILE_NAME_WIN32_AND_DOS :
+				/* name was Win32+DOS : done */
+				res = 0;
+				break;
+			case FILE_NAME_DOS :
+				/* name was DOS, make it back to DOS */
+				set_namespace(ni,dir_ni,longname,longlen,
+						FILE_NAME_DOS);
+				errno = ENOENT;
+				break;
+			case FILE_NAME_WIN32 :
+				/* name was Win32, make it Posix and delete */
+				if (set_namespace(ni,dir_ni,shortname,shortlen,
+						FILE_NAME_POSIX) >= 0) {
+					if (!ntfs_delete(vol,
+							(const char*)NULL, ni,
+							dir_ni, shortname,
+							shortlen))
+						res = 0;
+					deleted = TRUE;
+				} else {
+					/*
+					 * DOS name has been found, but cannot
+					 * migrate to Posix : something bad 
+					 * has happened
+					 */
+					errno = EIO;
+					ntfs_log_error("Could not change"
+						" DOS name of %s to Posix\n",
+						path);
+				}
+				break;
+			default :
+				/* name was Posix or not found : error */
+				errno = ENOENT;
+				break;
+			}
+		}
+		if (!deleted)
+			ntfs_inode_close(dir_ni);
+	}
+	if (!deleted)
+		ntfs_inode_close(ni);
+	free(longname);
+	free(dirname);
+	return (res);
+}
+
 #endif

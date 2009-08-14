@@ -2882,6 +2882,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 				res = -errno;
 			break;
 		case XATTR_NTFS_DOS_NAME:
+			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
+			if (ni) {
+				if (ntfs_remove_ntfs_dos_name(path,ni))
+					res = -errno;
+			} else
+				res = -errno;
+			break;
 		default :
 			errno = EOPNOTSUPP;
 			res = -errno;
@@ -2925,6 +2932,13 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 					res = -errno;
 				break;
 			case XATTR_NTFS_DOS_NAME:
+				ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
+				if (ni) {
+					if (ntfs_remove_ntfs_dos_name(path,ni))
+						res = -errno;
+				} else
+					res = -errno;
+				break;
 			default :
 				/*
 				 * make sure applications do not see
