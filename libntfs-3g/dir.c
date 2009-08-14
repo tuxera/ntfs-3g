@@ -1860,8 +1860,6 @@ static int get_dos_name(ntfs_inode *ni, u64 dnum, ntfschar *dosname)
 			if (outsize > MAX_DOS_NAME_LENGTH)
 				outsize = MAX_DOS_NAME_LENGTH;
 			memcpy(dosname,fn->file_name,outsize*sizeof(ntfschar));
-			ntfs_name_upcase(dosname, outsize,
-					ni->vol->upcase, ni->vol->upcase_len);
 		}
 	}
 	ntfs_attr_put_search_ctx(ctx);
@@ -1902,10 +1900,12 @@ int ntfs_get_ntfs_dos_name(const char *path,
 		doslen = get_dos_name(ni, dnum, dosname);
 		if (doslen > 0) {
 				/*
-				 * Found a DOS name for the entry,
-				 * encode it into the buffer if there is
-				 * enough space
+				 * Found a DOS name for the entry, make
+				 * uppercase and encode into the buffer
+				 * if there is enough space
 				 */
+			ntfs_name_upcase(dosname, doslen,
+					ni->vol->upcase, ni->vol->upcase_len);
 			if (ntfs_ucstombs(dosname, doslen, &outname, size) < 0) {
 				ntfs_log_error("Cannot represent dosname in current locale.\n");
 				outsize = -errno;
@@ -1930,40 +1930,98 @@ int ntfs_get_ntfs_dos_name(const char *path,
 }
 
 /*
+ *		Change the name space of an existing file or directory
+ *
+ *	Returns the old namespace if successful
+ *		-1 if an error occurred (described by errno)
+ */
+
+static int set_namespace(ntfs_inode *ni, ntfs_inode *dir_ni,
+			ntfschar *name, int len,
+			FILE_NAME_TYPE_FLAGS nametype)
+{
+	ntfs_attr_search_ctx *actx;
+	ntfs_index_context *icx;
+	FILE_NAME_ATTR *fnx;
+	FILE_NAME_ATTR *fn = NULL;
+	BOOL found;
+	int lkup;
+	int ret;
+
+	ret = -1;
+	actx = ntfs_attr_get_search_ctx(ni, NULL);
+	if (actx) {
+		found = FALSE;
+		do {
+			lkup = ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+	                        CASE_SENSITIVE, 0, NULL, 0, actx);
+			if (!lkup) {
+				fn = (FILE_NAME_ATTR*)((u8*)actx->attr +
+				     le16_to_cpu(actx->attr->value_offset));
+				found = (MREF_LE(fn->parent_directory)
+						== dir_ni->mft_no)
+					&& !memcmp(fn->file_name, name,
+						len*sizeof(ntfschar));
+			}
+		} while (!lkup && !found);
+		if (found) {
+			icx = ntfs_index_ctx_get(dir_ni, NTFS_INDEX_I30, 4);
+			if (icx) {
+				lkup = ntfs_index_lookup((char*)fn, len, icx);
+				if (!lkup && icx->data && icx->data_len) {
+					fnx = (FILE_NAME_ATTR*)icx->data;
+					ret = fn->file_name_type;
+					fn->file_name_type = nametype;
+					fnx->file_name_type = nametype;
+					ntfs_inode_mark_dirty(ni);
+					ntfs_index_entry_mark_dirty(icx);
+				}
+			ntfs_index_ctx_put(icx);
+			}
+		}
+		ntfs_attr_put_search_ctx(actx);
+	}
+	return (ret);
+}
+
+/*
  *		Set a DOS name to a file and adjust name spaces
  *
- *	This done in three (or four) steps :
+ *	If the new names are collapsible (same uppercased chars) :
  *
- * - insert the short name (as a DOS name or Posix name if collapsible)
+ * - the existing DOS name or DOS+Win32 name is made Posix
+ * - if it was a real DOS name, the existing long name is made DOS+Win32
+ *        and the existing DOS name is deleted
+ * - finally the existing long name is made DOS+Win32 unless already done
+ *
+ *	If the new names are not collapsible :
+ *
+ * - insert the short name as a DOS name
  * - delete the old long name or existing short name
  * - insert the new long name (as a Win32 or DOS+Win32 name)
- * - delete the short name if collapsible
  *
  * Deleting the old long name will not delete the file
  * provided the old name was in the Posix name space,
- * because the alternate name has been set before.
- *
- * Likewise, deleting the existing short name implies
- * deleting the long name, but not the file itself
  * because the alternate name has been set before.
  *
  * The inodes of file and parent directory are always closed
  *
  * Returns 0 if successful
  *	   -1 if failed
- * Note : currently the short name and the long name must be different
  */
 
 static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			const char *fullpath,
 			ntfschar *shortname, int shortlen,
 			ntfschar *longname, int longlen,
-			ntfschar *deletename, int deletelen)
+			ntfschar *deletename, int deletelen, BOOL existed)
 {
 	unsigned int linkcount;
 	ntfs_volume *vol;
 	BOOL collapsible;
 	BOOL deleted;
+	BOOL done;
+	FILE_NAME_TYPE_FLAGS oldnametype;
 	u64 dnum;
 	u64 fnum;
 	int res;
@@ -1978,43 +2036,60 @@ static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 		/* check whether the same name may be used as DOS and WIN32 */
 	collapsible = ntfs_collapsible_chars(ni->vol, shortname, shortlen,
 						longname, longlen);
-	if (!ntfs_link_i(ni, dir_ni, shortname, shortlen,
-		(collapsible ? FILE_NAME_POSIX : FILE_NAME_DOS))
-		/* make sure a new link was recorded */
-	    && (le16_to_cpu(ni->mrec->link_count) > linkcount)
-		/* delete the existing long name or short name */
-	    && !ntfs_delete(vol, fullpath, ni, dir_ni, deletename, deletelen)) {
-		/* delete closes the inodes, so have to open again */
-		dir_ni = ntfs_inode_open(vol, dnum);
+	if (collapsible) {
 		deleted = FALSE;
-		if (dir_ni) {
-			ni = ntfs_inode_open(vol, fnum);
-			if (ni) {
-				if (collapsible) {
-					if (!ntfs_link_i(ni, dir_ni, longname,
-						    longlen, FILE_NAME_WIN32_AND_DOS)) {
-						if (!ntfs_delete(vol, (const char*)NULL, ni,
-							dir_ni, shortname, shortlen))
-							res = 0;
-						deleted = TRUE;
-					}
+		done = FALSE;
+		if (existed) {
+			oldnametype = set_namespace(ni, dir_ni, deletename,
+					deletelen, FILE_NAME_POSIX);
+			if (oldnametype == FILE_NAME_DOS) {
+				if (set_namespace(ni, dir_ni, longname, longlen,
+						FILE_NAME_WIN32_AND_DOS) >= 0) {
+					if (!ntfs_delete(vol,
+						(const char*)NULL, ni, dir_ni,  
+						deletename, deletelen))
+						res = 0;
+					deleted = TRUE;
 				} else
+					done = TRUE;
+			}
+		}
+		if (!deleted) {
+			if (!done && (set_namespace(ni, dir_ni,
+					longname, longlen,
+					FILE_NAME_WIN32_AND_DOS) >= 0))
+				res = 0;
+			ntfs_inode_close(ni);
+			ntfs_inode_close(dir_ni);
+		}
+	} else
+		if (!ntfs_link_i(ni, dir_ni, shortname, shortlen, 
+				FILE_NAME_DOS)
+			/* make sure a new link was recorded */
+		    && (le16_to_cpu(ni->mrec->link_count) > linkcount)
+			/* delete the existing long name or short name */
+		    && !ntfs_delete(vol, fullpath, ni, dir_ni,
+				 deletename, deletelen)) {
+			/* delete closes the inodes, so have to open again */
+			dir_ni = ntfs_inode_open(vol, dnum);
+			if (dir_ni) {
+				ni = ntfs_inode_open(vol, fnum);
+				if (ni) {
 					if (!ntfs_link_i(ni, dir_ni, longname,
 						    longlen, FILE_NAME_WIN32))
 						res = 0;
-				if (!deleted)
 					ntfs_inode_close(ni);
-			}
-		if (!deleted)
+				}
 			ntfs_inode_close(dir_ni);
+			}
 		}
-	}
 	return (res);
 }
 
 
 /*
  *		Set the ntfs DOS name into an extended attribute
+ *
  *  The DOS name will be added as another file name attribute
  *  using the existing file name information from the original
  *  name or overwriting the DOS Name if one exists.
@@ -2030,7 +2105,7 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 	int shortlen = 0;
 	char newname[MAX_DOS_NAME_LENGTH + 1];
 	ntfschar oldname[MAX_DOS_NAME_LENGTH];
-	int oldsize;
+	int oldlen;
 	ntfs_volume *vol;
 	u64 fnum;
 	u64 dnum;
@@ -2067,24 +2142,31 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 			if (!ntfs_forbidden_chars(longname,longlen)) {
 				rdirname = (dirname[0] ? dirname : "/");
 				dir_ni = ntfs_pathname_to_inode(vol, NULL, rdirname);
-				dnum = dir_ni->mft_no;
 			}
 		}
 	}
 	if (dir_ni) {
-		oldsize = get_dos_name(ni, dnum, oldname);
-		if (oldsize >= 0) {
-			if (oldsize > 0) {
+		dnum = dir_ni->mft_no;
+		oldlen = get_dos_name(ni, dnum, oldname);
+		if (oldlen >= 0) {
+			if (oldlen > 0) {
 				if (flags & XATTR_CREATE) {
 					res = -1;
 					errno = EEXIST;
-				} else {
-					res = set_dos_name(ni, dir_ni, path,
-						shortname, shortlen,
-						longname, longlen,
-						oldname, oldsize);
-					closed = TRUE;
-				}
+				} else
+					if ((shortlen == oldlen)
+					    && !memcmp(shortname,oldname,
+						     oldlen*sizeof(ntfschar)))
+						/* already set, done */
+						res = 0;
+					else {
+						res = set_dos_name(ni, dir_ni,
+							path,
+							shortname, shortlen,
+							longname, longlen,
+							oldname, oldlen, TRUE);
+						closed = TRUE;
+					}
 			} else {
 				if (flags & XATTR_REPLACE) {
 					res = -1;
@@ -2093,7 +2175,7 @@ int ntfs_set_ntfs_dos_name(const char *path, const char *value, size_t size,
 					res = set_dos_name(ni, dir_ni, path,
 						shortname, shortlen,
 						longname, longlen,
-						longname, longlen);
+						longname, longlen, FALSE);
 					closed = TRUE;
 				}
 			}
