@@ -3851,6 +3851,15 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 	
+	ctx->security.uid = 0;
+	ctx->security.gid = 0;
+	if ((opts.mnt_point[0] == '/')
+	   && !stat(opts.mnt_point,&sbuf)) {
+		/* collect owner of mount point, useful for default mapping */
+		ctx->security.uid = sbuf.st_uid;
+		ctx->security.gid = sbuf.st_gid;
+	}
+
 #if defined(linux) || defined(__uClinux__)
 	fstype = get_fuse_fstype();
 
@@ -3861,14 +3870,6 @@ int main(int argc, char *argv[])
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
 	
-	ctx->security.uid = 0;
-	ctx->security.gid = 0;
-	if ((opts.mnt_point[0] == '/')
-	   && !stat(opts.mnt_point,&sbuf)) {
-		/* collect owner of mount point, useful for default mapping */
-		ctx->security.uid = sbuf.st_uid;
-		ctx->security.gid = sbuf.st_gid;
-	}
 	create_dev_fuse();
 
 	if (drop_privs())
