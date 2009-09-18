@@ -2066,22 +2066,27 @@ static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 		if (!ntfs_link_i(ni, dir_ni, shortname, shortlen, 
 				FILE_NAME_DOS)
 			/* make sure a new link was recorded */
-		    && (le16_to_cpu(ni->mrec->link_count) > linkcount)
+		    && (le16_to_cpu(ni->mrec->link_count) > linkcount)) {
 			/* delete the existing long name or short name */
-		    && !ntfs_delete(vol, fullpath, ni, dir_ni,
-				 deletename, deletelen)) {
+			    if (!ntfs_delete(vol, fullpath, ni, dir_ni,
+					 deletename, deletelen)) {
 			/* delete closes the inodes, so have to open again */
-			dir_ni = ntfs_inode_open(vol, dnum);
-			if (dir_ni) {
-				ni = ntfs_inode_open(vol, fnum);
-				if (ni) {
-					if (!ntfs_link_i(ni, dir_ni, longname,
-						    longlen, FILE_NAME_WIN32))
-						res = 0;
-					ntfs_inode_close(ni);
+				dir_ni = ntfs_inode_open(vol, dnum);
+				if (dir_ni) {
+					ni = ntfs_inode_open(vol, fnum);
+					if (ni) {
+						if (!ntfs_link_i(ni, dir_ni,
+							longname, longlen,
+							FILE_NAME_WIN32))
+							res = 0;
+						ntfs_inode_close(ni);
+					}
+				ntfs_inode_close(dir_ni);
 				}
-			ntfs_inode_close(dir_ni);
 			}
+		} else {
+			ntfs_inode_close(ni);
+			ntfs_inode_close(dir_ni);
 		}
 	return (res);
 }
