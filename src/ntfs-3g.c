@@ -2219,14 +2219,12 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 		   /* file must be readable */
 	if (!ntfs_allowed_access(&security,path,ni,S_IREAD)) {
 		ret = -EACCES;
-		ntfs_inode_close(ni);
 		goto exit;
 	}
 #endif
 	actx = ntfs_attr_get_search_ctx(ni, NULL);
 	if (!actx) {
 		ret = -errno;
-		ntfs_inode_close(ni);
 		goto exit;
 	}
 
