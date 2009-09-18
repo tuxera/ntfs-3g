@@ -1311,7 +1311,7 @@ static int ntfs_fuse_access(const char *path, int type)
 			res = -EOPNOTSUPP;
 	} else {
 		   /* parent directory must be readable */
-		if (ntfs_allowed_dir_access(&security,path,S_IREAD)) {
+		if (ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
 			ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 			if (!ni) {
 				res = -errno;
