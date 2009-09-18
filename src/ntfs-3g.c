@@ -1464,9 +1464,17 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				fi->fh |= CLOSE_ENCRYPTED;
 			NInoSetDirty(ni);
+			/*
+			 * closing ni will necessitate to open dir_ni to
+			 * synchronize the index, which will update the change
+			 * time again. Better avoid a dangerous double opening.
+			 */
+			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
+			if (ntfs_inode_close(dir_ni))
+				set_fuse_error(&res);
+			dir_ni = (ntfs_inode*)NULL;
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
-			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 		} else
 			res = -errno;
 #if POSIXACLS
