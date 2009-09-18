@@ -1096,9 +1096,7 @@ BOOL ntfs_forbidden_chars(const ntfschar *name, int len)
 			| (1L << ('>' - 0x20))
 			| (1L << ('?' - 0x20));
 
-	forbidden = (len == 0)
-			|| (le16_to_cpu(name[0]) == ' ')
-			|| (le16_to_cpu(name[len-1]) == ' ');
+	forbidden = (len == 0) || (le16_to_cpu(name[len-1]) == ' ');
 	for (i=0; i<len; i++) {
 		ch = le16_to_cpu(name[i]);
 		if ((ch < 0x20)
