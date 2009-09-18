@@ -51,6 +51,7 @@
 /** Minor version number of this interface */
 #ifdef POSIXACLS
 #define FUSE_KERNEL_MINOR_VERSION 12
+#define FUSE_KERNEL_MINOR_FALLBACK 8
 #else
 #define FUSE_KERNEL_MINOR_VERSION 8
 #endif
@@ -83,7 +84,7 @@ struct fuse_attr {
 	__u32	gid;
 	__u32	rdev;
 #ifdef POSIXACLS
-	__u64 filling; /* JPA needed, but do not know how to fill */
+	__u64 filling; /* JPA needed for minor >= 12, but meaning unknown */
 #endif
 };
 
@@ -181,6 +182,7 @@ enum fuse_opcode {
 
 /* The read buffer is required to be at least 8k, but may be much larger */
 #define FUSE_MIN_READ_BUFFER 8192
+#define FUSE_COMPAT_ENTRY_OUT_SIZE 120 /* JPA */
 
 struct fuse_entry_out {
 	__u64	nodeid;		/* Inode ID */
@@ -196,6 +198,8 @@ struct fuse_entry_out {
 struct fuse_forget_in {
 	__u64	nlookup;
 };
+
+#define FUSE_COMPAT_FUSE_ATTR_OUT_SIZE 96  /* JPA */
 
 struct fuse_attr_out {
 	__u64	attr_valid;	/* Cache timeout for the attributes */

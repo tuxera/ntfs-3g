@@ -331,7 +331,12 @@ int fuse_reply_entry(fuse_req_t req, const struct fuse_entry_param *e)
 
     memset(&arg, 0, sizeof(arg));
     fill_entry(&arg, e);
+#ifdef POSIXACLS
+    return send_reply_ok(req, &arg, (req->f->conn.proto_minor >= 12 
+			? sizeof(arg) : FUSE_COMPAT_ENTRY_OUT_SIZE));
+#else
     return send_reply_ok(req, &arg, sizeof(arg));
+#endif
 }
 
 int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
@@ -344,8 +349,20 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
 
     memset(&arg, 0, sizeof(arg));
     fill_entry(&arg.e, e);
+#ifdef POSIXACLS
+    if (req->f->conn.proto_minor < 12) {
+	fill_open((struct fuse_open_out*)
+		((char*)&arg + FUSE_COMPAT_ENTRY_OUT_SIZE), f);
+	return send_reply_ok(req, &arg,
+		FUSE_COMPAT_ENTRY_OUT_SIZE + sizeof(struct fuse_open_out));
+    } else {
+    	fill_open(&arg.o, f);
+    	return send_reply_ok(req, &arg, sizeof(arg));
+    }
+#else
     fill_open(&arg.o, f);
     return send_reply_ok(req, &arg, sizeof(arg));
+#endif
 }
 
 int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
@@ -358,7 +375,12 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
     arg.attr_valid_nsec = calc_timeout_nsec(attr_timeout);
     convert_stat(attr, &arg.attr);
 
+#ifdef POSIXACLS
+    return send_reply_ok(req, &arg, (req->f->conn.proto_minor >= 12
+			? sizeof(arg) : FUSE_COMPAT_FUSE_ATTR_OUT_SIZE));
+#else
     return send_reply_ok(req, &arg, sizeof(arg));
+#endif
 }
 
 int fuse_reply_readlink(fuse_req_t req, const char *linkname)
@@ -657,9 +679,19 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     fi.fh_old = fi.fh;
     fi.writepage = arg->write_flags & 1;
 
-    if (req->f->op.write)
+    if (req->f->op.write) {
+#ifdef POSIXACLS
+	const char *buf;
+
+	if (req->f->conn.proto_minor >= 12)
+		buf = PARAM(arg);
+	else
+		buf = ((const char*)arg) + FUSE_COMPAT_WRITE_IN_SIZE;
+        req->f->op.write(req, nodeid, buf, arg->size, arg->offset, &fi);
+#else
         req->f->op.write(req, nodeid, PARAM(arg), arg->size, arg->offset, &fi);
-    else
+#endif
+    } else
         fuse_reply_err(req, ENOSYS);
 }
 
@@ -1032,7 +1064,21 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 
     memset(&outarg, 0, sizeof(outarg));
     outarg.major = FUSE_KERNEL_VERSION;
+	/*
+	 * if POSIXACLS is not set, protocol 7.8 provides a good
+	 * compatibility with older kernel modules.
+	 * if POSIXACLS is set, we try to use protocol 7.12 supposed
+	 * to have the ability to process the umask conditionnally,
+	 * but, when using an older kernel module, we fallback to 7.8
+	 */
+#ifdef POSIXACLS
+    if (arg->major > 7 || (arg->major == 7 && arg->minor >= 12))
+	    outarg.minor = FUSE_KERNEL_MINOR_VERSION;
+    else
+	    outarg.minor = FUSE_KERNEL_MINOR_FALLBACK;
+#else
     outarg.minor = FUSE_KERNEL_MINOR_VERSION;
+#endif
     if (f->conn.async_read)
         outarg.flags |= FUSE_ASYNC_READ;
     if (f->op.getlk && f->op.setlk)
