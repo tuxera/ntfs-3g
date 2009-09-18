@@ -668,11 +668,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		}
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
-		if (ni != index_ni) {
-			ntfs_inode_update_times(index_ni, NTFS_UPDATE_CTIME);
-			if (ntfs_inode_close(index_ni) && !err)
-				err = errno;
-		}
+		if ((ni != index_ni) && ntfs_inode_close(index_ni) && !err)
+			err = errno;
 	}
 	/* Check for real error occurred. */
 	if (errno != ENOENT) {

@@ -1466,8 +1466,8 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			NInoSetDirty(ni);
 			/*
 			 * closing ni will necessitate to open dir_ni to
-			 * synchronize the index, which will update the change
-			 * time again. Better avoid a dangerous double opening.
+			 * synchronize the index.
+			 * Better avoid a dangerous double opening.
 			 */
 			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
 			if (ntfs_inode_close(dir_ni))
