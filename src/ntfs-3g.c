@@ -1927,19 +1927,61 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
 	int res = 0;
+#if POSIXACLS
+	BOOL ownerok;
+	BOOL writeok;
+	struct SECURITY_CONTEXT security;
+#endif
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
+#if POSIXACLS
+		/* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
-	
+#if POSIXACLS
+	ownerok = ntfs_allowed_as_owner(&security, path, ni);
+	if (buf) {
+		/*
+		 * fuse never calls with a NULL buf and we do not
+		 * know whether the specific condition can be applied
+		 * So we have to accept updating by a non-owner having
+		 * write access.
+		 */
+		writeok = !ownerok
+			&& (buf->actime == buf->modtime)
+			&& ntfs_allowed_access(&security, path, ni, S_IWRITE);
+			/* Must be owner */
+		if (!ownerok && !writeok)
+			res = (buf->actime == buf->modtime ? -EACCES : -EPERM);
+		else {
+			ni->last_access_time = buf->actime;
+			ni->last_data_change_time = buf->modtime;
+			ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
+		}
+	} else {
+			/* Must be owner or have write access */
+		writeok = !ownerok
+			&& ntfs_allowed_access(&security, path, ni, S_IWRITE);
+		if (!ownerok && !writeok)
+			res = -EACCES;
+		else
+			ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
+	}
+#else
 	if (buf) {
 		ni->last_access_time = buf->actime;
 		ni->last_data_change_time = buf->modtime;
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	} else
 		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
+#endif
 
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
