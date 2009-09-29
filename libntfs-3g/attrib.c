@@ -1650,6 +1650,7 @@ retry:
 		if (written > 0) {
 			total += written;
 			count -= written;
+			fullcount -= written;
 			b = (const u8*)b + written;
 		}
 		if (written != to_write) {
