@@ -32,7 +32,6 @@ headers = \
 	support.h	\
 	types.h		\
 	unistr.h	\
-	version.h	\
 	volume.h
 
 if INSTALL_LIBRARY
