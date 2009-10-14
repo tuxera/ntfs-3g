@@ -1,18 +1,19 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
-.\" Copyright (c) 2006-2007 Szabolcs Szakacsits.
+.\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
+.\" Copyright (c) 2009 Jean-Pierre Andre
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "August 2007" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "October 2009" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
-.I device mount_point
+.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
 .br
 .B mount \-t ntfs-3g
-.I device mount_point
+.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
 .SH DESCRIPTION
 \fBntfs-3g\fR is an NTFS driver, which can
@@ -20,12 +21,15 @@ create, remove, rename, move files, directories, hard links, and
 streams; it can read and write files, including 
 streams and sparse files; it can handle special files like 
 symbolic links, devices, and FIFOs; moreover it can also read
-transparently compressed files.
+and create transparently compressed files.
+.PP
+The \fIvolume\fR to be mounted can be either a block device or 
+an image file.
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
 user and group of the mounting process and everybody has
 full read, write, execution and directory browsing permissions.
-If you want to use permissions handling then use the
+You can also assign permissions to a single user by using the
 .B uid
 and/or the
 .B gid 
@@ -37,20 +41,18 @@ and
 .B dmask
 options.
 .PP
-Windows users have full access to the files created by 
+Doing so, Windows users have full access to the files created by 
 .B ntfs-3g.
+.PP
+But, by defining a Windows-to-Linux user mapping in the file
+\fB.NTFS-3G/UserMapping\fP, you can benefit from the full ownership and
+permissions features as defined by Posix and those ownership and
+permissions will be applied to Windows users and conversely.
 .PP
 If 
 .B ntfs-3g 
 is set setuid-root then non-root users will 
-be also able to mount block devices or via /etc/fstab if the 'user'
-or 'users' 
-.BR mount (8)
-option is specified. The
-.B ntfs-3g 
-process drops the 
-root privilege after successful mount and runs unprivileged 
-afterwards.
+be also able to mount volumes.
 .SS Windows Filename Compatibility
 NTFS supports several filename namespaces: DOS, Win32 and POSIX. While the
 \fBntfs-3g\fR driver handles all of them, it always creates new files in the 
@@ -73,7 +75,7 @@ For example:
 cat some.mp3:artist
 .sp
 .RE
-Named data streams act like normals files, so you can read from them, write to
+Named data streams act like normal files, so you can read from them, write to
 them and even delete them (using rm).  You can list all the named data streams
 a file has by getting the "ntfs.streams.list" extended attribute.
 .SH OPTIONS
@@ -98,8 +100,34 @@ Set the  bitmask of the directory permissions that are not
 present. The value is given in octal. The default value is 0 which
 means full access to everybody.
 .TP
+.BI usermapping= file-name
+Use file \fIfile-name\fP as the user mapping file instead of the default
+\fB.NTFS-3G/UserMapping\fP. If \fIfile-name\fP defines a full path, the
+file must be located on a partition previously mounted. If it defines a
+relative path, it is interpreted relative to the root of NTFS partition
+being mounted.
+.P
+.RS
+When a user mapping file is defined, the options \fBuid=\fP, \fBgid=\fP,
+\fBumask=\fP, \fBfmask=\fP, \fBdmask=\fP and \fBdsilent=\fP are ignored.
+.RE
+.TP
+.B default_permissions
+Use standard access control. This option requires either a user mapping
+file to be present, or the options \fIuid=\fP and \fIgid=\fP of a user
+to be defined. This option is set by default when a user mapping file
+or an ownership related option is present.
+.TP
+.B inherit
+When creating a new file, set its initial ownership and protections
+according to inheritance rules defined in parent directory. These rules
+deviate from Posix specifications, but yield a better Windows
+compatibility. A valid user mapping file is required for this option
+to be effective.
+.TP
 .B ro
-Mount filesystem read\-only.
+Mount filesystem read\-only. Useful if Windows is hibernated or the
+NTFS journal file is unclean.
 .TP
 .BI locale= value
 This option can be useful if your language specific locale environment 
@@ -113,6 +141,37 @@ Force the mounting even if the NTFS logfile is unclean. The logfile
 will be unconditionally cleared. Use this option with caution and for 
 your own responsibility.
 .TP
+.B remove_hiberfile
+Unlike in case of read-only mount, the read-write mount is denied if 
+the NTFS volume is hibernated. One needs either to resume Windows and
+shutdown it properly, or use this option which will remove the Windows
+hibernation file. Please note, this means that the saved Windows 
+session will be completely lost. Use this option for your own 
+responsibility.
+.TP
+.B atime, noatime, relatime
+The 
+.B atime 
+option updates inode access time for each access.
+
+The 
+.B noatime 
+option disables inode access time updates which can speed up
+file operations and prevent sleeping (notebook) disks spinning 
+up too often thus saving energy and disk lifetime.
+
+The
+.B relatime 
+option is very similar to 
+.B noatime. 
+It  updates inode access times relative to modify or change time. 
+The access time is only updated if the previous access time was earlier 
+than the current modify or change time. Unlike
+.B noatime
+this option doesn't break applications that need to know 
+if a file has been read since the last time it was modified.
+This is the default behaviour.
+.TP
 .B show_sys_files
 Show the system files in directory listings. 
 Otherwise the default behaviour is to hide the system files.
@@ -122,23 +181,18 @@ Furthermore, irrespectively of show_sys_files, all
 files are accessible by name, for example you can always do
 "ls \-l '$UpCase'".
 .TP
-.B allow_other
-This option overrides the security measure restricting file access
-to the user mounting the filesystem.  This option is only
-allowed to root, but this restriction can be overridden by 
-the 'user_allow_other' option in the /etc/fuse.conf file.
-.TP
 .BI max_read= value
 With this option the maximum size of read operations can be set.
 The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 .TP
 .B silent
-Do nothing on chmod and chown operations, but do not return error. 
+Do nothing on chmod and chown operations, but do not return error
+when the user mapping file required by these operations is not defined.
 This option is on by default.
 .TP
 .B no_def_opts
-By default ntfs-3g acts as "silent,allow_other" was passed to it,
+By default ntfs-3g acts as "silent" was passed to it,
 this option cancel this behaviour.
 .TP
 .BI streams_interface= value
@@ -149,7 +203,10 @@ to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
 to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
 file:stream). If it's set to \fBxattr\fR, then the named data streams are
 mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
-utilities. The default is \fBnone\fR.
+utilities. The default is \fBxattr\fR.
+.TP
+.B user_xattr
+Same as \fBstreams_interface=\fP\fIxattr\fP.
 .TP
 .B debug
 Makes ntfs-3g to not detach from terminal and print a lot of debug output from
@@ -157,30 +214,69 @@ libntfs-3g and FUSE.
 .TP
 .B no_detach
 Same as above but with less debug output.
-.SH EXAMPLES
-Mount /dev/hda1 to /mnt/windows:
+.SH USER MAPPING
+NTFS uses specific ids to record the ownership of files instead of
+the \fBuid\fP and \fBgid\fP used by Linux. As a consequence a mapping
+between the ids has to be defined for ownerships to be recorded into
+NTFS and recognized.
+.P
+By default this mapping is fetched from the file \fB.NTFS-3G/UserMapping\fP
+located in the NTFS partition. The option \fBusermapping=\fP may be used
+to define another location.
+.P
+Each line in the user mapping file defines a mapping. It is organized
+in three fields separated by colons. The first field identifies a \fBuid\fP,
+the second field identifies a \fBgid\fP and the third one identifies the
+corresponding NTFS id, known as a \fBSID\fP. The \fBuid\fP and the \fBgid\fP
+are optional and defining both of them for the same \fBSID\fP is not
+recommended.
+.P
+If no interoperation with Windows is needed, a single default mapping
+with no uid and gid can be used. Just copy the example below and replace
+the 9 and 10-digit numbers by any number not greater than 4294967295.
 .RS
 .sp
-.B ntfs-3g /dev/hda1 /mnt/windows
+.B ::S-1-5-21-3141592653-589793238-462643383-10000
+.sp
+.RE
+If interoperation with Windows is needed, the mapping has to be defined
+for each user and group known in both system, and the \fBSID\fPs used
+by Windows has to be collected. This will lead to a user mapping file
+like :
+.RS
+.sp
+.B john::S-1-5-21-3141592653-589793238-462643383-1008
+.B mary::S-1-5-21-3141592653-589793238-462643383-1009
+.B :smith:S-1-5-21-3141592653-589793238-462643383-513
+.B ::S-1-5-21-3141592653-589793238-462643383-10000
+.sp
+.RE
+.P
+The utility \fBntfs-3g.usermap\fP may be used to create the user mapping file.
+.SH EXAMPLES
+Mount /dev/sda1 to /mnt/windows:
+.RS
+.sp
+.B ntfs-3g /dev/sda1 /mnt/windows
 .sp
 .RE
 or
 .RS
 .sp
-.B mount -t ntfs-3g /dev/hda1 /mnt/windows
+.B mount -t ntfs-3g /dev/sda1 /mnt/windows
 .sp
 .RE
-Read\-only mount /dev/hda5 to /home/user/mnt and make user with uid 1000 
+Read\-only mount /dev/sda5 to /home/user/mnt and make user with uid 1000 
 to be the owner of all files:
 .RS
 .sp
-.B ntfs-3g /dev/hda5 /home/user/mnt \-o ro,uid=1000
+.B ntfs-3g /dev/sda5 /home/user/mnt \-o ro,uid=1000
 .sp
 .RE
 /etc/fstab entry for the above:
 .RS
 .sp
-.B /dev/hda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
+.B /dev/sda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
 .sp
 .RE
 Unmount /mnt/windows:
@@ -189,11 +285,19 @@ Unmount /mnt/windows:
 .B umount /mnt/windows
 .sp
 .RE
+.SH EXIT CODES
+To facilitate the use of the
+.B ntfs-3g
+driver in scripts, an exit code is returned to give an indication of the 
+mountability status of a volume. Value 0 means success, and all other
+ones mean an error. The unique error codes are documented in the
+.BR ntfs-3g.probe (8)
+manual page.
 .SH KNOWN ISSUES
 Please see 
 .RS
 .sp
-http://ntfs-3g.org/support.html
+http://www.tuxera.com/support/
 .sp
 .RE
 for common questions and known issues.
@@ -207,16 +311,15 @@ address.
 was based on and a major improvement to ntfsmount and libntfs which were
 written by Yura Pakhuchiy and the Linux-NTFS team. The improvements were 
 made, the ntfs-3g project was initiated and currently led by long time 
-Linux-NTFS team developer Szabolcs Szakacsits (szaka@sienet.hu) to revive
-the stalled open source development and project management.
-
+Linux-NTFS team developer Szabolcs Szakacsits (szaka@tuxera.com).
 .SH THANKS
 Several people made heroic efforts, often over five or more
 years which resulted the ntfs-3g driver. Most importantly they are 
-Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy,
-Yuval Fledel, and the author of the groundbreaking FUSE filesystem development 
-framework, Miklos Szeredi.
+Anton Altaparmakov, Jean-Pierre André, Richard Russon, Szabolcs Szakacsits,
+Yura Pakhuchiy, Yuval Fledel, and the author of the groundbreaking FUSE
+filesystem development framework, Miklos Szeredi.
 .SH SEE ALSO
+.BR ntfs-3g.probe (8),
 .BR ntfsprogs (8),
 .BR attr (5),
 .BR getfattr (1)
