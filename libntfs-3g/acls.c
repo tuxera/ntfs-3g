@@ -2131,9 +2131,10 @@ return (0);
 		}
 	}
 
-	if (!ok)
+	if (!ok) {
 		errno = EINVAL;
-	else {
+		pos = 0;
+	} else {
 		/* an ACE for administrators */
 		/* always full access */
 
