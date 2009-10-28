@@ -130,10 +130,9 @@ Mount filesystem read\-only. Useful if Windows is hibernated or the
 NTFS journal file is unclean.
 .TP
 .BI locale= value
-This option can be useful if your language specific locale environment 
-variables are not set correctly or at all in your operating system.
-In such cases, the national characters can be made visible by using this 
-option. Please see more information about this topic at
+This option can be useful when wanting a language specific locale environment.
+It is however discouraged as it leads to files with untranslatable chars
+to not be visible. Please see more information about this topic at
 http://ntfs-3g.org/support.html#locale
 .TP
 .B force
