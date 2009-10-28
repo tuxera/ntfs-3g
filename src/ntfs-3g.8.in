@@ -181,6 +181,12 @@ Furthermore, irrespectively of show_sys_files, all
 files are accessible by name, for example you can always do
 "ls \-l '$UpCase'".
 .TP
+.B allow_other
+This option overrides the security measure restricting file access
+to the user mounting the filesystem. This option is only
+allowed to root, but this restriction can be overridden by
+the 'user_allow_other' option in the /etc/fuse.conf file.
+.TP
 .BI max_read= value
 With this option the maximum size of read operations can be set.
 The default is infinite.  Note that the size of read requests is
