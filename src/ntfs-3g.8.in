@@ -213,6 +213,13 @@ utilities. The default is \fBxattr\fR.
 .B user_xattr
 Same as \fBstreams_interface=\fP\fIxattr\fP.
 .TP
+.B efs_raw
+This option should only be used in backup or restore situation.
+It changes the apparent size of files and the behavior of read and
+write operation so that encrypted files can be saved and restored
+without being decrypted. The \fBuser.ntfs.efsinfo\fP extended attribute
+has also to be saved and restored for the file to be decrypted.
+.TP
 .B debug
 Makes ntfs-3g to not detach from terminal and print a lot of debug output from
 libntfs-3g and FUSE.
