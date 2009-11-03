@@ -5,7 +5,7 @@
  *	library, but should only be used to build tools runnable both
  *	on Linux (dynamic linking) and Windows (static linking)
  *
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2009 Jean-Pierre Andre
  *
  */
 
@@ -531,6 +531,10 @@ enum {
 #define SECURITY_DESCRIPTOR_REVISION 1
 
 #endif /* !WIN32 */
+
+#ifndef ACL_REVISION_DS	/* not always defined in <windows.h> */
+#define ACL_REVISION_DS 4
+#endif
 
 /*
  *		Matching of ntfs permissions to Linux permissions
