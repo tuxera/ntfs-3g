@@ -36,7 +36,7 @@
 
 #define OWNERFROMACL 1 /* must match option in security.c */
 
-#define MAXATTRSZ 30000 /* Max sec attr size (16448 met for WinXP) */
+#define MAXATTRSZ 65536 /* Max sec attr size (16448 met for WinXP) */
 #define MAXSECURID 262144
 #define SECBLKSZ 8
 #define MAXFILENAME 4096

@@ -146,6 +146,9 @@
  *  Jul 2009, version 1.3.8
  *     - fixed again displaying owner and group of a mounted file over Linux
  *     - cleaned some code to avoid warnings
+ *
+ *  Nov 2009, version 1.3.9
+ *     - allowed security descriptors up to 64K
  */
 
 /*
@@ -169,7 +172,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.8"
+#define AUDT_VERSION "1.3.9"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -557,6 +560,10 @@ unsigned int warnings; /* number of non-severe errors */
 struct CHKALLOC *firstalloc;
 struct SECURITY_CONTEXT context;
 MAPTYPE mappingtype;
+
+#ifdef STSC
+#define static
+#endif
 
 #ifndef WIN32
 
@@ -2260,7 +2267,7 @@ BOOL ishexdump(const char *line, int first, int lth)
 
 void showhex(FILE *fd)
 {
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 	char line[MAXLINE+1];
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
@@ -2478,7 +2485,7 @@ BOOL applyattr(const char *fullname, const char *attr,
 
 BOOL restore(FILE *fd)
 {
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 	char line[MAXFILENAME+25];
 	char fullname[MAXFILENAME+25];
 	SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -3886,7 +3893,7 @@ if (errors) exit(1);
 
 unsigned int getfull(char *attr, const char *fullname)
 {
-	char part[MAXATTRSZ];
+	static char part[MAXATTRSZ];
 	BIGSID ownsid;
 	int xowner;
 	int ownersz;
@@ -4048,7 +4055,7 @@ BOOL updatefull(const char *name, DWORD flags, char *attr)
 
 unsigned int getfull(char *attr, const char *fullname)
 {
-	char part[MAXATTRSZ];
+	static char part[MAXATTRSZ];
 	BIGSID ownsid;
 	int xowner;
 	int ownersz;
@@ -4199,7 +4206,7 @@ BOOL updatefull(const char *name, DWORD flags, char *attr)
 BOOL setfull_posix(const char *fullname, const struct POSIX_SECURITY *pxdesc,
 			BOOL isdir)
 {
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 	struct POSIX_SECURITY *oldpxdesc;
 	struct POSIX_SECURITY *newpxdesc;
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -4319,7 +4326,7 @@ free(interp);
 
 BOOL setfull(const char *fullname, int mode, BOOL isdir)
 {
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	char *newattr;
 	int err;
@@ -4487,7 +4494,7 @@ BOOL iterate(RECURSE call, const char *fullname, mode_t mode)
 
 void showfull(const char *fullname, BOOL isdir)
 {
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
 #endif
@@ -4754,8 +4761,8 @@ BOOL singleset(const char *path, int mode)
 
 void showfull(const char *fullname, BOOL isdir)
 {
-	char attr[MAXATTRSZ];
-	char part[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
+	static char part[MAXATTRSZ];
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
 #endif
@@ -5003,7 +5010,7 @@ void showmounted(const char *fullname)
 {
 #ifdef HAVE_SETXATTR
 
-	char attr[MAXATTRSZ];
+	static char attr[MAXATTRSZ];
 	struct stat st;
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
@@ -5556,7 +5563,7 @@ int consist_sds(const char *attr, unsigned int offset,
 
 int audit_sds(BOOL second)
 {
-	char attr[MAXATTRSZ + 20];
+	static char attr[MAXATTRSZ + 20];
 	BOOL isdir;
 	BOOL done;
 	BOOL unsane;
