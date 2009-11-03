@@ -158,6 +158,7 @@ extern void ntfs_ih_filename_dump(INDEX_HEADER *ih);
 
 /* the following was added by JPA for use in security.c */
 extern int ntfs_ie_add(ntfs_index_context *icx, INDEX_ENTRY *ie);
+extern int ntfs_index_rm(ntfs_index_context *icx);
 
 #endif /* _NTFS_INDEX_H */
 

@@ -95,6 +95,12 @@ struct INODE_STACK {
 	ntfs_inode *ni;
 } ;
 
+struct REPARSE_INDEX {			/* index entry in $Extend/$Reparse */
+	INDEX_ENTRY_HEADER header;
+	REPARSE_INDEX_KEY key;
+	le32 filling;
+} ;
+
 static const ntfschar dir_junction_head[] = {
 	const_cpu_to_le16('\\'),
 	const_cpu_to_le16('?'),
@@ -115,6 +121,9 @@ static const ntfschar vol_junction_head[] = {
 	const_cpu_to_le16('e'),
 	const_cpu_to_le16('{'),
 } ;
+
+static ntfschar reparse_index_name[] = { const_cpu_to_le16('$'),
+				 const_cpu_to_le16('R') };
 
 static const char mappingdir[] = ".NTFS-3G/";
 
@@ -897,6 +906,208 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 }
 
 /*
+ *			Set the index for new reparse data
+ *
+ *	Returns 0 if success
+ *		-1 if failure, explained by errno
+ */
+
+static int set_reparse_index(ntfs_inode *ni, ntfs_index_context *xr,
+			le32 reparse_tag)
+{
+	struct REPARSE_INDEX indx;
+	u64 file_id_cpu;
+	le64 file_id;
+	le16 seqn;
+
+	seqn = ni->mrec->sequence_number;
+	file_id_cpu = MK_MREF(ni->mft_no,le16_to_cpu(seqn));
+	file_id = cpu_to_le64(file_id_cpu);
+	indx.header.data_offset = const_cpu_to_le16(
+					sizeof(INDEX_ENTRY_HEADER)
+					+ sizeof(REPARSE_INDEX_KEY));
+	indx.header.data_length = const_cpu_to_le16(0);
+	indx.header.reservedV = const_cpu_to_le32(0);
+	indx.header.length = const_cpu_to_le16(
+					sizeof(struct REPARSE_INDEX));
+	indx.header.key_length = const_cpu_to_le16(
+					sizeof(REPARSE_INDEX_KEY));
+	indx.header.flags = const_cpu_to_le16(0);
+	indx.header.reserved = const_cpu_to_le16(0);
+	indx.key.reparse_tag = reparse_tag;
+		/* danger on processors which require proper alignment ! */
+	memcpy(&indx.key.file_id, &file_id, 8);
+	indx.filling = const_cpu_to_le32(0);
+	ntfs_index_ctx_reinit(xr);
+	return (ntfs_ie_add(xr,(INDEX_ENTRY*)&indx));
+}
+
+/*
+ *		Remove a reparse data index entry if attribute present
+ *
+ *	Returns the size of existing reparse data
+ *			(the existing reparse tag is returned)
+ *		-1 if failure, explained by errno
+ */
+
+static int remove_reparse_index(ntfs_attr *na, ntfs_index_context *xr,
+				le32 *preparse_tag)
+{
+	REPARSE_INDEX_KEY key;
+	u64 file_id_cpu;
+	le64 file_id;
+	s64 size;
+	le16 seqn;
+	int ret;
+
+	ret = na->data_size;
+	if (ret) {
+			/* read the existing reparse_tag */
+		size = ntfs_attr_pread(na, 0, 4, preparse_tag);
+		if (size == 4) {
+			seqn = na->ni->mrec->sequence_number;
+			file_id_cpu = MK_MREF(na->ni->mft_no,le16_to_cpu(seqn));
+			file_id = cpu_to_le64(file_id_cpu);
+			key.reparse_tag = *preparse_tag;
+		/* danger on processors which require proper alignment ! */
+			memcpy(&key.file_id, &file_id, 8);
+			if (!ntfs_index_lookup(&key, sizeof(REPARSE_INDEX_KEY), xr))
+				ret = ntfs_index_rm(xr);
+		} else {
+			ret = -1;
+			errno = ENODATA;
+		}
+	}
+	return (ret);
+}
+
+/*
+ *		Open the $Extend/$Reparse file and its index
+ *
+ *	Return the index context if opened
+ *		or NULL if an error occurred (errno tells why)
+ *
+ *	The index has to be freed and inode closed when not needed any more.
+ */
+
+static ntfs_index_context *open_reparse_index(ntfs_volume *vol)
+{
+	ntfs_inode *ni;
+	ntfs_index_context *xr;
+
+	ni = ntfs_pathname_to_inode(vol, NULL, "$Extend/$Reparse");
+	if (ni) {
+		xr = ntfs_index_ctx_get(ni, reparse_index_name, 2);
+		if (!xr) {
+			ntfs_inode_close(ni);
+		}
+	} else
+		xr = (ntfs_index_context*)NULL;
+	return (xr);
+}
+
+/*
+ *		Update the reparse data and index
+ *
+ *	The reparse data attribute should have been created, and
+ *	an existing index is expected if there is an existing value.
+ *
+ *	Returns 0 if success
+ *		-1 if failure, explained by errno
+ *	If could not remove the existing index, nothing is done,
+ *	If could not write the new data, no index entry is inserted
+ *	If failed to insert the index, data is removed
+ */
+
+static int update_reparse_data(ntfs_inode *ni, ntfs_index_context *xr,
+			const char *value, size_t size)
+{
+	int res;
+	int written;
+	int oldsize;
+	ntfs_attr *na;
+	le32 reparse_tag;
+
+	res = 0;
+	na = ntfs_attr_open(ni, AT_REPARSE_POINT, AT_UNNAMED, 0);
+	if (na) {
+			/* remove the existing reparse data */
+		oldsize = remove_reparse_index(na,xr,&reparse_tag);
+		if (oldsize < 0)
+			res = -1;
+		else {
+			/* resize attribute */
+			res = ntfs_attr_truncate(na, (s64)size);
+			/* overwrite value if any */
+			if (!res && value) {
+				written = (int)ntfs_attr_pwrite(na,
+						 (s64)0, (s64)size, value);
+				if (written != (s64)size) {
+					ntfs_log_error("Failed to update "
+						"reparse data\n");
+					errno = EIO;
+					res = -1;
+				}
+			}
+			if (!res
+			    && set_reparse_index(ni,xr,
+				((const REPARSE_POINT*)value)->reparse_tag)
+			    && (oldsize > 0)) {
+				/*
+				 * If cannot index, try to remove the reparse
+				 * data and log the error. There will be an
+				 * inconsistency if removal fails.
+				 */
+				ntfs_attr_rm(na);
+				ntfs_log_error("Failed to index reparse data."
+						" Possible corruption.\n");
+			}
+		}
+		ntfs_attr_close(na);
+		NInoSetDirty(ni);
+	} else
+		res = -1;
+	return (res);
+}
+
+/*
+ *		Delete a reparse index entry
+ *
+ *	Returns 0 if success
+ *		-1 if failure, explained by errno
+ */
+
+int ntfs_delete_reparse_index(ntfs_inode *ni)
+{
+	ntfs_index_context *xr;
+	ntfs_inode *xrni;
+	ntfs_attr *na;
+	le32 reparse_tag;
+	int res;
+
+	res = 0;
+	na = ntfs_attr_open(ni, AT_REPARSE_POINT, AT_UNNAMED, 0);
+	if (na) {
+			/*
+			 * read the existing reparse data (the tag is enough)
+			 * and un-index it
+			 */
+		xr = open_reparse_index(ni->vol);
+		if (xr) {
+			if (remove_reparse_index(na,xr,&reparse_tag) < 0)
+				res = -1;
+			xrni = xr->ni;
+			ntfs_index_entry_mark_dirty(xr);
+			NInoSetDirty(xrni);
+			ntfs_index_ctx_put(xr);
+			ntfs_inode_close(xrni);
+		}
+		ntfs_attr_close(na);
+	}
+	return (res);
+}
+
+/*
  *		Get the ntfs reparse data into an extended attribute
  *
  *	Returns the reparse data size
@@ -943,64 +1154,56 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
 			ntfs_inode *ni)
 {
 	int res;
-	int written;
-	ntfs_attr *na;
+	u8 dummy;
+	ntfs_inode *xrni;
+	ntfs_index_context *xr;
 
 	res = 0;
-	if (ni && (value || !size)) {
-		if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,AT_UNNAMED,0)) {
-			if (!(flags & XATTR_REPLACE)) {
+	if (ni && value && (size >= 4)) {
+		xr = open_reparse_index(ni->vol);
+		if (xr) {
+			if (!ntfs_attr_exist(ni,AT_REPARSE_POINT,
+						AT_UNNAMED,0)) {
+				if (!(flags & XATTR_REPLACE)) {
 			/*
 			 * no reparse data attribute : add one,
 			 * apparently, this does not feed the new value in
 			 * Note : NTFS version must be >= 3
 			 */
-				if (ni->vol->major_ver >= 3) {
-					res = ntfs_attr_add(ni,AT_REPARSE_POINT,
-						AT_UNNAMED,0,(u8*)NULL,
-						(s64)size);
-					if (!res)
-						ni->flags
-						    |= FILE_ATTR_REPARSE_POINT;
-					NInoSetDirty(ni);
+					if (ni->vol->major_ver >= 3) {
+						res = ntfs_attr_add(ni,
+							AT_REPARSE_POINT,
+							AT_UNNAMED,0,&dummy,
+							(s64)0);
+						if (!res)
+							ni->flags |=
+							FILE_ATTR_REPARSE_POINT;
+						NInoSetDirty(ni);
+					} else {
+						errno = EOPNOTSUPP;
+						res = -1;
+					}
 				} else {
-					errno = EOPNOTSUPP;
+					errno = ENODATA;
 					res = -1;
 				}
 			} else {
-				errno = ENODATA;
-				res = -1;
-			}
-		} else {
-			if (flags & XATTR_CREATE) {
-				errno = EEXIST;
-				res = -1;
-			}
-		}
-		if (!res) {
-			/*
-			 * open and update the existing reparse data
-			 */
-			na = ntfs_attr_open(ni, AT_REPARSE_POINT,
-				AT_UNNAMED,0);
-			if (na) {
-				/* resize attribute */
-				res = ntfs_attr_truncate(na, (s64)size);
-				/* overwrite value if any */
-				if (!res && value) {
-					written = (int)ntfs_attr_pwrite(na,
-						 (s64)0, (s64)size, value);
-					if (written != (s64)size) {
-						ntfs_log_error("Failed to update "
-							"reparse data\n");
-						errno = EIO;
-						res = -1;
-					}
+				if (flags & XATTR_CREATE) {
+					errno = EEXIST;
+					res = -1;
 				}
-				ntfs_attr_close(na);
-				NInoSetDirty(ni);
-			} else
-				res = -1;
+			}
+			if (!res) {
+					/* update value and index */
+				res = update_reparse_data(ni,xr,value,size);
+			}
+			xrni = xr->ni;
+			ntfs_index_entry_mark_dirty(xr);
+			NInoSetDirty(xrni);
+			ntfs_index_ctx_put(xr);
+			ntfs_inode_close(xrni);
+		} else {
+			res = -1;
 		}
 	} else {
 		errno = EINVAL;
@@ -1021,6 +1224,9 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 	int res;
 	int olderrno;
 	ntfs_attr *na;
+	ntfs_inode *xrni;
+	ntfs_index_context *xr;
+	le32 reparse_tag;
 
 	res = 0;
 	if (ni) {
@@ -1030,10 +1236,39 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 		na = ntfs_attr_open(ni, AT_REPARSE_POINT,
 			AT_UNNAMED,0);
 		if (na) {
-			/* remove attribute */
-			res = ntfs_attr_rm(na);
-			if (!res)
-				ni->flags &= ~FILE_ATTR_REPARSE_POINT;
+			/* first remove index (reparse data needed) */
+			xr = open_reparse_index(ni->vol);
+			if (xr) {
+				if (remove_reparse_index(na,xr,
+						&reparse_tag) < 0) {
+					res = -1;
+				} else {
+					/* now remove attribute */
+					res = ntfs_attr_rm(na);
+					if (!res) {
+						ni->flags &=
+						    ~FILE_ATTR_REPARSE_POINT;
+					} else {
+					/*
+					 * If we could not remove the
+					 * attribute, try to restore the
+					 * index and log the error. There
+					 * will be an inconsistency if
+					 * the reindexing fails.
+					 */
+						set_reparse_index(ni, xr,
+							reparse_tag);
+						ntfs_log_error(
+						"Failed to remove reparse data."
+						" Possible corruption.\n");
+					}
+				}
+				xrni = xr->ni;
+				ntfs_index_entry_mark_dirty(xr);
+				NInoSetDirty(xrni);
+				ntfs_index_ctx_put(xr);
+				ntfs_inode_close(xrni);
+			}
 			olderrno = errno;
 			ntfs_attr_close(na);
 					/* avoid errno pollution */
@@ -1050,4 +1285,3 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 	}
 	return (res ? -1 : 0);
 }
-

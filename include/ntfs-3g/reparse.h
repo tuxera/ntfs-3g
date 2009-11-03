@@ -34,4 +34,6 @@ int ntfs_set_ntfs_reparse_data(const char *path, const char *value,
 			size_t size, int flags, ntfs_inode *ni);
 int ntfs_remove_ntfs_reparse_data(const char *path, ntfs_inode *ni);
 
+int ntfs_delete_reparse_index(ntfs_inode *ni);
+
 #endif /* REPARSE_H */
