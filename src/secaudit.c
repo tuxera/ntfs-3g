@@ -2367,36 +2367,6 @@ BOOL applyattr(const char *fullname, const char *attr,
 	BOOL bad;
 	BOOL badattrib;
 	BOOL err;
-#if 0
-u32 canall[] =
-{
-0x80040001,
-0,
-0,
-0,
-20,
-
-/* world
-0x001c0002,
-0x00000001,
-
-0x00140400,
-0x001f01ff, // 0x001f01bf,
-0x00000101,
-0x01000000,
-0x00000000
-*/
-0x00200002,
-0x00000001,
-
-0x00180400,
-0x001f01ff, // 0x001f01bf,
-0x00000201,
-0x05000000,
-0x00000020,
-0x00000220
-} ;
-#endif
 
 	err = FALSE;
 	psecurdata = (struct SECURITY_DATA*)NULL;
@@ -2459,18 +2429,6 @@ u32 canall[] =
 			switch (GetLastError()) {
 			case 1307 :
 			case 1314 :
-#if 0
-{
-          /* try to change the DACL - no improvement */
-int try;
-printf("Trying to set canall\n");
-showall((char*)canall,0);
-try = SetFileSecurityW((LPCWSTR)fullname,DACL_SECURITY_INFORMATION,(char*)canall);
-printf("try 0x%lx err %d\n",try,GetLastError());
-try = SetFileSecurityW((LPCWSTR)fullname, selection, (char*)curattr);
-printf("try again 0x%lx err %d\n",try,GetLastError());
-}
-#endif
 				printf("** Could not set owner of ");
 				printname(stdout,fullname);
 				printf(", retrying with no owner setting\n");
