@@ -987,7 +987,7 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 		size = max_read - offset;
 	}
 	while (size > 0) {
-		s64 ret = ntfs_attr_pread(na, offset, size, buf);
+		s64 ret = ntfs_attr_pread(na, offset, size, buf + total);
 		if (ret != (s64)size)
 			ntfs_log_perror("ntfs_attr_pread error reading '%s' at "
 				"offset %lld: %lld <> %lld", org_path, 
@@ -1039,7 +1039,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		goto exit;
 	}
 	while (size) {
-		s64 ret = ntfs_attr_pwrite(na, offset, size, &buf[total]);
+		s64 ret = ntfs_attr_pwrite(na, offset, size, buf + total);
 		if (ret <= 0) {
 			res = -errno;
 			goto exit;
