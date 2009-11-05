@@ -45,6 +45,12 @@
 #include <locale.h>
 #endif
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+#include <CoreFoundation/CoreFoundation.h>
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+
 #include "compat.h"
 #include "attrib.h"
 #include "types.h"
@@ -64,6 +70,18 @@
  */
 
 static int use_utf8 = 1; /* use UTF-8 encoding for file names */
+
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+/**
+ * This variable controls whether or not automatic normalization form conversion
+ * should be performed when translating NTFS unicode file names to UTF-8.
+ * Defaults to on, but can be controlled from the outside using the function
+ *   int ntfs_macosx_normalize_filenames(int normalize);
+ */
+static int nfconvert_utf8 = 1;
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 
 /*
  * This is used by the name collation functions to quickly determine what
@@ -478,6 +496,13 @@ fail:
 static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 			      char **outs, int outs_len)
 {
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+	char *original_outs_value = *outs;
+	int original_outs_len = outs_len;
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+
 	char *t;
 	int i, size, ret = -1;
 	ntfschar halfpair;
@@ -533,6 +558,36 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 	        }
 	}
 	*t = '\0';
+	
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+	if(nfconvert_utf8 && (t - *outs) > 0) {
+		char *new_outs = NULL;
+		int new_outs_len = ntfs_macosx_normalize_utf8(*outs, &new_outs, 0); // Normalize to decomposed form
+		if(new_outs_len >= 0 && new_outs != NULL) {
+			if(original_outs_value != *outs) {
+				// We have allocated outs ourselves.
+				free(*outs);
+				*outs = new_outs;
+				t = *outs + new_outs_len;
+			}
+			else {
+				// We need to copy new_outs into the fixed outs buffer.
+				memset(*outs, 0, original_outs_len);
+				strncpy(*outs, new_outs, original_outs_len-1);
+				t = *outs + original_outs_len;
+				free(new_outs);
+			}
+		}
+		else {
+			ntfs_log_error("Failed to normalize NTFS string to UTF-8 NFD: %s\n", *outs);
+			ntfs_log_error("  new_outs=0x%p\n", new_outs);
+			ntfs_log_error("  new_outs_len=%d\n", new_outs_len);
+		}
+	}
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+	
 	ret = t - *outs;
 out:
 	return ret;
@@ -667,6 +722,19 @@ fail:
  */
 static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 {
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+	char *new_ins = NULL;
+	if(nfconvert_utf8) {
+		int new_ins_len;
+		new_ins_len = ntfs_macosx_normalize_utf8(ins, &new_ins, 1); // Normalize to composed form
+		if(new_ins_len >= 0)
+			ins = new_ins;
+		else
+			ntfs_log_error("Failed to normalize NTFS string to UTF-8 NFC: %s\n", ins);
+	}
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 	const char *t = ins;
 	u32 wc;
 	ntfschar *outpos;
@@ -702,6 +770,12 @@ static int ntfs_utf8_to_utf16(const char *ins, ntfschar **outs)
 	
 	ret = --outpos - *outs;
 fail:
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+	if(new_ins != NULL)
+		free(new_ins);
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 	return ret;
 }
 
@@ -1160,3 +1234,81 @@ int ntfs_set_char_encoding(const char *locale)
 	return 0; /* always successful */
 }
 
+#if defined(__APPLE__) || defined(__DARWIN__)
+
+int ntfs_macosx_normalize_filenames(int normalize) {
+#ifdef ENABLE_NFCONV
+	if(normalize == 0 || normalize == 1) {
+		nfconvert_utf8 = normalize;
+		return 0;
+	}
+	else
+		return -1;
+#else
+	return -1;
+#endif /* ENABLE_NFCONV */
+} 
+
+int ntfs_macosx_normalize_utf8(const char *utf8_string, char **target,
+ int composed) {
+#ifdef ENABLE_NFCONV
+	/* For this code to compile, the CoreFoundation framework must be fed to the linker. */
+	CFStringRef cfSourceString;
+	CFMutableStringRef cfMutableString;
+	CFRange rangeToProcess;
+	CFIndex requiredBufferLength;
+	char *result = NULL;
+	int resultLength = -1;
+	
+	/* Convert the UTF-8 string to a CFString. */
+	cfSourceString = CFStringCreateWithCString(kCFAllocatorDefault, utf8_string, kCFStringEncodingUTF8);
+	if(cfSourceString == NULL) {
+		ntfs_log_error("CFStringCreateWithCString failed!\n");
+		return -2;
+	}
+	
+	/* Create a mutable string from cfSourceString that we are free to modify. */
+	cfMutableString = CFStringCreateMutableCopy(kCFAllocatorDefault, 0, cfSourceString);
+	CFRelease(cfSourceString); /* End-of-life. */
+	if(cfMutableString == NULL) {
+		ntfs_log_error("CFStringCreateMutableCopy failed!\n");
+		return -3;
+	}
+  
+	/* Normalize the mutable string to the desired normalization form. */
+	CFStringNormalize(cfMutableString, (composed != 0 ? kCFStringNormalizationFormC : kCFStringNormalizationFormD));
+	
+	/* Store the resulting string in a '\0'-terminated UTF-8 encoded char* buffer. */
+	rangeToProcess = CFRangeMake(0, CFStringGetLength(cfMutableString));
+	if(CFStringGetBytes(cfMutableString, rangeToProcess, kCFStringEncodingUTF8, 0, false, NULL, 0, &requiredBufferLength) > 0) {
+		resultLength = sizeof(char)*(requiredBufferLength + 1);
+		result = ntfs_calloc(resultLength);
+		
+		if(result != NULL) {
+			if(CFStringGetBytes(cfMutableString, rangeToProcess, kCFStringEncodingUTF8,
+					    0, false, (UInt8*)result, resultLength-1, &requiredBufferLength) <= 0) {
+				ntfs_log_error("Could not perform UTF-8 conversion of normalized CFMutableString.\n");
+				free(result);
+				result = NULL;
+			}
+		}
+		else
+			ntfs_log_error("Could not perform a ntfs_calloc of %d bytes for char *result.\n", resultLength);
+	}
+	else
+		ntfs_log_error("Could not perform check for required length of UTF-8 conversion of normalized CFMutableString.\n");
+
+	
+	CFRelease(cfMutableString);
+	
+	if(result != NULL) {
+	 	*target = result;
+		return resultLength - 1;
+	}
+	else
+		return -1;
+#else
+	return -1;
+#endif /* ENABLE_NFCONV */
+}
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
