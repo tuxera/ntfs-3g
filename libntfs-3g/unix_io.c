@@ -71,9 +71,9 @@
 /**
  * fsync replacement which makes every effort to try to get the data down to
  * disk, using different means for different operating systems. Specifically,
- * it issues the proper fcntl for Mac OS X or does fdatasync where it is
- * available or as a last resort calls the fsync function.
- * Information on this problem was retrieved from:
+ * it issues the proper fcntl for Mac OS X or does fsync where it is available
+ * or as a last resort calls the fsync function. Information on this problem
+ * was retrieved from:
  *   http://mirror.linux.org.au/pub/linux.conf.au/2007/video/talks/278.pdf
  */
 static int ntfs_fsync(int fildes)
