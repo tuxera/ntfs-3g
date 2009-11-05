@@ -558,7 +558,7 @@ static int ntfs_ie_lookup(const void *key, const int key_len,
 	*vcn = ntfs_ie_get_vcn(ie);
 	if (*vcn < 0) {
 		errno = EINVAL;
-		ntfs_log_perror("Negative vcn in inode %llu\n",
+		ntfs_log_perror("Negative vcn in inode %llu",
 			       	(unsigned long long)icx->ni->mft_no);
 		return STATUS_ERROR;
 	}
