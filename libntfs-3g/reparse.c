@@ -167,9 +167,12 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 			cpuchar = le16_to_cpu(uname[i]);
 			/*
 			 * We need upper or lower value, whichever is smaller,
-			 * here we assume upper is always smaller
+			 * but we can only convert to upper case, so we
+			 * will fail when searching for an upper case char
+			 * whose lower case is smaller (such as umlauted Y)
 			 */
-			if (cpuchar < vol->upcase_len)
+			if ((cpuchar < vol->upcase_len)
+			    && (le16_to_cpu(vol->upcase[cpuchar]) < cpuchar))
 				find.attr.file_name[i] = vol->upcase[cpuchar];
 			else
 				find.attr.file_name[i] = uname[i];
