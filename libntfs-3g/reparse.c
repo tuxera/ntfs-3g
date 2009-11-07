@@ -151,6 +151,7 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 	int olderrno;
 	int i;
 	u32 cpuchar;
+	INDEX_ENTRY *entry;
 	FILE_NAME_ATTR *found;
 	struct {
 		FILE_NAME_ATTR attr;
@@ -185,8 +186,13 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 		 * We generally only get the first matching candidate,
 		 * so we still have to check whether this is a real match
 		 */
-		if (icx->data && icx->data_len) {
-			found = (FILE_NAME_ATTR*)icx->data;
+		if (icx->entry && (icx->entry->ie_flags & INDEX_ENTRY_END))
+				/* get next entry if reaching end of block */
+			entry = ntfs_index_next(icx->entry, icx);
+		else
+			entry = icx->entry;
+		if (entry) {
+			found = &entry->key.file_name;
 			if (lkup
 			   && !ntfs_names_collate(find.attr.file_name,
 				find.attr.file_name_length,
