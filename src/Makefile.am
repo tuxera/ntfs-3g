@@ -9,7 +9,7 @@ FUSE_CFLAGS = $(FUSE_MODULE_CFLAGS)
 FUSE_LIBS   = $(FUSE_MODULE_LIBS)
 endif
 
-bin_PROGRAMS	 = ntfs-3g.probe usermap secaudit
+bin_PROGRAMS	 = ntfs-3g.probe ntfs-3g.usermap ntfs-3g.secaudit
 rootbin_PROGRAMS = ntfs-3g
 rootsbin_DATA 	 = #Create directory
 man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8
@@ -26,19 +26,20 @@ ntfs_3g_CFLAGS   =			\
 ntfs_3g_SOURCES  = ntfs-3g.c
 
 ntfs_3g_probe_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
-usermap_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
-secaudit_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
+ntfs_3g_usermap_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
+ntfs_3g_secaudit_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
 ntfs_3g_probe_LDFLAGS	= $(AM_LDFLAGS) -all-static
-usermap_LDFLAGS	= $(AM_LDFLAGS) -all-static
-secaudit_LDFLAGS	= $(AM_LDFLAGS) -all-static
+ntfs_3g_usermap_LDFLAGS	= $(AM_LDFLAGS) -all-static
+ntfs_3g_secaudit_LDFLAGS= $(AM_LDFLAGS) -all-static
 endif
 ntfs_3g_probe_CFLAGS  	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
-usermap_CFLAGS  	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
-secaudit_CFLAGS  	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
+ntfs_3g_usermap_CFLAGS 	= $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
+ntfs_3g_secaudit_CFLAGS = $(AM_CFLAGS) -I$(top_srcdir)/include/ntfs-3g
+
 ntfs_3g_probe_SOURCES 	= ntfs-3g.probe.c
-usermap_SOURCES 	= usermap.c
-secaudit_SOURCES 	= secaudit.c
+ntfs_3g_usermap_SOURCES = usermap.c
+ntfs_3g_secaudit_SOURCES= secaudit.c
 
 if RUN_LDCONFIG
 install-exec-hook:
