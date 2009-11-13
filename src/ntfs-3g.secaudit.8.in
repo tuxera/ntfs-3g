@@ -1,7 +1,7 @@
 .\" Copyright (c) 2007-2009 Jean-Pierre André.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G.SECAUDIT 8 "October 2009" "ntfs-3g.secaudit 1.3.8"
+.TH NTFS-3G.SECAUDIT 8 "November 2009" "ntfs-3g.secaudit 1.3.8"
 .SH NAME
 ntfs-3g.secaudit \- NTFS Security Data Auditing
 .SH SYNOPSIS
@@ -147,7 +147,7 @@ of 1 when an error was detected.
 Please see 
 .RS
 .sp
-http://ntfs-3g.org/support.html
+http://www.tuxera.com/community/ntfs-3g-faq/
 .sp
 .RE
 for common questions and known issues.
