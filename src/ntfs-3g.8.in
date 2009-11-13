@@ -1,10 +1,10 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
-.\" Copyright (c) 2006-2008 Szabolcs Szakacsits.
+.\" Copyright (c) 2006-2009 Szabolcs Szakacsits.
 .\" Copyright (c) 2009 Jean-Pierre Andre
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "October 2009" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "November 2009" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
