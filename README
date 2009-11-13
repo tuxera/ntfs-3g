@@ -3,21 +3,21 @@ INTRODUCTION
 ============
 
 The NTFS-3G driver is an open source, freely available read/write NTFS driver 
-for Linux, FreeBSD, Mac OS X, NetBSD, Solaris and Haiku. It provides safe and 
-fast handling of the Windows XP, Windows Server 2003, Windows 2000, Windows 
-Vista, and Windows Server 2008 file systems. 
+for Linux, FreeBSD, Mac OS X, NetBSD, OpenSolaris, QNX and Haiku. It provides 
+safe and fast handling of the Windows XP, Windows Server 2003, Windows 2000, 
+Windows Vista, Windows Server 2008 and Windows 7 file systems. 
 
-The purpose of the project is to develop, continuously quality test and
-support a trustable, featureful and high performance solution for hardware
-platforms and operating systems whose users need to reliably interoperate
-with NTFS. Besides this practical goal, the project also aims to explore
-the limits of the hybrid, kernel/user space filesystem driver approach,
-performance, reliability and feature richness per invested effort wise.
+The purpose of the project is to develop, quality assurance and support a 
+trustable, featureful and high performance solution for hardware platforms 
+and operating systems whose users need to reliably interoperate with NTFS. 
+Besides this practical goal, the project also aims to explore the limits 
+of the hybrid, kernel/user space filesystem driver approach, performance, 
+reliability and feature richness per invested effort wise.
 
-This specific version has support for new features such as file ownership
-and permissions, Posix ACLs, junction points, extended attributes and
-creating compressed files. Parameter files in the hidden directory .NTFS-3G
-may be required to enable them, please get the instructions from
+Besides the common file system features, NTFS-3G has support for file 
+ownership and permissions, POSIX ACLs, junction points, extended attributes 
+and creating compressed files. Parameter files in the directory .NTFS-3G may 
+be required to enable them, please get the instructions from
 
 	http://www.tuxera.com/community/ntfs-3g-advanced/
 
@@ -25,7 +25,7 @@ News, support answers, problem submission instructions, support and discussion
 forums, performance numbers and other information are available on the project 
 web site at
 
-	http://tuxera.com/forum/
+	http://www.tuxera.com/community/
 
 
 QUICK INSTALLATION
@@ -38,10 +38,13 @@ the FUSE kernel module. Then unpack the source tarball and type:
 	make
 	make install      # or 'sudo make install' if you aren't root.
 
-Please note that NTFS-3G doesn't require the FUSE user space package anymore.
+Please note that NTFS-3G doesn't require the FUSE user space package.
 
-Non-Linux: Please see the NTFS-3G web page for OS specific installation and 
-source packages.
+Non-Linux: Please see 
+
+	http://www.tuxera.com/community/ntfs-3g-download/
+
+for OS specific installation and source packages.
 
 
 USAGE
@@ -59,6 +62,7 @@ or
 Please see the ntfs-3g manual page for more options and examples.
 
 You can also make NTFS to be mounted during boot by putting the below 
-line at the __END__ of the /etc/fstab file:
+line at the END(!) of the /etc/fstab file:
 
 	/dev/sda1 /mnt/windows ntfs-3g defaults 0 0
+
