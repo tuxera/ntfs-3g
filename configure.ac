@@ -415,6 +415,8 @@ AC_CONFIG_FILES([
 	src/Makefile
 	src/ntfs-3g.8
 	src/ntfs-3g.probe.8
+	src/ntfs-3g.usermap.8
+	src/ntfs-3g.secaudit.8
 ])
 AC_OUTPUT
 

@@ -12,7 +12,10 @@ endif
 bin_PROGRAMS	 = ntfs-3g.probe ntfs-3g.usermap ntfs-3g.secaudit
 rootbin_PROGRAMS = ntfs-3g
 rootsbin_DATA 	 = #Create directory
-man_MANS	 = ntfs-3g.8 ntfs-3g.probe.8
+man_MANS	 = 	ntfs-3g.8 		\
+			ntfs-3g.probe.8 	\
+			ntfs-3g.usermap.8 	\
+			ntfs-3g.secaudit.8
 
 ntfs_3g_LDADD    = $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
