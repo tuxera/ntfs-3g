@@ -100,9 +100,9 @@ int ntfs_get_efs_info(const char *path,
 			} else {
 				if (efs_info) {
 					free(efs_info);
-					ntfs_log_info("Bad efs_info for file %s\n",path);
+					ntfs_log_error("Bad efs_info for file %s\n",path);
 				} else {
-					ntfs_log_info("Could not get efsinfo"
+					ntfs_log_error("Could not get efsinfo"
 						" for file %s\n", path);
 				}
 				errno = EIO;
@@ -110,7 +110,7 @@ int ntfs_get_efs_info(const char *path,
 			}
 		} else {
 			errno = ENODATA;
-			ntfs_log_info("File %s is not encrypted",path); 
+			ntfs_log_trace("File %s is not encrypted\n",path); 
 		}
 	}
 	return (attr_size ? (int)attr_size : -errno);
@@ -136,7 +136,7 @@ int ntfs_set_efs_info(const char *path	__attribute__((unused)),
 	if (ni && value && size) {
 		if (ni->flags & (FILE_ATTR_ENCRYPTED | FILE_ATTR_COMPRESSED)) {
 			if (ni->flags & FILE_ATTR_ENCRYPTED) {
-				ntfs_log_info("File %s already encrypted",path);
+				ntfs_log_trace("File %s already encrypted\n",path);
 				errno = EEXIST;
 			} else {
 				/*
@@ -213,7 +213,7 @@ int ntfs_set_efs_info(const char *path	__attribute__((unused)),
 				while (!ntfs_attr_lookup(AT_DATA, NULL, 0, 
 					   CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 					if (ntfs_efs_fixup_attribute(ctx, NULL)) {
-						ntfs_log_error("Error in efs fixup of AT_DATA Attribute");
+						ntfs_log_error("Error in efs fixup of AT_DATA Attribute\n");
 						ntfs_attr_put_search_ctx(ctx);
 						return(-1);
 					}
@@ -283,7 +283,7 @@ int ntfs_efs_fixup_attribute(ntfs_attr_search_ctx *ctx, ntfs_attr *na)
 	}
 		/* make sure size is valid for a raw encrypted stream */
 	if ((na->data_size & 511) != 2) {
-		ntfs_log_error("Bad raw encrypted stream");
+		ntfs_log_error("Bad raw encrypted stream\n");
 		goto err_out;
 	}
 	/* read padding length from last two bytes of attribute */
