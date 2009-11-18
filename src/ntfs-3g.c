@@ -409,12 +409,6 @@ static void set_fuse_error(int *err)
 }
 
 #if defined(__APPLE__) || defined(__DARWIN__)
-static void *ntfs_macfuse_init(struct fuse_conn_info *conn)
-{
-	FUSE_ENABLE_XTIMES(conn);
-	return NULL;
-}
-
 static int ntfs_macfuse_getxtimes(const char *org_path,
 		struct timespec *bkuptime, struct timespec *crtime)
 {
@@ -495,29 +489,34 @@ int ntfs_macfuse_setchgtime(const char *path, const struct timespec *tv)
 
 	if (ntfs_fuse_is_named_data_stream(path))
 		return -EINVAL; /* n/a for named data streams. */
-	ni = ntfs_pathname_to_inode(ctx-&gt;vol, NULL, path);
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		return -errno;
 
 	if (tv) {
-		ni-&gt;last_mft_change_time = tv-&gt;tv_sec;
+		ni->last_mft_change_time = tv->tv_sec;
 		ntfs_fuse_update_times(ni, 0);
 	}
 
 	if (ntfs_inode_close(ni))
-		set_fuse_error(&amp;res);
+		set_fuse_error(&res);
 	return res;
 }
-#else /* defined(__APPLE__) || defined(__DARWIN__) */
-#ifdef FUSE_CAP_DONT_MASK
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+
+#if defined(FUSE_CAP_DONT_MASK) || (defined(__APPLE__) || defined(__DARWIN__))
 static void *ntfs_init(struct fuse_conn_info *conn)
 {
+#if defined(__APPLE__) || defined(__DARWIN__)
+	FUSE_ENABLE_XTIMES(conn);
+#endif
+#ifdef FUSE_CAP_DONT_MASK
 		/* request umask not to be enforced by fuse */
 	conn->want |= FUSE_CAP_DONT_MASK;
+#endif /* defined FUSE_CAP_DONT_MASK */
 	return NULL;
 }
-#endif
-#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+#endif /* defined(FUSE_CAP_DONT_MASK) || (defined(__APPLE__) || defined(__DARWIN__)) */
 
 static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 {
@@ -3182,17 +3181,15 @@ static struct fuse_operations ntfs_3g_ops = {
 	.listxattr	= ntfs_fuse_listxattr,
 #endif /* HAVE_SETXATTR */
 #if defined(__APPLE__) || defined(__DARWIN__)
-	.init		= ntfs_macfuse_init,
 	/* MacFUSE extensions. */
 	.getxtimes	= ntfs_macfuse_getxtimes,
 	.setcrtime	= ntfs_macfuse_setcrtime,
 	.setbkuptime	= ntfs_macfuse_setbkuptime,
 	.setchgtime	= ntfs_macfuse_setchgtime,
-#else /* defined(__APPLE__) || defined(__DARWIN__) */
-#ifdef FUSE_CAP_DONT_MASK
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+#if defined(FUSE_CAP_DONT_MASK) || (defined(__APPLE__) || defined(__DARWIN__))
 	.init		= ntfs_init
 #endif
-#endif /* defined(__APPLE__) || defined(__DARWIN__) */
 };
 
 static int ntfs_fuse_init(void)

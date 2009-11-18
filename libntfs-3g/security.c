@@ -44,6 +44,9 @@
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 
 #include <unistd.h>
 #include <pwd.h>

@@ -149,6 +149,9 @@
  *
  *  Nov 2009, version 1.3.9
  *     - allowed security descriptors up to 64K
+ *
+ *  Nov 2009, version 1.3.10
+ *     - applied patches for MacOSX from Erik Larsson
  */
 
 /*
@@ -172,7 +175,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.9"
+#define AUDT_VERSION "1.3.10"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -234,7 +237,12 @@
 				 */
 
 #include <sys/stat.h>
+#ifdef HAVE_ENDIAN_H
 #include <endian.h>
+#endif
+#ifdef HAVE_MACHINE_ENDIAN_H
+#include <machine/endian.h>
+#endif
 #include <unistd.h>
 #include <dlfcn.h>
 #endif /* STSC */
@@ -259,7 +267,11 @@
 #endif /* HAVE_CONFIG_H */
 
 #ifdef HAVE_SETXATTR
+#if defined(__APPLE__) || defined(__DARWIN__)
+#include <sys/xattr.h>
+#else
 #include <attr/xattr.h>
+#endif
 #else
 #warning "The extended attribute package is not available"
 #endif /* HAVE_SETXATTR */
@@ -5002,6 +5014,15 @@ BOOL singleshow(const char *path)
 	return (err);
 }
 
+static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, size_t size)
+{
+#if defined(__APPLE__) || defined(__DARWIN__)
+    return getxattr(path, name, value, size, 0, 0);
+#else
+    return getxattr(path, name, value, size);
+#endif
+}
+
 /*
  *		   Display all the parameters associated to a mounted file
  */
@@ -5030,14 +5051,14 @@ void showmounted(const char *fullname)
 		printname(stdout,fullname);
 		printf("\n");
 
-		attrsz = getxattr(fullname,"system.ntfs_acl",attr,MAXATTRSZ);
+		attrsz = ntfs_getxattr(fullname,"system.ntfs_acl",attr,MAXATTRSZ);
 		if (attrsz > 0) {
 			if (opt_v) {
 				hexdump(attr,attrsz,8);
 				printf("Computed hash : 0x%08lx\n",
 					(unsigned long)hash((le32*)attr,attrsz));
 			}
-			if (getxattr(fullname,"system.ntfs_attrib",&attrib,4) != 4) {
+			if (ntfs_getxattr(fullname,"system.ntfs_attrib",&attrib,4) != 4) {
 				printf("** Could not get file attrib\n");
 				errors++;
 			} else
