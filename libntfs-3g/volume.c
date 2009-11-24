@@ -1045,7 +1045,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 				goto error_exit;
 			
 			for (j = 0; j < (s32)u; j++) {
-				ntfschar uc = le16_to_cpu(vname[j]);
+				u16 uc = le16_to_cpu(vname[j]);
 				if (uc > 0xff)
 					uc = (ntfschar)'_';
 				vol->vol_name[j] = (char)uc;
@@ -1432,7 +1432,7 @@ error_exit:
  *
  * Return 0 if successful and -1 if not with errno set to the error code.
  */
-int ntfs_volume_write_flags(ntfs_volume *vol, const u16 flags)
+int ntfs_volume_write_flags(ntfs_volume *vol, const le16 flags)
 {
 	ATTR_RECORD *a;
 	VOLUME_INFORMATION *c;

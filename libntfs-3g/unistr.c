@@ -162,7 +162,7 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 		const u32 upcase_len)
 {
 	u32 cnt;
-	ntfschar c1, c2;
+	u16 c1, c2;
 
 #ifdef DEBUG
 	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
@@ -264,7 +264,7 @@ int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
 		const ntfschar *upcase, const u32 upcase_size)
 {
-	ntfschar c1, c2;
+	u16 c1, c2;
 	size_t i;
 
 #ifdef DEBUG
@@ -357,7 +357,7 @@ void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 		const u32 upcase_len)
 {
 	u32 i;
-	ntfschar u;
+	u16 u;
 
 	for (i = 0; i < name_len; i++)
 		if ((u = le16_to_cpu(name[i])) < upcase_len)
@@ -505,7 +505,7 @@ static int ntfs_utf16_to_utf8(const ntfschar *ins, const int ins_len,
 
 	char *t;
 	int i, size, ret = -1;
-	ntfschar halfpair;
+	int halfpair;
 
 	halfpair = 0;
 	if (!*outs)

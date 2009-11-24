@@ -177,7 +177,7 @@ static int ntfs_collate_ntofs_security_hash(ntfs_volume *vol __attribute__((unus
 {
 	int rc;
 	u32 d1, d2;
-	const u32 *p1, *p2;
+	const le32 *p1, *p2;
 
 	ntfs_log_trace("Entering.\n");
 	if (data1_len != data2_len || data1_len != 8) {
