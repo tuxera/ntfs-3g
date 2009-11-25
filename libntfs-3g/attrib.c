@@ -5560,7 +5560,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	 */
 	if (na->data_flags & ATTR_IS_ENCRYPTED) {
 		errno = EACCES;
-		ntfs_log_info("Failed to truncate encrypted attribute");
+		ntfs_log_trace("Cannot truncate encrypted attribute\n");
 		goto out;
 	}
 	/*
