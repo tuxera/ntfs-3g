@@ -2862,36 +2862,48 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
 	BOOL gotowner;
 	int allowed;
 
-	gotowner = FALSE; /* default */
 	processuid = scx->uid;
-		/* get the owner, either from cache or from old attribute  */
-	cached = fetch_cache(scx, ni);
-	if (cached) {
-		uid = cached->uid;
-		gotowner = TRUE;
-	} else {
-		oldattr = getsecurityattr(scx->vol,path, ni);
-		if (oldattr) {
-#if OWNERFROMACL
-			usid = ntfs_acl_owner(oldattr);
-#else
-			const SECURITY_DESCRIPTOR_RELATIVE *phead;
-
-			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
-			usid = (const SID*)&oldattr[le32_to_cpu(phead->owner)];
-#endif
-			uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
-			gotowner = TRUE;
-			free(oldattr);
-		}
-	}
-	allowed = FALSE;
-	if (gotowner) {
 /* TODO : use CAP_FOWNER process capability */
-		if (!processuid || (processuid == uid))
-			allowed = TRUE;
-		else
-			errno = EPERM;
+	/*
+	 * Always allow for root
+	 * Also always allow if no mapping has been defined
+	 */
+	if (!scx->mapping[MAPUSERS] || !processuid)
+		allowed = TRUE;
+	else {
+		gotowner = FALSE; /* default */
+		/* get the owner, either from cache or from old attribute  */
+		cached = fetch_cache(scx, ni);
+		if (cached) {
+			uid = cached->uid;
+			gotowner = TRUE;
+		} else {
+			oldattr = getsecurityattr(scx->vol,path, ni);
+			if (oldattr) {
+#if OWNERFROMACL
+				usid = ntfs_acl_owner(oldattr);
+#else
+				const SECURITY_DESCRIPTOR_RELATIVE *phead;
+
+				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+								oldattr;
+				usid = (const SID*)&oldattr
+						[le32_to_cpu(phead->owner)];
+#endif
+				uid = ntfs_find_user(scx->mapping[MAPUSERS],
+						usid);
+				gotowner = TRUE;
+				free(oldattr);
+			}
+		}
+		allowed = FALSE;
+		if (gotowner) {
+/* TODO : use CAP_FOWNER process capability */
+			if (!processuid || (processuid == uid))
+				allowed = TRUE;
+			else
+				errno = EPERM;
+		}
 	}
 	return (allowed);
 }
