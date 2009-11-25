@@ -764,7 +764,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
  * two into one, if that is possible (we check for overlap and discard the new
  * runlist if overlap present before returning NULL, with errno = ERANGE).
  */
-runlist_element *ntfs_mapping_pairs_decompress_i(const ntfs_volume *vol,
+static runlist_element *ntfs_mapping_pairs_decompress_i(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl)
 {
 	VCN vcn;		/* Current vcn. */
