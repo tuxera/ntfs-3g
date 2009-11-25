@@ -184,8 +184,8 @@ static int ntfs_collate_ntofs_security_hash(ntfs_volume *vol __attribute__((unus
 		ntfs_log_error("data1_len or/and data2_len not equal to 8.\n");
 		return NTFS_COLLATION_ERROR;
 	}
-	p1 = (const u32*)data1;
-	p2 = (const u32*)data2;
+	p1 = (const le32*)data1;
+	p2 = (const le32*)data2;
 	d1 = le32_to_cpup(p1);
 	d2 = le32_to_cpup(p2);
 	if (d1 < d2)

@@ -1047,7 +1047,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			for (j = 0; j < (s32)u; j++) {
 				u16 uc = le16_to_cpu(vname[j]);
 				if (uc > 0xff)
-					uc = (ntfschar)'_';
+					uc = (u16)'_';
 				vol->vol_name[j] = (char)uc;
 			}
 			vol->vol_name[u] = '\0';
