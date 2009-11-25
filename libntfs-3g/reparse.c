@@ -1185,9 +1185,11 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
 							AT_REPARSE_POINT,
 							AT_UNNAMED,0,&dummy,
 							(s64)0);
-						if (!res)
-							ni->flags |=
+						if (!res) {
+						    ni->flags |=
 							FILE_ATTR_REPARSE_POINT;
+						    NInoFileNameSetDirty(ni);
+						}
 						NInoSetDirty(ni);
 					} else {
 						errno = EOPNOTSUPP;
@@ -1258,6 +1260,7 @@ int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
 					if (!res) {
 						ni->flags &=
 						    ~FILE_ATTR_REPARSE_POINT;
+						NInoFileNameSetDirty(ni);
 					} else {
 					/*
 					 * If we could not remove the

@@ -601,6 +601,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 	ntfs_index_context *ictx;
 	ntfs_inode *index_ni;
 	FILE_NAME_ATTR *fn;
+	FILE_NAME_ATTR *fnx;
 	int err = 0;
 
 	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
@@ -658,17 +659,22 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			continue;
 		}
 		/* Update flags and file size. */
-		fn = (FILE_NAME_ATTR *)ictx->data;
-		fn->file_attributes =
-				(fn->file_attributes & ~FILE_ATTR_VALID_FLAGS) |
+		fnx = (FILE_NAME_ATTR *)ictx->data;
+		fnx->file_attributes =
+				(fnx->file_attributes & ~FILE_ATTR_VALID_FLAGS) |
 				(ni->flags & FILE_ATTR_VALID_FLAGS);
-		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
-		fn->data_size = cpu_to_sle64(ni->data_size);
+		fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
+		fnx->data_size = cpu_to_sle64(ni->data_size);
 		if (test_nino_flag(ni, TimesDirty)) {
-			fn->creation_time = utc2ntfs(ni->creation_time);
-			fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-			fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-			fn->last_access_time = utc2ntfs(ni->last_access_time);
+			fnx->creation_time = utc2ntfs(ni->creation_time);
+			fnx->last_data_change_time = utc2ntfs(ni->last_data_change_time);
+			fnx->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
+			fnx->last_access_time = utc2ntfs(ni->last_access_time);
+		} else {
+			fnx->creation_time = fn->creation_time;
+			fnx->last_data_change_time = fn->last_data_change_time;
+			fnx->last_mft_change_time = fn->last_mft_change_time;
+			fnx->last_access_time = fn->last_access_time;
 		}
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
@@ -1304,6 +1310,7 @@ int ntfs_inode_set_times(const char *path __attribute__((unused)),
 					std_info->last_access_time = cpu_to_le64(times[2]);
 				std_info->last_mft_change_time = now;
 				ntfs_inode_mark_dirty(ctx->ntfs_ino);
+				NInoFileNameSetDirty(ni);
 
 				/* update the file names attributes */
 				ntfs_attr_reinit_search_ctx(ctx);

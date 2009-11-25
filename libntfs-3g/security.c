@@ -4079,6 +4079,7 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 			if (!res) {
 				ni->flags = (ni->flags & ~settable)
 					 | (cpu_to_le32(attrib) & settable);
+				NInoFileNameSetDirty(ni);
 				NInoSetDirty(ni);
 			}
 		} else
