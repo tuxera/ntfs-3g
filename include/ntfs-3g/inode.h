@@ -49,7 +49,7 @@ typedef enum {
 	NI_FileNameDirty,	/* 1: FILE_NAME attributes need to be updated
 				      in the index. */
 	NI_v3_Extensions,	/* 1: JPA v3.x extensions present. */
-	NI_TimesDirty,		/* 1: Times need to be updated */
+	NI_TimesSet,		/* 1: Use times which were set */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)

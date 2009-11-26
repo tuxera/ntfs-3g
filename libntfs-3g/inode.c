@@ -561,7 +561,7 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
 	std_info->file_attributes = ni->flags;
-	if (test_nino_flag(ni, TimesDirty)) {
+	if (!test_nino_flag(ni, TimesSet)) {
 		std_info->creation_time = utc2ntfs(ni->creation_time);
 		std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 		std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
@@ -665,7 +665,7 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				(ni->flags & FILE_ATTR_VALID_FLAGS);
 		fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
 		fnx->data_size = cpu_to_sle64(ni->data_size);
-		if (test_nino_flag(ni, TimesDirty)) {
+		if (!test_nino_flag(ni, TimesSet)) {
 			fnx->creation_time = utc2ntfs(ni->creation_time);
 			fnx->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 			fnx->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
@@ -1154,7 +1154,6 @@ void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (mask & NTFS_UPDATE_CTIME)
 		ni->last_mft_change_time = now;
 	
-	set_nino_flag(ni, TimesDirty);
 	NInoFileNameSetDirty(ni);
 	NInoSetDirty(ni);
 }
@@ -1300,9 +1299,10 @@ int ntfs_inode_set_times(const char *path __attribute__((unused)),
 				std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 					le16_to_cpu(ctx->attr->value_offset));
 				/*
-				 * Do not mark times dirty to avoid
-				 * overwriting them when the inode is closed.
+				 * Mark times set to avoid overwriting
+				 * them when the inode is closed.
 				 */
+				set_nino_flag(ni, TimesSet);
 				std_info->creation_time = cpu_to_le64(times[0]);
 				if (size >= 16)
 					std_info->last_data_change_time = cpu_to_le64(times[1]);
@@ -1320,10 +1320,6 @@ int ntfs_inode_set_times(const char *path __attribute__((unused)),
 						0, NULL, 0, ctx)) {
 					fn = (FILE_NAME_ATTR*)((u8 *)ctx->attr +
 						le16_to_cpu(ctx->attr->value_offset));
-				/*
-				 * Do not mark times dirty to avoid
-				 * overwriting them when the inode is closed.
-				 */
 					fn->creation_time
 						= cpu_to_le64(times[0]);
 					if (size >= 16)
