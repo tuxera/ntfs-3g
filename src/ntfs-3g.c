@@ -1912,6 +1912,8 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 	char *path = NULL;
 	ntfschar *stream_name;
 	ntfs_inode *ni;
+	u64 inum;
+	BOOL same;
 	
 	ntfs_log_debug("rename: old: '%s'  new: '%s'\n", old_path, new_path);
 	
@@ -1931,12 +1933,34 @@ static int ntfs_fuse_rename(const char *old_path, const char *new_path)
 			goto out;
 		}
 		
+		inum = ni->mft_no;
 		if (ntfs_inode_close(ni)) {
 			set_fuse_error(&ret);
 			goto out;
 		}
-		
-		ret = ntfs_fuse_rename_existing_dest(old_path, new_path);
+
+		free(path);
+		path = (char*)NULL;
+		if (stream_name_len)
+			free(stream_name);
+
+			/* silently ignore a rename to same inode */
+		stream_name_len = ntfs_fuse_parse_path(old_path,
+						&path, &stream_name);
+		if (stream_name_len < 0)
+			return stream_name_len;
+	
+		ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+		if (ni) {
+			same = ni->mft_no == inum;
+			if (ntfs_inode_close(ni))
+				ret = -errno;
+			else
+				if (!same)
+					ret = ntfs_fuse_rename_existing_dest(
+							old_path, new_path);
+		} else
+			ret = -errno;
 		goto out;
 	}
 
