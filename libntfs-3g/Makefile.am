@@ -1,4 +1,6 @@
 
+EXTRA_DIST = device_io.c
+
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if INSTALL_LIBRARY

@@ -1,4 +1,6 @@
 
+EXTRA_DIST = secaudit.h
+
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 if FUSE_INTERNAL
