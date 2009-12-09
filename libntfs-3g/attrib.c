@@ -61,6 +61,7 @@
 #include "efs.h"
 
 #define STANDARD_COMPRESSION_UNIT 4
+#define MAX_COMPRESSION_CLUSTER_SIZE 4096
 
 ntfschar AT_UNNAMED[] = { const_cpu_to_le16('\0') };
 ntfschar STREAM_SDS[] = { const_cpu_to_le16('$'),
@@ -450,7 +451,8 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * change when stream is wiped out.
 		 */
 		a->flags &= ~ATTR_COMPRESSION_MASK;
-		if (na->ni->flags & FILE_ATTR_COMPRESSED)
+		if ((na->ni->flags & FILE_ATTR_COMPRESSED)
+		    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE))
 			a->flags |= ATTR_IS_COMPRESSED;
 	}
 	
@@ -3677,6 +3679,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 
 add_attr_record:
 	if ((ni->flags & FILE_ATTR_COMPRESSED)
+	    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	    && ((type == AT_DATA)
 	       || ((type == AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
 		data_flags = ATTR_IS_COMPRESSED;
@@ -4641,6 +4644,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 */
 	if (!na->data_size
 	    && (na->type == AT_DATA)
+	    && (na->ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	    && (na->ni->flags & FILE_ATTR_COMPRESSED)) {
 		a->flags |= ATTR_IS_COMPRESSED;
 		na->data_flags = a->flags;
