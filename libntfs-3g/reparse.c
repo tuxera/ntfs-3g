@@ -598,7 +598,7 @@ static char *ntfs_get_fulllink(ntfs_volume *vol, ntfschar *junction,
 				if (*p == '/')
 					level++;
 			fulltarget = (char*)ntfs_malloc(3*level
-					+ sizeof(mappingdir) + count - 4);
+				    + sizeof(mappingdir) + strlen(target) - 3);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
@@ -721,7 +721,7 @@ static char *ntfs_get_abslink(ntfs_volume *vol, ntfschar *junction,
 				if (*p == '/')
 					level++;
 			fulltarget = (char*)ntfs_malloc(3*level
-					+ sizeof(mappingdir) + count - 4);
+				    + sizeof(mappingdir) + strlen(target) - 3);
 			if (fulltarget) {
 				fulltarget[0] = 0;
 				if (level > 1) {
