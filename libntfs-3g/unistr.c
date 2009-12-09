@@ -614,24 +614,26 @@ static int utf8_to_utf16_size(const char *s)
 	while ((byte = *((const unsigned char *)s++))) {
 		if (++count >= PATH_MAX) 
 			goto fail;
-		if (byte >= 0xF5) {
-			errno = EILSEQ;
-			goto out;
-		}
-		if (!*s) 
-			break;
-		if (byte >= 0xC0) 
-			s++;
-		if (!*s) 
-			break;
-		if (byte >= 0xE0) 
-			s++;
-		if (!*s) 
-			break;
-		if (byte >= 0xF0) {
-			s++;
-			if (++count >= PATH_MAX)
-				goto fail;
+		if (byte >= 0xc0) {
+			if (byte >= 0xF5) {
+				errno = EILSEQ;
+				goto out;
+			}
+			if (!*s) 
+				break;
+			if (byte >= 0xC0) 
+				s++;
+			if (!*s) 
+				break;
+			if (byte >= 0xE0) 
+				s++;
+			if (!*s) 
+				break;
+			if (byte >= 0xF0) {
+				s++;
+				if (++count >= PATH_MAX)
+					goto fail;
+			}
 		}
 	}
 	ret = count;
@@ -663,8 +665,6 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 	} else if (byte < 0xc2) {
 		goto fail;
 	} else if (byte < 0xE0) {
-		if (strlen(s) < 2)
-			goto fail;
 		if ((s[1] & 0xC0) == 0x80) {
 			*wc = ((u32)(byte & 0x1F) << 6)
 			    | ((u32)(s[1] & 0x3F));
@@ -673,8 +673,6 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 			goto fail;
 					/* three-byte */
 	} else if (byte < 0xF0) {
-		if (strlen(s) < 3)
-			goto fail;
 		if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)) {
 			*wc = ((u32)(byte & 0x0F) << 12)
 			    | ((u32)(s[1] & 0x3F) << 6)
@@ -693,8 +691,6 @@ static int utf8_to_unicode(u32 *wc, const char *s)
 		goto fail;
 					/* four-byte */
 	} else if (byte < 0xF5) {
-		if (strlen(s) < 4)
-			goto fail;
 		if (((s[1] & 0xC0) == 0x80) && ((s[2] & 0xC0) == 0x80)
 		  && ((s[3] & 0xC0) == 0x80)) {
 			*wc = ((u32)(byte & 0x07) << 18)
