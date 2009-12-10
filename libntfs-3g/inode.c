@@ -5,6 +5,7 @@
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
+ * Copyright (c) 2009      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -595,7 +596,7 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
  *
  * Return 0 on success or -1 on error with errno set to the error code.
  */
-static int ntfs_inode_sync_file_name(ntfs_inode *ni)
+static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 {
 	ntfs_attr_search_ctx *ctx = NULL;
 	ntfs_index_context *ictx;
@@ -625,7 +626,10 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 			 */
 			index_ni = ni;
 		} else
-			index_ni = ntfs_inode_open(ni->vol, 
+			if (dir_ni)
+				index_ni = dir_ni;
+			else
+				index_ni = ntfs_inode_open(ni->vol, 
 					le64_to_cpu(fn->parent_directory));
 		if (!index_ni) {
 			if (!err)
@@ -640,7 +644,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 				err = errno;
 			ntfs_log_perror("Failed to get index ctx, inode %lld",
 					(long long)index_ni->mft_no);
-			if (ni != index_ni && ntfs_inode_close(index_ni) && !err)
+			if ((ni != index_ni) && !dir_ni
+			    && ntfs_inode_close(index_ni) && !err)
 				err = errno;
 			continue;
 		}
@@ -678,7 +683,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni)
 		}
 		ntfs_index_entry_mark_dirty(ictx);
 		ntfs_index_ctx_put(ictx);
-		if ((ni != index_ni) && ntfs_inode_close(index_ni) && !err)
+		if ((ni != index_ni) && !dir_ni
+		    && ntfs_inode_close(index_ni) && !err)
 			err = errno;
 	}
 	/* Check for real error occurred. */
@@ -720,11 +726,10 @@ err_out:
  *	EBUSY	- Inode and/or one of its extents is busy, try again later.
  *	EIO	- I/O error while writing the inode (or one of its extents).
  */
-int ntfs_inode_sync(ntfs_inode *ni)
+static int ntfs_inode_sync_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni)
 {
 	int ret = 0;
 	int err = 0;
-
 	if (!ni) {
 		errno = EINVAL;
 		ntfs_log_error("Failed to sync NULL inode\n");
@@ -746,7 +751,7 @@ int ntfs_inode_sync(ntfs_inode *ni)
 	/* Update FILE_NAME's in the index. */
 	if ((ni->mrec->flags & MFT_RECORD_IN_USE) && ni->nr_extents != -1 &&
 			NInoFileNameTestAndClearDirty(ni) &&
-			ntfs_inode_sync_file_name(ni)) {
+			ntfs_inode_sync_file_name(ni, dir_ni)) {
 		if (!err || errno == EIO) {
 			err = errno;
 			if (err != EIO)
@@ -847,6 +852,28 @@ sync_inode:
 	
 	ntfs_log_leave("\n");
 	return ret;
+}
+
+int ntfs_inode_sync(ntfs_inode *ni)
+{
+	return (ntfs_inode_sync_in_dir(ni, (ntfs_inode*)NULL));
+}
+
+/*
+ *		Close an inode with an open parent inode
+ */
+
+int ntfs_inode_close_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni)
+{
+	int res;
+
+	res = ntfs_inode_sync_in_dir(ni, dir_ni);
+	if (res) {
+		if (errno != EIO)
+			errno = EBUSY;
+	} else
+		res = ntfs_inode_close(ni);
+	return (res);
 }
 
 /**

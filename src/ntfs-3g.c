@@ -1504,16 +1504,12 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 				fi->fh |= CLOSE_ENCRYPTED;
 			NInoSetDirty(ni);
 			/*
-			 * closing ni will necessitate to open dir_ni to
-			 * synchronize the index.
-			 * Better avoid a dangerous double opening.
+			 * closing ni requires access to dir_ni to
+			 * synchronize the index, avoid double opening.
 			 */
+			if (ntfs_inode_close_in_dir(ni, dir_ni))
+				set_fuse_error(&res);
 			ntfs_fuse_update_times(dir_ni, NTFS_UPDATE_MCTIME);
-			if (ntfs_inode_close(dir_ni))
-				set_fuse_error(&res);
-			dir_ni = (ntfs_inode*)NULL;
-			if (ntfs_inode_close(ni))
-				set_fuse_error(&res);
 		} else
 			res = -errno;
 #if POSIXACLS

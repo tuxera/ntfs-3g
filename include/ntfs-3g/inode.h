@@ -177,6 +177,7 @@ extern ntfs_inode *ntfs_inode_allocate(ntfs_volume *vol);
 extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
 
 extern int ntfs_inode_close(ntfs_inode *ni);
+extern int ntfs_inode_close_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni);
 
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);

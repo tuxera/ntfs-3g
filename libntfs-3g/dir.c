@@ -2068,8 +2068,10 @@ static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 					longname, longlen,
 					FILE_NAME_WIN32_AND_DOS) >= 0))
 				res = 0;
-			ntfs_inode_close(ni);
-			ntfs_inode_close(dir_ni);
+			if (ntfs_inode_close_in_dir(ni,dir_ni) && !res)
+				res = -1;
+			if (ntfs_inode_close(dir_ni) && !res)
+				res = -1;
 		}
 	} else
 		if (!ntfs_link_i(ni, dir_ni, shortname, shortlen, 
@@ -2088,13 +2090,17 @@ static int set_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 							longname, longlen,
 							FILE_NAME_WIN32))
 							res = 0;
-						ntfs_inode_close(ni);
+						if (ntfs_inode_close_in_dir(ni,
+							dir_ni)
+						    && !res)
+							res = -1;
 					}
-				ntfs_inode_close(dir_ni);
+				if (ntfs_inode_close(dir_ni) && !res)
+					res = -1;
 				}
 			}
 		} else {
-			ntfs_inode_close(ni);
+			ntfs_inode_close_in_dir(ni,dir_ni);
 			ntfs_inode_close(dir_ni);
 		}
 	return (res);
