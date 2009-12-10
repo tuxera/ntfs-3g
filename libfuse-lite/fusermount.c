@@ -588,7 +588,8 @@ static int mount_fuse(const char *mnt, const char *opts)
 			&source, &mnt_opts);
 
     if (currdir_fd != -1) {
-        fchdir(currdir_fd);
+	 __attribute__((unused))int ignored_fchdir_status =
+	        fchdir(currdir_fd);
         close(currdir_fd);
     }
     if (mountpoint_fd != -1)
