@@ -152,6 +152,9 @@
  *
  *  Nov 2009, version 1.3.10
  *     - applied patches for MacOSX from Erik Larsson
+ *
+ *  Nov 2009, version 1.3.11
+ *     - replace <attr/xattr.h> by <sys/xattr.h> (provided by glibc)
  */
 
 /*
@@ -175,7 +178,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.10"
+#define AUDT_VERSION "1.3.11"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -254,12 +257,12 @@
 #ifndef STSC
 
 #if !defined(HAVE_CONFIG_H) && POSIXACLS
-      /* require <attr/xattr.h> if not integrated into ntfs-3g package */
+      /* require <sys/xattr.h> if not integrated into ntfs-3g package */
 #define HAVE_SETXATTR 1
 #endif
 
 #ifdef HAVE_CONFIG_H
-      /* <attr/xattr.h> according to config.h if integrated into ntfs-3g package */
+      /* <sys/xattr.h> according to config.h if integrated into ntfs-3g package */
 #include "config.h"
 #ifndef POSIXACLS
 #define POSIXACLS 0
@@ -267,11 +270,7 @@
 #endif /* HAVE_CONFIG_H */
 
 #ifdef HAVE_SETXATTR
-#if defined(__APPLE__) || defined(__DARWIN__)
 #include <sys/xattr.h>
-#else
-#include <attr/xattr.h>
-#endif
 #else
 #warning "The extended attribute package is not available"
 #endif /* HAVE_SETXATTR */
