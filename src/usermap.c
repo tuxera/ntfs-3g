@@ -39,6 +39,9 @@
  *
  *  May 2009 Version 1.1.2
  *     - avoided selecting DOS names on Linux
+ *
+ *  Nov 2009 Version 1.1.3
+ *     - shutdown compiler warnings for unused parameters
  */
 
 /*
@@ -67,8 +70,8 @@
 #else
 #define USESTUBS 0 /* direct calls to API, based on following definitions */
 #define ENVNTFS3G "NTFS3G"
-#define LIBFILE64 "/lib64/libntfs-3g.so.4921"
-#define LIBFILE "/lib/libntfs-3g.so.4921"
+#define LIBFILE64 "/lib64/libntfs-3g.so.491"
+#define LIBFILE "/lib/libntfs-3g.so.491"
 #endif
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
@@ -77,7 +80,7 @@
 #define INIT_FILE_SECURITY "ntfs_initialize_file_security"
 #define LEAVE_FILE_SECURITY "ntfs_leave_file_security"
 
-#define VERSION "1.1.2"
+#define VERSION "1.1.3"
 #define MAPDIR ".NTFS-3G"
 #define MAPFILE "UserMapping"
 #define MAXATTRSZ 2048
@@ -213,6 +216,15 @@ unsigned char *currentsid;
 
 void *ntfs_handle;
 void *ntfs_context = (void*)NULL;
+
+/*
+ *		Shut down compiler warnings for unused parameters
+ */
+
+static long unused(const void *p)
+{
+return ((long)p);
+}
 
 /*
  *		Open and close the security API (platform dependent)
@@ -715,6 +727,9 @@ STATIC int callback(struct CALLBACK *context, char *ntfsname,
 	char *accname;
 	char *name;
 
+	unused((void*)&pos);
+	unused((void*)&mft_ref);
+	unused((void*)&dt_type);
 	fullname = (char *)malloc(strlen(context->dir)
 			 + utf8_size(ntfsname, length) + 2);
 	if (fullname) {
@@ -1249,6 +1264,8 @@ STATIC boolean checkoptions(int argc, char *argv[], boolean silent)
 		fprintf(stderr, "    the Windows system partition should be named first\n");
 	}
 #else
+	unused((void*)argv);
+	unused((void*)&silent);
 	err = (argc < 2);
 	if (err) {
 		fprintf(stderr, "Usage : usermap dev1 [dev2 ...]\n");
