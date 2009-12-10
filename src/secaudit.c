@@ -155,6 +155,9 @@
  *
  *  Nov 2009, version 1.3.11
  *     - replace <attr/xattr.h> by <sys/xattr.h> (provided by glibc)
+ *
+ *  Dec 2009, version 1.3.12
+ *     - worked around "const" possibly redefined in config.h
  */
 
 /*
@@ -178,7 +181,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.11"
+#define AUDT_VERSION "1.3.12"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -264,6 +267,9 @@
 #ifdef HAVE_CONFIG_H
       /* <sys/xattr.h> according to config.h if integrated into ntfs-3g package */
 #include "config.h"
+#ifdef const /* work around "const" possibly redefined in config.h */
+#undef const
+#endif
 #ifndef POSIXACLS
 #define POSIXACLS 0
 #endif
