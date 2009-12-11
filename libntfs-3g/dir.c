@@ -560,9 +560,46 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 		q = strchr(p, PATH_SEP);
 		if (q != NULL) {
 			*q = '\0';
-			/* q++; JPA */
 		}
-
+#if CACHE_INODE_SIZE
+			/*
+			 * fetch inode for partial path from cache
+			 */
+		cached = (struct CACHED_INODE*)NULL;
+		if (!parent) {
+			item.pathname = fullname;
+			item.varsize = strlen(fullname) + 1;
+			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
+					vol->xinode_cache, GENERIC(&item),
+					inode_cache_compare);
+			if (cached) {
+				inum = cached->inum;
+			}
+		}
+			/*
+			 * if not in cache, translate, search, then
+			 * insert into cache if found
+			 */
+		if (!cached) {
+			len = ntfs_mbstoucs(p, &unicode);
+			if (len < 0) {
+				ntfs_log_perror("Could not convert filename to Unicode:"
+					" '%s'", p);
+				err = errno;
+				goto close;
+			} else if (len > NTFS_MAX_NAME_LEN) {
+				err = ENAMETOOLONG;
+				goto close;
+			}
+			inum = ntfs_inode_lookup_by_name(ni, unicode, len);
+			if (!parent && (inum != (u64) -1)) {
+				item.inum = inum;
+				ntfs_enter_cache(vol->xinode_cache,
+						GENERIC(&item),
+						inode_cache_compare);
+			}
+		}
+#else
 		len = ntfs_mbstoucs(p, &unicode);
 		if (len < 0) {
 			ntfs_log_perror("Could not convert filename to Unicode:"
@@ -573,32 +610,6 @@ ntfs_inode *ntfs_pathname_to_inode(ntfs_volume *vol, ntfs_inode *parent,
 			err = ENAMETOOLONG;
 			goto close;
 		}
-#if CACHE_INODE_SIZE
-			/*
-			 * fetch inode for partial path from cache
-			 * if not available, compute and store into cache
-			 */
-		if (parent)
-			inum = ntfs_inode_lookup_by_name(ni, unicode, len);
-		else {
-			item.pathname = fullname;
-			item.varsize = strlen(fullname) + 1;
-			cached = (struct CACHED_INODE*)ntfs_fetch_cache(
-					vol->xinode_cache, GENERIC(&item),
-					inode_cache_compare);
-			if (cached) {
-				inum = cached->inum;
-			} else {
-				inum = ntfs_inode_lookup_by_name(ni, unicode, len);
-				if (inum != (u64) -1) {
-					item.inum = inum;
-					ntfs_enter_cache(vol->xinode_cache,
-							GENERIC(&item),
-							inode_cache_compare);
-				}
-			}
-		}
-#else
 		inum = ntfs_inode_lookup_by_name(ni, unicode, len);
 #endif
 		if (inum == (u64) -1) {
