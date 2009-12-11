@@ -1854,6 +1854,7 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 	int groupperms;
 	int mask;
 	BOOL somegroup;
+	BOOL needgroups;
 	mode_t perms;
 	int i;
 
@@ -1888,9 +1889,17 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 		} else
 			perms &= 07700;
 	} else {
-					/* analyze designated users and get mask */
+				/*
+				 * analyze designated users, get mask
+				 * and identify whether we need to check
+				 * the group memberships. The groups are
+				 * not needed when all groups have the
+				 * same permissions as other for the
+				 * requested modes.
+				 */
 		userperms = -1;
 		groupperms = -1;
+		needgroups = FALSE;
 		mask = 7;
 		for (i=pxdesc->acccnt-1; i>=0 ; i--) {
 			pxace = &pxdesc->acl.ace[i];
@@ -1902,6 +1911,12 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 			case POSIX_ACL_MASK :
 				mask = pxace->perms & 7;
 				break;
+			case POSIX_ACL_GROUP_OBJ :
+			case POSIX_ACL_GROUP :
+				if (((pxace->perms & mask) ^ perms)
+				    & (request >> 6) & 7)
+					needgroups = TRUE;
+				break;
 			default :
 				break;
 			}
@@ -1909,6 +1924,8 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 					/* designated users */
 		if (userperms >= 0)
 			perms = (perms & 07000) + (userperms & mask);
+		else if (!needgroups)
+				perms &= 07007;
 		else {
 					/* owning group */
 			if (!(~(perms >> 3) & request & mask)
@@ -2203,7 +2220,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 	gid_t gid;
 	int perm;
 
-	if (!scx->mapping[MAPUSERS] || !scx->uid)
+	if (!scx->mapping[MAPUSERS] || (!scx->uid && !(request & S_IEXEC)))
 		perm = 07777;
 	else {
 		/* check whether available in cache */
@@ -2267,14 +2284,28 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			}
 		}
 		if (perm >= 0) {
-			if (uid == scx->uid)
-				perm &= 07700;
-			else
-				if ((gid == scx->gid)
-				   || groupmember(scx, scx->uid, gid))
-					perm &= 07070;
+			if (!scx->uid) {
+				/* root access and execution */
+				if (perm & 0111)
+					perm = 07777;
 				else
-					perm &= 07007;
+					perm = 0;
+			} else
+				if (uid == scx->uid)
+					perm &= 07700;
+				else
+				/*
+				 * avoid checking group membership
+				 * when the requested perms for group
+				 * are the same as perms for other
+				 */
+					if ((gid == scx->gid)
+					  || ((((perm >> 3) ^ perm)
+						& (request >> 6) & 7)
+					    && groupmember(scx, scx->uid, gid)))
+						perm &= 07070;
+					else
+						perm &= 07007;
 		}
 	}
 	return (perm);
