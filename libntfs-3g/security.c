@@ -1105,7 +1105,7 @@ static int update_secur_descr(ntfs_volume *vol,
  *		-1 if there is a problem
  */
 
-static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
+static int upgrade_secur_desc(ntfs_volume *vol,
 				const char *attr, ntfs_inode *ni)
 {
 	int attrsz;
@@ -1116,11 +1116,11 @@ static int upgrade_secur_desc(ntfs_volume *vol, const char *path,
 		/*
 		 * upgrade requires NTFS format v3.x
 		 * also refuse upgrading for special files
+		 * whose number is less than FILE_first_user
 		 */
 
 	if ((vol->major_ver >= 3)
-		&& (path[0] == '/')
-		&& (path[1] != '$') && (path[1] != '\0')) {
+		&& (ni->mft_no < FILE_first_user)) {
 		attrsz = ntfs_attr_size(attr);
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
@@ -1788,8 +1788,7 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
  *	The returned descriptor is dynamically allocated and has to be freed
  */
 
-static char *getsecurityattr(ntfs_volume *vol,
-		const char *path, ntfs_inode *ni)
+static char *getsecurityattr(ntfs_volume *vol, ntfs_inode *ni)
 {
 	SII_INDEX_KEY securid;
 	char *securattr;
@@ -1815,8 +1814,8 @@ static char *getsecurityattr(ntfs_volume *vol,
 		securattr = ntfs_attr_readall(ni, AT_SECURITY_DESCRIPTOR,
 				AT_UNNAMED, 0, &readallsz);
 		if (securattr && !ntfs_valid_descr(securattr, readallsz)) {
-			ntfs_log_error("Bad security descriptor for %s\n",
-				path);
+			ntfs_log_error("Bad security descriptor for inode %lld\n",
+				(long long)ni->mft_no);
 			free(securattr);
 			securattr = (char*)NULL;
 		}
@@ -1830,7 +1829,8 @@ static char *getsecurityattr(ntfs_volume *vol,
 			 * minimum rights, so that a real descriptor can
 			 * be created by chown or chmod
 			 */
-		ntfs_log_error("No security descriptor found for %s\n",path);
+		ntfs_log_error("No security descriptor found for inode %lld\n",
+				(long long)ni->mft_no);
 		securattr = ntfs_build_descr(0, 0, adminsid, adminsid);
 	}
 	return (securattr);
@@ -1968,7 +1968,7 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
  */
 
 static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
-		 const char *path, ntfs_inode * ni, mode_t request)
+		 ntfs_inode * ni, mode_t request)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -1994,7 +1994,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			perm = 0;	/* default to no permission */
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
-			securattr = getsecurityattr(scx->vol, path, ni);
+			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
 				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 				    	securattr;
@@ -2034,7 +2034,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				   && (perm >= 0)
 				   && (scx->vol->secure_flags
 				     & (1 << SECURITY_ADDSECURIDS))) {
-					upgrade_secur_desc(scx->vol, path,
+					upgrade_secur_desc(scx->vol,
 						securattr, ni);
 					/*
 					 * fetch owner and group for cacheing
@@ -2068,9 +2068,8 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
  *	the caller is expected to issue a new call
  */
 
-int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, char *value, size_t size,
-			ntfs_inode *ni)
+int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *name, char *value, size_t size) 
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	struct POSIX_SECURITY *pxdesc;
@@ -2093,7 +2092,7 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 		if (cached)
 			pxdesc = cached->pxdesc;
 		else {
-			securattr = getsecurityattr(scx->vol, path, ni);
+			securattr = getsecurityattr(scx->vol, ni);
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
 			if (securattr) {
@@ -2124,7 +2123,7 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 					   && (scx->vol->secure_flags
 					     & (1 << SECURITY_ADDSECURIDS))) {
 						upgrade_secur_desc(scx->vol,
-							 path, securattr, ni);
+							 securattr, ni);
 					}
 #if OWNERFROMACL
 					uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
@@ -2202,13 +2201,10 @@ int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
  *	Do no use as mode of the file
  *
  *	returns -1 if there is a problem
- *
- *	This is only used for checking creation of DOS file names
  */
 
 static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni,
-		mode_t request __attribute__((unused)))
+		ntfs_inode *ni,	mode_t request)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -2233,7 +2229,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			perm = 0;	/* default to no permission */
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
-			securattr = getsecurityattr(scx->vol, path, ni);
+			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
 				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 				    	securattr;
@@ -2265,7 +2261,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 				   && (perm >= 0)
 				   && (scx->vol->secure_flags
 				     & (1 << SECURITY_ADDSECURIDS))) {
-					upgrade_secur_desc(scx->vol, path,
+					upgrade_secur_desc(scx->vol,
 						securattr, ni);
 					/*
 					 * fetch owner and group for cacheing
@@ -2321,15 +2317,14 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
  *	the caller is expected to issue a new call
  */
 
-int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name  __attribute__((unused)),
-			char *value, size_t size, ntfs_inode *ni)
+int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			char *value, size_t size)
 {
 	char *securattr;
 	size_t outsize;
 
 	outsize = 0;	/* default to no data and no error */
-	securattr = getsecurityattr(scx->vol, path, ni);
+	securattr = getsecurityattr(scx->vol, ni);
 	if (securattr) {
 		outsize = ntfs_attr_size(securattr);
 		if (outsize <= size) {
@@ -2346,8 +2341,7 @@ int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
  */
 
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode * ni,
-		 struct stat *stbuf)
+		ntfs_inode * ni, struct stat *stbuf)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	char *securattr;
@@ -2374,7 +2368,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 			perm = -1;	/* default to error */
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
-			securattr = getsecurityattr(scx->vol, path, ni);
+			securattr = getsecurityattr(scx->vol, ni);
 			if (securattr) {
 				phead =
 				    (const SECURITY_DESCRIPTOR_RELATIVE*)
@@ -2410,7 +2404,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 					   && (scx->vol->secure_flags
 					     & (1 << SECURITY_ADDSECURIDS))) {
 						upgrade_secur_desc(scx->vol,
-							 path, securattr, ni);
+							 securattr, ni);
 					}
 #if OWNERFROMACL
 					stbuf->st_uid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
@@ -2451,8 +2445,7 @@ int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
  */
 
 static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
-			const char *dir_path, ntfs_inode *dir_ni,
-			mode_t mode, BOOL isdir)
+			ntfs_inode *dir_ni, mode_t mode, BOOL isdir)
 {
 	const struct CACHED_PERMISSIONS *cached;
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
@@ -2476,7 +2469,7 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 					scx->umask,isdir);
 		}
 	} else {
-		securattr = getsecurityattr(scx->vol, dir_path, dir_ni);
+		securattr = getsecurityattr(scx->vol, dir_ni);
 		if (securattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
 			    	securattr;
@@ -2506,7 +2499,7 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
 				if (!test_nino_flag(dir_ni, v3_Extensions)
 				   && (scx->vol->secure_flags
 				     & (1 << SECURITY_ADDSECURIDS))) {
-					upgrade_secur_desc(scx->vol, dir_path,
+					upgrade_secur_desc(scx->vol,
 						securattr, dir_ni);
 					/*
 					 * fetch owner and group for cacheing
@@ -2534,8 +2527,8 @@ static struct POSIX_SECURITY *inherit_posix(struct SECURITY_CONTEXT *scx,
  */
 
 le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
-		uid_t uid, gid_t gid, const char *dir_path,
-		ntfs_inode *dir_ni, mode_t mode, BOOL isdir)
+		uid_t uid, gid_t gid, ntfs_inode *dir_ni,
+		mode_t mode, BOOL isdir)
 {
 #if !FORCE_FORMAT_v1x
 	const struct CACHED_SECURID *cached;
@@ -2554,7 +2547,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 
 #if !FORCE_FORMAT_v1x
 
-	pxdesc = inherit_posix(scx, dir_path, dir_ni, mode, isdir);
+	pxdesc = inherit_posix(scx, dir_ni, mode, isdir);
 	if (pxdesc) {
 		/* check whether target securid is known in cache */
 
@@ -2617,7 +2610,7 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 
 int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid,
-		const char *dir_path, ntfs_inode *dir_ni, mode_t mode)
+		ntfs_inode *dir_ni, mode_t mode)
 {
 	struct POSIX_SECURITY *pxdesc;
 	char *newattr;
@@ -2630,7 +2623,7 @@ int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 
 	res = -1;
 	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
-	pxdesc = inherit_posix(scx, dir_path, dir_ni, mode, isdir);
+	pxdesc = inherit_posix(scx, dir_ni, mode, isdir);
 	if (pxdesc) {
 		usid = ntfs_find_usid(scx->mapping[MAPUSERS],uid,(SID*)&defusid);
 		gsid = ntfs_find_gsid(scx->mapping[MAPGROUPS],gid,(SID*)&defgsid);
@@ -2882,8 +2875,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
  *		if not, errno tells why
  */
 
-BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni)
+BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni)
 {
 	const struct CACHED_PERMISSIONS *cached;
 	char *oldattr;
@@ -2909,7 +2901,7 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
 			uid = cached->uid;
 			gotowner = TRUE;
 		} else {
-			oldattr = getsecurityattr(scx->vol,path, ni);
+			oldattr = getsecurityattr(scx->vol, ni);
 			if (oldattr) {
 #if OWNERFROMACL
 				usid = ntfs_acl_owner(oldattr);
@@ -2949,9 +2941,9 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
  *	Returns 0, or -1 if there is a problem which errno describes
  */
 
-int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
+int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			const char *name, const char *value, size_t size,
-			int flags, ntfs_inode *ni)
+			int flags)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -2991,7 +2983,7 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
 						(const struct POSIX_ACL*)value,count,deflt);
 				}
 		} else {
-			oldattr = getsecurityattr(scx->vol,path, ni);
+			oldattr = getsecurityattr(scx->vol, ni);
 			if (oldattr) {
 				phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
 #if OWNERFROMACL
@@ -3052,11 +3044,11 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
  *	Returns 0, or -1 if there is a problem which errno describes
  */
 
-int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, ntfs_inode *ni)
+int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *name)
 {
-	return (ntfs_set_posix_acl(scx, path, name,
-			(const char*)NULL, 0, 0, ni));
+	return (ntfs_set_posix_acl(scx, ni, name,
+			(const char*)NULL, 0, 0));
 }
 
 #endif
@@ -3067,11 +3059,8 @@ int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
  *	Returns 0, or -1 if there is a problem
  */
 
-int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
-			const char *path  __attribute__((unused)),
-			const char *name  __attribute__((unused)),
-			const char *value, size_t size,	int flags,
-			ntfs_inode *ni)
+int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *value, size_t size,	int flags)
 {
 	char *attr;
 	int res;
@@ -3130,8 +3119,7 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
  *		-1 on failure, with errno = EIO
  */
 
-int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni, mode_t mode)
+int ntfs_set_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni, mode_t mode)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -3172,7 +3160,7 @@ int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
 			newpxdesc = (struct POSIX_SECURITY*)NULL;
 #endif
 	} else {
-		oldattr = getsecurityattr(scx->vol,path, ni);
+		oldattr = getsecurityattr(scx->vol, ni);
 		if (oldattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)oldattr;
 #if OWNERFROMACL
@@ -3319,7 +3307,7 @@ int ntfs_sd_add_everyone(ntfs_inode *ni)
  */
 
 int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni,
+		ntfs_inode *ni,
 		int accesstype) /* access type required (S_Ixxx values) */
 {
 	int perm;
@@ -3327,10 +3315,6 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	int allow;
 	struct stat stbuf;
 
-#if POSIXACLS
-		/* shortcut, use only if Posix ACLs in use */
-	if (scx->vol->secure_flags & (1 << SECURITY_DEFAULT)) return (1);
-#endif
 	/*
 	 * Always allow for root unless execution is requested.
 	 * (was checked by fuse until kernel 2.6.29)
@@ -3342,7 +3326,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		    || (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY))))
 		allow = 1;
 	else {
-		perm = ntfs_get_perm(scx, path, ni, accesstype);
+		perm = ntfs_get_perm(scx, ni, accesstype);
 		if (perm >= 0) {
 			res = EACCES;
 			switch (accesstype) {
@@ -3369,7 +3353,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 				break;
 			case S_IWRITE + S_IEXEC + S_ISVTX:
 				if (perm & S_ISVTX) {
-					if ((ntfs_get_owner_mode(scx,path,ni,&stbuf) >= 0)
+					if ((ntfs_get_owner_mode(scx,ni,&stbuf) >= 0)
 					    && (stbuf.st_uid == scx->uid))
 						allow = 1;
 					else
@@ -3391,6 +3375,8 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 	return (allow);
 }
 
+#if 0 /* not needed any more */
+
 /*
  *		Check whether user can access the parent directory
  *	of a file in a specific way
@@ -3403,7 +3389,7 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
  *	This is used for Posix ACL and checking creation of DOS file names
  */
 
-BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
+BOOL old_ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype)
 {
 	int allow;
@@ -3413,10 +3399,6 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	ntfs_inode *dir_ni;
 	struct stat stbuf;
 
-#if POSIXACLS
-		/* shortcut, use only if Posix ACLs in use */
-	if (scx->vol->secure_flags & (1 << SECURITY_DEFAULT)) return (TRUE);
-#endif
 	allow = 0;
 	dirpath = strdup(path);
 	if (dirpath) {
@@ -3426,7 +3408,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		*name = 0;
 		dir_ni = ntfs_pathname_to_inode(scx->vol, NULL, dirpath);
 		if (dir_ni) {
-			allow = ntfs_allowed_access(scx,dirpath,
+			allow = ntfs_allowed_access(scx,
 				 dir_ni, accesstype);
 			ntfs_inode_close(dir_ni);
 				/*
@@ -3439,7 +3421,7 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 					 path);
 				allow = FALSE;
 				if (ni) {
-					allow = (ntfs_get_owner_mode(scx,path,ni,&stbuf) >= 0)
+					allow = (ntfs_get_owner_mode(scx,ni,&stbuf) >= 0)
 						&& (stbuf.st_uid == scx->uid);
 				ntfs_inode_close(ni);
 				}
@@ -3450,14 +3432,16 @@ BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 	return (allow);		/* errno is set if not allowed */
 }
 
+#endif
+
 /*
  *		Define a new owner/group to a file
  *
  *	returns zero if successful
  */
 
-int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid)
+int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			uid_t uid, gid_t gid)
 {
 	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
@@ -3492,7 +3476,7 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
 		fileuid = 0;
 		filegid = 0;
 		mode = 0;
-		oldattr = getsecurityattr(scx->vol, path, ni);
+		oldattr = getsecurityattr(scx->vol, ni);
 		if (oldattr) {
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
@@ -3709,7 +3693,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
  */
 
 le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
-			const char *dir_path, ntfs_inode *dir_ni, BOOL fordir)
+			ntfs_inode *dir_ni, BOOL fordir)
 {
 	struct CACHED_PERMISSIONS *cached;
 	char *parentattr;
@@ -3732,7 +3716,7 @@ le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
 		 * Note : if parent directory has no id, it is not cacheable
 		 */
 	if (!securid) {
-		parentattr = getsecurityattr(scx->vol, dir_path, dir_ni);
+		parentattr = getsecurityattr(scx->vol, dir_ni);
 		if (parentattr) {
 			securid = build_inherited_id(scx,
 						parentattr, fordir);
@@ -3933,7 +3917,7 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 	res = -1;
 	ni = ntfs_pathname_to_inode(scx->vol, NULL, "/.");
 	if (ni) {
-		securattr = getsecurityattr(scx->vol,"/.",ni);
+		securattr = getsecurityattr(scx->vol, ni);
 		if (securattr) {
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 			usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
@@ -4039,8 +4023,7 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
  *	The attribute is returned according to cpu endianness
  */
 
-int ntfs_get_ntfs_attrib(const char *path  __attribute__((unused)),
-			char *value, size_t size, ntfs_inode *ni)
+int ntfs_get_ntfs_attrib(ntfs_inode *ni, char *value, size_t size)
 {
 	u32 attrib;
 	size_t outsize;
@@ -4072,9 +4055,8 @@ int ntfs_get_ntfs_attrib(const char *path  __attribute__((unused)),
  *	Returns 0, or -1 if there is a problem
  */
 
-int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
-			const char *value, size_t size,	int flags,
-			ntfs_inode *ni)
+int ntfs_set_ntfs_attrib(ntfs_inode *ni,
+			const char *value, size_t size,	int flags)
 {
 	u32 attrib;
 	le32 settable;
@@ -4526,7 +4508,7 @@ int ntfs_get_file_security(struct SECURITY_API *scapi,
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		ni = ntfs_pathname_to_inode(scapi->security.vol, NULL, path);
 		if (ni) {
-			attr = getsecurityattr(scapi->security.vol, path, ni);
+			attr = getsecurityattr(scapi->security.vol, ni);
 			if (attr) {
 				if (feedsecurityattr(attr,selection,
 						buf,buflen,psize)) {
@@ -4595,7 +4577,7 @@ int ntfs_set_file_security(struct SECURITY_API *scapi,
 				NULL, path);
 			if (ni) {
 				oldattr = getsecurityattr(scapi->security.vol,
-						path, ni);
+						ni);
 				if (oldattr) {
 					if (mergesecurityattr(
 						scapi->security.vol,

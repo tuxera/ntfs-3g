@@ -240,26 +240,24 @@ extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd,
 
 int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path);
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni, struct stat*);
-int ntfs_set_mode(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni, mode_t mode);
-BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
-                const char *path, ntfs_inode *ni);
-int ntfs_allowed_access(struct SECURITY_CONTEXT *scx, const char *path,
+		ntfs_inode *ni, struct stat*);
+int ntfs_set_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni, mode_t mode);
+BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni);
+int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, int accesstype);
-BOOL ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
+BOOL old_ntfs_allowed_dir_access(struct SECURITY_CONTEXT *scx,
 		const char *path, int accesstype);
 
 #if POSIXACLS
 le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
-		uid_t uid, gid_t gid, const char *dir_path,
-		ntfs_inode *dir_ni, mode_t mode, BOOL isdir);
+		uid_t uid, gid_t gid, ntfs_inode *dir_ni,
+		mode_t mode, BOOL isdir);
 #else
 le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 		uid_t uid, gid_t gid, mode_t mode, BOOL isdir);
 #endif
-int ntfs_set_owner(struct SECURITY_CONTEXT *scx,
-		const char *path, ntfs_inode *ni, uid_t uid, gid_t gid);
+int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+		uid_t uid, gid_t gid);
 #if POSIXACLS
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid,
@@ -269,7 +267,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode);
 #endif
 le32 ntfs_inherited_id(struct SECURITY_CONTEXT *scx,
-		const char *dir_path, ntfs_inode *dir_ni, BOOL fordir);
+		ntfs_inode *dir_ni, BOOL fordir);
 int ntfs_open_secure(ntfs_volume *vol);
 void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
 
@@ -277,28 +275,25 @@ void ntfs_close_secure(struct SECURITY_CONTEXT *scx);
 
 int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid,
-		const char *dir_path, ntfs_inode *dir_ni, mode_t mode);
-int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, char *value, size_t size,
-			ntfs_inode *ni);
-int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
+		ntfs_inode *dir_ni, mode_t mode);
+int ntfs_get_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *name, char *value, size_t size);
+int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			const char *name, const char *value, size_t size,
-			int flags, ntfs_inode *ni);
-int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, ntfs_inode *ni);
+			int flags);
+int ntfs_remove_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *name);
 #endif
 
-int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, char *value, size_t size,
-			ntfs_inode *ni);
-int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, const char *path,
-			const char *name, const char *value, size_t size,
-			int flags, ntfs_inode *ni);
-int ntfs_get_ntfs_attrib(const char *path,
-			char *value, size_t size, ntfs_inode *ni);
-int ntfs_set_ntfs_attrib(const char *path,
-			const char *value, size_t size,	int flags,
-			ntfs_inode *ni);
+int ntfs_get_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			char *value, size_t size);
+int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			const char *value, size_t size, int flags); 
+
+int ntfs_get_ntfs_attrib(ntfs_inode *ni, char *value, size_t size);
+int ntfs_set_ntfs_attrib(ntfs_inode *ni,
+			const char *value, size_t size,	int flags);
+			
 
 /*
  *		Security API for direct access to security descriptors
