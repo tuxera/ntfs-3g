@@ -1840,6 +1840,45 @@ int ntfs_link(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name, u8 name_len)
 	return (ntfs_link_i(ni, dir_ni, name, name_len, FILE_NAME_POSIX));
 }
 
+/*
+ *		Get a parent directory from an inode entry
+ *
+ *	This is only used in situations where the path used to access
+ *	the current file is not known for sure. The result may be different
+ *	from the path when the file is linked in several parent directories.
+ *
+ *	Currently this is only used for translating ".." in the target
+ *	of a Vista relative symbolic link
+ */
+
+ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni)
+{
+	ntfs_inode *dir_ni = (ntfs_inode*)NULL;
+	u64 inum;
+	FILE_NAME_ATTR *fn;
+	ntfs_attr_search_ctx *ctx;
+
+	if (ni->mft_no != FILE_root) {
+			/* find the name in the attributes */
+		ctx = ntfs_attr_get_search_ctx(ni, NULL);
+		if (!ctx)
+			return ((ntfs_inode*)NULL);
+
+		if (!ntfs_attr_lookup(AT_FILE_NAME, AT_UNNAMED, 0,
+				CASE_SENSITIVE,	0, NULL, 0, ctx)) {
+			/* We know this will always be resident. */
+			fn = (FILE_NAME_ATTR*)((u8*)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
+			inum = le64_to_cpu(fn->parent_directory);
+			if (inum != (u64)-1) {
+				dir_ni = ntfs_inode_open(ni->vol, MREF(inum));
+			}
+		}
+		ntfs_attr_put_search_ctx(ctx);
+	}
+	return (dir_ni);
+}
+
 #ifdef HAVE_SETXATTR
 
 #define MAX_DOS_NAME_LENGTH	 12

@@ -104,6 +104,8 @@ typedef int (*ntfs_filldir_t)(void *dirent, const ntfschar *name,
 extern int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 		void *dirent, ntfs_filldir_t filldir);
 
+ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni);
+
 int ntfs_get_ntfs_dos_name(const char *path,
 			char *value, size_t size, ntfs_inode *ni);
 int ntfs_set_ntfs_dos_name(const char *path,

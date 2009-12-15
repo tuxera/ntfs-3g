@@ -165,6 +165,7 @@ typedef struct {
 	BOOL inherit;
 	unsigned int secure_flags;
 	char *usermap_path;
+	char *abs_mnt_point;
 	struct PERMISSIONS_CACHE *seccache;
 	struct SECURITY_CONTEXT security;
 } ntfs_fuse_context_t;
@@ -689,7 +690,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			int attr_size;
 
 			errno = 0;
-			target = ntfs_make_symlink(org_path, ni, &attr_size);
+			target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
 				/*
 				 * If the reparse point is not a valid
 				 * directory junction, and there is no error
@@ -870,7 +871,7 @@ static int ntfs_fuse_readlink(const char *org_path, char *buf, size_t buf_size)
 
 		errno = 0;
 		res = 0;
-		target = ntfs_make_symlink(org_path, ni, &attr_size);
+		target = ntfs_make_symlink(ni, ctx->abs_mnt_point, &attr_size);
 		if (target) {
 			strncpy(buf,target,buf_size);
 			free(target);
@@ -4105,6 +4106,24 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 	
+			/* need absolute mount point for junctions */
+	if (opts.mnt_point[0] == '/')
+		ctx->abs_mnt_point = strdup(opts.mnt_point);
+	else {
+		ctx->abs_mnt_point = (char*)ntfs_malloc(PATH_MAX);
+		if (ctx->abs_mnt_point) {
+			if (getcwd(ctx->abs_mnt_point,
+				     PATH_MAX - strlen(opts.mnt_point) - 1)) {
+				strcat(ctx->abs_mnt_point, "/");
+				strcat(ctx->abs_mnt_point, opts.mnt_point);
+			}
+		}
+	}
+	if (!ctx->abs_mnt_point) {
+		err = NTFS_VOLUME_OUT_OF_MEMORY;
+		goto err_out;
+	}
+
 	ctx->security.uid = 0;
 	ctx->security.gid = 0;
 	if ((opts.mnt_point[0] == '/')
@@ -4227,6 +4246,8 @@ int main(int argc, char *argv[])
 	fuse_destroy(fh);
 err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);
+	if (ctx->abs_mnt_point)
+		free(ctx->abs_mnt_point);
 err2:
 	ntfs_close();
 	free(ctx);
