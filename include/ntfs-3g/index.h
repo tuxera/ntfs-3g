@@ -63,6 +63,9 @@
 
 #define  MAX_PARENT_VCN		32
 
+typedef int (*COLLATE)(ntfs_volume *vol, const void *data1, int len1,
+					 const void *data2, int len2);
+
 /**
  * struct ntfs_index_context -
  * @ni:			inode containing the @entry described by this context
@@ -116,7 +119,7 @@ typedef struct {
 	INDEX_ENTRY *entry;
 	void *data;
 	u16 data_len;
-	COLLATION_RULES cr;
+	COLLATE collate;
 	BOOL is_in_root;
 	INDEX_ROOT *ir;
 	ntfs_attr_search_ctx *actx;

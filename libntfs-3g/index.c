@@ -38,9 +38,9 @@
 #endif
 
 #include "attrib.h"
-#include "collate.h"
 #include "debug.h"
 #include "index.h"
+#include "collate.h"
 #include "mst.h"
 #include "dir.h"
 #include "logging.h"
@@ -517,8 +517,13 @@ static int ntfs_ie_lookup(const void *key, const int key_len,
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
 		 */
-		rc = ntfs_collate(icx->ni->vol, icx->cr, key, key_len, &ie->key,
-				  le16_to_cpu(ie->key_length));
+		if (!icx->collate) {
+			ntfs_log_error("Collation function not defined\n");
+			errno = EOPNOTSUPP;
+			return STATUS_ERROR;
+		}
+		rc = icx->collate(icx->ni->vol, key, key_len,
+					&ie->key, le16_to_cpu(ie->key_length));
 		if (rc == NTFS_COLLATION_ERROR) {
 			ntfs_log_error("Collation error. Perhaps a filename "
 				       "contains invalid characters?\n");
@@ -697,12 +702,12 @@ int ntfs_index_lookup(const void *key, const int key_len, ntfs_index_context *ic
 		icx->vcn_size_bits = ni->vol->cluster_size_bits;
 	else
 		icx->vcn_size_bits = ni->vol->sector_size_bits;
-		
-	icx->cr = ir->collation_rule;
-	if (!ntfs_is_collation_rule_supported(icx->cr)) {
+			/* get the appropriate collation function */
+	icx->collate = ntfs_get_collate_function(ir->collation_rule);
+	if (!icx->collate) {
 		err = errno = EOPNOTSUPP;
 		ntfs_log_perror("Unknown collation rule 0x%x", 
-				(unsigned)le32_to_cpu(icx->cr));
+				(unsigned)le32_to_cpu(ir->collation_rule));
 		goto err_out;
 	}
 	
