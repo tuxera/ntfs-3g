@@ -30,9 +30,9 @@ extern BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
 		const ntfschar *s2, size_t s2_len, const IGNORE_CASE_BOOL ic,
 		const ntfschar *upcase, const u32 upcase_size);
 
-extern int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
+extern int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
-		const int err_val, const IGNORE_CASE_BOOL ic,
+		const IGNORE_CASE_BOOL ic,
 		const ntfschar *upcase, const u32 upcase_len);
 
 extern int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n);

@@ -2184,38 +2184,24 @@ static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				errno = ENOENT;
 				return -1;
 			}
-		} else if (name && !ntfs_names_are_equal(name, name_len,
-			    (ntfschar*)((char*)a + le16_to_cpu(a->name_offset)),
-			    a->name_length, ic, upcase, upcase_len)) {
+		} else {
 			register int rc;
-
-			rc = ntfs_names_collate(name, name_len,
-					(ntfschar*)((char*)a +
-					le16_to_cpu(a->name_offset)),
-					a->name_length, 1, IGNORE_CASE,
-					upcase, upcase_len);
-			/*
-			 * If @name collates before a->name, there is no
-			 * matching attribute.
-			 */
-			if (rc == -1) {
-				errno = ENOENT;
-				return -1;
-			}
+			if (name && ((rc = ntfs_names_full_collate(name,
+					name_len, (ntfschar*)((char*)a +
+						le16_to_cpu(a->name_offset)),
+					a->name_length, ic,
+					upcase, upcase_len)))) {
+				/*
+				 * If @name collates before a->name,
+				 * there is no matching attribute.
+				 */
+				if (rc < 0) {
+					errno = ENOENT;
+					return -1;
+				}
 			/* If the strings are not equal, continue search. */
-			if (rc)
-				continue;
-			rc = ntfs_names_collate(name, name_len,
-					(ntfschar*)((char*)a +
-					le16_to_cpu(a->name_offset)),
-					a->name_length, 1, CASE_SENSITIVE,
-					upcase, upcase_len);
-			if (rc == -1) {
-				errno = ENOENT;
-				return -1;
+			continue;
 			}
-			if (rc)
-				continue;
 		}
 		/*
 		 * The names match or @name not present and attribute is
@@ -2495,38 +2481,22 @@ find_attr_list_attr:
 		if (name == AT_UNNAMED) {
 			if (al_name_len)
 				goto not_found;
-		} else if (name && !ntfs_names_are_equal(al_name, al_name_len,
-				name, name_len, ic, vol->upcase,
-				vol->upcase_len)) {
-			register int rc;
+		} else {
+			int rc;
 
-			rc = ntfs_names_collate(name, name_len, al_name,
-					al_name_len, 1, IGNORE_CASE,
-					vol->upcase, vol->upcase_len);
-			/*
-			 * If @name collates before al_name, there is no
-			 * matching attribute.
-			 */
-			if (rc == -1)
-				goto not_found;
-			/* If the strings are not equal, continue search. */
-			if (rc)
+			if (name && ((rc = ntfs_names_full_collate(name,
+					name_len, al_name, al_name_len, ic,
+					vol->upcase, vol->upcase_len)))) {
+
+				/*
+				 * If @name collates before al_name,
+				 * there is no matching attribute.
+				 */
+				if (rc < 0)
+					goto not_found;
+				/* If the strings are not equal, continue search. */
 				continue;
-			/*
-			 * FIXME: Reverse engineering showed 0, IGNORE_CASE but
-			 * that is inconsistent with ntfs_attr_find(). The
-			 * subsequent rc checks were also different. Perhaps I
-			 * made a mistake in one of the two. Need to recheck
-			 * which is correct or at least see what is going
-			 * on... (AIA)
-			 */
-			rc = ntfs_names_collate(name, name_len, al_name,
-					al_name_len, 1, CASE_SENSITIVE,
-					vol->upcase, vol->upcase_len);
-			if (rc == -1)
-				goto not_found;
-			if (rc)
-				continue;
+			}
 		}
 		/*
 		 * The names match or @name not present and attribute is

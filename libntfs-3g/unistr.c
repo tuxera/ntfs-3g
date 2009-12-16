@@ -132,37 +132,30 @@ BOOL ntfs_names_are_equal(const ntfschar *s1, size_t s1_len,
 								       TRUE;
 }
 
-/**
- * ntfs_names_collate - collate two Unicode names
+/*
+ * ntfs_names_full_collate() fully collate two Unicode names
+ *
  * @name1:	first Unicode name to compare
  * @name1_len:	length of first Unicode name to compare
  * @name2:	second Unicode name to compare
  * @name2_len:	length of second Unicode name to compare
- * @err_val:	if @name1 contains an invalid character return this value
  * @ic:		either CASE_SENSITIVE or IGNORE_CASE
  * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
  * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
  *
- * ntfs_names_collate() collates two Unicode names and returns:
- *
  *  -1 if the first name collates before the second one,
  *   0 if the names match,
  *   1 if the second name collates before the first one, or
- * @err_val if an invalid character is found in @name1 during the comparison.
  *
- * The following characters are considered invalid: '"', '*', '<', '>' and '?'.
- *
- * A few optimizations made by JPA
  */
-
-int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
+int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *name2, const u32 name2_len,
-		const int err_val __attribute__((unused)),
 		const IGNORE_CASE_BOOL ic, const ntfschar *upcase,
 		const u32 upcase_len)
 {
 	u32 cnt;
 	u16 c1, c2;
+	u16 u1, u2;
 
 #ifdef DEBUG
 	if (!name1 || !name2 || (ic && (!upcase || !upcase_len))) {
@@ -171,38 +164,70 @@ int ntfs_names_collate(const ntfschar *name1, const u32 name1_len,
 	}
 #endif
 	cnt = min(name1_len, name2_len);
-		/* JPA average loop count is 8 */
 	if (cnt > 0) {
-		if (ic)
-				/* JPA this loop in 76% cases */
+		if (ic == CASE_SENSITIVE) {
 			do {
 				c1 = le16_to_cpu(*name1);
 				name1++;
 				c2 = le16_to_cpu(*name2);
 				name2++;
-				if (c1 < upcase_len)
-					c1 = le16_to_cpu(upcase[c1]);
-				if (c2 < upcase_len)
-					c2 = le16_to_cpu(upcase[c2]);
-			} while ((c1 == c2) && --cnt);
-		else
+			} while (--cnt && (c1 == c2));
+			u1 = c1;
+			u2 = c2;
+			if (u1 < upcase_len)
+				u1 = le16_to_cpu(upcase[u1]);
+			if (u2 < upcase_len)
+				u2 = le16_to_cpu(upcase[u2]);
+			if ((u1 == u2) && cnt)
+				do {
+					u1 = le16_to_cpu(*name1);
+					name1++;
+					u2 = le16_to_cpu(*name2);
+					name2++;
+					if (u1 < upcase_len)
+						u1 = le16_to_cpu(upcase[u1]);
+					if (u2 < upcase_len)
+						u2 = le16_to_cpu(upcase[u2]);
+				} while ((u1 == u2) && --cnt);
+			if (u1 < u2)
+				return -1;
+			if (u1 > u2)
+				return 1;
+			if (name1_len < name2_len)
+				return -1;
+			if (name1_len > name2_len)
+				return 1;
+			if (c1 < c2)
+				return -1;
+			if (c1 > c2)
+				return 1;
+		} else {
 			do {
-				/* JPA this loop in 24% cases */
-				c1 = le16_to_cpu(*name1);
+				u1 = c1 = le16_to_cpu(*name1);
 				name1++;
-				c2 = le16_to_cpu(*name2);
+				u2 = c2 = le16_to_cpu(*name2);
 				name2++;
-			} while ((c1 == c2) && --cnt);
-		if (c1 < c2)
+				if (u1 < upcase_len)
+					u1 = le16_to_cpu(upcase[u1]);
+				if (u2 < upcase_len)
+					u2 = le16_to_cpu(upcase[u2]);
+			} while ((u1 == u2) && --cnt);
+			if (u1 < u2)
+				return -1;
+			if (u1 > u2)
+				return 1;
+			if (name1_len < name2_len)
+				return -1;
+			if (name1_len > name2_len)
+				return 1;
+		}
+	} else {
+		if (name1_len < name2_len)
 			return -1;
-		if (c1 > c2)
+		if (name1_len > name2_len)
 			return 1;
 	}
-	if (name1_len < name2_len)
-		return -1;
-	if (name1_len == name2_len)
-		return 0;
-	return 1;
+	return 0;
 }
 
 /**
@@ -379,31 +404,6 @@ void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 {
 	ntfs_name_upcase((ntfschar*)&file_name_attr->file_name,
 			file_name_attr->file_name_length, upcase, upcase_len);
-}
-
-/**
- * ntfs_file_values_compare - Which of two filenames should be listed first
- * @file_name_attr1:
- * @file_name_attr2:
- * @err_val:
- * @ic:
- * @upcase:
- * @upcase_len:
- *
- * Description...
- *
- * Returns:
- */
-int ntfs_file_values_compare(const FILE_NAME_ATTR *file_name_attr1,
-		const FILE_NAME_ATTR *file_name_attr2,
-		const int err_val, const IGNORE_CASE_BOOL ic,
-		const ntfschar *upcase, const u32 upcase_len)
-{
-	return ntfs_names_collate((ntfschar*)&file_name_attr1->file_name,
-			file_name_attr1->file_name_length,
-			(ntfschar*)&file_name_attr2->file_name,
-			file_name_attr2->file_name_length,
-			err_val, ic, upcase, upcase_len);
 }
 
 /*

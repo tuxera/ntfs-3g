@@ -188,10 +188,10 @@ static u64 ntfs_fix_file_name(ntfs_inode *dir_ni, ntfschar *uname,
 		if (entry) {
 			found = &entry->key.file_name;
 			if (lkup
-			   && !ntfs_names_collate(find.attr.file_name,
+			   && ntfs_names_are_equal(find.attr.file_name,
 				find.attr.file_name_length,
 				found->file_name, found->file_name_length,
-				1, IGNORE_CASE,
+				IGNORE_CASE,
 				vol->upcase, vol->upcase_len))
 					lkup = 0;
 			if (!lkup) {

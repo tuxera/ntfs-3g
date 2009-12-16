@@ -226,10 +226,10 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
 		 */
-		rc = ntfs_names_collate(uname, uname_len,
+		rc = ntfs_names_full_collate(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
-				ie->key.file_name.file_name_length, 1,
-				IGNORE_CASE, vol->upcase, vol->upcase_len);
+				ie->key.file_name.file_name_length,
+				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		/*
 		 * If uname collates before the name of the current entry, there
 		 * is definitely no such name in this index but we might need to
@@ -238,19 +238,6 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		if (rc == -1)
 			break;
 		/* The names are not equal, continue the search. */
-		if (rc)
-			continue;
-		/*
-		 * Names match with case insensitive comparison, now try the
-		 * case sensitive comparison, which is required for proper
-		 * collation.
-		 */
-		rc = ntfs_names_collate(uname, uname_len,
-				(ntfschar*)&ie->key.file_name.file_name,
-				ie->key.file_name.file_name_length, 1,
-				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
-		if (rc == -1)
-			break;
 		if (rc)
 			continue;
 		/*
@@ -381,10 +368,10 @@ descend_into_child_node:
 		 * Not a perfect match, need to do full blown collation so we
 		 * know which way in the B+tree we have to go.
 		 */
-		rc = ntfs_names_collate(uname, uname_len,
+		rc = ntfs_names_full_collate(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
-				ie->key.file_name.file_name_length, 1,
-				IGNORE_CASE, vol->upcase, vol->upcase_len);
+				ie->key.file_name.file_name_length,
+				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		/*
 		 * If uname collates before the name of the current entry, there
 		 * is definitely no such name in this index but we might need to
@@ -395,20 +382,6 @@ descend_into_child_node:
 		/* The names are not equal, continue the search. */
 		if (rc)
 			continue;
-		/*
-		 * Names match with case insensitive comparison, now try the
-		 * case sensitive comparison, which is required for proper
-		 * collation.
-		 */
-		rc = ntfs_names_collate(uname, uname_len,
-				(ntfschar*)&ie->key.file_name.file_name,
-				ie->key.file_name.file_name_length, 1,
-				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
-		if (rc == -1)
-			break;
-		if (rc)
-			continue;
-		
 		mref = le64_to_cpu(ie->indexed_file);
 		free(ia);
 		ntfs_attr_close(ia_na);

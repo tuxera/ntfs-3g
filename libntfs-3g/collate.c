@@ -228,15 +228,19 @@ static int ntfs_collate_file_name(ntfs_volume *vol,
 		const void *data1, const int data1_len __attribute__((unused)),
 		const void *data2, const int data2_len __attribute__((unused)))
 {
+	const FILE_NAME_ATTR *file_name_attr1;
+	const FILE_NAME_ATTR *file_name_attr2;
 	int rc;
 
 	ntfs_log_trace("Entering.\n");
-	rc = ntfs_file_values_compare(data1, data2, NTFS_COLLATION_ERROR,
-			IGNORE_CASE, vol->upcase, vol->upcase_len);
-	if (!rc)
-		rc = ntfs_file_values_compare(data1, data2,
-				NTFS_COLLATION_ERROR, CASE_SENSITIVE,
-				vol->upcase, vol->upcase_len);
+	file_name_attr1 = (const FILE_NAME_ATTR*)data1;
+	file_name_attr2 = (const FILE_NAME_ATTR*)data2;
+	rc = ntfs_names_full_collate(
+			(ntfschar*)&file_name_attr1->file_name,
+			file_name_attr1->file_name_length,
+			(ntfschar*)&file_name_attr2->file_name,
+			file_name_attr2->file_name_length,
+			CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 	ntfs_log_trace("Done, returning %i.\n", rc);
 	return rc;
 }
