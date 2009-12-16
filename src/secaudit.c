@@ -158,6 +158,9 @@
  *
  *  Dec 2009, version 1.3.12
  *     - worked around "const" possibly redefined in config.h
+ *
+ *  Dec 2009, version 1.3.13
+ *     - fixed the return code of dorestore()
  */
 
 /*
@@ -181,7 +184,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.12"
+#define AUDT_VERSION "1.3.13"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2673,10 +2676,11 @@ BOOL dorestore(const char *volume, FILE *fd)
 {
 	BOOL err;
 
+	err = FALSE;
 	if (!getuid()) {
  		if (open_security_api()) {
 			if (open_volume(volume,MS_NONE)) {
-				if (!restore(fd)) err = TRUE;
+				if (restore(fd)) err = TRUE;
 				close_volume(volume);
 			} else {
 				fprintf(stderr,"Could not open volume %s\n",volume);
@@ -2693,7 +2697,7 @@ BOOL dorestore(const char *volume, FILE *fd)
 		fprintf(stderr,"Restore is only possible as root\n");
 		err = TRUE;
 	}
-	return (!err);
+	return (err);
 }
 #endif /* WIN32 */
 
@@ -7033,7 +7037,7 @@ int main(int argc, char *argv[])
 				if (opt_s) {
 					fd = fopen(argv[xarg+1],"rb");
 					if (fd) {
-						if (!dorestore(argv[xarg],fd))
+						if (dorestore(argv[xarg],fd))
 							cmderr = TRUE;
 						fclose(fd);
 					} else { 
