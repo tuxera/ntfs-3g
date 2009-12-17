@@ -44,6 +44,7 @@
 #include <sys/sysmacros.h>
 #endif
 
+#include "param.h"
 #include "types.h"
 #include "debug.h"
 #include "attrib.h"

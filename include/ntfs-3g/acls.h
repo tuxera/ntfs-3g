@@ -29,8 +29,6 @@
  *	should be moved to some config file
  */
 
-#define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
-#define OWNERFROMACL 1		/* Get the owner from ACL (not Windows owner) */
 #define BUFSZ 1024		/* buffer size to read mapping file */
 #define MAPPINGFILE ".NTFS-3G/UserMapping" /* default mapping file */
 #define LINESZ 120              /* maximum useful size of a mapping line */

@@ -52,6 +52,7 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include "param.h"
 #include "types.h"
 #include "layout.h"
 #include "attrib.h"

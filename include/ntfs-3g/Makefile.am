@@ -27,6 +27,7 @@ headers = \
 	mst.h		\
 	ntfstime.h	\
 	object_id.h	\
+	param.h		\
 	reparse.h	\
 	runlist.h	\
 	security.h	\
