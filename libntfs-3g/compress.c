@@ -1185,7 +1185,8 @@ static int ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
 		   && ntfs_compress_free(na,rl,offs + written,
 				offs + na->compression_block_size))
 			written = -1;
-	}
+	} else
+		written = 0;
 	if (!compress) {
 		clsz = 1 << na->ni->vol->cluster_size_bits;
 		rounded = ((count - 1) | (clsz - 1)) + 1;
