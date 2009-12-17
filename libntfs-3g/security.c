@@ -61,6 +61,7 @@
 #include "bitmap.h"
 #include "security.h"
 #include "acls.h"
+#include "cache.h"
 #include "misc.h"
 
 /*
@@ -2655,7 +2656,7 @@ int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 					+ (pxdesc->acccnt + pxdesc->defcnt)*sizeof(struct POSIX_ACE);
 				ntfs_invalidate_cache(scx->vol->legacy_cache,
 						GENERIC(&legacy),
-						(cache_compare)leg_compare);
+						(cache_compare)leg_compare,0);
 			}
 #endif
 			free(newattr);
@@ -2853,7 +2854,7 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 #endif
 					ntfs_invalidate_cache(scx->vol->legacy_cache,
 						GENERIC(&legacy),
-						(cache_compare)leg_compare);
+						(cache_compare)leg_compare,0);
 				}
 #endif
 			}
@@ -3099,7 +3100,7 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 				legacy.varsize = 0;
 				ntfs_invalidate_cache(scx->vol->legacy_cache,
 					GENERIC(&legacy),
-					(cache_compare)leg_compare);
+					(cache_compare)leg_compare,0);
 			}
 #endif
 			free(attr);

@@ -23,6 +23,7 @@ libntfs_3g_la_SOURCES =	\
 	attrlist.c 	\
 	bitmap.c 	\
 	bootsect.c 	\
+	cache.c 	\
 	collate.c 	\
 	compat.c 	\
 	compress.c 	\

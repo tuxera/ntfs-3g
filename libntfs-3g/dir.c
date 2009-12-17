@@ -56,6 +56,7 @@
 #include "ntfstime.h"
 #include "lcnalloc.h"
 #include "logging.h"
+#include "cache.h"
 #include "misc.h"
 #include "security.h"
 #include "reparse.h"
@@ -88,6 +89,29 @@ ntfschar NTFS_INDEX_R[3] = { const_cpu_to_le16('$'), const_cpu_to_le16('R'),
 #if CACHE_INODE_SIZE
 
 /*
+ *		Pathname hashing
+ *
+ *	Based on first char and second char (which may be '\0')
+ */
+
+int ntfs_dir_inode_hash(const struct CACHED_GENERIC *cached)
+{
+	const char *path;
+	const unsigned char *name;
+
+	path = (const char*)cached->variable;
+	if (!path) {
+		ntfs_log_error("Bad inode cache entry\n");
+		return (-1);
+	}
+	name = (const unsigned char*)strrchr(path,'/');
+	if (!name)
+		name = (const unsigned char*)path;
+	return (((name[0] << 1) + name[1] + strlen((const char*)name))
+				% (2*CACHE_INODE_SIZE));
+}
+
+/*
  *		Pathname comparing for entering/fetching from cache
  */
 
@@ -105,21 +129,31 @@ static int inode_cache_compare(const struct CACHED_GENERIC *cached,
  *	related to a renamed directory
  *	inode numbers are also checked, as deleting a long name may
  *	imply deleting a short name and conversely
+ *
+ *	Only use associated with a CACHE_NOHASH flag
  */
 
 static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 			const struct CACHED_GENERIC *wanted)
 {
 	int len;
+	BOOL different;
+	const struct CACHED_INODE *w;
+	const struct CACHED_INODE *c;
 
-	len = strlen(wanted->variable);
-	return (!cached->variable
-		|| ((((const struct CACHED_INODE*)wanted)->inum
-		         != MREF(((const struct CACHED_INODE*)cached)->inum))
-		   && (strncmp((const char*)cached->variable,
-				(const char*)wanted->variable,len)
-			|| ((((const char*)cached->variable)[len] != '\0')
-			   && (((const char*)cached->variable)[len] != '/')))));
+	w = (const struct CACHED_INODE*)wanted;
+	c = (const struct CACHED_INODE*)cached;
+	if (w->pathname) {
+		len = strlen(w->pathname);
+		different = !cached->variable
+			|| ((w->inum != MREF(c->inum))
+			   && (strncmp(c->pathname, w->pathname, len)
+				|| ((c->pathname[len] != '\0')
+				   && (c->pathname[len] != '/'))));
+	} else
+		different = !c->pathname
+			|| (w->inum != MREF(c->inum));
+	return (different);
 }
 
 #endif
@@ -1628,6 +1662,26 @@ search:
 	 */
 #if CACHE_INODE_SIZE
 	inum = ni->mft_no;
+	if (pathname) {
+			/* invalide cache entry, even if there was an error */
+		/* Remove leading /'s. */
+		p = pathname;
+		while (*p == PATH_SEP)
+			p++;
+		if (p[0] && (p[strlen(p)-1] == PATH_SEP))
+			ntfs_log_error("Unnormalized path %s\n",pathname);
+		item.pathname = p;
+		item.varsize = strlen(p);
+	} else {
+		item.pathname = (const char*)NULL;
+		item.varsize = 0;
+	}
+	item.inum = inum;
+	count = ntfs_invalidate_cache(vol->xinode_cache, GENERIC(&item),
+				inode_cache_inv_compare, CACHE_NOHASH);
+	if (pathname && !count)
+		ntfs_log_error("Could not delete inode cache entry for %s\n",
+			pathname);
 #endif
 	if (ni->mrec->link_count) {
 		ntfs_inode_update_times(ni, NTFS_UPDATE_CTIME);
@@ -1698,24 +1752,6 @@ out:
 		err = errno;
 	if (ntfs_inode_close(ni) && !err)
 		err = errno;
-#if CACHE_INODE_SIZE
-	if (pathname) {
-			/* invalide cache entry, even if there was an error */
-		/* Remove leading /'s. */
-		p = pathname;
-		while (*p == PATH_SEP)
-			p++;
-		if (p[0] && (p[strlen(p)-1] == PATH_SEP))
-			ntfs_log_error("Unnormalized path %s\n",pathname);
-		item.pathname = p;
-		item.inum = inum;
-		count = ntfs_invalidate_cache(vol->xinode_cache, GENERIC(&item),
-					inode_cache_inv_compare);
-		if (!count)
-			ntfs_log_error("Could not delete inode cache entry for %s\n",
-				pathname);
-	}
-#endif
 	if (err) {
 		errno = err;
 		ntfs_log_debug("Could not delete file: %s\n", strerror(errno));

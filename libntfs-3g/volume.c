@@ -65,6 +65,7 @@
 #include "logfile.h"
 #include "dir.h"
 #include "logging.h"
+#include "cache.h"
 #include "misc.h"
 
 const char *ntfs_home = 

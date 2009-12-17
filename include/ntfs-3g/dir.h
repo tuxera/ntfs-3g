@@ -112,5 +112,14 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 			const char *value, size_t size,	int flags);
 int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni);
 
+#if CACHE_INODE_SIZE
+
+struct CACHED_GENERIC;
+
+extern int ntfs_dir_inode_hash(const struct CACHED_GENERIC *cached);
+extern int ntfs_dir_lookup_hash(const struct CACHED_GENERIC *cached);
+
+#endif
+
 #endif /* defined _NTFS_DIR_H */
 

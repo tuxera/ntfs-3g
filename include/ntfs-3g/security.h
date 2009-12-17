@@ -79,6 +79,7 @@ struct CACHED_PERMISSIONS {
 
 struct CACHED_PERMISSIONS_LEGACY {
 	struct CACHED_PERMISSIONS_LEGACY *next;
+	struct CACHED_PERMISSIONS_LEGACY *previous;
 	void *variable;
 	size_t varsize;
 		/* above fields must match "struct CACHED_GENERIC" */
@@ -92,6 +93,7 @@ struct CACHED_PERMISSIONS_LEGACY {
 
 struct CACHED_SECURID {
 	struct CACHED_SECURID *next;
+	struct CACHED_SECURID *previous;
 	void *variable;
 	size_t varsize;
 		/* above fields must match "struct CACHED_GENERIC" */
