@@ -1239,8 +1239,7 @@ int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *attr)
  *		-errno if failed
  */
 
-int ntfs_inode_get_times(const char *path __attribute__((unused)),
-			char *value, size_t size, ntfs_inode *ni)
+int ntfs_inode_get_times(ntfs_inode *ni, char *value, size_t size)
 {
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;
@@ -1298,9 +1297,8 @@ int ntfs_inode_get_times(const char *path __attribute__((unused)),
  *		-1 if there were an error (described by errno)
  */
 
-int ntfs_inode_set_times(const char *path __attribute__((unused)),
-			const char *value, size_t size,
-			int flags, ntfs_inode *ni)
+int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
+			int flags)
 {
 	ntfs_attr_search_ctx *ctx;
 	STANDARD_INFORMATION *std_info;

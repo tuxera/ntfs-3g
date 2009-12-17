@@ -106,12 +106,11 @@ extern int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 
 ntfs_inode *ntfs_dir_parent_inode(ntfs_inode *ni);
 
-int ntfs_get_ntfs_dos_name(const char *path,
-			char *value, size_t size, ntfs_inode *ni);
-int ntfs_set_ntfs_dos_name(const char *path,
-			const char *value, size_t size,	int flags,
-			ntfs_inode *ni);
-int ntfs_remove_ntfs_dos_name(const char *path, ntfs_inode *ni);
+int ntfs_get_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
+			char *value, size_t size);
+int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
+			const char *value, size_t size,	int flags);
+int ntfs_remove_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni);
 
 #endif /* defined _NTFS_DIR_H */
 

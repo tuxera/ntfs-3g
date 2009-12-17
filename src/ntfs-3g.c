@@ -2653,6 +2653,83 @@ exit:
 	return ret;
 }
 
+static __inline__ int ntfs_system_getxattr(struct SECURITY_CONTEXT *scx,
+			const char *path, int attr, ntfs_inode *ni,
+			char *value, size_t size)
+{
+	int res;
+	ntfs_inode *dir_ni;
+	char *dirpath;
+	char *p;
+				/*
+				 * the returned value is the needed
+				 * size. If it is too small, no copy
+				 * is done, and the caller has to
+				 * issue a new call with correct size.
+				 */
+	switch (attr) {
+	case XATTR_NTFS_ACL :
+		res = ntfs_get_ntfs_acl(scx, ni, value, size);
+		break;
+#if POSIXACLS
+	case XATTR_POSIX_ACC :
+		res = ntfs_get_posix_acl(scx, ni, nf_ns_xattr_posix_access,
+					value, size);
+		break;
+	case XATTR_POSIX_DEF :
+		res = ntfs_get_posix_acl(scx, ni, nf_ns_xattr_posix_default,
+					value, size);
+		break;
+#endif
+	case XATTR_NTFS_ATTRIB :
+		res = ntfs_get_ntfs_attrib(ni, value, size);
+		break;
+	case XATTR_NTFS_EFSINFO :
+		if (ctx->efs_raw)
+			res = ntfs_get_efs_info(ni, value, size);
+		else
+			res = -EPERM;
+		break;
+	case XATTR_NTFS_REPARSE_DATA :
+		res = ntfs_get_ntfs_reparse_data(ni, value, size);
+		break;
+	case XATTR_NTFS_DOS_NAME:
+		res = 0;
+		dirpath = strdup(path);
+		if (dirpath) {
+			p = strrchr(dirpath,'/'); /* always present */
+			*p = 0;
+			dir_ni = ntfs_pathname_to_inode(ni->vol,
+						NULL, dirpath);
+			if (dir_ni) {
+				res = ntfs_get_ntfs_dos_name(ni,
+						dir_ni, value, size);
+				if (ntfs_inode_close(dir_ni))
+						set_fuse_error(&res);
+			} else
+				res = -errno;
+			free(dirpath);
+		} else
+			res = -ENOMEM;
+		if (res < 0)
+			errno = -res;
+		break;
+	case XATTR_NTFS_TIMES:
+		res = ntfs_inode_get_times(ni, value, size);
+		break;
+	default :
+			/*
+			 * make sure applications do not see
+			 * Posix ACL not consistent with mode
+			 */
+		errno = EOPNOTSUPP;
+		res = -errno;
+		break;
+	}
+	return (res);
+}
+
+
 static int ntfs_fuse_getxattr(const char *path, const char *name,
 				char *value, size_t size)
 {
@@ -2676,54 +2753,8 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		ni = ntfs_check_access_xattr(&security, path, attr, FALSE);
 		if (ni) {
 			if (ntfs_allowed_access(&security,ni,S_IREAD)) {
-				/*
-				 * the returned value is the needed
-				 * size. If it is too small, no copy
-				 * is done, and the caller has to
-				 * issue a new call with correct size.
-				 */
-				switch (attr) {
-				case XATTR_NTFS_ACL :
-					res = ntfs_get_ntfs_acl(&security, ni,
-						value, size);
-					break;
-				case XATTR_POSIX_ACC :
-				case XATTR_POSIX_DEF :
-					res = ntfs_get_posix_acl(&security, ni,
-						name, value, size);
-					break;
-				case XATTR_NTFS_ATTRIB :
-					res = ntfs_get_ntfs_attrib(ni,
-						value, size);
-					break;
-				case XATTR_NTFS_EFSINFO :
-					if (ctx->efs_raw)
-						res = ntfs_get_efs_info(path,
-							value,size,ni);
-					else
-						res = -EPERM;
-					break;
-				case XATTR_NTFS_REPARSE_DATA :
-					res = ntfs_get_ntfs_reparse_data(path,
-						value,size,ni);
-					break;
-				case XATTR_NTFS_DOS_NAME:
-					res = ntfs_get_ntfs_dos_name(path,
-						value,size,ni);
-					break;
-				case XATTR_NTFS_TIMES:
-					res = ntfs_inode_get_times(path,
-						value,size,ni);
-					break;
-				default :
-					/*
-					 * make sure applications do not see
-					 * Posix ACL not consistent with mode
-					 */
-					errno = EOPNOTSUPP;
-					res = -errno;
-					break;
-				}
+				res = ntfs_system_getxattr(&security,
+					path, attr, ni, value, size);
 			} else {
 				res = -errno;
                         }
@@ -2744,49 +2775,8 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 			if (ni) {
 					/* user mapping not mandatory */
 				ntfs_fuse_fill_security_context(&security);
-				/*
-				 * the returned value is the needed
-				 * size. If it is too small, no copy
-				 * is done, and the caller has to
-				 * issue a new call with correct size.
-				 */
-				switch (attr) {
-				case XATTR_NTFS_ACL :
-					res = ntfs_get_ntfs_acl(&security, ni,
-						value, size);
-					break;
-				case XATTR_NTFS_ATTRIB :
-					res = ntfs_get_ntfs_attrib(ni,
-						value, size);
-					break;
-				case XATTR_NTFS_EFSINFO :
-					if (ctx->efs_raw)
-						res = ntfs_get_efs_info(path,
-							value,size,ni);
-					else
-						res = -EPERM;
-					break;
-				case XATTR_NTFS_REPARSE_DATA :
-					res = ntfs_get_ntfs_reparse_data(path,
-						value,size,ni);
-					break;
-				case XATTR_NTFS_DOS_NAME:
-					res = ntfs_get_ntfs_dos_name(path,
-						value,size,ni);
-					break;
-				case XATTR_NTFS_TIMES:
-					res = ntfs_inode_get_times(path,
-						value,size,ni);
-					break;
-				default :
-					/*
-					 * make sure applications do not see
-					 * Posix ACL not consistent with mode
-					 */
-					errno = EOPNOTSUPP;
-					res = -errno;
-					break;
-				}
+				res = ntfs_system_getxattr(&security,
+					path, attr, ni, value, size);
 				if (ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			} else
@@ -2857,6 +2847,77 @@ exit:
 	return res;
 }
 
+static __inline__ int ntfs_system_setxattr(struct SECURITY_CONTEXT *scx,
+			const char *path, int attr, ntfs_inode *ni,
+			const char *value, size_t size, int flags)
+{
+	int res;
+	char *dirpath;
+	char *p;
+	ntfs_inode *dir_ni;
+
+	switch (attr) {
+	case XATTR_NTFS_ACL :
+		res = ntfs_set_ntfs_acl(scx, ni, value, size, flags);
+		break;
+#if POSIXACLS
+	case XATTR_POSIX_ACC :
+		res = ntfs_set_posix_acl(scx,ni, nf_ns_xattr_posix_access,
+					value, size, flags);
+		break;
+	case XATTR_POSIX_DEF :
+		res = ntfs_set_posix_acl(scx, ni, nf_ns_xattr_posix_default,
+					value, size, flags);
+		break;
+#endif
+	case XATTR_NTFS_ATTRIB :
+		res = ntfs_set_ntfs_attrib(ni, value, size, flags);
+		break;
+	case XATTR_NTFS_EFSINFO :
+		if (ctx->efs_raw)
+			res = ntfs_set_efs_info(ni, value, size, flags);
+		else
+			res = -EPERM;
+		break;
+	case XATTR_NTFS_REPARSE_DATA :
+		res = ntfs_set_ntfs_reparse_data(ni, value, size, flags);
+		break;
+	case XATTR_NTFS_DOS_NAME:
+		res = 0;
+		dirpath = strdup(path);
+		if (dirpath) {
+			p = strrchr(dirpath,'/'); /* always present */
+			*p = 0;
+			dir_ni = ntfs_pathname_to_inode(ni->vol,
+						NULL, dirpath);
+			if (dir_ni)
+					/* warning : this closes both inodes */
+				res = ntfs_set_ntfs_dos_name(ni, dir_ni,
+						value,size,flags);
+			else
+				res = -errno;
+			free(dirpath);
+		} else
+			res = -ENOMEM;
+		if (res < 0)
+			errno = -res;
+		break;
+	case XATTR_NTFS_TIMES:
+		res = ntfs_inode_set_times(ni, value, size, flags);
+		break;
+	default :
+				/*
+				 * make sure applications do not see
+				 * Posix ACL not consistent with mode
+				 */
+		errno = EOPNOTSUPP;
+		res = -errno;
+		break;
+	}
+	return (res);
+}
+
+
 static int ntfs_fuse_setxattr(const char *path, const char *name,
 				const char *value, size_t size, int flags)
 {
@@ -2881,49 +2942,8 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
 		if (ni) {
 			if (ntfs_allowed_as_owner(&security,ni)) {
-				switch (attr) {
-				case XATTR_NTFS_ACL :
-					res = ntfs_set_ntfs_acl(&security, ni,
-						value, size, flags);
-					break;
-				case XATTR_POSIX_ACC :
-				case XATTR_POSIX_DEF :
-					res = ntfs_set_posix_acl(&security, ni,
-						name, value, size, flags);
-					break;
-				case XATTR_NTFS_ATTRIB :
-					res = ntfs_set_ntfs_attrib(ni,
-						value, size, flags);
-					break;
-				case XATTR_NTFS_EFSINFO :
-					if (ctx->efs_raw)
-						res = ntfs_set_efs_info(path,
-							value,size,flags,ni);
-					else
-						res = -EPERM;
-					break;
-				case XATTR_NTFS_REPARSE_DATA :
-					res = ntfs_set_ntfs_reparse_data(path,
-						value,size,flags,ni);
-					break;
-				case XATTR_NTFS_DOS_NAME:
-					/* warning : this closes the inode */
-					res = ntfs_set_ntfs_dos_name(path,
-						value,size,flags,ni);
-					break;
-				case XATTR_NTFS_TIMES:
-					res = ntfs_inode_set_times(path,
-						value,size,flags,ni);
-					break;
-				default :
-					/*
-					 * make sure applications do not see
-					 * Posix ACL not consistent with mode
-					 */
-					errno = EOPNOTSUPP;
-					res = -errno;
-					break;
-				}
+				res = ntfs_system_setxattr(&security,
+					path, attr, ni, value, size, flags);
 				if (res)
 					res = -errno;
 			} else
@@ -2953,45 +2973,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 					 * if defined, only owner is allowed
 					 */
 				if (!ntfs_fuse_fill_security_context(&security)
-				   || ntfs_allowed_as_owner(&security, ni)) {
-					switch (attr) {
-					case XATTR_NTFS_ACL :
-						res = ntfs_set_ntfs_acl(&security, ni,
-							value, size, flags);
-						break;
-					case XATTR_NTFS_ATTRIB :
-						res = ntfs_set_ntfs_attrib(ni,
-							value, size, flags);
-						break;
-					case XATTR_NTFS_EFSINFO :
-						if (ctx->efs_raw)
-							res = ntfs_set_efs_info(path,
-								value,size,flags,ni);
-						else
-							res = -EPERM;
-						break;
-					case XATTR_NTFS_REPARSE_DATA :
-						res = ntfs_set_ntfs_reparse_data(path,
-							value,size,flags,ni);
-						break;
-					case XATTR_NTFS_DOS_NAME:
-					/* warning : this closes the inode */
-						res = ntfs_set_ntfs_dos_name(path,
-							value,size,flags,ni);
-						break;
-					case XATTR_NTFS_TIMES:
-						res = ntfs_inode_set_times(path,
-							value,size,flags,ni);
-						break;
-					default :
-						/*
-						 * make sure applications do not see
-						 * Posix ACL not consistent with mode
-						 */
-						errno = EOPNOTSUPP;
-						res = -errno;
-						break;
-					}
+				   || ntfs_allowed_as_owner(&security,ni)) {
+					res = ntfs_system_setxattr(&security,
+						path, attr, ni, value,
+						size, flags);
 					if (res)
 						res = -errno;
 				} else
@@ -3111,6 +3096,89 @@ exit:
 	return res;
 }
 
+static __inline__ int ntfs_system_removexattr(const char *path,
+			int attr)
+{
+	int res;
+	ntfs_inode *dir_ni;
+	ntfs_inode *ni;
+	char *dirpath;
+	char *p;
+	struct SECURITY_CONTEXT security;
+
+	res = 0;
+	switch (attr) {
+			/*
+			 * Removal of NTFS ACL, ATTRIB, EFSINFO or TIMES
+			 * is never allowed
+			 */
+	case XATTR_NTFS_ACL :
+	case XATTR_NTFS_ATTRIB :
+	case XATTR_NTFS_EFSINFO :
+	case XATTR_NTFS_TIMES :
+		res = -EPERM;
+		break;
+#if POSIXACLS
+	case XATTR_POSIX_ACC :
+	case XATTR_POSIX_DEF :
+		ni = ntfs_check_access_xattr(&security, path, attr, TRUE);
+		if (ni) {
+			if (!ntfs_allowed_as_owner(&security,ni)
+			   || ntfs_remove_posix_acl(&security,ni,
+					(attr == XATTR_POSIX_ACC ?
+					nf_ns_xattr_posix_access :
+					nf_ns_xattr_posix_default)))
+				res = -errno;
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
+		break;
+#endif
+	case XATTR_NTFS_REPARSE_DATA :
+		ni = ntfs_check_access_xattr(&security, path, attr, TRUE);
+		if (ni) {
+			if (!ntfs_allowed_as_owner(&security,ni)
+			    || ntfs_remove_ntfs_reparse_data(ni))
+				res = -errno;
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
+		break;
+	case XATTR_NTFS_DOS_NAME:
+		res = 0;
+		ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
+		if (ni) {
+			dirpath = strdup(path);
+			if (dirpath) {
+				p = strrchr(dirpath,'/'); /* always present */
+				*p = 0;
+				dir_ni = ntfs_pathname_to_inode(ni->vol,
+							NULL, dirpath);
+				if (!dir_ni
+				   || ntfs_remove_ntfs_dos_name(ni, dir_ni))
+					res = -errno;
+				free(dirpath);
+			} else
+				res = -ENOMEM;
+			if (res < 0)
+				errno = -res;
+		} else
+			res = -errno;
+		break;
+	default :
+			/*
+			 * make sure applications do not see
+			 * Posix ACL not consistent with mode
+			 */
+		errno = EOPNOTSUPP;
+		res = -errno;
+		break;
+	}
+	return (res);
+}
+
 static int ntfs_fuse_removexattr(const char *path, const char *name)
 {
 	ntfs_inode *ni;
@@ -3118,7 +3186,9 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 	int res = 0, lename_len;
 	int attr;
 	int namespace;
+#if POSIXACLS
 	struct SECURITY_CONTEXT security;
+#endif
 
 	attr = mapped_xattr_system(name);
 	if (attr != XATTR_UNMAPPED) {
@@ -3130,56 +3200,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			 * point of view, ACLs are not xattr)
 			 * Note : updating an ACL does not set ctime
 			 */
-		res = 0;
-		switch (attr) {
-			/*
-			 * Removal of NTFS ACL, ATTRIB, EFSINFO or TIMES
-			 * is never allowed
-			 */
-		case XATTR_NTFS_ACL :
-		case XATTR_NTFS_ATTRIB :
-		case XATTR_NTFS_EFSINFO :
-		case XATTR_NTFS_TIMES :
-			res = -EPERM;
-			break;
-		case XATTR_POSIX_ACC :
-		case XATTR_POSIX_DEF :
-			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
-			if (ni) {
-				if (!ntfs_allowed_as_owner(&security, ni)
-				   || ntfs_remove_posix_acl(&security, ni,
-						name))
-					res = -errno;
-				if (ntfs_inode_close(ni))
-					set_fuse_error(&res);
-			} else
-				res = -errno;
-			break;
-		case XATTR_NTFS_REPARSE_DATA :
-			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
-			if (ni) {
-				if (!ntfs_allowed_as_owner(&security, ni)
-				    || ntfs_remove_ntfs_reparse_data(path,ni))
-						res = -errno;
-				if (ntfs_inode_close(ni))
-					set_fuse_error(&res);
-			} else
-				res = -errno;
-			break;
-		case XATTR_NTFS_DOS_NAME:
-			ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
-			if (ni) {
-				if (ntfs_remove_ntfs_dos_name(path,ni))
-					res = -errno;
-			} else
-				res = -errno;
-			break;
-		default :
-			errno = EOPNOTSUPP;
-			res = -errno;
-			break;
-			break;
-		}
+		res = ntfs_system_removexattr(path, attr);
 #else
 			/*
 			 * Only hijack NTFS ACL and ATTRIB removal if POSIX ACLS
@@ -3189,50 +3210,7 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 		if (ntfs_fuse_is_named_data_stream(path))
 			res = -EINVAL; /* n/a for named data streams. */
 		else {
-			switch (attr) {
-				/*
-				 * Removal of NTFS ACL, ATTRIB, EFSINFO or TIMES
-				 * is never allowed
-				 */
-			case XATTR_NTFS_ACL :
-			case XATTR_NTFS_ATTRIB :
-			case XATTR_NTFS_EFSINFO :
-			case XATTR_NTFS_TIMES :
-				res = -EPERM;
-				break;
-			case XATTR_NTFS_REPARSE_DATA :
-				ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
-				if (ni) {
-					/*
-					 * user mapping is not mandatory
-					 * if defined, only owner is allowed
-					 */
-					if ((ntfs_fuse_fill_security_context(&security)
-					   && !ntfs_allowed_as_owner(&security, ni))
-					     || ntfs_remove_ntfs_reparse_data(path,ni))
-						res = -errno;
-					if (ntfs_inode_close(ni))
-						set_fuse_error(&res);
-				} else
-					res = -errno;
-				break;
-			case XATTR_NTFS_DOS_NAME:
-				ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
-				if (ni) {
-					if (ntfs_remove_ntfs_dos_name(path,ni))
-						res = -errno;
-				} else
-					res = -errno;
-				break;
-			default :
-				/*
-				 * make sure applications do not see
-				 * Posix ACL not consistent with mode
-				 */
-				errno = EOPNOTSUPP;
-				res = -errno;
-				break;
-			}
+			res = ntfs_system_removexattr(path, attr);
 		}
 #endif
 		return (res);

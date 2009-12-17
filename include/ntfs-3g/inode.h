@@ -196,9 +196,9 @@ extern int ntfs_inode_free_space(ntfs_inode *ni, int size);
 
 extern int ntfs_inode_badclus_bad(u64 mft_no, ATTR_RECORD *a);
 
-extern int ntfs_inode_get_times(const char *path, char *value,
-			size_t size, ntfs_inode *ni);
-extern int ntfs_inode_set_times(const char *path, const char *value,
-			size_t size, int flags, ntfs_inode *ni);
+extern int ntfs_inode_get_times(ntfs_inode *ni, char *value, size_t size);
+
+extern int ntfs_inode_set_times(ntfs_inode *ni, const char *value,
+			size_t size, int flags);
 
 #endif /* defined _NTFS_INODE_H */

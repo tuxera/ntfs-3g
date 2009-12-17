@@ -1028,8 +1028,7 @@ int ntfs_delete_reparse_index(ntfs_inode *ni)
  *		and the buffer is updated if it is long enough
  */
 
-int ntfs_get_ntfs_reparse_data(const char *path  __attribute__((unused)),
-			char *value, size_t size, ntfs_inode *ni)
+int ntfs_get_ntfs_reparse_data(ntfs_inode *ni, char *value, size_t size)
 {
 	REPARSE_POINT *reparse_attr;
 	s64 attr_size;
@@ -1063,9 +1062,8 @@ int ntfs_get_ntfs_reparse_data(const char *path  __attribute__((unused)),
  *	Returns 0, or -1 if there is a problem
  */
 
-int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
-			const char *value, size_t size, int flags,
-			ntfs_inode *ni)
+int ntfs_set_ntfs_reparse_data(ntfs_inode *ni,
+			const char *value, size_t size, int flags)
 {
 	int res;
 	u8 dummy;
@@ -1134,8 +1132,7 @@ int ntfs_set_ntfs_reparse_data(const char *path  __attribute__((unused)),
  *	Returns 0, or -1 if there is a problem
  */
 
-int ntfs_remove_ntfs_reparse_data(const char *path  __attribute__((unused)),
-				ntfs_inode *ni)
+int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 {
 	int res;
 	int olderrno;
