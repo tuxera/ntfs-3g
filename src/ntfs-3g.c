@@ -98,6 +98,7 @@
 #include "ntfstime.h"
 #include "security.h"
 #include "reparse.h"
+#include "object_id.h"
 #include "efs.h"
 #include "logging.h"
 #include "misc.h"
@@ -2289,6 +2290,7 @@ enum { XATTR_UNMAPPED,
 	XATTR_NTFS_ATTRIB,
 	XATTR_NTFS_EFSINFO,
 	XATTR_NTFS_REPARSE_DATA,
+	XATTR_NTFS_OBJECT_ID,
 	XATTR_NTFS_DOS_NAME,
 	XATTR_NTFS_TIMES,
 	XATTR_POSIX_ACC, 
@@ -2298,6 +2300,7 @@ static const char nf_ns_xattr_ntfs_acl[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
 static const char nf_ns_xattr_efsinfo[] = "user.ntfs.efsinfo";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
+static const char nf_ns_xattr_object_id[] = "system.ntfs_object_id";
 static const char nf_ns_xattr_dos_name[] = "system.ntfs_dos_name";
 static const char nf_ns_xattr_times[] = "system.ntfs_times";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
@@ -2313,6 +2316,7 @@ static struct XATTRNAME nf_ns_xattr_names[] = {
 	{ XATTR_NTFS_ATTRIB, nf_ns_xattr_attrib },
 	{ XATTR_NTFS_EFSINFO, nf_ns_xattr_efsinfo },
 	{ XATTR_NTFS_REPARSE_DATA, nf_ns_xattr_reparse },
+	{ XATTR_NTFS_OBJECT_ID, nf_ns_xattr_object_id },
 	{ XATTR_NTFS_DOS_NAME, nf_ns_xattr_dos_name },
 	{ XATTR_NTFS_TIMES, nf_ns_xattr_times },
 	{ XATTR_POSIX_ACC, nf_ns_xattr_posix_access },
@@ -2693,6 +2697,9 @@ static __inline__ int ntfs_system_getxattr(struct SECURITY_CONTEXT *scx,
 	case XATTR_NTFS_REPARSE_DATA :
 		res = ntfs_get_ntfs_reparse_data(ni, value, size);
 		break;
+	case XATTR_NTFS_OBJECT_ID :
+		res = ntfs_get_ntfs_object_id(ni, value, size);
+		break;
 	case XATTR_NTFS_DOS_NAME:
 		res = 0;
 		dirpath = strdup(path);
@@ -2881,6 +2888,9 @@ static __inline__ int ntfs_system_setxattr(struct SECURITY_CONTEXT *scx,
 		break;
 	case XATTR_NTFS_REPARSE_DATA :
 		res = ntfs_set_ntfs_reparse_data(ni, value, size, flags);
+		break;
+	case XATTR_NTFS_OBJECT_ID :
+		res = ntfs_set_ntfs_object_id(ni, value, size, flags);
 		break;
 	case XATTR_NTFS_DOS_NAME:
 		res = 0;
@@ -3140,6 +3150,17 @@ static __inline__ int ntfs_system_removexattr(const char *path,
 		if (ni) {
 			if (!ntfs_allowed_as_owner(&security,ni)
 			    || ntfs_remove_ntfs_reparse_data(ni))
+				res = -errno;
+			if (ntfs_inode_close(ni))
+				set_fuse_error(&res);
+		} else
+			res = -errno;
+		break;
+	case XATTR_NTFS_OBJECT_ID :
+		ni = ntfs_check_access_xattr(&security,path,attr,TRUE);
+		if (ni) {
+			if (!ntfs_allowed_as_owner(&security,ni)
+			    || ntfs_remove_ntfs_object_id(ni))
 				res = -errno;
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);

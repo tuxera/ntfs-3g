@@ -58,6 +58,7 @@
 #include "misc.h"
 #include "security.h"
 #include "reparse.h"
+#include "object_id.h"
 
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -1637,6 +1638,13 @@ search:
 		 * This is not a critical error, the entry is useless
 		 * because of sequence_number, and stopping file deletion
 		 * would be much worse as the file is not referenced now.
+		 */
+		err = errno;
+	}
+	if (ntfs_delete_object_id_index(ni)) {
+		/*
+		 * Failed to remove the object id index : proceed anyway
+		 * This is not a critical error.
 		 */
 		err = errno;
 	}
