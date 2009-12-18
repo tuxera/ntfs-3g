@@ -1,8 +1,7 @@
 /**
  * reparse.c - Processing of reparse points
  *
- *	This module is part of ntfs-3g library, but may also be
- *	integrated in tools running over Linux or Windows
+ *	This module is part of ntfs-3g library
  *
  * Copyright (c) 2008-2009 Jean-Pierre Andre
  *
