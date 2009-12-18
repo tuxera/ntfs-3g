@@ -117,7 +117,7 @@ static const ntfschar vol_junction_head[] = {
 } ;
 
 static ntfschar reparse_index_name[] = { const_cpu_to_le16('$'),
-				 const_cpu_to_le16('R') };
+					 const_cpu_to_le16('R') };
 
 static const char mappingdir[] = ".NTFS-3G/";
 
