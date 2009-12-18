@@ -158,6 +158,65 @@ static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
 
 #endif
 
+#if CACHE_LOOKUP_SIZE
+
+/*
+ *		File name comparing for entering/fetching from lookup cache
+ */
+
+static int lookup_cache_compare(const struct CACHED_GENERIC *cached,
+			const struct CACHED_GENERIC *wanted)
+{
+	const struct CACHED_LOOKUP *c = (const struct CACHED_LOOKUP*) cached;
+	const struct CACHED_LOOKUP *w = (const struct CACHED_LOOKUP*) wanted;
+	return (!c->name
+		    || (c->parent != w->parent)
+		    || (c->namesize != w->namesize)
+		    || memcmp(c->name, w->name, c->namesize));
+}
+
+/*
+ *		Inode number comparing for invalidating lookup cache
+ *
+ *	All entries with designated inode number are invalidated
+ *
+ *	Only use associated with a CACHE_NOHASH flag
+ */
+
+static int lookup_cache_inv_compare(const struct CACHED_GENERIC *cached,
+			const struct CACHED_GENERIC *wanted)
+{
+	const struct CACHED_LOOKUP *c = (const struct CACHED_LOOKUP*) cached;
+	const struct CACHED_LOOKUP *w = (const struct CACHED_LOOKUP*) wanted;
+	return (!c->name
+		    || (c->parent != w->parent)
+		    || (MREF(c->inum) != MREF(w->inum)));
+}
+
+/*
+ *		Lookup hashing
+ *
+ *	Based on first, second and and last char
+ */
+
+int ntfs_dir_lookup_hash(const struct CACHED_GENERIC *cached)
+{
+	const unsigned char *name;
+	int count;
+	unsigned int val;
+
+	name = (const unsigned char*)cached->variable;
+	count = cached->varsize;
+	if (!name || !count) {
+		ntfs_log_error("Bad lookup cache entry\n");
+		return (-1);
+	}
+	val = (name[0] << 2) + (name[1] << 1) + name[count - 1] + count;
+	return (val % (2*CACHE_LOOKUP_SIZE));
+}
+
+#endif
+
 /**
  * ntfs_inode_lookup_by_name - find an inode in a directory given its name
  * @dir_ni:	ntfs inode of the directory in which to search for the name
@@ -183,8 +242,8 @@ static int inode_cache_inv_compare(const struct CACHED_GENERIC *cached,
  * If the volume is mounted with the case sensitive flag set, then we only
  * allow exact matches.
  */
-u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
-		const int uname_len)
+u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
+		const ntfschar *uname, const int uname_len)
 {
 	VCN vcn;
 	u64 mref = 0;
@@ -470,6 +529,94 @@ close_err_out:
 	free(ia);
 	ntfs_attr_close(ia_na);
 	goto eo_put_err_out;
+}
+
+/*
+ *		Lookup a file in a directory from its UTF-8 name
+ *
+ *	The name is first fetched from cache if one is defined
+ *
+ *	Returns the inode number
+ *		or -1 if not possible (errno tells why)
+ */
+
+u64 ntfs_inode_lookup_by_mbsname(ntfs_inode *dir_ni, const char *name)
+{
+	int uname_len;
+	ntfschar *uname = (ntfschar*)NULL;
+	u64 inum;
+#if CACHE_LOOKUP_SIZE
+	struct CACHED_LOOKUP item;
+	struct CACHED_LOOKUP *cached;
+
+		/*
+		 * fetch inode from cache
+		 */
+
+	if (dir_ni->vol->lookup_cache) {
+		item.name = name;
+		item.namesize = strlen(name) + 1;
+		item.parent = dir_ni->mft_no;
+		cached = (struct CACHED_LOOKUP*)ntfs_fetch_cache(
+				dir_ni->vol->lookup_cache, GENERIC(&item),
+				lookup_cache_compare);
+		if (cached) {
+			inum = cached->inum;
+			if (inum == (u64)-1)
+				errno = ENOENT;
+		} else {
+			/* Generate unicode name. */
+			uname_len = ntfs_mbstoucs(name, &uname);
+			if (uname_len >= 0) {
+				inum = ntfs_inode_lookup_by_name(dir_ni,
+						uname, uname_len);
+				item.inum = inum;
+				/* enter into cache, even if not found */
+				ntfs_enter_cache(dir_ni->vol->lookup_cache,
+							GENERIC(&item),
+							lookup_cache_compare);
+				free(uname);
+			} else
+				inum = (s64)-1;
+		}
+	} else
+#endif
+		{
+			/* Generate unicode name. */
+		uname_len = ntfs_mbstoucs(name, &uname);
+		if (uname_len >= 0)
+			inum = ntfs_inode_lookup_by_name(dir_ni,
+					uname, uname_len);
+		else
+			inum = (s64)-1;
+	}
+	return (inum);
+}
+
+/*
+ *		Update a cache lookup record when a name has been defined
+ *
+ *	The UTF-8 name is required
+ */
+
+void ntfs_inode_update_mbsname(ntfs_inode *dir_ni, const char *name, u64 inum)
+{
+#if CACHE_LOOKUP_SIZE
+	struct CACHED_LOOKUP item;
+	struct CACHED_LOOKUP *cached;
+
+	if (dir_ni->vol->lookup_cache) {
+		item.name = name;
+		item.namesize = strlen(name) + 1;
+		item.parent = dir_ni->mft_no;
+		item.inum = inum;
+		cached = (struct CACHED_LOOKUP*)ntfs_enter_cache(
+					dir_ni->vol->lookup_cache,
+					GENERIC(&item), lookup_cache_compare);
+		if (cached)
+			cached->inum = inum;
+	}
+#endif
 }
 
 /**
@@ -1557,6 +1704,9 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 	u64 inum = (u64)-1;
 	int count;
 #endif
+#if CACHE_LOOKUP_SIZE
+	struct CACHED_LOOKUP lkitem;
+#endif
 
 	ntfs_log_trace("Entering.\n");
 	
@@ -1670,6 +1820,15 @@ search:
 	 * case there are no reference to this inode left, so we should free all
 	 * non-resident attributes and mark all MFT record as not in use.
 	 */
+#if CACHE_LOOKUP_SIZE
+			/* invalidate entry in lookup cache */
+	lkitem.name = (const char*)NULL;
+	lkitem.namesize = 0;
+	lkitem.inum = ni->mft_no;
+	lkitem.parent = dir_ni->mft_no;
+	ntfs_invalidate_cache(vol->lookup_cache, GENERIC(&lkitem),
+			lookup_cache_inv_compare, CACHE_NOHASH);
+#endif
 #if CACHE_INODE_SIZE
 	inum = ni->mft_no;
 	if (pathname) {

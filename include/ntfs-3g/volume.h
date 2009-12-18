@@ -235,6 +235,9 @@ struct _ntfs_volume {
 #if CACHE_NIDATA_SIZE
 	struct CACHE_HEADER *nidata_cache;
 #endif
+#if CACHE_LOOKUP_SIZE
+	struct CACHE_HEADER *lookup_cache;
+#endif
 #if CACHE_SECURID_SIZE
 	struct CACHE_HEADER *securid_cache;
 #endif

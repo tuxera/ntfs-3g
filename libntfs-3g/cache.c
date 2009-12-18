@@ -572,6 +572,13 @@ void ntfs_create_lru_caches(ntfs_volume *vol)
 		sizeof(struct CACHED_NIDATA),
 		CACHE_NIDATA_SIZE, 2*CACHE_NIDATA_SIZE);
 #endif
+#if CACHE_LOOKUP_SIZE
+		 /* lookup cache */
+	vol->lookup_cache = ntfs_create_cache("lookup",
+		(cache_free)NULL, ntfs_dir_lookup_hash,
+		sizeof(struct CACHED_LOOKUP),
+		CACHE_LOOKUP_SIZE, 2*CACHE_LOOKUP_SIZE);
+#endif
 	vol->securid_cache = ntfs_create_cache("securid",(cache_free)NULL,
 		(cache_hash)NULL,sizeof(struct CACHED_SECURID), CACHE_SECURID_SIZE, 0);
 #if CACHE_LEGACY_SIZE
@@ -591,6 +598,9 @@ void ntfs_free_lru_caches(ntfs_volume *vol)
 #endif
 #if CACHE_NIDATA_SIZE
 	ntfs_free_cache(vol->nidata_cache);
+#endif
+#if CACHE_LOOKUP_SIZE
+	ntfs_free_cache(vol->lookup_cache);
 #endif
 	ntfs_free_cache(vol->securid_cache);
 #if CACHE_LEGACY_SIZE
