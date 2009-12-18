@@ -104,22 +104,17 @@
 #include "logging.h"
 #include "misc.h"
 
-#define PERMSCONFIG 5 /* 5 for standard release */
+/*
+ *	The following permission checking modes are governed by
+ *	the LPERMSCONFIG value in param.h
+ */
 
-#if PERMSCONFIG
-
-#define KERNELACLS ((PERMSCONFIG > 6) & (PERMSCONFIG < 10))	/* want ACLs checked by fuse kernel */
-#define KERNELPERMS (((PERMSCONFIG - 1) % 6) < 3)	/* want permissions checked by kernel */
-#define CACHEING (!(PERMSCONFIG % 3))	/* want to use fuse cacheing */
-
-#else
-
-#define KERNELACLS 0		/* do not want ACLs checked by fuse kernel */
-				/* fuse patch required for KERNELACLS ! */
-#define KERNELPERMS 0		/* do not want permissions checked by kernel */
-#define CACHEING 0		/* do not want fuse cacheing */
-
-#endif
+/*	ACLS may be checked by kernel (requires a fuse patch) or here */
+#define KERNELACLS ((LPERMSCONFIG > 6) & (LPERMSCONFIG < 10))
+/*	basic permissions may be checked by kernel or here */
+#define KERNELPERMS (((LPERMSCONFIG - 1) % 6) < 3)
+/*	may want to use fuse/kernel cacheing */
+#define CACHEING (!(LPERMSCONFIG % 3))
 
 #if KERNELACLS & !KERNELPERMS
 #error "Incompatible options KERNELACLS and KERNELPERMS"
