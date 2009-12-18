@@ -260,6 +260,8 @@ le32 ntfs_alloc_securid(struct SECURITY_CONTEXT *scx,
 #endif
 int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		uid_t uid, gid_t gid);
+int ntfs_set_ownmod(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *ni, uid_t uid, gid_t gid, mode_t mode);
 #if POSIXACLS
 int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, uid_t uid, gid_t gid,

@@ -3364,6 +3364,11 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 					allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
 					    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
 				break;
+			case S_IREAD + S_IWRITE + S_IEXEC:
+				allow = ((perm & (S_IRUSR | S_IRGRP | S_IROTH)) != 0)
+				    && ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
+				    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+				break;
 			default :
 				res = EINVAL;
 				allow = 0;
@@ -3555,6 +3560,121 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		res = -1;
 		errno = EIO;
 	}
+	return (res ? -1 : 0);
+}
+
+/*
+ *		Define new owner/group and mode to a file
+ *
+ *	returns zero if successful
+ */
+
+int ntfs_set_ownmod(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
+			uid_t uid, gid_t gid, const mode_t mode)
+{
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const struct CACHED_PERMISSIONS *cached;
+	char *oldattr;
+	const SID *usid;
+	const SID *gsid;
+	uid_t fileuid;
+	uid_t filegid;
+	BOOL isdir;
+	int res;
+#if POSIXACLS
+	const struct POSIX_SECURITY *oldpxdesc;
+	struct POSIX_SECURITY *newpxdesc = (struct POSIX_SECURITY*)NULL;
+	int pxsize;
+#endif
+
+	res = 0;
+	/* get the current owner and mode from cache or security attributes */
+	oldattr = (char*)NULL;
+	cached = fetch_cache(scx,ni);
+	if (cached) {
+		fileuid = cached->uid;
+		filegid = cached->gid;
+#if POSIXACLS
+		oldpxdesc = cached->pxdesc;
+		if (oldpxdesc) {
+				/* must copy before merging */
+			pxsize = sizeof(struct POSIX_SECURITY)
+				+ (oldpxdesc->acccnt + oldpxdesc->defcnt)*sizeof(struct POSIX_ACE);
+			newpxdesc = (struct POSIX_SECURITY*)malloc(pxsize);
+			if (newpxdesc) {
+				memcpy(newpxdesc, oldpxdesc, pxsize);
+				if (ntfs_merge_mode_posix(newpxdesc, mode))
+					res = -1;
+			} else
+				res = -1;
+		}
+#endif
+	} else {
+		fileuid = 0;
+		filegid = 0;
+		oldattr = getsecurityattr(scx->vol, ni);
+		if (oldattr) {
+			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+				!= const_cpu_to_le16(0);
+			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
+				oldattr;
+			gsid = (const SID*)
+				&oldattr[le32_to_cpu(phead->group)];
+#if OWNERFROMACL
+			usid = ntfs_acl_owner(oldattr);
+#else
+			usid = (const SID*)
+				&oldattr[le32_to_cpu(phead->owner)];
+#endif
+#if POSIXACLS
+			newpxdesc = ntfs_build_permissions_posix(scx->mapping, oldattr,
+					usid, gsid, isdir);
+			if (!newpxdesc || ntfs_merge_mode_posix(newpxdesc, mode))
+				res = -1;
+			else {
+				fileuid = ntfs_find_user(scx->mapping[MAPUSERS],usid);
+				filegid = ntfs_find_group(scx->mapping[MAPGROUPS],gsid);
+			}
+#endif
+			free(oldattr);
+		} else
+			res = -1;
+	}
+	if (!res) {
+		/* check requested by root */
+		/* or chgrp requested by owner to an owned group */
+		if (!scx->uid
+		   || ((((int)uid < 0) || (uid == fileuid))
+		      && ((gid == scx->gid) || groupmember(scx, scx->uid, gid))
+		      && (fileuid == scx->uid))) {
+			/* replace by the new usid and gsid */
+			/* or reuse old gid and sid for cacheing */
+			if ((int)uid < 0)
+				uid = fileuid;
+			if ((int)gid < 0)
+				gid = filegid;
+#if POSIXACLS
+			res = ntfs_set_owner_mode(scx, ni, uid, gid, 
+				mode, newpxdesc);
+#else
+			res = ntfs_set_owner_mode(scx, ni, uid, gid, mode);
+#endif
+		} else {
+			res = -1;	/* neither owner nor root */
+			errno = EPERM;
+		}
+	} else {
+		/*
+		 * Should not happen : a default descriptor is generated
+		 * by getsecurityattr() when there are none
+		 */
+		ntfs_log_error("File has no security descriptor\n");
+		res = -1;
+		errno = EIO;
+	}
+#if POSIXACLS
+	free(newpxdesc);
+#endif
 	return (res ? -1 : 0);
 }
 
