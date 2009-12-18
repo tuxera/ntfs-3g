@@ -103,10 +103,17 @@
 #include "logging.h"
 #include "misc.h"
 
-#define KERNELACLS 0		/* do not want ACLs checked by kernel */
-				/* fuse patch required for KERNELACLS ! */
-#define KERNELPERMS 1		/* want permissions checked by kernel */
-#define CACHEING 0		/* Fuse cacheing; broken, do no use ! */
+/*
+ *	The following permission checking modes are governed by
+ *	the LPERMSCONFIG value in param.h
+ */
+
+/*	ACLS may be checked by kernel (requires a fuse patch) or here */
+#define KERNELACLS ((HPERMSCONFIG > 6) & (HPERMSCONFIG < 10))
+/*	basic permissions may be checked by kernel or here */
+#define KERNELPERMS (((HPERMSCONFIG - 1) % 6) < 3)
+/*	may want to use fuse/kernel cacheing */
+#define CACHEING (!(HPERMSCONFIG % 3))
 
 #if KERNELACLS & !KERNELPERMS
 #error Incompatible options KERNELACLS and KERNELPERMS
@@ -4163,6 +4170,7 @@ int main(int argc, char *argv[])
 	if (fstype == FSTYPE_NONE || fstype == FSTYPE_UNKNOWN)
 		fstype = load_fuse_module();
 	create_dev_fuse();
+
 	if (drop_privs())
 		goto err_out;
 #endif	

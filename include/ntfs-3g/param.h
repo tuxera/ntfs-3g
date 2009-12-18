@@ -31,6 +31,33 @@
 #define FORCE_FORMAT_v1x 0	/* Insert security data as in NTFS v1.x */
 #define OWNERFROMACL 1		/* Get the owner from ACL (not Windows owner) */
 
-#define FULLCOLLATE 1
+/*
+ *		Permission checking modes for high level and low level
+ *
+ *	The choices for high and low lowel are independent, they have
+ *	no effect on the library
+ *
+ *	Stick to the recommended values unless you understand the consequences
+ *	on protection and performances. Use of cacheing is good for
+ *	performances, but bad on security.
+ *
+ *	Possible values for high level :
+ *		1 : no cache, kernel control (recommended)
+ *		4 : no cache, file system control
+ *		7 : no cache, kernel control for ACLs
+ *
+ *	Possible values for low level :
+ *		2 : no cache, kernel control
+ *		3 : use kernel/fuse cache, kernel control
+ *		5 : no cache, file system control (recommended)
+ *		8 : no cache, kernel control for ACLs
+ *
+ *	Use of options 7 and 8 requires a patch to fuse
+ *	When Posix ACLs are selected in the configure options, a value
+ *	of 6 is added in the mount report.
+ */
+
+#define HPERMSCONFIG 1
+#define LPERMSCONFIG 5
 
 #endif /* defined _NTFS_PARAM_H */
