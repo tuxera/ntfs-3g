@@ -50,6 +50,7 @@ typedef enum {
 				      in the index. */
 	NI_v3_Extensions,	/* 1: JPA v3.x extensions present. */
 	NI_TimesSet,		/* 1: Use times which were set */
+	NI_KnownSize,		/* 1: Set if sizes are meaningful */
 } ntfs_inode_state_bits;
 
 #define  test_nino_flag(ni, flag)	   test_bit(NI_##flag, (ni)->state)
@@ -135,8 +136,11 @@ struct _ntfs_inode {
 	 * These two fields are used to sync filename index and guaranteed to be
 	 * correct, however value in index itself maybe wrong (windows itself
 	 * do not update them properly).
+	 * For directories, they hold the index size, provided the
+	 * flag KnownSize is set.
 	 */
-	s64 data_size;		/* Data size of unnamed DATA attribute. */
+	s64 data_size;		/* Data size of unnamed DATA attribute
+				   (or INDEX_ROOT for directories) */
 	s64 allocated_size;	/* Allocated size stored in the filename
 				   index. (NOTE: Equal to allocated size of
 				   the unnamed data attribute for normal or
@@ -179,6 +183,18 @@ extern ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref);
 extern int ntfs_inode_close(ntfs_inode *ni);
 extern int ntfs_inode_close_in_dir(ntfs_inode *ni, ntfs_inode *dir_ni);
 
+#if CACHE_NIDATA_SIZE
+
+struct CACHED_GENERIC;
+
+extern int ntfs_inode_real_close(ntfs_inode *ni);
+extern void ntfs_inode_invalidate(ntfs_volume *vol, const MFT_REF mref);
+extern void ntfs_inode_nidata_free(const struct CACHED_GENERIC *cached);
+extern int ntfs_inode_nidata_hash(const struct CACHED_GENERIC *item);
+
+#endif
+
+
 extern ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni,
 		const MFT_REF mref);
 
@@ -200,5 +216,9 @@ extern int ntfs_inode_get_times(ntfs_inode *ni, char *value, size_t size);
 
 extern int ntfs_inode_set_times(ntfs_inode *ni, const char *value,
 			size_t size, int flags);
+
+/* debugging */
+#define debug_double_inode(num, type)
+#define debug_cached_inode(ni)
 
 #endif /* defined _NTFS_INODE_H */

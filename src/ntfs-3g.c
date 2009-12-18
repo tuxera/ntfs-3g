@@ -714,12 +714,18 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		} else {
 			/* Directory. */
 			stbuf->st_mode = S_IFDIR | (0777 & ~ctx->dmask);
-			na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
-			if (na) {
-				stbuf->st_size = na->data_size;
-				stbuf->st_blocks = na->allocated_size >> 9;
-				ntfs_attr_close(na);
+			/* get index size, if not known */
+			if (!test_nino_flag(ni, KnownSize)) {
+				na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, NTFS_INDEX_I30, 4);
+				if (na) {
+					ni->data_size = na->data_size;
+					ni->allocated_size = na->allocated_size;
+					set_nino_flag(ni, KnownSize);
+					ntfs_attr_close(na);
+				}
 			}
+			stbuf->st_size = ni->data_size;
+			stbuf->st_blocks = ni->allocated_size >> 9;
 			stbuf->st_nlink = 1;	/* Make find(1) work */
 		}
 	} else {

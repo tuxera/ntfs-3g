@@ -23,6 +23,7 @@
 #define _NTFS_PARAM_H
 
 #define CACHE_INODE_SIZE 32	/* inode cache, zero or >= 3 and not too big */
+#define CACHE_NIDATA_SIZE 64	/* idata cache, zero or >= 3 and not too big */
 #define CACHE_SECURID_SIZE 16    /* securid cache, zero or >= 3 and not too big */
 #define CACHE_LEGACY_SIZE 8    /* legacy cache size, zero or >= 3 and not too big */
 

@@ -43,6 +43,7 @@
 #include <limits.h>
 #endif
 
+#include "param.h"
 #include "compat.h"
 #include "attrib.h"
 #include "attrlist.h"
@@ -1463,6 +1464,15 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			goto err_out;
 		}
 		na->initialized_size = pos + count;
+#if CACHE_NIDATA_SIZE
+		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
+		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
+		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
+			na->ni->data_size = na->data_size;
+			na->ni->allocated_size = na->allocated_size;
+			set_nino_flag(na->ni,KnownSize);
+		}
+#endif
 		ntfs_attr_put_search_ctx(ctx);
 		ctx = NULL;
 		/*
@@ -1876,6 +1886,15 @@ retry:
 	if (!NVolReadOnly(vol)) {
 			
 		written = ntfs_compressed_close(na, rl, ofs);
+#if CACHE_NIDATA_SIZE
+		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
+		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
+		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
+			na->ni->data_size = na->data_size;
+			na->ni->allocated_size = na->allocated_size;
+			set_nino_flag(na->ni,KnownSize);
+		}
+#endif
 		/* If everything ok, update progress counters and continue. */
 		if (!written)
 			goto done;
@@ -3217,9 +3236,12 @@ int ntfs_resident_attr_record_add(ntfs_inode *ni, ATTR_TYPES type,
 			goto put_err_out;
 		}
 	}
-	if (type == AT_DATA && name == AT_UNNAMED) {
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
+	    ? type == AT_INDEX_ROOT && name == NTFS_INDEX_I30
+	    : type == AT_DATA && name == AT_UNNAMED) {
 		ni->data_size = size;
 		ni->allocated_size = (size + 7) & ~7;
+		set_nino_flag(ni,KnownSize);
 	}
 	ntfs_inode_mark_dirty(ni);
 	ntfs_attr_put_search_ctx(ctx);
@@ -4341,10 +4363,14 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 			if ((na->data_flags & ATTR_COMPRESSION_MASK)
 			    || NAttrSparse(na))
 				na->compressed_size = na->allocated_size;
-			if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+			if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
+			    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
+			    : na->type == AT_DATA && na->name == AT_UNNAMED) {
 				na->ni->data_size = na->data_size;
 				na->ni->allocated_size = na->allocated_size;
-				NInoFileNameSetDirty(na->ni);
+				set_nino_flag(na->ni,KnownSize);
+				if (na->type == AT_DATA)
+					NInoFileNameSetDirty(na->ni);
 			}
 			goto resize_done;
 		}
@@ -5244,9 +5270,17 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 		ctx->attr->initialized_size = cpu_to_sle64(newsize);
 	}
 	/* Update data size in the index. */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-		na->ni->data_size = na->data_size;
-		NInoFileNameSetDirty(na->ni);
+	if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30) {
+			na->ni->data_size = na->data_size;
+			na->ni->allocated_size = na->allocated_size;
+			set_nino_flag(na->ni,KnownSize);
+		}
+	} else {
+		if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+			na->ni->data_size = na->data_size;
+			NInoFileNameSetDirty(na->ni);
+		}
 	}
 
 	/* If the attribute now has zero size, make it resident. */
@@ -5435,9 +5469,17 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 	na->data_size = newsize;
 	ctx->attr->data_size = cpu_to_sle64(newsize);
 	/* Update data size in the index. */
-	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-		na->ni->data_size = na->data_size;
-		NInoFileNameSetDirty(na->ni);
+	if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
+		if (na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30) {
+			na->ni->data_size = na->data_size;
+			na->ni->allocated_size = na->allocated_size;
+			set_nino_flag(na->ni,KnownSize);
+		}
+	} else {
+		if (na->type == AT_DATA && na->name == AT_UNNAMED) {
+			na->ni->data_size = na->data_size;
+			NInoFileNameSetDirty(na->ni);
+		}
 	}
 	/* Set the inode dirty so it is written out later. */
 	ntfs_inode_mark_dirty(ctx->ntfs_ino);

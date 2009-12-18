@@ -565,6 +565,13 @@ void ntfs_create_lru_caches(ntfs_volume *vol)
 		ntfs_dir_inode_hash, sizeof(struct CACHED_INODE),
 		CACHE_INODE_SIZE, 2*CACHE_INODE_SIZE);
 #endif
+#if CACHE_NIDATA_SIZE
+		 /* idata cache */
+	vol->nidata_cache = ntfs_create_cache("nidata",
+		ntfs_inode_nidata_free, ntfs_inode_nidata_hash,
+		sizeof(struct CACHED_NIDATA),
+		CACHE_NIDATA_SIZE, 2*CACHE_NIDATA_SIZE);
+#endif
 	vol->securid_cache = ntfs_create_cache("securid",(cache_free)NULL,
 		(cache_hash)NULL,sizeof(struct CACHED_SECURID), CACHE_SECURID_SIZE, 0);
 #if CACHE_LEGACY_SIZE
@@ -581,6 +588,9 @@ void ntfs_free_lru_caches(ntfs_volume *vol)
 {
 #if CACHE_INODE_SIZE
 	ntfs_free_cache(vol->xinode_cache);
+#endif
+#if CACHE_NIDATA_SIZE
+	ntfs_free_cache(vol->nidata_cache);
 #endif
 	ntfs_free_cache(vol->securid_cache);
 #if CACHE_LEGACY_SIZE

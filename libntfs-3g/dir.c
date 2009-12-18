@@ -1216,6 +1216,9 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	ni = ntfs_mft_record_alloc(dir_ni->vol, NULL);
 	if (!ni)
 		return NULL;
+#if CACHE_NIDATA_SIZE
+	ntfs_inode_invalidate(dir_ni->vol, ni->mft_no);
+#endif
 	/*
 	 * Create STANDARD_INFORMATION attribute.
 	 * JPA Depending on available inherited security descriptor,
@@ -1379,8 +1382,12 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
 	fn->last_access_time = utc2ntfs(ni->last_access_time);
-	fn->data_size = cpu_to_sle64(ni->data_size);
-	fn->allocated_size = cpu_to_sle64(ni->allocated_size);
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
+	else {
+		fn->data_size = cpu_to_sle64(ni->data_size);
+		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
+	}
 	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
 	/* Add FILE_NAME attribute to inode. */
 	if (ntfs_attr_add(ni, AT_FILE_NAME, AT_UNNAMED, 0, (u8*)fn, fn_len)) {
@@ -1541,6 +1548,9 @@ int ntfs_delete(ntfs_volume *vol, const char *pathname,
 	BOOL looking_for_dos_name = FALSE, looking_for_win32_name = FALSE;
 	BOOL case_sensitive_match = TRUE;
 	int err = 0;
+#if CACHE_NIDATA_SIZE
+	int i;
+#endif
 #if CACHE_INODE_SIZE
 	struct CACHED_INODE item;
 	const char *p;
@@ -1731,12 +1741,31 @@ search:
 				"Probably leaving inconsistent metadata.\n");
 	}
 	/* All extents should be attached after attribute walk. */
+#if CACHE_NIDATA_SIZE
+		/*
+		 * Disconnect extents before deleting them, so they are
+		 * not wrongly moved to cache through the chainings
+		 */
+	for (i=ni->nr_extents-1; i>=0; i--) {
+		ni->extent_nis[i]->base_ni = (ntfs_inode*)NULL;
+		ni->extent_nis[i]->nr_extents = 0;
+		if (ntfs_mft_record_free(ni->vol, ni->extent_nis[i])) {
+			err = errno;
+			ntfs_log_error("Failed to free extent MFT record.  "
+					"Leaving inconsistent metadata.\n");
+		}
+	}
+	free(ni->extent_nis);
+	ni->nr_extents = 0;
+	ni->extent_nis = (ntfs_inode**)NULL;
+#else
 	while (ni->nr_extents)
 		if (ntfs_mft_record_free(ni->vol, *(ni->extent_nis))) {
 			err = errno;
 			ntfs_log_error("Failed to free extent MFT record.  "
 					"Leaving inconsistent metadata.\n");
 		}
+#endif
 	if (ntfs_mft_record_free(ni->vol, ni)) {
 		err = errno;
 		ntfs_log_error("Failed to free base MFT record.  "
@@ -1812,10 +1841,13 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 	fn->file_name_length = name_len;
 	fn->file_name_type = nametype;
 	fn->file_attributes = ni->flags;
-	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
 		fn->file_attributes |= FILE_ATTR_I30_INDEX_PRESENT;
-	fn->allocated_size = cpu_to_sle64(ni->allocated_size);
-	fn->data_size = cpu_to_sle64(ni->data_size);
+		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
+	} else {
+		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
+		fn->data_size = cpu_to_sle64(ni->data_size);
+	}
 	fn->creation_time = utc2ntfs(ni->creation_time);
 	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
 	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);

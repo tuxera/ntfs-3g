@@ -43,8 +43,10 @@
 #include "param.h"
 #include "compat.h"
 #include "types.h"
-#include "attrib.h"
+#include "volume.h"
+#include "cache.h"
 #include "inode.h"
+#include "attrib.h"
 #include "debug.h"
 #include "mft.h"
 #include "attrlist.h"
@@ -154,7 +156,7 @@ static void __ntfs_inode_release(ntfs_inode *ni)
  * Return a pointer to the ntfs_inode structure on success or NULL on error,
  * with errno set to the error code.
  */
-ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
+static ntfs_inode *ntfs_inode_real_open(ntfs_volume *vol, const MFT_REF mref)
 {
 	s64 l;
 	ntfs_inode *ni = NULL;
@@ -207,13 +209,13 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 		ni->usn = std_info->usn;
 	} else {
 		clear_nino_flag(ni, v3_Extensions);
-		ni->owner_id = 0;
-		ni->security_id = 0;
+		ni->owner_id = const_cpu_to_le32(0);
+		ni->security_id = const_cpu_to_le32(0);
 	}
 	/* Set attribute list information. */
 	olderrno = errno;
-	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0, 0, 0, NULL, 0,
-			ctx)) {
+	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, AT_UNNAMED, 0,
+			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		if (errno != ENOENT)
 			goto put_err_out;
 		/* Attribute list attribute does not present. */
@@ -268,6 +270,7 @@ get_size:
 			ni->data_size = le32_to_cpu(ctx->attr->value_length);
 			ni->allocated_size = (ni->data_size + 7) & ~7;
 		}
+		set_nino_flag(ni,KnownSize);
 	}
 	ntfs_attr_put_search_ctx(ctx);
 out:	
@@ -306,7 +309,8 @@ err_out:
  *	EINVAL	@ni is invalid (probably it is an extent inode).
  *	EIO	I/O error while trying to write inode to disk.
  */
-int ntfs_inode_close(ntfs_inode *ni)
+
+int ntfs_inode_real_close(ntfs_inode *ni)
 {
 	int ret = -1;
 	
@@ -326,7 +330,7 @@ int ntfs_inode_close(ntfs_inode *ni)
 	/* Is this a base inode with mapped extent inodes? */
 	if (ni->nr_extents > 0) {
 		while (ni->nr_extents > 0) {
-			if (ntfs_inode_close(ni->extent_nis[0])) {
+			if (ntfs_inode_real_close(ni->extent_nis[0])) {
 				if (errno != EIO)
 					errno = EBUSY;
 				goto err;
@@ -366,8 +370,10 @@ int ntfs_inode_close(ntfs_inode *ni)
 				/* Ignore errors, they don't really matter. */
 				if (tmp_nis)
 					base_ni->extent_nis = tmp_nis;
-			} else if (tmp_nis)
+			} else if (tmp_nis) {
 				free(tmp_nis);
+				base_ni->extent_nis = (ntfs_inode**)NULL;
+			}
 			/* Allow for error checking. */
 			i = -1;
 			break;
@@ -387,6 +393,154 @@ int ntfs_inode_close(ntfs_inode *ni)
 err:
 	ntfs_log_leave("\n");
 	return ret;
+}
+
+#if CACHE_NIDATA_SIZE
+
+/*
+ *		Free an inode structure when there is not more space
+ *	in the cache
+ */
+
+void ntfs_inode_nidata_free(const struct CACHED_GENERIC *cached)
+{
+        ntfs_inode_real_close(((const struct CACHED_NIDATA*)cached)->ni);
+}
+
+/*
+ *		Compute a hash value for an inode entry
+ */
+
+int ntfs_inode_nidata_hash(const struct CACHED_GENERIC *item)
+{
+	return (((const struct CACHED_NIDATA*)item)->inum
+			% (2*CACHE_NIDATA_SIZE));
+}
+
+/*
+ *		inum comparing for entering/fetching from cache
+ */
+
+static int idata_cache_compare(const struct CACHED_GENERIC *cached,
+			const struct CACHED_GENERIC *wanted)
+{
+	return (((const struct CACHED_NIDATA*)cached)->inum
+			!= ((const struct CACHED_NIDATA*)wanted)->inum);
+}
+
+/*
+ *		Invalidate an inode entry when not needed anymore.
+ *	The entry should have been synced, it may be reused later,
+ *	if it is requested before it is dropped from cache.
+ */
+
+void ntfs_inode_invalidate(ntfs_volume *vol, const MFT_REF mref)
+{
+	struct CACHED_NIDATA item;
+	int count;
+
+	item.inum = MREF(mref);
+	item.ni = (ntfs_inode*)NULL;
+	item.pathname = (const char*)NULL;
+	item.varsize = 0;
+	count = ntfs_invalidate_cache(vol->nidata_cache,
+				GENERIC(&item),idata_cache_compare,CACHE_FREE);
+}
+
+#endif
+
+/*
+ *		Open an inode
+ *
+ *	When possible, an entry recorded in the cache is reused
+ *
+ *	**NEVER REOPEN** an inode, this can lead to a duplicated
+ * 	cache entry (hard to detect), and to an obsolete one being
+ *	reused. System files are however protected from being cached.
+ */
+
+ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
+{
+	ntfs_inode *ni;
+#if CACHE_NIDATA_SIZE
+	struct CACHED_NIDATA item;
+	struct CACHED_NIDATA *cached;
+
+		/* fetch idata from cache */
+	item.inum = MREF(mref);
+	debug_double_inode(item.inum,1);
+	item.pathname = (const char*)NULL;
+	item.varsize = 0;
+	cached = (struct CACHED_NIDATA*)ntfs_fetch_cache(vol->nidata_cache,
+				GENERIC(&item),idata_cache_compare);
+	if (cached) {
+		ni = cached->ni;
+		/* do not keep open entries in cache */
+		ntfs_remove_cache(vol->nidata_cache,
+				(struct CACHED_GENERIC*)cached,0);
+	} else {
+		ni = ntfs_inode_real_open(vol, mref);
+	}
+#else
+	ni = ntfs_inode_real_open(vol, mref);
+#endif
+	return (ni);
+}
+
+/*
+ *		Close an inode entry
+ *
+ *	If cacheing is in use, the entry is synced and kept available
+ *	in cache for further use.
+ *
+ *	System files (inode < 16 or having the IS_4 flag) are protected
+ *	against being cached.
+ */
+
+int ntfs_inode_close(ntfs_inode *ni)
+{
+	int res;
+#if CACHE_NIDATA_SIZE
+	BOOL dirty;
+	struct CACHED_NIDATA item;
+
+	if (ni) {
+		debug_double_inode(ni->mft_no,0);
+		/* do not cache system files : could lead to double entries */
+		if (ni->vol && ni->vol->nidata_cache
+			&& ((ni->mft_no == FILE_root)
+			    || ((ni->mft_no >= FILE_first_user)
+				&& !(ni->mrec->flags & MFT_RECORD_IS_4)))) {
+			/* If we have dirty metadata, write it out. */
+			dirty = NInoDirty(ni) || NInoAttrListDirty(ni);
+			if (dirty) {
+				res = ntfs_inode_sync(ni);
+					/* do a real close if sync failed */
+				if (res)
+					ntfs_inode_real_close(ni);
+			} else
+				res = 0;
+
+			if (!res) {
+					/* feed idata into cache */
+				item.inum = ni->mft_no;
+				item.ni = ni;
+				item.pathname = (const char*)NULL;
+				item.varsize = 0;
+				debug_cached_inode(ni);
+				ntfs_enter_cache(ni->vol->nidata_cache,
+					GENERIC(&item), idata_cache_compare);
+			}
+		} else {
+			/* cache not ready or system file, really close */
+			res = ntfs_inode_real_close(ni);
+		}
+	} else
+		res = 0;
+#else
+	res = ntfs_inode_real_close(ni);
+#endif
+	return (res);
 }
 
 /**
@@ -669,8 +823,13 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 		fnx->file_attributes =
 				(fnx->file_attributes & ~FILE_ATTR_VALID_FLAGS) |
 				(ni->flags & FILE_ATTR_VALID_FLAGS);
-		fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
-		fnx->data_size = cpu_to_sle64(ni->data_size);
+		if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+			fnx->data_size = fnx->allocated_size
+				= const_cpu_to_le64(0);
+		else {
+			fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
+			fnx->data_size = cpu_to_sle64(ni->data_size);
+		}
 		if (!test_nino_flag(ni, TimesSet)) {
 			fnx->creation_time = utc2ntfs(ni->creation_time);
 			fnx->last_data_change_time = utc2ntfs(ni->last_data_change_time);
@@ -1327,14 +1486,27 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 				/*
 				 * Mark times set to avoid overwriting
 				 * them when the inode is closed.
+				 * The inode structure must also be updated
+				 * (with loss of precision) because of cacheing.
+				 * TODO : use NTFS precision in inode, and
+				 * return sub-second times in getattr()
 				 */
 				set_nino_flag(ni, TimesSet);
 				std_info->creation_time = cpu_to_le64(times[0]);
-				if (size >= 16)
+				ni->creation_time
+					= ntfs2utc(std_info->creation_time);
+				if (size >= 16) {
 					std_info->last_data_change_time = cpu_to_le64(times[1]);
-				if (size >= 24)
+					ni->last_data_change_time
+						= ntfs2utc(std_info->last_data_change_time);
+				}
+				if (size >= 24) {
 					std_info->last_access_time = cpu_to_le64(times[2]);
+					ni->last_access_time
+						= ntfs2utc(std_info->last_access_time);
+				}
 				std_info->last_mft_change_time = now;
+				ni->last_mft_change_time = ntfs2utc(now);
 				ntfs_inode_mark_dirty(ctx->ntfs_ino);
 				NInoFileNameSetDirty(ni);
 
@@ -1365,7 +1537,7 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 				}
 			}
 			ntfs_attr_put_search_ctx(ctx);
-		}		
+		}
 	} else
 		if (size < 8)
 			errno = ERANGE;

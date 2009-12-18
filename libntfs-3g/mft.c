@@ -1860,7 +1860,11 @@ int ntfs_mft_record_free(ntfs_volume *vol, ntfs_inode *ni)
 	}
 
 	/* Throw away the now freed inode. */
+#if CACHE_NIDATA_SIZE
+	if (!ntfs_inode_real_close(ni)) {
+#else
 	if (!ntfs_inode_close(ni)) {
+#endif
 		vol->free_mft_records++; 
 		return 0;
 	}
