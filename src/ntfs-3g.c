@@ -105,7 +105,7 @@
 
 /*
  *	The following permission checking modes are governed by
- *	the LPERMSCONFIG value in param.h
+ *	the HPERMSCONFIG value in param.h
  */
 
 /*	ACLS may be checked by kernel (requires a fuse patch) or here */
