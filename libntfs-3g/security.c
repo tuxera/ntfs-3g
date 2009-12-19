@@ -1239,7 +1239,8 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	else {
 		ismember = FALSE; /* default return */
 		tid = scx->tid;
-		sprintf(filename,"/proc/%u/task/%u/status",tid,tid);
+		sprintf(filename,"/proc/%u/task/%u/status",
+				(unsigned int)tid,(unsigned int)tid);
 		fd = open(filename,O_RDONLY);
 		if (fd >= 0) {
 			got = read(fd, buf, BUFSZ);
