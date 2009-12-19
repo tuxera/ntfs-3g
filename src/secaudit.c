@@ -161,6 +161,9 @@
  *
  *  Dec 2009, version 1.3.13
  *     - fixed the return code of dorestore()
+ *
+ *  Dec 2009, version 1.3.14
+ *     - adapted to opensolaris
  */
 
 /*
@@ -184,7 +187,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.13"
+#define AUDT_VERSION "1.3.14"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -268,6 +271,9 @@
 #endif
 
 #ifdef HAVE_CONFIG_H
+#ifdef _FILE_OFFSET_BITS
+#undef _FILE_OFFSET_BITS  /* work around "_FILE_OFFSET_BITS" possibly already defined */
+#endif
       /* <sys/xattr.h> according to config.h if integrated into ntfs-3g package */
 #include "config.h"
 #ifdef const /* work around "const" possibly redefined in config.h */
@@ -4363,6 +4369,7 @@ BOOL setfull(const char *fullname, int mode, BOOL isdir)
 	printname(stdout,fullname);
 	printf(" mode 0%03o\n",mode);
 	attrsz = getfull(attr, fullname);
+	err = FALSE;
 	if (attrsz) {
 		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 		gsid = (const SID*)&attr[le32_to_cpu(phead->group)];
@@ -5132,6 +5139,8 @@ void showmounted(const char *fullname)
 		}
 	} else
 		printf("%s not found\n",fullname);
+#else
+	fprintf(stderr,"Not possible on this configuration\n");
 #endif
 }
 
@@ -6617,9 +6626,11 @@ int getoptions(int argc, char *argv[])
 		fprintf(stderr,"	set the security parameters of file to perms\n");
 		fprintf(stderr,"   secaudit -r[v] volume perms directory\n");
 		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+#ifdef HAVE_SETXATTR
 		fprintf(stderr," special case, does not require being root :\n");
 		fprintf(stderr,"   secaudit [-v] mounted-file\n");
 		fprintf(stderr,"	display the security parameters of a mounted file\n");
+#endif
 #if POSIXACLS
 		fprintf(stderr,"   Note: perms can be an octal mode or a Posix ACL description\n");
 #else
