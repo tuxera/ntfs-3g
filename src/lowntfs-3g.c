@@ -216,7 +216,9 @@ typedef struct {
 	BOOL no_detach;
 	BOOL blkdev;
 	BOOL mounted;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	BOOL efs_raw;
+#endif /* HAVE_SETXATTR */
 	struct fuse_chan *fc;
 	BOOL inherit;
 	unsigned int secure_flags;
@@ -673,6 +675,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 		/* Regular or Interix (INTX) file. */
 		stbuf->st_mode = S_IFREG;
 		stbuf->st_size = ni->data_size;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 		/*
 		 * return data size rounded to next 512 byte boundary for
 		 * encrypted files to include padding required for decryption
@@ -680,7 +683,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 		*/
 		if (ctx->efs_raw && ni->flags & FILE_ATTR_ENCRYPTED)
 			stbuf->st_size = ((ni->data_size + 511) & ~511) + 2;
-
+#endif /* HAVE_SETXATTR */
 		/* 
 		 * Temporary fix to make ActiveSync work via Samba 3.0.
 		 * See more on the ntfs-3g-devel list.
@@ -1193,11 +1196,13 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 			/* mark a future need to compress the last chunk */
 				if (na->data_flags & ATTR_COMPRESSION_MASK)
 					state |= CLOSE_COMPRESSED;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 				if (ctx->efs_raw
 				    && !(na->data_flags & ATTR_IS_ENCRYPTED)
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					state |= CLOSE_ENCRYPTED;
+#endif /* HAVE_SETXATTR */
 			}
 			ntfs_attr_close(na);
 		} else
@@ -1256,12 +1261,14 @@ static void ntfs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 		res = -errno;
 		goto exit;
 	}
-	/* limit reads at next 512 byte boundary for encrypted attributes */
 	max_read = na->data_size;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+	/* limit reads at next 512 byte boundary for encrypted attributes */
 	if (ctx->efs_raw && (na->data_flags & ATTR_IS_ENCRYPTED) && 
 	    NAttrNonResident(na)) {
 		max_read = ((na->data_size+511) & ~511) + 2;
 	}
+#endif /* HAVE_SETXATTR */
 	if (offset + (off_t)size > max_read) {
 		if (max_read < offset)
 			goto ok;
@@ -1798,11 +1805,13 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 			if (fi && (ni->flags & FILE_ATTR_COMPRESSED)) {
 				state |= CLOSE_COMPRESSED;
 			}
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 			/* mark a future need to fixup encrypted inode */
 			if (fi
 			    && ctx->efs_raw
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				state |= CLOSE_ENCRYPTED;
+#endif /* HAVE_SETXATTR */
 			ntfs_inode_update_mbsname(dir_ni, name, ni->mft_no);
 			NInoSetDirty(ni);
 			e->ino = ni->mft_no;
@@ -2291,8 +2300,10 @@ static void ntfs_fuse_release(fuse_req_t req, fuse_ino_t ino,
 	res = 0;
 	if (of->state & CLOSE_COMPRESSED)
 		res = ntfs_attr_pclose(na);
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	if (of->state & CLOSE_ENCRYPTED)
 		res = ntfs_efs_fixup_attribute(NULL, na);
+#endif /* HAVE_SETXATTR */
 exit:
 	if (na)
 		ntfs_attr_close(na);
@@ -3583,7 +3594,9 @@ static char *parse_mount_options(const char *orig_opts)
 	int want_permissions = 0;
 
 	ctx->secure_flags = 0;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->efs_raw = FALSE;
+#endif /* HAVE_SETXATTR */
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
 		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
@@ -3764,10 +3777,12 @@ static char *parse_mount_options(const char *orig_opts)
 					"'usermapping' option.\n");
 				goto err_exit;
 			}
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 		} else if (!strcmp(opt, "efs_raw")) {
 			if (bogus_option_value(val, "efs_raw"))
 				goto err_exit;
 			ctx->efs_raw = TRUE;
+#endif /* HAVE_SETXATTR */
 		} else { /* Probably FUSE option. */
 			if (strappend(&ret, opt))
 				goto err_exit;
@@ -4242,7 +4257,9 @@ int main(int argc, char *argv[])
 
 	ctx->security.vol = ctx->vol;
 	ctx->vol->secure_flags = ctx->secure_flags;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->vol->efs_raw = ctx->efs_raw;
+#endif /* HAVE_SETXATTR */
 		/* JPA open $Secure, (whatever NTFS version !) */
 		/* to initialize security data */
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
