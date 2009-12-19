@@ -817,6 +817,8 @@ BOOL ntfs_possible_symlink(ntfs_inode *ni)
 	return (possible);
 }
 
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+
 /*
  *			Set the index for new reparse data
  *
@@ -853,6 +855,8 @@ static int set_reparse_index(ntfs_inode *ni, ntfs_index_context *xr,
 	ntfs_index_ctx_reinit(xr);
 	return (ntfs_ie_add(xr,(INDEX_ENTRY*)&indx));
 }
+
+#endif /* HAVE_SETXATTR */
 
 /*
  *		Remove a reparse data index entry if attribute present
@@ -919,6 +923,8 @@ static ntfs_index_context *open_reparse_index(ntfs_volume *vol)
 	return (xr);
 }
 
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+
 /*
  *		Update the reparse data and index
  *
@@ -983,6 +989,8 @@ static int update_reparse_data(ntfs_inode *ni, ntfs_index_context *xr,
 	return (res);
 }
 
+#endif /* HAVE_SETXATTR */
+
 /*
  *		Delete a reparse index entry
  *
@@ -1019,6 +1027,8 @@ int ntfs_delete_reparse_index(ntfs_inode *ni)
 	}
 	return (res);
 }
+
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
 
 /*
  *		Get the ntfs reparse data into an extended attribute
@@ -1198,3 +1208,5 @@ int ntfs_remove_ntfs_reparse_data(ntfs_inode *ni)
 	}
 	return (res ? -1 : 0);
 }
+
+#endif /* HAVE_SETXATTR */

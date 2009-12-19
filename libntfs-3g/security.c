@@ -2934,6 +2934,8 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni)
 	return (allowed);
 }
 
+#ifdef HAVE_SETXATTR    /* extended attributes interface required */
+
 #if POSIXACLS
 
 /*
@@ -3111,6 +3113,8 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		errno = EINVAL;
 	return (res ? -1 : 0);
 }
+
+#endif /* HAVE_SETXATTR */
 
 /*
  *		Set new permissions to a file
@@ -4141,6 +4145,8 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 	return (!scx->mapping[MAPUSERS] || link_group_members(scx));
 }
 
+#ifdef HAVE_SETXATTR    /* extended attributes interface required */
+
 /*
  *		Get the ntfs attribute into an extended attribute
  *	The attribute is returned according to cpu endianness
@@ -4224,6 +4230,8 @@ int ntfs_set_ntfs_attrib(ntfs_inode *ni,
 		errno = EINVAL;
 	return (res ? -1 : 0);
 }
+
+#endif /* HAVE_SETXATTR */
 
 /*
  *	Open $Secure once for all
