@@ -2185,6 +2185,63 @@ static int ntfs_fuse_rmdir(const char *path)
 	return ntfs_fuse_rm(path);
 }
 
+#ifdef HAVE_UTIMENSAT
+
+static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2])
+{
+	ntfs_inode *ni;
+	int res = 0;
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+	struct SECURITY_CONTEXT security;
+#endif
+
+	if (ntfs_fuse_is_named_data_stream(path))
+		return -EINVAL; /* n/a for named data streams. */
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		   /* parent directory must be executable */
+	if (ntfs_fuse_fill_security_context(&security)
+	    && !ntfs_allowed_dir_access(&security,path,
+			(ntfs_inode*)NULL,(ntfs_inode*)NULL,S_IEXEC)) {
+		return (-errno);
+	}
+#endif
+	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
+	if (!ni)
+		return -errno;
+
+			/* no check or update if both UTIME_OMIT */
+	if ((tv[0].tv_nsec != UTIME_OMIT) || (tv[1].tv_nsec != UTIME_OMIT)) {
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		if (ntfs_allowed_access(&security, ni, S_IWRITE)
+		    || ((tv[0].tv_nsec == UTIME_NOW)
+			&& (tv[0].tv_nsec == UTIME_NOW)
+			&& ntfs_allowed_as_owner(&security, ni))) {
+#endif
+			ntfs_time_update_flags mask = NTFS_UPDATE_CTIME;
+
+			if (tv[0].tv_nsec == UTIME_NOW)
+				mask |= NTFS_UPDATE_ATIME;
+			else
+				if (tv[0].tv_nsec != UTIME_OMIT)
+					ni->last_access_time = tv[0].tv_sec;
+			if (tv[1].tv_nsec == UTIME_NOW)
+				mask |= NTFS_UPDATE_MTIME;
+			else
+				if (tv[1].tv_nsec != UTIME_OMIT)
+					ni->last_data_change_time = tv[1].tv_sec;
+			ntfs_inode_update_times(ni, mask);
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		} else
+			res = -errno;
+#endif
+	}
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+#else /* HAVE_UTIMENSAT */
+
 static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
@@ -2251,6 +2308,8 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 		set_fuse_error(&res);
 	return res;
 }
+
+#endif /* HAVE_UTIMENSAT */
 
 static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
@@ -3386,6 +3445,9 @@ static void ntfs_fuse_destroy2(void *unused __attribute__((unused)))
 }
 
 static struct fuse_operations ntfs_3g_ops = {
+#if defined(HAVE_UTIMENSAT) && defined(HAS_UTIME_OMIT_OK)
+	.flag_utime_omit_ok = 1, /* accept UTIME_NOW and UTIME_OMIT in utimens */
+#endif
 	.getattr	= ntfs_fuse_getattr,
 	.readlink	= ntfs_fuse_readlink,
 	.readdir	= ntfs_fuse_readdir,
@@ -3406,7 +3468,11 @@ static struct fuse_operations ntfs_3g_ops = {
 	.rename		= ntfs_fuse_rename,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
+#ifdef HAVE_UTIMENSAT
+	.utimens	= ntfs_fuse_utimens,
+#else
 	.utime		= ntfs_fuse_utime,
+#endif
 	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
