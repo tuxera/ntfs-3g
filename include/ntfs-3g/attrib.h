@@ -281,8 +281,6 @@ extern runlist_element *ntfs_attr_find_vcn(ntfs_attr *na, const VCN vcn);
 
 extern int ntfs_attr_size_bounds_check(const ntfs_volume *vol,
 		const ATTR_TYPES type, const s64 size);
-extern int ntfs_attr_can_be_non_resident(const ntfs_volume *vol,
-		const ATTR_TYPES type);
 extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
 		const ATTR_TYPES type);
 int ntfs_attr_make_non_resident(ntfs_attr *na,
