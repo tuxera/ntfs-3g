@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -217,7 +217,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2009 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2010 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -275,8 +275,10 @@ static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
 	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
-			ni->last_access_time >= ni->last_data_change_time &&
-			ni->last_access_time >= ni->last_mft_change_time)
+			(le64_to_cpu(ni->last_access_time)
+				>= le64_to_cpu(ni->last_data_change_time)) &&
+			(le64_to_cpu(ni->last_access_time)
+				>= le64_to_cpu(ni->last_mft_change_time)))
 		return;
 	ntfs_inode_update_times(ni, mask);
 }
@@ -860,9 +862,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	if (S_ISLNK(stbuf->st_mode))
 		stbuf->st_mode |= 0777;
 	stbuf->st_ino = ni->mft_no;
-	stbuf->st_atime = ni->last_access_time;
-	stbuf->st_ctime = ni->last_mft_change_time;
-	stbuf->st_mtime = ni->last_data_change_time;
+	stbuf->st_atim = ntfs2timespec(ni->last_access_time);
+	stbuf->st_ctim = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_mtim = ntfs2timespec(ni->last_data_change_time);
 exit:
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
@@ -2223,12 +2225,14 @@ static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2])
 				mask |= NTFS_UPDATE_ATIME;
 			else
 				if (tv[0].tv_nsec != UTIME_OMIT)
-					ni->last_access_time = tv[0].tv_sec;
+					ni->last_access_time
+						= timespec2ntfs(tv[0]);
 			if (tv[1].tv_nsec == UTIME_NOW)
 				mask |= NTFS_UPDATE_MTIME;
 			else
 				if (tv[1].tv_nsec != UTIME_OMIT)
-					ni->last_data_change_time = tv[1].tv_sec;
+					ni->last_data_change_time
+						= timespec2ntfs(tv[1]);
 			ntfs_inode_update_times(ni, mask);
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		} else
@@ -2246,6 +2250,8 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 {
 	ntfs_inode *ni;
 	int res = 0;
+	struct timespec actime;
+	struct timespec modtime;
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	BOOL ownerok;
 	BOOL writeok;
@@ -2282,8 +2288,12 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 		if (!ownerok && !writeok)
 			res = (buf->actime == buf->modtime ? -EACCES : -EPERM);
 		else {
-			ni->last_access_time = buf->actime;
-			ni->last_data_change_time = buf->modtime;
+			actime.tv_sec = buf->actime;
+			actime.tv_nsec = 0;
+			modtime.tv_sec = buf->modtime;
+			modtime.tv_nsec = 0;
+			ni->last_access_time = timespec2ntfs(actime);
+			ni->last_data_change_time = timespec2ntfs(modtime);
 			ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 		}
 	} else {
@@ -2297,8 +2307,12 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 	}
 #else
 	if (buf) {
-		ni->last_access_time = buf->actime;
-		ni->last_data_change_time = buf->modtime;
+		actime.tv_sec = buf->actime;
+		actime.tv_nsec = 0;
+		modtime.tv_sec = buf->modtime;
+		modtime.tv_nsec = 0;
+		ni->last_access_time = timespec2ntfs(actime);
+		ni->last_data_change_time = timespec2ntfs(modtime);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	} else
 		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);

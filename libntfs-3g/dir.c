@@ -5,7 +5,7 @@
  * Copyright (c) 2004-2005 Richard Russon
  * Copyright (c) 2004-2008 Szabolcs Szakacsits
  * Copyright (c) 2005-2007 Yura Pakhuchiy
- * Copyright (c) 2008-2009 Jean-Pierre Andre
+ * Copyright (c) 2008-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1380,10 +1380,10 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		err = errno;
 		goto err_out;
 	}
-	si->creation_time = utc2ntfs(ni->creation_time);
-	si->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-	si->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-	si->last_access_time = utc2ntfs(ni->last_access_time);
+	si->creation_time = ni->creation_time;
+	si->last_data_change_time = ni->last_data_change_time;
+	si->last_mft_change_time = ni->last_mft_change_time;
+	si->last_access_time = ni->last_access_time;
 	if (securid) {
 		set_nino_flag(ni, v3_Extensions);
 		ni->owner_id = si->owner_id = 0;
@@ -1525,10 +1525,10 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	else
 		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
-	fn->creation_time = utc2ntfs(ni->creation_time);
-	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	fn->creation_time = ni->creation_time;
+	fn->last_data_change_time = ni->last_data_change_time;
+	fn->last_mft_change_time = ni->last_mft_change_time;
+	fn->last_access_time = ni->last_access_time;
 	if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 		fn->data_size = fn->allocated_size = const_cpu_to_le64(0);
 	else {
@@ -2007,10 +2007,10 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		fn->allocated_size = cpu_to_sle64(ni->allocated_size);
 		fn->data_size = cpu_to_sle64(ni->data_size);
 	}
-	fn->creation_time = utc2ntfs(ni->creation_time);
-	fn->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-	fn->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-	fn->last_access_time = utc2ntfs(ni->last_access_time);
+	fn->creation_time = ni->creation_time;
+	fn->last_data_change_time = ni->last_data_change_time;
+	fn->last_mft_change_time = ni->last_mft_change_time;
+	fn->last_access_time = ni->last_access_time;
 	memcpy(fn->file_name, name, name_len * sizeof(ntfschar));
 	/* Add FILE_NAME attribute to index. */
 	if (ntfs_index_add_filename(dir_ni, fn, MK_MREF(ni->mft_no,

@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2004-2005 Richard Russon
- * Copyright (c) 2009      Jean-Pierre Andre
+ * Copyright (c) 2009-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -194,10 +194,10 @@ static ntfs_inode *ntfs_inode_real_open(ntfs_volume *vol, const MFT_REF mref)
 	std_info = (STANDARD_INFORMATION *)((u8 *)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
 	ni->flags = std_info->file_attributes;
-	ni->creation_time = ntfs2utc(std_info->creation_time);
-	ni->last_data_change_time = ntfs2utc(std_info->last_data_change_time);
-	ni->last_mft_change_time = ntfs2utc(std_info->last_mft_change_time);
-	ni->last_access_time = ntfs2utc(std_info->last_access_time);
+	ni->creation_time = std_info->creation_time;
+	ni->last_data_change_time = std_info->last_data_change_time;
+	ni->last_mft_change_time = std_info->last_mft_change_time;
+	ni->last_access_time = std_info->last_access_time;
   		/* JPA insert v3 extensions if present */
                 /* length may be seen as 72 (v1.x) or 96 (v3.x) */
 	lthle = ctx->attr->length;
@@ -718,10 +718,10 @@ static int ntfs_inode_sync_standard_information(ntfs_inode *ni)
 			le16_to_cpu(ctx->attr->value_offset));
 	std_info->file_attributes = ni->flags;
 	if (!test_nino_flag(ni, TimesSet)) {
-		std_info->creation_time = utc2ntfs(ni->creation_time);
-		std_info->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-		std_info->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-		std_info->last_access_time = utc2ntfs(ni->last_access_time);
+		std_info->creation_time = ni->creation_time;
+		std_info->last_data_change_time = ni->last_data_change_time;
+		std_info->last_mft_change_time = ni->last_mft_change_time;
+		std_info->last_access_time = ni->last_access_time;
 	}
 
 		/* JPA update v3.x extensions, ensuring consistency */
@@ -831,10 +831,10 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 			fnx->data_size = cpu_to_sle64(ni->data_size);
 		}
 		if (!test_nino_flag(ni, TimesSet)) {
-			fnx->creation_time = utc2ntfs(ni->creation_time);
-			fnx->last_data_change_time = utc2ntfs(ni->last_data_change_time);
-			fnx->last_mft_change_time = utc2ntfs(ni->last_mft_change_time);
-			fnx->last_access_time = utc2ntfs(ni->last_access_time);
+			fnx->creation_time = ni->creation_time;
+			fnx->last_data_change_time = ni->last_data_change_time;
+			fnx->last_mft_change_time = ni->last_mft_change_time;
+			fnx->last_access_time = ni->last_access_time;
 		} else {
 			fnx->creation_time = fn->creation_time;
 			fnx->last_data_change_time = fn->last_data_change_time;
@@ -1322,7 +1322,7 @@ put_err_out:
  */
 void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 {
-	time_t now;
+	ntfs_time now;
 
 	if (!ni) {
 		ntfs_log_error("%s(): Invalid arguments.\n", __FUNCTION__);
@@ -1333,7 +1333,7 @@ void ntfs_inode_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 			NVolReadOnly(ni->vol) || !mask)
 		return;
 
-	now = time(NULL);
+	now = ntfs_current_time();
 	if (mask & NTFS_UPDATE_ATIME)
 		ni->last_access_time = now;
 	if (mask & NTFS_UPDATE_MTIME)
@@ -1466,14 +1466,14 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 	STANDARD_INFORMATION *std_info;
 	FILE_NAME_ATTR *fn;
 	const u64 *times;
-	le64 now;
+	ntfs_time now;
 	int cnt;
 	int ret;
 
 	ret = -1;
 	if ((size >= 8) && !(flags & XATTR_CREATE)) {
 		times = (const u64*)value;
-		now = utc2ntfs(time((time_t*)NULL));
+		now = ntfs_current_time();
 			/* update the standard information attribute */
 		ctx = ntfs_attr_get_search_ctx(ni, NULL);
 		if (ctx) {
@@ -1496,19 +1496,19 @@ int ntfs_inode_set_times(ntfs_inode *ni, const char *value, size_t size,
 				set_nino_flag(ni, TimesSet);
 				std_info->creation_time = cpu_to_le64(times[0]);
 				ni->creation_time
-					= ntfs2utc(std_info->creation_time);
+					= std_info->creation_time;
 				if (size >= 16) {
 					std_info->last_data_change_time = cpu_to_le64(times[1]);
 					ni->last_data_change_time
-						= ntfs2utc(std_info->last_data_change_time);
+						= std_info->last_data_change_time;
 				}
 				if (size >= 24) {
 					std_info->last_access_time = cpu_to_le64(times[2]);
 					ni->last_access_time
-						= ntfs2utc(std_info->last_access_time);
+						= std_info->last_access_time;
 				}
 				std_info->last_mft_change_time = now;
-				ni->last_mft_change_time = ntfs2utc(now);
+				ni->last_mft_change_time = now;
 				ntfs_inode_mark_dirty(ctx->ntfs_ino);
 				NInoFileNameSetDirty(ni);
 

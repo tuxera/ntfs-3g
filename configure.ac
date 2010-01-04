@@ -313,7 +313,7 @@ AC_CHECK_FUNCS([ \
 	atexit basename daemon dup2 fdatasync ffs getopt_long hasmntopt \
 	mbsinit memmove memset realpath regcomp setlocale setxattr \
 	strcasecmp strchr strdup strerror strnlen strsep strtol strtoul \
-	sysconf utime utimensat fork \
+	sysconf utime utimensat gettimeofday clock_gettime fork \
 ])
 AC_SYS_LARGEFILE
 

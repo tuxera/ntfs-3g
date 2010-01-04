@@ -1478,7 +1478,7 @@ found_free_rec:
 	ni->flags = 0;
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
-			ni->last_access_time = time(NULL);
+			ni->last_access_time = ntfs_current_time();
 	/* Update the default mft allocation position if it was used. */
 	if (!base_ni)
 		vol->mft_data_pos = bit + 1;
@@ -1780,7 +1780,7 @@ found_free_rec:
 	ni->flags = 0;
 	ni->creation_time = ni->last_data_change_time =
 			ni->last_mft_change_time =
-			ni->last_access_time = time(NULL);
+			ni->last_access_time = ntfs_current_time();
 	/* Update the default mft allocation position if it was used. */
 	if (!base_ni)
 		vol->mft_data_pos = bit + 1;

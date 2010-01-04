@@ -32,6 +32,7 @@ typedef struct _ntfs_inode ntfs_inode;
 #include "layout.h"
 #include "support.h"
 #include "volume.h"
+#include "ntfstime.h"
 
 /**
  * enum ntfs_inode_state_bits -
@@ -153,10 +154,10 @@ struct _ntfs_inode {
 	 * STANDARD_INFORMATION attribute and used to sync it and FILE_NAME
 	 * attribute in the index.
 	 */
-	time_t creation_time;
-	time_t last_data_change_time;
-	time_t last_mft_change_time;
-	time_t last_access_time;
+	ntfs_time creation_time;
+	ntfs_time last_data_change_time;
+	ntfs_time last_mft_change_time;
+	ntfs_time last_access_time;
 				/* NTFS 3.x extensions added by JPA */
 				/* only if NI_v3_Extensions is set in state */
  	le32 owner_id;
