@@ -68,6 +68,8 @@
 #include "cache.h"
 #include "misc.h"
 
+extern ntfschar TXF_DATA[];
+
 const char *ntfs_home = 
 "Ntfs-3g news, support and information:  http://ntfs-3g.org\n";
 
@@ -761,6 +763,67 @@ out:
 	return errno ? -1 : 0;
 }
 
+/*
+ *		Make sure a LOGGED_UTILITY_STREAM attribute named "$TXF_DATA"
+ *	on the root directory is resident.
+ *	When it is non-resident, the partition cannot be mounted on Vista
+ *	(see http://support.microsoft.com/kb/974729)
+ *
+ *	We take care to avoid this situation, however this can be a
+ *	consequence of having used an older version (including older
+ *	Windows version), so we had better fix it.
+ *
+ *	Returns 0 if unneeded or successful
+ *		-1 if there was an error, explained by errno
+ */
+
+static int fix_txf_data(ntfs_volume *vol)
+{
+	void *txf_data;
+	s64 txf_data_size;
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	int res;
+
+	res = 0;
+	ntfs_log_debug("Loading root directory\n");
+	ni = ntfs_inode_open(vol, FILE_root);
+	if (!ni) {
+		ntfs_log_perror("Failed to open root directory");
+		res = -1;
+	} else {
+		/* Get the $TXF_DATA attribute */
+		na = ntfs_attr_open(ni, AT_LOGGED_UTILITY_STREAM, TXF_DATA, 9);
+		if (na) {
+			if (NAttrNonResident(na)) {
+				/*
+				 * Fix the attribute by truncating, then
+				 * rewriting it.
+				 */
+				ntfs_log_debug("Making $TXF_DATA resident\n");
+				txf_data = ntfs_attr_readall(ni,
+						AT_LOGGED_UTILITY_STREAM,
+						TXF_DATA, 9, &txf_data_size);
+				if (txf_data) {
+					if (ntfs_attr_truncate(na, 0)
+					    || (ntfs_attr_pwrite(na, 0,
+						 txf_data_size, txf_data)
+							!= txf_data_size))
+						res = -1;
+					free(txf_data);
+				}
+			}
+			/* Done with the $AttrDef mft record. */
+			ntfs_attr_close(na);
+		}
+		if (ntfs_inode_close(ni)) {
+			ntfs_log_perror("Failed to close root");
+			res = -1;
+		}
+	}
+	return (res);
+}
+
 /**
  * ntfs_device_mount - open ntfs volume
  * @dev:	device to open
@@ -1112,6 +1175,9 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 				goto error_exit;
 		}
 	}
+		/* make $TXF_DATA resident if present on the root directory */
+	if (!NVolReadOnly(vol) && fix_txf_data(vol))
+		goto error_exit;
 
 	return vol;
 io_error_exit:
