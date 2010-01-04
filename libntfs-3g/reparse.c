@@ -909,10 +909,20 @@ static int remove_reparse_index(ntfs_attr *na, ntfs_index_context *xr,
 
 static ntfs_index_context *open_reparse_index(ntfs_volume *vol)
 {
+	u64 inum;
 	ntfs_inode *ni;
+	ntfs_inode *dir_ni;
 	ntfs_index_context *xr;
 
-	ni = ntfs_pathname_to_inode(vol, NULL, "$Extend/$Reparse");
+		/* do not use path_name_to inode - could reopen root */
+	dir_ni = ntfs_inode_open(vol, FILE_Extend);
+	ni = (ntfs_inode*)NULL;
+	if (dir_ni) {
+		inum = ntfs_inode_lookup_by_mbsname(dir_ni,"$Reparse");
+		if (inum != (u64)-1)
+			ni = ntfs_inode_open(vol, inum);
+		ntfs_inode_close(dir_ni);
+	}
 	if (ni) {
 		xr = ntfs_index_ctx_get(ni, reparse_index_name, 2);
 		if (!xr) {
