@@ -39,6 +39,9 @@ typedef struct _ntfs_attr_search_ctx ntfs_attr_search_ctx;
 extern ntfschar AT_UNNAMED[];
 extern ntfschar STREAM_SDS[];
 
+/* The little endian Unicode string $TXF_DATA as a global constant. */
+extern ntfschar TXF_DATA[10];
+
 /**
  * enum ntfs_lcn_special_values - special return values for ntfs_*_vcn_to_lcn()
  *

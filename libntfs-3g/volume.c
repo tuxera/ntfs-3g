@@ -4,6 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2009 Szabolcs Szakacsits
  * Copyright (c) 2004-2005 Richard Russon
+ * Copyright (c) 2010      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -67,8 +68,6 @@
 #include "logging.h"
 #include "cache.h"
 #include "misc.h"
-
-extern ntfschar TXF_DATA[];
 
 const char *ntfs_home = 
 "Ntfs-3g news, support and information:  http://ntfs-3g.org\n";
@@ -813,7 +812,6 @@ static int fix_txf_data(ntfs_volume *vol)
 					free(txf_data);
 				}
 			}
-			/* Done with the $AttrDef mft record. */
 			ntfs_attr_close(na);
 		}
 		if (ntfs_inode_close(ni)) {
