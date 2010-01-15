@@ -1883,6 +1883,7 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	}
 
 retry:
+	written = 0;
 	if (!NVolReadOnly(vol)) {
 			
 		written = ntfs_compressed_close(na, rl, ofs);
