@@ -53,7 +53,7 @@
 
 #include "utils.h"
 #include "list.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfsls";
 

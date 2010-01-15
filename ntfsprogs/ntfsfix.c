@@ -72,7 +72,7 @@
 #include <ntfs-3g/logging.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \

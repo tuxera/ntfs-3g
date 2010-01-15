@@ -49,7 +49,7 @@
 #include <ntfs-3g/logging.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfslabel";
 

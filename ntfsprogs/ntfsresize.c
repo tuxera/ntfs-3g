@@ -65,7 +65,7 @@
 #include <ntfs-3g/runlist.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfsresize";
 

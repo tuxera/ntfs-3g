@@ -71,7 +71,7 @@
 #include <ntfs-3g/logging.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 const char *ntfs_bugs = "Developers' email address: "NTFS_DEV_LIST"\n";
 const char *ntfs_home = "Linux NTFS homepage: http://www.linux-ntfs.org\n";

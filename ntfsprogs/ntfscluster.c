@@ -51,7 +51,7 @@
 #include "ntfscluster.h"
 #include "utils.h"
 #include "cluster.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfscluster";
 static struct options opts;

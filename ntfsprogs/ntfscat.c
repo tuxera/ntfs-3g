@@ -45,7 +45,7 @@
 #include <ntfs-3g/dir.h>
 
 #include "ntfscat.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;

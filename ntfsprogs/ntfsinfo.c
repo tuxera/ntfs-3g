@@ -78,7 +78,7 @@
 #include <ntfs-3g/ntfstime.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfsinfo";
 

@@ -73,7 +73,7 @@
 #include <ntfs-3g/ntfstime.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 #if defined(linux) && defined(_IO) && !defined(BLKGETSIZE)
 #define BLKGETSIZE	_IO(0x12,96)  /* Get device size in 512-byte blocks. */
