@@ -46,6 +46,7 @@
 
 #include "ntfscat.h"
 /* #include "version.h" */
+#include "utils.h"
 
 static const char *EXEC_NAME = "ntfscat";
 static struct options opts;
@@ -229,7 +230,7 @@ static int parse_options(int argc, char **argv)
 			break;
 
 		case 'n':
-			opts.attr_name_len = ntfs_mbstoucs(optarg,
+			opts.attr_name_len = ntfs_mbstoucs_libntfscompat(optarg,
 							   &opts.attr_name, 0);
 			if (opts.attr_name_len < 0) {
 				ntfs_log_perror("Invalid attribute name '%s'", optarg);

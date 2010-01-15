@@ -2072,7 +2072,7 @@ static int add_attr_file_name(MFT_RECORD *m, const MFT_REF parent_dir,
 	}
 	fn->file_name_type = file_name_type;
 	uname = fn->file_name;
-	i = ntfs_mbstoucs(file_name, &uname, i);
+	i = ntfs_mbstoucs_libntfscompat(file_name, &uname, i);
 	if (i < 1) {
 		free(fn);
 		return -EINVAL;
@@ -2198,7 +2198,7 @@ static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 	int i;
 
 	if (vol_name) {
-		uname_len = ntfs_mbstoucs(vol_name, &uname, 0);
+		uname_len = ntfs_mbstoucs_libntfscompat(vol_name, &uname, 0);
 		if (uname_len < 0)
 			return -errno;
 		if (uname_len > 0xff) {
@@ -3149,7 +3149,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 	}
 	fn->file_name_type = file_name_type;
 	uname = fn->file_name;
-	i = ntfs_mbstoucs(file_name, &uname, i);
+	i = ntfs_mbstoucs_libntfscompat(file_name, &uname, i);
 	if (i < 1) {
 		free(fn);
 		return -EINVAL;
@@ -3261,7 +3261,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 	}
 	fn->file_name_type = file_name_type;
 	uname = fn->file_name;
-	i = ntfs_mbstoucs(file_name, &uname, i);
+	i = ntfs_mbstoucs_libntfscompat(file_name, &uname, i);
 	if (i < 1) {
 		free(fn);
 		return -EINVAL;

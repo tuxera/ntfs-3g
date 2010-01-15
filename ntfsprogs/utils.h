@@ -105,4 +105,28 @@ static __inline__ const char *ntfs_libntfs_version(void) {
 	return "ntfs-3g unknown version (TODO: find or create a way to extract ntfs-3g version from library)";
 }
 
+/**
+ * linux-ntfs's ntfs_mbstoucs has different semantics, so we emulate it with
+ * ntfs-3g's.
+ */
+static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
+		ntfschar **outs, int outs_len)
+{
+	ntfschar *tmpstr;
+	int tmpstr_len;
+
+	if(*outs != NULL) {
+		tmpstr_len = ntfs_mbstoucs(ins, &tmpstr);
+		if(tmpstr_len >= 0) {
+			/* The extra character is the null terminator. */
+			memcpy(*outs, ins,
+				sizeof(ntfschar)*(MIN(outs_len, tmpstr_len)+1));
+			free(tmpstr);
+		}
+		return tmpstr_len;
+	}
+	else
+		return ntfs_mbstoucs(ins, outs);
+}
+
 #endif /* _NTFS_UTILS_H_ */
