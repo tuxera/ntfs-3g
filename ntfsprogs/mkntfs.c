@@ -4654,7 +4654,7 @@ static BOOL mkntfs_create_root_structures(void)
 	 */
 	bs->checksum = cpu_to_le32(0);
 	/* Make sure the bootsector is ok. */
-	if (!ntfs_boot_sector_is_ntfs(bs, TRUE)) {
+	if (!ntfs_boot_sector_is_ntfs(bs)) {
 		free(bs);
 		ntfs_log_error("FATAL: Generated boot sector is invalid!\n");
 		return FALSE;
