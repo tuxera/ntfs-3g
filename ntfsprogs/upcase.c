@@ -26,8 +26,8 @@
 #include <string.h>
 #endif
 
-#include "endians.h"
-#include "types.h"
+#include <ntfs-3g/endians.h>
+#include <ntfs-3g/types.h>
 #include "upcase.h"
 
 /**

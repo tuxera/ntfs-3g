@@ -25,8 +25,8 @@
 #ifndef _NTFSCAT_H_
 #define _NTFSCAT_H_
 
-#include "types.h"
-#include "layout.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/layout.h>
 
 struct options {
 	char		*device;	/* Device/File to work with */

@@ -24,9 +24,10 @@
 #ifndef _NTFSUNDELETE_H_
 #define _NTFSUNDELETE_H_
 
-#include "types.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/runlist.h>
+
 #include "list.h"
-#include "runlist.h"
 
 enum optmode {
 	MODE_NONE = 0,

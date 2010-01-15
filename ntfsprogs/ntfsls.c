@@ -42,17 +42,18 @@
 #include <string.h>
 #endif
 
-#include "types.h"
-#include "mft.h"
-#include "attrib.h"
-#include "layout.h"
-#include "inode.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/mft.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/layout.h>
+#include <ntfs-3g/inode.h>
+#include <ntfs-3g/dir.h>
+#include <ntfs-3g/ntfstime.h>
+#include <ntfs-3g/logging.h>
+
 #include "utils.h"
-#include "dir.h"
 #include "list.h"
-#include "ntfstime.h"
 #include "version.h"
-#include "logging.h"
 
 static const char *EXEC_NAME = "ntfsls";
 

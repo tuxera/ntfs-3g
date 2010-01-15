@@ -38,12 +38,12 @@
 #include <string.h>
 #endif
 
-#include "types.h"
-#include "attrib.h"
-#include "utils.h"
-#include "volume.h"
-#include "debug.h"
-#include "dir.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/debug.h>
+#include <ntfs-3g/dir.h>
+
 #include "ntfscat.h"
 #include "version.h"
 

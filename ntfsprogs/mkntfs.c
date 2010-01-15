@@ -128,24 +128,25 @@
 #	endif
 #endif
 
-#include "security.h"
-#include "types.h"
-#include "attrib.h"
-#include "bitmap.h"
-#include "bootsect.h"
-#include "device.h"
-#include "dir.h"
-#include "mft.h"
-#include "mst.h"
-#include "runlist.h"
+#include <ntfs-3g/security.h>
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/bitmap.h>
+#include <ntfs-3g/bootsect.h>
+#include <ntfs-3g/device.h>
+#include <ntfs-3g/dir.h>
+#include <ntfs-3g/mft.h>
+#include <ntfs-3g/mst.h>
+#include <ntfs-3g/runlist.h>
+#include <ntfs-3g/ntfstime.h>
+#include <ntfs-3g/logging.h>
+
 #include "utils.h"
-#include "ntfstime.h"
 #include "sd.h"
 #include "upcase.h"
 #include "boot.h"
 #include "attrdef.h"
 #include "version.h"
-#include "logging.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #error "No default device io operations!  Cannot build mkntfs.  \

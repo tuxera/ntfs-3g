@@ -51,18 +51,19 @@
 #include <getopt.h>
 #endif
 
-#include "debug.h"
-#include "types.h"
-#include "support.h"
-#include "endians.h"
-#include "bootsect.h"
-#include "device.h"
-#include "attrib.h"
-#include "volume.h"
-#include "mft.h"
-#include "bitmap.h"
-#include "inode.h"
-#include "runlist.h"
+#include <ntfs-3g/debug.h>
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/support.h>
+#include <ntfs-3g/endians.h>
+#include <ntfs-3g/bootsect.h>
+#include <ntfs-3g/device.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/mft.h>
+#include <ntfs-3g/bitmap.h>
+#include <ntfs-3g/inode.h>
+#include <ntfs-3g/runlist.h>
+
 #include "utils.h"
 #include "version.h"
 

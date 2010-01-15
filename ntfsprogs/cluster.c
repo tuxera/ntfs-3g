@@ -33,9 +33,10 @@
 #include <string.h>
 #endif
 
+#include <ntfs-3g/logging.h>
+
 #include "cluster.h"
 #include "utils.h"
-#include "logging.h"
 
 /**
  * cluster_find
