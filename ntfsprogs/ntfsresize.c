@@ -2239,7 +2239,7 @@ static ntfs_volume *mount_volume(void)
 				 "You must 'umount' it first.\n", opt.volume);
 	}
 
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | MS_NOATIME))) {
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag /*| MS_NOATIME*/))) {
 
 		int err = errno;
 
