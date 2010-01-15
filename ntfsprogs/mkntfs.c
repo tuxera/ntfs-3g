@@ -2295,7 +2295,7 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 	r->index.index_length = const_cpu_to_le32(sizeof(INDEX_HEADER) +
 			sizeof(INDEX_ENTRY_HEADER));
 	r->index.allocated_size = r->index.index_length;
-	r->index.flags = SMALL_INDEX;
+	r->index.ih_flags = SMALL_INDEX;
 	memset(&r->index.reserved, 0, sizeof(r->index.reserved));
 	e = (INDEX_ENTRY_HEADER*)((u8*)&r->index +
 			le32_to_cpu(r->index.entries_offset));
@@ -2475,14 +2475,14 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 			cpu_to_le16(1);
 	ia_val->lsn = cpu_to_le64(0);
 	ia_val->index_block_vcn = cpu_to_le64(0);
-	ia_val->index.flags = LEAF_NODE;
+	ia_val->index.ih_flags = LEAF_NODE;
 	/* Align to 8-byte boundary. */
 	ia_val->index.entries_offset = cpu_to_le32((sizeof(INDEX_HEADER) +
 			le16_to_cpu(ia_val->usa_count) * 2 + 7) & ~7);
 	ia_val->index.allocated_size = cpu_to_le32(index_block_size -
 			(sizeof(INDEX_ALLOCATION) - sizeof(INDEX_HEADER)));
 	/* Find the last entry in the index root and save it in re. */
-	while ((char*)re < re_end && !(re->flags & INDEX_ENTRY_END)) {
+	while ((char*)re < re_end && !(re->ie_flags & INDEX_ENTRY_END)) {
 		/* Next entry in index root. */
 		re = (INDEX_ENTRY*)((char*)re + le16_to_cpu(re->length));
 	}
@@ -2499,8 +2499,8 @@ static int upgrade_to_large_index(MFT_RECORD *m, const char *name,
 		re = (INDEX_ENTRY*)re_start;
 	}
 	/* Now fixup empty index root with pointer to index allocation VCN 0. */
-	r->index.flags = LARGE_INDEX;
-	re->flags |= INDEX_ENTRY_NODE;
+	r->index.ih_flags = LARGE_INDEX;
+	re->ie_flags |= INDEX_ENTRY_NODE;
 	if (le16_to_cpu(re->length) < sizeof(INDEX_ENTRY_HEADER) + sizeof(VCN))
 		re->length = cpu_to_le16(le16_to_cpu(re->length) + sizeof(VCN));
 	r->index.index_length = cpu_to_le32(le32_to_cpu(r->index.entries_offset)
@@ -2717,7 +2717,7 @@ static int insert_index_entry_in_res_dir_index(INDEX_ENTRY *idx, u32 idx_size,
 	 */
 	if (type == AT_FILE_NAME) {
 		while (((u8*)idx_entry < (u8*)idx_end) &&
-				!(idx_entry->flags & INDEX_ENTRY_END)) {
+				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
 			i = ntfs_file_values_compare(&idx->key.file_name,
 					&idx_entry->key.file_name, 1,
 					IGNORE_CASE, g_vol->upcase,
@@ -2750,7 +2750,7 @@ do_next:
 		}
 	} else if (type == AT_UNUSED) {  /* case view */
 		while (((u8*)idx_entry < (u8*)idx_end) &&
-				!(idx_entry->flags & INDEX_ENTRY_END)) {
+				!(idx_entry->ie_flags & INDEX_ENTRY_END)) {
 			i = ntfs_index_keys_compare((u8*)idx + 0x10,
 					(u8*)idx_entry + 0x10,
 					le16_to_cpu(idx->key_length),
@@ -2821,7 +2821,7 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		idx_entry_sdh->reservedV = const_cpu_to_le32(0x00);
 		idx_entry_sdh->length = const_cpu_to_le16(0x30);
 		idx_entry_sdh->key_length = const_cpu_to_le16(0x08);
-		idx_entry_sdh->flags = const_cpu_to_le16(0x00);
+		idx_entry_sdh->ie_flags = const_cpu_to_le16(0x00);
 		idx_entry_sdh->reserved = const_cpu_to_le16(0x00);
 		idx_entry_sdh->key.sdh.hash = sds_header->hash;
 		idx_entry_sdh->key.sdh.security_id = sds_header->security_id;
@@ -2839,7 +2839,7 @@ static int initialize_secure(char *sds, u32 sds_size, MFT_RECORD *m)
 		idx_entry_sii->reservedV = const_cpu_to_le32(0x00);
 		idx_entry_sii->length = const_cpu_to_le16(0x28);
 		idx_entry_sii->key_length = const_cpu_to_le16(0x04);
-		idx_entry_sii->flags = const_cpu_to_le16(0x00);
+		idx_entry_sii->ie_flags = const_cpu_to_le16(0x00);
 		idx_entry_sii->reserved = const_cpu_to_le16(0x00);
 		idx_entry_sii->key.sii.security_id = sds_header->security_id;
 		sii_data = (SII_INDEX_DATA*)((u8*)idx_entry_sii +
@@ -2885,7 +2885,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q1->reservedV = const_cpu_to_le32(0x00);
 	idx_entry_q1->length = const_cpu_to_le16(0x48);
 	idx_entry_q1->key_length = const_cpu_to_le16(0x04);
-	idx_entry_q1->flags = const_cpu_to_le16(0x00);
+	idx_entry_q1->ie_flags = const_cpu_to_le16(0x00);
 	idx_entry_q1->reserved = const_cpu_to_le16(0x00);
 	idx_entry_q1->key.owner_id = const_cpu_to_le32(0x01);
 	idx_entry_q1_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q1
@@ -2914,7 +2914,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2->reservedV = const_cpu_to_le32(0x00);
 	idx_entry_q2->length = const_cpu_to_le16(0x58);
 	idx_entry_q2->key_length = const_cpu_to_le16(0x04);
-	idx_entry_q2->flags = const_cpu_to_le16(0x00);
+	idx_entry_q2->ie_flags = const_cpu_to_le16(0x00);
 	idx_entry_q2->reserved = const_cpu_to_le16(0x00);
 	idx_entry_q2->key.owner_id = QUOTA_FIRST_USER_ID;
 	idx_entry_q2_data = (QUOTA_CONTROL_ENTRY*)((char*)idx_entry_q2
@@ -2950,7 +2950,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_o->reservedV = const_cpu_to_le32(0x00);
 	idx_entry_o->length = const_cpu_to_le16(0x28);
 	idx_entry_o->key_length = const_cpu_to_le16(0x10);
-	idx_entry_o->flags = const_cpu_to_le16(0x00);
+	idx_entry_o->ie_flags = const_cpu_to_le16(0x00);
 	idx_entry_o->reserved = const_cpu_to_le16(0x00);
 	idx_entry_o->key.sid.revision = 0x01;
 	idx_entry_o->key.sid.sub_authority_count = 0x02;
@@ -3004,7 +3004,7 @@ static int insert_file_link_in_dir_index(INDEX_BLOCK *idx, MFT_REF file_ref,
 	 * Loop until we exceed valid memory (corruption case) or until we
 	 * reach the last entry.
 	 */
-	while ((char*)ie < index_end && !(ie->flags & INDEX_ENTRY_END)) {
+	while ((char*)ie < index_end && !(ie->ie_flags & INDEX_ENTRY_END)) {
 #if 0
 #ifdef DEBUG
 		ntfs_log_debug("file_name_attr1->file_name_length = %i\n",
@@ -3086,7 +3086,7 @@ do_next:
 	ie->indexed_file = file_ref;
 	ie->length = cpu_to_le16(i);
 	ie->key_length = cpu_to_le16(file_name_size);
-	ie->flags = cpu_to_le16(0);
+	ie->ie_flags = cpu_to_le16(0);
 	ie->reserved = cpu_to_le16(0);
 	memcpy((char*)&ie->key.file_name, (char*)file_name, file_name_size);
 	return 0;

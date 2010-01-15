@@ -1350,7 +1350,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 	int numb_entries = 1;
 	while (1) {
 		if (!opts.verbose) {
-			if (entry->flags & INDEX_ENTRY_END)
+			if (entry->ie_flags & INDEX_ENTRY_END)
 				break;
 			entry = (INDEX_ENTRY *)((u8 *)entry +
 						le16_to_cpu(entry->length));
@@ -1362,13 +1362,13 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 		ntfs_log_verbose("\t\tKey length:\t\t %u\n",
 				le16_to_cpu(entry->key_length));
 		ntfs_log_verbose("\t\tFlags:\t\t\t 0x%02x\n",
-			le16_to_cpu(entry->flags));
+			le16_to_cpu(entry->ie_flags));
 
-		if (entry->flags & INDEX_ENTRY_NODE)
+		if (entry->ie_flags & INDEX_ENTRY_NODE)
 			ntfs_log_verbose("\t\tSubnode VCN:\t\t 0x%llx\n",
 				sle64_to_cpu(*(VCN*)((u8*)entry +
 				le16_to_cpu(entry->length) - sizeof(VCN))));
-		if (entry->flags & INDEX_ENTRY_END)
+		if (entry->ie_flags & INDEX_ENTRY_END)
 			break;
 
 		switch (type) {
@@ -1502,7 +1502,7 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 		(unsigned int)le32_to_cpu(index_root->index.index_length));
 
 	/* the flags are 8bit long, no need for byte-order handling */
-	printf("\tFlags:\t\t\t 0x%02x\n",index_root->index.flags);
+	printf("\tFlags:\t\t\t 0x%02x\n",index_root->index.ih_flags);
 
 	entry = (INDEX_ENTRY *)((u8 *)index_root +
 			le32_to_cpu(index_root->index.entries_offset) + 0x10);
@@ -1583,7 +1583,7 @@ static void ntfs_dump_attr_index_allocation(ATTR_RECORD *attr, ntfs_inode *ni)
 					index.index_length), (unsigned int)
 					le32_to_cpu(tmp_alloc->index.
 					allocated_size),
-					tmp_alloc->index.flags);
+					tmp_alloc->index.ih_flags);
 			if (opts.verbose) {
 				ntfs_dump_usa_lsn("\t\t", 
 						  (MFT_RECORD *)tmp_alloc);

@@ -718,7 +718,7 @@ static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
 	s64 timestamp = utc2ntfs(0);
 
-	while (!(e->flags & INDEX_ENTRY_END)) {
+	while (!(e->ie_flags & INDEX_ENTRY_END)) {
 
 		e->key.file_name.creation_time = timestamp;
 		e->key.file_name.last_data_change_time = timestamp;
@@ -827,7 +827,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 	entry = (INDEX_ENTRY *)((u8 *)iroot +
 			le32_to_cpu(iroot->index.entries_offset) + 0x10);
 
-	while (!(entry->flags & INDEX_ENTRY_END)) {
+	while (!(entry->ie_flags & INDEX_ENTRY_END)) {
 
 		if (iroot->type == AT_FILE_NAME) {
 
