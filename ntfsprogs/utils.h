@@ -105,6 +105,11 @@ static __inline__ const char *ntfs_libntfs_version(void) {
 	return "ntfs-3g unknown version (TODO: find or create a way to extract ntfs-3g version from library)";
 }
 
+/* MAX_PATH definition was missing in ntfs-3g's headers. */
+#ifndef MAX_PATH
+#define MAX_PATH 1024
+#endif
+
 /**
  * linux-ntfs's ntfs_mbstoucs has different semantics, so we emulate it with
  * ntfs-3g's.
