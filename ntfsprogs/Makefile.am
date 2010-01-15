@@ -1,10 +1,10 @@
 if REALLYSTATIC
-AM_LIBS		= $(top_builddir)/libntfs/.libs/libntfs.a
+AM_LIBS		= 
 AM_LFLAGS	= -static
 STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else
-AM_LIBS		= $(top_builddir)/libntfs/libntfs.la
-AM_LFLAGS	= $(all_libraries)
+AM_LIBS		= 
+AM_LFLAGS	= $(all_libraries) -lntfs-3g
 LIBTOOL_LINK    = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
@@ -42,7 +42,7 @@ EXTRA_PROGRAMS		+= ntfsrm
 endif
 
 # Set the include path.
-AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
+AM_CPPFLAGS		= $(all_includes)
 
 ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)
