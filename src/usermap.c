@@ -130,7 +130,11 @@ typedef enum { false, true } boolean;
 #include <unistd.h>
 #include <dlfcn.h>
 
+#if __bool_true_false_are_defined
+typedef bool boolean, BOOL;
+#else
 typedef enum { false, true } boolean, BOOL;
+#endif
 typedef unsigned int DWORD; /* must be 32 bits whatever the platform */
 typedef DWORD *LPDWORD;
 
