@@ -149,6 +149,25 @@
  *
  *  Nov 2009, version 1.3.9
  *     - allowed security descriptors up to 64K
+ *
+ *  Nov 2009, version 1.3.10
+ *     - applied patches for MacOSX from Erik Larsson
+ *
+ *  Nov 2009, version 1.3.11
+ *     - replace <attr/xattr.h> by <sys/xattr.h> (provided by glibc)
+ *
+ *  Dec 2009, version 1.3.12
+ *     - worked around "const" possibly redefined in config.h
+ *
+ *  Dec 2009, version 1.3.13
+ *     - fixed the return code of dorestore()
+ *
+ *  Dec 2009, version 1.3.14
+ *     - adapted to opensolaris
+ *
+ *  Jan 2010, version 1.3.15
+ *     - more adaptations to opensolaris
+ *     - removed the fix for return code of dorestore()
  */
 
 /*
@@ -172,7 +191,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.9"
+#define AUDT_VERSION "1.3.15"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -234,7 +253,12 @@
 				 */
 
 #include <sys/stat.h>
+#ifdef HAVE_ENDIAN_H
 #include <endian.h>
+#endif
+#ifdef HAVE_MACHINE_ENDIAN_H
+#include <machine/endian.h>
+#endif
 #include <unistd.h>
 #include <dlfcn.h>
 #endif /* STSC */
@@ -246,20 +270,26 @@
 #ifndef STSC
 
 #if !defined(HAVE_CONFIG_H) && POSIXACLS
-      /* require <attr/xattr.h> if not integrated into ntfs-3g package */
+      /* require <sys/xattr.h> if not integrated into ntfs-3g package */
 #define HAVE_SETXATTR 1
 #endif
 
 #ifdef HAVE_CONFIG_H
-      /* <attr/xattr.h> according to config.h if integrated into ntfs-3g package */
+#ifdef _FILE_OFFSET_BITS
+#undef _FILE_OFFSET_BITS  /* work around "_FILE_OFFSET_BITS" possibly already defined */
+#endif
+      /* <sys/xattr.h> according to config.h if integrated into ntfs-3g package */
 #include "config.h"
+#ifdef const /* work around "const" possibly redefined in config.h */
+#undef const
+#endif
 #ifndef POSIXACLS
 #define POSIXACLS 0
 #endif
 #endif /* HAVE_CONFIG_H */
 
 #ifdef HAVE_SETXATTR
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #else
 #warning "The extended attribute package is not available"
 #endif /* HAVE_SETXATTR */
@@ -5002,14 +5032,23 @@ BOOL singleshow(const char *path)
 	return (err);
 }
 
+#ifdef HAVE_SETXATTR
+
+static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, size_t size)
+{
+#if defined(__APPLE__) || defined(__DARWIN__)
+    return getxattr(path, name, value, size, 0, 0);
+#else
+    return getxattr(path, name, value, size);
+#endif
+}
+
 /*
  *		   Display all the parameters associated to a mounted file
  */
 
 void showmounted(const char *fullname)
 {
-#ifdef HAVE_SETXATTR
-
 	static char attr[MAXATTRSZ];
 	struct stat st;
 #if POSIXACLS
@@ -5030,14 +5069,14 @@ void showmounted(const char *fullname)
 		printname(stdout,fullname);
 		printf("\n");
 
-		attrsz = getxattr(fullname,"system.ntfs_acl",attr,MAXATTRSZ);
+		attrsz = ntfs_getxattr(fullname,"system.ntfs_acl",attr,MAXATTRSZ);
 		if (attrsz > 0) {
 			if (opt_v) {
 				hexdump(attr,attrsz,8);
 				printf("Computed hash : 0x%08lx\n",
 					(unsigned long)hash((le32*)attr,attrsz));
 			}
-			if (getxattr(fullname,"system.ntfs_attrib",&attrib,4) != 4) {
+			if (ntfs_getxattr(fullname,"system.ntfs_attrib",&attrib,4) != 4) {
 				printf("** Could not get file attrib\n");
 				errors++;
 			} else
@@ -5102,8 +5141,16 @@ void showmounted(const char *fullname)
 		}
 	} else
 		printf("%s not found\n",fullname);
-#endif
 }
+
+#else /* HAVE_SETXATTR */
+
+void showmounted(const char *fullname __attribute__((unused)))
+{
+	fprintf(stderr,"Not possible on this configuration\n");
+}
+
+#endif /* HAVE_SETXATTR */
 
 #if POSIXACLS
 
@@ -6587,9 +6634,11 @@ int getoptions(int argc, char *argv[])
 		fprintf(stderr,"	set the security parameters of file to perms\n");
 		fprintf(stderr,"   secaudit -r[v] volume perms directory\n");
 		fprintf(stderr,"	set the security parameters of files in directory to perms\n");
+#ifdef HAVE_SETXATTR
 		fprintf(stderr," special case, does not require being root :\n");
 		fprintf(stderr,"   secaudit [-v] mounted-file\n");
 		fprintf(stderr,"	display the security parameters of a mounted file\n");
+#endif
 #if POSIXACLS
 		fprintf(stderr,"   Note: perms can be an octal mode or a Posix ACL description\n");
 #else
@@ -7007,7 +7056,7 @@ int main(int argc, char *argv[])
 				if (opt_s) {
 					fd = fopen(argv[xarg+1],"rb");
 					if (fd) {
-						if (!dorestore(argv[xarg],fd))
+						if (dorestore(argv[xarg],fd))
 							cmderr = TRUE;
 						fclose(fd);
 					} else { 
