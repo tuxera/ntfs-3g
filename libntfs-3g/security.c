@@ -41,6 +41,9 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
@@ -2893,6 +2896,8 @@ BOOL ntfs_allowed_as_owner(struct SECURITY_CONTEXT *scx,
 	return (allowed);
 }
 
+#ifdef HAVE_SETXATTR    /* extended attributes interface required */
+
 #if POSIXACLS
 
 /*
@@ -3073,6 +3078,8 @@ int ntfs_set_ntfs_acl(struct SECURITY_CONTEXT *scx,
 		errno = EINVAL;
 	return (res ? -1 : 0);
 }
+
+#endif /* HAVE_SETXATTR */
 
 /*
  *		Set new permissions to a file
@@ -3988,6 +3995,8 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 	return (!scx->mapping[MAPUSERS] || link_group_members(scx));
 }
 
+#ifdef HAVE_SETXATTR    /* extended attributes interface required */
+
 /*
  *		Get the ntfs attribute into an extended attribute
  *	The attribute is returned according to cpu endianness
@@ -4072,6 +4081,8 @@ int ntfs_set_ntfs_attrib(const char *path  __attribute__((unused)),
 		errno = EINVAL;
 	return (res ? -1 : 0);
 }
+
+#endif /* HAVE_SETXATTR */
 
 /*
  *	Open $Secure once for all
