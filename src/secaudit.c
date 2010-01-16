@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -164,6 +164,13 @@
  *
  *  Dec 2009, version 1.3.14
  *     - adapted to opensolaris
+ *
+ *  Jan 2010, version 1.3.15
+ *     - more adaptations to opensolaris
+ *     - removed the fix for return code of dorestore()
+ *
+ *  Jan 2010, version 1.3.16
+ *     - repeated the fix for return code of dorestore()
  */
 
 /*
@@ -187,7 +194,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.14"
+#define AUDT_VERSION "1.3.16"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -5030,6 +5037,8 @@ BOOL singleshow(const char *path)
 	return (err);
 }
 
+#ifdef HAVE_SETXATTR
+
 static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, size_t size)
 {
 #if defined(__APPLE__) || defined(__DARWIN__)
@@ -5045,7 +5054,6 @@ static ssize_t ntfs_getxattr(const char *path, const char *name, void *value, si
 
 void showmounted(const char *fullname)
 {
-#ifdef HAVE_SETXATTR
 
 	static char attr[MAXATTRSZ];
 	struct stat st;
@@ -5139,10 +5147,16 @@ void showmounted(const char *fullname)
 		}
 	} else
 		printf("%s not found\n",fullname);
-#else
-	fprintf(stderr,"Not possible on this configuration\n");
-#endif
 }
+
+#else /* HAVE_SETXATTR */
+
+void showmounted(const char *fullname __attribute__((unused)))
+{
+	fprintf(stderr,"Not possible on this configuration\n");
+}
+
+#endif /* HAVE_SETXATTR */
 
 #if POSIXACLS
 
