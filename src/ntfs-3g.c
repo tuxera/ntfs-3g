@@ -3459,8 +3459,13 @@ static void ntfs_fuse_destroy2(void *unused __attribute__((unused)))
 }
 
 static struct fuse_operations ntfs_3g_ops = {
-#if defined(HAVE_UTIMENSAT) && defined(HAS_UTIME_OMIT_OK)
-	.flag_utime_omit_ok = 1, /* accept UTIME_NOW and UTIME_OMIT in utimens */
+#if defined(HAVE_UTIMENSAT) && (defined(FUSE_INTERNAL) || (FUSE_VERSION > 28))
+		/*
+		 * Accept UTIME_NOW and UTIME_OMIT in utimens, when
+		 * using internal fuse or a fuse version since 2.9
+		 * (this field is not present in older versions)
+		 */
+	.flag_utime_omit_ok = 1,
 #endif
 	.getattr	= ntfs_fuse_getattr,
 	.readlink	= ntfs_fuse_readlink,

@@ -68,8 +68,6 @@ typedef int (*fuse_fill_dir_t) (void *buf, const char *name,
  * Previously, paths were limited to a length of PATH_MAX.
  */
 
-#define HAS_UTIME_OMIT_OK 1
-
 struct fuse_operations {
 	/** Get file attributes.
 	 *
