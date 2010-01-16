@@ -811,6 +811,10 @@ static int fix_txf_data(ntfs_volume *vol)
 						res = -1;
 					free(txf_data);
 				}
+			if (res)
+				ntfs_log_error("Failed to make $TXF_DATA resident\n");
+			else
+				ntfs_log_error("$TXF_DATA made resident\n");
 			}
 			ntfs_attr_close(na);
 		}
