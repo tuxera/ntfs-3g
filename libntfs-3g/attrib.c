@@ -1895,8 +1895,8 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	}
 
 retry:
+	written = 0;
 	if (!NVolReadOnly(vol)) {
-			
 		written = ntfs_compressed_close(na, rl, ofs);
 #if CACHE_NIDATA_SIZE
 		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
