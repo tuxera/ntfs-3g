@@ -42,6 +42,9 @@
  *
  *  Nov 2009 Version 1.1.3
  *     - shutdown compiler warnings for unused parameters
+ *
+ *  Jan 2010 Version 1.1.4
+ *     - fixed compilation problems for Mac OSX (Erik Larsson)
  */
 
 /*
@@ -80,7 +83,7 @@
 #define INIT_FILE_SECURITY "ntfs_initialize_file_security"
 #define LEAVE_FILE_SECURITY "ntfs_leave_file_security"
 
-#define VERSION "1.1.3"
+#define VERSION "1.1.4"
 #define MAPDIR ".NTFS-3G"
 #define MAPFILE "UserMapping"
 #define MAXATTRSZ 2048
@@ -133,7 +136,12 @@ typedef enum { false, true } boolean;
 #include <unistd.h>
 #include <dlfcn.h>
 
+#if __bool_true_false_are_defined
+		/* when stdbool.h has been included */
+typedef bool boolean, BOOL;
+#else
 typedef enum { false, true } boolean, BOOL;
+#endif
 typedef unsigned int DWORD; /* must be 32 bits whatever the platform */
 typedef DWORD *LPDWORD;
 
