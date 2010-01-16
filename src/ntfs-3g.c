@@ -4378,6 +4378,9 @@ int main(int argc, char *argv[])
 	if (permissions_mode)
 	        ntfs_log_info("%s, configuration type %d\n",permissions_mode,
 			4 + POSIXACLS*6 - KERNELPERMS*3 + CACHEING);
+	if ((ctx->secure_flags |= (1 << SECURITY_RAW))
+	    && !ctx->uid && ctx->gid)
+		ntfs_log_error("Warning : using problematic uid==0 and gid!=0\n");
 	
 	fuse_loop(fh);
 	
