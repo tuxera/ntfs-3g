@@ -862,9 +862,17 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	if (S_ISLNK(stbuf->st_mode))
 		stbuf->st_mode |= 0777;
 	stbuf->st_ino = ni->mft_no;
-	stbuf->st_atim = ntfs2timespec(ni->last_access_time);
-	stbuf->st_ctim = ntfs2timespec(ni->last_mft_change_time);
-	stbuf->st_mtim = ntfs2timespec(ni->last_data_change_time);
+#ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
+	stbuf->st_atimespec = ntfs2timespec(ni->last_access_time);
+	stbuf->st_ctimespec = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_mtimespec = ntfs2timespec(ni->last_data_change_time);
+#elif defined(HAVE_STRUCT_STAT_ST_ATIM)
+ 	stbuf->st_atim = ntfs2timespec(ni->last_access_time);
+ 	stbuf->st_ctim = ntfs2timespec(ni->last_mft_change_time);
+ 	stbuf->st_mtim = ntfs2timespec(ni->last_data_change_time);
+#else
+	#error "No known timespec member in struct stat!"
+#endif
 exit:
 	if (ntfs_inode_close(ni))
 		set_fuse_error(&res);
