@@ -1622,7 +1622,11 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 
 	if (!arl || !*arl) {
 		errno = EINVAL;
-		ntfs_log_perror("rl_truncate error: arl: %p *arl: %p", arl, *arl);
+		if (!arl)
+			ntfs_log_perror("rl_truncate error: arl: %p", arl);
+		else
+			ntfs_log_perror("rl_truncate error:"
+				" arl: %p *arl: %p", arl, *arl);
 		return -1;
 	}
 	
