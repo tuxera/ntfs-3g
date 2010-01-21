@@ -473,7 +473,7 @@ done_zones_check:
 			ntfs_log_trace("Switching zone.\n");
 			pass = 1;
 			if (rlpos) {
-				LCN tc = tc = rl[rlpos - 1].lcn + 
+				LCN tc = rl[rlpos - 1].lcn + 
 				      rl[rlpos - 1].length + NTFS_LCNALLOC_SKIP;
 				
 				if (used_zone_pos)
