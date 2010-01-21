@@ -4599,7 +4599,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	if (sle64_to_cpu(a->lowest_vcn)) {
 		ntfs_log_trace("Eeek!  Should be called for the first extent of the "
 				"attribute.  Aborting...\n");
-		err = EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
