@@ -3447,7 +3447,6 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 {
 	ntfs_inode *base_ni, *ni;
 	ATTR_TYPES type;
-	int err;
 
 	if (!ctx || !ctx->ntfs_ino || !ctx->mrec || !ctx->attr) {
 		errno = EINVAL;
@@ -3472,7 +3471,7 @@ int ntfs_attr_record_rm(ntfs_attr_search_ctx *ctx)
 			if (ntfs_attrlist_entry_add(ni, ctx->attr))
 				ntfs_log_trace("Rollback failed. Leaving inconstant "
 						"metadata.\n");
-		err = EIO;
+		errno = EIO;
 		return -1;
 	}
 	ntfs_inode_mark_dirty(ni);
