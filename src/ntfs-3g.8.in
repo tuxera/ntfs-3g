@@ -4,7 +4,7 @@
 .\" Copyright (c) 2009 Jean-Pierre Andre
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "November 2009" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "February 2010" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
