@@ -1520,11 +1520,62 @@ exit:
 	return res;
 }
 
+#ifdef HAVE_UTIMENSAT
+
+static int ntfs_fuse_utimens(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
+		struct stat *stin, struct stat *stbuf, int to_set)
+{
+	ntfs_inode *ni;
+	int res = 0;
+
+	ni = ntfs_inode_open(ctx->vol, INODE(ino));
+	if (!ni)
+		return -errno;
+
+			/* no check or update if both UTIME_OMIT */
+	if (to_set & (FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME)) {
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		if (ntfs_allowed_access(scx, ni, S_IWRITE)
+		    || ((to_set & FUSE_SET_ATTR_ATIME_NOW)
+			&& (to_set & FUSE_SET_ATTR_MTIME_NOW)
+			&& ntfs_allowed_as_owner(scx, ni))) {
+#endif
+			ntfs_time_update_flags mask = NTFS_UPDATE_CTIME;
+
+			if (to_set & FUSE_SET_ATTR_ATIME_NOW)
+				mask |= NTFS_UPDATE_ATIME;
+			else
+				if (to_set & FUSE_SET_ATTR_ATIME)
+					ni->last_access_time
+						= timespec2ntfs(stin->st_atim);
+			if (to_set & FUSE_SET_ATTR_MTIME_NOW)
+				mask |= NTFS_UPDATE_MTIME;
+			else
+				if (to_set & FUSE_SET_ATTR_MTIME)
+					ni->last_data_change_time 
+						= timespec2ntfs(stin->st_mtim);
+			ntfs_inode_update_times(ni, mask);
+#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
+		} else
+			res = -errno;
+#endif
+	}
+	if (!res)
+		res = ntfs_fuse_getstat(scx, ni, stbuf);
+	if (ntfs_inode_close(ni))
+		set_fuse_error(&res);
+	return res;
+}
+
+#else /* HAVE_UTIMENSAT */
+
 static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		struct stat *stin, struct stat *stbuf)
 {
 	ntfs_inode *ni;
 	int res = 0;
+	struct timespec actime;
+	struct timespec modtime;
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	BOOL ownerok;
 	BOOL writeok;
@@ -1578,6 +1629,8 @@ static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		set_fuse_error(&res);
 	return res;
 }
+
+#endif /* HAVE_UTIMENSAT */
 
 static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			 int to_set, struct fuse_file_info *fi __attribute__((unused)))
