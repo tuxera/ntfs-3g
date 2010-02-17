@@ -302,8 +302,10 @@ static void ntfs_fuse_update_times(ntfs_inode *ni, ntfs_time_update_flags mask)
 	if (ctx->atime == ATIME_DISABLED)
 		mask &= ~NTFS_UPDATE_ATIME;
 	else if (ctx->atime == ATIME_RELATIVE && mask == NTFS_UPDATE_ATIME &&
-			ni->last_access_time >= ni->last_data_change_time &&
-			ni->last_access_time >= ni->last_mft_change_time)
+			(le64_to_cpu(ni->last_access_time)
+				>= le64_to_cpu(ni->last_data_change_time)) &&
+			(le64_to_cpu(ni->last_access_time)
+				>= le64_to_cpu(ni->last_mft_change_time)))
 		return;
 	ntfs_inode_update_times(ni, mask);
 }
@@ -761,9 +763,17 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 	if (S_ISLNK(stbuf->st_mode))
 		stbuf->st_mode |= 0777;
 	stbuf->st_ino = ni->mft_no;
-	stbuf->st_atime = ni->last_access_time;
-	stbuf->st_ctime = ni->last_mft_change_time;
-	stbuf->st_mtime = ni->last_data_change_time;
+#ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
+	stbuf->st_atimespec = ntfs2timespec(ni->last_access_time);
+	stbuf->st_ctimespec = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_mtimespec = ntfs2timespec(ni->last_data_change_time);
+#elif defined(HAVE_STRUCT_STAT_ST_ATIM)
+	stbuf->st_atim = ntfs2timespec(ni->last_access_time);
+	stbuf->st_ctim = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_mtim = ntfs2timespec(ni->last_data_change_time);
+#else
+	#error "No known timespec member in struct stat!"
+#endif
 exit:
 	return (res);
 }
@@ -1602,8 +1612,12 @@ static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 			res = (stin->st_atime == stin->st_mtime
 					? -EACCES : -EPERM);
 		else {
-			ni->last_access_time = stin->st_atime;
-			ni->last_data_change_time = stin->st_mtime;
+			actime.tv_sec = stin->st_atime;
+			actime.tv_nsec = 0;
+			modtime.tv_sec = stin->st_mtime;
+			modtime.tv_nsec = 0;
+			ni->last_access_time = timespec2ntfs(actime);
+			ni->last_data_change_time = timespec2ntfs(modtime);
 			ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 		}
 	} else {
@@ -1617,8 +1631,12 @@ static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	}
 #else
 	if (stin) {
-		ni->last_access_time = stin->st_atime;
-		ni->last_data_change_time = stin->st_mtime;
+		actime.tv_sec = stin->st_atime;
+		actime.tv_nsec = 0;
+		modtime.tv_sec = stin->st_mtime;
+		modtime.tv_nsec = 0;
+		ni->last_access_time = timespec2ntfs(actime);
+		ni->last_data_change_time = timespec2ntfs(modtime);
 		ntfs_fuse_update_times(ni, NTFS_UPDATE_CTIME);
 	} else
 		ntfs_inode_update_times(ni, NTFS_UPDATE_AMCTIME);
