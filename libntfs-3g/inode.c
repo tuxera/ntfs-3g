@@ -758,6 +758,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 	ntfs_inode *index_ni;
 	FILE_NAME_ATTR *fn;
 	FILE_NAME_ATTR *fnx;
+	REPARSE_POINT *rpp;
+	le32 reparse_tag;
 	int err = 0;
 
 	ntfs_log_trace("Entering for inode %lld\n", (long long)ni->mft_no);
@@ -766,6 +768,17 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 	if (!ctx) {
 		err = errno;
 		goto err_out;
+	}
+	/* Collect the reparse tag, if any */
+	reparse_tag = cpu_to_le32(0);
+	if (ni->flags & FILE_ATTR_REPARSE_POINT) {
+		if (!ntfs_attr_lookup(AT_REPARSE_POINT, NULL,
+				0, CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			rpp = (REPARSE_POINT*)((u8 *)ctx->attr +
+					le16_to_cpu(ctx->attr->value_offset));
+			reparse_tag = rpp->reparse_tag;
+		}
+		ntfs_attr_reinit_search_ctx(ctx);
 	}
 	/* Walk through all FILE_NAME attributes and update them. */
 	while (!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0, ctx)) {
@@ -830,6 +843,8 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 			fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
 			fnx->data_size = cpu_to_sle64(ni->data_size);
 		}
+			/* update or clear the reparse tag in the index */
+		fnx->reparse_point_tag = reparse_tag;
 		if (!test_nino_flag(ni, TimesSet)) {
 			fnx->creation_time = ni->creation_time;
 			fnx->last_data_change_time = ni->last_data_change_time;
