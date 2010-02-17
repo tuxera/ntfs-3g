@@ -4330,6 +4330,7 @@ int main(int argc, char *argv[])
 #ifndef FUSE_INTERNAL
 	if (getuid() && ctx->blkdev) {
 		ntfs_log_error("%s", unpriv_fuseblk_msg);
+		err = NTFS_VOLUME_NO_PRIVILEGE;
 		goto err2;
 	}
 #endif
