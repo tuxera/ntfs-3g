@@ -1658,13 +1658,14 @@ static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int res;
 	struct SECURITY_CONTEXT security;
 
+	res = 0;
 	ntfs_fuse_fill_security_context(req, &security);
-	switch (to_set
+						/* no flags */
+	if (!(to_set
 		    & (FUSE_SET_ATTR_MODE
 			| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID
 			| FUSE_SET_ATTR_SIZE
-			| FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME)) {
-	case 0 :
+			| FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME))) {
 		ni = ntfs_inode_open(ctx->vol, INODE(ino));
 		if (!ni)
 			res = -errno;
@@ -1673,46 +1674,60 @@ static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			if (ntfs_inode_close(ni))
 				set_fuse_error(&res);
 		}
-		break;
-	case FUSE_SET_ATTR_MODE :
-		res = ntfs_fuse_chmod(&security, ino, attr->st_mode & 07777,
-					&stbuf);
-		break;
-	case FUSE_SET_ATTR_UID :
-		res = ntfs_fuse_chown(&security, ino, attr->st_uid,
-					(gid_t)-1, &stbuf);
-		break;
-	case FUSE_SET_ATTR_GID :
-		res = ntfs_fuse_chown(&security, ino, (uid_t)-1,
-					attr->st_gid, &stbuf);
-		break;
-	case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID :
-		res = ntfs_fuse_chown(&security, ino, attr->st_uid,
-					attr->st_gid, &stbuf);
-		break;
-	case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_MODE:
-		res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
-					(gid_t)-1,attr->st_mode, &stbuf);
-		break;
-	case FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
-		res = ntfs_fuse_chownmod(&security, ino, (uid_t)-1,
+	}
+						/* some set of uid/gid/mode */
+	if (to_set
+		    & (FUSE_SET_ATTR_MODE
+			| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
+		switch (to_set
+			    & (FUSE_SET_ATTR_MODE
+				| FUSE_SET_ATTR_UID | FUSE_SET_ATTR_GID)) {
+		case FUSE_SET_ATTR_MODE :
+			res = ntfs_fuse_chmod(&security, ino,
+						attr->st_mode & 07777, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID :
+			res = ntfs_fuse_chown(&security, ino, attr->st_uid,
+						(gid_t)-1, &stbuf);
+			break;
+		case FUSE_SET_ATTR_GID :
+			res = ntfs_fuse_chown(&security, ino, (uid_t)-1,
+						attr->st_gid, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID :
+			res = ntfs_fuse_chown(&security, ino, attr->st_uid,
+						attr->st_gid, &stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
+						(gid_t)-1,attr->st_mode,
+						&stbuf);
+			break;
+		case FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, (uid_t)-1,
+						attr->st_gid,attr->st_mode,
+						&stbuf);
+			break;
+		case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
+			res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
 					attr->st_gid,attr->st_mode, &stbuf);
-		break;
-	case FUSE_SET_ATTR_UID + FUSE_SET_ATTR_GID + FUSE_SET_ATTR_MODE:
-		res = ntfs_fuse_chownmod(&security, ino, attr->st_uid,
-					attr->st_gid,attr->st_mode, &stbuf);
-		break;
-	case FUSE_SET_ATTR_SIZE :
+			break;
+		default :
+			break;
+		}
+	}
+						/* size */
+	if (!res && (to_set & FUSE_SET_ATTR_SIZE)) {
 		res = ntfs_fuse_trunc(&security, ino, attr->st_size,
 					!fi, &stbuf);
-		break;
-	case FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME :
+	}
+						/* some set of atime/mtime */
+	if (!res && (to_set & (FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME))) {
+#ifdef HAVE_UTIMENSAT
+		res = ntfs_fuse_utimens(&security, ino, attr, &stbuf, to_set);
+#else /* HAVE_UTIMENSAT */
 		res = ntfs_fuse_utime(&security, ino, attr, &stbuf);
-		break;
-	default:
-		ntfs_log_error("Unsupported setattr mode 0x%x\n",(int)to_set);
-		res = -EOPNOTSUPP;
-		break;
+#endif /* HAVE_UTIMENSAT */
 	}
 	if (res)
 		fuse_reply_err(req, -res);
