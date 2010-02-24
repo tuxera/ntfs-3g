@@ -3186,7 +3186,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			res = -errno;
 			goto exit;
 		}
-		set_archive(ni);
+		if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+			set_archive(ni);
+			NInoFileNameSetDirty(ni);
+		}
 		na = ntfs_attr_open(ni, AT_DATA, lename, lename_len);
 		if (!na) {
 			res = -errno;
@@ -3215,8 +3218,10 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 				   && (ni->flags & FILE_ATTR_ENCRYPTED))
 					res = ntfs_efs_fixup_attribute(NULL,
 						na);
-		if (total)
+		if (total && !(ni->flags & FILE_ATTR_ARCHIVE)) {
 			set_archive(ni);
+			NInoFileNameSetDirty(ni);
+		}
 	} else
 		res = 0;
 exit:
@@ -3413,7 +3418,10 @@ static int ntfs_fuse_removexattr(const char *path, const char *name)
 			errno = ENODATA;
 		res = -errno;
 	}
-	set_archive(ni);
+	if (!(ni->flags & FILE_ATTR_ARCHIVE)) {
+		set_archive(ni);
+		NInoFileNameSetDirty(ni);
+	}
 exit:
 	free(lename);
 	if (ntfs_inode_close(ni))

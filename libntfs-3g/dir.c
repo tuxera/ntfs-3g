@@ -1396,6 +1396,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		si->file_attributes = FILE_ATTR_SYSTEM;
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
+	ni->flags |= FILE_ATTR_ARCHIVE;
 	if ((dir_ni->flags & FILE_ATTR_COMPRESSED)
 	   && (S_ISREG(type) || S_ISDIR(type)))
 		ni->flags |= FILE_ATTR_COMPRESSED;
@@ -1525,6 +1526,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		fn->file_attributes = FILE_ATTR_SYSTEM;
 	else
 		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
+	fn->file_attributes |= FILE_ATTR_ARCHIVE;
 	fn->creation_time = ni->creation_time;
 	fn->last_data_change_time = ni->last_data_change_time;
 	fn->last_mft_change_time = ni->last_mft_change_time;
