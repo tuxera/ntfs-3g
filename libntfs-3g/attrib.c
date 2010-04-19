@@ -1774,7 +1774,8 @@ errno_set:
 
 int ntfs_attr_pclose(ntfs_attr *na)
 {
-	s64 written, ofs;
+	s64 ofs;
+	int failed;
 	BOOL ok = TRUE;
 	VCN update_from = -1;
 	ntfs_volume *vol;
@@ -1895,9 +1896,9 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	}
 
 retry:
-	written = 0;
+	failed = 0;
 	if (!NVolReadOnly(vol)) {
-		written = ntfs_compressed_close(na, rl, ofs);
+		failed = ntfs_compressed_close(na, rl, ofs);
 #if CACHE_NIDATA_SIZE
 		if (na->ni->mrec->flags & MFT_RECORD_IS_DIRECTORY
 		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
@@ -1907,18 +1908,14 @@ retry:
 			set_nino_flag(na->ni,KnownSize);
 		}
 #endif
-		/* If everything ok, update progress counters and continue. */
-		if (!written)
-			goto done;
 	}
+	if (failed) {
 		/* If the syscall was interrupted, try again. */
-	if (written == (s64)-1 && errno == EINTR)
-		goto retry;
-	if (!written)
-		errno = EIO;
-	goto rl_err_out;
-
-done:
+		if (errno == EINTR)
+			goto retry;
+		else
+			goto rl_err_out;
+	}
 	if (ctx)
 		ntfs_attr_put_search_ctx(ctx);
 	/* Update mapping pairs if needed. */
