@@ -1033,21 +1033,32 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 			newone = (ntfs_fuse_fill_item_t*)ntfs_malloc
 				(sizeof(ntfs_fuse_fill_item_t)
 				     + current->bufsize);
-			newone->off = 0;
-			newone->bufsize = current->bufsize;
-			newone->next = (ntfs_fuse_fill_item_t*)NULL;
-			current->next = newone;
-			fill_ctx->last = newone;
-			current = newone;
-			sz = fuse_add_direntry(fill_ctx->req, current->buf,
-				current->bufsize - current->off,
-				filename, &st, current->off);
+			if (newone) {
+				newone->off = 0;
+				newone->bufsize = current->bufsize;
+				newone->next = (ntfs_fuse_fill_item_t*)NULL;
+				current->next = newone;
+				fill_ctx->last = newone;
+				current = newone;
+				sz = fuse_add_direntry(fill_ctx->req,
+					current->buf,
+					current->bufsize - current->off,
+					filename, &st, current->off);
+				if (!sz) {
+					errno = EIO;
+					ntfs_log_error("Could not add a"
+						" directory entry (inode %lld)\n",
+						(unsigned long long)MREF(mref));
+				}
+			} else {
+				sz = 0;
+				errno = ENOMEM;
+			}
 		}
 		if (sz) {
 			current->off += sz;
 		} else {
 			ret = -1;
-			errno = EIO; /* ? */
 		}
 	}
         
