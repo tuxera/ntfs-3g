@@ -563,7 +563,8 @@ static BOOL valid_acl(const ACL *pacl, unsigned int end)
 				&((const char*)pacl)[offace];
 			acesz = le16_to_cpu(pace->size);
 			if (((offace + acesz) > end)
-			   || !ntfs_valid_sid(&pace->sid))
+			   || !ntfs_valid_sid(&pace->sid)
+			   || ((ntfs_sid_size(&pace->sid) + 8) != (int)acesz))
 				 ok = FALSE;
 			offace += acesz;
 		}
@@ -707,10 +708,12 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
 				memcpy(&pnewace->sid, usid, usidsz);
 				acesz = usidsz + 8;
+				pnewace->size = cpu_to_le16(acesz);
 			}
 			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
 				memcpy(&pnewace->sid, gsid, gsidsz);
 				acesz = gsidsz + 8;
+				pnewace->size = cpu_to_le16(acesz);
 			}
 			if (pnewace->mask & GENERIC_ALL) {
 				pnewace->mask &= ~GENERIC_ALL;
