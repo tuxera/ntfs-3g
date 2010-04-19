@@ -283,7 +283,9 @@ int restore_privs(void);
  * therefore the below functions are no-op in such case.
  */
 static int drop_privs(void)    { return 0; }
+#if defined(linux) || defined(__uClinux__)
 static int restore_privs(void) { return 0; }
+#endif
 
 static const char *setuid_msg =
 "Mount is denied because setuid and setgid root ntfs-3g is insecure with the\n"
@@ -4271,7 +4273,9 @@ int main(int argc, char *argv[])
 {
 	char *parsed_options = NULL;
 	struct fuse_session *se;
+#if !(defined(__sun) && defined (__SVR4))
 	fuse_fstype fstype = FSTYPE_UNKNOWN;
+#endif
 	const char *permissions_mode = (const char*)NULL;
 	const char *failed_secure = (const char*)NULL;
 	struct stat sbuf;
