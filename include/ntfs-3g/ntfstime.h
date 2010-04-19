@@ -39,7 +39,7 @@
 /*
  * assume "struct timespec" is not defined if st_mtime is not defined
  */
-#ifndef st_mtime
+#if !defined(st_mtime) & !defined(__timespec_defined)
 struct timespec {
 	time_t tv_sec;
 	long tv_nsec;

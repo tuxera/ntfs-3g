@@ -36,6 +36,12 @@ static inline void fuse_mutex_init(pthread_mutex_t *mut)
 #define ST_MTIM_NSEC(stbuf) ((stbuf)->st_mtimespec.tv_nsec)
 #define ST_ATIM_NSEC_SET(stbuf, val) (stbuf)->st_atimespec.tv_nsec = (val)
 #define ST_MTIM_NSEC_SET(stbuf, val) (stbuf)->st_mtimespec.tv_nsec = (val)
+#elif defined(HAVE_STRUCT_STAT_ST_ATIMENSEC)
+#define ST_ATIM_NSEC(stbuf) ((stbuf)->st_atimensec)
+#define ST_CTIM_NSEC(stbuf) ((stbuf)->st_ctimensec)
+#define ST_MTIM_NSEC(stbuf) ((stbuf)->st_mtimensec)
+#define ST_ATIM_NSEC_SET(stbuf, val) (stbuf)->st_atimensec = (val)
+#define ST_MTIM_NSEC_SET(stbuf, val) (stbuf)->st_mtimensec = (val)
 #else
 #define ST_ATIM_NSEC(stbuf) 0
 #define ST_CTIM_NSEC(stbuf) 0

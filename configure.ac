@@ -280,6 +280,7 @@ AC_STRUCT_ST_BLOCKS
 AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_CHECK_MEMBERS([struct stat.st_atim])
 AC_CHECK_MEMBERS([struct stat.st_atimespec])
+AC_CHECK_MEMBERS([struct stat.st_atimensec])
 
 # For the 'nfconv' patch (Mac OS X only):
 case "${target_os}" in

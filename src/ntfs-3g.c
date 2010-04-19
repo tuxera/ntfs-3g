@@ -870,8 +870,32 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
  	stbuf->st_atim = ntfs2timespec(ni->last_access_time);
  	stbuf->st_ctim = ntfs2timespec(ni->last_mft_change_time);
  	stbuf->st_mtim = ntfs2timespec(ni->last_data_change_time);
+#elif defined(HAVE_STRUCT_STAT_ST_ATIMENSEC)
+	{
+	struct timespec ts;
+
+	ts = ntfs2timespec(ni->last_access_time);
+	stbuf->st_atime = ts.tv_sec;
+	stbuf->st_atimensec = ts.tv_nsec;
+	ts = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_ctime = ts.tv_sec;
+	stbuf->st_ctimensec = ts.tv_nsec;
+	ts = ntfs2timespec(ni->last_data_change_time);
+	stbuf->st_mtime = ts.tv_sec;
+	stbuf->st_mtimensec = ts.tv_nsec;
+	}
 #else
-	#error "No known timespec member in struct stat!"
+#warning "No known way to set nanoseconds in struct stat !"
+	{
+	struct timespec ts;
+
+	ts = ntfs2timespec(ni->last_access_time);
+	stbuf->st_atime = ts.tv_sec;
+	ts = ntfs2timespec(ni->last_mft_change_time);
+	stbuf->st_ctime = ts.tv_sec;
+	ts = ntfs2timespec(ni->last_data_change_time);
+	stbuf->st_mtime = ts.tv_sec;
+	}
 #endif
 exit:
 	if (ntfs_inode_close(ni))
