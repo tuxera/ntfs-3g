@@ -714,6 +714,7 @@ static le32 entersecurityattr(ntfs_volume *vol,
 	INDEX_ENTRY *entry;
 	INDEX_ENTRY *next;
 	ntfs_index_context *xsii;
+	int retries;
 	ntfs_attr *na;
 	int olderrno;
 
@@ -758,10 +759,14 @@ static le32 entersecurityattr(ntfs_volume *vol,
 		 * All index blocks should be at least half full
 		 * so there always is a last entry but one,
 		 * except when creating the first entry in index root.
-		 * A simplified version of next(), limited to
-		 * current index node, could be used
+		 * This was however found not to be true : chkdsk
+		 * sometimes deletes all the (unused) keys in the last
+		 * index block without rebalancing the tree.
+		 * When this happens, a new search is restarted from
+		 * the smallest key.
 		 */
 		keyid = const_cpu_to_le32(0);
+		retries = 0;
 		while (entry) {
 			next = ntfs_index_next(entry,xsii);
 			if (next) { 
@@ -777,6 +782,20 @@ static le32 entersecurityattr(ntfs_volume *vol,
 				size = le32_to_cpu(psii->datasize);
 			}
 			entry = next;
+			if (!entry && !keyid && !retries) {
+				/* search failed, retry from smallest key */
+				ntfs_index_ctx_reinit(xsii);
+				found = !ntfs_index_lookup((char*)&keyid,
+					       sizeof(SII_INDEX_KEY), xsii);
+				if (!found && (errno != ENOENT)) {
+					ntfs_log_perror("Index $SII is broken");
+				} else {
+						/* restore errno */
+					errno = olderrno;
+					entry = xsii->entry;
+				}
+				retries++;
+			}
 		}
 	}
 	if (!keyid) {
