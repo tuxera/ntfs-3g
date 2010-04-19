@@ -9,19 +9,30 @@
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
 .B ntfs-3g
-.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
 .br
 .B mount \-t ntfs-3g
-.I volume mount_point
 \fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
+.br
+.B lowntfs-3g
+\fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
+.br
+.B mount \-t lowntfs-3g
+\fB[-o \fIoption\fP\fB[,...]]\fR
+.I volume mount_point
 .SH DESCRIPTION
-\fBntfs-3g\fR is an NTFS driver, which can
-create, remove, rename, move files, directories, hard links, and
-streams; it can read and write files, including 
-streams and sparse files; it can handle special files like 
-symbolic links, devices, and FIFOs; moreover it can also read
-and create transparently compressed files.
+\fBntfs-3g\fR is an NTFS driver, which can create, remove, rename, move
+files, directories, hard links, and streams; it can read and write files,
+including streams, sparse files and transparently compressed files; it can
+handle special files like symbolic links, devices, and FIFOs; moreover it
+provides standard management of file ownership and permissions, including
+POSIX ACLs.
+.PP
+It comes in two variants \fBntfs-3g\fR and \fBlowntfs-3g\fR with
+a few differences mentioned below in relevant options descriptions.
 .PP
 The \fIvolume\fR to be mounted can be either a block device or 
 an image file.
@@ -67,8 +78,9 @@ data stream and can have many named data streams.  The size of a file is the
 size of its unnamed data stream.  By default, \fBntfs-3g\fR will only read
 the unnamed data stream.
 .PP
-By using the options "streams_interface=windows", you will be able to read
-any named data streams, simply by specifying the stream's name after a colon.
+By using the options "streams_interface=windows", with the ntfs-3g driver
+(not possible with lowntfs-3g), you will be able to read any named data
+streams, simply by specifying the stream's name after a colon.
 For example:
 .RS
 .sp
@@ -163,7 +175,7 @@ The
 .B relatime 
 option is very similar to 
 .B noatime. 
-It  updates inode access times relative to modify or change time. 
+It updates inode access times relative to modify or change time. 
 The access time is only updated if the previous access time was earlier 
 than the current modify or change time. Unlike
 .B noatime
@@ -197,8 +209,8 @@ when the user mapping file required by these operations is not defined.
 This option is on by default.
 .TP
 .B no_def_opts
-By default ntfs-3g acts as "silent" was passed to it,
-this option cancel this behaviour.
+By default ntfs-3g acts as if "silent" were set, and
+this option cancel this default behavior.
 .TP
 .BI streams_interface= value
 This option controls how the user can access Alternate Data Streams (ADS)
