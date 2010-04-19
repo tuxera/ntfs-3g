@@ -171,6 +171,9 @@
  *
  *  Jan 2010, version 1.3.16
  *     - repeated the fix for return code of dorestore()
+ *
+ *  Mar 2010, version 1.3.17
+ *     - fixed #ifdef'd code for selftest
  */
 
 /*
@@ -194,7 +197,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.16"
+#define AUDT_VERSION "1.3.17"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2073,7 +2076,7 @@ int basicread(void *fileid, char *buf, size_t size,
 	return (read(*(int*)fileid, buf, size));
 }
 
-#if POSIXACLS & SELFTESTS & !USESTUBS
+#if SELFTESTS & !USESTUBS
 
 /*
  *		Read a dummy mapping file for tests
@@ -3861,6 +3864,7 @@ void selftests(void)
 		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
 		cpu_to_le32(AUTH3), cpu_to_le32(513)
 		} ;
+#if POSIXACLS
 #ifdef STSC
 	unsigned char kindlist[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 			   16, 17, 18, 20, 22, 24,
@@ -3871,6 +3875,7 @@ void selftests(void)
 			   32, 33, 36, 40 } ;
 #endif
 	unsigned int k;
+#endif /* POSIXACLS */
 	int kind;
 	const SID *owner;
 	const SID *group;
