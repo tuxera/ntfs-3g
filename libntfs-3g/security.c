@@ -2639,7 +2639,7 @@ int ntfs_set_inherited_posix(struct SECURITY_CONTEXT *scx,
 		if (newattr) {
 				/* Adjust Windows read-only flag */
 			res = update_secur_descr(scx->vol, newattr, ni);
-			if (!res) {
+			if (!res && !isdir) {
 				if (mode & S_IWUSR)
 					ni->flags &= ~FILE_ATTR_READONLY;
 				else
@@ -2828,10 +2828,13 @@ int ntfs_set_owner_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			res = update_secur_descr(scx->vol, newattr, ni);
 			if (!res) {
 				/* adjust Windows read-only flag */
-				if (mode & S_IWUSR)
-					ni->flags &= ~FILE_ATTR_READONLY;
-				else
-					ni->flags |= FILE_ATTR_READONLY;
+				if (!isdir) {
+					if (mode & S_IWUSR)
+						ni->flags &= ~FILE_ATTR_READONLY;
+					else
+						ni->flags |= FILE_ATTR_READONLY;
+					NInoFileNameSetDirty(ni);
+				}
 				/* update cache, for subsequent use */
 				if (test_nino_flag(ni, v3_Extensions)) {
 					wanted.securid = ni->security_id;
