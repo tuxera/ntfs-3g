@@ -1589,10 +1589,10 @@ static int ntfs_fuse_utimens(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 			/* no check or update if both UTIME_OMIT */
 	if (to_set & (FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME)) {
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-		if (ntfs_allowed_access(scx, ni, S_IWRITE)
+		if (ntfs_allowed_as_owner(scx, ni)
 		    || ((to_set & FUSE_SET_ATTR_ATIME_NOW)
 			&& (to_set & FUSE_SET_ATTR_MTIME_NOW)
-			&& ntfs_allowed_as_owner(scx, ni))) {
+			&& ntfs_allowed_access(scx, ni, S_IWRITE))) {
 #endif
 			ntfs_time_update_flags mask = NTFS_UPDATE_CTIME;
 

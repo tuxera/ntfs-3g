@@ -2248,10 +2248,10 @@ static int ntfs_fuse_utimens(const char *path, const struct timespec tv[2])
 			/* no check or update if both UTIME_OMIT */
 	if ((tv[0].tv_nsec != UTIME_OMIT) || (tv[1].tv_nsec != UTIME_OMIT)) {
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-		if (ntfs_allowed_access(&security, ni, S_IWRITE)
+		if (ntfs_allowed_as_owner(&security, ni)
 		    || ((tv[0].tv_nsec == UTIME_NOW)
 			&& (tv[0].tv_nsec == UTIME_NOW)
-			&& ntfs_allowed_as_owner(&security, ni))) {
+			&& ntfs_allowed_access(&security, ni, S_IWRITE))) {
 #endif
 			ntfs_time_update_flags mask = NTFS_UPDATE_CTIME;
 
