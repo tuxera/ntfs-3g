@@ -1122,7 +1122,7 @@ static int upgrade_secur_desc(ntfs_volume *vol,
 		 */
 
 	if ((vol->major_ver >= 3)
-		&& (ni->mft_no < FILE_first_user)) {
+	    && (ni->mft_no >= FILE_first_user)) {
 		attrsz = ntfs_attr_size(attr);
 		securid = setsecurityattr(vol,
 			(const SECURITY_DESCRIPTOR_RELATIVE*)attr,
