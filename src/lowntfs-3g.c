@@ -4432,19 +4432,19 @@ int main(int argc, char *argv[])
 		/* same ownership/permissions for all files */
 		ctx->security.mapping[MAPUSERS] = (struct MAPPING*)NULL;
 		ctx->security.mapping[MAPGROUPS] = (struct MAPPING*)NULL;
-		if ((ctx->secure_flags & (1 << SECURITY_WANTED))
-		   && !(ctx->secure_flags & (1 << SECURITY_DEFAULT))) {
-			ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+		if ((ctx->vol->secure_flags & (1 << SECURITY_WANTED))
+		   && !(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))) {
+			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
 			if (strappend(&parsed_options, ",default_permissions")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
 			}
 		}
-		if (ctx->secure_flags & (1 << SECURITY_DEFAULT)) {
-			ctx->secure_flags |= (1 << SECURITY_RAW);
+		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT)) {
+			ctx->vol->secure_flags |= (1 << SECURITY_RAW);
 			permissions_mode = "Global ownership and permissions enforced";
 		} else {
-			ctx->secure_flags &= ~(1 << SECURITY_RAW);
+			ctx->vol->secure_flags &= ~(1 << SECURITY_RAW);
 			permissions_mode = "Ownership and permissions disabled";
 		}
 	}
