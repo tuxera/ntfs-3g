@@ -507,7 +507,7 @@ static void set_fuse_error(int *err)
 		*err = -errno;
 }
 
-#if defined(__APPLE__) || defined(__DARWIN__)
+#if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
 static int ntfs_macfuse_getxtimes(const char *org_path,
 		struct timespec *bkuptime, struct timespec *crtime)
 {
@@ -3587,7 +3587,7 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 	.removexattr	= ntfs_fuse_removexattr,
 	.listxattr	= ntfs_fuse_listxattr,
 #endif /* HAVE_SETXATTR */
-#if defined(__APPLE__) || defined(__DARWIN__)
+#if 0 && (defined(__APPLE__) || defined(__DARWIN__)) /* Unfinished. */
 	/* MacFUSE extensions. */
 	.getxtimes	= ntfs_macfuse_getxtimes,
 	.setcrtime	= ntfs_macfuse_setcrtime,
