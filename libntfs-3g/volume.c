@@ -202,6 +202,7 @@ static int __ntfs_volume_release(ntfs_volume *v)
 	ntfs_free_lru_caches(v);
 	free(v->vol_name);
 	free(v->upcase);
+	if (v->locase) free(v->locase);
 	free(v->attrdef);
 	free(v);
 
@@ -488,6 +489,9 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
+	/* Default with no locase table and case sensitive file names */
+	vol->locase = (ntfschar*)NULL;
+	NVolSetCaseSensitive(vol);
 	
 		/* by default, all files are shown and not marked hidden */
 	NVolSetShowSysFiles(vol);
@@ -1226,6 +1230,28 @@ int ntfs_set_shown_files(ntfs_volume *vol,
 	}
 	if (res)
 		ntfs_log_error("Failed to set file visibility\n");
+	return (res);
+}
+
+/*
+ *		Set ignore case mode
+ */
+
+int ntfs_set_ignore_case(ntfs_volume *vol)
+{
+	int res;
+
+	res = -1;
+	if (vol && vol->upcase) {
+		vol->locase = ntfs_locase_table_build(vol->upcase,
+					vol->upcase_len);
+		if (vol->locase) {
+			NVolClearCaseSensitive(vol);
+			res = 0;
+		}
+	}
+	if (res)
+		ntfs_log_error("Failed to set ignore_case mode\n");
 	return (res);
 }
 

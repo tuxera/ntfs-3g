@@ -47,6 +47,9 @@ extern ntfschar *ntfs_ucsndup(const ntfschar *s, u32 maxlen);
 extern void ntfs_name_upcase(ntfschar *name, u32 name_len,
 		const ntfschar *upcase, const u32 upcase_len);
 
+extern void ntfs_name_locase(ntfschar *name, u32 name_len,
+		const ntfschar *locase, const u32 locase_len);
+
 extern void ntfs_file_value_upcase(FILE_NAME_ATTR *file_name_attr,
 		const ntfschar *upcase, const u32 upcase_len);
 
@@ -59,7 +62,11 @@ extern int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		int outs_len);
 extern int ntfs_mbstoucs(const char *ins, ntfschar **outs);
 
+extern char *ntfs_uppercase_mbs(const char *low,
+		const ntfschar *upcase, u32 upcase_len);
+
 extern void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len);
+extern ntfschar *ntfs_locase_table_build(const ntfschar *uc, u32 uc_cnt);
 
 extern ntfschar *ntfs_str2ucs(const char *s, int *len);
 

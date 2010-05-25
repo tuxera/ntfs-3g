@@ -253,6 +253,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_ALLOCATION *ia;
+	IGNORE_CASE_BOOL case_sensitivity;
 	u8 *index_end;
 	ntfs_attr *ia_na;
 	int eo, rc;
@@ -277,6 +278,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 				"%lld", (unsigned long long)dir_ni->mft_no);
 		goto put_err_out;
 	}
+	case_sensitivity = (NVolCaseSensitive(vol) ? CASE_SENSITIVE : IGNORE_CASE);
 	/* Get to the index root value. */
 	ir = (INDEX_ROOT*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->value_offset));
@@ -324,7 +326,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 		rc = ntfs_names_full_collate(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
-				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
+				case_sensitivity, vol->upcase, vol->upcase_len);
 		/*
 		 * If uname collates before the name of the current entry, there
 		 * is definitely no such name in this index but we might need to
@@ -466,7 +468,7 @@ descend_into_child_node:
 		rc = ntfs_names_full_collate(uname, uname_len,
 				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
-				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
+				case_sensitivity, vol->upcase, vol->upcase_len);
 		/*
 		 * If uname collates before the name of the current entry, there
 		 * is definitely no such name in this index but we might need to
@@ -545,51 +547,68 @@ u64 ntfs_inode_lookup_by_mbsname(ntfs_inode *dir_ni, const char *name)
 	int uname_len;
 	ntfschar *uname = (ntfschar*)NULL;
 	u64 inum;
+	char *cached_name;
+	const char *const_name;
+
+	if (!NVolCaseSensitive(dir_ni->vol)) {
+		cached_name = ntfs_uppercase_mbs(name,
+			dir_ni->vol->upcase, dir_ni->vol->upcase_len);
+		const_name = cached_name;
+	} else {
+		cached_name = (char*)NULL;
+		const_name = name;
+	}
+	if (const_name) {
 #if CACHE_LOOKUP_SIZE
-	struct CACHED_LOOKUP item;
-	struct CACHED_LOOKUP *cached;
 
 		/*
 		 * fetch inode from cache
 		 */
 
-	if (dir_ni->vol->lookup_cache) {
-		item.name = name;
-		item.namesize = strlen(name) + 1;
-		item.parent = dir_ni->mft_no;
-		cached = (struct CACHED_LOOKUP*)ntfs_fetch_cache(
-				dir_ni->vol->lookup_cache, GENERIC(&item),
-				lookup_cache_compare);
-		if (cached) {
-			inum = cached->inum;
-			if (inum == (u64)-1)
-				errno = ENOENT;
-		} else {
-			/* Generate unicode name. */
-			uname_len = ntfs_mbstoucs(name, &uname);
-			if (uname_len >= 0) {
-				inum = ntfs_inode_lookup_by_name(dir_ni,
-						uname, uname_len);
-				item.inum = inum;
+		if (dir_ni->vol->lookup_cache) {
+			struct CACHED_LOOKUP item;
+			struct CACHED_LOOKUP *cached;
+
+			item.name = const_name;
+			item.namesize = strlen(const_name) + 1;
+			item.parent = dir_ni->mft_no;
+			cached = (struct CACHED_LOOKUP*)ntfs_fetch_cache(
+					dir_ni->vol->lookup_cache,
+					GENERIC(&item), lookup_cache_compare);
+			if (cached) {
+				inum = cached->inum;
+				if (inum == (u64)-1)
+					errno = ENOENT;
+			} else {
+				/* Generate unicode name. */
+				uname_len = ntfs_mbstoucs(name, &uname);
+				if (uname_len >= 0) {
+					inum = ntfs_inode_lookup_by_name(dir_ni,
+							uname, uname_len);
+					item.inum = inum;
 				/* enter into cache, even if not found */
-				ntfs_enter_cache(dir_ni->vol->lookup_cache,
+					ntfs_enter_cache(dir_ni->vol->lookup_cache,
 							GENERIC(&item),
 							lookup_cache_compare);
-				free(uname);
-			} else
+					free(uname);
+				} else
+					inum = (s64)-1;
+			}
+		} else
+#endif
+			{
+				/* Generate unicode name. */
+			uname_len = ntfs_mbstoucs(cached_name, &uname);
+			if (uname_len >= 0)
+				inum = ntfs_inode_lookup_by_name(dir_ni,
+						uname, uname_len);
+			else
 				inum = (s64)-1;
 		}
+		if (cached_name)
+			free(cached_name);
 	} else
-#endif
-		{
-			/* Generate unicode name. */
-		uname_len = ntfs_mbstoucs(name, &uname);
-		if (uname_len >= 0)
-			inum = ntfs_inode_lookup_by_name(dir_ni,
-					uname, uname_len);
-		else
-			inum = (s64)-1;
-	}
+		inum = (s64)-1;
 	return (inum);
 }
 
@@ -604,17 +623,29 @@ void ntfs_inode_update_mbsname(ntfs_inode *dir_ni, const char *name, u64 inum)
 #if CACHE_LOOKUP_SIZE
 	struct CACHED_LOOKUP item;
 	struct CACHED_LOOKUP *cached;
+	char *cached_name;
 
 	if (dir_ni->vol->lookup_cache) {
-		item.name = name;
-		item.namesize = strlen(name) + 1;
-		item.parent = dir_ni->mft_no;
-		item.inum = inum;
-		cached = (struct CACHED_LOOKUP*)ntfs_enter_cache(
+		if (!NVolCaseSensitive(dir_ni->vol)) {
+			cached_name = ntfs_uppercase_mbs(name,
+				dir_ni->vol->upcase, dir_ni->vol->upcase_len);
+			item.name = cached_name;
+		} else {
+			cached_name = (char*)NULL;
+			item.name = name;
+		}
+		if (item.name) {
+			item.namesize = strlen(item.name) + 1;
+			item.parent = dir_ni->mft_no;
+			item.inum = inum;
+			cached = (struct CACHED_LOOKUP*)ntfs_enter_cache(
 					dir_ni->vol->lookup_cache,
 					GENERIC(&item), lookup_cache_compare);
-		if (cached)
-			cached->inum = inum;
+			if (cached)
+				cached->inum = inum;
+			if (cached_name)
+				free(cached_name);
+		}
 	}
 #endif
 }
@@ -859,6 +890,7 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 	FILE_NAME_ATTR *fn = &ie->key.file_name;
 	unsigned dt_type;
 	BOOL metadata;
+	ntfschar *loname;
 	int res;
 	MFT_REF mref;
 
@@ -888,9 +920,27 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 				|| !(fn->file_attributes & FILE_ATTR_HIDDEN)))
             || (NVolShowSysFiles(dir_ni->vol) && (NVolShowHidFiles(dir_ni->vol)
 				|| metadata))) {
-		res = filldir(dirent, fn->file_name, fn->file_name_length,
-				fn->file_name_type, *pos,
-				mref, dt_type);
+		if (NVolCaseSensitive(dir_ni->vol)) {
+			res = filldir(dirent, fn->file_name,
+					fn->file_name_length,
+					fn->file_name_type, *pos,
+					mref, dt_type);
+		} else {
+			loname = (ntfschar*)ntfs_malloc(2*fn->file_name_length);
+			if (loname) {
+				memcpy(loname, fn->file_name,
+					2*fn->file_name_length);
+				ntfs_name_locase(loname, fn->file_name_length,
+					dir_ni->vol->locase,
+					dir_ni->vol->upcase_len);
+				res = filldir(dirent, loname,
+					fn->file_name_length,
+					fn->file_name_type, *pos,
+					mref, dt_type);
+				free(loname);
+			} else
+				res = -1;
+		}
 	} else
 		res = 0;
 	return (res);

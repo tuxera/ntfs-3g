@@ -390,6 +390,21 @@ void ntfs_name_upcase(ntfschar *name, u32 name_len, const ntfschar *upcase,
 }
 
 /**
+ * ntfs_name_locase - Map a Unicode name to its lowercase equivalent
+ */
+void ntfs_name_locase(ntfschar *name, u32 name_len, const ntfschar *locase,
+		const u32 locase_len)
+{
+	u32 i;
+	u16 u;
+
+	if (locase)
+		for (i = 0; i < name_len; i++)
+			if ((u = le16_to_cpu(name[i])) < locase_len)
+				name[i] = locase[u];
+}
+
+/**
  * ntfs_file_value_upcase - Convert a filename to upper case
  * @file_name_attr:
  * @upcase:
@@ -1035,6 +1050,61 @@ err_out:
 	return -1;
 }
 
+/*
+ *		Turn a UTF8 name uppercase
+ *
+ *	Returns an allocated uppercase name which has to be freed by caller
+ *	or NULL if there is an error (described by errno)
+ */
+
+char *ntfs_uppercase_mbs(const char *low,
+			const ntfschar *upcase, u32 upcase_size)
+{
+	int size;
+	char *upp;
+	u32 wc;
+	int n;
+	const char *s;
+	char *t;
+
+	size = strlen(low);
+	upp = (char*)ntfs_malloc(3*size + 1);
+	if (upp) {
+		s = low;
+		t = upp;
+		do {
+			n = utf8_to_unicode(&wc, s);
+			if (n > 0) {
+				if (wc < upcase_size)
+					wc = le16_to_cpu(upcase[wc]);
+				if (wc < 0x80)
+					*t++ = wc;
+				else if (wc < 0x800) {
+					*t++ = (0xc0 | ((wc >> 6) & 0x3f));
+					*t++ = 0x80 | (wc & 0x3f);
+				} else if (wc < 0x10000) {
+					*t++ = 0xe0 | (wc >> 12);
+					*t++ = 0x80 | ((wc >> 6) & 0x3f);
+					*t++ = 0x80 | (wc & 0x3f);
+				} else {
+					*t++ = 0xf0 | ((wc >> 18) & 7);
+					*t++ = 0x80 | ((wc >> 12) & 63);
+					*t++ = 0x80 | ((wc >> 6) & 0x3f);
+					*t++ = 0x80 | (wc & 0x3f);
+				}
+			s += n;
+			}
+		} while (n > 0);
+		if (n < 0) {
+			free(upp);
+			upp = (char*)NULL;
+			errno = EILSEQ;
+		}
+		*t = 0;
+	}
+	return (upp);
+}
+
 /**
  * ntfs_upcase_table_build - build the default upcase table for NTFS
  * @uc:		destination buffer where to store the built table
@@ -1104,6 +1174,38 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 		k = uc_byte_table[r][1];
 		uc[uc_byte_table[r][0]] = cpu_to_le16(k);
 	}
+}
+
+/*
+ *		Build a table for converting to lower case
+ *
+ *	This is only meaningful when there is a single lower case
+ *	character leading to an upper case one, and currently the
+ *	only exception is the greek letter sigma which has a single
+ *	upper case glyph (code U+03A3), but two lower case glyphs
+ *	(code U+03C3 and U+03C2, the latter to be used at the end
+ *	of a word). In the following implementation the upper case
+ *	sigma will be lowercased as U+03C3.
+ */
+
+ntfschar *ntfs_locase_table_build(const ntfschar *uc, u32 uc_cnt)
+{
+	ntfschar *lc;
+	u32 upp;
+	u32 i;
+
+	lc = (ntfschar*)ntfs_malloc(uc_cnt*sizeof(ntfschar));
+	if (lc) {
+		for (i=0; i<uc_cnt; i++)
+			lc[i] = cpu_to_le16(i);
+		for (i=0; i<uc_cnt; i++) {
+			upp = le16_to_cpu(uc[i]);
+			if ((upp != i) && (upp < uc_cnt))
+				lc[upp] = cpu_to_le16(i);
+		}
+	} else
+		ntfs_log_error("Could not build the locase table\n");
+	return (lc);
 }
 
 /**

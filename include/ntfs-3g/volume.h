@@ -232,6 +232,9 @@ struct _ntfs_volume {
 				   FILE_UpCase. */
 	u32 upcase_len;		/* Length in Unicode characters of the upcase
 				   table. */
+	ntfschar *locase;	/* Lower case equivalents of all 65536 2-byte
+				   Unicode characters. Only if option
+				   case_ignore is set. */
 
 	ATTR_DEF *attrdef;	/* Attribute definitions. Obtained from
 				   FILE_AttrDef. */
@@ -289,6 +292,7 @@ extern int ntfs_volume_get_free_space(ntfs_volume *vol);
 extern int ntfs_set_shown_files(ntfs_volume *vol,
 		BOOL show_sys_files, BOOL show_hid_files, BOOL hide_dot_files);
 extern int ntfs_set_locale(void);
+extern int ntfs_set_ignore_case(ntfs_volume *vol);
 
 #endif /* defined _NTFS_VOLUME_H */
 

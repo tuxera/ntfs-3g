@@ -211,6 +211,7 @@ typedef struct {
 	BOOL show_sys_files;
 	BOOL show_hid_files;
 	BOOL hide_dot_files;
+	BOOL ignore_case;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -3630,6 +3631,7 @@ static int ntfs_fuse_init(void)
 static int ntfs_open(const char *device)
 {
 	unsigned long flags = 0;
+	ntfs_volume *vol;
         
 	if (!ctx->blkdev)
 		flags |= MS_EXCLUSIVE;
@@ -3640,28 +3642,31 @@ static int ntfs_open(const char *device)
 	if (ctx->hiberfile)
 		flags |= MS_IGNORE_HIBERFILE;
 
-	ctx->vol = ntfs_mount(device, flags);
-	if (!ctx->vol) {
+	ctx->vol = vol = ntfs_mount(device, flags);
+	if (!vol) {
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
 	}
-	if (ntfs_set_shown_files(ctx->vol, ctx->show_sys_files,
+	if (ntfs_set_shown_files(vol, ctx->show_sys_files,
 				ctx->show_hid_files, ctx->hide_dot_files))
 		goto err_out;
+
+	if (ctx->ignore_case && ntfs_set_ignore_case(vol))
+		goto err_out;
         
-	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
-	if (ctx->vol->free_clusters < 0) {
+	vol->free_clusters = ntfs_attr_get_free_bits(vol->lcnbmp_na);
+	if (vol->free_clusters < 0) {
 		ntfs_log_perror("Failed to read NTFS $Bitmap");
 		goto err_out;
 	}
 
-	ctx->vol->free_mft_records = ntfs_get_nr_free_mft_records(ctx->vol);
-	if (ctx->vol->free_mft_records < 0) {
+	vol->free_mft_records = ntfs_get_nr_free_mft_records(vol);
+	if (vol->free_mft_records < 0) {
 		ntfs_log_perror("Failed to calculate free MFT records");
 		goto err_out;
 	}
 
-	if (ctx->hiberfile && ntfs_volume_check_hiberfile(ctx->vol, 0)) {
+	if (ctx->hiberfile && ntfs_volume_check_hiberfile(vol, 0)) {
 		if (errno != EPERM)
 			goto err_out;
 		if (ntfs_fuse_rm((fuse_req_t)NULL,FILE_root,"hiberfil.sys"))
@@ -3820,6 +3825,10 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "hide_dot_files"))
 				goto err_exit;
 			ctx->hide_dot_files = TRUE;
+		} else if (!strcmp(opt, "ignore_case")) {
+			if (bogus_option_value(val, "ignore_case"))
+				goto err_exit;
+			ctx->ignore_case = TRUE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;
