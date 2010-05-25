@@ -3027,10 +3027,6 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		res = -EOPNOTSUPP;
 		goto out;
 	}
-	if (ctx->streams == NF_STREAMS_INTERFACE_NONE) {
-		res = -EOPNOTSUPP;
-		goto out;
-	}
 	namespace = xattr_namespace(name);
 	if (namespace == XATTRNS_NONE) {
 		res = -EOPNOTSUPP;
