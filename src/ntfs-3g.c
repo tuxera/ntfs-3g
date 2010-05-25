@@ -1413,16 +1413,9 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 	}
 #endif
 		/*
-		 * for compressed files, only deleting contents and expanding
-		 * are implemented. Expanding is done by inserting a final
+		 * For compressed files, upsizing is done by inserting a final
 		 * zero, which is optimized as creating a hole when possible. 
 		 */
-	if ((na->data_flags & ATTR_COMPRESSION_MASK)
-	    && size
-	    && (size < na->initialized_size)) {
-		errno = EOPNOTSUPP;
-		goto exit;
-	}
 	oldsize = na->data_size;
 	if ((na->data_flags & ATTR_COMPRESSION_MASK)
 	    && (size > na->initialized_size)) {

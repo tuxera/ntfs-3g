@@ -5533,8 +5533,19 @@ static int ntfs_non_resident_attr_shrink(ntfs_attr *na, const s64 newsize)
 	}
 
 	/* The first cluster outside the new allocation. */
-	first_free_vcn = (newsize + vol->cluster_size - 1) >>
-			vol->cluster_size_bits;
+	if (na->data_flags & ATTR_COMPRESSION_MASK)
+		/*
+		 * For compressed files we must keep full compressions blocks,
+		 * but currently we do not decompress/recompress the last
+		 * block to truncate the data, so we may leave more allocated
+		 * clusters than really needed.
+		 */
+		first_free_vcn = (((newsize - 1)
+				 | (na->compression_block_size - 1)) + 1)
+				   >> vol->cluster_size_bits;
+	else
+		first_free_vcn = (newsize + vol->cluster_size - 1) >>
+				vol->cluster_size_bits;
 	/*
 	 * Compare the new allocation with the old one and only deallocate
 	 * clusters if there is a change.
@@ -5923,8 +5934,7 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 			 != const_cpu_to_le16(0);
 	if (compressed
 	   && NAttrNonResident(na)
-	   && (((na->data_flags & ATTR_COMPRESSION_MASK) != ATTR_IS_COMPRESSED)
-		|| (newsize && (newsize < na->data_size)))) {
+	   && ((na->data_flags & ATTR_COMPRESSION_MASK) != ATTR_IS_COMPRESSED)) {
 		errno = EOPNOTSUPP;
 		ntfs_log_perror("Failed to truncate compressed attribute");
 		goto out;
@@ -5932,16 +5942,16 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 	if (NAttrNonResident(na)) {
 		/*
 		 * For compressed data, the last block must be fully
-		 * allocated, and we do not known the size of compression
+		 * allocated, and we do not know the size of compression
 		 * block until the attribute has been made non-resident.
 		 * Moreover we can only process a single compression
 		 * block at a time (from where we are about to write),
 		 * so we silently do not allocate more.
 		 *
-		 * Note : do not request truncate on compressed files
+		 * Note : do not request upsizing of compressed files
 		 * unless being able to face the consequences !
 		 */
-		if (compressed && newsize)
+		if (compressed && newsize && (newsize > na->data_size))
 			fullsize = (na->initialized_size
 				 | (na->compression_block_size - 1)) + 1;
 		else
