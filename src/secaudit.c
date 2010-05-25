@@ -173,6 +173,7 @@
  *     - repeated the fix for return code of dorestore()
  *
  *  Mar 2010, version 1.3.17
+ *     - adapted to new default user mapping
  *     - fixed #ifdef'd code for selftest
  */
 
@@ -2102,6 +2103,44 @@ int dummyread(void *fileid  __attribute__((unused)),
 #endif /* POSIXACLS & SELFTESTS & !USESTUBS */
 
 /*
+ *		Apply default single user mapping
+ *	returns zero if successful
+ */
+
+static int do_default_mapping(struct MAPPING *mapping[],
+			 const SID *usid)
+{
+	struct MAPPING *usermapping;
+	struct MAPPING *groupmapping;
+	SID *sid;
+	int sidsz;
+	int res;
+
+	res = -1;
+	sidsz = ntfs_sid_size(usid);
+	sid = (SID*)ntfs_malloc(sidsz);
+	if (sid) {
+		memcpy(sid,usid,sidsz);
+		usermapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
+		if (usermapping) {
+			groupmapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
+			if (groupmapping) {
+				usermapping->sid = sid;
+				usermapping->xid = 0;
+				usermapping->next = (struct MAPPING*)NULL;
+				groupmapping->sid = sid;
+				groupmapping->xid = 0;
+				groupmapping->next = (struct MAPPING*)NULL;
+				mapping[MAPUSERS] = usermapping;
+				mapping[MAPGROUPS] = groupmapping;
+				res = 0;
+			}
+		}
+	}
+	return (res);
+}
+
+/*
  *		Build the user mapping
  *	- according to a mapping file if defined (or default present),
  *	- or try default single user mapping if possible
@@ -2126,6 +2165,22 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 	struct MAPLIST *firstitem = (struct MAPLIST*)NULL;
 	struct MAPPING *usermapping;
 	struct MAPPING *groupmapping;
+	static struct {
+		u8 revision;
+		u8 levels;
+		be16 highbase;
+		be32 lowbase;
+		le32 level1;
+		le32 level2;
+		le32 level3;
+		le32 level4;
+		le32 level5;
+	} defmap = {
+		1, 5, const_cpu_to_be16(0), const_cpu_to_be32(5),
+		const_cpu_to_le32(21),
+		const_cpu_to_le32(DEFSECAUTH1), const_cpu_to_le32(DEFSECAUTH2),
+		const_cpu_to_le32(DEFSECAUTH3), const_cpu_to_le32(DEFSECBASE)
+	} ;
 
 	/* be sure not to map anything until done */
 	mapping[MAPUSERS] = (struct MAPPING*)NULL;
@@ -2201,6 +2256,8 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 #endif
 			firstitem = item;
 		}
+	} else {
+		do_default_mapping(mapping,(const SID*)&defmap);
 	}
 	if (mapping[MAPUSERS])
 		mappingtype = MAPLOCAL;
@@ -2784,14 +2841,14 @@ void tryposix(struct POSIX_SECURITY *pxdesc)
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(1016)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(513)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 
 	char *attr;
@@ -3039,14 +3096,14 @@ void check_samples()
 	le32 owner3[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(1016)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group3[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(513)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 
 #if POSIXACLS
@@ -3855,14 +3912,14 @@ void selftests(void)
 	le32 owner_sid[] = /* S-1-5-21-3141592653-589793238-462843383-1016 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(1016)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(1016)
 		} ;
 	le32 group_sid[] = /* S-1-5-21-3141592653-589793238-462843383-513 */
 		{
 		cpu_to_le32(0x501), cpu_to_le32(0x05000000), cpu_to_le32(21),
-		cpu_to_le32(AUTH1), cpu_to_le32(AUTH2),
-		cpu_to_le32(AUTH3), cpu_to_le32(513)
+		cpu_to_le32(DEFSECAUTH1), cpu_to_le32(DEFSECAUTH2),
+		cpu_to_le32(DEFSECAUTH3), cpu_to_le32(513)
 		} ;
 #if POSIXACLS
 #ifdef STSC

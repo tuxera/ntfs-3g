@@ -3970,14 +3970,13 @@ static int link_group_members(struct SECURITY_CONTEXT *scx)
 	return (res);
 }
 
-
 /*
  *		Apply default single user mapping
  *	returns zero if successful
  */
 
 static int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx,
-			 const SID *usid)
+			 uid_t uid, gid_t gid, const SID *usid)
 {
 	struct MAPPING *usermapping;
 	struct MAPPING *groupmapping;
@@ -3995,10 +3994,10 @@ static int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx,
 			groupmapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
 			if (groupmapping) {
 				usermapping->sid = sid;
-				usermapping->xid = scx->uid;
+				usermapping->xid = uid;
 				usermapping->next = (struct MAPPING*)NULL;
 				groupmapping->sid = sid;
-				groupmapping->xid = scx->uid;
+				groupmapping->xid = gid;
 				groupmapping->next = (struct MAPPING*)NULL;
 				scx->mapping[MAPUSERS] = usermapping;
 				scx->mapping[MAPGROUPS] = groupmapping;
@@ -4007,7 +4006,6 @@ static int ntfs_do_default_mapping(struct SECURITY_CONTEXT *scx,
 		}
 	}
 	return (res);
-
 }
 
 /*
@@ -4049,6 +4047,8 @@ static BOOL check_mapping(const struct MAPPING *usermapping,
 
 #endif
 
+#if 0 /* not used any more */
+
 /*
  *		Try and apply default single user mapping
  *	returns zero if successful
@@ -4070,13 +4070,16 @@ static int ntfs_default_mapping(struct SECURITY_CONTEXT *scx)
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)securattr;
 			usid = (SID*)&securattr[le32_to_cpu(phead->owner)];
 			if (ntfs_is_user_sid(usid))
-				res = ntfs_do_default_mapping(scx,usid);
+				res = ntfs_do_default_mapping(scx,
+						scx->uid, scx->gid, usid);
 			free(securattr);
 		}
 		ntfs_inode_close(ni);
 	}
 	return (res);
 }
+
+#endif
 
 /*
  *		Basic read from a user mapping file on another volume
@@ -4110,7 +4113,8 @@ static int localread(void *fileid, char *buf, size_t size, off_t offs)
  *	(failure should not be interpreted as an error)
  */
 
-int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
+int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path,
+			BOOL allowdef)
 {
 	struct MAPLIST *item;
 	struct MAPLIST *firstitem;
@@ -4118,6 +4122,22 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 	struct MAPPING *groupmapping;
 	ntfs_inode *ni;
 	int fd;
+	static struct {
+		u8 revision;
+		u8 levels;
+		be16 highbase;
+		be32 lowbase;
+		le32 level1;
+		le32 level2;
+		le32 level3;
+		le32 level4;
+		le32 level5;
+	} defmap = {
+		1, 5, const_cpu_to_be16(0), const_cpu_to_be32(5),
+		const_cpu_to_le32(21),
+		const_cpu_to_le32(DEFSECAUTH1), const_cpu_to_le32(DEFSECAUTH2),
+		const_cpu_to_le32(DEFSECAUTH3), const_cpu_to_le32(DEFSECBASE)
+	} ;
 
 	/* be sure not to map anything until done */
 	scx->mapping[MAPUSERS] = (struct MAPPING*)NULL;
@@ -4157,9 +4177,10 @@ int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path)
 			firstitem = item;
 		}
 	} else {
-			/* no mapping file, try default mapping */
-		if (scx->uid && scx->gid) {
-			if (!ntfs_default_mapping(scx))
+			/* no mapping file, try a default mapping */
+		if (allowdef) {
+			if (!ntfs_do_default_mapping(scx,
+					0, 0, (const SID*)&defmap))
 				ntfs_log_info("Using default user mapping\n");
 		}
 	}
@@ -5120,7 +5141,7 @@ struct SECURITY_API *ntfs_initialize_file_security(const char *device,
 				scx->pseccache = &scapi->seccache;
 				scx->vol->secure_flags = 0;
 					/* accept no mapping and no $Secure */
-				ntfs_build_mapping(scx,(const char*)NULL);
+				ntfs_build_mapping(scx,(const char*)NULL,TRUE);
 				ntfs_open_secure(vol);
 			} else {
 				if (scapi)

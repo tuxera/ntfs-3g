@@ -34,6 +34,9 @@
 #define POSIXACLS 0
 #endif
 
+typedef u16 be16;
+typedef u32 be32;
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define const_cpu_to_be16(x) ((((x) & 255L) << 8) + (((x) >> 8) & 255L))
 #define const_cpu_to_be32(x) ((((x) & 255L) << 24) + (((x) & 0xff00L) << 8) \
@@ -240,7 +243,8 @@ extern int ntfs_sd_add_everyone(ntfs_inode *ni);
 extern le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, 
 			       const u32 len);
 
-int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path);
+int ntfs_build_mapping(struct SECURITY_CONTEXT *scx, const char *usermap_path,
+		BOOL allowdef);
 int ntfs_get_owner_mode(struct SECURITY_CONTEXT *scx,
 		ntfs_inode *ni, struct stat*);
 int ntfs_set_mode(struct SECURITY_CONTEXT *scx, ntfs_inode *ni, mode_t mode);

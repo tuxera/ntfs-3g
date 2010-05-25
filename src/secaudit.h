@@ -260,9 +260,14 @@ struct SECURITY_DATA {
 	unsigned int flags:4;
 } ;
 
-#define AUTH1 3141592653U
-#define AUTH2 589793238
-#define AUTH3 462843383
+		/* default security sub-authorities */
+enum {
+	DEFSECAUTH1 = -1153374643, /* 3141592653 */
+	DEFSECAUTH2 = 589793238,
+	DEFSECAUTH3 = 462843383,
+	DEFSECBASE = 10000
+};
+
 #define OWNERID 1016
 #define GROUPID 513
 

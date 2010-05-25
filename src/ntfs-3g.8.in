@@ -38,7 +38,7 @@ The \fIvolume\fR to be mounted can be either a block device or
 an image file.
 .SS Access Handling and Security
 By default, files and directories are owned by the effective 
-user and group of the mounting process and everybody has
+user and group of the mounting process, and everybody has
 full read, write, execution and directory browsing permissions.
 You can also assign permissions to a single user by using the
 .B uid
@@ -55,10 +55,10 @@ options.
 Doing so, Windows users have full access to the files created by 
 .B ntfs-3g.
 .PP
-But, by defining a Windows-to-Linux user mapping in the file
-\fB.NTFS-3G/UserMapping\fP, you can benefit from the full ownership and
-permissions features as defined by Posix and those ownership and
-permissions will be applied to Windows users and conversely.
+But, by setting the default_permissions option, you can benefit from the full
+ownership and permissions features as defined by POSIX. By defining a
+Windows-to-Linux user mapping, the ownership and permissions will even be
+applied to Windows users and conversely.
 .PP
 If 
 .B ntfs-3g 
@@ -125,17 +125,15 @@ When a user mapping file is defined, the options \fBuid=\fP, \fBgid=\fP,
 .RE
 .TP
 .B default_permissions
-Use standard access control. This option requires either a user mapping
-file to be present, or the options \fIuid=\fP and \fIgid=\fP of a user
-to be defined. This option is set by default when a user mapping file
-or an ownership related option is present.
+Set standard permissions on created files and use standard access control.
+This option is set by default when a user mapping file or an ownership related
+option is present.
 .TP
 .B inherit
 When creating a new file, set its initial ownership and protections
 according to inheritance rules defined in parent directory. These rules
 deviate from Posix specifications, but yield a better Windows
-compatibility. A valid user mapping file is required for this option
-to be effective.
+compatibility.
 .TP
 .B ro
 Mount filesystem read\-only. Useful if Windows is hibernated or the
@@ -259,9 +257,10 @@ the \fBuid\fP and \fBgid\fP used by Linux. As a consequence a mapping
 between the ids has to be defined for ownerships to be recorded into
 NTFS and recognized.
 .P
-By default this mapping is fetched from the file \fB.NTFS-3G/UserMapping\fP
+By default, this mapping is fetched from the file \fB.NTFS-3G/UserMapping\fP
 located in the NTFS partition. The option \fBusermapping=\fP may be used
-to define another location.
+to define another location. When the option default_permissions is set and
+no mapping file is found, a default mapping is used.
 .P
 Each line in the user mapping file defines a mapping. It is organized
 in three fields separated by colons. The first field identifies a \fBuid\fP,
@@ -270,18 +269,21 @@ corresponding NTFS id, known as a \fBSID\fP. The \fBuid\fP and the \fBgid\fP
 are optional and defining both of them for the same \fBSID\fP is not
 recommended.
 .P
-If no interoperation with Windows is needed, a single default mapping
-with no uid and gid can be used. Just copy the example below and replace
-the 9 and 10-digit numbers by any number not greater than 4294967295.
+If no strong interoperation with Windows is needed, a single default mapping
+with no uid and gid can be used. Files created on Linux will appear to
+Windows as owned by a foreign user, and files created on Windows will appear
+to Linux as owned by root. Just copy the example below and replace the 9 and
+10-digit numbers by any number not greater than 4294967295. The resulting
+behavior is the same as the one with the option default_permission set with
+no ownership option and no user mapping file available.
 .RS
 .sp
 .B ::S-1-5-21-3141592653-589793238-462643383-10000
 .sp
 .RE
-If interoperation with Windows is needed, the mapping has to be defined
-for each user and group known in both system, and the \fBSID\fPs used
-by Windows has to be collected. This will lead to a user mapping file
-like :
+If a strong interoperation with Windows is needed, the mapping has to be
+defined for each user and group known in both system, and the \fBSID\fPs used
+by Windows has to be collected. This will lead to a user mapping file like :
 .RS
 .sp
 .B john::S-1-5-21-3141592653-589793238-462643383-1008
@@ -291,7 +293,8 @@ like :
 .sp
 .RE
 .P
-The utility \fBntfs-3g.usermap\fP may be used to create the user mapping file.
+The utility \fBntfs-3g.usermap\fP may be used to create such a user
+mapping file.
 .SH EXAMPLES
 Mount /dev/sda1 to /mnt/windows:
 .RS

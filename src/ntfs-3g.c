@@ -4372,7 +4372,9 @@ int main(int argc, char *argv[])
 		/* to initialize security data */
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
 		failed_secure = "Could not open file $Secure";
-	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path)) {
+	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path,
+		(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+		&& !(ctx->vol->secure_flags & (1 << SECURITY_WANTED)))) {
 #if POSIXACLS
 		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
 			permissions_mode = "User mapping built, Posix ACLs not used";
