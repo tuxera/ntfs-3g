@@ -1101,7 +1101,6 @@ static int update_secur_descr(ntfs_volume *vol,
 
 	/* mark node as dirty */
 	NInoSetDirty(ni);
-	ntfs_inode_sync(ni); /* useful ? */
 	return (res);
 }
 
@@ -1170,9 +1169,8 @@ static int upgrade_secur_desc(ntfs_volume *vol,
 			}
 		} else
 			res = -1;
-	/* mark node as dirty */
-	NInoSetDirty(ni);
-	ntfs_inode_sync(ni); /* useful ? */
+			/* mark node as dirty */
+		NInoSetDirty(ni);
 	} else
 		res = 1;
 
