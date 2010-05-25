@@ -170,6 +170,8 @@ typedef struct {
 	ntfs_atime_t atime;
 	BOOL ro;
 	BOOL show_sys_files;
+	BOOL show_hid_files;
+	BOOL hide_dot_files;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -1028,10 +1030,7 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 				filename, (unsigned long long)MREF(mref));
 		free(filename);
 		return 0;
-	}
-	
-	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
-			ctx->show_sys_files) {
+	} else {
 		struct stat st = { .st_ino = MREF(mref) };
 		 
 		if (dt_type == NTFS_DT_REG)
@@ -3597,6 +3596,9 @@ static int ntfs_open(const char *device)
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
 	}
+	if (ntfs_set_shown_files(ctx->vol, ctx->show_sys_files,
+				ctx->show_hid_files, ctx->hide_dot_files))
+		goto err_out;
 	
 	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
 	if (ctx->vol->free_clusters < 0) {
@@ -3761,6 +3763,14 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
 			ctx->show_sys_files = TRUE;
+		} else if (!strcmp(opt, "show_hid_files")) {
+			if (bogus_option_value(val, "show_hid_files"))
+				goto err_exit;
+			ctx->show_hid_files = TRUE;
+		} else if (!strcmp(opt, "hide_dot_files")) {
+			if (bogus_option_value(val, "hide_dot_files"))
+				goto err_exit;
+			ctx->hide_dot_files = TRUE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;
@@ -3872,6 +3882,8 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "efs_raw"))
 				goto err_exit;
 			ctx->efs_raw = TRUE;
+				/* show hidden files to archivers */
+			ctx->show_hid_files = 1;
 #endif /* HAVE_SETXATTR */
 		} else { /* Probably FUSE option. */
 			if (strappend(&ret, opt))

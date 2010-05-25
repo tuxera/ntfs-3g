@@ -209,6 +209,8 @@ typedef struct {
 	ntfs_atime_t atime;
 	BOOL ro;
 	BOOL show_sys_files;
+	BOOL show_hid_files;
+	BOOL hide_dot_files;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -374,6 +376,11 @@ static u64 ntfs_fuse_inode_lookup(fuse_ino_t parent, const char *name)
 	if (dir_ni) {
 		/* Lookup file */
 		inum = ntfs_inode_lookup_by_mbsname(dir_ni, name);
+			/* never return inodes 0 and 1 */
+		if (MREF(inum) <= 1) {
+			inum = (u64)-1;
+			errno = ENOENT;
+		}
 		if (ntfs_inode_close(dir_ni)
 		    || (inum == (u64)-1))
 			ino = (u64)-1;
@@ -878,6 +885,11 @@ static void ntfs_fuse_lookup(fuse_req_t req, fuse_ino_t parent,
 #endif
 				iref = ntfs_inode_lookup_by_mbsname(dir_ni,
 								name);
+					/* never return inodes 0 and 1 */
+				if (MREF(iref) <= 1) {
+					iref = (u64)-1;
+					errno = ENOENT;
+				}
 				ok = !ntfs_inode_close(dir_ni)
 					&& (iref != (u64)-1)
 					&& ntfs_fuse_fillstat(
@@ -1002,9 +1014,8 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 				(unsigned long long)MREF(mref));
 		return -1;
 	}
-        
-	if (MREF(mref) == FILE_root || MREF(mref) >= FILE_first_user ||
-			ctx->show_sys_files) {
+		/* never return inodes 0 and 1 */
+	if (MREF(mref) > 1) {
 		struct stat st = { .st_ino = MREF(mref) };
 		 
 		if (dt_type == NTFS_DT_REG)
@@ -3638,6 +3649,9 @@ static int ntfs_open(const char *device)
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
 	}
+	if (ntfs_set_shown_files(ctx->vol, ctx->show_sys_files,
+				ctx->show_hid_files, ctx->hide_dot_files))
+		goto err_out;
         
 	ctx->vol->free_clusters = ntfs_attr_get_free_bits(ctx->vol->lcnbmp_na);
 	if (ctx->vol->free_clusters < 0) {
@@ -3802,6 +3816,14 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "show_sys_files"))
 				goto err_exit;
 			ctx->show_sys_files = TRUE;
+		} else if (!strcmp(opt, "show_hid_files")) {
+			if (bogus_option_value(val, "show_hid_files"))
+				goto err_exit;
+			ctx->show_hid_files = TRUE;
+		} else if (!strcmp(opt, "hide_dot_files")) {
+			if (bogus_option_value(val, "hide_dot_files"))
+				goto err_exit;
+			ctx->hide_dot_files = TRUE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;
@@ -3911,6 +3933,8 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "efs_raw"))
 				goto err_exit;
 			ctx->efs_raw = TRUE;
+				/* show hidden files to archivers */
+			ctx->show_hid_files = 1;
 #endif /* HAVE_SETXATTR */
 		} else { /* Probably FUSE option. */
 			if (strappend(&ret, opt))

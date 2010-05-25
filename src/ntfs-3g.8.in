@@ -184,13 +184,28 @@ if a file has been read since the last time it was modified.
 This is the default behaviour.
 .TP
 .B show_sys_files
-Show the system files in directory listings. 
-Otherwise the default behaviour is to hide the system files.
-Please note that even when this option is specified, "$MFT"
-may not be visible due to a glibc bug.
-Furthermore, irrespectively of show_sys_files, all
-files are accessible by name, for example you can always do
+Show the metafiles in directory listings. Otherwise the default behaviour is
+to hide the metafiles, which are special files used to store the NTFS
+structure. Please note that even when this option is specified, "$MFT" may
+not be visible due to a glibc bug. Furthermore, irrespectively of
+show_sys_files, all files are accessible by name, for example you can always
+do
 "ls \-l '$UpCase'".
+.TP
+.B show_hid_files
+Show the hidden files and directories in directory listings, the hidden files
+and directories being the ones whose NTFS attribute have the hidden flag set.
+This flag has no effect on files and directory whose first character of
+the name is a dot. Furthermore, irrespectively of show_hid_files, all files
+and directories are accessible by name, for example you can always display
+the Windows trash bin directory by :
+"ls \-ld '$RECYCLE.BIN'".
+.TP
+.B hide_dot_files
+Set the hidden flag in the NTFS attribute for created files and directories
+whose first character of the name is a dot. Such files and directories
+normally do not appear in directory listings, and when the flag is set
+they do not appear in Windows directory displays either.
 .TP
 .B allow_other
 This option overrides the security measure restricting file access

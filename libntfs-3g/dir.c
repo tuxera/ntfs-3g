@@ -858,6 +858,9 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 {
 	FILE_NAME_ATTR *fn = &ie->key.file_name;
 	unsigned dt_type;
+	BOOL metadata;
+	int res;
+	MFT_REF mref;
 
 	ntfs_log_trace("Entering.\n");
 	
@@ -877,9 +880,20 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 		dt_type = NTFS_DT_UNKNOWN;
 	else
 		dt_type = NTFS_DT_REG;
-	return filldir(dirent, fn->file_name, fn->file_name_length,
-			fn->file_name_type, *pos,
-			le64_to_cpu(ie->indexed_file), dt_type);
+
+		/* return metadata files and hidden files if requested */
+	mref = le64_to_cpu(ie->indexed_file);
+        metadata = (MREF(mref) != FILE_root) && (MREF(mref) < FILE_first_user);
+        if ((!metadata && (NVolShowHidFiles(dir_ni->vol)
+				|| !(fn->file_attributes & FILE_ATTR_HIDDEN)))
+            || (NVolShowSysFiles(dir_ni->vol) && (NVolShowHidFiles(dir_ni->vol)
+				|| metadata))) {
+		res = filldir(dirent, fn->file_name, fn->file_name_length,
+				fn->file_name_type, *pos,
+				mref, dt_type);
+	} else
+		res = 0;
+	return (res);
 }
 
 /**
@@ -1397,6 +1411,11 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		ni->flags = FILE_ATTR_SYSTEM;
 	}
 	ni->flags |= FILE_ATTR_ARCHIVE;
+	if (NVolHideDotFiles(dir_ni->vol)
+	    && (name_len > 1)
+	    && (name[0] == const_cpu_to_le16('.'))
+	    && (name[1] != const_cpu_to_le16('.')))
+		ni->flags |= FILE_ATTR_HIDDEN;
 		/*
 		 * Set compression flag according to parent directory
 		 * unless NTFS version < 3.0 or cluster size > 4K
@@ -1536,6 +1555,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 	else
 		fn->file_attributes |= ni->flags & FILE_ATTR_COMPRESSED;
 	fn->file_attributes |= FILE_ATTR_ARCHIVE;
+	fn->file_attributes |= ni->flags & FILE_ATTR_HIDDEN;
 	fn->creation_time = ni->creation_time;
 	fn->last_data_change_time = ni->last_data_change_time;
 	fn->last_mft_change_time = ni->last_mft_change_time;

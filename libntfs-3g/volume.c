@@ -489,6 +489,10 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	ntfs_upcase_table_build(vol->upcase,
 			vol->upcase_len * sizeof(ntfschar));
 	
+		/* by default, all files are shown and not marked hidden */
+	NVolSetShowSysFiles(vol);
+	NVolSetShowHidFiles(vol);
+	NVolClearHideDotFiles(vol);
 	if (flags & MS_RDONLY)
 		NVolSetReadOnly(vol);
 	
@@ -1193,6 +1197,36 @@ error_exit:
 	__ntfs_volume_release(vol);
 	errno = eo;
 	return NULL;
+}
+
+/*
+ *		Set appropriate flags for showing NTFS metafiles
+ *	or files marked as hidden.
+ *	Not set in ntfs_mount() to avoid breaking existing tools.
+ */
+
+int ntfs_set_shown_files(ntfs_volume *vol,
+			BOOL show_sys_files, BOOL show_hid_files,
+			BOOL hide_dot_files)
+{
+	int res;
+
+	res = -1;
+	if (vol) {
+		NVolClearShowSysFiles(vol);
+		NVolClearShowHidFiles(vol);
+		NVolClearHideDotFiles(vol);
+		if (show_sys_files)
+			NVolSetShowSysFiles(vol);
+		if (show_hid_files)
+			NVolSetShowHidFiles(vol);
+		if (hide_dot_files)
+			NVolSetHideDotFiles(vol);
+		res = 0;
+	}
+	if (res)
+		ntfs_log_error("Failed to set file visibility\n");
+	return (res);
 }
 
 /**

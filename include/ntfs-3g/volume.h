@@ -107,6 +107,9 @@ typedef enum {
 	NV_ReadOnly,		/* 1: Volume is read-only. */
 	NV_CaseSensitive,	/* 1: Volume is mounted case-sensitive. */
 	NV_LogFileEmpty,	/* 1: $logFile journal is empty. */
+	NV_ShowSysFiles,	/* 1: Show NTFS metafiles. */
+	NV_ShowHidFiles,	/* 1: Show files marked hidden. */
+	NV_HideDotFiles,	/* 1: Set hidden flag on dot files */
 } ntfs_volume_state_bits;
 
 #define  test_nvol_flag(nv, flag)	 test_bit(NV_##flag, (nv)->state)
@@ -124,6 +127,18 @@ typedef enum {
 #define NVolLogFileEmpty(nv)		 test_nvol_flag(nv, LogFileEmpty)
 #define NVolSetLogFileEmpty(nv)		  set_nvol_flag(nv, LogFileEmpty)
 #define NVolClearLogFileEmpty(nv)	clear_nvol_flag(nv, LogFileEmpty)
+
+#define NVolShowSysFiles(nv)		 test_nvol_flag(nv, ShowSysFiles)
+#define NVolSetShowSysFiles(nv)		  set_nvol_flag(nv, ShowSysFiles)
+#define NVolClearShowSysFiles(nv)	clear_nvol_flag(nv, ShowSysFiles)
+
+#define NVolShowHidFiles(nv)		 test_nvol_flag(nv, ShowHidFiles)
+#define NVolSetShowHidFiles(nv)		  set_nvol_flag(nv, ShowHidFiles)
+#define NVolClearShowHidFiles(nv)	clear_nvol_flag(nv, ShowHidFiles)
+
+#define NVolHideDotFiles(nv)		 test_nvol_flag(nv, HideDotFiles)
+#define NVolSetHideDotFiles(nv)		  set_nvol_flag(nv, HideDotFiles)
+#define NVolClearHideDotFiles(nv)	clear_nvol_flag(nv, HideDotFiles)
 
 /*
  * NTFS version 1.1 and 1.2 are used by Windows NT4.
@@ -271,6 +286,8 @@ extern void ntfs_mount_error(const char *vol, const char *mntpoint, int err);
 
 extern int ntfs_volume_get_free_space(ntfs_volume *vol);
 
+extern int ntfs_set_shown_files(ntfs_volume *vol,
+		BOOL show_sys_files, BOOL show_hid_files, BOOL hide_dot_files);
 extern int ntfs_set_locale(void);
 
 #endif /* defined _NTFS_VOLUME_H */
