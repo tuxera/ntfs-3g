@@ -29,7 +29,11 @@ struct CACHED_GENERIC {
 	struct CACHED_GENERIC *previous;
 	void *variable;
 	size_t varsize;
-	void *fixed[0];
+	union {
+		/* force alignment for pointers and u64 */
+		u64 u64align;
+		void *ptralign;
+	} fixed[0];
 } ;
 
 struct CACHED_INODE {
