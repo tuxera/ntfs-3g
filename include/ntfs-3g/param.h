@@ -40,6 +40,15 @@ enum {
 };
 
 /*
+ *		Parameters for compression
+ */
+
+	/* (log2 of) number of clusters in a compression block for new files */
+#define STANDARD_COMPRESSION_UNIT 4
+	/* maximum cluster size for allowing compression for new files */
+#define MAX_COMPRESSION_CLUSTER_SIZE 4096
+
+/*
  *		Permission checking modes for high level and low level
  *
  *	The choices for high and low lowel are independent, they have

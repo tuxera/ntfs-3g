@@ -609,6 +609,42 @@ out:
 	return ret;
 }
 
+/*
+ *		Basic cluster run free
+ *	Returns 0 if successful
+ */
+
+int ntfs_cluster_free_basic(ntfs_volume *vol, s64 lcn, s64 count)
+{
+	s64 nr_freed = 0;
+	int ret = -1;
+
+	ntfs_log_trace("Entering.\n");
+	ntfs_log_trace("Dealloc lcn 0x%llx, len 0x%llx.\n",
+			       (long long)lcn, (long long)count);
+
+	if (lcn >= 0) { 
+		update_full_status(vol,lcn);
+		if (ntfs_bitmap_clear_run(vol->lcnbmp_na, lcn, 
+						  count)) {
+			ntfs_log_perror("Cluster deallocation failed "
+				       "(%lld, %lld)",
+					(long long)lcn, 
+					(long long)count);
+				goto out;
+		}
+		nr_freed += count; 
+	}
+	ret = 0;
+out:
+	vol->free_clusters += nr_freed;
+	if (vol->free_clusters > vol->nr_clusters)
+		ntfs_log_error("Too many free clusters (%lld > %lld)!",
+			       (long long)vol->free_clusters, 
+			       (long long)vol->nr_clusters);
+	return ret;
+}
+
 /**
  * ntfs_cluster_free - free clusters on an ntfs volume
  * @vol:	mounted ntfs volume on which to free the clusters
