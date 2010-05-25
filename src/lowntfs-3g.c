@@ -212,6 +212,7 @@ typedef struct {
 	BOOL show_hid_files;
 	BOOL hide_dot_files;
 	BOOL ignore_case;
+	BOOL windows_names;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -1849,7 +1850,9 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 
 	/* Generate unicode filename. */
 	uname_len = ntfs_mbstoucs(name, &uname);
-	if (uname_len < 0) {
+	if ((uname_len < 0)
+	    || (ctx->windows_names
+		&& ntfs_forbidden_chars(uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -2053,7 +2056,9 @@ static int ntfs_fuse_newlink(fuse_req_t req __attribute__((unused)),
         
 	/* Generate unicode filename. */
 	uname_len = ntfs_mbstoucs(newname, &uname);
-	if (uname_len < 0) {
+	if ((uname_len < 0)
+            || (ctx->windows_names
+                && ntfs_forbidden_chars(uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -3271,7 +3276,9 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
-	if (lename_len == -1) {
+	if ((lename_len == -1)
+	    || (ctx->windows_names
+		&& ntfs_forbidden_chars(lename,lename_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -3829,6 +3836,10 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "ignore_case"))
 				goto err_exit;
 			ctx->ignore_case = TRUE;
+		} else if (!strcmp(opt, "windows_names")) {
+			if (bogus_option_value(val, "windows_names"))
+				goto err_exit;
+			ctx->windows_names = TRUE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;

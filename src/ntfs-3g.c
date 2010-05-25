@@ -172,6 +172,7 @@ typedef struct {
 	BOOL show_sys_files;
 	BOOL show_hid_files;
 	BOOL hide_dot_files;
+	BOOL windows_names;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -1617,12 +1618,15 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 	name = strrchr(dir_path, '/');
 	name++;
 	uname_len = ntfs_mbstoucs(name, &uname);
-	if (uname_len < 0) {
+	if ((uname_len < 0)
+	    || (ctx->windows_names
+		&& ntfs_forbidden_chars(uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
 	stream_name_len = ntfs_fuse_parse_path(org_path,
 					 &path, &stream_name);
+		/* stream name validity has been checked previously */
 	if (stream_name_len < 0) {
 		res = stream_name_len;
 		goto exit;
@@ -1808,7 +1812,10 @@ static int ntfs_fuse_mknod_common(const char *org_path, mode_t mode, dev_t dev,
 	stream_name_len = ntfs_fuse_parse_path(org_path, &path, &stream_name);
 	if (stream_name_len < 0)
 		return stream_name_len;
-	if (stream_name_len && !S_ISREG(mode)) {
+	if (stream_name_len
+	    && (!S_ISREG(mode)
+		|| (ctx->windows_names
+		    && ntfs_forbidden_chars(stream_name,stream_name_len)))) {
 		res = -EINVAL;
 		goto exit;
 	}
@@ -1875,7 +1882,9 @@ static int ntfs_fuse_link(const char *old_path, const char *new_path)
 	name = strrchr(path, '/');
 	name++;
 	uname_len = ntfs_mbstoucs(name, &uname);
-	if (uname_len < 0) {
+	if ((uname_len < 0)
+	    || (ctx->windows_names
+		&& ntfs_forbidden_chars(uname,uname_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -3193,7 +3202,9 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
-	if (lename_len == -1) {
+	if ((lename_len == -1)
+	    || (ctx->windows_names
+		&& ntfs_forbidden_chars(lename,lename_len))) {
 		res = -errno;
 		goto exit;
 	}
@@ -3771,6 +3782,10 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "hide_dot_files"))
 				goto err_exit;
 			ctx->hide_dot_files = TRUE;
+		} else if (!strcmp(opt, "windows_names")) {
+			if (bogus_option_value(val, "windows_names"))
+				goto err_exit;
+			ctx->windows_names = TRUE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;

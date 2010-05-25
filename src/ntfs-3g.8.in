@@ -70,8 +70,8 @@ NTFS supports several filename namespaces: DOS, Win32 and POSIX. While the
 POSIX namespace for maximum portability and interoperability reasons. 
 This means that filenames are case sensitive and all characters are
 allowed except '/' and '\\0'. This is perfectly legal on Windows, though
-some application may get confused. If you find so then please report it
-to the developer of the relevant Windows software.
+some application may get confused. The option \fBwindows_names\fP may be
+used to apply Windows restrictions to new file names.
 .SS Alternate Data Streams (ADS)
 NTFS stores all data in streams. Every file has exactly one unnamed
 data stream and can have many named data streams.  The size of a file is the
@@ -209,6 +209,13 @@ Set the hidden flag in the NTFS attribute for created files and directories
 whose first character of the name is a dot. Such files and directories
 normally do not appear in directory listings, and when the flag is set
 they do not appear in Windows directory displays either.
+.TP
+.B windows_names
+This option prevents files, directories and extended attributes to be
+created with a name not allowed by windows, either because it contains
+some not allowed character (which are the nine characters " * / : < > ? \ | and
+those whose code is less than 0x20) or because the last character is a space.
+Existing such files can still be read (and renamed).
 .TP
 .B allow_other
 This option overrides the security measure restricting file access
