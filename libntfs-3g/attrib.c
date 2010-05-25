@@ -465,9 +465,13 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 		 * inode (for named data streams). The compression mark
 		 * may change any time, the compression state can only
 		 * change when stream is wiped out.
+		 * 
+		 * Also prevent compression on NTFS version < 3.0
+		 * or if cluster size > 4K
 		 */
 		a->flags &= ~ATTR_COMPRESSION_MASK;
-		if ((na->ni->flags & FILE_ATTR_COMPRESSED)
+		if ((ni->flags & FILE_ATTR_COMPRESSED)
+		    && (ni->vol->major_ver >= 3)
 		    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE))
 			a->flags |= ATTR_IS_COMPRESSED;
 	}
@@ -3704,6 +3708,7 @@ int ntfs_attr_add(ntfs_inode *ni, ATTR_TYPES type,
 
 add_attr_record:
 	if ((ni->flags & FILE_ATTR_COMPRESSED)
+	    && (ni->vol->major_ver >= 3)
 	    && (ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	    && ((type == AT_DATA)
 	       || ((type == AT_INDEX_ROOT) && (name == NTFS_INDEX_I30))))
@@ -4673,6 +4678,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 */
 	if (!na->data_size
 	    && (na->type == AT_DATA)
+	    && (na->ni->vol->major_ver >= 3)
 	    && (na->ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	    && (na->ni->flags & FILE_ATTR_COMPRESSED)) {
 		a->flags |= ATTR_IS_COMPRESSED;
