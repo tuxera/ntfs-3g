@@ -195,13 +195,12 @@ show_sys_files, all files are accessible by name, for example you can always
 do
 "ls \-l '$UpCase'".
 .TP
-.B show_hid_files
-Show the hidden files and directories in directory listings, the hidden files
+.B hide_hid_files
+Hide the hidden files and directories in directory listings, the hidden files
 and directories being the ones whose NTFS attribute have the hidden flag set.
-This flag has no effect on files and directory whose first character of
-the name is a dot. Furthermore, irrespectively of show_hid_files, all files
-and directories are accessible by name, for example you can always display
-the Windows trash bin directory by :
+The hidden files will not be selected when using wildcards in commands,
+but all files and directories remain accessible by full name, for example you
+can always display the Windows trash bin directory by :
 "ls \-ld '$RECYCLE.BIN'".
 .TP
 .B hide_dot_files
