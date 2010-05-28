@@ -1741,8 +1741,10 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			
 		ctx->attr->initialized_size = cpu_to_sle64(pos + count);
 		/* fix data_size for compressed files */
-		if (compressed)
+		if (compressed) {
+			na->data_size = pos + count;
 			ctx->attr->data_size = ctx->attr->initialized_size;
+		}
 		if (ntfs_mft_record_write(vol, ctx->ntfs_ino->mft_no,
 				ctx->mrec)) {
 			/*
