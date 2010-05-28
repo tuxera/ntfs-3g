@@ -1130,7 +1130,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 			/* merging with a hole before */
 		freerl = rl;
 	} else {
-		rl->length -= freelength;
+		rl->length -= freelength; /* warning : can be zero */
 		freerl = ++rl;
 	}
 	if (!mergeholes && (usedcnt || beginhole)) {
@@ -1154,6 +1154,8 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 			if (!usedcnt) {
 				holes++;
 				freerl--;
+				freerl->length += (threeparts
+						? freecnt : freelength);
 				if (freerl->vcn < *update_from)
 					*update_from = freerl->vcn;
 			}
@@ -1352,16 +1354,26 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 						usedcnt,freecnt,update_from);
 			else {
 				freelength = rl->length - usedcnt;
-				rl->length = usedcnt; /* warning : can be zero */
 				beginhole = !usedcnt && !rl->vcn;
 				mergeholes = !usedcnt
 						&& rl[0].vcn
 						&& (rl[-1].lcn == LCN_HOLE);
 				if (mergeholes) {
+					s32 carry;
+
+				/* shorten the runs which have free space */
+					carry = freecnt;
 					freerl = rl;
-					freerl->length = freecnt;
-				} else
+					while (freerl->length < carry) {
+						carry -= freerl->length;
+						freerl++;
+					}
+					freerl->length = carry;
+					freerl = rl;
+				} else {
+					rl->length = usedcnt; /* can be zero ? */
 					freerl = ++rl;
+				}
 				if ((freelength > 0)
 				    && !mergeholes
 				    && (usedcnt || beginhole)) {
