@@ -43,6 +43,8 @@ enum {
  *		Parameters for compression
  */
 
+	/* default option for compression */
+#define DEFAULT_COMPRESSION FALSE
 	/* (log2 of) number of clusters in a compression block for new files */
 #define STANDARD_COMPRESSION_UNIT 4
 	/* maximum cluster size for allowing compression for new files */

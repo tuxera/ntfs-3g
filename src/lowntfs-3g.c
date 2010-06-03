@@ -213,6 +213,7 @@ typedef struct {
 	BOOL hide_dot_files;
 	BOOL ignore_case;
 	BOOL windows_names;
+	BOOL compression;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
@@ -3647,6 +3648,8 @@ static int ntfs_open(const char *device)
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
 	}
+	if (ctx->compression)
+		NVolSetCompression(ctx->vol);
 #ifdef HAVE_SETXATTR
 			/* archivers must see hidden files */
 	if (ctx->efs_raw)
@@ -3748,6 +3751,7 @@ static char *parse_mount_options(const char *orig_opts)
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	ctx->efs_raw = FALSE;
 #endif /* HAVE_SETXATTR */
+	ctx->compression = DEFAULT_COMPRESSION;
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
 		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
@@ -3838,6 +3842,14 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "windows_names"))
 				goto err_exit;
 			ctx->windows_names = TRUE;
+		} else if (!strcmp(opt, "compression")) {
+			if (bogus_option_value(val, "compression"))
+				goto err_exit;
+			ctx->compression = TRUE;
+		} else if (!strcmp(opt, "nocompression")) {
+			if (bogus_option_value(val, "nocompression"))
+				goto err_exit;
+			ctx->compression = FALSE;
 		} else if (!strcmp(opt, "silent")) {
 			if (bogus_option_value(val, "silent"))
 				goto err_exit;
