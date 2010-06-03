@@ -2135,10 +2135,16 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	 * length.
 	 */
 	compressed_part = 0;
- 	if ((rl->lcn >= 0) && (rl[1].lcn == (LCN)LCN_HOLE))
-		compressed_part
-			 = na->compression_block_clusters - rl[1].length;
-	else
+ 	if (rl->lcn >= 0) {
+		runlist_element *xrl;
+
+		xrl = rl;
+		do {
+			xrl++;
+		} while (xrl->lcn >= 0);
+		compressed_part = (-xrl->length)
+					& (na->compression_block_clusters - 1);
+	} else
 		if (rl->lcn == (LCN)LCN_HOLE) {
 			if (rl->length < na->compression_block_clusters)
 				compressed_part
