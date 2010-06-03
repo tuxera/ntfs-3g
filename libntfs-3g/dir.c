@@ -1469,11 +1469,8 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		/*
 		 * Set compression flag according to parent directory
 		 * unless NTFS version < 3.0 or cluster size > 4K
-		 * or parent directory is root directory (this is to
-		 * avoid problems with boot loaders).
 		 */
 	if ((dir_ni->flags & FILE_ATTR_COMPRESSED)
-	   && (dir_ni->mft_no != FILE_root)
 	   && (dir_ni->vol->major_ver >= 3)
 	   && (dir_ni->vol->cluster_size <= MAX_COMPRESSION_CLUSTER_SIZE)
 	   && (S_ISREG(type) || S_ISDIR(type)))
