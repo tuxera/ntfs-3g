@@ -212,9 +212,9 @@ they do not appear in Windows directory displays either.
 .B windows_names
 This option prevents files, directories and extended attributes to be
 created with a name not allowed by windows, either because it contains
-some not allowed character (which are the nine characters " * / : < > ? \ | and
-those whose code is less than 0x20) or because the last character is a space.
-Existing such files can still be read (and renamed).
+some not allowed character (which are the nine characters " * / : < > ? \\ | and
+those whose code is less than 0x20) or because the last character is a space
+or a dot. Existing such files can still be read (and renamed).
 .TP
 .B allow_other
 This option overrides the security measure restricting file access
