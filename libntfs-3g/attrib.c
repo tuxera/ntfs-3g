@@ -1781,7 +1781,11 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
 		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
-			na->ni->allocated_size = na->allocated_size;
+			if ((compressed || NAttrSparse(na))
+					&& NAttrNonResident(na))
+				na->ni->allocated_size = na->compressed_size;
+			else
+				na->ni->allocated_size = na->allocated_size;
 			set_nino_flag(na->ni,KnownSize);
 		}
 #endif
@@ -2225,7 +2229,7 @@ retry:
 		    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
 		    : na->type == AT_DATA && na->name == AT_UNNAMED) {
 			na->ni->data_size = na->data_size;
-			na->ni->allocated_size = na->allocated_size;
+			na->ni->allocated_size = na->compressed_size;
 			set_nino_flag(na->ni,KnownSize);
 		}
 #endif
@@ -4723,7 +4727,14 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 			    ? na->type == AT_INDEX_ROOT && na->name == NTFS_INDEX_I30
 			    : na->type == AT_DATA && na->name == AT_UNNAMED) {
 				na->ni->data_size = na->data_size;
-				na->ni->allocated_size = na->allocated_size;
+				if (((na->data_flags & ATTR_COMPRESSION_MASK)
+					|| NAttrSparse(na))
+						&& NAttrNonResident(na))
+					na->ni->allocated_size
+						= na->compressed_size;
+				else
+					na->ni->allocated_size
+						= na->allocated_size;
 				set_nino_flag(na->ni,KnownSize);
 				if (na->type == AT_DATA)
 					NInoFileNameSetDirty(na->ni);
