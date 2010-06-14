@@ -55,7 +55,7 @@ options.
 Doing so, Windows users have full access to the files created by 
 .B ntfs-3g.
 .PP
-But, by setting the default_permissions option, you can benefit from the full
+But, by setting the permissions option, you can benefit from the full
 ownership and permissions features as defined by POSIX. By defining a
 Windows-to-Linux user mapping, the ownership and permissions will even be
 applied to Windows users and conversely.
@@ -124,10 +124,9 @@ When a user mapping file is defined, the options \fBuid=\fP, \fBgid=\fP,
 \fBumask=\fP, \fBfmask=\fP, \fBdmask=\fP and \fBdsilent=\fP are ignored.
 .RE
 .TP
-.B default_permissions
+.B permissions
 Set standard permissions on created files and use standard access control.
-This option is set by default when a user mapping file or an ownership related
-option is present.
+This option is set by default when a user mapping file is present.
 .TP
 .B inherit
 When creating a new file, set its initial ownership and protections
@@ -283,7 +282,7 @@ NTFS and recognized.
 .P
 By default, this mapping is fetched from the file \fB.NTFS-3G/UserMapping\fP
 located in the NTFS partition. The option \fBusermapping=\fP may be used
-to define another location. When the option default_permissions is set and
+to define another location. When the option permissions is set and
 no mapping file is found, a default mapping is used.
 .P
 Each line in the user mapping file defines a mapping. It is organized
@@ -298,7 +297,7 @@ with no uid and gid can be used. Files created on Linux will appear to
 Windows as owned by a foreign user, and files created on Windows will appear
 to Linux as owned by root. Just copy the example below and replace the 9 and
 10-digit numbers by any number not greater than 4294967295. The resulting
-behavior is the same as the one with the option default_permission set with
+behavior is the same as the one with the option permission set with
 no ownership option and no user mapping file available.
 .RS
 .sp

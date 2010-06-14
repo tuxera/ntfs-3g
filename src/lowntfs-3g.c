@@ -3745,6 +3745,7 @@ static char *parse_mount_options(const char *orig_opts)
 	char *options, *s, *opt, *val, *ret = NULL;
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
+	int permissions = 0;
 	int want_permissions = 0;
 
 	ctx->secure_flags = 0;
@@ -3796,6 +3797,8 @@ static char *parse_mount_options(const char *orig_opts)
 			no_def_opts = TRUE; /* Don't add default options. */
 		} else if (!strcmp(opt, "default_permissions")) {
 			default_permissions = 1;
+		} else if (!strcmp(opt, "permissions")) {
+			permissions = 1;
 		} else if (!strcmp(opt, "umask")) {
 			if (missing_option_value(val, "umask"))
 				goto err_exit;
@@ -3976,7 +3979,8 @@ static char *parse_mount_options(const char *orig_opts)
 	if (!no_def_opts && strappend(&ret, def_opts))
 		goto err_exit;
 #if KERNELPERMS
-	if (default_permissions && strappend(&ret, "default_permissions,"))
+	if ((default_permissions || permissions)
+			&& strappend(&ret, "default_permissions,"))
 		goto err_exit;
 #endif
         
@@ -3991,7 +3995,7 @@ static char *parse_mount_options(const char *orig_opts)
 		goto err_exit;
 	if (strappend(&ret, opts.device))
 		goto err_exit;
-	if (default_permissions)
+	if (permissions)
 		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
 	if (want_permissions)
 		ctx->secure_flags |= (1 << SECURITY_WANTED);
