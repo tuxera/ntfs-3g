@@ -1528,18 +1528,35 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 		}
 	} else {
 		runlist_element *orl = na->rl;
+		s64 olcn = (*prl)->lcn;
 			/*
 			 * Map the full runlist (needed to compute the
 			 * compressed size), unless the runlist has not
 			 * yet been created (data just made non-resident)
 			 */
+		irl = *prl - na->rl;
 		if (!NAttrBeingNonResident(na)
 			&& ntfs_attr_map_whole_runlist(na)) {
 			*prl = (runlist_element*)NULL;
 		} else {
-			if (na->rl != orl) {
-				/* hope this cannot happen */
-				ntfs_log_error("Unexpected runlist relocation\n");
+			/*
+			 * Mapping the runlist may cause its relocation,
+			 * and relocation may be at the same place with
+			 * relocated contents.
+			 * Have to find the current run again when this
+			 * happens.
+			 */
+			if ((na->rl != orl) || ((*prl)->lcn != olcn)) {
+				zrl = &na->rl[irl];
+				while (zrl->length && (zrl->lcn != olcn))
+					zrl++;
+				*prl = zrl;
+			}
+			if (!(*prl)->length) {
+				 ntfs_log_error("Mapped run not found,"
+					" inode %lld lcn 0x%llx\n",
+					(long long)na->ni->mft_no,
+					(long long)olcn);
 				*prl = (runlist_element*)NULL;
 			} else {
 				*prl = ntfs_rl_extend(na,*prl,2);
