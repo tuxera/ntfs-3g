@@ -2127,6 +2127,7 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	if (!compressed || !NAttrNonResident(na))
 		goto out;
 
+	NAttrSetComprClosing(na); /* for safety checks */
 		/*
 		 * For a compressed attribute, we must be sure there are two
 		 * available entries, so reserve them before it gets too late.
@@ -4518,6 +4519,13 @@ int ntfs_attr_make_non_resident(ntfs_attr *na,
 			- 1) & ~(vol->cluster_size - 1);
 
 	if (new_allocated_size > 0) {
+			if ((a->flags & ATTR_COMPRESSION_MASK)
+					== ATTR_IS_COMPRESSED) {
+				/* must allocate full compression blocks */
+				new_allocated_size = ((new_allocated_size - 1)
+					| ((1L << (STANDARD_COMPRESSION_UNIT
+					   + vol->cluster_size_bits)) - 1)) + 1;
+			}
 		/* Start by allocating clusters to hold the attribute value. */
 		rl = ntfs_cluster_alloc(vol, 0, new_allocated_size >>
 				vol->cluster_size_bits, -1, DATA_ZONE);
@@ -4790,6 +4798,20 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 		if (ntfs_attr_make_non_resident(tna, ctx)) {
 			ntfs_attr_close(tna);
 			continue;
+		}
+		if (((tna->data_flags & ATTR_COMPRESSION_MASK)
+						== ATTR_IS_COMPRESSED)
+		   && (NAttrComprClosing(tna) || ntfs_attr_pclose(tna))) {
+			/* safety check : no recursion on close */
+			if (NAttrComprClosing(tna)) {
+				err = EIO;
+				ntfs_log_error("Bad ntfs_attr_pclose"
+					" recursion on inode %lld\n",
+					(long long)tna->ni->mft_no);
+			} else
+				err = errno;
+			ntfs_attr_close(tna);
+			goto put_err_out;
 		}
 		ntfs_inode_mark_dirty(tna->ni);
 		ntfs_attr_close(tna);

@@ -200,7 +200,8 @@ typedef enum {
 	NA_Initialized,		/* 1: structure is initialized. */
 	NA_NonResident,		/* 1: Attribute is not resident. */
 	NA_BeingNonResident,	/* 1: Attribute is being made not resident. */
-	NA_FullyMapped,		/* 1: Attribute has beed fully mapped */
+	NA_FullyMapped,		/* 1: Attribute has been fully mapped */
+	NA_ComprClosing,	/* 1: Compressed attribute is being closed */
 } ntfs_attr_state_bits;
 
 #define  test_nattr_flag(na, flag)	 test_bit(NA_##flag, (na)->state)
@@ -222,6 +223,10 @@ typedef enum {
 #define NAttrFullyMapped(na)		test_nattr_flag(na, FullyMapped)
 #define NAttrSetFullyMapped(na)		set_nattr_flag(na, FullyMapped)
 #define NAttrClearFullyMapped(na)	clear_nattr_flag(na, FullyMapped)
+
+#define NAttrComprClosing(na)		test_nattr_flag(na, ComprClosing)
+#define NAttrSetComprClosing(na)	set_nattr_flag(na, ComprClosing)
+#define NAttrClearComprClosing(na)	clear_nattr_flag(na, ComprClosing)
 
 #define GenNAttrIno(func_name, flag)			\
 extern int NAttr##func_name(ntfs_attr *na);		\
