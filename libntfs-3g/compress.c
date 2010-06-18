@@ -742,7 +742,15 @@ do_next_cb:
 		na->data_size = na->initialized_size = na->allocated_size;
 		do {
 			br = ntfs_attr_pread(na, ofs, to_read, b);
-			if (br < 0) {
+			if (br <= 0) {
+				if (!br) {
+					ntfs_log_error("Failed to read an"
+						" uncompressed cluster,"
+						" inode %lld offs 0x%llx\n",
+						(long long)na->ni->mft_no,
+						(long long)ofs);
+					errno = EIO;
+				}
 				err = errno;
 				na->data_size = tdata_size;
 				na->initialized_size = tinitialized_size;
@@ -793,7 +801,15 @@ do_next_cb:
 			br = ntfs_attr_pread(na,
 					(vcn << vol->cluster_size_bits) +
 					(cb_pos - cb), to_read, cb_pos);
-			if (br < 0) {
+			if (br <= 0) {
+				if (!br) {
+					ntfs_log_error("Failed to read a"
+						" compressed cluster, "
+						" inode %lld offs 0x%llx\n",
+						(long long)na->ni->mft_no,
+						(long long)(vcn << vol->cluster_size_bits));
+					errno = EIO;
+				}
 				err = errno;
 				na->data_size = tdata_size;
 				na->initialized_size = tinitialized_size;
