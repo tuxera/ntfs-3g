@@ -1775,10 +1775,12 @@ static int ntfs_fuse_create_stream(const char *path,
 	}
 	if (ntfs_attr_add(ni, AT_DATA, stream_name, stream_name_len, NULL, 0))
 		res = -errno;
+	else
+		set_archive(ni);
 
 	if ((res >= 0)
+	    && fi
 	    && (fi->flags & (O_WRONLY | O_RDWR))) {
-		set_archive(ni);
 		/* mark a future need to compress the last block */
 		if (ni->flags & FILE_ATTR_COMPRESSED)
 			fi->fh |= CLOSE_COMPRESSED;
