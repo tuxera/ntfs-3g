@@ -1581,7 +1581,7 @@ exit:
 	return res;
 }
 
-#ifdef HAVE_UTIMENSAT
+#if defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW)
 
 static int ntfs_fuse_utimens(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		struct stat *stin, struct stat *stbuf, int to_set)
@@ -1628,7 +1628,7 @@ static int ntfs_fuse_utimens(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	return res;
 }
 
-#else /* HAVE_UTIMENSAT */
+#else /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
 
 static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 		struct stat *stin, struct stat *stbuf)
@@ -1699,7 +1699,7 @@ static int ntfs_fuse_utime(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	return res;
 }
 
-#endif /* HAVE_UTIMENSAT */
+#endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
 
 static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			 int to_set, struct fuse_file_info *fi __attribute__((unused)))
@@ -1774,11 +1774,11 @@ static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 						/* some set of atime/mtime */
 	if (!res && (to_set & (FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME))) {
-#ifdef HAVE_UTIMENSAT
+#if defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW)
 		res = ntfs_fuse_utimens(&security, ino, attr, &stbuf, to_set);
-#else /* HAVE_UTIMENSAT */
+#else /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
 		res = ntfs_fuse_utime(&security, ino, attr, &stbuf);
-#endif /* HAVE_UTIMENSAT */
+#endif /* defined(HAVE_UTIMENSAT) & defined(FUSE_SET_ATTR_ATIME_NOW) */
 	}
 	if (res)
 		fuse_reply_err(req, -res);
