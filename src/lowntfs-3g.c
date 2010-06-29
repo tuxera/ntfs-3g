@@ -2490,6 +2490,8 @@ static void ntfs_fuse_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
 		fuse_reply_err(req, 0);
 }
 
+#if FUSE_VERSION >= 28
+
 static void ntfs_fuse_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
 		      uint64_t vidx)
 {
@@ -2542,6 +2544,8 @@ done :
 	else
 		fuse_reply_bmap(req, lidx);
 }
+
+#endif /* FUSE_VERSION >= 28 */
 
 #ifdef HAVE_SETXATTR
 
@@ -3585,7 +3589,9 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 	.rename 	= ntfs_fuse_rename,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
+#if FUSE_VERSION >= 28
 	.bmap		= ntfs_fuse_bmap,
+#endif /* FUSE_VERSION >= 28 */
 	.destroy	= ntfs_fuse_destroy2,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	.access 	= ntfs_fuse_access,
