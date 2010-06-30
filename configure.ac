@@ -245,7 +245,7 @@ if test "$enable_crypto" != "no"; then
 		fi
 	])
 	have_libgnutls=false
-	AM_PATH_LIBGNUTLS(1.2.8, [ have_libgnutls=true ],
+	PKG_CHECK_MODULES(GNUTLS_MODULE, gnutls >= 1.2.8, [ have_libgnutls=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([Linux-NTFS crypto code requires the gnutls library.])
