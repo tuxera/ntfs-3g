@@ -3,8 +3,9 @@ AM_LIBS		=
 AM_LFLAGS	= -static
 STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else
-AM_LIBS		= 
-AM_LFLAGS	= $(all_libraries) -lntfs-3g
+AM_LIBS		= $(NTFS_3G_MODULE_LIBS)
+AM_CFLAGS	= $(NTFS_3G_MODULE_CFLAGS)
+AM_LFLAGS	= $(all_libraries)
 LIBTOOL_LINK    = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
