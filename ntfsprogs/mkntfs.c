@@ -523,11 +523,15 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 /**
  * mkntfs_time
  */
-static time_t mkntfs_time(void)
+static struct timespec mkntfs_time(void)
 {
+	struct timespec ts;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 0;
 	if (!opts.use_epoch_time)
-		return time(NULL);
-	return 0;
+		ts.tv_sec = time(NULL);
+	return ts;
 }
 
 /**
@@ -1336,10 +1340,10 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 				a->name_length, ic, upcase, upcase_len)) {
 			int rc;
 
-			rc = ntfs_names_collate(name, name_len,
+			rc = ntfs_names_full_collate(name, name_len,
 					(ntfschar*)((char*)a +
 					le16_to_cpu(a->name_offset)),
-					a->name_length, 1, IGNORE_CASE,
+					a->name_length, IGNORE_CASE,
 					upcase, upcase_len);
 			/*
 			 * If @name collates before a->name, there is no
@@ -1352,10 +1356,10 @@ static int mkntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 			/* If the strings are not equal, continue search. */
 			if (rc)
 				continue;
-			rc = ntfs_names_collate(name, name_len,
+			rc = ntfs_names_full_collate(name, name_len,
 					(ntfschar*)((char*)a +
 					le16_to_cpu(a->name_offset)),
-					a->name_length, 1, CASE_SENSITIVE,
+					a->name_length, CASE_SENSITIVE,
 					upcase, upcase_len);
 			if (rc == -1) {
 				errno = ENOENT;
@@ -1566,7 +1570,7 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 	} else {
 		hdr_size = 64;
 		if (val_len) {
-			mpa_size = ntfs_get_size_for_mapping_pairs(g_vol, rl, 0);
+			mpa_size = ntfs_get_size_for_mapping_pairs(g_vol, rl, 0, INT_MAX);
 			if (mpa_size < 0) {
 				err = -errno;
 				ntfs_log_error("Failed to get size for mapping "
@@ -1759,7 +1763,7 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 	} else {
 		hdr_size = 64;
 		if (val_len) {
-			mpa_size = ntfs_get_size_for_mapping_pairs(g_vol, rl, 0);
+			mpa_size = ntfs_get_size_for_mapping_pairs(g_vol, rl, 0, INT_MAX);
 			if (mpa_size < 0) {
 				err = -errno;
 				ntfs_log_error("Failed to get size for mapping "
@@ -1980,7 +1984,7 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
 
 	sd_size = 48;
 
-	si.creation_time = utc2ntfs(mkntfs_time());
+	si.creation_time = timespec2ntfs(mkntfs_time());
 	si.last_data_change_time = si.creation_time;
 	si.last_mft_change_time = si.creation_time;
 	si.last_access_time = si.creation_time;
@@ -2895,7 +2899,7 @@ static int initialize_quota(MFT_RECORD *m)
 	if (g_vol->minor_ver == 0)
 		idx_entry_q1_data->flags |= QUOTA_FLAG_OUT_OF_DATE;
 	idx_entry_q1_data->bytes_used = const_cpu_to_le64(0x00);
-	idx_entry_q1_data->change_time = utc2ntfs(mkntfs_time());
+	idx_entry_q1_data->change_time = timespec2ntfs(mkntfs_time());
 	idx_entry_q1_data->threshold = const_cpu_to_le64((s64)-1);
 	idx_entry_q1_data->limit = const_cpu_to_le64((s64)-1);
 	idx_entry_q1_data->exceeded_time = const_cpu_to_le64(0x00);
@@ -2922,7 +2926,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2_data->version = const_cpu_to_le32(0x02);
 	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	idx_entry_q2_data->bytes_used = const_cpu_to_le64(0x00);
-	idx_entry_q2_data->change_time = utc2ntfs(mkntfs_time());;
+	idx_entry_q2_data->change_time = timespec2ntfs(mkntfs_time());;
 	idx_entry_q2_data->threshold = const_cpu_to_le64((s64)-1);
 	idx_entry_q2_data->limit = const_cpu_to_le64((s64)-1);
 	idx_entry_q2_data->exceeded_time = const_cpu_to_le64(0x00);
@@ -3125,7 +3129,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const MFT_REF ref_parent,
 		return -errno;
 	fn->parent_directory = ref_parent;
 	/* FIXME: copy the creation_time from the std info */
-	fn->creation_time = utc2ntfs(mkntfs_time());
+	fn->creation_time = timespec2ntfs(mkntfs_time());
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -3241,7 +3245,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const MFT_REF ref_parent,
 	fn->parent_directory = ref_parent;
 	/* FIXME: Is this correct? Or do we have to copy the creation_time */
 	/* from the std info? */
-	fn->creation_time = utc2ntfs(mkntfs_time());
+	fn->creation_time = timespec2ntfs(mkntfs_time());
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -4956,7 +4960,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		goto done;
 	}
 	/* Initialize the random number generator with the current time. */
-	srandom(mkntfs_time());
+	srandom(mkntfs_time().tv_sec);
 	/* Allocate and initialize ntfs_volume structure g_vol. */
 	g_vol = ntfs_volume_alloc();
 	if (!g_vol) {

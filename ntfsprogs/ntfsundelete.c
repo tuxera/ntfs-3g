@@ -793,7 +793,7 @@ static FILE_NAME_ATTR* verify_parent(struct filename* name, MFT_RECORD* rec)
 
 	filename_attr = (FILE_NAME_ATTR*)((char*)attr30 + le16_to_cpu(attr30->value_offset));
 	/* if name is older than this dir -> can't determine */
-	if (ntfs2utc(filename_attr->creation_time) > name->date_c) {
+	if (ntfs2timespec(filename_attr->creation_time).tv_sec > name->date_c) {
 		return NULL;
 	}
 
@@ -923,10 +923,10 @@ static int get_filenames(struct ufile *file, ntfs_volume* vol)
 		name->size_data  = sle64_to_cpu(attr->data_size);
 		name->flags      = attr->file_attributes;
 
-		name->date_c     = ntfs2utc(attr->creation_time);
-		name->date_a     = ntfs2utc(attr->last_data_change_time);
-		name->date_m     = ntfs2utc(attr->last_mft_change_time);
-		name->date_r     = ntfs2utc(attr->last_access_time);
+		name->date_c     = ntfs2timespec(attr->creation_time).tv_sec;
+		name->date_a     = ntfs2timespec(attr->last_data_change_time).tv_sec;
+		name->date_m     = ntfs2timespec(attr->last_mft_change_time).tv_sec;
+		name->date_r     = ntfs2timespec(attr->last_access_time).tv_sec;
 
 		if (ntfs_ucstombs(name->uname, name->uname_len, &name->name,
 				0) < 0) {
@@ -1101,7 +1101,7 @@ static struct ufile * read_record(ntfs_volume *vol, long long record)
 	if (attr10) {
 		STANDARD_INFORMATION *si;
 		si = (STANDARD_INFORMATION *) ((char *) attr10 + le16_to_cpu(attr10->value_offset));
-		file->date = ntfs2utc(si->last_data_change_time);
+		file->date = ntfs2timespec(si->last_data_change_time).tv_sec;
 	}
 
 	if (attr20 || !attr10)

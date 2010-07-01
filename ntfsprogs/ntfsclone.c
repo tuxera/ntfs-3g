@@ -716,7 +716,8 @@ static void restore_image(void)
 
 static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
-	s64 timestamp = utc2ntfs(0);
+	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
+	s64 timestamp = timespec2ntfs(zero_time);
 
 	while (!(e->ie_flags & INDEX_ENTRY_END)) {
 
@@ -806,7 +807,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		}
 	}
 	
-	if (ntfs_rl_pwrite(vol, na->rl, 0, na->data_size, indexa) != na->data_size)
+	if (ntfs_rl_pwrite(vol, na->rl, 0, 0, na->data_size, indexa) != na->data_size)
 		ntfs_log_perror("ntfs_rl_pwrite failed");
 out_indexa:
 	free(indexa);
@@ -879,8 +880,9 @@ do {								\
 
 static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
+	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
 	ATTR_RECORD *a = image->ctx->attr;
-	s64 timestamp = utc2ntfs(0);
+	s64 timestamp = timespec2ntfs(zero_time);
 
 	if (a->type == AT_FILE_NAME)
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);

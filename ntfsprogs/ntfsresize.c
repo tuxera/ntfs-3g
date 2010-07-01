@@ -1146,7 +1146,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 
 	rl_fixup(&rl);
 
-	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0)) == -1)
+	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0, INT_MAX)) == -1)
 		perr_exit("ntfs_get_size_for_mapping_pairs");
 
 	if (a->name_length) {
@@ -1964,7 +1964,7 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	 * attribute too, for now chkdsk will do this for us.
 	 */
 
-	size = ntfs_rl_pwrite(vol, rl, 0, bm_bsize, resize->lcn_bitmap.bm);
+	size = ntfs_rl_pwrite(vol, rl, 0, 0, bm_bsize, resize->lcn_bitmap.bm);
 	if (bm_bsize != size) {
 		if (size == -1)
 			perr_exit("Couldn't write $Bitmap");

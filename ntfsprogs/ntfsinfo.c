@@ -319,8 +319,8 @@ static int parse_options(int argc, char *argv[])
  */
 static char *ntfsinfo_time_to_str(const s64 sle_ntfs_clock)
 {
-	time_t unix_clock = ntfs2utc(sle_ntfs_clock);
-	return ctime(&unix_clock);
+	struct timespec unix_clock = ntfs2timespec((ntfs_time) sle_ntfs_clock);
+	return ctime(&unix_clock.tv_sec);
 }
 
 /**
