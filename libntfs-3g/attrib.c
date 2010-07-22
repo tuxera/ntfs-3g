@@ -2127,7 +2127,15 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	if (!compressed || !NAttrNonResident(na))
 		goto out;
 
-	NAttrSetComprClosing(na); /* for safety checks */
+		/* safety check : no recursion on close */
+	if (NAttrComprClosing(na)) {
+		errno = EIO;
+		ntfs_log_error("Bad ntfs_attr_pclose"
+				" recursion on inode %lld\n",
+				(long long)na->ni->mft_no);
+		goto out;
+	}
+	NAttrSetComprClosing(na);
 		/*
 		 * For a compressed attribute, we must be sure there are two
 		 * available entries, so reserve them before it gets too late.
@@ -4801,15 +4809,8 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 		}
 		if (((tna->data_flags & ATTR_COMPRESSION_MASK)
 						== ATTR_IS_COMPRESSED)
-		   && (NAttrComprClosing(tna) || ntfs_attr_pclose(tna))) {
-			/* safety check : no recursion on close */
-			if (NAttrComprClosing(tna)) {
-				err = EIO;
-				ntfs_log_error("Bad ntfs_attr_pclose"
-					" recursion on inode %lld\n",
-					(long long)tna->ni->mft_no);
-			} else
-				err = errno;
+		   && ntfs_attr_pclose(tna)) {
+			err = errno;
 			ntfs_attr_close(tna);
 			goto put_err_out;
 		}
