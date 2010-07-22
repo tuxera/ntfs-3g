@@ -3170,7 +3170,8 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ntfs_attr *na = NULL;
 	ntfschar *lename = NULL;
 	int res, lename_len;
-	size_t part, total;
+	size_t total;
+	s64 part;
 	int attr;
 	int namespace;
 	struct SECURITY_CONTEXT security;
