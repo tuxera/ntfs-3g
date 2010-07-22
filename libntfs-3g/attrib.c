@@ -4681,6 +4681,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize);
  * @newsize:	new size (in bytes) to which to resize the attribute
  *
  * Change the size of a resident, open ntfs attribute @na to @newsize bytes.
+ * Can also be used to force an attribute non-resident. In this case, the
+ * size cannot be changed.
  *
  * On success return 0 
  * On error return values are:
@@ -4691,7 +4693,8 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize);
  *	ERANGE - @newsize is not valid for the attribute type of @na.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
+static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
+			BOOL force_non_resident)
 {
 	ntfs_attr_search_ctx *ctx;
 	ntfs_volume *vol;
@@ -4729,7 +4732,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 	 * attribute non-resident if the attribute type supports it. If it is
 	 * smaller we can go ahead and attempt the resize.
 	 */
-	if (newsize < vol->mft_record_size) {
+	if ((newsize < vol->mft_record_size) && !force_non_resident) {
 		/* Perform the resize of the attribute record. */
 		if (!(ret = ntfs_resident_attr_value_resize(ctx->mrec, ctx->attr,
 				newsize))) {
@@ -4769,6 +4772,21 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 	if (!ntfs_attr_make_non_resident(na, ctx)) {
 		ntfs_inode_mark_dirty(ctx->ntfs_ino);
 		ntfs_attr_put_search_ctx(ctx);
+		/*
+		 * do not truncate when forcing non-resident, this
+		 * could cause the attribute to be made resident again,
+		 * so size changes are not allowed.
+		 */
+		if (force_non_resident) {
+			ret = 0;
+			if (newsize != na->data_size) {
+				ntfs_log_error("Cannot change size when"
+					" forcing non-resident\n");
+				errno = EIO;
+				ret = STATUS_ERROR;
+			}
+			return (ret);
+		}
 		/* Resize non-resident attribute */
 		return ntfs_attr_truncate(na, newsize);
 	} else if (errno != ENOSPC && errno != EPERM) {
@@ -4817,7 +4835,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 		ntfs_inode_mark_dirty(tna->ni);
 		ntfs_attr_close(tna);
 		ntfs_attr_put_search_ctx(ctx);
-		return ntfs_resident_attr_resize(na, newsize);
+		return ntfs_resident_attr_resize_i(na, newsize, force_non_resident);
 	}
 	/* Check whether error occurred. */
 	if (errno != ENOENT) {
@@ -4837,7 +4855,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 			ntfs_log_perror("Could not free space in MFT record");
 			return -1;
 		}
-		return ntfs_resident_attr_resize(na, newsize);
+		return ntfs_resident_attr_resize_i(na, newsize, force_non_resident);
 	}
 
 	/*
@@ -4876,7 +4894,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 		ntfs_attr_put_search_ctx(ctx);
 		if (ntfs_inode_add_attrlist(ni))
 			return -1;
-		return ntfs_resident_attr_resize(na, newsize);
+		return ntfs_resident_attr_resize_i(na, newsize, force_non_resident);
 	}
 	/* Allocate new mft record. */
 	ni = ntfs_mft_record_alloc(vol, ni);
@@ -4897,7 +4915,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize)
 
 	ntfs_attr_put_search_ctx(ctx);
 	/* Try to perform resize once again. */
-	return ntfs_resident_attr_resize(na, newsize);
+	return ntfs_resident_attr_resize_i(na, newsize, force_non_resident);
 
 resize_done:
 	/*
@@ -4918,9 +4936,37 @@ static int ntfs_resident_attr_resize(ntfs_attr *na, const s64 newsize)
 	int ret; 
 	
 	ntfs_log_enter("Entering\n");
-	ret = ntfs_resident_attr_resize_i(na, newsize);
+	ret = ntfs_resident_attr_resize_i(na, newsize, FALSE);
 	ntfs_log_leave("\n");
 	return ret;
+}
+
+/*
+ *		Force an attribute to be made non-resident without
+ *	changing its size.
+ *
+ *	This is particularly needed when the attribute has no data,
+ *	as the non-resident variant requires more space in the MFT
+ *	record, and may imply expelling some other attribute.
+ *
+ *	As a consequence the existing ntfs_attr_search_ctx's have to
+ *	be closed or reinitialized.
+ *
+ *	returns 0 if successful,
+ *		< 0 if failed, with errno telling why
+ */
+
+int ntfs_attr_force_non_resident(ntfs_attr *na)
+{
+	int res;
+
+	res = ntfs_resident_attr_resize_i(na, na->data_size, TRUE);
+	if (!res && !NAttrNonResident(na)) {
+		res = -1;
+		errno = EIO;
+		ntfs_log_error("Failed to force non-resident\n");
+	}
+	return (res);
 }
 
 /**

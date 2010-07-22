@@ -768,7 +768,9 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 		 * encrypted files to include padding required for decryption
 		 * also include 2 bytes for padding info
 		*/
-		if (ctx->efs_raw && ni->flags & FILE_ATTR_ENCRYPTED)
+		if (ctx->efs_raw
+		    && (ni->flags & FILE_ATTR_ENCRYPTED)
+		    && ni->data_size)
 			stbuf->st_size = ((ni->data_size + 511) & ~511) + 2;
 #endif /* HAVE_SETXATTR */
 		/* 
@@ -1230,8 +1232,10 @@ static int ntfs_fuse_read(const char *org_path, char *buf, size_t size,
 	max_read = na->data_size;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	/* limit reads at next 512 byte boundary for encrypted attributes */
-	if (ctx->efs_raw && (na->data_flags & ATTR_IS_ENCRYPTED) && 
-            NAttrNonResident(na)) {
+	if (ctx->efs_raw
+	    && max_read
+	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && NAttrNonResident(na)) {
 		max_read = ((na->data_size+511) & ~511) + 2;
 	}
 #endif /* HAVE_SETXATTR */
@@ -2984,10 +2988,11 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		goto exit;
 	}
 	rsize = na->data_size;
-	if (ctx->efs_raw && 
-	    (na->data_flags & ATTR_IS_ENCRYPTED) &&
-	    NAttrNonResident(na))
-		rsize = ((na->data_size + 511) & ~511)+2;
+	if (ctx->efs_raw
+	    && rsize
+	    && (na->data_flags & ATTR_IS_ENCRYPTED)
+	    && NAttrNonResident(na))
+		rsize = ((na->data_size + 511) & ~511) + 2;
 	if (size) {
 		if (size >= (size_t)rsize) {
 			res = ntfs_attr_pread(na, 0, rsize, value);
@@ -3235,6 +3240,7 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 		}
 	}
 	total = 0;
+	res = 0;
 	if (size) {
 		do {
 			part = ntfs_attr_pwrite(na, total, size - total,
@@ -3242,20 +3248,20 @@ static int ntfs_fuse_setxattr(const char *path, const char *name,
 			if (part > 0)
 				total += part;
 		} while ((part > 0) && (total < size));
-		if (total != size)
-			res = -errno;
-		else
-			if (!(res = ntfs_attr_pclose(na)))
-				if (ctx->efs_raw 
-				   && (ni->flags & FILE_ATTR_ENCRYPTED))
-					res = ntfs_efs_fixup_attribute(NULL,
-						na);
-		if (total && !(ni->flags & FILE_ATTR_ARCHIVE)) {
-			set_archive(ni);
-			NInoFileNameSetDirty(ni);
+	}
+	if ((total != size) || ntfs_attr_pclose(na))
+		res = -errno;
+	else {
+		if (ctx->efs_raw 
+		   && (ni->flags & FILE_ATTR_ENCRYPTED)) {
+			if (ntfs_efs_fixup_attribute(NULL,na))
+				res = -errno;
 		}
-	} else
-		res = 0;
+	}
+	if (!res && !(ni->flags & FILE_ATTR_ARCHIVE)) {
+		set_archive(ni);
+		NInoFileNameSetDirty(ni);
+	}
 exit:
 	if (na)
 		ntfs_attr_close(na);
