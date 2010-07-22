@@ -1542,7 +1542,7 @@ static int ntfs_flush(ntfs_attr *na, runlist_element *rl, s64 offs,
  *	it has to be reserved beforehand.
  *
  *	Returns the size of uncompressed data written,
- *		or zero if an error occurred.
+ *		or negative if an error occurred.
  *	When the returned size is less than requested, new clusters have
  *	to be allocated before the function is called again.
  */
@@ -1572,7 +1572,7 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 	BOOL appending;
 
 	if (!valid_compressed_run(na,wrl,FALSE,"begin compressed write")) {
-		return (0);
+		return (-1);
 	}
 	if ((*update_from < 0)
 	    || (compressed_part < 0)
@@ -1580,17 +1580,17 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 		ntfs_log_error("Bad update vcn or compressed_part %d for compressed write\n",
 			compressed_part);
 		errno = EIO;
-		return (0);
+		return (-1);
 	}
 		/* make sure there are two unused entries in runlist */
 	if (na->unused_runs < 2) {
 		ntfs_log_error("No unused runs for compressed write\n");
 		errno = EIO;
-		return (0);
+		return (-1);
 	}
 	if (wrl->vcn < *update_from)
 		*update_from = wrl->vcn;
-	written = 0; /* default return */
+	written = -1; /* default return */
 	vol = na->ni->vol;
 	compression_length = na->compression_block_clusters;
 	compress = FALSE;
@@ -1730,9 +1730,9 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 			}
 		}
 	}
-	if (written
+	if ((written >= 0)
 	    && !valid_compressed_run(na,wrl,TRUE,"end compressed write"))
-		written = 0;
+		written = -1;
 	return (written);
 }
 
