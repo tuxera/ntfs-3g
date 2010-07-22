@@ -1486,11 +1486,12 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 	int compressed_part = 0;
 	int cluster_size_bits = na->ni->vol->cluster_size_bits;
 	runlist_element *rl = *prl;
-		/* the beginning of needed block is allocated */
 	s32 endblock;
 	long long allocated;
 	runlist_element *zrl;
 	int irl;
+	BOOL undecided;
+	BOOL nothole;
 
 		/* check whether the compression block is fully allocated */
 	endblock = (((pos + count - 1) >> cluster_size_bits) | (na->compression_block_clusters - 1)) + 1 - rl->vcn;
@@ -1502,11 +1503,65 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 		zrl++;
 		irl++;
 	}
+
+	undecided = (allocated < endblock) && (zrl->lcn == LCN_RL_NOT_MAPPED);
+	nothole = (allocated >= endblock) || (zrl->lcn != LCN_HOLE);
+
+	if (undecided || nothole) {
+		runlist_element *orl = na->rl;
+		s64 olcn = (*prl)->lcn;
+			/*
+			 * Map the full runlist (needed to compute the
+			 * compressed size), unless the runlist has not
+			 * yet been created (data just made non-resident)
+			 */
+		irl = *prl - na->rl;
+		if (!NAttrBeingNonResident(na)
+			&& ntfs_attr_map_whole_runlist(na)) {
+			rl = (runlist_element*)NULL;
+		} else {
+			/*
+			 * Mapping the runlist may cause its relocation,
+			 * and relocation may be at the same place with
+			 * relocated contents.
+			 * Have to find the current run again when this
+			 * happens.
+			 */
+			if ((na->rl != orl) || ((*prl)->lcn != olcn)) {
+				zrl = &na->rl[irl];
+				while (zrl->length && (zrl->lcn != olcn))
+					zrl++;
+				*prl = zrl;
+			}
+			if (!(*prl)->length) {
+				 ntfs_log_error("Mapped run not found,"
+					" inode %lld lcn 0x%llx\n",
+					(long long)na->ni->mft_no,
+					(long long)olcn);
+				rl = (runlist_element*)NULL;
+			} else {
+				rl = ntfs_rl_extend(na,*prl,2);
+				na->unused_runs = 2;
+			}
+		}
+		*prl = rl;
+		if (rl && undecided) {
+			allocated = 0;
+			zrl = rl;
+			irl = 0;
+			while (zrl->length && (zrl->lcn >= 0)
+			    && (allocated < endblock)) {
+				allocated += zrl->length;
+				zrl++;
+				irl++;
+			}
+		}
+	}
 		/*
 		 * compression block not fully allocated and followed
 		 * by a hole : we must allocate in the hole.
 		 */
-	if ((allocated < endblock) && (zrl->lcn == LCN_HOLE)) {
+	if (rl && (allocated < endblock) && (zrl->lcn == LCN_HOLE)) {
 		s64 xofs;
 
 			/*
@@ -1545,43 +1600,6 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 				while (zrl->vcn > (pos >> cluster_size_bits))
 					zrl--;
 				*prl = zrl;
-			}
-		}
-	} else {
-		runlist_element *orl = na->rl;
-		s64 olcn = (*prl)->lcn;
-			/*
-			 * Map the full runlist (needed to compute the
-			 * compressed size), unless the runlist has not
-			 * yet been created (data just made non-resident)
-			 */
-		irl = *prl - na->rl;
-		if (!NAttrBeingNonResident(na)
-			&& ntfs_attr_map_whole_runlist(na)) {
-			*prl = (runlist_element*)NULL;
-		} else {
-			/*
-			 * Mapping the runlist may cause its relocation,
-			 * and relocation may be at the same place with
-			 * relocated contents.
-			 * Have to find the current run again when this
-			 * happens.
-			 */
-			if ((na->rl != orl) || ((*prl)->lcn != olcn)) {
-				zrl = &na->rl[irl];
-				while (zrl->length && (zrl->lcn != olcn))
-					zrl++;
-				*prl = zrl;
-			}
-			if (!(*prl)->length) {
-				 ntfs_log_error("Mapped run not found,"
-					" inode %lld lcn 0x%llx\n",
-					(long long)na->ni->mft_no,
-					(long long)olcn);
-				*prl = (runlist_element*)NULL;
-			} else {
-				*prl = ntfs_rl_extend(na,*prl,2);
-				na->unused_runs = 2;
 			}
 		}
 	}
