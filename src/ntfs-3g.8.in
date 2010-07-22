@@ -227,13 +227,15 @@ The default is infinite.  Note that the size of read requests is
 limited anyway to 32 pages (which is 128kbyte on i386).
 .TP
 .B silent
-Do nothing on chmod and chown operations, but do not return error
+Do nothing, without returning any error, on chmod and chown operations,
 when the user mapping file required by these operations is not defined.
 This option is on by default.
 .TP
 .B no_def_opts
-By default ntfs-3g acts as if "silent" were set, and
-this option cancel this default behavior.
+By default ntfs-3g acts as if "silent" (ignore errors on chmod and chown),
+"allow_other" (allow any user to access files) and "nonempty"
+(allow mounting on non-empty directories) were set, and "no_def_opts"
+cancels these default options.
 .TP
 .BI streams_interface= value
 This option controls how the user can access Alternate Data Streams (ADS)
@@ -269,11 +271,10 @@ marked for compression. Existing compressed files can still be read and
 updated. Currently this is the default option.
 .TP
 .B debug
-Makes ntfs-3g to not detach from terminal and print a lot of debug output from
-libntfs-3g and FUSE.
+Makes ntfs-3g to print a lot of debug output from libntfs-3g and FUSE.
 .TP
 .B no_detach
-Same as above but with less debug output.
+Makes ntfs-3g to not detach from terminal and print some debug output.
 .SH USER MAPPING
 NTFS uses specific ids to record the ownership of files instead of
 the \fBuid\fP and \fBgid\fP used by Linux. As a consequence a mapping

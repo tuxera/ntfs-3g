@@ -242,7 +242,7 @@ static struct options {
 } opts;
 
 static const char *EXEC_NAME = "ntfs-3g";
-static char def_opts[] = "silent,allow_other,nonempty,";
+static char def_opts[] = "allow_other,nonempty,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 static const char ghostformat[] = ".ghost-ntfs-3g-%020llu";
@@ -3807,6 +3807,7 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "no_def_opts"))
 				goto err_exit;
 			no_def_opts = TRUE; /* Don't add default options. */
+			ctx->silent = FALSE; /* cancel default silent */
 		} else if (!strcmp(opt, "default_permissions")) {
 			default_permissions = 1;
 		} else if (!strcmp(opt, "permissions")) {
