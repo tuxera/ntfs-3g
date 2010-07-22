@@ -4344,6 +4344,7 @@ int main(int argc, char *argv[])
 	const char *permissions_mode = (const char*)NULL;
 	const char *failed_secure = (const char*)NULL;
 	struct stat sbuf;
+	unsigned long existing_mount;
 	int err, fd;
 
 	/*
@@ -4383,7 +4384,12 @@ int main(int argc, char *argv[])
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
 	}
-        
+	if (ntfs_check_if_mounted(opts.device,&existing_mount)
+	    || (existing_mount & NTFS_MF_MOUNTED)) {
+		err = NTFS_VOLUME_LOCKED;
+		goto err_out;
+	}
+
 			/* need absolute mount point for junctions */
 	if (opts.mnt_point[0] == '/')
 		ctx->abs_mnt_point = strdup(opts.mnt_point);
