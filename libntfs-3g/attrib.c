@@ -1199,10 +1199,29 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 	if ((na->data_flags & ATTR_COMPRESSION_MASK)
 	    && (need < na->compression_block_clusters)) {
 		/*
-		 * for a compressed file, be sure to allocate the full hole.
-		 * We may need space to decompress existing compressed data.
+		 * for a compressed file, be sure to allocate the full
+		 * compression block, as we may need space to decompress
+		 * existing compressed data.
+		 * So allocate the space common to compression block
+		 * and existing hole.
 		 */
-		rlc = ntfs_cluster_alloc(vol, (*rl)->vcn, (*rl)->length,
+		VCN alloc_vcn;
+
+		if ((from_vcn & -na->compression_block_clusters) <= (*rl)->vcn)
+			alloc_vcn = (*rl)->vcn;
+		else
+			alloc_vcn = from_vcn & -na->compression_block_clusters;
+		need = (alloc_vcn | (na->compression_block_clusters - 1))
+			+ 1 - alloc_vcn;
+		if (need > (*rl)->length) {
+			ntfs_log_error("Cannot allocate %lld clusters"
+					" within a hole of %lld\n",
+					(long long)need,
+					(long long)(*rl)->length);
+			errno = EIO;
+			goto err_out;
+		}
+		rlc = ntfs_cluster_alloc(vol, alloc_vcn, need,
 				 lcn_seek_from, DATA_ZONE);
 	} else
 		rlc = ntfs_cluster_alloc(vol, from_vcn, need,
