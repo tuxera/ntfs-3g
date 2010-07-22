@@ -1157,16 +1157,14 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 		BOOL threeparts;
 
 		/* free the unneeded clusters from initial run, then freerl */
-		freed = freelength;
-		threeparts = FALSE;
-		if (freed > freecnt) {
-			threeparts = TRUE;
-			freed = freecnt;
-		}
+		threeparts = (freelength > freecnt);
+		freed = 0;
 		frl = freerl;
 		if (freelength) {
       			res = ntfs_cluster_free_basic(vol,freelcn,
 				(threeparts ? freecnt : freelength));
+			if (!res)
+				freed += (threeparts ? freecnt : freelength);
 			if (!usedcnt) {
 				holes++;
 				freerl--;
@@ -1199,6 +1197,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
       			}
       			frl++;
    		}
+		na->compressed_size -= freed << vol->cluster_size_bits;
 		switch (holes) {
 		case 0 :
 			/* there are no hole, must insert one */
@@ -1310,6 +1309,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 			*++xrl = *frl++;
 		}
 		*++xrl = *frl; /* terminator */
+	na->compressed_size -= freed << vol->cluster_size_bits;
 	}
 	return (res);
 }
@@ -1425,6 +1425,8 @@ static int ntfs_compress_free(ntfs_attr *na, runlist_element *rl,
 				/* free the hole */
 				res = ntfs_cluster_free_from_rl(vol,freerl);
 				if (!res) {
+					na->compressed_size -= freecnt
+						<< vol->cluster_size_bits;
 					if (mergeholes) {
 						/* merge with adjacent hole */
 						freerl--;

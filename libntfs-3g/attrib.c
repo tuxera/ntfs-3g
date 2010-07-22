@@ -1228,6 +1228,8 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 				 lcn_seek_from, DATA_ZONE);
 	if (!rlc)
 		goto err_out;
+	if (na->data_flags & (ATTR_COMPRESSION_MASK | ATTR_IS_SPARSE))
+		na->compressed_size += need << vol->cluster_size_bits;
 	
 	*rl = ntfs_runlists_merge(na->rl, rlc);
 		/*
@@ -5273,7 +5275,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	 * allocated size in the index.
 	 */
 	if (na->type == AT_DATA && na->name == AT_UNNAMED) {
-		if (sparse)
+		if (sparse || (na->data_flags & ATTR_COMPRESSION_MASK))
 			na->ni->allocated_size = na->compressed_size;
 		else
 			na->ni->allocated_size = na->allocated_size;
@@ -5300,6 +5302,7 @@ static int ntfs_attr_update_mapping_pairs_i(ntfs_attr *na, VCN from_vcn)
 	const runlist_element *stop_rl;
 	int err, mp_size, cur_max_mp_size, exp_max_mp_size, ret = -1;
 	BOOL finished_build;
+	BOOL first_updated = FALSE;
 
 retry:
 	if (!na || !na->rl) {
@@ -5334,6 +5337,8 @@ retry:
 				CASE_SENSITIVE, from_vcn, NULL, 0, ctx)) {
 		a = ctx->attr;
 		m = ctx->mrec;
+		if (!a->lowest_vcn)
+			first_updated = TRUE;
 		/*
 		 * If runlist is updating not from the beginning, then set
 		 * @stop_vcn properly, i.e. to the lowest vcn of record that
@@ -5482,6 +5487,34 @@ retry:
 	if (errno != ENOENT) {
 		ntfs_log_perror("%s: Attribute lookup failed", __FUNCTION__);
 		goto put_err_out;
+	}
+		/*
+		 * If the base extent was skipped in the above process,
+		 * we still may have to update the sizes.
+		 */
+	if (!first_updated) {
+		le16 spcomp;
+
+		ntfs_attr_reinit_search_ctx(ctx);
+		if (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			a = ctx->attr;
+			a->allocated_size = cpu_to_sle64(na->allocated_size);
+			spcomp = na->data_flags
+				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+			if (spcomp)
+				a->compressed_size = cpu_to_sle64(na->compressed_size);
+			if ((na->type == AT_DATA) && (na->name == AT_UNNAMED)) {
+				na->ni->allocated_size
+					= (spcomp
+						? na->compressed_size
+						: na->allocated_size);
+				NInoFileNameSetDirty(na->ni);
+			}
+		} else {
+			ntfs_log_error("Failed to update sizes in base extent\n");
+			goto put_err_out;
+		}
 	}
 
 	/* Deallocate not used attribute extents and return with success. */
