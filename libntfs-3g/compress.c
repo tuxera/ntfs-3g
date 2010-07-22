@@ -1576,7 +1576,7 @@ s64 ntfs_compressed_pwrite(ntfs_attr *na, runlist_element *wrl, s64 wpos,
 	}
 	if ((*update_from < 0)
 	    || (compressed_part < 0)
-	    || (compressed_part > (int)na->compression_block_size)) {
+	    || (compressed_part > (int)na->compression_block_clusters)) {
 		ntfs_log_error("Bad update vcn or compressed_part %d for compressed write\n",
 			compressed_part);
 		errno = EIO;
