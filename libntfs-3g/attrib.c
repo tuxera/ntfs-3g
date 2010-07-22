@@ -1916,7 +1916,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	 * partial final vcn is taken care of by the @count capping of write
 	 * length.
 	 */
-	for (hole_end = 0; count; rl++, ofs = 0, hole_end = 0) {
+	for (hole_end = 0; count; rl++, ofs = 0) {
 		if (rl->lcn == LCN_RL_NOT_MAPPED) {
 			rl = ntfs_attr_find_vcn(na, rl->vcn);
 			if (!rl) {
