@@ -1997,7 +1997,7 @@ retry:
 				if (compressed) {
 					written = ntfs_compressed_pwrite(na,
 						rl, wpos, ofs, to_write,
-						rounding, b, compressed_part,
+						rounding, cb, compressed_part,
 						&update_from);
 				} else {
 					written = ntfs_pwrite(vol->dev, wpos,
