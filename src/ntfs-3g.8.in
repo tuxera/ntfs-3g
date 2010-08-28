@@ -55,9 +55,9 @@ options.
 Doing so, Windows users have full access to the files created by 
 .B ntfs-3g.
 .PP
-But, by setting the permissions option, you can benefit from the full
-ownership and permissions features as defined by POSIX. By defining a
-Windows-to-Linux user mapping, the ownership and permissions will even be
+But, by setting the \fBpermissions\fR option, you can benefit from the full
+ownership and permissions features as defined by POSIX. Moreover, by defining
+a Windows-to-Linux user mapping, the ownerships and permissions are even
 applied to Windows users and conversely.
 .PP
 If 
@@ -121,7 +121,7 @@ being mounted.
 .P
 .RS
 When a user mapping file is defined, the options \fBuid=\fP, \fBgid=\fP,
-\fBumask=\fP, \fBfmask=\fP, \fBdmask=\fP and \fBdsilent=\fP are ignored.
+\fBumask=\fP, \fBfmask=\fP, \fBdmask=\fP and \fBsilent\fP are ignored.
 .RE
 .TP
 .B permissions
@@ -141,18 +141,16 @@ NTFS journal file is unclean.
 .BI locale= value
 This option can be useful when wanting a language specific locale environment.
 It is however discouraged as it leads to files with untranslatable chars
-to not be visible. Please see more information about this topic at
-http://ntfs-3g.org/support.html#locale
+to not be visible.
 .TP
 .B force
-Force the mounting even if the NTFS logfile is unclean. The logfile 
-will be unconditionally cleared. Use this option with caution and for 
-your own responsibility.
+This option is obsolete. It has been superseded by the \fBrecover\fR and
+\fBnorecover\fR options.
 .TP
-.B ignore_case
-(only with lowntfs-3g) Ignore character case when accessing a file
-(\fBFOO\fR, \fBFoo\fR, \fBfoo\fR, etc. designate the same file). All
-files are displayed with lower case in directory listings.
+.B ignore_case \fP(only with lowntfs-3g)
+Ignore character case when accessing a file (\fBFOO\fR, \fBFoo\fR, \fBfoo\fR,
+etc. designate the same file). All files are displayed with lower case in
+directory listings.
 .TP
 .B remove_hiberfile
 Unlike in case of read-only mount, the read-write mount is denied if 
@@ -228,8 +226,8 @@ limited anyway to 32 pages (which is 128kbyte on i386).
 .TP
 .B silent
 Do nothing, without returning any error, on chmod and chown operations,
-when the user mapping file required by these operations is not defined.
-This option is on by default.
+when the \fBpermissions\fR option is not set and no user mapping file
+is defined. This option is on by default.
 .TP
 .B no_def_opts
 By default ntfs-3g acts as if "silent" (ignore errors on chmod and chown),
@@ -238,14 +236,14 @@ By default ntfs-3g acts as if "silent" (ignore errors on chmod and chown),
 cancels these default options.
 .TP
 .BI streams_interface= value
-This option controls how the user can access Alternate Data Streams (ADS)
-or in other words, named data streams. It can be set
-to, one of \fBnone\fR, \fBwindows\fR or \fBxattr\fR. If the option is set to
-\fBnone\fR, the user will have no access to the named data streams.  If it's set
-to \fBwindows\fR, then the user can access them just like in Windows (eg. cat
-file:stream). If it's set to \fBxattr\fR, then the named data streams are
-mapped to xattrs and user can manipulate them using \fB{get,set}fattr\fR
-utilities. The default is \fBxattr\fR.
+This option controls how the user can access Alternate Data Streams (ADS) or
+in other words, named data streams. It can be set to, one of \fBnone\fR,
+\fBwindows\fR or \fBxattr\fR. If the option is set to \fBnone\fR, the user
+will have no access to the named data streams. If it is set to \fBwindows\fR
+(not possible with lowntfs-3g), then the user can access them just like in
+Windows (eg. cat file:stream). If it's set to \fBxattr\fR, then the named
+data streams are mapped to xattrs and user can manipulate them using
+\fB{get,set}fattr\fR utilities. The default is \fBxattr\fR.
 .TP
 .B user_xattr
 Same as \fBstreams_interface=\fP\fIxattr\fP.
@@ -293,13 +291,15 @@ corresponding NTFS id, known as a \fBSID\fP. The \fBuid\fP and the \fBgid\fP
 are optional and defining both of them for the same \fBSID\fP is not
 recommended.
 .P
-If no strong interoperation with Windows is needed, a single default mapping
-with no uid and gid can be used. Files created on Linux will appear to
-Windows as owned by a foreign user, and files created on Windows will appear
-to Linux as owned by root. Just copy the example below and replace the 9 and
-10-digit numbers by any number not greater than 4294967295. The resulting
-behavior is the same as the one with the option permission set with
-no ownership option and no user mapping file available.
+If no interoperation with Windows is needed, you can use the option
+\fBpermissions\fP to define a standard mapping. Alternately, you may define
+your own mapping by setting a single default mapping with no uid and gid. In
+both cases, files created on Linux will appear to Windows as owned by a
+foreign user, and files created on Windows will appear to Linux as owned by
+root. Just copy the example below and replace the 9 and 10-digit numbers by
+any number not greater than 4294967295. The resulting behavior is the same as
+the one with the option permission set with no ownership option and no user
+mapping file available.
 .RS
 .sp
 .B ::S-1-5-21-3141592653-589793238-462643383-10000
@@ -324,12 +324,21 @@ Mount /dev/sda1 to /mnt/windows:
 .RS
 .sp
 .B ntfs-3g /dev/sda1 /mnt/windows
-.sp
 .RE
 or
 .RS
-.sp
 .B mount -t ntfs-3g /dev/sda1 /mnt/windows
+.sp
+.RE
+Mount the ntfs data partition /dev/sda3 to /mnt/data with standard Linux
+permissions applied :
+.RS
+.sp
+.B ntfs-3g -o permissions /dev/sda3 /mnt/data
+.RE
+or
+.RS
+.B mount -t ntfs-3g -o permissions /dev/sda3 /mnt/data
 .sp
 .RE
 Read\-only mount /dev/sda5 to /home/user/mnt and make user with uid 1000 
@@ -341,7 +350,6 @@ to be the owner of all files:
 .RE
 /etc/fstab entry for the above:
 .RS
-.sp
 .B /dev/sda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
 .sp
 .RE
