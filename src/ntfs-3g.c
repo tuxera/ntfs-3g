@@ -4332,8 +4332,8 @@ int main(int argc, char *argv[])
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
 	}
-	if (ntfs_check_if_mounted(opts.device,&existing_mount)
-	    || (existing_mount & NTFS_MF_MOUNTED)) {
+	if (!ntfs_check_if_mounted(opts.device,&existing_mount)
+	    && (existing_mount & NTFS_MF_MOUNTED)) {
 		err = NTFS_VOLUME_LOCKED;
 		goto err_out;
 	}
