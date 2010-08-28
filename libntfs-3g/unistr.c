@@ -830,12 +830,15 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 		int outs_len)
 {
 	char *mbs;
+	int mbs_len;
+#ifdef MB_CUR_MAX
 	wchar_t wc;
-	int i, o, mbs_len;
+	int i, o;
 	int cnt = 0;
 #ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
 #endif
+#endif /* MB_CUR_MAX */
 
 	if (!ins || !outs) {
 		errno = EINVAL;
@@ -849,6 +852,7 @@ int ntfs_ucstombs(const ntfschar *ins, const int ins_len, char **outs,
 	}
 	if (use_utf8)
 		return ntfs_utf16_to_utf8(ins, ins_len, outs, outs_len);
+#ifdef MB_CUR_MAX
 	if (!mbs) {
 		mbs_len = (ins_len + 1) * MB_CUR_MAX;
 		mbs = ntfs_malloc(mbs_len);
@@ -914,6 +918,9 @@ err_out:
 		free(mbs);
 		errno = eo;
 	}
+#else /* MB_CUR_MAX */
+	errno = EILSEQ;
+#endif /* MB_CUR_MAX */
 	return -1;
 }
 
@@ -942,6 +949,7 @@ err_out:
  */
 int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 {
+#ifdef MB_CUR_MAX
 	ntfschar *ucs;
 	const char *s;
 	wchar_t wc;
@@ -949,6 +957,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 #ifdef HAVE_MBSINIT
 	mbstate_t mbstate;
 #endif
+#endif /* MB_CUR_MAX */
 
 	if (!ins || !outs) {
 		errno = EINVAL;
@@ -958,6 +967,7 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 	if (use_utf8)
 		return ntfs_utf8_to_utf16(ins, outs);
 
+#ifdef MB_CUR_MAX
 	/* Determine the size of the multi-byte string in bytes. */
 	ins_size = strlen(ins);
 	/* Determine the length of the multi-byte string. */
@@ -1047,6 +1057,9 @@ int ntfs_mbstoucs(const char *ins, ntfschar **outs)
 	return o;
 err_out:
 	free(ucs);
+#else /* MB_CUR_MAX */
+	errno = EILSEQ;
+#endif /* MB_CUR_MAX */
 	return -1;
 }
 
