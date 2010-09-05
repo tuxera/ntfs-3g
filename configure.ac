@@ -233,7 +233,7 @@ fi
 AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 
 PKG_CHECK_MODULES(NTFS_3G_MODULE, libntfs-3g >= 2010.5.22, [],
-	AC_MSG_ERROR([ntfs-3g.progs requires libntfs-3g version >= 2009.5.22.])
+	AC_MSG_ERROR([ntfs-3g.progs requires libntfs-3g version >= 2010.5.22.])
 )
 
 # Autodetect whether we can build crypto stuff or not.
