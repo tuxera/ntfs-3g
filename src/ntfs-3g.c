@@ -3997,6 +3997,7 @@ static int parse_options(int argc, char *argv[])
 	static const struct option lopt[] = {
 		{ "options",	 required_argument,	NULL, 'o' },
 		{ "help",	 no_argument,		NULL, 'h' },
+		{ "no-mtab",	 no_argument,		NULL, 'n' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
 		{ "version",	 no_argument,		NULL, 'V' },
 		{ NULL,		 0,			NULL,  0  }
@@ -4039,6 +4040,11 @@ static int parse_options(int argc, char *argv[])
 		case 'h':
 			usage();
 			exit(9);
+		case 'n':
+			/*
+			 * no effect - automount passes it, meaning 'no-mtab'
+			 */
+			break;
 		case 'v':
 			/*
 			 * We must handle the 'verbose' option even if
