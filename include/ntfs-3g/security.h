@@ -166,14 +166,14 @@ struct POSIX_ACE {
 	u16 tag;
 	u16 perms;
 	s32 id;   
-} ;
+} __attribute__((__packed__));
         
 struct POSIX_ACL {
 	u8 version;
 	u8 flags;
 	u16 filler;
 	struct POSIX_ACE ace[0];
-} ;
+} __attribute__((__packed__));
 
 struct POSIX_SECURITY {
 	mode_t mode;
