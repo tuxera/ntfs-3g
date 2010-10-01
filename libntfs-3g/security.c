@@ -2995,7 +2995,9 @@ int ntfs_set_posix_acl(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		count = 0;
 	isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != const_cpu_to_le16(0);
 	newpxdesc = (struct POSIX_SECURITY*)NULL;
-	if (!deflt || isdir || !size) {
+	if ((!value
+		|| (((const struct POSIX_ACL*)value)->version == POSIX_VERSION))
+	    && (!deflt || isdir || (!size && !value))) {
 		cached = fetch_cache(scx, ni);
 		if (cached) {
 			uid = cached->uid;
