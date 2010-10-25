@@ -709,7 +709,8 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 		if (ni->flags & FILE_ATTR_SYSTEM) {
 			na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 			if (!na) {
-				goto exit;
+				stbuf->st_ino = ni->mft_no;
+				goto nodata;
 			}
 			/* Check whether it's Interix FIFO or socket. */
 			if (!(ni->flags & FILE_ATTR_HIDDEN)) {
@@ -779,6 +780,7 @@ static int ntfs_fuse_getstat(struct SECURITY_CONTEXT *scx,
 	}
 	if (S_ISLNK(stbuf->st_mode))
 		stbuf->st_mode |= 0777;
+nodata :
 	stbuf->st_ino = ni->mft_no;
 #ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
 	stbuf->st_atimespec = ntfs2timespec(ni->last_access_time);

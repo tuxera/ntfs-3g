@@ -783,9 +783,11 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 			na = ntfs_attr_open(ni, AT_DATA, stream_name,
 					stream_name_len);
 			if (!na) {
-				if (stream_name_len)
+				if (stream_name_len) {
 					res = -ENOENT;
-				goto exit;
+					goto exit;
+				} else
+					goto nodata;
 			}
 			if (stream_name_len) {
 				stbuf->st_size = na->data_size;
@@ -869,6 +871,7 @@ static int ntfs_fuse_getattr(const char *org_path, struct stat *stbuf)
 	}
 	if (S_ISLNK(stbuf->st_mode))
 		stbuf->st_mode |= 0777;
+nodata :
 	stbuf->st_ino = ni->mft_no;
 #ifdef HAVE_STRUCT_STAT_ST_ATIMESPEC
 	stbuf->st_atimespec = ntfs2timespec(ni->last_access_time);
