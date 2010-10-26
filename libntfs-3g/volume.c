@@ -868,6 +868,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	VOLUME_INFORMATION *vinf;
 	ntfschar *vname;
 	int i, j, eo;
+	unsigned int k;
 	u32 u;
 
 	vol = ntfs_volume_startup(dev, flags);
@@ -1023,6 +1024,17 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	ntfs_attr_close(na);
 	if (ntfs_inode_close(ni)) {
 		ntfs_log_perror("Failed to close $UpCase");
+		goto error_exit;
+	}
+	/* Consistency check of $UpCase, restricted to plain ASCII chars */
+	k = 0x20;
+	while ((k < vol->upcase_len)
+	    && (k < 0x7f)
+	    && (le16_to_cpu(vol->upcase[k])
+			== ((k < 'a') || (k > 'z') ? k : k + 'A' - 'a')))
+		k++;
+	if (k < 0x7f) {
+		ntfs_log_perror("Corrupted file $UpCase");
 		goto error_exit;
 	}
 
