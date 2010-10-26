@@ -5,7 +5,7 @@
  * Copyright (c) 2002-2005 Richard Russon
  * Copyright (c) 2002-2008 Szabolcs Szakacsits
  * Copyright (c) 2004 Yura Pakhuchiy
- * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1418,28 +1418,18 @@ int ntfs_write_significant_bytes(u8 *dst, const u8 *dst_max, const s64 n)
 {
 	s64 l = n;
 	int i;
-	s8 j;
 
 	i = 0;
-	do {
+	if (dst > dst_max)
+		goto err_out;
+	*dst++ = l;
+	i++;
+	while ((l > 0x7f) || (l < -0x80)) {
 		if (dst > dst_max)
 			goto err_out;
-		*dst++ = l & 0xffLL;
 		l >>= 8;
+		*dst++ = l;
 		i++;
-	} while (l != 0LL && l != -1LL);
-	j = (n >> 8 * (i - 1)) & 0xff;
-	/* If the sign bit is wrong, we need an extra byte. */
-	if (n < 0LL && j >= 0) {
-		if (dst > dst_max)
-			goto err_out;
-		i++;
-		*dst = (u8)-1;
-	} else if (n > 0LL && j < 0) {
-		if (dst > dst_max)
-			goto err_out;
-		i++;
-		*dst = 0;
 	}
 	return i;
 err_out:
