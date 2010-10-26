@@ -4,7 +4,7 @@
  *
  * Copyright (c) 2004      Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
- * Copyright (c) 2007-2008 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -85,6 +85,7 @@ struct CACHED_PERMISSIONS_LEGACY {
 	struct CACHED_PERMISSIONS_LEGACY *previous;
 	void *variable;
 	size_t varsize;
+	union ALIGNMENT payload[0];
 		/* above fields must match "struct CACHED_GENERIC" */
 	u64 mft_no;
 	struct CACHED_PERMISSIONS perm;
@@ -99,6 +100,7 @@ struct CACHED_SECURID {
 	struct CACHED_SECURID *previous;
 	void *variable;
 	size_t varsize;
+	union ALIGNMENT payload[0];
 		/* above fields must match "struct CACHED_GENERIC" */
 	uid_t uid;
 	gid_t gid;

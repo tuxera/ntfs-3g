@@ -1,7 +1,7 @@
 /**
  * cache.c : deal with LRU caches
  *
- * Copyright (c) 2008-2009 Jean-Pierre Andre
+ * Copyright (c) 2008-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -298,7 +298,7 @@ struct CACHED_GENERIC *ntfs_enter_cache(struct CACHE_HEADER *cache,
 			if (cache->most_recent_entry)
 				cache->most_recent_entry->previous = current;
 			cache->most_recent_entry = current;
-			memcpy(current->fixed, item->fixed, cache->fixed_size);
+			memcpy(current->payload, item->payload, cache->fixed_size);
 			if (item->varsize) {
 				if (current->variable) {
 					memcpy(current->variable,
