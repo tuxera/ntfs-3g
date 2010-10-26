@@ -72,6 +72,8 @@ static const char nf_ns_xattr_object_id[] = "system.ntfs_object_id";
 static const char nf_ns_xattr_dos_name[] = "system.ntfs_dos_name";
 static const char nf_ns_xattr_times[] = "system.ntfs_times";
 static const char nf_ns_xattr_times_be[] = "system.ntfs_times_be";
+static const char nf_ns_xattr_crtime[] = "system.ntfs_crtime";
+static const char nf_ns_xattr_crtime_be[] = "system.ntfs_crtime_be";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
 
@@ -92,6 +94,8 @@ static struct XATTRNAME nf_ns_xattr_names[] = {
 	{ XATTR_NTFS_DOS_NAME, nf_ns_xattr_dos_name },
 	{ XATTR_NTFS_TIMES, nf_ns_xattr_times },
 	{ XATTR_NTFS_TIMES_BE, nf_ns_xattr_times_be },
+	{ XATTR_NTFS_CRTIME, nf_ns_xattr_crtime },
+	{ XATTR_NTFS_CRTIME_BE, nf_ns_xattr_crtime_be },
 	{ XATTR_POSIX_ACC, nf_ns_xattr_posix_access },
 	{ XATTR_POSIX_DEF, nf_ns_xattr_posix_default },
 	{ XATTR_UNMAPPED, (char*)NULL } /* terminator */
@@ -274,6 +278,16 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 						sizeof(u64));
 		}
 		break;
+	case XATTR_NTFS_CRTIME:
+		res = ntfs_inode_get_times(ni, value,
+				(size >= sizeof(u64) ? sizeof(u64) : size));
+		break;
+	case XATTR_NTFS_CRTIME_BE:
+		res = ntfs_inode_get_times(ni, value,
+				(size >= sizeof(u64) ? sizeof(u64) : size));
+		if ((res >= (int)sizeof(u64)) && value)
+			fix_big_endian(value,sizeof(u64));
+		break;
 	default :
 		errno = EOPNOTSUPP;
 		res = -errno;
@@ -349,6 +363,18 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 		} else
 			res = ntfs_inode_set_times(ni, value, size, flags);
 		break;
+	case XATTR_NTFS_CRTIME:
+		res = ntfs_inode_set_times(ni, value,
+			(size >= sizeof(u64) ? sizeof(u64) : size), flags);
+		break;
+	case XATTR_NTFS_CRTIME_BE:
+		if (value && (size >= sizeof(u64))) {
+			memcpy(buf,value,sizeof(u64));
+			fix_big_endian(buf,sizeof(u64));
+			res = ntfs_inode_set_times(ni, buf, sizeof(u64), flags);
+		} else
+			res = ntfs_inode_set_times(ni, value, size, flags);
+		break;
 	default :
 		errno = EOPNOTSUPP;
 		res = -errno;
@@ -375,6 +401,8 @@ int ntfs_xattr_system_removexattr(struct SECURITY_CONTEXT *scx,
 	case XATTR_NTFS_EFSINFO :
 	case XATTR_NTFS_TIMES :
 	case XATTR_NTFS_TIMES_BE :
+	case XATTR_NTFS_CRTIME :
+	case XATTR_NTFS_CRTIME_BE :
 		res = -EPERM;
 		break;
 #if POSIXACLS
