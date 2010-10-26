@@ -58,7 +58,8 @@ enum {
  *
  *	Stick to the recommended values unless you understand the consequences
  *	on protection and performances. Use of cacheing is good for
- *	performances, but bad on security.
+ *	performances, but bad on security with internal fuse or external
+ *	fuse older than 2.8
  *
  *	Possible values for high level :
  *		1 : no cache, kernel control (recommended)
@@ -67,7 +68,7 @@ enum {
  *
  *	Possible values for low level :
  *		2 : no cache, kernel control
- *		3 : use kernel/fuse cache, kernel control
+ *		3 : use kernel/fuse cache, kernel control (external fuse >= 2.8)
  *		5 : no cache, file system control (recommended)
  *		8 : no cache, kernel control for ACLs
  *
@@ -77,6 +78,10 @@ enum {
  */
 
 #define HPERMSCONFIG 1
+#if defined(FUSE_INTERNAL) || !defined(FUSE_VERSION) || (FUSE_VERSION < 28)
 #define LPERMSCONFIG 5
+#else
+#define LPERMSCONFIG 3
+#endif
 
 #endif /* defined _NTFS_PARAM_H */

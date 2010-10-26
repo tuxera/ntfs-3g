@@ -122,18 +122,17 @@
 #endif
 
 #if CACHEING & (KERNELACLS | !KERNELPERMS)
-#warning "Fuse cacheing is broken unless basic permissions checked by kernel"
+#warning "Fuse cacheing is only usable with basic permissions checked by kernel"
 #endif
 
 #if !CACHEING
-	/*
-	 * FUSE cacheing is broken except for basic permissions
-	 * checked by the kernel
-	 * So do not use cacheing until this is fixed
-	 */
 #define ATTR_TIMEOUT 0.0
 #define ENTRY_TIMEOUT 0.0
 #else
+	/*
+	 * FUSE cacheing is only usable with basic permissions
+	 * checked by the kernel with external fuse >= 2.8
+	 */
 #define ATTR_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
 #define ENTRY_TIMEOUT (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT) ? 1.0 : 0.0)
 #endif
@@ -3029,6 +3028,18 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		} else
 			res = -errno;
 #endif
+#if CACHEING && !defined(FUSE_INTERNAL)
+		/*
+		 * Most of system xattr settings cause changes to some
+		 * file attribute (st_mode, st_nlink, st_mtime, etc.),
+		 * so we must invalidate cached data when cacheing is
+		 * in use (not possible with internal fuse or external
+		 * fuse before 2.8)
+		 */
+		if ((res >= 0)
+		    && fuse_lowlevel_notify_inval_inode(ctx->fc, ino, -1, 0))
+			res = -errno;
+#endif
 		if (res < 0)
 			fuse_reply_err(req, -res);
 		else
@@ -3230,6 +3241,19 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 				    && ntfs_inode_close(ni))
 					set_fuse_error(&res);
 			} else
+				res = -errno;
+#endif
+#if CACHEING && !defined(FUSE_INTERNAL)
+		/*
+		 * Some allowed system xattr removals cause changes to
+		 * some file attribute (st_mode, st_nlink, etc.),
+		 * so we must invalidate cached data when cacheing is
+		 * in use (not possible with internal fuse or external
+		 * fuse before 2.8)
+		 */
+			if ((res >= 0)
+			    && fuse_lowlevel_notify_inval_inode(ctx->fc,
+						ino, -1, 0))
 				res = -errno;
 #endif
 			break;
