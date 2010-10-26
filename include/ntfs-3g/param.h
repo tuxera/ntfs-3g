@@ -51,6 +51,13 @@ enum {
 #define MAX_COMPRESSION_CLUSTER_SIZE 4096
 
 /*
+ *		Parameters for runlists
+ */
+
+	/* only update the final extent of a runlist when appending data */
+#define PARTIAL_RUNLIST_UPDATING 1
+
+/*
  *		Permission checking modes for high level and low level
  *
  *	The choices for high and low lowel are independent, they have

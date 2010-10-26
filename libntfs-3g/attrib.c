@@ -402,7 +402,7 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	ntfs_attr *na = NULL;
 	ntfschar *newname = NULL;
 	ATTR_RECORD *a;
-	BOOL cs;
+	le16 cs;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x.\n",
 		       (unsigned long long)ni->mft_no, type);
@@ -587,6 +587,74 @@ int ntfs_attr_map_runlist(ntfs_attr *na, VCN vcn)
 	ntfs_attr_put_search_ctx(ctx);
 	return -1;
 }
+
+#if PARTIAL_RUNLIST_UPDATING
+
+/*
+ *		Map the runlist of an attribute from some point to the end
+ *
+ *	Returns 0 if success,
+ *		-1 if it failed (errno telling why)
+ */
+
+static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
+{
+	LCN lcn;
+	VCN last_vcn;
+	VCN highest_vcn;
+	VCN needed;
+	runlist_element *rl;
+	ATTR_RECORD *a;
+	BOOL startseen;
+	ntfs_attr_search_ctx *ctx;
+
+	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
+	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
+		return 0;
+
+	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
+	if (!ctx)
+		return -1;
+
+	/* Get the last vcn in the attribute. */
+	last_vcn = na->allocated_size >> na->ni->vol->cluster_size_bits;
+
+	needed = vcn;
+	highest_vcn = 0;
+	startseen = FALSE;
+	do {
+		/* Find the attribute in the mft record. */
+		if (!ntfs_attr_lookup(na->type, na->name, na->name_len, CASE_SENSITIVE,
+				needed, NULL, 0, ctx)) {
+
+			a = ctx->attr;
+			/* Decode and merge the runlist. */
+			rl = ntfs_mapping_pairs_decompress(na->ni->vol, a,
+					na->rl);
+			if (rl) {
+				na->rl = rl;
+				highest_vcn = le64_to_cpu(a->highest_vcn);
+				/* corruption detection */
+				if (((highest_vcn + 1) < last_vcn)
+				    && ((highest_vcn + 1) <= needed)) {
+					ntfs_log_error("Corrupt attribute list\n");
+					rl = (runlist_element*)NULL;
+				}
+				needed = highest_vcn + 1;
+				if (!a->lowest_vcn)
+					startseen = TRUE;
+			}
+		} else
+			rl = (runlist_element*)NULL;
+	} while (rl && (needed < last_vcn));
+	ntfs_attr_put_search_ctx(ctx);
+		/* mark fully mapped if we did so */
+	if (rl && startseen)
+		NAttrSetFullyMapped(na);
+	return (rl ? 0 : -1);
+}
+
+#endif
 
 /**
  * ntfs_attr_map_whole_runlist - map the whole runlist of an ntfs attribute
@@ -1149,9 +1217,27 @@ static int ntfs_attr_fill_hole(ntfs_attr *na, s64 count, s64 *ofs,
 		       "%lld\n", (long long)count, (long long)cur_vcn, 
 		       (long long)from_vcn, (long long)to_write, (long long)*ofs);
 	 
-	/* Map whole runlist to be able update mapping pairs later. */
+	/* Map the runlist to be able to update mapping pairs later. */
+#if PARTIAL_RUNLIST_UPDATING
+	if ((!na->rl
+	    || !NAttrDataAppending(na))) {
+		if (ntfs_attr_map_whole_runlist(na))
+			goto err_out;
+	} else {
+		/* make sure the previous non-hole is mapped */
+		rlc = *rl;
+		rlc--;
+		if (((*rl)->lcn == LCN_HOLE)
+		    && cur_vcn
+		    && (rlc->vcn < 0)) {
+			if (ntfs_attr_map_partial_runlist(na, cur_vcn - 1))
+				goto err_out;
+		}
+	}
+#else
 	if (ntfs_attr_map_whole_runlist(na))
 		goto err_out;
+#endif
 	 
 	/* Restore @*rl, it probably get lost during runlist mapping. */
 	*rl = ntfs_attr_find_vcn(na, cur_vcn);
@@ -1510,14 +1596,27 @@ static int borrow_from_hole(ntfs_attr *na, runlist_element **prl,
 	if (undecided || nothole) {
 		runlist_element *orl = na->rl;
 		s64 olcn = (*prl)->lcn;
+#if PARTIAL_RUNLIST_UPDATING
+		VCN prevblock;
+#endif
 			/*
-			 * Map the full runlist (needed to compute the
-			 * compressed size), unless the runlist has not
-			 * yet been created (data just made non-resident)
+			 * Map the runlist, unless it has not been created.
+			 * If appending data, a partial mapping from the
+			 * end of previous block will do.
 			 */
 		irl = *prl - na->rl;
+#if PARTIAL_RUNLIST_UPDATING
+		prevblock = pos >> cluster_size_bits;
+		if (prevblock)
+			prevblock--;
+		if (!NAttrBeingNonResident(na)
+		    && (NAttrDataAppending(na)
+			? ntfs_attr_map_partial_runlist(na,prevblock)
+			: ntfs_attr_map_whole_runlist(na))) {
+#else
 		if (!NAttrBeingNonResident(na)
 			&& ntfs_attr_map_whole_runlist(na)) {
+#endif
 			rl = (runlist_element*)NULL;
 		} else {
 			/*
@@ -1649,6 +1748,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	} need_to = { 0, 0 };
 	BOOL wasnonresident = FALSE;
 	BOOL compressed;
+	BOOL sparse;
 	BOOL updatemap;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
@@ -1703,16 +1803,38 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	fullcount = count;
 	/* If the write reaches beyond the end, extend the attribute. */
 	old_data_size = na->data_size;
+	/* identify whether this is appending to a non resident data attribute */
+	if ((na->type == AT_DATA) && (pos >= old_data_size)
+	    && NAttrNonResident(na))
+		NAttrSetDataAppending(na);
 	if (pos + count > na->data_size) {
+#if PARTIAL_RUNLIST_UPDATING
+		/*
+		 * When appending data, the attribute is first extended
+		 * before being filled with data. This may cause the
+		 * attribute to be made temporarily sparse, which
+		 * implies reformating the inode and reorganizing the
+		 * full runlist. To avoid unnecessary reorganization,
+		 * we delay sparse testing until the data is filled in.
+		 *
+		 * Note : should add a specific argument to truncate()
+		 * instead of the hackish test of a flag...
+		 */
+		if (NAttrDataAppending(na))
+			NAttrSetDelaySparsing(na);
+#endif
 		if (ntfs_attr_truncate(na, pos + count)) {
+			NAttrClearDelaySparsing(na);
 			ntfs_log_perror("Failed to enlarge attribute");
 			goto errno_set;
 		}
+		NAttrClearDelaySparsing(na);
 			/* resizing may change the compression mode */
 		compressed = (na->data_flags & ATTR_COMPRESSION_MASK)
 				!= const_cpu_to_le16(0);
 		need_to.undo_data_size = 1;
 	}
+	sparse = (na->data_flags & ATTR_IS_SPARSE) != const_cpu_to_le16(0);
 		/*
 		 * For compressed data, a single full block was allocated
 		 * to deal with compression, possibly in a previous call.
@@ -1768,8 +1890,29 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	/* Handle writes beyond initialized_size. */
 
 	if (pos + count > na->initialized_size) {
-		if (ntfs_attr_map_whole_runlist(na))
-			goto err_out;
+#if PARTIAL_RUNLIST_UPDATING
+		/*
+		 * When appending, we only need to map the end of the runlist,
+		 * starting at the last previously allocated run, so that
+		 * we are able a new one to it.
+		 * However, for compressed file, we need the full compression
+		 * block, which may be split in several extents.
+		 */
+		if (NAttrDataAppending(na)) {
+			VCN block_begin = pos >> vol->cluster_size_bits;
+
+			if (compressed)
+				block_begin &= -na->compression_block_clusters;
+			if (block_begin)
+				block_begin--;
+			if (ntfs_attr_map_partial_runlist(na, block_begin))
+				goto err_out;
+			if ((update_from == -1) || (block_begin < update_from))
+				update_from = block_begin;
+		} else
+#endif
+			if (ntfs_attr_map_whole_runlist(na))
+				goto err_out;
 		/*
 		 * For a compressed attribute, we must be sure there is an
 		 * available entry, and, when reopening a compressed file,
@@ -2046,8 +2189,12 @@ done:
 		 * of the mapping list. This makes a difference only if
 		 * inode extents were needed.
 		 */
+#if PARTIAL_RUNLIST_UPDATING
+	updatemap = NAttrFullyMapped(na) || NAttrDataAppending(na);
+#else
 	updatemap = (compressed
 			? NAttrFullyMapped(na) != 0 : update_from != -1);
+#endif
 	if (updatemap)
 		if (ntfs_attr_update_mapping_pairs(na,
 				(update_from < 0 ? 0 : update_from))) {
@@ -5204,15 +5351,21 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 
 	a->allocated_size = cpu_to_sle64(na->allocated_size);
 
-	/* Update sparse bit. */
-	sparse = ntfs_rl_sparse(na->rl);
-	if (sparse == -1) {
-		errno = EIO;
-		goto error;
+	/* Update sparse bit, unless this is an intermediate state */
+	if (NAttrDelaySparsing(na))
+		sparse = (a->flags & ATTR_IS_SPARSE) != const_cpu_to_le16(0);
+	else {
+		sparse = ntfs_rl_sparse(na->rl);
+		if (sparse == -1) {
+			errno = EIO;
+			goto error;
+		}
 	}
 
-	/* Attribute become sparse. */
-	if (sparse && !(a->flags & (ATTR_IS_SPARSE | ATTR_IS_COMPRESSED))) {
+	/* Check whether attribute becomes sparse, unless check is delayed. */
+	if (!NAttrDelaySparsing(na)
+	    && sparse
+	    && !(a->flags & (ATTR_IS_SPARSE | ATTR_IS_COMPRESSED))) {
 		/*
 		 * Move attribute to another mft record, if attribute is too 
 		 * small to add compressed_size field to it and we have no 
@@ -5245,6 +5398,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 		
 		NAttrSetSparse(na);
 		a->flags |= ATTR_IS_SPARSE;
+		na->data_flags = a->flags;
 		a->compression_unit = STANDARD_COMPRESSION_UNIT;  /* Windows
 		 set it so, even if attribute is not actually compressed. */
 		
@@ -5278,7 +5432,8 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 	}
 
 	/* Update compressed size if required. */
-	if (sparse || (na->data_flags & ATTR_COMPRESSION_MASK)) {
+	if (NAttrFullyMapped(na)
+	    && (sparse || (na->data_flags & ATTR_COMPRESSION_MASK))) {
 		s64 new_compr_size;
 
 		new_compr_size = ntfs_rl_get_compressed_size(na->ni->vol, na->rl);
@@ -5338,6 +5493,59 @@ retry:
 		return -1;
 	}
 
+#if PARTIAL_RUNLIST_UPDATING
+		/*
+		 * For a file just been made sparse, we will have
+		 * to reformat the first extent, so be sure the
+		 * runlist is fully mapped and fully processed.
+		 * Same if the file was sparse and is not any more.
+		 * Note : not needed if the full runlist is to be processed
+		 */
+	if (!NAttrDelaySparsing(na)
+	   && (!NAttrFullyMapped(na) || from_vcn)
+	   && !(na->data_flags & ATTR_IS_COMPRESSED)) {
+		BOOL changed;
+
+		if (!(na->data_flags & ATTR_IS_SPARSE)) {
+			int sparse;
+			runlist_element *xrl;
+
+				/*
+				 * If attribute was not sparse, we only
+				 * have to check whether there is a hole
+				 * in the updated region.
+				 */
+			xrl = na->rl;
+			if (xrl->lcn == LCN_RL_NOT_MAPPED)
+				xrl++;
+			sparse = ntfs_rl_sparse(xrl);
+			if (sparse < 0) {
+				ntfs_log_error("Could not check whether sparse\n");
+				errno = EIO;
+				return (-1);
+			}
+			changed = sparse > 0;
+		} else {
+				/*
+				 * If attribute was sparse, the compressed
+				 * size has been maintained, and it gives
+				 * and easy way to check whether the
+				 * attribute is still sparse.
+				 */
+			changed = (((na->data_size - 1)
+					| (na->ni->vol->cluster_size - 1)) + 1)
+				== na->compressed_size;
+		}
+		if (changed) {
+			if (ntfs_attr_map_whole_runlist(na)) {
+				ntfs_log_error("Could not map whole for sparse change\n");
+				errno = EIO;
+				return (-1);
+			}
+			from_vcn = 0;
+		}
+	}
+#endif
 	if (na->ni->nr_extents == -1)
 		base_ni = na->ni->base_ni;
 	else
@@ -5505,6 +5713,34 @@ retry:
 	if (errno != ENOENT) {
 		ntfs_log_perror("%s: Attribute lookup failed", __FUNCTION__);
 		goto put_err_out;
+	}
+		/*
+		 * If the base extent was skipped in the above process,
+		 * we still may have to update the sizes.
+		 */
+	if (!first_updated) {
+		le16 spcomp;
+
+		ntfs_attr_reinit_search_ctx(ctx);
+		if (!ntfs_attr_lookup(na->type, na->name, na->name_len,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+			a = ctx->attr;
+			a->allocated_size = cpu_to_sle64(na->allocated_size);
+			spcomp = na->data_flags
+				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
+			if (spcomp)
+				a->compressed_size = cpu_to_sle64(na->compressed_size);
+			if ((na->type == AT_DATA) && (na->name == AT_UNNAMED)) {
+				na->ni->allocated_size
+					= (spcomp
+						? na->compressed_size
+						: na->allocated_size);
+				NInoFileNameSetDirty(na->ni);
+			}
+		} else {
+			ntfs_log_error("Failed to update sizes in base extent\n");
+			goto put_err_out;
+		}
 	}
 		/*
 		 * If the base extent was skipped in the above process,
@@ -5864,6 +6100,8 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 		return -1;
 	}
 
+	if (na->type == AT_DATA)
+		NAttrSetDataAppending(na);
 	/* Save for future use. */
 	org_alloc_size = na->allocated_size;
 	/* The first cluster outside the new allocation. */
@@ -5874,10 +6112,26 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 	 * clusters if there is a change.
 	 */
 	if ((na->allocated_size >> vol->cluster_size_bits) < first_free_vcn) {
+#if PARTIAL_RUNLIST_UPDATING
+		s64 start_update;
+
+		/*
+		 * Update from the last previously allocated run,
+		 * as we may have to expand an existing hole.
+		 */
+		start_update = na->allocated_size >> vol->cluster_size_bits;
+		if (start_update)
+			start_update--;
+		if (ntfs_attr_map_partial_runlist(na, start_update)) {
+			ntfs_log_perror("failed to map partial runlist");
+			return -1;
+		}
+#else
 		if (ntfs_attr_map_whole_runlist(na)) {
 			ntfs_log_perror("ntfs_attr_map_whole_runlist failed");
 			return -1;
 		}
+#endif
 
 		/*
 		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
@@ -5953,8 +6207,11 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
 		/* Write mapping pairs for new runlist. */
-		if (ntfs_attr_update_mapping_pairs(na, 0 /*na->allocated_size >>
-				vol->cluster_size_bits*/)) {
+#if PARTIAL_RUNLIST_UPDATING
+		if (ntfs_attr_update_mapping_pairs(na, start_update)) {
+#else
+		if (ntfs_attr_update_mapping_pairs(na, 0)) {
+#endif
 			err = errno;
 			ntfs_log_perror("Mapping pairs update failed");
 			goto rollback;
