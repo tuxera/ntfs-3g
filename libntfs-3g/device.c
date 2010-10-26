@@ -280,6 +280,9 @@ s64 ntfs_pwrite(struct ntfs_device *dev, const s64 pos, s64 count,
 		total = written;
 		break;
 	}
+	if (NDevSync(dev) && total && dops->sync(dev)) {
+		total--; /* on sync error, return partially written */
+	}
 	ret = total;
 out:	
 	return ret;

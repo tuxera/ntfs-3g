@@ -177,6 +177,7 @@ typedef struct {
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;
+	BOOL sync;
 	BOOL debug;
 	BOOL no_detach;
 	BOOL blkdev;
@@ -3628,6 +3629,8 @@ static int ntfs_open(const char *device)
 		ntfs_log_perror("Failed to mount '%s'", device);
 		goto err_out;
 	}
+	if (ctx->sync && ctx->vol->dev)
+		NDevSetSync(ctx->vol->dev);
 	if (ctx->compression)
 		NVolSetCompression(ctx->vol);
 #ifdef HAVE_SETXATTR
@@ -3843,6 +3846,12 @@ static char *parse_mount_options(const char *orig_opts)
 			if (bogus_option_value(val, "remove_hiberfile"))
 				goto err_exit;
 			ctx->hiberfile = TRUE;
+		} else if (!strcmp(opt, "sync")) {
+			if (bogus_option_value(val, "sync"))
+				goto err_exit;
+			ctx->sync = TRUE;
+			if (strappend(&ret, "sync,"))
+                                goto err_exit;
 		} else if (!strcmp(opt, "locale")) {
 			if (missing_option_value(val, "locale"))
 				goto err_exit;
