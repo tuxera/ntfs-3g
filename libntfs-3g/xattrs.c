@@ -59,6 +59,29 @@
 #include "logging.h"
 #include "xattrs.h"
 
+#if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+
+/*
+ *		       Posix ACL structures
+ */
+        
+struct LE_POSIX_ACE {
+	le16 tag;
+	le16 perms;
+	le32 id;    
+} __attribute__((__packed__));
+
+struct LE_POSIX_ACL {
+	u8 version;
+	u8 flags;
+	le16 filler; 
+	struct LE_POSIX_ACE ace[0];
+} __attribute__((__packed__));
+        
+#endif
+#endif
+
 static const char xattr_ntfs_3g[] = "ntfs-3g.";
 static const char nf_ns_user_prefix[] = "user.";
 static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
@@ -123,6 +146,56 @@ static void fix_big_endian(char *p, int size)
 	}
 #endif
 }
+
+#if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+
+/*
+ *		Make a Posix ACL CPU endian
+ */
+
+static int le_acl_to_cpu(const struct LE_POSIX_ACL *le_acl, size_t size,
+				struct POSIX_ACL *acl)
+{
+	int i;
+	int cnt;
+
+	acl->version = le_acl->version;
+	acl->flags = le_acl->flags;
+	acl->filler = 0;
+	cnt = (size - sizeof(struct LE_POSIX_ACL)) / sizeof(struct LE_POSIX_ACE);
+	for (i=0; i<cnt; i++) {
+		acl->ace[i].tag = le16_to_cpu(le_acl->ace[i].tag);
+		acl->ace[i].perms = le16_to_cpu(le_acl->ace[i].perms);
+		acl->ace[i].id = le32_to_cpu(le_acl->ace[i].id);
+	}
+	return (0);
+}
+
+/*
+ *		Make a Posix ACL little endian
+ */
+
+int cpu_to_le_acl(const struct POSIX_ACL *acl, size_t size,
+			struct LE_POSIX_ACL *le_acl)
+{
+	int i;
+	int cnt;
+
+	le_acl->version = acl->version;
+	le_acl->flags = acl->flags;
+	le_acl->filler = const_cpu_to_le16(0);
+	cnt = (size - sizeof(struct POSIX_ACL)) / sizeof(struct POSIX_ACE);
+	for (i=0; i<cnt; i++) {
+		le_acl->ace[i].tag = cpu_to_le16(acl->ace[i].tag);
+		le_acl->ace[i].perms = cpu_to_le16(acl->ace[i].perms);
+		le_acl->ace[i].id = cpu_to_le32(acl->ace[i].id);
+	}
+	return (0);
+}
+
+#endif
+#endif
 
 /*
  *		Determine whether an extended attribute is mapped to
@@ -216,6 +289,11 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 {
 	int res;
 	int i;
+#if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+	struct POSIX_ACL *acl;
+#endif
+#endif
 
 				/*
 				 * the returned value is the needed
@@ -228,6 +306,36 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 		res = ntfs_get_ntfs_acl(scx, ni, value, size);
 		break;
 #if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+	case XATTR_POSIX_ACC :
+		acl = (struct POSIX_ACL*)ntfs_malloc(size);
+		if (acl) {
+			res = ntfs_get_posix_acl(scx, ni,
+				nf_ns_xattr_posix_access, (char*)acl, size);
+			if (res > 0) {
+				if (cpu_to_le_acl(acl,res,
+						(struct LE_POSIX_ACL*)value))
+					res = -errno;
+			}
+			free(acl);
+		} else
+			res = -errno;
+		break;
+	case XATTR_POSIX_DEF :
+		acl = (struct POSIX_ACL*)ntfs_malloc(size);
+		if (acl) {
+			res = ntfs_get_posix_acl(scx, ni,
+				nf_ns_xattr_posix_default, (char*)acl, size);
+			if (res > 0) {
+				if (cpu_to_le_acl(acl,res,
+						(struct LE_POSIX_ACL*)value))
+					res = -errno;
+			}
+			free(acl);
+		} else
+			res = -errno;
+		break;
+#else
 	case XATTR_POSIX_ACC :
 		res = ntfs_get_posix_acl(scx, ni, nf_ns_xattr_posix_access,
 				value, size);
@@ -236,6 +344,7 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 		res = ntfs_get_posix_acl(scx, ni, nf_ns_xattr_posix_default,
 				value, size);
 		break;
+#endif
 #endif
 	case XATTR_NTFS_ATTRIB :
 		res = ntfs_get_ntfs_attrib(ni, value, size);
@@ -304,12 +413,47 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 	int res;
 	int i;
 	char buf[4*sizeof(u64)];
+#if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+	struct POSIX_ACL *acl;
+#endif
+#endif
 
 	switch (attr) {
 	case XATTR_NTFS_ACL :
 		res = ntfs_set_ntfs_acl(scx, ni, value, size, flags);
 		break;
 #if POSIXACLS
+#if __BYTE_ORDER == __BIG_ENDIAN
+	case XATTR_POSIX_ACC :
+		acl = (struct POSIX_ACL*)ntfs_malloc(size);
+		if (acl) {
+			if (!le_acl_to_cpu((const struct LE_POSIX_ACL*)value,
+					size, acl)) {
+				res = ntfs_set_posix_acl(scx ,ni ,
+					nf_ns_xattr_posix_access,
+					(char*)acl, size, flags);
+			} else
+				res = -errno;
+			free(acl);
+		} else
+			res = -errno;
+		break;
+	case XATTR_POSIX_DEF :
+		acl = (struct POSIX_ACL*)ntfs_malloc(size);
+		if (acl) {
+			if (!le_acl_to_cpu((const struct LE_POSIX_ACL*)value,
+					size, acl)) {
+				res = ntfs_set_posix_acl(scx ,ni ,
+					nf_ns_xattr_posix_default,
+					(char*)acl, size, flags);
+			} else
+				res = -errno;
+			free(acl);
+		} else
+			res = -errno;
+		break;
+#else
 	case XATTR_POSIX_ACC :
 		res = ntfs_set_posix_acl(scx ,ni , nf_ns_xattr_posix_access,
 					value, size, flags);
@@ -318,6 +462,7 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 		res = ntfs_set_posix_acl(scx, ni, nf_ns_xattr_posix_default,
 					value, size, flags);
 		break;
+#endif
 #endif
 	case XATTR_NTFS_ATTRIB :
 		res = ntfs_set_ntfs_attrib(ni, value, size, flags);
