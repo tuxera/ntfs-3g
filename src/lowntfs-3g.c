@@ -2748,7 +2748,6 @@ static void ntfs_fuse_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	}
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		   /* file must be readable */
-// condition on fill_security ?
 	if (!ntfs_allowed_access(&security,ni,S_IREAD)) {
 		ret = -EACCES;
 		goto exit;
@@ -2896,7 +2895,6 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	}
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		   /* file must be readable */
-// condition on fill_security
 	if (!ntfs_allowed_access(&security, ni, S_IREAD)) {
 		res = -errno;
 		goto exit;
