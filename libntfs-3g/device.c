@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2004-2006 Anton Altaparmakov
  * Copyright (c) 2004-2006 Szabolcs Szakacsits
+ * Copyright (c) 2010      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -152,6 +153,25 @@ int ntfs_device_free(struct ntfs_device *dev)
 	free(dev->d_name);
 	free(dev);
 	return 0;
+}
+
+/*
+ *		Sync the device
+ *
+ *	returns zero if successful.
+ */
+
+int ntfs_device_sync(struct ntfs_device *dev)
+{
+	int ret;
+	struct ntfs_device_operations *dops;
+
+	if (NDevDirty(dev)) {
+		dops = dev->d_ops;
+		ret = dops->sync(dev);
+	} else
+		ret = 0;
+	return ret;
 }
 
 /**

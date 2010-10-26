@@ -2370,6 +2370,19 @@ static int ntfs_fuse_utime(const char *path, struct utimbuf *buf)
 
 #endif /* HAVE_UTIMENSAT */
 
+static int ntfs_fuse_fsync(const char *path __attribute__((unused)),
+			int type __attribute__((unused)),
+			struct fuse_file_info *fi __attribute__((unused)))
+{
+	int ret;
+
+		/* sync the full device */
+	ret = ntfs_device_sync(ctx->vol->dev);
+	if (ret)
+		ret = -errno;
+	return (ret);
+}
+
 static int ntfs_fuse_bmap(const char *path, size_t blocksize, uint64_t *idx)
 {
 	ntfs_inode *ni;
@@ -3550,6 +3563,8 @@ static struct fuse_operations ntfs_3g_ops = {
 #else
 	.utime		= ntfs_fuse_utime,
 #endif
+	.fsync		= ntfs_fuse_fsync,
+	.fsyncdir	= ntfs_fuse_fsync,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy        = ntfs_fuse_destroy2,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)

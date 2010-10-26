@@ -2496,6 +2496,18 @@ static void ntfs_fuse_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
 		fuse_reply_err(req, 0);
 }
 
+static void ntfs_fuse_fsync(fuse_req_t req,
+			fuse_ino_t ino __attribute__((unused)),
+			int type __attribute__((unused)),
+			struct fuse_file_info *fi __attribute__((unused)))
+{
+		/* sync the full device */
+	if (ntfs_device_sync(ctx->vol->dev))
+		fuse_reply_err(req, errno);
+	else
+		fuse_reply_err(req, 0);
+}
+
 static void ntfs_fuse_bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize,
 		      uint64_t vidx)
 {
@@ -3594,6 +3606,8 @@ static struct fuse_lowlevel_ops ntfs_3g_ops = {
 	.rename 	= ntfs_fuse_rename,
 	.mkdir		= ntfs_fuse_mkdir,
 	.rmdir		= ntfs_fuse_rmdir,
+	.fsync		= ntfs_fuse_fsync,
+	.fsyncdir	= ntfs_fuse_fsync,
 	.bmap		= ntfs_fuse_bmap,
 	.destroy	= ntfs_fuse_destroy2,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
