@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2002-2009 Szabolcs Szakacsits
- * Copyright (c) 2008-2009 Jean-Pierre Andre
+ * Copyright (c) 2008-2010 Jean-Pierre Andre
  * Copyright (c) 2008      Bernhard Kaindl
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -166,24 +166,22 @@ int ntfs_names_full_collate(const ntfschar *name1, const u32 name1_len,
 	cnt = min(name1_len, name2_len);
 	if (cnt > 0) {
 		if (ic == CASE_SENSITIVE) {
-			do {
-				c1 = le16_to_cpu(*name1);
+			while (--cnt && (*name1 == *name2)) {
 				name1++;
-				c2 = le16_to_cpu(*name2);
 				name2++;
-			} while (--cnt && (c1 == c2));
-			u1 = c1;
-			u2 = c2;
+			}
+			u1 = c1 = le16_to_cpu(*name1);
+			u2 = c2 = le16_to_cpu(*name2);
 			if (u1 < upcase_len)
 				u1 = le16_to_cpu(upcase[u1]);
 			if (u2 < upcase_len)
 				u2 = le16_to_cpu(upcase[u2]);
 			if ((u1 == u2) && cnt)
 				do {
-					u1 = le16_to_cpu(*name1);
 					name1++;
-					u2 = le16_to_cpu(*name2);
+					u1 = le16_to_cpu(*name1);
 					name2++;
+					u2 = le16_to_cpu(*name2);
 					if (u1 < upcase_len)
 						u1 = le16_to_cpu(upcase[u1]);
 					if (u2 < upcase_len)
