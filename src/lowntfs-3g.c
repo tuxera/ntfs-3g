@@ -3186,8 +3186,10 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 			 */
 		case XATTR_NTFS_ACL :
 		case XATTR_NTFS_ATTRIB :
+		case XATTR_NTFS_ATTRIB_BE :
 		case XATTR_NTFS_EFSINFO :
 		case XATTR_NTFS_TIMES :
+		case XATTR_NTFS_TIMES_BE :
 			res = -EPERM;
 			break;
 		default :

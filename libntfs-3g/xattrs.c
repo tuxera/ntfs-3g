@@ -65,11 +65,13 @@ static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
 
 static const char nf_ns_xattr_ntfs_acl[] = "system.ntfs_acl";
 static const char nf_ns_xattr_attrib[] = "system.ntfs_attrib";
+static const char nf_ns_xattr_attrib_be[] = "system.ntfs_attrib_be";
 static const char nf_ns_xattr_efsinfo[] = "user.ntfs.efsinfo";
 static const char nf_ns_xattr_reparse[] = "system.ntfs_reparse_data";
 static const char nf_ns_xattr_object_id[] = "system.ntfs_object_id";
 static const char nf_ns_xattr_dos_name[] = "system.ntfs_dos_name";
 static const char nf_ns_xattr_times[] = "system.ntfs_times";
+static const char nf_ns_xattr_times_be[] = "system.ntfs_times_be";
 static const char nf_ns_xattr_posix_access[] = "system.posix_acl_access";
 static const char nf_ns_xattr_posix_default[] = "system.posix_acl_default";
 
@@ -83,15 +85,40 @@ struct XATTRNAME {
 static struct XATTRNAME nf_ns_xattr_names[] = {
 	{ XATTR_NTFS_ACL, nf_ns_xattr_ntfs_acl },
 	{ XATTR_NTFS_ATTRIB, nf_ns_xattr_attrib },
+	{ XATTR_NTFS_ATTRIB_BE, nf_ns_xattr_attrib_be },
 	{ XATTR_NTFS_EFSINFO, nf_ns_xattr_efsinfo },
 	{ XATTR_NTFS_REPARSE_DATA, nf_ns_xattr_reparse },
 	{ XATTR_NTFS_OBJECT_ID, nf_ns_xattr_object_id },
 	{ XATTR_NTFS_DOS_NAME, nf_ns_xattr_dos_name },
 	{ XATTR_NTFS_TIMES, nf_ns_xattr_times },
+	{ XATTR_NTFS_TIMES_BE, nf_ns_xattr_times_be },
 	{ XATTR_POSIX_ACC, nf_ns_xattr_posix_access },
 	{ XATTR_POSIX_DEF, nf_ns_xattr_posix_default },
 	{ XATTR_UNMAPPED, (char*)NULL } /* terminator */
 };
+
+/*
+ *		Make an integer big-endian
+ *
+ *	Swap bytes on a small-endian computer and does nothing on a
+ *	big-endian computer.
+ */
+
+static void fix_big_endian(char *p, int size)
+{
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	int i,j;
+	int c;
+
+	i = 0;
+	j = size - 1;
+	while (i < j) {
+		c = p[i];
+		p[i++] = p[j];
+		p[j--] = c;
+	}
+#endif
+}
 
 /*
  *		Determine whether an extended attribute is mapped to
@@ -184,6 +211,7 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 			char *value, size_t size)
 {
 	int res;
+	int i;
 
 				/*
 				 * the returned value is the needed
@@ -208,6 +236,15 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 	case XATTR_NTFS_ATTRIB :
 		res = ntfs_get_ntfs_attrib(ni, value, size);
 		break;
+	case XATTR_NTFS_ATTRIB_BE :
+		res = ntfs_get_ntfs_attrib(ni, value, size);
+		if ((res == 4) && value) {
+			if (size >= 4)
+				fix_big_endian(value,4);
+			else
+				res = -EINVAL;
+		}
+		break;
 	case XATTR_NTFS_EFSINFO :
 		if (ni->vol->efs_raw)
 			res = ntfs_get_efs_info(ni, value, size);
@@ -229,6 +266,14 @@ int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 	case XATTR_NTFS_TIMES:
 		res = ntfs_inode_get_times(ni, value, size);
 		break;
+	case XATTR_NTFS_TIMES_BE:
+		res = ntfs_inode_get_times(ni, value, size);
+		if ((res > 0) && value) {
+			for (i=0; (i+1)*sizeof(u64)<=(unsigned int)res; i++)
+				fix_big_endian(&value[i*sizeof(u64)],
+						sizeof(u64));
+		}
+		break;
 	default :
 		errno = EOPNOTSUPP;
 		res = -errno;
@@ -243,6 +288,8 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 			const char *value, size_t size, int flags)
 {
 	int res;
+	int i;
+	char buf[4*sizeof(u64)];
 
 	switch (attr) {
 	case XATTR_NTFS_ACL :
@@ -260,6 +307,14 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 #endif
 	case XATTR_NTFS_ATTRIB :
 		res = ntfs_set_ntfs_attrib(ni, value, size, flags);
+		break;
+	case XATTR_NTFS_ATTRIB_BE :
+		if (value && (size >= 4)) {
+			memcpy(buf,value,4);
+			fix_big_endian(buf,4);
+			res = ntfs_set_ntfs_attrib(ni, buf, 4, flags);
+		} else
+			res = ntfs_set_ntfs_attrib(ni, value, size, flags);
 		break;
 	case XATTR_NTFS_EFSINFO :
 		if (ni->vol->efs_raw)
@@ -284,6 +339,16 @@ int ntfs_xattr_system_setxattr(struct SECURITY_CONTEXT *scx,
 	case XATTR_NTFS_TIMES:
 		res = ntfs_inode_set_times(ni, value, size, flags);
 		break;
+	case XATTR_NTFS_TIMES_BE:
+		if (value && (size > 0) && (size <= 4*sizeof(u64))) {
+			memcpy(buf,value,size);
+			for (i=0; (i+1)*sizeof(u64)<=size; i++)
+				fix_big_endian(&buf[i*sizeof(u64)],
+						sizeof(u64));
+			res = ntfs_inode_set_times(ni, buf, size, flags);
+		} else
+			res = ntfs_inode_set_times(ni, value, size, flags);
+		break;
 	default :
 		errno = EOPNOTSUPP;
 		res = -errno;
@@ -306,8 +371,10 @@ int ntfs_xattr_system_removexattr(struct SECURITY_CONTEXT *scx,
 		 */
 	case XATTR_NTFS_ACL :
 	case XATTR_NTFS_ATTRIB :
+	case XATTR_NTFS_ATTRIB_BE :
 	case XATTR_NTFS_EFSINFO :
 	case XATTR_NTFS_TIMES :
+	case XATTR_NTFS_TIMES_BE :
 		res = -EPERM;
 		break;
 #if POSIXACLS
