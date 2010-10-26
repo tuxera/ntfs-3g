@@ -2154,14 +2154,6 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name)
 		goto exit;
 	}
 
-{ /* temporary */
-struct open_file *prev = (struct open_file*)NULL;
-for (of=ctx->open_files; of; of=of->next)
-{
-if (of->previous != prev) ntfs_log_error("bad chaining\n");
-prev = of;
-}
-}
 	of = ctx->open_files;
 	ino = (fuse_ino_t)MREF(iref);
 				/* improvable search in open files list... */
