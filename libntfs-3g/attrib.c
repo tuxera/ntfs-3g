@@ -6542,6 +6542,89 @@ err_exit:
 	return ret;
 }
 
+/*
+ *		Read some data from a data attribute
+ *
+ *	Returns the amount of data read, negative if there was an error
+ */
+
+int ntfs_attr_data_read(ntfs_inode *ni,
+		ntfschar *stream_name, int stream_name_len,
+		char *buf, size_t size, off_t offset)
+{
+	ntfs_attr *na = NULL;
+	int res, total = 0;
+
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	if ((size_t)offset < (size_t)na->data_size) {
+		if (offset + size > (size_t)na->data_size)
+			size = na->data_size - offset;
+		while (size) {
+			res = ntfs_attr_pread(na, offset, size, buf + total);
+			if ((off_t)res < (off_t)size)
+				ntfs_log_perror("ntfs_attr_pread partial read "
+					"(%lld : %lld <> %d)",
+					(long long)offset,
+					(long long)size, res);
+			if (res <= 0) {
+				res = -errno;
+				goto exit;
+			}
+			size -= res;
+			offset += res;
+			total += res;
+		}
+	}
+	res = total;
+exit:
+	if (na)
+		ntfs_attr_close(na);
+	return res;
+}
+
+
+/*
+ *		Write some data into a data attribute
+ *
+ *	Returns the amount of data written, negative if there was an error
+ */
+
+int ntfs_attr_data_write(ntfs_inode *ni,
+		ntfschar *stream_name, int stream_name_len,
+		char *buf, size_t size, off_t offset)
+{
+	ntfs_attr *na = NULL;
+	int res, total = 0;
+
+	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
+	if (!na) {
+		res = -errno;
+		goto exit;
+	}
+	while (size) {
+		res = ntfs_attr_pwrite(na, offset, size, buf + total);
+		if (res < (s64)size)
+			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
+				"%lld <> %d)", (long long)offset,
+				(long long)size, res);
+		if (res <= 0) {
+			res = -errno;
+			goto exit;
+		}
+		size -= res;
+		offset += res;
+		total += res;
+	}
+	res = total;
+exit:
+	if (na)
+		ntfs_attr_close(na);
+	return res;
+}
 
 
 int ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type, ntfschar *name,

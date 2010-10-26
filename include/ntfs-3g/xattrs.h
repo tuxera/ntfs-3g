@@ -43,10 +43,25 @@ enum SYSTEMXATTRS {
 	XATTR_POSIX_DEF
 } ;
 
-enum SYSTEMXATTRS ntfs_xattr_system_type(const char *name);
+struct XATTRMAPPING {
+	struct XATTRMAPPING *next;
+	enum SYSTEMXATTRS xattr;
+	char name[1]; /* variable length */
+} ;
 
+#ifdef XATTR_MAPPINGS
+
+struct XATTRMAPPING *ntfs_xattr_build_mapping(ntfs_volume *vol,
+			const char *path);
+void ntfs_xattr_free_mapping(struct XATTRMAPPING*);
+
+#endif /* XATTR_MAPPINGS */
+
+enum SYSTEMXATTRS ntfs_xattr_system_type(const char *name,
+			ntfs_volume *vol);
 int ntfs_xattr_listxattr(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
-			char *list, size_t size, BOOL prefixing);
+ 			char *list, size_t size, BOOL prefixing);
+
 int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 			enum SYSTEMXATTRS attr,
 			ntfs_inode *ni, ntfs_inode *dir_ni,

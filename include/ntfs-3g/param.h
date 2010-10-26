@@ -1,7 +1,7 @@
 /*
  * param.h - Parameter values for ntfs-3g
  *
- * Copyright (c) 2009      Jean-Pierre Andre
+ * Copyright (c) 2009-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -56,6 +56,13 @@ enum {
 
 	/* only update the final extent of a runlist when appending data */
 #define PARTIAL_RUNLIST_UPDATING 1
+
+/*
+ *		Parameters for user and xattr mappings
+ */
+
+#define XATTRMAPPINGFILE ".NTFS-3G/XattrMapping" /* default mapping file */
+
 
 /*
  *		Permission checking modes for high level and low level

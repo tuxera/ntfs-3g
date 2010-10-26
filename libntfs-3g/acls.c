@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -3957,33 +3957,6 @@ static SID *encodesid(const char *sidstr)
 }
 
 /*
- *			Early logging before the logs are redirected
- *
- *	(not quite satisfactory : this appears before the ntfs-g banner,
- *	and with a different pid)
- */
-
-static void log_early_error(const char *format, ...)
-		__attribute__((format(printf, 1, 2)));
-
-static void log_early_error(const char *format, ...)
-{
-	va_list args;
-
-	va_start(args, format);
-#ifdef HAVE_SYSLOG_H
-	openlog("ntfs-3g", LOG_PID, LOG_USER);
-	ntfs_log_handler_syslog(NULL, NULL, 0,
-		NTFS_LOG_LEVEL_ERROR, NULL,
-		format, args);
-#else
-	vfprintf(stderr,format,args);
-#endif
-	va_end(args);
-}
-
-
-/*
  *		Get a single mapping item from buffer
  *
  *	Always reads a full line, truncating long lines
@@ -4045,7 +4018,7 @@ static struct MAPLIST *getmappingitem(FILEREADER reader, void *fileid,
 			if (pu && pg)
 				*pu = *pg = '\0';
 			else {
-				log_early_error("Bad mapping item \"%s\"\n",
+				ntfs_log_early_error("Bad mapping item \"%s\"\n",
 					item->maptext);
 				free(item);
 				item = (struct MAPLIST*)NULL;
@@ -4174,7 +4147,7 @@ struct MAPPING *ntfs_do_user_mapping(struct MAPLIST *firstitem)
 				if (pwd)
 					uid = pwd->pw_uid;
 				else
-					log_early_error("Invalid user \"%s\"\n",
+					ntfs_log_early_error("Invalid user \"%s\"\n",
 						item->uidstr);
 			}
 		}
@@ -4254,7 +4227,7 @@ struct MAPPING *ntfs_do_group_mapping(struct MAPLIST *firstitem)
 					if (grp)
 						gid = grp->gr_gid;
 					else
-						log_early_error("Invalid group \"%s\"\n",
+						ntfs_log_early_error("Invalid group \"%s\"\n",
 							item->gidstr);
 				}
 			}

@@ -114,6 +114,13 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[xattr-mappings],
+	[AS_HELP_STRING([--enable-xattr-mappings],[enable system extended attributes mappings])],
+	,
+	[enable_xattr_mappings="no"]
+)
+
+AC_ARG_ENABLE(
 	[device-default-io-ops],
 	[AS_HELP_STRING([--disable-device-default-io-ops],[install default IO ops])],
 	,
@@ -349,6 +356,7 @@ test "${enable_device_default_io_ops}" = "no" && AC_DEFINE(
 
 test "${enable_mtab}" = "no" && AC_DEFINE([IGNORE_MTAB], [1], [Don't update /etc/mtab])
 test "${enable_posix_acls}" != "no" && AC_DEFINE([POSIXACLS], [1], [POSIX ACL support])
+test "${enable_xattr_mappings}" != "no" && AC_DEFINE([XATTR_MAPPINGS], [1], [system extended attributes mappings])
 
 test "${enable_really_static}" = "yes" && enable_library="no"
 test "${enable_library}" = "no" && enable_ldconfig="no"

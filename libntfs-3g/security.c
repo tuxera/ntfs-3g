@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2009 Jean-Pierre Andre
+ * Copyright (c) 2007-2010 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -405,91 +405,6 @@ le32 ntfs_security_hash(const SECURITY_DESCRIPTOR_RELATIVE *sd, const u32 len)
 }
 
 /*
- *		Internal read
- *	copied and pasted from ntfs_fuse_read() and made independent
- *	of fuse context
- */
-
-static int ntfs_local_read(ntfs_inode *ni,
-		ntfschar *stream_name, int stream_name_len,
-		char *buf, size_t size, off_t offset)
-{
-	ntfs_attr *na = NULL;
-	int res, total = 0;
-
-	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
-		goto exit;
-	}
-	if ((size_t)offset < (size_t)na->data_size) {
-		if (offset + size > (size_t)na->data_size)
-			size = na->data_size - offset;
-		while (size) {
-			res = ntfs_attr_pread(na, offset, size, buf);
-			if ((off_t)res < (off_t)size)
-				ntfs_log_perror("ntfs_attr_pread partial read "
-					"(%lld : %lld <> %d)",
-					(long long)offset,
-					(long long)size, res);
-			if (res <= 0) {
-				res = -errno;
-				goto exit;
-			}
-			size -= res;
-			offset += res;
-			total += res;
-		}
-	}
-	res = total;
-exit:
-	if (na)
-		ntfs_attr_close(na);
-	return res;
-}
-
-
-/*
- *		Internal write
- *	copied and pasted from ntfs_fuse_write() and made independent
- *	of fuse context
- */
-
-static int ntfs_local_write(ntfs_inode *ni,
-		ntfschar *stream_name, int stream_name_len,
-		char *buf, size_t size, off_t offset)
-{
-	ntfs_attr *na = NULL;
-	int res, total = 0;
-
-	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
-	if (!na) {
-		res = -errno;
-		goto exit;
-	}
-	while (size) {
-		res = ntfs_attr_pwrite(na, offset, size, buf);
-		if (res < (s64)size)
-			ntfs_log_perror("ntfs_attr_pwrite partial write (%lld: "
-				"%lld <> %d)", (long long)offset,
-				(long long)size, res);
-		if (res <= 0) {
-			res = -errno;
-			goto exit;
-		}
-		size -= res;
-		offset += res;
-		total += res;
-	}
-	res = total;
-exit:
-	if (na)
-		ntfs_attr_close(na);
-	return res;
-}
-
-
-/*
  *	Get the first entry of current index block
  *	cut and pasted form ntfs_ie_get_first() in index.c
  */
@@ -531,7 +446,7 @@ static int entersecurity_stuff(ntfs_volume *vol, off_t offs)
 	if (stuff) {
 		memset(stuff, 0, STUFFSZ);
 		do {
-			written = ntfs_local_write(vol->secure_ni,
+			written = ntfs_attr_data_write(vol->secure_ni,
 				STREAM_SDS, 4, stuff, STUFFSZ, offs);
 			if (written == STUFFSZ) {
 				total += STUFFSZ;
@@ -589,10 +504,10 @@ static int entersecurity_data(ntfs_volume *vol,
 		phsds->security_id = keyid;
 		phsds->offset = cpu_to_le64(offs);
 		phsds->length = cpu_to_le32(fullsz - gap);
-		written1 = ntfs_local_write(vol->secure_ni,
+		written1 = ntfs_attr_data_write(vol->secure_ni,
 			STREAM_SDS, 4, fullattr, fullsz,
 			offs - gap);
-		written2 = ntfs_local_write(vol->secure_ni,
+		written2 = ntfs_attr_data_write(vol->secure_ni,
 			STREAM_SDS, 4, fullattr, fullsz,
 			offs - gap + ALIGN_SDS_BLOCK);
 		if ((written1 == fullsz)
@@ -950,7 +865,7 @@ static le32 setsecurityattr(ntfs_volume *vol,
 						+ sizeof(SECURITY_DESCRIPTOR_HEADER);
 					oldattr = (char*)ntfs_malloc(size);
 					if (oldattr) {
-						rdsize = ntfs_local_read(
+						rdsize = ntfs_attr_data_read(
 							vol->secure_ni,
 							STREAM_SDS, 4,
 							oldattr, size, offs);
@@ -1772,7 +1687,7 @@ static char *retrievesecurityattr(ntfs_volume *vol, SII_INDEX_KEY id)
 
 			securattr = (char*)ntfs_malloc(size);
 			if (securattr) {
-				rdsize = ntfs_local_read(
+				rdsize = ntfs_attr_data_read(
 					ni, STREAM_SDS, 4,
 					securattr, size, offs);
 				if ((rdsize != size)
@@ -4097,7 +4012,7 @@ static int basicread(void *fileid, char *buf, size_t size, off_t offs __attribut
 
 static int localread(void *fileid, char *buf, size_t size, off_t offs)
 {
-	return (ntfs_local_read((ntfs_inode*)fileid,
+	return (ntfs_attr_data_read((ntfs_inode*)fileid,
 			AT_UNNAMED, 0, buf, size, offs));
 }
 
@@ -4919,7 +4834,7 @@ int ntfs_read_sds(struct SECURITY_API *scapi,
 	got = -1; /* default return */
 	if (scapi && (scapi->magic == MAGIC_API)) {
 		if (scapi->security.vol->secure_ni)
-			got = ntfs_local_read(scapi->security.vol->secure_ni,
+			got = ntfs_attr_data_read(scapi->security.vol->secure_ni,
 				STREAM_SDS, 4, buf, size, offset);
 		else
 			errno = EOPNOTSUPP;

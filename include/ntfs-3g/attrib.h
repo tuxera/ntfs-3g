@@ -4,6 +4,7 @@
  * Copyright (c) 2000-2004 Anton Altaparmakov
  * Copyright (c) 2004-2005 Yura Pakhuchiy
  * Copyright (c) 2006-2007 Szabolcs Szakacsits
+ * Copyright (c) 2010      Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -380,6 +381,12 @@ extern int   ntfs_attr_exist(ntfs_inode *ni, const ATTR_TYPES type,
 extern int   ntfs_attr_remove(ntfs_inode *ni, const ATTR_TYPES type,
 			      ntfschar *name, u32 name_len);
 extern s64   ntfs_attr_get_free_bits(ntfs_attr *na);
+extern int ntfs_attr_data_read(ntfs_inode *ni,
+		ntfschar *stream_name, int stream_name_len,
+		char *buf, size_t size, off_t offset);
+extern int ntfs_attr_data_write(ntfs_inode *ni,
+		ntfschar *stream_name, int stream_name_len,
+		char *buf, size_t size, off_t offset);
 
 #endif /* defined _NTFS_ATTRIB_H */
 

@@ -175,6 +175,9 @@
  *  Mar 2010, version 1.3.17
  *     - adapted to new default user mapping
  *     - fixed #ifdef'd code for selftest
+ *
+ *  May 2010, version 1.3.18
+ *     - redefined early error logging
  */
 
 /*
@@ -198,7 +201,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.17"
+#define AUDT_VERSION "1.3.18"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -311,6 +314,11 @@ struct CALLBACK;
 typedef int (*dircallback)(struct CALLBACK *context, char *ntfsname,
 	int length, int type, long long pos, u64 mft_ref,
 	unsigned int dt_type);
+
+#ifndef HAVE_SYSLOG_H
+void ntfs_log_early_error(const char *format, ...)
+			__attribute__((format(printf, 1, 2)));
+#endif
 
 #if USESTUBS | defined(STSC)
 
@@ -1270,6 +1278,23 @@ void printerror(FILE *file)
 #endif
 #endif
 }
+
+#ifndef HAVE_SYSLOG_H
+
+/*
+ *		Redefine early error messages in stand-alone situations
+ */
+
+void ntfs_log_early_error(const char *format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+	vfprintf(stderr,format,args);
+	va_end(args);
+}
+
+#endif
 
 /*
  *	Guess whether a security attribute is intended for a directory

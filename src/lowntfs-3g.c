@@ -224,6 +224,9 @@ typedef struct {
 	BOOL mounted;
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
 	BOOL efs_raw;
+#ifdef XATTR_MAPPINGS
+	char *xattrmap_path;
+#endif /* XATTR_MAPPINGS */
 #endif /* HAVE_SETXATTR */
 	struct fuse_chan *fc;
 	BOOL inherit;
@@ -2806,7 +2809,7 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = ntfs_xattr_system_type(name);
+	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
 		/*
 		 * hijack internal data and ACL retrieval, whatever
@@ -2959,7 +2962,7 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = ntfs_xattr_system_type(name);
+	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
 		/*
 		 * hijack internal data and ACL setting, whatever
@@ -3167,7 +3170,7 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 	int namespace;
 	struct SECURITY_CONTEXT security;
 
-	attr = ntfs_xattr_system_type(name);
+	attr = ntfs_xattr_system_type(name,ctx->vol);
 	if (attr != XATTR_UNMAPPED) {
 		switch (attr) {
 			/*
@@ -3783,6 +3786,20 @@ static char *parse_mount_options(const char *orig_opts)
 				goto err_exit;
 			}
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef XATTR_MAPPINGS
+		} else if (!strcmp(opt, "xattrmapping")) {
+			if (!val) {
+				ntfs_log_error("'xattrmapping' option should have "
+						"a value.\n");
+				goto err_exit;
+			}
+			ctx->xattrmap_path = strdup(val);
+			if (!ctx->xattrmap_path) {
+				ntfs_log_error("no more memory to store "
+					"'xattrmapping' option.\n");
+				goto err_exit;
+			}
+#endif /* XATTR_MAPPINGS */
 		} else if (!strcmp(opt, "efs_raw")) {
 			if (bogus_option_value(val, "efs_raw"))
 				goto err_exit;
@@ -4161,6 +4178,9 @@ int main(int argc, char *argv[])
 #endif
 	const char *permissions_mode = (const char*)NULL;
 	const char *failed_secure = (const char*)NULL;
+#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+	struct XATTRMAPPING *xattr_mapping = (struct XATTRMAPPING*)NULL;
+#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
 	struct stat sbuf;
 	unsigned long existing_mount;
 	int err, fd;
@@ -4342,6 +4362,18 @@ int main(int argc, char *argv[])
 	if (ctx->usermap_path)
 		free (ctx->usermap_path);
 
+#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+	xattr_mapping = ntfs_xattr_build_mapping(ctx->vol,
+				ctx->xattrmap_path);
+	ctx->vol->xattr_mapping = xattr_mapping;
+	/*
+	 * Errors are logged, do not refuse mounting, it would be
+	 * too difficult to fix the unmountable mapping file.
+	 */
+	if (ctx->xattrmap_path)
+		free(ctx->xattrmap_path);
+#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
+
 	se = mount_fuse(parsed_options);
 	if (!se) {
 		err = NTFS_VOLUME_FUSE_ERROR;
@@ -4372,6 +4404,9 @@ err_out:
 	ntfs_mount_error(opts.device, opts.mnt_point, err);
 	if (ctx->abs_mnt_point)
 		free(ctx->abs_mnt_point);
+#if defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS)
+	ntfs_xattr_free_mapping(xattr_mapping);
+#endif /* defined(HAVE_SETXATTR) && defined(XATTR_MAPPINGS) */
 err2:
 	ntfs_close();
 	free(ctx);
