@@ -183,6 +183,7 @@ struct POSIX_SECURITY {
 	int defcnt;
 	int firstdef;
 	u16 tagsset;
+	s32 alignment[0];
 	struct POSIX_ACL acl;
 } ;
         

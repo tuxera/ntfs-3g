@@ -62,6 +62,10 @@
 #include "logging.h"
 #include "misc.h"
 
+#undef le16_to_cpup 
+/* the standard le16_to_cpup() crashes for unaligned data on some processors */ 
+#define le16_to_cpup(p) (*(u8*)(p) + (((u8*)(p))[1] << 8))
+
 /**
  * enum ntfs_compression_constants - constants used in the compression code
  */

@@ -107,7 +107,11 @@
  */
 
 typedef struct {
-	GUID object_id;
+	union {
+		/* alignment may be needed to evaluate collations */
+		u32 alignment;
+		GUID guid;
+	} object_id;
 } OBJECT_ID_INDEX_KEY;
 
 typedef struct {
