@@ -1034,8 +1034,8 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			== ((k < 'a') || (k > 'z') ? k : k + 'A' - 'a')))
 		k++;
 	if (k < 0x7f) {
-		ntfs_log_perror("Corrupted file $UpCase");
-		goto error_exit;
+		ntfs_log_error("Corrupted file $UpCase\n");
+		goto io_error_exit;
 	}
 
 	/*
