@@ -31,16 +31,6 @@ autoreconf --force --verbose --install
 # current time stamp rather than the time stamp at check in time.
 touch config.h.in
 
-if test -z "$*"; then
-  echo "**Warning**: I am going to run \`configure' with no arguments."
-  echo "If you wish to pass any to it, please specify them on the"
-  echo \`$0\'" command line."
-  echo
-fi
-
-echo Running $srcdir/configure "$@" ...
-$srcdir/configure "$@" && echo Now type \`make\' to compile ntfsprogs. || err=1
-
 if test "$srcdir" != "."; then
 	popd > /dev/null
 fi
