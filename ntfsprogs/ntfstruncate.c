@@ -242,7 +242,7 @@ static void parse_options(int argc, char *argv[])
 		s = argv[optind++];
 		if (optind != argc) {
 			/* Convert the string to little endian Unicode. */
-			attr_name_len = ntfs_mbstoucs(s, &attr_name, 0);
+			attr_name_len = ntfs_mbstoucs_libntfscompat(s, &attr_name, 0);
 			if ((int)attr_name_len < 0)
 				err_exit("Invalid attribute name \"%s\": %s\n",
 						s, strerror(errno));
