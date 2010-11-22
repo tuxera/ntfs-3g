@@ -25,7 +25,7 @@
 
 #undef FALSE
 #undef TRUE
-#include "types.h"		/* for 'FALSE'/'TRUE' libntfs definition */
+#include <ntfs-3g/types.h>	/* for 'FALSE'/'TRUE' libntfs definition */
 #define FALSE FALSE
 #define TRUE TRUE
 
@@ -39,8 +39,8 @@
 #endif
 #include <libgnomevfs/gnome-vfs-utils.h>
 
-#include "volume.h"
-#include "dir.h"
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/dir.h>
 
 static GnomeVFSMethod GnomeVFSMethod_static;
 G_LOCK_DEFINE_STATIC(GnomeVFSMethod_static);

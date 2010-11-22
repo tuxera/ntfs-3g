@@ -42,9 +42,8 @@ gnomevfsmodulesconf_DATA = libntfs.conf
 endif
 
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
-libntfs_gnomevfs_la_LIBADD = libntfs-3g.la
-libntfs_gnomevfs_la_LIBS = $(LIBNTFS_GNOMEVFS_LIBS)
-libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS)
+libntfs_gnomevfs_la_LIBS = $(NTFS_3G_MODULE_LIBS) $(LIBNTFS_GNOMEVFS_LIBS)
+libntfs_gnomevfs_la_CFLAGS = $(NTFS_3G_MODULE_CFLAGS) $(LIBNTFS_GNOMEVFS_CFLAGS)
 libntfs_gnomevfs_la_SOURCES =	\
 	gnome-vfs-method.c	\
 	gnome-vfs-module.c
