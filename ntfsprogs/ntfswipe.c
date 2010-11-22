@@ -517,7 +517,7 @@ static s64 wipe_compressed_attribute(ntfs_volume *vol, int byte,
 		}
 		memset(buf, byte, size);
 
-		ret = ntfs_rl_pwrite(vol, na->rl, offset, size, buf);
+		ret = ntfs_rl_pwrite(vol, na->rl, 0, offset, size, buf);
 		free(buf);
 		if (ret != size) {
 			ntfs_log_verbose("Internal error\n");
@@ -569,7 +569,7 @@ static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 	}
 	memset(buf, byte, size);
 
-	wiped = ntfs_rl_pwrite(vol, na->rl, offset, size, buf);
+	wiped = ntfs_rl_pwrite(vol, na->rl, 0, offset, size, buf);
 	if (wiped == -1) {
 		ntfs_log_verbose("Internal error\n");
 		ntfs_log_error("Couldn't wipe tail");
@@ -891,7 +891,7 @@ static s64 wipe_index_allocation(ntfs_volume *vol, int byte, enum action act
 				ntfs_log_verbose("x");
 		}
 
-		wiped = ntfs_rl_pwrite(vol, naa->rl, offset, indx_record_size, buf);
+		wiped = ntfs_rl_pwrite(vol, naa->rl, 0, offset, indx_record_size, buf);
 		if (wiped != indx_record_size) {
 			ntfs_log_verbose("ntfs_rl_pwrite failed\n");
 			ntfs_log_error("Couldn't wipe tail of INDX record");
