@@ -106,12 +106,6 @@ AC_ARG_ENABLE(gnome-vfs,
 	enable_gnome_vfs=auto
 )
 
-AC_ARG_ENABLE(fuse-module,
-	AS_HELP_STRING(--disable-fuse-module,omit FUSE 'libntfs' interface
-		       (default=detect)), ,
-	enable_fuse_module=auto
-)
-
 AC_ARG_ENABLE(crypto,
 	AS_HELP_STRING(--enable-crypto,enable crypto related code and utilities
 		       (default=no)), ,
@@ -200,37 +194,6 @@ if test "$enable_gnome_vfs" != "no"; then
 	)
 fi
 AM_CONDITIONAL(ENABLE_GNOME_VFS, $compile_gnome_vfs)
-
-# Autodetect whether to build FUSE module or not.
-compile_fuse_module=false
-if test "$enable_fuse_module" != "no"; then
-	case "$target_os" in
-	linux*)
-		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.3.0, [ compile_fuse_module=true ],
-			if test "$enable_fuse_module" = "yes"; then
-				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.3.0.])
-			else
-				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.3.0.])
-			fi
-		);;
-	freebsd*)
-		PKG_CHECK_MODULES(FUSE_MODULE, fuse >= 2.5.0, [ compile_fuse_module=true ],
-			if test "$enable_fuse_module" = "yes"; then
-				AC_MSG_ERROR([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
-			else
-				AC_MSG_WARN([ntfsmount requires FUSE version >= 2.5.0 under FreeBSD.])
-			fi
-		);;
-	*)
-		if test "$enable_fuse_module" = "yes"; then
-			AC_MSG_ERROR([ntfsmount can be built only under Linux and FreeBSD.])
-		else
-			AC_MSG_WARN([ntfsmount can be built only under Linux and FreeBSD.])
-		fi
-		;;
-	esac
-fi
-AM_CONDITIONAL(ENABLE_FUSE_MODULE, $compile_fuse_module)
 
 PKG_CHECK_MODULES(NTFS_3G_MODULE, libntfs-3g >= 2010.5.22, [],
 	AC_MSG_ERROR([ntfs-3g.progs requires libntfs-3g version >= 2010.5.22.])
@@ -382,7 +345,6 @@ AC_CONFIG_FILES([
 	ntfsprogs/ntfsinfo.8
 	ntfsprogs/ntfslabel.8
 	ntfsprogs/ntfsls.8
-	ntfsprogs/ntfsmount.8
 	ntfsprogs/ntfsprogs.8
 	ntfsprogs/ntfsresize.8
 	ntfsprogs/ntfsundelete.8

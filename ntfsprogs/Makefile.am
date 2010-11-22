@@ -21,7 +21,7 @@ EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
 			  ntfsclone.8 ntfscluster.8 ntfscat.8 ntfscp.8 \
-			  ntfsmount.8 ntfscmp.8
+			  ntfscmp.8
 EXTRA_MANS		=
 
 CLEANFILES		= $(EXTRA_PROGRAMS)
@@ -29,10 +29,6 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 MAINTAINERCLEANFILES = Makefile.in
 
 linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
-
-if ENABLE_FUSE_MODULE
-bin_PROGRAMS		+= ntfsmount
-endif
 
 if ENABLE_CRYPTO
 EXTRA_PROGRAMS		+= ntfsdecrypt
@@ -89,13 +85,6 @@ ntfscp_SOURCES		= ntfscp.c utils.c utils.h
 ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
-if ENABLE_FUSE_MODULE
-ntfsmount_SOURCES	= ntfsmount.c utils.c utils.h
-ntfsmount_LDADD		= $(AM_LIBS) $(FUSE_MODULE_LIBS)
-ntfsmount_LDFLAGS	= $(AM_LFLAGS)
-ntfsmount_CFLAGS	= $(FUSE_MODULE_CFLAGS) -DFUSE_USE_VERSION=25
-endif
-
 ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
 ntfscmp_LDADD		= $(AM_LIBS)
 ntfscmp_LDFLAGS		= $(AM_LFLAGS)
@@ -146,26 +135,16 @@ extra:	extras
 
 extras:	libs $(EXTRA_PROGRAMS)
 
-# mkfs.ntfs[.8] and mount.ntfs-fuse hard links
+# mkfs.ntfs[.8] hard link
 
 install-exec-hook:
 	$(INSTALL) -d $(DESTDIR)/sbin
 	$(LN_S) -f $(sbindir)/mkntfs $(DESTDIR)/sbin/mkfs.ntfs
-if ENABLE_FUSE_MODULE
-	$(LN_S) -f $(bindir)/ntfsmount $(DESTDIR)/sbin/mount.ntfs-fuse
-endif
 
 install-data-hook:
 	$(INSTALL) -d $(DESTDIR)$(man8dir)
 	$(LN_S) -f mkntfs.8 $(DESTDIR)$(man8dir)/mkfs.ntfs.8
-if ENABLE_FUSE_MODULE
-	$(LN_S) -f ntfsmount.8 $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
-endif
 
 uninstall-local:
 	$(RM) -f $(DESTDIR)/sbin/mkfs.ntfs
 	$(RM) -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
-if ENABLE_FUSE_MODULE
-	$(RM) -f $(DESTDIR)/sbin/mount.ntfs-fuse
-	$(RM) -f $(DESTDIR)$(man8dir)/mount.ntfs-fuse.8
-endif

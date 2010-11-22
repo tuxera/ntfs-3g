@@ -43,9 +43,6 @@ perform a thorough check next time it boots.
 .BR ntfsls (8)
 \- List information about files in a directory residing on an NTFS.
 .PP
-.BR ntfsmount (8)
-\- Read-write NTFS userspace driver.
-.PP
 .BR ntfsresize (8)
 \- Resize NTFS without losing data.
 .PP
