@@ -1,5 +1,5 @@
 
-SUBDIRS = doc ntfsprogs
+SUBDIRS = doc include libntfs ntfsprogs
 
 EXTRA_DIST = AUTHORS CREDITS COPYING TODO.include TODO.libntfs ChangeLog \
 		INSTALL NEWS README autogen.sh ntfsprogs.spec.in \
