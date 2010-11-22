@@ -56,7 +56,7 @@
 
 #include "ntfswipe.h"
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;

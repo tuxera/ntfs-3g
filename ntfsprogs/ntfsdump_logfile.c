@@ -71,7 +71,7 @@
 #include <ntfs-3g/logging.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 typedef struct {
 	BOOL is_volume;

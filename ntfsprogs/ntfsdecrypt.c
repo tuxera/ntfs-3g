@@ -71,7 +71,7 @@
 #include <ntfs-3g/layout.h>
 
 #include "utils.h"
-#include "version.h"
+/* #include "version.h" */
 
 typedef gcry_sexp_t ntfs_rsa_private_key;
 

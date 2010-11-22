@@ -47,7 +47,7 @@
 
 #include "utils.h"
 #include "ntfsmove.h"
-#include "version.h"
+/* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfsmove";
 static struct options opts;

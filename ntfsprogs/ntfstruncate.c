@@ -67,7 +67,7 @@
 
 #include "utils.h"
 #include "attrdef.h"
-#include "version.h"
+/* #include "version.h" */
 
 const char *EXEC_NAME = "ntfstruncate";
 
