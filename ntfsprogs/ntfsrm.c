@@ -66,8 +66,8 @@ static const char *space_line = "                                               
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Delete files from an NTFS volume.\n\n",
-			EXEC_NAME, VERSION, ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Delete files from an NTFS volume.\n\n",
+			EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2004 Richard Russon\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

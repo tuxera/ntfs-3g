@@ -852,8 +852,7 @@ int main(int argc, char **argv)
 	ntfs_volume *vol1;
 	ntfs_volume *vol2;
 
-	printf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	printf("%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 
 	parse_options(argc, argv);
 

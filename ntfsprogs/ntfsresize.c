@@ -2387,8 +2387,7 @@ int main(int argc, char **argv)
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
-	printf("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	printf("%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 
 	if (!parse_options(argc, argv))
 		return 1;

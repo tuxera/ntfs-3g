@@ -169,7 +169,7 @@ static void log_err_exit(u8 *buf, const char *fmt, ...)
 __attribute__((noreturn))
 static void usage(const char *exec_name)
 {
-	ntfs_log_error("%s v%s (libntfs %s) - Interpret and display information "
+	ntfs_log_error("%s v%s (libntfs-3g) - Interpret and display information "
 			"about the journal\n($LogFile) of an NTFS volume.\n"
 			"Copyright (c) 2000-2005 Anton Altaparmakov.\n"
 			"%s is free software, released under the GNU General "
@@ -181,7 +181,7 @@ static void usage(const char *exec_name)
 			"directory.\nUsage: %s device\n    e.g. %s /dev/hda6\n"
 			"Alternative usage: %s -f file\n    e.g. %s -f "
 			"MyCopyOfTheLogFile\n", exec_name, VERSION,
-			ntfs_libntfs_version(), exec_name, exec_name,
+			exec_name, exec_name,
 			exec_name, exec_name, exec_name, exec_name);
 	exit(1);
 }

@@ -96,7 +96,7 @@ struct {
 __attribute__((noreturn))
 static int usage(void)
 {
-	ntfs_log_info("%s v%s (libntfs %s)\n"
+	ntfs_log_info("%s v%s (libntfs-3g)\n"
 		   "\n"
 		   "Usage: %s [options] device\n"
 		   "    Attempt to fix an NTFS partition.\n"
@@ -105,7 +105,7 @@ static int usage(void)
 		   "    -V, --version          Display version information\n"
 		   "\n"
 		   "For example: %s /dev/hda6\n\n",
-		   EXEC_NAME, VERSION, ntfs_libntfs_version(), EXEC_NAME,
+		   EXEC_NAME, VERSION, EXEC_NAME,
 		   EXEC_NAME);
 	ntfs_log_info("%s%s", ntfs_bugs, ntfs_home);
 	exit(1);

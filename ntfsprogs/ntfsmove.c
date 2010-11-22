@@ -60,9 +60,8 @@ static struct options opts;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Move files and directories on an "
-			"NTFS volume.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Move files and directories on an "
+			"NTFS volume.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2003 Richard Russon\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }

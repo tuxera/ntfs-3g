@@ -101,10 +101,6 @@ int mft_next_record(struct mft_search_ctx *ctx);
 #define DM_BLUE		(1 << 5)
 #define DM_BOLD		(1 << 6)
 
-static __inline__ const char *ntfs_libntfs_version(void) {
-	return "ntfs-3g unknown version (TODO: find or create a way to extract ntfs-3g version from library)";
-}
-
 /* MAX_PATH definition was missing in ntfs-3g's headers. */
 #ifndef MAX_PATH
 #define MAX_PATH 1024

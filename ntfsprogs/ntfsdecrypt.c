@@ -143,9 +143,8 @@ static ntfschar EFS[5] = {
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Decrypt files and print on the "
-			"standard output.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Decrypt files and print on the "
+			"standard output.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2005 Yuval Fledel\n");
 	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);

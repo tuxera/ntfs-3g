@@ -139,9 +139,8 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
  */
 static void version(void)
 {
-	printf("\n%s v%s (libntfs %s) - Display information about an NTFS "
-			"Volume.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	printf("\n%s v%s (libntfs-3g) - Display information about an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION);
 	printf("Copyright (c) 2003 Lode Leroy\n");
 	printf("Copyright (c) 2003-2005 Anton Altaparmakov\n");
 	printf("Copyright (c) 2003 Richard Russon\n");

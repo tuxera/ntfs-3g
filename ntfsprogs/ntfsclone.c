@@ -1643,8 +1643,7 @@ int main(int argc, char **argv)
 	unsigned int wiped_total = 0;
 
 	/* print to stderr, stdout can be an NTFS image ... */
-	fprintf(stderr, "%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-		ntfs_libntfs_version());
+	fprintf(stderr, "%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 	msg_out = stderr;
 
 	parse_options(argc, argv);

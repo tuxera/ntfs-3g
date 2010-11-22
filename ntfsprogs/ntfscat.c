@@ -60,9 +60,8 @@ static struct options opts;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Concatenate files and print on the "
-			"standard output.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Concatenate files and print on the "
+			"standard output.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2003-2005 Richard Russon\n");
 	ntfs_log_info("Copyright (c) 2003-2005 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2003-2005 Szabolcs Szakacsits\n");

@@ -222,9 +222,8 @@ static int parse_inode_arg(void)
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Recover deleted files from an NTFS "
-			"Volume.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Recover deleted files from an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2002-2005 Richard Russon\n"
 		"Copyright (c) 2004-2005 Holger Ohmacht\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);

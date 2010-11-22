@@ -260,7 +260,7 @@ static void mkntfs_usage(void)
  */
 static void mkntfs_version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s)\n\n", EXEC_NAME, VERSION, ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g)\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Create an NTFS volume on a user specified (block) device.\n\n");
 	ntfs_log_info("Copyright (c) 2000-2006 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2001-2005 Richard Russon\n");

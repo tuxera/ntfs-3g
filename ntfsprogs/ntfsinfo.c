@@ -103,9 +103,8 @@ static struct options {
  */
 static void version(void)
 {
-	printf("\n%s v%s (libntfs %s) - Display information about an NTFS "
-			"Volume.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	printf("\n%s v%s (libntfs-3g) - Display information about an NTFS "
+			"Volume.\n\n", EXEC_NAME, VERSION);
 	printf("Copyright (c)\n");
 	printf("    2002-2004 Matthew J. Fanto\n");
 	printf("    2002-2006 Anton Altaparmakov\n");

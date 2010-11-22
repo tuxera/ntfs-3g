@@ -71,9 +71,8 @@ static struct options {
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs %s) - Display, or set, the label for an "
-			"NTFS Volume.\n\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Display, or set, the label for an "
+			"NTFS Volume.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c)\n");
 	ntfs_log_info("    2002      Matthew J. Fanto\n");
 	ntfs_log_info("    2002-2005 Anton Altaparmakov\n");

@@ -159,8 +159,7 @@ static void parse_options(int argc, char *argv[])
 
 	if (argc && *argv)
 		EXEC_NAME = *argv;
-	ntfs_log_info("%s v%s (libntfs %s)\n", EXEC_NAME, VERSION,
-			ntfs_libntfs_version());
+	ntfs_log_info("%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 	while ((c = getopt(argc, argv, "fh?nqvVl")) != EOF) {
 		switch (c) {
 		case 'f':
