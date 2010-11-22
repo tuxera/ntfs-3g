@@ -31,39 +31,6 @@ LTVERSION_LIBNTFS_GNOMEVFS = 1:0:0
 
 linux_ntfsincludedir = -I$(top_srcdir)/include/ntfs
 
-lib_LTLIBRARIES = libntfs.la
-libntfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS) -no-undefined
-libntfs_la_CFLAGS = $(LIBNTFS_CFLAGS) \
-	-DLTVERSION_LIBNTFS=\"$(LTVERSION_LIBNTFS)\"
-libntfs_la_SOURCES =	\
-	attrib.c	\
-	attrlist.c	\
-	bitmap.c	\
-	bootsect.c	\
-	collate.c	\
-	compat.c	\
-	compress.c	\
-	debug.c		\
-	device.c	\
-	device_io.c	\
-	dir.c		\
-	index.c		\
-	inode.c		\
-	lcnalloc.c	\
-	logfile.c	\
-	logging.c	\
-	mft.c		\
-	mst.c		\
-	runlist.c	\
-	security.c	\
-	unistr.c	\
-	version.c	\
-	volume.c
-
-if ENABLE_RICH
-libntfs_la_SOURCES += rich.c tree.c
-endif
-
 if ENABLE_GNOME_VFS
 
 gnomevfsmoduleslibdir = $(libdir)/gnome-vfs-2.0/modules
@@ -75,7 +42,7 @@ gnomevfsmodulesconf_DATA = libntfs.conf
 endif
 
 libntfs_gnomevfs_la_LDFLAGS = -version-info $(LTVERSION_LIBNTFS_GNOMEVFS)
-libntfs_gnomevfs_la_LIBADD = libntfs.la
+libntfs_gnomevfs_la_LIBADD = libntfs-3g.la
 libntfs_gnomevfs_la_LIBS = $(LIBNTFS_GNOMEVFS_LIBS)
 libntfs_gnomevfs_la_CFLAGS = $(LIBNTFS_GNOMEVFS_CFLAGS)
 libntfs_gnomevfs_la_SOURCES =	\
@@ -86,7 +53,7 @@ man_MANS = libntfs-gnomevfs.8
 
 AM_CPPFLAGS = $(linux_ntfsincludedir) $(all_includes)
 
-EXTRA_DIST = unix_io.c win32_io.c libntfs.conf.in
+EXTRA_DIST = libntfs.conf.in
 
 MAINTAINERCLEANFILES = Makefile.in
 
