@@ -690,7 +690,7 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 	ntfs_log_info("move %lld,%lld,%lld to %lld,%lld,%lld\n", run->vcn,
 		run->lcn, run->length, to->vcn, to->lcn, to->length);
 
-	need_from = ntfs_get_size_for_mapping_pairs(vol, from, 0);
+	need_from = ntfs_get_size_for_mapping_pairs(vol, from, 0, INT_MAX);
 	ntfs_log_info("orig data run = %d bytes\n", need_from);
 
 	//ntfs_debug_runlist_dump2(from, 5, "\t");
@@ -704,7 +704,7 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 
 	//ntfs_debug_runlist_dump2(from, 5, "\t");
 
-	need_to = ntfs_get_size_for_mapping_pairs(vol, from, 0);
+	need_to = ntfs_get_size_for_mapping_pairs(vol, from, 0, INT_MAX);
 	ntfs_log_info("new  data run = %d bytes\n", need_to);
 
 	need_from = calc_attr_length(rec, need_from);
