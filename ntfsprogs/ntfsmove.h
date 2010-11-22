@@ -24,7 +24,7 @@
 #ifndef _NTFSMOVE_H_
 #define _NTFSMOVE_H_
 
-#include "types.h"
+#include <ntfs-3g/types.h>
 					/* Move files to */
 #define NTFS_MOVE_LOC_START	-1000	/*   the first available space */
 #define NTFS_MOVE_LOC_BEST	-1001	/*   place big enough for entire file */

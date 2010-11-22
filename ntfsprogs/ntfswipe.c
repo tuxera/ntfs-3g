@@ -47,15 +47,16 @@
 #include <unistd.h>
 #endif
 
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/debug.h>
+#include <ntfs-3g/dir.h>
+#include <ntfs-3g/mst.h>
+#include <ntfs-3g/logging.h>
+
 #include "ntfswipe.h"
-#include "types.h"
-#include "volume.h"
 #include "utils.h"
-#include "debug.h"
-#include "dir.h"
-#include "mst.h"
 #include "version.h"
-#include "logging.h"
 
 static const char *EXEC_NAME = "ntfswipe";
 static struct options opts;

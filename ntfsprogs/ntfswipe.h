@@ -24,7 +24,7 @@
 #ifndef _NTFSWIPE_H_
 #define _NTFSWIPE_H_
 
-#include "types.h"
+#include <ntfs-3g/types.h>
 
 enum action {
 	act_info,

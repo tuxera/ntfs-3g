@@ -60,17 +60,18 @@
 #include <fcntl.h>
 #endif
 
-#include "types.h"
-#include "endians.h"
-#include "volume.h"
-#include "inode.h"
-#include "attrib.h"
-#include "layout.h"
-#include "logfile.h"
-#include "mst.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/endians.h>
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/inode.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/layout.h>
+#include <ntfs-3g/logfile.h>
+#include <ntfs-3g/mst.h>
+#include <ntfs-3g/logging.h>
+
 #include "utils.h"
 #include "version.h"
-#include "logging.h"
 
 typedef struct {
 	BOOL is_volume;

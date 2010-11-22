@@ -58,15 +58,16 @@
 #	define LLONG_MAX 9223372036854775807LL
 #endif
 
-#include "types.h"
-#include "attrib.h"
-#include "inode.h"
-#include "layout.h"
-#include "volume.h"
+#include <ntfs-3g/types.h>
+#include <ntfs-3g/attrib.h>
+#include <ntfs-3g/inode.h>
+#include <ntfs-3g/layout.h>
+#include <ntfs-3g/volume.h>
+#include <ntfs-3g/logging.h>
+
 #include "utils.h"
 #include "attrdef.h"
 #include "version.h"
-#include "logging.h"
 
 const char *EXEC_NAME = "ntfstruncate";
 
