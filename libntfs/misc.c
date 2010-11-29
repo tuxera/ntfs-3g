@@ -1,9 +1,7 @@
-/*
- * gnome-vfs-module.h - Exports for Gnome-VFS init/shutdown implementation of
- *			interface to libntfs. Part of the Linux-NTFS project.
+/**
+ * misc.c - Miscellaneous functions. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2003 Jan Kratochvil <project-captive@jankratochvil.net>
- * Copyright (c) 2000-2004 Anton Altaparmakov
+ * Copyright (c) 2006 Szabolcs Szakacsits
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -21,22 +19,45 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _NTFS_GNOME_VFS_MODULE_H
-#define _NTFS_GNOME_VFS_MODULE_H
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-G_BEGIN_DECLS
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
 
-G_LOCK_EXTERN(libntfs);
+#include "support.h"
+#include "logging.h"
 
-#define libntfs_newn(objp, n)	((objp) = (typeof(objp))g_new(typeof(*(objp)), (n)))
-#define libntfs_new(objp)	(libntfs_newn((objp), 1))
-#define LIBNTFS_MEMZERO(objp)	(memset((objp), 0, sizeof(*(objp))))
+/**
+ * ntfs_calloc - A logging supported calloc(3)
+ * 
+ * Return a pointer to the allocated memory or NULL if the request fails.
+ * Memory is initialized with zeros.
+ */
+void *ntfs_calloc(size_t size)
+{
+	void *p;
 
-G_END_DECLS
+	p = calloc(1, size);
+	if (!p)
+		ntfs_log_perror("Failed to calloc %lld bytes", (long long)size);
+	return p;
+}
 
-#endif /* _NTFS_GNOME_VFS_MODULE_H */
+/**
+ * ntfs_malloc - A logging supported malloc(3)
+ * 
+ * Return a pointer to the allocated memory or NULL if the request fails.
+ * Memory is uninitialized.
+ */
+void *ntfs_malloc(size_t size)
+{
+	void *p;
 
+	p = malloc(size);
+	if (!p)
+		ntfs_log_perror("Failed to malloc %lld bytes", (long long)size);
+	return p;
+}

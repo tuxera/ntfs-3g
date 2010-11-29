@@ -1,8 +1,9 @@
 /**
  * ntfsfix - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2006 Anton Altaparmakov.
- * Copyright (c) 2002-2006 Szabolcs Szakacsits.
+ * Copyright (c) 2000-2006 Anton Altaparmakov
+ * Copyright (c) 2002-2006 Szabolcs Szakacsits
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -83,10 +84,8 @@ switch if you want to be able to build the NTFS utilities."
 static const char *EXEC_NAME = "ntfsfix";
 static const char *OK        = "OK\n";
 static const char *FAILED    = "FAILED\n";
-static BOOL vol_is_dirty     = FALSE;
-static BOOL journal_is_empty = FALSE;
 
-struct {
+static struct {
 	char *volume;
 } opt;
 
@@ -119,8 +118,9 @@ static void version(void)
 {
 	ntfs_log_info("%s v%s\n\n"
 		   "Attempt to fix an NTFS partition.\n\n"
-		   "Copyright (c) 2000-2006 Anton Altaparmakov.\n"
-		   "Copyright (c) 2002-2006 Szabolcs Szakacsits.\n\n",
+		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
+		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
+		   "Copyright (c) 2007      Yura Pakhuchiy\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);
@@ -171,7 +171,7 @@ static void parse_options(int argc, char **argv)
 /**
  * OLD_ntfs_volume_set_flags
  */
-static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
+static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const le16 flags)
 {
 	MFT_RECORD *m = NULL;
 	ATTR_RECORD *a;
@@ -228,7 +228,7 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const u16 flags)
 		goto err_out;
 	}
 	/* Set the volume flags. */
-	vol->flags = c->flags = cpu_to_le16(flags);
+	vol->flags = c->flags = flags;
 	if (ntfs_mft_record_write(vol, FILE_Volume, m)) {
 		ntfs_log_perror("Error writing $Volume");
 		goto err_out;
@@ -246,56 +246,24 @@ err_exit:
  */
 static int set_dirty_flag(ntfs_volume *vol)
 {
-	u16 flags;
+	le16 flags;
 
-	if (vol_is_dirty == TRUE)
+	if (NVolWasDirty(vol))
 		return 0;
-
 	ntfs_log_info("Setting required flags on partition... ");
 	/*
 	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
 	 * and fix it for us.
 	 */
 	flags = vol->flags | VOLUME_IS_DIRTY;
-	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
 	if (OLD_ntfs_volume_set_flags(vol, flags)) {
 		ntfs_log_info(FAILED);
 		ntfs_log_error("Error setting volume flags.\n");
 		return -1;
 	}
+	vol->flags = flags;
+	NVolSetWasDirty(vol);
 	ntfs_log_info(OK);
-	vol_is_dirty = TRUE;
-	return 0;
-}
-
-/**
- * set_dirty_flag_mount
- */
-static int set_dirty_flag_mount(ntfs_volume *vol)
-{
-	u16 flags;
-
-	if (vol_is_dirty == TRUE)
-		return 0;
-
-	ntfs_log_info("Setting required flags on partition... ");
-	/*
-	 * Set chkdsk flag, i.e. mark the partition dirty so chkdsk will run
-	 * and fix it for us.
-	 */
-	flags = vol->flags | VOLUME_IS_DIRTY;
-	/* If NTFS volume version >= 2.0 then set mounted on NT4 flag. */
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
-	if (ntfs_volume_write_flags(vol, flags)) {
-		ntfs_log_info(FAILED);
-		ntfs_log_error("Error setting volume flags.\n");
-		return -1;
-	}
-	ntfs_log_info(OK);
-	vol_is_dirty = TRUE;
 	return 0;
 }
 
@@ -304,9 +272,8 @@ static int set_dirty_flag_mount(ntfs_volume *vol)
  */
 static int empty_journal(ntfs_volume *vol)
 {
-	if (journal_is_empty == TRUE)
+	if (NVolLogFileEmpty(vol))
 		return 0;
-
 	ntfs_log_info("Going to empty the journal ($LogFile)... ");
 	if (ntfs_logfile_reset(vol)) {
 		ntfs_log_info(FAILED);
@@ -314,7 +281,6 @@ static int empty_journal(ntfs_volume *vol)
 		return -1;
 	}
 	ntfs_log_info(OK);
-	journal_is_empty = TRUE;
 	return 0;
 }
 
@@ -399,7 +365,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 		use_mirr = FALSE;
 		mrec = (MFT_RECORD*)(m + i * vol->mft_record_size);
 		if (mrec->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec)) {
+			if (ntfs_is_baad_record(mrec->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFT error: Incomplete multi "
 						"sector transfer detected in "
@@ -407,7 +373,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 						")-:\n", s);
 				goto error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec)) {
+			if (!ntfs_is_mft_record(mrec->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFT error: Invalid mft "
 						"record for %s.\nCannot "
@@ -417,14 +383,14 @@ static int fix_mftmirr(ntfs_volume *vol)
 		}
 		mrec2 = (MFT_RECORD*)(m2 + i * vol->mft_record_size);
 		if (mrec2->flags & MFT_RECORD_IN_USE) {
-			if (ntfs_is_baad_recordp(mrec2)) {
+			if (ntfs_is_baad_record(mrec2->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFTMirr error: Incomplete "
 						"multi sector transfer "
 						"detected in %s.\n", s);
 				goto error_exit;
 			}
-			if (!ntfs_is_mft_recordp(mrec2)) {
+			if (!ntfs_is_mft_record(mrec2->magic)) {
 				ntfs_log_info(FAILED);
 				ntfs_log_error("$MFTMirr error: Invalid mft "
 						"record for %s.\n", s);
@@ -432,7 +398,7 @@ static int fix_mftmirr(ntfs_volume *vol)
 			}
 			/* $MFT is corrupt but $MFTMirr is ok, use $MFTMirr. */
 			if (!(mrec->flags & MFT_RECORD_IN_USE) &&
-					!ntfs_is_mft_recordp(mrec))
+					!ntfs_is_mft_record(mrec->magic))
 				use_mirr = TRUE;
 		}
 		if (memcmp(mrec, mrec2, ntfs_mft_record_get_data_size(mrec))) {
@@ -476,13 +442,13 @@ static int fix_mount(void)
 
 	ntfs_log_info("Attempting to correct errors... ");
 
-	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops, NULL);
+	dev = ntfs_device_alloc(opt.volume, 0, &ntfs_device_default_io_ops,
+			NULL);
 	if (!dev) {
 		ntfs_log_info(FAILED);
 		ntfs_log_perror("Failed to allocate device");
 		return -1;
 	}
-
 	vol = ntfs_volume_startup(dev, 0);
 	if (!vol) {
 		ntfs_log_info(FAILED);
@@ -491,17 +457,12 @@ static int fix_mount(void)
 		ntfs_device_free(dev);
 		return -1;
 	}
-
 	if (fix_mftmirr(vol) < 0)
 		goto error_exit;
-
-	/* FIXME: Will this fail?  Probably... */
 	if (set_dirty_flag(vol) < 0)
 		goto error_exit;
-
 	if (empty_journal(vol) < 0)
 		goto error_exit;
-
 	ret = 0;
 error_exit:
 	/* ntfs_umount() will invoke ntfs_device_free() for us. */
@@ -551,7 +512,8 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
-
+	/* So the unmount does not clear it again. */
+	NVolSetWasDirty(vol);
 	/* Check NTFS version is ok for us (in $Volume) */
 	ntfs_log_info("NTFS volume version is %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
@@ -559,22 +521,13 @@ int main(int argc, char **argv)
 		ntfs_log_error("Error: Unknown NTFS version.\n");
 		goto error_exit;
 	}
-
-	if (set_dirty_flag_mount(vol) < 0)
-		goto error_exit;
-
-	if (empty_journal(vol) < 0)
-		goto error_exit;
-
 	if (vol->major_ver >= 3) {
-	/* FIXME: If on NTFS 3.0+, check for presence of the usn journal and
-	   disable it (if present) as Win2k might be unhappy otherwise and Bad
-	   Things(TM) could happen depending on what applications are actually
-	   using it for. */
+		/*
+		 * FIXME: If on NTFS 3.0+, check for presence of the usn
+		 * journal and stamp it if present.
+		 */
 	}
-
-	/* FIXME: Should we be marking the quota out of date, too? */
-
+	/* FIXME: We should be marking the quota out of date, too. */
 	/* That's all for now! */
 	ntfs_log_info("NTFS partition %s was processed successfully.\n",
 			vol->dev->d_name);

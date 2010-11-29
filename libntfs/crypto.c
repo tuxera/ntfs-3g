@@ -1,12 +1,10 @@
 /**
- * ntfsdecrypt - Decrypt ntfs encrypted files.  Part of the Linux-NTFS project.
+ * crypto.c - Routines for dealing with encrypted files.  Part of the
+ *            Linux-NTFS project.
  *
- * Copyright (c) 2005 Yuval Fledel
+ * Copyright (c) 2005      Yuval Fledel
  * Copyright (c) 2005-2007 Anton Altaparmakov
- * Copyright (c) 2007 Yura Pakhuchiy
- *
- * This utility will decrypt files and print the decrypted data on the standard
- * output.
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,9 +20,17 @@
  * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * TODO: Cleanup this file. Write nice descriptions for non-exported functions
+ * and maybe clean up namespace (not necessary for all functions to belong to
+ * ntfs_crypto, we can have ntfs_fek, ntfs_rsa, etc.., but there should be
+ * maximum 2-3 namespaces, not every function begins with it own namespace
+ * like now).
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -38,9 +44,6 @@
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -53,27 +56,34 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+
+#include "attrib.h"
+#include "types.h"
+#include "volume.h"
+#include "debug.h"
+#include "dir.h"
+#include "layout.h"
+#include "crypto.h"
+
+#ifdef ENABLE_CRYPTO
+
 #include <gcrypt.h>
 #include <gnutls/pkcs12.h>
+#include <gnutls/x509.h>
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/attrib.h>
-#include <ntfs-3g/volume.h>
-#include <ntfs-3g/debug.h>
-#include <ntfs-3g/dir.h>
-#include <ntfs-3g/layout.h>
+#include <libconfig.h>
 
-#include "utils.h"
-/* #include "version.h" */
+#define NTFS_CONFIG_PATH_SYSTEM		"/etc/libntfs/config"
+#define NTFS_CONFIG_PATH_USER		".libntfs/config"
 
-typedef gcry_sexp_t ntfs_rsa_private_key;
+#define NTFS_SHA1_THUMBPRINT_SIZE	0x14
 
-#define NTFS_SHA1_THUMBPRINT_SIZE 0x14
+#define NTFS_CRED_TYPE_CERT_THUMBPRINT	const_cpu_to_le32(3)
 
-#define NTFS_CRED_TYPE_CERT_THUMBPRINT const_cpu_to_le32(3)
+#define NTFS_EFS_CERT_PURPOSE_OID_DDF	"1.3.6.1.4.1.311.10.3.4"
+#define NTFS_EFS_CERT_PURPOSE_OID_DRF	"1.3.6.1.4.1.311.10.3.4.1"
 
-#define NTFS_EFS_CERT_PURPOSE_OID_DDF "1.3.6.1.4.1.311.10.3.4"
-#define NTFS_EFS_CERT_PURPOSE_OID_DRF "1.3.6.1.4.1.311.10.3.4.1"
+#define NTFS_EFS_SECTOR_SIZE		512
 
 typedef enum {
 	DF_TYPE_UNKNOWN,
@@ -106,201 +116,51 @@ typedef enum {
 /**
  * struct ntfs_fek - Decrypted, in-memory file encryption key.
  */
-typedef struct {
+struct _ntfs_fek {
 	gcry_cipher_hd_t gcry_cipher_hd;
 	le32 alg_id;
 	u8 *key_data;
 	gcry_cipher_hd_t *des_gcry_cipher_hd_ptr;
-} ntfs_fek;
+};
 
-/* DESX-MS128 implementation for libgcrypt. */
-static gcry_module_t ntfs_desx_module;
-static int ntfs_desx_algorithm_id = -1;
+typedef struct _ntfs_fek ntfs_fek;
+
+struct _ntfs_crypto_attr {
+	ntfs_fek *fek;
+};
 
 typedef struct {
 	u64 in_whitening, out_whitening;
 	gcry_cipher_hd_t gcry_cipher_hd;
 } ntfs_desx_ctx;
 
-struct options {
-	char *keyfile;	/* .pfx file containing the user's private key. */
-	char *device;		/* Device/File to work with */
-	char *file;		/* File to display */
-	s64 inode;		/* Inode to work with */
-	ATTR_TYPES attr;	/* Attribute type to display */
-	int force;		/* Override common sense */
-	int quiet;		/* Less output */
-	int verbose;		/* Extra output */
-};
-
-static const char *EXEC_NAME = "ntfsdecrypt";
-static struct options opts;
-
-static ntfschar EFS[5] = {
+ntfschar NTFS_EFS[5] = {
 	const_cpu_to_le16('$'), const_cpu_to_le16('E'), const_cpu_to_le16('F'),
-	const_cpu_to_le16('S'), const_cpu_to_le16('\0')
+	const_cpu_to_le16('S'), const_cpu_to_le16(0)
 };
 
-/**
- * version - Print version information about the program
- *
- * Print a copyright statement and a brief description of the program.
- *
- * Return:  none
+typedef struct {
+	gcry_sexp_t key;
+	NTFS_DF_TYPES df_type;
+	char thumbprint[NTFS_SHA1_THUMBPRINT_SIZE];
+} ntfs_rsa_private_key_t;
+
+/*
+ * Yes, global variables sucks, but we need to keep whether we performed
+ * gcrypt/gnutls global initialization and keep user's RSA keys.
  */
-static void version(void)
-{
-	ntfs_log_info("\n%s v%s (libntfs-3g) - Decrypt files and print on the "
-			"standard output.\n\n", EXEC_NAME, VERSION);
-	ntfs_log_info("Copyright (c) 2005 Yuval Fledel\n");
-	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
-	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
-}
+typedef struct {
+	int initialized;
+	int desx_alg_id;
+	gcry_module_t desx_module;
+	ntfs_rsa_private_key_t **rsa_key;
+	int nr_rsa_keys;
+} ntfs_crypto_ctx_t;
 
-/**
- * usage - Print a list of the parameters to the program
- *
- * Print a list of the parameters and options for the program.
- *
- * Return:  none
- */
-static void usage(void)
-{
-	ntfs_log_info("\nUsage: %s [options] -k name.pfx device [file]\n\n"
-	       "    -i, --inode num         Display this inode\n\n"
-	       "    -k  --keyfile name.pfx  Use file name as the user's private key file.\n"
-	       "    -f  --force             Use less caution\n"
-	       "    -h  --help              Print this help\n"
-	       "    -q  --quiet             Less output\n"
-	       "    -V  --version           Version information\n"
-	       "    -v  --verbose           More output\n\n",
-	       EXEC_NAME);
-	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
-}
-
-/**
- * parse_options - Read and validate the programs command line
- *
- * Read the command line, verify the syntax and parse the options.
- * This function is very long, but quite simple.
- *
- * Return:  1 Success
- *	    0 Error, one or more problems
- */
-static int parse_options(int argc, char **argv)
-{
-	static const char *sopt = "-fh?i:k:qVv";
-	static const struct option lopt[] = {
-		{"force", no_argument, NULL, 'f'},
-		{"help", no_argument, NULL, 'h'},
-		{"inode", required_argument, NULL, 'i'},
-		{"keyfile", required_argument, NULL, 'k'},
-		{"quiet", no_argument, NULL, 'q'},
-		{"version", no_argument, NULL, 'V'},
-		{"verbose", no_argument, NULL, 'v'},
-		{NULL, 0, NULL, 0}
-	};
-
-	int c = -1;
-	int err = 0;
-	int ver = 0;
-	int help = 0;
-
-	opterr = 0;		/* We'll handle the errors, thank you. */
-
-	opts.inode = -1;
-
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
-		switch (c) {
-		case 1:	/* A non-option argument */
-			if (!opts.device)
-				opts.device = argv[optind - 1];
-			else if (!opts.file)
-				opts.file = argv[optind - 1];
-			else {
-				ntfs_log_error("You must specify exactly one "
-					"file.\n");
-				err++;
-			}
-			break;
-		case 'f':
-			opts.force++;
-			break;
-		case 'h':
-		case '?':
-			help++;
-			break;
-		case 'k':
-			if (!opts.keyfile)
-				opts.keyfile = argv[optind - 1];
-			else {
-				ntfs_log_error("You must specify exactly one "
-						"key file.\n");
-				err++;
-			}
-			break;
-		case 'i':
-			if (opts.inode != -1)
-				ntfs_log_error("You must specify exactly one "
-						"inode.\n");
-			else if (utils_parse_size(optarg, &opts.inode, FALSE))
-				break;
-			else
-				ntfs_log_error("Couldn't parse inode number.\n");
-			err++;
-			break;
-		case 'q':
-			opts.quiet++;
-			ntfs_log_clear_levels(NTFS_LOG_LEVEL_QUIET);
-			break;
-		case 'V':
-			ver++;
-			break;
-		case 'v':
-			opts.verbose++;
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
-			break;
-		default:
-			ntfs_log_error("Unknown option '%s'.\n",
-				argv[optind - 1]);
-			err++;
-			break;
-		}
-	}
-
-	if (help || ver) {
-		opts.quiet = 0;
-		ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET);
-	} else {
-		if (!opts.keyfile) {
-			ntfs_log_error("You must specify a key file.\n");
-			err++;
-		} else if (opts.device == NULL) {
-			ntfs_log_error("You must specify a device.\n");
-			err++;
-		} else if (opts.file == NULL && opts.inode == -1) {
-			ntfs_log_error("You must specify a file or inode with "
-				"the -i option.\n");
-			err++;
-		} else if (opts.file != NULL && opts.inode != -1) {
-			ntfs_log_error("You can't specify both a file and "
-				"inode.\n");
-			err++;
-		}
-		if (opts.quiet && opts.verbose) {
-			ntfs_log_error("You may not use --quiet and --verbose "
-				"at the same time.\n");
-			err++;
-		}
-	}
-
-	if (ver)
-		version();
-	if (help || err)
-		usage();
-
-	return (!err && !help && !ver);
-}
+static ntfs_crypto_ctx_t ntfs_crypto_ctx = {
+	.desx_alg_id = -1,
+	.desx_module = NULL,
+};
 
 /**
  * ntfs_pkcs12_load_pfxfile
@@ -367,44 +227,9 @@ file_out:
 }
 
 /**
- * ntfs_crypto_init
- */
-static int ntfs_crypto_init(void)
-{
-	int err;
-
-	/* Initialize gcrypt library.  Note: Must come before GNU TLS init. */
-	if (gcry_control(GCRYCTL_DISABLE_SECMEM, 0) != GPG_ERR_NO_ERROR) {
-		ntfs_log_error("Failed to initialize the gcrypt library.\n");
-		return -1;
-	}
-	/* Initialize GNU TLS library.  Note: Must come after libgcrypt init. */
-	err = gnutls_global_init();
-	if (err < 0) {
-		ntfs_log_error("Failed to initialize GNU TLS library: %s\n",
-				gnutls_strerror(err));
-		return -1;
-	}
-	return 0;
-}
-
-/**
- * ntfs_crypto_deinit
- */
-static void ntfs_crypto_deinit(void)
-{
-	gnutls_global_deinit();
-	if (ntfs_desx_module) {
-		gcry_cipher_unregister(ntfs_desx_module);
-		ntfs_desx_module = NULL;
-		ntfs_desx_algorithm_id = -1;
-	}
-}
-
-/**
  * ntfs_rsa_private_key_import_from_gnutls
  */
-static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
+static gcry_sexp_t ntfs_rsa_private_key_import_from_gnutls(
 		gnutls_x509_privkey_t priv_key)
 {
 	int i, j;
@@ -420,7 +245,7 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 				"key an RSA private key?)\n");
 		return NULL;
 	}
-	/* Convert each RSA parameter to mpi format. */
+	/* Convert each RSA parameter to MPI format. */
 	for (i = 0; i < 6; i++) {
 		if (gcry_mpi_scan(&rm[i], GCRYMPI_FMT_USG, rd[i].data,
 				rd[i].size, &tmp_size) != GPG_ERR_NO_ERROR) {
@@ -447,26 +272,29 @@ static ntfs_rsa_private_key ntfs_rsa_private_key_import_from_gnutls(
 		ntfs_log_error("Failed to build RSA private key s-exp.\n");
 		rsa_key = NULL;
 	}
-	/* Release the no longer needed mpi values. */
+	/* Release the no longer needed MPI values. */
 	for (j = 0; j < i; j++)
 		gcry_mpi_release(rm[j]);
-	return (ntfs_rsa_private_key)rsa_key;
+	return rsa_key;
 }
 
 /**
  * ntfs_rsa_private_key_release
  */
-static void ntfs_rsa_private_key_release(ntfs_rsa_private_key rsa_key)
+static void ntfs_rsa_private_key_release(ntfs_rsa_private_key_t *rsa_key)
 {
-	gcry_sexp_release((gcry_sexp_t)rsa_key);
+	if (rsa_key) {
+		if (rsa_key->key)
+			gcry_sexp_release(rsa_key->key);
+		free(rsa_key);
+	}
 }
 
 /**
  * ntfs_pkcs12_extract_rsa_key
  */
-static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
-		char *password, char *thumbprint, int thumbprint_size,
-		NTFS_DF_TYPES *df_type)
+static ntfs_rsa_private_key_t *ntfs_pkcs12_extract_rsa_key(u8 *pfx,
+		int pfx_size, const char *password)
 {
 	int err, bag_index, flags;
 	gnutls_datum_t dpfx, dkey;
@@ -474,19 +302,26 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	gnutls_pkcs12_bag_t bag = NULL;
 	gnutls_x509_privkey_t pkey = NULL;
 	gnutls_x509_crt_t crt = NULL;
-	ntfs_rsa_private_key rsa_key = NULL;
+	ntfs_rsa_private_key_t *rsa_key = NULL;
 	char purpose_oid[100];
 	size_t purpose_oid_size = sizeof(purpose_oid);
-	size_t tp_size = thumbprint_size;
+	size_t tp_size;
 	BOOL have_thumbprint = FALSE;
 
-	*df_type = DF_TYPE_UNKNOWN;
+	rsa_key = malloc(sizeof(ntfs_rsa_private_key_t));
+	if (!rsa_key) {
+		ntfs_log_perror("%s", __FUNCTION__);
+		return NULL;
+	}
+	rsa_key->df_type = DF_TYPE_UNKNOWN;
+	rsa_key->key = NULL;
+	tp_size = sizeof(rsa_key->thumbprint);
 	/* Create a pkcs12 structure. */
 	err = gnutls_pkcs12_init(&pkcs12);
 	if (err) {
 		ntfs_log_error("Failed to initialize PKCS#12 structure: %s\n",
 				gnutls_strerror(err));
-		return NULL;
+		goto err;
 	}
 	/* Convert the PFX file (DER format) to native pkcs12 format. */
 	dpfx.data = pfx;
@@ -502,7 +337,7 @@ static ntfs_rsa_private_key ntfs_pkcs12_extract_rsa_key(u8 *pfx, int pfx_size,
 	 * Verify that the password is correct and that the key file has not
 	 * been tampered with.  Note if the password has zero length and the
 	 * verification fails, retry with password set to NULL.  This is needed
-	 * to get passwordless .pfx files generated with Windows XP SP1 (and
+	 * to get password less .pfx files generated with Windows XP SP1 (and
 	 * probably earlier versions of Windows) to work.
 	 */
 retry_verify:
@@ -513,8 +348,8 @@ retry_verify:
 			password = NULL;
 			goto retry_verify;
 		}
-		ntfs_log_error("Failed to verify the MAC: %s  Is the "
-				"password correct?\n", gnutls_strerror(err));
+		ntfs_log_error("You are probably misspelled password to PFX "
+				"file.\n");
 		goto err;
 	}
 	for (bag_index = 0; ; bag_index++) {
@@ -602,8 +437,9 @@ check_again:
 			free(buf);
 #endif
 			/* Convert the private key to our internal format. */
-			rsa_key = ntfs_rsa_private_key_import_from_gnutls(pkey);
-			if (!rsa_key)
+			rsa_key->key =
+				ntfs_rsa_private_key_import_from_gnutls(pkey);
+			if (!rsa_key->key)
 				goto err;
 			break;
 		case GNUTLS_BAG_ENCRYPTED:
@@ -644,13 +480,13 @@ check_again:
 						gnutls_strerror(err));
 				goto err;
 			}
-			purpose_oid[purpose_oid_size - 1] = '\0';
+			purpose_oid[purpose_oid_size - 1] = 0;
 			if (!strcmp(purpose_oid,
 					NTFS_EFS_CERT_PURPOSE_OID_DRF))
-				*df_type = DF_TYPE_DRF;
+				rsa_key->df_type = DF_TYPE_DRF;
 			else if (!strcmp(purpose_oid,
 					NTFS_EFS_CERT_PURPOSE_OID_DDF))
-				*df_type = DF_TYPE_DDF;
+				rsa_key->df_type = DF_TYPE_DDF;
 			else {
 				ntfs_log_error("Certificate has unknown "
 						"purpose OID %s.\n",
@@ -660,7 +496,8 @@ check_again:
 			}
 			/* Return the thumbprint to the caller. */
 			err = gnutls_x509_crt_get_fingerprint(crt,
-					GNUTLS_DIG_SHA1, thumbprint, &tp_size);
+					GNUTLS_DIG_SHA1, rsa_key->thumbprint,
+					&tp_size);
 			if (err) {
 				ntfs_log_error("Failed to get thumbprint: "
 						"%s\n", gnutls_strerror(err));
@@ -669,7 +506,7 @@ check_again:
 			if (tp_size != NTFS_SHA1_THUMBPRINT_SIZE) {
 				ntfs_log_error("Invalid thumbprint size %zd.  "
 						"Should be %d.\n", tp_size,
-						thumbprint_size);
+						sizeof(rsa_key->thumbprint));
 				err = EINVAL;
 				goto err;
 			}
@@ -684,8 +521,8 @@ check_again:
 		gnutls_pkcs12_bag_deinit(bag);
 	}
 err:
-	if (rsa_key && (err || *df_type == DF_TYPE_UNKNOWN ||
-			!have_thumbprint)) {
+	if (err || !rsa_key->key || rsa_key->df_type == DF_TYPE_UNKNOWN ||
+			!have_thumbprint) {
 		if (!err)
 			ntfs_log_error("Key type or thumbprint not found, "
 					"aborting.\n");
@@ -743,7 +580,7 @@ static size_t strnlen(const char *s, size_t maxlen)
  * Note: decrypting into the input buffer.
  */
 static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
-		ntfs_rsa_private_key rsa_key)
+		ntfs_rsa_private_key_t *rsa_key)
 {
 	gcry_mpi_t fek_mpi;
 	gcry_sexp_t fek_sexp, fek_sexp2;
@@ -771,7 +608,7 @@ static unsigned ntfs_raw_fek_decrypt(u8 *fek, u32 fek_size,
 		return 0;
 	}
 	/* Decrypt the FEK. */
-	err = gcry_pk_decrypt(&fek_sexp2, fek_sexp, (gcry_sexp_t)rsa_key);
+	err = gcry_pk_decrypt(&fek_sexp2, fek_sexp, rsa_key->key);
 	gcry_sexp_release(fek_sexp);
 	if (err != GPG_ERR_NO_ERROR) {
 		ntfs_log_error("Failed to decrypt the file encryption key: "
@@ -942,11 +779,13 @@ static gcry_cipher_spec_t ntfs_desx_cipher = {
 	.decrypt = ntfs_desx_decrypt,
 };
 
-//#define DO_CRYPTO_TESTS 1
+#ifdef NTFS_TEST
+/*
+ * Do not remove this test code from this file!  (AIA)
+ * It would be nice to move all tests (these and runlist) out of the library
+ * (at least, into the separate file{,s}), so they would not annoy eyes.  (Yura)
+ */
 
-#ifdef DO_CRYPTO_TESTS
-
-/* Do not remove this test code from this file! AIA */
 /**
  * ntfs_desx_key_expand_test
  */
@@ -1040,7 +879,7 @@ static BOOL ntfs_des_test(void)
 	return res;
 }
 
-#else /* !defined(DO_CRYPTO_TESTS) */
+#else /* !defined(NTFS_TEST) */
 
 /**
  * ntfs_desx_key_expand_test
@@ -1058,12 +897,13 @@ static inline BOOL ntfs_des_test(void)
 	return TRUE;
 }
 
-#endif /* !defined(DO_CRYPTO_TESTS) */
+#endif /* !defined(NTFS_TEST) */
 
 /**
  * ntfs_fek_import_from_raw
  */
-static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
+static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf,
+		unsigned fek_size)
 {
 	ntfs_fek *fek;
 	u32 key_size, wanted_key_size, gcry_algo;
@@ -1084,7 +924,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 		return NULL;
 	}
 	fek->alg_id = *(le32*)(fek_buf + 8);
-	//ntfs_log_debug("alg_id 0x%x\n", le32_to_cpu(fek->alg_id));
+	ntfs_log_debug("algorithm_id 0x%x\n", le32_to_cpu(fek->alg_id));
 	fek->key_data = (u8*)fek + ((sizeof(*fek) + 7) & ~7);
 	memcpy(fek->key_data, fek_buf + 16, key_size);
 	fek->des_gcry_cipher_hd_ptr = NULL;
@@ -1092,14 +932,14 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 			&fek->des_gcry_cipher_hd_ptr;
 	switch (fek->alg_id) {
 	case CALG_DESX:
-		if (!ntfs_desx_module) {
+		if (!ntfs_crypto_ctx.desx_module) {
 			if (!ntfs_desx_key_expand_test() || !ntfs_des_test()) {
 				err = EINVAL;
 				goto out;
 			}
 			err = gcry_cipher_register(&ntfs_desx_cipher,
-					&ntfs_desx_algorithm_id,
-					&ntfs_desx_module);
+					&ntfs_crypto_ctx.desx_alg_id,
+					&ntfs_crypto_ctx.desx_module);
 			if (err != GPG_ERR_NO_ERROR) {
 				ntfs_log_error("Failed to register desx "
 						"cipher: %s\n",
@@ -1109,7 +949,7 @@ static ntfs_fek *ntfs_fek_import_from_raw(u8 *fek_buf, unsigned fek_size)
 			}
 		}
 		wanted_key_size = 16;
-		gcry_algo = ntfs_desx_algorithm_id;
+		gcry_algo = ntfs_crypto_ctx.desx_alg_id;
 		break;
 	case CALG_3DES:
 		wanted_key_size = 24;
@@ -1180,8 +1020,7 @@ static void ntfs_fek_release(ntfs_fek *fek)
  * ntfs_df_array_fek_get
  */
 static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
-		ntfs_rsa_private_key rsa_key, char *thumbprint,
-		int thumbprint_size)
+		ntfs_rsa_private_key_t *rsa_key)
 {
 	EFS_DF_HEADER *df_header;
 	EFS_DF_CREDENTIAL_HEADER *df_cred;
@@ -1189,7 +1028,7 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 	u8 *fek_buf;
 	ntfs_fek *fek;
 	u32 df_count, fek_size;
-	unsigned i;
+	unsigned i, thumbprint_size = sizeof(rsa_key->thumbprint);
 
 	df_count = le32_to_cpu(df_array->df_count);
 	if (!df_count)
@@ -1217,7 +1056,7 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
 		}
 		if (memcmp((u8*)df_cert +
 				le32_to_cpu(df_cert->thumbprint_offset),
-				thumbprint, thumbprint_size)) {
+				rsa_key->thumbprint, thumbprint_size)) {
 			ntfs_log_debug("Thumbprints do not match, skipping "
 					"this DF entry.\n");
 			continue;
@@ -1248,15 +1087,15 @@ static ntfs_fek *ntfs_df_array_fek_get(EFS_DF_ARRAY_HEADER *df_array,
  * ntfs_inode_fek_get -
  */
 static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
-		ntfs_rsa_private_key rsa_key, char *thumbprint,
-		int thumbprint_size, NTFS_DF_TYPES df_type)
+		ntfs_rsa_private_key_t *rsa_key)
 {
 	EFS_ATTR_HEADER *efs;
 	EFS_DF_ARRAY_HEADER *df_array = NULL;
 	ntfs_fek *fek = NULL;
 
 	/* Obtain the $EFS contents. */
-	efs = ntfs_attr_readall(inode, AT_LOGGED_UTILITY_STREAM, EFS, 4, NULL);
+	efs = ntfs_attr_readall(inode, AT_LOGGED_UTILITY_STREAM, NTFS_EFS, 4,
+			NULL);
 	if (!efs) {
 		ntfs_log_perror("Failed to read $EFS attribute");
 		return NULL;
@@ -1265,14 +1104,14 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	 * Depending on whether the key is a normal key or a data recovery key,
 	 * iterate through the DDF or DRF array, respectively.
 	 */
-	if (df_type == DF_TYPE_DDF) {
+	if (rsa_key->df_type == DF_TYPE_DDF) {
 		if (efs->offset_to_ddf_array)
 			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
 					le32_to_cpu(efs->offset_to_ddf_array));
 		else
 			ntfs_log_error("There are no entries in the DDF "
 					"array.\n");
-	} else if (df_type == DF_TYPE_DRF) {
+	} else if (rsa_key->df_type == DF_TYPE_DRF) {
 		if (efs->offset_to_drf_array)
 			df_array = (EFS_DF_ARRAY_HEADER*)((u8*)efs +
 					le32_to_cpu(efs->offset_to_drf_array));
@@ -1282,8 +1121,7 @@ static ntfs_fek *ntfs_inode_fek_get(ntfs_inode *inode,
 	} else
 		ntfs_log_error("Invalid DF type.\n");
 	if (df_array)
-		fek = ntfs_df_array_fek_get(df_array, rsa_key, thumbprint,
-				thumbprint_size);
+		fek = ntfs_df_array_fek_get(df_array, rsa_key);
 	free(efs);
 	return fek;
 }
@@ -1317,175 +1155,364 @@ static int ntfs_fek_decrypt_sector(ntfs_fek *fek, u8 *data, const u64 offset)
 		((le64*)data)[0] ^= cpu_to_le64(0x5816657be9161312ULL + offset);
 		((le64*)data)[1] ^= cpu_to_le64(0x1989adbe44918961ULL + offset);
 	} else {
-		/* All other algos (Des, 3Des, DesX) use the same IV. */
+		/* All other algorithms (Des, 3Des, DesX) use the same IV. */
 		((le64*)data)[0] ^= cpu_to_le64(0x169119629891ad13ULL + offset);
 	}
 	return 512;
 }
 
 /**
- * ntfs_cat_decrypt - Decrypt the contents of an encrypted file to stdout.
- * @inode:	An encrypted file's inode structure, as obtained by
- * 		ntfs_inode_open().
- * @fek:	A file encryption key. As obtained by ntfs_inode_fek_get().
+ * ntfs_crypto_deinit - perform library-wide crypto deinitialization
  */
-static int ntfs_cat_decrypt(ntfs_inode *inode, ntfs_fek *fek)
+static void ntfs_crypto_deinit(void)
 {
-	int bufsize = 512;
-	unsigned char *buffer;
-	ntfs_attr *attr;
-	s64 bytes_read, written, offset, total;
-	s64 old_data_size, old_initialized_size;
 	int i;
 
-	buffer = malloc(bufsize);
-	if (!buffer)
-		return 1;
-	attr = ntfs_attr_open(inode, AT_DATA, NULL, 0);
-	if (!attr) {
-		ntfs_log_error("Cannot cat a directory.\n");
-		free(buffer);
-		return 1;
-	}
-	total = attr->data_size;
+	if (!ntfs_crypto_ctx.initialized)
+		return;
 
-	// hack: make sure attr will not be commited to disk if you use this.
-	// clear the encrypted bit, otherwise the library won't allow reading.
-	NAttrClearEncrypted(attr);
-	// extend the size, we may need to read past the end of the stream.
-	old_data_size = attr->data_size;
-	old_initialized_size = attr->initialized_size;
-	attr->data_size = attr->initialized_size = attr->allocated_size;
-
-	offset = 0;
-	while (total > 0) {
-		bytes_read = ntfs_attr_pread(attr, offset, 512, buffer);
-		if (bytes_read == -1) {
-			ntfs_log_perror("ERROR: Couldn't read file");
-			break;
-		}
-		if (!bytes_read)
-			break;
-		if ((i = ntfs_fek_decrypt_sector(fek, buffer, offset)) <
-				bytes_read) {
-			ntfs_log_perror("ERROR: Couldn't decrypt all data!");
-			ntfs_log_error("%u/%lld/%lld/%lld\n", i,
-				(long long)bytes_read, (long long)offset,
-				(long long)total);
-			break;
-		}
-		if (bytes_read > total)
-			bytes_read = total;
-		written = fwrite(buffer, 1, bytes_read, stdout);
-		if (written != bytes_read) {
-			ntfs_log_perror("ERROR: Couldn't output all data!");
-			break;
-		}
-		offset += bytes_read;
-		total -= bytes_read;
+	for (i = 0; i < ntfs_crypto_ctx.nr_rsa_keys; i++)
+		ntfs_rsa_private_key_release(ntfs_crypto_ctx.rsa_key[i]);
+	free(ntfs_crypto_ctx.rsa_key);
+	ntfs_crypto_ctx.rsa_key = NULL;
+	ntfs_crypto_ctx.nr_rsa_keys = 0;
+	gnutls_global_deinit();
+	if (ntfs_crypto_ctx.desx_module) {
+		gcry_cipher_unregister(ntfs_crypto_ctx.desx_module);
+		ntfs_crypto_ctx.desx_module = NULL;
+		ntfs_crypto_ctx.desx_alg_id = -1;
 	}
-	attr->data_size = old_data_size;
-	attr->initialized_size = old_initialized_size;
-	NAttrSetEncrypted(attr);
-	ntfs_attr_close(attr);
-	free(buffer);
-	return 0;
+	ntfs_crypto_ctx.initialized = 0;
+}
+
+
+static void ntfs_crypto_parse_config(struct config_t *cfg)
+{
+	ntfs_crypto_ctx_t *ctx = &ntfs_crypto_ctx;
+	config_setting_t *cfg_keys, *cfg_key;
+	const char *pfx_file, *pfx_pwd;
+	ntfs_rsa_private_key_t *key;
+	u8 *pfx_buf;
+	unsigned pfx_size;
+	int i;
+
+	/* Search for crypto.keys list. */
+	cfg_keys = config_lookup(cfg, "crypto.keys");
+	if (!cfg_keys) {
+		ntfs_log_error("Unable to find crypto.keys in config file.\n");
+		return;
+	}
+	/* Iterate trough list of records about keys. */
+	for (i = 0; (cfg_key = config_setting_get_elem(cfg_keys, i)); i++) {
+		/* Get path and password to key. */
+		pfx_file = config_setting_get_string_elem(cfg_key, 0);
+		pfx_pwd = config_setting_get_string_elem(cfg_key, 1);
+		if (!pfx_file) {
+			ntfs_log_error("Entry number %d in section crypto.keys "
+					"of configuration file formed "
+					"incorrectly.\n", i + 1);
+			continue;
+		}
+		if (!pfx_pwd)
+			pfx_pwd = "";
+		/* Load the PKCS#12 file containing the user's private key. */
+		if (ntfs_pkcs12_load_pfxfile(pfx_file, &pfx_buf, &pfx_size)) {
+			ntfs_log_error("Failed to load key file %s.\n",
+					pfx_file);
+			continue;
+		}
+		/*
+		 * Check whether we need to allocate memory for new key pointer.
+		 * If yes, allocate memory for it and for 3 more pointers.
+		 */
+		if (!(ctx->nr_rsa_keys % 4)) {
+			ntfs_rsa_private_key_t **new;
+
+			new = realloc(ctx->rsa_key,
+					sizeof(ntfs_rsa_private_key_t *) *
+					(ctx->nr_rsa_keys + 4));
+			if (!new) {
+				ntfs_log_perror("Unable to store all keys");
+				break;
+			}
+			ctx->rsa_key = new;
+		}
+		/* Obtain the user's private RSA key from the key file. */
+		key = ntfs_pkcs12_extract_rsa_key(pfx_buf, pfx_size, pfx_pwd);
+		if (key)
+			ctx->rsa_key[ctx->nr_rsa_keys++] = key;
+		else
+			ntfs_log_error("Failed to obtain RSA key from %s\n",
+					pfx_file);
+		/* No longer need the pfx file contents. */
+		free(pfx_buf);
+	}
+}
+
+
+static void ntfs_crypto_read_configs(void)
+{
+	struct config_t cfg;
+	char *home;
+	int fd = -1;
+
+	config_init(&cfg);
+	/* Load system configuration file. */
+	if (config_read_file(&cfg, NTFS_CONFIG_PATH_SYSTEM))
+		ntfs_crypto_parse_config(&cfg);
+	else
+		if (config_error_line(&cfg)) /* Do not cry if file absent. */
+			ntfs_log_error("Failed to read system configuration "
+					"file: %s (line %d).\n",
+					config_error_text(&cfg),
+					config_error_line(&cfg));
+	/* Load user configuration file. */
+	fd = open(".", O_RDONLY); /* Save current working directory. */
+	if (fd == -1) {
+		ntfs_log_error("Failed to open working directory.\n");
+		goto out;
+	}
+	home = getenv("HOME");
+	if (!home) {
+		ntfs_log_error("Environment variable HOME is not set.\n");
+		goto out;
+	}
+	if (chdir(home) == -1) {
+		ntfs_log_perror("chdir() to home directory failed");
+		goto out;
+	}
+	if (config_read_file(&cfg, NTFS_CONFIG_PATH_USER))
+		ntfs_crypto_parse_config(&cfg);
+	else
+		if (config_error_line(&cfg)) /* Do not cry if file absent. */
+			ntfs_log_error("Failed to read user configuration "
+					"file: %s (line %d).\n",
+					config_error_text(&cfg),
+					config_error_line(&cfg));
+	if (fchdir(fd) == -1)
+		ntfs_log_error("Failed to restore original working "
+				"directory.\n");
+out:
+	if (fd != -1)
+		close(fd);
+	config_destroy(&cfg);
 }
 
 /**
- * main - Begin here
+ * ntfs_crypto_init - perform library-wide crypto initializations
  *
- * Start from here.
- *
- * Return:  0  Success, the program worked
- *	    1  Error, something went wrong
+ * This function is called during first call of ntfs_crypto_attr_open and
+ * performs gcrypt and GNU TLS initializations, then read list of PFX files
+ * from configuration files and load RSA keys from them.
  */
-int main(int argc, char *argv[])
+static int ntfs_crypto_init(void)
 {
-	u8 *pfx_buf;
-	char *password;
-	ntfs_rsa_private_key rsa_key;
-	ntfs_volume *vol;
-	ntfs_inode *inode;
-	ntfs_fek *fek;
-	unsigned pfx_size;
-	int res;
-	NTFS_DF_TYPES df_type;
-	char thumbprint[NTFS_SHA1_THUMBPRINT_SIZE];
+	int err;
 
-	ntfs_log_set_handler(ntfs_log_handler_stderr);
+	if (ntfs_crypto_ctx.initialized)
+		return 0;
 
-	if (!parse_options(argc, argv))
-		return 1;
-	utils_set_locale();
+	/* Initialize gcrypt library.  Note: Must come before GNU TLS init. */
+	if (gcry_control(GCRYCTL_DISABLE_SECMEM, 0) != GPG_ERR_NO_ERROR) {
+		ntfs_log_error("Failed to initialize the gcrypt library.\n");
+		return -1;
+	}
+	/* Initialize GNU TLS library.  Note: Must come after libgcrypt init. */
+	err = gnutls_global_init();
+	if (err < 0) {
+		ntfs_log_error("Failed to initialize GNU TLS library: %s\n",
+				gnutls_strerror(err));
+		return -1;
+	}
+	/* Read crypto related sections of libntfs configuration files. */
+	ntfs_crypto_read_configs();
 
-	/* Initialize crypto in ntfs. */
-	if (ntfs_crypto_init()) {
-		ntfs_log_error("Failed to initialize crypto.  Aborting.\n");
-		return 1;
-	}
-	/* Load the PKCS#12 (.pfx) file containing the user's private key. */
-	if (ntfs_pkcs12_load_pfxfile(opts.keyfile, &pfx_buf, &pfx_size)) {
-		ntfs_log_error("Failed to load key file.  Aborting.\n");
-		ntfs_crypto_deinit();
-		return 1;
-	}
-	/* Ask the user for their password. */
-	password = getpass("Enter the password with which the private key was "
-			"encrypted: ");
-	if (!password) {
-		ntfs_log_perror("Failed to obtain user password");
-		free(pfx_buf);
-		ntfs_crypto_deinit();
-		return 1;
-	}
-	/* Obtain the user's private RSA key from the key file. */
-	rsa_key = ntfs_pkcs12_extract_rsa_key(pfx_buf, pfx_size, password,
-			thumbprint, sizeof(thumbprint), &df_type);
-	/* Destroy the password. */
-	memset(password, 0, strlen(password));
-	/* No longer need the pfx file contents. */
-	free(pfx_buf);
-	if (!rsa_key) {
-		ntfs_log_error("Failed to extract the private RSA key.\n");
-		ntfs_crypto_deinit();
-		return 1;
-	}
-	/* Mount the ntfs volume. */
-	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
-			(opts.force ? NTFS_MNT_FORCE : 0));
-	if (!vol) {
-		ntfs_log_error("Failed to mount ntfs volume.  Aborting.\n");
-		ntfs_rsa_private_key_release(rsa_key);
-		ntfs_crypto_deinit();
-		return 1;
-	}
-	/* Open the encrypted ntfs file. */
-	if (opts.inode != -1)
-		inode = ntfs_inode_open(vol, opts.inode);
-	else
-		inode = ntfs_pathname_to_inode(vol, NULL, opts.file);
-	if (!inode) {
-		ntfs_log_error("Failed to open encrypted file.  Aborting.\n");
-		ntfs_umount(vol, FALSE);
-		ntfs_rsa_private_key_release(rsa_key);
-		ntfs_crypto_deinit();
-		return 1;
-	}
-	/* Obtain the file encryption key of the encrypted file. */
-	fek = ntfs_inode_fek_get(inode, rsa_key, thumbprint,
-			sizeof(thumbprint), df_type);
-	ntfs_rsa_private_key_release(rsa_key);
-	if (fek) {
-		res = ntfs_cat_decrypt(inode, fek);
-		ntfs_fek_release(fek);
-	} else {
-		ntfs_log_error("Failed to obtain file encryption key.  "
-				"Aborting.\n");
-		res = 1;
-	}
-	ntfs_inode_close(inode);
-	ntfs_umount(vol, FALSE);
-	ntfs_crypto_deinit();
-	return res;
+	ntfs_crypto_ctx.initialized = 1;
+	atexit(ntfs_crypto_deinit);
+	return 0;
 }
+
+
+/**
+ * ntfs_crypto_attr_open - perform crypto related initialization for attribute
+ * @na:		ntfs attribute to perform initialization for
+ *
+ * This function is called from ntfs_attr_open for encrypted attributes and
+ * tries to decrypt FEK enumerating all user submitted RSA keys. If we
+ * successfully obtained FEK, then @na->crypto is allocated and FEK stored
+ * inside. In the other case @na->crypto is set to NULL.
+ *
+ * Return 0 on success and -1 on error with errno set to the error code.
+ */
+int ntfs_crypto_attr_open(ntfs_attr *na)
+{
+	ntfs_fek *fek;
+	int i;
+
+	na->crypto = NULL;
+	if (!na || !NAttrEncrypted(na)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (ntfs_crypto_init()) {
+		errno = EACCES;
+		return -1;
+	}
+
+	for (i = 0; i < ntfs_crypto_ctx.nr_rsa_keys; i++) {
+		fek = ntfs_inode_fek_get(na->ni, ntfs_crypto_ctx.rsa_key[i]);
+		if (fek) {
+			na->crypto = ntfs_malloc(sizeof(ntfs_crypto_attr));
+			if (!na->crypto)
+				return -1;
+			na->crypto->fek = fek;
+			return 0;
+		}
+	}
+
+	errno = EACCES;
+	return -1;
+}
+
+
+/**
+ * ntfs_crypto_attr_close - perform crypto related deinit for attribute
+ * @na:		ntfs attribute to perform deinitialization for
+ *
+ * This function is called from ntfs_attr_close for encrypted attributes and
+ * frees memory that were allocated for it handling.
+ */
+void ntfs_crypto_attr_close(ntfs_attr *na)
+{
+	if (!na || !NAttrEncrypted(na))
+		return;
+
+	if (na->crypto) {
+		ntfs_fek_release(na->crypto->fek);
+		free(na->crypto);
+	}
+}
+
+
+/**
+ * ntfs_crypto_attr_pread - read from an encrypted attribute
+ * @na:		ntfs attribute to read from
+ * @pos:	byte position in the attribute to begin reading from
+ * @count:	number of bytes to read
+ * @b:		output data buffer
+ *
+ * This function is called from ntfs_attr_pread for encrypted attributes and
+ * should behave as described in ntfs_attr_pread description.
+ */
+s64 ntfs_crypto_attr_pread(ntfs_attr *na, const s64 pos, s64 count, void *b)
+{
+	unsigned char *buffer;
+	s64 bytes_read, offset, total, length;
+	int i;
+
+	if (!na || pos < 0 || count < 0 || !b || !NAttrEncrypted(na)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (!count)
+		return 0;
+
+	if (!na->crypto) {
+		errno = EACCES;
+		return -1;
+	}
+
+	buffer = malloc(NTFS_EFS_SECTOR_SIZE);
+	if (!buffer)
+		return -1;
+
+	ntfs_attr_map_runlist_range(na, pos >> na->ni->vol->cluster_size_bits,
+			(pos + count - 1) >> na->ni->vol->cluster_size_bits);
+
+	total = 0;
+	offset = ROUND_DOWN(pos, 9);
+	while (total < count && offset < na->data_size) {
+		/* Calculate number of bytes we actually want. */
+		length = NTFS_EFS_SECTOR_SIZE;
+		if (offset + length > pos + count)
+			length = pos + count - offset;
+		if (offset + length > na->data_size)
+			length = na->data_size - offset;
+
+		if (length < 0) {
+			total = -1;
+			errno = EIO;
+			ntfs_log_error("LIBRARY BUG!!! Please report that you "
+					"saw this message to %s. Thanks!",
+					NTFS_DEV_LIST);
+			break;
+		}
+
+		/* Just write zeros if @offset fully beyond initialized size. */
+		if (offset >= na->initialized_size) {
+			memset(b + total, 0, length);
+			total += length;
+			continue;
+		}
+
+		bytes_read = ntfs_rl_pread(na->ni->vol, na->rl, offset,
+				NTFS_EFS_SECTOR_SIZE, buffer);
+		if (!bytes_read)
+			break;
+		if (bytes_read != NTFS_EFS_SECTOR_SIZE) {
+			ntfs_log_perror("%s(): ntfs_rl_pread returned %lld "
+					"bytes", __FUNCTION__, bytes_read);
+			break;
+		}
+		if ((i = ntfs_fek_decrypt_sector(na->crypto->fek, buffer,
+				offset)) < bytes_read) {
+			ntfs_log_error("%s(): Couldn't decrypt all data "
+					"(%u/%lld/%lld/%lld)!", __FUNCTION__,
+					i, (long long)bytes_read,
+					(long long)offset, (long long)total);
+			break;
+		}
+
+		/* Handle partially in initialized size situation. */
+		if (offset + length > na->initialized_size)
+			memset(buffer + (na->initialized_size - offset), 0,
+					offset + length - na->initialized_size);
+
+		if (offset >= pos)
+			memcpy(b + total, buffer, length);
+		else {
+			length -= (pos - offset);
+			memcpy(b + total, buffer + (pos - offset), length);
+		}
+		total += length;
+		offset += bytes_read;
+	}
+
+	free(buffer);
+	return total;
+}
+
+#else /* !ENABLE_CRYPTO */
+
+/* Stubs for crypto-disabled version of libntfs. */
+
+int ntfs_crypto_attr_open(ntfs_attr *na)
+{
+	na->crypto = NULL;
+	errno = EACCES;
+	return -1;
+}
+
+void ntfs_crypto_attr_close(ntfs_attr *na)
+{
+}
+
+s64 ntfs_crypto_attr_pread(ntfs_attr *na, const s64 pos, s64 count,
+		void *b)
+{
+	errno = EACCES;
+	return -1;
+}
+
+#endif /* !ENABLE_CRYPTO */
+

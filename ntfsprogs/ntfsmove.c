@@ -746,7 +746,8 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_attribute
+ * move_attribute -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error
@@ -791,7 +792,8 @@ static s64 move_attribute(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_file
+ * move_file -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error
@@ -873,9 +875,11 @@ int main(int argc, char *argv[])
 	utils_set_locale();
 
 	if (opts.noaction)
-		flags |= MS_RDONLY;
+		flags |= NTFS_MNT_RDONLY;
+	if (opts.force)
+		flags |= NTFS_MNT_FORCE;
 
-	vol = utils_mount_volume(opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags);
 	if (!vol) {
 		ntfs_log_info("!vol\n");
 		return 1;
@@ -889,10 +893,7 @@ int main(int argc, char *argv[])
 
 	count = move_file(vol, inode, opts.location, 0);
 	if ((count > 0) && (!opts.nodirty)) {
-		if (ntfs_volume_write_flags(vol, vol->flags | VOLUME_IS_DIRTY) <
-				0) {
-			ntfs_log_error("Couldn't mark volume dirty\n");
-		}
+		NVolSetWasDirty(vol);
 		ntfs_log_info("Relocated %lld bytes\n", count);
 	}
 	if (count >= 0)

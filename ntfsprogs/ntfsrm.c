@@ -1027,7 +1027,7 @@ int main(int argc, char *argv[])
 #endif
 
 	if (opts.noaction)
-		flags |= MS_RDONLY;
+		flags |= NTFS_MNT_RDONLY;
 
 	//ntfs_log_set_levels (NTFS_LOG_LEVEL_DEBUG | NTFS_LOG_LEVEL_TRACE);
 	//ntfs_log_set_levels (NTFS_LOG_LEVEL_DEBUG);

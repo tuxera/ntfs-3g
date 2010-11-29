@@ -1,3 +1,210 @@
+28/09/2007 - 2.0.0 - ntfsmount sports full read/write, libntfs can read
+		     encrypted files and ntfsresize supports Vista.
+
+	- ntfsmount now creates files and directories with security descriptor
+	  that grant full access to everyone.  (Yura)
+	- Fix typo that lead to incorrect sparse file size calculation.  (Yuval)
+	- Fix long standing stupendously stupid bug in libntfs/attrib.c::
+	  ntfs_external_attr_find() and also port a bugfix from the advanced
+	  ntfs kernel driver to the same function.  (Anton)
+	- Add new API ntfs_attr_exist() that checks whether attribute with
+	  selected type and name already present in inode.  (Szaka)
+	- Extend ntfs_index_{add_filename,rm} to support almost all cases of
+	  index operations.  (Szaka)
+	- Support index operations when index root is in the base MFT
+	  record.  (Yura)
+	- calloc/malloc -> ntfs_{calloc,malloc} conversions.  (Szaka)
+	- ntfsclone: don't create image files with executable bit set.  (Szaka)
+	- ntfsclone: metadata cloning: write out extent records.  (Szaka)
+	- ntfsclone: fix sometimes missing error messages and be more
+	  detailed.  (Szaka)
+	- ntfsclone: fix crash in wipe_index_allocation_timestamps(): don't
+	  dump empty index allocation attribute.  (Szaka)
+	- ntfscmp: fine grained AT_INDEX_ALLOCATION comparison.  (Szaka)
+	- ntfsinfo: rename 'Flags:' fields to be unique.  (Szaka)
+	- ntfsinfo: add ntfs_dump_index_header(); dump full index attribute
+	  INDEX_HEADER.  (Szaka)
+	- ntfsinfo: add ntfs_dump_index_block() and use it.  (Szaka)
+	- ntfsinfo: fix output indenting.  (Szaka)
+	- ntfsinfo: make stdout line buffered.  (Szaka)
+	- ntfsinfo: fix segfaults when SDS has absolute security
+	  descriptor.  (Szaka)
+	- ntfsinfo: redirect stderr to /dev/null if --debug isn't used in
+	  debug mode.  (Szaka)
+	- ntfsinfo: fix segfaults on corrupt index blocks.  (Szaka)
+	- ntfsinfo: dump number of entries per block in index allocation
+	  attributes.  (Szaka)
+	- ntfsinfo: dump ATTR_LIST_ENTRY padding in verbose mode. (Szaka)
+	- ntfsinfo: dump all VCN's in the same numeral system.  (Szaka)
+	- ntfsinfo: dump the FILE_ATTR_DIRECTORY flag.  (Szaka)
+	- ntfsinfo: dump padding between the Update Sequence Array and the
+	  first attribute in verbose mode.  (Szaka)
+	- ntfsinfo: Fix endianness.  (Yura)
+	- ntfsinfo: Make more resilient to corrupt index entries in an index
+	  node.  (Anton)
+	- ntfsinfo: Print in both decimal and hexadecimal where it makes sense
+	  and is useful.  (Anton)
+	- ntfsclone: Define endianness safe image format.  (Anton)
+	- ntfsclone: Redefine image format version number to be the image
+	  format version and not the NTFS version of the imaged volume which is
+	  totally useless.  (Anton)
+	- ntfsclone: Make ntfsclone image format extensible.  (Anton)
+	- ntfsclone: Fix endianness problems.  (Anton)
+	- Allow ntfscp to create the destination file if it does not already
+	  exists by calling ntfs_create().  (Hil)
+	- Fix GUID to string conversion.  (Anton)
+	- Multiple big-endianness fixes.  (zhanglinbao, Yuval)
+	- Spelling mistake fixes.  (Yuval)
+	- Remove inline keywords from static non-one-liners.  (Szaka, Yuval)
+	- Memory leak fixes.  (Yura, Yuval)
+	- Change ntfs_collate()'s signature to take size_t's.  (Yuval)
+	- Move ntfs_is_collation_rule_supported() from collate.h to collate.c
+	  and rewrite it to be clearer.  (Yuval)
+	- Move ntfs_index_entry_mark_dirty() to index.c.  (Szaka)
+	- Introduce misc.c. Move ntfs_[mc]alloc there.  (Szaka)
+	- Change malloc() calls to ntfs_malloc().  (Szaka)
+	- ntfsmount: require FUSE version >= 2.6.0 for build. Fixes fusermount
+	  lookup problem and allows to drop compatibility code.  (Yura)
+	- Rewrite ntfs_attr_add() algorithm to be faster and cleverer.  (Yura)
+	- Rename MS_{RDONLY,NOATIME} to NTFS_MNT_{RDONLY,NOATIME}. Introduce
+	  NTFS_MNT_CASE_SENSITIVE.  (Yura)
+	- Treat filenames in POSIX namespace as case insensitive in case of
+	  case insensitive mounts.  (Anton, Yura)
+	- Windows cares only about first 4 records in $MFTMirr and ignores
+	  everything beyond them. Update libntfs behaviour to be like in
+	  windows.  (Yura)
+	- ntfsmount: Fix free clusters and MFT records calculation.  (Yura)
+	- ntfsmount: Fix st_blocks calculation for resident files.  (Yuval,
+	  Yura)
+	- ntfsmount: Umount volume in DESTROY. This is guarantees that all
+	  data would be synced before umount return for volumes mounted with
+	  blkdev option.  (Yura)
+	- Introduce MNT_NTFS_NOT_EXCLUSIVE mount option that tells libntfs do
+	  not open volume exclusively. Useful if libntfs user cares about this
+	  himself, eg. FUSE with blkdev option.  (Yura)
+	- Empty the journal at mount time.  (Anton)
+	- Set the volume dirty bit at mount time (if it is not set already and
+	  clear it again at umount time but only if it was not set to start
+	  with.  (Anton)
+	- Introduce NTFS_MNT_FORENSIC mount option for logfile dumping for
+	  example otherwise the logfile gets wiped out by the mount attempt if
+	  it is not read-only.  Also use it for ntfsresize as it wishes to do
+	  its own logfile emptying and volume dirtying.  (Anton)
+	- Raise FUSE dependence to 2.6.1 (the most stable and featured ATM),
+	  rename --enable-fuse-module to more clear --enable-ntfsmount and
+	  cleanup autotools scripts a bit.  (Yura)
+	- ntfsclone: don't check free space if output file is FIFO.  (Andree
+	  Leidenfrost)
+	- Turn ntfs_pathname_to_inode() into ntfs_pathname_to_inode_num() which
+	  returns ntfs inode number instead of opened inode itself.
+	  Reimplement ntfs_pathname_to_inode() as wrapper to new API.  (Yura)
+	- ntfsmount: fix rename if destination already exists.  (Yura)
+	- ntfsfix: do not set VOLUME_MOUNTED_ON_NT4 flag as it causes Vista to
+	  not boot any more.
+	- Implement ntfs_pread() and ntfs_pwrite() in terms of device
+	  operations pread() and pwrite() respectively and fall back to using
+	  seek() + read()/write() if no pread()/pwrite() device operation is
+	  supplied or the OS does not support the pread()/pwrite() system call.
+	  Adapt unix_io pread()/pwrite() device operations to use pread()/
+	  pwrite() system call and adapt win32_io device operations to not
+	  supply pread()/pwrite().  (Csaba Henk, Anton)
+	- mkntfs: Generate a random DCE compliant UUID for the created volume
+	  and include --with-uuid[=PFX] and --without-uuid options.  (Anton)
+	- configure.ac: Set language to C.  (Anton)
+	- mkntfs: Always set default cluster size to 4096 bytes regardless of
+	  volume size.  This is what Windows Vista does and it makes perfect
+	  sense from a performance point of view.  (Anton)
+	- mkntfs: As announced, remove the deprecated support for creation of
+	  NTFS 1.2/3.0 volumes.  We now create NTFS 3.1 volumes only.  (Anton)
+	- mkntfs: Remove lots of unused/unneeded debugging code.  (Anton)
+	- libntfs: Add support for FreeBSD 5.0+ sector aligned access
+	  requirements.  (Max Khon)
+	- mkntfs: Create more Vista like volumes.  We now match the security
+	  descriptor attributes (but not yet the security descriptors stored in
+	  $Secure).  (Anton)
+	- libntfs: Rewrite ntfs_upcase_table_build() to generate a Vista
+	  compatible upcase table ($UpCase).  (Anton)
+	- mkntfs: Remove own generation of upcase table, i.e. delete
+	  ntfsprogs/upcase.[ch] and use ntfs_upcase_table_build() supplied by
+	  libntfs.  (Anton)
+	- Upgrade ntfsmount to new FUSE option parsing API.  (Yura)
+	- ntfsmount: Remove "show_sys_files" as potential harmful and
+	  introduce new "case_insensitive" option to support both case
+	  sensitive and insensitive mounts.  (Yura)
+	- ntfsmount: st_block calculation was wrong.  (Yuval)
+	- mkntfs: Use Vista $Boot rather than XP one.  (Anton)
+	- ntfsmount: use utimens() instead of deprecated utime().  (Yura)
+	- libntfs: Ignore bootsector checksum inconsistencies as too many 3rd
+	  party utilities update the boot sector without correcting the
+	  checksum.  Ported change from kernel driver.  (Anton)
+	- ntfsdecrypt: Major improvement!  We now validate the .pfx file to be
+	  the right type of RSA key and we also determine the thumbprint and
+	  compare the one in the keys to the one in the .pfx file thus we only
+	  try to decrypt the FEK once we have the correct key.  Several other
+	  bug fixes leading to crashes.  Also make compilation work on OS X
+	  when gnutls is otherwise not found.  (Anton, Yura)
+	- ntfsmount: fix errno in truncate() operation.  (Yura)
+	- Add new API: __ntfs_attr_truncate that allow user to select whether
+	  holes should be created or clusters allocated.  (Yura)
+	- Add new API: ntfs_attr_map_runlist_range to map part of runlist from
+	  selected VCN to selected VCN.  (Yura)
+	- Make ntfs_attr_update_mapping_pairs to be mostly O(1) for normal
+	  files.  (Yura)
+	- Introduce sparse bitwise annotations to automatically catch endian
+	  bugs. Adopt libntfs (and fix 2 bugs) and ntfsprogs (and fix lots of
+	  bugs).  (Yura)
+	- ntfsinfo: nicely dump special LCN values.  (Yura)
+	- Transparently integrate reading of encrypted files into library.
+	  This adds crypto.[ch], several exported functions that you are not
+	  interested to use and dependency on >=libconfig-1.0.1 to read list of
+	  PFX files with keys. See libntfs/config for example configuration
+	  file.  (Yura)
+	- Add new API ntfs_attr_get_name - returns pointer to unicode name of
+	  attribute.  (Yura)
+	- ntfsinfo: Dump raw content of LOGGED_UTILITY_STREAM in verbose
+	  mode.  (Yura)
+	- Export NTFS_EFS string.  (Yura)
+	- Merge --enable-debug and --enable-debug-logging.  (Yura)
+	- Add --enable-sparse configure option.  (Yura)
+	- Fix corner case in hole instantiating in ntfs_attr_pwrite().  (Szaka)
+	- Fix heavy memory usage during whole instantiating and add new API:
+	  ntfs_rl_fill_zero.  (Szaka, Yura)
+	- ntfs_delete() now takes pointer to pointer to ntfs_inode for file to
+	  delete and closes inode only in cases there are no more hard links
+	  left to file.  (Yura)
+	- Library no longer perform time updates, only provides API for
+	  performing time updates. Remove ntfs_inode_update_{a,}time() and
+	  introduce ntfs_inode_update_times(). Make ntfsmount update time
+	  according to SUS.  (Yura)
+	- Fix cache handling in utils_attr_get_name.  (Bogdan, Yura)
+	- ntfsmount: Submit inode number during readdir.  (Ted Anderson, Szaka)
+	- Fix syslog logging handler to respect all logging flags.  (Yura)
+	- ntfs_readdir, ntfs_fuse_filler: return with error if FUSE filler
+	  failed.  (Szaka, Yura)
+	- Fix rare directory corruption in index code.  (Szaka, Yura)
+	- ntfsmount: Mount block devices with blkdev mount option.  (Yura)
+	- ntfsmount: Add set-uid-root binary support.  (Yura)
+	- ntfsmount: Implement {no,}relatime (relative atime) options.  (Yura)
+	- Make libntfs keep track number of free clusters and MFT records.
+	  Thanks to David Fox and Szabolcs Szakacsits for idea.  (Yura)
+	- ntfsmount: Add bmap support.  (Szaka, Yura)
+	- Introduce NTFS_MNT_FORCE instead of third parameter (force) of
+	  utils_mount_volume.  (Yura)
+	- ntfs_attr_pwrite: Write 4096 bytes blocks when possible.  (David Fox,
+	  Szaka, Anton, Yura)
+	- Allow mounting volumes with non-clean logfile with force mount
+	  option. Thanks to Szaka for idea.  (Yura)
+	- libntfs: Attach opened inodes to volume.  (Yura)
+	- libntfs: Attach opened attributes to inode.  (Yura)
+	- ntfsmount: Save pointer to ntfs_attr in (fuse_file_info *)->fh and
+	  use it in ntfs_fuse_{read,write}.  (Yura)
+	- ntfsmount: Implement .create(), .ftruncate(), .fgetattr().  (Yura)
+	- libntfs: Sync and warn about not closed inodes in ntfs_umount.  (Yura)
+	- ntfsmount: Cache directory in which was performed last
+	  operation.  (Yura)
+	- Install mount.fuse.ntfs symbolic link.  (Yura)
+	- ntfsmount: Fill .st_mode in readdir().  (Szaka, Yura)
+
 21/06/2006 - 1.13.1 - Various fixes.
 
 	- Fix bug in ntfs_attr_pwrite() when we sometimes lose current run in
@@ -18,13 +225,13 @@
 	  compressed metadata image size by 10-25% and more importantly it
 	  eliminates non-interesting ntfscmp differences.  (Szaka)
 	- Change utils_parse_size() to use a base of 0 instead of 10 when
-	  calling strtoll().  This automagically allows specification of
+	  calling strtoll().  This automatically allows specification of
 	  numbers in hex (and octal if anyone is crazy enough to use that) in
 	  addition to decimal numbers on the command line options to most if
 	  not all utilities.  (Anton)
 	- Fix comparison of $MFT and $MFTMirr to not bail out when there are
 	  unused, invalid mft records which are the same in both $MFT and
-	  $MFTMirr.  Ported from kernel driver 2.1.27 release and aplied both
+	  $MFTMirr.  Ported from kernel driver 2.1.27 release and applied both
 	  to libntfs/volume.c mount related code and to ntfsprogs/ntfsfix.c's
 	  fixup code.  (Anton)
 	- Change ntfsinfo to dump the key data as well as the keys themselves
@@ -129,7 +336,7 @@
 	- New APIs (dir.[ch]):
 	    ntfs_create_device() for Interix block and character devices
 	    creation.
-	    ntfs_crate_symlink() for Interix symbolic links creation.  (Yura)
+	    ntfs_create_symlink() for Interix symbolic links creation.  (Yura)
 	- Teach ntfs_create() to create Interix FIFOs and sockets.  (Yura)
 	- Fix the -u option in ntfsundelete.  Instead of a confusing optional
 	  parameter, there's a new option -i with a required parameter.  (Rich)

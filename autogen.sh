@@ -1,5 +1,5 @@
-#!/bin/bash
-# Run this to generate all the initial makefiles, etc.
+#!/usr/bin/env bash
+# Run this to generate configure, Makefile.in's, etc
 
 if test "$srcdir" == ""; then
 	srcdir=.
@@ -23,6 +23,17 @@ fi
   echo "from ftp://ftp.gnu.org/pub/gnu/."
   exit 1
 }
+
+UNAME=`which uname`
+if [ $? -eq 0 -a -n ${UNAME} -a -x ${UNAME} ]; then
+	OS=`${UNAME} -s`
+	if [ $? -eq 0 -a -n ${OS} -a "${OS}" == "Darwin" ]; then
+		echo ""
+		echo "Running on Mac OS X / Darwin.  Setting LIBTOOLIZE=glibtoolize..."
+		echo ""
+		export LIBTOOLIZE="glibtoolize"
+	fi
+fi
 
 echo Running autoreconf --verbose --install
 autoreconf --force --verbose --install

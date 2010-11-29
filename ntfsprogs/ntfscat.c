@@ -4,6 +4,7 @@
  * Copyright (c) 2003-2005 Richard Russon
  * Copyright (c) 2003-2005 Anton Altaparmakov
  * Copyright (c) 2003-2005 Szabolcs Szakacsits
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility will concatenate files and print on the standard output.
  *
@@ -60,11 +61,12 @@ static struct options opts;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs-3g) - Concatenate files and print on the "
-			"standard output.\n\n", EXEC_NAME, VERSION);
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Concatenate files and print "
+			"on the standard output.\n\n", EXEC_NAME, VERSION);
 	ntfs_log_info("Copyright (c) 2003-2005 Richard Russon\n");
 	ntfs_log_info("Copyright (c) 2003-2005 Anton Altaparmakov\n");
 	ntfs_log_info("Copyright (c) 2003-2005 Szabolcs Szakacsits\n");
+	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -86,7 +88,8 @@ static void usage(void)
 		"    -q, --quiet                Less output\n"
 		"    -V, --version              Version information\n"
 		"    -v, --verbose              More output\n\n",
-		//"    -r  --raw     Display the compressed or encrypted file",
+// Does not work for compressed files at present so leave undocumented...
+//		"    -r  --raw                  Display the raw data (e.g. for compressed or encrypted file)",
 		EXEC_NAME);
 	ntfs_log_info("%s%s\n", ntfs_bugs, ntfs_home);
 }
@@ -130,15 +133,15 @@ static int parse_attribute(const char *value, ATTR_TYPES *attr)
 
 	for (i = 0; attr_name[i]; i++) {
 		if ((strcmp(value, attr_name[i]) == 0) ||
-		    (strcmp(value, attr_name[i]+1) == 0)) {
-			*attr = (ATTR_TYPES) ((i+1)*16);
+		    (strcmp(value, attr_name[i] + 1) == 0)) {
+			*attr = (ATTR_TYPES)cpu_to_le32((i + 1) * 16);
 			return 1;
 		}
 	}
 
 	num = strtol(value, NULL, 0);
 	if ((num > 0) && (num < 257)) {
-		*attr = (ATTR_TYPES) num;
+		*attr = (ATTR_TYPES)cpu_to_le32(num);
 		return 1;
 	}
 
@@ -156,7 +159,7 @@ static int parse_attribute(const char *value, ATTR_TYPES *attr)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-a:fh?i:n:qVv";
+	static const char *sopt = "-a:fh?i:n:qVvr";
 	static const struct option lopt[] = {
 		{ "attribute",      required_argument,	NULL, 'a' },
 		{ "attribute-name", required_argument,	NULL, 'n' },
@@ -166,6 +169,7 @@ static int parse_options(int argc, char **argv)
 		{ "quiet",	    no_argument,	NULL, 'q' },
 		{ "version",	    no_argument,	NULL, 'V' },
 		{ "verbose",	    no_argument,	NULL, 'v' },
+		{ "raw",	    no_argument,	NULL, 'r' },
 		{ NULL,		    0,			NULL, 0   }
 	};
 
@@ -179,7 +183,7 @@ static int parse_options(int argc, char **argv)
 	opterr = 0; /* We'll handle the errors, thank you. */
 
 	opts.inode = -1;
-	opts.attr = -1;
+	opts.attr = cpu_to_le32(-1);
 	opts.attr_name = NULL;
 	opts.attr_name_len = 0;
 
@@ -187,17 +191,19 @@ static int parse_options(int argc, char **argv)
 		switch (c) {
 		case 1:	/* A non-option argument */
 			if (!opts.device) {
-				opts.device = argv[optind-1];
+				opts.device = argv[optind - 1];
 			} else if (!opts.file) {
-				opts.file = argv[optind-1];
+				opts.file = argv[optind - 1];
 			} else {
-				ntfs_log_error("You must specify exactly one file.\n");
+				ntfs_log_error("You must specify exactly one "
+						"file.\n");
 				err++;
 			}
 			break;
 		case 'a':
-			if (opts.attr != (ATTR_TYPES)-1) {
-				ntfs_log_error("You must specify exactly one attribute.\n");
+			if (opts.attr != cpu_to_le32(-1)) {
+				ntfs_log_error("You must specify exactly one "
+						"attribute.\n");
 			} else if (parse_attribute(optarg, &attr) > 0) {
 				opts.attr = attr;
 				break;
@@ -232,7 +238,8 @@ static int parse_options(int argc, char **argv)
 			opts.attr_name_len = ntfs_mbstoucs_libntfscompat(optarg,
 							   &opts.attr_name, 0);
 			if (opts.attr_name_len < 0) {
-				ntfs_log_perror("Invalid attribute name '%s'", optarg);
+				ntfs_log_perror("Invalid attribute name '%s'",
+						optarg);
 				usage();
 			}
 
@@ -246,6 +253,9 @@ static int parse_options(int argc, char **argv)
 		case 'v':
 			opts.verbose++;
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_VERBOSE);
+			break;
+		case 'r':
+			opts.raw = TRUE;
 			break;
 		default:
 			ntfs_log_error("Unknown option '%s'.\n", argv[optind-1]);
@@ -312,8 +322,7 @@ static int index_get_size(ntfs_inode *inode)
 		return 0;	// not a directory
 
 	iroot = (INDEX_ROOT*)((u8*)attr90 + le16_to_cpu(attr90->value_offset));
-
-	return iroot->index_block_size;
+	return le32_to_cpu(iroot->index_block_size);
 }
 
 /**
@@ -335,7 +344,8 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 
 	attr = ntfs_attr_open(inode, type, name, namelen);
 	if (!attr) {
-		ntfs_log_error("Cannot find attribute type 0x%lx.\n", (long) type);
+		ntfs_log_error("Cannot find attribute type 0x%x.\n",
+				le32_to_cpu(type));
 		free(buffer);
 		return 1;
 	}
@@ -349,10 +359,11 @@ static int cat(ntfs_volume *vol, ntfs_inode *inode, ATTR_TYPES type,
 
 	offset = 0;
 	for (;;) {
-		if (block_size > 0) {
+		if (!opts.raw && block_size > 0) {
 			// These types have fixup
 			bytes_read = ntfs_attr_mst_pread(attr, offset, 1, block_size, buffer);
-			bytes_read *= block_size;
+			if (bytes_read > 0)
+				bytes_read *= block_size;
 		} else {
 			bytes_read = ntfs_attr_pread(attr, offset, bufsize, buffer);
 		}
@@ -399,7 +410,8 @@ int main(int argc, char *argv[])
 
 	utils_set_locale();
 
-	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
+	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
+			(opts.force ? NTFS_MNT_FORCE : 0));
 	if (!vol) {
 		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;
@@ -416,7 +428,7 @@ int main(int argc, char *argv[])
 	}
 
 	attr = AT_DATA;
-	if (opts.attr != (ATTR_TYPES)-1)
+	if (opts.attr != cpu_to_le32(-1))
 		attr = opts.attr;
 
 	result = cat(vol, inode, attr, opts.attr_name, opts.attr_name_len);

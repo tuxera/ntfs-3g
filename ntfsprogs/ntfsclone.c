@@ -2,7 +2,7 @@
  * ntfsclone - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
- * Copyright (c) 2004-2005 Anton Altaparmakov
+ * Copyright (c) 2004-2006 Anton Altaparmakov
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -55,6 +55,12 @@
 #include <getopt.h>
 #endif
 
+/*
+ * FIXME: ntfsclone do bad things about endians handling. Fix it and remove
+ * this note and define.
+ */
+#define NTFS_DO_NOT_CHECK_ENDIANS
+
 #include <ntfs-3g/debug.h>
 #include <ntfs-3g/types.h>
 #include <ntfs-3g/support.h>
@@ -96,7 +102,7 @@ static const char *dirty_volume_msg =
 "Volume '%s' is scheduled for a check or it was shutdown \n"
 "uncleanly. Please boot Windows or use the --force option to progress.\n";
 
-struct {
+static struct {
 	int verbose;
 	int quiet;
 	int debug;
@@ -117,7 +123,6 @@ struct {
 struct bitmap {
 	s64 size;
 	u8 *bm;
-	u8 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 struct progress_bar {
@@ -141,24 +146,44 @@ struct ntfs_walk_cluster {
 };
 
 
-ntfs_volume *vol = NULL;
-struct bitmap lcn_bitmap;
+static ntfs_volume *vol = NULL;
+static struct bitmap lcn_bitmap;
 
-int fd_in;
-int fd_out;
-FILE *msg_out = NULL;
+static int fd_in;
+static int fd_out;
+static FILE *msg_out = NULL;
 
-int wipe = 0;
-unsigned int nr_used_mft_records   = 0;
-unsigned int wiped_unused_mft_data = 0;
-unsigned int wiped_unused_mft      = 0;
-unsigned int wiped_resident_data   = 0;
-unsigned int wiped_timestamp_data  = 0;
+static int wipe = 0;
+static unsigned int nr_used_mft_records   = 0;
+static unsigned int wiped_unused_mft_data = 0;
+static unsigned int wiped_unused_mft      = 0;
+static unsigned int wiped_resident_data   = 0;
+static unsigned int wiped_timestamp_data  = 0;
+
+static BOOL image_is_host_endian = FALSE;
 
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
 
-struct {
+/* This is the first endianness safe format version. */
+#define NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE	10
+#define NTFSCLONE_IMG_VER_MINOR_ENDIANNESS_SAFE	0
+
+/*
+ * Set the version to 10.0 to avoid colisions with old ntfsclone which
+ * stupidly used the volume version as the image version...  )-:  I hope NTFS
+ * never reaches version 10.0 and if it does one day I hope no-one is using
+ * such an old ntfsclone by then...
+ *
+ * NOTE: Only bump the minor version if the image format and header are still
+ * backwards compatible.  Otherwise always bump the major version.  If in
+ * doubt, bump the major version.
+ */
+#define NTFSCLONE_IMG_VER_MAJOR	10
+#define NTFSCLONE_IMG_VER_MINOR	0
+
+/* All values are in little endian. */
+static struct {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
 	u8 minor_ver;
@@ -166,7 +191,11 @@ struct {
 	s64 device_size;
 	s64 nr_clusters;
 	s64 inuse;
+	u32 offset_to_image_data;	/* From start of image_hdr. */
 } __attribute__((__packed__)) image_hdr;
+
+#define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
+		(offsetof(typeof(image_hdr), offset_to_image_data))
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -528,7 +557,7 @@ static void copy_cluster(int rescue, u64 rescue_lcn)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 	/* vol is NULL if opt.restore_image is set */
-	u32 csize = image_hdr.cluster_size;
+	u32 csize = le32_to_cpu(image_hdr.cluster_size);
 	void *fd = (void *)&fd_in;
 	off_t rescue_pos;
 
@@ -590,10 +619,12 @@ static void lseek_to_cluster(s64 lcn)
 static void image_skip_clusters(s64 count)
 {
 	if (opt.save_image && count > 0) {
+		typeof(count) count_buf;
 		char buff[1 + sizeof(count)];
 
 		buff[0] = 0;
-		memcpy(buff + 1, &count, sizeof(count));
+		count_buf = cpu_to_sle64(count);
+		memcpy(buff + 1, &count_buf, sizeof(count_buf));
 
 		if (write_all(&fd_out, buff, sizeof(buff)) == -1)
 			perr_exit("write_all");
@@ -630,13 +661,15 @@ static void clone_ntfs(u64 nr_clusters)
 	else
 		Printf("Cloning NTFS ...\n");
 
-	if ((buf = calloc(1, csize)) == NULL)
+	buf = ntfs_calloc(csize);
+	if (!buf)
 		perr_exit("clone_ntfs");
 
 	progress_init(&progress, p_counter, nr_clusters, 100);
 
 	if (opt.save_image) {
-		if (write_all(&fd_out, &image_hdr, sizeof(image_hdr)) == -1)
+		if (write_all(&fd_out, &image_hdr,
+				image_hdr.offset_to_image_data) == -1)
 			perr_exit("write_all");
 	}
 
@@ -679,7 +712,7 @@ static void write_empty_clusters(s32 csize, s64 count,
 static void restore_image(void)
 {
 	s64 pos = 0, count;
-	s32 csize = image_hdr.cluster_size;
+	s32 csize = le32_to_cpu(image_hdr.cluster_size);
 	char cmd;
 	u64 p_counter = 0;
 	struct progress_bar progress;
@@ -687,21 +720,25 @@ static void restore_image(void)
 	Printf("Restoring NTFS from image ...\n");
 
 	progress_init(&progress, p_counter, opt.std_out ?
-		      image_hdr.nr_clusters : image_hdr.inuse, 100);
+		      sle64_to_cpu(image_hdr.nr_clusters) :
+		      sle64_to_cpu(image_hdr.inuse),
+		      100);
 
-	while (pos < image_hdr.nr_clusters) {
+	while (pos < sle64_to_cpu(image_hdr.nr_clusters)) {
 		if (read_all(&fd_in, &cmd, sizeof(cmd)) == -1)
 			perr_exit("read_all");
 
 		if (cmd == 0) {
 			if (read_all(&fd_in, &count, sizeof(count)) == -1)
 				perr_exit("read_all");
+			if (!image_is_host_endian)
+				count = sle64_to_cpu(count);
 			if (opt.std_out)
 				write_empty_clusters(csize, count,
 						     &progress, &p_counter);
 			else {
-				if (lseek(fd_out, count * csize, SEEK_CUR)
-				    == (off_t)-1)
+				if (lseek(fd_out, count * csize, SEEK_CUR) ==
+						(off_t)-1)
 					perr_exit("restore_image: lseek");
 			}
 			pos += count;
@@ -719,15 +756,16 @@ static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
 	s64 timestamp = timespec2ntfs(zero_time);
 
+	/* FIXME: can fall into infinite loop if corrupted */
 	while (!(e->ie_flags & INDEX_ENTRY_END)) {
 
 		e->key.file_name.creation_time = timestamp;
 		e->key.file_name.last_data_change_time = timestamp;
 		e->key.file_name.last_mft_change_time = timestamp;
 		e->key.file_name.last_access_time = timestamp;
-		
+
 		wiped_timestamp_data += 32;
-		
+
 		e = (INDEX_ENTRY *)((u8 *)e + le16_to_cpu(e->length));
 	}
 }
@@ -745,7 +783,8 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	indexr = ntfs_index_root_get(ni, attr);
 	if (!indexr) {
-		ntfs_log_perror("Failed to read $INDEX_ROOT attribute");
+		perr_printf("Failed to read $INDEX_ROOT attribute of inode "
+			    "%lld", ni->mft_no);
 		return;
 	}
 
@@ -754,34 +793,38 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
-	
+
 	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
 	if (!byte) {
-		ntfs_log_perror("Failed to read $BITMAP attribute");
+		perr_printf("Failed to read $BITMAP attribute");
 		goto out_indexr;
 	}
 
 	na = ntfs_attr_open(ni, AT_INDEX_ALLOCATION, name, name_len);
 	if (!na) {
-		ntfs_log_perror("Failed to open $INDEX_ALLOCATION attribute");
+		perr_printf("Failed to open $INDEX_ALLOCATION attribute");
 		goto out_bitmap;
 	}
-	tmp_indexa = indexa = malloc(na->data_size);
-	if (!tmp_indexa) {
-		ntfs_log_perror("malloc failed");
+
+	if (!na->data_size)
 		goto out_na;
-	}
+
+	tmp_indexa = indexa = ntfs_malloc(na->data_size);
+	if (!tmp_indexa)
+		goto out_na;
+
 	if (ntfs_attr_pread(na, 0, na->data_size, indexa) != na->data_size) {
-		ntfs_log_perror("Failed to read $INDEX_ALLOCATION attribute");
+		perr_printf("Failed to read $INDEX_ALLOCATION attribute");
 		goto out_indexa;
 	}
 
 	bit = 0;
 	while ((u8 *)tmp_indexa < (u8 *)indexa + na->data_size) {
-		if (*byte & (1 << bit)) {					   
+		if (*byte & (1 << bit)) {
 			if (ntfs_mst_post_read_fixup((NTFS_RECORD *)tmp_indexa,
-						indexr->index_block_size)) {
-				ntfs_log_perror("Damaged INDX record");
+					le32_to_cpu(
+					indexr->index_block_size))) {
+				perr_printf("Damaged INDX record");
 				goto out_indexa;
 			}
 			entry = (INDEX_ENTRY *)((u8 *)tmp_indexa + le32_to_cpu(
@@ -793,22 +836,22 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 				perr_exit("ntfs_mft_usn_dec");
 
 			if (ntfs_mst_pre_write_fixup((NTFS_RECORD *)tmp_indexa,
-						indexr->index_block_size)) {
-				ntfs_log_perror("INDX write fixup failed");
+					le32_to_cpu(
+					indexr->index_block_size))) {
+				perr_printf("INDX write fixup failed");
 				goto out_indexa;
 			}
 		}
-		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa + 
-						 indexr->index_block_size);
+		tmp_indexa = (INDEX_ALLOCATION *)((u8 *)tmp_indexa +
+				le32_to_cpu(indexr->index_block_size));
 		bit++;
 		if (bit > 7) {
 			bit = 0;
 			byte++;
 		}
 	}
-	
 	if (ntfs_rl_pwrite(vol, na->rl, 0, 0, na->data_size, indexa) != na->data_size)
-		ntfs_log_perror("ntfs_rl_pwrite failed");
+		perr_printf("ntfs_rl_pwrite failed for inode %lld", ni->mft_no);
 out_indexa:
 	free(indexa);
 out_na:
@@ -848,7 +891,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 			QUOTA_CONTROL_ENTRY *quota_q;
 
 			quota_q = (QUOTA_CONTROL_ENTRY *)((u8 *)entry +
-							  entry->data_offset);
+					le16_to_cpu(entry->data_offset));
 			/*
 			 *  FIXME: no guarantee it's indeed /$Extend/$Quota:$Q.
 			 *  For now, as a minimal safeguard, we check only for
@@ -867,7 +910,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 #define WIPE_TIMESTAMPS(atype, attr, timestamp)			\
 do {								\
 	atype *ats;						\
-	ats = (atype *)((char *)(attr) + (attr)->value_offset);	\
+	ats = (atype *)((char *)(attr) + le16_to_cpu((attr)->value_offset)); \
 								\
 	ats->creation_time = (timestamp);	       		\
 	ats->last_data_change_time = (timestamp);		\
@@ -889,7 +932,7 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 
 	else if (a->type == AT_STANDARD_INFORMATION)
 		WIPE_TIMESTAMPS(STANDARD_INFORMATION, a, timestamp);
-	
+
 	else if (a->type == AT_INDEX_ROOT)
 		wipe_index_root_timestamps(a, timestamp);
 }
@@ -1133,9 +1176,24 @@ static void mft_record_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
 {
 	if (ntfs_mft_usn_dec(ni->mrec))
 		perr_exit("ntfs_mft_usn_dec");
-	
+
 	if (ntfs_mft_record_write(volume, ni->mft_no, ni->mrec))
 		perr_exit("ntfs_mft_record_write");
+}
+
+static void mft_inode_write_with_same_usn(ntfs_volume *volume, ntfs_inode *ni)
+{
+	s32 i;
+
+	mft_record_write_with_same_usn(volume, ni);
+
+	if (ni->nr_extents <= 0)
+		return;
+
+	for (i = 0; i < ni->nr_extents; ++i) {
+		ntfs_inode *eni = ni->extent_nis[i];
+		mft_record_write_with_same_usn(volume, eni);
+	}
 }
 
 static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
@@ -1160,7 +1218,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 
 		/* FIXME: Terrible kludge for libntfs not being able to return
 		   a deleted MFT record as inode */
-		ni = (ntfs_inode*)calloc(1, sizeof(ntfs_inode));
+		ni = ntfs_calloc(sizeof(ntfs_inode));
 		if (!ni)
 			perr_exit("walk_clusters");
 
@@ -1209,7 +1267,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 out:
 		if (wipe) {
 			wipe_unused_mft_data(ni);
-			mft_record_write_with_same_usn(volume, ni);
+			mft_inode_write_with_same_usn(volume, ni);
 		}
 
 		if (ntfs_inode_close(ni))
@@ -1241,7 +1299,8 @@ static void setup_lcn_bitmap(void)
 	/* Determine lcn bitmap byte size and allocate it. */
 	lcn_bitmap.size = rounded_up_division(vol->nr_clusters, 8);
 
-	if (!(lcn_bitmap.bm = (unsigned char *)calloc(1, lcn_bitmap.size)))
+	lcn_bitmap.bm = ntfs_calloc(lcn_bitmap.size);
+	if (!lcn_bitmap.bm)
 		perr_exit("Failed to allocate internal buffer");
 
 	bitmap_file_data_fixup(vol->nr_clusters, &lcn_bitmap);
@@ -1261,14 +1320,15 @@ static void print_volume_size(const char *str, s64 bytes)
 }
 
 
-static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
+static void print_disk_usage(const char *spacer, u32 cluster_size,
+		s64 nr_clusters, s64 inuse)
 {
 	s64 total, used;
 
 	total = nr_clusters * cluster_size;
 	used = inuse * cluster_size;
 
-	Printf("Space in use       : %lld MB (%.1f%%)   ",
+	Printf("Space in use       %s: %lld MB (%.1f%%)   ", spacer,
 			(long long)rounded_up_division(used, NTFS_MBYTE),
 			100.0 * ((float)used / total));
 
@@ -1277,16 +1337,21 @@ static void print_disk_usage(u32 cluster_size, s64 nr_clusters, s64 inuse)
 
 static void print_image_info(void)
 {
-	Printf("NTFS volume version: %d.%d\n",
-	       image_hdr.major_ver, image_hdr.minor_ver);
-	Printf("Cluster size       : %u bytes\n",
-	       (unsigned int)image_hdr.cluster_size);
-	print_volume_size("Image volume size  ",
-			  image_hdr.nr_clusters * image_hdr.cluster_size);
-	Printf("Image device size  : %lld bytes\n", image_hdr.device_size);
-	print_disk_usage(image_hdr.cluster_size,
-			 image_hdr.nr_clusters,
-			 image_hdr.inuse);
+	Printf("Ntfsclone image version: %d.%d\n",
+			image_hdr.major_ver, image_hdr.minor_ver);
+	Printf("Cluster size           : %u bytes\n",
+			(unsigned)le32_to_cpu(image_hdr.cluster_size));
+	print_volume_size("Image volume size      ",
+			sle64_to_cpu(image_hdr.nr_clusters) *
+			le32_to_cpu(image_hdr.cluster_size));
+	Printf("Image device size      : %lld bytes\n",
+			sle64_to_cpu(image_hdr.device_size));
+	print_disk_usage("    ", le32_to_cpu(image_hdr.cluster_size),
+			sle64_to_cpu(image_hdr.nr_clusters),
+			sle64_to_cpu(image_hdr.inuse));
+	Printf("Offset to image data   : %u (0x%x) bytes\n",
+			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data),
+			(unsigned)le32_to_cpu(image_hdr.offset_to_image_data));
 }
 
 static void check_if_mounted(const char *device, unsigned long new_mntflag)
@@ -1331,7 +1396,7 @@ static void mount_volume(unsigned long new_mntflag)
 		exit(1);
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (NVolWasDirty(vol))
 		if (opt.force-- <= 0)
 			err_exit(dirty_volume_msg, opt.volume);
 
@@ -1349,7 +1414,7 @@ static void mount_volume(unsigned long new_mntflag)
 			  volume_size(vol, vol->nr_clusters));
 }
 
-struct ntfs_walk_cluster backup_clusters = { NULL, NULL };
+static struct ntfs_walk_cluster backup_clusters = { NULL, NULL };
 
 static int device_offset_valid(int fd, s64 ofs)
 {
@@ -1476,21 +1541,68 @@ static s64 open_image(void)
 		if ((fd_in = open(opt.volume, O_RDONLY)) == -1)
 			perr_exit("failed to open image");
 	}
-
-	if (read_all(&fd_in, &image_hdr, sizeof(image_hdr)) == -1)
+	if (read_all(&fd_in, &image_hdr, NTFSCLONE_IMG_HEADER_SIZE_OLD) == -1)
 		perr_exit("read_all");
-
 	if (memcmp(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE) != 0)
 		err_exit("Input file is not an image! (invalid magic)\n");
+	if (image_hdr.major_ver < NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE) {
+		image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
+		image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
+#if (__BYTE_ORDER == __BIG_ENDIAN)
+		Printf("Old image format detected.  If the image was created "
+				"on a little endian architecture it will not "
+				"work.  Use a more recent version of "
+				"ntfsclone to recreate the image.\n");
+		image_hdr.cluster_size = cpu_to_le32(image_hdr.cluster_size);
+		image_hdr.device_size = cpu_to_sle64(image_hdr.device_size);
+		image_hdr.nr_clusters = cpu_to_sle64(image_hdr.nr_clusters);
+		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
+#endif
+		image_hdr.offset_to_image_data =
+				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
+		image_is_host_endian = TRUE;
+	} else {
+		typeof(image_hdr.offset_to_image_data) offset_to_image_data;
+		int delta;
 
-	return image_hdr.device_size;
+		if (image_hdr.major_ver > NTFSCLONE_IMG_VER_MAJOR)
+			err_exit("Do not know how to handle image format "
+					"version %d.%d.  Please obtain a "
+					"newer version of ntfsclone.\n",
+					image_hdr.major_ver,
+					image_hdr.minor_ver);
+		/* Read the image header data offset. */
+		if (read_all(&fd_in, &offset_to_image_data,
+				sizeof(offset_to_image_data)) == -1)
+			perr_exit("read_all");
+		image_hdr.offset_to_image_data =
+				le32_to_cpu(offset_to_image_data);
+		/*
+		 * Read any fields from the header that we have not read yet so
+		 * that the input stream is positioned correctly.  This means
+		 * we can support future minor versions that just extend the
+		 * header in a backwards compatible way.
+		 */
+		delta = offset_to_image_data - (NTFSCLONE_IMG_HEADER_SIZE_OLD +
+				sizeof(image_hdr.offset_to_image_data));
+		if (delta > 0) {
+			char *dummy_buf;
+
+			dummy_buf = malloc(delta);
+			if (!dummy_buf)
+				perr_exit("malloc dummy_buffer");
+			if (read_all(&fd_in, dummy_buf, delta) == -1)
+				perr_exit("read_all");
+		}
+	}
+	return sle64_to_cpu(image_hdr.device_size);
 }
 
 static s64 open_volume(void)
 {
 	s64 device_size;
 
-	mount_volume(MS_RDONLY);
+	mount_volume(NTFS_MNT_RDONLY);
 
 	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)
@@ -1509,12 +1621,14 @@ static s64 open_volume(void)
 static void initialise_image_hdr(s64 device_size, s64 inuse)
 {
 	memcpy(image_hdr.magic, IMAGE_MAGIC, IMAGE_MAGIC_SIZE);
-	image_hdr.major_ver = vol->major_ver;
-	image_hdr.minor_ver = vol->minor_ver;
-	image_hdr.cluster_size = vol->cluster_size;
-	image_hdr.device_size = device_size;
-	image_hdr.nr_clusters = vol->nr_clusters;
-	image_hdr.inuse = inuse;
+	image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
+	image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
+	image_hdr.cluster_size = cpu_to_le32(vol->cluster_size);
+	image_hdr.device_size = cpu_to_sle64(device_size);
+	image_hdr.nr_clusters = cpu_to_sle64(vol->nr_clusters);
+	image_hdr.inuse = cpu_to_sle64(inuse);
+	image_hdr.offset_to_image_data = cpu_to_le32((sizeof(image_hdr) + 7) &
+			~7);
 }
 
 static void check_output_device(s64 input_size)
@@ -1611,10 +1725,11 @@ static void check_dest_free_space(u64 src_bytes)
 {
 	u64 dest_bytes;
 	struct statvfs stvfs;
+	struct stat st;
 
 	if (opt.metadata || opt.blkdev_out || opt.std_out)
 		return;
-	/* 
+	/*
 	 * TODO: save_image needs a bit more space than src_bytes
 	 * due to the free space encoding overhead.
 	 */
@@ -1623,11 +1738,18 @@ static void check_dest_free_space(u64 src_bytes)
 		       strerror(errno));
 		return;
 	}
+	
+	/* If file is a FIFO then there is no point in checking the size. */
+	if (!fstat(fd_out, &st)) {
+		if (S_ISFIFO(st.st_mode))
+			return;
+	} else
+		Printf("WARNING: fstat failed: %s\n", strerror(errno));
 
 	dest_bytes = (u64)stvfs.f_frsize * stvfs.f_bfree;
 	if (!dest_bytes)
 		dest_bytes = (u64)stvfs.f_bsize * stvfs.f_bfree;
-	
+
 	if (dest_bytes < src_bytes)
 		err_exit("Destination doesn't have enough free space: "
 			 "%llu MB < %llu MB\n",
@@ -1652,11 +1774,13 @@ int main(int argc, char **argv)
 
 	if (opt.restore_image) {
 		device_size = open_image();
-		ntfs_size = image_hdr.nr_clusters * image_hdr.cluster_size;
+		ntfs_size = sle64_to_cpu(image_hdr.nr_clusters) *
+				le32_to_cpu(image_hdr.cluster_size);
 	} else {
 		device_size = open_volume();
 		ntfs_size = vol->nr_clusters * vol->cluster_size;
 	}
+	// FIXME: This needs to be the cluster size...
 	ntfs_size += 512; /* add backup boot sector */
 
 	if (opt.std_out) {
@@ -1672,7 +1796,7 @@ int main(int argc, char **argv)
 				flags |= O_EXCL;
 		}
 
-		if ((fd_out = open(opt.output, flags, S_IRWXU)) == -1)
+		if ((fd_out = open(opt.output, flags, S_IRUSR | S_IWUSR)) == -1)
 			perr_exit("Opening file '%s' failed", opt.output);
 
 		if (!opt.save_image)
@@ -1692,7 +1816,7 @@ int main(int argc, char **argv)
 
 	walk_clusters(vol, &backup_clusters);
 	compare_bitmaps(&lcn_bitmap);
-	print_disk_usage(vol->cluster_size, vol->nr_clusters, image.inuse);
+	print_disk_usage("", vol->cluster_size, vol->nr_clusters, image.inuse);
 
 	check_dest_free_space(vol->cluster_size * image.inuse);
 

@@ -4,6 +4,7 @@
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2007      Yura Pakhuchiy
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -126,7 +127,7 @@ static const char *many_bad_sectors_msg =
 "* other reason. We suggest to get a replacement disk as soon as possible. *\n"
 "***************************************************************************\n";
 
-struct {
+static struct {
 	int verbose;
 	int debug;
 	int ro_flag;
@@ -141,7 +142,6 @@ struct {
 struct bitmap {
 	s64 size;
 	u8 *bm;
-	u8 padding[4];		/* Unused: padding to 64 bit. */
 };
 
 #define NTFS_PROGBAR		0x0001
@@ -153,7 +153,6 @@ struct progress_bar {
 	int resolution;
 	int flags;
 	float unit;
-	u8 padding[4];		/* Unused: padding to 64 bit. */
 };
 
 struct llcn_t {
@@ -203,7 +202,7 @@ typedef struct {
 
 /* FIXME: This, lcn_bitmap and pos from find_free_cluster() will make a cluster
    allocation related structure, attached to ntfs_resize_t */
-s64 max_free_cluster_range = 0;
+static s64 max_free_cluster_range = 0;
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -350,7 +349,7 @@ static void proceed_question(void)
 	printf("Are you sure you want to proceed (y/[n])? ");
 	buf[0] = 0;
 	fgets(buf, sizeof(buf), stdin);
-	if (strchr(short_yes, buf[0]) == 0) {
+	if (!strchr(short_yes, buf[0])) {
 		printf("OK quitting. NO CHANGES have been made to your "
 				"NTFS volume.\n");
 		exit(1);
@@ -370,6 +369,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2006  Szabolcs Szakacsits\n");
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
+	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -487,7 +487,7 @@ static int parse_options(int argc, char **argv)
 			opt.info++;
 			break;
 		case 'n':
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 			break;
 		case 'P':
 			opt.show_progress = 0;
@@ -523,7 +523,7 @@ static int parse_options(int argc, char **argv)
 			err++;
 		}
 		if (opt.info) {
-			opt.ro_flag = MS_RDONLY;
+			opt.ro_flag = NTFS_MNT_RDONLY;
 			if (opt.bytes) {
 				printf(NERR_PREFIX "Options --info and --size "
 					"can't be used together.\n");
@@ -804,11 +804,9 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 				 lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
-
 			u64 k = (u64)lcn + j;
 
 			if (k >= (u64)vol->nr_clusters) {
-
 				long long outsiders = lcn_length - j;
 
 				fsck->outsider += outsiders;
@@ -824,7 +822,7 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 			if (ntfs_bit_get_and_set(lcn_bitmap->bm, k, 1)) {
 				if (++fsck->multi_ref <= 10 || opt.verbose)
 					printf("Cluster %lld is referenced "
-					       "multiply times!\n",
+					       "multiple times!\n",
 					       (long long)k);
 				continue;
 			}
@@ -1174,7 +1172,7 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		ntfs_log_verbose("Bytes in use     : %u\n", (unsigned int)
 				 le32_to_cpu(ctx->mrec->bytes_in_use));
 
-		next_attr = (char *)a + le16_to_cpu(a->length);
+		next_attr = (char *)a + le32_to_cpu(a->length);
 		l = mp_size - l;
 
 		ntfs_log_verbose("Bytes in use new : %u\n", l + (unsigned int)
@@ -1201,11 +1199,12 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		memmove(next_attr + l, next_attr, remains_size);
 		ctx->mrec->bytes_in_use = cpu_to_le32(l +
 				le32_to_cpu(ctx->mrec->bytes_in_use));
-		a->length += l;
+		a->length = cpu_to_le32(le32_to_cpu(a->length) + l);
 	}
 
-	if (!(mp = calloc(1, mp_size)))
-		perr_exit("Couldn't get memory");
+	mp = ntfs_calloc(mp_size);
+	if (!mp)
+		perr_exit("ntfsc_calloc couldn't get memory");
 
 	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0, NULL))
 		perr_exit("ntfs_mapping_pairs_build");
@@ -1469,8 +1468,9 @@ static void rl_split_run(runlist **rl, int run, s64 pos)
 	size_head = run * sizeof(runlist_element);
 	size_tail = (items - run - 1) * sizeof(runlist_element);
 
-	if (!(rl_new = (runlist *)malloc(new_size)))
-		perr_exit("malloc");
+	rl_new = ntfs_malloc(new_size);
+	if (!rl_new)
+		perr_exit("ntfs_malloc");
 
 	rle_new = rl_new + run;
 	rle = *rl + run;
@@ -1612,8 +1612,8 @@ static int is_mftdata(ntfs_resize_t *resize)
 	if (resize->mref == 0)
 		return 1;
 
-	if (  MREF(resize->mrec->base_mft_record) == 0  &&
-	    MSEQNO(resize->mrec->base_mft_record) != 0)
+	if (MREF_LE(resize->mrec->base_mft_record) == 0 &&
+	    MSEQNO_LE(resize->mrec->base_mft_record) != 0)
 		return 1;
 
 	return 0;
@@ -1720,9 +1720,9 @@ static void relocate_inodes(ntfs_resize_t *resize)
 	progress_init(&resize->progress, 0, resize->relocations, resize->progress.flags);
 	resize->relocations = 0;
 
-	resize->mrec = (MFT_RECORD *)malloc(resize->vol->mft_record_size);
+	resize->mrec = ntfs_malloc(resize->vol->mft_record_size);
 	if (!resize->mrec)
-		perr_exit("malloc failed");
+		perr_exit("ntfs_malloc failed");
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
@@ -1875,9 +1875,9 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 
 	rl_truncate(&rl_bad, nr_clusters);
 
-	a->highest_vcn = cpu_to_le64(nr_clusters - 1LL);
-	a->allocated_size = cpu_to_le64(nr_clusters * vol->cluster_size);
-	a->data_size = cpu_to_le64(nr_clusters * vol->cluster_size);
+	a->highest_vcn = cpu_to_sle64(nr_clusters - 1LL);
+	a->allocated_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
+	a->data_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
 
 	replace_attribute_runlist(vol, resize->ctx, rl_bad);
 
@@ -1952,10 +1952,10 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 		realloc_bitmap_data_attr(resize, &rl, nr_bm_clusters);
 	}
 
-	a->highest_vcn = cpu_to_le64(nr_bm_clusters - 1LL);
-	a->allocated_size = cpu_to_le64(nr_bm_clusters * vol->cluster_size);
-	a->data_size = cpu_to_le64(bm_bsize);
-	a->initialized_size = cpu_to_le64(bm_bsize);
+	a->highest_vcn = cpu_to_sle64(nr_bm_clusters - 1LL);
+	a->allocated_size = cpu_to_sle64(nr_bm_clusters * vol->cluster_size);
+	a->data_size = cpu_to_sle64(bm_bsize);
+	a->initialized_size = cpu_to_sle64(bm_bsize);
 
 	replace_attribute_runlist(vol, resize->ctx, rl);
 
@@ -2031,7 +2031,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 	if (!ctx->attr->non_resident)
 		err_exit("Resident attribute in $BadClust! Please report to "
 			 "%s\n", NTFS_DEV_LIST);
-	/* 
+	/*
 	 * FIXME: The below would be partial for non-base records in the
 	 * not yet supported multi-record case. Alternatively use audited
 	 * ntfs_attr_truncate after an umount & mount.
@@ -2120,7 +2120,8 @@ static int setup_lcn_bitmap(struct bitmap *bm, s64 nr_clusters)
 	/* Determine lcn bitmap byte size and allocate it. */
 	bm->size = rounded_up_division(nr_clusters, 8);
 
-	if (!(bm->bm = (unsigned char *)calloc(1, bm->size)))
+	bm->bm = ntfs_calloc(bm->size);
+	if (!bm->bm)
 		return -1;
 
 	bitmap_file_data_fixup(nr_clusters, bm);
@@ -2153,7 +2154,7 @@ static void update_bootsector(ntfs_resize_t *r)
 		r->progress.flags |= NTFS_PROGBAR_SUPPRESS;
 		copy_clusters(r, r->mftmir_rl.lcn, r->mftmir_old,
 			      r->mftmir_rl.length);
-		bs.mftmirr_lcn = cpu_to_le64(r->mftmir_rl.lcn);
+		bs.mftmirr_lcn = cpu_to_sle64(r->mftmir_rl.lcn);
 		r->progress.flags &= ~NTFS_PROGBAR_SUPPRESS;
 	}
 
@@ -2238,9 +2239,12 @@ static ntfs_volume *mount_volume(void)
 			err_exit("Device '%s' is mounted. "
 				 "You must 'umount' it first.\n", opt.volume);
 	}
-
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag /*| MS_NOATIME*/))) {
-
+	/*
+	 * Pass NTFS_MNT_FORENSIC so that the mount process does not modify the
+	 * volume at all.  We will do the logfile emptying and dirty setting
+	 * later if needed.
+	 */
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_FORENSIC))) {
 		int err = errno;
 
 		perr_printf("Opening '%s' as NTFS failed", opt.volume);
@@ -2257,7 +2261,7 @@ static ntfs_volume *mount_volume(void)
 		exit(1);
 	}
 
-	if (vol->flags & VOLUME_IS_DIRTY)
+	if (NVolWasDirty(vol))
 		if (opt.force-- <= 0)
 			err_exit("Volume is scheduled for check.\nRun chkdsk /f"
 				 " and please try again, or see option -f.\n");
@@ -2287,30 +2291,20 @@ static ntfs_volume *mount_volume(void)
  */
 static void prepare_volume_fixup(ntfs_volume *vol)
 {
-	u16 flags;
-
-	flags = vol->flags | VOLUME_IS_DIRTY;
-	if (vol->major_ver >= 2)
-		flags |= VOLUME_MOUNTED_ON_NT4;
-
-	printf("Schedule chkdsk for NTFS consistency check at Windows "
-		"boot time ...\n");
-
-	if (ntfs_volume_write_flags(vol, flags))
-		perr_exit("Failed to set $Volume dirty");
-
+	printf("Schedule chkdsk for NTFS consistency check at Windows boot "
+			"time ...\n");
+	vol->flags |= VOLUME_IS_DIRTY;
+	if (ntfs_volume_write_flags(vol, vol->flags))
+		perr_exit("Failed to set the volume dirty");
+	NVolSetWasDirty(vol);
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
-
 	printf("Resetting $LogFile ... (this might take a while)\n");
-
 	if (ntfs_logfile_reset(vol))
 		perr_exit("Failed to reset $LogFile");
-
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 }
-
 
 static void set_disk_usage_constraint(ntfs_resize_t *resize)
 {
@@ -2394,7 +2388,7 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	if ((vol = mount_volume()) == NULL)
+	if (!(vol = mount_volume()))
 		err_exit("Couldn't open volume '%s'!\n", opt.volume);
 
 	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);

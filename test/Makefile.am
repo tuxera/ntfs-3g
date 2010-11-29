@@ -57,3 +57,6 @@ testf:	runlist
 		diff -qs {runlist-data/,}frag$$i;				\
 	done
 
+dist-hook:
+	rm -rf `find $(distdir)/runlist-data -name CVS`
+

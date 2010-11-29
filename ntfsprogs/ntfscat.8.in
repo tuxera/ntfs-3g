@@ -1,7 +1,8 @@
 .\" Copyright (c) 2003\-2005 Richard Russon.
+.\" Copyright (c) 2007 Yura Pakhuchiy.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCAT 8 "November 2005" "ntfsprogs @VERSION@"
+.TH NTFSCAT 8 "September 2007" "ntfsprogs @VERSION@"
 .SH NAME
 ntfscat \- print NTFS files and streams on the standard output
 .SH SYNOPSIS
@@ -133,5 +134,8 @@ The manual pages are available online at:
 http://man.linux-ntfs.org/
 .hy
 .SH SEE ALSO
+Read \fBlibntfs\fR(8) for details how to access encrypted files.
+.sp
+.BR libntfs (8),
 .BR ntfsls (8),
 .BR ntfsprogs (8)

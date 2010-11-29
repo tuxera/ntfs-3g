@@ -28,9 +28,6 @@
 #include <glib/gmessages.h>
 #include <glib/gutils.h>	/* for g_atexit() */
 
-/* Filesystem-module-scope lock for _any_ libntfs access. */
-G_LOCK_DEFINE(libntfs);
-
 static void vfs_module_shutdown_atexit(void);
 
 /**

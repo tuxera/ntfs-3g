@@ -37,16 +37,15 @@ This package contains the NTFS GNOME virtual filesystem (VFS) module which
 allows GNOME VFS clients to seamlessly utilize the NTFS library (libntfs).
 
 
-%package fuse
+%package -n ntfsmount
 Summary		: NTFS FUSE module (ntfsmount)
 Group		: System Environment/Base
 Requires	: ntfsprogs = %{ver}-%{rel}
-Requires	: fuse >= 2.3.0
-%description fuse
-This package contains the ntfsmount utility which is an NTFS filesystem in
-userspace (FUSE) module allowing users to mount an ntfs filesystem from
-userspace and accessing it using the functionality provided by the NTFS
-library (libntfs).
+Requires	: fuse >= 2.6.1
+%description -n ntfsmount
+This package contains the ntfsmount utility which is an userspace read/write
+NTFS driver allowing users to mount an ntfs filesystem using FUSE and accessing
+it using the functionality provided by the NTFS library (libntfs).
 
 
 %package devel
@@ -101,7 +100,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*so*
 %config %{_sysconfdir}/gnome-vfs-2.0/modules/libntfs.conf
 
-%files fuse
+%files -n ntfsmount
 %defattr(-,root,root)
 %{bindir}/ntfsmount*
 /sbin/mount.ntfs-fuse
@@ -115,6 +114,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/gnome-vfs-2.0/modules/libntfs-gnomevfs.*a*
 
 %changelog
+* Mon Sep 10 2007 Yura Pakhuchiy <pakhuchiy@gmail.com>
+- Rename rpm ntfsprogs-fuse to ntfsmount.
+
 * Fri Oct 7 2005 Anton Altaparmakov <aia21@cantab.net>
 - Fix the file distribution after new binaries have been added as they were
   ending up in the wrong rpms.
