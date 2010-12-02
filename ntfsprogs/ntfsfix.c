@@ -248,7 +248,9 @@ static int set_dirty_flag(ntfs_volume *vol)
 {
 	le16 flags;
 
-	if (NVolWasDirty(vol))
+	/* Porting note: We test for the current state of VOLUME_IS_DIRTY. This
+	 * should actually be more appropriate than testing for NVolWasDirty. */
+	if (vol->flags | VOLUME_IS_DIRTY)
 		return 0;
 	ntfs_log_info("Setting required flags on partition... ");
 	/*

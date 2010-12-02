@@ -357,7 +357,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (NVolWasDirty(vol) && !opts.force)
+	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
 	{

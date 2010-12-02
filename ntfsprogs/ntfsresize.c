@@ -2262,7 +2262,7 @@ static ntfs_volume *mount_volume(void)
 		exit(1);
 	}
 
-	if (NVolWasDirty(vol))
+	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
 			err_exit("Volume is scheduled for check.\nRun chkdsk /f"
 				 " and please try again, or see option -f.\n");
