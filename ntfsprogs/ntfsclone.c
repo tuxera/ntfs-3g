@@ -1603,7 +1603,7 @@ static s64 open_volume(void)
 {
 	s64 device_size;
 
-	mount_volume(NTFS_MNT_RDONLY);
+	mount_volume(MS_RDONLY);
 
 	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)

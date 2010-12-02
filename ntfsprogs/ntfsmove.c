@@ -875,7 +875,7 @@ int main(int argc, char *argv[])
 	utils_set_locale();
 
 	if (opts.noaction)
-		flags |= NTFS_MNT_RDONLY;
+		flags |= MS_RDONLY;
 	if (opts.force)
 		flags |= NTFS_MNT_FORCE;
 

@@ -1340,7 +1340,7 @@ int main(int argc, char *argv[])
 		print_summary();
 
 	if (opts.info || opts.noaction)
-		flags = NTFS_MNT_RDONLY;
+		flags = MS_RDONLY;
 	if (opts.force)
 		flags |= NTFS_MNT_FORCE;
 

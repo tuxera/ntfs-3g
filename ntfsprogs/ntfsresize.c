@@ -488,7 +488,7 @@ static int parse_options(int argc, char **argv)
 			opt.info++;
 			break;
 		case 'n':
-			opt.ro_flag = NTFS_MNT_RDONLY;
+			opt.ro_flag = MS_RDONLY;
 			break;
 		case 'P':
 			opt.show_progress = 0;
@@ -524,7 +524,7 @@ static int parse_options(int argc, char **argv)
 			err++;
 		}
 		if (opt.info) {
-			opt.ro_flag = NTFS_MNT_RDONLY;
+			opt.ro_flag = MS_RDONLY;
 			if (opt.bytes) {
 				printf(NERR_PREFIX "Options --info and --size "
 					"can't be used together.\n");

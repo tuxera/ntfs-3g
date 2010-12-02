@@ -962,7 +962,7 @@ static ntfs_volume *mount_volume(const char *volume)
 				 "You must 'umount' it first.\n", volume);
 	}
 
-	vol = ntfs_mount(volume, NTFS_MNT_RDONLY);
+	vol = ntfs_mount(volume, MS_RDONLY);
 	if (vol == NULL) {
 
 		int err = errno;

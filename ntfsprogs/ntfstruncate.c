@@ -738,7 +738,7 @@ int main(int argc, char **argv)
 	/* Mount the device. */
 	if (opts.no_action) {
 		ntfs_log_quiet("Running in READ-ONLY mode!\n");
-		ul = NTFS_MNT_RDONLY;
+		ul = MS_RDONLY;
 	} else
 		ul = 0;
 	vol = ntfs_mount(dev_name, ul);

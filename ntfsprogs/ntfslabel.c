@@ -395,7 +395,7 @@ int main(int argc, char **argv)
 		opts.noaction++;
 
 	vol = utils_mount_volume(opts.device,
-			(opts.noaction ? NTFS_MNT_RDONLY : 0) |
+			(opts.noaction ? MS_RDONLY : 0) |
 			(opts.force ? NTFS_MNT_FORCE : 0));
 	if (!vol)
 		return 1;

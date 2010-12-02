@@ -2252,7 +2252,7 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
+	vol = utils_mount_volume(opts.device, MS_RDONLY |
 			(opts.force ? NTFS_MNT_FORCE : 0));
 	if (!vol) {
 		printf("Failed to open '%s'.\n", opts.device);
