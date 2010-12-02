@@ -1453,7 +1453,7 @@ int main(int argc, char *argv[])
 	}
 	/* Mount the ntfs volume. */
 	vol = utils_mount_volume(opts.device, MS_RDONLY |
-			(opts.force ? NTFS_MNT_FORCE : 0));
+			(opts.force ? MS_RECOVER : 0));
 	if (!vol) {
 		ntfs_log_error("Failed to mount ntfs volume.  Aborting.\n");
 		ntfs_rsa_private_key_release(rsa_key);

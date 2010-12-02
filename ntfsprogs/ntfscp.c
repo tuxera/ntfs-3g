@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
 	if (opts.noaction)
 		flags = MS_RDONLY;
 	if (opts.force)
-		flags |= NTFS_MNT_FORCE;
+		flags |= MS_RECOVER;
 
 	vol = utils_mount_volume(opts.device, flags);
 	if (!vol) {

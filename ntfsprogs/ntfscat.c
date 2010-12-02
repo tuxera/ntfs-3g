@@ -411,7 +411,7 @@ int main(int argc, char *argv[])
 	utils_set_locale();
 
 	vol = utils_mount_volume(opts.device, MS_RDONLY |
-			(opts.force ? NTFS_MNT_FORCE : 0));
+			(opts.force ? MS_RECOVER : 0));
 	if (!vol) {
 		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;

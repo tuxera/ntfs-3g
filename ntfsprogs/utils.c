@@ -216,7 +216,22 @@ ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
 		return NULL;
 	}
 
-	if (!utils_valid_device(device, flags & NTFS_MNT_FORCE))
+	/* Porting notes:
+	 *
+	 * libntfs-3g does not have the 'force' flag in ntfs_mount_flags.
+	 * The 'force' flag in libntfs bypasses two safety checks when mounting
+	 * read/write:
+	 *   1. Do not mount when the VOLUME_IS_DIRTY flag in
+	 *      VOLUME_INFORMATION is set.
+	 *   2. Do not mount when the logfile is unclean.
+	 *
+	 * libntfs-3g only has safety check number 2. The dirty flag is simply
+	 * ignored because we are confident that we can handle a dirty volume.
+	 * So we treat MS_RECOVER like NTFS_MNT_FORCE, knowing that the first
+	 * check is always bypassed.
+	 */
+
+	if (!utils_valid_device(device, flags & MS_RECOVER))
 		return NULL;
 
 	vol = ntfs_mount(device, flags);
@@ -242,7 +257,7 @@ ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
 	 * before mount, so we can only warn if the VOLUME_IS_DIRTY flag is set
 	 * in VOLUME_INFORMATION. */
 	if (vol->flags & VOLUME_IS_DIRTY) {
-		if (!(flags & NTFS_MNT_FORCE)) {
+		if (!(flags & MS_RECOVER)) {
 			ntfs_log_error("%s", dirty_volume_msg);
 			ntfs_umount(vol, FALSE);
 			return NULL;
