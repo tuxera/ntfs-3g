@@ -37,12 +37,13 @@
 #include <fcntl.h>
 #endif
 
-#include "layout.h"
+#include <ntfs-3g/layout.h>
+#include <ntfs-3g/bitmap.h>
+#include <ntfs-3g/endians.h>
+#include <ntfs-3g/bootsect.h>
+
 #include "cluster.h"
-#include "bitmap.h"
 #include "utils.h"
-#include "endians.h"
-#include "bootsect.h"
 
 #define RETURN_FS_ERRORS_CORRECTED (1)
 #define RETURN_SYSTEM_NEEDS_REBOOT (2)
