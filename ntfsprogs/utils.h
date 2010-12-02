@@ -126,4 +126,10 @@ static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 		return ntfs_mbstoucs(ins, outs);
 }
 
+/* This simple utility function was missing from libntfs-3g. */
+static __inline__ ntfschar *ntfs_attr_get_name(ATTR_RECORD *attr)
+{
+	return (ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset));
+}
+
 #endif /* _NTFS_UTILS_H_ */
