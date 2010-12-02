@@ -70,6 +70,7 @@
 #include <ntfs-3g/debug.h>
 #include <ntfs-3g/dir.h>
 #include <ntfs-3g/logging.h>
+#include <ntfs-3g/misc.h>
 
 #include "utils.h"
 /* #include "version.h" */

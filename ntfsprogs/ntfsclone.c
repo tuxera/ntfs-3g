@@ -77,6 +77,7 @@
 #include <ntfs-3g/dir.h>
 #include <ntfs-3g/runlist.h>
 #include <ntfs-3g/ntfstime.h>
+#include <ntfs-3g/misc.h>
 
 #include "utils.h"
 /* #include "version.h" */

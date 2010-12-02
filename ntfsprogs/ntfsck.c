@@ -41,6 +41,7 @@
 #include <ntfs-3g/bitmap.h>
 #include <ntfs-3g/endians.h>
 #include <ntfs-3g/bootsect.h>
+#include <ntfs-3g/misc.h>
 
 #include "cluster.h"
 #include "utils.h"

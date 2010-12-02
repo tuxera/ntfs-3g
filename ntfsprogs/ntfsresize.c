@@ -64,6 +64,7 @@
 #include <ntfs-3g/bitmap.h>
 #include <ntfs-3g/inode.h>
 #include <ntfs-3g/runlist.h>
+#include <ntfs-3g/misc.h>
 
 #include "utils.h"
 /* #include "version.h" */

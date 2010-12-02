@@ -132,6 +132,7 @@
 #include <ntfs-3g/logging.h>
 #include <ntfs-3g/support.h>
 #include <ntfs-3g/unistr.h>
+#include <ntfs-3g/misc.h>
 
 #include "utils.h"
 #include "sd.h"

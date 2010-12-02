@@ -35,6 +35,7 @@
 
 #include <ntfs-3g/mst.h>
 #include <ntfs-3g/support.h>
+#include <ntfs-3g/misc.h>
 
 #include "utils.h"
 /* #include "version.h" */
