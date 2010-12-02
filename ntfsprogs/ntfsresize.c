@@ -2297,7 +2297,12 @@ static void prepare_volume_fixup(ntfs_volume *vol)
 	vol->flags |= VOLUME_IS_DIRTY;
 	if (ntfs_volume_write_flags(vol, vol->flags))
 		perr_exit("Failed to set the volume dirty");
-	NVolSetWasDirty(vol);
+
+	/* Porting note: This flag does not exist in libntfs-3g. The dirty flag
+	 * is never modified by libntfs-3g on unmount and we set it above. We
+	 * can safely comment out this statement. */
+	/* NVolSetWasDirty(vol); */
+
 	if (vol->dev->d_ops->sync(vol->dev) == -1)
 		perr_exit("Failed to sync device");
 	printf("Resetting $LogFile ... (this might take a while)\n");

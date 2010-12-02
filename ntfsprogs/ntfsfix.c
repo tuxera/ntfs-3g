@@ -264,7 +264,14 @@ static int set_dirty_flag(ntfs_volume *vol)
 		return -1;
 	}
 	vol->flags = flags;
-	NVolSetWasDirty(vol);
+
+	/* Porting note: libntfs-3g does not have the 'WasDirty' flag/property,
+	 * and never touches the 'dirty' bit except when explicitly told to do
+	 * so. Since we just wrote the VOLUME_IS_DIRTY bit to disk, and
+	 * vol->flags is up-to-date, we can just ignore the NVolSetWasDirty
+	 * statement. */
+	/* NVolSetWasDirty(vol); */
+
 	ntfs_log_info(OK);
 	return 0;
 }
@@ -515,7 +522,20 @@ int main(int argc, char **argv)
 		}
 	}
 	/* So the unmount does not clear it again. */
-	NVolSetWasDirty(vol);
+
+	/* Porting note: The WasDirty flag was set here to prevent ntfs_unmount
+	 * from clearing the dirty bit (which might have been set in
+	 * fix_mount()). So the intention is to leave the dirty bit set.
+	 *
+	 * libntfs-3g does not automatically set or clear dirty flags on
+	 * mount/unmount, this means that the assumption that the dirty flag is
+	 * now set does not hold. So we need to set it if not already set. */
+	if(!(vol->flags & VOLUME_IS_DIRTY) && ntfs_volume_write_flags(vol,
+			vol->flags | VOLUME_IS_DIRTY)) {
+		ntfs_log_error("Error: Failed to set volume dirty flag (%d "
+			"(%s))!\n", errno, strerror(errno));
+	}
+
 	/* Check NTFS version is ok for us (in $Volume) */
 	ntfs_log_info("NTFS volume version is %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
