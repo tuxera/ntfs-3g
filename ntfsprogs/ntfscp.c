@@ -300,7 +300,7 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 					filename);
 		return NULL;
 	}
-	ni = ntfs_create(dir_ni, ufilename, ufilename_len, S_IFREG);
+	ni = ntfs_create(dir_ni, 0, ufilename, ufilename_len, S_IFREG);
 	free(ufilename);
 	return ni;
 }
