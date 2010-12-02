@@ -109,17 +109,41 @@ int mft_next_record(struct mft_search_ctx *ctx);
 static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 		ntfschar **outs, int outs_len)
 {
-	ntfschar *tmpstr;
-	int tmpstr_len;
+	if(!outs) {
+		errno = EINVAL;
+		return -1;
+	}
+	else if(*outs != NULL) {
+		/* Note: libntfs's mbstoucs implementation allows the caller to
+		 * specify a preallocated buffer while libntfs-3g's always
+		 * allocates the output buffer.
+		 */
+		ntfschar *tmpstr = NULL;
+		int tmpstr_len;
 
-	if(*outs != NULL) {
 		tmpstr_len = ntfs_mbstoucs(ins, &tmpstr);
 		if(tmpstr_len >= 0) {
-			/* The extra character is the null terminator. */
-			memcpy(*outs, ins,
-				sizeof(ntfschar)*(MIN(outs_len, tmpstr_len)+1));
+			if(tmpstr_len > outs_len) {
+				/* Doing a realloc instead of reusing tmpstr
+				 * because it emulates libntfs's mbstoucs more
+				 * closely. */
+				ntfschar *re_outs =
+					realloc(*outs, tmpstr_len + 1);
+				if(!re_outs)
+					tmpstr_len = -1;
+				else
+					*outs = re_outs;
+			}
+
+			if(tmpstr_len >= 0) {
+				/* The extra character is the \0 terminator. */
+				memcpy(*outs, ins,
+					sizeof(ntfschar)*(tmpstr_len + 1));
+			}
+
 			free(tmpstr);
 		}
+
 		return tmpstr_len;
 	}
 	else
