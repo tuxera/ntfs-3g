@@ -4010,6 +4010,7 @@ static BOOL mkntfs_create_root_structures(void)
 	u8 *buf_log = NULL;
 	int buf_sds_first_size;
 	char *buf_sds;
+	GUID vol_guid;
 
 	ntfs_log_quiet("Creating NTFS volume structures.\n");
 	nr_sysfiles = 27;
@@ -4357,11 +4358,11 @@ static BOOL mkntfs_create_root_structures(void)
 	 */
 	if (!opts.use_epoch_time) {
 		/* Generate a GUID for the volume. */
-		uuid_generate((void*)&g_vol->guid);
+		uuid_generate((void*)&vol_guid);
 	} else
-		memset(&g_vol->guid, 0, sizeof(g_vol->guid));
+		memset(&g_vol->guid, 0, sizeof(vol_guid));
 #endif
-	if (!create_file_volume(m, root_ref, volume_flags, &g_vol->guid))
+	if (!create_file_volume(m, root_ref, volume_flags, &vol_guid))
 		return FALSE;
 	ntfs_log_verbose("Creating $BadClus (mft record 8)\n");
 	m = (MFT_RECORD*)(g_buf + 8 * g_vol->mft_record_size);
