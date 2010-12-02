@@ -198,7 +198,10 @@ static int logfile_open(BOOL is_volume, const char *filename,
 		ntfs_inode *ni;
 		ntfs_attr *na;
 
-		vol = ntfs_mount(filename, MS_RDONLY | NTFS_MNT_FORENSIC);
+		/* Porting note: NTFS_MNT_FORENSIC is not needed when we mount
+		 * the volume in read-only mode. No changes will be made to the
+		 * logfile or anything else when we are in read only-mode. */
+		vol = ntfs_mount(filename, MS_RDONLY);
 		if (!vol)
 			log_err_exit(NULL, "Failed to mount %s: %s\n",
 					filename, strerror(errno));
