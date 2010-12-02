@@ -29,6 +29,7 @@
 #include <ntfs-3g/runlist.h>
 
 #include "list.h"
+#include "utils.h"
 
 enum optmode {
 	MODE_NONE = 0,
