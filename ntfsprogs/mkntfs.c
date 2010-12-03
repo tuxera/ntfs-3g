@@ -4360,7 +4360,7 @@ static BOOL mkntfs_create_root_structures(void)
 		/* Generate a GUID for the volume. */
 		uuid_generate((void*)&vol_guid);
 	} else
-		memset(&g_vol->guid, 0, sizeof(vol_guid));
+		memset(&vol_guid, 0, sizeof(vol_guid));
 #endif
 	if (!create_file_volume(m, root_ref, volume_flags, &vol_guid))
 		return FALSE;
@@ -4525,7 +4525,7 @@ static BOOL mkntfs_create_root_structures(void)
 			g_vol->indx_record_size);
 #ifdef ENABLE_UUID
 	if (!err)
-		err = index_obj_id_insert(m, &g_vol->guid,
+		err = index_obj_id_insert(m, &vol_guid,
 				MK_LE_MREF(FILE_Volume, FILE_Volume));
 #endif
 	if (err < 0) {
