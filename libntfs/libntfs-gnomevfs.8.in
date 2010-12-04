@@ -10,14 +10,14 @@ The GNOME virtual filesystem (VFS) provides universal access to different filesy
 The
 .BR libntfs-gnomevfs
 module enables GNOME VFS aware clients to seamlessly utilize the NTFS library
-.BR libntfs .
+.BR libntfs-3g .
 
 So you can access an NTFS filesystem without needing to use the NTFS utilities themselves
 (at least in theory anyway).  In practice this is probably more useful for programs and
 programmers to make using
-.BR libntfs
+.BR libntfs-3g
 easier, more generic, and to allow easier debugging of
-.BR libntfs .
+.BR libntfs-3g .
 
 .SH Examples
 .SS Prerequisites
@@ -39,9 +39,7 @@ Then run ./configure followed by make and make install (as root) in the main
 .BR ntfsprogs
 directory to build and install the
 .BR libntfs-gnomevfs
-module and
-.BR libntfs
-library which is used by the module.
+module.
 
 .SS Copying a file from an NTFS partition
 .PP
@@ -59,7 +57,7 @@ So for example to copy the file win.ini from the Windows directory you would run
 .PP
 For debugging it is most useful to be able to do various things to the NTFS partition while it
 is being operated upon by
-.BR libntfs .
+.BR libntfs-3g .
 This is achieved using the test-shell utility (from the gnome-vfs-2.4.x package) by running:
 /path/to/gnome-vfs-2.4.x/test/test-shell
 
