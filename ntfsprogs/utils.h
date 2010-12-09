@@ -127,7 +127,7 @@ static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 
 		tmpstr_len = ntfs_mbstoucs(ins, &tmpstr);
 		if(tmpstr_len >= 0) {
-			if(tmpstr_len > outs_len) {
+			if((tmpstr_len + 1) > outs_len) {
 				/* Doing a realloc instead of reusing tmpstr
 				 * because it emulates libntfs's mbstoucs more
 				 * closely. */
