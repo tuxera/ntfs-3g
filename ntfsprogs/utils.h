@@ -141,7 +141,7 @@ static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 
 			if(tmpstr_len >= 0) {
 				/* The extra character is the \0 terminator. */
-				memcpy(*outs, ins,
+				memcpy(*outs, tmpstr,
 					sizeof(ntfschar)*(tmpstr_len + 1));
 			}
 
