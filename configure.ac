@@ -22,7 +22,7 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([ntfsprogs],[1.13.1-ntfs-3g.1],[ntfs-3g-devel@lists.sourceforge.net])
+AC_INIT([ntfsprogs],[1.13.1-ntfs-3g.2],[ntfs-3g-devel@lists.sourceforge.net])
 
 #
 # Before making a release, the LTVERSION string should be modified.
