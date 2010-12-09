@@ -131,8 +131,8 @@ static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 				/* Doing a realloc instead of reusing tmpstr
 				 * because it emulates libntfs's mbstoucs more
 				 * closely. */
-				ntfschar *re_outs =
-					realloc(*outs, tmpstr_len + 1);
+				ntfschar *re_outs = realloc(*outs,
+					sizeof(ntfschar)*(tmpstr_len + 1));
 				if(!re_outs)
 					tmpstr_len = -1;
 				else
