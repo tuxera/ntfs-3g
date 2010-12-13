@@ -1,10 +1,9 @@
 if REALLYSTATIC
-AM_LIBS		= 
+AM_LIBS		= $(top_builddir)/libntfs-3g/.libs/libntfs-3g.a
 AM_LFLAGS	= -static
 STATIC_LINK     = $(CC) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 else
-AM_LIBS		= $(NTFS_3G_MODULE_LIBS)
-AM_CFLAGS	= $(NTFS_3G_MODULE_CFLAGS)
+AM_LIBS		= $(top_builddir)/libntfs-3g/libntfs-3g.la
 AM_LFLAGS	= $(all_libraries)
 LIBTOOL_LINK    = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 endif
