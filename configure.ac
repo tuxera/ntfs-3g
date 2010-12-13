@@ -3,6 +3,7 @@
 #		 compilation.
 #
 # Copyright (c) 2000-2006 Anton Altaparmakov
+# Copyright (c) 2003 Jan Kratochvil
 # Copyright (c) 2005-2009 Szabolcs Szakacsits
 # Copyright (C) 2007-2008 Alon Bar-Lev
 #
@@ -127,6 +128,12 @@ AC_ARG_ENABLE(
 	[enable_device_default_io_ops="yes"]
 )
 
+AC_ARG_ENABLE(crypto,
+	AS_HELP_STRING(--enable-crypto,enable crypto related code and utilities
+		       (default=no)), ,
+	enable_crypto=no
+)
+
 AC_ARG_ENABLE(
 	[nfconv],
 	[AS_HELP_STRING([--disable-nfconv],[disable the 'nfconv' patch, which adds support for Unicode normalization form conversion when built on Mac OS X @<:@default=enabled for Mac OS X@:>@])],
@@ -152,6 +159,9 @@ ifdef(
 	[LT_INIT],
 	[AC_PROG_LIBTOOL]
 )
+
+AC_PROG_INSTALL
+PKG_PROG_PKG_CONFIG
 
 AC_PATH_PROG([MV], [mv])
 AC_PATH_PROG([RM], [rm])
@@ -256,6 +266,41 @@ else
 	FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
 fi
 
+# Autodetect whether we can build crypto stuff or not.
+compile_crypto=false
+if test "$enable_crypto" != "no"; then
+	have_libgcrypt=false
+	AM_PATH_LIBGCRYPT(1.2.0, [ have_libgcrypt=true ],
+	[
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([ntfsprogs crypto code requires the gcrypt library.])
+		else
+			AC_MSG_WARN([ntfsprogs crypto code requires the gcrypt library.])
+		fi
+	])
+	have_libgnutls=false
+	PKG_CHECK_MODULES(GNUTLS_MODULE, gnutls >= 1.2.8, [ have_libgnutls=true ],
+	[
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([ntfsprogs crypto code requires the gnutls library.])
+		else
+			AC_MSG_WARN([ntfsprogs crypto code requires the gnutls library.])
+		fi
+	])
+	if test "$have_libgcrypt" = "true"; then
+		if test "$have_libgnutls" = "true"; then
+			compile_crypto=true
+		fi
+	fi
+fi
+AM_CONDITIONAL(ENABLE_CRYPTO, $compile_crypto)
+
+# add --with-extra-includes and --with-extra-libs switch to ./configure
+all_libraries="$all_libraries $USER_LDFLAGS"
+all_includes="$all_includes $USER_INCLUDES"
+AC_SUBST(all_includes)
+AC_SUBST(all_libraries)
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
@@ -264,7 +309,7 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	endian.h byteswap.h sys/byteorder.h sys/endian.h sys/param.h \
 	sys/ioctl.h sys/mkdev.h sys/mount.h sys/stat.h sys/types.h sys/vfs.h \
 	sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h linux/hdreg.h \
-	machine/endian.h windows.h syslog.h])
+	machine/endian.h gcrypt.h windows.h gnutls/pkcs12.h syslog.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -280,6 +325,7 @@ AC_C_BIGENDIAN(
 	]
 	,
 )
+AC_C_CONST
 AC_C_INLINE
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
@@ -413,13 +459,29 @@ fi
 # generate files
 AC_CONFIG_FILES([
 	Makefile
+	doc/Makefile
 	include/Makefile
 	include/fuse-lite/Makefile
+	include/ntfs/Makefile
 	include/ntfs-3g/Makefile
 	libfuse-lite/Makefile
 	libntfs-3g/Makefile
 	libntfs-3g/libntfs-3g.pc
 	libntfs-3g/libntfs-3g.script.so
+	ntfsprogs/Makefile
+	ntfsprogs/mkntfs.8
+	ntfsprogs/ntfscat.8
+	ntfsprogs/ntfsclone.8
+	ntfsprogs/ntfscluster.8
+	ntfsprogs/ntfscmp.8
+	ntfsprogs/ntfscp.8
+	ntfsprogs/ntfsfix.8
+	ntfsprogs/ntfsinfo.8
+	ntfsprogs/ntfslabel.8
+	ntfsprogs/ntfsls.8
+	ntfsprogs/ntfsprogs.8
+	ntfsprogs/ntfsresize.8
+	ntfsprogs/ntfsundelete.8
 	src/Makefile
 	src/ntfs-3g.8
 	src/ntfs-3g.probe.8
