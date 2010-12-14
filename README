@@ -38,14 +38,15 @@ the FUSE kernel module. Then unpack the source tarball and type:
 	make
 	make install      # or 'sudo make install' if you aren't root.
 
-Please note that NTFS-3G doesn't require the FUSE user space package.
+Please note that NTFS-3G doesn't require the FUSE user space package any
+more.
 
 Non-Linux: Please see 
 
 	http://www.tuxera.com/community/ntfs-3g-download/
 
-for OS specific installation and source packages.
-
+for known OS specific installation and source packages, but generally
+the same procedures apply.
 
 USAGE
 =====
@@ -66,3 +67,20 @@ line at the END(!) of the /etc/fstab file:
 
 	/dev/sda1 /mnt/windows ntfs-3g defaults 0 0
 
+
+TESTING WITHOUT INSTALLING
+=========================
+
+Newer versions of ntfs-3g can be tested without installing anything and
+without disturbing an existing installation. Just configure and make as
+shown previously. This will create the scripts ntfs-3g and lowntfs-3g
+in the src directory, which you may activate for testing :
+
+	./configure
+	make
+
+then, as root :
+	src/ntfs-3g [-o mount-options] /dev/sda1 /mnt/windows
+
+And, to end the test, unmount the usual way :
+	umount /dev/sda1
