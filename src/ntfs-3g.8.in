@@ -147,6 +147,14 @@ to not be visible.
 This option is obsolete. It has been superseded by the \fBrecover\fR and
 \fBnorecover\fR options.
 .TP
+.B recover
+Recover and try to mount a partition which was not unmounted properly by
+Windows. The Windows logfile is cleared, which may cause inconsistencies.
+Currently this is the default option.
+.TP
+.B norecover
+Do not try to mount a partition which was not unmounted properly by Windows.
+.TP
 .B ignore_case \fP(only with lowntfs-3g)
 Ignore character case when accessing a file (\fBFOO\fR, \fBFoo\fR, \fBfoo\fR,
 etc. designate the same file). All files are displayed with lower case in
@@ -157,7 +165,7 @@ Unlike in case of read-only mount, the read-write mount is denied if
 the NTFS volume is hibernated. One needs either to resume Windows and
 shutdown it properly, or use this option which will remove the Windows
 hibernation file. Please note, this means that the saved Windows 
-session will be completely lost. Use this option for your own 
+session will be completely lost. Use this option under your own 
 responsibility.
 .TP
 .B atime, noatime, relatime
