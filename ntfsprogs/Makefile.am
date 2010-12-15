@@ -118,7 +118,7 @@ strip:	$(bin_PROGRAMS) $(sbin_PROGRAMS)
 	$(STRIP) $^
 
 libs:
-	(cd ../libntfs && $(MAKE) libs) || exit 1;
+	(cd ../libntfs-3g && $(MAKE) libs) || exit 1;
 
 extra:	extras
 

@@ -37,6 +37,9 @@ libtool: $(LIBTOOL_DEPS)
 strip:
 	(cd ntfsprogs && $(MAKE) strip) || exit 1;
 
+libs:
+	(cd libntfs-3g && $(MAKE) libs) || exit 1;
+
 extra:	extras
 
 extras: libs

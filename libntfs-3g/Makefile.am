@@ -78,3 +78,5 @@ if INSTALL_LIBRARY
 	$(RM) -f "$(DESTDIR)/$(rootlibdir)"/libntfs-3g.so*
 endif
 
+libs:	$(lib_LTLIBRARIES)
+
