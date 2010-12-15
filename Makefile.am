@@ -24,7 +24,7 @@ MAINTAINERCLEANFILES=\
 	$(srcdir)/m4/lt~obsolete.m4 \
 	$(srcdir)/m4/ltoptions.m4
 
-SUBDIRS = doc include libfuse-lite libntfs-3g ntfsprogs src
+SUBDIRS = include libfuse-lite libntfs-3g ntfsprogs src
 
 doc_DATA = README
 

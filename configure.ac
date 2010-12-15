@@ -459,7 +459,6 @@ fi
 # generate files
 AC_CONFIG_FILES([
 	Makefile
-	doc/Makefile
 	include/Makefile
 	include/fuse-lite/Makefile
 	include/ntfs/Makefile
