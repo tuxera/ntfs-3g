@@ -34,6 +34,7 @@ dist-hook:
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
+if ENABLE_NTFSPROGS
 strip:
 	(cd ntfsprogs && $(MAKE) strip) || exit 1;
 
@@ -44,3 +45,4 @@ extra:	extras
 
 extras: libs
 	(cd ntfsprogs && $(MAKE) extras) || exit 1;
+endif

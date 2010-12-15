@@ -128,6 +128,14 @@ AC_ARG_ENABLE(
 	[enable_device_default_io_ops="yes"]
 )
 
+AC_ARG_ENABLE(
+	[ntfsprogs],
+	[AS_HELP_STRING([--enable-ntfsprogs],[enable ntfsprogs utilities
+		       (default=no)])],
+	,
+	[enable_ntfsprogs="no"]
+)
+
 AC_ARG_ENABLE(crypto,
 	AS_HELP_STRING(--enable-crypto,enable crypto related code and utilities
 		       (default=no)), ,
@@ -444,6 +452,7 @@ AM_CONDITIONAL([RUN_LDCONFIG], [test "${enable_ldconfig}" = "yes"])
 AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
 AM_CONDITIONAL([ENABLE_MOUNT_HELPER], [test "${enable_mount_helper}" = "yes"])
+AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" != "no"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then

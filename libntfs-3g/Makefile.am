@@ -78,5 +78,7 @@ if INSTALL_LIBRARY
 	$(RM) -f "$(DESTDIR)/$(rootlibdir)"/libntfs-3g.so*
 endif
 
+if ENABLE_NTFSPROGS
 libs:	$(lib_LTLIBRARIES)
+endif
 

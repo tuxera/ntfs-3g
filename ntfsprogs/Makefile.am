@@ -11,6 +11,8 @@ endif
 # Workaround to make REALLYSTATIC work with automake 1.5.
 LINK=$(STATIC_LINK) $(LIBTOOL_LINK)
 
+if ENABLE_NTFSPROGS
+
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
@@ -137,3 +139,5 @@ install-data-hook:
 uninstall-local:
 	$(RM) -f $(DESTDIR)/sbin/mkfs.ntfs
 	$(RM) -f $(DESTDIR)$(man8dir)/mkfs.ntfs.8
+
+endif
