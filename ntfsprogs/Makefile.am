@@ -29,8 +29,6 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 
 MAINTAINERCLEANFILES = Makefile.in
 
-linux_ntfsincludedir	= -I$(top_srcdir)/include/ntfs
-
 if ENABLE_CRYPTO
 EXTRA_PROGRAMS		+= ntfsdecrypt
 endif
