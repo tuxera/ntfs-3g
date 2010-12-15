@@ -73,19 +73,18 @@
 #define REG_NOERROR 0
 #endif
 
-#include <ntfs-3g/bootsect.h>
-#include <ntfs-3g/mft.h>
-#include <ntfs-3g/attrib.h>
-#include <ntfs-3g/layout.h>
-#include <ntfs-3g/inode.h>
-#include <ntfs-3g/device.h>
-#include <ntfs-3g/debug.h>
-#include <ntfs-3g/ntfstime.h>
-#include <ntfs-3g/logging.h>
-
 #include "ntfsundelete.h"
+#include "bootsect.h"
+#include "mft.h"
+#include "attrib.h"
+#include "layout.h"
+#include "inode.h"
+#include "device.h"
 #include "utils.h"
+#include "debug.h"
+#include "ntfstime.h"
 /* #include "version.h" */
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";

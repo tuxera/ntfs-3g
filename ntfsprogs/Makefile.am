@@ -38,7 +38,7 @@ EXTRA_PROGRAMS		+= ntfsrm
 endif
 
 # Set the include path.
-AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs $(all_includes)
+AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs -I$(top_srcdir)/include/ntfs-3g $(all_includes)
 
 ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)

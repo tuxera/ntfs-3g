@@ -44,12 +44,11 @@
 #include <getopt.h>
 #endif
 
-#include <ntfs-3g/debug.h>
-#include <ntfs-3g/mft.h>
-#include <ntfs-3g/logging.h>
-
+#include "debug.h"
+#include "mft.h"
 #include "utils.h"
 /* #include "version.h" */
+#include "logging.h"
 
 static const char *EXEC_NAME = "ntfslabel";
 

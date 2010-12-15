@@ -66,18 +66,17 @@
 #include <errno.h>
 #endif
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/mft.h>
-#include <ntfs-3g/attrib.h>
-#include <ntfs-3g/layout.h>
-#include <ntfs-3g/inode.h>
-#include <ntfs-3g/index.h>
-#include <ntfs-3g/security.h>
-#include <ntfs-3g/mst.h>
-#include <ntfs-3g/dir.h>
-#include <ntfs-3g/ntfstime.h>
-
+#include "types.h"
+#include "mft.h"
+#include "attrib.h"
+#include "layout.h"
+#include "inode.h"
+#include "index.h"
 #include "utils.h"
+#include "security.h"
+#include "mst.h"
+#include "dir.h"
+#include "ntfstime.h"
 /* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfsinfo";

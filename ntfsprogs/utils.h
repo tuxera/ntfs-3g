@@ -27,9 +27,9 @@
 
 #include "config.h"
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/layout.h>
-#include <ntfs-3g/volume.h>
+#include "types.h"
+#include "layout.h"
+#include "volume.h"
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>

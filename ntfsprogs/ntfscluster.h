@@ -24,8 +24,8 @@
 #ifndef _NTFSCLUSTER_H_
 #define _NTFSCLUSTER_H_
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/layout.h>
+#include "types.h"
+#include "layout.h"
 
 enum action {
 	act_none,

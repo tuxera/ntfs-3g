@@ -1,7 +1,7 @@
 #ifndef _NTFS_SD_H_
 #define _NTFS_SD_H_
 
-#include <ntfs-3g/types.h>
+#include "types.h"
 
 void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len);
 void init_root_sd_31(u8 **sd_val, int *sd_val_len);

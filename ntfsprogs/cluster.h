@@ -24,8 +24,8 @@
 #ifndef _CLUSTER_H_
 #define _CLUSTER_H_
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/volume.h>
+#include "types.h"
+#include "volume.h"
 
 typedef struct {
 	int x;

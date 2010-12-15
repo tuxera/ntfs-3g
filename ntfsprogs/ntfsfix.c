@@ -64,15 +64,14 @@
 #include <getopt.h>
 #endif
 
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/attrib.h>
-#include <ntfs-3g/mft.h>
-#include <ntfs-3g/device.h>
-#include <ntfs-3g/logfile.h>
-#include <ntfs-3g/logging.h>
-
+#include "types.h"
+#include "attrib.h"
+#include "mft.h"
+#include "device.h"
+#include "logfile.h"
 #include "utils.h"
 /* #include "version.h" */
+#include "logging.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \

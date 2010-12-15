@@ -1,5 +1,5 @@
-#include <ntfs-3g/types.h>
-#include <ntfs-3g/layout.h>
+#include "types.h"
+#include "layout.h"
 #include "sd.h"
 
 /**
