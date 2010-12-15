@@ -34,7 +34,7 @@ EXTRA_PROGRAMS		+= ntfsdecrypt
 endif
 
 # Set the include path.
-AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs -I$(top_srcdir)/include/ntfs-3g $(all_includes)
+AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs-3g $(all_includes)
 
 ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)
@@ -52,7 +52,7 @@ ntfsinfo_SOURCES	= ntfsinfo.c utils.c utils.h
 ntfsinfo_LDADD		= $(AM_LIBS)
 ntfsinfo_LDFLAGS	= $(AM_LFLAGS)
 
-ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h utils.c utils.h
+ntfsundelete_SOURCES	= ntfsundelete.c ntfsundelete.h utils.c utils.h list.h
 ntfsundelete_LDADD	= $(AM_LIBS)
 ntfsundelete_LDFLAGS	= $(AM_LFLAGS)
 
@@ -68,7 +68,7 @@ ntfscluster_SOURCES	= ntfscluster.c ntfscluster.h cluster.c cluster.h utils.c ut
 ntfscluster_LDADD	= $(AM_LIBS)
 ntfscluster_LDFLAGS	= $(AM_LFLAGS)
 
-ntfsls_SOURCES		= ntfsls.c utils.c utils.h
+ntfsls_SOURCES		= ntfsls.c utils.c utils.h list.h
 ntfsls_LDADD		= $(AM_LIBS)
 ntfsls_LDFLAGS		= $(AM_LFLAGS)
 

@@ -461,7 +461,6 @@ AC_CONFIG_FILES([
 	Makefile
 	include/Makefile
 	include/fuse-lite/Makefile
-	include/ntfs/Makefile
 	include/ntfs-3g/Makefile
 	libfuse-lite/Makefile
 	libntfs-3g/Makefile
