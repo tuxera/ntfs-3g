@@ -62,7 +62,7 @@ The ntfsclone utility guarantees to make an exact copy of NTFS but it
 won't deal with booting issues. This is by design: ntfsclone is a 
 filesystem, not system utility. Its aim is only NTFS cloning, not Windows 
 cloning. Hereby ntfsclone can be used as a very fast and reliable 
-build block for Windows clonning but itself it's not enough. You 
+build block for Windows cloning but itself it's not enough. You 
 can find useful tips following the related links on the below page
 .br
 .nh
