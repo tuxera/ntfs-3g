@@ -54,7 +54,7 @@ The exit code is 0 on success, non\-zero otherwise.
 No problem is known. If you would find otherwise then please send
 your report to the development team:
 .nh
-linux\-ntfs\-dev@lists.sourceforge.net
+ntfs\-3g\-devel@lists.sf.net
 .hy
 .SH AUTHOR
 .B ntfscmp

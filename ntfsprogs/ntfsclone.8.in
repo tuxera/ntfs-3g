@@ -323,7 +323,7 @@ There are no known problems with
 If you think you have found a problem then please send an email describing it
 to the development team:
 .nh
-linux\-ntfs\-dev@lists.sourceforge.net
+ntfs\-3g\-devel@lists.sf.net
 .hy
 .sp
 Sometimes it might appear ntfsclone froze if the clone is on ReiserFS
