@@ -70,4 +70,5 @@ These manual pages can be viewed online at:
 http://man.linux-ntfs.org/
 .hy
 .SH SEE ALSO
+.BR ntfs\-3g (8)
 
