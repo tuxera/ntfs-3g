@@ -57,7 +57,7 @@ was written by Anton Altaparmakov, with contributions from Szabolcs Szakacsits.
 .SH AVAILABILITY
 .B ntfsfix
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

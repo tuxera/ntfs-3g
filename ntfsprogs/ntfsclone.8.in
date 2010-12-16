@@ -340,7 +340,7 @@ was written by Szabolcs Szakacsits with contributions from Per Olofsson
 .SH AVAILABILITY
 .B ntfsclone
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available at:
 .br
 .nh

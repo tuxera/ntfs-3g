@@ -120,7 +120,7 @@ was written by Richard Russon, Anton Altaparmakov and Szabolcs Szakacsits.
 .SH AVAILABILITY
 .B ntfscat
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

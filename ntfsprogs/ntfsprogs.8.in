@@ -56,7 +56,9 @@ Olofsson, Richard Russon, Szabolcs Szakacsits, Yura Pakhuchiy and Yuval Fledel.
 .SH AVAILABILITY
 The
 .B ntfsprogs
-can be downloaded from:
+are part of the
+.B ntfs-3g
+package which can be downloaded from:
 .br
 .nh
 http://www.linux\-ntfs.org/content/view/19/37

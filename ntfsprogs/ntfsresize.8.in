@@ -255,7 +255,7 @@ man page originally formed the basis of this page.
 .SH AVAILABILITY
 .B ntfsresize
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

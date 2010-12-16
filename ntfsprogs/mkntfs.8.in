@@ -283,7 +283,7 @@ was written by Anton Altaparmakov, Richard Russon, Erik Sornes and Szabolcs Szak
 .SH AVAILABILITY
 .B mkntfs
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

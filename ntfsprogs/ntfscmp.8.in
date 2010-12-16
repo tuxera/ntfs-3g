@@ -62,7 +62,7 @@ was written by Szabolcs Szakacsits (szaka@sienet.hu).
 .SH AVAILABILITY
 .B ntfscmp
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

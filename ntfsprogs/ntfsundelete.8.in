@@ -312,7 +312,7 @@ Altaparmakov.
 .SH AVAILABILITY
 .B ntfsundelete
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh

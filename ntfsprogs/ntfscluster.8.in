@@ -112,7 +112,7 @@ was written by Richard Russon, with contributions from Anton Altaparmakov.
 .SH AVAILABILITY
 .B ntfscluster
 is part of the
-.B ntfsprogs
+.B ntfs-3g
 package and is available from:
 .br
 .nh
