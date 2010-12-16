@@ -2,7 +2,7 @@
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSLS 8 "November 2005" "ntfsprogs @VERSION@"
+.TH NTFSLS 8 "November 2005" "ntfs-3g @VERSION@"
 .SH NAME
 ntfsls \- list directory contents on an NTFS filesystem
 .SH SYNOPSIS

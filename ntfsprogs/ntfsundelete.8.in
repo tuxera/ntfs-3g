@@ -1,7 +1,7 @@
 .\" Copyright (c) 2002\-2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSUNDELETE 8 "November 2005" "ntfsprogs @VERSION@"
+.TH NTFSUNDELETE 8 "November 2005" "ntfs-3g @VERSION@"
 .SH NAME
 ntfsundelete \- recover a deleted file from an NTFS volume.
 .SH SYNOPSIS
