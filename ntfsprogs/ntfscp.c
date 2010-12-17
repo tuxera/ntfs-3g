@@ -1,10 +1,11 @@
 /**
  * ntfscp - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2004-2005 Yura Pakhuchiy
+ * Copyright (c) 2004-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Anton Altaparmakov
+ * Copyright (c) 2006 Hil Liao
  *
- * This utility will overwrite files on NTFS volume.
+ * This utility will copy file to an NTFS volume.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,6 +44,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 
 #include "types.h"
 #include "attrib.h"
@@ -68,7 +72,7 @@ struct options {
 
 static const char *EXEC_NAME = "ntfscp";
 static struct options opts;
-volatile sig_atomic_t caught_terminate = 0;
+static volatile sig_atomic_t caught_terminate = 0;
 
 /**
  * version - Print version information about the program
@@ -79,9 +83,11 @@ volatile sig_atomic_t caught_terminate = 0;
  */
 static void version(void)
 {
-	ntfs_log_info("\n%s v%s (libntfs-3g) - Overwrite files on NTFS "
+	ntfs_log_info("\n%s v%s (libntfs-3g) - Copy file to an NTFS "
 		"volume.\n\n", EXEC_NAME, VERSION);
-	ntfs_log_info("Copyright (c) 2004-2005 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2004-2007 Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2005 Anton Altaparmakov\n");
+	ntfs_log_info("Copyright (c) 2006 Hil Liao\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -178,7 +184,7 @@ static int parse_options(int argc, char **argv)
 				ntfs_log_error("Couldn't parse attribute.\n");
 				err++;
 			} else
-				opts.attribute = (ATTR_TYPES)attr;
+				opts.attribute = (ATTR_TYPES)cpu_to_le32(attr);
 			break;
 		case 'i':
 			opts.inode++;
@@ -271,6 +277,34 @@ static void signal_handler(int arg __attribute__((unused)))
 }
 
 /**
+ * Create a regular file under the given directory inode
+ *
+ * It is a wrapper function to ntfs_create(...)
+ *
+ * Return:  the created file inode
+ */
+static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
+			  const char *filename)
+{
+	ntfschar *ufilename;
+	/* inode to the file that is being created */
+	ntfs_inode *ni;
+	int ufilename_len;
+
+	/* ntfs_mbstoucs(...) will allocate memory for ufilename if it's NULL */
+	ufilename = NULL;
+	ufilename_len = ntfs_mbstoucs_libntfscompat(filename, &ufilename, 0);
+	if (ufilename_len == -1) {
+		ntfs_log_perror("ERROR: Failed to convert '%s' to unicode",
+					filename);
+		return NULL;
+	}
+	ni = ntfs_create(dir_ni, 0, ufilename, ufilename_len, S_IFREG);
+	free(ufilename);
+	return ni;
+}
+
+/**
  * main - Begin here
  *
  * Start from here.
@@ -313,14 +347,16 @@ int main(int argc, char *argv[])
 
 	if (opts.noaction)
 		flags = MS_RDONLY;
+	if (opts.force)
+		flags |= MS_RECOVER;
 
-	vol = utils_mount_volume(opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags);
 	if (!vol) {
 		ntfs_log_perror("ERROR: couldn't mount volume");
 		return 1;
 	}
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && (!opts.force))
+	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
 	{
@@ -352,45 +388,113 @@ int main(int argc, char *argv[])
 	} else
 		out = ntfs_pathname_to_inode(vol, NULL, opts.dest_file);
 	if (!out) {
-		ntfs_log_perror("ERROR: Couldn't open destination file");
-		goto close_src;
-	}
-	if ((le16_to_cpu(out->mrec->flags) & MFT_RECORD_IS_DIRECTORY) &&
-			!opts.inode){
-		/*
-		 * @out is directory and it was specified by pathname, add
-		 * filename to path and reopen inode.
-		 */
-		char *filename, *new_dest_file;
+		/* Copy the file if the dest_file's parent dir can be opened. */
+		char *parent_dirname;
+		char *filename;
+		ntfs_inode *dir_ni;
+		ntfs_inode *ni;
+		int dest_path_len;
+		char *dirname_last_whack;
 
-		/*
-		 * FIXME: There should exist more beautiful way to get filename.
-		 * Not sure that it will work in windows, but I don't think that
-		 * someone will use ntfscp under windows.
-		 */
-		filename = strrchr(opts.src_file, '/');
-		if (filename)
-			filename++;
-		else
-			filename = opts.src_file;
-		/* Add 2 bytes for '/' and null-terminator. */
-		new_dest_file = malloc(strlen(opts.dest_file) +
-				strlen(filename) + 2);
-		if (!new_dest_file) {
-			ntfs_log_perror("ERROR: malloc() failed");
-			goto close_dst;
-		}
-		strcpy(new_dest_file, opts.dest_file);
-		strcat(new_dest_file, "/");
-		strcat(new_dest_file, filename);
-		ntfs_inode_close(out);
-		out = ntfs_pathname_to_inode(vol, NULL, new_dest_file);
-		free(new_dest_file);
-		if (!out) {
-			ntfs_log_perror("ERROR: Failed to open destination "
-					"file");
+		filename = basename(opts.dest_file);
+		dest_path_len = strlen(opts.dest_file);
+		parent_dirname = strdup(opts.dest_file);
+		if (!parent_dirname) {
+			ntfs_log_perror("strdup() failed");
 			goto close_src;
 		}
+		dirname_last_whack = strrchr(parent_dirname, '/');
+		if (dirname_last_whack) {
+			dirname_last_whack[1] = 0;
+			dir_ni = ntfs_pathname_to_inode(vol, NULL,
+					parent_dirname);
+		} else {
+			ntfs_log_verbose("Target path does not contain '/'. "
+					"Using root directory as parent.\n");
+			dir_ni = ntfs_inode_open(vol, FILE_root);
+		}
+		if (dir_ni) {
+			if (!(dir_ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+				/* Remove the last '/' for estetic reasons. */
+				dirname_last_whack[0] = 0;
+				ntfs_log_error("The file '%s' already exists "
+						"and is not a directory. "
+						"Aborting.\n", parent_dirname);
+				free(parent_dirname);
+				ntfs_inode_close(dir_ni);
+				goto close_src;
+			}
+			ntfs_log_verbose("Creating a new file '%s' under '%s'"
+					 "\n", filename, parent_dirname);
+			ni = ntfs_new_file(dir_ni, filename);
+			ntfs_inode_close(dir_ni);
+			if (!ni) {
+				ntfs_log_perror("Failed to create '%s' under "
+						"'%s'", filename,
+						parent_dirname);
+				free(parent_dirname);
+				goto close_src;
+			}
+			out = ni;
+		} else {
+			ntfs_log_perror("ERROR: Couldn't open '%s'",
+					parent_dirname);
+			free(parent_dirname);
+			goto close_src;
+		}
+		free(parent_dirname);
+	}
+	/* The destination is a directory. */
+	if ((out->mrec->flags & MFT_RECORD_IS_DIRECTORY) && !opts.inode) {
+		char *filename;
+		char *overwrite_filename;
+		int overwrite_filename_len;
+		ntfs_inode *ni;
+		ntfs_inode *dir_ni;
+		int filename_len;
+		int dest_dirname_len;
+
+		filename = basename(opts.src_file);
+		dir_ni = out;
+		filename_len = strlen(filename);
+		dest_dirname_len = strlen(opts.dest_file);
+		overwrite_filename_len = filename_len+dest_dirname_len + 2;
+		overwrite_filename = malloc(overwrite_filename_len);
+		if (!overwrite_filename) {
+			ntfs_log_perror("ERROR: Failed to allocate %i bytes "
+					"memory for the overwrite filename",
+					overwrite_filename_len);
+			ntfs_inode_close(out);
+			goto close_src;
+		}
+		strcpy(overwrite_filename, opts.dest_file);
+		if (opts.dest_file[dest_dirname_len - 1] != '/') {
+			strcat(overwrite_filename, "/");
+		}
+		strcat(overwrite_filename, filename);
+		ni = ntfs_pathname_to_inode(vol, NULL, overwrite_filename);
+		/* Does a file with the same name exist in the dest dir? */
+		if (ni) {
+			ntfs_log_verbose("Destination path has a file with "
+					"the same name\nOverwriting the file "
+					"'%s'\n", overwrite_filename);
+			ntfs_inode_close(out);
+			out = ni;
+		} else {
+			ntfs_log_verbose("Creating a new file '%s' under "
+					"'%s'\n", filename, opts.dest_file);
+			ni = ntfs_new_file(dir_ni, filename);
+			ntfs_inode_close(dir_ni);
+			if (!ni) {
+				ntfs_log_perror("ERROR: Failed to create the "
+						"destination file under '%s'",
+						opts.dest_file);
+				free(overwrite_filename);
+				goto close_src;
+			}
+			out = ni;
+		}
+		free(overwrite_filename);
 	}
 
 	attr_name = ntfs_str2ucs(opts.attr_name, &attr_name_len);
@@ -424,7 +528,7 @@ int main(int argc, char *argv[])
 
 	ntfs_log_verbose("Old file size: %lld\n", na->data_size);
 	if (na->data_size != new_size) {
-		if (ntfs_attr_truncate(na, new_size)) {
+		if (__ntfs_attr_truncate(na, new_size, FALSE)) {
 			ntfs_log_perror("ERROR: Couldn't resize attribute");
 			goto close_attr;
 		}

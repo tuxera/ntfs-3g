@@ -1,30 +1,20 @@
-.\" Copyright (c) 2004\-2005 Yura Pakhuchiy.
+.\" Copyright (c) 2004\-2007 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFSCP 8 "November 2005" "ntfs-3g @VERSION@"
+.TH NTFSCP 8 "September 2007" "ntfs-3g @VERSION@"
 .SH NAME
-ntfscp \- overwrite file on an NTFS volume.
+ntfscp \- copy file to an NTFS volume.
 .SH SYNOPSIS
-.B ntfscp
-[\fIoptions\fR] \fIdevice source_file destination\fR
+\fBntfscp\fR [\fIoptions\fR] \fIdevice source_file destination\fR
 .SH DESCRIPTION
-.B ntfscp
-will overwrite file on an NTFS volume. At present
-.B ntfscp
-can't create new files.
-.B destination
-can be either file or directory. In case if
-.B destination
-is directory specified by name then
-.B source_file
-is copied into this directory, in case if
-.B destination
-is directory and specified by inode number then unnamed data attribute is
-created for this inode and
-.B source_file
-is copied into it (WARNING: it's unusual to have unnamed data streams in the
-directories, think twice before specifying directory by inode number).
+\fBntfscp\fR will copy file to an NTFS volume. \fIdestination\fR can be either
+file or directory. In case if \fIdestination\fR is directory specified by name
+then \fIsource_file\fR is copied into this directory, in case if
+\fIdestination\fR is directory and specified by inode number then unnamed data
+attribute is created for this inode and \fIsource_file\fR is copied into it
+(WARNING: it's unusual to have unnamed data streams in the directories, think
+twice before specifying directory by inode number).
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfscp
@@ -96,24 +86,26 @@ windows is C):
 .sp
 .RE
 .SH BUGS
-There are no known problems with
-.BR ntfscp .
-If you find a bug please send an email describing the problem to the
-development team:
+There are no known problems with \fBntfscp\fR. If you find a bug please send an
+email describing the problem to the development team:
 .br
 .nh
 ntfs\-3g\-devel@lists.sf.net
 .hy
 .SH AUTHORS
-.B ntfscp
-was written by Yura Pakhuchiy, with contributions from Anton Altaparmakov.
+\fBntfscp\fR was written by Yura Pakhuchiy, with contributions from Anton
+Altaparmakov and Hil Liao.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH AVAILABILITY
+<<<<<<< HEAD
 .B ntfscp
 is part of the
 .B ntfs-3g
 package and is available from:
+=======
+\fBntfscp\fR is part of the \fBntfsprogs\fR package and is available from:
+>>>>>>> linux-ntfs/libntfs-3g_port-v2_0_0
 .br
 .nh
 http://www.tuxera.com/community/

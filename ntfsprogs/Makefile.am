@@ -17,7 +17,7 @@ bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
 EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
-			  ntfsmftalloc
+			  ntfsmftalloc ntfsck
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
 			  ntfsundelete.8 ntfsresize.8 ntfsprogs.8 ntfsls.8 \
@@ -40,8 +40,9 @@ ntfsfix_SOURCES		= ntfsfix.c utils.c utils.h
 ntfsfix_LDADD		= $(AM_LIBS)
 ntfsfix_LDFLAGS		= $(AM_LFLAGS)
 
-mkntfs_SOURCES		= attrdef.c attrdef.h upcase.c upcase.h boot.c boot.h sd.c sd.h mkntfs.c utils.c utils.h
-mkntfs_LDADD		= $(AM_LIBS)
+mkntfs_CPPFLAGS		= $(AM_CPPFLAGS) $(MKNTFS_CPPFLAGS)
+mkntfs_SOURCES		= attrdef.c attrdef.h boot.c boot.h sd.c sd.h mkntfs.c utils.c utils.h
+mkntfs_LDADD		= $(AM_LIBS) $(MKNTFS_LIBS)
 mkntfs_LDFLAGS		= $(AM_LFLAGS)
 
 ntfslabel_SOURCES	= ntfslabel.c utils.c utils.h
@@ -80,6 +81,10 @@ ntfscp_SOURCES		= ntfscp.c utils.c utils.h
 ntfscp_LDADD		= $(AM_LIBS)
 ntfscp_LDFLAGS		= $(AM_LFLAGS)
 
+ntfsck_SOURCES		= ntfsck.c utils.c utils.h
+ntfsck_LDADD		= $(AM_LIBS)
+ntfsck_LDFLAGS		= $(AM_LFLAGS)
+
 ntfscmp_SOURCES		= ntfscmp.c utils.c utils.h
 ntfscmp_LDADD		= $(AM_LIBS)
 ntfscmp_LDFLAGS		= $(AM_LFLAGS)
@@ -108,8 +113,9 @@ ntfsdump_logfile_LDFLAGS= $(AM_LFLAGS)
 
 if ENABLE_CRYPTO
 ntfsdecrypt_SOURCES	= ntfsdecrypt.c utils.c utils.h
-ntfsdecrypt_LDADD	= $(AM_LIBS)
-ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS) -lgcrypt -lgnutls
+ntfsdecrypt_LDADD	= $(AM_LIBS) $(GNUTLS_LIBS) $(LIBGCRYPT_LIBS)
+ntfsdecrypt_LDFLAGS	= $(AM_LFLAGS)
+ntfsdecrypt_CFLAGS	= $(GNUTLS_CFLAGS) $(LIBGCRYPT_CFLAGS)
 endif
 
 # Extra targets

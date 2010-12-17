@@ -38,6 +38,7 @@ struct options {
 	int		 force;		/* Override common sense */
 	int		 quiet;		/* Less output */
 	int		 verbose;	/* Extra output */
+	BOOL		 raw;		/* Raw data output */
 };
 
 #endif /* _NTFSCAT_H_ */

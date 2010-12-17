@@ -278,7 +278,7 @@ fi
 compile_crypto=false
 if test "$enable_crypto" != "no"; then
 	have_libgcrypt=false
-	AM_PATH_LIBGCRYPT(1.2.0, [ have_libgcrypt=true ],
+	AM_PATH_LIBGCRYPT(1.2.2, [ have_libgcrypt=true ],
 	[
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([ntfsprogs crypto code requires the gcrypt library.])
@@ -287,17 +287,29 @@ if test "$enable_crypto" != "no"; then
 		fi
 	])
 	have_libgnutls=false
-	PKG_CHECK_MODULES(GNUTLS_MODULE, gnutls >= 1.2.8, [ have_libgnutls=true ],
-	[
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 1.4.4, [ have_libgnutls=true ],
 		if test "$enable_crypto" = "yes"; then
 			AC_MSG_ERROR([ntfsprogs crypto code requires the gnutls library.])
 		else
 			AC_MSG_WARN([ntfsprogs crypto code requires the gnutls library.])
 		fi
-	])
+	)
+	have_libconfig=false
+	PKG_CHECK_MODULES(libconfig, libconfig >= 1.0.1, [ have_libconfig=true ],
+		if test "$enable_crypto" = "yes"; then
+			AC_MSG_ERROR([ntfsprogs crypto code requires the libconfig.])
+		else
+			AC_MSG_WARN([ntfsprogs crypto code requires the libconfig.])
+		fi
+	)
 	if test "$have_libgcrypt" = "true"; then
 		if test "$have_libgnutls" = "true"; then
-			compile_crypto=true
+			if test "$have_libconfig" = "true"; then
+				compile_crypto=true
+				AC_DEFINE([ENABLE_CRYPTO], 1,
+				[Define this to 1 if you want to enable support of
+				 encrypted files in libntfs and utilities.])
+			fi
 		fi
 	fi
 fi
@@ -309,6 +321,42 @@ all_includes="$all_includes $USER_INCLUDES"
 AC_SUBST(all_includes)
 AC_SUBST(all_libraries)
 
+# Specify support for generating DCE compliant UUIDs (aka GUIDs).  We check if
+# uuid/uuid.h header is present and the uuid library is present that goes with
+# it and then check if uuid_generate() is present and usable.
+#
+# DCE UUIDs are enabled by default and can be disabled with the --disable-uuid
+# option to the configure script.
+AC_ARG_WITH(uuid, [
+  --with-uuid@<:@=PFX@:>@       generate DCE compliant UUIDs, with optional prefix
+                          to uuid library and headers @<:@default=detect@:>@
+  --without-uuid          do not generate DCE compliant UUIDs],
+	if test "$with_uuid" = "yes"; then
+		extrapath=default
+	elif test "$with_uuid" = "no"; then
+		extrapath=
+	else
+		extrapath=$with_uuid
+	fi,
+	extrapath=default
+)
+if test "x$extrapath" != "x"; then
+	if test "x$extrapath" != "xdefault"; then
+		MKNTFS_CPPFLAGS="$MKNTFS_CPPFLAGS -I$extrapath/include"
+		MKNTFS_LIBS="$MKNTFS_LIBS -L$extrapath/lib"
+	fi
+	AC_CHECK_HEADER([uuid/uuid.h],
+		AC_CHECK_LIB([uuid], [uuid_generate],
+			AC_DEFINE([ENABLE_UUID], 1,
+			[Define this to 1 if you want to enable generation of
+			DCE compliant UUIDs.])
+			MKNTFS_LIBS="$MKNTFS_LIBS -luuid",
+			AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.]),
+		),
+		AC_MSG_WARN([ntfsprogs DCE compliant UUID generation code requires the uuid library.]),
+	)
+fi
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
@@ -317,7 +365,7 @@ AC_CHECK_HEADERS([ctype.h fcntl.h libgen.h libintl.h limits.h locale.h \
 	endian.h byteswap.h sys/byteorder.h sys/endian.h sys/param.h \
 	sys/ioctl.h sys/mkdev.h sys/mount.h sys/stat.h sys/types.h sys/vfs.h \
 	sys/statvfs.h sys/sysmacros.h linux/major.h linux/fd.h linux/hdreg.h \
-	machine/endian.h gcrypt.h windows.h gnutls/pkcs12.h syslog.h])
+	machine/endian.h windows.h syslog.h pwd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

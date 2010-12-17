@@ -24,7 +24,7 @@
 
 /**
  * struct list_head - Simple doubly linked list implementation.
- * 
+ *
  * Copied from Linux kernel 2.4.2-ac18 into Linux-NTFS (with minor
  * modifications). - AIA
  *

@@ -2,6 +2,7 @@
  * ntfsundelete - Part of the Linux-NTFS project.
  *
  * Copyright (c) 2002 Richard Russon
+ * Copyright (c) 2007 Yura Pakhuchiy
  *
  * This utility will recover deleted files from an NTFS volume.
  *
@@ -27,6 +28,7 @@
 #include "types.h"
 #include "list.h"
 #include "runlist.h"
+#include "utils.h"
 
 enum optmode {
 	MODE_NONE = 0,
@@ -57,7 +59,6 @@ struct options {
 	s64		 mft_begin;	/* Range for mft copy */
 	s64		 mft_end;
 	char		 fillbyte;	/* Use for unrecoverable sections */
-	char		 padding[7];	/* Unused: padding to 64 bit. */
 };
 
 struct filename {
@@ -73,9 +74,8 @@ struct filename {
 	time_t		 date_r;	/*	read */
 	char		*name;		/* Filename in current locale */
 	FILE_NAME_TYPE_FLAGS name_space;
-	long long	 parent_mref;
+	leMFT_REF	 parent_mref;
 	char		*parent_name;
-	char		 padding[7];	/* Unused: padding to 64 bit. */
 };
 
 struct data {
@@ -93,7 +93,6 @@ struct data {
 	runlist_element *runlist;	/* Decoded data runs */
 	int		 percent;	/* Amount potentially recoverable */
 	void		*data;		/* If resident, a pointer to the data */
-	char		 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 struct ufile {
@@ -107,7 +106,6 @@ struct ufile {
 	int		 attr_list;	/* MFT record may be one of many */
 	int		 directory;	/* MFT record represents a directory */
 	MFT_RECORD	*mft;		/* Raw MFT record */
-	char		 padding[4];	/* Unused: padding to 64 bit. */
 };
 
 #endif /* _NTFSUNDELETE_H_ */

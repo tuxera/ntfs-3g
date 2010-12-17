@@ -14,14 +14,14 @@ is a utility that fixes some common NTFS problems.
 .B ntfsfix
 is
 .B NOT
-a Linux version of chkdsk. It only repairs some fundamental NTFS
+a Linux version of chkdsk.  It only repairs some fundamental NTFS
 inconsistencies, resets the NTFS journal file and schedules an NTFS consistency
 check for the first boot into Windows.
 .sp
 You may run
 .B ntfsfix
 on an NTFS volume if you think it was damaged by Windows or some other way 
-and it can't be mounted.
+and it cannot be mounted.
 .SH OPTIONS
 Below is a summary of all the options that
 .B ntfsfix

@@ -52,15 +52,11 @@ int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref);
 int utils_is_metadata(ntfs_inode *inode);
 void utils_dump_mem(void *buf, int start, int length, int flags);
 
-#ifndef _NTFS_RICH_H_
 ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
-#endif
 
-#if !(defined(_NTFS_VOLUME_H) && defined(NTFS_RICH))
 int utils_valid_device(const char *name, int force);
-ntfs_volume * utils_mount_volume(const char *device, unsigned long flags, BOOL force);
-#endif
+ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags);
 
 /**
  * defines...
@@ -153,5 +149,15 @@ static __inline__ int ntfs_mbstoucs_libntfscompat(const char *ins,
 	else
 		return ntfs_mbstoucs(ins, outs);
 }
+
+/* This simple utility function was missing from libntfs-3g. */
+static __inline__ ntfschar *ntfs_attr_get_name(ATTR_RECORD *attr)
+{
+	return (ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset));
+}
+
+/* The define 'leMFT_REF' is not present in libntfs-3g. It is only symbolic so
+ * typedef it to MFT_REF.*/
+typedef MFT_REF leMFT_REF;
 
 #endif /* _NTFS_UTILS_H_ */

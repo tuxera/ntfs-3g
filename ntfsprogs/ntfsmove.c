@@ -745,7 +745,8 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_attribute
+ * move_attribute -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error
@@ -790,7 +791,8 @@ static s64 move_attribute(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 }
 
 /**
- * move_file
+ * move_file -
+ *
  * > 0  Bytes moved / size to be moved
  * = 0  Nothing to do
  * < 0  Error
@@ -873,8 +875,10 @@ int main(int argc, char *argv[])
 
 	if (opts.noaction)
 		flags |= MS_RDONLY;
+	if (opts.force)
+		flags |= MS_RECOVER;
 
-	vol = utils_mount_volume(opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags);
 	if (!vol) {
 		ntfs_log_info("!vol\n");
 		return 1;
@@ -888,10 +892,19 @@ int main(int argc, char *argv[])
 
 	count = move_file(vol, inode, opts.location, 0);
 	if ((count > 0) && (!opts.nodirty)) {
-		if (ntfs_volume_write_flags(vol, vol->flags | VOLUME_IS_DIRTY) <
-				0) {
-			ntfs_log_error("Couldn't mark volume dirty\n");
+
+		/* Porting note: libntfs-3g does not automatically set or clear
+		 * dirty flags on mount/unmount. It always preserves them until
+		 * they are explicitly changed with ntfs_volume_write_flags.
+		 * This means that the dirty flag is possibly not set, but
+		 * should be set. So we explicitly set it with a call to
+		 * ntfs_volume_write_flags. */
+		if(!(vol->flags & VOLUME_IS_DIRTY) && ntfs_volume_write_flags(
+			vol, vol->flags | VOLUME_IS_DIRTY)) {
+			ntfs_log_error("Error: Failed to set volume dirty "
+				"flag (%d (%s))!\n", errno, strerror(errno));
 		}
+
 		ntfs_log_info("Relocated %lld bytes\n", count);
 	}
 	if (count >= 0)

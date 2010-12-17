@@ -650,7 +650,8 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	vol = utils_mount_volume(opts.device, MS_RDONLY, opts.force);
+	vol = utils_mount_volume(opts.device, MS_RDONLY |
+			(opts.force ? MS_RECOVER : 0));
 	if (!vol) {
 		// FIXME: Print error... (AIA)
 		return 2;

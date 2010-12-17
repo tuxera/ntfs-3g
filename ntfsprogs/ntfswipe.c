@@ -1340,12 +1340,14 @@ int main(int argc, char *argv[])
 
 	if (opts.info || opts.noaction)
 		flags = MS_RDONLY;
+	if (opts.force)
+		flags |= MS_RECOVER;
 
-	vol = utils_mount_volume(opts.device, flags, opts.force);
+	vol = utils_mount_volume(opts.device, flags);
 	if (!vol)
 		goto free;
 
-	if ((vol->flags & VOLUME_IS_DIRTY) && (!opts.force))
+	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
 	if (opts.info) {

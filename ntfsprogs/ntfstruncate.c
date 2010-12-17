@@ -715,7 +715,7 @@ int main(int argc, char **argv)
 	 * Setup a default $AttrDef. FIXME: Should be reading this from the
 	 * volume itself, at ntfs_mount() time.
 	 */
-	attr_defs = (ATTR_DEF*)&attrdef_ntfs12_array;
+	attr_defs = (ATTR_DEF*)&attrdef_ntfs3x_array;
 
 	/* Parse command line options. */
 	parse_options(argc, argv);
@@ -807,4 +807,3 @@ int main(int argc, char **argv)
 	ntfs_log_quiet("ntfstruncate completed successfully. Have a nice day.\n");
 	return 0;
 }
-
