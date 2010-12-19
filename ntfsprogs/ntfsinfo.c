@@ -87,7 +87,6 @@ static struct options {
 	const char *device;	/* Device/File to work with */
 	const char *filename;	/* Resolve this filename to mft number */
 	s64	 inode;		/* Info for this inode */
-	int	 debug;		/* Debug output */
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
@@ -137,9 +136,6 @@ static void usage(void)
 		"    -v, --verbose    More output\n"
 		"    -V, --version    Display version information\n"
 		"    -h, --help       Display this help\n"
-#ifdef DEBUG
-                "    -d, --debug            Show debug information\n"
-#endif
 	        "\n",
 		EXEC_NAME);
 	printf("%s%s\n", ntfs_bugs, ntfs_home);
@@ -158,9 +154,6 @@ static int parse_options(int argc, char *argv[])
 {
 	static const char *sopt = "-:dfhi:F:mqtTvV";
 	static const struct option lopt[] = {
-#ifdef DEBUG
-                { "debug",      no_argument,            NULL, 'd' },
-#endif
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
 		{ "inode",	 required_argument,	NULL, 'i' },
@@ -191,9 +184,6 @@ static int parse_options(int argc, char *argv[])
 				opts.device = optarg;
 			else
 				err++;
-			break;
-		case 'd':
-			opts.debug++;
 			break;
 		case 'i':
 			if ((opts.inode != -1) ||
@@ -280,7 +270,7 @@ static int parse_options(int argc, char *argv[])
 			err++;
 		}
 
-		if ((opts.inode == -1) && (opts.filename == NULL) && !opts.mft) {
+		if (opts.inode == -1 && !opts.filename && !opts.mft) {
 			if (argc > 1)
 				ntfs_log_error("You must specify an inode to "
 					"learn about.\n");
@@ -301,14 +291,6 @@ static int parse_options(int argc, char *argv[])
 		}
 
 	}
-
-#ifdef DEBUG
-	if (!opts.debug)
-		if (!freopen("/dev/null", "w", stderr)) {
-			ntfs_log_perror("Failed to freopen stderr to /dev/null");
-			exit(1);
-		}
-#endif
 
 	if (ver)
 		version();
