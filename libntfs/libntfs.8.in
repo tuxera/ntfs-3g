@@ -12,9 +12,9 @@ NTFS volumes if\fB libntfs\fR was compiled with \fB--enable-crypto\fR option
 (it depends on\fB libgcrypt\fR,\fB GNU TLS\fR and \fBlibconfig\fR) and user
 wrote configuration file. Configuration file should be placed in
 \fB/etc/libntfs/config\fR or \fB$(HOME)/.libntfs/config\fR and contain list
-of .PFX key files (see ntfsprogs-<version>/libntfs/config in ntfsprogs source
-tarball for sample configuration file). Key files can be created/exported
-using\fB cipher\fR tool under windows.
+of .PFX key files (see \fBntfsprogs-@VERSION@/libntfs/config\fR in ntfsprogs
+sources tarball for sample configuration file). Key files can be
+created/exported using\fB cipher\fR tool under windows.
 .SH AUTHORS
 \fBlibntfs\fR was written by Anton Altaparmakov, Richard Russon, Szabolcs Szakacsits, Yuval Fledel and Yura Pakhuchiy.
 .SH AVAILABILITY
