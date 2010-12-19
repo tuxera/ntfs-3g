@@ -39,7 +39,6 @@
 #endif
 
 extern const char *ntfs_bugs;
-extern const char *ntfs_home;
 extern const char *ntfs_gpl;
 
 int utils_set_locale(void);
