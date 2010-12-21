@@ -145,6 +145,54 @@ int utils_set_locale(void)
 }
 
 /**
+ * linux-ntfs's ntfs_mbstoucs has different semantics, so we emulate it with
+ * ntfs-3g's.
+ */
+int ntfs_mbstoucs_libntfscompat(const char *ins,
+		ntfschar **outs, int outs_len)
+{
+	if(!outs) {
+		errno = EINVAL;
+		return -1;
+	}
+	else if(*outs != NULL) {
+		/* Note: libntfs's mbstoucs implementation allows the caller to
+		 * specify a preallocated buffer while libntfs-3g's always
+		 * allocates the output buffer.
+		 */
+		ntfschar *tmpstr = NULL;
+		int tmpstr_len;
+
+		tmpstr_len = ntfs_mbstoucs(ins, &tmpstr);
+		if(tmpstr_len >= 0) {
+			if((tmpstr_len + 1) > outs_len) {
+				/* Doing a realloc instead of reusing tmpstr
+				 * because it emulates libntfs's mbstoucs more
+				 * closely. */
+				ntfschar *re_outs = realloc(*outs,
+					sizeof(ntfschar)*(tmpstr_len + 1));
+				if(!re_outs)
+					tmpstr_len = -1;
+				else
+					*outs = re_outs;
+			}
+
+			if(tmpstr_len >= 0) {
+				/* The extra character is the \0 terminator. */
+				memcpy(*outs, tmpstr,
+					sizeof(ntfschar)*(tmpstr_len + 1));
+			}
+
+			free(tmpstr);
+		}
+
+		return tmpstr_len;
+	}
+	else
+		return ntfs_mbstoucs(ins, outs);
+}
+
+/**
  * utils_valid_device - Perform some safety checks on the device, before start
  * @name:   Full pathname of the device/file to work with
  * @force:  Continue regardless of problems
