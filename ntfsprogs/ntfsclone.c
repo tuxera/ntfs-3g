@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
+ * Copyright (c) 2010      Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -165,6 +166,8 @@ static BOOL image_is_host_endian = FALSE;
 
 #define IMAGE_MAGIC "\0ntfsclone-image"
 #define IMAGE_MAGIC_SIZE 16
+#define IMAGE_OFFSET_OFFSET 46 /* must be the same for all versions ! */
+#define IMAGE_HDR_ALIGN 8 /* alignment wanted after header */
 
 /* This is the first endianness safe format version. */
 #define NTFSCLONE_IMG_VER_MAJOR_ENDIANNESS_SAFE	10
@@ -184,7 +187,7 @@ static BOOL image_is_host_endian = FALSE;
 #define NTFSCLONE_IMG_VER_MINOR	0
 
 /* All values are in little endian. */
-static struct {
+static struct image_hdr {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
 	u8 minor_ver;
@@ -197,7 +200,7 @@ static struct {
 } __attribute__((__packed__)) image_hdr;
 
 #define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
-		(offsetof(typeof(image_hdr), offset_to_image_data))
+		(offsetof(struct image_hdr, offset_to_image_data))
 
 #define NTFS_MBYTE (1000 * 1000)
 
@@ -675,6 +678,7 @@ static void clone_ntfs(u64 nr_clusters)
 	void *buf;
 	u32 csize = vol->cluster_size;
 	u64 p_counter = 0;
+	char alignment[IMAGE_HDR_ALIGN];
 	struct progress_bar progress;
 
 	if (opt.save_image)
@@ -689,8 +693,12 @@ static void clone_ntfs(u64 nr_clusters)
 	progress_init(&progress, p_counter, nr_clusters, 100);
 
 	if (opt.save_image) {
-		if (write_all(&fd_out, &image_hdr,
-				image_hdr.offset_to_image_data) == -1)
+		int alignsize = le32_to_cpu(image_hdr.offset_to_image_data)
+				- sizeof(image_hdr);
+		memset(alignment,0,IMAGE_HDR_ALIGN);
+		if ((alignsize < 0)
+			|| write_all(&fd_out, &image_hdr, sizeof(image_hdr))
+			|| write_all(&fd_out, alignment, alignsize))
 			perr_exit("write_all");
 	}
 
@@ -1605,7 +1613,8 @@ static s64 open_image(void)
 		image_hdr.inuse = cpu_to_sle64(image_hdr.inuse);
 #endif
 		image_hdr.offset_to_image_data =
-				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
+				const_cpu_to_le32((sizeof(image_hdr)
+				    + IMAGE_HDR_ALIGN - 1) & -IMAGE_HDR_ALIGN);
 		image_is_host_endian = TRUE;
 	} else {
 			/* safe image : little endian data */
@@ -1677,8 +1686,8 @@ static void initialise_image_hdr(s64 device_size, s64 inuse)
 	image_hdr.device_size = cpu_to_sle64(device_size);
 	image_hdr.nr_clusters = cpu_to_sle64(vol->nr_clusters);
 	image_hdr.inuse = cpu_to_sle64(inuse);
-	image_hdr.offset_to_image_data = cpu_to_le32((sizeof(image_hdr) + 7) &
-			~7);
+	image_hdr.offset_to_image_data = cpu_to_le32((sizeof(image_hdr)
+			 + IMAGE_HDR_ALIGN - 1) & -IMAGE_HDR_ALIGN);
 }
 
 static void check_output_device(s64 input_size)
@@ -1816,6 +1825,13 @@ int main(int argc, char **argv)
 	s64 ntfs_size;
 	unsigned int wiped_total = 0;
 
+	/* make sure the layout of header is not affected by alignments */
+	if (offsetof(struct image_hdr, offset_to_image_data)
+			!= IMAGE_OFFSET_OFFSET) {
+		fprintf(stderr,"ntfsclone is not compiled properly. "
+				"Please fix\n");
+		exit(1);
+	}
 	/* print to stderr, stdout can be an NTFS image ... */
 	fprintf(stderr, "%s v%s (libntfs-3g)\n", EXEC_NAME, VERSION);
 	msg_out = stderr;
