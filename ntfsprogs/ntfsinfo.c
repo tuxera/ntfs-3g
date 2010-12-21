@@ -1123,7 +1123,7 @@ static void ntfs_dump_sds(ATTR_RECORD *attr, ntfs_inode *ni)
 
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	if (!ntfs_names_are_equal(NTFS_DATA_SDS, sizeof(NTFS_DATA_SDS) / 2 - 1,
-				  name, name_len, 0, NULL, 0))
+				  name, name_len, CASE_SENSITIVE, NULL, 0))
 		return;
 
 	sd = sds = ntfs_attr_readall(ni, AT_DATA, name, name_len, &data_size);
@@ -1589,7 +1589,7 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 #define	COMPARE_INDEX_NAMES(attr, name)					       \
 	ntfs_names_are_equal((name), sizeof(name) / 2 - 1,		       \
 		(ntfschar*)((char*)(attr) + le16_to_cpu((attr)->name_offset)), \
-		(attr)->name_length, 0, NULL, 0)
+		(attr)->name_length, CASE_SENSITIVE, NULL, 0)
 
 static INDEX_ATTR_TYPE get_index_attr_type(ntfs_inode *ni, ATTR_RECORD *attr,
 					   INDEX_ROOT *index_root)
@@ -1722,10 +1722,10 @@ static void ntfs_dump_usa_lsn(const char *indent, MFT_RECORD *mrec)
 			(unsigned)le16_to_cpu(mrec->usa_count),
 			(unsigned)le16_to_cpu(mrec->usa_count));
 	printf("%sUpd. Seq. Number:\t %u (0x%x)\n", indent,
-			(unsigned)le16_to_cpup((u16 *)((u8 *)mrec +
-			le16_to_cpu(mrec->usa_ofs))),
-			(unsigned)le16_to_cpup((u16 *)((u8 *)mrec +
-			le16_to_cpu(mrec->usa_ofs))));
+			(unsigned)le16_to_cpup((le16*)((u8*)mrec +
+				le16_to_cpu(mrec->usa_ofs))),
+			(unsigned)le16_to_cpup((le16*)((u8*)mrec +
+				le16_to_cpu(mrec->usa_ofs))));
 	printf("%sLogFile Seq. Number:\t 0x%llx\n", indent,
 			(unsigned long long)sle64_to_cpu(mrec->lsn));
 }
@@ -2134,7 +2134,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 	/* then start enumerating attributes
 	   see ntfs_attr_lookup documentation for detailed explanation */
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
-	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	while (!ntfs_attr_lookup(AT_UNUSED, NULL, 0, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
 		if (ctx->attr->type == AT_END || ctx->attr->type == AT_UNUSED) {
 			printf("Weird: %s attribute type was found, please "
 					"report this.\n",

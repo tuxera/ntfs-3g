@@ -187,11 +187,12 @@ static struct {
 	char magic[IMAGE_MAGIC_SIZE];
 	u8 major_ver;
 	u8 minor_ver;
-	u32 cluster_size;
-	s64 device_size;
-	s64 nr_clusters;
-	s64 inuse;
-	u32 offset_to_image_data;	/* From start of image_hdr. */
+	/* the following is aligned dangerously (too late...) */
+	le32 cluster_size;
+	le64 device_size;
+	sle64 nr_clusters;
+	le64 inuse;
+	le32 offset_to_image_data;	/* From start of image_hdr. */
 } __attribute__((__packed__)) image_hdr;
 
 #define NTFSCLONE_IMG_HEADER_SIZE_OLD	\
@@ -252,7 +253,7 @@ static void err_printf(const char *fmt, ...)
 
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
-static int err_exit(const char *fmt, ...)
+static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -266,7 +267,7 @@ static int err_exit(const char *fmt, ...)
 
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
-static int perr_exit(const char *fmt, ...)
+static void perr_exit(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
@@ -629,7 +630,7 @@ static void lseek_to_cluster(s64 lcn)
 static void image_skip_clusters(s64 count)
 {
 	if (opt.save_image && count > 0) {
-		typeof(count) count_buf;
+		s64 count_buf;
 		char buff[1 + sizeof(count)];
 
 		buff[0] = 0;
@@ -764,7 +765,7 @@ static void restore_image(void)
 static void wipe_index_entry_timestams(INDEX_ENTRY *e)
 {
 	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
-	s64 timestamp = timespec2ntfs(zero_time);
+	le64 timestamp = timespec2ntfs(zero_time);
 
 	/* FIXME: can fall into infinite loop if corrupted */
 	while (!(e->ie_flags & INDEX_ENTRY_END)) {
@@ -804,7 +805,8 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	name = (ntfschar *)((u8 *)attr + le16_to_cpu(attr->name_offset));
 	name_len = attr->name_length;
 
-	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len, NULL);
+	byte = bitmap = ntfs_attr_readall(ni, AT_BITMAP, name, name_len,
+						NULL);
 	if (!byte) {
 		perr_printf("Failed to read $BITMAP attribute");
 		goto out_indexr;
@@ -873,7 +875,7 @@ out_indexr:
 	free(indexr);
 }
 
-static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
+static void wipe_index_root_timestamps(ATTR_RECORD *attr, le64 timestamp)
 {
 	INDEX_ENTRY *entry;
 	INDEX_ROOT *iroot;
@@ -897,7 +899,7 @@ static void wipe_index_root_timestamps(ATTR_RECORD *attr, s64 timestamp)
 				sizeof(NTFS_INDEX_Q) / 2 - 1,
 				(ntfschar *)((char *)attr +
 					    le16_to_cpu(attr->name_offset)),
-				attr->name_length, 0, NULL, 0)) {
+				attr->name_length, CASE_SENSITIVE, NULL, 0)) {
 
 			QUOTA_CONTROL_ENTRY *quota_q;
 
@@ -936,7 +938,7 @@ static void wipe_timestamps(ntfs_walk_clusters_ctx *image)
 {
 	static const struct timespec zero_time = { .tv_sec = 0, .tv_nsec = 0 };
 	ATTR_RECORD *a = image->ctx->attr;
-	s64 timestamp = timespec2ntfs(zero_time);
+	le64 timestamp = timespec2ntfs(zero_time);
 
 	if (a->type == AT_FILE_NAME)
 		WIPE_TIMESTAMPS(FILE_NAME_ATTR, a, timestamp);
@@ -1577,7 +1579,8 @@ static s64 open_image(void)
 				const_cpu_to_le32((sizeof(image_hdr) + 7) & ~7);
 		image_is_host_endian = TRUE;
 	} else {
-		typeof(image_hdr.offset_to_image_data) offset_to_image_data;
+			/* safe image : little endian data */
+		le32 offset_to_image_data;
 		int delta;
 
 		if (image_hdr.major_ver > NTFSCLONE_IMG_VER_MAJOR)
@@ -1590,15 +1593,16 @@ static s64 open_image(void)
 		if (read_all(&fd_in, &offset_to_image_data,
 				sizeof(offset_to_image_data)) == -1)
 			perr_exit("read_all");
-		image_hdr.offset_to_image_data =
-				le32_to_cpu(offset_to_image_data);
+			/* do not translate little endian data */
+		image_hdr.offset_to_image_data = offset_to_image_data;
 		/*
 		 * Read any fields from the header that we have not read yet so
 		 * that the input stream is positioned correctly.  This means
 		 * we can support future minor versions that just extend the
 		 * header in a backwards compatible way.
 		 */
-		delta = offset_to_image_data - (NTFSCLONE_IMG_HEADER_SIZE_OLD +
+		delta = le32_to_cpu(offset_to_image_data)
+				- (NTFSCLONE_IMG_HEADER_SIZE_OLD +
 				sizeof(image_hdr.offset_to_image_data));
 		if (delta > 0) {
 			char *dummy_buf;
@@ -1690,7 +1694,8 @@ static ntfs_attr_search_ctx *lookup_data_attr(ntfs_inode *ni, const char *aname)
 		goto error_out;
 	}
 
-	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_DATA, ustr, len, CASE_SENSITIVE,
+				0, NULL, 0, ctx)) {
 		perr_printf("ntfs_attr_lookup");
 		goto error_out;
 	}

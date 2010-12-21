@@ -628,8 +628,8 @@ int utils_attr_get_name(ntfs_volume *vol, ATTR_RECORD *attr, char *buffer, int b
 
 	name    = NULL;
 	namelen = attr->name_length;
-	if (ntfs_ucstombs((ntfschar *)((char *)attr + le16_to_cpu(
-			attr->name_offset)), namelen, &name, 0) < 0) {
+	if (ntfs_ucstombs((ntfschar *)((char *)attr + attr->name_offset),
+				namelen, &name, 0) < 0) {
 		ntfs_log_error("Couldn't translate attribute name to current "
 				"locale.\n");
 		// <UNKNOWN>?
@@ -681,7 +681,8 @@ int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 	}
 
 	/* Does lcn lie in the section of $Bitmap we already have cached? */
-	if ((lcn < bmplcn) || (lcn >= (bmplcn + (sizeof(buffer) << 3)))) {
+	if ((lcn < bmplcn)
+	    || (lcn >= (long long)(bmplcn + (sizeof(buffer) << 3)))) {
 		ntfs_log_debug("Bit lies outside cache.\n");
 		attr = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA, AT_UNNAMED, 0);
 		if (!attr) {
@@ -744,8 +745,8 @@ int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref)
 	}
 
 	/* Does mref lie in the section of $Bitmap we already have cached? */
-	if (((s64)MREF(mref) < bmpmref) || ((s64)MREF(mref) >= (bmpmref +
-			(sizeof(buffer) << 3)))) {
+	if (((s64)MREF(mref) < bmpmref)
+	    || ((s64)MREF(mref) >= (s64)(bmpmref + (sizeof(buffer) << 3)))) {
 		ntfs_log_debug("Bit lies outside cache.\n");
 
 		/* Mark the buffer as not in use, in case the read is shorter. */
@@ -916,7 +917,7 @@ struct mft_search_ctx * mft_get_search_ctx(ntfs_volume *vol)
 		return NULL;
 	}
 
-	ctx = calloc(1, sizeof *ctx);
+	ctx = (struct mft_search_ctx*)calloc(1, sizeof *ctx);
 
 	ctx->mft_num = -1;
 	ctx->vol = vol;
@@ -1023,7 +1024,7 @@ int mft_next_record(struct mft_search_ctx *ctx)
 
 			ctx->flags_match |= FEMR_NOT_IN_USE;
 
-			ctx->inode = calloc(1, sizeof(*ctx->inode));
+			ctx->inode = (ntfs_inode*)calloc(1, sizeof(*ctx->inode));
 			if (!ctx->inode) {
 				ntfs_log_error("Out of memory.  Aborting.\n");
 				return -1;

@@ -2010,7 +2010,8 @@ static void lookup_data_attr(ntfs_volume *vol,
 		exit(1);
 	}
 
-	if (ntfs_attr_lookup(AT_DATA, ustr, len, 0, 0, NULL, 0, *ctx))
+	if (ntfs_attr_lookup(AT_DATA, ustr, len, CASE_SENSITIVE,
+			 0, NULL, 0, *ctx))
 		perr_exit("ntfs_lookup_attr");
 
 	ntfs_ucsfree(ustr);
