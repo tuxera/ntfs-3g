@@ -550,7 +550,7 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		ntfs_attr_search_ctx *ctx = NULL;
 		FILE_NAME_ATTR *file_name_attr;
 		ATTR_RECORD *attr;
-		struct timespec ntfs_time;
+		struct timespec change_time;
 		char t_buf[26];
 
 		result = -1;				// Everything else is bad
@@ -573,8 +573,8 @@ static int list_dir_entry(ntfsls_dirent * dirent, const ntfschar * name,
 		if (!file_name_attr)
 			goto release;
 
-		ntfs_time = ntfs2timespec(file_name_attr->last_data_change_time);
-		strcpy(t_buf, ctime(&ntfs_time.tv_sec));
+		change_time = ntfs2timespec(file_name_attr->last_data_change_time);
+		strcpy(t_buf, ctime(&change_time.tv_sec));
 		memmove(t_buf+16, t_buf+19, 5);
 		t_buf[21] = '\0';
 
