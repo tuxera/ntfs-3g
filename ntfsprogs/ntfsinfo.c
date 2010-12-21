@@ -317,8 +317,60 @@ static int parse_options(int argc, char *argv[])
  */
 static char *ntfsinfo_time_to_str(const sle64 sle_ntfs_clock)
 {
-	struct timespec unix_clock = ntfs2timespec((ntfs_time) sle_ntfs_clock);
-	return ctime(&unix_clock.tv_sec);
+		/* JPA display timestamps in UTC */
+	static const char *months[]
+		= { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+		    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" } ;
+	static const char *wdays[]
+		= { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" } ;
+	static char str[30];
+	long long stamp;
+	u32 days;
+	u32 seconds;
+	unsigned int year;
+	unsigned int wday;
+	int mon;
+	int cnt;
+
+	stamp = sle64_to_cpu(sle_ntfs_clock);
+	days = (stamp/(86400*10000000LL)) & 0x7ffff;
+	seconds = ((stamp/10000000LL)%86400) & 0x1ffff;
+	wday = (days + 1)%7;
+	year = 1601;
+				/* periods of 400 years */
+	cnt = days/146097;
+	days -= 146097*cnt;
+	year += 400*cnt;
+				/* periods of 100 years */
+	cnt = (3*days + 3)/109573;
+	days -= 36524*cnt;
+	year += 100*cnt;
+				/* periods of 4 years */
+	cnt = days/1461;
+	days -= 1461*cnt;
+	year += 4*cnt;
+				/* periods of a single year */
+	cnt = (3*days + 3)/1096;
+	days -= 365*cnt;
+	year += cnt;
+
+	if ((!(year % 100) ? (year % 400) : (year % 4))
+		&& (days > 58)) days++;
+	if (days > 59) {
+		mon = (5*days + 161)/153;
+		days -= (153*mon - 162)/5;
+	} else {
+		mon = days/31 + 1;
+		days -= 31*(mon - 1) - 1;
+	}
+	sprintf(str,"%3s %3s %2u %02u:%02u:%02u %4u UTC\n",
+		wdays[wday],
+		months[mon-1],(unsigned int)days,
+		(unsigned int)(seconds/3600),
+		(unsigned int)(seconds/60%60),
+		(unsigned int)(seconds%60),
+		(unsigned int)year);
+	return (str);
 }
 
 /**
