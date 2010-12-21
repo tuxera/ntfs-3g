@@ -33,11 +33,10 @@
 #include <errno.h>
 #include <getopt.h>
 
-#include <ntfs-3g/mst.h>
-#include <ntfs-3g/support.h>
-#include <ntfs-3g/misc.h>
-
+#include "mst.h"
+#include "support.h"
 #include "utils.h"
+#include "misc.h"
 /* #include "version.h" */
 
 static const char *EXEC_NAME = "ntfscmp";
