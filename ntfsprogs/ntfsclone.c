@@ -263,6 +263,8 @@ static void err_exit(const char *fmt, ...)
 	vfprintf(msg_out, fmt, ap);
 	va_end(ap);
 	fflush(msg_out);
+	if (vol)
+		ntfs_umount(vol,FALSE);
 	exit(1);
 }
 
@@ -279,6 +281,8 @@ static void perr_exit(const char *fmt, ...)
 	va_end(ap);
 	Printf(": %s\n", strerror(eo));
 	fflush(msg_out);
+	if (vol)
+		ntfs_umount(vol,FALSE);
 	exit(1);
 }
 
@@ -709,6 +713,7 @@ static void clone_ntfs(u64 nr_clusters)
 		}
 	}
 	image_skip_clusters(cl - last_cl - 1);
+	free(buf);
 }
 
 static void write_empty_clusters(s32 csize, s64 count,
@@ -1636,6 +1641,7 @@ static s64 open_image(void)
 				perr_exit("malloc dummy_buffer");
 			if (read_all(&fd_in, dummy_buf, delta) == -1)
 				perr_exit("read_all");
+			free(dummy_buf);
 		}
 	}
 	return sle64_to_cpu(image_hdr.device_size);
@@ -1880,6 +1886,8 @@ int main(int argc, char **argv)
 
 		clone_ntfs(nr_clusters_to_save);
 		fsync_clone(fd_out);
+		ntfs_umount(vol,FALSE);
+		free(lcn_bitmap.bm);
 		exit(0);
 	}
 
@@ -1888,6 +1896,7 @@ int main(int argc, char **argv)
 	/* 'force' again mount for dirty volumes (e.g. after resize).
 	   FIXME: use mount flags to avoid potential side-effects in future */
 	opt.force++;
+	ntfs_umount(vol,FALSE);
 	mount_volume(0 /*MS_NOATIME*/);
 
 	free(lcn_bitmap.bm);
@@ -1914,5 +1923,7 @@ int main(int argc, char **argv)
 	Printf("Wiped totally            = %10u\n", wiped_total);
 
 	fsync_clone(fd_out);
+	ntfs_umount(vol,FALSE);
+	free(lcn_bitmap.bm);
 	exit(0);
 }
