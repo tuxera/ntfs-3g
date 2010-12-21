@@ -740,10 +740,20 @@ static void restore_image(void)
 			perr_exit("read_all");
 
 		if (cmd == 0) {
-			if (read_all(&fd_in, &count, sizeof(count)) == -1)
-				perr_exit("read_all");
-			if (!image_is_host_endian)
-				count = sle64_to_cpu(count);
+			if (!image_is_host_endian) {
+				le64 lecount;
+
+				/* little endian image, on any computer */
+				if (read_all(&fd_in, &lecount,
+						sizeof(lecount)) == -1)
+					perr_exit("read_all");
+				count = sle64_to_cpu(lecount);
+			} else {
+				/* big endian image on big endian computer */
+				if (read_all(&fd_in, &count,
+						sizeof(count)) == -1)
+					perr_exit("read_all");
+			}
 			if (opt.std_out)
 				write_empty_clusters(csize, count,
 						     &progress, &p_counter);
@@ -1566,6 +1576,11 @@ static s64 open_image(void)
 		image_hdr.major_ver = NTFSCLONE_IMG_VER_MAJOR;
 		image_hdr.minor_ver = NTFSCLONE_IMG_VER_MINOR;
 #if (__BYTE_ORDER == __BIG_ENDIAN)
+		/*
+		 * old image read on a big endian computer,
+		 * assuming it was created big endian and read cpu-wise,
+		 * so we should translate to little endian
+		 */
 		Printf("Old image format detected.  If the image was created "
 				"on a little endian architecture it will not "
 				"work.  Use a more recent version of "
