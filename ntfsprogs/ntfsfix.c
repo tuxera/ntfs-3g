@@ -81,8 +81,8 @@ switch if you want to be able to build the NTFS utilities."
 #endif
 
 static const char *EXEC_NAME = "ntfsfix";
-static const char *OK        = "OK\n";
-static const char *FAILED    = "FAILED\n";
+static const char OK[]       = "OK\n";
+static const char FAILED[]   = "FAILED\n";
 
 static struct {
 	char *volume;
