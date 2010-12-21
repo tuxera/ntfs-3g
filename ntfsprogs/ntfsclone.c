@@ -114,6 +114,7 @@ static struct {
 	int ignore_fs_check;
 	int rescue;
 	int save_image;
+	int preserve_timestamps;
 	int restore_image;
 	char *output;
 	char *volume;
@@ -295,6 +296,7 @@ static void usage(void)
 		"        --rescue           Continue after disk read errors\n"
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"        --ignore-fs-check  Ignore the filesystem check result\n"
+		"    -t, --preserve-timestamps Do not clear the timestamps\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
 		"    -h, --help             Display this help\n"
 #ifdef DEBUG
@@ -311,7 +313,7 @@ static void usage(void)
 
 static void parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-dfhmo:O:rs";
+	static const char *sopt = "-dfhmo:O:rst";
 	static const struct option lopt[] = {
 #ifdef DEBUG
 		{ "debug",	      no_argument,	 NULL, 'd' },
@@ -325,6 +327,7 @@ static void parse_options(int argc, char **argv)
 		{ "ignore-fs-check",  no_argument,	 NULL, 'C' },
 		{ "rescue",           no_argument,	 NULL, 'R' },
 		{ "save-image",	      no_argument,	 NULL, 's' },
+		{ "preserve-timestamps",   no_argument,  NULL, 't' },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -369,6 +372,9 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 's':
 			opt.save_image++;
+			break;
+		case 't':
+			opt.preserve_timestamps++;
 			break;
 		default:
 			err_printf("Unknown option '%s'.\n", argv[optind-1]);
@@ -1020,12 +1026,15 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 	if (!a->non_resident) {
 		if (wipe) {
 			wipe_resident_data(walk->image);
-			wipe_timestamps(walk->image);
+			if (!opt.preserve_timestamps)
+				wipe_timestamps(walk->image);
 		}
 		return;
 	}
 
-	if (wipe && walk->image->ctx->attr->type == AT_INDEX_ALLOCATION)
+	if (wipe
+	    && !opt.preserve_timestamps
+	    && walk->image->ctx->attr->type == AT_INDEX_ALLOCATION)
 		wipe_index_allocation_timestamps(walk->image->ni, a);
 
 	if (!(rl = ntfs_mapping_pairs_decompress(vol, a, NULL)))

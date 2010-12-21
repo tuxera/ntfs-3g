@@ -226,6 +226,11 @@ to be used only with the
 option, for the safety of user's data. The clusters which cause the
 inconsistency are saved too.
 .TP
+\fB\-t\fR, \fB\-\-preserve\-timestamps\fR
+Do not wipe the timestamps, to be used only with the
+.B \-\-metadata
+option.
+.TP
 \fB\-f\fR, \fB\-\-force\fR
 Forces ntfsclone to proceed if the filesystem is marked
 "dirty" for consistency check.
