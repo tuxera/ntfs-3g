@@ -2251,11 +2251,11 @@ static ntfs_volume *mount_volume(void)
 				 "You must 'umount' it first.\n", opt.volume);
 	}
 	/*
-	 * Pass NTFS_MNT_FORENSIC so that the mount process does not modify the
+	 * Pass MS_FORENSIC so that the mount process does not modify the
 	 * volume at all.  We will do the logfile emptying and dirty setting
 	 * later if needed.
 	 */
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | NTFS_MNT_FORENSIC))) {
+	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | MS_FORENSIC))) {
 		int err = errno;
 
 		perr_printf("Opening '%s' as NTFS failed", opt.volume);
