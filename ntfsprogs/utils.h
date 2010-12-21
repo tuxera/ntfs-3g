@@ -155,8 +155,4 @@ static __inline__ ntfschar *ntfs_attr_get_name(ATTR_RECORD *attr)
 	return (ntfschar*)((u8*)attr + le16_to_cpu(attr->name_offset));
 }
 
-/* The define 'leMFT_REF' is not present in libntfs-3g. It is only symbolic so
- * typedef it to MFT_REF.*/
-typedef MFT_REF leMFT_REF;
-
 #endif /* _NTFS_UTILS_H_ */
