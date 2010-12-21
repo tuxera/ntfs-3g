@@ -1941,5 +1941,5 @@ int main(int argc, char **argv)
 	fsync_clone(fd_out);
 	ntfs_umount(vol,FALSE);
 	free(lcn_bitmap.bm);
-	exit(0);
+	return (0);
 }

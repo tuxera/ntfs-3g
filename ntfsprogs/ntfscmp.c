@@ -1007,6 +1007,6 @@ int main(int argc, char **argv)
 	ntfs_umount(vol1, FALSE);
 	ntfs_umount(vol2, FALSE);
 
-	exit(0);
+	return (0);
 }
 
