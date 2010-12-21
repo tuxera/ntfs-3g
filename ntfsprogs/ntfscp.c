@@ -528,7 +528,7 @@ int main(int argc, char *argv[])
 
 	ntfs_log_verbose("Old file size: %lld\n", (long long)na->data_size);
 	if (na->data_size != new_size) {
-		if (__ntfs_attr_truncate(na, new_size, FALSE)) {
+		if (ntfs_attr_truncate_solid(na, new_size)) {
 			ntfs_log_perror("ERROR: Couldn't resize attribute");
 			goto close_attr;
 		}
