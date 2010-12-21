@@ -6,6 +6,7 @@
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
  * Copyright (c) 2007      Yura Pakhuchiy
+ * Copyright (c) 2010      Jean-Pierre Andre
  *
  * This utility will create an NTFS 1.2 or 3.1 volume on a user
  * specified (block) device.
@@ -139,6 +140,8 @@
 #include "unistr.h"
 #include "misc.h"
 
+typedef enum { WRITE_STANDARD, WRITE_BITMAP } WRITE_TYPE;
+
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #error "No default device io operations!  Cannot build mkntfs.  \
 You need to run ./configure without the --disable-default-device-io-ops \
@@ -150,6 +153,12 @@ switch if you want to be able to build the NTFS utilities."
 
 static char EXEC_NAME[] = "mkntfs";
 
+struct BITMAP_ALLOCATION {
+	struct BITMAP_ALLOCATION *next;
+	LCN	lcn;		/* first allocated cluster */
+	s64	length;		/* count of consecutive clusters */
+} ;
+
 /**
  * global variables
  */
@@ -157,7 +166,8 @@ static u8		  *g_buf		  = NULL;
 static int		   g_mft_bitmap_byte_size = 0;
 static u8		  *g_mft_bitmap		  = NULL;
 static int		   g_lcn_bitmap_byte_size = 0;
-static u8		  *g_lcn_bitmap		  = NULL;
+static int		   g_dynamic_buf_size	  = 0;
+static u8		  *g_dynamic_buf	  = NULL;
 static runlist		  *g_rl_mft		  = NULL;
 static runlist		  *g_rl_mft_bmp		  = NULL;
 static runlist		  *g_rl_mftmirr		  = NULL;
@@ -174,6 +184,8 @@ static int		   g_logfile_size	  = 0;		/* in bytes, determined from volume_size *
 static long long	   g_mft_zone_end	  = 0;		/* Determined from volume_size and mft_zone_multiplier, in clusters */
 static long long	   g_num_bad_blocks	  = 0;		/* Number of bad clusters */
 static long long	  *g_bad_blocks		  = NULL;	/* Array of bad clusters */
+
+static struct BITMAP_ALLOCATION *g_allocation	  = NULL;	/* Head of cluster allocations */
 
 /**
  * struct mkntfs_options
@@ -256,9 +268,184 @@ static void mkntfs_version(void)
 	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
 	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
 	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
+	ntfs_log_info("Copyright (c) 2010      Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
+/*
+ *		Mark a run of clusters as allocated
+ *
+ *	Returns FALSE if unsuccessful
+ */
+
+static BOOL bitmap_allocate(LCN lcn, s64 length)
+{
+	BOOL done;
+	struct BITMAP_ALLOCATION *p;
+	struct BITMAP_ALLOCATION *q;
+	struct BITMAP_ALLOCATION *newall;
+
+	done = TRUE;
+	if (length) {
+		p = g_allocation;
+		q = (struct BITMAP_ALLOCATION*)NULL;
+		/* locate the first run which starts beyond the requested lcn */
+		while (p && (p->lcn <= lcn)) {
+			q = p;
+			p = p->next;
+		}
+		/* make sure the requested lcns were not allocated */
+		if ((q && ((q->lcn + q->length) > lcn))
+		   || (p && ((lcn + length) > p->lcn))) {
+			ntfs_log_error("Bitmap allocation error\n");
+			done = FALSE;
+		}
+		if (q && ((q->lcn + q->length) == lcn)) {
+			/* extend current run, no overlapping possible */
+			q->length += length;
+		} else {
+			newall = (struct BITMAP_ALLOCATION*)
+				    ntfs_malloc(sizeof(struct BITMAP_ALLOCATION));
+			if (newall) {
+				newall->lcn = lcn;
+				newall->length = length;
+				newall->next = p;
+				if (q) q->next = newall;
+				else g_allocation = newall;
+			} else {
+				done = FALSE;
+				ntfs_log_perror("Not enough memory");
+			}
+		}
+	}
+	return (done);
+}
+
+/*
+ *		Mark a run of cluster as not allocated
+ *
+ *	Returns FALSE if unsuccessful
+ *		(freeing free clusters is not considered as an error)
+ */
+
+static BOOL bitmap_deallocate(LCN lcn, s64 length)
+{
+	BOOL done;
+	struct BITMAP_ALLOCATION *p;
+	struct BITMAP_ALLOCATION *q;
+	LCN first, last;
+	s64 begin_length, end_length;
+
+	done = TRUE;
+	if (length) {
+		p = g_allocation;
+		q = (struct BITMAP_ALLOCATION*)NULL;
+			/* locate a run which has a common portion */
+		while (p) {
+			first = (p->lcn > lcn ? p->lcn : lcn);
+			last = ((p->lcn + p->length) < (lcn + length)
+				? p->lcn + p->length : lcn + length);
+			if (first < last) {
+					/* get the parts which must be kept */
+				begin_length = first - p->lcn;
+				end_length = p->lcn + p->length - last;
+					/* delete the entry */
+				if (q)
+					q->next = p->next;
+				else
+					g_allocation = p->next;
+				free(p);
+				/* reallocate the beginning and the end */
+				if (begin_length
+				    && !bitmap_allocate(first - begin_length,
+							begin_length))
+					done = FALSE;
+				if (end_length
+				    && !bitmap_allocate(last, end_length))
+					done = FALSE;
+					/* restart a full search */
+				p = g_allocation;
+				q = (struct BITMAP_ALLOCATION*)NULL;
+			} else {
+				q = p;
+				p = p->next;
+			}
+		}
+	}
+	return (done);
+}
+
+/*
+ *		Get the allocation status of a single cluster
+ *	and mark as allocated
+ *
+ *	Returns 1 if the cluster was previously allocated
+ */
+
+static int bitmap_get_and_set(LCN lcn, unsigned long length)
+{
+	struct BITMAP_ALLOCATION *p;
+	struct BITMAP_ALLOCATION *q;
+	int bit;
+
+	if (length == 1) {
+		p = g_allocation;
+		q = (struct BITMAP_ALLOCATION*)NULL;
+		/* locate the first run which starts beyond the requested lcn */
+		while (p && (p->lcn <= lcn)) {
+			q = p;
+			p = p->next;
+		}
+		if (q && (q->lcn <= lcn) && ((q->lcn + q->length) > lcn))
+			bit = 1; /* was allocated */
+		else {
+			bitmap_allocate(lcn, length);
+			bit = 0;
+		}
+	} else {
+		ntfs_log_error("Can only allocate a single cluster at a time\n");
+		bit = 0;
+	}
+	return (bit);
+}
+
+/*
+ *		Build a section of the bitmap according to allocation
+ */
+
+static void bitmap_build(u8 *buf, LCN lcn, s64 length)
+{
+	struct BITMAP_ALLOCATION *p;
+	LCN first, last;
+	int j; /* byte number */
+	int bn; /* bit number */
+
+	for (j=0; (8*j)<length; j++)
+		buf[j] = 0;
+	for (p=g_allocation; p; p=p->next) {
+		first = (p->lcn > lcn ? p->lcn : lcn);
+		last = ((p->lcn + p->length) < (lcn + length)
+			? p->lcn + p->length : lcn + length);
+		if (first < last) {
+			bn = first - lcn;
+				/* initial partial byte, if any */
+			while ((bn < (last - lcn)) && (bn & 7)) {
+				buf[bn >> 3] |= 1 << (bn & 7);
+				bn++;
+			}
+				/* full bytes */
+			while (bn < (last - lcn - 7)) {
+				buf[bn >> 3] = 255;
+				bn += 8;
+			}
+				/* final partial byte, if any */
+			while (bn < (last - lcn)) {
+				buf[bn >> 3] |= 1 << (bn & 7);
+				bn++;
+			}
+		}
+	}
+}
 
 /**
  * mkntfs_parse_long
@@ -576,10 +763,30 @@ static long long mkntfs_write(struct ntfs_device *dev,
 }
 
 /**
- * ntfs_rlwrite - Write data to disk on clusters found in a runlist.
+ *		Build and write a part of the global bitmap
+ *	without overflowing from the allocated buffer
  *
- * Write to disk the clusters contained in the runlist @rl taking the data
- * from @val.  Take @val_len bytes from @val and pad the rest with zeroes.
+ * mkntfs_bitmap_write
+ */
+static s64 mkntfs_bitmap_write(struct ntfs_device *dev,
+			s64 offset, s64 length)
+{
+	s64 partial_length;
+	s64 written;
+
+	partial_length = length;
+	if (partial_length > g_dynamic_buf_size)
+		partial_length = g_dynamic_buf_size;
+		/* create a partial bitmap section, and write it */
+	bitmap_build(g_dynamic_buf,offset << 3,partial_length << 3);
+	written = dev->d_ops->write(dev, g_dynamic_buf, partial_length);
+	return (written);
+}
+
+/**
+ * ntfs_rlwrite - Write to disk the clusters contained in the runlist @rl
+ * taking the data from @val.  Take @val_len bytes from @val and pad the
+ * rest with zeroes.
  *
  * If the @rl specifies a completely sparse file, @val is allowed to be NULL.
  *
@@ -591,7 +798,8 @@ static long long mkntfs_write(struct ntfs_device *dev,
  * will be set to the error code.
  */
 static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
-		const u8 *val, const s64 val_len, s64 *inited_size)
+		const u8 *val, const s64 val_len, s64 *inited_size,
+		WRITE_TYPE write_type)
 {
 	s64 bytes_written, total, length, delta;
 	int retry, i;
@@ -627,8 +835,17 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 			return -1LL;
 		retry = 0;
 		do {
-			bytes_written = dev->d_ops->write(dev, val + total,
-					length);
+			/* use specific functions if buffer is not prefilled */
+			switch (write_type) {
+			case WRITE_BITMAP :
+				bytes_written = mkntfs_bitmap_write(dev,
+					total, length);
+				break;
+			default :
+				bytes_written = dev->d_ops->write(dev,
+					val + total, length);
+				break;
+			}
 			if (bytes_written == -1LL) {
 				retry = errno;
 				ntfs_log_perror("Error writing to %s",
@@ -724,7 +941,6 @@ static int make_room_for_attribute(MFT_RECORD *m, char *pos, const u32 size)
  */
 static void deallocate_scattered_clusters(const runlist *rl)
 {
-	LCN j;
 	int i;
 
 	if (!rl)
@@ -735,8 +951,7 @@ static void deallocate_scattered_clusters(const runlist *rl)
 		if (rl[i].lcn == -1LL)
 			continue;
 		/* Deallocate the current run. */
-		for (j = rl[i].lcn; j < rl[i].lcn + rl[i].length; j++)
-			ntfs_bit_set(g_lcn_bitmap, j, 0);
+		bitmap_deallocate(rl[i].lcn, rl[i].length);
 	}
 }
 
@@ -769,7 +984,7 @@ static runlist * allocate_scattered_clusters(s64 clusters)
 	while (clusters) {
 		/* Loop in current zone until we run out of free clusters. */
 		for (lcn = g_mft_zone_end; lcn < end; lcn++) {
-			bit = ntfs_bit_get_and_set(g_lcn_bitmap, lcn, 1);
+			bit = bitmap_get_and_set(lcn,1);
 			if (bit)
 				continue;
 			/*
@@ -1299,7 +1514,8 @@ err_out:
 static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		const ATTR_TYPES type, const char *name, u32 name_len,
 		const IGNORE_CASE_BOOL ic, const ATTR_FLAGS flags,
-		const u8 *val, const s64 val_len)
+		const u8 *val, const s64 val_len,
+		WRITE_TYPE write_type)
 {
 	ntfs_attr_search_ctx *ctx;
 	ATTR_RECORD *a;
@@ -1453,7 +1669,8 @@ static int insert_non_resident_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 	} else {
 		a->compression_unit = 0;
-		bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len, NULL);
+		bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len, NULL,
+					write_type);
 		if (bw != val_len) {
 			ntfs_log_error("Error writing non-resident attribute "
 					"value.\n");
@@ -1757,7 +1974,7 @@ static int add_attr_sd(MFT_RECORD *m, const u8 *sd, const s64 sd_len)
 		err = insert_non_resident_attr_in_mft_record(m,
 				AT_SECURITY_DESCRIPTOR, NULL, 0,
 				CASE_SENSITIVE, const_cpu_to_le16(0), sd,
-				sd_len);
+				sd_len, WRITE_STANDARD);
 	else
 		err = insert_resident_attr_in_mft_record(m,
 				AT_SECURITY_DESCRIPTOR, NULL, 0,
@@ -1794,7 +2011,8 @@ static int add_attr_data(MFT_RECORD *m, const char *name, const u32 name_len,
 			min(le32_to_cpu(m->bytes_allocated),
 			le32_to_cpu(m->bytes_allocated) - 512))
 		err = insert_non_resident_attr_in_mft_record(m, AT_DATA, name,
-				name_len, ic, flags, val, val_len);
+				name_len, ic, flags, val, val_len,
+				WRITE_STANDARD);
 	else
 		err = insert_resident_attr_in_mft_record(m, AT_DATA, name,
 				name_len, ic, flags, 0, val, val_len);
@@ -1983,7 +2201,7 @@ static int add_attr_index_alloc(MFT_RECORD *m, const char *name,
 
 	err = insert_non_resident_attr_in_mft_record(m, AT_INDEX_ALLOCATION,
 			name, name_len, ic, const_cpu_to_le16(0),
-			index_alloc_val, index_alloc_val_len);
+			index_alloc_val, index_alloc_val_len, WRITE_STANDARD);
 	if (err < 0)
 		ntfs_log_error("add_attr_index_alloc failed: %s\n", strerror(-err));
 	return err;
@@ -2005,7 +2223,7 @@ static int add_attr_bitmap(MFT_RECORD *m, const char *name, const u32 name_len,
 						le32_to_cpu(m->bytes_allocated))
 		err = insert_non_resident_attr_in_mft_record(m, AT_BITMAP, name,
 				name_len, ic, const_cpu_to_le16(0), bitmap,
-				bitmap_len);
+				bitmap_len, WRITE_STANDARD);
 	else
 		err = insert_resident_attr_in_mft_record(m, AT_BITMAP, name,
 				name_len, ic, const_cpu_to_le16(0), 0,
@@ -3043,6 +3261,8 @@ static int index_obj_id_insert(MFT_RECORD *m, const GUID *guid,
  */
 static void mkntfs_cleanup(void)
 {
+	struct BITMAP_ALLOCATION *p, *q;
+
 	/* Close the volume */
 	if (g_vol) {
 		if (g_vol->dev) {
@@ -3061,7 +3281,7 @@ static void mkntfs_cleanup(void)
 	free(g_bad_blocks);	g_bad_blocks	= NULL;
 	free(g_buf);		g_buf		= NULL;
 	free(g_index_block);	g_index_block	= NULL;
-	free(g_lcn_bitmap);	g_lcn_bitmap	= NULL;
+	free(g_dynamic_buf);	g_dynamic_buf	= NULL;
 	free(g_mft_bitmap);	g_mft_bitmap	= NULL;
 	free(g_rl_bad);		g_rl_bad	= NULL;
 	free(g_rl_boot);	g_rl_boot	= NULL;
@@ -3069,6 +3289,13 @@ static void mkntfs_cleanup(void)
 	free(g_rl_mft);		g_rl_mft	= NULL;
 	free(g_rl_mft_bmp);	g_rl_mft_bmp	= NULL;
 	free(g_rl_mftmirr);	g_rl_mftmirr	= NULL;
+
+	p = g_allocation;
+	while (p) {
+		q = p->next;
+		free(p);
+		p = q;
+	}
 }
 
 
@@ -3494,15 +3721,17 @@ static BOOL mkntfs_initialize_bitmaps(void)
 			~(g_vol->cluster_size - 1);
 	ntfs_log_debug("g_lcn_bitmap_byte_size = %i, allocated = %llu\n",
 			g_lcn_bitmap_byte_size, i);
-	g_lcn_bitmap = ntfs_calloc(g_lcn_bitmap_byte_size);
-	if (!g_lcn_bitmap)
+	g_dynamic_buf_size = mkntfs_get_page_size();
+	g_dynamic_buf = (u8*)ntfs_calloc(g_dynamic_buf_size);
+	if (!g_dynamic_buf)
 		return FALSE;
 	/*
 	 * $Bitmap can overlap the end of the volume. Any bits in this region
 	 * must be set. This region also encompasses the backup boot sector.
 	 */
-	for (i = g_vol->nr_clusters; i < (u64)g_lcn_bitmap_byte_size << 3; i++)
-		ntfs_bit_set(g_lcn_bitmap, i, 1);
+	if (!bitmap_allocate(g_vol->nr_clusters,
+		    ((s64)g_lcn_bitmap_byte_size << 3) - g_vol->nr_clusters))
+		return (FALSE);
 	/*
 	 * Mft size is 27 (NTFS 3.0+) mft records or one cluster, whichever is
 	 * bigger.
@@ -3541,8 +3770,7 @@ static BOOL mkntfs_initialize_bitmaps(void)
 	g_rl_mft_bmp[1].lcn = -1LL;
 	g_rl_mft_bmp[1].length = 0LL;
 	/* Allocate cluster for mft bitmap. */
-	ntfs_bit_set(g_lcn_bitmap, i, 1);
-	return TRUE;
+	return (bitmap_allocate(i,1));
 }
 
 /**
@@ -3550,7 +3778,8 @@ static BOOL mkntfs_initialize_bitmaps(void)
  */
 static BOOL mkntfs_initialize_rl_mft(void)
 {
-	int i, j;
+	int j;
+	BOOL done;
 
 	/* If user didn't specify the mft lcn, determine it now. */
 	if (!g_mft_lcn) {
@@ -3602,8 +3831,7 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	g_rl_mft[1].lcn = -1LL;
 	g_rl_mft[1].length = 0LL;
 	/* Allocate clusters for mft. */
-	for (i = 0; i < j; i++)
-		ntfs_bit_set(g_lcn_bitmap, g_mft_lcn + i, 1);
+	bitmap_allocate(g_mft_lcn,j);
 	/* Determine mftmirr_lcn (middle of volume). */
 	g_mftmirr_lcn = (opts.num_sectors * opts.sector_size >> 1)
 			/ g_vol->cluster_size;
@@ -3629,12 +3857,11 @@ static BOOL mkntfs_initialize_rl_mft(void)
 	g_rl_mftmirr[1].lcn = -1LL;
 	g_rl_mftmirr[1].length = 0LL;
 	/* Allocate clusters for mft mirror. */
-	for (i = 0; i < j; i++)
-		ntfs_bit_set(g_lcn_bitmap, g_mftmirr_lcn + i, 1);
+	done = bitmap_allocate(g_mftmirr_lcn,j);
 	g_logfile_lcn = g_mftmirr_lcn + j;
 	ntfs_log_debug("$LogFile logical cluster number = 0x%llx\n",
 			g_logfile_lcn);
-	return TRUE;
+	return (done);
 }
 
 /**
@@ -3642,7 +3869,7 @@ static BOOL mkntfs_initialize_rl_mft(void)
  */
 static BOOL mkntfs_initialize_rl_logfile(void)
 {
-	int i, j;
+	int j;
 	u64 volume_size;
 
 	/* Create runlist for log file. */
@@ -3712,9 +3939,7 @@ static BOOL mkntfs_initialize_rl_logfile(void)
 	g_rl_logfile[1].lcn = -1LL;
 	g_rl_logfile[1].length = 0LL;
 	/* Allocate clusters for log file. */
-	for (i = 0; i < j; i++)
-		ntfs_bit_set(g_lcn_bitmap, g_logfile_lcn + i, 1);
-	return TRUE;
+	return (bitmap_allocate(g_logfile_lcn,j));
 }
 
 /**
@@ -3722,7 +3947,7 @@ static BOOL mkntfs_initialize_rl_logfile(void)
  */
 static BOOL mkntfs_initialize_rl_boot(void)
 {
-	int i, j;
+	int j;
 	/* Create runlist for $Boot. */
 	g_rl_boot = ntfs_malloc(2 * sizeof(runlist));
 	if (!g_rl_boot)
@@ -3740,9 +3965,7 @@ static BOOL mkntfs_initialize_rl_boot(void)
 	g_rl_boot[1].lcn = -1LL;
 	g_rl_boot[1].length = 0LL;
 	/* Allocate clusters for $Boot. */
-	for (i = 0; i < j; i++)
-		ntfs_bit_set(g_lcn_bitmap, 0LL + i, 1);
-	return TRUE;
+	return (bitmap_allocate(0,j));
 }
 
 /**
@@ -3895,7 +4118,8 @@ static BOOL mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
 			"syncing index block.\n");
 		return FALSE;
 	}
-	lw = ntfs_rlwrite(g_vol->dev, rl_index, (u8*)idx, i, NULL);
+	lw = ntfs_rlwrite(g_vol->dev, rl_index, (u8*)idx, i, NULL,
+				WRITE_STANDARD);
 	free(rl_index);
 	if (lw != i) {
 		ntfs_log_error("Error writing $INDEX_ALLOCATION.\n");
@@ -4251,7 +4475,7 @@ static BOOL mkntfs_create_root_structures(void)
 		err = insert_non_resident_attr_in_mft_record(m,
 			AT_DATA,  NULL, 0, CASE_SENSITIVE,
 			const_cpu_to_le16(0), (const u8*)NULL,
-			g_lcn_bitmap_byte_size);
+			g_lcn_bitmap_byte_size, WRITE_BITMAP);
 
 
 	if (!err)
@@ -4710,7 +4934,8 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 			ntfs_log_error("ntfs_mapping_pairs_decompress() failed\n");
 			goto done;
 		}
-		lw = ntfs_rlwrite(g_vol->dev, rl, g_lcn_bitmap, g_lcn_bitmap_byte_size, NULL);
+		lw = ntfs_rlwrite(g_vol->dev, rl, (const u8*)NULL,
+			 g_lcn_bitmap_byte_size, NULL, WRITE_BITMAP);
 		err = errno;
 		free(rl);
 		if (lw != g_lcn_bitmap_byte_size) {
@@ -4719,7 +4944,9 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 			goto done;
 		}
 	} else {
-		memcpy((char*)a + le16_to_cpu(a->value_offset), g_lcn_bitmap, le32_to_cpu(a->value_length));
+		/* Error : the bitmap must be created non resident */
+		ntfs_log_error("Error : the global bitmap is resident\n");
+		goto done;
 	}
 
 	/*
