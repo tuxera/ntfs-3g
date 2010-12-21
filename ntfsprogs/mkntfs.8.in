@@ -66,6 +66,9 @@ mkntfs \- create an NTFS file system
 .B \-T
 ]
 [
+.B \-U
+]
+[
 .B \-V
 ]
 [
@@ -203,6 +206,9 @@ multiplier	(% of volume size)
 \fB\-T\fR, \fB\-\-zero\-time\fR
 Fake the time to be 00:00:00 UTC, Jan 1, 1970 instead of the current system
 time.  This is only really useful for debugging purposes.
+.TP
+\fB\-U\fR, \fB\-\-with\-uuid\fR
+Generate a random volume UUID.
 .TP
 \fB\-I\fR, \fB\-\-no\-indexing\fR
 Disable content indexing on the volume. (This is only meaningful on

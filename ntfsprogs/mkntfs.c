@@ -205,6 +205,7 @@ static struct mkntfs_options {
 	long mft_zone_multiplier;	/* -z, value from 1 to 4. Default is 1. */
 	long long num_sectors;		/* size of device in sectors */
 	long cluster_size;		/* -c, format with this cluster-size */
+	BOOL with_uuid;			/* -U, request setting an uuid */
 	char *label;			/* -L, volume label */
 } opts;
 
@@ -526,7 +527,7 @@ static void mkntfs_init_options(struct mkntfs_options *opts2)
  */
 static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *opts2)
 {
-	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TvVz:";
+	static const char *sopt = "-c:CfFhH:IlL:np:qQs:S:TUvVz:";
 	static const struct option lopt[] = {
 		{ "cluster-size",	required_argument,	NULL, 'c' },
 		{ "debug",		no_argument,		NULL, 'Z' },
@@ -545,6 +546,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 		{ "quiet",		no_argument,		NULL, 'q' },
 		{ "sector-size",	required_argument,	NULL, 's' },
 		{ "sectors-per-track",	required_argument,	NULL, 'S' },
+		{ "with-uuid",		no_argument,		NULL, 'U' },
 		{ "verbose",		no_argument,		NULL, 'v' },
 		{ "version",		no_argument,		NULL, 'V' },
 		{ "zero-time",		no_argument,		NULL, 'T' },
@@ -636,6 +638,9 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 			break;
 		case 'T':
 			opts2->use_epoch_time = TRUE;
+			break;
+		case 'U':
+			opts2->with_uuid = TRUE;
 			break;
 		case 'v':
 			ntfs_log_set_levels(NTFS_LOG_LEVEL_QUIET |
@@ -1959,8 +1964,6 @@ static int add_attr_file_name(MFT_RECORD *m, const leMFT_REF parent_dir,
 	return i;
 }
 
-#ifdef ENABLE_UUID
-
 /**
  * add_attr_object_id -
  *
@@ -1985,8 +1988,6 @@ static int add_attr_object_id(MFT_RECORD *m, const GUID *object_id)
 		ntfs_log_error("add_attr_vol_info failed: %s\n", strerror(-err));
 	return err;
 }
-
-#endif
 
 /**
  * add_attr_sd
@@ -3238,8 +3239,6 @@ static int create_hardlink(INDEX_BLOCK *idx, const leMFT_REF ref_parent,
 	return 0;
 }
 
-#ifdef ENABLE_UUID
-
 /**
  * index_obj_id_insert
  *
@@ -3285,8 +3284,6 @@ static int index_obj_id_insert(MFT_RECORD *m, const GUID *guid,
 	}
 	return 0;
 }
-
-#endif
 
 /**
  * mkntfs_cleanup
@@ -4166,11 +4163,7 @@ static BOOL mkntfs_sync_index_record(INDEX_ALLOCATION* idx, MFT_RECORD* m,
  * create_file_volume -
  */
 static BOOL create_file_volume(MFT_RECORD *m, leMFT_REF root_ref,
-		VOLUME_FLAGS fl, const GUID *volume_guid
-#ifndef ENABLE_UUID
-		__attribute__((unused))
-#endif
-		)
+		VOLUME_FLAGS fl, const GUID *volume_guid)
 {
 	int i, err;
 	u8 *sd;
@@ -4199,10 +4192,8 @@ static BOOL create_file_volume(MFT_RECORD *m, leMFT_REF root_ref,
 		err = add_attr_vol_info(m, fl, g_vol->major_ver,
 				g_vol->minor_ver);
 	}
-#ifdef ENABLE_UUID
-	if (!err)
+	if (!err && opts.with_uuid)
 		err = add_attr_object_id(m, volume_guid);
-#endif
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $Volume: %s\n",
 				strerror(-err));
@@ -4620,7 +4611,6 @@ static BOOL mkntfs_create_root_structures(void)
 		volume_flags |= VOLUME_IS_DIRTY;
 	}
 	free(bs);
-#ifdef ENABLE_UUID
 	/*
 	 * We cheat a little here and if the user has requested all times to be
 	 * set to zero then we set the GUID to zero as well.  This options is
@@ -4628,10 +4618,13 @@ static BOOL mkntfs_create_root_structures(void)
 	 */
 	if (!opts.use_epoch_time) {
 		/* Generate a GUID for the volume. */
+#ifdef ENABLE_UUID
 		uuid_generate((void*)&vol_guid);
+#else
+		ntfs_generate_guid(&vol_guid);
+#endif
 	} else
 		memset(&vol_guid, 0, sizeof(vol_guid));
-#endif
 	if (!create_file_volume(m, root_ref, volume_flags, &vol_guid))
 		return FALSE;
 	ntfs_log_verbose("Creating $BadClus (mft record 8)\n");
@@ -4799,11 +4792,9 @@ static BOOL mkntfs_create_root_structures(void)
 		err = add_attr_index_root(m, "$O", 2, CASE_SENSITIVE, AT_UNUSED,
 			COLLATION_NTOFS_ULONGS,
 			g_vol->indx_record_size);
-#ifdef ENABLE_UUID
-	if (!err)
+	if (!err && opts.with_uuid)
 		err = index_obj_id_insert(m, &vol_guid,
 				MK_LE_MREF(FILE_Volume, FILE_Volume));
-#endif
 	if (err < 0) {
 		ntfs_log_error("Couldn't create $ObjId: %s\n",
 				strerror(-err));
