@@ -799,9 +799,9 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 		/* FIXME: ntfs_mapping_pairs_decompress should return error */
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
-				 "%llx length %llx\n", inode,
-				 (unsigned int)le32_to_cpu(a->type), lcn,
-				 lcn_length);
+				 "%llx length %llx\n", (long long)inode,
+				 (unsigned int)le32_to_cpu(a->type),
+				 (long long)lcn, (long long)lcn_length);
 
 		for (j = 0; j < lcn_length; j++) {
 			u64 k = (u64)lcn + j;
@@ -814,7 +814,8 @@ static void build_lcn_usage_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 				if (++fsck->show_outsider <= 10 || opt.verbose)
 					printf("Outside of the volume reference"
 					       " for inode %lld at %lld:%lld\n",
-					       inode, (long long)k, outsiders);
+					       (long long)inode, (long long)k,
+					       (long long)outsiders);
 
 				break;
 			}
@@ -888,7 +889,8 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 		if (count == 0) {
 			if (a->size > pos)
 				err_exit("$Bitmap size is smaller than expected"
-					 " (%lld != %lld)\n", a->size, pos);
+					 " (%lld != %lld)\n",
+					 (long long)a->size, (long long)pos);
 			break;
 		}
 
@@ -1018,7 +1020,8 @@ static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO || errno == ENOENT)
 				continue;
-			perr_printf("Reading inode %lld failed", inode);
+			perr_printf("Reading inode %lld failed",
+					(long long)inode);
 			return -1;
 		}
 
@@ -1091,7 +1094,8 @@ static void set_resize_constraints(ntfs_resize_t *resize)
 		if (ni == NULL) {
 			if (errno == EIO || errno == ENOENT)
 				continue;
-			perr_exit("Reading inode %lld failed", inode);
+			perr_exit("Reading inode %lld failed",
+					(long long)inode);
 		}
 
 		if (ni->mrec->base_mft_record)
@@ -1407,7 +1411,7 @@ static void lseek_to_cluster(ntfs_volume *vol, s64 lcn)
 	pos = (off_t)(lcn * vol->cluster_size);
 
 	if (vol->dev->d_ops->seek(vol->dev, pos, SEEK_SET) == (off_t)-1)
-		perr_exit("seek failed to position %lld", lcn);
+		perr_exit("seek failed to position %lld", (long long)lcn);
 }
 
 static void copy_clusters(ntfs_resize_t *resize, s64 dest, s64 src, s64 len)
@@ -1544,7 +1548,8 @@ static void relocate_run(ntfs_resize_t *resize, runlist **rl, int run)
 	if (!(relocate_rl = alloc_cluster(&resize->lcn_bitmap, lcn_length,
 					  new_vol_size, hint)))
 		perr_exit("Cluster allocation failed for %llu:%lld",
-			  resize->mref, lcn_length);
+			  (unsigned long long)resize->mref,
+			  (long long)lcn_length);
 
 	/* FIXME: check $MFTMirr DATA isn't multi-run (or support it) */
 	ntfs_log_verbose("Relocate record %7llu:0x%x:%08lld:0x%08llx:0x%08llx "
@@ -1589,9 +1594,10 @@ static void relocate_attribute(ntfs_resize_t *resize)
 		/* FIXME: ntfs_mapping_pairs_decompress should return error */
 		if (lcn < 0 || lcn_length <= 0)
 			err_exit("Corrupt runlist in MTF %llu attr %x LCN "
-				 "%llx length %llx\n", resize->mref,
+				 "%llx length %llx\n",
+				 (unsigned long long)resize->mref,
 				 (unsigned int)le32_to_cpu(a->type),
-				 lcn, lcn_length);
+				 (long long)lcn, (long long)lcn_length);
 
 		relocate_run(resize, &rl, i);
 	}
@@ -1705,7 +1711,8 @@ static void relocate_inode(ntfs_resize_t *resize, MFT_REF mref, int do_mftdata)
 //		if (vol->dev->d_ops->sync(vol->dev) == -1)
 //			perr_exit("Failed to sync device");
 		if (write_mft_record(resize->vol, mref, resize->mrec))
-			perr_exit("Couldn't update record %llu", mref);
+			perr_exit("Couldn't update record %llu",
+					(unsigned long long)mref);
 	}
 }
 
@@ -1741,7 +1748,7 @@ static void relocate_inodes(ntfs_resize_t *resize)
 
 		if (highest_vcn == resize->mft_highest_vcn)
 			err_exit("Sanity check failed! Highest_vcn = %lld. "
-				 "Please report!\n", highest_vcn);
+				 "Please report!\n", (long long)highest_vcn);
 	}
 done:
 	free(resize->mrec);
@@ -1797,7 +1804,8 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 
 	if (p[len].vcn > last_vcn)
 		err_exit("rl_expand: length is already more than requested "
-			 "(%lld > %lld)\n", p[len].vcn, last_vcn);
+			 "(%lld > %lld)\n",
+			 (long long)p[len].vcn, (long long)last_vcn);
 
 	if (p[len - 1].lcn == LCN_HOLE) {
 
@@ -1816,7 +1824,8 @@ static void rl_expand(runlist **rl, const VCN last_vcn)
 		*rl = p;
 
 	} else
-		err_exit("rl_expand: bad LCN: %lld\n", p[len - 1].lcn);
+		err_exit("rl_expand: bad LCN: %lld\n",
+				(long long)p[len - 1].lcn);
 }
 
 static void rl_truncate(runlist **rl, const VCN last_vcn)
@@ -2046,15 +2055,16 @@ static int check_bad_sectors(ntfs_volume *vol)
 
 		badclusters += rl[i].length;
 		ntfs_log_verbose("Bad cluster: %#8llx - %#llx    (%lld)\n",
-				 rl[i].lcn, rl[i].lcn + rl[i].length - 1,
-				 rl[i].length);
+				 (long long)rl[i].lcn,
+				 (long long)rl[i].lcn + rl[i].length - 1,
+				 (long long)rl[i].length);
 	}
 
 	if (badclusters) {
 		printf("%sThis software has detected that the disk has at least"
 		       " %lld bad sector%s.\n",
 		       !opt.badsectors ? NERR_PREFIX : "WARNING: ",
-		       badclusters, badclusters - 1 ? "s" : "");
+		       (long long)badclusters, badclusters - 1 ? "s" : "");
 		if (!opt.badsectors) {
 			printf("%s", bad_sectors_warning_msg);
 			exit(1);
@@ -2399,7 +2409,8 @@ int main(int argc, char **argv)
 	device_size = ntfs_device_size_get(vol->dev, vol->sector_size);
 	device_size *= vol->sector_size;
 	if (device_size <= 0)
-		err_exit("Couldn't get device size (%lld)!\n", device_size);
+		err_exit("Couldn't get device size (%lld)!\n",
+			(long long)device_size);
 
 	print_vol_size("Current device size", device_size);
 

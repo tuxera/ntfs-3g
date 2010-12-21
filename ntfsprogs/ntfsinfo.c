@@ -1188,7 +1188,7 @@ static const char * ntfs_dump_lcn(LCN lcn)
 			return "<EIO>\t";
 		default:
 			ntfs_log_error("Invalid LCN value %llx passed to "
-					"ntfs_dump_lcn().\n", lcn);
+					"ntfs_dump_lcn().\n", (long long)lcn);
 			return "???\t";
 	}
 }
@@ -1297,13 +1297,16 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
 			while (rlc->length) {
 				if (rlc->lcn >= 0)
 					printf("\t\t\t0x%llx\t\t0x%llx\t\t"
-							"0x%llx\n", rlc->vcn,
-							rlc->lcn, rlc->length);
+							"0x%llx\n",
+							(long long)rlc->vcn,
+							(long long)rlc->lcn,
+							(long long)rlc->length);
 				else
 					printf("\t\t\t0x%llx\t\t%s\t"
-							"0x%llx\n", rlc->vcn,
+							"0x%llx\n",
+							(long long)rlc->vcn,
 							ntfs_dump_lcn(rlc->lcn),
-							rlc->length);
+							(long long)rlc->length);
 				rlc++;
 			}
 			free(rl);
@@ -1539,8 +1542,8 @@ static int ntfs_dump_index_entries(INDEX_ENTRY *entry, INDEX_ATTR_TYPE type)
 
 		if (entry->ie_flags & INDEX_ENTRY_NODE)
 			ntfs_log_verbose("\t\tSubnode VCN:\t\t %lld (0x%llx)\n",
-					 ntfs_ie_get_vcn(entry),
-					 ntfs_ie_get_vcn(entry));
+					 (long long)ntfs_ie_get_vcn(entry),
+					 (long long)ntfs_ie_get_vcn(entry));
 		if (entry->ie_flags & INDEX_ENTRY_END)
 			break;
 

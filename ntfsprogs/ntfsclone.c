@@ -794,7 +794,7 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 	indexr = ntfs_index_root_get(ni, attr);
 	if (!indexr) {
 		perr_printf("Failed to read $INDEX_ROOT attribute of inode "
-			    "%lld", ni->mft_no);
+			    "%lld", (long long)ni->mft_no);
 		return;
 	}
 
@@ -861,7 +861,8 @@ static void wipe_index_allocation_timestamps(ntfs_inode *ni, ATTR_RECORD *attr)
 		}
 	}
 	if (ntfs_rl_pwrite(vol, na->rl, 0, 0, na->data_size, indexa) != na->data_size)
-		perr_printf("ntfs_rl_pwrite failed for inode %lld", ni->mft_no);
+		perr_printf("ntfs_rl_pwrite failed for inode %lld",
+				(long long)ni->mft_no);
 out_indexa:
 	free(indexa);
 out_na:
@@ -1028,9 +1029,10 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 		/* FIXME: ntfs_mapping_pairs_decompress should return error */
 		if (lcn < 0 || lcn_length < 0)
 			err_exit("Corrupt runlist in inode %lld attr %x LCN "
-				 "%llx length %llx\n", ctx->ntfs_ino->mft_no,
-				 (unsigned int)le32_to_cpu(a->type), lcn,
-				 lcn_length);
+				 "%llx length %llx\n",
+				(long long)ctx->ntfs_ino->mft_no,
+				(unsigned int)le32_to_cpu(a->type),
+				(long long)lcn, (long long)lcn_length);
 
 		if (!wipe)
 			dump_clusters(walk->image, rl + i);
@@ -1091,7 +1093,8 @@ static void compare_bitmaps(struct bitmap *a)
 		if (count == 0) {
 			if (a->size > pos)
 				err_exit("$Bitmap size is smaller than expected"
-					 " (%lld != %lld)\n", a->size, pos);
+					 " (%lld != %lld)\n",
+					(long long)a->size, (long long)pos);
 			break;
 		}
 
@@ -1263,7 +1266,8 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			   MFT record not in use based on $MFT bitmap */
 			if (errno == EIO || errno == ENOENT)
 				continue;
-			perr_exit("Reading inode %lld failed", inode);
+			perr_exit("Reading inode %lld failed",
+				(long long)inode);
 		}
 
 		if (wipe)
@@ -1281,7 +1285,8 @@ out:
 		}
 
 		if (ntfs_inode_close(ni))
-			perr_exit("ntfs_inode_close for inode %lld", inode);
+			perr_exit("ntfs_inode_close for inode %lld",
+				(long long)inode);
 	}
 
 	return 0;
@@ -1355,7 +1360,7 @@ static void print_image_info(void)
 			sle64_to_cpu(image_hdr.nr_clusters) *
 			le32_to_cpu(image_hdr.cluster_size));
 	Printf("Image device size      : %lld bytes\n",
-			sle64_to_cpu(image_hdr.device_size));
+			(long long)sle64_to_cpu(image_hdr.device_size));
 	print_disk_usage("    ", le32_to_cpu(image_hdr.cluster_size),
 			sle64_to_cpu(image_hdr.nr_clusters),
 			sle64_to_cpu(image_hdr.inuse));
@@ -1616,14 +1621,15 @@ static s64 open_volume(void)
 
 	device_size = ntfs_device_size_get(vol->dev, 1);
 	if (device_size <= 0)
-		err_exit("Couldn't get device size (%lld)!\n", device_size);
+		err_exit("Couldn't get device size (%lld)!\n",
+			(long long)device_size);
 
 	print_volume_size("Current device size", device_size);
 
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
 			 "size (%lld)!\nCorrupt partition table or incorrect "
-			 "device partitioning?\n", device_size);
+			 "device partitioning?\n", (long long)device_size);
 
 	return device_size;
 }
@@ -1647,7 +1653,8 @@ static void check_output_device(s64 input_size)
 		s64 dest_size = device_size_get(fd_out);
 		if (dest_size < input_size)
 			err_exit("Output device is too small (%lld) to fit the "
-				 "NTFS image (%lld).\n", dest_size, input_size);
+				 "NTFS image (%lld).\n",
+				(long long)dest_size, (long long)input_size);
 
 		check_if_mounted(opt.output, 0);
 	} else
@@ -1723,7 +1730,7 @@ static void ignore_bad_clusters(ntfs_walk_clusters_ctx *image)
 	}
 	if (nr_bad_clusters)
 		Printf("WARNING: The disk has %lld or more bad sectors"
-		       " (hardware faults).\n", nr_bad_clusters);
+		       " (hardware faults).\n", (long long)nr_bad_clusters);
 	free(rl_bad);
 
 	ntfs_attr_put_search_ctx(ctx);
@@ -1763,8 +1770,8 @@ static void check_dest_free_space(u64 src_bytes)
 	if (dest_bytes < src_bytes)
 		err_exit("Destination doesn't have enough free space: "
 			 "%llu MB < %llu MB\n",
-			 rounded_up_division(dest_bytes, NTFS_MBYTE),
-			 rounded_up_division(src_bytes,  NTFS_MBYTE));
+			 (unsigned long long)rounded_up_division(dest_bytes, NTFS_MBYTE),
+			 (unsigned long long)rounded_up_division(src_bytes,  NTFS_MBYTE));
 }
 
 int main(int argc, char **argv)

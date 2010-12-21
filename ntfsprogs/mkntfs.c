@@ -3311,7 +3311,8 @@ static BOOL mkntfs_override_vol_params(ntfs_volume *vol)
 	/* Validate volume size. */
 	if (volume_size < (1 << 20)) {			/* 1MiB */
 		ntfs_log_error("Device is too small (%llikiB).  Minimum NTFS "
-				"volume size is 1MiB.\n", volume_size / 1024);
+				"volume size is 1MiB.\n",
+				(long long)(volume_size / 1024));
 		return FALSE;
 	}
 	ntfs_log_debug("volume size = %llikiB\n", volume_size / 1024);

@@ -2179,8 +2179,8 @@ int main(int argc, char *argv[])
 		result = !copy_mft(vol, opts.mft_begin, opts.mft_end);
 		if (result)
 			ntfs_log_verbose("ERROR: Failed to read MFT blocks "
-				"%lld-%lld.\n", opts.mft_begin,
-				min((vol->mft_na->initialized_size >>
+				"%lld-%lld.\n", (long long)opts.mft_begin,
+				(long long)min((vol->mft_na->initialized_size >>
 				vol->mft_record_size_bits) , opts.mft_end));
 		break;
 	default:

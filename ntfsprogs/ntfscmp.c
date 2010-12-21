@@ -309,7 +309,8 @@ static int inode_close(ntfs_inode *ni)
 		return 0;
 
 	if (ntfs_inode_close(ni)) {
-		perr_println("ntfs_inode_close: inode %llu", inumber(ni));
+		perr_println("ntfs_inode_close: inode %llu",
+				(unsigned long long)inumber(ni));
 		return -1;
 	}
 	return 0;
@@ -359,7 +360,7 @@ static int inode_open(ntfs_volume *vol, MFT_REF mref, ntfs_inode **ni)
 		if (errno == ENOENT)
 			return NTFSCMP_INODE_OPEN_ENOENT_ERROR;
 
-		perr_println("Reading inode %lld failed", mref);
+		perr_println("Reading inode %lld failed", (long long)mref);
 		return NTFSCMP_INODE_OPEN_ERROR;
 	}
 
@@ -384,7 +385,7 @@ static ntfs_inode *base_inode(ntfs_attr_search_ctx *ctx)
 
 static void print_inode(u64 inum)
 {
-	printf("Inode %llu ", inum);
+	printf("Inode %llu ", (unsigned long long)inum);
 }
 
 static void print_inode_ni(ntfs_inode *ni)
@@ -612,8 +613,10 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 		if (count1 != count2) {
 			print_na(na1);
 			printf("abrupt length:   %lld  !=  %lld ",
-			       na1->data_size, na2->data_size);
-			printf("(count: %lld  !=  %lld)", count1, count2);
+				(long long)na1->data_size,
+				(long long)na2->data_size);
+			printf("(count: %lld  !=  %lld)",
+				(long long)count1, (long long)count2);
 			puts("");
 			return;
 		}
@@ -621,7 +624,8 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 		if (count1 == -1) {
 			err_printf("%s read error: ", __FUNCTION__);
 			print_na(na1);
-			printf("len = %lld, pos = %lld\n", na1->data_size, pos);
+			printf("len = %lld, pos = %lld\n",
+				(long long)na1->data_size, (long long)pos);
 			exit(1);
 		}
 
@@ -632,7 +636,8 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 
 			err_printf("%s read error before EOF: ", __FUNCTION__);
 			print_na(na1);
-			printf("%lld  !=  %lld\n", pos + count1, na1->data_size);
+			printf("%lld  !=  %lld\n", (long long)pos + count1,
+					(long long)na1->data_size);
 			exit(1);
 		}
 
@@ -643,7 +648,7 @@ static void cmp_attribute_data(ntfs_attr *na1, ntfs_attr *na2)
 	err_printf("%s read overrun: ", __FUNCTION__);
 	print_na(na1);
 	err_printf("(len = %lld, pos = %lld, count = %lld)\n",
-		  na1->data_size, pos, count1);
+		  (long long)na1->data_size, (long long)pos, (long long)count1);
 	exit(1);
 }
 
@@ -690,7 +695,8 @@ static void cmp_attribute(ntfs_attr_search_ctx *ctx1,
 
 	if (na1->data_size != na2->data_size) {
 		print_na(na1);
-		printf("length:   %lld  !=  %lld\n", na1->data_size, na2->data_size);
+		printf("length:   %lld  !=  %lld\n",
+			(long long)na1->data_size, (long long)na2->data_size);
 		goto close_attribs;
 	}
 
@@ -732,7 +738,8 @@ static void print_attributes(ntfs_inode *ni,
 	if (!opt.verbose)
 		return;
 
-	printf("Walking inode %llu attributes: ", inumber(ni));
+	printf("Walking inode %llu attributes: ",
+			(unsigned long long)inumber(ni));
 	vprint_attribute(atype1, name1);
 	vprint_attribute(atype2, name2);
 	printf("\n");
@@ -774,7 +781,8 @@ static int new_attribute(ntfs_attr_search_ctx *ctx,
 		print_inode(base_inode(ctx)->mft_no);
 		print_attribute_ctx(ctx);
 		printf("record %llu lowest_vcn %lld:    SKIPPED\n",
-			ctx->ntfs_ino->mft_no, ctx->attr->lowest_vcn);
+			(unsigned long long)ctx->ntfs_ino->mft_no,
+			(long long)ctx->attr->lowest_vcn);
 	}
 
 	return 0;
@@ -905,7 +913,7 @@ static int cmp_inodes(ntfs_volume *vol1, ntfs_volume *vol2)
 	if (nr_mft_records != nr_mft_records2) {
 
 		printf("Number of mft records:   %lld  !=  %lld\n",
-		       nr_mft_records, nr_mft_records2);
+		       (long long)nr_mft_records, (long long)nr_mft_records2);
 
 		if (nr_mft_records > nr_mft_records2)
 			nr_mft_records = nr_mft_records2;

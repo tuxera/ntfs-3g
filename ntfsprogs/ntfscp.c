@@ -367,7 +367,7 @@ int main(int argc, char *argv[])
 		}
 		new_size = fst.st_size;
 	}
-	ntfs_log_verbose("New file size: %lld\n", new_size);
+	ntfs_log_verbose("New file size: %lld\n", (long long)new_size);
 
 	in = fopen(opts.src_file, "r");
 	if (!in) {
@@ -526,7 +526,7 @@ int main(int argc, char *argv[])
 	}
 	ntfs_ucsfree(attr_name);
 
-	ntfs_log_verbose("Old file size: %lld\n", na->data_size);
+	ntfs_log_verbose("Old file size: %lld\n", (long long)na->data_size);
 	if (na->data_size != new_size) {
 		if (__ntfs_attr_truncate(na, new_size, FALSE)) {
 			ntfs_log_perror("ERROR: Couldn't resize attribute");
