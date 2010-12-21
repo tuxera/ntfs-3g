@@ -140,7 +140,7 @@
 #include "unistr.h"
 #include "misc.h"
 
-typedef enum { WRITE_STANDARD, WRITE_BITMAP } WRITE_TYPE;
+typedef enum { WRITE_STANDARD, WRITE_BITMAP, WRITE_LOGFILE } WRITE_TYPE;
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #error "No default device io operations!  Cannot build mkntfs.  \
@@ -784,6 +784,27 @@ static s64 mkntfs_bitmap_write(struct ntfs_device *dev,
 }
 
 /**
+ *		Build and write a part of the log file
+ *	without overflowing from the allocated buffer
+ *
+ * mkntfs_logfile_write
+ */
+static s64 mkntfs_logfile_write(struct ntfs_device *dev,
+			s64 offset __attribute__((unused)), s64 length)
+{
+	s64 partial_length;
+	s64 written;
+
+	partial_length = length;
+	if (partial_length > g_dynamic_buf_size)
+		partial_length = g_dynamic_buf_size;
+		/* create a partial bad cluster section, and write it */
+	memset(g_dynamic_buf, -1, partial_length);
+	written = dev->d_ops->write(dev, g_dynamic_buf, partial_length);
+	return (written);
+}
+
+/**
  * ntfs_rlwrite - Write to disk the clusters contained in the runlist @rl
  * taking the data from @val.  Take @val_len bytes from @val and pad the
  * rest with zeroes.
@@ -839,6 +860,10 @@ static s64 ntfs_rlwrite(struct ntfs_device *dev, const runlist *rl,
 			switch (write_type) {
 			case WRITE_BITMAP :
 				bytes_written = mkntfs_bitmap_write(dev,
+					total, length);
+				break;
+			case WRITE_LOGFILE :
+				bytes_written = mkntfs_logfile_write(dev,
 					total, length);
 				break;
 			default :
@@ -1480,7 +1505,14 @@ static int insert_positioned_attr_in_mft_record(MFT_RECORD *m,
 		err = -EOPNOTSUPP;
 	} else {
 		a->compression_unit = 0;
-		bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len, &inited_size);
+		if ((type == AT_DATA)
+		    && (m->mft_record_number
+				 == const_cpu_to_le32(FILE_LogFile)))
+			bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len,
+					&inited_size, WRITE_LOGFILE);
+		else
+			bw = ntfs_rlwrite(g_vol->dev, rl, val, val_len,
+					&inited_size, WRITE_STANDARD);
 		if (bw != val_len) {
 			ntfs_log_error("Error writing non-resident attribute "
 					"value.\n");
@@ -4246,7 +4278,6 @@ static BOOL mkntfs_create_root_structures(void)
 	FILE_ATTR_FLAGS extend_flags;
 	VOLUME_FLAGS volume_flags = const_cpu_to_le16(0);
 	int nr_sysfiles;
-	u8 *buf_log = NULL;
 	int buf_sds_first_size;
 	char *buf_sds;
 	GUID vol_guid;
@@ -4427,15 +4458,9 @@ static BOOL mkntfs_create_root_structures(void)
 	}
 	ntfs_log_verbose("Creating $LogFile (mft record 2)\n");
 	m = (MFT_RECORD*)(g_buf + 2 * g_vol->mft_record_size);
-	buf_log = ntfs_malloc(g_logfile_size);
-	if (!buf_log)
-		return FALSE;
-	memset(buf_log, -1, g_logfile_size);
 	err = add_attr_data_positioned(m, NULL, 0, CASE_SENSITIVE,
-			const_cpu_to_le16(0), g_rl_logfile, buf_log,
-			g_logfile_size);
-	free(buf_log);
-	buf_log = NULL;
+			const_cpu_to_le16(0), g_rl_logfile,
+			(const u8*)NULL, g_logfile_size);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_LogFile, FILE_LogFile),
