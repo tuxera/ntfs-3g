@@ -55,7 +55,7 @@ ATTR_RECORD * find_attribute(const ATTR_TYPES type, ntfs_attr_search_ctx *ctx);
 ATTR_RECORD * find_first_attribute(const ATTR_TYPES type, MFT_RECORD *mft);
 
 int utils_valid_device(const char *name, int force);
-ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags);
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags);
 
 /**
  * defines...

@@ -253,7 +253,7 @@ int utils_valid_device(const char *name, int force)
 /**
  * utils_mount_volume - Mount an NTFS volume
  */
-ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
+ntfs_volume * utils_mount_volume(const char *device, unsigned long flags)
 {
 	ntfs_volume *vol;
 
