@@ -845,6 +845,12 @@ static int ntfs_inode_sync_file_name(ntfs_inode *ni, ntfs_inode *dir_ni)
 		else {
 			fnx->allocated_size = cpu_to_sle64(ni->allocated_size);
 			fnx->data_size = cpu_to_sle64(ni->data_size);
+			/*
+			 * The file name record has also to be fixed if some
+			 * attribute update implied the unnamed data to be
+			 * made non-resident
+			 */
+			fn->allocated_size = fnx->allocated_size;
 		}
 			/* update or clear the reparse tag in the index */
 		fnx->reparse_point_tag = reparse_tag;

@@ -5011,6 +5011,15 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			ntfs_attr_close(tna);
 			continue;
 		}
+		if ((tna->type == AT_DATA) && !tna->name_len) {
+			/*
+			 * If we had to make the unnamed data attribute
+			 * non-resident, propagate its new allocated size
+			 * to all name attributes and directory indexes
+			 */
+			tna->ni->allocated_size = tna->allocated_size;
+			NInoFileNameSetDirty(tna->ni);
+		}
 		if (((tna->data_flags & ATTR_COMPRESSION_MASK)
 						== ATTR_IS_COMPRESSED)
 		   && ntfs_attr_pclose(tna)) {
