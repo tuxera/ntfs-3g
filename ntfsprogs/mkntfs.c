@@ -702,7 +702,7 @@ static BOOL mkntfs_parse_options(int argc, char *argv[], struct mkntfs_options *
 /**
  * mkntfs_time
  */
-static struct timespec mkntfs_time(void)
+static ntfs_time mkntfs_time(void)
 {
 	struct timespec ts;
 
@@ -710,7 +710,7 @@ static struct timespec mkntfs_time(void)
 	ts.tv_nsec = 0;
 	if (!opts.use_epoch_time)
 		ts.tv_sec = time(NULL);
-	return ts;
+	return timespec2ntfs(ts);
 }
 
 /**
@@ -1854,7 +1854,7 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
 
 	sd_size = 48;
 
-	si.creation_time = timespec2ntfs(mkntfs_time());
+	si.creation_time = mkntfs_time();
 	si.last_data_change_time = si.creation_time;
 	si.last_mft_change_time = si.creation_time;
 	si.last_access_time = si.creation_time;
@@ -2810,7 +2810,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q1_data->version = const_cpu_to_le32(0x02);
 	idx_entry_q1_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	idx_entry_q1_data->bytes_used = const_cpu_to_le64(0x00);
-	idx_entry_q1_data->change_time = timespec2ntfs(mkntfs_time());
+	idx_entry_q1_data->change_time = mkntfs_time();
 	idx_entry_q1_data->threshold = cpu_to_sle64(-1);
 	idx_entry_q1_data->limit = cpu_to_sle64(-1);
 	idx_entry_q1_data->exceeded_time = const_cpu_to_le64(0);
@@ -2837,7 +2837,7 @@ static int initialize_quota(MFT_RECORD *m)
 	idx_entry_q2_data->version = const_cpu_to_le32(0x02);
 	idx_entry_q2_data->flags = QUOTA_FLAG_DEFAULT_LIMITS;
 	idx_entry_q2_data->bytes_used = const_cpu_to_le64(0x00);
-	idx_entry_q2_data->change_time = timespec2ntfs(mkntfs_time());;
+	idx_entry_q2_data->change_time = mkntfs_time();
 	idx_entry_q2_data->threshold = cpu_to_sle64(-1);
 	idx_entry_q2_data->limit = cpu_to_sle64(-1);
 	idx_entry_q2_data->exceeded_time = const_cpu_to_le64(0);
@@ -3053,7 +3053,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const leMFT_REF ref_parent,
 		return -errno;
 	fn->parent_directory = ref_parent;
 	/* FIXME: copy the creation_time from the std info */
-	fn->creation_time = timespec2ntfs(mkntfs_time());
+	fn->creation_time = mkntfs_time();
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -3170,7 +3170,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const leMFT_REF ref_parent,
 	fn->parent_directory = ref_parent;
 	/* FIXME: Is this correct? Or do we have to copy the creation_time */
 	/* from the std info? */
-	fn->creation_time = timespec2ntfs(mkntfs_time());
+	fn->creation_time = mkntfs_time();
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -4839,7 +4839,7 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		goto done;
 	}
 	/* Initialize the random number generator with the current time. */
-	srandom(mkntfs_time().tv_sec);
+	srandom(le64_to_cpu(mkntfs_time())/10000000);
 	/* Allocate and initialize ntfs_volume structure g_vol. */
 	g_vol = ntfs_volume_alloc();
 	if (!g_vol) {
