@@ -481,6 +481,9 @@ ntfs_inode *ntfs_inode_open(ntfs_volume *vol, const MFT_REF mref)
 	} else {
 		ni = ntfs_inode_real_open(vol, mref);
 	}
+	if (!ni) {
+		debug_double_inode(item.inum, 0);
+	}
 #else
 	ni = ntfs_inode_real_open(vol, mref);
 #endif
