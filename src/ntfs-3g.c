@@ -104,6 +104,8 @@
 #include "xattrs.h"
 #include "misc.h"
 
+#include "ntfs-3g_common.h"
+
 /*
  *	The following permission checking modes are governed by
  *	the HPERMSCONFIG value in param.h
@@ -2471,17 +2473,6 @@ enum {
 	XATTRNS_OPEN
 } ;
 
-static const char nf_ns_user_prefix[] = "user.";
-static const int nf_ns_user_prefix_len = sizeof(nf_ns_user_prefix) - 1;
-static const char nf_ns_system_prefix[] = "system.";
-static const int nf_ns_system_prefix_len = sizeof(nf_ns_system_prefix) - 1;
-static const char nf_ns_security_prefix[] = "security.";
-static const int nf_ns_security_prefix_len = sizeof(nf_ns_security_prefix) - 1;
-static const char nf_ns_trusted_prefix[] = "trusted.";
-static const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
-
-static const char xattr_ntfs_3g[] = "ntfs-3g.";
-
 /*
  *		Check whether access to internal data as an extended
  *	attribute in system name space is allowed
@@ -2648,7 +2639,7 @@ static int ntfs_fuse_listxattr(const char *path, char *list, size_t size)
 
 	if ((ctx->streams == NF_STREAMS_INTERFACE_XATTR)
 	    || (ctx->streams == NF_STREAMS_INTERFACE_OPENXATTR)) {
-		ret = ntfs_xattr_listxattr(ni, actx, list, size,
+		ret = ntfs_fuse_listxattr_common(ni, actx, list, size,
 				ctx->streams == NF_STREAMS_INTERFACE_XATTR);
 		if (ret < 0)
 			goto exit;
