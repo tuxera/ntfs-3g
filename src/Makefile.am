@@ -1,5 +1,5 @@
 
-EXTRA_DIST = secaudit.h
+EXTRA_DIST = secaudit.h ntfs-3g_common.h
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
@@ -29,7 +29,7 @@ ntfs_3g_CFLAGS   =			\
 	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
 	-I$(top_srcdir)/include/ntfs-3g
-ntfs_3g_SOURCES  = ntfs-3g.c
+ntfs_3g_SOURCES  = ntfs-3g.c ntfs-3g_common.c
 
 lowntfs_3g_LDADD    = $(FUSE_LIBS) $(top_builddir)/libntfs-3g/libntfs-3g.la
 if REALLYSTATIC
@@ -40,7 +40,7 @@ lowntfs_3g_CFLAGS   =			\
 	-DFUSE_USE_VERSION=26 		\
 	$(FUSE_CFLAGS) 			\
 	-I$(top_srcdir)/include/ntfs-3g
-lowntfs_3g_SOURCES  = lowntfs-3g.c
+lowntfs_3g_SOURCES  = lowntfs-3g.c ntfs-3g_common.c
 
 ntfs_3g_probe_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la
 ntfs_3g_usermap_LDADD 	= $(top_builddir)/libntfs-3g/libntfs-3g.la

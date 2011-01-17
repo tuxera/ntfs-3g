@@ -59,8 +59,6 @@ void ntfs_xattr_free_mapping(struct XATTRMAPPING*);
 
 enum SYSTEMXATTRS ntfs_xattr_system_type(const char *name,
 			ntfs_volume *vol);
-int ntfs_xattr_listxattr(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
- 			char *list, size_t size, BOOL prefixing);
 
 int ntfs_xattr_system_getxattr(struct SECURITY_CONTEXT *scx,
 			enum SYSTEMXATTRS attr,
