@@ -1252,6 +1252,27 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 }
 
 /*
+ *		Allocate and build the default upcase table
+ *
+ *	Returns the number of entries
+ *		0 if failed
+ */
+
+#define UPCASE_LEN 65536 /* default number of entries in upcase */
+
+u32 ntfs_upcase_build_default(ntfschar **upcase)
+{
+	u32 upcase_len;
+
+	*upcase = (ntfschar*)ntfs_malloc(UPCASE_LEN*2);
+	if (*upcase) {
+		ntfs_upcase_table_build(*upcase, UPCASE_LEN*2);
+		upcase_len = UPCASE_LEN;
+	}
+	return (upcase_len);
+}
+
+/*
  *		Build a table for converting to lower case
  *
  *	This is only meaningful when there is a single lower case

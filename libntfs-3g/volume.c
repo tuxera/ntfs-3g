@@ -482,13 +482,10 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	
 	/* Create the default upcase table. */
-	vol->upcase_len = 65536;
-	vol->upcase = ntfs_malloc(vol->upcase_len * sizeof(ntfschar));
-	if (!vol->upcase)
+	vol->upcase_len = ntfs_upcase_build_default(&vol->upcase);
+	if (!vol->upcase_len || !vol->upcase)
 		goto error_exit;
-	
-	ntfs_upcase_table_build(vol->upcase,
-			vol->upcase_len * sizeof(ntfschar));
+
 	/* Default with no locase table and case sensitive file names */
 	vol->locase = (ntfschar*)NULL;
 	NVolSetCaseSensitive(vol);
