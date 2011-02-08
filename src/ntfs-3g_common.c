@@ -1,8 +1,8 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010 Jean-Pierre Andre
- * Copyright (c) 2010 Erik Larsson
+ * Copyright (c) 2010-2011 Jean-Pierre Andre
+ * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published

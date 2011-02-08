@@ -4,6 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2007      Yura Pakhuchiy
+ * Copyright (c) 2011      Jean-Pierre Andre
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
