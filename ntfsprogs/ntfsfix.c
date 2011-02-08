@@ -450,6 +450,153 @@ error_exit:
 }
 
 /*
+ *		Rewrite the $UpCase file as default
+ *
+ *	Returns 0 if could be written
+ */
+
+static int rewrite_upcase(ntfs_volume *vol, ntfs_attr *na)
+{
+	s64 l;
+	int res;
+
+		/* writing the $UpCase may require bitmap updates */
+	res = -1;
+	vol->lcnbmp_ni = ntfs_inode_open(vol, FILE_Bitmap);
+	if (!vol->lcnbmp_ni) {
+		ntfs_log_perror("Failed to open bitmap inode");
+	} else {
+		vol->lcnbmp_na = ntfs_attr_open(vol->lcnbmp_ni, AT_DATA,
+					AT_UNNAMED, 0);
+		if (!vol->lcnbmp_na) {
+			ntfs_log_perror("Failed to open bitmap data attribute");
+		} else {
+			/* minimal consistency check on the bitmap */
+			if (((vol->lcnbmp_na->data_size << 3)
+				< vol->nr_clusters)
+			    || ((vol->lcnbmp_na->data_size << 3)
+				>= (vol->nr_clusters << 1))
+			    || (vol->lcnbmp_na->data_size
+					> vol->lcnbmp_na->allocated_size)) {
+				ntfs_log_error("Corrupt cluster map size %lld"
+					" (allocated %lld minimum %lld)\n",
+					(long long)vol->lcnbmp_na->data_size, 
+					(long long)vol->lcnbmp_na->allocated_size,
+					(long long)(vol->nr_clusters + 7) >> 3);
+			} else {
+				ntfs_log_info("Rewriting $UpCase file\n");
+				l = ntfs_attr_pwrite(na, 0, vol->upcase_len*2,
+							vol->upcase);
+				if (l != vol->upcase_len*2) {
+					ntfs_log_error("Failed to rewrite $UpCase\n");
+				} else {
+					ntfs_log_info("$UpCase has been set to default\n");
+					res = 0;
+				}
+			}
+			ntfs_attr_close(vol->lcnbmp_na);
+			vol->lcnbmp_na = (ntfs_attr*)NULL;
+		}
+		ntfs_inode_close(vol->lcnbmp_ni);
+		vol->lcnbmp_ni = (ntfs_inode*)NULL;
+	}
+	return (res);
+}
+
+/*
+ *		Fix the $UpCase file
+ *
+ *	Returns 0 if the table is valid or has been fixed
+ */
+
+static int fix_upcase(ntfs_volume *vol)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	ntfschar *upcase;
+	s64 l;
+	u32 upcase_len;
+	u32 k;
+	int res;
+
+	res = -1;
+	ni = (ntfs_inode*)NULL;
+	na = (ntfs_attr*)NULL;
+	/* Now load the upcase table from $UpCase. */
+	ntfs_log_debug("Loading $UpCase...\n");
+	ni = ntfs_inode_open(vol, FILE_UpCase);
+	if (!ni) {
+		ntfs_log_perror("Failed to open inode FILE_UpCase");
+		goto error_exit;
+	}
+	/* Get an ntfs attribute for $UpCase/$DATA. */
+	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
+	if (!na) {
+		ntfs_log_perror("Failed to open ntfs attribute");
+		goto error_exit;
+	}
+	/*
+	 * Note: Normally, the upcase table has a length equal to 65536
+	 * 2-byte Unicode characters but allow for different cases, so no
+	 * checks done. Just check we don't overflow 32-bits worth of Unicode
+	 * characters.
+	 */
+	if (na->data_size & ~0x1ffffffffULL) {
+		ntfs_log_error("Error: Upcase table is too big (max 32-bit "
+				"allowed).\n");
+		errno = EINVAL;
+		goto error_exit;
+	}
+	upcase_len = na->data_size >> 1;
+	upcase = (ntfschar*)ntfs_malloc(na->data_size);
+	if (!upcase)
+		goto error_exit;
+	/* Read in the $DATA attribute value into the buffer. */
+	l = ntfs_attr_pread(na, 0, na->data_size, upcase);
+	if (l != na->data_size) {
+		ntfs_log_error("Failed to read $UpCase, unexpected length "
+			       "(%lld != %lld).\n", (long long)l,
+			       (long long)na->data_size);
+		errno = EIO;
+		goto error_exit;
+	}
+	/* Consistency check of $UpCase, restricted to plain ASCII chars */
+	k = 0x20;
+	while ((k < upcase_len)
+	    && (k < 0x7f)
+	    && (le16_to_cpu(upcase[k])
+			== ((k < 'a') || (k > 'z') ? k : k + 'A' - 'a')))
+		k++;
+	if (k < 0x7f) {
+		ntfs_log_error("Corrupted file $UpCase\n");
+		if (!opt.no_action) {
+			/* rewrite the $UpCase file from default */
+			res = rewrite_upcase(vol, na);
+			/* free the bad upcase record */
+			if (!res)
+				free(upcase);
+		} else {
+			/* keep the default upcase but return an error */
+			free(upcase);
+		}
+	} else {
+			/* accept the upcase table read from $UpCase */
+		free(vol->upcase);
+		vol->upcase = upcase;
+		vol->upcase_len = upcase_len;
+		res = 0;
+	}
+error_exit :
+	/* Done with the $UpCase mft record. */
+	if (na)
+		ntfs_attr_close(na);
+	if (ni && ntfs_inode_close(ni)) {
+		ntfs_log_perror("Failed to close $UpCase");
+	}
+	return (res);
+}
+
+/*
  *		Rewrite the boot sector
  *
  *	Returns 0 if successful
@@ -668,13 +815,17 @@ static int fix_mount(void)
 		/* if option -n proceed despite errors, to display them all */
 	if ((!ret || opt.no_action) && (fix_mftmirr(vol) < 0))
 		ret = -1;
+	if ((!ret || opt.no_action) && (fix_upcase(vol) < 0))
+		ret = -1;
 	if ((!ret || opt.no_action) && (set_dirty_flag(vol) < 0))
 		ret = -1;
 	if ((!ret || opt.no_action) && (empty_journal(vol) < 0))
 		ret = -1;
-	/* ntfs_umount() will invoke ntfs_device_free() for us. */
-	if (ntfs_umount(vol, 0))
-		ntfs_umount(vol, 1);
+	/*
+	 * ntfs_umount() will invoke ntfs_device_free() for us.
+	 * Ignore the returned error resulting from partial mounting.
+	 */
+	ntfs_umount(vol, 1);
 	return ret;
 }
 
