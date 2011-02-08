@@ -67,12 +67,14 @@
 
 #include "types.h"
 #include "attrib.h"
+#include "volume.h"
 #include "mft.h"
 #include "device.h"
 #include "logfile.h"
 #include "utils.h"
 /* #include "version.h" */
 #include "logging.h"
+#include "misc.h"
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
 #	error "No default device io operations!  Cannot build ntfsfix.  \
@@ -86,6 +88,7 @@ static const char FAILED[]   = "FAILED\n";
 
 static struct {
 	char *volume;
+	BOOL no_action;
 } opt;
 
 /**
@@ -100,6 +103,7 @@ static int usage(void)
 		   "    Attempt to fix an NTFS partition.\n"
 		   "\n"
 		   "    -h, --help             Display this help\n"
+		   "    -n, --no-action        Do not write anything\n"
 		   "    -V, --version          Display version information\n"
 		   "\n"
 		   "For example: %s /dev/hda6\n\n",
@@ -131,9 +135,10 @@ static void version(void)
 static void parse_options(int argc, char **argv)
 {
 	int c;
-	static const char *sopt = "-hV";
+	static const char *sopt = "-hnV";
 	static const struct option lopt[] = {
 		{ "help",	no_argument,	NULL, 'h' },
+		{ "no-action",	no_argument,	NULL, 'n' },
 		{ "version",	no_argument,	NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -150,9 +155,13 @@ static void parse_options(int argc, char **argv)
 				usage();
 			}
 			break;
+		case 'n':
+			opt.no_action = TRUE;
+			break;
 		case 'h':
 		case '?':
 			usage();
+			/* fall through */
 		case 'V':
 			version();
 		default:
@@ -447,6 +456,7 @@ static int fix_mount(void)
 	int ret = -1; /* failure */
 	ntfs_volume *vol;
 	struct ntfs_device *dev;
+	unsigned long flags;
 
 	ntfs_log_info("Attempting to correct errors... ");
 
@@ -457,7 +467,8 @@ static int fix_mount(void)
 		ntfs_log_perror("Failed to allocate device");
 		return -1;
 	}
-	vol = ntfs_volume_startup(dev, 0);
+	flags = (opt.no_action ? MS_RDONLY : 0);
+	vol = ntfs_volume_startup(dev, flags);
 	if (!vol) {
 		ntfs_log_info(FAILED);
 		ntfs_log_perror("Failed to startup volume");
@@ -465,14 +476,14 @@ static int fix_mount(void)
 		ntfs_device_free(dev);
 		return -1;
 	}
-	if (fix_mftmirr(vol) < 0)
-		goto error_exit;
-	if (set_dirty_flag(vol) < 0)
-		goto error_exit;
-	if (empty_journal(vol) < 0)
-		goto error_exit;
+		/* if option -n proceed despite errors, to display them all */
 	ret = 0;
-error_exit:
+	if ((!ret || opt.no_action) && (fix_mftmirr(vol) < 0))
+		ret = -1;
+	if ((!ret || opt.no_action) && (set_dirty_flag(vol) < 0))
+		ret = -1;
+	if ((!ret || opt.no_action) && (empty_journal(vol) < 0))
+		ret = -1;
 	/* ntfs_umount() will invoke ntfs_device_free() for us. */
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
@@ -486,6 +497,7 @@ int main(int argc, char **argv)
 {
 	ntfs_volume *vol;
 	unsigned long mnt_flags;
+	unsigned long flags;
 	int ret = 1; /* failure */
 	BOOL force = FALSE;
 
@@ -504,16 +516,20 @@ int main(int argc, char **argv)
 		ntfs_log_perror("Failed to determine whether %s is mounted",
 				opt.volume);
 	/* Attempt a full mount first. */
+	flags = (opt.no_action ? MS_RDONLY : 0);
 	ntfs_log_info("Mounting volume... ");
-	vol = ntfs_mount(opt.volume, 0);
+	vol = ntfs_mount(opt.volume, flags);
 	if (vol) {
 		ntfs_log_info(OK);
 		ntfs_log_info("Processing of $MFT and $MFTMirr completed "
 				"successfully.\n");
 	} else {
 		ntfs_log_info(FAILED);
-		if (fix_mount() < 0)
+		if (fix_mount() < 0) {
+			if (opt.no_action)
+				ntfs_log_info("No change made\n");
 			exit(1);
+		}
 		vol = ntfs_mount(opt.volume, 0);
 		if (!vol) {
 			ntfs_log_perror("Remount failed");
