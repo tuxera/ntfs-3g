@@ -203,7 +203,6 @@ typedef enum {
 	NA_BeingNonResident,	/* 1: Attribute is being made not resident. */
 	NA_FullyMapped,		/* 1: Attribute has been fully mapped */
 	NA_DataAppending,	/* 1: Attribute is being appended to */
-	NA_DelaySparsing,	/* 1: Delay checking attribute being sparse */
 	NA_ComprClosing,	/* 1: Compressed attribute is being closed */
 } ntfs_attr_state_bits;
 
@@ -230,10 +229,6 @@ typedef enum {
 #define NAttrDataAppending(na)		test_nattr_flag(na, DataAppending)
 #define NAttrSetDataAppending(na)	set_nattr_flag(na, DataAppending)
 #define NAttrClearDataAppending(na)	clear_nattr_flag(na, DataAppending)
-
-#define NAttrDelaySparsing(na)		test_nattr_flag(na, DelaySparsing)
-#define NAttrSetDelaySparsing(na)	set_nattr_flag(na, DelaySparsing)
-#define NAttrClearDelaySparsing(na)	clear_nattr_flag(na, DelaySparsing)
 
 #define NAttrComprClosing(na)		test_nattr_flag(na, ComprClosing)
 #define NAttrSetComprClosing(na)	set_nattr_flag(na, ComprClosing)
