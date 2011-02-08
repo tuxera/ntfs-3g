@@ -311,6 +311,7 @@ typedef enum {
 #define MFT_REF_MASK_LE const_cpu_to_le64(MFT_REF_MASK_CPU)
 
 typedef u64 MFT_REF;
+typedef le64 leMFT_REF;   /* a little-endian MFT_MREF */
 
 #define MK_MREF(m, s)	((MFT_REF)(((MFT_REF)(s) << 48) |		\
 					((MFT_REF)(m) & MFT_REF_MASK_CPU)))
