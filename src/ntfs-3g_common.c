@@ -78,6 +78,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
 	{ "default_permissions", OPT_DEFAULT_PERMISSIONS, FLGOPT_BOGUS },
 	{ "permissions", OPT_PERMISSIONS, FLGOPT_BOGUS },
+	{ "acl", OPT_ACL, FLGOPT_BOGUS },
 	{ "umask", OPT_UMASK, FLGOPT_OCTAL },
 	{ "fmask", OPT_FMASK, FLGOPT_OCTAL },
 	{ "dmask", OPT_DMASK, FLGOPT_OCTAL },
@@ -175,6 +176,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	BOOL no_def_opts = FALSE;
 	int default_permissions = 0;
 	int permissions = 0;
+	int acl = 0;
 	int want_permissions = 0;
 	int intarg;
 	const struct DEFOPTION *poptl;
@@ -243,6 +245,11 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			case OPT_PERMISSIONS :
 				permissions = 1;
 				break;
+#if POSIXACLS
+			case OPT_ACL :
+				acl = 1;
+				break;
+#endif
 			case OPT_UMASK :
 				ctx->dmask = ctx->fmask = intarg;
 				want_permissions = 1;
@@ -436,7 +443,7 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	}
 	if (!no_def_opts && ntfs_strappend(&ret, def_opts))
 		goto err_exit;
-	if ((default_permissions || permissions)
+	if ((default_permissions || (permissions && !acl))
 			&& ntfs_strappend(&ret, "default_permissions,"))
 		goto err_exit;
 			/* The atime options exclude each other */
@@ -451,8 +458,10 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 		goto err_exit;
 	if (ntfs_strappend(&ret, popts->device))
 		goto err_exit;
-	if (permissions)
+	if (permissions && !acl)
 		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+	if (acl)
+		ctx->secure_flags |= (1 << SECURITY_ACL);
 	if (want_permissions)
 		ctx->secure_flags |= (1 << SECURITY_WANTED);
 	if (ctx->ro)

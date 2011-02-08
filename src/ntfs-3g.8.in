@@ -128,6 +128,13 @@ When a user mapping file is defined, the options \fBuid=\fP, \fBgid=\fP,
 Set standard permissions on created files and use standard access control.
 This option is set by default when a user mapping file is present.
 .TP
+.B acl
+Enable setting Posix ACLs on created files and use them for access control.
+This option is only available on specific builds. It is set by default
+when a user mapping file is present and the
+.B permissions
+mount option is not set.
+.TP
 .B inherit
 When creating a new file, set its initial ownership and protections
 according to inheritance rules defined in parent directory. These rules
