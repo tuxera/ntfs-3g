@@ -1251,6 +1251,7 @@ static int ntfs_compress_overwr_free(ntfs_attr *na, runlist_element *rl,
 		case 1 :
 			/* there is a single hole, may have to merge */
 			freerl->vcn = freevcn;
+			freerl->length = freecnt;
 			if (freerl[1].lcn == LCN_HOLE) {
 				freerl->length += freerl[1].length;
 				erl = freerl;
