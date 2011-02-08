@@ -88,6 +88,8 @@ static const char *EXEC_NAME = "ntfsfix";
 static const char OK[]       = "OK\n";
 static const char FAILED[]   = "FAILED\n";
 
+#define DEFAULT_SECTOR_SIZE 512
+
 static struct {
 	char *volume;
 	BOOL no_action;
@@ -625,45 +627,111 @@ static int rewrite_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
 }
 
 /*
+ *		Try an alternate boot sector and fix the real one
+ *
+ *	Only after successful checks is the boot sector rewritten.
+ *
+ *	The alternate boot sector is not rewritten, either because it
+ *	was found correct, or because we truncated the file system
+ *	and the last actual sector might be part of some file.
+ *
+ *	Returns 0 if successful
+ */
+
+static int try_fix_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
+			s64 read_sector, s64 fix_sectors)
+{
+	s64 br;
+	int res;
+	s64 got_sectors;
+
+	res = -1;
+	br = ntfs_pread(vol->dev, read_sector*DEFAULT_SECTOR_SIZE,
+					sizeof(NTFS_BOOT_SECTOR), bs);
+	if (br != sizeof(NTFS_BOOT_SECTOR)) {
+		if (br != -1)
+			errno = EINVAL;
+		if (!br)
+			ntfs_log_error("Failed to read alternate bootsector (size=0)\n");
+		else
+			ntfs_log_perror("Error reading alternate bootsector");
+	} else {
+		got_sectors = le64_to_cpu(bs->number_of_sectors);
+		bs->number_of_sectors = cpu_to_le64(fix_sectors);
+		if (ntfs_boot_sector_is_ntfs(bs)
+		    && !ntfs_boot_sector_parse(vol, bs)) {
+			ntfs_log_info("The alternate bootsector is usable\n");
+			if (fix_sectors != got_sectors)
+				ntfs_log_info("Set sector count to %lld instead of %lld\n",
+						(long long)fix_sectors,
+						(long long)got_sectors);
+			/* fix the normal boot sector */
+			if (!opt.no_action) {
+				res = rewrite_boot(vol->dev, bs);
+			} else
+				res = 0;
+		}
+		if (!res && !opt.no_action)
+			ntfs_log_info("The boot sector has been rewritten\n");
+	}
+	return (res);
+}
+
+/*
  *		Try the alternate boot sector if the normal one is bad
+ *
+ *	Actually :
+ *	- first try the last sector of the partition (expected location)
+ *	- then try the last sector as shown in the main boot sector,
+ *		(could be meaningful for an undersized partition)
+ *	- finally try truncating the file system actual size of partition
+ *		(could be meaningful for an oversized partition)
  *
  *	if successful, rewrite the normal boot sector accordingly
  *
  *	Returns 0 if successful
  */
 
-static int try_alternate_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
+static int try_alternate_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
+			s64 shown_sectors)
 {
-	s64 blocks;
-	s64 br;
+	s64 actual_sectors;
 	int res;
 
 	res = -1;
-	blocks = ntfs_device_size_get(dev,512);
-	if (blocks > 0) {
-		br = ntfs_pread(dev, (blocks - 1)*512,
-					sizeof(NTFS_BOOT_SECTOR), bs);
-		if (br != sizeof(NTFS_BOOT_SECTOR)) {
-			if (br != -1)
-				errno = EINVAL;
-			if (!br)
-				ntfs_log_error("Failed to read alternate bootsector (size=0)\n");
-			else
-				ntfs_log_perror("Error reading alternate bootsector");
-		} else {
-			if (!ntfs_boot_sector_is_ntfs(bs)) {
-				ntfs_log_error("Both boot sectors are unusable\n");
-// provide information about NTFS signature
-			} else {
-				ntfs_log_info("The alternate bootsector is usable\n");
-				/* fix the normal boot sector */
-				if (!opt.no_action) {
-					res = rewrite_boot(dev, bs);
-				} else
-					res = 0;
-			}
-		}
-	}
+	ntfs_log_info("Trying the alternate boot sector\n");
+
+		/*
+		 * We do not rely on the sector size defined in the
+		 * boot sector, supposed to be corrupt, so we assume the
+		 * sector size is 512 (some ioctl might be be needed to
+		 * get the actual size). This is only used to guess the
+		 * alternate boot sector location and should not damage
+		 * anything if wrong.
+		 * Other values might be worth trying (1024, 2048, 4096).
+		 *
+		 * Note : the real last sector is not accounted for here.
+		 */
+	actual_sectors = ntfs_device_size_get(vol->dev,DEFAULT_SECTOR_SIZE) - 1;
+
+		/* first try the actual last sector */
+	if ((actual_sectors > 0)
+	    && !try_fix_boot(vol,bs,actual_sectors,actual_sectors))
+		res = 0;
+
+		/* then try the shown last sector, if less than actual */
+	if (res
+	    && (shown_sectors > 0)
+	    && (shown_sectors < actual_sectors)
+	    && !try_fix_boot(vol,bs,shown_sectors,shown_sectors))
+		res = 0;
+
+		/* then try reducing the number of sectors to actual value */
+	if (res
+	    && (shown_sectors > actual_sectors)
+	    && !try_fix_boot(vol,bs,0,actual_sectors))
+		res = 0;
+
 	return (res);
 }
 
@@ -679,6 +747,7 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	s64 br;
 	ntfs_volume *vol;
 	BOOL dev_open;
+	s64 shown_sectors;
 	NTFS_BOOT_SECTOR *bs;
 	int res;
 	int eo;
@@ -737,16 +806,16 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 			ntfs_log_perror("Error reading bootsector");
 		goto error_exit;
 	}
-	if (!ntfs_boot_sector_is_ntfs(bs)) {
+	if (!ntfs_boot_sector_is_ntfs(bs)
+		/* get the bootsector data, only fails when inconsistent */
+	    || (ntfs_boot_sector_parse(vol, bs) < 0)) {
+		shown_sectors = le64_to_cpu(bs->number_of_sectors);
 		/* boot sector is wrong, try the alternate boot sector */
-		if (try_alternate_boot(dev, bs)) {
+		if (try_alternate_boot(vol, bs, shown_sectors)) {
 			errno = EINVAL;
 			goto error_exit;
 		}
 	}
-		/* get the bootsector data, only fails when inconsistent */
-	if (ntfs_boot_sector_parse(vol, bs) < 0)
-		goto error_exit;
 	res = 0;
 error_exit:
 	if (res) {
