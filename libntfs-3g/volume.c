@@ -1184,7 +1184,7 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 	 * Check for dirty logfile and hibernated Windows.
 	 * We care only about read-write mounts.
 	 */
-	if (!(flags & MS_RDONLY)) {
+	if (!(flags & (MS_RDONLY | MS_FORENSIC))) {
 		if (!(flags & MS_IGNORE_HIBERFILE) && 
 		    ntfs_volume_check_hiberfile(vol, 1) < 0)
 			goto error_exit;
@@ -1196,10 +1196,10 @@ ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, unsigned long flags)
 			if (ntfs_logfile_reset(vol))
 				goto error_exit;
 		}
-	}
 		/* make $TXF_DATA resident if present on the root directory */
-	if (!NVolReadOnly(vol) && fix_txf_data(vol))
-		goto error_exit;
+		if (fix_txf_data(vol))
+			goto error_exit;
+	}
 
 	return vol;
 io_error_exit:

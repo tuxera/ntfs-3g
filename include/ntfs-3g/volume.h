@@ -58,6 +58,7 @@
 #endif
 
 #define MS_IGNORE_HIBERFILE   0x20000000
+#define MS_FORENSIC	      0x04000000 /* No modification during mount */
 
 /* Forward declaration */
 typedef struct _ntfs_volume ntfs_volume;
