@@ -54,6 +54,7 @@ enum {
 	OPT_NO_DEF_OPTS,
 	OPT_DEFAULT_PERMISSIONS,
 	OPT_PERMISSIONS,
+	OPT_ACL,
 	OPT_UMASK,
 	OPT_FMASK,
 	OPT_DMASK,
@@ -120,6 +121,7 @@ typedef struct {
 	BOOL windows_names;
 	BOOL ignore_case;
 	BOOL compression;
+	BOOL acl;
 	BOOL silent;
 	BOOL recover;
 	BOOL hiberfile;

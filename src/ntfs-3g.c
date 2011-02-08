@@ -3732,9 +3732,11 @@ int main(int argc, char *argv[])
 	if (ntfs_open_secure(ctx->vol) && (ctx->vol->major_ver >= 3))
 		failed_secure = "Could not open file $Secure";
 	if (!ntfs_build_mapping(&ctx->security,ctx->usermap_path,
-		(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
+		(ctx->vol->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_ACL)))
 		&& !(ctx->vol->secure_flags & (1 << SECURITY_WANTED)))) {
 #if POSIXACLS
+		/* use basic permissions if requested */
 		if (ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))
 			permissions_mode = "User mapping built, Posix ACLs not used";
 		else {
@@ -3748,7 +3750,8 @@ int main(int argc, char *argv[])
 		}
 #else /* POSIXACLS */
 #if KERNELPERMS
-		if (!(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))) {
+		if (!(ctx->vol->secure_flags
+			& ((1 << SECURITY_DEFAULT) | (1 << SECURITY_ACL)))) {
 			/*
 			 * No explicit option but user mapping found
 			 * force default security
