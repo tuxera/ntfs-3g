@@ -68,6 +68,7 @@
 #include "types.h"
 #include "attrib.h"
 #include "volume.h"
+#include "bootsect.h"
 #include "mft.h"
 #include "device.h"
 #include "logfile.h"
@@ -448,12 +449,187 @@ error_exit:
 	return ret;
 }
 
+/*
+ *		Rewrite the boot sector
+ *
+ *	Returns 0 if successful
+ */
+
+static int rewrite_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
+{
+	s64 bw;
+	int res;
+
+	res = -1;
+	ntfs_log_info("Rewriting the bootsector\n");
+	bw = ntfs_pwrite(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
+	if (bw == sizeof(NTFS_BOOT_SECTOR))
+		res = 0;
+	else {
+		if (bw != -1)
+			errno = EINVAL;
+		if (!bw)
+			ntfs_log_error("Failed to rewrite the bootsector (size=0)\n");
+		else
+			ntfs_log_perror("Error rewriting the bootsector");
+	}
+	return (res);
+}
+
+/*
+ *		Try the alternate boot sector if the normal one is bad
+ *
+ *	if successful, rewrite the normal boot sector accordingly
+ *
+ *	Returns 0 if successful
+ */
+
+static int try_alternate_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
+{
+	s64 blocks;
+	s64 br;
+	int res;
+
+	res = -1;
+	blocks = ntfs_device_size_get(dev,512);
+	if (blocks > 0) {
+		br = ntfs_pread(dev, (blocks - 1)*512,
+					sizeof(NTFS_BOOT_SECTOR), bs);
+		if (br != sizeof(NTFS_BOOT_SECTOR)) {
+			if (br != -1)
+				errno = EINVAL;
+			if (!br)
+				ntfs_log_error("Failed to read alternate bootsector (size=0)\n");
+			else
+				ntfs_log_perror("Error reading alternate bootsector");
+		} else {
+			if (!ntfs_boot_sector_is_ntfs(bs)) {
+				ntfs_log_error("Both boot sectors are unusable\n");
+// provide information about NTFS signature
+			} else {
+				ntfs_log_info("The alternate bootsector is usable\n");
+				/* fix the normal boot sector */
+				if (!opt.no_action) {
+					res = rewrite_boot(dev, bs);
+				} else
+					res = 0;
+			}
+		}
+	}
+	return (res);
+}
+
+/*
+ *		Try to fix problems which may arise in the start up sequence
+ *
+ *	This is a replay of the normal start up sequence with fixes when
+ *	some problem arise.
+ */
+
+static int fix_startup(struct ntfs_device *dev, unsigned long flags)
+{
+	s64 br;
+	ntfs_volume *vol;
+	BOOL dev_open;
+	NTFS_BOOT_SECTOR *bs;
+	int res;
+	int eo;
+
+	errno = 0;
+	res = -1;
+	dev_open = FALSE;
+	if (!dev || !dev->d_ops || !dev->d_name) {
+		errno = EINVAL;
+		ntfs_log_perror("%s: dev = %p", __FUNCTION__, dev);
+		goto error_exit;
+	}
+
+	bs = (NTFS_BOOT_SECTOR*)ntfs_malloc(sizeof(NTFS_BOOT_SECTOR));
+	if (!bs)
+		goto error_exit;
+	
+	/* Allocate the volume structure. */
+	vol = ntfs_volume_alloc();
+	if (!vol)
+		goto error_exit;
+	
+	/* Create the default upcase table. */
+	vol->upcase_len = ntfs_upcase_build_default(&vol->upcase);
+	if (!vol->upcase_len || !vol->upcase)
+		goto error_exit;
+
+	/* Default with no locase table and case sensitive file names */
+	vol->locase = (ntfschar*)NULL;
+	NVolSetCaseSensitive(vol);
+	
+		/* by default, all files are shown and not marked hidden */
+	NVolSetShowSysFiles(vol);
+	NVolSetShowHidFiles(vol);
+	NVolClearHideDotFiles(vol);
+	if (flags & MS_RDONLY)
+		NVolSetReadOnly(vol);
+	
+	/* ...->open needs bracketing to compile with glibc 2.7 */
+	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
+		ntfs_log_perror("Error opening '%s'", dev->d_name);
+		goto error_exit;
+	}
+	dev_open = TRUE;
+	/* Attach the device to the volume. */
+	vol->dev = dev;
+	
+	/* Now read the bootsector. */
+	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
+	if (br != sizeof(NTFS_BOOT_SECTOR)) {
+		if (br != -1)
+			errno = EINVAL;
+		if (!br)
+			ntfs_log_error("Failed to read bootsector (size=0)\n");
+		else
+			ntfs_log_perror("Error reading bootsector");
+		goto error_exit;
+	}
+	if (!ntfs_boot_sector_is_ntfs(bs)) {
+		/* boot sector is wrong, try the alternate boot sector */
+		if (try_alternate_boot(dev, bs)) {
+			errno = EINVAL;
+			goto error_exit;
+		}
+	}
+		/* get the bootsector data, only fails when inconsistent */
+	if (ntfs_boot_sector_parse(vol, bs) < 0)
+		goto error_exit;
+	res = 0;
+error_exit:
+	if (res) {
+		switch (errno) {
+		case ENOMEM :
+			ntfs_log_error("Failed to allocate memory\n");
+			break;
+		case EINVAL :
+			ntfs_log_error("Unrecoverable error\n");
+			break;
+		default :
+			break;
+		}
+	}
+	eo = errno;
+	free(bs);
+	if (vol)
+		free(vol);
+	if (dev_open) {
+		(dev->d_ops->close)(dev);
+	}
+	errno = eo;
+	return (res);
+}
+
 /**
  * fix_mount
  */
 static int fix_mount(void)
 {
-	int ret = -1; /* failure */
+	int ret = 0; /* default success */
 	ntfs_volume *vol;
 	struct ntfs_device *dev;
 	unsigned long flags;
@@ -472,12 +648,24 @@ static int fix_mount(void)
 	if (!vol) {
 		ntfs_log_info(FAILED);
 		ntfs_log_perror("Failed to startup volume");
-		ntfs_log_error("Volume is corrupt. You should run chkdsk.\n");
-		ntfs_device_free(dev);
-		return -1;
+
+		/* Try fixing the bootsector and redo the startup */
+		if (!fix_startup(dev, flags)) {
+			if (opt.no_action)
+				ntfs_log_info("The bootsector can be fixed, "
+						"but no change was requested\n");
+			else
+				vol = ntfs_volume_startup(dev, flags);
+		}
+		if (!vol) {
+			ntfs_log_error("Volume is corrupt. You should run chkdsk.\n");
+			ntfs_device_free(dev);
+			return -1;
+		}
+		if (opt.no_action)
+			ret = -1; /* error present and not fixed */
 	}
 		/* if option -n proceed despite errors, to display them all */
-	ret = 0;
 	if ((!ret || opt.no_action) && (fix_mftmirr(vol) < 0))
 		ret = -1;
 	if ((!ret || opt.no_action) && (set_dirty_flag(vol) < 0))
