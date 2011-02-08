@@ -147,6 +147,12 @@ typedef struct {
 
 extern const char *EXEC_NAME;
 
+#ifdef FUSE_INTERNAL
+#define FUSE_TYPE	"integrated FUSE"
+#else
+#define FUSE_TYPE	"external FUSE"
+#endif
+
 extern const char xattr_ntfs_3g[];
 
 extern const char nf_ns_user_prefix[];
@@ -161,6 +167,8 @@ extern const int nf_ns_trusted_prefix_len;
 int ntfs_strappend(char **dest, const char *append);
 char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			const struct ntfs_options *popts, BOOL low_fuse);
+int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
+			int argc, char *argv[]);
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
  			char *list, size_t size, BOOL prefixing);
