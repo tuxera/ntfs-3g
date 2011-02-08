@@ -6082,7 +6082,8 @@ put_err_out:
  *	ERANGE - @newsize is not valid for the attribute type of @na.
  *	ENOSPC - There is no enough space in base mft to resize $ATTRIBUTE_LIST.
  */
-static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
+static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
+					BOOL holes)
 {
 	LCN lcn_seek_from;
 	VCN first_free_vcn;
@@ -6146,7 +6147,7 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize)
 		 * If we extend $DATA attribute on NTFS 3+ volume, we can add
 		 * sparse runs instead of real allocation of clusters.
 		 */
-		if (na->type == AT_DATA && vol->major_ver >= 3) {
+		if ((na->type == AT_DATA && vol->major_ver >= 3) && holes) {
 			rl = ntfs_malloc(0x1000);
 			if (!rl)
 				return -1;
@@ -6306,12 +6307,13 @@ put_err_out:
 }
 
 
-static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
+static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize,
+				BOOL holes)
 {
 	int ret; 
 	
 	ntfs_log_enter("Entering\n");
-	ret = ntfs_non_resident_attr_expand_i(na, newsize);
+	ret = ntfs_non_resident_attr_expand_i(na, newsize, holes);
 	ntfs_log_leave("\n");
 	return ret;
 }
@@ -6320,6 +6322,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
  * ntfs_attr_truncate - resize an ntfs attribute
  * @na:		open ntfs attribute to resize
  * @newsize:	new size (in bytes) to which to resize the attribute
+ * @holes:	try creating a hole if expanding
  *
  * Change the size of an open ntfs attribute @na to @newsize bytes. If the
  * attribute is made bigger and the attribute is resident the newly
@@ -6336,7 +6339,7 @@ static int ntfs_non_resident_attr_expand(ntfs_attr *na, const s64 newsize)
  *	EOPNOTSUPP - The desired resize is not implemented yet.
  * 	EACCES     - Encrypted attribute.
  */
-int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
+static int ntfs_attr_truncate_i(ntfs_attr *na, const s64 newsize, BOOL holes)
 {
 	int ret = STATUS_ERROR;
 	s64 fullsize;
@@ -6401,7 +6404,8 @@ int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 		else
 			fullsize = newsize;
 		if (fullsize > na->data_size)
-			ret = ntfs_non_resident_attr_expand(na, fullsize);
+			ret = ntfs_non_resident_attr_expand(na, fullsize,
+								holes);
 		else
 			ret = ntfs_non_resident_attr_shrink(na, fullsize);
 	} else
@@ -6410,7 +6414,25 @@ out:
 	ntfs_log_leave("Return status %d\n", ret);
 	return ret;
 }
-	
+
+/*
+ *		Resize an attribute, creating a hole if relevant
+ */
+
+int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
+{
+	return (ntfs_attr_truncate_i(na, newsize, TRUE));
+}
+
+/*
+ *		Resize an attribute, avoiding hole creation
+ */
+
+int ntfs_attr_truncate_solid(ntfs_attr *na, const s64 newsize)
+{
+	return (ntfs_attr_truncate_i(na, newsize, FALSE));
+}
+
 /*
  *		Stuff a hole in a compressed file
  *
@@ -6471,7 +6493,7 @@ static int stuff_hole(ntfs_attr *na, const s64 pos)
 			if (!ret
 			    && ((na->initialized_size + end_size) < pos)
 			    && ntfs_non_resident_attr_expand(na,
-					pos - end_size))
+					pos - end_size, TRUE))
 				ret = -1;
 			else 
 				na->initialized_size
