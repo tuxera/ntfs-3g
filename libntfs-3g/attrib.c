@@ -1182,12 +1182,27 @@ static int ntfs_attr_fill_zero(ntfs_attr *na, s64 pos, s64 count)
 			rli++;
 		}
 		size = min(end - pos, NTFS_BUF_SIZE);
-		written = ntfs_rl_pwrite(vol, rli, ofsi, pos, size, buf);
-		if (written <= 0) {
-			ntfs_log_perror("Failed to zero space");
-			goto err_free;
+			/*
+			 * If the zeroed block is fully within a hole,
+			 * we need not write anything, so advance as far
+			 * as possible within the hole.
+			 */
+		if ((rli->lcn == (LCN)LCN_HOLE)
+		    && (ofsi <= pos)
+		    && (ofsi + (rli->length << vol->cluster_size_bits)
+				>= (pos + size))) {
+			size = min(end - pos, ofsi - pos
+				+ (rli->length << vol->cluster_size_bits));
+			pos += size;
+		} else {
+			written = ntfs_rl_pwrite(vol, rli, ofsi, pos,
+							size, buf);
+			if (written <= 0) {
+				ntfs_log_perror("Failed to zero space");
+				goto err_free;
+			}
+			pos += written;
 		}
-		pos += written;
 	}
 	
 	ret = 0;
