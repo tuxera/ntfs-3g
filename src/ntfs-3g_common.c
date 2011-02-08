@@ -40,6 +40,7 @@
 #include "security.h"
 #include "xattrs.h"
 #include "ntfs-3g_common.h"
+#include "misc.h"
 
 const char xattr_ntfs_3g[] = "ntfs-3g.";
 
@@ -55,6 +56,412 @@ const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
 static const char nf_ns_alt_xattr_efsinfo[] = "user.ntfs.efsinfo";
 
 #ifdef HAVE_SETXATTR
+
+static const char def_opts[] = "allow_other,nonempty,";
+
+	/*
+	 *	 Table of recognized options
+	 * Their order may be significant
+	 * The options invalid in some configuration should still
+	 * be present, so that an error can be returned
+	 */
+const struct DEFOPTION optionlist[] = {
+	{ "ro", OPT_RO, FLGOPT_APPEND | FLGOPT_BOGUS },
+	{ "noatime", OPT_NOATIME, FLGOPT_BOGUS },
+	{ "atime", OPT_ATIME, FLGOPT_BOGUS },
+	{ "relatime", OPT_RELATIME, FLGOPT_BOGUS },
+	{ "fake_rw", OPT_FAKE_RW, FLGOPT_BOGUS },
+	{ "fsname", OPT_FSNAME, FLGOPT_NOSUPPORT },
+	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
+	{ "default_permissions", OPT_DEFAULT_PERMISSIONS, FLGOPT_BOGUS },
+	{ "permissions", OPT_PERMISSIONS, FLGOPT_BOGUS },
+	{ "umask", OPT_UMASK, FLGOPT_OCTAL },
+	{ "fmask", OPT_FMASK, FLGOPT_OCTAL },
+	{ "dmask", OPT_DMASK, FLGOPT_OCTAL },
+	{ "uid", OPT_UID, FLGOPT_DECIMAL },
+	{ "gid", OPT_GID, FLGOPT_DECIMAL },
+	{ "show_sys_files", OPT_SHOW_SYS_FILES, FLGOPT_BOGUS },
+	{ "hide_hid_files", OPT_HIDE_HID_FILES, FLGOPT_BOGUS },
+	{ "hide_dot_files", OPT_HIDE_DOT_FILES, FLGOPT_BOGUS },
+	{ "ignore_case", OPT_IGNORE_CASE, FLGOPT_BOGUS },
+	{ "windows_names", OPT_WINDOWS_NAMES, FLGOPT_BOGUS },
+	{ "compression", OPT_COMPRESSION, FLGOPT_BOGUS },
+	{ "nocompression", OPT_NOCOMPRESSION, FLGOPT_BOGUS },
+	{ "silent", OPT_SILENT, FLGOPT_BOGUS },
+	{ "recover", OPT_RECOVER, FLGOPT_BOGUS },
+	{ "norecover", OPT_NORECOVER, FLGOPT_BOGUS },
+	{ "remove_hiberfile", OPT_REMOVE_HIBERFILE, FLGOPT_BOGUS },
+	{ "sync", OPT_SYNC, FLGOPT_BOGUS | FLGOPT_APPEND },
+	{ "locale", OPT_LOCALE, FLGOPT_STRING },
+	{ "nfconv", OPT_NFCONV, FLGOPT_BOGUS },
+	{ "nonfconv", OPT_NONFCONV, FLGOPT_BOGUS },
+	{ "streams_interface", OPT_STREAMS_INTERFACE, FLGOPT_STRING },
+	{ "user_xattr", OPT_USER_XATTR, FLGOPT_BOGUS },
+	{ "noauto", OPT_NOAUTO, FLGOPT_BOGUS },
+	{ "debug", OPT_DEBUG, FLGOPT_BOGUS },
+	{ "no_detach", OPT_NO_DETACH, FLGOPT_BOGUS },
+	{ "remount", OPT_REMOUNT, FLGOPT_BOGUS },
+	{ "blksize", OPT_BLKSIZE, FLGOPT_STRING },
+	{ "inherit", OPT_INHERIT, FLGOPT_BOGUS },
+	{ "addsecurids", OPT_ADDSECURIDS, FLGOPT_BOGUS },
+	{ "staticgrps", OPT_STATICGRPS, FLGOPT_BOGUS },
+	{ "usermapping", OPT_USERMAPPING, FLGOPT_STRING },
+	{ "xattrmapping", OPT_XATTRMAPPING, FLGOPT_STRING },
+	{ "efs_raw", OPT_EFS_RAW, FLGOPT_BOGUS },
+	{ (const char*)NULL, 0, 0 } /* end marker */
+} ;
+
+#define STRAPPEND_MAX_INSIZE   8192
+#define strappend_is_large(x) ((x) > STRAPPEND_MAX_INSIZE)
+
+int ntfs_strappend(char **dest, const char *append)
+{
+	char *p;
+	size_t size_append, size_dest = 0;
+	
+	if (!dest)
+		return -1;
+	if (!append)
+		return 0;
+
+	size_append = strlen(append);
+	if (*dest)
+		size_dest = strlen(*dest);
+	
+	if (strappend_is_large(size_dest) || strappend_is_large(size_append)) {
+		errno = EOVERFLOW;
+		ntfs_log_perror("%s: Too large input buffer", EXEC_NAME);
+		return -1;
+	}
+	
+	p = (char*)realloc(*dest, size_dest + size_append + 1);
+    	if (!p) {
+		ntfs_log_perror("%s: Memory realloction failed", EXEC_NAME);
+		return -1;
+	}
+	
+	*dest = p;
+	strcpy(*dest + size_dest, append);
+	
+	return 0;
+}
+
+static int bogus_option_value(char *val, const char *s)
+{
+	if (val) {
+		ntfs_log_error("'%s' option shouldn't have value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
+static int missing_option_value(char *val, const char *s)
+{
+	if (!val) {
+		ntfs_log_error("'%s' option should have a value.\n", s);
+		return -1;
+	}
+	return 0;
+}
+
+char *parse_mount_options(ntfs_fuse_context_t *ctx,
+			const struct ntfs_options *popts, BOOL low_fuse)
+{
+	char *options, *s, *opt, *val, *ret = NULL;
+	const char *orig_opts = popts->options;
+	BOOL no_def_opts = FALSE;
+	int default_permissions = 0;
+	int permissions = 0;
+	int want_permissions = 0;
+	int intarg;
+	const struct DEFOPTION *poptl;
+
+	ctx->secure_flags = 0;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+	ctx->efs_raw = FALSE;
+#endif /* HAVE_SETXATTR */
+	ctx->compression = DEFAULT_COMPRESSION;
+	ctx->atime = ATIME_ENABLED;
+	options = strdup(orig_opts ? orig_opts : "");
+	if (!options) {
+		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
+		return NULL;
+	}
+	
+	s = options;
+	while (s && *s && (val = strsep(&s, ","))) {
+		opt = strsep(&val, "=");
+		poptl = optionlist;
+		while (poptl->name && strcmp(poptl->name,opt))
+			poptl++;
+		if (poptl->name) {
+			if ((poptl->flags & FLGOPT_BOGUS)
+			    && bogus_option_value(val, opt))
+				goto err_exit;
+			if ((poptl->flags & FLGOPT_OCTAL)
+			    && (!val
+				|| !sscanf(val, "%o", &intarg))) {
+				ntfs_log_error("'%s' option needs an octal value\n",
+					opt);
+				goto err_exit;
+			}
+			if ((poptl->flags & FLGOPT_DECIMAL)
+			    && (!val
+				|| !sscanf(val, "%i", &intarg))) {
+				ntfs_log_error("'%s' option needs a decimal value\n",
+					opt);
+				goto err_exit;
+			}
+			if ((poptl->flags & FLGOPT_STRING)
+			    && missing_option_value(val, opt))
+				goto err_exit;
+
+			switch (poptl->type) {
+			case OPT_RO :
+			case OPT_FAKE_RW :
+				ctx->ro = TRUE;
+				break;
+			case OPT_NOATIME :
+				ctx->atime = ATIME_DISABLED;
+				break;
+			case OPT_ATIME :
+				ctx->atime = ATIME_ENABLED;
+				break;
+			case OPT_RELATIME :
+				ctx->atime = ATIME_RELATIVE;
+				break;
+			case OPT_NO_DEF_OPTS :
+				no_def_opts = TRUE; /* Don't add default options. */
+				ctx->silent = FALSE; /* cancel default silent */
+				break;
+			case OPT_DEFAULT_PERMISSIONS :
+				default_permissions = 1;
+				break;
+			case OPT_PERMISSIONS :
+				permissions = 1;
+				break;
+			case OPT_UMASK :
+				ctx->dmask = ctx->fmask = intarg;
+				want_permissions = 1;
+				break;
+			case OPT_FMASK :
+				ctx->fmask = intarg;
+			       	want_permissions = 1;
+				break;
+			case OPT_DMASK :
+				ctx->dmask = intarg;
+			       	want_permissions = 1;
+				break;
+			case OPT_UID :
+				ctx->uid = intarg;
+			       	want_permissions = 1;
+				break;
+			case OPT_GID :
+				ctx->gid = intarg;
+				want_permissions = 1;
+				break;
+			case OPT_SHOW_SYS_FILES :
+				ctx->show_sys_files = TRUE;
+				break;
+			case OPT_HIDE_HID_FILES :
+				ctx->hide_hid_files = TRUE;
+				break;
+			case OPT_HIDE_DOT_FILES :
+				ctx->hide_dot_files = TRUE;
+				break;
+			case OPT_WINDOWS_NAMES :
+				ctx->windows_names = TRUE;
+				break;
+			case OPT_IGNORE_CASE :
+				if (low_fuse)
+					ctx->ignore_case = TRUE;
+				else {
+					ntfs_log_error("'%s' is an unsupported option.\n",
+						poptl->name);
+					goto err_exit;
+				}
+				break;
+			case OPT_COMPRESSION :
+				ctx->compression = TRUE;
+				break;
+			case OPT_NOCOMPRESSION :
+				ctx->compression = FALSE;
+				break;
+			case OPT_SILENT :
+				ctx->silent = TRUE;
+				break;
+			case OPT_RECOVER :
+				ctx->recover = TRUE;
+				break;
+			case OPT_NORECOVER :
+				ctx->recover = FALSE;
+				break;
+			case OPT_REMOVE_HIBERFILE :
+				ctx->hiberfile = TRUE;
+				break;
+			case OPT_SYNC :
+				ctx->sync = TRUE;
+				break;
+			case OPT_LOCALE :
+				ntfs_set_char_encoding(val);
+				break;
+#if defined(__APPLE__) || defined(__DARWIN__)
+#ifdef ENABLE_NFCONV
+			case OPT_NFCONV :
+				if (ntfs_macosx_normalize_filenames(1)) {
+					ntfs_log_error("ntfs_macosx_normalize_filenames(1) failed!\n");
+					goto err_exit;
+				}
+				break;
+			case OPT_NONFCONV :
+				if (ntfs_macosx_normalize_filenames(0)) {
+					ntfs_log_error("ntfs_macosx_normalize_filenames(0) failed!\n");
+					goto err_exit;
+				}
+				break;
+#endif /* ENABLE_NFCONV */
+#endif /* defined(__APPLE__) || defined(__DARWIN__) */
+			case OPT_STREAMS_INTERFACE :
+				if (!strcmp(val, "none"))
+					ctx->streams = NF_STREAMS_INTERFACE_NONE;
+				else if (!strcmp(val, "xattr"))
+					ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+				else if (!strcmp(val, "openxattr"))
+					ctx->streams = NF_STREAMS_INTERFACE_OPENXATTR;
+				else if (!low_fuse && !strcmp(val, "windows"))
+					ctx->streams = NF_STREAMS_INTERFACE_WINDOWS;
+				else {
+					ntfs_log_error("Invalid named data streams "
+						"access interface.\n");
+					goto err_exit;
+				}
+				break;
+			case OPT_USER_XATTR :
+				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
+				break;
+			case OPT_NOAUTO :
+				/* Don't pass noauto option to fuse. */
+				break;
+			case OPT_DEBUG :
+				ctx->debug = TRUE;
+				ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
+				ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
+				break;
+			case OPT_NO_DETACH :
+				ctx->no_detach = TRUE;
+				break;
+			case OPT_REMOUNT :
+				ntfs_log_error("Remounting is not supported at present."
+					" You have to umount volume and then "
+					"mount it once again.\n");
+				goto err_exit;
+			case OPT_BLKSIZE :
+				ntfs_log_info("WARNING: blksize option is ignored "
+				      "because ntfs-3g must calculate it.\n");
+				break;
+			case OPT_INHERIT :
+				/*
+				 * do not overwrite inherited permissions
+				 * in create()
+				 */
+				ctx->inherit = TRUE;
+				break;
+			case OPT_ADDSECURIDS :
+				/*
+				 * create security ids for files being read
+				 * with an individual security attribute
+				 */
+				ctx->secure_flags |= (1 << SECURITY_ADDSECURIDS);
+				break;
+			case OPT_STATICGRPS :
+				/*
+				 * use static definition of groups
+				 * for file access control
+				 */
+				ctx->secure_flags |= (1 << SECURITY_STATICGRPS);
+				break;
+			case OPT_USERMAPPING :
+				ctx->usermap_path = strdup(val);
+				if (!ctx->usermap_path) {
+					ntfs_log_error("no more memory to store "
+						"'usermapping' option.\n");
+					goto err_exit;
+				}
+				break;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+#ifdef XATTR_MAPPINGS
+			case OPT_XATTRMAPPING :
+				ctx->xattrmap_path = strdup(val);
+				if (!ctx->xattrmap_path) {
+					ntfs_log_error("no more memory to store "
+						"'xattrmapping' option.\n");
+					goto err_exit;
+				}
+				break;
+#endif /* XATTR_MAPPINGS */
+			case OPT_EFS_RAW :
+				ctx->efs_raw = TRUE;
+				break;
+#endif /* HAVE_SETXATTR */
+			case OPT_FSNAME : /* Filesystem name. */
+			/*
+			 * We need this to be able to check whether filesystem
+			 * mounted or not.
+			 *      (falling through to default)
+			 */
+			default :
+				ntfs_log_error("'%s' is an unsupported option.\n",
+					poptl->name);
+				goto err_exit;
+			}
+			if ((poptl->flags & FLGOPT_APPEND)
+			    && (ntfs_strappend(&ret, poptl->name)
+				    || ntfs_strappend(&ret, ",")))
+				goto err_exit;
+		} else { /* Probably FUSE option. */
+			if (ntfs_strappend(&ret, opt))
+				goto err_exit;
+			if (val) {
+				if (ntfs_strappend(&ret, "="))
+					goto err_exit;
+				if (ntfs_strappend(&ret, val))
+					goto err_exit;
+			}
+			if (ntfs_strappend(&ret, ","))
+				goto err_exit;
+		}
+	}
+	if (!no_def_opts && ntfs_strappend(&ret, def_opts))
+		goto err_exit;
+	if ((default_permissions || permissions)
+			&& ntfs_strappend(&ret, "default_permissions,"))
+		goto err_exit;
+			/* The atime options exclude each other */
+	if (ctx->atime == ATIME_RELATIVE && ntfs_strappend(&ret, "relatime,"))
+		goto err_exit;
+	else if (ctx->atime == ATIME_ENABLED && ntfs_strappend(&ret, "atime,"))
+		goto err_exit;
+	else if (ctx->atime == ATIME_DISABLED && ntfs_strappend(&ret, "noatime,"))
+		goto err_exit;
+	
+	if (ntfs_strappend(&ret, "fsname="))
+		goto err_exit;
+	if (ntfs_strappend(&ret, popts->device))
+		goto err_exit;
+	if (permissions)
+		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
+	if (want_permissions)
+		ctx->secure_flags |= (1 << SECURITY_WANTED);
+	if (ctx->ro)
+		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
+exit:
+	free(options);
+	return ret;
+err_exit:
+	free(ret);
+	ret = NULL;
+	goto exit;
+}
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
 			char *list, size_t size, BOOL prefixing)

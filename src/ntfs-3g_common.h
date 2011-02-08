@@ -25,6 +25,128 @@
 
 #include "inode.h"
 
+struct ntfs_options {
+        char    *mnt_point;     /* Mount point */    
+        char    *options;       /* Mount options */  
+        char    *device;        /* Device to mount */
+} ;
+
+typedef enum {
+	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
+	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
+	NF_STREAMS_INTERFACE_OPENXATTR,	/* Same, not limited to "user." */
+	NF_STREAMS_INTERFACE_WINDOWS,	/* "file:stream" interface. */
+} ntfs_fuse_streams_interface;
+
+struct DEFOPTION {
+	const char *name;
+	int type;
+	int flags;
+} ;
+			/* Options, order not significant */
+enum {
+	OPT_RO,
+	OPT_NOATIME,
+	OPT_ATIME,
+	OPT_RELATIME,
+	OPT_FAKE_RW,
+	OPT_FSNAME,
+	OPT_NO_DEF_OPTS,
+	OPT_DEFAULT_PERMISSIONS,
+	OPT_PERMISSIONS,
+	OPT_UMASK,
+	OPT_FMASK,
+	OPT_DMASK,
+	OPT_UID,
+	OPT_GID,
+	OPT_SHOW_SYS_FILES,
+	OPT_HIDE_HID_FILES,
+	OPT_HIDE_DOT_FILES,
+	OPT_IGNORE_CASE,
+	OPT_WINDOWS_NAMES,
+	OPT_COMPRESSION,
+	OPT_NOCOMPRESSION,
+	OPT_SILENT,
+	OPT_RECOVER,
+	OPT_NORECOVER,
+	OPT_REMOVE_HIBERFILE,
+	OPT_SYNC,
+	OPT_LOCALE,
+	OPT_NFCONV,
+	OPT_NONFCONV,
+	OPT_STREAMS_INTERFACE,
+	OPT_USER_XATTR,
+	OPT_NOAUTO,
+	OPT_DEBUG,
+	OPT_NO_DETACH,
+	OPT_REMOUNT,
+	OPT_BLKSIZE,
+	OPT_INHERIT,
+	OPT_ADDSECURIDS,
+	OPT_STATICGRPS,
+	OPT_USERMAPPING,
+	OPT_XATTRMAPPING,
+	OPT_EFS_RAW,
+} ;
+
+			/* Option flags */
+enum {
+	FLGOPT_BOGUS = 1,
+	FLGOPT_STRING = 2,
+	FLGOPT_OCTAL = 4,
+	FLGOPT_DECIMAL = 8,
+	FLGOPT_APPEND = 16,
+	FLGOPT_NOSUPPORT = 32
+} ;
+
+typedef enum {
+	ATIME_ENABLED,
+	ATIME_DISABLED,
+	ATIME_RELATIVE
+} ntfs_atime_t;
+
+typedef struct {
+	ntfs_volume *vol;
+	unsigned int uid;
+	unsigned int gid;
+	unsigned int fmask;
+	unsigned int dmask;
+	ntfs_fuse_streams_interface streams;
+	ntfs_atime_t atime;
+	BOOL ro;
+	BOOL show_sys_files;
+	BOOL hide_hid_files;
+	BOOL hide_dot_files;
+	BOOL windows_names;
+	BOOL ignore_case;
+	BOOL compression;
+	BOOL silent;
+	BOOL recover;
+	BOOL hiberfile;
+	BOOL sync;
+	BOOL debug;
+	BOOL no_detach;
+	BOOL blkdev;
+	BOOL mounted;
+#ifdef HAVE_SETXATTR	/* extended attributes interface required */
+	BOOL efs_raw;
+#ifdef XATTR_MAPPINGS
+	char *xattrmap_path;
+#endif /* XATTR_MAPPINGS */
+#endif /* HAVE_SETXATTR */
+	struct fuse_chan *fc;
+	BOOL inherit;
+	unsigned int secure_flags;
+	char *usermap_path;
+	char *abs_mnt_point;
+	struct PERMISSIONS_CACHE *seccache;
+	struct SECURITY_CONTEXT security;
+	struct open_file *open_files; /* only defined in lowntfs-3g */
+	u64 latest_ghost;
+} ntfs_fuse_context_t;
+
+extern const char *EXEC_NAME;
+
 extern const char xattr_ntfs_3g[];
 
 extern const char nf_ns_user_prefix[];
@@ -35,6 +157,10 @@ extern const char nf_ns_security_prefix[];
 extern const int nf_ns_security_prefix_len;
 extern const char nf_ns_trusted_prefix[];
 extern const int nf_ns_trusted_prefix_len;
+
+int ntfs_strappend(char **dest, const char *append);
+char *parse_mount_options(ntfs_fuse_context_t *ctx,
+			const struct ntfs_options *popts, BOOL low_fuse);
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
  			char *list, size_t size, BOOL prefixing);

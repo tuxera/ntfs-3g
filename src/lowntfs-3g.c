@@ -159,12 +159,6 @@ typedef enum {
 	FSTYPE_FUSEBLK
 } fuse_fstype;
 
-typedef enum {
-	ATIME_ENABLED,
-	ATIME_DISABLED,
-	ATIME_RELATIVE
-} ntfs_atime_t;
-
 typedef struct fill_item {
 	struct fill_item *next;
 	size_t bufsize;
@@ -189,66 +183,16 @@ struct open_file {
 	int state;
 } ;
 
-typedef enum {
-	NF_STREAMS_INTERFACE_NONE,	/* No access to named data streams. */
-	NF_STREAMS_INTERFACE_XATTR,	/* Map named data streams to xattrs. */
-	NF_STREAMS_INTERFACE_OPENXATTR,	/* Same, not limited to "user." */
-} ntfs_fuse_streams_interface;
-
 enum {
 	CLOSE_GHOST = 1,
 	CLOSE_COMPRESSED = 2,
 	CLOSE_ENCRYPTED = 4
 };
 
-typedef struct {
-	ntfs_volume *vol;
-	unsigned int uid;
-	unsigned int gid;
-	unsigned int fmask;
-	unsigned int dmask;
-	ntfs_fuse_streams_interface streams;
-	ntfs_atime_t atime;
-	BOOL ro;
-	BOOL show_sys_files;
-	BOOL hide_hid_files;
-	BOOL hide_dot_files;
-	BOOL ignore_case;
-	BOOL windows_names;
-	BOOL compression;
-	BOOL silent;
-	BOOL recover;
-	BOOL hiberfile;
-	BOOL sync;
-	BOOL debug;
-	BOOL no_detach;
-	BOOL blkdev;
-	BOOL mounted;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
-	BOOL efs_raw;
-#ifdef XATTR_MAPPINGS
-	char *xattrmap_path;
-#endif /* XATTR_MAPPINGS */
-#endif /* HAVE_SETXATTR */
-	struct fuse_chan *fc;
-	BOOL inherit;
-	unsigned int secure_flags;
-	char *usermap_path;
-	char *abs_mnt_point;
-	struct PERMISSIONS_CACHE *seccache;
-	struct SECURITY_CONTEXT security;
-	struct open_file *open_files;
-	u64 latest_ghost;
-} ntfs_fuse_context_t;
+static struct ntfs_options opts;
 
-static struct options {
-	char	*mnt_point;	/* Mount point */
-	char	*options;	/* Mount options */
-	char	*device;	/* Device to mount */
-} opts;
+const char *EXEC_NAME = "lowntfs-3g";
 
-static const char *EXEC_NAME = "ntfs-3g";
-static char def_opts[] = "allow_other,nonempty,";
 static ntfs_fuse_context_t *ctx;
 static u32 ntfs_sequence;
 static const char ghostformat[] = ".ghost-ntfs-3g-%020llu";
@@ -3512,350 +3456,6 @@ err_out:
         
 }
 
-#define STRAPPEND_MAX_INSIZE   8192
-#define strappend_is_large(x) ((x) > STRAPPEND_MAX_INSIZE)
-
-static int strappend(char **dest, const char *append)
-{
-	char *p;
-	size_t size_append, size_dest = 0;
-        
-	if (!dest)
-		return -1;
-	if (!append)
-		return 0;
-
-	size_append = strlen(append);
-	if (*dest)
-		size_dest = strlen(*dest);
-        
-	if (strappend_is_large(size_dest) || strappend_is_large(size_append)) {
-		errno = EOVERFLOW;
-		ntfs_log_perror("%s: Too large input buffer", EXEC_NAME);
-		return -1;
-	}
-        
-	p = (char*)realloc(*dest, size_dest + size_append + 1);
-	if (!p) {
-		ntfs_log_perror("%s: Memory reallocation failed", EXEC_NAME);
-		return -1;
-	}
-        
-	*dest = p;
-	strcpy(*dest + size_dest, append);
-        
-	return 0;
-}
-
-static int bogus_option_value(char *val, const char *s)
-{
-	if (val) {
-		ntfs_log_error("'%s' option shouldn't have value.\n", s);
-		return -1;
-	}
-	return 0;
-}
-
-static int missing_option_value(char *val, const char *s)
-{
-	if (!val) {
-		ntfs_log_error("'%s' option should have a value.\n", s);
-		return -1;
-	}
-	return 0;
-}
-
-static char *parse_mount_options(const char *orig_opts)
-{
-	char *options, *s, *opt, *val, *ret = NULL;
-	BOOL no_def_opts = FALSE;
-	int default_permissions = 0;
-	int permissions = 0;
-	int want_permissions = 0;
-
-	ctx->secure_flags = 0;
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
-	ctx->efs_raw = FALSE;
-#endif /* HAVE_SETXATTR */
-	ctx->compression = DEFAULT_COMPRESSION;
-	options = strdup(orig_opts ? orig_opts : "");
-	if (!options) {
-		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
-		return NULL;
-	}
-        
-	s = options;
-	while (s && *s && (val = strsep(&s, ","))) {
-		opt = strsep(&val, "=");
-		if (!strcmp(opt, "ro")) { /* Read-only mount. */
-			if (bogus_option_value(val, "ro"))
-				goto err_exit;
-			ctx->ro = TRUE;
-			if (strappend(&ret, "ro,"))
-				goto err_exit;
-		} else if (!strcmp(opt, "noatime")) {
-			if (bogus_option_value(val, "noatime"))
-				goto err_exit;
-			ctx->atime = ATIME_DISABLED;
-		} else if (!strcmp(opt, "atime")) {
-			if (bogus_option_value(val, "atime"))
-				goto err_exit;
-			ctx->atime = ATIME_ENABLED;
-		} else if (!strcmp(opt, "relatime")) {
-			if (bogus_option_value(val, "relatime"))
-				goto err_exit;
-			ctx->atime = ATIME_RELATIVE;
-		} else if (!strcmp(opt, "fake_rw")) {
-			if (bogus_option_value(val, "fake_rw"))
-				goto err_exit;
-			ctx->ro = TRUE;
-		} else if (!strcmp(opt, "fsname")) { /* Filesystem name. */
-			/*
-			 * We need this to be able to check whether filesystem
-			 * mounted or not.
-			 */
-			ntfs_log_error("'fsname' is unsupported option.\n");
-			goto err_exit;
-		} else if (!strcmp(opt, "no_def_opts")) {
-			if (bogus_option_value(val, "no_def_opts"))
-				goto err_exit;
-			no_def_opts = TRUE; /* Don't add default options. */
-			ctx->silent = FALSE; /* cancel default silent */
-		} else if (!strcmp(opt, "default_permissions")) {
-			default_permissions = 1;
-		} else if (!strcmp(opt, "permissions")) {
-			permissions = 1;
-		} else if (!strcmp(opt, "umask")) {
-			if (missing_option_value(val, "umask"))
-				goto err_exit;
-			sscanf(val, "%o", &ctx->fmask);
-			ctx->dmask = ctx->fmask;
-			want_permissions = 1;
-		} else if (!strcmp(opt, "fmask")) {
-			if (missing_option_value(val, "fmask"))
-				goto err_exit;
-			sscanf(val, "%o", &ctx->fmask);
-			want_permissions = 1;
-		} else if (!strcmp(opt, "dmask")) {
-			if (missing_option_value(val, "dmask"))
-				goto err_exit;
-			sscanf(val, "%o", &ctx->dmask);
-			want_permissions = 1;
-		} else if (!strcmp(opt, "uid")) {
-			if (missing_option_value(val, "uid"))
-				goto err_exit;
-			sscanf(val, "%i", &ctx->uid);
-			want_permissions = 1;
-		} else if (!strcmp(opt, "gid")) {
-			if (missing_option_value(val, "gid"))
-				goto err_exit;
-			sscanf(val, "%i", &ctx->gid);
-			want_permissions = 1;
-		} else if (!strcmp(opt, "show_sys_files")) {
-			if (bogus_option_value(val, "show_sys_files"))
-				goto err_exit;
-			ctx->show_sys_files = TRUE;
-		} else if (!strcmp(opt, "hide_hid_files")) {
-			if (bogus_option_value(val, "hide_hid_files"))
-				goto err_exit;
-			ctx->hide_hid_files = TRUE;
-		} else if (!strcmp(opt, "hide_dot_files")) {
-			if (bogus_option_value(val, "hide_dot_files"))
-				goto err_exit;
-			ctx->hide_dot_files = TRUE;
-		} else if (!strcmp(opt, "ignore_case")) {
-			if (bogus_option_value(val, "ignore_case"))
-				goto err_exit;
-			ctx->ignore_case = TRUE;
-		} else if (!strcmp(opt, "windows_names")) {
-			if (bogus_option_value(val, "windows_names"))
-				goto err_exit;
-			ctx->windows_names = TRUE;
-		} else if (!strcmp(opt, "compression")) {
-			if (bogus_option_value(val, "compression"))
-				goto err_exit;
-			ctx->compression = TRUE;
-		} else if (!strcmp(opt, "nocompression")) {
-			if (bogus_option_value(val, "nocompression"))
-				goto err_exit;
-			ctx->compression = FALSE;
-		} else if (!strcmp(opt, "silent")) {
-			if (bogus_option_value(val, "silent"))
-				goto err_exit;
-			ctx->silent = TRUE;
-		} else if (!strcmp(opt, "recover")) {
-			if (bogus_option_value(val, "recover"))
-				goto err_exit;
-			ctx->recover = TRUE;
-		} else if (!strcmp(opt, "norecover")) {
-			if (bogus_option_value(val, "norecover"))
-				goto err_exit;
-			ctx->recover = FALSE;
-		} else if (!strcmp(opt, "remove_hiberfile")) {
-			if (bogus_option_value(val, "remove_hiberfile"))
-				goto err_exit;
-			ctx->hiberfile = TRUE;
-		} else if (!strcmp(opt, "sync")) {
-			if (bogus_option_value(val, "sync"))
-				goto err_exit;
-			ctx->sync = TRUE;
-			if (strappend(&ret, "sync,"))
-				goto err_exit;
-		} else if (!strcmp(opt, "locale")) {
-			if (missing_option_value(val, "locale"))
-				goto err_exit;
-			ntfs_set_char_encoding(val);
-#if defined(__APPLE__) || defined(__DARWIN__)
-#ifdef ENABLE_NFCONV
-		} else if (!strcmp(opt, "nfconv")) {
-			if (bogus_option_value(val, "nfconv"))
-				goto err_exit;
-			if (ntfs_macosx_normalize_filenames(1)) {
-				ntfs_log_error("ntfs_macosx_normalize_filenames(1) failed!\n");
-				goto err_exit;
-			}
-		} else if (!strcmp(opt, "nonfconv")) {
-			if (bogus_option_value(val, "nonfconv"))
-				goto err_exit;
-			if (ntfs_macosx_normalize_filenames(0)) {
-				ntfs_log_error("ntfs_macosx_normalize_filenames(0) failed!\n");
-				goto err_exit;
-			}
-#endif /* ENABLE_NFCONV */
-#endif /* defined(__APPLE__) || defined(__DARWIN__) */
-		} else if (!strcmp(opt, "streams_interface")) {
-			if (missing_option_value(val, "streams_interface"))
-				goto err_exit;
-			if (!strcmp(val, "none"))
-				ctx->streams = NF_STREAMS_INTERFACE_NONE;
-			else if (!strcmp(val, "xattr"))
-				ctx->streams = NF_STREAMS_INTERFACE_XATTR;
-			else if (!strcmp(val, "openxattr"))
-				ctx->streams = NF_STREAMS_INTERFACE_OPENXATTR;
-			else {
-				ntfs_log_error("Invalid named data streams "
-						"access interface.\n");
-				goto err_exit;
-			}
-		} else if (!strcmp(opt, "user_xattr")) {
-			ctx->streams = NF_STREAMS_INTERFACE_XATTR;
-		} else if (!strcmp(opt, "noauto")) {
-			/* Don't pass noauto option to fuse. */
-		} else if (!strcmp(opt, "debug")) {
-			if (bogus_option_value(val, "debug"))
-				goto err_exit;
-			ctx->debug = TRUE;
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_DEBUG);
-			ntfs_log_set_levels(NTFS_LOG_LEVEL_TRACE);
-		} else if (!strcmp(opt, "no_detach")) {
-			if (bogus_option_value(val, "no_detach"))
-				goto err_exit;
-			ctx->no_detach = TRUE;
-		} else if (!strcmp(opt, "remount")) {
-			ntfs_log_error("Remounting is not supported at present."
-					" You have to umount volume and then "
-					"mount it once again.\n");
-			goto err_exit;
-		} else if (!strcmp(opt, "blksize")) {
-			ntfs_log_info("WARNING: blksize option is ignored "
-				      "because ntfs-3g must calculate it.\n");
-		} else if (!strcmp(opt, "inherit")) {
-			/*
-			 * JPA do not overwrite inherited permissions
-			 * in create()
-			 */
-			ctx->inherit = TRUE;
-		} else if (!strcmp(opt, "addsecurids")) {
-			/*
-			 * JPA create security ids for files being read
-			 * with an individual security attribute
-			 */
-			ctx->secure_flags |= (1 << SECURITY_ADDSECURIDS);
-		} else if (!strcmp(opt, "staticgrps")) {
-			/*
-			 * JPA use static definition of groups
-			 * for file access control
-			 */
-			ctx->secure_flags |= (1 << SECURITY_STATICGRPS);
-		} else if (!strcmp(opt, "usermapping")) {
-			if (!val) {
-				ntfs_log_error("'usermapping' option should have "
-						"a value.\n");
-				goto err_exit;
-			}
-			ctx->usermap_path = strdup(val);
-			if (!ctx->usermap_path) {
-				ntfs_log_error("no more memory to store "
-					"'usermapping' option.\n");
-				goto err_exit;
-			}
-#ifdef HAVE_SETXATTR	/* extended attributes interface required */
-#ifdef XATTR_MAPPINGS
-		} else if (!strcmp(opt, "xattrmapping")) {
-			if (!val) {
-				ntfs_log_error("'xattrmapping' option should have "
-						"a value.\n");
-				goto err_exit;
-			}
-			ctx->xattrmap_path = strdup(val);
-			if (!ctx->xattrmap_path) {
-				ntfs_log_error("no more memory to store "
-					"'xattrmapping' option.\n");
-				goto err_exit;
-			}
-#endif /* XATTR_MAPPINGS */
-		} else if (!strcmp(opt, "efs_raw")) {
-			if (bogus_option_value(val, "efs_raw"))
-				goto err_exit;
-			ctx->efs_raw = TRUE;
-#endif /* HAVE_SETXATTR */
-		} else { /* Probably FUSE option. */
-			if (strappend(&ret, opt))
-				goto err_exit;
-			if (val) {
-				if (strappend(&ret, "="))
-					goto err_exit;
-				if (strappend(&ret, val))
-					goto err_exit;
-			}
-			if (strappend(&ret, ","))
-				goto err_exit;
-		}
-	}
-	if (!no_def_opts && strappend(&ret, def_opts))
-		goto err_exit;
-#if KERNELPERMS
-	if ((default_permissions || permissions)
-			&& strappend(&ret, "default_permissions,"))
-		goto err_exit;
-#endif
-        
-	if (ctx->atime == ATIME_RELATIVE && strappend(&ret, "relatime,"))
-		goto err_exit;
-	else if (ctx->atime == ATIME_ENABLED && strappend(&ret, "atime,"))
-		goto err_exit;
-	else if (ctx->atime == ATIME_DISABLED && strappend(&ret, "noatime,"))
-		goto err_exit;
-        
-	if (strappend(&ret, "fsname="))
-		goto err_exit;
-	if (strappend(&ret, opts.device))
-		goto err_exit;
-	if (permissions)
-		ctx->secure_flags |= (1 << SECURITY_DEFAULT);
-	if (want_permissions)
-		ctx->secure_flags |= (1 << SECURITY_WANTED);
-	if (ctx->ro)
-		ctx->secure_flags &= ~(1 << SECURITY_ADDSECURIDS);
-exit:
-	free(options);
-	return ret;
-err_exit:
-	free(ret);
-	ret = NULL;
-	goto exit;
-}
-
 static void usage(void)
 {
 	ntfs_log_info(usage_msg, EXEC_NAME, VERSION, FUSE_TYPE, fuse_version(),
@@ -3922,9 +3522,9 @@ static int parse_options(int argc, char *argv[])
 			break;
 		case 'o':
 			if (opts.options)
-				if (strappend(&opts.options, ","))
+				if (ntfs_strappend(&opts.options, ","))
 					return -1;
-			if (strappend(&opts.options, optarg))
+			if (ntfs_strappend(&opts.options, optarg))
 				return -1;
 			break;
 		case 'h':
@@ -4109,7 +3709,7 @@ static int set_fuseblk_options(char **parsed_options)
 		blksize = pagesize;
         
 	snprintf(options, sizeof(options), ",blkdev,blksize=%u", blksize);
-	if (strappend(parsed_options, options))
+	if (ntfs_strappend(parsed_options, options))
 		return -1;
 	return 0;
 }
@@ -4221,7 +3821,7 @@ int main(int argc, char *argv[])
 		goto err2;
 	}
         
-	parsed_options = parse_mount_options(opts.options);
+	parsed_options = parse_mount_options(ctx, &opts, TRUE);
 	if (!parsed_options) {
 		err = NTFS_VOLUME_SYNTAX_ERROR;
 		goto err_out;
@@ -4318,7 +3918,7 @@ int main(int argc, char *argv[])
 		else {
 			permissions_mode = "User mapping built, Posix ACLs in use";
 #if KERNELACLS
-			if (strappend(&parsed_options,
+			if (ntfs_strappend(&parsed_options,
 					",default_permissions,acl")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
@@ -4333,7 +3933,7 @@ int main(int argc, char *argv[])
 			 */
 #if KERNELPERMS
 			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-			if (strappend(&parsed_options, ",default_permissions")) {
+			if (ntfs_strappend(&parsed_options, ",default_permissions")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
 			}
@@ -4350,7 +3950,7 @@ int main(int argc, char *argv[])
 		if ((ctx->vol->secure_flags & (1 << SECURITY_WANTED))
 		   && !(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))) {
 			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-			if (strappend(&parsed_options, ",default_permissions")) {
+			if (ntfs_strappend(&parsed_options, ",default_permissions")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
 			}
