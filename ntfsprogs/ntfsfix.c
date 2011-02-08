@@ -557,6 +557,8 @@ int main(int argc, char **argv)
 error_exit:
 	if (ntfs_umount(vol, 0))
 		ntfs_umount(vol, 1);
+	if (ret)
+		exit(ret);
 	return ret;
 }
 
