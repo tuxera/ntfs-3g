@@ -99,7 +99,7 @@ static struct {
  * usage
  */
 __attribute__((noreturn))
-static int usage(void)
+static void usage(void)
 {
 	ntfs_log_info("%s v%s (libntfs-3g)\n"
 		   "\n"
