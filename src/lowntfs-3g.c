@@ -38,12 +38,6 @@
 #error "***********************************************************"
 #endif
 
-#ifdef FUSE_INTERNAL
-#define FUSE_TYPE	"integrated FUSE low"
-#else
-#define FUSE_TYPE	"external FUSE low"
-#endif
-
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -69,7 +63,6 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
-#include <getopt.h>
 #include <syslog.h>
 #include <sys/wait.h>
 
@@ -3473,97 +3466,6 @@ static char *realpath(const char *path, char *resolved_path)
 }
 #endif
 
-/**
- * parse_options - Read and validate the programs command line
- * Read the command line, verify the syntax and parse the options.
- *
- * Return:   0 success, -1 error.
- */
-static int parse_options(int argc, char *argv[])
-{
-	int c;
-
-	static const char *sopt = "-o:hnvV";
-	static const struct option lopt[] = {
-		{ "options",	 required_argument,	NULL, 'o' },
-		{ "help",	 no_argument,		NULL, 'h' },
-		{ "no-mtab",	 no_argument,		NULL, 'n' },
-		{ "verbose",	 no_argument,		NULL, 'v' },
-		{ "version",	 no_argument,		NULL, 'V' },
-		{ NULL,		 0,			NULL,  0  }
-	};
-
-	opterr = 0; /* We'll handle the errors, thank you. */
-
-	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
-		switch (c) {
-		case 1: /* A non-option argument */
-			if (!opts.device) {
-				opts.device = (char*)ntfs_malloc(PATH_MAX + 1);
-				if (!opts.device)
-					return -1;
-			        
-				/* Canonicalize device name (mtab, etc) */
-				if (!realpath(optarg, opts.device)) {
-					ntfs_log_perror("%s: Failed to access "
-					     "volume '%s'", EXEC_NAME, optarg);
-					free(opts.device);
-					opts.device = NULL;
-					return -1;
-				}
-			} else if (!opts.mnt_point) {
-				opts.mnt_point = optarg;
-			} else {
-				ntfs_log_error("%s: You must specify exactly one "
-						"device and exactly one mount "
-						"point.\n", EXEC_NAME);
-				return -1;
-			}
-			break;
-		case 'o':
-			if (opts.options)
-				if (ntfs_strappend(&opts.options, ","))
-					return -1;
-			if (ntfs_strappend(&opts.options, optarg))
-				return -1;
-			break;
-		case 'h':
-			usage();
-			exit(9);
-		case 'n':
-			/*
-			 * no effect - automount passes it, meaning 'no-mtab'
-			 */
-			break;
-		case 'v':
-			/*
-			 * We must handle the 'verbose' option even if
-			 * we don't use it because mount(8) passes it.
-			 */
-			break;
-		case 'V':
-			ntfs_log_info("%s %s %s %d\n", EXEC_NAME, VERSION, 
-				      FUSE_TYPE, fuse_version());
-			exit(0);
-		default:
-			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
-				       argv[optind - 1]);
-			return -1;
-		}
-	}
-
-	if (!opts.device) {
-		ntfs_log_error("%s: No device is specified.\n", EXEC_NAME);
-		return -1;
-	}
-	if (!opts.mnt_point) {
-		ntfs_log_error("%s: No mountpoint is specified.\n", EXEC_NAME);
-		return -1;
-	}
-
-	return 0;
-}
-
 #if defined(linux) || defined(__uClinux__)
 
 static const char *dev_fuse_msg =
@@ -3811,7 +3713,7 @@ int main(int argc, char *argv[])
 	ntfs_set_locale();
 	ntfs_log_set_handler(ntfs_log_handler_stderr);
 
-	if (parse_options(argc, argv)) {
+	if (ntfs_parse_options(&opts, usage, argc, argv)) {
 		usage();
 		return NTFS_VOLUME_SYNTAX_ERROR;
 	}

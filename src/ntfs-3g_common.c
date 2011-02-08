@@ -36,6 +36,9 @@
 #include <errno.h>
 #endif
 
+#include <getopt.h>
+#include <fuse.h>
+
 #include "inode.h"
 #include "security.h"
 #include "xattrs.h"
@@ -461,6 +464,98 @@ err_exit:
 	free(ret);
 	ret = NULL;
 	goto exit;
+}
+
+/**
+ * parse_options - Read and validate the programs command line
+ * Read the command line, verify the syntax and parse the options.
+ *
+ * Return:   0 success, -1 error.
+ */
+int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
+			int argc, char *argv[])
+{
+	int c;
+
+	static const char *sopt = "-o:hnvV";
+	static const struct option lopt[] = {
+		{ "options",	 required_argument,	NULL, 'o' },
+		{ "help",	 no_argument,		NULL, 'h' },
+		{ "no-mtab",	 no_argument,		NULL, 'n' },
+		{ "verbose",	 no_argument,		NULL, 'v' },
+		{ "version",	 no_argument,		NULL, 'V' },
+		{ NULL,		 0,			NULL,  0  }
+	};
+
+	opterr = 0; /* We'll handle the errors, thank you. */
+
+	while ((c = getopt_long(argc, argv, sopt, lopt, NULL)) != -1) {
+		switch (c) {
+		case 1:	/* A non-option argument */
+			if (!popts->device) {
+				popts->device = ntfs_malloc(PATH_MAX + 1);
+				if (!popts->device)
+					return -1;
+				
+				/* Canonicalize device name (mtab, etc) */
+				if (!realpath(optarg, popts->device)) {
+					ntfs_log_perror("%s: Failed to access "
+					     "volume '%s'", EXEC_NAME, optarg);
+					free(popts->device);
+					popts->device = NULL;
+					return -1;
+				}
+			} else if (!popts->mnt_point) {
+				popts->mnt_point = optarg;
+			} else {
+				ntfs_log_error("%s: You must specify exactly one "
+						"device and exactly one mount "
+						"point.\n", EXEC_NAME);
+				return -1;
+			}
+			break;
+		case 'o':
+			if (popts->options)
+				if (ntfs_strappend(&popts->options, ","))
+					return -1;
+			if (ntfs_strappend(&popts->options, optarg))
+				return -1;
+			break;
+		case 'h':
+			usage();
+			exit(9);
+		case 'n':
+			/*
+			 * no effect - automount passes it, meaning 'no-mtab'
+			 */
+			break;
+		case 'v':
+			/*
+			 * We must handle the 'verbose' option even if
+			 * we don't use it because mount(8) passes it.
+			 */
+			break;
+		case 'V':
+			ntfs_log_info("%s %s %s %d\n", EXEC_NAME, VERSION, 
+				      FUSE_TYPE, fuse_version());
+			exit(0);
+		default:
+			ntfs_log_error("%s: Unknown option '%s'.\n", EXEC_NAME,
+				       argv[optind - 1]);
+			return -1;
+		}
+	}
+
+	if (!popts->device) {
+		ntfs_log_error("%s: No device is specified.\n", EXEC_NAME);
+		return -1;
+	}
+	if (!popts->mnt_point) {
+		ntfs_log_error("%s: No mountpoint is specified.\n", EXEC_NAME);
+		return -1;
+	}
+
+	return 0;
 }
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
