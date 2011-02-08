@@ -1220,6 +1220,9 @@ static int ntfs_fuse_open(const char *org_path,
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			/* deny opening metadata files for writing */
+				if (ni->mft_no < FILE_first_user)
+					res = -EPERM;
 			}
 			ntfs_attr_close(na);
 		} else
@@ -1431,6 +1434,11 @@ static int ntfs_fuse_trunc(const char *org_path, off_t size,
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
 		goto exit;
+	/* deny truncating metadata files */
+	if (ni->mft_no < FILE_first_user) {
+		errno = EPERM;
+		goto exit;
+	}
 
 	na = ntfs_attr_open(ni, AT_DATA, stream_name, stream_name_len);
 	if (!na)
@@ -1983,6 +1991,13 @@ static int ntfs_fuse_rm(const char *org_path)
 		res = -errno;
 		goto exit;
 	}
+	/* deny unlinking metadata files */
+	if (ni->mft_no < FILE_first_user) {
+		errno = EPERM;
+		res = -errno;
+		goto exit;
+	}
+
 	/* Generate unicode filename. */
 	name = strrchr(path, '/');
 	name++;

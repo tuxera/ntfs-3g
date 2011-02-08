@@ -1274,6 +1274,9 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					state |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			/* deny opening metadata files for writing */
+				if (ino < FILE_first_user)
+					res = -EPERM;
 			}
 			ntfs_attr_close(na);
 		} else
@@ -1551,6 +1554,11 @@ static int ntfs_fuse_trunc(struct SECURITY_CONTEXT *scx, fuse_ino_t ino,
 	if (!ni)
 		goto exit;
 
+	/* deny truncating metadata files */
+	if (ino < FILE_first_user) {
+		errno = EPERM;
+		goto exit;
+	}
 	na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
 	if (!na)
 		goto exit;
@@ -2156,6 +2164,11 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name)
 	iref = ntfs_inode_lookup_by_mbsname(dir_ni, name);
 	if (iref == (u64)-1) {
 		res = -errno;
+		goto exit;
+	}
+	/* deny unlinking metadata files */
+	if (MREF(iref) < FILE_first_user) {
+		res = -EPERM;
 		goto exit;
 	}
 
