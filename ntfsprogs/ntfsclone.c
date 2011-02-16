@@ -182,9 +182,11 @@ static BOOL image_is_host_endian = FALSE;
  * NOTE: Only bump the minor version if the image format and header are still
  * backwards compatible.  Otherwise always bump the major version.  If in
  * doubt, bump the major version.
+ *
+ * Moved to 10.1 : Alternate boot sector now saved. Still compatible.
  */
 #define NTFSCLONE_IMG_VER_MAJOR	10
-#define NTFSCLONE_IMG_VER_MINOR	0
+#define NTFSCLONE_IMG_VER_MINOR	1
 
 /* All values are in little endian. */
 static struct image_hdr {
@@ -702,7 +704,8 @@ static void clone_ntfs(u64 nr_clusters)
 			perr_exit("write_all");
 	}
 
-	for (last_cl = cl = 0; cl < (u64)vol->nr_clusters; cl++) {
+		/* Examine up to the alternate boot sector */
+	for (last_cl = cl = 0; cl <= (u64)vol->nr_clusters; cl++) {
 
 		if (ntfs_bit_get(lcn_bitmap.bm, cl)) {
 			progress_update(&progress, ++p_counter);
@@ -750,13 +753,21 @@ static void restore_image(void)
 	Printf("Restoring NTFS from image ...\n");
 
 	progress_init(&progress, p_counter, opt.std_out ?
-		      sle64_to_cpu(image_hdr.nr_clusters) :
-		      sle64_to_cpu(image_hdr.inuse),
+		      sle64_to_cpu(image_hdr.nr_clusters) + 1 :
+		      sle64_to_cpu(image_hdr.inuse) + 1,
 		      100);
 
-	while (pos < sle64_to_cpu(image_hdr.nr_clusters)) {
-		if (read_all(&fd_in, &cmd, sizeof(cmd)) == -1)
-			perr_exit("read_all");
+		/* Restore up to the alternate boot sector */
+	while (pos <= sle64_to_cpu(image_hdr.nr_clusters)) {
+		if (read_all(&fd_in, &cmd, sizeof(cmd)) == -1) {
+			if (pos == sle64_to_cpu(image_hdr.nr_clusters)) {
+				/* alternate boot sector no present in old images */
+				Printf("Warning : no alternate boot"
+						" sector in image\n");
+				break;
+			} else
+				perr_exit("read_all");
+		}
 
 		if (cmd == 0) {
 			if (!image_is_host_endian) {
@@ -1346,7 +1357,8 @@ static void bitmap_file_data_fixup(s64 cluster, struct bitmap *bm)
 static void setup_lcn_bitmap(void)
 {
 	/* Determine lcn bitmap byte size and allocate it. */
-	lcn_bitmap.size = rounded_up_division(vol->nr_clusters, 8);
+	/* include the alternate boot sector in the bitmap count */
+	lcn_bitmap.size = rounded_up_division(vol->nr_clusters + 1, 8);
 
 	lcn_bitmap.bm = ntfs_calloc(lcn_bitmap.size);
 	if (!lcn_bitmap.bm)
@@ -1893,12 +1905,11 @@ int main(int argc, char **argv)
 	if (opt.save_image)
 		initialise_image_hdr(device_size, image.inuse);
 
-	/* FIXME: save backup boot sector */
-
 	if (opt.std_out || !opt.metadata) {
 		s64 nr_clusters_to_save = image.inuse;
 		if (opt.std_out && !opt.save_image)
 			nr_clusters_to_save = vol->nr_clusters;
+		nr_clusters_to_save++; /* account for the backup boot sector */
 
 		clone_ntfs(nr_clusters_to_save);
 		fsync_clone(fd_out);
