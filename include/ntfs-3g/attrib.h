@@ -58,6 +58,12 @@ typedef enum {
 	LCN_EIO			= -5,
 } ntfs_lcn_special_values;
 
+typedef enum {			/* ways of processing holes when expanding */
+	HOLES_NO,
+	HOLES_OK,
+	HOLES_DELAY
+} hole_type;
+
 /**
  * struct ntfs_attr_search_ctx - search context used in attribute search functions
  * @mrec:	buffer containing mft record to search
