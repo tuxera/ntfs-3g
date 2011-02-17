@@ -162,6 +162,8 @@ static unsigned int wiped_unused_mft      = 0;
 static unsigned int wiped_resident_data   = 0;
 static unsigned int wiped_timestamp_data  = 0;
 
+static u64 full_device_size; /* full size, including the backup boot sector */
+
 static BOOL image_is_host_endian = FALSE;
 
 #define IMAGE_MAGIC "\0ntfsclone-image"
@@ -579,11 +581,11 @@ static void rescue_sector(void *fd, off_t pos, void *buff)
 }
 
 
-static void copy_cluster(int rescue, u64 rescue_lcn)
+static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 {
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 	/* vol is NULL if opt.restore_image is set */
-	u32 csize = le32_to_cpu(image_hdr.cluster_size);
+	s32 csize = le32_to_cpu(image_hdr.cluster_size);
 	void *fd = (void *)&fd_in;
 	off_t rescue_pos;
 
@@ -594,12 +596,20 @@ static void copy_cluster(int rescue, u64 rescue_lcn)
 
 	rescue_pos = (off_t)(rescue_lcn * csize);
 
+		/* possible partial cluster holding the backup boot sector */
+	if ((lcn + 1)*csize > full_device_size) {
+		csize = full_device_size - lcn*csize;
+		if (csize < 0) {
+			err_exit("Corrupted input, copy aborted");
+		}
+	}
+
 	if (read_all(fd, buff, csize) == -1) {
 
 		if (errno != EIO)
 			perr_exit("read_all");
 		else if (rescue){
-			u32 i;
+			s32 i;
 			for (i = 0; i < csize; i += NTFS_SECTOR_SIZE)
 				rescue_sector(fd, rescue_pos + i, buff + i);
 		} else {
@@ -671,7 +681,7 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 	/* FIXME: this could give pretty suboptimal performance */
 	for (i = 0; i < len; i++)
-		copy_cluster(opt.rescue, rl->lcn + i);
+		copy_cluster(opt.rescue, rl->lcn + i, rl->lcn + i);
 }
 
 static void clone_ntfs(u64 nr_clusters)
@@ -712,7 +722,7 @@ static void clone_ntfs(u64 nr_clusters)
 			lseek_to_cluster(cl);
 			image_skip_clusters(cl - last_cl - 1);
 
-			copy_cluster(opt.rescue, cl);
+			copy_cluster(opt.rescue, cl, cl);
 			last_cl = cl;
 			continue;
 		}
@@ -794,7 +804,7 @@ static void restore_image(void)
 			}
 			pos += count;
 		} else if (cmd == 1) {
-			copy_cluster(0, 0);
+			copy_cluster(0, 0, pos);
 			pos++;
 			progress_update(&progress, ++p_counter);
 		} else
@@ -1028,7 +1038,7 @@ static void clone_logfile_parts(ntfs_walk_clusters_ctx *image, runlist *rl)
 			break;
 
 		lseek_to_cluster(lcn);
-		copy_cluster(opt.rescue, lcn);
+		copy_cluster(opt.rescue, lcn, lcn);
 
 		if (offset == 0)
 			offset = NTFS_BLOCK_SIZE >> 1;
@@ -1161,7 +1171,7 @@ static void compare_bitmaps(struct bitmap *a)
 
 				if (opt.ignore_fs_check) {
 					lseek_to_cluster(cl);
-					copy_cluster(opt.rescue, cl);
+					copy_cluster(opt.rescue, cl, cl);
 				}
 
 				if (++mismatch > 10)
@@ -1862,6 +1872,7 @@ int main(int argc, char **argv)
 	}
 	// FIXME: This needs to be the cluster size...
 	ntfs_size += 512; /* add backup boot sector */
+	full_device_size = device_size;
 
 	if (opt.std_out) {
 		if ((fd_out = fileno(stdout)) == -1)
