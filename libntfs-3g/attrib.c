@@ -603,6 +603,7 @@ static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
 	VCN last_vcn;
 	VCN highest_vcn;
 	VCN needed;
+	VCN existing_vcn;
 	runlist_element *rl;
 	ATTR_RECORD *a;
 	BOOL startseen;
@@ -611,6 +612,8 @@ static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
 	lcn = ntfs_rl_vcn_to_lcn(na->rl, vcn);
 	if (lcn >= 0 || lcn == LCN_HOLE || lcn == LCN_ENOENT)
 		return 0;
+
+	existing_vcn = (na->rl ? na->rl->vcn : -1);
 
 	ctx = ntfs_attr_get_search_ctx(na->ni, NULL);
 	if (!ctx)
@@ -643,6 +646,11 @@ static int ntfs_attr_map_partial_runlist(ntfs_attr *na, VCN vcn)
 				needed = highest_vcn + 1;
 				if (!a->lowest_vcn)
 					startseen = TRUE;
+				/* reaching a previously allocated part ? */
+				if ((existing_vcn >= 0)
+				    && (needed >= existing_vcn)) {
+					needed = last_vcn;
+				}
 			}
 		} else
 			rl = (runlist_element*)NULL;
