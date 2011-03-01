@@ -58,6 +58,9 @@
 #ifdef HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
+#ifdef HAVE_SYS_DISK_H
+#include <sys/disk.h>
+#endif
 #ifdef HAVE_LINUX_FD_H
 #include <linux/fd.h>
 #endif
@@ -557,6 +560,36 @@ s64 ntfs_device_size_get(struct ntfs_device *dev, int block_size)
 		}
 	}
 #endif
+#ifdef DIOCGMEDIASIZE
+	{
+		/* FreeBSD */
+		off_t size;
+
+		if (dev->d_ops->ioctl(dev, DIOCGMEDIASIZE, &size) >= 0) {
+			ntfs_log_debug("DIOCGMEDIASIZE nr bytes = %llu (0x%llx)\n",
+					(unsigned long long)size,
+					(unsigned long long)size);
+			return (s64)size / block_size;
+		}
+	}
+#endif
+#ifdef DKIOCGETBLOCKCOUNT
+	{
+		/* Mac OS X */
+		uint64_t blocks;
+		int sector_size;
+
+		sector_size = ntfs_device_sector_size_get(dev);
+		if (sector_size >= 0 && dev->d_ops->ioctl(dev,
+			DKIOCGETBLOCKCOUNT, &blocks) >= 0)
+		{
+			ntfs_log_debug("DKIOCGETBLOCKCOUNT nr blocks = %llu (0x%llx)\n",
+				(unsigned long long) blocks,
+				(unsigned long long) blocks);
+			return blocks * sector_size / block_size;
+		}
+	}
+#endif
 	/*
 	 * We couldn't figure it out by using a specialized ioctl,
 	 * so do binary search to find the size of the device.
@@ -702,6 +735,28 @@ int ntfs_device_sector_size_get(struct ntfs_device *dev)
 		if (!dev->d_ops->ioctl(dev, BLKSSZGET, &sect_size)) {
 			ntfs_log_debug("BLKSSZGET sector size = %d bytes\n",
 					sect_size);
+			return sect_size;
+		}
+	}
+#elif defined(DIOCGSECTORSIZE)
+	{
+		/* FreeBSD */
+		size_t sect_size = 0;
+
+		if (!dev->d_ops->ioctl(dev, DIOCGSECTORSIZE, &sect_size)) {
+			ntfs_log_debug("DIOCGSECTORSIZE sector size = %d bytes\n",
+					(int) sect_size);
+			return sect_size;
+		}
+	}
+#elif defined(DKIOCGETBLOCKSIZE)
+	{
+		/* Mac OS X */
+		uint32_t sect_size = 0;
+
+		if (!dev->d_ops->ioctl(dev, DKIOCGETBLOCKSIZE, &sect_size)) {
+			ntfs_log_debug("DKIOCGETBLOCKSIZE sector size = %d bytes\n",
+					(int) sect_size);
 			return sect_size;
 		}
 	}
