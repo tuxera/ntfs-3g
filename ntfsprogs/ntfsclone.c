@@ -1930,6 +1930,7 @@ int main(int argc, char **argv)
 	}
 
 	wipe = 1;
+	fsync_clone(fd_out); /* sync copy before mounting */
 	opt.volume = opt.output;
 	/* 'force' again mount for dirty volumes (e.g. after resize).
 	   FIXME: use mount flags to avoid potential side-effects in future */
