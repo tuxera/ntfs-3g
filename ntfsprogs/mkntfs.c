@@ -1904,6 +1904,32 @@ static BOOL non_resident_unnamed_data(MFT_RECORD *m)
 	return (nonres);
 }
 
+/*
+ *		Get the time stored in the standard information attribute
+ */
+
+static ntfs_time stdinfo_time(MFT_RECORD *m)
+{
+	STANDARD_INFORMATION *si;
+	ntfs_attr_search_ctx *ctx;
+	ntfs_time info_time;
+
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
+	if (ctx && !mkntfs_attr_find(AT_STANDARD_INFORMATION,
+				(const ntfschar*)NULL, 0, CASE_SENSITIVE,
+				(u8*)NULL, 0, ctx)) {
+		si = (STANDARD_INFORMATION*)((char*)ctx->attr +
+				le16_to_cpu(ctx->attr->value_offset));
+		info_time = si->creation_time;
+	} else {
+		ntfs_log_error("BUG: Standard information not found\n");
+		info_time = mkntfs_time();
+	}
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
+	return (info_time);
+}
+
 /**
  * add_attr_file_name
  *
@@ -3077,8 +3103,7 @@ static int create_hardlink_res(MFT_RECORD *m_parent, const leMFT_REF ref_parent,
 	if (!fn)
 		return -errno;
 	fn->parent_directory = ref_parent;
-	/* FIXME: copy the creation_time from the std info */
-	fn->creation_time = mkntfs_time();
+	fn->creation_time = stdinfo_time(m_file);
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
@@ -3193,9 +3218,7 @@ static int create_hardlink(INDEX_BLOCK *idx, const leMFT_REF ref_parent,
 	if (!fn)
 		return -errno;
 	fn->parent_directory = ref_parent;
-	/* FIXME: Is this correct? Or do we have to copy the creation_time */
-	/* from the std info? */
-	fn->creation_time = mkntfs_time();
+	fn->creation_time = stdinfo_time(m_file);
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
