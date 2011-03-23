@@ -605,15 +605,16 @@ error_exit :
  *	Returns 0 if successful
  */
 
-static int rewrite_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
+static int rewrite_boot(struct ntfs_device *dev, char *full_bs,
+				s32 sector_size)
 {
 	s64 bw;
 	int res;
 
 	res = -1;
 	ntfs_log_info("Rewriting the bootsector\n");
-	bw = ntfs_pwrite(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
-	if (bw == sizeof(NTFS_BOOT_SECTOR))
+	bw = ntfs_pwrite(dev, 0, sector_size, full_bs);
+	if (bw == sector_size)
 		res = 0;
 	else {
 		if (bw != -1)
@@ -638,17 +639,19 @@ static int rewrite_boot(struct ntfs_device *dev, NTFS_BOOT_SECTOR *bs)
  *	Returns 0 if successful
  */
 
-static int try_fix_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
-			s64 read_sector, s64 fix_sectors)
+static int try_fix_boot(ntfs_volume *vol, char *full_bs,
+			s64 read_sector, s64 fix_sectors, s32 sector_size)
 {
 	s64 br;
 	int res;
 	s64 got_sectors;
+	le16 sector_size_le;
+	NTFS_BOOT_SECTOR *bs;
 
 	res = -1;
-	br = ntfs_pread(vol->dev, read_sector*DEFAULT_SECTOR_SIZE,
-					sizeof(NTFS_BOOT_SECTOR), bs);
-	if (br != sizeof(NTFS_BOOT_SECTOR)) {
+	br = ntfs_pread(vol->dev, read_sector*sector_size,
+					sector_size, full_bs);
+	if (br != sector_size) {
 		if (br != -1)
 			errno = EINVAL;
 		if (!br)
@@ -656,9 +659,13 @@ static int try_fix_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
 		else
 			ntfs_log_perror("Error reading alternate bootsector");
 	} else {
+		bs = (NTFS_BOOT_SECTOR*)full_bs;
 		got_sectors = le64_to_cpu(bs->number_of_sectors);
 		bs->number_of_sectors = cpu_to_le64(fix_sectors);
-		if (ntfs_boot_sector_is_ntfs(bs)
+		/* alignment problem on Sparc, even doing memcpy() */
+		sector_size_le = cpu_to_le16(sector_size);
+		if (!memcmp(&sector_size_le, &bs->bpb.bytes_per_sector,2)
+		    && ntfs_boot_sector_is_ntfs(bs)
 		    && !ntfs_boot_sector_parse(vol, bs)) {
 			ntfs_log_info("The alternate bootsector is usable\n");
 			if (fix_sectors != got_sectors)
@@ -667,7 +674,8 @@ static int try_fix_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
 						(long long)got_sectors);
 			/* fix the normal boot sector */
 			if (!opt.no_action) {
-				res = rewrite_boot(vol->dev, bs);
+				res = rewrite_boot(vol->dev, full_bs,
+							sector_size);
 			} else
 				res = 0;
 		}
@@ -692,8 +700,8 @@ static int try_fix_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
  *	Returns 0 if successful
  */
 
-static int try_alternate_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
-			s64 shown_sectors)
+static int try_alternate_boot(ntfs_volume *vol, char *full_bs,
+			s32 sector_size, s64 shown_sectors)
 {
 	s64 actual_sectors;
 	int res;
@@ -703,33 +711,35 @@ static int try_alternate_boot(ntfs_volume *vol, NTFS_BOOT_SECTOR *bs,
 
 		/*
 		 * We do not rely on the sector size defined in the
-		 * boot sector, supposed to be corrupt, so we assume the
-		 * sector size is 512 (some ioctl might be be needed to
-		 * get the actual size). This is only used to guess the
-		 * alternate boot sector location and should not damage
+		 * boot sector, supposed to be corrupt, so we try to get
+		 * the actual sector size and defaulting to 512 if failed
+		 * to get. This value is only used to guess the alternate
+		 * boot sector location and it is checked against the
+		 * value found in the sector itself. It should not damage
 		 * anything if wrong.
-		 * Other values might be worth trying (1024, 2048, 4096).
 		 *
 		 * Note : the real last sector is not accounted for here.
 		 */
-	actual_sectors = ntfs_device_size_get(vol->dev,DEFAULT_SECTOR_SIZE) - 1;
+	actual_sectors = ntfs_device_size_get(vol->dev,sector_size) - 1;
 
 		/* first try the actual last sector */
 	if ((actual_sectors > 0)
-	    && !try_fix_boot(vol,bs,actual_sectors,actual_sectors))
+	    && !try_fix_boot(vol, full_bs, actual_sectors,
+				actual_sectors, sector_size))
 		res = 0;
 
 		/* then try the shown last sector, if less than actual */
 	if (res
 	    && (shown_sectors > 0)
 	    && (shown_sectors < actual_sectors)
-	    && !try_fix_boot(vol,bs,shown_sectors,shown_sectors))
+	    && !try_fix_boot(vol, full_bs, shown_sectors,
+				shown_sectors, sector_size))
 		res = 0;
 
 		/* then try reducing the number of sectors to actual value */
 	if (res
 	    && (shown_sectors > actual_sectors)
-	    && !try_fix_boot(vol,bs,0,actual_sectors))
+	    && !try_fix_boot(vol, full_bs, 0, actual_sectors, sector_size))
 		res = 0;
 
 	return (res);
@@ -748,7 +758,9 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	ntfs_volume *vol;
 	BOOL dev_open;
 	s64 shown_sectors;
+	char *full_bs;
 	NTFS_BOOT_SECTOR *bs;
+	s32 sector_size;
 	int res;
 	int eo;
 
@@ -761,10 +773,6 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 		goto error_exit;
 	}
 
-	bs = (NTFS_BOOT_SECTOR*)ntfs_malloc(sizeof(NTFS_BOOT_SECTOR));
-	if (!bs)
-		goto error_exit;
-	
 	/* Allocate the volume structure. */
 	vol = ntfs_volume_alloc();
 	if (!vol)
@@ -795,9 +803,15 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	/* Attach the device to the volume. */
 	vol->dev = dev;
 	
+	sector_size = ntfs_device_sector_size_get(dev);
+	if (sector_size <= 0)
+		sector_size = DEFAULT_SECTOR_SIZE;
+	full_bs = (char*)malloc(sector_size);
+	if (!full_bs)
+		goto error_exit;
 	/* Now read the bootsector. */
-	br = ntfs_pread(dev, 0, sizeof(NTFS_BOOT_SECTOR), bs);
-	if (br != sizeof(NTFS_BOOT_SECTOR)) {
+	br = ntfs_pread(dev, 0, sector_size, full_bs);
+	if (br != sector_size) {
 		if (br != -1)
 			errno = EINVAL;
 		if (!br)
@@ -806,12 +820,14 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 			ntfs_log_perror("Error reading bootsector");
 		goto error_exit;
 	}
+	bs = (NTFS_BOOT_SECTOR*)full_bs;
 	if (!ntfs_boot_sector_is_ntfs(bs)
 		/* get the bootsector data, only fails when inconsistent */
 	    || (ntfs_boot_sector_parse(vol, bs) < 0)) {
 		shown_sectors = le64_to_cpu(bs->number_of_sectors);
 		/* boot sector is wrong, try the alternate boot sector */
-		if (try_alternate_boot(vol, bs, shown_sectors)) {
+		if (try_alternate_boot(vol, full_bs, sector_size,
+						shown_sectors)) {
 			errno = EINVAL;
 			goto error_exit;
 		}
