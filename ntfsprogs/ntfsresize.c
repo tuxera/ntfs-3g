@@ -262,7 +262,7 @@ static void err_printf(const char *fmt, ...)
  */
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
-static int err_exit(const char *fmt, ...)
+static void err_exit(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -282,7 +282,7 @@ static int err_exit(const char *fmt, ...)
  */
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
-static int perr_exit(const char *fmt, ...)
+static void perr_exit(const char *fmt, ...)
 {
 	va_list ap;
 	int eo = errno;
