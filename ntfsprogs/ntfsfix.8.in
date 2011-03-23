@@ -54,6 +54,7 @@ ntfs\-3g\-devel@lists.sf.net
 .SH AUTHORS
 .B ntfsfix
 was written by Anton Altaparmakov, with contributions from Szabolcs Szakacsits.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH AVAILABILITY
 .B ntfsfix
 is part of the

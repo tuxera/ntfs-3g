@@ -95,6 +95,7 @@ ntfs\-3g\-devel@lists.sf.net
 .SH AUTHORS
 \fBntfscp\fR was written by Yura Pakhuchiy, with contributions from Anton
 Altaparmakov and Hil Liao.
+It was ported to ntfs-3g by Erik Larsson.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH AVAILABILITY

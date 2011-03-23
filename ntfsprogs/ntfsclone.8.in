@@ -342,6 +342,7 @@ XFS, JFS and ext3 don't have this problem.
 .B ntfsclone
 was written by Szabolcs Szakacsits with contributions from Per Olofsson 
 (special image format support) and Anton Altaparmakov.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH AVAILABILITY
 .B ntfsclone
 is part of the

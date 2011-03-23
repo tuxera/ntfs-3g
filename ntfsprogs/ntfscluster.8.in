@@ -109,6 +109,7 @@ ntfs\-3g\-devel@lists.sf.net
 .SH AUTHORS
 .B ntfscluster
 was written by Richard Russon, with contributions from Anton Altaparmakov.
+It was ported to ntfs-3g by Erik Larsson.
 .SH AVAILABILITY
 .B ntfscluster
 is part of the

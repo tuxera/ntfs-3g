@@ -158,6 +158,7 @@ This version of
 .B ntfsls
 was written by Lode Leroy, Anton Altaparmakov, Richard Russon, Carmelo Kintana
 and Giang Nguyen.
+It was ported to ntfs-3g by Erik Larsson.
 .SH AVAILABILITY
 .B ntfsls
 is part of the

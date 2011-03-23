@@ -248,6 +248,7 @@ in the Troubleshooting section of the below referred Ntfsresize FAQ.
 .B ntfsresize
 was written by Szabolcs Szakacsits, with contributions from Anton Altaparmakov
 and Richard Russon.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH ACKNOWLEDGEMENT
 Many thanks to Anton Altaparmakov and Richard Russon
 for libntfs, the excellent documentation and comments,

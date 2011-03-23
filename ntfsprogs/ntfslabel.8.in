@@ -85,6 +85,7 @@ ntfs\-3g\-devel@lists.sf.net
 .B ntfslabel
 was written by Matthew J. Fanto, with contributions from Anton Altaparmakov and
 Richard Russon.
+It was ported to ntfs-3g by Erik Larsson.
 .SH AVAILABILITY
 .B ntfslabel
 is part of the

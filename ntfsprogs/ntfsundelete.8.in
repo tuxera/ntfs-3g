@@ -309,6 +309,7 @@ ntfs\-3g\-devel@lists.sf.net
 .B ntfsundelete
 was written by Richard Russon and Holger Ohmacht, with contributions from Anton
 Altaparmakov.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH AVAILABILITY
 .B ntfsundelete
 is part of the

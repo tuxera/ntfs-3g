@@ -75,6 +75,7 @@ ntfs\-3g\-devel@lists.sf.net
 .B ntfsinfo
 was written by Matthew J. Fanto, Anton Altaparmakov, Richard Russon, Szabolcs
 Szakacsits, Yuval Fledel, Yura Pakhuchiy and Cristian Klein.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH AVAILABILITY
 .B ntfsinfo
 is part of the

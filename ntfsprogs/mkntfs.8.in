@@ -261,6 +261,7 @@ ntfs\-3g\-devel@lists.sf.net
 .SH AUTHORS
 .B mkntfs
 was written by Anton Altaparmakov, Richard Russon, Erik Sornes and Szabolcs Szakacsits.
+It was ported to ntfs-3g by Erik Larsson and Jean-Pierre Andre.
 .SH AVAILABILITY
 .B mkntfs
 is part of the

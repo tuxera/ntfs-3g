@@ -118,6 +118,7 @@ ntfs\-3g\-devel@lists.sf.net
 .SH AUTHORS
 .B ntfscat
 was written by Richard Russon, Anton Altaparmakov and Szabolcs Szakacsits.
+It was ported to ntfs-3g by Erik Larsson.
 .SH AVAILABILITY
 .B ntfscat
 is part of the
