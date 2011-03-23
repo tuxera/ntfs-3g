@@ -4415,7 +4415,9 @@ static BOOL mkntfs_create_root_structures(void)
 			const_cpu_to_le16(0), g_rl_mft, g_buf, g_mft_size);
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
-				MK_LE_MREF(FILE_MFT, 1), g_mft_size,
+				MK_LE_MREF(FILE_MFT, 1),
+				((g_mft_size - 1)
+					| (g_vol->cluster_size - 1)) + 1,
 				g_mft_size, FILE_ATTR_HIDDEN |
 				FILE_ATTR_SYSTEM, 0, 0, "$MFT",
 				FILE_NAME_WIN32_AND_DOS);
