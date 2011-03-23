@@ -1879,6 +1879,31 @@ static int add_attr_std_info(MFT_RECORD *m, const FILE_ATTR_FLAGS flags,
 	return err;
 }
 
+/*
+ *		Tell whether the unnamed data is non resident
+ */
+
+static BOOL non_resident_unnamed_data(MFT_RECORD *m)
+{
+	ATTR_RECORD *a;
+	ntfs_attr_search_ctx *ctx;
+	BOOL nonres;
+
+	ctx = ntfs_attr_get_search_ctx(NULL, m);
+	if (ctx && !mkntfs_attr_find(AT_DATA,
+				(const ntfschar*)NULL, 0, CASE_SENSITIVE,
+				(u8*)NULL, 0, ctx)) {
+		a = ctx->attr;
+		nonres = a->non_resident != 0;
+	} else {
+		ntfs_log_error("BUG: Unnamed data not found\n");
+		nonres = TRUE;
+	}
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
+	return (nonres);
+}
+
 /**
  * add_attr_file_name
  *
@@ -3174,7 +3199,11 @@ static int create_hardlink(INDEX_BLOCK *idx, const leMFT_REF ref_parent,
 	fn->last_data_change_time = fn->creation_time;
 	fn->last_mft_change_time = fn->creation_time;
 	fn->last_access_time = fn->creation_time;
-	fn->allocated_size = cpu_to_sle64(allocated_size);
+		/* allocated size depends on unnamed data being resident */
+	if (allocated_size && non_resident_unnamed_data(m_file))
+		fn->allocated_size = cpu_to_sle64(allocated_size);
+	else
+		fn->allocated_size = cpu_to_sle64((data_size + 7) & -8);
 	fn->data_size = cpu_to_sle64(data_size);
 	fn->file_attributes = flags;
 	/* These are in a union so can't have both. */
