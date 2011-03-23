@@ -832,8 +832,10 @@ error_exit:
 	}
 	eo = errno;
 	free(bs);
-	if (vol)
+	if (vol) {
+		free(vol->upcase);
 		free(vol);
+	}
 	if (dev_open) {
 		(dev->d_ops->close)(dev);
 	}
