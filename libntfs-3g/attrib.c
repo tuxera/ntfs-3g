@@ -5778,34 +5778,6 @@ retry:
 			goto put_err_out;
 		}
 	}
-		/*
-		 * If the base extent was skipped in the above process,
-		 * we still may have to update the sizes.
-		 */
-	if (!first_updated) {
-		le16 spcomp;
-
-		ntfs_attr_reinit_search_ctx(ctx);
-		if (!ntfs_attr_lookup(na->type, na->name, na->name_len,
-				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-			a = ctx->attr;
-			a->allocated_size = cpu_to_sle64(na->allocated_size);
-			spcomp = na->data_flags
-				& (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
-			if (spcomp)
-				a->compressed_size = cpu_to_sle64(na->compressed_size);
-			if ((na->type == AT_DATA) && (na->name == AT_UNNAMED)) {
-				na->ni->allocated_size
-					= (spcomp
-						? na->compressed_size
-						: na->allocated_size);
-				NInoFileNameSetDirty(na->ni);
-			}
-		} else {
-			ntfs_log_error("Failed to update sizes in base extent\n");
-			goto put_err_out;
-		}
-	}
 
 	/* Deallocate not used attribute extents and return with success. */
 	if (finished_build) {
