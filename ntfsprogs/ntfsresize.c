@@ -133,6 +133,7 @@ static struct {
 	int ro_flag;
 	int force;
 	int info;
+	int infombonly;
 	int show_progress;
 	int badsectors;
 	s64 bytes;
@@ -312,6 +313,7 @@ static void usage(void)
 		"    Resize an NTFS volume non-destructively, safely move any data if needed.\n"
 		"\n"
 		"    -i, --info             Estimate the smallest shrunken size possible\n"
+		"    -m, --info-mb-only     Estimate the smallest shrunken size possible, output size in MB only\n"
 		"    -s, --size SIZE        Resize volume to SIZE[k|M|G] bytes\n"
 		"\n"
 		"    -n, --no-action        Do not write to disk\n"
@@ -437,7 +439,7 @@ static s64 get_new_volume_size(char *s)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-bdfhinPs:vV";
+	static const char *sopt = "-bdfhimnPs:vV";
 	static const struct option lopt[] = {
 		{ "bad-sectors",no_argument,		NULL, 'b' },
 #ifdef DEBUG
@@ -446,6 +448,7 @@ static int parse_options(int argc, char **argv)
 		{ "force",	no_argument,		NULL, 'f' },
 		{ "help",	no_argument,		NULL, 'h' },
 		{ "info",	no_argument,		NULL, 'i' },
+		{ "info-mb-only", no_argument,		NULL, 'm' },
 		{ "no-action",	no_argument,		NULL, 'n' },
 		{ "no-progress-bar", no_argument,	NULL, 'P' },
 		{ "size",	required_argument,	NULL, 's' },
@@ -486,6 +489,9 @@ static int parse_options(int argc, char **argv)
 		case 'i':
 			opt.info++;
 			break;
+		case 'm':
+			opt.infombonly++;
+			break;
 		case 'n':
 			opt.ro_flag = MS_RDONLY;
 			break;
@@ -522,10 +528,10 @@ static int parse_options(int argc, char **argv)
 				printf("You must specify exactly one device.\n");
 			err++;
 		}
-		if (opt.info) {
+		if (opt.info || opt.infombonly) {
 			opt.ro_flag = MS_RDONLY;
 			if (opt.bytes) {
-				printf(NERR_PREFIX "Options --info and --size "
+				printf(NERR_PREFIX "Options --info(-mb-only) and --size "
 					"can't be used together.\n");
 				usage();
 			}
@@ -578,19 +584,26 @@ static void print_advise(ntfs_volume *vol, s64 supp_lcn)
 	freed_mb = freed_b / NTFS_MBYTE;
 
 	/* WARNING: don't modify the text, external tools grep for it */
-	printf("You might resize at %lld bytes ", (long long)new_b);
-	if ((new_mb * NTFS_MBYTE) < old_b)
-		printf("or %lld MB ", (long long)new_mb);
+	if (!opt.infombonly)
+		printf("You might resize at %lld bytes ", (long long)new_b);
+	if ((new_mb * NTFS_MBYTE) < old_b) {
+		if (!opt.infombonly)
+			printf("or %lld MB ", (long long)new_mb);
+		else
+			printf("Minsize (in MB): %lld\n", (long long)new_mb);
+	}
 
-	printf("(freeing ");
-	if (freed_mb && (old_mb - new_mb))
-	    printf("%lld MB", (long long)(old_mb - new_mb));
-	else
-	    printf("%lld bytes", (long long)freed_b);
-	printf(").\n");
+	if (!opt.infombonly) {
+		printf("(freeing ");
+		if (freed_mb && (old_mb - new_mb))
+			printf("%lld MB", (long long)(old_mb - new_mb));
+		else
+		        printf("%lld bytes", (long long)freed_b);
+		printf(").\n");
 
-	printf("Please make a test run using both the -n and -s options "
-	       "before real resizing!\n");
+		printf("Please make a test run using both the -n and -s "
+			"options before real resizing!\n");
+	}
 }
 
 static void rl_set(runlist *rl, VCN vcn, LCN lcn, s64 len)
@@ -737,7 +750,7 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 		start = new_vol_size;
 		len = lcn_length - (new_vol_size - lcn);
 
-		if (!opt.info && (inode == FILE_MFTMirr)) {
+		if ((!opt.info && !opt.infombonly) && (inode == FILE_MFTMirr)) {
 			err_printf("$MFTMirr can't be split up yet. Please try "
 				   "a different size.\n");
 			print_advise(resize->vol, lcn + lcn_length - 1);
@@ -747,7 +760,7 @@ static void collect_relocation_info(ntfs_resize_t *resize, runlist *rl)
 
 	resize->relocations += len;
 
-	if (!opt.info || !resize->new_volume_size)
+	if ((!opt.info && !opt.infombonly) || !resize->new_volume_size)
 		return;
 
 	printf("Relocation needed for inode %8lld attr 0x%x LCN 0x%08llx "
@@ -878,7 +891,8 @@ static void compare_bitmaps(ntfs_volume *vol, struct bitmap *a)
 	int backup_boot = 0;
 	u8 bm[NTFS_BUF_SIZE];
 
-	printf("Accounting clusters ...\n");
+        if (!opt.infombonly)
+		printf("Accounting clusters ...\n");
 
 	pos = 0;
 	while (1) {
@@ -1002,7 +1016,8 @@ static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 	int pb_flags = 0;	/* progress bar flags */
 
 	/* WARNING: don't modify the text, external tools grep for it */
-	printf("Checking filesystem consistency ...\n");
+        if (!opt.infombonly)
+		printf("Checking filesystem consistency ...\n");
 
 	if (fsck->flags & NTFSCK_PROGBAR)
 		pb_flags |= NTFS_PROGBAR;
@@ -1013,7 +1028,8 @@ static int build_allocation_bitmap(ntfs_volume *vol, ntfsck_t *fsck)
 	progress_init(&progress, inode, nr_mft_records - 1, pb_flags);
 
 	for (; inode < nr_mft_records; inode++) {
-		progress_update(&progress, inode);
+        	if (!opt.infombonly)
+			progress_update(&progress, inode);
 
 		if ((ni = ntfs_inode_open(vol, (MFT_REF)inode)) == NULL) {
 			/* FIXME: continue only if it make sense, e.g.
@@ -1083,7 +1099,8 @@ static void set_resize_constraints(ntfs_resize_t *resize)
 	s64 nr_mft_records, inode;
 	ntfs_inode *ni;
 
-	printf("Collecting resizing constraints ...\n");
+        if (!opt.infombonly)
+		printf("Collecting resizing constraints ...\n");
 
 	nr_mft_records = resize->vol->mft_na->initialized_size >>
 			resize->vol->mft_record_size_bits;
@@ -1792,7 +1809,6 @@ static void advise_on_resize(ntfs_resize_t *resize)
 	print_advise(vol, resize->last_unsupp);
 }
 
-
 static void rl_expand(runlist **rl, const VCN last_vcn)
 {
 	int len;
@@ -2210,9 +2226,11 @@ static void print_disk_usage(ntfs_volume *vol, s64 nr_used_clusters)
 	used = nr_used_clusters * vol->cluster_size;
 
 	/* WARNING: don't modify the text, external tools grep for it */
-	printf("Space in use       : %lld MB (%.1f%%)\n",
-	       (long long)rounded_up_division(used, NTFS_MBYTE),
-	       100.0 * ((float)used / total));
+        if (!opt.infombonly) {
+		printf("Space in use       : %lld MB (%.1f%%)\n",
+	        	(long long)rounded_up_division(used, NTFS_MBYTE),
+	        	100.0 * ((float)used / total));
+	}
 }
 
 static void print_num_of_relocations(ntfs_resize_t *resize)
@@ -2281,14 +2299,20 @@ static ntfs_volume *mount_volume(void)
 		err_exit("Cluster size %u is too large!\n",
 			(unsigned int)vol->cluster_size);
 
-	printf("Device name        : %s\n", opt.volume);
-	printf("NTFS volume version: %d.%d\n", vol->major_ver, vol->minor_ver);
+	if (!opt.infombonly) {
+		printf("Device name        : %s\n", opt.volume);
+		printf("NTFS volume version: %d.%d\n",
+				vol->major_ver, vol->minor_ver);
+	}
 	if (ntfs_version_is_supported(vol))
 		perr_exit("Unknown NTFS version");
 
-	printf("Cluster size       : %u bytes\n",
+	if (!opt.infombonly) {
+		printf("Cluster size       : %u bytes\n",
 			(unsigned int)vol->cluster_size);
-	print_vol_size("Current volume size", vol_size(vol, vol->nr_clusters));
+		print_vol_size("Current volume size",
+			vol_size(vol, vol->nr_clusters));
+	}
 
 	return vol;
 }
@@ -2343,7 +2367,7 @@ static void check_resize_constraints(ntfs_resize_t *resize)
 		err_exit("Volume is full. To shrink it, "
 			 "delete unused files.\n");
 
-	if (opt.info)
+	if (opt.info || opt.infombonly)
 		return;
 
 	/* FIXME: reserve some extra space so Windows can boot ... */
@@ -2413,14 +2437,15 @@ int main(int argc, char **argv)
 		err_exit("Couldn't get device size (%lld)!\n",
 			(long long)device_size);
 
-	print_vol_size("Current device size", device_size);
+	if (!opt.infombonly)
+		print_vol_size("Current device size", device_size);
 
 	if (device_size < vol->nr_clusters * vol->cluster_size)
 		err_exit("Current NTFS volume size is bigger than the device "
 			 "size!\nCorrupt partition table or incorrect device "
 			 "partitioning?\n");
 
-	if (!opt.bytes && !opt.info)
+	if (!opt.bytes && !opt.info && !opt.infombonly)
 		opt.bytes = device_size;
 
 	/* Take the integer part: don't make the volume bigger than requested */
@@ -2431,7 +2456,7 @@ int main(int argc, char **argv)
 	if (new_size)
 		--new_size;
 
-	if (!opt.info) {
+	if (!opt.info && !opt.infombonly) {
 		print_vol_size("New volume size    ", vol_size(vol, new_size));
 		if (device_size < opt.bytes)
 			err_exit("New size can't be bigger than the device size"
@@ -2439,7 +2464,7 @@ int main(int argc, char **argv)
 				 "enlarge the device size by e.g. fdisk.\n");
 	}
 
-	if (!opt.info && (new_size == vol->nr_clusters ||
+	if (!opt.info && !opt.infombonly && (new_size == vol->nr_clusters ||
 			  (opt.bytes == device_size &&
 			   new_size == vol->nr_clusters - 1))) {
 		printf("Nothing to do: NTFS volume size is already OK.\n");
@@ -2472,7 +2497,7 @@ int main(int argc, char **argv)
 	set_disk_usage_constraint(&resize);
 	check_resize_constraints(&resize);
 
-	if (opt.info) {
+	if (opt.info || opt.infombonly) {
 		advise_on_resize(&resize);
 		exit(0);
 	}

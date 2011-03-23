@@ -8,7 +8,7 @@ ntfsresize \- resize an NTFS filesystem without data loss
 .SH SYNOPSIS
 .B ntfsresize
 [\fIOPTIONS\fR]
-.B \-\-info
+.B \-\-info(\-mb\-only)
 .I DEVICE
 .br
 .B ntfsresize
@@ -45,7 +45,7 @@ conforms to the SI, ATA, IEEE standards and the disk manufacturers
 by using k=10^3, M=10^6 and G=10^9.
 
 If both
-.B \-\-info
+.B \-\-info(\-mb\-only)
 and
 .B \-\-size
 are omitted then the
@@ -132,6 +132,10 @@ that Windows might need about 50\-100 MB free space left to boot safely.
 
 This option never causes any changes to the filesystem, the partition is
 opened read\-only.
+.TP
+\fB\-m\fR, \fB\-\-info\-mb\-only\fR
+Like the info option, only print out the shrinkable size in MB.  Print nothing
+if the shrink size is the same as the original size (in MB).
 .TP
 \fB\-s\fR, \fB\-\-size\fR SIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR]
 Resize filesystem to \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
