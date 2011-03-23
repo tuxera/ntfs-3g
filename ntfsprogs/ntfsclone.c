@@ -153,6 +153,7 @@ static struct bitmap lcn_bitmap;
 
 static int fd_in;
 static int fd_out;
+static FILE *stream_out = (FILE*)NULL;
 static FILE *msg_out = NULL;
 
 static int wipe = 0;
@@ -539,9 +540,12 @@ static int io_all(void *fd, void *buf, int count, int do_write)
 	struct ntfs_device *dev = fd;
 
 	while (count > 0) {
-		if (do_write)
-			i = write(*(int *)fd, buf, count);
-		else if (opt.restore_image)
+		if (do_write) {
+			if (opt.save_image)
+				i = fwrite(buf, 1, count, stream_out);
+			else
+				i = write(*(int *)fd, buf, count);
+		} else if (opt.restore_image)
 			i = read(*(int *)fd, buf, count);
 		else
 			i = dev->d_ops->read(dev, buf, count);
@@ -1553,6 +1557,8 @@ static s64 device_size_get(int fd)
 static void fsync_clone(int fd)
 {
 	Printf("Syncing ...\n");
+	if (opt.save_image && stream_out && fflush(stream_out))
+		perr_exit("fflush");
 	if (fsync(fd) && errno != EINVAL)
 		perr_exit("fsync");
 }
@@ -1877,6 +1883,7 @@ int main(int argc, char **argv)
 	if (opt.std_out) {
 		if ((fd_out = fileno(stdout)) == -1)
 			perr_exit("fileno for stdout failed");
+		stream_out = stdout;
 	} else {
 		/* device_size_get() might need to read() */
 		int flags = O_RDWR;
@@ -1887,8 +1894,17 @@ int main(int argc, char **argv)
 				flags |= O_EXCL;
 		}
 
-		if ((fd_out = open(opt.output, flags, S_IRUSR | S_IWUSR)) == -1)
-			perr_exit("Opening file '%s' failed", opt.output);
+		if (opt.save_image) {
+			stream_out = fopen(opt.output,"w");
+			if (!stream_out)
+				perr_exit("Opening file '%s' failed",
+						opt.output);
+			fd_out = fileno(stream_out);
+		} else
+			if ((fd_out = open(opt.output, flags,
+						S_IRUSR | S_IWUSR)) == -1)
+				perr_exit("Opening file '%s' failed",
+						opt.output);
 
 		if (!opt.save_image)
 			check_output_device(ntfs_size);
@@ -1924,6 +1940,8 @@ int main(int argc, char **argv)
 
 		clone_ntfs(nr_clusters_to_save);
 		fsync_clone(fd_out);
+		if (opt.save_image)
+			fclose(stream_out);
 		ntfs_umount(vol,FALSE);
 		free(lcn_bitmap.bm);
 		exit(0);
