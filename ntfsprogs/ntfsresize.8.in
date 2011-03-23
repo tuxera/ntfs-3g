@@ -116,6 +116,11 @@ is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
+\fB\-c\fR, \fB\-\-check\fR
+By using this option ntfsresize will only check the device to ensure that it
+is ready to be resized. If not, it will print any errors detected. 
+If the device is fine, nothing will be printed.
+.TP
 \fB\-i\fR, \fB\-\-info\fR
 By using this option ntfsresize will determine the theoretically smallest
 shrunken filesystem size supported. Most of the time the result is the space

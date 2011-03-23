@@ -136,6 +136,7 @@ static struct {
 	int infombonly;
 	int show_progress;
 	int badsectors;
+	int check;
 	s64 bytes;
 	char *volume;
 } opt;
@@ -312,6 +313,7 @@ static void usage(void)
 	printf("\nUsage: %s [OPTIONS] DEVICE\n"
 		"    Resize an NTFS volume non-destructively, safely move any data if needed.\n"
 		"\n"
+		"    -c, --check            Check to ensure that the device is ready for resize\n"
 		"    -i, --info             Estimate the smallest shrunken size possible\n"
 		"    -m, --info-mb-only     Estimate the smallest shrunken size possible, output size in MB only\n"
 		"    -s, --size SIZE        Resize volume to SIZE[k|M|G] bytes\n"
@@ -439,9 +441,10 @@ static s64 get_new_volume_size(char *s)
  */
 static int parse_options(int argc, char **argv)
 {
-	static const char *sopt = "-bdfhimnPs:vV";
+	static const char *sopt = "-bcdfhimnPs:vV";
 	static const struct option lopt[] = {
 		{ "bad-sectors",no_argument,		NULL, 'b' },
+		{ "check",	no_argument,		NULL, 'c' },
 #ifdef DEBUG
 		{ "debug",	no_argument,		NULL, 'd' },
 #endif
@@ -475,6 +478,9 @@ static int parse_options(int argc, char **argv)
 			break;
 		case 'b':
 			opt.badsectors++;
+			break;
+		case 'c':
+			opt.check++;
 			break;
 		case 'd':
 			opt.debug++;
@@ -2242,6 +2248,44 @@ static void print_num_of_relocations(ntfs_resize_t *resize)
 			rounded_up_division(relocations, NTFS_MBYTE));
 }
 
+static ntfs_volume *check_volume(void)
+{
+	ntfs_volume *myvol = NULL;
+
+	/*
+	 * Pass MS_FORENSIC so that the mount process does not modify the
+	 * volume at all.  We will do the logfile emptying and dirty setting
+	 * later if needed.
+	 */
+	if (!(myvol = ntfs_mount(opt.volume, opt.ro_flag | MS_FORENSIC))) {
+		int err = errno;
+
+		perr_printf("Opening '%s' as NTFS failed", opt.volume);
+		switch (err) {
+		case EINVAL :
+			printf(invalid_ntfs_msg, opt.volume);
+			break;
+		case EIO :
+			printf("%s", corrupt_volume_msg);
+			break;
+		case EPERM :
+			printf("%s", hibernated_volume_msg);
+			break;
+		case EOPNOTSUPP :
+			printf("%s", unclean_journal_msg);
+			break;
+		case EBUSY :
+			printf("%s", opened_volume_msg);
+			break;
+		default :
+			break;
+		}
+		exit(1);
+	}
+	return myvol;
+}
+
+
 /**
  * mount_volume
  *
@@ -2268,27 +2312,7 @@ static ntfs_volume *mount_volume(void)
 			err_exit("Device '%s' is mounted. "
 				 "You must 'umount' it first.\n", opt.volume);
 	}
-	/*
-	 * Pass MS_FORENSIC so that the mount process does not modify the
-	 * volume at all.  We will do the logfile emptying and dirty setting
-	 * later if needed.
-	 */
-	if (!(vol = ntfs_mount(opt.volume, opt.ro_flag | MS_FORENSIC))) {
-		int err = errno;
-
-		perr_printf("Opening '%s' as NTFS failed", opt.volume);
-		if (err == EINVAL)
-			printf(invalid_ntfs_msg, opt.volume);
-		else if (err == EIO)
-			printf("%s", corrupt_volume_msg);
-		else if (err == EPERM)
-			printf("%s", hibernated_volume_msg);
-		else if (err == EOPNOTSUPP)
-			printf("%s", unclean_journal_msg);
-		else if (err == EBUSY)
-			printf("%s", opened_volume_msg);
-		exit(1);
-	}
+	vol = check_volume();
 
 	if (vol->flags & VOLUME_IS_DIRTY)
 		if (opt.force-- <= 0)
@@ -2417,7 +2441,7 @@ int main(int argc, char **argv)
 	ntfs_resize_t resize;
 	s64 new_size = 0;	/* in clusters; 0 = --info w/o --size */
 	s64 device_size;        /* in bytes */
-	ntfs_volume *vol;
+	ntfs_volume *vol = NULL;
 
 	ntfs_log_set_handler(ntfs_log_handler_outerr);
 
@@ -2427,6 +2451,15 @@ int main(int argc, char **argv)
 		return 1;
 
 	utils_set_locale();
+
+		/*
+		 * If we're just checking the device, we'll do it first,
+		 * and exit out, no matter what we find.
+		 */
+	if (opt.check) {
+		vol = check_volume();
+		exit(0);
+	}
 
 	if (!(vol = mount_volume()))
 		err_exit("Couldn't open volume '%s'!\n", opt.volume);
