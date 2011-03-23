@@ -366,6 +366,8 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 	result = 0;
 err_out:
 	free(new_label);
+	if (ctx)
+		ntfs_attr_put_search_ctx(ctx);
 	return result;
 }
 
