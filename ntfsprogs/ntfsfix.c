@@ -213,8 +213,8 @@ static int OLD_ntfs_volume_set_flags(ntfs_volume *vol, const le16 flags)
 				"context.\n");
 		goto err_exit;
 	}
-	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0, 0, 0, NULL,
-			0, ctx)) {
+	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, AT_UNNAMED, 0,
+			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		ntfs_log_error("Attribute $VOLUME_INFORMATION was not found in "
 				"$Volume!\n");
 		goto err_out;

@@ -298,8 +298,8 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		ntfs_log_perror("Failed to get attribute search context");
 		goto err_out;
 	}
-	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, 0, 0, NULL, 0,
-			ctx)) {
+	if (ntfs_attr_lookup(AT_VOLUME_NAME, AT_UNNAMED, 0, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
 		if (errno != ENOENT) {
 			ntfs_log_perror("Lookup of $VOLUME_NAME attribute failed");
 			goto err_out;
@@ -325,7 +325,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 				"allowed. Truncating excess characters.\n",
 				(unsigned)(0x100 / sizeof(ntfschar)));
 		label_len = 0x100;
-		new_label[label_len / sizeof(ntfschar)] = 0;
+		new_label[label_len / sizeof(ntfschar)] = const_cpu_to_le16(0);
 	}
 	if (a) {
 		if (resize_resident_attribute_value(ctx->mrec, a, label_len)) {
