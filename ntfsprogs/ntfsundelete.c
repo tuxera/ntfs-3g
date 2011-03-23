@@ -1778,7 +1778,7 @@ static int undelete_file(ntfs_volume *vol, long long inode)
 							"%lld clusters.\n",
 							(long long)rl[i].length);
 					memset(buffer, opts.fillbyte, bufsize);
-					for (k = 0; k < rl[k].length * vol->cluster_size; k += bufsize) {
+					for (k = 0; k < rl[i].length * vol->cluster_size; k += bufsize) {
 						if (write_data(fd, buffer, bufsize) < bufsize) {
 							ntfs_log_perror("Write failed");
 							close(fd);
