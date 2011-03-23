@@ -6494,7 +6494,7 @@ static int stuff_hole(ntfs_attr *na, const s64 pos)
 			if (!ret
 			    && ((na->initialized_size + end_size) < pos)
 			    && ntfs_non_resident_attr_expand(na,
-					pos - end_size, TRUE))
+					pos - end_size, HOLES_OK))
 				ret = -1;
 			else 
 				na->initialized_size
