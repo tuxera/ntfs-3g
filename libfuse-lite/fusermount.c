@@ -412,7 +412,7 @@ static int do_mount(const char *mnt, char **typep, mode_t rootmode,
 	    if (errno_save == EPERM)
 		    fprintf(stderr, "User doesn't have privilege to mount. "
 			    "For more information\nplease see: "
-			    "http://ntfs-3g.org/support.html#unprivileged\n");
+			    "http://tuxera.com/community/ntfs-3g-faq/#unprivileged\n");
 	}
 	goto err;
     } else {
