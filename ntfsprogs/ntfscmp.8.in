@@ -58,7 +58,7 @@ ntfs\-3g\-devel@lists.sf.net
 .hy
 .SH AUTHOR
 .B ntfscmp
-was written by Szabolcs Szakacsits (szaka@sienet.hu).
+was written by Szabolcs Szakacsits.
 It was ported to ntfs-3g by Erik Larsson.
 .SH AVAILABILITY
 .B ntfscmp

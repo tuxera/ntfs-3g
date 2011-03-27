@@ -70,7 +70,7 @@
 #include "misc.h"
 
 const char *ntfs_home = 
-"Ntfs-3g news, support and information:  http://ntfs-3g.org\n";
+"News, support and information:  http://tuxera.com\n";
 
 static const char *invalid_ntfs_msg =
 "The device '%s' doesn't seem to have a valid NTFS.\n"
@@ -113,7 +113,7 @@ static const char *fakeraid_msg =
 static const char *access_denied_msg =
 "Please check '%s' and the ntfs-3g binary permissions,\n"
 "and the mounting user ID. More explanation is provided at\n"
-"http://ntfs-3g.org/support.html#unprivileged\n";
+"http://tuxera.com/community/ntfs-3g-faq/#unprivileged\n";
 
 /**
  * ntfs_volume_alloc - Create an NTFS volume object and initialise it
