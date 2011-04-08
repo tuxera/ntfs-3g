@@ -41,6 +41,17 @@ the FUSE kernel module. Then unpack the source tarball and type:
 Please note that NTFS-3G doesn't require the FUSE user space package any
 more.
 
+The list of options for building specific configurations is displayed by
+typing :
+
+	./configure --help
+
+Below are a few specific options to ./configure :
+	--disable-ntfsprogs : do not build the ntfsprogs tools,
+	--enable-posix-acls : enable support for Posix ACLs
+	--enable-xattr-mappings : enable system extended attributes mappings
+	--with-fuse=external : use external fuse (overriding Linux default)
+
 Non-Linux: Please see 
 
 	http://www.tuxera.com/community/ntfs-3g-download/
