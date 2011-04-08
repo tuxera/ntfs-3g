@@ -181,6 +181,9 @@
  *
  *  Mar 2011, version 1.3.19
  *     - fixed interface to ntfs_initialize_file_security()
+ *
+ *  Apr 2011, version 1.3.20
+ *     - fixed false memory leak detection
  */
 
 /*
@@ -204,7 +207,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.19"
+#define AUDT_VERSION "1.3.20"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -5015,7 +5018,11 @@ void showfull(const char *fullname, BOOL isdir)
 							| POSIX_ACL_GROUP
 							| POSIX_ACL_MASK))))
 						showposix(pxdesc);
+#if USESTUBS
+					stdfree(pxdesc); /* allocated within library */
+#else
 					free(pxdesc);
+#endif
 				}
 #endif
 				if ((opt_r || opt_b) && (securindex < MAXSECURID)
