@@ -350,7 +350,7 @@ INDEX_ENTRY *ntfs_read_sii(struct SECURITY_API *scapi,
 INDEX_ENTRY *ntfs_read_sdh(struct SECURITY_API *scapi,
 		INDEX_ENTRY *entry);
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
-                                int flags);
+                                unsigned long flags);
 BOOL ntfs_leave_file_security(struct SECURITY_API *scx);
 
 int ntfs_get_usid(struct SECURITY_API *scapi, uid_t uid, char *buf);

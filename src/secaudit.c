@@ -178,6 +178,9 @@
  *
  *  May 2010, version 1.3.18
  *     - redefined early error logging
+ *
+ *  Mar 2011, version 1.3.19
+ *     - fixed interface to ntfs_initialize_file_security()
  */
 
 /*
@@ -201,7 +204,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.18"
+#define AUDT_VERSION "1.3.19"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -343,7 +346,7 @@ int ntfs_get_gsid(void *scapi, gid_t gid, char *buf);
 int ntfs_get_user(void *scapi, const char *usid);
 int ntfs_get_group(void *scapi, const char *gsid);
 
-void *ntfs_initialize_file_security(const char *device, int flags);
+void *ntfs_initialize_file_security(const char *device, unsigned long flags);
 BOOL ntfs_leave_file_security(void *scapi);
 
 #else
@@ -369,7 +372,8 @@ typedef int (*type_get_gsid)(void *scapi, gid_t gid, char *buf);
 typedef int (*type_get_user)(void *scapi, const char *usid);
 typedef int (*type_get_group)(void *scapi, const char *gsid);
 
-typedef void *(*type_initialize_file_security)(const char *device, int flags);
+typedef void *(*type_initialize_file_security)(const char *device,
+				unsigned long flags);
 typedef BOOL (*type_leave_file_security)(void *scapi);
 
 type_get_file_security ntfs_get_file_security;
@@ -400,7 +404,7 @@ type_leave_file_security ntfs_leave_file_security;
 BOOL open_security_api(void);
 BOOL close_security_api(void);
 #ifndef WIN32
-BOOL open_volume(const char*, int flags);
+BOOL open_volume(const char*, unsigned long flags);
 BOOL close_volume(const char*);
 #endif
 unsigned int get2l(const char*, int);
@@ -707,7 +711,7 @@ BOOL close_security_api(void)
  *	Assumes a single volume is opened
  */
 
-BOOL open_volume(const char *volume, int flags)
+BOOL open_volume(const char *volume, unsigned long flags)
 {
 	BOOL ok;
 

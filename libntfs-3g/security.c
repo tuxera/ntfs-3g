@@ -5030,7 +5030,7 @@ int ntfs_get_group(struct SECURITY_API *scapi, const SID *gsid)
  */
 
 struct SECURITY_API *ntfs_initialize_file_security(const char *device,
-				int flags)
+				unsigned long flags)
 {
 	ntfs_volume *vol;
 	unsigned long mntflag;
