@@ -376,7 +376,6 @@ int ntfs_invalidate_cache(struct CACHE_HEADER *cache,
 		int flags)
 {
 	struct CACHED_GENERIC *current;
-	struct CACHED_GENERIC *previous;
 	struct CACHED_GENERIC *next;
 	struct HASH_ENTRY *link;
 	int count;
@@ -412,7 +411,6 @@ int ntfs_invalidate_cache(struct CACHE_HEADER *cache,
 				 * Search sequentially in LRU list
 				 */
 			current = cache->most_recent_entry;
-			previous = (struct CACHED_GENERIC*)NULL;
 			while (current) {
 				if (!compare(current, item)) {
 					next = current->next;
@@ -423,7 +421,6 @@ int ntfs_invalidate_cache(struct CACHE_HEADER *cache,
 					current = next;
 					count++;
 				} else {
-					previous = current;
 					current = current->next;
 				}
 			}

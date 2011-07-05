@@ -257,7 +257,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 	u8 *index_end;
 	ntfs_attr *ia_na;
 	int eo, rc;
-	u32 index_block_size, index_vcn_size;
+	u32 index_block_size;
 	u8 index_vcn_size_bits;
 
 	ntfs_log_trace("Entering\n");
@@ -378,10 +378,8 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 
 	/* Determine the size of a vcn in the directory index. */
 	if (vol->cluster_size <= index_block_size) {
-		index_vcn_size = vol->cluster_size;
 		index_vcn_size_bits = vol->cluster_size_bits;
 	} else {
-		index_vcn_size = vol->sector_size;
 		index_vcn_size_bits = vol->sector_size_bits;
 	}
 
@@ -1039,7 +1037,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	INDEX_ENTRY *ie;
 	INDEX_ALLOCATION *ia = NULL;
 	int rc, ir_pos, bmp_buf_size, bmp_buf_pos, eo;
-	u32 index_block_size, index_vcn_size;
+	u32 index_block_size;
 	u8 index_block_size_bits, index_vcn_size_bits;
 
 	ntfs_log_trace("Entering.\n");
@@ -1131,10 +1129,8 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	}
 	index_block_size_bits = ffs(index_block_size) - 1;
 	if (vol->cluster_size <= index_block_size) {
-		index_vcn_size = vol->cluster_size;
 		index_vcn_size_bits = vol->cluster_size_bits;
 	} else {
-		index_vcn_size = vol->sector_size;
 		index_vcn_size_bits = vol->sector_size_bits;
 	}
 
@@ -2511,15 +2507,11 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	char newname[MAX_DOS_NAME_LENGTH + 1];
 	ntfschar oldname[MAX_DOS_NAME_LENGTH];
 	int oldlen;
-	ntfs_volume *vol;
-	u64 fnum;
 	u64 dnum;
 	BOOL closed = FALSE;
 	ntfschar *shortname = NULL;
 	ntfschar longname[NTFS_MAX_NAME_LEN];
 
-	vol = ni->vol;
-	fnum = ni->mft_no;
 		/* convert the string to the NTFS wide chars */
 	if (size > MAX_DOS_NAME_LENGTH)
 		size = MAX_DOS_NAME_LENGTH;

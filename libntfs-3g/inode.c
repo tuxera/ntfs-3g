@@ -437,13 +437,12 @@ static int idata_cache_compare(const struct CACHED_GENERIC *cached,
 void ntfs_inode_invalidate(ntfs_volume *vol, const MFT_REF mref)
 {
 	struct CACHED_NIDATA item;
-	int count;
 
 	item.inum = MREF(mref);
 	item.ni = (ntfs_inode*)NULL;
 	item.pathname = (const char*)NULL;
 	item.varsize = 0;
-	count = ntfs_invalidate_cache(vol->nidata_cache,
+	ntfs_invalidate_cache(vol->nidata_cache,
 				GENERIC(&item),idata_cache_compare,CACHE_FREE);
 }
 

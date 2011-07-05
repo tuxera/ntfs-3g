@@ -1775,7 +1775,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 	} need_to = { 0, 0 };
 	BOOL wasnonresident = FALSE;
 	BOOL compressed;
-	BOOL sparse;
 	BOOL updatemap;
 
 	ntfs_log_enter("Entering for inode %lld, attr 0x%x, pos 0x%llx, count "
@@ -1861,7 +1860,6 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 				!= const_cpu_to_le16(0);
 		need_to.undo_data_size = 1;
 	}
-	sparse = (na->data_flags & ATTR_IS_SPARSE) != const_cpu_to_le16(0);
 		/*
 		 * For compressed data, a single full block was allocated
 		 * to deal with compression, possibly in a previous call.
@@ -2316,7 +2314,6 @@ int ntfs_attr_pclose(ntfs_attr *na)
 	ntfs_attr_search_ctx *ctx = NULL;
 	runlist_element *rl;
 	int eo;
-	s64 hole;
 	int compressed_part;
 	BOOL compressed;
 
@@ -2428,7 +2425,6 @@ int ntfs_attr_pclose(ntfs_attr *na)
 		goto rl_err_out;
 	}
 	if (rl->lcn < (LCN)0) {
-		hole = rl->vcn + rl->length;
 		if (rl->lcn != (LCN)LCN_HOLE) {
 			errno = EIO;
 			ntfs_log_perror("%s: Unexpected LCN (%lld)", 

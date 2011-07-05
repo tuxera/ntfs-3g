@@ -184,6 +184,9 @@
  *
  *  Apr 2011, version 1.3.20
  *     - fixed false memory leak detection
+ *
+ *  Jun 2011, version 1.3.21
+ *     - cleaned a few unneeded variables
  */
 
 /*
@@ -207,7 +210,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.20"
+#define AUDT_VERSION "1.3.21"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2024,14 +2027,15 @@ int linux_permissions(const char *attr, BOOL isdir)
 
 uid_t linux_owner(const char *attr)
 {
-	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const SID *usid;
 	uid_t uid;
 
-	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 #if OWNERFROMACL
 	usid = ntfs_acl_owner((const char*)attr);
 #else
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+
+	phead = (const SECURITY_DESCRIPTOR_RELATIVE*)attr;
 	usid = (const SID*)&attr[le32_to_cpu(phead->owner)];
 #endif
 #if defined(WIN32) | defined(STSC)
@@ -2400,7 +2404,6 @@ void showhex(FILE *fd)
 	int lth;
 	int first;
 	unsigned int pos;
-	unsigned char b;
 	u32 v;
 	int c;
 	int isdir;
@@ -2410,7 +2413,6 @@ void showhex(FILE *fd)
 	BOOL isdump;
 	BOOL done;
 
-	b = 0;
 	pos = 0;
 	off = 0;
 	done = FALSE;
@@ -2491,7 +2493,6 @@ void showhex(FILE *fd)
 BOOL applyattr(const char *fullname, const char *attr,
 			BOOL withattr, int attrib, s32 key)
 {
-	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	struct SECURITY_DATA *psecurdata;
 	const char *curattr;
 	char *newattr;
@@ -2549,7 +2550,6 @@ BOOL applyattr(const char *fullname, const char *attr,
        
 
 	if (curattr) {
-		phead = (const SECURITY_DESCRIPTOR_RELATIVE*)curattr;
 #ifdef WIN32
 			/* SACL currently not set, need some special privilege */
 		selection = OWNER_SECURITY_INFORMATION
@@ -2617,8 +2617,6 @@ BOOL restore(FILE *fd)
 	int lth;
 	int first;
 	unsigned int pos;
-	unsigned int size;
-	unsigned char b;
 	int c;
 	int isdir;
 	int mode;
@@ -2633,9 +2631,7 @@ BOOL restore(FILE *fd)
 	BOOL withattr;
 	BOOL done;
 
-	b = 0;
 	pos = 0;
-	size = 0;
 	off = 0;
 	done = FALSE;
 	withattr = FALSE;
@@ -2680,7 +2676,6 @@ BOOL restore(FILE *fd)
 				mode = linux_permissions(attr,isdir);
 				printf("Interpreted Unix mode 0%03o\n",mode);
 			}
-			size = pos;
 			pos = 0;
 		}
 		if (isdump && !off)
@@ -7096,13 +7091,14 @@ char *argv[];
 int main(int argc, char *argv[])
 {
 	FILE *fd;
-	unsigned int mode;
 	const char *p;
 	int xarg;
 	BOOL cmderr;
 	int i;
 #if POSIXACLS
 	struct POSIX_SECURITY *pxdesc;
+#else
+	unsigned int mode;
 #endif
 
 	printf("%s\n",BANNER);
@@ -7171,7 +7167,6 @@ int main(int argc, char *argv[])
 					cmderr = listfiles(argv[xarg],argv[xarg+1]);
 			break;
 		case 3 :
-			mode = 0;
 			p = argv[xarg+1];
 #if POSIXACLS
 			pxdesc = encode_posix_acl(p);
@@ -7202,6 +7197,7 @@ int main(int argc, char *argv[])
 			} else
 				cmderr = TRUE;
 #else
+			mode = 0;
 			while ((*p >= '0') && (*p <= '7'))
 				mode = (mode << 3) + (*p++) - '0';
 			if (*p) {

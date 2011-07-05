@@ -1623,7 +1623,7 @@ errno_set:
 int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 {
 	runlist *rl;
-	BOOL is_end = FALSE;
+	/* BOOL is_end = FALSE; */
 
 	if (!arl || !*arl) {
 		errno = EINVAL;
@@ -1666,8 +1666,10 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	 */
 	if (rl->length) {
 		++rl;
+/*
 		if (!rl->length)
 			is_end = TRUE;
+*/
 		rl->vcn = start_vcn;
 		rl->length = 0;
 	}

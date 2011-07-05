@@ -1190,7 +1190,7 @@ undo_alloc:
 static int ntfs_mft_record_init(ntfs_volume *vol, s64 size)
 {
 	int ret = -1;
-	ntfs_attr *mft_na, *mftbmp_na;
+	ntfs_attr *mft_na;
 	s64 old_data_initialized, old_data_size;
 	ntfs_attr_search_ctx *ctx;
 	
@@ -1199,7 +1199,6 @@ static int ntfs_mft_record_init(ntfs_volume *vol, s64 size)
 	/* NOTE: Caller must sanity check vol, vol->mft_na and vol->mftbmp_na */
 	
 	mft_na = vol->mft_na;
-	mftbmp_na = vol->mftbmp_na;
 	
 	/*
 	 * The mft record is outside the initialized data. Extend the mft data
@@ -1295,14 +1294,13 @@ undo_data_init:
 static int ntfs_mft_rec_init(ntfs_volume *vol, s64 size)
 {
 	int ret = -1;
-	ntfs_attr *mft_na, *mftbmp_na;
+	ntfs_attr *mft_na;
 	s64 old_data_initialized, old_data_size;
 	ntfs_attr_search_ctx *ctx;
 	
 	ntfs_log_enter("Entering\n");
 	
 	mft_na = vol->mft_na;
-	mftbmp_na = vol->mftbmp_na;
 	
 	if (size > mft_na->allocated_size || size > mft_na->initialized_size) {
 		errno = EIO;

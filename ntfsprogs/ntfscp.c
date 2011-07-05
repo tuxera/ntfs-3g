@@ -393,11 +393,9 @@ int main(int argc, char *argv[])
 		char *filename;
 		ntfs_inode *dir_ni;
 		ntfs_inode *ni;
-		int dest_path_len;
 		char *dirname_last_whack;
 
 		filename = basename(opts.dest_file);
-		dest_path_len = strlen(opts.dest_file);
 		parent_dirname = strdup(opts.dest_file);
 		if (!parent_dirname) {
 			ntfs_log_perror("strdup() failed");

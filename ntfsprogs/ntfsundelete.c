@@ -115,7 +115,6 @@ static long	nr_entries;			/* Number of range entries */
 static int parse_inode_arg(void)
 {
 	int p;
-	u32 imax;
 	u32 range_begin;
 	u32 range_end;
 	u32 range_temp;
@@ -132,7 +131,6 @@ static int parse_inode_arg(void)
 
 	/* init variables */
 	p = strlen(optarg);
-	imax = p;
 	opt_arg_ptr = optarg;
 	opt_arg_end1 = optarg;
 	opt_arg_end2 = &(optarg[p]);
@@ -1279,7 +1277,6 @@ static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 static void dump_record(struct ufile *file)
 {
 	char buffer[20];
-	const char *name;
 	struct list_head *item;
 	int i;
 
@@ -1296,11 +1293,6 @@ static void dump_record(struct ufile *file)
 
 	list_for_each(item, &file->name) {
 		struct filename *f = list_entry(item, struct filename, list);
-
-		if (f->name)
-			name = f->name;
-		else
-			name = NONE;
 
 		ntfs_log_quiet("Filename: (%d) %s\n", f->name_space, f->name);
 		ntfs_log_quiet("File Flags: ");
