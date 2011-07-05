@@ -767,11 +767,11 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	errno = 0;
 	res = -1;
 	dev_open = FALSE;
+	full_bs = (char*)NULL;
 	if (!dev || !dev->d_ops || !dev->d_name) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: dev = %p", __FUNCTION__, dev);
 		vol = (ntfs_volume*)NULL;
-		bs = (NTFS_BOOT_SECTOR*)NULL;
 		goto error_exit;
 	}
 
@@ -849,7 +849,7 @@ error_exit:
 		}
 	}
 	eo = errno;
-	free(bs);
+	free(full_bs);
 	if (vol) {
 		free(vol->upcase);
 		free(vol);
