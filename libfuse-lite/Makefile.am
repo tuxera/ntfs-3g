@@ -26,3 +26,5 @@ libfuse_lite_la_SOURCES =	\
 	mount.c 		\
 	mount_util.c 		\
 	mount_util.h
+
+libs:	libfuse-lite.la

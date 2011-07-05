@@ -52,6 +52,12 @@ Below are a few specific options to ./configure :
 	--enable-xattr-mappings : enable system extended attributes mappings
 	--with-fuse=external : use external fuse (overriding Linux default)
 
+There are also a few make targets for building parts :
+	make libntfs : only build the libntfs-3g library
+	make libs : only build libntfs-3g (and libfuse-lite, if relevant)
+	make drivers : only build drivers and libraries, without ntfsprogs
+	make ntfsprogs : only build ntfsprogs and libntfs-3g, without drivers
+
 Non-Linux: Please see 
 
 	http://www.tuxera.com/community/ntfs-3g-download/
