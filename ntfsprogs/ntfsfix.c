@@ -770,6 +770,8 @@ static int fix_startup(struct ntfs_device *dev, unsigned long flags)
 	if (!dev || !dev->d_ops || !dev->d_name) {
 		errno = EINVAL;
 		ntfs_log_perror("%s: dev = %p", __FUNCTION__, dev);
+		vol = (ntfs_volume*)NULL;
+		bs = (NTFS_BOOT_SECTOR*)NULL;
 		goto error_exit;
 	}
 
