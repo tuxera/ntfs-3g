@@ -33,6 +33,10 @@ if ENABLE_CRYPTO
 EXTRA_PROGRAMS		+= ntfsdecrypt
 endif
 
+if ENABLE_EXTRAS
+bin_PROGRAMS		+= $(EXTRA_PROGRAMS)
+endif
+
 # Set the include path.
 AM_CPPFLAGS		= -I$(top_srcdir)/include/ntfs-3g $(all_includes)
 

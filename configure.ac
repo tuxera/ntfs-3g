@@ -143,6 +143,14 @@ AC_ARG_ENABLE(crypto,
 )
 
 AC_ARG_ENABLE(
+	[extras],
+	[AS_HELP_STRING([--enable-extras],[enable extra ntfsprogs utilities
+		       (default=no)])],
+	,
+	[enable_extras="no"]
+)
+
+AC_ARG_ENABLE(
 	[nfconv],
 	[AS_HELP_STRING([--disable-nfconv],[disable the 'nfconv' patch, which adds support for Unicode normalization form conversion when built on Mac OS X @<:@default=enabled for Mac OS X@:>@])],
 	[enable_nfconv="no"],
@@ -493,6 +501,7 @@ AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
 AM_CONDITIONAL([ENABLE_MOUNT_HELPER], [test "${enable_mount_helper}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" = "yes"])
+AM_CONDITIONAL([ENABLE_EXTRAS], [test "${enable_extras}" = "yes"])
 
 # workaround for <autoconf-2.60
 if test -z "${docdir}"; then
