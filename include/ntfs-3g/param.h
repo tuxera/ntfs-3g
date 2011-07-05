@@ -51,6 +51,19 @@ enum {
 #define MAX_COMPRESSION_CLUSTER_SIZE 4096
 
 /*
+ *		Use of big write buffers
+ *
+ *	With small volumes, the cluster allocator may fail to allocate
+ *	enough clusters when the volume is nearly full. At most a run
+ *	can be allocated per bitmap chunk. So, there is a danger when the
+ *	number of chunks (capacity/(32768*clsiz)) is less than the number
+ *	of clusters in the biggest write buffer (131072/clsiz). Hence
+ *	a safe minimal capacity is 4GB
+ */
+
+#define SAFE_CAPACITY_FOR_BIG_WRITES 0x100000000LL
+
+/*
  *		Parameters for runlists
  */
 

@@ -73,6 +73,7 @@ enum {
 	OPT_NORECOVER,
 	OPT_REMOVE_HIBERFILE,
 	OPT_SYNC,
+	OPT_BIG_WRITES,
 	OPT_LOCALE,
 	OPT_NFCONV,
 	OPT_NONFCONV,
@@ -127,6 +128,7 @@ typedef struct {
 	BOOL recover;
 	BOOL hiberfile;
 	BOOL sync;
+	BOOL big_writes;
 	BOOL debug;
 	BOOL no_detach;
 	BOOL blkdev;

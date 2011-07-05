@@ -43,6 +43,8 @@ extern "C" {
 #define FUSE_CAP_DONT_MASK	(1 << 6)
 #endif
 
+#define FUSE_CAP_BIG_WRITES	(1 << 5)
+
 /**
  * Information about open files
  *
@@ -116,19 +118,12 @@ struct fuse_conn_info {
 	 */
 	unsigned max_readahead;
 
-#ifdef POSIXACLS
 	unsigned capable;
 	unsigned want;
 	/**
 	 * For future use.
 	 */
 	unsigned reserved[25];
-#else
-	/**
-	 * For future use.
-	 */
-	unsigned reserved[27];
-#endif
     };
 
 struct fuse_session;

@@ -99,6 +99,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "norecover", OPT_NORECOVER, FLGOPT_BOGUS },
 	{ "remove_hiberfile", OPT_REMOVE_HIBERFILE, FLGOPT_BOGUS },
 	{ "sync", OPT_SYNC, FLGOPT_BOGUS | FLGOPT_APPEND },
+	{ "big_writes", OPT_BIG_WRITES, FLGOPT_BOGUS },
 	{ "locale", OPT_LOCALE, FLGOPT_STRING },
 	{ "nfconv", OPT_NFCONV, FLGOPT_BOGUS },
 	{ "nonfconv", OPT_NONFCONV, FLGOPT_BOGUS },
@@ -314,6 +315,11 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			case OPT_SYNC :
 				ctx->sync = TRUE;
 				break;
+#ifdef FUSE_CAP_BIG_WRITES
+			case OPT_BIG_WRITES :
+				ctx->big_writes = TRUE;
+				break;
+#endif
 			case OPT_LOCALE :
 				ntfs_set_char_encoding(val);
 				break;

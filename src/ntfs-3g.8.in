@@ -284,6 +284,11 @@ This option disables creating new transparently compressed files in directories
 marked for compression. Existing compressed files can still be read and
 updated. Currently this is the default option.
 .TP
+.B big_writes
+This option prevents fuse from splitting write buffers into 4K chunks,
+enabling big write buffers to be transferred from the application in a
+single step (up to some system limit, generally 128K bytes).
+.TP
 .B debug
 Makes ntfs-3g to print a lot of debug output from libntfs-3g and FUSE.
 .TP

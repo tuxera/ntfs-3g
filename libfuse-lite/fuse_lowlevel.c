@@ -1043,6 +1043,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	if (arg->flags & FUSE_DONT_MASK)
 	    f->conn.capable |= FUSE_CAP_DONT_MASK;
 #endif
+	if (arg->flags & FUSE_BIG_WRITES)
+	    f->conn.capable |= FUSE_CAP_BIG_WRITES;
     } else {
         f->conn.async_read = 0;
         f->conn.max_readahead = 0;
@@ -1087,6 +1089,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
     if (f->conn.want & FUSE_CAP_DONT_MASK)
 	outarg.flags |= FUSE_DONT_MASK;
 #endif
+    if (f->conn.want & FUSE_CAP_BIG_WRITES)
+	outarg.flags |= FUSE_BIG_WRITES;
     outarg.max_readahead = f->conn.max_readahead;
     outarg.max_write = f->conn.max_write;
 
