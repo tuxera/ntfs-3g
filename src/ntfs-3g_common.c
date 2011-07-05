@@ -189,7 +189,6 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 	ctx->efs_raw = FALSE;
 #endif /* HAVE_SETXATTR */
 	ctx->compression = DEFAULT_COMPRESSION;
-	ctx->atime = ATIME_ENABLED;
 	options = strdup(orig_opts ? orig_opts : "");
 	if (!options) {
 		ntfs_log_perror("%s: strdup failed", EXEC_NAME);
