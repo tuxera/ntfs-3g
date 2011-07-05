@@ -1406,16 +1406,18 @@ BOOL ntfs_collapsible_chars(ntfs_volume *vol,
 {
 	BOOL collapsible;
 	unsigned int ch;
+	unsigned int cs;
 	int i;
 
 	collapsible = shortlen == longlen;
-	if (collapsible)
-		for (i=0; i<shortlen; i++) {
-			ch = le16_to_cpu(longname[i]);
-			if ((ch >= vol->upcase_len)
-		   	 || ((shortname[i] != longname[i])
-				&& (shortname[i] != vol->upcase[ch])))
-					collapsible = FALSE;
+	for (i=0; collapsible && (i<shortlen); i++) {
+		ch = le16_to_cpu(longname[i]);
+		cs = le16_to_cpu(shortname[i]);
+		if ((cs != ch)
+		    && ((ch >= vol->upcase_len)
+			|| (cs >= vol->upcase_len)
+			|| (vol->upcase[cs] != vol->upcase[ch])))
+				collapsible = FALSE;
 	}
 	return (collapsible);
 }
