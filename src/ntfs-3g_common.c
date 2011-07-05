@@ -58,8 +58,6 @@ const int nf_ns_trusted_prefix_len = sizeof(nf_ns_trusted_prefix) - 1;
 
 static const char nf_ns_alt_xattr_efsinfo[] = "user.ntfs.efsinfo";
 
-#ifdef HAVE_SETXATTR
-
 static const char def_opts[] = "allow_other,nonempty,";
 
 	/*
@@ -566,6 +564,8 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 
 	return 0;
 }
+
+#ifdef HAVE_SETXATTR
 
 int ntfs_fuse_listxattr_common(ntfs_inode *ni, ntfs_attr_search_ctx *actx,
 			char *list, size_t size, BOOL prefixing)
