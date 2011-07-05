@@ -497,7 +497,8 @@ static s64 wipe_compressed_attribute(ntfs_volume *vol, int byte,
 		if (size < 0) {
 			ntfs_log_verbose("Internal error\n");
 			ntfs_log_error("bug or damaged fs: we want "
-				"allocate buffer size %lld bytes", size);
+				"allocate buffer size %lld bytes",
+				(long long)size);
 			return -1;
 		}
 
@@ -511,7 +512,8 @@ static s64 wipe_compressed_attribute(ntfs_volume *vol, int byte,
 		if (!buf) {
 			ntfs_log_verbose("Not enough memory\n");
 			ntfs_log_error("Not enough memory to allocate "
-							"%lld bytes", size);
+							"%lld bytes",
+							(long long)size);
 			return -1;
 		}
 		memset(buf, byte, size);
@@ -521,7 +523,9 @@ static s64 wipe_compressed_attribute(ntfs_volume *vol, int byte,
 		if (ret != size) {
 			ntfs_log_verbose("Internal error\n");
 			ntfs_log_error("ntfs_rl_pwrite failed, offset %llu, "
-				"size %lld, vcn %lld",	offset, size, rlc->vcn);
+				"size %lld, vcn %lld",
+				(unsigned long long)offset,
+				(long long)size, (long long)rlc->vcn);
 			return -1;
 		}
 		wiped += ret;
@@ -563,7 +567,8 @@ static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 	buf = malloc(size);
 	if (!buf) {
 		ntfs_log_verbose("Not enough memory\n");
-		ntfs_log_error("Not enough memory to allocate %lld bytes", size);
+		ntfs_log_error("Not enough memory to allocate %lld bytes",
+					(long long)size);
 		return -1;
 	}
 	memset(buf, byte, size);
@@ -607,7 +612,7 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 	for (inode_num = 16; inode_num < nr_mft_records; inode_num++) {
 		s64 wiped;
 
-		ntfs_log_verbose("Inode %lld - ", inode_num);
+		ntfs_log_verbose("Inode %lld - ", (long long)inode_num);
 		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
 			ntfs_log_verbose("Could not open inode\n");
@@ -632,7 +637,8 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 
 		if (ntfs_attr_map_whole_runlist(na)) {
 			ntfs_log_verbose("Internal error\n");
-			ntfs_log_error("Can't map runlist (inode %lld)\n", inode_num);
+			ntfs_log_error("Can't map runlist (inode %lld)\n",
+					(long long)inode_num);
 			goto close_attr;
 		}
 
@@ -642,12 +648,13 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 			wiped = wipe_attribute(vol, byte, act, na);
 
 		if (wiped == -1) {
-			ntfs_log_error(" (inode %lld)\n", inode_num);
+			ntfs_log_error(" (inode %lld)\n", (long long)inode_num);
 			goto close_attr;
 		}
 
 		if (wiped) {
-			ntfs_log_verbose("Wiped %llu bytes\n", wiped);
+			ntfs_log_verbose("Wiped %llu bytes\n",
+					(unsigned long long)wiped);
 			total += wiped;
 		} else
 			ntfs_log_verbose("Nothing to wipe\n");
@@ -656,7 +663,8 @@ close_attr:
 close_inode:
 		ntfs_inode_close(ni);
 	}
-	ntfs_log_quiet("wipe_tails 0x%02x, %lld bytes\n", byte, total);
+	ntfs_log_quiet("wipe_tails 0x%02x, %lld bytes\n", byte,
+				(long long)total);
 	return total;
 }
 
@@ -826,7 +834,8 @@ static s64 wipe_index_allocation(ntfs_volume *vol, int byte, enum action act
 	bitmap = malloc(nab->data_size);
 	if (!bitmap) {
 		ntfs_log_verbose("malloc failed\n");
-		ntfs_log_error("Couldn't allocate %lld bytes", nab->data_size);
+		ntfs_log_error("Couldn't allocate %lld bytes",
+				(long long)nab->data_size);
 		return -1;
 	}
 
@@ -972,7 +981,7 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 		u32 indx_record_size;
 		s64 wiped;
 
-		ntfs_log_verbose("Inode %lld - ", inode_num);
+		ntfs_log_verbose("Inode %lld - ", (long long)inode_num);
 		ni = ntfs_inode_open(vol, inode_num);
 		if (!ni) {
 			if (opts.verbose > 2)
@@ -1002,14 +1011,14 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 		if (!NAttrNonResident(naa)) {
 			ntfs_log_verbose("Resident $INDEX_ALLOCATION\n");
 			ntfs_log_error("damaged fs: Resident $INDEX_ALLOCATION "
-					"(inode %lld)\n", inode_num);
+					"(inode %lld)\n", (long long)inode_num);
 			goto close_attr_allocation;
 		}
 
 		if (ntfs_attr_map_whole_runlist(naa)) {
 			ntfs_log_verbose("Internal error\n");
 			ntfs_log_error("Can't map runlist for $INDEX_ALLOCATION "
-					"(inode %lld)\n", inode_num);
+					"(inode %lld)\n", (long long)inode_num);
 			goto close_attr_allocation;
 		}
 
@@ -1018,7 +1027,7 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 			ntfs_log_verbose("Couldn't open $BITMAP\n");
 			ntfs_log_error("damaged fs: $INDEX_ALLOCATION is present, "
 					"but we can't open $BITMAP with same "
-					"name (inode %lld)\n", inode_num);
+					"name (inode %lld)\n", (long long)inode_num);
 			goto close_attr_allocation;
 		}
 
@@ -1027,32 +1036,34 @@ static s64 wipe_directory(ntfs_volume *vol, int byte, enum action act)
 			ntfs_log_verbose("Couldn't open $INDEX_ROOT\n");
 			ntfs_log_error("damaged fs: $INDEX_ALLOCATION is present, but "
 					"we can't open $INDEX_ROOT with same name"
-					" (inode %lld)\n", inode_num);
+					" (inode %lld)\n", (long long)inode_num);
 			goto close_attr_bitmap;
 		}
 
 		if (NAttrNonResident(nar)) {
 			ntfs_log_verbose("Not resident $INDEX_ROOT\n");
 			ntfs_log_error("damaged fs: Not resident $INDEX_ROOT "
-					"(inode %lld)\n", inode_num);
+					"(inode %lld)\n", (long long)inode_num);
 			goto close_attr_root;
 		}
 
 		indx_record_size = get_indx_record_size(nar);
 		if (!indx_record_size) {
-			ntfs_log_error(" (inode %lld)\n", inode_num);
+			ntfs_log_error(" (inode %lld)\n", (long long)inode_num);
 			goto close_attr_root;
 		}
 
 		wiped = wipe_index_allocation(vol, byte, act,
 						naa, nab, indx_record_size);
 		if (wiped == -1) {
-			ntfs_log_error(" (inode %lld)\n", inode_num);
+			ntfs_log_error(" (inode %lld)\n",
+					(long long)inode_num);
 			goto close_attr_root;
 		}
 
 		if (wiped) {
-			ntfs_log_verbose("Wiped %llu bytes\n", wiped);
+			ntfs_log_verbose("Wiped %llu bytes\n",
+					(unsigned long long)wiped);
 			total += wiped;
 		} else
 			ntfs_log_verbose("Nothing to wipe\n");
@@ -1066,7 +1077,8 @@ close_inode:
 		ntfs_inode_close(ni);
 	}
 
-	ntfs_log_quiet("wipe_directory 0x%02x, %lld bytes\n", byte, total);
+	ntfs_log_quiet("wipe_directory 0x%02x, %lld bytes\n", byte,
+			(long long)total);
 	return total;
 }
 
@@ -1166,7 +1178,8 @@ static s64 wipe_logfile(ntfs_volume *vol, int byte, enum action act
 
 	ntfs_attr_close(na);
 	ntfs_inode_close(ni);
-	ntfs_log_quiet("wipe_logfile 0x%02x, %lld bytes\n", byte, pos);
+	ntfs_log_quiet("wipe_logfile 0x%02x, %lld bytes\n", byte,
+			(long long)pos);
 	return pos;
 
 io_error_exit:
@@ -1256,7 +1269,8 @@ static s64 wipe_pagefile(ntfs_volume *vol, int byte, enum action act
 
 	ntfs_attr_close(na);
 	ntfs_inode_close(ni);
-	ntfs_log_quiet("wipe_pagefile 0x%02x, %lld bytes\n", byte, pos);
+	ntfs_log_quiet("wipe_pagefile 0x%02x, %lld bytes\n", byte,
+			(long long)pos);
 	return pos;
 
 io_error_exit:

@@ -144,7 +144,7 @@ static int assert_u32_equal(u32 val, u32 ok, const char *name)
 {
 	if (val!=ok) {
 		check_failed("Assertion failed for '%lld:%s'. should be 0x%x, "
-			"was 0x%x.\n", current_mft_record, name,
+			"was 0x%x.\n", (long long)current_mft_record, name,
 			(int)ok, (int)val);
 		//errors++;
 		return 1;
@@ -156,7 +156,8 @@ static int assert_u32_noteq(u32 val, u32 wrong, const char *name)
 {
 	if (val==wrong) {
 		check_failed("Assertion failed for '%lld:%s'. should not be "
-			"0x%x.\n", current_mft_record, name, (int)wrong);
+			"0x%x.\n", (long long)current_mft_record, name,
+			(int)wrong);
 		return 1;
 	}
 	return 0;
@@ -262,7 +263,9 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 
 	if (ntfs_pread(dev, offset_to_file_record, size_of_file_record, buf) !=
 			size_of_file_record) {
-		check_failed("Failed to read file record at offset %lld (0x%llx).\n", offset_to_file_record, offset_to_file_record);
+		check_failed("Failed to read file record at offset %lld (0x%llx).\n",
+					(long long)offset_to_file_record,
+					(long long)offset_to_file_record);
 		return NULL;
 	}
 
@@ -279,7 +282,9 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 		//printf("Attr type: 0x%x.\n", attr_rec->type);
 		// Check attribute record. (Only what is in the buffer)
 		if (attr_rec->type==AT_END) {
-			check_failed("Attribute 0x%x not found in file record at offset %lld (0x%llx).\n", (int)le32_to_cpu(attr_rec->type), offset_to_file_record, offset_to_file_record);
+			check_failed("Attribute 0x%x not found in file record at offset %lld (0x%llx).\n", (int)le32_to_cpu(attr_rec->type),
+					(long long)offset_to_file_record,
+					(long long)offset_to_file_record);
 			return NULL;
 		}
 		if ((u8*)attr_rec>buf+size_of_file_record-8) {
@@ -295,7 +300,9 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 		// Check that this attribute does not overflow the mft_record
 		if ((u8*)attr_rec+length >= buf+size_of_file_record) {
 			check_failed("Attribute (0x%x) is larger than FILE record at offset %lld (0x%llx).\n",
-					(int)le32_to_cpu(attr_rec->type), offset_to_file_record, offset_to_file_record);
+					(int)le32_to_cpu(attr_rec->type),
+					(long long)offset_to_file_record,
+					(long long)offset_to_file_record);
 			return NULL;
 		}
 		// todo: what ATTRIBUTE_LIST (0x20)?
@@ -313,7 +320,9 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 		attr_rec = (ATTR_RECORD*)((u8*)attr_rec+length);
 	}
 	// If we got here, there was an overflow.
-	check_failed("file record corrupted at offset %lld (0x%llx).\n", offset_to_file_record, offset_to_file_record);
+	check_failed("file record corrupted at offset %lld (0x%llx).\n",
+			(long long)offset_to_file_record,
+			(long long)offset_to_file_record);
 	return NULL;
 }
 
@@ -330,8 +339,8 @@ static VCN get_last_vcn(runlist *rl)
 
 	res = LCN_EINVAL;
 	while (rl->length) {
-		ntfs_log_verbose("vcn: %lld, length: %lld.\n", rl->vcn,
-				rl->length);
+		ntfs_log_verbose("vcn: %lld, length: %lld.\n",
+				(long long)rl->vcn, (long long)rl->length);
 		if (rl->vcn<0)
 			res = rl->vcn;
 		else
@@ -419,7 +428,7 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 	// Check that this attribute does not overflow the mft_record
 	if ((u8*)attr_rec+length >= ((u8*)mft_rec)+buflen) {
 		check_failed("Attribute (0x%x) is larger than FILE record (%lld).\n",
-				(int)attr_type, current_mft_record);
+				(int)attr_type, (long long)current_mft_record);
 		return NULL;
 	}
 
@@ -432,7 +441,8 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 
 	if (length<24) {
 		check_failed("Attribute %lld:0x%x Length too short (%u).\n",
-			current_mft_record, (int)attr_type, (int)length);
+			(long long)current_mft_record, (int)attr_type,
+			(int)length);
 		goto check_attr_record_next_attr;
 	}
 
@@ -461,13 +471,13 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 	// Check flags.
 	if (attr_rec->flags & ~(const_cpu_to_le16(0xc0ff))) {
 		check_failed("Attribute %lld:0x%x Unknown flags (0x%x).\n",
-			current_mft_record, (int)attr_type,
+			(long long)current_mft_record, (int)attr_type,
 			(int)le16_to_cpu(attr_rec->flags));
 	}
 
 	if (attr_rec->non_resident>1) {
 		check_failed("Attribute %lld:0x%x Unknown non-resident "
-			"flag (0x%x).\n", current_mft_record,
+			"flag (0x%x).\n", (long long)current_mft_record,
 			(int)attr_type, (int)attr_rec->non_resident);
 		goto check_attr_record_next_attr;
 	}
@@ -487,12 +497,14 @@ static ATTR_REC *check_attr_record(ATTR_REC *attr_rec, MFT_RECORD *mft_rec,
 		// Make sure all the fields exist.
 		if (length<64) {
 			check_failed("Non-resident attribute %lld:0x%x too short (%u).\n",
-				current_mft_record, (int)attr_type, (int)length);
+				(long long)current_mft_record, (int)attr_type,
+				(int)length);
 			goto check_attr_record_next_attr;
 		}
 		if (attr_rec->compression_unit && (length<72)) {
 			check_failed("Compressed attribute %lld:0x%x too short (%u).\n",
-				current_mft_record, (int)attr_type, (int)length);
+				(long long)current_mft_record, (int)attr_type,
+				(int)length);
 			goto check_attr_record_next_attr;
 		}
 
@@ -663,9 +675,11 @@ static void verify_mft_record(ntfs_volume *vol, s64 mft_num)
 
 	is_used = mft_bitmap_get_bit(mft_num);
 	if (is_used<0) {
-		ntfs_log_error("Error getting bit value for record %lld.\n", mft_num);
+		ntfs_log_error("Error getting bit value for record %lld.\n",
+			(long long)mft_num);
 	} else if (!is_used) {
-		ntfs_log_verbose("Record %lld unused. Skipping.\n", mft_num);
+		ntfs_log_verbose("Record %lld unused. Skipping.\n",
+				(long long)mft_num);
 		return;
 	}
 
@@ -673,9 +687,9 @@ static void verify_mft_record(ntfs_volume *vol, s64 mft_num)
 	if (!buffer)
 		goto verify_mft_record_error;
 
-	ntfs_log_verbose("MFT record %lld\n", mft_num);
+	ntfs_log_verbose("MFT record %lld\n", (long long)mft_num);
 	if (ntfs_attr_pread(vol->mft_na, mft_num*vol->mft_record_size, vol->mft_record_size, buffer) < 0) {
-		ntfs_log_perror("Couldn't read $MFT record %lld", mft_num);
+		ntfs_log_perror("Couldn't read $MFT record %lld", (long long)mft_num);
 		goto verify_mft_record_error;
 	}
 	
@@ -758,7 +772,7 @@ static void check_volume(ntfs_volume *vol)
 	// For each mft record, verify that it contains a valid file record.
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
-	ntfs_log_info("Checking %lld MFT records.\n", nr_mft_records);
+	ntfs_log_info("Checking %lld MFT records.\n", (long long)nr_mft_records);
 
 	for (mft_num=0; mft_num < nr_mft_records; mft_num++) {
 	 	verify_mft_record(vol, mft_num);

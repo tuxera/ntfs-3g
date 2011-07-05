@@ -446,7 +446,8 @@ done:
 	if (res) {
 		for (i = 0; i < size; i++) {
 			if (utils_cluster_in_use(vol, res->lcn + i)) {
-				ntfs_log_info("ERROR cluster %lld in use\n", res->lcn + i);
+				ntfs_log_info("ERROR cluster %lld in use\n",
+				(long long)res->lcn + i);
 			}
 		}
 	} else {
@@ -573,7 +574,7 @@ static int data_copy(ntfs_volume *vol, runlist_element *from, runlist_element *t
 		res = ntfs_pwrite(vol->dev, (to->lcn+i) * vol->cluster_size,
 				vol->cluster_size, buffer);
 		if (res != vol->cluster_size) {
-			ntfs_log_error("!write %lld\n", res);
+			ntfs_log_error("!write %lld\n", (long long)res);
 			res = -1;
 			break;
 		}
@@ -686,8 +687,9 @@ static s64 move_datarun(ntfs_volume *vol, ntfs_inode *ino, ATTR_RECORD *rec,
 		return -1;
 	}
 
-	ntfs_log_info("move %lld,%lld,%lld to %lld,%lld,%lld\n", run->vcn,
-		run->lcn, run->length, to->vcn, to->lcn, to->length);
+	ntfs_log_info("move %lld,%lld,%lld to %lld,%lld,%lld\n",
+		(long long)run->vcn, (long long)run->lcn, (long long)run->length,
+		(long long)to->vcn, (long long)to->lcn, (long long)to->length);
 
 	need_from = ntfs_get_size_for_mapping_pairs(vol, from, 0, INT_MAX);
 	ntfs_log_info("orig data run = %d bytes\n", need_from);
@@ -905,7 +907,7 @@ int main(int argc, char *argv[])
 				"flag (%d (%s))!\n", errno, strerror(errno));
 		}
 
-		ntfs_log_info("Relocated %lld bytes\n", count);
+		ntfs_log_info("Relocated %lld bytes\n", (long long)count);
 	}
 	if (count >= 0)
 		result = 0;
