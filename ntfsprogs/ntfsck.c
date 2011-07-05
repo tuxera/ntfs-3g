@@ -208,7 +208,7 @@ static BOOL verify_boot_sector(struct ntfs_device *dev)
 			(buf[2]!=0x90)) {
 		check_failed("Boot sector: Bad jump.\n");
 	}
-	if (ntfs_boot->oem_id != NTFS_SB_MAGIC) {
+	if (ntfs_boot->oem_id != magicNTFS) {
 		check_failed("Boot sector: Bad NTFS magic.\n");
 	}
 	bytes_per_sector = le16_to_cpu(ntfs_boot->bpb.bytes_per_sector);
