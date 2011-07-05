@@ -224,8 +224,8 @@ static BOOL verify_boot_sector(struct ntfs_device *dev)
 	// todo: if partition, query bios and match heads/tracks? */
 
 	// Initialize some values from vol. We will need those later.
-	ntfs_boot_sector_parse(&vol, (NTFS_BOOT_SECTOR *)buf);
 	vol.dev = dev;
+	ntfs_boot_sector_parse(&vol, (NTFS_BOOT_SECTOR *)buf);
 
 	return 0;
 }
