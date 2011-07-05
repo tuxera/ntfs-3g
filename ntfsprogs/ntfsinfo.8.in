@@ -85,11 +85,5 @@ package and is available from:
 .nh
 http://www.tuxera.com/community/
 .hy
-.sp
-The manual pages are available online at:
-.br
-.nh
-http://man.linux-ntfs.org/
-.hy
 .SH SEE ALSO
 .BR ntfsprogs (8)

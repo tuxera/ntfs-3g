@@ -62,12 +62,7 @@ The ntfsclone utility guarantees to make an exact copy of NTFS but it
 won't deal with booting issues. This is by design: ntfsclone is a 
 filesystem, not system utility. Its aim is only NTFS cloning, not Windows 
 cloning. Hereby ntfsclone can be used as a very fast and reliable 
-build block for Windows cloning but itself it's not enough. You 
-can find useful tips following the related links on the below page
-.br
-.nh
-http://wiki.linux-ntfs.org/doku.php?id=ntfsclone
-.hy
+build block for Windows cloning but itself it's not enough.
 .SS Sparse Files
 A file is sparse if it has unallocated blocks (holes). The reported size of
 such files are always higher than the disk space consumed by them.  The
@@ -351,18 +346,6 @@ package and is available at:
 .br
 .nh
 http://www.tuxera.com/community/
-.hy
-.sp
-The latest manual pages are available at:
-.br
-.nh
-http://man.linux-ntfs.org/
-.hy
-.sp
-Additional up-to-date information can be found furthermore at:
-.br
-.nh
-http://wiki.linux-ntfs.org/doku.php?id=ntfsclone
 .hy
 .SH SEE ALSO
 .BR ntfsresize (8)

@@ -99,23 +99,13 @@ It was ported to ntfs-3g by Erik Larsson.
 .SH DEDICATION
 With love to Marina Sapego.
 .SH AVAILABILITY
-<<<<<<< HEAD
 .B ntfscp
 is part of the
 .B ntfs-3g
 package and is available from:
-=======
-\fBntfscp\fR is part of the \fBntfsprogs\fR package and is available from:
->>>>>>> linux-ntfs/libntfs-3g_port-v2_0_0
 .br
 .nh
 http://www.tuxera.com/community/
-.hy
-.sp
-The manual pages are available online at:
-.br
-.nh
-http://man.linux-ntfs.org/
 .hy
 .SH SEE ALSO
 .BR ntfsprogs (8)

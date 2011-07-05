@@ -64,12 +64,6 @@ package which can be downloaded from:
 .nh
 http://www.tuxera.com/community/
 .hy
-.sp
-These manual pages can be viewed online at:
-.br
-.nh
-http://man.linux-ntfs.org/
-.hy
 .SH SEE ALSO
 .BR ntfs\-3g (8)
 
