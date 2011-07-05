@@ -5,6 +5,7 @@
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
  * Copyright (c) 2007      Yura Pakhuchiy
+ * Copyright (c) 2011      Jean-Pierre Andre
  *
  * This utility will resize an NTFS volume without data loss.
  *
@@ -71,6 +72,7 @@
 /* #include "version.h" */
 #include "misc.h"
 
+#define BAN_NEW_TEXT 1	/* Respect the ban on new messages */
 #define CLEAN_EXIT 0	/* traditionnally volume is not closed, there must be a reason */
 
 static const char *EXEC_NAME = "ntfsresize";
@@ -169,6 +171,18 @@ struct llcn_t {
 
 #define NTFSCK_PROGBAR		0x0001
 
+			/* runlists which have to be processed later */
+struct DELAYED {
+	struct DELAYED *next;
+	ATTR_TYPES type;
+	MFT_REF mref;
+	VCN lowest_vcn;
+	int name_len;
+	ntfschar *attr_name;
+	runlist_element *rl;
+	runlist *head_rl;
+} ;
+
 typedef struct {
 	ntfs_inode *ni;		     /* inode being processed */
 	ntfs_attr_search_ctx *ctx;   /* inode attribute being processed */
@@ -195,6 +209,7 @@ typedef struct {
 	int shrink;		     /* shrink = 1, enlarge = 0 */
 	s64 badclusters;	     /* num of physically dead clusters */
 	VCN mft_highest_vcn;	     /* used for relocating the $MFT */
+	struct DELAYED *delayed_runlists; /* runlists to process later */
 	struct progress_bar progress;
 	struct bitmap lcn_bitmap;
 	/* Temporary statistics until all case is supported */
@@ -379,6 +394,7 @@ static void version(void)
 	printf("Copyright (c) 2002-2005  Anton Altaparmakov\n");
 	printf("Copyright (c) 2002-2003  Richard Russon\n");
 	printf("Copyright (c) 2007       Yura Pakhuchiy\n");
+	printf("Copyright (c) 2011       Jean-Pierre Andre\n");
 	printf("\n%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -1166,14 +1182,252 @@ static void rl_fixup(runlist **rl)
 	}
 }
 
-static void replace_attribute_runlist(ntfs_volume *vol,
-				      ntfs_attr_search_ctx *ctx,
-				      runlist *rl)
+/*
+ *		Plug a replacement (partial) runlist into full runlist
+ *
+ *	Returns 0 if successful
+ *		-1 if failed
+ */
+
+static int replace_runlist(ntfs_attr *na, const runlist_element *reprl,
+				VCN lowest_vcn)
+{
+	const runlist_element *prep;
+	const runlist_element *pold;
+	runlist_element *pnew;
+	runlist_element *newrl;
+	VCN nextvcn;
+	s32 oldcnt, newcnt;
+	s32 newsize;
+	int r;
+
+	r = -1; /* default return */
+		/* allocate a new runlist able to hold both */
+	oldcnt = 0;
+	while (na->rl[oldcnt].length)
+		oldcnt++;
+	newcnt = 0;
+	while (reprl[newcnt].length)
+		newcnt++;
+	newsize = ((oldcnt + newcnt)*sizeof(runlist_element) + 4095) & -4096;
+	newrl = (runlist_element*)malloc(newsize);
+	if (newrl) {
+		/* copy old runs until reaching replaced ones */
+		pnew = newrl;
+		pold = na->rl;
+		while (pold->length
+		    && ((pold->vcn + pold->length)
+				 <= (reprl[0].vcn + lowest_vcn))) {
+			*pnew = *pold;
+			pnew++;
+			pold++;
+		}
+		/* split a possible old run partially overlapped */
+		if (pold->length
+		    && (pold->vcn < (reprl[0].vcn + lowest_vcn))) {
+			pnew->vcn = pold->vcn;
+			pnew->lcn = pold->lcn;
+			pnew->length = reprl[0].vcn + lowest_vcn - pold->vcn;
+			pnew++;
+		}
+		/* copy new runs */
+		prep = reprl;
+		nextvcn = prep->vcn + lowest_vcn;
+		while (prep->length) {
+			pnew->vcn = prep->vcn + lowest_vcn;
+			pnew->lcn = prep->lcn;
+			pnew->length = prep->length;
+			nextvcn = pnew->vcn + pnew->length;
+			pnew++;
+			prep++;
+		}
+		/* locate the first fully replaced old run */
+		while (pold->length
+		    && ((pold->vcn + pold->length) <= nextvcn)) {
+			pold++;
+		}
+		/* split a possible old run partially overlapped */
+		if (pold->length
+		    && (pold->vcn < nextvcn)) {
+			pnew->vcn = nextvcn;
+			pnew->lcn = pold->lcn + nextvcn - pold->vcn;
+			pnew->length = pold->length - nextvcn + pold->vcn;
+			pnew++;
+		}
+		/* copy old runs beyond replaced ones */
+		while (pold->length) {
+			*pnew = *pold;
+			pnew++;
+			pold++;
+		}
+		/* the terminator is same as the old one */
+		*pnew = *pold;
+		/* deallocate the old runlist and replace */
+		free(na->rl);
+		na->rl = newrl;
+		r = 0;
+	}
+	return (r);
+}
+
+/*
+ *		Expand the new runlist in new extent(s)
+ *
+ *	This implies allocating inode extents and, generally, creating
+ *	an attribute list and allocating clusters for the list, and
+ *	shuffle the existing attributes accordingly.
+ *
+ *	Sometimes the runlist being reallocated is within an extent,
+ *	so we have a partial runlist to plug into an existing one
+ *	whose other parts have already been processed or will have
+ *	to be processed later, and we must not interfere with the
+ *	processing of these parts.
+ *
+ *	This cannot be done on the runlist part stored in a single
+ *	extent, it has to be done globally for the file.
+ *
+ *	We use the standard library functions, so we must wait until
+ *	the new global bitmap and the new MFT bitmap are saved to
+ *	disk and usable for the allocation of a new extent and creation
+ *	of an attribute list.
+ *
+ *	Aborts if something goes wrong. There should be no data damage,
+ *	because the old runlist is still in use and the bootsector has
+ *	not been updated yet, so the initial clusters can be accessed.
+ */
+
+static void expand_attribute_runlist(ntfs_volume *vol, struct DELAYED *delayed)
+{
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	ATTR_TYPES type;
+	MFT_REF mref;
+	runlist_element *rl;
+
+		/* open the inode */
+	mref = delayed->mref;
+#ifndef BAN_NEW_TEXT
+	ntfs_log_verbose("Processing a delayed update for inode %lld\n",
+					(long long)mref);
+#endif
+	type = delayed->type;
+	rl = delayed->rl;
+	ni = ntfs_inode_open(vol,mref);
+	if (ni) {
+		na = ntfs_attr_open(ni, type,
+					delayed->attr_name, delayed->name_len);
+		if (na) {
+			if (!ntfs_attr_map_whole_runlist(na)) {
+				if (replace_runlist(na,rl,delayed->lowest_vcn)
+				    || ntfs_attr_update_mapping_pairs(na,0))
+					perr_exit("Could not update runlist "
+						"for attribute 0x%lx in inode %lld",
+						(long)le32_to_cpu(type),(long long)mref);
+			} else
+				perr_exit("Could not map attribute 0x%lx in inode %lld",
+					(long)le32_to_cpu(type),(long long)mref);
+			ntfs_attr_close(na);
+		} else
+			perr_exit("Could not open attribute 0x%lx in inode %lld",
+				(long)le32_to_cpu(type),(long long)mref);
+		ntfs_inode_mark_dirty(ni);
+		if (ntfs_inode_close(ni))
+			perr_exit("Failed to close inode %lld through the library",
+				(long long)mref);
+	} else
+		perr_exit("Could not open inode %lld through the library",
+			(long long)mref);
+}
+
+/*
+ *		Process delayed runlist updates
+ */
+
+static void delayed_updates(ntfs_resize_t *resize)
+{
+	struct DELAYED *delayed;
+
+	while (resize->delayed_runlists) {
+		delayed = resize->delayed_runlists;
+		expand_attribute_runlist(resize->vol, delayed);
+		resize->delayed_runlists = resize->delayed_runlists->next;
+		if (delayed->attr_name)
+			free(delayed->attr_name);
+		free(delayed->head_rl);
+		free(delayed);
+	}
+}
+
+/*
+ *		Queue a runlist replacement for later update
+ *
+ *	Store the attribute identification relative to base inode
+ */
+
+static void replace_later(ntfs_resize_t *resize, runlist *rl, runlist *head_rl)
+{
+	struct DELAYED *delayed;
+	ATTR_RECORD *a;
+	MFT_REF mref;
+	leMFT_REF lemref;
+	int name_len;
+	ntfschar *attr_name;
+
+		/* save the attribute parameters, to be able to find it later */
+	a = resize->ctx->attr;
+	name_len = a->name_length;
+	attr_name = (ntfschar*)NULL;
+	if (name_len) {
+		attr_name = (ntfschar*)ntfs_malloc(name_len*sizeof(ntfschar));
+		if (attr_name)
+			memcpy(attr_name,(u8*)a + le16_to_cpu(a->name_offset),
+					name_len*sizeof(ntfschar));
+	}
+	delayed = (struct DELAYED*)ntfs_malloc(sizeof(struct DELAYED));
+	if (delayed && (attr_name || !name_len)) {
+		lemref = resize->ctx->mrec->base_mft_record;
+		if (lemref)
+			mref = le64_to_cpu(lemref);
+		else
+			mref = resize->mref;
+		delayed->mref = MREF(mref);
+		delayed->type = a->type;
+		delayed->attr_name = attr_name;
+		delayed->name_len = name_len;
+		delayed->lowest_vcn = le64_to_cpu(a->lowest_vcn);
+		delayed->rl = rl;
+		delayed->head_rl = head_rl;
+		delayed->next = resize->delayed_runlists;
+		resize->delayed_runlists = delayed;
+	} else
+		perr_exit("Could not store delayed update data");
+}
+
+/*
+ *		Replace the runlist in an attribute
+ *
+ *	This sometimes requires expanding the runlist into another extent,
+ *	which has to be done globally on the attribute. Is so, the action
+ *	is put in a delay queue, and the caller must not free the runlist.
+ *
+ *	Returns 0 if the replacement could be done
+ *		1 when it has been put in the delay queue.
+ */
+
+static int replace_attribute_runlist(ntfs_resize_t *resize, runlist *rl)
 {
 	int mp_size, l;
+	int must_delay;
 	void *mp;
-	ATTR_RECORD *a = ctx->attr;
+	runlist *head_rl;
+	ntfs_volume *vol;
+	ntfs_attr_search_ctx *ctx;
+	ATTR_RECORD *a;
 
+	vol = resize->vol;
+	ctx = resize->ctx;
+	a = ctx->attr;
+	head_rl = rl;
 	rl_fixup(&rl);
 
 	if ((mp_size = ntfs_get_size_for_mapping_pairs(vol, rl, 0, INT_MAX)) == -1)
@@ -1191,8 +1445,9 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 	/* CHECKME: don't trust mapping_pairs is always the last item in the
 	   attribute, instead check for the real size/space */
 	l = (int)le32_to_cpu(a->length) - le16_to_cpu(a->mapping_pairs_offset);
+	must_delay = 0;
 	if (mp_size > l) {
-		s64 remains_size;
+		s32 remains_size;
 		char *next_attr;
 
 		ntfs_log_verbose("Enlarging attribute header ...\n");
@@ -1218,32 +1473,34 @@ static void replace_attribute_runlist(ntfs_volume *vol,
 		ntfs_log_verbose("increase         : %d\n", l);
 		ntfs_log_verbose("shift            : %lld\n",
 				 (long long)remains_size);
-
 		if (le32_to_cpu(ctx->mrec->bytes_in_use) + l >
-				le32_to_cpu(ctx->mrec->bytes_allocated))
-			err_exit("Extended record needed (%u > %u), not yet "
-				 "supported!\nPlease try to free less space.\n",
-				 (unsigned int)le32_to_cpu(ctx->mrec->
-					bytes_in_use) + l,
-				 (unsigned int)le32_to_cpu(ctx->mrec->
-					bytes_allocated));
-
-		memmove(next_attr + l, next_attr, remains_size);
-		ctx->mrec->bytes_in_use = cpu_to_le32(l +
-				le32_to_cpu(ctx->mrec->bytes_in_use));
-		a->length = cpu_to_le32(le32_to_cpu(a->length) + l);
+				le32_to_cpu(ctx->mrec->bytes_allocated)) {
+#ifndef BAN_NEW_TEXT
+			ntfs_log_verbose("Queuing expansion for later processing\n");
+#endif
+			must_delay = 1;
+			replace_later(resize,rl,head_rl);
+		} else {
+			memmove(next_attr + l, next_attr, remains_size);
+			ctx->mrec->bytes_in_use = cpu_to_le32(l +
+					le32_to_cpu(ctx->mrec->bytes_in_use));
+			a->length = cpu_to_le32(le32_to_cpu(a->length) + l);
+		}
 	}
 
-	mp = ntfs_calloc(mp_size);
-	if (!mp)
-		perr_exit("ntfsc_calloc couldn't get memory");
+	if (!must_delay) {
+		mp = ntfs_calloc(mp_size);
+		if (!mp)
+			perr_exit("ntfsc_calloc couldn't get memory");
 
-	if (ntfs_mapping_pairs_build(vol, mp, mp_size, rl, 0, NULL))
-		perr_exit("ntfs_mapping_pairs_build");
+		if (ntfs_mapping_pairs_build(vol, (u8*)mp, mp_size, rl, 0, NULL))
+			perr_exit("ntfs_mapping_pairs_build");
 
-	memmove((u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
+		memmove((u8*)a + le16_to_cpu(a->mapping_pairs_offset), mp, mp_size);
 
-	free(mp);
+		free(mp);
+	}
+	return (must_delay);
 }
 
 static void set_bitmap_range(struct bitmap *bm, s64 pos, s64 length, u8 bit)
@@ -1631,11 +1888,11 @@ static void relocate_attribute(ntfs_resize_t *resize)
 	}
 
 	if (resize->dirty_inode == DIRTY_ATTRIB) {
-		replace_attribute_runlist(resize->vol, resize->ctx, rl);
+		if (!replace_attribute_runlist(resize, rl))
+			free(rl);
 		resize->dirty_inode = DIRTY_INODE;
-	}
-
-	free(rl);
+	} else
+		free(rl);
 }
 
 static int is_mftdata(ntfs_resize_t *resize)
@@ -1915,9 +2172,8 @@ static void truncate_badclust_bad_attr(ntfs_resize_t *resize)
 	a->allocated_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
 	a->data_size = cpu_to_sle64(nr_clusters * vol->cluster_size);
 
-	replace_attribute_runlist(vol, resize->ctx, rl_bad);
-
-	free(rl_bad);
+	if (!replace_attribute_runlist(resize, rl_bad))
+		free(rl_bad);
 }
 
 /**
@@ -1970,6 +2226,7 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	runlist *rl;
 	s64 bm_bsize, size;
 	s64 nr_bm_clusters;
+	int truncated;
 	ntfs_volume *vol = resize->vol;
 
 	a = resize->ctx->attr;
@@ -1993,7 +2250,7 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 	a->data_size = cpu_to_sle64(bm_bsize);
 	a->initialized_size = cpu_to_sle64(bm_bsize);
 
-	replace_attribute_runlist(vol, resize->ctx, rl);
+	truncated = !replace_attribute_runlist(resize, rl);
 
 	/*
 	 * FIXME: update allocated/data sizes and timestamps in $FILE_NAME
@@ -2008,7 +2265,8 @@ static void truncate_bitmap_data_attr(ntfs_resize_t *resize)
 				(long long)size, (long long)bm_bsize);
 	}
 
-	free(rl);
+	if (truncated)
+		free(rl);
 }
 
 /**
@@ -2585,6 +2843,7 @@ int main(int argc, char **argv)
 
 	truncate_badclust_file(&resize);
 	truncate_bitmap_file(&resize);
+	delayed_updates(&resize);
 	update_bootsector(&resize);
 
 	/* We don't create backup boot sector because we don't know where the
