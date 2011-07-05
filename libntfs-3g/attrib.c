@@ -475,9 +475,10 @@ ntfs_attr *ntfs_attr_open(ntfs_inode *ni, const ATTR_TYPES type,
 	}
 	
 	cs = a->flags & (ATTR_IS_COMPRESSED | ATTR_IS_SPARSE);
-	
+
+	/* a file may be sparse though its unnamed data is not (cf $UsnJrnl) */
 	if (na->type == AT_DATA && na->name == AT_UNNAMED &&
-	    ((!(a->flags & ATTR_IS_SPARSE)     != !NAttrSparse(na)) ||
+	    (((a->flags & ATTR_IS_SPARSE)     && !NAttrSparse(na)) ||
 	     (!(a->flags & ATTR_IS_ENCRYPTED)  != !NAttrEncrypted(na)))) {
 		errno = EIO;
 		ntfs_log_perror("Inode %lld has corrupt attribute flags "
