@@ -26,6 +26,7 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	ACL *acl;
 	ACCESS_ALLOWED_ACE *aa_ace;
 	SID *sid;
+	le32 *sub_authorities;
 
 	if (sys_file_no < 0) {
 		*sd_val = NULL;
@@ -120,9 +121,10 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	aa_ace->sid.identifier_authority.value[3] = 0;
 	aa_ace->sid.identifier_authority.value[4] = 0;
 	aa_ace->sid.identifier_authority.value[5] = 5;
-	aa_ace->sid.sub_authority[0] =
+	sub_authorities = aa_ace->sid.sub_authority;
+	*sub_authorities++ =
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	aa_ace->sid.sub_authority[1] =
+	*sub_authorities =
 			const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 	/*
 	 * Now at offset 0x48 into the security descriptor, as specified in the
@@ -153,8 +155,9 @@ void init_system_file_sd(int sys_file_no, u8 **sd_val, int *sd_val_len)
 	sid->identifier_authority.value[3] = 0;
 	sid->identifier_authority.value[4] = 0;
 	sid->identifier_authority.value[5] = 5;
-	sid->sub_authority[0] = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	sid->sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	sub_authorities = sid->sub_authority;
+	*sub_authorities++ = const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
+	*sub_authorities = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 }
 
 /**
@@ -171,6 +174,7 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ACL *acl;
 	ACCESS_ALLOWED_ACE *ace;
 	SID *sid;
+	le32 *sub_authorities;
 
 	static char sd_array[0x102c];
 	*sd_val_len = 0x102c;
@@ -213,9 +217,10 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[3] = 0;
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
-	ace->sid.sub_authority[0] =
+	sub_authorities = ace->sid.sub_authority;
+	*sub_authorities++ =
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	*sub_authorities = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 
 	//ace2
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
@@ -233,9 +238,10 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[3] = 0;
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
-	ace->sid.sub_authority[0] =
+	sub_authorities = ace->sid.sub_authority;
+	*sub_authorities++ =
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
+	*sub_authorities = const_cpu_to_le32(DOMAIN_ALIAS_RID_ADMINS);
 
 	//ace3
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
@@ -335,9 +341,10 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[3] = 0;
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
-	ace->sid.sub_authority[0] =
+	sub_authorities = ace->sid.sub_authority;
+	*sub_authorities++ =
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
+	*sub_authorities = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
 
 	//ace8
 	ace = (ACCESS_ALLOWED_ACE*)((u8*)ace + le16_to_cpu(ace->size));
@@ -355,9 +362,10 @@ void init_root_sd(u8 **sd_val, int *sd_val_len)
 	ace->sid.identifier_authority.value[3] = 0;
 	ace->sid.identifier_authority.value[4] = 0;
 	ace->sid.identifier_authority.value[5] = 5;
-	ace->sid.sub_authority[0] =
+	sub_authorities = ace->sid.sub_authority;
+	*sub_authorities++ =
 			const_cpu_to_le32(SECURITY_BUILTIN_DOMAIN_RID);
-	ace->sid.sub_authority[1] = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
+	*sub_authorities = const_cpu_to_le32(DOMAIN_ALIAS_RID_USERS);
 
 	//owner sid
 	sid = (SID*)((char*)sd + le32_to_cpu(sd->owner));
