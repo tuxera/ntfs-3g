@@ -125,7 +125,7 @@ static s64 current_mft_record;
  * This is just a preliminary volume.
  * Filled while checking the boot sector and used in the preliminary MFT check.
  */
-static ntfs_volume vol;
+//static ntfs_volume vol;
 
 static runlist_element *mft_rl, *mft_bitmap_rl;
 
@@ -191,7 +191,7 @@ static int assert_u32_less(u32 val1, u32 val2, const char *name)
  * todo: may we use ntfs_boot_sector_is_ntfs() instead?
  *	It already does the checks but will not be able to fix anything.
  */
-static BOOL verify_boot_sector(struct ntfs_device *dev)
+static BOOL verify_boot_sector(struct ntfs_device *dev, ntfs_volume *rawvol)
 {
 	u8 buf[512];
 	NTFS_BOOT_SECTOR *ntfs_boot = (NTFS_BOOT_SECTOR *)&buf;
@@ -224,9 +224,9 @@ static BOOL verify_boot_sector(struct ntfs_device *dev)
 
 	// todo: if partition, query bios and match heads/tracks? */
 
-	// Initialize some values from vol. We will need those later.
-	vol.dev = dev;
-	ntfs_boot_sector_parse(&vol, (NTFS_BOOT_SECTOR *)buf);
+	// Initialize some values into rawvol. We will need those later.
+	rawvol->dev = dev;
+	ntfs_boot_sector_parse(rawvol, (NTFS_BOOT_SECTOR *)buf);
 
 	return 0;
 }
@@ -247,7 +247,7 @@ static BOOL verify_boot_sector(struct ntfs_device *dev)
  *
  * Assumes dev is open.
  */
-static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record, u32 attr_type, u32 size_of_file_record)
+static runlist *load_runlist(ntfs_volume *rawvol, s64 offset_to_file_record, u32 attr_type, u32 size_of_file_record)
 {
 	u8 *buf;
 	u16 attrs_offset;
@@ -261,7 +261,7 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 	if (!buf)
 		return NULL;
 
-	if (ntfs_pread(dev, offset_to_file_record, size_of_file_record, buf) !=
+	if (ntfs_pread(rawvol->dev, offset_to_file_record, size_of_file_record, buf) !=
 			size_of_file_record) {
 		check_failed("Failed to read file record at offset %lld (0x%llx).\n",
 					(long long)offset_to_file_record,
@@ -314,7 +314,7 @@ static runlist *load_runlist(struct ntfs_device *dev, s64 offset_to_file_record,
 			// todo: it will also use vol->major_ver if defined(DEBUG). But only for printing purposes.
 
 			// Assume ntfs_boot_sector_parse() was called.
-			return ntfs_mapping_pairs_decompress(&vol, attr_rec, NULL);
+			return ntfs_mapping_pairs_decompress(rawvol, attr_rec, NULL);
 		}
 
 		attr_rec = (ATTR_RECORD*)((u8*)attr_rec+length);
@@ -359,7 +359,7 @@ static u8 *mft_bitmap_buf;
  * return: 0 ok.
  *	   RETURN_OPERATIONAL_ERROR on error.
  */
-static int mft_bitmap_load(struct ntfs_device *dev)
+static int mft_bitmap_load(ntfs_volume *rawvol)
 {
 	VCN vcn;
 	u32 mft_bitmap_length;
@@ -371,16 +371,16 @@ static int mft_bitmap_load(struct ntfs_device *dev)
 		goto error;
 	}
 
-	mft_bitmap_length = vcn * vol.cluster_size;
-	mft_bitmap_records = 8 * mft_bitmap_length * vol.cluster_size /
-		vol.mft_record_size;
+	mft_bitmap_length = vcn * rawvol->cluster_size;
+	mft_bitmap_records = 8 * mft_bitmap_length * rawvol->cluster_size /
+		rawvol->mft_record_size;
 
 	//printf("sizes: %d, %d.\n", mft_bitmap_length, mft_bitmap_records);
 
 	mft_bitmap_buf = (u8*)ntfs_malloc(mft_bitmap_length);
 	if (!mft_bitmap_buf)
 		goto error;
-	if (ntfs_rl_pread(&vol, mft_bitmap_rl, 0, mft_bitmap_length,
+	if (ntfs_rl_pread(rawvol, mft_bitmap_rl, 0, mft_bitmap_length,
 			mft_bitmap_buf)!=mft_bitmap_length)
 		goto error;
 	return 0;
@@ -658,7 +658,7 @@ static BOOL check_file_record(u8 *buffer, u16 buflen)
 	return FALSE;
 }
 
-static void replay_log(ntfs_volume *vol)
+static void replay_log(ntfs_volume *vol __attribute__((unused)))
 {
 	// At this time, only check that the log is fully replayed.
 	ntfs_log_warning("Unsupported: replay_log()\n");
@@ -718,7 +718,7 @@ verify_mft_record_error:
  * It should not depend on other checks or we may have a circular dependancy.
  * Also, this loadng must be forgiving, unlike the comprehensive checks.
  */
-static int verify_mft_preliminary(struct ntfs_device *dev)
+static int verify_mft_preliminary(ntfs_volume *rawvol)
 {
 	current_mft_record = 0;
 	s64 mft_offset, mftmirr_offset;
@@ -727,12 +727,12 @@ static int verify_mft_preliminary(struct ntfs_device *dev)
 	ntfs_log_trace("Entering verify_mft_preliminary().\n");
 	// todo: get size_of_file_record from boot sector
 	// Load the first segment of the $MFT/DATA runlist.
-	mft_offset = vol.mft_lcn * vol.cluster_size;
-	mftmirr_offset = vol.mftmirr_lcn * vol.cluster_size;
-	mft_rl = load_runlist(dev, mft_offset, AT_DATA, 1024);
+	mft_offset = rawvol->mft_lcn * rawvol->cluster_size;
+	mftmirr_offset = rawvol->mftmirr_lcn * rawvol->cluster_size;
+	mft_rl = load_runlist(rawvol, mft_offset, AT_DATA, 1024);
 	if (!mft_rl) {
 		check_failed("Loading $MFT runlist failed. Trying $MFTMirr.\n");
-		mft_rl = load_runlist(dev, mftmirr_offset, AT_DATA, 1024);
+		mft_rl = load_runlist(rawvol, mftmirr_offset, AT_DATA, 1024);
 	}
 	if (!mft_rl) {
 		check_failed("Loading $MFTMirr runlist failed too. Aborting.\n");
@@ -744,10 +744,10 @@ static int verify_mft_preliminary(struct ntfs_device *dev)
 
 	// Load the runlist of $MFT/Bitmap.
 	// todo: what about ATTRIBUTE_LIST? Can we reuse code?
-	mft_bitmap_rl = load_runlist(dev, mft_offset, AT_BITMAP, 1024);
+	mft_bitmap_rl = load_runlist(rawvol, mft_offset, AT_BITMAP, 1024);
 	if (!mft_bitmap_rl) {
 		check_failed("Loading $MFT/Bitmap runlist failed. Trying $MFTMirr.\n");
-		mft_bitmap_rl = load_runlist(dev, mftmirr_offset, AT_BITMAP, 1024);
+		mft_bitmap_rl = load_runlist(rawvol, mftmirr_offset, AT_BITMAP, 1024);
 	}
 	if (!mft_bitmap_rl) {
 		check_failed("Loading $MFTMirr/Bitmap runlist failed too. Aborting.\n");
@@ -756,7 +756,7 @@ static int verify_mft_preliminary(struct ntfs_device *dev)
 	}
 
 	/* Load $MFT/Bitmap */
-	if ((res = mft_bitmap_load(dev)))
+	if ((res = mft_bitmap_load(rawvol)))
 		return res;
 	return -1; /* FIXME: Just added to fix compiler warning without
 			thinking about what should be here.  (Yura) */
@@ -813,6 +813,7 @@ static int reset_dirty(ntfs_volume *vol)
 int main(int argc, char **argv)
 {
 	struct ntfs_device *dev;
+	ntfs_volume rawvol;
 	ntfs_volume *vol;
 	const char *name;
 	int ret;
@@ -828,20 +829,19 @@ int main(int argc, char **argv)
 	dev = ntfs_device_alloc(name, 0, &ntfs_device_default_io_ops, NULL);
 	if (!dev)
 		return RETURN_OPERATIONAL_ERROR;
-
 	if (dev->d_ops->open(dev, O_RDONLY)) { //O_RDWR/O_RDONLY?
 		ntfs_log_perror("Error opening partition device");
 		ntfs_device_free(dev);
 		return RETURN_OPERATIONAL_ERROR;
 	}
 
-	if ((ret = verify_boot_sector(dev))) {
+	if ((ret = verify_boot_sector(dev,&rawvol))) {
 		dev->d_ops->close(dev);
 		return ret;
 	}
 	ntfs_log_verbose("Boot sector verification complete. Proceeding to $MFT");
 
-	verify_mft_preliminary(dev);
+	verify_mft_preliminary(&rawvol);
 
 	/* ntfs_device_mount() expects the device to be closed. */
 	if (dev->d_ops->close(dev))
