@@ -1160,10 +1160,11 @@ static void compare_bitmaps(struct bitmap *a)
 			perr_exit("Couldn't get $Bitmap $DATA");
 
 		if (count == 0) {
-			if (a->size > pos)
+			/* the backup bootsector need not be accounted for */
+			if (((vol->nr_clusters + 7) >> 3) > pos)
 				err_exit("$Bitmap size is smaller than expected"
-					 " (%lld != %lld)\n",
-					(long long)a->size, (long long)pos);
+					 " (%lld < %lld)\n",
+					(long long)pos, (long long)a->size);
 			break;
 		}
 
