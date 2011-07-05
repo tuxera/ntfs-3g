@@ -355,8 +355,8 @@ static void proceed_question(void)
 	fflush(stderr);
 	printf("Are you sure you want to proceed (y/[n])? ");
 	buf[0] = 0;
-	fgets(buf, sizeof(buf), stdin);
-	if (!strchr(short_yes, buf[0])) {
+	if (!fgets(buf, sizeof(buf), stdin)
+	    || !strchr(short_yes, buf[0])) {
 		printf("OK quitting. NO CHANGES have been made to your "
 				"NTFS volume.\n");
 		exit(1);
