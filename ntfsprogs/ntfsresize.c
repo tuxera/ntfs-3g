@@ -71,6 +71,8 @@
 /* #include "version.h" */
 #include "misc.h"
 
+#define CLEAN_EXIT 0	/* traditionnally volume is not closed, there must be a reason */
+
 static const char *EXEC_NAME = "ntfsresize";
 
 static const char *resize_warning_msg =
@@ -2042,6 +2044,22 @@ static void lookup_data_attr(ntfs_volume *vol,
 	ntfs_ucsfree(ustr);
 }
 
+#if CLEAN_EXIT
+
+static void close_inode_and_context(ntfs_attr_search_ctx *ctx)
+{
+	ntfs_inode *ni;
+
+	ni = ctx->base_ntfs_ino;
+	if (!ni)
+		ni = ctx->ntfs_ino;
+	ntfs_attr_put_search_ctx(ctx);
+	if (ni)
+		ntfs_inode_close(ni);
+}
+
+#endif /* CLEAN_EXIT */
+
 static int check_bad_sectors(ntfs_volume *vol)
 {
 	ntfs_attr_search_ctx *ctx;
@@ -2100,7 +2118,11 @@ static int check_bad_sectors(ntfs_volume *vol)
 	}
 
 	free(rl);
+#if CLEAN_EXIT
+	close_inode_and_context(ctx);
+#else
 	ntfs_attr_put_search_ctx(ctx);
+#endif
 
 	return badclusters;
 }
@@ -2122,7 +2144,11 @@ static void truncate_badclust_file(ntfs_resize_t *resize)
 			     resize->ctx->mrec))
 		perr_exit("Couldn't update $BadClust");
 
+#if CLEAN_EXIT
+	close_inode_and_context(resize->ctx);
+#else
 	ntfs_attr_put_search_ctx(resize->ctx);
+#endif
 }
 
 /**
@@ -2141,7 +2167,11 @@ static void truncate_bitmap_file(ntfs_resize_t *resize)
 			     resize->ctx->mrec))
 		perr_exit("Couldn't update $Bitmap");
 
+#if CLEAN_EXIT
+	close_inode_and_context(resize->ctx);
+#else
 	ntfs_attr_put_search_ctx(resize->ctx);
+#endif
 }
 
 /**
@@ -2461,6 +2491,10 @@ int main(int argc, char **argv)
 		 */
 	if (opt.check) {
 		vol = check_volume();
+#if CLEAN_EXIT
+		if (vol)
+			ntfs_umount(vol,0);
+#endif
 		exit(0);
 	}
 
@@ -2569,6 +2603,11 @@ int main(int argc, char **argv)
 	printf("Successfully resized NTFS on device '%s'.\n", vol->dev->d_name);
 	if (resize.shrink)
 		printf("%s", resize_important_msg);
-
+#if CLEAN_EXIT
+	if (resize.lcn_bitmap.bm)
+		free(resize.lcn_bitmap.bm);
+	if (vol)
+		ntfs_umount(vol,0);
+#endif
 	return 0;
 }
