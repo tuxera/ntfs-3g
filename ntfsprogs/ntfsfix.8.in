@@ -37,8 +37,15 @@ is equivalent to
 .BR "\-f \-v" .
 Long named options can be abbreviated to any unique prefix of their name.
 .TP
+\fB\-b\fR, \fB\-\-clear\-bad\-sectors\fR
+Clear the list of bad sectors. This is useful after cloning an old disk
+with bad sectors to a new disk.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
+.TP
+\fB\-n\fR, \fB\-\-do\-nothing\fR
+Do not write anything, just show what would have been done.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Show the version number, copyright and license

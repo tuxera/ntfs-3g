@@ -93,6 +93,7 @@ static const char FAILED[]   = "FAILED\n";
 static struct {
 	char *volume;
 	BOOL no_action;
+	BOOL clear_bad_sectors;
 } opt;
 
 /**
@@ -106,9 +107,10 @@ static void usage(void)
 		   "Usage: %s [options] device\n"
 		   "    Attempt to fix an NTFS partition.\n"
 		   "\n"
-		   "    -h, --help             Display this help\n"
-		   "    -n, --no-action        Do not write anything\n"
-		   "    -V, --version          Display version information\n"
+		   "    -b, --clear-bad-sectors Clear the bad sector list\n"
+		   "    -h, --help              Display this help\n"
+		   "    -n, --no-action         Do not write anything\n"
+		   "    -V, --version           Display version information\n"
 		   "\n"
 		   "For example: %s /dev/hda6\n\n",
 		   EXEC_NAME, VERSION, EXEC_NAME,
@@ -127,7 +129,8 @@ static void version(void)
 		   "Attempt to fix an NTFS partition.\n\n"
 		   "Copyright (c) 2000-2006 Anton Altaparmakov\n"
 		   "Copyright (c) 2002-2006 Szabolcs Szakacsits\n"
-		   "Copyright (c) 2007      Yura Pakhuchiy\n\n",
+		   "Copyright (c) 2007      Yura Pakhuchiy\n\n"
+		   "Copyright (c) 2011      Jean-Pierre Andre\n\n",
 		   EXEC_NAME, VERSION);
 	ntfs_log_info("%s\n%s%s", ntfs_gpl, ntfs_bugs, ntfs_home);
 	exit(1);
@@ -139,12 +142,13 @@ static void version(void)
 static void parse_options(int argc, char **argv)
 {
 	int c;
-	static const char *sopt = "-hnV";
+	static const char *sopt = "-bhnV";
 	static const struct option lopt[] = {
-		{ "help",	no_argument,	NULL, 'h' },
-		{ "no-action",	no_argument,	NULL, 'n' },
-		{ "version",	no_argument,	NULL, 'V' },
-		{ NULL, 0, NULL, 0 }
+		{ "help",		no_argument,	NULL, 'h' },
+		{ "no-action",		no_argument,	NULL, 'n' },
+		{ "clear-bad-sectors",	no_argument,	NULL, 'b' },
+		{ "version",		no_argument,	NULL, 'V' },
+		{ NULL, 		0, NULL, 0 }
 	};
 
 	memset(&opt, 0, sizeof(opt));
@@ -158,6 +162,9 @@ static void parse_options(int argc, char **argv)
 				ntfs_log_info("ERROR: Too many arguments.\n");
 				usage();
 			}
+			break;
+		case 'b':
+			opt.clear_bad_sectors = TRUE;
 			break;
 		case 'n':
 			opt.no_action = TRUE;
@@ -303,6 +310,57 @@ static int empty_journal(ntfs_volume *vol)
 	}
 	ntfs_log_info(OK);
 	return 0;
+}
+
+/**
+ *		Clear the bad cluster marks (option)
+ */
+static int clear_badclus(ntfs_volume *vol)
+{
+	static ntfschar badstream[] = {
+				cpu_to_le16('$'), cpu_to_le16('B'),
+				cpu_to_le16('a'), cpu_to_le16('d')
+	} ;
+	ntfs_inode *ni;
+	ntfs_attr *na;
+	BOOL ok;
+
+	ok = FALSE;
+	ntfs_log_info("Going to un-mark the bad clusters ($BadClus)... ");
+	ni = ntfs_inode_open(vol, FILE_BadClus);
+	if (ni) {
+		na = ntfs_attr_open(ni, AT_DATA, badstream, 4);
+		if (na) {
+			if (na->initialized_size) {
+			/*
+			 * Truncate the stream to free all its clusters,
+			 * then reallocate a sparse stream to full size
+			 * of volume.
+			 */
+				if (!ntfs_attr_truncate(na,0)
+				    && !ntfs_attr_truncate(na,vol->nr_clusters
+						<< vol->cluster_size_bits)) {
+					ni->flags |= FILE_ATTR_SPARSE_FILE;
+					NInoFileNameSetDirty(ni);
+					ok = TRUE;
+				} else {
+					ntfs_log_perror("Failed to un-mark the bad clusters");
+				}
+			} else {
+				ntfs_log_info("No bad clusters...");
+				ok = TRUE;
+			}
+			ntfs_attr_close(na);
+		} else {
+			ntfs_log_perror("Failed to open $BadClus::$Bad");
+		}
+		ntfs_inode_close(ni);
+	} else {
+		ntfs_log_perror("Failed to open inode FILE_BadClus");
+	}
+	if (ok)
+		ntfs_log_info(OK);
+	return (ok ? 0 : -1);
 }
 
 /**
@@ -986,6 +1044,12 @@ int main(int argc, char **argv)
 	if (ntfs_version_is_supported(vol)) {
 		ntfs_log_error("Error: Unknown NTFS version.\n");
 		goto error_exit;
+	}
+	if (opt.clear_bad_sectors && !opt.no_action) {
+		if (clear_badclus(vol)) {
+			ntfs_log_error("Error: Failed to un-mark bad sectors.\n");
+			goto error_exit;
+		}
 	}
 	if (vol->major_ver >= 3) {
 		/*
