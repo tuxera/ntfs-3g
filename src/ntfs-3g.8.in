@@ -136,10 +136,11 @@ when a user mapping file is present and the
 mount option is not set.
 .TP
 .B inherit
-When creating a new file, set its initial ownership and protections
+When creating a new file, set its initial protections
 according to inheritance rules defined in parent directory. These rules
 deviate from Posix specifications, but yield a better Windows
-compatibility.
+compatibility. The \fBcompression\fR option or a valid user mapping file
+is required for this option to be effective.
 .TP
 .B ro
 Mount filesystem read\-only. Useful if Windows is hibernated or the
