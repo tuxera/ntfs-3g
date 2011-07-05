@@ -37,11 +37,11 @@
 #include <fcntl.h>
 #endif
 
-#include <ntfs-3g/layout.h>
-#include <ntfs-3g/bitmap.h>
-#include <ntfs-3g/endians.h>
-#include <ntfs-3g/bootsect.h>
-#include <ntfs-3g/misc.h>
+#include <layout.h>
+#include <bitmap.h>
+#include <endians.h>
+#include <bootsect.h>
+#include <misc.h>
 
 #include "cluster.h"
 #include "utils.h"
