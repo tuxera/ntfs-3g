@@ -1850,7 +1850,7 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			goto errno_set;
 		}
 #else
-		if (ntfs_attr_truncate(na, pos + count)) {
+		if (ntfs_attr_truncate_i(na, pos + count, HOLES_OK)) {
 			ntfs_log_perror("Failed to enlarge attribute");
 			goto errno_set;
 		}
@@ -2221,7 +2221,7 @@ done:
 	updatemap = (compressed
 			? NAttrFullyMapped(na) != 0 : update_from != -1);
 #endif
-	if (updatemap)
+	if (updatemap) {
 		if (ntfs_attr_update_mapping_pairs(na,
 				(update_from < 0 ? 0 : update_from))) {
 			/*
@@ -2231,6 +2231,10 @@ done:
 			total = -1;
 			goto out;
 		}
+		if (!wasnonresident)
+			NAttrClearBeingNonResident(na);
+		NAttrClearDataAppending(na);
+	}
 out:	
 	ntfs_log_leave("\n");
 	return total;
@@ -2292,7 +2296,8 @@ err_out:
 	if (updatemap)
 		ntfs_attr_update_mapping_pairs(na, 0);
 	/* Restore original data_size if needed. */
-	if (need_to.undo_data_size && ntfs_attr_truncate(na, old_data_size))
+	if (need_to.undo_data_size
+			&& ntfs_attr_truncate_i(na, old_data_size, HOLES_OK))
 		ntfs_log_perror("Failed to restore data_size");
 	errno = eo;
 errno_set:
@@ -2475,6 +2480,7 @@ retry:
 			goto out;
 	}
 out:	
+	NAttrClearComprClosing(na);
 	ntfs_log_leave("\n");
 	return (!ok);
 rl_err_out:
@@ -4296,7 +4302,7 @@ add_non_resident:
 		goto rm_attr_err_out;
 	}
 	/* Resize and set attribute value. */
-	if (ntfs_attr_truncate(na, size) ||
+	if (ntfs_attr_truncate_i(na, size, HOLES_OK) ||
 			(val && (ntfs_attr_pwrite(na, 0, size, val) != size))) {
 		err = errno;
 		ntfs_log_perror("Failed to initialize just added attribute");
@@ -5000,7 +5006,7 @@ static int ntfs_resident_attr_resize_i(ntfs_attr *na, const s64 newsize,
 			return (ret);
 		}
 		/* Resize non-resident attribute */
-		return ntfs_attr_truncate(na, newsize);
+		return ntfs_attr_truncate_i(na, newsize, HOLES_OK);
 	} else if (errno != ENOSPC && errno != EPERM) {
 		err = errno;
 		ntfs_log_perror("Failed to make attribute non-resident");
@@ -6422,7 +6428,12 @@ out:
 
 int ntfs_attr_truncate(ntfs_attr *na, const s64 newsize)
 {
-	return (ntfs_attr_truncate_i(na, newsize, HOLES_OK));
+	int r;
+
+	r = ntfs_attr_truncate_i(na, newsize, HOLES_OK);
+	NAttrClearDataAppending(na);
+	NAttrClearBeingNonResident(na);
+	return (r);
 }
 
 /*
