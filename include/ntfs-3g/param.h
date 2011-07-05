@@ -63,6 +63,11 @@ enum {
 
 #define XATTRMAPPINGFILE ".NTFS-3G/XattrMapping" /* default mapping file */
 
+/*
+ *		Parameters for path canonicalization
+ */
+
+#define MAPPERNAMELTH 256
 
 /*
  *		Permission checking modes for high level and low level

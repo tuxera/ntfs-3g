@@ -3457,16 +3457,6 @@ static void usage(void)
 			EXEC_NAME, ntfs_home);
 }
 
-#ifndef HAVE_REALPATH
-/* If there is no realpath() on the system, provide a dummy one. */
-static char *realpath(const char *path, char *resolved_path)
-{
-	strncpy(resolved_path, path, PATH_MAX);
-	resolved_path[PATH_MAX] = '\0';
-	return resolved_path;
-}
-#endif
-
 #if defined(linux) || defined(__uClinux__)
 
 static const char *dev_fuse_msg =
@@ -3668,6 +3658,9 @@ static void setup_logging(char *parsed_options)
 	ctx->seccache = (struct PERMISSIONS_CACHE*)NULL;
 
 	ntfs_log_info("Version %s %s %d\n", VERSION, FUSE_TYPE, fuse_version());
+	if (strcmp(opts.arg_device,opts.device))
+		ntfs_log_info("Requested device %s canonicalized as %s\n",
+				opts.arg_device,opts.device);
 	ntfs_log_info("Mounted %s (%s, label \"%s\", NTFS %d.%d)\n",
 			opts.device, (ctx->ro) ? "Read-Only" : "Read-Write",
 			ctx->vol->vol_name, ctx->vol->major_ver,

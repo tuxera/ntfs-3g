@@ -67,6 +67,7 @@
 #include "dir.h"
 #include "logging.h"
 #include "cache.h"
+#include "realpath.h"
 #include "misc.h"
 
 const char *ntfs_home = 
@@ -1359,18 +1360,6 @@ int ntfs_umount(ntfs_volume *vol, const BOOL force __attribute__((unused)))
 
 #ifdef HAVE_MNTENT_H
 
-#ifndef HAVE_REALPATH
-/**
- * realpath - If there is no realpath on the system
- */
-static char *realpath(const char *path, char *resolved_path)
-{
-	strncpy(resolved_path, path, PATH_MAX);
-	resolved_path[PATH_MAX] = '\0';
-	return resolved_path;
-}
-#endif
-
 /**
  * ntfs_mntent_check - desc
  *
@@ -1394,7 +1383,7 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 		err = errno;
 		goto exit;
 	}
-	if (!realpath(file, real_file)) {
+	if (!ntfs_realpath_canonicalize(file, real_file)) {
 		err = errno;
 		goto exit;
 	}
@@ -1403,7 +1392,7 @@ static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
 		goto exit;
 	}
 	while ((mnt = getmntent(f))) {
-		if (!realpath(mnt->mnt_fsname, real_fsname))
+		if (!ntfs_realpath_canonicalize(mnt->mnt_fsname, real_fsname))
 			continue;
 		if (!strcmp(real_file, real_fsname))
 			break;

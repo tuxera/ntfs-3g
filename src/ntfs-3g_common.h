@@ -29,6 +29,7 @@ struct ntfs_options {
         char    *mnt_point;     /* Mount point */    
         char    *options;       /* Mount options */  
         char    *device;        /* Device to mount */
+	char	*arg_device;	/* Device requested in argv */
 } ;
 
 typedef enum {

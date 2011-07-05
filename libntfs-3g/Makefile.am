@@ -36,6 +36,7 @@ libntfs_3g_la_SOURCES =	\
 	misc.c 		\
 	mst.c 		\
 	object_id.c 	\
+	realpath.c	\
 	reparse.c 	\
 	runlist.c 	\
 	security.c 	\

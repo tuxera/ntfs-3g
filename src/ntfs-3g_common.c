@@ -47,6 +47,7 @@
 #include "security.h"
 #include "xattrs.h"
 #include "ntfs-3g_common.h"
+#include "realpath.h"
 #include "misc.h"
 
 const char xattr_ntfs_3g[] = "ntfs-3g.";
@@ -509,7 +510,9 @@ int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),
 					return -1;
 				
 				/* Canonicalize device name (mtab, etc) */
-				if (!realpath(optarg, popts->device)) {
+				popts->arg_device = optarg;
+				if (!ntfs_realpath_canonicalize(optarg,
+						popts->device)) {
 					ntfs_log_perror("%s: Failed to access "
 					     "volume '%s'", EXEC_NAME, optarg);
 					free(popts->device);
