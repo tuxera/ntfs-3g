@@ -16,7 +16,7 @@ if ENABLE_NTFSPROGS
 bin_PROGRAMS		= ntfsfix ntfsinfo ntfscluster ntfsls ntfscat ntfscmp
 sbin_PROGRAMS		= mkntfs ntfslabel ntfsundelete ntfsresize ntfsclone \
 			  ntfscp
-EXTRA_PROGRAMS		= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
+EXTRA_PROGRAM_NAMES	= ntfsdump_logfile ntfswipe ntfstruncate ntfsmove \
 			  ntfsmftalloc ntfsck
 
 man_MANS		= mkntfs.8 ntfsfix.8 ntfslabel.8 ntfsinfo.8 \
@@ -30,11 +30,13 @@ CLEANFILES		= $(EXTRA_PROGRAMS)
 MAINTAINERCLEANFILES = Makefile.in
 
 if ENABLE_CRYPTO
-EXTRA_PROGRAMS		+= ntfsdecrypt
+EXTRA_PROGRAM_NAMES	+= ntfsdecrypt
 endif
 
 if ENABLE_EXTRAS
-bin_PROGRAMS		+= $(EXTRA_PROGRAMS)
+bin_PROGRAMS		+= $(EXTRA_PROGRAM_NAMES)
+else
+EXTRA_PROGRAMS		= $(EXTRA_PROGRAM_NAMES)
 endif
 
 # Set the include path.
