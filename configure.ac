@@ -129,6 +129,13 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+	[ntfs-3g],
+	[AS_HELP_STRING([--disable-ntfs-3g],[disable the ntfs-3g FUSE driver])],
+	,
+	[enable_ntfs_3g="yes"]
+)
+
+AC_ARG_ENABLE(
 	[ntfsprogs],
 	[AS_HELP_STRING([--disable-ntfsprogs],[disable ntfsprogs utilities
 		       (default=no)])],
@@ -500,6 +507,7 @@ AM_CONDITIONAL([RUN_LDCONFIG], [test "${enable_ldconfig}" = "yes"])
 AM_CONDITIONAL([REALLYSTATIC], [test "${enable_really_static}" = "yes"])
 AM_CONDITIONAL([INSTALL_LIBRARY], [test "${enable_library}" = "yes"])
 AM_CONDITIONAL([ENABLE_MOUNT_HELPER], [test "${enable_mount_helper}" = "yes"])
+AM_CONDITIONAL([ENABLE_NTFS_3G], [test "${enable_ntfs_3g}" = "yes"])
 AM_CONDITIONAL([ENABLE_NTFSPROGS], [test "${enable_ntfsprogs}" = "yes"])
 AM_CONDITIONAL([ENABLE_EXTRAS], [test "${enable_extras}" = "yes"])
 

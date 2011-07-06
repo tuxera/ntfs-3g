@@ -11,6 +11,8 @@ FUSE_CFLAGS = $(FUSE_MODULE_CFLAGS)
 FUSE_LIBS   = $(FUSE_MODULE_LIBS)
 endif
 
+if ENABLE_NTFS_3G
+
 bin_PROGRAMS	 = ntfs-3g.probe \
 		ntfs-3g.usermap \
 		ntfs-3g.secaudit
@@ -80,3 +82,5 @@ uninstall-local:
 if ENABLE_MOUNT_HELPER
 	$(RM) -f "$(DESTDIR)/sbin/mount.ntfs-3g" "$(DESTDIR)/sbin/mount.lowntfs-3g"
 endif
+
+endif # ENABLE_NTFS_3G
