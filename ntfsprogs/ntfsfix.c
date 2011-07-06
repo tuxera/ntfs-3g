@@ -318,8 +318,8 @@ static int empty_journal(ntfs_volume *vol)
 static int clear_badclus(ntfs_volume *vol)
 {
 	static ntfschar badstream[] = {
-				cpu_to_le16('$'), cpu_to_le16('B'),
-				cpu_to_le16('a'), cpu_to_le16('d')
+				const_cpu_to_le16('$'), const_cpu_to_le16('B'),
+				const_cpu_to_le16('a'), const_cpu_to_le16('d')
 	} ;
 	ntfs_inode *ni;
 	ntfs_attr *na;
