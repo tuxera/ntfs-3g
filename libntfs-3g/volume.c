@@ -374,6 +374,11 @@ mft_has_no_attr_list:
 	/* Done with the $Mft mft record. */
 	ntfs_attr_put_search_ctx(ctx);
 	ctx = NULL;
+
+	/* Update the size fields in the inode. */
+	vol->mft_ni->data_size = vol->mft_na->data_size;
+	vol->mft_ni->allocated_size = vol->mft_na->allocated_size;
+
 	/*
 	 * The volume is now setup so we can use all read access functions.
 	 */
