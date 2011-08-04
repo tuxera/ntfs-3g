@@ -157,8 +157,10 @@ with
 first.
 .TP
 \fB\-f\fR, \fB\-\-force\fR
-Forces ntfsresize to proceed with the resize operation even if the filesystem
-is marked for consistency check.
+Forces ntfsresize to proceed with the resize operation either without
+prompting for an explicit acceptance, or if the filesystem is marked for
+consistency check. Double the option (-ff, --force --force) to avoid
+prompting even if the file system is marked for check.
 
 Please note, ntfsresize always marks the filesystem
 for consistency check before a real resize operation
