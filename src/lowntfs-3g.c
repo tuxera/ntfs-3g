@@ -1262,8 +1262,10 @@ static void ntfs_fuse_read(fuse_req_t req, fuse_ino_t ino, size_t size,
 	s64 total = 0;
 	s64 max_read;
 
-	if (!size)
+	if (!size) {
+		res = 0;
 		goto exit;
+	}
 	buf = (char*)ntfs_malloc(size);
 	if (!buf) {
 		res = -errno;
