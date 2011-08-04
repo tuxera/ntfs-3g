@@ -870,7 +870,6 @@ int utils_is_metadata(ntfs_inode *inode)
 		if (__metadata(vol, num) == 1)
 			return 1;
 	}
-	file = inode->mrec;
 
 	rec = find_first_attribute(AT_FILE_NAME, inode->mrec);
 	if (!rec)
