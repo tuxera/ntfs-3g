@@ -192,6 +192,7 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
     return send_reply_iov(req, error, iov, count);
 }
 
+#if 0 /* not used */
 int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
 {
     int res;
@@ -209,6 +210,7 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
 
     return res;
 }
+#endif
 
 size_t fuse_dirent_size(size_t namelen)
 {
