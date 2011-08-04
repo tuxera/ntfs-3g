@@ -1262,7 +1262,7 @@ void ntfs_upcase_table_build(ntfschar *uc, u32 uc_len)
 
 u32 ntfs_upcase_build_default(ntfschar **upcase)
 {
-	u32 upcase_len;
+	u32 upcase_len = 0;
 
 	*upcase = (ntfschar*)ntfs_malloc(UPCASE_LEN*2);
 	if (*upcase) {
