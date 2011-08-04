@@ -3507,16 +3507,16 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 int ntfs_set_ownmod(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			uid_t uid, gid_t gid, const mode_t mode)
 {
-	const SECURITY_DESCRIPTOR_RELATIVE *phead;
 	const struct CACHED_PERMISSIONS *cached;
 	char *oldattr;
-	const SID *usid;
-	const SID *gsid;
 	uid_t fileuid;
 	uid_t filegid;
-	BOOL isdir;
 	int res;
 #if POSIXACLS
+	const SECURITY_DESCRIPTOR_RELATIVE *phead;
+	const SID *usid;
+	const SID *gsid;
+	BOOL isdir;
 	const struct POSIX_SECURITY *oldpxdesc;
 	struct POSIX_SECURITY *newpxdesc = (struct POSIX_SECURITY*)NULL;
 	int pxsize;
@@ -3549,6 +3549,7 @@ int ntfs_set_ownmod(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 		filegid = 0;
 		oldattr = getsecurityattr(scx->vol, ni);
 		if (oldattr) {
+#if POSIXACLS
 			isdir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
 				!= const_cpu_to_le16(0);
 			phead = (const SECURITY_DESCRIPTOR_RELATIVE*)
@@ -3561,7 +3562,6 @@ int ntfs_set_ownmod(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 			usid = (const SID*)
 				&oldattr[le32_to_cpu(phead->owner)];
 #endif
-#if POSIXACLS
 			newpxdesc = ntfs_build_permissions_posix(scx->mapping, oldattr,
 					usid, gsid, isdir);
 			if (!newpxdesc || ntfs_merge_mode_posix(newpxdesc, mode))
