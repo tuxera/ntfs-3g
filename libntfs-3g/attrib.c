@@ -5351,7 +5351,6 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 	 * record is in a transiently corrupted state at this moment in time.
 	 */
 	if (ntfs_cluster_free(vol, na, 0, -1) < 0) {
-		err = errno;
 		ntfs_log_perror("Eeek! Failed to release allocated clusters");
 		ntfs_log_trace("Ignoring error and leaving behind wasted "
 				"clusters.\n");
