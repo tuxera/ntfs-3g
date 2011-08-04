@@ -1064,7 +1064,6 @@ static int upgrade_secur_desc(ntfs_volume *vol,
 			na = ntfs_attr_open(ni, AT_STANDARD_INFORMATION,
 				AT_UNNAMED, 0);
 			if (na) {
-				res = 0;
 			/* expand standard information attribute to v3.x */
 				res = ntfs_attr_truncate(na,
 					 (s64)sizeof(STANDARD_INFORMATION));
