@@ -4880,6 +4880,7 @@ cluster_free_err_out:
 		ntfs_log_trace("Eeek!  Failed to release allocated clusters in error "
 				"code path.  Leaving inconsistent metadata...\n");
 	NAttrClearNonResident(na);
+	NAttrClearFullyMapped(na);
 	na->allocated_size = na->data_size;
 	na->rl = NULL;
 	free(rl);
@@ -5362,6 +5363,7 @@ static int ntfs_attr_make_resident(ntfs_attr *na, ntfs_attr_search_ctx *ctx)
 
 	/* Update in-memory struct ntfs_attr. */
 	NAttrClearNonResident(na);
+	NAttrClearFullyMapped(na);
 	NAttrClearSparse(na);
 	NAttrClearEncrypted(na);
 	na->initialized_size = na->data_size;
