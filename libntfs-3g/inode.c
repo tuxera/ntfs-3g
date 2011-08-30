@@ -573,6 +573,9 @@ int ntfs_inode_close(ntfs_inode *ni)
 ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 {
 	u64 mft_no = MREF_LE(mref);
+	VCN extent_vcn;
+	runlist_element *rl;
+	ntfs_volume *vol;
 	ntfs_inode *ni = NULL;
 	ntfs_inode **extent_nis;
 	int i;
@@ -587,6 +590,37 @@ ntfs_inode *ntfs_extent_inode_open(ntfs_inode *base_ni, const MFT_REF mref)
 			(unsigned long long)mft_no,
 			(unsigned long long)base_ni->mft_no);
 	
+	if (!base_ni->mft_no) {
+			/*
+			 * When getting extents of MFT, we must be sure
+			 * they are in the MFT part which has already
+			 * been mapped, otherwise we fall into an endless
+			 * recursion.
+			 * Situations have been met where extents locations
+			 * are described in themselves.
+			 * This is a severe error which chkdsk cannot fix.
+			 */
+		vol = base_ni->vol;
+		extent_vcn = mft_no << vol->mft_record_size_bits
+				>> vol->cluster_size_bits;
+		rl = vol->mft_na->rl;
+		if (rl) {
+			while (rl->length
+			    && ((rl->vcn + rl->length) <= extent_vcn))
+				rl++;
+		}
+		if (!rl || (rl->lcn < 0)) {
+			ntfs_log_error("MFT is corrupt, cannot read"
+				" its unmapped extent record %lld\n",
+					(long long)mft_no);
+			ntfs_log_error("Note : chkdsk cannot fix this,"
+				" try ntfsfix\n");
+			errno = EIO;
+			ni = (ntfs_inode*)NULL;
+			goto out;
+		}
+	}
+
 	/* Is the extent inode already open and attached to the base inode? */
 	if (base_ni->nr_extents > 0) {
 		extent_nis = base_ni->extent_nis;
