@@ -2504,7 +2504,7 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	int res = 0;
 	int longlen = 0;
 	int shortlen = 0;
-	char newname[MAX_DOS_NAME_LENGTH + 1];
+	char newname[3*MAX_DOS_NAME_LENGTH + 1];
 	ntfschar oldname[MAX_DOS_NAME_LENGTH];
 	int oldlen;
 	u64 dnum;
@@ -2512,12 +2512,16 @@ int ntfs_set_ntfs_dos_name(ntfs_inode *ni, ntfs_inode *dir_ni,
 	ntfschar *shortname = NULL;
 	ntfschar longname[NTFS_MAX_NAME_LEN];
 
-		/* convert the string to the NTFS wide chars */
-	if (size > MAX_DOS_NAME_LENGTH)
-		size = MAX_DOS_NAME_LENGTH;
+		/* copy the string to insert a null char, and truncate */
+	if (size > 3*MAX_DOS_NAME_LENGTH)
+		size = 3*MAX_DOS_NAME_LENGTH;
 	strncpy(newname, value, size);
+		/* a long name may be truncated badly and be untranslatable */
 	newname[size] = 0;
+		/* convert the string to the NTFS wide chars, and truncate */
 	shortlen = ntfs_mbstoucs(newname, &shortname);
+	if (shortlen > MAX_DOS_NAME_LENGTH)
+		shortlen = MAX_DOS_NAME_LENGTH;
 			/* make sure the short name has valid chars */
 	if ((shortlen < 0) || ntfs_forbidden_chars(shortname,shortlen)) {
 		ntfs_inode_close_in_dir(ni,dir_ni);
