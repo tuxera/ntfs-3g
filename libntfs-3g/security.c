@@ -4777,6 +4777,7 @@ BOOL ntfs_set_file_attributes(struct SECURITY_API *scapi,
 				ni->flags = (ni->flags & ~settable)
 					 | (cpu_to_le32(attrib) & settable);
 				NInoSetDirty(ni);
+				NInoFileNameSetDirty(ni);
 			}
 			if (!ntfs_inode_close(ni))
 				res = -1;
