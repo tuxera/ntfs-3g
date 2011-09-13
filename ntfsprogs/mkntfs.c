@@ -2149,7 +2149,7 @@ static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 	int i;
 
 	if (vol_name) {
-		uname_len = ntfs_mbstoucs_libntfscompat(vol_name, &uname, 0);
+		uname_len = ntfs_mbstoucs(vol_name, &uname);
 		if (uname_len < 0)
 			return -errno;
 		if (uname_len > 0xff) {

@@ -235,8 +235,8 @@ static int parse_options(int argc, char **argv)
 			break;
 
 		case 'n':
-			opts.attr_name_len = ntfs_mbstoucs_libntfscompat(optarg,
-							   &opts.attr_name, 0);
+			opts.attr_name_len = ntfs_mbstoucs(optarg,
+							   &opts.attr_name);
 			if (opts.attr_name_len < 0) {
 				ntfs_log_perror("Invalid attribute name '%s'",
 						optarg);

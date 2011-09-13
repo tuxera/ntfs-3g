@@ -293,7 +293,7 @@ static ntfs_inode *ntfs_new_file(ntfs_inode *dir_ni,
 
 	/* ntfs_mbstoucs(...) will allocate memory for ufilename if it's NULL */
 	ufilename = NULL;
-	ufilename_len = ntfs_mbstoucs_libntfscompat(filename, &ufilename, 0);
+	ufilename_len = ntfs_mbstoucs(filename, &ufilename);
 	if (ufilename_len == -1) {
 		ntfs_log_perror("ERROR: Failed to convert '%s' to unicode",
 					filename);

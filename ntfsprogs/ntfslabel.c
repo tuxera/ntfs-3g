@@ -257,7 +257,7 @@ static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, 
 		}
 	}
 
-	label_len = ntfs_mbstoucs_libntfscompat(label, &new_label, 0);
+	label_len = ntfs_mbstoucs(label, &new_label);
 	if (label_len == -1) {
 		ntfs_log_perror("Unable to convert label string to Unicode");
 		return 1;
