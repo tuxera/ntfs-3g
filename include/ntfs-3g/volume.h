@@ -297,6 +297,7 @@ extern int ntfs_volume_error(int err);
 extern void ntfs_mount_error(const char *vol, const char *mntpoint, int err);
 
 extern int ntfs_volume_get_free_space(ntfs_volume *vol);
+extern int ntfs_volume_rename(ntfs_volume *vol, ntfschar *label, int label_len);
 
 extern int ntfs_set_shown_files(ntfs_volume *vol,
 		BOOL show_sys_files, BOOL show_hid_files, BOOL hide_dot_files);

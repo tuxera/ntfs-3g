@@ -1725,3 +1725,113 @@ int ntfs_volume_get_free_space(ntfs_volume *vol)
 	}
 	return (ret);
 }
+
+/**
+ * ntfs_volume_rename - change the current label on a volume
+ * @vol:	volume to change the label on
+ * @label:	the new label
+ * @label_len:	the length of @label in ntfschars including the terminating NULL
+ *		character, which is mandatory (the value can not exceed 128)
+ *
+ * Change the label on the volume @vol to @label.
+ */
+int ntfs_volume_rename(ntfs_volume *vol, ntfschar *label, int label_len)
+{
+	ntfs_attr *na;
+	char *old_vol_name;
+	char *new_vol_name = NULL;
+	int new_vol_name_len;
+	int err;
+
+	if (NVolReadOnly(vol)) {
+		ntfs_log_error("Refusing to change label on read-only mounted "
+			"volume.\n");
+		errno = EROFS;
+		return -1;
+	}
+
+	label_len *= sizeof(ntfschar);
+	if (label_len > 0x100) {
+		ntfs_log_error("New label is too long. Maximum %u characters "
+				"allowed.\n",
+				(unsigned)(0x100 / sizeof(ntfschar)));
+		errno = ERANGE;
+		return -1;
+	}
+
+	na = ntfs_attr_open(vol->vol_ni, AT_VOLUME_NAME, AT_UNNAMED, 0);
+	if (!na) {
+		if (errno != ENOENT) {
+			err = errno;
+			ntfs_log_perror("Lookup of $VOLUME_NAME attribute "
+				"failed");
+			goto err_out;
+		}
+
+		/* The volume name attribute does not exist.  Need to add it. */
+		if (ntfs_attr_add(vol->vol_ni, AT_VOLUME_NAME, AT_UNNAMED, 0,
+			(u8*) label, label_len))
+		{
+			err = errno;
+			ntfs_log_perror("Encountered error while adding "
+				"$VOLUME_NAME attribute");
+			goto err_out;
+		}
+	}
+	else {
+		s64 written;
+
+		if (NAttrNonResident(na)) {
+			err = errno;
+			ntfs_log_error("Error: Attribute $VOLUME_NAME must be "
+					"resident.\n");
+			goto err_out;
+		}
+
+		if (na->data_size != label_len) {
+			if (ntfs_attr_truncate(na, label_len)) {
+				err = errno;
+				ntfs_log_perror("Error resizing resident "
+					"attribute");
+				goto err_out;
+			}
+		}
+
+		if (label_len) {
+			written = ntfs_attr_pwrite(na, 0, label_len, label);
+			if (written == -1) {
+				err = errno;
+				ntfs_log_perror("Error when writing "
+					"$VOLUME_NAME data");
+				goto err_out;
+			}
+			else if (written != label_len) {
+				err = EIO;
+				ntfs_log_error("Partial write when writing "
+					"$VOLUME_NAME data.");
+				goto err_out;
+
+			}
+		}
+	}
+
+	new_vol_name_len =
+		ntfs_ucstombs(label, label_len, &new_vol_name, 0);
+	if (new_vol_name_len == -1) {
+		err = errno;
+		ntfs_log_perror("Error while decoding new volume name");
+		goto err_out;
+	}
+
+	old_vol_name = vol->vol_name;
+	vol->vol_name = new_vol_name;
+	free(old_vol_name);
+
+	err = 0;
+err_out:
+	if (na)
+		ntfs_attr_close(na);
+	if (err)
+		errno = err;
+	return err ? -1 : 0;
+}
