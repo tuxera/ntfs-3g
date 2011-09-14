@@ -2136,8 +2136,9 @@ static int add_attr_data_positioned(MFT_RECORD *m, const char *name,
  * Create volume name attribute specifying the volume name @vol_name as a null
  * terminated char string of length @vol_name_len (number of characters not
  * including the terminating null), which is converted internally to a little
- * endian ntfschar string. The name is at least 1 character long and at most
- * 0xff characters long (not counting the terminating null).
+ * endian ntfschar string. The name is at least 1 character long (though
+ * Windows accepts zero characters), and at most 128 characters long (not
+ * counting the terminating null).
  *
  * Return 0 on success or -errno on error.
  */
@@ -2152,7 +2153,7 @@ static int add_attr_vol_name(MFT_RECORD *m, const char *vol_name,
 		uname_len = ntfs_mbstoucs(vol_name, &uname);
 		if (uname_len < 0)
 			return -errno;
-		if (uname_len > 0xff) {
+		if (uname_len > 128) {
 			free(uname);
 			return -ENAMETOOLONG;
 		}
