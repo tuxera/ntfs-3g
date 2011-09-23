@@ -216,8 +216,10 @@ int ntfs_mft_record_check(const ntfs_volume *vol, const MFT_REF mref,
 	int ret = -1;
 	
 	if (!ntfs_is_file_record(m->magic)) {
-		ntfs_log_error("Record %llu has no FILE magic (0x%x)\n",
-			       (unsigned long long)MREF(mref), *(le32 *)m);
+		if (!NVolNoFixupWarn(vol))
+			ntfs_log_error("Record %llu has no FILE magic (0x%x)\n",
+				(unsigned long long)MREF(mref),
+				(int)le32_to_cpu(*(le32*)m));
 		goto err_out;
 	}
 	

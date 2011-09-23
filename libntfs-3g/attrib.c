@@ -2534,6 +2534,7 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 {
 	s64 br;
 	u8 *end;
+	BOOL warn;
 
 	ntfs_log_trace("Entering for inode 0x%llx, attr type 0x%x, pos 0x%llx.\n",
 			(unsigned long long)na->ni->mft_no, na->type,
@@ -2547,9 +2548,11 @@ s64 ntfs_attr_mst_pread(ntfs_attr *na, const s64 pos, const s64 bk_cnt,
 	if (br <= 0)
 		return br;
 	br /= bk_size;
+		/* log errors unless silenced */
+	warn = !na->ni || !na->ni->vol || !NVolNoFixupWarn(na->ni->vol);
 	for (end = (u8*)dst + br * bk_size; (u8*)dst < end; dst = (u8*)dst +
 			bk_size)
-		ntfs_mst_post_read_fixup((NTFS_RECORD*)dst, bk_size);
+		ntfs_mst_post_read_fixup_warn((NTFS_RECORD*)dst, bk_size, warn);
 	/* Finally, return the number of blocks read. */
 	return br;
 }

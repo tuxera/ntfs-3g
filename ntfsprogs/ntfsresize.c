@@ -2814,6 +2814,7 @@ int main(int argc, char **argv)
 	 */
 	resize.badclusters = check_bad_sectors(vol);
 
+	NVolSetNoFixupWarn(vol);
 	check_cluster_allocation(vol, &fsck);
 
 	print_disk_usage(vol, fsck.inuse);

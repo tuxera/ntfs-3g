@@ -1292,6 +1292,7 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 			volume->mft_record_size_bits) - 1;
 	progress_init(&progress, inode, last_mft_rec, 100);
 
+	NVolSetNoFixupWarn(volume);
 	for (; inode <= last_mft_rec; inode++) {
 
 		int err, deleted_inode;
