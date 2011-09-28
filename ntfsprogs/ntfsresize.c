@@ -2717,7 +2717,7 @@ static void check_cluster_allocation(ntfs_volume *vol, ntfsck_t *fsck)
 			err_printf("%d clusters are referenced outside "
 				   "of the volume.\n", fsck->outsider);
 		if (fsck->multi_ref)
-			err_printf("%d clusters are referenced multiply"
+			err_printf("%d clusters are referenced multiple"
 				   " times.\n", fsck->multi_ref);
 		printf("%s", corrupt_volume_msg);
 		exit(1);

@@ -1678,7 +1678,7 @@ int ntfs_rl_truncate(runlist **arl, const VCN start_vcn)
 	/**
 	 * Reallocate memory if necessary.
 	 * FIXME: Below code is broken, because runlist allocations must be 
-	 * a multiply of 4096. The code caused crashes and corruptions.
+	 * a multiple of 4096. The code caused crashes and corruptions.
 	 */
 /*	
 	 if (!is_end) {

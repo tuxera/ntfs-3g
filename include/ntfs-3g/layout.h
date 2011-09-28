@@ -2223,11 +2223,11 @@ typedef struct {
 /* The below field is NOT present for the quota defaults entry. */
 	SID sid;		/* The SID of the user/object associated with
 				   this quota entry. If this field is missing
-				   then the INDEX_ENTRY is padded with zeros
-				   to multiply of 8 which are not counted in
+				   then the INDEX_ENTRY is padded to a multiple
+				   of 8 with zeros which are not counted in
 				   the data_length field. If the sid is present
 				   then this structure is padded with zeros to
-				   multiply of 8 and the padding is counted in
+				   a multiple of 8 and the padding is counted in
 				   the INDEX_ENTRY's data_length. */
 } __attribute__((__packed__)) QUOTA_CONTROL_ENTRY;
 
