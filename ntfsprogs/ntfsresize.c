@@ -2334,7 +2334,7 @@ static int check_bad_sectors(ntfs_volume *vol)
 		base_ni = ctx->ntfs_ino;
 
 	if (NInoAttrList(base_ni)) {
-		err_printf("Hopelessly many bad sectors has been detected!\n");
+		err_printf("Too many bad sectors have been detected!\n");
 		printf("%s", many_bad_sectors_msg);
 		exit(1);
 	}
