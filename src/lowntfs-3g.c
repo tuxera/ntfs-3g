@@ -179,7 +179,8 @@ struct open_file {
 enum {
 	CLOSE_GHOST = 1,
 	CLOSE_COMPRESSED = 2,
-	CLOSE_ENCRYPTED = 4
+	CLOSE_ENCRYPTED = 4,
+	CLOSE_DMTIME = 8
 };
 
 static struct ntfs_options opts;
@@ -1219,6 +1220,9 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					state |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			/* mark a future need to update the mtime */
+				if (ctx->dmtime)
+					state |= CLOSE_DMTIME;
 			/* deny opening metadata files for writing */
 				if (ino < FILE_first_user)
 					res = -EPERM;
@@ -1355,7 +1359,7 @@ static void ntfs_fuse_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		total  += ret;
 	}
 	res = total;
-	if (res > 0)
+	if ((res > 0) && !ctx->dmtime)
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
@@ -1911,6 +1915,8 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				state |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			if (fi && ctx->dmtime)
+				state |= CLOSE_DMTIME;
 			ntfs_inode_update_mbsname(dir_ni, name, ni->mft_no);
 			NInoSetDirty(ni);
 			e->ino = ni->mft_no;
@@ -2381,7 +2387,9 @@ static void ntfs_fuse_release(fuse_req_t req, fuse_ino_t ino,
 
 	of = (struct open_file*)(long)fi->fh;
 	/* Only for marked descriptors there is something to do */
-	if (!of || !(of->state & (CLOSE_COMPRESSED | CLOSE_ENCRYPTED))) {
+	if (!of
+	    || !(of->state & (CLOSE_COMPRESSED
+				| CLOSE_ENCRYPTED | CLOSE_DMTIME))) {
 		res = 0;
 		goto out;
 	}
@@ -2396,6 +2404,8 @@ static void ntfs_fuse_release(fuse_req_t req, fuse_ino_t ino,
 		goto exit;
 	}
 	res = 0;
+	if (of->state & CLOSE_DMTIME)
+		ntfs_inode_update_times(ni,NTFS_UPDATE_MCTIME);
 	if (of->state & CLOSE_COMPRESSED)
 		res = ntfs_attr_pclose(na);
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */

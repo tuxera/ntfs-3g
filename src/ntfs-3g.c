@@ -140,7 +140,8 @@ typedef struct {
 
 enum {
 	CLOSE_COMPRESSED = 1,
-	CLOSE_ENCRYPTED = 2
+	CLOSE_ENCRYPTED = 2,
+	CLOSE_DMTIME = 4
 };
 
 static struct ntfs_options opts;
@@ -1167,6 +1168,9 @@ static int ntfs_fuse_open(const char *org_path,
 				    && (ni->flags & FILE_ATTR_ENCRYPTED))
 					fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			/* mark a future need to update the mtime */
+				if (ctx->dmtime)
+					fi->fh |= CLOSE_DMTIME;
 			/* deny opening metadata files for writing */
 				if (ni->mft_no < FILE_first_user)
 					res = -EPERM;
@@ -1289,7 +1293,7 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		total  += ret;
 	}
 	res = total;
-	if (res > 0)
+	if ((res > 0) && !ctx->dmtime)
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)
@@ -1315,7 +1319,7 @@ static int ntfs_fuse_release(const char *org_path,
 	int stream_name_len, res;
 
 	/* Only for marked descriptors there is something to do */
-	if (!(fi->fh & (CLOSE_COMPRESSED | CLOSE_ENCRYPTED))) {
+	if (!(fi->fh & (CLOSE_COMPRESSED | CLOSE_ENCRYPTED | CLOSE_DMTIME))) {
 		res = 0;
 		goto out;
 	}
@@ -1335,6 +1339,8 @@ static int ntfs_fuse_release(const char *org_path,
 		goto exit;
 	}
 	res = 0;
+	if (fi->fh & CLOSE_DMTIME)
+		ntfs_inode_update_times(na->ni,NTFS_UPDATE_MCTIME);
 	if (fi->fh & CLOSE_COMPRESSED)
 		res = ntfs_attr_pclose(na);
 #ifdef HAVE_SETXATTR	/* extended attributes interface required */
@@ -1712,6 +1718,9 @@ static int ntfs_fuse_create(const char *org_path, mode_t typemode, dev_t dev,
 			    && (ni->flags & FILE_ATTR_ENCRYPTED))
 				fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+			/* mark a need to update the mtime */
+			if (fi && ctx->dmtime)
+				fi->fh |= CLOSE_DMTIME;
 			NInoSetDirty(ni);
 			/*
 			 * closing ni requires access to dir_ni to
@@ -1781,6 +1790,8 @@ static int ntfs_fuse_create_stream(const char *path,
 		    && (ni->flags & FILE_ATTR_ENCRYPTED))
 			fi->fh |= CLOSE_ENCRYPTED;
 #endif /* HAVE_SETXATTR */
+		if (ctx->dmtime)
+			fi->fh |= CLOSE_DMTIME;
 	}
 
 	if (ntfs_inode_close(ni))

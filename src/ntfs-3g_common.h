@@ -50,6 +50,7 @@ enum {
 	OPT_NOATIME,
 	OPT_ATIME,
 	OPT_RELATIME,
+	OPT_DMTIME,
 	OPT_FAKE_RW,
 	OPT_FSNAME,
 	OPT_NO_DEF_OPTS,
@@ -116,6 +117,7 @@ typedef struct {
 	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
 	ntfs_atime_t atime;
+	BOOL dmtime;
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL hide_hid_files;

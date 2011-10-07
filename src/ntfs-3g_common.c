@@ -76,6 +76,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "noatime", OPT_NOATIME, FLGOPT_BOGUS },
 	{ "atime", OPT_ATIME, FLGOPT_BOGUS },
 	{ "relatime", OPT_RELATIME, FLGOPT_BOGUS },
+	{ "delay_mtime", OPT_DMTIME, FLGOPT_BOGUS },
 	{ "fake_rw", OPT_FAKE_RW, FLGOPT_BOGUS },
 	{ "fsname", OPT_FSNAME, FLGOPT_NOSUPPORT },
 	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
@@ -237,6 +238,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 				break;
 			case OPT_RELATIME :
 				ctx->atime = ATIME_RELATIVE;
+				break;
+			case OPT_DMTIME :
+				ctx->dmtime = TRUE;
 				break;
 			case OPT_NO_DEF_OPTS :
 				no_def_opts = TRUE; /* Don't add default options. */
