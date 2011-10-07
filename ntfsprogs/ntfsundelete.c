@@ -1802,11 +1802,18 @@ static int undelete_file(ntfs_volume *vol, long long inode)
 
 	list_for_each(item, &file->data) {
 		struct data *d = list_entry(item, struct data, list);
+		char defname[sizeof(UNKNOWN) + 25];
 
 		if (opts.output)
-				name = opts.output;
+			name = opts.output;
 		else
+			if (file->pref_name)
 				name = file->pref_name;
+			else {
+				sprintf(defname,"%s%lld",UNKNOWN,
+						(long long)file->inode);
+				name = defname;
+			}
 
 		create_pathname(opts.dest, name, d->name, pathname, sizeof(pathname));
 		if (d->resident) {
