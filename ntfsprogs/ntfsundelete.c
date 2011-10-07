@@ -86,6 +86,7 @@
 #include "ntfstime.h"
 /* #include "version.h" */
 #include "logging.h"
+#include "misc.h"
 
 static const char *EXEC_NAME = "ntfsundelete";
 static const char *MFTFILE   = "mft";
@@ -872,6 +873,74 @@ static void get_parent_name(struct filename* name, ntfs_volume* vol)
 	return;
 }
 
+/*
+ *		Rescue the last deleted name of a file
+ *
+ *	Under some conditions, when a name is deleted and the MFT
+ *	record is shifted to reclaim the space, the name is still
+ *	present beyond the end of record.
+ *
+ *	For this to be possible, the data record has to be small (less
+ *	than 80 bytes), and there must be no other attributes.
+ *	So only the names of plain unfragmented files can be rescued.
+ *
+ *	Returns NULL when the name cannot be recovered.
+ */
+
+static struct filename *rescue_name(MFT_RECORD *mft, ntfs_attr_search_ctx *ctx)
+{
+	ATTR_RECORD *rec;
+	struct filename *name;
+	int off_name;
+	int length;
+	int type;
+
+	name = (struct filename*)NULL;
+	ntfs_attr_reinit_search_ctx(ctx);
+	rec = find_attribute(AT_DATA, ctx);
+	if (rec) {
+		/*
+		 * If the data attribute replaced the name attribute,
+		 * the name itself is at offset 0x58 from the data attr.
+		 * First be sure this location is within the unused part
+		 * of the MFT record, then make extra checks.
+		 */
+		off_name = (long)rec - (long)mft + 0x58;
+		if ((off_name >= (int)le32_to_cpu(mft->bytes_in_use))
+		    && ((off_name + 4)
+				 <= (int)le32_to_cpu(mft->bytes_allocated))) {
+			length = *((char*)mft + off_name);
+			type = *((char*)mft + off_name + 1);
+			/* check whether the name is fully allocated */
+			if ((type <= 3)
+			   && (length > 0)
+			   && ((off_name + 2*length + 2) 
+				<= (int)le32_to_cpu(mft->bytes_allocated))) {
+				/* create a (partial) name record */
+				name = (struct filename*)
+						ntfs_calloc(sizeof(*name));
+				if (name) {
+					name->uname = (ntfschar*)
+						((char*)mft + off_name + 2);
+					name->uname_len = length;
+					name->name_space = type;
+					if (ntfs_ucstombs(name->uname, length,
+							&name->name, 0) < 0) {
+						free(name);
+						name = (struct filename*)NULL;
+					}
+				}
+			if (name && name->name)
+				ntfs_log_verbose("Recovered file name %s\n",
+						name->name);
+			}
+		}
+	}
+	return (name);
+}
+
+
+
 /**
  * get_filenames - Read an MFT Record's $FILENAME attributes
  * @file:  The file object to work with
@@ -958,6 +1027,34 @@ static int get_filenames(struct ufile *file, ntfs_volume* vol)
 		count++;
 	}
 
+	if (!count) {
+		name = rescue_name(file->mft,ctx);
+		if (name) {
+			/* a name was recovered, get missing attributes */
+			file->pref_name = name->name;
+			ntfs_attr_reinit_search_ctx(ctx);
+			rec = find_attribute(AT_STANDARD_INFORMATION, ctx);
+			if (rec) {
+				attr = (FILE_NAME_ATTR *)((char *)rec +
+						le16_to_cpu(rec->value_offset));
+				name->flags      = attr->file_attributes;
+
+				name->date_c     = ntfs2timespec(attr->creation_time).tv_sec;
+				name->date_a     = ntfs2timespec(attr->last_data_change_time).tv_sec;
+				name->date_m     = ntfs2timespec(attr->last_mft_change_time).tv_sec;
+				name->date_r     = ntfs2timespec(attr->last_access_time).tv_sec;
+			}
+			rec = find_attribute(AT_DATA, ctx);
+			if (rec) {
+				attr = (FILE_NAME_ATTR *)((char *)rec +
+						le16_to_cpu(rec->value_offset));
+				name->size_alloc = sle64_to_cpu(attr->allocated_size);
+				name->size_data  = sle64_to_cpu(attr->data_size);
+			}
+		list_add_tail(&name->list, &file->name);
+		count++;
+		}
+	}
 	ntfs_attr_put_search_ctx(ctx);
 	ntfs_log_debug("File has %d names.\n", count);
 	return count;
