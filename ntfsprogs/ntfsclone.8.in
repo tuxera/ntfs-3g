@@ -157,6 +157,8 @@ embedded into metadata. All is filled with zeros.
 Moreover all the file timestamps, deleted and unused spaces inside
 the metadata are filled with zeros. Thus this mode is inappropriate
 for example for forensic analyses.
+This mode may be combined with \fB\-\-save\-image\fP to create a
+special image format file instead of a sparse file.
 
 Please note, filenames are not wiped out. They might contain
 sensitive information, so think twice before sending such an
@@ -211,8 +213,9 @@ beginning of such sectors are marked by "BadSectoR\\0".
 \fB\-m\fR, \fB\-\-metadata\fR
 Clone
 .B ONLY METADATA
-(for NTFS experts). Moreover only cloning to a file is allowed.
-You can't metadata\-only clone to a device, image or standard output.
+(for NTFS experts). Only cloning to a (sparse) file is allowed, unless used
+the option \fB\-\-save\-image\fP is also used.
+You can't metadata\-only clone to a device.
 .TP
 \fB\-\-ignore\-fs\-check\fR
 Ignore the result of the filesystem consistency check. This option is allowed
@@ -301,12 +304,16 @@ Clone an NTFS volume to a non\-existent file:
 .RE
 Pack NTFS metadata for NTFS experts. Please note that bzip2 runs
 very long but results usually at least 10 times smaller archives 
-than gzip.
+than gzip on a sparse file.
 .RS
 .sp
 .B ntfsclone \-\-metadata \-\-output ntfsmeta.img /dev/hda1
 .br
 .B bzip2 ntfsmeta.img
+.sp
+Or, outputting to a compressed image :
+.br
+.B ntfsclone \-mst \-\-output - /dev/hda1 | bzip2 > ntfsmeta.bz2
 .sp
 .RE
 Unpacking NTFS metadata into a sparse file:
