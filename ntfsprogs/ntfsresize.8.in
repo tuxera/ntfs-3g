@@ -87,7 +87,11 @@ underlying partition. This can be done using
 .BR fdisk (8)
 by deleting the partition and recreating it with a larger size.
 Make sure it will not overlap with an other existing partition.
-Then  you may use
+You may enlarge upwards (first sector unchanged) or downwards (last
+sector unchanged), but you may not enlarge at both ends in a single step.
+If you merge two NTFS partitions, only one of them can be expanded to the
+merged partition.
+After you have enlarged the partition, you may use
 .B ntfsresize
 to enlarge the size of the filesystem.
 .SS Partitioning
@@ -122,8 +126,9 @@ is ready to be resized. If not, it will print any errors detected.
 If the device is fine, nothing will be printed.
 .TP
 \fB\-i\fR, \fB\-\-info\fR
-By using this option ntfsresize will determine the theoretically smallest
-shrunken filesystem size supported. Most of the time the result is the space
+By using this option without \fB\-\-expand\fP, ntfsresize will determine the
+theoretically smallest shrunken filesystem size supported.
+Most of the time the result is the space
 already used on the filesystem. Ntfsresize will refuse shrinking to a
 smaller size than what you got by this option and depending on several
 factors it might be unable to shrink very close to this theoretical
@@ -135,15 +140,23 @@ Practically the smallest shrunken size generally is
 at around "used space" + (20\-200 MB). Please also take into account
 that Windows might need about 50\-100 MB free space left to boot safely.
 
+If used in association with option \fB\-\-expand\fP, ntfsresize will determine
+the smallest downwards expansion size and the possible increments to the
+size. These are exact byte counts which must not be rounded.
+This option may be used after the partition has been expanded
+provided the upper bound has not been changed.
+
 This option never causes any changes to the filesystem, the partition is
 opened read\-only.
 .TP
 \fB\-m\fR, \fB\-\-info\-mb\-only\fR
 Like the info option, only print out the shrinkable size in MB.  Print nothing
 if the shrink size is the same as the original size (in MB).
+This option cannot be used in association with option \fB\-\-expand\fP.
 .TP
 \fB\-s\fR, \fB\-\-size\fR SIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR]
-Resize filesystem to \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes.
+Resize filesystem to \fISIZE\fR[\fBk\fR|\fBM\fR|\fBG\fR] bytes by
+shifting its end and keeping its beginning unchanged.
 The optional modifiers
 .BR k ,
 .BR M ,
@@ -155,6 +168,23 @@ Conforming to standards, k=10^3, M=10^6 and G=10^9. Use this option
 with
 .B \-\-no\-action
 first.
+.TP
+\fB\-x\fR, \fB\-\-expand\fR
+Expand the filesystem to the current partition size, shifting down its
+beginning and keeping its end unchanged. The metadata is recreated in the
+expanded space and no user data is relocated. This is incompatible with
+option \-s (or \-\-size) and can only be made if the expanded space is an
+exact multiple of the cluster size. It must also be large enough to hold the
+new metadata.
+
+If the expansion is interrupted for some reason (power outage, etc), you may
+restart the resizing, as the original data and metadata have been kept
+unchanged.
+
+Note : expanding a Windows system partition and filesystem downwards may lead
+to the registry or some files not matching the new system layout, or to
+some important files being located too far from the beginning of the
+partition, thus making Windows not bootable.
 .TP
 \fB\-f\fR, \fB\-\-force\fR
 Forces ntfsresize to proceed with the resize operation either without
