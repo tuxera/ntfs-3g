@@ -54,6 +54,7 @@
 #include <locale.h>
 #endif
 
+#include "param.h"
 #include "compat.h"
 #include "volume.h"
 #include "attrib.h"
@@ -501,6 +502,12 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	NVolSetShowSysFiles(vol);
 	NVolSetShowHidFiles(vol);
 	NVolClearHideDotFiles(vol);
+		/* set default compression */
+#if DEFAULT_COMPRESSION
+	NVolSetCompression(vol);
+#else
+	NVolClearCompression(vol);
+#endif
 	if (flags & MS_RDONLY)
 		NVolSetReadOnly(vol);
 	

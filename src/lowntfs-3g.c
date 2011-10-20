@@ -3433,6 +3433,8 @@ static int ntfs_open(const char *device)
 		NDevSetSync(ctx->vol->dev);
 	if (ctx->compression)
 		NVolSetCompression(ctx->vol);
+	else
+		NVolClearCompression(ctx->vol);
 #ifdef HAVE_SETXATTR
 			/* archivers must see hidden files */
 	if (ctx->efs_raw)
