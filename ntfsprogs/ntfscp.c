@@ -360,6 +360,10 @@ int main(int argc, char *argv[])
 		goto umount;
 
 	NVolSetCompression(vol); /* allow compression */
+	if (ntfs_volume_get_free_space(vol)) {
+		ntfs_log_perror("ERROR: couldn't get free space");
+		goto umount;
+	}
 
 	{
 		struct stat fst;
