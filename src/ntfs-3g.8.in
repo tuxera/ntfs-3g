@@ -375,8 +375,10 @@ to be the owner of all files:
 .B ntfs-3g /dev/sda5 /home/user/mnt \-o ro,uid=1000
 .sp
 .RE
-/etc/fstab entry for the above:
+/etc/fstab entry for the above (the sixth and last field has to be zero to
+avoid a file system check at boot time) :
 .RS
+.sp
 .B /dev/sda5 /home/user/mnt ntfs\-3g ro,uid=1000 0 0
 .sp
 .RE
