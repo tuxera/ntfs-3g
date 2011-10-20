@@ -5468,6 +5468,7 @@ static int ntfs_attr_update_meta(ATTR_RECORD *a, ntfs_attr *na, MFT_RECORD *m,
 		
 		NAttrClearSparse(na);
 		a->flags &= ~ATTR_IS_SPARSE;
+		na->data_flags = a->flags;
 		a->compression_unit = 0;
 		
 		memmove((u8*)a + le16_to_cpu(a->name_offset) - 8, 
