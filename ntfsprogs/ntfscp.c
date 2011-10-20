@@ -359,6 +359,8 @@ int main(int argc, char *argv[])
 	if ((vol->flags & VOLUME_IS_DIRTY) && !opts.force)
 		goto umount;
 
+	NVolSetCompression(vol); /* allow compression */
+
 	{
 		struct stat fst;
 		if (stat(opts.src_file, &fst) == -1) {
@@ -558,6 +560,9 @@ int main(int argc, char *argv[])
 		}
 		offset += bw;
 	}
+	if ((na->data_flags & ATTR_COMPRESSION_MASK)
+	    && ntfs_attr_pclose(na))
+		ntfs_log_perror("ERROR: ntfs_attr_pclose failed");
 	ntfs_log_verbose("Syncing.\n");
 	result = 0;
 	free(buf);
