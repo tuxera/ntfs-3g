@@ -97,6 +97,7 @@ static struct {
 	char *volume;
 	BOOL no_action;
 	BOOL clear_bad_sectors;
+	BOOL clear_dirty;
 } opt;
 
 /*
@@ -130,6 +131,7 @@ static void usage(void)
 		   "    Attempt to fix an NTFS partition.\n"
 		   "\n"
 		   "    -b, --clear-bad-sectors Clear the bad sector list\n"
+		   "    -d, --clear-dirty       Clear the volume dirty flag\n"
 		   "    -h, --help              Display this help\n"
 		   "    -n, --no-action         Do not write anything\n"
 		   "    -V, --version           Display version information\n"
@@ -164,11 +166,12 @@ static void version(void)
 static void parse_options(int argc, char **argv)
 {
 	int c;
-	static const char *sopt = "-bhnV";
+	static const char *sopt = "-bdhnV";
 	static const struct option lopt[] = {
 		{ "help",		no_argument,	NULL, 'h' },
 		{ "no-action",		no_argument,	NULL, 'n' },
 		{ "clear-bad-sectors",	no_argument,	NULL, 'b' },
+		{ "clear-dirty",	no_argument,	NULL, 'd' },
 		{ "version",		no_argument,	NULL, 'V' },
 		{ NULL, 		0, NULL, 0 }
 	};
@@ -187,6 +190,9 @@ static void parse_options(int argc, char **argv)
 			break;
 		case 'b':
 			opt.clear_bad_sectors = TRUE;
+			break;
+		case 'd':
+			opt.clear_dirty = TRUE;
 			break;
 		case 'n':
 			opt.no_action = TRUE;
@@ -1486,9 +1492,16 @@ int main(int argc, char **argv)
 	 *
 	 * libntfs-3g does not automatically set or clear dirty flags on
 	 * mount/unmount, this means that the assumption that the dirty flag is
-	 * now set does not hold. So we need to set it if not already set. */
-	if(!(vol->flags & VOLUME_IS_DIRTY) && ntfs_volume_write_flags(vol,
-			vol->flags | VOLUME_IS_DIRTY)) {
+	 * now set does not hold. So we need to set it if not already set.
+	 *
+	 * However clear the flag if requested to do so, at this stage
+	 * mounting was successful.
+	 */
+	if (opt.clear_dirty)
+		vol->flags &= ~VOLUME_IS_DIRTY;
+	else
+		vol->flags |= VOLUME_IS_DIRTY;
+	if (!opt.no_action && ntfs_volume_write_flags(vol, vol->flags)) {
 		ntfs_log_error("Error: Failed to set volume dirty flag (%d "
 			"(%s))!\n", errno, strerror(errno));
 	}

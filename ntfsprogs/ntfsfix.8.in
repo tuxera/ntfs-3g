@@ -41,6 +41,11 @@ Long named options can be abbreviated to any unique prefix of their name.
 Clear the list of bad sectors. This is useful after cloning an old disk
 with bad sectors to a new disk.
 .TP
+\fB\-d\fR, \fB\-\-clear\-dirty\fR
+Clear the volume dirty flag if the volume can be fixed and mounted.
+If the option is not present or the volume cannot be fixed, the dirty
+volume flag is set to request a volume checking at next mount.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .TP
