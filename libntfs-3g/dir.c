@@ -380,7 +380,7 @@ u64 ntfs_inode_lookup_by_name(ntfs_inode *dir_ni,
 	if (vol->cluster_size <= index_block_size) {
 		index_vcn_size_bits = vol->cluster_size_bits;
 	} else {
-		index_vcn_size_bits = vol->sector_size_bits;
+		index_vcn_size_bits = NTFS_BLOCK_SIZE_BITS;
 	}
 
 	/* Get the starting vcn of the index_block holding the child node. */
@@ -1131,7 +1131,7 @@ int ntfs_readdir(ntfs_inode *dir_ni, s64 *pos,
 	if (vol->cluster_size <= index_block_size) {
 		index_vcn_size_bits = vol->cluster_size_bits;
 	} else {
-		index_vcn_size_bits = vol->sector_size_bits;
+		index_vcn_size_bits = NTFS_BLOCK_SIZE_BITS;
 	}
 
 	/* Are we jumping straight into the index allocation attribute? */
@@ -1513,7 +1513,7 @@ static ntfs_inode *__ntfs_create(ntfs_inode *dir_ni, le32 securid,
 		else
 			ir->clusters_per_index_block = 
 					ni->vol->indx_record_size >>
-					ni->vol->sector_size_bits;
+					NTFS_BLOCK_SIZE_BITS;
 		ir->index.entries_offset = cpu_to_le32(sizeof(INDEX_HEADER));
 		ir->index.index_length = cpu_to_le32(index_len);
 		ir->index.allocated_size = cpu_to_le32(index_len);

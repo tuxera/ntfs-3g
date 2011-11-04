@@ -415,6 +415,7 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
 	printf("\tSector Size: %hu\n", vol->sector_size);
 	printf("\tCluster Size: %u\n", (unsigned int)vol->cluster_size);
+	printf("\tIndex Block Size: %u\n", (unsigned int)vol->indx_record_size);
 	printf("\tVolume Size in Clusters: %lld\n",
 			(long long)vol->nr_clusters);
 
@@ -1752,7 +1753,12 @@ static void ntfs_dump_attr_index_root(ATTR_RECORD *attr, ntfs_inode *ni)
 	printf("\tIndex Block Size:\t %u (0x%x)\n",
 			(unsigned)le32_to_cpu(index_root->index_block_size),
 			(unsigned)le32_to_cpu(index_root->index_block_size));
-	printf("\tClusters Per Block:\t %u (0x%x)\n",
+	if (le32_to_cpu(index_root->index_block_size) < ni->vol->cluster_size)
+		printf("\t512-byte Units Per Block:\t %u (0x%x)\n",
+			(unsigned)index_root->clusters_per_index_block,
+			(unsigned)index_root->clusters_per_index_block);
+	else
+		printf("\tClusters Per Block:\t %u (0x%x)\n",
 			(unsigned)index_root->clusters_per_index_block,
 			(unsigned)index_root->clusters_per_index_block);
 

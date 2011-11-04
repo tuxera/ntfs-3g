@@ -1,7 +1,7 @@
 /**
  * mkntfs - Part of the Linux-NTFS project.
  *
- * Copyright (c) 2000-2007 Anton Altaparmakov
+ * Copyright (c) 2000-2011 Anton Altaparmakov
  * Copyright (c) 2001-2005 Richard Russon
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2005      Erik Sornes
@@ -2242,8 +2242,8 @@ static int add_attr_index_root(MFT_RECORD *m, const char *name,
 			 free(r);
 			 return -EINVAL;
 		}
-		r->clusters_per_index_block = index_block_size /
-				opts.sector_size;
+		r->clusters_per_index_block = index_block_size
+				>> NTFS_BLOCK_SIZE_BITS;
 	}
 	memset(&r->reserved, 0, sizeof(r->reserved));
 	r->index.entries_offset = const_cpu_to_le32(sizeof(INDEX_HEADER));
