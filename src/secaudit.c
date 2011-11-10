@@ -190,6 +190,7 @@
  *
  *  Nov 2011, version 1.3.22
  *     - added a distinctive prefix to owner and group SID
+ *     - fixed a false memory leak detection
  */
 
 /*
@@ -492,6 +493,7 @@ BOOL recurseset_posix(const char*, const struct POSIX_SECURITY*);
 BOOL singleset_posix(const char*, const struct POSIX_SECURITY*);
 struct POSIX_SECURITY *encode_posix_acl(const char*);
 #endif
+static void *stdmalloc(size_t);
 static void stdfree(void*);
 
 BOOL valid_sds(const char*, unsigned int, unsigned int,
@@ -2157,12 +2159,24 @@ static int do_default_mapping(struct MAPPING *mapping[],
 
 	res = -1;
 	sidsz = ntfs_sid_size(usid);
+#if USESTUBS
+	sid = (SID*)stdmalloc(sidsz); /* will be freed within the library */
+#else
 	sid = (SID*)ntfs_malloc(sidsz);
+#endif
 	if (sid) {
 		memcpy(sid,usid,sidsz);
+#if USESTUBS
+		usermapping = (struct MAPPING*)stdmalloc(sizeof(struct MAPPING));
+#else
 		usermapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
+#endif
 		if (usermapping) {
+#if USESTUBS
+			groupmapping = (struct MAPPING*)stdmalloc(sizeof(struct MAPPING));
+#else
 			groupmapping = (struct MAPPING*)ntfs_malloc(sizeof(struct MAPPING));
+#endif
 			if (groupmapping) {
 				usermapping->sid = sid;
 				usermapping->xid = 0;
@@ -6842,6 +6856,11 @@ void chkfree(void *p, const char *file, int line)
 			free(p);
 		}
 	}
+}
+
+void *stdmalloc(size_t size)
+{
+	return (malloc(size));
 }
 
 void stdfree(void *p)
