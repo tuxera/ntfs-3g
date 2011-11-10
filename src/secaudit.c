@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2010 Jean-Pierre Andre
+ * Copyright (c) 2007-2011 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -187,6 +187,9 @@
  *
  *  Jun 2011, version 1.3.21
  *     - cleaned a few unneeded variables
+ *
+ *  Nov 2011, version 1.3.22
+ *     - added a distinctive prefix to owner and group SID
  */
 
 /*
@@ -210,7 +213,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.21"
+#define AUDT_VERSION "1.3.22"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -430,7 +433,7 @@ unsigned int utf16len(const char*);
 void printname(FILE*, const char*);
 void printerror(FILE*);
 BOOL guess_dir(const char*);
-void showsid(const char*, int, int);
+void showsid(const char*, int, const char*, int);
 void showusid(const char*, int);
 void showgsid(const char*, int);
 void showheader(const char*, int);
@@ -1339,7 +1342,7 @@ BOOL guess_dir(const char *attr)
  *   See http://msdn2.microsoft.com/en-us/library/aa379649.aspx
  */
 
-void showsid(const char *attr, int off, int level)
+void showsid(const char *attr, int off, const char *prefix, int level)
 {
 	int cnt;
 	int i;
@@ -1466,12 +1469,12 @@ void showsid(const char *attr, int off, int level)
 		}
 	if (!known)
 		printf("%*cUnknown SID\n",-level,marker);
-	printf("%*chex S-%d-",-level,marker,attr[off] & 255);
+	printf("%*c%shex S-%d-",-level,marker,prefix,attr[off] & 255);
 	printf("%llx",auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lx",get4l(attr,off+8+4*i));
 	printf("\n");
-	printf("%*cdec S-%d-",-level,marker,attr[off] & 255);
+	printf("%*c%sdec S-%d-",-level,marker,prefix,attr[off] & 255);
 	printf("%llu",auth);
 	for (i=0; i<cnt; i++)
 		printf("-%lu",get4l(attr,off+8+4*i));
@@ -1489,9 +1492,9 @@ void showusid(const char *attr, int level)
 		marker = ' ';
 	if (level)
 		printf("%*c",-level,marker);
-	printf("User SID\n");
+	printf("Owner SID\n");
 	off = get4l(attr,4);
-	showsid(attr,off,level+4);
+	showsid(attr,off,"O:",level+4);
 }
 
 void showgsid(const char *attr, int level)
@@ -1507,7 +1510,7 @@ void showgsid(const char *attr, int level)
 		printf("%*c",-level,marker);
 	printf("Group SID\n");
 	off = get4l(attr,8);
-	showsid(attr,off,level+4);
+	showsid(attr,off,"G:",level+4);
 }
 
 void showheader(const char *attr, int level)
@@ -1667,7 +1670,7 @@ void showace(const char *attr, int off, int isdir, int level)
 		printf("%*cGeneric read\n",-level-4,marker);
 
 	printf("%*cSID at 0x%x\n",-level,marker,off+8);
-	showsid(attr,off+8,level+4);
+	showsid(attr,off+8,"",level+4);
 	printf("%*cSummary :",-level,marker);
 	if (attr[off] == 0)
 		printf(" grant");
