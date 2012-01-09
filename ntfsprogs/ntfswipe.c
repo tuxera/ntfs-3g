@@ -689,13 +689,13 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 	s64 total = 0;
 	s64 result = 0;
 	int size = 0;
-	u8 *buffer = NULL;
+	MFT_RECORD *rec = NULL;
 
 	if (!vol || (byte < 0))
 		return -1;
 
-	buffer = malloc(vol->mft_record_size);
-	if (!buffer) {
+	rec = malloc(vol->mft_record_size);
+	if (!rec) {
 		ntfs_log_error("malloc failed\n");
 		return -1;
 	}
@@ -706,7 +706,7 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 	for (i = 0; i < nr_mft_records; i++) {
 		if (utils_mftrec_in_use(vol, i)) {
 			result = ntfs_attr_mst_pread(vol->mft_na, vol->mft_record_size * i,
-				1, vol->mft_record_size, buffer);
+				1, vol->mft_record_size, rec);
 			if (result != 1) {
 				ntfs_log_error("error attr mst read %lld\n",
 						(long long)i);
@@ -715,7 +715,7 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			}
 
 			// We know that the end marker will only take 4 bytes
-			size = le32_to_cpu(*((u32*) (buffer + 0x18))) - 4;
+			size = le32_to_cpu(rec->bytes_in_use) - 4;
 
 			if (act == act_info) {
 				//ntfs_log_info("mft %d\n", size);
@@ -723,10 +723,10 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 				continue;
 			}
 
-			memset(buffer + size, byte, vol->mft_record_size - size);
+			memset(((u8*) rec) + size, byte, vol->mft_record_size - size);
 
 			result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
-				1, vol->mft_record_size, buffer);
+				1, vol->mft_record_size, rec);
 			if (result != 1) {
 				ntfs_log_error("error attr mst write %lld\n",
 						(long long)i);
@@ -738,13 +738,13 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			{
 				// We have to reduce the update sequence number, or else...
 				u16 offset;
-				u16 usa;
-				offset = le16_to_cpu(*((le16*)(buffer + 0x04)));
-				usa = le16_to_cpu(*((le16*)(buffer + offset)));
-				*((u16*) (buffer + offset)) = cpu_to_le16(usa - 1);
+				le16 *usnp;
+				offset = le16_to_cpu(rec->usa_ofs);
+				usnp = (le16*) (((u8*) rec) + offset);
+				*usnp = cpu_to_le16(le16_to_cpu(*usnp) - 1);
 
 				result = ntfs_attr_mst_pwrite(vol->mftmirr_na, vol->mft_record_size * i,
-					1, vol->mft_record_size, buffer);
+					1, vol->mft_record_size, rec);
 				if (result != 1) {
 					ntfs_log_error("error attr mst write %lld\n",
 							(long long)i);
@@ -759,6 +759,10 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 				(vol->major_ver == 3) ? 0x0030 : 0x002A;
 			const u32 usa_size = 1 +
 				(vol->mft_record_size >> NTFS_BLOCK_SIZE_BITS);
+			const u16 attrs_offset =
+				((usa_offset + usa_size) + 7) & ~((u16) 7);
+			const u32 bytes_in_use = attrs_offset + 8;
+
 			if(usa_size > 0xFFFF || (usa_offset + usa_size) >
 				(NTFS_BLOCK_SIZE - sizeof(u16)))
 			{
@@ -774,35 +778,23 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			}
 
 			// Build the record from scratch
-			memset(buffer, 0, vol->mft_record_size);
+			memset(rec, 0, vol->mft_record_size);
 
 			// Common values
-			*((u32*) (buffer + 0x00)) = magic_FILE;				// Magic
-			*((u16*) (buffer + 0x06)) = cpu_to_le16((u16) usa_size);	// USA size
-			*((u16*) (buffer + 0x10)) = cpu_to_le16(0x0001);		// Seq num
-			*((u32*) (buffer + 0x1C)) = cpu_to_le32(vol->mft_record_size);	// FILE size
-			*((u16*) (buffer + 0x28)) = cpu_to_le16(0x0001);		// Attr ID
+			rec->magic = magic_FILE;
+			rec->usa_ofs = cpu_to_le16(usa_offset);
+			rec->usa_count = cpu_to_le16((u16) usa_size);
+			rec->sequence_number = cpu_to_le16(0x0001);
+			rec->attrs_offset = cpu_to_le16(attrs_offset);
+			rec->bytes_in_use = cpu_to_le32(bytes_in_use);
+			rec->bytes_allocated = cpu_to_le32(vol->mft_record_size);
+			rec->next_attr_instance = cpu_to_le16(0x0001);
 
-			if (vol->major_ver == 3) {
-				// Only XP and 2K3
-				const u16 attrs_offset = ((0x0030 + usa_size) + 7) & ~((u16) 7);
-				const u32 bytes_in_use = attrs_offset + 8;
-				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x0030);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16(attrs_offset);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32(bytes_in_use);	// FILE usage
-				*((u32*) (buffer + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);	// End marker
-			} else {
-				// Only NT and 2K
-				const u16 attrs_offset = ((0x002A + usa_size) + 7) & ~((u16) 7);
-				const u32 bytes_in_use = attrs_offset + 8;
-				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x002A);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16(attrs_offset);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32(bytes_in_use);	// FILE usage
-				*((u32*) (buffer + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);	// End marker
-			}
+			// End marker.
+			*((le32*) (((u8*) rec) + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);
 
 			result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
-				1, vol->mft_record_size, buffer);
+				1, vol->mft_record_size, rec);
 			if (result != 1) {
 				ntfs_log_error("error attr mst write %lld\n",
 						(long long)i);
@@ -814,13 +806,13 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			{
 				// We have to reduce the update sequence number, or else...
 				u16 offset;
-				u16 usa;
-				offset = le16_to_cpu(*((le16*)(buffer + 0x04)));
-				usa = le16_to_cpu(*((le16*)(buffer + offset)));
-				*((u16*) (buffer + offset)) = cpu_to_le16(usa - 1);
+				le16 *usnp;
+				offset = le16_to_cpu(rec->usa_ofs);
+				usnp = (le16*) (((u8*) rec) + offset);
+				*usnp = cpu_to_le16(le16_to_cpu(*usnp) - 1);
 
 				result = ntfs_attr_mst_pwrite(vol->mftmirr_na, vol->mft_record_size * i,
-					1, vol->mft_record_size, buffer);
+					1, vol->mft_record_size, rec);
 				if (result != 1) {
 					ntfs_log_error("error attr mst write %lld\n",
 							(long long)i);
@@ -835,7 +827,7 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 
 	ntfs_log_quiet("wipe_mft 0x%02x, %lld bytes\n", byte, (long long)total);
 free:
-	free(buffer);
+	free(rec);
 	return total;
 }
 
