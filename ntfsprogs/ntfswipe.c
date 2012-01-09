@@ -810,6 +810,25 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 				goto free;
 			}
 
+			if ((vol->mft_record_size * (i+1)) <= vol->mftmirr_na->allocated_size)
+			{
+				// We have to reduce the update sequence number, or else...
+				u16 offset;
+				u16 usa;
+				offset = le16_to_cpu(*((le16*)(buffer + 0x04)));
+				usa = le16_to_cpu(*((le16*)(buffer + offset)));
+				*((u16*) (buffer + offset)) = cpu_to_le16(usa - 1);
+
+				result = ntfs_attr_mst_pwrite(vol->mftmirr_na, vol->mft_record_size * i,
+					1, vol->mft_record_size, buffer);
+				if (result != 1) {
+					ntfs_log_error("error attr mst write %lld\n",
+							(long long)i);
+					total = -1;
+					goto free;
+				}
+			}
+
 			total += vol->mft_record_size;
 		}
 	}
