@@ -739,8 +739,8 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 				// We have to reduce the update sequence number, or else...
 				u16 offset;
 				u16 usa;
-				offset = le16_to_cpu(*(buffer + 0x04));
-				usa = le16_to_cpu(*(buffer + offset));
+				offset = le16_to_cpu(*((le16*)(buffer + 0x04)));
+				usa = le16_to_cpu(*((le16*)(buffer + offset)));
 				*((u16*) (buffer + offset)) = cpu_to_le16(usa - 1);
 
 				result = ntfs_attr_mst_pwrite(vol->mftmirr_na, vol->mft_record_size * i,
