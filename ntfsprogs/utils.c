@@ -782,7 +782,7 @@ int utils_cluster_in_use(ntfs_volume *vol, long long lcn)
 int utils_mftrec_in_use(ntfs_volume *vol, MFT_REF mref)
 {
 	static u8 buffer[512];
-	static s64 bmpmref = -sizeof(buffer) - 1; /* Which bit of $BITMAP is in the buffer */
+	static s64 bmpmref = -(sizeof(buffer) << 3) - 1; /* Which bit of $BITMAP is in the buffer */
 	int byte, bit;
 
 	ntfs_log_trace("Entering.\n");
