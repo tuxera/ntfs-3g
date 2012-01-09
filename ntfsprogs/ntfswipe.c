@@ -755,6 +755,19 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 
 			total += vol->mft_record_size;
 		} else {
+			const u16 usa_offset =
+				(vol->major_ver == 3) ? 0x0030 : 0x002A;
+			const u32 usa_size = 1 +
+				(vol->mft_record_size >> NTFS_BLOCK_SIZE_BITS);
+			if(usa_size > 0xFFFF || (usa_offset + usa_size) >
+				(NTFS_BLOCK_SIZE - sizeof(u16)))
+			{
+				ntfs_log_error("%d: usa_size out of bounds "
+					"(%u)\n", __LINE__, usa_size);
+				total = -1;
+				goto free;
+			}
+
 			if (act == act_info) {
 				total += vol->mft_record_size;
 				continue;
@@ -765,23 +778,27 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 
 			// Common values
 			*((u32*) (buffer + 0x00)) = magic_FILE;				// Magic
-			*((u16*) (buffer + 0x06)) = cpu_to_le16(0x0003);		// USA size
+			*((u16*) (buffer + 0x06)) = cpu_to_le16((u16) usa_size);	// USA size
 			*((u16*) (buffer + 0x10)) = cpu_to_le16(0x0001);		// Seq num
 			*((u32*) (buffer + 0x1C)) = cpu_to_le32(vol->mft_record_size);	// FILE size
 			*((u16*) (buffer + 0x28)) = cpu_to_le16(0x0001);		// Attr ID
 
 			if (vol->major_ver == 3) {
 				// Only XP and 2K3
+				const u16 attrs_offset = ((0x0030 + usa_size) + 7) & ~((u16) 7);
+				const u32 bytes_in_use = attrs_offset + 8;
 				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x0030);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16(0x0038);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32(0x00000040);	// FILE usage
-				*((u32*) (buffer + 0x38)) = cpu_to_le32(0xFFFFFFFF);	// End marker
+				*((u16*) (buffer + 0x14)) = cpu_to_le16(attrs_offset);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32(bytes_in_use);	// FILE usage
+				*((u32*) (buffer + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);	// End marker
 			} else {
 				// Only NT and 2K
+				const u16 attrs_offset = ((0x002A + usa_size) + 7) & ~((u16) 7);
+				const u32 bytes_in_use = attrs_offset + 8;
 				*((u16*) (buffer + 0x04)) = cpu_to_le16(0x002A);	// USA offset
-				*((u16*) (buffer + 0x14)) = cpu_to_le16(0x0030);	// Attr offset
-				*((u32*) (buffer + 0x18)) = cpu_to_le32(0x00000038);	// FILE usage
-				*((u32*) (buffer + 0x30)) = cpu_to_le32(0xFFFFFFFF);	// End marker
+				*((u16*) (buffer + 0x14)) = cpu_to_le16(attrs_offset);	// Attr offset
+				*((u32*) (buffer + 0x18)) = cpu_to_le32(bytes_in_use);	// FILE usage
+				*((u32*) (buffer + attrs_offset)) = cpu_to_le32(0xFFFFFFFF);	// End marker
 			}
 
 			result = ntfs_attr_mst_pwrite(vol->mft_na, vol->mft_record_size * i,
