@@ -715,7 +715,7 @@ static s64 wipe_mft(ntfs_volume *vol, int byte, enum action act)
 			}
 
 			// We know that the end marker will only take 4 bytes
-			size = *((u32*) (buffer + 0x18)) - 4;
+			size = le32_to_cpu(*((u32*) (buffer + 0x18))) - 4;
 
 			if (act == act_info) {
 				//ntfs_log_info("mft %d\n", size);
