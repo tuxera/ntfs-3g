@@ -61,7 +61,7 @@ static const char *EXEC_NAME = "ntfsls";
  * @depth:     the level of this dir relative to opts.path
  */
 struct dir {
-	struct list_head list;
+	struct ntfs_list_head list;
 	ntfs_inode *ni;
 	char name[MAX_PATH];
 	int depth;
@@ -76,7 +76,7 @@ struct dir {
  * character array name in struct dir.
  */
 struct path_component {
-	struct list_head list;
+	struct ntfs_list_head list;
 	const char *name;
 };
 
@@ -98,7 +98,7 @@ struct path_component {
  * dir_list_insert_pos keeps track of where to insert a sub-dir
  * into the list.
  */
-static struct list_head *dir_list_insert_pos = NULL;
+static struct ntfs_list_head *dir_list_insert_pos = NULL;
 
 /* The global depth relative to opts.path.
  * ie: opts.path has depth 0, a sub-dir of opts.path has depth 1
@@ -338,19 +338,19 @@ static void free_dir(struct dir *tofree)
 
 /**
  * free_dirs - walk the list of dir's and free each of them
- * @dir_list:    the list_head of any entry in the list
+ * @dir_list:    the ntfs_list_head of any entry in the list
  *
  * Iterate over @dir_list, calling free_dir on each entry
  */
-static void free_dirs(struct list_head *dir_list)
+static void free_dirs(struct ntfs_list_head *dir_list)
 {
 	struct dir *tofree = NULL;
-	struct list_head *walker = NULL;
+	struct ntfs_list_head *walker = NULL;
 
 	if (dir_list) {
-		list_for_each(walker, dir_list) {
+		ntfs_list_for_each(walker, dir_list) {
 			free_dir(tofree);
-			tofree = list_entry(walker, struct dir, list);
+			tofree = ntfs_list_entry(walker, struct dir, list);
 		}
 
 		free_dir(tofree);
@@ -375,14 +375,14 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 {
 	/* list of dirs to "ls" recursively */
 	static struct dir dirs = {
-		.list = LIST_HEAD_INIT(dirs.list),
+		.list = NTFS_LIST_HEAD_INIT(dirs.list),
 		.ni = NULL,
 		.name = {0},
 		.depth = 0
 	};
 
 	static struct path_component paths = {
-		.list = LIST_HEAD_INIT(paths.list),
+		.list = NTFS_LIST_HEAD_INIT(paths.list),
 		.name = NULL
 	};
 
@@ -392,15 +392,15 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 	struct dir *tofree = NULL;
 	struct path_component comp;
 	struct path_component *tempcomp = NULL;
-	struct list_head *dir_walker = NULL;
-	struct list_head *comp_walker = NULL;
+	struct ntfs_list_head *dir_walker = NULL;
+	struct ntfs_list_head *comp_walker = NULL;
 	s64 pos2 = 0;
 	int ni_depth = depth;
 	int result = 0;
 
-	if (list_empty(&dirs.list)) {
+	if (ntfs_list_empty(&dirs.list)) {
 		base_comp.name = opts.path;
-		list_add(&base_comp.list, &paths.list);
+		ntfs_list_add(&base_comp.list, &paths.list);
 		dir_list_insert_pos = &dirs.list;
 		printf("%s:\n", opts.path);
 	}
@@ -410,16 +410,16 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 	result = ntfs_readdir(ni, pos, dirent, (ntfs_filldir_t) list_dir_entry);
 
 	if (result == 0) {
-		list_add_tail(&comp.list, &paths.list);
+		ntfs_list_add_tail(&comp.list, &paths.list);
 
 		/* for each of ni's sub-dirs: list in this iteration, then
 		   free at the top of the next iteration or outside of loop */
-		list_for_each(dir_walker, &dirs.list) {
+		ntfs_list_for_each(dir_walker, &dirs.list) {
 			if (tofree) {
 				free_dir(tofree);
 				tofree = NULL;
 			}
-			subdir = list_entry(dir_walker, struct dir, list);
+			subdir = ntfs_list_entry(dir_walker, struct dir, list);
 
 			/* subdir is not a subdir of ni */
 			if (subdir->depth != ni_depth + 1)
@@ -444,9 +444,9 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 			comp.name = subdir->name;
 
 			/* print relative path header */
-			list_for_each(comp_walker, &paths.list) {
+			ntfs_list_for_each(comp_walker, &paths.list) {
 				tempcomp =
-				    list_entry(comp_walker,
+				    ntfs_list_entry(comp_walker,
 					       struct path_component, list);
 				printf("%s", tempcomp->name);
 				if (tempcomp != &comp
@@ -463,10 +463,10 @@ static int readdir_recursive(ntfs_inode * ni, s64 * pos, ntfsls_dirent * dirent)
 				break;
 
 			tofree = subdir;
-			list_del(dir_walker);
+			ntfs_list_del(dir_walker);
 		}
 
-		list_del(&comp.list);
+		ntfs_list_del(&comp.list);
 	}
 
 	if (tofree)
@@ -610,7 +610,7 @@ release:
 
 	if (dir) {
 		if (result == 0) {
-			list_add(&dir->list, dir_list_insert_pos);
+			ntfs_list_add(&dir->list, dir_list_insert_pos);
 			dir_list_insert_pos = &dir->list;
 		} else {
 			free(dir);

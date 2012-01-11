@@ -23,7 +23,7 @@
 #define _NTFS_LIST_H
 
 /**
- * struct list_head - Simple doubly linked list implementation.
+ * struct ntfs_list_head - Simple doubly linked list implementation.
  *
  * Copied from Linux kernel 2.4.2-ac18 into Linux-NTFS (with minor
  * modifications). - AIA
@@ -34,21 +34,21 @@
  * generate better code by using them directly rather than
  * using the generic single-entry routines.
  */
-struct list_head {
-	struct list_head *next, *prev;
+struct ntfs_list_head {
+	struct ntfs_list_head *next, *prev;
 };
 
-#define LIST_HEAD_INIT(name) { &(name), &(name) }
+#define NTFS_LIST_HEAD_INIT(name) { &(name), &(name) }
 
-#define LIST_HEAD(name) \
-	struct list_head name = LIST_HEAD_INIT(name)
+#define NTFS_LIST_HEAD(name) \
+	struct ntfs_list_head name = NTFS_LIST_HEAD_INIT(name)
 
-#define INIT_LIST_HEAD(ptr) do { \
+#define NTFS_INIT_LIST_HEAD(ptr) do { \
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 } while (0)
 
 /**
- * __list_add - Insert a new entry between two known consecutive entries.
+ * __ntfs_list_add - Insert a new entry between two known consecutive entries.
  * @new:
  * @prev:
  * @next:
@@ -56,8 +56,8 @@ struct list_head {
  * This is only for internal list manipulation where we know the prev/next
  * entries already!
  */
-static __inline__ void __list_add(struct list_head * new,
-		struct list_head * prev, struct list_head * next)
+static __inline__ void __ntfs_list_add(struct ntfs_list_head * new,
+		struct ntfs_list_head * prev, struct ntfs_list_head * next)
 {
 	next->prev = new;
 	new->next = next;
@@ -66,33 +66,35 @@ static __inline__ void __list_add(struct list_head * new,
 }
 
 /**
- * list_add - add a new entry
+ * ntfs_list_add - add a new entry
  * @new:	new entry to be added
  * @head:	list head to add it after
  *
  * Insert a new entry after the specified head.
  * This is good for implementing stacks.
  */
-static __inline__ void list_add(struct list_head *new, struct list_head *head)
+static __inline__ void ntfs_list_add(struct ntfs_list_head *new,
+		struct ntfs_list_head *head)
 {
-	__list_add(new, head, head->next);
+	__ntfs_list_add(new, head, head->next);
 }
 
 /**
- * list_add_tail - add a new entry
+ * ntfs_list_add_tail - add a new entry
  * @new:	new entry to be added
  * @head:	list head to add it before
  *
  * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
-static __inline__ void list_add_tail(struct list_head *new, struct list_head *head)
+static __inline__ void ntfs_list_add_tail(struct ntfs_list_head *new,
+		struct ntfs_list_head *head)
 {
-	__list_add(new, head->prev, head);
+	__ntfs_list_add(new, head->prev, head);
 }
 
 /**
- * __list_del -
+ * __ntfs_list_del -
  * @prev:
  * @next:
  *
@@ -101,57 +103,57 @@ static __inline__ void list_add_tail(struct list_head *new, struct list_head *he
  * This is only for internal list manipulation where we know the prev/next
  * entries already!
  */
-static __inline__ void __list_del(struct list_head * prev,
-		struct list_head * next)
+static __inline__ void __ntfs_list_del(struct ntfs_list_head * prev,
+		struct ntfs_list_head * next)
 {
 	next->prev = prev;
 	prev->next = next;
 }
 
 /**
- * list_del - deletes entry from list.
+ * ntfs_list_del - deletes entry from list.
  * @entry:	the element to delete from the list.
  *
- * Note: list_empty on entry does not return true after this, the entry is in
- * an undefined state.
+ * Note: ntfs_list_empty on entry does not return true after this, the entry is
+ * in an undefined state.
  */
-static __inline__ void list_del(struct list_head *entry)
+static __inline__ void ntfs_list_del(struct ntfs_list_head *entry)
 {
-	__list_del(entry->prev, entry->next);
+	__ntfs_list_del(entry->prev, entry->next);
 }
 
 /**
- * list_del_init - deletes entry from list and reinitialize it.
+ * ntfs_list_del_init - deletes entry from list and reinitialize it.
  * @entry:	the element to delete from the list.
  */
-static __inline__ void list_del_init(struct list_head *entry)
+static __inline__ void ntfs_list_del_init(struct ntfs_list_head *entry)
 {
-	__list_del(entry->prev, entry->next);
-	INIT_LIST_HEAD(entry);
+	__ntfs_list_del(entry->prev, entry->next);
+	NTFS_INIT_LIST_HEAD(entry);
 }
 
 /**
- * list_empty - tests whether a list is empty
+ * ntfs_list_empty - tests whether a list is empty
  * @head:	the list to test.
  */
-static __inline__ int list_empty(struct list_head *head)
+static __inline__ int ntfs_list_empty(struct ntfs_list_head *head)
 {
 	return head->next == head;
 }
 
 /**
- * list_splice - join two lists
+ * ntfs_list_splice - join two lists
  * @list:	the new list to add.
  * @head:	the place to add it in the first list.
  */
-static __inline__ void list_splice(struct list_head *list,
-		struct list_head *head)
+static __inline__ void ntfs_list_splice(struct ntfs_list_head *list,
+		struct ntfs_list_head *head)
 {
-	struct list_head *first = list->next;
+	struct ntfs_list_head *first = list->next;
 
 	if (first != list) {
-		struct list_head *last = list->prev;
-		struct list_head *at = head->next;
+		struct ntfs_list_head *last = list->prev;
+		struct ntfs_list_head *at = head->next;
 
 		first->prev = head;
 		head->next = first;
@@ -162,29 +164,29 @@ static __inline__ void list_splice(struct list_head *list,
 }
 
 /**
- * list_entry - get the struct for this entry
- * @ptr:	the &struct list_head pointer.
+ * ntfs_list_entry - get the struct for this entry
+ * @ptr:	the &struct ntfs_list_head pointer.
  * @type:	the type of the struct this is embedded in.
  * @member:	the name of the list_struct within the struct.
  */
-#define list_entry(ptr, type, member) \
+#define ntfs_list_entry(ptr, type, member) \
 	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
 
 /**
- * list_for_each - iterate over a list
- * @pos:	the &struct list_head to use as a loop counter.
+ * ntfs_list_for_each - iterate over a list
+ * @pos:	the &struct ntfs_list_head to use as a loop counter.
  * @head:	the head for your list.
  */
-#define list_for_each(pos, head) \
+#define ntfs_list_for_each(pos, head) \
 	for (pos = (head)->next; pos != (head); pos = pos->next)
 
 /**
- * list_for_each_safe	-	iterate over a list safe against removal of list entry
- * @pos:	the &struct list_head to use as a loop counter.
- * @n:		another &struct list_head to use as temporary storage
+ * ntfs_list_for_each_safe	-	iterate over a list safe against removal of list entry
+ * @pos:	the &struct ntfs_list_head to use as a loop counter.
+ * @n:		another &struct ntfs_list_head to use as temporary storage
  * @head:	the head for your list.
  */
-#define list_for_each_safe(pos, n, head) \
+#define ntfs_list_for_each_safe(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
 

@@ -62,7 +62,7 @@ struct options {
 };
 
 struct filename {
-	struct list_head list;		/* Previous/Next links */
+	struct ntfs_list_head list;	/* Previous/Next links */
 	ntfschar	*uname;		/* Filename in unicode */
 	int		 uname_len;	/* and its length */
 	long long	 size_alloc;	/* Allocated size (multiple of cluster size) */
@@ -79,7 +79,7 @@ struct filename {
 };
 
 struct data {
-	struct list_head list;		/* Previous/Next links */
+	struct ntfs_list_head list;	/* Previous/Next links */
 	char		*name;		/* Stream name in current locale */
 	ntfschar	*uname;		/* Unicode stream name */
 	int		 uname_len;	/* and its length */
@@ -98,8 +98,8 @@ struct data {
 struct ufile {
 	long long	 inode;		/* MFT record number */
 	time_t		 date;		/* Last modification date/time */
-	struct list_head name;		/* A list of filenames */
-	struct list_head data;		/* A list of data streams */
+	struct ntfs_list_head name;	/* A list of filenames */
+	struct ntfs_list_head data;	/* A list of data streams */
 	char		*pref_name;	/* Preferred filename */
 	char		*pref_pname;	/*	     parent filename */
 	long long	 max_size;	/* Largest size we find */

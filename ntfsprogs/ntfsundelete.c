@@ -719,13 +719,14 @@ static int parse_options(int argc, char *argv[])
  */
 static void free_file(struct ufile *file)
 {
-	struct list_head *item, *tmp;
+	struct ntfs_list_head *item, *tmp;
 
 	if (!file)
 		return;
 
-	list_for_each_safe(item, tmp, &file->name) { /* List of filenames */
-		struct filename *f = list_entry(item, struct filename, list);
+	ntfs_list_for_each_safe(item, tmp, &file->name) {
+		/* List of filenames */
+		struct filename *f = ntfs_list_entry(item, struct filename, list);
 		ntfs_log_debug("freeing filename '%s'", f->name ? f->name :
 				NONE);
 		if (f->name)
@@ -739,8 +740,9 @@ static void free_file(struct ufile *file)
 		free(f);
 	}
 
-	list_for_each_safe(item, tmp, &file->data) { /* List of data streams */
-		struct data *d = list_entry(item, struct data, list);
+	ntfs_list_for_each_safe(item, tmp, &file->data) {
+		/* List of data streams */
+		struct data *d = ntfs_list_entry(item, struct data, list);
 		ntfs_log_debug("Freeing data stream '%s'.\n", d->name ?
 				d->name : UNNAMED);
 		if (d->name)
@@ -1023,7 +1025,7 @@ static int get_filenames(struct ufile *file, ntfs_volume* vol)
 		file->max_size = max(file->max_size, name->size_alloc);
 		file->max_size = max(file->max_size, name->size_data);
 
-		list_add_tail(&name->list, &file->name);
+		ntfs_list_add_tail(&name->list, &file->name);
 		count++;
 	}
 
@@ -1051,7 +1053,7 @@ static int get_filenames(struct ufile *file, ntfs_volume* vol)
 				name->size_alloc = sle64_to_cpu(attr->allocated_size);
 				name->size_data  = sle64_to_cpu(attr->data_size);
 			}
-		list_add_tail(&name->list, &file->name);
+		ntfs_list_add_tail(&name->list, &file->name);
 		count++;
 		}
 	}
@@ -1133,7 +1135,7 @@ static int get_data(struct ufile *file, ntfs_volume *vol)
 		file->max_size = max(file->max_size, data->size_data);
 		file->max_size = max(file->max_size, data->size_init);
 
-		list_add_tail(&data->list, &file->data);
+		ntfs_list_add_tail(&data->list, &file->data);
 		count++;
 	}
 
@@ -1168,8 +1170,8 @@ static struct ufile * read_record(ntfs_volume *vol, long long record)
 		return NULL;
 	}
 
-	INIT_LIST_HEAD(&file->name);
-	INIT_LIST_HEAD(&file->data);
+	NTFS_INIT_LIST_HEAD(&file->name);
+	NTFS_INIT_LIST_HEAD(&file->data);
 	file->inode = record;
 
 	file->mft = malloc(vol->mft_record_size);
@@ -1249,7 +1251,7 @@ static struct ufile * read_record(ntfs_volume *vol, long long record)
 static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 {
 	runlist_element *rl = NULL;
-	struct list_head *pos;
+	struct ntfs_list_head *pos;
 	struct data *data;
 	long long i, j;
 	long long start, end;
@@ -1264,13 +1266,13 @@ static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 		return 0;
 	}
 
-	if (list_empty(&file->data)) {
+	if (ntfs_list_empty(&file->data)) {
 		ntfs_log_verbose("File has no data streams.\n");
 		return 0;
 	}
 
-	list_for_each(pos, &file->data) {
-		data  = list_entry(pos, struct data, list);
+	ntfs_list_for_each(pos, &file->data) {
+		data  = ntfs_list_entry(pos, struct data, list);
 		clusters_inuse = 0;
 		clusters_free  = 0;
 
@@ -1374,7 +1376,7 @@ static int calc_percentage(struct ufile *file, ntfs_volume *vol)
 static void dump_record(struct ufile *file)
 {
 	char buffer[20];
-	struct list_head *item;
+	struct ntfs_list_head *item;
 	int i;
 
 	if (!file)
@@ -1388,8 +1390,9 @@ static void dump_record(struct ufile *file)
 	if (file->attr_list)
 		ntfs_log_quiet("Metadata may span more than one MFT record\n");
 
-	list_for_each(item, &file->name) {
-		struct filename *f = list_entry(item, struct filename, list);
+	ntfs_list_for_each(item, &file->name) {
+		struct filename *f =
+			ntfs_list_entry(item, struct filename, list);
 
 		ntfs_log_quiet("Filename: (%d) %s\n", f->name_space, f->name);
 		ntfs_log_quiet("File Flags: ");
@@ -1436,8 +1439,8 @@ static void dump_record(struct ufile *file)
 	}
 
 	ntfs_log_quiet("Data Streams:\n");
-	list_for_each(item, &file->data) {
-		struct data *d = list_entry(item, struct data, list);
+	ntfs_list_for_each(item, &file->data) {
+		struct data *d = ntfs_list_entry(item, struct data, list);
 		ntfs_log_quiet("Name: %s\n", (d->name) ? d->name : UNNAMED);
 		ntfs_log_quiet("Flags: ");
 		if (d->resident)   ntfs_log_quiet("Resident\n");
@@ -1497,7 +1500,7 @@ static void dump_record(struct ufile *file)
 static void list_record(struct ufile *file)
 {
 	char buffer[20];
-	struct list_head *item;
+	struct ntfs_list_head *item;
 	const char *name = NULL;
 	long long size = 0;
 	int percent = 0;
@@ -1514,8 +1517,8 @@ static void list_record(struct ufile *file)
 	else
 		flagd = 'F';
 
-	list_for_each(item, &file->data) {
-		struct data *d = list_entry(item, struct data, list);
+	ntfs_list_for_each(item, &file->data) {
+		struct data *d = ntfs_list_entry(item, struct data, list);
 
 		if (!d->name) {
 			if (d->resident)
@@ -1558,14 +1561,15 @@ static void list_record(struct ufile *file)
  */
 static int name_match(regex_t *re, struct ufile *file)
 {
-	struct list_head *item;
+	struct ntfs_list_head *item;
 	int result;
 
 	if (!re || !file)
 		return 0;
 
-	list_for_each(item, &file->name) {
-		struct filename *f = list_entry(item, struct filename, list);
+	ntfs_list_for_each(item, &file->name) {
+		struct filename *f =
+			ntfs_list_entry(item, struct filename, list);
 
 		if (!f->name)
 			continue;
@@ -1744,7 +1748,7 @@ static int undelete_file(ntfs_volume *vol, long long inode)
 	int i, j;
 	long long start, end;
 	runlist_element *rl;
-	struct list_head *item;
+	struct ntfs_list_head *item;
 	int fd = -1;
 	long long k;
 	int result = 0;
@@ -1795,13 +1799,13 @@ static int undelete_file(ntfs_volume *vol, long long inode)
 		goto free;
 	}
 
-	if (list_empty(&file->data)) {
+	if (ntfs_list_empty(&file->data)) {
 		ntfs_log_quiet("File has no data.  There is nothing to recover.\n");
 		goto free;
 	}
 
-	list_for_each(item, &file->data) {
-		struct data *d = list_entry(item, struct data, list);
+	ntfs_list_for_each(item, &file->data) {
+		struct data *d = ntfs_list_entry(item, struct data, list);
 		char defname[sizeof(UNKNOWN) + 25];
 
 		if (opts.output)
