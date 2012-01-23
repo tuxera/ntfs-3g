@@ -3664,7 +3664,9 @@ int main(int argc, char *argv[])
 		goto err_out;
 	}
 	if (!ntfs_check_if_mounted(opts.device,&existing_mount)
-	    && (existing_mount & NTFS_MF_MOUNTED)) {
+	    && (existing_mount & NTFS_MF_MOUNTED)
+		/* accept multiple read-only mounts */
+	    && (!(existing_mount & NTFS_MF_READONLY) || !ctx->ro)) {
 		err = NTFS_VOLUME_LOCKED;
 		goto err_out;
 	}
