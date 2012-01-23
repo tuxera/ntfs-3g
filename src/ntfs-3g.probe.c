@@ -74,7 +74,8 @@ static int ntfs_open(const char *device)
 	if (!vol)
 		ret = ntfs_volume_error(errno);
 
-	ntfs_umount(vol, FALSE);
+	if (ret == 0 && ntfs_umount(vol, FALSE) == -1)
+		ret = ntfs_volume_error(errno);
 
 	return ret;
 }
