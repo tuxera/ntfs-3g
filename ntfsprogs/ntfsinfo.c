@@ -94,6 +94,11 @@ static struct options {
 	int	 mft;		/* Dump information about the volume as well */
 } opts;
 
+struct RUNCOUNT {
+	unsigned long runs;
+	unsigned long fragments;
+} ;
+
 /**
  * version - Print version information about the program
  *
@@ -1247,7 +1252,7 @@ static const char * ntfs_dump_lcn(LCN lcn)
 }
 
 static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
-		ntfs_volume *vol)
+		ntfs_volume *vol, struct RUNCOUNT *runcount)
 {
 	ATTR_RECORD *a = ctx->attr;
 
@@ -1344,17 +1349,25 @@ static void ntfs_dump_attribute_header(ntfs_attr_search_ctx *ctx,
 		rl = ntfs_mapping_pairs_decompress(vol, a, NULL);
 		if (rl) {
 			runlist *rlc = rl;
+			LCN next_lcn;
 
+			next_lcn = LCN_HOLE;
 			// TODO: Switch this to properly aligned hex...
 			printf("\tRunlist:\tVCN\t\tLCN\t\tLength\n");
+			runcount->fragments++;
 			while (rlc->length) {
-				if (rlc->lcn >= 0)
+				runcount->runs++;
+				if (rlc->lcn >= 0) {
 					printf("\t\t\t0x%llx\t\t0x%llx\t\t"
 							"0x%llx\n",
 							(long long)rlc->vcn,
 							(long long)rlc->lcn,
 							(long long)rlc->length);
-				else
+					if ((next_lcn >= 0)
+					    && (rlc->lcn != next_lcn))
+						runcount->fragments++;
+					next_lcn = rlc->lcn + rlc->length;
+				} else
 					printf("\t\t\t0x%llx\t\t%s\t"
 							"0x%llx\n",
 							(long long)rlc->vcn,
@@ -2187,8 +2200,11 @@ static void ntfs_dump_inode_general_info(ntfs_inode *inode)
  */
 static void ntfs_dump_file_attributes(ntfs_inode *inode)
 {
+	struct RUNCOUNT runcount;
 	ntfs_attr_search_ctx *ctx = NULL;
 
+	runcount.runs = 0;
+	runcount.fragments = 0;
 	/* then start enumerating attributes
 	   see ntfs_attr_lookup documentation for detailed explanation */
 	ctx = ntfs_attr_get_search_ctx(inode, NULL);
@@ -2202,7 +2218,7 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 			continue;
 		}
 
-		ntfs_dump_attribute_header(ctx, inode->vol);
+		ntfs_dump_attribute_header(ctx, inode->vol, &runcount);
 
 		switch (ctx->attr->type) {
 		case AT_STANDARD_INFORMATION:
@@ -2265,6 +2281,8 @@ static void ntfs_dump_file_attributes(ntfs_inode *inode)
 				"enumerating attributes");
 	} else {
 		printf("End of inode reached\n");
+		printf("Total runs: %lu (fragments: %lu)\n",
+				runcount.runs, runcount.fragments);
 	}
 
 	/* close all data-structures we used */
