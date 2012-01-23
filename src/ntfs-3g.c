@@ -3681,6 +3681,10 @@ int main(int argc, char *argv[])
 				     PATH_MAX - strlen(opts.mnt_point) - 1)) {
 				strcat(ctx->abs_mnt_point, "/");
 				strcat(ctx->abs_mnt_point, opts.mnt_point);
+#if defined(__sun) && defined (__SVR4)
+			/* Solaris also wants the absolute mount point */
+				opts.mnt_point = ctx->abs_mnt_point;
+#endif /* defined(__sun) && defined (__SVR4) */
 			}
 		}
 	}
