@@ -358,16 +358,27 @@ static int clear_badclus(ntfs_volume *vol)
 	ni = ntfs_inode_open(vol, FILE_BadClus);
 	if (ni) {
 		na = ntfs_attr_open(ni, AT_DATA, badstream, 4);
-		if (na) {
-			if (na->initialized_size) {
+			/*
+			 * chkdsk does not adjust the data size when
+			 * moving clusters to $BadClus, so we have to
+			 * check the runlist.
+			 */
+		if (na && !ntfs_attr_map_whole_runlist(na)) {
+			if (na->rl
+			    && na->rl[0].length && na->rl[1].length) {
 			/*
 			 * Truncate the stream to free all its clusters,
-			 * then reallocate a sparse stream to full size
-			 * of volume.
+			 * (which requires setting the data size according
+			 * to allocation), then reallocate a sparse stream
+			 * to full size of volume and reset the data size.
 			 */
+				na->data_size = na->allocated_size;
+				na->initialized_size = na->allocated_size;
 				if (!ntfs_attr_truncate(na,0)
 				    && !ntfs_attr_truncate(na,vol->nr_clusters
 						<< vol->cluster_size_bits)) {
+					na->data_size = 0;
+					na->initialized_size = 0;
 					ni->flags |= FILE_ATTR_SPARSE_FILE;
 					NInoFileNameSetDirty(ni);
 					ok = TRUE;
