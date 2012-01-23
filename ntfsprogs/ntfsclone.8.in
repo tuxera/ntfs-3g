@@ -233,6 +233,9 @@ option.
 Forces ntfsclone to proceed if the filesystem is marked
 "dirty" for consistency check.
 .TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Do not display any progress-bars during operation.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
 .SH EXIT CODES
