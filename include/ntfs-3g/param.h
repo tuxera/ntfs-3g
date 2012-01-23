@@ -109,7 +109,11 @@ enum {
  *	of 6 is added in the mount report.
  */
 
+#if defined(__sun) && defined(__SVR4)
+#define HPERMSCONFIG 4 /* access control by kernel is broken on OpenIndiana */
+#else
 #define HPERMSCONFIG 1
+#endif
 #if defined(FUSE_INTERNAL) || !defined(FUSE_VERSION) || (FUSE_VERSION < 28)
 #define LPERMSCONFIG 5
 #else
