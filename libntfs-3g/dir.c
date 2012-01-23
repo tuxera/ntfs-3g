@@ -2002,6 +2002,7 @@ search:
 					"Leaving inconsistent metadata.\n");
 		}
 #endif
+	debug_double_inode(ni->mft_no,0);
 	if (ntfs_mft_record_free(ni->vol, ni)) {
 		err = errno;
 		ntfs_log_error("Failed to free base MFT record.  "
