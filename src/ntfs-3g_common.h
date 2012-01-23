@@ -172,6 +172,7 @@ extern const char nf_ns_trusted_prefix[];
 extern const int nf_ns_trusted_prefix_len;
 
 int ntfs_strappend(char **dest, const char *append);
+int ntfs_strinsert(char **dest, const char *append);
 char *parse_mount_options(ntfs_fuse_context_t *ctx,
 			const struct ntfs_options *popts, BOOL low_fuse);
 int ntfs_parse_options(struct ntfs_options *popts, void (*usage)(void),

@@ -3908,7 +3908,7 @@ int main(int argc, char *argv[])
 		else {
 			permissions_mode = "User mapping built, Posix ACLs in use";
 #if KERNELACLS
-			if (ntfs_strappend(&parsed_options,
+			if (ntfs_strinsert(&parsed_options,
 					",default_permissions,acl")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
@@ -3924,7 +3924,7 @@ int main(int argc, char *argv[])
 			 */
 #if KERNELPERMS
 			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-			if (ntfs_strappend(&parsed_options, ",default_permissions")) {
+			if (ntfs_strinsert(&parsed_options, ",default_permissions")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
 			}
@@ -3941,7 +3941,7 @@ int main(int argc, char *argv[])
 		if ((ctx->vol->secure_flags & (1 << SECURITY_WANTED))
 		   && !(ctx->vol->secure_flags & (1 << SECURITY_DEFAULT))) {
 			ctx->vol->secure_flags |= (1 << SECURITY_DEFAULT);
-			if (ntfs_strappend(&parsed_options, ",default_permissions")) {
+			if (ntfs_strinsert(&parsed_options, ",default_permissions")) {
 				err = NTFS_VOLUME_SYNTAX_ERROR;
 				goto err_out;
 			}

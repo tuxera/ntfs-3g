@@ -155,6 +155,54 @@ int ntfs_strappend(char **dest, const char *append)
 	return 0;
 }
 
+/*
+ *		Insert an option before ",fsname="
+ *	This is for keeping "fsname" as the last option, because on
+ *	Solaris device names may contain commas.
+ */
+
+int ntfs_strinsert(char **dest, const char *append)
+{
+	char *p, *q;
+	size_t size_append, size_dest = 0;
+	
+	if (!dest)
+		return -1;
+	if (!append)
+		return 0;
+
+	size_append = strlen(append);
+	if (*dest)
+		size_dest = strlen(*dest);
+	
+	if (strappend_is_large(size_dest) || strappend_is_large(size_append)) {
+		errno = EOVERFLOW;
+		ntfs_log_perror("%s: Too large input buffer", EXEC_NAME);
+		return -1;
+	}
+	
+	p = (char*)malloc(size_dest + size_append + 1);
+	if (!p) {
+		ntfs_log_perror("%s: Memory reallocation failed", EXEC_NAME);
+		return -1;
+	}
+	strcpy(p, *dest);
+	q = strstr(p, ",fsname=");
+	if (q) {
+		strcpy(q, append);
+		q = strstr(*dest, ",fsname=");
+		if (q)
+			strcat(p, q);
+		free(*dest);
+		*dest = p;
+	} else {
+		free(*dest);
+		*dest = p;
+		strcpy(*dest + size_dest, append);
+	}
+	return 0;
+}
+
 static int bogus_option_value(char *val, const char *s)
 {
 	if (val) {
