@@ -1407,8 +1407,13 @@ static int walk_clusters(ntfs_volume *volume, struct ntfs_walk_cluster *walk)
 		walk->image->ni = ni;
 		walk_attributes(walk);
 out:
-		if (wipe) {
+		if (wipe && !opt.metadata_image) {
+			int i;
+
 			wipe_unused_mft_data(ni);
+			for (i = 0; i < ni->nr_extents; ++i) {
+				wipe_unused_mft_data(ni->extent_nis[i]);
+			}
 			mft_inode_write_with_same_usn(volume, ni);
 		}
 
