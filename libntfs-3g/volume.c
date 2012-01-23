@@ -762,7 +762,8 @@ int ntfs_volume_check_hiberfile(ntfs_volume *vol, int verbose)
 		errno = EPERM;
 		goto out;
 	}
-	if (memcmp(buf, "hibr", 4) == 0) {
+	if ((memcmp(buf, "hibr", 4) == 0)
+	   ||  (memcmp(buf, "HIBR", 4) == 0)) {
 		if (verbose)
 			ntfs_log_error("Windows is hibernated, refused to mount.\n");
 		errno = EPERM;
