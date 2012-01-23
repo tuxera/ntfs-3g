@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2003-2006 Szabolcs Szakacsits
  * Copyright (c) 2004-2006 Anton Altaparmakov
- * Copyright (c) 2010-2011 Jean-Pierre Andre
+ * Copyright (c) 2010-2012 Jean-Pierre Andre
  * Special image format support copyright (c) 2004 Per Olofsson
  *
  * Clone NTFS data and/or metadata to a sparse file, image, device or stdout.
@@ -31,6 +31,9 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -54,6 +57,9 @@
 #endif
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
 #endif
 
 /*
@@ -119,6 +125,7 @@ static struct {
 	int ignore_fs_check;
 	int rescue;
 	int save_image;
+	int new_serial;
 	int metadata_image;
 	int preserve_timestamps;
 	int restore_image;
@@ -171,6 +178,7 @@ static unsigned int wiped_unused_mft      = 0;
 static unsigned int wiped_resident_data   = 0;
 static unsigned int wiped_timestamp_data  = 0;
 
+static le64 volume_serial_number; /* new random serial number */
 static u64 full_device_size; /* full size, including the backup boot sector */
 
 static BOOL image_is_host_endian = FALSE;
@@ -316,6 +324,8 @@ static void usage(void)
 		"        --rescue           Continue after disk read errors\n"
 		"    -m, --metadata         Clone *only* metadata (for NTFS experts)\n"
 		"        --ignore-fs-check  Ignore the filesystem check result\n"
+		"        --new-serial       Set a new serial number\n"
+		"        --new-half-serial  Set a partial new serial number\n"
 		"    -t, --preserve-timestamps Do not clear the timestamps\n"
 		"    -q, --quiet            Do not display any progress bars\n"
 		"    -f, --force            Force to progress (DANGEROUS)\n"
@@ -347,6 +357,8 @@ static void parse_options(int argc, char **argv)
 		{ "restore-image",    no_argument,	 NULL, 'r' },
 		{ "ignore-fs-check",  no_argument,	 NULL, 'C' },
 		{ "rescue",           no_argument,	 NULL, 'R' },
+		{ "new-serial",       no_argument,	 NULL, 'I' },
+		{ "new-half-serial",  no_argument,	 NULL, 'i' },
 		{ "save-image",	      no_argument,	 NULL, 's' },
 		{ "preserve-timestamps",   no_argument,  NULL, 't' },
 		{ NULL, 0, NULL, 0 }
@@ -375,6 +387,12 @@ static void parse_options(int argc, char **argv)
 		case 'h':
 		case '?':
 			usage();
+		case 'i':	/* not proposed as a short option */
+			opt.new_serial |= 1;
+			break;
+		case 'I':	/* not proposed as a short option */
+			opt.new_serial |= 2;
+			break;
 		case 'm':
 			opt.metadata++;
 			break;
@@ -489,6 +507,20 @@ static void parse_options(int argc, char **argv)
 		if (!freopen("/dev/null", "w", stderr))
 			perr_exit("Failed to redirect stderr to /dev/null");
 	}
+}
+
+/*
+ * Initialize the random number generator with the current
+ * time, and generate a 64-bit random number for the serial
+ * number
+ */
+static void generate_serial_number(void) {
+	u64 sn;
+
+		/* different values for parallel processes */
+	srandom(time((time_t*)NULL) ^ (getpid() << 16));
+	sn = ((u64)random() << 32) | ((u64)random() & 0xffffffff);
+	volume_serial_number = cpu_to_le64(sn);
 }
 
 static void progress_init(struct progress_bar *p, u64 start, u64 stop, int res)
@@ -630,8 +662,12 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	char buff[NTFS_MAX_CLUSTER_SIZE]; /* overflow checked at mount time */
 	/* vol is NULL if opt.restore_image is set */
 	s32 csize = le32_to_cpu(image_hdr.cluster_size);
+	BOOL backup_bootsector;
 	void *fd = (void *)&fd_in;
 	off_t rescue_pos;
+	NTFS_BOOT_SECTOR *bs;
+	le64 mask;
+	static u16 bytes_per_sector;
 
 	if (!opt.restore_image) {
 		csize = vol->cluster_size;
@@ -641,7 +677,8 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 	rescue_pos = (off_t)(rescue_lcn * csize);
 
 		/* possible partial cluster holding the backup boot sector */
-	if ((lcn + 1)*csize > full_device_size) {
+	backup_bootsector = (lcn + 1)*csize >= full_device_size;
+	if (backup_bootsector) {
 		csize = full_device_size - lcn*csize;
 		if (csize < 0) {
 			err_exit("Corrupted input, copy aborted");
@@ -661,6 +698,40 @@ static void copy_cluster(int rescue, u64 rescue_lcn, u64 lcn)
 			Printf("%s", bad_sectors_warning_msg);
 			err_exit("Disk is faulty, can't make full backup!");
 		}
+	}
+
+		/* Set the new serial number if requested */
+	if (opt.new_serial
+	    && !opt.save_image
+	    && (!lcn || backup_bootsector)) {
+			/*
+			 * For updating the backup boot sector, we need to
+			 * know the sector size, but this is not recorded
+			 * in the image header, so we collect it on the fly
+			 * while reading the first boot sector.
+			 */
+		if (!lcn) {
+			bs = (NTFS_BOOT_SECTOR*)buff;
+			bytes_per_sector = le16_to_cpu(bs->bpb.bytes_per_sector);
+			if ((bytes_per_sector > csize)
+			    || (bytes_per_sector < NTFS_SECTOR_SIZE))
+				bytes_per_sector = NTFS_SECTOR_SIZE;
+		} else
+			bs = (NTFS_BOOT_SECTOR*)(buff
+						+ csize - bytes_per_sector);
+		if (opt.new_serial & 2)
+			bs->volume_serial_number = volume_serial_number;
+		else {
+			mask = const_cpu_to_le64(~0x0ffffffffULL);
+			bs->volume_serial_number
+			    = (volume_serial_number & mask)
+				| (bs->volume_serial_number & ~mask);
+		}
+			/* Show the new full serial after merging */
+		if (!lcn)
+			Printf("New serial number      : 0x%llx\n",
+				(long long)le64_to_cpu(
+						bs->volume_serial_number));
 	}
 
 	if (opt.save_image || (opt.metadata_image && wipe)) {
@@ -760,6 +831,9 @@ static void clone_ntfs(u64 nr_clusters)
 	else
 		Printf("Cloning NTFS ...\n");
 
+	if (opt.new_serial)
+		generate_serial_number();
+
 	buf = ntfs_calloc(csize);
 	if (!buf)
 		perr_exit("clone_ntfs");
@@ -828,6 +902,9 @@ static void restore_image(void)
 		      sle64_to_cpu(image_hdr.nr_clusters) + 1 :
 		      sle64_to_cpu(image_hdr.inuse) + 1,
 		      100);
+
+	if (opt.new_serial)
+		generate_serial_number();
 
 		/* Restore up to the alternate boot sector */
 	while (pos <= sle64_to_cpu(image_hdr.nr_clusters)) {

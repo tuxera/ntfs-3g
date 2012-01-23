@@ -228,6 +228,26 @@ inconsistency are saved too.
 Do not wipe the timestamps, to be used only with the
 .B \-\-metadata
 option.
+
+
+.TP
+\fB\-\-new\-serial\fR, or
+.TP
+\fB\-\-new\-half\-serial\fR
+Set a new random serial number to the clone. The serial number is a 64
+bit number used to identify the device during the mounting process, so
+it has to be changed to enable the original file system
+and the clone to be mounted at the same time on the same computer.
+
+The option \fB\-\-new\-half\-serial\fP only changes the upper part of the
+serial number, keeping the lower part which is used by Windows unchanged.
+
+The options \fB\-\-new\-serial\fP and \fB\-\-new\-half\-serial\fP can
+only be used when cloning a file system of restoring from an image.
+
+The serial number is not the volume UUID used by Windows
+to locate files which have been moved to another volume.
+
 .TP
 \fB\-f\fR, \fB\-\-force\fR
 Forces ntfsclone to proceed if the filesystem is marked
