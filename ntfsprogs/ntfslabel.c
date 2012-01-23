@@ -4,6 +4,7 @@
  * Copyright (c) 2002 Matthew J. Fanto
  * Copyright (c) 2002-2005 Anton Altaparmakov
  * Copyright (c) 2002-2003 Richard Russon
+ * Copyright (c) 2012      Jean-Pierre Andre
  *
  * This utility will display/change the label on an NTFS partition.
  *
@@ -43,12 +44,16 @@
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #include "debug.h"
 #include "mft.h"
 #include "utils.h"
 /* #include "version.h" */
 #include "logging.h"
+#include "misc.h"
 
 static const char *EXEC_NAME = "ntfslabel";
 
@@ -58,6 +63,8 @@ static struct options {
 	int	 quiet;		/* Less output */
 	int	 verbose;	/* Extra output */
 	int	 force;		/* Override common sense */
+	int	 new_serial;	/* Change the serial number */
+	long long serial;	/* Forced serial number value */
 	int	 noaction;	/* Do not write to disk */
 } opts;
 
@@ -76,6 +83,7 @@ static void version(void)
 	ntfs_log_info("    2002      Matthew J. Fanto\n");
 	ntfs_log_info("    2002-2005 Anton Altaparmakov\n");
 	ntfs_log_info("    2002-2003 Richard Russon\n");
+	ntfs_log_info("    2012      Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
 }
 
@@ -91,6 +99,8 @@ static void usage(void)
 	ntfs_log_info("\nUsage: %s [options] device [label]\n"
 	       "    -n, --no-action    Do not write to disk\n"
 	       "    -f, --force        Use less caution\n"
+	       "        --new-serial   Set a new serial number\n"
+	       "        --new-half-serial Set a partial new serial number\n"
 	       "    -q, --quiet        Less output\n"
 	       "    -v, --verbose      More output\n"
 	       "    -V, --version      Display version information\n"
@@ -110,10 +120,12 @@ static void usage(void)
  */
 static int parse_options(int argc, char *argv[])
 {
-	static const char *sopt = "-fh?nqvV";
+	static const char *sopt = "-fh?IinqvV";
 	static const struct option lopt[] = {
 		{ "force",	 no_argument,		NULL, 'f' },
 		{ "help",	 no_argument,		NULL, 'h' },
+		{ "new-serial",  optional_argument,	NULL, 'I' },
+		{ "new-half-serial", optional_argument,	NULL, 'i' },
 		{ "no-action",	 no_argument,		NULL, 'n' },
 		{ "quiet",	 no_argument,		NULL, 'q' },
 		{ "verbose",	 no_argument,		NULL, 'v' },
@@ -126,6 +138,7 @@ static int parse_options(int argc, char *argv[])
 	int ver  = 0;
 	int help = 0;
 	int levels = 0;
+	char *endserial;
 
 	opterr = 0; /* We'll handle the errors, thank you. */
 
@@ -150,6 +163,23 @@ static int parse_options(int argc, char *argv[])
 				break;
 			}
 			help++;
+			break;
+		case 'I' :	/* not proposed as a short option letter */
+			if (optarg) {
+				opts.serial = strtoll(optarg, &endserial, 16);
+				if (*endserial)
+					ntfs_log_error("Bad hexadecimal serial number.\n");
+			}
+			opts.new_serial |= 2;
+			break;
+		case 'i' :	/* not proposed as a short option letter */
+			if (optarg) {
+				opts.serial = strtoll(optarg, &endserial, 16)
+							<< 32;
+				if (*endserial)
+					ntfs_log_error("Bad hexadecimal serial number.\n");
+			}
+			opts.new_serial |= 1;
 			break;
 		case 'n':
 			opts.noaction++;
@@ -203,6 +233,106 @@ static int parse_options(int argc, char *argv[])
 	return (!err && !help && !ver);
 }
 
+static int change_serial(ntfs_volume *vol, u64 sector, le64 serial_number,
+			NTFS_BOOT_SECTOR *bs, NTFS_BOOT_SECTOR *oldbs)
+{
+	int res;
+	le64 mask;
+	BOOL same;
+
+	res = -1;
+        if ((ntfs_pread(vol->dev, sector << vol->sector_size_bits,
+			vol->sector_size, bs) == vol->sector_size)) {
+		same = TRUE;
+		if (!sector)
+				/* save the real bootsector */
+			memcpy(oldbs, bs, vol->sector_size);
+		else
+				/* backup bootsector must be similar */
+			same = !memcmp(oldbs, bs, vol->sector_size);
+		if (same) {
+			if (opts.new_serial & 2)
+				bs->volume_serial_number = serial_number;
+			else {
+				mask = const_cpu_to_le64(~0x0ffffffffULL);
+				bs->volume_serial_number
+				    = (serial_number & mask)
+					| (bs->volume_serial_number & ~mask);
+			}
+			if (opts.noaction
+			    || (ntfs_pwrite(vol->dev,
+				sector << vol->sector_size_bits,
+				vol->sector_size, bs) == vol->sector_size)) {
+				res = 0;
+			}
+		} else {
+			ntfs_log_info("* Warning : the backup boot sector"
+				" does not match (leaving unchanged)\n");
+			res = 0;
+		}
+	}
+	return (res);
+}
+
+static int set_new_serial(ntfs_volume *vol)
+{
+	NTFS_BOOT_SECTOR *bs; /* full boot sectors */
+	NTFS_BOOT_SECTOR *oldbs; /* full original boot sector */
+	le64 serial_number;
+	u64 number_of_sectors;
+	u64 sn;
+	int res;
+
+	res = -1;
+	bs = (NTFS_BOOT_SECTOR*)ntfs_malloc(vol->sector_size);
+	oldbs = (NTFS_BOOT_SECTOR*)ntfs_malloc(vol->sector_size);
+	if (bs && oldbs) {
+		if (opts.serial)
+			serial_number = cpu_to_le64(opts.serial);
+		else {
+			/* different values for parallel processes */
+			srandom(time((time_t*)NULL) ^ (getpid() << 16));
+			sn = ((u64)random() << 32)
+					| ((u64)random() & 0xffffffff);
+			serial_number = cpu_to_le64(sn);
+		}
+		if (!change_serial(vol, 0, serial_number, bs, oldbs)) {
+			number_of_sectors = le64_to_cpu(bs->number_of_sectors);
+			if (!change_serial(vol, number_of_sectors,
+						serial_number, bs, oldbs)) {
+				ntfs_log_info("New serial number : %016llx\n",
+					(long long)le64_to_cpu(
+						bs->volume_serial_number));
+				res = 0;
+				}
+		}
+		free(bs);
+		free(oldbs);
+	}
+	if (res)
+		ntfs_log_info("Error setting a new serial number\n");
+	return (res);
+}
+
+static int print_serial(ntfs_volume *vol)
+{
+	NTFS_BOOT_SECTOR *bs; /* full boot sectors */
+	int res;
+
+	res = -1;
+	bs = (NTFS_BOOT_SECTOR*)ntfs_malloc(vol->sector_size);
+	if (bs
+	    && (ntfs_pread(vol->dev, 0,
+			vol->sector_size, bs) == vol->sector_size)) {
+		ntfs_log_info("Serial number : %016llx\n",
+			(long long)le64_to_cpu(bs->volume_serial_number));
+		res = 0;
+		free(bs);
+	}
+	if (res)
+		ntfs_log_info("Error getting the serial number\n");
+	return (res);
+}
 
 /**
  * print_label - display the current label of a mounted ntfs partition.
@@ -223,7 +353,10 @@ static int print_label(ntfs_volume *vol, unsigned long mnt_flags)
 		result = 1;
 	}
 
-	ntfs_log_info("%s\n", vol->vol_name);
+	if (opts.verbose)
+		ntfs_log_info("Volume label :  %s\n", vol->vol_name);
+	else
+		ntfs_log_info("%s\n", vol->vol_name);
 	return result;
 }
 
@@ -236,26 +369,11 @@ static int print_label(ntfs_volume *vol, unsigned long mnt_flags)
  *
  * Change the label on the device @dev to @label.
  */
-static int change_label(ntfs_volume *vol, unsigned long mnt_flags, char *label, BOOL force)
+static int change_label(ntfs_volume *vol, char *label)
 {
 	ntfschar *new_label = NULL;
 	int label_len;
 	int result = 0;
-
-	//XXX significant?
-	if (mnt_flags & NTFS_MF_MOUNTED) {
-		/* If not the root fs or mounted read/write, refuse change. */
-		if (!(mnt_flags & NTFS_MF_ISROOT) ||
-				!(mnt_flags & NTFS_MF_READONLY)) {
-			if (!force) {
-				ntfs_log_error("Refusing to change label on "
-						"read-%s mounted device %s.\n",
-						mnt_flags & NTFS_MF_READONLY ?
-						"only" : "write", opts.device);
-				return 1;
-			}
-		}
-	}
 
 	label_len = ntfs_mbstoucs(label, &new_label);
 	if (label_len == -1) {
@@ -300,7 +418,17 @@ int main(int argc, char **argv)
 
 	utils_set_locale();
 
-	if (!opts.label)
+	if ((opts.label || opts.new_serial)
+	    && !opts.noaction
+	    && !opts.force
+	    && !ntfs_check_if_mounted(opts.device, &mnt_flags)
+	    && (mnt_flags & NTFS_MF_MOUNTED)) {
+		ntfs_log_error("Cannot make changes to a mounted device\n");
+		result = 1;
+		goto abort;
+	}
+
+	if (!opts.label && !opts.new_serial)
 		opts.noaction++;
 
 	vol = utils_mount_volume(opts.device,
@@ -309,12 +437,22 @@ int main(int argc, char **argv)
 	if (!vol)
 		return 1;
 
+	if (opts.new_serial) {
+		result = set_new_serial(vol);
+		if (result)
+			goto unmount;
+	} else {
+		if (opts.verbose)
+			result = print_serial(vol);
+	}
 	if (opts.label)
-		result = change_label(vol, mnt_flags, opts.label, opts.force);
+		result = change_label(vol, opts.label);
 	else
 		result = print_label(vol, mnt_flags);
 
+unmount :
 	ntfs_umount(vol, FALSE);
+abort :
 	return result;
 }
 
