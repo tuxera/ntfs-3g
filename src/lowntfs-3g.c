@@ -2848,7 +2848,7 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		/* trusted only readable by root */
 	if ((namespace == XATTRNS_TRUSTED)
 	    && security.uid) {
-		res = -EPERM;
+		res = -ENODATA;
 		goto out;
 	}
 #endif

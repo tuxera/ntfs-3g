@@ -2791,7 +2791,7 @@ static int ntfs_fuse_getxattr(const char *path, const char *name,
 		/* trusted only readable by root */
 	if ((namespace == XATTRNS_TRUSTED)
 	    && security.uid)
-		    return -EPERM;
+		    return -ENODATA;
 #endif
 	ni = ntfs_pathname_to_inode(ctx->vol, NULL, path);
 	if (!ni)
