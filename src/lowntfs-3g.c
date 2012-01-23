@@ -1092,14 +1092,17 @@ static void ntfs_fuse_releasedir(fuse_req_t req,
 	ntfs_fuse_fill_item_t *current;
 
 	fill = (ntfs_fuse_fill_context_t*)(long)fi->fh;
-		/* make sure to clear results */
-	current = fill->first;
-	while (current) {
-		current = current->next;
-		free(fill->first);
-		fill->first = current;
+	if (fill && (fill->ino == ino)) {
+			/* make sure to clear results */
+		current = fill->first;
+		while (current) {
+			current = current->next;
+			free(fill->first);
+			fill->first = current;
+		}
+		fill->ino = 0;
+		free(fill);
 	}
-	free(fill);
 	fuse_reply_err(req, 0);
 }
 
@@ -1115,7 +1118,7 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int err = 0;
 
 	fill = (ntfs_fuse_fill_context_t*)(long)fi->fh;
-	if (fill) {
+	if (fill && (fill->ino == ino)) {
 		if (!fill->filled) {
 				/* initial call : build the full list */
 			first = (ntfs_fuse_fill_item_t*)ntfs_malloc
