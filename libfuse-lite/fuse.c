@@ -2649,7 +2649,7 @@ struct fuse *fuse_new(struct fuse_chan *ch, struct fuse_args *args,
     if (!f->conf.ac_attr_timeout_set)
         f->conf.ac_attr_timeout = f->conf.attr_timeout;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     /*
      * In FreeBSD, we always use these settings as inode numbers are needed to
      * make getcwd(3) work.

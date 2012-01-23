@@ -220,7 +220,7 @@ linux*)
 		[with_fuse="internal"]
 	)
 	;;
-darwin*|netbsd*|solaris*)
+darwin*|netbsd*|solaris*|kfreebsd*-gnu)
 	with_fuse="external"
 	;;
 freebsd*)
