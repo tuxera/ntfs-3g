@@ -2091,6 +2091,12 @@ static int ntfs_fuse_newlink(fuse_req_t req __attribute__((unused)),
 		goto exit;
 	}
         
+	/* Do not accept linking to a directory (except for renaming) */
+	if (e && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)) {
+		errno = EPERM;
+		res = -errno;
+		goto exit;
+	}
 	/* Generate unicode filename. */
 	uname_len = ntfs_mbstoucs(newname, &uname);
 	if ((uname_len < 0)
