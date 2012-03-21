@@ -4,7 +4,7 @@
  * Copyright (c) 2004 Anton Altaparmakov
  * Copyright (c) 2005-2006 Szabolcs Szakacsits
  * Copyright (c) 2006 Yura Pakhuchiy
- * Copyright (c) 2007-2010 Jean-Pierre Andre
+ * Copyright (c) 2007-2012 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1129,10 +1129,86 @@ static BOOL staticgroupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid
 	return (ingroup);
 }
 
+#if defined(__sun) && defined (__SVR4)
 
 /*
  *		Check whether current thread owner is member of file group
+ *				Solaris/OpenIndiana version
+ *	Should not be called for user root, however the group may be root
  *
+ * The group list is available in "/proc/$PID/cred"
+ *
+ */
+
+static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
+{
+	typedef struct prcred {
+		uid_t pr_euid;	    /* effective user id */
+		uid_t pr_ruid;	    /* real user id */
+		uid_t pr_suid;	    /* saved user id (from exec) */
+		gid_t pr_egid;	    /* effective group id */
+		gid_t pr_rgid;	    /* real group id */
+		gid_t pr_sgid;	    /* saved group id (from exec) */
+		int pr_ngroups;     /* number of supplementary groups */
+		gid_t pr_groups[1]; /* array of supplementary groups */
+	} prcred_t;
+	enum { readset = 16 };
+
+	prcred_t basecreds;
+	gid_t groups[readset];
+	char filename[64];
+	int fd;
+	int k;
+	int cnt;
+	gid_t *p;
+	BOOL ismember;
+	int got;
+	pid_t tid;
+
+	if (scx->vol->secure_flags & (1 << SECURITY_STATICGRPS))
+		ismember = staticgroupmember(scx, uid, gid);
+	else {
+		ismember = FALSE; /* default return */
+		tid = scx->tid;
+		sprintf(filename,"/proc/%u/cred",tid);
+		fd = open(filename,O_RDONLY);
+		if (fd >= 0) {
+			got = read(fd, &basecreds, sizeof(prcred_t));
+			if (got == sizeof(prcred_t)) {
+				if (basecreds.pr_egid == gid)
+					ismember = TRUE;
+				p = basecreds.pr_groups;
+				cnt = 1;
+				k = 0;
+				while (!ismember
+				    && (k < basecreds.pr_ngroups)
+				    && (cnt > 0)
+				    && (*p != gid)) {
+					k++;
+					cnt--;
+					p++;
+					if (cnt <= 0) {
+						got = read(fd, groups,
+							readset*sizeof(gid_t));
+						cnt = got/sizeof(gid_t);
+						p = groups;
+					}
+				}
+				if ((cnt > 0)
+				    && (k < basecreds.pr_ngroups))
+					ismember = TRUE;
+			}
+		close(fd);
+		}
+	}
+	return (ismember);
+}
+
+#else /* defined(__sun) && defined (__SVR4) */
+
+/*
+ *		Check whether current thread owner is member of file group
+ *				Linux version
  *	Should not be called for user root, however the group may be root
  *
  * As indicated by Miklos Szeredi :
@@ -1234,6 +1310,8 @@ static BOOL groupmember(struct SECURITY_CONTEXT *scx, uid_t uid, gid_t gid)
 	}
 	return (ismember);
 }
+
+#endif /* defined(__sun) && defined (__SVR4) */
 
 /*
  *	Cacheing is done two-way :
