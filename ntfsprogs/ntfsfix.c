@@ -4,7 +4,7 @@
  * Copyright (c) 2000-2006 Anton Altaparmakov
  * Copyright (c) 2002-2006 Szabolcs Szakacsits
  * Copyright (c) 2007      Yura Pakhuchiy
- * Copyright (c) 2011      Jean-Pierre Andre
+ * Copyright (c) 2011-2012 Jean-Pierre Andre
  *
  * This utility fixes some common NTFS problems, resets the NTFS journal file
  * and schedules an NTFS consistency check for the first boot into Windows.
@@ -1274,6 +1274,76 @@ static int try_alternate_boot(ntfs_volume *vol, char *full_bs,
 }
 
 /*
+ *		Check and fix the alternate boot sector
+ *
+ *	Fixing is only done if the volume could be mounted, and the
+ *	last sector designated in the normal boot sector is reachable.
+ *
+ *	Returns 0 if successful
+ */
+
+static int check_alternate_boot(ntfs_volume *vol)
+{
+	s64 got_sectors;
+	s64 last_sector_off;
+	char *full_bs;
+	char *alt_bs;
+	NTFS_BOOT_SECTOR *bs;
+	s64 br;
+	s64 bw;
+	int res;
+
+	res = -1;
+	full_bs = (char*)malloc(vol->sector_size);
+	alt_bs = (char*)malloc(vol->sector_size);
+	if (!full_bs || !alt_bs) {
+		ntfs_log_info("Error : failed to allocate memory\n");
+		goto error_exit;
+	}
+	/* Now read both bootsectors. */
+	br = ntfs_pread(vol->dev, 0, vol->sector_size, full_bs);
+	if (br == vol->sector_size) {
+		bs = (NTFS_BOOT_SECTOR*)full_bs;
+		got_sectors = le64_to_cpu(bs->number_of_sectors);
+		last_sector_off = got_sectors << vol->sector_size_bits;
+		ntfs_log_info("Checking the alternate boot sector... ");
+		br = ntfs_pread(vol->dev, last_sector_off, vol->sector_size,
+							alt_bs);
+		/* accept getting no byte, needed for short image files */
+		if (br >= 0) {
+			if ((br != vol->sector_size)
+			    || memcmp(full_bs, alt_bs, vol->sector_size)) {
+				if (opt.no_action) {
+					ntfs_log_info("BAD\n");
+				} else {
+					bw = ntfs_pwrite(vol->dev,
+						last_sector_off,
+						vol->sector_size, full_bs);
+					if (bw == vol->sector_size) {
+						ntfs_log_info("FIXED\n");
+						res = 0;
+					} else {
+						ntfs_log_info(FAILED);
+					}
+				}
+			} else {
+				ntfs_log_info(OK);
+				res = 0;
+			}
+		} else {
+			ntfs_log_info(FAILED);
+		}
+	} else {
+		ntfs_log_info("Error : could not read the boot sector again\n");
+	}
+	free(full_bs);
+	free(alt_bs);
+
+error_exit :
+	return (res);
+}
+
+/*
  *		Try to fix problems which may arise in the start up sequence
  *
  *	This is a replay of the normal start up sequence with fixes when
@@ -1494,6 +1564,10 @@ int main(int argc, char **argv)
 			ntfs_log_perror("Remount failed");
 			exit(1);
 		}
+	}
+	if (check_alternate_boot(vol)) {
+		ntfs_log_error("Error: Failed to fix the alternate boot sector\n");
+		exit(1);
 	}
 	/* So the unmount does not clear it again. */
 
