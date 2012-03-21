@@ -1878,8 +1878,18 @@ search:
 	if (ntfs_index_remove(dir_ni, ni, fn, le32_to_cpu(actx->attr->value_length)))
 		goto err_out;
 	
-	if (ntfs_attr_record_rm(actx))
-		goto err_out;
+	/*
+	 * Keep the last name in place, this is useful for undeletion
+	 * (Windows also does so), however delete the name if it were
+	 * in an extent, to avoid leaving an attribute list.
+	 */
+	if ((ni->mrec->link_count == cpu_to_le16(1)) && !actx->base_ntfs_ino) {
+			/* make sure to not loop to another search */
+		looking_for_dos_name = FALSE;
+	} else {
+		if (ntfs_attr_record_rm(actx))
+			goto err_out;
+	}
 	
 	ni->mrec->link_count = cpu_to_le16(le16_to_cpu(
 			ni->mrec->link_count) - 1);
