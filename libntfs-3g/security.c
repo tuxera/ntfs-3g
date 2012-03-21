@@ -3546,10 +3546,12 @@ int ntfs_set_owner(struct SECURITY_CONTEXT *scx, ntfs_inode *ni,
 				uid = fileuid;
 			if ((int)gid < 0)
 				gid = filegid;
+#if !defined(__sun) || !defined (__SVR4)
 			/* clear setuid and setgid if owner has changed */
                         /* unless request originated by root */
 			if (uid && (fileuid != uid))
 				mode &= 01777;
+#endif
 #if POSIXACLS
 			res = ntfs_set_owner_mode(scx, ni, uid, gid, 
 				mode, pxdesc);
