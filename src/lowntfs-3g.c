@@ -174,21 +174,13 @@ struct open_file {
 	fuse_ino_t ino;
 	fuse_ino_t parent;
 	int state;
-#if defined(__sun) && defined (__SVR4)
-	pid_t tid;
-#endif /* defined(__sun) && defined (__SVR4) */
 } ;
 
 enum {
 	CLOSE_GHOST = 1,
 	CLOSE_COMPRESSED = 2,
 	CLOSE_ENCRYPTED = 4,
-#if defined(__sun) && defined (__SVR4)
-	CLOSE_DMTIME = 8,
-	CLOSE_WRITING = 16
-#else /* defined(__sun) && defined (__SVR4) */
 	CLOSE_DMTIME = 8
-#endif /* defined(__sun) && defined (__SVR4) */
 };
 
 enum RM_TYPES {
@@ -1192,31 +1184,6 @@ static void ntfs_fuse_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		fuse_reply_err(req, -err);
 }
 
-#if defined(__sun) && defined (__SVR4)
-
-/*
- *		When a file is created with a read-only mode,
- *	access for writing and ftruncating are allowed to the thread
- *	which is creating.
- */
-
-static BOOL check_open_for_writing(fuse_ino_t ino, pid_t tid)
-{
-	BOOL ok;
-	struct open_file *of;
-
-	ok = FALSE;
-	of = ctx->open_files;
-	while (of && (of->ino != ino))
-		of = of->next;
-	if (of && (of->state & CLOSE_WRITING) && (of->tid == tid)) {
-		ok = TRUE;
-	}
-	return (ok);
-}
-
-#endif /* defined(__sun) && defined (__SVR4) */
-
 static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 		      struct fuse_file_info *fi)
 {
@@ -1252,9 +1219,6 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 #endif
 			if ((res >= 0)
 			    && (fi->flags & (O_WRONLY | O_RDWR))) {
-#if defined(__sun) && defined (__SVR4)
-				state |= CLOSE_WRITING;
-#endif /* defined(__sun) && defined (__SVR4) */
 			/* mark a future need to compress the last chunk */
 				if (na->data_flags & ATTR_COMPRESSION_MASK)
 					state |= CLOSE_COMPRESSED;
@@ -1286,13 +1250,6 @@ static void ntfs_fuse_open(fuse_req_t req, fuse_ino_t ino,
 			of->parent = 0;
 			of->ino = ino;
 			of->state = state;
-#if defined(__sun) && defined (__SVR4)
-#if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-			of->tid = security.tid;
-#else
-			of->tid = fuse_req_ctx(req)->pid;
-#endif
-#endif /* defined(__sun) && defined (__SVR4) */
 			of->next = ctx->open_files;
 			of->previous = (struct open_file*)NULL;
 			if (ctx->open_files)
@@ -1792,14 +1749,8 @@ static void ntfs_fuse_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 						/* size */
 	if (!res && (to_set & FUSE_SET_ATTR_SIZE)) {
-#if defined(__sun) && defined (__SVR4)
-		res = ntfs_fuse_trunc(&security, ino, attr->st_size,
-					!fi && !check_open_for_writing(ino,
-						security.tid), &stbuf);
-#else
 		res = ntfs_fuse_trunc(&security, ino, attr->st_size,
 					!fi, &stbuf);
-#endif /* defined(__sun) && defined (__SVR4) */
 	}
 						/* some set of atime/mtime */
 	if (!res && (to_set & (FUSE_SET_ATTR_ATIME + FUSE_SET_ATTR_MTIME))) {
@@ -1831,13 +1782,6 @@ static void ntfs_fuse_access(fuse_req_t req, fuse_ino_t ino, int mask)
 		else
 			res = -EOPNOTSUPP;
 	} else {
-#if defined(__sun) && defined (__SVR4)
-		if ((mask & W_OK) && check_open_for_writing(ino,
-						security.tid)) {
-			fuse_reply_err(req, 0);
-			return;
-		}
-#endif /* defined(__sun) && defined (__SVR4) */
 		ni = ntfs_inode_open(ctx->vol, INODE(ino));
 		if (!ni) {
 			res = -errno;
@@ -2014,12 +1958,7 @@ exit:
 		if (of) {
 			of->parent = 0;
 			of->ino = e->ino;
-#if defined(__sun) && defined (__SVR4)
-			of->state = state | CLOSE_WRITING;
-			of->tid = security.tid;
-#else /* defined(__sun) && defined (__SVR4) */
 			of->state = state;
-#endif /* defined(__sun) && defined (__SVR4) */
 			of->next = ctx->open_files;
 			of->previous = (struct open_file*)NULL;
 			if (ctx->open_files)
