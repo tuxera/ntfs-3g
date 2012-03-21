@@ -227,6 +227,8 @@ Set the hidden flag in the NTFS attribute for created files and directories
 whose first character of the name is a dot. Such files and directories
 normally do not appear in directory listings, and when the flag is set
 they do not appear in Windows directory displays either.
+When a file is renamed or linked with a new name, the hidden flag is
+adjusted to the latest name.
 .TP
 .B windows_names
 This option prevents files, directories and extended attributes to be

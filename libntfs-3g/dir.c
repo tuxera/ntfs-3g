@@ -2075,6 +2075,15 @@ static int ntfs_link_i(ntfs_inode *ni, ntfs_inode *dir_ni, ntfschar *name,
 		err = EOPNOTSUPP;
 		goto err_out;
 	}
+	if (NVolHideDotFiles(dir_ni->vol)) {
+		/* Set hidden flag according to the latest name */
+		if ((name_len > 1)
+		    && (name[0] == const_cpu_to_le16('.'))
+		    && (name[1] != const_cpu_to_le16('.')))
+			ni->flags |= FILE_ATTR_HIDDEN;
+		else
+			ni->flags &= ~FILE_ATTR_HIDDEN;
+	}
 	
 	/* Create FILE_NAME attribute. */
 	fn_len = sizeof(FILE_NAME_ATTR) + name_len * sizeof(ntfschar);
