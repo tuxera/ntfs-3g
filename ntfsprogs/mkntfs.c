@@ -140,6 +140,11 @@
 #include "unistr.h"
 #include "misc.h"
 
+#if defined(__sun) && defined (__SVR4)
+#undef basename
+#define basename(name) name
+#endif
+
 typedef enum { WRITE_STANDARD, WRITE_BITMAP, WRITE_LOGFILE } WRITE_TYPE;
 
 #ifdef NO_NTFS_DEVICE_DEFAULT_IO_OPS
@@ -167,11 +172,6 @@ static int		   g_mft_bitmap_byte_size = 0;
 static u8		  *g_mft_bitmap		  = NULL;
 static int		   g_lcn_bitmap_byte_size = 0;
 static int		   g_dynamic_buf_size	  = 0;
-#if defined(__sun) && defined (__SVR4)
-#undef basename
-#define basename(name) name
-#endif
-
 static u8		  *g_dynamic_buf	  = NULL;
 static runlist		  *g_rl_mft		  = NULL;
 static runlist		  *g_rl_mft_bmp		  = NULL;
