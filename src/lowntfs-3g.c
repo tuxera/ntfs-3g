@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2011 Jean-Pierre Andre
+ * Copyright (c) 2007-2012 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -191,6 +191,12 @@ enum {
 #endif /* defined(__sun) && defined (__SVR4) */
 };
 
+enum RM_TYPES {
+	RM_LINK,
+	RM_DIR,
+	RM_ANY,
+} ;
+
 static struct ntfs_options opts;
 
 const char *EXEC_NAME = "lowntfs-3g";
@@ -216,7 +222,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2011 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2012 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -2152,7 +2158,8 @@ static void ntfs_fuse_link(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_entry(req, &entry);
 }
 
-static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name)
+static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name,
+			enum RM_TYPES rm_type __attribute__((unused)))
 {
 	ntfschar *uname = NULL;
 	ntfs_inode *dir_ni = NULL, *ni = NULL;
@@ -2207,7 +2214,7 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name)
 			goto out;
 		}
 			/* sweep existing ghost if any */
-		ntfs_fuse_rm(req, parent, ghostname);
+		ntfs_fuse_rm(req, parent, ghostname, RM_LINK);
 		res = ntfs_fuse_newlink(req, of->ino, parent, ghostname,
 				(struct fuse_entry_param*)NULL);
 		if (res)
@@ -2226,6 +2233,16 @@ static int ntfs_fuse_rm(fuse_req_t req, fuse_ino_t parent, const char *name)
 		goto exit;
 	}
         
+#if defined(__sun) && defined (__SVR4)
+	/* on Solaris : deny unlinking directories */
+	if (rm_type
+	    == (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? RM_LINK : RM_DIR)) {
+		errno = EPERM;
+		res = -errno;
+		goto exit;
+	}
+#endif /* defined(__sun) && defined (__SVR4) */
+
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 	/* JPA deny unlinking if directory is not writable and executable */
 	if (!ntfs_fuse_fill_security_context(req, &security)
@@ -2256,7 +2273,7 @@ static void ntfs_fuse_unlink(fuse_req_t req, fuse_ino_t parent,
 {
 	int res;
 
-	res = ntfs_fuse_rm(req, parent, name);
+	res = ntfs_fuse_rm(req, parent, name, RM_LINK);
 	if (res)
 		fuse_reply_err(req, -res);
 	else
@@ -2277,7 +2294,7 @@ static int ntfs_fuse_safe_rename(fuse_req_t req, fuse_ino_t ino,
 	if (ret)
 		return ret;
         
-	ret = ntfs_fuse_rm(req, newparent, newname);
+	ret = ntfs_fuse_rm(req, newparent, newname, RM_ANY);
 	if (!ret) {
 	        
 		ret = ntfs_fuse_newlink(req, ino, newparent, newname,
@@ -2285,9 +2302,9 @@ static int ntfs_fuse_safe_rename(fuse_req_t req, fuse_ino_t ino,
 		if (ret)
 			goto restore;
 	        
-		ret = ntfs_fuse_rm(req, parent, name);
+		ret = ntfs_fuse_rm(req, parent, name, RM_ANY);
 		if (ret) {
-			if (ntfs_fuse_rm(req, newparent, newname))
+			if (ntfs_fuse_rm(req, newparent, newname, RM_ANY))
 				goto err;
 			goto restore;
 		}
@@ -2308,7 +2325,7 @@ cleanup:
 		 * fail (unless concurrent access to directories when fuse
 		 * is multithreaded)
 		 */
-		if (ntfs_fuse_rm(req, newparent, tmp) < 0)
+		if (ntfs_fuse_rm(req, newparent, tmp, RM_ANY) < 0)
 			ntfs_log_perror("Rename failed. Existing file '%s' still present "
 				"as '%s'", newname, tmp);
 	}
@@ -2429,9 +2446,9 @@ static void ntfs_fuse_rename(fuse_req_t req, fuse_ino_t parent,
 		if (ret)
 			goto out;
         
-		ret = ntfs_fuse_rm(req, parent, name);
+		ret = ntfs_fuse_rm(req, parent, name, RM_ANY);
 		if (ret)
-			ntfs_fuse_rm(req, newparent, newname);
+			ntfs_fuse_rm(req, newparent, newname, RM_ANY);
 	}
 out:
 	if (ret)
@@ -2486,7 +2503,7 @@ out:
 	if (of) {
 		if (of->state & CLOSE_GHOST) {
 			sprintf(ghostname,ghostformat,of->ghost);
-			ntfs_fuse_rm(req, of->parent, ghostname);
+			ntfs_fuse_rm(req, of->parent, ghostname, RM_ANY);
 		}
 			/* remove from open files list */
 		if (of->next)
@@ -2521,7 +2538,7 @@ static void ntfs_fuse_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
 	int res;
 
-	res = ntfs_fuse_rm(req, parent, name);
+	res = ntfs_fuse_rm(req, parent, name, RM_DIR);
 	if (res)
 		fuse_reply_err(req, -res);
 	else
@@ -3526,7 +3543,8 @@ static int ntfs_open(const char *device)
 	if (ctx->hiberfile && ntfs_volume_check_hiberfile(vol, 0)) {
 		if (errno != EPERM)
 			goto err_out;
-		if (ntfs_fuse_rm((fuse_req_t)NULL,FILE_root,"hiberfil.sys"))
+		if (ntfs_fuse_rm((fuse_req_t)NULL,FILE_root,"hiberfil.sys",
+					RM_LINK))
 			goto err_out;
 	}
         
