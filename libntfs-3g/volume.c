@@ -54,6 +54,10 @@
 #include <locale.h>
 #endif
 
+#if defined(__sun) && defined (__SVR4)
+#include <sys/mnttab.h>
+#endif
+
 #include "param.h"
 #include "compat.h"
 #include "volume.h"
@@ -1430,6 +1434,60 @@ exit:
 	}
 	return 0;
 }
+
+#else /* HAVE_MNTENT_H */
+
+#if defined(__sun) && defined (__SVR4)
+
+static int ntfs_mntent_check(const char *file, unsigned long *mnt_flags)
+{
+	struct mnttab *mnt = NULL;
+	char *real_file = NULL, *real_fsname = NULL;
+	FILE *f;
+	int err = 0;
+
+	real_file = (char*)ntfs_malloc(PATH_MAX + 1);
+	if (!real_file)
+		return -1;
+	real_fsname = (char*)ntfs_malloc(PATH_MAX + 1);
+	mnt = (struct mnttab*)ntfs_malloc(MNT_LINE_MAX + 1);
+	if (!real_fsname || !mnt) {
+		err = errno;
+		goto exit;
+	}
+	if (!ntfs_realpath_canonicalize(file, real_file)) {
+		err = errno;
+		goto exit;
+	}
+	if (!(f = fopen(MNTTAB, "r"))) {
+		err = errno;
+		goto exit;
+	}
+	while (!getmntent(f, mnt)) {
+		if (!ntfs_realpath_canonicalize(mnt->mnt_special, real_fsname))
+			continue;
+		if (!strcmp(real_file, real_fsname)) {
+			*mnt_flags = NTFS_MF_MOUNTED;
+			if (!strcmp(mnt->mnt_mountp, "/"))
+				*mnt_flags |= NTFS_MF_ISROOT;
+			if (hasmntopt(mnt, "ro") && !hasmntopt(mnt, "rw"))
+				*mnt_flags |= NTFS_MF_READONLY;
+			break;
+		}
+	}
+	fclose(f);
+exit:
+	free(mnt);
+	free(real_file);
+	free(real_fsname);
+	if (err) {
+		errno = err;
+		return -1;
+	}
+	return 0;
+}
+
+#endif /* defined(__sun) && defined (__SVR4) */
 #endif /* HAVE_MNTENT_H */
 
 /**
@@ -1461,7 +1519,7 @@ int ntfs_check_if_mounted(const char *file __attribute__((unused)),
 		unsigned long *mnt_flags)
 {
 	*mnt_flags = 0;
-#ifdef HAVE_MNTENT_H
+#if defined(HAVE_MNTENT_H) || (defined(__sun) && defined (__SVR4))
 	return ntfs_mntent_check(file, mnt_flags);
 #else
 	return 0;
