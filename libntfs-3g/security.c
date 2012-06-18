@@ -1876,7 +1876,7 @@ static int access_check_posix(struct SECURITY_CONTEXT *scx,
 		if (!scx->uid) {
 					/* root access if owner or other execution */
 			if (perms & 0101)
-				perms = 07777;
+				perms |= 01777;
 			else {
 					/* root access if some group execution */
 				groupperms = 0;
@@ -2292,7 +2292,7 @@ static int ntfs_get_perm(struct SECURITY_CONTEXT *scx,
 			if (!scx->uid) {
 				/* root access and execution */
 				if (perm & 0111)
-					perm = 07777;
+					perm |= 01777;
 				else
 					perm = 0;
 			} else
@@ -3391,6 +3391,56 @@ int ntfs_allowed_access(struct SECURITY_CONTEXT *scx,
 				errno = res;
 		} else
 			allow = 0;
+	}
+	return (allow);
+}
+
+/*
+ *		Check whether user can create a file (or directory)
+ *
+ *	Returns TRUE if access is allowed,
+ *	Also returns the gid and dsetgid applicable to the created file
+ */
+
+int ntfs_allowed_create(struct SECURITY_CONTEXT *scx,
+		ntfs_inode *dir_ni, gid_t *pgid, mode_t *pdsetgid)
+{
+	int perm;
+	int res;
+	int allow;
+	struct stat stbuf;
+
+	/*
+	 * Always allow for root.
+	 * Also always allow if no mapping has been defined
+	 */
+	if (!scx->mapping[MAPUSERS])
+		perm = 0777;
+	else
+		perm = ntfs_get_perm(scx, dir_ni, S_IWRITE + S_IEXEC);
+	if (!scx->mapping[MAPUSERS]
+	    || !scx->uid) {
+		allow = 1;
+	} else {
+		perm = ntfs_get_perm(scx, dir_ni, S_IWRITE + S_IEXEC);
+		if (perm >= 0) {
+			res = EACCES;
+			allow = ((perm & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0)
+				    && ((perm & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0);
+			if (!allow)
+				errno = res;
+		} else
+			allow = 0;
+	}
+	*pgid = scx->gid;
+	*pdsetgid = 0;
+		/* return directory group if S_ISGID is set */
+	if (allow && (perm & S_ISGID)) {
+		if (ntfs_get_owner_mode(scx, dir_ni, &stbuf) >= 0) {
+			*pdsetgid = stbuf.st_mode & S_ISGID;
+			if (perm & S_ISGID)
+				*pgid = stbuf.st_gid;
+		}
 	}
 	return (allow);
 }

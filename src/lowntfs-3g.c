@@ -1820,6 +1820,8 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 	struct open_file *of;
 	int state = 0;
 	le32 securid;
+	gid_t gid;
+	mode_t dsetgid;
 	mode_t type = typemode & ~07777;
 	mode_t perm;
 	struct SECURITY_CONTEXT security;
@@ -1842,13 +1844,15 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
 		/* make sure parent directory is writeable and executable */
 	if (!ntfs_fuse_fill_security_context(req, &security)
-	       || ntfs_allowed_access(&security,
-				dir_ni,S_IWRITE + S_IEXEC)) {
+	       || ntfs_allowed_create(&security,
+				dir_ni, &gid, &dsetgid)) {
 #else
 		ntfs_fuse_fill_security_context(req, &security);
+		ntfs_allowed_create(&security, dir_ni, &gid, &dsetgid);
 #endif
 		if (S_ISDIR(type))
-			perm = typemode & ~ctx->dmask & 0777;
+			perm = (typemode & ~ctx->dmask & 0777)
+				| (dsetgid & S_ISGID);
 		else
 			perm = typemode & ~ctx->fmask & 0777;
 			/*
@@ -1866,11 +1870,11 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 			else
 #if POSIXACLS
 				securid = ntfs_alloc_securid(&security,
-					security.uid, security.gid,
+					security.uid, gid,
 					dir_ni, perm, S_ISDIR(type));
 #else
 				securid = ntfs_alloc_securid(&security,
-					security.uid, security.gid,
+					security.uid, gid,
 					perm & ~security.umask, S_ISDIR(type));
 #endif
 		/* Create object specified in @type. */
@@ -1904,13 +1908,13 @@ static int ntfs_fuse_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 #if POSIXACLS
 				if (!securid
 				   && ntfs_set_inherited_posix(&security, ni,
-					security.uid, security.gid,
+					security.uid, gid,
 					dir_ni, perm) < 0)
 					set_fuse_error(&res);
 #else
 				if (!securid
 				   && ntfs_set_owner_mode(&security, ni,
-					security.uid, security.gid, 
+					security.uid, gid, 
 					perm & ~security.umask) < 0)
 					set_fuse_error(&res);
 #endif
