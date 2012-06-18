@@ -47,6 +47,7 @@ struct options {
 	int	 pagefile;	/* Wipe pagefile (swap space) */
 	int	 tails;		/* Wipe file tails */
 	int	 unused;	/* Wipe unused clusters */
+	int	 undel;		/* Wipe undelete data */
 };
 
 #endif /* _NTFSWIPE_H_ */
