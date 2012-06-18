@@ -1,7 +1,7 @@
 /**
  * ntfs-3g_common.c - Common definitions for ntfs-3g and lowntfs-3g.
  *
- * Copyright (c) 2010-2011 Jean-Pierre Andre
+ * Copyright (c) 2010-2012 Jean-Pierre Andre
  * Copyright (c) 2010      Erik Larsson
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -76,7 +76,7 @@ const struct DEFOPTION optionlist[] = {
 	{ "noatime", OPT_NOATIME, FLGOPT_BOGUS },
 	{ "atime", OPT_ATIME, FLGOPT_BOGUS },
 	{ "relatime", OPT_RELATIME, FLGOPT_BOGUS },
-	{ "delay_mtime", OPT_DMTIME, FLGOPT_BOGUS },
+	{ "delay_mtime", OPT_DMTIME, FLGOPT_DECIMAL | FLGOPT_OPTIONAL },
 	{ "fake_rw", OPT_FAKE_RW, FLGOPT_BOGUS },
 	{ "fsname", OPT_FSNAME, FLGOPT_NOSUPPORT },
 	{ "no_def_opts", OPT_NO_DEF_OPTS, FLGOPT_BOGUS },
@@ -262,12 +262,17 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 					opt);
 				goto err_exit;
 			}
-			if ((poptl->flags & FLGOPT_DECIMAL)
-			    && (!val
-				|| !sscanf(val, "%i", &intarg))) {
-				ntfs_log_error("'%s' option needs a decimal value\n",
-					opt);
-				goto err_exit;
+			if (poptl->flags & FLGOPT_DECIMAL) {
+				if ((poptl->flags & FLGOPT_OPTIONAL) && !val)
+					intarg = 0;
+				else
+					if (!val
+					    || !sscanf(val, "%i", &intarg)) {
+						ntfs_log_error("'%s' option "
+						     "needs a decimal value\n",
+							opt);
+						goto err_exit;
+					}
 			}
 			if ((poptl->flags & FLGOPT_STRING)
 			    && missing_option_value(val, opt))
@@ -288,7 +293,9 @@ char *parse_mount_options(ntfs_fuse_context_t *ctx,
 				ctx->atime = ATIME_RELATIVE;
 				break;
 			case OPT_DMTIME :
-				ctx->dmtime = TRUE;
+				if (!intarg)
+					intarg = DEFAULT_DMTIME;
+				ctx->dmtime = intarg*10000000LL;
 				break;
 			case OPT_NO_DEF_OPTS :
 				no_def_opts = TRUE; /* Don't add default options. */

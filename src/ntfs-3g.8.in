@@ -1,10 +1,10 @@
 .\" Copyright (c) 2005-2006 Yura Pakhuchiy.
 .\" Copyright (c) 2005 Richard Russon.
 .\" Copyright (c) 2006-2009 Szabolcs Szakacsits.
-.\" Copyright (c) 2009 Jean-Pierre Andre
+.\" Copyright (c) 2009-2012 Jean-Pierre Andre
 .\" This file may be copied under the terms of the GNU Public License.
 .\"
-.TH NTFS-3G 8 "February 2010" "ntfs-3g @VERSION@"
+.TH NTFS-3G 8 "May 2012" "ntfs-3g @VERSION@"
 .SH NAME
 ntfs-3g \- Third Generation Read/Write NTFS Driver
 .SH SYNOPSIS
@@ -199,11 +199,13 @@ this option doesn't break applications that need to know
 if a file has been read since the last time it was modified.
 This is the default behaviour.
 .TP
-.B delay_mtime
-Delay the updating of file modification time and file change time until
-the file is closed. This is mainly useful for files which are written
-to without changing their size, such as databases or file system images
-mounted as loop.
+.B delay_mtime[= value]
+Only update the file modification time and the file change time of a file
+when it is closed or when the indicated delay since the previous update has
+elapsed. The argument is a number of seconds, with a default value of 60.
+This is mainly useful for big files which are kept open for a long
+time and written to without changing their size, such as databases or file
+system images mounted as loop.
 .TP
 .B show_sys_files
 Show the metafiles in directory listings. Otherwise the default behaviour is

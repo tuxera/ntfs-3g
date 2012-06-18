@@ -1368,7 +1368,10 @@ static void ntfs_fuse_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		total  += ret;
 	}
 	res = total;
-	if ((res > 0) && !ctx->dmtime)
+	if ((res > 0)
+	    && (!ctx->dmtime
+		|| (le64_to_cpu(ntfs_current_time())
+		     - le64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)

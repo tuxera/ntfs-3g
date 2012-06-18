@@ -100,7 +100,8 @@ enum {
 	FLGOPT_OCTAL = 4,
 	FLGOPT_DECIMAL = 8,
 	FLGOPT_APPEND = 16,
-	FLGOPT_NOSUPPORT = 32
+	FLGOPT_NOSUPPORT = 32,
+	FLGOPT_OPTIONAL = 64
 } ;
 
 typedef enum {
@@ -117,7 +118,7 @@ typedef struct {
 	unsigned int dmask;
 	ntfs_fuse_streams_interface streams;
 	ntfs_atime_t atime;
-	BOOL dmtime;
+	u64 dmtime;
 	BOOL ro;
 	BOOL show_sys_files;
 	BOOL hide_hid_files;

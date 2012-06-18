@@ -4,7 +4,7 @@
  * Copyright (c) 2005-2007 Yura Pakhuchiy
  * Copyright (c) 2005 Yuval Fledel
  * Copyright (c) 2006-2009 Szabolcs Szakacsits
- * Copyright (c) 2007-2011 Jean-Pierre Andre
+ * Copyright (c) 2007-2012 Jean-Pierre Andre
  * Copyright (c) 2009 Erik Larsson
  *
  * This file is originated from the Linux-NTFS project.
@@ -168,7 +168,7 @@ static const char *usage_msg =
 "\n"
 "Copyright (C) 2005-2007 Yura Pakhuchiy\n"
 "Copyright (C) 2006-2009 Szabolcs Szakacsits\n"
-"Copyright (C) 2007-2011 Jean-Pierre Andre\n"
+"Copyright (C) 2007-2012 Jean-Pierre Andre\n"
 "Copyright (C) 2009 Erik Larsson\n"
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
@@ -1293,7 +1293,10 @@ static int ntfs_fuse_write(const char *org_path, const char *buf, size_t size,
 		total  += ret;
 	}
 	res = total;
-	if ((res > 0) && !ctx->dmtime)
+	if ((res > 0)
+	    && (!ctx->dmtime
+		|| (le64_to_cpu(ntfs_current_time())
+		     - le64_to_cpu(ni->last_data_change_time)) > ctx->dmtime))
 		ntfs_fuse_update_times(na->ni, NTFS_UPDATE_MCTIME);
 exit:
 	if (na)

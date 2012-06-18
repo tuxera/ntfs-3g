@@ -51,6 +51,12 @@ enum {
 #define MAX_COMPRESSION_CLUSTER_SIZE 4096
 
 /*
+ *		Parameters for default options
+ */
+
+#define DEFAULT_DMTIME 60 /* default 1mn for delay_mtime */
+
+/*
  *		Use of big write buffers
  *
  *	With small volumes, the cluster allocator may fail to allocate
