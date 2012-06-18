@@ -191,6 +191,9 @@
  *  Nov 2011, version 1.3.22
  *     - added a distinctive prefix to owner and group SID
  *     - fixed a false memory leak detection
+ *
+ *  Jun 2012, version 1.3.23
+ *     - added support for SACL (nickgarvey)
  */
 
 /*
@@ -214,7 +217,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.22"
+#define AUDT_VERSION "1.3.23"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -2209,6 +2212,7 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 {
 #ifdef WIN32
 	char mapfile[sizeof(MAPDIR) + sizeof(MAPFILE) + 6];
+	char currpath[261];
 #else
 	char *mapfile;
 	char *p;
@@ -2245,8 +2249,10 @@ int local_build_mapping(struct MAPPING *mapping[], const char *usermap_path)
 		strcpy(mapfile,"x:\\" MAPDIR "\\" MAPFILE);
 		if (((le16*)usermap_path)[1] == ':')
   			mapfile[0] = usermap_path[0];
-		else
-			mapfile[0] = getdrive() + 'A' - 1;
+		else {
+			GetModuleFileName(NULL, currpath, 261);
+			mapfile[0] = currpath[0];
+		}
 		fd = open(mapfile,O_RDONLY);
 #else
 		fd = 0;
@@ -2517,6 +2523,10 @@ BOOL applyattr(const char *fullname, const char *attr,
 	BOOL bad;
 	BOOL badattrib;
 	BOOL err;
+#ifdef WIN32
+	HANDLE htoken;
+	TOKEN_PRIVILEGES tkp;
+#endif
 
 	err = FALSE;
 	psecurdata = (struct SECURITY_DATA*)NULL;
@@ -2568,26 +2578,42 @@ BOOL applyattr(const char *fullname, const char *attr,
 
 	if (curattr) {
 #ifdef WIN32
-			/* SACL currently not set, need some special privilege */
 		selection = OWNER_SECURITY_INFORMATION
 			| GROUP_SECURITY_INFORMATION
 			| DACL_SECURITY_INFORMATION;
+		if (OpenProcessToken(GetCurrentProcess(), 
+				TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &htoken)) {
+			if (LookupPrivilegeValue(NULL, SE_SECURITY_NAME,
+					&tkp.Privileges[0].Luid)) {
+				tkp.PrivilegeCount = 1;
+				tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+				if (AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0)) {
+					selection |= SACL_SECURITY_INFORMATION;
+				}
+			}
+		}
 		bad = !SetFileSecurityW((LPCWSTR)fullname,
 			selection, (char*)curattr);
 		if (bad)
 			switch (GetLastError()) {
 			case 1307 :
 			case 1314 :
-				printf("** Could not set owner of ");
+				printf("** Could not set owner or SACL of ");
 				printname(stdout,fullname);
-				printf(", retrying with no owner setting\n");
+				printf(", retrying with no owner or SACL setting\n");
 				warnings++;
 				bad = !SetFileSecurityW((LPCWSTR)fullname,
-					selection & ~OWNER_SECURITY_INFORMATION, (char*)curattr);
+					selection & ~OWNER_SECURITY_INFORMATION
+					& ~SACL_SECURITY_INFORMATION, (char*)curattr);
 				break;
 			default :
 				break;
 			}
+		/* Release privileges once we are done*/
+		if (selection ^ SACL_SECURITY_INFORMATION) {
+			tkp.Privileges[0].Attributes = 0;
+			AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0);
+		}
 #else
 		selection = OWNER_SECURITY_INFORMATION
 			| GROUP_SECURITY_INFORMATION
@@ -4041,6 +4067,9 @@ unsigned int getfull(char *attr, const char *fullname)
 	ULONG attrsz;
 	ULONG partsz;
 	BOOL overflow;
+	HANDLE htoken;
+	TOKEN_PRIVILEGES tkp;
+	BOOL saclsuccess;
 
 	attrsz = 0;
 	partsz = 0;
@@ -4061,9 +4090,27 @@ unsigned int getfull(char *attr, const char *fullname)
 		}
 			/*
 			 *  SACL : just feed in or clean
+			 *  This requires the SE_SECURITY_NAME privilege
 			 */
-		if (!GetFileSecurityW((LPCWSTR)fullname,SACL_SECURITY_INFORMATION,
-				(char*)attr,MAXATTRSZ,&attrsz)) {
+		saclsuccess = FALSE;
+		if (OpenProcessToken(GetCurrentProcess(), 
+				TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &htoken)) {
+			if (LookupPrivilegeValue(NULL, SE_SECURITY_NAME,
+					&tkp.Privileges[0].Luid)) {
+				tkp.PrivilegeCount = 1;
+				tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+				if (AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0)) {
+					if (GetFileSecurityW((LPCWSTR)fullname,
+							SACL_SECURITY_INFORMATION,
+							(char*)attr,MAXATTRSZ,&attrsz)) {
+						saclsuccess = TRUE;
+					}
+					tkp.Privileges[0].Attributes = 0;
+					AdjustTokenPrivileges(htoken, FALSE, &tkp, 0, NULL, 0);
+				}
+			}
+		}		
+		if (!saclsuccess) {
 			attrsz = 20;
 			set4l(attr,0);
 			attr[0] = SECURITY_DESCRIPTOR_REVISION;

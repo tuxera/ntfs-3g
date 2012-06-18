@@ -221,14 +221,6 @@ typedef DWORD *LPDWORD;
 
 typedef le16 ntfschar;
 
-typedef struct {
-	le32 a;
-	le16 b,c;
-	struct {
-		le16 m,n,o,p,  q,r,s,t;
-	} ;
-} GUID;
-
 #define ntfs_log_error(args...) do { printf("** " args); if (!isatty(1)) fprintf(stderr,args); } while(0)
 
 /*
