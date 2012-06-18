@@ -417,6 +417,12 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	printf("\tDevice state: %lu\n", vol->dev->d_state);
 	printf("\tVolume Name: %s\n", vol->vol_name);
 	printf("\tVolume State: %lu\n", vol->state);
+	printf("\tVolume Flags: 0x%04x", (int)vol->flags);
+	if (vol->flags & VOLUME_IS_DIRTY)
+		printf(" DIRTY");
+	if (vol->flags & VOLUME_MODIFIED_BY_CHKDSK)
+		printf(" MODIFIED_BY_CHKDSK");
+	printf("\n");
 	printf("\tVolume Version: %u.%u\n", vol->major_ver, vol->minor_ver);
 	printf("\tSector Size: %hu\n", vol->sector_size);
 	printf("\tCluster Size: %u\n", (unsigned int)vol->cluster_size);
@@ -435,6 +441,12 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 			(long long)vol->data1_zone_pos);
 	printf("\tCurrent Position in Second Data Zone: %lld\n",
 			(long long)vol->data2_zone_pos);
+	printf("\tAllocated clusters %lld (%2.1lf%%)\n",
+			(long long)vol->mft_na->allocated_size
+				>> vol->cluster_size_bits,
+			100.0*(vol->mft_na->allocated_size
+				>> vol->cluster_size_bits)
+				/ vol->nr_clusters);
 	printf("\tLCN of Data Attribute for FILE_MFT: %lld\n",
 			(long long)vol->mft_lcn);
 	printf("\tFILE_MFTMirr Size: %d\n", vol->mftmirr_size);
@@ -442,6 +454,8 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 			(long long)vol->mftmirr_lcn);
 	printf("\tSize of Attribute Definition Table: %d\n",
 			(int)vol->attrdef_len);
+	printf("\tNumber of Attached Extent Inodes: %d\n",
+			(int)vol->mft_ni->nr_extents);
 
 	printf("FILE_Bitmap Information \n");
 	printf("\tFILE_Bitmap MFT Record Number: %llu\n",
@@ -449,7 +463,7 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 	printf("\tState of FILE_Bitmap Inode: %lu\n", vol->lcnbmp_ni->state);
 	printf("\tLength of Attribute List: %u\n",
 			(unsigned int)vol->lcnbmp_ni->attr_list_size);
-	printf("\tAttribute List: %s\n", vol->lcnbmp_ni->attr_list);
+	/* JPA	printf("\tAttribute List: %s\n", vol->lcnbmp_ni->attr_list); */
 	printf("\tNumber of Attached Extent Inodes: %d\n",
 			(int)vol->lcnbmp_ni->nr_extents);
 	/* FIXME: need to add code for the union if nr_extens != 0, but
@@ -478,6 +492,11 @@ static void ntfs_dump_volume(ntfs_volume *vol)
 			vol->lcnbmp_na->compression_block_size_bits);
 	printf("\tCompression Block Clusters: %u\n",
 			vol->lcnbmp_na->compression_block_clusters);
+	if (!ntfs_volume_get_free_space(vol))
+		printf("\tFree Clusters: %lld (%2.1lf%%)\n",
+				(long long)vol->free_clusters,
+				100.0*vol->free_clusters
+					/(double)vol->nr_clusters);
 
 	//TODO: Still need to add a few more attributes
 }
