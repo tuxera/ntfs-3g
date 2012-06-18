@@ -4,7 +4,7 @@
  *	This module is part of ntfs-3g library, but may also be
  *	integrated in tools running over Linux or Windows
  *
- * Copyright (c) 2007-2010 Jean-Pierre Andre
+ * Copyright (c) 2007-2012 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -235,6 +235,12 @@ static int is_world_sid(const SID * usid)
 	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
 	    && (usid->sub_authority[0] == const_cpu_to_le32(32))
 	    && (usid->sub_authority[1] == const_cpu_to_le32(545)))
+
+	     /* check whether S-1-5-11 : authenticated user */
+	  ||   ((usid->sub_authority_count == 1)
+	    && (usid->identifier_authority.high_part ==  const_cpu_to_be16(0))
+	    && (usid->identifier_authority.low_part ==  const_cpu_to_be32(5))
+	    && (usid->sub_authority[0] == const_cpu_to_le32(11)))
 		);
 }
 
@@ -713,6 +719,7 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				acesz = gsidsz + 8;
 				pnewace->size = cpu_to_le16(acesz);
 			}
+				/* reencode GENERIC_ALL */
 			if (pnewace->mask & GENERIC_ALL) {
 				pnewace->mask &= ~GENERIC_ALL;
 				if (fordir)
@@ -730,6 +737,36 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 							| FILE_WRITE
 							| FILE_EXEC
 							| cpu_to_le32(0x40);
+			}
+				/* reencode GENERIC_READ (+ EXECUTE) */
+			if (pnewace->mask & GENERIC_READ) {
+				if (fordir)
+					pnewace->mask |= OWNER_RIGHTS
+							| DIR_READ
+							| DIR_EXEC;
+				else
+					pnewace->mask |= OWNER_RIGHTS
+							| FILE_READ
+							| FILE_EXEC;
+				pnewace->mask &= ~(GENERIC_READ
+						| GENERIC_EXECUTE
+						| WRITE_DAC
+						| WRITE_OWNER
+						| DELETE | FILE_WRITE_EA
+						| FILE_WRITE_ATTRIBUTES);
+			}
+				/* reencode GENERIC_WRITE */
+			if (pnewace->mask & GENERIC_WRITE) {
+				if (fordir)
+					pnewace->mask |= OWNER_RIGHTS
+							| DIR_WRITE;
+				else
+					pnewace->mask |= OWNER_RIGHTS
+							| FILE_WRITE;
+				pnewace->mask &= ~(GENERIC_WRITE
+							| WRITE_DAC
+							| WRITE_OWNER
+							| FILE_DELETE_CHILD);
 			}
 				/* remove inheritance flags */
 			pnewace->flags &= ~(OBJECT_INHERIT_ACE
@@ -3705,7 +3742,7 @@ struct POSIX_SECURITY *ntfs_build_permissions_posix(
 				pxace->perms |= POSIX_PERM_DENIAL;
 			else
 				if (pxace->tag == POSIX_ACL_OTHER)
-					pctx->permswrld = pxace->perms;
+					pctx->permswrld |= pxace->perms;
 			pctx->tagsset |= pxace->tag;
 			if (pace->flags & INHERIT_ONLY_ACE) {
 				l--;
