@@ -3804,7 +3804,7 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			 */
 		memcpy(&newattr[pos],gsid,gsidsz);
 		pnhead->group = cpu_to_le32(pos);
-		pos += usidsz;
+		pos += gsidsz;
 		securid = setsecurityattr(scx->vol,
 			(SECURITY_DESCRIPTOR_RELATIVE*)newattr, pos);
 		free(newattr);
