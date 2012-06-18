@@ -94,12 +94,7 @@ static const char *corrupt_volume_msg =
 
 static const char *hibernated_volume_msg =
 "The NTFS partition is hibernated. Please resume and shutdown Windows\n"
-"properly, or mount the volume read-only with the 'ro' mount option, or\n"
-"mount the volume read-write with the 'remove_hiberfile' mount option.\n"
-"For example type on the command line:\n"
-"\n"
-"            mount -t ntfs-3g -o remove_hiberfile %s %s\n"
-"\n";
+"properly, or mount the volume read-only with the 'ro' mount option.\n";
 
 static const char *unclean_journal_msg =
 "Write access is denied because the disk wasn't safely powered\n"

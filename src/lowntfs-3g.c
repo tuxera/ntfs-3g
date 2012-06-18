@@ -219,7 +219,7 @@ static const char *usage_msg =
 "\n"
 "Usage:    %s [-o option[,...]] <device|image_file> <mount_point>\n"
 "\n"
-"Options:  ro (read-only mount), remove_hiberfile, uid=, gid=,\n" 
+"Options:  ro (read-only mount), windows_names, uid=, gid=,\n" 
 "          umask=, fmask=, dmask=, streams_interface=.\n"
 "          Please see the details in the manual (type: man ntfs-3g).\n"
 "\n"
