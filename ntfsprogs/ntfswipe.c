@@ -650,7 +650,7 @@ static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 
 	if (!offset)
 		return 0;
-	if (NAttrEncrypted(na))
+	if (na->data_flags & ATTR_IS_ENCRYPTED)
 		offset = (((offset - 1) >> 10) + 1) << 10;
 	size = (vol->cluster_size - offset) % vol->cluster_size;
 
@@ -676,8 +676,56 @@ static s64 wipe_attribute(ntfs_volume *vol, int byte, enum action act,
 	return wiped;
 }
 
+/*
+ *		Wipe a data attribute tail
+ *
+ * Return: >0  Success, the clusters were wiped
+ *          0  Nothing to wipe
+ *         -1  Error, something went wrong
+ */
+
+static s64 wipe_attr_tail(ntfs_inode *ni, ntfschar *name, int namelen,
+					int byte, enum action act)
+{
+	ntfs_attr *na;
+	ntfs_volume *vol = ni->vol;
+	s64 wiped;
+
+	wiped = -1;
+	na = ntfs_attr_open(ni, AT_DATA, name, namelen);
+	if (!na) {
+		ntfs_log_error("Couldn't open $DATA attribute\n");
+		goto close_attr;
+	}
+
+	if (!NAttrNonResident(na)) {
+		ntfs_log_verbose("Resident $DATA attribute. Skipping.\n");
+		goto close_attr;
+	}
+
+	if (ntfs_attr_map_whole_runlist(na)) {
+		ntfs_log_verbose("Internal error\n");
+		ntfs_log_error("Can't map runlist (inode %lld)\n",
+				(long long)ni->mft_no);
+		goto close_attr;
+	}
+
+	if (na->data_flags & ATTR_COMPRESSION_MASK)
+		wiped = wipe_compressed_attribute(vol, byte, act, na);
+	else
+		wiped = wipe_attribute(vol, byte, act, na);
+
+	if (wiped == -1) {
+		ntfs_log_error(" (inode %lld)\n", (long long)ni->mft_no);
+	}
+
+close_attr:
+	ntfs_attr_close(na);
+	return (wiped);
+}
+
 /**
- * wipe_tails - Wipe the file tails
+ * wipe_tails - Wipe the file tails in all its data attributes
  * @vol:   An ntfs volume obtained from ntfs_mount
  * @byte:  Overwrite with this value
  * @act:   Wipe, test or info
@@ -693,8 +741,10 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 {
 	s64 total = 0;
 	s64 nr_mft_records, inode_num;
+	ntfs_attr_search_ctx *ctx;
 	ntfs_inode *ni;
-	ntfs_attr *na;
+	ATTR_RECORD *a;
+	ntfschar *name;
 
 	if (!vol || (byte < 0))
 		return -1;
@@ -702,8 +752,10 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 	nr_mft_records = vol->mft_na->initialized_size >>
 			vol->mft_record_size_bits;
 
-	for (inode_num = 16; inode_num < nr_mft_records; inode_num++) {
-		s64 wiped;
+	for (inode_num = FILE_first_user; inode_num < nr_mft_records;
+							inode_num++) {
+		s64 attr_wiped;
+		s64 wiped = 0;
 
 		ntfs_log_verbose("Inode %lld - ", (long long)inode_num);
 		ni = ntfs_inode_open(vol, inode_num);
@@ -717,45 +769,36 @@ static s64 wipe_tails(ntfs_volume *vol, int byte, enum action act)
 			goto close_inode;
 		}
 
-		na = ntfs_attr_open(ni, AT_DATA, AT_UNNAMED, 0);
-		if (!na) {
-			ntfs_log_verbose("Couldn't open $DATA attribute\n");
-			goto close_inode;
+		ctx = ntfs_attr_get_search_ctx(ni, (MFT_RECORD*)NULL);
+		if (!ctx) {
+			ntfs_log_error("Can't get a context, aborting\n");
+			ntfs_inode_close(ni);
+			goto close_abort;
 		}
+		while (!ntfs_attr_lookup(AT_DATA, NULL, 0, CASE_SENSITIVE, 0,
+							NULL, 0, ctx)) {
+			a = ctx->attr;
 
-		if (!NAttrNonResident(na)) {
-			ntfs_log_verbose("Resident $DATA attribute. Skipping.\n");
-			goto close_attr;
+			if (!ctx->al_entry || !ctx->al_entry->lowest_vcn) {
+				name = (ntfschar*)((u8*)a
+						+ le16_to_cpu(a->name_offset));
+				attr_wiped = wipe_attr_tail(ni, name,
+						a->name_length, byte, act);
+				if (attr_wiped > 0)
+					wiped += attr_wiped;
+			}
 		}
-
-		if (ntfs_attr_map_whole_runlist(na)) {
-			ntfs_log_verbose("Internal error\n");
-			ntfs_log_error("Can't map runlist (inode %lld)\n",
-					(long long)inode_num);
-			goto close_attr;
-		}
-
-		if (NAttrCompressed(na))
-			wiped = wipe_compressed_attribute(vol, byte, act, na);
-		else
-			wiped = wipe_attribute(vol, byte, act, na);
-
-		if (wiped == -1) {
-			ntfs_log_error(" (inode %lld)\n", (long long)inode_num);
-			goto close_attr;
-		}
-
+		ntfs_attr_put_search_ctx(ctx);
 		if (wiped) {
 			ntfs_log_verbose("Wiped %llu bytes\n",
 					(unsigned long long)wiped);
 			total += wiped;
 		} else
 			ntfs_log_verbose("Nothing to wipe\n");
-close_attr:
-		ntfs_attr_close(na);
 close_inode:
 		ntfs_inode_close(ni);
 	}
+close_abort :
 	ntfs_log_quiet("wipe_tails 0x%02x, %lld bytes\n", byte,
 				(long long)total);
 	return total;
