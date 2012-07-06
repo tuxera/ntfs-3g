@@ -1276,8 +1276,27 @@ static int try_alternate_boot(ntfs_volume *vol, char *full_bs,
 /*
  *		Check and fix the alternate boot sector
  *
- *	Fixing is only done if the volume could be mounted, and the
- *	last sector designated in the normal boot sector is reachable.
+ *	The alternate boot sector is usually in the last sector of a
+ *	partition, which should not be used by the file system
+ *	(the sector count in the boot sector should be less than
+ *	the total sector count in the partition).
+ *
+ *	chkdsk never changes the count in the boot sector.
+ *	- If this is less than the total count, chkdsk place the
+ *	  alternate boot sector into the sector,
+ *	- if the count is the same as the total count, chkdsk place
+ *	  the alternate boot sector into the middle sector (half
+ *	  the total count rounded upwards)
+ *	- if the count is greater than the total count, chkdsk
+ *	  declares the file system as raw, and refuses to fix anything.
+ *
+ *	Here, we check and fix the alternate boot sector, only in the
+ *	first situation where the file system does not overflow on the
+ *	last sector.
+ *
+ *	Note : when shrinking a partition, ntfsresize cannot determine
+ *	the future size of the partition. As a consequence the number of
+ *	sectors in the boot sectors may be less than the possible size.
  *
  *	Returns 0 if successful
  */
@@ -1285,6 +1304,7 @@ static int try_alternate_boot(ntfs_volume *vol, char *full_bs,
 static int check_alternate_boot(ntfs_volume *vol)
 {
 	s64 got_sectors;
+	s64 actual_sectors;
 	s64 last_sector_off;
 	char *full_bs;
 	char *alt_bs;
@@ -1305,10 +1325,18 @@ static int check_alternate_boot(ntfs_volume *vol)
 	if (br == vol->sector_size) {
 		bs = (NTFS_BOOT_SECTOR*)full_bs;
 		got_sectors = le64_to_cpu(bs->number_of_sectors);
-		last_sector_off = got_sectors << vol->sector_size_bits;
-		ntfs_log_info("Checking the alternate boot sector... ");
-		br = ntfs_pread(vol->dev, last_sector_off, vol->sector_size,
-							alt_bs);
+		actual_sectors = ntfs_device_size_get(vol->dev,
+						vol->sector_size);
+		if (actual_sectors > got_sectors) {
+			last_sector_off = (actual_sectors - 1)
+						<< vol->sector_size_bits;
+			ntfs_log_info("Checking the alternate boot sector... ");
+			br = ntfs_pread(vol->dev, last_sector_off,
+						vol->sector_size, alt_bs);
+		} else {
+			ntfs_log_info("Checking file system overflow... ");
+			br = -1;
+		}
 		/* accept getting no byte, needed for short image files */
 		if (br >= 0) {
 			if ((br != vol->sector_size)
