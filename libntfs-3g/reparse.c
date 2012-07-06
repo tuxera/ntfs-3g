@@ -3,7 +3,7 @@
  *
  *	This module is part of ntfs-3g library
  *
- * Copyright (c) 2008-2009 Jean-Pierre Andre
+ * Copyright (c) 2008-2012 Jean-Pierre Andre
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -236,6 +236,17 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 	ni = ntfs_inode_open(vol, (MFT_REF)FILE_root);
 	if (ni) {
 		start = 0;
+		/*
+		 * Examine and translate the path, until we reach either
+		 *  - the end,
+		 *  - an unknown item
+		 *  - a non-directory
+		 *  - another reparse point,
+		 * A reparse point is not dereferenced, it will be
+		 * examined later when the translated path is dereferenced,
+		 * however the final part of the path will not be adjusted
+		 * to correct case.
+		 */
 		do {
 			len = 0;
 			while (((start + len) < count)
@@ -253,9 +264,11 @@ static char *search_absolute(ntfs_volume *vol, ntfschar *path,
 			}
 		} while (ni
 		    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+		    && !(ni->flags & FILE_ATTR_REPARSE_POINT)
 		    && (start < count));
 	if (ni
-	    && (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? isdir : !isdir))
+	    && ((ni->mrec->flags & MFT_RECORD_IS_DIRECTORY ? isdir : !isdir)
+		|| (ni->flags & FILE_ATTR_REPARSE_POINT)))
 		if (ntfs_ucstombs(path, count, &target, 0) < 0) {
 			if (target) {
 				free(target);
@@ -289,12 +302,25 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 	int pos;
 	int lth;
 	BOOL ok;
+	BOOL morelinks;
 	int max = 32; /* safety */
 
 	pos = 0;
 	ok = TRUE;
+	morelinks = FALSE;
 	curni = ntfs_dir_parent_inode(ni);
-	while (curni && ok && (pos < (count - 1)) && --max) {
+		/*
+		 * Examine and translate the path, until we reach either
+		 *  - the end,
+		 *  - an unknown item
+		 *  - a non-directory
+		 *  - another reparse point,
+		 * A reparse point is not dereferenced, it will be
+		 * examined later when the translated path is dereferenced,
+		 * however the final part of the path will not be adjusted
+		 * to correct case.
+		 */
+	while (curni && ok && !morelinks && (pos < (count - 1)) && --max) {
 		if ((count >= (pos + 2))
 		    && (path[pos] == const_cpu_to_le16('.'))
 		    && (path[pos+1] == const_cpu_to_le16('\\'))) {
@@ -332,12 +358,18 @@ static char *search_relative(ntfs_inode *ni, ntfschar *path, int count)
 					if (!curni)
 						ok = FALSE;
 					else {
+						if (curni->flags & FILE_ATTR_REPARSE_POINT)
+							morelinks = TRUE;
 						if (ok && ((pos + lth) < count)) {
 							path[pos + lth] = const_cpu_to_le16('/');
 							pos += lth + 1;
+							if (morelinks
+							   && ntfs_inode_close(curni))
+								ok = FALSE;
 						} else {
 							pos += lth;
-							if ((ni->mrec->flags ^ curni->mrec->flags)
+							if (!morelinks
+							  && (ni->mrec->flags ^ curni->mrec->flags)
 							    & MFT_RECORD_IS_DIRECTORY)
 								ok = FALSE;
 							if (ntfs_inode_close(curni))
