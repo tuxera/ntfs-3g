@@ -194,6 +194,10 @@
  *
  *  Jun 2012, version 1.3.23
  *     - added support for SACL (nickgarvey)
+ *
+ *  Jul 2012, version 1.3.24
+ *     - added self-tests for authenticated users
+ *     - added display of ace-inherited flag
  */
 
 /*
@@ -217,7 +221,7 @@
  *		General parameters which may have to be adapted to needs
  */
 
-#define AUDT_VERSION "1.3.23"
+#define AUDT_VERSION "1.3.24"
 
 #define GET_FILE_SECURITY "ntfs_get_file_security"
 #define SET_FILE_SECURITY "ntfs_set_file_security"
@@ -1630,6 +1634,8 @@ void showace(const char *attr, int off, int isdir, int level)
 		printf("%*cDon\'t propagate inherits ACE\n",-level-4,marker);
 	if (flags & 8)
 		printf("%*cInherit only ACE\n",-level-4,marker);
+	if (flags & 0x10)
+		printf("%*cACE was inherited\n",-level-4,marker);
 	if (flags & 0x40)
 		printf("%*cAudit on success\n",-level-4,marker);
 	if (flags & 0x80)

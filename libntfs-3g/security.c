@@ -3810,7 +3810,9 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 		pnhead = (SECURITY_DESCRIPTOR_RELATIVE*)newattr;
 		pnhead->revision = SECURITY_DESCRIPTOR_REVISION;
 		pnhead->alignment = 0;
-		pnhead->control = SE_SELF_RELATIVE;
+		pnhead->control = (pphead->control
+			& (SE_DACL_AUTO_INHERITED | SE_SACL_AUTO_INHERITED))
+				| SE_SELF_RELATIVE;
 		pos = sizeof(SECURITY_DESCRIPTOR_RELATIVE);
 			/*
 			 * locate and inherit DACL
@@ -3821,7 +3823,9 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			offpacl = le32_to_cpu(pphead->dacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
-			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid, fordir);
+			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid,
+				fordir, pphead->control
+					& SE_DACL_AUTO_INHERITED);
 			if (aclsz) {
 				pnhead->dacl = cpu_to_le32(pos);
 				pos += aclsz;
@@ -3836,7 +3840,9 @@ static le32 build_inherited_id(struct SECURITY_CONTEXT *scx,
 			offpacl = le32_to_cpu(pphead->sacl);
 			ppacl = (const ACL*)&parentattr[offpacl];
 			pnacl = (ACL*)&newattr[pos];
-			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid, fordir);
+			aclsz = ntfs_inherit_acl(ppacl, pnacl, usid, gsid,
+				fordir, pphead->control
+					& SE_SACL_AUTO_INHERITED);
 			if (aclsz) {
 				pnhead->sacl = cpu_to_le32(pos);
 				pos += aclsz;

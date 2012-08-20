@@ -516,7 +516,8 @@ enum {
 #define CONTAINER_INHERIT_ACE		  (0x2)
 #define NO_PROPAGATE_INHERIT_ACE	  (0x4)
 #define INHERIT_ONLY_ACE		  (0x8)
-#define VALID_INHERIT_FLAGS		  (0xF)
+#define INHERITED_ACE			  (0x10)
+#define VALID_INHERIT_FLAGS		  (0x1F)
 
 /*
  *	     Other useful definitions
@@ -531,6 +532,12 @@ enum {
 
 #ifndef ACL_REVISION_DS	/* not always defined in <windows.h> */
 #define ACL_REVISION_DS 4
+#endif
+
+#ifndef INHERITED_ACE /* not always defined in <windows.h> */
+#define INHERITED_ACE			  (0x10)
+#undef VALID_INHERIT_FLAGS
+#define VALID_INHERIT_FLAGS		  (0x1F)
 #endif
 
 /*

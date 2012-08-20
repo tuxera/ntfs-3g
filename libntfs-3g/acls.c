@@ -136,6 +136,19 @@ static const char worldsidbytes[] = {
 		0, 0, 0, 0	/* 1st level */
 } ;
 
+/*
+ *		SID for authenticated user (S-1-5-11)
+ */
+
+static const char authsidbytes[] = {
+		1,		/* revision */
+		1,		/* auth count */
+		0, 0, 0, 0, 0, 5,	/* base */
+		11, 0, 0, 0	/* 1st level */ 
+};
+	        
+static const SID *authsid = (const SID*)authsidbytes;
+
 const SID *worldsid = (const SID*)worldsidbytes;
 
 /*
@@ -670,7 +683,8 @@ BOOL ntfs_valid_descr(const char *securattr, unsigned int attrsz)
  */
 
 int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
-			const SID *usid, const SID *gsid, BOOL fordir)
+			const SID *usid, const SID *gsid, BOOL fordir,
+			le16 inherited)
 {
 	unsigned int src;
 	unsigned int dst;
@@ -683,7 +697,9 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	int gsidsz;
 	const ACCESS_ALLOWED_ACE *poldace;
 	ACCESS_ALLOWED_ACE *pnewace;
+	ACCESS_ALLOWED_ACE *pauthace;
 
+	pauthace = (ACCESS_ALLOWED_ACE*)NULL;
 	usidsz = ntfs_sid_size(usid);
 	gsidsz = ntfs_sid_size(gsid);
 
@@ -700,8 +716,12 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	for (nace = 0; nace < oldcnt; nace++) {
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
-			/* inheritance for access */
-		if (poldace->flags & selection) {
+			/*
+			 * Inheritance for access, unless this is inheriting
+			 * an inherited ACL to a directory.
+			 */
+		if ((poldace->flags & selection)
+		    && !(fordir && inherited)) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
@@ -772,9 +792,27 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			pnewace->flags &= ~(OBJECT_INHERIT_ACE
 						| CONTAINER_INHERIT_ACE
 						| INHERIT_ONLY_ACE);
-			dst += acesz;
-			newcnt++;
+			/*
+			 * Group similar ACE for authenticated users
+			 * (should probably be done for other SIDs)
+			 */
+			if (!fordir
+			    && (poldace->type == ACCESS_ALLOWED_ACE_TYPE)
+			    && ntfs_same_sid(&poldace->sid, authsid)) {
+				if (pauthace) {
+					pauthace->flags |= pnewace->flags;
+					pauthace->mask |= pnewace->mask;
+				} else {
+					pauthace = pnewace;
+					dst += acesz;
+					newcnt++;
+				}
+			} else {
+				dst += acesz;
+				newcnt++;
+			}
 		}
+
 			/* inheritance for further inheritance */
 		if (fordir
 		   && (poldace->flags
@@ -794,6 +832,8 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 				memcpy(&pnewace->sid, gsid, gsidsz);
 				acesz = gsidsz + 8;
 			}
+			if (inherited)
+				pnewace->flags |= INHERITED_ACE;
 			dst += acesz;
 			newcnt++;
 		}
