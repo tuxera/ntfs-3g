@@ -4918,12 +4918,9 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 	if (opts.cluster_size >= 0)
 		g_vol->cluster_size = opts.cluster_size;
 	/* Length is in unicode characters. */
-	g_vol->upcase_len = 65536;
-	g_vol->upcase = ntfs_malloc(g_vol->upcase_len * sizeof(ntfschar));
-	if (!g_vol->upcase)
+	g_vol->upcase_len = ntfs_upcase_build_default(&g_vol->upcase);
+	if (!g_vol->upcase_len)
 		goto done;
-	ntfs_upcase_table_build(g_vol->upcase,
-			g_vol->upcase_len * sizeof(ntfschar));
 	g_vol->attrdef = ntfs_malloc(sizeof(attrdef_ntfs3x_array));
 	if (!g_vol->attrdef) {
 		ntfs_log_perror("Could not create attrdef structure");
