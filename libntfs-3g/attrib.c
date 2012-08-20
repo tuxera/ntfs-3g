@@ -1849,6 +1849,13 @@ s64 ntfs_attr_pwrite(ntfs_attr *na, const s64 pos, s64 count, const void *b)
 			ntfs_log_perror("Failed to enlarge attribute");
 			goto errno_set;
 		}
+		/*
+		 * If we avoided updating the runlist, we must be sure
+		 * to cancel the enlargement and put back the runlist to
+		 * a clean state if we get into some error.
+		 */
+		if (NAttrDataAppending(na))
+			need_to.undo_data_size = 1;
 #else
 		if (ntfs_attr_truncate_i(na, pos + count, HOLES_OK)) {
 			ntfs_log_perror("Failed to enlarge attribute");
@@ -6232,10 +6239,18 @@ static int ntfs_non_resident_attr_expand_i(ntfs_attr *na, const s64 newsize,
 
 		/* Prepare to mapping pairs update. */
 		na->allocated_size = first_free_vcn << vol->cluster_size_bits;
-		/* Write mapping pairs for new runlist. */
 #if PARTIAL_RUNLIST_UPDATING
-		if (ntfs_attr_update_mapping_pairs_i(na, start_update, holes)) {
+		/*
+		 * Write mapping pairs for new runlist, unless this is
+		 * a temporary state before appending data.
+		 * If the update is not done, we must be sure to do
+		 * it later, and to get to a clean state even on errors.
+		 */
+		if ((holes != HOLES_DELAY)
+		   && ntfs_attr_update_mapping_pairs_i(na, start_update,
+					holes)) {
 #else
+		/* Write mapping pairs for new runlist. */
 		if (ntfs_attr_update_mapping_pairs(na, 0)) {
 #endif
 			err = errno;
