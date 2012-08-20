@@ -3096,6 +3096,7 @@ static int build_owngrp_permissions(const char *securattr,
 	int nace;
 	le32 special;
 	BOOL grppresent;
+	BOOL ownpresent;
 	le32 allowown, allowgrp, allowall;
 	le32 denyown, denygrp, denyall;
 
@@ -3105,6 +3106,7 @@ static int build_owngrp_permissions(const char *securattr,
 	special = const_cpu_to_le32(0);
 	allowown = allowgrp = allowall = const_cpu_to_le32(0);
 	denyown = denygrp = denyall = const_cpu_to_le32(0);
+	ownpresent = FALSE;
 	grppresent = FALSE;
 	if (offdacl) {
 		acecnt = le16_to_cpu(pacl->ace_count);
@@ -3117,9 +3119,11 @@ static int build_owngrp_permissions(const char *securattr,
 			if ((ntfs_same_sid(usid, &pace->sid)
 			   || ntfs_same_sid(ownersid, &pace->sid))
 			    && (pace->mask & WRITE_OWNER)) {
-				if (pace->type == ACCESS_ALLOWED_ACE_TYPE)
+				if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
 					allowown |= pace->mask;
-				} else
+					ownpresent = TRUE;
+				}
+			} else
 				if (ntfs_same_sid(usid, &pace->sid)
 				   && (!(pace->mask & WRITE_OWNER))) {
 					if (pace->type == ACCESS_ALLOWED_ACE_TYPE) {
@@ -3140,6 +3144,8 @@ static int build_owngrp_permissions(const char *securattr,
 			}
 			offace += le16_to_cpu(pace->size);
 		}
+	if (!ownpresent)
+		allowown = allowall;
 	if (!grppresent)
 		allowgrp = allowall;
 	return (merge_permissions(isdir,
