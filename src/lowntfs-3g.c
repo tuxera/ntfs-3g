@@ -2743,8 +2743,11 @@ static void ntfs_fuse_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		ret = -errno;
 		goto out;
 	}
+		/* Return with no result for symlinks, fifo, etc. */
+	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))
+		goto exit;
+		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-		   /* file must be readable */
 	if (!ntfs_allowed_access(&security,ni,S_IREAD)) {
 		ret = -EACCES;
 		goto exit;
@@ -2890,8 +2893,13 @@ static void ntfs_fuse_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		res = -errno;
 		goto out;
 	}
+		/* Return with no result for symlinks, fifo, etc. */
+	if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+		res = -ENODATA;
+		goto exit;
+	}
+		/* otherwise file must be readable */
 #if !KERNELPERMS | (POSIXACLS & !KERNELACLS)
-		   /* file must be readable */
 	if (!ntfs_allowed_access(&security, ni, S_IREAD)) {
 		res = -errno;
 		goto exit;
@@ -3074,11 +3082,23 @@ static void ntfs_fuse_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		}
 		break;
 	default :
+		/* User xattr not allowed for symlinks, fifo, etc. */
+		if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+			res = -EPERM;
+			goto exit;
+		}
 		if (!ntfs_allowed_access(&security,ni,S_IWRITE)) {
 			res = -EACCES;
 			goto exit;
 		}
 		break;
+	}
+#else
+		/* User xattr not allowed for symlinks, fifo, etc. */
+	if ((namespace == XATTRNS_USER)
+	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+		res = -EPERM;
+		goto exit;
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
@@ -3296,11 +3316,23 @@ static void ntfs_fuse_removexattr(fuse_req_t req, fuse_ino_t ino, const char *na
 		}
 		break;
 	default :
+		/* User xattr not allowed for symlinks, fifo, etc. */
+		if (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT)) {
+			res = -EPERM;
+			goto exit;
+		}
 		if (!ntfs_allowed_access(&security,ni,S_IWRITE)) {
 			res = -EACCES;
 			goto exit;
 		}
 		break;
+	}
+#else
+		/* User xattr not allowed for symlinks, fifo, etc. */
+	if ((namespace == XATTRNS_USER)
+	    && (ni->flags & (FILE_ATTR_SYSTEM | FILE_ATTR_REPARSE_POINT))) {
+		res = -EPERM;
+		goto exit;
 	}
 #endif
 	lename_len = fix_xattr_prefix(name, namespace, &lename);
