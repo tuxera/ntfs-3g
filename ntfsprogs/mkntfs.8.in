@@ -93,7 +93,7 @@ or file.
 is the special file corresponding to the device (e.g
 .IR /dev/hdXX ).
 .I number\-of\-sectors
-is the number of blocks on the device.  If omitted,
+is the number of sectors on the device. If omitted,
 .B mkntfs
 automagically figures the file system size.
 .SH OPTIONS
