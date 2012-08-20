@@ -164,6 +164,18 @@ struct BITMAP_ALLOCATION {
 	s64	length;		/* count of consecutive clusters */
 } ;
 
+		/* Upcase $Info, used since Windows 8 */
+struct UPCASEINFO {
+	le32	len;
+	le32	filler;
+	le64	crc;
+	le32	osmajor;
+	le32	osminor;
+	le32	build;
+	le16	packmajor;
+	le16	packminor;
+} ;
+
 /**
  * global variables
  */
@@ -173,6 +185,7 @@ static u8		  *g_mft_bitmap		  = NULL;
 static int		   g_lcn_bitmap_byte_size = 0;
 static int		   g_dynamic_buf_size	  = 0;
 static u8		  *g_dynamic_buf	  = NULL;
+static struct UPCASEINFO  *g_upcaseinfo		  = NULL;
 static runlist		  *g_rl_mft		  = NULL;
 static runlist		  *g_rl_mft_bmp		  = NULL;
 static runlist		  *g_rl_mftmirr		  = NULL;
@@ -274,8 +287,55 @@ static void mkntfs_version(void)
 	ntfs_log_info("Copyright (c) 2002-2006 Szabolcs Szakacsits\n");
 	ntfs_log_info("Copyright (c) 2005      Erik Sornes\n");
 	ntfs_log_info("Copyright (c) 2007      Yura Pakhuchiy\n");
-	ntfs_log_info("Copyright (c) 2010      Jean-Pierre Andre\n");
+	ntfs_log_info("Copyright (c) 2010-2012 Jean-Pierre Andre\n");
 	ntfs_log_info("\n%s\n%s%s\n", ntfs_gpl, ntfs_bugs, ntfs_home);
+}
+
+/*
+ *  crc64, adapted from http://rpm5.org/docs/api/digest_8c-source.html
+ * ECMA-182 polynomial, see
+ *     http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-182.pdf
+ */
+		/* make sure the needed types are defined */
+#undef byte
+#undef uint32_t
+#undef uint64_t
+#define byte u8
+#define uint32_t u32
+#define uint64_t u64
+static uint64_t crc64(uint64_t crc, const byte * data, size_t size)
+	/*@*/
+{
+	static uint64_t polynomial = 0x9a6c9329ac4bc9b5ULL;
+	static uint64_t xorout = 0xffffffffffffffffULL;
+	static uint64_t table[256];
+
+	crc ^= xorout;
+
+	if (data == NULL) {
+	/* generate the table of CRC remainders for all possible bytes */
+		uint64_t c;
+		uint32_t i, j;
+		for (i = 0;  i < 256;  i++) {
+			c = i;
+			for (j = 0;  j < 8;  j++) {
+				if (c & 1)
+					c = polynomial ^ (c >> 1);
+				else
+					c = (c >> 1);
+			}
+			table[i] = c;
+		}
+	} else
+		while (size) {
+			crc = table[(crc ^ *data) & 0xff] ^ (crc >> 8);
+			size--;
+			data++;
+		}
+
+	crc ^= xorout;
+
+	return crc;
 }
 
 /*
@@ -4755,6 +4815,14 @@ static BOOL mkntfs_create_root_structures(void)
 	m = (MFT_RECORD*)(g_buf + 0xa * g_vol->mft_record_size);
 	err = add_attr_data(m, NULL, 0, CASE_SENSITIVE, const_cpu_to_le16(0),
 			(u8*)g_vol->upcase, g_vol->upcase_len << 1);
+	/*
+	 * The $Info only exists since Windows 8, but it apparently
+	 * does not disturb chkdsk from earlier versions.
+	 */
+	if (!err)
+		err = add_attr_data(m, "$Info", 5, CASE_SENSITIVE,
+			const_cpu_to_le16(0),
+			(u8*)g_upcaseinfo, sizeof(struct UPCASEINFO));
 	if (!err)
 		err = create_hardlink(g_index_block, root_ref, m,
 				MK_LE_MREF(FILE_UpCase, FILE_UpCase),
@@ -4885,6 +4953,7 @@ static BOOL mkntfs_create_root_structures(void)
  */
 static int mkntfs_redirect(struct mkntfs_options *opts2)
 {
+	u64 upcase_crc;
 	int result = 1;
 	ntfs_attr_search_ctx *ctx = NULL;
 	long long lw, pos;
@@ -4919,8 +4988,19 @@ static int mkntfs_redirect(struct mkntfs_options *opts2)
 		g_vol->cluster_size = opts.cluster_size;
 	/* Length is in unicode characters. */
 	g_vol->upcase_len = ntfs_upcase_build_default(&g_vol->upcase);
-	if (!g_vol->upcase_len)
+	/* Since Windows 8, there is a $Info stream in $UpCase */
+	g_upcaseinfo =
+		(struct UPCASEINFO*)ntfs_malloc(sizeof(struct UPCASEINFO));
+	if (!g_vol->upcase_len || !g_upcaseinfo)
 		goto done;
+	/* If the CRC is correct, chkdsk does not warn about obsolete table */
+	crc64(0,(byte*)NULL,0); /* initialize the crc computation */
+	upcase_crc = crc64(0,(byte*)g_vol->upcase,
+			g_vol->upcase_len * sizeof(ntfschar));
+	/* keep the version fields as zero */
+	memset(g_upcaseinfo, 0, sizeof(struct UPCASEINFO));
+	g_upcaseinfo->len = cpu_to_le32(sizeof(struct UPCASEINFO));
+	g_upcaseinfo->crc = cpu_to_le64(upcase_crc);
 	g_vol->attrdef = ntfs_malloc(sizeof(attrdef_ntfs3x_array));
 	if (!g_vol->attrdef) {
 		ntfs_log_perror("Could not create attrdef structure");
