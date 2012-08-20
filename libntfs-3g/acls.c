@@ -716,29 +716,18 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 	for (nace = 0; nace < oldcnt; nace++) {
 		poldace = (const ACCESS_ALLOWED_ACE*)((const char*)oldacl + src);
 		acesz = le16_to_cpu(poldace->size);
+		src += acesz;
 			/*
 			 * Inheritance for access, unless this is inheriting
 			 * an inherited ACL to a directory.
 			 */
 		if ((poldace->flags & selection)
-		    && !(fordir && inherited)) {
+		    && !(fordir && inherited)
+		    && !ntfs_same_sid(&poldace->sid, ownersid)
+		    && !ntfs_same_sid(&poldace->sid, groupsid)) {
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
-				/*
-				 * Replace generic creator-owner and
-				 * creator-group by owner and group
-				 */
-			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
-				memcpy(&pnewace->sid, usid, usidsz);
-				acesz = usidsz + 8;
-				pnewace->size = cpu_to_le16(acesz);
-			}
-			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
-				memcpy(&pnewace->sid, gsid, gsidsz);
-				acesz = gsidsz + 8;
-				pnewace->size = cpu_to_le16(acesz);
-			}
 				/* reencode GENERIC_ALL */
 			if (pnewace->mask & GENERIC_ALL) {
 				pnewace->mask &= ~GENERIC_ALL;
@@ -804,11 +793,55 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 					pauthace->mask |= pnewace->mask;
 				} else {
 					pauthace = pnewace;
+					if (inherited)
+						pnewace->flags |= INHERITED_ACE;
 					dst += acesz;
 					newcnt++;
 				}
 			} else {
+				if (inherited)
+					pnewace->flags |= INHERITED_ACE;
 				dst += acesz;
+				newcnt++;
+			}
+		}
+			/*
+			 * Inheritance for access, specific to
+			 * creator-owner (and creator-group)
+			 */
+		if (fordir || !inherited
+		   || (poldace->flags
+			   & (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE))) {
+			pnewace = (ACCESS_ALLOWED_ACE*)
+					((char*)newacl + dst);
+			memcpy(pnewace,poldace,acesz);
+				/*
+				 * Replace generic creator-owner and
+				 * creator-group by owner and group
+				 * (but keep for further inheritance)
+				 */
+			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
+				memcpy(&pnewace->sid, usid, usidsz);
+				pnewace->size = cpu_to_le16(usidsz + 8);
+					/* remove inheritance flags */
+				pnewace->flags &= ~(OBJECT_INHERIT_ACE
+						| CONTAINER_INHERIT_ACE
+						| INHERIT_ONLY_ACE);
+				if (inherited)
+					pnewace->flags |= INHERITED_ACE;
+				dst += usidsz + 8;
+				newcnt++;
+			}
+			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
+				memcpy(&pnewace->sid, gsid, gsidsz);
+				pnewace->size = cpu_to_le16(gsidsz + 8);
+					/* remove inheritance flags */
+				pnewace->flags &= ~(OBJECT_INHERIT_ACE
+						| CONTAINER_INHERIT_ACE
+						| INHERIT_ONLY_ACE);
+				if (inherited)
+					pnewace->flags |= INHERITED_ACE;
+				dst += gsidsz + 8;
 				newcnt++;
 			}
 		}
@@ -820,24 +853,11 @@ int ntfs_inherit_acl(const ACL *oldacl, ACL *newacl,
 			pnewace = (ACCESS_ALLOWED_ACE*)
 					((char*)newacl + dst);
 			memcpy(pnewace,poldace,acesz);
-				/*
-				 * Replace generic creator-owner and
-				 * creator-group by owner and group
-				 */
-			if (ntfs_same_sid(&pnewace->sid, ownersid)) {
-				memcpy(&pnewace->sid, usid, usidsz);
-				acesz = usidsz + 8;
-			}
-			if (ntfs_same_sid(&pnewace->sid, groupsid)) {
-				memcpy(&pnewace->sid, gsid, gsidsz);
-				acesz = gsidsz + 8;
-			}
 			if (inherited)
 				pnewace->flags |= INHERITED_ACE;
 			dst += acesz;
 			newcnt++;
 		}
-		src += acesz;
 	}
 		/*
 		 * Adjust header if something was inherited
