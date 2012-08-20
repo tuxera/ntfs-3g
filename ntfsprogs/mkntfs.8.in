@@ -251,6 +251,20 @@ and exit.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Show a list of options with a brief description of each one.
+.SH KNOWN ISSUES
+When applying chkdsk to a file system, it sometimes throws a warning
+"Correcting errors in the uppercase file." The uppercase file is created
+while formatting and it defines the mapping of lower case  characters to
+upper case ones, as needed to sort file names in directories. The warning
+means that the uppercase file defined on the file system is not the same as
+the one used by the Windows OS on which chkdsk is running, and this may
+happen because newer versions of Windows take into account new characters
+defined by the Unicode consortium.
+.P
+Currently, mkntfs creates the uppercase table so that no warning is thrown
+by Windows Vista, Windows 7 or Windows 8. A warning may be thrown by
+other Windows versions, or if chkdsk is applied in succession on different
+Windows versions.
 .SH BUGS
 If you find a bug please send an email describing the problem to the
 development team:
