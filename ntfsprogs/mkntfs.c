@@ -1788,7 +1788,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	}
 	a = ctx->attr;
 	/* sizeof(resident attribute record header) == 24 */
-	asize = ((24 + ((name_len + 7) & ~7) + val_len) + 7) & ~7;
+	asize = ((24 + ((name_len*2 + 7) & ~7) + val_len) + 7) & ~7;
 	err = make_room_for_attribute(m, (char*)a, asize);
 	if (err == -ENOSPC) {
 		/*
@@ -1831,7 +1831,7 @@ static int insert_resident_attr_in_mft_record(MFT_RECORD *m,
 	m->next_attr_instance = cpu_to_le16((le16_to_cpu(m->next_attr_instance)
 			+ 1) & 0xffff);
 	a->value_length = cpu_to_le32(val_len);
-	a->value_offset = cpu_to_le16(24 + ((name_len + 7) & ~7));
+	a->value_offset = cpu_to_le16(24 + ((name_len*2 + 7) & ~7));
 	a->resident_flags = res_flags;
 	a->reservedR = 0;
 	if (name_len)
