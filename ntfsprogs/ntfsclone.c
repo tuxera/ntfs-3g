@@ -1233,7 +1233,7 @@ static void clone_logfile_parts(ntfs_walk_clusters_ctx *image, runlist *rl)
 
 		copy_cluster(opt.rescue, lcn, lcn);
 		image->current_lcn = lcn + 1;
-		if (opt.metadata_image)
+		if (opt.metadata_image && !wipe)
 			image->inuse++;
 
 		if (offset == 0)
@@ -1513,8 +1513,6 @@ static void dump_clusters(ntfs_walk_clusters_ctx *image, runlist *rl)
 			copy_cluster(opt.rescue, rl->lcn + i, rl->lcn + i);
 		image->current_lcn = rl->lcn + len;
 	}
-	if (opt.metadata_image)
-		image->inuse += len;
 }
 
 static void walk_runs(struct ntfs_walk_cluster *walk)
@@ -1583,6 +1581,24 @@ static void walk_runs(struct ntfs_walk_cluster *walk)
 
 		if (!opt.metadata_image)
 			walk->image->inuse += lcn_length;
+			/*
+			 * For a metadata image, we have to compute the
+			 * number of metadata clusters for the percentages
+			 * to be displayed correctly while restoring.
+			 */
+		if (!wipe && opt.metadata_image) {
+			if ((walk->image->ni->mft_no == FILE_LogFile)
+			    && (walk->image->ctx->attr->type == AT_DATA)) {
+					/* 16 KiB of FILE_LogFile */
+				walk->image->inuse
+				   += is_critical_metadata(walk->image,rl);
+			} else {
+				if ((walk->image->ni->mft_no
+						<= LAST_METADATA_INODE)
+				   || (walk->image->ctx->attr->type != AT_DATA))
+					walk->image->inuse += lcn_length;
+			}
+		}
 	}
 	if (wipe && opt.metadata_image) {
 		if (mft_data)
@@ -1811,7 +1827,9 @@ out:
 		if (opt.metadata_image ? wipe : !wipe)
 			copy_cluster(opt.rescue, nr_clusters, nr_clusters);
 		walk->image->current_lcn = nr_clusters;
-		walk->image->inuse++;
+			/* Not counted, for compatibility with older versions */
+		if (!opt.metadata_image)
+			walk->image->inuse++;
 	}
 	return 0;
 }
