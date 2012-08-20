@@ -1,7 +1,7 @@
 /*
  *		 Display and audit security attributes in an NTFS volume
  *
- * Copyright (c) 2007-2011 Jean-Pierre Andre
+ * Copyright (c) 2007-2012 Jean-Pierre Andre
  * 
  *	Options :
  *		-a auditing security data
@@ -299,7 +299,7 @@
 
 #ifndef STSC
 
-#if !defined(HAVE_CONFIG_H) && POSIXACLS
+#if !defined(HAVE_CONFIG_H) && POSIXACLS && !defined(__SVR4)
       /* require <sys/xattr.h> if not integrated into ntfs-3g package */
 #define HAVE_SETXATTR 1
 #endif
@@ -681,7 +681,12 @@ BOOL open_security_api(void)
 	libfile = getenv(ENVNTFS3G);
 	if (!libfile)
 		libfile = (sizeof(char*) == 8 ? LIBFILE64 : LIBFILE);
+#ifdef __SVR4
+		/* do not override library functions by caller ones */
+	ntfs_handle = dlopen(libfile,RTLD_LAZY | RTLD_GROUP);
+#else
 	ntfs_handle = dlopen(libfile,RTLD_LAZY);
+#endif
 	if (ntfs_handle) {
 		ntfs_initialize_file_security = (type_initialize_file_security)
 				dlsym(ntfs_handle,INIT_FILE_SECURITY);
@@ -762,7 +767,7 @@ BOOL open_volume(const char *volume, unsigned long flags)
 
 	ok = FALSE;
 	if (!ntfs_context) {
-		ntfs_context = (*ntfs_initialize_file_security)(volume,flags);
+		ntfs_context = ntfs_initialize_file_security(volume,flags);
 		if (ntfs_context) {
 			if (*(u32*)ntfs_context != MAGIC_API) {
 				fprintf(stderr,"Versions of ntfs-3g and secaudit"
@@ -785,7 +790,7 @@ BOOL close_volume(const char *volume)
 {
 	BOOL r;
 
-	r = (*ntfs_leave_file_security)(ntfs_context);
+	r = ntfs_leave_file_security(ntfs_context);
 	if (r)
 		fprintf(stderr,"\"%s\" closed\n",volume);
 	else
