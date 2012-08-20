@@ -1017,10 +1017,30 @@ static int ntfs_fuse_filler(ntfs_fuse_fill_context_t *fill_ctx,
 	} else {
 		struct stat st = { .st_ino = MREF(mref) };
 		 
-		if (dt_type == NTFS_DT_REG)
-			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
-		else if (dt_type == NTFS_DT_DIR)
+		switch (dt_type) {
+		case NTFS_DT_DIR :
 			st.st_mode = S_IFDIR | (0777 & ~ctx->dmask); 
+			break;
+		case NTFS_DT_LNK :
+			st.st_mode = S_IFLNK | 0777;
+			break;
+		case NTFS_DT_FIFO :
+			st.st_mode = S_IFIFO;
+			break;
+		case NTFS_DT_SOCK :
+			st.st_mode = S_IFSOCK;
+			break;
+		case NTFS_DT_BLK :
+			st.st_mode = S_IFBLK;
+			break;
+		case NTFS_DT_CHR :
+			st.st_mode = S_IFCHR;
+			break;
+		default : /* unexpected types shown as plain files */
+		case NTFS_DT_REG :
+			st.st_mode = S_IFREG | (0777 & ~ctx->fmask);
+			break;
+		}
 		
 #if defined(__APPLE__) || defined(__DARWIN__)
 		/* 

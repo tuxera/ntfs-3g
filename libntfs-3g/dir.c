@@ -867,6 +867,87 @@ typedef enum {
 	INDEX_TYPE_ALLOCATION,	/* index allocation */
 } INDEX_TYPE;
 
+/*
+ *		Decode Interix file types
+ *
+ *	Non-Interix types are returned as plain files, because a
+ *	Windows user may force patterns very similar to Interix,
+ *	and most metadata files have such similar patters.
+ */
+
+static u32 ntfs_interix_types(ntfs_inode *ni)
+{
+	ntfs_attr *na;
+	u32 dt_type;
+	le64 magic;
+
+	dt_type = NTFS_DT_UNKNOWN;
+	na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+	if (na) {
+		/* Unrecognized patterns (eg HID + SYST) are plain files */
+		dt_type = NTFS_DT_REG;
+		if (na->data_size <= 1) {
+			if (!(ni->flags & FILE_ATTR_HIDDEN))
+				dt_type = (na->data_size ?
+						NTFS_DT_SOCK : NTFS_DT_FIFO);
+		} else {
+			if ((na->data_size >= (s64)sizeof(magic))
+			    && (ntfs_attr_pread(na, 0, sizeof(magic), &magic)
+				== sizeof(magic))) {
+				if (magic == INTX_SYMBOLIC_LINK)
+					dt_type = NTFS_DT_LNK;
+				else if (magic == INTX_BLOCK_DEVICE)
+					dt_type = NTFS_DT_BLK;
+				else if (magic == INTX_CHARACTER_DEVICE)
+					dt_type = NTFS_DT_CHR;
+			}
+		}
+		ntfs_attr_close(na);
+	}
+	return (dt_type);
+}
+
+/*
+ *		Decode file types
+ *
+ *	Better only use for Interix types and junctions,
+ *	unneeded complexity when used for plain files or directories
+ *
+ *	Error cases are logged and returned as unknown.
+ */
+
+static u32 ntfs_dir_entry_type(ntfs_inode *dir_ni, MFT_REF mref,
+					FILE_ATTR_FLAGS attributes)
+{
+	ntfs_inode *ni;
+	u32 dt_type;
+
+	dt_type = NTFS_DT_UNKNOWN;
+	ni = ntfs_inode_open(dir_ni->vol, mref);
+	if (ni) {
+		if ((attributes & FILE_ATTR_REPARSE_POINT)
+		    && ntfs_possible_symlink(ni))
+			dt_type = NTFS_DT_LNK;
+		else
+			if ((attributes & FILE_ATTR_SYSTEM)
+			   && !(attributes & FILE_ATTR_I30_INDEX_PRESENT))
+				dt_type = ntfs_interix_types(ni);
+			else
+				dt_type = (attributes
+						& FILE_ATTR_I30_INDEX_PRESENT
+					? NTFS_DT_DIR : NTFS_DT_REG);
+		if (ntfs_inode_close(ni)) {
+				 /* anything special worth doing ? */
+			ntfs_log_error("Failed to close inode %lld\n",
+				(long long)MREF(mref));
+		}
+	}
+	if (dt_type == NTFS_DT_UNKNOWN)
+		ntfs_log_error("Could not decode the type of inode %lld\n",
+				(long long)MREF(mref));
+	return (dt_type);
+}
+
 /**
  * ntfs_filldir - ntfs specific filldir method
  * @dir_ni:	ntfs inode of current directory
@@ -901,19 +982,23 @@ static int ntfs_filldir(ntfs_inode *dir_ni, s64 *pos, u8 ivcn_bits,
 				dir_ni->vol->mft_record_size;
 	else /* if (index_type == INDEX_TYPE_ROOT) */
 		*pos = (u8*)ie - (u8*)iu.ir;
+	mref = le64_to_cpu(ie->indexed_file);
+	metadata = (MREF(mref) != FILE_root) && (MREF(mref) < FILE_first_user);
 	/* Skip root directory self reference entry. */
 	if (MREF_LE(ie->indexed_file) == FILE_root)
 		return 0;
-	if (ie->key.file_name.file_attributes & FILE_ATTR_I30_INDEX_PRESENT)
+	if ((ie->key.file_name.file_attributes
+		     & (FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYSTEM))
+	    && !metadata)
+		dt_type = ntfs_dir_entry_type(dir_ni, mref,
+					ie->key.file_name.file_attributes);
+	else if (ie->key.file_name.file_attributes
+		     & FILE_ATTR_I30_INDEX_PRESENT)
 		dt_type = NTFS_DT_DIR;
-	else if (fn->file_attributes & FILE_ATTR_SYSTEM)
-		dt_type = NTFS_DT_UNKNOWN;
 	else
 		dt_type = NTFS_DT_REG;
 
 		/* return metadata files and hidden files if requested */
-	mref = le64_to_cpu(ie->indexed_file);
-        metadata = (MREF(mref) != FILE_root) && (MREF(mref) < FILE_first_user);
         if ((!metadata && (NVolShowHidFiles(dir_ni->vol)
 				|| !(fn->file_attributes & FILE_ATTR_HIDDEN)))
             || (NVolShowSysFiles(dir_ni->vol) && (NVolShowHidFiles(dir_ni->vol)
