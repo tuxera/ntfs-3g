@@ -19,14 +19,20 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
+
+#ifdef __SOLARIS__
+#include <sys/mnttab.h>
+#else /* __SOLARIS__ */
+#include <grp.h>
 #include <mntent.h>
+#include <sys/fsuid.h>
+#endif /* __SOLARIS__ */
+
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
-#include <sys/fsuid.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
-#include <grp.h>
 
 #define FUSE_DEV_NEW "/dev/fuse"
 
@@ -40,6 +46,32 @@ static int mount_max = 1000;
 
 int drop_privs(void);
 int restore_privs(void);
+
+#ifdef __SOLARIS__
+
+/*
+ * fusermount is not implemented in fuse-lite for Solaris,
+ * only the minimal functions are provided.
+ */
+
+/*
+ * Solaris doesn't have setfsuid/setfsgid.
+ * This doesn't really matter anyway as this program shouldn't be made
+ * suid on Solaris. It should instead be used via a profile with the
+ * sys_mount privilege.
+ */
+
+int drop_privs(void)
+{
+    return (0);
+}
+
+int restore_privs(void)
+{
+    return (0);
+}
+
+#else /* __SOLARIS__ */
 
 static const char *get_user_name(void)
 {
@@ -668,3 +700,5 @@ out:
     free(mnt);
     return res;	    
 }
+
+#endif /* __SOLARIS__ */

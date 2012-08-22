@@ -624,6 +624,47 @@ void fuse_fs_destroy(struct fuse_fs *fs);
 struct fuse_fs *fuse_fs_new(const struct fuse_operations *op, size_t op_size,
 			    void *user_data);
 
+#ifdef __SOLARIS__
+
+/**
+ * Filesystem module
+ *
+ * Filesystem modules are registered with the FUSE_REGISTER_MODULE()
+ * macro.
+ *
+ * If the "-omodules=modname:..." option is present, filesystem
+ * objects are created and pushed onto the stack with the 'factory'
+ * function.
+ */
+struct fuse_module {
+    /**
+     * Name of filesystem
+     */
+    const char *name;
+
+    /**
+     * Factory for creating filesystem objects
+     *
+     * The function may use and remove options from 'args' that belong
+     * to this module.
+     *
+     * For now the 'fs' vector always contains exactly one filesystem.
+     * This is the filesystem which will be below the newly created
+     * filesystem in the stack.
+     *
+     * @param args the command line arguments
+     * @param fs NULL terminated filesystem object vector
+     * @return the new filesystem object
+     */
+    struct fuse_fs *(*factory)(struct fuse_args *args, struct fuse_fs *fs[]);
+
+    struct fuse_module *next;
+    struct fusemod_so *so;
+    int ctr;
+};
+
+#endif /* __SOLARIS__ */
+
 /* ----------------------------------------------------------- *
  * Advanced API for event handling, don't worry about this...  *
  * ----------------------------------------------------------- */

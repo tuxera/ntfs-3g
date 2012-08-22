@@ -1079,6 +1079,13 @@ int fuse_req_interrupted(fuse_req_t req);
  * Filesystem setup					       *
  * ----------------------------------------------------------- */
 
+#ifdef __SOLARIS__
+
+/* Deprecated, don't use */
+int fuse_lowlevel_is_lib_option(const char *opt);
+
+#endif /* __SOLARIS__ */
+
 /**
  * Create a low level session
  *

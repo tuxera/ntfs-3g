@@ -212,7 +212,7 @@ esac
 
 AC_MSG_CHECKING([fuse compatibility])
 case "${target_os}" in
-linux*)
+linux*|solaris*)
 	AC_ARG_WITH(
 		[fuse],
 		[AS_HELP_STRING([--with-fuse=<internal|external>],[Select FUSE library: internal or external @<:@default=internal@:>@])],
@@ -220,7 +220,7 @@ linux*)
 		[with_fuse="internal"]
 	)
 	;;
-darwin*|netbsd*|solaris*|kfreebsd*-gnu)
+darwin*|netbsd*|kfreebsd*-gnu)
 	with_fuse="external"
 	;;
 freebsd*)
