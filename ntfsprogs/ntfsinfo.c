@@ -508,6 +508,8 @@ static void ntfs_dump_volume(ntfs_volume *vol)
  */
 static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 {
+	const le32 original_flags = flags;
+
 	printf("%sFile attributes:\t", indent);
 	if (flags & FILE_ATTR_READONLY) {
 		printf(" READONLY");
@@ -580,7 +582,7 @@ static void ntfs_dump_flags(const char *indent, ATTR_TYPES type, le32 flags)
 	if (flags)
 		printf(" UNKNOWN: 0x%08x", (unsigned int)le32_to_cpu(flags));
 	/* Print all the flags in hex. */
-	printf(" (0x%08x)\n", (unsigned)le32_to_cpu(flags));
+	printf(" (0x%08x)\n", (unsigned)le32_to_cpu(original_flags));
 }
 
 /**
