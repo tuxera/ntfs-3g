@@ -512,8 +512,20 @@ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev, unsigned long flags)
 	
 	/* ...->open needs bracketing to compile with glibc 2.7 */
 	if ((dev->d_ops->open)(dev, NVolReadOnly(vol) ? O_RDONLY: O_RDWR)) {
-		ntfs_log_perror("Error opening '%s'", dev->d_name);
-		goto error_exit;
+		if (!NVolReadOnly(vol) && (errno == EROFS)) {
+			if ((dev->d_ops->open)(dev, O_RDONLY)) {
+				ntfs_log_perror("Error opening read-only '%s'",
+						dev->d_name);
+				goto error_exit;
+			} else {
+				ntfs_log_info("Can only open '%s' as read-only\n",
+						dev->d_name);
+				NVolSetReadOnly(vol);
+			}
+		} else {
+			ntfs_log_perror("Error opening '%s'", dev->d_name);
+			goto error_exit;
+		}
 	}
 	/* Attach the device to the volume. */
 	vol->dev = dev;

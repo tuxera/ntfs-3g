@@ -3798,6 +3798,12 @@ int main(int argc, char *argv[])
 	if (err)
 		goto err_out;
 	
+	/* Force read-only mount if the device was found read-only */
+	if (!ctx->ro && NVolReadOnly(ctx->vol)) {
+		ctx->ro = TRUE;
+		if (ntfs_strinsert(&parsed_options, ",ro")) 
+                	goto err_out;
+	}
 	/* We must do this after ntfs_open() to be able to set the blksize */
 	if (ctx->blkdev && set_fuseblk_options(&parsed_options))
 		goto err_out;
